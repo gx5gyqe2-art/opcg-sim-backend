@@ -1,0 +1,2269 @@
+{
+  "job": "pvm-strat",
+  "role": "band",
+  "status": "done",
+  "inputs": {
+    "net": "claude/train-r8:n1_results/nrel_r8.npz",
+    "waves": [
+      28,
+      30,
+      31,
+      32
+    ],
+    "combined": [
+      30,
+      31,
+      32
+    ],
+    "holdout_mod": 7,
+    "leader_top": 16,
+    "min_n": 60,
+    "script": "tests/scripts/plan_value_map.py@925549cd"
+  },
+  "outputs": {
+    "dir": "n1_results/plan_map_strat/"
+  },
+  "metrics": {
+    "w28": {
+      "games": 908,
+      "meta_games_seeds": 0,
+      "meta_games_missing_dirs": 8,
+      "strat": null
+    },
+    "w30": {
+      "games": 1096,
+      "meta_games_seeds": 7197,
+      "meta_games_missing_dirs": 8,
+      "strat": {
+        "peak_spread": {
+          "by_leader": {
+            "groups": 16,
+            "peak_dist": {},
+            "span_mean": null,
+            "span_max": null
+          },
+          "by_leader_life": {
+            "groups": 5,
+            "peak_dist": {
+              "3": 3
+            },
+            "span_mean": 0.07048115251889431,
+            "span_max": 0.07694504407089799
+          },
+          "by_leader_colors": {
+            "groups": 21,
+            "peak_dist": {
+              "2": 3,
+              "3": 14,
+              "4": 4
+            },
+            "span_mean": 0.03504479929369857,
+            "span_max": 0.09968019478212767
+          },
+          "by_deck_template": {
+            "groups": 9,
+            "peak_dist": {
+              "2": 1,
+              "3": 7,
+              "4": 1
+            },
+            "span_mean": 0.0664936777592523,
+            "span_max": 0.09081283057974195
+          }
+        },
+        "by_leader_life": {
+          "leaderlife2": {
+            "defense": {
+              "n": 80,
+              "by_life": {
+                "life1": {
+                  "n": 11,
+                  "v_guard_minus_take": -0.007065851580012928,
+                  "argmax_guard": 0.2727272727272727,
+                  "played_guard": 1.0,
+                  "winrate": 0.0
+                },
+                "life2": {
+                  "n": 22,
+                  "v_guard_minus_take": -0.012558933686126362,
+                  "argmax_guard": 0.22727272727272727,
+                  "played_guard": 0.5,
+                  "winrate": 0.0
+                },
+                "life3": {
+                  "n": 29,
+                  "v_guard_minus_take": -0.00043648121685817325,
+                  "argmax_guard": 0.3793103448275862,
+                  "played_guard": 0.5384615384615384,
+                  "winrate": 0.0
+                },
+                "life4": {
+                  "n": 7,
+                  "v_guard_minus_take": 0.016499698162078857,
+                  "argmax_guard": 0.42857142857142855,
+                  "played_guard": 0.8333333333333334,
+                  "winrate": 0.0
+                },
+                "life5": {
+                  "n": 8,
+                  "v_guard_minus_take": -0.014822110533714294,
+                  "argmax_guard": 0.5,
+                  "played_guard": 0.5,
+                  "winrate": 0.5
+                }
+              },
+              "peak_life": null,
+              "peak_value": null,
+              "span": null
+            },
+            "attack_both_lethal": {
+              "n": 4,
+              "v_face_minus_board": -0.00889153778553009,
+              "argmax_face": 0.5,
+              "played_face": 0.3333333333333333,
+              "winrate": 0.0
+            }
+          },
+          "leaderlife3": {
+            "defense": {
+              "n": 201,
+              "by_life": {
+                "life1": {
+                  "n": 31,
+                  "v_guard_minus_take": 0.07328530857639928,
+                  "argmax_guard": 0.8709677419354839,
+                  "played_guard": 0.41379310344827586,
+                  "winrate": 0.7419354838709677
+                },
+                "life2": {
+                  "n": 53,
+                  "v_guard_minus_take": 0.07388552077958044,
+                  "argmax_guard": 0.9433962264150944,
+                  "played_guard": 0.35555555555555557,
+                  "winrate": 0.6037735849056604
+                },
+                "life3": {
+                  "n": 92,
+                  "v_guard_minus_take": 0.05617429412719186,
+                  "argmax_guard": 0.8913043478260869,
+                  "played_guard": 0.5060240963855421,
+                  "winrate": 0.4891304347826087
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05617429412719186,
+              "span": null
+            },
+            "attack_both_lethal": {
+              "n": 34,
+              "v_face_minus_board": 0.15431469659704497,
+              "argmax_face": 0.9117647058823529,
+              "played_face": 0.7352941176470589,
+              "winrate": 0.7941176470588235
+            }
+          },
+          "leaderlife4": {
+            "defense": {
+              "n": 4695,
+              "by_life": {
+                "life1": {
+                  "n": 482,
+                  "v_guard_minus_take": -0.00622134396170664,
+                  "argmax_guard": 0.5933609958506224,
+                  "played_guard": 0.436,
+                  "winrate": 0.2863070539419087
+                },
+                "life2": {
+                  "n": 744,
+                  "v_guard_minus_take": 0.04507104768325457,
+                  "argmax_guard": 0.7997311827956989,
+                  "played_guard": 0.2962328767123288,
+                  "winrate": 0.4018817204301075
+                },
+                "life3": {
+                  "n": 1224,
+                  "v_guard_minus_take": 0.05779591700518401,
+                  "argmax_guard": 0.869281045751634,
+                  "played_guard": 0.3671497584541063,
+                  "winrate": 0.4354575163398693
+                },
+                "life4": {
+                  "n": 1938,
+                  "v_guard_minus_take": 0.039323114100210534,
+                  "argmax_guard": 0.7899896800825593,
+                  "played_guard": 0.47393087287639135,
+                  "winrate": 0.44272445820433437
+                },
+                "life5": {
+                  "n": 34,
+                  "v_guard_minus_take": 0.03305819312877515,
+                  "argmax_guard": 0.8823529411764706,
+                  "played_guard": 0.48,
+                  "winrate": 0.7352941176470589
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05779591700518401,
+              "span": 0.06401726096689064
+            },
+            "attack_both_lethal": {
+              "n": 635,
+              "v_face_minus_board": 0.21858308112201114,
+              "argmax_face": 0.8566929133858268,
+              "played_face": 0.6356466876971609,
+              "winrate": 0.6913385826771653
+            }
+          },
+          "leaderlife5": {
+            "defense": {
+              "n": 5619,
+              "by_life": {
+                "life1": {
+                  "n": 379,
+                  "v_guard_minus_take": -0.029734945231876617,
+                  "argmax_guard": 0.5065963060686016,
+                  "played_guard": 0.43956043956043955,
+                  "winrate": 0.2717678100263852
+                },
+                "life2": {
+                  "n": 588,
+                  "v_guard_minus_take": 0.04161437712673123,
+                  "argmax_guard": 0.7636054421768708,
+                  "played_guard": 0.3294392523364486,
+                  "winrate": 0.445578231292517
+                },
+                "life3": {
+                  "n": 862,
+                  "v_guard_minus_take": 0.04721009883902137,
+                  "argmax_guard": 0.8735498839907193,
+                  "played_guard": 0.2827298050139276,
+                  "winrate": 0.5707656612529002
+                },
+                "life4": {
+                  "n": 1440,
+                  "v_guard_minus_take": 0.04045508849222743,
+                  "argmax_guard": 0.8333333333333334,
+                  "played_guard": 0.34873583260680036,
+                  "winrate": 0.5875
+                },
+                "life5": {
+                  "n": 2078,
+                  "v_guard_minus_take": 0.010810652539765738,
+                  "argmax_guard": 0.6381135707410972,
+                  "played_guard": 0.45550027639579876,
+                  "winrate": 0.5842155919153031
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.04721009883902137,
+              "span": 0.07694504407089799
+            },
+            "attack_both_lethal": {
+              "n": 729,
+              "v_face_minus_board": 0.17568343582059115,
+              "argmax_face": 0.8024691358024691,
+              "played_face": 0.6112637362637363,
+              "winrate": 0.720164609053498
+            }
+          },
+          "leaderlife6": {
+            "defense": {
+              "n": 164,
+              "by_life": {
+                "life1": {
+                  "n": 13,
+                  "v_guard_minus_take": 0.05648098284235367,
+                  "argmax_guard": 1.0,
+                  "played_guard": 0.0,
+                  "winrate": 0.23076923076923078
+                },
+                "life2": {
+                  "n": 15,
+                  "v_guard_minus_take": 0.032646366953849794,
+                  "argmax_guard": 0.8,
+                  "played_guard": 0.16666666666666666,
+                  "winrate": 0.3333333333333333
+                },
+                "life3": {
+                  "n": 26,
+                  "v_guard_minus_take": 0.051526314220749415,
+                  "argmax_guard": 0.8846153846153846,
+                  "played_guard": 0.2,
+                  "winrate": 0.46153846153846156
+                },
+                "life4": {
+                  "n": 24,
+                  "v_guard_minus_take": 0.04030687672396501,
+                  "argmax_guard": 0.9583333333333334,
+                  "played_guard": 0.10526315789473684,
+                  "winrate": 0.5833333333333334
+                },
+                "life5": {
+                  "n": 36,
+                  "v_guard_minus_take": 0.017938075897594292,
+                  "argmax_guard": 0.7777777777777778,
+                  "played_guard": 0.29411764705882354,
+                  "winrate": 0.6111111111111112
+                }
+              },
+              "peak_life": null,
+              "peak_value": null,
+              "span": null
+            },
+            "attack_both_lethal": {
+              "n": 19,
+              "v_face_minus_board": 0.29893262505433277,
+              "argmax_face": 1.0,
+              "played_face": 0.6842105263157895,
+              "winrate": 0.8421052631578947
+            }
+          }
+        },
+        "by_leader_n_colors": {
+          "1color": {
+            "defense": {
+              "n": 5493,
+              "by_life": {
+                "life1": {
+                  "n": 385,
+                  "v_guard_minus_take": -0.02500647006241919,
+                  "argmax_guard": 0.5324675324675324,
+                  "played_guard": 0.43243243243243246,
+                  "winrate": 0.2623376623376623
+                },
+                "life2": {
+                  "n": 586,
+                  "v_guard_minus_take": 0.04051132026881793,
+                  "argmax_guard": 0.7508532423208191,
+                  "played_guard": 0.3271461716937355,
+                  "winrate": 0.42662116040955633
+                },
+                "life3": {
+                  "n": 868,
+                  "v_guard_minus_take": 0.04863440580097401,
+                  "argmax_guard": 0.880184331797235,
+                  "played_guard": 0.2880886426592798,
+                  "winrate": 0.554147465437788
+                },
+                "life4": {
+                  "n": 1408,
+                  "v_guard_minus_take": 0.04419262113093613,
+                  "argmax_guard": 0.8579545454545454,
+                  "played_guard": 0.35532102022867196,
+                  "winrate": 0.5901988636363636
+                },
+                "life5": {
+                  "n": 1942,
+                  "v_guard_minus_take": 0.01460380625743088,
+                  "argmax_guard": 0.6652935118434603,
+                  "played_guard": 0.45076201641266117,
+                  "winrate": 0.5942327497425335
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.04863440580097401,
+              "span": 0.0736408758633932
+            },
+            "attack_both_lethal": {
+              "n": 706,
+              "v_face_minus_board": 0.18189343622365897,
+              "argmax_face": 0.8130311614730878,
+              "played_face": 0.6170212765957447,
+              "winrate": 0.7294617563739377
+            }
+          },
+          "2color": {
+            "defense": {
+              "n": 5266,
+              "by_life": {
+                "life1": {
+                  "n": 531,
+                  "v_guard_minus_take": -0.003224798649630164,
+                  "argmax_guard": 0.5951035781544256,
+                  "played_guard": 0.43508771929824563,
+                  "winrate": 0.3126177024482109
+                },
+                "life2": {
+                  "n": 836,
+                  "v_guard_minus_take": 0.04592321903572104,
+                  "argmax_guard": 0.8026315789473685,
+                  "played_guard": 0.3048780487804878,
+                  "winrate": 0.41626794258373206
+                },
+                "life3": {
+                  "n": 1365,
+                  "v_guard_minus_take": 0.05547084589925895,
+                  "argmax_guard": 0.8564102564102564,
+                  "played_guard": 0.375,
+                  "winrate": 0.4402930402930403
+                },
+                "life4": {
+                  "n": 2001,
+                  "v_guard_minus_take": 0.03664326583266725,
+                  "argmax_guard": 0.7741129435282359,
+                  "played_guard": 0.4661308840413318,
+                  "winrate": 0.4432783608195902
+                },
+                "life5": {
+                  "n": 214,
+                  "v_guard_minus_take": -0.019835903550820235,
+                  "argmax_guard": 0.4485981308411215,
+                  "played_guard": 0.4759036144578313,
+                  "winrate": 0.5186915887850467
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05547084589925895,
+              "span": 0.07530674945007919
+            },
+            "attack_both_lethal": {
+              "n": 715,
+              "v_face_minus_board": 0.20887771840695735,
+              "argmax_face": 0.848951048951049,
+              "played_face": 0.6339410939691444,
+              "winrate": 0.6881118881118881
+            }
+          }
+        },
+        "by_deck_rate": {
+          "rate0": {
+            "defense": {
+              "n": 1933,
+              "by_life": {
+                "life1": {
+                  "n": 150,
+                  "v_guard_minus_take": -0.0003438280709087849,
+                  "argmax_guard": 0.5666666666666667,
+                  "played_guard": 0.42528735632183906,
+                  "winrate": 0.36666666666666664
+                },
+                "life2": {
+                  "n": 248,
+                  "v_guard_minus_take": 0.045076405407951006,
+                  "argmax_guard": 0.8064516129032258,
+                  "played_guard": 0.3105263157894737,
+                  "winrate": 0.4798387096774194
+                },
+                "life3": {
+                  "n": 394,
+                  "v_guard_minus_take": 0.044165934509299884,
+                  "argmax_guard": 0.8451776649746193,
+                  "played_guard": 0.36023054755043227,
+                  "winrate": 0.4796954314720812
+                },
+                "life4": {
+                  "n": 621,
+                  "v_guard_minus_take": 0.04102538230530123,
+                  "argmax_guard": 0.8421900161030595,
+                  "played_guard": 0.4332688588007737,
+                  "winrate": 0.5700483091787439
+                },
+                "life5": {
+                  "n": 412,
+                  "v_guard_minus_take": 0.01463804264763117,
+                  "argmax_guard": 0.6601941747572816,
+                  "played_guard": 0.4511494252873563,
+                  "winrate": 0.6868932038834952
+                }
+              },
+              "peak_life": 2,
+              "peak_value": 0.045076405407951006,
+              "span": 0.04542023347885979
+            },
+            "attack_both_lethal": {
+              "n": 262,
+              "v_face_minus_board": 0.20171788955180203,
+              "argmax_face": 0.8587786259541985,
+              "played_face": 0.6692307692307692,
+              "winrate": 0.7709923664122137
+            }
+          },
+          "rate1-9": {
+            "defense": {
+              "n": 1817,
+              "by_life": {
+                "life1": {
+                  "n": 145,
+                  "v_guard_minus_take": -0.028554416918356355,
+                  "argmax_guard": 0.5448275862068965,
+                  "played_guard": 0.4927536231884058,
+                  "winrate": 0.2413793103448276
+                },
+                "life2": {
+                  "n": 234,
+                  "v_guard_minus_take": 0.04540271944024114,
+                  "argmax_guard": 0.7564102564102564,
+                  "played_guard": 0.34065934065934067,
+                  "winrate": 0.42735042735042733
+                },
+                "life3": {
+                  "n": 395,
+                  "v_guard_minus_take": 0.0592566516713086,
+                  "argmax_guard": 0.8708860759493671,
+                  "played_guard": 0.3483483483483483,
+                  "winrate": 0.49873417721518987
+                },
+                "life4": {
+                  "n": 566,
+                  "v_guard_minus_take": 0.036916132259853976,
+                  "argmax_guard": 0.7968197879858657,
+                  "played_guard": 0.3879310344827586,
+                  "winrate": 0.5229681978798587
+                },
+                "life5": {
+                  "n": 377,
+                  "v_guard_minus_take": 0.012748224172242164,
+                  "argmax_guard": 0.6684350132625995,
+                  "played_guard": 0.47633136094674555,
+                  "winrate": 0.583554376657825
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.0592566516713086,
+              "span": 0.08781106858966495
+            },
+            "attack_both_lethal": {
+              "n": 260,
+              "v_face_minus_board": 0.19415301876769472,
+              "argmax_face": 0.8846153846153846,
+              "played_face": 0.6602316602316602,
+              "winrate": 0.7538461538461538
+            }
+          },
+          "rate10-19": {
+            "defense": {
+              "n": 3984,
+              "by_life": {
+                "life1": {
+                  "n": 340,
+                  "v_guard_minus_take": -0.013836529950939995,
+                  "argmax_guard": 0.5529411764705883,
+                  "played_guard": 0.425,
+                  "winrate": 0.2647058823529412
+                },
+                "life2": {
+                  "n": 545,
+                  "v_guard_minus_take": 0.04261960059013474,
+                  "argmax_guard": 0.7871559633027523,
+                  "played_guard": 0.34299516908212563,
+                  "winrate": 0.3908256880733945
+                },
+                "life3": {
+                  "n": 804,
+                  "v_guard_minus_take": 0.051075714714780264,
+                  "argmax_guard": 0.8731343283582089,
+                  "played_guard": 0.328335832083958,
+                  "winrate": 0.5024875621890548
+                },
+                "life4": {
+                  "n": 1222,
+                  "v_guard_minus_take": 0.03716886528215482,
+                  "argmax_guard": 0.7831423895253683,
+                  "played_guard": 0.42775665399239543,
+                  "winrate": 0.46890343698854337
+                },
+                "life5": {
+                  "n": 834,
+                  "v_guard_minus_take": 0.010649940041418698,
+                  "argmax_guard": 0.645083932853717,
+                  "played_guard": 0.4532967032967033,
+                  "winrate": 0.5335731414868106
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.051075714714780264,
+              "span": 0.06491224466572026
+            },
+            "attack_both_lethal": {
+              "n": 522,
+              "v_face_minus_board": 0.18527268143071904,
+              "argmax_face": 0.8122605363984674,
+              "played_face": 0.5977011494252874,
+              "winrate": 0.6647509578544061
+            }
+          },
+          "rate20+": {
+            "defense": {
+              "n": 3745,
+              "by_life": {
+                "life1": {
+                  "n": 335,
+                  "v_guard_minus_take": -0.013559504263381015,
+                  "argmax_guard": 0.5880597014925373,
+                  "played_guard": 0.3977272727272727,
+                  "winrate": 0.2955223880597015
+                },
+                "life2": {
+                  "n": 502,
+                  "v_guard_minus_take": 0.044932257461517425,
+                  "argmax_guard": 0.7709163346613546,
+                  "played_guard": 0.27486910994764396,
+                  "winrate": 0.41832669322709165
+                },
+                "life3": {
+                  "n": 793,
+                  "v_guard_minus_take": 0.05624900148414583,
+                  "argmax_guard": 0.8713745271122321,
+                  "played_guard": 0.3548872180451128,
+                  "winrate": 0.46027742749054223
+                },
+                "life4": {
+                  "n": 1217,
+                  "v_guard_minus_take": 0.042557663866892706,
+                  "argmax_guard": 0.8216926869350862,
+                  "played_guard": 0.42940038684719534,
+                  "winrate": 0.4938373048479869
+                },
+                "life5": {
+                  "n": 687,
+                  "v_guard_minus_take": 0.009245760163212307,
+                  "argmax_guard": 0.61863173216885,
+                  "played_guard": 0.44276094276094274,
+                  "winrate": 0.6026200873362445
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05624900148414583,
+              "span": 0.06980850574752684
+            },
+            "attack_both_lethal": {
+              "n": 472,
+              "v_face_minus_board": 0.21076546081389158,
+              "argmax_face": 0.8008474576271186,
+              "played_face": 0.6165254237288136,
+              "winrate": 0.7076271186440678
+            }
+          }
+        },
+        "by_deck_template": {
+          "reduce_then_ko": {
+            "defense": {
+              "n": 1627,
+              "by_life": {
+                "life1": {
+                  "n": 147,
+                  "v_guard_minus_take": 0.008168085125040542,
+                  "argmax_guard": 0.6394557823129252,
+                  "played_guard": 0.36904761904761907,
+                  "winrate": 0.2653061224489796
+                },
+                "life2": {
+                  "n": 226,
+                  "v_guard_minus_take": 0.03667641842487449,
+                  "argmax_guard": 0.7433628318584071,
+                  "played_guard": 0.32926829268292684,
+                  "winrate": 0.3938053097345133
+                },
+                "life3": {
+                  "n": 352,
+                  "v_guard_minus_take": 0.06291344954396746,
+                  "argmax_guard": 0.8920454545454546,
+                  "played_guard": 0.36054421768707484,
+                  "winrate": 0.5198863636363636
+                },
+                "life4": {
+                  "n": 511,
+                  "v_guard_minus_take": 0.034011567217423606,
+                  "argmax_guard": 0.7671232876712328,
+                  "played_guard": 0.3870192307692308,
+                  "winrate": 0.5048923679060665
+                },
+                "life5": {
+                  "n": 295,
+                  "v_guard_minus_take": 0.00021655495511367916,
+                  "argmax_guard": 0.511864406779661,
+                  "played_guard": 0.44357976653696496,
+                  "winrate": 0.5186440677966102
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.06291344954396746,
+              "span": 0.06269689458885379
+            },
+            "attack_both_lethal": {
+              "n": 217,
+              "v_face_minus_board": 0.1857567110532371,
+              "argmax_face": 0.8064516129032258,
+              "played_face": 0.5898617511520737,
+              "winrate": 0.6820276497695853
+            }
+          },
+          "lock_and_attack": {
+            "defense": {
+              "n": 1919,
+              "by_life": {
+                "life1": {
+                  "n": 150,
+                  "v_guard_minus_take": -0.004338578457633654,
+                  "argmax_guard": 0.6333333333333333,
+                  "played_guard": 0.5394736842105263,
+                  "winrate": 0.32666666666666666
+                },
+                "life2": {
+                  "n": 240,
+                  "v_guard_minus_take": 0.05239304035227785,
+                  "argmax_guard": 0.85,
+                  "played_guard": 0.291005291005291,
+                  "winrate": 0.5
+                },
+                "life3": {
+                  "n": 441,
+                  "v_guard_minus_take": 0.05663420993824439,
+                  "argmax_guard": 0.9024943310657596,
+                  "played_guard": 0.36464088397790057,
+                  "winrate": 0.4988662131519274
+                },
+                "life4": {
+                  "n": 609,
+                  "v_guard_minus_take": 0.047325693685462016,
+                  "argmax_guard": 0.8702791461412152,
+                  "played_guard": 0.4340659340659341,
+                  "winrate": 0.5615763546798029
+                },
+                "life5": {
+                  "n": 369,
+                  "v_guard_minus_take": 0.020817053381720844,
+                  "argmax_guard": 0.7479674796747967,
+                  "played_guard": 0.4773413897280967,
+                  "winrate": 0.6829268292682927
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05663420993824439,
+              "span": 0.060972788395878046
+            },
+            "attack_both_lethal": {
+              "n": 263,
+              "v_face_minus_board": 0.21026588427150772,
+              "argmax_face": 0.8555133079847909,
+              "played_face": 0.6768060836501901,
+              "winrate": 0.7604562737642585
+            }
+          },
+          "deck_out": {
+            "defense": {
+              "n": 1151,
+              "by_life": {
+                "life1": {
+                  "n": 90,
+                  "v_guard_minus_take": -0.005078197601768706,
+                  "argmax_guard": 0.5666666666666667,
+                  "played_guard": 0.48936170212765956,
+                  "winrate": 0.26666666666666666
+                },
+                "life2": {
+                  "n": 173,
+                  "v_guard_minus_take": 0.05348136405207518,
+                  "argmax_guard": 0.8208092485549133,
+                  "played_guard": 0.36764705882352944,
+                  "winrate": 0.47398843930635837
+                },
+                "life3": {
+                  "n": 230,
+                  "v_guard_minus_take": 0.059830385067945586,
+                  "argmax_guard": 0.8913043478260869,
+                  "played_guard": 0.34196891191709844,
+                  "winrate": 0.5043478260869565
+                },
+                "life4": {
+                  "n": 350,
+                  "v_guard_minus_take": 0.03771152312401682,
+                  "argmax_guard": 0.7485714285714286,
+                  "played_guard": 0.40893470790378006,
+                  "winrate": 0.49714285714285716
+                },
+                "life5": {
+                  "n": 229,
+                  "v_guard_minus_take": 0.010100130268319725,
+                  "argmax_guard": 0.6462882096069869,
+                  "played_guard": 0.5172413793103449,
+                  "winrate": 0.6943231441048034
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.059830385067945586,
+              "span": 0.06490858266971429
+            },
+            "attack_both_lethal": {
+              "n": 156,
+              "v_face_minus_board": 0.20928134029516235,
+              "argmax_face": 0.7756410256410257,
+              "played_face": 0.6025641025641025,
+              "winrate": 0.7243589743589743
+            }
+          },
+          "trigger_removal": {
+            "defense": {
+              "n": 1701,
+              "by_life": {
+                "life1": {
+                  "n": 153,
+                  "v_guard_minus_take": -0.03335509376198638,
+                  "argmax_guard": 0.5294117647058824,
+                  "played_guard": 0.4722222222222222,
+                  "winrate": 0.20915032679738563
+                },
+                "life2": {
+                  "n": 221,
+                  "v_guard_minus_take": 0.03451990866633259,
+                  "argmax_guard": 0.7692307692307693,
+                  "played_guard": 0.30177514792899407,
+                  "winrate": 0.3891402714932127
+                },
+                "life3": {
+                  "n": 363,
+                  "v_guard_minus_take": 0.05745773681775557,
+                  "argmax_guard": 0.8650137741046832,
+                  "played_guard": 0.33774834437086093,
+                  "winrate": 0.465564738292011
+                },
+                "life4": {
+                  "n": 549,
+                  "v_guard_minus_take": 0.038458892705134425,
+                  "argmax_guard": 0.7923497267759563,
+                  "played_guard": 0.4182590233545648,
+                  "winrate": 0.4262295081967213
+                },
+                "life5": {
+                  "n": 310,
+                  "v_guard_minus_take": 0.009521337449475522,
+                  "argmax_guard": 0.6161290322580645,
+                  "played_guard": 0.45185185185185184,
+                  "winrate": 0.567741935483871
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05745773681775557,
+              "span": 0.09081283057974195
+            },
+            "attack_both_lethal": {
+              "n": 199,
+              "v_face_minus_board": 0.23268844216275755,
+              "argmax_face": 0.8542713567839196,
+              "played_face": 0.6482412060301508,
+              "winrate": 0.7035175879396985
+            }
+          },
+          "on_attack_removal": {
+            "defense": {
+              "n": 1879,
+              "by_life": {
+                "life1": {
+                  "n": 171,
+                  "v_guard_minus_take": -0.01827691114992339,
+                  "argmax_guard": 0.5555555555555556,
+                  "played_guard": 0.43023255813953487,
+                  "winrate": 0.2573099415204678
+                },
+                "life2": {
+                  "n": 260,
+                  "v_guard_minus_take": 0.047052234676308355,
+                  "argmax_guard": 0.7730769230769231,
+                  "played_guard": 0.3399014778325123,
+                  "winrate": 0.4807692307692308
+                },
+                "life3": {
+                  "n": 387,
+                  "v_guard_minus_take": 0.052795825989147435,
+                  "argmax_guard": 0.8527131782945736,
+                  "played_guard": 0.3701492537313433,
+                  "winrate": 0.49612403100775193
+                },
+                "life4": {
+                  "n": 549,
+                  "v_guard_minus_take": 0.04083263318271517,
+                  "argmax_guard": 0.8105646630236795,
+                  "played_guard": 0.4033970276008493,
+                  "winrate": 0.48633879781420764
+                },
+                "life5": {
+                  "n": 413,
+                  "v_guard_minus_take": 0.010542134400039965,
+                  "argmax_guard": 0.648910411622276,
+                  "played_guard": 0.43478260869565216,
+                  "winrate": 0.5907990314769975
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.052795825989147435,
+              "span": 0.07107273713907082
+            },
+            "attack_both_lethal": {
+              "n": 264,
+              "v_face_minus_board": 0.20401849830390842,
+              "argmax_face": 0.8371212121212122,
+              "played_face": 0.6212121212121212,
+              "winrate": 0.7196969696969697
+            }
+          },
+          "activate_main_removal": {
+            "defense": {
+              "n": 2232,
+              "by_life": {
+                "life1": {
+                  "n": 219,
+                  "v_guard_minus_take": -0.021093650018269,
+                  "argmax_guard": 0.5525114155251142,
+                  "played_guard": 0.43243243243243246,
+                  "winrate": 0.3287671232876712
+                },
+                "life2": {
+                  "n": 311,
+                  "v_guard_minus_take": 0.052297619196894754,
+                  "argmax_guard": 0.7942122186495176,
+                  "played_guard": 0.3020408163265306,
+                  "winrate": 0.3665594855305466
+                },
+                "life3": {
+                  "n": 446,
+                  "v_guard_minus_take": 0.05064951336781824,
+                  "argmax_guard": 0.8811659192825112,
+                  "played_guard": 0.30294906166219837,
+                  "winrate": 0.48654708520179374
+                },
+                "life4": {
+                  "n": 691,
+                  "v_guard_minus_take": 0.03987632425183191,
+                  "argmax_guard": 0.8133140376266281,
+                  "played_guard": 0.44197952218430037,
+                  "winrate": 0.46599131693198265
+                },
+                "life5": {
+                  "n": 436,
+                  "v_guard_minus_take": 0.016515732353815912,
+                  "argmax_guard": 0.6788990825688074,
+                  "played_guard": 0.45012787723785164,
+                  "winrate": 0.5435779816513762
+                }
+              },
+              "peak_life": 2,
+              "peak_value": 0.052297619196894754,
+              "span": 0.07339126921516376
+            },
+            "attack_both_lethal": {
+              "n": 293,
+              "v_face_minus_board": 0.19637962205195642,
+              "argmax_face": 0.8191126279863481,
+              "played_face": 0.5684931506849316,
+              "winrate": 0.6791808873720137
+            }
+          },
+          "bounce": {
+            "defense": {
+              "n": 1037,
+              "by_life": {
+                "life1": {
+                  "n": 86,
+                  "v_guard_minus_take": -0.009051441604834657,
+                  "argmax_guard": 0.5116279069767442,
+                  "played_guard": 0.3181818181818182,
+                  "winrate": 0.3023255813953488
+                },
+                "life2": {
+                  "n": 139,
+                  "v_guard_minus_take": 0.0456803818802825,
+                  "argmax_guard": 0.7913669064748201,
+                  "played_guard": 0.37962962962962965,
+                  "winrate": 0.43884892086330934
+                },
+                "life3": {
+                  "n": 247,
+                  "v_guard_minus_take": 0.05636023189815945,
+                  "argmax_guard": 0.8623481781376519,
+                  "played_guard": 0.35233160621761656,
+                  "winrate": 0.5060728744939271
+                },
+                "life4": {
+                  "n": 340,
+                  "v_guard_minus_take": 0.03416957891381839,
+                  "argmax_guard": 0.7705882352941177,
+                  "played_guard": 0.4131944444444444,
+                  "winrate": 0.5205882352941177
+                },
+                "life5": {
+                  "n": 178,
+                  "v_guard_minus_take": -0.002199331492060021,
+                  "argmax_guard": 0.601123595505618,
+                  "played_guard": 0.4258064516129032,
+                  "winrate": 0.6741573033707865
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05636023189815945,
+              "span": 0.06541167350299411
+            },
+            "attack_both_lethal": {
+              "n": 138,
+              "v_face_minus_board": 0.19768654939759037,
+              "argmax_face": 0.7971014492753623,
+              "played_face": 0.644927536231884,
+              "winrate": 0.7028985507246377
+            }
+          },
+          "trash": {
+            "defense": {
+              "n": 348,
+              "by_life": {
+                "life1": {
+                  "n": 26,
+                  "v_guard_minus_take": -0.06636630930006504,
+                  "argmax_guard": 0.6153846153846154,
+                  "played_guard": 0.3,
+                  "winrate": 0.19230769230769232
+                },
+                "life2": {
+                  "n": 56,
+                  "v_guard_minus_take": 0.04432881270934429,
+                  "argmax_guard": 0.7142857142857143,
+                  "played_guard": 0.3783783783783784,
+                  "winrate": 0.42857142857142855
+                },
+                "life3": {
+                  "n": 61,
+                  "v_guard_minus_take": 0.04909254039530871,
+                  "argmax_guard": 0.9180327868852459,
+                  "played_guard": 0.3584905660377358,
+                  "winrate": 0.39344262295081966
+                },
+                "life4": {
+                  "n": 127,
+                  "v_guard_minus_take": 0.05547942652543053,
+                  "argmax_guard": 0.8740157480314961,
+                  "played_guard": 0.4392523364485981,
+                  "winrate": 0.3700787401574803
+                },
+                "life5": {
+                  "n": 61,
+                  "v_guard_minus_take": 0.011683088475380276,
+                  "argmax_guard": 0.639344262295082,
+                  "played_guard": 0.34545454545454546,
+                  "winrate": 0.5573770491803278
+                }
+              },
+              "peak_life": 4,
+              "peak_value": 0.05547942652543053,
+              "span": 0.04379633805005025
+            },
+            "attack_both_lethal": {
+              "n": 48,
+              "v_face_minus_board": 0.1476598510829111,
+              "argmax_face": 0.7708333333333334,
+              "played_face": 0.6666666666666666,
+              "winrate": 0.5416666666666666
+            }
+          },
+          "event_removal": {
+            "defense": {
+              "n": 2195,
+              "by_life": {
+                "life1": {
+                  "n": 176,
+                  "v_guard_minus_take": -0.015115648465739056,
+                  "argmax_guard": 0.5340909090909091,
+                  "played_guard": 0.352112676056338,
+                  "winrate": 0.22727272727272727
+                },
+                "life2": {
+                  "n": 276,
+                  "v_guard_minus_take": 0.038241587612993906,
+                  "argmax_guard": 0.7753623188405797,
+                  "played_guard": 0.28365384615384615,
+                  "winrate": 0.32971014492753625
+                },
+                "life3": {
+                  "n": 414,
+                  "v_guard_minus_take": 0.0502643372260646,
+                  "argmax_guard": 0.8671497584541062,
+                  "played_guard": 0.3137254901960784,
+                  "winrate": 0.45169082125603865
+                },
+                "life4": {
+                  "n": 683,
+                  "v_guard_minus_take": 0.039391654783397595,
+                  "argmax_guard": 0.8067349926793558,
+                  "played_guard": 0.42168674698795183,
+                  "winrate": 0.5021961932650073
+                },
+                "life5": {
+                  "n": 530,
+                  "v_guard_minus_take": 0.008564326300215468,
+                  "argmax_guard": 0.6169811320754717,
+                  "played_guard": 0.4782608695652174,
+                  "winrate": 0.5169811320754717
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.0502643372260646,
+              "span": 0.06537998569180366
+            },
+            "attack_both_lethal": {
+              "n": 263,
+              "v_face_minus_board": 0.1844894052934638,
+              "argmax_face": 0.8593155893536122,
+              "played_face": 0.6311787072243346,
+              "winrate": 0.6920152091254753
+            }
+          }
+        },
+        "by_leader_reduced": {
+          "OP04-001": {
+            "n": 147,
+            "peak_life": "life1"
+          },
+          "P-047": {
+            "n": 135,
+            "peak_life": "life2"
+          },
+          "ST03-001": {
+            "n": 130,
+            "peak_life": "life2"
+          },
+          "OP01-003": {
+            "n": 122,
+            "peak_life": "life3"
+          },
+          "OP09-061": {
+            "n": 121,
+            "peak_life": "life4"
+          },
+          "ST10-001": {
+            "n": 119,
+            "peak_life": "life2"
+          },
+          "OP05-060": {
+            "n": 118,
+            "peak_life": "life2"
+          },
+          "OP06-042": {
+            "n": 111,
+            "peak_life": "life1"
+          },
+          "OP10-003": {
+            "n": 110,
+            "peak_life": "life3"
+          },
+          "OP07-001": {
+            "n": 110,
+            "peak_life": "life3"
+          },
+          "EB03-001": {
+            "n": 109,
+            "peak_life": "life3"
+          },
+          "OP04-039": {
+            "n": 108,
+            "peak_life": "life2"
+          },
+          "P-117": {
+            "n": 107,
+            "peak_life": "life4"
+          },
+          "P-086": {
+            "n": 104,
+            "peak_life": "life3"
+          },
+          "OP04-020": {
+            "n": 102,
+            "peak_life": "life3"
+          },
+          "OP03-022": {
+            "n": 102,
+            "peak_life": "life3"
+          }
+        }
+      }
+    },
+    "w32": {
+      "games": 960,
+      "meta_games_seeds": 6720,
+      "meta_games_missing_dirs": 0,
+      "strat": {
+        "peak_spread": {
+          "by_leader": {
+            "groups": 16,
+            "peak_dist": {
+              "4": 1
+            },
+            "span_mean": null,
+            "span_max": null
+          },
+          "by_leader_life": {
+            "groups": 4,
+            "peak_dist": {
+              "3": 3
+            },
+            "span_mean": 0.08661732388091466,
+            "span_max": 0.09336365416877598
+          },
+          "by_leader_colors": {
+            "groups": 21,
+            "peak_dist": {
+              "2": 2,
+              "3": 15,
+              "4": 4
+            },
+            "span_mean": 0.03610274044974648,
+            "span_max": 0.11083242526154177
+          },
+          "by_deck_template": {
+            "groups": 9,
+            "peak_dist": {
+              "3": 9
+            },
+            "span_mean": 0.08500067507261073,
+            "span_max": 0.11739959720020685
+          }
+        },
+        "by_leader_life": {
+          "leaderlife3": {
+            "defense": {
+              "n": 193,
+              "by_life": {
+                "life1": {
+                  "n": 34,
+                  "v_guard_minus_take": 0.03149956437375616,
+                  "argmax_guard": 0.7058823529411765,
+                  "played_guard": 0.5217391304347826,
+                  "winrate": 0.5588235294117647
+                },
+                "life2": {
+                  "n": 49,
+                  "v_guard_minus_take": 0.08214686191355695,
+                  "argmax_guard": 0.9795918367346939,
+                  "played_guard": 0.32608695652173914,
+                  "winrate": 0.673469387755102
+                },
+                "life3": {
+                  "n": 95,
+                  "v_guard_minus_take": 0.0650660900154004,
+                  "argmax_guard": 0.8947368421052632,
+                  "played_guard": 0.5842696629213483,
+                  "winrate": 0.5789473684210527
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.0650660900154004,
+              "span": null
+            },
+            "attack_both_lethal": {
+              "n": 39,
+              "v_face_minus_board": 0.2421796995525559,
+              "argmax_face": 0.8717948717948718,
+              "played_face": 0.6923076923076923,
+              "winrate": 0.8461538461538461
+            }
+          },
+          "leaderlife4": {
+            "defense": {
+              "n": 4154,
+              "by_life": {
+                "life1": {
+                  "n": 369,
+                  "v_guard_minus_take": -0.023881838490383896,
+                  "argmax_guard": 0.5203252032520326,
+                  "played_guard": 0.36585365853658536,
+                  "winrate": 0.23035230352303523
+                },
+                "life2": {
+                  "n": 618,
+                  "v_guard_minus_take": 0.0371593985467144,
+                  "argmax_guard": 0.8058252427184466,
+                  "played_guard": 0.2982832618025751,
+                  "winrate": 0.3818770226537217
+                },
+                "life3": {
+                  "n": 1115,
+                  "v_guard_minus_take": 0.05598915510266944,
+                  "argmax_guard": 0.884304932735426,
+                  "played_guard": 0.36677814938684505,
+                  "winrate": 0.46278026905829595
+                },
+                "life4": {
+                  "n": 1785,
+                  "v_guard_minus_take": 0.03938684518579772,
+                  "argmax_guard": 0.803921568627451,
+                  "played_guard": 0.4854614412136536,
+                  "winrate": 0.4526610644257703
+                },
+                "life5": {
+                  "n": 46,
+                  "v_guard_minus_take": 0.03623234893640746,
+                  "argmax_guard": 0.9565217391304348,
+                  "played_guard": 0.6585365853658537,
+                  "winrate": 0.6739130434782609
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05598915510266944,
+              "span": 0.07987099359305333
+            },
+            "attack_both_lethal": {
+              "n": 597,
+              "v_face_minus_board": 0.230360756510825,
+              "argmax_face": 0.8458961474036851,
+              "played_face": 0.62248322147651,
+              "winrate": 0.6582914572864321
+            }
+          },
+          "leaderlife5": {
+            "defense": {
+              "n": 5294,
+              "by_life": {
+                "life1": {
+                  "n": 318,
+                  "v_guard_minus_take": -0.04431003413848438,
+                  "argmax_guard": 0.4748427672955975,
+                  "played_guard": 0.39416058394160586,
+                  "winrate": 0.3050314465408805
+                },
+                "life2": {
+                  "n": 549,
+                  "v_guard_minus_take": 0.033554465430644505,
+                  "argmax_guard": 0.7449908925318761,
+                  "played_guard": 0.2849604221635884,
+                  "winrate": 0.46265938069216755
+                },
+                "life3": {
+                  "n": 848,
+                  "v_guard_minus_take": 0.0490536200302916,
+                  "argmax_guard": 0.8643867924528302,
+                  "played_guard": 0.27246376811594203,
+                  "winrate": 0.5400943396226415
+                },
+                "life4": {
+                  "n": 1452,
+                  "v_guard_minus_take": 0.03444393654201582,
+                  "argmax_guard": 0.8209366391184573,
+                  "played_guard": 0.36127409891031015,
+                  "winrate": 0.550275482093664
+                },
+                "life5": {
+                  "n": 1901,
+                  "v_guard_minus_take": 0.007186125858702419,
+                  "argmax_guard": 0.6086270384008416,
+                  "played_guard": 0.4226190476190476,
+                  "winrate": 0.5486586007364544
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.0490536200302916,
+              "span": 0.09336365416877598
+            },
+            "attack_both_lethal": {
+              "n": 853,
+              "v_face_minus_board": 0.1766805102593393,
+              "argmax_face": 0.7702227432590856,
+              "played_face": 0.6056338028169014,
+              "winrate": 0.7139507620164126
+            }
+          },
+          "leaderlife6": {
+            "defense": {
+              "n": 145,
+              "by_life": {
+                "life1": {
+                  "n": 15,
+                  "v_guard_minus_take": 0.03468461968004703,
+                  "argmax_guard": 0.8,
+                  "played_guard": 0.2222222222222222,
+                  "winrate": 0.4
+                },
+                "life2": {
+                  "n": 11,
+                  "v_guard_minus_take": 0.022214617241512646,
+                  "argmax_guard": 0.7272727272727273,
+                  "played_guard": 0.0,
+                  "winrate": 0.45454545454545453
+                },
+                "life3": {
+                  "n": 16,
+                  "v_guard_minus_take": 0.040602719876915216,
+                  "argmax_guard": 0.875,
+                  "played_guard": 0.0,
+                  "winrate": 0.4375
+                },
+                "life4": {
+                  "n": 23,
+                  "v_guard_minus_take": 0.019331029413834862,
+                  "argmax_guard": 0.8260869565217391,
+                  "played_guard": 0.14285714285714285,
+                  "winrate": 0.782608695652174
+                },
+                "life5": {
+                  "n": 32,
+                  "v_guard_minus_take": 0.027281967690214515,
+                  "argmax_guard": 0.875,
+                  "played_guard": 0.2962962962962963,
+                  "winrate": 0.84375
+                }
+              },
+              "peak_life": null,
+              "peak_value": null,
+              "span": null
+            },
+            "attack_both_lethal": {
+              "n": 17,
+              "v_face_minus_board": 0.3086773078231251,
+              "argmax_face": 0.8823529411764706,
+              "played_face": 0.8235294117647058,
+              "winrate": 0.8235294117647058
+            }
+          }
+        },
+        "by_leader_n_colors": {
+          "1color": {
+            "defense": {
+              "n": 5118,
+              "by_life": {
+                "life1": {
+                  "n": 312,
+                  "v_guard_minus_take": -0.04296413086987554,
+                  "argmax_guard": 0.5096153846153846,
+                  "played_guard": 0.3893129770992366,
+                  "winrate": 0.3108974358974359
+                },
+                "life2": {
+                  "n": 519,
+                  "v_guard_minus_take": 0.034927837174253,
+                  "argmax_guard": 0.7630057803468208,
+                  "played_guard": 0.27146814404432135,
+                  "winrate": 0.4682080924855491
+                },
+                "life3": {
+                  "n": 830,
+                  "v_guard_minus_take": 0.05221218270896962,
+                  "argmax_guard": 0.8903614457831325,
+                  "played_guard": 0.27662721893491127,
+                  "winrate": 0.5469879518072289
+                },
+                "life4": {
+                  "n": 1414,
+                  "v_guard_minus_take": 0.03777824149062314,
+                  "argmax_guard": 0.8394625176803394,
+                  "played_guard": 0.3727659574468085,
+                  "winrate": 0.5721357850070722
+                },
+                "life5": {
+                  "n": 1795,
+                  "v_guard_minus_take": 0.010290679651682854,
+                  "argmax_guard": 0.6373259052924791,
+                  "played_guard": 0.4295641187618446,
+                  "winrate": 0.5571030640668524
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05221218270896962,
+              "span": 0.09517631357884516
+            },
+            "attack_both_lethal": {
+              "n": 814,
+              "v_face_minus_board": 0.1852834090294147,
+              "argmax_face": 0.7825552825552825,
+              "played_face": 0.6186961869618696,
+              "winrate": 0.7285012285012284
+            }
+          },
+          "2color": {
+            "defense": {
+              "n": 4701,
+              "by_life": {
+                "life1": {
+                  "n": 428,
+                  "v_guard_minus_take": -0.018559634330830424,
+                  "argmax_guard": 0.514018691588785,
+                  "played_guard": 0.3842364532019704,
+                  "winrate": 0.2570093457943925
+                },
+                "life2": {
+                  "n": 715,
+                  "v_guard_minus_take": 0.03897219027426758,
+                  "argmax_guard": 0.7972027972027972,
+                  "played_guard": 0.3069852941176471,
+                  "winrate": 0.3986013986013986
+                },
+                "life3": {
+                  "n": 1256,
+                  "v_guard_minus_take": 0.05422047773374439,
+                  "argmax_guard": 0.8678343949044586,
+                  "played_guard": 0.3795121951219512,
+                  "winrate": 0.46337579617834396
+                },
+                "life4": {
+                  "n": 1852,
+                  "v_guard_minus_take": 0.03640072977695663,
+                  "argmax_guard": 0.7894168466522679,
+                  "played_guard": 0.47080516287645974,
+                  "winrate": 0.4406047516198704
+                },
+                "life5": {
+                  "n": 188,
+                  "v_guard_minus_take": -0.012096121709080452,
+                  "argmax_guard": 0.4574468085106383,
+                  "played_guard": 0.39644970414201186,
+                  "winrate": 0.5372340425531915
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05422047773374439,
+              "span": 0.07278011206457481
+            },
+            "attack_both_lethal": {
+              "n": 694,
+              "v_face_minus_board": 0.2191102043212249,
+              "argmax_face": 0.8270893371757925,
+              "played_face": 0.6132756132756133,
+              "winrate": 0.6570605187319885
+            }
+          }
+        },
+        "by_deck_rate": {
+          "rate0": {
+            "defense": {
+              "n": 1665,
+              "by_life": {
+                "life1": {
+                  "n": 129,
+                  "v_guard_minus_take": -0.0035419347298930783,
+                  "argmax_guard": 0.6046511627906976,
+                  "played_guard": 0.47692307692307695,
+                  "winrate": 0.29457364341085274
+                },
+                "life2": {
+                  "n": 210,
+                  "v_guard_minus_take": 0.03720926123981674,
+                  "argmax_guard": 0.7761904761904762,
+                  "played_guard": 0.325,
+                  "winrate": 0.49047619047619045
+                },
+                "life3": {
+                  "n": 362,
+                  "v_guard_minus_take": 0.05400659805498194,
+                  "argmax_guard": 0.8784530386740331,
+                  "played_guard": 0.3468013468013468,
+                  "winrate": 0.5359116022099447
+                },
+                "life4": {
+                  "n": 536,
+                  "v_guard_minus_take": 0.04211233975626389,
+                  "argmax_guard": 0.8470149253731343,
+                  "played_guard": 0.41755888650963596,
+                  "winrate": 0.5503731343283582
+                },
+                "life5": {
+                  "n": 339,
+                  "v_guard_minus_take": 0.006456617910087323,
+                  "argmax_guard": 0.6371681415929203,
+                  "played_guard": 0.4033333333333333,
+                  "winrate": 0.5899705014749262
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05400659805498194,
+              "span": 0.05754853278487502
+            },
+            "attack_both_lethal": {
+              "n": 288,
+              "v_face_minus_board": 0.2120099735758332,
+              "argmax_face": 0.8159722222222222,
+              "played_face": 0.6445993031358885,
+              "winrate": 0.7361111111111112
+            }
+          },
+          "rate1-9": {
+            "defense": {
+              "n": 1687,
+              "by_life": {
+                "life1": {
+                  "n": 132,
+                  "v_guard_minus_take": -0.03236152995801107,
+                  "argmax_guard": 0.5,
+                  "played_guard": 0.32786885245901637,
+                  "winrate": 0.3181818181818182
+                },
+                "life2": {
+                  "n": 205,
+                  "v_guard_minus_take": 0.0451853141926865,
+                  "argmax_guard": 0.8341463414634146,
+                  "played_guard": 0.2875,
+                  "winrate": 0.4878048780487805
+                },
+                "life3": {
+                  "n": 337,
+                  "v_guard_minus_take": 0.05024895891813196,
+                  "argmax_guard": 0.8724035608308606,
+                  "played_guard": 0.35555555555555557,
+                  "winrate": 0.5281899109792285
+                },
+                "life4": {
+                  "n": 589,
+                  "v_guard_minus_take": 0.03652030369884521,
+                  "argmax_guard": 0.8251273344651953,
+                  "played_guard": 0.4397590361445783,
+                  "winrate": 0.533106960950764
+                },
+                "life5": {
+                  "n": 333,
+                  "v_guard_minus_take": 0.0036044795654837166,
+                  "argmax_guard": 0.6216216216216216,
+                  "played_guard": 0.4266666666666667,
+                  "winrate": 0.6126126126126126
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05024895891813196,
+              "span": 0.08261048887614303
+            },
+            "attack_both_lethal": {
+              "n": 272,
+              "v_face_minus_board": 0.1829704455072608,
+              "argmax_face": 0.8235294117647058,
+              "played_face": 0.6088560885608856,
+              "winrate": 0.7169117647058824
+            }
+          },
+          "rate10-19": {
+            "defense": {
+              "n": 3284,
+              "by_life": {
+                "life1": {
+                  "n": 247,
+                  "v_guard_minus_take": -0.02330861885387164,
+                  "argmax_guard": 0.5182186234817814,
+                  "played_guard": 0.3565217391304348,
+                  "winrate": 0.2793522267206478
+                },
+                "life2": {
+                  "n": 413,
+                  "v_guard_minus_take": 0.03584501923066981,
+                  "argmax_guard": 0.7675544794188862,
+                  "played_guard": 0.3026315789473684,
+                  "winrate": 0.4188861985472155
+                },
+                "life3": {
+                  "n": 667,
+                  "v_guard_minus_take": 0.05633244093425845,
+                  "argmax_guard": 0.8695652173913043,
+                  "played_guard": 0.3351749539594843,
+                  "winrate": 0.48125937031484256
+                },
+                "life4": {
+                  "n": 1099,
+                  "v_guard_minus_take": 0.036520253460675486,
+                  "argmax_guard": 0.7998180163785259,
+                  "played_guard": 0.44265809217577706,
+                  "winrate": 0.4786169244767971
+                },
+                "life5": {
+                  "n": 683,
+                  "v_guard_minus_take": 0.012348479122239797,
+                  "argmax_guard": 0.6266471449487555,
+                  "played_guard": 0.4440789473684211,
+                  "winrate": 0.5636896046852123
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05633244093425845,
+              "span": 0.07964105978813009
+            },
+            "attack_both_lethal": {
+              "n": 490,
+              "v_face_minus_board": 0.19090526152820309,
+              "argmax_face": 0.773469387755102,
+              "played_face": 0.5979591836734693,
+              "winrate": 0.673469387755102
+            }
+          },
+          "rate20+": {
+            "defense": {
+              "n": 3183,
+              "by_life": {
+                "life1": {
+                  "n": 232,
+                  "v_guard_minus_take": -0.04682099971326132,
+                  "argmax_guard": 0.46120689655172414,
+                  "played_guard": 0.3978494623655914,
+                  "winrate": 0.25
+                },
+                "life2": {
+                  "n": 406,
+                  "v_guard_minus_take": 0.0347579712497777,
+                  "argmax_guard": 0.7758620689655172,
+                  "played_guard": 0.2669039145907473,
+                  "winrate": 0.37438423645320196
+                },
+                "life3": {
+                  "n": 720,
+                  "v_guard_minus_take": 0.05191528601050474,
+                  "argmax_guard": 0.8847222222222222,
+                  "played_guard": 0.3299492385786802,
+                  "winrate": 0.47638888888888886
+                },
+                "life4": {
+                  "n": 1042,
+                  "v_guard_minus_take": 0.03513834306468826,
+                  "argmax_guard": 0.7965451055662188,
+                  "played_guard": 0.4170353982300885,
+                  "winrate": 0.47024952015355087
+                },
+                "life5": {
+                  "n": 628,
+                  "v_guard_minus_take": 0.006965927844184931,
+                  "argmax_guard": 0.6035031847133758,
+                  "played_guard": 0.41911764705882354,
+                  "winrate": 0.4968152866242038
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05191528601050474,
+              "span": 0.09873628572376605
+            },
+            "attack_both_lethal": {
+              "n": 458,
+              "v_face_minus_board": 0.2150933734328368,
+              "argmax_face": 0.8144104803493449,
+              "played_face": 0.6222707423580786,
+              "winrate": 0.6812227074235808
+            }
+          }
+        },
+        "by_deck_template": {
+          "reduce_then_ko": {
+            "defense": {
+              "n": 1338,
+              "by_life": {
+                "life1": {
+                  "n": 92,
+                  "v_guard_minus_take": -0.06130741917244766,
+                  "argmax_guard": 0.44565217391304346,
+                  "played_guard": 0.4,
+                  "winrate": 0.22826086956521738
+                },
+                "life2": {
+                  "n": 173,
+                  "v_guard_minus_take": 0.03370082248917463,
+                  "argmax_guard": 0.815028901734104,
+                  "played_guard": 0.30303030303030304,
+                  "winrate": 0.4161849710982659
+                },
+                "life3": {
+                  "n": 299,
+                  "v_guard_minus_take": 0.056092178027759176,
+                  "argmax_guard": 0.8795986622073578,
+                  "played_guard": 0.392,
+                  "winrate": 0.46488294314381273
+                },
+                "life4": {
+                  "n": 443,
+                  "v_guard_minus_take": 0.04228408946487506,
+                  "argmax_guard": 0.801354401805869,
+                  "played_guard": 0.43859649122807015,
+                  "winrate": 0.43340857787810383
+                },
+                "life5": {
+                  "n": 248,
+                  "v_guard_minus_take": 0.013982801502870937,
+                  "argmax_guard": 0.657258064516129,
+                  "played_guard": 0.4131455399061033,
+                  "winrate": 0.5201612903225806
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.056092178027759176,
+              "span": 0.11739959720020685
+            },
+            "attack_both_lethal": {
+              "n": 189,
+              "v_face_minus_board": 0.18708837251844151,
+              "argmax_face": 0.8201058201058201,
+              "played_face": 0.6170212765957447,
+              "winrate": 0.6666666666666666
+            }
+          },
+          "lock_and_attack": {
+            "defense": {
+              "n": 1523,
+              "by_life": {
+                "life1": {
+                  "n": 112,
+                  "v_guard_minus_take": -0.04890789996300425,
+                  "argmax_guard": 0.48214285714285715,
+                  "played_guard": 0.29411764705882354,
+                  "winrate": 0.2857142857142857
+                },
+                "life2": {
+                  "n": 200,
+                  "v_guard_minus_take": 0.035505252312868836,
+                  "argmax_guard": 0.755,
+                  "played_guard": 0.3028169014084507,
+                  "winrate": 0.45
+                },
+                "life3": {
+                  "n": 306,
+                  "v_guard_minus_take": 0.052472358112972156,
+                  "argmax_guard": 0.8888888888888888,
+                  "played_guard": 0.35177865612648224,
+                  "winrate": 0.4934640522875817
+                },
+                "life4": {
+                  "n": 538,
+                  "v_guard_minus_take": 0.04167047646256955,
+                  "argmax_guard": 0.845724907063197,
+                  "played_guard": 0.47761194029850745,
+                  "winrate": 0.4888475836431227
+                },
+                "life5": {
+                  "n": 291,
+                  "v_guard_minus_take": 0.020512633444101282,
+                  "argmax_guard": 0.697594501718213,
+                  "played_guard": 0.42745098039215684,
+                  "winrate": 0.6529209621993127
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.052472358112972156,
+              "span": 0.1013802580759764
+            },
+            "attack_both_lethal": {
+              "n": 238,
+              "v_face_minus_board": 0.23183049928365634,
+              "argmax_face": 0.773109243697479,
+              "played_face": 0.6286919831223629,
+              "winrate": 0.6932773109243697
+            }
+          },
+          "deck_out": {
+            "defense": {
+              "n": 1100,
+              "by_life": {
+                "life1": {
+                  "n": 91,
+                  "v_guard_minus_take": -0.006652595618596444,
+                  "argmax_guard": 0.5934065934065934,
+                  "played_guard": 0.37254901960784315,
+                  "winrate": 0.42857142857142855
+                },
+                "life2": {
+                  "n": 140,
+                  "v_guard_minus_take": 0.05335076149328545,
+                  "argmax_guard": 0.85,
+                  "played_guard": 0.30097087378640774,
+                  "winrate": 0.45714285714285713
+                },
+                "life3": {
+                  "n": 222,
+                  "v_guard_minus_take": 0.058184235870129185,
+                  "argmax_guard": 0.8963963963963963,
+                  "played_guard": 0.3783783783783784,
+                  "winrate": 0.46846846846846846
+                },
+                "life4": {
+                  "n": 402,
+                  "v_guard_minus_take": 0.030625147166701304,
+                  "argmax_guard": 0.7736318407960199,
+                  "played_guard": 0.4649122807017544,
+                  "winrate": 0.4651741293532338
+                },
+                "life5": {
+                  "n": 184,
+                  "v_guard_minus_take": 0.00316494022263214,
+                  "argmax_guard": 0.6684782608695652,
+                  "played_guard": 0.44155844155844154,
+                  "winrate": 0.6195652173913043
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.058184235870129185,
+              "span": 0.06483683148872563
+            },
+            "attack_both_lethal": {
+              "n": 172,
+              "v_face_minus_board": 0.17071943786428417,
+              "argmax_face": 0.7441860465116279,
+              "played_face": 0.5697674418604651,
+              "winrate": 0.6802325581395349
+            }
+          },
+          "trigger_removal": {
+            "defense": {
+              "n": 1323,
+              "by_life": {
+                "life1": {
+                  "n": 121,
+                  "v_guard_minus_take": -0.05260384662369312,
+                  "argmax_guard": 0.4049586776859504,
+                  "played_guard": 0.4,
+                  "winrate": 0.19834710743801653
+                },
+                "life2": {
+                  "n": 160,
+                  "v_guard_minus_take": 0.04036373294802616,
+                  "argmax_guard": 0.78125,
+                  "played_guard": 0.21666666666666667,
+                  "winrate": 0.40625
+                },
+                "life3": {
+                  "n": 301,
+                  "v_guard_minus_take": 0.04825480126170906,
+                  "argmax_guard": 0.8372093023255814,
+                  "played_guard": 0.3112033195020747,
+                  "winrate": 0.4219269102990033
+                },
+                "life4": {
+                  "n": 440,
+                  "v_guard_minus_take": 0.03348023150524982,
+                  "argmax_guard": 0.8090909090909091,
+                  "played_guard": 0.43535620052770446,
+                  "winrate": 0.4659090909090909
+                },
+                "life5": {
+                  "n": 241,
+                  "v_guard_minus_take": 0.005122751482526667,
+                  "argmax_guard": 0.5933609958506224,
+                  "played_guard": 0.3923444976076555,
+                  "winrate": 0.5228215767634855
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.04825480126170906,
+              "span": 0.10085864788540218
+            },
+            "attack_both_lethal": {
+              "n": 189,
+              "v_face_minus_board": 0.214208059426811,
+              "argmax_face": 0.8201058201058201,
+              "played_face": 0.6031746031746031,
+              "winrate": 0.6825396825396826
+            }
+          },
+          "on_attack_removal": {
+            "defense": {
+              "n": 1801,
+              "by_life": {
+                "life1": {
+                  "n": 134,
+                  "v_guard_minus_take": -0.02258473659740455,
+                  "argmax_guard": 0.5373134328358209,
+                  "played_guard": 0.3235294117647059,
+                  "winrate": 0.30597014925373134
+                },
+                "life2": {
+                  "n": 211,
+                  "v_guard_minus_take": 0.039514010971835795,
+                  "argmax_guard": 0.7772511848341233,
+                  "played_guard": 0.2597402597402597,
+                  "winrate": 0.41706161137440756
+                },
+                "life3": {
+                  "n": 357,
+                  "v_guard_minus_take": 0.051944251804784104,
+                  "argmax_guard": 0.9103641456582633,
+                  "played_guard": 0.3400673400673401,
+                  "winrate": 0.49859943977591037
+                },
+                "life4": {
+                  "n": 601,
+                  "v_guard_minus_take": 0.037241239826304964,
+                  "argmax_guard": 0.8086522462562395,
+                  "played_guard": 0.4389763779527559,
+                  "winrate": 0.5224625623960066
+                },
+                "life5": {
+                  "n": 395,
+                  "v_guard_minus_take": 0.01247940521592958,
+                  "argmax_guard": 0.6151898734177215,
+                  "played_guard": 0.4378531073446328,
+                  "winrate": 0.5392405063291139
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.051944251804784104,
+              "span": 0.07452898840218866
+            },
+            "attack_both_lethal": {
+              "n": 269,
+              "v_face_minus_board": 0.1908452116423823,
+              "argmax_face": 0.8104089219330854,
+              "played_face": 0.6245353159851301,
+              "winrate": 0.6765799256505576
+            }
+          },
+          "activate_main_removal": {
+            "defense": {
+              "n": 1809,
+              "by_life": {
+                "life1": {
+                  "n": 132,
+                  "v_guard_minus_take": -0.04957113183583274,
+                  "argmax_guard": 0.4772727272727273,
+                  "played_guard": 0.3770491803278688,
+                  "winrate": 0.29545454545454547
+                },
+                "life2": {
+                  "n": 200,
+                  "v_guard_minus_take": 0.03920949355699122,
+                  "argmax_guard": 0.815,
+                  "played_guard": 0.3129251700680272,
+                  "winrate": 0.415
+                },
+                "life3": {
+                  "n": 378,
+                  "v_guard_minus_take": 0.05686770437997347,
+                  "argmax_guard": 0.8888888888888888,
+                  "played_guard": 0.2956810631229236,
+                  "winrate": 0.5238095238095238
+                },
+                "life4": {
+                  "n": 609,
+                  "v_guard_minus_take": 0.040062609959236224,
+                  "argmax_guard": 0.8456486042692939,
+                  "played_guard": 0.42661448140900193,
+                  "winrate": 0.5205254515599343
+                },
+                "life5": {
+                  "n": 407,
+                  "v_guard_minus_take": 0.011014082373797217,
+                  "argmax_guard": 0.5921375921375921,
+                  "played_guard": 0.46612466124661245,
+                  "winrate": 0.5528255528255528
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.05686770437997347,
+              "span": 0.10643883621580622
+            },
+            "attack_both_lethal": {
+              "n": 290,
+              "v_face_minus_board": 0.2018124690632625,
+              "argmax_face": 0.8241379310344827,
+              "played_face": 0.6068965517241379,
+              "winrate": 0.7172413793103448
+            }
+          },
+          "bounce": {
+            "defense": {
+              "n": 931,
+              "by_life": {
+                "life1": {
+                  "n": 73,
+                  "v_guard_minus_take": 0.002566527881442684,
+                  "argmax_guard": 0.5342465753424658,
+                  "played_guard": 0.45714285714285713,
+                  "winrate": 0.3150684931506849
+                },
+                "life2": {
+                  "n": 126,
+                  "v_guard_minus_take": 0.028572252598620715,
+                  "argmax_guard": 0.6825396825396826,
+                  "played_guard": 0.29896907216494845,
+                  "winrate": 0.40476190476190477
+                },
+                "life3": {
+                  "n": 210,
+                  "v_guard_minus_take": 0.055406035298004835,
+                  "argmax_guard": 0.8809523809523809,
+                  "played_guard": 0.39156626506024095,
+                  "winrate": 0.5476190476190477
+                },
+                "life4": {
+                  "n": 289,
+                  "v_guard_minus_take": 0.027991403063443394,
+                  "argmax_guard": 0.7612456747404844,
+                  "played_guard": 0.3815261044176707,
+                  "winrate": 0.47058823529411764
+                },
+                "life5": {
+                  "n": 186,
+                  "v_guard_minus_take": -0.010090473020369167,
+                  "argmax_guard": 0.5645161290322581,
+                  "played_guard": 0.44936708860759494,
+                  "winrate": 0.5860215053763441
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.055406035298004835,
+              "span": 0.065496508318374
+            },
+            "attack_both_lethal": {
+              "n": 151,
+              "v_face_minus_board": 0.16365579108935813,
+              "argmax_face": 0.7748344370860927,
+              "played_face": 0.6026490066225165,
+              "winrate": 0.7417218543046358
+            }
+          },
+          "trash": {
+            "defense": {
+              "n": 337,
+              "by_life": {
+                "life1": {
+                  "n": 21,
+                  "v_guard_minus_take": -0.014203260697069623,
+                  "argmax_guard": 0.5714285714285714,
+                  "played_guard": 0.6666666666666666,
+                  "winrate": 0.2857142857142857
+                },
+                "life2": {
+                  "n": 46,
+                  "v_guard_minus_take": 0.04127352595653223,
+                  "argmax_guard": 0.8695652173913043,
+                  "played_guard": 0.30303030303030304,
+                  "winrate": 0.3695652173913043
+                },
+                "life3": {
+                  "n": 78,
+                  "v_guard_minus_take": 0.06485817225602193,
+                  "argmax_guard": 0.8974358974358975,
+                  "played_guard": 0.38095238095238093,
+                  "winrate": 0.5384615384615384
+                },
+                "life4": {
+                  "n": 107,
+                  "v_guard_minus_take": 0.049002246165247725,
+                  "argmax_guard": 0.8878504672897196,
+                  "played_guard": 0.40625,
+                  "winrate": 0.6074766355140186
+                },
+                "life5": {
+                  "n": 74,
+                  "v_guard_minus_take": 0.01601103993566908,
+                  "argmax_guard": 0.7027027027027027,
+                  "played_guard": 0.4406779661016949,
+                  "winrate": 0.44594594594594594
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.06485817225602193,
+              "span": 0.04884713232035285
+            },
+            "attack_both_lethal": {
+              "n": 47,
+              "v_face_minus_board": 0.19772657252689627,
+              "argmax_face": 0.8297872340425532,
+              "played_face": 0.6808510638297872,
+              "winrate": 0.7021276595744681
+            }
+          },
+          "event_removal": {
+            "defense": {
+              "n": 1785,
+              "by_life": {
+                "life1": {
+                  "n": 129,
+                  "v_guard_minus_take": -0.0326747963089467,
+                  "argmax_guard": 0.4806201550387597,
+                  "played_guard": 0.3090909090909091,
+                  "winrate": 0.20155038759689922
+                },
+                "life2": {
+                  "n": 252,
+                  "v_guard_minus_take": 0.035404456568935455,
+                  "argmax_guard": 0.7857142857142857,
+                  "played_guard": 0.26436781609195403,
+                  "winrate": 0.4126984126984127
+                },
+                "life3": {
+                  "n": 385,
+                  "v_guard_minus_take": 0.052544479437517125,
+                  "argmax_guard": 0.8545454545454545,
+                  "played_guard": 0.2996845425867508,
+                  "winrate": 0.4623376623376623
+                },
+                "life4": {
+                  "n": 544,
+                  "v_guard_minus_take": 0.029874923647559413,
+                  "argmax_guard": 0.7702205882352942,
+                  "played_guard": 0.37662337662337664,
+                  "winrate": 0.47610294117647056
+                },
+                "life5": {
+                  "n": 383,
+                  "v_guard_minus_take": 0.005296505869709091,
+                  "argmax_guard": 0.5953002610966057,
+                  "played_guard": 0.42441860465116277,
+                  "winrate": 0.5483028720626631
+                }
+              },
+              "peak_life": 3,
+              "peak_value": 0.052544479437517125,
+              "span": 0.08521927574646382
+            },
+            "attack_both_lethal": {
+              "n": 248,
+              "v_face_minus_board": 0.20293555438571098,
+              "argmax_face": 0.8064516129032258,
+              "played_face": 0.625,
+              "winrate": 0.6653225806451613
+            }
+          }
+        },
+        "by_leader_reduced": {
+          "OP15-039": {
+            "n": 152,
+            "peak_life": "life1"
+          },
+          "OP04-019": {
+            "n": 126,
+            "peak_life": "life2"
+          },
+          "OP04-001": {
+            "n": 122,
+            "peak_life": "life2"
+          },
+          "ST10-003": {
+            "n": 109,
+            "peak_life": "life2"
+          },
+          "OP17-020": {
+            "n": 108,
+            "peak_life": "life3"
+          },
+          "OP04-020": {
+            "n": 107,
+            "peak_life": "life2"
+          },
+          "OP16-041": {
+            "n": 103,
+            "peak_life": "life3"
+          },
+          "EB01-021": {
+            "n": 101,
+            "peak_life": "life1"
+          },
+          "OP12-041": {
+            "n": 101,
+            "peak_life": "life2"
+          },
+          "OP01-060": {
+            "n": 99,
+            "peak_life": "life3"
+          },
+          "OP07-059": {
+            "n": 98,
+            "peak_life": "life2"
+          },
+          "OP03-021": {
+            "n": 98,
+            "peak_life": "life4"
+          },
+          "OP12-040": {
+            "n": 96,
+            "peak_life": "life3"
+          },
+          "OP03-099": {
+            "n": 95,
+            "peak_life": "life5"
+          },
+          "OP09-062": {
+            "n": 95,
+            "peak_life": "life3"
+          },
+          "OP01-062": {
+            "n": 93,
+            "peak_life": "life3"
+          }
+        }
+      }
+    }
+  },
+  "notes": "波28は想定通りmeta_games.json／deck_kindsを持たない旧形式（meta_games_missing_dirs=8/8、全シャードで層別軸が空）＝リーダー／デッキ別の層別は出せず、集団平均のみ（前回pvmと同じ値）。波30はmeta_games_missing_dirs=8（24シャード中16本のみmeta_games.jsonを持つ）だが層別は出た。波32は0欠落で全シャード層別成功。【波31の失敗】単波実行・合算実行（30+31+32）ともに同一のTracebackで失敗:\n  File \"tests/scripts/plan_value_map.py\", line 316, in flush\n  File \"tests/scripts/plan_value_map.py\", line 264, in flush\n    sc = np.stack([p[2] for p in pend]); ci = np.stack([p[3] for p in pend]); tok = np.stack([p[4] for p in pend])\n  ValueError: all input arrays must have the same shape\n波31のシャードのどれかでトークン列等の形状が他と異なる（符号化バージョン差やdump世代差の可能性）。コードは変更していないため原因の切り分けは未実施。合算(30+31+32)は波31を含むため同じ理由で失敗し、pvm_strat_all.jsonは生成できなかった（波28除く3波合算は次回以降の課題）。【層別の要点（判定はコーディネータ）】by_leader_life.peak_spread: 波30={'3': 3}（groups=4）・波32={'3': 3}（groups=4）＝いずれもリーダーのライフ上限帯別4群のうち3群がpeak_life=3で一致（span_mean 波30=0.087・波32=0.087）＝「守りどきはライフ3」という前回の集団平均の閾値は、ライフ上限で割ってもおおむね崩れない。一方by_leader_colors（21群）はpeak_distが{'2':2/3,'3':14/15,'4':4/4}前後とpeak=3が主流だが2・4に散る色もあり、span_max 0.100〜0.111とばらつきがやや大きい＝色の組み合わせ次第でしきい値が多少動く。by_leader（個々のリーダー・n=16、min_n=60未満は除外済み）はpeak_dist自体がほぼ空（大半がpeak_life=None＝life5以上まで単調増加でピークを打たない）＝個別リーダー単位ではサンプル数不足で山を特定できない対象が大半だった。"
+}

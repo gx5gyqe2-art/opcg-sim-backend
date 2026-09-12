@@ -1,0 +1,86 @@
+対局 1096・自席ターン 14222・相手ターン 11479
+攻め: agree 0.407  gap 0.033  gap>0.1 0.091  wr agree/disagree 0.579/0.490
+  argmax {'face': 0.36, 'board': 0.291, 'mixed': 0.349}  played {'face': 0.47, 'board': 0.157, 'mixed': 0.373}
+  calib face: n5607 v 0.206 z 0.202  board: n1868 v -0.198 z -0.226  mixed: n4445 v -0.010 z -0.018
+  lethal_only  n    819  V_face−V_board 0.021  argmax_face 0.756  played_face 0.697  agree 0.629  gap 0.014  wr 0.904
+  threat_only  n   2693  V_face−V_board -0.009  argmax_face 0.294  played_face 0.281  agree 0.356  gap 0.027  wr 0.283
+  both_lethal  n   1516  V_face−V_board 0.198  argmax_face 0.829  played_face 0.627  agree 0.599  gap 0.061  wr 0.712
+  opp_hand h0-1  n    780  V_face−V_board 0.006  argmax_face 0.346  played_face 0.478
+  opp_hand h2-3  n   2237  V_face−V_board 0.026  argmax_face 0.368  played_face 0.416
+  opp_hand h4+   n  11205  V_face−V_board 0.056  argmax_face 0.375  played_face 0.483
+守り: agree 0.448  gap 0.030  argmax_guard 0.784  played_guard 0.406
+  life1  n    970  V_guard−V_take -0.014  argmax_guard 0.566  played_guard 0.425  wr 0.288
+  life2  n   1529  V_guard−V_take 0.044  argmax_guard 0.780  played_guard 0.315  wr 0.420
+  life3  n   2386  V_guard−V_take 0.053  argmax_guard 0.868  played_guard 0.346  wr 0.484
+  life4  n   3626  V_guard−V_take 0.040  argmax_guard 0.808  played_guard 0.423  wr 0.503
+  life5  n   2310  V_guard−V_take 0.011  argmax_guard 0.644  played_guard 0.454  wr 0.590
+--- 層別（リーダー／デッキ・meta_games の seed 7197・sidecar 無しの dir 8）---
+by_leader_life（5 群）
+  leaderlife2            n    80 peak LNone span — | L1:-0.007  L2:-0.013  L3:-0.000  L4:0.016  L5:-0.015 | 両方の圏 n4 Vf-Vb -0.009 amf 0.500 pf 0.333
+  leaderlife3            n   201 peak L3 span — | L1:0.073  L2:0.074  L3:0.056 | 両方の圏 n34 Vf-Vb 0.154 amf 0.912 pf 0.735
+  leaderlife4            n  4695 peak L3 span 0.064 | L1:-0.006  L2:0.045  L3:0.058  L4:0.039  L5:0.033 | 両方の圏 n635 Vf-Vb 0.219 amf 0.857 pf 0.636
+  leaderlife5            n  5619 peak L3 span 0.077 | L1:-0.030  L2:0.042  L3:0.047  L4:0.040  L5:0.011 | 両方の圏 n729 Vf-Vb 0.176 amf 0.802 pf 0.611
+  leaderlife6            n   164 peak LNone span — | L1:0.056  L2:0.033  L3:0.052  L4:0.040  L5:0.018 | 両方の圏 n19 Vf-Vb 0.299 amf 1.000 pf 0.684
+by_leader_n_colors（2 群）
+  1color                 n  5493 peak L3 span 0.074 | L1:-0.025  L2:0.041  L3:0.049  L4:0.044  L5:0.015 | 両方の圏 n706 Vf-Vb 0.182 amf 0.813 pf 0.617
+  2color                 n  5266 peak L3 span 0.075 | L1:-0.003  L2:0.046  L3:0.055  L4:0.037  L5:-0.020 | 両方の圏 n715 Vf-Vb 0.209 amf 0.849 pf 0.634
+by_leader_colors（21 群）
+  BLACK                  n   826 peak L3 span 0.049 | L1:0.009  L2:0.051  L3:0.058  L4:0.057  L5:0.016 | 両方の圏 n106 Vf-Vb 0.167 amf 0.821 pf 0.594
+  BLACK+BLUE             n   315 peak L3 span 0.009 | L1:-0.014  L2:0.039  L3:0.056  L4:0.047  L5:-0.052 | 両方の圏 n56 Vf-Vb 0.105 amf 0.679 pf 0.375
+  BLACK+GREEN            n   247 peak L3 span 0.035 | L1:0.010  L2:0.046  L3:0.066  L4:0.031 | 両方の圏 n32 Vf-Vb 0.268 amf 0.781 pf 0.531
+  BLACK+PURPLE           n   275 peak L4 span 0.012 | L1:-0.067  L2:0.056  L3:0.060  L4:0.072 | 両方の圏 n38 Vf-Vb 0.202 amf 0.737 pf 0.579
+  BLACK+RED              n   251 peak L3 span 0.027 | L1:-0.049  L2:0.032  L3:0.062  L4:0.035  L5:0.003 | 両方の圏 n33 Vf-Vb 0.152 amf 0.848 pf 0.667
+  BLACK+YELLOW           n   419 peak L2 span 0.018 | L1:-0.015  L2:0.068  L3:0.065  L4:0.049  L5:0.065 | 両方の圏 n63 Vf-Vb 0.252 amf 0.889 pf 0.774
+  BLUE                   n  1138 peak L3 span 0.069 | L1:-0.025  L2:0.040  L3:0.044  L4:0.032  L5:0.009 | 両方の圏 n137 Vf-Vb 0.199 amf 0.752 pf 0.606
+  BLUE+GREEN             n   258 peak L3 span 0.019 | L1:0.010  L2:0.035  L3:0.051  L4:0.032 | 両方の圏 n32 Vf-Vb 0.302 amf 0.906 pf 0.688
+  BLUE+PURPLE            n   482 peak L3 span 0.024 | L1:0.031  L2:0.061  L3:0.062  L4:0.038 | 両方の圏 n59 Vf-Vb 0.184 amf 0.814 pf 0.627
+  BLUE+RED               n   551 peak L3 span 0.032 | L1:-0.000  L2:0.043  L3:0.046  L4:0.014  L5:-0.057 | 両方の圏 n71 Vf-Vb 0.225 amf 0.887 pf 0.700
+  BLUE+YELLOW            n   302 peak L3 span 0.021 | L1:0.021  L2:0.054  L3:0.063  L4:0.042  L5:0.057 | 両方の圏 n30 Vf-Vb 0.190 amf 0.867 pf 0.767
+  GREEN                  n   910 peak L3 span 0.021 | L1:-0.078  L2:0.027  L3:0.046  L4:0.044  L5:0.025 | 両方の圏 n110 Vf-Vb 0.201 amf 0.882 pf 0.673
+  GREEN+PURPLE           n   167 peak L4 span — | L1:0.038  L2:0.035  L3:0.050  L4:0.041 | 両方の圏 n19 Vf-Vb 0.299 amf 0.947 pf 0.632
+  GREEN+RED              n   567 peak L3 span 0.079 | L1:-0.020  L2:0.038  L3:0.059  L4:0.041  L5:0.016 | 両方の圏 n78 Vf-Vb 0.232 amf 0.872 pf 0.654
+  GREEN+YELLOW           n   298 peak L3 span 0.016 | L1:-0.056  L2:0.027  L3:0.061  L4:0.045  L5:-0.041 | 両方の圏 n47 Vf-Vb 0.221 amf 0.894 pf 0.596
+  PURPLE                 n   921 peak L2 span 0.041 | L1:0.015  L2:0.049  L3:0.046  L4:0.039  L5:0.009 | 両方の圏 n115 Vf-Vb 0.136 amf 0.713 pf 0.600
+  PURPLE+RED             n   599 peak L2 span 0.038 | L1:0.006  L2:0.038  L3:0.036  L4:-0.000  L5:0.023 | 両方の圏 n78 Vf-Vb 0.158 amf 0.897 pf 0.654
+  PURPLE+YELLOW          n   302 peak L3 span 0.027 | L1:0.017  L2:0.062  L3:0.075  L4:0.048  L5:0.018 | 両方の圏 n53 Vf-Vb 0.170 amf 0.830 pf 0.604
+  RED                    n   889 peak L3 span 0.100 | L1:-0.052  L2:0.039  L3:0.047  L4:0.044  L5:0.005 | 両方の圏 n107 Vf-Vb 0.274 amf 0.916 pf 0.682
+  RED+YELLOW             n   233 peak L4 span — | L1:0.008  L2:0.054  L3:0.035  L4:0.032  L5:0.006 | 両方の圏 n26 Vf-Vb 0.334 amf 0.923 pf 0.654
+  YELLOW                 n   809 peak L4 span 0.030 | L1:-0.039  L2:0.038  L3:0.053  L4:0.056  L5:0.026 | 両方の圏 n131 Vf-Vb 0.126 amf 0.817 pf 0.562
+by_deck_rate（4 群）
+  rate0                  n  1933 peak L2 span 0.045 | L1:-0.000  L2:0.045  L3:0.044  L4:0.041  L5:0.015 | 両方の圏 n262 Vf-Vb 0.202 amf 0.859 pf 0.669
+  rate1-9                n  1817 peak L3 span 0.088 | L1:-0.029  L2:0.045  L3:0.059  L4:0.037  L5:0.013 | 両方の圏 n260 Vf-Vb 0.194 amf 0.885 pf 0.660
+  rate10-19              n  3984 peak L3 span 0.065 | L1:-0.014  L2:0.043  L3:0.051  L4:0.037  L5:0.011 | 両方の圏 n522 Vf-Vb 0.185 amf 0.812 pf 0.598
+  rate20+                n  3745 peak L3 span 0.070 | L1:-0.014  L2:0.045  L3:0.056  L4:0.043  L5:0.009 | 両方の圏 n472 Vf-Vb 0.211 amf 0.801 pf 0.617
+by_deck_template（9 群）
+  reduce_then_ko         n  1627 peak L3 span 0.063 | L1:0.008  L2:0.037  L3:0.063  L4:0.034  L5:0.000 | 両方の圏 n217 Vf-Vb 0.186 amf 0.806 pf 0.590
+  lock_and_attack        n  1919 peak L3 span 0.061 | L1:-0.004  L2:0.052  L3:0.057  L4:0.047  L5:0.021 | 両方の圏 n263 Vf-Vb 0.210 amf 0.856 pf 0.677
+  deck_out               n  1151 peak L3 span 0.065 | L1:-0.005  L2:0.053  L3:0.060  L4:0.038  L5:0.010 | 両方の圏 n156 Vf-Vb 0.209 amf 0.776 pf 0.603
+  trigger_removal        n  1701 peak L3 span 0.091 | L1:-0.033  L2:0.035  L3:0.057  L4:0.038  L5:0.010 | 両方の圏 n199 Vf-Vb 0.233 amf 0.854 pf 0.648
+  on_attack_removal      n  1879 peak L3 span 0.071 | L1:-0.018  L2:0.047  L3:0.053  L4:0.041  L5:0.011 | 両方の圏 n264 Vf-Vb 0.204 amf 0.837 pf 0.621
+  activate_main_removal  n  2232 peak L2 span 0.073 | L1:-0.021  L2:0.052  L3:0.051  L4:0.040  L5:0.017 | 両方の圏 n293 Vf-Vb 0.196 amf 0.819 pf 0.568
+  bounce                 n  1037 peak L3 span 0.065 | L1:-0.009  L2:0.046  L3:0.056  L4:0.034  L5:-0.002 | 両方の圏 n138 Vf-Vb 0.198 amf 0.797 pf 0.645
+  trash                  n   348 peak L4 span 0.044 | L1:-0.066  L2:0.044  L3:0.049  L4:0.055  L5:0.012 | 両方の圏 n48 Vf-Vb 0.148 amf 0.771 pf 0.667
+  event_removal          n  2195 peak L3 span 0.065 | L1:-0.015  L2:0.038  L3:0.050  L4:0.039  L5:0.009 | 両方の圏 n263 Vf-Vb 0.184 amf 0.859 pf 0.631
+by_leader（16 群）
+  OP04-001               n   147 peak LNone span — | L1:0.030  L2:0.025  L3:0.000  L4:-0.019  L5:-0.057 | 両方の圏 n14 Vf-Vb 0.083 amf 0.786 pf 0.615
+  P-047                  n   135 peak LNone span — | L1:-0.001  L2:0.046  L3:0.036  L4:0.033  L5:0.003 | 両方の圏 n10 Vf-Vb 0.190 amf 1.000 pf 0.800
+  ST03-001               n   130 peak LNone span — | L1:-0.088  L2:0.074  L3:0.055  L4:0.033  L5:0.014 | 両方の圏 n10 Vf-Vb 0.258 amf 0.500 pf 0.800
+  OP01-003               n   122 peak LNone span — | L1:-0.031  L2:0.014  L3:0.051  L4:0.035 | 両方の圏 n10 Vf-Vb 0.251 amf 0.800 pf 0.500
+  OP09-061               n   121 peak LNone span — | L1:-0.113  L2:0.061  L3:0.070  L4:0.073 | 両方の圏 n17 Vf-Vb 0.141 amf 0.706 pf 0.588
+  ST10-001               n   119 peak LNone span — | L1:-0.047  L2:0.034  L3:-0.016  L4:-0.059 | 両方の圏 n19 Vf-Vb 0.042 amf 0.789 pf 0.474
+  OP05-060               n   118 peak LNone span — | L1:0.019  L2:0.058  L3:0.055  L4:0.054  L5:-0.007 | 両方の圏 n15 Vf-Vb 0.122 amf 0.733 pf 0.533
+  OP06-042               n   111 peak LNone span — | L1:0.050  L2:0.040  L3:0.025  L4:0.005 | 両方の圏 n7 Vf-Vb 0.338 amf 0.857 pf 0.714
+  OP10-003               n   110 peak LNone span — | L1:0.046  L2:0.058  L3:0.086  L4:0.034 | 両方の圏 n19 Vf-Vb 0.291 amf 1.000 pf 0.737
+  OP07-001               n   110 peak LNone span — | L1:-0.097  L2:0.037  L3:0.046  L4:0.039  L5:-0.031 | 両方の圏 n15 Vf-Vb 0.431 amf 0.933 pf 0.733
+  EB03-001               n   109 peak LNone span — | L1:0.003  L2:0.036  L3:0.045  L4:0.023 | 両方の圏 n16 Vf-Vb 0.245 amf 0.875 pf 0.750
+  OP04-039               n   108 peak LNone span — | L1:0.017  L2:0.022  L3:0.009  L4:0.021  L5:-0.052 | 両方の圏 n15 Vf-Vb 0.113 amf 0.467 pf 0.467
+  P-117                  n   107 peak LNone span — | L1:-0.050  L2:0.003  L3:0.024  L4:0.025  L5:0.015 | 両方の圏 n6 Vf-Vb 0.261 amf 0.333 pf 0.333
+  P-086                  n   104 peak LNone span — | L1:0.009  L2:-0.000  L3:0.010  L4:-0.013 | 両方の圏 n4 Vf-Vb 0.481 amf 0.750 pf 0.750
+  OP04-020               n   102 peak LNone span — | L1:0.025  L2:0.051  L3:0.069  L4:0.060 | 両方の圏 n18 Vf-Vb 0.222 amf 0.778 pf 0.500
+  OP03-022               n   102 peak LNone span — | L1:0.015  L2:0.008  L3:0.070  L4:0.059  L5:-0.017 | 両方の圏 n11 Vf-Vb 0.301 amf 0.909 pf 0.545
+peak_spread/by_leader: 群 16 peak の分布 {} span 平均 — 最大 —
+peak_spread/by_leader_life: 群 5 peak の分布 {'3': 3} span 平均 0.070 最大 0.077
+peak_spread/by_leader_colors: 群 21 peak の分布 {'2': 3, '3': 14, '4': 4} span 平均 0.035 最大 0.100
+peak_spread/by_deck_template: 群 9 peak の分布 {'2': 1, '3': 7, '4': 1} span 平均 0.066 最大 0.091
+  50.6s
+  → /root/pvm_strat/pvm_strat_w30.json

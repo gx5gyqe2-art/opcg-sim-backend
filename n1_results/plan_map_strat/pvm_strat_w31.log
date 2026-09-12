@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/user/opcg-sim-backend/tests/scripts/plan_value_map.py", line 481, in <module>
+    main()
+  File "/home/user/opcg-sim-backend/tests/scripts/plan_value_map.py", line 464, in main
+    att, dfn, games, meta_miss, n_meta = collect(net, rt, args.src, args.holdout_mod,
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/opcg-sim-backend/tests/scripts/plan_value_map.py", line 316, in collect
+    flush()
+  File "/home/user/opcg-sim-backend/tests/scripts/plan_value_map.py", line 264, in flush
+    sc = np.stack([p[2] for p in pend]); ci = np.stack([p[3] for p in pend]); tok = np.stack([p[4] for p in pend])
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/numpy/_core/shape_base.py", line 458, in stack
+    raise ValueError('all input arrays must have the same shape')
+ValueError: all input arrays must have the same shape
