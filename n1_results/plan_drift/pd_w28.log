@@ -1,0 +1,39 @@
+行 922309・対局 6353（86s）
+対局 6353・席 12706・unknown 対象 0
+ラベル分布: {'pass': 5753, 'face': 32952, 'mixed': 27934, 'develop': 7276, 'board': 7675}
+  t1-4: {'face': 8421, 'board': 2089, 'mixed': 2362, 'develop': 6870, 'pass': 5670}
+  t5-8: {'face': 9964, 'board': 3377, 'mixed': 11790, 'develop': 265, 'pass': 12}
+  t9+: {'face': 14567, 'board': 2209, 'mixed': 13782, 'develop': 141, 'pass': 71}
+遷移（prev → cur）:
+  face     n  24812  face 0.51  board 0.09  mixed 0.40  develop 0.01  pass 0.00
+  board    n   7226  face 0.31  board 0.18  mixed 0.49  develop 0.02  pass 0.01
+  mixed    n  23872  face 0.40  board 0.08  mixed 0.51  develop 0.00  pass 0.00
+  develop  n   7246  face 0.62  board 0.07  mixed 0.21  develop 0.08  pass 0.01
+  pass     n   5728  face 0.68  board 0.05  mixed 0.16  develop 0.08  pass 0.03
+切り替え率（勝者／敗者）:
+  switch        win 0.606 [0.601,0.611] n 6353   lose 0.619 [0.614,0.624] n 6353   diff +0.013
+  switch_early  win 0.745 [0.739,0.751] n 6353   lose 0.749 [0.743,0.755] n 6353   diff +0.004
+  fb_switch     win 0.194 [0.185,0.203] n 4951   lose 0.305 [0.293,0.317] n 4128   diff +0.111
+  drift         win 0.297 [0.293,0.301] n 6353   lose 0.342 [0.338,0.347] n 6335   diff +0.045
+  don_waste     win 0.030 [0.029,0.032] n 6353   lose 0.039 [0.037,0.041] n 6353   diff +0.009
+対にした比較（敗者の方が多い割合・差のある対局のみ）:
+  switch        0.499 [0.486,0.513] n 5549  (more 2771 / less 2778 / tie 804)
+  switch_early  0.510 [0.492,0.527] n 3147  (more 1604 / less 1543 / tie 3206)
+  fb_switch     0.601 [0.579,0.623] n 1889  (more 1136 / less 753 / tie 1333)
+  drift         0.574 [0.562,0.586] n 6199  (more 3558 / less 2641 / tie 136)
+  don_waste     0.568 [0.547,0.589] n 2083  (more 1183 / less 900 / tie 4270)
+長さ帯別 switch（win／lose）:
+  T<=5   win 0.593 (n 722)  lose 0.644 (n 1864)
+  T6-8   win 0.609 (n 5225)  lose 0.610 (n 4260)
+  T9+    win 0.585 (n 406)  lose 0.582 (n 229)
+分岐点（face 系 vs board 系が拮抗）: 130994 点
+  H_pi 1.821  face_share 0.432  chosen {'board': 26901, 'don': 52420, 'face': 31506, 'develop': 16446, 'end': 3721}
+  前ターンの方針あり 48161  prev {'face': 32919, 'board': 15242}
+  sticky 期待値（無状態）0.515  chosen 0.544 [0.540,0.549] n 48161  teacher 0.542 [0.537,0.546] n 48161
+  sticky win 0.540 [0.532,0.548] n 16504  lose 0.546 [0.541,0.552] n 31657
+  sticky t1-4: 0.454 [0.415,0.494] n 612
+  sticky t5-8: 0.524 [0.517,0.532] n 16340
+  sticky t9+: 0.557 [0.551,0.562] n 31209
+  chosen×z {'face': {'win': 10759, 'lose': 20747}, 'board': {'win': 9403, 'lose': 17498}}
+  86.0s
+  → /root/pd/pd_w28.json
