@@ -1,14 +1,86 @@
-Traceback (most recent call last):
-  File "/home/user/opcg-sim-backend/tests/scripts/plan_value_map.py", line 481, in <module>
-    main()
-  File "/home/user/opcg-sim-backend/tests/scripts/plan_value_map.py", line 464, in main
-    att, dfn, games, meta_miss, n_meta = collect(net, rt, args.src, args.holdout_mod,
-                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/user/opcg-sim-backend/tests/scripts/plan_value_map.py", line 316, in collect
-    flush()
-  File "/home/user/opcg-sim-backend/tests/scripts/plan_value_map.py", line 264, in flush
-    sc = np.stack([p[2] for p in pend]); ci = np.stack([p[3] for p in pend]); tok = np.stack([p[4] for p in pend])
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/dist-packages/numpy/_core/shape_base.py", line 458, in stack
-    raise ValueError('all input arrays must have the same shape')
-ValueError: all input arrays must have the same shape
+対局 957・自席ターン 12207・相手ターン 9772
+攻め: agree 0.395  gap 0.036  gap>0.1 0.100  wr agree/disagree 0.592/0.485
+  argmax {'face': 0.361, 'board': 0.292, 'mixed': 0.347}  played {'face': 0.476, 'board': 0.153, 'mixed': 0.371}
+  calib face: n4821 v 0.213 z 0.194  board: n1554 v -0.231 z -0.230  mixed: n3756 v 0.001 z -0.007
+  lethal_only  n    662  V_face−V_board 0.012  argmax_face 0.733  played_face 0.662  agree 0.591  gap 0.014  wr 0.890
+  threat_only  n   2291  V_face−V_board -0.010  argmax_face 0.289  played_face 0.257  agree 0.328  gap 0.030  wr 0.293
+  both_lethal  n   1442  V_face−V_board 0.198  argmax_face 0.822  played_face 0.601  agree 0.580  gap 0.071  wr 0.704
+  opp_hand h0-1  n    627  V_face−V_board 0.036  argmax_face 0.402  played_face 0.439
+  opp_hand h2-3  n   1905  V_face−V_board 0.037  argmax_face 0.373  played_face 0.407
+  opp_hand h4+   n   9675  V_face−V_board 0.055  argmax_face 0.373  played_face 0.496
+守り: agree 0.435  gap 0.030  argmax_guard 0.791  played_guard 0.391
+  life1  n    792  V_guard−V_take -0.026  argmax_guard 0.528  played_guard 0.336  wr 0.275
+  life2  n   1178  V_guard−V_take 0.039  argmax_guard 0.795  played_guard 0.267  wr 0.434
+  life3  n   2158  V_guard−V_take 0.047  argmax_guard 0.855  played_guard 0.343  wr 0.484
+  life4  n   3156  V_guard−V_take 0.039  argmax_guard 0.819  played_guard 0.425  wr 0.493
+  life5  n   1915  V_guard−V_take 0.014  argmax_guard 0.667  played_guard 0.428  wr 0.586
+--- 層別（リーダー／デッキ・meta_games の seed 6686・sidecar 無しの dir 1）---
+by_leader_life（5 群）
+  leaderlife2            n    98 peak LNone span — | L1:-0.015  L2:0.005  L3:-0.009  L4:0.008  L5:0.016 | 両方の圏 n10 Vf-Vb 0.063 amf 0.500 pf 0.556
+  leaderlife3            n   130 peak LNone span — | L1:0.039  L2:0.065  L3:0.049 | 両方の圏 n11 Vf-Vb 0.493 amf 0.909 pf 0.818
+  leaderlife4            n  4288 peak L3 span 0.084 | L1:-0.031  L2:0.048  L3:0.053  L4:0.038  L5:0.056 | 両方の圏 n646 Vf-Vb 0.213 amf 0.828 pf 0.582
+  leaderlife5            n  5129 peak L3 span 0.066 | L1:-0.023  L2:0.026  L3:0.043  L4:0.040  L5:0.013 | 両方の圏 n756 Vf-Vb 0.184 amf 0.819 pf 0.612
+  leaderlife6            n    93 peak LNone span — | L1:-0.062  L2:0.043  L3:0.045  L4:0.038  L5:0.038 | 両方の圏 n15 Vf-Vb 0.184 amf 0.933 pf 0.600
+by_leader_n_colors（2 群）
+  1color                 n  5071 peak L3 span 0.073 | L1:-0.029  L2:0.028  L3:0.044  L4:0.042  L5:0.016 | 両方の圏 n757 Vf-Vb 0.185 amf 0.820 pf 0.611
+  2color                 n  4667 peak L3 span 0.074 | L1:-0.024  L2:0.047  L3:0.050  L4:0.036  L5:-0.011 | 両方の圏 n681 Vf-Vb 0.213 amf 0.825 pf 0.587
+by_leader_colors（21 群）
+  BLACK                  n   782 peak L2 span 0.034 | L1:-0.020  L2:0.050  L3:0.043  L4:0.046  L5:0.016 | 両方の圏 n117 Vf-Vb 0.220 amf 0.829 pf 0.632
+  BLACK+BLUE             n   320 peak L3 span 0.003 | L1:0.017  L2:0.002  L3:0.049  L4:0.045  L5:-0.058 | 両方の圏 n44 Vf-Vb 0.133 amf 0.682 pf 0.455
+  BLACK+GREEN            n   176 peak L4 span — | L1:-0.054  L2:0.043  L3:0.058  L4:0.023 | 両方の圏 n20 Vf-Vb 0.159 amf 0.900 pf 0.650
+  BLACK+PURPLE           n   151 peak L4 span — | L1:-0.034  L2:0.056  L3:0.033  L4:0.044 | 両方の圏 n31 Vf-Vb 0.130 amf 0.871 pf 0.548
+  BLACK+RED              n   230 peak L3 span 0.002 | L1:0.017  L2:0.049  L3:0.045  L4:0.043  L5:-0.003 | 両方の圏 n29 Vf-Vb 0.193 amf 0.862 pf 0.517
+  BLACK+YELLOW           n   457 peak L2 span 0.021 | L1:-0.063  L2:0.070  L3:0.066  L4:0.050  L5:0.062 | 両方の圏 n70 Vf-Vb 0.217 amf 0.800 pf 0.565
+  BLUE                   n   936 peak L3 span 0.074 | L1:-0.031  L2:0.032  L3:0.043  L4:0.037  L5:0.011 | 両方の圏 n135 Vf-Vb 0.180 amf 0.763 pf 0.590
+  BLUE+GREEN             n   263 peak L3 span 0.008 | L1:-0.007  L2:0.038  L3:0.044  L4:0.035 | 両方の圏 n35 Vf-Vb 0.277 amf 0.914 pf 0.600
+  BLUE+PURPLE            n   394 peak L2 span 0.019 | L1:0.023  L2:0.066  L3:0.056  L4:0.047 | 両方の圏 n57 Vf-Vb 0.263 amf 0.789 pf 0.632
+  BLUE+RED               n   460 peak L3 span 0.024 | L1:0.016  L2:0.040  L3:0.045  L4:0.022  L5:-0.048 | 両方の圏 n56 Vf-Vb 0.205 amf 0.696 pf 0.554
+  BLUE+YELLOW            n   234 peak L4 span — | L1:0.014  L2:0.071  L3:0.061  L4:0.042  L5:0.058 | 両方の圏 n36 Vf-Vb 0.246 amf 0.833 pf 0.667
+  GREEN                  n   773 peak L3 span 0.048 | L1:-0.004  L2:0.006  L3:0.053  L4:0.052  L5:0.026 | 両方の圏 n118 Vf-Vb 0.205 amf 0.839 pf 0.644
+  GREEN+PURPLE           n   250 peak L3 span 0.010 | L1:-0.073  L2:0.046  L3:0.054  L4:0.043 | 両方の圏 n33 Vf-Vb 0.268 amf 0.909 pf 0.594
+  GREEN+RED              n   513 peak L3 span 0.013 | L1:-0.105  L2:0.045  L3:0.050  L4:0.037 | 両方の圏 n75 Vf-Vb 0.301 amf 0.907 pf 0.707
+  GREEN+YELLOW           n   233 peak L3 span 0.031 | L1:-0.141  L2:0.036  L3:0.061  L4:0.030  L5:-0.057 | 両方の圏 n32 Vf-Vb 0.151 amf 0.812 pf 0.594
+  PURPLE                 n   827 peak L4 span 0.031 | L1:-0.028  L2:0.036  L3:0.042  L4:0.045  L5:0.014 | 両方の圏 n123 Vf-Vb 0.156 amf 0.772 pf 0.593
+  PURPLE+RED             n   514 peak L2 span 0.022 | L1:0.022  L2:0.037  L3:0.032  L4:0.015  L5:0.009 | 両方の圏 n81 Vf-Vb 0.200 amf 0.827 pf 0.568
+  PURPLE+YELLOW          n   283 peak L3 span 0.019 | L1:-0.031  L2:0.066  L3:0.064  L4:0.045  L5:0.057 | 両方の圏 n52 Vf-Vb 0.160 amf 0.788 pf 0.569
+  RED                    n   937 peak L3 span 0.081 | L1:-0.031  L2:0.029  L3:0.050  L4:0.035  L5:0.003 | 両方の圏 n119 Vf-Vb 0.183 amf 0.908 pf 0.622
+  RED+YELLOW             n   189 peak L3 span 0.032 | L1:0.009  L2:0.020  L3:0.038  L4:0.006  L5:0.006 | 両方の圏 n30 Vf-Vb 0.187 amf 0.933 pf 0.533
+  YELLOW                 n   816 peak L4 span 0.020 | L1:-0.055  L2:0.020  L3:0.031  L4:0.040  L5:0.031 | 両方の圏 n145 Vf-Vb 0.173 amf 0.821 pf 0.590
+by_deck_rate（4 群）
+  rate0                  n  1632 peak L3 span 0.063 | L1:-0.013  L2:0.045  L3:0.050  L4:0.041  L5:0.015 | 両方の圏 n244 Vf-Vb 0.179 amf 0.857 pf 0.651
+  rate1-9                n  1615 peak L3 span 0.103 | L1:-0.059  L2:0.036  L3:0.044  L4:0.041  L5:0.013 | 両方の圏 n242 Vf-Vb 0.205 amf 0.781 pf 0.639
+  rate10-19              n  3145 peak L3 span 0.061 | L1:-0.016  L2:0.037  L3:0.045  L4:0.039  L5:0.015 | 両方の圏 n493 Vf-Vb 0.200 amf 0.807 pf 0.575
+  rate20+                n  3380 peak L3 span 0.079 | L1:-0.030  L2:0.040  L3:0.050  L4:0.035  L5:0.013 | 両方の圏 n463 Vf-Vb 0.203 amf 0.842 pf 0.581
+by_deck_template（9 群）
+  reduce_then_ko         n  1359 peak L3 span 0.092 | L1:-0.052  L2:0.038  L3:0.040  L4:0.034  L5:-0.001 | 両方の圏 n191 Vf-Vb 0.179 amf 0.822 pf 0.607
+  lock_and_attack        n  1545 peak L3 span 0.070 | L1:-0.021  L2:0.040  L3:0.049  L4:0.044  L5:0.023 | 両方の圏 n240 Vf-Vb 0.199 amf 0.867 pf 0.621
+  deck_out               n  1096 peak L3 span 0.067 | L1:-0.020  L2:0.045  L3:0.047  L4:0.038  L5:0.014 | 両方の圏 n166 Vf-Vb 0.166 amf 0.771 pf 0.620
+  trigger_removal        n  1330 peak L3 span 0.072 | L1:-0.030  L2:0.028  L3:0.042  L4:0.034  L5:0.014 | 両方の圏 n190 Vf-Vb 0.201 amf 0.837 pf 0.579
+  on_attack_removal      n  1793 peak L3 span 0.076 | L1:-0.029  L2:0.040  L3:0.047  L4:0.037  L5:0.014 | 両方の圏 n264 Vf-Vb 0.223 amf 0.845 pf 0.570
+  activate_main_removal  n  1775 peak L3 span 0.092 | L1:-0.047  L2:0.034  L3:0.045  L4:0.035  L5:0.015 | 両方の圏 n259 Vf-Vb 0.191 amf 0.788 pf 0.541
+  bounce                 n   842 peak L3 span 0.042 | L1:0.002  L2:0.031  L3:0.049  L4:0.031  L5:0.007 | 両方の圏 n130 Vf-Vb 0.202 amf 0.738 pf 0.554
+  trash                  n   342 peak L4 span 0.024 | L1:-0.028  L2:0.059  L3:0.035  L4:0.042  L5:0.018 | 両方の圏 n56 Vf-Vb 0.202 amf 0.714 pf 0.571
+  event_removal          n  2029 peak L3 span 0.080 | L1:-0.030  L2:0.041  L3:0.050  L4:0.037  L5:0.007 | 両方の圏 n275 Vf-Vb 0.225 amf 0.833 pf 0.579
+by_leader（16 群）
+  EB02-010               n   121 peak LNone span — | L1:-0.067  L2:0.056  L3:0.049  L4:0.060 | 両方の圏 n15 Vf-Vb 0.381 amf 1.000 pf 0.667
+  EB03-001               n   118 peak LNone span — | L1:-0.188  L2:0.021  L3:0.029  L4:0.003 | 両方の圏 n11 Vf-Vb 0.397 amf 0.909 pf 0.545
+  P-086                  n   118 peak LNone span — | L1:0.011  L2:-0.003  L3:0.011  L4:-0.016 | 両方の圏 n6 Vf-Vb 0.231 amf 1.000 pf 0.500
+  OP10-003               n   117 peak LNone span — | L1:0.037  L2:0.036  L3:0.045  L4:0.031 | 両方の圏 n26 Vf-Vb 0.125 amf 0.885 pf 0.538
+  OP09-042               n   112 peak LNone span — | L1:-0.006  L2:0.043  L3:0.051  L4:0.054  L5:0.032 | 両方の圏 n17 Vf-Vb 0.077 amf 0.647 pf 0.647
+  OP12-081               n   112 peak LNone span — | L1:-0.028  L2:0.063  L3:0.072  L4:0.051 | 両方の圏 n17 Vf-Vb 0.206 amf 0.765 pf 0.588
+  OP15-039               n   112 peak LNone span — | L1:0.022  L2:0.019  L3:0.004  L4:-0.030  L5:-0.049 | 両方の圏 n20 Vf-Vb 0.153 amf 0.550 pf 0.316
+  OP10-002               n   106 peak LNone span — | L1:0.083  L2:0.028  L3:0.092  L4:0.059 | 両方の圏 n16 Vf-Vb 0.115 amf 0.688 pf 0.562
+  OP05-041               n   105 peak LNone span — | L1:0.030  L2:0.032  L3:0.071  L4:0.054 | 両方の圏 n14 Vf-Vb 0.138 amf 0.786 pf 0.429
+  OP16-001               n   104 peak LNone span — | L1:0.009  L2:0.029  L3:0.040  L4:0.036  L5:0.028 | 両方の圏 n11 Vf-Vb 0.167 amf 1.000 pf 0.545
+  OP13-100               n   103 peak LNone span — | L1:-0.041  L2:-0.017  L3:0.040  L4:0.055  L5:0.034 | 両方の圏 n17 Vf-Vb 0.328 amf 0.824 pf 0.765
+  OP06-020               n    98 peak LNone span — | L1:-0.025  L2:0.004  L3:0.077  L4:0.075  L5:0.027 | 両方の圏 n12 Vf-Vb 0.332 amf 1.000 pf 0.833
+  OP07-097               n    98 peak LNone span — | L1:-0.015  L2:0.005  L3:-0.009  L4:0.008  L5:0.016 | 両方の圏 n10 Vf-Vb 0.063 amf 0.500 pf 0.556
+  OP08-058               n    96 peak LNone span — | L1:-0.050  L2:0.084  L3:0.076  L4:0.051  L5:0.070 | 両方の圏 n20 Vf-Vb 0.093 amf 0.800 pf 0.421
+  P-076                  n    92 peak LNone span — | L1:0.007  L2:-0.019  L3:0.065  L4:0.044 | 両方の圏 n13 Vf-Vb 0.075 amf 0.538 pf 0.385
+  OP11-062               n    92 peak LNone span — | L1:-0.081  L2:0.030  L3:0.078  L4:0.041  L5:0.008 | 両方の圏 n10 Vf-Vb 0.259 amf 1.000 pf 0.600
+peak_spread/by_leader: 群 16 peak の分布 {} span 平均 — 最大 —
+peak_spread/by_leader_life: 群 5 peak の分布 {'3': 2} span 平均 0.075 最大 0.084
+peak_spread/by_leader_colors: 群 21 peak の分布 {'2': 4, '3': 12, '4': 5} span 平均 0.027 最大 0.081
+peak_spread/by_deck_template: 群 9 peak の分布 {'3': 8, '4': 1} span 平均 0.068 最大 0.092
+  33.0s
+  → /root/pvm_strat2/pvm_strat_w31.json
