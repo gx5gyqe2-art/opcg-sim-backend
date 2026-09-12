@@ -1,0 +1,59 @@
+行 3973577・対局 27832（142s）
+対局 27832・自席ターン 358003
+状態の分布（L=lethal_margin・T=threat_margin）: {'L+1|T+1': 3669, 'L+1|T-1': 2635, 'L+1|T0': 3666, 'L+1|T<=-2': 2799, 'L+1|T>=+2': 4222, 'L-1|T+1': 6580, 'L-1|T-1': 7189, 'L-1|T0': 7425, 'L-1|T<=-2': 9668, 'L-1|T>=+2': 8920, 'L0|T+1': 5615, 'L0|T-1': 4557, 'L0|T0': 5665, 'L0|T<=-2': 5175, 'L0|T>=+2': 7069, 'L<=-2|T+1': 12727, 'L<=-2|T-1': 27783, 'L<=-2|T0': 19767, 'L<=-2|T<=-2': 186039, 'L<=-2|T>=+2': 12142, 'L>=+2|T+1': 3154, 'L>=+2|T-1': 2243, 'L>=+2|T0': 3295, 'L>=+2|T<=-2': 2428, 'L>=+2|T>=+2': 3571}
+lethal_only: 19837 ターン
+  attempted 0.670 [0.664,0.677] n 19837  defended 0.341 [0.335,0.348] n 19837  won_now 0.404 [0.397,0.411] n 19837  died_next 0.007 [0.006,0.008] n 19837  winrate 0.901 [0.897,0.905] n 19837
+    attempted      winrate 0.954 [0.950,0.958] n 13295  won_now 0.598 [0.589,0.606] n 13295  died_next 0.007 [0.006,0.008] n 13295
+    not_attempted  winrate 0.794 [0.785,0.804] n 6542  won_now 0.010 [0.008,0.013] n 6542  died_next 0.007 [0.005,0.010] n 6542
+    defended       winrate 0.833 [0.825,0.842] n 6774  won_now 0.062 [0.057,0.068] n 6774  died_next 0.008 [0.005,0.010] n 6774
+    not_defended   winrate 0.937 [0.932,0.941] n 13063  won_now 0.581 [0.573,0.589] n 13063  died_next 0.007 [0.006,0.008] n 13063
+    face_only      winrate 0.938 [0.933,0.942] n 12997  won_now 0.584 [0.575,0.592] n 12997  died_next 0.007 [0.005,0.008] n 12997
+    by_opp_hand/h0-1   turns  2225  attempted 0.759 [0.741,0.776] n 2225  defended 0.210 [0.193,0.227] n 2225  winrate 0.979 [0.973,0.985] n 2225
+    by_opp_hand/h2-3   turns  5455  attempted 0.722 [0.710,0.734] n 5455  defended 0.288 [0.276,0.300] n 5455  winrate 0.954 [0.949,0.960] n 5455
+    by_opp_hand/h4+    turns 12157  attempted 0.631 [0.622,0.639] n 12157  defended 0.390 [0.381,0.398] n 12157  winrate 0.863 [0.857,0.870] n 12157
+    by_turn/t1-4   turns     2  attempted 0.000 [0.000,0.000] n 2  defended 0.000 [0.000,0.000] n 2  winrate 1.000 [1.000,1.000] n 2
+    by_turn/t5-8   turns  2573  attempted 0.285 [0.268,0.303] n 2573  defended 0.569 [0.550,0.588] n 2573  winrate 0.731 [0.714,0.748] n 2573
+    by_turn/t9+    turns 17262  attempted 0.728 [0.721,0.734] n 17262  defended 0.308 [0.301,0.314] n 17262  winrate 0.927 [0.923,0.931] n 17262
+    by_z/win    turns 17880  attempted 0.709 [0.703,0.716] n 17880  defended 0.316 [0.309,0.323] n 17880
+    by_z/lose   turns  1957  attempted 0.313 [0.292,0.333] n 1957  defended 0.576 [0.554,0.598] n 1957
+threat_only: 67561 ターン
+  attempted 0.356 [0.352,0.359] n 67561  defended 0.763 [0.760,0.766] n 67561  won_now 0.010 [0.009,0.011] n 67561  died_next 0.280 [0.276,0.283] n 67561  winrate 0.296 [0.293,0.300] n 67561
+    attempted      winrate 0.324 [0.318,0.330] n 24041  won_now 0.028 [0.026,0.030] n 24041  died_next 0.318 [0.312,0.324] n 24041
+    not_attempted  winrate 0.281 [0.277,0.285] n 43520  won_now 0.000 [0.000,0.000] n 43520  died_next 0.258 [0.254,0.262] n 43520
+    defended       winrate 0.301 [0.297,0.305] n 51532  won_now 0.006 [0.005,0.007] n 51532  died_next 0.261 [0.257,0.265] n 51532
+    not_defended   winrate 0.282 [0.275,0.289] n 16029  won_now 0.023 [0.021,0.026] n 16029  died_next 0.339 [0.331,0.346] n 16029
+    face_only      winrate 0.292 [0.285,0.299] n 15221  won_now 0.025 [0.022,0.027] n 15221  died_next 0.335 [0.327,0.342] n 15221
+    by_my_hand/h0-1   turns  2565  attempted 0.413 [0.394,0.432] n 2565  defended 0.636 [0.618,0.655] n 2565  winrate 0.155 [0.141,0.169] n 2565
+    by_my_hand/h2-3   turns 14548  attempted 0.366 [0.358,0.373] n 14548  defended 0.740 [0.732,0.747] n 14548  winrate 0.211 [0.204,0.217] n 14548
+    by_my_hand/h4+    turns 50448  attempted 0.350 [0.346,0.354] n 50448  defended 0.776 [0.772,0.780] n 50448  winrate 0.328 [0.324,0.332] n 50448
+    by_turn/t1-4   turns    63  attempted 0.270 [0.160,0.379] n 63  defended 0.492 [0.369,0.616] n 63  winrate 0.317 [0.203,0.432] n 63
+    by_turn/t5-8   turns 16598  attempted 0.328 [0.321,0.335] n 16598  defended 0.771 [0.764,0.777] n 16598  winrate 0.356 [0.349,0.363] n 16598
+    by_turn/t9+    turns 50900  attempted 0.365 [0.361,0.369] n 50900  defended 0.760 [0.757,0.764] n 50900  winrate 0.277 [0.273,0.281] n 50900
+    by_z/win    turns 20007  attempted 0.389 [0.382,0.396] n 20007  defended 0.774 [0.769,0.780] n 20007
+    by_z/lose   turns 47554  attempted 0.342 [0.338,0.346] n 47554  defended 0.758 [0.754,0.762] n 47554
+both: 39926 ターン
+  attempted 0.702 [0.697,0.706] n 39926  defended 0.394 [0.389,0.399] n 39926  won_now 0.476 [0.471,0.481] n 39926  died_next 0.215 [0.211,0.219] n 39926  winrate 0.703 [0.699,0.707] n 39926
+    attempted      winrate 0.808 [0.804,0.813] n 28018  won_now 0.673 [0.667,0.678] n 28018  died_next 0.164 [0.160,0.169] n 28018
+    not_attempted  winrate 0.455 [0.446,0.464] n 11908  won_now 0.012 [0.010,0.014] n 11908  died_next 0.334 [0.325,0.342] n 11908
+    defended       winrate 0.471 [0.463,0.478] n 15724  won_now 0.050 [0.047,0.053] n 15724  died_next 0.368 [0.360,0.375] n 15724
+    not_defended   winrate 0.854 [0.849,0.858] n 24202  won_now 0.752 [0.747,0.758] n 24202  died_next 0.115 [0.111,0.119] n 24202
+    face_only      winrate 0.856 [0.851,0.860] n 24117  won_now 0.755 [0.750,0.760] n 24117  died_next 0.114 [0.110,0.119] n 24117
+    by_opp_hand/h0-1   turns  4631  attempted 0.763 [0.751,0.775] n 4631  defended 0.261 [0.249,0.274] n 4631  winrate 0.851 [0.841,0.862] n 4631
+    by_opp_hand/h2-3   turns 11597  attempted 0.721 [0.712,0.729] n 11597  defended 0.356 [0.347,0.365] n 11597  winrate 0.769 [0.761,0.776] n 11597
+    by_opp_hand/h4+    turns 23698  attempted 0.681 [0.675,0.687] n 23698  defended 0.438 [0.432,0.445] n 23698  winrate 0.642 [0.636,0.648] n 23698
+    by_turn/t5-8   turns  1398  attempted 0.260 [0.237,0.283] n 1398  defended 0.701 [0.677,0.725] n 1398  winrate 0.524 [0.498,0.550] n 1398
+    by_turn/t9+    turns 38528  attempted 0.718 [0.713,0.722] n 38528  defended 0.383 [0.378,0.388] n 38528  winrate 0.709 [0.705,0.714] n 38528
+    by_z/win    turns 28068  attempted 0.807 [0.802,0.812] n 28068  defended 0.264 [0.259,0.269] n 28068
+    by_z/lose   turns 11858  attempted 0.453 [0.444,0.462] n 11858  defended 0.702 [0.694,0.710] n 11858
+neither: 230679 ターン  attempted 0.418 [0.416,0.420] n 230679  defended 0.431 [0.429,0.434] n 230679
+lethal_by_margin: {'0': (28081, 0.501, 0.223), '+1': (16991, 0.795, 0.528), '>=+2': (14691, 0.935, 0.802)}
+見逃し（リーサル圏で attempted でない）0.309 [0.305,0.312] n 59763  win 0.231 [0.227,0.235] n 45948  lose 0.567 [0.559,0.575] n 13815
+無謀（被リーサル圏で face だけ）0.225 [0.222,0.228] n 67561
+守り guard_rate 0.530（相手ターン 224834）  by_turn {t1-4: 0.615, t5-8: 0.566, t9+: 0.473}  by_life {life1: 0.661, life2: 0.524, life3: 0.496, life4: 0.526, life5: 0.527}  by_z {win: 0.562, lose: 0.500}
+  超過パワー別（不明 113）: p<=0: n43201 guard 0.704 平均 -23 wr 0.521  p1-2k: n124233 guard 0.525 平均 +1703 wr 0.491  p3-4k: n38478 guard 0.431 平均 +3374 wr 0.490  p5k+: n18809 guard 0.415 平均 +6920 wr 0.568
+    p<=0   × ライフ: life1:0.778(n1105)  life2:0.673(n3316)  life3:0.674(n8409)  life4:0.730(n26448)  life5:0.686(n24704)
+    p1-2k  × ライフ: life1:0.719(n11296)  life2:0.546(n32777)  life3:0.508(n60681)  life4:0.509(n72947)  life5:0.486(n38265)
+    p3-4k  × ライフ: life1:0.644(n3738)  life2:0.487(n11425)  life3:0.436(n18956)  life4:0.382(n21079)  life5:0.341(n9854)
+    p5k+   × ライフ: life1:0.474(n3889)  life2:0.412(n6899)  life3:0.380(n9044)  life4:0.357(n7122)  life5:0.339(n2801)
+  145.2s
+  → /root/race_atk/rs_atk_all.json
