@@ -1,0 +1,175 @@
+{
+  "job": "train-r7",
+  "role": "train",
+  "status": "done",
+  "inputs": {
+    "warm_start": "claude/train-r5:n1_results/nrel_r5.npz",
+    "pi_waves": [
+      29,
+      30,
+      31,
+      32
+    ],
+    "z_waves": [
+      27,
+      28
+    ],
+    "epochs": 2,
+    "lr": 0.0002,
+    "aux_weight": 0.1,
+    "ablate": "rel",
+    "backend": "torch",
+    "pi_teacher": "visits",
+    "diff_vs_r6": "pi_waves only"
+  },
+  "outputs": {
+    "net": "n1_results/nrel_r7.npz",
+    "band": "n1_results/band_r7/",
+    "arena": "n1_results/arena_r7/"
+  },
+  "metrics": {
+    "val_v_mse": 0.49648886919021606,
+    "val_v_sign": 0.81955,
+    "pi_top1": 0.62475,
+    "best_ep": 1,
+    "value_rows": 5966525,
+    "value_rows_val": 853742,
+    "policy_points": 1624058,
+    "policy_points_val": 232147,
+    "train_sec": 3721.17,
+    "band": {
+      "w32": {
+        "rows": 19375,
+        "p_net_src": "pol_p",
+        "r3": {
+          "v_mse": 0.5409438523164357,
+          "v_sign": 0.797058064516129,
+          "top1_visits": 0.5158120196547814,
+          "ce_visits": 1.9570212912256117
+        },
+        "r5": {
+          "v_mse": 0.5263126848046884,
+          "v_sign": 0.8120774193548387,
+          "top1_visits": 0.5728864810381756,
+          "ce_visits": 1.8447839976318299
+        },
+        "r6": {
+          "v_mse": 0.5114572351261207,
+          "v_sign": 0.8149161290322581,
+          "top1_visits": 0.5757843013733148,
+          "ce_visits": 1.8359592866128587
+        },
+        "r7": {
+          "v_mse": 0.5264539035133706,
+          "v_sign": 0.8103225806451613,
+          "top1_visits": 0.5863676452059973,
+          "ce_visits": 1.8346712921043329
+        }
+      },
+      "w30": {
+        "rows": 19467,
+        "p_net_src": "pol_p",
+        "r3": {
+          "v_mse": 0.5480434322334934,
+          "v_sign": 0.7927775209328607,
+          "top1_visits": 0.606449955030194,
+          "ce_visits": 1.8054117523550175
+        },
+        "r5": {
+          "v_mse": 0.5155001935078082,
+          "v_sign": 0.81445523193096,
+          "top1_visits": 0.6254657587048695,
+          "ce_visits": 1.7550082039468533
+        },
+        "r6": {
+          "v_mse": 0.5221434472564392,
+          "v_sign": 0.8120922586942004,
+          "top1_visits": 0.5974559938327123,
+          "ce_visits": 1.7701152853957796
+        },
+        "r7": {
+          "v_mse": 0.5268451710850761,
+          "v_sign": 0.811373092926491,
+          "top1_visits": 0.6259796993447256,
+          "ce_visits": 1.7550667766799937
+        }
+      },
+      "w28": {
+        "rows": 31926,
+        "p_net_src": "nrel_a1.npz",
+        "r3": {
+          "v_mse": 0.5592032119716303,
+          "v_sign": 0.7976884044352566,
+          "top1_visits": 0.6310534198701947,
+          "ce_visits": 1.6801148612097045
+        },
+        "r5": {
+          "v_mse": 0.5715890996124696,
+          "v_sign": 0.7945248386894694,
+          "top1_visits": 0.5770233538581018,
+          "ce_visits": 1.7492213252116184
+        },
+        "r6": {
+          "v_mse": 0.5864879795681898,
+          "v_sign": 0.7857858798471465,
+          "top1_visits": 0.49780884229211736,
+          "ce_visits": 1.8415131801944435
+        },
+        "r7": {
+          "v_mse": 0.5858033665101913,
+          "v_sign": 0.7905468896823905,
+          "top1_visits": 0.5497309591168802,
+          "ce_visits": 1.7728864551615502
+        }
+      }
+    },
+    "arena_random": {
+      "label": "r7_vs_r5_random",
+      "pairs": 192,
+      "games": 384,
+      "void": 0,
+      "wins": 206.0,
+      "wr": 0.5365,
+      "ci95": [
+        0.4821,
+        0.5909
+      ],
+      "elo": 25.4,
+      "elo95": [
+        -12.5,
+        63.8
+      ],
+      "promoted": false,
+      "shards": 8,
+      "dup_seeds": 0,
+      "seed_base": 571000,
+      "leaders": "random",
+      "decks": "synth_roles"
+    },
+    "arena_mirror": {
+      "label": "r7_vs_r5_mirror",
+      "pairs": 192,
+      "games": 384,
+      "void": 0,
+      "wins": 201.0,
+      "wr": 0.5234,
+      "ci95": [
+        0.4775,
+        0.5694
+      ],
+      "elo": 16.3,
+      "elo95": [
+        -15.6,
+        48.5
+      ],
+      "promoted": false,
+      "shards": 8,
+      "dup_seeds": 0,
+      "seed_base": 581000,
+      "leaders": "fixed",
+      "decks": "singleton"
+    }
+  },
+  "command": "OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in ~/n29_wave/*/n_records/* ~/n30_wave/*/n_records/* ~/n31_wave/*/n_records/* ~/n32_wave/*/n_records/* --z-in ~/n28_wave/*/n_records/* ~/n27_wave/*/n_records/* --warm-start ~/start.npz --ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --backend torch --pi-teacher visits --out ~/nrel_r7.npz",
+  "notes": "z集合はr6と同一（波27〜32）でOOMなし・波を落とす必要なし。ep1がbest（v_mse 0.4965、r6と異なりep1で過学習は見られなかった）。3波の行列比較（r3/r5/r6/r7、判定はコーディネータ）: 波32（新しい・in-distribution寄り）ではr7のtop1_visits=0.586が4本中最良（v_mseはr5と同水準・r6よりやや悪化）。波30ではr7のtop1_visits=0.626がr6(0.597)から回復しr5(0.625)と同水準まで戻った。波28（最古・分布外）ではr7のtop1_visits=0.550がr6(0.498)から部分回復したが、r5(0.577)・r3(0.631)には届かない＝πの窓を広げる（2波→4波）ことで古い分布での方策劣化は緩和されるが完全には解消しない。アリーナ（候補r7・基準r5）は主random wr=0.5365 Elo+25.4[-12.5,+63.8]・副mirror wr=0.5234 Elo+16.3[-15.6,+48.5]、いずれもvoid 0・両条件ともr6より改善し退行シグナルなし。torch・rust wheel・教材は前回r6セッションのものを再利用、opcg_effects.jsonキャッシュ競合等の新規事象は今回発生しなかった。"
+}
