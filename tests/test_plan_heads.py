@@ -396,3 +396,38 @@ def test_stratification_reads_leaders_and_decks(tmp_path):
     assert cur2["peak_life"] == 5 and cur2["span"] is None      # 候補が 1 本なので span 無し
     assert "life1" in cur2["by_life"] and cur2["by_life"]["life1"]["n"] == 10
     assert PVM.life_curve([], min_n=1)["n"] == 0
+
+def test_extra_pads_mixed_encoding_versions():
+    """`plan_value_map._extra` が**シャードを読んだ時点で**行を現行の形へ 0 埋めする。
+
+    版の混ざった波（v13 の scalars 123・tokens 22×20 と v14 の 127・22×22 が同じ波にある）で、
+    行を積んでから揃えていたため `np.stack` が「形が違う」で落ちた（波 31 で実測・2026-09-12）。
+    """
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
+    import plan_value_map as PVM
+    from opcg_sim.learned import n_rel_feat as NR
+
+    class _DD(dict):
+        @property
+        def files(self):
+            return list(self.keys())
+
+    n = 4
+    v13 = _DD(scalars=np.zeros((n, 123), np.float32), tokens=np.zeros((n, 22, 20), np.float32),
+              card_idx=np.zeros((n, MAX_CI), np.int64))
+    v14 = _DD(scalars=np.zeros((n, NL.D_SC), np.float32),
+              tokens=np.zeros((n, 22, NR.S_DIM), np.float32),
+              card_idx=np.zeros((n, MAX_CI), np.int64))
+    e13, e14 = PVM._extra(v13, n), PVM._extra(v14, n)
+    for e in (e13, e14):
+        assert e["sc"].shape == (n, NL.D_SC) and e["tok"].shape == (n, 22, NR.S_DIM)
+        assert e["deck_kinds"] is None                     # 列が無い波は None
+    np.stack([e13["sc"][0], e14["sc"][0]])                 # 混在でも積める（これが落ちていた）
+    np.stack([e13["tok"][0], e14["tok"][0]])
+    # 0 埋めは末尾だけ＝古い列はそのまま（`dump_io.build_pack` と同じ扱い）
+    v13b = _DD(scalars=np.arange(n * 123, dtype=np.float32).reshape(n, 123),
+               tokens=np.ones((n, 22, 20), np.float32), card_idx=np.zeros((n, MAX_CI), np.int64))
+    e = PVM._extra(v13b, n)
+    assert np.array_equal(e["sc"][:, :123], v13b["scalars"])
+    assert not e["sc"][:, 123:].any() and not e["tok"][:, :, 20:].any()

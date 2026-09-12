@@ -170,14 +170,20 @@ def both_lethal_block(recs):
             "winrate": float(np.mean([r["z"] > 0 for r in rs]))}
 
 
-def _group_block(recs, min_n):
+def _group_block(recs, min_life_n):
     """1 群の出力（守りのライフ曲線＋攻めの両方の圏）。"""
-    return {"defense": life_curve([r for r in recs if r["kind"] == "d"], min_n),
+    return {"defense": life_curve([r for r in recs if r["kind"] == "d"], min_life_n),
             "attack_both_lethal": both_lethal_block([r for r in recs if r["kind"] == "a"])}
 
 
-def strat_blocks(recs, leader_top=16, min_n=60):
-    """リーダー／デッキの軸で割った群の表と、peak_life の散らばり。"""
+def strat_blocks(recs, leader_top=16, min_n=60, min_life_n=None):
+    """リーダー／デッキの軸で割った群の表と、peak_life の散らばり。
+
+    `min_n`＝**群を出す**最小の相手ターン行数・`min_life_n`（既定 `min_n`）＝**ライフ 1 点を山の
+    候補にする**最小の行数。リーダー個別は 1 名の行数が少ないので、群の関門を上げてライフの
+    関門を下げる（既定を分けないと `peak_life` が全部 None になる・波 30／32 で実測）。
+    """
+    min_life_n = min_n if min_life_n is None else min_life_n
     out = {}
     axes = {
         "by_leader_life": lambda r: (f"leaderlife{r['own_leader_life']}"
@@ -194,21 +200,21 @@ def strat_blocks(recs, leader_top=16, min_n=60):
             k = key(r)
             if k:
                 groups[k].append(r)
-        out[name] = {k: _group_block(v, min_n) for k, v in sorted(groups.items())
+        out[name] = {k: _group_block(v, min_life_n) for k, v in sorted(groups.items())
                      if len([x for x in v if x["kind"] == "d"]) >= min_n}
     # 注入テンプレートは「そのテンプレートを含むか」の重複あり分類
     tpl = {}
     for t in DECK_TEMPLATES:
         sub = [r for r in recs if t in (r.get("deck_templates") or ())]
         if len([x for x in sub if x["kind"] == "d"]) >= min_n:
-            tpl[t] = _group_block(sub, min_n)
+            tpl[t] = _group_block(sub, min_life_n)
     out["by_deck_template"] = tpl
     # リーダー個別（出現数の多い上位）
     cnt = collections.Counter(r["own_leader"] for r in recs
                               if r["kind"] == "d" and r.get("own_leader"))
     top = [cid for cid, n in cnt.most_common(leader_top) if n >= min_n]
-    out["by_leader"] = {cid: dict(_group_block([r for r in recs if r.get("own_leader") == cid], min_n),
-                                  rows_d=cnt[cid]) for cid in top}
+    out["by_leader"] = {cid: dict(_group_block([r for r in recs if r.get("own_leader") == cid],
+                                               min_life_n), rows_d=cnt[cid]) for cid in top}
     # peak_life の散らばり（**しきい値が共通か個別かの答え**）
     def spread(d):
         peaks = [v["defense"].get("peak_life") for v in d.values()
@@ -226,24 +232,34 @@ def strat_blocks(recs, leader_top=16, min_n=60):
     return out
 
 
-def _extra(dd, n):
-    """race_state の状態列に加えて、forward に要る scalars／card_idx／tokens を丸ごと持つ。"""
-    sc, tk = _race_extra(dd, n)
-    return {"race_sc": sc, "race_tk": tk,
-            "deck_kinds": (np.asarray(dd["deck_kinds"])[:n] if "deck_kinds" in dd.files else None),
-            "sc": np.asarray(dd["scalars"])[:n].astype(np.float32),
-            "ci": np.asarray(dd["card_idx"])[:n, :NL.N_TOK].astype(np.int64),
-            "tok": np.asarray(dd["tokens"])[:n].astype(np.float32),
-            "life0": np.asarray(dd["scalars"])[:n, 0].astype(np.float32)}
-
-
 def _pad(sc, tok):
-    """v13 の行（scalars 123・tokens 22×20）を現行の形へ 0 埋め（`dump_io.target_form` と同じ）。"""
+    """v13 の行（scalars 123・tokens 22×20）を現行の形へ 0 埋め（`dump_io.target_form` と同じ）。
+
+    **シャードを読んだ直後に呼ぶ**（行を積んでから呼ぶと、版の混ざった波で `np.stack` が
+    「形が違う」で落ちる。波 31 で実測・2026-09-12）。0 埋めは `dump_io.build_pack` と同じ扱い
+    ＝新しい列は情報なしの 0。
+    """
     if sc.shape[1] < NL.D_SC:
         sc = np.concatenate([sc, np.zeros((sc.shape[0], NL.D_SC - sc.shape[1]), np.float32)], 1)
     if tok.shape[2] < NR.S_DIM:
         tok = np.concatenate([tok, np.zeros(tok.shape[:2] + (NR.S_DIM - tok.shape[2],), np.float32)], 2)
     return sc, tok
+
+
+def _extra(dd, n):
+    """race_state の状態列に加えて、forward に要る scalars／card_idx／tokens を丸ごと持つ。
+
+    scalars／tokens は**このシャードを読んだ時点で現行の形へ 0 埋めする**＝版の混ざった波
+    （v13 と v14 のシャードが同じ波にある）でも行の形が揃う。
+    """
+    sc_race, tk_race = _race_extra(dd, n)
+    sc, tok = _pad(np.asarray(dd["scalars"])[:n].astype(np.float32),
+                   np.asarray(dd["tokens"])[:n].astype(np.float32))
+    return {"race_sc": sc_race, "race_tk": tk_race,
+            "deck_kinds": (np.asarray(dd["deck_kinds"])[:n] if "deck_kinds" in dd.files else None),
+            "sc": sc, "ci": np.asarray(dd["card_idx"])[:n, :NL.N_TOK].astype(np.int64),
+            "tok": tok,
+            "life0": np.asarray(dd["scalars"])[:n, 0].astype(np.float32)}
 
 
 def _mean(xs):
@@ -261,8 +277,8 @@ def collect(net, rt, dirs, holdout_mod=7, limit_games=0, bs=512):
     def flush():
         if not pend:
             return
+        # 行は `_extra` で現行の形に揃っている（版の混ざった波でも stack できる）
         sc = np.stack([p[2] for p in pend]); ci = np.stack([p[3] for p in pend]); tok = np.stack([p[4] for p in pend])
-        sc, tok = _pad(sc, tok)
         _v, vq = net.value_with_plan(sc, ci, tok, *NT.relations_or_zeros(net, ci, tok, rt))
         for (kind, rec, _s, _c, _t), q in zip(pend, vq):
             rec["vq"] = [float(x) for x in q]
@@ -451,7 +467,10 @@ def main(argv=None):
     ap.add_argument("--leader-top", type=int, default=16,
                     help="個別に出すリーダーの数（相手ターンの行数の多い順）")
     ap.add_argument("--min-n", type=int, default=60,
-                    help="群を出す最小の相手ターン行数（ライフ曲線の山を出す最小の n も同じ）")
+                    help="**群を出す**最小の相手ターン行数")
+    ap.add_argument("--min-life-n", type=int, default=None,
+                    help="**ライフ 1 点を山（peak_life）の候補にする**最小の行数（既定 --min-n）。"
+                         "リーダー個別は 1 名の行数が少ないので下げる（例 --min-n 200 --min-life-n 30）")
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
     t0 = time.time()
@@ -467,8 +486,9 @@ def main(argv=None):
            "holdout_mod": args.holdout_mod, "games": games,
            "meta_games_missing_dirs": meta_miss, "meta_games_seeds": n_meta,
            "attack": _attack_block(att), "defense": _defense_block(dfn),
-           "strat": strat_blocks(att + dfn, args.leader_top, args.min_n),
-           "strat_params": {"leader_top": args.leader_top, "min_n": args.min_n},
+           "strat": strat_blocks(att + dfn, args.leader_top, args.min_n, args.min_life_n),
+           "strat_params": {"leader_top": args.leader_top, "min_n": args.min_n,
+                            "min_life_n": args.min_life_n or args.min_n},
            "seconds": round(time.time() - t0, 1)}
     _print(out)
     if args.out:
