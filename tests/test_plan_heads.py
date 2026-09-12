@@ -431,3 +431,38 @@ def test_extra_pads_mixed_encoding_versions():
     e = PVM._extra(v13b, n)
     assert np.array_equal(e["sc"][:, :123], v13b["scalars"])
     assert not e["sc"][:, 123:].any() and not e["tok"][:, :, 20:].any()
+
+# --- 8. V と方策の更新回数の比（`--pi-steps-mult`・計画 §20.11 の候補 A）-------
+def test_pi_steps_mult_is_identity_at_one_and_scales_above():
+    """`_policy_order`: 1.0 は**今までと同じ並び・同じ本数**・>1 は本数が倍率どおり増える。"""
+    rng = np.random.default_rng(4)
+    tr_p = np.arange(100)
+    n1, o1 = NT._policy_order(tr_p, 8, 1.0, rng)
+    assert n1 == 100 // 8 == 12
+    assert np.array_equal(o1, tr_p[:12 * 8])            # 従来の `tr_p[:npi*bs_p]` と一致
+    n2, o2 = NT._policy_order(tr_p, 8, 2.0, rng)
+    assert n2 == 24 and len(o2) == 24 * 8               # 本数は 2 倍
+    assert np.array_equal(np.sort(o2[:100]), tr_p)      # 1 周目は全点を 1 回ずつ
+    assert set(o2.tolist()) == set(tr_p.tolist())       # 継ぎ足しも同じ点の集合から
+    n3, o3 = NT._policy_order(tr_p, 8, 0.5, rng)
+    assert n3 == 6 and len(o3) == 48                    # 減らす側も効く
+    assert np.array_equal(o3, tr_p[:48])
+    assert NT._policy_order(tr_p, 8, 0.0, rng)[0] == 1  # 0 でも 1 本は残す（空スケジュールにしない）
+
+
+@pytest.mark.parametrize("backend", ["numpy", "torch"])
+def test_pi_steps_mult_one_is_bit_identical(waves, backend):
+    """`--pi-steps-mult 1.0`（既定）は倍率を入れる前の学習と**同じ重み**になる。"""
+    if backend == "torch":
+        pytest.importorskip("torch", reason="torch は任意依存")
+    base = os.path.join(waves["root"], f"pm_base_{backend}.npz")
+    mult = os.path.join(waves["root"], f"pm_one_{backend}.npz")
+    a = _Args([waves["plain"]], base, os.path.join(waves["root"], f"c_pmb_{backend}"), 0.0, backend)
+    NT.train(a)
+    b = _Args([waves["plain"]], mult, os.path.join(waves["root"], f"c_pmo_{backend}"), 0.0, backend)
+    b.pi_steps_mult = 1.0
+    NT.train(b)
+    with np.load(base, allow_pickle=True) as d1, np.load(mult, allow_pickle=True) as d2:
+        for k in NL.NRelNet.PARAMS:
+            assert np.array_equal(d1[k], d2[k]), k
+        assert "pi_steps_mult" not in json.loads(str(d2["meta"]))   # 既定は meta に焼かない

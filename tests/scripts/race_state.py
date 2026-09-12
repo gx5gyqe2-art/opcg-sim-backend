@@ -60,8 +60,12 @@ from opcg_sim.loop import decks as D  # noqa: E402
 _ROW_COLS = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
 _POL_COLS = ("pol_sig", "pol_cid", "pol_tcid")
 # tokens の列（n_rel_feat.S_COLS）・枠（0 自L・1 相L・2〜6 自場・7〜11 相場）
-_C_REST, _C_CAN, _C_BLK, _C_CHAR = 3, 5, 6, 18
+_C_PWR, _C_REST, _C_CAN, _C_BLK, _C_CHAR = 0, 3, 5, 6, 18
+_TOK_COLS = (_C_PWR, _C_REST, _C_CAN, _C_BLK, _C_CHAR)
+_T_PWR, _T_REST, _T_CAN, _T_BLK, _T_CHAR = range(len(_TOK_COLS))
 _SLOT_OWN = slice(2, 7); _SLOT_OPP = slice(7, 12)
+#: `power_now` の目盛り（`n_rel_feat` は 10000 で割って入れる）
+_PWR_SCALE = 10000.0
 
 
 def _turn_band(t):
@@ -76,21 +80,53 @@ def _margin_band(m):
     return "<=-2" if m <= -2 else "-1" if m == -1 else "0" if m == 0 else "+1" if m == 1 else ">=+2"
 
 
+def _pwr_band(p):
+    """飛んでくる攻撃の超過パワー（攻撃側 − 自リーダー）の帯（単位 1000）。
+
+    **カウンター 1 枚は 1000 か 2000** なので、この帯がそのまま「守るのに何枚要るか」に対応する
+    （<=0＝守らなくても耐える・1000〜2000＝1 枚・3000〜4000＝2 枚・5000+＝3 枚以上）。
+    """
+    if p is None:
+        return None
+    k = int(round(p / 1000.0))
+    return "p<=0" if k <= 0 else "p1-2k" if k <= 2 else "p3-4k" if k <= 4 else "p5k+"
+
+
 def _extra(dd, n):
-    """scalars の先頭 14（ライフ・ドン・手札・場・ターン・リーダーパワー）と tokens の 12 枠 × 4 列。"""
+    """scalars の先頭 14（ライフ・ドン・手札・場・ターン・リーダーパワー）と tokens の 12 枠 × 5 列。"""
     sc = np.asarray(dd["scalars"])[:n, :14].astype(np.float32)
-    tk = np.asarray(dd["tokens"])[:n, :12][:, :, [_C_REST, _C_CAN, _C_BLK, _C_CHAR]].astype(np.float32)
+    tk = np.asarray(dd["tokens"])[:n, :12][:, :, list(_TOK_COLS)].astype(np.float32)
     return sc, tk
+
+
+def _incoming(tk):
+    """相手ターン中の自分の行 → 飛んでくる攻撃の超過パワー（最大の攻撃側 − 自リーダー）。
+
+    `power_now` は**その行が誰の手番かで評価が切り替わる**（`n_rel_feat` の v14 の注記）ので、
+    相手ターン中の自分の行では「相手の攻撃パワー」と「自分の守りのパワー」がそのまま入っている。
+    相手の枠（リーダー＋場のキャラ）の最大パワーから自リーダーのパワーを引く。攻撃側が居ない
+    （枠が全て空）なら None。
+    """
+    opp = tk[_SLOT_OPP]
+    cand = [float(tk[1, _T_PWR])]                      # 相手リーダー
+    ch = opp[:, _T_CHAR] > 0.5
+    if ch.any():
+        cand.append(float(opp[ch, _T_PWR].max()))
+    top = max(cand) * _PWR_SCALE
+    mine = float(tk[0, _T_PWR]) * _PWR_SCALE
+    if top <= 0.0:
+        return None
+    return top - mine
 
 
 def _state(sc, tk):
     """自席ターン開始の main 行 → レースの状態。tk は [12, 4]（rest, can, blk, char）。"""
     own = tk[_SLOT_OWN]; opp = tk[_SLOT_OPP]
-    own_ch = own[:, 3] > 0.5; opp_ch = opp[:, 3] > 0.5
-    my_atk = int(tk[0, 1] > 0.5) + int((own_ch & (own[:, 1] > 0.5)).sum())
+    own_ch = own[:, _T_CHAR] > 0.5; opp_ch = opp[:, _T_CHAR] > 0.5
+    my_atk = int(tk[0, _T_CAN] > 0.5) + int((own_ch & (own[:, _T_CAN] > 0.5)).sum())
     opp_atk = 1 + int(opp_ch.sum())
-    my_blk = int((own_ch & (own[:, 2] > 0.5)).sum())
-    opp_blk = int((opp_ch & (opp[:, 2] > 0.5)).sum())
+    my_blk = int((own_ch & (own[:, _T_BLK] > 0.5)).sum())
+    opp_blk = int((opp_ch & (opp[:, _T_BLK] > 0.5)).sum())
     my_life, opp_life = int(round(sc[0])), int(round(sc[1]))
     my_hand, opp_hand = int(round(sc[6])), int(round(sc[7]))
     return {"my_life": my_life, "opp_life": opp_life, "my_hand": my_hand, "opp_hand": opp_hand,
@@ -128,10 +164,14 @@ def analyze(dirs, limit_games=0):
                     u2c[sj[2][0]] = str(pol["pol_tcid"][j])
         # (who, turn) → 状態（最初の main 行）と行動の集計
         first = {}; acts = {}; zs = {}
+        # (who, 相手ターン) → 飛んでくる攻撃の超過パワー（自分の**最初の**行で測る・§D）
+        incoming = {}
         last_turn = max(int(rows["turn"][i]) for i in idx)
         for i in idx:
             w = int(rows["who"][i]); t = int(rows["turn"][i])
             zs[w] = float(rows["z"][i])
+            if t >= 1 and (t % 2 == 1) != (w == 0) and (w, t) not in incoming:
+                incoming[(w, t)] = _incoming(tk[i])      # 相手ターン中の自分の行（守りの層別用）
             if t < 1 or (t % 2 == 1) != (w == 0) or int(rows["kind"][i]) != 0:
                 continue
             key = (w, t)
@@ -173,7 +213,8 @@ def analyze(dirs, limit_games=0):
                     continue
                 guard_recs.append({"who": w, "turn": a_t + 1, "z": zs.get(w, 0.0), "attacks": n_att,
                                    "lost": max(0, lost), "life_before": first[(w, a_t)]["my_life"],
-                                   "hand_before": first[(w, a_t)]["my_hand"]})
+                                   "hand_before": first[(w, a_t)]["my_hand"],
+                                   "atk_over": incoming.get((w, a_t + 1))})
     print(f"行 {n_rows}・対局 {games}（{time.time()-t0:.0f}s）", flush=True)
     return _aggregate(turn_recs, guard_recs, games, t0)
 
@@ -280,6 +321,31 @@ def _aggregate(turn_recs, guard_recs, games, t0):
             if sub:
                 a = sum(r["attacks"] for r in sub); l_ = sum(r["lost"] for r in sub)
                 g["by_z"][name] = {"attacks": a, "guard_rate": 1.0 - l_ / a}
+        # **飛んでくる攻撃の超過パワー別**（§D・「安い攻撃は受けて高い攻撃を守る」の検査）。
+        # 帯はカウンター 1 枚（1000〜2000）を単位にしている＝守るのに要る枚数に対応する。
+        g["by_atk_power"] = {}
+        for band in ("p<=0", "p1-2k", "p3-4k", "p5k+"):
+            sub = [r for r in guard_recs if _pwr_band(r.get("atk_over")) == band]
+            if sub:
+                a = sum(r["attacks"] for r in sub); l_ = sum(r["lost"] for r in sub)
+                g["by_atk_power"][band] = {"attacks": a, "turns": len(sub),
+                                           "guard_rate": 1.0 - l_ / a,
+                                           "mean_over": float(np.mean([r["atk_over"] for r in sub])),
+                                           "winrate": float(np.mean([r["z"] > 0 for r in sub]))}
+        g["atk_power_unknown"] = sum(1 for r in guard_recs if _pwr_band(r.get("atk_over")) is None)
+        # 超過パワー × 自分のライフ（**交換レートの管理が在るか**＝安い攻撃をライフで受け、
+        # 高い攻撃を手札で止める、がライフ残に応じて動いているか）
+        g["by_atk_power_life"] = {}
+        for band in ("p<=0", "p1-2k", "p3-4k", "p5k+"):
+            row = {}
+            for lb in (1, 2, 3, 4, 5):
+                sub = [r for r in guard_recs
+                       if _pwr_band(r.get("atk_over")) == band and r["life_before"] == lb]
+                if sub:
+                    a = sum(r["attacks"] for r in sub); l_ = sum(r["lost"] for r in sub)
+                    row[f"life{lb}"] = {"attacks": a, "guard_rate": 1.0 - l_ / a}
+            if row:
+                g["by_atk_power_life"][band] = row
     out["guard"] = g
     out["seconds"] = round(time.time() - t0, 1)
     return out
@@ -319,6 +385,13 @@ def _print(out):
             return "{" + ", ".join(f"{k}: {v['guard_rate']:.3f}" for k, v in d.items()) + "}"
         print(f"守り guard_rate {g['guard_rate']:.3f}（相手ターン {g['opp_turns_with_leader_attacks']}）"
               f"  by_turn {fmt(g['by_turn'])}  by_life {fmt(g['by_life'])}  by_z {fmt(g['by_z'])}")
+        if g.get("by_atk_power"):
+            print(f"  超過パワー別（不明 {g['atk_power_unknown']}）: " + "  ".join(
+                f"{k}: n{v['turns']} guard {v['guard_rate']:.3f} 平均 {v['mean_over']:+.0f} wr {v['winrate']:.3f}"
+                for k, v in g["by_atk_power"].items()))
+            for k, row in g["by_atk_power_life"].items():
+                print(f"    {k:6} × ライフ: " + "  ".join(
+                    f"{lb}:{v['guard_rate']:.3f}(n{v['attacks']})" for lb, v in row.items()))
     print(f"  {out['seconds']}s")
 
 

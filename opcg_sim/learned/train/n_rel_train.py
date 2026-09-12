@@ -605,6 +605,27 @@ def eval_plan(net, rt, V, vi, bs=512):
     return (float(tot / n) if n else float("nan")), n
 
 
+def _policy_order(tr_p, bs_p, mult, rng):
+    """1 エポックの方策バッチの並びと本数（`--pi-steps-mult`・計画 §20.11 の候補 A）。
+
+    **V と方策の釣り合いは「1 エポックに各ヘッドが何回更新されるか」で決まる**（V と方策は
+    別のステップで更新されるので、損失に定数を掛けても Adam が正規化して効かない）。ここで
+    方策のステップ数だけを `mult` 倍する＝V の回数は変えずに方策を重く／軽くする。
+    `mult` を 1 倍で超える分は `tr_p` をシャッフルし直して継ぎ足す（同じ点を 2 周する）。
+
+    **`mult` が 1.0 のときは今までと 1 bit も変わらない**（`tr_p[:npi*bs_p]` と同じ並び・同じ本数）。
+    """
+    npi0 = len(tr_p) // bs_p
+    if mult == 1.0:
+        return npi0, tr_p[:npi0 * bs_p]
+    npi = max(1, int(npi0 * mult))
+    need = npi * bs_p
+    if need <= len(tr_p):
+        return npi, tr_p[:need]
+    reps = -(-need // max(len(tr_p), 1))
+    return npi, np.concatenate([tr_p] + [rng.permutation(tr_p) for _ in range(reps - 1)])[:need]
+
+
 def _val_batch(net, rt, V, vi):
     """holdout の value 予測（memmap から切り出して float32 へ上げる）。"""
     sc, ci, tok = DIO.rows_f32(V, vi)
@@ -811,6 +832,10 @@ def train(args):
         n_ok = int((np.asarray(V["plan"][:], np.int8) >= 0).sum()) if plan_on else 0
         print(f"plan: {'on' if plan_on else 'off（dump に plan 列＝sidecar が無い）'}"
               f" λ={plan_w} 有効行 {n_ok}/{len(V['z'])}", flush=True)
+    # V と方策の更新回数の比（§20.11 の候補 A）。1.0＝今までと同じ。
+    pi_mult = float(getattr(args, "pi_steps_mult", 1.0) or 1.0)
+    if pi_mult != 1.0:
+        print(f"pi_steps_mult: {pi_mult}（方策のステップ数を {pi_mult} 倍・V は不変）", flush=True)
     # backend（§18.4）: torch のときも重みの正本は numpy の `net`（holdout 評価・保存はそちら）。
     # 学習中は torch 側に置き、epoch の終わりに `sync_to_numpy()` で書き戻す。
     backend, backend_name, note = make_backend(args.backend, net, args.lr, args.threads,
@@ -841,9 +866,10 @@ def train(args):
     for ep in range(args.epochs):
         t_ep = time.time()
         rng.shuffle(tr_v); rng.shuffle(tr_p)
-        nv = len(tr_v) // args.bs_v; npi = len(tr_p) // args.bs_p
+        nv = len(tr_v) // args.bs_v
+        npi, ord_p = _policy_order(tr_p, args.bs_p, pi_mult, rng)
         if src is not None:
-            src.begin(tr_v[:nv * args.bs_v], args.bs_v, tr_p[:npi * args.bs_p], args.bs_p)
+            src.begin(tr_v[:nv * args.bs_v], args.bs_v, ord_p, args.bs_p)
         mse = ce = 0.0
         sched = [0] * nv + [1] * npi
         rng.shuffle(sched)
@@ -886,7 +912,7 @@ def train(args):
                     ce += backend.policy_step_b(*b, args.lr)
                 else:
                     sp("slice_p")
-                    bi = tr_p[ip * args.bs_p:(ip + 1) * args.bs_p]
+                    bi = ord_p[ip * args.bs_p:(ip + 1) * args.bs_p]
                     lens = P["len"][bi]
                     idx = np.concatenate([np.arange(ptr[i], ptr[i] + P["len"][i]) for i in bi])
                     seg = np.repeat(np.arange(len(bi)), lens)
@@ -979,7 +1005,9 @@ def _save(net, args, vocab, V, P, best_ep):
                                 {"pi_teacher": args.pi_teacher, "pi_n_min": args.pi_n_min,
                                  "pi_c_visit": args.pi_c_visit, "pi_c_scale": args.pi_c_scale}),
                              **({"aux_weight": float(args.aux_weight)} if net.aux else {}),
-                             **({"plan_weight": float(args.plan_weight)} if net.plan else {})})
+                             **({"plan_weight": float(args.plan_weight)} if net.plan else {}),
+                             **({} if float(getattr(args, "pi_steps_mult", 1.0) or 1.0) == 1.0 else
+                                {"pi_steps_mult": float(args.pi_steps_mult)})})
 
 
 def main(argv=None):
@@ -1000,6 +1028,11 @@ def main(argv=None):
                     help="補助教師（dump v4 の aux／aux_tok・§20.8.2）の重み λ_aux。"
                          "**0 で完全に無効＝今までと同じ学習**。aux 列を持たない波だけの dump は"
                          "自動で無効になる（既定 0.1）")
+    tr.add_argument("--pi-steps-mult", type=float, default=1.0,
+                    help="方策のステップ数の倍率（計画 §20.11 の候補 A・V と方策の釣り合い）。"
+                         "**1.0 で今までと 1 bit も変わらない**。2.0 なら 1 エポックで方策を 2 倍"
+                         "更新する（V の回数は不変・足りない分は方策点をシャッフルし直して 2 周）。"
+                         "損失に重みを掛けても Adam が正規化して効かないので、比は回数で作る")
     tr.add_argument("--plan-weight", type=float, default=0.0,
                     help="方針ヘッド（計画 §20.10・sidecar の plan 列・V(盤面, 方針)）の重み λ_plan。"
                          "**既定 0＝完全に無効＝今までと同じ学習**。plan 列（`plan_labels` の sidecar）を"
