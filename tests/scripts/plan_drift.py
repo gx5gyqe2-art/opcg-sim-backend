@@ -49,8 +49,7 @@ _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from opcg_sim.learned.train import dump_io as DIO  # noqa: E402
-from opcg_sim.loop import deck_roles as DR_ROLES  # noqa: E402
+from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from opcg_sim.loop import decks as D  # noqa: E402
 
 LABELS = ("face", "board", "mixed", "develop", "pass")
@@ -79,95 +78,13 @@ def _prop_ci(k, n):
     return {"n": int(n), "p": float(p), "ci95": [p - 1.96 * se, p + 1.96 * se]}
 
 
-class _Cards:
-    """カード ID → リーダーか／除去の型を持つか（マスター単位でキャッシュ）。"""
-
-    def __init__(self, db):
-        self.db = db
-        self._t = {}
-
-    def info(self, cid):
-        if cid not in self._t:
-            m = self.db.get_card(cid) if cid else None
-            if m is None:
-                self._t[cid] = None
-            else:
-                forms = {k.split(":", 1)[0] for k in DR_ROLES.classify(m)}
-                self._t[cid] = {"leader": getattr(getattr(m, "type", None), "name", "") == "LEADER",
-                                "removal": bool(forms & set(DR_ROLES.FORMS))}
-        return self._t[cid]
-
-
-def _cls(sj, u2c, cards):
-    """1 手（move_sig の JSON）→ 方針クラス（face/board/develop/end/don/None・unknown）。"""
-    at = sj[0]
-    if at in ("ATTACK", "DON_BOX"):
-        tg = sj[2][0] if sj[2] else None
-        if tg is None:
-            return "don" if at == "DON_BOX" else None
-        inf = cards.info(u2c.get(tg))
-        if inf is None:
-            return "unknown"
-        return "face" if inf["leader"] else "board"
-    if at in ("PLAY", "ACTIVATE_MAIN"):
-        inf = cards.info(u2c.get(sj[1]))
-        if inf is not None and inf["removal"]:
-            return "board"
-        return "develop"
-    if at == "TURN_END":
-        return "end"
-    return None
-
-
-def _label(c):
-    """自席ターンのクラス集計 → 方針ラベル。"""
-    board = c["board"]
-    if c["face"] and board:
-        return "mixed"
-    if c["face"]:
-        return "face"
-    if board:
-        return "board"
-    if c["develop"]:
-        return "develop"
-    return "pass"
-
-
-def _lean(c):
-    """ターンの傾き＝リーダー攻撃 /（リーダー攻撃＋キャラ攻撃＋除去）。攻撃も除去も無ければ None。"""
-    tot = c["face"] + c["board"]
-    return (c["face"] / tot) if tot else None
-
-
-def _iter_shards(dirs, row_cols, pol_cols, extra_fn=None):
-    """シャード npz を 1 本ずつ開いて (rows, pol, extra) を返す（**1 波を丸ごと載せない**）。
-
-    波 28／30／31 を一括で読むと 14GB を超えて OOM した（2026-09-12 実測）。シャードは対局単位で
-    切られている（`record_gen` は `shard_games` 局ごとに丸ごと書く）ので、1 本ずつで集計できる。
-    """
-    files = [f for d in dirs for f in DIO.shard_files(d)]
-    if not files:
-        raise SystemExit("シャードが無い")
-    for f in files:
-        with np.load(f, allow_pickle=True) as dd:
-            n = int(dd["z"].shape[0])
-            rows = {k: (np.asarray(dd[k])[:n] if k in dd.files else np.zeros(n, np.int64)) for k in row_cols}
-            pol = {k: np.asarray(dd[k]) for k in pol_cols}
-            extra = extra_fn(dd, n) if extra_fn else None
-        yield rows, pol, extra
-
-
-def _iter_games(dirs, row_cols, pol_cols, extra_fn=None):
-    """対局ごとに (rows, pol, extra, L, ptr, idx) を返す。idx は手順どおりの行 index。"""
-    for rows, pol, extra in _iter_shards(dirs, row_cols, pol_cols, extra_fn):
-        L = rows["pol_len"].astype(np.int64)
-        ptr = np.concatenate([[0], np.cumsum(L)]).astype(np.int64)
-        order = np.lexsort((rows["step"], rows["seed"]))
-        seeds = rows["seed"][order]
-        bounds = np.flatnonzero(np.diff(seeds)) + 1
-        starts = np.concatenate([[0], bounds]); ends = np.concatenate([bounds, [len(seeds)]])
-        for s_, e_ in zip(starts, ends):
-            yield rows, pol, extra, L, ptr, order[s_:e_]
+# 分類・シャードの走査の正本は `opcg_sim/learned/train/plan_labels.py`（方針ヘッドの sidecar と
+# 同じ関数＝計器と教師がずれない・§20.10）。ここは別名で使うだけ。
+_Cards = PL.Cards
+_cls = PL.move_class
+_label = PL.turn_label
+_lean = PL.turn_lean
+_iter_games = PL.iter_games
 
 
 def analyze(dirs, fork_ratio=0.5, early_turn=6, limit_games=0):

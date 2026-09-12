@@ -41,6 +41,12 @@ npz からしか作れない（`pol_sig` の JSON を語彙 index に潰す＝`v
 **末尾に足しただけ**（`tokens` 22×20→22×22・`scalars` 123→127）。pack は**常に現行の形**で
 書き、古い波（v13）は新しい列を **0**（＝情報なし。mask は要らない）で埋める。これで v13 と
 v14 の波を 1 本の `_Waves` に束ねられる＝`n_rel_train` は無改造で混ぜて回せる。
+
+**方針ラベル（2026-09-12・計画 §20.10・WP `rs-plan-aux`・`PACK_VERSION` 4）**: シャードの隣の
+sidecar `n_record_XXXXX.plan.npz`（`plan_labels.py` が既存の記録から後付けで書く・`plan(D int8)`・
+-1＝無し）を pack の `plan` 列に取り込む。**sidecar の無いシャードは -1** で埋める＝損失に入らない。
+どの波も持っていなければ `V["plan"]` は `None`（訓練側は方針ヘッドを自動で切る）。sidecar の
+一覧・サイズ・mtime も pack の鍵に入れる＝後から sidecar を足せば pack は作り直される。
 """
 import glob
 import hashlib
@@ -53,13 +59,17 @@ import numpy as np
 from opcg_sim.learned.train.n1_train import _atype_idx    # 候補 action → ATYPES の index
 
 # pack の版（レイアウトを変えたら上げる＝古い pack を無視して作り直す）
-PACK_VERSION = 3                       # 3: 符号化 v14 の形へ 0 埋めで揃える（§20.9 の E）
+PACK_VERSION = 4                       # 4: 方針ラベル `plan` を足した（§20.10・sidecar）
+#                                      # 3: 符号化 v14 の形へ 0 埋めで揃える（§20.9 の E）
 #                                      # 2: 補助教師の 3 列を足した（dump v4・§20.8）
 # V の pack が持つ列と dtype（tok/sc/ci/z は memmap・seed/turn は小さいので RAM に読む）
 MMAP_COLS = {"sc": np.float16, "ci": np.int16, "tok": np.float16, "z": np.float16}
 RAM_COLS = {"seed": np.int64, "turn": np.int16}
 #: 補助教師（dump v4・§20.8.2）。npz に無い波は 0／`aux_mask=0` で埋める＝行は必ず揃う。
 AUX_COLS = {"aux": np.float16, "aux_tok": np.float16, "aux_mask": np.int8}
+#: 方針ラベル（§20.10・sidecar）。無いシャードは -1＝損失に入らない。
+PLAN_COLS = {"plan": np.int8}
+PLAN_NONE = -1
 CACHE_ENV = "OPCG_DUMP_CACHE"
 
 
@@ -88,7 +98,13 @@ def default_cache_dir():
 
 
 def shard_files(d):
-    return sorted(glob.glob(os.path.join(d, "n_record_*.npz")))
+    return sorted(f for f in glob.glob(os.path.join(d, "n_record_*.npz"))
+                  if not f.endswith(".plan.npz"))
+
+
+def plan_sidecar(f):
+    """シャード → 方針ラベルの sidecar のパス（`plan_labels.sidecar_path` と同じ規則）。"""
+    return os.path.splitext(f)[0] + ".plan.npz"
 
 
 def _wave_key(files):
@@ -98,6 +114,10 @@ def _wave_key(files):
     for f in files:
         st = os.stat(f)
         h.update(f"{os.path.basename(f)}\t{st.st_size}\t{st.st_mtime_ns}\n".encode())
+        sc = plan_sidecar(f)
+        if os.path.exists(sc):                 # sidecar を足したら pack を作り直す（§20.10）
+            st = os.stat(sc)
+            h.update(f"{os.path.basename(sc)}\t{st.st_size}\t{st.st_mtime_ns}\n".encode())
     return h.hexdigest()[:16]
 
 
@@ -128,8 +148,10 @@ def build_pack(d, cache_dir):
     form = None
     per_shard = []
     has_aux = False
+    has_plan = False
     for f in files:
         n, ts, sd, cd, aux = _rows_of(f)
+        has_plan = has_plan or os.path.exists(plan_sidecar(f))
         if form is None:
             form = (ts, sd, cd)
         elif (ts, sd, cd) != form:
@@ -153,7 +175,8 @@ def build_pack(d, cache_dir):
     shapes = {"sc": (n_tot, sc_dim), "ci": (n_tot, ci_dim), "tok": (n_tot,) + tok_shape,
               "z": (n_tot,)}
     shapes.update({k: (n_tot,) + aux_shapes[k] for k in AUX_COLS})
-    cols = {**MMAP_COLS, **AUX_COLS}
+    shapes.update({k: (n_tot,) for k in PLAN_COLS})
+    cols = {**MMAP_COLS, **AUX_COLS, **PLAN_COLS}
     mm = {k: np.lib.format.open_memmap(os.path.join(tmp, f"{k}.npy"), mode="w+",
                                        dtype=cols[k], shape=shapes[k])
           for k in cols}
@@ -178,6 +201,16 @@ def build_pack(d, cache_dir):
             # 補助教師（v4）。無いシャードは 0＝`aux_mask=0`＝損失に入らない。
             for k, dt in AUX_COLS.items():
                 mm[k][sl] = d_[k].astype(dt) if k in d_.files else 0
+        # 方針ラベル（§20.10・sidecar）。無いシャードは -1＝損失に入らない。
+        sc_path = plan_sidecar(f)
+        if os.path.exists(sc_path):
+            with np.load(sc_path, allow_pickle=True) as ds:
+                pl = np.asarray(ds["plan"], np.int8)[:n]
+            if len(pl) != n:
+                raise ValueError(f"{sc_path}: 行数がシャードと合わない（{len(pl)} != {n}）")
+            mm["plan"][sl] = pl
+        else:
+            mm["plan"][sl] = PLAN_NONE
         off += n
     assert off == n_tot
     for k in list(mm):
@@ -189,11 +222,12 @@ def build_pack(d, cache_dir):
         json.dump({"pack_version": PACK_VERSION, "src": os.path.abspath(d), "key": key,
                    "rows": n_tot, "shards": [os.path.basename(f) for f in files],
                    "shard_rows": per_shard, "ci_dim": ci_dim, "has_aux": bool(has_aux),
+                   "has_plan": bool(has_plan),
                    "tok_shape": list(tok_shape), "sc_dim": sc_dim,
                    # 元の npz の形（0 埋めしたかが判る＝v13 の波か v14 の波か）
                    "src_tok_shape": list(src_tok_shape), "src_sc_dim": src_sc_dim,
                    "dtypes": {k: np.dtype(v).name for k, v in
-                              {**MMAP_COLS, **AUX_COLS, **RAM_COLS}.items()}}, fh)
+                              {**MMAP_COLS, **AUX_COLS, **PLAN_COLS, **RAM_COLS}.items()}}, fh)
     shutil.rmtree(out, ignore_errors=True)
     os.replace(tmp, out)
     return out
@@ -342,6 +376,11 @@ def load_dump(dirs, vocab, with_policy=True, z_dirs=(), cache_dir=None, n_tok=No
     for k in AUX_COLS:
         V[k] = (_Waves([np.load(os.path.join(p, f"{k}.npy"), mmap_mode="r")
                         for p, _d, _x in packs]) if any_aux else None)
+    # 方針ラベル（§20.10）: 1 本でも sidecar を持つ波があれば列を出す（持たない行は -1）。
+    any_plan = any(_pack_meta(p).get("has_plan") for p, _d, _x in packs)
+    for k in PLAN_COLS:
+        V[k] = (_Waves([np.load(os.path.join(p, f"{k}.npy"), mmap_mode="r")
+                        for p, _d, _x in packs]) if any_plan else None)
     P = {"row": [], "seed": [], "len": [], "chosen": [], "v0": []}
     C = {"pi": [], "at": [], "cid": [], "tcid": [], "k": [], "si": [], "ti": [],
          "n": [], "q": [], "p": []}

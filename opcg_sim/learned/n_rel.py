@@ -77,6 +77,14 @@ D_AUX_TOK_H = 32               # aux_tok ヘッドの中間
 #: npz へ**別鍵**（`aux_` 接頭辞）で保存する補助ヘッドの重み。既存 18 個の `PARAMS` は不変。
 AUX_PARAMS = ("Wx1", "bx1", "Wx2", "bx2", "Wy1", "by1", "Wy2", "by2")
 AUX_KEY = "aux_"
+# --- 方針ヘッド（計画 §20.10・WP `rs-plan-aux`・ユーザ決定 2026-09-12）-----------------------
+# V(盤面, 方針)＝方針ごとの勝率（tanh・z が教師）。列の意味は `train/plan_labels.PLAN_CLASSES`
+# （face／board／mixed／take／guard）が正本。**打った方針のヘッドだけ**に勾配が流れる（mask）。
+# serve は使わない（Rust の読み手は `plan_` の鍵を無視する）＝読み出しは `plan_head` から。
+D_PLAN = 5
+D_PLAN_H = 32
+PLAN_PARAMS = ("Wq1", "bq1", "Wq2", "bq2")
+PLAN_KEY = "plan_"
 N_TOK, N_OWN, N_OPP = NR.N_TOK, NR.N_OWN, NR.N_OPP
 OWN_SLOTS = [i for i in range(N_TOK) if NR._zone(i) in ("own_leader", "own_field", "hand")]   # 16
 OPP_SLOTS = [i for i in range(N_TOK) if NR._zone(i) in ("opp_leader", "opp_field")]          # 6
@@ -158,6 +166,16 @@ class NRelNet:
         self.Wy2 = WA(D_AUX_TOK_H, D_AUX_TOK); self.by2 = np.zeros(D_AUX_TOK, np.float32)
         self.aux_params = list(AUX_PARAMS)
         self.aux = False                  # 補助ヘッドを使うか（訓練器が --aux-weight から立てる）
+        # 方針ヘッド（§20.10）: これも別の乱数列＝既存の初期値は動かない。`plan` が False の
+        # あいだは forward からも損失からも触られない（保存もしない）。
+        rq = np.random.default_rng(seed + 20_100_000)
+
+        def WQ(a, b):
+            return (rq.standard_normal((a, b)) * np.sqrt(2.0 / a)).astype(np.float32)
+        self.Wq1 = WQ(D_E, D_PLAN_H); self.bq1 = np.zeros(D_PLAN_H, np.float32)
+        self.Wq2 = WQ(D_PLAN_H, D_PLAN); self.bq2 = np.zeros(D_PLAN, np.float32)
+        self.plan_params = list(PLAN_PARAMS)
+        self.plan = False                 # 方針ヘッドを使うか（訓練器が --plan-weight から立てる）
         self.vocab_ids = None
         self.meta = {}
         #: このネットが読む符号化の世代（新規は現行＝v14。`load` が npz の meta から入れ直す）。
@@ -344,6 +362,25 @@ class NRelNet:
         v = np.tanh((e @ self.Wv + self.bv)[:, 0])
         return v, self.aux_head(e), self.aux_tok_head(h)
 
+    # --- 方針ヘッド（§20.10・serve は呼ばない） ---
+    def plan_head(self, e, keep=None):
+        """共有表現 e [B,D_E] → 方針ごとの勝率 [B,5]（tanh・列は `plan_labels.PLAN_CLASSES`）。"""
+        hq = e @ self.Wq1 + self.bq1
+        rq = np.maximum(hq, 0.0)
+        oq = rq @ self.Wq2 + self.bq2
+        vq = np.tanh(oq)
+        if keep is not None:
+            keep.update(q_hq=hq, q_rq=rq, q_vq=vq)
+        return vq
+
+    def value_with_plan(self, sc, ci, tok, rel_om, rel_oo):
+        """(value, plan [B,5])（評価・地図の読み出しが使う・value は既存の forward と同じ値）。"""
+        tab = self.card_table()
+        h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
+        e = self.body(sc, h, present)
+        v = np.tanh((e @ self.Wv + self.bv)[:, 0])
+        return v, self.plan_head(e)
+
     # --- 方策 ---
     def cand_input(self, e, h, rel_om, seg, si, ti, feats, budget):
         """候補ごとの入力 [P_cand, D_PIN]。si/ti は 22 枠 index（−1=無し）。"""
@@ -397,6 +434,10 @@ class NRelNet:
             # 読み手（`net/mod.rs` は鍵ごとに `get`）も知らない鍵をそのまま無視する。
             m["aux"] = True
             extra.update({AUX_KEY + p: getattr(self, p) for p in self.aux_params})
+        if self.plan:
+            # 方針ヘッド（§20.10）も別鍵（`plan_Wq1` …）。Rust は知らない鍵を無視する。
+            m["plan"] = True
+            extra.update({PLAN_KEY + p: getattr(self, p) for p in self.plan_params})
         np.savez_compressed(path, **{p: getattr(self, p) for p in self.params},
                             meta=json.dumps(m), nrel=np.array(1), **extra)
 
@@ -426,6 +467,11 @@ class NRelNet:
             for p in net.aux_params:
                 setattr(net, p, d[AUX_KEY + p])
             net.aux = True
+        # 方針ヘッド（§20.10・あれば）。無ければ初期値のまま `plan=False`。
+        if all(PLAN_KEY + p in d.files for p in net.plan_params):
+            for p in net.plan_params:
+                setattr(net, p, d[PLAN_KEY + p])
+            net.plan = True
         return net
 
 

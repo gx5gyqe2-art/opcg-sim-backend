@@ -58,7 +58,7 @@ class TorchNRel(torch.nn.Module):
     パラメータ名は npz 鍵と同じ（`NRelNet.PARAMS`）＝`state_dict` の名前がそのまま npz の鍵に
     なる。語彙表（STATS/AB/ABM/PWR/ISL）は学習対象ではないので buffer/定数で持つ。"""
 
-    def __init__(self, net, aux=False):
+    def __init__(self, net, aux=False, plan=False):
         super().__init__()
         self.ablate = set(getattr(net, "ablate", ()) or ())
         for p in NL.NRelNet.PARAMS:
@@ -68,6 +68,11 @@ class TorchNRel(torch.nn.Module):
         self.aux = bool(aux)
         if self.aux:
             for p in NL.AUX_PARAMS:
+                setattr(self, p, torch.nn.Parameter(_f32(getattr(net, p))))
+        # 方針ヘッド（§20.10）も同じ流儀（`plan=True` のときだけ Parameter）。
+        self.plan = bool(plan)
+        if self.plan:
+            for p in NL.PLAN_PARAMS:
                 setattr(self, p, torch.nn.Parameter(_f32(getattr(net, p))))
         self.register_buffer("STATS", _f32(net.STATS))
         self.register_buffer("AB", _f32(net.AB))
@@ -182,6 +187,25 @@ class TorchNRel(torch.nn.Module):
         at = torch.relu(ho @ self.Wy1 + self.by1) @ self.Wy2 + self.by2
         return v, a, at
 
+    def plan_head(self, e):
+        """共有表現 e → 方針ごとの勝率 [B,5]（numpy 版 `NRelNet.plan_head` と同じ式）。"""
+        return torch.tanh(torch.relu(e @ self.Wq1 + self.bq1) @ self.Wq2 + self.bq2)
+
+    def value_heads(self, sc, ci, tok, rel_om, rel_oo, aux=False, plan=False):
+        """(value, aux, aux_tok, plan)＝要るヘッドだけ計算し、要らないものは None（共有部は 1 回）。"""
+        tab = self.card_table()
+        h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
+        e = self.body(sc, h, present)
+        v = torch.tanh((e @ self.Wv + self.bv)[:, 0])
+        pa = pt = pq = None
+        if aux:
+            pa = torch.relu(e @ self.Wx1 + self.bx1) @ self.Wx2 + self.bx2
+            ho = h[:, self.opp]
+            pt = torch.relu(ho @ self.Wy1 + self.by1) @ self.Wy2 + self.by2
+        if plan:
+            pq = self.plan_head(e)
+        return v, pa, pt, pq
+
     # --- 方策 ---
     def cand_feats(self, tab, at, cid, tcid, tail):
         """候補素性 139（numpy 版 `NRelNet.cand_feats` と同じ列）。
@@ -232,6 +256,20 @@ def aux_loss_terms(pred, pred_tok, aux, aux_tok, mask):
     return la, lt
 
 
+def plan_loss_terms(pred, plan, z):
+    """方針損失＝**`n_rel_train.plan_loss` と同じ式**（打った方針の列の mean((v_q − z)²)・`plan<0` は入れない）。
+
+    戻り値は (損失, 有効行数)。有効行が無ければ (0, 0)。"""
+    pl = plan.to(torch.int64)
+    ok = pl >= 0
+    n = int(ok.sum())
+    if n <= 0:
+        return pred.sum() * 0.0, 0
+    rows = torch.nonzero(ok, as_tuple=False)[:, 0]
+    sel = pred[rows, pl[ok]]
+    return ((sel - z[ok]) ** 2).mean(), n
+
+
 def seg_log_softmax(lo, seg, P):
     """区間ごとの log-softmax（numpy 版 `NRelNet.seg_softmax` と同じ区間・同じ最大値の引き方）。
 
@@ -280,11 +318,15 @@ class TorchTrainer:
     知らない）。numpy 版の `net` は「表の持ち主・holdout 評価・保存の担当」として残り、
     学習中の重みは `sync_to_numpy()` で書き戻す。"""
 
-    def __init__(self, net, lr=5e-4, threads=None, betas=(0.9, 0.999), eps=1e-8, aux_weight=0.0):
+    def __init__(self, net, lr=5e-4, threads=None, betas=(0.9, 0.999), eps=1e-8, aux_weight=0.0,
+                 plan_weight=0.0):
         self.net = net
         self.aux_weight = float(aux_weight)
-        self.tn = TorchNRel(net, aux=bool(net.aux and self.aux_weight > 0.0))
+        self.plan_weight = float(plan_weight)
+        self.tn = TorchNRel(net, aux=bool(net.aux and self.aux_weight > 0.0),
+                            plan=bool(getattr(net, "plan", False) and self.plan_weight > 0.0))
         self.aux_loss = (0.0, 0.0)                # 直近の (aux, aux_tok)（エポック行に出す）
+        self.plan_loss = (0.0, 0)                 # 直近の (方針損失, 有効行数)
         # 既定（threads が 0/None）は全コア。`n_rel_train` は import 時に OMP_NUM_THREADS=1 を
         # 立てる（numpy の BLAS はスレッドを増やすと**遅くなる**＝§4 の対照表）ので、torch の
         # 既定スレッド数もそれに引きずられて 1 になる。ここで明示的に上書きする。
@@ -312,6 +354,9 @@ class TorchTrainer:
             if self.tn.aux:
                 for p in NL.AUX_PARAMS:
                     setattr(self.net, p, getattr(self.tn, p).detach().numpy().copy())
+            if self.tn.plan:
+                for p in NL.PLAN_PARAMS:
+                    setattr(self.net, p, getattr(self.tn, p).detach().numpy().copy())
 
     def _set_lr(self, lr):
         if lr != self._lr:
@@ -327,16 +372,19 @@ class TorchTrainer:
 
     # --- ステップ（numpy 版 `NRelNet.value_step` / `policy_step` と同じ引数） ---
     def value_step(self, sc, ci, tok, rel_om, rel_oo, zt, lr,
-                   aux=None, aux_tok=None, aux_mask=None, aux_w=None):
+                   aux=None, aux_tok=None, aux_mask=None, aux_w=None, plan=None, plan_w=None):
         self._mark("step_v_prep")
         tsc, ttok, tz = _f32(sc), _f32(tok), _f32(zt)
         trom = None if rel_om is None else _f32(rel_om)
         troo = None if rel_oo is None else _f32(rel_oo)
         w = self.aux_weight if aux_w is None else float(aux_w)
         use_aux = bool(self.tn.aux and w > 0.0 and aux_mask is not None)
+        wq = self.plan_weight if plan_w is None else float(plan_w)
+        use_plan = bool(self.tn.plan and wq > 0.0 and plan is not None)
         self._mark("step_v_fwd")
-        if use_aux:
-            v, pa, pt = self.tn.value_with_aux(tsc, _i64(ci), ttok, trom, troo)
+        if use_aux or use_plan:
+            v, pa, pt, pq = self.tn.value_heads(tsc, _i64(ci), ttok, trom, troo,
+                                                aux=use_aux, plan=use_plan)
         else:
             v = self.tn.value(tsc, _i64(ci), ttok, trom, troo)
         # numpy 版の勾配は do = ((v-z)/B)·(1-v²)＝**0.5·mean((v-z)²)** の勾配。
@@ -348,6 +396,11 @@ class TorchTrainer:
             la, lt = aux_loss_terms(pa, pt, _f32(aux), _f32(aux_tok), _f32(aux_mask))
             loss = loss + w * (la + lt)
             self.aux_loss = (float(la.detach()), float(lt.detach()))
+        if use_plan:
+            # 方針ヘッド（§20.10）: value と同じ流儀＝損失側は 0.5·mean((v_q−z)²)・報告は mean そのもの
+            lq, nq = plan_loss_terms(pq, _i64(plan), tz)
+            loss = loss + wq * 0.5 * lq
+            self.plan_loss = (float(lq.detach()), nq)
         self._mark("step_v_bwd")
         self._update(loss, lr)
         return out
@@ -444,7 +497,7 @@ class EpochBatches:
 
     `V`/`P`/`C` の中身も `load_dump*` も触らない（読むだけ）。"""
 
-    def __init__(self, V, P, C, ptr, budget, tail, rt, ablate, aux=False):
+    def __init__(self, V, P, C, ptr, budget, tail, rt, ablate, aux=False, plan=False):
         self.V = V; self.P = P; self.C = C
         # 補助教師（dump v4・§20.8.2）。列が無い波だけの dump なら `V["aux"] is None`＝切る。
         self.aux = bool(aux and V.get("aux") is not None)
@@ -452,6 +505,10 @@ class EpochBatches:
             self.v_aux = _Rows(V["aux"], torch.float32)
             self.v_auxt = _Rows(V["aux_tok"], torch.float32)
             self.v_auxm = _Rows(V["aux_mask"], torch.float32)
+        # 方針ラベル（§20.10・sidecar）。無ければ切る。
+        self.plan = bool(plan and V.get("plan") is not None)
+        if self.plan:
+            self.v_plan = _Rows(V["plan"], torch.int64)
         self.ptr = np.asarray(ptr)
         self.plen = np.asarray(P["len"])
         self.prow = np.asarray(P["row"])
@@ -520,10 +577,16 @@ class EpochBatches:
         if sp is not None:
             sp("rel_v")
         rom, roo = self._rel(bn)
-        if not self.aux:
-            return out + (rom, roo, z)
-        return out + (rom, roo, z, self.v_aux.take(bi, bn), self.v_auxt.take(bi, bn),
-                      self.v_auxm.take(bi, bn))
+        out = out + (rom, roo, z)
+        # 末尾の並びは今までどおり（aux なし＝6 本・aux あり＝9 本）。方針ラベル（§20.10）は
+        # **plan が立っているときだけ** 10 本目に足す（aux が無ければ 3 本の None を挟む）。
+        if self.aux:
+            out = out + (self.v_aux.take(bi, bn), self.v_auxt.take(bi, bn), self.v_auxm.take(bi, bn))
+        elif self.plan:
+            out = out + (None, None, None)
+        if self.plan:
+            out = out + (self.v_plan.take(bi, bn),)
+        return out
 
     def policy(self, i, sp=None):
         if sp is not None:

@@ -150,7 +150,7 @@ class Split:
         return {k: round(v, nd) for k, v in sorted(self.t.items())}
 
 
-def make_backend(name, net, lr, threads=None, aux_weight=0.0):
+def make_backend(name, net, lr, threads=None, aux_weight=0.0, plan_weight=0.0):
     """訓練ループが叩く backend を返す（`--backend`・2026-09-07・§18.4）。
 
     `numpy`＝この module の手書き backward（参照実装）。`torch`＝`n_rel_torch.TorchTrainer`
@@ -166,7 +166,7 @@ def make_backend(name, net, lr, threads=None, aux_weight=0.0):
               f"入れるなら: pip install torch --index-url https://download.pytorch.org/whl/cpu",
               flush=True)
         return net, "numpy", "torch-import-failed"
-    tr = TorchTrainer(net, lr=lr, threads=threads, aux_weight=aux_weight)
+    tr = TorchTrainer(net, lr=lr, threads=threads, aux_weight=aux_weight, plan_weight=plan_weight)
     return tr, "torch", f"threads={tr.threads}"
 
 
@@ -220,6 +220,22 @@ def aux_losses(pred, pred_tok, aux, aux_tok, mask):
     return la, lt
 
 
+def plan_loss(pred, plan, z):
+    """方針ヘッドの損失（§20.10）＝**打った方針の列だけ**の mean((v_q − z)²)（`plan<0` の行は入れない）。
+
+    式の正本はここ 1 か所（torch 経路 `n_rel_torch.plan_loss_terms` が写し）。報告値は value と
+    同じく mean((·)²) そのもの・勾配側は 0.5 倍（`plan_backward`）＝value ヘッドと同じ流儀。
+    戻り値は (損失, 有効行数)。
+    """
+    pl = np.asarray(plan).astype(np.int64)
+    ok = pl >= 0
+    n = int(ok.sum())
+    if n <= 0:
+        return 0.0, 0
+    sel = pred[np.where(ok)[0], pl[ok]]
+    return float(np.mean((sel - np.asarray(z, np.float32)[ok]) ** 2)), n
+
+
 def _onehot_argmax(masked, d_out, axis):
     """masked [...] の axis 方向 argmax に d_out を散らす（max プールの backward）。
     行に有効要素が無い（max が −1e8 未満）場合は 0。"""
@@ -236,7 +252,7 @@ class NRelNet(NL.NRelNet):
     def __init__(self, tables, hidden=192, seed=13):
         super().__init__(tables, hidden=hidden, seed=seed)
         self._adam = {p: [np.zeros_like(getattr(self, p)), np.zeros_like(getattr(self, p))]
-                      for p in self.params + self.aux_params}
+                      for p in self.params + self.aux_params + self.plan_params}
         self._t = 0
 
     def _trainable(self):
@@ -244,7 +260,8 @@ class NRelNet(NL.NRelNet):
 
         `_t` は今までどおり**全パラメータで 1 本**＝補助ヘッドを足しても既存の更新式は動かない。
         """
-        return self.params + (self.aux_params if self.aux else [])
+        return (self.params + (self.aux_params if self.aux else [])
+                + (self.plan_params if self.plan else []))
 
     # --- card_table backward（NEff と同じ） ---
     def card_table_backward(self, k, dtab, g):
@@ -371,9 +388,31 @@ class NRelNet(NL.NRelNet):
         dh[:, OPP_SLOTS] = dhy @ self.Wy1.T
         return dE, dh
 
+    # --- 方針ヘッドの backward（§20.10・λ_plan>0 のときだけ通る） ---
+    def plan_backward(self, e, plan, zt, w, g):
+        """方針損失（0.5·λ·mean_valid((v_q[plan] − z)²)）の勾配 → dE [B,D_E]。`g` にヘッドの勾配を足す。"""
+        pl = np.asarray(plan).astype(np.int64)
+        ok = pl >= 0
+        n = int(ok.sum())
+        if n <= 0:
+            return None
+        kq = {}
+        vq = self.plan_head(e, kq)                                    # [B,5]
+        self.plan_loss = plan_loss(vq, pl, zt)                        # エポック行に出す
+        rows = np.where(ok)[0]
+        do = np.zeros_like(vq)
+        sel = vq[rows, pl[ok]]
+        do[rows, pl[ok]] = ((sel - np.asarray(zt, np.float32)[ok]) / n) * (1.0 - sel ** 2) * w
+        g["Wq2"] = kq["q_rq"].T @ do
+        g["bq2"] = do.sum(0)
+        dhq = (do @ self.Wq2.T) * (kq["q_hq"] > 0)
+        g["Wq1"] = e.T @ dhq
+        g["bq1"] = dhq.sum(0)
+        return dhq @ self.Wq1.T
+
     # --- ステップ ---
     def value_step(self, sc, ci, tok, rel_om, rel_oo, zt, lr,
-                   aux=None, aux_tok=None, aux_mask=None, aux_w=0.0):
+                   aux=None, aux_tok=None, aux_mask=None, aux_w=0.0, plan=None, plan_w=0.0):
         k = {}
         tab = self.card_table(k)
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab, k)
@@ -389,6 +428,10 @@ class NRelNet(NL.NRelNet):
             dE_a, dh_aux = self.aux_backward(e, h, aux, aux_tok, aux_mask, aux_w, g)
             if dE_a is not None:
                 dE = dE + dE_a
+        if self.plan and plan_w > 0.0 and plan is not None:
+            dE_q = self.plan_backward(e, plan, zt, plan_w, g)
+            if dE_q is not None:
+                dE = dE + dE_q
         dh = self.body_backward(k, dE, g)
         if dh_aux is not None:
             dh = dh + dh_aux
@@ -536,6 +579,30 @@ def aux_rows(V, bi, on):
         return None, None, None
     return (np.asarray(V["aux"][bi], np.float32), np.asarray(V["aux_tok"][bi], np.float32),
             np.asarray(V["aux_mask"][bi], np.float32))
+
+
+def plan_rows(V, bi, on):
+    """行 `bi` の方針ラベル（`on` が False／列が無ければ `None`）。"""
+    if not on or V.get("plan") is None:
+        return None
+    return np.asarray(V["plan"][bi], np.int64)
+
+
+def eval_plan(net, rt, V, vi, bs=512):
+    """holdout の方針損失（打った方針の列の mean((v_q − z)²)・有効行の加重平均）と有効行数。"""
+    tot = 0.0
+    n = 0
+    for s in range(0, len(vi), bs):
+        bi = vi[s:s + bs]
+        pl = np.asarray(V["plan"][bi], np.int64)
+        if not (pl >= 0).any():
+            continue
+        sc, ci, tok = DIO.rows_f32(V, bi)
+        _v, vq = net.value_with_plan(sc, ci, tok, *relations_or_zeros(net, ci, tok, rt))
+        l, k = plan_loss(vq, pl, np.asarray(V["z"][bi], np.float32))
+        tot += l * k
+        n += k
+    return (float(tot / n) if n else float("nan")), n
 
 
 def _val_batch(net, rt, V, vi):
@@ -735,10 +802,19 @@ def train(args):
         n_ok = int(np.asarray(V["aux_mask"][:], np.int32).sum()) if aux_on else 0
         print(f"aux: {'on' if aux_on else 'off（dump に aux 列が無い）'}"
               f" λ={aux_w} 有効行 {n_ok}/{len(V['z'])}", flush=True)
+    # 方針ヘッド（§20.10）: **λ_plan>0 かつ dump に plan 列（sidecar）がある**ときだけ立てる。
+    # どちらかが欠ければ `net.plan=False`＝今までの学習と 1 ビットも変わらない。
+    plan_w = float(getattr(args, "plan_weight", 0.0) or 0.0)
+    plan_on = plan_w > 0.0 and V.get("plan") is not None
+    net.plan = plan_on
+    if plan_w > 0.0:
+        n_ok = int((np.asarray(V["plan"][:], np.int8) >= 0).sum()) if plan_on else 0
+        print(f"plan: {'on' if plan_on else 'off（dump に plan 列＝sidecar が無い）'}"
+              f" λ={plan_w} 有効行 {n_ok}/{len(V['z'])}", flush=True)
     # backend（§18.4）: torch のときも重みの正本は numpy の `net`（holdout 評価・保存はそちら）。
     # 学習中は torch 側に置き、epoch の終わりに `sync_to_numpy()` で書き戻す。
     backend, backend_name, note = make_backend(args.backend, net, args.lr, args.threads,
-                                               aux_weight=aux_w)
+                                               aux_weight=aux_w, plan_weight=plan_w)
     print(f"backend: {backend_name}{(' ' + note) if note else ''}", flush=True)
     # 方策点ごとに決まる値は**ここで 1 回だけ**作る（§18.6-2/3）。ループでは切り出すだけ。
     t_pre = time.time()
@@ -748,7 +824,8 @@ def train(args):
     src = None
     if backend_name == "torch":
         from opcg_sim.learned.train import n_rel_torch as TT
-        src = TT.EpochBatches(V, P, C, ptr, C["budget"], c_tail, rt, net.ablate, aux=aux_on)
+        src = TT.EpochBatches(V, P, C, ptr, C["budget"], c_tail, rt, net.ablate, aux=aux_on,
+                              plan=plan_on)
     # 教師（π）の作り方（§20.6.1・WP rs-q-pi）。**既定 `visits` は 1 bit も変わらない**＝
     # ここを通らない。`q_improved` のときだけ `C["pi"]` を π' に差し替える（`EpochBatches` は
     # `C` を参照で持ち、`begin()` はエポックの先頭で読む＝この時点の差し替えが効く）。
@@ -782,8 +859,14 @@ def train(args):
                 if src is not None:
                     b = src.value(iv, sp)                   # 切り出しは torch 側（§18.6-3）
                     sp("step_v")
-                    # 補助教師（あれば b の末尾 3 本）は lr の**後ろ**に渡す（§20.8.2）
-                    mse += backend.value_step(*b[:6], args.lr, *b[6:])
+                    # 末尾（aux 3 本・方針ラベル 1 本）は lr の**後ろ**に名前で渡す（§20.8.2／§20.10）。
+                    # 並びは EpochBatches.value が決める（6／9／10 本）＝無いものは渡さない。
+                    kw = {}
+                    if len(b) >= 9:
+                        kw.update(aux=b[6], aux_tok=b[7], aux_mask=b[8])
+                    if len(b) >= 10:
+                        kw["plan"] = b[9]
+                    mse += backend.value_step(*b[:6], args.lr, **kw)
                 else:
                     sp("slice_v")
                     bi = tr_v[iv * args.bs_v:(iv + 1) * args.bs_v]
@@ -793,7 +876,8 @@ def train(args):
                     sp("step_v")
                     mse += backend.value_step(sc, ci, tok, rel_om, rel_oo,
                                               np.asarray(V["z"][bi], np.float32), args.lr,
-                                              *aux_rows(V, bi, aux_on), aux_w=aux_w)
+                                              *aux_rows(V, bi, aux_on), aux_w=aux_w,
+                                              plan=plan_rows(V, bi, plan_on), plan_w=plan_w)
                 iv += 1
             else:
                 if src is not None:
@@ -863,6 +947,11 @@ def train(args):
             row.update({"aux_weight": aux_w, "val_aux": va, "val_aux_tok": vt,
                         "train_aux": list(getattr(backend, "aux_loss", (0.0, 0.0)))})
             print(f"  aux val huber {va:.4f} tok {vt:.4f}", flush=True)
+        if plan_on:
+            vq, nq = eval_plan(net, rt, V, vi)
+            row.update({"plan_weight": plan_w, "val_plan_mse": vq, "val_plan_rows": nq,
+                        "train_plan": list(getattr(backend, "plan_loss", (0.0, 0)))})
+            print(f"  plan val mse {vq:.4f}（{nq} 行）", flush=True)
         print("N_REL_TRAIN_EPOCH " + json.dumps(row), flush=True)
         if best is None or vmse < best[0]:
             best = (vmse, {p: getattr(net, p).copy() for p in net._trainable()}); best_ep = ep
@@ -889,7 +978,8 @@ def _save(net, args, vocab, V, P, best_ep):
                              **({} if getattr(args, "pi_teacher", "visits") == "visits" else
                                 {"pi_teacher": args.pi_teacher, "pi_n_min": args.pi_n_min,
                                  "pi_c_visit": args.pi_c_visit, "pi_c_scale": args.pi_c_scale}),
-                             **({"aux_weight": float(args.aux_weight)} if net.aux else {})})
+                             **({"aux_weight": float(args.aux_weight)} if net.aux else {}),
+                             **({"plan_weight": float(args.plan_weight)} if net.plan else {})})
 
 
 def main(argv=None):
@@ -910,6 +1000,10 @@ def main(argv=None):
                     help="補助教師（dump v4 の aux／aux_tok・§20.8.2）の重み λ_aux。"
                          "**0 で完全に無効＝今までと同じ学習**。aux 列を持たない波だけの dump は"
                          "自動で無効になる（既定 0.1）")
+    tr.add_argument("--plan-weight", type=float, default=0.0,
+                    help="方針ヘッド（計画 §20.10・sidecar の plan 列・V(盤面, 方針)）の重み λ_plan。"
+                         "**既定 0＝完全に無効＝今までと同じ学習**。plan 列（`plan_labels` の sidecar）を"
+                         "持たない dump では自動で無効になる")
     tr.add_argument("--ablate", default="",
                     help="切り分け: rel（関係 R を 0）/ opp_pool（相手デッキ知識の列を 0）をカンマ区切り。"
                          "訓練・serve の両方で遮断され npz の meta に焼き込まれる")
