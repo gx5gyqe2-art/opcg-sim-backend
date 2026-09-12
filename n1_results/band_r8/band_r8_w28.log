@@ -1,0 +1,92 @@
+holdout 行 31926（seed%7==0・2s）
+  [policy] start.npz top1_visits 0.577 ce_visits 1.749 top1_q_improved 0.578 ce_q_improved 1.725 | gate mass 0.215 argmax 0.198 data 0.212 (n 4902)
+  [policy] nrel_r7.npz top1_visits 0.550 ce_visits 1.773 top1_q_improved 0.548 ce_q_improved 1.746 | gate mass 0.216 argmax 0.203 data 0.212 (n 4902)
+  [policy] nrel_r8.npz top1_visits 0.546 ce_visits 1.775 top1_q_improved 0.545 ce_q_improved 1.748 | gate mass 0.215 argmax 0.202 data 0.212 (n 4902)
+  [policy] 75s
+  start.npz
+    all                          mse 0.5716 sign 0.795 n  31926
+    turn1-4                      mse 0.7652 sign 0.707 n   4114
+    turn5-8                      mse 0.6511 sign 0.764 n  10001
+    turn9-99                     mse 0.4744 sign 0.836 n  17375
+    leader_color:BLACK           mse 0.5857 sign 0.798 n   2798
+    leader_color:BLACK|BLUE      mse 0.5849 sign 0.757 n   1004
+    leader_color:BLACK|GREEN     mse 0.3235 sign 0.881 n    452
+    leader_color:BLACK|PURPLE    mse 0.5828 sign 0.781 n    416
+    leader_color:BLACK|RED       mse 0.3741 sign 0.879 n    750
+    leader_color:BLACK|YELLOW    mse 0.5685 sign 0.791 n   1844
+    leader_color:BLUE            mse 0.6394 sign 0.776 n   3561
+    leader_color:BLUE|GREEN      mse 0.8717 sign 0.698 n    675
+    leader_color:BLUE|PURPLE     mse 0.7115 sign 0.708 n    884
+    leader_color:BLUE|RED        mse 0.5058 sign 0.788 n   1513
+    leader_color:BLUE|YELLOW     mse 0.5134 sign 0.804 n    767
+    leader_color:GREEN           mse 0.4976 sign 0.823 n   3194
+    leader_color:GREEN|PURPLE    mse 1.0342 sign 0.629 n    700
+    leader_color:GREEN|RED       mse 0.5670 sign 0.799 n   1811
+    leader_color:GREEN|YELLOW    mse 0.4837 sign 0.851 n    450
+    leader_color:PURPLE          mse 0.4240 sign 0.851 n   2382
+    leader_color:PURPLE|RED      mse 0.5141 sign 0.806 n   1046
+    leader_color:PURPLE|YELLOW   mse 0.4815 sign 0.827 n    764
+    leader_color:RED             mse 0.5118 sign 0.822 n   2757
+    leader_color:RED|YELLOW      mse 0.6916 sign 0.731 n    725
+    leader_color:YELLOW          mse 0.6600 sign 0.775 n   3433
+    after_removal                mse 0.6353 sign 0.773 n    696
+    not_removal                  mse 0.5702 sign 0.795 n  31230
+  nrel_r7.npz
+    all                          mse 0.5858 sign 0.791 n  31926
+    turn1-4                      mse 0.7719 sign 0.708 n   4114
+    turn5-8                      mse 0.6814 sign 0.751 n  10001
+    turn9-99                     mse 0.4812 sign 0.835 n  17375
+    leader_color:BLACK           mse 0.6452 sign 0.776 n   2798
+    leader_color:BLACK|BLUE      mse 0.5642 sign 0.775 n   1004
+    leader_color:BLACK|GREEN     mse 0.2955 sign 0.892 n    452
+    leader_color:BLACK|PURPLE    mse 0.5618 sign 0.793 n    416
+    leader_color:BLACK|RED       mse 0.4234 sign 0.852 n    750
+    leader_color:BLACK|YELLOW    mse 0.5654 sign 0.791 n   1844
+    leader_color:BLUE            mse 0.7105 sign 0.744 n   3561
+    leader_color:BLUE|GREEN      mse 0.9239 sign 0.696 n    675
+    leader_color:BLUE|PURPLE     mse 0.7153 sign 0.714 n    884
+    leader_color:BLUE|RED        mse 0.4747 sign 0.826 n   1513
+    leader_color:BLUE|YELLOW     mse 0.4961 sign 0.803 n    767
+    leader_color:GREEN           mse 0.4420 sign 0.850 n   3194
+    leader_color:GREEN|PURPLE    mse 1.1354 sign 0.584 n    700
+    leader_color:GREEN|RED       mse 0.6308 sign 0.766 n   1811
+    leader_color:GREEN|YELLOW    mse 0.6034 sign 0.804 n    450
+    leader_color:PURPLE          mse 0.4372 sign 0.855 n   2382
+    leader_color:PURPLE|RED      mse 0.5413 sign 0.796 n   1046
+    leader_color:PURPLE|YELLOW   mse 0.5228 sign 0.806 n    764
+    leader_color:RED             mse 0.4574 sign 0.842 n   2757
+    leader_color:RED|YELLOW      mse 0.5194 sign 0.796 n    725
+    leader_color:YELLOW          mse 0.7147 sign 0.754 n   3433
+    after_removal                mse 0.6322 sign 0.763 n    696
+    not_removal                  mse 0.5848 sign 0.791 n  31230
+  nrel_r8.npz
+    all                          mse 0.5859 sign 0.790 n  31926
+    turn1-4                      mse 0.7689 sign 0.704 n   4114
+    turn5-8                      mse 0.6801 sign 0.750 n  10001
+    turn9-99                     mse 0.4827 sign 0.836 n  17375
+    leader_color:BLACK           mse 0.6486 sign 0.776 n   2798
+    leader_color:BLACK|BLUE      mse 0.5757 sign 0.768 n   1004
+    leader_color:BLACK|GREEN     mse 0.3070 sign 0.885 n    452
+    leader_color:BLACK|PURPLE    mse 0.5789 sign 0.793 n    416
+    leader_color:BLACK|RED       mse 0.4440 sign 0.843 n    750
+    leader_color:BLACK|YELLOW    mse 0.5656 sign 0.786 n   1844
+    leader_color:BLUE            mse 0.7052 sign 0.741 n   3561
+    leader_color:BLUE|GREEN      mse 0.9285 sign 0.698 n    675
+    leader_color:BLUE|PURPLE     mse 0.7369 sign 0.707 n    884
+    leader_color:BLUE|RED        mse 0.4700 sign 0.826 n   1513
+    leader_color:BLUE|YELLOW     mse 0.4873 sign 0.803 n    767
+    leader_color:GREEN           mse 0.4389 sign 0.850 n   3194
+    leader_color:GREEN|PURPLE    mse 1.1327 sign 0.587 n    700
+    leader_color:GREEN|RED       mse 0.6145 sign 0.775 n   1811
+    leader_color:GREEN|YELLOW    mse 0.5970 sign 0.798 n    450
+    leader_color:PURPLE          mse 0.4419 sign 0.852 n   2382
+    leader_color:PURPLE|RED      mse 0.5342 sign 0.792 n   1046
+    leader_color:PURPLE|YELLOW   mse 0.5096 sign 0.818 n    764
+    leader_color:RED             mse 0.4672 sign 0.839 n   2757
+    leader_color:RED|YELLOW      mse 0.5374 sign 0.799 n    725
+    leader_color:YELLOW          mse 0.7071 sign 0.756 n   3433
+    after_removal                mse 0.6312 sign 0.769 n    696
+    not_removal                  mse 0.5849 sign 0.790 n  31230
+  176s
+  → /root/band_r8/band_r8_w28.json
+N_REL_BAND {"rows": 31926, "src": ["/root/n28_wave/w01/n_records/n28_records", "/root/n28_wave/w02/n_records/n28_records"], "out": "/root/band_r8/band_r8_w28.json", "buckets": 27, "nets": {"start.npz": {"v_mse": 0.5715890996124696, "v_sign": 0.7945248386894694, "n": 31926}, "nrel_r7.npz": {"v_mse": 0.5858033665101913, "v_sign": 0.7905468896823905, "n": 31926}, "nrel_r8.npz": {"v_mse": 0.5858791540872194, "v_sign": 0.7897011839879722, "n": 31926}}, "policy": {"start.npz": {"points": 18027, "top1_visits": 0.5770233538581018, "ce_visits": 1.7492213252116184, "top1_q_improved": 0.5781328007988018, "ce_q_improved": 1.7252859563261986, "gate": {"rows": 4902, "p_mass_removal": 0.21483670881284253, "argmax_removal": 0.19808241534067728, "data_chose_removal": 0.21215830273357814}}, "nrel_r7.npz": {"points": 18027, "top1_visits": 0.5497309591168802, "ce_visits": 1.7728864551615502, "top1_q_improved": 0.5479003716647252, "ce_q_improved": 1.746011815372915, "gate": {"rows": 4902, "p_mass_removal": 0.2155408859771182, "argmax_removal": 0.2029783761729906, "data_chose_removal": 0.21215830273357814}}, "nrel_r8.npz": {"points": 18027, "top1_visits": 0.546458090641815, "ce_visits": 1.7748202982391648, "top1_q_improved": 0.5447384478837299, "ce_q_improved": 1.7481024844704514, "gate": {"rows": 4902, "p_mass_removal": 0.21542180930377813, "argmax_removal": 0.2021623827009384, "data_chose_removal": 0.21215830273357814}}}}

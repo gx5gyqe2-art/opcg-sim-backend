@@ -1,0 +1,18 @@
+対局 1096・自席ターン 14222・相手ターン 11479
+攻め: agree 0.407  gap 0.033  gap>0.1 0.091  wr agree/disagree 0.579/0.490
+  argmax {'face': 0.36, 'board': 0.291, 'mixed': 0.349}  played {'face': 0.47, 'board': 0.157, 'mixed': 0.373}
+  calib face: n5607 v 0.206 z 0.202  board: n1868 v -0.198 z -0.226  mixed: n4445 v -0.010 z -0.018
+  lethal_only  n    819  V_face−V_board 0.021  argmax_face 0.756  played_face 0.697  agree 0.629  gap 0.014  wr 0.904
+  threat_only  n   2693  V_face−V_board -0.009  argmax_face 0.294  played_face 0.281  agree 0.356  gap 0.027  wr 0.283
+  both_lethal  n   1516  V_face−V_board 0.198  argmax_face 0.829  played_face 0.627  agree 0.599  gap 0.061  wr 0.712
+  opp_hand h0-1  n    780  V_face−V_board 0.006  argmax_face 0.346  played_face 0.478
+  opp_hand h2-3  n   2237  V_face−V_board 0.026  argmax_face 0.368  played_face 0.416
+  opp_hand h4+   n  11205  V_face−V_board 0.056  argmax_face 0.375  played_face 0.483
+守り: agree 0.448  gap 0.030  argmax_guard 0.784  played_guard 0.406
+  life1  n    970  V_guard−V_take -0.014  argmax_guard 0.566  played_guard 0.425  wr 0.288
+  life2  n   1529  V_guard−V_take 0.044  argmax_guard 0.780  played_guard 0.315  wr 0.420
+  life3  n   2386  V_guard−V_take 0.053  argmax_guard 0.868  played_guard 0.346  wr 0.484
+  life4  n   3626  V_guard−V_take 0.040  argmax_guard 0.808  played_guard 0.423  wr 0.503
+  life5  n   2310  V_guard−V_take 0.011  argmax_guard 0.644  played_guard 0.454  wr 0.590
+  35.5s
+  → /root/plan_map/pvm_w30.json
