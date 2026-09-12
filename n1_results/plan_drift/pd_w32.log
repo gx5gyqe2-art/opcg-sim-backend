@@ -1,0 +1,41 @@
+行 943351・対局 6720・シャード 672（88s）
+/home/user/opcg-sim-backend/tests/scripts/plan_drift.py:291: RuntimeWarning: invalid value encountered in scalar divide
+  "face_share": float(best["face"] / (best["face"] + best["board"]))})
+対局 6720・席 13440・unknown 対象 0
+ラベル分布: {'pass': 7589, 'face': 33780, 'board': 10933, 'develop': 6748, 'mixed': 26487}
+  t1-4: {'face': 8547, 'board': 2490, 'mixed': 2441, 'develop': 5959, 'pass': 7443}
+  t5-8: {'face': 11252, 'board': 4046, 'mixed': 10980, 'develop': 524, 'pass': 69}
+  t9+: {'face': 13981, 'board': 4397, 'mixed': 13066, 'develop': 265, 'pass': 77}
+遷移（prev → cur）:
+  face     n  25391  face 0.50  board 0.12  mixed 0.36  develop 0.01  pass 0.00
+  board    n   9843  face 0.31  board 0.22  mixed 0.43  develop 0.02  pass 0.01
+  mixed    n  22641  face 0.41  board 0.12  mixed 0.46  develop 0.01  pass 0.00
+  develop  n   6665  face 0.58  board 0.10  mixed 0.20  develop 0.08  pass 0.04
+  pass     n   7557  face 0.62  board 0.07  mixed 0.18  develop 0.07  pass 0.06
+切り替え率（勝者／敗者）:
+  switch        win 0.622 [0.618,0.627] n 6720   lose 0.652 [0.647,0.657] n 6720   diff +0.030
+  switch_early  win 0.740 [0.734,0.746] n 6720   lose 0.748 [0.742,0.754] n 6720   diff +0.008
+  fb_switch     win 0.233 [0.224,0.242] n 5333   lose 0.354 [0.343,0.366] n 4761   diff +0.121
+  drift         win 0.323 [0.319,0.327] n 6717   lose 0.369 [0.365,0.373] n 6693   diff +0.046
+  don_waste     win 0.046 [0.043,0.048] n 6720   lose 0.045 [0.043,0.047] n 6720   diff -0.001
+対にした比較（敗者の方が多い割合・差のある対局のみ）:
+  switch        0.524 [0.511,0.536] n 5824  (more 3049 / less 2775 / tie 896)
+  switch_early  0.517 [0.500,0.534] n 3290  (more 1700 / less 1590 / tie 3430)
+  fb_switch     0.619 [0.600,0.638] n 2489  (more 1541 / less 948 / tie 1303)
+  drift         0.563 [0.551,0.575] n 6431  (more 3620 / less 2811 / tie 259)
+  don_waste     0.502 [0.483,0.521] n 2650  (more 1330 / less 1320 / tie 4070)
+長さ帯別 switch（win／lose）:
+  T<=5   win 0.614 (n 960)  lose 0.664 (n 2265)
+  T6-8   win 0.625 (n 5330)  lose 0.647 (n 4190)
+  T9+    win 0.611 (n 430)  lose 0.626 (n 265)
+分岐点（face 系 vs board 系が拮抗）: 127843 点
+  H_pi 2.125  face_share nan  chosen {'develop': 21650, 'face': 28769, 'don': 44872, 'board': 27026, 'end': 5526}
+  前ターンの方針あり 42332  prev {'face': 26989, 'board': 15343}
+  sticky 期待値（無状態）0.505  chosen 0.538 [0.533,0.543] n 42332  teacher 0.449 [0.445,0.454] n 42332
+  sticky win 0.556 [0.549,0.564] n 17478  lose 0.525 [0.519,0.531] n 24854
+  sticky t1-4: 0.444 [0.407,0.481] n 703
+  sticky t5-8: 0.510 [0.502,0.519] n 14083
+  sticky t9+: 0.555 [0.549,0.561] n 27546
+  chosen×z {'face': {'win': 12583, 'lose': 16186}, 'board': {'win': 10169, 'lose': 16857}}
+  142.4s
+  → /root/pd/pd_w32.json
