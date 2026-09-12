@@ -245,6 +245,22 @@ RESULT.json の notes に減らした旨を書いてください。
 2026-09-02 の決定を置き換え）。指示書には生成役ネットの所在・波番号・シャード・seed 帯・局数を
 全て書く（**`--dump-v2` はもう要らない**＝下記 dump v3）。完了は生成側から共有され、コーディネータは §4 の手順で回収する。
 
+**生成の出力ブランチの基点（ユーザ決定 2026-09-12）**: `claude/n{W}-w{NN}` は**生成に使ったコードの
+コミット（作業セッションが checkout していた本線）から分岐する**。`claude/n1-results` を基点に
+**しない**——n1-results はネットと台帳の正本で npz を大量に抱えており、波 31／32 では基点にした
+ために push 段階の fetch だけで 10 分以上かかった（この基点は規約ではなく波 31 の指示書の書き方が
+波 32 に写っただけだった）。本線を基点にすると (a) 手元にあるので fetch が要らない (b) push は
+棋譜の blob だけ (c) ブランチがどのエンジンのコミットで生成したかを指す＝出所の記録になる。
+回収は `git fetch origin claude/n{W}-w{NN}:tmp && git archive tmp n_records | tar -x` で基点に依らない。
+**訓練の出力（§7.1 の `claude/train-{name}`）は従来どおり n1-results を基点にする**（ネットを
+`n1_results/` に積み上げる場所だから）。作業セッションへの指示は次の形:
+```
+git checkout -B claude/n{W}-w{NN}          # 今 checkout している本線のコミットから分岐（fetch 不要）
+git add -f n_records/n{W}_w{NN} n{W}_gen.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "gen wave {W} shard {NN}"
+git push -u origin claude/n{W}-w{NN}
+```
+
 **シャードの細分化（2026-09-05〜）**: 壁時計を縮めるため 1 波を **16 シャード×480 局**（32 セッションで
 2 波）にできる。seed は従来の帯を半分に割る＝シャード k（1..16）の base は
 `2000000 + W*10000 + ceil(k/2)*1000 + (k が偶数なら 500)`・各 480 局。帯の払い出しは波単位のまま。
