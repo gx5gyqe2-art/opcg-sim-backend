@@ -139,36 +139,41 @@ def _lean(c):
     return (c["face"] / tot) if tot else None
 
 
-def _load(dirs):
+def _iter_shards(dirs, row_cols, pol_cols, extra_fn=None):
+    """シャード npz を 1 本ずつ開いて (rows, pol, extra) を返す（**1 波を丸ごと載せない**）。
+
+    波 28／30／31 を一括で読むと 14GB を超えて OOM した（2026-09-12 実測）。シャードは対局単位で
+    切られている（`record_gen` は `shard_games` 局ごとに丸ごと書く）ので、1 本ずつで集計できる。
+    """
     files = [f for d in dirs for f in DIO.shard_files(d)]
     if not files:
         raise SystemExit("シャードが無い")
-    rows = {k: [] for k in _ROW_COLS}
-    pol = {k: [] for k in _POL_COLS}
     for f in files:
         with np.load(f, allow_pickle=True) as dd:
             n = int(dd["z"].shape[0])
-            for k in _ROW_COLS:
-                rows[k].append(np.asarray(dd[k])[:n] if k in dd.files else np.zeros(n, np.int64))
-            for k in _POL_COLS:
-                pol[k].append(np.asarray(dd[k]))
-    rows = {k: np.concatenate(v) for k, v in rows.items()}
-    pol = {k: np.concatenate(v) for k, v in pol.items()}
-    return rows, pol, len(files)
+            rows = {k: (np.asarray(dd[k])[:n] if k in dd.files else np.zeros(n, np.int64)) for k in row_cols}
+            pol = {k: np.asarray(dd[k]) for k in pol_cols}
+            extra = extra_fn(dd, n) if extra_fn else None
+        yield rows, pol, extra
+
+
+def _iter_games(dirs, row_cols, pol_cols, extra_fn=None):
+    """対局ごとに (rows, pol, extra, L, ptr, idx) を返す。idx は手順どおりの行 index。"""
+    for rows, pol, extra in _iter_shards(dirs, row_cols, pol_cols, extra_fn):
+        L = rows["pol_len"].astype(np.int64)
+        ptr = np.concatenate([[0], np.cumsum(L)]).astype(np.int64)
+        order = np.lexsort((rows["step"], rows["seed"]))
+        seeds = rows["seed"][order]
+        bounds = np.flatnonzero(np.diff(seeds)) + 1
+        starts = np.concatenate([[0], bounds]); ends = np.concatenate([bounds, [len(seeds)]])
+        for s_, e_ in zip(starts, ends):
+            yield rows, pol, extra, L, ptr, order[s_:e_]
 
 
 def analyze(dirs, fork_ratio=0.5, early_turn=6, limit_games=0):
     t0 = time.time()
     cards = _Cards(D.load_db())
-    rows, pol, nfiles = _load(dirs)
-    n = len(rows["z"])
-    L = rows["pol_len"].astype(np.int64)
-    ptr = np.concatenate([[0], np.cumsum(L)]).astype(np.int64)
-    order = np.lexsort((rows["step"], rows["seed"]))         # 対局ごと・手順どおり
-    seeds = rows["seed"][order]
-    bounds = np.flatnonzero(np.diff(seeds)) + 1
-    starts = np.concatenate([[0], bounds]); ends = np.concatenate([bounds, [n]])
-    print(f"行 {n}・対局 {len(starts)}・シャード {nfiles}（{time.time()-t0:.0f}s）", flush=True)
+    n_rows = 0
 
     per_seat = []                       # 1 席 1 局 = 1 レコード
     trans = collections.Counter()       # (prev, cur) → n
@@ -177,11 +182,12 @@ def analyze(dirs, fork_ratio=0.5, early_turn=6, limit_games=0):
     forks = []                          # 分岐点レコード
     unknown_targets = 0
     games = 0
-    for s, e in zip(starts, ends):
-        idx = order[s:e]
+    for rows, pol, _x, L, ptr, idx in _iter_games(dirs, _ROW_COLS, _POL_COLS):
         games += 1
         if limit_games and games > limit_games:
             break
+        n_rows += len(idx)
+        seed = int(rows["seed"][idx[0]])
         # uuid → カード ID（対局内の全候補から）
         u2c = {}
         for i in idx:
@@ -253,7 +259,7 @@ def analyze(dirs, fork_ratio=0.5, early_turn=6, limit_games=0):
                     fb.append(a != b)
             waste = sum(len(don_att[(w, t)] - attackers[(w, t)]) for t in ts)
             per_seat.append({
-                "seed": int(seeds[s]), "who": w, "z": zs.get(w, 0.0), "own_turns": len(ts),
+                "seed": seed, "who": w, "z": zs.get(w, 0.0), "own_turns": len(ts),
                 "labels": labs, "switch": (float(np.mean(sw)) if sw else None),
                 "switch_early": (float(np.mean(sw_early)) if sw_early else None),
                 "fb_switch": (float(np.mean(fb)) if fb else None), "fb_pairs": len(fb),
@@ -288,7 +294,8 @@ def analyze(dirs, fork_ratio=0.5, early_turn=6, limit_games=0):
             forks.append({"who": w, "z": zs.get(w, 0.0), "turn": t, "k": k,
                           "h_pi": float(-(np.clip(pi, 1e-12, None) * np.log(np.clip(pi, 1e-12, None))).sum()),
                           "chosen": ch_cls, "top": top_cls, "prev": prev,
-                          "face_share": float(best["face"] / (best["face"] + best["board"]))})
+                          "face_share": float(best["face"] / max(best["face"] + best["board"], 1e-12))})
+    print(f"行 {n_rows}・対局 {games}（{time.time()-t0:.0f}s）", flush=True)
     return _aggregate(per_seat, trans, trans_band, label_band, forks, unknown_targets, games,
                       fork_ratio, early_turn, t0)
 

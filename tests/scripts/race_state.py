@@ -54,8 +54,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from plan_drift import _Cards, _cls, _prop_ci  # noqa: E402
-from opcg_sim.learned.train import dump_io as DIO  # noqa: E402
+from plan_drift import _Cards, _cls, _iter_games, _prop_ci  # noqa: E402
 from opcg_sim.loop import decks as D  # noqa: E402
 
 _ROW_COLS = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
@@ -77,25 +76,11 @@ def _margin_band(m):
     return "<=-2" if m <= -2 else "-1" if m == -1 else "0" if m == 0 else "+1" if m == 1 else ">=+2"
 
 
-def _load(dirs):
-    files = [f for d in dirs for f in DIO.shard_files(d)]
-    if not files:
-        raise SystemExit("シャードが無い")
-    rows = {k: [] for k in _ROW_COLS}; pol = {k: [] for k in _POL_COLS}
-    sc, tk = [], []
-    for f in files:
-        with np.load(f, allow_pickle=True) as dd:
-            n = int(dd["z"].shape[0])
-            for k in _ROW_COLS:
-                rows[k].append(np.asarray(dd[k])[:n])
-            for k in _POL_COLS:
-                pol[k].append(np.asarray(dd[k]))
-            sc.append(np.asarray(dd["scalars"])[:n, :14].astype(np.float32))
-            t = np.asarray(dd["tokens"])[:n]
-            tk.append(t[:, :12][:, :, [_C_REST, _C_CAN, _C_BLK, _C_CHAR]].astype(np.float32))
-    rows = {k: np.concatenate(v) for k, v in rows.items()}
-    pol = {k: np.concatenate(v) for k, v in pol.items()}
-    return rows, pol, np.concatenate(sc), np.concatenate(tk), len(files)
+def _extra(dd, n):
+    """scalars の先頭 14（ライフ・ドン・手札・場・ターン・リーダーパワー）と tokens の 12 枠 × 4 列。"""
+    sc = np.asarray(dd["scalars"])[:n, :14].astype(np.float32)
+    tk = np.asarray(dd["tokens"])[:n, :12][:, :, [_C_REST, _C_CAN, _C_BLK, _C_CHAR]].astype(np.float32)
+    return sc, tk
 
 
 def _state(sc, tk):
@@ -118,15 +103,7 @@ def analyze(dirs, limit_games=0):
     t0 = time.time()
     cards = _Cards(D.load_db())
     db = cards.db
-    rows, pol, sc, tk, nfiles = _load(dirs)
-    n = len(rows["z"])
-    L = rows["pol_len"].astype(np.int64)
-    ptr = np.concatenate([[0], np.cumsum(L)]).astype(np.int64)
-    order = np.lexsort((rows["step"], rows["seed"]))
-    seeds = rows["seed"][order]
-    bounds = np.flatnonzero(np.diff(seeds)) + 1
-    starts = np.concatenate([[0], bounds]); ends = np.concatenate([bounds, [n]])
-    print(f"行 {n}・対局 {len(starts)}・シャード {nfiles}（{time.time()-t0:.0f}s）", flush=True)
+    n_rows = 0
 
     def is_blocker(cid):
         m = db.get_card(cid) if cid else None
@@ -135,11 +112,11 @@ def analyze(dirs, limit_games=0):
     turn_recs = []                      # 自席ターン 1 つ = 1 レコード
     guard_recs = []                     # 相手ターン 1 つ = 1 レコード
     games = 0
-    for s, e in zip(starts, ends):
-        idx = order[s:e]
+    for rows, pol, (sc, tk), L, ptr, idx in _iter_games(dirs, _ROW_COLS, _POL_COLS, _extra):
         games += 1
         if limit_games and games > limit_games:
             break
+        n_rows += len(idx)
         u2c = {}
         for i in idx:
             k = int(L[i])
@@ -197,6 +174,7 @@ def analyze(dirs, limit_games=0):
                 guard_recs.append({"who": w, "turn": a_t + 1, "z": zs.get(w, 0.0), "attacks": n_att,
                                    "lost": max(0, lost), "life_before": first[(w, a_t)]["my_life"],
                                    "hand_before": first[(w, a_t)]["my_hand"]})
+    print(f"行 {n_rows}・対局 {games}（{time.time()-t0:.0f}s）", flush=True)
     return _aggregate(turn_recs, guard_recs, games, t0)
 
 
