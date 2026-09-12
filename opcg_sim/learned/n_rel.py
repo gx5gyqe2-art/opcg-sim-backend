@@ -3,21 +3,23 @@
 serve と訓練で **forward はここが唯一の正本**（訓練器 `tests/scripts/n_rel_train.py` は継承して backward を足す）。
 
 入力（`n_rel_feat`・dump v2）:
-  scalars [B,123]  = v12 の 94 ＋ グローバル追加 29
+  scalars [B,127]  = v12 の 94 ＋ グローバル追加 33（v13 は 29）
   card_idx [B,22]  = 語彙 idx（0=PAD/UNK）… 構造 64（stats16＋効果埋め込み 48・`card_table`）を引く
-  tokens  [B,22,20] = トークン状態 S
+  tokens  [B,22,22] = トークン状態 S（v13 は 22 枠 × 20）
   rel_om  [B,16,6,5] / rel_oo [B,16,16,5] = 関係（訓練時は `relations_from_dump` で再計算）
 
 構造（Stage A・対の MLP＋プール）:
-  x_i  = [構造64, S20, ゾーン5]                        (89)
+  x_i  = [構造64, S22, ゾーン5]                        (91・v13 は S20 で 89)
   t_i  = relu(x_i Wt + bt)                              (Dt=48)
   r_ij = relu([t_i, t_j, R_ij] Wr + br)   i∈自, j∈相手  (Dr=32)
   c_ik = relu([t_i, t_k, R_ik] Wc + bc)   i,k∈自, k≠i   (Dc=32)
   h_i  = [t_i, max_j r_ij, mean_j r_ij, max_k c_ik]     自トークン (48+32+32+32=144)
   h_j  = [t_j, max_i r_ij, mean_i r_ij, 0]              相手トークン
-  z    = [scalars, mean_i h_i, max_i h_i]（存在する枠だけ） (123+144+144=411)
+  z    = [scalars, mean_i h_i, max_i h_i]（存在する枠だけ） (127+144+144=415)
   e    = relu(relu(z W1 + b1) W2 + b2)                   (64)
   value = tanh(e Wv + bv)
+  aux     = relu(e Wx1 + bx1) Wx2 + bx2                  (10・補助ヘッド・§20.8.2)
+  aux_tok = relu(h_j Wy1 + by1) Wy2 + by2   j∈相手 6 枠  (3)
   policy: 候補 (主体枠 si, 対象枠 ti, 素性 f139, 予算 3) →
           logit = relu([e, h_si, h_ti, R(si,ti), f139, 予算3] Wp1 + bp1) Wp2 + bp2 → seg-softmax
   枠が無い（−1）主体/対象は 0 ベクトル。R(si,ti) は si∈自・ti∈相手のときだけ rel_om、それ以外 0。
@@ -41,9 +43,11 @@ _CACHE_MAX = 4096                     # 席ごとの符号化キャッシュ上�
 _NOCACHE = bool(os.environ.get("OPCG_NREL_NOCACHE"))
 _VERIFY = bool(os.environ.get("OPCG_NREL_VERIFY"))
 _VERIFY_STATS = collections.Counter()   # 同値性の検査用（キャッシュ無し＝毎回符号化）
-NR_ENC_VERSION = 13                   # NRel の符号化世代（v12 + n_rel_feat の追加 29）
+NR_ENC_VERSION = 14                   # NRel の符号化世代（v14＝v13 + S 2 列・EXTRA 4 列・§20.9）
+NR_ENC_VERSION_V13 = 13               # 1 つ前（pad して読む対象・`nrel_r3.npz`／`nrel_a1.npz`）
 
-D_SC = 94 + NR.EXTRA_DIM              # 123
+D_SC = 94 + NR.EXTRA_DIM              # 127（v13 は 94 + 29 = 123）
+D_SC_V13 = 94 + NR.EXTRA_DIM_V13      # 123
 # 切り分け（ablation・2026-09-05）: 相手デッキ知識＝EXTRA の opp_pool_* 列（scalars 上の列番号）
 OPP_POOL_COLS = tuple(94 + j for j, _n in enumerate(NR.EXTRA_COLS) if _n.startswith("opp_pool_"))
 # 登場時スキャン（v7・`cpu_ai.onplay_option_scan` の実測 3 列）: 発火する PLAY 数・その keep 値・不発数
@@ -51,16 +55,36 @@ ONPLAY_COLS = (E.SCALARS_V6, E.SCALARS_V6 + 1, E.SCALARS_V6 + 2)
 ABLATE_KINDS = ("rel", "opp_pool", "onplay")
 D_STRUCT = NE.D_CARD_FEAT             # 64
 D_ZONE = 5
-D_X = D_STRUCT + NR.S_DIM + D_ZONE    # 89
+D_X = D_STRUCT + NR.S_DIM + D_ZONE    # 91（v13 は 64 + 20 + 5 = 89）
+D_X_V13 = D_STRUCT + NR.S_DIM_V13 + D_ZONE   # 89
 D_T = 48
 D_R = 32
 D_C = 32
 D_H = D_T + 2 * D_R + D_C             # 144
-D_Z = D_SC + 2 * D_H                  # 411
+D_Z = D_SC + 2 * D_H                  # 415（v13 は 123 + 288 = 411）
+D_Z_V13 = D_SC_V13 + 2 * D_H          # 411
 D_E = 64
 F_CAND = NE.F_CAND                    # 139（action7＋主体/対象の構造 64×2＋4）
 D_BUDGET = 3
 D_PIN = D_E + 2 * D_H + NR.R_DIM + F_CAND + D_BUDGET   # 64+288+5+139+3 = 499
+# --- 補助ヘッド（dump v4 の対称な補助教師・計画 §20.8.2）---------------------
+# 列の意味は `opcg_sim/loop/record_gen.py` の `AUX_COLS`／`AUX_TOK_COLS` が正本（ここは形だけ）。
+# **serve は使わない**（forward は value/policy のまま・Rust の読み手は補助鍵を無視する）。
+D_AUX = 10                     # aux（回帰・Huber）
+D_AUX_H = 64                   # aux ヘッドの中間
+D_AUX_TOK = 3                  # aux_tok（相手 6 枠 × [BCE, Huber, BCE]）
+D_AUX_TOK_H = 32               # aux_tok ヘッドの中間
+#: npz へ**別鍵**（`aux_` 接頭辞）で保存する補助ヘッドの重み。既存 18 個の `PARAMS` は不変。
+AUX_PARAMS = ("Wx1", "bx1", "Wx2", "bx2", "Wy1", "by1", "Wy2", "by2")
+AUX_KEY = "aux_"
+# --- 方針ヘッド（計画 §20.10・WP `rs-plan-aux`・ユーザ決定 2026-09-12）-----------------------
+# V(盤面, 方針)＝方針ごとの勝率（tanh・z が教師）。列の意味は `train/plan_labels.PLAN_CLASSES`
+# （face／board／mixed／take／guard）が正本。**打った方針のヘッドだけ**に勾配が流れる（mask）。
+# serve は使わない（Rust の読み手は `plan_` の鍵を無視する）＝読み出しは `plan_head` から。
+D_PLAN = 5
+D_PLAN_H = 32
+PLAN_PARAMS = ("Wq1", "bq1", "Wq2", "bq2")
+PLAN_KEY = "plan_"
 N_TOK, N_OWN, N_OPP = NR.N_TOK, NR.N_OWN, NR.N_OPP
 OWN_SLOTS = [i for i in range(N_TOK) if NR._zone(i) in ("own_leader", "own_field", "hand")]   # 16
 OPP_SLOTS = [i for i in range(N_TOK) if NR._zone(i) in ("opp_leader", "opp_field")]          # 6
@@ -68,6 +92,22 @@ _ZONE_ID = {"own_leader": 0, "opp_leader": 1, "own_field": 2, "opp_field": 3, "h
 ZONE_ONEHOT = np.zeros((N_TOK, D_ZONE), np.float32)
 for _i in range(N_TOK):
     ZONE_ONEHOT[_i, _ZONE_ID[NR._zone(_i)]] = 1.0
+
+
+def _pad_rows(W, at, n_new, want_rows):
+    """行列 `W` の `at` 行目の後ろへ **0 の行を `n_new` 本**挿す（列は不変）。
+
+    符号化の版を上げると入力ベクトルの**途中**に列が増える（S は構造 64 の後ろ・scalars は
+    グローバル追加列の末尾）。重みの行はその並びに 1 対 1 なので、新しい列の重みを 0 で
+    埋めれば **forward の値は 1 bit も変わらない**（0 を掛けて足すだけ）。
+    既に新しい形（`want_rows` 行）なら何もしない＝冪等。
+    """
+    W = np.asarray(W)
+    if W.shape[0] == want_rows:
+        return W
+    if W.shape[0] != want_rows - n_new:
+        raise ValueError(f"pad できない形（{W.shape[0]} 行・{want_rows - n_new} 行が要る）")
+    return np.concatenate([W[:at], np.zeros((n_new, W.shape[1]), W.dtype), W[at:]], 0)
 
 
 def cand_rel_rows(rel_om, seg, si, ti):
@@ -114,8 +154,33 @@ class NRelNet:
         self.Wp1 = W(D_PIN, 64); self.bp1 = np.zeros(64, np.float32)
         self.Wp2 = W(64, 1); self.bp2 = np.zeros(1, np.float32)
         self.params = list(self.PARAMS)
+        # 補助ヘッド（§20.8.2）: **別の乱数列**から引く＝既存 18 個の初期値は 1 ビットも動かない。
+        # `aux` が False のあいだは forward からも損失からも触られない（保存もしない）。
+        ra = np.random.default_rng(seed + 20_080_000)
+
+        def WA(a, b):
+            return (ra.standard_normal((a, b)) * np.sqrt(2.0 / a)).astype(np.float32)
+        self.Wx1 = WA(D_E, D_AUX_H); self.bx1 = np.zeros(D_AUX_H, np.float32)
+        self.Wx2 = WA(D_AUX_H, D_AUX); self.bx2 = np.zeros(D_AUX, np.float32)
+        self.Wy1 = WA(D_H, D_AUX_TOK_H); self.by1 = np.zeros(D_AUX_TOK_H, np.float32)
+        self.Wy2 = WA(D_AUX_TOK_H, D_AUX_TOK); self.by2 = np.zeros(D_AUX_TOK, np.float32)
+        self.aux_params = list(AUX_PARAMS)
+        self.aux = False                  # 補助ヘッドを使うか（訓練器が --aux-weight から立てる）
+        # 方針ヘッド（§20.10）: これも別の乱数列＝既存の初期値は動かない。`plan` が False の
+        # あいだは forward からも損失からも触られない（保存もしない）。
+        rq = np.random.default_rng(seed + 20_100_000)
+
+        def WQ(a, b):
+            return (rq.standard_normal((a, b)) * np.sqrt(2.0 / a)).astype(np.float32)
+        self.Wq1 = WQ(D_E, D_PLAN_H); self.bq1 = np.zeros(D_PLAN_H, np.float32)
+        self.Wq2 = WQ(D_PLAN_H, D_PLAN); self.bq2 = np.zeros(D_PLAN, np.float32)
+        self.plan_params = list(PLAN_PARAMS)
+        self.plan = False                 # 方針ヘッドを使うか（訓練器が --plan-weight から立てる）
         self.vocab_ids = None
         self.meta = {}
+        #: このネットが読む符号化の世代（新規は現行＝v14。`load` が npz の meta から入れ直す）。
+        #: **候補行の対象（§20.9 の A）はこの版で分岐する**＝v13 のネットは v13 の行のまま。
+        self.enc_version = NR_ENC_VERSION
         # 切り分け（ablation）: {"rel"}＝関係 R を 0 に・{"opp_pool"}＝相手デッキ知識の列を 0 に。
         # 訓練・serve の両方でここ（forward の入口）で遮断する＝npz の meta に焼き込まれ load で復元。
         self.ablate = set()
@@ -271,6 +336,51 @@ class NRelNet:
         e = self.body(sc, h, present)
         return np.tanh((e @ self.Wv + self.bv)[:, 0])
 
+    # --- 補助ヘッド（§20.8.2・serve は呼ばない） ---
+    def aux_head(self, e, keep=None):
+        """共有表現 e [B,D_E] → aux の予測 [B,10]（回帰・Huber の出力そのまま）。"""
+        ha = e @ self.Wx1 + self.bx1
+        ra = np.maximum(ha, 0.0)
+        if keep is not None:
+            keep.update(a_ha=ha, a_ra=ra)
+        return ra @ self.Wx2 + self.bx2
+
+    def aux_tok_head(self, h, keep=None):
+        """h [B,22,D_H] → 相手 6 枠の予測 [B,6,3]（列 0/2 は**ロジット**・列 1 は回帰）。"""
+        ho = h[:, OPP_SLOTS]
+        hy = ho @ self.Wy1 + self.by1
+        ry = np.maximum(hy, 0.0)
+        if keep is not None:
+            keep.update(a_ho=ho, a_hy=hy, a_ry=ry)
+        return ry @ self.Wy2 + self.by2
+
+    def value_with_aux(self, sc, ci, tok, rel_om, rel_oo):
+        """(value, aux, aux_tok)（評価帯が使う・value は既存の forward と同じ値）。"""
+        tab = self.card_table()
+        h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
+        e = self.body(sc, h, present)
+        v = np.tanh((e @ self.Wv + self.bv)[:, 0])
+        return v, self.aux_head(e), self.aux_tok_head(h)
+
+    # --- 方針ヘッド（§20.10・serve は呼ばない） ---
+    def plan_head(self, e, keep=None):
+        """共有表現 e [B,D_E] → 方針ごとの勝率 [B,5]（tanh・列は `plan_labels.PLAN_CLASSES`）。"""
+        hq = e @ self.Wq1 + self.bq1
+        rq = np.maximum(hq, 0.0)
+        oq = rq @ self.Wq2 + self.bq2
+        vq = np.tanh(oq)
+        if keep is not None:
+            keep.update(q_hq=hq, q_rq=rq, q_vq=vq)
+        return vq
+
+    def value_with_plan(self, sc, ci, tok, rel_om, rel_oo):
+        """(value, plan [B,5])（評価・地図の読み出しが使う・value は既存の forward と同じ値）。"""
+        tab = self.card_table()
+        h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
+        e = self.body(sc, h, present)
+        v = np.tanh((e @ self.Wv + self.bv)[:, 0])
+        return v, self.plan_head(e)
+
     # --- 方策 ---
     def cand_input(self, e, h, rel_om, seg, si, ti, feats, budget):
         """候補ごとの入力 [P_cand, D_PIN]。si/ti は 22 枠 index（−1=無し）。"""
@@ -314,8 +424,20 @@ class NRelNet:
         if ids:
             extra["vocab_ids"] = np.array([str(x) for x in ids])
         m = dict(meta if meta is not None else (self.meta or {}))
+        # 符号化の世代（v14 で導入・§20.9 の E）。**読み手はこれで pad するかを決める**ので、
+        # 保存した重みの形（`Wt` の行数・`W1` の行数）と必ず一致させる。
+        m["enc_version"] = NR_ENC_VERSION
         if self.ablate:
             m["ablate"] = sorted(self.ablate)
+        if self.aux:
+            # 補助ヘッドは**別鍵**（`aux_Wx1` …）で置く。serve の forward は読まないし、Rust の
+            # 読み手（`net/mod.rs` は鍵ごとに `get`）も知らない鍵をそのまま無視する。
+            m["aux"] = True
+            extra.update({AUX_KEY + p: getattr(self, p) for p in self.aux_params})
+        if self.plan:
+            # 方針ヘッド（§20.10）も別鍵（`plan_Wq1` …）。Rust は知らない鍵を無視する。
+            m["plan"] = True
+            extra.update({PLAN_KEY + p: getattr(self, p) for p in self.plan_params})
         np.savez_compressed(path, **{p: getattr(self, p) for p in self.params},
                             meta=json.dumps(m), nrel=np.array(1), **extra)
 
@@ -331,6 +453,25 @@ class NRelNet:
         except Exception:
             net.meta = {}
         net.ablate = set(net.meta.get("ablate") or ())
+        # 符号化 v13 のネット（`enc_version` が無い／13）は**新しい列の重みを 0 で埋めて**読む
+        # （§20.9 の E）。埋める位置は入力の並びで決まる: x=[構造64, S, ゾーン5] なので `Wt` は
+        # 64+20 行目の後ろへ 2 行・z=[scalars, mean h, max h] なので `W1` は 123 行目の後ろへ 4 行。
+        net.enc_version = int(net.meta.get("enc_version") or NR_ENC_VERSION_V13)
+        if net.enc_version < NR_ENC_VERSION:
+            net.Wt = _pad_rows(net.Wt, D_STRUCT + NR.S_DIM_V13, NR.S_DIM - NR.S_DIM_V13, D_X)
+            net.W1 = _pad_rows(net.W1, D_SC_V13, D_SC - D_SC_V13, D_Z)
+            net.meta = dict(net.meta, enc_version=NR_ENC_VERSION,
+                            enc_version_loaded=net.enc_version)
+        # 補助ヘッド（あれば）。無ければ初期値のまま `aux=False`＝今までの npz と同じ扱い。
+        if all(AUX_KEY + p in d.files for p in net.aux_params):
+            for p in net.aux_params:
+                setattr(net, p, d[AUX_KEY + p])
+            net.aux = True
+        # 方針ヘッド（§20.10・あれば）。無ければ初期値のまま `plan=False`。
+        if all(PLAN_KEY + p in d.files for p in net.plan_params):
+            for p in net.plan_params:
+                setattr(net, p, d[PLAN_KEY + p])
+            net.plan = True
         return net
 
 
@@ -426,7 +567,7 @@ class NRelValueAdapter:
         return tuple(parts)
 
     def encode_state(self, state, to_move):
-        """盤面 → (sc [1,123], ci [1,22], tok [1,22,S], rel_om, rel_oo, R)。
+        """盤面 → (sc [1,D_SC], ci [1,22], tok [1,22,S], rel_om, rel_oo, R)。
 
         同じ盤面（指紋一致）なら直前の結果を返す＝1 ノードで value と priors が同じ符号化を共有する。"""
         cache = getattr(self, "_cache", None)
@@ -504,14 +645,43 @@ class NRelValueAdapter:
         return self.predict(batch)
 
 
-def _cand_rows(net, tab, vocab, state, legal, smap):
+#: 効果の対象選択の手（対象は `payload.target_ids` ではなく `selected_uuids` に入る）。
+SELECT_AT = "RESOLVE_EFFECT_SELECTION"
+
+
+def cand_ids(mv, src_uuid=None, enc_version=NR_ENC_VERSION):
+    """候補 → `(主体 uuid, 対象 uuid)`。**候補行の対象の規則の正本**（§20.9 の A）。
+
+    素の手は今までどおり `card_uuid`／`payload.uuid` が主体・`payload.target_ids[0]` が対象。
+    符号化 v14 では **`RESOLVE_EFFECT_SELECTION` だけ**が変わる:
+
+      対象＝`payload.selected_uuids[0]`（複数選択は先頭・空なら対象なし）
+      主体＝効果の**発生源**（payload に uuid があればそれ・無ければ `src_uuid`＝
+            中断している効果の `source_card_uuid`）
+
+    これが無いと「神の裁きで A を KO」と「B を KO」が**同じ候補行**になり、P が対象を
+    区別できない（`rs-q-pi` の実測: 対話ノードの P は一様）。CHOICE／CONFIRM_OPTIONAL は
+    `selected_uuids` を持たない＝対象なしのまま。
+
+    `enc_version` が 14 未満のネット（r3／a1）は **v13 の規則のまま**＝1 bit も変わらない。
+    """
+    p = mv.get("payload") or {}
+    su = mv.get("card_uuid") or p.get("uuid")
+    if enc_version >= 14 and (mv.get("action_type") or p.get("action_type")) == SELECT_AT:
+        sel = list(p.get("selected_uuids") or ())
+        return (su or src_uuid), (sel[0] if sel else None)
+    return su, ((p.get("target_ids") or [None])[0])
+
+
+def _cand_rows(net, tab, vocab, state, legal, smap, src_uuid=None):
     """候補 → (feats [n,139], si [n], ti [n])。素性は NEff と同じ定義（`n_eff._cand_row`）。"""
     uidx = NE._uuid_index(state)
-    feats = np.stack([NE._cand_row(net, tab, state, mv, vocab, uidx) for mv in legal])
-    si = np.array([smap.get(mv.get("card_uuid") or (mv.get("payload") or {}).get("uuid"), -1)
-                   for mv in legal], np.int64)
-    ti = np.array([smap.get(((mv.get("payload") or {}).get("target_ids") or [None])[0], -1)
-                   for mv in legal], np.int64)
+    ev = getattr(net, "enc_version", NR_ENC_VERSION)
+    ids = [cand_ids(mv, src_uuid, ev) for mv in legal]
+    feats = np.stack([NE._cand_row(net, tab, state, mv, vocab, uidx, ids=d)
+                      for mv, d in zip(legal, ids)])
+    si = np.array([smap.get(su, -1) if su else -1 for su, _tu in ids], np.int64)
+    ti = np.array([smap.get(tu, -1) if tu else -1 for _su, tu in ids], np.int64)
     return feats, si, ti
 
 
@@ -529,7 +699,10 @@ def nrel_priors(adapter):
             me = state.p1 if state.p1.name == me_name else state.p2
             opp = state.p2 if me is state.p1 else state.p1
             smap = {getattr(c, "uuid", None): i for i, c in enumerate(NR._slots(me, opp)) if c is not None}
-            feats, si, ti = _cand_rows(net, adapter.tab, vocab, state, legal, smap)
+            # 効果の発生源（対象選択の候補行の主体・§20.9 の A）。中断していなければ None。
+            ai = getattr(state, "active_interaction", None)
+            src_uuid = ai.get("source_card_uuid") if isinstance(ai, dict) else None
+            feats, si, ti = _cand_rows(net, adapter.tab, vocab, state, legal, smap, src_uuid)
             n = len(legal)
             seg = np.zeros(n, np.int64)
             # 予算 3（訓練の budget_feats と同じ定義）

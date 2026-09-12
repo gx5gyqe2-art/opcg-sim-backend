@@ -26,11 +26,11 @@ use crate::model::{GameState, Seat};
 use crate::state::EngineError;
 
 use super::quiesce::{
-    argmax_f64, best_branch, in_battle, in_dialog, resolve_battle_inplace, resolved_branch_values,
-    Ctx, SearchState, Window,
+    argmax_f64, best_branch, in_battle, in_dialog, leaf_rollout_turn_end, record_rollout,
+    resolve_battle_inplace, resolved_branch_values, Ctx, SearchState, Window,
 };
 use super::rng::SearchRng;
-use super::{apply, Move};
+use super::{apply, LeafRollout, Move};
 
 /// Python `config.DIRICHLET_ALPHA`。
 pub const DIRICHLET_ALPHA: f64 = 0.3;
@@ -38,6 +38,89 @@ pub const DIRICHLET_ALPHA: f64 = 0.3;
 pub const C_PUCT: f64 = 1.5;
 /// Python `config.SERVE_SIMS`。
 pub const SERVE_SIMS: usize = 160;
+/// `select_rule="q_min_n"` の訪問下限の既定割合（`sims/8`・§20.5）。
+pub const Q_MIN_FRAC: f64 = 0.125;
+
+/// 根で「どの手を出すか」の規則（§20.5・既定は [`SelectRule::Visits`]＝今までの挙動）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SelectRule {
+    /// 訪問数最多（同点は添字が小さい方＝numpy の argmax 規約）。
+    #[default]
+    Visits,
+    /// 訪問数が下限（`max(1, floor(sims * q_min_frac))`）以上の手の中で Q 最大。
+    /// 下限を満たす手が無ければ [`SelectRule::Visits`] に落ちる。
+    QMinN,
+}
+
+impl SelectRule {
+    /// `opts_json` の文字列（"visits"／"q_min_n"）から。知らない値は `None`。
+    pub fn from_name(s: &str) -> Option<SelectRule> {
+        match s {
+            "visits" => Some(SelectRule::Visits),
+            "q_min_n" => Some(SelectRule::QMinN),
+            _ => None,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            SelectRule::Visits => "visits",
+            SelectRule::QMinN => "q_min_n",
+        }
+    }
+}
+
+/// `q_min_n` の訪問下限（`max(1, floor(sims * q_min_frac))`）。
+pub fn q_min_n_floor(sims: usize, q_min_frac: f64) -> f64 {
+    (sims as f64 * q_min_frac).floor().max(1.0)
+}
+
+/// 根の候補（`n`／`q` は同じ並び）から出す手の添字を選ぶ（§20.5）。
+///
+/// `Visits` は `argmax(N)`、`QMinN` は `N >= n_floor` の中で `argmax(Q)`（該当が無ければ
+/// `argmax(N)`）。どちらも同点は**添字が小さい方**（[`argmax_f64`] と同じ規約）。
+pub fn select_index(n: &[f64], q: &[f64], rule: SelectRule, n_floor: f64) -> usize {
+    if rule == SelectRule::QMinN {
+        let qv = |i: usize| q.get(i).copied().unwrap_or(0.0);
+        let mut best: Option<usize> = None;
+        for (i, ni) in n.iter().enumerate() {
+            if *ni < n_floor {
+                continue;
+            }
+            match best {
+                Some(b) if qv(b) >= qv(i) => {}
+                _ => best = Some(i),
+            }
+        }
+        if let Some(b) = best {
+            return b;
+        }
+    }
+    argmax_f64(n)
+}
+
+/// 根の事前分布を `P^(1/t)` へ丸めて正規化する（§20.5・`t=1` は何もしない＝1 bit も変えない）。
+///
+/// 根だけに掛ける（子ノードの `expand` は触らない）。和が 0 になる病的な入力（全部 0）は
+/// そのまま返す。
+pub fn apply_root_prior_temp(p: &mut [f64], temp: f64) -> bool {
+    if temp.is_nan() || temp <= 0.0 || temp == 1.0 || p.len() < 2 {
+        return false;
+    }
+    let inv = 1.0 / temp;
+    let mut total = 0.0;
+    for x in p.iter_mut() {
+        *x = x.max(0.0).powf(inv);
+        total += *x;
+    }
+    if total.is_nan() || total <= 0.0 {
+        return false;
+    }
+    for x in p.iter_mut() {
+        *x /= total;
+    }
+    true
+}
 
 /// Python `mcts._Node`。
 #[derive(Debug, Default, Clone)]
@@ -56,6 +139,15 @@ pub struct Node {
     pub term_val: f64,
 }
 
+/// PV（主変化）の 1 手（`docs/rust_engine_plan.md` §20.4 の思考ログ・[`TreeMcts::principal_variation`]）。
+#[derive(Debug, Clone)]
+pub struct PvStep {
+    pub mv: Move,
+    pub seat: Seat,
+    pub n: f64,
+    pub q: f64,
+}
+
 /// `TreeMCTS.run` の返り値（`last_stats` 込み）。
 #[derive(Debug, Clone, Default)]
 pub struct RunOut {
@@ -71,6 +163,38 @@ pub struct RunOut {
     pub p: Vec<f64>,
 }
 
+/// ノード列（1 本の木）から PV を辿る（[`TreeMcts::principal_variation`] の本体）。
+///
+/// `first`＝根で辿り始める手の添字（`None`＝訪問数最多＝単一世界の既定）。複数世界
+/// （§20.7.1）は「束ねた統計で選んだ手」から辿る＝その世界の根の argmax(N) とは限らないので、
+/// 最初の 1 手だけ外から指定する。
+pub fn principal_variation_of(nodes: &[Node], first: Option<usize>, max_len: usize) -> Vec<PvStep> {
+    let mut out = Vec::with_capacity(max_len);
+    let mut node = 0usize; // run() は必ず root を最初のノードにする
+    let mut forced = first;
+    for _ in 0..max_len {
+        if node >= nodes.len() {
+            break;
+        }
+        let n = &nodes[node];
+        if !n.expanded || n.terminal || n.legal.is_empty() {
+            break;
+        }
+        let Some(seat) = n.to_move else { break };
+        let a = match forced.take().filter(|i| *i < n.legal.len()) {
+            Some(i) => i,
+            None => argmax_f64(&n.n),
+        };
+        let q = n.w[a] / n.n[a].max(1.0);
+        out.push(PvStep { mv: n.legal[a].clone(), seat, n: n.n[a], q });
+        match n.children[a] {
+            Some(c) => node = c,
+            None => break,
+        }
+    }
+    out
+}
+
 /// 木の探索（Python `TreeMCTS`）。
 pub struct TreeMcts<'a, 'b> {
     pub ctx: &'a Ctx<'b>,
@@ -78,6 +202,12 @@ pub struct TreeMcts<'a, 'b> {
     pub n_sims: usize,
     pub dirichlet_alpha: f64,
     pub dirichlet_eps: f64,
+    /// 根で出す手の選び方（§20.5・既定 [`SelectRule::Visits`]）。
+    pub select_rule: SelectRule,
+    /// `q_min_n` の訪問下限の割合（§20.5・既定 [`Q_MIN_FRAC`]）。
+    pub q_min_frac: f64,
+    /// 根の事前分布の平坦化（§20.5・既定 1.0＝何もしない）。
+    pub root_prior_temp: f64,
     nodes: Vec<Node>,
 }
 
@@ -89,6 +219,9 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             n_sims,
             dirichlet_alpha: DIRICHLET_ALPHA,
             dirichlet_eps,
+            select_rule: SelectRule::Visits,
+            q_min_frac: Q_MIN_FRAC,
+            root_prior_temp: 1.0,
             nodes: Vec::new(),
         }
     }
@@ -110,11 +243,31 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         st: &mut SearchState,
     ) -> Result<RunOut, EngineError> {
         let world = super::determinize::determinize_with(real, me, rng)?;
+        self.run_in_world(world, rng, st)
+    }
+
+    /// [`run`](Self::run) の「世界サンプルを外から渡す」版（§20.7.1 の複数世界が使う）。
+    ///
+    /// `run` は世界を自分で引く（`rng` の 1 本目のシャッフル）が、こちらは引き終えた世界を
+    /// 受け取る＝**同じ `rng` を渡せば `run` と 1 bit も変わらない**（Dirichlet と温度の出目は
+    /// 世界サンプルの後に引かれるので順序も同じ）。世界ごとに別の `rng` を渡せば K 本の木を
+    /// 独立に回せる。
+    pub fn run_in_world(
+        &mut self,
+        world: GameState,
+        rng: &mut dyn SearchRng,
+        st: &mut SearchState,
+    ) -> Result<RunOut, EngineError> {
         let mut s = Session::new(world);
         let root = self.new_node();
         self.expand(root, &mut s, st)?;
         if self.nodes[root].legal.is_empty() {
             return Ok(RunOut::default());
+        }
+        // 根の事前分布の平坦化（§20.5）。Dirichlet 混合の**前**に掛ける＝混合は
+        // 「平坦化後の P」に対する既定どおりの `(1-eps)*P + eps*noise`。
+        if apply_root_prior_temp(&mut self.nodes[root].p, self.root_prior_temp) {
+            self.nodes[root].p_f32 = false;
         }
         if self.dirichlet_eps > 0.0 && self.nodes[root].legal.len() > 1 {
             let n = self.nodes[root].legal.len();
@@ -141,17 +294,23 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         }
         s.rng.restore(&base_rng);
         let node = &self.nodes[root];
-        let best = argmax_f64(&node.n);
+        let q: Vec<f64> = node
+            .n
+            .iter()
+            .zip(&node.w)
+            .map(|(n, w)| w / n.max(1.0))
+            .collect();
+        let best = select_index(
+            &node.n,
+            &q,
+            self.select_rule,
+            q_min_n_floor(self.n_sims, self.q_min_frac),
+        );
         Ok(RunOut {
             best: Some(node.legal[best].clone()),
             legal: node.legal.clone(),
             n: node.n.clone(),
-            q: node
-                .n
-                .iter()
-                .zip(&node.w)
-                .map(|(n, w)| w / n.max(1.0))
-                .collect(),
+            q,
             p: node.p.clone(),
         })
     }
@@ -264,42 +423,55 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
     ///
     /// 延長は `value_fn=None`（箱の枝評価を呼ばない）＝予算は減らない。乱数と
     /// イベントログは復元する（延長の消費を漏らさない＝CRN 一貫性）。
-    fn leaf_value(
+    ///
+    /// **葉の打ち切り**（§20.7.9・`SearchOptions::leaf_rollout="turn_end"`）: 窓の解決を終えた
+    /// 後、盤面が終局でなく手番の側のメインフェイズにあるなら
+    /// [`leaf_rollout_turn_end`] でターンが替わるまで方策で打ち続けてから評価する。
+    /// **既定（`"none"`）では下の分岐に 1 度も入らない＝1 bit も変わらない**。
+    pub(in crate::search) fn leaf_value(
         &mut self,
         s: &mut Session,
         st: &mut SearchState,
         to_move: Seat,
     ) -> Result<f64, EngineError> {
         let ctx = self.ctx;
+        let rollout = ctx.opts.leaf_rollout == LeafRollout::TurnEnd;
         let noisy = in_battle(s) || (ctx.box_dialog && in_dialog(s));
-        if !ctx.quiesce || !noisy {
+        let resolve_windows = ctx.quiesce && noisy;
+        if !resolve_windows && !rollout {
             return ctx.value(s, to_move);
         }
         let rng_state = s.rng.snapshot();
         let saved = s.swap_events(Vec::new());
         let out = s.transaction(|s| -> Result<f64, EngineError> {
-            if ctx.box_dialog && in_dialog(s) && !in_battle(s) {
+            if resolve_windows {
+                if ctx.box_dialog && in_dialog(s) && !in_battle(s) {
+                    resolve_battle_inplace(
+                        ctx,
+                        s,
+                        st,
+                        Window::Dialog,
+                        ctx.quiesce_max_plies,
+                        false,
+                        0,
+                        None,
+                    )?;
+                }
                 resolve_battle_inplace(
                     ctx,
                     s,
                     st,
-                    Window::Dialog,
+                    Window::Battle,
                     ctx.quiesce_max_plies,
                     false,
                     0,
                     None,
                 )?;
             }
-            resolve_battle_inplace(
-                ctx,
-                s,
-                st,
-                Window::Battle,
-                ctx.quiesce_max_plies,
-                false,
-                0,
-                None,
-            )?;
+            if rollout {
+                let (plies, capped) = leaf_rollout_turn_end(ctx, s, st)?;
+                record_rollout(plies, capped);
+            }
             ctx.value(s, to_move)
         });
         s.swap_events(saved);
@@ -419,6 +591,21 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         Ok(v)
     }
 
+    /// PV（主変化・`docs/rust_engine_plan.md` §20.4）: root（node 0）から「訪問数最多の子」を
+    /// 辿る（相手番の節も同じ規則）。`max_len` 手または葉（未展開／終局／合法手無し）で止める。
+    ///
+    /// **単一の木**（[`run`](Self::run) が世界サンプルを 1 度だけ引いて 1 本の木を回す）を辿る
+    /// ので世界の選び方に曖昧さは無い。複数世界（§20.7.1・`worlds>1`）では
+    /// [`principal_variation_of`] に「選んだ世界の木」を渡す。
+    pub fn principal_variation(&self, max_len: usize) -> Vec<PvStep> {
+        principal_variation_of(&self.nodes, None, max_len)
+    }
+
+    /// 木のノード列（複数世界が世界ごとの木を持ち帰るのに使う・§20.7.1）。
+    pub fn into_nodes(self) -> Vec<Node> {
+        self.nodes
+    }
+
     /// PUCT の選択（Python `U = Q + c_puct*P*sqrt(ΣN)/(1+N)` の argmax・同点は添字が小さい方）。
     fn puct_select(&self, node: usize) -> usize {
         let n = &self.nodes[node];
@@ -486,6 +673,111 @@ mod tests {
         t.nodes[node].n = vec![1.0, 0.0];
         t.nodes[node].w = vec![-1.0, 0.0];
         assert_eq!(t.puct_select(node), 1);
+    }
+
+    // --- 選択規則と根の平坦化（§20.5・WP `rs-search-a`）--------------------------
+
+    /// `q_min_n` は「訪問下限を満たす手の中で Q 最大」・下限を満たす手が無ければ訪問数最多。
+    #[test]
+    fn q_min_n_picks_the_best_q_above_the_visit_floor() {
+        let n = [81.0, 21.0, 14.0, 3.0];
+        let q = [0.862, 0.989, 0.984, 1.0];
+        // 下限 20（sims 160・1/8）: 訪問 81／21 が候補 → Q 0.989 の添字 1（エネル T9 #14 の形）。
+        assert_eq!(q_min_n_floor(160, Q_MIN_FRAC), 20.0);
+        assert_eq!(select_index(&n, &q, SelectRule::QMinN, 20.0), 1);
+        // 訪問数最多（既定）は Q を見ない＝添字 0。
+        assert_eq!(select_index(&n, &q, SelectRule::Visits, 20.0), 0);
+        // 下限が高すぎて誰も満たさないなら visits に落ちる。
+        assert_eq!(select_index(&n, &q, SelectRule::QMinN, 200.0), 0);
+        // 下限 1 なら全部が候補＝Q 最大の添字 3。
+        assert_eq!(select_index(&n, &q, SelectRule::QMinN, 1.0), 3);
+        // Q 同点は添字が小さい方（numpy の argmax 規約）。
+        assert_eq!(select_index(&[5.0, 5.0], &[0.5, 0.5], SelectRule::QMinN, 1.0), 0);
+        // 訪問 0 の手は下限（>=1）を満たさない＝Q が高くても選ばれない。
+        assert_eq!(select_index(&[4.0, 0.0], &[-0.9, 0.9], SelectRule::QMinN, 1.0), 0);
+    }
+
+    /// 下限は `max(1, floor(sims * q_min_frac))`（0 にはならない）。
+    #[test]
+    fn the_visit_floor_is_at_least_one() {
+        assert_eq!(q_min_n_floor(16, 0.125), 2.0);
+        assert_eq!(q_min_n_floor(4, 0.125), 1.0); // floor(0.5)=0 → 1 へ
+        assert_eq!(q_min_n_floor(0, 0.125), 1.0);
+        assert_eq!(q_min_n_floor(16000, 0.125), 2000.0);
+    }
+
+    /// `select_rule` の名前（知らない値は None＝呼び出し側が既定へ落とす）。
+    #[test]
+    fn select_rule_names_round_trip() {
+        assert_eq!(SelectRule::from_name("visits"), Some(SelectRule::Visits));
+        assert_eq!(SelectRule::from_name("q_min_n"), Some(SelectRule::QMinN));
+        assert_eq!(SelectRule::from_name("greedy"), None);
+        assert_eq!(SelectRule::default(), SelectRule::Visits);
+        assert_eq!(SelectRule::QMinN.name(), "q_min_n");
+    }
+
+    /// `root_prior_temp`: 和は 1 のまま・順位は保つ・尖りは緩む。t=1 は 1 bit も変えない。
+    #[test]
+    fn root_prior_temp_flattens_and_keeps_the_simplex() {
+        let base = [0.696f64, 0.199, 0.057, 0.048];
+        let mut p = base;
+        assert!(apply_root_prior_temp(&mut p, 2.0));
+        let s: f64 = p.iter().sum();
+        assert!((s - 1.0).abs() < 1e-12, "和が 1 でない: {s}");
+        // 順位は保つ（単調変換）
+        assert!(p[0] > p[1] && p[1] > p[2] && p[2] > p[3]);
+        // 尖りは緩む（最大は下がり・最小は上がる／最大と最小の比が縮む）
+        assert!(p[0] < base[0], "{} < {}", p[0], base[0]);
+        assert!(p[3] > base[3], "{} > {}", p[3], base[3]);
+        assert!(p[0] / p[3] < base[0] / base[3]);
+        // t=1（既定）は何もしない＝配列は 1 bit も変わらない
+        let mut same = base;
+        assert!(!apply_root_prior_temp(&mut same, 1.0));
+        assert_eq!(same, base);
+        // 病的な入力（非正の t・全部 0・要素 1 つ）でも壊さない
+        let mut zero = [0.0f64, 0.0];
+        assert!(!apply_root_prior_temp(&mut zero, 2.0));
+        assert_eq!(zero, [0.0, 0.0]);
+        let mut neg = base;
+        assert!(!apply_root_prior_temp(&mut neg, 0.0));
+        assert_eq!(neg, base);
+        let mut one = [1.0f64];
+        assert!(!apply_root_prior_temp(&mut one, 2.0));
+        assert_eq!(one, [1.0]);
+    }
+
+    /// 平坦化は**根だけ**に掛かる（[`TreeMcts::run`] が呼ぶ・[`TreeMcts::expand`] は触らない）。
+    /// ここでは「ノードの P を直接畳んでも他のノードは無傷」であることを見る。
+    #[test]
+    fn root_prior_temp_touches_only_the_node_it_is_applied_to() {
+        let masters = crate::model::MasterTable::default();
+        let net = crate::net::LoadedNet {
+            weights: Default::default(),
+            tab: Vec::new(),
+            vocab: Default::default(),
+            statics: Default::default(),
+        };
+        let ctx = Ctx {
+            masters: &masters,
+            net: &net,
+            opts: Default::default(),
+            box_battle: true,
+            box_dialog: true,
+            quiesce: true,
+            quiesce_max_plies: 12,
+        };
+        let mut t = TreeMcts::new(&ctx, 1.5, 1, 0.0);
+        assert_eq!(t.select_rule, SelectRule::Visits, "既定は訪問数最多");
+        assert_eq!(t.root_prior_temp, 1.0, "既定は平坦化なし");
+        let root = t.new_node();
+        let child = t.new_node();
+        t.nodes[root].p = vec![0.9, 0.1];
+        t.nodes[root].p_f32 = true;
+        t.nodes[child].p = vec![0.9, 0.1];
+        t.nodes[child].p_f32 = true;
+        assert!(apply_root_prior_temp(&mut t.nodes[root].p, 2.0));
+        assert_eq!(t.nodes[child].p, vec![0.9, 0.1], "子ノードの P は無傷");
+        assert!((t.nodes[root].p.iter().sum::<f64>() - 1.0).abs() < 1e-12);
     }
 
     /// Dirichlet 混合は `(1-eps)*P + eps*noise`（和は 1 のまま）。

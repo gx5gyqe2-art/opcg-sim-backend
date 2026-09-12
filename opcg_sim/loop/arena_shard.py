@@ -13,6 +13,16 @@
   OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard \\
     --candidate /home/user/cand/nrel_c12.npz --pairs 400 --max-pairs 40 \\
     --leaders random --decks synth --out /tmp/arena_pairs.jsonl
+
+**ネットを固定して探索の設定だけを比べる**こともできる（WP `rs-search-arena`・§20.5.3）:
+`--candidate` に基準と同じ npz（または空の `--baseline`）を渡し、`--cand-*` で候補席の
+つまみだけを変える。候補席の設定は台帳の各行（`cand_opts`）と `ARENA_RESUME_FINAL` に載る
+＝判定が設定に紐づく。既定（`--cand-*` 無し）の記録は歴代の台帳と同じ形のまま。
+
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard \\
+    --candidate opcg_sim/data/learned/nrel_r3.npz --leaders random --decks synth \\
+    --cand-worlds 4 --cand-select-rule q_min_n --cand-q-min-frac 0.125 \\
+    --cand-root-prior-temp 2.0 --workers 2 --out /tmp/arena_r2.jsonl
 """
 import os
 for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
@@ -43,9 +53,11 @@ def build_parser():
                     help="対面の選び方: fixed=既定リーダーミラー（歴代判定と地続き）／"
                          "random=全リーダーからペアごとに 2 枚引く（汎化）／"
                          "real=実デッキ 4 リーダー／purple=紫を含むリーダー（掘り実験の母集団）")
-    ap.add_argument("--decks", default="singleton", choices=("singleton", "synth", "synth_dig"),
+    ap.add_argument("--decks", default="singleton",
+                    choices=("singleton", "synth", "synth_dig", "synth_roles", "user"),
                     help="デッキの中身。singleton=従来（色が合う 50 枚・全部 1 枚ずつ）／"
-                         "synth=リーダーに合わせて合成／synth_dig=合成に掘りカードを差し込む")
+                         "synth=リーダーに合わせて合成／synth_dig=合成に掘りカードを差し込む／"
+                         "synth_roles=合成に除去の型を色ごとに差し込む（§20.8.1）")
     ap.add_argument("--pair-timeout", type=int, default=900,
                     help="1 ペアの実時間上限（秒・0=無制限）。超過したペアは void として残す")
     ap.add_argument("--out", required=True, help="ペアスコア jsonl（追記台帳・再開の正）")
@@ -55,6 +67,9 @@ def build_parser():
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
+    cand_kw = A.cand_kw_from_args(args)
+    if cand_kw:
+        print(f"候補席の設定 {json.dumps(cand_kw, ensure_ascii=False)}（基準席は既定）", flush=True)
     planned = [s for band in A.plan_bands(args.pairs, args.bands, args.seed_base) for s in band]
     done = A.load_ledger(args.out)
     todo = A.remaining_seeds(planned, done)
@@ -62,7 +77,7 @@ def main(argv=None):
     if todo:
         batch = todo[: args.max_pairs]
         t0 = time.time()
-        initargs = (args.candidate, args.baseline, A.cand_kw_from_args(args), args.leaders,
+        initargs = (args.candidate, args.baseline, cand_kw, args.leaders,
                     args.decks, args.pair_timeout, args.sims)
         with mp.get_context("spawn").Pool(args.workers, initializer=A.init_pool,
                                           initargs=initargs) as pool:
@@ -79,6 +94,8 @@ def main(argv=None):
     res = A.final_result(planned, done, args.frac)
     if res is not None:
         res["candidate"] = args.candidate
+        if cand_kw:
+            res["cand_opts"] = cand_kw          # 判定は設定に紐づく（§20.5.3）
         print(f"ARENA_RESUME_FINAL {json.dumps(res, ensure_ascii=False)}", flush=True)
     return 0
 

@@ -269,6 +269,25 @@ pub fn run_target_loop(
                 continue;
             }
         }
+        // 相手のキャラの効果でレストされる場合の置換（PRB02-006・
+        // [`rules::active_rest_replacement`]）。除去の置換と同じ作法で、中断したら
+        // 残りの対象を退避して抜ける。
+        if action.ty == ActionType::Rest
+            && actor != owner
+            && source_list == Some(CardZone::Field)
+            && rules::active_rest_replacement(s, masters, target, actor, source_card)?
+        {
+            if s.state().active_interaction().is_some() {
+                let remaining = &targets[i + 1..];
+                if !remaining.is_empty() {
+                    super::interact::defer_removal_targets(
+                        s, actor, node_ref, &cards_of(remaining), value,
+                    );
+                }
+                return Ok(success);
+            }
+            continue; // 置換が中断なしで成立＝本来のレストはしない
+        }
         match handler.as_ref() {
             Some(TargetHandler::Ko) => ko(s, masters, actor, target, owner, source_card)?,
             Some(TargetHandler::Discard) => discard(s, masters, target, owner)?,
@@ -341,7 +360,7 @@ fn discard(
 /// [`status::FLAG_CANNOT_BE_RESTED_BY_OPP`] を載せている。**相手の効果**（`actor` が持ち主で
 /// ない）による REST だけをここで弾く＝本人のアタック宣言・ブロックには一切効かない
 /// （それらは `rules::battle` の経路で、このハンドラを通らない）。
-fn rest(
+pub(crate) fn rest(
     s: &mut Session,
     masters: &MasterTable,
     actor: Seat,

@@ -25,7 +25,11 @@ pub mod mcts;
 pub mod prune;
 pub mod quiesce;
 #[cfg(test)]
+mod tests_leaf_rollout;
+#[cfg(test)]
 mod tests_search;
+#[cfg(test)]
+mod tests_setup_box;
 
 #[allow(unused_imports)]
 pub use rng::{Pcg32SearchRng, RecordedRng, SearchRng};
@@ -38,6 +42,44 @@ use serde_json::Value;
 /// 探索用の手（Python の dict と同じ JSON）。
 pub type Move = Value;
 
+/// 葉の打ち切り（§20.7.9・WP `rs-leaf-rollout`）。**既定は [`LeafRollout::None`]＝今までどおり**。
+///
+/// [`LeafRollout::TurnEnd`] は `mcts::TreeMcts::leaf_value` が戦闘窓／対話窓を解決し終えた後、
+/// 盤面が終局でなく**手番の側のメインフェイズ**にあるなら、ターンが替わるまで方策で手を
+/// 打ち続けてから評価する（[`quiesce::leaf_rollout_turn_end`]）。「準備だけして終わり」の
+/// 中途半端な葉の値を無くすのが狙い（相手のターンの葉も同じ＝相手の残り手番を打ち切る）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LeafRollout {
+    /// 打ち切らない（既定＝今までの [`mcts::TreeMcts::leaf_value`]）。
+    #[default]
+    None,
+    /// そのターンの終わりまで方策で打ち切ってから評価する。
+    TurnEnd,
+}
+
+impl LeafRollout {
+    /// `opts_json` の文字列（"none"／"turn_end"）から。知らない値は `None`（＝呼び出し側が既定へ）。
+    pub fn from_name(s: &str) -> Option<LeafRollout> {
+        match s {
+            "none" => Some(LeafRollout::None),
+            "turn_end" => Some(LeafRollout::TurnEnd),
+            _ => Option::None,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            LeafRollout::None => "none",
+            LeafRollout::TurnEnd => "turn_end",
+        }
+    }
+
+    /// 打ち切るか（`!= None`）。
+    pub fn enabled(&self) -> bool {
+        *self != LeafRollout::None
+    }
+}
+
 /// `OPCGGame` の設定（config の既定に対応）。
 #[derive(Debug, Clone)]
 pub struct SearchOptions {
@@ -49,11 +91,44 @@ pub struct SearchOptions {
     pub defense_box: bool,
     /// `cpu_ai.DON_MARGIN_ATTACH` の席別上書き（None＝既定）
     pub don_margin: Option<i32>,
+    /// 準備箱（§20.7.2・WP `rs-setup-box`）。**既定 false＝1 bit も変わらない**。
+    ///
+    /// `true` で (1) 準備の手（メインイベント／起動メイン／登場時持ちの PLAY）を
+    /// 「発動 → 対象選択 → 効果」の箱（`SETUP_BOX`・§20.7.8）として候補に足し、
+    /// (2) 攻撃箱／防御箱の中でも「自分が選ぶ最初の対象選択」を 1 段だけ枝にする。
+    pub setup_box: bool,
+    /// 準備箱があっても素の PLAY／ACTIVATE_MAIN を候補に残す（§20.7.10 の実験用・
+    /// 既定 false＝v3 のとおり落とす）。`setup_box=true` のときだけ意味を持つ。
+    pub setup_box_keep_bare: bool,
+    /// 葉の打ち切り（§20.7.9・WP `rs-leaf-rollout`）。**既定 [`LeafRollout::None`]＝1 bit も変わらない**。
+    pub leaf_rollout: LeafRollout,
+    /// 診断つまみ（§20.7.8 の 5・既定 `None`＝[`SearchOptions::setup_box`] に従う）。
+    ///
+    /// 明示すると (2) の**共通規則だけ**（`quiesce::resolve_battle_inplace` の
+    /// `sel_branch_left`・`macro::may_branch_selection`）を on/off できる。準備箱そのもの
+    /// （(1)）は [`SearchOptions::setup_box`] のまま。
+    pub select_branch: Option<bool>,
+}
+
+impl SearchOptions {
+    /// 共通規則（自分の対象選択を枝にする）が入っているか（§20.7.8 の 5）。
+    pub fn select_branch_on(&self) -> bool {
+        self.select_branch.unwrap_or(self.setup_box)
+    }
 }
 
 impl Default for SearchOptions {
     fn default() -> Self {
-        SearchOptions { prune_futile: true, macro_moves: true, defense_box: true, don_margin: None }
+        SearchOptions {
+            prune_futile: true,
+            macro_moves: true,
+            defense_box: true,
+            don_margin: None,
+            setup_box: false,
+            setup_box_keep_bare: false,
+            leaf_rollout: LeafRollout::None,
+            select_branch: None,
+        }
     }
 }
 
@@ -105,6 +180,16 @@ fn options_from_json(v: &Value) -> SearchOptions {
             Some(Value::Bool(b)) => Some(i32::from(*b)),
             Some(other) => other.as_i64().map(|n| n as i32),
         },
+        setup_box: flag("setup_box", d.setup_box),
+        setup_box_keep_bare: flag("setup_box_keep_bare", d.setup_box_keep_bare),
+        // §20.7.9（知らない値・欄無しは既定＝打ち切らない）。
+        leaf_rollout: v
+            .get("leaf_rollout")
+            .and_then(Value::as_str)
+            .and_then(LeafRollout::from_name)
+            .unwrap_or(d.leaf_rollout),
+        // §20.7.8 の 5: 欄が無い／null＝None（`setup_box` に従う）。
+        select_branch: v.get("select_branch").and_then(Value::as_bool),
     }
 }
 
@@ -253,8 +338,41 @@ pub fn decide_on_state(
     rng: &mut dyn SearchRng,
     carry: &decide::DecideCarry,
 ) -> Result<Value, EngineError> {
+    // 準備箱（§20.7.2）の枝予算と計測をこの decide のぶんだけ張る（既定 false のときは
+    // 1 度も触られない＝出力にも `boxes` は出ない）。共通規則の入り切りは §20.7.8 の 5。
+    r#macro::reset_setup_state(opts.search.setup_box, opts.search.select_branch_on());
+    // 葉の打ち切り（§20.7.9）の実績もこの decide のぶんだけ張る（既定＝`none` では
+    // 1 度も触られず、戻り値に `rollout` の欄も出ない＝trace の形が変わらない）。
+    quiesce::reset_rollout_stats(opts.search.leaf_rollout);
     let out = decide::decide(masters, net, state, name, opts, rng, carry)?;
-    Ok(serde_json::json!({
+    // 複数世界（§20.7.1）の欄は `worlds>1` のときだけ出す＝**既定（1 本）の戻り値は
+    // 1 bit も変わらない**（Python 側の trace の形も変わらない）。
+    let mut worlds_fields = serde_json::Map::new();
+    if out.worlds > 1 {
+        worlds_fields.insert("worlds".into(), Value::from(out.worlds));
+        worlds_fields.insert(
+            "world_used".into(),
+            match out.world_used {
+                Some(w) => Value::from(w),
+                None => Value::Null,
+            },
+        );
+        worlds_fields.insert(
+            "per_world".into(),
+            out.per_world
+                .iter()
+                .map(|w| {
+                    serde_json::json!({
+                        "seed": w.seed, "N": w.n, "Q": w.q,
+                        "best": w.best, "unmapped": w.unmapped, "p_differs": w.p_differs,
+                    })
+                })
+                .collect::<Vec<_>>()
+                .into(),
+        );
+    }
+    let boxes = r#macro::take_setup_stats();
+    let mut body = serde_json::json!({
         "move": out.mv,
         // 棋譜ダンプの鍵（箱レベル・原始手化と残り掘りの前＝Python `record["sig"]`／`["k"]`）
         "sig": out.sig,
@@ -269,10 +387,32 @@ pub fn decide_on_state(
         "groups": out.groups.iter().map(|g| serde_json::json!({
             "rep": g.rep, "idxs": g.idxs, "n": g.n, "q": g.q,
         })).collect::<Vec<_>>(),
+        // 選択規則の束ね（§20.7.8 の 4・準備箱の枝を同じ card_id で 1 グループに束ねたもの。
+        // 箱が 1 つも無い decide では空＝`groups` の形は変えない）。
+        "select_groups": out.select_groups.iter().map(|g| serde_json::json!({
+            "key": g.key, "n": g.n, "rep": g.rep, "q": g.q,
+        })).collect::<Vec<_>>(),
+        // PV（主変化・§20.4・kind=main のときだけ埋まる）。
+        "pv": out.pv.iter().map(|p| serde_json::json!({
+            "move": p.mv, "seat": p.seat.name(), "n": p.n, "q": p.q,
+        })).collect::<Vec<_>>(),
         "commit": out.carry.commit.iter().map(decide::Step::to_json).collect::<Vec<_>>(),
         "resact_pending": out.carry.resact_pending,
         "budget": {"used": out.budget_used, "exhausted": out.budget_exhausted},
-    }))
+        // 箱ごとの枝数（§20.7.2 の共通規則の計測・`setup_box=false` なら `null`）。
+        "boxes": boxes,
+    });
+    // 葉の打ち切りの実績（§20.7.9）は `leaf_rollout != none` のときだけ足す。
+    // **世界 0 のぶんだけ**が出る（世界 1 以降はスレッドが違う＝thread_local の計測を
+    // スレッドと共に捨てる。`boxes` と同じ扱い・`decide::run_worlds` の注記）。
+    let rollout = quiesce::take_rollout_stats();
+    if let Some(o) = body.as_object_mut() {
+        o.extend(worlds_fields);
+        if !rollout.is_null() {
+            o.insert("rollout".into(), rollout);
+        }
+    }
+    Ok(body)
 }
 
 /// `opts_json` の欄から [`decide::DecideOptions`] と [`decide::DecideCarry`] を取り出す
@@ -372,6 +512,32 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .get("residual_activate")
             .and_then(Value::as_str)
             .map(str::to_owned),
+        // §20.5 の 3 つ（知らない `select_rule` の値・非正の `root_prior_temp` は既定へ落とす）。
+        select_rule: v
+            .get("select_rule")
+            .and_then(Value::as_str)
+            .and_then(mcts::SelectRule::from_name)
+            .unwrap_or(d.select_rule),
+        q_min_frac: v
+            .get("q_min_frac")
+            .and_then(Value::as_f64)
+            .filter(|x| *x > 0.0)
+            .unwrap_or(d.q_min_frac),
+        root_prior_temp: v
+            .get("root_prior_temp")
+            .and_then(Value::as_f64)
+            .filter(|x| *x > 0.0)
+            .unwrap_or(d.root_prior_temp),
+        // §20.7.1 の世界サンプル本数（0／負は 1＝既定へ落とす）。世界 i の乱数は
+        // `search_seed + i` から作るので、`search_seed` が無い経路（記録した出目で回す
+        // オラクル）は `DecideOptions::effective_worlds` が 1 に落とす。
+        worlds: v
+            .get("worlds")
+            .and_then(Value::as_u64)
+            .map(|n| n as usize)
+            .filter(|n| *n > 0)
+            .unwrap_or(d.worlds),
+        search_seed: v.get("search_seed").and_then(Value::as_u64),
         search: options_from_json(v),
         budget: match v.get("budget") {
             None | Some(Value::Null) => d.budget,

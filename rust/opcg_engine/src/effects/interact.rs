@@ -30,13 +30,13 @@ use crate::journal::{CardZone, Session};
 use crate::model::{
     ArrangeContinuation, ArrangeDest, BattleKoContinuation, CardIdx, CardType, Continuation,
     DeferredFrame, DonIdx, GameState, Interaction, InteractionKind, MasterTable, Position, Seat,
-    TargetRef, Zone,
+    SelectionIntent, TargetRef, Zone,
 };
 use crate::ops;
 use crate::state::EngineError;
 use serde_json::{Map, Value};
 
-use super::ast::{GameAction, TargetQuery, TriggerType};
+use super::ast::{ActionType, GameAction, TargetQuery, TriggerType};
 use super::resolver::Resolver;
 use super::{EffectContext, NodeRef};
 
@@ -65,6 +65,11 @@ fn continuation(
 // ---------------------------------------------------------------------------
 
 /// Python `_suspend_for_target_selection`（SELECT_TARGET）。
+///
+/// `action_kind` は既定解決（[`choose_selection`]）が使う「利益／コスト」分類の元になる
+/// `GameAction`（WP `rs-select-fix`）。呼び出し元は中断のもとになった `GameAction` を持って
+/// いる（`resolver.rs` の 2 か所）ので、`None` のまま呼ぶことは実質無い——テストや将来の
+/// 呼び出し元で渡せない場合は [`SelectionIntent::Unknown`] に丸める。
 #[allow(clippy::too_many_arguments)]
 pub fn suspend_for_target_selection(
     s: &mut Session,
@@ -76,6 +81,7 @@ pub fn suspend_for_target_selection(
     action_node: Option<&NodeRef>,
     execution_stack: &[NodeRef],
     context: &EffectContext,
+    action_kind: Option<&GameAction>,
 ) -> Result<(), EngineError> {
     let required_count = query.count;
     let is_up_to = query.is_up_to;
@@ -129,6 +135,9 @@ pub fn suspend_for_target_selection(
     let name = card_name(s, masters, source_card);
     let mut cont = continuation(&saved_stack, context, source_card);
     cont.query = Some(Box::new(query.clone()));
+    let intent = action_kind
+        .map(classify_intent)
+        .unwrap_or(SelectionIntent::Unknown);
 
     s.edit().set_interaction(Interaction {
         kind: InteractionKind::SelectTarget,
@@ -145,6 +154,7 @@ pub fn suspend_for_target_selection(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
+        intent,
     });
     Ok(())
 }
@@ -195,6 +205,7 @@ pub fn suspend_for_choice(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
+        intent: SelectionIntent::Unknown,
     });
     Ok(())
 }
@@ -230,6 +241,7 @@ pub fn suspend_for_ability_cost_confirm(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
+        intent: SelectionIntent::Unknown,
     });
 }
 
@@ -261,6 +273,7 @@ pub fn suspend_for_optional_confirmation(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
+        intent: SelectionIntent::Unknown,
     });
     Ok(())
 }
@@ -296,6 +309,7 @@ pub fn suspend_for_battle_ko_replacement(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
+        intent: SelectionIntent::Unknown,
     });
 }
 
@@ -350,6 +364,7 @@ pub fn suspend_for_arrange(
         allow_position: needs_pos,
         allow_reorder: needs_reorder,
         continuation: Some(cont),
+        intent: SelectionIntent::Unknown,
     });
     Ok(())
 }
@@ -379,6 +394,7 @@ pub fn suspend_for_cost_declaration(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
+        intent: SelectionIntent::Unknown,
     });
     Ok(())
 }
@@ -435,6 +451,7 @@ pub fn suspend_for_don_selection(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
+        intent: SelectionIntent::Unknown,
     });
     let _ = name;
     Ok(true)
@@ -542,6 +559,13 @@ pub fn resolve_interaction(
             let mut resolver = Resolver::resumed(cont.execution_stack.clone(), ctx);
             resolver.process_stack(s, masters, actor, Some(source_card))?;
             history = resolver.action_history;
+            // レスト置換（PRB02-006）で 0 枚を選んだ＝「代わりの効果を使わない」＝
+            // 本来のレストがそのまま起きる（1 枚以上なら置換成立＝元のカードはレストしない）。
+            if let Some(rr) = cont.rest_replace {
+                if selected.is_empty() {
+                    super::actions::rest(s, masters, rr.actor, rr.original, rr.source_card)?;
+                }
+            }
         }
         InteractionKind::SelectResource => {
             let uuids = selected_uuids(payload);
@@ -723,7 +747,15 @@ pub fn resolve_interaction(
 
     // Python `resolve_interaction` の共通末尾: 再開経路で実行したアクションも `action_events` へ
     // 写す（記録しないと中断を挟んだ効果が「何も実行していない」ように見える・§15.1 の 3 か所目）。
-    super::resolver::push_effect_events(s, masters, actor, source_card, &history);
+    // 発生源のトリガー種別は continuation の実行スタック（`NodeRef.ability`）から引く
+    // （再開経路は能力そのものを持たない）。
+    let trigger = cont
+        .execution_stack
+        .first()
+        .or(cont.node.as_ref())
+        .and_then(|n| masters.abilities.abilities.get(n.ability as usize))
+        .map(|ab| ab.trigger);
+    super::resolver::push_effect_events(s, masters, actor, source_card, &history, trigger);
 
     after_resolve(s, masters)
 }
@@ -969,17 +1001,130 @@ pub fn selection_entries(
         .collect()
 }
 
-/// Python `choose_selection`（ゾーン意味論に基づく既定選択・pure）。
+// ---------------------------------------------------------------------------
+// 対象選択の「利益／コスト」分類（WP `rs-select-fix`・§8.27.2 案①）
+// ---------------------------------------------------------------------------
+//
+// 分類表はこの節 1 か所だけに置く（`docs/rust_engine_plan.md` §8.27.3「分類表は 1 か所に
+// 置き…」の指示）。判定根拠は `docs/reports/2026-09-08_select_default_rca.md` §Q4:
+// `opcg_effects.json` を「自分・up_to・hand/field」で絞った 660 件の内訳（利益 51%／
+// コスト 2%／分類不能 47%）と、その代表 10 件（万雷・神の裁き・神避 ×2・放電・雷獣・
+// EB01-019・EB02-007・EB02-018・EB03-001）の実際の `ActionType`／`status` を確認して作った。
+
+/// `ValueSource` の符号（`(base * multiplier).signum()`）。動的値（`dynamic_source: Some(_)`）
+/// は評価せず `base * multiplier` をそのまま使う——既定手を選ぶだけの粗い判定でよく（実際の
+/// 値はゲーム状態依存）、符号 0（＝リテラル 0 か動的）は「不明」として楽観側（Benefit）に倒す。
+fn value_sign(action: &GameAction) -> i32 {
+    (action.value.base * action.value.multiplier).signum()
+}
+
+/// 値の符号だけで利益／コストを決める既定則（負なら Cost、0 以上・不明なら Benefit）。
+fn benefit_if_nonneg(sign: i32) -> SelectionIntent {
+    if sign < 0 {
+        SelectionIntent::Cost
+    } else {
+        SelectionIntent::Benefit
+    }
+}
+
+/// `ActionType::Buff`（Python の `DEBUFF` エイリアスもここ）は `status` で 6 通りに割れる
+/// （`effects/actions/mod.rs::buff`）。
+fn classify_buff(action: &GameAction) -> SelectionIntent {
+    match action.status.as_deref() {
+        // 能力／キーワードのような付与（無効化ではなく自分のブロッカーを守る側の効果）。
+        // 符号を問わず利益（当該 status を負値で使うカードは現行 DB に無い）。
+        Some("POWER_OVERRIDE") | Some("BLOCKER_DISABLE") => SelectionIntent::Benefit,
+        // コストの上書き／増減: 負値＝コストを下げる（利益）・正値＝上げる（コスト）。
+        // プレーンなパワー増減（Some("COUNTER")＝カウンター値の増減も含む）と符号の向きが
+        // 逆なので専用に扱う。
+        Some("COST_OVERRIDE") | Some("COST_REDUCTION") => {
+            if value_sign(action) > 0 {
+                SelectionIntent::Cost
+            } else {
+                SelectionIntent::Benefit
+            }
+        }
+        // status 無し（プレーンなパワー増減）／`Some("COUNTER")`（カウンター値の増減）／
+        // 未知の status 文字列（`buff()` の `_ =>` と同じ丸め）は同じ符号規則。
+        _ => benefit_if_nonneg(value_sign(action)),
+    }
+}
+
+/// `GameAction` から既定解決の分類を決める（[`SelectionIntent`] のドキュメント参照）。
+///
+/// - `ActionType::Buff` は [`classify_buff`] に委譲（`status` で分岐）。
+/// - `BpBuff`／`SetBasePower`／`SwapPower` は `Buff` の「プレーンなパワー増減」と同じ符号則
+///   （現行カード DB では自分側 up_to の対象には使われていないが、将来のため備える）。
+/// - `CostBuff` は符号が `Buff` の `COST_*` と同じ向き（正＝コスト増＝Cost）。
+/// - `GrantKeyword`／`RampDon`／`ActiveDon`／`Draw`／`PlayCard`／`LifeRecover`／`FaceUpLife`／
+///   `AttachDon`／`Keyword`／`ExtraTurn` は常に Benefit（自分側に対して選ぶほど損になる使い方が
+///   現行カード DB に無い＝符号を見るまでもない）。
+/// - `Rest`／`Ko`／`Trash`／`Discard`／`ReturnDon`／`Freeze`／`Lock`／`DisableAbility`／
+///   `FreezeDon`／`AttackDisable`／`MoveToHand` は常に Cost（自分の場を弱める側の操作。
+///   `MoveToHand`＝手札に戻すのは、盤面から退かす＝コスト寄りと判断した——手札に戻すことで
+///   コストを再徴収する／場の圧を減らす使われ方が典型で、「戻すほど得」なケースは今回の
+///   RCA 代表 10 件・Q4 集計のどちらにも現れなかった。手札に戻す効果が明確に利益になる
+///   カードが見つかったら個別に Benefit へ動かす）。
+/// - それ以外（`Select`／`Search` 系・`Arrange` 系・`ModifyDonPhase` 等の文脈依存アクション）は
+///   `Unknown`（RCA Q4 の「分類不能」308 件＝今のゾーン意味論のフォールバックに委ねる）。
+pub fn classify_intent(action: &GameAction) -> SelectionIntent {
+    use SelectionIntent::{Benefit, Cost, Unknown};
+    match action.ty {
+        ActionType::Buff => classify_buff(action),
+        ActionType::BpBuff | ActionType::SetBasePower | ActionType::SwapPower => {
+            benefit_if_nonneg(value_sign(action))
+        }
+        ActionType::CostBuff => {
+            if value_sign(action) > 0 {
+                Cost
+            } else {
+                Benefit
+            }
+        }
+        ActionType::GrantKeyword
+        | ActionType::RampDon
+        | ActionType::ActiveDon
+        | ActionType::Draw
+        | ActionType::PlayCard
+        | ActionType::LifeRecover
+        | ActionType::FaceUpLife
+        | ActionType::AttachDon
+        | ActionType::Keyword
+        | ActionType::ExtraTurn => Benefit,
+        ActionType::Rest
+        | ActionType::Ko
+        | ActionType::Trash
+        | ActionType::Discard
+        | ActionType::ReturnDon
+        | ActionType::Freeze
+        | ActionType::Lock
+        | ActionType::DisableAbility
+        | ActionType::FreezeDon
+        | ActionType::AttackDisable
+        | ActionType::MoveToHand => Cost,
+        _ => Unknown,
+    }
+}
+
+/// Python `choose_selection`（ゾーン意味論に基づく既定選択・pure）。WP `rs-select-fix` で
+/// 「自分の手札／場」の既定方針に `intent`（[`SelectionIntent`]）を配線した
+/// （`docs/rust_engine_plan.md` §8.27.2 案①）。
 ///
 /// - 全候補が自分の山札／トラッシュ＝**獲得系** → max 件・価値降順
 /// - 全候補が自分の公開一時領域で `min_n == 0` ＝獲得系 → max 件・価値降順
-/// - 全候補が自分の手札／場＝**コスト系** → min 件・価値昇順
+/// - 全候補が自分の手札／場／リーダー／ステージ（混在含む）:
+///   - `intent == Benefit` → **利益系** → max 件・価値降順（相手側の対象系と同じ扱い）
+///   - `intent == Cost` → **コスト系** → min 件・価値昇順（今までの挙動のまま）
+///   - `intent == Unknown` → 今までの挙動のまま（min 件・価値昇順）。ただし「自分のリーダー＋
+///     キャラの混在」（zone が leader/field に割れる）はここに含める＝`None` に落とさない
+///     （RCA (a) の直接の原因だった分岐）。
 /// - 全候補が相手側＝**対象系** → max 件・価値降順
-/// - 判別できない（混在／不明／ライフ・リーダー・ステージ）＝`None`（呼び出し側が先頭 min 件）
+/// - 判別できない（混在／不明／ライフ）＝`None`（呼び出し側が先頭 min 件）
 pub fn choose_selection(
     entries: &[SelectionEntry],
     min_n: i32,
     max_n: i32,
+    intent: SelectionIntent,
 ) -> Option<Vec<String>> {
     if entries.is_empty() || max_n < 1 {
         return None;
@@ -1011,8 +1156,16 @@ pub fn choose_selection(
     if all_own && zones_in(&["temp"]) && min_n == 0 {
         return Some(by_value_desc(n_max));
     }
-    if all_own && zones_in(&["hand", "field"]) {
-        return Some(by_value_asc(n_min));
+    // 自分の手札／場／リーダー／ステージ（混在含む）＝ WP rs-select-fix の本体: 種別で
+    // max/min を分ける。「自分のリーダー＋キャラの混在」（万雷・神避・EB01-019 等の
+    // 「自分のリーダーかキャラ1枚まで」）もここで拾う（`zones_in(&["hand","field"])` だけだと
+    // leader が漏れて `None` に落ち、フォールバックの `uuids[:min_n]` が空になっていた＝
+    // RCA (a) の原因）。ライフ／不明ゾーンはこの `zones_in` に含めない（today のまま `None`）。
+    if all_own && zones_in(&["hand", "field", "leader", "stage"]) {
+        return Some(match intent {
+            SelectionIntent::Benefit => by_value_desc(n_max),
+            SelectionIntent::Cost | SelectionIntent::Unknown => by_value_asc(n_min),
+        });
     }
     if all_opp {
         return Some(by_value_desc(n_max));
@@ -1051,11 +1204,23 @@ pub fn default_interaction_payload(
         .get("player_id")
         .and_then(Value::as_str)
         .and_then(Seat::from_name);
+    // `pending["intent"]`（`rules/pending.rs::get_pending_request` が `SelectTarget` の
+    // `Interaction.intent` から出す。無い／未知の値は Unknown＝今までの挙動のまま）。
+    let intent = match pending.get("intent").and_then(Value::as_str) {
+        Some("BENEFIT") => SelectionIntent::Benefit,
+        Some("COST") => SelectionIntent::Cost,
+        _ => SelectionIntent::Unknown,
+    };
 
     let mut selected: Option<Vec<String>> = None;
     if !uuids.is_empty() && max_n >= 1 {
         if let Some(pid) = pid {
-            selected = choose_selection(&selection_entries(state, masters, pid, &uuids), min_n, max_n);
+            selected = choose_selection(
+                &selection_entries(state, masters, pid, &uuids),
+                min_n,
+                max_n,
+                intent,
+            );
         }
     }
     let selected = selected.unwrap_or_else(|| {

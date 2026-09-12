@@ -1687,6 +1687,278 @@ ATTACK_DISABLE は見るが税は見ていない）＝切替の退行ではな�
 決着（void 0）。交差監査は台帳を消して全 120 ペアを回し直し **void 0**（240 局・wr 0.5125）。
 `make test` 444 passed（cargo 383・pytest 446 のうち torch 系は導入環境のみ）。PR #207。
 
+### 8.26 不具合 3 件目: 【メイン】イベントが合法手に載らない＝CPU がイベントを一度も打てない（2026-09-08・分岐点シナリオで発見）
+
+**症状**: 分岐点シナリオ 36 本（`2026-09-08_scenario_analysis_02.md`）で、CPU がメインフェイズに
+イベント（ガンマナイフ・神の裁き・万雷・雷龍・放電…）を一度も打たず、候補上位 5 にも出ない。
+「探索が触っていない」と読んだが、探索の生 `stats.legal`（全合法手・P・N）を取って数えると
+**PLAY 480 手のうちイベントは 0**＝そもそも合法手に無かった（`get_legal_actions` の 10 手にも無い）。
+**原因**: `rules/legal.rs::main_actions` が「バニラは abilities が空＝イベントは常に登場不可」と
+**全イベントを列挙から外していた**（P2 の移植時の読み違い。Python 版 `_event_has_main_play` は
+「ON_PLAY／ACTIVATE_MAIN を持たないイベントだけ除外」）。適用側 `actions.rs::play_card_action` は
+正しく（【メイン】効果を持つイベントは発動→解決→トラッシュ）動くので、**フロントから直接
+`PLAY` を送る人間は打てる**＝ユーザは気付かない。CPU（探索の候補は同じ列挙）・再生 golden・
+交差監査・アリーナ（r3 vs a1）・人間一致率は全部この状態で回っていた。訓練データ（波 23〜28）は
+Python 時代の生成なので影響なし＝ネットの事前分布にはイベント PLAY が入っている。
+**修正**: `legal.rs` の判定を `actions::event_has_main_play_state`（`play_card_action` と同じ関数）に
+1 本化。`tests/test_main_event_legal.py`（API と同じ `RsGame`: 【メイン】イベントは PLAY に載り、
+【カウンター】専用は載らない・列挙した手がそのまま適用できる）。
+**なぜ受け入れで漏れたか**: 8.25 と同型。golden の正本は Rust（§16.3-10）なので Rust の列挙の穴は
+golden に写る。Python との合法手照合（P2 受け入れ）は random 帯の局で「手札にイベントがあり
+ドン!!で払える MAIN_ACTION」を通っていたはずだが、照合は箱化後の候補で比べていた可能性が高い
+（未検証・照合スクリプトは legacy）。**列挙の受け入れは、カード種別ごとに「載るべき手が載る」正例で
+持つ**（本件と 8.25 のテストがその 2 本目・3 本目）。
+**影響の扱い**: 再生 golden はこの修正で a1 帯・random 帯とも進行が変わるので作り直す（差分＝
+イベントが打たれる分だけ・§16.3-10 のとおりレビューする）。r3 vs a1 の判定（2026-09-08）は両者が
+同じ制約で打った比較なので採用は維持する。分岐点シナリオの分析 #2 の「イベント PLAY が探索されない」
+という所見は**原因の読みが誤り**（合法手に無かった）＝修正後に 9 本を回し直して #3 を書く。
+**データ側の別件**: `opcg_cards.json` でイベント 23 枚の `コスト` が欠けている（OP15 のエネル系
+イベント 5 枚・神避・OP12 の覇気 3 枚・OP17 の 4 枚ほか）。エンジンはコスト無し＝0 として扱う
+（Python 時代も同じ）。正しい値の補完はカード DB の作業（別 WP）。
+**結果**（`2026-09-08_scenario_analysis_03.md`）: 修正後はイベントが普通に探索される（N=0 は 13%・
+P はキャラと同水準）。残るのは**除去イベント（ガンマナイフ・ゴムゴムの雷）の事前分布が 1 桁低い**
+こと＝訓練データ（波 28: イベント選択率 5.5%・除去系は下位）の写し。再生 golden は `--decks singleton`
+（イベント 0 枚）で作られていてこの穴を守れなかった（200 局・20,169 歩で手札にイベント 0）＝
+synth デッキで作り直すかはユーザ判断。era7 の波 29 はこの修正の後に回す。
+
+### 8.27 不具合 4 件目（未修正・観測のみ）: 効果の対象選択が「対象なし」で解決される（2026-09-08）
+
+**症状**: 万雷を【カウンター】で使うと +1000 の対象が空（イベント `BUFF targets []`・カウンター値 0 で
+捨てただけ）。神の裁き（メイン）の KO 対象が空（相手の 1c ルフィが `selectable_uuids` に 1 枚あり
+`can_skip=False` なのに、適用された手は `RESOLVE_EFFECT_SELECTION index=0` で選択なし）。分岐点
+シナリオの修正前後の 72 本で繰り返し出る（万雷カウンターはほぼ毎回）。
+**分かっていること**: (1) これらの決定は探索の窓／コミット経路（`window_choice` の単一候補即決・
+`commit_step` の継続適用）で決まり、trace に候補が無い。(2) 枝の中の対話は既定解決
+`default_interaction_payload` で畳まれ、その `choose_selection` のゾーン意味論（Python 由来）は
+**自分側の候補を「コスト系」として min 件＝「1 枚まで」なら 0 件**を選ぶ。自分への +1000 に当たると
+「何も選ばない」になる。(3) 適用側 `interact.rs` の `SelectTarget` は空選択を `can_skip` と照合せず
+そのまま解決する（Python も同じ）。(4) 神の裁きの KO（相手側の候補＝max 件のはず）が空になる経路は
+未特定（コミットに積まれた sig の選択が空だった＝#10 の探索時の枝がそうなっていた可能性）。
+**影響**: CPU の防御（カウンターイベントの値）と除去が名目より弱い。人間はフロントで対象を選ぶので無関係。
+**修正候補**: 既定解決に効果の種別（利益／コスト）を渡し利益系は max 件にする／探索の枝で対話を
+既定解決せず対象ごとに 1 段だけ分岐する／適用側で `can_skip=False` かつ候補ありの空選択を拒む
+（Python との一致は崩れるが Python も誤り）。分析 #3 §5-1。
+**補足（ユーザ 2026-09-08）**: 神の裁きはコスト 0（`opcg_cards.json` の `コスト` 欠けは欠損でなく 0 が正）
+で、KO を伴わなくてもリーサルで +1000 のパンプに使う札。分析 #3 の「攻撃後のパンプは無駄」は
+**順序**（攻撃の前に打てば通る打点が増える）の話であって、パンプ用途そのものは正しい使い方。
+§8.26 の「23 枚のコスト欠け」も、少なくとも一部は本当に 0 コスト＝補完 WP の前に 1 枚ずつ確かめる。
+
+#### 8.27.1 WP `rs-select-default` の指示書（原因分析・ユーザ指示 2026-09-08「1 はなんとかしたい」）
+
+```
+作業: WP rs-select-default（効果の対象選択が「対象なし」で解決される欠陥の原因分析・
+docs/rust_engine_plan.md §8.27・docs/reports/2026-09-08_scenario_analysis_03.md 結論 5）。
+
+本線 claude/cpu-spec-improvements-yw91jd（48031926 以降）から分岐し claude/rs-select-default に
+push、PR は作りません。成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop` で
+wheel を入れてから作業する（無いと golden ゲートが fail する）。
+
+■ 症状（再現手順つき）
+  CPU（Rust の探索）が効果の対象選択を「対象なし」で解決することがある。
+  (a) 万雷を【カウンター】で使うと「自分のリーダーかキャラ 1 枚までを +1000」の対象が空
+      （action_events に {'action':'BUFF','targets':[],'value':1000}）＝カウンター値 0 で捨てただけ。
+  (b) 神の裁き（メイン・ドン!!-1: 自分 +1000 → 相手のパワー 3000 以下を KO）の KO 対象が空。
+      pending は SEARCH_AND_SELECT・selectable_uuids に相手の 1c ルフィ（パワー 0）が 1 枚・
+      can_skip=False なのに、適用された手は RESOLVE_EFFECT_SELECTION index=0（selected_uuids なし）。
+  再現: 分岐点シナリオを回すと出る（sims 160・seed 0/1）:
+    OPCG_LOG_SILENT=1 python tests/scripts/rs_scenario_play.py play \
+      --scenario enel_human_20260810_t3-4 --net opcg_sim/data/learned/nrel_r3.npz --seeds 2 --sims 160 --out /tmp/sel
+    → r3_s0.md の T4（相手の番）: p1 が 万雷 でカウンター → 手 #12 の (5) に BUFF targets [] が出る。
+    OPCG_LOG_SILENT=1 python tests/scripts/rs_scenario_play.py play \
+      --scenario human_enel_vs_luffy_20260904_t4-5 --net opcg_sim/data/learned/nrel_r3.npz --seeds 2 --sims 160 --out /tmp/sel
+    → r3_s1.md の T4 手 #10〜#13: PLAY 神の裁き → RETURN_DON → BUFF エネル → KO targets []。
+    （同じ位置の再現は乱数 seed で決まる＝search_seed は RsGame が (対局, ターン, 席) から作る。
+      再現しない場合は seeds を 4 に増やす。.md の各決定に盤面・pending・合法手・候補が全部ある）
+
+■ 分かっていること（§8.27・確かめ直してよい）
+  1. これらの決定は探索の窓／コミット経路で決まり、trace に候補が無い（「(候補なし)」）。
+     search/decide.rs: window_choice は合法手が 1 つなら即決（legal[0]）・commit_step は前の決定で
+     積んだ継続（Step::Sig）を find_move で合法手に当てて適用する。
+  2. 枝の中の対話は既定解決 effects/interact.rs::default_interaction_payload で畳まれる。その
+     choose_selection のゾーン意味論（Python 由来・legacy/python_engine/core/engine/interaction.py）は
+     「全候補が自分側 → コスト系＝min 件・価値昇順」。「1 枚まで」は min 0 なので**自分への +1000 は
+     何も選ばない**が既定になる。
+  3. 適用側 interact.rs の SelectTarget は selected_uuids が空でも can_skip と照合せず解決する。
+  4. (b) の KO（相手側の候補＝対象系・max 件のはず）が空になる経路は未特定。PLAY 神の裁き の決定
+     （手 #10）の探索で積まれたコミット（out["commit"] の Step::Sig の sig[3]=selected_uuids）が
+     空だった可能性。search/adapter.rs::selection_moves は SEARCH_AND_SELECT を候補ごとに分岐する
+     （min 0 なら「選ばない」も候補）ので、枝の評価で「選ばない」が勝った可能性もある。
+
+■ 答えてほしい問い（この順で・証拠＝decide の戻り値／trace／盤面を添える）
+  Q1 (a)(b) それぞれ、手を返した経路はどれか（kind: main／window／commit）。RsGame._decide の out
+     （"kind"・"commit"・"stats"）を決定ごとに記録して示す（tests/scripts/rs_scenario_play.py は
+     RsGame._trace の戻りを decisions に入れるので、_trace を差し替えて out を丸ごと残すのが早い。
+     コーディネータの計測は scratchpad に置いた同種の差し替えで取った）。
+  Q2 (a) 万雷カウンターの選択が窓に来たとき、探索側の合法手（ctx.legal_actions＝merged_search_actions
+     後）はいくつだったか。1 つなら selection_moves が None を返した理由（request_actor／action／
+     uuids／constraints の min・max のどれで落ちたか）。2 つ以上なら resolved_branch_values が
+     「選ばない」を最良にした理由（各枝の値）。
+  Q3 (b) 神の裁きの KO が空になった経路: コミットに積まれた sig か／窓の即決か／枝の評価か。
+     PLAY 決定時の out["commit"] を出す。
+  Q4 既定解決 choose_selection が「自分側＝コスト系＝min 件」を選ぶ場面のうち、実際は利益
+     （BUFF／GRANT_KEYWORD／RAMP 等）である割合。opcg_effects.json の能力表から「対象が自分側で
+     効果が利益系」の対話を数え、代表 10 件を挙げる（万雷カウンター・神の裁き・神避・雷獣…）。
+  Q5 Python 版（tag/ブランチ py-engine-final・legacy/python_engine）も同じ既定解決なので同じ欠陥を
+     持っていたはず。同じ盤面で Python も空選択になるかを 1 例だけ確かめる（できれば。時間が
+     かかるなら「未確認」と書いて省略可）。
+  Q6 修正案を 3 つ（候補: ①既定解決に効果の種別を渡し利益系は max 件／②探索の枝で対話を既定解決
+     せず対象ごとに 1 段だけ分岐／③適用側で can_skip=False かつ候補ありの空選択を拒む）について、
+     変更箇所・影響範囲（golden／交差監査／レイテンシ）・Python との一致が崩れる点を表にする。
+     推奨を 1 つ選ぶ。
+
+■ 修正（原因が Q1〜Q3 で確定し、修正が局所なら同じブランチに**別コミット**で入れてよい）
+  - cargo test（rules/effects の単体）＋ pytest（API と同じ RsGame で (a)(b) を固定する
+    tests/test_select_default_*.py・TEST_SPEC §2 に 1 行）。
+  - make test green・make audit-cross void 0。再生 golden が変わったら（既定解決の変更は
+    キャラ効果の対象選択にも及ぶので変わりうる）make golden-replay で作り直し、**差分を
+    レビューして RESULT.json に「何が変わったか」を書く**（golden は正しさの証拠ではない）。
+  - 修正の是非はコーディネータが判断するので、修正コミットは分析レポートと分けておく。
+
+■ 成果物
+  - docs/reports/2026-09-0X_select_default_rca.md（Q1〜Q6 の答えと証拠・修正案の表・推奨）
+  - （修正した場合）コード＋テスト＋golden 差分の説明
+  - RESULT.json: {"job":"rs-select-default","status":"done|partial","report":"docs/reports/…",
+     "root_cause":"…1 行…","fix_included":true|false,"golden_changed":true|false,
+     "make_test":"N passed","audit_cross":{"pairs":120,"void":0},"notes":"…"}
+  - 長いコマンド（シナリオ再走・make test・audit-cross）はバックグラウンドで回し、待つ間も
+    分析を進める。
+
+■ 前提・注意
+  - 神の裁きはコスト 0（カード DB の コスト 欠けは欠損でなく 0 が正・ユーザ）。KO を伴わなくても
+    +1000 のパンプとしてリーサルで使う札＝「KO 対象なし」自体は誤りではない。誤りは**候補があるのに
+    選ばない**こと。
+  - 修正で Python との一致が崩れてよい（Python も同じ欠陥・ユーザ決定 2026-08-25「互換性より根本改善」）。
+  - コーディネータ（本セッション）は成果物を回収して判定する。質問があれば RESULT.json の notes に。
+```
+
+#### 8.27.2 判定（2026-09-08・`docs/reports/2026-09-08_select_default_rca.md`・RESULT は同名 `.RESULT.json`）
+
+- (a) と (b) は**別原因**という結論を受け入れる。
+  - **(a) 万雷カウンター**: 既定解決 `choose_selection` が「自分のリーダー＋キャラの混在」を判別できず
+    （`zones_in(["hand","field"])` にリーダーが無い）フォールバックの `uuids[:min]`＝空を返し、それが
+    `merged_search_actions` の先頭に並び、3 枝の値が完全一致するタイで先頭が勝つ。**§8.27 の
+    「自分側＝コスト系＝min 件」の読みは半分正しく、半分（混在→None）は別経路**だった。
+  - **(b) 神の裁きの KO**: 既定解決は正しく相手を選ぶが、箱の浅い先読み（`BOX_RESOLVE_DEPTH=1`）の
+    価値が「KO しない」を高く見た（3 回中 2 回）。分析 #3 の「除去の過小評価」と同根＝ネット側。
+  - 修正案③（can_skip で空を拒む）は前提誤り（`SelectTarget` の can_skip は常に false・必須／任意は
+    `constraints.min`）＝不採用。
+- **採用: 修正案①**（既定解決に効果の種別を配線し、利益系の自分側 up_to は max 件・価値降順）を
+  WP `rs-select-fix`（§8.27.3）で実装する。影響は自分側 up_to 660 件・golden 2 種に及ぶので、
+  golden は作り直して**差分をレビュー**する。
+- **残る疑問 Q7**（WP に持ち越し）: (a) で 3 枝の値が小数点以下 15 桁まで一致したのは不自然。
+  ナミ 5000 の攻撃に対しエネル 5000 が +1000 されれば戦闘の結果（ライフが減るか）が変わるはず。
+  「評価時点でバフが失効」だけでは説明がつかない＝箱の中でカウンターの BUFF が適用されていない、
+  または戦闘結果が評価に入る前に箱を抜けている可能性。修正 WP で確かめる。
+- (b) は価値の問題として §20 の思考ログ（§20.4）と分析 #3 の「次にやること 2」で扱う。
+
+#### 8.27.3 WP `rs-select-fix` の指示書（修正案①の実装）
+
+```
+作業: WP rs-select-fix（効果の対象選択の既定解決に「効果の種別」を配線する・修正案①・
+docs/rust_engine_plan.md §8.27.2・原因分析 docs/reports/2026-09-08_select_default_rca.md）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-select-fix に push、PR は作りません。
+成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。長いコマンド（golden 作り直し・
+make test・audit-cross）はバックグラウンドで回し、待つ間も作業を進める。
+
+■ 直すもの
+  effects/interact.rs の default_interaction_payload → choose_selection が、自分側の対象選択を
+  「コスト系＝min 件」と決め打ちしている（かつ自分のリーダー＋キャラの混在を判別できず None →
+  uuids[:min]＝空）。これを「効果の種別」で分ける:
+    - 利益系（BUFF／GRANT_KEYWORD／RAMP_DON／ACTIVE_DON／DRAW／ADD_COUNTER／PLAY_CARD 等・
+      RCA Q4 の 339 件）: max 件・価値降順（相手側の対象系と同じ扱い）。
+    - コスト系（REST／KO／TRASH／DISCARD／RETURN_DON／DEBUFF を自分に・RCA Q4 の 13 件）: min 件・
+      価値昇順（今のまま）。
+    - 分類不能（SEARCH／ARRANGE／MODIFY_COST 等・308 件）: 今のゾーン意味論のまま。ただし
+      「自分のリーダー＋キャラの混在」は own 側として扱う（None に落とさない）。
+  配線: suspend_for_target_selection（interact.rs）は GameAction の種別を知っているので、中断
+  （Interaction）に intent（Benefit／Cost／Unknown）を持たせ、default_interaction_payload と
+  choose_selection がそれを読む。pending の JSON にも "intent" を出してよい（フロントは無視する）。
+  分類表は 1 か所（interact.rs か effects/ の定数）に置き、RCA Q4 の判定基準を注記する。
+
+■ Q7（原因分析で残った疑問・修正の前に確かめる）
+  万雷カウンターの 3 枝（空／サトリ／リーダー）の値が 15 桁まで一致した理由。ナミ 5000 の攻撃に
+  エネル 5000 が +1000 されれば戦闘結果（ライフ）が変わるはず。search/quiesce.rs::resolve_battle_inplace
+  の中で (i) カウンターイベントの BUFF が箱の盤面に適用されているか、(ii) 戦闘の結果（ダメージ）が
+  評価前に解決されているか、を OPCG_DEBUG_SELECT 相当の一時ログで確かめる。どちらかが No なら
+  それは別の欠陥＝報告して（直せるなら直す・別コミット）。
+
+■ 受け入れ
+  - cargo test: choose_selection の利益系／コスト系／混在（リーダー＋キャラ）の 3 ケース。
+  - pytest tests/test_select_default_intent.py（API と同じ RsGame）: 神の裁き（コスト 0・ドン!!-1）を
+    エネル OP15-058 で打った直後の SEARCH_AND_SELECT（自分 +1000）で get_legal_actions の既定手が
+    リーダーを選んでいること／万雷を【カウンター】で使ったときの既定手が空でないこと／コスト系
+    （自分のキャラを 1 枚までレストにできる 等・1 枚見つけて）の既定手が空のままであること。
+    TEST_SPEC §2 に 1 行。
+  - golden: 監査 3,386 件・再生 200 局が変わる。make golden-audit／make golden-replay で作り直し、
+    差分を「変わった件数・変わった能力の内訳（利益系で対象が空→非空になった／それ以外）・
+    想定外の変化 0 件」の形で RESULT.json と報告に書く。想定外があれば止めて報告。
+  - make test green・make audit-cross void 0。
+  - 分岐点シナリオ 2 本（enel_human_20260810_t3-4・human_enel_vs_luffy_20260904_t4-5・r3・seeds 2）を
+    回し直し、万雷カウンターの BUFF が対象を持つこと（(b) の KO は本 WP の対象外＝空のままでよい）を
+    .md で確認して RESULT.json に書く。
+
+■ 成果物
+  - コード＋テスト＋golden（同じ作業単位でコミット）・docs/TEST_SPEC.md・
+    docs/rust_engine_plan.md §8.27 に「修正済み」の追記（結果だけ・数行）。
+  - RESULT.json: {"job":"rs-select-fix","status":"done|partial","q7":"…1 行…","golden":{"audit_changed":N,
+     "replay_changed":N,"unexpected":0},"make_test":"N passed","audit_cross":{"pairs":120,"void":0},
+     "scenario_check":"万雷 BUFF targets 非空 …","notes":"…"}
+
+■ 前提
+  - Python との一致は崩れてよい（ユーザ決定 2026-08-25）。
+  - 神の裁きはコスト 0 が正（カード DB のコスト欠けは欠損ではない）。
+  - 判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+#### 8.27.4 修正済み（2026-09-08・WP `rs-select-fix`・結果のみ）
+
+`effects/interact.rs::choose_selection` に `SelectionIntent`（Benefit/Cost/Unknown）を配線し、
+自分側 up_to 選択の既定解決を「利益系は max 件・価値降順、コスト系は今までどおり min 件・
+価値昇順」に分けた。「自分のリーダー＋キャラの混在」（万雷・神の裁き・神避等）は own 側の
+ゾーン集合を `hand/field/leader/stage` に広げて拾う（以前は `None` に落ちて空選択になっていた）。
+分類表は `interact.rs::classify_intent` の 1 か所（`ActionType`／`status`／値の符号）。
+
+- **万雷・神の裁き・放電の COUNTER/ACTIVATE_MAIN の自分への BUFF は非空になった**（分岐点シナリオ
+  4 本＝enel_human_20260810_t3-4 の seed 0/1・human_enel_vs_luffy_20260904_t4-5 の seed 0/1、
+  いずれも r3・sims 160 で確認。万雷: `targets: ['サトリ']`／神の裁き: `targets: ['エネル']` 等）。
+- **golden**: 監査 3,386 件は **0 件変化**（`audit.rs::drain_default`/`drain_payload` は
+  `choose_selection` を使わない独立の既定応答実装のため、この WP の変更を経由しない——
+  次に監査 golden 側の既定解決も統一するかはコーディネータ判断）。再生 200 局は
+  133 局変化（118 局は最初の分岐点が利益系 BUFF の選択＝114 局が空→非空・4 局が非空→別の非空
+  候補、残り 15 局は手そのものは同じで `legal` 候補の既定値だけ変わった）・67 局無変化・
+  **想定外の変化 0 件**。差分の分類手順は本 WP の作業ログ（コミットには残さない）。
+- **Q7**: 万雷カウンターの 3 枝が 15 桁一致した RCA の観測は、カウンター BUFF の適用機構自体は
+  正しく動いている（`timed_power` が枝ごとに正しく変わり、戦闘結果〔ライフ増減〕も評価前に
+  解決されている）ことを一時計装で確認した——同一に見えたのは「その盤面ではバフが戦闘結果を
+  変えなかった」ケースだった可能性が高い（別コミットでの修正は不要と判断）。
+- **副産物**: `tests/fixtures/rs_goldens/replay/` は commit `c4688fd`（2026-09-07）以降に着地した
+  `rules/legal.rs` の変更（commit `4803192`・イベント PLAY 列挙）で既に陳腐化していた
+  （このWPの変更を除いた「現在の HEAD」だけで回しても 200 局中 200 局が委託 golden と食い違う）。
+  本 WP の再生成でその陳腐化も合わせて解消した。
+
+#### 8.27.5 判定（2026-09-08・コーディネータ・`docs/reports/2026-09-08_select_fix.RESULT.json`）
+
+- **受け入れ・本線へ merge**（思考ログ WP と並行だったので ff でなく merge・衝突なし）。本線で
+  `make rust-develop` → `make test` → `make audit-cross` を回し直して確認した: **457 passed・void 0／240 局（wr 0.5125）**。
+- (a) 万雷カウンター・神の裁き・放電の自分への BUFF が非空になった＝§8.27 の (a) は解消。
+  (b) 神の裁きの KO 空は対象外のまま（ネットの価値・分析 #4 の縛り B）。
+- **Q7 の結論**（カウンター BUFF は箱の中で適用され、戦闘結果も評価前に解決されている）は受け入れる。
+  「3 枝が 15 桁一致」は、その盤面では +1000 で戦闘結果が変わらなかった（ナミ側の付与ドン!!や
+  カウンター値を含めた計算）ケースと読む。
+- **監査 golden の既定解決**（`audit.rs::drain_default` が `choose_selection` を通らない独立実装）:
+  統一は**しない**。監査 golden は「能力を 1 つ発動して既定応答で流す」テスト用の駆動で、探索や
+  対局の既定解決とは役割が違う。ただし §8.26 のとおり「golden はその時点の出力」であり、
+  監査 golden が CPU の既定解決の退行を守らないことは TEST_SPEC に明記する（§2 の行に追記済み）。
+- **「再生 golden が 4803192 で陳腐化していた」は読み違い**。4803192（イベント PLAY 列挙）の時点で
+  `make test` は 449 passed＝委託 golden と一致していた（コーディネータ実測・§8.26「golden 不変」）。
+  作り直すと 200 局が変わるのは、`rs_golden_make.py` の再生成が委託時点と同じ出力にならない既知の
+  事情（デッキ／uuid／記録形式・2026-09-07 の切替時に確認済み）であって、エンジンの変更による
+  陳腐化ではない。今回の再生成で golden は「現在の maker の出力」に揃ったので、以後の差分は
+  そのまま読める。**教訓**: golden の差分レビューは「委託 golden vs 再生成」でなく
+  「同じ maker での変更前 vs 変更後」で行う（本 WP はそうしていた＝114／4／15／67 の内訳は有効）。
+- 本 WP の golden 差分（再生 133 局変化・想定外 0）は受け入れる。
+
 ## 9. P1 の設計（2026-09-06・コーディネータが本線に入れた契約）
 
 P1 は **2 WP を並列**に出す。両 WP が共有する契約（記録形式 v2・`model.rs` の型・公開 API）は
@@ -3122,3 +3394,2217 @@ claude/cpu-spec-improvements-yw91jd から分岐し claude/train-torch2 に push
 RESULT.json: {"job":"train-torch2","status":"done","breakdown_before":{...},"breakdown_after":{...},
 "epoch_sec":{"before":34.7,"after":..},"loss_traj_max_abs":..,"budget_bit_identical":true}
 ```
+
+## 19. 人間の手との一致率を Rust の decide で測り直す（ユーザ質問 2026-09-08「人間の手をどれくらい再現できているか」）
+
+最後の実測は Python エンジン時代（2026-09-05・h1〜h6・317 決定点・seeds 4・sims 160）: c10 0.322／
+r1 0.355／**a1 0.345**／a2 0.364／c12 0.311（PLAY 0.22 前後・ACTIVATE_MAIN 0.20 前後・ATTACK 0.38 前後）。
+**r3 と Rust の decide では未計測**。計器（`human_replay_divergence.py`・`coach_gate.py`）は人間リプレイの
+フレーム（盤面 dict）から Python エンジンで盤面を復元するため `legacy/` にある。Rust 側は `hidden` から
+しか盤面を組めないので、**復元は legacy の Python・判断は Rust の `opcg_engine.decide(hidden, …)`** の
+2 段で測る（決定オラクル `rs_search_oracle.py` と同じ橋渡し＝`rs_diff_replay.hidden_dict(manager)`）。
+
+### 19.1 WP `human-agree-rs` の指示書
+
+```
+人間リプレイ h1〜h6 との一致率と、コーチゲートのマーク（コンボ・裁定点）の通過率を、Rust の decide で
+r3（出荷既定）と a1（前既定）について測ってください。コードは変更せず、計器は
+legacy/python_engine/tests/scripts/ に新しいファイルで書きます（human_replay_divergence.py と coach_gate.py の
+兄弟。1 トピック=1 ファイル）。本線 claude/cpu-spec-improvements-yw91jd から分岐し claude/human-agree-rs に
+push、PR は作りません。詳細は docs/rust_engine_plan.md §19。
+
+仕組み: 決定点ごとに legacy の mark_gate._restore（Python エンジン）で盤面を復元 → rs_diff_replay.hidden_dict で
+hidden JSON にする → opcg_engine.decide(hidden, seat, opts, rng) で Rust の手を得る → Game.describe_move と同じ
+記述子（action_type, card, targets）で人間の記録と比べる（ATTACK_CONFIRM は ATTACK に寄せる・従来どおり）。
+opts は serve と同じ（sims 160・net は --net で r3／a1 の npz）。seeds 4。
+復元できない点（効果対話の途中など）は従来どおり除外し、件数を報告に書く。
+
+やること:
+1. human_agree_rs.py: --replay h1..h6 --net <npz> --seeds 4 --sims 160 で一致率（全体・action_type 別）を出す。
+   r3 と a1 の両方を回し、Python 時代の a1 0.345（n1-results 467ebf0 のログ）と並べる。
+2. coach_gate_rs.py: coach_gate.py のマーク定義（h1@2 など・述語）をそのまま使い、判断だけ Rust の decide に
+   差し替えて PASS 数を出す（gen15 の 20 点 PASS 11.9 と同じ土俵）。r3 と a1。
+3. 報告 docs/reports/2026-09-08_human_agree_rs.md（表: リプレイ別・action_type 別・マーク別、Python 時代との差、
+   Rust 化で変わった点があればその決定点）＋ RESULT.json。TEST_SPEC に計器 2 本の行。
+
+受け入れ: r3／a1 の一致率とマーク PASS 数が揃う・復元不能点の件数が書いてある・学習コードとエンジンは無変更。
+RESULT.json: {"job":"human-agree-rs","status":"done","agree":{"r3":..,"a1":..,"a1_python_20260905":0.345},
+"by_action":{...},"coach_pass":{"r3":..,"a1":..},"unrestorable":..}
+```
+
+## 20. 分岐点シナリオ: 人間のプレイログの一部を CPU に打たせて目視で比べる（ユーザ要望 2026-09-08）
+
+§19 の数値の一致率とは別に、**定性的に**「除去やコンボを CPU が考えられているか」を見る道具。
+旧計器（`human_replay_divergence.py`・`coach_gate.py`）は使わず、**Rust の `Game`（`from_hidden`＋`decide` の
+trace）で新規に作る**。ユーザのイメージ（2026-09-08・確定）:
+
+- 入口は **リプレイビューアで取得できる JSON ファイル**（`/replay/frames` の形・指摘〔marks〕の無い
+  純粋な対戦ログ）。API は作らない。
+- **分岐点の盤面をいくつも保存しておく**（シナリオ集）。分岐点は人間のプレイログの一部で、
+  **始まりは必ずどこかのターンの始め**・終わりはそれ以降の任意のターン終了時（範囲はログの特性に
+  応じて定性的に決める）。各分岐点には**人間がどうプレイしたかの定性的な分析文**が紐づく。
+- 検証用 npz が範囲を通してプレイし、ツールはそのプレイログを出力する。
+- 出力を人が読んで、人間と同じ方針で打てていれば合格。数値化は知見が貯まってから。
+
+### 20.1 設計
+
+- **シナリオ集** `tests/fixtures/scenarios/<name>.json`（1 分岐点=1 ファイル）:
+  ```
+  {"source": "replays/human_enel_vs_luffy_20260904/enel_vs_luffy_….json.gz",   // fixtures からの相対
+   "seat": "p1",                       // 人間が打っていた席（CPU がその席を打つ）
+   "start_turn": 5, "end_turn": 6,     // 開始ターンの始め〜終了ターンの TURN_END
+   "title": "エネル T5: サトリで掘って除去を揃える",
+   "note": "人間は … を優先し、… は温存した。見どころは …（自由記述・markdown 可）",
+   "tags": ["除去", "コンボ"]}
+  ```
+  `source` は `tests/fixtures/replays/` 配下のリプレイ JSON（ビューアで取得したもの・gz 可）。
+- **復元** `opcg_sim/loop/hidden_build.py`（新規・純 Python）: `frame_to_hidden(payload, action_index, seed)`。
+  開始ターンの最初の frame（`turn == start_turn` の先頭・pending が MAIN_ACTION）から記録 v5 の `hidden` を
+  組む。手札・場・ライフ・トラッシュ・ステージ・リーダー・各カードの `attached_don`・レストは frame に
+  ある／デッキは `replay.decks` から見えているカードを引いた残りを seed で混ぜる／ドン!!は active・rested
+  の枚数／ターン・手番は frame の値。**frame に無いもの（付与中の継続効果・フラグ・対話の途中）は
+  復元しない**＝ターンの始めなら継続効果は切れているので実害は小さい。開始が効果対話の途中なら
+  ValueError（「別のターンを」）。
+- **実行** `tests/scripts/rs_scenario_play.py`（CLI・Rust の `Game.from_hidden`＋`RsGame.decide`）:
+  - `list <replay.json>`: ターンごとの action_index の範囲・手番・その間の人間の手（記述子）を一覧＝
+    シナリオを書くための下見。
+  - `play --scenario <name|all> --net <npz>（既定＝出荷既定） --seeds 3 --sims 160 --out <dir>`:
+    分岐点を復元 → `seat` を候補 npz、相手席も同じ npz（`--opp-net` で別指定可）で `end_turn` の TURN_END
+    まで打つ → `out/<name>/<net>_s<seed>.frames.json`（ビューアの「ファイルを開く」で読める `frames`＋
+    `decisions`＝各決定の候補上位 5・visit%・Q）と `out/<name>/<net>_s<seed>.md`（読み物: 冒頭にシナリオの
+    `note`、次に**同じ範囲で人間が実際に打った手**（`replay.actions` から抜く）、続いて CPU の手を
+    ターン・席ごとに「選んだ手／候補と Q／盤面の要約（場・手札枚数・ライフ・ドン）」で並べる）。
+  - `add --replay <file> --seat p1 --start-turn N --end-turn M --title … --note-file note.md`:
+    シナリオ JSON を書く（下見の後に使う。note は後から編集してよい）。
+- **判定は人だが、分析（盤面の要約・人間の方針との比較）は Claude（コーディネータ）の役割**（ユーザ決定
+  2026-09-08）。したがって .md は**人が眺める要約ではなく、Claude が読んで分析するための完全な事実の記録**に
+  する＝ツールは要約も合否も出さず、各決定について次を**省略なく**書く: (1) 盤面の全情報（両席: リーダー
+  〔名前・card_id・パワー・レスト・付与ドン〕・場の各キャラ〔同＋コスト・登場ターン〕・ステージ・手札の
+  各カード〔名前・card_id・コスト・パワー・カウンター〕・ライフ枚数・ドン!! active/rested/付与・デッキ枚数・
+  トラッシュの主なカード）、(2) pending（要求の種類・選択肢）、(3) 合法手の一覧（記述子）、(4) 探索の候補
+  上位 5（visit%・Q）と選んだ手、(5) 適用後のイベント列（`action_events`）。末尾に**登場したカードの
+  効果本文**（card_id ごとに 1 回・`opcg_cards.json` から）を付録として付ける＝Claude がコンボや除去の
+  可否をカード本文から判断できるようにする。同じ形式で「同じ範囲で人間が打った手」も並べる（人間側は
+  frame の盤面＋記述子）。ファイルが長くなってよい（1 シナリオ 2 ターンで数百行）。
+- 運用: 作業セッションが play を回して出力を push → コーディネータが .md を読み、シナリオの note
+  （人間の方針）と比べて「同じ方針か・除去やコンボを見つけているか・何が違うか」を `docs/reports/` に
+  分析として書く → ユーザが判定する。将来の数値化に備え、`decisions` に人間の手との一致（同じ
+  action_type＋card）も 1 列だけ付けておく（集計はしない）。
+- 置き場: 復元は `opcg_sim/loop/`（生成・アリーナと同じ「Rust で対局を回す段取り」）、CLI は
+  `tests/scripts/`、シナリオと出力は `tests/fixtures/scenarios/`（出力はコミットしない・`--out` 既定は
+  `/tmp/scenario_out`）。
+- **思考ログ（§20.4・WP `rs-think-log` で追加）**: 各決定の (3) は「探索が見た候補」（`legal_stats`＝
+  P/N/Q・訪問 0 は ×）に置き換え、(4) の後に (6) PV（主変化・8 手か葉まで）・(7) V の帰属（22 枠を
+  PAD へ潰した ΔV 上位 5）を足す。commit 消化の決定（機械実行・探索していない）は「決定 #k で
+  焼き込まれた継続」の 1 行だけ。`frames.json` の `decisions` にも同じ欄（`pv`／`legal_stats`／
+  `kind`／`commit_from`／`attribution`）が入る。`RsGame.attribution` は決定ごとに 23 回の forward
+  （`opcg_engine.net_eval`）を追加で呼ぶので **scenario の play にだけ**使う（serve は呼ばない）。
+
+### 20.2 WP `rs-scenario` の指示書
+
+```
+人間のプレイログの一部（分岐点）を CPU に打たせ、そのプレイログを人が読んで比べる道具を作ってください。
+設計は docs/rust_engine_plan.md §20.1（ユーザのイメージを §20 冒頭に書いてある。API は作らない）。
+旧計器（legacy/）は使わず、Rust の Game（from_hidden・decide の trace）で新規に作ります。
+本線 claude/cpu-spec-improvements-yw91jd から分岐し claude/rs-scenario に push、PR は作りません。
+
+やること:
+1. opcg_sim/loop/hidden_build.py（新規・純 Python）: frame_to_hidden(payload, action_index, seed) →
+   記録 v5 の hidden（形は tests/fixtures/rs_goldens/replay/*.json の input.setup.hidden と同じ）。
+   ターン開始の frame の見つけ方（turn_start_index(payload, turn)）も同じ module に。復元不能は ValueError。
+2. tests/scripts/rs_scenario_play.py: サブコマンド list／play／add（§20.1）。play は RsGame.from_hidden 相当
+   （opcg_sim/api/engine_rs.py に from_hidden の薄い口が無ければ足す）で Game を組み、RsGame.decide(trace=…) で
+   両席を打ち、services/replay.py の frames／decisions と同じ形の JSON と、**Claude が分析するための .md**
+   （§20.1 の (1)〜(5) を各決定について省略なく・末尾にカード効果本文の付録）を書く。
+   .md の冒頭にシナリオの note と「同じ範囲で人間が打った手」（同じ形式）を載せる。要約や合否は書かない。
+3. シナリオを 2 本作って動作を示す: tests/fixtures/replays/human_enel_vs_luffy_20260904 と
+   human_law_vs_luffy_20260904 から、list で下見して「除去かコンボが見どころのターン」を 1 つずつ選び、
+   add で JSON を書く（note は「人間は何を優先したか」を 3〜5 行・暫定でよい）。play を出荷既定 r3 と
+   a1（同梱）で回し、出力（frames.json と .md）を RESULT.json の横（claude/rs-scenario の scenario_out/）に添える。
+4. テスト tests/test_scenario_play.py（必須）: (a) frame_to_hidden → Game.from_hidden → board() が元の frame と
+   一致（手札・場・ライフ・トラッシュ・ドン枚数・ターン・手番） (b) シナリオ 1 本を seeds 1・sims 16 で
+   play して frames／decisions（candidates 付き）が出る・末尾が end_turn の TURN_END（か決着） (c) 対話途中の
+   frame は拒否。TEST_SPEC に行。
+5. docs/n_loop_ops.md に §9「分岐点シナリオ（人間のプレイと比べる）」: シナリオの書き方・回し方・
+   ビューアでの見方。RESULT.json。確認は make test。
+
+受け入れ: 4 の a〜c が green・シナリオ 2 本の出力（r3／a1）が添えてある・ビューアの「ファイルを開く」で
+frames.json が読める。
+RESULT.json: {"job":"rs-scenario","status":"done","cli":"tests/scripts/rs_scenario_play.py",
+"scenarios":["...","..."],"outputs":"scenario_out/","unrestorable_rules":"..."}
+```
+
+### 20.3 結果（2026-09-08 時点）
+
+- WP `rs-scenario` 完了（`tests/scripts/rs_scenario_play.py`・`opcg_sim/loop/hidden_build.py`・
+  `tests/test_scenario_play.py`）。分析 #1（作業セッションの暫定 note・2 本）＝
+  `docs/reports/2026-09-08_scenario_analysis_01.md`。
+- **シナリオ集 9 本**（`tests/fixtures/scenarios/`）はコーディネータが人間ログ 6 局を全ターン読んで切り抜き、
+  note も書いた（ユーザ指示 2026-09-08）。r3／a1 × seed 0/1＝36 本の分析 #2＝
+  `docs/reports/2026-09-08_scenario_analysis_02.md`。要点: 起動効果どうしのコンボ（ロー起動）と
+  「攻撃を先に済ませてからドン!!-3」の手順は人間と同じ。**メインフェイズのイベント PLAY が 36 本で一度も
+  選ばれない**（除去・コンボの部品は全部イベント＝再現性の低さはこの 1 点に帰着）。相手キャラを攻撃対象に
+  選ばない（ドフラ T10 は 4 本とも次ターンに負け）。r3 と a1 の差はこの観点では出ない。
+- **分析 #3**（`2026-09-08_scenario_analysis_03.md`）: 訪問割合を測ろうとして「イベントが合法手に無い」
+  （§8.26）を発見・修正・9 本を回し直した。イベントは探索されるが除去イベントの事前分布が低い
+  （訓練データの写し）。副産物 §8.27（対象なし解決）。次の候補: §8.27 の修正 → 除去イベントの
+  Q を波 28 で切り分け → era7 の波 29 はこの修正後に。ドフラ T10 は価値の回帰テスト候補のまま。
+  9 本は世代交代のたびに回して表を更新する（判定は定性のまま）。
+
+### 20.4 思考ログ: 「CPU が何をしようとしてこうなったか」を出す（ユーザ決定 2026-09-08）
+
+**運用の決定**: 人間の手は強制しない（人間の手は正解ではない・note に書いた比較対象として残すだけ）。
+CPU の思考そのものを各決定に出し、Claude が読んで「CPU はこう読んでいた」と書く。判定はユーザ。
+数字（PV・Q 差・N）を横に置き、言語化はその読み替えに留める（破綻した PV＝「相手はパスする」の
+ような想定は、それ自体が発見）。
+
+出すもの（決定ごと）:
+1. **PV（主変化）**: 探索が想定した「この後の進行」＝根から訪問数最多の子を辿った手順（相手の返し込み・
+   8 手または葉まで）。各手に N・Q。窓／コミットの決定は `commit` の継続がそのまま計画。
+2. **全合法手の P・N・Q**（訪問 0 に印）: 「考えなかった（P 低・N 0）」と「読んで捨てた（N あり・
+   Q 低）」を分ける。
+3. **V の帰属**: 根の符号化のトークンを 1 つずつ潰して V の変化を見る（上位 5・どのカード／ゾーンか）。
+   「何を重く見ているか」の近似。相関であって理由ではない。
+4. 決定の種類（main／window／commit）と、commit 消化なら「どの決定で焼き込まれたか」。
+
+#### 20.4.1 WP `rs-think-log` の指示書
+
+```
+作業: WP rs-think-log（分岐点シナリオの各決定に CPU の思考ログを足す・docs/rust_engine_plan.md §20.4）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-think-log に push、PR は作りません。
+成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。WP rs-select-fix と並行して
+走るので、effects/interact.rs と rules/ は触らない（触るのは search/decide.rs・search/mcts.rs・
+py_game.rs／lib.rs・opcg_sim/api/engine_rs.py・tests/scripts/rs_scenario_play.py・tests/）。
+
+■ 足すもの
+  1. PV（主変化）。Rust `decide` の戻り値に "pv": [{"move":<legal と同形>, "seat":"p1|p2",
+     "n":int, "q":float}, ...] を足す。木の根から「訪問数最多の子」を辿る（相手番の節も同じ規則・
+     PIMC の世界が複数ある場合は最後の世界の木でよい＝その旨を注記）。長さは 8 手または葉まで。
+     kind=window／commit のときは pv を空にし、代わりに "commit" の継続（既にある）を計画として扱う。
+     RsGame._trace は pv を describe_move で記述子（card_id 基準）に直して trace["pv"] に入れる。
+  2. 全合法手の P・N・Q。RsGame._trace に trace["legal_stats"] = [{"move":記述子, "p":float,
+     "n":int, "q":float}, ...]（stats.legal／P／N／Q をそのまま並べる・箱化後の候補＝探索が見た手）。
+  3. V の帰属。Python で opcg_engine.net_eval(encoding_json, legal_json)（lib.rs:318・`value` と
+     `priors`）を使い、根の符号化（game.encode(name)）の tokens（22 枠）を 1 枠ずつ PAD 相当に潰して
+     value を再計算、ΔV の絶対値上位 5 を trace["attribution"] = [{"slot":i, "label":"…", "dv":float}]
+     に。label は枠がどのカード／ゾーンかを opcg_sim/learned/n_rel_feat.py の枠の定義から引く
+     （枠→カード uuid／card_id の対応は encode の出力か n_rel_feat の仕様にある。無ければ枠番号と
+     ゾーン名だけでよい）。潰し方（ゼロ埋め か PAD 行）は n_rel_feat の PAD の定義に合わせる。
+     計算は決定ごとに 22 回の forward＝軽い。scenario の play にだけ付ける（serve には付けない）。
+  4. trace["kind"]（main／window／commit）と、commit 消化のときは trace["commit_from"]＝
+     「その継続を焼き込んだ決定の action_index」（RsGame が carry を作った決定を覚えておく）。
+
+■ .md への出し方（tests/scripts/rs_scenario_play.py）
+  各決定の (3) 合法手 を「探索が見た候補（P・N・Q・訪問 0 は ×印）」に置き換え、(4) の後に
+  (6) PV＝「この後の進行（CPU の想定）」を手順で、(7) V の帰属 上位 5、を足す。commit 消化の決定は
+  「決定 #k で焼き込まれた継続」と 1 行で書く。frames.json の decisions にも同じ欄を入れる。
+
+■ 受け入れ
+  - cargo test: pv の先頭が返した手と一致する／長さ ≤8／kind=window のとき空。
+  - pytest tests/test_think_log.py（cpu_infra）: RsGame.decide の trace に pv・legal_stats・attribution・
+    kind が入る／attribution の dv 合計が有限／legal_stats の n 合計 = sims（箱化で減る場合はその
+    旨を assert 側で緩める）。TEST_SPEC §2 に 1 行（基盤健全性と明記）。
+  - make test green（エンジンの裁定は変えないので audit-cross は不要。golden は decide を通らないので
+    不変のはず＝変わったら止めて報告）。
+  - 9 シナリオ（tests/fixtures/scenarios）を r3・seeds 2・sims 160 で回し、出力（.md／frames.json）を
+    scenario_out/ としてブランチに添える（コーディネータが読む）。分析は書かなくてよい。
+
+■ 成果物
+  - コード＋テスト＋docs/TEST_SPEC.md＋docs/rust_engine_plan.md §20.1 に欄の追記（数行）。
+  - scenario_out/（18 本）。
+  - RESULT.json: {"job":"rs-think-log","status":"done|partial","fields":["pv","legal_stats",
+     "attribution","kind","commit_from"],"make_test":"N passed","golden_changed":false,
+     "outputs":"scenario_out/","notes":"…（PIMC の木の扱い・帰属の潰し方・制約）"}
+
+■ 前提
+  - 言語化はコーディネータの仕事。WP は数字を出すところまで。
+  - decide の既定の挙動（返す手）は変えない（trace 用の欄を足すだけ）。レイテンシは scenario の
+    play でだけ増えてよい（serve は pv を作らない・オプションで切る）。
+  - 判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+#### 20.4.2 判定（2026-09-08・`docs/reports/2026-09-08_think_log.RESULT.json`）
+
+- WP `rs-think-log` を受け入れ、本線へ ff で取り込んだ（`decide` に `pv`・`RsGame._trace` に
+  `legal_stats`／`pv`／`kind`／`commit_from`・`RsGame.attribution`・`.md` の (3)(6)(7)・
+  `tests/test_think_log.py`〔cpu_infra〕）。本線で `make test` 454 passed・golden 不変。
+- 制約（RESULT の notes）: 木は 1 本（PIMC の複数世界は持たない）／PV は n=0 の枝に達しても
+  「先頭の合法手」を示す／帰属はプロセスの既定ネット（席ごとの切替を追わない・両席同じネットの
+  運用では差なし）。
+- 最初の読み＝`docs/reports/2026-09-08_scenario_analysis_04.md`。縛り A（事前分布の尖り×訪問数最多の
+  選択）は探索設定で今日動かせる。B（相手の小駒を有利と見る）・C（相手の盤面の数を見ない）は
+  ネット側。
+- 道具への要望（次の WP へ）: PV を相手の次の TURN_END まで／帰属 label にレスト・付与ドン!!／
+  「Q が高いのに N で負けた手」の印。合法手一覧の visit 0 の印は (3) で実現済み。
+- 据え置きの要望: 効果 ATTACH_DON の対象をイベントに出す／相手の手札枚数・カウンター値合計の
+  見積りを盤面要約に出す。
+
+### 20.5 縛り A の実験: 探索の設定だけで「Q が推す手」を拾えるか（分析 #4・2026-09-08）
+
+分析 #4 の縛り A＝事前分布 P の尖り × 訪問数最多の選択規則。160 sims では P 0.005 の手は
+訪問 0〜1 回で、Q が高い手（神の裁き 0.989・ガンマナイフ -0.185）も訪問数で負ける。
+ネットを変えずに探索の設定で動くかを、9 シナリオの思考ログで確かめる。
+
+#### 20.5.1 WP `rs-search-a` の指示書
+
+```
+作業: WP rs-search-a（探索の設定 3 条件で 9 シナリオを回し、思考ログで比較する・
+docs/rust_engine_plan.md §20.5・分析 #4 docs/reports/2026-09-08_scenario_analysis_04.md の縛り A）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-search-a に push、PR は作りません。
+成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。ネット（nrel_r3.npz）は変えない。
+
+■ 足す設定（search/decide.rs::DecideOptions・opts_json から渡せるように・既定値は今の挙動のまま）
+  1. sims（既にある）: 160 と 640。
+  2. select_rule: "visits"（既定・訪問数最多）／"q_min_n"（訪問数 ≥ max(1, sims * q_min_frac) の手の中で
+     Q 最大・該当なしなら visits）。q_min_frac は opts（既定 0.125＝sims/8）。
+  3. root_prior_temp: 根の事前分布 P を P^(1/t) に丸めて正規化（t=1 が既定＝今のまま・t=2 で平坦化）。
+     Dirichlet 混合（生成側）とは別の欄。根だけに掛け、子ノードには掛けない。
+  RsGame.decide（opcg_sim/api/engine_rs.py）と tests/scripts/rs_scenario_play.py の play に
+  --select-rule／--q-min-frac／--root-prior-temp を通す（省略時は既定）。
+
+■ 回す条件（両席同じ設定・r3）
+  主軸＝sims の段階掃引（select_rule=visits・t=1・ネット不変）。ユーザ指示 2026-09-08「検証なので
+  sims は 100 倍くらいまで段階的に」:
+    S1: sims 160（今の既定＝分析 #4 と同じ。scenario_out/ の既存出力で代用してよい）
+    S2: sims 640        … 9 シナリオ × seed 0/1
+    S3: sims 2,560      … 9 シナリオ × seed 0/1
+    S4: sims 10,240     … 3 本（enel_human_20260810_t9-9・human_enel_vs_roger_20260904_t7-8・
+                            human_doflamingo_vs_luffy_20260904_t10-11）× seed 0/1
+    S5: sims 16,000     … 同じ 3 本 × seed 0/1
+  （S4・S5 は 1 決定に数十秒〜数分かかる。バックグラウンドで回し、S2・S3 の集計を先に出す。
+    時間が足りなければ S5 を seed 0 だけにして notes に書く）
+  副軸＝規則と平坦化（sims 160 と 640 で）:
+    R1: sims 160・q_min_n（1/8）・t=2
+    R2: sims 640・q_min_n（1/8）・t=2
+  出力は scenario_out_a/<条件>/<name>/r3_s<seed>.{md,frames.json}。
+
+■ 見るもの（RESULT.json と短い報告に表で）
+  - 分析 #4 が挙げた 3 決定の選択: エネル T9（enel_human_20260810_t9-9）の「オーム攻撃の前に神の裁きを
+    打つか」／エネル T7 対ロジャー（human_enel_vs_roger_20260904_t7-8）の #7「ガンマナイフを打つか」／
+    ドフラ T10（human_doflamingo_vs_luffy_20260904_t10-11）の #0「訪問される根の手の数」と勝敗。
+    ※ seed と sims が変わると決定番号がずれる。盤面（ターン・手番・手札）で同じ局面を特定する。
+  - 全 seat 側 MAIN 決定での集計: 訪問された根の手の割合／「Q が選んだ手より高いのに N で負けた手」の
+    件数（legal_stats から機械的に数える）／イベント PLAY が選ばれた回数／相手キャラ攻撃が選ばれた回数。
+  - 9 本の勝敗（winner）と、seat 側の最終 V。
+  - 1 決定あたりの decide 時間（各 sims・serve に載せられる上限の目安）。
+  - **sims 掃引で見たいこと**: 3 決定の選択と「Q が高いのに N で負けた手」の件数が sims とともに
+    どう変わるか。sims で変わる決定＝探索予算の問題、10,240 でも変わらない決定＝価値（ネット）の
+    問題、と切り分ける。
+
+■ 受け入れ
+  - cargo test: select_rule="q_min_n" が N 下限を満たす手の中で Q 最大を返す／root_prior_temp が
+    根の P だけを変え和が 1 のまま／既定値では出力が 1 bit も変わらない（既存の PV テストが通る）。
+  - pytest tests/test_search_options.py（cpu_infra）: RsGame.decide に 3 つの opts が通る。TEST_SPEC §2 に 1 行。
+  - make test green。golden は decide を通らないので不変（変わったら止めて報告）。audit-cross は
+    既定値が不変なので不要。
+
+■ 成果物
+  - コード＋テスト＋scenario_out_a/（S2・S3・R1・R2＝各 18 本、S4・S5＝各 6 本）＋docs/reports/2026-09-0X_search_a.md（表と
+    3 決定の前後・各条件の所要時間）＋RESULT.json:
+    {"job":"rs-search-a","status":"done|partial","conditions":["S2","S3","S4","S5","R1","R2"],
+     "key_decisions":{"enel_t9_kaminosabaki_before_attack":{"S1":false,"S2":…,"R1":…},
+                      "enel_roger_t7_gammaknife":{…},"doffy_t10_root_visited":{"S1":3,…},
+                      "doffy_t10_winner":{…}},
+     "q_beats_n_count":{"S1":N,…},"latency_ms_per_decide":{"S1":…},"make_test":"N passed","notes":"…"}
+  - 分析（どの条件を serve／生成に採るか）はコーディネータが書く。WP は数字まで。
+
+■ 前提
+  - 既定の挙動（serve・生成・アリーナ）は変えない＝opts を渡さなければ今までと同じ。
+  - 判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+#### 20.5.2 判定（2026-09-09・`docs/reports/2026-09-09_search_a.RESULT.json`・分析 #5）
+
+- WP `rs-search-a` を受け入れ、本線へ ff で取り込んだ（`DecideOptions` に `select_rule`／`q_min_frac`／
+  `root_prior_temp`・既定は不変・`tests/test_search_options.py`〔cpu_infra〕・`scenario_out_a/`
+  7 条件・`rs_search_a_*.py`）。本線で `make test` 463 passed。
+- **縛り A は 2 つに割れた**（`docs/reports/2026-09-09_scenario_analysis_05.md`）: (A1) 予算＝
+  ガンマナイフは sims 2,560 で拾える／ドフラ T10 の負けは 640 で消える。(A2) 事前分布の門＝
+  ドフラ T10 の根の訪問手は 16,000 でも 7/47。神の裁き→攻撃の順は sims では動かず、
+  **根の平坦化＋N 下限つき Q 最大（R2）で 8 seed 中 6 本**が人間の順になった（既定 0/8）。
+- **serve と生成の候補設定 = R2（sims 640・q_min_n 1/8・root_prior_temp 2）**。採用はアリーナで
+  決める（WP `rs-search-arena`・§20.5.3）。レイテンシ 4 倍（中央値 0.4 s → 1.6 s）はユーザ判断。
+- 副産物: `rs_scenario_play.py` の探索乱数の基点を固定（以前は起動ごとに世界サンプルが変わり、
+  分析 #1〜#4 の条件比較は厳密には成立していなかった。向きは再現）。以後、判断に使う決定は
+  **seed 8 本**を標準にする。分析 #4 の材料は作り直さない。
+- A2（事前分布の門）は探索の設定では開かない＝π の教師を Q で補正する段（§20.6・未着手）。
+
+#### 20.5.3 WP `rs-search-arena` の指示書（探索設定の採否をアリーナで決める）
+
+```
+作業: WP rs-search-arena（探索の設定「worlds 4 ＋ R2」を、同じネット r3 の既定設定 S1 とアリーナで
+比べる・docs/rust_engine_plan.md §20.5.2・§20.7.5・分析 #6 docs/reports/2026-09-09_scenario_analysis_06.md）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-search-arena に push、PR は作りません。
+成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。
+
+■ 足すもの（opcg_sim/loop/arena_shard.py・arena_merge.py）
+  - 候補席の探索設定を CLI で渡せるようにする: --cand-sims／--cand-select-rule／--cand-q-min-frac／
+    --cand-root-prior-temp／--cand-worlds／--cand-setup-box（省略＝既定＝今までの挙動。基準席は常に
+    既定）。RsGame.decide の opts にそのまま流す（worlds／setup_box は §20.7 で配線済みの欄）。
+    記録の jsonl に候補席の設定を書く（判定が設定に紐づくため）。
+  - 候補ネットが基準と同じ npz でも回せること（--candidate に既定と同じパスを渡す＝設定だけの比較）。
+
+■ 回すもの（候補＝r3 + 〔sims 160・worlds 4・q_min_n 0.125・root_prior_temp 2.0〕／基準＝r3 + 既定。
+  分析 #6 の C_w4_r2＝実効 sims 640・壁時計は既定の 1.9 倍。setup_box は入れない〔§20.7.6 の後〕）
+  主条件: --leaders random --decks synth・8 シャード × 24 ペア（48 局／シャード・先後入替）＝384 局。
+  副条件: 既定の固定ミラー・8 シャード × 24 ペア＝384 局。
+  seed 帯: 主 441000〜448000（シャード k は 441000 + 1000k）・副 451000〜458000（台帳
+  docs/n_loop_ops.md §6 に「探索設定 R2 vs S1」で払い出し済み扱い＝この指示書が台帳の根拠）。
+  1 セッションで回すなら --workers 4 で順に。並列にするなら 16 セッション（条件×シャード）に分けて
+  claude/arena-r2-{random|mirror}-wNN に push し、コーディネータが arena_merge で束ねる。
+  ※ 候補席は worlds 4（4 スレッド）なので 1 局の壁時計は既定の 1.5 倍程度（片側だけ 1.9 倍）。
+    --workers は 4 コアで 2 まで（候補席の decide が 4 スレッド使う）。主 384 局で数時間。
+
+■ 判定基準（コーディネータが判定・CLAUDE.md の規約）
+  主条件 wr ≥0.55 かつ CI 下限 >0.50、副条件は退行なし（CI 下限 ≥0.45）。void >2% なら判定しない。
+
+■ 受け入れ
+  - pytest tests/test_arena_search_opts.py（cpu_infra）: 候補席の opts が decide に届く・jsonl に記録される。
+    TEST_SPEC §2 に 1 行。make test green。
+  - 既定（opts 省略）の記録が今までと同じ形であること（既存の arena 台帳の読み手を壊さない）。
+
+■ 成果物
+  - コード＋テスト＋n1_results/arena_search_r2/{random,mirror}_wNN.jsonl（または各セッションのブランチ）
+  - RESULT.json: {"job":"rs-search-arena","status":"done|partial","candidate_opts":{…},
+     "random":{"games":N,"wr":x,"ci95":[..],"void":n},"mirror":{…},
+     "latency_ms_main_median":{"cand":…,"base":…},"make_test":"N passed","notes":"…"}
+
+■ 前提
+  - ネットは両席 r3（opcg_sim/data/learned/nrel_r3.npz）。違うのは候補席の探索設定だけ。
+  - 判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+##### 20.5.3-1 回収（2026-09-09・作業セッション `claude/rs-search-arena`）
+
+コード（候補席の探索設定 seam）と測定を 1 セッションで回した。**判定はユーザ／コーディネータ**。
+
+| 条件 | ペア | 勝率 | 95% CI | Elo | void | dup | 規約 |
+|---|---|---|---|---|---|---|---|
+| 主（`--leaders random --decks synth`・帯 441000〜448000）| 191 | **0.5314** | [0.4757, 0.5871] | +21.9 | 1 | 0 | wr≥0.55 かつ CI 下限>0.50 → **未達** |
+| 副（既定の固定ミラー・帯 451000〜458000）| 192 | **0.5443** | [0.5022, 0.5863] | +30.8 | 0 | 0 | 退行なし（CI 下限≥0.45）→ **達成** |
+
+候補＝r3 ＋ `{sims 160, worlds 4, select_rule q_min_n, q_min_frac 0.125, root_prior_temp 2.0}`
+（分析 #6 の `C_w4_r2`・準備箱なし）／基準＝r3 ＋ 既定。**違うのは候補席の探索設定だけ**。
+台帳は `n1_results/arena_search_r2/{random,mirror}_w00..w07.jsonl`（各行に `cand_opts`）。
+
+読み: **分析 #6 で 3 局面に見えた効き（神の裁き→攻撃 5/8・決着 4/8）は、384 局の実プレイでは
++22 Elo 相当（CI が 0 を跨ぐ）にとどまった**。3 局面の分岐点は「この設定でしか読めない手」を
+選んで作った標本なので、実プレイ全体の分布ではその手が出る頻度そのものが小さい——分岐点の
+改善が勝率に乗るとは限らない、という §20.5 の問い（読みの質 vs 勝率）に対する 1 本目の実測。
+シャード間のばらつきは主 0.396〜0.646 と大きく、24 ペア 1 本では何も言えない（8 本合算して
+初めて CI が読める）。
+
+レイテンシ（主条件の実対局・単独プロセス・**合法手 2 本以上の決定だけ**の中位）:
+候補 **138.1 ms**／基準 **101.2 ms**＝**1.36 倍**（n=358／296）。強制手を含む全決定の中位は
+3.0 ms／4.9 ms で、木を回さない決定に埋もれて比較にならない。分析 #6 の 1.9 倍より小さいのは、
+あちらが手で選んだ非自明 3 局面、こちらが実プレイ全体の分布だから。
+
+### 20.6 π の教師を Q で補正する（縛り A2・未着手・設計メモ）
+
+分析 #5 で「事前分布の門」（P 0.001 の手は 16,000 sims でも訪問されない）は探索の設定では開かない
+ことが分かった。自己対戦の π が訪問分布である限り、門は次の世代にも写る。候補: 根で「読めた手は Q・
+読めていない手は根の V」から改良方策を作り、それを π の教師にする（Gumbel AlphaZero の完成 Q の
+考え方）。`mcts.rs` の根の扱いと `record_gen.py` の π の作り方が変わる。R2 でのアリーナ結果と
+波 29 の r4 を見てから着手する。
+
+### 20.7 探索の 3 段（ユーザ決定 2026-09-09「1〜3 はやりましょう・方式は任せる」）
+
+分析 #5 の「どうしたら良いか」の 1〜3 を実装する。**方式の決定はコーディネータ**（本節）、実装は WP。
+順序: **WP `rs-pimc-worlds`（1）→ WP `rs-setup-box`（3）→ アリーナ 1 本で 1＋2＋3 を束ねて採否**
+（2＝R2 の設定は実装済み・採否だけ）。§20.5.3 の `rs-search-arena` は候補設定を「worlds 4 ＋ R2 ＋
+準備箱」に差し替えて回す（別々に測らない＝1 本で済ませる。効果の切り分けが要れば後で抜き差し）。
+
+#### 20.7.1 方式 1: 世界サンプルを複数本引いて根で束ねる（`rs-pimc-worlds`）
+
+- 今: 1 回の `decide` で世界（相手の伏せ札・山札の順）を 1 本引き、その世界で木を 1 本回す＝
+  「相手の手札を知っている」つもりの Q になる（神の裁きの決定でオーム攻撃 Q 1.000）。
+- 変更: `DecideOptions.worlds`（既定 1＝不変）。`worlds=K` なら **K 本の世界を独立に引き、各世界で
+  同じ sims の木を回し、根の統計を束ねる**: N は和・Q は N で重み付けた平均・P は同じ（ネットの
+  出力は世界に依らない）。選択規則（visits／q_min_n）は束ねた統計に対して適用。PV とコミットの
+  継続は「選んだ手の訪問が最も多い世界の木」から取る（世界ごとに継続は違うので 1 本に決める）。
+- 並列: K 本の木を **スレッドで並列**に回す（`std::thread::scope`・GIL は `Game.decide` の間だけ
+  `allow_threads` で放す）。世界ごとの乱数は `search_seed` から派生（`seed + world_index`）＝
+  再現性を保つ。4 コアで K=4 ならレイテンシは K=1 の 1.3 倍以内を目標（ネットの forward が
+  スレッド安全であること・`LoadedNet` は読み取り専用）。
+- 効き目の見立て: 保険の手（パンプしてから殴る・止められる世界を織り込む）の Q が上がる。
+  実効 sims が K 倍（同じ壁時計）。
+
+#### 20.7.2 方式 3: 準備の手を「続きの攻撃」まで箱にする（`rs-setup-box`・ユーザの問いへの答え）
+
+**準備の手とは**（意味分類はしない・構造で決める）: メインフェイズの手のうち攻撃でも終了でもなく、
+解決後に同じターンの攻撃の結果を変えうるもの。具体的には次の 3 種:
+1. 【メイン】効果を持つイベントの PLAY（除去・パンプ・ドロー・レスト・コスト操作）。
+2. ACTIVATE_MAIN（リーダー／キャラ／ステージの【起動メイン】。エネル起動のドン!!加速も含む）。
+3. 【登場時】効果を持つキャラ／ステージの PLAY（登場時に対象を取る・ドローする・KO する等）。
+含めないもの: ドン!!付与（既に配分箱）、登場時効果を持たないキャラの PLAY（価値が盤面に即出る）、
+TURN_END。**手ではないもの**（常在効果・アタック時・相手アタック時・カウンター・ブロッカー・
+トリガー）は箱の対象外＝アタック時は攻撃箱の中で既に解決され、常在は盤面に常時反映され、
+防御系は防御窓が扱う（変更なし）。
+
+**アタック時効果と攻撃箱**（ユーザの問い 2026-09-09）: アタック時の効果（オームの -1000 等）は攻撃箱の中で
+解決されるので、**攻撃箱が準備箱を兼ねる**（この戦闘の結果と、効果が付いた盤面の V まで箱の評価に入る）。
+兼ねないのは「その効果が別の攻撃の準備になる」場合（-1000 をゾロに当て、次にもう 1 体で殴って KO）＝
+木が深さ 2 で読む領域で、準備箱の「深さ 1」と同じ線引き。揃える点（ユーザ決定 2026-09-09「他の箱も同じに」）: **箱の中で自分が選ぶ最初の対象選択は枝にする・
+2 つ目以降は既定解決**を、全部の箱に共通の規則にする。配分箱＝対話なし（不変）／攻撃箱＝アタック時効果の
+最初の対象選択（-1000 を「モリアに当てる枝」と「ゾロに当てる枝」）・戦闘後の自分のトリガーに対象選択が
+あればそれが最初なら枝・相手のブロック／カウンターは相手側の既定のまま／防御箱＝カウンターイベントの
+効果の最初の対象選択（万雷の +1000 を「サトリ」と「リーダー」で比べる＝§8.27 (a) が畳まれていた場所）／
+準備箱＝上のとおり。対話の無い箱は今のまま。枝は `BOX_BRANCH_BUDGET` の枠内・超えたら既定に落とす。
+
+**箱の範囲**: 準備箱 ＝ [準備の手 → その手の対話を全部解決 → 続く攻撃を **1 回だけ**（攻撃箱 1 個、
+または「攻撃しない」）] → その時点の盤面の V が箱の評価値。深さは 1（準備の後の攻撃 1 回）で止める
+＝価値が現れる最短の続きだから。2 回目以降の攻撃と 2 段の準備（ガンマナイフ → 神の裁き）は木が
+読む（1 段目の Q が正しくなれば 2 段目は通常の展開で届く。2 段の「連鎖箱」は今回入れない）。
+
+**対象の取り方**: 準備の手の**最初の対象選択**（SEARCH_AND_SELECT の「1 枚まで」等）は候補ごとに
+枝を作る（`adapter::selection_moves` と同じ・上限 `HARD_SELECT_CAP`=8・「選ばない」も 1 枝）。
+**2 つ目以降の対話は既定解決**（`choose_selection`・intent 配線済み）。理由: 価値を分けるのは主に
+最初の対象（除去先・パンプ先）で、枝の爆発を抑える。ドン!!-x の返却先（SELECT_RESOURCE）は既定。
+
+**複数効果**: 1 つの能力の中の連続（神の裁き: +1000 → KO）は順に解決して 1 つの箱。1 枚に複数の
+能力（登場時＋起動）があっても、箱は「今使う能力」だけ。CHOICE（どちらかを選ぶ）は枝にする
+（`selection_moves` の CHOICE 分岐と同じ）。
+
+**続きの攻撃の選び方**: 枝ごとに攻撃箱を全部評価すると 8×6 で重いので、**続きは貪欲 1 本**＝
+準備の手を解決した盤面で `quiesce_choice`（方策優先）が選ぶ攻撃箱を 1 つだけ in-place で解決する
+（`resolve_battle_inplace`・窓は既定）。攻撃が無い／攻撃しない方が良い盤面は「攻撃しない」で
+評価。コストは「対象の枝数 × 1」に収まる。
+
+**探索との接続**: 準備箱は根の候補（マクロ手）として DON_BOX と同じ扱いで並べる。元の素の
+PLAY／ACTIVATE_MAIN も残す（続きが攻撃でない場合のため）。箱の P は元の手の P を枝で分配
+（配分箱と同じ規則）。箱を選んだら `commit` で続き（対話の選択 → 攻撃）を機械的に消化する
+（既存のコミット機構）。**根だけでなく木の全節で候補化**するのは配分箱と同じ（予算は
+`BOX_BRANCH_BUDGET` の枠内・超えたら素の手に落ちる）。
+
+**効き目の見立て**: ガンマナイフ（除去 → 攻撃が通る）の Q が深さ 1 で正になる＝160 sims でも
+拾える。神の裁き（パンプ → 攻撃）も同じ。除去対象の選択が枝になるので「KO しない」枝と
+「KO する」枝の Q 差が見える（§8.27 (b) の空選択も価値で決まるようになる）。
+
+#### 20.7.3 WP `rs-pimc-worlds` の指示書
+
+```
+作業: WP rs-pimc-worlds（1 回の decide で世界サンプルを K 本引き、木を並列に回して根で束ねる・
+docs/rust_engine_plan.md §20.7.1）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-pimc-worlds に push、PR は作りません。
+成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。ネット（nrel_r3.npz）は変えない。
+WP rs-setup-box と並行するので、触るのは search/mcts.rs・search/decide.rs・search/mod.rs・py_game.rs／
+lib.rs・opcg_sim/api/engine_rs.py・tests/scripts/rs_scenario_play.py・tests/ に限る（search/macro.rs・
+quiesce.rs・adapter.rs は触らない）。
+
+■ 足すもの
+  - DecideOptions.worlds（既定 1＝1 bit も変わらない）。opts_json → RsGame.decide(worlds=) →
+    rs_scenario_play.py --worlds。
+  - worlds=K: 世界を K 本 determinize（乱数は search_seed から派生: 世界 i は seed+i、世界 0 は
+    今と同じ列＝K=1 の出力が不変であること）。各世界で同じ sims の TreeMcts を回す。
+  - 根の統計の束ね: N は和・Q は N 重みの平均・P は世界 0 のもの（同じはず。違えば notes に）。
+    束ねた統計に対して select_rule（visits／q_min_n）と等価手マージ（groups）を適用。
+    `stats.legal/N/Q/P` はこの束ねた値を返す（legal の並びは世界間で同じ＝同じ盤面の同じ列挙。
+    違う場合は sig で突き合わせて notes に書く）。
+  - PV とコミットの継続: 選んだ手の訪問が最も多い世界の木から取る。trace に "world_used" を出す。
+  - 並列: std::thread::scope で K スレッド。Game.decide は木を回す間 Python の GIL を放す
+    （pyo3 allow_threads）。ネットの forward・マスター表は読み取り専用で共有（&LoadedNet）。
+    K=1 のときはスレッドを作らない（今の経路のまま）。
+  - decide の戻り値に "worlds":K と、世界ごとの根の N/Q（"per_world"）を出す（思考ログで
+    「世界によって答えが割れたか」を読むため）。RsGame._trace に per_world を載せる（.md の (4) に
+    「世界ごとの最善手」を 1 行足す）。
+
+■ 受け入れ
+  - cargo test: worlds=1 は既定と 1 bit も変わらない／worlds=4 の根の N 合計＝4×sims／同じ seed で
+    2 回回して同じ出力（再現性）／per_world の数が K。
+  - pytest tests/test_pimc_worlds.py（cpu_infra）: RsGame.decide(worlds=4) が動き trace に
+    worlds・per_world が入る／worlds=1 の trace が今までと同じ形。TEST_SPEC §2 に 1 行。
+  - make test green・make audit-cross void 0（既定 K=1 なので挙動は不変のはずだが、スレッド化の
+    穴を見るため回す）。
+  - 計測（RESULT.json）: enel_human_20260810_t9-9 を seed 0〜7・sims 160・worlds ∈ {1,2,4,8}・
+    visits 規則で回し、「オーム攻撃の前に神の裁きを打つか」の本数（tests/scripts/rs_search_a_keys.py）
+    と、同じ 3 局面（tests/scripts/rs_search_a_latency.py に --worlds を足す）の decide 時間。
+    目標: worlds=4 の時間が worlds=1 の 1.3 倍以内（4 コア）。
+    9 シナリオ × seed 0/1 を worlds=4 で回して scenario_out_w/ に添える（分析はコーディネータ）。
+
+■ 成果物
+  - コード＋テスト＋scenario_out_w/（18 本）＋RESULT.json:
+    {"job":"rs-pimc-worlds","status":"done|partial","kami_before_attack":{"w1":n,"w2":n,"w4":n,"w8":n},
+     "latency_ms":{"w1":…,"w2":…,"w4":…,"w8":…},"make_test":"N passed","audit_cross":{"pairs":120,"void":0},
+     "notes":"…（P が世界で違ったか・legal の並びが違ったか・スレッド化で困った点）"}
+
+■ 前提
+  - 既定（worlds=1）の挙動は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+#### 20.7.4 WP `rs-setup-box` の指示書
+
+```
+作業: WP rs-setup-box（準備の手＝メインイベント／起動メイン／登場時効果持ちの PLAY を「続きの攻撃
+1 回」まで箱にする・docs/rust_engine_plan.md §20.7.2＝方式の決定はそこに書いてある）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-setup-box に push、PR は作りません。
+成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。ネット（nrel_r3.npz）は変えない。
+WP rs-pimc-worlds と並行するので、触るのは search/macro.rs・search/adapter.rs・search/quiesce.rs・
+search/apply.rs・tests/ に限る（search/mcts.rs・decide.rs の根の統計まわりは触らない。候補生成
+（legal_actions の macro_moves）から先で完結させる）。
+
+■ 実装（§20.7.2 の決定どおり）
+  1. 準備の手の判定（構造）: PLAY のカードがイベント（【メイン】効果あり）／ACTIVATE_MAIN／
+     PLAY のカードが【登場時】能力を持つキャラ・ステージ。マスター表の ability の trigger で判定
+     （ON_PLAY／ACTIVATE_MAIN）。
+  2. 準備箱の候補化（macro.rs に setup_box_candidates）: 準備の手ごとに、最初の対象選択の候補
+     （≤8・「選ばない」含む・CHOICE は枝）× 1 ＝枝。各枝を in-place で解決（手 → 対話は最初の
+     対象だけ枝の値・以降は既定解決 → quiesce_choice が選ぶ攻撃箱を 1 つ解決・攻撃が無ければ
+     「攻撃しない」）。箱の手は {"kind":"game","action_type":"SETUP_BOX","payload":{"uuid":…,
+     "first_select":[uuid…]|null,"attack":<攻撃箱の手|null>}} の形（DON_BOX と同じ流儀）。
+     元の素の PLAY／ACTIVATE_MAIN は残す。P は素の手の P を枝で等分（配分箱と同じ）。
+  3. 適用（apply.rs）: SETUP_BOX を「素の手 → 対話の解決（first_select を最初の対話に・以降は既定）
+     → 攻撃箱」の順に適用する。commit（既存）に同じ手順を積む＝実対局へは原始手で出る。
+  4. 予算: BOX_BRANCH_BUDGET の枠内。超えたら準備箱を作らず素の手だけ（今と同じ）。
+     枝数の上限は準備の手 1 つにつき 9（対象 8 ＋「選ばない」）。
+  6. 共通規則（§20.7.2）「箱の中で自分が選ぶ最初の対象選択は枝・2 つ目以降は既定」を、攻撃箱
+     （attack_box_candidates: アタック時効果の対象・戦闘後の自分のトリガーの対象）と防御箱
+     （defense 窓: カウンターイベントの効果の対象）にも適用する（候補 ≤8・「選ばない」含む）。
+     相手側の選択（ブロック・カウンター・相手のトリガー）は相手側の既定のまま。対話の無い箱は今のまま。
+     setup_box=true のときだけ有効（既定は不変）。箱ごとの枝数（平均・最大）を RESULT に書く。
+  5. SearchOptions に setup_box: bool（既定 false＝1 bit も変わらない）。opts_json → RsGame.decide →
+     rs_scenario_play.py --setup-box。
+
+■ 受け入れ
+  - cargo test: setup_box=false は既定と不変／神の裁き（コスト 0・ドン!!-1: 自分 +1000 → 相手 ≤3000 を
+    KO）を手札に持ち相手に 1c パワー 0 のキャラが居る盤面で、SETUP_BOX の枝に「KO する」「KO しない」
+    の両方があり、適用すると原始手の列（PLAY → SELECT_RESOURCE → BUFF 対象 → KO 対象 → 攻撃）に
+    展開される／ガンマナイフ（-5000）→ 攻撃の箱が作られ、攻撃の対象が -5000 後の相手キャラでも
+    リーダーでもよいこと。
+  - pytest tests/test_setup_box.py（cpu_infra）: RsGame.decide(setup_box=True) で候補に SETUP_BOX が
+    出て、選ばれたときの apply が原始手で実対局に出る。TEST_SPEC §2 に 1 行。
+  - make test green・make audit-cross void 0（既定 false だが、候補生成のコードは既定でも通るので回す）。
+  - 計測（RESULT.json・sims 160・visits・worlds 1・seed 0〜7）: human_enel_vs_roger_20260904_t7-8
+    「ガンマナイフを打つか」／human_enel_vs_luffy_20260904_t4-5「神の裁きで 1c ルフィを KO するか」／
+    enel_human_20260810_t9-9「神の裁き → 攻撃の順」を setup_box on/off で比べる（rs_search_a_keys.py に
+    2 つ目の鍵を足す）。同じ 3 局面の decide 時間（rs_search_a_latency.py に --setup-box）。
+    9 シナリオ × seed 0/1 を setup_box on で回して scenario_out_b/ に添える（分析はコーディネータ）。
+
+■ 成果物
+  - コード＋テスト＋scenario_out_b/（18 本）＋RESULT.json:
+    {"job":"rs-setup-box","status":"done|partial","keys":{"gammaknife":{"off":n,"on":n},
+     "kami_ko_luffy":{"off":n,"on":n},"kami_before_attack":{"off":n,"on":n}},
+     "latency_ms":{"off":…,"on":…},"branches_per_box":{"setup":[mean,max],"attack":[mean,max],"defense":[mean,max]},
+     "make_test":"N passed",
+     "audit_cross":{"pairs":120,"void":0},"notes":"…"}
+
+■ 前提
+  - 既定（setup_box=false）の挙動は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+#### 20.7.5 回収と判定（2026-09-09・`rs-pimc-worlds`／`rs-setup-box`）
+
+**回収**: `rs-pimc-worlds`（`origin/claude/rs-pimc-worlds`・RESULT `docs/reports/2026-09-09_pimc_worlds.RESULT.json`）
+を ff で取り込み、続けて `rs-setup-box`（`origin/claude/rs-setup-box-swto7v`・RESULT
+`2026-09-09_setup_box.RESULT.json`）を合流（4 ファイルで衝突＝両 WP が同じ場所に欄を足していた:
+`DecideOptions`／`Game.decide` の opts／`rs_scenario_play.py`／`rs_search_a_latency.py`。両方残して解いた）。
+**合流時に見つけた組み合わせの欠陥を 1 つ直した**: 準備箱の状態（`macro::SETUP`＝枝予算・計測・
+「箱の持ち主」）は `thread_local` なので、`worlds>1` の世界スレッドでは**既定（無効）で始まっていた**
+（箱の候補化そのものは `ctx.opts.setup_box` で決まるので世界 1 以降にも箱は出るが、箱の中の
+対象選択の枝 `may_branch_selection` と計測が世界 0 だけになる）。`decide::run_worlds` の各スレッドで
+`reset_setup_state(opts.search.setup_box)` を張り直す（`tests_setup_box::setup_box_survives_multiple_worlds`＝
+世界 i の N/Q が「rng を seed+i にした単一世界」と一致すること。ゼロ重みネットの盤面では枝が
+踏まれず差は再現しないので、一致の確認にとどまる）。計測 `boxes` は世界 0 のぶんだけ出る。
+
+**`rs-pimc-worlds` の判定**
+- 効き目（RESULT）: 神の裁き → 攻撃の順は visits 規則では K=1〜8 で 0/8 のまま。ただし**オーム攻撃の
+  Q が 1.000（K=1）→ 0.958（K=4）→ 0.904（K=8）** へ落ち、神の裁きの訪問は 3 → 120（K=8）＝
+  §20.7.1 が狙った「相手の手札を知っているつもりの Q」の是正は起きている。9 シナリオの 229 決定の
+  **27.9% で世界ごとの最善手が割れた**。P は世界で違わず（916 世界すべて）、legal の並びも同じ
+  （unmapped 0）。
+- レイテンシ: K=2 で 1.27 倍・K=4 で 2.32 倍・K=8 で 4.19 倍（目標 1.3 倍は未達）。原因はスレッド化
+  ではなく**世界ごとのコストが二峰**（同じ局面で 55 ms 級と 400 ms 級に割れる＝相手の伏せ札次第で
+  戦闘箱が膨らむ）で、並列の壁時計は最大値に張り付くため。CPU 時間は 1 コアでも 4 コアでも同じ＝
+  無駄な仕事は増えていない。
+- (a) `q_min_n` の訪問下限を実効 sims（K×sims）で測る: **採る**。下限は「Q を信じてよい訪問数」なので、
+  束ねた N に対して同じ割合で引くのが筋（K=1 は今までと同じ値）。
+- (b) 生成・アリーナへの配線: `rs-search-arena`（§20.5.3）に含める（`arena_shard` が席ごとに
+  worlds／setup_box／select_rule／q_min_frac／root_prior_temp を受ける）。
+- 候補設定: **K=4 を主候補**（Q の是正が K=4 で見え、K=8 は 4 倍超）。レイテンシが serve で問題なら
+  K=2（1.27 倍）へ落とす。「K×sims 一定」（K=4 × sims 40）は 1 本の木が浅くなり A1（予算）を
+  悪化させるので採らない。
+
+**`rs-setup-box` の判定**
+- 効き目（RESULT・sims 160・visits・K=1・seed 8 本）: **ガンマナイフ off 0/8 → on 5/8**・神の裁きの
+  KO off 0/8 → on 2/8（打った run に限れば 0/2 → 2/3）・神の裁き → 攻撃の順は off/on とも 0/8（この
+  局面は準備箱では動かない＝R2 の平坦化で動く・分析 #5）。分析 #4 の 3 決定のうち 2 つが「深さ 1 で
+  Q に出る」ようになった＝§20.7.2 の見立てどおり。
+- レイテンシ: 中位 221 ms → 728 ms（3.3 倍・根の候補 29 → 54 等）。木の全節で候補化しているため。
+- Q1（対象選択の 2 段目以降も上限 9 に収まるあいだ枝にする・`SETUP_BOX_SELECT_DEPTH`=3）: **採る**。
+  規則の目的は枝の爆発を抑えることで、上限 9 がそれを担っている。神の裁きは「+1000 の先（1 段目）
+  → KO 対象（2 段目）」なので、字面どおり 1 段では受け入れ条件（KO する／しない）が成り立たない。
+  §20.7.2 の共通規則は「**総枝数が 9 に収まるあいだは対象選択を順に枝にし、収まらなくなる段からは
+  既定**」と読み替える（攻撃箱／防御箱は 1 段のまま＝`quiesce.rs` の `sel_branch_left`・枝数 max 8）。
+- Q2（素の PLAY／ACTIVATE_MAIN を残し、箱の P は素の手の P を枝数で等分）: **今は維持**（指示どおり・
+  アリーナの基準にする）。素の手が P をまるごと持ち、各枝は P/n＝低 sims では箱が素の手に訪問で負け
+  やすい構造。分析 #6 で「箱の候補がある決定で、素の手の N と箱の N の和」を数え、箱が負けている
+  なら次の摘みは (a) 素の手を落とす（配分箱と同じ扱い・「攻撃しない」枝が素の手の意味を持つ）。
+- Q3（レイテンシ 3.3 倍）: **今は全節のまま**（指示どおり）。根だけに限る案は「2 段の準備を木が読む」
+  経路を弱めるので、アリーナで効き目を見てから。serve の予算（分析 #5: 640 sims＝1.6 s まで）には
+  160 sims × 3.3 倍 × K=4 の 2.3 倍 ≈ 1.7 s で収まる見込み（分析 #6 で実測）。
+- CHOICE を枝にしない（`selection_moves` に CHOICE 分岐が無い）: 指示の誤り。据え置き＝CHOICE は既定
+  解決。枝にするなら `selection_moves` 側の別 WP。
+- 範囲外のファイル（`search/mod.rs`・`decide.rs`・`engine_rs.py`・`state.rs`）: 最小限で妥当。
+  `state::tests::load_masters_reports_a_missing_file` の実行順依存は実在した穴（`--test-threads=1` で
+  落ちる）＝直しを採る。
+- 計測 `branches_per_box`: setup 平均 2.9・最大 9／attack 5.1・最大 8／defense 3.8・最大 8。予算
+  （`BOX_BRANCH_BUDGET` 8000／decide）の打ち切りは観測範囲で 0。
+
+**次**: 分析 #6（コーディネータ・`2026-09-09_scenario_analysis_06.md`）＝ 1＋2＋3 を束ねた条件
+（worlds 4 ＋ setup_box ＋ q_min_n 1/8 ＋ t=2・sims 160）を 3 局面 × seed 8 本で回し、鍵 3 つと
+レイテンシを見る → §20.5.3 `rs-search-arena` の候補設定を差し替えてユーザへ渡す。
+
+#### 20.7.6 WP `rs-setup-box-2` の指示書（準備箱の「素の手との取り合い」を直す・分析 #6）
+
+```
+作業: WP rs-setup-box-2（準備箱が素の手に訪問で負ける構造を直す・docs/rust_engine_plan.md §20.7.5・
+分析 #6 docs/reports/2026-09-09_scenario_analysis_06.md §3）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-setup-box-2 に push、PR は作りません。
+成果物は RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。ネット（nrel_r3.npz）は変えない。
+触るのは search/macro.rs・search/quiesce.rs・search/apply.rs・search/decide.rs（箱コミットの腕だけ）・
+tests/・tests/scripts/rs_search_a_keys.py に限る。
+
+■ 直すもの（setup_box=true のときだけ・既定 false は 1 bit も変えない）
+  1. 箱があるとき素の PLAY／ACTIVATE_MAIN を候補から落とす（配分箱と同じ扱い）。「攻撃しない」枝
+     （attack: null）が素の手の意味を持つ。箱が作れない（予算切れ・対話が枝にならない）ときは今までどおり
+     素の手を残す。
+  2. 箱の P は等分しない: 各枝に素の手の P をそのまま与える（quiesce.rs::split_setup_box_priors を
+     置き換える）。根の平坦化（root_prior_temp）はその後に掛かる（今の順のまま）。
+  3. 同名カードが手札に 2 枚あるときの箱の重複（同じ枝が 2 組出る）は、`move_equiv_key` の等価手マージ
+     （groups）で束ねられていることを確かめる（束ねられていなければ、同じ card_id の準備の手は 1 枚だけ
+     箱にする）。
+  4. rs_search_a_keys.py に鍵を足す: 箱のある main 決定について「箱を選んだ数／素の手を選んだ数／
+     素の N > 箱の N 和 の枚数」（分析 #6 §3 の表と同じ定義）。
+
+■ 受け入れ
+  - cargo test: 既存の tests_setup_box.rs が通る（素の手が消える分は期待値を直す）・箱の枝の P が
+    素の手の P と等しい・箱が作れない準備の手は素の手が残る。
+  - pytest tests/test_setup_box.py を更新（素の手が候補に無いこと）。make test green・make audit-cross void 0。
+  - 計測（RESULT.json・sims 160・seed 0〜7・3 局面〔enel_human_20260810_t9-9／human_enel_vs_roger_20260904_t7-8／
+    human_enel_vs_luffy_20260904_t4-5〕）: 条件は C_all（--worlds 4 --setup-box --select-rule q_min_n
+    --q-min-frac 0.125 --root-prior-temp 2）と C_box_r2（worlds なし）の 2 つ。鍵は分析 #6 の表
+    （神の裁き→攻撃の順／決着／ガンマナイフ／神の裁きで KO）＋上の 4 の鍵。目標: C_all で
+    神の裁き→攻撃の順が worlds 4 ＋ R2 単独（5/8）を下回らず、ガンマナイフ 5/8・KO 5/8 を保つ。
+    レイテンシ（rs_search_a_latency.py・同じ 3 局面・単独プロセス）も添える。出力は scenario_out_d/。
+
+■ 成果物
+  - コード＋テスト＋scenario_out_d/＋RESULT.json:
+    {"job":"rs-setup-box-2","status":"done|partial","keys":{"C_all":{"kami_before_attack":n,"lethal":n,
+     "gammaknife":n,"kami_ko":n,"chose_box":n,"chose_bare":n,"bare_gt_box":"n/m"},"C_box_r2":{…}},
+     "latency_ms":{"C_all":…,"C_box_r2":…},"make_test":"N passed","audit_cross":{"pairs":120,"void":0},"notes":"…"}
+
+■ 前提
+  - 既定（setup_box=false）の挙動は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+#### 20.7.7 `rs-setup-box-2` の回収と判定（2026-09-09・status=partial・本線には入れない）
+
+**結果**（`origin/claude/rs-setup-box-2`・RESULT は同ブランチ `scenario_out_d/RESULT.json`）: 指示の 1〜4 は
+全部入り、素の手と箱の取り合いは消えた（素の手を選んだ決定 49→0・22→0）。**しかし鍵は退行した**:
+ガンマナイフが C_all／C_box_r2 とも 5/8 → **0/8**、神の裁き→攻撃（C_box_r2）4/8 → 0/8。KO は 1/8 → 2/8・
+5/8 → 4/8。レイテンシ C_all 1.58 s・C_box_r2 0.59 s。
+
+**分かったこと（作業セッションの調べ・コーディネータが追認）**
+- 分析 #6 のガンマナイフ 5/8 は **10 run とも素の PLAY で打たれていた**（箱経由 0）。つまり
+  「準備箱を入れると効く」の出所は箱そのものではなく、**箱と同時に有効になる何か**が素の手の
+  Q を -0.47 → -0.23 に押し上げていた。候補は 2 つ: (i) 全箱共通の「自分の対象選択を枝にする」規則
+  （攻撃箱・防御箱の中で最善の枝の値を採る＝攻撃の値が上がる）、(ii) 根の候補が増えたことによる
+  訪問配分の変化。**どちらかは未分離**＝次の WP で切り分ける。
+- 箱の枝の Q は素の手より低い（-0.31／-0.47／-0.51 vs -0.229）。箱は「対象を枝で固定 ＋ 続きの攻撃を
+  方策で決め打ち」なので、木がノードとして続きを読む素の手より粗い。**素の手を落とすと、この
+  「木が読む自由度」ごと落ちる**＝§20.7.6 の 1 は誤りだった（分析 #6 §3 の読み「素の手が箱に勝つのが
+  問題」は、勝っていた側が正解だった）。
+- 訪問の分裂（神の裁き 8 枝・ガンマナイフ 3 枝が `q_min_n` の下限を各々割る）は、素の手を落としても
+  P を等分しなくても消えない。**選択規則を「同じ準備の手の枝を束ねたグループ」に対して掛ける**のが
+  残る一手（作業セッションの Q1・分析 #6 §4-4 と同じ）。
+
+**判定**
+- `rs-setup-box-2` の候補構造（素の手を落とす・P を等分しない・「攻撃しない」枝を足す）は**採らない**。
+  候補構造は v1（`rs-setup-box`＝素の手を残す・箱の P は枝で等分）へ戻す。「攻撃しない」枝は素の手が
+  あれば要らない（外す・上限 9 のまま）。
+- 作業セッションの Q1（枝を束ねてから下限を見る）: **採る**。束ね方は「`SETUP_BOX` は base の card_id で
+  束ね、同じ card_id の素の PLAY／ACTIVATE_MAIN も同じグループ」・代表は N 最大の枝（その Q を使う）。
+- Q2（素の手を条件付きで残す）: 無条件で残す（v1）ので不要。Q3（「攻撃しない」枝）: 外す。
+- 4（`rs_search_a_keys.py` の box_vs_bare・enel_t9_winner・`_is_play` が SETUP_BOX も拾う）と Rust テスト
+  `duplicate_copies_of_a_setup_move_merge_into_one_group`: 有用なので**残す**。
+- ブランチは捨てず、同じブランチで続ける（下の `rs-setup-box-3`）。本線には v3 の結果を見てから入れる。
+
+#### 20.7.8 準備箱の粒度を改める（ユーザ決定 2026-09-09）＋ WP `rs-setup-box-3` の指示書
+
+**決定**: 準備箱は「**発動 → 対象選択 → 効果の適用**」まで。続きの攻撃は入れない（§20.7.2 の「続く攻撃を
+1 回だけ」を撤回）。KO・攻撃・別の準備は次の箱／手として木が並べる（「パワー下げの準備箱 → パワー〜以下を
+KO する準備箱 or 攻撃箱」）。理由（§20.7.7）: 続きを貪欲に決め打ちした箱は素の手（木が続きを読む）より
+粗い値しか持てず、素の手を落とせない＝候補が重複する。対話だけを畳んだ箱は素の手を完全に含み余計な
+ものを含まないので、**素の手を落としてよく、木の自由度も失わず、戦闘の先払いも無い**。効き目は
+「対話の 1 ply が減る・対象ごとに候補が分かれる」ぶんに限られる見込み（薄くてもそれが正しい・ユーザ）。
+「計画は箱・行動は素の手」は今の構造そのもの（木は箱を見る・commit が原始手に展開して実対局へ出す）。
+
+```
+作業: WP rs-setup-box-3（準備箱の粒度を「発動 → 対象選択 → 効果」までに改める・
+docs/rust_engine_plan.md §20.7.8＝方式はそこに書いてある。rs-setup-box-2 の続き）。
+
+ブランチ claude/rs-setup-box-2 の最新（6bcd0480）から続けて同じブランチに push、PR は作りません。
+成果物は docs/reports/2026-09-09_setup_box_3.RESULT.json を添えて同ブランチへ。最初に `make rust-develop`
+（opcg_effects.json が無ければ export_effects_json で作る＝無いと tests_setup_box.rs が何も検査せずに通る）。
+ネット（nrel_r3.npz）は変えない。触ってよいのは search/macro.rs・quiesce.rs・apply.rs・decide.rs・mod.rs・
+engine_rs.py・tests/・tests/scripts/。mcts.rs は触らない（WP rs-leaf-rollout が触る）。
+
+■ 直すもの（setup_box=true のときだけ・既定 false は 1 bit も変えない）
+  1. 準備箱の範囲: 準備の手 → その効果の対話を解決、まで。対象選択（SEARCH_AND_SELECT）は枝
+     （総枝数が 9 に収まるあいだは 2 段目以降も枝・収まらなくなる段からは既定）、それ以外の対話は既定。
+     **続きの攻撃は入れない**（payload.attack を廃止・setup_box_continuation／commit の攻撃の腕も外す）。
+     箱の値は効果を解決した盤面（そこから先は木が読む）。rs-setup-box-2 の「攻撃しない」枝は不要（外す）。
+  2. 素の手: 箱ができた準備の手の素の PLAY／ACTIVATE_MAIN は候補から落とす（rs-setup-box-2 の 1 を維持）。
+     箱が作れない（枝予算切れ・対話が枝にならない）ときは素の手が残る。
+  3. 箱の P: 「素の手の P × 対象選択の P」。対象選択の P は、準備の手を適用して対話に入った盤面で、
+     木が対話ノードで使うのと同じ方策（selection_moves の候補にネットの policy）を 1 度呼んで得る
+     （準備の手 1 つにつきネット 1 回）。方策が出せない対話（候補行を作れない）は等分に退避。
+     根の平坦化（root_prior_temp）はその後（今の順）。
+  4. 選択規則の束ね（decide.rs・q_min_n のときだけ・visits は不変）: 根の候補を「同じ card_id の
+     SETUP_BOX の枝（素の手が残っていればそれも）」で 1 グループに束ね、グループの N（和）が下限以上の
+     グループの代表（N 最大の枝・その Q）の中から Q 最大を選んで代表の手を返す。それ以外の手は 1 手
+     1 グループ（既存の move_equiv_key の等価手マージはそのまま・その上に重ねる）。decide の戻り値に
+     "select_groups":[{"key":…,"n":…,"rep":idx,"q":…}] を足す（trace の stats／groups の形は変えない）。
+  5. 診断つまみ: SearchOptions.select_branch: Option<bool>（既定 None＝setup_box に従う）。明示すると
+     全箱共通の「自分の対象選択を枝にする」規則（quiesce.rs の sel_branch_left・macro.rs の
+     may_branch_selection）だけを on/off できる。opts_json → RsGame.decide(select_branch=) →
+     rs_scenario_play.py --select-branch {on,off}。
+  6. rs-setup-box-2 で足した鍵（box_vs_bare・enel_t9_winner・_is_play が SETUP_BOX も拾う）と Rust テスト
+     duplicate_copies_of_a_setup_move_merge_into_one_group は残す。
+
+■ 受け入れ
+  - cargo test: 神の裁きの箱に「KO する／しない」の枝が両方あり、適用すると PLAY → SELECT_RESOURCE →
+    BUFF 対象 → KO 対象 で止まる（攻撃は含まない）／箱がある準備の手の素の手は候補に無い／箱の各枝の P が
+    「素の手の P × 対象の P」（和が素の手の P）／束ね: 同じ card_id の枝 3 本が各々下限未満でも和が下限以上
+    なら q_min_n がその代表を選べる・visits は不変／select_branch=false ＋ setup_box=true で攻撃箱・防御箱
+    の枝が出ない（boxes.attack/defense が 0）／setup_box=false は既定と 1 bit も変わらない。
+  - pytest tests/test_setup_box.py を更新（素の手が候補に無い・箱に attack が無い）。make test green・
+    make audit-cross void 0。
+  - 計測（sims 160・seed 0〜7・3 局面〔enel_human_20260810_t9-9／human_enel_vs_roger_20260904_t7-8／
+    human_enel_vs_luffy_20260904_t4-5〕・鍵は分析 #6 の表 ＋ box_vs_bare・出力は scenario_out_e/）:
+      E1: --worlds 4 --setup-box --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2
+      E2: --setup-box ＋ R2（worlds なし）
+      E3: 準備箱だけ（--setup-box --select-branch off ＋ R2・worlds なし）
+      E4: 共通規則だけ（--select-branch on・--setup-box なし ＋ R2・worlds なし）
+    参照（測らなくてよい・scenario_out_c/C_w4_r2）: worlds 4 ＋ R2・箱なし＝神の裁き→攻撃 5/8・決着 4/8・
+    ガンマナイフ 4/8・KO 0/8（神の裁きを打たない）。目標: E1 がこれを下回らず、KO が増えること。
+    E3/E4 は「rs-setup-box（v1）のガンマナイフ 5/8 の出所がどちらか」を答える。
+    レイテンシ（rs_search_a_latency.py・同じ 3 局面・単独プロセス）は E1〜E4 全部。
+
+■ 成果物
+  - コード＋テスト＋scenario_out_e/＋docs/reports/2026-09-09_setup_box_3.RESULT.json:
+    {"job":"rs-setup-box-3","status":"done|partial","keys":{"E1":{"kami_before_attack":n,"lethal":n,
+     "gammaknife":n,"kami_ko":n,"kami_played":n,"chose_box":n,"chose_bare":n},"E2":{…},"E3":{…},"E4":{…}},
+     "latency_ms":{"E1":…,"E2":…,"E3":…,"E4":…},"make_test":"N passed","audit_cross":{"pairs":120,"void":0},
+     "notes":"…"}
+
+■ 前提
+  - 既定（setup_box=false・select_branch=None）の挙動は変えない。判定はコーディネータ。質問は
+    RESULT.json の notes に。
+```
+
+#### 20.7.9 葉をターン終了まで伸ばす（ユーザ提案 2026-09-09）＋ WP `rs-leaf-rollout` の指示書
+
+**着想（ユーザ）**: 深さ 2 の予算しか無くても、葉を**ターン終了まで強制的に伸ばして**から評価すれば
+「準備だけして終わり」の中途半端な値にならない。**コーディネータの読み**: 今の葉の評価（`mcts.rs::leaf_value`）
+は戦闘窓・対話窓（手順が強制される区間）だけを解決してから V を出す。メインフェイズの自由な手（残りの
+攻撃・付与・ターン終了）は伸ばさない。だから「神の裁きを打った直後の葉」の V には続きの攻撃が入らず、
+「攻撃を先にした葉」との比較が深さ 1 では付かない（分析 #4〜#6 の縛り）。葉で方策（P の最大）に沿って
+ターン終了まで打ち切ってから V を出せば、**全ての手の値が「このターンでやり切った結果」の値**になる。
+準備箱が「続きの攻撃を先払い」で狙ったことを、候補生成ではなく葉で・全ての手に一様に・訪問された葉
+だけに払う形で実現する＝構造として正しい置き場所。
+弱点（先に書いておく）: (1) 打ち切りは方策の貪欲なので、方策が低く見る手（P 0.05 の神の裁き）は打ち切りの
+中では打たれない＝「攻撃を先にした葉」の値に神の裁きが入らないのは、むしろ正しい比較になるが、打ち切りの
+質そのものは方策の質に縛られる。(2) コスト＝葉ごとに残り ply 数だけネットを呼ぶ（方策のため）。1 葉あたり
+数回・160 葉で数百回＝レイテンシ 2〜4 倍の見込み（実測で決める）。(3) 相手のターンの葉も同じ規則で伸ばす
+（相手の残り手番を相手の方策で打ち切る）。
+
+```
+作業: WP rs-leaf-rollout（木の葉を「そのターンの終わり」まで方策で打ち切ってから評価する・
+docs/rust_engine_plan.md §20.7.9）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-leaf-rollout に push、PR は作りません。
+成果物は docs/reports/2026-09-09_leaf_rollout.RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。
+ネット（nrel_r3.npz）は変えない。触るのは search/mcts.rs（leaf_value）・search/quiesce.rs（打ち切りの
+補助）・search/mod.rs（SearchOptions）・opcg_sim/api/engine_rs.py・tests/scripts/rs_scenario_play.py・
+rs_search_a_latency.py・tests/ に限る（macro.rs・adapter.rs・decide.rs は WP rs-setup-box-3 が触る）。
+
+■ 足すもの（既定は今と同じ・1 bit も変えない）
+  - SearchOptions.leaf_rollout: "none"（既定）| "turn_end"。opts_json → RsGame.decide(leaf_rollout=) →
+    rs_scenario_play.py --leaf-rollout turn_end・rs_search_a_latency.py にも。
+  - "turn_end": leaf_value で今の戦闘窓／対話窓の解決を終えた後、盤面が終局でなく手番の側のメイン
+    フェイズにあるなら、ターンが替わるまで手を打ち続ける: 各手は木と同じ候補（Ctx::legal_actions＝箱を
+    含む）から quiesce_choice（方策優先・P 最大・乱数を使わない）で 1 つ選んで適用し、途中の戦闘窓／対話窓は
+    今の既定解決で進める。TURN_END が選ばれるか、ターンが替わるか、上限 ply（LEAF_ROLLOUT_MAX_PLIES=12）で
+    止め、その盤面を to_move の視点で評価（ctx.value）。相手のターンの葉も同じ（相手の方策で相手の残り
+    手番を打ち切る）。乱数とイベントログは今の leaf_value と同じく復元する（transaction・CRN 一貫性）。
+  - 枝予算（BOX_BRANCH_BUDGET）は打ち切りの中では引かない（value_fn=None の流儀と同じ）。
+  - trace に葉の打ち切りの実績（葉の数・平均 ply・上限で止まった数）を "rollout":{…} で出す。
+
+■ 受け入れ
+  - cargo test: leaf_rollout="none" は既定と 1 bit も変わらない／"turn_end" で「PLAY（残り攻撃あり）の葉」の
+    評価が「攻撃を打ち切った盤面」の V になる（小盤面で、打ち切り前後の盤面が違うこと・ターンが替わって
+    いること）／上限 ply で止まる／同じ seed で同じ出力。
+  - pytest tests/test_leaf_rollout.py（cpu_infra）: RsGame.decide(leaf_rollout="turn_end") が動き trace に
+    rollout が入る・省略時は trace の形が変わらない。TEST_SPEC §2 に 1 行。make test green・
+    make audit-cross void 0。
+  - 計測（sims 160・seed 0〜7・3 局面〔enel_human_20260810_t9-9／human_enel_vs_roger_20260904_t7-8／
+    human_enel_vs_luffy_20260904_t4-5〕・鍵は分析 #6 の表・出力は scenario_out_f/）:
+      F1: --leaf-rollout turn_end（visits・worlds なし）
+      F2: --leaf-rollout turn_end ＋ R2（--select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2）
+      F3: --leaf-rollout turn_end ＋ R2 ＋ --worlds 4
+    参照（scenario_out_c/C_w4_r2）: worlds 4 ＋ R2＝神の裁き→攻撃 5/8・決着 4/8・ガンマナイフ 4/8。
+    レイテンシ（rs_search_a_latency.py・同じ 3 局面・単独プロセス）は F1〜F3 全部と既定。
+
+■ 成果物
+  - コード＋テスト＋scenario_out_f/＋docs/reports/2026-09-09_leaf_rollout.RESULT.json:
+    {"job":"rs-leaf-rollout","status":"done|partial","keys":{"F1":{"kami_before_attack":n,"lethal":n,
+     "gammaknife":n,"kami_ko":n},"F2":{…},"F3":{…}},"latency_ms":{"base":…,"F1":…,"F2":…,"F3":…},
+     "rollout":{"mean_plies":…,"capped_frac":…},"make_test":"N passed","audit_cross":{"pairs":120,"void":0},
+     "notes":"…"}
+
+■ 前提
+  - 既定（leaf_rollout="none"）の挙動は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
+  - WP rs-setup-box-3 と並行する。同じファイル（quiesce.rs・mod.rs・engine_rs.py・rs_scenario_play.py）に
+    欄を足すので衝突はコーディネータが解く。
+```
+
+#### 20.7.10 3 本の回収と判定（2026-09-09・`rs-search-arena`／`rs-leaf-rollout`／`rs-setup-box-3`）
+
+**回収**: 3 本とも本線へ合流（アリーナ・打ち切りは衝突なし、準備箱 v3 は 4 ファイルで衝突＝両方の欄を残して
+解いた）。既定はいずれも off／none＝1 bit も変わらない。RESULT は `docs/reports/2026-09-09_{search_arena,
+leaf_rollout,setup_box_3}.RESULT.json`。ゲート: cargo test 421・clippy clean・`make test`／`make audit-cross` は
+本節末尾。
+
+**1. アリーナ（worlds 4 ＋ R2 vs 既定・r3 同士）**
+
+| 条件 | 局 | wr | 95% CI | Elo | void | 規約 |
+|---|---|---|---|---|---|---|
+| 主（random×synth）| 382 | 0.5314 | [0.4757, 0.5871] | +21.9 | 1 | wr≥0.55 かつ CI 下限>0.50 → **未達** |
+| 副（固定ミラー）| 384 | 0.5443 | [0.5022, 0.5863] | +30.8 | 0 | 退行なし → 達成 |
+
+- **判定: 既定にはしない**（規約どおり）。方向は両条件とも正で、副条件は CI が 0 を跨がない（+31 Elo）が、
+  主条件が基準に届かない。3 局面の分岐点で見えた効き（神の裁き→攻撃 5/8・決着 4/8）は、実プレイ全体では
+  「その手が出る局面の頻度」に薄められて +22 Elo 相当に留まる＝**分岐点の改善は勝率にそのまま乗らない**
+  （§20.5 の問いへの 1 本目の実測）。レイテンシは実プレイで 1.36 倍（非自明な決定の中位）。
+- 残す価値: 設定は候補席の seam（`--cand-*`）として使えるので、次の設定比較はこの seam で回す。
+  生成（波 29）の設定にするかは別判断（π の教師を変える目的なら勝率規約とは別の理由で採れる。§20.6 と
+  合わせて決める）。
+
+**2. 葉の打ち切り（`leaf_rollout="turn_end"`）**
+
+| 条件 | 神の裁き→攻撃 | 決着 | ガンマナイフ | KO | レイテンシ |
+|---|---|---|---|---|---|
+| F1: 打ち切りだけ（visits）| 0/8 | 0/8 | 0/8 | 1/8 | 1.9 倍 |
+| F2: 打ち切り ＋ R2 | 4/8 | 2/8 | 0/8 | 1/8 | 1.85 倍 |
+| F3: 打ち切り ＋ R2 ＋ worlds 4 | 4/8 | 4/8 | 0/8 | 1/8 | 2.5 倍 |
+| 参照: worlds 4 ＋ R2（打ち切りなし）| 5/8 | 4/8 | 4/8 | 0/8 | 1.9 倍 |
+
+- **判定: 採らない（既定 none のまま・つまみは残す）**。参照を上回らず、ガンマナイフが 0/8 に落ちる。
+- 読み: 打ち切りは「攻撃を先にした葉」にも同じだけ続きの価値を足すので、深さの不揃いが消えて**公平な
+  比較**になる。その公平な比較で V は攻撃先行を選んだ（T7: ガンマナイフ Q -0.17 vs 攻撃 +0.02）。つまり
+  分析 #5〜#6 のガンマナイフ 4〜5/8 は、一部「ガンマナイフ側だけ木が続きの攻撃を読み、攻撃側の葉は
+  読まなかった」不揃いの産物だった可能性がある。人間の線が正解とは限らない（ユーザ 2026-09-08）ので、
+  これは「退行」ではなく「V の判断が見えた」と読む。V が除去を過小評価しているかは縛り B（符号化）の話。
+- 打ち切りは訪問の配り方（P）を変えないので単独では何も動かない（F1 全 0/8）＝R2 とセットでしか意味が
+  ない。ターンは平均 3 ply で自然に終わり、上限 12 ply はほぼ効かない。
+
+**3. 準備箱 v3（発動 → 対象選択 → 効果・素の手を落とす・束ね）**
+
+| 条件 | 神の裁き→攻撃 | 決着 | ガンマナイフ | KO（打った）| レイテンシ |
+|---|---|---|---|---|---|
+| E5: R2 単独（対照）| 2/8 | 2/8 | 6/8 | 0/8（1）| 0.17 s |
+| E4: 共通規則だけ ＋ R2 | 2/8 | 1/8 | 7/8 | 0/8（1）| 0.18 s |
+| E3: 準備箱だけ ＋ R2 | 0/8 | 0/8 | 2/8 | 3/8（3）| 0.36 s |
+| E2: 準備箱 ＋ 共通規則 ＋ R2 | 0/8 | 0/8 | 3/8 | 3/8（3）| 0.44 s |
+| E1: E2 ＋ worlds 4 | 0/8 | 0/8 | 1/8 | 0/8（0）| 1.0 s |
+
+- **答え（E3/E4/E5）**: v1 のガンマナイフ 5/8 の出所は「共通規則」でも「準備箱」でもなく、**素の PLAY が
+  候補に残っていたこと**。共通規則は中立（6→7）、準備箱は下げる側（6→2）。
+- 箱が買っているのは**神の裁きの KO 判断**（打った run は全部 KO・箱なしは打たない／KO しない）。
+  効果の解決まで含めて「打つと得か」を測れるのは箱だけ。
+- 失っているのは**素の手の訪問の集中**。束ね（select_groups）は N を回復する（下限未満の枝を選べた決定
+  21〜24 件）が、グループの Q は代表 1 本ぶんしか出ず、素の手（木が対話を後から読み直す）より低い局面が残る。
+- 対象選択の P は一様だった: NRel の候補行は RESOLVE_EFFECT_SELECTION の選択肢を区別する欄を持たない。
+  枝ごとの P を出すには**方策の候補行に「選んだ対象」を載せる符号化**が要る（ネットの再訓練を伴う・別 WP）。
+- worlds 4 と箱は噛み合わない（E1 最下位）: 実効 sims 640 で下限が 80 になり、束ねても届かない箱が増える。
+- 判定: **今の形（素の手を落とす）は採らない**。作業セッションの Q1「素の手を残したまま箱を足し、束ねで
+  取り合いを解く」を実験つまみ `setup_box_keep_bare` で測る（K1: 箱 ＋ 素の手 ＋ R2／K2: ＋ worlds 4・
+  結果は下）。Q3「worlds と箱は切り離す」: そのとおり。
+
+**3'. 素の手を残す実験（`setup_box_keep_bare`・コーディネータ・`scenario_out_g/`）**
+
+| 条件 | 神の裁き→攻撃 | 決着 | ガンマナイフ | KO（打った）| レイテンシ |
+|---|---|---|---|---|---|
+| K1: 箱 ＋ 素の手 ＋ 束ね ＋ R2 | 0/8 | 0/8 | 7/8 | 2/8（5）| 0.44 s |
+| 参照 E5: R2 単独 | 2/8 | 2/8 | 6/8 | 0/8（1）| 0.17 s |
+| K2: K1 ＋ worlds 4 | 2/8 | 2/8 | 6/8 | 0/8（2）| 1.04 s |
+| 参照 C_w4_r2: worlds 4 ＋ R2 | 5/8 | 4/8 | 4/8 | 0/8（0）| 0.39 s |
+
+- 素の手を戻すとガンマナイフは戻る（7/8・6/8）が、神の裁き→攻撃と決着は箱なしより悪い（0/8・2/8 vs
+  2/8・5/8）。KO の得も薄まる（打った 5 本のうち KO 2）。束ねで下限未満の箱を選べた決定は K1 3・K2 0。
+- **準備箱の最終判定: 採らない**（既定 off のまま・つまみ `setup_box`／`setup_box_keep_bare`／
+  `select_branch` は残す）。3 つの形（v1 貪欲な続き・v3 素の手を落とす・v3＋素の手）のどれも
+  「箱なし ＋ worlds 4 ＋ R2」を総合で上回らず、レイテンシは 2.5〜3 倍。箱が本当に買うもの（対象選択を
+  価値で決める）は、方策の候補行が対象を区別できるようになってから（符号化）再挑戦する。
+
+**判定のまとめ（探索の 3 段）**
+- ゲート（本線・合流後）: cargo test 421・clippy clean・`make test` 482 passed・`make audit-cross` void 0。
+- 探索の設定だけで動く分は **worlds 4 ＋ R2** が上限に近く、それでも勝率は +22 Elo（有意でない）。
+- 準備箱・葉の打ち切りは、それぞれ「効果の解決まで測る」「ターンをやり切った値で比べる」という**正しい
+  比較**を持ち込むが、正しい比較にすると V（ネット）が除去を選ばない＝**ボトルネックは探索ではなく V と P**
+  （縛り B・C ＋ A2 の門）。次は学習側: §20.6（π の教師を Q で補正）と符号化（`power_owner_turn`・
+  対象選択の候補行）。
+
+#### 20.7.11 学習側へ（ユーザの問い 2026-09-09「盤面の除去の価値は今の学習方式で学べるか」）
+
+答え: **構造上は学べるが、今の教師（z のみ）と教材（除去がほぼ打たれない自己対戦）では実質学べていない**
+（縛り B・C の実測）。符号化 v13 は相手トークンごとに現在パワー・レスト・登場直後・攻撃可否・ブロッカー・
+KO 時／アタック時／相手アタック時の能力フラグ・条件充足・能力構造（4 つまで）を持つので、「攻撃できる
+キャラが 1 体減る」「アタック時 -1000 持ちが消える」は入力の差として見えている。学べない理由: (1) 教師が
+勝敗 z 1 個で薄い、(2) 教材に「除去した／しなかった」の対照が無い（鶏と卵）、(3) 方策の候補行が除去対象を
+区別しない（「打つか」は学べても「何を」は学べない）、(4) 相手の起動メイン・自分への制限（ブロック不可等）は
+明示の列が無い。
+
+手当て（効く順・次の WP 候補）:
+1. **補助教師**（密な信号）: 棋譜から各局面に「次の相手ターンの攻撃回数」「次の相手ターンで失うライフ」
+   「次の相手ターンの効果発動回数」を計算し、V の補助ヘッドとして学習させる（`n_rel_train.py`・
+   `record` の読み手・損失の重み）。除去の価値（相手の攻撃回数を減らす）を直接教える最短経路。
+2. **教材に対照を作る**: 生成（波 29）を worlds 4 ＋ R2 で回す（除去が実際に打たれる）＋ 除去が合法な
+   決定の数 % を ε 探索で強制的に打つ（人間の手の強制ではない・z に対照を入れるため）。
+3. **§20.6**: π を Q で補正して「読めたら良かった除去」に教師の重みを乗せる。
+4. **符号化**: 候補行に対象（card_id・枠）を載せる／`power_owner_turn`／相手の起動メインの残数。
+
+**補記（ユーザとの詰め 2026-09-09・指示書に入れる決定）**
+- 補助教師は「何が起きるか」の予測であって「何が良いか」ではない＝V の目的関数は z のまま・重み小・
+  別ヘッド。**対称**に持つ（次の相手ターンに自分が失うライフ／次の自分のターンに相手が失うライフ・
+  攻撃回数・効果発動回数の両側）＝片側だけだと除去バイアス、両側なら「レースの読み」。ドンを振って
+  ライフへ行く線は「相手が失うライフ」側の教師が支える。
+- 相手の効果の特性: 相手トークン単位の補助教師（次の相手ターンに「攻撃したか・通した打点・能力を発動
+  したか」）で、各駒の能力構造を読んで「どの駒が仕事をするか」を計算させる＝「何を除去するか」の土台
+  （方策の候補行に対象を載せる符号化と対）。
+- 教材のデッキ: synth は役割を見ずにテーマで組む。**実測（143 リーダー × 2 seed ＝ 286 本）: 除去 0 枚が 27%
+  （平均 4.5 枚）・減少 0 枚 41%・ロック 0 枚 45%・除去も減少も無し 20%**。`deck_dig.inject_dig` と同じ流儀で
+  役割（除去／減少／ロック）を制御した率で差し込む（デッキごとに 0〜25% の幅・「減少 → KO しきい値」の
+  組み合わせも一定割合で意図的に作る・死に札監査は通す）。差し込みは対照を作るためで、良し悪しは z が決める。
+- 判定の物差し: シナリオの鍵（人間の線）ではなく、評価帯（未見の波での z の予測）とアリーナ。**リーダー別・
+  デッキの除去率別に層別**して「除去向きでないリーダーまで除去を高く見ていないか」を見る。
+
+**除去の分類（ユーザとの詰め 2026-09-09・教材のカバレッジ点検表と層別の切り口に使う・教師にはしない）**
+軸: A 形（KO／バウンス／山札／トラッシュ／疑似除去＝レスト・凍結・攻撃不可／減少／戦闘 KO）・B 対象の取り方
+（コスト以下／パワー以下／特徴／レストのみ／相手が選ぶ／複数／ランダム）・C 発動源（イベント／登場時／
+起動メイン／リーダー／アタック時／トリガー／カウンター時）・D コスト（使用コスト・ドン返却・追加コスト）・
+E 目的（起点潰し／テンポ／リーサル阻止／自分のリーサル準備／温存）・F 相手側の割引（除去耐性・使い切り・
+回収・KO 時効果・再展開力）・G 自分側の副作用（KO 時利得・守りの薄化・相手の手札増）。
+**カードプールの実測（2026-09-09・相手対象の除去系を持つカード・色別・種類数）**:
+
+| 色 | KO | 山札 | トラッシュ | 疑似除去 | 減少 | 硬い除去の発動源（イベント／登場時／起動／アタック時）| 低コスト減少 | リーダー |
+|---|---|---|---|---|---|---|---|---|
+| 黒 | 70 | 5 | 4 | 7 | 63 | 26／31／10／8 | 28 | 32 |
+| 青 | 0 | 29 | 0 | 7 | 3 | 4／13／4／2 | 0 | 38 |
+| 緑 | 50 | 0 | 0 | 143 | 3 | 22／17／3／4 | 1 | 34 |
+| 紫 | 43 | 3 | 1 | 30 | 23 | 13／19／3／4 | 8 | 35 |
+| 赤 | 66 | 0 | 1 | 0 | 91 | 27／19／2／14 | 41 | 41 |
+| 黄 | 62 | 0 | 11 | 25 | 12 | 21／25／5／2 | 4 | 32 |
+
+（バウンス＝0 はパーサが「手札に戻す」を山札／移動側に畳んでいる可能性＝別途確認。リーダーは 143・
+2 色 69）。読み: **「減少 → KO」の型は黒・赤（紫）でしか組めない**／青は硬い除去がほぼ無く「山札へ」と
+疑似除去／緑は疑似除去（レスト）が主で減少はほぼ無い／黄はトリガー由来の除去が多い。＝分類の全マスを
+全色で揃えることはできない。差し込みは「その色で組める型」に限り、**組めない型は評価の層から外す
+（学べていないのではなく教材に存在しない、と区別できるよう `deck_removal_kinds` を記録する）**。
+2 色リーダーは 2 色のプールを合わせられるので、型のカバレッジは 2 色で広がる。
+
+### 20.8 学習側の手当て: 除去の価値を教材と補助教師で学べるようにする（ユーザ決定 2026-09-09）
+
+方針（§20.7.11 と補記の合意）: 人が価値を書き込まない（V の目的関数は z のまま）・補助教師は「何が起きるか」の
+対称な予測・教材に対照を作る（型 × 色の差し込み・両方向 ε）・判定は評価帯とアリーナの層別。探索側は今回
+触らない（準備箱・打ち切りは既定 off・生成は worlds 4 ＋ R2）。WP は 4 本: **`rs-removal-decks`（§20.8.1）と
+`rs-aux-heads`（§20.8.2）を並行**→ 波 29 の生成（§20.8.3・後日）→ r4 の訓練と判定（§20.8.4・後日）。
+
+**dump の追加列（2 つの WP で共有する契約・dump v4）**: 既存の列は 1 バイトも変えない。追加は
+`deck_kinds(D str)`（§20.8.1 が書く・JSON・手番側デッキの型の集合）と `aux(D, A) float16`／`aux_tok(D, 6, 3)
+float16`／`aux_mask(D) int8`（§20.8.2 が書く）。`dump_io.py` は無い列を `None` で返す（v3 の波はそのまま読める）。
+
+#### 20.8.1 WP `rs-removal-decks` の指示書（型 × 色の差し込み・記録・分類の確認）
+
+```
+作業: WP rs-removal-decks（synth デッキに除去の「型」を色ごとに制御して差し込み、各局にその型を記録する・
+docs/rust_engine_plan.md §20.8／§20.7.11 の補記＝分類と色別の実測）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-removal-decks に push、PR は作りません。
+成果物は docs/reports/2026-09-10_removal_decks.RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。
+触るのは opcg_sim/loop/deck_synth.py・deck_dig.py（流儀の参照）・新規 opcg_sim/loop/deck_roles.py・decks.py・
+record_gen.py（deck_kinds 列の追加だけ）・opcg_sim/learned/n_rel_feat.py（分類の修正だけ）・tests/・
+tests/scripts/。ネット・探索・訓練は触らない。
+
+■ 1. 分類の確認と修正（n_rel_feat.py の _REMOVAL_OPS／_LOCK_OPS／_RED_OPS と profile）
+  - 「手札に戻す」（バウンス）が相手対象で 0 種と出た（2026-09-09 実測）。パーサの出力（MOVE_TO_HAND／
+    MOVE_CARD の target・zone）を確認し、バウンスが「山札へ」や「移動」に畳まれているなら形（form）を
+    分けて数え直す。形の語彙: KO／bounce／deck（山札上下）／trash（直接トラッシュ）／lock（レスト・凍結・
+    攻撃不可・ブロック不可）／reduce（パワー・コスト減少）。
+  - 分類器 `deck_roles.classify(master) -> set[str]` を 1 つに集約する（n_rel_feat の roles_of はそのまま・
+    こちらは「型」を返す）。型の鍵＝(form, source, cost_band)。source＝EVENT／ON_PLAY／ACTIVATE_MAIN／
+    ON_ATTACK／TRIGGER／COUNTER／OTHER、cost_band＝c0-2／c3-5／c6+。減少は form=reduce として同じ鍵。
+
+■ 2. 型 × 色のテンプレート表（deck_roles.TEMPLATES）
+  - 色ごとに「そのプールで組める型」だけを列挙する（§20.7.11 の実測表が出発点・コードで再計算して
+    表を生成する＝手書きで固定しない）。最低 3 種のカードがある型だけを「組める」とする。
+  - 組み合わせ型も持つ: {"reduce_c0-2" ＋ "KO_c3-5"}（黒・赤・紫）／{"lock" ＋ 攻撃役}（緑）／
+    {"deck" 送り}（青）／{"TRIGGER 除去"}（黄）／{"ON_ATTACK 除去"}（赤）／{"ACTIVATE_MAIN 除去"}（黒）。
+    2 色リーダーは 2 色のプールの和で判定する。
+
+■ 3. 差し込み（deck_roles.inject_roles(db, leader, cards, owner, seed) -> (cards, kinds)）
+  - deck_dig.inject_dig と同じ流儀（差し替え位置・同名 4 枚まで・シャッフル・決定論）。
+  - seed から差し込み率 r ∈ {0, 5, 10, 15, 20, 25}% を引く（0 も残す＝差し込み無しのデッキが 1/6）。
+    r>0 のとき、その色で組める型から 1〜2 型を選び、r×50 枚を目安に差し込む（組み合わせ型は両方の要素を
+    入れる）。差し込み後も deck_synth の死に札監査とカウンター比率の下限（MIN_COUNTER_CARDS）を通す
+    （割れたら差し込みを減らす）。
+  - 戻り値 kinds＝差し込んだ型の集合 ＋ 元のデッキが既に持っていた型（両方を JSON で記録）。
+  - decks.build_pair に decks="synth_roles" を足す（既定の "synth" は不変）。record_gen／arena の
+    --decks に synth_roles を通す。
+
+■ 4. 記録（record_gen.py）
+  - 各行に deck_kinds(D str)＝手番側デッキの型 JSON（{"injected":[…],"native":[…],"rate":r,"colors":[…]}）を
+    足す。既存の列は不変（dump v4＝v3 ＋ 追加列・dump_io.py は無ければ None を返す）。
+  - 対局メタ（seed・両席のリーダー・両席の kinds）を part ごとの sidecar JSON にも書く（層別の集計用）。
+
+■ 5. 計測（RESULT.json）
+  - synth_roles で 143 リーダー × seed 0〜1 を組み、型 × 色のカバレッジ表（各型が入ったデッキ数・差し込み
+    前後）と、死に札監査の落ち数、差し込みで割れた回数を出す。
+  - 短い自己対戦（record_gen --games 60 --sims 32・synth_roles）で void 0・deck_kinds 列が読めることを確認。
+  - 組めない型（その色に 3 種未満）の一覧を明示する＝評価の層から外す根拠。
+
+■ 受け入れ
+  - pytest tests/test_deck_roles.py（標準）: 分類が実カード数枚で期待どおり（KO／bounce／deck／lock／reduce）・
+    inject_roles が決定論で同名 4 枚以内・r=0 は元のデッキと同一・死に札監査を通る・deck_kinds が dump に
+    載り dump_io が v3 の波も読める。TEST_SPEC §2 に 1 行。make test green。
+
+■ 成果物
+  - コード＋テスト＋docs/reports/2026-09-10_removal_decks.RESULT.json:
+    {"job":"rs-removal-decks","status":"done|partial","coverage":{"<color>":{"<kind>":n,…}},
+     "unbuildable":{"<color>":[…]},"bounce_fix":"…（分類の修正内容）","audit_fail":n,
+     "selfplay":{"games":60,"void":0},"make_test":"N passed","notes":"…"}
+
+■ 前提
+  - 既定（decks="synth"）の挙動は変えない。人が「型の価値」を書かない（差し込みは対照を作るためだけ）。
+    判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+#### 20.8.2 WP `rs-aux-heads` の指示書（対称な補助教師・トークン単位・層別評価）
+
+```
+作業: WP rs-aux-heads（棋譜から「次の 1 ターンで何が起きたか」の対称な補助教師を作り、NRel の別ヘッドで
+学習し、評価帯を層別で読めるようにする・docs/rust_engine_plan.md §20.8／§20.7.11）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-aux-heads に push、PR は作りません。
+成果物は docs/reports/2026-09-10_aux_heads.RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。
+触るのは opcg_sim/loop/record_gen.py（aux 列の追加）・opcg_sim/loop/driver.py（observer に渡す情報の追加だけ）・
+opcg_sim/learned/n_rel.py・train/n_rel_train.py・train/n_rel_torch.py・train/dump_io.py・train/n_rel_band.py・
+tests/・tests/scripts/。Rust・探索・デッキ生成は触らない（WP rs-removal-decks と並行・deck_kinds 列の契約は
+§20.8 の冒頭）。
+
+■ 1. 補助教師（生成時に記録する・dump v4 の追加列・既存の列は不変）
+  各判断点の行 d（手番視点）に対して、**次の 1 ターン**を「この行の後、相手の手番が 1 回終わるまで」と
+  「その後の自分の手番が 1 回終わるまで」の 2 区間で数える。値はいずれも「起きたこと」＝符号なし:
+  aux(D, A) の列（A=10・全部 float・ライフは枚数・パワーは /10000）:
+    0 opp_turn_my_life_lost     … 次の相手ターンに自分が失ったライフ枚数
+    1 opp_turn_attacks          … 次の相手ターンの相手の攻撃回数
+    2 opp_turn_effects          … 次の相手ターンの相手の効果発動回数（効果イベント数・Rust の
+                                   effect_events と同じ数え方）
+    3 my_turn_opp_life_lost     … 次の自分のターンに相手が失ったライフ枚数
+    4 my_turn_attacks           … 次の自分のターンの自分の攻撃回数
+    5 my_turn_effects           … 次の自分のターンの自分の効果発動回数
+    6 next_my_board_power       … 次の自分のターン開始時の自分の場のパワー合計
+    7 next_opp_board_power      … 同・相手の場のパワー合計
+    8 next_my_board_n           … 同・自分の場の体数
+    9 next_opp_board_n          … 同・相手の場の体数
+  aux_tok(D, 6, 3)＝相手トークン 6 枠（相手 L ＋ 相手場 5・tokens の並びと同じ）ごとに、次の相手ターンに
+    [攻撃したか(0/1), 通したライフ枚数, 能力を発動したか(0/1)]。枠が空なら 0。
+  aux_mask(D) int8＝1 なら aux が有効（対局が次の区間の途中で終わった行は 0＝損失に入れない）。
+  実装: driver.run_game の observer に「ターンごとの台帳」（両席のライフ・場の uuid とパワー・攻撃の
+  attacker uuid と結果・効果イベント数・ターン境界）を積み、対局後に行へ backfill する。攻撃と効果の
+  数え方は Game の action_events／effect_events から取る（新しい計測が要れば driver に足す・Rust は触らない）。
+  ※ 補助教師は「起きたこと」であって「良し悪し」ではない。人が符号や重みで価値を入れない。
+
+■ 2. ネット（n_rel.py・n_rel_torch.py）
+  - 既存の value ヘッドと policy ヘッドは不変。共有表現 Z（value ヘッドの手前）から別の小ヘッド 2 本:
+    aux_head(Z) -> 10（回帰・Huber）、aux_tok_head(token_i) -> 3（相手 6 枠・[BCE, Huber, BCE]）。
+  - 損失 = 既存の loss + λ_aux × (aux + aux_tok)（λ_aux 既定 0.1・CLI --aux-weight・0 で完全に無効＝
+    今までと同じ学習）。aux_mask=0 の行は補助損失に入れない。aux 列が無い波（v3）は自動で無効。
+  - npz の保存: 補助ヘッドの重みは別鍵で保存し、**Rust の読み手（net/nrel.rs）は知らない鍵を無視する**
+    ことを確認する（serve は補助ヘッドを使わない・forward は不変）。
+
+■ 3. 評価帯（n_rel_band.py）
+  - 既存の指標（z の予測）に加えて、aux の各列の予測誤差（Huber／BCE・holdout 行）を出す。
+  - 層別: dump に deck_kinds 列があればそれで（型・色）、無ければリーダー色で層別し、各層の z 予測誤差と
+    aux 誤差を表にする。加えて「除去を打った直後の行」（sig の action_type が PLAY／ACTIVATE_MAIN で、
+    その手の card が除去系＝deck_roles.classify があれば使う・無ければ n_rel_feat.roles_of）の層を持つ。
+  - 出力は JSON（--out）と表（stdout）。
+
+■ 4. 計測（RESULT.json）
+  - 既存の波（v3・aux 無し）で --aux-weight 0.1 を指定しても学習が今までと同一であること（aux 列が
+    無いので無効）＝小さな学習で npz の値が一致することを確認。
+  - 短い生成（record_gen --games 200 --sims 32・4 workers・既定 synth）で aux 列を持つ波を 1 本作り、
+    r3 を warm-start に λ_aux ∈ {0, 0.1, 0.3} で短い訓練（--epochs 1）を回して、holdout の z 予測誤差と
+    aux 誤差を並べる（効き目の判定はコーディネータ・ここでは数字だけ）。
+  - 補助ヘッド付き npz を Rust が読めて serve の出力が不変であること（tests/test_rs_net_load 相当があれば
+    それで・無ければ RsGame.decide が同じ手を返すことを 10 局面で確認）。
+
+■ 受け入れ
+  - pytest tests/test_aux_targets.py（標準）: 小さな対局の台帳から aux／aux_tok／aux_mask が期待どおり
+    （手作りの 2 ターン分で値を固定）・区間の途中で終わった対局は mask 0。
+  - pytest tests/test_aux_heads.py（cpu_infra）: --aux-weight 0 と aux 列無しが既存の学習と同一・
+    λ>0 で補助損失が下がる・npz の追加鍵を Rust が無視する。TEST_SPEC §2 に 2 行。make test green。
+
+■ 成果物
+  - コード＋テスト＋docs/reports/2026-09-10_aux_heads.RESULT.json:
+    {"job":"rs-aux-heads","status":"done|partial","dump_v4_cols":["aux","aux_tok","aux_mask"],
+     "identity_check":"…（λ=0／列無しで既存と同一）","band":{"lambda_0":{"z_err":…,"aux_err":{…}},
+     "lambda_0.1":{…},"lambda_0.3":{…}},"rust_ignores_extra_keys":true,"make_test":"N passed","notes":"…"}
+
+■ 前提
+  - 既定（--aux-weight 0・aux 列無し）の学習と serve は 1 bit も変えない。判定はコーディネータ。
+    質問は RESULT.json の notes に。
+```
+
+#### 20.8.3 生成の探索設定（波 29）の下見（2026-09-09・コーディネータ実測・`scenario_out_h/`）
+
+ユーザの問い「worlds を増やすより sims を伸ばす案は」に答えるため、同じ CPU 時間帯の 2 条件を足して比べた
+（3 局面 × seed 8・R2 は全条件共通）:
+
+| 条件（CPU 時間の目安）| 神の裁き→攻撃 | 決着 | ガンマナイフ | KO（打った）|
+|---|---|---|---|---|
+| 160 × 1 世界（1 倍・E5）| 2/8 | 2/8 | 6/8 | 0/8（1）|
+| 160 × 4 世界（5 倍・C_w4_r2・アリーナ済）| 5/8 | 4/8 | 4/8 | 0/8（0）|
+| **640 × 1 世界（5 倍・H640w1）** | **6/8** | 2/8 | 3/8 | 2/8（6）|
+| 320 × 4 世界（10 倍・H320w4）| 4/8 | 2/8 | 3/8 | 0/8（1）|
+
+読み: **8 seed では 640×1 と 160×4 を分けられない**（差は 1〜2 本＝雑音の幅）。「worlds の較正が要る」という
+§20.7.1 の見立ては、鍵の上では sims 640 でも同等に達成される（R2 が効いている分が大きい）。320×4 は 10 倍の
+費用に見合う上乗せが無い。ガンマナイフは探索を増やすほど減る（公平な比較になるほど V が攻撃先行を選ぶ＝
+§20.7.10 の打ち切りと同じ現象）。
+判断: 波 29 の設定は **640×1×R2 と 160×4×R2 のどちらか**（CPU 同等）。鍵で分けられないので、`rs-search-arena`
+の seam で **640×1×R2 の主・副 384 局**を回して 160×4 の結果（主 0.531・副 0.544）と並べ、上のほうを採る。
+π の教師としての性格は違う（640×1＝深いが「引いた 1 世界」に集中／160×4＝浅いが隠れ情報に堅い）ので、
+勝率が並んだら **640×1**（ユーザの案・実装が単純・スレッド競合が無く生成の壁時計が読みやすい）。
+
+#### 20.8.1-1／20.8.2-1 回収と判定（2026-09-10・`rs-removal-decks`／`rs-aux-heads`）
+
+**回収**: 両方を本線へ合流（`record_gen.py`・TEST_SPEC・`test_n_record_v3.py` の衝突は両方の列を残して解いた。
+dump v4 ＝ v3 ＋ `aux`／`aux_tok`／`aux_mask` ＋ `deck_kinds`・既定 `--decks synth`・`--no-aux` で v3 の列だけ）。
+RESULT は `docs/reports/2026-09-10_{removal_decks,aux_heads}.RESULT.json`。作業セッションが自前で取った seed 帯は
+台帳（`docs/n_loop_ops.md` §6）へ事後登録。
+
+**`rs-removal-decks`（partial）の判定**
+- 成果物（分類器・型 × 色の表の再計算・差し込み・記録・sidecar）は全部入り。硬い除去 0 のデッキ 19.6% → 9.1%、
+  差し込みで死に札とカウンター枚数を悪化させた回数 0。**受け入れる**（partial の理由は下のエンジン欠陥）。
+- 発見 1（**符号化の分類漏れ**）: パーサはバウンスを `ActionType.BOUNCE` で出すが、`n_rel_feat._REMOVAL_OPS`（と
+  Rust `encode/tokens.rs::is_removal_op`）は `MOVE_TO_HAND` しか見ない＝相手の場を対象にする BOUNCE 23 件が
+  「除去でない」と符号化されていた。さらに対象ゾーンを見ないので、手札の山札送り 12・ライフのトラッシュ送り 13・
+  ライフ操作の MOVE_CARD 32 が「盤面の除去」に混ざっていた。**符号化を直すと入力分布が変わる**（golden replay の
+  a1 帯・既存ネット）ので、r4 の符号化 v14 として次の訓練サイクルで直す（§20.8.6 に含める・v13 は凍結）。
+  §20.7.11 の表の山札／トラッシュ列は過大だった（型ベースの正しい数は RESULT の coverage）。
+- 発見 2（**エンジンの欠陥**）: PRB02-006「ロロノア・ゾロ」の置換効果（【相手のターン中】このキャラが相手の
+  キャラの効果でレストになる場合、代わりに自分の他のキャラ 1 枚をレストにできる）で、SEARCH_AND_SELECT が
+  消費されず同じ pending が戻り続け max_steps で void（seed 930028・どの候補を選んでも切れない）。ミラーや素の
+  synth では踏まない経路で、レスト除去を差し込んで露出した＝交差監査（§5.0）の類。**WP `rs-replace-rest-fix`
+  （§20.8.4）で直す**。直るまで synth_roles の生成は void を 1 件でも出しうる（2% の足切りには遠いが、生成の
+  規約は void 0 を目指す）。
+- 差し込み率は (リーダー, seed) から引く／差し替えはカウンター持ち以外を先に使う／MOVE_CARD（場 → ライフ）は
+  deck に畳む: いずれも妥当。arena に `--decks synth_roles` を通しただけ（既定は synth のまま）も妥当。
+
+**`rs-aux-heads`（done）の判定**
+- 同一性（λ=0・aux 列無し＝既存とビット一致・npz に補助鍵が出ない・Rust が補助鍵を無視・serve 10 局面で同じ手）
+  を確認済み。台帳コスト +3.7%。**受け入れる**。
+- 200 局 1 エポックの数字（z 予測 0.6025／0.6031／0.5930・補助損失は下がる）は規模が小さく、λ の効き目は
+  波 29 の本番規模で測る（§20.8.6）。λ の既定は 0.1 を仮置き（変えるなら本番の評価帯で）。
+- 副産物 1: **torch backend の多スレッド学習は同一設定でも再現しない**（max|Δ| 2.2e-2）。以前からの性質。
+  同一性の判定は `--threads 1` か numpy backend で行う（訓練の指示書に明記する）。
+- 副産物 2: 効果イベントに発生源 uuid が無く、`aux_tok` の「能力を発動したか」は ACTIVATE_MAIN の uuid 一致か
+  **card_name 一致**（同名が並ぶと両枠が立つ）。Rust `effects/resolver.rs::push_effect_events` に発生源 uuid を
+  足す＝**`rs-replace-rest-fix` に同梱**（同じエンジン WP・§20.8.4）。
+- `dump_io` の pack 版 1 → 2（既存の pack は作り直し・波 1 本数分）: 妥当。
+
+#### 20.8.4 WP `rs-replace-rest-fix` の指示書（エンジン: 置換効果のループ ＋ 効果イベントの発生源）
+
+```
+作業: WP rs-replace-rest-fix（エンジンの欠陥 1 件の修正 ＋ 効果イベントに発生源 uuid を足す・
+docs/rust_engine_plan.md §20.8.1-1／§20.8.2-1）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-replace-rest-fix に push、PR は作りません。
+成果物は docs/reports/2026-09-10_replace_rest_fix.RESULT.json を添えて同ブランチへ。最初に `make rust-develop`
+（opcg_effects.json が無ければ export_effects_json で作る）。触るのは rust/opcg_engine/src/effects/・
+rules/・opcg_sim/loop/record_gen.py（発生源 uuid を aux_tok に使う部分だけ）・tests/。探索・ネット・符号化は
+触らない。
+
+■ 1. 置換効果のループ（PRB02-006「ロロノア・ゾロ」）
+  再現: OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen --games 1 --seed-base 930028 --workers 1 --sims 32
+        --decks synth_roles --out /tmp/void  （p2 の PRB02-006 の置換で SEARCH_AND_SELECT が消費されず
+        RESOLVE_EFFECT_SELECTION を 300 回以上繰り返して max_steps=400 に当たる）
+  - 原因を突き止めて直す（置換効果 REPLACE_EFFECT の「代わりに自分の他のキャラ 1 枚をレストにできる」の
+    解決で、選択の受理後に元のレストが再び置換の判定に入る／pending が pop されない、のどちらかが疑わしい。
+    effects/resolver.rs の _replacement_suspended まわりと interact.rs の選択の消費を見る）。
+  - 「選ばない」（0 枚）を選んだときは元のレストがそのまま起きること・「選ぶ」ときは元のキャラがレストに
+    ならず選んだキャラがレストになること・同じ効果が 1 回のレストに対して 1 回しか発火しないこと。
+  - 同種の置換（「〜になる場合、代わりに〜」で対象選択を伴うもの）を効果 JSON から列挙し、同じ経路を踏む
+    カードを RESULT に列挙する（直したのが 1 枚の特例でないことの確認）。
+
+■ 2. 効果イベントの発生源（aux_tok の「能力を発動したか」のため）
+  - effects/resolver.rs::push_effect_events が出す効果イベントに、発生源のカード uuid（能力の持ち主）と
+    トリガー種別を足す。Python 側 record_gen の台帳が card_name 一致で立てている箇所を uuid 一致に置き換える
+    （同名が並んでも正しい枠だけ立つ）。既存のイベントの形は変えない（欄を足すだけ・action_events の
+    読み手を壊さない）。
+
+■ 受け入れ
+  - cargo test: 置換効果の単体テスト（PRB02-006 の盤面を実カードで組み、相手の効果でレストされる →
+    「選ぶ／選ばない」の両方で 1 手ずつ進んで終局しない・pending が消費される）／効果イベントに
+    source_uuid が載る。
+  - make test green。**make audit-cross void 0**（エンジン変更）。golden 2 本は挙動が変わらないなら
+    不変のはず＝変わったら差分をレビューして理由を RESULT に書く（作り直しはコーディネータ判定）。
+  - 上の再現コマンドが void にならない。synth_roles で record_gen --games 120（seed 930000〜・940000〜）
+    を回して void 0。
+
+■ 成果物
+  - コード＋テスト＋docs/reports/2026-09-10_replace_rest_fix.RESULT.json:
+    {"job":"rs-replace-rest-fix","status":"done|partial","root_cause":"…","same_path_cards":[…],
+     "event_source_uuid":true,"repro_void":false,"selfplay_roles":{"games":120,"void":0},
+     "golden":"unchanged|regenerated（理由）","make_test":"N passed","audit_cross":{"pairs":120,"void":0},
+     "notes":"…"}
+
+■ 前提
+  - 既定の挙動（この欠陥以外）は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+#### 20.8.5 WP `rs-eps-explore` の指示書（両方向の ε 探索・生成の対照づくり）
+
+```
+作業: WP rs-eps-explore（生成で「除去を打つ／保留する」の対照を作る両方向の ε 探索・
+docs/rust_engine_plan.md §20.8／§20.7.11 の補記）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-eps-explore に push、PR は作りません。
+成果物は docs/reports/2026-09-10_eps_explore.RESULT.json を添えて同ブランチへ。最初に `make rust-develop`。
+触るのは opcg_sim/loop/record_gen.py・driver.py（手の差し替えの入口だけ）・engine.py（SeatSpec の欄）・
+tests/。Rust・ネット・探索の中身は触らない。
+
+■ 仕様（既定 0＝1 bit も変わらない）
+  - record_gen に --eps-play P と --eps-hold H（既定 0.0）。main の決定で:
+    (a) 打つ側: 木が選んだ手が除去系でなく、候補に除去系の手（deck_roles.classify で form が KO/bounce/deck/
+        trash/lock/reduce のカードの PLAY／ACTIVATE_MAIN・箱の中身も含む）があれば、確率 P でその中の 1 つ
+        （候補の N が最大のもの）に差し替える。
+    (b) 保留側: 木が選んだ手が除去系なら、確率 H で「除去系でない候補のうち N 最大の手」に差し替える
+        （TURN_END も可）。
+    差し替えは decide の後（木・π は変えない）。**π は木の訪問分布のまま記録し**、差し替えた行には
+    forced(D int8)＝1（打つ側）／2（保留側）／0 を書く（dump v4 の追加列・契約は §20.8 冒頭と同じ・
+    dump_io は無い列を None）。差し替えた手は実対局に原始手で出る（commit は木の選んだ手のものを捨て、
+    差し替えた手の decide をやり直さない＝差し替え後の対話は既定解決）。
+  - 乱数は seed から決定論（同じ seed で同じ差し替え）。
+  - 学習側（n_rel_train）は forced 列を**読まない**（教師は変えない・後で層別に使うだけ）。
+
+■ 受け入れ
+  - pytest tests/test_eps_explore.py（cpu_infra）: 既定 0 は dump が今までと同一（forced 列は全 0）／
+    P=1 で除去が合法な main 決定が全部差し替わり forced=1／H=1 で除去を選んだ決定が差し替わり forced=2／
+    π は差し替え前後で同じ／同じ seed で同じ結果。TEST_SPEC §2 に 1 行。make test green。
+  - 計測: record_gen --games 60 --sims 32 --decks synth_roles --eps-play 0.03 --eps-hold 0.03 で void 0・
+    forced の内訳（1 と 2 の行数・除去が合法だった main 行数）を RESULT に。
+
+■ 成果物
+  - コード＋テスト＋docs/reports/2026-09-10_eps_explore.RESULT.json:
+    {"job":"rs-eps-explore","status":"done|partial","forced_counts":{"play":n,"hold":n,"removal_legal_rows":n},
+     "selfplay":{"games":60,"void":n},"make_test":"N passed","notes":"…"}
+
+■ 前提
+  - 既定（ε=0）の挙動と教師は変えない。判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+#### 20.8.4-1 回収と判定（2026-09-10・`rs-replace-rest-fix`＋`rs-eps-explore`・1 セッション）
+
+**回収**: 本線へ ff で合流（RESULT `docs/reports/2026-09-10_replace_rest_fix.RESULT.json`）。エンジン変更なので
+`make rust-develop` → `make test` → `make audit-cross` を回した（結果は本節末尾）。
+
+**A（エンジン）の判定: 受け入れる**
+- 原因は指示書の推測（pending が消費されない）ではなく、**パーサが PRB02-006 の「代わりにレスト」を REPLACE_EFFECT
+  にせず素の誘発能力として出し、常在効果の再計算が毎回それを実行して対象選択で中断し続けていた**こと。直し方は
+  「再計算から外し、レストの現場で置換として扱う」（`rules::active_rest_replacement`・0 枚なら元のレスト）。
+  同じ経路を踏むのは 1 枚だが形で書いてある。パーサは触っていない（将来パーサが REPLACE_EFFECT で出せば
+  `find_replacement` 1 本に寄せられる）。
+- 効果イベントに `source_uuid`／`trigger` を追加（aux_tok の「発動したか」が uuid 一致に）。**golden 2 本を作り直した**
+  ——差分が追加した 2 欄だけであること（監査 3,386 件・再生 200 局で盤面 0 件・合法手 0 件不変・欄を落とせば
+  旧 golden と完全一致）を作業セッションが機械的に確認済み。**作り直しを認める**（挙動の変化ではなく記録の欄の追加）。
+- 作業セッションの問い: (4) 再計算が反応型の能力（OP04-024 シュガー・OP04-047 氷鬼・ST13-003）を実行している
+  3 件と `resolve_targets` の in_passive_recalc ガードの一般化 → **別 WP に積む**（挙動＝golden が動くので、
+  波 29 の生成と切り離す。`rs-passive-recalc-guard`・後日）。(5) レスト置換の候補が 1 枚なら自動確定＝「使わない」を
+  選べない → 既存の対象解決の規則どおりで**据え置き**（本文は任意だが、1 枚で訊く例外は他の任意効果とも
+  揃えて直す話）。
+
+**B（両方向 ε）の判定: 受け入れる**
+- decide の後で手だけ差し替え、π・sig・pol_chosen は不変、`forced` 列で印。乱数は (seed, ターン, 席, 手数) の
+  純関数で探索の乱数と別 salt。ε 3% で play 36／hold 8（除去が合法な main 行 1,516／3,663＝41%）。
+  `forced` は pack に入れない（`load_row_col` で読む）＝教師にしない契約どおり。
+- コーディネータが足した配線: `record_gen` に `--worlds／--select-rule／--q-min-frac／--root-prior-temp`
+  （`SeatSpec` の kw に流す・省略＝serve 既定＝歴代の波と同じ・`meta_n_record.json` に `search` として記録）。
+  波 29 の生成に要る。
+
+#### 20.8.6 波 29 の生成（era7・生成役 r3・§20.8 の設定で・ユーザ決定 2026-09-09「教師の概念として worlds」）
+
+**設定**（生成・アリーナ・serve で物差しを 1 本に保つ＝アリーナ済みの `C_w4_r2`）:
+`--sims 160 --worlds 4 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2 --dirichlet-eps 0.25
+--temp-turns 4 --decks synth_roles --eps-play 0.03 --eps-hold 0.03`（aux は既定 on・dump v4・生成役 r3＝既定）。
+**16 シャード × 480 局＝7,680 局**（§7.3 の細分化・seed 帯 2291000〜2298000・台帳 §6）。1 局の CPU は sims 128 の
+約 5 倍なので、`--workers 2`（候補席が 4 スレッド）で 480 局は 3〜4 時間の見込み＝**最初のシャードで 30 局の
+壁時計を実測してから残りを回す**（見込みを外れたら局数をコーディネータへ）。
+
+```
+作業: 生成 波 29 シャード k（k=1..16・docs/rust_engine_plan.md §20.8.6・docs/n_loop_ops.md §6／§7.3）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（コードは変更しない）。最初に
+pip install -r opcg_sim/requirements.txt pytest maturin && make rust-develop（opcg_effects.json が無ければ
+python -m opcg_sim.tools.export_effects_json）。出力ブランチ claude/n29-wKK（KK=01..16・2 桁）。PR は作らない。
+
+■ 実行（seed_base は台帳どおり: 2290000 + ceil(k/2)*1000 + (k が偶数なら 500)）
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen \
+    --games 480 --seed-base <seed_base> --workers 2 \
+    --sims 160 --worlds 4 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2 \
+    --dirichlet-eps 0.25 --temp-turns 4 \
+    --decks synth_roles --eps-play 0.03 --eps-hold 0.03 \
+    --out n_records/n29_wKK
+  最初に --games 30 で回して 1 局の壁時計を測り、480 局が 6 時間を超える見込みならその旨を RESULT に書いて
+  コーディネータの指示を待つ（勝手に sims や worlds を下げない）。
+
+■ 成果物（出力ブランチ直下）
+  - n_records/n29_wKK/（npz シャード・meta_n_record.json・meta_games.json）
+  - RESULT.json: {"job":"gen-n29-wKK","status":"done|partial","games":480,"rows":N,"main_rows":N,
+     "dropped":n,"void":n,"forced":{"play":n,"hold":n},"removal_legal_rows":n,
+     "sec_per_game":x,"wall_hours":x,"search":{…meta の search…},"decks":"synth_roles",
+     "dump_version":4,"net":"nrel_r3.npz","commit":"<HEAD>","notes":"…"}
+
+■ 前提
+  - 打ち切りはしない（partial なら残り局数を RESULT に）。void（決着せず）が出たら seed と症状を notes に。
+  - コードは変更しない。質問は RESULT.json の notes に。
+```
+
+**r4 の訓練（波 29 が揃ってから・§7.1 の形で別途出す）**: warm-start r3・`--ablate rel`・π＝波 29（era7 のみ）・
+z＝新しい波から載るだけ（波 29 → 28 → 27 …・OOM なら落とす）・**`--aux-weight 0.1`**・epochs 2・lr 5e-4・
+**同一性の確認は `--threads 1`**。符号化は v13 のまま（§20.8.1-1 の分類漏れの修正＝v14 は Rust の
+`encode/tokens.rs` と同時に直す別 WP・r4 の後）。判定: 評価帯（波 29 の holdout・型 × 色 × リーダーで層別）→
+アリーナ（主・副・規約どおり）。
+
+#### 20.8.6-1 波 29 の回収（2026-09-10）
+
+16 セッション（sonnet・コーディネータが起こした）のうち **14 本が完走**（w01〜w03・w05〜w12・w14〜w16）。w04 は
+ビルド待ちで 1 時間寝ていて再開後も遅く、w13 も遅かったので**ユーザ判断で打ち切り**（k=4・k=13 の帯は未使用＝
+必要なら再走）。合計 **6,720 局・974,297 行（main 442,217）**・dropped 1・1 局 12.8〜14.8 秒（480 局 ≈ 1.9 h・
+見込みどおり）。forced＝play 4,505／hold 783（除去が合法な main 行 178,924）。
+**void 1 件**（w12・seed 2296720・ST29-001 vs OP04-040・turn 8 で max_steps 400）: 作業セッションは PRB02-006 と
+同種と推測したが、本線には `rs-replace-rest-fix` が合流済みなので**別の欠陥**。再現手順は w12 の RESULT.json。
+→ `rs-void-2296720`（後日の WP・§20.8.4 の「反応型能力の再計算」3 件と一緒に見る）。
+教材としては 1/6,720 なので r4 の訓練はこのまま進める。
+
+#### 20.8.7 r4 の訓練（era7 第 1 回・§7.1 の形・1 セッション）
+
+π＝波 29（era7 のみ・14 シャード）・z＝波 29 ＋ 28 ＋ 27（新しい順・OOM なら古い方＝27 から落とす）・
+warm-start r3・`--ablate rel`・**`--aux-weight 0.1`**・epochs 2・lr 5e-4・backend torch（既定スレッド＝速度優先。
+同一性の判定は要らない）。出力 `claude/train-r4` の `n1_results/nrel_r4.npz`。評価帯: 波 29 の holdout
+（`--holdout-mod 7`）で r3 と r4 を `n_rel_band` にかけ、層別 JSON を添える。
+
+```
+作業: 訓練 r4（docs/rust_engine_plan.md §20.8.7・docs/n_loop_ops.md §7.1）。コードは変更しない。PR は作らない。
+メモリは 12GB 以上必要。
+
+bash で順に:
+
+pip install -r opcg_sim/requirements.txt maturin torch   （torch は CPU 版でよい）
+make rust-develop
+# 教材（波 29 は 14 シャード・n_records/n29_wKK／波 27・28 は 8 シャード・n27_records／n28_records）
+for w in 01 02 03 05 06 07 08 09 10 11 12 14 15 16; do
+  git fetch -q origin claude/n29-w$w:tmpw && mkdir -p ~/n29_wave/w$w \
+  && git archive tmpw n_records/n29_w$w | tar -x -C ~/n29_wave/w$w && git branch -qD tmpw; done
+for N in 28 27; do for w in 01 02 03 04 05 06 07 08; do
+  git fetch -q origin claude/n${N}-w$w:tmpw && mkdir -p ~/n${N}_wave/w$w \
+  && git archive tmpw n${N}_records | tar -x -C ~/n${N}_wave/w$w && git branch -qD tmpw; done; done
+
+OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train \
+  --in "$HOME/n29_wave/w*/n_records/n29_w*" \
+  --z-in "$HOME/n28_wave/w*/n28_records" "$HOME/n27_wave/w*/n27_records" \
+  --ablate rel --aux-weight 0.1 --epochs 2 --lr 5e-4 \
+  --warm-start opcg_sim/data/learned/nrel_r3.npz --out ~/nrel_r4.npz 2>&1 | tee ~/train_r4.log
+（OOM で落ちたら --z-in から古い波〔27〕を外して再実行し、RESULT.json の notes に書く。）
+
+# 評価帯（波 29 の holdout・r3 と r4・層別）
+OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band \
+  --in "$HOME/n29_wave/w*/n_records/n29_w*" --nrel opcg_sim/data/learned/nrel_r3.npz ~/nrel_r4.npz \
+  --holdout-mod 7 --out ~/band_r4.json 2>&1 | tee ~/band_r4.log
+
+git checkout -B claude/train-r4
+mkdir -p n1_results && cp ~/nrel_r4.npz n1_results/ && cp ~/train_r4.log ~/band_r4.json ~/band_r4.log .
+（RESULT.json を docs/n_loop_ops.md §5 の形式で書く: inputs〔起点 r3・π 波 29〔14 シャード〕・z 波 29+28+27〕・
+ epochs・best_ep・val の v_mse／v_sign／pi_top1・aux の各列の誤差・train_sec・band の要約〔r3 vs r4 の
+ z 予測と層別で差が大きい層〕・notes）
+git add -f n1_results/nrel_r4.npz train_r4.log band_r4.json band_r4.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "train r4（era7・aux 0.1）"
+git push -u origin claude/train-r4
+
+補足: 所要は 2〜4 時間（波 29 は 97 万行・aux 列あり）。長い実行は nohup でバックグラウンドにし、進捗を
+定期的に確認する。質問は RESULT.json の notes に。
+```
+
+#### 20.8.7-1 r4 の回収と中間判定（2026-09-10・アリーナ前）
+
+| ネット（教材）| 訓練 val v_mse（ep0／ep1）| 波 29 holdout v_mse（band）| v_sign | 除去直後の行 |
+|---|---|---|---|---|
+| r3（波 25〜28・波 29 は未見）| — | **0.5327** | 0.804 | 0.624 |
+| r4z（π・z＝波 29・aux 0.1）| 0.544／0.569 | 0.5419 | 0.803 | 0.640 |
+| r4（π＝波 29・z＝29+28+27・aux 0.1）| 0.535／0.541 | 0.5474 | 0.803 | — |
+| ばらつき幅（r4z 同一設定 ×3・`train-r4z-repro`）| 0.003 | **0.0008** | 0.0005 | — |
+
+- **再現性**: 同一設定 3 回（多スレッド ×2・1 スレッド ×1）の band v_mse の幅は 0.0008＝r4z／r4 と r3 の差
+  （0.009／0.015）はその 10〜18 倍＝**本物の退行**。以後の判定は「差 ≥ ばらつき幅の 2 倍（0.002）」を目安にする。
+- **r3 を波 29 で再訓練すると、その波の holdout で r3 より悪くなる**。z 窓を 3 波にしても（r4）改善せず、むしろ
+  r4z より悪い。2 エポック目は過学習（全条件で ep0 が最良）。
+- 補助教師そのものは学べている（失うライフ 0.22・攻撃回数 0.23）が、z の予測には乗っていない。
+- 疑い: (a) 補助損失 λ=0.1 が V の容量を食う、(b) lr 5e-4 の warm-start が r3 の V を崩す、(c) 波 29 の z が
+  旧波より予測しにくい（ε の強制手・平坦化した根の分布）——(c) は r3 も同じ holdout で測っているので差の
+  説明にはならない。→ **切り分け `train-r4-ablate`**（λ=0／lr 2e-4／両方・1 エポック・同じ評価帯）を回す。
+- r4 の訓練はコンテナの再起動（20〜25 分おき）で `--epochs 2` を通せず、`--epochs 1` × 2 の warm-start 連鎖で
+  代替（データ 2 周は同じ・シャッフル順は連続実行と異なる）。**訓練セッションの再起動問題は既知**
+  （`docs/n_loop_ops.md` §7.4）＝1 エポック 690 秒なら 2 回に割るのは妥当。
+- アリーナ（r4 vs r3）は切り分けの結果を見てから。評価帯で退行しているネットにアリーナ 85 分を使う前に、
+  原因の切り分け（15 分）を先にする。
+
+#### 20.8.7-2 切り分けの結果（2026-09-10・`train-r4-ablate`・π・z＝波 29・1 エポック・波 29 holdout）
+
+| 条件 | 全体 v_mse | 除去直後 | 終盤（turn 9+）| v_sign |
+|---|---|---|---|---|
+| r3 | 0.5327 | 0.6244 | 0.4074 | 0.804 |
+| L0: aux 0・lr 5e-4 | 0.5415 | 0.6378 | 0.4202 | 0.804 |
+| LR2: aux 0.1・**lr 2e-4** | **0.5249** | **0.6197** | **0.4040** | **0.809** |
+| L0LR2: aux 0・lr 2e-4 | 0.5242 | 0.6202 | 0.4031 | 0.809 |
+
+- **退行の原因は lr 5e-4（warm-start の刻み幅）**。aux を外しても lr 5e-4 なら同じだけ退行し（L0）、lr 2e-4 なら
+  aux の有無に関わらず r3 を全層で上回る（差 0.008＝ばらつき幅の 10 倍）。
+- **補助教師の効き目は z 予測には見えない**（LR2 と L0LR2 の差 0.0007＝ばらつき幅の中）。害も無い。効くとすれば
+  実プレイ（アリーナ）と層別の挙動で、そこはまだ測っていない＝**λ=0.1 は残す**（密な信号を持たせたまま次の
+  世代へ。z 予測で差が出ないのは、V の目的関数が z のままだから当然でもある）。
+- r2→r3 で lr 5e-4 が効いたのは教材が 2 波 × 960 局 × 8 で今回の 1.6 倍・生成器も違ったため。以後の era7 の訓練は
+  **lr 2e-4 を既定**にする（`docs/n_loop_ops.md` §7.1 の {lr} の既定を書き換える）。
+- 次: `train-r4-lr2`（lr 2e-4・aux 0.1・2 エポック・A＝z 波 29／B＝z 29+28+27）で z 窓を決め、良い方を r4 として
+  アリーナ（r4 vs r3・主・副・両席既定の探索設定・帯 461000〜468000／471000〜478000）。
+
+#### 20.8.8 アリーナ r4 vs r3（指示書・2 セッション＝主／副・r4 候補が決まり次第 npz 名を埋める）
+
+判定は CLAUDE.md の規約（主 wr≥0.55 かつ CI 下限>0.50／副 退行なし CI 下限≥0.45・void ≤2%）。**両席とも探索設定は
+serve 既定**（worlds 1・visits・t=1）＝ネットの差だけを測る（生成は worlds 4 ＋ R2 で回したが、serve 既定は
+§20.5.3-1 で変えていない）。seed 帯: 主 461000〜468000／副 471000〜478000（台帳 §6）。
+
+```
+作業: アリーナ r4 vs r3（{条件}＝主〔random×synth〕または副〔固定ミラー〕・docs/rust_engine_plan.md §20.8.8）。
+コードは変更しない。PR は作らない。本線 claude/cpu-spec-improvements-yw91jd が checkout されている前提。
+
+bash で順に:
+pip install -r opcg_sim/requirements.txt maturin && make rust-develop
+git fetch -q origin claude/train-r4-lr2:tmpr && git show tmpr:n1_results/{r4_npz} > ~/nrel_r4.npz && git branch -qD tmpr
+mkdir -p ~/arena_r4
+for k in 0 1 2 3 4 5 6 7; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard \
+    --candidate ~/nrel_r4.npz --baseline "" \
+    --pairs 24 --max-pairs 24 --seed-base $(( {seed_base0} + k*1000 )) --workers 4 \
+    {条件のフラグ: 主＝--leaders random --decks synth／副＝--leaders fixed --decks singleton} \
+    --out ~/arena_r4/{条件名}_w0$k.jsonl 2>&1 | tail -3
+done
+python -m opcg_sim.loop.arena_merge --in "$HOME/arena_r4/{条件名}_w0*.jsonl" --label "r4 vs r3 {条件名}" | tee ~/arena_r4/merge_{条件名}.log
+
+git checkout -B claude/arena-r4-{条件名}
+mkdir -p n1_results/arena_r4 && cp ~/arena_r4/{条件名}_w0*.jsonl ~/arena_r4/merge_{条件名}.log n1_results/arena_r4/
+（RESULT.json: {"job":"arena-r4-{条件名}","status":"done","candidate":"{r4_npz}","baseline":"nrel_r3（既定）",
+ "games":N,"pairs":N,"wr":x,"ci95":[..],"elo":x,"void":n,"dup_seeds":0,"per_shard_wr":[..],"notes":"…"}
+ ＝ arena_merge の出力から転記）
+git add -f n1_results/arena_r4/ RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "arena r4 vs r3 {条件名}"
+git push -u origin claude/arena-r4-{条件名}
+
+補足: 1 シャード 5〜7 分・8 シャードで 1 時間弱。各シャードは nohup でなく順に回してよい（1 本 10 分以内）が、
+セッションが寝ないよう各シャードの完了ごとにログを確認する。void（決着せず）が出たら seed を notes に。
+```
+
+#### 20.8.7-3 r4 の確定（2026-09-10・`train-r4-lr2`・lr 2e-4・aux 0.1・2 エポック・best＝ep0）
+
+| ネット | z 窓 | 全体 v_mse | v_sign | 除去直後 | 終盤 | 序盤 |
+|---|---|---|---|---|---|---|
+| r3 | — | 0.5327 | 0.804 | 0.624 | 0.407 | 0.772 |
+| A | 波 29 | 0.5244 | 0.809 | 0.620 | 0.403 | 0.756 |
+| **B＝r4** | **29+28+27** | **0.5198** | **0.811** | 0.622 | **0.396** | 0.760 |
+
+- **B を r4 とする**（`claude/train-r4-lr2` の `n1_results/nrel_r4b.npz`）。r3 との差 0.013＝ばらつき幅の 16 倍。
+  z 窓を広げた B が A を 0.0046 上回る（幅の 6 倍）＝**era7 でも z は「新しい波から載るだけ」の規約のまま**で良い
+  （lr が正しければ旧波の z は害にならず、終盤の予測を助ける）。
+- 層別: n>1 万の主要バケットに退行なし。小さなバケット（lock:COUNTER 等・n<1,000）で悪化が見えるが雑音の範囲。
+  改善が大きいのは bounce／deck（山札送り）／lock の差し込みバケット＝波 29 で初めて教材に入った型。
+- 運用の注記: A と B を同時に回すとスレッド競合で 6 倍遅くなった（4 コアに 4 スレッド × 2）。訓練は順次実行。
+- 次: アリーナ（§20.8.8・主 `claude/arena-r4-random`・副 `claude/arena-r4-mirror`・コーディネータが 2 セッションを起こした）。
+
+#### 20.8.8-1 アリーナ r4 vs r3 の判定（2026-09-10・規約上は非昇格・`docs/reports/r4_judgment_20260910.md`）
+
+主 0.4555 [0.402, 0.509]（−31 Elo・未達）／副 0.5469 [0.498, 0.596]（退行なし）。評価帯の改善（16 倍の幅）が主条件の
+勝率に乗らない。疑いの本命は**教師（worlds 4 ＋ t=2 の平坦な π）と物差し（serve 既定＝worlds 1・visits）の不一致**。
+次の測定: 配備案「r4 ＋ worlds 4 ＋ R2」vs 既定「r3 ＋ 既定設定」（主 481000〜488000／副 491000〜498000・
+`--cand-worlds 4 --cand-select-rule q_min_n --cand-q-min-frac 0.125 --cand-root-prior-temp 2`）。判定はユーザ。
+
+#### 20.8.8-2 教師とアリーナの妥当性（ユーザの問い 2026-09-10「リーダーがランダムなので」）
+
+**副条件の追加結果**: 配備案「r4 ＋ worlds 4 ＋ R2」vs 既定「r3 ＋ 既定設定」＝固定ミラー 0.4609 [0.417, 0.505]・
+−27 Elo・**退行シグナル**（r3 ＋ w4R2 は +31・r4 既定は +33 だったのに、組むと下がる）＝「教師どおりの物差しで
+打たせれば伸びる」の疑いは少なくともミラーでは外れ。主条件は待ち。
+
+**分布の不一致（本命の疑い・整理）**
+| | リーダー | デッキ | 探索 | ε |
+|---|---|---|---|---|
+| r3 の教師（波 25〜28）| random | synth | S1（visits・1 世界）| なし |
+| r4 の教師（波 29）| random | **synth_roles**（差し込み 0〜25%）| **w4 ＋ R2（平坦化）** | 3% |
+| アリーナ主 | random | synth | S1 | なし |
+| アリーナ副 | 固定 1 組 | singleton（イベント無し）| S1 | なし |
+| 評価帯（波 29 holdout）| random | synth_roles | w4 ＋ R2 | 3% |
+
+- 評価帯は **r4 の教師と同じ分布**（in-distribution）なので r4 が勝つのは当然で、アリーナ主は r3 の教師と同じ
+  分布（out-of-distribution for r4）。**評価帯の改善がアリーナに乗らない最も単純な説明は分布の差**であり、探索設定の
+  不一致だけではない（副の結果もこれと整合）。
+- リーダー random は教師・アリーナとも同じ生成器なので不一致ではないが、143 リーダー × 191 ペアでは対面ごとに
+  1 回しか出ず、**対面の運がシャード間のばらつき（0.375〜0.521）を作る**。CI はそれを含んで ±0.05。教師側は 1 リーダー
+  あたり 47 局程度（波 29）＝リーダー条件付きの学習には薄い。r3 は 4 波 30,720 局で条件付きが厚い。
+- 副条件（固定ミラー・singleton＝イベント無し）は「除去の型」を学んだ r4 に不利な物差し（除去イベントが出ない）。
+  退行なしの確認にはよいが、除去の効き目は測れない。
+- ε 3% の強制手は z に「たまに悪手を打つ世界」を混ぜる。V はその分布の価値を学ぶ＝強制なしで打つアリーナとの
+  小さな不一致（3% なので主因ではない）。
+
+**測るもの（`arena-r4-roles`・コーディネータが起こした）**
+(a) 波 28 holdout（旧分布）の評価帯 r3 vs r4＝忘却の有無。r4 が悪ければ「新分布に寄って旧分布を忘れた」。
+(b) アリーナ r4 vs r3・random × **synth_roles**（教師と同じデッキ分布・両席既定の探索）＝in-distribution の実プレイ。
+   これで勝てなければ「評価帯の改善は z 予測の話で、打ち方には乗っていない」。
+
+**アリーナの物差しについて（判定はユーザ）**: 実デッキには除去が入るので、synth（除去 0 枚が 27%）より
+synth_roles のほうが「汎化の条件」として実態に近い。ただし**候補が負けた後に物差しを変えるのは禁じ手**なので、
+今回の r4 は宣言どおり synth の主条件で判定し、次の世代から主条件を synth_roles に切り替えるかを別途決める
+（切り替えるなら r3 の基準値も synth_roles で取り直す）。
+
+#### 20.8.8-3 妥当性検討の結果と次（2026-09-10・`docs/reports/r4_validity_20260910.md`）
+
+(a) 波 28 holdout で r4 は全バケットで r3 より悪い（0.5515 vs 0.5348＝幅の 20 倍）＝**忘却**。(b) synth_roles の
+アリーナは 0.5182 [0.465, 0.571]・+13 Elo＝分布内でも優位なし。→ **r4 は不採用**（既に規約で非昇格）。配備案
+（r4 ＋ w4R2）の主条件は走らせたまま記録用（副は退行シグナル済み）。
+
+**学んだこと**
+- 評価帯は教師と同じ分布で測ると in-distribution の改善を見せるだけ。**評価帯は「旧分布（前世代の波）」と
+  「新分布」の両方で測り、両方で改善して初めて候補**とする（`n_rel_band` を 2 波で回す）。
+- 1 波の warm-start 再訓練は分布を寄せるだけで強さを動かさない。era7 は **2 波以上**を揃えてから訓練する
+  （r2 → r3 と同じ）。
+- 生成の設定を変えたら（デッキ分布・探索・ε）、その世代の物差し（アリーナ主条件）も同時に宣言し直す。
+  候補が負けた後に変えない。
+
+**提案（ユーザ判定）**
+1. アリーナの主条件を次世代から **random × synth_roles** に（副次: random × synth＝旧分布への汎化、副: 固定ミラー
+   ＝退行なし）。
+2. 波 30 を波 29 と同じ設定で生成（16 セッション × 480 局）、r5 ＝ warm-start r3・π＝29+30・z＝新しい順・lr 2e-4・
+   aux 0.1、評価帯は波 28（旧）と波 30 holdout（新）の両方 → アリーナ 3 条件。
+3. 並行して §20.6（π を Q で補正）の設計を WP にする。平坦化した π（t=2）を教師にする方式は、今回の結果では
+   強さに乗らなかった＝Q 補正のほうが筋が良い可能性。
+
+**ユーザ決定（2026-09-10）**: アリーナの主条件は次世代（r5〜）から **random × synth_roles**。CLAUDE.md の規約に追記済み。
+
+#### 20.6.1 π を Q で補正する（設計・ユーザ決定 2026-09-10「B を先に」）
+
+**今の教師**: π＝根の訪問分布（等価手マージ後の `pol_n` を正規化）。訪問されなかった手は 0＝門が閉じたまま。
+根の平坦化（t=2）で門を無理に開けた波 29 は、強さに乗らなかった（§20.8.8-3）。
+
+**改良方策（Gumbel MuZero の completed-Q の考え方）**: 根の候補 a について
+- q̂(a) ＝ Q(a)（訪問 N(a) ≥ n_min）／v_mix（未訪問・v_mix＝訪問で重み付けた根の Q の平均＝根の価値の推定）
+- logit'(a) ＝ log P_net(a) ＋ σ(q̂(a))・σ(q) ＝ (c_visit ＋ max_a N(a)) × c_scale × q01(q)・q01＝(q+1)/2
+- π'(a) ＝ softmax(logit')＝**「読めた手はその Q、読めていない手は根の価値」で P を持ち上げ・押し下げた分布**。
+  訪問 0 の手も v_mix 相当の重みを持つ（門が完全には閉じない）。Q が高くて訪問が少ない手（A2 の門の向こう）は
+  P より重くなる。
+- P_net は**生成役ネットの根の P**（平坦化前）。過去の波（波 29）には保存していないので、訓練時に warm-start
+  ネット（＝生成役 r3）で forward して作る（波 29 の生成役は r3 なので一致）。以後の波は `pol_p` を dump に保存。
+- 使い方: **教師だけ変える**（P の CE の目標を `pol_n` の正規化から π' に）。生成の手の選び方・探索は変えない。
+  z・補助教師は不変。旧波（π' の材料が揃わない v2 の波）は従来どおり訪問分布。
+- つまみ: n_min（既定 1）・c_visit（50）・c_scale（既定 0.3・{0.1, 0.3, 1.0} を掃引して π' のエントロピーと
+  「下限未満の手に乗る質量」で決める）。
+
+**検証の順**: 波 29 の同じ教材で r4（訪問 π）と r4q（π'）を作り、旧分布（波 28）と新分布（波 29）の評価帯・
+「門」の指標（除去が合法な main 行で、除去候補に載る P の質量: 生成役 r3 → r4 → r4q）・アリーナ
+（synth_roles 主・ミラー副・帯 511000〜518000／521000〜528000）で比べる。同じ教材なので差は教師の作り方だけ。
+
+#### 20.6.2 WP `rs-q-pi` の指示書
+
+```
+作業: WP rs-q-pi（π の教師を Q で補正した改良方策にする・docs/rust_engine_plan.md §20.6.1＝設計はそこ）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-q-pi に push、PR は作りません。成果物は
+docs/reports/2026-09-10_q_pi.RESULT.json を添えて同ブランチへ。最初に `make rust-develop`（opcg_effects.json が
+無ければ export_effects_json）。触るのは opcg_sim/loop/record_gen.py（列の追加だけ）・opcg_sim/learned/train/
+（n_rel_train.py・n_rel_torch.py・dump_io.py・n_rel_band.py）・tests/・tests/scripts/。Rust・探索・エンジンは触らない。
+訓練は 1 コンテナ 1 ジョブ・順次実行（同時に回すと 6 倍遅い・docs/n_loop_ops.md §7.1）。
+
+■ 1. dump の列（record_gen・dump v4 の追加列・既存の列は不変）
+  - pol_p(K float16)＝候補（group）の根の P＝生成役ネットの P を group の idxs で合算したもの。**平坦化前**の P が
+    decide の戻り値から取れないなら、取れる値（stats.P）を保存して notes に「平坦化後」と書く（root_prior_temp=1
+    の波では同じ）。pol_v0(D float16)＝根の価値の推定（訪問で重み付けた Q の平均・main 行のみ）。
+  - dump_io は無い列を None で返す（契約どおり）。
+
+■ 2. 訓練（n_rel_train・n_rel_torch）
+  - --pi-teacher {visits,q_improved}（既定 visits＝今までと 1 bit も変わらない）。
+  - q_improved: pack を読むときに main 行ごとに π' を作る（§20.6.1 の式）。P_net は pol_p があればそれ、無ければ
+    --warm-start のネットで候補行を forward して作る（1 回だけ・pack のキャッシュに保存して再利用）。
+    Q は pol_q・N は pol_n・v_mix は N 重みの Q 平均（pol_v0 があればそれ）。
+  - つまみ: --pi-n-min 1・--pi-c-visit 50・--pi-c-scale 0.3。
+  - P の CE の目標を π' に置き換える。z・補助教師・他は不変。旧波（v2）は visits のまま（自動で判定）。
+
+■ 3. 評価帯（n_rel_band）
+  - 方策指標を「visits 目標」と「π' 目標」の両方で出す（top1・CE）。
+  - 「門」の指標: 除去が合法な main 行（deck_roles.classify の form が除去系の候補がある行）で、除去候補に載る
+    ネットの P の質量の平均と、その行で除去を選んだ割合。
+
+■ 4. 計測
+  - 掃引: 波 29 の 1 シャードで c_scale ∈ {0.1, 0.3, 1.0} の π' のエントロピー（visits 分布との比較）と
+    「N が floor（sims/8）未満の手に乗る質量」を表にする（教師が退化していないことの確認）。
+  - 訓練: r4q ＝ warm-start r3・--pi-teacher q_improved（採った c_scale）・π 波 29（14 シャード・
+    claude/n29-wKK の n_records/n29_wKK）・z 29+28+27（claude/n28-w0N・n27-w0N の n28_records／n27_records）・
+    --ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2（best epoch）。比較対象 r4＝claude/train-r4-lr2 の
+    n1_results/nrel_r4b.npz（同じ教材・visits 教師）。
+  - 評価帯: 波 28 holdout と 波 29 holdout の両方で r3／r4／r4q（z 予測・方策 2 種・門の指標・層別）。
+  - アリーナ r4q vs r3（両席既定の探索）: 主 random × synth_roles（帯 511000〜518000）・副 固定ミラー
+    （521000〜528000）・各 8 シャード × 24 ペア・arena_merge。
+
+■ 受け入れ
+  - pytest tests/test_q_pi.py（cpu_infra）: --pi-teacher visits は既存とビット一致（numpy backend／--threads 1）／
+    q_improved の π' が手作りの N・Q・P で式どおり（未訪問の手が v_mix・N≥n_min の手が Q・softmax が 1）／
+    pol_p 列の無い波で warm-start forward に退避する／pol_p 列が dump に載る。TEST_SPEC §2 に 1 行。make test green。
+
+■ 成果物
+  - コード＋テスト＋n1_results/nrel_r4q.npz（同ブランチ）＋docs/reports/2026-09-10_q_pi.RESULT.json:
+    {"job":"rs-q-pi","status":"done|partial","sweep":{"0.1":{entropy,mass_below_floor},…},"c_scale":x,
+     "train":{ep0/ep1 の val},"band":{"wave28":{"r3":…,"r4":…,"r4q":…},"wave29":{…},"gate":{…}},
+     "arena":{"roles":{games,wr,ci95,elo,void},"mirror":{…}},"make_test":"N passed","notes":"…"}
+
+■ 前提
+  - 既定（--pi-teacher visits）は 1 bit も変えない。判定はコーディネータ。質問は RESULT.json の notes に。
+```
+
+#### 20.8.8-4 配備案アリーナの主条件（2026-09-10・`docs/reports/r4w4_judgment_20260910.md`）
+
+主 0.4818 [0.424, 0.539]・−13 Elo（未達）／副 0.4609（退行シグナル）。r3 ＋ w4R2（主 0.531・副 0.544）より低い＝
+**r4 は探索設定に関わらず r3 を上回らない**。r4 の総括: 不採用（§20.8.8-1／-3／-4）。
+次: WP `rs-q-pi`（§20.6.2・コーディネータが opus のセッションを起こした・2026-09-10 14:23 UTC）。同じ教材で
+教師の作り方だけを変えた r4q を r4／r3 と 2 分布の評価帯とアリーナ（synth_roles 主・ミラー副）で比べる。
+
+#### 20.6.3 `rs-q-pi` の回収と判定（2026-09-10・`docs/reports/2026-09-10_q_pi_judgment.md`）
+
+本線へ合流（既定 `--pi-teacher visits` はビット一致・`make test` 536）。同じ教材で教師だけ替えた r4q: 新分布の z 予測は
+r4 より 0.002 良く、π' は学べ、visits 一致も落ちない。しかし**門は開かず**（除去候補の P 質量 0.2595 → 0.2529）、
+**強さは同一**（synth_roles で r4 0.5182・r4q 0.5182）、旧分布の忘却は r4 より大きい。→ 不採用・道具は残す。
+作業セッションの問いへの答え: (1) 門は教師では開かない＝探索の Q（＝V）の問題。(2) r4 の synth_roles は
+`arena-r4-roles` で測定済み（0.5182）＝土俵は揃っていて差は 0。(3) 忘却の拡大は許容しない（era7 は 2 波揃える）。
+
+**総括（探索の 3 段 ＋ 学習側 5 本・2026-09-08〜10）**: 探索設定・教材・補助教師・学習率・教師の作り方をそれぞれ
+切り分けて測り、どれも主条件で +13 Elo を超えない。共通の壁は **V が除去の後の盤面を評価できない**こと。
+次は V の入力（符号化 v14）と容量（関係 R・幅）、教材 2 波（波 30・`pol_p` 付き）。判定と順序はユーザ。
+
+#### 20.8.9 「除去を打つべき展開は起きているか」（ユーザの問い 2026-09-10・コーディネータ実測・波 29 の 3 シャード 1,440 局）
+
+| 指標 | 値 |
+|---|---|
+| main 決定のうち除去が合法 | 38,721／95,445（40.6%）|
+| そのうち探索が除去を Q 最大と読んだ | 5,546（14.3%）・最良の除去 Q − 最多訪問手の Q ＝ −0.174 |
+| z の平均: 木が除去以外を選んだ（基準）| +0.021（n 31,945）|
+| z の平均: **ε で除去を強制**（基準と同じ母集団の 3%）| **−0.036**（n 990）＝強制で −0.057（SE 0.032・約 1.8σ）|
+| z の平均: 木が自分で除去を選んだ | −0.080（n 5,632）＝除去したくなる局面は元々不利 |
+| z の平均: 木が除去を選んだのに ε で保留 | −0.091（n 154）＝選んだ場合との差 −0.011（雑音）|
+| 次の相手ターンに失うライフの出どころ | リーダー攻撃 43%・**キャラ攻撃 57%** |
+| 次の自分ターン開始時の相手の盤面 | 平均 2.19 体・パワー合計 10,433 |
+
+読み: **除去を打てる局面は多く（41%）、相手のキャラは打点の 57% を担っている**ので「除去が構造的に無価値な世界」では
+ない。しかし ε の対照実験は「木が除去以外を選んだ局面で除去を強制すると z が 0.057 下がる（示唆的・1.8σ）」と
+言っており、**この CPU の打ち回しの中では除去は平均して得になっていない**。V が除去を低く見るのは、この世界の
+実績と整合している。考えられる理由は 2 つ: (a) 合成デッキ同士の展開ではテンポ／顔殴りが勝ち、除去のカード・ドンの
+損が回収されない（ユーザの疑い）、(b) 除去の後の打ち回し（対象の選び方・除去した後に殴りに行くか）が下手で、
+除去の価値を実現できていない＝z が除去を過小評価する。(a) と (b) は今の数字では分けられない。
+次の切り分け: ① 強制除去 990 行を型（form・コスト帯）・対象（パワー・能力）・その後の自分の攻撃回数で層別し、
+「得だった除去」の条件を探す。② **実デッキ**（合成でない）同士で同じ census を取り、除去が合法な局面の割合・
+キャラ打点の比率・強制除去の z を比べる＝世界の差か打ち回しの差か。
+
+**層別（強制除去 990 行・行レベルの属性のみ。強制した手そのものは dump に残らない〔sig／pol_chosen は木の選択の
+まま〕ので、型・コスト帯の層別は次の生成で `forced_move` 列を足してから）**:
+
+| 層 | n | 強制除去の z | 同じ層の基準（木の選択のまま）|
+|---|---|---|---|
+| ターン 0〜2 | 23 | −0.39 | −0.01 |
+| ターン 3〜5 | 125 | −0.04 | +0.02 |
+| ターン 6〜8 | 255 | **−0.23** | −0.04 |
+| ターン 9 以降 | 587 | +0.06 | +0.03 |
+| 次の自分ターンの攻撃 <2 回 | 145 | **−0.30** | — |
+| 次の自分ターンの攻撃 ≥2 回 | 486 | −0.10 | — |
+
+読み: 中盤（6〜8 ターン）の強制除去が最も損（−0.19）、終盤は損得なし。**除去の後に攻撃が続かない局面では大きく損
+（−0.30）、続く局面では損が小さい**＝ユーザの「自分の盤面を強くしながら相手の盤面を弱くしてテンポを取る」と整合。
+除去の価値は「除去した後に殴れるか」に依存し、この CPU は除去の後の打ち回し（b）でそれを回収できていない可能性が
+高い。世界の差（a）は実デッキの census で切り分ける（`--decks user`＝ユーザの 4 デッキ・240 局・§20.8.9 の ②・
+コーディネータが回している）。
+
+**実デッキの census（240 局・最終）と結論**: `docs/reports/2026-09-10_removal_world_census.md`。実デッキは合成より除去を
+打ちたくなる構造（キャラ打点 63%・盤面 2.6 体／14,200）だが、探索が除去を最良と読む割合（15%）も強制除去が損になる
+向き（−0.07）も合成と同じ＝**世界は原因ではなく、この CPU は除去を打っても得にできない**（鶏と卵: V は打ち回しの
+実績に整合している）。卵を割るのは打ち回し側＝除去の対象選択と除去後のテンポ。`forced_sig` 列（差し替えた手の
+move_sig）を dump v4 に足した（次の生成から型・対象で層別できる）。
+
+### 20.9 符号化 v14（ユーザ決定 2026-09-11「それでやってみましょう」）
+
+**方針**: 人が価値を書かない原則のまま、ネットに「材料」を足す。**append-only**（v13 の列は 1 bit も変えない・
+新しい列を末尾に足す）＝v13 のネット（r3）は新しい列の重みを 0 で埋めて読み込めば出力が同一＝生成役 r3 のまま
+v14 の dump を採れる。r5 は r3 から warm-start（新しい列の重みだけ初期化）。
+
+**A. 候補行に「対象」を載せる（次元は変えない）**: 方策の候補行は `payload.target_ids[0]` を対象にしているので、
+効果の対象選択（`RESOLVE_EFFECT_SELECTION`・`selected_uuids`）は対象なしの同じ行になり、P が対象を区別できない
+（`rs-q-pi` の実測: 対話ノードの P は一様）。`selected_uuids[0]` を対象（`has_target`／`target_card_id`／`ti`）に、
+効果の発生源を主体（`si`）にする。Python（`n_rel._cand_rows`）と Rust（`quiesce::cand_owned`）の両方・同一性テスト。
+**B. トークン列（S 20 → 22）**: `power_opp_turn`（相手ターン中のパワー＝【自分のターン中】【相手のターン中】の
+常在を相手ターンの側で評価した値）・`act_avail`（未使用の【起動メイン】があるか・リーダーも）。
+**C. EXTRA（29 → 33）**: `deck_removal_fixed`／`opp_pool_removal_fixed`（`deck_roles.classify` の form＝KO/bounce/deck/
+trash・盤面対象のみ）・`deck_bounce`／`opp_pool_bounce`。旧列（`deck_removal` 等）は据え置き。
+**D. ε の対象ランダム化**: 強制した除去（forced=1）の直後の対象選択は候補から一様に引く（forced=3・`forced_sig`）。
+加えて木が選んだ除去の対象選択も確率 `--eps-target`（既定 0）で一様に引く＝対象の良し悪しの対照。
+**E. 版**: `NR_ENC_VERSION` 14・dump `enc_version` 14・`dump_io` は v13 の波の新列を 0 で埋める（mask 不要・
+0 は「情報なし」）。Rust の `encode` は版を引数に取り、npz の `enc_version` で v13 のネットは pad。golden 2 本は
+符号化を含まない（盤面・合法手・イベント）ので不変のはず。
+
+#### 20.9.1 WP `rs-enc-v14` の指示書
+
+```
+作業: WP rs-enc-v14（符号化 v14＝候補行に対象・トークン列 2・EXTRA 列 4・ε の対象ランダム化・
+docs/rust_engine_plan.md §20.9＝設計はそこ）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新から分岐し claude/rs-enc-v14 に push、PR は作りません。成果物は
+docs/reports/2026-09-11_enc_v14.RESULT.json を添えて同ブランチへ。最初に pip install -r opcg_sim/requirements.txt
+pytest pytest-xdist maturin torch httpx → make rust-develop（opcg_effects.json が無ければ export_effects_json）。
+触るのは opcg_sim/learned/（n_rel_feat.py・n_rel.py・encoder.py・train/dump_io.py・train/n_rel_train.py の読み）・
+rust/opcg_engine/src/encode/・net/（npz の読み・pad）・search/quiesce.rs（cand_owned）・opcg_sim/loop/record_gen.py
+（ε の対象・enc_version）・tests/。探索・エンジンの裁定・アリーナは触らない。長い実行は run_in_background。
+
+■ A. 候補行の対象（次元不変）
+  - RESOLVE_EFFECT_SELECTION の候補行: 対象＝selected_uuids[0]（複数選択は先頭）・主体＝効果の発生源
+    （payload に無ければ pending の source から引く）。Python と Rust で同じ規則。CHOICE／CONFIRM は対象なしのまま。
+  - 同一性: 選択以外の候補行は 1 bit も変わらない（既存の Python/Rust 一致テストで確認）。
+
+■ B・C. 列の追加（append-only）
+  - n_rel_feat: S_COLS 末尾に power_opp_turn・act_avail、EXTRA_COLS 末尾に deck_removal_fixed・opp_pool_removal_fixed・
+    deck_bounce・opp_pool_bounce。定義は §20.9。Rust encode/ を同じ規則で（Python/Rust の parity テストを v14 で）。
+  - NR_ENC_VERSION 14。ネットの npz meta に enc_version を持たせ、13 のネットは新列の重み 0 で pad して読む
+    （Python・Rust とも）。**r3 を v14 で読んだときの decide が v13 と同じ手・同じ stats になる**ことを 20 局面で固定。
+
+■ D. ε の対象ランダム化（record_gen）
+  - forced=1 の直後の対象選択（同じ効果の最初の SEARCH_AND_SELECT）は候補から一様に引き forced=3・forced_sig。
+  - --eps-target P（既定 0）: 木が選んだ除去系の手の直後の対象選択も確率 P で一様に引く（forced=3）。π は木のまま。
+
+■ E. dump／訓練
+  - dump の enc_version 14・tokens [22,22]・scalars 94+33。dump_io は v13 の波（tokens [22,20]・scalars 123）を読むとき
+    新列を 0 で埋めて v14 の形に揃える（pack 版を上げる）。n_rel_train は v13/v14 混在で回る。
+  - 訓練の warm-start: v13 の npz を v14 のネットに読むとき新列の重みは 0 初期化（他はそのまま）。
+
+■ 受け入れ
+  - cargo test ＋ pytest: Python/Rust の符号化 parity（v14）／v13 ネットの pad で decide 同一（20 局面）／候補行の対象
+    （神の裁きの KO 対象 2 通りが別の行になる）／dump v13→v14 の pad／forced=3 の記録／既定（--eps-target 0）で
+    forced=3 が出ない。golden 2 本が不変であること（変わったら理由を書く・作り直しは判定待ち）。
+    docs/TEST_SPEC.md §2 に行を追記。make test green・make audit-cross void 0（Rust 変更）。
+  - 計測（RESULT.json）: r3 を v14 で読んだ serve の同一性（20 局面）・符号化のレイテンシ（v13 vs v14・1 decide の中位・
+    3 局面）・波 29 の 1 シャードを v14 に pad して読めること・record_gen --games 20 --decks synth_roles --eps-play 0.03
+    --eps-hold 0.03 --eps-target 0.1 で forced 1/2/3 の内訳。
+
+■ 成果物
+  - コード＋テスト＋docs/reports/2026-09-11_enc_v14.RESULT.json:
+    {"job":"rs-enc-v14","status":"done|partial","dims":{"S_DIM":22,"EXTRA_DIM":33},"r3_identity":{"positions":20,"same":20},
+     "latency_ms":{"v13":…,"v14":…},"golden":"unchanged|…","forced_counts":{…},"make_test":"N passed",
+     "audit_cross":{"pairs":120,"void":0},"notes":"…"}
+
+■ 前提
+  - v13 の列は 1 bit も変えない。判定はコーディネータ。質問は RESULT.json の notes に。モデル名はコミットに書かない。
+```
+
+**その後（合流後・別の指示書）**: 波 30 の生成（16 セッション・生成役 r3・v14 dump・`pol_p`・ε 3%/3%・`--eps-target 0.1`・
+synth_roles・160×4×R2）→ r5 ＝ warm-start r3（pad）・π 波 29+30・z 30+29+28+27・lr 2e-4・aux 0.1・visits 教師 → 評価帯
+（波 28・29・30）→ アリーナ（synth_roles 主・ミラー副）を常設セッションで 1 セット。
+
+#### 20.9.2 実装のメモ（WP `rs-enc-v14`・2026-09-11）
+
+設計（§20.9）どおりに入った。**指示書に無い判断を 2 つ**したので明記する。
+
+1. **候補行の対象（A）はネットの `enc_version` で分岐する**。列（B・C）は重みを 0 で埋めれば
+   恒等になるが、A は**次元を変えない代わりに重みで無効化できない**——v13 のネット（r3／a1）が
+   v14 のコードで対話ノードの候補行を読むと、今まで一様だった P が割れて**手が変わる**。
+   受け入れの「r3 を v14 で読んだ decide が v13 と同じ手・同じ stats」と両立させるため、
+   `NRelWeights::cand_target()`／`n_rel.cand_ids(enc_version=…)` が **14 以上のときだけ**
+   `selected_uuids[0]` を対象にする。**dump は版に依らず常に v14 の規則で書く**（生成役が r3 でも
+   教材は v14 のネットが読むもの＝π は木のまま・行の見え方だけが新しい）。
+2. **新しい列の「除去」の判定はゾーン FIELD 単一**（`n_rel_feat._is_field`）。Python の
+   `deck_roles._zone_name` は `TargetQuery.zone` が単一の `Zone` のときだけ FIELD と読むが、
+   Rust の loader は単一もリストも `Vec<ZoneRef>` に畳む＝「単一かリストか」を保てない。
+   **FIELD 1 つだけ**を FIELD と呼ぶ規則に揃えた（現物の効果 JSON に FIELD を含むリストは
+   1 件も無い＝実データ上は `deck_roles` と同じ集合・2026-09-11 実測）。
+
+**実測の注記**: 生成の棋譜で main 行の候補に出る `RESOLVE_EFFECT_SELECTION` は
+ARRANGE_DECK／SELECT_RESOURCE（山札・ドン）ばかりで、**盤面を対象にする選択は対話窓へ畳まれる**
+（`kind=window`＝候補を配らない行）。つまり A が効くのは**木の中の対話ノードの P**（Rust
+`quiesce::priors`）で、そこは `rs-q-pi` の実測どおり今まで一様だった。dump の `pol_si`／`pol_ti` は
+規則としては v14 に揃えたが、実データで値が変わるのは盤面対象の選択が main 行に出たときだけ。
+
+#### 20.9.3 判定（コーディネータ・2026-09-11・**採用**）
+
+受け入れ条件は全て満たした（RESULT: `docs/reports/2026-09-11_enc_v14.RESULT.json`）: S 22／EXTRA 33・
+r3 の同一性 20/20（v13 の build と v14 の build で同じ手・同じ stats）・golden 2 本不変・`Game.encode` +2〜9%・
+波 29 の pad（旧列ビット一致・新列 0）・`make test` 559・cargo 429・clippy green・audit-cross void 0。
+本線でもゲートを再実行して green を確認（下の合流コミット）。
+
+**指示書に無い判断 2 つは両方採る**:
+
+1. **A（候補行の対象）は `enc_version ≥ 14` のネットだけ**: 受け入れの「r3 は 1 bit も変わらない」を
+   守るには他に手が無い（A は重みで無効化できない）。**生成役 r3 の木の対話ノードは波 30 でも一様のまま**
+   ＝波 30 の対象選択の教師は「木の P」ではなく **D（対象のランダム化・forced=3）と z** から来る。これは
+   v14 の設計どおり（対象の良し悪しは対照から学ぶ）。r5 が v14 で読むようになった時点で木の対話ノードも
+   割れる＝**波 31 から**木の P が対象を区別する。dump は常に v14 の規則で書く（教材は r5 が読むもの）。
+2. **除去の判定ゾーン FIELD 単一**: 実データ上 `deck_roles.classify` と同じ集合。FIELD を含むリストが
+   現物に無い以上、規則の差は今は観測不能。効果 JSON にそういうカードが入ったら
+   `test_enc_v14.py` の parity が拾う（Python/Rust の同じ規則）。
+
+**注記**: (a) main 行の `RESOLVE_EFFECT_SELECTION` は山札・ドンばかりで盤面対象は対話窓に畳まれる＝A の効きは
+木の中に限られる。これは §20.7.8 の「対象選択の P は一様」を直す場所がまさに木の中（`quiesce::priors`）
+なので目的には合う。(b) `test_grads_match_numpy` の 1e-4 判定は「絶対値 1e-4 未満**か**丸めの下限の 5 倍以内」
+に緩んだ（実測 1.20e-4・下限 4.06e-5・式の差ではなく加算順）。1e-6 の判定と同じ読み方なので受ける。
+(c) 20 局で forced=3 は 2 行＝**波 30 で対象の対照を採るには `--eps-target` を 0.1 より上げるか、
+KO/bounce の型を synth_roles で厚くする**必要がある。波 30 の指示書で `--eps-target 0.3` にする
+（対象は木の手そのものを変えない＝π・z の教師を汚さないので上げて損はない）。
+
+**次**: 波 30 の生成（§20.9.1 末尾の計画どおり・`--eps-target 0.3` に上げる）→ r5 セット。
+
+#### 20.9.4 波 30 の生成（era7・生成役 r3・**dump v14**・16 セッション・2026-09-11）
+
+波 29（§20.8.6）と同じ探索設定・同じデッキ分布（**教師の物差しは変えない**）。違いは **符号化 v14 の dump**
+（本線 3d042a63 以降＝`enc_version 14`・tokens 22×22・scalars 127・`pol_p`／`pol_v0`・`forced` に 3）と
+**`--eps-target 0.3`**（§20.9.3 (c)・20 局で forced=3 が 2 行しか立たなかったため。対象の引き直しは木の手
+そのものを変えず π も汚さない）。生成役 r3 は v14 のコードで pad して読む＝木は波 29 と同じ（同一性 20/20）。
+**16 シャード × 480 局**・seed 帯 **2301000〜2308500**（§7.3 の細分化・台帳 §6）。1 局 12.8〜14.8 秒（波 29 実測）
+＝480 局 ≈ 1.9 h。セッションはコーディネータが `create_session`（sonnet・tag `n30-gen`）で起こす。
+
+```
+作業: 生成 波 30 シャード k（k=1..16・docs/rust_engine_plan.md §20.9.4・docs/n_loop_ops.md §6／§7.3）。
+
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（コードは変更しない・HEAD が 3d042a63 以降＝
+符号化 v14 が入っていること: python -c "from opcg_sim.learned import n_rel; print(n_rel.NR_ENC_VERSION)" が 14）。
+最初に pip install -r opcg_sim/requirements.txt pytest maturin && make rust-develop（opcg_effects.json が無ければ
+python -m opcg_sim.tools.export_effects_json）。出力ブランチ claude/n30-wKK（KK=01..16・2 桁）。PR は作らない。
+長い実行は run_in_background で回し、途中でコンテナが再起動したら**別の出力先**（--out n_records/n30_wKK_p2）へ
+残り局数（--games 480−完了数・--seed-base <seed_base>+完了数）で再開する（同じ --out に回すと
+n_record_00000.npz から上書きされる。完了数は既存 npz の行数ではなく最後の進捗行「N/480局」で読む）。
+p2 があれば RESULT の notes に局数の内訳を書く（訓練は wKK と wKK_p2 を別の波ディレクトリとして読む）。
+
+■ 実行（seed_base は台帳どおり: 2300000 + ceil(k/2)*1000 + (k が偶数なら 500)）
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen \
+    --games 480 --seed-base <seed_base> --workers 2 \
+    --sims 160 --worlds 4 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2 \
+    --dirichlet-eps 0.25 --temp-turns 4 \
+    --decks synth_roles --eps-play 0.03 --eps-hold 0.03 --eps-target 0.3 \
+    --out n_records/n30_wKK
+  最初に --games 30 で回して 1 局の壁時計を測り、480 局が 6 時間を超える見込みならその旨を RESULT に書いて
+  コーディネータの指示を待つ（勝手に sims や worlds を下げない）。
+
+■ 成果物（出力ブランチ直下）
+  - n_records/n30_wKK/（npz シャード・meta_n_record.json・meta_games.json）
+  - RESULT.json: {"job":"gen-n30-wKK","status":"done|partial","games":480,"rows":N,"main_rows":N,
+     "dropped":n,"void":n,"forced":{"play":n,"hold":n,"target":n},"removal_legal_rows":n,
+     "sec_per_game":x,"wall_hours":x,"search":{…meta の search…},"decks":"synth_roles",
+     "dump_version":4,"enc_version":14,"net":"nrel_r3.npz","commit":"<HEAD>","notes":"…"}
+
+■ 前提
+  - 打ち切りはしない（partial なら残り局数を RESULT に）。void（決着せず）が出たら seed と症状を notes に。
+  - コードは変更しない。質問は RESULT.json の notes に。
+```
+
+**r5 の訓練（波 30 が揃ってから・常設の訓練セッションへ poke で 1 セット）**: warm-start r3（v14 へ pad）・
+`--ablate rel`・π＝波 29＋30（era7）・z＝波 30 → 29 → 28 → 27（新しい波から載るだけ・波 29 以前は v13＝
+`dump_io` が新列を 0 埋め）・`--aux-weight 0.1`・epochs 2・lr 2e-4・visits 教師 → 評価帯（波 28・29・30 の
+holdout・層別）→ アリーナ（主 random × synth_roles／副 固定ミラー・帯は台帳で払い出す）。
+
+#### 20.9.4-1 波 30 の回収（2026-09-11 05:50 UTC・14/16 完走・2 本は進行中）
+
+16 セッション（sonnet・コーディネータが起こした）のうち **14 本が完走**（w01〜w05・w07〜w10・w12〜w16）。
+w06・w11 はコンテナ再起動を挟んで進行中（§20.9.4 の `_p2` 規則で再開・打ち切らない）。r5 の訓練は
+**起動時に揃っているシャード**で始める（14 本＝波 29 と同数・§20.9.5）。
+
+| 項目 | 14 シャード合計 |
+|---|---|
+| 局 | 6,720（480 × 14）|
+| 行 | 974,671（main 442,922）|
+| forced | play 4,585／hold 880／**target 3,926** |
+| 除去が合法な main 行 | 172,978（w15 の part1 分は未計上・下記）|
+| dropped／void | 3／2 |
+| 1 局の壁時計 | 10.8〜14.6 秒（8 本）・20.3〜21.5 秒（6 本）＝コンテナの当たり外れ・波 29 は 12.8〜14.8 |
+
+- **`--eps-target 0.3` の効き**: forced=3 が 3,926 行（20 局の試走で 2 行だった 0.1 から上げた結果・局あたり 0.58）。
+  forced=1（play 4,585）の直後は必ず引く規則なので、target ≈ play × 「除去が対象選択を出す割合」＋ 木が
+  選んだ除去 × 0.3。対象の対照としては十分な本数。
+- **void 2 件**（1/3,360＝波 29 と同率）:
+  - **w09・seed 2305269**（step 135）: `GameAborted(ValueError: 不明なアクションです: DON_BOX)`＝Rust
+    `rules/actions.rs` の apply に `DON_BOX` がそのまま渡った。生成の差し替え（`eps_swap`）は箱を
+    `first_primitive` で原始手にしてから出す規約だが、**どこかの経路が箱のまま `apply` に届いている**。作業
+    セッションが同一環境で再現を確認済み（コードは触っていない）。→ **`rs-void-2305269`**（後日の WP・
+    `rs-void-2296720` と一緒に。§20.9.4 の生成コードは v14 で `_target_swap` が増えたので、まずそこを疑う）。
+  - **w10・seed 2305912**（413 局目）: `OPCG_LOG_SILENT` で症状が出ず未特定（play_one の一律 except か
+    winner None／max_steps）。再現手順は w10 の RESULT.json。
+  - w12 の dropped 1 も同様に症状未特定（void ログ 0）。
+- **w15 は part1（200 局）の sidecar（`meta_games.json`／`meta_n_record.json`）が無い**: 200 局目で
+  ワーカーがハング（BrokenPipe・コンテナ再起動）し、sidecar は最終局の後にしか書かれない実装のため。
+  npz 20 本（seed 2308000〜2308199・全ユニーク）は健全で **`dump_io` は sidecar を読まない**＝教材としては
+  問題ない。`meta_games.json` を使う層別（型 × 色）だけ part1 が欠ける。**教訓**: sidecar はシャードごとに
+  書くべき（`record_gen` の改修＝小 WP・後日）。
+- 作業セッションの運用メモ: `nohup … &` はハーネスの完了通知が先に返る（w08）＝指示どおり `run_in_background`
+  直付けが正しい。試走の壁時計は本走より遅く出ることがある（w08: 29.4 → 14.3 秒）。
+
+#### 20.9.5 r5 のセット（訓練 → 評価帯 → アリーナ・1 セッション・opus・2026-09-11）
+
+ユーザ決定（2026-09-10）どおり **1 セッションで 1 セット**。常設の訓練セッションはアーカイブ済み（復帰しても
+コンテナは新規＝データは消えている）ので新規に起こす。教材の窓は CLAUDE.md の運用（π＝現 era・z＝新しい波から
+載るだけ）: **π＝波 29＋30（era7）・z＝波 30 → 29 → 28 → 27**（OOM なら 27 から落とす）。warm-start r3
+（v14 へ pad＝`NRelNet.load` が新列を 0 初期化）・`--ablate rel`・`--aux-weight 0.1`・epochs 2・**lr 2e-4**
+（§20.8.7-3）・visits 教師（π' は不採用・§20.6.3）。評価帯は **波 28・29・30 の holdout を別々に**（28・29 は
+v13 dump＝`dump_io` が新列を 0 埋め・30 は v14）で r3／r4b／r5 を並べる。アリーナは CLAUDE.md の規約
+（主 random × synth_roles・副 固定ミラー・両席 serve 既定の探索設定・8 帯 × 24 ペア）。seed 帯: 主 531000〜538000／
+副 541000〜548000（台帳 §6）。
+
+```
+作業: r5 のセット（訓練 → 評価帯 → アリーナ・docs/rust_engine_plan.md §20.9.5・docs/n_loop_ops.md §7.1／§5）。
+コードは変更しない。PR は作らない。本線 claude/cpu-spec-improvements-yw91jd の最新を checkout。メモリ 12GB 以上。
+長い実行は Bash の run_in_background で回す（nohup は使わない）。3 段は順に（並列にしない）。
+
+pip install -r opcg_sim/requirements.txt maturin torch   （torch は CPU 版）
+make rust-develop
+
+# 教材 ── 波 30（n_records/n30_wKK・完走したシャードだけ・_p2 があれば同列に）
+#   起動時に origin の claude/n30-w01〜w16 を fetch し、RESULT.json が status=done のシャードを全部使う
+#   （w06・w11 が未完なら待たずに進め、使ったシャードの一覧を RESULT.json の inputs に書く）
+for w in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16; do
+  git fetch -q origin claude/n30-w$w:tmpw 2>/dev/null || continue
+  if git ls-tree -r --name-only tmpw | grep -qE "^(n_records/.*)?RESULT.json$"; then   # docs/reports の RESULT は数えない
+    mkdir -p ~/n30_wave/w$w && git archive tmpw n_records | tar -x -C ~/n30_wave/w$w
+    rm -rf ~/n30_wave/w$w/n_records/*_trial
+  fi; git branch -qD tmpw; done
+# 波 29（14 シャード）・波 28／27（8 シャード）
+for w in 01 02 03 05 06 07 08 09 10 11 12 14 15 16; do
+  git fetch -q origin claude/n29-w$w:tmpw && mkdir -p ~/n29_wave/w$w \
+  && git archive tmpw n_records/n29_w$w | tar -x -C ~/n29_wave/w$w && git branch -qD tmpw; done
+for N in 28 27; do for w in 01 02 03 04 05 06 07 08; do
+  git fetch -q origin claude/n${N}-w$w:tmpw && mkdir -p ~/n${N}_wave/w$w \
+  && git archive tmpw n${N}_records | tar -x -C ~/n${N}_wave/w$w && git branch -qD tmpw; done; done
+
+# ① 訓練 r5
+OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train \
+  --in "$HOME/n30_wave/w*/n_records/n30_w*" "$HOME/n29_wave/w*/n_records/n29_w*" \
+  --z-in "$HOME/n28_wave/w*/n28_records" "$HOME/n27_wave/w*/n27_records" \
+  --ablate rel --aux-weight 0.1 --epochs 2 --lr 2e-4 --pi-teacher visits \
+  --warm-start opcg_sim/data/learned/nrel_r3.npz --out ~/nrel_r5.npz 2>&1 | tee ~/train_r5.log
+（OOM なら --z-in から 27 を外す→それでも落ちたら 28 も外す。外した旨を notes に。
+ 訓練開始時に RSS を実測して notes に書く。）
+
+# ② 評価帯（波 28・29・30 の holdout を別々に・r3／r4b／r5）
+git fetch -q origin claude/train-r4-lr2:tmpr && git show tmpr:n1_results/nrel_r4b.npz > ~/nrel_r4b.npz && git branch -qD tmpr
+for N in 28 29 30; do
+  case $N in 28) IN="$HOME/n28_wave/w*/n28_records";; 29) IN="$HOME/n29_wave/w*/n_records/n29_w*";; 30) IN="$HOME/n30_wave/w*/n_records/n30_w*";; esac
+  OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$IN" \
+    --nrel opcg_sim/data/learned/nrel_r3.npz ~/nrel_r4b.npz ~/nrel_r5.npz \
+    --holdout-mod 7 --out ~/band_r5_w$N.json 2>&1 | tee ~/band_r5_w$N.log; done
+
+# ③ アリーナ r5 vs r3（基準＝出荷既定・両席 serve 既定の探索設定）
+mkdir -p ~/arena_r5
+for k in 0 1 2 3 4 5 6 7; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_r5.npz --baseline "" \
+    --pairs 24 --max-pairs 24 --seed-base $(( 531000 + k*1000 )) --workers 4 \
+    --leaders random --decks synth_roles --out ~/arena_r5/main_w0$k.jsonl 2>&1 | tail -3; done
+for k in 0 1 2 3 4 5 6 7; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_r5.npz --baseline "" \
+    --pairs 24 --max-pairs 24 --seed-base $(( 541000 + k*1000 )) --workers 4 \
+    --out ~/arena_r5/mirror_w0$k.jsonl 2>&1 | tail -3; done
+python -m opcg_sim.loop.arena_merge --in "$HOME/arena_r5/main_w0*.jsonl" --label "r5 vs r3 main" | tee ~/arena_r5/merge_main.log
+python -m opcg_sim.loop.arena_merge --in "$HOME/arena_r5/mirror_w0*.jsonl" --label "r5 vs r3 mirror" | tee ~/arena_r5/merge_mirror.log
+
+# 成果物
+git checkout -B claude/train-r5
+mkdir -p n1_results/arena_r5 && cp ~/nrel_r5.npz n1_results/ && cp ~/train_r5.log ~/band_r5_w2*.json ~/band_r5_w30.json ~/band_r5_w*.log . \
+  && cp ~/arena_r5/*.jsonl ~/arena_r5/merge_*.log n1_results/arena_r5/
+（RESULT.json〔§5 の形〕: inputs＝warm_start r3・pi_waves [29,30]・z_waves・使った波 30 のシャード一覧・epochs・lr・
+ rss_gb／metrics＝best_ep・val v_mse／v_sign／pi_top1・aux の誤差／band＝波ごとに r3／r4b／r5 の v_mse と
+ 除去直後・終盤・型 × 色で差が大きい層／arena＝main と mirror の pairs・wr・ci95・elo・void・dup_seeds・
+ per_shard_wr／train_sec・band_sec・arena_sec／notes）
+git add -f n1_results/nrel_r5.npz n1_results/arena_r5/ train_r5.log band_r5_w*.json band_r5_w*.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r5 のセット（訓練・評価帯・アリーナ）"
+git push -u origin claude/train-r5
+
+補足: 訓練 2〜4 時間（π 2 波＝約 190 万行・aux あり）・評価帯 3 本で 30 分・アリーナ 2 条件で 2 時間弱。
+段ごとに完了したら途中経過（ログ・npz・band JSON）を同じブランチへ push してよい（RESULT.json は最後）。
+コミットメッセージにモデル名を入れない。質問は RESULT.json の notes に。
+```
+
+判定（コーディネータ）: CLAUDE.md の規約（主 wr≥0.55 かつ CI 下限>0.50／副 退行なし CI 下限≥0.45・void≤2%）。
+評価帯は補助（波 30 は r5 だけが訓練に含む＝r3／r4b と比較性が無い点に注意・波 28 は忘却の指標）。
+
+#### 20.9.6 r5 の判定（2026-09-11・規約上は非昇格・`docs/reports/r5_judgment_20260911.md`）
+
+主 **0.5026 [0.4492, 0.5560]・+1.8 Elo**＝未達／副 0.5365 [0.4952, 0.5777]＝退行なし／void 0。評価帯は
+r3 → r4b → r5 で単調改善（波 30: 0.5131 → 0.5044 → 0.4981・除去直後・終盤も r5 が最良）、波 28 は忘却（r4 と同じ）。
+best は **ep1**（r 系譜で初）＝π 2 波の教材はまだ過学習に届いていない。層別: reduce／trash／KO の高コスト帯で
+大きく改善・**lock（レスト）系で退行**（相手ターンの進行に依る価値は S に出ていない）。
+
+**要点**: era7 の 3 本（r4 0.5182・r4q 0.5182・r5 0.5026）は全部 192 ペアの CI（±0.053＝±37 Elo）の内側。
+「V の改善が打ち手に出ていない」のか「+10〜20 Elo が見えていない」のかを今の物差しでは分けられない。
+**提案 1: 高分解能アリーナ**（r5 vs r3・主条件・2,800 ペア＝16 セッション × 175 ペア・±10 Elo・1 時間）を先に。
+その結果で r6 の方針（生成役の交代／規約の読み替え／方策側へ戻る）を決める。判定はユーザ（報告 §提案）。
+1 セッション 1 セットは 2 時間で回った（訓練 39 分・評価帯 25 分・アリーナ 55 分）。
+
+#### 20.9.7 高分解能アリーナ r5 vs r3（ユーザ決定 2026-09-11「お願いします」・16 セッションを使い回す）
+
+§20.9.6 の提案 1。主条件（random × synth_roles）だけを **2,800 ペア**（16 シャード × 175 ペア・`--bands 1`）で測り、
+95% CI を ±0.014（±10 Elo）まで詰める。両席 serve 既定（worlds 1・visits・sims 160）。候補 r5＝`claude/train-r5`
+ea9f031d の `n1_results/nrel_r5.npz`・基準 r3＝出荷既定。seed 帯 **1001000〜1016000**（シャード k の base は
+1001000 + (k−1)×1000・台帳 §6）。セッションは波 30 の生成 16 本（tag `n30-gen`・sonnet）を poke で使い回す
+（ユーザ決定・環境構築の時間を省く。コンテナが入れ替わっていたら各自で構築し直す）。読み方: 2,800 ペアの
+合算で **CI 下限 > 0.50 なら「era7 の改善は実在」**、CI が 0.50 を跨げば「±10 Elo の内側＝V の改善は打ち手に
+出ていない」。r6 の方針はこの結果で決める（§20.9.6 の 2／3）。
+
+```
+新しい作業: 高分解能アリーナ r5 vs r3 シャード k（k=1..16・docs/rust_engine_plan.md §20.9.7）。
+前の作業（波 30 の生成）のブランチとファイルはそのまま残してよい。コードは変更しない。PR は作らない。
+
+git fetch origin claude/cpu-spec-improvements-yw91jd && git checkout -B claude/cpu-spec-improvements-yw91jd origin/claude/cpu-spec-improvements-yw91jd
+（コンテナが新しくなっていて opcg_engine が import できなければ pip install -r opcg_sim/requirements.txt maturin && make rust-develop）
+git fetch -q origin claude/train-r5:tmpr && git show tmpr:n1_results/nrel_r5.npz > ~/nrel_r5.npz && git branch -qD tmpr
+mkdir -p ~/arena_hires
+OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_r5.npz --baseline "" \
+  --pairs 175 --bands 1 --max-pairs 175 --seed-base <base> --workers 4 \
+  --leaders random --decks synth_roles --out ~/arena_hires/main_wKK.jsonl
+（run_in_background で回す。1 ペア約 15 秒＝175 ペアで 45 分前後。途中でコンテナが再起動したら同じコマンドを
+ 再実行する＝jsonl は追記台帳で未消化 seed から再開する）
+python -m opcg_sim.loop.arena_merge --in ~/arena_hires/main_wKK.jsonl --label "hires r5 vs r3 wKK" | tee ~/arena_hires/merge_wKK.log
+
+git checkout -B claude/arena-hires-wKK
+mkdir -p n1_results/arena_hires && cp ~/arena_hires/main_wKK.jsonl ~/arena_hires/merge_wKK.log n1_results/arena_hires/
+RESULT.json（ブランチ直下）: {"job":"arena-hires-wKK","status":"done","candidate":"nrel_r5.npz（claude/train-r5 ea9f031d）",
+ "baseline":"nrel_r3（既定）","condition":"random x synth_roles","seed_base":<base>,"pairs":175,"games":N,"wr":x,
+ "ci95":[..],"elo":x,"void":n,"dup_seeds":0,"sec_per_pair":x,"commit":"<HEAD>","notes":"…"}（arena_merge の出力から転記）
+git add -f n1_results/arena_hires/ RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "hires arena r5 vs r3 wKK"
+git push -u origin claude/arena-hires-wKK
+```
+
+#### 20.9.8 高分解能アリーナの判定（2026-09-11・`docs/reports/2026-09-11_hires_arena.md`）
+
+**2,798 ペア・wr 0.5050 [0.4908, 0.5192]・+3.5 Elo [−6.4, +13.4]・void 2・dup 0**（16 セッション・壁時計 1 時間）。
+CI が 0.50 を跨ぐ＝**era7（r3 → r5）の改善は ±10 Elo の内側＝0**。評価帯の一貫した改善（波 30 −0.015）は
+打ち手に出ていない。読み: era7 の 3 世代は全部 r3 の打ち筋（π・z）で訓練されており、生成役が固定のままでは
+教材が更新されない。昇格規約（wr ≥ 0.55）は c 系の世代差の閾値で NRel では満たせない。
+**提案 A**: 生成役を r5 に替え（era8）門を「退行なし（CI 下限 ≥ 0.45）」に読み替え、強さは高分解能アリーナで
+累積判定。**提案 B（診断・1 時間）**: r5 vs r3 を worlds 4 ＋ R2 で 700 ペア＝serve 既定が V の差を潰しているかを
+見る。判定はユーザ。
+
+#### 20.9.9 r5 は違う手を打つか（2026-09-11・`docs/reports/2026-09-11_r5_agreement.md`）
+
+同じ盤面・同じ探索 seed で r3 と r5 の decide を比べた（生成設定・40 局・main 2,435 判断点）: **一致率 0.589**
+（r3 vs r3 の seed 違いは 0.825＝探索ノイズの 2.3 倍の不一致）・除去が合法な判断点では 0.535・除去を選ぶ率
+0.145 → 0.166（終盤 0.110 → 0.155・序盤は減る）。**r5 は r3 と違う手を打つが平均すると同程度に良い**
+（2,800 ペアで +3.5 Elo）。提案 A（生成役 r5）の前提「教材が更新される」は成り立つ。
+
+### 20.10 方針ヘッド: V(盤面, 方針) を補助ヘッドで学ぶ（ユーザ決定 2026-09-12「それでやってみましょうか」）
+
+**経緯**: 自己対戦の「方針」の計測（`docs/reports/2026-09-12_plan_drift.md`）で、方針は前ターンから
+持ち越されていない（分岐点での粘り＝無状態の期待値 +0.03）・ブレと負けの相関は序盤に無い（因果は
+不支持）・勝敗に直結するのは「お互いにリーサル圏で殴らない」（殴れば 0.81・見送れば 0.45）と出た。
+ユーザの提案は「方針を変えると負ける」の検証ではなく「**この方針の方が勝ちやすい**」をネットに教える
+こと。方針を入力にする案（AlphaStar の z に相当）は交絡（自分で選んだ方針の盤面でしか観測されない）と
+対局側の変更が大きいので、まず**補助ヘッド**（KataGo の補助ヘッドと同じ位置づけ・入力も Rust も変えない）
+として学ばせ、地図を読んでから次を決める。
+
+**設計**（WP `rs-plan-aux`・実装 2026-09-12・コーディネータ）:
+
+- ラベル `plan(D int8)`（`opcg_sim/learned/train/plan_labels.py`・**分類の正本**・計器 `plan_drift.py`／
+  `race_state.py` も同じ関数）: 自席ターンの行＝そのターンの方針（0 face／1 board／2 mixed・develop／pass は -1）・
+  相手ターンの行＝受けた（3 take・ライフが減った）／守った（4 guard・リーダー攻撃はあったが減らない）・
+  他は -1。既存の記録から後付けで作り、シャードの隣の sidecar `n_record_XXXXX.plan.npz` に置く
+  （生成し直し不要・冪等）。`dump_io` が pack の `plan` 列に取り込む（`PACK_VERSION` 4・sidecar の無い
+  シャードは -1・鍵に sidecar を含める）。
+- ヘッド `n_rel.plan_head`: 共有表現 e → relu(e Wq1 + bq1) Wq2 + bq2 → tanh の 5 列（`D_PLAN`）。
+  重みは別鍵 `plan_*`（Rust は無視・serve は読まない）。`n_rel_train --plan-weight λ`（既定 0＝完全に無効）
+  で、**打った方針の列だけ**に z の勾配を流す（`plan_loss`／`plan_backward`・torch は `plan_loss_terms`）。
+  損失の流儀は value と同じ（勾配側 0.5・報告は mean((v_q−z)²)）。
+- 地図 `tests/scripts/plan_value_map.py`: holdout の自席ターン開始行で V_face／V_board／V_mixed、相手ターンの
+  最初の自分の行で V_take／V_guard を出し、argmax と打った方針の一致率・gap・レースの状態別の
+  V_face−V_board・較正を出す。
+- 契約は `tests/test_plan_heads.py`（既定の不変・pack・ラベル・損失の一致・Rust が鍵を無視）。
+
+**交絡（この段の限界）**: V(盤面, 方針) は「その方針が**選ばれた**盤面での勝率」であって反事実ではない。
+自分で選んだ方針は盤面が良いから選ばれている面があり、滅多に打たれない方針の列は外挿になる。地図で
+差が大きく出たら、次に**生成時に方針を一定確率で強制する**波（`--eps-play`／`--eps-hold` が除去について
+やっているのと同じ）で反事実の教材を作る。それでも差が本物なら、ターン頭で V_方針 を引いて方針を選び
+π をそれで条件付ける（対局側の変更・AlphaStar の z に近づく）。
+
+**WP の指示書と事前の読み方**は `docs/n_loop_ops.md` §6 の行（r8）が正本。
+
+### 20.11 候補の棚卸し（2026-09-12・ユーザの求めに応じて整理・判定はユーザ）
+
+「V は毎世代良くなるのにアリーナが動かない」の調査（`docs/reports/2026-09-12_policy_band.md`・
+`2026-09-12_r7_pi_window.md`・`2026-09-12_search_vs_prior.md`・`2026-09-12_plan_drift.md`・
+`2026-09-12_plan_head_r8.md`・`2026-09-12_plan_map_strat.md`）で出た案を 1 か所に集めた。
+**ここは候補の一覧であって決定ではない**。着手はユーザの指示で行う。
+
+#### 本線候補（根拠が最も強い）
+
+| 案 | 中身 | 根拠 | 規模 |
+|---|---|---|---|
+| **C 深い探索で「見送り」を再判定** | お互いにリーサル圏で殴らなかった局面と殴った局面を各 200 抜き、sims 1,600・worlds 16 で打たせて判断が変わるかを見る。20 局面はユーザが目視 | その帯で殴れば勝率 0.81・見送れば 0.45（`plan_drift`）。r8 の価値も独立に「殴る」と言う（V_face−V_board +0.20〜0.26・argmax_face 0.80）。**40 リーダー全員で同じ向き**（`plan_map_strat`）。見送りの 33% が次の相手ターンに死ぬ。相手の手札 0〜1 枚でも 0.74〜0.78 しか殴らない | 局面の復元（seed から再生）＋シナリオ再生。中 |
+| **F 方針ごとの勝率を対局で使う** | ターンの頭で V_方針 を引き、argmax の方針で根の事前分布を偏らせる。両方の圏と序盤に限る | ネットの推奨は殴る 0.80／守る 0.78 なのに、実際は殴る 0.62／守る 0.40（`plan_head_r8`）。**層別で向きが群に依らないと分かった＝1 本の規則で全リーダーに効く**（`plan_map_strat`）。補助ヘッドのままでは対局に効かない（r8 のアリーナ 主 0.5000／副 0.4896） | Rust の変更あり（方針ヘッドの forward＋根の P の補正）。中〜大 |
+| **G レースの状態を組み立てた量として入力に足す**（旧「案 A」） | リーサル圏の余裕・被リーサルの余裕・手数の差・守りの単価などを scalars の末尾に足す（append-only） | 勝敗に直結した唯一の箇所が両方の圏＝「攻撃回数 − ブロッカー − 相手ライフ − 1」の組み立てを要する局面。生の枚数は入力にあるが組み立てた量は無い | 符号化 v15（append-only）＋ Rust 側の同期。中 |
+| **H 時間軸を補助ヘッドに足す**（ユーザ提案 2026-09-12） | 決着まであと何ターンか・自分と相手のどちらが先に落ちるか・1／2／3 ターン後の勝率（今との差）を補助ヘッドで予測させる | V は盤面 1 つに勝率 1 個を返すだけで「いつ」を持たない。ライフレースは速さの勝負。探索は時系列を持つが sims 160・worlds 4 では 5 ターン先の決着に届かない。既存の補助教師は 1 ターン先を予測しており機構は在る | 補助ヘッドの列追加＋教師の後付け（既存記録から作れる）。小〜中。**G と 1 本で試せる** |
+
+#### 未着手だが根拠のある候補
+
+| 案 | 中身 | 根拠 | 規模 |
+|---|---|---|---|
+| **A V と π の損失の釣り合いを明示する** | `n_rel_train` の `sched` の比を引数化し、π の更新を V に対して重くする | r6 は V 最良・方策最悪、r7（π を 2 波→4 波）は方策 3 波とも改善・V が r5 水準へ後退。**z は同一**＝2 ヘッドが共有部を奪い合い、比はデータ量で決まっている（明示の重みが無い）。事前分布は k≥9 でほぼ一様（H_p 2.63 ≒ ln14）＝π は飢えている | 小（引数化のみ）＋訓練 1 本 |
+| **B 高分解能アリーナ r7 vs r5** | 2,800 ペア（±10 Elo） | r7 は r3 以降で初めて両条件が正・退行なし（主 +25.4／副 +16.3）だが 192 ペアは ±38 Elo で未確定 | 16 セッション×1 時間 |
+
+#### 保留（先に別の案の結果を見る）
+
+| 案 | 中身 | 保留の理由 |
+|---|---|---|
+| **D 守りを攻撃パワーで層別**（**2026-09-12 実施・半分だけ答えが出た**） | 残りの問い「単価の管理が合理か否か」は手札のカウンター総量を入力に持つ必要がある＝**候補 G に統合する** | 超過パワーが上がるほど守らない（0.704→0.525→0.431→0.415）が、カウンター 1 枚で止まる攻撃と 3 枚要る攻撃を同じ「1 回」と数えているので合理と非合理が分離できない。**帯を固定するとライフで単調＝逆算の形は在った**（`plan_drift` §4 の「平ら」は帯の混ざりによる見かけ・訂正済み）。決められた 1 点はライフ 1 × `p5k+` の 0.474＝最も守るべき所で半分以上通す。`docs/reports/2026-09-12_race_atk.md` |
+| **E 反事実の教材** | 生成時に方針を一定確率で強制した波を 1 本作る（`--eps-play`／`--eps-hold` と同じ仕掛け） | 地図は「その方針が**選ばれた**盤面の勝率」で反事実ではない（board の較正が +0.05〜0.08 外れているのと整合）。ただし F が効けば要らない。F の後 |
+| **I 履歴・方針を入力に入れる**（旧「案 B」） | 前の自席ターンの傾き・受けたか守ったかを入力に足す | 方針の持ち越しは無状態の期待値 +0.03（`plan_drift`）だが、**ブレが負けを作る証拠は出なかった**（序盤に差が無く逆因果と区別できない）。盤面が全情報という前提を崩す割に利得が未証明 |
+| **J 方針の潜在変数**（旧「案 C」・AlphaStar の z 相当） | 対局の頭で方針を 1 つ選び、π をそれで条件付ける | 一貫性が強さを作る証拠が無い。誰が方針を決めるかが未解決（ネットなら入力を分けただけ・探索なら方針の数だけ sims が要る）。教師は z しかない。多様性（教材が広がる）という別の利得は本物なので A〜H の後 |
+
+#### 決着済み（やらない）
+
+| 案 | 判断 | 根拠 |
+|---|---|---|
+| **M リーダーの総ライフ別の「最後の 1 枚」** | **閉じる**（2026-09-12・n を 524→699 に増やした追試） | ライフ 1 の V_guard−V_take は 3 枚 +0.055／4 枚 −0.017／5 枚 −0.027／6 枚 +0.023 で前回と同符号だが、**負になる 4 枚／5 枚はライフ 1 での勝率が 0.274／0.295＝既に負けている局面**＝「まだ勝てるうちは守りが効く」と言っているだけでリーダー別しきい値の証拠ではない。層別しても消えないのは木と V の乖離（argmax_guard 0.77〜0.93 対 played_guard 0.28〜0.48・全群同じ向き）＝候補 F の材料 |
+| **K ブレ（`plan_drift`）をこれ以上追う** | やらない | 対にした比較で敗者の drift が多いのは 4 波一貫（0.563〜0.574）だが、**序盤（t≤6）では差が無い**（0.503〜0.517・CI 下限 ≤0.500）＝「負けが決まってから打ち方が変わる」逆因果と区別できない |
+| **L 固定ライフでの守り強制** | **撤回**（ユーザ指摘 2026-09-12） | 40 リーダー全員の山が帯（ライフ 2〜4）の中だが、**帯の中の差は n 16,000 でも 0.005〜0.017**・1 リーダー 1 ライフ約 50 行では解けない。**山の位置は関門の設定で動く**（25→60 で {L3 26,L2 7,L4 7}→{L3 12,L4 10,L5 2}）＝解けていない区別を固定することになる |
+| **探索側（sims・温度・dirichlet）を触る** | やらない | 教師は既に π より 0.3 nats 尖っており、π がそこに届いていないのが問題（`search_vs_prior`）。教師を尖らせても π が吸えなければ同じ |
+
+#### 規約の見直し（実験ではない・ユーザ決定待ち）
+
+2026-09-12 に「今すぐは生成の出力ブランチの基点だけ」とされ、残りは据え置き:
+評価帯の読み方・昇格ゲートの書き換え・CPU 系統の記述の古い部分・旗の検証の手順・
+セッション数の上限・**「π は現 era のみ」の規約**（A と B の結果を見てから）。
+
+#### 推奨の順序（コーディネータの意見・判定はユーザ）
+
+1. **G＋H を 1 本の訓練で試す**（入力と出力の列を足すだけ・既存の教材で回る）。ネットの読み自体を
+   良くする側なので、効けば F の価値も上がる。
+2. **C**（深い探索での再判定）を並行。物差しの較正になり、F に投資する前の関門になる。
+3. **A**（損失の釣り合い）は独立に効く可能性があり、訓練 1 本で済む。
+4. F は G／H／C の結果を見てから。Rust を触るので最後に回す。
+5. **D** は安いのでいつでも挟める。

@@ -26,8 +26,10 @@ EFFECTS_PATH = os.path.join(DATA, "opcg_effects.json")
 MODELS = os.path.join(DATA, "learned")
 CARDS_PATH = os.path.join(DATA, "opcg_cards.json")
 
-#: 出荷既定のネット（`cpu_learned._DEFAULT_VALUE` と同じもの＝物差しを 1 本に保つ）。
-DEFAULT_NET = os.path.join(MODELS, "nrel_a1.npz")
+#: 出荷既定のネット（生成・アリーナ・serve が同じものを使う＝物差しを 1 本に保つ）。
+#: **r3**（2026-09-08 採用・`docs/reports/r3_adoption_20260908.md`）。ロールバック先は a1
+#: （同梱 `nrel_a1.npz`・2026-09-05 採用）。
+DEFAULT_NET = os.path.join(MODELS, "nrel_r3.npz")
 
 #: serve 既定（`opcg_sim/learned/config.py` の共有既定と同じ値。Rust 側 `DecideOptions`
 #: の既定と一致するので、通常はここを触らない）。
@@ -124,8 +126,19 @@ class SeatSpec:
     """
 
     def __init__(self, net: Optional[str] = None, sims: int = SERVE_SIMS,
-                 dirichlet_eps: float = 0.0, temp_turns: int = 0, **kw):
+                 dirichlet_eps: float = 0.0, temp_turns: int = 0,
+                 eps_play: float = 0.0, eps_hold: float = 0.0,
+                 eps_target: float = 0.0, **kw):
         self.net = load_net(net)
+        #: 両方向 ε 探索（§20.8.5・生成の対照づくり）。**decide の opts には入れない**——
+        #: 木も π も変えず、「decide が返した後で打つ手だけを差し替える」Python 側のつまみ
+        #: （差し替えの実体は `record_gen.eps_swap`・入口は `driver.run_game(swap=…)`）。
+        #: 既定 0.0＝1 bit も変わらない。
+        self.eps_play = float(eps_play or 0.0)
+        self.eps_hold = float(eps_hold or 0.0)
+        #: ε の**対象**ランダム化（§20.9 の D）。木が選んだ除去の直後の対象選択を確率
+        #: `eps_target` で一様に引く（`forced=1` の直後は確率に依らず必ず引く）。既定 0.0。
+        self.eps_target = float(eps_target or 0.0)
         self.opts: Dict[str, Any] = {"net": self.net, "sims": int(sims)}
         if dirichlet_eps:
             self.opts["dirichlet_eps"] = float(dirichlet_eps)

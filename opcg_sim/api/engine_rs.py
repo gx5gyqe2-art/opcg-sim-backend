@@ -35,6 +35,23 @@ EFFECTS_PATH = os.path.join(_REPO_ROOT, "opcg_sim", "data", "opcg_effects.json")
 
 _masters_lock = threading.Lock()
 _masters_loaded = False
+# 符号化の語彙（`opcg_engine.set_vocab`）。棋譜ダンプ・§20.4 の `RsGame.attribution`（`Game.encode`）
+# が要る。**最初に読んだネットの語彙**をプロセスの語彙にする（`opcg_sim.loop.engine.load_net` と
+# 同じ「1 本目が既定」規約）。
+_vocab_lock = threading.Lock()
+_vocab_loaded = False
+
+
+def _ensure_vocab(engine, summary: Dict[str, Any]) -> None:
+    """ネットの要約 JSON（`load_net` の戻り値）の `vocab_ids` を、プロセスで 1 度だけ設定する。"""
+    global _vocab_loaded
+    if _vocab_loaded:
+        return
+    with _vocab_lock:
+        if _vocab_loaded:
+            return
+        engine.set_vocab(json.dumps(summary.get("vocab_ids") or []))
+        _vocab_loaded = True
 
 
 def _net_path() -> str:
@@ -105,7 +122,7 @@ class RsGame:
     盤面 dict（[`board`]）と暫定 CPU 経路（[`py_manager`]）。
     """
 
-    def __init__(self, game, p1_name: str, p2_name: str, card_db=None):
+    def __init__(self, game, p1_name: str, p2_name: str, card_db=None, net: Optional[str] = None):
         self._game = game
         self.p1_name = p1_name
         self.p2_name = p2_name
@@ -117,7 +134,15 @@ class RsGame:
         self._search_base = random.getrandbits(63)
         self._carry_key = None
         self._carry: Dict[str, Any] = {}
-        self._net_loaded = False
+        # 箱コミットを焼き込んだ決定の action_index（§20.4 の思考ログ・`trace["commit_from"]`）。
+        # `_carry_key` と同じ (turn, seat) の間だけ有効＝キーが変われば自然に無効になる。
+        self._commit_from_index: Optional[int] = None
+        # このインスタンスの既定ネット（省略時は `_net_path()`＝出荷既定）。`decide` は呼び出し
+        # ごとに `net` で上書きできる（`tests/scripts/rs_scenario_play.py` が席ごとに別ネットで
+        # 打たせるのに使う・§20.1）。複数ネットを同一プロセスで読める（`opcg_sim.loop.engine`）ので
+        # 1 インスタンスが両方の鍵を使い分けても問題ない。
+        self._net = net
+        self._loaded_nets: set = set()
 
     # --- 生成 ---------------------------------------------------------------
 
@@ -152,6 +177,19 @@ class RsGame:
             random.getrandbits,
         )
         return cls(game, p1_name, p2_name, card_db=card_db)
+
+    @classmethod
+    def from_hidden(cls, hidden: Dict[str, Any], p1_name: str = "p1", p2_name: str = "p2",
+                    seed: Optional[int] = None, card_db=None, net: Optional[str] = None) -> "RsGame":
+        """記録 v5 の `hidden` から対局を組み直す（`docs/rust_engine_plan.md` §20.1・`rs-scenario`）。
+
+        `opcg_engine.Game.from_hidden` の薄い口。**中断（対話）スタック・誘発待ち行列は
+        `hidden` に無い**ので失われる（記録 v5 の契約・`hidden` 側の docstring 参照）。
+        """
+        engine = load_engine()
+        game = engine.Game.from_hidden(
+            json.dumps(hidden, ensure_ascii=False, default=str), p1_name, p2_name, seed)
+        return cls(game, p1_name, p2_name, card_db=card_db, net=net)
 
     # --- 盤面・要求 ---------------------------------------------------------
 
@@ -240,14 +278,58 @@ class RsGame:
 
     # --- CPU の思考（Rust `decide`）-----------------------------------------
 
-    def decide(self, player_id: str, trace: Optional[Dict[str, Any]] = None):
-        """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。"""
-        move, tr = self._decide(player_id)
+    def decide(self, player_id: str, trace: Optional[Dict[str, Any]] = None,
+              net: Optional[str] = None, sims: Optional[int] = None,
+              action_index: Optional[int] = None, select_rule: Optional[str] = None,
+              q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None,
+              worlds: Optional[int] = None, setup_box: Optional[bool] = None,
+              leaf_rollout: Optional[str] = None,
+              select_branch: Optional[bool] = None,
+              setup_box_keep_bare: Optional[bool] = None):
+        """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
+
+        `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
+        軽い探索数で打たせたいとき・`tests/scripts/rs_scenario_play.py`・§20.1）。
+        `action_index`（省略可）は呼び出し側の決定番号（`tests/scripts/rs_scenario_play.py` の
+        `len(actions)`）＝箱コミットを焼き込んだ決定を覚えておくための鍵（`trace["commit_from"]`・
+        §20.4）。省略すると `commit_from` は出さない。
+
+        `select_rule`／`q_min_frac`／`root_prior_temp`（省略可・§20.5）は探索の設定の上書き:
+        `select_rule`＝根で出す手の選び方（"visits"＝訪問数最多〔既定〕／"q_min_n"＝訪問数が
+        `max(1, floor(sims * q_min_frac))` 以上の手の中で Q 最大）・`q_min_frac`＝その割合
+        （既定 0.125＝sims/8）・`root_prior_temp`＝根の事前分布を `P^(1/t)` へ丸めて正規化
+        （既定 1.0＝何もしない・2.0 で平坦化）。**省略すれば serve 既定と 1 bit も変わらない**。
+
+        `worlds`（省略可・§20.7.1）＝1 回の決定で引く世界サンプルの本数（既定 1）。2 以上なら
+        Rust が K 本の世界で同じ sims の木を**並列**に回して根の統計を束ねる（N は和・Q は N
+        重みの平均）。trace に `worlds`／`world_used`／`per_world`（世界ごとの根の N/Q と最善手）
+        が入る。**省略すれば 1 本＝今までと同じ**（trace の欄も増えない）。
+
+        `leaf_rollout`（省略可・§20.7.9）＝木の葉の打ち切り。"turn_end" にすると、葉の
+        戦闘窓／対話窓を解決し終えた後、手番の側のメインフェイズなら**ターンが替わるまで**
+        方策（P 最大）で打ち続けてから評価する＝「準備だけして終わり」の中途半端な葉の値が
+        無くなる。trace に `rollout`（葉の数・平均 ply・上限で止まった割合）が入る。
+        **省略すれば "none"＝今までと同じ**（trace の欄も増えない）。
+        `select_branch`（省略可・§20.7.8 の 5）＝診断つまみ。全箱共通の「自分の対象選択を
+        枝にする」規則だけを on/off する（`None`＝`setup_box` に従う＝今までどおり）。
+        """
+        move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
+                                select_rule=select_rule, q_min_frac=q_min_frac,
+                                root_prior_temp=root_prior_temp, worlds=worlds,
+                                setup_box=setup_box, leaf_rollout=leaf_rollout,
+                                select_branch=select_branch,
+                                setup_box_keep_bare=setup_box_keep_bare)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
 
-    def _decide(self, player_id: str):
+    def _decide(self, player_id: str, net: Optional[str] = None, sims: Optional[int] = None,
+               action_index: Optional[int] = None, select_rule: Optional[str] = None,
+               q_min_frac: Optional[float] = None, root_prior_temp: Optional[float] = None,
+               worlds: Optional[int] = None, setup_box: Optional[bool] = None,
+               leaf_rollout: Optional[str] = None,
+               select_branch: Optional[bool] = None,
+               setup_box_keep_bare: Optional[bool] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -260,32 +342,72 @@ class RsGame:
         は生成時に 1 度だけ引く（`random` 由来＝`random.seed()` を張った traced 対局は再現する）。
         """
         engine = load_engine()
-        if not self._net_loaded:
-            engine.load_net(_net_path())
-            self._net_loaded = True
+        net_path = net or self._net or _net_path()
+        if net_path not in self._loaded_nets:
+            summary = json.loads(engine.load_net(net_path))
+            self._loaded_nets.add(net_path)
+            _ensure_vocab(engine, summary)
         turn = self.turn_count
         seat = "p1" if player_id == self.p1_name else "p2"
         carry = self._carry if self._carry_key == (turn, seat) else {}
-        opts = {"search_seed": _search_seed(self._search_base, turn, seat),
+        had_commit = bool(carry.get("commit"))
+        opts = {"net": net_path,
+                "search_seed": _search_seed(self._search_base, turn, seat),
                 "commit": carry.get("commit") or [],
                 "resact_pending": bool(carry.get("resact_pending"))}
+        if sims is not None:
+            opts["sims"] = int(sims)
+        # §20.5 の 3 つ（None＝渡さない＝Rust 側の既定）。
+        if select_rule is not None:
+            opts["select_rule"] = str(select_rule)
+        if q_min_frac is not None:
+            opts["q_min_frac"] = float(q_min_frac)
+        if root_prior_temp is not None:
+            opts["root_prior_temp"] = float(root_prior_temp)
+        # §20.7.1（None／1＝渡さない＝Rust 側の既定＝単一世界）。
+        if worlds is not None and int(worlds) > 1:
+            opts["worlds"] = int(worlds)
+        # §20.7.2（WP `rs-setup-box`）: 準備箱。None＝渡さない＝Rust 側の既定（false）。
+        if setup_box is not None:
+            opts["setup_box"] = bool(setup_box)
+        # §20.7.10（実験）: 準備箱があっても素の手を残す。None＝渡さない＝Rust 側の既定（false）。
+        if setup_box_keep_bare is not None:
+            opts["setup_box_keep_bare"] = bool(setup_box_keep_bare)
+        # §20.7.9（WP `rs-leaf-rollout`）: 葉の打ち切り。None＝渡さない＝Rust 側の既定（"none"）。
+        if leaf_rollout is not None:
+            opts["leaf_rollout"] = str(leaf_rollout)
+        # §20.7.8 の 5（診断つまみ）: None＝渡さない＝Rust 側の既定（setup_box に従う）。
+        if select_branch is not None:
+            opts["select_branch"] = bool(select_branch)
         out = json.loads(self._game.decide(player_id, json.dumps(opts)))
         self._carry_key = (turn, seat)
         self._carry = {"commit": out.get("commit") or [],
                        "resact_pending": bool(out.get("resact_pending"))}
-        return out.get("move"), self._trace(out)
+        # commit_from（§20.4）: このターン/席で箱コミットを初めて焼き込んだ決定の action_index を
+        # 覚えておく。既に焼き込み済み（had_commit）なら覚えたままの鍵を使う＝焼き込んだ決定を指す。
+        if had_commit:
+            commit_from = self._commit_from_index
+        else:
+            commit_from = None
+            self._commit_from_index = action_index if out.get("commit") else None
+        return out.get("move"), self._trace(out, commit_from=commit_from)
 
-    def _trace(self, out: Dict[str, Any]) -> Dict[str, Any]:
+    def _trace(self, out: Dict[str, Any], commit_from: Optional[int] = None) -> Dict[str, Any]:
         """思考の内訳（旧 `cpu_learned._fill_trace` の欄のうち、Rust から出せるもの）。
 
         `chosen`／`dialog`／`candidates`（等価手マージ後の訪問上位・visit%・行動価値 Q）／
         `value`。**decide が返した後の盤面を読まない**（決定は盤面を動かさない）ので、記述は
         決定時点のもの。旧版にあった L1 の第二意見（`readout` の一部）は L1 廃止で無くなった。
+
+        §20.4（思考ログ）で足した欄: `kind`（`readout` と同じ値・欄名を揃えただけ）・
+        `pv`（主変化・record["pv"] を describe_move で記述子化）・`legal_stats`（全合法手の
+        P/N/Q・stats をそのまま並べる）・`commit_from`（kind=="commit" のときだけ）。
         """
         move = out.get("move")
+        kind = out.get("kind")
         tr: Dict[str, Any] = {"difficulty": "learned", "turn": self.turn_count,
                               "chosen": self.describe_move(move) if move else None,
-                              "readout": out.get("kind")}
+                              "readout": kind, "kind": kind}
         pending = json.loads(self._game.pending_json())
         if pending and pending.get("action"):
             tr["dialog"] = pending["action"]
@@ -305,6 +427,59 @@ class RsGame:
                 if sig is not None and self._sig(legal[g["rep"]]) == sig:
                     tr["value"] = round(float(g["q"]), 3)
                     break
+        # 全合法手の P・N・Q（箱化後の候補＝探索が見た手・訪問 0 も含む）。
+        stats = out.get("stats") or {}
+        ns, qs, ps = stats.get("N") or [], stats.get("Q") or [], stats.get("P")
+        if legal:
+            tr["legal_stats"] = [{
+                "move": self.describe_move(mv),
+                "p": (float(ps[i]) if ps is not None and i < len(ps) else None),
+                "n": (int(ns[i]) if i < len(ns) else None),
+                "q": (float(qs[i]) if i < len(qs) else None),
+            } for i, mv in enumerate(legal)]
+        # PV（主変化）: 記述子（card_id 基準）に直す。相手の伏せ手札など、根の世界サンプル
+        # にしか無いカードの uuid は実盤面で引けない＝describe_move はその uuid をそのまま返す
+        # （§20.4 の注記）。
+        pv = out.get("pv") or []
+        if pv:
+            tr["pv"] = [{
+                "move": self.describe_move(p.get("move") or {}),
+                "seat": p.get("seat"),
+                "n": (int(p["n"]) if p.get("n") is not None else None),
+                "q": (float(p["q"]) if p.get("q") is not None else None),
+            } for p in pv]
+        # 複数世界（§20.7.1）: `worlds>1` のときだけ Rust が出す欄。世界ごとの根の N/Q は
+        # **世界 0 の legal の並び**なので `legal_stats` と添字が揃う。
+        if out.get("worlds"):
+            tr["worlds"] = int(out["worlds"])
+            tr["world_used"] = out.get("world_used")
+            tr["per_world"] = [{
+                "seed": w.get("seed"),
+                "best": (self.describe_move(legal[w["best"]])
+                         if (w.get("best") is not None and w["best"] < len(legal)) else None),
+                "best_n": (float(w["N"][w["best"]])
+                           if (w.get("best") is not None and w["best"] < len(w.get("N") or []))
+                           else None),
+                "best_q": (round(float(w["Q"][w["best"]]), 3)
+                           if (w.get("best") is not None and w["best"] < len(w.get("Q") or []))
+                           else None),
+                "N": [float(x) for x in (w.get("N") or [])],
+                "Q": [float(x) for x in (w.get("Q") or [])],
+                "unmapped": w.get("unmapped"),
+                "p_differs": w.get("p_differs"),
+            } for w in (out.get("per_world") or [])]
+        if kind == "commit":
+            tr["commit_from"] = commit_from
+        # 箱レベルの鍵（`move_sig`）。原始手化の**前**の手が分かる＝思考ログで
+        # 「箱（DON_BOX／SETUP_BOX）を選んだのか素の手を選んだのか」を読める（§20.7.2）。
+        if out.get("sig") is not None:
+            tr["sig"] = out["sig"]
+        # 箱ごとの枝数（§20.7.2 の計測・`setup_box` を渡した decide だけ非 None）。
+        if out.get("boxes") is not None:
+            tr["boxes"] = out["boxes"]
+        # 葉の打ち切りの実績（§20.7.9 の計測・`leaf_rollout="turn_end"` の decide だけ欄が出る）。
+        if out.get("rollout") is not None:
+            tr["rollout"] = out["rollout"]
         return tr
 
     @staticmethod
@@ -321,6 +496,63 @@ class RsGame:
         """手を card_id 基準の記述 dict へ（旧 `cpu_ai._describe_move`）。**適用前**に呼ぶ。"""
         return json.loads(self._game.describe_move_json(
             json.dumps(move, ensure_ascii=False, default=str)))
+
+    #: 22 枠のゾーン名（`n_rel_feat._slots`／`docs/rust_engine_plan.md` §20.4 の並びと同じ:
+    #: 自L・相L・自場5・相場5・手札10）。
+    _ZONE_LABELS = (["own_leader", "opp_leader"] + ["own_field"] * 5 + ["opp_field"] * 5
+                    + ["hand"] * 10)
+
+    def _slot_labels(self, player_id: str) -> List[str]:
+        """22 枠 → `"<ゾーン>[<枠>]:<card_id>"`（`dump_index_json` の枠→uuid→card_id を組む・
+        空枠や uuid が引けない枠はゾーン名＋枠番号のみ）。
+        """
+        idx = json.loads(self._game.dump_index_json(player_id))
+        slot_to_uuid = {v: k for k, v in (idx.get("slots") or {}).items()}
+        cids = idx.get("cids") or {}
+        out = []
+        for i, zone in enumerate(self._ZONE_LABELS):
+            uuid = slot_to_uuid.get(i)
+            card_id = cids.get(uuid) if uuid else None
+            out.append(f"{zone}[{i}]:{card_id}" if card_id else f"{zone}[{i}]")
+        return out
+
+    def attribution(self, player_id: str, top_k: int = 5) -> List[Dict[str, Any]]:
+        """V の帰属（§20.4 の 3・scenario の play にだけ呼ぶ・serve には付けない）。
+
+        根の符号化（`self._game.encode`＝**実盤面**。decide 内部の世界サンプルではない）の
+        22 枠を 1 つずつ PAD（`tok` を 0 埋め・`card_idx` を 0）へ潰し、`opcg_engine.net_eval`
+        で value を取り直す（決定ごとに 23 回の forward＝軽い）。`dv = v0 - v_masked`（その枠を
+        消すと value がどれだけ動くか）の絶対値上位 `top_k` を返す。相関であって理由ではない
+        （§20.4 冒頭の注記）。
+
+        **制約**: `net_eval` はプロセスの既定ネット（最初に `load_net` した npz。`opcg_engine`
+        の「1 本目が既定」規約）を使う——`decide` が席ごとに別ネットを選べるのと違い、
+        帰属は席ごとのネット切替を追わない。両席とも同じネットで打たせる運用（本 WP の
+        9 シナリオ）ではこの差は出ない。
+        """
+        engine = load_engine()
+        enc = json.loads(self._game.encode(player_id))
+        enc["tok"] = enc.pop("tokens", None) or []
+        tok = list(enc["tok"])
+        card_idx = list(enc.get("card_idx") or [])
+        n_tok = len(self._ZONE_LABELS)
+        s_dim = (len(tok) // n_tok) if n_tok else 0
+        base = json.loads(engine.net_eval(json.dumps(enc), "[]"))
+        v0 = float(base["value"])
+        labels = self._slot_labels(player_id)
+        out = []
+        for i in range(n_tok):
+            t = list(tok)
+            for k in range(s_dim):
+                t[i * s_dim + k] = 0.0
+            ci = list(card_idx)
+            if i < len(ci):
+                ci[i] = 0
+            mod = dict(enc, tok=t, card_idx=ci)
+            r = json.loads(engine.net_eval(json.dumps(mod), "[]"))
+            out.append({"slot": i, "label": labels[i], "dv": v0 - float(r["value"])})
+        out.sort(key=lambda d: abs(d["dv"]), reverse=True)
+        return out[:top_k]
 
     def deck_counts(self) -> Dict[str, int]:
         """山札の残り枚数（`{"p1": n, "p2": n}`）。リプレイフレームだけが使う。"""
