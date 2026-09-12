@@ -1,0 +1,15 @@
+方策点 55907（全 55907・7s）
+  all      n  55907  agree 0.490  tv_raw 0.228  tv_temp 0.259  H_pi 1.624  H_p 1.892  chosen=top1 0.634  q_backs 0.875 (n 28502)
+  k2       n   7916  agree 0.695  tv_raw 0.131  tv_temp 0.136  H_pi 0.602  H_p 0.658  chosen=top1 0.717  q_backs 0.847 (n 2411)
+  k3-4     n   9285  agree 0.562  tv_raw 0.159  tv_temp 0.165  H_pi 1.075  H_p 1.157  chosen=top1 0.595  q_backs 0.800 (n 4063)
+  k5-8     n  10268  agree 0.422  tv_raw 0.195  tv_temp 0.204  H_pi 1.612  H_p 1.737  chosen=top1 0.533  q_backs 0.869 (n 5933)
+  k9+      n  28438  agree 0.434  tv_raw 0.289  tv_temp 0.344  H_pi 2.093  H_p 2.532  chosen=top1 0.660  q_backs 0.900 (n 16095)
+  t1-4     n  10379  agree 0.568  tv_raw 0.180  tv_temp 0.196  H_pi 1.083  H_p 1.209  chosen=top1 0.527  q_backs 0.896 (n 4481)
+  t5-8     n  17719  agree 0.480  tv_raw 0.222  tv_temp 0.250  H_pi 1.633  H_p 1.868  chosen=top1 0.681  q_backs 0.889 (n 9209)
+  t9+      n  27809  agree 0.467  tv_raw 0.250  tv_temp 0.288  H_pi 1.820  H_p 2.164  chosen=top1 0.644  q_backs 0.860 (n 14812)
+  forced0  n  55155  agree 0.491  tv_raw 0.227  tv_temp 0.258  H_pi 1.621  H_p 1.887  chosen=top1 0.633  q_backs 0.875 (n 28099)
+  forced1  n    606  agree 0.455  tv_raw 0.272  tv_temp 0.317  H_pi 1.935  H_p 2.321  chosen=top1 0.645  q_backs 0.906 (n 330)
+  forced2  n    136  agree 0.493  tv_raw 0.260  tv_temp 0.306  H_pi 1.752  H_p 2.124  chosen=top1 0.779  q_backs 0.884 (n 69)
+  forced3  n     10  agree 0.600  tv_raw 0.105  tv_temp 0.053  H_pi 1.475  H_p 1.436  chosen=top1 0.200  q_backs 0.500 (n 4)
+  9s
+  → /root/svp_w30.json
