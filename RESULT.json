@@ -1,0 +1,200 @@
+{
+  "job": "train-r9",
+  "role": "train",
+  "status": "done",
+  "inputs": {
+    "warm_start": "claude/train-r5:n1_results/nrel_r5.npz",
+    "pi_waves": [
+      29,
+      30,
+      31,
+      32
+    ],
+    "z_waves": [
+      27,
+      28
+    ],
+    "epochs": 2,
+    "lr": 0.0002,
+    "aux_weight": 0.1,
+    "ablate": "rel",
+    "backend": "torch",
+    "pi_teacher": "visits",
+    "pi_steps_mult": {
+      "r9": 2.0,
+      "r9h": 0.5
+    },
+    "diff_vs_r7": "教材・warm-start完全同一。--pi-steps-multのみ変更（r9=2.0倍・r9h=0.5倍）。--plan-weightは付けず（0のまま）"
+  },
+  "outputs": {
+    "net_r9": "n1_results/nrel_r9.npz",
+    "net_r9h": "n1_results/nrel_r9h.npz",
+    "band": "n1_results/band_r9/",
+    "arena": "n1_results/arena_r9/ (r9 vs r5 only; r9h did not qualify)"
+  },
+  "metrics": {
+    "r9": {
+      "val_v_mse": 0.4916875958442688,
+      "val_v_sign": 0.82295,
+      "pi_top1": 0.63225,
+      "best_ep": 1,
+      "train_sec": 3869.383,
+      "steps_ep0": 63467
+    },
+    "r9h": {
+      "val_v_mse": 0.49465668201446533,
+      "val_v_sign": 0.82055,
+      "pi_top1": 0.61925,
+      "best_ep": 0,
+      "train_sec": 2792.829,
+      "steps_ep0": 30845
+    },
+    "value_rows": 5966525,
+    "value_rows_val": 853742,
+    "policy_points": 1624058,
+    "policy_points_val": 232147,
+    "band": {
+      "w28": {
+        "rows": 31926,
+        "p_net_src": "nrel_a1.npz",
+        "r5": {
+          "v_mse": 0.5715890996124696,
+          "v_sign": 0.7945248386894694,
+          "top1_visits": 0.5770233538581018,
+          "ce_visits": 1.7492213252116184
+        },
+        "r7": {
+          "v_mse": 0.5858033665101913,
+          "v_sign": 0.7905468896823905,
+          "top1_visits": 0.5497309591168802,
+          "ce_visits": 1.7728864551615502
+        },
+        "r9": {
+          "v_mse": 0.5915564768403389,
+          "v_sign": 0.7849714965858547,
+          "top1_visits": 0.5509513507516502,
+          "ce_visits": 1.7694183026268973
+        },
+        "r9h": {
+          "v_mse": 0.5827383732762358,
+          "v_sign": 0.7901396980517447,
+          "top1_visits": 0.545015809618905,
+          "ce_visits": 1.777169163111886
+        }
+      },
+      "w30": {
+        "rows": 19467,
+        "p_net_src": "pol_p",
+        "r5": {
+          "v_mse": 0.5155001935078082,
+          "v_sign": 0.81445523193096,
+          "top1_visits": 0.6254657587048695,
+          "ce_visits": 1.7550082039468533
+        },
+        "r7": {
+          "v_mse": 0.5268451710850761,
+          "v_sign": 0.811373092926491,
+          "top1_visits": 0.6259796993447256,
+          "ce_visits": 1.7550667766799937
+        },
+        "r9": {
+          "v_mse": 0.5308035332088236,
+          "v_sign": 0.8095751785072174,
+          "top1_visits": 0.6302197096235385,
+          "ce_visits": 1.7529525217690751
+        },
+        "r9h": {
+          "v_mse": 0.5150182340274335,
+          "v_sign": 0.8139929110802897,
+          "top1_visits": 0.6198124116664525,
+          "ce_visits": 1.7598082331540146
+        }
+      },
+      "w32": {
+        "rows": 19375,
+        "p_net_src": "pol_p",
+        "r5": {
+          "v_mse": 0.5263126848046884,
+          "v_sign": 0.8120774193548387,
+          "top1_visits": 0.5728864810381756,
+          "ce_visits": 1.8447839976318299
+        },
+        "r7": {
+          "v_mse": 0.5264539035133706,
+          "v_sign": 0.8103225806451613,
+          "top1_visits": 0.5863676452059973,
+          "ce_visits": 1.8346712921043329
+        },
+        "r9": {
+          "v_mse": 0.5204564936041626,
+          "v_sign": 0.8142967741935484,
+          "top1_visits": 0.5887614967871992,
+          "ce_visits": 1.8324761802368865
+        },
+        "r9h": {
+          "v_mse": 0.5174167849406769,
+          "v_sign": 0.8112,
+          "top1_visits": 0.5819579186090462,
+          "ce_visits": 1.837367994472604
+        }
+      }
+    },
+    "band_top1_visits_3wave_avg": {
+      "r7": 0.5873594345558677,
+      "r9": 0.5899775190541293,
+      "r9h": 0.582262046631468,
+      "r9_beats_r7": true,
+      "r9h_beats_r7": false
+    },
+    "arena_random": {
+      "label": "r9_vs_r5_random",
+      "pairs": 190,
+      "games": 380,
+      "void": 2,
+      "wins": 198.0,
+      "wr": 0.5211,
+      "ci95": [
+        0.4664,
+        0.5757
+      ],
+      "elo": 14.6,
+      "elo95": [
+        -23.4,
+        53.0
+      ],
+      "promoted": false,
+      "shards": 8,
+      "dup_seeds": 0,
+      "seed_base": 571000,
+      "leaders": "random",
+      "decks": "synth_roles"
+    },
+    "arena_mirror": {
+      "label": "r9_vs_r5_mirror",
+      "pairs": 192,
+      "games": 384,
+      "void": 0,
+      "wins": 194.0,
+      "wr": 0.5052,
+      "ci95": [
+        0.4606,
+        0.5498
+      ],
+      "elo": 3.6,
+      "elo95": [
+        -27.4,
+        34.7
+      ],
+      "promoted": false,
+      "shards": 8,
+      "dup_seeds": 0,
+      "seed_base": 581000,
+      "leaders": "fixed",
+      "decks": "singleton"
+    },
+    "arena_r9h": "not run — r9h's 3-wave avg top1_visits (0.5823) did not exceed r7's (0.5874), per the pre-registered condition"
+  },
+  "command_r9": "OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in ~/n29_wave/*/n_records/* ~/n30_wave/*/n_records/* ~/n31_wave/*/n_records/* ~/n32_wave/*/n_records/* --z-in ~/n28_wave/*/n_records/* ~/n27_wave/*/n_records/* --warm-start ~/start.npz --ablate rel --aux-weight 0.1 --pi-steps-mult 2.0 --lr 2e-4 --epochs 2 --backend torch --pi-teacher visits --out ~/nrel_r9.npz",
+  "command_r9h": "OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in ~/n29_wave/*/n_records/* ~/n30_wave/*/n_records/* ~/n31_wave/*/n_records/* ~/n32_wave/*/n_records/* --z-in ~/n28_wave/*/n_records/* ~/n27_wave/*/n_records/* --warm-start ~/start.npz --ablate rel --aux-weight 0.1 --pi-steps-mult 0.5 --lr 2e-4 --epochs 2 --backend torch --pi-teacher visits --out ~/nrel_r9h.npz",
+  "notes": "両訓練ともログ冒頭でvalue 5,966,525行（val 853,742）・policy 1,624,058点（val 232,147）を確認、r7/r8と完全一致（教材集合の相違なし）。pi_steps_mult確認行（r9=2.0・r9h=0.5）も両ログで確認済み。実ステップ数はep0でr9=63,467（r7の41,719の約1.52倍）・r9h=30,845（約0.74倍）＝指示どおりの単純な2倍/0.5倍ではないが、πステップを増減させる実装の仕様どおり（V据え置き・πはシャッフルし直して複数周する組み合わせ計算のため）。OOM・再起動等の異常は無かった。best epoch: r9はep1（過学習なし、r7はep0がbestだったのと対照的）・r9hはep0（ep1でv_mse 0.4917→0.5001, top1 0.632→0.613と明確に悪化＝過学習）。\n\n【3波行列（r5/r7/r9/r9h、判定はコーディネータ）】top1_visits 3波平均: r7=0.5874・r9=0.5900（r7を上回る＝True）・r9h=0.5823（r7を上回る＝False）。波32ではr9がv_mse・top1_visitsとも単独でr7を上回った（V/πのトレードオフが緩和）。波30ではr9のtop1は伸びたがv_mseはr7よりさらに悪化（V/πのトレードオフが強まる方向）。波28（分布外）ではr9のtop1がr7よりわずかに改善したがv_mseはさらに悪化、r9hはv_mseが改善（r7比）もtop1は悪化。r9hのV水準はr5に近づいたが（波30: 0.5150 vs r5 0.5155とほぼ同水準・波32: 0.5174）r6水準（0.5115）までは戻らなかった＝候補(d)は部分的にのみ支持。全体としては候補(a)（比が律速）と候補(b)（波・層によりV/πの綱引きの出方が違う）が混在しているように見え、単一の候補で説明しきれない。\n\n【アリーナ】事前登録した条件どおり、3波平均top1_visitsでr7を上回ったr9のみ実施（r9hは条件未達のため未実施）。r9 vs r5: 主random wr=0.5211 Elo+14.6[-23.4,+53.0]・副mirror wr=0.5052 Elo+3.6[-27.4,+34.7]、void計2/766局と僅少、両条件とも退行シグナルなし（CI下限とも0.45を上回る）が、r7の主+25.4/副+16.3ほどの明確な改善でもない。"
+}
