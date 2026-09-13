@@ -1,0 +1,3 @@
+{"seed": 1032001, "score": 1.0, "leaders": ["OP01-062", "ST13-003"], "games": [1.0, 0.0], "cand_leaders": ["OP01-062", "OP01-062"], "turns": [11, 15], "cand_opts": {"worlds": 4}}
+{"seed": 1032000, "score": 0.0, "leaders": ["OP02-049", "OP17-058"], "games": [0.0, 0.0], "cand_leaders": ["OP02-049", "OP02-049"], "turns": [16, 15], "cand_opts": {"worlds": 4}}
+{"seed": 1032002, "score": 0.0, "leaders": ["ST10-002", "OP07-019"], "games": [0.0, 0.0], "cand_leaders": ["ST10-002", "ST10-002"], "turns": [12, 9], "cand_opts": {"worlds": 4}}

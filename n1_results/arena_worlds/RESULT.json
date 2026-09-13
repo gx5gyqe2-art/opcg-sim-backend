@@ -1,0 +1,20 @@
+{
+  "job": "arena-worlds-w02",
+  "role": "arena",
+  "status": "in_progress",
+  "base_branch": "claude/cpu-spec-improvements-yw91jd",
+  "base_commit": "af11fd3",
+  "inputs": {
+    "candidate": "claude/train-r5:n1_results/nrel_r5.npz",
+    "baseline": "claude/train-r5:n1_results/nrel_r5.npz",
+    "cand_worlds": 4,
+    "pairs": 300,
+    "seed_base": 1032000,
+    "leaders": "random",
+    "decks": "synth_roles",
+    "workers": 2,
+    "pair_timeout": 1800
+  },
+  "metrics": { "pairs_done": 0, "void": 0, "wins": 0.0, "wr": 0.0 },
+  "notes": "実行中のスナップショット。当初の指示書は origin/main を土台とし --cand-worlds/--decks synth_roles が存在しない状態だったため、コーディネータの自動修正指示（origin/claude/cpu-spec-improvements-yw91jd, af11fd3）へ土台を差し替えて再開。1ペアのスモークテストで cand_opts={worlds:4} を確認済み。バックグラウンドドライバが n1_results/arena_worlds/random_w02.jsonl へ追記中（このコミット時点では最初のバッチが未完了で0ペア）。以後は進捗が出るたびに再push する。"
+}
