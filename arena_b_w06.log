@@ -32,3 +32,9 @@
 === iter 8 exit=0 ===
 === iter 9 (done=320/350) 2026-09-13T08:11:38Z ===
 消化済み 320/350 ペア・残り 30
+今回 30 ペア（310s）・累計 350/350
+ARENA_RESUME_FINAL {"pairs": 350, "games": 700, "void": 0, "wins": 344.0, "wr": 0.4914, "ci95": [0.4502, 0.5326], "elo": -6.0, "promoted": false, "candidate": "/root/nrel_r7.npz"}
+=== iter 9 exit=0 ===
+=== iter 10 (done=350/350) 2026-09-13T08:16:48Z ===
+reached 350, stopping
+LOOP_DONE final_count=350
