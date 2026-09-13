@@ -4,3 +4,7 @@ DRIVER: relaunching arena_shard (lines=40/350)
 DRIVER: batch exit rc=0
 DRIVER: relaunching arena_shard (lines=80/350)
 消化済み 80/350 ペア・残り 270
+今回 40 ペア（268s）・累計 120/350
+DRIVER: batch exit rc=0
+DRIVER: relaunching arena_shard (lines=120/350)
+消化済み 120/350 ペア・残り 230
