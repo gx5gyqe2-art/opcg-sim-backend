@@ -83,6 +83,10 @@ TURN_BANDS = ("T<=4", "T5-8", "T9+")
 CLOCK_BANDS = ("t<=2", "t3-4", "t5+")
 C_TLEFT = 0
 PRESSURE_BANDS = ("p<=0", "p1k", "p2k", "p3k", "p4k", "p5k+")
+#: パワーの許容（power 単位）。符号化は f16 なので戻したパワーは 2000 が 2000.0002 になる。
+#: **許容なしでは「2000 のカウンター 1 枚で 2000 の攻撃を止められない」と数える**＝`c_min` が
+#: 系統的に +1 される（実データの大半がちょうど 1000 の倍数）。10 は実カードの刻みよりはるかに小さい。
+PWR_EPS = 10.0
 
 
 def turn_band(t):
@@ -94,12 +98,12 @@ def clock_band(t):
 
 
 def pressure_band(x):
-    """超過パワー → カウンター 1 枚（1000）刻みの帯。"""
+    """超過パワー → カウンター 1 枚（1000）刻みの帯（[`PWR_EPS`] の許容つき）。"""
     if x is None:
         return None
-    if x <= 0:
+    if x <= PWR_EPS:
         return "p<=0"
-    k = int(np.ceil(x / 1000.0))
+    k = int(np.ceil((x - PWR_EPS) / 1000.0))
     return f"p{k}k" if k <= 4 else "p5k+"
 
 
@@ -117,14 +121,14 @@ def c_min(values, x):
 
     `values` はカウンター値のリスト（power 単位）。止められないなら None。
     """
-    if x is None or x <= 0:
+    if x is None or x <= PWR_EPS:
         return 0
     got = 0.0
     n = 0
     for v in sorted((float(v) for v in values if float(v) > 0), reverse=True):
         got += v
         n += 1
-        if got >= x:
+        if got >= x - PWR_EPS:            # f16 の丸めで「ちょうど足りる」を落とさない
             return n
     return None
 

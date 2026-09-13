@@ -69,9 +69,19 @@ def test_pressure_band_is_one_counter_card_per_step():
     assert B.pressure_band(None) is None
     assert B.pressure_band(-1000) == "p<=0"
     assert B.pressure_band(0) == "p<=0"
-    assert B.pressure_band(1) == "p1k"
+    assert B.pressure_band(1000) == "p1k"
     assert B.pressure_band(2000) == "p2k"
-    assert B.pressure_band(4001) == "p5k+"
+    assert B.pressure_band(4500) == "p5k+"
+
+
+def test_power_tolerance_keeps_f16_rounding_from_adding_a_card():
+    """符号化は f16 なので 2000 が 2000.0002 で戻る。**許容が無いと 1 段上がる**。"""
+    assert B.pressure_band(2000.0002) == "p2k"
+    assert B.pressure_band(1.0) == "p<=0"            # 1 パワーの超過は実在しない
+    # 2000 のカウンター 1 枚で 2000.0002 の攻撃を止められると数える
+    assert B.c_min([2000], 2000.0002) == 1
+    assert B.c_min([1000, 1000], 2000.0002) == 2
+    assert B.c_min([1000], 2000.0002) is None
 
 
 def _tk(own_leader, opp_leader, chars=()):
