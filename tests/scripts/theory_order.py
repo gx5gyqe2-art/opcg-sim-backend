@@ -68,7 +68,8 @@ from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from order_acc import band_of, pair_agree, q_floor  # noqa: E402
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0")
-POL_COLS = ("pol_n", "pol_q", "pol_p", "pol_sig", "pol_cid", "pol_tcid", "pol_si", "pol_ti")
+POL_COLS = ("pol_n", "pol_q", "pol_p", "pol_sig", "pol_cid", "pol_tcid", "pol_si",
+            "pol_ti", "pol_k")
 
 #: 実測の価格（`docs/game_theory.md` §18・勝率の単位）。相手ターンの値を既定にする
 #: ——守る／受けるの判断は相手ターンに起きるので、攻撃の値付けはそちらの価格で見る。
@@ -188,12 +189,19 @@ def play_value(power, cost, opp_leader_power, r_turns, theta=THETA, mu=MU, delta
     return nu_of(power, opp_leader_power, r_turns, theta, mu) - mu - float(cost) * d
 
 
-def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None):
+def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, don_k=None):
     """候補 1 つの理論値（値付けできなければ `None`）。
 
     `sig` は `[action_type, uuid, target_ids, selected_uuids, accepted]`（`record_gen.move_sig`）。
     `ctx` は `{"opp_leader_power", "my_leader_power", "r_turns", "theta", "mu", "don_k"}`。
     `src_power`／`tgt_power` を渡せば**印字ではなく今のパワー**で値付けする（枠から採った値）。
+    `don_k` を渡せば**その候補の実際の付与枚数**を使う（`ctx["don_k"]` の仮定より優先）。
+
+    > **付与枚数は記録に在る**（2026-09-13 に判明）＝**`pol_k` 列**（`record_gen` の
+    > `_don_k(rep)`＝`payload["don_k"]`・`-1` は DON_BOX でない候補）。`move_sig` が 5 要素で
+    > 落としているのは事実だが、**dump は別列として持っている**ので仮定は要らない。
+    > それまで `--don-k 1` を仮定していたのは誤りで、実測の分布は
+    > **攻撃（対象付き）は k=0 が 58%**（＝ドンを付けずに殴る）＝**全攻撃に +1000 を足していた**。
 
     **`DON_BOX` は「ドンを k 枚付けてから攻撃する」マクロ手**（`search/decide.rs::
     don_box_first_primitive`・`box_total`）。**`target_ids` が入っていればそれは攻撃**で、
@@ -214,12 +222,14 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None):
         return None
     sp = float(src["power"]) if src_power is None else float(src_power)
     has_target = bool(sig[2]) if len(sig) > 2 else False
+    # 記録の `pol_k`（`-1` は DON_BOX でない）を優先し、無ければ `ctx` の仮定に落ちる
+    k = float(ctx["don_k"]) if (don_k is None or int(don_k) < 0) else float(don_k)
     if at == "ATTACK" or (at == "DON_BOX" and has_target):
         # DON_BOX ならドン k 枚を付けてから殴る＝パワーは 1000k 上がる。
         # **`don_k` は記録に無い**（`move_sig` は 5 要素で付与枚数は payload にしか無い）ので
         # 仮定値 `ctx["don_k"]` を足し、`--don-k` で感度を見る。
         if at == "DON_BOX":
-            sp += 1000.0 * float(ctx["don_k"])
+            sp += 1000.0 * k
         if tgt is None and tgt_power is None:         # 対象のカードが引けない＝リーダー扱い
             return attack_value(sp, ctx["opp_leader_power"], True, theta, mu)
         tp = float(tgt["power"]) if tgt_power is None else float(tgt_power)
@@ -228,7 +238,7 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None):
         nu_t = nu_of(tp, ctx["my_leader_power"], ctx["r_turns"], theta, mu)
         return attack_value(sp, tp, False, theta, mu, nu_target=nu_t)
     if at in ("ATTACH_DON", "DON_BOX"):
-        return attach_value(sp, ctx["opp_leader_power"], ctx["don_k"], theta, mu)
+        return attach_value(sp, ctx["opp_leader_power"], k, theta, mu)
     if at == "PLAY":
         if src is None or src.get("event"):
             return None                              # イベントは効果の中身が要る
@@ -301,7 +311,8 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
                 theory.append(score_candidate(sig, str(pol["pol_cid"][j]) or None,
                                               tcid, ctx, cards,
                                               src_power=slot_power(tok, pol["pol_si"][j]),
-                                              tgt_power=slot_power(tok, pol["pol_ti"][j])))
+                                              tgt_power=slot_power(tok, pol["pol_ti"][j]),
+                                              don_k=pol["pol_k"][j]))
             stats["cand"] += k
             stats["cand_scored"] += sum(1 for t in theory if t is not None)
             r = row_order(pol["pol_n"][b:b + k], pol["pol_q"][b:b + k], pol["pol_p"][b:b + k],

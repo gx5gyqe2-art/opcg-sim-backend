@@ -171,5 +171,31 @@ def test_the_loss_is_reported_against_a_random_candidate_baseline():
            "q_loss": 0.4, "q_loss_vs_n": 0.4, "th_loss": 0.0, "th_loss_vs_n": 0.0,
            "q_loss_rand": 0.3, "th_loss_rand": 0.3}
     s = V.summarise([rec, dict(rec, seed=2)], Counter(), {}, None, 0.02)
-    assert s["q_recovered"] == pytest.approx(1.0 - 0.4 / 0.3, abs=1e-4)   # 出力は 4 桁で丸める
-    assert s["q_recovered"] < 0
+    # 食い違いだけに絞った版（理論に不利に偏る＝参考値）
+    assert s["q_recovered_on_disagreements"] == pytest.approx(1.0 - 0.4 / 0.3, abs=1e-4)
+    assert s["q_recovered_on_disagreements"] < 0
+
+
+def test_the_primary_recovered_counts_the_rows_where_they_agree():
+    """**母数は判定できる全行**——食い違った行だけだと理論側の損は定義上 正になり偏る。
+
+    一致した行（損 0）を入れると符号が変わりうる（2026-09-13 に実際に起きた）。
+    """
+    from collections import Counter
+    base = {"band": "close", "turn": 1, "z": 1.0, "tie": False, "th_tied": False,
+            "at_th": "attack", "at_n": "attach", "i_q": 0, "i_th": 0, "i_played": 0,
+            "played_is_th": False, "q_loss": 0.4, "th_loss": 0.0,
+            "q_loss_rand": 0.3, "th_loss_rand": 0.3}
+    rows = []
+    for g in range(1, 11):
+        # 9 行は一致（損 0）・1 行だけ食い違う
+        hit = (g == 1)
+        rows.append(dict(base, seed=g, agree=not hit, agree_n=not hit, i_n=0 if not hit else 1,
+                         q_loss_vs_n=0.4 if hit else 0.0, th_loss_vs_n=0.0))
+    s = V.summarise(rows, Counter(), {}, None, 0.02)
+    # 損の平均は 0.4/10 = 0.04 対 無作為 0.3 ⇒ 大きく**正**
+    assert s["q_loss_all"]["mean"] == pytest.approx(0.04, abs=1e-4)
+    assert s["q_recovered"] == pytest.approx(1.0 - 0.04 / 0.3, abs=1e-3)
+    assert s["q_recovered"] > 0.8
+    # 同じデータで食い違い限定は **負**（母数の選び方だけで符号が反転する）
+    assert s["q_recovered_on_disagreements"] < 0

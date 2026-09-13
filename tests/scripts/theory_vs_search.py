@@ -80,7 +80,8 @@ from theory_order import (MU, THETA, SC_MY_LEADER_POWER, SC_OPP_LEADER_POWER,  #
                           SC_OPP_LIFE, PWR_EPS, c_of, saturation_x, score_candidate)
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0")
-POL_COLS = ("pol_n", "pol_q", "pol_p", "pol_sig", "pol_cid", "pol_tcid", "pol_si", "pol_ti")
+POL_COLS = ("pol_n", "pol_q", "pol_p", "pol_sig", "pol_cid", "pol_tcid", "pol_si",
+            "pol_ti", "pol_k")
 
 #: 予言の名前（出力の鍵・順序を固定する）
 PREDICTIONS = ("p1_don_on_zero", "p2_over_sat", "p3_cannot_connect")
@@ -109,12 +110,13 @@ def slot_power(tok_row, slot):
     return _round10(float(tok_row[s, S_POWER]) * 1e4)
 
 
-def cand_detail(sig, cid, tcid, si, ti, ctx, cards, tok_row):
+def cand_detail(sig, cid, tcid, si, ti, ctx, cards, tok_row, don_k=None):
     """候補 1 つの**性質**（値ではなく、何をする手なのか）。
 
     `x` は超過パワー（攻撃・ドン付与だけ）。対象の取り方は
     `theory_order.score_candidate` に揃える（対象が引けない攻撃はリーダー扱い・
     ドン付与はリーダーを相手と見る）が、**パワーは枠から現在値を採る**（無ければ印字に落ちる）。
+    `don_k` は**記録の `pol_k`**（その候補の実際の付与枚数・`-1` は DON_BOX でない）。
     """
     at = sig[0] if sig else None
     src = cards.info(cid) if cid else None
@@ -133,9 +135,12 @@ def cand_detail(sig, cid, tcid, si, ti, ctx, cards, tok_row):
     d["x_src"] = "slot" if sp is not None else "printed"
     if sp is None:
         sp = float(src["power"])
+    # 記録の `pol_k`（`-1` は DON_BOX でない）を優先し、無ければ `ctx` の仮定に落ちる
+    k = float(ctx["don_k"]) if (don_k is None or int(don_k) < 0) else float(don_k)
+    d["don_k"] = k
     if is_attack:
         if at == "DON_BOX":
-            sp += 1000.0 * float(ctx["don_k"])        # ドンを付けてから殴る
+            sp += 1000.0 * k                          # ドンを付けてから殴る
         tp = slot_power(tok_row, ti)
         if tp is None:
             tp = ctx["opp_leader_power"] if tgt is None else float(tgt["power"])
@@ -154,10 +159,12 @@ def predictions_of(det, theta=THETA, don_k=1):
     if x is None:
         return out
     at = det["at"]
-    if at in ("ATTACH_DON", "DON_BOX"):
-        # 超過 0 の攻撃にドン: c(0) と c(1000) が同じ段なので 1 枚付けても増えない
+    # **付与枚数は記録に在る**（`pol_k`）＝仮定ではなくその候補の実際の k で判定する
+    k = float(det.get("don_k", don_k) or 0.0)
+    if at in ("ATTACH_DON", "DON_BOX") and k > 0:
+        # 超過 0 の攻撃にドン: c(0) と c(1000) が同じ段なので付けても増えない
         out["p1_don_on_zero"] = bool(0.0 <= x < 1000.0 and
-                                     c_of(x + 1000.0 * don_k) <= c_of(x) + 1e-9)
+                                     c_of(x + 1000.0 * k) <= c_of(x) + 1e-9)
     out["p2_over_sat"] = bool(x > saturation_x(theta))
     # **攻撃は `DON_BOX`（対象付き）の形で来る**＝`ATTACK` だけ見ていては 1 件も数えられない
     if det.get("is_attack"):
@@ -171,10 +178,11 @@ def row_compare(n, q, theory, chosen, n_min=5, q_eps=0.02, n_min_frac=0.05, th_e
     **`theory_order.row_order` と同じ絞り方**（値付け可 ＆ 訪問の下限）にして、
     順序一致率の母集団と揃える＝2 つの器の数字を並べて読める。
 
-    **理論の最良が同値で並んだ行は判定から外す**（`th_tied`）——`DON_BOX` は
-    「このキャラにドンを k 枚」を畳んだマクロ手で、**`don_k` が記録に無い**ので理論は
-    同じキャラの k 違いを区別できない。`argmax` は最小 index を返すだけなので、
-    そのまま数えると**器の癖を「探索の食い違い」と誤読する**（2026-09-13 に実際に踏んだ）。
+    **理論の最良が同値で並んだ行は判定から外す**（`th_tied`）——`min(c(x), Θ)` は飽和すると
+    同値を量産し、付与の増分は平らな段で 0 になるので、**価格は構造的に引き分けを作る**。
+    `argmax` は最小 index を返すだけなので、そのまま数えると**器の癖を「探索の食い違い」と
+    誤読する**（2026-09-13 に実際に踏んだ。当時は付与枚数を仮定していたので同値がさらに多く、
+    同じキャラの k 違いが全部同じ値になっていた＝いまは記録の `pol_k` を使うので区別できる）。
 
     探索側の物差しは 2 つ出す:
       `i_q` … `Q` の最大（`theory_order` と同じ基準だが**勝者の呪いで上振れする**）
@@ -259,10 +267,11 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
                 cid = str(pol["pol_cid"][j]) or None
                 tcid = (str(pol["pol_tcid"][j]) or None) if (len(sig) > 2 and sig[2]) else None
                 si, ti = pol["pol_si"][j], pol["pol_ti"][j]
+                dk = pol["pol_k"][j]
                 theory.append(score_candidate(sig, cid, tcid, ctx, cards,
                                               src_power=slot_power(tok, si),
-                                              tgt_power=slot_power(tok, ti)))
-                dets.append(cand_detail(sig, cid, tcid, si, ti, ctx, cards, tok))
+                                              tgt_power=slot_power(tok, ti), don_k=dk))
+                dets.append(cand_detail(sig, cid, tcid, si, ti, ctx, cards, tok, dk))
             r = row_compare(pol["pol_n"][b:b + k], pol["pol_q"][b:b + k], theory,
                             int(rows["pol_chosen"][i]), n_min, q_eps, n_min_frac)
             if "i_th" not in r:
@@ -350,12 +359,23 @@ def summarise(recs, cross, pred_hit, at_dist=None, q_eps=0.02, top=8):
                                 "rate": round(c["hit"] / max(1, c["hit"] + c["miss"]), 4)}
                            for nm, c in pred_hit.items()},
            "q_eps": q_eps}
-    # **無作為からどれだけ最良側に寄れたか**（0 = 無作為・1 = 最良）＝損の数字の読み方
+    # **無作為からどれだけ最良側に寄れたか**（0 = 無作為・1 = 最良）＝損の数字の読み方。
+    # **母数は判定できる全行**（一致した行の損は 0）——食い違った行だけで測ると
+    # 理論側の損は**定義上 正**になるのに基準線はそうならないので、**理論に不利に偏る**
+    # （2026-09-13 に踏んだ: 食い違い限定で −0.51・全行で符号が変わる）。
+    okd = [r["seed"] for r in ok]
+    out["q_loss_all"] = _mean_ci([r["q_loss_vs_n"] if not r["agree_n"] else 0.0 for r in ok], okd)
+    out["th_loss_all"] = _mean_ci([r["th_loss_vs_n"] if not r["agree_n"] else 0.0 for r in ok], okd)
+    out["q_loss_random_all"] = _mean_ci([r["q_loss_rand"] for r in ok], okd)
+    out["th_loss_random_all"] = _mean_ci([r["th_loss_rand"] for r in ok], okd)
     for side in ("q", "th"):
-        loss = out[f"{side}_loss_vs_visits"]["mean"]
-        rand = out[f"{side}_loss_random"]["mean"]
-        out[f"{side}_recovered"] = (round(1.0 - loss / rand, 4)
-                                   if (loss is not None and rand not in (None, 0.0)) else None)
+        for tag, lk, rk in (("", "_loss_all", "_loss_random_all"),
+                            ("_on_disagreements", "_loss_vs_visits", "_loss_random")):
+            loss = out[f"{side}{lk}"]["mean"]
+            rand = out[f"{side}{rk}"]["mean"]
+            out[f"{side}_recovered{tag}"] = (round(1.0 - loss / rand, 4)
+                                             if (loss is not None
+                                                 and rand not in (None, 0.0)) else None)
     if at_dist:
         tot = sum(at_dist.values())
         out["search_action_mix"] = {a: round(c / tot, 4) for a, c in at_dist.most_common()}
