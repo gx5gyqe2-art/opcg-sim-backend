@@ -1,7 +1,7 @@
 {
   "job": "arena-worlds-w03",
   "role": "arena",
-  "status": "in_progress",
+  "status": "done",
   "inputs": {
     "candidate": "claude/train-r5:n1_results/nrel_r5.npz",
     "baseline": "claude/train-r5:n1_results/nrel_r5.npz",
@@ -14,10 +14,10 @@
     "pair_timeout": 1800
   },
   "metrics": {
-    "pairs_done": 280,
+    "pairs_done": 300,
     "void": 0,
-    "wins": 283.0,
-    "wr": 0.5054
+    "wins": 304.0,
+    "wr": 0.5067
   },
-  "notes": "manual sync commit; background driver+pusher continue"
+  "notes": "全300ペア消化。ARENA_RESUME_FINAL: wr=0.5067 ci95=[0.4618,0.5515] elo=4.6 void=0（候補=基準=r5・worlds=4 vs 既定worlds=1の効果のみを測定・promoted判定は候補=基準ネットのため意味なし）。異常・クラッシュなし。"
 }
