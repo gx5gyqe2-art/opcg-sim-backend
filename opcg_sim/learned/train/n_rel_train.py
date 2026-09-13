@@ -1079,6 +1079,10 @@ def _save(net, args, vocab, V, P, best_ep):
     net.save(args.out, meta={"rows_v": int(len(V["z"])), "points_p": int(len(P["len"])),
                              "epochs": args.epochs, "best_ep": best_ep, "hidden": args.hidden,
                              "src": args.src, "kind": "nrel-a",
+                             # z 専用の dump（`--z-in`）も焼く（2026-09-13）。`src` だけだと
+                             # 「どの教材で作ったネットか」が半分しか残らず、後から同じ教材で
+                             # 対照を組めない（r10 の再実行で実際に詰まった＝行数が合わせられない）。
+                             **({"z_src": list(args.zsrc)} if getattr(args, "zsrc", None) else {}),
                              "ablate": sorted(net.ablate),
                              # 教師の作り方（§20.6.1）。既定 visits のときは焼かない＝
                              # 今までの npz と meta が 1 bit も変わらない。
