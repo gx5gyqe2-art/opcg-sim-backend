@@ -1,0 +1,20 @@
+{
+  "job": "arena-worlds-w01",
+  "role": "arena",
+  "status": "in_progress",
+  "base_branch": "claude/cpu-spec-improvements-yw91jd",
+  "base_commit": "97994c67cba530b61ad669bca96a98e1f8d8e09e",
+  "inputs": {
+    "candidate": "claude/train-r5:n1_results/nrel_r5.npz",
+    "baseline": "claude/train-r5:n1_results/nrel_r5.npz",
+    "cand_worlds": 4,
+    "pairs": 300,
+    "seed_base": 1031000,
+    "leaders": "random",
+    "decks": "synth_roles",
+    "workers": 2,
+    "pair_timeout": 1800
+  },
+  "metrics": { "pairs_done": 2, "void": 0, "wins": 4.0, "wr": 1.0 },
+  "notes": "初回起動でoriginをorigin/mainからチェックアウトしたところ--cand-worlds/synth_rolesが無く停止・報告。コーディネータの訂正指示（スケジュールトリガ経由）でclaude/cpu-spec-improvements-yw91jdへ土台差し替え、wheel再ビルド。さらにこの環境にはnumpyが入っておらず最初の300ペアが全件voidになる不具合を検出・停止し、pip install -r opcg_sim/requirements.txtで解消（voidは0件・除去済みjsonlは破棄して1031000から再開）。バックグラウンドドライバで継続中。1ペア=68秒(worlds=4・workers=2)程度、300ペア完走は数時間規模の見込み。"
+}
