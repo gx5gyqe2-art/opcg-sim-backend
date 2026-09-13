@@ -10,8 +10,9 @@
   3. `_spread` は n の少ない帯を混ぜない。
   4. **視点**: `collect` の `true_margin` は**その行の席から見た（自分 − 相手）**＝
      自分が有利なら正（手作りの 1 局で固定）。
-  5. **「しない」と「できない」の分離**（`avail`）: 候補一覧から face／board／guard が選べたかを拾い、
-     カウンター値を合計する。**ここを取り違えると「守れるのに守らない」の数が壊れる**。
+  5. **「しない」と「できない」の分離**: 攻めは候補一覧（`avail`）・**守りは行の符号化**
+     （`guard_means`＝窓の行は候補一覧を持たないため・2026-09-13 に実測で判った）。
+     **ここを取り違えると「守れるのに守らない」の数が壊れる**（1 回壊した）。
 """
 import json
 import os
@@ -209,3 +210,22 @@ def test_capability_accounting():
     assert row["played_take"]["guard_avail"] == pytest.approx(0.6)   # 守れたのに受けた 6/10
     assert row["played_take"]["guard_enough"] == pytest.approx(0.0)
     assert row["played_guard"]["guard_enough"] == pytest.approx(1.0)
+
+
+def test_guard_means_reads_the_hand_from_the_encoding():
+    """窓の行は候補一覧を持たないので、守る手段は符号化（`counter_value`／`is_blocker_active`）から読む。"""
+    tok = np.zeros((N_TOK, S_DIM), np.float32)
+    # 手札 3 枚に 1000／2000／0（`counter_value` は counter/2000 で入っている）
+    tok[12, TPM.S_COUNTER] = 1000 / TPM.COUNTER_SCALE
+    tok[13, TPM.S_COUNTER] = 2000 / TPM.COUNTER_SCALE
+    csum, blocker = TPM.guard_means(tok)
+    assert csum == pytest.approx(3000.0)
+    assert blocker is False
+    # 自分の場にブロッカー
+    tok[3, TPM.S_BLOCKER] = 1.0
+    csum2, blocker2 = TPM.guard_means(tok)
+    assert csum2 == pytest.approx(3000.0) and blocker2 is True
+    # 場の枠のカウンター値は数えない（`counter_value` は手札の枠だけ）
+    tok3 = np.zeros((N_TOK, S_DIM), np.float32)
+    tok3[2, TPM.S_COUNTER] = 2000 / TPM.COUNTER_SCALE
+    assert TPM.guard_means(tok3)[0] == pytest.approx(0.0)

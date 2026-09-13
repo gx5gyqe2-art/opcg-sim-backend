@@ -33,9 +33,15 @@ holdout だけ）。**方針は打った方針**（`plan_labels` の分類）で
 **その時に合法だった手の一覧**（候補列）とカード ID が残っているので、**推測ではなく観測**で分けられる:
   face_avail   … 相手リーダーを殴る手が候補にあった
   board_avail  … 相手キャラを殴る／除去する手が候補にあった
-  guard_avail  … カウンターを使う手（`SELECT_COUNTER`）かブロッカー宣言（`SELECT_BLOCKER`）が候補にあった
-  counter_sum  … 候補に出ているカウンターカードの**カウンター値の合計**
+  guard_avail  … **守る手段が在った**（手札のカウンター値の合計 > 0 か、自分の場に起動中のブロッカー）
+  counter_sum  … **手札のカウンター値の合計**（power 単位）
   guard_enough … `counter_sum` が飛んでくる攻撃の超過パワー以上（ブロッカーが在れば無条件で真）
+
+**守りの手段を候補一覧からは読めない**（2026-09-13 に実測で判った）: `record_gen` は
+「窓・コミットは訪問を配らない＝候補を持たない」ので、カウンター窓の行の `pol_len` は 0。
+そこで**その行の符号化そのもの**から読む——`n_rel_feat.S_COLS` の `counter_value`（列 7・手札の枠だけ・
+`min(counter/2000, 2.5)`・**カウンターイベントも max で入っている**）を手札 10 枠で合計し、
+`is_blocker_active`（列 6）を自分の場 5 枠で見る。攻めの側は main 行なので候補一覧が在る＝そのまま使う。
 これで **`attack_both`（face も board も選べた行だけ）／`defense_can`（守れた行だけ）／
 `defense_enough`（止めるだけのカウンターが在った行だけ）** を出す。絞っても差が残れば
 **選択の誤り**、消えれば**能力の限界**＝手当ての場所が変わる。
@@ -76,8 +82,12 @@ from opcg_sim.learned.train.n_eff_feat import build_eff_tables  # noqa: E402
 ATTACK = ("face", "board", "mixed")
 DEFENSE = ("take", "guard")
 MARGIN_BANDS = ("m<=-2", "m-1", "m0", "m+1", "m>=+2")
-#: 守りの候補に出る action_type（`rules/legal.rs` の `ACT_SELECT_COUNTER`／`ACT_SELECT_BLOCKER`）
+#: 守りの候補に出る action_type（`rules/legal.rs`・**窓の行は候補を持たないので実際には出てこない**）
 GUARD_ATS = ("SELECT_COUNTER", "SELECT_BLOCKER")
+#: 守る手段を符号化から読む（`n_rel_feat.S_COLS` の index・`encode/tokens.rs` の表）
+S_BLOCKER, S_COUNTER = 6, 7
+SLOT_OWN_FIELD, SLOT_HAND = slice(2, 7), slice(12, 22)
+COUNTER_SCALE = 2000.0          # `counter_value` は `min(counter/2000, 2.5)`
 CLOCK_BANDS = ("t<=2", "t3-4", "t5+")
 #: 時間の列（`time_labels.TIME_COLS` と同じ並び）の index
 C_TLEFT, C_MY2, C_OP2, C_MY3, C_OP3, C_MYE, C_OPE = range(TL.D_TIME)
@@ -141,6 +151,20 @@ def avail(pol, L, ptr, i, u2c, cards):
     return out
 
 
+def guard_means(tok_row):
+    """行の符号化 → (手札のカウンター値の合計, 起動中のブロッカーが居るか)。
+
+    窓の行は候補一覧を持たない（`record_gen`「窓・コミットは訪問を配らない」）ので、
+    「守れたのか」はここから読む。`counter_value` は手札の枠だけに入り、**カウンターイベントも
+    max で含む**（`encode/tokens.rs` の表）。1 枚あたり 2.5（＝5000）で飽和する近似。
+    """
+    hand = np.asarray(tok_row)[SLOT_HAND]
+    field = np.asarray(tok_row)[SLOT_OWN_FIELD]
+    csum = float(hand[:, S_COUNTER].sum()) * COUNTER_SCALE
+    blocker = bool((field[:, S_BLOCKER] > 0.5).any())
+    return csum, blocker
+
+
 def _cls(sj, u2c, cards):
     return PL.move_class(sj, u2c, cards)
 
@@ -198,12 +222,13 @@ def collect(net, rt, dirs, holdout_mod=7, limit_games=0, bs=512):
             tt = tm_true[n]
             av = avail(pol, L, ptr, i, u2c, cards)
             if not own:
+                # 窓の行は候補を持たないので、守る手段は符号化から読む（2026-09-13）
+                csum, blocker = guard_means(ex["tok"][i])
                 over = _incoming(ex["race_tk"][i])    # 飛んでくる攻撃の超過パワー（None＝攻撃なし）
-                av["atk_over"] = over
-                av["guard_enough"] = bool(
-                    av["blocker_avail"] or
-                    (over is not None and av["counter_sum"] >= over) or
-                    (over is not None and over <= 0.0))
+                av.update(counter_sum=csum, blocker_avail=blocker,
+                          guard_avail=bool(csum > 0.0 or blocker), atk_over=over,
+                          guard_enough=bool(blocker or (over is not None and csum >= over)
+                                            or (over is not None and over <= 0.0)))
             rec = {"turn": t, "z": zs.get(w, 0.0), "played": int(labels[n]), **av,
                    "true_margin": float(tt[C_MY3] - tt[C_OP3]),
                    "true_clock": float(tt[C_TLEFT] * TL.T_SCALE),
