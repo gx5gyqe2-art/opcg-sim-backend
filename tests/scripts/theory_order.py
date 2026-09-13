@@ -18,11 +18,20 @@ order_acc(理論, Q)  vs  order_acc(p, Q) = 0.5016（接戦帯・実測）
 | リーダーへの攻撃 | `min( c(x)·μ, Θ·μ )` … 相手が「守る／受ける」の安い方を選ぶので **min** |
 | キャラへの攻撃 | `min( c(x)·μ, ν(対象) )` … 守るか、そのキャラを失うか |
 | 登場（キャラ） | `ν(自分のキャラ) − μ − cost·δ` … 手札とドンで場を買う |
-| ドン付与 | `( c(x+1000) − c(x) )·μ` … 段を 1 つ上げる。**飽和点 `x*` を超えたら 0** |
+| ドン付与（攻撃を伴わない） | `( c(x+1000k) − c(x) )·μ` … 段を上げる。**飽和点 `x*` を超えたら 0** |
 | ターン終了 | 0 |
 | 起動メイン・イベント | **値付けできない**（効果の中身が要る）＝ペアから外す |
 
 `x = 攻撃側のパワー − 対象のパワー`。`x < 0` は**通らないので 0**（`game_theory.md` §14.1）。
+
+> **記録に `ATTACK` という行動型は出てこない**（2026-09-13 に判明・それまでの数字は無効）。
+> 攻撃は全部 **`DON_BOX`（対象付き）**の形で来る——これは「ドンを k 枚付けてから殴る」を
+> 畳んだマクロ手（`rust/opcg_engine/src/search/decide.rs::don_box_first_primitive`・`box_total`）で、
+> **`target_ids` が空なら純粋な付与・入っていれば攻撃**である。
+> 実測（24 局）: `DON_BOX` 9,782 件のうち **6,460 件（66%）が対象付き＝全候補の 44%**。
+> **この 44% を「付与」の式で値付けしていた**のが初版の誤りで、理論の中心
+> （攻撃の価値と飽和点）が一度も検査されないまま「接戦帯 0.526」を出していた。
+> パワーも**枠の現在値**を渡せるようにした（印字ではドンが付いたキャラを測れない）。
 
 ## 読み方（事前登録）
 
@@ -59,7 +68,7 @@ from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from order_acc import band_of, pair_agree, q_floor  # noqa: E402
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0")
-POL_COLS = ("pol_n", "pol_q", "pol_p", "pol_sig", "pol_cid", "pol_tcid")
+POL_COLS = ("pol_n", "pol_q", "pol_p", "pol_sig", "pol_cid", "pol_tcid", "pol_si", "pol_ti")
 
 #: 実測の価格（`docs/game_theory.md` §18・勝率の単位）。相手ターンの値を既定にする
 #: ——守る／受けるの判断は相手ターンに起きるので、攻撃の値付けはそちらの価格で見る。
@@ -100,6 +109,20 @@ def c_of(x):
         prev = cards
     over = (x - CBAR_CURVE[-1][0]) / 1000.0
     return prev + CBAR_SLOPE * over
+
+
+#: トークンの 1 枠あたりのパワー列（現在パワーは /1e4 で入っている）
+S_POWER = 0
+
+
+def slot_power(tok_row, slot):
+    """枠 index → **今のパワー**（`None` なら枠が無い＝呼び側は印字に落ちる）。"""
+    if slot is None or int(slot) < 0:
+        return None
+    s = int(slot)
+    if s >= tok_row.shape[0]:
+        return None
+    return float(np.round(float(tok_row[s, S_POWER]) * 1e4 / PWR_EPS) * PWR_EPS)
 
 
 def saturation_x(theta=THETA):
@@ -165,11 +188,19 @@ def play_value(power, cost, opp_leader_power, r_turns, theta=THETA, mu=MU, delta
     return nu_of(power, opp_leader_power, r_turns, theta, mu) - mu - float(cost) * d
 
 
-def score_candidate(sig, cid, tcid, ctx, cards):
+def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None):
     """候補 1 つの理論値（値付けできなければ `None`）。
 
     `sig` は `[action_type, uuid, target_ids, selected_uuids, accepted]`（`record_gen.move_sig`）。
-    `ctx` は `{"opp_leader_power", "r_turns", "theta", "mu"}`。
+    `ctx` は `{"opp_leader_power", "my_leader_power", "r_turns", "theta", "mu", "don_k"}`。
+    `src_power`／`tgt_power` を渡せば**印字ではなく今のパワー**で値付けする（枠から採った値）。
+
+    **`DON_BOX` は「ドンを k 枚付けてから攻撃する」マクロ手**（`search/decide.rs::
+    don_box_first_primitive`・`box_total`）。**`target_ids` が入っていればそれは攻撃**で、
+    空なら純粋な付与である。記録に `ATTACK` という行動型は出てこない——攻撃は全部
+    `DON_BOX` の形で来る（2026-09-13 実測: DON_BOX 9,782 件のうち 6,460 件＝66% が対象付き
+    ＝**全候補の 44%**）。**ここを付与として値付けしていたのが 2026-09-13 の誤り**で、
+    理論の中心（攻撃の価値と飽和点）が一度も検査されていなかった。
     """
     at = sig[0] if sig else None
     if at not in SCORABLE:
@@ -179,22 +210,25 @@ def score_candidate(sig, cid, tcid, ctx, cards):
     src = cards.info(cid) if cid else None
     tgt = cards.info(tcid) if tcid else None
     theta, mu = ctx["theta"], ctx["mu"]
-    if at == "ATTACK":
-        if src is None:
-            return None
-        if tgt is None:                              # 対象のカードが引けない＝リーダー扱い
-            return attack_value(src["power"], ctx["opp_leader_power"], True, theta, mu)
-        if tgt.get("leader"):
-            return attack_value(src["power"], tgt["power"], True, theta, mu)
-        nu_t = nu_of(tgt["power"], ctx["my_leader_power"], ctx["r_turns"], theta, mu)
-        return attack_value(src["power"], tgt["power"], False, theta, mu, nu_target=nu_t)
+    if src is None and at != "PLAY":
+        return None
+    sp = float(src["power"]) if src_power is None else float(src_power)
+    has_target = bool(sig[2]) if len(sig) > 2 else False
+    if at == "ATTACK" or (at == "DON_BOX" and has_target):
+        # DON_BOX ならドン k 枚を付けてから殴る＝パワーは 1000k 上がる。
+        # **`don_k` は記録に無い**（`move_sig` は 5 要素で付与枚数は payload にしか無い）ので
+        # 仮定値 `ctx["don_k"]` を足し、`--don-k` で感度を見る。
+        if at == "DON_BOX":
+            sp += 1000.0 * float(ctx["don_k"])
+        if tgt is None and tgt_power is None:         # 対象のカードが引けない＝リーダー扱い
+            return attack_value(sp, ctx["opp_leader_power"], True, theta, mu)
+        tp = float(tgt["power"]) if tgt_power is None else float(tgt_power)
+        if tgt is not None and tgt.get("leader"):
+            return attack_value(sp, tp, True, theta, mu)
+        nu_t = nu_of(tp, ctx["my_leader_power"], ctx["r_turns"], theta, mu)
+        return attack_value(sp, tp, False, theta, mu, nu_target=nu_t)
     if at in ("ATTACH_DON", "DON_BOX"):
-        if src is None:
-            return None
-        # **`don_k` は記録に無い**（`move_sig` は [action_type, uuid, target_ids,
-        # selected_uuids, accepted] の 5 要素で、付与枚数は payload にしか無い）。
-        # そこで仮定値 `ctx["don_k"]` を使い、`--don-k` で感度を見られるようにする。
-        return attach_value(src["power"], ctx["opp_leader_power"], ctx["don_k"], theta, mu)
+        return attach_value(sp, ctx["opp_leader_power"], ctx["don_k"], theta, mu)
     if at == "PLAY":
         if src is None or src.get("event"):
             return None                              # イベントは効果の中身が要る
@@ -217,7 +251,12 @@ def row_order(n, q, p, theory, n_min=5, q_eps=0.02, p_eps=1e-4, n_min_frac=0.05)
     t = np.array([float(theory[i]) for i in range(len(theory)) if keep[i]], np.float64)
     a1, n1 = pair_agree(t, q[keep], 0.0, q_eps)
     a2, n2 = pair_agree(p[keep], q[keep], p_eps, q_eps)
-    out.update(th_agree=a1, th_pairs=n1, p_agree=a2, p_pairs=n2)
+    # **並べられたペア数も返す**——`pair_agree` は同値のペアを母数から外すので、
+    # `th_pairs` が小さい行は「理論が順位を付けられなかった」行である。一致率だけ見ると
+    # **理論が無言だった割合が見えない**（2026-09-13: 接戦帯で半分近くが無言だった）。
+    kk = int(keep.sum())
+    out.update(th_agree=a1, th_pairs=n1, p_agree=a2, p_pairs=n2,
+               pairs_possible=kk * (kk - 1) // 2)
     return out
 
 
@@ -250,6 +289,7 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
                    "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
                    "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))),
                    "don_k": don_k}
+            tok = ex["tok"][i]
             theory = []
             for j in range(b, b + k):
                 sig = json.loads(pol["pol_sig"][j])
@@ -257,8 +297,11 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
                 tl = sig[2] if len(sig) > 2 else None
                 if tl:
                     tcid = str(pol["pol_tcid"][j]) or None
+                # **パワーは枠の現在値**（印字ではドンが付いたキャラ・強化されたキャラを測れない）
                 theory.append(score_candidate(sig, str(pol["pol_cid"][j]) or None,
-                                              tcid, ctx, cards))
+                                              tcid, ctx, cards,
+                                              src_power=slot_power(tok, pol["pol_si"][j]),
+                                              tgt_power=slot_power(tok, pol["pol_ti"][j])))
             stats["cand"] += k
             stats["cand_scored"] += sum(1 for t in theory if t is not None)
             r = row_order(pol["pol_n"][b:b + k], pol["pol_q"][b:b + k], pol["pol_p"][b:b + k],
@@ -274,7 +317,8 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
 
 
 def _extra(dd, n):
-    return {"sc": np.asarray(dd["scalars"])[:n].astype(np.float32)}
+    return {"sc": np.asarray(dd["scalars"])[:n].astype(np.float32),
+            "tok": np.asarray(dd["tokens"])[:n].astype(np.float32)}
 
 
 def block(recs):
@@ -289,6 +333,12 @@ def block(recs):
            "k_mean": round(float(np.mean([r["k"] for r in recs])), 2),
            "coverage_cand": round(float(np.mean([r["k_scored"] / r["k"] for r in recs])), 4),
            "kept_mean": round(float(np.mean([r["k_kept"] for r in recs])), 2)}
+    # **理論が順位を付けられたペアの割合**＝`coverage_cand`（値付けできたか）とは別物で、
+    # 「値は付いたが全部同じ値だった」を捉える。**価格は飽和すると同値を量産する**
+    # （`min(c(x), Θ)` の天井・付与の増分 0）＝方策の教師にするとき**半分は無言になる**。
+    poss = sum(r.get("pairs_possible", 0) for r in recs)
+    out["th_decisive"] = round(th_t / poss, 4) if poss else None
+    out["p_decisive"] = round(p_t / poss, 4) if poss else None
     if out["order_acc_theory"] is not None and out["order_acc_prior"] is not None:
         out["gain"] = round(out["order_acc_theory"] - out["order_acc_prior"], 4)
     # 対局でクラスタした SE（1 局から多数の行を採るので行数で割らない）

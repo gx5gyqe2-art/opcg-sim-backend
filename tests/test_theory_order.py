@@ -121,6 +121,77 @@ def test_score_candidate_marks_unscorable_as_none():
     assert atk == pytest.approx(T.attack_value(7000, 5000, True, 1.15, 0.05))
 
 
+def _cards():
+    class _Cards:
+        def info(self, cid):
+            return {"C_ATK": {"power": 7000, "cost": 3, "leader": False, "event": False},
+                    "C_LEAD": {"power": 5000, "cost": 0, "leader": True, "event": False},
+                    "C_CHAR": {"power": 4000, "cost": 2, "leader": False, "event": False}}.get(cid)
+    return _Cards()
+
+
+CTX = {"theta": 1.15, "mu": 0.05, "opp_leader_power": 5000.0,
+       "my_leader_power": 5000.0, "r_turns": 3.0, "don_k": 1}
+
+
+def test_don_box_with_a_target_is_an_attack_not_an_attach():
+    """**記録に `ATTACK` は出てこない**——攻撃は `DON_BOX`（対象付き）の形で来る。
+
+    `search/decide.rs::don_box_first_primitive` は `don_k<=0` かつ対象付きの `DON_BOX` を
+    素の `ATTACK` に落とす＝**対象付きの `DON_BOX` は「ドンを k 枚付けてから殴る」**。
+    2026-09-13 にここを付与として値付けしていた（全候補の 44% を誤った式で測っていた）。
+    """
+    cards = _cards()
+    box = T.score_candidate(["DON_BOX", "u", ["t"], [], None], "C_ATK", "C_LEAD", CTX, cards)
+    # ドン 1 枚を付けてから殴る＝8000 対 5000（超過 3000）の攻撃
+    assert box == pytest.approx(T.attack_value(8000, 5000, True, 1.15, 0.05))
+    # 付与として測ると別の値になる（＝取り違えは数字に出る）
+    assert box != pytest.approx(T.attach_value(7000, 5000, 1, 1.15, 0.05))
+
+
+def test_don_box_without_a_target_is_still_an_attach():
+    cards = _cards()
+    bare = T.score_candidate(["DON_BOX", "u", [], [], None], "C_ATK", None, CTX, cards)
+    assert bare == pytest.approx(T.attach_value(7000, 5000, 1, 1.15, 0.05))
+
+
+def test_a_character_target_is_priced_against_that_character():
+    """キャラ狙いは `min(c(x)·μ, ν(対象))`＝リーダー狙いと別の式になる。"""
+    cards = _cards()
+    ch = T.score_candidate(["DON_BOX", "u", ["t"], [], None], "C_ATK", "C_CHAR", CTX, cards)
+    nu_t = T.nu_of(4000, 5000.0, 3.0, 1.15, 0.05)
+    assert ch == pytest.approx(T.attack_value(8000, 4000, False, 1.15, 0.05, nu_target=nu_t))
+
+
+def _box(src=None, tgt=None):
+    return T.score_candidate(["DON_BOX", "u", ["t"], [], None], "C_ATK", "C_LEAD", CTX, _cards(),
+                             src_power=src, tgt_power=tgt)
+
+
+def test_current_power_overrides_the_printed_power():
+    """ドンが付いたキャラや強化されたキャラは**印字では測れない**（枠の現在値を渡す）。
+
+    印字 7000 の札でも枠が 4000 なら弱い攻撃として値付けされる（逆も同じ）。
+    """
+    assert _box(src=4000.0) == pytest.approx(T.attack_value(5000, 5000, True, 1.15, 0.05))
+    # 対象側の現在パワーも効く（強くなった対象は殴りにくい＝通らないので 0）
+    assert _box(tgt=20000.0) == 0.0
+
+
+def test_piling_power_past_the_saturation_point_buys_nothing():
+    """**飽和点を超えたら価値は増えない**（`min(c(x), Θ)` の天井＝理論の中心の予言）。
+
+    Θ=1.15 なので飽和点は 2000（`c(2000) = 1.28 ≥ Θ`）。5000 のリーダー相手なら
+    7000 で天井に当たり、そこから積んでも同じ値になる。
+    """
+    assert T.saturation_x(1.15) == 2000.0
+    cap = 1.15 * 0.05
+    assert _box(src=6000.0) == pytest.approx(cap)      # +1 ドンで 7000＝超過 2000
+    assert _box(src=9000.0) == pytest.approx(cap)      # 10000 でも同じ
+    # 飽和より下では**ちゃんと増える**（天井が効いているだけで式が死んでいるのではない）
+    assert _box(src=4000.0) < cap
+
+
 def test_row_order_uses_the_same_pairs_for_theory_and_prior():
     """**値付けできない候補を外した後の同じ集合**で両方を測る（比較が公平になる）。"""
     n = [100.0, 90.0, 80.0, 1.0]        # 4 本目は訪問が足りない
