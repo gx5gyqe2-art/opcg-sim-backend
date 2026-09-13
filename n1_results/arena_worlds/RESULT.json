@@ -1,0 +1,19 @@
+{
+  "job": "arena-worlds-w08",
+  "role": "arena",
+  "status": "in_progress",
+  "base_branch": "claude/cpu-spec-improvements-yw91jd",
+  "inputs": {
+    "candidate": "claude/train-r5:n1_results/nrel_r5.npz",
+    "baseline": "claude/train-r5:n1_results/nrel_r5.npz",
+    "cand_worlds": 8,
+    "pairs": 300,
+    "seed_base": 1038000,
+    "leaders": "random",
+    "decks": "synth_roles",
+    "workers": 2,
+    "pair_timeout": 1800
+  },
+  "metrics": { "pairs_done": 4, "void": 0, "wins": 3.0, "wr": 0.75 },
+  "notes": "Snapshot taken while the background driver (/tmp .../scratchpad/arena_driver_w08.sh, not committed) is still running; pairs_done=4 is far too small a sample to mean anything, this is just an early progress checkpoint. This RESULT.json will be updated with final metrics when the run stops (all 300 pairs consumed, low disk, or crash). First smoke pair (1 pair, worlds=8) took 39s wall with workers=2. Base branch corrected from main to claude/cpu-spec-improvements-yw91jd per coordinator follow-up (2026-09-13T10:38Z) after confirming --cand-worlds and --decks synth_roles only exist there; verified directly in source before trusting the correction."
+}
