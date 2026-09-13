@@ -1,0 +1,463 @@
+{
+  "net": "nrel_r3.npz",
+  "stats": {
+    "games": 1041,
+    "rows": 65591,
+    "skipped_draw": 0
+  },
+  "resid_mean": -0.00849,
+  "rank": {
+    "n": 65591,
+    "min_effect": 0.01,
+    "ranked": [
+      {
+        "n": 59647,
+        "bands": 604,
+        "games": 1041,
+        "beta": -0.146675,
+        "se": 0.00484,
+        "sd": 1.1142,
+        "effect": 0.16342,
+        "ci95": [
+          -0.15616,
+          -0.137189
+        ],
+        "name": "f_life_spent",
+        "kind": "future",
+        "band_r2": 0.5689,
+        "significant": true,
+        "worth_adding": true
+      },
+      {
+        "n": 58889,
+        "bands": 601,
+        "games": 1041,
+        "beta": 0.146348,
+        "se": 0.004951,
+        "sd": 1.1042,
+        "effect": 0.1616,
+        "ci95": [
+          0.136644,
+          0.156051
+        ],
+        "name": "f_life_taken",
+        "kind": "future",
+        "band_r2": 0.572,
+        "significant": true,
+        "worth_adding": true
+      },
+      {
+        "n": 65482,
+        "bands": 867,
+        "games": 1041,
+        "beta": 0.00126,
+        "se": 0.000705,
+        "sd": 7.2026,
+        "effect": 0.00907,
+        "ci95": [
+          -0.000123,
+          0.002642
+        ],
+        "name": "f_own_rows_left",
+        "kind": "future",
+        "band_r2": 0.6055,
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 65010,
+        "bands": 748,
+        "games": 1041,
+        "beta": -0.003831,
+        "se": 0.001287,
+        "sd": 1.7584,
+        "effect": 0.00674,
+        "ci95": [
+          -0.006354,
+          -0.001308
+        ],
+        "name": "f_t_real",
+        "kind": "future",
+        "band_r2": 0.7437,
+        "significant": true,
+        "worth_adding": false
+      },
+      {
+        "n": 65094,
+        "bands": 765,
+        "games": 1041,
+        "beta": -0.005337,
+        "se": 0.004619,
+        "sd": 1.0382,
+        "effect": 0.00554,
+        "ci95": [
+          -0.01439,
+          0.003716
+        ],
+        "name": "q_A",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 65210,
+        "bands": 780,
+        "games": 1041,
+        "beta": -0.002228,
+        "se": 0.002553,
+        "sd": 2.1902,
+        "effect": 0.00488,
+        "ci95": [
+          -0.007233,
+          0.002776
+        ],
+        "name": "q_N",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 65221,
+        "bands": 785,
+        "games": 1041,
+        "beta": 0.001488,
+        "se": 0.001905,
+        "sd": 3.2377,
+        "effect": 0.00482,
+        "ci95": [
+          -0.002245,
+          0.005221
+        ],
+        "name": "q_deck_left",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 65232,
+        "bands": 785,
+        "games": 1041,
+        "beta": -0.001919,
+        "se": 0.002463,
+        "sd": 2.2706,
+        "effect": 0.00436,
+        "ci95": [
+          -0.006746,
+          0.002908
+        ],
+        "name": "q_theta_life",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 65232,
+        "bands": 785,
+        "games": 1041,
+        "beta": 0.001919,
+        "se": 0.002463,
+        "sd": 2.2706,
+        "effect": 0.00436,
+        "ci95": [
+          -0.002908,
+          0.006746
+        ],
+        "name": "q_L_minus_theta",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 65311,
+        "bands": 810,
+        "games": 1041,
+        "beta": 0.067247,
+        "se": 0.065523,
+        "sd": 0.0567,
+        "effect": 0.00381,
+        "ci95": [
+          -0.061178,
+          0.195671
+        ],
+        "name": "q_nu_sum",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 65360,
+        "bands": 819,
+        "games": 1041,
+        "beta": 0.001248,
+        "se": 0.000643,
+        "sd": 3.0076,
+        "effect": 0.00375,
+        "ci95": [
+          -1.2e-05,
+          0.002509
+        ],
+        "name": "q_don",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 64655,
+        "bands": 721,
+        "games": 1041,
+        "beta": -0.001576,
+        "se": 0.002507,
+        "sd": 1.9637,
+        "effect": 0.0031,
+        "ci95": [
+          -0.00649,
+          0.003337
+        ],
+        "name": "q_G",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 64949,
+        "bands": 740,
+        "games": 1041,
+        "beta": -0.003715,
+        "se": 0.006927,
+        "sd": 0.829,
+        "effect": 0.00308,
+        "ci95": [
+          -0.017291,
+          0.009862
+        ],
+        "name": "q_n_dead_attackers",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 65089,
+        "bands": 758,
+        "games": 1041,
+        "beta": 0.002016,
+        "se": 0.004658,
+        "sd": 1.0684,
+        "effect": 0.00215,
+        "ci95": [
+          -0.007113,
+          0.011145
+        ],
+        "name": "q_F",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 63373,
+        "bands": 607,
+        "games": 1041,
+        "beta": -0.004771,
+        "se": 0.010191,
+        "sd": 0.4134,
+        "effect": 0.00197,
+        "ci95": [
+          -0.024744,
+          0.015203
+        ],
+        "name": "q_B",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 58171,
+        "bands": 614,
+        "games": 1041,
+        "beta": -0.001908,
+        "se": 0.003539,
+        "sd": 1.0319,
+        "effect": 0.00197,
+        "ci95": [
+          -0.008844,
+          0.005027
+        ],
+        "name": "q_c_in",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 59897,
+        "bands": 635,
+        "games": 1041,
+        "beta": -0.001908,
+        "se": 0.003539,
+        "sd": 1.0169,
+        "effect": 0.00194,
+        "ci95": [
+          -0.008844,
+          0.005027
+        ],
+        "name": "q_c_in_minus_theta",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 65273,
+        "bands": 792,
+        "games": 1041,
+        "beta": 0.001911,
+        "se": 0.003537,
+        "sd": 0.9741,
+        "effect": 0.00186,
+        "ci95": [
+          -0.005022,
+          0.008844
+        ],
+        "name": "q_guard_slack",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 50382,
+        "bands": 492,
+        "games": 1041,
+        "beta": -0.002188,
+        "se": 0.006328,
+        "sd": 0.7134,
+        "effect": 0.00156,
+        "ci95": [
+          -0.014591,
+          0.010215
+        ],
+        "name": "q_t_hat",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 65154,
+        "bands": 781,
+        "games": 1041,
+        "beta": -1e-06,
+        "se": 2e-06,
+        "sd": 2139.1892,
+        "effect": 0.00134,
+        "ci95": [
+          -5e-06,
+          4e-06
+        ],
+        "name": "q_x_max",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 65154,
+        "bands": 781,
+        "games": 1041,
+        "beta": -1e-06,
+        "se": 2e-06,
+        "sd": 2139.1892,
+        "effect": 0.00134,
+        "ci95": [
+          -5e-06,
+          4e-06
+        ],
+        "name": "q_x_over_sat",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 65249,
+        "bands": 790,
+        "games": 1041,
+        "beta": 0.00033,
+        "se": 0.001674,
+        "sd": 2.0643,
+        "effect": 0.00068,
+        "ci95": [
+          -0.002952,
+          0.003612
+        ],
+        "name": "q_S",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 64864,
+        "bands": 734,
+        "games": 1041,
+        "beta": 5.1e-05,
+        "se": 0.003656,
+        "sd": 0.7473,
+        "effect": 4e-05,
+        "ci95": [
+          -0.007115,
+          0.007217
+        ],
+        "name": "q_n_rested",
+        "kind": "now",
+        "significant": false,
+        "worth_adding": false
+      },
+      {
+        "n": 0,
+        "bands": 0,
+        "beta": null,
+        "se": null,
+        "sd": null,
+        "effect": null,
+        "ci95": null,
+        "games": 0,
+        "name": "q_L",
+        "kind": "now"
+      },
+      {
+        "n": 0,
+        "bands": 0,
+        "beta": null,
+        "se": null,
+        "sd": null,
+        "effect": null,
+        "ci95": null,
+        "games": 0,
+        "name": "q_H",
+        "kind": "now"
+      }
+    ]
+  },
+  "verdict": "add_heads_only",
+  "args": {
+    "net": "opcg_sim/data/learned/nrel_r3.npz",
+    "src": [
+      "/root/w32/n_records/n32_w01",
+      "/root/w32/n_records/n32_w02",
+      "/root/w32/n_records/n32_w03",
+      "/root/w32/n_records/n32_w04",
+      "/root/w32/n_records/n32_w05",
+      "/root/w32/n_records/n32_w06",
+      "/root/w32/n_records/n32_w07",
+      "/root/w32/n_records/n32_w08",
+      "/root/w32/n_records/n32_w09",
+      "/root/w32/n_records/n32_w10",
+      "/root/w32/n_records/n32_w11",
+      "/root/w32/n_records/n32_w12",
+      "/root/w32/n_records/n32_w13",
+      "/root/w32/n_records/n32_w14",
+      "/root/w32/n_records/n32_w15",
+      "/root/w32/n_records/n32_w16"
+    ],
+    "holdout_mod": 7,
+    "limit_games": 0,
+    "batch": 512,
+    "theta": 1.15,
+    "mu": 0.0551,
+    "min_effect": 0.01
+  },
+  "seconds": 28.7
+}
