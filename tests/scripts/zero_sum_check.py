@@ -191,15 +191,24 @@ def run_games(games, seed_base, net=None, sims=None, leaders="random",
                 r["z_p1"] = r["z_p2"] = None
             else:
                 r["z_p1"], r["z_p2"] = z1, 1.0 - z1
-            # 手番側（on-distribution）と非手番側（off-distribution）に分ける
-            act, idle = ("p1", "p2") if r["to_move"] == "p1" else ("p2", "p1")
-            r["v_act"], r["v_idle"] = r[f"v_{act}"], r[f"v_{idle}"]
-            r["z_act"] = r.get(f"z_{act}")
-            r["z_idle"] = r.get(f"z_{idle}")
+            label_seats(r)
         rows.extend(game_rows)
         if win is None:
             stats["void"] = stats.get("void", 0) + 1
     return rows, stats
+
+
+def label_seats(r):
+    """**手番側（on-distribution）と非手番側（off-distribution）を貼る**。
+
+    訓練の行は「決定点の席」からしか作られないので、**非手番側の評価は構造的に
+    教わっていない**（`is_my_turn=0` の行は「攻撃を受けている窓」に偏る）＝
+    偏りの切り分けはこの 2 群の較正で付く。席の名前ではなく `to_move` で決まる。
+    """
+    act, idle = ("p1", "p2") if r["to_move"] == "p1" else ("p2", "p1")
+    r["v_act"], r["v_idle"] = r[f"v_{act}"], r[f"v_{idle}"]
+    r["z_act"], r["z_idle"] = r.get(f"z_{act}"), r.get(f"z_{idle}")
+    return r
 
 
 def block(rows):

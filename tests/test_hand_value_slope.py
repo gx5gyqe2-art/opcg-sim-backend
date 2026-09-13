@@ -43,6 +43,19 @@ def test_band_key_excludes_hand():
     assert k1 == H.band_key(sc2) == (3, 5, "T5-8", 2)
 
 
+def test_band_key_life_axis_swaps_the_explanatory_variable():
+    """`axis="life"` は帯から**自ライフを外し手札を入れる**（`λ` の測定・§11.1）。"""
+    sc = np.zeros(14, np.float32)
+    sc[H.SC_MY_LIFE], sc[H.SC_OPP_LIFE], sc[H.SC_MY_HAND] = 3, 5, 6
+    sc[H.SC_MY_FIELD], sc[H.SC_TURN] = 2, 7
+    assert H.band_key(sc, "hand") == (3, 5, "T5-8", 2)
+    assert H.band_key(sc, "life") == (6, 5, "T5-8", 2)
+    sc2 = np.array(sc)
+    sc2[H.SC_MY_LIFE] = 1                       # ライフを動かしても life 軸の帯は変わらない
+    assert H.band_key(sc2, "life") == H.band_key(sc, "life")
+    assert H.band_key(sc2, "hand") != H.band_key(sc, "hand")
+
+
 def test_drop_one_hand_picks_the_cheapest_counter():
     tok = np.zeros((22, 22), np.float32)
     # 手札 3 枠（12,13,14）に埋める。counter_value が最小なのは 13。

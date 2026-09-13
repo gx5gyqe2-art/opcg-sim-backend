@@ -77,6 +77,37 @@ def test_blind_hand_zeroes_only_the_hand_slots():
     assert enc["tok"][12 * s_dim] == 1.0                 # 入力は書き換えない
 
 
+def test_calibration_separates_the_acting_seat_from_the_idle_one():
+    """切り分けの要: **手番側だけ較正されている**なら偏りは「非手番側が分布外」。
+
+    `z` が無い行（void）は較正に使わない。`P̂ = (V+1)/2`。
+    """
+    rows = [
+        # 手番側は当たっている（P̂ 0.75 対 z 0.75）・非手番側だけ悲観（P̂ 0.1 対 z 0.25）
+        {"v_act": 0.5, "z_act": 1.0, "v_idle": -0.8, "z_idle": 0.0},
+        {"v_act": 0.5, "z_act": 1.0, "v_idle": -0.8, "z_idle": 0.0},
+        {"v_act": 0.5, "z_act": 1.0, "v_idle": -0.8, "z_idle": 0.0},
+        {"v_act": 0.5, "z_act": 0.0, "v_idle": -0.8, "z_idle": 1.0},
+        {"v_act": 0.9, "z_act": None, "v_idle": 0.9, "z_idle": None},   # void＝使わない
+    ]
+    out = Z.calibration(rows)
+    assert out["calib_act"]["n"] == 4 and out["calib_idle"]["n"] == 4
+    assert out["calib_act"]["gap"] == pytest.approx(0.0, abs=1e-6)
+    assert out["calib_idle"]["gap"] == pytest.approx(0.10 - 0.25, abs=1e-6)
+    assert Z.calibration([{"v_act": 0.1, "z_act": None,
+                           "v_idle": 0.1, "z_idle": None}])["calib_act"] is None
+
+
+def test_label_seats_follows_to_move_not_the_seat_name():
+    """`v_act`／`v_idle` は `to_move` で決まる（`p1` が常に手番側ではない）。"""
+    r = Z.label_seats({"to_move": "p2", "v_p1": -0.3, "v_p2": 0.1,
+                       "z_p1": 0.0, "z_p2": 1.0})
+    assert (r["v_act"], r["v_idle"]) == (0.1, -0.3)
+    assert (r["z_act"], r["z_idle"]) == (1.0, 0.0)
+    r1 = Z.label_seats({"to_move": "p1", "v_p1": -0.3, "v_p2": 0.1})
+    assert r1["v_act"] == -0.3 and r1["z_act"] is None     # void でも落ちない
+
+
 def test_to_net_enc_renames_tokens_to_tok():
     """`encode_state` は `tokens`・`net_eval` は `tok`（黙って 0 要素になる穴）。"""
     d = Z.to_net_enc('{"tokens": [1, 2], "scalars": [0]}')

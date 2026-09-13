@@ -16,6 +16,20 @@ slope_V    = ∂V̂     / ∂(手札枚数)     同じ帯・同じ行での V �
 
 **符号が違えば V は手札の価値を逆に学んでいる**。大きさが違うだけなら較正の問題。
 
+### `--axis life`＝**ライフ 1 枚の限界価値 `λ`**（2026-09-13 追加・`docs/game_theory.md` §11.1）
+
+同じ within 推定を**軸をライフに替えて**回すと `λ = ∂P(win)/∂ライフ` が出る。
+`μ`（手札の傾き・既定の軸）と合わせると、予算モデルの価格が**独立に 2 通りで出る**:
+
+```
+c̄ = λ/μ − 1 − τ_value          （§11.1 の恒等式）
+```
+
+実測の `c̄(3000) ≈ 2.2 枚` と `μ = +0.0433` から予測は **`λ/μ ≈ 3.4 + τ_value`**
+＝**外れたら予算モデルのどこかが誤り**（反証可能な予測）。
+`axis="life"` では帯から自ライフを外して**手札を帯に入れる**（説明変数と帯を入れ替える）。
+ライフは符号化のトークン枠を持たない（scalars だけ）ので**枠落としの応答は測らない**。
+
 ### 帯（交絡の除き方）
 
 手札の枚数は盤面と強く相関する（負けている側は殴られて手札が増え、勝っている側は使い切る）。
@@ -87,9 +101,15 @@ def turn_band(t):
     return "T<=4" if t <= 4 else ("T5-8" if t <= 8 else "T9+")
 
 
-def band_key(sc_row):
-    """帯＝(自ライフ, 相手ライフ, ターン帯, 自場のキャラ数)。**手札は入れない**（説明変数）。"""
-    return (int(round(float(sc_row[SC_MY_LIFE]))),
+def band_key(sc_row, axis="hand"):
+    """帯＝**説明変数を除いた**盤面の型。
+
+    `axis="hand"`（既定）＝(自ライフ, 相手ライフ, ターン帯, 自場のキャラ数)＝**手札は入れない**。
+    `axis="life"` ＝(手札, 相手ライフ, ターン帯, 自場のキャラ数)＝**自ライフを入れない**
+    （`λ`＝ライフ 1 枚の限界価値を測る軸・`docs/game_theory.md` §11.1）。
+    """
+    x = SC_MY_HAND if axis == "life" else SC_MY_LIFE
+    return (int(round(float(sc_row[x]))),
             int(round(float(sc_row[SC_OPP_LIFE]))),
             turn_band(int(round(float(sc_row[SC_TURN])))),
             int(round(float(sc_row[SC_MY_FIELD]))))
@@ -160,8 +180,15 @@ def within_slope(rows, y_key, h_key="hand", band="band", min_n=2):
             "n": len(rows)}
 
 
-def collect(net, rt, dirs, holdout_mod=7, limit_games=0, bs=512, do_slot=True):
-    """holdout の行 → (自席ターンの記録, 相手ターンの記録, 局数)。"""
+def collect(net, rt, dirs, holdout_mod=7, limit_games=0, bs=512, do_slot=True, axis="hand"):
+    """holdout の行 → (自席ターンの記録, 相手ターンの記録, 局数)。
+
+    `axis="life"` なら説明変数を**自ライフ**に替える（`λ`＝ライフ 1 枚の限界価値・§11.1）。
+    ライフは符号化のトークン枠を持たない（scalars だけ）ので**枠落としの応答は測らない**。
+    """
+    sc_x = SC_MY_LIFE if axis == "life" else SC_MY_HAND
+    if axis == "life":
+        do_slot = False
     own, opp = [], []
     games = 0
     pend = []
@@ -174,9 +201,9 @@ def collect(net, rt, dirs, holdout_mod=7, limit_games=0, bs=512, do_slot=True):
         tok = np.stack([p[3] for p in pend])
         rel = NT.relations_or_zeros(net, ci, tok, rt)
         v0 = np.asarray(net.value(sc, ci, tok, *rel), np.float32).reshape(-1)
-        # 枚数の列だけ −1（下限は 0）
+        # 説明変数の列だけ −1（下限は 0）
         sc_m = np.array(sc, copy=True)
-        sc_m[:, SC_MY_HAND] = np.maximum(sc_m[:, SC_MY_HAND] - 1.0, 0.0)
+        sc_m[:, sc_x] = np.maximum(sc_m[:, sc_x] - 1.0, 0.0)
         v_m = np.asarray(net.value(sc_m, ci, tok, *rel), np.float32).reshape(-1)
         if do_slot:
             tok_s = np.stack([p[4] for p in pend])
@@ -219,9 +246,10 @@ def collect(net, rt, dirs, holdout_mod=7, limit_games=0, bs=512, do_slot=True):
                 seen_opp.add((w, t))
             sc_row = ex["sc"][i]
             rec = {"own": is_own, "z": 1.0 if z > 0 else 0.0,
-                   "hand": float(sc_row[SC_MY_HAND]),
+                   "hand": float(sc_row[sc_x]),            # 説明変数（axis で切り替わる）
+                   "life": float(sc_row[SC_MY_LIFE]),
                    "opp_hand": float(sc_row[SC_OPP_HAND]),
-                   "turn": t, "band": "|".join(str(x) for x in band_key(sc_row))}
+                   "turn": t, "band": "|".join(str(x) for x in band_key(sc_row, axis))}
             tok_s, slot_ok = drop_one_hand(ex["tok"][i]) if do_slot else (None, False)
             pend.append((rec, sc_row, ex["ci"][i], ex["tok"][i], tok_s, slot_ok))
             if len(pend) >= bs:
@@ -301,6 +329,8 @@ def main(argv=None):
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--batch", type=int, default=512)
     ap.add_argument("--no-slot", action="store_true", help="枠を落とす応答を測らない（速い）")
+    ap.add_argument("--axis", default="hand", choices=("hand", "life"),
+                    help="説明変数（既定 hand＝μ／life＝λ・`docs/game_theory.md` §11.1）")
     ap.add_argument("--out", default="")
     args = ap.parse_args(argv)
 
@@ -309,9 +339,9 @@ def main(argv=None):
     net = NL.NRelNet.load(args.net, (stats, ab, abm, pwr, isl))
     rt = None if "rel" in (net.ablate or ()) else (stats, ab, abm, pwr, isl)
     own, opp, games = collect(net, rt, args.src, args.holdout_mod, args.limit_games,
-                              args.batch, do_slot=not args.no_slot)
+                              args.batch, do_slot=not args.no_slot, axis=args.axis)
     out = {"net": os.path.basename(args.net), "games": games,
-           "holdout_mod": args.holdout_mod,
+           "axis": args.axis, "holdout_mod": args.holdout_mod,
            "own_turn": summarize(own), "opp_turn": summarize(opp),
            "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(out, ensure_ascii=False, indent=2)
