@@ -1,0 +1,36 @@
+z専用 dir 16 本を合流（π は読まない）
+value 5966525行（val 853742） policy 1624058点（val 232147） 200s
+warm-start: /root/nrel_r5.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 2759667/5966525
+time: on λ=0.1 有効行 5710290/5966525
+backend: torch threads=4
+予算・候補定数を先に作った（候補 18100704行 15.5s）
+  ep0 step 5000/41719 mse 0.4904 ce 1.7897 448s
+  ep0 step 10000/41719 mse 0.4889 ce 1.7893 644s
+  ep0 step 15000/41719 mse 0.4877 ce 1.7891 838s
+  ep0 step 20000/41719 mse 0.4868 ce 1.7889 1030s
+  ep0 step 25000/41719 mse 0.4856 ce 1.7881 1211s
+  ep0 step 30000/41719 mse 0.4843 ce 1.7878 1392s
+  ep0 step 35000/41719 mse 0.4835 ce 1.7874 1573s
+  ep0 step 40000/41719 mse 0.4828 ce 1.7870 1761s
+ep0 train mse 0.4826 ce 1.7869 | val v_mse 0.4988 v_sign 0.819 pi_top1 0.625 ce 1.757 1828s
+  aux val huber 0.3605 tok 0.0967
+  time val huber 0.2741（19173 行）
+N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 4, "train_sec": 1579.393, "steps": 41719, "breakdown": {"budget_p": 2.857, "holdout": 2.15, "rel_p": 0.062, "rel_v": 3.442, "slice_p": 6.356, "slice_v": 8.387, "step_p": 0.156, "step_p_bwd": 292.047, "step_p_fwd": 179.292, "step_v": 0.376, "step_v_bwd": 701.909, "step_v_fwd": 381.132, "step_v_prep": 0.172}, "train_mse": 0.4825516381050516, "train_ce": 1.7868580678894126, "val_vmse": 0.4988003969192505, "val_vsign": 0.8192, "val_pi_top1": 0.6255, "val_p_loss": 1.7566565856933594, "aux_weight": 0.1, "val_aux": 0.3605261019343179, "val_aux_tok": 0.09665848778302269, "train_aux": [0.35703611373901367, 0.10590829700231552], "time_weight": 0.1, "val_time_huber": 0.2741197895423625, "val_time_rows": 19173, "train_time": [0.26759466528892517, 246]}
+  ep0 を /home/user/opcg-sim-backend/n1_results/nrel_r10.npz に保存（暫定最良）
+  ep1 step 5000/41719 mse 0.4734 ce 1.7861 2003s
+  ep1 step 10000/41719 mse 0.4722 ce 1.7847 2168s
+  ep1 step 15000/41719 mse 0.4714 ce 1.7841 2335s
+  ep1 step 20000/41719 mse 0.4705 ce 1.7846 2503s
+  ep1 step 25000/41719 mse 0.4701 ce 1.7847 2672s
+  ep1 step 30000/41719 mse 0.4694 ce 1.7846 2839s
+  ep1 step 35000/41719 mse 0.4687 ce 1.7848 3006s
+  ep1 step 40000/41719 mse 0.4681 ce 1.7854 3172s
+ep1 train mse 0.4678 ce 1.7853 | val v_mse 0.4985 v_sign 0.819 pi_top1 0.624 ce 1.756 3230s
+  aux val huber 0.3514 tok 0.0957
+  time val huber 0.2714（19173 行）
+N_REL_TRAIN_EPOCH {"ep": 1, "backend": "torch", "threads": 4, "train_sec": 1392.982, "steps": 41719, "breakdown": {"budget_p": 2.838, "holdout": 2.138, "rel_p": 0.065, "rel_v": 3.402, "slice_p": 6.333, "slice_v": 8.466, "step_p": 0.152, "step_p_bwd": 301.193, "step_p_fwd": 182.802, "step_v": 0.373, "step_v_bwd": 557.818, "step_v_fwd": 325.827, "step_v_prep": 0.178}, "train_mse": 0.4678492941013425, "train_ce": 1.785304725093396, "val_vmse": 0.4985139071941376, "val_vsign": 0.81915, "val_pi_top1": 0.62375, "val_p_loss": 1.7560004653930663, "aux_weight": 0.1, "val_aux": 0.35141838617988586, "val_aux_tok": 0.09569352082744786, "train_aux": [0.3222028613090515, 0.10067464411258698], "time_weight": 0.1, "val_time_huber": 0.271418142014376, "val_time_rows": 19173, "train_time": [0.2489735633134842, 245]}
+  ep1 を /home/user/opcg-sim-backend/n1_results/nrel_r10.npz に保存（暫定最良）
+best ep1 val v_mse 0.4985 を保存
+N_REL_TRAIN_DONE {"out": "/home/user/opcg-sim-backend/n1_results/nrel_r10.npz"}
