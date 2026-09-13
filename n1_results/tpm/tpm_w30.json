@@ -1,0 +1,580 @@
+{
+ "net": "nrel_r10.npz",
+ "games": 1096,
+ "src": [
+  "/root/n_records/n30_w01",
+  "/root/n_records/n30_w02",
+  "/root/n_records/n30_w03",
+  "/root/n_records/n30_w04",
+  "/root/n_records/n30_w05",
+  "/root/n_records/n30_w06",
+  "/root/n_records/n30_w06_p2",
+  "/root/n_records/n30_w06_p3",
+  "/root/n_records/n30_w06_p4",
+  "/root/n_records/n30_w06_p5",
+  "/root/n_records/n30_w06_p6",
+  "/root/n_records/n30_w06_p7",
+  "/root/n_records/n30_w07",
+  "/root/n_records/n30_w08",
+  "/root/n_records/n30_w09",
+  "/root/n_records/n30_w10",
+  "/root/n_records/n30_w11",
+  "/root/n_records/n30_w11_p2",
+  "/root/n_records/n30_w12",
+  "/root/n_records/n30_w13",
+  "/root/n_records/n30_w14",
+  "/root/n_records/n30_w15",
+  "/root/n_records/n30_w15_p2",
+  "/root/n_records/n30_w16"
+ ],
+ "rows_without_truth": 0,
+ "attack": {
+  "rows": 11920,
+  "by_true_margin": {
+   "m<=-2": {
+    "n": 3435,
+    "share": {
+     "face": 0.3516739446870451,
+     "board": 0.24687045123726348,
+     "mixed": 0.4014556040756914
+    },
+    "winrate": {
+     "face": 0.2433774834437086,
+     "board": 0.17099056603773585,
+     "mixed": 0.1319796954314721
+    },
+    "n_by_plan": {
+     "face": 1208,
+     "board": 848,
+     "mixed": 1379
+    },
+    "winrate_all": 0.18078602620087336,
+    "best_plan": "face"
+   },
+   "m-1": {
+    "n": 2216,
+    "share": {
+     "face": 0.46705776173285196,
+     "board": 0.15342960288808663,
+     "mixed": 0.3795126353790614
+    },
+    "winrate": {
+     "face": 0.49082125603864735,
+     "board": 0.40294117647058825,
+     "mixed": 0.4126040428061831
+    },
+    "n_by_plan": {
+     "face": 1035,
+     "board": 340,
+     "mixed": 841
+    },
+    "winrate_all": 0.44765342960288806,
+    "best_plan": "face"
+   },
+   "m0": {
+    "n": 2380,
+    "share": {
+     "face": 0.49831932773109244,
+     "board": 0.13403361344537815,
+     "mixed": 0.36764705882352944
+    },
+    "winrate": {
+     "face": 0.6374367622259697,
+     "board": 0.5799373040752351,
+     "mixed": 0.592
+    },
+    "n_by_plan": {
+     "face": 1186,
+     "board": 319,
+     "mixed": 875
+    },
+    "winrate_all": 0.6130252100840337,
+    "best_plan": "face"
+   },
+   "m+1": {
+    "n": 1764,
+    "share": {
+     "face": 0.5453514739229025,
+     "board": 0.10204081632653061,
+     "mixed": 0.3526077097505669
+    },
+    "winrate": {
+     "face": 0.7214137214137214,
+     "board": 0.6333333333333333,
+     "mixed": 0.7572347266881029
+    },
+    "n_by_plan": {
+     "face": 962,
+     "board": 180,
+     "mixed": 622
+    },
+    "winrate_all": 0.7250566893424036,
+    "best_plan": "mixed"
+   },
+   "m>=+2": {
+    "n": 2125,
+    "share": {
+     "face": 0.5722352941176471,
+     "board": 0.0851764705882353,
+     "mixed": 0.34258823529411764
+    },
+    "winrate": {
+     "face": 0.9185855263157895,
+     "board": 0.7845303867403315,
+     "mixed": 0.9120879120879121
+    },
+    "n_by_plan": {
+     "face": 1216,
+     "board": 181,
+     "mixed": 728
+    },
+    "winrate_all": 0.9049411764705882,
+    "best_plan": "face"
+   }
+  },
+  "by_pred_margin": {
+   "m<=-2": {
+    "n": 2933,
+    "share": {
+     "face": 0.32151380838731675,
+     "board": 0.24684623252642346,
+     "mixed": 0.4316399590862598
+    },
+    "winrate": {
+     "face": 0.16436903499469777,
+     "board": 0.15607734806629833,
+     "mixed": 0.12322274881516587
+    },
+    "n_by_plan": {
+     "face": 943,
+     "board": 724,
+     "mixed": 1266
+    },
+    "winrate_all": 0.1445618820320491,
+    "best_plan": "face"
+   },
+   "m-1": {
+    "n": 2994,
+    "share": {
+     "face": 0.45390781563126253,
+     "board": 0.17100868403473615,
+     "mixed": 0.37508350033400134
+    },
+    "winrate": {
+     "face": 0.45842531272994846,
+     "board": 0.390625,
+     "mixed": 0.40160284951024044
+    },
+    "n_by_plan": {
+     "face": 1359,
+     "board": 512,
+     "mixed": 1123
+    },
+    "winrate_all": 0.4255177020708083,
+    "best_plan": "face"
+   },
+   "m0": {
+    "n": 3058,
+    "share": {
+     "face": 0.5189666448659255,
+     "board": 0.13996075866579463,
+     "mixed": 0.3410725964682799
+    },
+    "winrate": {
+     "face": 0.6471329552614997,
+     "board": 0.572429906542056,
+     "mixed": 0.6308724832214765
+    },
+    "n_by_plan": {
+     "face": 1587,
+     "board": 428,
+     "mixed": 1043
+    },
+    "winrate_all": 0.631131458469588,
+    "best_plan": "face"
+   },
+   "m+1": {
+    "n": 1605,
+    "share": {
+     "face": 0.5694704049844237,
+     "board": 0.09034267912772585,
+     "mixed": 0.3401869158878505
+    },
+    "winrate": {
+     "face": 0.850109409190372,
+     "board": 0.7379310344827587,
+     "mixed": 0.86996336996337
+    },
+    "n_by_plan": {
+     "face": 914,
+     "board": 145,
+     "mixed": 546
+    },
+    "winrate_all": 0.8467289719626169,
+    "best_plan": "mixed"
+   },
+   "m>=+2": {
+    "n": 1330,
+    "share": {
+     "face": 0.6045112781954888,
+     "board": 0.0443609022556391,
+     "mixed": 0.3511278195488722
+    },
+    "winrate": {
+     "face": 0.9788557213930348,
+     "board": 0.9830508474576272,
+     "mixed": 0.9464668094218416
+    },
+    "n_by_plan": {
+     "face": 804,
+     "board": 59,
+     "mixed": 467
+    },
+    "winrate_all": 0.9676691729323308,
+    "best_plan": "board"
+   }
+  },
+  "by_true_clock": {
+   "t<=2": {
+    "n": 4342,
+    "share": {
+     "face": 0.5271764163979733,
+     "board": 0.09926301243666513,
+     "mixed": 0.37356057116536157
+    },
+    "winrate": {
+     "face": 0.6784622105723023,
+     "board": 0.07192575406032482,
+     "mixed": 0.3717632552404439
+    },
+    "n_by_plan": {
+     "face": 2289,
+     "board": 431,
+     "mixed": 1622
+    },
+    "winrate_all": 0.5036849378166743,
+    "best_plan": "face"
+   },
+   "t3-4": {
+    "n": 4230,
+    "share": {
+     "face": 0.4,
+     "board": 0.1628841607565012,
+     "mixed": 0.43711583924349884
+    },
+    "winrate": {
+     "face": 0.5023640661938534,
+     "board": 0.42670537010159654,
+     "mixed": 0.5478637101135749
+    },
+    "n_by_plan": {
+     "face": 1692,
+     "board": 689,
+     "mixed": 1849
+    },
+    "winrate_all": 0.5099290780141844,
+    "best_plan": "mixed"
+   },
+   "t5+": {
+    "n": 3348,
+    "share": {
+     "face": 0.48566308243727596,
+     "board": 0.22341696535244923,
+     "mixed": 0.2909199522102748
+    },
+    "winrate": {
+     "face": 0.5940959409594095,
+     "board": 0.5320855614973262,
+     "mixed": 0.5811088295687885
+    },
+    "n_by_plan": {
+     "face": 1626,
+     "board": 748,
+     "mixed": 974
+    },
+    "winrate_all": 0.5764635603345281,
+    "best_plan": "face"
+   }
+  },
+  "spread_true_margin": {
+   "face": 0.22056134943060196,
+   "board": 0.16169398064902818,
+   "mixed": 0.05886736878157378
+  },
+  "spread_pred_margin": {
+   "face": 0.28299746980817203,
+   "board": 0.20248533027078436,
+   "mixed": 0.0914530431984093
+  },
+  "time_err": {
+   "t_left": 0.0776,
+   "my_life_p2": 0.6747,
+   "opp_life_p2": 0.6534,
+   "my_life_p3": 0.7294,
+   "opp_life_p3": 0.7257,
+   "my_life_end": 0.5942,
+   "opp_life_end": 0.5946,
+   "t_left_turns": 0.776,
+   "margin": 0.993
+  },
+  "played": {
+   "face": 5607,
+   "board": 1868,
+   "mixed": 4445
+  }
+ },
+ "defense": {
+  "rows": 8953,
+  "by_true_margin": {
+   "m<=-2": {
+    "n": 2898,
+    "share": {
+     "take": 0.6714975845410628,
+     "guard": 0.3285024154589372
+    },
+    "winrate": {
+     "take": 0.16135662898252826,
+     "guard": 0.16281512605042017
+    },
+    "n_by_plan": {
+     "take": 1946,
+     "guard": 952
+    },
+    "winrate_all": 0.16183574879227053,
+    "best_plan": "guard"
+   },
+   "m-1": {
+    "n": 1689,
+    "share": {
+     "take": 0.6234458259325044,
+     "guard": 0.3765541740674956
+    },
+    "winrate": {
+     "take": 0.45014245014245013,
+     "guard": 0.4308176100628931
+    },
+    "n_by_plan": {
+     "take": 1053,
+     "guard": 636
+    },
+    "winrate_all": 0.4428656009473061,
+    "best_plan": "take"
+   },
+   "m0": {
+    "n": 1774,
+    "share": {
+     "take": 0.6059751972942503,
+     "guard": 0.39402480270574974
+    },
+    "winrate": {
+     "take": 0.641860465116279,
+     "guard": 0.6165951359084406
+    },
+    "n_by_plan": {
+     "take": 1075,
+     "guard": 699
+    },
+    "winrate_all": 0.6319052987598647,
+    "best_plan": "take"
+   },
+   "m+1": {
+    "n": 1246,
+    "share": {
+     "take": 0.5409309791332263,
+     "guard": 0.4590690208667737
+    },
+    "winrate": {
+     "take": 0.755192878338279,
+     "guard": 0.7062937062937062
+    },
+    "n_by_plan": {
+     "take": 674,
+     "guard": 572
+    },
+    "winrate_all": 0.7327447833065811,
+    "best_plan": "take"
+   },
+   "m>=+2": {
+    "n": 1346,
+    "share": {
+     "take": 0.42421991084695393,
+     "guard": 0.575780089153046
+    },
+    "winrate": {
+     "take": 0.9387040280210157,
+     "guard": 0.9187096774193548
+    },
+    "n_by_plan": {
+     "take": 571,
+     "guard": 775
+    },
+    "winrate_all": 0.9271916790490342,
+    "best_plan": "take"
+   }
+  },
+  "by_pred_margin": {
+   "m<=-2": {
+    "n": 2489,
+    "share": {
+     "take": 0.6251506629168341,
+     "guard": 0.3748493370831659
+    },
+    "winrate": {
+     "take": 0.12017994858611825,
+     "guard": 0.16613076098606644
+    },
+    "n_by_plan": {
+     "take": 1556,
+     "guard": 933
+    },
+    "winrate_all": 0.13740458015267176,
+    "best_plan": "guard"
+   },
+   "m-1": {
+    "n": 2319,
+    "share": {
+     "take": 0.5804225959465287,
+     "guard": 0.4195774040534713
+    },
+    "winrate": {
+     "take": 0.3885586924219911,
+     "guard": 0.47070914696813976
+    },
+    "n_by_plan": {
+     "take": 1346,
+     "guard": 973
+    },
+    "winrate_all": 0.4230271668822768,
+    "best_plan": "guard"
+   },
+   "m0": {
+    "n": 2146,
+    "share": {
+     "take": 0.5927306616961789,
+     "guard": 0.40726933830382106
+    },
+    "winrate": {
+     "take": 0.6336477987421384,
+     "guard": 0.6681922196796338
+    },
+    "n_by_plan": {
+     "take": 1272,
+     "guard": 874
+    },
+    "winrate_all": 0.6477166821994408,
+    "best_plan": "guard"
+   },
+   "m+1": {
+    "n": 1181,
+    "share": {
+     "take": 0.5817104149026249,
+     "guard": 0.4182895850973751
+    },
+    "winrate": {
+     "take": 0.8224163027656477,
+     "guard": 0.8744939271255061
+    },
+    "n_by_plan": {
+     "take": 687,
+     "guard": 494
+    },
+    "winrate_all": 0.8441998306519899,
+    "best_plan": "guard"
+   },
+   "m>=+2": {
+    "n": 818,
+    "share": {
+     "take": 0.5599022004889975,
+     "guard": 0.4400977995110024
+    },
+    "winrate": {
+     "take": 0.9650655021834061,
+     "guard": 0.9638888888888889
+    },
+    "n_by_plan": {
+     "take": 458,
+     "guard": 360
+    },
+    "winrate_all": 0.9645476772616137,
+    "best_plan": "take"
+   }
+  },
+  "by_true_clock": {
+   "t<=2": {
+    "n": 3775,
+    "share": {
+     "take": 0.7263576158940397,
+     "guard": 0.27364238410596026
+    },
+    "winrate": {
+     "take": 0.42414296134208607,
+     "guard": 0.5721200387221684
+    },
+    "n_by_plan": {
+     "take": 2742,
+     "guard": 1033
+    },
+    "winrate_all": 0.46463576158940395,
+    "best_plan": "guard"
+   },
+   "t3-4": {
+    "n": 3346,
+    "share": {
+     "take": 0.5454273759713091,
+     "guard": 0.454572624028691
+    },
+    "winrate": {
+     "take": 0.5046575342465753,
+     "guard": 0.4970414201183432
+    },
+    "n_by_plan": {
+     "take": 1825,
+     "guard": 1521
+    },
+    "winrate_all": 0.5011954572624029,
+    "best_plan": "take"
+   },
+   "t5+": {
+    "n": 1832,
+    "share": {
+     "take": 0.4104803493449782,
+     "guard": 0.5895196506550219
+    },
+    "winrate": {
+     "take": 0.5837765957446809,
+     "guard": 0.5824074074074074
+    },
+    "n_by_plan": {
+     "take": 752,
+     "guard": 1080
+    },
+    "winrate_all": 0.5829694323144105,
+    "best_plan": "take"
+   }
+  },
+  "spread_true_margin": {
+   "take": 0.24727767369410886,
+   "guard": 0.2472776736941088
+  },
+  "spread_pred_margin": {
+   "take": 0.06524846242783655,
+   "guard": 0.0652484624278365
+  },
+  "time_err": {
+   "t_left": 0.0836,
+   "my_life_p2": 0.7683,
+   "opp_life_p2": 0.6785,
+   "my_life_p3": 0.7779,
+   "opp_life_p3": 0.7435,
+   "my_life_end": 0.5876,
+   "opp_life_end": 0.6224,
+   "t_left_turns": 0.836,
+   "margin": 1.05
+  },
+  "played": {
+   "take": 5319,
+   "guard": 3634
+  }
+ },
+ "seconds": 44.6
+}
