@@ -81,6 +81,14 @@ THETA = 1.15
 CBAR_CURVE = ((1000, 1.00), (2000, 1.28), (3000, 2.25), (4000, 2.78), (5000, 3.63))
 #: 5000 を超えた分の傾き（1000 あたり・実測の平均）
 CBAR_SLOPE = 0.66
+#: `ν` の定数（**2026-09-13 に実測へ差し替えた**・`nu_calib.py`・300 局 3,139 自席ターン）。
+#: それまでは block_p=0.3／ko_p=0.25 の当てずっぽうだった。
+#: **ブロックできるのはブロッカーだけ**（トークンの `is_blocker_active`）＝
+#: 定数を全キャラに掛けていたのが**種類の誤り**。実測は「ブロッカーを持っていた相手ターン」の
+#: **77.3%** でブロックが起きる一方、**自場のキャラのうちブロッカーは 10.4% しか居ない**
+#: ＝平均では 0.773×0.104 ≈ 0.080 で、**旧定数 0.30 は約 3.7 倍の過大評価**だった。
+BLOCK_P_BLOCKER = 0.773
+KO_P = 0.289
 #: f16 の丸め対策（ちょうど 1000 の倍数が 2000.0002 になる・`budget_audit` と同じ）
 PWR_EPS = 10.0
 #: scalars の列（`rust/opcg_engine/src/encode/scalars.rs`）
@@ -149,17 +157,24 @@ def attack_value(power, target_power, is_leader, theta=THETA, mu=MU, nu_target=N
     return float(min(guard, take))
 
 
-def nu_of(power, opp_leader_power, r_turns, theta=THETA, mu=MU, block_p=0.3, ko_p=0.25):
-    """場のキャラ 1 体の価格 `ν`（`game_theory.md` §14.1 の近似）。
+def nu_of(power, opp_leader_power, r_turns, theta=THETA, mu=MU, block_p=None, ko_p=KO_P,
+          is_blocker=None):
+    """場のキャラ 1 体の価格 `ν`（`game_theory.md` §14.1）。
 
     残り `r_turns` ターンぶんの攻撃の価値＋ブロックの option value − KO される損。
-    `block_p`・`ko_p` は帯によって動く量だが、**順序を測るのが目的なので定数で近似**する
-    （全候補に同じ定数が乗るので、同じ種類の候補どうしの順序には影響しない）。
+
+    **`is_blocker` を渡すのが正しい使い方**（2026-09-13・`nu_calib.py` の較正）——
+    **ブロックできるのはブロッカーだけ**なので、`block_p` を全キャラに掛けるのは**種類の誤り**
+    だった。ブロッカーなら `BLOCK_P_BLOCKER`（実測 0.773）・それ以外は **0**。
+    `block_p` を明示すれば上書きできる（旧値で引き直したいときだけ）。
     """
+    if block_p is None:
+        block_p = (BLOCK_P_BLOCKER if is_blocker else 0.0) if is_blocker is not None else \
+            BLOCK_P_BLOCKER * 0.104          # 素性が判らないときは母集団の平均で置く
     per_turn = attack_value(power, opp_leader_power, True, theta, mu)
     atk = float(r_turns) * per_turn
-    block = block_p * theta * mu                    # 1 回ぶんの攻撃を消す価値
-    return atk + block - ko_p * (atk + block)
+    block = float(block_p) * theta * mu             # 1 回ぶんの攻撃を消す価値
+    return atk + block - float(ko_p) * (atk + block)
 
 
 def attach_value(power, target_power, k=1, theta=THETA, mu=MU):
@@ -180,13 +195,15 @@ def attach_value(power, target_power, k=1, theta=THETA, mu=MU):
     return (min(c_of(x1), theta) - min(c_of(x0), theta)) * mu
 
 
-def play_value(power, cost, opp_leader_power, r_turns, theta=THETA, mu=MU, delta=None):
+def play_value(power, cost, opp_leader_power, r_turns, theta=THETA, mu=MU, delta=None,
+               is_blocker=None):
     """登場の価値＝`ν − μ − cost·δ`（手札 1 枚とドンで場を買う・§14.1）。
 
     `δ`（ドン 1 個の価値）の既定は理論値 `Δpressure(1000)·μ ≈ 0.66·μ`（§13）。
     """
     d = (0.66 * mu) if delta is None else float(delta)
-    return nu_of(power, opp_leader_power, r_turns, theta, mu) - mu - float(cost) * d
+    return (nu_of(power, opp_leader_power, r_turns, theta, mu, is_blocker=is_blocker)
+            - mu - float(cost) * d)
 
 
 def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, don_k=None):
@@ -235,7 +252,8 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
         tp = float(tgt["power"]) if tgt_power is None else float(tgt_power)
         if tgt is not None and tgt.get("leader"):
             return attack_value(sp, tp, True, theta, mu)
-        nu_t = nu_of(tp, ctx["my_leader_power"], ctx["r_turns"], theta, mu)
+        nu_t = nu_of(tp, ctx["my_leader_power"], ctx["r_turns"], theta, mu,
+                     is_blocker=(tgt or {}).get("blocker"))
         return attack_value(sp, tp, False, theta, mu, nu_target=nu_t)
     if at in ("ATTACH_DON", "DON_BOX"):
         return attach_value(sp, ctx["opp_leader_power"], k, theta, mu)
@@ -243,7 +261,8 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
         if src is None or src.get("event"):
             return None                              # イベントは効果の中身が要る
         return play_value(src["power"], src.get("cost") or 0,
-                          ctx["opp_leader_power"], ctx["r_turns"], theta, mu)
+                          ctx["opp_leader_power"], ctx["r_turns"], theta, mu,
+                          is_blocker=src.get("blocker"))
     return None
 
 
