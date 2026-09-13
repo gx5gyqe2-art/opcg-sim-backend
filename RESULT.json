@@ -1,0 +1,21 @@
+{
+  "job": "arena-b-w01",
+  "role": "arena",
+  "status": "done",
+  "inputs": {
+    "candidate": "claude/train-r7:n1_results/nrel_r7.npz",
+    "baseline": "claude/train-r5:n1_results/nrel_r5.npz",
+    "pairs": 350,
+    "seed_base": 1021000,
+    "leaders": "random",
+    "decks": "synth_roles",
+    "workers": 4
+  },
+  "metrics": {
+    "pairs_done": 350,
+    "void": 0,
+    "wins": 325.0,
+    "wr": 0.4643
+  },
+  "notes": "全350ペア完走・void=0。異常・クラッシュ・再起動なし。arena_shard は既定 --max-pairs=40 のため、コーディネータの指示コマンドをそのまま1バッチ実行→exit するのを確認した後、同じコマンドを未消化seedが無くなるまで再実行するドライバループ（/tmp/arena_driver.sh、コード変更なし・既存の再開可能設計をそのまま利用）でラップして完走させた。8バッチ（40,40,40,40,40,40,40,30ペア）を順に消化。判定（昇格可否）はコーディネータ側で8シャード合算後に行うため、本シャードでは判定しない。参考までに engine 側の ARENA_RESUME_FINAL 出力: pairs=350, games=700, void=0, wins=325.0, wr=0.4643, ci95=[0.4235, 0.505], elo=-24.9, promoted=false（このシャード単体のCI・判定は±10Eloの精度目標に対して意味を持たないため無視してよい）。"
+}

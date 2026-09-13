@@ -28,3 +28,7 @@ DRIVER: relaunching arena_shard (lines=280/350)
 DRIVER: batch exit rc=0
 DRIVER: relaunching arena_shard (lines=320/350)
 消化済み 320/350 ペア・残り 30
+今回 30 ペア（231s）・累計 350/350
+ARENA_RESUME_FINAL {"pairs": 350, "games": 700, "void": 0, "wins": 325.0, "wr": 0.4643, "ci95": [0.4235, 0.505], "elo": -24.9, "promoted": false, "candidate": "/root/nrel_r7.npz"}
+DRIVER: batch exit rc=0
+DRIVER_DONE lines=350
