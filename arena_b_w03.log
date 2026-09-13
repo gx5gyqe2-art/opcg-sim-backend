@@ -15,3 +15,5 @@
 消化済み 280/350 ペア・残り 70
 今回 40 ペア（268s）・累計 320/350
 消化済み 320/350 ペア・残り 30
+今回 30 ペア（208s）・累計 350/350
+ARENA_RESUME_FINAL {"pairs": 350, "games": 700, "void": 0, "wins": 358.0, "wr": 0.5114, "ci95": [0.4706, 0.5522], "elo": 7.9, "promoted": false, "candidate": "/root/nrel_r7.npz"}
