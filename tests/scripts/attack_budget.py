@@ -50,7 +50,7 @@ force_gap     = force_max − force_actual        ← **付与を使い切れて
   ＝`don_idle` は**わずかに過大**（起動を使ったターンで余りを多く見せる）。
 - `force_max` は「攻撃回数は実際と同じ」を仮定しない＝**攻撃できた枠を全部使う**上限。
   そのため **`force_gap` は「殴らなかった分」と「ドンを乗せなかった分」の合計**で、
-  分解して読む: ドン側は `don_unused`（記録から直接）・攻撃側は `attacks_available − attacks_made`。
+  分解して読む: ドン側は `don_idle`（記録から直接）・攻撃側は `attacks_available − attacks_made`。
 - **`force` の単位は「1000 パワー分」**で、カードの枚数そのものではない。相手が実際に払う枚数は
   相手のカウンター分布で決まる（`deck_profile.py` の `c̄(x)` が変換係数＝2000 が多いデッキなら
   同じ `force` で払う**枚数は少ない**）。
