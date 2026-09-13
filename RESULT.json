@@ -1,0 +1,36 @@
+{
+  "job": "readout-w32",
+  "role": "measure",
+  "status": "done",
+  "inputs": {
+    "wave": 32,
+    "shards_found": 16,
+    "shards_missing": [],
+    "nets": ["nrel_r3", "nrel_r5", "nrel_r10"],
+    "commit": "43d73f8"
+  },
+  "outputs": [
+    "n1_results/order/order_w32.json",
+    "n1_results/afford/afford_w32_hold.json",
+    "n1_results/afford/afford_w32_all.json",
+    "n1_results/budget/budget_w32.json",
+    "n1_results/hazard/hazard_w32.json",
+    "n1_results/attack/attack_w32.json",
+    "n1_results/entropy/entropy_w32_min.json",
+    "n1_results/entropy/entropy_w32_mid.json",
+    "n1_results/hvs/hvs_w32_r3.json",
+    "n1_results/hvs/hvs_w32_r5.json",
+    "n1_results/hvs/hvs_w32_r10.json"
+  ],
+  "metrics": {
+    "order_close_acc_pq": 0.5016,
+    "order_close_acc_pn": 0.7369,
+    "order_close_q_cost": 0.0701,
+    "afford_hold_take_enough_naive": 0.7071,
+    "afford_hold_take_enough_don": 0.6466,
+    "afford_hold_budget_mean": 0.57,
+    "hvs_r3_own_slope_true": 0.04332,
+    "hvs_r3_own_slope_v": 0.09050
+  },
+  "notes": "全7計器完走・クラッシュ無し・コンテナ再起動無し。所要秒数: order_acc 71.9s(410,290行)/guard_afford hold 27.7s+all 57.0s/budget_audit 78.2s/hazard_curve 9.0s(92,800行)/attack_budget (計測時刻ログ無し・数秒程度)/policy_entropy min+mid 各数秒/hand_value_slope r3 35.0s・r5 34.2s・r10 37.3s(各13,230+10,634行)。詳細はチャット報告を参照。"
+}
