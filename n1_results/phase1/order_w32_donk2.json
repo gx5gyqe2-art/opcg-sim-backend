@@ -1,0 +1,110 @@
+{
+  "stats": {
+    "games": 1041,
+    "rows": 60770,
+    "rows_used": 42557,
+    "cand": 701340,
+    "cand_scored": 639443
+  },
+  "all": {
+    "n": 42557,
+    "th_pairs": 188692,
+    "p_pairs": 371377,
+    "order_acc_theory": 0.5407,
+    "order_acc_prior": 0.517,
+    "k_mean": 12.22,
+    "coverage_cand": 0.9176,
+    "kept_mean": 5.23,
+    "gain": 0.0237,
+    "games": 1041,
+    "theory_se": 0.003,
+    "theory_ci95": [
+      0.5786,
+      0.5903
+    ]
+  },
+  "verdict": "partly",
+  "by_band": {
+    "close": {
+      "n": 6311,
+      "th_pairs": 25893,
+      "p_pairs": 50696,
+      "order_acc_theory": 0.534,
+      "order_acc_prior": 0.4975,
+      "k_mean": 11.01,
+      "coverage_cand": 0.9127,
+      "kept_mean": 4.55,
+      "gain": 0.0365,
+      "games": 677,
+      "theory_se": 0.0087,
+      "theory_ci95": [
+        0.5519,
+        0.5861
+      ]
+    },
+    "mid": {
+      "n": 13792,
+      "th_pairs": 61493,
+      "p_pairs": 119398,
+      "order_acc_theory": 0.5309,
+      "order_acc_prior": 0.4995,
+      "k_mean": 11.57,
+      "coverage_cand": 0.9161,
+      "kept_mean": 4.77,
+      "gain": 0.0314,
+      "games": 914,
+      "theory_se": 0.0054,
+      "theory_ci95": [
+        0.575,
+        0.5962
+      ]
+    },
+    "decided": {
+      "n": 22454,
+      "th_pairs": 101306,
+      "p_pairs": 201283,
+      "order_acc_theory": 0.5483,
+      "order_acc_prior": 0.5323,
+      "k_mean": 12.96,
+      "coverage_cand": 0.9198,
+      "kept_mean": 5.7,
+      "gain": 0.016,
+      "games": 1029,
+      "theory_se": 0.0048,
+      "theory_ci95": [
+        0.5697,
+        0.5886
+      ]
+    }
+  },
+  "saturation_x": 2000.0,
+  "args": {
+    "src": [
+      "/root/w32/n_records/n32_w01",
+      "/root/w32/n_records/n32_w02",
+      "/root/w32/n_records/n32_w03",
+      "/root/w32/n_records/n32_w04",
+      "/root/w32/n_records/n32_w05",
+      "/root/w32/n_records/n32_w06",
+      "/root/w32/n_records/n32_w07",
+      "/root/w32/n_records/n32_w08",
+      "/root/w32/n_records/n32_w09",
+      "/root/w32/n_records/n32_w10",
+      "/root/w32/n_records/n32_w11",
+      "/root/w32/n_records/n32_w12",
+      "/root/w32/n_records/n32_w13",
+      "/root/w32/n_records/n32_w14",
+      "/root/w32/n_records/n32_w15",
+      "/root/w32/n_records/n32_w16"
+    ],
+    "holdout_mod": 7,
+    "limit_games": 0,
+    "theta": 1.15,
+    "mu": 0.0551,
+    "n_min": 5,
+    "n_min_frac": 0.05,
+    "q_eps": 0.02,
+    "don_k": 2
+  },
+  "seconds": 22.9
+}
