@@ -3,7 +3,7 @@
   "role": "arena",
   "status": "in_progress",
   "base_branch": "claude/cpu-spec-improvements-yw91jd",
-  "base_commit": "97994c67cba530b61ad669bca96a98e1f8d8e09e",
+  "base_commit_at_fork": "97994c67cba530b61ad669bca96a98e1f8d8e09e",
   "inputs": {
     "candidate": "claude/train-r5:n1_results/nrel_r5.npz",
     "baseline": "claude/train-r5:n1_results/nrel_r5.npz",
@@ -15,6 +15,9 @@
     "workers": 2,
     "pair_timeout": 1800
   },
-  "metrics": { "pairs_done": 2, "void": 0, "wins": 4.0, "wr": 1.0 },
-  "notes": "初回起動でoriginをorigin/mainからチェックアウトしたところ--cand-worlds/synth_rolesが無く停止・報告。コーディネータの訂正指示（スケジュールトリガ経由）でclaude/cpu-spec-improvements-yw91jdへ土台差し替え、wheel再ビルド。さらにこの環境にはnumpyが入っておらず最初の300ペアが全件voidになる不具合を検出・停止し、pip install -r opcg_sim/requirements.txtで解消（voidは0件・除去済みjsonlは破棄して1031000から再開）。バックグラウンドドライバで継続中。1ペア=68秒(worlds=4・workers=2)程度、300ペア完走は数時間規模の見込み。"
+  "metrics": { "pairs_done": 11, "void": 0, "wins": 15.0, "games": 22, "wr": 0.6818 },
+  "notes": "経緯まとめ（コーディネータの確認依頼への回答）: (1) origin/main を土台にした初回は --cand-worlds/synth_roles が無く停止・報告→コーディネータの訂正（トリガ経由）で claude/cpu-spec-improvements-yw91jd（97994c6）へ土台差し替え・make rust-develop 再実行。(2) その後、300ペア全件が void=\"ModuleNotFoundError: No module named 'numpy'\" になる不具合を発見（エラー原文そのまま）。原因はこの環境に opcg_sim/requirements.txt が未インストールだっただけで、**リポジトリのコードは一切変更していない**（pip install -r opcg_sim/requirements.txt という環境操作のみ）。該当jsonlは破棄しseed 1031000から再走。git status --short / git diff --stat origin/claude/cpu-spec-improvements-yw91jd -- opcg_sim rust tests Makefile で確認済み: 差分はtests/scripts/{attack_budget,budget_audit,deck_profile,hazard_curve}.py等8ファイルの『削除』表示のみだが、これは自分の削除ではなく、fork後にbase側で6コミット進んだ(b19a0f9まで)ことで新規追加されたファイルが自分の古いチェックアウトに無いだけ（git log HEAD..origin/...で確認・自分のコミットd874076はn1_results/arena_worlds/配下のみ変更）。(3) 2026-09-13 11:38 UTC頃、コンテナが再起動（uptimeが2分にリセットされているのを検出）していたことが判明。バックグラウンドドライバが無言で停止しjsonlは11ペア(1031000-1031010)で止まっていたが、ディスク上のwheel/pip依存/リポジトリ状態/baseline npzは全て無事だったため再インストール不要で即再起動・seed 1031011から再開。void 0件で継続中。",
+  "container_restarts": [
+    { "detected_at": "2026-09-13T11:38:04Z", "evidence": "uptime showed ~2min; driver process gone; jsonl had 11 lines with no matching driver-loop log lines after batch start", "data_loss": "none (jsonl/venv/wheel/repo all persisted on disk)" }
+  ]
 }
