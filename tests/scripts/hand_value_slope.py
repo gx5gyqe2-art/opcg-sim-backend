@@ -16,7 +16,7 @@ slope_V    = ∂V̂     / ∂(手札枚数)     同じ帯・同じ行での V �
 
 **符号が違えば V は手札の価値を逆に学んでいる**。大きさが違うだけなら較正の問題。
 
-### `--axis life`＝**ライフ 1 枚の限界価値 `λ`**（2026-09-13 追加・`docs/game_theory.md` §11.1）
+### `--axis life`＝**ライフ 1 枚の限界価値 `λ`**（2026-09-13 追加・`docs/game_theory.md` §9）
 
 同じ within 推定を**軸をライフに替えて**回すと `λ = ∂P(win)/∂ライフ` が出る。
 `μ`（手札の傾き・既定の軸）と合わせると、予算モデルの価格が**独立に 2 通りで出る**:
@@ -106,7 +106,7 @@ def band_key(sc_row, axis="hand"):
 
     `axis="hand"`（既定）＝(自ライフ, 相手ライフ, ターン帯, 自場のキャラ数)＝**手札は入れない**。
     `axis="life"` ＝(手札, 相手ライフ, ターン帯, 自場のキャラ数)＝**自ライフを入れない**
-    （`λ`＝ライフ 1 枚の限界価値を測る軸・`docs/game_theory.md` §11.1）。
+    （`λ`＝ライフ 1 枚の限界価値を測る軸・`docs/game_theory.md` §9）。
     """
     x = SC_MY_HAND if axis == "life" else SC_MY_LIFE
     return (int(round(float(sc_row[x]))),
@@ -330,7 +330,7 @@ def main(argv=None):
     ap.add_argument("--batch", type=int, default=512)
     ap.add_argument("--no-slot", action="store_true", help="枠を落とす応答を測らない（速い）")
     ap.add_argument("--axis", default="hand", choices=("hand", "life"),
-                    help="説明変数（既定 hand＝μ／life＝λ・`docs/game_theory.md` §11.1）")
+                    help="説明変数（既定 hand＝μ／life＝λ・`docs/game_theory.md` §9）")
     ap.add_argument("--out", default="")
     args = ap.parse_args(argv)
 

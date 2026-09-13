@@ -1,5 +1,5 @@
 """PIMC の診断——**strategy fusion が実際に起きているか**と、PIMC の適性 3 性質
-（`docs/game_theory.md` §5・§6・§25 の宿題 3／4・読み取り専用）。
+（`docs/cpu_theory_gap.md` §2・`game_theory.md` §5・読み取り専用）。
 
 PIMC は情報集合から世界を `K` 本引き、**各世界を完全情報ゲームとして**解いて束ねる。
 理論上 2 つの誤りが残る（Frank & Basin 以来の指摘）:
@@ -19,7 +19,7 @@ unmapped      = 世界間で候補の対応が付かなかった数（本来 0�
 ```
 
 `q_spread` が小さければ **leaf correlation が高い**（どの世界でも同じ側が勝つ）＝PIMC が効く
-条件（`game_theory.md` §6）。大きい帯は PIMC が壊れる帯。
+条件（`game_theory.md` §5）。大きい帯は PIMC が壊れる帯。
 
 **disambiguation factor**（隠れ情報がどれだけ速く公開になるか）も同時に出す:
 未見プール（相手の手札＋山＋伏せライフの枚数）がターンごとにどれだけ縮むか。
