@@ -14,10 +14,10 @@
     "pair_timeout": 1800
   },
   "metrics": {
-    "pairs_done": 60,
+    "pairs_done": 68,
     "void": 0,
-    "wins": 74.0,
-    "wr": 0.6167
+    "wins": 80.0,
+    "wr": 0.5882
   },
-  "notes": "manual sync commit; background driver+pusher continue"
+  "notes": "periodic progress push"
 }
