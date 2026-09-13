@@ -91,7 +91,13 @@ def turn_band(t):
 
 
 def band_key(sc):
-    """帯＝(自ライフ, 相手ライフ, ターン帯, 手札)。**量そのものは帯に入れない**。"""
+    """帯＝(自ライフ, 相手ライフ, ターン帯, 手札)。
+
+    **帯に入れた量は測れない**（帯の中で動かないので傾きが定義できない）＝
+    `q_L`（自ライフ）と `q_H`（手札）は必ず `n=0`・`beta=null` になる。**これは仕様**で、
+    データの欠落ではない（2026-09-13 の回収で作業セッションが欠落と報告した）。
+    それらを測りたいときは帯の定義を変える（`hand_value_slope --axis life|hand` が担当）。
+    """
     return "|".join((str(int(round(float(sc[SC_MY_LIFE])))),
                      str(int(round(float(sc[SC_OPP_LIFE])))),
                      turn_band(int(round(float(sc[SC_TURN])))),

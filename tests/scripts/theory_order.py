@@ -300,6 +300,11 @@ def block(recs):
         m = np.array([float(np.mean(v)) for v in by.values()], np.float64)
         se = float(m.std(ddof=1) / np.sqrt(len(m)))
         out["games"] = len(m)
+        # **CI が付くのは「局ごとの平均」**で、`order_acc_theory`（ペアで重み付けした点推定）
+        # とは別の量である。ペア数が局で大きく違うと 2 つはずれる（2026-09-13 実測: `--don-k 2`
+        # の接戦帯で点 0.534 対 局平均 0.569）。**両方を並べて出す**——片方だけ見ると
+        # 「CI が点推定を含まない」という読み違いが起きる。
+        out["theory_mean_per_game"] = round(float(m.mean()), 4)
         out["theory_se"] = round(se, 4)
         out["theory_ci95"] = [round(float(m.mean()) - 1.96 * se, 4),
                              round(float(m.mean()) + 1.96 * se, 4)]
