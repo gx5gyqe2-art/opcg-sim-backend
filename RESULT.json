@@ -1,0 +1,22 @@
+{
+  "job": "arena-b-w04",
+  "role": "arena",
+  "status": "done",
+  "inputs": {
+    "candidate": "claude/train-r7:n1_results/nrel_r7.npz",
+    "baseline": "claude/train-r5:n1_results/nrel_r5.npz",
+    "pairs": 350,
+    "seed_base": 1024000,
+    "leaders": "random",
+    "decks": "synth_roles",
+    "workers": 4
+  },
+  "metrics": {
+    "pairs_done": 350,
+    "void": 0,
+    "wins": 365.0,
+    "games": 700,
+    "wr": 0.5214285714285715
+  },
+  "notes": "全350ペア完走・void 0。異常なしークラッシュ・再起動・ValueError の発生ゼロ（9バッチ全て exit code 0）。arena_shard.py の --max-pairs 既定が40のため、1回の起動では40ペアで打ち切られる仕様（再実行で未消化 seed から再開）＝再開ループで9バッチ回して350まで到達（330s/281s/243s/276s/274s/249s/237s/246s/172s、累計約35分）。勝率の判定はしていない（コーディネータが8シャード合算で判定する方針のため）。"
+}
