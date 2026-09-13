@@ -1,0 +1,24 @@
+{
+  "job": "coverage-w1",
+  "role": "measure",
+  "status": "done",
+  "inputs": {
+    "games": 40,
+    "seed_base": 9101000,
+    "sims": 160,
+    "leaders": "random",
+    "decks": "synth_roles",
+    "commit": "b19a0f9"
+  },
+  "outputs": [
+    "n1_results/coverage/coverage_40.json"
+  ],
+  "metrics": {
+    "coverage_mean": 1.0,
+    "missing_any": 0.0,
+    "best_not_in_a": 0.0,
+    "exhausted_a_any": 0.0,
+    "n_decides": 2606
+  },
+  "notes": "40/40 games completed, 0 aborted, 0 errors. n_decides=2606 is the compared decision-point count (all.n, own_main_only filter); run.decides raw count (before the own_main_only filter) was 5517. Arm B (unlimited enumeration) added 397.6s of the 800.9s total wall time. All turn bands (T<=4/T5-8/T9+) individually show coverage_mean=1.0, missing_any=0.0, best_not_in_a=0.0, exhausted_a_any=0.0, don_coverage_mean=1.0."
+}
