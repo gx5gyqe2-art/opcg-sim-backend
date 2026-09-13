@@ -37,6 +37,18 @@
       {"ep": 1, "val_v_mse": 0.4985139071941376, "val_v_sign": 0.81915, "val_pi_top1": 0.62375,
        "val_time_huber": 0.271418142014376, "val_time_rows": 19173, "train_sec": 1392.982}
     ],
+    "time_baseline": {
+      "rows": 191526,
+      "trained": 0.27899712324142456,
+      "trained_per_col": {"t_left": 0.0046, "my_life_p2": 0.3294, "opp_life_p2": 0.3033, "my_life_p3": 0.3621, "opp_life_p3": 0.3582, "my_life_end": 0.2964, "opp_life_end": 0.2988},
+      "untrained_head": 1.697670340538025,
+      "untrained_head_per_col": {"t_left": 0.2807, "my_life_p2": 3.2967, "opp_life_p2": 2.6201, "my_life_p3": 1.4157, "opp_life_p3": 0.956, "my_life_end": 1.9371, "opp_life_end": 1.3773},
+      "const_mean": 0.6127936244010925,
+      "const_mean_per_col": {"t_left": 0.016, "my_life_p2": 0.7961, "opp_life_p2": 0.8257, "my_life_p3": 0.6962, "opp_life_p3": 0.7728, "my_life_end": 0.6106, "opp_life_end": 0.5731},
+      "target_mean": {"t_left": 0.3013, "my_life_p2": 1.8372, "opp_life_p2": 2.2188, "my_life_p3": 1.5522, "opp_life_p3": 1.9524, "my_life_end": 0.8662, "opp_life_end": 0.7972},
+      "target_sd": {"t_left": 0.1791, "my_life_p2": 1.4561, "opp_life_p2": 1.4918, "my_life_p3": 1.3506, "opp_life_p3": 1.4356, "my_life_end": 1.3, "opp_life_end": 1.2683},
+      "note": "trained (r10's actual time head) < const_mean < untrained_head (shared trunk from r10, fresh random time head), same order in every column -- computed with the same --in/--z-in dirs and cache-dir as r10 training, holdout seed%7==0, first 200000 rows"
+    },
     "band": {
       "w28": {"rows": 31926, "p_net_src": "nrel_a1.npz",
         "r5": {"v_mse": 0.5715890996124696, "v_sign": 0.7945248386894694, "top1_visits": 0.5770233538581018, "ce_visits": 1.7492213252116184},
