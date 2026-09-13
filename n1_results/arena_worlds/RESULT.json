@@ -1,7 +1,7 @@
 {
   "job": "arena-worlds-w05",
   "role": "arena",
-  "status": "in_progress",
+  "status": "done",
   "inputs": {
     "candidate": "claude/train-r5:n1_results/nrel_r5.npz",
     "baseline": "claude/train-r5:n1_results/nrel_r5.npz",
@@ -10,6 +10,9 @@
     "leaders": "random", "decks": "synth_roles",
     "workers": 2, "pair_timeout": 1800
   },
-  "metrics": { "pairs_done": 280, "void": 0, "wins": 280.0, "wr": 0.5 },
-  "notes": "code base corrected mid-run: origin/main lacks --cand-worlds/synth_roles; a scheduled check-in notification redirected this shard to origin/claude/cpu-spec-improvements-yw91jd, which has both. Rebuilt wheel from that branch before running. Driver running in background, resumable, appending to random_w05.jsonl in batches of 20. This is a partial push mid-run (stop-hook triggered by untracked files); RESULT.json will be updated to status=done with final metrics when the driver stops. arena_worlds_w05.log is intentionally not pushed: repo .gitignore has an explicit `arena_*.log` rule, kept local instead. First batch of 20 pairs took ~470s wall (10:39:55-10:47:45 UTC) with workers=2 => ~23.5s/pair average, well under the 1800s pair-timeout, so worlds=8 is not causing runaway pair times here."
+  "metrics": {
+    "pairs_done": 300, "void": 0, "wins": 297.0, "wr": 0.495,
+    "games": 600, "ci95": [0.4507, 0.5393], "elo": -3.5, "promoted": false
+  },
+  "notes": "ARENA_RESUME_FINAL (from arena_shard, verbatim): {\"pairs\": 300, \"games\": 600, \"void\": 0, \"wins\": 297.0, \"wr\": 0.495, \"ci95\": [0.4507, 0.5393], \"elo\": -3.5, \"promoted\": false, \"candidate\": \"/root/nrel_r5.npz\", \"cand_opts\": {\"worlds\": 8}}. All 300 pairs completed cleanly across 15 batches of 20, void=0 throughout. Total wall time ~1h58m (10:39:55-12:38:21 UTC) => ~23.7s/pair average with workers=2, well under the 1800s pair-timeout; per-batch times ranged ~370-570s with no trend, so cand-worlds=8 did not cause runaway or growing pair times in this shard. wr=0.495 (95% CI [0.4507, 0.5393]) is a dead heat vs the worlds=1 baseline (same r5 net both seats) -- this shard alone shows no measurable strength gain from raising candidate-seat PIMC worlds from 1 to 8 under random leaders + synth_roles decks; coordinator should weigh this alongside sibling shards before drawing conclusions, since this is one seed band only. Code-base correction mid-run: origin/main lacks --cand-worlds and the synth_roles deck choice entirely (verified via --help and grep before starting); a scheduled check-in notification (not the original task issuer) redirected this shard to origin/claude/cpu-spec-improvements-yw91jd, which has both -- verified by inspecting that branch's arena_shard.py before switching. Rebuilt the Rust wheel from that branch's code before running (main's wheel is a different build). arena_worlds_w05.log kept local only: repo .gitignore has an explicit `arena_*.log` rule."
 }
