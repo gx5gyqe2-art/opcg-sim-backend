@@ -1,0 +1,71 @@
+{
+  "job": "lambda-w32",
+  "commit": "59bc3db",
+  "net": "nrel_r3.npz",
+  "dirs": [
+    "/root/w32/n_records/n32_w01",
+    "/root/w32/n_records/n32_w02",
+    "/root/w32/n_records/n32_w03",
+    "/root/w32/n_records/n32_w04",
+    "/root/w32/n_records/n32_w05",
+    "/root/w32/n_records/n32_w06",
+    "/root/w32/n_records/n32_w07",
+    "/root/w32/n_records/n32_w08",
+    "/root/w32/n_records/n32_w09",
+    "/root/w32/n_records/n32_w10",
+    "/root/w32/n_records/n32_w11",
+    "/root/w32/n_records/n32_w12",
+    "/root/w32/n_records/n32_w13",
+    "/root/w32/n_records/n32_w14",
+    "/root/w32/n_records/n32_w15",
+    "/root/w32/n_records/n32_w16"
+  ],
+  "games": 1041,
+  "holdout_mod": 7,
+  "life": {
+    "own_turn": {
+      "slope_true_within": 0.11583464587053982,
+      "slope_true_se": 0.0041629254566420805,
+      "n": 13230,
+      "bands_used": 503,
+      "rows_used": 13047,
+      "slope_v_obs_within": 0.23305066800688207,
+      "dv_count_mean": 0.23788
+    },
+    "opp_turn": {
+      "slope_true_within": 0.1361973348209107,
+      "slope_true_se": 0.004457088362095586,
+      "n": 10634,
+      "bands_used": 515,
+      "rows_used": 10409,
+      "slope_v_obs_within": 0.26424570890715116,
+      "dv_count_mean": 0.2702
+    }
+  },
+  "hand": {
+    "own_turn": {
+      "slope_true_within": 0.04332409889754328,
+      "slope_true_se": 0.0025350410741203904,
+      "n": 13230,
+      "bands_used": 337,
+      "rows_used": 13132,
+      "slope_v_obs_within": 0.09050120343919205,
+      "dv_count_mean": 0.06611
+    },
+    "opp_turn": {
+      "slope_true_within": 0.05506680448662067,
+      "slope_true_se": 0.0026373096851731474,
+      "n": 10634,
+      "bands_used": 353,
+      "rows_used": 10517,
+      "slope_v_obs_within": 0.09657538813347197,
+      "dv_count_mean": 0.05763
+    }
+  },
+  "ratio": {
+    "lambda_over_mu_own": 2.6736769792829618,
+    "lambda_over_mu_opp": 2.4733110281349617
+  },
+  "seconds": 64.8,
+  "notes": "life軸のjsonは dv_slot_mean が null／dv_slot_n=0（--no-slot指定のため想定どおり）。opp_turnのlambda/mu比 2.4733 は事前提示レンジ2.5〜4.5をわずかに下回っている（own側2.6737はレンジ内）。両軸ともsign_agrees.all=trueで異常値・符号反転・桁違いは見られない。実行はreadout-w32セッションのwave32ダンプ(~/w32/n_records)を再取得せず再利用。リポジトリのコードは変更していない（n1_results/とRESULT.jsonのみ追加）。"
+}
