@@ -10,6 +10,6 @@
     "leaders": "random", "decks": "synth_roles",
     "workers": 2, "pair_timeout": 1800
   },
-  "metrics": { "pairs_done": 260, "void": 0, "wins": 260.0, "wr": 0.5 },
+  "metrics": { "pairs_done": 280, "void": 0, "wins": 280.0, "wr": 0.5 },
   "notes": "code base corrected mid-run: origin/main lacks --cand-worlds/synth_roles; a scheduled check-in notification redirected this shard to origin/claude/cpu-spec-improvements-yw91jd, which has both. Rebuilt wheel from that branch before running. Driver running in background, resumable, appending to random_w05.jsonl in batches of 20. This is a partial push mid-run (stop-hook triggered by untracked files); RESULT.json will be updated to status=done with final metrics when the driver stops. arena_worlds_w05.log is intentionally not pushed: repo .gitignore has an explicit `arena_*.log` rule, kept local instead. First batch of 20 pairs took ~470s wall (10:39:55-10:47:45 UTC) with workers=2 => ~23.5s/pair average, well under the 1800s pair-timeout, so worlds=8 is not causing runaway pair times here."
 }
