@@ -7,6 +7,13 @@
 3. **SE は対局でクラスタ**する（同じ局の行は独立でない・今日 2 回踏んだ罠）。
 4. **順位は `|β|·sd`**（単位の違う量を並べるため）。`future` の量は
    `band_r2`（盤面から読めるか）を併記しないとヘッドの可否が判断できない。
+
+**T11（`--split`）はもう 1 つの罠を潰す器**＝`future` の量は**勝敗の関数**なので、
+`z` 以外に何の情報も無くても β が出る。`f = f̂(s) + u` に分けて、
+**状態の関数である `f̂` が残差を持っているか**で本物かを決める。ここで固めるのは:
+**(a) `f̂` は局で out-of-fold**（in-sample だと `u` を吸って artefact を持ち込む）・
+**(b) artefact の世界と本物の世界を作り分けたとき判定が正しく出る**（両方向）・
+**(c) 未学習の時間軸ヘッドは黙って使わせない**。
 """
 import os
 import sys
@@ -116,6 +123,102 @@ def test_verdict_says_when_the_net_already_has_everything():
     out = R.rank(recs, min_effect=0.01)
     assert R.verdict(out) == "net_already_has_it"
     assert R.verdict({"n": 0}) is None
+
+
+def _split_rows(resid_from):
+    """`f = q_a + w`（`q_a`＝状態から読める部分・`w`＝読めない残り）の合成行。
+
+    `resid_from` で**残差を駆動するのがどちらか**を切り替える＝T11 の 2 つの世界を作る。
+    `w` は局とターンの偶奇で振るので `q_a` と無相関（＝`f̂` が `w` を吸えない）。
+    """
+    recs = []
+    for g in range(1, 41):
+        for k in range(4):
+            q_a = float(k)
+            w = 1.0 if (g + k) % 2 == 0 else -1.0
+            recs.append({"band": "A", "seed": g, "q_a": q_a, "q_b": float(g % 3),
+                         "f_x": q_a + w, "resid": 0.3 * (w if resid_from == "w" else q_a)})
+    return recs
+
+
+def test_cross_fit_recovers_the_readable_part_only():
+    """`f̂` は状態から読める部分だけを拾い、読めない残りは拾わない（局で out-of-fold）。"""
+    recs = _split_rows("w")
+    hat, y, fitted = R.cross_fit(recs, "f_x", ["q_a", "q_b"], folds=5)
+    assert fitted == len(recs)
+    # y = q_a + w（分散 1.25 + 1）から w は読めない ⇒ 説明できるのは q_a の分だけ
+    r2 = 1.0 - float(((y - hat) ** 2).mean()) / float(y.var())
+    assert 0.45 < r2 < 0.65
+    # 拾ったのは q_a（`hat` は centered q_a とほぼ一致）
+    q_c = R.center_in_band(recs, "q_a")
+    assert float(np.corrcoef(hat, q_c)[0, 1]) > 0.99
+
+
+def test_split_calls_the_outcome_artefact_by_its_name():
+    """**読めない残りだけが残差を駆動する世界**＝`f` の β は勝敗の写し＝ヘッドの線は閉じる。"""
+    sp = R.split_future(_split_rows("w"), "f_x", feats=["q_a", "q_b"], min_effect=0.01)
+    assert sp["whole"]["beta"] is not None and abs(sp["whole"]["effect"]) > 0.01   # 素では効く
+    assert abs(sp["hat"]["beta"]) < 0.01              # 状態から読める部分は効かない
+    assert sp["unpredictable"]["beta"] == pytest.approx(0.3, abs=0.02)
+    # `f̂` が十分強い（hat_r2 ≥ 0.5）ときだけ artefact と名乗れる
+    assert sp["hat_r2"] >= R.MIN_HAT_R2
+    assert sp["verdict"] == R.SPLIT_ARTEFACT
+
+
+def test_a_weak_predictor_may_not_call_it_an_artefact():
+    """**弱い `f̂` は artefact の偽陽性を作る**（読める分が `u` に残り `β(u)` が拾う）。
+
+    `f̂` が帯の中の変動を半分も説明できていないなら判定を出さない——`β(f̂)` は
+    「本物の情報」の**下限**で、`hat_r2` がその下限の被覆率だから。
+    """
+    recs = _split_rows("w")
+    for r in recs:
+        r["p_weak"] = 0.1 * r["q_a"]              # 大きく縮んだ予測（実際のネットの癖）
+    sp = R.split_future(recs, "f_x", pred_key="p_weak", min_effect=0.01)
+    assert sp["hat_r2"] < R.MIN_HAT_R2
+    assert sp["verdict"] == R.SPLIT_WEAK          # artefact とは言わせない
+    # 同じデータで強い予測器を渡せば artefact と出る＝違いは推定器の強さだけ
+    for r in recs:
+        r["p_strong"] = r["q_a"]
+    strong = R.split_future(recs, "f_x", pred_key="p_strong", min_effect=0.01)
+    assert strong["verdict"] == R.SPLIT_ARTEFACT
+
+
+def test_split_calls_real_information_when_the_readable_part_carries_it():
+    """**状態から読める部分が残差を駆動する世界**＝本物の情報＝ヘッドで直せる。"""
+    sp = R.split_future(_split_rows("q_a"), "f_x", feats=["q_a", "q_b"], min_effect=0.01)
+    assert sp["hat"]["beta"] == pytest.approx(0.3, abs=0.02)
+    assert abs(sp["unpredictable"]["beta"]) < 0.01
+    assert sp["verdict"] == R.SPLIT_REAL
+
+
+def test_split_uses_a_given_predictor_instead_of_fitting_one():
+    """`--pred-net`（r10 のヘッド）の経路＝**23 量の張る空間の外**の予測器を使う形。"""
+    recs = _split_rows("q_a")
+    for r in recs:
+        r["p_x"] = r["q_a"]                      # 与えられた予測（ここでは完全な予測器）
+    sp = R.split_future(recs, "f_x", pred_key="p_x", min_effect=0.01)
+    assert sp["source"] == "p_x" and sp["rows_fitted"] == len(recs)
+    assert sp["hat"]["beta"] == pytest.approx(0.3, abs=0.02)
+    assert sp["verdict"] == R.SPLIT_REAL
+
+
+def test_split_says_no_signal_when_neither_part_carries():
+    recs = _split_rows("w")
+    for r in recs:
+        r["resid"] = 0.0
+    sp = R.split_future(recs, "f_x", feats=["q_a", "q_b"], min_effect=0.01)
+    assert sp["verdict"] == R.SPLIT_NONE
+    assert R.split_verdict(None) is None
+    assert R.split_future([], "f_x") is None
+
+
+def test_an_untrained_time_head_is_refused():
+    """未学習のヘッドは定数予測より悪い（r10 の報告で 1.698 対 0.613）＝黙って使わせない。"""
+    class _Stub:
+        time = False
+    with pytest.raises(SystemExit):
+        R.time_predictions(_Stub(), None, None, None, None)
 
 
 def test_now_quantities_are_computed_from_the_state_only():
