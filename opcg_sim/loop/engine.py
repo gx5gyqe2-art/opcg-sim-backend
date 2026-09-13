@@ -45,10 +45,11 @@ def engine():
 
     if not _STATE.get("masters"):
         if not os.path.exists(EFFECTS_PATH):
-            # 生成物（git 管理外・約 8MB）。無ければその場でエクスポータを回す。
-            subprocess.run([sys.executable, "-m", "opcg_sim.tools.export_effects_json",
-                            "--out", EFFECTS_PATH],
-                           cwd=_REPO_ROOT, check=True, stdout=subprocess.DEVNULL)
+            # 生成物（git 管理外・約 8MB）。無ければその場でエクスポータを回す。**プールの
+            # ワーカーが同時に来ても 1 本だけが作り、他は待つ**（`ensure`・2026-09-13 の実害:
+            # 4 ワーカーが同じ tmp へ書いて壊れた JSON を公開し、ほぼ全員が落ちた）。
+            from opcg_sim.tools import export_effects_json as EEJ
+            EEJ.ensure(EFFECTS_PATH)
         opcg_engine.load_masters(EFFECTS_PATH)
         _STATE["masters"] = True
     return opcg_engine

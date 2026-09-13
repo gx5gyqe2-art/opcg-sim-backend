@@ -84,10 +84,10 @@ def load_engine():
             return opcg_engine
         if not os.path.exists(EFFECTS_PATH):
             # 生成物なので配布物に無いことがある。その場でエクスポータを回す（起動時 1 回）。
+            # **同時に何プロセス来ても 1 本だけが作る**（`ensure`・2026-09-13 の実害）。
             _logger.info("効果構造 JSON が無いので生成する: %s", EFFECTS_PATH)
-            subprocess.run([sys.executable, "-m", "opcg_sim.tools.export_effects_json",
-                            "--out", EFFECTS_PATH],
-                           cwd=_REPO_ROOT, check=True, stdout=subprocess.DEVNULL)
+            from opcg_sim.tools import export_effects_json as EEJ
+            _logger.info("効果構造 JSON: %s", EEJ.ensure(EFFECTS_PATH))
         opcg_engine.load_masters(EFFECTS_PATH)
         _masters_loaded = True
     return opcg_engine
