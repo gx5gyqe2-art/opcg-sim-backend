@@ -1,0 +1,58 @@
+{
+  "job": "phase1-w32",
+  "commit": "3a47416",
+  "net": "nrel_r3.npz",
+  "dirs": [
+    "/root/w32/n_records/n32_w01",
+    "/root/w32/n_records/n32_w02",
+    "/root/w32/n_records/n32_w03",
+    "/root/w32/n_records/n32_w04",
+    "/root/w32/n_records/n32_w05",
+    "/root/w32/n_records/n32_w06",
+    "/root/w32/n_records/n32_w07",
+    "/root/w32/n_records/n32_w08",
+    "/root/w32/n_records/n32_w09",
+    "/root/w32/n_records/n32_w10",
+    "/root/w32/n_records/n32_w11",
+    "/root/w32/n_records/n32_w12",
+    "/root/w32/n_records/n32_w13",
+    "/root/w32/n_records/n32_w14",
+    "/root/w32/n_records/n32_w15",
+    "/root/w32/n_records/n32_w16"
+  ],
+  "holdout_mod": 7,
+  "prices": {
+    "hand": {"own_slope_true": 0.04332409889754328, "own_slope_v_obs": 0.09050120343919205, "own_dv_count": 0.06611, "n": 13230},
+    "life": {"own_slope_true": 0.11583464587053982, "own_slope_v_obs": 0.23305066800688207, "own_dv_count": 0.23788, "n": 13230},
+    "don":  {"own_slope_true": 0.027675327321258162, "own_slope_v_obs": 0.058246360139153755, "own_dv_count": 0.04186, "n": 13230},
+    "field": {"own_slope_true": 0.1086565129666582, "own_slope_v_obs": 0.2077391377954894, "own_dv_count": 0.03971, "n": 13230}
+  },
+  "prices_slot_variant": {
+    "note": "hand と field は --no-slot 無しでも1回追加で回した（時間に余裕があったため）。ファイルは n1_results/phase1/prices_w32_{hand,field}_slot.json"
+  },
+  "order": {
+    "donk1": {
+      "order_acc_theory": 0.5165, "order_acc_prior": 0.517, "gain": -0.0005,
+      "coverage_cand": 0.9176, "th_pairs": 145335, "verdict": "price_does_not_teach",
+      "by_band_close": {"n": 6311, "order_acc_theory": 0.5259, "order_acc_prior": 0.4975, "gain": 0.0284, "th_pairs": 20046, "theory_ci95": [0.513, 0.55]}
+    },
+    "donk2": {
+      "order_acc_theory": 0.5407, "order_acc_prior": 0.517, "gain": 0.0237,
+      "coverage_cand": 0.9176, "th_pairs": 188692, "verdict": "partly",
+      "by_band_close": {"n": 6311, "order_acc_theory": 0.534, "order_acc_prior": 0.4975, "gain": 0.0365, "th_pairs": 25893, "theory_ci95": [0.5519, 0.5861]}
+    }
+  },
+  "residual": {
+    "verdict": "add_heads_only",
+    "top5": [
+      {"name": "f_life_spent", "kind": "future", "effect": 0.16342, "ci95": [-0.15616, -0.137189], "band_r2": 0.5689},
+      {"name": "f_life_taken", "kind": "future", "effect": 0.1616, "ci95": [0.136644, 0.156051], "band_r2": 0.572},
+      {"name": "f_own_rows_left", "kind": "future", "effect": 0.00907, "ci95": [-0.000123, 0.002642], "band_r2": 0.6055},
+      {"name": "f_t_real", "kind": "future", "effect": 0.00674, "ci95": [-0.006354, -0.001308], "band_r2": 0.7437},
+      {"name": "q_A", "kind": "now", "effect": 0.00554, "ci95": [-0.01439, 0.003716], "band_r2": null}
+    ],
+    "n_worth_adding": 2
+  },
+  "seconds": {"prices": 115.6, "order": 45.9, "residual": 28.7, "prices_slot_variant": 60.0},
+  "notes": "全計器完走・エラー落ち無し。donの--limit-games 20サニティのみsign_agrees.all=falseだったが、全16シャード本番(n=13230)ではhand/life/don/field全てsign_agrees.all=true・異常値なし。theory_residualで q_L と q_H の2量は --limit-games 20 でも本番(全16シャード)でも一貫して n=0/bands=0/beta=null（計算自体が一度も成立しなかった＝データ側の欠落の可能性、原因は未調査）。donk1は verdict price_does_not_teach（gain -0.0005・ほぼ差なし）、donk2は verdict partly（gain +0.0237）で、付与枚数の仮定（--don-k）で判定が変わる。任意項目の slot 付き価格（hand/field、--no-slotなし）は時間に余裕があったため追加で完走・push済み。リポジトリのコード差分はゼロ（n1_results/とRESULT.jsonのみ追加）。"
+}
