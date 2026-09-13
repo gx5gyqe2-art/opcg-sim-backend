@@ -1,0 +1,16 @@
+{
+  "job": "arena-worlds-w04",
+  "role": "arena",
+  "status": "in_progress",
+  "inputs": {
+    "base_branch": "claude/cpu-spec-improvements-yw91jd",
+    "candidate": "claude/train-r5:n1_results/nrel_r5.npz",
+    "baseline": "claude/train-r5:n1_results/nrel_r5.npz",
+    "cand_worlds": 4,
+    "pairs": 300, "seed_base": 1034000,
+    "leaders": "random", "decks": "synth_roles",
+    "workers": 2, "pair_timeout": 1800
+  },
+  "metrics": { "pairs_done": 0, "void": 0, "wins": 0.0, "wr": 0.0 },
+  "notes": "2026-09-13T10:37:58Z: コーディネータの scheduled trigger により土台ブランチを main から claude/cpu-spec-improvements-yw91jd へ訂正（main には --cand-worlds も worlds フィールドも存在しない。訂正を rust/opcg_engine/src/search/decide.rs の DecideOptions.worlds・opcg_sim/loop/arena_shard.py の --cand-worlds/--decks synth_roles で検証済み)。この時点ではまだ最初のバッチ（20 ペア）が実行中で pairs_done=0。バックグラウンドドライバ（/tmp/arena_driver.sh・リポジトリ管理外）が継続実行中。stop hook の指摘によりこの時点でチェックポイントとして push する。"
+}
