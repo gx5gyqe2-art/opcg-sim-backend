@@ -75,7 +75,12 @@ class Cards:
                     "removal": bool(forms & set(DR_ROLES.FORMS)),
                     "blocker": "ブロッカー" in (getattr(m, "keywords", ()) or ()),
                     # カウンター値（「守れたのか」を候補一覧から測るのに使う・2026-09-13）
-                    "counter": int(getattr(m, "counter", 0) or 0)}
+                    "counter": int(getattr(m, "counter", 0) or 0),
+                    # 種別とコスト（**カウンターの支払い能力**を測るのに使う・2026-09-13）。
+                    # `rules/battle.rs::apply_counter`: EVENT は `pay_cost` が要る・
+                    # それ以外は印字カウンターをそのまま足せる＝無料。
+                    "event": getattr(getattr(m, "type", None), "name", "") == "EVENT",
+                    "cost": int(getattr(m, "cost", 0) or 0)}
         return self._t[cid]
 
 
