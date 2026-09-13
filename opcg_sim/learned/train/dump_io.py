@@ -42,6 +42,11 @@ npz からしか作れない（`pol_sig` の JSON を語彙 index に潰す＝`v
 書き、古い波（v13）は新しい列を **0**（＝情報なし。mask は要らない）で埋める。これで v13 と
 v14 の波を 1 本の `_Waves` に束ねられる＝`n_rel_train` は無改造で混ぜて回せる。
 
+**時間軸の教師（2026-09-13・計画 §20.11 の候補 H・`PACK_VERSION` 5）**: 同じ仕掛けで sidecar
+`n_record_XXXXX.time.npz`（`time_labels.py` が書く・`time(D,7 float16)`／`time_mask(D int8)`）を
+pack の `time`／`time_mask` 列に取り込む。sidecar の無いシャードは **0／mask 0**＝損失に入らない。
+どの波も持っていなければ `V["time"]` は `None`（訓練側は時間軸ヘッドを自動で切る）。
+
 **方針ラベル（2026-09-12・計画 §20.10・WP `rs-plan-aux`・`PACK_VERSION` 4）**: シャードの隣の
 sidecar `n_record_XXXXX.plan.npz`（`plan_labels.py` が既存の記録から後付けで書く・`plan(D int8)`・
 -1＝無し）を pack の `plan` 列に取り込む。**sidecar の無いシャードは -1** で埋める＝損失に入らない。
@@ -59,7 +64,8 @@ import numpy as np
 from opcg_sim.learned.train.n1_train import _atype_idx    # 候補 action → ATYPES の index
 
 # pack の版（レイアウトを変えたら上げる＝古い pack を無視して作り直す）
-PACK_VERSION = 4                       # 4: 方針ラベル `plan` を足した（§20.10・sidecar）
+PACK_VERSION = 5                       # 5: 時間軸の教師 `time`／`time_mask` を足した（§20.11 H）
+#                                      # 4: 方針ラベル `plan` を足した（§20.10・sidecar）
 #                                      # 3: 符号化 v14 の形へ 0 埋めで揃える（§20.9 の E）
 #                                      # 2: 補助教師の 3 列を足した（dump v4・§20.8）
 # V の pack が持つ列と dtype（tok/sc/ci/z は memmap・seed/turn は小さいので RAM に読む）
@@ -70,6 +76,8 @@ AUX_COLS = {"aux": np.float16, "aux_tok": np.float16, "aux_mask": np.int8}
 #: 方針ラベル（§20.10・sidecar）。無いシャードは -1＝損失に入らない。
 PLAN_COLS = {"plan": np.int8}
 PLAN_NONE = -1
+#: 時間軸の教師（§20.11 の候補 H・sidecar）。無いシャードは 0／`time_mask=0`＝損失に入らない。
+TIME_COLS = {"time": np.float16, "time_mask": np.int8}
 CACHE_ENV = "OPCG_DUMP_CACHE"
 
 
@@ -77,6 +85,12 @@ def _aux_shapes():
     """`aux` 系の 1 行あたりの形（正本は `n_rel` の次元＝`record_gen.AUX_COLS` と同じ数）。"""
     from opcg_sim.learned.n_rel import D_AUX, D_AUX_TOK, N_OPP
     return {"aux": (D_AUX,), "aux_tok": (N_OPP, D_AUX_TOK), "aux_mask": ()}
+
+
+def _D_TIME():
+    """時間軸の教師の列数（正本は `n_rel.D_TIME`＝`time_labels.TIME_COLS` と同じ数）。"""
+    from opcg_sim.learned.n_rel import D_TIME
+    return D_TIME
 
 
 def target_form():
@@ -99,12 +113,17 @@ def default_cache_dir():
 
 def shard_files(d):
     return sorted(f for f in glob.glob(os.path.join(d, "n_record_*.npz"))
-                  if not f.endswith(".plan.npz"))
+                  if not (f.endswith(".plan.npz") or f.endswith(".time.npz")))
 
 
 def plan_sidecar(f):
     """シャード → 方針ラベルの sidecar のパス（`plan_labels.sidecar_path` と同じ規則）。"""
     return os.path.splitext(f)[0] + ".plan.npz"
+
+
+def time_sidecar(f):
+    """シャード → 時間軸の教師の sidecar のパス（`time_labels.sidecar_path` と同じ規則）。"""
+    return os.path.splitext(f)[0] + ".time.npz"
 
 
 def _wave_key(files):
@@ -114,10 +133,10 @@ def _wave_key(files):
     for f in files:
         st = os.stat(f)
         h.update(f"{os.path.basename(f)}\t{st.st_size}\t{st.st_mtime_ns}\n".encode())
-        sc = plan_sidecar(f)
-        if os.path.exists(sc):                 # sidecar を足したら pack を作り直す（§20.10）
-            st = os.stat(sc)
-            h.update(f"{os.path.basename(sc)}\t{st.st_size}\t{st.st_mtime_ns}\n".encode())
+        for sc in (plan_sidecar(f), time_sidecar(f)):
+            if os.path.exists(sc):             # sidecar を足したら pack を作り直す（§20.10／§20.11）
+                st = os.stat(sc)
+                h.update(f"{os.path.basename(sc)}\t{st.st_size}\t{st.st_mtime_ns}\n".encode())
     return h.hexdigest()[:16]
 
 
@@ -149,9 +168,11 @@ def build_pack(d, cache_dir):
     per_shard = []
     has_aux = False
     has_plan = False
+    has_time = False
     for f in files:
         n, ts, sd, cd, aux = _rows_of(f)
         has_plan = has_plan or os.path.exists(plan_sidecar(f))
+        has_time = has_time or os.path.exists(time_sidecar(f))
         if form is None:
             form = (ts, sd, cd)
         elif (ts, sd, cd) != form:
@@ -176,7 +197,8 @@ def build_pack(d, cache_dir):
               "z": (n_tot,)}
     shapes.update({k: (n_tot,) + aux_shapes[k] for k in AUX_COLS})
     shapes.update({k: (n_tot,) for k in PLAN_COLS})
-    cols = {**MMAP_COLS, **AUX_COLS, **PLAN_COLS}
+    shapes.update({"time": (n_tot, _D_TIME()), "time_mask": (n_tot,)})
+    cols = {**MMAP_COLS, **AUX_COLS, **PLAN_COLS, **TIME_COLS}
     mm = {k: np.lib.format.open_memmap(os.path.join(tmp, f"{k}.npy"), mode="w+",
                                        dtype=cols[k], shape=shapes[k])
           for k in cols}
@@ -211,6 +233,19 @@ def build_pack(d, cache_dir):
             mm["plan"][sl] = pl
         else:
             mm["plan"][sl] = PLAN_NONE
+        # 時間軸の教師（§20.11 の候補 H・sidecar）。無いシャードは 0／mask 0＝損失に入らない。
+        tm_path = time_sidecar(f)
+        if os.path.exists(tm_path):
+            with np.load(tm_path, allow_pickle=True) as ds:
+                tm = np.asarray(ds["time"], np.float32)[:n]
+                tmk = np.asarray(ds["time_mask"], np.int8)[:n]
+            if len(tm) != n or len(tmk) != n:
+                raise ValueError(f"{tm_path}: 行数がシャードと合わない（{len(tm)} != {n}）")
+            mm["time"][sl, :tm.shape[1]] = tm.astype(np.float16)
+            mm["time_mask"][sl] = tmk
+        else:
+            mm["time"][sl] = 0
+            mm["time_mask"][sl] = 0
         off += n
     assert off == n_tot
     for k in list(mm):
@@ -222,12 +257,13 @@ def build_pack(d, cache_dir):
         json.dump({"pack_version": PACK_VERSION, "src": os.path.abspath(d), "key": key,
                    "rows": n_tot, "shards": [os.path.basename(f) for f in files],
                    "shard_rows": per_shard, "ci_dim": ci_dim, "has_aux": bool(has_aux),
-                   "has_plan": bool(has_plan),
+                   "has_plan": bool(has_plan), "has_time": bool(has_time),
                    "tok_shape": list(tok_shape), "sc_dim": sc_dim,
                    # 元の npz の形（0 埋めしたかが判る＝v13 の波か v14 の波か）
                    "src_tok_shape": list(src_tok_shape), "src_sc_dim": src_sc_dim,
                    "dtypes": {k: np.dtype(v).name for k, v in
-                              {**MMAP_COLS, **AUX_COLS, **PLAN_COLS, **RAM_COLS}.items()}}, fh)
+                              {**MMAP_COLS, **AUX_COLS, **PLAN_COLS, **TIME_COLS,
+                               **RAM_COLS}.items()}}, fh)
     shutil.rmtree(out, ignore_errors=True)
     os.replace(tmp, out)
     return out
@@ -381,6 +417,11 @@ def load_dump(dirs, vocab, with_policy=True, z_dirs=(), cache_dir=None, n_tok=No
     for k in PLAN_COLS:
         V[k] = (_Waves([np.load(os.path.join(p, f"{k}.npy"), mmap_mode="r")
                         for p, _d, _x in packs]) if any_plan else None)
+    # 時間軸の教師（§20.11 の候補 H）: 1 本でも sidecar を持つ波があれば列を出す（持たない行は 0）。
+    any_time = any(_pack_meta(p).get("has_time") for p, _d, _x in packs)
+    for k in TIME_COLS:
+        V[k] = (_Waves([np.load(os.path.join(p, f"{k}.npy"), mmap_mode="r")
+                        for p, _d, _x in packs]) if any_time else None)
     P = {"row": [], "seed": [], "len": [], "chosen": [], "v0": []}
     C = {"pi": [], "at": [], "cid": [], "tcid": [], "k": [], "si": [], "ti": [],
          "n": [], "q": [], "p": []}

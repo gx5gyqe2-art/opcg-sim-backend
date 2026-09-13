@@ -85,6 +85,14 @@ D_PLAN = 5
 D_PLAN_H = 32
 PLAN_PARAMS = ("Wq1", "bq1", "Wq2", "bq2")
 PLAN_KEY = "plan_"
+# --- 時間軸ヘッド（計画 §20.11 の候補 H・ユーザ提案 2026-09-12）-------------------------------
+# 決着までの自席ターン数と 2／3 ターン先のライフ（回帰・Huber）。列の意味は
+# `train/time_labels.TIME_COLS` が正本。**+1 ターンは既存の `aux` が持っている**ので入れない。
+# serve は使わない（Rust の読み手は `time_` の鍵を無視する）＝読み出しは `time_head` から。
+D_TIME = 7
+D_TIME_H = 32
+TIME_PARAMS = ("Wu1", "bu1", "Wu2", "bu2")
+TIME_KEY = "time_"
 N_TOK, N_OWN, N_OPP = NR.N_TOK, NR.N_OWN, NR.N_OPP
 OWN_SLOTS = [i for i in range(N_TOK) if NR._zone(i) in ("own_leader", "own_field", "hand")]   # 16
 OPP_SLOTS = [i for i in range(N_TOK) if NR._zone(i) in ("opp_leader", "opp_field")]          # 6
@@ -176,6 +184,16 @@ class NRelNet:
         self.Wq2 = WQ(D_PLAN_H, D_PLAN); self.bq2 = np.zeros(D_PLAN, np.float32)
         self.plan_params = list(PLAN_PARAMS)
         self.plan = False                 # 方針ヘッドを使うか（訓練器が --plan-weight から立てる）
+        # 時間軸ヘッド（§20.11 の候補 H）: これも別の乱数列＝既存の初期値は動かない。`time` が
+        # False のあいだは forward からも損失からも触られない（保存もしない）。
+        ru = np.random.default_rng(seed + 20_110_000)
+
+        def WU(a, b):
+            return (ru.standard_normal((a, b)) * np.sqrt(2.0 / a)).astype(np.float32)
+        self.Wu1 = WU(D_E, D_TIME_H); self.bu1 = np.zeros(D_TIME_H, np.float32)
+        self.Wu2 = WU(D_TIME_H, D_TIME); self.bu2 = np.zeros(D_TIME, np.float32)
+        self.time_params = list(TIME_PARAMS)
+        self.time = False                 # 時間軸ヘッドを使うか（訓練器が --time-weight から立てる）
         self.vocab_ids = None
         self.meta = {}
         #: このネットが読む符号化の世代（新規は現行＝v14。`load` が npz の meta から入れ直す）。
@@ -381,6 +399,23 @@ class NRelNet:
         v = np.tanh((e @ self.Wv + self.bv)[:, 0])
         return v, self.plan_head(e)
 
+    # --- 時間軸ヘッド（§20.11 の候補 H・serve は呼ばない） ---
+    def time_head(self, e, keep=None):
+        """共有表現 e [B,D_E] → 時間軸の予測 [B,7]（回帰・列は `time_labels.TIME_COLS`）。"""
+        hu = e @ self.Wu1 + self.bu1
+        ru = np.maximum(hu, 0.0)
+        if keep is not None:
+            keep.update(u_hu=hu, u_ru=ru)
+        return ru @ self.Wu2 + self.bu2
+
+    def value_with_time(self, sc, ci, tok, rel_om, rel_oo):
+        """(value, time [B,7])（評価・読み出しが使う・value は既存の forward と同じ値）。"""
+        tab = self.card_table()
+        h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
+        e = self.body(sc, h, present)
+        v = np.tanh((e @ self.Wv + self.bv)[:, 0])
+        return v, self.time_head(e)
+
     # --- 方策 ---
     def cand_input(self, e, h, rel_om, seg, si, ti, feats, budget):
         """候補ごとの入力 [P_cand, D_PIN]。si/ti は 22 枠 index（−1=無し）。"""
@@ -438,6 +473,10 @@ class NRelNet:
             # 方針ヘッド（§20.10）も別鍵（`plan_Wq1` …）。Rust は知らない鍵を無視する。
             m["plan"] = True
             extra.update({PLAN_KEY + p: getattr(self, p) for p in self.plan_params})
+        if self.time:
+            # 時間軸ヘッド（§20.11 の候補 H）も別鍵（`time_Wu1` …）。Rust は知らない鍵を無視する。
+            m["time"] = True
+            extra.update({TIME_KEY + p: getattr(self, p) for p in self.time_params})
         np.savez_compressed(path, **{p: getattr(self, p) for p in self.params},
                             meta=json.dumps(m), nrel=np.array(1), **extra)
 
@@ -472,6 +511,11 @@ class NRelNet:
             for p in net.plan_params:
                 setattr(net, p, d[PLAN_KEY + p])
             net.plan = True
+        # 時間軸ヘッド（§20.11 の候補 H・あれば）。無ければ初期値のまま `time=False`。
+        if all(TIME_KEY + p in d.files for p in net.time_params):
+            for p in net.time_params:
+                setattr(net, p, d[TIME_KEY + p])
+            net.time = True
         return net
 
 

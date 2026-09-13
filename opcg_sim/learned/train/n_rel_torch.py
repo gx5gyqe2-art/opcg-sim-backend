@@ -58,7 +58,7 @@ class TorchNRel(torch.nn.Module):
     パラメータ名は npz 鍵と同じ（`NRelNet.PARAMS`）＝`state_dict` の名前がそのまま npz の鍵に
     なる。語彙表（STATS/AB/ABM/PWR/ISL）は学習対象ではないので buffer/定数で持つ。"""
 
-    def __init__(self, net, aux=False, plan=False):
+    def __init__(self, net, aux=False, plan=False, time=False):
         super().__init__()
         self.ablate = set(getattr(net, "ablate", ()) or ())
         for p in NL.NRelNet.PARAMS:
@@ -73,6 +73,11 @@ class TorchNRel(torch.nn.Module):
         self.plan = bool(plan)
         if self.plan:
             for p in NL.PLAN_PARAMS:
+                setattr(self, p, torch.nn.Parameter(_f32(getattr(net, p))))
+        # 時間軸ヘッド（§20.11 の候補 H）も同じ流儀（`time=True` のときだけ Parameter）。
+        self.time = bool(time)
+        if self.time:
+            for p in NL.TIME_PARAMS:
                 setattr(self, p, torch.nn.Parameter(_f32(getattr(net, p))))
         self.register_buffer("STATS", _f32(net.STATS))
         self.register_buffer("AB", _f32(net.AB))
@@ -191,20 +196,27 @@ class TorchNRel(torch.nn.Module):
         """共有表現 e → 方針ごとの勝率 [B,5]（numpy 版 `NRelNet.plan_head` と同じ式）。"""
         return torch.tanh(torch.relu(e @ self.Wq1 + self.bq1) @ self.Wq2 + self.bq2)
 
-    def value_heads(self, sc, ci, tok, rel_om, rel_oo, aux=False, plan=False):
-        """(value, aux, aux_tok, plan)＝要るヘッドだけ計算し、要らないものは None（共有部は 1 回）。"""
+    def time_head(self, e):
+        """共有表現 e → 時間軸の予測 [B,7]（numpy 版 `NRelNet.time_head` と同じ式）。"""
+        return torch.relu(e @ self.Wu1 + self.bu1) @ self.Wu2 + self.bu2
+
+    def value_heads(self, sc, ci, tok, rel_om, rel_oo, aux=False, plan=False, time=False):
+        """(value, aux, aux_tok, plan, time)＝要るヘッドだけ計算し、要らないものは None
+        （共有部は 1 回）。"""
         tab = self.card_table()
         h, present = self.tokens_forward(ci, tok, rel_om, rel_oo, tab)
         e = self.body(sc, h, present)
         v = torch.tanh((e @ self.Wv + self.bv)[:, 0])
-        pa = pt = pq = None
+        pa = pt = pq = pu = None
         if aux:
             pa = torch.relu(e @ self.Wx1 + self.bx1) @ self.Wx2 + self.bx2
             ho = h[:, self.opp]
             pt = torch.relu(ho @ self.Wy1 + self.by1) @ self.Wy2 + self.by2
         if plan:
             pq = self.plan_head(e)
-        return v, pa, pt, pq
+        if time:
+            pu = self.time_head(e)
+        return v, pa, pt, pq, pu
 
     # --- 方策 ---
     def cand_feats(self, tab, at, cid, tcid, tail):
@@ -270,6 +282,17 @@ def plan_loss_terms(pred, plan, z):
     return ((sel - z[ok]) ** 2).mean(), n
 
 
+def time_loss_terms(pred, tm, mask):
+    """時間軸損失＝**`n_rel_train.time_loss` と同じ式**（有効行の全要素平均 Huber）。
+
+    戻り値は (損失, 有効行数)。有効行が無ければ (0, 0)。"""
+    n = int(mask.sum())
+    if n <= 0:
+        return pred.sum() * 0.0, 0
+    per = torch.nn.functional.huber_loss(pred, tm, reduction="none", delta=1.0)
+    return (per * mask[:, None]).sum() / (n * pred.shape[1]), n
+
+
 def seg_log_softmax(lo, seg, P):
     """区間ごとの log-softmax（numpy 版 `NRelNet.seg_softmax` と同じ区間・同じ最大値の引き方）。
 
@@ -319,14 +342,17 @@ class TorchTrainer:
     学習中の重みは `sync_to_numpy()` で書き戻す。"""
 
     def __init__(self, net, lr=5e-4, threads=None, betas=(0.9, 0.999), eps=1e-8, aux_weight=0.0,
-                 plan_weight=0.0):
+                 plan_weight=0.0, time_weight=0.0):
         self.net = net
         self.aux_weight = float(aux_weight)
         self.plan_weight = float(plan_weight)
+        self.time_weight = float(time_weight)
         self.tn = TorchNRel(net, aux=bool(net.aux and self.aux_weight > 0.0),
-                            plan=bool(getattr(net, "plan", False) and self.plan_weight > 0.0))
+                            plan=bool(getattr(net, "plan", False) and self.plan_weight > 0.0),
+                            time=bool(getattr(net, "time", False) and self.time_weight > 0.0))
         self.aux_loss = (0.0, 0.0)                # 直近の (aux, aux_tok)（エポック行に出す）
         self.plan_loss = (0.0, 0)                 # 直近の (方針損失, 有効行数)
+        self.time_loss = (0.0, 0)                 # 直近の (時間軸損失, 有効行数)
         # 既定（threads が 0/None）は全コア。`n_rel_train` は import 時に OMP_NUM_THREADS=1 を
         # 立てる（numpy の BLAS はスレッドを増やすと**遅くなる**＝§4 の対照表）ので、torch の
         # 既定スレッド数もそれに引きずられて 1 になる。ここで明示的に上書きする。
@@ -357,6 +383,9 @@ class TorchTrainer:
             if self.tn.plan:
                 for p in NL.PLAN_PARAMS:
                     setattr(self.net, p, getattr(self.tn, p).detach().numpy().copy())
+            if self.tn.time:
+                for p in NL.TIME_PARAMS:
+                    setattr(self.net, p, getattr(self.tn, p).detach().numpy().copy())
 
     def _set_lr(self, lr):
         if lr != self._lr:
@@ -372,7 +401,8 @@ class TorchTrainer:
 
     # --- ステップ（numpy 版 `NRelNet.value_step` / `policy_step` と同じ引数） ---
     def value_step(self, sc, ci, tok, rel_om, rel_oo, zt, lr,
-                   aux=None, aux_tok=None, aux_mask=None, aux_w=None, plan=None, plan_w=None):
+                   aux=None, aux_tok=None, aux_mask=None, aux_w=None, plan=None, plan_w=None,
+                   tm=None, tm_mask=None, time_w=None):
         self._mark("step_v_prep")
         tsc, ttok, tz = _f32(sc), _f32(tok), _f32(zt)
         trom = None if rel_om is None else _f32(rel_om)
@@ -381,10 +411,12 @@ class TorchTrainer:
         use_aux = bool(self.tn.aux and w > 0.0 and aux_mask is not None)
         wq = self.plan_weight if plan_w is None else float(plan_w)
         use_plan = bool(self.tn.plan and wq > 0.0 and plan is not None)
+        wu = self.time_weight if time_w is None else float(time_w)
+        use_time = bool(self.tn.time and wu > 0.0 and tm is not None and tm_mask is not None)
         self._mark("step_v_fwd")
-        if use_aux or use_plan:
-            v, pa, pt, pq = self.tn.value_heads(tsc, _i64(ci), ttok, trom, troo,
-                                                aux=use_aux, plan=use_plan)
+        if use_aux or use_plan or use_time:
+            v, pa, pt, pq, pu = self.tn.value_heads(tsc, _i64(ci), ttok, trom, troo,
+                                                    aux=use_aux, plan=use_plan, time=use_time)
         else:
             v = self.tn.value(tsc, _i64(ci), ttok, trom, troo)
         # numpy 版の勾配は do = ((v-z)/B)·(1-v²)＝**0.5·mean((v-z)²)** の勾配。
@@ -401,6 +433,11 @@ class TorchTrainer:
             lq, nq = plan_loss_terms(pq, _i64(plan), tz)
             loss = loss + wq * 0.5 * lq
             self.plan_loss = (float(lq.detach()), nq)
+        if use_time:
+            # 時間軸ヘッド（§20.11 の候補 H）: `aux` と同じ流儀＝損失も報告も有効行の平均 Huber
+            lu, nu = time_loss_terms(pu, _f32(tm), _f32(tm_mask))
+            loss = loss + wu * lu
+            self.time_loss = (float(lu.detach()), nu)
         self._mark("step_v_bwd")
         self._update(loss, lr)
         return out
@@ -497,7 +534,8 @@ class EpochBatches:
 
     `V`/`P`/`C` の中身も `load_dump*` も触らない（読むだけ）。"""
 
-    def __init__(self, V, P, C, ptr, budget, tail, rt, ablate, aux=False, plan=False):
+    def __init__(self, V, P, C, ptr, budget, tail, rt, ablate, aux=False, plan=False,
+                 time=False):
         self.V = V; self.P = P; self.C = C
         # 補助教師（dump v4・§20.8.2）。列が無い波だけの dump なら `V["aux"] is None`＝切る。
         self.aux = bool(aux and V.get("aux") is not None)
@@ -509,6 +547,11 @@ class EpochBatches:
         self.plan = bool(plan and V.get("plan") is not None)
         if self.plan:
             self.v_plan = _Rows(V["plan"], torch.int64)
+        # 時間軸の教師（§20.11 の候補 H・sidecar）。無ければ切る。
+        self.time = bool(time and V.get("time") is not None)
+        if self.time:
+            self.v_time = _Rows(V["time"], torch.float32)
+            self.v_timem = _Rows(V["time_mask"], torch.float32)
         self.ptr = np.asarray(ptr)
         self.plen = np.asarray(P["len"])
         self.prow = np.asarray(P["row"])
@@ -579,13 +622,16 @@ class EpochBatches:
         rom, roo = self._rel(bn)
         out = out + (rom, roo, z)
         # 末尾の並びは今までどおり（aux なし＝6 本・aux あり＝9 本）。方針ラベル（§20.10）は
-        # **plan が立っているときだけ** 10 本目に足す（aux が無ければ 3 本の None を挟む）。
+        # **plan か time が立っているときだけ** 10 本目（aux が無ければ 3 本の None を挟む・
+        # time だけなら 10 本目は None）。時間軸（§20.11 H）は 11／12 本目＝合計 12 本。
         if self.aux:
             out = out + (self.v_aux.take(bi, bn), self.v_auxt.take(bi, bn), self.v_auxm.take(bi, bn))
-        elif self.plan:
+        elif self.plan or self.time:
             out = out + (None, None, None)
-        if self.plan:
-            out = out + (self.v_plan.take(bi, bn),)
+        if self.plan or self.time:
+            out = out + (self.v_plan.take(bi, bn) if self.plan else None,)
+        if self.time:
+            out = out + (self.v_time.take(bi, bn), self.v_timem.take(bi, bn))
         return out
 
     def policy(self, i, sp=None):

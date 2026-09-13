@@ -298,8 +298,9 @@ def test_numpy_plan_backward_matches_torch_autograd():
     net.tokens_backward(k, dh, g, ci, dtab)
     net.card_table_backward(k, dtab, g)
     tn = TT.TorchNRel(net, plan=True)
-    _v, _pa, _pt, pq = tn.value_heads(torch.from_numpy(sc), torch.from_numpy(ci), torch.from_numpy(tok),
-                                      torch.from_numpy(rom), torch.from_numpy(roo), plan=True)
+    _v, _pa, _pt, pq, _pu = tn.value_heads(
+        torch.from_numpy(sc), torch.from_numpy(ci), torch.from_numpy(tok),
+        torch.from_numpy(rom), torch.from_numpy(roo), plan=True)
     lq, _n = TT.plan_loss_terms(pq, torch.from_numpy(plan), torch.from_numpy(z))
     (w * 0.5 * lq).backward()
     for p in list(NL.PLAN_PARAMS) + ["W1", "b1", "W2", "b2", "Wt", "bt", "Wa", "ba"]:
