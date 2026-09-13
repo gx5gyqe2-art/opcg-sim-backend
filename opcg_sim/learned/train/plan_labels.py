@@ -80,7 +80,9 @@ class Cards:
                     # `rules/battle.rs::apply_counter`: EVENT は `pay_cost` が要る・
                     # それ以外は印字カウンターをそのまま足せる＝無料。
                     "event": getattr(getattr(m, "type", None), "name", "") == "EVENT",
-                    "cost": int(getattr(m, "cost", 0) or 0)}
+                    "cost": int(getattr(m, "cost", 0) or 0),
+                    # 印字パワー（**攻撃の値付け**に使う・`theory_order.py`・2026-09-13）
+                    "power": int(getattr(m, "power", 0) or 0)}
         return self._t[cid]
 
 
