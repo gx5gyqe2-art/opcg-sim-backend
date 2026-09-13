@@ -73,7 +73,9 @@ class Cards:
                 self._t[cid] = {
                     "leader": getattr(getattr(m, "type", None), "name", "") == "LEADER",
                     "removal": bool(forms & set(DR_ROLES.FORMS)),
-                    "blocker": "ブロッカー" in (getattr(m, "keywords", ()) or ())}
+                    "blocker": "ブロッカー" in (getattr(m, "keywords", ()) or ()),
+                    # カウンター値（「守れたのか」を候補一覧から測るのに使う・2026-09-13）
+                    "counter": int(getattr(m, "counter", 0) or 0)}
         return self._t[cid]
 
 

@@ -10,6 +10,8 @@
   3. `_spread` は n の少ない帯を混ぜない。
   4. **視点**: `collect` の `true_margin` は**その行の席から見た（自分 − 相手）**＝
      自分が有利なら正（手作りの 1 局で固定）。
+  5. **「しない」と「できない」の分離**（`avail`）: 候補一覧から face／board／guard が選べたかを拾い、
+     カウンター値を合計する。**ここを取り違えると「守れるのに守らない」の数が壊れる**。
 """
 import json
 import os
@@ -144,3 +146,66 @@ def test_collect_margin_is_from_the_row_seat(tmp_path):
     assert p1[0]["true_clock"] == pytest.approx(4.0)
     b = TPM.block(att, TPM.ATTACK)
     assert b["rows"] == len(att) and b["by_true_margin"]
+
+
+def test_avail_reads_the_candidate_list(tmp_path):
+    """候補一覧 → 何が選べたか（攻めの 2 種＋カウンター／ブロッカーとカウンター値の合計）。"""
+    from opcg_sim.loop import decks as D
+    db = D.load_db()
+    cards = PL.Cards(db)
+    leader = counter_card = None
+    for cid in sorted(db.raw_db):
+        m = db.get_card(cid)
+        if m is None:
+            continue
+        t = getattr(getattr(m, "type", None), "name", "")
+        if t == "LEADER" and leader is None:
+            leader = cid
+        elif t == "CHARACTER" and int(getattr(m, "counter", 0) or 0) == 1000 and counter_card is None:
+            counter_card = cid
+        if leader and counter_card:
+            break
+    assert leader and counter_card
+    u2c = {"u-oppL": leader, "u-oppC": counter_card}
+    pol = {"pol_sig": np.array([
+        _sig("DON_BOX", "u-myL", "u-oppL"),        # リーダーを殴る → face
+        _sig("DON_BOX", "u-myC", "u-oppC"),        # キャラを殴る → board
+        _sig("TURN_END"),
+    ]), "pol_cid": np.array([leader, counter_card, ""]),
+        "pol_tcid": np.array([leader, counter_card, ""])}
+    L = np.array([3]); ptr = np.array([0, 3])
+    got = TPM.avail(pol, L, ptr, 0, u2c, cards)
+    assert got["face_avail"] and got["board_avail"]
+    assert not got["guard_avail"] and got["counter_sum"] == 0
+    # 守りの窓: カウンター 2 枚（1000 + 1000）とパス
+    pol2 = {"pol_sig": np.array([_sig("SELECT_COUNTER", "u-h1"), _sig("SELECT_COUNTER", "u-h2"),
+                                _sig("PASS")]),
+            "pol_cid": np.array([counter_card, counter_card, ""]),
+            "pol_tcid": np.array(["", "", ""])}
+    got2 = TPM.avail(pol2, L, ptr, 0, u2c, cards)
+    assert got2["guard_avail"] and not got2["blocker_avail"]
+    assert got2["counter_sum"] == 2000
+    assert not got2["face_avail"] and not got2["board_avail"]
+    # ブロッカー宣言だけの窓
+    pol3 = {"pol_sig": np.array([_sig("SELECT_BLOCKER", "u-b1"), _sig("PASS")]),
+            "pol_cid": np.array(["", ""]), "pol_tcid": np.array(["", ""])}
+    got3 = TPM.avail(pol3, np.array([2]), np.array([0, 2]), 0, u2c, cards)
+    assert got3["guard_avail"] and got3["blocker_avail"] and got3["counter_sum"] == 0
+
+
+def test_capability_accounting():
+    """帯 × 打った方針 × 選べたか の会計（`capability`）。"""
+    recs = ([{"played": PL.PLAN_CLASSES.index("take"), "z": 1.0, "true_clock": 2.0,
+              "guard_avail": True, "guard_enough": False} for _ in range(6)] +
+            [{"played": PL.PLAN_CLASSES.index("take"), "z": -1.0, "true_clock": 2.0,
+              "guard_avail": False, "guard_enough": False} for _ in range(4)] +
+            [{"played": PL.PLAN_CLASSES.index("guard"), "z": 1.0, "true_clock": 2.0,
+              "guard_avail": True, "guard_enough": True} for _ in range(5)])
+    cap = TPM.capability(recs, TPM.DEFENSE, ("guard_avail", "guard_enough"))
+    row = cap["t<=2"]
+    assert row["n"] == 15
+    assert row["guard_avail"] == pytest.approx(11 / 15)
+    assert row["played_take"]["n"] == 10
+    assert row["played_take"]["guard_avail"] == pytest.approx(0.6)   # 守れたのに受けた 6/10
+    assert row["played_take"]["guard_enough"] == pytest.approx(0.0)
+    assert row["played_guard"]["guard_enough"] == pytest.approx(1.0)
