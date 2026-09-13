@@ -1,0 +1,73 @@
+{
+ "games": 7290,
+ "src": [
+  "/root/w32/n_records/n32_w01",
+  "/root/w32/n_records/n32_w02",
+  "/root/w32/n_records/n32_w03",
+  "/root/w32/n_records/n32_w04",
+  "/root/w32/n_records/n32_w05",
+  "/root/w32/n_records/n32_w06",
+  "/root/w32/n_records/n32_w07",
+  "/root/w32/n_records/n32_w08",
+  "/root/w32/n_records/n32_w09",
+  "/root/w32/n_records/n32_w10",
+  "/root/w32/n_records/n32_w11",
+  "/root/w32/n_records/n32_w12",
+  "/root/w32/n_records/n32_w13",
+  "/root/w32/n_records/n32_w14",
+  "/root/w32/n_records/n32_w15",
+  "/root/w32/n_records/n32_w16"
+ ],
+ "level": "mid",
+ "defense": {
+  "H": 0.8971,
+  "H_cond": 0.8407,
+  "I_bits": 0.0564,
+  "I_bits_corrected": 0.0485,
+  "bands": 1935,
+  "n": 174894,
+  "bands_per_row": 0.0111,
+  "predictor": {
+   "n_test": 87226,
+   "acc": 0.689,
+   "base_rate": 0.6871,
+   "lift": 0.0018,
+   "bands_seen": 1755,
+   "covered": 0.9962
+  },
+  "train_n": 87668,
+  "share": {
+   "take": 0.6866,
+   "guard": 0.3134
+  }
+ },
+ "attack": {
+  "H": 1.868,
+  "H_cond": 1.7894,
+  "I_bits": 0.0786,
+  "I_bits_corrected": 0.0764,
+  "bands": 456,
+  "n": 442116,
+  "bands_per_row": 0.001,
+  "predictor": {
+   "n_test": 220080,
+   "acc": 0.4293,
+   "base_rate": 0.4242,
+   "lift": 0.0051,
+   "bands_seen": 439,
+   "covered": 0.9998
+  },
+  "train_n": 222036,
+  "share": {
+   "other": 0.4244,
+   "develop": 0.1661,
+   "face": 0.2626,
+   "board": 0.1469
+  }
+ },
+ "seconds": 47.7,
+ "verdict": {
+  "defense": "opaque",
+  "attack": "opaque"
+ }
+}
