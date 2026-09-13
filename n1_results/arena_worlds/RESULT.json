@@ -1,0 +1,15 @@
+{
+  "job": "arena-worlds-w05",
+  "role": "arena",
+  "status": "in_progress",
+  "inputs": {
+    "candidate": "claude/train-r5:n1_results/nrel_r5.npz",
+    "baseline": "claude/train-r5:n1_results/nrel_r5.npz",
+    "cand_worlds": 8,
+    "pairs": 300, "seed_base": 1035000,
+    "leaders": "random", "decks": "synth_roles",
+    "workers": 2, "pair_timeout": 1800
+  },
+  "metrics": { "pairs_done": 3, "void": 0, "wins": 2.0, "wr": 0.667 },
+  "notes": "code base corrected mid-run: origin/main lacks --cand-worlds/synth_roles; a scheduled check-in notification redirected this shard to origin/claude/cpu-spec-improvements-yw91jd, which has both. Rebuilt wheel from that branch before running. Driver running in background, resumable, appending to random_w05.jsonl in batches of 20. This is a partial push mid-run (stop-hook triggered by untracked files); RESULT.json will be updated to status=done with final metrics when the driver stops. arena_worlds_w05.log is intentionally not pushed: repo .gitignore has an explicit `arena_*.log` rule, kept local instead."
+}
