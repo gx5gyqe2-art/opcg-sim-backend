@@ -16,7 +16,22 @@ slope_V    = ∂V̂     / ∂(手札枚数)     同じ帯・同じ行での V �
 
 **符号が違えば V は手札の価値を逆に学んでいる**。大きさが違うだけなら較正の問題。
 
-### `--axis life`＝**ライフ 1 枚の限界価値 `λ`**（2026-09-13 追加・`docs/game_theory.md` §9）
+### `--axis` ＝ **4 通貨の価格をすべて読む**（2026-09-13 拡張・`docs/game_theory.md` §1.3）
+
+同じ within 推定を軸だけ替えて回すと、**ゲームの 4 つの通貨の価格が同じ物差しで出る**:
+
+| 軸 | 価格 | 説明変数 | 「1 単位失う」操作（モデルの応答） |
+|---|---|---|---|
+| `hand`（既定） | **`μ`** 手札 | scalars[6] | 最安のカウンター札の枠を 0 に |
+| `life` | **`λ`** ライフ | scalars[0] | 枠なし（scalars だけ） |
+| `don` | **`δ`** ドン | scalars[2] | 枠なし |
+| `field` | **`ν`** 場のキャラ | scalars[8] | **パワー最小の自場の枠**を 0 に |
+
+**ネットの内部価格と実測の価格を並べるのが目的**（`cpu_theory_gap.md` §3.3）。
+実測済み: `λ` は合っているが `μ` は 24〜48% 過小＝**内部の `λ/μ` は 3.60 で真の 2.67 より高い**。
+`δ` と `ν` は未測定で、理論側の予測は `δ ≈ Δpressure·μ`（§13）・`ν ≈ k̄_use + cost·δ`（§14.1）。
+
+### `--axis life` の補足（`λ`）
 
 同じ within 推定を**軸をライフに替えて**回すと `λ = ∂P(win)/∂ライフ` が出る。
 `μ`（手札の傾き・既定の軸）と合わせると、予算モデルの価格が**独立に 2 通りで出る**:
@@ -94,6 +109,13 @@ SC_TURN = 10
 #: トークンの手札 10 枠と `counter_value` の列（`n_rel_feat.S_COLS`）
 SLOT_HAND = slice(12, 22)
 S_COUNTER = 7
+#: ドン（アクティブ）の列と**自場の 5 枠**（トークンの並びは 自L,相L,自場5,相場5,手札10）
+SC_MY_DON = 2
+SLOT_OWN_FIELD = slice(2, 7)
+S_POWER = 0
+#: 軸 → 測る価格（`docs/game_theory.md` §1.3 の 4 通貨）
+AXES = ("hand", "life", "don", "field")
+AXIS_PRICE = {"hand": "mu", "life": "lambda", "don": "delta", "field": "nu"}
 TURN_BANDS = ("T<=4", "T5-8", "T9+")
 
 
@@ -102,17 +124,24 @@ def turn_band(t):
 
 
 def band_key(sc_row, axis="hand"):
-    """帯＝**説明変数を除いた**盤面の型。
+    """帯＝**説明変数を除いた**盤面の型（4 通貨のどれを測るかで入れ替える）。
 
-    `axis="hand"`（既定）＝(自ライフ, 相手ライフ, ターン帯, 自場のキャラ数)＝**手札は入れない**。
-    `axis="life"` ＝(手札, 相手ライフ, ターン帯, 自場のキャラ数)＝**自ライフを入れない**
-    （`λ`＝ライフ 1 枚の限界価値を測る軸・`docs/game_theory.md` §9）。
+    | 軸 | 測る価格 | 帯に入れる 4 つ |
+    |---|---|---|
+    | `hand` | **`μ`** | 自ライフ・相手ライフ・ターン帯・自場のキャラ数 |
+    | `life` | **`λ`** | **手札**・相手ライフ・ターン帯・自場のキャラ数 |
+    | `don` | **`δ`** | 自ライフ・相手ライフ・ターン帯・**手札**（ドンと手札は強く相関するので手札を固定する） |
+    | `field` | **`ν`** | 自ライフ・相手ライフ・ターン帯・**手札** |
+
+    **説明変数そのものは帯に入れない**（入れると帯の中で動かなくなり傾きが定義できない）。
+    4 通貨は `docs/game_theory.md` §1.3。
     """
-    x = SC_MY_HAND if axis == "life" else SC_MY_LIFE
-    return (int(round(float(sc_row[x]))),
+    first = SC_MY_HAND if axis == "life" else SC_MY_LIFE
+    last = SC_MY_FIELD if axis in ("hand", "life") else SC_MY_HAND
+    return (int(round(float(sc_row[first]))),
             int(round(float(sc_row[SC_OPP_LIFE]))),
             turn_band(int(round(float(sc_row[SC_TURN])))),
-            int(round(float(sc_row[SC_MY_FIELD]))))
+            int(round(float(sc_row[last]))))
 
 
 def _extra(dd, n):
@@ -137,6 +166,35 @@ def drop_one_hand(tok_row):
     j = min(occupied, key=lambda k: float(hand[k, S_COUNTER]))
     tok[SLOT_HAND.start + j] = 0.0
     return tok, True
+
+
+def drop_weakest_char(tok_row):
+    """**自場のうちパワーが最小の埋まった枠**を 0 にした写し（と、落とせたか）。
+
+    `ν`（場のキャラ 1 体の限界価値）の「1 体失う」に対応させる。パワーで選ぶのは
+    攻撃の価値が `x = パワー − 相手リーダー` で決まるため（`game_theory.md` §14.1）
+    ＝**いちばん価値の低い体を失う**操作＝応答の**下限**側。
+    """
+    tok = np.array(tok_row, np.float32, copy=True)
+    field = tok[SLOT_OWN_FIELD]
+    occupied = [j for j in range(field.shape[0]) if float(np.abs(field[j]).sum()) > 0.0]
+    if not occupied:
+        return tok, False
+    j = min(occupied, key=lambda k: float(field[k, S_POWER]))
+    tok[SLOT_OWN_FIELD.start + j] = 0.0
+    return tok, True
+
+
+def drop_one(tok_row, axis="hand"):
+    """軸に応じた「1 単位失う」操作（`hand`＝最安のカウンター札／`field`＝最弱のキャラ）。
+
+    `life`・`don` はトークン枠を持たない（scalars だけ）ので枠落としは無い。
+    """
+    if axis == "field":
+        return drop_weakest_char(tok_row)
+    if axis == "hand":
+        return drop_one_hand(tok_row)
+    return tok_row, False
 
 
 def within_slope(rows, y_key, h_key="hand", band="band", min_n=2):
@@ -186,9 +244,10 @@ def collect(net, rt, dirs, holdout_mod=7, limit_games=0, bs=512, do_slot=True, a
     `axis="life"` なら説明変数を**自ライフ**に替える（`λ`＝ライフ 1 枚の限界価値・§11.1）。
     ライフは符号化のトークン枠を持たない（scalars だけ）ので**枠落としの応答は測らない**。
     """
-    sc_x = SC_MY_LIFE if axis == "life" else SC_MY_HAND
-    if axis == "life":
-        do_slot = False
+    sc_x = {"hand": SC_MY_HAND, "life": SC_MY_LIFE,
+            "don": SC_MY_DON, "field": SC_MY_FIELD}[axis]
+    if axis != "hand":
+        do_slot = axis == "field"          # 枠落としの応答は hand と field だけで意味を持つ
     own, opp = [], []
     games = 0
     pend = []
@@ -250,7 +309,7 @@ def collect(net, rt, dirs, holdout_mod=7, limit_games=0, bs=512, do_slot=True, a
                    "life": float(sc_row[SC_MY_LIFE]),
                    "opp_hand": float(sc_row[SC_OPP_HAND]),
                    "turn": t, "band": "|".join(str(x) for x in band_key(sc_row, axis))}
-            tok_s, slot_ok = drop_one_hand(ex["tok"][i]) if do_slot else (None, False)
+            tok_s, slot_ok = drop_one(ex["tok"][i], axis) if do_slot else (None, False)
             pend.append((rec, sc_row, ex["ci"][i], ex["tok"][i], tok_s, slot_ok))
             if len(pend) >= bs:
                 flush()
@@ -329,8 +388,9 @@ def main(argv=None):
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--batch", type=int, default=512)
     ap.add_argument("--no-slot", action="store_true", help="枠を落とす応答を測らない（速い）")
-    ap.add_argument("--axis", default="hand", choices=("hand", "life"),
-                    help="説明変数（既定 hand＝μ／life＝λ・`docs/game_theory.md` §9）")
+    ap.add_argument("--axis", default="hand", choices=AXES,
+                    help="どの通貨の価格を測るか（hand＝μ／life＝λ／don＝δ／field＝ν・"
+                         "`docs/game_theory.md` §1.3）")
     ap.add_argument("--out", default="")
     args = ap.parse_args(argv)
 

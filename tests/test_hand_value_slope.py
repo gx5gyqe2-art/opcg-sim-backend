@@ -56,6 +56,48 @@ def test_band_key_life_axis_swaps_the_explanatory_variable():
     assert H.band_key(sc2, "hand") != H.band_key(sc, "hand")
 
 
+def test_band_key_covers_all_four_currencies():
+    """4 通貨の軸で**説明変数が帯に入らない**こと（入ると傾きが定義できない）。"""
+    sc = np.zeros(14, np.float32)
+    sc[H.SC_MY_LIFE], sc[H.SC_OPP_LIFE], sc[H.SC_MY_HAND] = 3, 5, 6
+    sc[H.SC_MY_DON], sc[H.SC_MY_FIELD], sc[H.SC_TURN] = 4, 2, 7
+    keys = {a: H.band_key(sc, a) for a in H.AXES}
+    assert keys["hand"] == (3, 5, "T5-8", 2)      # 手札は帯に無い
+    assert keys["life"] == (6, 5, "T5-8", 2)      # 自ライフは帯に無い
+    assert keys["don"] == (3, 5, "T5-8", 6)       # ドンは帯に無い・手札を固定
+    assert keys["field"] == (3, 5, "T5-8", 6)     # 自場は帯に無い・手札を固定
+    # 説明変数を動かしても、その軸の帯は変わらない
+    for axis, col in (("hand", H.SC_MY_HAND), ("life", H.SC_MY_LIFE),
+                      ("don", H.SC_MY_DON), ("field", H.SC_MY_FIELD)):
+        sc2 = np.array(sc); sc2[col] += 1
+        assert H.band_key(sc2, axis) == keys[axis], axis
+
+
+def test_drop_weakest_char_picks_the_lowest_power_own_slot():
+    """`ν` の「1 体失う」は**自場でパワー最小の埋まった枠**（相手場には触らない）。"""
+    tok = np.zeros((22, 22), np.float32)
+    tok[H.SLOT_OWN_FIELD.start + 0, H.S_POWER] = 0.5      # 5000
+    tok[H.SLOT_OWN_FIELD.start + 2, H.S_POWER] = 0.2      # 2000 ← これを落とす
+    tok[7, H.S_POWER] = 0.1                               # 相手場（触らない）
+    out, ok = H.drop_weakest_char(tok)
+    assert ok
+    assert float(out[H.SLOT_OWN_FIELD.start + 2].sum()) == 0.0
+    assert out[H.SLOT_OWN_FIELD.start + 0, H.S_POWER] == pytest.approx(0.5)
+    assert out[7, H.S_POWER] == pytest.approx(0.1)        # 相手場は残る
+    assert tok[H.SLOT_OWN_FIELD.start + 2, H.S_POWER] == pytest.approx(0.2)  # 入力は壊さない
+    assert H.drop_weakest_char(np.zeros((22, 22), np.float32))[1] is False
+
+
+def test_drop_one_dispatches_by_axis():
+    tok = np.zeros((22, 22), np.float32)
+    tok[H.SLOT_OWN_FIELD.start, H.S_POWER] = 0.5
+    tok[H.SLOT_HAND.start, H.S_COUNTER] = 0.1
+    assert H.drop_one(tok, "field")[1] is True
+    assert H.drop_one(tok, "hand")[1] is True
+    assert H.drop_one(tok, "life")[1] is False       # 枠を持たない通貨
+    assert H.drop_one(tok, "don")[1] is False
+
+
 def test_drop_one_hand_picks_the_cheapest_counter():
     tok = np.zeros((22, 22), np.float32)
     # 手札 3 枠（12,13,14）に埋める。counter_value が最小なのは 13。
