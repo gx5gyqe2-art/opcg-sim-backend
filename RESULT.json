@@ -1,0 +1,24 @@
+{
+  "job": "arena-b-w08",
+  "role": "arena",
+  "status": "done",
+  "inputs": {
+    "candidate": "claude/train-r7:n1_results/nrel_r7.npz",
+    "baseline": "claude/train-r5:n1_results/nrel_r5.npz",
+    "pairs": 350,
+    "seed_base": 1028000,
+    "leaders": "random",
+    "decks": "synth_roles",
+    "workers": 4
+  },
+  "metrics": {
+    "pairs_done": 350,
+    "pairs_scored": 346,
+    "void": 4,
+    "wins": 340.0,
+    "wr": 0.4913,
+    "ci95": [0.4504, 0.5322],
+    "elo": -6.0
+  },
+  "notes": "台帳は350/350行で完走（欠落なし）。実行は8コンテナ再起動ではなく1本の再開ループ（40ペア×8回＋30ペア×1回、計9回のarena_shard呼び出し）で通し、各回rc=0・ログにtraceback/crashなし。void=4/350（母数から除外済み・ARENA_RESUME_FINALのpairs=346と整合）。内訳: 決着せず（上限手数）が3件（seed 1028177, 1028184, 1028346）、異常が1件（seed=1028203, step=127, ValueError: 不明なアクションです: DON_BOX）。このValueErrorは実プレイ中に発生した本物の例外で、要調査（コーディネータ判断）。勝率の判定はしていない（合算前の350ペアは単体では意味を持たないため）。"
+}
