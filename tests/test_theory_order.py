@@ -36,11 +36,93 @@ def test_cost_curve_is_a_staircase_and_tolerates_f16_rounding():
 
 
 def test_saturation_point_moves_with_theta():
-    """`x* = min{x : c(x) ≥ Θ}`。**Θ が上がると飽和点も上がる**（相手のライフが薄い帯）。"""
-    assert T.saturation_x(0.8) == 1000.0                # c(1000)=1.00 ≥ 0.8
+    """`x* = min{x : c(x) ≥ Θ}`。**Θ が上がると飽和点も上がる**（相手のライフが薄い帯）。
+
+    > **2026-09-14 に書き直した——旧版は 2 つのバグを固定していた**
+    > （`saturation_x(0.8) == 1000` と `saturation_x(10.0) == 5000`）。
+    > (1) **`x = 0` が候補に入っていなかった**——`c(0) = 1.00` なので `Θ ≤ 1` の答えは **0**。
+    > (2) **曲線の端（5000）で頭打ち**にしていた——`c(x)` はその先も +0.66/1000 で伸びる。
+    > 既定の `Θ = 1.15` では露見しないが、**盤面から出す `Θ` は 1 を割ることが多い**。
+    """
+    # (1) `Θ ≤ 1` は「通すだけでよい」＝積む価値が無い
+    assert T.saturation_x(0.5) == 0.0
+    assert T.saturation_x(0.8) == 0.0                   # c(0)=1.00 ≥ 0.8
+    assert T.saturation_x(1.0) == 0.0                   # ちょうど 1 枚でも足りる
     assert T.saturation_x(1.15) == 2000.0               # c(2000)=1.28 ≥ 1.15
     assert T.saturation_x(2.0) == 3000.0
-    assert T.saturation_x(10.0) == 5000.0               # 曲線の端で止める
+    # (2) 端から先は傾き `CBAR_SLOPE` で伸ばす（頭打ちにしない）
+    assert T.saturation_x(3.63) == 5000.0
+    assert T.saturation_x(4.0) == 6000.0                # 3.63 + 0.66 = 4.29 ≥ 4.0
+    assert T.saturation_x(10.0) > 5000.0
+    # 定義そのもの: 返した x で足り、1000 手前では足りない
+    for th in (0.9, 1.15, 2.0, 4.0, 7.0):
+        x = T.saturation_x(th)
+        assert T.c_of(x) >= th
+        if x > 0:
+            assert T.c_of(x - 1000.0) < th
+
+
+def _tok_board(my_leader=5000, opp_leader=5000, opp_chars=(), blockers=0):
+    """トークンの枠（0 自L・1 相L・2〜6 自場・7〜11 相場）を最小限で作る。"""
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, T.S_POWER] = my_leader / 1e4
+    tok[1, T.S_POWER] = opp_leader / 1e4
+    for j, p in enumerate(opp_chars):
+        tok[7 + j, T.S_POWER] = p / 1e4
+        tok[7 + j, T.S_IS_CHAR] = 1.0
+    for j in range(blockers):
+        tok[2 + j, T.S_IS_CHAR] = 1.0
+        tok[2 + j, T.S_IS_BLOCKER] = 1.0
+    return tok
+
+
+def test_incoming_attacks_are_the_opponents_leader_and_characters():
+    xs = T.incoming_x(_tok_board(5000, 5000, (6000, 3000)))
+    assert sorted(xs) == pytest.approx([-2000.0, 0.0, 1000.0], abs=1.0)
+    # 自分の場のブロッカーは攻撃側に入らない
+    assert len(T.incoming_x(_tok_board(blockers=3))) == 1
+    # 付与は**高い攻撃から順に**乗る
+    assert sorted(T.incoming_x(_tok_board(5000, 5000, (6000,)), don=1)) == \
+        pytest.approx([0.0, 2000.0], abs=1.0)
+
+
+def test_only_my_active_blockers_are_counted():
+    assert T.count_blockers(_tok_board(blockers=0)) == 0
+    assert T.count_blockers(_tok_board(blockers=2)) == 2
+    tok = _tok_board(blockers=1)
+    tok[2, T.S_IS_BLOCKER] = 0.0
+    assert T.count_blockers(tok) == 0
+
+
+def test_board_theta_is_the_g_th_cheapest_incoming_cost():
+    """**`Θ` は盤面から出せる**（`λ` を通らない）＝`G = max(0, N − L − B)` 番目に安い `c(x)`。"""
+    tok = _tok_board(5000, 5000, (6000, 8000, 10000))   # x = 0, 1000, 3000, 5000
+    # ライフ 1・ブロッカー 0 → G = 4 − 1 − 0 = 3 → c を安い順に並べて 3 番目
+    assert T.board_theta(tok, life=1) == pytest.approx(2.25)
+    # ブロッカーが 1 体居れば G = 2 → 2 番目
+    tok_b = _tok_board(5000, 5000, (6000, 8000, 10000), blockers=1)
+    assert T.board_theta(tok_b, life=1) == pytest.approx(1.00)
+    # ライフが厚いほど G が小さい＝Θ が下がる（守る必要が薄い）
+    assert T.board_theta(tok, life=2) < T.board_theta(tok, life=1)
+
+
+def test_region_one_falls_back_to_the_constant_not_to_zero():
+    """**`G = 0` で 0 を返してはいけない**——`take = Θ·μ` は「受けたときの正味の損」なので、
+    0 にすると**領域 1 の攻撃が全部「価値 0」**になる（ライフは減っているのに）。"""
+    tok = _tok_board(5000, 5000, (6000,))               # 2 攻撃
+    th = T.board_theta(tok, life=5, fallback=T.THETA)   # ライフ 5 ＞ 2 攻撃＝G=0
+    assert th == pytest.approx(T.THETA)
+    assert th > 0.0
+    # 別の fallback を渡せばそちらに落ちる
+    assert T.board_theta(tok, life=5, fallback=0.42) == pytest.approx(0.42)
+
+
+def test_the_don_allowance_uses_the_measured_attach_share():
+    """相手が付与に回すのは**持っているドンの 47%**（実測 2.94/6.29）。"""
+    assert T.DON_SHARE == pytest.approx(2.94 / 6.29, abs=0.01)
+    tok = _tok_board(5000, 5000, (6000, 8000, 10000))
+    # ドン 6 個 × 0.467 ≈ 3 個ぶん乗るので Θ は上がる（攻撃が高くなる）
+    assert T.board_theta(tok, life=1, my_don=6.0) > T.board_theta(tok, life=1, my_don=0.0)
 
 
 def test_attack_on_leader_is_the_min_of_guarding_and_taking():

@@ -97,10 +97,10 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
-from race_state import _extra as _race_extra  # noqa: E402
-from race_state import (_PWR_SCALE, _SLOT_OPP, _SLOT_OWN, _T_BLK, _T_CHAR,  # noqa: E402
-                        _T_PWR)
-from theory_order import c_of  # noqa: E402
+# **`Θ` の材料は理論の本体（`theory_order`）に置いてある**——本器はそれを集計するだけ。
+# 2026-09-14 に両方へ書いていたのを片方へ寄せた（値付けの定義が 2 か所に在ると必ずずれる）。
+from theory_order import (DON_SHARE, c_of, count_blockers,  # noqa: E402
+                          incoming_x, saturation_x)
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len")
 SC_MY_LIFE, SC_OPP_LIFE = 0, 1
@@ -111,58 +111,22 @@ SC_TURN = 10
 LAM_OVER_MU_MINUS_1 = {"own": 1.674, "opp": 1.473}
 #: 恒等式で割り戻した相手ターンの `λ/μ − 1`（`2026-09-14_life_price.md` §4）
 LAM_OVER_MU_MINUS_1_FIXED = 0.860
-#: 飽和点を探す刻み
-X_GRID = tuple(range(0, 11000, 1000))
-#: **実測の付与率**＝1 ターンのドンのうち付与に回る割合（2.94 / 6.29・`don_accounting`）
-DON_SHARE = 0.467
 
 
 def turn_band(t):
     return "T<=4" if t <= 4 else ("T5-8" if t <= 8 else "T9+")
 
 
-def incoming(tk_row, with_don=0):
-    """**これから来る攻撃の超過パワー `x`**（自席の main 行から相手の枠を読む）。
-
-    攻撃側は**相手のリーダー（枠 1）＋相手のキャラ（枠 7〜11）**、守るのは自分のリーダー（枠 0）。
-    `with_don` を渡すと**いちばん高い攻撃から順に 1 個 +1000 ずつ**乗せる
-    （相手は最も通る攻撃を伸ばすので、これが `x` の上限側）。
-    """
-    tk = np.asarray(tk_row)
-    mine = float(tk[0, _T_PWR]) * _PWR_SCALE
-    opp = tk[_SLOT_OPP]
-    pwr = [float(tk[1, _T_PWR]) * _PWR_SCALE]                      # 相手リーダー
-    ch = opp[:, _T_CHAR] > 0.5
-    pwr += [float(v) * _PWR_SCALE for v in opp[ch, _T_PWR]]
-    pwr.sort(reverse=True)                                          # 高い順
-    for k in range(int(max(with_don, 0))):
-        if not pwr:
-            break
-        pwr[k % len(pwr)] += 1000.0                                 # 高い側から順に配る
-    return [p - mine for p in pwr]
-
-
-def my_blockers(tk_row):
-    tk = np.asarray(tk_row)
-    own = tk[_SLOT_OWN]
-    ch = own[:, _T_CHAR] > 0.5
-    return int(((own[:, _T_BLK] > 0.5) & ch).sum())
-
-
-def x_star(theta):
-    """**飽和点**＝`c(x) ≥ Θ` になる最小の x（これを超えて積むのは無駄）。"""
-    for x in X_GRID:
-        if c_of(float(x)) >= theta:
-            return x
-    return X_GRID[-1]
-
-
 def window(sc_row, tk_row, with_don=0):
-    """1 つの自席 main 行 → シャドー価格 `Θ` とその材料。`G = 0` なら `theta` は None。"""
-    xs = incoming(tk_row, with_don)
+    """1 つの自席 main 行 → シャドー価格 `Θ` とその材料。`G = 0` なら `theta` は None。
+
+    材料（来る攻撃の `x`・ブロッカー数・`c(x)`・飽和点）は**全部 `theory_order` から借りる**
+    ——`theory_order.board_theta` と**同じ数字**でなければ A/B の比較が意味を失う。
+    """
+    xs = incoming_x(tk_row, with_don)
     n = len(xs)
     life = int(round(float(sc_row[SC_MY_LIFE])))
-    blk = my_blockers(tk_row)
+    blk = count_blockers(tk_row)
     g = max(0, n - life - blk)
     cs = sorted(c_of(x) for x in xs)
     out = {"n_attacks": n, "life": life, "blockers": blk, "G": g,
@@ -173,7 +137,7 @@ def window(sc_row, tk_row, with_don=0):
         return out
     out["theta"] = round(cs[g - 1], 4)          # **G 番目に安い**＝守る中で最も高い
     out["c_mean_blocked"] = round(float(np.mean(cs[:g])), 4)
-    out["x_star"] = x_star(cs[g - 1])
+    out["x_star"] = saturation_x(cs[g - 1])
     return out
 
 
@@ -206,8 +170,9 @@ def collect(dirs, limit_games=0, don_share=0.0):
 
 
 def _extra(dd, n):
-    _sc, tk = _race_extra(dd, n)
-    return {"sc": np.asarray(dd["scalars"])[:n, :14].astype(np.float32), "tk": tk}
+    # **生のトークンを渡す**（`theory_order` の列番号で読むため・race_state の 5 列版ではない）
+    return {"sc": np.asarray(dd["scalars"])[:n, :14].astype(np.float32),
+            "tk": np.asarray(dd["tokens"])[:n].astype(np.float32)}
 
 
 def _mean_ci(vals, seeds):

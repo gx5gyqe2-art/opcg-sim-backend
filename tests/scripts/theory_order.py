@@ -51,6 +51,7 @@ order_acc(理論, Q)  vs  order_acc(p, Q) = 0.5016（接戦帯・実測）
 """
 import argparse
 import json
+import math
 import os
 import sys
 import time
@@ -75,8 +76,28 @@ POL_COLS = ("pol_n", "pol_q", "pol_p", "pol_sig", "pol_cid", "pol_tcid", "pol_si
 #: ——守る／受けるの判断は相手ターンに起きるので、攻撃の値付けはそちらの価格で見る。
 MU = 0.0551
 LAM = 0.1362
-#: 無差別点 `Θ`（枚）＝`λ/μ − 1 − τ_value` の区間 [0.8, 1.5] の中央（`--theta` で変えられる）
+#: 無差別点 `Θ`（枚）＝`λ/μ − 1 − τ_value`。**2026-09-14 に実測が付いた**——
+#: 盤面のシャドー価格として直接測ると **1.325** [1.234, 1.416]（`2026-09-14_theta_price.md`）。
+#: 既定は当面 1.15 のまま（下の `--theta-mode` の A/B が決まるまで動かさない）。
 THETA = 1.15
+#: **`Θ` には 2 つの経路が在り、帯レベルで食い違う**（2026-09-14 に判明・未解決）:
+#:
+#: | 経路 | 定義 | ライフ別 (ℓ=1..4) |
+#: |---|---|---|
+#: | **恒等式** | `λ(ℓ)/μ − 1 − τ_value`（§9） | 0.90 / 2.81 / 2.30 / 0.27 |
+#: | **シャドー価格** | 来る攻撃の `c(x)` の `G` 番目（§8） | 1.48 / 0.85 / 0.40 / 0.31 |
+#:
+#: **平均はどちらも 1.325 で一致する**（`τ_value` をそう決めたので当然）が、
+#: **帯ごとの形が違う**——盤面側はライフで単調に下がり、恒等式側は単調でない。
+#: `λ(ℓ)` の CI は ±0.07〜0.10 と広いので、**食い違いが本物かは決着していない**。
+#: だから**既定を替えず `--theta-mode` で選べるようにし、順序の一致率で決める**。
+THETA_MODES = ("const", "board")
+#: トークンの枠（0 自L・1 相L・2〜6 自場・7〜11 相場）と列（`n_rel_feat.S_COLS`）
+S_IS_BLOCKER, S_IS_CHAR = 6, 18
+SLOT_OWN_FIELD = slice(2, 7)
+SLOT_OPP_FIELD = slice(7, 12)
+#: 相手が付与に回すドンの割合（実測 2.94/6.29・`2026-09-14_don_accounting.md`）
+DON_SHARE = 0.467
 #: 費用曲線 `c(x)`＝x を止めるのに要る枚数（合成 800 デッキの実測・§18）
 CBAR_CURVE = ((1000, 1.00), (2000, 1.28), (3000, 2.25), (4000, 2.78), (5000, 3.63))
 #: 5000 を超えた分の傾き（1000 あたり・実測の平均）
@@ -93,6 +114,7 @@ KO_P = 0.289
 PWR_EPS = 10.0
 #: scalars の列（`rust/opcg_engine/src/encode/scalars.rs`）
 SC_MY_LIFE, SC_OPP_LIFE = 0, 1
+SC_MY_DON = 2
 SC_MY_HAND = 6
 SC_TURN = 10
 SC_MY_LEADER_POWER, SC_OPP_LEADER_POWER = 12, 13
@@ -135,11 +157,81 @@ def slot_power(tok_row, slot):
 
 
 def saturation_x(theta=THETA):
-    """飽和点 `x* = min{ x : c(x) ≥ Θ }`（`game_theory.md` §14.1）。"""
+    """飽和点 `x* = min{ x : c(x) ≥ Θ }`（`game_theory.md` §14.1）。
+
+    > **2026-09-14 の修正**: 以前は曲線の**節（1000〜5000）だけ**を探していたので、
+    > **`x = 0` が候補に入っていなかった**。`c(0) = 1.00` なので **`Θ ≤ 1.00` の答えは 0**
+    > （＝「通すだけでよく、積む価値は無い」）なのに 1000 を返していた。
+    > 既定の `Θ = 1.15` では露見しないが、**盤面から出す `Θ` は 1 を下回ることが多い**
+    > （ライフ 3〜4 で 0.31〜0.40・`2026-09-14_theta_price.md`）ので実害が出る。
+    >
+    > **2 つ目の修正（同日）**: 曲線の**最後の節（5000）で頭打ち**にしていた。
+    > `c(x)` は 5000 より上も 1000 あたり +0.66 で伸びる（`CBAR_SLOPE`）ので、
+    > **`Θ > 3.63` の飽和点は 5000 より上に在る**。頭打ちにすると
+    > 「もう積んでも無駄」と早く言い過ぎる（リーサル圏の窓で実際に起きる）。
+    """
+    if c_of(0.0) >= theta:
+        return 0.0
     for thr, cards in CBAR_CURVE:
         if cards >= theta:
             return float(thr)
-    return float(CBAR_CURVE[-1][0])
+    # 5000 より上は `CBAR_SLOPE` で伸ばす（1000 刻みに切り上げる）
+    last_x, last_c = CBAR_CURVE[-1]
+    need = (float(theta) - last_c) / CBAR_SLOPE          # 1000 が何本要るか
+    return float(last_x + 1000.0 * math.ceil(need - 1e-9))
+
+
+def incoming_x(tok_row, don=0):
+    """**これから来る攻撃の超過パワー `x`**（自席の行から相手の枠を読む・高い順）。
+
+    攻撃側は**相手のリーダー（枠 1）＋相手のキャラ（枠 7〜11）**、守るのは自分のリーダー（枠 0）。
+    `don` を渡すと**高い攻撃から順に 1 個 +1000 ずつ**乗せる（相手が次のターンに付与する分）。
+    """
+    tok = np.asarray(tok_row)
+    mine = slot_power(tok, 0) or 0.0
+    pwr = [slot_power(tok, 1) or 0.0]
+    for s in range(SLOT_OPP_FIELD.start, SLOT_OPP_FIELD.stop):
+        if float(tok[s, S_IS_CHAR]) > 0.5:
+            pwr.append(slot_power(tok, s) or 0.0)
+    pwr.sort(reverse=True)
+    for k in range(int(max(don, 0))):
+        if not pwr:
+            break
+        pwr[k % len(pwr)] += 1000.0
+    return [p - mine for p in pwr]
+
+
+def count_blockers(tok_row):
+    """自分の場の**アクティブなブロッカー**の数（手札を使わずに 1 回止められる）。"""
+    tok = np.asarray(tok_row)
+    n = 0
+    for s in range(SLOT_OWN_FIELD.start, SLOT_OWN_FIELD.stop):
+        if float(tok[s, S_IS_CHAR]) > 0.5 and float(tok[s, S_IS_BLOCKER]) > 0.5:
+            n += 1
+    return n
+
+
+def board_theta(tok_row, life, my_don=0.0, don_share=DON_SHARE, fallback=THETA):
+    """**盤面から出す `Θ`（シャドー価格）**＝来る攻撃の `c(x)` を安い順に並べた `G` 番目。
+
+    ```
+    G = max(0, N − L − B)      必ず守る回数（§7）
+    Θ = c(x) の G 番目          守る中で最も高いものの費用（§8・順序統計量で平均ではない）
+    ```
+
+    **`G = 0`（領域 1＝全部受けても死なない）では制約が無い＝シャドー価格も無い**。
+    そこは `fallback`（定数の `Θ`）に落とす——**0 を返してはいけない**。
+    `attack_value` の `take = Θ·μ` は「受けたときの正味の損」`λ − μ(1+τ)` そのものなので、
+    0 にすると**領域 1 の攻撃が全部「価値 0」になる**（ライフは減っているのに）。
+
+    相手のドンは `my_don · don_share` で見積もる（自席では相手の `don_active` が
+    0.40 しか無く付与済みの分が見えないため・`2026-09-14_don_accounting.md`）。
+    """
+    xs = incoming_x(tok_row, int(round(float(my_don) * float(don_share))))
+    g = max(0, len(xs) - int(round(float(life))) - count_blockers(tok_row))
+    if g <= 0 or g > len(xs):
+        return float(fallback)
+    return float(sorted(c_of(x) for x in xs)[g - 1])
 
 
 def attack_value(power, target_power, is_leader, theta=THETA, mu=MU, nu_target=None):
@@ -290,7 +382,7 @@ def row_order(n, q, p, theory, n_min=5, q_eps=0.02, p_eps=1e-4, n_min_frac=0.05)
 
 
 def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
-            n_min=5, q_eps=0.02, n_min_frac=0.05, don_k=1):
+            n_min=5, q_eps=0.02, n_min_frac=0.05, don_k=1, theta_mode="const"):
     cards = PL.Cards()
     recs = []
     stats = {"games": 0, "rows": 0, "rows_used": 0, "cand": 0, "cand_scored": 0}
@@ -313,7 +405,13 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
             stats["rows"] += 1
             b = int(ptr[i])
             sc = ex["sc"][i]
-            ctx = {"theta": theta, "mu": mu,
+            # **`Θ` は行ごとに決めうる**（`board`）。既定は定数（`const`）で、
+            # どちらが順序を当てるかは `theory_vs_search` の A/B で決める（2026-09-14）
+            th = theta
+            if theta_mode == "board":
+                th = board_theta(ex["tok"][i], float(sc[SC_MY_LIFE]),
+                                 float(sc[SC_MY_DON]), fallback=theta)
+            ctx = {"theta": th, "mu": mu,
                    "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
                    "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
                    "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))),
@@ -408,6 +506,9 @@ def main(argv=None):
     ap.add_argument("--holdout-mod", type=int, default=7)
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA, help="無差別点（枚・既定は実測の中央 1.15）")
+    ap.add_argument("--theta-mode", default="const", choices=THETA_MODES,
+                    help="`Θ` を定数にするか（const）盤面から出すか（board）。"
+                         "2 つの経路は帯レベルで食い違うので A/B で決める（2026-09-14）")
     ap.add_argument("--mu", type=float, default=MU, help="手札 1 枚の価格（既定は相手ターンの実測）")
     ap.add_argument("--n-min", type=int, default=5)
     ap.add_argument("--n-min-frac", type=float, default=0.05)
@@ -419,7 +520,7 @@ def main(argv=None):
 
     t0 = time.time()
     recs, stats = collect(a.src, a.holdout_mod, a.limit_games, a.theta, a.mu,
-                          a.n_min, a.q_eps, a.n_min_frac, a.don_k)
+                          a.n_min, a.q_eps, a.n_min_frac, a.don_k, theta_mode=a.theta_mode)
     allb = block(recs)
     res = {"stats": stats, "all": allb, "verdict": verdict(allb),
            "by_band": {b: block([r for r in recs if r["band"] == b])

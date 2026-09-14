@@ -76,8 +76,10 @@ if _HERE not in sys.path:
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from order_acc import band_of, q_floor  # noqa: E402
-from theory_order import (MU, THETA, SC_MY_LEADER_POWER, SC_OPP_LEADER_POWER,  # noqa: E402
-                          SC_OPP_LIFE, PWR_EPS, c_of, saturation_x, score_candidate)
+from theory_order import (MU, THETA, THETA_MODES, SC_MY_LIFE, SC_MY_DON,  # noqa: E402
+                          SC_MY_LEADER_POWER, SC_OPP_LEADER_POWER,  # noqa: E402
+                          SC_OPP_LIFE, PWR_EPS, board_theta, c_of,  # noqa: E402
+                          saturation_x, score_candidate)
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0")
 POL_COLS = ("pol_n", "pol_q", "pol_p", "pol_sig", "pol_cid", "pol_tcid", "pol_si",
@@ -222,7 +224,7 @@ def row_compare(n, q, theory, chosen, n_min=5, q_eps=0.02, n_min_frac=0.05, th_e
 
 
 def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
-            n_min=5, q_eps=0.02, n_min_frac=0.05, don_k=1, bands=("close",)):
+            n_min=5, q_eps=0.02, n_min_frac=0.05, don_k=1, bands=("close",), theta_mode="const"):
     """holdout の判断点 → 食い違いの記録（既定は接戦帯だけ）。"""
     cards = PL.Cards()
     recs = []
@@ -255,7 +257,12 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
             stats["rows_band"] += 1
             b = int(ptr[i])
             sc = ex["sc"][i]
-            ctx = {"theta": theta, "mu": mu,
+            # `Θ` を盤面から出すか定数にするか（`theory_order` と同じ規約・A/B 用）
+            th = theta
+            if theta_mode == "board":
+                th = board_theta(ex["tok"][i], float(sc[SC_MY_LIFE]),
+                                 float(sc[SC_MY_DON]), fallback=theta)
+            ctx = {"theta": th, "mu": mu,
                    "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
                    "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
                    "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))),
@@ -394,6 +401,8 @@ def main(argv=None):
     ap.add_argument("--holdout-mod", type=int, default=7)
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA)
+    ap.add_argument("--theta-mode", default="const", choices=THETA_MODES,
+                    help="`Θ` を定数にするか盤面から出すか（`theory_order` と同じ）")
     ap.add_argument("--mu", type=float, default=MU)
     ap.add_argument("--n-min", type=int, default=5)
     ap.add_argument("--n-min-frac", type=float, default=0.05)
@@ -408,7 +417,8 @@ def main(argv=None):
     res = {"args": {k: v for k, v in vars(a).items() if k != "out"}}
     recs, stats, cross, pred, at_dist = collect(
         a.src, a.holdout_mod, a.limit_games, a.theta, a.mu,
-        a.n_min, a.q_eps, a.n_min_frac, a.don_k, tuple(a.bands))
+        a.n_min, a.q_eps, a.n_min_frac, a.don_k, tuple(a.bands),
+        theta_mode=a.theta_mode)
     res["stats"] = stats
     res["summary"] = summarise(recs, cross, pred, at_dist, a.q_eps)
     by_band = {}

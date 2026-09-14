@@ -27,20 +27,24 @@ if _SCRIPTS not in sys.path:
     sys.path.insert(0, _SCRIPTS)
 
 import theta_price as T  # noqa: E402
-from race_state import _PWR_SCALE, _T_BLK, _T_CHAR, _T_PWR  # noqa: E402
+import theory_order as TO  # noqa: E402
 
 
 def _tk(my_leader=5000, opp_leader=5000, opp_chars=(), my_blockers=0):
-    """枠 0 自L・1 相L・2〜6 自場・7〜11 相場（列は race_state の 5 つ）。"""
-    tk = np.zeros((12, 5), np.float32)
-    tk[0, _T_PWR] = my_leader / _PWR_SCALE
-    tk[1, _T_PWR] = opp_leader / _PWR_SCALE
+    """枠 0 自L・1 相L・2〜6 自場・7〜11 相場（列は**生のトークン**＝`theory_order` の規約）。
+
+    2026-09-14 に `race_state` の 5 列版から生のトークンへ移した——**`Θ` の材料は
+    `theory_order` に 1 つだけ置く**ことにしたので、器の側も同じ列を読む。
+    """
+    tk = np.zeros((22, 24), np.float32)
+    tk[0, TO.S_POWER] = my_leader / 1e4
+    tk[1, TO.S_POWER] = opp_leader / 1e4
     for j, p in enumerate(opp_chars):
-        tk[7 + j, _T_PWR] = p / _PWR_SCALE
-        tk[7 + j, _T_CHAR] = 1.0
+        tk[7 + j, TO.S_POWER] = p / 1e4
+        tk[7 + j, TO.S_IS_CHAR] = 1.0
     for j in range(my_blockers):
-        tk[2 + j, _T_CHAR] = 1.0
-        tk[2 + j, _T_BLK] = 1.0
+        tk[2 + j, TO.S_IS_CHAR] = 1.0
+        tk[2 + j, TO.S_IS_BLOCKER] = 1.0
     return tk
 
 
@@ -50,36 +54,6 @@ def _sc(life=4, don=6, turn=6):
     sc[T.SC_MY_DON] = don
     sc[T.SC_TURN] = turn
     return sc
-
-
-def test_incoming_reads_the_opponents_leader_and_characters():
-    """攻撃側は**相手のリーダー＋相手のキャラ**、守るのは自分のリーダー。"""
-    xs = T.incoming(_tk(my_leader=5000, opp_leader=5000, opp_chars=(6000, 3000)))
-    assert sorted(xs) == pytest.approx([-2000.0, 0.0, 1000.0], abs=1.0)
-    # 自分のリーダーが高ければ全部下がる
-    xs2 = T.incoming(_tk(my_leader=6000, opp_leader=5000, opp_chars=(6000,)))
-    assert sorted(xs2) == pytest.approx([-1000.0, 0.0], abs=1.0)
-    # 自分の場のキャラは攻撃側に入らない（枠 2〜6 は数えない）
-    assert len(T.incoming(_tk(opp_chars=(), my_blockers=3))) == 1
-
-
-def test_the_don_allowance_goes_to_the_highest_attacks_first():
-    """付与は**高い攻撃から順に 1 個ずつ**（中立な配り方）。"""
-    base = T.incoming(_tk(opp_leader=5000, opp_chars=(6000,)), with_don=0)
-    assert sorted(base) == pytest.approx([0.0, 1000.0], abs=1.0)
-    one = T.incoming(_tk(opp_leader=5000, opp_chars=(6000,)), with_don=1)
-    assert sorted(one) == pytest.approx([0.0, 2000.0], abs=1.0)   # 高い側（6000）に乗る
-    two = T.incoming(_tk(opp_leader=5000, opp_chars=(6000,)), with_don=2)
-    assert sorted(two) == pytest.approx([1000.0, 2000.0], abs=1.0)  # 2 個目は次に高い側
-
-
-def test_only_my_active_blockers_count():
-    assert T.my_blockers(_tk(my_blockers=0)) == 0
-    assert T.my_blockers(_tk(my_blockers=2)) == 2
-    # ブロッカー旗が立っていないキャラは数えない
-    tk = _tk(my_blockers=1)
-    tk[2, _T_BLK] = 0.0
-    assert T.my_blockers(tk) == 0
 
 
 def test_theta_is_the_g_th_cheapest_not_the_mean():
@@ -117,15 +91,6 @@ def test_blockers_reduce_the_number_you_must_counter():
     tk1 = _tk(opp_chars=(6000, 8000), my_blockers=1)
     assert T.window(_sc(life=1), tk0)["G"] == 2
     assert T.window(_sc(life=1), tk1)["G"] == 1
-
-
-def test_the_saturation_point_is_zero_when_theta_is_below_one_card():
-    """**`Θ < 1` なら `x* = 0`**——`c(0) = 1` が既に `Θ` を超えるので積む意味が無い。"""
-    assert T.x_star(0.9) == 0
-    assert T.x_star(1.0) == 0                     # ちょうど 1 枚でも c(0)=1.00 で足りる
-    assert T.x_star(1.28) == 2000                 # c(2000) = 1.28
-    assert T.x_star(2.25) == 3000
-    assert T.x_star(99.0) == T.X_GRID[-1]         # 届かないときは上限
 
 
 def test_the_implied_tau_is_the_identity_residual():
