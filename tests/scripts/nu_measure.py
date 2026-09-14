@@ -84,8 +84,9 @@ if _HERE not in sys.path:
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from nu_calib import (S_BLOCKER_ACTIVE, S_IS_CHAR, S_POWER, SC_OPP_LEADER_POWER,  # noqa: E402
                       SLOT_OWN_FIELD, _round10)
-from theory_order import (MU, NU_TARGET_MODES, PWR_EPS, SC_MY_LEADER_POWER,  # noqa: E402
-                          SLOT_OPP_FIELD, THETA, incoming_x, nu_of, opp_chars_of)
+from theory_order import (MU, NU_TARGET_MODES, PWR_EPS, S_IS_BLOCKER,  # noqa: E402
+                          SC_MY_LEADER_POWER, SLOT_OPP_FIELD, THETA, c_of,
+                          incoming_x, nu_of, opp_chars_of)
 from opcg_sim.learned import n_rel_feat as F  # noqa: E402
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0")
@@ -151,7 +152,7 @@ def deck_key(sc_row):
 
 
 #: 帯の切り方（2026-09-14・ユーザ指摘「価格はデッキの中身でなく進行により決まる」）
-BAND_MODES = ("state", "deck", "progress", "deck_progress")
+BAND_MODES = ("state", "deck", "progress", "progress_full", "deck_progress")
 #: 進行の型に使う列（`rust/opcg_engine/src/encode/scalars.rs` の対応表）
 SC_MY_DON_ = 2
 #: **相手の手札枚数**＝相手が守れる回数＝`T_me` の分子（列 6,7 が自/相手の手札）
@@ -196,6 +197,40 @@ def progress_key(sc_row, tok_row):
     return (min(3, a_opp), min(2, opp_hand // 3), min(2, don // 4))
 
 
+def progress_key_full(sc_row, tok_row):
+    """**進行の型 v3**——`progress_key` に**パワーの大小**と**相手のブロッカー**を足す。
+
+    ユーザ指摘 2026-09-14:
+
+    > 「盤面のキャラクター数は加味されていると読めましたが、キャラクターのパワーや
+    > ブロッカーなども必要な情報な気がしています」
+
+    **どちらも正しい**。v2 の欠け方は 2 つあった:
+
+    1. **パワーを閾値判定にしか使っていない**——`A_opp` は「通る攻撃の本数」なので
+       **10000 の攻撃と 5100 の攻撃が同じ 1** になる。実際には止める費用が
+       `c(5000)=3.63` 枚と `c(0)=1.00` 枚で全く違う＝**パワーは分母ではなく
+       分子（守れる回数）に効く**。だから **`Σ c(x)`（来る攻撃を全部止める費用）**で持つ。
+    2. **ブロッカーが実装に無い**——§17.1.5c の定義には `B_me`・`B_opp` が在るのに
+       落としていた（定義と実装のずれ）。**相手のブロッカーは帯に入れられる**
+       （`T_me` の分子）。
+
+    **`B_me`（自分のブロッカー）と吸収は入れられない**——**自分の場が説明変数だから**。
+    ＝**帯は「自分の体が働く環境」までしか描けない**（推定量の定義からの帰結）。
+
+    `Σ c(x)` は本数と大きさを同時に持つので、**`A_opp` は落として置き換える**
+    （帯が細かくなりすぎると行が落ちる）。
+    """
+    cost = sum(c_of(x) for x in incoming_x(tok_row) if x >= -PWR_EPS)
+    opp_blockers = sum(1 for s in range(SLOT_OPP_FIELD.start, SLOT_OPP_FIELD.stop)
+                       if float(tok_row[s, S_IS_CHAR]) > 0.5
+                       and float(tok_row[s, S_IS_BLOCKER]) > 0.5)
+    opp_hand = int(float(sc_row[SC_OPP_HAND]))
+    don = int(float(sc_row[SC_MY_DON_]))
+    return (min(3, int(cost)), min(1, opp_blockers),
+            min(2, opp_hand // 3), min(2, don // 4))
+
+
 def band_key(sc_row, deck_band=False, tok_row=None, mode=None):
     """帯＝(自ライフ, 相手ライフ, ターン帯, 手札)＝`--axis field` と同一。
 
@@ -213,6 +248,8 @@ def band_key(sc_row, deck_band=False, tok_row=None, mode=None):
         return base
     if mode == "deck":
         return base + deck_key(sc_row)
+    if mode == "progress_full":
+        return base + progress_key_full(sc_row, tok_row)
     prog = progress_key(sc_row, tok_row)
     return base + prog if mode == "progress" else base + deck_key(sc_row) + prog
 

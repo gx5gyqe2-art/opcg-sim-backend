@@ -500,3 +500,53 @@ def test_the_band_modes_nest_as_expected():
     assert len(both) == len(base) + 5
     # 既定（mode 未指定）は従来どおり state
     assert M.band_key(sc) == base
+
+
+def test_the_full_progress_key_prices_the_incoming_attacks_not_just_counts_them():
+    """**パワーの大小は分母でなく分子に効く**（ユーザ指摘 2026-09-14）。
+
+    `A_opp`（本数）では **10000 の攻撃と 5100 の攻撃が同じ 1** になるが、止める費用は
+    `c(5000)=3.63` 枚と `c(0)=1.00` 枚で全く違う。だから **`Σ c(x)`** で持つ。
+    """
+    sc = _sc_prog()
+    small = M.progress_key_full(sc, _tok_prog(opp=(5100,), my_leader=5000))
+    big = M.progress_key_full(sc, _tok_prog(opp=(10000,), my_leader=5000))
+    assert big[0] > small[0]
+    # 本数だけの v2 では区別が付かない（これが v3 を足した理由そのもの）
+    assert M.progress_key(sc, _tok_prog(opp=(5100,), my_leader=5000))[0] == \
+        M.progress_key(sc, _tok_prog(opp=(10000,), my_leader=5000))[0]
+
+
+def test_the_full_progress_key_carries_the_opponents_blockers():
+    """**相手のブロッカー**＝`T_me` の分子（相手が手札を使わずに止める回数）。"""
+    sc = _sc_prog()
+    tok = _tok_prog(opp=(6000,))
+    plain = M.progress_key_full(sc, tok)
+    tok[7, N.S_BLOCKER_ACTIVE] = 1.0
+    assert M.progress_key_full(sc, tok)[1] > plain[1]
+
+
+def test_my_own_blockers_still_cannot_enter_the_band():
+    """**`B_me`（自分のブロッカー）と吸収は入れられない**——**自分の場が説明変数だから**。
+
+    帯が描けるのは**自分の体が働く環境**までで、自分の体そのものは描けない。
+    これは欠陥ではなく推定量の定義からの帰結なので、**ラチェットして残す**。
+    """
+    sc = _sc_prog(opp_hand=4, my_don=3)
+    bare = _tok_prog(opp=(6000,))
+    mine = _tok_prog(opp=(6000,), mine=(3000, 9000))
+    mine[2, N.S_BLOCKER_ACTIVE] = 1.0
+    mine[3, N.S_BLOCKER_ACTIVE] = 1.0
+    assert M.progress_key_full(sc, bare) == M.progress_key_full(sc, mine)
+
+
+def test_the_full_progress_key_never_reads_the_deck():
+    """v3 も**デッキの中身を 1 つも参照しない**（一般化の要件は保つ）。"""
+    from opcg_sim.learned import n_rel_feat as F
+    tok = _tok_prog(opp=(6000,))
+    a = _sc_prog(opp_hand=4, my_don=3)
+    b = _sc_prog(opp_hand=4, my_don=3)
+    for r in M.DECK_ROLES:
+        b[94 + F.EXTRA_COLS.index("deck_%s" % r)] = 1.0
+        b[94 + F.EXTRA_COLS.index("opp_pool_%s" % r)] = 1.0
+    assert M.progress_key_full(a, tok) == M.progress_key_full(b, tok)
