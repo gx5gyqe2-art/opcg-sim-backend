@@ -91,6 +91,10 @@ ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen",
 THETA_SWEEP = (1.15, 1.325, 1.88)
 #: **P2** の扱い（理論が値を付けられなかった行）
 SILENT_MODES = ("zero", "exclude")
+#: **T28-c**——「払えた」の判定が粗いせいで反転しているのではないかを分ける閾値。
+#: 守る力が来る攻撃をこれだけ上回っていれば**余裕で払えた**と見なす（暫定値・感度を取る）。
+#: **ブロッカーが居る行は無条件で余裕**（レストするだけでドンを使わない）。
+MARGIN_COMFORT = 2000.0
 
 
 def _extra(dd, n):
@@ -99,7 +103,7 @@ def _extra(dd, n):
             "ci": np.asarray(dd["card_idx"])[:n]}
 
 
-def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU):
+def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=None):
     """**守りの窓 1 つ**の取りこぼし（`≤ 0`）と、判定に使った内訳。
 
     **払えなかった行は誤りと数えない**——`measurement.md` §1。
@@ -119,28 +123,41 @@ def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU):
     if played == "guard" and not can_guard:
         # 守れないはずの行で守っている＝予算の見積りが渋い。**誤りにしない**
         actual = best
-    return {"s": -max(0.0, actual - best), "x": x, "can_guard": can_guard,
+    # **T28-c**: 余裕の大きさ。**貧しい席を減点していないか**を分けるために出す。
+    margin = (float("inf") if blocker else float(afford_pw) - float(x))
+    return {"s": -max(0.0, actual - best), "x": x, "can_guard": can_guard, "margin": margin,
+            "comfortable": bool(can_guard and margin >= (MARGIN_COMFORT
+                                                        if margin_comfort is None
+                                                        else float(margin_comfort))),
             "played": played, "theory_says": ("guard" if (can_guard and cost_guard < cost_take)
                                               else "take")}
 
 
 def _add(rec, band, s, side):
-    """**行ごとに帯へ足す**（T28-b）——決着後の雑さが接戦帯に混ざらないようにする。"""
-    rec["s_%s" % side] += float(s)
-    rec["n_%s" % side] += 1
+    """**行ごとに帯へ足す**（T28-b）——決着後の雑さが接戦帯に混ざらないようにする。
+
+    `side="grdc"` は**余裕で払えた守りの行だけ**の別勘定（T28-c）＝`grd` と二重に足す。
+    """
+    if side != "grdc":
+        rec["s_%s" % side] += float(s)
+        rec["n_%s" % side] += 1
     b = rec["band"].setdefault(band, {"s": 0.0, "n": 0, "s_atk": 0.0, "n_atk": 0,
-                                      "s_grd": 0.0, "n_grd": 0})
+                                      "s_grd": 0.0, "n_grd": 0,
+                                      # **T28-c**: 余裕で払えた守りの行だけの集計
+                                      "s_grdc": 0.0, "n_grdc": 0})
     b["s"] += float(s); b["n"] += 1
     b["s_%s" % side] += float(s); b["n_%s" % side] += 1
 
 
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targets="leader",
-            silent="zero"):
+            silent="zero", margin_comfort=None):
     """(局, 席) ごとに攻め側と守り側の取りこぼしを足す。"""
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     per = {}
-    stats = {"games": 0, "atk_rows": 0, "atk_silent": 0, "grd_rows": 0, "grd_no_attack": 0}
+    stats = {"games": 0, "atk_rows": 0, "atk_silent": 0, "grd_rows": 0, "grd_no_attack": 0,
+             # **T28-c**: 余裕で払えた守りの行の数
+             "grd_comfortable": 0}
     games = 0
     for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS,
                                                     pol_cols=POL_COLS, extra_fn=_extra):
@@ -214,12 +231,16 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 if played not in ("take", "guard"):
                     continue
                 free, paid, _slots = GA.hand_counters(tok, ex["ci"][i], idx2cid, cards)
-                got = guard_step(tok, sc, played, free, paid, theta, mu)
+                got = guard_step(tok, sc, played, free, paid, theta, mu, margin_comfort)
                 if got is None:
                     stats["grd_no_attack"] += 1
                     continue
                 stats["grd_rows"] += 1
-                _add(rec, band_of(abs(float(rows["pol_v0"][i]))), got["s"], "grd")
+                bnd = band_of(abs(float(rows["pol_v0"][i])))
+                _add(rec, bnd, got["s"], "grd")
+                if got["comfortable"]:
+                    stats["grd_comfortable"] += 1
+                    _add(rec, bnd, got["s"], "grdc")   # **余裕で払えた行だけの別勘定**
     return per, stats
 
 
@@ -243,6 +264,10 @@ def pair_by_band(per, band):
                               - (bb["s_atk"] / bb["n_atk"] if bb["n_atk"] else 0.0),
                     "dS_grd": (ba["s_grd"] / ba["n_grd"] if ba["n_grd"] else 0.0)
                               - (bb["s_grd"] / bb["n_grd"] if bb["n_grd"] else 0.0),
+                    # **T28-c**: 両席が「余裕で払えた」行を持つ局だけで意味を持つ
+                    "dS_grdc": ((ba["s_grdc"] / ba["n_grdc"] if ba["n_grdc"] else None)
+                                if (ba["n_grdc"] and bb["n_grdc"]) else None),
+                    "n_grdc": (ba["n_grdc"], bb["n_grdc"]),
                     "n": ba["n"] + bb["n"], "dn": ba["n"] - bb["n"],
                     "silent": a["n_silent"] + b["n_silent"], "v0": None})
     return out
@@ -337,6 +362,19 @@ def summarise(pairs, reps=200, seed=0):
     out["dn_auc"] = (round(auc([p["dn"] for p in pairs], [p["z"] for p in pairs]), 4)
                      if auc([p["dn"] for p in pairs], [p["z"] for p in pairs]) is not None
                      else None)
+    # **T28-c**: 余裕で払えた守りの行だけで引き直す（貧しい席の減点を除く）
+    cf = [p for p in pairs if p.get("dS_grdc") is not None and p.get("n_grdc")]
+    if len(cf) >= 30:
+        for p in cf:
+            a, b = p["n_grdc"]
+            p["dS_grdc_pr"] = p["dS_grdc"] - 0.0      # 既に 1 手あたり
+        out["grd_comfortable_only"] = {
+            "games": len(cf),
+            "auc": (round(auc([p["dS_grdc"] for p in cf], [p["z"] for p in cf]), 4)
+                    if auc([p["dS_grdc"] for p in cf], [p["z"] for p in cf]) is not None
+                    else None),
+            "slope": (round(slope(cf, "dS_grdc"), 5) if slope(cf, "dS_grdc") else None),
+            "slope_ci95": _boot(cf, reps, seed, "dS_grdc")}
     for key in ("dS", "dS_per_row", "dS_atk", "dS_grd"):
         out[key] = {"auc": (round(auc([p[key] for p in pairs],
                                       [p["z"] for p in pairs]), 4)
@@ -377,6 +415,8 @@ def main(argv=None):
     ap.add_argument("--silent", default="zero", choices=SILENT_MODES,
                     help="**P2** の暫定値——`zero` は無言の行を取りこぼし 0 として母数に入れる／"
                          "`exclude` は母数にも入れない")
+    ap.add_argument("--margin-comfort", type=float, default=MARGIN_COMFORT,
+                    help="**T28-c** の暫定値——守る力が来る攻撃をこれだけ上回れば「余裕で払えた」")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
@@ -384,10 +424,11 @@ def main(argv=None):
 
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.nu_targets,
-                         a.silent)
+                         a.silent, a.margin_comfort)
     pairs = pair_games(per, a.silent)
     res = {"stats": stats,
            "provisional": {"P3_theta": a.theta, "P2_silent": a.silent,
+                           "T28c_margin": a.margin_comfort,
                            "note": "§0.4 の暫定値。感度を付けて読む"},
            "summary": summarise(pairs, a.boot_reps, a.seed),
            # **T28-b: 行ごとに帯で切ってから足した版**（判定の主はこちら）

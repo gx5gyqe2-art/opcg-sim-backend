@@ -187,3 +187,32 @@ def test_the_two_silent_modes_differ_in_the_denominator():
     B._add(e, "close", -0.4, "atk")                 # exclude は足さない
     assert z["band"]["close"]["s"] / z["band"]["close"]["n"] == pytest.approx(-0.2)
     assert e["band"]["close"]["s"] / e["band"]["close"]["n"] == pytest.approx(-0.4)
+
+
+def test_a_blocker_row_is_always_comfortably_affordable():
+    """**T28-c**——ブロッカーはレストするだけでドンを使わないので、余裕は無限。"""
+    got = B.guard_step(_tok(opp_lead=14000, blocker=True), _sc(don=0), "take",
+                       free=0.0, paid=[])
+    assert got["margin"] == float("inf") and got["comfortable"] is True
+
+
+def test_the_margin_is_how_much_the_guard_overshoots_the_attack():
+    """余裕＝**守る力 − 来る攻撃**。ここが小さい行を減点すると**貧しい席を罰する**。"""
+    tok, sc = _tok(opp_lead=8000), _sc()          # 超過 3000
+    got = B.guard_step(tok, sc, "take", free=5000.0, paid=[])
+    assert got["margin"] == pytest.approx(2000.0)
+    assert got["comfortable"] is True             # 既定の閾値 2000 にちょうど届く
+    tight = B.guard_step(tok, sc, "take", free=3500.0, paid=[])
+    assert tight["can_guard"] is True and tight["comfortable"] is False
+
+
+def test_the_comfort_threshold_is_a_provisional_value_you_can_sweep():
+    """**閾値は暫定値**なので振れる（§0.4 の規則 2＝感度を付ける）。"""
+    tok, sc = _tok(opp_lead=8000), _sc()
+    got = B.guard_step(tok, sc, "take", free=5000.0, paid=[], margin_comfort=6000.0)
+    assert got["can_guard"] is True and got["comfortable"] is False
+
+
+def test_a_row_that_could_not_be_guarded_is_never_comfortable():
+    got = B.guard_step(_tok(opp_lead=9000), _sc(don=0), "take", free=0.0, paid=[])
+    assert got["can_guard"] is False and got["comfortable"] is False
