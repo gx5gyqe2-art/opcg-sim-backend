@@ -152,7 +152,8 @@ def deck_key(sc_row):
 
 
 #: 帯の切り方（2026-09-14・ユーザ指摘「価格はデッキの中身でなく進行により決まる」）
-BAND_MODES = ("state", "deck", "progress", "progress_full", "deck_progress")
+BAND_MODES = ("state", "deck", "progress", "progress_full", "progress_fwd",
+              "deck_progress")
 #: 進行の型に使う列（`rust/opcg_engine/src/encode/scalars.rs` の対応表）
 SC_MY_DON_ = 2
 #: **相手の手札枚数**＝相手が守れる回数＝`T_me` の分子（列 6,7 が自/相手の手札）
@@ -231,6 +232,42 @@ def progress_key_full(sc_row, tok_row):
             min(2, opp_hand // 3), min(2, don // 4))
 
 
+#: **時計の「未来側」**に使う列（`band_screen.py` が実デッキで上位に挙げたもの）。
+#: どれも**これから来るもの**で、**自分の場（説明変数）ではない**。
+SC_MY_DECK_APEX_POWER = 68
+
+
+def progress_fwd_key(sc_row, tok_row):
+    """**進行の型 v4**——v3 に**時計の「未来側」**を足す（2026-09-14）。
+
+    ユーザ指示「今あるエンジンの変数から効きそうなものを洗えたりする？」で
+    `band_screen.py` を回した結果、**実デッキで残る交絡の上位がほぼ全て
+    「これから来るもの」**だった（`leader_pair`・`deck_big`・`my_deck_agg`・
+    `deck_draw`・`my_deck_apex_*`・`opp_pool_max_power`）。
+
+    **これは §17.1.5c に書いた限界そのもの**——`A_opp` も `Σc(x)` も**今の盤面の
+    1 手番ぶん**で、**残りターンにわたる率ではない**。デッキ残量の列は、
+    エンジンが**時計の未来側**を符号化しているものである。
+
+    > **デッキの「中身」ではなく「これから来る量」を使う**——
+    > **同じ残量プロファイルなら別のデッキでも同じ値段**になるので、
+    > 17.1.5b の一般化の要件（未見のデッキに効く）は保たれる。
+
+    足すのは 3 つ（それぞれ 2 値に潰す＝帯が細かくなりすぎないように）:
+
+    | 列 | 何の未来か |
+    |---|---|
+    | `my_deck_apex_power` | **自分の `A_me` の未来**（デッキに残る最大の体） |
+    | `extra.opp_pool_max_power` | **相手の `A_opp` の未来**（相手が出せる最大の体） |
+    | `extra.deck_draw` | **自分の守り／展開の未来**（デッキに残るドロー） |
+    """
+    off = _extra_off(sc_row)
+    apex = float(sc_row[SC_MY_DECK_APEX_POWER])
+    opp_max = float(sc_row[off + F.EXTRA_COLS.index("opp_pool_max_power")])
+    draw = float(sc_row[off + F.EXTRA_COLS.index("deck_draw")])
+    return (int(apex > 0.7), int(opp_max > 0.7), int(draw > 0.5))
+
+
 def band_key(sc_row, deck_band=False, tok_row=None, mode=None):
     """帯＝(自ライフ, 相手ライフ, ターン帯, 手札)＝`--axis field` と同一。
 
@@ -250,6 +287,9 @@ def band_key(sc_row, deck_band=False, tok_row=None, mode=None):
         return base + deck_key(sc_row)
     if mode == "progress_full":
         return base + progress_key_full(sc_row, tok_row)
+    if mode == "progress_fwd":
+        return (base + progress_key_full(sc_row, tok_row)
+                + progress_fwd_key(sc_row, tok_row))
     prog = progress_key(sc_row, tok_row)
     return base + prog if mode == "progress" else base + deck_key(sc_row) + prog
 
