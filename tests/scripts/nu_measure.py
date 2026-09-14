@@ -84,8 +84,8 @@ if _HERE not in sys.path:
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from nu_calib import (S_BLOCKER_ACTIVE, S_IS_CHAR, S_POWER, SC_OPP_LEADER_POWER,  # noqa: E402
                       SLOT_OWN_FIELD, _round10)
-from theory_order import (MU, NU_TARGET_MODES, SC_MY_LEADER_POWER, SLOT_OPP_FIELD,  # noqa: E402
-                          THETA, nu_of, opp_chars_of)
+from theory_order import (MU, NU_TARGET_MODES, PWR_EPS, SC_MY_LEADER_POWER,  # noqa: E402
+                          SLOT_OPP_FIELD, THETA, incoming_x, nu_of, opp_chars_of)
 from opcg_sim.learned import n_rel_feat as F  # noqa: E402
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0")
@@ -152,31 +152,48 @@ def deck_key(sc_row):
 
 #: 帯の切り方（2026-09-14・ユーザ指摘「価格はデッキの中身でなく進行により決まる」）
 BAND_MODES = ("state", "deck", "progress", "deck_progress")
-#: 進行の粗い型に使う列（`theory_order` と同じ scalars の割り当て）
+#: 進行の型に使う列（`rust/opcg_engine/src/encode/scalars.rs` の対応表）
 SC_MY_DON_ = 2
+#: **相手の手札枚数**＝相手が守れる回数＝`T_me` の分子（列 6,7 が自/相手の手札）
+SC_OPP_HAND = 7
 
 
 def progress_key(sc_row, tok_row):
-    """**進行の型**＝`(相手の場の体数, 自分のドン, 自リーダーのパワー)` を粗く。
+    """**進行の型**＝2 本の時計（`game_theory.md` §17.1）のうち、**帯に入れられる入力**。
 
-    ユーザ指摘 2026-09-14:
+    ユーザ指摘 2026-09-14「価格はデッキの中身でなく進行により決まる」に対し、
+    「では進行とは何か」を §17.1 から導いて定義したもの（同日・「そこは固めましょう」）。
 
-    > 「価格の考え方はデッキの中身でなくて進行により決まる。デッキの進行方法がデッキにより
-    > 特徴付けられているだけで、デッキ相性＝デッキの中身に特徴付けられる進行という意味では
-    > ないのかな。デッキの中身はリーダー効果や色によって縛られているので、それが出てくる」
+    ```
+    T_opp = （自分が耐えられる被弾回数）/（相手が 1 手番に通す攻撃数）
+    T_me  = （相手が耐えられる被弾回数）/（自分が 1 手番に通す攻撃数）
+    進行 ≡ (T_me, T_opp)
+    ```
 
-    **`deck_key`（デッキのラベル）は代理変数**で、**本体は進行**——`game_theory.md` §17.1 の
-    **2 本の時計**そのもの。ラベルで縛ると**未見のデッキに一般化しない**ので、
-    **進行の変数で縛れるなら、そちらが正しい**。
+    | 要素 | 何の入力か | ここで使う列 |
+    |---|---|---|
+    | 自ライフ・相手ライフ | 両方の分子 | `band_key` の基本部に既に在る |
+    | 自分の手札 | `T_opp` の分子（守れる回数） | 同上 |
+    | **`A_opp`** | **`T_opp` の分母**＝相手の**通る**攻撃数 | `incoming_x`（`x ≥ 0` を数える） |
+    | **相手の手札** | `T_me` の分子（相手が守れる回数） | `SC_OPP_HAND` |
+    | 自分のドン | `T_me` の分母のうち**体以外** | `SC_MY_DON_` |
 
-    **説明変数（自分の場の体数）は入れない**——入れると帯の中で動かない。
-    だから**相手の場・自分のドン・自リーダーのパワー**（リーダー効果と色の代理）で取る。
+    **`T_me` の分母（自分の場の体）は入れない**——**それが説明変数だから**。
+    ＝**帯に入るのは「相手の時計の全部」と「自分の時計のうち体でない入力」**。
+    これは欠陥ではなく**推定量の定義からの帰結**である。
+
+    > **自リーダーのパワーは入れない**（v1 では入れていた）——
+    > **`A_opp` の中に入っている**（相手の攻撃が越えるべき閾値そのもの）。
+
+    **デッキの中身は 1 つも参照しない**＝**未見のデッキにも同じ値付けが効く**。
+
+    **限界**: `A_opp` は**今の盤面**から数えた 1 手番ぶんで、**残り全ターンの率ではない**
+    （時計は本来は先を見る量）。相手のブロッカー・トリガーも入っていない。
     """
-    n_opp = sum(1 for s in range(SLOT_OPP_FIELD.start, SLOT_OPP_FIELD.stop)
-                if float(tok_row[s, S_IS_CHAR]) > 0.5)
+    a_opp = sum(1 for x in incoming_x(tok_row) if x >= -PWR_EPS)
+    opp_hand = int(float(sc_row[SC_OPP_HAND]))
     don = int(float(sc_row[SC_MY_DON_]))
-    lead = float(tok_row[0, S_POWER]) * 1e4
-    return (min(3, n_opp), min(2, don // 4), 1 if lead > 5500.0 else 0)
+    return (min(3, a_opp), min(2, opp_hand // 3), min(2, don // 4))
 
 
 def band_key(sc_row, deck_band=False, tok_row=None, mode=None):

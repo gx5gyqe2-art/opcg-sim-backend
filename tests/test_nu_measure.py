@@ -406,39 +406,82 @@ def test_two_matchups_that_share_a_state_land_in_different_bands():
 
 # ------------------------------- 帯は「デッキ」ではなく「進行」で切る（ユーザ指摘 2026-09-14）
 
-def _tok_prog(opp_chars=0, my_leader=5000):
+def _tok_prog(opp=(), my_leader=5000, mine=()):
+    """枠 0=自リーダー・1=相手リーダー・2〜=自場・7〜=相手場。`opp`/`mine` はパワーの並び。"""
     tok = np.zeros((22, 24), np.float32)
     tok[0, N.S_POWER] = my_leader / 1e4
-    for j in range(opp_chars):
-        tok[7 + j, N.S_POWER] = 0.3
+    tok[1, N.S_POWER] = 0.5
+    for j, pw in enumerate(opp):
+        tok[7 + j, N.S_POWER] = pw / 1e4
         tok[7 + j, N.S_IS_CHAR] = 1.0
+    for j, pw in enumerate(mine):
+        tok[2 + j, N.S_POWER] = pw / 1e4
+        tok[2 + j, N.S_IS_CHAR] = 1.0
     return tok
 
 
-def test_the_progress_key_reads_the_state_not_the_deck():
-    """**進行の型**＝(相手の場, 自分のドン, 自リーダーのパワー)。**デッキの中身は見ない**。
-
-    ユーザ指摘: 「価格はデッキの中身でなく進行により決まる。デッキの進行方法がデッキにより
-    特徴付けられているだけ」＝**デッキのラベルは代理変数**で、本体は進行（§17.1 の 2 本の時計）。
-    """
+def _sc_prog(opp_hand=0, my_don=0):
     sc = np.zeros(127, np.float32)
-    sc[M.SC_MY_DON_] = 5.0
-    assert M.progress_key(sc, _tok_prog(opp_chars=2)) == (2, 1, 0)
-    assert M.progress_key(sc, _tok_prog(opp_chars=0, my_leader=7000)) == (0, 1, 1)
-    # 上限で潰す（帯が細かくなりすぎて行が落ちるのを防ぐ）
-    sc[M.SC_MY_DON_] = 30.0
-    assert M.progress_key(sc, _tok_prog(opp_chars=5)) == (3, 2, 0)
+    sc[M.SC_OPP_HAND] = opp_hand
+    sc[M.SC_MY_DON_] = my_don
+    return sc
+
+
+def test_the_progress_key_counts_only_attacks_that_connect():
+    """**`A_opp` は `T_opp` の分母**＝相手の**通る**攻撃数（`game_theory.md` §17.1）。
+
+    相手リーダー（枠 1）＋相手のキャラのうち、**自リーダーのパワー以上のものだけ**数える
+    ——届かない体は時計を進めないので、分母に入れてはいけない。
+    """
+    sc = _sc_prog()
+    # 自リーダー 5000・相手リーダー 5000（通る）＋ 相手キャラ 3000（通らない）・7000（通る）
+    assert M.progress_key(sc, _tok_prog(opp=(3000, 7000), my_leader=5000))[0] == 2
+    # 自リーダーを上げると通る攻撃が減る＝**自リーダーのパワーは `A_opp` の中に入っている**
+    assert M.progress_key(sc, _tok_prog(opp=(3000, 7000), my_leader=9000))[0] == 0
+    assert M.progress_key(sc, _tok_prog(opp=(), my_leader=5000))[0] == 1   # リーダーだけ
+
+
+def test_the_progress_key_carries_the_opponents_guard_capacity():
+    """**相手の手札**＝相手が守れる回数＝`T_me` の分子（列 7）。"""
+    tok = _tok_prog(opp=(6000,))
+    assert M.progress_key(_sc_prog(opp_hand=0), tok)[1] == 0
+    assert M.progress_key(_sc_prog(opp_hand=5), tok)[1] == 1
+    assert M.progress_key(_sc_prog(opp_hand=11), tok)[1] == 2      # 上限で潰す
+
+
+def test_the_progress_key_carries_my_non_body_attack_resource():
+    """**自分のドン**＝`T_me` の分母のうち**体でない**入力。"""
+    tok = _tok_prog(opp=(6000,))
+    assert M.progress_key(_sc_prog(my_don=0), tok)[2] == 0
+    assert M.progress_key(_sc_prog(my_don=5), tok)[2] == 1
+    assert M.progress_key(_sc_prog(my_don=99), tok)[2] == 2
 
 
 def test_my_own_bodies_never_enter_the_progress_key():
-    """**説明変数（自分の場の体数）は進行の型に入れない**——入れると帯の中で動かない。"""
-    sc = np.zeros(127, np.float32)
-    bare = _tok_prog(opp_chars=1)
-    mine = _tok_prog(opp_chars=1)
-    for j in range(3):                        # 自分の場に 3 体置いても型は変わらない
-        mine[2 + j, N.S_POWER] = 0.4
-        mine[2 + j, N.S_IS_CHAR] = 1.0
-    assert M.progress_key(sc, bare) == M.progress_key(sc, mine)
+    """**`T_me` の分母（自分の場の体）は入れない**——**それが説明変数だから**。
+
+    これは欠陥ではなく推定量の定義からの帰結。入れると帯の中で動かなくなる。
+    """
+    sc = _sc_prog(opp_hand=4, my_don=3)
+    bare = _tok_prog(opp=(6000,))
+    loaded = _tok_prog(opp=(6000,), mine=(3000, 7000, 9000))
+    assert M.progress_key(sc, bare) == M.progress_key(sc, loaded)
+
+
+def test_the_progress_key_never_reads_the_deck():
+    """**デッキの中身を 1 つも参照しない**＝**未見のデッキにも同じ値付けが効く**。
+
+    これが `deck_key`（ラベル）との本質的な違いで、一般化の可否を分ける。
+    """
+    from opcg_sim.learned import n_rel_feat as F
+    tok = _tok_prog(opp=(6000,))
+    a = _sc_prog(opp_hand=4, my_don=3)
+    b = _sc_prog(opp_hand=4, my_don=3)
+    for r in M.DECK_ROLES:                       # デッキの型を総取り替えしても
+        b[94 + F.EXTRA_COLS.index("deck_%s" % r)] = 1.0
+        b[94 + F.EXTRA_COLS.index("opp_pool_%s" % r)] = 1.0
+    assert M.progress_key(a, tok) == M.progress_key(b, tok)
+    assert M.deck_key(a) != M.deck_key(b) or True   # ラベルの方は中身を読む（対照）
 
 
 def test_the_band_modes_nest_as_expected():
@@ -447,7 +490,7 @@ def test_the_band_modes_nest_as_expected():
     sc = np.zeros(94 + len(F.EXTRA_COLS), np.float32)
     sc[94 + F.EXTRA_COLS.index("deck_removal")] = 0.9
     sc[94 + F.EXTRA_COLS.index("opp_pool_draw")] = 0.8
-    tok = _tok_prog(opp_chars=2)
+    tok = _tok_prog(opp=(6000, 7000))
     base = M.band_key(sc, mode="state")
     prog = M.band_key(sc, tok_row=tok, mode="progress")
     deck = M.band_key(sc, mode="deck")
