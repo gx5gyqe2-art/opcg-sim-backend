@@ -304,3 +304,32 @@ def test_block_and_verdict():
     mid = T.block([dict(r, th_agree=53, th_pairs=100, p_pairs=100) for r in recs])
     assert T.verdict(mid) == "partly"
     assert T.verdict(T.block([])) is None
+
+
+def test_theta_of_takes_the_max_of_the_two_routes():
+    """**守る理由は 2 つあり、どちらかが成り立てば守る**＝境目は**大きい方**。
+
+    2026-09-14・ユーザ指摘「2 通りの方はどちらも正しいね」。
+    `board` 単体は**経済的な理由を消してしまう**ので、`Θ_B < Θ_A` の帯で
+    守る基準を不当に下げる（それが `board` を既定にできなかった一因）。
+    """
+    # 相手 3 体＋リーダー・ライフ 1 → G = 3 → Θ_B = 2.25 ＞ Θ_A（既定 1.15）
+    tok = _tok_board(5000, 5000, (6000, 8000, 10000))
+    assert T.theta_of(tok, life=1, mode="const") == pytest.approx(T.THETA)
+    assert T.theta_of(tok, life=1, mode="board") == pytest.approx(2.25)
+    assert T.theta_of(tok, life=1, mode="max") == pytest.approx(2.25)    # B の方が大きい
+    # ライフが厚い＝Θ_B が小さい帯では **A が残る**（board だと下がってしまう）
+    tok2 = _tok_board(5000, 5000, (6000, 5000))          # x = 0, 1000 → c = 1.00, 1.00
+    assert T.theta_of(tok2, life=1, mode="board") == pytest.approx(1.00)
+    assert T.theta_of(tok2, life=1, mode="max") == pytest.approx(T.THETA)  # 1.15 > 1.00
+    # 領域 1（G=0）はどのモードでも定数
+    for mode in T.THETA_MODES:
+        assert T.theta_of(tok, life=9, mode=mode) == pytest.approx(T.THETA)
+
+
+def test_the_max_mode_never_goes_below_the_constant():
+    """`max` は**定数を下回らない**——これが `board` との違いそのもの。"""
+    for chars in ((), (3000,), (6000, 7000), (6000, 8000, 10000)):
+        tok = _tok_board(5000, 5000, chars)
+        for life in range(0, 6):
+            assert T.theta_of(tok, life=life, mode="max") >= T.THETA - 1e-9

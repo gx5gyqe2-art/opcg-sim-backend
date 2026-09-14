@@ -78,8 +78,8 @@ from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from order_acc import band_of, q_floor  # noqa: E402
 from theory_order import (MU, THETA, THETA_MODES, SC_MY_LIFE, SC_MY_DON,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_OPP_LEADER_POWER,  # noqa: E402
-                          SC_OPP_LIFE, PWR_EPS, board_theta, c_of,  # noqa: E402
-                          saturation_x, score_candidate)
+                          SC_OPP_LIFE, PWR_EPS, c_of, saturation_x,  # noqa: E402
+                          score_candidate, theta_of)
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0")
 POL_COLS = ("pol_n", "pol_q", "pol_p", "pol_sig", "pol_cid", "pol_tcid", "pol_si",
@@ -258,10 +258,8 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
             b = int(ptr[i])
             sc = ex["sc"][i]
             # `Θ` を盤面から出すか定数にするか（`theory_order` と同じ規約・A/B 用）
-            th = theta
-            if theta_mode == "board":
-                th = board_theta(ex["tok"][i], float(sc[SC_MY_LIFE]),
-                                 float(sc[SC_MY_DON]), fallback=theta)
+            th = theta_of(ex["tok"][i], float(sc[SC_MY_LIFE]), float(sc[SC_MY_DON]),
+                          mode=theta_mode, theta=theta)
             ctx = {"theta": th, "mu": mu,
                    "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
                    "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
@@ -325,6 +323,35 @@ def _mean_ci(vals, seeds):
             "ci95": [round(m - 1.96 * se, 5), round(m + 1.96 * se, 5)]}
 
 
+def _recovered_ci(rows, loss_key, rand_key, zero_when_agree, reps=400, seed=0):
+    """`1 − loss/rand` の**対局クラスタブートストラップ CI**。
+
+    **比の統計量に CI を付けない**と、分母・分子がどちらも小さいので**驚くほど動く**
+    ——実測で同じ設定・同じ帯が局の部分集合で 0.17／0.20／0.31 と出た（2026-09-14）。
+    """
+    if not rows:
+        return None
+    by = {}
+    for r in rows:
+        by.setdefault(r["seed"], []).append(r)
+    keys = list(by)
+    if len(keys) < 3:
+        return None
+    rng = np.random.default_rng(seed)
+    out = []
+    for _ in range(reps):
+        pick = rng.choice(len(keys), size=len(keys), replace=True)
+        sub = [r for k in pick for r in by[keys[k]]]
+        loss = float(np.mean([(0.0 if (zero_when_agree and r["agree_n"]) else r[loss_key])
+                              for r in sub]))
+        rand = float(np.mean([r[rand_key] for r in sub]))
+        if rand:
+            out.append(1.0 - loss / rand)
+    if len(out) < reps // 4:
+        return None
+    return [round(float(np.percentile(out, 2.5)), 4), round(float(np.percentile(out, 97.5)), 4)]
+
+
 def summarise(recs, cross, pred_hit, at_dist=None, q_eps=0.02, top=8):
     """事実の表（top1 の一致・食い違いの型・損の非対称・予言の頻度・勝敗との符号）。
 
@@ -383,6 +410,17 @@ def summarise(recs, cross, pred_hit, at_dist=None, q_eps=0.02, top=8):
             out[f"{side}_recovered{tag}"] = (round(1.0 - loss / rand, 4)
                                              if (loss is not None
                                                  and rand not in (None, 0.0)) else None)
+    # **`*_recovered` には必ず CI を付ける**（2026-09-14）。これは**2 つの小さな平均の比**
+    # なので単独では非常に不安定で、**同じ設定でも局の部分集合を替えると 0.17〜0.31 と動く**
+    # ——実際にその振れ幅を「設定の差」と読み違えた（`2026-09-14_theta_mode_ab.md` の訂正）。
+    # 比は局を復元抽出して作り直す（1 局から多数の行を採るので行で割ってはいけない）。
+    rows_for = {"": (ok, "_loss_vs_n", "_loss_rand", True),
+                "_on_disagreements": (real, "_loss_vs_n", "_loss_rand", False)}
+    for side in ("q", "th"):
+        for tag, (sub, lkey, rkey, zero_when_agree) in rows_for.items():
+            ci = _recovered_ci(sub, side + lkey, side + rkey, zero_when_agree)
+            if ci is not None:
+                out[f"{side}_recovered{tag}_ci95"] = ci
     if at_dist:
         tot = sum(at_dist.values())
         out["search_action_mix"] = {a: round(c / tot, 4) for a, c in at_dist.most_common()}

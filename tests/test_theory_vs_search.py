@@ -199,3 +199,23 @@ def test_the_primary_recovered_counts_the_rows_where_they_agree():
     assert s["q_recovered"] > 0.8
     # 同じデータで食い違い限定は **負**（母数の選び方だけで符号が反転する）
     assert s["q_recovered_on_disagreements"] < 0
+
+
+def test_the_recovered_ratio_carries_a_clustered_ci():
+    """**比の統計量には CI を付ける**——分母も分子も小さいので驚くほど動く。
+
+    2026-09-14 に実測で踏んだ形: **同じ設定・同じ帯**でも局の部分集合を替えると
+    `q_recovered` が **0.17／0.20／0.31** と出た。その振れ幅を「設定の差」と読み違えて
+    「`board` は接戦帯で悪化する」と書いた（`2026-09-14_theta_mode_ab.md` の訂正）。
+    """
+    rows = []
+    for g in range(20):
+        rows.append({"seed": g, "agree_n": False, "q_loss_vs_n": 0.4, "q_loss_rand": 1.0})
+        rows.append({"seed": g, "agree_n": True, "q_loss_vs_n": 0.0, "q_loss_rand": 1.0})
+    ci = V._recovered_ci(rows, "q_loss_vs_n", "q_loss_rand", True, reps=80)
+    assert ci is not None and ci[0] <= ci[1]
+    # 損が無作為の 0.2 倍（一致した行は 0）＝回収率 0.8 前後に収まる
+    assert 0.6 <= ci[0] <= 0.9 and 0.7 <= ci[1] <= 1.0
+    # 局が 2 つ以下なら CI を出さない（クラスタが足りない）
+    assert V._recovered_ci(rows[:4], "q_loss_vs_n", "q_loss_rand", True, reps=20) is None
+    assert V._recovered_ci([], "q_loss_vs_n", "q_loss_rand", True) is None

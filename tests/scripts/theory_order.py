@@ -91,7 +91,23 @@ THETA = 1.15
 #: **帯ごとの形が違う**——盤面側はライフで単調に下がり、恒等式側は単調でない。
 #: `λ(ℓ)` の CI は ±0.07〜0.10 と広いので、**食い違いが本物かは決着していない**。
 #: だから**既定を替えず `--theta-mode` で選べるようにし、順序の一致率で決める**。
-THETA_MODES = ("const", "board")
+#:
+#: > **2026-09-14 夕・ユーザ指摘「2 通りの方はどちらも正しいね」で構造が判った**——
+#: > **どちらか片方ではなく、両方を満たす形が正しい**。守る理由は 2 つあって
+#: > **どちらかが成り立てば守る**ので、境目は**大きい方**である:
+#: >
+#: > ```
+#: > Θ(状態) = max( λ/μ − 1 − τ_value ,  来る攻撃の c(x) の G 番目 )
+#: >            └─ A: 経済（受ける損より安い）┘ └─ B: 生存（守らないと死ぬ）─┘
+#: > ```
+#: >
+#: > **序盤**（`G = 0`）は B が効かず **A だけ**＝損得で守る。
+#: > **終盤**は B が A を超え、**損得を無視してでも守る**＝ライフの重さが 2 重に入る。
+#: >
+#: > **`board` が接戦帯で悪化した理由もこれで説明が付く**——A を B で**置き換えた**ので、
+#: > `Θ_B < Θ_A` の帯（ライフ 2〜4 で 0.31〜0.85）で**守る基準を不当に下げていた**。
+#: > `max` なら**既定と違うのはリーサル圏だけ**（ライフ 0 で 2.64・1 で 1.48）。
+THETA_MODES = ("const", "board", "max")
 #: トークンの枠（0 自L・1 相L・2〜6 自場・7〜11 相場）と列（`n_rel_feat.S_COLS`）
 S_IS_BLOCKER, S_IS_CHAR = 6, 18
 SLOT_OWN_FIELD = slice(2, 7)
@@ -232,6 +248,28 @@ def board_theta(tok_row, life, my_don=0.0, don_share=DON_SHARE, fallback=THETA):
     if g <= 0 or g > len(xs):
         return float(fallback)
     return float(sorted(c_of(x) for x in xs)[g - 1])
+
+
+def theta_of(tok_row, life, my_don=0.0, mode="const", theta=THETA, don_share=DON_SHARE):
+    """**`Θ` の 3 つの出し方**（`--theta-mode`）。
+
+    | mode | 式 | 意味 |
+    |---|---|---|
+    | `const` | `Θ`（定数） | 経済だけ＝「受ける損より安いなら守る」 |
+    | `board` | シャドー価格 | 生存だけ＝「守らないと死ぬ本数」から |
+    | **`max`** | **`max(定数, シャドー価格)`** | **両方**＝どちらかが成り立てば守る |
+
+    **`max` が理屈の上では正しい**（2026-09-14・ユーザ指摘）——守る理由は
+    「損得で安い」か「守らないと死ぬ」の**どちらかが成り立てば十分**なので、
+    境目は**大きい方**になる。`board` 単体は**経済的な理由を消してしまう**ので、
+    `Θ_B < Θ_A` の帯（ライフ 2〜4）で守る基準を不当に下げる。
+    """
+    if mode == "const":
+        return float(theta)
+    b = board_theta(tok_row, life, my_don, don_share, fallback=theta)
+    if mode == "board":
+        return b
+    return max(float(theta), b)
 
 
 def attack_value(power, target_power, is_leader, theta=THETA, mu=MU, nu_target=None):
@@ -407,10 +445,8 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
             sc = ex["sc"][i]
             # **`Θ` は行ごとに決めうる**（`board`）。既定は定数（`const`）で、
             # どちらが順序を当てるかは `theory_vs_search` の A/B で決める（2026-09-14）
-            th = theta
-            if theta_mode == "board":
-                th = board_theta(ex["tok"][i], float(sc[SC_MY_LIFE]),
-                                 float(sc[SC_MY_DON]), fallback=theta)
+            th = theta_of(ex["tok"][i], float(sc[SC_MY_LIFE]), float(sc[SC_MY_DON]),
+                          mode=theta_mode, theta=theta)
             ctx = {"theta": th, "mu": mu,
                    "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
                    "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
