@@ -277,7 +277,8 @@ def _collect_played(rows, pol, ex, L, ptr, idx, cards, played):
             continue
         cid = str(pol["pol_cid"][j]) or None
         info = cards.info(cid)
-        if not info or info.get("event"):
+        # **ステージは体を持たない**＝「場のキャラ 1 体」の勘定から外す（2026-09-14）
+        if not info or info.get("event") or info.get("stage"):
             continue
         master = cards.db.get_card(cid) if cid else None
         forms = DR.classify(master) if master is not None else set()

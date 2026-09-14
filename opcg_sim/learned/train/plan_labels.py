@@ -80,6 +80,10 @@ class Cards:
                     # `rules/battle.rs::apply_counter`: EVENT は `pay_cost` が要る・
                     # それ以外は印字カウンターをそのまま足せる＝無料。
                     "event": getattr(getattr(m, "type", None), "name", "") == "EVENT",
+                    # **ステージは体を持たない**（`scalars` の場のキャラ数に入らない）＝
+                    # 「場のキャラ 1 体の価格 `ν`」の勘定から外す（2026-09-14・実測で
+                    # パワー 0 のステージ 124 枚が最弱帯に混ざっていた）
+                    "stage": getattr(getattr(m, "type", None), "name", "") == "STAGE",
                     "cost": int(getattr(m, "cost", 0) or 0),
                     # 印字パワー（**攻撃の値付け**に使う・`theory_order.py`・2026-09-13）
                     "power": int(getattr(m, "power", 0) or 0)}
