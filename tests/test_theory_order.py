@@ -333,3 +333,116 @@ def test_the_max_mode_never_goes_below_the_constant():
         tok = _tok_board(5000, 5000, chars)
         for life in range(0, 6):
             assert T.theta_of(tok, life=life, mode="max") >= T.THETA - 1e-9
+
+
+# ---------------------------------------------------------------- ν の攻撃項（task #39）
+
+def test_opp_chars_reads_only_the_opponents_characters():
+    """`opp_chars_of` は**相手の枠だけ**（リーダーも自分の場も入れない）。"""
+    tok = _tok_board(5000, 9000, (6000, 3000), blockers=2)
+    assert T.opp_chars_of(tok) == [(6000.0, False), (3000.0, False)]
+    tok[8, T.S_IS_BLOCKER] = 1.0
+    assert T.opp_chars_of(tok)[1] == (3000.0, True)
+    assert T.opp_chars_of(_tok_board()) == []
+
+
+def test_an_empty_board_leaves_nu_exactly_where_it_was():
+    """**盤面を渡さなければ値は 1 つも動かない**——#39 は既存の測定値を動かさない。
+
+    `None`（渡さない）と `[]`（相手の場が空）が**同じ値**であることも押さえる。
+    """
+    for pw in (3000.0, 6000.0, 9000.0, 12000.0):
+        for blk in (True, False):
+            base = T.nu_of(pw, 5000.0, 4.128, is_blocker=blk)
+            assert T.nu_of(pw, 5000.0, 4.128, is_blocker=blk, opp_chars=[]) == \
+                pytest.approx(base)
+            assert T.nu_of(pw, 5000.0, 4.128, is_blocker=blk, opp_chars=None,
+                           my_leader_power=5000.0) == pytest.approx(base)
+
+
+def test_the_attack_term_never_falls_below_the_leader_line():
+    """対象を増やしても**下がらない**＝これは option（選ばなければよい）。"""
+    board = [(3000.0, False), (5000.0, False), (7000.0, True)]
+    for pw in (2000.0, 4000.0, 6000.0, 8000.0, 11000.0):
+        lead = T.attack_stream(pw, 5000.0, 4.128)
+        assert T.attack_stream(pw, 5000.0, 4.128, opp_chars=board,
+                               my_leader_power=5000.0) >= lead - 1e-12
+
+
+def test_power_keeps_paying_past_the_saturation_point():
+    """**飽和点から上でもパワーが効く**——これが #39 の狙い（`2026-09-14_nu_measure.md` ②）。
+
+    リーダー狙いだけだと `x ≥ x*` で頭打ちになる。**相手の大きなキャラを殴る選択肢**が
+    残るので、盤面を渡すと**飽和点の先も単調に伸びる**。
+    """
+    board = [(7000.0, False), (9000.0, False)]
+    flat = [T.nu_of(p, 5000.0, 4.128, is_blocker=False) for p in (8000.0, 10000.0, 13000.0)]
+    assert flat[0] == pytest.approx(flat[1]) == pytest.approx(flat[2])   # 頭打ち
+    grow = [T.nu_of(p, 5000.0, 4.128, is_blocker=False, opp_chars=board,
+                    my_leader_power=5000.0) for p in (8000.0, 10000.0, 13000.0)]
+    assert grow[0] < grow[1] < grow[2]
+
+
+def test_the_stock_of_a_target_is_not_multiplied_by_the_horizon():
+    """**`ν(対象)` は在庫であって毎ターンの流量ではない**（実装の初版の型の誤り）。
+
+    `R · max(lead, v_T)` と書くと「4 ターン続けて同じ 1 体を倒す」ことになる。
+    倒せるのは **1 体 1 回**なので、**対象は高い順に 1 ターン 1 体ずつ**しか充てられない——
+    対象を 1 体だけ置いた盤面の上乗せは `(v_T − lead)` **1 回ぶん**で頭打ちになる。
+    """
+    one = [(9000.0, False)]
+    lead = T.attack_value(12000.0, 5000.0, True)
+    got = T.attack_stream(12000.0, 5000.0, 4.0, opp_chars=one, my_leader_power=5000.0)
+    v_t = got - 3.0 * lead                       # 残り 3 ターンはリーダー狙い
+    assert got == pytest.approx(3.0 * lead + v_t)
+    assert got < 4.0 * max(lead, v_t) - 1e-9     # 在庫を R 倍してはいない
+    # 2 体置けば 2 回ぶん乗る（が 3 回ぶんにはならない）
+    two = T.attack_stream(12000.0, 5000.0, 4.0, opp_chars=one * 2, my_leader_power=5000.0)
+    assert two == pytest.approx(got + (v_t - lead))
+
+
+def test_the_fractional_turn_is_prorated():
+    """端数のターンは**比例配分**（`R` は実測の 4.128 のような小数）。"""
+    lead = T.attack_value(6000.0, 5000.0, True)
+    assert T.attack_stream(6000.0, 5000.0, 2.5) == pytest.approx(2.5 * lead)
+    assert T.attack_stream(6000.0, 5000.0, 0.0) == 0.0
+
+
+def test_the_inner_nu_does_not_recurse():
+    """**深さ 1 で止める**——内側の `ν` に `opp_chars` を渡さない。
+
+    渡すと相互再帰になる。**止まっている証拠**は「対象の `ν` が `opp_chars` 無しの
+    `ν` と一致する」こと（値で押さえる＝実装を書き換えても意味が残る）。
+    """
+    board = [(9000.0, False)]
+    lead = T.attack_value(12000.0, 5000.0, True)
+    v_t = T.attack_stream(12000.0, 5000.0, 1.0, opp_chars=board, my_leader_power=5000.0)
+    nu_shallow = T.nu_of(9000.0, 5000.0, 1.0, is_blocker=False)
+    assert v_t == pytest.approx(max(lead, T.attack_value(12000.0, 9000.0, False,
+                                                         nu_target=nu_shallow)))
+
+
+def test_play_value_passes_the_board_through():
+    """`play_value` は `opp_chars` をそのまま `ν` へ渡す（`score_candidate` の経路）。"""
+    board = [(9000.0, False)]
+    got = T.play_value(12000.0, 3, 5000.0, 4.128, opp_chars=board, my_leader_power=5000.0,
+                       is_blocker=False)
+    want = (T.nu_of(12000.0, 5000.0, 4.128, is_blocker=False, opp_chars=board,
+                    my_leader_power=5000.0) - T.MU - 3 * 0.66 * T.MU)
+    assert got == pytest.approx(want)
+    assert got > T.play_value(12000.0, 3, 5000.0, 4.128, is_blocker=False)
+
+
+def test_score_candidate_prices_a_play_against_the_board_when_asked():
+    """`ctx["opp_chars"]` があれば登場の値付けが盤面を見る（`--nu-targets board` の経路）。
+
+    **無ければ従来どおり**＝既定（`leader`）で走らせた過去の測定は動かない。
+    """
+    cards = _cards()
+    sig = ["PLAY", "u", [], [], None]
+    plain = T.score_candidate(sig, "C_ATK", None, CTX, cards)
+    # 7000 の体が 5000 のキャラを殴る方がリーダー狙い（Θμ=0.0575）より高い 0.064
+    ctx = dict(CTX, opp_chars=[(5000.0, False)])
+    assert T.score_candidate(sig, "C_ATK", None, ctx, cards) > plain
+    assert T.score_candidate(sig, "C_ATK", None, dict(CTX, opp_chars=[]), cards) == \
+        pytest.approx(plain)

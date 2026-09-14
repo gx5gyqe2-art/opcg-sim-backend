@@ -175,3 +175,39 @@ def test_collect_played_refuses_to_run_without_the_candidate_columns():
     """**黙って空を返さない**——2026-09-14 に `pol_cols=()` のまま呼んで空になった。"""
     with pytest.raises(KeyError):
         M._collect_played({}, {}, {}, {}, {}, [0], object(), {})
+
+
+def test_the_board_arm_averages_the_formula_over_the_rows_actual_boards():
+    """`targets="board"` は**行ごとの盤面で式を引いて平均する**（task #39）。
+
+    代表値 1 つでは引けない——攻撃項を「対象の max」にすると `ν` が**相手の場に依る**。
+    実測の `β` と同じ行集合で比べるために、**その行集合の盤面の分布**で平均する。
+    """
+    import theory_order as T
+    recs = [{"opp_leader_power": 5000.0, "my_leader_power": 5000.0,
+             "opp_chars": [(9000.0, False)]},
+            {"opp_leader_power": 5000.0, "my_leader_power": 5000.0, "opp_chars": []}]
+    got = M.predict(["over_sat"], targets="board", recs=recs)["over_sat"]
+    pw = M.PREDICT_POWER["over_sat"]
+    want = 0.5 * (T.nu_of(pw, 5000.0, 4.128, is_blocker=False, opp_chars=[(9000.0, False)],
+                          my_leader_power=5000.0)
+                  + T.nu_of(pw, 5000.0, 4.128, is_blocker=False))
+    assert got == pytest.approx(want, abs=1e-5)
+
+
+def test_the_board_arm_only_ever_raises_the_prediction():
+    """盤面を足しても**予測は下がらない**（option なので選ばなければよい）。"""
+    recs = [{"opp_leader_power": 5000.0, "my_leader_power": 5000.0,
+             "opp_chars": [(3000.0, False), (9000.0, True)]}]
+    keys = ["lt_leader", "leader_to_sat", "over_sat"]
+    lead = M.predict(keys)
+    board = M.predict(keys, targets="board", recs=recs)
+    for k in keys:
+        assert board[k] >= lead[k] - 1e-9
+
+
+def test_the_board_arm_falls_back_when_there_are_no_rows():
+    """**盤面が無ければ黙って壊さず** `leader` と同じ値を返す。"""
+    keys = ["leader_to_sat", "over_sat"]
+    assert M.predict(keys, targets="board", recs=[]) == M.predict(keys)
+    assert M.predict(keys, targets="board") == M.predict(keys)

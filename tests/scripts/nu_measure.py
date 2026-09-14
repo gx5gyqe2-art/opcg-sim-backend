@@ -63,7 +63,8 @@ if _HERE not in sys.path:
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from nu_calib import (S_BLOCKER_ACTIVE, S_IS_CHAR, S_POWER, SC_OPP_LEADER_POWER,  # noqa: E402
                       SLOT_OWN_FIELD, _round10)
-from theory_order import MU, THETA, nu_of  # noqa: E402
+from theory_order import (MU, NU_TARGET_MODES, SC_MY_LEADER_POWER, THETA,  # noqa: E402
+                          nu_of, opp_chars_of)
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0")
 #: scalars の列（`hand_value_slope` と同じ）
@@ -245,7 +246,12 @@ def collect(dirs, limit_games=0, schemes=SCHEMES, cards=None):
             sc = ex["sc"][i]; tok = ex["tok"][i]
             opl = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
             rec = {"seed": seed, "band": band_key(sc), "z": 1.0 if z > 0 else 0.0,
-                   "opp_leader_power": opl, "turn": t}
+                   "opp_leader_power": opl, "turn": t,
+                   # **式の予測をこの行の盤面で引くため**に持ち回る（task #39）——
+                   # 攻撃項を「対象の max」にすると `ν` が**相手の場に依る**ので、
+                   # 代表値 1 つでは引けない（行ごとに引いて平均する）。
+                   "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
+                   "opp_chars": opp_chars_of(tok)}
             for sch in schemes:
                 rec.update(categories(tok, opl, sch))
             recs.append(rec)
@@ -302,25 +308,55 @@ def _extra(dd, n):
 PREDICT_POWER = {"lt_leader": 3000.0, "leader_to_sat": 6000.0, "over_sat": 9000.0}
 
 
-def predict(keys, opp_leader_power=5000.0, r_turns=4.128, theta=THETA, mu=MU):
-    """式の予測値（同じ種類の `ν`）。`R` は実測の 4.128 を既定にする。"""
+def _kind_spec(k):
+    """種類 → (代表パワー, ブロッカーか)。`None` は「母集団の平均（10.4%）で混ぜる」。
+
+    **`power` 帯（`lt_leader` など）は `False`（非ブロッカー）で引く**——混ぜる方が
+    母集団としては正しいが、**#39 の前後で比べられるように 2026-09-14 以前と同じにしてある**
+    （差は `block_p` 0.104×0.773×Θμ ≈ 0.004 で、本件の差より小さい）。
+    """
+    if k == "chars":
+        return 6000.0, None
+    if k in ("blocker", "plain"):
+        return 6000.0, (k == "blocker")
+    base = k.replace("_blk", "").replace("_plain", "")
+    pw = PREDICT_POWER.get(base)
+    if pw is None:
+        return None, None
+    return pw, k.endswith("_blk")
+
+
+def predict(keys, opp_leader_power=5000.0, r_turns=4.128, theta=THETA, mu=MU,
+            targets="leader", recs=None):
+    """式の予測値（同じ種類の `ν`）。`R` は実測の 4.128 を既定にする。
+
+    `targets="board"` で**攻撃項を「対象の max」に広げた式**を引く（task #39）。
+    そのとき `ν` は**相手の場に依る**ので、代表値 1 つでは引けない——`recs`（`collect` が
+    返す行）を渡し、**行ごとに引いてその平均**を予測値にする。**行の盤面の分布ごと**
+    突き合わせるので、実測の `β`（同じ行集合の帯内回帰）と同じ母集団で比べられる。
+    """
+    board = (targets == "board")
+    rows = list(recs or ()) if board else []
+    if board and not rows:
+        board = False                     # 盤面が無いなら従来どおり（黙って壊さない）
+
+    def one(pw, blk, opl, mlp, oc):
+        if blk is None:                   # 母集団の平均（ブロッカー 10.4%）で混ぜる
+            return (0.104 * one(pw, True, opl, mlp, oc)
+                    + 0.896 * one(pw, False, opl, mlp, oc))
+        return nu_of(pw, opl, r_turns, theta, mu, is_blocker=blk,
+                     opp_chars=oc, my_leader_power=mlp)
+
     out = {}
     for k in keys:
-        if k == "chars":
-            # 母集団の平均（ブロッカー 10.4%）で置く
-            out[k] = (0.104 * nu_of(6000.0, opp_leader_power, r_turns, theta, mu, is_blocker=True)
-                      + 0.896 * nu_of(6000.0, opp_leader_power, r_turns, theta, mu,
-                                      is_blocker=False))
-        elif k in ("blocker", "plain"):
-            out[k] = nu_of(6000.0, opp_leader_power, r_turns, theta, mu,
-                           is_blocker=(k == "blocker"))
-        else:
-            base = k.replace("_blk", "").replace("_plain", "")
-            pw = PREDICT_POWER.get(base)
-            if pw is None:
-                continue
-            out[k] = nu_of(pw, opp_leader_power, r_turns, theta, mu,
-                           is_blocker=k.endswith("_blk"))
+        pw, blk = _kind_spec(k)
+        if pw is None:
+            continue
+        if not board:
+            out[k] = one(pw, blk, opp_leader_power, None, None)
+            continue
+        out[k] = float(np.mean([one(pw, blk, r["opp_leader_power"], r["my_leader_power"],
+                                    r["opp_chars"]) for r in rows]))
     return {k: round(float(v), 5) for k, v in out.items()}
 
 
@@ -355,6 +391,10 @@ def main(argv=None):
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--scheme", nargs="+", default=list(SCHEMES), choices=SCHEMES)
     ap.add_argument("--r-turns", type=float, default=4.128, help="式に渡す R（実測の既定）")
+    ap.add_argument("--nu-targets", default="leader", choices=NU_TARGET_MODES,
+                    help="式の攻撃項をリーダー狙いだけにするか（leader）"
+                         "相手の場も対象に含めた max にするか（board・task #39）。"
+                         "`board` は**行ごとの盤面で引いて平均**する")
     ap.add_argument("--theta", type=float, default=THETA)
     ap.add_argument("--mu", type=float, default=MU)
     ap.add_argument("--cost-check", action="store_true",
@@ -376,7 +416,8 @@ def main(argv=None):
     for sch in a.scheme:
         keys = [k for k in keys_of[sch] if any(r.get(k) for r in recs)]
         fit = within_multi(recs, keys) if keys else None
-        pred = predict(keys, r_turns=a.r_turns, theta=a.theta, mu=a.mu)
+        pred = predict(keys, r_turns=a.r_turns, theta=a.theta, mu=a.mu,
+                       targets=a.nu_targets, recs=recs)
         res["fits"][sch] = {"fit": fit, "predicted": pred, "check": check(fit, pred)}
     if a.cost_check:
         pf = res["fits"].get("power", {}).get("fit") or {}

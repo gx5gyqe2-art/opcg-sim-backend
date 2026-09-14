@@ -108,6 +108,15 @@ THETA = 1.15
 #: > `Θ_B < Θ_A` の帯（ライフ 2〜4 で 0.31〜0.85）で**守る基準を不当に下げていた**。
 #: > `max` なら**既定と違うのはリーサル圏だけ**（ライフ 0 で 2.64・1 で 1.48）。
 THETA_MODES = ("const", "board", "max")
+#: `ν` の攻撃項をどこまで対象に広げるか（task #39・2026-09-14）
+#:
+#: > **`leader`** = 従来＝リーダー狙いだけ。**パワーは飽和点（`x*`）で頭打ちになり、
+#: > リーダー未満のキャラは `ν` が 0 になる**。
+#: > **`board`** = **相手の場のキャラも対象に含めた `max`**。ユーザ指摘 2026-09-14——
+#: > 「パワーが大きいほど相手の大きなキャラクターに対して攻撃する選択肢が残る」＝
+#: > **パワーの価値の残り半分は「対象の選択肢」**である。
+#: > 既定は `leader`（既存の測定値を動かさない）。
+NU_TARGET_MODES = ("leader", "board")
 #: トークンの枠（0 自L・1 相L・2〜6 自場・7〜11 相場）と列（`n_rel_feat.S_COLS`）
 S_IS_BLOCKER, S_IS_CHAR = 6, 18
 SLOT_OWN_FIELD = slice(2, 7)
@@ -227,6 +236,19 @@ def count_blockers(tok_row):
     return n
 
 
+def opp_chars_of(tok_row):
+    """**相手の場のキャラ**を `(パワー, ブロッカーか)` で返す（`nu_of(opp_chars=...)` の材料）。
+
+    リーダーは入れない——リーダー狙いは `attack_stream` が別に見ている。
+    """
+    tok = np.asarray(tok_row)
+    out = []
+    for s in range(SLOT_OPP_FIELD.start, SLOT_OPP_FIELD.stop):
+        if float(tok[s, S_IS_CHAR]) > 0.5:
+            out.append((slot_power(tok, s) or 0.0, float(tok[s, S_IS_BLOCKER]) > 0.5))
+    return out
+
+
 def board_theta(tok_row, life, my_don=0.0, don_share=DON_SHARE, fallback=THETA):
     """**盤面から出す `Θ`（シャドー価格）**＝来る攻撃の `c(x)` を安い順に並べた `G` 番目。
 
@@ -287,8 +309,53 @@ def attack_value(power, target_power, is_leader, theta=THETA, mu=MU, nu_target=N
     return float(min(guard, take))
 
 
+def attack_stream(power, opp_leader_power, r_turns, theta=THETA, mu=MU, opp_chars=None,
+                  my_leader_power=None, ko_p=KO_P):
+    """残り `r_turns` ターンぶんの**攻撃の総価値**（毎ターン**一番おいしい対象**を選ぶ）。
+
+    ```
+    リーダー狙い  lead = min(c(P − L_opp)·μ, Θ·μ)          ——毎ターン繰り返せる
+    キャラ狙い    v_T  = min(c(P − P_T)·μ, ν(T))            ——**1 体につき 1 回だけ**
+    atk = Σ_{i < R}  max( v_(i) , lead )                    （v は高い順・端数は比例配分）
+    ```
+
+    **これが「パワーの価値」の残り半分**（ユーザ指摘 2026-09-14・task #39）——
+    パワーが大きいほど**相手の大きなキャラへ攻撃する選択肢が残る**ので、
+    リーダー狙いが飽和（`Θ·μ`）した先にも価値が伸びる。
+
+    > **`R` を掛けるのは `lead` だけ**——`ν(T)` は**在庫**（その体が持つ残り価値の総額）で
+    > あって**毎ターンの流量ではない**。`R · max(lead, v_T)` と書くと
+    > 「4 ターン続けて同じキャラを倒す」ことになり、**単位が合わない**（実装の初版は
+    > これで 12000 のキャラを 0.587＝実測の全体 0.1087 の 5 倍に値付けした）。
+    > 倒せるのは **1 体 1 回**なので、**高い順に 1 ターン 1 体ずつ充てて足す**。
+
+    `opp_chars` は `(パワー, ブロッカーか)` の並び（`opp_chars_of` が枠から作る）。
+    **内側の `ν` には `opp_chars` を渡さない**＝**深さ 1 で止める**（相手のキャラの価値を
+    測るのにこちらの盤面を要求すると相互再帰になる）。
+    """
+    lead = attack_value(power, opp_leader_power, True, theta, mu)
+    r = max(0.0, float(r_turns))
+    if not opp_chars:
+        return lead * r                          # 従来どおり（盤面を渡さなければ値は動かない）
+    mlp = float(opp_leader_power if my_leader_power is None else my_leader_power)
+    vals = []
+    for entry in opp_chars:
+        tp, blk = (entry if isinstance(entry, (tuple, list)) else (entry, None))
+        nu_t = nu_of(tp, mlp, r_turns, theta, mu, ko_p=ko_p, is_blocker=blk)
+        vals.append(attack_value(power, tp, False, theta, mu, nu_target=nu_t))
+    vals.sort(reverse=True)
+    total = 0.0
+    i = 0
+    while r > 1e-12:                          # 端数の丸め残りで回り続けない
+        share = min(1.0, r)                      # 端数のターンは比例配分
+        total += share * max(vals[i] if i < len(vals) else lead, lead)
+        r -= share
+        i += 1
+    return float(total)
+
+
 def nu_of(power, opp_leader_power, r_turns, theta=THETA, mu=MU, block_p=None, ko_p=KO_P,
-          is_blocker=None):
+          is_blocker=None, opp_chars=None, my_leader_power=None):
     """場のキャラ 1 体の価格 `ν`（`game_theory.md` §14.1）。
 
     残り `r_turns` ターンぶんの攻撃の価値＋ブロックの option value − KO される損。
@@ -297,12 +364,15 @@ def nu_of(power, opp_leader_power, r_turns, theta=THETA, mu=MU, block_p=None, ko
     **ブロックできるのはブロッカーだけ**なので、`block_p` を全キャラに掛けるのは**種類の誤り**
     だった。ブロッカーなら `BLOCK_P_BLOCKER`（実測 0.773）・それ以外は **0**。
     `block_p` を明示すれば上書きできる（旧値で引き直したいときだけ）。
+
+    **`opp_chars` を渡すと攻撃項が「対象の max」になる**（2026-09-14・task #39）——
+    渡さなければ従来どおりリーダー狙いだけなので、**既存の呼び出しの値は変わらない**。
     """
     if block_p is None:
         block_p = (BLOCK_P_BLOCKER if is_blocker else 0.0) if is_blocker is not None else \
             BLOCK_P_BLOCKER * 0.104          # 素性が判らないときは母集団の平均で置く
-    per_turn = attack_value(power, opp_leader_power, True, theta, mu)
-    atk = float(r_turns) * per_turn
+    atk = attack_stream(power, opp_leader_power, r_turns, theta, mu, opp_chars,
+                        my_leader_power, ko_p)
     block = float(block_p) * theta * mu             # 1 回ぶんの攻撃を消す価値
     return atk + block - float(ko_p) * (atk + block)
 
@@ -326,13 +396,15 @@ def attach_value(power, target_power, k=1, theta=THETA, mu=MU):
 
 
 def play_value(power, cost, opp_leader_power, r_turns, theta=THETA, mu=MU, delta=None,
-               is_blocker=None):
+               is_blocker=None, opp_chars=None, my_leader_power=None):
     """登場の価値＝`ν − μ − cost·δ`（手札 1 枚とドンで場を買う・§14.1）。
 
     `δ`（ドン 1 個の価値）の既定は理論値 `Δpressure(1000)·μ ≈ 0.66·μ`（§13）。
+    `opp_chars` を渡すと `ν` の攻撃項が「対象の max」になる（§14.1・task #39）。
     """
     d = (0.66 * mu) if delta is None else float(delta)
-    return (nu_of(power, opp_leader_power, r_turns, theta, mu, is_blocker=is_blocker)
+    return (nu_of(power, opp_leader_power, r_turns, theta, mu, is_blocker=is_blocker,
+                  opp_chars=opp_chars, my_leader_power=my_leader_power)
             - mu - float(cost) * d)
 
 
@@ -392,7 +464,8 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
             return None                              # イベントは効果の中身が要る
         return play_value(src["power"], src.get("cost") or 0,
                           ctx["opp_leader_power"], ctx["r_turns"], theta, mu,
-                          is_blocker=src.get("blocker"))
+                          is_blocker=src.get("blocker"), opp_chars=ctx.get("opp_chars"),
+                          my_leader_power=ctx["my_leader_power"])
     return None
 
 
@@ -420,7 +493,8 @@ def row_order(n, q, p, theory, n_min=5, q_eps=0.02, p_eps=1e-4, n_min_frac=0.05)
 
 
 def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
-            n_min=5, q_eps=0.02, n_min_frac=0.05, don_k=1, theta_mode="const"):
+            n_min=5, q_eps=0.02, n_min_frac=0.05, don_k=1, theta_mode="const",
+            nu_targets="leader"):
     cards = PL.Cards()
     recs = []
     stats = {"games": 0, "rows": 0, "rows_used": 0, "cand": 0, "cand_scored": 0}
@@ -453,6 +527,10 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
                    "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))),
                    "don_k": don_k}
             tok = ex["tok"][i]
+            # `board` なら `ν` の攻撃項を**相手の場も対象に含めた max** にする（task #39）。
+            # 既定の `leader` は従来どおり＝**既存の測定値は動かない**。
+            if nu_targets == "board":
+                ctx["opp_chars"] = opp_chars_of(tok)
             theory = []
             for j in range(b, b + k):
                 sig = json.loads(pol["pol_sig"][j])
@@ -545,6 +623,9 @@ def main(argv=None):
     ap.add_argument("--theta-mode", default="const", choices=THETA_MODES,
                     help="`Θ` を定数にするか（const）盤面から出すか（board）。"
                          "2 つの経路は帯レベルで食い違うので A/B で決める（2026-09-14）")
+    ap.add_argument("--nu-targets", default="leader", choices=NU_TARGET_MODES,
+                    help="`ν` の攻撃項をリーダー狙いだけにするか（leader）"
+                         "相手の場も対象に含めた max にするか（board・task #39）")
     ap.add_argument("--mu", type=float, default=MU, help="手札 1 枚の価格（既定は相手ターンの実測）")
     ap.add_argument("--n-min", type=int, default=5)
     ap.add_argument("--n-min-frac", type=float, default=0.05)
@@ -556,7 +637,8 @@ def main(argv=None):
 
     t0 = time.time()
     recs, stats = collect(a.src, a.holdout_mod, a.limit_games, a.theta, a.mu,
-                          a.n_min, a.q_eps, a.n_min_frac, a.don_k, theta_mode=a.theta_mode)
+                          a.n_min, a.q_eps, a.n_min_frac, a.don_k, theta_mode=a.theta_mode,
+                          nu_targets=a.nu_targets)
     allb = block(recs)
     res = {"stats": stats, "all": allb, "verdict": verdict(allb),
            "by_band": {b: block([r for r in recs if r["band"] == b])

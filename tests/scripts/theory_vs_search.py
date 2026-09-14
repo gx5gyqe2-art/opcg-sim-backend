@@ -76,9 +76,10 @@ if _HERE not in sys.path:
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from order_acc import band_of, q_floor  # noqa: E402
-from theory_order import (MU, THETA, THETA_MODES, SC_MY_LIFE, SC_MY_DON,  # noqa: E402
+from theory_order import (MU, THETA, THETA_MODES, NU_TARGET_MODES,  # noqa: E402
+                          SC_MY_LIFE, SC_MY_DON,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_OPP_LEADER_POWER,  # noqa: E402
-                          SC_OPP_LIFE, PWR_EPS, c_of, saturation_x,  # noqa: E402
+                          SC_OPP_LIFE, PWR_EPS, c_of, opp_chars_of, saturation_x,  # noqa: E402
                           score_candidate, theta_of)
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0")
@@ -224,7 +225,8 @@ def row_compare(n, q, theory, chosen, n_min=5, q_eps=0.02, n_min_frac=0.05, th_e
 
 
 def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
-            n_min=5, q_eps=0.02, n_min_frac=0.05, don_k=1, bands=("close",), theta_mode="const"):
+            n_min=5, q_eps=0.02, n_min_frac=0.05, don_k=1, bands=("close",), theta_mode="const",
+            nu_targets="leader"):
     """holdout の判断点 → 食い違いの記録（既定は接戦帯だけ）。"""
     cards = PL.Cards()
     recs = []
@@ -266,6 +268,9 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
                    "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))),
                    "don_k": don_k}
             tok = ex["tok"][i]
+            # `ν` の攻撃項を相手の場も含めた max にするか（`theory_order` と同じ規約・task #39）
+            if nu_targets == "board":
+                ctx["opp_chars"] = opp_chars_of(tok)
             theory, dets = [], []
             for j in range(b, b + k):
                 sig = json.loads(pol["pol_sig"][j])
@@ -441,6 +446,8 @@ def main(argv=None):
     ap.add_argument("--theta", type=float, default=THETA)
     ap.add_argument("--theta-mode", default="const", choices=THETA_MODES,
                     help="`Θ` を定数にするか盤面から出すか（`theory_order` と同じ）")
+    ap.add_argument("--nu-targets", default="leader", choices=NU_TARGET_MODES,
+                    help="`ν` の攻撃項を対象の max に広げるか（`theory_order` と同じ・task #39）")
     ap.add_argument("--mu", type=float, default=MU)
     ap.add_argument("--n-min", type=int, default=5)
     ap.add_argument("--n-min-frac", type=float, default=0.05)
@@ -456,7 +463,7 @@ def main(argv=None):
     recs, stats, cross, pred, at_dist = collect(
         a.src, a.holdout_mod, a.limit_games, a.theta, a.mu,
         a.n_min, a.q_eps, a.n_min_frac, a.don_k, tuple(a.bands),
-        theta_mode=a.theta_mode)
+        theta_mode=a.theta_mode, nu_targets=a.nu_targets)
     res["stats"] = stats
     res["summary"] = summarise(recs, cross, pred, at_dist, a.q_eps)
     by_band = {}
