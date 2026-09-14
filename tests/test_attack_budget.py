@@ -1,8 +1,14 @@
 """`tests/scripts/attack_budget.py`（攻め側の予算＝掛けた圧力とドンの使い切り）の算術。
 
-基盤健全性（`cpu_infra`）。要は **`don_idle` の分解**——手持ちのドンから「付与した分」と
-「場に出すのに払った分」を引かないと「余らせた」を大きく数え過ぎる（`don_unused` 4.9 →
-`don_idle` 1.9 に変わった）。ここを取り違えると「付与が苦手」の量が水増しになる。
+基盤健全性（`cpu_infra`）。要は **`don_idle` の出し方**——**状態から直接読む**
+（自席ターンの最後の main 行のアクティブなドン）。
+
+> **2026-09-14 にこのテストは書き直した**（`docs/reports/2026-09-14_don_accounting.md`）。
+> 旧版は `don_idle == 6 − 1 − 4` という**再構成の定義を固定していた**＝**バグを守るテスト**
+> だった。`ATTACH_DON` は選ばれた手として一度も現れない（付与は全部 `DON_BOX` の中）ので、
+> 再構成は付与を丸ごと余りに計上し、**実データで余りを 4 倍に見せていた**（2.07 対 真値 0.51）。
+> いまラチェットするのは **(1) 余りは状態から読む・(2) 箱の付与は `pol_k` で数える
+> （的の無い箱も）・(3) 恒等式 `don = 付与 + コスト + 余り` が閉じる**の 3 点。
 """
 import json
 import os
@@ -101,14 +107,20 @@ def _sig(at, uuid=None, targets=()):
 
 
 def _fake_game():
-    """自席ターン 3（who=0）: 4 コストを 1 枚出し・ドン 1 個付与・リーダーへ 1 回・キャラへ 1 回。"""
+    """自席ターン 3（who=0）: ドン 6 で 4 コスト 1 枚・箱で 1 個付与しリーダーへ・キャラへ 1 回。
+
+    **ドンは行ごとに減る**（6 → 出して 2 → 付与して 1）＝`don_idle` は
+    **最後の main 行のアクティブなドン**を直接読むので 1。
+    `pol_k` に箱の付与枚数を入れる（付与は**箱の中でしか起きない**ので、これが実際の観測）。
+    """
+    #                                                       don_active, pol_k
     recs = [
-        (0, 3, 0, _sig("PLAY", "chr1")),
-        (0, 3, 0, _sig("DON_BOX", "atk1", ["ldrU"])),
-        (0, 3, 2, _sig("ATTACH_DON", "atk1")),
-        (0, 3, 2, _sig("ATTACK", "atk1", ["ldrU"])),          # 箱の中＝同じ攻撃の続き
-        (0, 3, 0, _sig("DON_BOX", "atk1", ["oppChrU"])),   # キャラへの攻撃＝board
-        (0, 3, 0, _sig("TURN_END")),
+        (0, 3, 0, _sig("PLAY", "chr1"), 6, -1),
+        (0, 3, 0, _sig("DON_BOX", "atk1", ["ldrU"]), 2, 1),   # 4 払った後・1 個乗せる
+        (0, 3, 2, _sig("ATTACH_DON", "atk1"), 1, -1),          # 箱の中の付与の行
+        (0, 3, 2, _sig("ATTACK", "atk1", ["ldrU"]), 1, -1),    # 箱の中＝同じ攻撃の続き
+        (0, 3, 0, _sig("DON_BOX", "atk1", ["oppChrU"]), 1, 0),  # キャラへ＝board・付与なし
+        (0, 3, 0, _sig("TURN_END"), 1, -1),                    # ここの 1 が余らせたドン
     ]
     n = len(recs)
     rows = {
@@ -119,16 +131,18 @@ def _fake_game():
         "seed": np.zeros(n, np.int64),
         "z": np.ones(n, np.float32),
         "step": np.arange(n, dtype=np.int32),
-        "pol_len": np.zeros(n, np.int32),
+        "pol_len": np.ones(n, np.int32),
+        "pol_chosen": np.zeros(n, np.int32),
         "deck_kinds": np.array(["{}"] * n),
     }
     sc = np.zeros((n, 14), np.float32)
     sc[:, A.SC_L] = 4.0
     sc[:, A.SC_OPP_L] = 3.0
-    sc[:, A.SC_DON] = 6.0
+    sc[:, A.SC_DON] = np.array([r[4] for r in recs], np.float32)
     ex = {"sc": sc, "tk": np.stack([_tk((6000, True), 5000, ((5000, True),))] * n)}
     L = rows["pol_len"].astype(np.int64)
     ptr = np.concatenate([[0], np.cumsum(L)]).astype(np.int64)
+    pol = {"pol_k": np.array([r[5] for r in recs], np.int32)}
     u2c = {"chr1": "C4", "atk1": "CHR", "ldrU": "LDR", "oppChrU": "CHR"}
     cards = FakeCards({
         "C4": {"leader": False, "cost": 4, "counter": 0, "event": False,
@@ -138,12 +152,12 @@ def _fake_game():
         "LDR": {"leader": True, "cost": 0, "counter": 0, "event": False,
                 "removal": False, "blocker": False},
     })
-    return rows, ex, L, ptr, list(range(n)), cards, u2c
+    return rows, ex, L, ptr, list(range(n)), cards, u2c, pol
 
 
 def test_turns_of_separates_attach_play_and_board_attacks():
-    rows, ex, L, ptr, idx, cards, u2c = _fake_game()
-    ts = A.turns_of(rows, ex, L, ptr, idx, cards, u2c)
+    rows, ex, L, ptr, idx, cards, u2c, pol = _fake_game()
+    ts = A.turns_of(rows, ex, L, ptr, idx, cards, u2c, pol)
     assert len(ts) == 1
     t = ts[0]
     # 箱の main 行 1 本だけを数える（中の `ATTACK` 行は同じ攻撃の続き）
@@ -157,18 +171,57 @@ def test_turns_of_separates_attach_play_and_board_attacks():
     assert t["don"] == 6
 
 
-def test_block_decomposes_the_unused_don():
-    """`don_idle` は付与と支払いを引いた残り（引かないと水増しになる）。"""
-    rows, ex, L, ptr, idx, cards, u2c = _fake_game()
-    ts = A.turns_of(rows, ex, L, ptr, idx, cards, u2c)
-    b = A.block(ts)
+def test_the_box_attachment_is_counted_from_pol_k():
+    """**付与は `DON_BOX` の中でしか起きない**ので `pol_k` を数えないと付与が丸ごと抜ける。
+
+    実測で `ATTACH_DON` は**選ばれた手として一度も現れない**（2026-09-14・300 局 約 1.9 万手で
+    0 件）。`ATTACH_DON` の**行**は箱の中に在るが付与の一部しか捉えない（実測 1.32 対 2.94）。
+    """
+    rows, ex, L, ptr, idx, cards, u2c, pol = _fake_game()
+    t = A.turns_of(rows, ex, L, ptr, idx, cards, u2c, pol)[0]
+    assert t["don_box_attached"] == 1             # リーダーへの箱で 1 個乗せた
+    # **的の無い箱（純粋な付与）でも数える**＝`continue` より前に置いてある
+    rows2, ex2, L2, ptr2, idx2, cards2, u2c2, pol2 = _fake_game()
+    rows2["sig"][1] = _sig("DON_BOX", "atk1")     # 的を外す（配分だけの箱）
+    t2 = A.turns_of(rows2, ex2, L2, ptr2, idx2, cards2, u2c2, pol2)[0]
+    assert t2["don_box_attached"] == 1
+    assert t2["attacks_made"] == 0                # 的が無いので攻撃ではない
+    # `pol` を渡さなければ 0（後方互換）
+    t3 = A.turns_of(rows, ex, L, ptr, idx, cards, u2c)[0]
+    assert t3["don_box_attached"] == 0
+
+
+def test_block_reads_the_unused_don_from_the_state_not_from_the_actions():
+    """**`don_idle` は最後の main 行のアクティブなドンを直接読む**。
+
+    2026-09-14 の訂正: 以前は `don − ATTACH_DON の行数 − PLAY のコスト` で再構成していたが、
+    **付与が全部 `DON_BOX` の中で起きる**ので付与が抜け、**余りを 3 倍に見せていた**
+    （実測 2.07 対 真値 0.51）。**状態が答えを持っているものを行動の再構成で出さない**。
+    """
+    rows, ex, L, ptr, idx, cards, u2c, pol = _fake_game()
+    b = A.block(A.turns_of(rows, ex, L, ptr, idx, cards, u2c, pol))
     assert b["don"] == 6.0
-    assert b["don_attached"] == 1.0
     assert b["don_plays"] == 4.0
-    assert b["don_idle"] == 1.0                   # 6 − 1 − 4
+    assert b["don_box_attached"] == 1.0
+    assert b["don_idle"] == 1.0                   # TURN_END 行のアクティブなドン（直接読み）
     assert b["don_idle_pos"] == 1.0
+    # 会計が閉じる: 6 = 付与 1 + コスト 4 + 余り 1
+    assert b["don_unaccounted"] == pytest.approx(0.0)
+    # 旧い再構成も並記する（同じ罠を二度踏まないため）＝付与が抜けるので 1 個多く出る
+    assert b["don_idle_recon_wrong"] == 1.0       # 6 − 1（ATTACH_DON 行）− 4
     assert b["force_gap"] == pytest.approx(b["force_max"] - b["force_actual"])
     assert A.block([]) is None
+
+
+def test_the_unused_don_is_not_inflated_when_the_box_attaches_many():
+    """箱が 3 個乗せたターンは**再構成だけが余りを水増しする**（直接読みは正しい）。"""
+    rows, ex, L, ptr, idx, cards, u2c, pol = _fake_game()
+    pol["pol_k"][1] = 3                            # 箱で 3 個乗せた
+    ex["sc"][2:, A.SC_DON] = 0.0                   # 付与し切ってドンは残っていない
+    b = A.block(A.turns_of(rows, ex, L, ptr, idx, cards, u2c, pol))
+    assert b["don_idle"] == 0.0                    # 直接読み＝余っていない
+    assert b["don_idle_recon_wrong"] == 1.0        # 再構成は 1 個余ったと言う（誤り）
+    assert b["don_unaccounted"] == pytest.approx(-1.0)   # 6 − 3 − 4 − 0（払い過ぎ＝途中で得た）
 
 
 def test_x_dist_shares_sum_to_one():
