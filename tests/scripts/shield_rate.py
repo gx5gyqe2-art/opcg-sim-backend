@@ -14,11 +14,23 @@
 残る候補のうち**身代わりだけは記録から直接率が測れる**:
 
 ```
-身代わり項 = （残り R ターンで殴られる回数）× Θ·μ
-           = （1 手番あたり被弾率）× R × Θ·μ
+身代わり項 = Σ（吸った攻撃 1 本ごとの価値） / 露出 × R
+1 本の価値 = min( c(x_lead)·μ , Θ·μ )      x_lead = 攻撃側のパワー − 守る側のリーダーのパワー
 ```
 
-`Θ·μ` は**リーダーへの攻撃 1 回を消す価値**（`attack_value` の `take` と同じ量）。
+**1 本を一律 `Θ·μ` と置いてはいけない**（ユーザ指摘 2026-09-14・初版はそう置いて 22% 過大に出した）:
+
+> 「2000 のパワーを吸うのか、5000 を吸うのか、10000 を吸うのかで身代わりの価値は変わる」
+
+**守った価値は「その攻撃がリーダーに行っていたら払わされた額」**＝`min(c(x_lead)·μ, Θ·μ)` で、
+`Θ·μ` は**上限**にすぎない（それ以上高い攻撃は「受ける」を選ぶので払う額は増えない）。
+そして決定的なのは **`x_lead < 0` なら価値が 0** だということ——
+**相手の 3000 の体は 5000 のリーダーにそもそも通らない**ので、それが自分の 2000 のキャラを
+殴っても**リーダーは何も守られていない**。実測で**吸った攻撃の 17.6% がこれ**である
+（弱い体ほど多く、リーダー未満の帯では 23.9%）。
+
+**`x_lead` は付与ドンを乗せてから測る**（`DON_BOX` は k 枚付けてから殴るマクロ手・`pol_k`）。
+
 **式を触る前に大きさが判る**ので、`nu_measure` の実測と**突き合わせる検算**になる
 （`measurement.md` §14-17＝順序の一致率で A/B しない）。
 
@@ -41,6 +53,9 @@
 - **率が低パワーほど高ければ**、身代わりは**穴のある帯に集中する**＝
   **`ν` のパワーに対する形そのもの**を直す項になる（`2026-09-14_nu_measure.md` §3 の
   「両端を切り落として真ん中を盛っている」と符合する）。
+- **率と 1 本の価値は逆を向きうる**（2026-09-14 に実測でそうなった）——
+  弱い体は**よく殴られるが、弱い攻撃しか吸わない**。
+  **積（`rate × value`）で見る**のが正しく、率だけを見ると過大に出る。
 
 **限界**: **観察された率であって因果ではない**——殴られやすい体が場に残りやすい／
 残りにくいという選択が入る。**粗の値**であり、**殴られて KO される損は引いていない**
@@ -67,12 +82,14 @@ if _HERE not in sys.path:
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from nu_measure import power_band  # noqa: E402
-from theory_order import (MU, POL_COLS, ROW_COLS, S_IS_CHAR, THETA,  # noqa: E402
-                          slot_power)
+from theory_order import (MU, POL_COLS, PWR_EPS, ROW_COLS, S_IS_CHAR,  # noqa: E402
+                          THETA, c_of, slot_power)
 
 #: 守る側の枠（打っている側の視点では「相手の場」）と、打つ側のリーダーの枠
 SLOT_FOE_FIELD = range(7, 12)
 SLOT_MY_LEADER = 0
+#: 守る側のリーダーの枠（打っている側から見た「相手リーダー」）
+SLOT_FOE_LEADER = 1
 #: 残りターン数の既定（実測・`nu_measure` と同じ）
 R_TURNS = 4.128
 BANDS = ("lt_leader", "leader_to_sat", "over_sat")
@@ -82,10 +99,37 @@ def _extra(dd, n):
     return {"tok": np.asarray(dd["tokens"])[:n].astype(np.float32)}
 
 
-def collect(dirs, limit_games=0):
-    """被弾数と露出（帯ごと）を数える。対局ごとの内訳も返す（クラスタ CI 用）。"""
+def absorb_value(x_lead, theta=THETA, mu=MU):
+    """吸った攻撃 1 本の価値＝**リーダーに行っていたら払わされた額**。
+
+    ```
+    min( c(x_lead)·μ , Θ·μ )        x_lead < 0 なら 0
+    ```
+
+    **`Θ·μ` は上限**（それ以上高い攻撃は「受ける」を選ぶので払う額は増えない）。
+    **`x_lead < 0` は 0**——リーダーに通らない攻撃をキャラが吸っても**何も守っていない**
+    （ユーザ指摘 2026-09-14。実測で吸った攻撃の 17.6% がこれ）。
+    """
+    x = float(x_lead)
+    if x < -PWR_EPS:
+        return 0.0
+    return float(min(c_of(x), float(theta)) * float(mu))
+
+
+def attacker_power(tok, src_slot, don_k):
+    """攻撃側の**実効パワー**＝枠の現在値 ＋ 1000 × 付与枚数（`DON_BOX` は付けてから殴る）。"""
+    sp = slot_power(tok, src_slot)
+    if sp is None:
+        return None
+    return sp + 1000.0 * max(int(don_k), 0)
+
+
+def collect(dirs, limit_games=0, theta=THETA, mu=MU):
+    """被弾数・露出・**吸った攻撃の価値の和**（帯ごと）。対局ごとの内訳も返す（CI 用）。"""
     hits = {b: 0 for b in BANDS}
     exposure = {b: 0 for b in BANDS}
+    value = {b: 0.0 for b in BANDS}          # Σ min(c(x_lead)μ, Θμ)
+    no_connect = {b: 0 for b in BANDS}       # x_lead < 0（リーダーには通らなかった）
     per_game = []
     games = 0
     for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS,
@@ -95,6 +139,7 @@ def collect(dirs, limit_games=0):
             break
         g_hits = {b: 0 for b in BANDS}
         g_exp = {b: 0 for b in BANDS}
+        g_val = {b: 0.0 for b in BANDS}
         seen = set()
         for i in idx:
             if int(rows["kind"][i]) != 0:
@@ -119,29 +164,45 @@ def collect(dirs, limit_games=0):
             if sig[0] != "DON_BOX" or not (len(sig) > 2 and sig[2]):
                 continue
             ti = int(pol["pol_ti"][b + ch])
-            if ti in SLOT_FOE_FIELD:
-                g_hits[power_band(slot_power(tok, ti) or 0.0, lead)] += 1
+            if ti not in SLOT_FOE_FIELD:
+                continue
+            bd = power_band(slot_power(tok, ti) or 0.0, lead)
+            g_hits[bd] += 1
+            # **1 本の価値は「リーダーに行っていたら払わされた額」**（一律 Θμ ではない）
+            sp = attacker_power(tok, int(pol["pol_si"][b + ch]), int(pol["pol_k"][b + ch]))
+            foe_lead = slot_power(tok, SLOT_FOE_LEADER) or 5000.0
+            if sp is None:
+                continue
+            x = sp - foe_lead
+            g_val[bd] += absorb_value(x, theta, mu)
+            if x < -PWR_EPS:
+                no_connect[bd] += 1
         for bd in BANDS:
             hits[bd] += g_hits[bd]
             exposure[bd] += g_exp[bd]
-        per_game.append((g_hits, g_exp))
-    return hits, exposure, per_game, games
+            value[bd] += g_val[bd]
+        per_game.append((g_hits, g_exp, g_val))
+    return hits, exposure, value, no_connect, per_game, games
 
 
-def _boot_ci(per_game, band, reps=400, seed=0):
-    """対局を復元抽出して率の CI を出す（比の統計量なので必ず付ける・§14-15）。"""
+def _boot_ci(per_game, band, reps=400, seed=0, num=0, scale=1.0):
+    """対局を復元抽出して比の CI を出す（比の統計量なので必ず付ける・§14-15）。
+
+    `num` は分子の取り方＝**0 なら被弾数**（率）・**2 なら吸った価値の和**（身代わり項）。
+    分母はどちらも露出。`scale` を掛ければそのまま `× R` した項の CI になる。
+    """
     if reps <= 0 or len(per_game) < 3:
         return None, None
     rng = np.random.default_rng(seed)
-    h = np.array([g[0][band] for g in per_game], np.float64)
+    h = np.array([g[num][band] for g in per_game], np.float64)
     e = np.array([g[1][band] for g in per_game], np.float64)
     n = len(h)
     out = []
     for _ in range(int(reps)):
-        j = rng.integers(0, n, n)
-        den = e[j].sum()
+        k = rng.integers(0, n, n)
+        den = e[k].sum()
         if den > 0:
-            out.append(h[j].sum() / den)
+            out.append(h[k].sum() / den * float(scale))
     if not out:
         return None, None
     return (round(float(np.percentile(out, 2.5)), 4),
@@ -155,34 +216,65 @@ NU_MEASURED = {"lt_leader": 0.0690, "leader_to_sat": 0.1503, "over_sat": 0.2112}
 NU_FORMULA = {"lt_leader": 0.0008, "leader_to_sat": 0.1603, "over_sat": 0.2185}
 
 
-def summarise(hits, exposure, per_game, r_turns=R_TURNS, theta=THETA, mu=MU, reps=400):
-    """帯ごとの率と、そこから出る身代わり項（粗）。"""
+def summarise(hits, exposure, value, no_connect, per_game, r_turns=R_TURNS,
+              theta=THETA, mu=MU, reps=400):
+    """帯ごとの率・**1 本の価値**・身代わり項（粗）。
+
+    ```
+    身代わり項（粗） = （吸った価値の和 / 露出）× R
+    ```
+
+    **率だけでは出せない**——弱い体はよく殴られるが**弱い攻撃しか吸わない**ので、
+    一律 `Θ·μ` を掛けると過大に出る（初版がそれで 22% 高かった・ユーザ指摘 2026-09-14）。
+    """
     tm = float(theta) * float(mu)
     rows = {}
     for bd in BANDS:
-        h, e = hits[bd], exposure[bd]
+        h, e, v = hits[bd], exposure[bd], value[bd]
         rate = (h / e) if e else 0.0
+        per_absorb = (v / h) if h else 0.0
+        gross = (v / e * float(r_turns)) if e else 0.0
         lo, hi = _boot_ci(per_game, bd, reps)
+        slo, shi = _boot_ci(per_game, bd, reps, num=2, scale=float(r_turns))
         room = NU_MEASURED[bd] - NU_FORMULA[bd]
         rows[bd] = {
             "hits": h, "exposure": e,
             "rate_per_turn": round(rate, 4),
             "rate_ci95": [lo, hi],
+            # **1 本あたりの価値**＝リーダーに行っていたら払わされた額（一律 Θμ ではない）
+            "value_per_absorb": round(per_absorb, 5),
+            "flat_theta_mu": round(tm, 5),
+            "no_connect": no_connect[bd],
+            "no_connect_share": round(no_connect[bd] / h, 4) if h else 0.0,
             "absorbs_over_r": round(rate * float(r_turns), 4),
-            "shield_gross": round(rate * float(r_turns) * tm, 4),
+            "shield_gross": round(gross, 4),
+            "shield_ci95": [slo, shi],
+            # 一律 Θμ で置いたときの値＝**どれだけ過大だったか**を残す
+            "shield_gross_flat": round(rate * float(r_turns) * tm, 4),
             "nu_measured": NU_MEASURED[bd], "nu_formula": NU_FORMULA[bd],
             "room_in_formula": round(room, 4),
             "fits_in_room": bool(room > 0),
+            "covers_room": (round(gross / room, 3) if room > 0 else None),
         }
     tot_h = sum(hits.values())
     tot_e = sum(exposure.values())
+    tot_v = sum(value.values())
     r = [rows[b]["rate_per_turn"] for b in BANDS]
+    val = [rows[b]["value_per_absorb"] for b in BANDS]
+    g = [rows[b]["shield_gross"] for b in BANDS]
     return {"by_band": rows,
             "rate_all": round(tot_h / tot_e, 4) if tot_e else 0.0,
+            "value_per_absorb_all": round(tot_v / tot_h, 5) if tot_h else 0.0,
+            "no_connect_share_all": (round(sum(no_connect.values()) / tot_h, 4)
+                                     if tot_h else 0.0),
             "theta_mu": round(tm, 4), "r_turns": float(r_turns),
-            # **事前登録の読み方**: 低パワーほど高ければ「形を直す項」・一律なら「悪化する項」
+            # **事前登録の読み方**: 低パワーほど厚ければ「形を直す項」・一律なら「悪化する項」
             "rate_falls_with_power": bool(r[0] > r[1] > r[2]),
-            "rate_ratio_lt_over_high": (round(r[0] / r[2], 2) if r[2] else None)}
+            # **率と 1 本の価値は逆を向く**（弱い体はよく殴られるが弱い攻撃しか吸わない）
+            "value_rises_with_power": bool(val[0] < val[1] < val[2]),
+            "shield_falls_with_power": bool(g[0] > g[1] > g[2]),
+            "rate_ratio_lt_over_high": (round(r[0] / r[2], 2) if r[2] else None),
+            "shield_ratio_lt_over_high": (round(g[0] / g[2], 2) if g[2] else None)}
 
 
 def main(argv=None):
@@ -197,10 +289,11 @@ def main(argv=None):
     a = ap.parse_args(argv)
 
     t0 = time.time()
-    hits, exposure, per_game, games = collect(a.src, a.limit_games)
+    hits, exposure, value, no_connect, per_game, games = collect(
+        a.src, a.limit_games, a.theta, a.mu)
     res = {"games": games,
-           "summary": summarise(hits, exposure, per_game, a.r_turns, a.theta, a.mu,
-                                a.boot_reps),
+           "summary": summarise(hits, exposure, value, no_connect, per_game,
+                                a.r_turns, a.theta, a.mu, a.boot_reps),
            "args": {k: v for k, v in vars(a).items() if k != "out"},
            "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
