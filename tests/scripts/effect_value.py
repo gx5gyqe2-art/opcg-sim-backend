@@ -21,14 +21,19 @@ T16 が「勘定は複数の互換でない仕方で閉じられる」と言っ�
 |---|---|---|
 | `KO` | **`ν`**（体が消える） | `target.player` で符号が決まる |
 | `BOUNCE` | `ν` − `μ`（体が手札に戻る） | 相手に撃てば相手の手札が増える |
-| `TRASH` | `zone` で分かれる（`FIELD`→`ν` / `HAND`→`μ`） | |
+| `TRASH` | `zone` で分かれる（`FIELD`→`ν` / `HAND`→`μ` / **`LIFE`→`λ`**） | |
 | `DISCARD` | **`μ`** | |
 | `DRAW` | **`μ`** | |
-| `PLAY_CARD` | **`ν`**（体が増える） | |
+| `PLAY_CARD` | **`ν`**（体が増える）。**手札から出すなら `ν − μ`** | **`zone` を読む** |
 | `BUFF` | **`δ` 換算**（`+1000` パワー ≈ ドン 1 個） | **新しい定数を作らない鍵** |
 | `HEAL` / `LIFE_RECOVER` | **`λ`** | |
 | `RAMP_DON` / `ACTIVE_DON` / `ATTACH_DON` / `RETURN_DON` | **`δ`** | **`REST_DON` は除く**（戻ってくる＝テンポ） |
 | `COST_REDUCTION` | **`δ`**（払わずに済んだドン） | |
+
+> **対象の種別と場所を読む**（ユーザ指摘 2026-09-14）——**ステージは体を持たない**ので
+> `ν` を当てない・**`PLAY_CARD` は手札から出すときだけ札 1 枚の損が付く**・
+> **`TRASH` はライフを落とすときは `λ`**。`card_type` が書かれていない動作も多いので、
+> **書かれているときだけ除外に使う**（書いていないものを弾くと範囲が不当に狭まる）。
 
 **上に無い動作は `None` を返す**（値付けできない）——**0 にしない**。
 0 にすると「効果が無い」と「値付けできていない」が区別できなくなる
@@ -98,8 +103,16 @@ PRICED = {
 }
 #: **ドンが減る動作**（持ち主の損）。増える動作（`RAMP_DON` 等）と向きが逆。
 DON_LOSS = ("RETURN_DON",)
+#: **体を持つカードの種別**——`ν` を当てられるのはここだけ（ユーザ指摘 2026-09-14）。
+#: **ステージは体を持たない**（T16・`2026-09-14_bodyless_and_power.md`）ので `ν` に入れない。
+BODY_TYPES = ("CHARACTER", "LEADER")
+#: **`PLAY_CARD` は「どこから出すか」で手札の損が付くかが変わる**（ユーザ指摘 2026-09-14）。
+#: 手札から出せば札が 1 枚減るが、トラッシュ・デッキ・見たカードからならその損は無い。
+PLAY_FROM_HAND_ZONES = ("HAND",)
 #: `TRASH` は `zone` で意味が変わる（場なら体・手札なら札）ので別扱い。
 ZONE_SPLIT = {"TRASH": {"FIELD": ("nu", 1.0), "HAND": ("hand", 1.0),
+                        # **ライフを落とすのはライフの損**（`ν` でも `μ` でもない）
+                        "LIFE": ("life_loss", 1.0),
                         "DECK": ("deck", 1.0)}}
 #: **価格がまだ無い系統**（`None` を返す理由を分類して出す）
 UNPRICED_FAMILY = {
@@ -143,6 +156,18 @@ def _magnitude(effect):
     return base * mul / div
 
 
+def is_body(target):
+    """**その対象は体を持つか**——`ν` を当てられるのは `CHARACTER`／`LEADER` だけ。
+
+    `card_type` が空の動作も多い（全体の 4 割）ので、**書かれているときだけ除外に使う**
+    ——書かれていないものを弾くと値付けできる範囲が不当に狭まる。
+    """
+    types = (target or {}).get("card_type") or []
+    if not types:
+        return True                     # 書かれていない＝体かどうか判らない（通す）
+    return any(str(t).upper() in BODY_TYPES for t in types)
+
+
 def _side(target):
     """**誰に効くか**——`OPPONENT` なら相手の資源が動く（自分にとっては逆符号）。"""
     if not target:
@@ -171,13 +196,21 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG):
     else:
         return None
     if kind == "nu":
-        # **体が消える動作**（KO・TRASH from FIELD）は相手に撃てば得・自分に撃てば損。
-        # `PLAY_CARD` は逆（体が**増える**）なので別に扱う。
+        # **体を持たない対象には `ν` を当てない**（ステージ等・ユーザ指摘 2026-09-14）
+        if not is_body(target):
+            return None
         gain = n * nu
         if at == "PLAY_CARD":
+            # **どこから出すか**で手札の損が付く（手札からなら札 1 枚を失う）
+            zone = str(target.get("zone") or "").upper()
+            per = nu - mu if zone in PLAY_FROM_HAND_ZONES else nu
+            gain = n * per
             return gain if not opp else -gain
+        # **体が消える動作**（KO・TRASH from FIELD）は相手に撃てば得・自分に撃てば損
         return gain if opp else -gain
     if kind == "nu_minus_hand":
+        if not is_body(target):
+            return None
         # BOUNCE: 体は消えるが持ち主の手札が 1 枚増える
         gain = n * (nu - mu)
         return gain if opp else -gain
@@ -189,6 +222,10 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG):
     if kind == "life":
         amt = n * lam
         return amt if not opp else -amt
+    if kind == "life_loss":
+        # ライフを**落とす**＝持ち主の損（`HEAL` と向きが逆）
+        amt = n * lam
+        return amt if opp else -amt
     if kind == "don":
         amt = max(1.0, abs(_magnitude(effect)) or float(n)) * delta
         # **向きは動作で決まる**——増える動作（RAMP など）は持ち主の得、

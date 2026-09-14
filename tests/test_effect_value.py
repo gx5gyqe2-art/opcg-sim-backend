@@ -22,10 +22,10 @@ import effect_value as E  # noqa: E402
 import theory_order as T  # noqa: E402
 
 
-def _act(kind, player="SELF", count=1, base=0, zone=None, up_to=False):
+def _act(kind, player="SELF", count=1, base=0, zone=None, up_to=False, card_type=None):
     return {"type": kind, "value": {"base": base, "multiplier": 1, "divisor": 1},
             "target": {"player": player, "count": count, "zone": zone,
-                       "is_up_to": up_to}}
+                       "is_up_to": up_to, "card_type": list(card_type or [])}}
 
 
 def test_who_the_action_hits_decides_the_sign():
@@ -142,3 +142,60 @@ def test_the_shipped_card_pool_is_priced_about_half_and_the_rest_is_classified()
     assert out["abilities"] > 3000
     assert 0.3 < out["coverage"] < 0.9
     assert set(out["unpriced_by_family"]) <= {"info", "tempo", "grant", "other"}
+
+
+def test_a_stage_has_no_body_so_nu_is_not_applied():
+    """**ステージは体を持たない**（T16）ので `KO` でも `ν` を当てない（ユーザ指摘 2026-09-14）。
+
+    当てると「体が 1 つ消えた」と誤って数える。**価格が無いので `None`。**
+    """
+    assert E.action_value(_act("KO", "OPPONENT", card_type=["STAGE"])) is None
+    assert E.action_value(_act("KO", "OPPONENT", card_type=["CHARACTER"])) is not None
+    assert E.action_value(_act("BOUNCE", "OPPONENT", card_type=["STAGE"])) is None
+
+
+def test_a_leader_counts_as_a_body_for_power_purposes():
+    """リーダーは場に居て殴るので、パワーの操作は通す。"""
+    assert E.is_body({"card_type": ["LEADER"]})
+    assert E.is_body({"card_type": ["LEADER", "CHARACTER"]})
+    assert not E.is_body({"card_type": ["STAGE"]})
+    assert not E.is_body({"card_type": ["EVENT"]})
+
+
+def test_an_unstated_card_type_is_not_excluded():
+    """**`card_type` が書かれていない動作も多い**ので、書かれているときだけ除外に使う。
+
+    書いていないものを弾くと、値付けできる範囲が不当に狭まる。
+    """
+    assert E.is_body({"card_type": []})
+    assert E.is_body({})
+    assert E.action_value(_act("KO", "OPPONENT")) is not None
+
+
+def test_playing_from_hand_costs_a_card_but_from_the_trash_does_not():
+    """**どこから出すか**で札 1 枚の損が付くかが変わる（ユーザ指摘 2026-09-14）。"""
+    from_hand = E.action_value(_act("PLAY_CARD", "SELF", zone="HAND",
+                                    card_type=["CHARACTER"]))
+    from_trash = E.action_value(_act("PLAY_CARD", "SELF", zone="TRASH",
+                                     card_type=["CHARACTER"]))
+    assert from_hand == pytest.approx(E.NU_AVG - T.MU)
+    assert from_trash == pytest.approx(E.NU_AVG)
+    assert from_hand < from_trash
+
+
+def test_trashing_a_life_card_is_a_life_loss_not_a_body_or_a_card():
+    """`TRASH` の `zone` が `LIFE` なら **`λ`**——`ν` でも `μ` でもない。"""
+    got = E.action_value(_act("TRASH", "OPPONENT", zone="LIFE"))
+    assert got == pytest.approx(T.LAM)                 # 相手のライフが落ちる＝自分の得
+    assert E.action_value(_act("TRASH", "SELF", zone="LIFE")) == pytest.approx(-T.LAM)
+
+
+def test_the_target_nu_can_be_overridden_by_the_caller():
+    """**配線するときは盤面の `ν`（対象のパワーの帯）を渡せる**。
+
+    カード単体の値付けでは平均を使うが、実際の対象が判るなら帯で置き換えるべき。
+    """
+    weak = E.action_value(_act("KO", "OPPONENT", card_type=["CHARACTER"]), nu=0.069)
+    strong = E.action_value(_act("KO", "OPPONENT", card_type=["CHARACTER"]), nu=0.211)
+    assert weak < strong
+    assert weak == pytest.approx(0.069)
