@@ -350,3 +350,55 @@ def test_the_first_row_of_a_turn_can_never_show_a_freshly_played_body(tmp_path):
     assert len(first) == len(last) == 1                  # 手番 1 回につき 1 行
     assert first[0].get("lt_fresh", 0.0) == 0.0 and first[0]["lt_aged"] == 1.0
     assert last[0]["lt_fresh"] == 1.0 and last[0]["lt_aged"] == 1.0
+
+
+# ------------------------------------------------ デッキの型を帯に入れる（2026-09-14）
+
+def _sc_with_deck(mine, opp, base=None):
+    """`scalars` を作る（`EXTRA_COLS` は末尾に append されている）。"""
+    from opcg_sim.learned import n_rel_feat as F
+    sc = np.zeros(94 + len(F.EXTRA_COLS), np.float32)
+    for k, v in (base or {}).items():
+        sc[k] = v
+    for r, v in mine.items():
+        sc[94 + F.EXTRA_COLS.index("deck_%s" % r)] = v
+    for r, v in opp.items():
+        sc[94 + F.EXTRA_COLS.index("opp_pool_%s" % r)] = v
+    return sc
+
+
+def test_the_deck_key_reads_the_dominant_role_on_each_side():
+    """デッキの型＝`deck_*` の argmax（自分・相手）。"""
+    sc = _sc_with_deck({"removal": 0.9, "draw": 0.2}, {"draw": 0.8, "removal": 0.1})
+    assert M.deck_key(sc) == ("removal", "draw")
+
+
+def test_the_counter_role_cannot_be_the_deck_type():
+    """`counter` は**常に 1.0**なので型の判別に使えない（除外していないと全部 counter になる）。"""
+    assert "counter" not in M.DECK_ROLES
+    sc = _sc_with_deck({"counter": 1.0, "lock": 0.4}, {"counter": 1.0, "big": 0.6})
+    assert M.deck_key(sc) == ("lock", "big")
+
+
+def test_the_deck_type_enters_the_band_only_when_asked():
+    """**既定では帯に入らない**（過去の測定値を動かさない）。`--deck-band` で入る。"""
+    base = {N.__dict__.get("SC_MY_LIFE", 0): 3.0}
+    sc = _sc_with_deck({"removal": 0.9}, {"draw": 0.8}, base)
+    plain = M.band_key(sc)
+    with_deck = M.band_key(sc, deck_band=True)
+    assert len(with_deck) == len(plain) + 2
+    assert with_deck[:len(plain)] == plain
+    assert with_deck[-2:] == ("removal", "draw")
+
+
+def test_two_matchups_that_share_a_state_land_in_different_bands():
+    """**同じ盤面でも対面が違えば別の帯**——これが無いと係数がデッキ相性を拾う。
+
+    実害: 実デッキでリーダー未満の体の係数が **−0.0346**（CI が 0 を含まない）と出た。
+    対面を帯に入れると **+0.0178**（CI が 0 を含む）に戻った。
+    """
+    a = M.band_key(_sc_with_deck({"removal": 0.9}, {"draw": 0.8}), deck_band=True)
+    b = M.band_key(_sc_with_deck({"draw": 0.9}, {"draw": 0.8}), deck_band=True)
+    assert a != b
+    assert M.band_key(_sc_with_deck({"removal": 0.9}, {"draw": 0.8})) == \
+        M.band_key(_sc_with_deck({"draw": 0.9}, {"draw": 0.8}))     # 型なしでは同じ帯

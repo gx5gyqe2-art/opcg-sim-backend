@@ -86,6 +86,7 @@ from nu_calib import (S_BLOCKER_ACTIVE, S_IS_CHAR, S_POWER, SC_OPP_LEADER_POWER,
                       SLOT_OWN_FIELD, _round10)
 from theory_order import (MU, NU_TARGET_MODES, SC_MY_LEADER_POWER, THETA,  # noqa: E402
                           nu_of, opp_chars_of)
+from opcg_sim.learned import n_rel_feat as F  # noqa: E402
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0")
 #: scalars の列（`hand_value_slope` と同じ）
@@ -126,15 +127,41 @@ def turn_band(t):
     return "T<=4" if t <= 4 else ("T5-8" if t <= 8 else "T9+")
 
 
-def band_key(sc_row):
+#: `deck_*`／`opp_pool_*` の役割（`counter` は常に 1.0 なので型の判別に使えない）
+DECK_ROLES = tuple(r for r in F.ROLES if r != "counter")
+
+
+def _extra_off(sc_row):
+    """`scalars` の中で `EXTRA_COLS` が始まる位置（末尾に append されている）。"""
+    return int(len(sc_row)) - len(F.EXTRA_COLS)
+
+
+def deck_key(sc_row):
+    """**デッキの型**＝`(自分の主役割, 相手の主役割)`（`deck_*` の argmax）。
+
+    > **実デッキでは対面が非対称**（デッキ相性で勝敗が先に決まる）＝
+    > **型を帯に入れないと、体の係数がデッキの型を拾う**（2026-09-14 に実害）。
+    > 合成デッキは両者が同じ生成器から出るので影響が小さいが、
+    > **実デッキでは弱い体の係数が負に出た**（−0.0346・CI が 0 を含まない）。
+    """
+    off = _extra_off(sc_row)
+    mine = [float(sc_row[off + F.EXTRA_COLS.index("deck_%s" % r)]) for r in DECK_ROLES]
+    opp = [float(sc_row[off + F.EXTRA_COLS.index("opp_pool_%s" % r)]) for r in DECK_ROLES]
+    return (DECK_ROLES[int(np.argmax(mine))], DECK_ROLES[int(np.argmax(opp))])
+
+
+def band_key(sc_row, deck_band=False):
     """帯＝(自ライフ, 相手ライフ, ターン帯, 手札)＝`--axis field` と同一。
 
     **説明変数（場のキャラの体数）は帯に入れない**——入れると帯の中で動かない。
+
+    `deck_band=True` で**デッキの型の対**も帯に入れる（実デッキで必要・`deck_key`）。
     """
-    return (int(round(float(sc_row[SC_MY_LIFE]))),
+    base = (int(round(float(sc_row[SC_MY_LIFE]))),
             int(round(float(sc_row[SC_OPP_LIFE]))),
             turn_band(int(round(float(sc_row[SC_TURN])))),
             int(round(float(sc_row[SC_MY_HAND]))))
+    return (base + deck_key(sc_row)) if deck_band else base
 
 
 def power_band(power, opp_leader_power):
@@ -326,7 +353,8 @@ def cost_check(played, nu_by_band, mu=MU_TRUE, delta=DELTA_TRUE):
     return out
 
 
-def collect(dirs, limit_games=0, schemes=SCHEMES, cards=None, row_pick="first"):
+def collect(dirs, limit_games=0, schemes=SCHEMES, cards=None, row_pick="first",
+            deck_band=False):
     """自席ターンの main 行 1 本 → 帯と種類別の体数（と勝敗）。
 
     `cards` を渡すと**実際に打たれたキャラ**（`pol_chosen`）のコストと素性も集める
@@ -371,7 +399,8 @@ def collect(dirs, limit_games=0, schemes=SCHEMES, cards=None, row_pick="first"):
                 continue
             sc = ex["sc"][i]; tok = ex["tok"][i]
             opl = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-            rec = {"seed": seed, "band": band_key(sc), "z": 1.0 if z > 0 else 0.0,
+            rec = {"seed": seed, "band": band_key(sc, deck_band),
+                   "z": 1.0 if z > 0 else 0.0,
                    "opp_leader_power": opl, "turn": t,
                    # **式の予測をこの行の盤面で引くため**に持ち回る（task #39）——
                    # 攻撃項を「対象の max」にすると `ν` が**相手の場に依る**ので、
@@ -532,6 +561,9 @@ def main(argv=None):
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--scheme", nargs="+", default=list(SCHEMES), choices=SCHEMES)
+    ap.add_argument("--deck-band", action="store_true",
+                    help="**デッキの型の対も帯に入れる**（実デッキでは必須）。"
+                         "入れないと体の係数がデッキ相性を拾う（2026-09-14 に実害）")
     ap.add_argument("--row-pick", default="first", choices=("first", "last"),
                     help="どの時点の盤面で測るか。既定 `first`＝ターンの最初（従来の `ν`）。"
                          "`last`＝ターンの最後＝**そのターンに出した体が見える**"
@@ -553,7 +585,7 @@ def main(argv=None):
     t0 = time.time()
     cards = PL.Cards() if a.cost_check else None
     recs, games, played = collect(a.src, a.limit_games, tuple(a.scheme), cards,
-                                  row_pick=a.row_pick)
+                                  row_pick=a.row_pick, deck_band=a.deck_band)
     res = {"games": games, "own_turns": len(recs), "fits": {},
            "args": {k: v for k, v in vars(a).items() if k != "out"}}
     keys_of = {"all": ["chars"], "blocker": ["blocker", "plain"],
