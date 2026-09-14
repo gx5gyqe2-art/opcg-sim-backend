@@ -28,9 +28,12 @@ import entry_gain as E  # noqa: E402
 MU, LAM, NU = 0.0433, 0.1158, 0.1230
 
 
-def _d(hand=-1.0, my_field=1.0, opp_field=0.0, my_life=0.0, opp_life=0.0):
+def _d(hand=-1.0, my_field=1.0, opp_field=0.0, my_life=0.0, opp_life=0.0,
+       my_power=0.0, opp_power_ex=0.0):
     return {"d_hand": hand, "d_my_field": my_field, "d_opp_field": opp_field,
-            "d_my_life": my_life, "d_opp_life": opp_life}
+            "d_my_life": my_life, "d_opp_life": opp_life,
+            "d_my_power": my_power, "d_opp_power": opp_power_ex,
+            "d_opp_power_ex_bodies": opp_power_ex}
 
 
 def test_a_plain_body_has_no_entry_gain():
@@ -50,6 +53,24 @@ def test_removing_an_opponent_body_is_worth_one_nu():
     assert E.gain_of(_d(opp_field=-1.0), MU, LAM, NU) == pytest.approx(NU)
     # 自分の場が体 1 つ以上増えたらその分も利得
     assert E.gain_of(_d(my_field=2.0), MU, LAM, NU) == pytest.approx(NU)
+
+
+def test_a_pump_is_priced_with_delta_because_delta_came_from_power():
+    """**`δ` は「+1000 パワー = 0.66 枚 × μ」から導いた値**なので、パワー変化はそれで値付けする。
+
+    自分側は**出した体自身のパワーを引く**（`ν` が持っているので二重計上になる）。
+    `scalars` の場の集約は**印字パワー**なのでパンプは出ない＝**トークンで見るしかない**
+    （2026-09-14・イベントの純価値が強く負に出た調査で判った）。
+    """
+    D = 0.0277
+    # 出した体のパワーぶんは引く＝素の登場では 0
+    assert E.gain_of(_d(my_power=5000.0), MU, LAM, NU, own_power=5000.0,
+                     delta=D) == pytest.approx(0.0)
+    # それを超えて +1000 上がっていればパンプ 1 段ぶん
+    assert E.gain_of(_d(my_power=6000.0), MU, LAM, NU, own_power=5000.0,
+                     delta=D) == pytest.approx(D)
+    # 相手のパワーを下げたら正（体が減った分は別に引いてある）
+    assert E.gain_of(_d(opp_power_ex=-2000.0), MU, LAM, NU, delta=D) == pytest.approx(2 * D)
 
 
 def test_life_moves_are_priced_with_lambda_and_signed_from_the_actor():
@@ -123,6 +144,16 @@ def test_the_onplay_split_is_reported_for_validity():
     r = E.summarise(recs, MU, LAM, NU, overpay={})["x"]
     assert r["with_onplay"]["n"] == 10 and r["without_onplay"]["n"] == 10
     assert r["onplay_share"] == pytest.approx(0.5)
+
+
+def test_the_weakest_band_target_is_the_stage_excluded_one():
+    """**要る額の既定はステージを外した後の値**（0.0318）。
+
+    ステージが混ざっていたときは 0.0290 と出ていた——体を持たないのに `(Δ自場 − 1)·ν` を
+    引かれて**過払いを過小に見せていた**。器を直したのに要る額だけ古いままだと、
+    `covers` が実際より高く出る（2026-09-14 に古い定数を残していた）。
+    """
+    assert E.OVERPAY["lt_leader"] == pytest.approx(0.0318)
 
 
 def test_a_band_without_an_overpay_target_gets_no_verdict():

@@ -35,12 +35,18 @@ play_value = ν ＋ 【登場時の一回性の利得】 − μ − cost·δ
 
 | パワー帯 | 過払い（勝率換算） |
 |---|---|
-| リーダー未満 | **0.0290** |
+| リーダー未満 | **0.0318**（ステージを外した後の値。混ざっていたときは 0.0290 と出ていた） |
 | リーダー〜飽和 | 0.0158 |
 | 飽和超え | 0.0219 |
 
 - **測った利得がこの値に届けば、勘定が閉じる**＝式に足すべき項はこれで足りる。
 - **届かなければ、まだ別の項が在る**（または「過払い」は CPU の漏れ）。
+
+> **重要な限界（2026-09-14・`2026-09-14_bodyless_and_power.md`）**: **`covers` は「勘定が閉じた／
+> 閉じない」の検定として読めない**。制約は 3 本（帯ごとの過払い）しかないのに動かせるものが
+> 3 つ以上ある（利得の構成／`δ`／帯ごとの `ν`）＝**足す項を選べば必ず閉じられる**。
+> 実際、正当な項（パワーの軸）を 1 つ足しただけで 2 帯が要る額を超えた（1.39 倍・2.05 倍）。
+> **`covers` は「どの帯がどれだけ足りないか」の記述として読む**。
 - **`ON_PLAY` の役割を持つ札に利得が集まっているか**も見る（集まっていなければ器を疑う）。
 
 **限界**: `Δ相手場` を相手の `ν` の**平均**で値付けする（消したキャラのパワー帯は追っていない）。
@@ -65,8 +71,9 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
-from nu_calib import SC_OPP_LEADER_POWER, _extra  # noqa: E402
-from nu_measure import MU_TRUE, power_band  # noqa: E402
+from nu_calib import (S_IS_CHAR, S_POWER, SC_OPP_LEADER_POWER, SLOT_OPP_FIELD,  # noqa: E402
+                      SLOT_OWN_FIELD, _extra, _round10)
+from nu_measure import DELTA_TRUE, MU_TRUE, power_band  # noqa: E402
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0")
 POL_COLS = ("pol_sig", "pol_cid")
@@ -77,20 +84,51 @@ SC_MY_LIFE, SC_OPP_LIFE, SC_MY_HAND, SC_MY_FIELD, SC_OPP_FIELD = 0, 1, 6, 8, 9
 LAM_TRUE = 0.1158
 NU_MEAN = 0.1230
 #: 勘定の穴（`2026-09-14_nu_measure.md`）＝**利得がここに届けば閉じる**
-OVERPAY = {"lt_leader": 0.0290, "leader_to_sat": 0.0158, "over_sat": 0.0219}
+#: 値付けできていない項が持つべき額（`nu_measure --cost-check` の過払い）。
+#: **最弱帯は 0.0318**——ステージを外す前は 0.0290 と出ていた（パワー 0 の 124 件が混ざり、
+#: 体を持たないのに `(Δ自場 − 1)·ν` を引かれて過払いを過小にしていた）。
+OVERPAY = {"lt_leader": 0.0318, "leader_to_sat": 0.0158, "over_sat": 0.0219}
 
 
-def deltas(sc_before, sc_after):
-    """登場の前後で動いた通貨（**行為者の視点**・符号はそのまま）。"""
+def field_power(tok_row, slot):
+    """枠の**今のパワー**の合計（トークンの `power_now`＝付与ドンと強化を含む）。
+
+    **`scalars` の場の集約は印字パワー**なので、パンプ／パワー減少はそこには出ない
+    （`encode/scalars.rs`: `_opp_field_aggregate` も印字を使う）＝**トークンで見るしかない**。
+    """
+    tot = 0.0
+    for sl in range(slot.start, slot.stop):
+        if float(tok_row[sl, S_IS_CHAR]) <= 0.0 and float(tok_row[sl, S_POWER]) <= 0.0:
+            continue
+        tot += _round10(float(tok_row[sl, S_POWER]) * 1e4)
+    return tot
+
+
+def deltas(sc_before, sc_after, tok_before=None, tok_after=None):
+    """登場の前後で動いた通貨（**行為者の視点**・符号はそのまま）。
+
+    `tok_*` を渡すと**場の総パワーの差分**も採る（パンプ／パワー減少＝5 つのスカラーには
+    出ない軸・ユーザ指摘 2026-09-14 でイベントの純価値が強く負に出た原因）。
+    """
     g = {}
     for name, col in (("hand", SC_MY_HAND), ("my_field", SC_MY_FIELD),
                       ("opp_field", SC_OPP_FIELD), ("my_life", SC_MY_LIFE),
                       ("opp_life", SC_OPP_LIFE)):
         g["d_" + name] = float(round(float(sc_after[col]) - float(sc_before[col]), 3))
+    if tok_before is not None and tok_after is not None:
+        for name, slot in (("my_power", SLOT_OWN_FIELD), ("opp_power", SLOT_OPP_FIELD)):
+            g["d_" + name] = _round10(field_power(tok_after, slot)
+                                      - field_power(tok_before, slot))
+        # 体が減ったぶんのパワーは `ν` が持っているので**引いて二重計上を避ける**
+        before = field_power(tok_before, SLOT_OPP_FIELD)
+        n_before = max(1.0, float(sc_before[SC_OPP_FIELD]))
+        g["d_opp_power_ex_bodies"] = _round10(
+            g["d_opp_power"] - g["d_opp_field"] * (before / n_before))
     return g
 
 
-def gain_of(d, mu=MU_TRUE, lam=LAM_TRUE, nu=NU_MEAN, body=1.0):
+def gain_of(d, mu=MU_TRUE, lam=LAM_TRUE, nu=NU_MEAN, body=1.0, own_power=0.0,
+            delta=DELTA_TRUE):
     """通貨の差分 → **登場時の利得**（勝率の単位）。
 
     機械的な分（手札 −1・自場 +`body`）は `play_value` の他の項が持っているので**戻す**。
@@ -102,6 +140,11 @@ def gain_of(d, mu=MU_TRUE, lam=LAM_TRUE, nu=NU_MEAN, body=1.0):
         + (-d["d_opp_field"]) * nu          # 相手の場を減らした分
         + (-d["d_opp_life"]) * lam          # 相手のライフを削った分
         + d["d_my_life"] * lam              # 自分のライフが動いた分
+        # **パワーの軸**（パンプ／減少）。`δ` は「+1000 パワー = 0.66 枚 × μ」から導いた値
+        # なので、**パワー変化は既に測ってある価格でそのまま値付けできる**（§13）。
+        # 自分側は**出した体自身のパワーを引く**（`ν` が持っているので二重計上になる）。
+        + ((d.get("d_my_power", 0.0) - own_power) / 1000.0) * delta
+        + ((-d.get("d_opp_power_ex_bodies", 0.0)) / 1000.0) * delta
     )
 
 
@@ -139,27 +182,34 @@ def collect(dirs, limit_games=0):
                     continue
                 cid = str(pol["pol_cid"][j]) or None
                 info = cards.info(cid)
-                if not info or info.get("event"):
+                if not info:
                     continue
                 stats["plays"] += 1
-                if info.get("stage"):
-                    # **ステージは体を持たない**＝`ν` の勘定に入れない。ただし
-                    # **登場時の利得だけで出来ている札**なので、別枠で測ると素性が出る
-                    stats["stage"] = stats.get("stage", 0) + 1
+                # **体を持たない札は別の帯にする**（ユーザ指摘 2026-09-14）:
+                # ステージは場に残るが体ではない・**イベントは場にも残らない**＝
+                # **イベントは「登場時の利得」だけで出来ている純粋な形**で、
+                # `ν` が 1 つも混ざらないので**この項を較正するのに最も向いている**。
+                for tag in ("stage", "event"):
+                    if info.get(tag):
+                        stats[tag] = stats.get(tag, 0) + 1
                 if b is None:                       # このターンに次の main 行が無い＝測れない
                     stats["no_next_main"] += 1
                     continue
                 sc0 = ex["sc"][i]; sc1 = ex["sc"][idx[b]]
+                tk0 = ex["tok"][i]; tk1 = ex["tok"][idx[b]]
                 master = cards.db.get_card(cid) if cid else None
                 forms = DR.classify(master) if master is not None else set()
                 opl = float(sc0[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
                 rec = {"seed": int(rows["seed"][idx[0]]), "turn": turn,
-                       "band": ("stage" if info.get("stage")
+                       "band": ("event" if info.get("event") else
+                                "stage" if info.get("stage")
                                 else power_band(float(info["power"]), opl)),
                        "cost": float(info.get("cost") or 0),
                        "onplay": bool(any(":ON_PLAY:" in f for f in forms)),
                        "has_ability": bool(getattr(master, "abilities", ()) or ())}
-                rec.update(deltas(sc0, sc1))
+                rec["own_power"] = (0.0 if (info.get("event") or info.get("stage"))
+                                   else float(info["power"] or 0))
+                rec.update(deltas(sc0, sc1, tk0, tk1))
                 recs.append(rec)
                 stats["measurable"] += 1
     return recs, stats, games
@@ -181,7 +231,15 @@ def _mean_ci(vals, seeds):
             "ci95": [round(m - 1.96 * se, 5), round(m + 1.96 * se, 5)]}
 
 
-DELTA_KEYS = ("d_hand", "d_my_field", "d_opp_field", "d_my_life", "d_opp_life")
+DELTA_KEYS = ("d_hand", "d_my_field", "d_opp_field", "d_my_life", "d_opp_life",
+              "d_my_power", "d_opp_power", "d_opp_power_ex_bodies")
+#: **体を持たない帯**（`(Δ自場 − body)` の `body` が 0）——ステージは場に残るが体ではなく、
+#: イベントは場にも残らない。**イベントは `ν` が 1 つも混ざらない＝較正に最も向く**。
+BODYLESS = ("stage", "event")
+
+
+def body_of(band):
+    return 0.0 if band in BODYLESS else 1.0
 
 
 def summarise(recs, mu=MU_TRUE, lam=LAM_TRUE, nu=NU_MEAN, overpay=OVERPAY):
@@ -191,9 +249,12 @@ def summarise(recs, mu=MU_TRUE, lam=LAM_TRUE, nu=NU_MEAN, overpay=OVERPAY):
         sub = [r for r in recs if r["band"] == band]
         sd = [r["seed"] for r in sub]
         row = {"n": len(sub),
-               "deltas": {k: _mean_ci([r[k] for r in sub], sd) for k in DELTA_KEYS},
-               "gain": _mean_ci([gain_of(r, mu, lam, nu, 0.0 if band == "stage" else 1.0)
-                                 for r in sub], sd),
+               # パワーの列は `tok` を渡さないと入らないので、無い列は飛ばす
+               "deltas": {k: _mean_ci([r[k] for r in sub if k in r],
+                                      [r["seed"] for r in sub if k in r])
+                          for k in DELTA_KEYS},
+               "gain": _mean_ci([gain_of(r, mu, lam, nu, body_of(band),
+                                         r.get("own_power", 0.0)) for r in sub], sd),
                "onplay_share": round(float(np.mean([r["onplay"] for r in sub])), 4)}
         need = overpay.get(band)
         g = row["gain"]["mean"]
@@ -203,10 +264,17 @@ def summarise(recs, mu=MU_TRUE, lam=LAM_TRUE, nu=NU_MEAN, overpay=OVERPAY):
                        # **穴を埋めるか**＝利得の CI が過払いを含むか（届いていれば勘定が閉じる）
                        closes_the_books=(None if lo is None else bool(lo <= need <= hi)),
                        reaches=bool(g >= need))
+        if band in BODYLESS:
+            # **`ν` が 1 つも入らない**＝`play_value = 利得 − μ − cost·δ` を直接出せる。
+            # **イベントはこの項を較正するのに最も向いた帯**（体の値付けが混ざらない）。
+            row["net_value"] = _mean_ci(
+                [gain_of(r, mu, lam, nu, 0.0, r.get("own_power", 0.0)) - mu
+                 - r["cost"] * DELTA_TRUE for r in sub], sd)
+            row["cost_mean"] = round(float(np.mean([r["cost"] for r in sub])), 3)
         # ON_PLAY の役割を持つ札に利得が集まっているか（器の妥当性検査）
         for tag, flt in (("with_onplay", True), ("without_onplay", False)):
             s2 = [r for r in sub if r["onplay"] is flt]
-            row[tag] = _mean_ci([gain_of(r, mu, lam, nu, 0.0 if band == "stage" else 1.0)
+            row[tag] = _mean_ci([gain_of(r, mu, lam, nu, body_of(band), r.get("own_power", 0.0))
                                  for r in s2], [r["seed"] for r in s2])
         out[band] = row
     return out
