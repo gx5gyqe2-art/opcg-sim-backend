@@ -284,3 +284,69 @@ def test_the_formula_predicts_zero_for_every_below_leader_kind():
     # 混ざりものには予測を出さない（代表値を選ぶと恣意になる）
     assert "lt_signal" not in M.predict(["lt_signal"])
     assert "ge_leader" not in M.predict(["ge_leader"])
+
+
+def test_a_freshly_played_body_is_marked_by_summoning_sickness():
+    """`lt_age` は**そのターンに出た体**を `is_sick` で見分ける（0/1 の旗）。"""
+    tok = np.zeros((22, 24), np.float32)
+    _slot(tok, 2, 3000.0, S_IS_SICK=1.0)
+    _slot(tok, 3, 3000.0)
+    _slot(tok, 4, 8000.0, S_IS_SICK=1.0)          # リーダー以上は年齢で割らない
+    assert M.categories(tok, 5000.0, "lt_age") == \
+        {"lt_fresh": 1.0, "lt_aged": 1.0, "ge_leader": 1.0}
+
+
+def test_lt_age_split_crosses_age_with_the_effect_flag():
+    tok = np.zeros((22, 24), np.float32)
+    _slot(tok, 2, 3000.0, S_IS_SICK=1.0, S_TRIG_ATTACK=1.0)
+    _slot(tok, 3, 3000.0, S_IS_SICK=1.0)
+    _slot(tok, 4, 3000.0)
+    assert M.categories(tok, 5000.0, "lt_age_split") == \
+        {"lt_fresh_signal": 1.0, "lt_fresh_plain": 1.0, "lt_aged_plain": 1.0}
+
+
+def _turn_shard(tmp_path, sick_flags):
+    """1 対局・1 手番・`len(sick_flags)` 行。行が進むにつれて体が増えていく盤面。
+
+    `sick_flags[i]` = その行で自場に居る体の `is_sick` の並び。
+    """
+    n = len(sick_flags)
+    tok = np.zeros((n, 22, 24), np.float32)
+    for i, flags in enumerate(sick_flags):
+        tok[i, 1, N.S_POWER] = 0.5                       # 相手リーダー 5000
+        for j, sick in enumerate(flags):
+            tok[i, 2 + j, N.S_POWER] = 0.3               # 3000＝リーダー未満
+            tok[i, 2 + j, N.S_IS_CHAR] = 1.0
+            tok[i, 2 + j, M.S_IS_SICK] = 1.0 if sick else 0.0
+    sc = np.zeros((n, 40), np.float32)
+    sc[:, 13] = 0.5                                      # 相手リーダーのパワー
+    shard = {
+        "tokens": tok, "scalars": sc,
+        "who": np.zeros(n, np.int8), "turn": np.ones(n, np.int16),
+        "seed": np.full(n, 3, np.int64), "z": np.ones(n, np.float32),
+        "kind": np.zeros(n, np.int8), "step": np.arange(n, dtype=np.int32),
+        "pol_len": np.ones(n, np.int32), "pol_chosen": np.zeros(n, np.int16),
+        "pol_v0": np.zeros(n, np.float32),
+    }
+    d = tmp_path / "n_records"
+    d.mkdir(parents=True)
+    np.savez_compressed(d / "n_record_00000.npz", **shard)
+    return [str(d)]
+
+
+def test_the_first_row_of_a_turn_can_never_show_a_freshly_played_body(tmp_path):
+    """**既定の測定点では `is_sick` が必ず 0 になる**（2026-09-14 に判明）。
+
+    `ν` は**ターンの最初の main 行**で測る＝**まだ何も出していない**盤面なので、
+    「そのターンに出た体」はそこに存在しない。**年齢の検定には `--row-pick last` が要る**。
+
+    ここでは「行 0 = 体 1 体（古い）／行 1 = 出した直後の体が 1 体増える」盤面を作り、
+    **`first` では `lt_fresh` が 1 件も出ず、`last` では出る**ことを固定する
+    ——既定のまま `lt_age` を回すと**検定が黙って無意味になる**ので。
+    """
+    src = _turn_shard(tmp_path, [(False,), (False, True)])
+    first, _g, _p = M.collect(src, schemes=("lt_age",), row_pick="first")
+    last, _g, _p = M.collect(src, schemes=("lt_age",), row_pick="last")
+    assert len(first) == len(last) == 1                  # 手番 1 回につき 1 行
+    assert first[0].get("lt_fresh", 0.0) == 0.0 and first[0]["lt_aged"] == 1.0
+    assert last[0]["lt_fresh"] == 1.0 and last[0]["lt_aged"] == 1.0

@@ -26,6 +26,8 @@ z  ~  Σ_c  β_c · (種類 c のキャラの体数)        （帯の中で・�
 | `power_blocker` | 上の 3 × ブロッカー 2 = 6 | 交互作用（高パワーのブロッカーは繰り返し使えるか） |
 | **`lt_split`** | **リーダー未満を「素の体／効果持ち」に割る**＋それ以上 | **T21＝`ν` 最大の穴 0.0690 の中身**（下記） |
 | `lt_detail` | 同じ帯を 素／ブロッカー／アタック時／起動／その他 に割る | どの効果が持っているか（分解能は落ちる） |
+| **`lt_age`** | **同じ帯を「そのターンに出た体／居座っている体」に割る** | **登場時効果か身代わりか**（下記・ユーザ仮説 2026-09-14） |
+| `lt_age_split` | 年齢 × 効果の有無 = 4 | 交互作用（分解能は落ちる） |
 
 ### T21——**リーダー未満の 0.0690 は効果か、体そのものか**（2026-09-14）
 
@@ -90,12 +92,16 @@ ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen",
 SC_MY_LIFE, SC_OPP_LIFE, SC_MY_HAND, SC_TURN = 0, 1, 6, 10
 #: 飽和点（`theory_order.saturation_x(1.15)` = 2000）を跨ぐ境目
 SAT_OVER = 2000.0
-SCHEMES = ("all", "blocker", "power", "power_blocker", "lt_split", "lt_detail")
+SCHEMES = ("all", "blocker", "power", "power_blocker", "lt_split", "lt_detail",
+           "lt_age", "lt_age_split")
 #: 枠 1 つが「効果を持っている」ことの信号（`n_rel_feat.S_COLS` の列・**カード ID に依らない**）。
 #:
 #: > **`cond_ok0..3` は使えない**（2026-09-14 に確認）——条件を持たない札も 1 が立つので
 #: > **実測で全枠の 100%／96%／89% が 1**。「常在効果を持つか」の代理にならない。
 S_TRIG_KO, S_TRIG_ATTACK, S_TRIG_OPP_ATTACK, S_THREAT_NEXT, S_ACT_AVAIL = 14, 15, 16, 17, 21
+#: **そのターンに出た体**（召喚酔い）。0/1 の旗で、リーダー未満の体の 22.7% が立つ。
+#: **登場時効果は 1 回だけ発動して消える**ので、これが「年齢 0」の印になる。
+S_IS_SICK = 4
 #: **素の体**＝この 5 つがどれも立っていない枠（実測でリーダー未満の帯の **63%**）。
 #:
 #: > **`threat_next` は入れない**（2026-09-14 に実測して外した）——**真偽値ではなく連続値**で
@@ -155,7 +161,7 @@ def categories(tok_row, opp_leader_power, scheme):
             key = "blocker" if blk else "plain"
         elif scheme == "power":
             key = power_band(pw, opp_leader_power)
-        elif scheme in ("lt_split", "lt_detail"):
+        elif scheme in ("lt_split", "lt_detail", "lt_age", "lt_age_split"):
             key = _lt_key(tok_row, s, pw, opp_leader_power, scheme)
         else:
             key = power_band(pw, opp_leader_power) + ("_blk" if blk else "_plain")
@@ -183,6 +189,8 @@ def _lt_key(tok_row, slot, pw, opp_leader_power, scheme):
     """
     if pw - _round10(float(opp_leader_power)) >= 0.0:
         return "ge_leader"
+    if scheme in ("lt_age", "lt_age_split"):
+        return _lt_age_key(tok_row, slot, scheme)
     sig = signals_of(tok_row, slot)
     if not sig:
         return "lt_plain"
@@ -195,6 +203,32 @@ def _lt_key(tok_row, slot, pw, opp_leader_power, scheme):
     if S_ACT_AVAIL in sig:
         return "lt_act"                      # 未使用の起動メイン（#3）
     return "lt_other"                        # KO 時・被攻撃時
+
+
+def _lt_age_key(tok_row, slot, scheme):
+    """**体の年齢で割る**（ユーザ仮説 2026-09-14「基本は登場時効果だと思っています」）。
+
+    **これが登場時効果と身代わりを分ける決定的な切り方**——
+    **登場時効果は 1 回だけ発動して消える**が、**身代わりは毎ターン効く**。
+
+    **読み方（事前登録）**:
+
+    - **登場時効果が正体なら** `lt_fresh`（そのターンに出た体）だけが価値を持ち、
+      **`lt_aged`（居座っている体）は 0 に近い**。
+    - **身代わりが正体なら** **年齢によらず同じくらい**——`ν` は前向きの在庫で、
+      **残りターン数は年齢に依らない**（古い体も新しい体も、この先の長さは同じ）。
+
+    **交絡（先に書く）**: 帯に**手札枚数が入っている**ので、**ドロー・サーチ系の
+    登場時効果は帯で吸われる**（`2026-09-14_entry_gain.md` は弱い体の利得の 8 割が
+    札の入れ替えだと測った）。**除去系は吸われない**（相手の場は帯に入っていない）。
+    ＝**この検定は「登場時効果」のうち札を増やさない側に効く**。
+
+    `lt_age_split` は更に効果の有無で割る（`lt_fresh_plain` など・分解能は落ちる）。
+    """
+    fresh = "fresh" if float(tok_row[slot, S_IS_SICK]) > 0.5 else "aged"
+    if scheme == "lt_age":
+        return "lt_" + fresh
+    return "lt_%s_%s" % (fresh, "signal" if signals_of(tok_row, slot) else "plain")
 
 
 def within_multi(recs, keys, y_key="z", band="band", seed="seed"):
@@ -292,11 +326,24 @@ def cost_check(played, nu_by_band, mu=MU_TRUE, delta=DELTA_TRUE):
     return out
 
 
-def collect(dirs, limit_games=0, schemes=SCHEMES, cards=None):
-    """holdout の自席ターン最初の main 行 → 帯と種類別の体数（と勝敗）。
+def collect(dirs, limit_games=0, schemes=SCHEMES, cards=None, row_pick="first"):
+    """自席ターンの main 行 1 本 → 帯と種類別の体数（と勝敗）。
 
     `cards` を渡すと**実際に打たれたキャラ**（`pol_chosen`）のコストと素性も集める
     （`cost_check` の材料・パワー帯は同じ切り方）。
+
+    ## `row_pick`——**どの時点の盤面で測るか**（2026-09-14 に追加）
+
+    | 値 | 時点 | 何が測れるか |
+    |---|---|---|
+    | **`first`**（既定） | **ターンの最初**の main 行 | 従来の `ν`（**まだ何も出していない**盤面） |
+    | `last` | **ターンの最後**の main 行 | **そのターンに出した体が見える**＝`is_sick` が立つ |
+
+    > **`first` では `is_sick` が必ず 0 になる**（2026-09-14 に判明）——
+    > ターンの最初にはまだ何も出していないので、**「そのターンに出た体」は存在しない**。
+    > **年齢で割る検定（`lt_age`）には `last` が要る**。
+    > **`last` は別の推定量**（時点が違う）なので、`first` の 0.0690 と直接は比べない。
+    > 比べてよいのは**同じ `last` の中での群どうし**である。
     """
     recs = []
     played = {}
@@ -310,13 +357,15 @@ def collect(dirs, limit_games=0, schemes=SCHEMES, cards=None):
             break
         seed = int(rows["seed"][idx[0]])
         seen = set()
+        n0 = len(recs)
         for i in idx:
             w = int(rows["who"][i]); t = int(rows["turn"][i])
             if t < 1 or int(rows["kind"][i]) != 0 or not PL.is_own_turn(w, t):
                 continue
-            if (w, t) in seen:
-                continue
-            seen.add((w, t))
+            if row_pick == "first":
+                if (w, t) in seen:
+                    continue
+                seen.add((w, t))
             z = float(rows["z"][i])
             if z == 0.0:
                 continue
@@ -328,10 +377,18 @@ def collect(dirs, limit_games=0, schemes=SCHEMES, cards=None):
                    # 攻撃項を「対象の max」にすると `ν` が**相手の場に依る**ので、
                    # 代表値 1 つでは引けない（行ごとに引いて平均する）。
                    "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
-                   "opp_chars": opp_chars_of(tok)}
+                   "opp_chars": opp_chars_of(tok), "_wt": (w, t)}
             for sch in schemes:
                 rec.update(categories(tok, opl, sch))
             recs.append(rec)
+        if row_pick == "last":
+            # **(w, t) ごとに最後の行だけ残す**（`idx` はターン順なので後勝ちでよい）
+            by_turn = {}
+            for r in recs[n0:]:
+                by_turn[r["_wt"]] = r
+            recs[n0:] = list(by_turn.values())
+        for r in recs[n0:]:
+            r.pop("_wt", None)
         if cards is not None:
             _collect_played(rows, pol, ex, L, ptr, idx, cards, played)
     return recs, games, played
@@ -399,7 +456,8 @@ def _kind_spec(k):
     # T21 の細分（`lt_split`／`lt_detail`）。**式の主張はどれも「リーダー未満は 0」**で、
     # ブロッカーだけがブロック項ぶん（0.035）を持つ。`lt_signal`／`ge_leader` は
     # 混ざりものなので**予測を出さない**（代表値を選ぶと恣意になる）。
-    if k in ("lt_plain", "lt_attack", "lt_act", "lt_other"):
+    if k in ("lt_plain", "lt_attack", "lt_act", "lt_other",
+             "lt_fresh", "lt_aged", "lt_fresh_plain", "lt_aged_plain"):
         return PREDICT_POWER["lt_leader"], False
     if k == "lt_blocker":
         return PREDICT_POWER["lt_leader"], True
@@ -474,6 +532,10 @@ def main(argv=None):
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--scheme", nargs="+", default=list(SCHEMES), choices=SCHEMES)
+    ap.add_argument("--row-pick", default="first", choices=("first", "last"),
+                    help="どの時点の盤面で測るか。既定 `first`＝ターンの最初（従来の `ν`）。"
+                         "`last`＝ターンの最後＝**そのターンに出した体が見える**"
+                         "（`lt_age` にはこちらが要る・別の推定量なので `first` とは直接比べない）")
     ap.add_argument("--r-turns", type=float, default=4.128, help="式に渡す R（実測の既定）")
     ap.add_argument("--nu-targets", default="leader", choices=NU_TARGET_MODES,
                     help="式の攻撃項をリーダー狙いだけにするか（leader）"
@@ -490,7 +552,8 @@ def main(argv=None):
 
     t0 = time.time()
     cards = PL.Cards() if a.cost_check else None
-    recs, games, played = collect(a.src, a.limit_games, tuple(a.scheme), cards)
+    recs, games, played = collect(a.src, a.limit_games, tuple(a.scheme), cards,
+                                  row_pick=a.row_pick)
     res = {"games": games, "own_turns": len(recs), "fits": {},
            "args": {k: v for k, v in vars(a).items() if k != "out"}}
     keys_of = {"all": ["chars"], "blocker": ["blocker", "plain"],
@@ -499,7 +562,10 @@ def main(argv=None):
                                  for s in ("_blk", "_plain")],
                "lt_split": ["lt_plain", "lt_signal", "ge_leader"],
                "lt_detail": ["lt_plain", "lt_blocker", "lt_attack", "lt_act", "lt_other",
-                             "ge_leader"]}
+                             "ge_leader"],
+               "lt_age": ["lt_fresh", "lt_aged", "ge_leader"],
+               "lt_age_split": ["lt_fresh_plain", "lt_fresh_signal", "lt_aged_plain",
+                                "lt_aged_signal", "ge_leader"]}
     for sch in a.scheme:
         keys = [k for k in keys_of[sch] if any(r.get(k) for r in recs)]
         fit = within_multi(recs, keys) if keys else None
