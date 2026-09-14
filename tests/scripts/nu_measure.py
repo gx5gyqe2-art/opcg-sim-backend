@@ -24,6 +24,25 @@ z  ~  Σ_c  β_c · (種類 c のキャラの体数)        （帯の中で・�
 | `blocker` | ブロッカー／非ブロッカー | ブロック項（実測 `block_p` = 0.773・ブロッカーは 10.4%） |
 | `power` | リーダー未満／〜+2000／+2000 以上 | **パワーの階段**（式は 0／0.157／0.180 の 3 値） |
 | `power_blocker` | 上の 3 × ブロッカー 2 = 6 | 交互作用（高パワーのブロッカーは繰り返し使えるか） |
+| **`lt_split`** | **リーダー未満を「素の体／効果持ち」に割る**＋それ以上 | **T21＝`ν` 最大の穴 0.0690 の中身**（下記） |
+| `lt_detail` | 同じ帯を 素／ブロッカー／アタック時／起動／その他 に割る | どの効果が持っているか（分解能は落ちる） |
+
+### T21——**リーダー未満の 0.0690 は効果か、体そのものか**（2026-09-14）
+
+式は `attack_value(x<0) = 0` から **`ν = 0`** と置くが、実測は **0.0690**（CI が 0 を含まない）で
+**体数の 40%** がここに居る＝**`ν` 最大の穴**。候補は `game_theory.md` §14.1.1 の
+**身代わり（#7）・常在効果（#13）・アタック時効果（#14）**。
+
+**効果を持つかは枠の列で判る**（カード ID に依らない）: `is_blocker_active`・`trig_attack`・
+`trig_ko`・`trig_opp_attack`・`act_avail` の 5 つ。どれも立っていない枠が**素の体**で、
+**実測でこの帯の 63%** を占める（`threat_next` は連続値かつ盤面由来なので入れない）。
+
+**読み方（事前登録・後から解釈を選ばないために先に書く）**:
+
+- **`lt_plain` が 0.069 前後を持つなら効果説は棄却**＝価値は**体そのもの**に在る
+  （身代わり・枠・ドンの器・他の札の「N 体以上」を満たす）。
+- **`lt_plain` が 0 に近く効果持ちだけが持つなら効果説が正しい**。
+  素の体が 63% なので、効果だけで 0.069 を作るには効果持ちが **0.18 級**を要る。
 
 ## 帯（`hand_value_slope --axis field` と同一）
 
@@ -71,7 +90,29 @@ ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen",
 SC_MY_LIFE, SC_OPP_LIFE, SC_MY_HAND, SC_TURN = 0, 1, 6, 10
 #: 飽和点（`theory_order.saturation_x(1.15)` = 2000）を跨ぐ境目
 SAT_OVER = 2000.0
-SCHEMES = ("all", "blocker", "power", "power_blocker")
+SCHEMES = ("all", "blocker", "power", "power_blocker", "lt_split", "lt_detail")
+#: 枠 1 つが「効果を持っている」ことの信号（`n_rel_feat.S_COLS` の列・**カード ID に依らない**）。
+#:
+#: > **`cond_ok0..3` は使えない**（2026-09-14 に確認）——条件を持たない札も 1 が立つので
+#: > **実測で全枠の 100%／96%／89% が 1**。「常在効果を持つか」の代理にならない。
+S_TRIG_KO, S_TRIG_ATTACK, S_TRIG_OPP_ATTACK, S_THREAT_NEXT, S_ACT_AVAIL = 14, 15, 16, 17, 21
+#: **素の体**＝この 5 つがどれも立っていない枠（実測でリーダー未満の帯の **63%**）。
+#:
+#: > **`threat_next` は入れない**（2026-09-14 に実測して外した）——**真偽値ではなく連続値**で
+#: > （172 種類・`>0` が 58% なのに `>0.5` は 1.1%）、しかも**カードの能力ではなく盤面から
+#: > 計算した量**である。`> 0` の真偽で拾うと**6 割の体が「効果持ち」に入って割合が反転する**
+#: > （素の体が 62% → 15% に化けた）。**構成比を先に確かめたので気付けた**
+#: > （`measurement.md` §14-18）。
+EFFECT_SIGNALS = (S_BLOCKER_ACTIVE, S_TRIG_ATTACK, S_TRIG_KO, S_TRIG_OPP_ATTACK, S_ACT_AVAIL)
+
+
+def signals_of(tok_row, slot):
+    """枠 `slot` が立てている効果の信号（列 index の組）。空なら**素の体**。
+
+    **`> 0.5` で見る**——`EFFECT_SIGNALS` は全て 0/1 の旗であり（実測で値の種類が 2）、
+    連続値の列を混ぜないための歯止めでもある。
+    """
+    return tuple(c for c in EFFECT_SIGNALS if float(tok_row[slot, c]) > 0.5)
 
 
 def turn_band(t):
@@ -114,10 +155,46 @@ def categories(tok_row, opp_leader_power, scheme):
             key = "blocker" if blk else "plain"
         elif scheme == "power":
             key = power_band(pw, opp_leader_power)
+        elif scheme in ("lt_split", "lt_detail"):
+            key = _lt_key(tok_row, s, pw, opp_leader_power, scheme)
         else:
             key = power_band(pw, opp_leader_power) + ("_blk" if blk else "_plain")
         out[key] = out.get(key, 0.0) + 1.0
     return out
+
+
+def _lt_key(tok_row, slot, pw, opp_leader_power, scheme):
+    """**リーダー未満の帯だけを効果の有無で割る**（task #40／T21・2026-09-14）。
+
+    実測の `ν` はこの帯で **0.0690**（CI が 0 を含まない）なのに式は **0** と置く＝
+    **`ν` 最大の穴**（体数の 40%）。中身の候補は `game_theory.md` §14.1.1 の
+    **身代わり（#7）・常在効果（#13）・アタック時効果（#14）**。
+
+    **読み方（事前登録）**:
+
+    - **`lt_plain`（素の体）が 0.069 前後を持つなら、効果説は棄却**＝価値は**体そのもの**
+      （身代わり・枠・ドンの器・他の札の「N 体以上」を満たす）に在る。
+    - **`lt_plain` が 0 に近く効果持ちだけが持つなら、効果説が正しい**。
+      素の体は帯の 63% を占めるので、効果だけで 0.069 を作るには
+      効果持ちが 0.18 級を持たねばならない。
+
+    リーダー以上の帯は 1 本にまとめる（対照＝**帯を分けずに全部入れる**ことで
+    除外変数を作らない）。
+    """
+    if pw - _round10(float(opp_leader_power)) >= 0.0:
+        return "ge_leader"
+    sig = signals_of(tok_row, slot)
+    if not sig:
+        return "lt_plain"
+    if scheme == "lt_split":
+        return "lt_signal"
+    if S_BLOCKER_ACTIVE in sig:
+        return "lt_blocker"                  # 式が既に持っている項（ブロック）
+    if S_TRIG_ATTACK in sig:
+        return "lt_attack"                   # アタック時効果（§14.1.1 #14）
+    if S_ACT_AVAIL in sig:
+        return "lt_act"                      # 未使用の起動メイン（#3）
+    return "lt_other"                        # KO 時・被攻撃時
 
 
 def within_multi(recs, keys, y_key="z", band="band", seed="seed"):
@@ -319,6 +396,13 @@ def _kind_spec(k):
         return 6000.0, None
     if k in ("blocker", "plain"):
         return 6000.0, (k == "blocker")
+    # T21 の細分（`lt_split`／`lt_detail`）。**式の主張はどれも「リーダー未満は 0」**で、
+    # ブロッカーだけがブロック項ぶん（0.035）を持つ。`lt_signal`／`ge_leader` は
+    # 混ざりものなので**予測を出さない**（代表値を選ぶと恣意になる）。
+    if k in ("lt_plain", "lt_attack", "lt_act", "lt_other"):
+        return PREDICT_POWER["lt_leader"], False
+    if k == "lt_blocker":
+        return PREDICT_POWER["lt_leader"], True
     base = k.replace("_blk", "").replace("_plain", "")
     pw = PREDICT_POWER.get(base)
     if pw is None:
@@ -412,7 +496,10 @@ def main(argv=None):
     keys_of = {"all": ["chars"], "blocker": ["blocker", "plain"],
                "power": ["lt_leader", "leader_to_sat", "over_sat"],
                "power_blocker": [b + s for b in ("lt_leader", "leader_to_sat", "over_sat")
-                                 for s in ("_blk", "_plain")]}
+                                 for s in ("_blk", "_plain")],
+               "lt_split": ["lt_plain", "lt_signal", "ge_leader"],
+               "lt_detail": ["lt_plain", "lt_blocker", "lt_attack", "lt_act", "lt_other",
+                             "ge_leader"]}
     for sch in a.scheme:
         keys = [k for k in keys_of[sch] if any(r.get(k) for r in recs)]
         fit = within_multi(recs, keys) if keys else None

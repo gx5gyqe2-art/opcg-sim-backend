@@ -211,3 +211,76 @@ def test_the_board_arm_falls_back_when_there_are_no_rows():
     keys = ["leader_to_sat", "over_sat"]
     assert M.predict(keys, targets="board", recs=[]) == M.predict(keys)
     assert M.predict(keys, targets="board") == M.predict(keys)
+
+
+# ---------------------------------------------------- T21: リーダー未満の帯の分解（#40）
+
+def _slot(tok, s, power, **flags):
+    tok[s, N.S_POWER] = power / 1e4
+    tok[s, N.S_IS_CHAR] = 1.0
+    for k, v in flags.items():
+        tok[s, getattr(M, k)] = v
+    return tok
+
+
+def test_threat_next_is_not_an_effect_signal():
+    """**`threat_next` を効果の旗に入れない**（2026-09-14 に実測して外した）。
+
+    連続値（172 種類・`>0` が 58% なのに `>0.5` は 1.1%）かつ**盤面から計算した量**で、
+    カードの能力ではない。`> 0` の真偽で拾うと**素の体が 62% → 15% に化ける**。
+    """
+    assert M.S_THREAT_NEXT not in M.EFFECT_SIGNALS
+    tok = np.zeros((22, 24), np.float32)
+    _slot(tok, 2, 3000.0)
+    tok[2, M.S_THREAT_NEXT] = 0.02            # 実測に出る「小さい正の値」
+    assert M.signals_of(tok, 2) == ()          # 素の体のまま
+
+
+def test_effect_signals_are_read_as_flags_not_as_magnitudes():
+    """旗は `> 0.5` で見る（連続値の列を混ぜたときの歯止め）。"""
+    tok = np.zeros((22, 24), np.float32)
+    _slot(tok, 2, 3000.0)
+    tok[2, M.S_TRIG_ATTACK] = 0.3              # 0.5 未満は立っていない扱い
+    assert M.signals_of(tok, 2) == ()
+    tok[2, M.S_TRIG_ATTACK] = 1.0
+    assert M.signals_of(tok, 2) == (M.S_TRIG_ATTACK,)
+
+
+def test_lt_split_partitions_every_body():
+    """`lt_split` は**全ての体を 3 つに分ける**（除外変数を作らない）。
+
+    素の体＋効果持ち＝リーダー未満の帯の体数、と一致することも押さえる。
+    """
+    tok = np.zeros((22, 24), np.float32)
+    _slot(tok, 2, 3000.0)                                   # 素・リーダー未満
+    _slot(tok, 3, 3000.0, S_TRIG_ATTACK=1.0)                # 効果持ち・リーダー未満
+    _slot(tok, 4, 8000.0)                                   # リーダー以上
+    got = M.categories(tok, 5000.0, "lt_split")
+    assert got == {"lt_plain": 1.0, "lt_signal": 1.0, "ge_leader": 1.0}
+    power = M.categories(tok, 5000.0, "power")
+    assert got["lt_plain"] + got["lt_signal"] == power["lt_leader"]
+
+
+def test_lt_detail_names_which_effect_carries_the_body():
+    """`lt_detail` はブロッカー → アタック時 → 起動 → その他 の順に振る。"""
+    tok = np.zeros((22, 24), np.float32)
+    _slot(tok, 2, 3000.0, S_BLOCKER_ACTIVE=1.0, S_TRIG_ATTACK=1.0)   # ブロッカー優先
+    _slot(tok, 3, 3000.0, S_TRIG_ATTACK=1.0)
+    _slot(tok, 4, 3000.0, S_ACT_AVAIL=1.0)
+    _slot(tok, 5, 3000.0, S_TRIG_KO=1.0)
+    got = M.categories(tok, 5000.0, "lt_detail")
+    assert got == {"lt_blocker": 1.0, "lt_attack": 1.0, "lt_act": 1.0, "lt_other": 1.0}
+
+
+def test_the_formula_predicts_zero_for_every_below_leader_kind():
+    """**式の主張は「リーダー未満は 0」**——ブロッカーだけがブロック項ぶんを持つ。
+
+    これが T21 の検定の相手で、`lt_plain` の実測が 0 を離れれば式は誤り。
+    """
+    p = M.predict(["lt_plain", "lt_attack", "lt_act", "lt_other", "lt_blocker"])
+    for k in ("lt_plain", "lt_attack", "lt_act", "lt_other"):
+        assert p[k] == 0.0
+    assert p["lt_blocker"] > 0.0
+    # 混ざりものには予測を出さない（代表値を選ぶと恣意になる）
+    assert "lt_signal" not in M.predict(["lt_signal"])
+    assert "ge_leader" not in M.predict(["ge_leader"])
