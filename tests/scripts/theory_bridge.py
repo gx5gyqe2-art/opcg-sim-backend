@@ -124,7 +124,18 @@ def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU):
                                               else "take")}
 
 
-def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targets="leader"):
+def _add(rec, band, s, side):
+    """**行ごとに帯へ足す**（T28-b）——決着後の雑さが接戦帯に混ざらないようにする。"""
+    rec["s_%s" % side] += float(s)
+    rec["n_%s" % side] += 1
+    b = rec["band"].setdefault(band, {"s": 0.0, "n": 0, "s_atk": 0.0, "n_atk": 0,
+                                      "s_grd": 0.0, "n_grd": 0})
+    b["s"] += float(s); b["n"] += 1
+    b["s_%s" % side] += float(s); b["n_%s" % side] += 1
+
+
+def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targets="leader",
+            silent="zero"):
     """(局, 席) ごとに攻め側と守り側の取りこぼしを足す。"""
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
@@ -149,7 +160,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
             key = (seed, w)
             rec = per.setdefault(key, {"seed": seed, "who": w, "z": None,
                                        "s_atk": 0.0, "s_grd": 0.0, "n_atk": 0, "n_grd": 0,
-                                       "n_silent": 0, "v0": []})
+                                       "n_silent": 0, "v0": [],
+                                       # **T28-b: 行ごとに帯を決めてから足す**
+                                       "band": {}})
             if z != 0.0:
                 rec["z"] = 1.0 if z > 0 else 0.0
             sc, tok = ex["sc"][i], ex["tok"][i]
@@ -183,12 +196,15 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     vals.append(v)
                 scored = [v for v in vals if v is not None]
                 played_v = vals[ch]
+                bnd = band_of(abs(float(rows["pol_v0"][i])))
                 if played_v is None or len(scored) < 2:
                     stats["atk_silent"] += 1
                     rec["n_silent"] += 1
-                    continue
-                rec["s_atk"] += float(played_v) - max(scored)
-                rec["n_atk"] += 1
+                    if silent == "zero":
+                        # **無言の行を「取りこぼし 0」として母数に入れる**
+                        _add(rec, bnd, 0.0, "atk")
+                    continue                     # `exclude` は母数にも入れない
+                _add(rec, bnd, float(played_v) - max(scored), "atk")
                 rec["v0"].append(abs(float(rows["pol_v0"][i])))
             else:
                 if (w, t) in seen or int(labels[n]) < 0:
@@ -203,13 +219,37 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     stats["grd_no_attack"] += 1
                     continue
                 stats["grd_rows"] += 1
-                rec["s_grd"] += got["s"]
-                rec["n_grd"] += 1
+                _add(rec, band_of(abs(float(rows["pol_v0"][i]))), got["s"], "grd")
     return per, stats
 
 
+def pair_by_band(per, band):
+    """**その帯の行だけ**で 2 席を突き合わせる（T28-b の本体）。"""
+    by = {}
+    for (seed, w), r in per.items():
+        by.setdefault(seed, {})[w] = r
+    out = []
+    for seed, seats in by.items():
+        a, b = seats.get(0), seats.get(1)
+        if a is None or b is None or a["z"] is None or b["z"] is None:
+            continue
+        ba, bb = a["band"].get(band), b["band"].get(band)
+        if not ba or not bb or ba["n"] < 1 or bb["n"] < 1:
+            continue
+        out.append({"seed": seed, "z": a["z"],
+                    "dS": ba["s"] - bb["s"],
+                    "dS_per_row": ba["s"] / ba["n"] - bb["s"] / bb["n"],
+                    "dS_atk": (ba["s_atk"] / ba["n_atk"] if ba["n_atk"] else 0.0)
+                              - (bb["s_atk"] / bb["n_atk"] if bb["n_atk"] else 0.0),
+                    "dS_grd": (ba["s_grd"] / ba["n_grd"] if ba["n_grd"] else 0.0)
+                              - (bb["s_grd"] / bb["n_grd"] if bb["n_grd"] else 0.0),
+                    "n": ba["n"] + bb["n"], "dn": ba["n"] - bb["n"],
+                    "silent": a["n_silent"] + b["n_silent"], "v0": None})
+    return out
+
+
 def pair_games(per, silent="zero"):
-    """(局) ごとに 2 席を突き合わせて `ΔS` を作る。"""
+    """(局) ごとに 2 席を突き合わせて `ΔS` を作る（全帯まとめ・T28 の形）。"""
     by = {}
     for (seed, w), r in per.items():
         by.setdefault(seed, {})[w] = r
@@ -335,19 +375,24 @@ def main(argv=None):
     ap.add_argument("--theta-mode", default="const", choices=("const", "board", "max"))
     ap.add_argument("--nu-targets", default="leader", choices=("leader", "board"))
     ap.add_argument("--silent", default="zero", choices=SILENT_MODES,
-                    help="**P2** の暫定値——理論が値を付けられなかった行の扱い")
+                    help="**P2** の暫定値——`zero` は無言の行を取りこぼし 0 として母数に入れる／"
+                         "`exclude` は母数にも入れない")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
 
     t0 = time.time()
-    per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.nu_targets)
+    per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.nu_targets,
+                         a.silent)
     pairs = pair_games(per, a.silent)
     res = {"stats": stats,
            "provisional": {"P3_theta": a.theta, "P2_silent": a.silent,
                            "note": "§0.4 の暫定値。感度を付けて読む"},
            "summary": summarise(pairs, a.boot_reps, a.seed),
+           # **T28-b: 行ごとに帯で切ってから足した版**（判定の主はこちら）
+           "per_band": {nm: summarise(pair_by_band(per, nm), a.boot_reps, a.seed)
+                        for nm in ("close", "mid", "decided")},
            "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
     print(txt)

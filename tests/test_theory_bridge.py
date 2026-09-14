@@ -131,3 +131,59 @@ def test_the_verdict_reads_the_normalised_slope():
     for p in pairs:                                     # 向きだけ反転させる
         p["dS_per_row"] = -p["dS_per_row"]
     assert B.summarise(pairs, reps=50)["verdict"] == "bridge_inverted"
+
+
+def _rec():
+    return {"seed": 1, "who": 0, "z": 1.0, "s_atk": 0.0, "s_grd": 0.0,
+            "n_atk": 0, "n_grd": 0, "n_silent": 0, "v0": [], "band": {}}
+
+
+def test_a_row_is_added_to_its_own_band():
+    """**T28-b の要点**——行ごとに帯を決めてから足す。
+
+    局ごとに足してから帯で切ると、**決着後の雑さが接戦帯に混ざる**（T28 で踏んだ）。
+    """
+    r = _rec()
+    B._add(r, "close", -0.1, "atk")
+    B._add(r, "decided", -0.9, "atk")
+    assert r["band"]["close"]["s"] == pytest.approx(-0.1)
+    assert r["band"]["decided"]["s"] == pytest.approx(-0.9)
+    assert r["band"]["close"]["n"] == 1 and r["band"]["decided"]["n"] == 1
+    assert r["s_atk"] == pytest.approx(-1.0)          # 全帯の合計も保つ
+
+
+def test_the_two_sides_are_kept_apart_inside_a_band():
+    """攻めと守りは帯の中でも分ける——**どちらの半分が効いているか**を見るため。"""
+    r = _rec()
+    B._add(r, "close", -0.2, "atk")
+    B._add(r, "close", -0.5, "grd")
+    b = r["band"]["close"]
+    assert b["s_atk"] == pytest.approx(-0.2) and b["s_grd"] == pytest.approx(-0.5)
+    assert b["n"] == 2
+
+
+def test_pairing_within_a_band_needs_both_seats_present_there():
+    """**片方の席にその帯の行が無い局は使えない**（差が定義できない）。"""
+    a, b = _rec(), _rec()
+    b["who"] = 1; b["z"] = 0.0
+    B._add(a, "close", -0.1, "atk")
+    per = {(1, 0): a, (1, 1): b}
+    assert B.pair_by_band(per, "close") == []       # 席 1 に close の行が無い
+    B._add(b, "close", -0.5, "atk")
+    got = B.pair_by_band(per, "close")
+    assert len(got) == 1 and got[0]["dS_per_row"] == pytest.approx(0.4)
+
+
+def test_the_two_silent_modes_differ_in_the_denominator():
+    """**P2 の暫定値**——無言の行を母数に入れるかどうかで 1 手あたりの値が変わる。
+
+    `zero` は「取りこぼし 0」として母数に入れる（薄まる）・`exclude` は入れない。
+    **実測でこの選択は結論を動かした**ので、テストで違いを固定する。
+    """
+    z = _rec()
+    B._add(z, "close", -0.4, "atk")
+    B._add(z, "close", 0.0, "atk")                  # zero が足す無言の行
+    e = _rec()
+    B._add(e, "close", -0.4, "atk")                 # exclude は足さない
+    assert z["band"]["close"]["s"] / z["band"]["close"]["n"] == pytest.approx(-0.2)
+    assert e["band"]["close"]["s"] / e["band"]["close"]["n"] == pytest.approx(-0.4)
