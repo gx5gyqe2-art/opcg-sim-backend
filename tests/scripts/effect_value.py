@@ -289,6 +289,50 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG):
     return total, []
 
 
+#: 登場時に解決する契機（イベントを `PLAY` したときに効くもの）。
+#: **イベントの本文は `ACTIVATE_MAIN` として入っていることがある**（実測・EB04-009）ので含める。
+ON_PLAY_TRIGGERS = ("ON_PLAY", "ACTIVATE_MAIN", "MAIN", "RULE", "PASSIVE", None)
+#: 起動メインの契機
+ACTIVATE_TRIGGERS = ("ACTIVATE_MAIN",)
+_CACHE = {}
+
+
+def _all_cards():
+    if "cards" not in _CACHE:
+        _CACHE["cards"] = load_cards()
+    return _CACHE["cards"]
+
+
+def card_value(cid, triggers, nu=NU_AVG, mu=MU, lam=LAM, delta=DELTA, cards=None):
+    """**カード 1 枚の、その契機での価値**を `(値, 読めなかった動作)` で返す。
+
+    同じ契機の能力が複数あれば**和**を取る（同時に解決するので）。
+    **1 つでも読めない能力があれば値は `None`**——部分的に足して 0 扱いにしない
+    （`ability_value` と同じ規約）。`nu` を渡せば盤面の帯で置き換えられる（配線側から渡す）。
+    """
+    c = (cards or _all_cards()).get(str(cid) or "")
+    if not c:
+        return None, [("<no_card>", "other")]
+    hit = []
+    for ab in (c.get("abilities") or []):
+        t = ab.get("trigger") or ab.get("timing")
+        if t in triggers:
+            hit.append(ab)
+    if not hit:
+        return None, [("<no_ability_for_trigger>", "other")]
+    total = 0.0
+    unp = []
+    for ab in hit:
+        v, u = ability_value(ab, mu, lam, delta, nu)
+        if v is None:
+            unp.extend(u)
+        else:
+            total += v
+    if unp:
+        return None, unp
+    return total, []
+
+
 def load_cards(path=None):
     p = path or os.path.join(_ROOT, "opcg_sim", "data", "opcg_effects.json")
     with open(p, encoding="utf-8") as fh:

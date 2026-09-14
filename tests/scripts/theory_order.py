@@ -144,7 +144,7 @@ SC_MY_HAND = 6
 SC_TURN = 10
 SC_MY_LEADER_POWER, SC_OPP_LEADER_POWER = 12, 13
 #: 値付けできる行動（できないものはペアから外す）
-SCORABLE = ("ATTACK", "ATTACH_DON", "PLAY", "TURN_END", "DON_BOX")
+SCORABLE = ("ATTACK", "ATTACH_DON", "PLAY", "TURN_END", "DON_BOX", "ACTIVATE_MAIN")
 
 
 def c_of(x):
@@ -408,6 +408,22 @@ def play_value(power, cost, opp_leader_power, r_turns, theta=THETA, mu=MU, delta
             - mu - float(cost) * d)
 
 
+def _effect_value(cid, when):
+    """**効果の値**（P2-1・`effect_value.py`）。読めなければ `None`。
+
+    **遅延 import**——`effect_value` は同梱 JSON を読むので、使う行だけで払う。
+    """
+    if not cid:
+        return None
+    try:
+        import effect_value as EV
+    except Exception:
+        return None
+    trg = EV.ON_PLAY_TRIGGERS if when == "on_play" else EV.ACTIVATE_TRIGGERS
+    v, _unp = EV.card_value(cid, trg)
+    return v
+
+
 def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, don_k=None):
     """候補 1 つの理論値（値付けできなければ `None`）。
 
@@ -459,9 +475,20 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
         return attack_value(sp, tp, False, theta, mu, nu_target=nu_t)
     if at in ("ATTACH_DON", "DON_BOX"):
         return attach_value(sp, ctx["opp_leader_power"], k, theta, mu)
+    if at == "ACTIVATE_MAIN":
+        # **起動メイン**——カードは既に場に在るので `μ` は引かない（コストは能力の中に在る）
+        return _effect_value(cid, "activate")
     if at == "PLAY":
-        if src is None or src.get("event"):
-            return None                              # イベントは効果の中身が要る
+        if src is None:
+            return None
+        if src.get("event") or src.get("stage"):
+            # **体を持たない札**（イベント・ステージ）は**効果の値**で見る（P2-1・§14.1.3）。
+            # 札 1 枚とドンを払って効果だけを買う形。
+            ev = _effect_value(cid, "on_play")
+            if ev is None:
+                return None
+            d = 0.66 * mu
+            return ev - mu - float(src.get("cost") or 0) * d
         return play_value(src["power"], src.get("cost") or 0,
                           ctx["opp_leader_power"], ctx["r_turns"], theta, mu,
                           is_blocker=src.get("blocker"), opp_chars=ctx.get("opp_chars"),

@@ -193,10 +193,13 @@ def test_score_candidate_marks_unscorable_as_none():
            "my_leader_power": 5000.0, "r_turns": 3.0, "don_k": 1}
     cards = _Cards()
     assert T.score_candidate(["TURN_END", None, [], [], None], None, None, ctx, cards) == 0.0
+    # **P2-1 で起動メインとイベントは値付けできるようになった**（`effect_value.py`）が、
+    # ここの cid は同梱の効果 JSON に無い架空のカードなので**読めず `None`**——
+    # 「値付けの仕組みが無い」ではなく「そのカードの効果が読めない」が理由になった。
     assert T.score_candidate(["ACTIVATE_MAIN", "u", [], [], None], "C_ATK", None, ctx,
-                             cards) is None            # 効果の中身が要る
+                             cards) is None            # 効果 JSON に無いカード
     assert T.score_candidate(["PLAY", "u", [], [], None], "C_EV", None, ctx,
-                             cards) is None            # イベントは値付けできない
+                             cards) is None            # 同上
     assert T.score_candidate(["PLAY", "u", [], [], None], "C_ATK", None, ctx,
                              cards) is not None
     atk = T.score_candidate(["ATTACK", "u", ["t"], [], None], "C_ATK", "C_LEAD", ctx, cards)
@@ -446,3 +449,55 @@ def test_score_candidate_prices_a_play_against_the_board_when_asked():
     assert T.score_candidate(sig, "C_ATK", None, ctx, cards) > plain
     assert T.score_candidate(sig, "C_ATK", None, dict(CTX, opp_chars=[]), cards) == \
         pytest.approx(plain)
+
+
+def _ev_ctx():
+    return {"theta": T.THETA, "mu": T.MU, "opp_leader_power": 5000.0,
+            "my_leader_power": 5000.0, "r_turns": 3.0, "don_k": 1}
+
+
+def test_an_activated_main_ability_is_now_scorable():
+    """**起動メイン**は効果の値で見る（P2-1）。配線前は `SCORABLE` に無く常に `None` で、
+    **無言の行の 45% を占めていた**。
+
+    カードは既に場に在るので `μ` は引かない（コストは能力の中に在る）。
+    """
+    import effect_value as EV
+    assert "ACTIVATE_MAIN" in T.SCORABLE
+    cid = next((c for c in EV._all_cards()
+                if EV.card_value(c, EV.ACTIVATE_TRIGGERS)[0] is not None), None)
+    assert cid, "起動メインが値付けできるカードが 1 枚も無いのはおかしい"
+    ev, _u = EV.card_value(cid, EV.ACTIVATE_TRIGGERS)
+    got = T.score_candidate(["ACTIVATE_MAIN", cid, [], [], None], cid, None,
+                            _ev_ctx(), PL_CARDS())
+    assert got == pytest.approx(ev)          # `μ` を引かない
+
+
+def test_a_bodyless_card_is_scored_as_its_effect_minus_the_card_and_don():
+    """**イベント・ステージは体を持たない**ので **効果の値 − `μ` − 費用·δ**。"""
+    import effect_value as EV
+    cards = PL_CARDS()
+    cid = None
+    for c in EV._all_cards():
+        info = cards.info(c) or {}
+        if not (info.get("event") or info.get("stage")):
+            continue
+        if EV.card_value(c, EV.ON_PLAY_TRIGGERS)[0] is not None:
+            cid = c
+            break
+    assert cid, "値付けできる体なしカードが同梱に無いのはおかしい"
+    ev, _u = EV.card_value(cid, EV.ON_PLAY_TRIGGERS)
+    info = cards.info(cid) or {}
+    got = T.score_candidate(["PLAY", cid, [], [], None], cid, None, _ev_ctx(), cards)
+    assert got == pytest.approx(ev - T.MU - float(info.get("cost") or 0) * 0.66 * T.MU)
+
+
+def test_an_unreadable_effect_still_returns_none():
+    """**読めない効果は `None`**——0 にすると「効果が無い」と混ざる。"""
+    assert T._effect_value(None, "on_play") is None
+    assert T._effect_value("NO-SUCH-CARD", "on_play") is None
+
+
+def PL_CARDS():
+    from opcg_sim.learned.train import plan_labels as PL
+    return PL.Cards()
