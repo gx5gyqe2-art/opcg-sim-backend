@@ -408,10 +408,15 @@ def play_value(power, cost, opp_leader_power, r_turns, theta=THETA, mu=MU, delta
             - mu - float(cost) * d)
 
 
-def _effect_value(cid, when):
-    """**効果の値**（P2-1・`effect_value.py`）。読めなければ `None`。
+def _effect_value(cid, when, st=None):
+    """**効果の値**（P2・`effect_value.py`）。読めなければ `None`。
 
     **遅延 import**——`effect_value` は同梱 JSON を読むので、使う行だけで払う。
+
+    **条件の扱いが契機で違う**（2026-09-14・ユーザ確認）:
+    **起動メインは `offered=True`**——エンジンが `has_activatable_main` で条件・回数・
+    コスト・空振りを確かめてから候補に出す＝**候補に在る時点で条件は成立している**ので
+    割り引かない。**登場（`ON_PLAY`）は解決時に判定される**ので `st` から判定する。
     """
     if not cid:
         return None
@@ -419,8 +424,9 @@ def _effect_value(cid, when):
         import effect_value as EV
     except Exception:
         return None
-    trg = EV.ON_PLAY_TRIGGERS if when == "on_play" else EV.ACTIVATE_TRIGGERS
-    v, _unp = EV.card_value(cid, trg)
+    activate = (when != "on_play")
+    trg = EV.ACTIVATE_TRIGGERS if activate else EV.ON_PLAY_TRIGGERS
+    v, _unp = EV.card_value(cid, trg, st=st, offered=activate)
     return v
 
 
@@ -477,14 +483,14 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
         return attach_value(sp, ctx["opp_leader_power"], k, theta, mu)
     if at == "ACTIVATE_MAIN":
         # **起動メイン**——カードは既に場に在るので `μ` は引かない（コストは能力の中に在る）
-        return _effect_value(cid, "activate")
+        return _effect_value(cid, "activate")        # 条件はエンジンが検査済み
     if at == "PLAY":
         if src is None:
             return None
         if src.get("event") or src.get("stage"):
             # **体を持たない札**（イベント・ステージ）は**効果の値**で見る（P2-1・§14.1.3）。
             # 札 1 枚とドンを払って効果だけを買う形。
-            ev = _effect_value(cid, "on_play")
+            ev = _effect_value(cid, "on_play", ctx.get("st"))
             if ev is None:
                 return None
             d = 0.66 * mu

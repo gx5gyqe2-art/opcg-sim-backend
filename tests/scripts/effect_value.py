@@ -584,9 +584,29 @@ def selection_k(actions):
     return max(ks) if ks else 0.0
 
 
+def condition_factor(ab, st=None, offered=False):
+    """**条件に掛かる係数**（`condition_value.py`・遅延 import）。
+
+    `st` を渡さなければ 1.0＝**判らないものは割り引かない**（上限として読む）。
+    `offered=True`（エンジンが候補に出した起動メイン）は**検査済みなので 1.0**。
+    """
+    if offered or not (ab or {}).get("condition"):
+        return 1.0
+    if st is None:
+        return 1.0
+    try:
+        import condition_value as CV
+    except Exception:
+        return 1.0
+    return CV.factor(ab, st)
+
+
 def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=KO_P,
-                  card=None, depth=0, selection=True):
-    """**能力 1 つの価値**＝実行内容の和 ＋ 選択の利得 − コストの和。
+                  card=None, depth=0, selection=True, st=None, offered=False):
+    """**能力 1 つの価値**＝**条件** × （実行内容の和 ＋ 選択の利得 − コストの和）。
+
+    **条件は足す項ではなく掛かる側**（ユーザ確認 2026-09-14）——成り立たなければ
+    **実行内容もコストも起きない**ので、和ごと 0 になる。
 
     **値付けできない動作が 1 つでもあれば `None`**——**部分的に足して 0 扱いにしない**
     （「効果が小さい」と「読めていない」を混ぜない）。
@@ -611,7 +631,7 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
             total -= abs(v)          # **コストは必ず損**（向きは表ではなく役割で決まる）
     if unpriced:
         return None, unpriced
-    return total, []
+    return total * condition_factor(ab, st, offered), []
 
 
 #: 登場時に解決する契機（イベントを `PLAY` したときに効くもの）。
@@ -629,7 +649,7 @@ def _all_cards():
 
 
 def card_value(cid, triggers, nu=NU_AVG, mu=MU, lam=LAM, delta=DELTA, cards=None,
-               selection=True):
+               selection=True, st=None, offered=False):
     """**カード 1 枚の、その契機での価値**を `(値, 読めなかった動作)` で返す。
 
     同じ契機の能力が複数あれば**和**を取る（同時に解決するので）。
@@ -646,7 +666,8 @@ def card_value(cid, triggers, nu=NU_AVG, mu=MU, lam=LAM, delta=DELTA, cards=None
     total = 0.0
     unp = []
     for ab in hit:
-        v, u = ability_value(ab, mu, lam, delta, nu, card=c, selection=selection)
+        v, u = ability_value(ab, mu, lam, delta, nu, card=c, selection=selection,
+                             st=st, offered=offered)
         if v is None:
             unp.extend(u)
         else:

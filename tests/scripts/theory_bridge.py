@@ -133,6 +133,18 @@ def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=N
                                               else "take")}
 
 
+def _state_of(sc, ci, idx2cid):
+    """判断点の状態（条件の判定用）。**記録だけで作れる**——リーダーは `card_idx` の
+    0/1（vocab index）・ステージの有無は 22/23。"""
+    try:
+        import condition_value as CV
+    except Exception:
+        return None
+    ci = np.asarray(ci)
+    return CV.state_from_scalars(sc, idx2cid.get(int(ci[0])), idx2cid.get(int(ci[1])),
+                                 my_stage=int(ci[22]) > 0, opp_stage=int(ci[23]) > 0)
+
+
 def _add(rec, band, s, side):
     """**行ごとに帯へ足す**（T28-b）——決着後の雑さが接戦帯に混ざらないようにする。
 
@@ -196,7 +208,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 ctx = {"theta": th, "mu": mu,
                        "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
                        "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
-                       "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), "don_k": 1}
+                       "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), "don_k": 1,
+                       # **条件の判定に使う状態**（`condition_value.py`・2026-09-14）。
+                       # リーダーとステージは `card_idx` の 0/1 と 22/23 に在る。
+                       "st": _state_of(sc, ex["ci"][i], idx2cid)}
                 if nu_targets == "board":
                     ctx["opp_chars"] = opp_chars_of(tok)
                 b = int(ptr[i])
@@ -417,11 +432,18 @@ def main(argv=None):
                          "`exclude` は母数にも入れない")
     ap.add_argument("--margin-comfort", type=float, default=MARGIN_COMFORT,
                     help="**T28-c** の暫定値——守る力が来る攻撃をこれだけ上回れば「余裕で払えた」")
+    ap.add_argument("--cond-unknown", type=float, default=1.0,
+                    help="**判らない条件の係数**（§0.4 の感度。1.0＝上限・0.0＝下限）")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
 
+    try:
+        import condition_value as CV
+        CV.set_unknown_factor(a.cond_unknown)
+    except Exception:
+        pass
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.nu_targets,
                          a.silent, a.margin_comfort)
