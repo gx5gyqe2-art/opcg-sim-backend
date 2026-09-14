@@ -84,8 +84,8 @@ if _HERE not in sys.path:
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from nu_calib import (S_BLOCKER_ACTIVE, S_IS_CHAR, S_POWER, SC_OPP_LEADER_POWER,  # noqa: E402
                       SLOT_OWN_FIELD, _round10)
-from theory_order import (MU, NU_TARGET_MODES, SC_MY_LEADER_POWER, THETA,  # noqa: E402
-                          nu_of, opp_chars_of)
+from theory_order import (MU, NU_TARGET_MODES, SC_MY_LEADER_POWER, SLOT_OPP_FIELD,  # noqa: E402
+                          THETA, nu_of, opp_chars_of)
 from opcg_sim.learned import n_rel_feat as F  # noqa: E402
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0")
@@ -150,7 +150,36 @@ def deck_key(sc_row):
     return (DECK_ROLES[int(np.argmax(mine))], DECK_ROLES[int(np.argmax(opp))])
 
 
-def band_key(sc_row, deck_band=False):
+#: 帯の切り方（2026-09-14・ユーザ指摘「価格はデッキの中身でなく進行により決まる」）
+BAND_MODES = ("state", "deck", "progress", "deck_progress")
+#: 進行の粗い型に使う列（`theory_order` と同じ scalars の割り当て）
+SC_MY_DON_ = 2
+
+
+def progress_key(sc_row, tok_row):
+    """**進行の型**＝`(相手の場の体数, 自分のドン, 自リーダーのパワー)` を粗く。
+
+    ユーザ指摘 2026-09-14:
+
+    > 「価格の考え方はデッキの中身でなくて進行により決まる。デッキの進行方法がデッキにより
+    > 特徴付けられているだけで、デッキ相性＝デッキの中身に特徴付けられる進行という意味では
+    > ないのかな。デッキの中身はリーダー効果や色によって縛られているので、それが出てくる」
+
+    **`deck_key`（デッキのラベル）は代理変数**で、**本体は進行**——`game_theory.md` §17.1 の
+    **2 本の時計**そのもの。ラベルで縛ると**未見のデッキに一般化しない**ので、
+    **進行の変数で縛れるなら、そちらが正しい**。
+
+    **説明変数（自分の場の体数）は入れない**——入れると帯の中で動かない。
+    だから**相手の場・自分のドン・自リーダーのパワー**（リーダー効果と色の代理）で取る。
+    """
+    n_opp = sum(1 for s in range(SLOT_OPP_FIELD.start, SLOT_OPP_FIELD.stop)
+                if float(tok_row[s, S_IS_CHAR]) > 0.5)
+    don = int(float(sc_row[SC_MY_DON_]))
+    lead = float(tok_row[0, S_POWER]) * 1e4
+    return (min(3, n_opp), min(2, don // 4), 1 if lead > 5500.0 else 0)
+
+
+def band_key(sc_row, deck_band=False, tok_row=None, mode=None):
     """帯＝(自ライフ, 相手ライフ, ターン帯, 手札)＝`--axis field` と同一。
 
     **説明変数（場のキャラの体数）は帯に入れない**——入れると帯の中で動かない。
@@ -161,7 +190,14 @@ def band_key(sc_row, deck_band=False):
             int(round(float(sc_row[SC_OPP_LIFE]))),
             turn_band(int(round(float(sc_row[SC_TURN])))),
             int(round(float(sc_row[SC_MY_HAND]))))
-    return (base + deck_key(sc_row)) if deck_band else base
+    if mode is None:
+        mode = "deck" if deck_band else "state"
+    if mode == "state":
+        return base
+    if mode == "deck":
+        return base + deck_key(sc_row)
+    prog = progress_key(sc_row, tok_row)
+    return base + prog if mode == "progress" else base + deck_key(sc_row) + prog
 
 
 def power_band(power, opp_leader_power):
@@ -354,7 +390,7 @@ def cost_check(played, nu_by_band, mu=MU_TRUE, delta=DELTA_TRUE):
 
 
 def collect(dirs, limit_games=0, schemes=SCHEMES, cards=None, row_pick="first",
-            deck_band=False):
+            deck_band=False, band_mode=None):
     """自席ターンの main 行 1 本 → 帯と種類別の体数（と勝敗）。
 
     `cards` を渡すと**実際に打たれたキャラ**（`pol_chosen`）のコストと素性も集める
@@ -399,7 +435,7 @@ def collect(dirs, limit_games=0, schemes=SCHEMES, cards=None, row_pick="first",
                 continue
             sc = ex["sc"][i]; tok = ex["tok"][i]
             opl = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-            rec = {"seed": seed, "band": band_key(sc, deck_band),
+            rec = {"seed": seed, "band": band_key(sc, deck_band, tok, band_mode),
                    "z": 1.0 if z > 0 else 0.0,
                    "opp_leader_power": opl, "turn": t,
                    # **式の予測をこの行の盤面で引くため**に持ち回る（task #39）——
@@ -561,6 +597,11 @@ def main(argv=None):
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--scheme", nargs="+", default=list(SCHEMES), choices=SCHEMES)
+    ap.add_argument("--band", dest="band_mode", default=None, choices=BAND_MODES,
+                    help="帯の切り方。`state`＝従来の 4 変数／`deck`＝＋デッキのラベル／"
+                         "**`progress`＝＋進行の型**（相手の場・自分のドン・自リーダー）／"
+                         "`deck_progress`＝両方。**`progress` が `deck` を再現すれば、"
+                         "デッキは代理変数にすぎず価格は進行で決まる**（未見のデッキに一般化する）")
     ap.add_argument("--deck-band", action="store_true",
                     help="**デッキの型の対も帯に入れる**（実デッキでは必須）。"
                          "入れないと体の係数がデッキ相性を拾う（2026-09-14 に実害）")
@@ -585,7 +626,8 @@ def main(argv=None):
     t0 = time.time()
     cards = PL.Cards() if a.cost_check else None
     recs, games, played = collect(a.src, a.limit_games, tuple(a.scheme), cards,
-                                  row_pick=a.row_pick, deck_band=a.deck_band)
+                                  row_pick=a.row_pick, deck_band=a.deck_band,
+                                  band_mode=a.band_mode)
     res = {"games": games, "own_turns": len(recs), "fits": {},
            "args": {k: v for k, v in vars(a).items() if k != "out"}}
     keys_of = {"all": ["chars"], "blocker": ["blocker", "plain"],

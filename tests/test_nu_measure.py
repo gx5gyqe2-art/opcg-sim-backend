@@ -402,3 +402,58 @@ def test_two_matchups_that_share_a_state_land_in_different_bands():
     assert a != b
     assert M.band_key(_sc_with_deck({"removal": 0.9}, {"draw": 0.8})) == \
         M.band_key(_sc_with_deck({"draw": 0.9}, {"draw": 0.8}))     # 型なしでは同じ帯
+
+
+# ------------------------------- 帯は「デッキ」ではなく「進行」で切る（ユーザ指摘 2026-09-14）
+
+def _tok_prog(opp_chars=0, my_leader=5000):
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, N.S_POWER] = my_leader / 1e4
+    for j in range(opp_chars):
+        tok[7 + j, N.S_POWER] = 0.3
+        tok[7 + j, N.S_IS_CHAR] = 1.0
+    return tok
+
+
+def test_the_progress_key_reads_the_state_not_the_deck():
+    """**進行の型**＝(相手の場, 自分のドン, 自リーダーのパワー)。**デッキの中身は見ない**。
+
+    ユーザ指摘: 「価格はデッキの中身でなく進行により決まる。デッキの進行方法がデッキにより
+    特徴付けられているだけ」＝**デッキのラベルは代理変数**で、本体は進行（§17.1 の 2 本の時計）。
+    """
+    sc = np.zeros(127, np.float32)
+    sc[M.SC_MY_DON_] = 5.0
+    assert M.progress_key(sc, _tok_prog(opp_chars=2)) == (2, 1, 0)
+    assert M.progress_key(sc, _tok_prog(opp_chars=0, my_leader=7000)) == (0, 1, 1)
+    # 上限で潰す（帯が細かくなりすぎて行が落ちるのを防ぐ）
+    sc[M.SC_MY_DON_] = 30.0
+    assert M.progress_key(sc, _tok_prog(opp_chars=5)) == (3, 2, 0)
+
+
+def test_my_own_bodies_never_enter_the_progress_key():
+    """**説明変数（自分の場の体数）は進行の型に入れない**——入れると帯の中で動かない。"""
+    sc = np.zeros(127, np.float32)
+    bare = _tok_prog(opp_chars=1)
+    mine = _tok_prog(opp_chars=1)
+    for j in range(3):                        # 自分の場に 3 体置いても型は変わらない
+        mine[2 + j, N.S_POWER] = 0.4
+        mine[2 + j, N.S_IS_CHAR] = 1.0
+    assert M.progress_key(sc, bare) == M.progress_key(sc, mine)
+
+
+def test_the_band_modes_nest_as_expected():
+    """`state ⊂ progress` ／ `state ⊂ deck` ／ `deck_progress` は両方を足す。"""
+    from opcg_sim.learned import n_rel_feat as F
+    sc = np.zeros(94 + len(F.EXTRA_COLS), np.float32)
+    sc[94 + F.EXTRA_COLS.index("deck_removal")] = 0.9
+    sc[94 + F.EXTRA_COLS.index("opp_pool_draw")] = 0.8
+    tok = _tok_prog(opp_chars=2)
+    base = M.band_key(sc, mode="state")
+    prog = M.band_key(sc, tok_row=tok, mode="progress")
+    deck = M.band_key(sc, mode="deck")
+    both = M.band_key(sc, tok_row=tok, mode="deck_progress")
+    assert prog[:len(base)] == base and len(prog) == len(base) + 3
+    assert deck[:len(base)] == base and len(deck) == len(base) + 2
+    assert len(both) == len(base) + 5
+    # 既定（mode 未指定）は従来どおり state
+    assert M.band_key(sc) == base
