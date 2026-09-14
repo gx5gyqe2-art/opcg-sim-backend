@@ -20,10 +20,13 @@ if _SCRIPTS not in sys.path:
 import exit_ledger as E  # noqa: E402
 
 
-def _rec(seed, before, gone, attacked=0, removed=0, bands=None):
+def _rec(seed, before, gone, attacked=0, removed=0, bands=None, gone_lo=None,
+         absorbed_x=None, opp_effects=0):
     return {"seed": seed, "turn": 5, "n_before": before, "n_gone": gone,
+            "n_gone_lo": gone if gone_lo is None else gone_lo,
             "gone_bands": bands or ["p4"] * gone,
-            "attacked": attacked, "removed": removed}
+            "attacked": attacked, "removed": removed,
+            "absorbed_x": list(absorbed_x or []), "opp_effects": opp_effects}
 
 
 def test_a_zero_is_not_reported_as_a_removal_rate():
@@ -83,11 +86,14 @@ def test_more_attacks_than_lost_bodies_is_expected_not_an_error():
 
 
 def test_the_chosen_candidate_is_the_one_read():
-    """選ばれていない候補を読むと「打たれなかった手」を数えてしまう。"""
+    """選ばれていない候補を読むと「打たれなかった手」を数えてしまう。
+
+    候補の index も返す——**吸ったパワーを同じ候補から読む**ために要る。
+    """
     pol = {"pol_sig": ['["DON_BOX","u",["t"],[],null]', '["PLAY","u",[],[],null]'],
-           "pol_ti": [9, -1]}
-    assert E.chosen_target(pol, 0, 2, 0) == ("DON_BOX", 9)
-    assert E.chosen_target(pol, 0, 2, 1) == ("PLAY", -1)
+           "pol_ti": [9, -1], "pol_si": [3, 0], "pol_k": [1, -1]}
+    assert E.chosen_target(pol, 0, 2, 0) == ("DON_BOX", 9, 0)
+    assert E.chosen_target(pol, 0, 2, 1) == ("PLAY", -1, 1)
     assert E.chosen_target(pol, 0, 2, -1) is None       # 選べていない
     assert E.chosen_target(pol, 0, 2, 5) is None        # 範囲外
 
@@ -97,3 +103,59 @@ def test_the_band_histogram_uses_the_shared_power_grid():
     out = E.summarise([_rec(1, 3, 2, attacked=1, bands=["p0", "p4"]),
                        _rec(2, 3, 1, attacked=1, bands=["p4"])], reps=0)
     assert out["gone_by_band"] == {"p0": 1, "p4": 2}
+
+
+def test_absorbing_a_bigger_attack_is_worth_more_but_only_up_to_theta():
+    """**吸ったパワーで値が変わる**（ユーザ指摘 2026-09-14）——ただし `Θ·μ` で頭打ち。
+
+    守る側は高すぎる攻撃には「受ける」を選ぶので、**それ以上は払う額が増えない**。
+    「2000 を吸うのか 10000 を吸うのか」の答えは
+    **超過 2000 くらいまでは効き、それ以上は効かない**。
+    """
+    from shield_rate import absorb_value
+    small, mid, huge = absorb_value(500.0), absorb_value(2500.0), absorb_value(12000.0)
+    assert small < mid
+    assert mid == pytest.approx(huge)                    # Θ·μ で天井
+    assert absorb_value(-3000.0) == 0.0                  # リーダーに通らない攻撃は 0
+
+
+def test_the_absorbed_value_is_reported_per_band_and_not_flattened():
+    recs = [_rec(i, 3, 1, attacked=2, absorbed_x=[500.0, 6000.0]) for i in range(10)]
+    out = E.summarise(recs, reps=0)
+    a = out["absorbed"]
+    assert a["n"] == 20
+    assert set(a["by_x_band"]) == {"p0", "p6"}
+    assert a["by_x_band"]["p6"]["value_mean"] > a["by_x_band"]["p0"]["value_mean"]
+
+
+def test_attacks_that_would_not_have_connected_are_counted_and_worth_nothing():
+    """**リーダーに通らない攻撃を吸っても何も守っていない**——割合を出す。"""
+    out = E.summarise([_rec(i, 3, 1, attacked=1, absorbed_x=[-2000.0]) for i in range(10)],
+                      reps=0)
+    assert out["absorbed"]["no_connect_share"] == pytest.approx(1.0)
+    assert out["absorbed"]["value_mean"] == pytest.approx(0.0)
+
+
+def test_the_loss_count_is_bracketed_because_a_debuff_looks_like_a_death():
+    """**パワーを下げられて生き残った体**は多重集合の差では「消えた」と数えられる。
+
+    ユーザ指摘 2026-09-14「除去要求は**パワー下げ＋攻撃**のパターンもある」。
+    体の**数**の差は逆に、同じ巡に出した体で埋まると見落とす。**両方出して挟む。**
+    """
+    out = E.summarise([_rec(i, 4, 2, gone_lo=1, attacked=1) for i in range(10)], reps=0)
+    assert out["gone"] == 20 and out["gone_lo"] == 10
+    assert out["gone_bracket"] == [pytest.approx(0.25), pytest.approx(0.5)]
+    assert out["gone_bracket"][0] <= out["gone_bracket"][1]
+
+
+def test_an_effect_in_the_same_turn_as_an_attack_is_flagged_as_possible_removal():
+    """「パワー下げ＋攻撃」は**攻撃 1 つ**にしか見えないが、相手は 1 枚余分に払っている。
+
+    **上限の目安**であって帰属ではない（効果が別の用途だったものも入る）。
+    """
+    recs = ([_rec(i, 3, 1, attacked=1, opp_effects=1) for i in range(3)]
+            + [_rec(10 + i, 3, 1, attacked=1) for i in range(7)])
+    out = E.summarise(recs, reps=0)
+    d = out["debuff_then_attack"]
+    assert d["turns_with_attack"] == 10 and d["also_had_effect"] == 3
+    assert d["share"] == pytest.approx(0.3)
