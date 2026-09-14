@@ -65,7 +65,7 @@ from nu_calib import (S_BLOCKER_ACTIVE, S_IS_CHAR, S_POWER, SC_OPP_LEADER_POWER,
                       SLOT_OWN_FIELD, _round10)
 from theory_order import MU, THETA, nu_of  # noqa: E402
 
-ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_v0")
+ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0")
 #: scalars の列（`hand_value_slope` と同じ）
 SC_MY_LIFE, SC_OPP_LIFE, SC_MY_HAND, SC_TURN = 0, 1, 6, 10
 #: 飽和点（`theory_order.saturation_x(1.15)` = 2000）を跨ぐ境目
@@ -171,11 +171,61 @@ def within_multi(recs, keys, y_key="z", band="band", seed="seed"):
                       for k in keys}}
 
 
-def collect(dirs, limit_games=0, schemes=SCHEMES):
-    """holdout の自席ターン最初の main 行 → 帯と種類別の体数（と勝敗）。"""
+#: 実測の価格（`docs/game_theory.md` §18・Phase 1a）。**勘定に使うのでここが正本**
+MU_TRUE, DELTA_TRUE = 0.0433, 0.0277
+
+
+def cost_check(played, nu_by_band, mu=MU_TRUE, delta=DELTA_TRUE):
+    """**支払ったコストと価格が見合っているか**（ユーザ指摘 2026-09-14）。
+
+    ```
+    play_value = ν − μ − cost·δ = 0  ⇒  分岐コスト = (ν − μ) / δ
+    ```
+
+    `ν` は**実測値**（種類別）を渡す。**実際に打たれたキャラの平均コスト**と比べて、
+    差が**値付けできていない項の大きさ**になる。
+
+    **なぜ差が `ν` の中身ではないのか**（2026-09-14 に自分の診断を訂正した）:
+    実測の `ν` は**観察された勝率の傾き**なので、**その体が場に居る間にすることは全部
+    入っている**（常在効果もアタック時効果も）。だから差を説明できるのは **`ν` の外**——
+    **登場した瞬間の一回性の利得**（サーチ・ドロー・登場時除去）である。カードは**手札**へ
+    行くので、原理的に「体が場に居る価値」には入らない。式はこの項を丸ごと欠いていた:
+
+    ```
+    play_value = ν ＋ 【登場時の一回性の利得】 − μ − cost·δ
+    ```
+    """
+    out = {}
+    for band, a in played.items():
+        if not a["n"]:
+            continue
+        nu = nu_by_band.get(band)
+        c = a["cost"] / a["n"]
+        row = {"n": a["n"], "cost_mean": round(c, 3), "nu_measured": nu,
+               "ability_share": round(a["abil"] / a["n"], 4),
+               "onplay_removal_share": round(a["onplay"] / a["n"], 4),
+               "blocker_share": round(a["blk"] / a["n"], 4)}
+        if nu is not None and delta:
+            be = (float(nu) - mu) / delta
+            row.update(break_even_cost=round(be, 3), overpay_cost=round(c - be, 3),
+                       # **値付けできていない項がこれだけの価値を持たないと勘定が合わない**
+                       missing_term_winrate=round((c - be) * delta, 5))
+        out[band] = row
+    return out
+
+
+def collect(dirs, limit_games=0, schemes=SCHEMES, cards=None):
+    """holdout の自席ターン最初の main 行 → 帯と種類別の体数（と勝敗）。
+
+    `cards` を渡すと**実際に打たれたキャラ**（`pol_chosen`）のコストと素性も集める
+    （`cost_check` の材料・パワー帯は同じ切り方）。
+    """
     recs = []
+    played = {}
     games = 0
-    for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=(),
+    # `cards` を渡すときは候補列も読む（打たれた登場の cid とコストを引くため）
+    pol_cols = ("pol_sig", "pol_cid") if cards is not None else ()
+    for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=pol_cols,
                                                     extra_fn=_extra):
         games += 1
         if limit_games and games > limit_games:
@@ -199,7 +249,47 @@ def collect(dirs, limit_games=0, schemes=SCHEMES):
             for sch in schemes:
                 rec.update(categories(tok, opl, sch))
             recs.append(rec)
-    return recs, games
+        if cards is not None:
+            _collect_played(rows, pol, ex, L, ptr, idx, cards, played)
+    return recs, games, played
+
+
+def _collect_played(rows, pol, ex, L, ptr, idx, cards, played):
+    """**打たれた登場**（`pol_chosen`）のコストと素性をパワー帯ごとに積む。"""
+    from opcg_sim.loop import deck_roles as DR
+    # **黙って空を返さない**——候補列が無いまま呼ばれるのは呼び側の誤り
+    # （2026-09-14 に `pol_cols=()` のまま呼んで、`except` が KeyError を飲んで空になった）
+    for need in ("pol_sig", "pol_cid"):
+        if need not in pol:
+            raise KeyError(f"_collect_played は {need} を要る（iter_games の pol_cols に足す）")
+    for i in idx:
+        if int(rows["kind"][i]) != 0:
+            continue
+        ch = int(rows["pol_chosen"][i]); k = int(L[i]); b = int(ptr[i])
+        if ch < 0 or ch >= k:
+            continue
+        j = b + ch
+        try:
+            sig = json.loads(pol["pol_sig"][j])
+        except (ValueError, TypeError):        # 壊れた JSON だけを飲む
+            continue
+        if sig[0] != "PLAY":
+            continue
+        cid = str(pol["pol_cid"][j]) or None
+        info = cards.info(cid)
+        if not info or info.get("event"):
+            continue
+        master = cards.db.get_card(cid) if cid else None
+        forms = DR.classify(master) if master is not None else set()
+        band = power_band(float(info["power"]), float(ex["sc"][i][SC_OPP_LEADER_POWER]) * 1e4
+                          or 5000.0)
+        a = played.setdefault(band, {"n": 0, "cost": 0.0, "blk": 0, "abil": 0, "onplay": 0})
+        a["n"] += 1
+        a["cost"] += float(info.get("cost") or 0)
+        a["blk"] += int(bool(info.get("blocker")))
+        a["abil"] += int(bool(getattr(master, "abilities", ()) or ()))
+        # **登場時の一回性の利得**の代理（今は除去の型だけ数えられる）
+        a["onplay"] += int(any(":ON_PLAY:" in f for f in forms))
 
 
 def _extra(dd, n):
@@ -266,11 +356,16 @@ def main(argv=None):
     ap.add_argument("--r-turns", type=float, default=4.128, help="式に渡す R（実測の既定）")
     ap.add_argument("--theta", type=float, default=THETA)
     ap.add_argument("--mu", type=float, default=MU)
+    ap.add_argument("--cost-check", action="store_true",
+                    help="**払ったコストと価格が見合っているか**（`--scheme power` が要る）")
+    ap.add_argument("--mu-true", type=float, default=MU_TRUE, help="実測の手札 1 枚（勘定に使う）")
+    ap.add_argument("--delta-true", type=float, default=DELTA_TRUE, help="実測のドン 1 個")
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
 
     t0 = time.time()
-    recs, games = collect(a.src, a.limit_games, tuple(a.scheme))
+    cards = PL.Cards() if a.cost_check else None
+    recs, games, played = collect(a.src, a.limit_games, tuple(a.scheme), cards)
     res = {"games": games, "own_turns": len(recs), "fits": {},
            "args": {k: v for k, v in vars(a).items() if k != "out"}}
     keys_of = {"all": ["chars"], "blocker": ["blocker", "plain"],
@@ -282,6 +377,9 @@ def main(argv=None):
         fit = within_multi(recs, keys) if keys else None
         pred = predict(keys, r_turns=a.r_turns, theta=a.theta, mu=a.mu)
         res["fits"][sch] = {"fit": fit, "predicted": pred, "check": check(fit, pred)}
+    if a.cost_check:
+        pf = res["fits"].get("power", {}).get("fit") or {}
+        res["cost_check"] = cost_check(played, (pf.get("beta") or {}), a.mu_true, a.delta_true)
     res["seconds"] = round(time.time() - t0, 1)
     txt = json.dumps(res, ensure_ascii=False, indent=2)
     print(txt)

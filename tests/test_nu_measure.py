@@ -144,3 +144,34 @@ def test_predict_gives_zero_for_the_band_the_formula_zeroes():
     # ブロッカーは上乗せされる
     pb = M.predict(["leader_to_sat_blk", "leader_to_sat_plain"])
     assert pb["leader_to_sat_blk"] > pb["leader_to_sat_plain"]
+
+
+def test_cost_check_turns_the_measured_prices_into_a_break_even_cost():
+    """**支払ったコストと価格が見合っているか**（ユーザ指摘 2026-09-14）。
+
+    `play_value = ν − μ − cost·δ = 0` ⇒ 分岐コスト `(ν − μ)/δ`。実際に払ったコストとの差が
+    **値付けできていない項の大きさ**になる。
+    """
+    played = {"lt_leader": {"n": 100, "cost": 198.0, "blk": 15, "abil": 98, "onplay": 10}}
+    out = M.cost_check(played, {"lt_leader": 0.0690}, mu=0.0433, delta=0.0277)
+    r = out["lt_leader"]
+    assert r["cost_mean"] == pytest.approx(1.98)
+    assert r["break_even_cost"] == pytest.approx((0.0690 - 0.0433) / 0.0277, abs=1e-3)
+    assert r["overpay_cost"] > 0                       # 分岐より高く払っている
+    assert r["missing_term_winrate"] == pytest.approx(r["overpay_cost"] * 0.0277, abs=1e-5)
+    assert r["ability_share"] == pytest.approx(0.98)
+    assert r["onplay_removal_share"] == pytest.approx(0.10)
+
+
+def test_cost_check_skips_a_band_with_no_measured_price():
+    """`ν` が測れていない帯は**分岐コストを出さない**（勘定を捏造しない）。"""
+    played = {"x": {"n": 5, "cost": 10.0, "blk": 0, "abil": 0, "onplay": 0}}
+    r = M.cost_check(played, {})["x"]
+    assert r["nu_measured"] is None and "break_even_cost" not in r
+    assert M.cost_check({}, {"a": 0.1}) == {}
+
+
+def test_collect_played_refuses_to_run_without_the_candidate_columns():
+    """**黙って空を返さない**——2026-09-14 に `pol_cols=()` のまま呼んで空になった。"""
+    with pytest.raises(KeyError):
+        M._collect_played({}, {}, {}, {}, {}, [0], object(), {})
