@@ -69,13 +69,56 @@ def test_a_wide_ci_cannot_support_flatness():
     assert not P.informative([1.0, 2.0], 0.0)
 
 
+def _recs(n, race, seed=0):
+    """**4 軸が互いに独立に動く**行（共線だと軸が自由度 0 になり帯ごと落ちてしまう）。"""
+    from hand_value_slope import SC_MY_DON, SC_MY_FIELD, SC_MY_HAND, SC_MY_LIFE
+    rng = np.random.default_rng(seed)
+    out = []
+    for i in range(n):
+        sc = np.zeros(127, np.float32)
+        sc[SC_MY_HAND] = rng.integers(3, 7)
+        sc[SC_MY_LIFE] = rng.integers(1, 5)
+        sc[SC_MY_DON] = rng.integers(4, 9)
+        sc[SC_MY_FIELD] = rng.integers(0, 3)
+        out.append({"seed": i, "race": race, "sc": sc, "z": float(rng.integers(0, 2))})
+    return out
+
+
 def test_thin_bands_are_dropped_before_judging():
     """**薄い帯は判定に入れない**——`a0`（52 行）の負の値だけで「壊れている」と出た。"""
-    recs = ([{"seed": i, "race": "a1", "sc": np.zeros(127), "z": 1.0} for i in range(500)]
-            + [{"seed": i, "race": "a0", "sc": np.zeros(127), "z": 1.0} for i in range(20)])
-    out = P.summarise(recs, reps=0, min_rows=200)
+    recs = _recs(4000, "a1", seed=1) + _recs(20, "a0", seed=2)
+    out = P.summarise(recs, reps=0, min_dof=200)
     assert [d["race"] for d in out["dropped_thin"]] == ["a0"]
     assert "a0" not in out["by_race"]
+
+
+def test_the_thin_band_gate_counts_degrees_of_freedom_not_records():
+    """**数えるのは記録数ではなく、推定に効いた自由度**（2026-09-14・900 局で判った）。
+
+    `within_slope` は**交絡の帯ごとに中心化してから**傾きを取るので、効く自由度は
+    `rows_used − bands_used`。900 局の `a0` は**記録 204 で記録数の足切りを通過**した
+    のに **`ν` の自由度は 9**（進行の帯）しか無く、その雑音だけで判定が
+    `instrument_broken_negative_price` に落ちた。
+
+    ここでは**記録は十分あるが交絡の帯がばらけて自由度が出ない**行を作り、
+    記録数では落ちず自由度で落ちることを押さえる。
+    """
+    from hand_value_slope import SC_OPP_LIFE
+    recs = _recs(400, "a1", seed=3)
+    for i, r in enumerate(recs):
+        r["sc"][SC_OPP_LIFE] = float(i)        # **1 行 1 帯**＝中心化で全部消える
+    out = P.summarise(recs, reps=0, min_dof=200)
+    assert out["dropped_thin"] and out["dropped_thin"][0]["why"] == "dof"
+    assert out["dropped_thin"][0]["n"] >= P.MIN_BAND_ROWS       # 記録数では落ちない
+    assert "a1" not in out["by_race"]
+
+
+def test_the_band_dof_is_the_thinnest_axis():
+    """自由度は**4 軸の最小**で見る——1 本でも薄ければその帯の比は信用できない。"""
+    p = {"mu": {"rows": 3000, "bands": 200}, "lambda": {"rows": 2800, "bands": 300},
+         "delta": {"rows": 100, "bands": 40}, "nu": {"rows": 2700, "bands": 250}}
+    assert P.band_dof(p) == 60
+    assert P.band_dof({"mu": {"rows": None, "bands": None}}) == 0
 
 
 def test_the_ratio_set_is_anchored_on_the_hand():
@@ -87,6 +130,42 @@ def test_the_ratio_set_is_anchored_on_the_hand():
     names = [n for n, _a, _b in P.RATIOS]
     assert names == ["lambda_over_mu", "delta_over_mu", "nu_over_mu"]
     assert all(den == "hand" for _n, _num, den in P.RATIOS)
+
+
+def test_the_progress_band_drops_my_don_when_measuring_delta():
+    """**進行の型も価格ごとに leave-one-out が要る**（ユーザ指摘 2026-09-14）。
+
+    `progress_key_full` は**自分のドンを含む**ので、そのまま `δ` の帯に使うと
+    **説明変数の上で層別する**ことになる（罠 21 を自分で踏む）。
+    `don` 軸だけドンの成分を落とすことを、**値が動かないこと**で押さえる。
+    """
+    from nu_measure import SC_MY_DON_, progress_key_full
+    sc = np.zeros(127, np.float32); sc[SC_MY_DON_] = 1.0
+    hi = sc.copy(); hi[SC_MY_DON_] = 9.0                  # ドンだけ違う
+    tok = _tok(opp=(4000,))
+    assert progress_key_full(sc, tok) != progress_key_full(hi, tok)
+    # `don` 軸: ドンが違っても同じ帯（＝説明変数が帯の中で動ける）
+    assert P.conf_band(sc, tok, "don", "progress") == P.conf_band(hi, tok, "don", "progress")
+    # 他の軸: ドンは交絡なので帯に残る
+    assert P.conf_band(sc, tok, "field", "progress") != P.conf_band(hi, tok, "field", "progress")
+
+
+def test_the_progress_band_is_strictly_finer_than_the_legacy_one():
+    """`progress` は `legacy` に**足す**（置き換えではない）——交絡を落とす方向にしか動かない。"""
+    sc = np.zeros(127, np.float32)
+    tok = _tok(opp=(4000,))
+    for ax in P.AXES:
+        base = P.conf_band(sc, tok, ax, "legacy")
+        fine = P.conf_band(sc, tok, ax, "progress")
+        assert len(fine) > len(base) and fine[:len(base)] == base
+    assert P.CONF_BANDS[0] == "legacy"                    # 既定は据え置き
+
+
+def test_the_legacy_band_never_touches_the_tokens():
+    """`legacy` は盤面を見ない＝`tok` が無い記録でも回る（既存の呼び出しを壊さない）。"""
+    sc = np.zeros(127, np.float32)
+    assert P.conf_band(sc, None, "hand", "legacy") == P.conf_band(sc, _tok(opp=(9000,)),
+                                                                 "hand", "legacy")
 
 
 def test_every_price_axis_drops_its_own_regressor_from_the_band():

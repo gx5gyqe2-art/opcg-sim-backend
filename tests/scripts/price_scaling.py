@@ -75,6 +75,7 @@ from hand_value_slope import (AXES, AXIS_PRICE, SC_MY_DON, SC_MY_FIELD,  # noqa:
                               SC_MY_HAND, SC_MY_LIFE, band_key, within_slope)
 from order_acc import band_of  # noqa: E402
 from theory_order import PWR_EPS, incoming_x  # noqa: E402
+from nu_measure import progress_key_full  # noqa: E402
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0")
 #: 軸 → 説明変数にする scalars の列
@@ -87,6 +88,28 @@ RATIOS = (("lambda_over_mu", "life", "hand"), ("delta_over_mu", "don", "hand"),
 
 #: 接近度の切り方（**説明変数の下流で切ってはいけない**・2026-09-14 に `v0` が壊れて判った）
 SPLITS = ("a_opp", "v0")
+#: 交絡を落とす帯の種類。`progress` は `game_theory.md` §17.1.5c の「進行」を足す。
+CONF_BANDS = ("legacy", "progress")
+
+
+def conf_band(sc_row, tok_row, axis, mode="legacy"):
+    """**交絡を落とす帯**（層別の帯とは別物）。
+
+    `legacy` は `hand_value_slope.band_key(axis)`＝**その価格の説明変数だけ外した 4 変数**。
+    `progress` はそれに**進行の型**（§17.1.5c）を足す。
+
+    > **進行の型も価格ごとに leave-one-out が要る**（ユーザ指摘 2026-09-14）——
+    > `progress_key_full` は **自分のドンを含む**ので、**`δ` を測るときに使うと
+    > 説明変数の上で帯を切ることになる**（罠 21 を自分で踏む）。
+    > **`don` 軸ではドンの成分を落とす**。
+    """
+    base = band_key(sc_row, axis)
+    if mode != "progress":
+        return base
+    prog = progress_key_full(sc_row, tok_row)
+    if axis == "don":
+        prog = prog[:-1]                     # **自分のドンを外す**（説明変数だから）
+    return base + prog
 
 
 def _extra(dd, n):
@@ -142,23 +165,24 @@ def collect(dirs, limit_games=0, split="a_opp"):
             recs.append({"seed": seed,
                          "race": race_of(rows["pol_v0"][i], ex["tok"][i], split),
                          "sc": np.asarray(ex["sc"][i], np.float64),
+                         "tok": np.asarray(ex["tok"][i], np.float32),
                          "z": 1.0 if z > 0 else 0.0})
     return recs, games
 
 
-def price(recs, axis):
+def price(recs, axis, conf="legacy"):
     """1 つの軸の価格（`hand_value_slope` の within 推定・軸ごとに帯を入れ替える）。"""
     col = AXIS_COL[axis]
-    rows = [{"band": band_key(r["sc"], axis), "h": float(r["sc"][col]), "z": r["z"]}
-            for r in recs]
+    rows = [{"band": conf_band(r["sc"], r.get("tok"), axis, conf),
+             "h": float(r["sc"][col]), "z": r["z"]} for r in recs]
     return within_slope(rows, "z", h_key="h")
 
 
-def prices(recs):
+def prices(recs, conf="legacy"):
     """4 軸まとめて。キーは価格名（`mu`／`lambda`／`delta`／`nu`）。"""
     out = {}
     for ax in AXES:
-        s = price(recs, ax)
+        s = price(recs, ax, conf)
         out[AXIS_PRICE[ax]] = {"value": s["within"], "se": s["within_se"],
                                "rows": s["rows_used"], "bands": s["bands_used"]}
     return out
@@ -173,7 +197,7 @@ def _ratios(p):
     return out
 
 
-def _boot_ratio_ci(recs, reps=200, seed=0):
+def _boot_ratio_ci(recs, reps=200, seed=0, conf="legacy"):
     """**対局を復元抽出して比の CI**（比の統計量には必ず CI・`measurement.md` §14-15）。"""
     if reps <= 0:
         return {name: [None, None] for name, _a, _b in RATIOS}
@@ -188,7 +212,7 @@ def _boot_ratio_ci(recs, reps=200, seed=0):
     for _ in range(int(reps)):
         pick = rng.integers(0, len(gids), len(gids))
         sub = [r for k in pick for r in by_game[gids[k]]]
-        rr = _ratios(prices(sub))
+        rr = _ratios(prices(sub, conf))
         for name, v in rr.items():
             if v is not None and np.isfinite(v):
                 acc[name].append(v)
@@ -230,25 +254,47 @@ def price_signs_ok(p):
     return bool(vals and all(v > 0.0 for v in vals))
 
 
-#: 帯として採る最小の行数。**薄い帯は判定に入れない**——2026-09-14 に `a0`（52 行）の
+#: 帯として採る最小の**自由度**。**薄い帯は判定に入れない**——2026-09-14 に `a0`（52 行）の
 #: 負の価格だけで「器が壊れている」と判定が出た（値そのものは単なる雑音だった）。
-MIN_BAND_ROWS = 200
+#:
+#: > **数えるのは記録数ではなく、推定に効いた自由度**（2026-09-14・900 局で判った）——
+#: > 初版は**接近度の帯に入った記録の数**で足切りしていたが、`within_slope` は
+#: > **交絡の帯ごとに中心化してから**傾きを取るので、**効く自由度は
+#: > `rows_used − bands_used`** であって記録数ではない。900 局で `a0` は記録 204 で
+#: > 足切りを通過したのに、**`ν` の自由度は 9**（進行の帯）しか無く、その雑音だけで
+#: > 判定が `instrument_broken_negative_price` に落ちた。**4 軸の最小**で見る。
+MIN_BAND_DOF = 200
+#: 価格を計算する前の粗い足切り（記録数）。**判定はしない**——本番の足切りは `MIN_BAND_DOF`。
+MIN_BAND_ROWS = 50
 
 
-def summarise(recs, reps=200, seed=0, races=None, min_rows=MIN_BAND_ROWS):
+def band_dof(p):
+    """その帯の**最も薄い軸**の自由度（`rows_used − bands_used`）。"""
+    d = [v["rows"] - v["bands"] for v in p.values()
+         if v.get("rows") is not None and v.get("bands") is not None]
+    return min(d) if d else 0
+
+
+def summarise(recs, reps=200, seed=0, races=None, min_dof=MIN_BAND_DOF,
+              conf="legacy"):
     """接近度の帯ごとに 4 価格と比を出し、**事前登録した読み方で判定する**。"""
     races = tuple(races) if races else tuple(sorted({r["race"] for r in recs}))
     out = {"by_race": {}, "dropped_thin": []}
     for race in races + ("all",):
         sub = recs if race == "all" else [r for r in recs if r["race"] == race]
-        if race != "all" and len(sub) < min_rows:
-            out["dropped_thin"].append({"race": race, "n": len(sub)})
+        if race != "all" and len(sub) < MIN_BAND_ROWS:
+            out["dropped_thin"].append({"race": race, "n": len(sub), "dof": None,
+                                        "why": "records"})
             continue
-        if len(sub) < 50:
+        p = prices(sub, conf)
+        dof = band_dof(p)
+        # **足切りは自由度で**——記録数では `within` の中心化で消える行を数えられない
+        if race != "all" and dof < min_dof:
+            out["dropped_thin"].append({"race": race, "n": len(sub), "dof": dof,
+                                        "why": "dof"})
             continue
-        p = prices(sub)
-        out["by_race"][race] = {"n": len(sub), "prices": p, "ratios": _ratios(p),
-                                "ratio_ci95": _boot_ratio_ci(sub, reps, seed)}
+        out["by_race"][race] = {"n": len(sub), "dof": dof, "prices": p, "ratios": _ratios(p),
+                                "ratio_ci95": _boot_ratio_ci(sub, reps, seed, conf)}
     got = [r for r in races if r in out["by_race"]]
     # **価格が負に出た帯は器が壊れている**（説明変数の下流で帯を切ると起きる）
     out["price_signs_ok"] = {r: price_signs_ok(out["by_race"][r]["prices"])
@@ -271,7 +317,6 @@ def summarise(recs, reps=200, seed=0, races=None, min_rows=MIN_BAND_ROWS):
         ov[name] = {("%s_vs_%s" % (x, y)):
                     _overlap(out["by_race"][x]["ratio_ci95"][name],
                              out["by_race"][y]["ratio_ci95"][name]) for x, y in pairs}
-    out["ratio_ci_overlap"] = ov
     out["ratio_ci_overlap"] = ov
     # **情報を持つ CI の組だけで判定する**（幅が広すぎる帯は棄権）
     info = {r: all(informative(out["by_race"][r]["ratio_ci95"][n],
@@ -303,8 +348,12 @@ def main(argv=None):
     ap.add_argument("--split", default="a_opp", choices=SPLITS,
                     help="接近度の切り方。既定 `a_opp`＝相手の通る攻撃数（`T_opp` の分母）。"
                          "**`v0` は説明変数の下流なので壊れる**（再現用に残してある）")
-    ap.add_argument("--min-band-rows", type=int, default=MIN_BAND_ROWS,
-                    help="帯として採る最小の行数（薄い帯は判定に入れない）")
+    ap.add_argument("--conf-band", default="legacy", choices=CONF_BANDS,
+                    help="交絡を落とす帯。`progress` は §17.1.5c の進行を足す"
+                         "（**`don` 軸では自分のドンを外す**＝説明変数だから）")
+    ap.add_argument("--min-band-dof", type=int, default=MIN_BAND_DOF,
+                    help="帯として採る最小の**自由度**（`rows_used − bands_used` の 4 軸最小）。"
+                         "**記録数ではない**——`within` は帯ごとに中心化するので効く自由度が減る")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
@@ -313,7 +362,9 @@ def main(argv=None):
     t0 = time.time()
     recs, games = collect(a.src, a.limit_games, a.split)
     res = {"games": games, "rows": len(recs), "split": a.split,
-           "summary": summarise(recs, a.boot_reps, a.seed, min_rows=a.min_band_rows),
+           "conf_band": a.conf_band,
+           "summary": summarise(recs, a.boot_reps, a.seed,
+                                min_dof=a.min_band_dof, conf=a.conf_band),
            "args": {k: v for k, v in vars(a).items() if k != "out"},
            "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
