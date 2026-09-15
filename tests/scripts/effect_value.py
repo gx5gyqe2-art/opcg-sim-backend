@@ -298,13 +298,16 @@ def is_body(target):
     return any(str(t).upper() in BODY_TYPES for t in types)
 
 
-#: **盤面から対象を選べない絞り込み**（枠＝トークンから読めない素性）。
-#: 1 つでも入っていたら**盤面を使わず平均で値付けする**——読めないものを
-#: 「当てはまる」と決めると除去を過大に、「当てはまらない」と決めると過小にする。
-OPAQUE_TARGET_KEYS = ("traits", "names", "colors", "attributes", "flags", "exclude_ids",
-                      "exclude_names", "is_vanilla", "is_unique_name", "lacks_trigger",
-                      "min_attached_don", "power_sum_max", "cost_max_dynamic",
-                      "count_dynamic", "is_face_up", "ref_id", "save_id")
+#: **絞り込み → それを判定するのに要る体の素性**（2026-09-15）。
+#: **体の側にその素性が無ければ判定しない**——静的な「読めない名前の一覧」ではなく
+#: **渡されたデータで決める**ので、呼び出し側が素性を足せば自動で読めるようになる。
+FILTER_NEEDS = {"traits": "traits", "names": "names", "colors": "colors",
+                "attributes": "attribute", "exclude_names": "names"}
+#: **どうやっても盤面から選べない絞り込み**（枠にもカード DB にも無い・出現は全部 10 件未満）。
+OPAQUE_TARGET_KEYS = ("flags", "exclude_ids", "is_vanilla", "is_unique_name",
+                      "lacks_trigger", "min_attached_don", "power_sum_max",
+                      "cost_max_dynamic", "count_dynamic", "is_face_up", "ref_id",
+                      "save_id")
 
 
 def eligible_bodies(target, bodies):
@@ -332,6 +335,13 @@ def eligible_bodies(target, bodies):
         v = t.get(k)
         if v not in (None, [], (), "", False, 0):
             return None
+    # **素性で絞る指定は、体の側にその素性が在るときだけ判定する**（2026-09-15）
+    for k, need in FILTER_NEEDS.items():
+        v = t.get(k)
+        if v in (None, [], (), "", False, 0):
+            continue
+        if any(need not in (b or {}) for b in bodies):
+            return None
     out = []
     for b in bodies:
         pw = float(b.get("power") or 0.0)
@@ -348,9 +358,39 @@ def eligible_bodies(target, bodies):
                 continue
         if t.get("is_rest") and not b.get("is_rest"):
             continue
+        if not _matches_identity(t, b):
+            continue
         out.append(float(b.get("nu") or 0.0))
     out.sort(reverse=True)
     return out
+
+
+def _matches_identity(t, b):
+    """**素性の絞り込みに当てはまるか**（特徴・カード名・色・属性・名前の除外）。
+
+    **どれか 1 つでも当てはまれば通す**（「特徴《ワノ国》または《麦わらの一味》」は
+    パーサが list で持つ）。**除外名は 1 つでも当たれば落とす**。
+    """
+    traits = t.get("traits") or []
+    if traits and not (set(map(str, traits)) & set(map(str, b.get("traits") or []))):
+        return False
+    colors = t.get("colors") or []
+    if colors and not (set(map(str, colors)) & set(map(str, b.get("colors") or []))):
+        return False
+    attrs = t.get("attributes") or []
+    if attrs and str(b.get("attribute") or "") not in set(map(str, attrs)):
+        return False
+    names = t.get("names") or []
+    if names:
+        have = [str(x) for x in (b.get("names") or [])]
+        if not any(str(w) == h or str(w) in h for w in names for h in have):
+            return False
+    bad = t.get("exclude_names") or []
+    if bad:
+        have = [str(x) for x in (b.get("names") or [])]
+        if any(str(w) == h or str(w) in h for w in bad for h in have):
+            return False
+    return True
 
 
 def _pick_opp(target, opp_bodies, n):

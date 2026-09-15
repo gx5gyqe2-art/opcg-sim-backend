@@ -541,3 +541,60 @@ def test_a_bodyless_target_is_not_picked_from_the_board():
     stage = _act("KO", "OPPONENT", card_type=["STAGE"])
     assert E._pick_opp(stage["target"], _bodies(), 1) is None
     assert E.action_value(stage, opp_bodies=_bodies()) == pytest.approx(E.ABILITY_UNKNOWN)
+
+
+# --- 素性（特徴・色・名前）で絞る除去（2026-09-15・T35） ------------------------
+
+def _ident_bodies():
+    """素性つきの相手の場（`card_idx` から引いた形）。"""
+    return [{"power": 3000, "cost": 2, "blocker": False, "is_rest": False, "nu": 0.069,
+             "traits": ["ワノ国"], "colors": ["赤"], "names": ["ゾロ"], "attribute": "斬"},
+            {"power": 9000, "cost": 7, "blocker": False, "is_rest": False, "nu": 0.211,
+             "traits": ["海軍"], "colors": ["青"], "names": ["ガープ"], "attribute": "打"}]
+
+
+def _ko(**spec):
+    act = _act("KO", "OPPONENT", card_type=["CHARACTER"])
+    act["target"].update(spec)
+    return act
+
+
+def test_identity_filters_are_evaluated_when_the_bodies_carry_the_identity():
+    """**特徴・色・名前で絞る除去も盤面から選べる**（枠のカード ID から素性を引いた場合）。"""
+    b = _ident_bodies()
+    assert E.action_value(_ko(traits=["ワノ国"]), opp_bodies=b) == pytest.approx(0.069)
+    assert E.action_value(_ko(colors=["青"]), opp_bodies=b) == pytest.approx(0.211)
+    assert E.action_value(_ko(names=["ガープ"]), opp_bodies=b) == pytest.approx(0.211)
+    assert E.action_value(_ko(attributes=["斬"]), opp_bodies=b) == pytest.approx(0.069)
+
+
+def test_an_identity_filter_that_matches_nothing_is_a_whiff():
+    """**当てはまる体が居なければ 0**（平均を当てない）。"""
+    assert E.action_value(_ko(traits=["百獣海賊団"]), opp_bodies=_ident_bodies()) == 0.0
+
+
+def test_excluded_names_drop_that_body():
+    """**名前の除外**は 1 つでも当たれば落とす。"""
+    assert E.action_value(_ko(exclude_names=["ガープ"]),
+                          opp_bodies=_ident_bodies()) == pytest.approx(0.069)
+
+
+def test_any_of_the_listed_traits_is_enough():
+    """パーサは「〜または〜」を list で持つので**どれか 1 つ当たれば通す**。"""
+    got = E.action_value(_ko(traits=["ワノ国", "海軍"]), opp_bodies=_ident_bodies())
+    assert got == pytest.approx(0.211)          # 両方該当なので高い方
+
+
+def test_without_the_identity_the_filter_is_not_decided():
+    """**体の側に素性が無ければ判定しない**（平均に落とす）。
+
+    ここが本作業の一番大事な向き——**静的な「読めない名前の一覧」ではなく、
+    渡されたデータで決める**。呼び出し側が素性を足せば自動で読めるようになり、
+    足さなければ黙って誤判定しない。
+    """
+    plain = [{"power": 3000, "cost": 2, "blocker": False, "is_rest": False, "nu": 0.069}]
+    assert E.eligible_bodies(_ko(traits=["ワノ国"])["target"], plain) is None
+    assert E.action_value(_ko(traits=["ワノ国"]), opp_bodies=plain) == pytest.approx(
+        E.NU_AVG)
+    # 素性を要らない絞り込みは素性が無くても判定できる
+    assert E.eligible_bodies(_ko(cost_max=4)["target"], plain) == [0.069]

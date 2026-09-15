@@ -217,7 +217,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                        # `ν` は動かさず、**効果の値が盤面で変わる**
                        "opp_bodies": opp_bodies_of(
                            tok, float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
-                           max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), th, mu)}
+                           max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), th, mu,
+                           # **枠の素性**（特徴・色・名前）＝除去の絞り込みを判定するため
+                           ci_row=ex["ci"][i], idx2cid=idx2cid)}
                 if nu_targets == "board":
                     ctx["opp_chars"] = opp_chars_of(tok)
                 b = int(ptr[i])

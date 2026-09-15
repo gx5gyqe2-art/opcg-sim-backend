@@ -253,8 +253,42 @@ def opp_chars_of(tok_row):
 S_COST, S_IS_REST = 1, 3
 
 
+_IDENT = {}
+
+
+def card_identity(cid):
+    """カードの**素性**（特徴・色・名前・属性）。判らなければ `None`。
+
+    **効果の絞り込み**（「特徴《ワノ国》を持つ」「〈ルフィ〉」「赤の」）を判定するのに要る。
+    **トークンの列には素性が無い**ので `card_idx`（枠のカード ID）から引く。
+    """
+    if not cid:
+        return None
+    if cid in _IDENT:
+        return _IDENT[cid]
+    try:
+        from opcg_sim.loop import decks as D
+        m = D.load_db().get_card(cid)
+    except Exception:
+        m = None
+    if m is None:
+        _IDENT[cid] = None
+        return None
+
+    def _v(x):
+        return getattr(x, "value", x)
+
+    _IDENT[cid] = {
+        "traits": [str(_v(t)) for t in (getattr(m, "traits", None) or [])],
+        "colors": [str(_v(c)) for c in (getattr(m, "colors", None) or [])],
+        "names": [str(n) for n in (getattr(m, "all_names", None)
+                                   or [getattr(m, "name", "")])],
+        "attribute": str(_v(getattr(m, "attribute", "")) or "")}
+    return _IDENT[cid]
+
+
 def opp_bodies_of(tok_row, my_leader_power, r_turns=4.128, theta=THETA, mu=MU,
-                  ko_p=KO_P):
+                  ko_p=KO_P, ci_row=None, idx2cid=None):
     """**相手の場の体を「価格つき」で返す**（効果の値付けが対象を選ぶための材料）。
 
     ユーザ指摘 2026-09-15「**登場時効果は `ν` ではなくて効果に紐づく価値を変動させるべき**」
@@ -276,12 +310,19 @@ def opp_bodies_of(tok_row, my_leader_power, r_turns=4.128, theta=THETA, mu=MU,
             continue
         pw = slot_power(tok, si) or 0.0
         blk = float(tok[si, S_IS_BLOCKER]) > 0.5
-        out.append({"power": pw,
-                    "cost": float(tok[si, S_COST]) * 10.0,
-                    "is_rest": float(tok[si, S_IS_REST]) > 0.5,
-                    "blocker": blk,
-                    "nu": nu_of(pw, float(my_leader_power), r_turns, theta, mu, ko_p=ko_p,
-                                is_blocker=blk)})
+        body = {"power": pw,
+                "cost": float(tok[si, S_COST]) * 10.0,
+                "is_rest": float(tok[si, S_IS_REST]) > 0.5,
+                "blocker": blk,
+                "nu": nu_of(pw, float(my_leader_power), r_turns, theta, mu, ko_p=ko_p,
+                            is_blocker=blk)}
+        if ci_row is not None and idx2cid is not None:
+            # **枠の素性**（特徴・色・名前・属性）——`card_idx` の並びはトークンと同じ
+            # （0/1 リーダー・2〜6 自場・**7〜11 相場**）。
+            ident = card_identity((idx2cid or {}).get(int(np.asarray(ci_row)[si])))
+            if ident:
+                body.update(ident)
+        out.append(body)
     return out
 
 

@@ -643,3 +643,35 @@ def test_an_on_play_removal_is_worth_nothing_when_the_board_is_empty():
     empty, avg = (EV.card_value(cid, EV.CHAR_ON_PLAY_TRIGGERS, opp_bodies=[])[0],
                   EV.card_value(cid, EV.CHAR_ON_PLAY_TRIGGERS)[0])
     assert empty < avg               # 相手の場が空なら安くなる
+
+
+def test_opp_bodies_of_attaches_the_card_identity_when_asked():
+    """**枠のカード ID から素性を引く**（2026-09-15・T35）——`card_idx` の並びは
+    トークンと同じ（0/1 リーダー・2〜6 自場・**7〜11 相場**）。
+
+    **渡さなければ素性を付けない**——付けないことが「判定しない」の合図になる。
+    """
+    from opcg_sim.learned.vocab import shared_vocab
+    v = shared_vocab()
+    cid2i = {c: i for c, i in v.items()}
+    cid = next(c for c in v if T.card_identity(c) and T.card_identity(c)["traits"])
+    tok = np.zeros((22, 40), dtype=np.float32)
+    si = T.SLOT_OPP_FIELD.start
+    tok[si, T.S_IS_CHAR] = 1.0
+    tok[si, T.S_POWER] = 0.5
+    ci = np.zeros(24, dtype=np.int64)
+    ci[si] = cid2i[cid]
+    idx2cid = {i: c for c, i in v.items()}
+    plain = T.opp_bodies_of(tok, 5000.0, 4.0)
+    assert "traits" not in plain[0]
+    rich = T.opp_bodies_of(tok, 5000.0, 4.0, ci_row=ci, idx2cid=idx2cid)
+    assert rich[0]["traits"] == T.card_identity(cid)["traits"]
+    assert rich[0]["nu"] == pytest.approx(plain[0]["nu"])      # 価格は変わらない
+
+
+def test_the_card_identity_is_read_from_the_card_database():
+    """素性はカード DB から引く（推定しない）。無いカードは `None`。"""
+    got = T.card_identity("OP01-001")
+    assert got and got["traits"] and got["colors"] and got["names"]
+    assert T.card_identity("NO-SUCH") is None
+    assert T.card_identity(None) is None
