@@ -550,3 +550,61 @@ def test_the_full_progress_key_never_reads_the_deck():
         b[94 + F.EXTRA_COLS.index("deck_%s" % r)] = 1.0
         b[94 + F.EXTRA_COLS.index("opp_pool_%s" % r)] = 1.0
     assert M.progress_key_full(a, tok) == M.progress_key_full(b, tok)
+
+
+# --- `onplay`／`onplay_power`（`ν` は登場時効果を含むか・2026-09-15） ------------
+
+def test_the_onplay_split_reads_the_card_not_the_token():
+    """**登場時能力の有無はトークンの旗に無い**（枠は「登場時効果を持っていた」を覚えない）。
+
+    だから `card_idx`（自場 5 枠のカード ID）から引く。ここが壊れると全部
+    `onplay_unknown` に落ち、**差が出ないのを「差が無い」と誤読する**（2026-09-15 に実際やった）。
+    """
+    ci = np.zeros(24, dtype=np.int64)
+    v = M._fill_ci2cid()
+    assert v, "vocab が空＝カード ID を引けない"
+    cid2i = {c: i for i, c in v.items()}
+    with_op = next((c for c in v.values() if M._has_onplay(c)), None)
+    without = next((c for c in v.values() if M._has_onplay(c) is False), None)
+    assert with_op and without
+    ci[M.CI_OWN_FIELD.start] = cid2i[with_op]
+    ci[M.CI_OWN_FIELD.start + 1] = cid2i[without]
+    assert M._onplay_key(ci, M.SLOT_OWN_FIELD.start) == "onplay_yes"
+    assert M._onplay_key(ci, M.SLOT_OWN_FIELD.start + 1) == "onplay_no"
+    # **カード ID が引けない枠は `unknown`**（0 を「素の体」に混ぜない）
+    assert M._onplay_key(ci, M.SLOT_OWN_FIELD.start + 2) == "onplay_unknown"
+    assert M._onplay_key(None, M.SLOT_OWN_FIELD.start) == "onplay_unknown"
+
+
+def test_the_onplay_power_scheme_splits_inside_the_power_band():
+    """**パワー帯を揃えてから割る**——素の体は同じコストでもパワーが高いので、
+    揃えないと「効果持ちは安い」が**パワーの交絡**になる（2026-09-15 に実際出た）。
+    """
+    keys = [k for k in M.SCHEMES]
+    assert "onplay" in keys and "onplay_power" in keys
+    v = M._fill_ci2cid()
+    cid2i = {c: i for i, c in v.items()}
+    with_op = next(c for c in v.values() if M._has_onplay(c))
+    ci = np.zeros(24, dtype=np.int64)
+    ci[M.CI_OWN_FIELD.start] = cid2i[with_op]
+    tok = np.zeros((22, 40), dtype=np.float32)
+    s = M.SLOT_OWN_FIELD.start
+    tok[s, M.S_IS_CHAR] = 1.0
+    tok[s, M.S_POWER] = 0.9                      # 9000 ＝ 飽和超え（相手リーダー 5000）
+    got = M.categories(tok, 5000.0, "onplay_power", ci)
+    assert got == {"over_sat_onplay_yes": 1.0}, got
+    # 帯が違えば別の種類になる
+    tok[s, M.S_POWER] = 0.3                      # 3000 ＝ リーダー未満
+    assert M.categories(tok, 5000.0, "onplay_power", ci) == {"lt_leader_onplay_yes": 1.0}
+
+
+def test_the_formula_predicts_the_same_nu_for_both_onplay_halves():
+    """**式は登場時能力で `ν` を変えない**ので、両半分に同じ予測を引く。
+
+    ＝**実測に差が出たら、その差が「`ν` に入っている登場時効果」**という読みが成立する。
+    """
+    for b in ("lt_leader", "leader_to_sat", "over_sat"):
+        pw_y, blk_y = M._kind_spec(b + "_onplay_yes")
+        pw_n, blk_n = M._kind_spec(b + "_onplay_no")
+        assert pw_y == pw_n == M.PREDICT_POWER[b]
+        assert blk_y == blk_n is False

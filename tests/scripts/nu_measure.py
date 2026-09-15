@@ -94,7 +94,8 @@ ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen",
 SC_MY_LIFE, SC_OPP_LIFE, SC_MY_HAND, SC_TURN = 0, 1, 6, 10
 #: 飽和点（`theory_order.saturation_x(1.15)` = 2000）を跨ぐ境目
 SAT_OVER = 2000.0
-SCHEMES = ("all", "blocker", "power", "power_blocker", "lt_split", "lt_detail",
+SCHEMES = ("all", "blocker", "power", "power_blocker", "onplay", "onplay_power",
+           "lt_split", "lt_detail",
            "lt_age", "lt_age_split")
 #: 枠 1 つが「効果を持っている」ことの信号（`n_rel_feat.S_COLS` の列・**カード ID に依らない**）。
 #:
@@ -304,8 +305,11 @@ def power_band(power, opp_leader_power):
     return "over_sat"                 # 飽和＝ここから上はパワーが効かない
 
 
-def categories(tok_row, opp_leader_power, scheme):
-    """自場の枠 → 種類ごとの体数（`scheme` で分け方を替える）。"""
+def categories(tok_row, opp_leader_power, scheme, ci_row=None):
+    """自場の枠 → 種類ごとの体数（`scheme` で分け方を替える）。
+
+    `ci_row` は `card_idx`（`onplay` の切り方だけが使う）。
+    """
     out = {}
     for s in range(SLOT_OWN_FIELD.start, SLOT_OWN_FIELD.stop):
         if float(tok_row[s, S_IS_CHAR]) <= 0.0 and float(tok_row[s, S_POWER]) <= 0.0:
@@ -318,12 +322,77 @@ def categories(tok_row, opp_leader_power, scheme):
             key = "blocker" if blk else "plain"
         elif scheme == "power":
             key = power_band(pw, opp_leader_power)
+        elif scheme == "onplay":
+            key = _onplay_key(ci_row, s)
+        elif scheme == "onplay_power":
+            # **パワー帯の中で割る**——素の体は同じコストでもパワーが高いので、
+            # 帯を揃えないと「効果持ちは安い」が**パワーの交絡**になる（2026-09-15）。
+            key = power_band(pw, opp_leader_power) + "_" + _onplay_key(ci_row, s)
         elif scheme in ("lt_split", "lt_detail", "lt_age", "lt_age_split"):
             key = _lt_key(tok_row, s, pw, opp_leader_power, scheme)
         else:
             key = power_band(pw, opp_leader_power) + ("_blk" if blk else "_plain")
         out[key] = out.get(key, 0.0) + 1.0
     return out
+
+
+#: `card_idx` の自場 5 枠（0 自L・1 相L・2..6 自場・7..11 相場・12..21 手札・22/23 ステージ）
+CI_OWN_FIELD = slice(2, 7)
+_ONPLAY_CACHE = {}
+
+
+def _has_onplay(cid):
+    """そのカードは**登場時に解決する能力**を持つか（同梱の効果 JSON から）。"""
+    if cid in _ONPLAY_CACHE:
+        return _ONPLAY_CACHE[cid]
+    try:
+        import effect_value as EV
+        c = EV._all_cards().get(str(cid) or "") or {}
+        got = any((ab.get("trigger") or ab.get("timing")) == "ON_PLAY"
+                  for ab in (c.get("abilities") or []))
+    except Exception:
+        got = None
+    _ONPLAY_CACHE[cid] = got
+    return got
+
+
+def _onplay_key(ci_row, slot):
+    """**体を「登場時能力を持つカードか」で割る**（ユーザ指摘 2026-09-15）。
+
+    > 「`ν` は登場時の効果処理を差し引いた値にするのが正しいんじゃない？」
+
+    **`ν` が登場時効果を含んでいるなら、効果持ちの体の方が高く出る**はず。
+    含んでいないなら**差は出ない**（効果は 1 回で消え、体の在庫価値は同じ）。
+    **これが「引くべきか」を決める測定**——引く量が有るなら差として見えるし、
+    見えないなら**引くのは自由度を 1 つ増やすだけ**になる。
+
+    **交絡（先に書く）**: 帯に**手札枚数が在る**ので**ドロー・サーチ系は既に吸われている**
+    （`2026-09-14_entry_gain.md`＝弱い体の利得の 8 割は札の入れ替え）。
+    **相手の場は帯に無い**ので**除去系は吸われない**＝この検定が効くのは主に除去側。
+    """
+    if ci_row is None:
+        return "onplay_unknown"
+    _fill_ci2cid()
+    try:
+        cid = _CI2CID.get(int(np.asarray(ci_row)[CI_OWN_FIELD][slot - SLOT_OWN_FIELD.start]))
+    except Exception:
+        cid = None
+    got = _has_onplay(cid) if cid else None
+    if got is None:
+        return "onplay_unknown"
+    return "onplay_yes" if got else "onplay_no"
+
+
+_CI2CID = {}
+
+
+def _fill_ci2cid():
+    """vocab index → card_id（`card_idx` を引くため・1 度だけ）。"""
+    if _CI2CID:
+        return _CI2CID
+    from opcg_sim.learned.vocab import shared_vocab
+    _CI2CID.update({i: c for c, i in shared_vocab().items()})
+    return _CI2CID
 
 
 def _lt_key(tok_row, slot, pw, opp_leader_power, scheme):
@@ -538,7 +607,7 @@ def collect(dirs, limit_games=0, schemes=SCHEMES, cards=None, row_pick="first",
                    "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
                    "opp_chars": opp_chars_of(tok), "_wt": (w, t)}
             for sch in schemes:
-                rec.update(categories(tok, opl, sch))
+                rec.update(categories(tok, opl, sch, ex["ci"][i] if "ci" in ex else None))
             recs.append(rec)
         if row_pick == "last":
             # **(w, t) ごとに最後の行だけ残す**（`idx` はターン順なので後勝ちでよい）
@@ -593,8 +662,16 @@ def _collect_played(rows, pol, ex, L, ptr, idx, cards, played):
 
 
 def _extra(dd, n):
-    return {"sc": np.asarray(dd["scalars"])[:n].astype(np.float32),
-            "tok": np.asarray(dd["tokens"])[:n].astype(np.float32)}
+    out = {"sc": np.asarray(dd["scalars"])[:n].astype(np.float32),
+           "tok": np.asarray(dd["tokens"])[:n].astype(np.float32)}
+    # **自場の枠のカード ID**（`onplay` の切り方に要る・列 2..6 が自場 5 枠）。
+    # **無い dump でも黙って通す**——古い記録とテストの作り物には `card_idx` が無い
+    # （必須にすると `onplay` 以外のスキームまで落ちる）。
+    try:
+        out["ci"] = np.asarray(dd["card_idx"])[:n]
+    except Exception:
+        pass
+    return out
 
 
 #: それぞれの種類について、式が返す `ν`（検算の相手）。代表パワーで引く。
@@ -615,6 +692,15 @@ def _kind_spec(k):
     # T21 の細分（`lt_split`／`lt_detail`）。**式の主張はどれも「リーダー未満は 0」**で、
     # ブロッカーだけがブロック項ぶん（0.035）を持つ。`lt_signal`／`ge_leader` は
     # 混ざりものなので**予測を出さない**（代表値を選ぶと恣意になる）。
+    if k.endswith(("_onplay_yes", "_onplay_no")):
+        # **パワー帯の中で割った版**——式は登場時能力で `ν` を変えないので、
+        # 同じ帯の代表パワーで引く（差が出れば `ν` が効果を含む証拠）。
+        base = k.rsplit("_onplay_", 1)[0]
+        return PREDICT_POWER.get(base), False
+    if k in ("onplay_yes", "onplay_no"):
+        # **同じ代表パワーで引く**——式は登場時能力の有無で `ν` を変えない。
+        # したがって**実測に差が出れば、その差が「`ν` に入っている登場時効果」**である。
+        return 6000.0, None
     if k in ("lt_plain", "lt_attack", "lt_act", "lt_other",
              "lt_fresh", "lt_aged", "lt_fresh_plain", "lt_aged_plain"):
         return PREDICT_POWER["lt_leader"], False
@@ -728,6 +814,12 @@ def main(argv=None):
                "power": ["lt_leader", "leader_to_sat", "over_sat"],
                "power_blocker": [b + s for b in ("lt_leader", "leader_to_sat", "over_sat")
                                  for s in ("_blk", "_plain")],
+               # **ユーザ指摘 2026-09-15**「`ν` は登場時の効果処理を差し引いた値にするのが
+               # 正しいんじゃない？」——引くべき量が有るなら**効果持ちの体が高く出る**。
+               "onplay": ["onplay_yes", "onplay_no", "onplay_unknown"],
+               "onplay_power": [b + "_" + o
+                                for b in ("lt_leader", "leader_to_sat", "over_sat")
+                                for o in ("onplay_yes", "onplay_no", "onplay_unknown")],
                "lt_split": ["lt_plain", "lt_signal", "ge_leader"],
                "lt_detail": ["lt_plain", "lt_blocker", "lt_attack", "lt_act", "lt_other",
                              "ge_leader"],
