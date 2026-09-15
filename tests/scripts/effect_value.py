@@ -639,6 +639,10 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
 ON_PLAY_TRIGGERS = ("ON_PLAY", "ACTIVATE_MAIN", "MAIN", "RULE", "PASSIVE", None)
 #: 起動メインの契機
 ACTIVATE_TRIGGERS = ("ACTIVATE_MAIN",)
+#: **キャラを登場させたときに解決する契機はこれだけ**（2026-09-15）。
+#: `ON_PLAY_TRIGGERS` は**体なしカード用に広げてある**（イベントの本文が `ACTIVATE_MAIN` に
+#: 入ることがあるため）ので、**キャラに使うと起動メインまで登場時に足してしまう**。
+CHAR_ON_PLAY_TRIGGERS = ("ON_PLAY",)
 _CACHE = {}
 
 
@@ -649,12 +653,16 @@ def _all_cards():
 
 
 def card_value(cid, triggers, nu=NU_AVG, mu=MU, lam=LAM, delta=DELTA, cards=None,
-               selection=True, st=None, offered=False):
+               selection=True, st=None, offered=False, no_ability=None):
     """**カード 1 枚の、その契機での価値**を `(値, 読めなかった動作)` で返す。
 
     同じ契機の能力が複数あれば**和**を取る（同時に解決するので）。
     **1 つでも読めない能力があれば値は `None`**——部分的に足して 0 扱いにしない
     （`ability_value` と同じ規約）。`nu` を渡せば盤面の帯で置き換えられる（配線側から渡す）。
+
+    **`no_ability` はその契機の能力を 1 つも持たないときに返す値**（既定 `None`）。
+    **`0.0` を渡すと「効果が無い」と「読めない」を分けられる**——素のキャラに
+    効果を足すときに要る（既定のままだと**バニラが全部 `None` になる**・2026-09-15）。
     """
     c = (cards or _all_cards()).get(str(cid) or "")
     if not c:
@@ -662,6 +670,8 @@ def card_value(cid, triggers, nu=NU_AVG, mu=MU, lam=LAM, delta=DELTA, cards=None
     hit = [ab for ab in (c.get("abilities") or [])
            if (ab.get("trigger") or ab.get("timing")) in triggers]
     if not hit:
+        if no_ability is not None:
+            return float(no_ability), []
         return None, [("<no_ability_for_trigger>", "other")]
     total = 0.0
     unp = []

@@ -101,15 +101,22 @@ def test_play_value_passes_the_blocker_flag_through():
     a = T.play_value(5000.0, 3, 5000.0, 4.0, is_blocker=True)
     b = T.play_value(5000.0, 3, 5000.0, 4.0, is_blocker=False)
     assert a > b
+    # **実在する素のキャラ 2 枚を使う**——2026-09-15 にキャラの登場へ登場時効果を足したので、
+    # **架空の cid では体の値付けも試せない**（効果 JSON に無い＝「読めない」で `None`）。
+    # 素のキャラなら効果は 0 なので、**差はブロッカー項だけ**になる。
+    import effect_value as EV
+    van = [cid for cid, c in EV._all_cards().items()
+           if not any((ab.get("trigger") or ab.get("timing")) == "ON_PLAY"
+                      for ab in (c.get("abilities") or []))][:2]
+    assert len(van) == 2, "素のキャラが 2 枚も無いのはおかしい"
+    blk_cid, plain_cid = van
     cards = type("C", (), {"info": staticmethod(lambda cid: {
         "power": 5000, "cost": 3, "leader": False, "event": False,
-        "blocker": cid == "C_BLK"}.get("x", None) or {
-        "power": 5000, "cost": 3, "leader": False, "event": False,
-        "blocker": cid == "C_BLK"})})()
+        "blocker": cid == blk_cid})})()
     ctx = {"theta": T.THETA, "mu": T.MU, "opp_leader_power": 5000.0,
            "my_leader_power": 5000.0, "r_turns": 4.0, "don_k": 1}
-    sb = T.score_candidate(["PLAY", "u", [], [], None], "C_BLK", None, ctx, cards)
-    sp = T.score_candidate(["PLAY", "u", [], [], None], "C_PLAIN", None, ctx, cards)
+    sb = T.score_candidate(["PLAY", "u", [], [], None], blk_cid, None, ctx, cards)
+    sp = T.score_candidate(["PLAY", "u", [], [], None], plain_cid, None, ctx, cards)
     assert sb > sp                                   # ブロッカーの方が高く値付けされる
 
 

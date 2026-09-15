@@ -200,8 +200,14 @@ def test_score_candidate_marks_unscorable_as_none():
                              cards) is None            # 効果 JSON に無いカード
     assert T.score_candidate(["PLAY", "u", [], [], None], "C_EV", None, ctx,
                              cards) is None            # 同上
+    # **体だけの値付けは実在する素のキャラで試す**（2026-09-15 以降、キャラの登場は
+    # 効果 JSON を引くので、架空の cid では「読めない」で落ちるのが正しい）
+    van = _vanilla_cid()
+    cards2 = _StubCards({van: {"power": 7000, "cost": 3, "leader": False, "event": False}})
+    assert T.score_candidate(["PLAY", "u", [], [], None], van, None, ctx,
+                             cards2) is not None
     assert T.score_candidate(["PLAY", "u", [], [], None], "C_ATK", None, ctx,
-                             cards) is not None
+                             cards) is None            # 効果 JSON に無いカード
     atk = T.score_candidate(["ATTACK", "u", ["t"], [], None], "C_ATK", "C_LEAD", ctx, cards)
     assert atk == pytest.approx(T.attack_value(7000, 5000, True, 1.15, 0.05))
 
@@ -441,14 +447,50 @@ def test_score_candidate_prices_a_play_against_the_board_when_asked():
 
     **無ければ従来どおり**＝既定（`leader`）で走らせた過去の測定は動かない。
     """
-    cards = _cards()
+    # **実在する素のキャラで試す**（2026-09-15 以降、登場の値付けは効果 JSON を引く）
+    van = _vanilla_cid()
+    cards = _StubCards({van: {"power": 7000, "cost": 3, "leader": False, "event": False}})
     sig = ["PLAY", "u", [], [], None]
-    plain = T.score_candidate(sig, "C_ATK", None, CTX, cards)
+    plain = T.score_candidate(sig, van, None, CTX, cards)
     # 7000 の体が 5000 のキャラを殴る方がリーダー狙い（Θμ=0.0575）より高い 0.064
     ctx = dict(CTX, opp_chars=[(5000.0, False)])
-    assert T.score_candidate(sig, "C_ATK", None, ctx, cards) > plain
-    assert T.score_candidate(sig, "C_ATK", None, dict(CTX, opp_chars=[]), cards) == \
+    assert T.score_candidate(sig, van, None, ctx, cards) > plain
+    assert T.score_candidate(sig, van, None, dict(CTX, opp_chars=[]), cards) == \
         pytest.approx(plain)
+
+
+class _StubCards:
+    """`info()` だけを返す差し替え（パワー・コストはテストが決める）。"""
+
+    def __init__(self, table):
+        self._t = table
+
+    def info(self, cid):
+        return self._t.get(cid)
+
+
+def _vanilla_cid():
+    """**実在するカードで「登場時効果を持たない」もの**（体だけの値付けを試すため）。
+
+    2026-09-15 にキャラの登場へ効果を足したので、**架空の cid では体の値付けも試せない**
+    （効果 JSON に無いカードは「読めない」＝`None` になる）。
+    """
+    import effect_value as EV
+    for cid, c in EV._all_cards().items():
+        if not any((ab.get("trigger") or ab.get("timing")) == "ON_PLAY"
+                   for ab in (c.get("abilities") or [])):
+            return cid
+    raise AssertionError("素のキャラが同梱に無いのはおかしい")
+
+
+def _onplay_cid():
+    """**登場時効果が値付けできる実在のキャラ**。"""
+    import effect_value as EV
+    for cid in EV._all_cards():
+        v, _u = EV.card_value(cid, EV.CHAR_ON_PLAY_TRIGGERS)
+        if v:
+            return cid
+    raise AssertionError("値付けできる登場時効果が同梱に無いのはおかしい")
 
 
 def _ev_ctx():
@@ -501,3 +543,58 @@ def test_an_unreadable_effect_still_returns_none():
 def PL_CARDS():
     from opcg_sim.learned.train import plan_labels as PL
     return PL.Cards()
+
+
+def test_a_character_play_adds_its_on_play_effect_to_the_body():
+    """**キャラの登場 = 体（`ν`）＋ 登場時効果 − 札 − 費用**（2026-09-15）。
+
+    足すのは **`ν` が登場時効果を含まないと測ったから**（`onplay_power`・
+    `2026-09-15_nu_onplay_split.md`）。**素のキャラは効果 0 なので従来と同じ値**でなければ
+    ならない——ここが崩れると過去の測定が全部動く。
+    """
+    import effect_value as EV
+    van, op = _vanilla_cid(), _onplay_cid()
+    # **`blocker` を明示する**——省くと `score_candidate` が `None` を渡し、
+    # `play_value` が母集団の平均（0.104×0.773）でブロック項を混ぜる（差 0.006）
+    info = {"power": 7000, "cost": 3, "leader": False, "event": False, "blocker": False}
+    cards = _StubCards({van: dict(info), op: dict(info)})
+    base = T.score_candidate(["PLAY", van, [], [], None], van, None, CTX, cards)
+    with_ev = T.score_candidate(["PLAY", op, [], [], None], op, None, CTX, cards)
+    ev, _u = EV.card_value(op, EV.CHAR_ON_PLAY_TRIGGERS)
+    assert base == pytest.approx(T.play_value(7000.0, 3, CTX["opp_leader_power"],
+                                              CTX["r_turns"], CTX["theta"], CTX["mu"],
+                                              is_blocker=False,
+                                              my_leader_power=CTX["my_leader_power"]))
+    assert with_ev == pytest.approx(base + ev)
+    assert with_ev > base
+
+
+def test_a_character_play_uses_only_the_on_play_trigger():
+    """**起動メインを登場時に足さない**——`ON_PLAY_TRIGGERS` は体なしカード用に
+    `ACTIVATE_MAIN` まで含むので、キャラに使うと**場に出しただけで起動が発動した**ことになる。
+    """
+    import effect_value as EV
+    assert EV.CHAR_ON_PLAY_TRIGGERS == ("ON_PLAY",)
+    # 起動メインだけを持つキャラを探し、**登場の値は体だけ**であることを押さえる
+    cid = None
+    for c, v in EV._all_cards().items():
+        trg = {(ab.get("trigger") or ab.get("timing")) for ab in (v.get("abilities") or [])}
+        if "ACTIVATE_MAIN" in trg and "ON_PLAY" not in trg:
+            cid = c
+            break
+    assert cid, "起動メインだけのカードが同梱に無いのはおかしい"
+    cards = _StubCards({cid: {"power": 7000, "cost": 3, "leader": False, "event": False,
+                              "blocker": False}})
+    got = T.score_candidate(["PLAY", cid, [], [], None], cid, None, CTX, cards)
+    assert got == pytest.approx(T.play_value(7000.0, 3, CTX["opp_leader_power"],
+                                             CTX["r_turns"], CTX["theta"], CTX["mu"],
+                                             is_blocker=False,
+                                             my_leader_power=CTX["my_leader_power"]))
+
+
+def test_a_character_whose_card_is_unknown_is_not_scored():
+    """**効果 JSON に無いカードは「読めない」**＝`None`（0 で隠さない）。"""
+    cards = _StubCards({"NO-SUCH": {"power": 7000, "cost": 3, "leader": False,
+                                    "event": False}})
+    assert T.score_candidate(["PLAY", "NO-SUCH", [], [], None], "NO-SUCH", None, CTX,
+                             cards) is None

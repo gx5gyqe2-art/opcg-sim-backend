@@ -424,6 +424,12 @@ def _effect_value(cid, when, st=None):
         import effect_value as EV
     except Exception:
         return None
+    if when == "char_on_play":
+        # **キャラの登場**——解決するのは `ON_PLAY` だけ（`ON_PLAY_TRIGGERS` は体なし用に
+        # `ACTIVATE_MAIN` まで含むので、キャラに使うと起動メインを登場時に足してしまう）。
+        # **登場時能力を持たないキャラは 0**（`None` にすると素のキャラが全部無言になる）。
+        v, _unp = EV.card_value(cid, EV.CHAR_ON_PLAY_TRIGGERS, st=st, no_ability=0.0)
+        return v
     activate = (when != "on_play")
     trg = EV.ACTIVATE_TRIGGERS if activate else EV.ON_PLAY_TRIGGERS
     v, _unp = EV.card_value(cid, trg, st=st, offered=activate)
@@ -495,11 +501,32 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
                 return None
             d = 0.66 * mu
             return ev - mu - float(src.get("cost") or 0) * d
-        return play_value(src["power"], src.get("cost") or 0,
-                          ctx["opp_leader_power"], ctx["r_turns"], theta, mu,
-                          is_blocker=src.get("blocker"), opp_chars=ctx.get("opp_chars"),
-                          my_leader_power=ctx["my_leader_power"])
+        return _char_play_value(cid, src, ctx, theta, mu, k)
     return None
+
+
+def _char_play_value(cid, src, ctx, theta, mu, k):
+    """**キャラの登場**＝体（`ν`）＋**登場時効果**− 札 − 費用（2026-09-15）。
+
+    **効果を足すのは `ν` が効果を含まないから**——`ν` は帯
+    `(自ライフ, 相手ライフ, ターン帯, 手札)` の中で自場の体数に付く係数なので、
+    **手札・ライフに現れる効果は条件付けられている＝`ν` の外**に在る。
+    **測っても上乗せは出なかった**（`onplay_power`・6 帯中 4 帯で負・
+    2 本の土台で一致する符号はリーダー未満の負だけ・`2026-09-15_nu_onplay_split.md`）。
+
+    > **相手の場に現れる分（登場時除去）だけは `ν` が吸いうる**が、実測 **0.0016**
+    > ＝`ν` の 1.5% なので**そのまま足す**（`2026-09-14_entry_gain.md`）。
+
+    **登場時能力が在るのに値付けできないときは `None`**（読めないことを 0 で隠さない）。
+    """
+    base = play_value(src["power"], src.get("cost") or 0,
+                      ctx["opp_leader_power"], ctx["r_turns"], theta, mu,
+                      is_blocker=src.get("blocker"), opp_chars=ctx.get("opp_chars"),
+                      my_leader_power=ctx["my_leader_power"])
+    ev = _effect_value(cid, "char_on_play", ctx.get("st"))
+    if ev is None:
+        return None
+    return base + ev
 
 
 def row_order(n, q, p, theory, n_min=5, q_eps=0.02, p_eps=1e-4, n_min_frac=0.05):
