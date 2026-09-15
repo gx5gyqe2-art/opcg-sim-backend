@@ -120,3 +120,35 @@ def test_the_opponent_don_next_turn_is_what_it_holds_plus_one():
     assert M.opp_don_next(sc) == 6
     sc[M.SC_OPP_DON_ACTIVE] = 10.0; sc[M.SC_OPP_DON_RESTED] = 0.0
     assert M.opp_don_next(sc) == M.DON_MAX          # 上限で止まる
+
+
+class _StubCards:
+    """`Cards.info(cid)` だけを持つ代役。"""
+
+    def __init__(self, table):
+        self._t = table
+
+    def info(self, cid):
+        return self._t.get(cid)
+
+
+def test_the_develop_branch_can_be_restricted_to_bodies():
+    """**`--play-kind char` はイベント・ステージを「作る枝」から外す**（2026-09-15）。
+
+    P2-1 以降は効果だけを買う札にも `PLAY` の値が付くので、`all` は体でないものを
+    「作る枝」の max に混ぜる。**T26 の問い（理論は体を出すなと言うか）は体の話**。
+    """
+    cards = _StubCards({"body": {"power": 5000, "cost": 4},
+                        "ev": {"event": True, "cost": 2},
+                        "st": {"stage": True, "cost": 1}})
+    assert M.PLAY_KIND == "all"                       # 既定は従来どおり（過去の数字の土台）
+    assert M.PLAY_KINDS == ("all", "char")
+    for cid in ("body", "ev", "st", "nope", None):
+        assert M._counts_as_develop(cards, cid, "all") is True
+    assert M._counts_as_develop(cards, "body", "char") is True
+    assert M._counts_as_develop(cards, "ev", "char") is False
+    assert M._counts_as_develop(cards, "st", "char") is False
+    assert M._counts_as_develop(cards, "nope", "char") is False   # 引けない札は数えない
+    assert M._counts_as_develop(cards, None, "char") is False
+    # 引数を省けばモジュールの既定に従う
+    assert M._counts_as_develop(cards, "ev") is True

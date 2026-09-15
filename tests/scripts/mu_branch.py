@@ -84,6 +84,24 @@ CBAR_MODES = ("row", "row_don", "const")
 SC_OPP_DON_ACTIVE, SC_OPP_DON_RESTED = 4, 5
 #: ドンの上限（次のターンに 1 個増える）
 DON_MAX = 10
+#: 「作る枝」に数える `PLAY` 候補（`--play-kind`）。**`all`＝2026-09-14 以降の既定**（P2-1 で
+#: イベント・ステージにも値が付くようになったのでそちらも混ざる）／**`char`＝体だけ**。
+#: T26 の問い「理論は体を出すなと言っているか」に答えるのは **`char`** の方。
+PLAY_KINDS = ("all", "char")
+PLAY_KIND = "all"
+
+
+def _counts_as_develop(cards, cid, kind=None):
+    """この `PLAY` 候補を「作る枝」に数えるか。
+
+    `char` は**体だけ**——イベント・ステージ（効果だけを買う札）は体にならないので外す。
+    **カードが引けない候補も外す**（`all` では `score_candidate` が `None` を返して同じ結果）。
+    """
+    kind = PLAY_KIND if kind is None else kind
+    if kind != "char":
+        return True
+    c = cards.info(cid) if cid else None
+    return bool(c) and not (c.get("event") or c.get("stage"))
 #: 手札の枝の内訳を見る帯（`μ_develop` は候補の質に依るので手札の枚数で割って読む）
 HAND_BANDS = ((0, 2, "hand0_2"), (3, 5, "hand3_5"), (6, 99, "hand6+"))
 TURN_BANDS = ((1, 4, "early"), (5, 8, "mid"), (9, 99, "late"))
@@ -162,7 +180,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, lam=LAM, theta_mode="const"
                 sig = json.loads(pol["pol_sig"][j])
                 if not sig or sig[0] != "PLAY":
                     continue
-                v = score_candidate(sig, str(pol["pol_cid"][j]) or None, None, ctx, cards,
+                cid = str(pol["pol_cid"][j]) or None
+                if not _counts_as_develop(cards, cid, PLAY_KIND):
+                    continue
+                v = score_candidate(sig, cid, None, ctx, cards,
                                     src_power=slot_power(tok, pol["pol_si"][j]),
                                     don_k=pol["pol_k"][j])
                 if v is not None and (best is None or v > best):
@@ -258,13 +279,25 @@ def main(argv=None):
     ap.add_argument("--theta-mode", default="const", choices=("const", "board", "max"))
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--nu-mode", default=None, choices=("base", "pair"),
+                    help="`ν` の形（省略時は `theory_order.NU_MODE`＝2026-09-15 から `pair`）。"
+                         "**T26 の 2026-09-14 の数字は `base`**——比べるときは明示する")
+    ap.add_argument("--play-kind", default="all", choices=PLAY_KINDS,
+                    help="「作る枝」に数える PLAY 候補。`all`＝イベント・ステージも混ざる（既定）／"
+                         "`char`＝体だけ（T26 の問いに答える方）")
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
 
+    import theory_order as _TO
+    if a.nu_mode is not None:
+        _TO.set_nu_mode(a.nu_mode)
+    global PLAY_KIND
+    PLAY_KIND = a.play_kind
     t0 = time.time()
     recs, stats = collect(a.src, a.limit_games, theta_mode=a.theta_mode)
     res = {"stats": stats, "rows_used": len(recs),
-           "frozen": {"lambda": LAM, "mu": MU, "theta": THETA, "theta_mode": a.theta_mode},
+           "frozen": {"lambda": LAM, "mu": MU, "theta": THETA, "theta_mode": a.theta_mode,
+                      "nu_mode": _TO.NU_MODE, "play_kind": PLAY_KIND},
            "summary": summarise(recs, a.boot_reps, a.seed),
            "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
