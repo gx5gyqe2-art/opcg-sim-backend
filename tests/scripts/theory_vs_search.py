@@ -76,7 +76,7 @@ if _HERE not in sys.path:
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from order_acc import band_of, q_floor  # noqa: E402
-from theory_order import (MU, THETA, THETA_MODES, NU_TARGET_MODES,  # noqa: E402
+from theory_order import (add_nu_mode_arg, apply_nu_mode, MU, THETA, THETA_MODES, NU_TARGET_MODES,  # noqa: E402
                           SC_MY_LIFE, SC_MY_DON,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_OPP_LEADER_POWER,  # noqa: E402
                           SC_OPP_LIFE, PWR_EPS, c_of, opp_chars_of, saturation_x,  # noqa: E402
@@ -455,8 +455,10 @@ def main(argv=None):
     ap.add_argument("--don-k", type=int, default=1, help="ドン付与の枚数の仮定（記録に無い）")
     ap.add_argument("--bands", nargs="*", default=["close"],
                     help="見る帯（既定は接戦だけ・`close mid decided` で全部）")
+    add_nu_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    apply_nu_mode(a)
 
     t0 = time.time()
     res = {"args": {k: v for k, v in vars(a).items() if k != "out"}}

@@ -59,7 +59,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
-from theory_order import MU, THETA, attack_value, nu_of  # noqa: E402
+from theory_order import add_nu_mode_arg, apply_nu_mode, MU, THETA, attack_value, nu_of  # noqa: E402
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "sig", "pol_len", "pol_v0")
 
@@ -243,13 +243,15 @@ def main(argv=None):
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA)
     ap.add_argument("--mu", type=float, default=MU)
+    add_nu_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    apply_nu_mode(a)
 
     t0 = time.time()
     recs, guard, field, otb, games = collect(a.src, a.limit_games)
     cal = calibrate(recs, guard, field, otb)
-    res = {"games": games, "own_turns": len(recs), "calibration": cal,
+    res = {"nu_mode": a.nu_mode, "games": games, "own_turns": len(recs), "calibration": cal,
            "nu_effect": nu_effect(recs, cal, a.theta, a.mu),
            "args": {k: v for k, v in vars(a).items() if k != "out"},
            "seconds": round(time.time() - t0, 1)}

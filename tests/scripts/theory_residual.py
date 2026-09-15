@@ -94,7 +94,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from plan_value_map import _pad  # noqa: E402
-from theory_order import c_of, nu_of, saturation_x, THETA, MU  # noqa: E402
+from theory_order import add_nu_mode_arg, apply_nu_mode, c_of, nu_of, saturation_x, THETA, MU  # noqa: E402
 from opcg_sim.learned import n_rel as NL  # noqa: E402
 from opcg_sim.learned.train import n_rel_train as NT  # noqa: E402
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
@@ -550,8 +550,10 @@ def main(argv=None):
                     help="T11: 状態から読める部分と読めない残りに分ける量"
                          f"（既定の候補は {' '.join(PRED_KEY)}）")
     ap.add_argument("--folds", type=int, default=FOLDS, help="交差適合の fold 数（局で割る）")
+    add_nu_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    apply_nu_mode(a)
 
     t0 = time.time()
     stats_t, ab, abm, pwr, isl, _vocab = build_eff_tables()
@@ -570,7 +572,7 @@ def main(argv=None):
                                        pred_key=PRED_KEY.get(nm) if pred_net is not None else None,
                                        folds=a.folds, min_effect=a.min_effect)
                           for nm in a.split) if s]
-    res = {"net": os.path.basename(a.net), "stats": stats,
+    res = {"nu_mode": a.nu_mode, "net": os.path.basename(a.net), "stats": stats,
            "pred_net": os.path.basename(a.pred_net) if a.pred_net else None,
            "resid_mean": round(float(np.mean([r["resid"] for r in recs])), 5) if recs else None,
            "rank": rk, "verdict": verdict(rk),

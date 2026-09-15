@@ -675,3 +675,26 @@ def test_the_card_identity_is_read_from_the_card_database():
     assert got and got["traits"] and got["colors"] and got["names"]
     assert T.card_identity("NO-SUCH") is None
     assert T.card_identity(None) is None
+
+
+def test_the_shared_nu_mode_flag_follows_the_module_default_and_writes_back():
+    """**`--nu-mode` の共有ヘルパ**（2026-09-15）——CLI ごとに既定を持たない（正本は 1 つ）。
+
+    省略時は `theory_order.NU_MODE`、明示すれば切り替え、**実際に使った形を `a.nu_mode` に
+    書き戻す**（出力に刻むため）。既定が動いても CLI の旗を直す必要が無い。
+    """
+    import argparse
+    before = T.NU_MODE
+    try:
+        ap = T.add_nu_mode_arg(argparse.ArgumentParser())
+        a = ap.parse_args([])
+        assert a.nu_mode is None                      # 旗そのものは既定を持たない
+        assert T.apply_nu_mode(a) == before
+        assert a.nu_mode == before                    # 書き戻し
+        a = ap.parse_args(["--nu-mode", "base"])
+        assert T.apply_nu_mode(a) == "base" and T.NU_MODE == "base" and a.nu_mode == "base"
+        with pytest.raises(SystemExit):
+            ap.parse_args(["--nu-mode", "なにか"])
+    finally:
+        T.set_nu_mode(before)
+    assert T.NU_MODE == before

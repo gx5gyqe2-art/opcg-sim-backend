@@ -69,7 +69,7 @@ if _HERE not in sys.path:
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 import theory_order as TO  # noqa: E402
-from theory_order import (LAM, MU, PWR_EPS, S_IS_BLOCKER, S_IS_CHAR, S_POWER,  # noqa: E402
+from theory_order import (add_nu_mode_arg, apply_nu_mode, LAM, MU, PWR_EPS, S_IS_BLOCKER, S_IS_CHAR, S_POWER,  # noqa: E402
                           SC_MY_DON, SC_MY_HAND, SC_MY_LEADER_POWER, SC_MY_LIFE,
                           SC_OPP_LEADER_POWER, SC_OPP_LIFE, SLOT_OPP_FIELD,
                           SLOT_OWN_FIELD, THETA, nu_of, opp_chars_of)
@@ -286,8 +286,10 @@ def main(argv=None):
                          "「価値は当たるが順序は当たらない」を見落とす")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
+    add_nu_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    apply_nu_mode(a)
 
     bad = overlap(a.src, a.construction)
     if bad:
@@ -297,7 +299,7 @@ def main(argv=None):
 
     t0 = time.time()
     recs, games = collect(a.src, a.limit_games, nu_targets=a.nu_targets)
-    res = {"games": games, "rows": len(recs),
+    res = {"nu_mode": a.nu_mode, "games": games, "rows": len(recs),
            # **凍結した定数を出力に刻む**（条件 2）——後から黙って引き直せないように
            "frozen": {"lambda": LAM, "mu": MU, "delta": DELTA, "theta": THETA,
                       "nu_targets": a.nu_targets,

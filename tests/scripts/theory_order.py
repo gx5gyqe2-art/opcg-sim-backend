@@ -458,6 +458,22 @@ def attack_stream(power, opp_leader_power, r_turns, theta=THETA, mu=MU, opp_char
     return float(total)
 
 
+def add_nu_mode_arg(ap):
+    """`--nu-mode` を CLI に足す（**省略時は `NU_MODE`**＝CLI ごとに既定を持たない・正本は 1 つ）。"""
+    ap.add_argument("--nu-mode", default=None, choices=NU_MODES,
+                    help="`ν` の形（省略時は `theory_order.NU_MODE`＝2026-09-15 から `pair`）。"
+                         "**2026-09-15 より前の数字と比べるときは `base` を明示する**")
+    return ap
+
+
+def apply_nu_mode(a):
+    """`--nu-mode` を反映し、**実際に使う形を `a.nu_mode` に書き戻して**返す（出力に刻めるように）。"""
+    if getattr(a, "nu_mode", None) is not None:
+        set_nu_mode(a.nu_mode)
+    a.nu_mode = NU_MODE
+    return NU_MODE
+
+
 def set_nu_mode(mode):
     """`ν` の形を切り替える（`base`／`pair`）。既定は `base`。"""
     global NU_MODE
@@ -838,15 +854,17 @@ def main(argv=None):
     ap.add_argument("--q-eps", type=float, default=0.02)
     ap.add_argument("--don-k", type=int, default=1,
                     help="DON_BOX の付与枚数の仮定（記録に無いので感度を見る・既定 1）")
+    add_nu_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    apply_nu_mode(a)
 
     t0 = time.time()
     recs, stats = collect(a.src, a.holdout_mod, a.limit_games, a.theta, a.mu,
                           a.n_min, a.q_eps, a.n_min_frac, a.don_k, theta_mode=a.theta_mode,
                           nu_targets=a.nu_targets)
     allb = block(recs)
-    res = {"stats": stats, "all": allb, "verdict": verdict(allb),
+    res = {"nu_mode": a.nu_mode, "stats": stats, "all": allb, "verdict": verdict(allb),
            "by_band": {b: block([r for r in recs if r["band"] == b])
                        for b in ("close", "mid", "decided")},
            "saturation_x": saturation_x(a.theta),
