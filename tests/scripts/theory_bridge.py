@@ -121,17 +121,45 @@ def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=N
     cost_guard = float(c_of(x)) * float(mu)
     best = min(cost_take, cost_guard) if can_guard else cost_take
     actual = cost_guard if played == "guard" else cost_take
+    # **選んだ行動の変化量 `g`**（T40・2026-09-15）＝**実際に払った費用の符号を返したもの**。
+    # 「取りこぼし `s`」と違い**誰の責任かを問わない**——払えずに受けた行も損は損として数える
+    # （`s` はそこを 0 にする）。守れないはずの行で守った場合も、払ったのは守りの費用。
+    g = -float(actual)
     if played == "guard" and not can_guard:
         # 守れないはずの行で守っている＝予算の見積りが渋い。**誤りにしない**
         actual = best
     # **T28-c**: 余裕の大きさ。**貧しい席を減点していないか**を分けるために出す。
     margin = (float("inf") if blocker else float(afford_pw) - float(x))
-    return {"s": -max(0.0, actual - best), "x": x, "can_guard": can_guard, "margin": margin,
+    return {"s": -max(0.0, actual - best), "g": g,
+            "x": x, "can_guard": can_guard, "margin": margin,
             "comfortable": bool(can_guard and margin >= (MARGIN_COMFORT
                                                         if margin_comfort is None
                                                         else float(margin_comfort))),
             "played": played, "theory_says": ("guard" if (can_guard and cost_guard < cost_take)
                                               else "take")}
+
+
+#: 手の型（T40 の内訳用）。**記録に `ATTACK` は無く攻撃は対象付きの `DON_BOX`**（`theory_order` の注記）
+MOVE_FAMILIES = ("attack", "attach", "play", "effect", "end", "other")
+
+
+def move_family(sig):
+    """候補の署名 → 手の型。`DON_BOX` は対象が在れば攻撃・無ければ付与。"""
+    if not sig:
+        return "other"
+    at = sig[0]
+    tl = sig[2] if len(sig) > 2 else None
+    if at == "ATTACK" or (at == "DON_BOX" and tl):
+        return "attack"
+    if at in ("DON_BOX", "ATTACH_DON"):
+        return "attach"
+    if at == "PLAY":
+        return "play"
+    if at == "ACTIVATE_MAIN":
+        return "effect"
+    if at == "TURN_END":
+        return "end"
+    return "other"
 
 
 def _state_of(sc, ci, idx2cid):
@@ -146,20 +174,27 @@ def _state_of(sc, ci, idx2cid):
                                  my_stage=int(ci[22]) > 0, opp_stage=int(ci[23]) > 0)
 
 
-def _add(rec, band, s, side):
+def _add(rec, band, s, side, g=0.0):
     """**行ごとに帯へ足す**（T28-b）——決着後の雑さが接戦帯に混ざらないようにする。
 
     `side="grdc"` は**余裕で払えた守りの行だけ**の別勘定（T28-c）＝`grd` と二重に足す。
+    `g` は**選んだ手の変化量**（T40）——`s`（最善からの逸脱）と並べて別勘定で足す。
     """
     if side != "grdc":
         rec["s_%s" % side] += float(s)
+        rec["g_%s" % side] = rec.get("g_%s" % side, 0.0) + float(g)
         rec["n_%s" % side] += 1
     b = rec["band"].setdefault(band, {"s": 0.0, "n": 0, "s_atk": 0.0, "n_atk": 0,
                                       "s_grd": 0.0, "n_grd": 0,
                                       # **T28-c**: 余裕で払えた守りの行だけの集計
-                                      "s_grdc": 0.0, "n_grdc": 0})
+                                      "s_grdc": 0.0, "n_grdc": 0,
+                                      # **T40**: 選んだ手の変化量
+                                      "g": 0.0, "g_atk": 0.0, "g_grd": 0.0, "g_grdc": 0.0})
     b["s"] += float(s); b["n"] += 1
     b["s_%s" % side] += float(s); b["n_%s" % side] += 1
+    if side != "grdc":
+        b["g"] += float(g)
+    b["g_%s" % side] += float(g)
 
 
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targets="leader",
@@ -190,6 +225,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
             key = (seed, w)
             rec = per.setdefault(key, {"seed": seed, "who": w, "z": None,
                                        "s_atk": 0.0, "s_grd": 0.0, "n_atk": 0, "n_grd": 0,
+                                       "g_atk": 0.0, "g_grd": 0.0,        # T40
+                                       "g_fam": {}, "n_fam": {},          # T40: 手の型ごとの内訳
                                        "n_silent": 0, "v0": [],
                                        # **T28-b: 行ごとに帯を決めてから足す**
                                        "band": {}})
@@ -244,7 +281,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                         # **無言の行を「取りこぼし 0」として母数に入れる**
                         _add(rec, bnd, 0.0, "atk")
                     continue                     # `exclude` は母数にも入れない
-                _add(rec, bnd, float(played_v) - max(scored), "atk")
+                # `s`＝最善からの逸脱（≤ 0）・`g`＝選んだ手の理論値そのもの（T40）
+                _add(rec, bnd, float(played_v) - max(scored), "atk", g=float(played_v))
+                fam = move_family(json.loads(pol["pol_sig"][b + ch]))
+                rec["g_fam"][fam] = rec["g_fam"].get(fam, 0.0) + float(played_v)
+                rec["n_fam"][fam] = rec["n_fam"].get(fam, 0) + 1
                 rec["v0"].append(abs(float(rows["pol_v0"][i])))
             else:
                 if (w, t) in seen or int(labels[n]) < 0:
@@ -260,10 +301,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     continue
                 stats["grd_rows"] += 1
                 bnd = band_of(abs(float(rows["pol_v0"][i])))
-                _add(rec, bnd, got["s"], "grd")
+                _add(rec, bnd, got["s"], "grd", g=got["g"])
                 if got["comfortable"]:
                     stats["grd_comfortable"] += 1
-                    _add(rec, bnd, got["s"], "grdc")   # **余裕で払えた行だけの別勘定**
+                    _add(rec, bnd, got["s"], "grdc", g=got["g"])   # **余裕で払えた行だけの別勘定**
     return per, stats
 
 
@@ -291,6 +332,13 @@ def pair_by_band(per, band):
                     "dS_grdc": ((ba["s_grdc"] / ba["n_grdc"] if ba["n_grdc"] else None)
                                 if (ba["n_grdc"] and bb["n_grdc"]) else None),
                     "n_grdc": (ba["n_grdc"], bb["n_grdc"]),
+                    # **T40**: 選んだ手の変化量の累積（同じ帯の行だけ）
+                    "dG": ba.get("g", 0.0) - bb.get("g", 0.0),
+                    "dG_per_row": ba.get("g", 0.0) / ba["n"] - bb.get("g", 0.0) / bb["n"],
+                    "dG_atk": (ba.get("g_atk", 0.0) / ba["n_atk"] if ba["n_atk"] else 0.0)
+                              - (bb.get("g_atk", 0.0) / bb["n_atk"] if bb["n_atk"] else 0.0),
+                    "dG_grd": (ba.get("g_grd", 0.0) / ba["n_grd"] if ba["n_grd"] else 0.0)
+                              - (bb.get("g_grd", 0.0) / bb["n_grd"] if bb["n_grd"] else 0.0),
                     "n": ba["n"] + bb["n"], "dn": ba["n"] - bb["n"],
                     "silent": a["n_silent"] + b["n_silent"], "v0": None})
     return out
@@ -315,6 +363,7 @@ def pair_games(per, silent="zero"):
         na, nb = a["n_atk"] + a["n_grd"], b["n_atk"] + b["n_grd"]
         if na < 1 or nb < 1:
             continue
+        ga, gb = (a.get("g_atk", 0.0), a.get("g_grd", 0.0)), (b.get("g_atk", 0.0), b.get("g_grd", 0.0))
         out.append({"seed": seed, "z": a["z"],
                     "dS": (a["s_atk"] + a["s_grd"]) - (b["s_atk"] + b["s_grd"]),
                     "dS_atk": a["s_atk"] - b["s_atk"],
@@ -323,6 +372,16 @@ def pair_games(per, silent="zero"):
                     # **先手は手番が 1 つ多い**ので、生の和は席順を拾いうる。
                     "dS_per_row": (a["s_atk"] + a["s_grd"]) / na
                                   - (b["s_atk"] + b["s_grd"]) / nb,
+                    # **T40**: 選んだ手の変化量の累積 `ΔG`（`s` と同じ 4 つの形で並べる）
+                    "dG": (ga[0] + ga[1]) - (gb[0] + gb[1]),
+                    "dG_atk": ga[0] - gb[0],
+                    "dG_grd": ga[1] - gb[1],
+                    "dG_per_row": (ga[0] + ga[1]) / na - (gb[0] + gb[1]) / nb,
+                    # 手の型ごとの内訳（攻め側の 1 手あたり・型の和が `dG_atk` の 1 手あたり版になる）
+                    "dG_fam": {f: ((a.get("g_fam", {}).get(f, 0.0) / a["n_atk"] if a["n_atk"] else 0.0)
+                                   - (b.get("g_fam", {}).get(f, 0.0) / b["n_atk"] if b["n_atk"] else 0.0))
+                               for f in MOVE_FAMILIES},
+                    "n_fam": (a.get("n_fam", {}), b.get("n_fam", {})),
                     "n": na + nb, "dn": na - nb,
                     "silent": a["n_silent"] + b["n_silent"],
                     "v0": float(np.mean(a["v0"])) if a["v0"] else None})
@@ -373,6 +432,47 @@ def _boot(pairs, reps=200, seed=0, key="dS"):
              round(float(np.percentile(vals, 97.5)), 5)] if len(vals) >= 10 else [None, None])
 
 
+def _verdict(ci):
+    """傾きの 95% CI → 判定（事前登録の 3 値＋`undecided`）。"""
+    if ci is None or None in ci:
+        return "undecided"
+    if ci[0] > 0:
+        return "bridge_holds"
+    if ci[1] < 0:
+        return "bridge_inverted"
+    return "no_link"
+
+
+#: 較正表の等分位の数（5＝五分位。局数が少ないので細かくしない）
+CALIB_BINS = 5
+
+
+def calibration(pairs, key="dG_per_row", bins=CALIB_BINS):
+    """**較正表**（T40）——`key` を等分位に切り、各分位の**実勝率**を並べる。
+
+    **回帰で係数を決めない**（決めた瞬間に価格の検算が循環する）。「`ΔG` がこの帯なら
+    勝率はこれだけ」を**そのまま表にする**だけ。単調なら「勝敗まで説明する」の第一歩。
+    """
+    xs = np.array([p[key] for p in pairs], np.float64)
+    ys = np.array([p["z"] for p in pairs], np.float64)
+    if len(xs) < bins * 2:
+        return None
+    order = np.argsort(xs, kind="mergesort")
+    rows = []
+    for k in range(bins):
+        sel = order[(len(xs) * k) // bins:(len(xs) * (k + 1)) // bins]
+        if len(sel) == 0:
+            continue
+        rows.append({"bin": k, "n": int(len(sel)),
+                     "x_lo": round(float(xs[sel].min()), 5), "x_hi": round(float(xs[sel].max()), 5),
+                     "x_mean": round(float(xs[sel].mean()), 5),
+                     "win_rate": round(float(ys[sel].mean()), 4)})
+    wr = [r["win_rate"] for r in rows]
+    return {"bins": rows,
+            "monotone": bool(all(wr[i] <= wr[i + 1] for i in range(len(wr) - 1))),
+            "spread": round(float(wr[-1] - wr[0]), 4) if wr else None}
+
+
 def summarise(pairs, reps=200, seed=0):
     if len(pairs) < 10:
         return {"n": len(pairs)}
@@ -398,7 +498,11 @@ def summarise(pairs, reps=200, seed=0):
                     else None),
             "slope": (round(slope(cf, "dS_grdc"), 5) if slope(cf, "dS_grdc") else None),
             "slope_ci95": _boot(cf, reps, seed, "dS_grdc")}
-    for key in ("dS", "dS_per_row", "dS_atk", "dS_grd"):
+    keys = ["dS", "dS_per_row", "dS_atk", "dS_grd"]
+    has_g = all("dG_per_row" in p for p in pairs)
+    if has_g:
+        keys += ["dG", "dG_per_row", "dG_atk", "dG_grd"]
+    for key in keys:
         out[key] = {"auc": (round(auc([p[key] for p in pairs],
                                       [p["z"] for p in pairs]), 4)
                             if auc([p[key] for p in pairs], [p["z"] for p in pairs])
@@ -406,6 +510,10 @@ def summarise(pairs, reps=200, seed=0):
                     "slope": (round(slope(pairs, key), 5)
                               if slope(pairs, key) is not None else None),
                     "slope_ci95": _boot(pairs, reps, seed, key)}
+    if has_g:
+        # **T40**: `ΔG`（選んだ手の変化量）の判定と**較正表**（当てはめない——等分位ごとの実勝率）
+        out["gain_verdict"] = _verdict(out["dG_per_row"]["slope_ci95"])
+        out["calibration"] = {k: calibration(pairs, k) for k in ("dG_per_row", "dS_per_row")}
     # **P1 の検査**——帯ごとに傾きが揃えば `w` の変動は実害なし
     out["by_band"] = {}
     for nm in ("close", "mid", "decided"):
@@ -414,16 +522,8 @@ def summarise(pairs, reps=200, seed=0):
             out["by_band"][nm] = {"n": len(sub), "slope": (round(slope(sub), 5)
                                                            if slope(sub) else None)}
     a = out["dS"]["auc"]
-    ci = out["dS_per_row"]["slope_ci95"]        # **正規化した版で判定する**
-    # **事前登録**: `ΔS` が勝敗を予測するか（傾きの CI が 0 を含まないか）
-    if None in ci:
-        out["verdict"] = "undecided"
-    elif ci[0] > 0:
-        out["verdict"] = "bridge_holds"
-    elif ci[1] < 0:
-        out["verdict"] = "bridge_inverted"
-    else:
-        out["verdict"] = "no_link"
+    # **事前登録**: `ΔS` が勝敗を予測するか（傾きの CI が 0 を含まないか）——**正規化した版で判定する**
+    out["verdict"] = _verdict(out["dS_per_row"]["slope_ci95"])
     out["auc_all"] = a
     return out
 

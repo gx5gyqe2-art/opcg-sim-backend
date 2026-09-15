@@ -216,3 +216,79 @@ def test_the_comfort_threshold_is_a_provisional_value_you_can_sweep():
 def test_a_row_that_could_not_be_guarded_is_never_comfortable():
     got = B.guard_step(_tok(opp_lead=9000), _sc(don=0), "take", free=0.0, paid=[])
     assert got["can_guard"] is False and got["comfortable"] is False
+
+
+# ---- T40: 選んだ手の変化量 `g` と、その累積 `ΔG`（2026-09-15） ----
+
+def test_the_gain_of_a_guard_row_is_minus_what_was_actually_paid():
+    """`g` は**実際に払った費用の符号**——`s` と違って誰の責任かを問わない。"""
+    tok, sc = _tok(), _sc(don=5)
+    x = 2000.0
+    got_g = B.guard_step(tok, sc, "guard", free=x + 1000.0, paid=[], theta=1.15, mu=0.0551)
+    got_t = B.guard_step(tok, sc, "take", free=x + 1000.0, paid=[], theta=1.15, mu=0.0551)
+    assert got_g["g"] == pytest.approx(-B.c_of(got_g["x"]) * 0.0551)
+    assert got_t["g"] == pytest.approx(-1.15 * 0.0551)
+    # 払えなかった行: `s` は 0（誤りでない）だが `g` は受けた損をそのまま持つ
+    # （`x = 0` は 0 パワーでも守れるので、守れない行は相手リーダーを大きくして作る）
+    poor = B.guard_step(_tok(opp_lead=8000), sc, "take", free=0.0, paid=[], theta=1.15, mu=0.0551)
+    assert poor["can_guard"] is False
+    assert poor["s"] == 0.0 and poor["g"] == pytest.approx(-1.15 * 0.0551)
+
+
+def test_gain_is_accumulated_beside_the_deviation_not_instead_of_it():
+    rec = _rec()
+    B._add(rec, "close", -0.02, "atk", g=0.05)
+    B._add(rec, "close", -0.01, "grd", g=-0.06)
+    assert rec["s_atk"] == pytest.approx(-0.02) and rec["g_atk"] == pytest.approx(0.05)
+    assert rec["s_grd"] == pytest.approx(-0.01) and rec["g_grd"] == pytest.approx(-0.06)
+    b = rec["band"]["close"]
+    assert b["g"] == pytest.approx(-0.01) and b["g_atk"] == pytest.approx(0.05)
+    assert b["g_grd"] == pytest.approx(-0.06)
+    # `grdc`（余裕で払えた行の別勘定）は席の合計には二重に足さない
+    B._add(rec, "close", -0.01, "grdc", g=-0.06)
+    assert rec["g_grd"] == pytest.approx(-0.06) and b["g"] == pytest.approx(-0.01)
+    assert b["g_grdc"] == pytest.approx(-0.06)
+
+
+def test_the_pairing_of_gain_is_my_gain_minus_the_opponents_per_row():
+    a = dict(_seat(n_atk=4, n_grd=4, z=1.0), g_atk=0.40, g_grd=-0.20)
+    b = dict(_seat(n_atk=2, n_grd=2, z=1.0), g_atk=0.10, g_grd=-0.10)
+    per = {(1, 0): a, (1, 1): b}
+    p = B.pair_games(per)[0]
+    assert p["dG"] == pytest.approx(0.20 - 0.0)
+    assert p["dG_atk"] == pytest.approx(0.30) and p["dG_grd"] == pytest.approx(-0.10)
+    assert p["dG_per_row"] == pytest.approx(0.20 / 8 - 0.0 / 4)
+    # 旧い席（`g` を持たない）でも落ちない＝0 として扱う
+    old = {(2, 0): _seat(z=1.0), (2, 1): _seat(z=0.0)}
+    assert B.pair_games(old)[0]["dG"] == 0.0
+
+
+def test_the_calibration_table_is_quantiles_with_their_raw_win_rate():
+    """**較正表は当てはめない**——等分位ごとの実勝率をそのまま並べる。"""
+    rng = np.random.default_rng(0)
+    pairs = []
+    for _ in range(200):
+        x = float(rng.normal())
+        z = 1.0 if rng.random() < 1.0 / (1.0 + np.exp(-3.0 * x)) else 0.0
+        pairs.append({"dG_per_row": x, "z": z})
+    cal = B.calibration(pairs, "dG_per_row", bins=5)
+    assert len(cal["bins"]) == 5 and sum(r["n"] for r in cal["bins"]) == 200
+    assert cal["bins"][0]["x_mean"] < cal["bins"][-1]["x_mean"]
+    assert cal["monotone"] is True and cal["spread"] > 0.5
+    assert B.calibration(pairs[:5], "dG_per_row", bins=5) is None      # 局数が足りなければ出さない
+
+
+def test_summarise_reports_the_gain_family_and_its_own_verdict():
+    rng = np.random.default_rng(1)
+    pairs = []
+    for i in range(120):
+        g = float(rng.normal())
+        z = 1.0 if rng.random() < 1.0 / (1.0 + np.exp(-4.0 * g)) else 0.0
+        pairs.append({"seed": i, "z": z, "dS": 0.0, "dS_per_row": 0.0, "dS_atk": 0.0,
+                      "dS_grd": 0.0, "dG": g * 8, "dG_per_row": g, "dG_atk": g, "dG_grd": 0.0,
+                      "n": 8, "dn": 0, "silent": 0, "v0": 0.1})
+    out = B.summarise(pairs, reps=50)
+    assert out["gain_verdict"] == "bridge_holds"
+    assert out["dG_per_row"]["auc"] > 0.7 and out["dG_per_row"]["slope"] > 0
+    assert out["calibration"]["dG_per_row"]["monotone"] is True
+    assert out["verdict"] == "undecided"          # `ΔS` は全部 0＝分散ゼロで判定できない
