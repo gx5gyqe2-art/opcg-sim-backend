@@ -125,9 +125,13 @@ PRICED = {
     "LIFE_RECOVER": "life_gain",
     "LIFE_MANIPULATE": "life_gain",
     "DEAL_DAMAGE": "life_loss",
+    # **在庫と流れを分ける**（T41・2026-09-15）——`RAMP_DON` はドンデッキから**恒久に**増える＝在庫（δ）。
+    # `ACTIVE_DON`（レスト→アクティブ）・`ATTACH_DON`（自分のドンの付け替え）は**そのターンだけ**
+    # 余分に使える＝流れ＝在庫÷R（`REST_DON` = δ/R の裏返し）。初版は 3 つとも δ×N で数え、
+    # 起動効果の価格が実現の 6 倍になった（`2026-09-15_price_vs_realised.md`）。
     "RAMP_DON": "don_gain",
-    "ACTIVE_DON": "don_gain",
-    "ATTACH_DON": "don_gain",
+    "ACTIVE_DON": "don_flow",
+    "ATTACH_DON": "don_flow",
     # **ドンがドンデッキへ戻る＝恒久の損**（`REST_DON` は戻ってくるのでテンポ）
     "RETURN_DON": "don_loss",
     # コストの増減はそのぶんのドン（`SET_COST` は絶対値なので盤面依存）
@@ -524,7 +528,7 @@ def _band_nu(power):
 
 
 def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
-                 ko_p=KO_P, card=None, depth=0, opp_bodies=None):
+                 ko_p=KO_P, card=None, depth=0, opp_bodies=None, st=None):
     """**1 つの動作の価値**（自分から見た勝率）。値付けできなければ `None`、
     **資源が動かない動作は 0**（観測・印）。
 
@@ -638,10 +642,24 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
     if kind == "life_loss":
         amt = n * lam
         return amt if opp else -amt
-    if kind in ("don_gain", "don_loss", "cost"):
+    if kind in ("don_gain", "don_loss", "cost", "don_flow"):
         # **ドンの枚数も打ち切る**——`base = 99`（パーサの「上限なし」）が素通しすると
         # 99·δ = 2.74 になる（2026-09-14 に実際に出た）。規則の上限は 10 枚。
-        amt = min(max(1.0, abs(_magnitude(effect)) or n), ZONE_CAPACITY["DON"]) * delta
+        cnt = min(max(1.0, abs(_magnitude(effect)) or n), ZONE_CAPACITY["DON"])
+        if st and not opp:
+            # **「N 枚まで」は上限であって期待値ではない**（T41: エネルの 5 枚は実現 2 枚）——
+            # 状態が渡されたら**実際に動かせる枚数**で打ち切る（ドンデッキ残／レスト／手持ち）
+            if kind == "don_gain":
+                cnt = min(cnt, float(st.get("my_don_deck", cnt)))
+            elif kind == "don_flow":
+                rest_only = "レスト" in str(effect.get("raw_text") or "")
+                pool = st.get("my_don_rested" if rest_only else "my_don", cnt)
+                cnt = min(cnt, float(pool))
+        if kind == "don_flow":
+            # **流れ**＝そのターンだけ余分に使えるドン＝在庫÷R（テンポの規則・`REST_DON` と同じ）
+            amt = cnt * delta / R_TURNS
+            return amt if not opp else -amt
+        amt = cnt * delta
         if kind == "don_loss":
             return amt if opp else -amt
         if kind == "cost":
@@ -753,7 +771,7 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
     total = 0.0
     acts = walk_actions(ab.get("effect"))
     for e in acts:
-        v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies)
+        v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st=st)
         if v is None:
             unpriced.append((str(e.get("type") or "?"), family_of(str(e.get("type") or ""))))
         else:
@@ -762,7 +780,7 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
         total += _sel_premium(selection_k(acts))
     cost = ab.get("cost") or {}
     for e in walk_actions(cost):
-        v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies)
+        v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st=st)
         if v is None:
             unpriced.append((str(e.get("type") or "?"), family_of(str(e.get("type") or ""))))
         else:

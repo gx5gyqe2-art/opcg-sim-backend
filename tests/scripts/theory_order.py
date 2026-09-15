@@ -170,6 +170,9 @@ SC_MY_DON = 2
 SC_MY_HAND = 6
 SC_TURN = 10
 SC_MY_LEADER_POWER, SC_OPP_LEADER_POWER = 12, 13
+#: 起動メインの値付けに判断点の状態を渡すか（T41・「N 枚まで」をドンデッキ残で打ち切る）。
+#: **感度の切替**——`False` にすると 2026-09-15 昼までの値付け（N を上限として読む）に戻る
+ACTIVATE_USES_STATE = True
 #: 値付けできる行動（できないものはペアから外す）
 SCORABLE = ("ATTACK", "ATTACH_DON", "PLAY", "TURN_END", "DON_BOX", "ACTIVATE_MAIN")
 
@@ -651,7 +654,10 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
     if at == "ACTIVATE_MAIN":
         # **起動メイン**——カードは既に場に在るので `μ` は引かない（コストは能力の中に在る）
         # 条件はエンジンが検査済み。**対象は盤面から選ぶ**
-        return _effect_value(cid, "activate", opp_bodies=ctx.get("opp_bodies"))
+        # `st` は条件には使わない（検査済み）が、**「N 枚まで」を実際に動かせる枚数で打ち切る**のに使う（T41）。
+        # `ACTIVATE_USES_STATE` は感度の切替（§0.4）——切ると従来どおり N を上限として読む
+        return _effect_value(cid, "activate", ctx.get("st") if ACTIVATE_USES_STATE else None,
+                             opp_bodies=ctx.get("opp_bodies"))
     if at == "PLAY":
         if src is None:
             return None

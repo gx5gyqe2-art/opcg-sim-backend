@@ -320,6 +320,11 @@ def state_from_scalars(sc, my_leader=None, opp_leader=None, my_stage=False,
           "my_stage": bool(my_stage), "opp_stage": bool(opp_stage)}
     st["my_don_max"] = DON_MAX
     st["opp_don_max"] = DON_MAX
+    # **ドンの内訳**（T41・2026-09-15）——レスト（列 3/5）と**ドンデッキ残**（列 66/67 ÷10・v9）。
+    # 効果の値付けが「N 枚まで」を実際に動かせる枚数で打ち切るのに使う。列が無い古い記録は省く
+    st["my_don_rested"] = int(round(f(3))); st["opp_don_rested"] = int(round(f(5)))
+    if len(sc) > 67:
+        st["my_don_deck"] = int(round(f(66) * 10)); st["opp_don_deck"] = int(round(f(67) * 10))
     st["my_leader"] = leader_info(my_leader, cards)
     st["opp_leader"] = leader_info(opp_leader, cards)
     return st

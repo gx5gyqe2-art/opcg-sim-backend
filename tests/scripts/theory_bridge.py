@@ -286,6 +286,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 fam = move_family(json.loads(pol["pol_sig"][b + ch]))
                 rec["g_fam"][fam] = rec["g_fam"].get(fam, 0.0) + float(played_v)
                 rec["n_fam"][fam] = rec["n_fam"].get(fam, 0) + 1
+                # 逸脱も型ごとに（どの型の取りこぼしが橋を運んでいるか・T41）
+                rec.setdefault("s_fam", {})[fam] = rec.get("s_fam", {}).get(fam, 0.0) + float(played_v) - max(scored)
+                # その行の最善の型（最善が起動効果だった行の割合を読む）
+                bf = move_family(json.loads(pol["pol_sig"][b + int(np.argmax([(-1e9 if v is None else v) for v in vals]))]))
+                rec.setdefault("best_fam", {})[bf] = rec.get("best_fam", {}).get(bf, 0) + 1
                 rec["v0"].append(abs(float(rows["pol_v0"][i])))
             else:
                 if (w, t) in seen or int(labels[n]) < 0:
@@ -382,6 +387,10 @@ def pair_games(per, silent="zero"):
                                    - (b.get("g_fam", {}).get(f, 0.0) / b["n_atk"] if b["n_atk"] else 0.0))
                                for f in MOVE_FAMILIES},
                     "n_fam": (a.get("n_fam", {}), b.get("n_fam", {})),
+                    "dS_fam": {f: ((a.get("s_fam", {}).get(f, 0.0) / a["n_atk"] if a["n_atk"] else 0.0)
+                                   - (b.get("s_fam", {}).get(f, 0.0) / b["n_atk"] if b["n_atk"] else 0.0))
+                               for f in MOVE_FAMILIES},
+                    "best_fam": (a.get("best_fam", {}), b.get("best_fam", {})),
                     "n": na + nb, "dn": na - nb,
                     "silent": a["n_silent"] + b["n_silent"],
                     "v0": float(np.mean(a["v0"])) if a["v0"] else None})

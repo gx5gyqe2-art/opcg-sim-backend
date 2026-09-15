@@ -99,8 +99,46 @@ def test_a_power_buff_saturates_instead_of_growing_forever():
 
 def test_a_don_count_is_capped_by_the_rule_limit():
     """**ドンも打ち切る**——`base = 99`（パーサの「上限なし」）は規則の 10 枚まで。"""
-    got = E.action_value(_act("ATTACH_DON", "SELF", base=99))
+    got = E.action_value(_act("RAMP_DON", "SELF", base=99))
     assert got == pytest.approx(10 * E.DELTA)
+    # 流れ（付け替え）も同じ上限——ただし単価は在庫÷R
+    assert E.action_value(_act("ATTACH_DON", "SELF", base=99)) == pytest.approx(10 * E.DELTA / E.R_TURNS)
+
+
+def test_don_stock_and_don_flow_are_priced_apart():
+    """**在庫と流れ**（T41・2026-09-15）——`RAMP_DON` は恒久に増える＝δ、`ACTIVE_DON`／`ATTACH_DON` は
+    そのターンだけ余分に使える＝δ/R（`REST_DON` = δ/R の裏返し）。初版は 3 つとも δ×N で、
+    起動効果の価格が実現の 6 倍になっていた。
+    """
+    assert E.action_value(_act("RAMP_DON", "SELF", count=2)) == pytest.approx(2 * E.DELTA)
+    assert E.action_value(_act("ACTIVE_DON", "SELF", count=2)) == pytest.approx(2 * E.DELTA / E.R_TURNS)
+    assert E.action_value(_act("ATTACH_DON", "SELF", count=4)) == pytest.approx(4 * E.DELTA / E.R_TURNS)
+    # 相手のドンを起こす／付け替えるなら相手の得＝負
+    assert E.action_value(_act("ACTIVE_DON", "OPPONENT", count=1)) == pytest.approx(-E.DELTA / E.R_TURNS)
+    # 流れは在庫より小さい（R > 1）
+    assert E.action_value(_act("ACTIVE_DON", "SELF", count=1)) < E.action_value(_act("RAMP_DON", "SELF", count=1))
+
+
+def test_up_to_n_don_is_capped_by_what_the_state_can_actually_move():
+    """**「N 枚まで」は上限であって期待値ではない**——状態を渡したら実際に動かせる枚数で打ち切る。
+
+    エネル（OP15-058）の「1 枚をアクティブで追加し、さらに 4 枚までをレストで追加」は
+    ドンデッキが 2 枚なら 2 枚ぶん。状態を渡さなければ従来どおり N（上限として読む）。
+    """
+    ramp = _act("RAMP_DON", "SELF", base=4)
+    assert E.action_value(ramp) == pytest.approx(4 * E.DELTA)
+    assert E.action_value(ramp, st={"my_don_deck": 2}) == pytest.approx(2 * E.DELTA)
+    assert E.action_value(ramp, st={"my_don_deck": 0}) == pytest.approx(0.0)
+    assert E.action_value(ramp, st={"my_don_deck": 9}) == pytest.approx(4 * E.DELTA)   # 上限は N
+    act = _act("ACTIVE_DON", "SELF", base=3)
+    assert E.action_value(act, st={"my_don": 1, "my_don_rested": 1}) == pytest.approx(E.DELTA / E.R_TURNS)
+    # 「レストのドン」と書いてあればレストの枚数で、無ければ手持ち全部で打ち切る
+    att = _act("ATTACH_DON", "SELF", base=4); att["raw_text"] = "自分のキャラ1枚にレストのドン!!4枚までを、付与する"
+    assert E.action_value(att, st={"my_don": 6, "my_don_rested": 1}) == pytest.approx(E.DELTA / E.R_TURNS)
+    att2 = _act("ATTACH_DON", "SELF", base=4)
+    assert E.action_value(att2, st={"my_don": 6, "my_don_rested": 1}) == pytest.approx(4 * E.DELTA / E.R_TURNS)
+    # 相手の分は相手の状態を知らないので打ち切らない（符号だけ）
+    assert E.action_value(_act("RAMP_DON", "OPPONENT", base=4), st={"my_don_deck": 0}) == pytest.approx(-4 * E.DELTA)
 
 
 # --- 4 通貨（従来の写像） -----------------------------------------------------
