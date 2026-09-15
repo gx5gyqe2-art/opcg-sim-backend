@@ -128,3 +128,89 @@ def test_the_measured_constants_replaced_the_guesses():
     old = T.nu_of(5000.0, 5000.0, 4.0, block_p=0.3, ko_p=0.25)
     new = T.nu_of(5000.0, 5000.0, 4.0, is_blocker=False)
     assert old != pytest.approx(new)
+
+
+# --- P5 身代わり ＋ P4 `ko_p` の形（対で入れる・2026-09-15・T37） ----------------
+
+def test_ko_p_is_a_hump_not_a_constant():
+    """**`ko_p` は山形**（T22 の実測）——4000〜6000 が峰で両端が低い。
+
+    **単調な関数にしても誤る**ので、実測の帯をそのまま引く。
+    """
+    assert T.ko_p_of(1000) == pytest.approx(0.2417)
+    assert T.ko_p_of(5000) == pytest.approx(0.3297)          # 峰
+    assert T.ko_p_of(9000) == pytest.approx(0.1987)          # 谷
+    assert T.ko_p_of(5000) > T.ko_p_of(1000) > T.ko_p_of(9000)
+    assert T.ko_p_of(None) == pytest.approx(T.KO_P)          # 判らなければ定数
+
+
+def test_the_shield_term_is_the_measured_product_not_the_rate():
+    """**身代わりは「率 × 1 本の価値」の積**（`2026-09-14_shield_value.md`）。
+
+    率は低パワーほど高い（3.0 倍）が 1 本の価値は高パワーほど高いので、
+    **率だけを見ると偏りを過大に読む**（積の比は 2.2 倍）。
+    """
+    assert T.shield_of(3000.0, 5000.0) == pytest.approx(0.0597)
+    assert T.shield_of(6000.0, 5000.0) == pytest.approx(0.0409)
+    assert T.shield_of(9000.0, 5000.0) == pytest.approx(0.0271)
+    # 比は 2.2 倍（率だけなら 3.0 倍になる）
+    assert 2.0 < T.shield_of(3000.0, 5000.0) / T.shield_of(9000.0, 5000.0) < 2.4
+    assert T.power_band_of(3000.0, 5000.0) == "lt_leader"
+    assert T.power_band_of(6000.0, 5000.0) == "leader_to_sat"
+    assert T.power_band_of(9000.0, 5000.0) == "over_sat"
+
+
+def test_the_pair_goes_in_together_and_the_default_is_unchanged():
+    """**P5 と P4 は対で入れる**（T21: 片方だけ直すと全体が悪化する）。
+
+    **既定は `base`**＝既存の測定を動かさない。`pair` は感度の切替である。
+    """
+    base = T.nu_of(3000.0, 5000.0, 4.128, is_blocker=False)
+    pair = T.nu_of(3000.0, 5000.0, 4.128, is_blocker=False, mode="pair")
+    assert base == pytest.approx(0.0)              # 式は「リーダー未満は 0」と言う
+    assert pair > base                             # 身代わりが入るので 0 ではなくなる
+    assert T.NU_MODE == "base"                     # 既定は動かさない
+    try:
+        T.set_nu_mode("pair")
+        assert T.nu_of(3000.0, 5000.0, 4.128, is_blocker=False) == pytest.approx(pair)
+    finally:
+        T.set_nu_mode("base")
+    assert T.nu_of(3000.0, 5000.0, 4.128, is_blocker=False) == pytest.approx(base)
+    with pytest.raises(ValueError):
+        T.set_nu_mode("なにか")
+
+
+def test_the_shield_is_discounted_by_survival_only_once():
+    """**身代わりは既に `R` を掛けた実測**なので、攻撃・ブロックと同じく 1 度だけ割り引く。
+
+    二重に割り引くと弱い体の穴が埋まらない（そこが `ν` 最大の穴だった）。
+    """
+    pw, opl, r = 3000.0, 5000.0, 4.128
+    got = T.nu_of(pw, opl, r, is_blocker=False, mode="pair")
+    kp = T.ko_p_of(pw)
+    atk = T.attack_stream(pw, opl, r, ko_p=kp)
+    want = (atk + 0.0 + T.shield_of(pw, opl)) * (1.0 - kp)
+    assert got == pytest.approx(want)
+
+
+def test_the_pair_fills_the_weak_band_but_overshoots_the_middle():
+    """**対で入れても勘定は閉じない**（2026-09-15 の実測）——ここを記録しておく。
+
+    | 帯 | base | pair | 実測 |
+    |---|---|---|---|
+    | リーダー未満 | 0.000 | **0.043** | 0.0690 |
+    | リーダー〜飽和 | 0.162 | **0.203** | 0.1503 |
+    | 飽和超え | 0.186 | **0.231** | 0.2112 |
+
+    **弱い帯の穴は 63% 埋まるが、中盤帯は +0.053 超過する**。
+    **残差に合わせて身代わりを下げてはいけない**（§0.1 の条件 3＝当てはめになる）。
+    """
+    meas = {"lt_leader": (3000.0, 0.0690), "leader_to_sat": (6000.0, 0.1503),
+            "over_sat": (9000.0, 0.2112)}
+    err = {}
+    for band, (pw, m) in meas.items():
+        pair = T.nu_of(pw, 5000.0, 4.128, is_blocker=False, mode="pair")
+        err[band] = pair - m
+    assert err["lt_leader"] < 0 and abs(err["lt_leader"]) < 0.03      # 埋まるが届かない
+    assert err["leader_to_sat"] > 0.04                                # 超過する
+    assert abs(err["over_sat"]) < 0.03

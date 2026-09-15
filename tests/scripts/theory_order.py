@@ -135,6 +135,27 @@ CBAR_SLOPE = 0.66
 #: ＝平均では 0.773×0.104 ≈ 0.080 で、**旧定数 0.30 は約 3.7 倍の過大評価**だった。
 BLOCK_P_BLOCKER = 0.773
 KO_P = 0.289
+#: **`ko_p` はパワーの関数**（T22・`2026-09-14_ko_by_power.md`）——**平らでも単調でもなく山形**。
+#: 4000〜6000 が峰（0.3297）で両端は 0.2417／0.1987（**峰と谷の CI は重ならない**）。
+#: 括弧内は素の体だけの値（効果持ちを除いた対照）。全体は 0.2729＝**現行の定数 0.289 と 6% 差**
+#: なので、**問題は水準ではなく形**である。
+KO_P_CURVE = ((2000.0, 0.2417), (4000.0, 0.2782), (6000.0, 0.3297), (8000.0, 0.2436),
+              (float("inf"), 0.1987))
+#: **身代わり項**（P5・`2026-09-14_shield_value.md`）＝率/手番 × 1 本の価値 × `R`。
+#: **率は低パワーほど高く（3.0 倍）・1 本の価値は高パワーほど高い**ので**積で見る**（比 2.2 倍）。
+#: 相手は**倒せる体**を狙うので弱い体には弱い攻撃が来る＝**弱い攻撃はリーダーに通らない**
+#: （リーダー未満の帯で 23.9%）ぶんを引いた**純額**である。
+SHIELD_TERM = {"lt_leader": 0.0597, "leader_to_sat": 0.0409, "over_sat": 0.0271}
+#: `ν` の形（`nu_of(mode=...)`）。**既定は `base`＝既存の測定を動かさない**。
+#: `pair` は **P5（身代わり）と P4（`ko_p` の形）を対で入れる**——T21 が
+#: 「片方だけ直すと全体が悪化する」と言って止めた組み合わせ。
+NU_MODES = ("base", "pair")
+#: `nu_of` の既定の形。**既定は `base`**＝既存の測定を動かさない。
+#: 切替は `set_nu_mode`（`theory_bridge --nu-mode`）——**感度の幅として振るだけ**で、
+#: 結果が良くなるように動かさない（§0.4 の規則 3）。
+NU_MODE = "base"
+#: 飽和の境目（`nu_measure.power_band` と同じ＝式が 3 値しか返さない境目）
+SAT_OVER_PWR = 2000.0
 #: f16 の丸め対策（ちょうど 1000 の倍数が 2000.0002 になる・`budget_audit` と同じ）
 PWR_EPS = 10.0
 #: scalars の列（`rust/opcg_engine/src/encode/scalars.rs`）
@@ -431,8 +452,41 @@ def attack_stream(power, opp_leader_power, r_turns, theta=THETA, mu=MU, opp_char
     return float(total)
 
 
+def set_nu_mode(mode):
+    """`ν` の形を切り替える（`base`／`pair`）。既定は `base`。"""
+    global NU_MODE
+    if mode not in NU_MODES:
+        raise ValueError("nu mode は %s のどれか" % (NU_MODES,))
+    NU_MODE = mode
+    return NU_MODE
+
+
+def ko_p_of(power, fallback=KO_P):
+    """**パワー別の `ko_p`**（T22 の実測・山形）。`None` なら定数に落とす。"""
+    if power is None:
+        return float(fallback)
+    p = float(power)
+    for hi, v in KO_P_CURVE:
+        if p < hi:
+            return float(v)
+    return float(KO_P_CURVE[-1][1])
+
+
+def power_band_of(power, opp_leader_power):
+    """パワーの 3 帯（`nu_measure.power_band` と同じ境目）。"""
+    x = float(power) - float(opp_leader_power)
+    if x < 0.0:
+        return "lt_leader"
+    return "leader_to_sat" if x < SAT_OVER_PWR else "over_sat"
+
+
+def shield_of(power, opp_leader_power):
+    """**身代わり項**（P5 の実測・帯ごと）＝その体が吸う攻撃の純価値。"""
+    return float(SHIELD_TERM[power_band_of(power, opp_leader_power)])
+
+
 def nu_of(power, opp_leader_power, r_turns, theta=THETA, mu=MU, block_p=None, ko_p=KO_P,
-          is_blocker=None, opp_chars=None, my_leader_power=None):
+          is_blocker=None, opp_chars=None, my_leader_power=None, mode=None):
     """場のキャラ 1 体の価格 `ν`（`game_theory.md` §14.1）。
 
     残り `r_turns` ターンぶんの攻撃の価値＋ブロックの option value − KO される損。
@@ -448,10 +502,17 @@ def nu_of(power, opp_leader_power, r_turns, theta=THETA, mu=MU, block_p=None, ko
     if block_p is None:
         block_p = (BLOCK_P_BLOCKER if is_blocker else 0.0) if is_blocker is not None else \
             BLOCK_P_BLOCKER * 0.104          # 素性が判らないときは母集団の平均で置く
+    # **P5 と P4 は対で入れる**（T21）——身代わりを足すと `ν` は上がり、`ko_p` の形を
+    # 入れると帯ごとに上下する。**片方だけ入れると全体が悪化する**と測定で判っている。
+    mode = NU_MODE if mode is None else mode
+    shield = shield_of(power, opp_leader_power) if mode == "pair" else 0.0
+    kp = ko_p_of(power) if mode == "pair" else float(ko_p)
     atk = attack_stream(power, opp_leader_power, r_turns, theta, mu, opp_chars,
-                        my_leader_power, ko_p)
+                        my_leader_power, kp)
     block = float(block_p) * theta * mu             # 1 回ぶんの攻撃を消す価値
-    return atk + block - float(ko_p) * (atk + block)
+    # **身代わりも R ターンぶんの流量**（実測が既に `R` を掛けてある）なので、
+    # 攻撃・ブロックと同じく**生存で 1 度だけ割り引く**（二重に割り引かない）。
+    return (atk + block + shield) * (1.0 - kp)
 
 
 def attach_value(power, target_power, k=1, theta=THETA, mu=MU):
