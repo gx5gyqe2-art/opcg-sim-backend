@@ -83,16 +83,22 @@ def test_empty_input_does_not_crash():
     assert N.nu_effect([], cal) is None
 
 
-def test_nu_is_zero_block_for_a_non_blocker():
-    """**ブロックできるのはブロッカーだけ**＝非ブロッカーの `ν` にブロック項は入らない。"""
-    blk = T.nu_of(5000.0, 5000.0, 4.0, is_blocker=True)
-    plain = T.nu_of(5000.0, 5000.0, 4.0, is_blocker=False)
+@pytest.mark.parametrize("mode", T.NU_MODES)
+def test_nu_is_zero_block_for_a_non_blocker(mode):
+    """**ブロックできるのはブロッカーだけ**＝非ブロッカーの `ν` にブロック項は入らない。
+
+    どちらの形でも成り立つ。違うのは**割り引く `ko_p`**だけ（`base` は定数・
+    `pair` はそのパワーの帯の値）。
+    """
+    blk = T.nu_of(5000.0, 5000.0, 4.0, is_blocker=True, mode=mode)
+    plain = T.nu_of(5000.0, 5000.0, 4.0, is_blocker=False, mode=mode)
     assert blk > plain
     # 差はちょうどブロック項ぶん（KO 率で割り引かれた分）
-    expect = T.BLOCK_P_BLOCKER * T.THETA * T.MU * (1.0 - T.KO_P)
+    kp = T.ko_p_of(5000.0) if mode == "pair" else T.KO_P
+    expect = T.BLOCK_P_BLOCKER * T.THETA * T.MU * (1.0 - kp)
     assert (blk - plain) == pytest.approx(expect, rel=1e-6)
     # 素性が判らないときは母集団の平均で置く（両者の間に入る）
-    unknown = T.nu_of(5000.0, 5000.0, 4.0)
+    unknown = T.nu_of(5000.0, 5000.0, 4.0, mode=mode)
     assert plain < unknown < blk
 
 
@@ -160,22 +166,26 @@ def test_the_shield_term_is_the_measured_product_not_the_rate():
     assert T.power_band_of(9000.0, 5000.0) == "over_sat"
 
 
-def test_the_pair_goes_in_together_and_the_default_is_unchanged():
+def test_the_pair_goes_in_together_and_is_the_default():
     """**P5 と P4 は対で入れる**（T21: 片方だけ直すと全体が悪化する）。
 
-    **既定は `base`**＝既存の測定を動かさない。`pair` は感度の切替である。
+    **既定は `pair`**（ユーザ決定 2026-09-15）。**`base` は旧い形として残す**
+    ——**2026-09-15 より前の測定は全部 `base` で出ている**ので、
+    過去の数字と比べるときの明示の切替が要る。
     """
-    base = T.nu_of(3000.0, 5000.0, 4.128, is_blocker=False)
+    base = T.nu_of(3000.0, 5000.0, 4.128, is_blocker=False, mode="base")
     pair = T.nu_of(3000.0, 5000.0, 4.128, is_blocker=False, mode="pair")
-    assert base == pytest.approx(0.0)              # 式は「リーダー未満は 0」と言う
+    assert base == pytest.approx(0.0)              # 旧い式は「リーダー未満は 0」と言った
     assert pair > base                             # 身代わりが入るので 0 ではなくなる
-    assert T.NU_MODE == "base"                     # 既定は動かさない
+    assert T.NU_MODE == "pair"                     # 既定が対の側であることをラチェットする
+    # 既定を明示せずに呼んだら `pair` と一致する（既定が黙って戻ったら落ちる）
+    assert T.nu_of(3000.0, 5000.0, 4.128, is_blocker=False) == pytest.approx(pair)
     try:
-        T.set_nu_mode("pair")
-        assert T.nu_of(3000.0, 5000.0, 4.128, is_blocker=False) == pytest.approx(pair)
-    finally:
         T.set_nu_mode("base")
-    assert T.nu_of(3000.0, 5000.0, 4.128, is_blocker=False) == pytest.approx(base)
+        assert T.nu_of(3000.0, 5000.0, 4.128, is_blocker=False) == pytest.approx(base)
+    finally:
+        T.set_nu_mode("pair")
+    assert T.nu_of(3000.0, 5000.0, 4.128, is_blocker=False) == pytest.approx(pair)
     with pytest.raises(ValueError):
         T.set_nu_mode("なにか")
 

@@ -714,13 +714,16 @@ def _kind_spec(k):
 
 
 def predict(keys, opp_leader_power=5000.0, r_turns=4.128, theta=THETA, mu=MU,
-            targets="leader", recs=None):
+            targets="leader", recs=None, mode=None):
     """式の予測値（同じ種類の `ν`）。`R` は実測の 4.128 を既定にする。
 
     `targets="board"` で**攻撃項を「対象の max」に広げた式**を引く（task #39）。
     そのとき `ν` は**相手の場に依る**ので、代表値 1 つでは引けない——`recs`（`collect` が
     返す行）を渡し、**行ごとに引いてその平均**を予測値にする。**行の盤面の分布ごと**
     突き合わせるので、実測の `β`（同じ行集合の帯内回帰）と同じ母集団で比べられる。
+
+    `mode` は `ν` の形（`theory_order.nu_of` の `mode`・`None` なら既定＝2026-09-15 から
+    `pair`）。**2026-09-15 より前の予測値は全部 `base`**なので、比べるときは明示する。
     """
     board = (targets == "board")
     rows = list(recs or ()) if board else []
@@ -732,7 +735,7 @@ def predict(keys, opp_leader_power=5000.0, r_turns=4.128, theta=THETA, mu=MU,
             return (0.104 * one(pw, True, opl, mlp, oc)
                     + 0.896 * one(pw, False, opl, mlp, oc))
         return nu_of(pw, opl, r_turns, theta, mu, is_blocker=blk,
-                     opp_chars=oc, my_leader_power=mlp)
+                     opp_chars=oc, my_leader_power=mlp, mode=mode)
 
     out = {}
     for k in keys:
@@ -796,6 +799,9 @@ def main(argv=None):
                          "`board` は**行ごとの盤面で引いて平均**する")
     ap.add_argument("--theta", type=float, default=THETA)
     ap.add_argument("--mu", type=float, default=MU)
+    ap.add_argument("--nu-mode", default=None, choices=("base", "pair"),
+                    help="式の形（省略時は `theory_order.NU_MODE`＝2026-09-15 から `pair`）。"
+                         "**それ以前の予測値と比べるときは `base` を明示する**")
     ap.add_argument("--cost-check", action="store_true",
                     help="**払ったコストと価格が見合っているか**（`--scheme power` が要る）")
     ap.add_argument("--mu-true", type=float, default=MU_TRUE, help="実測の手札 1 枚（勘定に使う）")
@@ -808,8 +814,11 @@ def main(argv=None):
     recs, games, played = collect(a.src, a.limit_games, tuple(a.scheme), cards,
                                   row_pick=a.row_pick, deck_band=a.deck_band,
                                   band_mode=a.band_mode)
+    import theory_order as _TO
     res = {"games": games, "own_turns": len(recs), "fits": {},
-           "args": {k: v for k, v in vars(a).items() if k != "out"}}
+           "args": {k: v for k, v in vars(a).items() if k != "out"},
+           # 省略時の既定を出力に刻む（既定が動いても後から何で引いたか判るように）
+           "nu_mode_effective": a.nu_mode or _TO.NU_MODE}
     keys_of = {"all": ["chars"], "blocker": ["blocker", "plain"],
                "power": ["lt_leader", "leader_to_sat", "over_sat"],
                "power_blocker": [b + s for b in ("lt_leader", "leader_to_sat", "over_sat")
@@ -830,7 +839,7 @@ def main(argv=None):
         keys = [k for k in keys_of[sch] if any(r.get(k) for r in recs)]
         fit = within_multi(recs, keys) if keys else None
         pred = predict(keys, r_turns=a.r_turns, theta=a.theta, mu=a.mu,
-                       targets=a.nu_targets, recs=recs)
+                       targets=a.nu_targets, recs=recs, mode=a.nu_mode)
         res["fits"][sch] = {"fit": fit, "predicted": pred, "check": check(fit, pred)}
     if a.cost_check:
         pf = res["fits"].get("power", {}).get("fit") or {}

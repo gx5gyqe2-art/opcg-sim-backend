@@ -137,10 +137,19 @@ def test_check_reports_whether_phase1a_is_reproduced():
 
 
 def test_predict_gives_zero_for_the_band_the_formula_zeroes():
-    """式の予測側の回帰——**リーダー未満は 0**（そこが最大の穴だと判った場所）。"""
-    p = M.predict(["lt_leader", "leader_to_sat", "over_sat"])
+    """式の予測側の回帰——**旧い形（`base`）はリーダー未満を 0 と言う**（そこが最大の穴
+    だと判った場所）。**既定（2026-09-15 から `pair`）は身代わりでそこが 0 を脱する**。
+
+    `predict` は `mode` を `nu_of` へ素通しする——**省略時は `theory_order` の既定**
+    なので、既定が黙って戻れば下の `pair` の行が落ちる。
+    """
+    p = M.predict(["lt_leader", "leader_to_sat", "over_sat"], mode="base")
     assert p["lt_leader"] == 0.0
     assert p["leader_to_sat"] < p["over_sat"]           # 飽和までは伸びる
+    q = M.predict(["lt_leader", "leader_to_sat", "over_sat"])      # 既定＝pair
+    assert q == M.predict(["lt_leader", "leader_to_sat", "over_sat"], mode="pair")
+    assert q["lt_leader"] > 0.0                         # 身代わりが入る
+    assert q["leader_to_sat"] < q["over_sat"]           # 形の向きは変わらない
     # ブロッカーは上乗せされる
     pb = M.predict(["leader_to_sat_blk", "leader_to_sat_plain"])
     assert pb["leader_to_sat_blk"] > pb["leader_to_sat_plain"]
@@ -273,14 +282,21 @@ def test_lt_detail_names_which_effect_carries_the_body():
 
 
 def test_the_formula_predicts_zero_for_every_below_leader_kind():
-    """**式の主張は「リーダー未満は 0」**——ブロッカーだけがブロック項ぶんを持つ。
+    """**旧い形（`base`）の主張は「リーダー未満は 0」**——ブロッカーだけがブロック項ぶんを持つ。
 
-    これが T21 の検定の相手で、`lt_plain` の実測が 0 を離れれば式は誤り。
+    これが T21 の検定の相手で、`lt_plain` の実測が 0 を離れれば式は誤り——**そして実際に
+    離れていた**（0.0753・CI が 0 を含まない）。**既定（`pair`）は身代わりでそこを埋める**が、
+    **素性の違い（効果の有無）で差は付けない**——身代わりは素の体が持つと判った（T21）。
     """
-    p = M.predict(["lt_plain", "lt_attack", "lt_act", "lt_other", "lt_blocker"])
+    keys = ["lt_plain", "lt_attack", "lt_act", "lt_other", "lt_blocker"]
+    p = M.predict(keys, mode="base")
     for k in ("lt_plain", "lt_attack", "lt_act", "lt_other"):
         assert p[k] == 0.0
     assert p["lt_blocker"] > 0.0
+    q = M.predict(keys)                                 # 既定＝pair
+    assert q["lt_plain"] > 0.0
+    assert q["lt_plain"] == q["lt_attack"] == q["lt_act"] == q["lt_other"]
+    assert q["lt_blocker"] > q["lt_plain"]
     # 混ざりものには予測を出さない（代表値を選ぶと恣意になる）
     assert "lt_signal" not in M.predict(["lt_signal"])
     assert "ge_leader" not in M.predict(["ge_leader"])

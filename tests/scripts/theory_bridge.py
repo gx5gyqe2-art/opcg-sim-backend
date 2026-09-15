@@ -440,8 +440,9 @@ def main(argv=None):
                          "`exclude` は母数にも入れない")
     ap.add_argument("--margin-comfort", type=float, default=MARGIN_COMFORT,
                     help="**T28-c** の暫定値——守る力が来る攻撃をこれだけ上回れば「余裕で払えた」")
-    ap.add_argument("--nu-mode", default="base", choices=("base", "pair"),
-                    help="**P5 身代わり ＋ P4 `ko_p` の形**を対で入れるか（§0.4 の感度）")
+    ap.add_argument("--nu-mode", default=None, choices=("base", "pair"),
+                    help="`ν` の形。**省略時は `theory_order.NU_MODE`（2026-09-15 から `pair`）**。"
+                         "**2026-09-15 より前の数字と比べるときは `base` を明示する**")
     ap.add_argument("--cond-unknown", type=float, default=1.0,
                     help="**判らない条件の係数**（§0.4 の感度。1.0＝上限・0.0＝下限）")
     ap.add_argument("--boot-reps", type=int, default=200)
@@ -455,7 +456,8 @@ def main(argv=None):
     except Exception:
         pass
     import theory_order as _TO
-    _TO.set_nu_mode(a.nu_mode)
+    if a.nu_mode is not None:
+        _TO.set_nu_mode(a.nu_mode)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.nu_targets,
                          a.silent, a.margin_comfort)
