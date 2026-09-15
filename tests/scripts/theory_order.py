@@ -249,6 +249,42 @@ def opp_chars_of(tok_row):
     return out
 
 
+#: トークンの列（`n_rel_feat.S_COLS`）。`cost_now` は `/10`・`is_rest` は旗。
+S_COST, S_IS_REST = 1, 3
+
+
+def opp_bodies_of(tok_row, my_leader_power, r_turns=4.128, theta=THETA, mu=MU,
+                  ko_p=KO_P):
+    """**相手の場の体を「価格つき」で返す**（効果の値付けが対象を選ぶための材料）。
+
+    ユーザ指摘 2026-09-15「**登場時効果は `ν` ではなくて効果に紐づく価値を変動させるべき**」
+    ——**`ν` は動かさない**。動くのは**効果の値**で、それは**実際に取れる対象**で決まる。
+
+    `ν` の定義は**攻撃の対象と同じものを使う**（`attack_stream` の中と 1 字も違わない）:
+
+    ```
+    nu_t = nu_of(対象のパワー, 自リーダーのパワー, R, is_blocker=対象がブロッカーか)
+    ```
+
+    **深さ 1 で止める**（対象の価値を測るのにこちらの盤面を要求すると相互再帰になる）。
+    コストとレストも返す——**効果の絞り込み（「コスト4以下」「レストの」）を尊重する**ため。
+    """
+    tok = np.asarray(tok_row)
+    out = []
+    for si in range(SLOT_OPP_FIELD.start, SLOT_OPP_FIELD.stop):
+        if float(tok[si, S_IS_CHAR]) <= 0.5:
+            continue
+        pw = slot_power(tok, si) or 0.0
+        blk = float(tok[si, S_IS_BLOCKER]) > 0.5
+        out.append({"power": pw,
+                    "cost": float(tok[si, S_COST]) * 10.0,
+                    "is_rest": float(tok[si, S_IS_REST]) > 0.5,
+                    "blocker": blk,
+                    "nu": nu_of(pw, float(my_leader_power), r_turns, theta, mu, ko_p=ko_p,
+                                is_blocker=blk)})
+    return out
+
+
 def board_theta(tok_row, life, my_don=0.0, don_share=DON_SHARE, fallback=THETA):
     """**盤面から出す `Θ`（シャドー価格）**＝来る攻撃の `c(x)` を安い順に並べた `G` 番目。
 
@@ -408,7 +444,7 @@ def play_value(power, cost, opp_leader_power, r_turns, theta=THETA, mu=MU, delta
             - mu - float(cost) * d)
 
 
-def _effect_value(cid, when, st=None):
+def _effect_value(cid, when, st=None, opp_bodies=None):
     """**効果の値**（P2・`effect_value.py`）。読めなければ `None`。
 
     **遅延 import**——`effect_value` は同梱 JSON を読むので、使う行だけで払う。
@@ -428,11 +464,12 @@ def _effect_value(cid, when, st=None):
         # **キャラの登場**——解決するのは `ON_PLAY` だけ（`ON_PLAY_TRIGGERS` は体なし用に
         # `ACTIVATE_MAIN` まで含むので、キャラに使うと起動メインを登場時に足してしまう）。
         # **登場時能力を持たないキャラは 0**（`None` にすると素のキャラが全部無言になる）。
-        v, _unp = EV.card_value(cid, EV.CHAR_ON_PLAY_TRIGGERS, st=st, no_ability=0.0)
+        v, _unp = EV.card_value(cid, EV.CHAR_ON_PLAY_TRIGGERS, st=st, no_ability=0.0,
+                                opp_bodies=opp_bodies)
         return v
     activate = (when != "on_play")
     trg = EV.ACTIVATE_TRIGGERS if activate else EV.ON_PLAY_TRIGGERS
-    v, _unp = EV.card_value(cid, trg, st=st, offered=activate)
+    v, _unp = EV.card_value(cid, trg, st=st, offered=activate, opp_bodies=opp_bodies)
     return v
 
 
@@ -489,14 +526,15 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
         return attach_value(sp, ctx["opp_leader_power"], k, theta, mu)
     if at == "ACTIVATE_MAIN":
         # **起動メイン**——カードは既に場に在るので `μ` は引かない（コストは能力の中に在る）
-        return _effect_value(cid, "activate")        # 条件はエンジンが検査済み
+        # 条件はエンジンが検査済み。**対象は盤面から選ぶ**
+        return _effect_value(cid, "activate", opp_bodies=ctx.get("opp_bodies"))
     if at == "PLAY":
         if src is None:
             return None
         if src.get("event") or src.get("stage"):
             # **体を持たない札**（イベント・ステージ）は**効果の値**で見る（P2-1・§14.1.3）。
             # 札 1 枚とドンを払って効果だけを買う形。
-            ev = _effect_value(cid, "on_play", ctx.get("st"))
+            ev = _effect_value(cid, "on_play", ctx.get("st"), ctx.get("opp_bodies"))
             if ev is None:
                 return None
             d = 0.66 * mu
@@ -523,7 +561,7 @@ def _char_play_value(cid, src, ctx, theta, mu, k):
                       ctx["opp_leader_power"], ctx["r_turns"], theta, mu,
                       is_blocker=src.get("blocker"), opp_chars=ctx.get("opp_chars"),
                       my_leader_power=ctx["my_leader_power"])
-    ev = _effect_value(cid, "char_on_play", ctx.get("st"))
+    ev = _effect_value(cid, "char_on_play", ctx.get("st"), ctx.get("opp_bodies"))
     if ev is None:
         return None
     return base + ev

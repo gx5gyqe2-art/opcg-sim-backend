@@ -454,3 +454,90 @@ def test_the_median_ability_is_still_worth_about_one_card():
     """
     out = E.summarise(E.load_cards())
     assert abs(out["value"]["median"] - T.MU) < 0.2 * T.MU, out["value"]
+
+
+# --- 効果が取る対象を盤面から選ぶ（ユーザ指摘 2026-09-15） ----------------------
+
+def _bodies():
+    """相手の場（弱い体と強い体）。`nu` は呼び出し側が入れる約束。"""
+    return [{"power": 3000, "cost": 2, "blocker": False, "is_rest": False, "nu": 0.069},
+            {"power": 9000, "cost": 7, "blocker": False, "is_rest": True, "nu": 0.211}]
+
+
+def test_removal_is_priced_by_the_best_target_on_the_board():
+    """**`ν` は動かさず、効果の値が盤面で変わる**（ユーザ指摘 2026-09-15）。
+
+    除去は**取れるうちで一番高い体**の価格になる——平均 0.1087 を当てるのは、
+    相手の場が弱い体 1 つのときも強い体のときも同じ値にしてしまう。
+    """
+    act = _act("KO", "OPPONENT", card_type=["CHARACTER"])
+    assert E.action_value(act, opp_bodies=_bodies()) == pytest.approx(0.211)
+    # 盤面を渡さなければ従来どおり平均
+    assert E.action_value(act) == pytest.approx(E.NU_AVG)
+
+
+def test_removal_with_no_legal_target_is_worth_zero():
+    """**対象が 1 体も居なければ空振り＝0**——実測で 406 件が該当した。"""
+    act = _act("KO", "OPPONENT", card_type=["CHARACTER"])
+    assert E.action_value(act, opp_bodies=[]) == 0.0
+
+
+def test_removing_two_takes_the_top_two_and_no_more_than_exist():
+    """**2 体なら上位 2 体の和**。**在る数を超えては取れない**。"""
+    two = _act("KO", "OPPONENT", count=2, card_type=["CHARACTER"])
+    assert E.action_value(two, opp_bodies=_bodies()) == pytest.approx(0.211 + 0.069)
+    one_body = [_bodies()[0]]
+    assert E.action_value(two, opp_bodies=one_body) == pytest.approx(0.069)
+    assert E._take([0.2, 0.1], 5) == [0.2, 0.1]
+
+
+def test_the_targets_filter_is_respected():
+    """**「コスト 4 以下」なら安い体しか取れない**——絞り込みを無視すると除去が過大になる。"""
+    cheap = _act("KO", "OPPONENT", card_type=["CHARACTER"])
+    cheap["target"]["cost_max"] = 4
+    assert E.action_value(cheap, opp_bodies=_bodies()) == pytest.approx(0.069)
+    weak = _act("KO", "OPPONENT", card_type=["CHARACTER"])
+    weak["target"]["power_max"] = 5000
+    assert E.action_value(weak, opp_bodies=_bodies()) == pytest.approx(0.069)
+    rested = _act("KO", "OPPONENT", card_type=["CHARACTER"])
+    rested["target"]["is_rest"] = True
+    assert E.action_value(rested, opp_bodies=_bodies()) == pytest.approx(0.211)
+
+
+def test_a_filter_we_cannot_read_falls_back_to_the_average():
+    """**枠から読めない絞り込み**（特徴・カード名・色）は**盤面を使わない**。
+
+    「当てはまる」と決めれば過大に、「当てはまらない」と決めれば過小になるので、
+    **決めない**（条件の `None` と同じ作法）。
+    """
+    trait = _act("KO", "OPPONENT", card_type=["CHARACTER"])
+    trait["target"]["traits"] = ["ワノ国"]
+    assert E.eligible_bodies(trait["target"], _bodies()) is None
+    assert E.action_value(trait, opp_bodies=_bodies()) == pytest.approx(E.NU_AVG)
+
+
+def test_bounce_gives_the_owner_a_card_back_per_target():
+    """`BOUNCE` は**対象ごとに**「体が消えて札が 1 枚戻る」。"""
+    act = _act("BOUNCE", "OPPONENT", card_type=["CHARACTER"])
+    assert E.action_value(act, opp_bodies=_bodies()) == pytest.approx(0.211 - T.MU)
+
+
+def test_resting_an_opponent_body_uses_that_bodys_price():
+    """テンポも**止める体の価格 ÷ R**（平均ではなく対象の価格）。"""
+    act = _act("REST", "OPPONENT", card_type=["CHARACTER"])
+    assert E.action_value(act, opp_bodies=_bodies()) == pytest.approx(0.211 / E.R_TURNS)
+
+
+def test_sending_a_body_to_the_deck_or_hand_is_priced_per_target():
+    """`DECK_BOTTOM`(FIELD) は除去・`MOVE_CARD`(FIELD→HAND) は bounce——どちらも対象の価格。"""
+    deck = _act("DECK_BOTTOM", "OPPONENT", zone="FIELD", card_type=["CHARACTER"])
+    assert E.action_value(deck, opp_bodies=_bodies()) == pytest.approx(0.211)
+    hand = _act("MOVE_CARD", "OPPONENT", zone="FIELD", card_type=["CHARACTER"], dest="HAND")
+    assert E.action_value(hand, opp_bodies=_bodies()) == pytest.approx(0.211 - T.MU)
+
+
+def test_a_bodyless_target_is_not_picked_from_the_board():
+    """**ステージは体ではない**ので盤面の体から選ばない（`field_value` の規約と同じ）。"""
+    stage = _act("KO", "OPPONENT", card_type=["STAGE"])
+    assert E._pick_opp(stage["target"], _bodies(), 1) is None
+    assert E.action_value(stage, opp_bodies=_bodies()) == pytest.approx(E.ABILITY_UNKNOWN)

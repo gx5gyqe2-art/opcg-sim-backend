@@ -598,3 +598,48 @@ def test_a_character_whose_card_is_unknown_is_not_scored():
                                     "event": False}})
     assert T.score_candidate(["PLAY", "NO-SUCH", [], [], None], "NO-SUCH", None, CTX,
                              cards) is None
+
+
+def test_opp_bodies_of_reads_the_board_and_prices_each_target():
+    """**効果が取れる対象を価格つきで返す**（2026-09-15・ユーザ指摘）。
+
+    **`ν` の定義は攻撃の対象と同じもの**でなければならない——`attack_stream` の中で
+    使う `nu_of(対象のパワー, 自リーダー, R, is_blocker=…)` と 1 字も違わないこと。
+    違うと「攻撃で倒す価値」と「効果で倒す価値」が食い違う。
+    """
+    tok = np.zeros((22, 40), dtype=np.float32)
+    a, b = T.SLOT_OPP_FIELD.start, T.SLOT_OPP_FIELD.start + 1
+    for si, (pw, cost, rest, blk) in ((a, (0.3, 0.2, 0, 0)), (b, (0.9, 0.7, 1, 1))):
+        tok[si, T.S_IS_CHAR] = 1.0
+        tok[si, T.S_POWER] = pw
+        tok[si, T.S_COST] = cost
+        tok[si, T.S_IS_REST] = rest
+        tok[si, T.S_IS_BLOCKER] = blk
+    got = T.opp_bodies_of(tok, 5000.0, 4.0)
+    assert len(got) == 2
+    assert got[0]["power"] == pytest.approx(3000.0)
+    assert got[0]["cost"] == pytest.approx(2.0)
+    assert got[0]["is_rest"] is False
+    assert got[1]["is_rest"] is True and got[1]["blocker"] is True
+    # **攻撃側と同じ定義**
+    assert got[1]["nu"] == pytest.approx(T.nu_of(9000.0, 5000.0, 4.0, is_blocker=True))
+    assert got[0]["nu"] == pytest.approx(T.nu_of(3000.0, 5000.0, 4.0, is_blocker=False))
+    # リーダーは入れない（リーダー狙いは `attack_stream` が別に見る）
+    tok[T.SLOT_OPP_FIELD.start - 6, T.S_IS_CHAR] = 1.0
+    assert len(T.opp_bodies_of(tok, 5000.0, 4.0)) == 2
+
+
+def test_an_on_play_removal_is_worth_nothing_when_the_board_is_empty():
+    """**空振りは 0**——盤面を渡さないと平均 0.1087 が付き、相手の場が空でも除去に値段が付く。"""
+    import effect_value as EV
+    cid = None
+    for c in EV._all_cards():
+        v, _u = EV.card_value(c, EV.CHAR_ON_PLAY_TRIGGERS, opp_bodies=[])
+        w, _u2 = EV.card_value(c, EV.CHAR_ON_PLAY_TRIGGERS)
+        if v is not None and w is not None and abs(v - w) > 1e-9:
+            cid = c
+            break
+    assert cid, "盤面で値が変わる登場時効果が同梱に無いのはおかしい"
+    empty, avg = (EV.card_value(cid, EV.CHAR_ON_PLAY_TRIGGERS, opp_bodies=[])[0],
+                  EV.card_value(cid, EV.CHAR_ON_PLAY_TRIGGERS)[0])
+    assert empty < avg               # 相手の場が空なら安くなる

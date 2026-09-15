@@ -298,6 +298,80 @@ def is_body(target):
     return any(str(t).upper() in BODY_TYPES for t in types)
 
 
+#: **盤面から対象を選べない絞り込み**（枠＝トークンから読めない素性）。
+#: 1 つでも入っていたら**盤面を使わず平均で値付けする**——読めないものを
+#: 「当てはまる」と決めると除去を過大に、「当てはまらない」と決めると過小にする。
+OPAQUE_TARGET_KEYS = ("traits", "names", "colors", "attributes", "flags", "exclude_ids",
+                      "exclude_names", "is_vanilla", "is_unique_name", "lacks_trigger",
+                      "min_attached_don", "power_sum_max", "cost_max_dynamic",
+                      "count_dynamic", "is_face_up", "ref_id", "save_id")
+
+
+def eligible_bodies(target, bodies):
+    """**その動作が実際に取れる相手の体**を価格の高い順で返す（読めなければ `None`）。
+
+    ユーザ指摘 2026-09-15「**登場時効果は `ν` ではなくて効果に紐づく価値を変動させるべき**」
+    ——**`ν`（体の価格）は動かさない**。動くのは**効果の値**で、それは
+    **その効果が実際に取れる対象**で決まる:
+
+    ```
+    登場時 KO の価値 = Σ（取れる対象のうち価格が高い n 体の ν）      n = 個数（在る数まで）
+    ```
+
+    **対象が 1 体も無ければ 0**（空振り）——いまは平均 0.1087 を当てていたので、
+    **相手の場が空でも除去に値段が付いていた**。
+
+    `bodies` は `[{"power", "cost", "blocker", "nu"}, ...]`（呼び出し側が枠から作る）。
+    **絞り込みのうち枠から読めるのはコスト・パワー・レストだけ**なので、
+    **特徴・カード名・色が指定されていたら `None`**（盤面を使わない）。
+    """
+    if bodies is None:
+        return None
+    t = target or {}
+    for k in OPAQUE_TARGET_KEYS:
+        v = t.get(k)
+        if v not in (None, [], (), "", False, 0):
+            return None
+    out = []
+    for b in bodies:
+        pw = float(b.get("power") or 0.0)
+        cost = b.get("cost")
+        if t.get("power_max") is not None and pw > float(t["power_max"]):
+            continue
+        if t.get("power_min") is not None and pw < float(t["power_min"]):
+            continue
+        if t.get("cost_max") is not None:
+            if cost is None or float(cost) > float(t["cost_max"]):
+                continue
+        if t.get("cost_min") is not None:
+            if cost is None or float(cost) < float(t["cost_min"]):
+                continue
+        if t.get("is_rest") and not b.get("is_rest"):
+            continue
+        out.append(float(b.get("nu") or 0.0))
+    out.sort(reverse=True)
+    return out
+
+
+def _pick_opp(target, opp_bodies, n):
+    """**相手の体に触る動作が実際に取る対象**（価格の高い順に `n` 体・読めなければ `None`）。
+
+    **体を持たない対象（ステージ）には当てない**——`field_value` の規約と同じ。
+    """
+    if opp_bodies is None or not is_body(target):
+        return None
+    got = eligible_bodies(target, opp_bodies)
+    if got is None:
+        return None
+    return _take(got, n)
+
+
+def _take(chosen, n):
+    """**取れるのは在る数まで**——「2 体まで KO」でも 1 体しか居なければ 1 体ぶん。"""
+    k = int(min(max(0, int(n)), len(chosen)))
+    return chosen[:k]
+
+
 def field_value(target, nu=NU_AVG):
     """**場に居る 1 枚の価値**。体（キャラ・リーダー）なら `ν`、
     **体を持たない常設（ステージ）なら「能力 1 つ」**（`ABILITY_UNKNOWN`）。
@@ -410,11 +484,15 @@ def _band_nu(power):
 
 
 def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
-                 ko_p=KO_P, card=None, depth=0):
+                 ko_p=KO_P, card=None, depth=0, opp_bodies=None):
     """**1 つの動作の価値**（自分から見た勝率）。値付けできなければ `None`、
     **資源が動かない動作は 0**（観測・印）。
 
     `target.player == "OPPONENT"` なら**相手の資源が動く**＝零和なので符号が反転する。
+
+    **`opp_bodies` を渡すと、相手の体に触る動作は「実際に取れる対象」で値付けする**
+    （ユーザ指摘 2026-09-15「**`ν` ではなくて効果に紐づく価値を変動させるべき**」）
+    ——`ν` は動かさず、**効果の値が盤面で変わる**。**対象が居なければ 0**（空振り）。
     """
     at = str(effect.get("type") or "")
     target = effect.get("target") or {}
@@ -435,6 +513,12 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         stock, turns, gain = TEMPO[at]
         per = {"nu": nu, "don": delta, "attack": theta * mu * R_TURNS}[stock]
         turns = DURATION_TURNS.get(str(effect.get("duration") or ""), turns)
+        if stock == "nu" and opp and not gain:
+            # **相手の体を止めるなら、止められる体の価格で値付けする**
+            picked = _pick_opp(target, opp_bodies, n)
+            if picked is not None:
+                amt = sum(picked) * turns / R_TURNS
+                return amt if opp else -amt
         amt = n * per * turns / R_TURNS
         # 相手のものを止めれば自分の得・自分のものが止まれば損（`gain` は向きの既定）
         if gain:
@@ -465,6 +549,14 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         dest = str(effect.get("destination") or MOVE_DEFAULT_DEST.get(at) or "").upper()
         zs = zones or [MOVE_DEFAULT_ZONE.get(at, "")]
         fv = field_value(target, nu)      # ステージは `ν` ではなく「能力 1 つ」
+        if opp and "FIELD" in zs and len(zs) == 1:
+            # **相手の場から動かすなら、動かせる体の価格で値付けする**
+            picked = _pick_opp(target, opp_bodies, n)
+            if picked is not None:
+                dst = {"FIELD": None, "HAND": mu, "LIFE": lam}.get(dest, 0.0)
+                if dst is not None:
+                    # 相手の体が場から `dest` へ動く＝**自分の得は `ν − 行き先の価値`**
+                    return sum(v - dst for v in picked)
         vals = [move_value(z, dest, mu, lam, fv) for z in zs]
         vals = [v for v in vals if v is not None]
         if not vals:
@@ -478,10 +570,15 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
     if kind is None:
         return None
     if kind == "nu_loss":
-        amt = n * field_value(target, nu)
+        picked = _pick_opp(target, opp_bodies, n) if opp else None
+        amt = sum(picked) if picked is not None else n * field_value(target, nu)
         return amt if opp else -amt
     if kind == "bounce":
-        amt = n * (field_value(target, nu) - mu)   # 場から消えるが手札が 1 枚増える
+        picked = _pick_opp(target, opp_bodies, n) if opp else None
+        if picked is not None:
+            amt = sum(v - mu for v in picked)     # 場から消えるが手札が 1 枚増える
+        else:
+            amt = n * (field_value(target, nu) - mu)
         return amt if opp else -amt
     if kind == "play":
         zone = zones[0] if zones else ""
@@ -602,7 +699,8 @@ def condition_factor(ab, st=None, offered=False):
 
 
 def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=KO_P,
-                  card=None, depth=0, selection=True, st=None, offered=False):
+                  card=None, depth=0, selection=True, st=None, offered=False,
+                  opp_bodies=None):
     """**能力 1 つの価値**＝**条件** × （実行内容の和 ＋ 選択の利得 − コストの和）。
 
     **条件は足す項ではなく掛かる側**（ユーザ確認 2026-09-14）——成り立たなければ
@@ -615,7 +713,7 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
     total = 0.0
     acts = walk_actions(ab.get("effect"))
     for e in acts:
-        v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth)
+        v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies)
         if v is None:
             unpriced.append((str(e.get("type") or "?"), family_of(str(e.get("type") or ""))))
         else:
@@ -624,7 +722,7 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
         total += _sel_premium(selection_k(acts))
     cost = ab.get("cost") or {}
     for e in walk_actions(cost):
-        v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth)
+        v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies)
         if v is None:
             unpriced.append((str(e.get("type") or "?"), family_of(str(e.get("type") or ""))))
         else:
@@ -653,7 +751,7 @@ def _all_cards():
 
 
 def card_value(cid, triggers, nu=NU_AVG, mu=MU, lam=LAM, delta=DELTA, cards=None,
-               selection=True, st=None, offered=False, no_ability=None):
+               selection=True, st=None, offered=False, no_ability=None, opp_bodies=None):
     """**カード 1 枚の、その契機での価値**を `(値, 読めなかった動作)` で返す。
 
     同じ契機の能力が複数あれば**和**を取る（同時に解決するので）。
@@ -677,7 +775,7 @@ def card_value(cid, triggers, nu=NU_AVG, mu=MU, lam=LAM, delta=DELTA, cards=None
     unp = []
     for ab in hit:
         v, u = ability_value(ab, mu, lam, delta, nu, card=c, selection=selection,
-                             st=st, offered=offered)
+                             st=st, offered=offered, opp_bodies=opp_bodies)
         if v is None:
             unp.extend(u)
         else:
