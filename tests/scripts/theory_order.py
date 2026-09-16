@@ -458,11 +458,22 @@ def theta_of(tok_row, life, my_don=0.0, mode="const", theta=THETA, don_share=DON
     return max(float(theta), b)
 
 
-def attack_value(power, target_power, is_leader, theta=THETA, mu=MU, nu_target=None):
-    """攻撃 1 回の価値＝**相手が安い方を選ぶので min**（`game_theory.md` §14.1）。
+def block_cost(power, blocker_power, nu_blocker, mu=MU):
+    """**ブロッカー B で受ける費用**（T47）——`P < P_B` なら B は無傷で 0、そうでなければ
+    **B を失う（`ν(B)`）か、ブロックしてから B をカウンターで守る（`c(P − P_B)·μ`）かの安い方**。
+    「対象より大きく攻撃側より小さいブロッカーで受けてから札を切る」パターンはこの `min` が拾う。"""
+    xb = float(power) - float(blocker_power)
+    if xb < -PWR_EPS:
+        return 0.0
+    return float(min(float(nu_blocker), c_of(xb) * mu))
 
-    リーダー狙い: `min(c(x)·μ, Θ·μ)`。キャラ狙い: `min(c(x)·μ, ν(対象))`。
-    `x < 0` は通らないので 0。
+
+def attack_value(power, target_power, is_leader, theta=THETA, mu=MU, nu_target=None, blockers=None):
+    """攻撃 1 回の価値＝**相手が一番安い応答を選ぶので min**（`game_theory.md` §14.1）。
+
+    リーダー狙い: `min(c(x)·μ, Θ·μ, ブロック)`。キャラ狙い: `min(c(x)·μ, ν(対象), ブロック)`。
+    `x < 0` は通らないので 0。`blockers` は相手の場の**アクティブなブロッカー** `[(パワー, ν(B)), …]`
+    （T47・2026-09-16）——渡さなければ従来どおり 2 つの応答だけ。
     """
     x = float(power) - float(target_power)
     if x < -PWR_EPS:
@@ -470,7 +481,10 @@ def attack_value(power, target_power, is_leader, theta=THETA, mu=MU, nu_target=N
     guard = c_of(x) * mu
     take = (theta * mu) if is_leader else (
         float(nu_target) if nu_target is not None else theta * mu)
-    return float(min(guard, take))
+    best = min(guard, take)
+    for pb, nub in (blockers or ()):
+        best = min(best, block_cost(power, pb, nub, mu))
+    return float(best)
 
 
 #: ドン 1 個の価格（実測・`game_theory.md` §18・`effect_value.DELTA` と同じ）——**ドンの代替価値**
@@ -486,19 +500,19 @@ ATTACK_DON_MAX = 10
 
 
 def attack_value_don(power, target_power, is_leader, theta=THETA, mu=MU, nu_target=None,
-                     delta=DELTA, max_don=ATTACK_DON_MAX, mode=None):
+                     delta=DELTA, max_don=ATTACK_DON_MAX, mode=None, blockers=None):
     """**ドンを付けて殴る**攻撃 1 回の価値＝`max_k [ attack_value(P + 1000k) − k·δ ]`（T45）。
 
     リーダーより 1000 低い体は 1 枚付けて通す（`c(0)·μ − δ`）、2000 低い体は 2 枚で
     `c(0)·μ − 2δ ≈ 0`＝今までどおり 0。リーダー以上の体は素殴りが最善のまま（`Θ·μ` で頭打ち）。
     """
     mode = ATTACK_DON_MODE if mode is None else mode
-    best = attack_value(power, target_power, is_leader, theta, mu, nu_target)
+    best = attack_value(power, target_power, is_leader, theta, mu, nu_target, blockers)
     if mode != "don":
         return best
     for k in range(1, int(max_don) + 1):
-        v = attack_value(float(power) + 1000.0 * k, target_power, is_leader, theta, mu, nu_target) \
-            - k * float(delta)
+        v = attack_value(float(power) + 1000.0 * k, target_power, is_leader, theta, mu, nu_target,
+                         blockers) - k * float(delta)
         if v > best:
             best = v
     return float(best)
@@ -550,7 +564,8 @@ def option_value(power, opp_leader_power, r_turns, theta=THETA, mu=MU, my_leader
     盤面モードと同じ規則・高い順に 1 ターン 1 体）——**毎ターン新しい体が現れる前提にはしない**
     （初版でそう書いて `ν` が 1.5〜1.75 倍になった＝#39 が踏んだ「在庫を流量として数える」単位の誤り）。
     **lead を超えた分だけ**を取るので二重計上にならない。盤面の分布は `R`（相手の残りライフの近似）で
-    条件付ける。分布が無ければ 0（従来どおり）。
+    条件付ける。分布が無ければ 0（従来どおり）。**ブロッカーが居る盤面では負にもなる**（T47・
+    リーダー狙いがブロックされる分）＝「盤面の効果」（倒せる体の得 − ブロッカーの損）の期待値。
     """
     if OPTION_MODE != "dist" and boards is None:
         return 0.0
@@ -617,19 +632,28 @@ def attack_stream(power, opp_leader_power, r_turns, theta=THETA, mu=MU, opp_char
     **内側の `ν` には `opp_chars` を渡さない**＝**深さ 1 で止める**（相手のキャラの価値を
     測るのにこちらの盤面を要求すると相互再帰になる）。
     """
-    lead = attack_value_don(power, opp_leader_power, True, theta, mu)      # ドンを付けて殴る（T45）
     r = max(0.0, float(r_turns))
     if not opp_chars:
+        lead = attack_value_don(power, opp_leader_power, True, theta, mu)  # ドンを付けて殴る（T45）
         # **盤面を渡さないときは分布で潜在価値を足す**（T46）——`lead·R + E[Σ max(v_(i), lead)] − lead·R`
         opt = (option_value(power, opp_leader_power, r, theta, mu, my_leader_power, ko_p)
                if _OPTION_DEPTH == 0 else 0.0)
         return lead * r + opt                    # 選択肢は `R` ターンぶんの総額（流量ではない）
     mlp = float(opp_leader_power if my_leader_power is None else my_leader_power)
-    vals = []
+    bodies = []
     for entry in opp_chars:
         tp, blk = (entry if isinstance(entry, (tuple, list)) else (entry, None))
-        nu_t = nu_of(tp, mlp, r_turns, theta, mu, ko_p=ko_p, is_blocker=blk)
-        vals.append(attack_value_don(power, tp, False, theta, mu, nu_target=nu_t))
+        bodies.append((float(tp), bool(blk), nu_of(tp, mlp, r_turns, theta, mu, ko_p=ko_p, is_blocker=blk)))
+    # **相手のブロッカー**（T47）——盤面の体のうちブロッカーは、リーダー狙いも他の体狙いも受けに来る
+    blockers = [(tp, nu_t) for tp, blk, nu_t in bodies if blk]
+    lead = attack_value_don(power, opp_leader_power, True, theta, mu, blockers=blockers)
+    vals = []
+    for tp, blk, nu_t in bodies:
+        # 対象そのものはその攻撃をブロックできないので外す（同じ 1 体を 1 つだけ）
+        others = list(blockers)
+        if blk and (tp, nu_t) in others:
+            others.remove((tp, nu_t))
+        vals.append(attack_value_don(power, tp, False, theta, mu, nu_target=nu_t, blockers=others))
     vals.sort(reverse=True)
     total = 0.0
     i = 0
@@ -780,6 +804,16 @@ def _effect_value(cid, when, st=None, opp_bodies=None):
     return v
 
 
+def blockers_of(ctx):
+    """`ctx["opp_bodies"]`（`opp_bodies_of` の辞書）から**アクティブなブロッカー** `[(パワー, ν(B)), …]`。
+    盤面を渡していない文脈では空＝従来どおり（T47）。"""
+    out = []
+    for b in (ctx.get("opp_bodies") or ()):
+        if b.get("blocker") and not b.get("is_rest"):
+            out.append((float(b["power"]), float(b["nu"])))
+    return out
+
+
 def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, don_k=None):
     """候補 1 つの理論値（値付けできなければ `None`）。
 
@@ -821,14 +855,21 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
         # 仮定値 `ctx["don_k"]` を足し、`--don-k` で感度を見る。
         if at == "DON_BOX":
             sp += 1000.0 * k
+        blockers = blockers_of(ctx)
         if tgt is None and tgt_power is None:         # 対象のカードが引けない＝リーダー扱い
-            return attack_value(sp, ctx["opp_leader_power"], True, theta, mu)
+            return attack_value(sp, ctx["opp_leader_power"], True, theta, mu, blockers=blockers)
         tp = float(tgt["power"]) if tgt_power is None else float(tgt_power)
         if tgt is not None and tgt.get("leader"):
-            return attack_value(sp, tp, True, theta, mu)
+            return attack_value(sp, tp, True, theta, mu, blockers=blockers)
         nu_t = nu_of(tp, ctx["my_leader_power"], ctx["r_turns"], theta, mu,
                      is_blocker=(tgt or {}).get("blocker"))
-        return attack_value(sp, tp, False, theta, mu, nu_target=nu_t)
+        if (tgt or {}).get("blocker"):
+            # 対象そのものはその攻撃をブロックできない——同じパワーのブロッカーを 1 つ外す
+            for i, (pb, _nb) in enumerate(blockers):
+                if abs(pb - tp) <= PWR_EPS:
+                    blockers = blockers[:i] + blockers[i + 1:]
+                    break
+        return attack_value(sp, tp, False, theta, mu, nu_target=nu_t, blockers=blockers)
     if at in ("ATTACH_DON", "DON_BOX"):
         return attach_value(sp, ctx["opp_leader_power"], k, theta, mu)
     if at == "ACTIVATE_MAIN":

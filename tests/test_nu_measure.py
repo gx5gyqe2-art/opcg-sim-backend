@@ -205,14 +205,19 @@ def test_the_board_arm_averages_the_formula_over_the_rows_actual_boards():
 
 
 def test_the_board_arm_only_ever_raises_the_prediction():
-    """盤面を足しても**予測は下がらない**（option なので選ばなければよい）。"""
+    """盤面を足しても**予測は下がらない**（option なので選ばなければよい）——
+    **ブロッカーが居なければ**。ブロッカーは受けに来るので下げうる（T47・2026-09-16）。"""
     recs = [{"opp_leader_power": 5000.0, "my_leader_power": 5000.0,
-             "opp_chars": [(3000.0, False), (9000.0, True)]}]
+             "opp_chars": [(3000.0, False), (9000.0, False)]}]
     keys = ["lt_leader", "leader_to_sat", "over_sat"]
     lead = M.predict(keys)
     board = M.predict(keys, targets="board", recs=recs)
     for k in keys:
         assert board[k] >= lead[k] - 1e-9
+    # 9000 のブロッカーは中盤の体（6000）のリーダー狙いを止める＝下がる
+    recs_b = [{"opp_leader_power": 5000.0, "my_leader_power": 5000.0,
+               "opp_chars": [(3000.0, False), (9000.0, True)]}]
+    assert M.predict(["leader_to_sat"], targets="board", recs=recs_b)["leader_to_sat"] < lead["leader_to_sat"]
 
 
 def test_the_board_arm_falls_back_when_there_are_no_rows():

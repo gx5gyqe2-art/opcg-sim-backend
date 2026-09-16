@@ -370,12 +370,20 @@ def test_an_empty_board_leaves_nu_exactly_where_it_was():
 
 
 def test_the_attack_term_never_falls_below_the_leader_line():
-    """対象を増やしても**下がらない**＝これは option（選ばなければよい）。"""
-    board = [(3000.0, False), (5000.0, False), (7000.0, True)]
+    """対象を増やしても**下がらない**＝これは option（選ばなければよい）。
+
+    **ただしブロッカーは別**（T47・2026-09-16）——ブロッカーはこちらの攻撃を受けに来るので、
+    ブロッカーの居る盤面ではリーダー狙いが安くなり、盤面を渡した方が**下がりうる**。
+    """
+    board = [(3000.0, False), (5000.0, False), (7000.0, False)]
     for pw in (2000.0, 4000.0, 6000.0, 8000.0, 11000.0):
         lead = T.attack_stream(pw, 5000.0, 4.128)
         assert T.attack_stream(pw, 5000.0, 4.128, opp_chars=board,
                                my_leader_power=5000.0) >= lead - 1e-12
+    # ブロッカー 7000 が居ると 6000 の攻撃は止められる＝リーダーの線より下がる
+    with_blocker = [(3000.0, False), (7000.0, True)]
+    assert T.attack_stream(6000.0, 5000.0, 4.128, opp_chars=with_blocker,
+                           my_leader_power=5000.0) < T.attack_stream(6000.0, 5000.0, 4.128)
 
 
 def test_power_keeps_paying_past_the_saturation_point():
@@ -841,7 +849,6 @@ def test_the_option_value_is_the_excess_over_the_leader_attack_never_double_coun
     P, olp, r = 9000.0, 5000.0, 3.0
     lead = T.attack_value_don(P, olp, True)
     opt = T.option_value(P, olp, r, my_leader_power=5000.0, boards=_boards())
-    assert opt >= 0.0
     # 盤面ごとに手で組む＝盤面モードの attack_stream と同じ
     vals = []
     for _mlp, bodies in _boards()[3]:
@@ -864,8 +871,8 @@ def test_a_bigger_body_has_more_option_value_and_a_tiny_one_none():
     small = T.option_value(2000.0, olp, r, my_leader_power=5000.0, boards=_boards())
     mid = T.option_value(6500.0, olp, r, my_leader_power=5000.0, boards=_boards())
     big = T.option_value(12000.0, olp, r, my_leader_power=5000.0, boards=_boards())
-    assert small == 0.0                                     # 何も倒せない
-    assert 0.0 <= mid <= big                                # 大きいほど選択肢が広い
+    assert small <= 0.0                                     # 何も倒せない（ブロッカーに止められる分は負）
+    assert mid <= big                                       # 大きいほど選択肢が広い
     assert big > 0.0
 
 
@@ -895,3 +902,36 @@ def test_the_shipped_distribution_loads_and_is_keyed_by_remaining_turns():
     assert set(bs) <= {1, 2, 3, 4, 5} and bs                # 同梱の fixture が読める
     for r, lst in bs.items():
         assert lst and all(isinstance(b[0], int) and isinstance(b[1], list) for b in lst)
+
+
+
+# ---- T47: ブロック（2026-09-16・ユーザ指摘「ブロックしてからカウンターを切るパターン」） ----
+
+def test_the_defender_may_block_and_then_counter_to_save_the_blocker():
+    """リーダー 5000・ブロッカー 7000（ν(B)=0.2）: 8000 の攻撃は「ブロックして 1 枚切る」が最安・
+    9000 は受ける方が安い・6000 はブロッカーに止められて 0。"""
+    lead, B = 5000.0, [(7000.0, 0.2)]
+    v8 = T.attack_value(8000.0, lead, True, blockers=B)
+    assert v8 == pytest.approx(T.c_of(1000.0) * T.MU)                  # ブロック→カウンター 1 枚
+    assert v8 < T.attack_value(8000.0, lead, True)                      # ブロッカーが居ると安くなる
+    v9 = T.attack_value(9000.0, lead, True, blockers=B)
+    assert v9 == pytest.approx(T.THETA * T.MU)                          # 受ける
+    assert T.attack_value(6000.0, lead, True, blockers=B) == 0.0        # 止められる
+    # B を失う方が安ければそちら（小さいブロッカー）
+    assert T.attack_value(8000.0, lead, True, blockers=[(3000.0, 0.02)]) == pytest.approx(0.02)
+    # 複数なら一番安い B・ブロッカー無しは従来どおり
+    assert T.attack_value(8000.0, lead, True, blockers=[(7000.0, 0.2), (3000.0, 0.02)]) == pytest.approx(0.02)
+    assert T.attack_value(8000.0, lead, True, blockers=[]) == T.attack_value(8000.0, lead, True)
+
+
+def test_only_active_blockers_on_the_board_count_and_the_target_cannot_block_itself():
+    ctx = {"opp_bodies": [{"power": 7000.0, "blocker": True, "is_rest": False, "nu": 0.2},
+                          {"power": 6000.0, "blocker": True, "is_rest": True, "nu": 0.15},
+                          {"power": 9000.0, "blocker": False, "is_rest": False, "nu": 0.25}]}
+    assert T.blockers_of(ctx) == [(7000.0, 0.2)]
+    assert T.blockers_of({}) == []
+    # 攻撃の流れ: ブロッカーが居る盤面はリーダー狙いが安くなり、そのブロッカー自身を狙う攻撃は他のブロッカーだけが受ける
+    P, olp, r = 8000.0, 5000.0, 1.0
+    with_b = T.attack_stream(P, olp, r, opp_chars=[(7000.0, True)], my_leader_power=5000.0)
+    no_b = T.attack_stream(P, olp, r, opp_chars=[(7000.0, False)], my_leader_power=5000.0)
+    assert with_b <= no_b

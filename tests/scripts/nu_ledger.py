@@ -69,7 +69,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         order = list(idx)
         by_seat = {}
         for n, i in enumerate(order):
-            by_seat.setdefault(int(rows["who"][i]), []).append(n)
+            if int(rows["kind"][i]) == 0:          # 次の**判断点**で挟む（`price_realised` と同じ・T47）
+                by_seat.setdefault(int(rows["who"][i]), []).append(n)
         nxt = {}
         for w, ns in by_seat.items():
             for a, b in zip(ns, ns[1:]):
