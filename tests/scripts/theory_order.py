@@ -93,9 +93,11 @@ THETA = round((LAM - H_LIFE_TO_HAND * MU) / MU, 4)
 #: `by_life`＝**`λ(L) − h·μ`**（`L` = 受け手のライフ。攻撃の価格では相手のライフ・守りの規則では自分のライフ）。
 #: `λ(L)` は T19 の実測（相手ターンの `λ_gross`・`2026-09-14_life_price.md`）の写し。**CI は広い**（±0.1・λ(1) は自席で 0 を含む）ので
 #: 表の形（2〜3 で高く 4 で低い）は雑音を含む。`L = 0` は受ければ負け＝勝利の価値 0.5（恒等式の値・`effect_value` の勝利と同じ）。
-#: **新定数ゼロ**（実測と恒等式の写し）。既定は `const`（測ってから決める）。
+#: **新定数ゼロ**（実測と恒等式の写し）。**既定は `lethal`**（ユーザ決定 2026-09-16「3 だけ採用」・`2026-09-16_take_by_life.md`）＝
+#: ライフ 0 で受ければ負け（0.5）だけを規則として入れ、他は定数。`by_life` は表の雑音（L=4 の谷）が規則と価格を壊すので不採用。
+#: **橋の総合値は決め手の一撃の分だけ膨らむので、以後は帯（接戦・中盤）で読む**。以前の数字と比べるときは `--take-mode const`。
 TAKE_MODES = ("const", "by_life", "lethal")
-TAKE_MODE = "const"
+TAKE_MODE = "lethal"
 LAM_BY_LIFE = {0: 0.5, 1: 0.113, 2: 0.218, 3: 0.190, 4: 0.078, 5: 0.119}
 
 
@@ -110,8 +112,8 @@ def set_take_mode(mode):
 
 def add_take_mode_arg(ap):
     ap.add_argument("--take-mode", default=None, choices=TAKE_MODES,
-                    help="受ける費用（T63）。省略時は `theory_order.TAKE_MODE`（`const`＝`Θ·μ`）。`by_life`＝`λ(L) − h·μ`（T19 の写し）・"
-                         "`lethal`＝ライフ 0 だけ勝利の価値 0.5（規則だけ）")
+                    help="受ける費用（T63）。省略時は `theory_order.TAKE_MODE`（2026-09-16 から `lethal`＝ライフ 0 だけ勝利の価値 0.5）。"
+                         "`const`＝`Θ·μ`（以前の数字と比べるとき）・`by_life`＝`λ(L) − h·μ`（T19 の写し・不採用）")
 
 
 def apply_take_mode(a):
