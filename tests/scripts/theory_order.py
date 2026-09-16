@@ -875,6 +875,17 @@ def play_value(power, cost, opp_leader_power, r_turns, theta=THETA, mu=MU, delta
             - mu - float(cost) * d)
 
 
+def _effect_state(ctx):
+    """効果の値付けに渡す状態＝`ctx["st"]` に**盤面の攻撃の材料**（相手リーダーのパワー・自分の攻撃手）を足したもの
+    （T54・2026-09-16）——キーワード付与（速攻など）の価格を「付与した体が実際に殴る価値」で出すため。"""
+    st = dict(ctx.get("st") or {})
+    if "opp_leader_power" in ctx:
+        st["opp_leader_power"] = ctx["opp_leader_power"]
+    if ctx.get("attackers") is not None:
+        st["attackers"] = list(ctx["attackers"])
+    return st
+
+
 def _effect_value(cid, when, st=None, opp_bodies=None):
     """**効果の値**（P2・`effect_value.py`）。読めなければ `None`。
 
@@ -977,7 +988,7 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
         # 条件はエンジンが検査済み。**対象は盤面から選ぶ**
         # `st` は条件には使わない（検査済み）が、**「N 枚まで」を実際に動かせる枚数で打ち切る**のに使う（T41）。
         # `ACTIVATE_USES_STATE` は感度の切替（§0.4）——切ると従来どおり N を上限として読む
-        return _effect_value(cid, "activate", ctx.get("st") if ACTIVATE_USES_STATE else None,
+        return _effect_value(cid, "activate", _effect_state(ctx) if ACTIVATE_USES_STATE else None,
                              opp_bodies=ctx.get("opp_bodies"))
     if at == "PLAY":
         if src is None:
@@ -985,7 +996,7 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
         if src.get("event") or src.get("stage"):
             # **体を持たない札**（イベント・ステージ）は**効果の値**で見る（P2-1・§14.1.3）。
             # 札 1 枚とドンを払って効果だけを買う形。
-            ev = _effect_value(cid, "on_play", ctx.get("st"), ctx.get("opp_bodies"))
+            ev = _effect_value(cid, "on_play", _effect_state(ctx), ctx.get("opp_bodies"))
             if ev is None:
                 return None
             return ev - mu - play_cost_term(ctx, float(src.get("cost") or 0), mu, theta)
@@ -1012,7 +1023,7 @@ def _char_play_value(cid, src, ctx, theta, mu, k):
                        is_blocker=src.get("blocker"), opp_chars=ctx.get("opp_chars"),
                        my_leader_power=ctx["my_leader_power"])
             - play_cost_term(ctx, float(src.get("cost") or 0), mu, theta))
-    ev = _effect_value(cid, "char_on_play", ctx.get("st"), ctx.get("opp_bodies"))
+    ev = _effect_value(cid, "char_on_play", _effect_state(ctx), ctx.get("opp_bodies"))
     if ev is None:
         return None
     return base + ev

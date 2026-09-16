@@ -194,6 +194,20 @@ KEYWORD_PER_TURN = {
 }
 #: キーワードを付与する動作
 KEYWORD_KINDS = ("GRANT_KEYWORD", "KEYWORD")
+#: **「後で効く効果」を帳簿でどう数えるか**（T54・2026-09-16）。`option`＝従来＝付与した時点で「できるようになった攻撃」の
+#: 価値を付ける／`exercise`＝**使った時点（攻撃・付与の行）で数えるので付与の行は 0**。速攻・追加攻撃・ダブルアタック・
+#: バニッシュ・そのターンだけのパワー上昇・ドンの流れ（`ACTIVE_DON`／`ATTACH_DON`）が対象。帳簿（ターン単位の恒等式・`ΔG`）では
+#: `option` だと**同じ攻撃を 2 度数える**（付与の行と攻撃の行）＝T53 の「後で効く効果が在るターン 0.73」の正体の候補。
+FLOW_PRICING_MODES = ("option", "exercise")
+FLOW_PRICING = "option"
+
+
+def set_flow_pricing(mode):
+    global FLOW_PRICING
+    if mode not in FLOW_PRICING_MODES:
+        raise ValueError("flow pricing は %s のどれか" % (FLOW_PRICING_MODES,))
+    FLOW_PRICING = mode
+    return FLOW_PRICING
 #: **生存**（場を離れない・代わりに〜）→ **体が消える確率 × 体**（`ko_p` は実測 0.289）
 SURVIVE_KINDS = ("PREVENT_LEAVE", "REPLACE_EFFECT")
 #: **能力そのものを足す／消す動作**——同じカードを指すなら再帰で解き、判らなければ `μ`。
@@ -573,8 +587,15 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         if got is None:
             return None                       # 知らないキーワード（0 にしない）
         mode, per = got
+        if FLOW_PRICING == "exercise" and mode in ("once", "turn"):
+            return 0.0                        # 攻撃の行で数える（付与の行は 0）
         if mode == "turn":
             per *= DURATION_TURNS.get(str(effect.get("duration") or ""), 1.0)
+        if mode == "once":
+            # **速攻・追加攻撃は「付与された体が実際に殴る価値」**（T54）——盤面が無ければ従来の `Θ·μ`
+            got_v = granted_attack_value(effect, card, st, theta, mu)
+            if got_v is not None:
+                per = got_v
         amt = n * per                         # `stock`／`once` は期間を掛けない
         return amt if not opp else -amt
     if fam == "survive":
@@ -656,6 +677,8 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
                 pool = st.get("my_don_rested" if rest_only else "my_don", cnt)
                 cnt = min(cnt, float(pool))
         if kind == "don_flow":
+            if FLOW_PRICING == "exercise":
+                return 0.0                    # 付与・攻撃の行で数える
             # **流れ**＝そのターンだけ余分に使えるドン＝在庫÷R（テンポの規則・`REST_DON` と同じ）
             amt = cnt * delta / R_TURNS
             return amt if not opp else -amt
@@ -669,11 +692,50 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
             return amt if good else -amt
         return amt if not opp else -amt
     if kind == "power":
-        amt = power_value(_magnitude(effect), delta, theta, mu, nu) * n
-        up = _magnitude(effect) >= 0
+        mag = _magnitude(effect)
+        if (FLOW_PRICING == "exercise" and not opp and mag > 0
+                and str(effect.get("duration") or "") in ("THIS_TURN", "INSTANT", "")):
+            return 0.0                        # そのターンのパワー上昇は攻撃の行で数える
+        # **「パワーを X にする」は +X ではなく「X − 今のパワー」**（T54・2026-09-16）——パーサは `BUFF +X` で出す
+        # （エンジンにも `SET_BASE_POWER` のハンドラが無い）ので、**価格の側で裁定する**: 自分の体なら印刷のパワーとの差。
+        # 相手の体（「パワー 0 にする」）は今のパワーが判らないので従来どおり（上限で打ち切られる）。
+        if _is_set_power(effect) and not opp and card is not None and card.get("power") is not None:
+            mag = mag - float(card.get("power") or 0.0)
+        amt = power_value(mag, delta, theta, mu, nu) * n
+        up = mag >= 0
         good = up if not opp else not up
         return amt if good else -amt
     return None
+
+
+def _is_set_power(effect):
+    """本文が「…パワー(を)X にする」の形か（`BUFF +X` に読まれているが本当は設定）。"""
+    raw = str(effect.get("raw_text") or "")
+    return ("にする" in raw or "になる" in raw) and "パワー" in raw
+
+
+def granted_attack_value(effect, card, st, theta=THETA, mu=MU):
+    """**キーワード付与（速攻など）の 1 回分の価値＝付与された体が実際にリーダーを殴る価値**（T54・2026-09-16）。
+
+    従来は無条件に `Θ·μ`（受ける費用の上限）を置いていたが、実測は 96 件で価格 0.087 対 実現 0（ターン末でも 0.038）。
+    付与された体のパワーで `attack_value_don`（ドン付き・`min(c(x)·μ, Θ·μ)`）を出す:
+    自分自身（`select_mode == "SOURCE"`）なら印刷のパワー・選ぶ対象なら今の攻撃手（`st["attackers"]`）の最良。
+    盤面（相手リーダーのパワー）が無ければ `None`＝従来の定数に落とす。
+    """
+    if not st or st.get("opp_leader_power") is None:
+        return None
+    from theory_order import attack_value_don
+    olp = float(st["opp_leader_power"])
+    target = effect.get("target") or {}
+    if str(target.get("select_mode") or "").upper() == "SOURCE":
+        pw = (card or {}).get("power")
+        if pw is None:
+            return None
+        return float(attack_value_don(float(pw), olp, True, theta, mu))
+    xs = st.get("attackers") or []
+    if not xs:
+        return 0.0                                   # 付与できる攻撃手が居ない＝殴れない
+    return float(max(attack_value_don(olp + float(x), olp, True, theta, mu) for x in xs))
 
 
 def _referenced_ability(at, effect, card, mu, lam, delta, nu, theta, ko_p, depth):

@@ -636,3 +636,74 @@ def test_without_the_identity_the_filter_is_not_decided():
         E.NU_AVG)
     # 素性を要らない絞り込みは素性が無くても判定できる
     assert E.eligible_bodies(_ko(cost_max=4)["target"], plain) == [0.069]
+
+
+# ---- T54（2026-09-16）: 付与の 1 回分は「付与された体が実際に殴る価値」・「パワーを X にする」は差分 ----
+
+def test_a_rush_grant_is_priced_by_the_granted_bodys_own_attack_when_the_board_is_known():
+    """盤面（相手リーダーのパワー）が渡れば、速攻の 1 回分は**その体の攻撃の価格**（`attack_value_don`）。
+    盤面が無ければ従来の `Θ·μ`（旧テストは変わらない）。"""
+    act = _act("GRANT_KEYWORD", "SELF", status="速攻", duration="THIS_TURN")
+    act["target"]["select_mode"] = "SOURCE"
+    st = {"opp_leader_power": 5000.0}
+    weak = E.action_value(act, card={"power": 3000}, st=st)             # 2000 低い＝ドンを付けても 0
+    mid = E.action_value(act, card={"power": 5000}, st=st)              # 同値＝1 枚切らせる
+    big = E.action_value(act, card={"power": 9000}, st=st)              # 受ける費用で頭打ち
+    assert weak == pytest.approx(T.attack_value_don(3000.0, 5000.0, True))
+    assert mid == pytest.approx(T.attack_value_don(5000.0, 5000.0, True))
+    assert big == pytest.approx(T.THETA * T.MU)
+    assert weak < mid <= big
+    assert E.action_value(act, card={"power": 3000}) == pytest.approx(T.THETA * T.MU)   # 盤面が無い＝従来
+    # 選ぶ対象なら今の攻撃手の最良・攻撃手が居なければ 0
+    choose = _act("GRANT_KEYWORD", "SELF", status="速攻", duration="THIS_TURN")
+    choose["target"]["select_mode"] = "CHOOSE"
+    assert E.action_value(choose, st={"opp_leader_power": 5000.0, "attackers": [0.0, 2000.0]}) == \
+        pytest.approx(T.attack_value_don(7000.0, 5000.0, True))
+    assert E.action_value(choose, st={"opp_leader_power": 5000.0, "attackers": []}) == 0.0
+    # ブロッカー（在庫）とダブルアタック（攻撃ごと）は変わらない
+    assert E.action_value(_act("GRANT_KEYWORD", "SELF", status="ブロッカー"), card={"power": 3000}, st=st) == \
+        pytest.approx(E.BLOCK_PREMIUM)
+
+
+def test_setting_the_power_to_x_is_priced_as_the_difference_from_the_printed_power():
+    """「元々のパワー 7000 にする」は `BUFF +7000` に読まれているが、価値は **7000 − 印刷のパワー**。
+    相手の体（「パワー 0 にする」）は今のパワーが判らないので従来どおり。"""
+    setp = _act("BUFF", "SELF", base=7000)
+    setp["raw_text"] = "このキャラを、元々のパワー7000にする"
+    assert E._is_set_power(setp) is True
+    assert E.action_value(setp, card={"power": 5000}) == pytest.approx(E.power_value(2000.0))
+    assert E.action_value(setp, card={"power": 7000}) == pytest.approx(0.0)
+    assert E.action_value(setp) == pytest.approx(E.power_value(7000.0))                    # カードが無ければ従来
+    plain = _act("BUFF", "SELF", base=7000)
+    plain["raw_text"] = "このキャラのパワー+7000"
+    assert E._is_set_power(plain) is False
+    assert E.action_value(plain, card={"power": 5000}) == pytest.approx(E.power_value(7000.0))
+    zero = _act("BUFF", "OPPONENT", base=0)
+    zero["raw_text"] = "相手のキャラ1枚を、パワー0にする"
+    assert E.action_value(zero, card={"power": 5000}) == pytest.approx(0.0)                 # 従来（0 のまま）
+
+
+def test_exercise_mode_prices_delayed_effects_at_the_row_that_uses_them():
+    """**`exercise`**（T54）: 速攻・ダブルアタック・そのターンのパワー上昇・ドンの流れは**付与の行で 0**（攻撃・付与の行で
+    数える）。ブロッカー（在庫）・恒久のパワー上昇・ドンの在庫は変わらない。`option`（既定）に戻すと元どおり。"""
+    rush = _act("GRANT_KEYWORD", "SELF", status="速攻", duration="THIS_TURN")
+    dbl = _act("GRANT_KEYWORD", "SELF", status="ダブルアタック", duration="THIS_TURN")
+    blk = _act("GRANT_KEYWORD", "SELF", status="ブロッカー")
+    buff = _act("BUFF", "SELF", base=2000, duration="THIS_TURN")
+    perm = _act("BUFF", "SELF", base=2000, duration="PERMANENT")
+    flow = _act("ACTIVE_DON", "SELF", base=2)
+    stock = _act("RAMP_DON", "SELF", base=1)
+    before = [E.action_value(a) for a in (rush, dbl, blk, buff, perm, flow, stock)]
+    assert all(v > 0 for v in before)
+    assert E.set_flow_pricing("exercise") == "exercise"
+    try:
+        assert E.action_value(rush) == 0.0 and E.action_value(dbl) == 0.0
+        assert E.action_value(buff) == 0.0 and E.action_value(flow) == 0.0
+        assert E.action_value(blk) == pytest.approx(before[2])
+        assert E.action_value(perm) == pytest.approx(before[4])
+        assert E.action_value(stock) == pytest.approx(before[6])
+        with pytest.raises(ValueError):
+            E.set_flow_pricing("なにか")
+    finally:
+        E.set_flow_pricing("option")
+    assert [E.action_value(a) for a in (rush, dbl, blk, buff, perm, flow, stock)] == pytest.approx(before)

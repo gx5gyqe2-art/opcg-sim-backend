@@ -242,7 +242,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 cost = float((info or {}).get("cost") or 0) if fam == "play" else 0.0
                 # 実際に引かれた費用（`state` なら機会費用・`flat` なら定額）を足し戻す（T43）
                 gross = float(v) + (play_cost_term(ctx, cost, mu, th) if fam == "play" else 0.0)
-                act = primary_action(cid) if fam == "effect" else None
+                act = (primary_action(cid) if fam == "effect"
+                       else primary_action(cid, EV.CHAR_ON_PLAY_TRIGGERS) if fam == "play" else None)
                 real_te = turn_end_state.get((w, t), state_meas(ex["sc"][i2], ex["tok"][i2])) - state_meas(sc, tok)
                 # **登場の内訳**（T53）: 価格を「体（ν − μ）」「登場時効果」「機会費用」に、実現を部品に割る
                 play_parts = None
@@ -325,6 +326,12 @@ def summarise(per, reps=200, seed=0):
         acts.setdefault(r["act"], []).append(r)
     out["effect_by_action"] = {a: block(rs) for a, rs in sorted(acts.items(), key=lambda kv: -len(kv[1]))
                                if len(rs) >= 20}
+    # **登場時効果の型の内訳**（T54）——登場の行を登場時能力の最初の動作の型で切る（`?` は能力なし／読めない）
+    pacts = {}
+    for r in [r for r in allrows if r["fam"] == "play"]:
+        pacts.setdefault(r.get("act") or "?", []).append(r)
+    out["play_by_onplay_action"] = {a: block(rs) for a, rs in sorted(pacts.items(), key=lambda kv: -len(kv[1]))
+                                    if len(rs) >= 20}
     # **T53 (a) ターン単位の恒等式を「後で効く効果が在るターン」と無いターンで分ける**——
     # 流れの効果の価格が正しければ両群の Σ価格/実現 は同じになる（重ね数えをせずに検める）
     grp = {"with_flow_effect": [], "without": []}
@@ -398,12 +405,16 @@ def main(argv=None):
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     add_nu_mode_arg(ap)
+    ap.add_argument("--flow-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
+                    help="**T54** 後で効く効果を付与の行で数える（`option`・既定）か、使った行で数える（`exercise`＝付与の行は 0）か")
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_nu_mode(a)
+    if a.flow_pricing is not None:
+        EV.set_flow_pricing(a.flow_pricing)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
-    res = {"nu_mode": a.nu_mode, "stats": stats,
+    res = {"nu_mode": a.nu_mode, "flow_pricing": EV.FLOW_PRICING, "stats": stats,
            "frozen": {"lambda": LAM, "mu": MU, "delta": DELTA, "nu_meas": NU_MEAS, "theta": a.theta},
            "summary": summarise(per, a.boot_reps, a.seed), "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
