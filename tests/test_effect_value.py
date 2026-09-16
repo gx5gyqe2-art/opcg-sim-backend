@@ -792,3 +792,21 @@ def test_attacking_active_characters_is_the_widening_of_the_target_choice_not_an
     assert E.action_value(eff, card={"power": 8000}, st=st, opp_bodies=[rested]) == 0.0         # レストの体は元から狙える
     assert E.action_value(eff, card={"power": 8000}, st=st, opp_bodies=[]) == 0.0
     assert E.action_value(eff, card={"power": 8000}, st=st) == pytest.approx(T.THETA * T.MU)    # 相手の場が無ければ従来
+
+
+# ---- T58（2026-09-16・ユーザ決定）: 数える価格の既定は `exercise`・`with flow_pricing()` は必ず戻す ----
+
+def test_the_flow_pricing_context_restores_the_mode_even_on_error():
+    assert E.FLOW_PRICING == "option" and E.LEDGER_FLOW_PRICING == "exercise"
+    rush = _act("GRANT_KEYWORD", "SELF", status="速攻", duration="THIS_TURN")
+    with E.flow_pricing("exercise") as m:
+        assert m == "exercise" and E.action_value(rush) == 0.0    # 付与の行は帳簿では 0
+    assert E.FLOW_PRICING == "option" and E.action_value(rush) > 0  # 決める側では値が付く
+    with pytest.raises(RuntimeError):
+        with E.flow_pricing("exercise"):
+            raise RuntimeError("途中で落ちても")
+    assert E.FLOW_PRICING == "option"
+    with pytest.raises(ValueError):
+        with E.flow_pricing("なにか"):
+            pass
+    assert E.FLOW_PRICING == "option"

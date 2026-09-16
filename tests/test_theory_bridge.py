@@ -305,3 +305,36 @@ def test_the_bridge_weights_each_row_by_the_slope_of_the_race():
     assert B._d_bin(-5) == "<-3" and B._d_bin(-2) == "-3..-1" and B._d_bin(0) == "-1..1"
     assert B._d_bin(2) == "1..3" and B._d_bin(9) == ">3"
     assert B._TO_W_MODE() in T.W_MODES
+
+
+# ---- T58（2026-09-16・ユーザ決定「それでいきましょうか」）: 数える価格は `exercise`・決める価格は `option` ----
+
+def test_the_ledger_rereads_the_played_move_under_exercise_and_leaves_the_choice_alone():
+    """`g`（数える）は帳簿の規約で 1 回だけ読み直し、`s`（決める）が使う `FLOW_PRICING` は動かさない。
+    読み直しの間だけ規約が替わり、抜けたら必ず元に戻る。"""
+    import effect_value as EV
+    assert EV.LEDGER_FLOW_PRICING == "exercise" and EV.FLOW_PRICING == "option"
+    seen = []
+
+    def score():
+        seen.append(EV.FLOW_PRICING)
+        return 0.25
+
+    assert B.ledger_value(score, 0.75) == 0.25                     # 帳簿の規約（exercise）で読み直した値
+    assert seen == ["exercise"] and EV.FLOW_PRICING == "option"    # 中だけ替わり・外は option のまま
+    assert B.ledger_value(score, 0.75, mode="option") == 0.75      # 同じ規約なら呼び直さない
+    assert seen == ["exercise"]
+    assert B.ledger_value(lambda: None, 0.75) == 0.75              # 読み直しが None なら決める側の値に戻す
+
+
+def test_the_ledger_convention_is_a_module_constant_with_a_switch():
+    import effect_value as EV
+    before = EV.LEDGER_FLOW_PRICING
+    try:
+        assert EV.set_ledger_flow_pricing("option") == "option"
+        assert B.ledger_value(lambda: 0.25, 0.75) == 0.75          # 既定を option に戻せば読み直さない
+        with pytest.raises(ValueError):
+            EV.set_ledger_flow_pricing("なにか")
+    finally:
+        EV.set_ledger_flow_pricing(before)
+    assert EV.LEDGER_FLOW_PRICING == before

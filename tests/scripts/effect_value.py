@@ -208,6 +208,38 @@ def set_flow_pricing(mode):
         raise ValueError("flow pricing は %s のどれか" % (FLOW_PRICING_MODES,))
     FLOW_PRICING = mode
     return FLOW_PRICING
+
+
+#: **数える価格の既定**（ユーザ決定 2026-09-16「それでいきましょうか」・T58）——価格には 2 つの用途がある（罠 31）:
+#: **決める**（行内で最善を選ぶ＝`ΔS`）は `FLOW_PRICING`（`option`・できるようになる手にも値が要る）のまま、
+#: **数える**（帳簿・`ΔG`・恒等式）は `exercise`（使った行で 1 回）。`ν` への変換（T55/T56）は消えず、載せる行が
+#: 付与の行から行使の行へ移るだけ（行使の行は上がったパワー・付いたドンを盤面から読む）。
+LEDGER_FLOW_PRICING = "exercise"
+
+
+def set_ledger_flow_pricing(mode):
+    global LEDGER_FLOW_PRICING
+    if mode not in FLOW_PRICING_MODES:
+        raise ValueError("ledger flow pricing は %s のどれか" % (FLOW_PRICING_MODES,))
+    LEDGER_FLOW_PRICING = mode
+    return LEDGER_FLOW_PRICING
+
+
+class flow_pricing:
+    """`with flow_pricing("exercise"):` の間だけ `FLOW_PRICING` を替え、抜けるときに必ず戻す（例外でも）。"""
+
+    def __init__(self, mode):
+        self.mode = mode
+        self._before = None
+
+    def __enter__(self):
+        self._before = FLOW_PRICING
+        set_flow_pricing(self.mode)
+        return FLOW_PRICING
+
+    def __exit__(self, *_exc):
+        set_flow_pricing(self._before)
+        return False
 #: **生存**（場を離れない・代わりに〜）→ **体が消える確率 × 体**（`ko_p` は実測 0.289）
 SURVIVE_KINDS = ("PREVENT_LEAVE", "REPLACE_EFFECT")
 #: **能力そのものを足す／消す動作**——同じカードを指すなら再帰で解き、判らなければ `μ`。

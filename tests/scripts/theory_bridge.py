@@ -80,6 +80,7 @@ if _HERE not in sys.path:
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 import guard_afford as GA  # noqa: E402
 from order_acc import band_of  # noqa: E402
+import effect_value as EV  # noqa: E402
 import theory_order as _TOM  # noqa: E402
 from theory_order import (own_attackers_of, MU, PWR_EPS, POL_COLS, SC_MY_DON, SC_MY_LEADER_POWER,  # noqa: E402
                           SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE, THETA,
@@ -217,9 +218,29 @@ def _add(rec, band, s, side, g=0.0):
     b["g_%s" % side] += float(g)
 
 
+def ledger_value(score, played_v, mode=None):
+    """**数える価格**（`g`・`ΔG`）を帳簿の規約で読み直す（**T58**・ユーザ決定 2026-09-16「それでいきましょうか」）。
+
+    `score()` は打った手の価格を今の `FLOW_PRICING` で返す関数。帳簿の規約（省略時 `effect_value.LEDGER_FLOW_PRICING`＝
+    `exercise`）が決める側の規約と同じなら呼び直さず `played_v` をそのまま返す。違えばその規約の下で 1 回だけ読み直す
+    （付与の行が 0 になり、行使の行に既に載っている分を 2 度数えない＝罠 31）。読み直しが `None` なら `played_v` に戻す。
+    """
+    mode = EV.LEDGER_FLOW_PRICING if mode is None else mode
+    if mode == EV.FLOW_PRICING:
+        return played_v
+    with EV.flow_pricing(mode):
+        v = score()
+    return played_v if v is None else v
+
+
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targets="leader",
-            silent="zero", margin_comfort=None):
-    """(局, 席) ごとに攻め側と守り側の取りこぼしを足す。"""
+            silent="zero", margin_comfort=None, ledger_pricing=None):
+    """(局, 席) ごとに攻め側と守り側の取りこぼしを足す。
+
+    `s`（決める＝行内の最善からの逸脱）は `FLOW_PRICING`、`g`（数える＝`ΔG`）は `ledger_pricing`
+    （省略時 `effect_value.LEDGER_FLOW_PRICING`）で読む（T58）。
+    """
+    ledger_pricing = EV.LEDGER_FLOW_PRICING if ledger_pricing is None else ledger_pricing
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     per = {}
@@ -228,6 +249,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
              "grd_comfortable": 0,
              # **T49**: 局面の傾き `κ = w(D)/w̄`（攻めの行）——平均が 1 に戻るかが `w(状態)` の検算
              "w_mode": _TO_W_MODE(), "sigma_turn": _TOM.SIGMA_TURN, "kappa_sum": 0.0, "kappa_n": 0,
+             # **T58**: 決める価格（`s`）と数える価格（`g`）の規約・読み直した行の数
+             "flow_pricing": EV.FLOW_PRICING, "ledger_pricing": ledger_pricing, "ledger_rescored": 0,
              "d_bins": {"<-3": 0, "-3..-1": 0, "-1..1": 0, "1..3": 0, ">3": 0},
              # **`D` の帯ごとの実勝率**（当てはめない）——時計の推定 `D` が勝敗を順序付けるか・
              # 実測の `W(D)` の傾きが置いた `σ_D` と合うかの検算
@@ -296,17 +319,17 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     stats["d_win"][_d_bin(ck["d"])][0] += (1 if z > 0 else 0)
                     stats["d_win"][_d_bin(ck["d"])][1] += 1
                 b = int(ptr[i])
-                vals = []
-                for j in range(b, b + k):
+
+                def _score(j, _ctx=ctx, _tok=tok):
                     sig = json.loads(pol["pol_sig"][j])
                     tl = sig[2] if len(sig) > 2 else None
-                    v = score_candidate(sig, str(pol["pol_cid"][j]) or None,
-                                        (str(pol["pol_tcid"][j]) or None) if tl else None,
-                                        ctx, cards,
-                                        src_power=slot_power(tok, pol["pol_si"][j]),
-                                        tgt_power=slot_power(tok, pol["pol_ti"][j]),
-                                        don_k=pol["pol_k"][j])
-                    vals.append(v)
+                    return score_candidate(sig, str(pol["pol_cid"][j]) or None,
+                                           (str(pol["pol_tcid"][j]) or None) if tl else None,
+                                           _ctx, cards,
+                                           src_power=slot_power(_tok, pol["pol_si"][j]),
+                                           tgt_power=slot_power(_tok, pol["pol_ti"][j]),
+                                           don_k=pol["pol_k"][j])
+                vals = [_score(j) for j in range(b, b + k)]
                 scored = [v for v in vals if v is not None]
                 played_v = vals[ch]
                 bnd = band_of(abs(float(rows["pol_v0"][i])))
@@ -319,7 +342,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     continue                     # `exclude` は母数にも入れない
                 # `s`＝最善からの逸脱（≤ 0）・`g`＝選んだ手の理論値そのもの（T40）
                 # `κ` は同じ行の全候補に共通なので順位（最善）は動かず、和の重みだけが局面で変わる
-                g_row = float(played_v) * kap
+                # **T58**: `g` は帳簿の規約（`exercise`）で読み直す——`s`（決める側）は `option` のまま
+                g_v = ledger_value(lambda: _score(b + ch), played_v, ledger_pricing)
+                if g_v != played_v:
+                    stats["ledger_rescored"] += 1          # 規約で値が動いた行（付与・流れの行）だけ数える
+                g_row = float(g_v) * kap
                 s_row = (float(played_v) - max(scored)) * kap
                 _add(rec, bnd, s_row, "atk", g=g_row)
                 fam = move_family(json.loads(pol["pol_sig"][b + ch]))
@@ -599,6 +626,12 @@ def main(argv=None):
                          "（既定 `flat`＝`κ = 1`・盤面の時計では `clock` は説明力を落とした）")
     ap.add_argument("--sigma-turn", type=float, default=None,
                     help="**T49 の感度**——時計 1 本のぶれ（ターン）。既定は写し（1.0）。合わせ込みには使わない")
+    ap.add_argument("--flow-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
+                    help="**決める価格**（`s`・`ΔS`）の規約。省略時は `effect_value.FLOW_PRICING`（`option`）")
+    ap.add_argument("--ledger-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
+                    help="**数える価格**（`g`・`ΔG`）の規約（T58）。省略時は `effect_value.LEDGER_FLOW_PRICING`"
+                         "（`exercise`＝使った行で 1 回・ユーザ決定 2026-09-16）。"
+                         "**2026-09-16 より前の `ΔG` と比べるときは `option` を明示する**")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
@@ -616,9 +649,11 @@ def main(argv=None):
         _TO.set_w_mode(a.w_mode)
     if a.sigma_turn is not None:
         _TO.set_sigma_turn(a.sigma_turn)
+    if a.flow_pricing is not None:
+        EV.set_flow_pricing(a.flow_pricing)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.nu_targets,
-                         a.silent, a.margin_comfort)
+                         a.silent, a.margin_comfort, ledger_pricing=a.ledger_pricing)
     # **T49 の検算**: `κ` の平均（`w` の平均が `w̄` に戻れば 1）
     stats["kappa_mean"] = (round(stats["kappa_sum"] / stats["kappa_n"], 4) if stats["kappa_n"] else None)
     stats["w_mean"] = (round(stats["kappa_mean"] * _TO.W_BAR, 4) if stats["kappa_mean"] is not None else None)
@@ -626,6 +661,7 @@ def main(argv=None):
     res = {"stats": stats,
            "provisional": {"P3_theta": a.theta, "P2_silent": a.silent,
                            "T28c_margin": a.margin_comfort, "w_mode": _TO.W_MODE,
+                           "flow_pricing": stats["flow_pricing"], "ledger_pricing": stats["ledger_pricing"],
                            "note": "§0.4 の暫定値。感度を付けて読む"},
            "summary": summarise(pairs, a.boot_reps, a.seed),
            # **T28-b: 行ごとに帯で切ってから足した版**（判定の主はこちら）
