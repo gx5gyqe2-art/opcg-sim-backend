@@ -57,7 +57,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     idx2cid = {i: c for c, i in GA._vocab().items()}
     atk = {b: {"price": [], "real": []} for b in BANDS}          # (1) 攻撃 1 回
     atk["leader"] = {"price": [], "real": []}
-    body = {b: {"present": 0, "attacked": 0, "can": 0, "nu_formula": [], "ko_p": []} for b in BANDS}   # (2)
+    # `nu_formula` は定数 `R` = 4.128・`nu_formula_state` は出荷の価格と同じ状態の `R`（`clip(相手ライフ, 1, 5)`・T50 で追加）
+    body = {b: {"present": 0, "attacked": 0, "can": 0, "nu_formula": [], "nu_formula_state": [], "ko_p": []}
+            for b in BANDS}   # (2)
     stats = {"games": 0, "turns": 0, "atk_rows": 0}
     games = 0
     for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS,
@@ -136,9 +138,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 body[bk]["present"] += 1
                 body[bk]["can"] += int(float(tok[s, S_CAN_ATTACK]) > 0.5)
                 body[bk]["attacked"] += int(s in turn_attacked[key])
-                body[bk]["nu_formula"].append(nu_of(pw, olp, R_TURNS, theta, mu,
-                                                    is_blocker=float(tok[s, S_IS_BLOCKER]) > 0.5,
-                                                    my_leader_power=mlp))
+                blk = float(tok[s, S_IS_BLOCKER]) > 0.5
+                body[bk]["nu_formula"].append(nu_of(pw, olp, R_TURNS, theta, mu, is_blocker=blk, my_leader_power=mlp))
+                body[bk]["nu_formula_state"].append(nu_of(pw, olp, max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), theta, mu,
+                                                          is_blocker=blk, my_leader_power=mlp))
                 body[bk]["ko_p"].append(ko_p_of(pw))
     return atk, body, stats
 
@@ -165,6 +168,7 @@ def summarise(atk, body):
         out["per_body_turn"][bk] = {"body_turns": d["present"], "attack_rate": round(d["attacked"] / d["present"], 4),
                                     "can_attack_rate": round(d["can"] / d["present"], 4),
                                     "nu_formula_mean": round(float(np.mean(d["nu_formula"])), 4),
+                                    "nu_formula_state_mean": round(float(np.mean(d.get("nu_formula_state") or d["nu_formula"])), 4),
                                     "ko_p_band_mean": round(float(np.mean(d["ko_p"])), 4)}
     # (3) 組み直し: 実測の因子 (1)×(2)×R×(1−ko_p) 対 実測 ν 対 式 ν
     for bk in BANDS:
@@ -180,6 +184,8 @@ def summarise(atk, body):
                               "composed_nu_curve_kop": round(comp_curve, 4),
                               "nu_formula": b["nu_formula_mean"], "nu_measured": NU_MEAS[bk],
                               "formula_over_measured": round(b["nu_formula_mean"] / NU_MEAS[bk], 3),
+                              # **出荷の価格と同じ `R`（状態）で引いた式**——定数 `R` の比は状態の `R` より高く出る（T50）
+                              "formula_state_over_measured": round(b["nu_formula_state_mean"] / NU_MEAS[bk], 3),
                               "composed_over_measured": round(comp_const / NU_MEAS[bk], 3)}
     return out
 
