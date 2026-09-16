@@ -61,8 +61,12 @@ def _theory_option_off():
     # 時計の形そのものは T49 のテストが**明示的に `clock` にして**固定する。
     before_w = _T.W_MODE
     _T.set_w_mode("flat")
+    # **生存の重み（T60）もテストでは `once`（従来の閉じた代数）に固定する**——`geo` は T60 のテストが明示的に入れる
+    before_s = _T.SURV_MODE
+    _T.set_surv_mode("once")
     try:
         yield
     finally:
         _T.set_option_mode(before)
         _T.set_w_mode(before_w)
+        _T.set_surv_mode(before_s)

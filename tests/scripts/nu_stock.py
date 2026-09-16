@@ -59,8 +59,15 @@ def formula_terms(power, opp_leader_power, my_leader_power, r, is_blocker, theta
     opt = option_value(power, opp_leader_power, r, theta, mu, my_leader_power, kp)
     block = (TO.BLOCK_P_BLOCKER if is_blocker else 0.0) * theta * mu
     shield = shield_of(power, opp_leader_power)
-    return {"lead": lead, "lead_R": lead * r, "option": opt, "block": block, "shield": shield, "ko_p": kp,
-            "nu": (lead * r + opt + block + shield) * (1.0 - kp)}
+    st = TO.surv_turns(r, kp)                     # `once` なら R・`geo` なら Σ(1−ko_p)^t（T60）
+    if TO.SURV_MODE == "geo":
+        nu = lead * st + opt + (block + shield) * (1.0 - kp)
+        weight = st                               # 式の生存の重み＝働くターン数
+    else:
+        nu = (lead * r + opt + block + shield) * (1.0 - kp)
+        weight = (1.0 - kp) * r
+    return {"lead": lead, "lead_R": lead * st, "option": opt, "block": block, "shield": shield, "ko_p": kp,
+            "surv_weight": weight, "nu": nu}
 
 
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
@@ -179,7 +186,9 @@ def summarise(bodies, r_by_life):
              "nu_measured": NU_MEAS[bk]}
         f = o["formula"]
         # 式の生存の重み（(1−ko_p)·R）対 実測の生きて迎えたターン数
-        o["turn_weight_formula"] = round(f["lead_R"] / f["lead"] * (1.0 - f["ko_p"]), 3) if f["lead"] else None
+        # 式の生存の重み（`once`: `(1−ko_p)·R`・`geo`: `Σ(1−ko_p)^t`＝`formula_terms` の `surv_weight`・T60）
+        o["turn_weight_formula"] = (round(_m(rs, "surv_weight"), 3) if all("surv_weight" in b for b in rs)
+                                    else (round(f["lead_R"] / f["lead"] * (1.0 - f["ko_p"]), 3) if f["lead"] else None))
         o["turn_weight_measured"] = o["turns_alive_mean"]
         # 組み直し: 流れ（実現/攻撃 × 攻撃/生きたターン）× 生きたターン
         o["composed_stock"] = round(o["real_per_attack"] * o["attacks_per_turn_alive"] * o["turns_alive_mean"], 4)
@@ -202,12 +211,14 @@ def main(argv=None):
     ap.add_argument("--theta", type=float, default=THETA)
     ap.add_argument("--theta-mode", default="const", choices=("const", "board", "max"))
     add_nu_mode_arg(ap)
+    TO.add_surv_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_nu_mode(a)
+    TO.apply_surv_mode(a)
     t0 = time.time()
     bodies, r_by_life, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
-    res = {"nu_mode": a.nu_mode, "option_mode": TO.OPTION_MODE, "stats": stats,
+    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "option_mode": TO.OPTION_MODE, "stats": stats,
            "frozen": {"theta": a.theta, "mu": MU, "nu_meas": NU_MEAS, "R_const": R_CONST},
            "summary": summarise(bodies, r_by_life), "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)

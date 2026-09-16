@@ -993,3 +993,65 @@ def test_the_two_clocks_are_read_from_the_board():
     d_even = np.subtract(*T.clocks(**even)[::-1])
     d_far = np.subtract(*T.clocks(**far)[::-1])
     assert T.state_factor(d_even, "clock") > T.state_factor(d_far, "clock")
+
+
+# ---- T60（2026-09-16・ユーザ決定「式の重みを調整するのが正しい」）: 生存の重みは幾何和 Σ(1−ko_p)^t ----
+
+def test_the_geometric_survival_weight_is_the_sum_of_per_turn_survival():
+    """`once` は R そのもの（生存は外で一度）・`geo` は `Σ_{t=1..R} (1−ko_p)^t`・端数のターンは比例配分。
+    T50 の帯の R（3.61／3.16／2.89）で 1.73／1.62／1.54＝実測の「生きて迎えたターン数」1.87／1.60／1.50 に乗る。"""
+    s = 1.0 - 0.289
+    assert T.turn_weights(4, 0.289, "once") == [1.0, 1.0, 1.0, 1.0]
+    assert T.turn_weights(4, 0.289, "geo") == pytest.approx([s, s ** 2, s ** 3, s ** 4])
+    assert T.surv_turns(4, 0.289, "once") == 4.0
+    assert T.surv_turns(4, 0.289, "geo") == pytest.approx(s + s ** 2 + s ** 3 + s ** 4, abs=1e-9)
+    assert T.surv_turns(2.5, 0.289, "geo") == pytest.approx(s + s ** 2 + 0.5 * s ** 3, abs=1e-9)   # 端数は比例
+    assert T.surv_turns(0, 0.289, "geo") == 0.0
+    for r, meas in ((3.61, 1.87), (3.16, 1.60), (2.89, 1.50)):
+        geo, once = T.surv_turns(r, 0.289, "geo"), (1 - 0.289) * r
+        assert abs(geo - meas) < abs(once - meas)          # 幾何和の方が実測に近い（3 帯とも）
+        assert abs(geo - meas) < 0.15
+
+
+def test_nu_under_geo_discounts_the_attack_stream_per_turn_and_the_block_once():
+    """`geo` の `ν` ＝ `lead·Σs^t + block·s`（潜在価値 off・`base` は身代わり無し）。`once` は `(lead·R + block)(1−ko_p)`。
+    既定（`once`）は従来の値のまま＝切替を入れても過去の数字は動かない。"""
+    before = T.SURV_MODE
+    try:
+        T.set_surv_mode("once")
+        v_once = T.nu_of(8000.0, 5000.0, 4.0, is_blocker=True, mode="base")
+        lead = T.attack_value_don(8000.0, 5000.0, True)
+        block = T.BLOCK_P_BLOCKER * T.THETA * T.MU
+        assert v_once == pytest.approx((lead * 4.0 + block) * (1 - T.KO_P), abs=1e-9)
+        assert T.set_surv_mode("geo") == "geo"
+        v_geo = T.nu_of(8000.0, 5000.0, 4.0, is_blocker=True, mode="base")
+        s = 1 - T.KO_P
+        assert v_geo == pytest.approx(lead * T.surv_turns(4.0, T.KO_P, "geo") + block * s, abs=1e-9)
+        assert 0.5 < v_geo / v_once < 0.8                   # 大きい体は 2/3 前後に下がる（T59 の KO の比 0.61〜0.64 の側）
+        # 身代わり（`pair`・実測の在庫）は従来どおり `(1 − ko_p)` を一度＝変わるのは攻撃項だけ
+        v_pair = T.nu_of(8000.0, 5000.0, 4.0, is_blocker=False, mode="pair")
+        kp = T.ko_p_of(8000.0)
+        st = T.surv_turns(4.0, kp, "geo")
+        assert v_pair == pytest.approx(lead * st + T.shield_of(8000.0, 5000.0) * (1 - kp), abs=1e-9)
+        with pytest.raises(ValueError):
+            T.set_surv_mode("なにか")
+    finally:
+        T.set_surv_mode(before)
+    assert T.SURV_MODE == before
+
+
+def test_the_board_attack_stream_weights_each_turns_target_by_survival():
+    """盤面モード（対象の max）でも t ターン目の対象に `(1−ko_p)^t` が掛かる。"""
+    before = T.SURV_MODE
+    try:
+        chars = [(3000.0, False)]
+        T.set_surv_mode("once")
+        a_once = T.attack_stream(8000.0, 5000.0, 2.0, opp_chars=chars)
+        T.set_surv_mode("geo")
+        a_geo = T.attack_stream(8000.0, 5000.0, 2.0, opp_chars=chars)
+        s = 1 - T.KO_P
+        lead = T.attack_value_don(8000.0, 5000.0, True)
+        v1 = a_once - lead                                  # 1 ターン目は対象の max・2 ターン目はリーダー
+        assert a_geo == pytest.approx(s * v1 + s ** 2 * lead, abs=1e-9)
+    finally:
+        T.set_surv_mode(before)

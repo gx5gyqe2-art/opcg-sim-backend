@@ -169,6 +169,58 @@ NU_MODES = ("base", "pair")
 #: > **過去の数字と比べるときは `--nu-mode base` を明示する**（罠: 既定の変更を挟んで
 #: > 前後の数字を並べると、変えていない量まで動いて見える）。
 NU_MODE = "pair"
+#: **生存の重みの形**（T60・ユーザ決定 2026-09-16「式の重みを調整するのが正しい」）。
+#: `once`＝従来＝`R` ターンぶん足してから `(1 − ko_p)` を**一度だけ**掛ける／
+#: `geo`＝**毎ターン倒される機会がある**ので t ターン目の重みは `(1 − ko_p)^t`（幾何和・§14.1.1 の「正しくは Σ lead·s^t」）。
+#: 新定数ゼロ（既に測ってある `ko_p` だけ）。T50 の帯ごとの「生きて迎えたターン数」1.87／1.60／1.50 に対し
+#: `once` は 2.67／2.34／2.30・`geo` は 1.73／1.62／1.54（合わせ込まずに乗る）。
+#: **既定は `once` のまま**（切替で両方測ってから決める）。
+SURV_MODES = ("once", "geo")
+SURV_MODE = "once"
+
+
+def set_surv_mode(mode):
+    global SURV_MODE
+    if mode not in SURV_MODES:
+        raise ValueError("surv mode は %s のどれか" % (SURV_MODES,))
+    SURV_MODE = mode
+    _OPTION_CACHE.clear()
+    return SURV_MODE
+
+
+def apply_surv_mode(a):
+    """`--surv-mode` を反映し、実際に使う形を `a.surv_mode` に書き戻して返す。"""
+    if getattr(a, "surv_mode", None) is not None:
+        set_surv_mode(a.surv_mode)
+    a.surv_mode = SURV_MODE
+    return SURV_MODE
+
+
+def add_surv_mode_arg(ap):
+    ap.add_argument("--surv-mode", default=None, choices=SURV_MODES,
+                    help="`ν` の生存の重み（T60）。省略時は `theory_order.SURV_MODE`（既定 `once`＝従来）。"
+                         "`geo` は毎ターン `(1 − ko_p)^t` で割り引く幾何和")
+
+
+def turn_weights(r_turns, ko_p, mode=None):
+    """t ターン目（t = 1, 2, …）の重みの並び。`once` は 1（生存は外で一度）・`geo` は `(1 − ko_p)^t`。
+    端数のターンは比例配分（`attack_stream` と同じ）。"""
+    mode = SURV_MODE if mode is None else mode
+    s = (1.0 - float(ko_p)) if mode == "geo" else 1.0
+    out = []
+    r = max(0.0, float(r_turns))
+    t = 1
+    while r > 1e-12:
+        share = min(1.0, r)
+        out.append(share * (s ** t))
+        r -= share
+        t += 1
+    return out
+
+
+def surv_turns(r_turns, ko_p, mode=None):
+    """**働くターン数の期待値**＝重みの和（`once` は `R` そのもの・`geo` は `Σ (1 − ko_p)^t`）。"""
+    return float(sum(turn_weights(r_turns, ko_p, mode)))
 #: 飽和の境目（`nu_measure.power_band` と同じ＝式が 3 値しか返さない境目）
 SAT_OVER_PWR = 2000.0
 #: f16 の丸め対策（ちょうど 1000 の倍数が 2000.0002 になる・`budget_audit` と同じ）
@@ -675,7 +727,7 @@ def option_value(power, opp_leader_power, r_turns, theta=THETA, mu=MU, my_leader
     mlp = float(olp if my_leader_power is None else my_leader_power)
     # 同梱の分布で引くときだけ覚える（`boards` を明示した呼び出しは検算用＝毎回計算する）
     key = (int(round(float(power) / 100.0)), rb, int(round(olp / 100.0)), int(round(mlp / 100.0)),
-           round(float(theta), 4), round(float(mu), 5), round(float(ko_p), 4)) if boards is None else None
+           round(float(theta), 4), round(float(mu), 5), round(float(ko_p), 4), SURV_MODE) if boards is None else None
     if key is not None and key in _OPTION_CACHE:
         return _OPTION_CACHE[key]
     bs = (load_opp_boards() if boards is None else boards).get(rb) or []
@@ -691,7 +743,7 @@ def option_value(power, opp_leader_power, r_turns, theta=THETA, mu=MU, my_leader
         for _mlp_rec, bodies in bs:
             chars = [(float(tp), bool(blk)) for tp, blk in bodies]
             # 盤面モードの `attack_stream`（高い順に 1 ターン 1 体・端数は比例配分）を分布の上で平均する
-            tot += attack_stream(power, olp, r, theta, mu, chars or None, mlp, ko_p) - lead * r
+            tot += attack_stream(power, olp, r, theta, mu, chars or None, mlp, ko_p) - lead * surv_turns(r, ko_p)
     finally:
         _OPTION_DEPTH -= 1
     val = float(tot / len(bs))
@@ -738,7 +790,7 @@ def attack_stream(power, opp_leader_power, r_turns, theta=THETA, mu=MU, opp_char
         # **盤面を渡さないときは分布で潜在価値を足す**（T46）——`lead·R + E[Σ max(v_(i), lead)] − lead·R`
         opt = (option_value(power, opp_leader_power, r, theta, mu, my_leader_power, ko_p)
                if _OPTION_DEPTH == 0 else 0.0)
-        return lead * r + opt                    # 選択肢は `R` ターンぶんの総額（流量ではない）
+        return lead * surv_turns(r, ko_p) + opt  # 選択肢は `R` ターンぶんの総額（流量ではない）・`geo` は重みの和（T60）
     mlp = float(opp_leader_power if my_leader_power is None else my_leader_power)
     bodies = []
     for entry in opp_chars:
@@ -756,12 +808,9 @@ def attack_stream(power, opp_leader_power, r_turns, theta=THETA, mu=MU, opp_char
         vals.append(attack_value_don(power, tp, False, theta, mu, nu_target=nu_t, blockers=others))
     vals.sort(reverse=True)
     total = 0.0
-    i = 0
-    while r > 1e-12:                          # 端数の丸め残りで回り続けない
-        share = min(1.0, r)                      # 端数のターンは比例配分
-        total += share * max(vals[i] if i < len(vals) else lead, lead)
-        r -= share
-        i += 1
+    # 端数のターンは比例配分・`geo` なら t ターン目に `(1 − ko_p)^t` が掛かる（T60）
+    for i, w in enumerate(turn_weights(r, ko_p)):
+        total += w * max(vals[i] if i < len(vals) else lead, lead)
     return float(total)
 
 
@@ -841,6 +890,10 @@ def nu_of(power, opp_leader_power, r_turns, theta=THETA, mu=MU, block_p=None, ko
     block = float(block_p) * theta * mu             # 1 回ぶんの攻撃を消す価値
     # **身代わりも R ターンぶんの流量**（実測が既に `R` を掛けてある）なので、
     # 攻撃・ブロックと同じく**生存で 1 度だけ割り引く**（二重に割り引かない）。
+    if SURV_MODE == "geo":
+        # **T60**: 攻撃項は `attack_stream` の中で t ターン目に `(1 − ko_p)^t` が掛かっている（変わるのはここだけ）。
+        # ブロック（1 回きり）と身代わり（実測の在庫＝生きた分が既に入っている）は従来どおり `(1 − ko_p)` を一度
+        return atk + (block + shield) * (1.0 - kp)
     return (atk + block + shield) * (1.0 - kp)
 
 

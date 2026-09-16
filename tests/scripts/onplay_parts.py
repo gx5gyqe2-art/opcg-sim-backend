@@ -34,6 +34,7 @@ if _HERE not in sys.path:
 
 import effect_value as EV  # noqa: E402
 import price_realised as PR  # noqa: E402
+import theory_order as TO  # noqa: E402
 from theory_order import MU  # noqa: E402
 
 #: 実現の部品のうち「相手の側」に括るもの
@@ -127,11 +128,16 @@ def main(argv=None):
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--min-card-rows", type=int, default=8)
+    TO.add_nu_mode_arg(ap)
+    TO.add_surv_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    TO.apply_nu_mode(a)
+    TO.apply_surv_mode(a)
     t0 = time.time()
     rows, stats = collect(a.src, a.limit_games)
-    res = {"stats": stats, "summary": summarise(rows, a.min_card_rows), "seconds": round(time.time() - t0, 1)}
+    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "stats": stats, "summary": summarise(rows, a.min_card_rows),
+           "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
     print(txt)
     if a.out:

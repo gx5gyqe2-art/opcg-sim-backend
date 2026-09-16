@@ -626,6 +626,7 @@ def main(argv=None):
                          "（既定 `flat`＝`κ = 1`・盤面の時計では `clock` は説明力を落とした）")
     ap.add_argument("--sigma-turn", type=float, default=None,
                     help="**T49 の感度**——時計 1 本のぶれ（ターン）。既定は写し（1.0）。合わせ込みには使わない")
+    _TOM.add_surv_mode_arg(ap)
     ap.add_argument("--flow-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
                     help="**決める価格**（`s`・`ΔS`）の規約。省略時は `effect_value.FLOW_PRICING`（`option`）")
     ap.add_argument("--ledger-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
@@ -651,6 +652,7 @@ def main(argv=None):
         _TO.set_sigma_turn(a.sigma_turn)
     if a.flow_pricing is not None:
         EV.set_flow_pricing(a.flow_pricing)
+    _TOM.apply_surv_mode(a)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.nu_targets,
                          a.silent, a.margin_comfort, ledger_pricing=a.ledger_pricing)
@@ -662,6 +664,7 @@ def main(argv=None):
            "provisional": {"P3_theta": a.theta, "P2_silent": a.silent,
                            "T28c_margin": a.margin_comfort, "w_mode": _TO.W_MODE,
                            "flow_pricing": stats["flow_pricing"], "ledger_pricing": stats["ledger_pricing"],
+                           "surv_mode": _TO.SURV_MODE, "nu_mode": _TO.NU_MODE,
                            "note": "§0.4 の暫定値。感度を付けて読む"},
            "summary": summarise(pairs, a.boot_reps, a.seed),
            # **T28-b: 行ごとに帯で切ってから足した版**（判定の主はこちら）

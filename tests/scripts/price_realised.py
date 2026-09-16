@@ -65,6 +65,7 @@ import guard_afford as GA  # noqa: E402
 import effect_value as EV  # noqa: E402
 from theory_bridge import (MOVE_FAMILIES, POL_COLS, ROW_COLS, _extra, _state_of,  # noqa: E402
                            move_family)
+import theory_order as _TO  # noqa: E402
 from theory_order import (own_attackers_of, play_value, LAM, MU, PWR_EPS, S_IS_CHAR, S_POWER, SC_MY_DON, SC_MY_HAND,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE,
                           SLOT_OPP_FIELD, SLOT_OWN_FIELD, THETA, add_nu_mode_arg, apply_nu_mode,
@@ -405,16 +406,18 @@ def main(argv=None):
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     add_nu_mode_arg(ap)
+    _TO.add_surv_mode_arg(ap)
     ap.add_argument("--flow-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
                     help="**T54** 後で効く効果を付与の行で数える（`option`・既定）か、使った行で数える（`exercise`＝付与の行は 0）か")
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_nu_mode(a)
+    _TO.apply_surv_mode(a)
     if a.flow_pricing is not None:
         EV.set_flow_pricing(a.flow_pricing)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
-    res = {"nu_mode": a.nu_mode, "flow_pricing": EV.FLOW_PRICING, "stats": stats,
+    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "flow_pricing": EV.FLOW_PRICING, "stats": stats,
            "frozen": {"lambda": LAM, "mu": MU, "delta": DELTA, "nu_meas": NU_MEAS, "theta": a.theta},
            "summary": summarise(per, a.boot_reps, a.seed), "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
