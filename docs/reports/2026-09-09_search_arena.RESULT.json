@@ -1,0 +1,67 @@
+{
+  "job": "rs-search-arena",
+  "status": "done",
+  "candidate_opts": {
+    "net": "opcg_sim/data/learned/nrel_r3.npz",
+    "sims": 160,
+    "worlds": 4,
+    "select_rule": "q_min_n",
+    "q_min_frac": 0.125,
+    "root_prior_temp": 2.0,
+    "setup_box": false
+  },
+  "baseline_opts": {
+    "net": "opcg_sim/data/learned/nrel_r3.npz",
+    "sims": 160,
+    "note": "既定（--baseline 空・--cand-* は基準席に一切渡さない）"
+  },
+  "random": {
+    "games": 382,
+    "pairs": 191,
+    "wins": 203.0,
+    "wr": 0.5314,
+    "ci95": [0.4757, 0.5871],
+    "elo": 21.9,
+    "elo95": [-16.9, 61.2],
+    "void": 1,
+    "void_rate": 0.0052,
+    "shards": 8,
+    "dup_seeds": 0,
+    "seed_base": "441000 + 1000k (k=0..7) ・各 24 ペア",
+    "conditions": "--leaders random --decks synth",
+    "per_shard_wr": [0.4583, 0.5833, 0.5625, 0.4375, 0.3958, 0.6458, 0.6458, 0.5217],
+    "gate": "wr>=0.55 かつ CI 下限>0.50 → 未達（wr 0.5314・CI 下限 0.4757）"
+  },
+  "mirror": {
+    "games": 384,
+    "pairs": 192,
+    "wins": 209.0,
+    "wr": 0.5443,
+    "ci95": [0.5022, 0.5863],
+    "elo": 30.8,
+    "elo95": [1.5, 60.6],
+    "void": 0,
+    "void_rate": 0.0,
+    "shards": 8,
+    "dup_seeds": 0,
+    "seed_base": "451000 + 1000k (k=0..7) ・各 24 ペア",
+    "conditions": "既定の固定ミラー（--leaders fixed --decks singleton）",
+    "per_shard_wr": [0.5833, 0.5208, 0.5, 0.5208, 0.5833, 0.6042, 0.5417, 0.5],
+    "gate": "退行なし（CI 下限 >=0.45）→ 達成（CI 下限 0.5022）"
+  },
+  "latency_ms_main_median": {
+    "cand": 138.1,
+    "base": 101.2,
+    "ratio": 1.36,
+    "n": {"cand": 358, "base": 296},
+    "note": "主条件（--leaders random --decks synth）の実対局 4 ペア 8 局を単独プロセスで打ち、Game.decide を直に時間で挟んだ。**合法手が 2 本以上ある決定だけ**の中位（強制手を含む全決定の中位は cand 3.0ms／base 4.9ms で、木を回さない決定に埋もれて比較にならない）。全決定の平均は cand 103.5ms／base 90.6ms。分析 #6 の 1.9 倍（0.39s vs 0.21s）より小さいのは、あちらが手で選んだ 3 局面、こちらが実プレイ全体の分布だから"
+  },
+  "make_test": "464 passed, 1 skipped（pytest）＋ cargo test 406 passed, 0 failed。skip は tests/test_n_rel_train_torch.py（torch は任意依存）。golden 2 本は wheel を入れてあるので走って pass している",
+  "artifacts": {
+    "ledgers": "n1_results/arena_search_r2/{random,mirror}_w00..w07.jsonl",
+    "code": "opcg_sim/loop/arena.py・arena_shard.py・arena_merge.py",
+    "test": "tests/test_arena_search_opts.py（cpu_infra・6 本）",
+    "docs": "docs/TEST_SPEC.md §2 に 1 行／docs/n_loop_ops.md §6 の候補設定を C_w4_r2 へ差し替え"
+  },
+  "notes": "(1) 判定はコーディネータ。数字だけ言うと**主条件は規約未達**（wr 0.5314・CI 下限 0.4757＝0.50 を跨ぐ）・**副条件は退行なし**（CI 下限 0.5022 ≧0.45）。分析 #6 の 3 局面で見えた効き（神の裁き→攻撃 5/8・決着 4/8）は、384 局の実プレイでは +22 Elo 相当（CI が 0 を跨ぐ）にとどまり、設定変更として有意とは言えない。 (2) void は主 1 件のみ（0.5%・seed 448009・上限手数で決着せず・リーダーは両席 OP07-019）＝2% の足切りには遠く、判定は出せる。dup_seeds は両条件 0。 (3) シャード間のばらつきが大きい（主 0.396〜0.646）。24 ペアのシャード 1 本では何も言えないことの再確認で、8 本合算して初めて CI が読める。 (4) **push 先について**: 指示書は claude/rs-search-arena だが、本セッションの designated branch は claude/rs-search-arena-1cwgoe だった。両方に同じコミットを push してある（内容は完全に同一）。 (5) --workers は 2 を使った（指示書の「4 コアで 2 まで」に従った）。念のため 6 ペアで 2 と 4 を測ったが 99s vs 94s＝誤差の範囲で、oversubscription の得も損も無かった。1 シャード 24 ペアが主条件 5〜7 分・副条件 4 分、2 条件 16 シャードで約 85 分。 (6) 準備箱（--cand-setup-box）は配線したが今回は使っていない（§20.7.6 の後・分析 #6 の提案 2 どおり）。 (7) 台帳の cand_opts は既定実行では鍵ごと出ない＝歴代の台帳と同じ形のままで、arena_merge は cand_opts の無い台帳を「既定」として読む。 (8) **実行環境の注意**: このコンテナは素の状態で pytest・numpy・maturin・cffi・httpx が入っていない。`pip install --break-system-packages -r opcg_sim/requirements.txt pytest pytest-xdist maturin==1.15.0 cffi httpx` を入れてから `make rust-develop`。httpx が無いと API 系 21 ファイルが starlette.testclient の RuntimeError で 52 errors になる（コードの失敗ではない）。"
+}

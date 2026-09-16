@@ -167,7 +167,7 @@ def build_parser():
         p.add_argument("--leaders", default="fixed",
                        choices=("fixed", "random", "real", "purple"))
         p.add_argument("--decks", default="singleton",
-                       choices=("singleton", "synth", "synth_dig"))
+                       choices=("singleton", "synth", "synth_dig", "synth_roles", "user"))
         p.add_argument("--pair-timeout", type=int, default=900)
         A.add_cand_args(p)
         return p

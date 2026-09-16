@@ -6,6 +6,8 @@ sys.path 設定と google.cloud スタブ注入は `_bootstrap`（tests/harness/
 import os
 import sys
 
+import pytest
+
 # _bootstrap（同ディレクトリ）を解決できるよう tests/ を path に載せてから読み込む。
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _bootstrap  # noqa: E402,F401  (sys.path 設定＋google スタブ)
@@ -36,3 +38,25 @@ def pytest_configure(config):
         "legacy: Python エンジン直叩きのテスト（Rust 化後は golden 2 本が一次防衛線・"
         "make test-legacy でのみ実行・docs/rust_engine_plan.md §16.1）",
     )
+
+
+@pytest.fixture(autouse=True)
+def _theory_option_off():
+    """**`ν` の潜在価値（T46・分布で足す項）はテストでは既定で切る**。
+
+    多くのテストは攻撃項の**閉じた代数**（`lead × R`・リーダー未満は 0 等）を固定している。
+    潜在価値は同梱の分布（`tests/fixtures/opp_boards.json`）に依る実測の項なので、
+    その代数とは別に T46 のテストが**明示的に入れて**固定する。
+    """
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
+        import theory_order as _T
+    except Exception:
+        yield
+        return
+    before = _T.OPTION_MODE
+    _T.set_option_mode("off")
+    try:
+        yield
+    finally:
+        _T.set_option_mode(before)
