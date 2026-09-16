@@ -792,3 +792,39 @@ def test_a_play_with_slack_don_is_priced_higher_than_under_the_flat_charge():
         T.PLAY_COST_MODE = before
     info = cards.info(cid)
     assert v_state - v_flat == pytest.approx(float(info.get("cost") or 0) * 0.66 * T.MU)
+
+
+# ---- T45: ドンを付けて殴る（2026-09-16・ユーザ提案「圧力から使用コストを差し引く」） ----
+
+def test_attacking_with_don_is_pressure_minus_the_don_s_alternative_value():
+    """`max_k [ attack_value(P + 1000k) − k·δ ]`——`δ` は実測のドンの価格（代替価値）・新定数なし。"""
+    lead = 5000.0
+    assert T.DELTA == pytest.approx(0.0277)
+    # リーダーより 1000 低い体: 1 枚付けて通す＝ c(0)·μ − δ
+    assert T.attack_value(4000.0, lead, True) == 0.0
+    assert T.attack_value_don(4000.0, lead, True) == pytest.approx(T.c_of(0.0) * T.MU - T.DELTA)
+    # 2000 低い体: 2 枚で c(0)·μ − 2δ ≈ 0（0 より下には行かない＝k=0 が採られる）
+    assert T.attack_value_don(3000.0, lead, True) == pytest.approx(max(0.0, T.c_of(0.0) * T.MU - 2 * T.DELTA))
+    # リーダー以上: 素殴りが最善のまま（頭打ち Θ·μ に届いていれば付けても増えない）
+    assert T.attack_value_don(6000.0, lead, True) == pytest.approx(T.attack_value(6000.0, lead, True))
+    assert T.attack_value_don(8000.0, lead, True) == pytest.approx(T.attack_value(8000.0, lead, True))
+    # 決して素殴りより下がらない・`bare` なら従来どおり
+    for pw in (2000.0, 4000.0, 5000.0, 7000.0):
+        assert T.attack_value_don(pw, lead, True) >= T.attack_value(pw, lead, True)
+        assert T.attack_value_don(pw, lead, True, mode="bare") == T.attack_value(pw, lead, True)
+
+
+def test_the_don_attack_flows_into_nu_for_bodies_just_below_the_leader():
+    """`ν` の攻撃項が「リーダー未満は 0」から「1000 低い体は付けて殴る」に変わる。"""
+    before = T.ATTACK_DON_MODE
+    try:
+        T.set_attack_don_mode("bare")
+        bare = T.nu_of(4000.0, 5000.0, 4.128, is_blocker=False, mode="base")
+        T.set_attack_don_mode("don")
+        don = T.nu_of(4000.0, 5000.0, 4.128, is_blocker=False, mode="base")
+    finally:
+        T.set_attack_don_mode(before)
+    assert bare == 0.0
+    assert don == pytest.approx((T.c_of(0.0) * T.MU - T.DELTA) * 4.128 * (1 - T.KO_P))
+    with pytest.raises(ValueError):
+        T.set_attack_don_mode("なにか")

@@ -473,6 +473,45 @@ def attack_value(power, target_power, is_leader, theta=THETA, mu=MU, nu_target=N
     return float(min(guard, take))
 
 
+#: ドン 1 個の価格（実測・`game_theory.md` §18・`effect_value.DELTA` と同じ）——**ドンの代替価値**
+#: （登場・他の体への付与を平均したもの）として「ドンを付けて殴る」の使用コストに使う（T45）
+DELTA = 0.0277
+#: 「ドンを付けて殴る」を `ν` の攻撃項に入れるか（T45・2026-09-16・ユーザ提案）。
+#: `don`＝毎ターン **max_k [ 圧力(k) − k·δ ]**（付けた後の攻撃 1 回の価値からドンの代替価値を引き、
+#: 一番得な枚数で殴る・k = 0 を含む）／`bare`＝従来＝素殴りだけ（リーダー未満は 0）。**新定数なし**
+ATTACK_DON_MODES = ("bare", "don")
+ATTACK_DON_MODE = "don"
+#: 1 体に付けられるドンの上限（規則の 10 枚）
+ATTACK_DON_MAX = 10
+
+
+def attack_value_don(power, target_power, is_leader, theta=THETA, mu=MU, nu_target=None,
+                     delta=DELTA, max_don=ATTACK_DON_MAX, mode=None):
+    """**ドンを付けて殴る**攻撃 1 回の価値＝`max_k [ attack_value(P + 1000k) − k·δ ]`（T45）。
+
+    リーダーより 1000 低い体は 1 枚付けて通す（`c(0)·μ − δ`）、2000 低い体は 2 枚で
+    `c(0)·μ − 2δ ≈ 0`＝今までどおり 0。リーダー以上の体は素殴りが最善のまま（`Θ·μ` で頭打ち）。
+    """
+    mode = ATTACK_DON_MODE if mode is None else mode
+    best = attack_value(power, target_power, is_leader, theta, mu, nu_target)
+    if mode != "don":
+        return best
+    for k in range(1, int(max_don) + 1):
+        v = attack_value(float(power) + 1000.0 * k, target_power, is_leader, theta, mu, nu_target) \
+            - k * float(delta)
+        if v > best:
+            best = v
+    return float(best)
+
+
+def set_attack_don_mode(mode):
+    global ATTACK_DON_MODE
+    if mode not in ATTACK_DON_MODES:
+        raise ValueError("attack don mode は %s のどれか" % (ATTACK_DON_MODES,))
+    ATTACK_DON_MODE = mode
+    return ATTACK_DON_MODE
+
+
 def attack_stream(power, opp_leader_power, r_turns, theta=THETA, mu=MU, opp_chars=None,
                   my_leader_power=None, ko_p=KO_P):
     """残り `r_turns` ターンぶんの**攻撃の総価値**（毎ターン**一番おいしい対象**を選ぶ）。
@@ -497,7 +536,7 @@ def attack_stream(power, opp_leader_power, r_turns, theta=THETA, mu=MU, opp_char
     **内側の `ν` には `opp_chars` を渡さない**＝**深さ 1 で止める**（相手のキャラの価値を
     測るのにこちらの盤面を要求すると相互再帰になる）。
     """
-    lead = attack_value(power, opp_leader_power, True, theta, mu)
+    lead = attack_value_don(power, opp_leader_power, True, theta, mu)      # ドンを付けて殴る（T45）
     r = max(0.0, float(r_turns))
     if not opp_chars:
         return lead * r                          # 従来どおり（盤面を渡さなければ値は動かない）
@@ -506,7 +545,7 @@ def attack_stream(power, opp_leader_power, r_turns, theta=THETA, mu=MU, opp_char
     for entry in opp_chars:
         tp, blk = (entry if isinstance(entry, (tuple, list)) else (entry, None))
         nu_t = nu_of(tp, mlp, r_turns, theta, mu, ko_p=ko_p, is_blocker=blk)
-        vals.append(attack_value(power, tp, False, theta, mu, nu_target=nu_t))
+        vals.append(attack_value_don(power, tp, False, theta, mu, nu_target=nu_t))
     vals.sort(reverse=True)
     total = 0.0
     i = 0
