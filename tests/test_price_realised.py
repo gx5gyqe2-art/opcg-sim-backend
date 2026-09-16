@@ -93,3 +93,14 @@ def test_the_gross_price_adds_back_the_don_opportunity_cost_the_theory_charges()
     assert PR.DON_COST == pytest.approx(0.66 * PR.MU)
     pv = T.play_value(5000.0, 4, 5000.0, 4.128)
     assert pv + 4 * PR.DON_COST == pytest.approx(T.play_value(5000.0, 0, 5000.0, 4.128))
+
+
+def test_attached_don_does_not_lift_the_band_of_the_realised_body_value():
+    """**付けたドンは実現に暗黙に加算されない**（ユーザ指摘 2026-09-16）——`power_now` は所有者のターンに
+    付与ドンを載せるので、帯は素のパワー（`power_now − 1000·付与ドン`）で決める。"""
+    bare = _tok(own=((4000, 0),))
+    with_don = _tok(own=((6000, 2),))        # 4000 に 2 枚付けて 6000 に見えている
+    assert PR.side_nu_meas(bare, PR.SLOT_OWN_FIELD, 5000.0) == pytest.approx(PR.NU_MEAS["lt_leader"])
+    assert PR.side_nu_meas(with_don, PR.SLOT_OWN_FIELD, 5000.0) == pytest.approx(PR.NU_MEAS["lt_leader"])
+    # 付与＝アクティブ 2 減・キャラ付与 2 増（総在庫は同じ）→ 盤面の評価も同じ
+    assert PR.state_meas(_sc(my_act=1), with_don) == pytest.approx(PR.state_meas(_sc(my_act=3), bare))

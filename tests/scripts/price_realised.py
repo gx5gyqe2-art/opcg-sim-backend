@@ -93,11 +93,14 @@ def nu_meas_of(power, opp_leader_power):
 
 
 def side_nu_meas(tok, slots, opp_leader_power):
+    """自分／相手の体の `ν_meas` の和。**帯は付与ドンを外した素のパワーで決める**（2026-09-16 訂正・
+    ユーザ指摘）——`power_now` は所有者のターンに付与ドンを載せるので、`DON_BOX` で付けた 1000·k が
+    次の判断点まで残り、帯が上がって**付けたドンが実現に暗黙に加算**されていた。"""
     tot = 0.0
     for s in range(slots.start, slots.stop):
         if float(tok[s, S_IS_CHAR]) <= 0.5:
             continue
-        pw = float(tok[s, S_POWER]) * 1e4
+        pw = float(tok[s, S_POWER]) * 1e4 - float(tok[s, S_ATTACHED_DON]) * 5.0 * 1000.0
         if pw < -PWR_EPS:
             continue
         tot += nu_meas_of(pw, opp_leader_power)
