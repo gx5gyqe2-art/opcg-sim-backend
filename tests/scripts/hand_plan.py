@@ -41,6 +41,7 @@ import theory_order as TO  # noqa: E402
 from theory_order import KO_P, MU, POL_COLS, SC_MY_DON, SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE  # noqa: E402
 from theory_bridge import ROW_COLS, _extra, move_family  # noqa: E402
 from hand_spend import hand_ids, spent_cards, use_value  # noqa: E402
+import hand_guard as HG  # noqa: E402
 from onplay_parts import look_k  # noqa: E402
 from price_realised import don_stock, primary_action  # noqa: E402
 
@@ -105,6 +106,30 @@ def _items(cids, cards, olp, r):
     return out
 
 
+def hand_items(tok_row, ci_row, idx2cid, cards, olp, r):
+    """手札の枠ごとに `{cid, cost, v, counter}`（空の枠は落とす・カウンター値は枠のトークンから）。"""
+    out = []
+    ci = np.asarray(ci_row)
+    for j, slot in enumerate(range(GA.SLOT_HAND.start, GA.SLOT_HAND.stop)):
+        cid = idx2cid.get(int(ci[slot]))
+        if not cid:
+            continue
+        info = cards.info(cid) or {}
+        out.append({"cid": str(cid), "cost": float(info.get("cost") or 0.0), "v": use_value(cid, info, olp, r),
+                    "counter": HG.counter_of(tok_row, slot), "event": bool(info.get("event"))})
+    return out
+
+
+def card_deltas(rest, card, caps, xs, take_cost):
+    """1 枚の `ΔH_play`・`ΔG_guard`・`ΔH = max` と、その札がカウンター札か（2000 以上か【カウンター】イベント）。"""
+    plan_items = [(it["cost"], it["v"]) for it in rest]
+    guard_items = [(it["counter"], it["v"]) for it in rest]
+    dh = delta_h(plan_items, (card["cost"], card["v"]), caps)
+    dg = HG.delta_g(guard_items, (card["counter"], card["v"]), xs, take_cost)
+    return {"dh": dh, "dg": dg, "dtotal": max(dh, dg), "counter": card["counter"],
+            "counter_card": bool(card["counter"] >= 2000.0 - TO.PWR_EPS or (card["event"] and card["counter"] > 0.0))}
+
+
 def collect(dirs, limit_games=0):
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
@@ -143,13 +168,17 @@ def collect(dirs, limit_games=0):
                     ip = order[p]
                     if int(round(float(ex["sc"][ip][SC_MY_LIFE]))) == int(round(float(sc[SC_MY_LIFE]))):
                         added = spent_cards(hand, hand_ids(ex["ci"][ip], idx2cid))
+                        hitems = hand_items(tok, ex["ci"][i], idx2cid, cards, olp, r)
+                        xs = HG.incoming(tok); take = HG.take_cost_of(float(sc[SC_MY_LIFE]))
                         for cid in added:
-                            rest = list(hand); rest.remove(cid)
-                            items = _items(rest, cards, olp, r)
-                            info = cards.info(cid) or {}
-                            v = use_value(cid, info, olp, r)
-                            dh = delta_h(items, (float(info.get("cost") or 0.0), v), caps)
-                            draws.append({"cid": cid, "v": v, "dh": dh, "turn": t, "hand_n": len(hand),
+                            k_ = next((q for q, it in enumerate(hitems) if it["cid"] == cid), None)
+                            if k_ is None:
+                                continue
+                            card = hitems[k_]; rest = hitems[:k_] + hitems[k_ + 1:]
+                            items = [(it["cost"], it["v"]) for it in rest]
+                            d = card_deltas(rest, card, caps, xs, take)
+                            draws.append({"cid": cid, "v": card["v"], "dh": d["dh"], "dg": d["dg"], "dtotal": d["dtotal"],
+                                          "counter_card": d["counter_card"], "turn": t, "hand_n": len(hand),
                                           "playable_next_before": playable_next(items, caps)})
                         stats["draw_rows"] += 1
             # --- 探した行 ---
@@ -172,14 +201,18 @@ def collect(dirs, limit_games=0):
             caps2 = caps_of(float(sc2[SC_MY_DON]), don_stock(sc2, tok2, "me"))
             after = hand_ids(ex["ci"][i2], idx2cid)
             added = spent_cards(after, hand)
+            hitems2 = hand_items(tok2, ex["ci"][i2], idx2cid, cards, olp, r)
+            xs2 = HG.incoming(tok2); take2 = HG.take_cost_of(float(sc2[SC_MY_LIFE]))
             got = []
             for c2 in added:
-                rest = list(after); rest.remove(c2)
-                items = _items(rest, cards, olp, r)
-                info = cards.info(c2) or {}
-                v = use_value(c2, info, olp, r)
-                got.append({"cid": c2, "v": v, "dh": delta_h(items, (float(info.get("cost") or 0.0), v), caps2),
-                            "playable_next_before": playable_next(items, caps2)})
+                k_ = next((q for q, it in enumerate(hitems2) if it["cid"] == c2), None)
+                if k_ is None:
+                    continue
+                card = hitems2[k_]; rest = hitems2[:k_] + hitems2[k_ + 1:]
+                items = [(it["cost"], it["v"]) for it in rest]
+                d = card_deltas(rest, card, caps2, xs2, take2)
+                got.append({"cid": c2, "v": card["v"], "dh": d["dh"], "dg": d["dg"], "dtotal": d["dtotal"],
+                            "counter_card": d["counter_card"], "playable_next_before": playable_next(items, caps2)})
             searches.append({"cid": cid, "k": look_k(cid), "turn": t, "found": len(added), "got": got})
     return searches, draws, stats
 
@@ -189,15 +222,23 @@ def _mean(xs):
     return float(np.mean(xs)) if xs else None
 
 
-def block(ss, draw_dh, draw_v):
+def block(ss, draw_dh, draw_v, draw_dg=None, draw_dt=None):
     n = len(ss)
     if n == 0:
         return {"n": 0}
     got = [g for s in ss for g in s["got"]]
     dh = [g["dh"] for g in got]
+    dg = [g["dg"] for g in got]
+    dt = [g["dtotal"] for g in got]
     vs = [g["v"] for g in got if g["v"] is not None]
     return {"n": n, "found": float(np.mean([s["found"] >= 1 for s in ss])), "k_mean": _mean([s["k"] for s in ss]),
             "dh_searched": _mean(dh), "dh_draw": draw_dh,
+            # **守る備え**（T67）: 探した札の ΔG・引いた札の ΔG・max(ΔH, ΔG)
+            "dg_searched": _mean(dg), "dg_draw": draw_dg, "premium_dg": (None if not dg or draw_dg is None else float(np.mean(dg) - draw_dg)),
+            "dtotal_searched": _mean(dt), "dtotal_draw": draw_dt,
+            "premium_total": (None if not dt or draw_dt is None else float(np.mean(dt) - draw_dt)),
+            "counter_card_share": (float(np.mean([g["counter_card"] for g in got])) if got else None),
+            "guard_motivated_share": (float(np.mean([g["dg"] > g["dh"] + 1e-12 for g in got])) if got else None),
             # **計画の増分で見た選択の利得**（探した札 − 引いた札）対 静的 v の差
             "premium_dh": (None if not dh or draw_dh is None else float(np.mean(dh) - draw_dh)),
             "v_searched": _mean(vs), "v_draw": draw_v,
@@ -210,18 +251,20 @@ def block(ss, draw_dh, draw_v):
 
 def summarise(searches, draws, min_card=8):
     draw_dh = _mean([d["dh"] for d in draws]); draw_v = _mean([d["v"] for d in draws])
-    out = {"draws": {"n": len(draws), "dh_mean": draw_dh, "v_mean": draw_v, "mu": MU,
+    draw_dg = _mean([d["dg"] for d in draws]); draw_dt = _mean([d["dtotal"] for d in draws])
+    out = {"draws": {"n": len(draws), "dh_mean": draw_dh, "dg_mean": draw_dg, "dtotal_mean": draw_dt, "v_mean": draw_v, "mu": MU,
                      "dh_zero_share": (float(np.mean([d["dh"] <= 1e-9 for d in draws])) if draws else None),
+                     "counter_card_share": (float(np.mean([d["counter_card"] for d in draws])) if draws else None),
                      "hole_before": _mean([None if d["playable_next_before"] is None else float(not d["playable_next_before"]) for d in draws])},
-           "all": block(searches, draw_dh, draw_v)}
+           "all": block(searches, draw_dh, draw_v, draw_dg, draw_dt)}
     for k in (3, 4, 5):
         ss = [s for s in searches if int(s["k"]) == k]
         if ss:
-            out["k=%d" % k] = block(ss, draw_dh, draw_v)
+            out["k=%d" % k] = block(ss, draw_dh, draw_v, draw_dg, draw_dt)
     by = collections.defaultdict(list)
     for s in searches:
         by[s["cid"]].append(s)
-    out["by_card"] = {c: block(ss, draw_dh, draw_v) for c, ss in sorted(by.items(), key=lambda kv: -len(kv[1])) if len(ss) >= min_card}
+    out["by_card"] = {c: block(ss, draw_dh, draw_v, draw_dg, draw_dt) for c, ss in sorted(by.items(), key=lambda kv: -len(kv[1])) if len(ss) >= min_card}
     return out
 
 

@@ -57,15 +57,20 @@ def test_delta_h_rewards_the_card_that_fills_the_hole():
 
 
 def test_summarise_compares_searched_and_drawn_delta_h():
-    draws = [{"cid": "D", "v": 0.05, "dh": 0.02, "turn": 2, "hand_n": 5, "playable_next_before": True},
-             {"cid": "E", "v": 0.07, "dh": 0.04, "turn": 3, "hand_n": 5, "playable_next_before": False}]
+    draws = [{"cid": "D", "v": 0.05, "dh": 0.02, "dg": 0.00, "dtotal": 0.02, "counter_card": False, "turn": 2, "hand_n": 5, "playable_next_before": True},
+             {"cid": "E", "v": 0.07, "dh": 0.04, "dg": 0.08, "dtotal": 0.08, "counter_card": True, "turn": 3, "hand_n": 5, "playable_next_before": False}]
     ss = [{"cid": "A", "k": 5.0, "turn": 3, "found": 1,
-           "got": [{"cid": "X", "v": 0.06, "dh": 0.06, "playable_next_before": False}]},
+           "got": [{"cid": "X", "v": 0.06, "dh": 0.06, "dg": 0.01, "dtotal": 0.06, "counter_card": False, "playable_next_before": False}]},
           {"cid": "A", "k": 5.0, "turn": 4, "found": 0, "got": []}]
     out = HP.summarise(ss, draws, min_card=1)
     assert out["draws"]["dh_mean"] == pytest.approx(0.03) and out["draws"]["hole_before"] == pytest.approx(0.5)
+    assert out["draws"]["dg_mean"] == pytest.approx(0.04) and out["draws"]["dtotal_mean"] == pytest.approx(0.05)
+    assert out["draws"]["counter_card_share"] == pytest.approx(0.5)
     b = out["all"]
     assert b["found"] == 0.5 and b["dh_searched"] == pytest.approx(0.06)
     assert b["premium_dh"] == pytest.approx(0.06 - 0.03) and b["premium_v"] == pytest.approx(0.06 - 0.06)
+    assert b["dg_searched"] == pytest.approx(0.01) and b["premium_dg"] == pytest.approx(0.01 - 0.04)
+    assert b["dtotal_searched"] == pytest.approx(0.06) and b["premium_total"] == pytest.approx(0.06 - 0.05)
+    assert b["guard_motivated_share"] == 0.0 and b["counter_card_share"] == 0.0
     assert b["hole_before"] == 1.0 and b["dh_zero_share"] == 0.0
     assert "A" in out["by_card"] and out["k=5"]["n"] == 2
