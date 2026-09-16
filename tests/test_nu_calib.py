@@ -219,7 +219,9 @@ def test_the_pair_fills_the_weak_band_but_overshoots_the_middle():
             "over_sat": (9000.0, 0.2112)}
     err = {}
     for band, (pw, m) in meas.items():
-        pair = T.nu_of(pw, 5000.0, 4.128, is_blocker=False, mode="pair")
+        # **2026-09-15 時点の台帳**なので当時の `Θ`（切替点 1.15）で引く——T49（2026-09-16）で `Θ` は
+        # 受ける費用の実測 ≈ 1.58 になり、飽和超えの帯は +0.10 まで超過する（流れ→在庫の換算 P1 の側）
+        pair = T.nu_of(pw, 5000.0, 4.128, theta=T.THETA_SWITCH, is_blocker=False, mode="pair")
         err[band] = pair - m
     assert err["lt_leader"] < 0 and abs(err["lt_leader"]) < 0.03      # 埋まるが届かない
     assert err["leader_to_sat"] > 0.04                                # 超過する

@@ -80,11 +80,31 @@ if _HERE not in sys.path:
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 import guard_afford as GA  # noqa: E402
 from order_acc import band_of  # noqa: E402
+import theory_order as _TOM  # noqa: E402
 from theory_order import (own_attackers_of, MU, PWR_EPS, POL_COLS, SC_MY_DON, SC_MY_LEADER_POWER,  # noqa: E402
                           SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE, THETA,
-                          c_of, incoming_x, opp_bodies_of, opp_chars_of, score_candidate,
+                          c_of, clock_of_row, incoming_x, opp_bodies_of, opp_chars_of, score_candidate,
                           slot_power,
                           theta_of)
+
+
+def _TO_W_MODE():
+    """今の `w` の形（`theory_order.W_MODE`・T49）——`stats` に刻んで数字の出所を残す。"""
+    return _TOM.W_MODE
+
+
+def _d_bin(d):
+    """時計の差 `D` の帯（T49 の検算用の分布）。"""
+    d = float(d)
+    if d < -3.0:
+        return "<-3"
+    if d < -1.0:
+        return "-3..-1"
+    if d <= 1.0:
+        return "-1..1"
+    if d <= 3.0:
+        return "1..3"
+    return ">3"
 
 ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen", "pol_v0",
             "sig")   # `sig` は `PL.label_game`（守り側の take/guard の判定）が要る
@@ -205,7 +225,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
     per = {}
     stats = {"games": 0, "atk_rows": 0, "atk_silent": 0, "grd_rows": 0, "grd_no_attack": 0,
              # **T28-c**: 余裕で払えた守りの行の数
-             "grd_comfortable": 0}
+             "grd_comfortable": 0,
+             # **T49**: 局面の傾き `κ = w(D)/w̄`（攻めの行）——平均が 1 に戻るかが `w(状態)` の検算
+             "w_mode": _TO_W_MODE(), "sigma_turn": _TOM.SIGMA_TURN, "kappa_sum": 0.0, "kappa_n": 0,
+             "d_bins": {"<-3": 0, "-3..-1": 0, "-1..1": 0, "1..3": 0, ">3": 0},
+             # **`D` の帯ごとの実勝率**（当てはめない）——時計の推定 `D` が勝敗を順序付けるか・
+             # 実測の `W(D)` の傾きが置いた `σ_D` と合うかの検算
+             "d_win": {"<-3": [0, 0], "-3..-1": [0, 0], "-1..1": [0, 0], "1..3": [0, 0], ">3": [0, 0]}}
     games = 0
     for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS,
                                                     pol_cols=POL_COLS, extra_fn=_extra):
@@ -261,6 +287,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                            ci_row=ex["ci"][i], idx2cid=idx2cid)}
                 if nu_targets == "board":
                     ctx["opp_chars"] = opp_chars_of(tok)
+                # **T49**: 局面の傾き。価格（平均の傾きで書いた時計の差分）に掛けて `ΔG` に足す
+                ck = clock_of_row(sc, tok)
+                kap = float(ck["kappa"])
+                stats["kappa_sum"] += kap; stats["kappa_n"] += 1
+                stats["d_bins"][_d_bin(ck["d"])] += 1
+                if z != 0.0:
+                    stats["d_win"][_d_bin(ck["d"])][0] += (1 if z > 0 else 0)
+                    stats["d_win"][_d_bin(ck["d"])][1] += 1
                 b = int(ptr[i])
                 vals = []
                 for j in range(b, b + k):
@@ -284,12 +318,15 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                         _add(rec, bnd, 0.0, "atk")
                     continue                     # `exclude` は母数にも入れない
                 # `s`＝最善からの逸脱（≤ 0）・`g`＝選んだ手の理論値そのもの（T40）
-                _add(rec, bnd, float(played_v) - max(scored), "atk", g=float(played_v))
+                # `κ` は同じ行の全候補に共通なので順位（最善）は動かず、和の重みだけが局面で変わる
+                g_row = float(played_v) * kap
+                s_row = (float(played_v) - max(scored)) * kap
+                _add(rec, bnd, s_row, "atk", g=g_row)
                 fam = move_family(json.loads(pol["pol_sig"][b + ch]))
-                rec["g_fam"][fam] = rec["g_fam"].get(fam, 0.0) + float(played_v)
+                rec["g_fam"][fam] = rec["g_fam"].get(fam, 0.0) + g_row
                 rec["n_fam"][fam] = rec["n_fam"].get(fam, 0) + 1
                 # 逸脱も型ごとに（どの型の取りこぼしが橋を運んでいるか・T41）
-                rec.setdefault("s_fam", {})[fam] = rec.get("s_fam", {}).get(fam, 0.0) + float(played_v) - max(scored)
+                rec.setdefault("s_fam", {})[fam] = rec.get("s_fam", {}).get(fam, 0.0) + s_row
                 # その行の最善の型（最善が起動効果だった行の割合を読む）
                 bf = move_family(json.loads(pol["pol_sig"][b + int(np.argmax([(-1e9 if v is None else v) for v in vals]))]))
                 rec.setdefault("best_fam", {})[bf] = rec.get("best_fam", {}).get(bf, 0) + 1
@@ -308,10 +345,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     continue
                 stats["grd_rows"] += 1
                 bnd = band_of(abs(float(rows["pol_v0"][i])))
-                _add(rec, bnd, got["s"], "grd", g=got["g"])
+                kap = float(clock_of_row(sc, tok)["kappa"])         # T49（守りの窓も同じ傾き）
+                _add(rec, bnd, got["s"] * kap, "grd", g=got["g"] * kap)
                 if got["comfortable"]:
                     stats["grd_comfortable"] += 1
-                    _add(rec, bnd, got["s"], "grdc", g=got["g"])   # **余裕で払えた行だけの別勘定**
+                    _add(rec, bnd, got["s"] * kap, "grdc", g=got["g"] * kap)   # **余裕で払えた行だけの別勘定**
     return per, stats
 
 
@@ -556,6 +594,11 @@ def main(argv=None):
                          "**2026-09-15 より前の数字と比べるときは `base` を明示する**")
     ap.add_argument("--cond-unknown", type=float, default=1.0,
                     help="**判らない条件の係数**（§0.4 の感度。1.0＝上限・0.0＝下限）")
+    ap.add_argument("--w-mode", default=None, choices=("flat", "clock"),
+                    help="**T49** 局面の傾き `κ = w(D)/w̄` を掛けるか。省略時は `theory_order.W_MODE`"
+                         "（既定 `flat`＝`κ = 1`・盤面の時計では `clock` は説明力を落とした）")
+    ap.add_argument("--sigma-turn", type=float, default=None,
+                    help="**T49 の感度**——時計 1 本のぶれ（ターン）。既定は写し（1.0）。合わせ込みには使わない")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
@@ -569,13 +612,20 @@ def main(argv=None):
     import theory_order as _TO
     if a.nu_mode is not None:
         _TO.set_nu_mode(a.nu_mode)
+    if a.w_mode is not None:
+        _TO.set_w_mode(a.w_mode)
+    if a.sigma_turn is not None:
+        _TO.set_sigma_turn(a.sigma_turn)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.nu_targets,
                          a.silent, a.margin_comfort)
+    # **T49 の検算**: `κ` の平均（`w` の平均が `w̄` に戻れば 1）
+    stats["kappa_mean"] = (round(stats["kappa_sum"] / stats["kappa_n"], 4) if stats["kappa_n"] else None)
+    stats["w_mean"] = (round(stats["kappa_mean"] * _TO.W_BAR, 4) if stats["kappa_mean"] is not None else None)
     pairs = pair_games(per, a.silent)
     res = {"stats": stats,
            "provisional": {"P3_theta": a.theta, "P2_silent": a.silent,
-                           "T28c_margin": a.margin_comfort,
+                           "T28c_margin": a.margin_comfort, "w_mode": _TO.W_MODE,
                            "note": "§0.4 の暫定値。感度を付けて読む"},
            "summary": summarise(pairs, a.boot_reps, a.seed),
            # **T28-b: 行ごとに帯で切ってから足した版**（判定の主はこちら）

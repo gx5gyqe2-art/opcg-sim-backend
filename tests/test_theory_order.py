@@ -909,12 +909,12 @@ def test_the_shipped_distribution_loads_and_is_keyed_by_remaining_turns():
 
 def test_the_defender_may_block_and_then_counter_to_save_the_blocker():
     """リーダー 5000・ブロッカー 7000（ν(B)=0.2）: 8000 の攻撃は「ブロックして 1 枚切る」が最安・
-    9000 は受ける方が安い・6000 はブロッカーに止められて 0。"""
+    10000 は受ける方が安い（ブロック後 3000 = 2.25 枚 > Θ ≈ 1.58）・6000 はブロッカーに止められて 0。"""
     lead, B = 5000.0, [(7000.0, 0.2)]
     v8 = T.attack_value(8000.0, lead, True, blockers=B)
     assert v8 == pytest.approx(T.c_of(1000.0) * T.MU)                  # ブロック→カウンター 1 枚
     assert v8 < T.attack_value(8000.0, lead, True)                      # ブロッカーが居ると安くなる
-    v9 = T.attack_value(9000.0, lead, True, blockers=B)
+    v9 = T.attack_value(10000.0, lead, True, blockers=B)
     assert v9 == pytest.approx(T.THETA * T.MU)                          # 受ける
     assert T.attack_value(6000.0, lead, True, blockers=B) == 0.0        # 止められる
     # B を失う方が安ければそちら（小さいブロッカー）
@@ -935,3 +935,61 @@ def test_only_active_blockers_on_the_board_count_and_the_target_cannot_block_its
     with_b = T.attack_stream(P, olp, r, opp_chars=[(7000.0, True)], my_leader_power=5000.0)
     no_b = T.attack_stream(P, olp, r, opp_chars=[(7000.0, False)], my_leader_power=5000.0)
     assert with_b <= no_b
+
+
+# ---- T49: 価格 = w(状態) × 時計の差分（2026-09-16・ユーザ決定「2 つ目」） ----
+
+def test_the_take_cost_is_what_the_defender_actually_loses():
+    """受ける費用 `Θ·μ` は**受けたときに相手が失うもの** `λ − h·μ`（T48 の実測の写し）。
+    旧既定 1.15（受け始める切替点）は `THETA_SWITCH` に残る。"""
+    assert T.THETA * T.MU == pytest.approx(T.LAM - T.H_LIFE_TO_HAND * T.MU, abs=1e-4)
+    assert T.THETA == pytest.approx(1.58, abs=0.01)
+    assert T.THETA_SWITCH == 1.15 and T.THETA > T.THETA_SWITCH
+    # 飽和点は 3000 に上がる（c(2000)=1.28 < 1.58 ≤ c(3000)=2.25）
+    assert T.saturation_x(T.THETA) == 3000.0
+
+
+def test_w_is_a_slope_that_peaks_when_the_race_is_even():
+    """`w(D)` は接戦（D=0）で最大・対称・大差でほぼ 0・**積分すると 1**（大差の負けから大差の勝ちまでで
+    勝率が 1 動く）。`w̄ = 0.5/R` は既存の定数から。"""
+    assert T.W_BAR == pytest.approx(0.5 / 4.128)
+    assert T.SIGMA_D == pytest.approx(2 ** 0.5)
+    assert T.w_of_d(0.0) > T.w_of_d(1.0) > T.w_of_d(3.0) > T.w_of_d(6.0)
+    assert T.w_of_d(-2.0) == pytest.approx(T.w_of_d(2.0))
+    assert T.w_of_d(0.0) == pytest.approx(1.0 / (T.SIGMA_D * (2 * np.pi) ** 0.5))
+    grid = np.arange(-12.0, 12.0, 0.01)
+    assert float(sum(T.w_of_d(d) for d in grid) * 0.01) == pytest.approx(1.0, abs=1e-3)
+    # `κ` は `flat` で 1・`clock` で `w(D)/w̄`
+    assert T.state_factor(0.0, mode="flat") == 1.0
+    assert T.state_factor(0.0, mode="clock") == pytest.approx(T.w_of_d(0.0) / T.W_BAR)
+    assert T.state_factor(0.0, mode="clock") > 1.0 > T.state_factor(4.0, mode="clock")
+    with pytest.raises(ValueError):
+        T.set_w_mode("なにか")
+
+
+def test_the_two_clocks_are_read_from_the_board():
+    """`T_me = (相手ライフ + 相手手札/c̄ + 相手ブロッカー)/A_me`・`T_opp` はその鏡。分母は通る攻撃の本数（床 1）。"""
+    t_me, t_opp = T.clocks(my_life=4, opp_life=2, my_hand=5, opp_hand=3, a_me=2, a_opp=1, b_me=1, b_opp=0)
+    assert t_me == pytest.approx((2 + 3 / T.CBAR) / 2)
+    assert t_opp == pytest.approx((4 + 5 / T.CBAR + 1) / 1)
+    assert T.clocks(4, 2, 5, 3, a_me=0, a_opp=0)[0] == pytest.approx(2 + 3 / T.CBAR)   # 床 1
+    # 盤面から: 自リーダー 5000・6000 のキャラ（通る）・相手は 4000 のキャラ（通らない）＋ブロッカー旗
+    sc = np.zeros(70, np.float32)
+    sc[T.SC_MY_LIFE], sc[T.SC_OPP_LIFE], sc[T.SC_MY_HAND], sc[T.SC_OPP_HAND] = 4, 2, 5, 3
+    sc[T.SC_MY_LEADER_POWER], sc[T.SC_OPP_LEADER_POWER] = 0.5, 0.5
+    tok = _tok_board(5000, 5000, opp_chars=(4000,))
+    tok[2, T.S_POWER], tok[2, T.S_IS_CHAR] = 0.6, 1.0
+    tok[7, T.S_IS_BLOCKER] = 1.0
+    ck = T.clock_of_row(sc, tok, mode="clock")
+    assert (ck["a_me"], ck["a_opp"]) == (2, 1)                       # 相手はリーダーだけ通る
+    assert ck["t_me"] == pytest.approx((2 + 3 / T.CBAR + 1) / 2)     # 相手のブロッカー 1
+    assert ck["t_opp"] == pytest.approx(4 + 5 / T.CBAR)
+    assert ck["d"] == pytest.approx(ck["t_opp"] - ck["t_me"])
+    assert ck["kappa"] == pytest.approx(T.state_factor(ck["d"], mode="clock"))
+    assert T.clock_of_row(sc, tok, mode="flat")["kappa"] == 1.0
+    # 接戦（時計が同じ）は大差より重い
+    even = dict(my_life=3, opp_life=3, my_hand=4, opp_hand=4, a_me=1, a_opp=1)
+    far = dict(my_life=5, opp_life=1, my_hand=6, opp_hand=1, a_me=2, a_opp=1)
+    d_even = np.subtract(*T.clocks(**even)[::-1])
+    d_far = np.subtract(*T.clocks(**far)[::-1])
+    assert T.state_factor(d_even, "clock") > T.state_factor(d_far, "clock")

@@ -76,10 +76,19 @@ POL_COLS = ("pol_n", "pol_q", "pol_p", "pol_sig", "pol_cid", "pol_tcid", "pol_si
 #: ——守る／受けるの判断は相手ターンに起きるので、攻撃の値付けはそちらの価格で見る。
 MU = 0.0551
 LAM = 0.1362
-#: 無差別点 `Θ`（枚）＝`λ/μ − 1 − τ_value`。**2026-09-14 に実測が付いた**——
-#: 盤面のシャドー価格として直接測ると **1.325** [1.234, 1.416]（`2026-09-14_theta_price.md`）。
-#: 既定は当面 1.15 のまま（下の `--theta-mode` の A/B が決まるまで動かさない）。
-THETA = 1.15
+#: **ライフの札が相手の手に入る割合**（T48・2026-09-16 実測・合成 0.887／実デッキ 0.815・
+#: `2026-09-16_attack_response.md`）——受けたとき相手が失うのは `λ − h·μ`（残りの部品の和 ≈ 0）。
+H_LIFE_TO_HAND = 0.89
+#: **相手が受け始める切替点**（T2・`x` の分布から測った 1.15）。**2026-09-16 までの既定 `Θ`**。
+#: 「どこから受け始めるか」であって「受けたときに失うもの」ではない（T48）ので、価格には使わない。
+#: `--theta 1.15` で以前の数字を再現するときのために残す。
+THETA_SWITCH = 1.15
+#: 無差別点 `Θ`（枚）＝**受けたときに相手が失うものを `μ` で割ったもの** `λ/μ − h`（≈ 1.58・
+#: T49・2026-09-16・ユーザ決定「2 つ目」＝価格は `w(状態) × 時計の差分`——受ける費用の時計の差分は
+#: `(1 − h/c̄)/A` で、`w̄/A = λ`・`λ/c̄ = μ_guard` を入れると `λ − h·μ`＝**実測の写しで新定数ゼロ**）。
+#: 旧: `λ/μ − 1 − τ_value`（§9）——`1 + τ_value` の位置に実測の `h` が入った形。
+#: 盤面のシャドー価格（`--theta-mode board`／`max`）はこれと `max` を取る（`theta_of`）。
+THETA = round((LAM - H_LIFE_TO_HAND * MU) / MU, 4)
 #: **`Θ` には 2 つの経路が在り、帯レベルで食い違う**（2026-09-14 に判明・未解決）:
 #:
 #: | 経路 | 定義 | ライフ別 (ℓ=1..4) |
@@ -167,9 +176,100 @@ PWR_EPS = 10.0
 #: scalars の列（`rust/opcg_engine/src/encode/scalars.rs`）
 SC_MY_LIFE, SC_OPP_LIFE = 0, 1
 SC_MY_DON = 2
-SC_MY_HAND = 6
+SC_MY_HAND, SC_OPP_HAND = 6, 7
 SC_TURN = 10
 SC_MY_LEADER_POWER, SC_OPP_LEADER_POWER = 12, 13
+
+#: ---- **時計と `w(状態)`**（T49・2026-09-16・ユーザ決定「2 つ目」）----
+#:
+#: **価格の定義は 1 つ**: 手の価値 = `W(打った後) − W(打つ前)`。`G(t) = W(s_t) − 0.5` を時間の関数と見ると
+#: 手の価値は **傾き `dG/dt` × その手で動いた時計の量**＝`w(状態) × 時計の差分`（§17.1 の★）。
+#: 4 通貨の定数（`λ`・`μ`・`δ`・`ν`）は**平均の傾き `w̄` で書いた時計の差分**であり、
+#: 局面ごとの傾きは `κ(状態) = w(状態)/w̄` を掛けて戻す（橋の `ΔG` はこの形で足す）。
+#:
+#: ```
+#: T_me  = (相手ライフ + 相手手札/c̄ + 相手ブロッカー) / A_me      自分が倒しきるまでの手数（§17.1.5c）
+#: T_opp = (自ライフ + 自手札/c̄ + 自ブロッカー) / A_opp          相手が倒しきるまでの手数
+#: D = T_opp − T_me                                                正なら自分が先に倒しきる
+#: w(D) = φ(D/σ_D)/σ_D                                             傾き＝接戦（D≈0）で最大・大差でほぼ 0
+#: ```
+#:
+#: **新定数ゼロ**——`w̄ = 0.5/R`（恒等式・§17.1.4）・`σ_D = √2 × 1.0 ターン`（時間軸ヘッド r10 の決着ターン
+#: 誤差＝時計 1 本のぶれ・`2026-09-13_time_head.md`）・`c̄ = c_mean_all 1.514`（`2026-09-14_theta_price.md`）。
+#: **仮定は 1 つ**——ぶれの形を正規に置いていること。**検算**は「`κ` の平均が 1（`w` の平均が `w̄`）に
+#: 戻るか」と「`ΔG` の傾きが 1 に寄るか」（合わせ込まない）。
+#:
+#: **実測（2026-09-16・`2026-09-16_w_clock_form.md`）**: `κ` の平均は 1 に戻る（`w` の平均 0.135／0.120 対 `w̄` 0.121）が、
+#: **盤面から機械的に出した `D` は借りた `σ` よりずっと粗い**（実勝率 `W(D)` は `D` −3〜+3 で 0.20 → 0.65 しか動かない・
+#: `|D| > 3` の行が 26〜35%）ので、`κ` を掛けると `ΔG` の説明力が落ちる（AUC 0.70 → 0.58／0.64 → 0.52・`σ` を 2〜4 に
+#: 振っても `flat` に届かない）。**出荷既定は `flat`（`κ = 1`＝平均の傾き・3 つ目の形を土台に）**——2 つ目の形が正本で
+#: あることは変わらず、**足りないのは時計の推定器**（`σ` の出所である時間軸ヘッドの `T` 予測で `D` を作るのが筋）。
+R_TURNS = 4.128
+W_BAR = 0.5 / R_TURNS
+SIGMA_TURN = 1.0
+SIGMA_D = math.sqrt(2.0) * SIGMA_TURN
+CBAR = 1.514
+W_MODES = ("flat", "clock")
+W_MODE = "flat"
+
+
+def set_w_mode(mode):
+    global W_MODE
+    if mode not in W_MODES:
+        raise ValueError("w mode は %s のどれか" % (W_MODES,))
+    W_MODE = mode
+    return W_MODE
+
+
+def clocks(my_life, opp_life, my_hand, opp_hand, a_me, a_opp, b_me=0, b_opp=0, cbar=CBAR):
+    """2 本の時計 `(T_me, T_opp)`（手数）。通る攻撃が 0 本でもリーダーは殴れるので分母の床は 1。"""
+    t_me = (float(opp_life) + float(opp_hand) / cbar + float(b_opp)) / max(1.0, float(a_me))
+    t_opp = (float(my_life) + float(my_hand) / cbar + float(b_me)) / max(1.0, float(a_opp))
+    return t_me, t_opp
+
+
+def set_sigma_turn(turns):
+    """時計 1 本のぶれを差し替える（**感度の幅**として回すためだけ・§0.4 規則 2。既定 1.0 は写し）。"""
+    global SIGMA_TURN, SIGMA_D
+    SIGMA_TURN = float(turns)
+    SIGMA_D = math.sqrt(2.0) * SIGMA_TURN
+    return SIGMA_D
+
+
+def w_of_d(d, sigma=None):
+    """傾き `w(D)`＝時計の差 `D` の正規密度（`∫ w dD = 1`＝大差の負けから大差の勝ちまでで勝率が 1 動く）。"""
+    sigma = SIGMA_D if sigma is None else float(sigma)
+    z = float(d) / sigma
+    return math.exp(-0.5 * z * z) / (sigma * math.sqrt(2.0 * math.pi))
+
+
+def state_factor(d, mode=None):
+    """`κ(状態) = w(D)/w̄`——平均の傾きで書いた価格を局面の傾きに戻す係数。`flat` なら 1。"""
+    mode = W_MODE if mode is None else mode
+    if mode != "clock":
+        return 1.0
+    return float(w_of_d(d) / W_BAR)
+
+
+def clock_of_row(sc, tok_row, mode=None):
+    """判断点の行（`scalars`・トークン）から時計と `κ` を出す。
+
+    `A_me`＝自分のリーダー＋場のキャラのうち**相手リーダーを越える**もの（レスト中も次のターンは殴れる
+    ので旗は見ない）・`A_opp`＝来る攻撃のうち `x ≥ 0`（`incoming_x`）・ブロッカーは両側の旗の数。
+    """
+    sc = np.asarray(sc); tok = np.asarray(tok_row)
+    olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+    a_me = 1 if (slot_power(tok, 0) or 0.0) >= olp - PWR_EPS else 0
+    for s in range(SLOT_OWN_FIELD.start, SLOT_OWN_FIELD.stop):
+        if float(tok[s, S_IS_CHAR]) > 0.5 and (slot_power(tok, s) or 0.0) >= olp - PWR_EPS:
+            a_me += 1
+    a_opp = sum(1 for x in incoming_x(tok) if x >= -PWR_EPS)
+    b_opp = sum(1 for _p, blk in opp_chars_of(tok) if blk)
+    t_me, t_opp = clocks(sc[SC_MY_LIFE], sc[SC_OPP_LIFE], sc[SC_MY_HAND], sc[SC_OPP_HAND],
+                         a_me, a_opp, count_blockers(tok), b_opp)
+    d = t_opp - t_me
+    return {"t_me": t_me, "t_opp": t_opp, "d": d, "a_me": a_me, "a_opp": a_opp,
+            "kappa": state_factor(d, mode)}
 #: 起動メインの値付けに判断点の状態を渡すか（T41・「N 枚まで」をドンデッキ残で打ち切る）。
 #: **感度の切替**——`False` にすると 2026-09-15 昼までの値付け（N を上限として読む）に戻る
 ACTIVATE_USES_STATE = True

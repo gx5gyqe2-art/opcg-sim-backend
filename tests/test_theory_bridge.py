@@ -292,3 +292,16 @@ def test_summarise_reports_the_gain_family_and_its_own_verdict():
     assert out["dG_per_row"]["auc"] > 0.7 and out["dG_per_row"]["slope"] > 0
     assert out["calibration"]["dG_per_row"]["monotone"] is True
     assert out["verdict"] == "undecided"          # `ΔS` は全部 0＝分散ゼロで判定できない
+
+
+def test_the_bridge_weights_each_row_by_the_slope_of_the_race():
+    """**T49**: `ΔG` の行は `κ = w(D)/w̄` で重み付く——同じ行の候補には共通なので順位は動かない。
+    `flat` なら 1（それ以前の橋）。`D` の帯は端が閉じている。"""
+    tok, sc = _tok(opp_lead=5000), _sc()
+    sc[T.SC_MY_LIFE], sc[T.SC_OPP_LIFE], sc[T.SC_MY_HAND], sc[T.SC_OPP_HAND] = 3, 3, 4, 4
+    assert T.clock_of_row(sc, tok, mode="flat")["kappa"] == 1.0
+    k = T.clock_of_row(sc, tok, mode="clock")["kappa"]
+    assert k == pytest.approx(T.w_of_d(T.clock_of_row(sc, tok)["d"]) / T.W_BAR)
+    assert B._d_bin(-5) == "<-3" and B._d_bin(-2) == "-3..-1" and B._d_bin(0) == "-1..1"
+    assert B._d_bin(2) == "1..3" and B._d_bin(9) == ">3"
+    assert B._TO_W_MODE() in T.W_MODES

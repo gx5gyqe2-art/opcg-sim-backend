@@ -241,5 +241,7 @@ def test_now_quantities_are_computed_from_the_state_only():
     assert q["x_max"] == pytest.approx(2000.0)            # 7000 − 5000
     assert q["c_in"] == pytest.approx(1.00)               # +1000 を止めるのは 1 枚
     assert q["n_dead_attackers"] == 0.0
-    # 飽和点（Θ=1.15 で 2000）を超えていない（**f32 の丸めを 10 の桁で吸収している**）
-    assert q["x_over_sat"] == pytest.approx(0.0)
+    # 飽和点を超えていない（**f32 の丸めを 10 の桁で吸収している**）——`x* = saturation_x(Θ)`
+    # （旧 Θ=1.15 で 2000＝ちょうど 0・T49 の Θ≈1.58 で 3000＝−1000）
+    assert q["x_over_sat"] == pytest.approx(2000.0 - R.saturation_x(R.THETA))
+    assert q["x_over_sat"] <= 0.0

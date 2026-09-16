@@ -56,7 +56,13 @@ def _theory_option_off():
         return
     before = _T.OPTION_MODE
     _T.set_option_mode("off")
+    # **`w(状態)`（T49）もテストでは平均の傾き（`flat`・`κ = 1`）に固定する**——橋の符号や
+    # 「助言どおりなら 0」の算術は `κ` を掛けても変わらないが、値を固定したテストは動く。
+    # 時計の形そのものは T49 のテストが**明示的に `clock` にして**固定する。
+    before_w = _T.W_MODE
+    _T.set_w_mode("flat")
     try:
         yield
     finally:
         _T.set_option_mode(before)
+        _T.set_w_mode(before_w)
