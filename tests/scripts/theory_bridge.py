@@ -123,6 +123,21 @@ MARGIN_COMFORT = 2000.0
 #: 受け手の行には見積もりとの差分だけを載せる（`paid` は同じ移転を両席で二重に数え、払える席ほど損に見えた＝守り側の `ΔG` が反対向き）。
 GUARD_G_MODES = ("paid", "delta")
 GUARD_G_MODE = "delta"
+#: **守りの窓で「払った額」をどう読むか**（T64・2026-09-16）。`formula`＝式の費用（守れば `c(x)·μ`・受ければ `Θ·μ`）／
+#: `spent`＝**実際に手札から消えた札の価値の和**（`hand_spend.use_value`・切った札の機会費用）＋ 受けたなら `Θ·μ`。
+#: 手札の中身は記録の枠 12〜21 に在る（P8 を待たずに読める）。`v` が読めない札は `μ` で数える。
+#: **既定は `spent`**（T64・2026-09-16・`2026-09-16_hand_spend.md`）: 守り側の `ΔG` が 0.276 → 0.602／0.429 → 0.574・接戦帯 0.33 → 0.64。
+#: 帳簿の「払った額」を式の近似から記録の実額に戻しただけ（定数は増えない）。以前の数字と比べるときは `--guard-cost formula`。
+GUARD_COST_MODES = ("formula", "spent")
+GUARD_COST_MODE = "spent"
+
+
+def set_guard_cost_mode(mode):
+    global GUARD_COST_MODE
+    if mode not in GUARD_COST_MODES:
+        raise ValueError("guard cost mode は %s のどれか" % (GUARD_COST_MODES,))
+    GUARD_COST_MODE = mode
+    return GUARD_COST_MODE
 
 
 def set_guard_g_mode(mode):
@@ -288,6 +303,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
         life0 = ex["sc"][:, 0]
         labels, _unk = PL.label_game(rows, pol, life0, L, ptr, idx, cards)
         seen = set()
+        # **T64**: 守りの窓で実際に消えた札を読むため、席ごとの次の自席ターンの最初の main 行を引く
+        first_main = {}
+        if GUARD_COST_MODE == "spent":
+            for i in idx:
+                w0, t0 = int(rows["who"][i]), int(rows["turn"][i])
+                if t0 >= 1 and PL.is_own_turn(w0, t0) and int(rows["kind"][i]) == 0 and (w0, t0) not in first_main:
+                    first_main[(w0, t0)] = i
         for n, i in enumerate(idx):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
             if t < 1:
@@ -397,6 +419,25 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 if got is None:
                     stats["grd_no_attack"] += 1
                     continue
+                if GUARD_COST_MODE == "spent":
+                    # **T64**: 払った額＝実際に消えた札の価値の和（＋受けたなら `Θ·μ`）。次の自席ターンが無ければ式の費用のまま
+                    j = first_main.get((w, t + 1))
+                    if j is not None:
+                        import hand_spend as HS
+                        before = HS.hand_ids(ex["ci"][i], idx2cid)
+                        after = HS.hand_ids(ex["ci"][j], idx2cid)
+                        olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+                        r_opp = max(1.0, min(5.0, float(sc[SC_OPP_LIFE])))
+                        paid_v = 0.0
+                        for cid in HS.spent_cards(before, after):
+                            v = HS.use_value(cid, cards.info(cid), olp, r_opp)
+                            paid_v += float(mu) if v is None else float(v)
+                        actual = paid_v + (float(th_g) * float(mu) if played == "take" else 0.0)
+                        stats["grd_spent_rows"] = stats.get("grd_spent_rows", 0) + 1
+                        stats["grd_spent_sum"] = stats.get("grd_spent_sum", 0.0) + paid_v
+                        got["g_paid"] = -actual
+                        got["g_delta"] = got["price"] - actual
+                        got["g"] = got["g_delta"] if GUARD_G_MODE == "delta" else got["g_paid"]
                 stats["grd_rows"] += 1
                 gl = stats["grd_by_life"].setdefault(str(int(round(float(sc[SC_MY_LIFE])))),
                                                      {"n": 0, "took": 0, "says_take": 0, "can_guard": 0,
@@ -663,6 +704,9 @@ def main(argv=None):
     _TOM.add_surv_mode_arg(ap)
     _TOM.add_cbar_mode_arg(ap)
     _TOM.add_take_mode_arg(ap)
+    ap.add_argument("--guard-cost", default=None, choices=GUARD_COST_MODES,
+                    help="**守りの窓の払った額**（T64）。`spent`＝実際に消えた札の価値の和（＋受けたなら Θ·μ・2026-09-16 から既定）／"
+                         "`formula`＝式の費用（以前の数字と比べるとき）")
     ap.add_argument("--guard-g", default=None, choices=GUARD_G_MODES,
                     help="**守りの窓の `g`**（T62）。省略時は `GUARD_G_MODE`（2026-09-16 から `delta`＝攻め手の価格 − 払った額）。"
                          "以前の数字と比べるときは `paid` を明示する")
@@ -696,6 +740,8 @@ def main(argv=None):
     _TOM.apply_take_mode(a)
     if a.guard_g is not None:
         set_guard_g_mode(a.guard_g)
+    if a.guard_cost is not None:
+        set_guard_cost_mode(a.guard_cost)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.nu_targets,
                          a.silent, a.margin_comfort, ledger_pricing=a.ledger_pricing)
@@ -709,6 +755,7 @@ def main(argv=None):
                            "flow_pricing": stats["flow_pricing"], "ledger_pricing": stats["ledger_pricing"],
                            "surv_mode": _TO.SURV_MODE, "nu_mode": _TO.NU_MODE,
                            "cbar_mode": _TO.CBAR_MODE, "guard_g": GUARD_G_MODE, "take_mode": _TO.TAKE_MODE,
+                           "guard_cost": GUARD_COST_MODE,
                            "note": "§0.4 の暫定値。感度を付けて読む"},
            "summary": summarise(pairs, a.boot_reps, a.seed),
            # **T28-b: 行ごとに帯で切ってから足した版**（判定の主はこちら）
