@@ -523,7 +523,7 @@ def board_theta(tok_row, life, my_don=0.0, don_share=DON_SHARE, fallback=THETA):
 
     **`G = 0`（領域 1＝全部受けても死なない）では制約が無い＝シャドー価格も無い**。
     そこは `fallback`（定数の `Θ`）に落とす——**0 を返してはいけない**。
-    `attack_value` の `take = Θ·μ` は「受けたときの正味の損」`λ − μ(1+τ)` そのものなので、
+    `attack_value` の `take = Θ·μ` は「受けたときの正味の損」`λ − h·μ`（T49・旧 `λ − μ(1+τ)`）そのものなので、
     0 にすると**領域 1 の攻撃が全部「価値 0」になる**（ライフは減っているのに）。
 
     相手のドンは `my_don · don_share` で見積もる（自席では相手の `don_active` が
