@@ -64,9 +64,14 @@ def _theory_option_off():
     # **生存の重み（T60）もテストでは `once`（従来の閉じた代数）に固定する**——`geo` は T60 のテストが明示的に入れる
     before_s = _T.SURV_MODE
     _T.set_surv_mode("once")
+    # **費用曲線の引き方（T61）もテストでは旧 `loose`（閉じた代数が `c(1000) = 1.00` で書いてある）に固定**——
+    # `strict`（`c̄(x+1000)`・2026-09-16 から既定）は T61 のテストが明示的に入れる
+    before_c = _T.CBAR_MODE
+    _T.set_cbar_mode("loose")
     try:
         yield
     finally:
         _T.set_option_mode(before)
         _T.set_w_mode(before_w)
         _T.set_surv_mode(before_s)
+        _T.set_cbar_mode(before_c)

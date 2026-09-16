@@ -130,10 +130,12 @@ def main(argv=None):
     ap.add_argument("--min-card-rows", type=int, default=8)
     TO.add_nu_mode_arg(ap)
     TO.add_surv_mode_arg(ap)
+    TO.add_cbar_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     TO.apply_nu_mode(a)
     TO.apply_surv_mode(a)
+    TO.apply_cbar_mode(a)
     t0 = time.time()
     rows, stats = collect(a.src, a.limit_games)
     res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "stats": stats, "summary": summarise(rows, a.min_card_rows),

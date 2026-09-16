@@ -331,24 +331,65 @@ ACTIVATE_USES_STATE = True
 SCORABLE = ("ATTACK", "ATTACH_DON", "PLAY", "TURN_END", "DON_BOX", "ACTIVATE_MAIN")
 
 
-def c_of(x):
+#: **費用曲線の引き方**（T61・2026-09-16）。`CBAR_CURVE` の節 `v` は「カウンターの合計が **`v` 以上**になる最小枚数」
+#: （`deck_profile.c_min`＝`got >= x`）。ルールは「攻撃側 ≥ 対象で命中」（`rules/battle.rs`・同値は命中）なので、超過 `x` を
+#: 生き残るには合計が **`x` を上回る**＝`x + 1000` 以上が要る。したがって **`c(x) = c̄(x + 1000)`**（`strict`）。
+#: 旧 `loose` は `c̄(x)` を引いていた＝`x = 0` だけ合い、`x ≥ 1000` で 1 段安い（実測: 相手が切る枚数は x=1000 で 1.2〜1.3・
+#: x=2000 で 1.9・x=4000 で 3.5〜3.7＝`strict` に乗る・`2026-09-16_counter_step.md`）。
+#: **2026-09-16 より前の数字と比べるときは `loose` を明示する**。
+CBAR_MODES = ("strict", "loose")
+CBAR_MODE = "strict"
+
+
+def set_cbar_mode(mode):
+    global CBAR_MODE
+    if mode not in CBAR_MODES:
+        raise ValueError("cbar mode は %s のどれか" % (CBAR_MODES,))
+    CBAR_MODE = mode
+    _OPTION_CACHE.clear()
+    return CBAR_MODE
+
+
+def add_cbar_mode_arg(ap):
+    ap.add_argument("--cbar-mode", default=None, choices=CBAR_MODES,
+                    help="費用曲線の引き方（T61）。省略時は `theory_order.CBAR_MODE`（2026-09-16 から `strict`＝`c̄(x+1000)`）。"
+                         "**2026-09-16 より前の数字と比べるときは `loose` を明示する**")
+
+
+def apply_cbar_mode(a):
+    if getattr(a, "cbar_mode", None) is not None:
+        set_cbar_mode(a.cbar_mode)
+    a.cbar_mode = CBAR_MODE
+    return CBAR_MODE
+
+
+def cbar_of(v):
+    """`CBAR_CURVE` の生の引き方＝**カウンターの合計が `v` 以上**になる枚数（`v ≤ 0` は 0・節の間は上の節・5000 超は `CBAR_SLOPE`）。"""
+    v = float(v)
+    if v <= PWR_EPS:
+        return 0.0
+    prev = 0.0
+    for thr, cards in CBAR_CURVE:
+        if v <= thr + PWR_EPS:
+            return cards
+        prev = cards
+    over = (v - CBAR_CURVE[-1][0]) / 1000.0
+    return prev + CBAR_SLOPE * over
+
+
+def c_of(x, mode=None):
     """費用曲線: 超過 `x` の攻撃を止めるのに要る枚数。
 
     **`x = 0` でも 1 枚要る**——ルールは「攻撃側のパワー ≥ 対象のパワー」で命中するので、
-    生き残るにはカウンターで**上回る**必要がある。したがって
-    `x < 0`（そもそも通らない）だけが 0 で、`0 ≤ x ≤ 1000` は 1 枚。
-    **ここを 0 にすると、実測で打った攻撃の 38.5% を占める `x ≤ 0` の帯の値付けが狂う**。
+    生き残るにはカウンターで**上回る**必要がある。`x < 0`（そもそも通らない）だけが 0。
+    **T61（2026-09-16）**: 同じ理由で **`x = 1000` は合計 2000 が要る**＝`c̄(2000)` = 1.28（旧 `loose` は 1.00 と引いていた）。
+    `strict`＝`c̄(x + 1000)`／`loose`＝`c̄(x)`（旧）。
     """
     x = float(x)
     if x < -PWR_EPS:
         return 0.0                       # 通らない攻撃＝守る必要が無い
-    prev = 0.0
-    for thr, cards in CBAR_CURVE:
-        if x <= thr + PWR_EPS:
-            return cards
-        prev = cards
-    over = (x - CBAR_CURVE[-1][0]) / 1000.0
-    return prev + CBAR_SLOPE * over
+    mode = CBAR_MODE if mode is None else mode
+    return cbar_of(x + 1000.0) if mode == "strict" else cbar_of(max(x, 1000.0))
 
 
 #: トークンの 1 枠あたりのパワー列（現在パワーは /1e4 で入っている）
@@ -379,15 +420,13 @@ def saturation_x(theta=THETA):
     > **`Θ > 3.63` の飽和点は 5000 より上に在る**。頭打ちにすると
     > 「もう積んでも無駄」と早く言い過ぎる（リーサル圏の窓で実際に起きる）。
     """
-    if c_of(0.0) >= theta:
-        return 0.0
-    for thr, cards in CBAR_CURVE:
-        if cards >= theta:
-            return float(thr)
-    # 5000 より上は `CBAR_SLOPE` で伸ばす（1000 刻みに切り上げる）
-    last_x, last_c = CBAR_CURVE[-1]
-    need = (float(theta) - last_c) / CBAR_SLOPE          # 1000 が何本要るか
-    return float(last_x + 1000.0 * math.ceil(need - 1e-9))
+    # **T61**: 曲線の引き方（`CBAR_MODE`）に従って `c_of` を 1000 刻みで走らせる（`strict` では節が 1 段手前に来る）
+    x = 0.0
+    for _ in range(64):
+        if c_of(x) >= theta:
+            return float(x)
+        x += 1000.0
+    return float(x)
 
 
 def incoming_x(tok_row, don=0):
@@ -907,8 +946,8 @@ def attach_value(power, target_power, k=1, theta=THETA, mu=MU):
     ```
 
     `Θ` で潰すのは §14.1 の飽和（相手が「受ける」を選んだらそれ以上払わせられない）。
-    **段が平らな区間では 0 になる**——実測の曲線は `c(0) = c(1000) = 1.00` なので、
-    **超過 0 の攻撃に 1 枚付与しても相手の費用は増えない**（検査できる予測）。
+    **段が平らな区間では 0 になる**（旧 `loose` では `c(0) = c(1000) = 1.00` だった。`strict`（T61）では
+    `c(1000) = 1.28` なので超過 0 の攻撃に 1 枚付与すると +0.28 枚ぶん増える）。
     """
     x0 = float(power) - float(target_power)
     if x0 < -PWR_EPS:

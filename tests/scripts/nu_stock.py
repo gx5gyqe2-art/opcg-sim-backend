@@ -212,10 +212,12 @@ def main(argv=None):
     ap.add_argument("--theta-mode", default="const", choices=("const", "board", "max"))
     add_nu_mode_arg(ap)
     TO.add_surv_mode_arg(ap)
+    TO.add_cbar_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_nu_mode(a)
     TO.apply_surv_mode(a)
+    TO.apply_cbar_mode(a)
     t0 = time.time()
     bodies, r_by_life, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
     res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "option_mode": TO.OPTION_MODE, "stats": stats,

@@ -627,6 +627,7 @@ def main(argv=None):
     ap.add_argument("--sigma-turn", type=float, default=None,
                     help="**T49 の感度**——時計 1 本のぶれ（ターン）。既定は写し（1.0）。合わせ込みには使わない")
     _TOM.add_surv_mode_arg(ap)
+    _TOM.add_cbar_mode_arg(ap)
     ap.add_argument("--flow-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
                     help="**決める価格**（`s`・`ΔS`）の規約。省略時は `effect_value.FLOW_PRICING`（`option`）")
     ap.add_argument("--ledger-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
@@ -653,6 +654,7 @@ def main(argv=None):
     if a.flow_pricing is not None:
         EV.set_flow_pricing(a.flow_pricing)
     _TOM.apply_surv_mode(a)
+    _TOM.apply_cbar_mode(a)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.nu_targets,
                          a.silent, a.margin_comfort, ledger_pricing=a.ledger_pricing)

@@ -1055,3 +1055,42 @@ def test_the_board_attack_stream_weights_each_turns_target_by_survival():
         assert a_geo == pytest.approx(s * v1 + s ** 2 * lead, abs=1e-9)
     finally:
         T.set_surv_mode(before)
+
+
+# ---- T61（2026-09-16）: 費用曲線は `c̄(x + 1000)`——同値は命中するので超過を上回る合計が要る ----
+
+def test_the_strict_cost_curve_is_the_loose_one_shifted_by_one_step():
+    """`CBAR_CURVE` の節は「合計が v 以上」の枚数。超過 x を生き残るには合計 x+1000 が要るので `c(x) = c̄(x+1000)`。
+    旧 `loose` は `c̄(x)`（x=0 だけ合い x≥1000 で 1 段安い）。実測（相手が切る枚数）は x=1000 で 1.2〜1.3・x=4000 で 3.5〜3.7＝strict。"""
+    before = T.CBAR_MODE
+    try:
+        T.set_cbar_mode("loose")
+        assert [T.c_of(x) for x in (-1000, 0, 1000, 2000, 3000, 4000, 5000)] == [0.0, 1.0, 1.0, 1.28, 2.25, 2.78, 3.63]
+        assert T.saturation_x(1.15) == 2000.0 and T.saturation_x(T.THETA) == 3000.0
+        assert T.set_cbar_mode("strict") == "strict"
+        assert [T.c_of(x) for x in (-1000, 0, 1000, 2000, 3000, 4000, 5000)] == [0.0, 1.0, 1.28, 2.25, 2.78, 3.63, 4.29]
+        assert T.c_of(6000) == pytest.approx(3.63 + 2 * T.CBAR_SLOPE)              # 5000 超は同じ傾きで伸びる
+        assert T.saturation_x(1.15) == 1000.0 and T.saturation_x(T.THETA) == 2000.0   # 飽和点も 1 段手前
+        for x in (0, 1000, 2000, 3000, 4000):
+            assert T.c_of(x, mode="strict") == T.c_of(x + 1000, mode="loose")   # 定義そのもの
+        assert T.cbar_of(0) == 0.0 and T.cbar_of(1000) == 1.0 and T.cbar_of(1500) == 1.28
+        with pytest.raises(ValueError):
+            T.set_cbar_mode("なにか")
+    finally:
+        T.set_cbar_mode(before)
+    assert T.CBAR_MODE == before
+
+
+def test_under_strict_the_attack_at_one_step_over_costs_the_two_thousand_counter():
+    """x = 1000 のリーダー攻撃: strict では守る費用 1.28μ（旧 1.00μ）・x = 2000 では 2.25μ > 受ける費用（Θ=1.58）なので受ける側に倒れる。"""
+    before = T.CBAR_MODE
+    try:
+        T.set_cbar_mode("strict")
+        v1 = T.attack_value(6000.0, 5000.0, True, theta=T.THETA)
+        v2 = T.attack_value(7000.0, 5000.0, True, theta=T.THETA)
+        assert v1 == pytest.approx(1.28 * T.MU, abs=1e-9)
+        assert v2 == pytest.approx(T.THETA * T.MU, abs=1e-9)                 # 2.25μ より受ける方が安い
+        T.set_cbar_mode("loose")
+        assert T.attack_value(6000.0, 5000.0, True, theta=T.THETA) == pytest.approx(1.0 * T.MU, abs=1e-9)
+    finally:
+        T.set_cbar_mode(before)

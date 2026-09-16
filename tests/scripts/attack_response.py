@@ -36,6 +36,7 @@ from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 import guard_afford as GA  # noqa: E402
 from price_realised import DELTA, SC_OPP_HAND, don_stock, side_nu_meas  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
+import theory_order as _TO  # noqa: E402
 from theory_order import (LAM, MU, PWR_EPS, SC_MY_DON, SC_MY_HAND, SC_MY_LEADER_POWER, SC_MY_LIFE,  # noqa: E402
                           SC_OPP_LEADER_POWER, SC_OPP_LIFE, SLOT_OPP_FIELD, SLOT_OWN_FIELD, THETA,
                           add_nu_mode_arg, apply_nu_mode, c_of, opp_bodies_of, own_attackers_of,
@@ -44,6 +45,10 @@ from theory_order import (LAM, MU, PWR_EPS, SC_MY_DON, SC_MY_HAND, SC_MY_LEADER_
 RESPONSES = ("took", "countered", "took_and_countered", "blocker_died", "nothing", "other")
 X_BANDS = ((-1e9, -PWR_EPS, "x<0"), (-PWR_EPS, 1000.0 + PWR_EPS, "0..1000"),
            (1000.0 + PWR_EPS, 2000.0 + PWR_EPS, "1000..2000"), (2000.0 + PWR_EPS, 1e9, ">2000"))
+
+
+#: scalars の列: 相手のアクティブなドン（`don_active_price.py` と同じ・4）
+SC_OPP_DON = 4
 
 
 def x_band(x):
@@ -155,7 +160,12 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             p = parts(sc, tok, sc2, tok2)
             rows_out.append({"leader": leader_target, "resp": classify(sc, tok, sc2, tok2),
                              "x": x, "xb": x_band(x), "price": float(v), "real": float(sum(p.values())),
-                             "parts": p, "theta_says_take": bool(c_of(x) > float(th))})
+                             "parts": p, "theta_says_take": bool(c_of(x) > float(th)),
+                             # **T61**: 相手が応答を「選べたか」を読むための状態（攻撃時の相手の手札とアクティブなドン）
+                             "opp_hand": int(round(float(sc[SC_OPP_HAND]))), "opp_don": int(round(float(sc[SC_OPP_DON]))),
+                             "opp_life": int(round(float(sc[SC_OPP_LIFE]))),
+                             # カウンターで切った札の枚数（手札の差分・受けた行はトリガーで増えうる）
+                             "cards": float(p["opp_hand"] / MU)})
     return rows_out, stats
 
 
@@ -199,8 +209,12 @@ def main(argv=None):
     ap.add_argument("--theta", type=float, default=THETA)
     ap.add_argument("--theta-mode", default="const", choices=("const", "board", "max"))
     add_nu_mode_arg(ap)
+    _TO.add_surv_mode_arg(ap)
+    _TO.add_cbar_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    _TO.apply_surv_mode(a)
+    _TO.apply_cbar_mode(a)
     apply_nu_mode(a)
     t0 = time.time()
     rows, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
