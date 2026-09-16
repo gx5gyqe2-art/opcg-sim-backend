@@ -224,15 +224,41 @@ def test_the_gain_of_a_guard_row_is_minus_what_was_actually_paid():
     """`g` は**実際に払った費用の符号**——`s` と違って誰の責任かを問わない。"""
     tok, sc = _tok(), _sc(don=5)
     x = 2000.0
-    got_g = B.guard_step(tok, sc, "guard", free=x + 1000.0, paid=[], theta=1.15, mu=0.0551)
-    got_t = B.guard_step(tok, sc, "take", free=x + 1000.0, paid=[], theta=1.15, mu=0.0551)
+    got_g = B.guard_step(tok, sc, "guard", free=x + 1000.0, paid=[], theta=1.15, mu=0.0551, guard_g="paid")
+    got_t = B.guard_step(tok, sc, "take", free=x + 1000.0, paid=[], theta=1.15, mu=0.0551, guard_g="paid")
     assert got_g["g"] == pytest.approx(-B.c_of(got_g["x"]) * 0.0551)
     assert got_t["g"] == pytest.approx(-1.15 * 0.0551)
     # 払えなかった行: `s` は 0（誤りでない）だが `g` は受けた損をそのまま持つ
     # （`x = 0` は 0 パワーでも守れるので、守れない行は相手リーダーを大きくして作る）
-    poor = B.guard_step(_tok(opp_lead=8000), sc, "take", free=0.0, paid=[], theta=1.15, mu=0.0551)
+    poor = B.guard_step(_tok(opp_lead=8000), sc, "take", free=0.0, paid=[], theta=1.15, mu=0.0551, guard_g="paid")
     assert poor["can_guard"] is False
     assert poor["s"] == 0.0 and poor["g"] == pytest.approx(-1.15 * 0.0551)
+
+
+def test_under_delta_the_guard_window_counts_only_the_gap_to_the_attackers_price():
+    """**T62**: `g = 攻め手の価格 − 払った額`（価格＝`min(Θ·μ, c(x)·μ)`）。最安の応答なら 0・高い方を選べば差分が負・
+    払えずに受けた行も差分（攻め手には払えるかが見えない）。`paid` と `delta` の両方を返し、既定はモジュール定数。"""
+    x = 2000.0                                              # loose: c(2000) = 1.28 > Θ 1.15 → 受けるのが最安
+    tok, sc = _tok(opp_lead=5000 + x), _sc(don=5)            # 来る攻撃の超過 x は相手リーダーと自リーダーの差
+    th, mu = 1.15, 0.0551
+    g = B.guard_step(tok, sc, "guard", free=x + 1000.0, paid=[], theta=th, mu=mu, guard_g="delta")
+    t = B.guard_step(tok, sc, "take", free=x + 1000.0, paid=[], theta=th, mu=mu, guard_g="delta")
+    assert t["g"] == pytest.approx(0.0, abs=1e-9)                                  # 最安どおり
+    assert g["g"] == pytest.approx((th - B.c_of(x)) * mu, abs=1e-9) and g["g"] < 0  # 高い方を選んだ分だけ負
+    assert g["g_paid"] == pytest.approx(-B.c_of(x) * mu) and g["g_delta"] == g["g"]
+    assert t["price"] == pytest.approx(th * mu)
+    poor = B.guard_step(_tok(opp_lead=8000), sc, "take", free=0.0, paid=[], theta=th, mu=mu, guard_g="delta")
+    assert poor["can_guard"] is False and poor["s"] == 0.0
+    assert poor["g"] == pytest.approx(min(th * mu, B.c_of(poor["x"]) * mu) - th * mu)   # 守れないが差分は載る
+    before = B.GUARD_G_MODE
+    try:
+        assert B.set_guard_g_mode("paid") == "paid"
+        assert B.guard_step(tok, sc, "guard", free=x + 1000.0, paid=[], theta=th, mu=mu)["g"] == pytest.approx(-B.c_of(x) * mu)
+        with pytest.raises(ValueError):
+            B.set_guard_g_mode("なにか")
+    finally:
+        B.set_guard_g_mode(before)
+    assert B.GUARD_G_MODE == before
 
 
 def test_gain_is_accumulated_beside_the_deviation_not_instead_of_it():

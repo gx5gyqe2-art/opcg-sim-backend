@@ -117,6 +117,20 @@ SILENT_MODES = ("zero", "exclude")
 #: 守る力が来る攻撃をこれだけ上回っていれば**余裕で払えた**と見なす（暫定値・感度を取る）。
 #: **ブロッカーが居る行は無条件で余裕**（レストするだけでドンを使わない）。
 MARGIN_COMFORT = 2000.0
+#: **守りの窓の `g`（数える価格）の定義**（T62・2026-09-16・ユーザ指示「まずは理論から固める」→「着手してみてください」）。
+#: `paid`＝従来＝**−実際に払った額**（守れば `c(x)·μ`・受ければ `Θ·μ`）／`delta`＝**攻め手の価格 − 実際に払った額**
+#: （攻め手の価格＝`min(c(x)·μ, Θ·μ)`＝相手が最安の応答をしたときに失う額）。零和なので同じ移転は攻め手の行で 1 回だけ数え、
+#: 受け手の行には見積もりとの差分だけを載せる（`paid` は同じ移転を両席で二重に数え、払える席ほど損に見えた＝守り側の `ΔG` が反対向き）。
+GUARD_G_MODES = ("paid", "delta")
+GUARD_G_MODE = "delta"
+
+
+def set_guard_g_mode(mode):
+    global GUARD_G_MODE
+    if mode not in GUARD_G_MODES:
+        raise ValueError("guard g mode は %s のどれか" % (GUARD_G_MODES,))
+    GUARD_G_MODE = mode
+    return GUARD_G_MODE
 
 
 def _extra(dd, n):
@@ -125,10 +139,12 @@ def _extra(dd, n):
             "ci": np.asarray(dd["card_idx"])[:n]}
 
 
-def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=None):
+def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=None, guard_g=None):
     """**守りの窓 1 つ**の取りこぼし（`≤ 0`）と、判定に使った内訳。
 
     **払えなかった行は誤りと数えない**——`measurement.md` §1。
+    `guard_g`（省略時 `GUARD_G_MODE`）: `g` を `paid`（−払った額）か `delta`（攻め手の価格 − 払った額・T62）で返す。
+    両方 `g_paid`／`g_delta` としても返す。
     """
     xs = [x for x in incoming_x(tok) if x >= -PWR_EPS]
     if not xs:
@@ -145,13 +161,17 @@ def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=N
     # **選んだ行動の変化量 `g`**（T40・2026-09-15）＝**実際に払った費用の符号を返したもの**。
     # 「取りこぼし `s`」と違い**誰の責任かを問わない**——払えずに受けた行も損は損として数える
     # （`s` はそこを 0 にする）。守れないはずの行で守った場合も、払ったのは守りの費用。
-    g = -float(actual)
+    g_paid = -float(actual)
+    # **T62**: 攻め手の価格＝相手が最安の応答をしたときに失う額（払えるかは攻め手には見えない＝`min` そのもの）
+    price = min(cost_take, cost_guard)
+    g_delta = float(price) - float(actual)
+    g = g_delta if (GUARD_G_MODE if guard_g is None else guard_g) == "delta" else g_paid
     if played == "guard" and not can_guard:
         # 守れないはずの行で守っている＝予算の見積りが渋い。**誤りにしない**
         actual = best
     # **T28-c**: 余裕の大きさ。**貧しい席を減点していないか**を分けるために出す。
     margin = (float("inf") if blocker else float(afford_pw) - float(x))
-    return {"s": -max(0.0, actual - best), "g": g,
+    return {"s": -max(0.0, actual - best), "g": g, "g_paid": g_paid, "g_delta": g_delta, "price": float(price),
             "x": x, "can_guard": can_guard, "margin": margin,
             "comfortable": bool(can_guard and margin >= (MARGIN_COMFORT
                                                         if margin_comfort is None
@@ -251,6 +271,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
              "w_mode": _TO_W_MODE(), "sigma_turn": _TOM.SIGMA_TURN, "kappa_sum": 0.0, "kappa_n": 0,
              # **T58**: 決める価格（`s`）と数える価格（`g`）の規約・読み直した行の数
              "flow_pricing": EV.FLOW_PRICING, "ledger_pricing": ledger_pricing, "ledger_rescored": 0,
+             # **T62**: 守りの窓の定義と、自ライフごとの内訳（受けた率・理論が受けろと言う率・`g` の平均）
+             "guard_g": GUARD_G_MODE, "grd_by_life": {},
              "d_bins": {"<-3": 0, "-3..-1": 0, "-1..1": 0, "1..3": 0, ">3": 0},
              # **`D` の帯ごとの実勝率**（当てはめない）——時計の推定 `D` が勝敗を順序付けるか・
              # 実測の `W(D)` の傾きが置いた `σ_D` と合うかの検算
@@ -371,6 +393,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     stats["grd_no_attack"] += 1
                     continue
                 stats["grd_rows"] += 1
+                gl = stats["grd_by_life"].setdefault(str(int(round(float(sc[SC_MY_LIFE])))),
+                                                     {"n": 0, "took": 0, "says_take": 0, "can_guard": 0,
+                                                      "g_paid": 0.0, "g_delta": 0.0, "z_win": 0, "z_n": 0})
+                gl["n"] += 1; gl["took"] += int(played == "take"); gl["says_take"] += int(got["theory_says"] == "take")
+                gl["can_guard"] += int(got["can_guard"]); gl["g_paid"] += got["g_paid"]; gl["g_delta"] += got["g_delta"]
+                if z != 0.0:
+                    gl["z_win"] += int(z > 0); gl["z_n"] += 1
                 bnd = band_of(abs(float(rows["pol_v0"][i])))
                 kap = float(clock_of_row(sc, tok)["kappa"])         # T49（守りの窓も同じ傾き）
                 _add(rec, bnd, got["s"] * kap, "grd", g=got["g"] * kap)
@@ -628,6 +657,9 @@ def main(argv=None):
                     help="**T49 の感度**——時計 1 本のぶれ（ターン）。既定は写し（1.0）。合わせ込みには使わない")
     _TOM.add_surv_mode_arg(ap)
     _TOM.add_cbar_mode_arg(ap)
+    ap.add_argument("--guard-g", default=None, choices=GUARD_G_MODES,
+                    help="**守りの窓の `g`**（T62）。省略時は `GUARD_G_MODE`（2026-09-16 から `delta`＝攻め手の価格 − 払った額）。"
+                         "以前の数字と比べるときは `paid` を明示する")
     ap.add_argument("--flow-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
                     help="**決める価格**（`s`・`ΔS`）の規約。省略時は `effect_value.FLOW_PRICING`（`option`）")
     ap.add_argument("--ledger-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
@@ -655,6 +687,8 @@ def main(argv=None):
         EV.set_flow_pricing(a.flow_pricing)
     _TOM.apply_surv_mode(a)
     _TOM.apply_cbar_mode(a)
+    if a.guard_g is not None:
+        set_guard_g_mode(a.guard_g)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.nu_targets,
                          a.silent, a.margin_comfort, ledger_pricing=a.ledger_pricing)
@@ -667,6 +701,7 @@ def main(argv=None):
                            "T28c_margin": a.margin_comfort, "w_mode": _TO.W_MODE,
                            "flow_pricing": stats["flow_pricing"], "ledger_pricing": stats["ledger_pricing"],
                            "surv_mode": _TO.SURV_MODE, "nu_mode": _TO.NU_MODE,
+                           "cbar_mode": _TO.CBAR_MODE, "guard_g": GUARD_G_MODE,
                            "note": "§0.4 の暫定値。感度を付けて読む"},
            "summary": summarise(pairs, a.boot_reps, a.seed),
            # **T28-b: 行ごとに帯で切ってから足した版**（判定の主はこちら）
