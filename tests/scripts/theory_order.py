@@ -504,6 +504,87 @@ def attack_value_don(power, target_power, is_leader, theta=THETA, mu=MU, nu_targ
     return float(best)
 
 
+#: **相手の体を倒せる潜在価値**（T46・2026-09-16・ユーザ決定「今の場ではなく分布で」）。
+#: `dist`＝記録の相手の場の分布（`tests/fixtures/opp_boards.json`・`opp_board_dist.py`・残りターン `R` で
+#: 条件付け）で `E[max(lead, 最良の v_T) − lead]` を取り、`ν` の攻撃項に足す。**今の場には依らない**
+#: （登場の価値が局面でブレない）。`off`＝従来（リーダーだけ）。**新定数なし**（分布は A 層の実測）。
+OPTION_MODES = ("off", "dist")
+OPTION_MODE = "dist"
+OPP_BOARDS_PATH = os.path.join(_ROOT, "tests", "fixtures", "opp_boards.json")
+_OPP_BOARDS = None
+_OPTION_CACHE = {}
+#: **深さ 1 の番人**——相手の体の `ν(T)` を評価している間は、その中で潜在価値を再び足さない（相互再帰を止める）
+_OPTION_DEPTH = 0
+
+
+def load_opp_boards(path=None):
+    """相手の場の分布（`R` → [(自リーダーのパワー, [(パワー, ブロッカーか), …]), …]）。無ければ空。"""
+    global _OPP_BOARDS
+    if _OPP_BOARDS is None or path is not None:
+        p = OPP_BOARDS_PATH if path is None else path
+        try:
+            with open(p, encoding="utf-8") as fh:
+                raw = json.load(fh)
+            _OPP_BOARDS = {int(k): v for k, v in (raw.get("by_r") or {}).items()}
+        except (OSError, ValueError):
+            _OPP_BOARDS = {}
+        _OPTION_CACHE.clear()
+    return _OPP_BOARDS
+
+
+def set_option_mode(mode):
+    global OPTION_MODE
+    if mode not in OPTION_MODES:
+        raise ValueError("option mode は %s のどれか" % (OPTION_MODES,))
+    OPTION_MODE = mode
+    _OPTION_CACHE.clear()
+    return OPTION_MODE
+
+
+def option_value(power, opp_leader_power, r_turns, theta=THETA, mu=MU, my_leader_power=None,
+                 ko_p=KO_P, boards=None):
+    """**残り `R` ターンぶんの選択肢の価値**＝`E_盤面[ Σ_{i<R} max(v_(i), lead) ] − lead·R`（T46）。
+
+    `v_T = min(c(P − P_T)·μ, ν(T))`・`ν(T)` は相手の体を**同じ式で相手の側から**評価したもの（深さ 1）。
+    **盤面 1 つを `R` ターンぶんの対象の池として使い、1 体は 1 回だけ倒す**（`attack_stream` の
+    盤面モードと同じ規則・高い順に 1 ターン 1 体）——**毎ターン新しい体が現れる前提にはしない**
+    （初版でそう書いて `ν` が 1.5〜1.75 倍になった＝#39 が踏んだ「在庫を流量として数える」単位の誤り）。
+    **lead を超えた分だけ**を取るので二重計上にならない。盤面の分布は `R`（相手の残りライフの近似）で
+    条件付ける。分布が無ければ 0（従来どおり）。
+    """
+    if OPTION_MODE != "dist" and boards is None:
+        return 0.0
+    r = max(0.0, float(r_turns))
+    rb = int(max(1, min(5, round(r))))
+    olp = float(opp_leader_power)
+    mlp = float(olp if my_leader_power is None else my_leader_power)
+    # 同梱の分布で引くときだけ覚える（`boards` を明示した呼び出しは検算用＝毎回計算する）
+    key = (int(round(float(power) / 100.0)), rb, int(round(olp / 100.0)), int(round(mlp / 100.0)),
+           round(float(theta), 4), round(float(mu), 5), round(float(ko_p), 4)) if boards is None else None
+    if key is not None and key in _OPTION_CACHE:
+        return _OPTION_CACHE[key]
+    bs = (load_opp_boards() if boards is None else boards).get(rb) or []
+    if not bs:
+        if key is not None:
+            _OPTION_CACHE[key] = 0.0
+        return 0.0
+    lead = attack_value_don(power, olp, True, theta, mu)
+    tot = 0.0
+    global _OPTION_DEPTH
+    _OPTION_DEPTH += 1
+    try:
+        for _mlp_rec, bodies in bs:
+            chars = [(float(tp), bool(blk)) for tp, blk in bodies]
+            # 盤面モードの `attack_stream`（高い順に 1 ターン 1 体・端数は比例配分）を分布の上で平均する
+            tot += attack_stream(power, olp, r, theta, mu, chars or None, mlp, ko_p) - lead * r
+    finally:
+        _OPTION_DEPTH -= 1
+    val = float(tot / len(bs))
+    if key is not None:
+        _OPTION_CACHE[key] = val
+    return val
+
+
 def set_attack_don_mode(mode):
     global ATTACK_DON_MODE
     if mode not in ATTACK_DON_MODES:
@@ -539,7 +620,10 @@ def attack_stream(power, opp_leader_power, r_turns, theta=THETA, mu=MU, opp_char
     lead = attack_value_don(power, opp_leader_power, True, theta, mu)      # ドンを付けて殴る（T45）
     r = max(0.0, float(r_turns))
     if not opp_chars:
-        return lead * r                          # 従来どおり（盤面を渡さなければ値は動かない）
+        # **盤面を渡さないときは分布で潜在価値を足す**（T46）——`lead·R + E[Σ max(v_(i), lead)] − lead·R`
+        opt = (option_value(power, opp_leader_power, r, theta, mu, my_leader_power, ko_p)
+               if _OPTION_DEPTH == 0 else 0.0)
+        return lead * r + opt                    # 選択肢は `R` ターンぶんの総額（流量ではない）
     mlp = float(opp_leader_power if my_leader_power is None else my_leader_power)
     vals = []
     for entry in opp_chars:

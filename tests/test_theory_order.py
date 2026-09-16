@@ -828,3 +828,70 @@ def test_the_don_attack_flows_into_nu_for_bodies_just_below_the_leader():
     assert don == pytest.approx((T.c_of(0.0) * T.MU - T.DELTA) * 4.128 * (1 - T.KO_P))
     with pytest.raises(ValueError):
         T.set_attack_don_mode("なにか")
+
+
+# ---- T46: 相手の体を倒せる潜在価値（分布で・2026-09-16） ----
+
+def _boards():
+    return {3: [[5000, [[4000, False], [7000, True]]], [5000, []], [5000, [[6000, False]]]]}
+
+
+def test_the_option_value_is_the_excess_over_the_leader_attack_never_double_counted():
+    """`E[Σ_{i<R} max(v_(i), lead)] − lead·R`——盤面 1 つを R ターンの池にし、1 体は 1 回だけ。空の場は 0。"""
+    P, olp, r = 9000.0, 5000.0, 3.0
+    lead = T.attack_value_don(P, olp, True)
+    opt = T.option_value(P, olp, r, my_leader_power=5000.0, boards=_boards())
+    assert opt >= 0.0
+    # 盤面ごとに手で組む＝盤面モードの attack_stream と同じ
+    vals = []
+    for _mlp, bodies in _boards()[3]:
+        chars = [(float(tp), blk) for tp, blk in bodies] or None
+        vals.append(T.attack_stream(P, olp, r, opp_chars=chars, my_leader_power=5000.0) - lead * r)
+    assert opt == pytest.approx(float(np.mean(vals)))
+    assert vals[1] == 0.0                                   # 空の場
+    # 1 体は 1 回だけ: 体が 1 つの盤面の選択肢は「1 ターンぶんの v_T − lead」を超えない
+    one = _boards()[3][2]
+    nu_t = T.nu_of(6000.0, 5000.0, r, is_blocker=False)
+    v_t = T.attack_value_don(P, 6000.0, False, nu_target=nu_t)
+    assert vals[2] == pytest.approx(max(0.0, v_t - lead))
+    # 分布が無ければ 0（従来どおり）
+    assert T.option_value(P, olp, r, boards={}) == 0.0
+    assert T.option_value(P, olp, r, boards={3: []}) == 0.0
+
+
+def test_a_bigger_body_has_more_option_value_and_a_tiny_one_none():
+    olp, r = 5000.0, 3.0
+    small = T.option_value(2000.0, olp, r, my_leader_power=5000.0, boards=_boards())
+    mid = T.option_value(6500.0, olp, r, my_leader_power=5000.0, boards=_boards())
+    big = T.option_value(12000.0, olp, r, my_leader_power=5000.0, boards=_boards())
+    assert small == 0.0                                     # 何も倒せない
+    assert 0.0 <= mid <= big                                # 大きいほど選択肢が広い
+    assert big > 0.0
+
+
+def test_the_attack_stream_adds_the_option_per_turn_when_no_board_is_given():
+    """`attack_stream` は盤面を渡さないとき `(lead + 選択肢) × R`。`off` なら従来どおり `lead × R`。"""
+    P, olp, r = 9000.0, 5000.0, 3.0
+    before = T.OPTION_MODE
+    try:
+        T.set_option_mode("off")
+        off = T.attack_stream(P, olp, r)
+        T.set_option_mode("dist")
+        on = T.attack_stream(P, olp, r, my_leader_power=5000.0)
+        opt = T.option_value(P, olp, r, my_leader_power=5000.0)
+    finally:
+        T.set_option_mode(before)
+    lead = T.attack_value_don(P, olp, True)
+    assert off == pytest.approx(lead * r)
+    assert opt > 0.0
+    assert on == pytest.approx(lead * r + opt)               # 選択肢は R ターンぶんの総額
+    assert on >= off
+    with pytest.raises(ValueError):
+        T.set_option_mode("なにか")
+
+
+def test_the_shipped_distribution_loads_and_is_keyed_by_remaining_turns():
+    bs = T.load_opp_boards()
+    assert set(bs) <= {1, 2, 3, 4, 5} and bs                # 同梱の fixture が読める
+    for r, lst in bs.items():
+        assert lst and all(isinstance(b[0], int) and isinstance(b[1], list) for b in lst)
