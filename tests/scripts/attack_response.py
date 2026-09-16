@@ -133,7 +133,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             sc2, tok2 = ex["sc"][order[j]], ex["tok"][order[j]]
             olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
             mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-            th = theta_of(tok, float(sc[SC_MY_LIFE]), float(sc[SC_MY_DON]), mode=theta_mode, theta=theta)
+            th = theta_of(tok, float(sc[SC_MY_LIFE]), float(sc[SC_MY_DON]), mode=theta_mode,
+                          theta=_TO.theta_take(float(sc[SC_OPP_LIFE]), theta=theta))   # T63: 相手のライフで受ける費用
             ctx = {"theta": th, "mu": mu, "opp_leader_power": olp, "my_leader_power": mlp,
                    "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), "don_k": 1,
                    "attackers": own_attackers_of(tok, olp), "don_active": float(sc[SC_MY_DON]),
@@ -211,10 +212,12 @@ def main(argv=None):
     add_nu_mode_arg(ap)
     _TO.add_surv_mode_arg(ap)
     _TO.add_cbar_mode_arg(ap)
+    _TO.add_take_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     _TO.apply_surv_mode(a)
     _TO.apply_cbar_mode(a)
+    _TO.apply_take_mode(a)
     apply_nu_mode(a)
     t0 = time.time()
     rows, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)

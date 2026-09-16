@@ -312,8 +312,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 if k < 2 or ch < 0 or ch >= k:
                     continue
                 stats["atk_rows"] += 1
+                # **T63**: 攻撃の価格の受ける費用は**相手のライフ**で読む（`by_life`）。`const` なら従来の `Θ`
                 th = theta_of(tok, float(sc[SC_MY_LIFE]), float(sc[SC_MY_DON]),
-                              mode=theta_mode, theta=theta)
+                              mode=theta_mode, theta=_TOM.theta_take(float(sc[SC_OPP_LIFE]), theta=theta))
                 ctx = {"theta": th, "mu": mu,
                        "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
                        "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
@@ -388,7 +389,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 if played not in ("take", "guard"):
                     continue
                 free, paid, _slots = GA.hand_counters(tok, ex["ci"][i], idx2cid, cards)
-                got = guard_step(tok, sc, played, free, paid, theta, mu, margin_comfort)
+                # **T63**: 守りの規則の `Θ` も `--theta-mode` に従う（`max`＝経済の `Θ` と生存のシャドー価格の大きい方）。
+                # それまでは定数だけ（攻めの行は `theta_of` を通していたのに守りの窓は通していなかった）
+                th_g = theta_of(tok, float(sc[SC_MY_LIFE]), float(sc[SC_MY_DON]), mode=theta_mode,
+                                theta=_TOM.theta_take(float(sc[SC_MY_LIFE]), theta=theta))   # T63: 自分のライフ
+                got = guard_step(tok, sc, played, free, paid, th_g, mu, margin_comfort)
                 if got is None:
                     stats["grd_no_attack"] += 1
                     continue
@@ -657,6 +662,7 @@ def main(argv=None):
                     help="**T49 の感度**——時計 1 本のぶれ（ターン）。既定は写し（1.0）。合わせ込みには使わない")
     _TOM.add_surv_mode_arg(ap)
     _TOM.add_cbar_mode_arg(ap)
+    _TOM.add_take_mode_arg(ap)
     ap.add_argument("--guard-g", default=None, choices=GUARD_G_MODES,
                     help="**守りの窓の `g`**（T62）。省略時は `GUARD_G_MODE`（2026-09-16 から `delta`＝攻め手の価格 − 払った額）。"
                          "以前の数字と比べるときは `paid` を明示する")
@@ -687,6 +693,7 @@ def main(argv=None):
         EV.set_flow_pricing(a.flow_pricing)
     _TOM.apply_surv_mode(a)
     _TOM.apply_cbar_mode(a)
+    _TOM.apply_take_mode(a)
     if a.guard_g is not None:
         set_guard_g_mode(a.guard_g)
     t0 = time.time()
@@ -701,7 +708,7 @@ def main(argv=None):
                            "T28c_margin": a.margin_comfort, "w_mode": _TO.W_MODE,
                            "flow_pricing": stats["flow_pricing"], "ledger_pricing": stats["ledger_pricing"],
                            "surv_mode": _TO.SURV_MODE, "nu_mode": _TO.NU_MODE,
-                           "cbar_mode": _TO.CBAR_MODE, "guard_g": GUARD_G_MODE,
+                           "cbar_mode": _TO.CBAR_MODE, "guard_g": GUARD_G_MODE, "take_mode": _TO.TAKE_MODE,
                            "note": "§0.4 の暫定値。感度を付けて読む"},
            "summary": summarise(pairs, a.boot_reps, a.seed),
            # **T28-b: 行ごとに帯で切ってから足した版**（判定の主はこちら）

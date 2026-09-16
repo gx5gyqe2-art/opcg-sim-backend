@@ -211,7 +211,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     stats["no_next"] += 1      # ターン最後の行＝相手のターンが挟まる
                     continue
                 th = theta_of(tok, float(sc[SC_MY_LIFE]), float(sc[SC_MY_DON]),
-                              mode=theta_mode, theta=theta)
+                              mode=theta_mode, theta=_TO.theta_take(float(sc[SC_OPP_LIFE]), theta=theta))   # T63
                 ctx = {"theta": th, "mu": mu,
                        "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
                        "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
@@ -408,6 +408,7 @@ def main(argv=None):
     add_nu_mode_arg(ap)
     _TO.add_surv_mode_arg(ap)
     _TO.add_cbar_mode_arg(ap)
+    _TO.add_take_mode_arg(ap)
     ap.add_argument("--flow-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
                     help="**T54** 後で効く効果を付与の行で数える（`option`・既定）か、使った行で数える（`exercise`＝付与の行は 0）か")
     ap.add_argument("--out", default="")
@@ -415,6 +416,7 @@ def main(argv=None):
     apply_nu_mode(a)
     _TO.apply_surv_mode(a)
     _TO.apply_cbar_mode(a)
+    _TO.apply_take_mode(a)
     if a.flow_pricing is not None:
         EV.set_flow_pricing(a.flow_pricing)
     t0 = time.time()

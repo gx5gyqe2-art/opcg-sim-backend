@@ -89,6 +89,55 @@ THETA_SWITCH = 1.15
 #: 旧: `λ/μ − 1 − τ_value`（§9）——`1 + τ_value` の位置に実測の `h` が入った形。
 #: 盤面のシャドー価格（`--theta-mode board`／`max`）はこれと `max` を取る（`theta_of`）。
 THETA = round((LAM - H_LIFE_TO_HAND * MU) / MU, 4)
+#: **受ける費用のライフ依存**（T63・2026-09-16・ユーザ指示「着手してください」）。`const`＝`Θ·μ`（λ の平均）／
+#: `by_life`＝**`λ(L) − h·μ`**（`L` = 受け手のライフ。攻撃の価格では相手のライフ・守りの規則では自分のライフ）。
+#: `λ(L)` は T19 の実測（相手ターンの `λ_gross`・`2026-09-14_life_price.md`）の写し。**CI は広い**（±0.1・λ(1) は自席で 0 を含む）ので
+#: 表の形（2〜3 で高く 4 で低い）は雑音を含む。`L = 0` は受ければ負け＝勝利の価値 0.5（恒等式の値・`effect_value` の勝利と同じ）。
+#: **新定数ゼロ**（実測と恒等式の写し）。既定は `const`（測ってから決める）。
+TAKE_MODES = ("const", "by_life", "lethal")
+TAKE_MODE = "const"
+LAM_BY_LIFE = {0: 0.5, 1: 0.113, 2: 0.218, 3: 0.190, 4: 0.078, 5: 0.119}
+
+
+def set_take_mode(mode):
+    global TAKE_MODE
+    if mode not in TAKE_MODES:
+        raise ValueError("take mode は %s のどれか" % (TAKE_MODES,))
+    TAKE_MODE = mode
+    _OPTION_CACHE.clear()
+    return TAKE_MODE
+
+
+def add_take_mode_arg(ap):
+    ap.add_argument("--take-mode", default=None, choices=TAKE_MODES,
+                    help="受ける費用（T63）。省略時は `theory_order.TAKE_MODE`（`const`＝`Θ·μ`）。`by_life`＝`λ(L) − h·μ`（T19 の写し）・"
+                         "`lethal`＝ライフ 0 だけ勝利の価値 0.5（規則だけ）")
+
+
+def apply_take_mode(a):
+    if getattr(a, "take_mode", None) is not None:
+        set_take_mode(a.take_mode)
+    a.take_mode = TAKE_MODE
+    return TAKE_MODE
+
+
+def lam_of_life(life):
+    """受け手のライフ `L` での `λ(L)`（T19 の写し・`L ≥ 5` は 5 の値・`L ≤ 0` は勝利の価値 0.5）。"""
+    lv = int(round(float(life)))
+    if lv <= 0:
+        return float(LAM_BY_LIFE[0])
+    return float(LAM_BY_LIFE.get(lv, LAM_BY_LIFE[5]))
+
+
+def theta_take(life, mode=None, theta=THETA, mu=MU, h=H_LIFE_TO_HAND):
+    """**受ける費用（枚）**＝`const` なら `Θ`・`by_life` なら `max(0, λ(L) − h·μ) / μ`。攻撃の価格には相手のライフ・守りの規則には自分のライフを渡す。"""
+    mode = TAKE_MODE if mode is None else mode
+    if mode == "const" or life is None:
+        return float(theta)
+    if mode == "lethal":
+        # **規則だけ**: 受ければ負け（ライフ 0）のときだけ勝利の価値 0.5・それ以外は定数（T19 の表を使わない）
+        return float(theta) if int(round(float(life))) > 0 else float(max(0.0, LAM_BY_LIFE[0] - float(h) * float(mu)) / float(mu))
+    return float(max(0.0, lam_of_life(life) - float(h) * float(mu)) / float(mu))
 #: **`Θ` には 2 つの経路が在り、帯レベルで食い違う**（2026-09-14 に判明・未解決）:
 #:
 #: | 経路 | 定義 | ライフ別 (ℓ=1..4) |
