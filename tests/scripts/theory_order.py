@@ -174,9 +174,11 @@ NU_MODE = "pair"
 #: `geo`＝**毎ターン倒される機会がある**ので t ターン目の重みは `(1 − ko_p)^t`（幾何和・§14.1.1 の「正しくは Σ lead·s^t」）。
 #: 新定数ゼロ（既に測ってある `ko_p` だけ）。T50 の帯ごとの「生きて迎えたターン数」1.87／1.60／1.50 に対し
 #: `once` は 2.67／2.34／2.30・`geo` は 1.73／1.62／1.54（合わせ込まずに乗る）。
-#: **既定は `once` のまま**（切替で両方測ってから決める）。
+#: **既定は `geo`**（ユーザ決定 2026-09-16「論理的に正しい方を採用」・`2026-09-16_surv_geo.md`: 体の価格が帯の実測の
+#: 0.84〜0.98 に乗り・登場の 実現/価格 0.62 → 0.85／0.66 → 0.93・帳簿の AUC 0.607 → 0.612／0.666 → 0.694・`ΔS` は無関係のまま）。
+#: **2026-09-16 より前の数字と比べるときは `--surv-mode once` を明示する**（既定の変更を挟んで前後を並べない）。
 SURV_MODES = ("once", "geo")
-SURV_MODE = "once"
+SURV_MODE = "geo"
 
 
 def set_surv_mode(mode):
@@ -198,8 +200,8 @@ def apply_surv_mode(a):
 
 def add_surv_mode_arg(ap):
     ap.add_argument("--surv-mode", default=None, choices=SURV_MODES,
-                    help="`ν` の生存の重み（T60）。省略時は `theory_order.SURV_MODE`（既定 `once`＝従来）。"
-                         "`geo` は毎ターン `(1 − ko_p)^t` で割り引く幾何和")
+                    help="`ν` の生存の重み（T60）。省略時は `theory_order.SURV_MODE`（2026-09-16 から `geo`＝幾何和）。"
+                         "**2026-09-16 より前の数字と比べるときは `once` を明示する**")
 
 
 def turn_weights(r_turns, ko_p, mode=None):
