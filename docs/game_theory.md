@@ -85,7 +85,9 @@
 KO = 対象の ν          BOUNCE = ν − μ          PLAY = ν − μ（手札から）/ ν（他所から）
 DRAW = +μ              DISCARD = 相手 −μ       HEAL / DAMAGE = ±λ
 RAMP_DON = δ×N（在庫・ドンデッキ残で打ち切り）
-ACTIVE_DON / ATTACH_DON = δ×N/R（流れ・レスト数で打ち切り）      RETURN_DON = −δ×N
+ATTACH_DON（効果で自分の体に付与）= [atk_don(P+1000N) − atk_don(P)]   付けた体の攻撃の価格の差（T56・盤面が無ければ δ×N/R）
+ACTIVE_DON = δ×N/R（流れ・レスト数で打ち切り・ユーザ判定待ち）        RETURN_DON = −δ×N
+アクティブのキャラにもアタックできる = max(0, max_{T: アクティブ} v_T − lead)   対象の広がり（T56）
 BUFF（自分の体）= [atk_don(P+ΔP) − atk_don(P)] × 効く回数           その体の攻撃の価格の差（T55・盤面が無ければ ΔP/1000·δ を上限で打ち切り）
 速攻 = atk_don(P, L_opp)（召喚酔いの解除＝その体の攻撃 1 回・T54/T55）
 ダブルアタック = [min(c(x)μ, 2Θμ) − min(c(x)μ, Θμ)] × 回数        バニッシュ = [min(c(x)μ, (λ/μ)μ) − min(c(x)μ, Θμ)] × 回数（T55）

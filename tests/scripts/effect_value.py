@@ -601,10 +601,17 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
                     return n * dv * attack_turns_of(effect, st)
             per *= DURATION_TURNS.get(str(effect.get("duration") or ""), 1.0)
         if mode == "once":
-            # **速攻＝召喚酔いの解除＝その体が今のターンに 1 回殴れる**（T54/T55）——その体の攻撃の価格。盤面が無ければ従来の `Θ·μ`
-            got_v = granted_attack_value(effect, card, st, theta, mu, at=at)
-            if got_v is not None:
-                per = got_v
+            if status == "ATTACK_ACTIVE":
+                # **「アクティブのキャラにもアタックできる」＝狙える対象が広がる**（T56）——追加攻撃ではない。
+                # 価値 = アクティブな相手の体の中で最良の攻撃 − リーダー狙い（正のときだけ）。相手の場が渡らなければ従来
+                got_v = active_target_option(effect, card, st, opp_bodies, theta, mu)
+                if got_v is not None:
+                    per = got_v
+            else:
+                # **速攻＝召喚酔いの解除＝その体が今のターンに 1 回殴れる**（T54/T55）——その体の攻撃の価格。盤面が無ければ従来の `Θ·μ`
+                got_v = granted_attack_value(effect, card, st, theta, mu, at=at)
+                if got_v is not None:
+                    per = got_v
         amt = n * per                         # `stock`／`once` は期間を掛けない
         return amt if not opp else -amt
     if fam == "survive":
@@ -688,6 +695,14 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         if kind == "don_flow":
             if FLOW_PRICING == "exercise":
                 return 0.0                    # 付与・攻撃の行で数える
+            if at == "ATTACH_DON" and not opp:
+                # **効果でのドン付与は `ν` の増加**（T56・ユーザ決定）＝付けた体の攻撃の価格の差（`+1000·N`・このターン）。
+                # 効く体が判らなければ従来の流れ
+                pw = body_power_of(effect, card, st, at)
+                if pw is not None:
+                    if pw <= 0.0:
+                        return 0.0
+                    return buff_delta(pw, 1000.0 * cnt, st["opp_leader_power"], theta, mu)
             # **流れ**＝そのターンだけ余分に使えるドン＝在庫÷R（テンポの規則・`REST_DON` と同じ）
             amt = cnt * delta / R_TURNS
             return amt if not opp else -amt
@@ -788,6 +803,30 @@ def buff_delta(power, d_power, opp_leader_power, theta=THETA, mu=MU):
     olp = float(opp_leader_power)
     return float(attack_value_don(float(power) + float(d_power), olp, True, theta, mu)
                  - attack_value_don(float(power), olp, True, theta, mu))
+
+
+def active_target_option(effect, card, st, opp_bodies, theta=THETA, mu=MU):
+    """**「アクティブのキャラにもアタックできる」の価値**（T56）＝その体が狙える対象にアクティブな相手の体が加わる分。
+
+    `max(0, max_{T: アクティブ} min(c(P − P_T)·μ, ν(T)) − リーダー狙いの価格)`。相手の場（`opp_bodies`）か体のパワーが無ければ `None`。
+    """
+    if opp_bodies is None:
+        return None
+    pw = body_power_of(effect, card, st)
+    if pw is None:
+        return None
+    if pw <= 0.0:
+        return 0.0
+    from theory_order import attack_value_don
+    olp = float(st["opp_leader_power"])
+    lead = attack_value_don(pw, olp, True, theta, mu)
+    best = 0.0
+    for b in opp_bodies:
+        if b.get("is_rest"):
+            continue                                     # レストの体は元から狙える
+        v = attack_value_don(pw, float(b["power"]), False, theta, mu, nu_target=float(b["nu"]))
+        best = max(best, float(v) - float(lead))
+    return float(best)
 
 
 def granted_attack_value(effect, card, st, theta=THETA, mu=MU, at=None):

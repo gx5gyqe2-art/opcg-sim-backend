@@ -763,3 +763,32 @@ def test_a_power_buff_on_an_own_body_is_the_difference_in_that_bodys_attack_pric
     assert E.action_value(perm, card={"power": 4000}, st=st) == pytest.approx(4.0 * E.buff_delta(4000.0, 2000.0, olp))
     down = _act("BUFF", "OPPONENT", base=-2000)                                            # 相手を下げる側は従来
     assert E.action_value(down, st=st) == pytest.approx(E.power_value(2000.0))
+
+
+# ---- T56（2026-09-16・ユーザ決定）: ドン付与は ν の増加・「アクティブのキャラにもアタックできる」は対象の広がり ----
+
+def test_attaching_don_by_effect_is_the_increase_in_that_bodys_attack_price():
+    """効果でのドン付与 `+1000·N` はその体の攻撃の価格の差（バフと同じ）。効く体が判らなければ従来の流れ（δ×N/R）。"""
+    st = {"opp_leader_power": 5000.0, "attackers": [-1000.0]}
+    eff = _act("ATTACH_DON", "SELF", base=1, card_type=["CHARACTER"])
+    assert E.action_value(eff, st=st) == pytest.approx(E.buff_delta(4000.0, 1000.0, 5000.0))   # 4000 に 1 枚 → 5000
+    assert E.action_value(eff, st=st) > 0
+    src = _act("ATTACH_DON", "SELF", base=2); src["target"]["select_mode"] = "SOURCE"
+    assert E.action_value(src, card={"power": 6000}, st=st) == pytest.approx(E.buff_delta(6000.0, 2000.0, 5000.0))
+    assert E.action_value(src, card={"power": 12000}, st=st) == pytest.approx(0.0)              # 飽和した体
+    assert E.action_value(eff) == pytest.approx(1 * E.DELTA / E.R_TURNS)                       # 盤面が無ければ従来
+    assert E.action_value(eff, st={"opp_leader_power": 5000.0, "attackers": []}) == 0.0        # 付ける体が無い
+
+
+def test_attacking_active_characters_is_the_widening_of_the_target_choice_not_an_extra_attack():
+    st = {"opp_leader_power": 5000.0}
+    eff = _act("GRANT_KEYWORD", "SELF", status="ATTACK_ACTIVE", duration="THIS_TURN"); eff["target"]["select_mode"] = "SOURCE"
+    lead = T.attack_value_don(8000.0, 5000.0, True)
+    active_big = {"power": 6000.0, "is_rest": False, "nu": 0.3}                                 # 倒せば ν 0.3・守るなら 2.25 枚
+    rested = {"power": 6000.0, "is_rest": True, "nu": 0.3}
+    got = E.action_value(eff, card={"power": 8000}, st=st, opp_bodies=[active_big])
+    assert got == pytest.approx(max(0.0, T.attack_value_don(8000.0, 6000.0, False, nu_target=0.3) - lead))
+    assert got > 0
+    assert E.action_value(eff, card={"power": 8000}, st=st, opp_bodies=[rested]) == 0.0         # レストの体は元から狙える
+    assert E.action_value(eff, card={"power": 8000}, st=st, opp_bodies=[]) == 0.0
+    assert E.action_value(eff, card={"power": 8000}, st=st) == pytest.approx(T.THETA * T.MU)    # 相手の場が無ければ従来
