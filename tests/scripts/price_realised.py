@@ -65,7 +65,7 @@ import guard_afford as GA  # noqa: E402
 import effect_value as EV  # noqa: E402
 from theory_bridge import (MOVE_FAMILIES, POL_COLS, ROW_COLS, _extra, _state_of,  # noqa: E402
                            move_family)
-from theory_order import (own_attackers_of, LAM, MU, PWR_EPS, S_IS_CHAR, S_POWER, SC_MY_DON, SC_MY_HAND,  # noqa: E402
+from theory_order import (own_attackers_of, play_value, LAM, MU, PWR_EPS, S_IS_CHAR, S_POWER, SC_MY_DON, SC_MY_HAND,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE,
                           SLOT_OPP_FIELD, SLOT_OWN_FIELD, THETA, add_nu_mode_arg, apply_nu_mode,
                           opp_bodies_of, play_cost_term, score_candidate, slot_power, theta_of)
@@ -129,6 +129,8 @@ def state_meas(sc, tok):
 
 #: 登場・イベントの価格が引くドンの機会費用（`theory_order.play_value`／`score_candidate` と同じ `0.66·μ`）
 DON_COST = 0.66 * MU
+#: **後で効く効果**（T53）——次の判断点には出ず、同じターンの後の行（攻撃）に実現が出る動作の型
+FLOW_ACTS = frozenset({"ACTIVE_DON", "ATTACH_DON", "GRANT_KEYWORD", "BUFF", "BP_BUFF", "REST"})
 
 
 def primary_action(cid, triggers=EV.ACTIVATE_TRIGGERS):
@@ -145,6 +147,7 @@ def primary_action(cid, triggers=EV.ACTIVATE_TRIGGERS):
 
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     """(局, 席) ごとに、手の型ごとの価格と実現を足す。"""
+    from attack_response import parts          # 遅延 import（attack_response は本器を import する）
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     per = {}
@@ -170,6 +173,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         for w, ns in by_seat.items():
             for a, b in zip(ns, ns[1:]):
                 nxt[a] = b
+        # **ターン末の盤面**（T53）＝そのターンの最後の判断点（`TURN_END` の行）。「後で効く」効果
+        # （`ACTIVE_DON`・`GRANT_KEYWORD`・`BUFF`・`REST`）の実現は次の判断点には出ず同じターンの攻撃に出るので、
+        # 行 → ターン末の差分 `real_te` も持つ（後の行の実現と重なるので**型の和には使わない**・ターン単位の恒等式で読む）
+        turn_end_state = {}
+        for n, i in enumerate(order):
+            w, t = int(rows["who"][i]), int(rows["turn"][i])
+            if t >= 1 and PL.is_own_turn(w, t) and int(rows["kind"][i]) == 0:
+                turn_end_state[(w, t)] = state_meas(ex["sc"][i], ex["tok"][i])   # 後の行で上書き＝最後が残る
         for n, i in enumerate(order):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
             if t < 1:
@@ -232,14 +243,25 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 # 実際に引かれた費用（`state` なら機会費用・`flat` なら定額）を足し戻す（T43）
                 gross = float(v) + (play_cost_term(ctx, cost, mu, th) if fam == "play" else 0.0)
                 act = primary_action(cid) if fam == "effect" else None
+                real_te = turn_end_state.get((w, t), state_meas(ex["sc"][i2], ex["tok"][i2])) - state_meas(sc, tok)
+                # **登場の内訳**（T53）: 価格を「体（ν − μ）」「登場時効果」「機会費用」に、実現を部品に割る
+                play_parts = None
+                if fam == "play" and info is not None and not (info.get("event") or info.get("stage")):
+                    nu_part = play_value(float(info["power"]), 0, ctx["opp_leader_power"], ctx["r_turns"], th, mu,
+                                         is_blocker=info.get("blocker"), my_leader_power=ctx["my_leader_power"])
+                    cost_part = play_cost_term(ctx, cost, mu, th)
+                    play_parts = {"nu_minus_mu": float(nu_part), "effect": float(v) - float(nu_part) + float(cost_part),
+                                  "opportunity": float(cost_part), **parts(sc, tok, ex["sc"][i2], ex["tok"][i2])}
             else:
                 continue                       # 守りの窓は比べない（docstring）
             rec["price"][fam] += float(v); rec["real"][fam] += float(real); rec["n"][fam] += 1
-            rec["rows"].append({"fam": fam, "price": float(v), "real": float(real),
-                                "gross": float(gross), "act": act, "cid": cid})
+            rec["rows"].append({"fam": fam, "price": float(v), "real": float(real), "real_te": float(real_te),
+                                "gross": float(gross), "act": act, "cid": cid, "turn": t, "play_parts": play_parts})
             # **ターン単位の恒等式**——価格の和 対 「最初の自分の行 → 最後の自分の行」の実現
-            tk = rec["turns"].setdefault(t, {"price": 0.0, "first": None, "last": None})
+            tk = rec["turns"].setdefault(t, {"price": 0.0, "first": None, "last": None, "acts": set()})
             tk["price"] += float(v)
+            if act:
+                tk["acts"].add(act)
             if tk["first"] is None:
                 tk["first"] = state_meas(sc, tok)
             tk["last"] = state_meas(ex["sc"][i2], ex["tok"][i2])
@@ -278,8 +300,11 @@ def summarise(per, reps=200, seed=0):
     def block(rs):
         p = np.array([r["price"] for r in rs]); q = np.array([r["real"] for r in rs])
         g = np.array([r["gross"] for r in rs])
+        te = np.array([r.get("real_te", r["real"]) for r in rs])
         return {"n": len(rs), "price_mean": round(float(p.mean()), 5), "real_mean": round(float(q.mean()), 5),
                 "gross_mean": round(float(g.mean()), 5),
+                # **行 → ターン末の実現**（T53・後の行の実現と重なるので参考値）
+                "real_turn_end_mean": round(float(te.mean()), 5),
                 "price_p10_p50_p90": [round(float(np.percentile(p, k)), 4) for k in (10, 50, 90)],
                 "real_p10_p50_p90": [round(float(np.percentile(q, k)), 4) for k in (10, 50, 90)],
                 "ratio_real_over_price": (round(float(q.mean() / p.mean()), 3)
@@ -300,6 +325,26 @@ def summarise(per, reps=200, seed=0):
         acts.setdefault(r["act"], []).append(r)
     out["effect_by_action"] = {a: block(rs) for a, rs in sorted(acts.items(), key=lambda kv: -len(kv[1]))
                                if len(rs) >= 20}
+    # **T53 (a) ターン単位の恒等式を「後で効く効果が在るターン」と無いターンで分ける**——
+    # 流れの効果の価格が正しければ両群の Σ価格/実現 は同じになる（重ね数えをせずに検める）
+    grp = {"with_flow_effect": [], "without": []}
+    for rec in per.values():
+        for tk in rec["turns"].values():
+            if tk["first"] is None or tk["last"] is None:
+                continue
+            key = "with_flow_effect" if (tk.get("acts") or set()) & FLOW_ACTS else "without"
+            grp[key].append((tk["price"], tk["last"] - tk["first"]))
+    out["turns_by_flow_effect"] = {}
+    for key, xs in grp.items():
+        if len(xs) >= 20:
+            p = np.array([a for a, _b in xs]); q = np.array([b for _a, b in xs])
+            out["turns_by_flow_effect"][key] = {"turns": len(xs), "price_mean": round(float(p.mean()), 5),
+                                                "real_mean": round(float(q.mean()), 5),
+                                                "ratio_real_over_price": round(float(q.mean() / p.mean()), 3) if abs(p.mean()) > 1e-9 else None}
+    # **T53 (b) 登場の内訳**——価格の部品と実現の部品の平均
+    pp = [r["play_parts"] for r in allrows if r.get("play_parts")]
+    if len(pp) >= 20:
+        out["play_breakdown"] = {"n": len(pp), **{k: round(float(np.mean([x[k] for x in pp])), 5) for k in pp[0]}}
     # 局ごとの突き合わせ: Σ価格 と Σ実現 が勝敗をどれだけ説明するか（傾き 1 が理想）
     by = {}
     for (sd, w), rec in per.items():

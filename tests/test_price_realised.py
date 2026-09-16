@@ -104,3 +104,39 @@ def test_attached_don_does_not_lift_the_band_of_the_realised_body_value():
     assert PR.side_nu_meas(with_don, PR.SLOT_OWN_FIELD, 5000.0) == pytest.approx(PR.NU_MEAS["lt_leader"])
     # 付与＝アクティブ 2 減・キャラ付与 2 増（総在庫は同じ）→ 盤面の評価も同じ
     assert PR.state_meas(_sc(my_act=1), with_don) == pytest.approx(PR.state_meas(_sc(my_act=3), bare))
+
+
+def test_the_turn_end_column_and_the_flow_split_do_not_touch_the_family_sums():
+    """**T53**: 行 → ターン末の実現は参考値（後の行と重なる）で、型の和は次の判断点の実現のまま。
+    ターン単位の恒等式は「後で効く効果が在るターン」と無いターンで分けて出す。登場の内訳は部品の平均。"""
+    def rec(w, rows_, turns):
+        return {"seed": 1, "who": w, "z": 1.0 if w == 0 else 0.0,
+                "price": {f: sum(r["price"] for r in rows_ if r["fam"] == f) for f in PR.MOVE_FAMILIES},
+                "real": {f: sum(r["real"] for r in rows_ if r["fam"] == f) for f in PR.MOVE_FAMILIES},
+                "n": {f: sum(1 for r in rows_ if r["fam"] == f) for f in PR.MOVE_FAMILIES},
+                "rows": rows_, "turns": turns}
+    pp = {"nu_minus_mu": 0.1, "effect": 0.02, "opportunity": 0.003, "opp_life": 0.0, "opp_hand": 0.0,
+          "opp_body": 0.0, "my_life": 0.0, "my_hand": -0.055, "my_body": 0.15, "don": 0.0}
+    rows_a = [{"fam": "effect", "price": 0.02, "real": 0.0, "real_te": 0.08, "gross": 0.02, "act": "ACTIVE_DON",
+               "cid": "x", "turn": 1, "play_parts": None}] * 25 + \
+             [{"fam": "play", "price": 0.12, "real": 0.09, "real_te": 0.09, "gross": 0.123, "act": None,
+               "cid": "y", "turn": 3, "play_parts": pp}] * 25
+    turns_a = {1: {"price": 0.05, "first": 0.0, "last": 0.10, "acts": {"ACTIVE_DON"}},
+               3: {"price": 0.12, "first": 0.0, "last": 0.09, "acts": set()}}
+    turns_b = {2: {"price": 0.04, "first": 0.0, "last": 0.02, "acts": set()}}
+    per = {(1, 0): rec(0, rows_a, turns_a), (1, 1): rec(1, [], turns_b)}
+    per_many = {}
+    for s in range(25):                      # ターンの群は 20 以上で出す
+        a = rec(0, rows_a, turns_a); a["seed"] = s
+        b = rec(1, [], turns_b); b["seed"] = s
+        per_many[(s, 0)] = a; per_many[(s, 1)] = b
+    out = PR.summarise(per_many, reps=10)
+    eff = out["by_family"]["effect"]
+    assert eff["real_mean"] == pytest.approx(0.0) and eff["real_turn_end_mean"] == pytest.approx(0.08)
+    assert out["effect_by_action"]["ACTIVE_DON"]["real_turn_end_mean"] == pytest.approx(0.08)
+    g = out["turns_by_flow_effect"]
+    assert g["with_flow_effect"]["turns"] == 25 and g["with_flow_effect"]["ratio_real_over_price"] == pytest.approx(2.0)
+    assert g["without"]["turns"] == 50 and g["without"]["price_mean"] == pytest.approx(0.08)
+    pb = out["play_breakdown"]
+    assert pb["n"] == 25 * 25 and pb["nu_minus_mu"] == pytest.approx(0.1) and pb["my_body"] == pytest.approx(0.15)
+    assert PR.FLOW_ACTS >= {"ACTIVE_DON", "GRANT_KEYWORD", "BUFF", "REST"}
