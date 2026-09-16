@@ -720,3 +720,75 @@ def test_activated_ability_pricing_uses_the_state_to_cap_up_to_n_don():
         assert T.score_candidate(["ACTIVATE_MAIN"], "OP15-058", None, ctx_empty, cards) == pytest.approx(full)
     finally:
         T.ACTIVATE_USES_STATE = before
+
+
+# ---- T43: 登場の機会費用を状態で決める（2026-09-16） ----
+
+def _tok_attackers(leader_pw=5000, chars=()):
+    """`chars` は (パワー, 攻撃できるか) の列。"""
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, T.S_POWER] = leader_pw / 1e4
+    for k, (pw, can) in enumerate(chars):
+        tok[2 + k, T.S_POWER] = pw / 1e4
+        tok[2 + k, T.S_IS_CHAR] = 1.0
+        tok[2 + k, T.S_CAN_ATTACK] = 1.0 if can else 0.0
+    return tok
+
+
+def test_own_attackers_are_the_leader_plus_bodies_that_can_attack_now():
+    xs = T.own_attackers_of(_tok_attackers(5000, ((6000, True), (7000, False), (3000, True))), 5000.0)
+    assert xs == [pytest.approx(0.0), pytest.approx(1000.0), pytest.approx(-2000.0)]
+
+
+def test_the_opportunity_cost_is_what_the_don_would_have_earned_on_attacks():
+    """**機会費用＝払わなければ攻撃に付けられた価値**——攻撃手が居なければ 0、飽和していれば 0、
+    ドンが余っていれば払っても 0。付与 1 枚の価値は攻撃の価格の増分（新定数なし）。
+    """
+    assert T.don_opportunity([], 5, 3) == 0.0                              # 攻撃手なし
+    assert T.don_opportunity([0.0], 5, 0) == 0.0                           # 払わない
+    # 攻撃手がリーダーより 1000 低い: 1 枚目の +1000 で通るようになる＝c(0)·μ ぶんの増分
+    one = T.don_opportunity([-1000.0], 1, 1)
+    assert one == pytest.approx(T.attack_value(0.0, 0.0, True) - T.attack_value(-1000.0, 0.0, True))
+    assert one > 0.0
+    # x=0 の攻撃手に 1 枚: c(1000) = c(0) = 1 枚なので増分 0（段が上がらない）
+    assert T.don_opportunity([0.0], 1, 1) == pytest.approx(0.0)
+    # 飽和: 攻撃手 1 体に 10 枚持っていて 3 枚払う——残り 7 枚で飽和点を越えるなら機会費用 0
+    assert T.don_opportunity([0.0], 10, 3) == pytest.approx(0.0)
+    # 攻撃手が多いほど払ったドンの機会費用は大きい（単調）
+    few, many = T.don_opportunity([0.0], 4, 4), T.don_opportunity([0.0, 0.0, 0.0, 0.0], 4, 4)
+    assert many >= few
+    # 払う枚数について単調
+    assert T.don_opportunity([0.0, 0.0], 4, 2) <= T.don_opportunity([0.0, 0.0], 4, 4)
+
+
+def test_play_cost_falls_back_to_the_flat_charge_without_a_board_and_under_flat_mode():
+    ctx = {"attackers": [0.0], "don_active": 10}
+    before = T.PLAY_COST_MODE
+    try:
+        T.PLAY_COST_MODE = "state"
+        assert T.play_cost_term(ctx, 3, T.MU) == pytest.approx(0.0)          # ドンが余る＝0
+        assert T.play_cost_term({}, 3, T.MU) == pytest.approx(3 * 0.66 * T.MU)  # 盤面なし＝定額
+        T.PLAY_COST_MODE = "flat"
+        assert T.play_cost_term(ctx, 3, T.MU) == pytest.approx(3 * 0.66 * T.MU)
+    finally:
+        T.PLAY_COST_MODE = before
+
+
+def test_a_play_with_slack_don_is_priced_higher_than_under_the_flat_charge():
+    """ドンが余る局面の登場は、定額の費用を引いた従来より高い（＝出す理屈が出る）。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    cards = PL.Cards()
+    cid = _vanilla_cid()
+    base = {"theta": T.THETA, "mu": T.MU, "opp_leader_power": 5000.0, "my_leader_power": 5000.0,
+            "r_turns": 4.0, "don_k": 1}
+    slack = dict(base, attackers=[0.0], don_active=10.0)
+    before = T.PLAY_COST_MODE
+    try:
+        T.PLAY_COST_MODE = "state"
+        v_state = T.score_candidate(["PLAY"], cid, None, slack, cards)
+        T.PLAY_COST_MODE = "flat"
+        v_flat = T.score_candidate(["PLAY"], cid, None, slack, cards)
+    finally:
+        T.PLAY_COST_MODE = before
+    info = cards.info(cid)
+    assert v_state - v_flat == pytest.approx(float(info.get("cost") or 0) * 0.66 * T.MU)

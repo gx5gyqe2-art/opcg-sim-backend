@@ -64,10 +64,10 @@ import guard_afford as GA  # noqa: E402
 import effect_value as EV  # noqa: E402
 from theory_bridge import (MOVE_FAMILIES, POL_COLS, ROW_COLS, _extra, _state_of,  # noqa: E402
                            move_family)
-from theory_order import (LAM, MU, PWR_EPS, S_IS_CHAR, S_POWER, SC_MY_DON, SC_MY_HAND,  # noqa: E402
+from theory_order import (own_attackers_of, LAM, MU, PWR_EPS, S_IS_CHAR, S_POWER, SC_MY_DON, SC_MY_HAND,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE,
                           SLOT_OPP_FIELD, SLOT_OWN_FIELD, THETA, add_nu_mode_arg, apply_nu_mode,
-                          opp_bodies_of, score_candidate, slot_power, theta_of)
+                          opp_bodies_of, play_cost_term, score_candidate, slot_power, theta_of)
 
 #: 実測の価格（`game_theory.md` §18）——**式ではなく実測**。`δ` は `theory_gate` と同じ値
 DELTA = 0.0277
@@ -196,7 +196,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                        "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
                        "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
                        "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), "don_k": 1,
-                       "st": _state_of(sc, ex["ci"][i], idx2cid),
+                       "attackers": own_attackers_of(tok, float(sc[SC_OPP_LEADER_POWER]) * 1e4),
+                       "don_active": float(sc[SC_MY_DON]),   # 登場の機会費用（T43）
+                                              "st": _state_of(sc, ex["ci"][i], idx2cid),
                        "opp_bodies": opp_bodies_of(
                            tok, float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
                            max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), th, mu,
@@ -219,7 +221,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 # **総額**＝価格にドンの機会費用を足し戻したもの（在庫の差分と同じ土俵にする）
                 info = cards.info(cid) if cid else None
                 cost = float((info or {}).get("cost") or 0) if fam == "play" else 0.0
-                gross = float(v) + cost * DON_COST
+                # 実際に引かれた費用（`state` なら機会費用・`flat` なら定額）を足し戻す（T43）
+                gross = float(v) + (play_cost_term(ctx, cost, mu, th) if fam == "play" else 0.0)
                 act = primary_action(cid) if fam == "effect" else None
             else:
                 continue                       # 守りの窓は比べない（docstring）

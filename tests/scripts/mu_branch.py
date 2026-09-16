@@ -69,7 +69,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
-from theory_order import (LAM, MU, POL_COLS, PWR_EPS, ROW_COLS, SC_MY_DON,  # noqa: E402
+from theory_order import (own_attackers_of, LAM, MU, POL_COLS, PWR_EPS, ROW_COLS, SC_MY_DON,  # noqa: E402
                           SC_MY_HAND, SC_MY_LIFE, SC_MY_LEADER_POWER,
                           SC_OPP_LEADER_POWER, SC_OPP_LIFE, THETA, c_of, incoming_x,
                           score_candidate, slot_power, theta_of)
@@ -173,7 +173,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, lam=LAM, theta_mode="const"
                    "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
                    "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
                    "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))),
-                   "don_k": 1}
+                   "don_k": 1,
+                   "attackers": own_attackers_of(tok, float(sc[SC_OPP_LEADER_POWER]) * 1e4),
+                   "don_active": float(sc[SC_MY_DON])}   # 登場の機会費用（T43）
             b = int(ptr[i])
             best = None
             for j in range(b, b + k):

@@ -80,7 +80,7 @@ if _HERE not in sys.path:
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 import guard_afford as GA  # noqa: E402
 from order_acc import band_of  # noqa: E402
-from theory_order import (MU, PWR_EPS, POL_COLS, SC_MY_DON, SC_MY_LEADER_POWER,  # noqa: E402
+from theory_order import (own_attackers_of, MU, PWR_EPS, POL_COLS, SC_MY_DON, SC_MY_LEADER_POWER,  # noqa: E402
                           SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE, THETA,
                           c_of, incoming_x, opp_bodies_of, opp_chars_of, score_candidate,
                           slot_power,
@@ -247,6 +247,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                        "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
                        "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
                        "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), "don_k": 1,
+                       "attackers": own_attackers_of(tok, float(sc[SC_OPP_LEADER_POWER]) * 1e4),
+                       "don_active": float(sc[SC_MY_DON]),   # 登場の機会費用（T43）
                        # **条件の判定に使う状態**（`condition_value.py`・2026-09-14）。
                        # リーダーとステージは `card_idx` の 0/1 と 22/23 に在る。
                        "st": _state_of(sc, ex["ci"][i], idx2cid),

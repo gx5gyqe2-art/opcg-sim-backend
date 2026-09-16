@@ -76,7 +76,7 @@ if _HERE not in sys.path:
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from order_acc import band_of, q_floor  # noqa: E402
-from theory_order import (add_nu_mode_arg, apply_nu_mode, MU, THETA, THETA_MODES, NU_TARGET_MODES,  # noqa: E402
+from theory_order import (own_attackers_of, add_nu_mode_arg, apply_nu_mode, MU, THETA, THETA_MODES, NU_TARGET_MODES,  # noqa: E402
                           SC_MY_LIFE, SC_MY_DON,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_OPP_LEADER_POWER,  # noqa: E402
                           SC_OPP_LIFE, PWR_EPS, c_of, opp_chars_of, saturation_x,  # noqa: E402
@@ -266,6 +266,8 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
                    "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
                    "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
                    "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))),
+                   "attackers": own_attackers_of(ex["tok"][i], float(sc[SC_OPP_LEADER_POWER]) * 1e4),
+                   "don_active": float(sc[SC_MY_DON]),   # 登場の機会費用（T43）
                    "don_k": don_k}
             tok = ex["tok"][i]
             # `ν` の攻撃項を相手の場も含めた max にするか（`theory_order` と同じ規約・task #39）

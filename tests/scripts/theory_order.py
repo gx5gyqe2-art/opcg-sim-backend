@@ -281,6 +281,63 @@ def opp_chars_of(tok_row):
 
 #: トークンの列（`n_rel_feat.S_COLS`）。`cost_now` は `/10`・`is_rest` は旗。
 S_COST, S_IS_REST = 1, 3
+#: 「今攻撃できるか」の旗（`n_rel_feat.S_COLS_V13` の 5 番目）
+S_CAN_ATTACK = 5
+#: 登場・イベントの費用（ドン）の引き方（T43・2026-09-16）。
+#: `flat`＝従来＝`コスト × 0.66μ` を無条件に引く。**`state`＝機会費用**＝「そのドンを攻撃に付けていれば
+#: 得られたはずの価値」だけを引く——攻撃手が居ない・ドンが余る局面では 0。**新定数なし**
+#: （付与 1 枚の価値は攻撃の価格 `attack_value` の増分＝理論の既存の規則）。
+PLAY_COST_MODES = ("flat", "state")
+PLAY_COST_MODE = "state"
+
+
+def own_attackers_of(tok_row, opp_leader_power):
+    """このターン攻撃できる自分の体の `x`（＝パワー − 相手リーダー）の列。リーダー（枠 0）は常に含める。"""
+    tok = np.asarray(tok_row)
+    xs = [float(tok[0, S_POWER]) * 1e4 - float(opp_leader_power)]
+    for s in range(SLOT_OWN_FIELD.start, SLOT_OWN_FIELD.stop):
+        if float(tok[s, S_IS_CHAR]) > 0.5 and float(tok[s, S_CAN_ATTACK]) > 0.5:
+            xs.append(float(tok[s, S_POWER]) * 1e4 - float(opp_leader_power))
+    return xs
+
+
+def _attach_total(attackers_x, n_don, theta=THETA, mu=MU):
+    """ドン `n_don` 枚を攻撃手に**貪欲に**配ったときの攻撃の価値の増分の和（リーダー狙い）。"""
+    if n_don <= 0 or not attackers_x:
+        return 0.0
+    k = [0] * len(attackers_x)
+    total = 0.0
+    for _ in range(int(n_don)):
+        best, bi = 0.0, -1
+        for i, x in enumerate(attackers_x):
+            gain = (attack_value(x + 1000.0 * (k[i] + 1), 0.0, True, theta, mu)
+                    - attack_value(x + 1000.0 * k[i], 0.0, True, theta, mu))
+            if gain > best + 1e-12:
+                best, bi = gain, i
+        if bi < 0:
+            break                                  # 全部飽和＝残りのドンに使い道が無い
+        k[bi] += 1
+        total += best
+    return float(total)
+
+
+def don_opportunity(attackers_x, don_active, cost, theta=THETA, mu=MU):
+    """**登場に払うドンの機会費用**＝「払わなければ攻撃に付けられた価値」の差
+    `V(アクティブ) − V(アクティブ − コスト)`。攻撃手が居ない／ドンが余る／飽和していれば 0。"""
+    n = int(round(float(don_active)))
+    c = int(round(float(cost)))
+    if c <= 0 or n <= 0:
+        return 0.0
+    return max(0.0, _attach_total(attackers_x, n, theta, mu)
+               - _attach_total(attackers_x, max(0, n - c), theta, mu))
+
+
+def play_cost_term(ctx, cost, mu, theta=THETA):
+    """登場・イベントの価格から引く費用。`state` で盤面が渡っていれば機会費用、無ければ従来の定額。"""
+    if PLAY_COST_MODE == "state" and ctx.get("attackers") is not None and ctx.get("don_active") is not None:
+        return don_opportunity(ctx["attackers"], ctx["don_active"], cost, theta, mu)
+    return float(cost) * 0.66 * mu
+
 
 
 _IDENT = {}
@@ -667,8 +724,7 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
             ev = _effect_value(cid, "on_play", ctx.get("st"), ctx.get("opp_bodies"))
             if ev is None:
                 return None
-            d = 0.66 * mu
-            return ev - mu - float(src.get("cost") or 0) * d
+            return ev - mu - play_cost_term(ctx, float(src.get("cost") or 0), mu, theta)
         return _char_play_value(cid, src, ctx, theta, mu, k)
     return None
 
@@ -687,10 +743,11 @@ def _char_play_value(cid, src, ctx, theta, mu, k):
 
     **登場時能力が在るのに値付けできないときは `None`**（読めないことを 0 で隠さない）。
     """
-    base = play_value(src["power"], src.get("cost") or 0,
-                      ctx["opp_leader_power"], ctx["r_turns"], theta, mu,
-                      is_blocker=src.get("blocker"), opp_chars=ctx.get("opp_chars"),
-                      my_leader_power=ctx["my_leader_power"])
+    # 費用は `play_cost_term`（機会費用・T43）で引くので `play_value` にはコスト 0 を渡す
+    base = (play_value(src["power"], 0, ctx["opp_leader_power"], ctx["r_turns"], theta, mu,
+                       is_blocker=src.get("blocker"), opp_chars=ctx.get("opp_chars"),
+                       my_leader_power=ctx["my_leader_power"])
+            - play_cost_term(ctx, float(src.get("cost") or 0), mu, theta))
     ev = _effect_value(cid, "char_on_play", ctx.get("st"), ctx.get("opp_bodies"))
     if ev is None:
         return None
@@ -753,6 +810,8 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
                    "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
                    "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
                    "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))),
+                   "attackers": own_attackers_of(ex["tok"][i], float(sc[SC_OPP_LEADER_POWER]) * 1e4),
+                   "don_active": float(sc[SC_MY_DON]),   # 登場の機会費用（T43）
                    "don_k": don_k}
             tok = ex["tok"][i]
             # `board` なら `ν` の攻撃項を**相手の場も対象に含めた max** にする（task #39）。
