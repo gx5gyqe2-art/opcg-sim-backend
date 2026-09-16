@@ -589,11 +589,20 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         mode, per = got
         if FLOW_PRICING == "exercise" and mode in ("once", "turn"):
             return 0.0                        # 攻撃の行で数える（付与の行は 0）
+        status = str(effect.get("status") or "")
+        pw = body_power_of(effect, card, st, at)
         if mode == "turn":
+            # **ダブルアタック・バニッシュは `ν` への変換**（T55）——その体の攻撃の価格の差 × 効く攻撃の回数。盤面が無ければ従来
+            if pw is not None and not opp:
+                if pw <= 0.0:
+                    return 0.0
+                dv = keyword_delta(status, pw, st["opp_leader_power"], theta, mu, lam)
+                if dv is not None:
+                    return n * dv * attack_turns_of(effect, st)
             per *= DURATION_TURNS.get(str(effect.get("duration") or ""), 1.0)
         if mode == "once":
-            # **速攻・追加攻撃は「付与された体が実際に殴る価値」**（T54）——盤面が無ければ従来の `Θ·μ`
-            got_v = granted_attack_value(effect, card, st, theta, mu)
+            # **速攻＝召喚酔いの解除＝その体が今のターンに 1 回殴れる**（T54/T55）——その体の攻撃の価格。盤面が無ければ従来の `Θ·μ`
+            got_v = granted_attack_value(effect, card, st, theta, mu, at=at)
             if got_v is not None:
                 per = got_v
         amt = n * per                         # `stock`／`once` は期間を掛けない
@@ -701,6 +710,14 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         # 相手の体（「パワー 0 にする」）は今のパワーが判らないので従来どおり（上限で打ち切られる）。
         if _is_set_power(effect) and not opp and card is not None and card.get("power") is not None:
             mag = mag - float(card.get("power") or 0.0)
+        # **自分の体のパワー上昇は `ν` への変換**（T55・ユーザ決定）＝その体の攻撃の価格の差 × 効く攻撃の回数。
+        # 盤面が無ければ従来のドン換算（上限つき）。相手の体を下げる側は従来のまま（今のパワーが判らない）。
+        if not opp and mag > 0:
+            pw = body_power_of(effect, card, st, at)
+            if pw is not None:
+                if pw <= 0.0:
+                    return 0.0
+                return n * buff_delta(pw, mag, st["opp_leader_power"], theta, mu) * attack_turns_of(effect, st)
         amt = power_value(mag, delta, theta, mu, nu) * n
         up = mag >= 0
         good = up if not opp else not up
@@ -714,28 +731,79 @@ def _is_set_power(effect):
     return ("にする" in raw or "になる" in raw) and "パワー" in raw
 
 
-def granted_attack_value(effect, card, st, theta=THETA, mu=MU):
-    """**キーワード付与（速攻など）の 1 回分の価値＝付与された体が実際にリーダーを殴る価値**（T54・2026-09-16）。
+def body_power_of(effect, card, st, at=None):
+    """**その効果が効く自分の体のパワー**（T55・2026-09-16・ユーザ決定「キーワードとパワー上昇は `ν` へ変換」）。
 
-    従来は無条件に `Θ·μ`（受ける費用の上限）を置いていたが、実測は 96 件で価格 0.087 対 実現 0（ターン末でも 0.038）。
-    付与された体のパワーで `attack_value_don`（ドン付き・`min(c(x)·μ, Θ·μ)`）を出す:
-    自分自身（`select_mode == "SOURCE"`）なら印刷のパワー・選ぶ対象なら今の攻撃手（`st["attackers"]`）の最良。
-    盤面（相手リーダーのパワー）が無ければ `None`＝従来の定数に落とす。
+    自分自身（`KEYWORD`＝カードの持つキーワード／`select_mode == "SOURCE"`）は印刷のパワー・リーダー指定は自分のリーダー・
+    選ぶ対象は今の攻撃手の最良（`st["attackers"]` は `x = パワー − 相手リーダー`）。盤面が無ければ `None`（従来の値に落ちる）。
+    攻撃手が 1 体も居なければ `0`（効く体が無い＝価値 0 の合図）。
     """
     if not st or st.get("opp_leader_power") is None:
         return None
-    from theory_order import attack_value_don
-    olp = float(st["opp_leader_power"])
     target = effect.get("target") or {}
-    if str(target.get("select_mode") or "").upper() == "SOURCE":
+    sm = str(target.get("select_mode") or "").upper()
+    types = [str(t).upper() for t in (target.get("card_type") or [])]
+    if at == "KEYWORD" or sm == "SOURCE":
         pw = (card or {}).get("power")
-        if pw is None:
-            return None
-        return float(attack_value_don(float(pw), olp, True, theta, mu))
-    xs = st.get("attackers") or []
+        return None if pw is None else float(pw)
+    if types == ["LEADER"] and st.get("my_leader_power") is not None:
+        return float(st["my_leader_power"])
+    xs = st.get("attackers")
+    if xs is None:
+        return None
     if not xs:
+        return 0.0
+    return float(st["opp_leader_power"]) + float(max(xs))
+
+
+def attack_turns_of(effect, st):
+    """効果が効く攻撃の回数——このターンだけなら 1・恒久なら残りターン `R`（状態が無ければ平均 4.128）。"""
+    d = str(effect.get("duration") or "")
+    if d in ("THIS_TURN", "THIS_BATTLE", "INSTANT", ""):
+        return 1.0
+    if d == "PERMANENT":
+        return float((st or {}).get("r_turns") or R_TURNS)
+    return float(DURATION_TURNS.get(d, 1.0))
+
+
+def keyword_delta(status, power, opp_leader_power, theta=THETA, mu=MU, lam=LAM):
+    """**キーワードを攻撃の価格の差に変換する**（T55）。
+
+    - ダブルアタック: 通れば相手はライフを 2 枚失う＝受ける費用が 2 倍 → `min(c(x)·μ, 2·Θ·μ) − min(c(x)·μ, Θ·μ)`
+    - バニッシュ: 通ったライフの札が相手の手に入らない＝受ける費用が `λ`（`h·μ` を戻さない）→ `Θ' = λ/μ`
+    どちらも「相手が一番安い応答を選ぶ」`min` の中で効くので、大きい攻撃（相手が受ける帯）でしか値が出ない。
+    """
+    from theory_order import attack_value_don
+    base = attack_value_don(float(power), float(opp_leader_power), True, theta, mu)
+    if status == "ダブルアタック":
+        return float(attack_value_don(float(power), float(opp_leader_power), True, 2.0 * theta, mu) - base)
+    if status == "バニッシュ":
+        return float(attack_value_don(float(power), float(opp_leader_power), True, lam / mu, mu) - base)
+    return None
+
+
+def buff_delta(power, d_power, opp_leader_power, theta=THETA, mu=MU):
+    """**パワー上昇を攻撃の価格の差に変換する**（T55）＝`attack_value_don(P + ΔP) − attack_value_don(P)`（1 攻撃ぶん）。"""
+    from theory_order import attack_value_don
+    olp = float(opp_leader_power)
+    return float(attack_value_don(float(power) + float(d_power), olp, True, theta, mu)
+                 - attack_value_don(float(power), olp, True, theta, mu))
+
+
+def granted_attack_value(effect, card, st, theta=THETA, mu=MU, at=None):
+    """**キーワード付与（速攻など）の 1 回分の価値＝付与された体が実際にリーダーを殴る価値**（T54・2026-09-16）。
+
+    従来は無条件に `Θ·μ`（受ける費用の上限）を置いていたが、実測は 96 件で価格 0.087 対 実現 0（ターン末でも 0.038）。
+    **速攻＝召喚酔いの解除**（ユーザ決定 T55）＝出たターンに 1 回殴れる＝その体の攻撃 1 回の価格（`attack_value_don`）。
+    体は `body_power_of`（自分自身は印刷のパワー・選ぶ対象は今の攻撃手の最良・居なければ 0）。盤面が無ければ `None`＝従来。
+    """
+    pw = body_power_of(effect, card, st, at)
+    if pw is None:
+        return None
+    if pw <= 0.0:
         return 0.0                                   # 付与できる攻撃手が居ない＝殴れない
-    return float(max(attack_value_don(olp + float(x), olp, True, theta, mu) for x in xs))
+    from theory_order import attack_value_don
+    return float(attack_value_don(pw, float(st["opp_leader_power"]), True, theta, mu))
 
 
 def _referenced_ability(at, effect, card, mu, lam, delta, nu, theta, ko_p, depth):

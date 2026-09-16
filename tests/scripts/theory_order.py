@@ -883,6 +883,10 @@ def _effect_state(ctx):
         st["opp_leader_power"] = ctx["opp_leader_power"]
     if ctx.get("attackers") is not None:
         st["attackers"] = list(ctx["attackers"])
+    if "my_leader_power" in ctx:
+        st["my_leader_power"] = ctx["my_leader_power"]
+    if "r_turns" in ctx:
+        st["r_turns"] = ctx["r_turns"]
     return st
 
 

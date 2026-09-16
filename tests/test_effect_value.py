@@ -707,3 +707,59 @@ def test_exercise_mode_prices_delayed_effects_at_the_row_that_uses_them():
     finally:
         E.set_flow_pricing("option")
     assert [E.action_value(a) for a in (rush, dbl, blk, buff, perm, flow, stock)] == pytest.approx(before)
+
+
+# ---- T55（2026-09-16・ユーザ決定）: 速攻＝召喚酔いの解除・パワー上昇とダブルアタック・バニッシュは ν への変換 ----
+
+def test_the_body_a_keyword_or_buff_applies_to_is_read_from_the_card_or_the_board():
+    st = {"opp_leader_power": 5000.0, "attackers": [0.0, 3000.0], "my_leader_power": 6000.0}
+    own = _act("KEYWORD", "SELF", status="速攻")
+    assert E.body_power_of(own, {"power": 4000}, st, at="KEYWORD") == 4000.0            # カード自身
+    src = _act("GRANT_KEYWORD", "SELF", status="速攻"); src["target"]["select_mode"] = "SOURCE"
+    assert E.body_power_of(src, {"power": 7000}, st) == 7000.0
+    lead = _act("BUFF", "SELF", base=1000, card_type=["LEADER"])
+    assert E.body_power_of(lead, None, st) == 6000.0                                     # 自分のリーダー
+    chosen = _act("BUFF", "SELF", base=1000, card_type=["CHARACTER"])
+    assert E.body_power_of(chosen, None, st) == 8000.0                                   # 攻撃手の最良（5000 + 3000）
+    assert E.body_power_of(chosen, None, {"opp_leader_power": 5000.0, "attackers": []}) == 0.0
+    assert E.body_power_of(chosen, None, None) is None and E.body_power_of(chosen, None, {}) is None
+    assert E.attack_turns_of({"duration": "THIS_TURN"}, st) == 1.0
+    assert E.attack_turns_of({"duration": ""}, st) == 1.0
+    assert E.attack_turns_of({"duration": "PERMANENT"}, {"r_turns": 3.0}) == 3.0
+    assert E.attack_turns_of({"duration": "PERMANENT"}, {}) == E.R_TURNS
+
+
+def test_double_attack_and_banish_are_the_difference_in_the_attack_price():
+    """通れば 2 枚（受ける費用 ×2）／札が手に入らない（受ける費用 = λ）——`min` の中で効くので相手が受ける帯でだけ出る。"""
+    olp = 5000.0
+    base9 = T.attack_value_don(9000.0, olp, True)                                        # 受ける帯（Θ·μ で頭打ち）
+    assert E.keyword_delta("ダブルアタック", 9000.0, olp) == pytest.approx(
+        T.attack_value_don(9000.0, olp, True, 2 * T.THETA) - base9)
+    assert E.keyword_delta("バニッシュ", 9000.0, olp) == pytest.approx(
+        T.attack_value_don(9000.0, olp, True, T.LAM / T.MU) - base9)
+    assert E.keyword_delta("ダブルアタック", 9000.0, olp) > 0
+    assert E.keyword_delta("ダブルアタック", 5000.0, olp) == pytest.approx(0.0)           # 守られる帯では効かない
+    assert E.keyword_delta("速攻", 9000.0, olp) is None
+    st = {"opp_leader_power": olp, "r_turns": 3.0}
+    src = _act("GRANT_KEYWORD", "SELF", status="ダブルアタック", duration="THIS_TURN"); src["target"]["select_mode"] = "SOURCE"
+    assert E.action_value(src, card={"power": 9000}, st=st) == pytest.approx(E.keyword_delta("ダブルアタック", 9000.0, olp))
+    perm = dict(src, duration="PERMANENT")
+    assert E.action_value(perm, card={"power": 9000}, st=st) == pytest.approx(3.0 * E.keyword_delta("ダブルアタック", 9000.0, olp))
+    assert E.action_value(src, card={"power": 9000}) == pytest.approx(T.THETA * T.MU)   # 盤面が無ければ従来
+
+
+def test_a_power_buff_on_an_own_body_is_the_difference_in_that_bodys_attack_price():
+    """`+2000` は「ドン 2 個ぶん」ではなく**その体の攻撃の価格の差**——飽和した体では 0・弱い体では段を越えるぶん。"""
+    olp = 5000.0
+    st = {"opp_leader_power": olp, "attackers": [0.0], "r_turns": 4.0}
+    src = _act("BUFF", "SELF", base=2000, duration="THIS_TURN"); src["target"]["select_mode"] = "SOURCE"
+    weak = E.action_value(src, card={"power": 4000}, st=st)
+    assert weak == pytest.approx(E.buff_delta(4000.0, 2000.0, olp))
+    assert E.buff_delta(4000.0, 2000.0, olp) == pytest.approx(
+        T.attack_value_don(6000.0, olp, True) - T.attack_value_don(4000.0, olp, True))
+    assert E.action_value(src, card={"power": 12000}, st=st) == pytest.approx(0.0)      # 飽和した体
+    assert E.action_value(src, card={"power": 4000}) == pytest.approx(E.power_value(2000.0))   # 盤面が無ければ従来
+    perm = dict(src, duration="PERMANENT")
+    assert E.action_value(perm, card={"power": 4000}, st=st) == pytest.approx(4.0 * E.buff_delta(4000.0, 2000.0, olp))
+    down = _act("BUFF", "OPPONENT", base=-2000)                                            # 相手を下げる側は従来
+    assert E.action_value(down, st=st) == pytest.approx(E.power_value(2000.0))
