@@ -230,6 +230,36 @@ def _state_of(sc, ci, idx2cid):
                                  my_stage=int(ci[22]) > 0, opp_stage=int(ci[23]) > 0)
 
 
+def _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats=None):
+    """**T68**: その局の席ごとのデッキ `{who: [card_id]}`（seed から復元・最初の自席ターンの手札で検算。合わなければ席を落とす）。"""
+    if not rec_decks or int(seed) not in rec_decks:
+        return {}
+    import hand_spend as HS
+    import search_price as SP
+    mode, leaders = rec_decks[int(seed)]
+    out = {}
+    for w in (0, 1):
+        i = next((i for i in idx if int(rows["who"][i]) == w and int(rows["turn"][i]) >= 1), None)
+        if i is None:
+            continue
+        d = SP.deck_for_seat(seed, mode, leaders, w, HS.hand_ids(ex["ci"][i], idx2cid))
+        if stats is not None:
+            stats["search_deck_ok" if d else "search_deck_bad"] = stats.get("search_deck_ok" if d else "search_deck_bad", 0) + 1
+        if d:
+            out[w] = d
+    return out
+
+
+def _search_ctx(sc, tok, ci_row, idx2cid, cards, deck):
+    """**T68**: 探す能力の計画価格の状態（`hand_plan.search_context` ＋ `cards`）。デッキが無ければ `None`。"""
+    if deck is None or EV.SEARCH_PRICE_MODE != "plan":
+        return None
+    import hand_plan as HP
+    ctx = HP.search_context(sc, tok, ci_row, idx2cid, cards, deck)
+    ctx["cards"] = cards
+    return ctx
+
+
 def _add(rec, band, s, side, g=0.0):
     """**行ごとに帯へ足す**（T28-b）——決着後の雑さが接戦帯に混ざらないようにする。
 
@@ -278,6 +308,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
     ledger_pricing = EV.LEDGER_FLOW_PRICING if ledger_pricing is None else ledger_pricing
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
+    # **T68**: 探す能力の計画価格に要るデッキ（seed から復元・席ごとに手札で検算）
+    import search_price as SP
+    rec_decks = SP.record_decks(dirs) if EV.SEARCH_PRICE_MODE == "plan" else {}
     per = {}
     stats = {"games": 0, "atk_rows": 0, "atk_silent": 0, "grd_rows": 0, "grd_no_attack": 0,
              # **T28-c**: 余裕で払えた守りの行の数
@@ -288,6 +321,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
              "flow_pricing": EV.FLOW_PRICING, "ledger_pricing": ledger_pricing, "ledger_rescored": 0,
              # **T62**: 守りの窓の定義と、自ライフごとの内訳（受けた率・理論が受けろと言う率・`g` の平均）
              "guard_g": GUARD_G_MODE, "grd_by_life": {},
+             # **T68**: 探す能力の価格の規約と、デッキを復元できた席／できなかった席の数
+             "search_price": EV.SEARCH_PRICE_MODE, "search_deck_ok": 0, "search_deck_bad": 0,
              "d_bins": {"<-3": 0, "-3..-1": 0, "-1..1": 0, "1..3": 0, ">3": 0},
              # **`D` の帯ごとの実勝率**（当てはめない）——時計の推定 `D` が勝敗を順序付けるか・
              # 実測の `W(D)` の傾きが置いた `σ_D` と合うかの検算
@@ -303,6 +338,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
         life0 = ex["sc"][:, 0]
         labels, _unk = PL.label_game(rows, pol, life0, L, ptr, idx, cards)
         seen = set()
+        decks = _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats)   # T68
         # **T64**: 守りの窓で実際に消えた札を読むため、席ごとの次の自席ターンの最初の main 行を引く
         first_main = {}
         if GUARD_COST_MODE == "spent":
@@ -346,6 +382,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                        # **条件の判定に使う状態**（`condition_value.py`・2026-09-14）。
                        # リーダーとステージは `card_idx` の 0/1 と 22/23 に在る。
                        "st": _state_of(sc, ex["ci"][i], idx2cid),
+                       # **T68**: 探す能力の計画価格に要る状態（手札・ドンの枠・来る攻撃・デッキ）。デッキが無ければ `sel(k)` に落ちる
+                       "search_ctx": _search_ctx(sc, tok, ex["ci"][i], idx2cid, cards, decks.get(w)),
                        # **効果が取れる相手の体**（価格つき・2026-09-15）——
                        # `ν` は動かさず、**効果の値が盤面で変わる**
                        "opp_bodies": opp_bodies_of(
@@ -716,10 +754,12 @@ def main(argv=None):
                     help="**数える価格**（`g`・`ΔG`）の規約（T58）。省略時は `effect_value.LEDGER_FLOW_PRICING`"
                          "（`exercise`＝使った行で 1 回・ユーザ決定 2026-09-16）。"
                          "**2026-09-16 より前の `ΔG` と比べるときは `option` を明示する**")
+    EV.add_search_price_arg(ap)
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    EV.apply_search_price(a)
 
     try:
         import condition_value as CV
@@ -755,7 +795,7 @@ def main(argv=None):
                            "flow_pricing": stats["flow_pricing"], "ledger_pricing": stats["ledger_pricing"],
                            "surv_mode": _TO.SURV_MODE, "nu_mode": _TO.NU_MODE,
                            "cbar_mode": _TO.CBAR_MODE, "guard_g": GUARD_G_MODE, "take_mode": _TO.TAKE_MODE,
-                           "guard_cost": GUARD_COST_MODE,
+                           "guard_cost": GUARD_COST_MODE, "search_price": EV.SEARCH_PRICE_MODE,
                            "note": "§0.4 の暫定値。感度を付けて読む"},
            "summary": summarise(pairs, a.boot_reps, a.seed),
            # **T28-b: 行ごとに帯で切ってから足した版**（判定の主はこちら）

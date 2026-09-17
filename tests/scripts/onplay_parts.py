@@ -131,14 +131,17 @@ def main(argv=None):
     TO.add_nu_mode_arg(ap)
     TO.add_surv_mode_arg(ap)
     TO.add_cbar_mode_arg(ap)
+    EV.add_search_price_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     TO.apply_nu_mode(a)
     TO.apply_surv_mode(a)
     TO.apply_cbar_mode(a)
+    EV.apply_search_price(a)
     t0 = time.time()
     rows, stats = collect(a.src, a.limit_games)
-    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "stats": stats, "summary": summarise(rows, a.min_card_rows),
+    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "search_price": EV.SEARCH_PRICE_MODE, "stats": stats,
+           "summary": summarise(rows, a.min_card_rows),
            "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
     print(txt)

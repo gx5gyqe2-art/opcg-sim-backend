@@ -149,10 +149,14 @@ def primary_action(cid, triggers=EV.ACTIVATE_TRIGGERS):
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     """(局, 席) ごとに、手の型ごとの価格と実現を足す。"""
     from attack_response import parts          # 遅延 import（attack_response は本器を import する）
+    from theory_bridge import _search_ctx, _seat_decks   # T68（遅延 import・橋は本器を import しない）
+    import search_price as SP
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
+    rec_decks = SP.record_decks(dirs) if EV.SEARCH_PRICE_MODE == "plan" else {}
     per = {}
-    stats = {"games": 0, "own_rows": 0, "scored": 0, "no_next": 0, "silent": 0}
+    stats = {"games": 0, "own_rows": 0, "scored": 0, "no_next": 0, "silent": 0,
+             "search_price": EV.SEARCH_PRICE_MODE, "search_deck_ok": 0, "search_deck_bad": 0}
     games = 0
     for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS,
                                                     pol_cols=POL_COLS, extra_fn=_extra):
@@ -162,6 +166,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         stats["games"] += 1
         seed = int(rows["seed"][idx[0]])
         order = list(idx)
+        decks = _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats)   # T68
         # 席ごとの **main 行**（kind 0）の並び——「次の自分の行」は**次の判断点**でなければならない。
         # 攻撃の直後に自分の選択の行（kind 1/2＝アタック時効果の対象・トリガー等）が挟まると、
         # そこで挟むと解決前の盤面を読んでしまい**攻撃の実現が半分消える**（2026-09-16 に実測:
@@ -218,7 +223,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                        "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), "don_k": 1,
                        "attackers": own_attackers_of(tok, float(sc[SC_OPP_LEADER_POWER]) * 1e4),
                        "don_active": float(sc[SC_MY_DON]),   # 登場の機会費用（T43）
-                                              "st": _state_of(sc, ex["ci"][i], idx2cid),
+                       "st": _state_of(sc, ex["ci"][i], idx2cid),
+                       "search_ctx": _search_ctx(sc, tok, ex["ci"][i], idx2cid, cards, decks.get(w)),   # T68
                        "opp_bodies": opp_bodies_of(
                            tok, float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
                            max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), th, mu,
@@ -411,6 +417,7 @@ def main(argv=None):
     _TO.add_take_mode_arg(ap)
     ap.add_argument("--flow-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
                     help="**T54** 後で効く効果を付与の行で数える（`option`・既定）か、使った行で数える（`exercise`＝付与の行は 0）か")
+    EV.add_search_price_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_nu_mode(a)
@@ -419,9 +426,11 @@ def main(argv=None):
     _TO.apply_take_mode(a)
     if a.flow_pricing is not None:
         EV.set_flow_pricing(a.flow_pricing)
+    EV.apply_search_price(a)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
-    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "flow_pricing": EV.FLOW_PRICING, "stats": stats,
+    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "flow_pricing": EV.FLOW_PRICING,
+           "search_price": EV.SEARCH_PRICE_MODE, "stats": stats,
            "frozen": {"lambda": LAM, "mu": MU, "delta": DELTA, "nu_meas": NU_MEAS, "theta": a.theta},
            "summary": summarise(per, a.boot_reps, a.seed), "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)

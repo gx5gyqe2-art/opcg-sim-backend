@@ -957,6 +957,57 @@ def condition_factor(ab, st=None, offered=False):
     return CV.factor(ab, st)
 
 
+#: **探す能力の価格の規約**（T68・2026-09-17・ユーザ決定「置き換えましょう」）:
+#: `plan`＝`E[max_{取れる札 ∈ k 枚} max(ΔH_play, ΔG_guard)]`（自分のデッキの絞り込みに合う札・今の手札とドンと
+#: 来る攻撃で読む・`search_price.py`）／`sel`＝旧 `μ + sel(k)`（山札全体の静的な価値 `W` の最大）。
+#: **状態（`st["search_ctx"]`）が無い行は `plan` でも `sel` に落ちる**（上限として読む・閉じた代数のテストは動かない）。
+SEARCH_PRICE_MODES = ("sel", "plan")
+SEARCH_PRICE_MODE = "plan"
+
+
+def set_search_price_mode(mode):
+    global SEARCH_PRICE_MODE
+    if mode not in SEARCH_PRICE_MODES:
+        raise ValueError("search price mode は %s のどれか" % (SEARCH_PRICE_MODES,))
+    SEARCH_PRICE_MODE = mode
+    return SEARCH_PRICE_MODE
+
+
+def add_search_price_arg(ap):
+    ap.add_argument("--search-price", default=None, choices=SEARCH_PRICE_MODES,
+                    help="**T68** 探す能力の価格: `plan`（既定・取れる札の `max(ΔH, ΔG)` の期待値・デッキから数える）"
+                         "／`sel`（旧・`μ + sel(k)`）。**2026-09-17 より前の数字と比べるときは `sel` を明示する**")
+
+
+def apply_search_price(a):
+    if getattr(a, "search_price", None) is not None:
+        set_search_price_mode(a.search_price)
+    return SEARCH_PRICE_MODE
+
+
+def _search_plan(acts, card, st):
+    """**探す能力の計画価格**（T68）＝`(値, k, 手札に加える動作)`。`plan` でなければ／状態が無ければ／探す能力でなければ `None`。"""
+    if SEARCH_PRICE_MODE != "plan" or not st or not st.get("search_ctx"):
+        return None
+    try:
+        import search_price as SP
+    except Exception:
+        return None
+    found = SP.search_actions(acts)
+    if found is None:
+        return None
+    k, target, act = found
+    ctx = st["search_ctx"]
+    cards = ctx.get("cards")
+    if cards is None or not ctx.get("deck"):
+        return None
+    n = _count(target, ["TEMP"])
+    cid = str((card or {}).get("id") or (card or {}).get("card_id") or "") or None
+    cost = float((card or {}).get("cost") or 0.0) if cid else 0.0
+    v = SP.search_value(ctx, k, target, cards, take_n=int(max(1.0, n)), played_cid=cid, played_cost=cost)
+    return float(v), int(k), act
+
+
 def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=KO_P,
                   card=None, depth=0, selection=True, st=None, offered=False,
                   opp_bodies=None):
@@ -971,13 +1022,19 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
     unpriced = []
     total = 0.0
     acts = walk_actions(ab.get("effect"))
+    # **T68**: 探す能力（k 枚見て手札に加える）は、状態（`search_ctx`）が在れば
+    # `E[max_{取れる札} max(ΔH, ΔG)]`（デッキから数える）で値付けし、`sel(k)` と手札 1 枚の μ は足さない
+    found = _search_plan(acts, card, st)
     for e in acts:
+        if found is not None and e is found[2]:
+            total += found[0]
+            continue
         v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st=st)
         if v is None:
             unpriced.append((str(e.get("type") or "?"), family_of(str(e.get("type") or ""))))
         else:
             total += v
-    if selection:
+    if selection and found is None:
         total += _sel_premium(selection_k(acts))
     cost = ab.get("cost") or {}
     for e in walk_actions(cost):

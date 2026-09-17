@@ -1032,6 +1032,8 @@ def _effect_state(ctx):
         st["my_leader_power"] = ctx["my_leader_power"]
     if "r_turns" in ctx:
         st["r_turns"] = ctx["r_turns"]
+    if ctx.get("search_ctx") is not None:
+        st["search_ctx"] = ctx["search_ctx"]           # T68: 探す能力の計画価格に要る状態（手札・ドン・来る攻撃・デッキ）
     return st
 
 

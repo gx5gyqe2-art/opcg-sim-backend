@@ -52,14 +52,32 @@ PLAN_TURNS = 4
 DON_CAP = 10
 
 
-def caps_of(don_active, don_total, turns=PLAN_TURNS):
-    """t = 0 は今アクティブなドン・t ≥ 1 は総在庫 + t（上限 10）。"""
+def caps_of(don_active, don_total, turns=PLAN_TURNS, r_turns=None):
+    """t = 0 は今アクティブなドン・t ≥ 1 は総在庫 + t（上限 10）。
+
+    **「それより後」の枠の容量は残りターン数で決まる**（T68・2026-09-17）: `r_turns`（式が置く残りターン `R`・1〜5）を
+    渡せば `10 × max(1, round(R) − (turns − 1))`＝3 ターン先より後に残るターンの数だけ 10 ドンのターンがある。
+    渡さなければ従来どおり 1 ターンぶん（10）。最終盤（R ≤ 3）は 1 ターンぶんのまま＝「最終盤まで使う札が揃っていれば
+    探す価値が下がる」がそのまま出る。"""
     out = [max(0, int(round(don_active)))]
     for t in range(1, turns - 1):
         out.append(int(min(DON_CAP, max(0, int(round(don_total)) + t))))
     if turns >= 2:
-        out.append(DON_CAP)                                # 「それより後」の枠＝上限まで出せる（割引 s^(turns−1)）
+        later = 1 if r_turns is None else max(1, int(round(float(r_turns))) - (turns - 1))
+        out.append(DON_CAP * later)                        # 「それより後」の枠＝上限まで出せる（割引 s^(turns−1)）
     return out
+
+
+def search_context(sc, tok_row, ci_row, idx2cid, cards, deck):
+    """**探す能力の価格に要る状態**（T68）＝今の手札（`hand_items`）・ドンの枠（`caps`・`R` 依存の後ろ枠）・来る攻撃・
+    受ける損・自分のデッキ（`search_price.deck_of` で seed から復元した並び・`None` なら価格は従来の `sel(k)` に落ちる）。"""
+    olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+    r = max(1.0, min(5.0, float(sc[SC_OPP_LIFE])))
+    return {"hand_items": hand_items(tok_row, ci_row, idx2cid, cards, olp, r),
+            "caps": caps_of(float(sc[SC_MY_DON]), don_stock(sc, tok_row, "me"), r_turns=r),
+            "xs": HG.incoming(tok_row), "take": HG.take_cost_of(float(sc[SC_MY_LIFE])),
+            "deck": (None if deck is None else list(deck)), "olp": olp, "r": r,
+            "field": [c for c in (idx2cid.get(int(x)) for x in np.asarray(ci_row)[GA.SLOT_OWN_FIELD]) if c]}
 
 
 def plan_value(items, caps, s=1.0 - KO_P):
@@ -158,7 +176,7 @@ def collect(dirs, limit_games=0):
             sc, tok = ex["sc"][i], ex["tok"][i]
             olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
             r = max(1.0, min(5.0, float(sc[SC_OPP_LIFE])))
-            caps = caps_of(float(sc[SC_MY_DON]), don_stock(sc, tok, "me"))
+            caps = caps_of(float(sc[SC_MY_DON]), don_stock(sc, tok, "me"), r_turns=r)   # T68: 後ろ枠は R 依存
             hand = hand_ids(ex["ci"][i], idx2cid)
             # --- 引いた札（ターン開始・直前の行からライフが減っていない） ---
             if (w, t) not in seen_first:
@@ -198,7 +216,7 @@ def collect(dirs, limit_games=0):
             stats["search_rows"] += 1
             i2 = order[j]
             sc2, tok2 = ex["sc"][i2], ex["tok"][i2]
-            caps2 = caps_of(float(sc2[SC_MY_DON]), don_stock(sc2, tok2, "me"))
+            caps2 = caps_of(float(sc2[SC_MY_DON]), don_stock(sc2, tok2, "me"), r_turns=r)
             after = hand_ids(ex["ci"][i2], idx2cid)
             added = spent_cards(after, hand)
             hitems2 = hand_items(tok2, ex["ci"][i2], idx2cid, cards, olp, r)
