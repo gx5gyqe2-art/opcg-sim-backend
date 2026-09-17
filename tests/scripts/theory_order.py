@@ -384,6 +384,13 @@ def clocks(my_life, opp_life, my_hand, opp_hand, a_me, a_opp, b_me=0, b_opp=0, c
     return t_me, t_opp
 
 
+def prob_of_d(d, sigma_d=None):
+    """**時計の差 `D` から勝率へ**（T80）＝`W(D) = Φ(D/σ_D)`。`w_of_d`（密度）の**積分**で、同じ `σ_D` を使う。
+    `κ = w(D)/w̄` が微分の形なら、こちらが積分の形＝「今の勝率」。**新しい定数は無い**。"""
+    sd = SIGMA_D if sigma_d is None else float(sigma_d)
+    return 0.5 * (1.0 + math.erf(float(d) / (sd * math.sqrt(2.0))))
+
+
 def set_sigma_turn(turns):
     """時計 1 本のぶれを差し替える（**感度の幅**として回すためだけ・§0.4 規則 2。既定 1.0 は写し）。"""
     global SIGMA_TURN, SIGMA_D

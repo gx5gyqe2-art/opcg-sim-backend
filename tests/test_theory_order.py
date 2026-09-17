@@ -1178,3 +1178,13 @@ def test_the_clock_can_take_the_hands_two_values_from_the_row(monkeypatch):
     assert both["t_me"] < on["t_me"]                                   # 相手の手札 4 枚 → 切れるのは 1 枚＝耐久が縮む
     assert both["t_opp"] < on["t_opp"]                                 # 相手の速さが上がる＝自分は早く死ぬ
     assert T.CLOCK_HAND_MODE == "off"                                  # 既定は旧のまま
+
+
+def test_the_win_probability_is_the_integral_of_the_same_density():
+    """**T80**: `prob_of_d` は `w_of_d` と**同じ `σ_D`** の積分（`Φ(D/σ_D)`）。`D = 0` で 0.5・単調・対称。"""
+    assert T.prob_of_d(0.0) == pytest.approx(0.5)
+    assert T.prob_of_d(2.0) > T.prob_of_d(1.0) > 0.5 > T.prob_of_d(-1.0)
+    assert T.prob_of_d(2.0) + T.prob_of_d(-2.0) == pytest.approx(1.0)
+    assert T.prob_of_d(20.0) == pytest.approx(1.0, abs=1e-6)
+    # σ を広げれば同じ `D` での勝率は 0.5 に近づく（`w_of_d` と同じ `σ_D` を使っている検算）
+    assert T.prob_of_d(1.0, sigma_d=10.0) < T.prob_of_d(1.0, sigma_d=1.0)

@@ -130,6 +130,19 @@ GUARD_G_MODE = "delta"
 #: 帳簿の「払った額」を式の近似から記録の実額に戻しただけ（定数は増えない）。以前の数字と比べるときは `--guard-cost formula`。
 GUARD_COST_MODES = ("formula", "spent")
 GUARD_COST_MODE = "spent"
+#: **最後のターンを落とすか**（T80 の診断・2026-09-17）。`keep`＝従来／`drop`＝**局の最後のターンの行を全部落とす**
+#: （とどめの一撃とその応答）。決着帯で `flat` が `curve` に勝っているのが「とどめを満額で数えているから」なのかを分ける
+#: ——落とした瞬間に差が消えるなら、決着帯の当たりは**勝敗の言い換え**であって価格の正しさの証拠ではない。
+LAST_TURN_MODES = ("keep", "drop")
+LAST_TURN_MODE = "keep"
+
+
+def set_last_turn_mode(mode):
+    global LAST_TURN_MODE
+    if mode not in LAST_TURN_MODES:
+        raise ValueError("last turn mode は %s のどれか" % (LAST_TURN_MODES,))
+    LAST_TURN_MODE = mode
+    return LAST_TURN_MODE
 
 
 def set_guard_cost_mode(mode):
@@ -378,6 +391,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
         if prof is None:
             raise ValueError("harm profile が無い（%s・%s）" % (harm_profile, CB.HARM_PROFILE_PATH))
     per = {}
+    kn_turns = []        # T80: ターンごとの（`D`・生の価格・`ΔW`）＝必要な `κ` を測る材料
     stats = {"games": 0, "atk_rows": 0, "atk_silent": 0, "grd_rows": 0, "grd_no_attack": 0,
              # **T28-c**: 余裕で払えた守りの行の数
              "grd_comfortable": 0,
@@ -419,6 +433,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 first_main[(w0, t0)] = i
         opp_turns = {0: sorted(t0 for (w0, t0) in first_main if w0 == 0),
                      1: sorted(t0 for (w0, t0) in first_main if w0 == 1)}
+        last_turn = max([int(rows["turn"][i]) for i in idx] or [0])        # T80: とどめのターン
+        kn = {}          # T80: ターンごとの `{d0（席 0 視点）, g0（生の価格・席 0 − 席 1）, r_turns}`
         for n, i in enumerate(idx):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
             if t < 1:
@@ -434,6 +450,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                        "band": {}})
             if z != 0.0:
                 rec["z"] = 1.0 if z > 0 else 0.0
+            if LAST_TURN_MODE == "drop" and t >= last_turn:               # T80 の診断
+                stats["last_turn_dropped"] = stats.get("last_turn_dropped", 0) + 1
+                continue
             sc, tok = ex["sc"][i], ex["tok"][i]
             if PL.is_own_turn(w, t):
                 if int(rows["kind"][i]) != 0:
@@ -510,6 +529,12 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     stats["ledger_rescored"] += 1          # 規約で値が動いた行（付与・流れの行）だけ数える
                 g_row = float(g_v) * kap
                 s_row = (float(played_v) - max(scored)) * kap
+                # **T80**: 区間の恒等式のために**生の価格**（`κ` を掛けない）と `D` を席 0 の視点で積む
+                e = kn.setdefault(t, {"d0": None, "g0": 0.0, "r_turns": None})
+                e["g0"] += float(g_v) * (1.0 if w == 0 else -1.0)
+                if e["d0"] is None:
+                    e["d0"] = float(ck["d"]) * (1.0 if w == 0 else -1.0)
+                    e["r_turns"] = float(ctx["r_turns"])
                 _add(rec, bnd, s_row, "atk", g=g_row)
                 fam = move_family(json.loads(pol["pol_sig"][b + ch]))
                 rec["g_fam"][fam] = rec["g_fam"].get(fam, 0.0) + g_row
@@ -572,10 +597,28 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                                  _g_of_row(opp_g["sc"], opp_g["tok"], opp_g["ci"], idx2cid, cards,
                                                            g_cache, (1 - w, opp_g["t"]))),
                                           opp=opp_g)["kappa"])
+                e = kn.setdefault(t, {"d0": None, "g0": 0.0, "r_turns": None})   # T80
+                e["g0"] += float(got["g"]) * (1.0 if w == 0 else -1.0)
                 _add(rec, bnd, got["s"] * kap, "grd", g=got["g"] * kap)
                 if got["comfortable"]:
                     stats["grd_comfortable"] += 1
                     _add(rec, bnd, got["s"] * kap, "grdc", g=got["g"] * kap)   # **余裕で払えた行だけの別勘定**
+        # **T80**: ターンの前後で動いた勝率 `ΔW = W(D の次) − W(D の今)` を、そのターンの**生の価格**と並べる
+        ts_kn = sorted(t0 for t0, e in kn.items() if e.get("d0") is not None)   # 席 0 視点の `D` が読めたターン
+        # **窓は 1 ラウンド（両席が 1 回打つ）**——1 ターンだけの窓では、打つのは手番の席だけなので
+        # 生の価格の符号が手番ごとに振れる（測ったのは advantage ではなく手番）。2 ターンで 1 組にする。
+        for k0 in range(len(ts_kn) - 2):
+            a0, b0, c0 = ts_kn[k0], ts_kn[k0 + 1], ts_kn[k0 + 2]
+            kn_turns.append({"turn": a0, "d0": kn[a0]["d0"], "r_turns": kn[a0]["r_turns"],
+                             "g0": kn[a0]["g0"] + kn[b0]["g0"],
+                             "dW": _TOM.prob_of_d(kn[c0]["d0"]) - _TOM.prob_of_d(kn[a0]["d0"]),
+                             # 診断: 1 ターンだけの窓（手番の交代が入ったまま）
+                             "g0_turn": kn[a0]["g0"],
+                             "dW_turn": _TOM.prob_of_d(kn[b0]["d0"]) - _TOM.prob_of_d(kn[a0]["d0"])})
+    import kappa_needed as KN
+    stats["kappa_needed"] = KN.summarise(kn_turns)
+    stats["kappa_needed_1turn"] = KN.summarise([dict(t, g0=t["g0_turn"], dW=t["dW_turn"]) for t in kn_turns])
+    stats["last_turn"] = LAST_TURN_MODE
     return per, stats
 
 
@@ -853,6 +896,8 @@ def main(argv=None):
                          "`quality`（自分の手札の札ごとの `max(ΔH, ΔG)` の平均。1 行から読めるのは自分の手札だけ＝相手側は `μ` のまま）")
     ap.add_argument("--clock-hand", default=_TOM.CLOCK_HAND_MODE, choices=_TOM.CLOCK_HAND_MODES,
                     help="**T78** `--w-mode clock` の時計に手札の 2 つの価値を入れるか（`on`＝耐久は切れる札だけ・速さは今出せる体を足す・自席側のみ）")
+    ap.add_argument("--last-turn", default=LAST_TURN_MODE, choices=LAST_TURN_MODES,
+                    help="**T80 の診断** `drop` なら局の最後のターンの行を落とす（とどめの一撃とその応答を外す）")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
@@ -862,6 +907,7 @@ def main(argv=None):
     _HP.apply_inflow_mode(a)
     _HP.apply_cond_clock_mode(a)
     _CB.set_theta_hand_mode(a.theta_hand)
+    set_last_turn_mode(a.last_turn)
     _TOM.set_clock_hand_mode(a.clock_hand)
 
     try:
