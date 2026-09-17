@@ -1163,4 +1163,18 @@ def test_the_clock_can_take_the_hands_two_values_from_the_row(monkeypatch):
     assert on["a_me"] == off["a_me"] + 2                               # ドン 5 で 2 体足せる
     assert on["t_opp"] < off["t_opp"]                                  # 自分の耐久が縮む＝相手は早く殺せる
     assert on["t_me"] < off["t_me"]                                    # 自分の速さが上がる＝自分も早く殺せる
+    # **T79（完全情報・§0.05）**: 相手の行を渡せば**相手側も同じ形で読む**（記録には両席の行が在る）
+    opp_tok = np.zeros((22, 24), np.float32)
+    for j, (pw, cost, cnt) in enumerate([(6000, 3, 0), (5000, 1, 2000)]):
+        s2 = T.SLOT_HAND.start + j
+        opp_tok[s2, T.S_POWER] = pw / 1e4; opp_tok[s2, T.S_COST] = cost / 10.0; opp_tok[s2, T.S_COUNTER] = cnt / 2000.0
+    opp_sc = np.zeros(16, np.float32); opp_sc[T.SC_MY_DON] = 4
+    T.set_clock_hand_mode("on")
+    try:
+        both = T.clock_of_row(sc, tok, opp_sc=opp_sc, opp_tok=opp_tok)
+    finally:
+        T.set_clock_hand_mode("off")
+    assert both["a_opp"] == on["a_opp"] + 2                            # 相手もドン 4 で 2 体（費用 1 と 3）
+    assert both["t_me"] < on["t_me"]                                   # 相手の手札 4 枚 → 切れるのは 1 枚＝耐久が縮む
+    assert both["t_opp"] < on["t_opp"]                                 # 相手の速さが上がる＝自分は早く死ぬ
     assert T.CLOCK_HAND_MODE == "off"                                  # 既定は旧のまま

@@ -251,26 +251,42 @@ def _state_of(sc, ci, idx2cid, tok=None, cards=None):
     return st
 
 
-def _kappa_of_row(sc, tok, t, prof=None, g_me=None):
+def _kappa_of_row(sc, tok, t, prof=None, g_me=None, g_opp=None, opp=None):
     """行の局面の傾き `κ` と時計の差 `d`。`W_MODE=curve`（T75）なら交点の橋の `D`（`crossing_bridge.curve_d_of_row`）、
     それ以外は盤面の時計（`clock_of_row`・`flat` なら `κ = 1`）。
-    `g_me`（T76）は**自分の**手札 1 枚あたりの価格（1 行から読めるのは自分の手札だけ＝相手側は `μ` のまま）。"""
+    `g_me`／`g_opp`（T76・**T79 で両側**）は手札 1 枚あたりの価格。`opp`（T79）は相手の直近の行＝時計の相手側もそこから読む。"""
     if _TO_W_MODE() == "curve" and prof is not None:
         import crossing_bridge as CB
-        cd = CB.curve_d_of_row(sc, tok, CB.own_turn_index(t), prof, g_hand_of_me=g_me)
+        cd = CB.curve_d_of_row(sc, tok, CB.own_turn_index(t), prof, g_hand_of_opp=g_opp, g_hand_of_me=g_me)
         return {"d": cd["d"], "kappa": _TOM.state_factor(cd["d"], "curve"), "tau_me": cd["tau_me"], "tau_opp": cd["tau_opp"]}
-    return clock_of_row(sc, tok)
+    return clock_of_row(sc, tok, opp_sc=(None if opp is None else opp["sc"]),
+                        opp_tok=(None if opp is None else opp["tok"]))
 
 
-def _g_me_of_row(sc, tok, ci_row, idx2cid, cards, cache, key):
-    """**T76**: この行の**自分の**手札 1 枚あたりの価格（`crossing_bridge.hand_price_mean`）。
-    `W_MODE=curve` かつ `THETA_HAND_MODE=quality` のときだけ計算し、`key`（席とターン）で使い回す。"""
+#: 耐久の手札項の数え方 → `crossing_bridge.hand_price_mean` の `part`（`count` は `None`＝`μ`）
+_THETA_HAND_PART = {"quality": "dtotal", "play": "dh", "guard": "dg", "cuttable": "cuttable"}
+
+
+def _g_of_row(sc, tok, ci_row, idx2cid, cards, cache, key):
+    """**T76／T79**: **その行の席の**手札 1 枚あたりの価格（`crossing_bridge.hand_price_mean`）。
+    `W_MODE=curve` のときだけ計算し、`key`（席とターン）で使い回す。`THETA_HAND_MODE=count` なら `None`（＝`μ`）。"""
     import crossing_bridge as CB
-    if _TO_W_MODE() != "curve" or CB.THETA_HAND_MODE != "quality":
+    part = _THETA_HAND_PART.get(CB.THETA_HAND_MODE)
+    if _TO_W_MODE() != "curve" or part is None:
         return None
     if key not in cache:
-        cache[key] = CB.hand_price_mean(sc, tok, ci_row, idx2cid, cards)
+        cache[key] = CB.hand_price_mean(sc, tok, ci_row, idx2cid, cards, part=part)
     return cache[key]
+
+
+def _opp_view(first_main, opp_turns, ex, w, t):
+    """**T79（完全情報・§0.05）**: 同じ局の**相手の直近の自席ターン最初の行**（`sc`／`tok`／`ci`）。
+    相手の手札はその席の行にしか無いので、両側を読むにはこれと組にする。まだ相手が打っていなければ `None`。"""
+    ts = [tt for tt in opp_turns.get(1 - w, ()) if tt <= t]
+    if not ts:
+        return None
+    i = first_main[(1 - w, ts[-1])]
+    return {"sc": ex["sc"][i], "tok": ex["tok"][i], "ci": ex["ci"][i], "t": ts[-1]}
 
 
 def _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats=None):
@@ -394,13 +410,15 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
         seen = set()
         decks = _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats)   # T68
         g_cache = {}                                                          # T76: 席×ターンごとの手札 1 枚あたりの価格
-        # **T64**: 守りの窓で実際に消えた札を読むため、席ごとの次の自席ターンの最初の main 行を引く
+        # **T64**: 守りの窓で実際に消えた札を読むため、席ごとの次の自席ターンの最初の main 行を引く。
+        # **T79**: 同じ表を「相手の直近の行」を引くのにも使う（完全情報・§0.05）ので**常に作る**。
         first_main = {}
-        if GUARD_COST_MODE == "spent":
-            for i in idx:
-                w0, t0 = int(rows["who"][i]), int(rows["turn"][i])
-                if t0 >= 1 and PL.is_own_turn(w0, t0) and int(rows["kind"][i]) == 0 and (w0, t0) not in first_main:
-                    first_main[(w0, t0)] = i
+        for i in idx:
+            w0, t0 = int(rows["who"][i]), int(rows["turn"][i])
+            if t0 >= 1 and PL.is_own_turn(w0, t0) and int(rows["kind"][i]) == 0 and (w0, t0) not in first_main:
+                first_main[(w0, t0)] = i
+        opp_turns = {0: sorted(t0 for (w0, t0) in first_main if w0 == 0),
+                     1: sorted(t0 for (w0, t0) in first_main if w0 == 1)}
         for n, i in enumerate(idx):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
             if t < 1:
@@ -449,8 +467,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 if nu_targets == "board":
                     ctx["opp_chars"] = opp_chars_of(tok)
                 # **T49**: 局面の傾き。価格（平均の傾きで書いた時計の差分）に掛けて `ΔG` に足す
+                opp = _opp_view(first_main, opp_turns, ex, w, t)          # T79: 相手の直近の行（完全情報）
                 ck = _kappa_of_row(sc, tok, t, prof,
-                                   g_me=_g_me_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t)))
+                                   g_me=_g_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t)),
+                                   g_opp=(None if opp is None else
+                                          _g_of_row(opp["sc"], opp["tok"], opp["ci"], idx2cid, cards,
+                                                    g_cache, (1 - w, opp["t"]))),
+                                   opp=opp)
                 kap = float(ck["kappa"])
                 stats["kappa_sum"] += kap; stats["kappa_n"] += 1
                 stats["d_bins"][_d_bin(ck["d"])] += 1
@@ -541,9 +564,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 if z != 0.0:
                     gl["z_win"] += int(z > 0); gl["z_n"] += 1
                 bnd = band_of(abs(float(rows["pol_v0"][i])))
+                opp_g = _opp_view(first_main, opp_turns, ex, w, t)    # T79: 相手の直近の行（完全情報）
                 kap = float(_kappa_of_row(sc, tok, t, prof,           # T49（守りの窓も同じ傾き）・T75（curve）
-                                          g_me=_g_me_of_row(sc, tok, ex["ci"][i], idx2cid, cards,
-                                                            g_cache, (w, t)))["kappa"])
+                                          g_me=_g_of_row(sc, tok, ex["ci"][i], idx2cid, cards,
+                                                         g_cache, (w, t)),
+                                          g_opp=(None if opp_g is None else
+                                                 _g_of_row(opp_g["sc"], opp_g["tok"], opp_g["ci"], idx2cid, cards,
+                                                           g_cache, (1 - w, opp_g["t"]))),
+                                          opp=opp_g)["kappa"])
                 _add(rec, bnd, got["s"] * kap, "grd", g=got["g"] * kap)
                 if got["comfortable"]:
                     stats["grd_comfortable"] += 1

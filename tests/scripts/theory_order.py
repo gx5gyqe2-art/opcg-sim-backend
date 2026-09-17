@@ -402,7 +402,7 @@ def state_factor(d, mode=None):
     return float(w_of_d(d) / W_BAR)
 
 
-def clock_of_row(sc, tok_row, mode=None):
+def clock_of_row(sc, tok_row, mode=None, opp_sc=None, opp_tok=None):
     """判断点の行（`scalars`・トークン）から時計と `κ` を出す。
 
     `A_me`＝自分のリーダー＋場のキャラのうち**相手リーダーを越える**もの（レスト中も次のターンは殴れる
@@ -416,12 +416,17 @@ def clock_of_row(sc, tok_row, mode=None):
             a_me += 1
     a_opp = sum(1 for x in incoming_x(tok) if x >= -PWR_EPS)
     b_opp = sum(1 for _p, blk in opp_chars_of(tok) if blk)
-    # **T78**（T77 の横展開）: 手札の 2 つの価値を時計へ。**自席側だけ**直る（相手の手札は 1 行からは読めない）
-    h_me = float(sc[SC_MY_HAND])
+    # **T78**（T77 の横展開）: 手札の 2 つの価値を時計へ。**T79（完全情報・§0.05）**: 相手の行（`opp_sc`／`opp_tok`）を
+    # 渡せば相手側も同じ形で読む（記録には両席の行が在る）。渡さなければ自席側だけ直る（片側＝T78 の形）。
+    h_me, h_opp = float(sc[SC_MY_HAND]), float(sc[SC_OPP_HAND])
     if CLOCK_HAND_MODE == "on":
         h_me = float(hand_cuttable(tok))
         a_me += hand_attackers(tok, olp, float(sc[SC_MY_DON]))
-    t_me, t_opp = clocks(sc[SC_MY_LIFE], sc[SC_OPP_LIFE], h_me, sc[SC_OPP_HAND],
+        if opp_tok is not None:
+            mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
+            h_opp = float(hand_cuttable(opp_tok))
+            a_opp += hand_attackers(opp_tok, mlp, 0.0 if opp_sc is None else float(np.asarray(opp_sc)[SC_MY_DON]))
+    t_me, t_opp = clocks(sc[SC_MY_LIFE], sc[SC_OPP_LIFE], h_me, h_opp,
                          a_me, a_opp, count_blockers(tok), b_opp)
     d = t_opp - t_me
     return {"t_me": t_me, "t_opp": t_opp, "d": d, "a_me": a_me, "a_opp": a_opp,
