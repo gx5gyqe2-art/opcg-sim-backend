@@ -81,3 +81,31 @@ def test_the_threshold_and_rate_equations_only_average_record_facts():
     r = out["rate"]
     assert r["A_board_mean"] == 2.5 and r["A_actual_mean"] == 2.0
     assert r["by_board"][2]["actual_mean"] == 1.0 and r["by_board"][3]["actual_mean"] == 3.0
+
+
+def test_the_two_value_threshold_and_the_next_turn_rate_are_summarised_when_present():
+    """**T78**（T77 の横展開）: しきい値に**切れる札だけ**の 3 本（`cut`／`cut_draws`／`cut_draws_frac`）と、
+    速度に**次の自席ターン**の実際（`rate_next`）を並べる。**古い作りの行（欄が無い）でも落ちない**。"""
+    thr = [{"L": 2, "H": 4, "B": 1, "hits": 5, "stops": 3, "turns_left": 2,
+            "H_cut": 2,
+            "formula_static": 4 / T.CBAR + 1, "formula_draws": 6 / T.CBAR + 1,
+            "formula_cut": 2 / T.CBAR + 1, "formula_cut_draws": 4 / T.CBAR + 1,
+            "formula_cut_draws_frac": (2 + 0.5 * 2) / T.CBAR + 1}] * 10
+    out = CC.summarise([], [], thr)["threshold"]
+    assert out["hand_cut_at_row"] == 2                                       # 4 枚中 2 枚が切れる
+    assert out["formula_cut"] == pytest.approx(2 / T.CBAR + 1, abs=1e-4)      # `_mean` は 4 桁で丸める
+    assert out["formula_cut_draws_frac"] == pytest.approx(3 / T.CBAR + 1, abs=1e-4)   # 引く 2 枚も半分だけ切れる
+    assert out["mae_cut"] == pytest.approx(abs(2 / T.CBAR + 1 - 3), abs=1e-4)
+    # 次の自席ターンの実際に対する 2 つの予測
+    rate = [{"A_board": 2, "A_actual": 1, "A_hand": 3, "A_next": 2}] * 20 + \
+           [{"A_board": 1, "A_actual": 1, "A_hand": 3, "A_next": 1}] * 20 + \
+           [{"A_board": 2, "A_actual": 2, "A_hand": 4, "A_next": None}] * 5   # 最後のターンは落ちる
+    rn = CC.summarise([], rate, [])["rate_next"]
+    assert rn["n"] == 40 and rn["A_next_mean"] == pytest.approx(1.5)
+    assert rn["A_board_mean"] == pytest.approx(1.5) and rn["bias_board"] == pytest.approx(0.0)
+    assert rn["A_hand_mean"] == pytest.approx(3.0) and rn["bias_hand"] == pytest.approx(1.5)
+    assert rn["mae_hand"] > rn["mae_board"]
+    # 欄が無い古い行でも落ちない（T78 前の `thr_rows`）
+    old = [{"L": 1, "H": 2, "B": 0, "hits": 3, "stops": 2, "turns_left": 1,
+            "formula_static": 2 / T.CBAR, "formula_draws": 3 / T.CBAR}] * 5
+    assert CC.summarise([], [], old)["threshold"]["formula_cut"] is None

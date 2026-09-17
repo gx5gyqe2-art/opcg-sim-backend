@@ -37,7 +37,8 @@ if _HERE not in sys.path:
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, move_family  # noqa: E402
-from theory_order import (CBAR, PWR_EPS, S_IS_CHAR, S_POWER, SC_MY_HAND, SC_MY_LEADER_POWER,  # noqa: E402
+import theory_order as TO  # noqa: E402
+from theory_order import (CBAR, PWR_EPS, S_IS_CHAR, S_POWER, SC_MY_DON, SC_MY_HAND, SC_MY_LEADER_POWER,  # noqa: E402
                           SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE, SLOT_OWN_FIELD,
                           count_blockers, incoming_x, opp_chars_of, slot_power)
 
@@ -81,10 +82,14 @@ def board_a_me(tok, opp_leader_power):
 def row_inputs(sc, tok):
     sc = np.asarray(sc); tok = np.asarray(tok)
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+    a_board = board_a_me(tok, olp)
     return {"L_me": float(sc[SC_MY_LIFE]), "L_opp": float(sc[SC_OPP_LIFE]),
             "H_me": float(sc[SC_MY_HAND]), "H_opp": float(sc[SC_OPP_HAND]),
             "B_me": count_blockers(tok), "B_opp": sum(1 for _p, blk in opp_chars_of(tok) if blk),
-            "A_me": board_a_me(tok, olp), "A_opp": sum(1 for x in incoming_x(tok) if x >= -PWR_EPS)}
+            "A_me": a_board, "A_opp": sum(1 for x in incoming_x(tok) if x >= -PWR_EPS),
+            # **T78**（T77 の横展開・手札の 2 つの価値）: 耐久は**切れる札だけ**・速さは**今出せる通る体**を足す
+            "H_me_cut": float(TO.hand_cuttable(tok)),
+            "A_me_hand": a_board + TO.hand_attackers(tok, olp, float(sc[SC_MY_DON]))}
 
 
 def collect(dirs, limit_games=0):
@@ -141,8 +146,11 @@ def collect(dirs, limit_games=0):
             for j, t in enumerate(ts):
                 sc, tok = turn_start[(w, t)]
                 q = row_inputs(sc, tok)
-                # (2) 速度
-                rate_rows.append({"A_board": q["A_me"], "A_actual": passing.get((w, t), 0)})
+                # (2) 速度（**T78**: 次の自席ターンの実際も並べる——手札から出した体は召喚酔いで次のターンから殴る）
+                t_next = ts[j + 1] if j + 1 < len(ts) else None
+                rate_rows.append({"A_board": q["A_me"], "A_actual": passing.get((w, t), 0),
+                                  "A_hand": q["A_me_hand"],
+                                  "A_next": (None if t_next is None else passing.get((w, t_next), 0))})
                 # (3) 時間: 倒した側の実際の残りターン
                 t_me_act = len(ts) - j                                         # 自分の残り自席ターン（今を含む）
                 t_opp_act = sum(1 for tt in ts_opp if tt > t)                  # 相手の残りターン
@@ -159,8 +167,15 @@ def collect(dirs, limit_games=0):
                     stops = hits - q["L_me"]                                   # 通った攻撃のうちライフを減らさなかった数
                     thr_rows.append({"L": q["L_me"], "H": q["H_me"], "B": q["B_me"], "hits": hits,
                                      "stops": max(0.0, stops), "turns_left": t_opp_act,
+                                     "H_cut": q["H_me_cut"],
                                      "formula_static": q["H_me"] / CBAR + q["B_me"],
-                                     "formula_draws": (q["H_me"] + t_opp_act) / CBAR + q["B_me"]})
+                                     "formula_draws": (q["H_me"] + t_opp_act) / CBAR + q["B_me"],
+                                     # **T78**: 耐久に入るのは**切れる札だけ**（T77 の `cuttable`）。
+                                     # 引く札も**同じ割合だけ切れる**と置くのが筋（割合はこの行の手札から測る＝新定数ゼロ）
+                                     "formula_cut": q["H_me_cut"] / CBAR + q["B_me"],
+                                     "formula_cut_draws": (q["H_me_cut"] + t_opp_act) / CBAR + q["B_me"],
+                                     "formula_cut_draws_frac": (q["H_me_cut"] + (q["H_me_cut"] / max(1.0, q["H_me"])) * t_opp_act)
+                                     / CBAR + q["B_me"]})
     return rows_out, rate_rows, thr_rows, stats
 
 
@@ -180,6 +195,18 @@ def summarise(rows_out, rate_rows, thr_rows):
                             "blockers_at_row": _mean([r["B"] for r in thr_rows]),
                             "formula_static": _mean([r["formula_static"] for r in thr_rows]),
                             "formula_draws": _mean([r["formula_draws"] for r in thr_rows]),
+                            # **T78**: 切れる札だけで数えた耐久（実測の `stops` に近いのはどちらか）。
+                            # **古い行（T78 前の作りの `thr_rows`）にも耐えるように欄が無ければ飛ばす**
+                            "hand_cut_at_row": _mean([r["H_cut"] for r in thr_rows if "H_cut" in r]),
+                            "formula_cut": _mean([r["formula_cut"] for r in thr_rows if "formula_cut" in r]),
+                            "formula_cut_draws": _mean([r["formula_cut_draws"] for r in thr_rows if "formula_cut_draws" in r]),
+                            "formula_cut_draws_frac": _mean([r["formula_cut_draws_frac"] for r in thr_rows if "formula_cut_draws_frac" in r]),
+                            "mae_static": _mean([abs(r["formula_static"] - r["stops"]) for r in thr_rows]),
+                            "mae_draws": _mean([abs(r["formula_draws"] - r["stops"]) for r in thr_rows]),
+                            "mae_cut": _mean([abs(r["formula_cut"] - r["stops"]) for r in thr_rows if "formula_cut" in r]),
+                            "mae_cut_draws": _mean([abs(r["formula_cut_draws"] - r["stops"]) for r in thr_rows if "formula_cut_draws" in r]),
+                            "mae_cut_draws_frac": _mean([abs(r["formula_cut_draws_frac"] - r["stops"])
+                                                         for r in thr_rows if "formula_cut_draws_frac" in r]),
                             "stops_per_hand_card": round(float(sum(r["stops"] for r in thr_rows)
                                                                / max(1.0, sum(r["H"] for r in thr_rows))), 4),
                             "implied_cbar_static": round(float(sum(r["H"] for r in thr_rows)
@@ -187,6 +214,18 @@ def summarise(rows_out, rate_rows, thr_rows):
     # (2) 速度
     if rate_rows:
         ab = np.array([r["A_board"] for r in rate_rows], float); aa = np.array([r["A_actual"] for r in rate_rows], float)
+        # **T78**: 次の自席ターンの実際に対して、盤面だけの `A` と手札を足した `A` のどちらが近いか
+        nxt = [r for r in rate_rows if r.get("A_next") is not None]
+        if nxt:
+            an = np.array([r["A_next"] for r in nxt], float)
+            abn = np.array([r["A_board"] for r in nxt], float)
+            ahn = np.array([r["A_hand"] for r in nxt], float)
+            out["rate_next"] = {"n": len(nxt), "A_next_mean": round(float(an.mean()), 4),
+                                "A_board_mean": round(float(abn.mean()), 4), "A_hand_mean": round(float(ahn.mean()), 4),
+                                "mae_board": round(float(np.abs(abn - an).mean()), 4),
+                                "mae_hand": round(float(np.abs(ahn - an).mean()), 4),
+                                "bias_board": round(float((abn - an).mean()), 4),
+                                "bias_hand": round(float((ahn - an).mean()), 4)}
         out["rate"] = {"n": len(rate_rows), "A_board_mean": round(float(ab.mean()), 4), "A_actual_mean": round(float(aa.mean()), 4),
                        "actual_over_board": round(float(aa.mean() / max(1e-9, ab.mean())), 3),
                        "by_board": {int(k): {"n": int((ab == k).sum()), "actual_mean": round(float(aa[ab == k].mean()), 3)}

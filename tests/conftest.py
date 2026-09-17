@@ -68,10 +68,15 @@ def _theory_option_off():
     # `strict`（`c̄(x+1000)`・2026-09-16 から既定）は T61 のテストが明示的に入れる
     before_c = _T.CBAR_MODE
     _T.set_cbar_mode("loose")
+    # **時計に手札の 2 つの価値を入れるか（T78）もテストでは `off`（旧の閉じた代数）に固定**——
+    # `on` は T78 のテストが明示的に入れる
+    before_ch = _T.CLOCK_HAND_MODE
+    _T.set_clock_hand_mode("off")
     try:
         yield
     finally:
         _T.set_option_mode(before)
+        _T.set_clock_hand_mode(before_ch)
         _T.set_w_mode(before_w)
         _T.set_surv_mode(before_s)
         _T.set_cbar_mode(before_c)

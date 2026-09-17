@@ -147,7 +147,7 @@ def test_theta_hand_mode_prices_the_hand_by_quality_instead_of_the_count(monkeyp
     # 切替の検査
     with pytest.raises(ValueError):
         CB.set_theta_hand_mode("nope")
-    assert CB.THETA_HAND_MODE == "count"                                            # 既定は旧のまま
+    assert CB.THETA_HAND_MODE == "cuttable"          # **既定は T77 で `cuttable` になった**（ユーザ決定 2026-09-17）
 
 
 def test_the_hand_carries_two_values_cuttable_for_the_threshold_and_playable_for_the_rate(monkeypatch):
@@ -183,4 +183,4 @@ def test_the_hand_carries_two_values_cuttable_for_the_threshold_and_playable_for
     assert CB.playable_attack_price([{"cid": "EV", "cost": 1, "counter": 0.0}], cards, 4, olp) == pytest.approx(0.0)
     with pytest.raises(ValueError):
         CB.set_slope_mode("nope")
-    assert CB.SLOPE_MODE == "board" and CB.THETA_HAND_MODE == "count"                     # 既定は旧のまま
+    assert CB.SLOPE_MODE == "hand" and CB.THETA_HAND_MODE == "cuttable"   # **既定は T77 の 2 値化**（ユーザ決定 2026-09-17）

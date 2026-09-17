@@ -59,7 +59,8 @@ SLOPE_FLOOR = 1e-3
 #: `Θ` の手札項も切られる札 1 枚 `μ`。**切られない札（カウンター値 0）は一生 `F` に入らない**＝耐久ではない。T76 で「札の機会費用」を入れて失敗したのは、
 #: `F` が `μ` で数えている物に別の値段を付けたため。出す価値は耐久ではなく**速さ**へ（`SLOPE_MODE`）。
 THETA_HAND_MODES = ("count", "quality", "play", "guard", "cuttable")
-THETA_HAND_MODE = "count"
+#: **既定は `cuttable`**（2026-09-17・ユーザ決定「1は変えましょうか」・T77）。以前の数字と比べるときは `--theta-hand count`。
+THETA_HAND_MODE = "cuttable"
 
 
 def set_theta_hand_mode(mode):
@@ -72,7 +73,8 @@ def set_theta_hand_mode(mode):
 #: **速さ（1 自席ターンに積む損害）の数え方**（T77）: `board`＝旧（今の盤面の攻撃手だけ）／`hand`＝**手札から今出せる体の攻撃の価格も足す**
 #: （出す価値 `v_play` の側＝場に出れば次のターンから殴る。ドンの枠で選ぶ）。**新定数ゼロ**（攻撃の価格は `attack_value_don`・枠は規則）。
 SLOPE_MODES = ("board", "hand")
-SLOPE_MODE = "board"
+#: **既定は `hand`**（2026-09-17・ユーザ決定「1は変えましょうか」・T77）。以前の数字と比べるときは `--slope-mode board`。
+SLOPE_MODE = "hand"
 
 
 def set_slope_mode(mode):

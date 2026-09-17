@@ -367,6 +367,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
              "grd_comfortable": 0,
              # **T49**: 局面の傾き `κ = w(D)/w̄`（攻めの行）——平均が 1 に戻るかが `w(状態)` の検算
              "w_mode": _TO_W_MODE(), "sigma_turn": _TOM.SIGMA_TURN, "kappa_sum": 0.0, "kappa_n": 0,
+             "clock_hand": _TOM.CLOCK_HAND_MODE,
              "harm_profile": (harm_profile if _TO_W_MODE() == "curve" else None),
              # **T76**: 耐久の手札項の数え方（`crossing_bridge.THETA_HAND_MODE`）
              "theta_hand": __import__("crossing_bridge").THETA_HAND_MODE,
@@ -822,6 +823,8 @@ def main(argv=None):
     ap.add_argument("--theta-hand", default=_CB.THETA_HAND_MODE, choices=_CB.THETA_HAND_MODES,
                     help="**T76** 耐久の手札項（`--w-mode curve` の `D` に効く）: `count`（既定・`μ × 枚数`）／"
                          "`quality`（自分の手札の札ごとの `max(ΔH, ΔG)` の平均。1 行から読めるのは自分の手札だけ＝相手側は `μ` のまま）")
+    ap.add_argument("--clock-hand", default=_TOM.CLOCK_HAND_MODE, choices=_TOM.CLOCK_HAND_MODES,
+                    help="**T78** `--w-mode clock` の時計に手札の 2 つの価値を入れるか（`on`＝耐久は切れる札だけ・速さは今出せる体を足す・自席側のみ）")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
@@ -831,6 +834,7 @@ def main(argv=None):
     _HP.apply_inflow_mode(a)
     _HP.apply_cond_clock_mode(a)
     _CB.set_theta_hand_mode(a.theta_hand)
+    _TOM.set_clock_hand_mode(a.clock_hand)
 
     try:
         import condition_value as CV

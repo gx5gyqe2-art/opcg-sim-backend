@@ -1130,3 +1130,37 @@ def test_the_curve_w_mode_uses_the_same_density_as_the_clock_mode():
             TO.set_w_mode("guess")
     finally:
         TO.set_w_mode(before)
+
+
+def test_the_clock_can_take_the_hands_two_values_from_the_row(monkeypatch):
+    """**T78**（T77 の横展開）: 2 本の時計にも手札の 2 つの価値を入れられる——**耐久は切れる札だけ**（カウンター値 > 0）・
+    **速さは盤面 ＋ 今のドンで出せる通る体**。どちらも**行のトークンだけ**から読める（手札の枠にパワー・費用・カウンター値が在る）。"""
+    tok = np.zeros((22, 24), np.float32)
+    for j, (pw, cost, cnt) in enumerate([(6000, 4, 0), (5000, 2, 1000), (2000, 1, 2000), (7000, 3, 0)]):
+        s = T.SLOT_HAND.start + j
+        tok[s, T.S_POWER] = pw / 1e4; tok[s, T.S_COST] = cost / 10.0; tok[s, T.S_COUNTER] = cnt / 2000.0
+    assert T.hand_cuttable(tok) == 2                                   # 1000 と 2000 の 2 枚だけ切れる
+    # 相手リーダー 5000 を越える体は 6000／5000／7000（費用 4／2／3）＝安い順に取れるだけ
+    assert T.hand_attackers(tok, 5000, 0) == 0
+    assert T.hand_attackers(tok, 5000, 2) == 1
+    assert T.hand_attackers(tok, 5000, 5) == 2
+    assert T.hand_attackers(tok, 5000, 9) == 3
+    assert T.hand_attackers(tok, 9000, 10) == 0                        # 越える体が無ければ 0
+    # 切替: `on` なら自席側の耐久が縮み（切れる札だけ）・自席側の速さが増える
+    sc = np.zeros(16, np.float32)
+    sc[T.SC_MY_LIFE], sc[T.SC_OPP_LIFE] = 3, 3
+    sc[T.SC_MY_HAND], sc[T.SC_OPP_HAND] = 4, 4
+    sc[T.SC_MY_DON] = 5
+    sc[T.SC_MY_LEADER_POWER], sc[T.SC_OPP_LEADER_POWER] = 0.5, 0.5
+    tok[0, T.S_POWER] = 0.5                                            # 自分のリーダー 5000（相手リーダーを越える）
+    tok[1, T.S_POWER] = 0.5
+    off = T.clock_of_row(sc, tok)
+    T.set_clock_hand_mode("on")
+    try:
+        on = T.clock_of_row(sc, tok)
+    finally:
+        T.set_clock_hand_mode("off")
+    assert on["a_me"] == off["a_me"] + 2                               # ドン 5 で 2 体足せる
+    assert on["t_opp"] < off["t_opp"]                                  # 自分の耐久が縮む＝相手は早く殺せる
+    assert on["t_me"] < off["t_me"]                                    # 自分の速さが上がる＝自分も早く殺せる
+    assert T.CLOCK_HAND_MODE == "off"                                  # 既定は旧のまま

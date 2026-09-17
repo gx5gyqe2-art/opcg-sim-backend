@@ -329,6 +329,49 @@ def set_w_mode(mode):
     return W_MODE
 
 
+#: 手札の枠と**カウンター値**の列（`guard_afford.SLOT_HAND`／`S_COUNTER` と同じ値・正本は `n_rel_feat.S_COLS`）。
+#: **手札の枠にはパワー・費用・カウンター値が入っている**ので、手札の 2 つの価値は**行のトークンだけで読める**（T78 で実測して確認）。
+SLOT_HAND = slice(12, 22)
+S_COUNTER = 7
+#: **手札の 2 つの価値を時計に入れるか**（T78・2026-09-17・T77 の横展開）。`off`＝旧（手札は枚数 `H`・速さは盤面だけ）／
+#: `on`＝**耐久は切れる札だけ**（カウンター値 > 0）・**速さは盤面 ＋ 今のドンで出せる通る体**。T77 が交点の橋で測った 2 つの
+#: 置き換えを、同じ量の別表現である**2 本の時計**（`T = (L + H/c̄ + B)/A`）にも当てる。**新定数ゼロ**。
+#: **1 行からは自分の手札しか読めない**ので、`clock_of_row` では自席側だけが直る（相手側は推定器待ち＝非対称）。
+CLOCK_HAND_MODES = ("off", "on")
+CLOCK_HAND_MODE = "off"
+
+
+def set_clock_hand_mode(mode):
+    global CLOCK_HAND_MODE
+    if mode not in CLOCK_HAND_MODES:
+        raise ValueError("clock hand mode は %s のどれか" % (CLOCK_HAND_MODES,))
+    CLOCK_HAND_MODE = mode
+    return CLOCK_HAND_MODE
+
+
+def hand_cuttable(tok_row):
+    """**手札のうち切れる札の枚数**（カウンター値 > 0・T78）＝耐久に入る手札（T77 の `cuttable`）。"""
+    tok = np.asarray(tok_row)
+    return int(sum(1 for s in range(SLOT_HAND.start, SLOT_HAND.stop) if float(tok[s, S_COUNTER]) > 0.0))
+
+
+def hand_attackers(tok_row, opp_leader_power, don):
+    """**今のドンで手札から出せる「通る体」の枚数**（T78）＝パワーが相手リーダー以上の体を、費用の合計が `don` を超えない
+    範囲で**最大枚数**（安い順）。速さ `A` に足す（T77 の `SLOPE_MODE=hand` の時計版）。"""
+    tok = np.asarray(tok_row)
+    costs = []
+    for s in range(SLOT_HAND.start, SLOT_HAND.stop):
+        pw = slot_power(tok, s) or 0.0
+        if pw >= float(opp_leader_power) - PWR_EPS and pw > 0.0:
+            costs.append(float(tok[s, S_COST]) * 10.0)
+    n, budget = 0, float(max(0.0, don))
+    for c in sorted(costs):
+        if c > budget + 1e-6:          # **費用の比較に `PWR_EPS`（パワーの許容差 10）を使わない**
+            break
+        budget -= c; n += 1
+    return n
+
+
 def clocks(my_life, opp_life, my_hand, opp_hand, a_me, a_opp, b_me=0, b_opp=0, cbar=CBAR):
     """2 本の時計 `(T_me, T_opp)`（手数）。通る攻撃が 0 本でもリーダーは殴れるので分母の床は 1。"""
     t_me = (float(opp_life) + float(opp_hand) / cbar + float(b_opp)) / max(1.0, float(a_me))
@@ -373,7 +416,12 @@ def clock_of_row(sc, tok_row, mode=None):
             a_me += 1
     a_opp = sum(1 for x in incoming_x(tok) if x >= -PWR_EPS)
     b_opp = sum(1 for _p, blk in opp_chars_of(tok) if blk)
-    t_me, t_opp = clocks(sc[SC_MY_LIFE], sc[SC_OPP_LIFE], sc[SC_MY_HAND], sc[SC_OPP_HAND],
+    # **T78**（T77 の横展開）: 手札の 2 つの価値を時計へ。**自席側だけ**直る（相手の手札は 1 行からは読めない）
+    h_me = float(sc[SC_MY_HAND])
+    if CLOCK_HAND_MODE == "on":
+        h_me = float(hand_cuttable(tok))
+        a_me += hand_attackers(tok, olp, float(sc[SC_MY_DON]))
+    t_me, t_opp = clocks(sc[SC_MY_LIFE], sc[SC_OPP_LIFE], h_me, sc[SC_OPP_HAND],
                          a_me, a_opp, count_blockers(tok), b_opp)
     d = t_opp - t_me
     return {"t_me": t_me, "t_opp": t_opp, "d": d, "a_me": a_me, "a_opp": a_opp,
