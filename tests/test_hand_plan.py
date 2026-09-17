@@ -92,6 +92,8 @@ def test_added_card_gains_reads_each_entering_card_in_the_hand_it_landed_in(monk
     monkeypatch.setattr(HP, "don_stock", lambda sc, tok, side="me": 2.0)
     monkeypatch.setattr(HP.HG, "incoming", lambda tok: [])
     monkeypatch.setattr(HP.HG, "take_cost_of", lambda life: 0.087)
+    monkeypatch.setattr(HP, "own_field_ids", lambda ci, idx2cid: [])
+    monkeypatch.setattr(HP, "apply_inflow", lambda items, *a, **k: list(items))   # T70 の相方待ちはここでは見ない
     seen = []
 
     def _deltas(rest, card, caps, xs, take):
@@ -105,3 +107,70 @@ def test_added_card_gains_reads_each_entering_card_in_the_hand_it_landed_in(monk
     assert seen[0][1] == ["S", "X", "Y"] and seen[1][1] == ["S", "X", "Y"] and seen[2][1] == ["S", "S", "X"]   # その札だけ除く
     assert seen[0][2] == (2, 3, 4, 10) and seen[0][4] == 0.087
     assert HP.added_card_gains(sc, None, "A", "B", {}, None) == []                                          # 出ただけなら空
+
+
+def test_plan_value_accepts_a_per_turn_value_for_partner_waiting_cards():
+    """**T70**: `v` がターンごとの並びなら、その t の値で計画に入る（相方が来るまで待つ札は後のターンほど高い）。"""
+    caps = [4, 4, 4, 10]
+    waiting = (2, [0.02, 0.05, 0.08, 0.08])                  # 今出せば 0.02・2 ターン待てば 0.08
+    assert HP.plan_value([waiting], caps, S) == pytest.approx(max(0.02, S * 0.05, S * S * 0.08, S ** 3 * 0.08), abs=1e-9)
+    assert HP.plan_value([(2, [0.0, 0.0, 0.0, 0.0])], caps, S) == 0.0
+    assert HP.v_at([0.1, 0.2], 5) == 0.2 and HP.v_at(0.3, 2) == 0.3 and HP.v_at(None, 0) == 0.0 and HP.v_at([], 1) == 0.0
+    assert HP.v_scalar([0.02, 0.05, 0.08], S) == pytest.approx(max(0.02, S * 0.05, S * S * 0.08))
+    assert HP.v_scalar(0.04) == 0.04 and HP.v_scalar(None) == 0.0
+    assert HP.playable_next([(2, [0.0, 0.05, 0.0])], caps) is True and HP.playable_next([(2, [0.05, 0.0, 0.0])], caps) is False
+
+
+def test_arrival_probability_and_the_inflow_from_draws_life_and_searches(monkeypatch):
+    """**T70**: `P = 1 − (1 − p)^n`・受けるライフ＝守る規則で止めない攻撃の本数・サーチの当たりはデッキの割合から。"""
+    assert HP.arrival_prob(0.0, 3) == 0.0 and HP.arrival_prob(1.0, 1) == 1.0 and HP.arrival_prob(1.0, 0) == 0.0
+    assert HP.arrival_prob(0.36, 1.5) == pytest.approx(1.0 - 0.64 ** 1.5)
+    items = [{"cid": "A", "cost": 2.0, "v": 0.01, "counter": 2000.0, "event": False}]
+    take = 0.087
+    # 攻撃 2 本（x=1000, x=0）: 2000 カウンター 1 枚で 1 本は止める（節約 0.077）・残り 1 本は受ける → 1 枚入る
+    assert HP.expected_taken(items, [1000.0, 0.0], take) == 1.0
+    assert HP.expected_taken([], [1000.0, 0.0], take) == 2.0
+    assert HP.expected_taken([{"cid": "B", "cost": 5.0, "v": 0.20, "counter": 2000.0, "event": False}], [1000.0], take) == 1.0   # 高い札は切らず受ける
+    assert HP.expected_taken(items, [], take) == 0.0
+    monkeypatch.setattr(HP, "expected_search_hits", lambda items, deck, cards: 0.5)
+    assert HP.inflow_per_turn(items, [1000.0, 0.0], take, ["X"], None) == pytest.approx(1.0 + 1.0 + 0.5)
+
+
+def test_inflow_item_turns_an_enabler_into_a_per_turn_value(monkeypatch):
+    """**T70**: 相方待ちの札の `v_t = base + P(t までに来る) × E[相方 − μ]`・相方が今在れば全部の t で満額・相方待ちでなければそのまま。"""
+    import search_price as SP
+    from theory_order import MU
+
+    class _Cards:
+        def info(self, cid):
+            return {"E": {"cost": 4}, "P": {"cost": 2}, "Q": {"cost": 2}, "Z": {"cost": 5}}.get(cid)
+    cards = _Cards()
+    monkeypatch.setattr(SP, "enabler_target", lambda cid, cards_json=None: {"cost_max": 2} if cid == "E" else None)
+    monkeypatch.setattr(SP, "eligible_hand_cards", lambda target, items, cards, skip_cid=None: [it["cid"] for it in items if it["cid"] in ("P", "Q")])
+    monkeypatch.setattr(SP, "eligible_deck_cards", lambda target, deck, cards: [c for c in deck if c in ("P", "Q")])
+    monkeypatch.setattr(HP, "_base_value", lambda cid, info, cards, olp, r, field=(): 0.10)
+    # 相方が手札に在るときの札の値（効果のコスト・条件込み）＝base + 相方の取り分
+    monkeypatch.setattr(HP, "_value_with_partner", lambda cid, info, cards, olp, r, partner, field=(): 0.10 + {"P": 0.12, "Q": 0.10}.get(partner, 0.0) - MU)
+    monkeypatch.setattr(HP, "inflow_per_turn", lambda items, xs, take, deck, cards: 2.0)
+    e = {"cid": "E", "cost": 4.0, "v": 0.2, "counter": 0.0, "event": False}
+    z = {"cid": "Z", "cost": 5.0, "v": 0.3, "counter": 0.0, "event": False}
+    deck = ["P", "Q", "Z", "Z"]                                   # 合う札の割合 p = 0.5
+    got = HP.inflow_item(e, [z], deck, [], 0.087, cards, 5000.0, 4.0, turns=4)
+    p_t = [HP.arrival_prob(0.5, 2.0 * t) for t in range(4)]
+    gain = ((0.12 - MU) + (0.10 - MU)) / 2
+    assert got["v"] == pytest.approx([0.10 + p * gain for p in p_t]) and got["v"][0] == pytest.approx(0.10)
+    assert got["v_static"] == 0.2 and got["p_partner"] == 0.5 and got["inflow_per_turn"] == 2.0
+    # 相方が今の手札に在れば全部の t で満額（一番良い相方）
+    p_item = {"cid": "P", "cost": 2.0, "v": 0.12, "counter": 0.0, "event": False}
+    got2 = HP.inflow_item(e, [p_item, z], deck, [], 0.087, cards, 5000.0, 4.0, turns=4)
+    assert got2["v"] == pytest.approx([0.10 + (0.12 - MU)] * 4) and got2["p_partner"] == 1.0
+    # 相方待ちでない札はそのまま・デッキに合う札が無ければ base だけ
+    assert HP.inflow_item(z, [e], deck, [], 0.087, cards, 5000.0, 4.0) is z
+    assert HP.inflow_item(e, [z], ["Z", "Z"], [], 0.087, cards, 5000.0, 4.0)["v"] == [0.10] * 4
+    HP.set_inflow_mode("off")
+    try:
+        assert HP.apply_inflow([e], deck, [], 0.087, cards, 5000.0, 4.0) == [e]
+    finally:
+        HP.set_inflow_mode("on")
+    with pytest.raises(ValueError):
+        HP.set_inflow_mode("guess")

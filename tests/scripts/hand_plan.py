@@ -73,11 +73,19 @@ def search_context(sc, tok_row, ci_row, idx2cid, cards, deck):
     受ける損・自分のデッキ（`search_price.deck_of` で seed から復元した並び・`None` なら価格は従来の `sel(k)` に落ちる）。"""
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     r = max(1.0, min(5.0, float(sc[SC_OPP_LIFE])))
-    return {"hand_items": hand_items(tok_row, ci_row, idx2cid, cards, olp, r),
+    xs = HG.incoming(tok_row); take = HG.take_cost_of(float(sc[SC_MY_LIFE]))
+    field = own_field_ids(ci_row, idx2cid)
+    items = hand_items(tok_row, ci_row, idx2cid, cards, olp, r)
+    items = apply_inflow(items, deck, xs, take, cards, olp, r, field=field)        # T70
+    return {"hand_items": items,
             "caps": caps_of(float(sc[SC_MY_DON]), don_stock(sc, tok_row, "me"), r_turns=r),
-            "xs": HG.incoming(tok_row), "take": HG.take_cost_of(float(sc[SC_MY_LIFE])),
-            "deck": (None if deck is None else list(deck)), "olp": olp, "r": r,
-            "field": [c for c in (idx2cid.get(int(x)) for x in np.asarray(ci_row)[GA.SLOT_OWN_FIELD]) if c]}
+            "xs": xs, "take": take,
+            "deck": (None if deck is None else list(deck)), "olp": olp, "r": r, "field": field}
+
+
+def own_field_ids(ci_row, idx2cid):
+    """自分の場のキャラの札 id（枠 2〜6・空は落とす）。"""
+    return [c for c in (idx2cid.get(int(x)) for x in np.asarray(ci_row)[GA.SLOT_OWN_FIELD]) if c]
 
 
 def plan_value(items, caps, s=1.0 - KO_P):
@@ -88,20 +96,38 @@ def plan_value(items, caps, s=1.0 - KO_P):
     disc = [s ** t for t in range(T)]
     best = {tuple([0] * T): 0.0}
     for cost, v in items:
-        v = 0.0 if v is None else float(v)
+        vs = [max(0.0, v_at(v, t)) for t in range(T)]     # T70: v はターンごとの並びでもよい（相方待ちの札）
         c = int(round(cost))
         nxt = dict(best)
-        if v <= 0.0:
+        if max(vs) <= 0.0:
             continue                                   # 価値 0 の札は出しても計画は増えない
         for used, val in best.items():
             for t in range(T):
-                if used[t] + c <= caps[t]:
+                if vs[t] > 0.0 and used[t] + c <= caps[t]:
                     u2 = list(used); u2[t] += c; u2 = tuple(u2)
-                    cand = val + disc[t] * v
+                    cand = val + disc[t] * vs[t]
                     if cand > nxt.get(u2, -1.0):
                         nxt[u2] = cand
         best = nxt
     return max(best.values()) if best else 0.0
+
+
+def v_at(v, t):
+    """札の価値の t ターン目の値（数なら同じ・並びなら t 番目・並びより先は最後の値・None は 0）。"""
+    if v is None:
+        return 0.0
+    if isinstance(v, (list, tuple)):
+        if not v:
+            return 0.0
+        return float(v[min(int(t), len(v) - 1)])
+    return float(v)
+
+
+def v_scalar(v, s=1.0 - KO_P):
+    """札の価値を 1 つの数に（守る費用＝切ったときの機会費用に使う）＝`max_t s^t v_t`。"""
+    if not isinstance(v, (list, tuple)):
+        return 0.0 if v is None else float(v)
+    return max([0.0] + [(s ** t) * float(x) for t, x in enumerate(v)])
 
 
 def delta_h(items, extra, caps, s=1.0 - KO_P):
@@ -113,7 +139,7 @@ def playable_next(items, caps):
     """次のターン（t=1）に出せる札が在るか（コスト ≤ cap_1 かつ v > 0）。"""
     if len(caps) < 2:
         return None
-    return any((v or 0.0) > 0.0 and int(round(c)) <= caps[1] for c, v in items)
+    return any(v_at(v, 1) > 0.0 and int(round(c)) <= caps[1] for c, v in items)
 
 
 def _items(cids, cards, olp, r):
@@ -138,17 +164,162 @@ def hand_items(tok_row, ci_row, idx2cid, cards, olp, r):
     return out
 
 
+#: **相方が後で来る期待**（T70・2026-09-17・ユーザ提案「ドロー＋サーチ＋相手の攻撃によるライフで出せる札が確保できる期待値も加味」）:
+#: `on`（既定）＝「手札から出す」効果を持つ札（相方待ちの札）の `v` を **ターンごとの並び** `v_t = base + P(t までに相方が来る) × E[相方の値]` に
+#: する（`P = 1 − (1 − p)^N(t)`・`p` = 残りの山の合う札の割合・`N(t)` = t ターンで手札に入る枚数＝ドロー 1 ＋ 受けるライフ ＋ サーチの当たり）。
+#: 相方が今の手札に在れば `P = 1`。`off`＝旧（静的 `v`・効果は満額）。**新定数ゼロ**（率は全部デッキと来る攻撃から出る）。
+INFLOW_MODES = ("off", "on")
+INFLOW_MODE = "on"
+#: 自分のターンに引く枚数（規則）
+DRAWS_PER_TURN = 1.0
+
+
+def set_inflow_mode(mode):
+    global INFLOW_MODE
+    if mode not in INFLOW_MODES:
+        raise ValueError("inflow mode は %s のどれか" % (INFLOW_MODES,))
+    INFLOW_MODE = mode
+    return INFLOW_MODE
+
+
+def add_inflow_arg(ap):
+    ap.add_argument("--inflow", default=None, choices=INFLOW_MODES,
+                    help="**T70** 相方待ちの札の v をターンごと（相方が来る確率つき）にする（`on`・既定）か旧の静的 v（`off`）か")
+
+
+def apply_inflow_mode(a):
+    if getattr(a, "inflow", None) is not None:
+        set_inflow_mode(a.inflow)
+    return INFLOW_MODE
+
+
+def arrival_prob(p, n):
+    """`n` 枚入るうちに合う札（割合 `p`）が 1 枚以上来る確率 `1 − (1 − p)^n`。"""
+    p = min(1.0, max(0.0, float(p))); n = max(0.0, float(n))
+    if p >= 1.0:
+        return 1.0 if n > 0 else 0.0
+    return 1.0 - (1.0 - p) ** n
+
+
+def expected_taken(items, xs, take_cost):
+    """相手のターン 1 回に受ける攻撃の本数（守る規則で止めない攻撃＝止められない・受ける方が安い）＝ライフの札が手札に入る枚数。"""
+    items = [(it["counter"], v_scalar(it["v"])) for it in items]
+    n = 0.0
+    for x in sorted(xs, reverse=True):
+        if x < -TO.PWR_EPS:
+            continue
+        cost, idx = HG.guard_cost_min_v(items, x)
+        if cost is None or float(take_cost) - float(cost) <= 0.0:
+            n += 1.0
+            continue
+        items = [it for i, it in enumerate(items) if i not in idx]
+    return n
+
+
+def expected_search_hits(items, deck, cards):
+    """手札の探す札ごとの「合う札が k 枚の中に在る確率」の和（`search_price.search_actions`・当たれば 1 枚入る）。"""
+    if not deck:
+        return 0.0
+    import search_price as SP
+    tot = 0.0
+    for it in items:
+        c = EV._all_cards().get(it["cid"])
+        for ab in (c or {}).get("abilities") or []:
+            if (ab.get("trigger") or ab.get("timing")) not in EV.CHAR_ON_PLAY_TRIGGERS:
+                continue
+            found = SP.search_actions(EV.walk_actions(ab.get("effect")))
+            if found is None:
+                continue
+            k, target, _act = found
+            f = len(SP.eligible_deck_cards(target, deck, cards)) / float(len(deck))
+            tot += arrival_prob(f, k)
+            break
+    return tot
+
+
+def inflow_per_turn(items, xs, take_cost, deck, cards):
+    """1 ターン（自分のターン＋相手のターン）に手札へ入る枚数の期待値＝ドロー ＋ 受けるライフ ＋ サーチの当たり。"""
+    return DRAWS_PER_TURN + expected_taken(items, xs, take_cost) + expected_search_hits(items, deck, cards)
+
+
+def _ctx_with_hand(hand_cids, cards, olp, r, field=()):
+    """`use_value` に渡す状態（手札の札 id だけ・`v` は要らない）。"""
+    items = [{"cid": str(c), "cost": float((cards.info(c) or {}).get("cost") or 0.0), "v": None, "counter": 0.0,
+              "event": bool((cards.info(c) or {}).get("event"))} for c in hand_cids]
+    return {"search_ctx": {"hand_items": items, "cards": cards, "deck": [], "olp": olp, "r": r, "caps": [], "xs": [], "take": 0.0,
+                           "field": list(field)}}
+
+
+def _base_value(cid, info, cards, olp, r, field=()):
+    """相方待ちの札の「手札から出す」効果を 0 にした値（`use_value` に空の手札の状態を渡す＝コスト付きなら払わない＝0）。"""
+    return use_value(cid, info, olp, r, st=_ctx_with_hand([], cards, olp, r, field))
+
+
+def _value_with_partner(cid, info, cards, olp, r, partner, field=()):
+    """相方 1 枚が手札に在るときの札の値（効果のコスト・条件・「払わない自由」込み＝`ability_value` をそのまま通す）。"""
+    return use_value(cid, info, olp, r, st=_ctx_with_hand([partner], cards, olp, r, field))
+
+
+def inflow_item(item, others, deck, xs, take_cost, cards, olp, r, turns=PLAN_TURNS, field=()):
+    """1 枚の `v` を相方待ちの並びにする（相方待ちの札でなければそのまま）。`others` は同じ手札の残り。
+    相方が来たときの取り分は `use_value(相方が手札に在る状態) − base`＝効果のコスト・条件・払わない自由を通した値。"""
+    import search_price as SP
+    target = SP.enabler_target(item["cid"])
+    if target is None:
+        return item
+    info = cards.info(item["cid"]) or {}
+    base = _base_value(item["cid"], info, cards, olp, r, field)
+    if base is None:
+        return item
+    out = dict(item)
+    out["v_static"] = item["v"]
+    in_hand = SP.eligible_hand_cards(target, others, cards)
+    if in_hand:                                                  # 相方が今在る＝P = 1（どの t でも・一番良い相方）
+        best = max(((_value_with_partner(item["cid"], info, cards, olp, r, c, field) or 0.0) - base) for c in in_hand)
+        out["v"] = [max(0.0, base + max(0.0, best))] * turns
+        out["p_partner"] = 1.0
+        return out
+    if not deck:
+        out["v"] = [base] * turns
+        out["p_partner"] = 0.0
+        return out
+    pool = SP.eligible_deck_cards(target, deck, cards)
+    if not pool:
+        out["v"] = [base] * turns
+        out["p_partner"] = 0.0
+        return out
+    p = len(pool) / float(len(deck))
+    gains = {}
+    for c in pool:
+        if c not in gains:
+            gains[c] = max(0.0, (_value_with_partner(item["cid"], info, cards, olp, r, c, field) or 0.0) - base)
+    gain = float(np.mean([gains[c] for c in pool]))
+    n_per = inflow_per_turn(others, xs, take_cost, deck, cards)
+    out["v"] = [max(0.0, base + arrival_prob(p, n_per * t) * gain) for t in range(turns)]
+    out["p_partner"] = p
+    out["inflow_per_turn"] = n_per
+    return out
+
+
+def apply_inflow(items, deck, xs, take_cost, cards, olp, r, turns=PLAN_TURNS, field=()):
+    """手札の全部の札に `inflow_item` を当てる（`off` ならそのまま）。`field` は自分の場の札 id（コストを払えるかの判定）。"""
+    if INFLOW_MODE != "on":
+        return list(items)
+    items = list(items)
+    return [inflow_item(it, items[:k] + items[k + 1:], deck, xs, take_cost, cards, olp, r, turns, field) for k, it in enumerate(items)]
+
+
 def card_deltas(rest, card, caps, xs, take_cost):
     """1 枚の `ΔH_play`・`ΔG_guard`・`ΔH = max` と、その札がカウンター札か（2000 以上か【カウンター】イベント）。"""
     plan_items = [(it["cost"], it["v"]) for it in rest]
-    guard_items = [(it["counter"], it["v"]) for it in rest]
+    guard_items = [(it["counter"], v_scalar(it["v"])) for it in rest]
     dh = delta_h(plan_items, (card["cost"], card["v"]), caps)
-    dg = HG.delta_g(guard_items, (card["counter"], card["v"]), xs, take_cost)
+    dg = HG.delta_g(guard_items, (card["counter"], v_scalar(card["v"])), xs, take_cost)
     return {"dh": dh, "dg": dg, "dtotal": max(dh, dg), "counter": card["counter"],
             "counter_card": bool(card["counter"] >= 2000.0 - TO.PWR_EPS or (card["event"] and card["counter"] > 0.0))}
 
 
-def added_card_gains(sc_after, tok_after, ci_before, ci_after, idx2cid, cards):
+def added_card_gains(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, deck=None):
     """**窓の中で手札に入った札の `max(ΔH_play, ΔG_guard)`**（T69・物差しに手札の質を入れる）。
     入った先の手札（`ci_after`・他の入った札も含む）で読む。同じ札が 2 枚入れば別の枠を当てる。戻り値は `[(cid, gain), …]`。"""
     before = hand_ids(ci_before, idx2cid)
@@ -159,9 +330,10 @@ def added_card_gains(sc_after, tok_after, ci_before, ci_after, idx2cid, cards):
     olp = float(sc_after[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     r = max(1.0, min(5.0, float(sc_after[SC_OPP_LIFE])))
     caps = caps_of(float(sc_after[SC_MY_DON]), don_stock(sc_after, tok_after, "me"), r_turns=r)
-    items = hand_items(tok_after, ci_after, idx2cid, cards, olp, r)
     xs = HG.incoming(tok_after)
     take = HG.take_cost_of(float(sc_after[SC_MY_LIFE]))
+    items = apply_inflow(hand_items(tok_after, ci_after, idx2cid, cards, olp, r), deck, xs, take, cards, olp, r,
+                         field=own_field_ids(ci_after, idx2cid))   # T70
     used = set()
     out = []
     for cid in added:
@@ -178,8 +350,11 @@ def added_card_gains(sc_after, tok_after, ci_before, ci_after, idx2cid, cards):
 def collect(dirs, limit_games=0):
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
+    from theory_bridge import _seat_decks                    # 遅延（橋は本器を import しない）
+    import search_price as SP
+    rec_decks = SP.record_decks(dirs) if INFLOW_MODE == "on" else {}
     searches, draws = [], []
-    stats = {"games": 0, "search_rows": 0, "draw_rows": 0, "no_next": 0}
+    stats = {"games": 0, "search_rows": 0, "draw_rows": 0, "no_next": 0, "inflow": INFLOW_MODE, "search_deck_ok": 0, "search_deck_bad": 0}
     games = 0
     for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
         games += 1
@@ -187,6 +362,7 @@ def collect(dirs, limit_games=0):
             break
         stats["games"] += 1
         order = list(idx)
+        decks = _seat_decks(rec_decks, int(rows["seed"][idx[0]]), rows, ex, idx, idx2cid, stats)   # T70
         by_main, by_all = {}, {}
         for n, i in enumerate(order):
             w = int(rows["who"][i])
@@ -213,8 +389,9 @@ def collect(dirs, limit_games=0):
                     ip = order[p]
                     if int(round(float(ex["sc"][ip][SC_MY_LIFE]))) == int(round(float(sc[SC_MY_LIFE]))):
                         added = spent_cards(hand, hand_ids(ex["ci"][ip], idx2cid))
-                        hitems = hand_items(tok, ex["ci"][i], idx2cid, cards, olp, r)
                         xs = HG.incoming(tok); take = HG.take_cost_of(float(sc[SC_MY_LIFE]))
+                        hitems = apply_inflow(hand_items(tok, ex["ci"][i], idx2cid, cards, olp, r), decks.get(w), xs, take, cards, olp, r,
+                                              field=own_field_ids(ex["ci"][i], idx2cid))
                         for cid in added:
                             k_ = next((q for q, it in enumerate(hitems) if it["cid"] == cid), None)
                             if k_ is None:
@@ -222,7 +399,7 @@ def collect(dirs, limit_games=0):
                             card = hitems[k_]; rest = hitems[:k_] + hitems[k_ + 1:]
                             items = [(it["cost"], it["v"]) for it in rest]
                             d = card_deltas(rest, card, caps, xs, take)
-                            draws.append({"cid": cid, "v": card["v"], "dh": d["dh"], "dg": d["dg"], "dtotal": d["dtotal"],
+                            draws.append({"cid": cid, "v": v_scalar(card["v"]), "dh": d["dh"], "dg": d["dg"], "dtotal": d["dtotal"],
                                           "counter_card": d["counter_card"], "turn": t, "hand_n": len(hand),
                                           "playable_next_before": playable_next(items, caps)})
                         stats["draw_rows"] += 1
@@ -246,8 +423,9 @@ def collect(dirs, limit_games=0):
             caps2 = caps_of(float(sc2[SC_MY_DON]), don_stock(sc2, tok2, "me"), r_turns=r)
             after = hand_ids(ex["ci"][i2], idx2cid)
             added = spent_cards(after, hand)
-            hitems2 = hand_items(tok2, ex["ci"][i2], idx2cid, cards, olp, r)
             xs2 = HG.incoming(tok2); take2 = HG.take_cost_of(float(sc2[SC_MY_LIFE]))
+            hitems2 = apply_inflow(hand_items(tok2, ex["ci"][i2], idx2cid, cards, olp, r), decks.get(w), xs2, take2, cards, olp, r,
+                                   field=own_field_ids(ex["ci"][i2], idx2cid))
             got = []
             for c2 in added:
                 k_ = next((q for q, it in enumerate(hitems2) if it["cid"] == c2), None)
@@ -256,7 +434,7 @@ def collect(dirs, limit_games=0):
                 card = hitems2[k_]; rest = hitems2[:k_] + hitems2[k_ + 1:]
                 items = [(it["cost"], it["v"]) for it in rest]
                 d = card_deltas(rest, card, caps2, xs2, take2)
-                got.append({"cid": c2, "v": card["v"], "dh": d["dh"], "dg": d["dg"], "dtotal": d["dtotal"],
+                got.append({"cid": c2, "v": v_scalar(card["v"]), "dh": d["dh"], "dg": d["dg"], "dtotal": d["dtotal"],
                             "counter_card": d["counter_card"], "playable_next_before": playable_next(items, caps2)})
             searches.append({"cid": cid, "k": look_k(cid), "turn": t, "found": len(added), "got": got})
     return searches, draws, stats
@@ -321,14 +499,16 @@ def main(argv=None):
     TO.add_nu_mode_arg(ap)
     TO.add_surv_mode_arg(ap)
     TO.add_cbar_mode_arg(ap)
+    add_inflow_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     TO.apply_nu_mode(a)
     TO.apply_surv_mode(a)
     TO.apply_cbar_mode(a)
+    apply_inflow_mode(a)
     t0 = time.time()
     searches, draws, stats = collect(a.src, a.limit_games)
-    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "cbar_mode": a.cbar_mode, "plan_turns": PLAN_TURNS,
+    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "cbar_mode": a.cbar_mode, "inflow": INFLOW_MODE, "plan_turns": PLAN_TURNS,
            "stats": stats, "summary": summarise(searches, draws, a.min_card), "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
     print(txt)

@@ -696,6 +696,10 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
     if kind == "play":
         zone = zones[0] if zones else ""
         fv = field_value(target, nu)
+        if zone in PLAY_FROM_HAND_ZONES and not opp:
+            now = _play_from_hand_now(target, st, card, n, mu)          # T70: 今の手札に出せる札が在るか
+            if now is not None:
+                return now
         per = fv - mu if zone in PLAY_FROM_HAND_ZONES else fv
         amt = n * per
         return amt if not opp else -amt
@@ -985,6 +989,84 @@ def apply_search_price(a):
     return SEARCH_PRICE_MODE
 
 
+#: **「手札から出す」効果（`PLAY_CARD`・zone HAND）の価格の規約**（T70・2026-09-17・ユーザ決定「着手してください」）:
+#: `hand`＝**今の手札に絞り込みに合う札が在ればその札の値（体 `ν` ＋ 登場時効果 − μ）・無ければ 0**（出す札そのものは除く）／
+#: `full`＝旧（合う札が在るものとして満額 `ν̄ − μ`）。状態（`st["search_ctx"]`）が無い行は `hand` でも `full` に落ちる。
+#: 「相方が後で来る」期待は価格ではなく手札の計画 `H`（`hand_plan.apply_inflow`）に入る。
+PLAY_NOW_MODES = ("full", "hand")
+PLAY_NOW_MODE = "hand"
+
+
+def set_play_now_mode(mode):
+    global PLAY_NOW_MODE
+    if mode not in PLAY_NOW_MODES:
+        raise ValueError("play now mode は %s のどれか" % (PLAY_NOW_MODES,))
+    PLAY_NOW_MODE = mode
+    return PLAY_NOW_MODE
+
+
+def add_play_now_arg(ap):
+    ap.add_argument("--play-now", default=None, choices=PLAY_NOW_MODES,
+                    help="**T70** 「手札から出す」効果の価格: `hand`（既定・今の手札に合う札が在ればその値・無ければ 0）／`full`（旧・満額）")
+
+
+def apply_play_now(a):
+    if getattr(a, "play_now", None) is not None:
+        set_play_now_mode(a.play_now)
+    return PLAY_NOW_MODE
+
+
+def _play_from_hand_now(target, st, card, n, mu):
+    """**今の手札から出せる札の値**（T70）＝合う札のうち値（`free_value` − μ）の大きい `n` 枚の和。合う札が無ければ 0。
+    `hand` でなければ／状態が無ければ `None`（旧価格に落ちる）。"""
+    if PLAY_NOW_MODE != "hand" or not st or not st.get("search_ctx"):
+        return None
+    ctx = st["search_ctx"]
+    cards = ctx.get("cards")
+    if cards is None or ctx.get("hand_items") is None:
+        return None
+    try:
+        import search_price as SP
+        from hand_spend import free_value
+    except Exception:
+        return None
+    cid = str((card or {}).get("card_id") or (card or {}).get("id") or "") or None
+    vals = []
+    for c in SP.eligible_hand_cards(target, ctx["hand_items"], cards, skip_cid=cid):
+        fv = free_value(c, cards.info(c), ctx["olp"], ctx["r"])
+        vals.append((NU_AVG if fv is None else float(fv)) - float(mu))
+    vals.sort(reverse=True)
+    return float(sum(max(0.0, v) for v in vals[:max(1, int(n))]))
+
+
+def _cost_unpayable(cost_acts, card, st):
+    """**コストを払える札が無いか**（T70）: 自分の場（`search_ctx["field"]`）か手札（`hand_items`）から絞り込みつきで
+    札を要求するコスト（戻す・捨てる・KO 等）で、合う札が 1 枚も無ければ `True`。状態が無ければ `False`（払えるとして読む＝上限）。"""
+    if not st or not st.get("search_ctx"):
+        return False
+    ctx = st["search_ctx"]
+    cards = ctx.get("cards")
+    if cards is None:
+        return False
+    try:
+        import search_price as SP
+    except Exception:
+        return False
+    cid = str((card or {}).get("card_id") or (card or {}).get("id") or "") or None
+    for e in cost_acts:
+        t = e.get("target") or {}
+        if not t or _side(t) != "SELF":
+            continue
+        zones = _zone(t)
+        if zones == ["FIELD"] and ctx.get("field") is not None:
+            if not SP.eligible_deck_cards(t, list(ctx["field"]), cards):
+                return True
+        elif zones == ["HAND"] and ctx.get("hand_items") is not None:
+            if not SP.eligible_hand_cards(t, ctx["hand_items"], cards, skip_cid=cid):
+                return True
+    return False
+
+
 def _search_plan(acts, card, st):
     """**探す能力の計画価格**（T68）＝`(値, k, 手札に加える動作)`。`plan` でなければ／状態が無ければ／探す能力でなければ `None`。"""
     if SEARCH_PRICE_MODE != "plan" or not st or not st.get("search_ctx"):
@@ -1037,7 +1119,10 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
     if selection and found is None:
         total += _sel_premium(selection_k(acts))
     cost = ab.get("cost") or {}
-    for e in walk_actions(cost):
+    cost_acts = walk_actions(cost)
+    if cost_acts and not offered and _cost_unpayable(cost_acts, card, st):
+        return 0.0, []                                     # T70: 払える札が場・手札に無い＝効果は起きない（登場時）
+    for e in cost_acts:
         v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st=st)
         if v is None:
             unpriced.append((str(e.get("type") or "?"), family_of(str(e.get("type") or ""))))
@@ -1045,6 +1130,10 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
             total -= abs(v)          # **コストは必ず損**（向きは表ではなく役割で決まる）
     if unpriced:
         return None, unpriced
+    if cost_acts and not offered:
+        # **T70**: 登場時のコスト付き能力は「〜できる」＝払わない自由がある。効果がコストに届かなければ払わない＝0
+        # （起動メインはエンジンが候補に出した時点で払う前提なので、負の値はそのまま＝選べば損）
+        total = max(0.0, total)
     return total * condition_factor(ab, st, offered), []
 
 

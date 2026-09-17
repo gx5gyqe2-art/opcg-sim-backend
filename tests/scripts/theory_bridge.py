@@ -755,11 +755,16 @@ def main(argv=None):
                          "（`exercise`＝使った行で 1 回・ユーザ決定 2026-09-16）。"
                          "**2026-09-16 より前の `ΔG` と比べるときは `option` を明示する**")
     EV.add_search_price_arg(ap)
+    EV.add_play_now_arg(ap)
+    import hand_plan as _HP
+    _HP.add_inflow_arg(ap)
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     EV.apply_search_price(a)
+    EV.apply_play_now(a)
+    _HP.apply_inflow_mode(a)
 
     try:
         import condition_value as CV
@@ -796,6 +801,7 @@ def main(argv=None):
                            "surv_mode": _TO.SURV_MODE, "nu_mode": _TO.NU_MODE,
                            "cbar_mode": _TO.CBAR_MODE, "guard_g": GUARD_G_MODE, "take_mode": _TO.TAKE_MODE,
                            "guard_cost": GUARD_COST_MODE, "search_price": EV.SEARCH_PRICE_MODE,
+                           "play_now": EV.PLAY_NOW_MODE, "inflow": _HP.INFLOW_MODE,
                            "note": "§0.4 の暫定値。感度を付けて読む"},
            "summary": summarise(pairs, a.boot_reps, a.seed),
            # **T28-b: 行ごとに帯で切ってから足した版**（判定の主はこちら）

@@ -118,6 +118,47 @@ def search_actions(acts):
     return None
 
 
+def play_from_hand_target(acts):
+    """能力の中の「手札から出す」動作（`PLAY_CARD`・zone HAND）の target を返す。無ければ `None`（T70）。"""
+    for e in acts:
+        if str(e.get("type") or "") != "PLAY_CARD":
+            continue
+        t = e.get("target") or {}
+        zones = EV._zone(t)
+        if zones and all(z in EV.PLAY_FROM_HAND_ZONES for z in zones):
+            return t
+    return None
+
+
+_ENABLER = {}
+
+
+def enabler_target(cid, cards_json=None):
+    """その札の登場時能力に「手札から出す」動作が在れば、その絞り込み（target）。無ければ `None`（T70・使い回す）。"""
+    cid = str(cid or "")
+    if cid in _ENABLER:
+        return _ENABLER[cid]
+    c = (cards_json or EV._all_cards()).get(cid)
+    out = None
+    for ab in (c or {}).get("abilities") or []:
+        if (ab.get("trigger") or ab.get("timing")) not in EV.CHAR_ON_PLAY_TRIGGERS:
+            continue
+        t = play_from_hand_target(EV.walk_actions(ab.get("effect")))
+        if t is not None:
+            out = t
+            break
+    _ENABLER[cid] = out
+    return out
+
+
+def eligible_hand_cards(target, items, cards, skip_cid=None):
+    """手札（`hand_items`）のうち絞り込みに合う札（`skip_cid` は 1 枚だけ除く＝出す札そのもの）。"""
+    cids = [it["cid"] for it in items]
+    if skip_cid and skip_cid in cids:
+        cids.remove(skip_cid)
+    return eligible_deck_cards(target, cids, cards)
+
+
 def _card_body(cid, cards):
     info = cards.info(cid) or {}
     ident = card_identity(cid) or {}
@@ -176,7 +217,7 @@ def ctx_after_play(ctx, played_cid=None, played_cost=0.0):
 
 
 def _ctx_key(ctx):
-    return (tuple(sorted((it["cid"], round(float(it["v"] or 0.0), 6)) for it in ctx["hand_items"])),
+    return (tuple(sorted((it["cid"], round(HP.v_scalar(it["v"]), 6)) for it in ctx["hand_items"])),
             tuple(ctx["caps"]), tuple(round(float(x), 1) for x in ctx["xs"]), round(float(ctx["take"]), 6),
             round(float(ctx["olp"]), 1), round(float(ctx["r"]), 3))
 
@@ -190,6 +231,9 @@ def card_gain(cid, ctx, cards):
     info = cards.info(cid) or {}
     card = {"cid": str(cid), "cost": b["cost"], "v": use_value(cid, info, ctx["olp"], ctx["r"]),
             "counter": b["counter"], "event": bool(info.get("event"))}
+    if HP.INFLOW_MODE == "on":                                   # T70: 取れる札が相方待ちの札なら v をターンごとの並びに
+        card = HP.inflow_item(card, ctx["hand_items"], ctx.get("deck") or [], ctx["xs"], ctx["take"], cards, ctx["olp"], ctx["r"],
+                              field=ctx.get("field") or ())
     d = HP.card_deltas(ctx["hand_items"], card, ctx["caps"], ctx["xs"], ctx["take"])
     _GAIN[key] = float(d["dtotal"])
     return _GAIN[key]

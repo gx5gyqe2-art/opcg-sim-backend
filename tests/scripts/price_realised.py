@@ -160,12 +160,12 @@ def quality_correction(gains, mu=MU):
     return float(sum(float(g) - float(mu) for g in gains))
 
 
-def hand_quality_delta(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, mu=MU):
-    """**T69**: 窓の中で手札に入った札の補正 `(Σ(gain − μ), [gain, …])`。`count` なら `(0, [])`。"""
+def hand_quality_delta(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, mu=MU, deck=None):
+    """**T69**: 窓の中で手札に入った札の補正 `(Σ(gain − μ), [gain, …])`。`count` なら `(0, [])`。`deck` は T70 の相方待ちに使う。"""
     if HAND_MEAS_MODE != "quality":
         return 0.0, []
     import hand_plan as HP                     # 遅延 import（hand_plan は本器を import する）
-    gains = [g for _cid, g in HP.added_card_gains(sc_after, tok_after, ci_before, ci_after, idx2cid, cards)]
+    gains = [g for _cid, g in HP.added_card_gains(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, deck=deck)]
     return quality_correction(gains, mu), gains
 
 
@@ -287,7 +287,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 stats["scored"] += 1
                 real = state_meas(ex["sc"][i2], ex["tok"][i2]) - state_meas(sc, tok)
                 # **T69**: 窓の中で手札に入った札は μ ではなく `max(ΔH, ΔG)` で数える（`quality`）
-                hq, gains = hand_quality_delta(ex["sc"][i2], ex["tok"][i2], ex["ci"][i], ex["ci"][i2], idx2cid, cards, mu)
+                hq, gains = hand_quality_delta(ex["sc"][i2], ex["tok"][i2], ex["ci"][i], ex["ci"][i2], idx2cid, cards, mu, deck=decks.get(w))
                 real += hq
                 stats["hand_added"] += len(gains); stats["hand_quality_sum"] += hq; stats["hand_gain_sum"] += sum(gains)
                 cid = str(pol["pol_cid"][b]) or None
@@ -300,7 +300,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                        else primary_action(cid, EV.CHAR_ON_PLAY_TRIGGERS) if fam == "play" else None)
                 ite = turn_end_row.get((w, t), i2)
                 real_te = state_meas(ex["sc"][ite], ex["tok"][ite]) - state_meas(sc, tok)
-                real_te += hand_quality_delta(ex["sc"][ite], ex["tok"][ite], ex["ci"][i], ex["ci"][ite], idx2cid, cards, mu)[0]   # T69
+                real_te += hand_quality_delta(ex["sc"][ite], ex["tok"][ite], ex["ci"][i], ex["ci"][ite], idx2cid, cards, mu, deck=decks.get(w))[0]   # T69
                 # **登場の内訳**（T53）: 価格を「体（ν − μ）」「登場時効果」「機会費用」に、実現を部品に割る
                 play_parts = None
                 if fam == "play" and info is not None and not (info.get("event") or info.get("stage")):
@@ -329,7 +329,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 tk["ci_first"] = ex["ci"][i]
             tk["last"] = state_meas(ex["sc"][i2], ex["tok"][i2])
             # **T69**: ターン単位の恒等式の実現にも入った札の質を載せる（最初の行の手札 → この判断点の手札）
-            tk["last"] += hand_quality_delta(ex["sc"][i2], ex["tok"][i2], tk["ci_first"], ex["ci"][i2], idx2cid, cards, mu)[0]
+            tk["last"] += hand_quality_delta(ex["sc"][i2], ex["tok"][i2], tk["ci_first"], ex["ci"][i2], idx2cid, cards, mu, deck=decks.get(w))[0]
     return per, stats
 
 
@@ -476,6 +476,9 @@ def main(argv=None):
                     help="**T54** 後で効く効果を付与の行で数える（`option`・既定）か、使った行で数える（`exercise`＝付与の行は 0）か")
     EV.add_search_price_arg(ap)
     add_hand_meas_arg(ap)
+    EV.add_play_now_arg(ap)
+    import hand_plan as _HP
+    _HP.add_inflow_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_nu_mode(a)
@@ -486,10 +489,13 @@ def main(argv=None):
         EV.set_flow_pricing(a.flow_pricing)
     EV.apply_search_price(a)
     apply_hand_meas(a)
+    EV.apply_play_now(a)
+    _HP.apply_inflow_mode(a)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
     res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "flow_pricing": EV.FLOW_PRICING,
-           "search_price": EV.SEARCH_PRICE_MODE, "hand_meas": HAND_MEAS_MODE, "stats": stats,
+           "search_price": EV.SEARCH_PRICE_MODE, "hand_meas": HAND_MEAS_MODE,
+           "play_now": EV.PLAY_NOW_MODE, "inflow": _HP.INFLOW_MODE, "stats": stats,
            "frozen": {"lambda": LAM, "mu": MU, "delta": DELTA, "nu_meas": NU_MEAS, "theta": a.theta},
            "summary": summarise(per, a.boot_reps, a.seed), "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)

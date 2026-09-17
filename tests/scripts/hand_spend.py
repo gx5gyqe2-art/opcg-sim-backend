@@ -74,26 +74,35 @@ def spent_cards(before, after):
     return out
 
 
-def use_value(cid, info, opp_leader_power, r_turns, cards=None):
+def use_value(cid, info, opp_leader_power, r_turns, cards=None, st=None):
     """**その札を使ったときの価値（`μ` を除く）**＝切ったときの機会費用。読めなければ `None`。
-    **0 で床を打つ**——使わない自由があるので機会費用は負にならない（コストの重い小さな体は 0）。"""
+    **0 で床を打つ**——使わない自由があるので機会費用は負にならない（コストの重い小さな体は 0）。
+    `st` を渡せば登場時効果を状態で読む（T70: `st["search_ctx"]` で「手札から出す」効果は今出せる札で値付け）。"""
+    v = free_value(cid, info, opp_leader_power, r_turns, cards=cards, st=st)
+    if v is None:
+        return None
+    return max(0.0, float(v) - float(info.get("cost") or 0.0) * DELTA)
+
+
+def free_value(cid, info, opp_leader_power, r_turns, cards=None, st=None):
+    """**コストを払わずに使えたときの価値（`μ` を除く）**＝体 `ν` ＋ 登場時効果（イベントは効果・ステージは能力 1 つ）。
+    「手札から出す」効果（T70）で相方をただで出したときの取り分。読めなければ `None`。"""
     if not info:
         return None
-    cost = float(info.get("cost") or 0.0)
     if info.get("event"):
-        v, _u = EV.card_value(cid, EV.ON_PLAY_TRIGGERS, cards=cards)
-        return None if v is None else max(0.0, float(v) - cost * DELTA)
+        v, _u = EV.card_value(cid, EV.ON_PLAY_TRIGGERS, cards=cards, st=st)
+        return None if v is None else float(v)
     if info.get("stage"):
-        return max(0.0, float(EV.ABILITY_UNKNOWN) - cost * DELTA)
+        return float(EV.ABILITY_UNKNOWN)
     power = float(info.get("power") or 0.0)
     body = TO.nu_of(power, float(opp_leader_power), float(r_turns), is_blocker=bool(info.get("blocker")))
-    onplay, unp = EV.card_value(cid, EV.CHAR_ON_PLAY_TRIGGERS, no_ability=0.0, cards=cards)
+    onplay, unp = EV.card_value(cid, EV.CHAR_ON_PLAY_TRIGGERS, no_ability=0.0, cards=cards, st=st)
     if onplay is None:
         if unp and unp[0][0] == "<no_card>":
             onplay = 0.0                                   # 効果 JSON に無い札＝素の体として読む
         else:
             return None                                    # 登場時能力が読めない札は None（0 にしない）
-    return max(0.0, float(body) + float(onplay) - cost * DELTA)
+    return float(body) + float(onplay)
 
 
 def rank_of(values, target):

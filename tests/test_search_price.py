@@ -177,3 +177,75 @@ def test_the_gain_cache_and_the_draw_baseline():
     assert SP.draw_value(ctx, cards) == pytest.approx(0.02 * 2, abs=1e-9)                     # 全部 SMALL → 今出せる → 満額
     assert len(SP._GAIN) == 1                                                                 # 同じ手札・同じ札は 1 回だけ
     assert 0.0 < 1.0 - KO_P < 1.0
+
+
+def test_play_from_hand_is_priced_by_the_matching_card_in_hand_now():
+    """**T70**: 「手札から出す」効果は今の手札に合う札が在ればその値（体 ＋ 登場時効果 − μ・負なら出さない＝0）・無ければ 0・
+    出す札そのものは除く・`full` なら旧（満額）。"""
+    import hand_spend
+    cards = _Cards(_TABLE)
+    act = {"type": "PLAY_CARD", "target": {"zone": "HAND", "card_type": ["CHARACTER"], "cost_max": 4, "count": 1, "player": "SELF"}}
+    look = {"type": "LOOK", "value": {"base": 5}, "target": None}
+    assert SP.play_from_hand_target([look, act]) is act["target"] and SP.play_from_hand_target([look]) is None
+    deck_act = {"type": "PLAY_CARD", "target": {"zone": "DECK", "count": 1}}
+    assert SP.play_from_hand_target([deck_act]) is None
+    before = EV.PLAY_NOW_MODE
+    try:
+        old = EV.action_value(act)                                                          # 状態なし＝旧（満額）
+        assert old == pytest.approx(EV.field_value(act["target"]) - MU)
+        ctx = _ctx(["MID", "BIG"], [4, 6, 7, 10]); ctx["cards"] = cards
+        st = {"search_ctx": ctx}
+        fv = hand_spend.free_value("MID", _TABLE["MID"], 5000.0, 4.0)
+        assert fv > MU
+        assert EV.action_value(act, st=st) == pytest.approx(fv - MU)                        # 4 コストの体が在る → その値
+        assert EV.action_value(act, st={"search_ctx": {**ctx, "hand_items": [_item("BIG")]}}) == 0.0   # 合う札が無い → 0
+        # 体が μ に届かない小物（3000）は出しても損＝「1 枚まで」なので 0
+        assert EV.action_value(act, st={"search_ctx": {**ctx, "hand_items": [_item("SMALL")]}}) == 0.0
+        # 出す札そのもの（MID を出してその効果で MID を出す）は除く
+        assert EV.action_value(act, st=st, card={"card_id": "MID", "cost": 4}) == 0.0
+        assert SP.eligible_hand_cards({"cost_max": 4}, ctx["hand_items"], cards, skip_cid="MID") == []
+        EV.set_play_now_mode("full")
+        assert EV.action_value(act, st=st) == pytest.approx(old)
+        with pytest.raises(ValueError):
+            EV.set_play_now_mode("guess")
+    finally:
+        EV.set_play_now_mode(before)
+
+
+def test_enabler_target_is_read_from_the_on_play_ability(monkeypatch):
+    SP._ENABLER.clear()
+    fake = {"E": {"abilities": [{"trigger": "ON_PLAY", "effect": {"type": "PLAY_CARD", "target": {"zone": "HAND", "cost_max": 2}}}]},
+            "N": {"abilities": [{"trigger": "ON_PLAY", "effect": {"type": "DRAW", "value": {"base": 1}}}]}}
+    assert SP.enabler_target("E", fake)["cost_max"] == 2 and SP.enabler_target("N", fake) is None and SP.enabler_target("?", fake) is None
+    SP._ENABLER.clear()
+
+
+def test_an_on_play_ability_with_a_cost_can_be_declined_and_needs_a_payable_card():
+    """**T70**: 登場時のコスト付き能力は「〜できる」＝効果がコストに届かなければ払わない（0）・コストを払える札が場／手札に
+    無ければ効果は起きない（0）・起動メイン（`offered`）は負のまま・状態が無ければ払えるとして読む。"""
+    cards = _Cards(_TABLE)
+    bounce = {"type": "BOUNCE", "target": {"zone": "FIELD", "player": "SELF", "card_type": ["CHARACTER"], "cost_min": 2, "count": 1}}
+    play = {"type": "PLAY_CARD", "target": {"zone": "HAND", "card_type": ["CHARACTER"], "cost_max": 2, "count": 1, "player": "SELF"}}
+    ab = {"trigger": "ON_PLAY", "cost": bounce, "effect": play}
+    before = EV.PLAY_NOW_MODE
+    try:
+        v_full, unp = EV.ability_value(ab)                                            # 状態なし: 旧＝満額の効果 − 戻す費用（≥ 0 に床）
+        assert unp == [] and v_full == pytest.approx(max(0.0, (EV.field_value(play["target"]) - MU) - abs(EV.action_value(bounce))))
+        ctx = _ctx(["BIG"], [4, 6, 7, 10]); ctx["cards"] = cards; ctx["field"] = ["MID"]
+        v, _ = EV.ability_value(ab, st={"search_ctx": ctx})                           # 相方が手札に無い → 効果 0 → 払わない → 0
+        assert v == 0.0
+        assert EV._cost_unpayable([bounce], None, {"search_ctx": {**ctx, "field": ["CNT"]}}) is True     # 戻せる札（コスト 2 以上）が無い（CNT は 1）
+        assert EV._cost_unpayable([bounce], None, {"search_ctx": ctx}) is False
+        assert EV._cost_unpayable([bounce], None, None) is False
+        v0, _ = EV.ability_value(ab, st={"search_ctx": {**ctx, "field": ["CNT"], "hand_items": [_item("SMALL")]}})
+        assert v0 == 0.0                                                              # 相方は在るが戻せる札が無い → 起きない
+        # 起動メイン（エンジンが候補に出した＝払う前提）は負のまま
+        act = {"trigger": "ACTIVATE_MAIN", "cost": bounce, "effect": play}
+        va, _ = EV.ability_value(act, st={"search_ctx": ctx}, offered=True)
+        assert va < 0.0
+        # 手札から捨てるコストも同じ（合う札が無ければ払えない）
+        discard = {"type": "TRASH", "target": {"zone": "HAND", "player": "SELF", "card_type": ["EVENT"], "count": 1}}
+        assert EV._cost_unpayable([discard], None, {"search_ctx": ctx}) is True
+        assert EV._cost_unpayable([discard], None, {"search_ctx": {**ctx, "hand_items": [_item("EVT")]}}) is False
+    finally:
+        EV.set_play_now_mode(before)
