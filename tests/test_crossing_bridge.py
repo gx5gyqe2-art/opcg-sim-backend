@@ -148,3 +148,39 @@ def test_theta_hand_mode_prices_the_hand_by_quality_instead_of_the_count(monkeyp
     with pytest.raises(ValueError):
         CB.set_theta_hand_mode("nope")
     assert CB.THETA_HAND_MODE == "count"                                            # 既定は旧のまま
+
+
+def test_the_hand_carries_two_values_cuttable_for_the_threshold_and_playable_for_the_rate(monkeypatch):
+    """**T77**（ユーザ提案「手札に 2 つの価値を持たせる」）: **守る価値は耐久へ**（切れる札だけが `μ`＝`F` が切らせた札を `μ` で数えるから）・
+    **出す価値は速さへ**（今のドンで出せる体の攻撃の価格を 1 ターンの損害に足す）。"""
+    sc = _sc(3, 4); sc[T.SC_MY_LIFE], sc[T.SC_MY_HAND], sc[T.SC_MY_DON] = 5, 2, 4
+    tok = np.zeros((22, 24), np.float32)
+    import hand_plan as HP
+    # 耐久側: 4 枚中 2 枚がカウンターを持つ → 1 枚あたりは μ の半分（＝μ × 切れる枚数）
+    items = [{"cid": "A", "counter": 2000.0}, {"cid": "B", "counter": 0.0},
+             {"cid": "C", "counter": 1000.0}, {"cid": "D", "counter": 0.0}]
+    monkeypatch.setattr(HP, "search_context", lambda *a, **k: {"hand_items": items, "caps": (1,), "xs": [], "take": 0.0})
+    g = CB.hand_price_mean(sc, tok, np.zeros(24, np.int32), {}, None, part="cuttable")
+    assert g == pytest.approx(T.MU * 0.5)
+    assert CB.threshold(sc, tok, g_hand=g) == pytest.approx(3 * T.LAM + 4 * T.MU * 0.5)   # 切れない札は耐久ではない
+
+    # 速さ側: ドン 4 で出せる体の攻撃の価格の和（費用の重い札は入らない・イベントは体を持たない）
+    class _Cards:
+        DB = {"P2": {"power": 5000.0, "cost": 2}, "P3": {"power": 6000.0, "cost": 3},
+              "P9": {"power": 9000.0, "cost": 9}, "EV": {"event": True, "cost": 1}}
+
+        def info(self, cid):
+            return dict(self.DB.get(cid) or {})
+    cards = _Cards()
+    hand = [{"cid": c, "cost": cards.DB[c]["cost"], "counter": 0.0} for c in ("P2", "P3", "P9", "EV")]
+    olp = 5000.0
+    one = T.attack_value_don(5000.0, olp, True, T.THETA, T.MU)
+    two = T.attack_value_don(6000.0, olp, True, T.THETA, T.MU)
+    assert CB.playable_attack_price(hand, cards, 5, olp) == pytest.approx(one + two)      # ドン 5 なら 2 + 3 の 2 体
+    assert CB.playable_attack_price(hand, cards, 4, olp) == pytest.approx(max(one, two))  # 4 では 1 体だけ（費用 9 は出せない）
+    assert CB.playable_attack_price(hand, cards, 2, olp) == pytest.approx(one)            # ドン 2 なら安い方だけ
+    assert CB.playable_attack_price(hand, cards, 0, olp) == pytest.approx(0.0)
+    assert CB.playable_attack_price([{"cid": "EV", "cost": 1, "counter": 0.0}], cards, 4, olp) == pytest.approx(0.0)
+    with pytest.raises(ValueError):
+        CB.set_slope_mode("nope")
+    assert CB.SLOPE_MODE == "board" and CB.THETA_HAND_MODE == "count"                     # 既定は旧のまま

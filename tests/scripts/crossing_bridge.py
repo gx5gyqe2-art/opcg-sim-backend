@@ -54,7 +54,11 @@ SLOPE_FLOOR = 1e-3
 #: **手札の中身はその席の行にしか無い**（記録に相手の手札は無い）ので、`quality` は守る席の直近の自席ターン開始の行から作る
 #: ＝**攻める席が持たない情報を使う**（「本当の耐久なら当たるのか」を先に確かめる段・推定器は次の T）。
 #: `play`＝**出す側だけ**（`ΔH_play`）／`guard`＝**守る側だけ**（`ΔG_guard`＝切って止められる分）＝どちらの半分が耐久なのかの切り分け（T76）。
-THETA_HAND_MODES = ("count", "quality", "play", "guard")
+#: `cuttable`＝**T77（ユーザ提案「手札に 2 つの価値を持たせる」）の守る側**: **切れる札だけが `μ` を持つ**（カウンター値 > 0）・切れない札は 0。
+#: 根拠は**損害 `F` と耐久 `Θ` は同じものに同じ値段を付けなければならない**こと——`F` は切らせた札 1 枚を `μ` で数える（`attack_response.parts`）ので、
+#: `Θ` の手札項も切られる札 1 枚 `μ`。**切られない札（カウンター値 0）は一生 `F` に入らない**＝耐久ではない。T76 で「札の機会費用」を入れて失敗したのは、
+#: `F` が `μ` で数えている物に別の値段を付けたため。出す価値は耐久ではなく**速さ**へ（`SLOPE_MODE`）。
+THETA_HAND_MODES = ("count", "quality", "play", "guard", "cuttable")
 THETA_HAND_MODE = "count"
 
 
@@ -63,6 +67,41 @@ def set_theta_hand_mode(mode):
     if mode not in THETA_HAND_MODES:
         raise ValueError("theta hand mode は %s のどれか" % (THETA_HAND_MODES,))
     THETA_HAND_MODE = mode
+
+
+#: **速さ（1 自席ターンに積む損害）の数え方**（T77）: `board`＝旧（今の盤面の攻撃手だけ）／`hand`＝**手札から今出せる体の攻撃の価格も足す**
+#: （出す価値 `v_play` の側＝場に出れば次のターンから殴る。ドンの枠で選ぶ）。**新定数ゼロ**（攻撃の価格は `attack_value_don`・枠は規則）。
+SLOPE_MODES = ("board", "hand")
+SLOPE_MODE = "board"
+
+
+def set_slope_mode(mode):
+    global SLOPE_MODE
+    if mode not in SLOPE_MODES:
+        raise ValueError("slope mode は %s のどれか" % (SLOPE_MODES,))
+    SLOPE_MODE = mode
+
+
+def playable_attack_price(items, cards, don, olp, theta=THETA, mu=MU):
+    """**今のドンで手札から出せる体**の攻撃の価格の和（T77）＝費用の合計が `don` を超えない範囲での最大（小さなナップサック）。
+    体を持たない札（イベント・ステージ）は 0。"""
+    cand = []
+    for it in items or ():
+        info = (cards.info(it["cid"]) or {}) if cards is not None else {}
+        if info.get("event") or info.get("stage"):
+            continue
+        power = float(info.get("power") or 0.0)
+        if power <= 0.0:
+            continue
+        cost = int(round(float(it.get("cost") or 0.0)))
+        cand.append((max(0, cost), float(attack_value_don(power, olp, True, theta, mu))))
+    budget = int(max(0, round(float(don))))
+    best = [0.0] * (budget + 1)
+    for cost, val in cand:
+        for b in range(budget, cost - 1, -1):
+            if best[b - cost] + val > best[b]:
+                best[b] = best[b - cost] + val
+    return float(best[budget]) if budget >= 0 else 0.0
 
 
 def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="dtotal"):
@@ -74,6 +113,8 @@ def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="dtotal"):
     items = ctx["hand_items"]
     if not items:
         return float(mu)
+    if part == "cuttable":                       # T77: 切れる札だけが μ を持つ（1 枚あたりの平均にすると μ × 切れる枚数 / 枚数）
+        return float(mu) * float(np.mean([1.0 if float(it.get("counter") or 0.0) > 0.0 else 0.0 for it in items]))
     vals = [float(HP.card_deltas(items[:k] + items[k + 1:], it, ctx["caps"], ctx["xs"], ctx["take"])[part])
             for k, it in enumerate(items)]
     return float(np.mean(vals))
@@ -170,6 +211,18 @@ def theory_slope(tok, opp_leader_power, theta=THETA, mu=MU):
                      for x in own_attackers_of(tok, opp_leader_power)))
 
 
+def seat_slope(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU):
+    """その席が **1 自席ターンに積む損害**（理論）。`SLOPE_MODE=hand`（T77）なら**手札から今出せる体**の攻撃の価格も足す
+    ＝手札の**出す価値**をしきい値ではなく**速さ**に置く（T76 の読み）。"""
+    base = theory_slope(tok_row, olp, theta, mu)
+    if SLOPE_MODE != "hand" or cards is None:
+        return base
+    import hand_plan as HP
+    r = max(1.0, min(5.0, float(np.asarray(sc)[SC_OPP_LIFE])))
+    items = HP.hand_items(tok_row, ci_row, idx2cid, cards, olp, r)
+    return base + playable_attack_price(items, cards, float(np.asarray(sc)[SC_MY_DON]), olp, theta, mu)
+
+
 def harm_of(p):
     """実現の部品（`attack_response.parts`）のうち**相手に与えた損害**だけ（相手ライフ・相手手札・相手の体）。"""
     return float(p["opp_life"] + p["opp_hand"] + p["opp_body"])
@@ -188,7 +241,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     rows_out = []
     ledger = []            # (d) 単位の検算: 勝った席の F_end 対 Θ_start
     turn_harm = []         # 自席ターン番号 j ごとの損害（損害の輪郭＝加速を測る材料）
-    stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "theta_hand": THETA_HAND_MODE,
+    stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "theta_hand": THETA_HAND_MODE, "slope_mode": SLOPE_MODE,
              "g_sum": 0.0, "g_n": 0, "g_fallback": 0,
              "g_win_sum": 0.0, "g_win_n": 0, "g_lose_sum": 0.0, "g_lose_n": 0}
     games = 0
@@ -258,7 +311,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         # **T76**: 席ごとの手札 1 枚あたりの価格（自席の行からしか読めない）。守る席の直近の自席ターン開始の値を耐久に使う。
         g_self = {}
         if THETA_HAND_MODE != "count":
-            part = {"quality": "dtotal", "play": "dh", "guard": "dg"}[THETA_HAND_MODE]
+            part = {"quality": "dtotal", "play": "dh", "guard": "dg", "cuttable": "cuttable"}[THETA_HAND_MODE]
             for w in (0, 1):
                 for t in turn_seq[w]:
                     sc, tok, ci = turn_last.get((w, t), turn_start[(w, t)])   # 出した後の手札（ターン最後の行）
@@ -289,7 +342,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
                 th_w = threshold(sc, tok, g_hand=g_for(1 - w, t))
                 slope_hist = (f_real / j) if j > 0 else None
-                slope_theory = theory_slope(tok, olp, theta, mu)
+                slope_theory = seat_slope(sc, tok, _ci, idx2cid, cards, olp, theta, mu)   # T77
                 per_seat[(w, t)] = {"theta": th_w, "slope_hist": slope_hist, "slope_theory": slope_theory,
                                     "f_real": f_real, "t_left": len(ts) - j, "j": j}
                 turn_harm.append({"j": j, "harm": harm.get((w, t), 0.0), "slope_theory": slope_theory})
@@ -403,6 +456,8 @@ def main(argv=None):
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA)
     ap.add_argument("--theta-mode", default="const", choices=("const", "board", "max"))
+    ap.add_argument("--slope-mode", default=SLOPE_MODE, choices=SLOPE_MODES,
+                    help="**T77** 速さ: `board`（既定・今の盤面の攻撃手）／`hand`（手札から今出せる体の攻撃の価格も足す）")
     ap.add_argument("--theta-hand", default=THETA_HAND_MODE, choices=THETA_HAND_MODES,
                     help="**T76** 耐久の手札項: `count`（既定・`μ × 枚数`）／`quality`（札ごとの `max(ΔH, ΔG)` の平均を掛ける）")
     add_nu_mode_arg(ap)
@@ -411,6 +466,7 @@ def main(argv=None):
     apply_nu_mode(a)
     t0 = time.time()
     set_theta_hand_mode(a.theta_hand)
+    set_slope_mode(a.slope_mode)
     rows_out, ledger, stats, turn_harm = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
     if stats.get("g_n"):
         stats["g_mean"] = round(stats["g_sum"] / stats["g_n"], 4)
