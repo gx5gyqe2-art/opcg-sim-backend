@@ -128,6 +128,47 @@ def state_meas(sc, tok):
             - side_nu_meas(tok, SLOT_OPP_FIELD, mlp))     # 相手の体は自分のリーダーに対して
 
 
+#: **物差しの手札の項**（T69・2026-09-17・ユーザ決定「物差し側にも質は入れた方が良さそう」）:
+#: `quality`（既定）＝窓の中で**手札に入った札**を μ ではなくその札の `max(ΔH_play, ΔG_guard)`（入った先の手札で・
+#: `hand_plan.added_card_gains`）で数える。手札から出た札は μ のまま（出す価格の `−μ` と揃える）。
+#: `count`＝旧（μ × 枚数の差）。**2026-09-17 より前の数字と比べるときは `count` を明示する**。
+HAND_MEAS_MODES = ("count", "quality")
+HAND_MEAS_MODE = "quality"
+
+
+def set_hand_meas_mode(mode):
+    global HAND_MEAS_MODE
+    if mode not in HAND_MEAS_MODES:
+        raise ValueError("hand meas mode は %s のどれか" % (HAND_MEAS_MODES,))
+    HAND_MEAS_MODE = mode
+    return HAND_MEAS_MODE
+
+
+def add_hand_meas_arg(ap):
+    ap.add_argument("--hand-meas", default=None, choices=HAND_MEAS_MODES,
+                    help="**T69** 物差しの手札の項: `quality`（既定・入った札を `max(ΔH, ΔG)` で数える）／`count`（旧・μ × 枚数）")
+
+
+def apply_hand_meas(a):
+    if getattr(a, "hand_meas", None) is not None:
+        set_hand_meas_mode(a.hand_meas)
+    return HAND_MEAS_MODE
+
+
+def quality_correction(gains, mu=MU):
+    """入った札の分の補正＝Σ (`max(ΔH, ΔG)` − μ)（物差しは既に μ × 枚数を数えているので差だけ足す）。"""
+    return float(sum(float(g) - float(mu) for g in gains))
+
+
+def hand_quality_delta(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, mu=MU):
+    """**T69**: 窓の中で手札に入った札の補正 `(Σ(gain − μ), [gain, …])`。`count` なら `(0, [])`。"""
+    if HAND_MEAS_MODE != "quality":
+        return 0.0, []
+    import hand_plan as HP                     # 遅延 import（hand_plan は本器を import する）
+    gains = [g for _cid, g in HP.added_card_gains(sc_after, tok_after, ci_before, ci_after, idx2cid, cards)]
+    return quality_correction(gains, mu), gains
+
+
 #: 登場・イベントの価格が引くドンの機会費用（`theory_order.play_value`／`score_candidate` と同じ `0.66·μ`）
 DON_COST = 0.66 * MU
 #: **後で効く効果**（T53）——次の判断点には出ず、同じターンの後の行（攻撃）に実現が出る動作の型
@@ -156,7 +197,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     rec_decks = SP.record_decks(dirs) if EV.SEARCH_PRICE_MODE == "plan" else {}
     per = {}
     stats = {"games": 0, "own_rows": 0, "scored": 0, "no_next": 0, "silent": 0,
-             "search_price": EV.SEARCH_PRICE_MODE, "search_deck_ok": 0, "search_deck_bad": 0}
+             "search_price": EV.SEARCH_PRICE_MODE, "search_deck_ok": 0, "search_deck_bad": 0,
+             # **T69**: 物差しの手札の項の規約・入った札の数・補正の和（Σ(gain − μ)）・入った札の gain の平均
+             "hand_meas": HAND_MEAS_MODE, "hand_added": 0, "hand_quality_sum": 0.0, "hand_gain_sum": 0.0}
     games = 0
     for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS,
                                                     pol_cols=POL_COLS, extra_fn=_extra):
@@ -182,11 +225,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         # **ターン末の盤面**（T53）＝そのターンの最後の判断点（`TURN_END` の行）。「後で効く」効果
         # （`ACTIVE_DON`・`GRANT_KEYWORD`・`BUFF`・`REST`）の実現は次の判断点には出ず同じターンの攻撃に出るので、
         # 行 → ターン末の差分 `real_te` も持つ（後の行の実現と重なるので**型の和には使わない**・ターン単位の恒等式で読む）
-        turn_end_state = {}
+        turn_end_row = {}
         for n, i in enumerate(order):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
             if t >= 1 and PL.is_own_turn(w, t) and int(rows["kind"][i]) == 0:
-                turn_end_state[(w, t)] = state_meas(ex["sc"][i], ex["tok"][i])   # 後の行で上書き＝最後が残る
+                turn_end_row[(w, t)] = i                                        # 後の行で上書き＝最後が残る
         for n, i in enumerate(order):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
             if t < 1:
@@ -243,6 +286,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     continue
                 stats["scored"] += 1
                 real = state_meas(ex["sc"][i2], ex["tok"][i2]) - state_meas(sc, tok)
+                # **T69**: 窓の中で手札に入った札は μ ではなく `max(ΔH, ΔG)` で数える（`quality`）
+                hq, gains = hand_quality_delta(ex["sc"][i2], ex["tok"][i2], ex["ci"][i], ex["ci"][i2], idx2cid, cards, mu)
+                real += hq
+                stats["hand_added"] += len(gains); stats["hand_quality_sum"] += hq; stats["hand_gain_sum"] += sum(gains)
                 cid = str(pol["pol_cid"][b]) or None
                 # **総額**＝価格にドンの機会費用を足し戻したもの（在庫の差分と同じ土俵にする）
                 info = cards.info(cid) if cid else None
@@ -251,7 +298,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 gross = float(v) + (play_cost_term(ctx, cost, mu, th) if fam == "play" else 0.0)
                 act = (primary_action(cid) if fam == "effect"
                        else primary_action(cid, EV.CHAR_ON_PLAY_TRIGGERS) if fam == "play" else None)
-                real_te = turn_end_state.get((w, t), state_meas(ex["sc"][i2], ex["tok"][i2])) - state_meas(sc, tok)
+                ite = turn_end_row.get((w, t), i2)
+                real_te = state_meas(ex["sc"][ite], ex["tok"][ite]) - state_meas(sc, tok)
+                real_te += hand_quality_delta(ex["sc"][ite], ex["tok"][ite], ex["ci"][i], ex["ci"][ite], idx2cid, cards, mu)[0]   # T69
                 # **登場の内訳**（T53）: 価格を「体（ν − μ）」「登場時効果」「機会費用」に、実現を部品に割る
                 play_parts = None
                 if fam == "play" and info is not None and not (info.get("event") or info.get("stage")):
@@ -260,11 +309,16 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     cost_part = play_cost_term(ctx, cost, mu, th)
                     play_parts = {"nu_minus_mu": float(nu_part), "effect": float(v) - float(nu_part) + float(cost_part),
                                   "opportunity": float(cost_part), **parts(sc, tok, ex["sc"][i2], ex["tok"][i2])}
+                    # **T69**: 手札の部品にも質の補正を載せる。枚数だけの旧値は `my_hand_count` に残す（「見つけたか」はこちらで読む）
+                    play_parts["my_hand_count"] = play_parts["my_hand"]
+                    play_parts["my_hand"] = play_parts["my_hand"] + hq
+                    play_parts["hand_quality"] = float(hq)             # 補正だけ（入った札の gain の並びは行の `hand_gains`）
             else:
                 continue                       # 守りの窓は比べない（docstring）
             rec["price"][fam] += float(v); rec["real"][fam] += float(real); rec["n"][fam] += 1
             rec["rows"].append({"fam": fam, "price": float(v), "real": float(real), "real_te": float(real_te),
-                                "gross": float(gross), "act": act, "cid": cid, "turn": t, "play_parts": play_parts})
+                                "gross": float(gross), "act": act, "cid": cid, "turn": t, "play_parts": play_parts,
+                                "hand_gains": list(gains)})                                 # T69: 窓で手札に入った札の gain
             # **ターン単位の恒等式**——価格の和 対 「最初の自分の行 → 最後の自分の行」の実現
             tk = rec["turns"].setdefault(t, {"price": 0.0, "first": None, "last": None, "acts": set()})
             tk["price"] += float(v)
@@ -272,7 +326,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 tk["acts"].add(act)
             if tk["first"] is None:
                 tk["first"] = state_meas(sc, tok)
+                tk["ci_first"] = ex["ci"][i]
             tk["last"] = state_meas(ex["sc"][i2], ex["tok"][i2])
+            # **T69**: ターン単位の恒等式の実現にも入った札の質を載せる（最初の行の手札 → この判断点の手札）
+            tk["last"] += hand_quality_delta(ex["sc"][i2], ex["tok"][i2], tk["ci_first"], ex["ci"][i2], idx2cid, cards, mu)[0]
     return per, stats
 
 
@@ -418,6 +475,7 @@ def main(argv=None):
     ap.add_argument("--flow-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
                     help="**T54** 後で効く効果を付与の行で数える（`option`・既定）か、使った行で数える（`exercise`＝付与の行は 0）か")
     EV.add_search_price_arg(ap)
+    add_hand_meas_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_nu_mode(a)
@@ -427,10 +485,11 @@ def main(argv=None):
     if a.flow_pricing is not None:
         EV.set_flow_pricing(a.flow_pricing)
     EV.apply_search_price(a)
+    apply_hand_meas(a)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
     res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "flow_pricing": EV.FLOW_PRICING,
-           "search_price": EV.SEARCH_PRICE_MODE, "stats": stats,
+           "search_price": EV.SEARCH_PRICE_MODE, "hand_meas": HAND_MEAS_MODE, "stats": stats,
            "frozen": {"lambda": LAM, "mu": MU, "delta": DELTA, "nu_meas": NU_MEAS, "theta": a.theta},
            "summary": summarise(per, a.boot_reps, a.seed), "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)

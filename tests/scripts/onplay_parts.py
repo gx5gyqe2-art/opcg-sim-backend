@@ -62,8 +62,8 @@ def row_parts(r, mu=MU):
             "real": float(r["real"]), "real_te": float(r["real_te"]),
             "my_body": float(pp["my_body"]), "my_hand": float(pp["my_hand"]), "my_life": float(pp["my_life"]),
             "opp": float(sum(pp[k] for k in OPP_PARTS)), "don": float(pp["don"]),
-            # 手札の差 ≥ 0 ＝ 出した札の分を埋めた（探す効果が札を見つけた）
-            "found": 1.0 if float(pp["my_hand"]) >= -0.5 * mu else 0.0}
+            # 手札の差 ≥ 0 ＝ 出した札の分を埋めた（探す効果が札を見つけた）。**T69**: 質の補正が載る前の枚数（`my_hand_count`）で読む
+            "found": 1.0 if float(pp.get("my_hand_count", pp["my_hand"])) >= -0.5 * mu else 0.0}
 
 
 def collect(dirs, limit_games=0, cards=None):
@@ -132,15 +132,18 @@ def main(argv=None):
     TO.add_surv_mode_arg(ap)
     TO.add_cbar_mode_arg(ap)
     EV.add_search_price_arg(ap)
+    PR.add_hand_meas_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     TO.apply_nu_mode(a)
     TO.apply_surv_mode(a)
     TO.apply_cbar_mode(a)
     EV.apply_search_price(a)
+    PR.apply_hand_meas(a)
     t0 = time.time()
     rows, stats = collect(a.src, a.limit_games)
-    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "search_price": EV.SEARCH_PRICE_MODE, "stats": stats,
+    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "search_price": EV.SEARCH_PRICE_MODE,
+           "hand_meas": PR.HAND_MEAS_MODE, "stats": stats,
            "summary": summarise(rows, a.min_card_rows),
            "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)

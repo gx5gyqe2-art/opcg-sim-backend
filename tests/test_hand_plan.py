@@ -79,3 +79,29 @@ def test_summarise_compares_searched_and_drawn_delta_h():
     assert b["guard_motivated_share"] == 0.0 and b["counter_card_share"] == 0.0
     assert b["hole_before"] == 1.0 and b["dh_zero_share"] == 0.0
     assert "A" in out["by_card"] and out["k=5"]["n"] == 2
+
+
+def test_added_card_gains_reads_each_entering_card_in_the_hand_it_landed_in(monkeypatch):
+    """**T69**: 窓の中で手札に入った札（after − before の多重集合）を、入った先の手札の残りに対して `card_deltas` で読む。
+    同じ札が 2 枚入れば別の枠を当て、手札に見つからない札は落とす。"""
+    hands = {"B": ["X"], "A": ["X", "S", "S", "Y"]}                          # S が 2 枚・Y が 1 枚入った
+    monkeypatch.setattr(HP, "hand_ids", lambda ci, idx2cid: list(hands[ci]))
+    monkeypatch.setattr(HP, "hand_items", lambda tok, ci, idx2cid, cards, olp, r: [
+        {"cid": c, "cost": 1.0, "v": 0.01 * (k + 1), "counter": 0.0, "event": False} for k, c in enumerate(hands[ci])])
+    monkeypatch.setattr(HP, "caps_of", lambda a, b, turns=4, r_turns=None: [2, 3, 4, 10])
+    monkeypatch.setattr(HP, "don_stock", lambda sc, tok, side="me": 2.0)
+    monkeypatch.setattr(HP.HG, "incoming", lambda tok: [])
+    monkeypatch.setattr(HP.HG, "take_cost_of", lambda life: 0.087)
+    seen = []
+
+    def _deltas(rest, card, caps, xs, take):
+        seen.append((card["cid"], sorted(it["cid"] for it in rest), tuple(caps), tuple(xs), take))
+        return {"dtotal": card["v"], "dh": card["v"], "dg": 0.0, "counter": 0.0, "counter_card": False}
+    monkeypatch.setattr(HP, "card_deltas", _deltas)
+    sc = [0.0] * 24; sc[HP.SC_OPP_LIFE] = 4.0; sc[HP.SC_MY_DON] = 2.0; sc[HP.SC_MY_LIFE] = 3.0
+    got = HP.added_card_gains(sc, None, "B", "A", {}, None)
+    assert got == [("S", pytest.approx(0.02)), ("S", pytest.approx(0.03)), ("Y", pytest.approx(0.04))]
+    assert [s[0] for s in seen] == ["S", "S", "Y"]
+    assert seen[0][1] == ["S", "X", "Y"] and seen[1][1] == ["S", "X", "Y"] and seen[2][1] == ["S", "S", "X"]   # その札だけ除く
+    assert seen[0][2] == (2, 3, 4, 10) and seen[0][4] == 0.087
+    assert HP.added_card_gains(sc, None, "A", "B", {}, None) == []                                          # 出ただけなら空

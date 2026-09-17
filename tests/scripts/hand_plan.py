@@ -148,6 +148,33 @@ def card_deltas(rest, card, caps, xs, take_cost):
             "counter_card": bool(card["counter"] >= 2000.0 - TO.PWR_EPS or (card["event"] and card["counter"] > 0.0))}
 
 
+def added_card_gains(sc_after, tok_after, ci_before, ci_after, idx2cid, cards):
+    """**窓の中で手札に入った札の `max(ΔH_play, ΔG_guard)`**（T69・物差しに手札の質を入れる）。
+    入った先の手札（`ci_after`・他の入った札も含む）で読む。同じ札が 2 枚入れば別の枠を当てる。戻り値は `[(cid, gain), …]`。"""
+    before = hand_ids(ci_before, idx2cid)
+    after = hand_ids(ci_after, idx2cid)
+    added = spent_cards(after, before)                      # after − before（多重集合）
+    if not added:
+        return []
+    olp = float(sc_after[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+    r = max(1.0, min(5.0, float(sc_after[SC_OPP_LIFE])))
+    caps = caps_of(float(sc_after[SC_MY_DON]), don_stock(sc_after, tok_after, "me"), r_turns=r)
+    items = hand_items(tok_after, ci_after, idx2cid, cards, olp, r)
+    xs = HG.incoming(tok_after)
+    take = HG.take_cost_of(float(sc_after[SC_MY_LIFE]))
+    used = set()
+    out = []
+    for cid in added:
+        k_ = next((q for q, it in enumerate(items) if it["cid"] == cid and q not in used), None)
+        if k_ is None:
+            continue
+        used.add(k_)
+        card = items[k_]
+        rest = items[:k_] + items[k_ + 1:]
+        out.append((cid, float(card_deltas(rest, card, caps, xs, take)["dtotal"])))
+    return out
+
+
 def collect(dirs, limit_games=0):
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
