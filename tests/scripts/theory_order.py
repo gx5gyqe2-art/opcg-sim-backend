@@ -318,7 +318,12 @@ CBAR = 1.514
 #: 盤面の時計（`clock`）より `D` が細かく中央に集まる（`W(D)` 0.20 → 0.97）。輪郭は `tests/fixtures/harm_profile.json`（実測の表・
 #: 新定数ゼロ）で、**測る記録と別のセットの輪郭**を使う（`crossing_bridge.profile_for`・§0.1 条件 1）。
 W_MODES = ("flat", "clock", "curve")
-W_MODE = "flat"
+#: **出荷既定は `curve`**（2026-09-17・ユーザ決定「曲線にしましょう」・T79 で**両側を読む**ようにしてから）。
+#: 根拠は**接戦帯**（`§0.7` の読み方の主）と**恒等式の傾き**: 接戦帯の `ΔG` AUC 0.689／0.568 が `flat` の 0.663／0.563 を上回り、
+#: **理論が要求する傾き 1** に対して帯ごとの傾きが 0.8〜2.2（`flat` は 1.7〜3.7・プールは 11〜12）まで寄る。
+#: **`curve` は損害の輪郭（`tests/fixtures/harm_profile.json`）を要する**——記録のセットの種類が判らないと
+#: `theory_bridge` は `ValueError` で止まる（黙って別の `κ` で走らない）。以前の数字と比べるときは `--w-mode flat`。
+W_MODE = "curve"
 
 
 def set_w_mode(mode):
