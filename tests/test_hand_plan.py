@@ -23,15 +23,17 @@ from theory_order import KO_P  # noqa: E402
 S = 1.0 - KO_P
 
 
-def test_caps_are_active_now_then_stock_plus_one_per_turn_capped_at_ten():
-    assert HP.caps_of(2, 4) == [2, 5, 6, 10]                    # 今・次・その次・それより後（上限 10）
+def test_caps_are_active_now_then_stock_plus_two_per_turn_capped_at_ten():
+    """ドン!!フェイズは 2 枚（ユーザ指摘 2026-09-17・T66〜T70 は +1 で誤っていた）。"""
+    assert HP.caps_of(2, 4) == [2, 6, 8, 10]                    # 今・次・その次・それより後（上限 10）
     assert HP.caps_of(0, 9) == [0, 10, 10, 10]                  # 上限 10
-    assert HP.caps_of(3.4, 3.6, turns=3) == [3, 5, 10]
+    assert HP.caps_of(3.4, 3.6, turns=3) == [3, 6, 10]
     # **T68**: 「それより後」の枠は残りターン `R` に応じて 10 × max(1, R − 3)——R ≤ 3 は 1 ターンぶんのまま
-    assert HP.caps_of(2, 4, r_turns=5) == [2, 5, 6, 20]
-    assert HP.caps_of(2, 4, r_turns=4) == [2, 5, 6, 10]
-    assert HP.caps_of(2, 4, r_turns=2) == [2, 5, 6, 10]
-    assert HP.caps_of(2, 4, turns=3, r_turns=5) == [2, 5, 30]
+    assert HP.caps_of(2, 4, r_turns=5) == [2, 6, 8, 20]
+    assert HP.caps_of(2, 4, r_turns=4) == [2, 6, 8, 10]
+    assert HP.caps_of(2, 4, r_turns=2) == [2, 6, 8, 10]
+    assert HP.caps_of(2, 4, turns=3, r_turns=5) == [2, 6, 30]
+    assert HP.DON_PER_TURN == 2
 
 
 def test_the_plan_is_an_exact_knapsack_over_turns_with_discount():

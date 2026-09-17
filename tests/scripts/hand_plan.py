@@ -5,7 +5,7 @@
 
 ```
 H(手札, 状態) = max_計画 Σ_t s^t · Σ_{t に出す札} v(札)     制約: t に出す札のコスト合計 ≤ cap_t・各札は 1 回
-cap_0 = 今アクティブなドン（このターンの残り）   cap_t = min(10, 総在庫 + t)（t = 1, 2）   cap_3 = 10（それより後の枠）   s = 1 − ko_p
+cap_0 = 今アクティブなドン（このターンの残り）   cap_t = min(10, 総在庫 + 2t)（t = 1, 2・ドン!!フェイズは 2 枚）   cap_3 = 10（それより後の枠）   s = 1 − ko_p
 ΔH(札) = H(手札 ∪ {札}) − H(手札)                                  （必要な札ほど大きい・出せない札は 0）
 ```
 
@@ -50,10 +50,13 @@ from price_realised import don_stock, primary_action  # noqa: E402
 PLAN_TURNS = 4
 #: ドンの上限（規則の 10 枚）
 DON_CAP = 10
+#: 自分のターンが来るたびに増えるドンの枚数（規則: ドン!!フェイズで 2 枚・ユーザ指摘 2026-09-17「ドンの数は自ターンが来るたびに +2」。
+#: T66〜T70 は誤って +1 で計算していた）
+DON_PER_TURN = 2
 
 
 def caps_of(don_active, don_total, turns=PLAN_TURNS, r_turns=None):
-    """t = 0 は今アクティブなドン・t ≥ 1 は総在庫 + t（上限 10）。
+    """t = 0 は今アクティブなドン・t ≥ 1 は総在庫 + 2t（上限 10・ドン!!フェイズは 2 枚）。
 
     **「それより後」の枠の容量は残りターン数で決まる**（T68・2026-09-17）: `r_turns`（式が置く残りターン `R`・1〜5）を
     渡せば `10 × max(1, round(R) − (turns − 1))`＝3 ターン先より後に残るターンの数だけ 10 ドンのターンがある。
@@ -61,7 +64,7 @@ def caps_of(don_active, don_total, turns=PLAN_TURNS, r_turns=None):
     探す価値が下がる」がそのまま出る。"""
     out = [max(0, int(round(don_active)))]
     for t in range(1, turns - 1):
-        out.append(int(min(DON_CAP, max(0, int(round(don_total)) + t))))
+        out.append(int(min(DON_CAP, max(0, int(round(don_total)) + DON_PER_TURN * t))))
     if turns >= 2:
         later = 1 if r_turns is None else max(1, int(round(float(r_turns))) - (turns - 1))
         out.append(DON_CAP * later)                        # 「それより後」の枠＝上限まで出せる（割引 s^(turns−1)）
