@@ -251,14 +251,26 @@ def _state_of(sc, ci, idx2cid, tok=None, cards=None):
     return st
 
 
-def _kappa_of_row(sc, tok, t, prof=None):
+def _kappa_of_row(sc, tok, t, prof=None, g_me=None):
     """行の局面の傾き `κ` と時計の差 `d`。`W_MODE=curve`（T75）なら交点の橋の `D`（`crossing_bridge.curve_d_of_row`）、
-    それ以外は盤面の時計（`clock_of_row`・`flat` なら `κ = 1`）。"""
+    それ以外は盤面の時計（`clock_of_row`・`flat` なら `κ = 1`）。
+    `g_me`（T76）は**自分の**手札 1 枚あたりの価格（1 行から読めるのは自分の手札だけ＝相手側は `μ` のまま）。"""
     if _TO_W_MODE() == "curve" and prof is not None:
         import crossing_bridge as CB
-        cd = CB.curve_d_of_row(sc, tok, CB.own_turn_index(t), prof)
+        cd = CB.curve_d_of_row(sc, tok, CB.own_turn_index(t), prof, g_hand_of_me=g_me)
         return {"d": cd["d"], "kappa": _TOM.state_factor(cd["d"], "curve"), "tau_me": cd["tau_me"], "tau_opp": cd["tau_opp"]}
     return clock_of_row(sc, tok)
+
+
+def _g_me_of_row(sc, tok, ci_row, idx2cid, cards, cache, key):
+    """**T76**: この行の**自分の**手札 1 枚あたりの価格（`crossing_bridge.hand_price_mean`）。
+    `W_MODE=curve` かつ `THETA_HAND_MODE=quality` のときだけ計算し、`key`（席とターン）で使い回す。"""
+    import crossing_bridge as CB
+    if _TO_W_MODE() != "curve" or CB.THETA_HAND_MODE != "quality":
+        return None
+    if key not in cache:
+        cache[key] = CB.hand_price_mean(sc, tok, ci_row, idx2cid, cards)
+    return cache[key]
 
 
 def _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats=None):
@@ -356,6 +368,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
              # **T49**: 局面の傾き `κ = w(D)/w̄`（攻めの行）——平均が 1 に戻るかが `w(状態)` の検算
              "w_mode": _TO_W_MODE(), "sigma_turn": _TOM.SIGMA_TURN, "kappa_sum": 0.0, "kappa_n": 0,
              "harm_profile": (harm_profile if _TO_W_MODE() == "curve" else None),
+             # **T76**: 耐久の手札項の数え方（`crossing_bridge.THETA_HAND_MODE`）
+             "theta_hand": __import__("crossing_bridge").THETA_HAND_MODE,
              # **T58**: 決める価格（`s`）と数える価格（`g`）の規約・読み直した行の数
              "flow_pricing": EV.FLOW_PRICING, "ledger_pricing": ledger_pricing, "ledger_rescored": 0,
              # **T62**: 守りの窓の定義と、自ライフごとの内訳（受けた率・理論が受けろと言う率・`g` の平均）
@@ -378,6 +392,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
         labels, _unk = PL.label_game(rows, pol, life0, L, ptr, idx, cards)
         seen = set()
         decks = _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats)   # T68
+        g_cache = {}                                                          # T76: 席×ターンごとの手札 1 枚あたりの価格
         # **T64**: 守りの窓で実際に消えた札を読むため、席ごとの次の自席ターンの最初の main 行を引く
         first_main = {}
         if GUARD_COST_MODE == "spent":
@@ -433,7 +448,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 if nu_targets == "board":
                     ctx["opp_chars"] = opp_chars_of(tok)
                 # **T49**: 局面の傾き。価格（平均の傾きで書いた時計の差分）に掛けて `ΔG` に足す
-                ck = _kappa_of_row(sc, tok, t, prof)
+                ck = _kappa_of_row(sc, tok, t, prof,
+                                   g_me=_g_me_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t)))
                 kap = float(ck["kappa"])
                 stats["kappa_sum"] += kap; stats["kappa_n"] += 1
                 stats["d_bins"][_d_bin(ck["d"])] += 1
@@ -524,7 +540,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 if z != 0.0:
                     gl["z_win"] += int(z > 0); gl["z_n"] += 1
                 bnd = band_of(abs(float(rows["pol_v0"][i])))
-                kap = float(_kappa_of_row(sc, tok, t, prof)["kappa"])   # T49（守りの窓も同じ傾き）・T75（curve）
+                kap = float(_kappa_of_row(sc, tok, t, prof,           # T49（守りの窓も同じ傾き）・T75（curve）
+                                          g_me=_g_me_of_row(sc, tok, ex["ci"][i], idx2cid, cards,
+                                                            g_cache, (w, t)))["kappa"])
                 _add(rec, bnd, got["s"] * kap, "grd", g=got["g"] * kap)
                 if got["comfortable"]:
                     stats["grd_comfortable"] += 1
@@ -800,6 +818,10 @@ def main(argv=None):
     _HP.add_cond_clock_arg(ap)
     ap.add_argument("--harm-profile", default="cross", choices=("cross", "real", "syn"),
                     help="**T75** `--w-mode curve` の輪郭: `cross`（既定・測る記録と別のセット）／`real`／`syn`（`tests/fixtures/harm_profile.json`）")
+    import crossing_bridge as _CB
+    ap.add_argument("--theta-hand", default=_CB.THETA_HAND_MODE, choices=_CB.THETA_HAND_MODES,
+                    help="**T76** 耐久の手札項（`--w-mode curve` の `D` に効く）: `count`（既定・`μ × 枚数`）／"
+                         "`quality`（自分の手札の札ごとの `max(ΔH, ΔG)` の平均。1 行から読めるのは自分の手札だけ＝相手側は `μ` のまま）")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
@@ -808,6 +830,7 @@ def main(argv=None):
     EV.apply_play_now(a)
     _HP.apply_inflow_mode(a)
     _HP.apply_cond_clock_mode(a)
+    _CB.set_theta_hand_mode(a.theta_hand)
 
     try:
         import condition_value as CV

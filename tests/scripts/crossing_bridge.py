@@ -49,22 +49,55 @@ SLOPES = ("hist", "theory")
 SLOPE_FLOOR = 1e-3
 
 
-def threshold(sc, tok, lam=LAM, mu=MU):
-    """相手の耐久を価格で: `λ·L_opp + μ·H_opp + Σν_meas(アクティブなブロッカー)`。"""
+#: **耐久の手札項の数え方**（T76・2026-09-17・§0.6 の残り 2）: `count`＝旧（`μ × 枚数`）／`quality`＝**札 1 枚あたりの実価格**
+#: （その席の手札の札ごとの `max(ΔH_play, ΔG_guard)`＝T67 の値の平均）を `μ` の代わりに掛ける。**新定数ゼロ**（T64〜T67 の器の写し）。
+#: **手札の中身はその席の行にしか無い**（記録に相手の手札は無い）ので、`quality` は守る席の直近の自席ターン開始の行から作る
+#: ＝**攻める席が持たない情報を使う**（「本当の耐久なら当たるのか」を先に確かめる段・推定器は次の T）。
+#: `play`＝**出す側だけ**（`ΔH_play`）／`guard`＝**守る側だけ**（`ΔG_guard`＝切って止められる分）＝どちらの半分が耐久なのかの切り分け（T76）。
+THETA_HAND_MODES = ("count", "quality", "play", "guard")
+THETA_HAND_MODE = "count"
+
+
+def set_theta_hand_mode(mode):
+    global THETA_HAND_MODE
+    if mode not in THETA_HAND_MODES:
+        raise ValueError("theta hand mode は %s のどれか" % (THETA_HAND_MODES,))
+    THETA_HAND_MODE = mode
+
+
+def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="dtotal"):
+    """**その席の手札 1 枚あたりの価格**（T76）＝自分の手札の札ごとの `max(ΔH_play, ΔG_guard)`（T67）の平均。
+    `part="dh"` なら出す側だけ（守る備えを外した切り分け）。手札が空なら `μ`（旧の数え方）。
+    来る攻撃・受ける損・ドンの枠はその席の行から採る（`hand_plan.search_context`）。"""
+    import hand_plan as HP
+    ctx = HP.search_context(sc, tok_row, ci_row, idx2cid, cards, None)
+    items = ctx["hand_items"]
+    if not items:
+        return float(mu)
+    vals = [float(HP.card_deltas(items[:k] + items[k + 1:], it, ctx["caps"], ctx["xs"], ctx["take"])[part])
+            for k, it in enumerate(items)]
+    return float(np.mean(vals))
+
+
+def threshold(sc, tok, lam=LAM, mu=MU, g_hand=None):
+    """相手の耐久を価格で: `λ·L_opp + g·H_opp + Σν_meas(アクティブなブロッカー)`。
+    `g` は手札 1 枚あたりの価格（`None`＝`μ`＝旧・T76 の `quality` では相手の手札から作った実価格）。"""
     sc = np.asarray(sc); tok = np.asarray(tok)
     mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-    th = lam * float(sc[SC_OPP_LIFE]) + mu * float(sc[SC_OPP_HAND])
+    g = float(mu if g_hand is None else g_hand)
+    th = lam * float(sc[SC_OPP_LIFE]) + g * float(sc[SC_OPP_HAND])
     for s in range(SLOT_OPP_FIELD.start, SLOT_OPP_FIELD.stop):
         if float(tok[s, S_IS_CHAR]) > 0.5 and float(tok[s, S_IS_BLOCKER]) > 0.5 and float(tok[s, S_IS_REST]) <= 0.5:
             th += nu_meas_of(slot_power(tok, s) or 0.0, mlp)
     return float(th)
 
 
-def threshold_of_me(sc, tok, lam=LAM, mu=MU):
-    """**自分の耐久**（相手から見たしきい値）: `λ·L_me + μ·H_me + Σν_meas(自分のアクティブなブロッカー)`（T75）。"""
+def threshold_of_me(sc, tok, lam=LAM, mu=MU, g_hand=None):
+    """**自分の耐久**（相手から見たしきい値）: `λ·L_me + g·H_me + Σν_meas(自分のアクティブなブロッカー)`（T75・`g` は T76）。"""
     sc = np.asarray(sc); tok = np.asarray(tok)
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-    th = lam * float(sc[SC_MY_LIFE]) + mu * float(sc[SC_MY_HAND])
+    g = float(mu if g_hand is None else g_hand)
+    th = lam * float(sc[SC_MY_LIFE]) + g * float(sc[SC_MY_HAND])
     for s in range(SLOT_OWN_FIELD.start, SLOT_OWN_FIELD.stop):
         if float(tok[s, S_IS_CHAR]) > 0.5 and float(tok[s, S_IS_BLOCKER]) > 0.5 and float(tok[s, S_IS_REST]) <= 0.5:
             th += nu_meas_of(slot_power(tok, s) or 0.0, olp)
@@ -114,11 +147,13 @@ def profile_for(dirs, name="cross", path=None):
     return [float(x) for x in v] if v else None
 
 
-def curve_d_of_row(sc, tok, j, prof):
+def curve_d_of_row(sc, tok, j, prof, g_hand_of_opp=None, g_hand_of_me=None):
     """**交点の近さ `D`**（T75）＝両席の到達ターンの差 `τ_opp − τ_me`（正なら自分が先に届く）。
-    `τ_me` は自分が相手の耐久 `Θ_me` に、`τ_opp` は相手が自分の耐久 `Θ_opp` に、同じ輪郭で積んで届くターン数（相手も同じ自席ターン番号 `j` と置く）。"""
-    th_me = threshold(sc, tok)
-    th_opp = threshold_of_me(sc, tok)
+    `τ_me` は自分が相手の耐久 `Θ_me` に、`τ_opp` は相手が自分の耐久 `Θ_opp` に、同じ輪郭で積んで届くターン数（相手も同じ自席ターン番号 `j` と置く）。
+    `g_hand_of_opp`／`g_hand_of_me` は**その席の手札**の 1 枚あたりの価格（T76・`None` なら `μ`）。1 行からは自分の手札しか読めないので、
+    線形の橋では `g_hand_of_me` だけが入る（相手側は `μ` のまま＝非対称・報告で明示する）。"""
+    th_me = threshold(sc, tok, g_hand=g_hand_of_opp)
+    th_opp = threshold_of_me(sc, tok, g_hand=g_hand_of_me)
     tau_me = tau_from_profile(th_me, int(j), prof)
     tau_opp = tau_from_profile(th_opp, int(j), prof)
     return {"d": float(tau_opp - tau_me), "tau_me": tau_me, "tau_opp": tau_opp, "theta_me": th_me, "theta_opp": th_opp}
@@ -153,7 +188,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     rows_out = []
     ledger = []            # (d) 単位の検算: 勝った席の F_end 対 Θ_start
     turn_harm = []         # 自席ターン番号 j ごとの損害（損害の輪郭＝加速を測る材料）
-    stats = {"games": 0, "turns": 0, "rows_bracketed": 0}
+    stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "theta_hand": THETA_HAND_MODE,
+             "g_sum": 0.0, "g_n": 0, "g_fallback": 0,
+             "g_win_sum": 0.0, "g_win_n": 0, "g_lose_sum": 0.0, "g_lose_n": 0}
     games = 0
     for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
         games += 1
@@ -169,7 +206,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         for w, ns in by_seat.items():
             for a, b in zip(ns, ns[1:]):
                 nxt[a] = b
-        turn_start = {}       # (w, t) -> (sc, tok)
+        turn_start = {}       # (w, t) -> (sc, tok, ci)
+        turn_last = {}        # (w, t) -> その席のそのターン最後の行（T76: 出した後の手札で 1 枚あたりの価格を測る）
         turn_seq = {0: [], 1: []}
         harm = {}             # (w, t) -> 実現の損害の和（そのターン）
         priced = {}           # (w, t) -> 攻撃の価格の和（そのターン）
@@ -185,8 +223,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             if k < 1 or ch < 0 or ch >= k:
                 continue
             sc, tok = ex["sc"][i], ex["tok"][i]
+            turn_last[(w, t)] = (sc, tok, ex["ci"][i])
             if (w, t) not in turn_start:
-                turn_start[(w, t)] = (sc, tok)
+                turn_start[(w, t)] = (sc, tok, ex["ci"][i])
                 turn_seq[w].append(t)
                 harm[(w, t)] = 0.0; priced[(w, t)] = 0.0
                 stats["turns"] += 1
@@ -216,15 +255,39 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 priced[(w, t)] += float(v)
         if len(z_of) < 2 or not turn_seq[0] or not turn_seq[1]:
             continue
+        # **T76**: 席ごとの手札 1 枚あたりの価格（自席の行からしか読めない）。守る席の直近の自席ターン開始の値を耐久に使う。
+        g_self = {}
+        if THETA_HAND_MODE != "count":
+            part = {"quality": "dtotal", "play": "dh", "guard": "dg"}[THETA_HAND_MODE]
+            for w in (0, 1):
+                for t in turn_seq[w]:
+                    sc, tok, ci = turn_last.get((w, t), turn_start[(w, t)])   # 出した後の手札（ターン最後の行）
+                    g_self[(w, t)] = hand_price_mean(sc, tok, ci, idx2cid, cards, mu, part)
+
+        def g_for(defender, t):
+            """守る席の手札 1 枚あたりの価格（その席の直近の自席ターン開始・無ければ `None`＝`μ`）。
+            **勝った席と負けた席で分けて集計する**（T76 の切り分け: 勝つ席ほど手札を場に出していて 1 枚あたりが安い、を確かめる）。"""
+            if THETA_HAND_MODE == "count":
+                return None
+            prev = [tt for tt in turn_seq[defender] if tt <= t]
+            g = g_self.get((defender, prev[-1])) if prev else None
+            if g is None:
+                stats["g_fallback"] += 1
+            else:
+                stats["g_sum"] += float(g); stats["g_n"] += 1
+                side = "win" if z_of.get(defender, 0.0) > 0.5 else "lose"
+                stats["g_%s_sum" % side] += float(g); stats["g_%s_n" % side] += 1
+            return g
+
         # 席ごとの自席ターン開始点で、両席の τ を出す（相手は直前の自分のターン開始の値）
         per_seat = {}
         for w in (0, 1):
             ts = turn_seq[w]
             f_real = 0.0
             for j, t in enumerate(ts):
-                sc, tok = turn_start[(w, t)]
+                sc, tok, _ci = turn_start[(w, t)]
                 olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-                th_w = threshold(sc, tok)
+                th_w = threshold(sc, tok, g_hand=g_for(1 - w, t))
                 slope_hist = (f_real / j) if j > 0 else None
                 slope_theory = theory_slope(tok, olp, theta, mu)
                 per_seat[(w, t)] = {"theta": th_w, "slope_hist": slope_hist, "slope_theory": slope_theory,
@@ -340,12 +403,20 @@ def main(argv=None):
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA)
     ap.add_argument("--theta-mode", default="const", choices=("const", "board", "max"))
+    ap.add_argument("--theta-hand", default=THETA_HAND_MODE, choices=THETA_HAND_MODES,
+                    help="**T76** 耐久の手札項: `count`（既定・`μ × 枚数`）／`quality`（札ごとの `max(ΔH, ΔG)` の平均を掛ける）")
     add_nu_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_nu_mode(a)
     t0 = time.time()
+    set_theta_hand_mode(a.theta_hand)
     rows_out, ledger, stats, turn_harm = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
+    if stats.get("g_n"):
+        stats["g_mean"] = round(stats["g_sum"] / stats["g_n"], 4)
+    for side in ("win", "lose"):
+        if stats.get("g_%s_n" % side):
+            stats["g_%s_mean" % side] = round(stats["g_%s_sum" % side] / stats["g_%s_n" % side], 4)
     res = {"nu_mode": a.nu_mode, "stats": stats, "frozen": {"lambda": LAM, "mu": MU, "theta": a.theta},
            "summary": summarise(rows_out, ledger, turn_harm), "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
