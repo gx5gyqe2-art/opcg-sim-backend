@@ -1145,7 +1145,27 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
         # **T70**: 登場時のコスト付き能力は「〜できる」＝払わない自由がある。効果がコストに届かなければ払わない＝0
         # （起動メインはエンジンが候補に出した時点で払う前提なので、負の値はそのまま＝選べば損）
         total = max(0.0, total)
+    dc = _don_attach_cost(ab, st, offered)                    # T74: 【ドン!!×N】＝付ける選択（費用 N·δ/R・付けない自由＝0 に床）
+    if dc > 0.0:
+        total = max(0.0, total - dc)
     return total * condition_factor(ab, st, offered), []
+
+
+def _don_attach_cost(ab, st, offered):
+    """**【ドン!!×N】の費用**（T74・2026-09-17・ユーザ決定「両方やりましょうか」）＝付けるドン N 枚の 1 ターンぶんの使用権
+    `N × δ_A`・`δ_A = δ / R`（§0.1・T57 の実測 0.0067／0.0142 と同じ形・新定数ゼロ）。`offered`（候補に出た起動メイン＝付いている）は 0。
+    状態が無ければ 0（上限として読む）。効果がこの費用に届かなければ付けない＝0 に床（呼び側の `total` は負にしない）。"""
+    if offered or not st:
+        return 0.0
+    try:
+        import condition_value as CV
+    except Exception:
+        return 0.0
+    n = CV.has_don_requirement((ab or {}).get("condition"))
+    if not n:
+        return 0.0
+    r = float(st.get("r_turns") or 0.0) or 4.0
+    return float(n) * DELTA / max(1.0, r)
 
 
 #: 登場時に解決する契機（イベントを `PLAY` したときに効くもの）。

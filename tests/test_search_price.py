@@ -249,3 +249,24 @@ def test_an_on_play_ability_with_a_cost_can_be_declined_and_needs_a_payable_card
         assert EV._cost_unpayable([discard], None, {"search_ctx": {**ctx, "hand_items": [_item("EVT")]}}) is False
     finally:
         EV.set_play_now_mode(before)
+
+
+def test_a_don_attach_requirement_is_a_choice_that_costs_n_active_don_for_a_turn():
+    """**T74**: 【ドン!!×N】は付ける選択＝効果から `N × δ / R` を引く（付けない自由＝0 に床）。付けられなければ（アクティブ < N）条件は偽で 0。
+    候補に出た起動メイン（`offered`）は付いている前提で費用なし。状態が無ければ費用なし（上限）。"""
+    import condition_value as CV
+    draw = {"type": "DRAW", "value": {"base": 1}, "target": None}
+    cond = {"type": "HAS_DON", "operator": "GE", "value": 2, "player": "SELF", "args": []}
+    ab = {"trigger": "ON_ATTACK", "effect": draw, "condition": cond}
+    assert CV.has_don_requirement(cond) == 2 and CV.has_don_requirement({"type": "AND", "args": [cond, {"type": "HAS_DON", "value": 3, "args": []}]}) == 3
+    assert CV.has_don_requirement({"type": "LIFE_COUNT", "value": 2, "args": []}) is None
+    full, _ = EV.ability_value(ab)                                                     # 状態なし＝費用なし
+    assert full == pytest.approx(MU)
+    st = {"my_don_active": 3, "r_turns": 4.0}
+    v, _ = EV.ability_value(ab, st=st)
+    assert v == pytest.approx(MU - 2 * EV.DELTA / 4.0)
+    assert EV.ability_value(ab, st={"my_don_active": 1, "r_turns": 4.0})[0] == 0.0     # 付けられない → 条件が偽
+    assert EV.ability_value(ab, st=st, offered=True)[0] == pytest.approx(MU)           # 付いている前提
+    tiny = {"trigger": "ON_ATTACK", "effect": {"type": "DRAW", "value": {"base": 1}, "target": None},
+            "condition": {"type": "HAS_DON", "operator": "GE", "value": 9, "player": "SELF", "args": []}}
+    assert EV.ability_value(tiny, st={"my_don_active": 10, "r_turns": 1.0})[0] == 0.0  # 費用 9δ > μ → 付けない

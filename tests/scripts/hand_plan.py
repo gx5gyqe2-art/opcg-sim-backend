@@ -255,6 +255,7 @@ def _ctx_with_hand(hand_cids, cards, olp, r, field=(), base=None):
     st.update({"search_ctx": {"hand_items": items, "cards": cards, "deck": [], "olp": olp, "r": r, "caps": [], "xs": [], "take": 0.0,
                               "field": list(field)},
                "source_rested": False, "cards": cards})               # 出た札はアクティブ
+    st.setdefault("r_turns", r)                                       # T74: 【ドン!!×N】の費用 N·δ/R
     st.setdefault("my_field_ids", list(field))
     st.setdefault("my_field_rest", [False] * len(list(field)))
     return st
@@ -271,47 +272,153 @@ def _value_with_partner(cid, info, cards, olp, r, partner, field=(), st_base=Non
 
 
 def state_of_row(sc, tok_row, ci_row, idx2cid, cards):
-    """判断点の状態（条件の判定用・`theory_bridge._state_of`＝場の札 id・レスト・総在庫・`cards` 込み）。"""
+    """判断点の状態（条件の判定用・`theory_bridge._state_of`＝場の札 id・レスト・総在庫・`cards` 込み）。
+    **T73**: 自分の攻撃手の超過 `x`（相手リーダー相手・時計の「相手のライフが減る本数」用）と `r_turns` も載せる。"""
     from theory_bridge import _state_of
-    return _state_of(sc, ci_row, idx2cid, tok=tok_row, cards=cards)
+    st = _state_of(sc, ci_row, idx2cid, tok=tok_row, cards=cards)
+    if st is not None:
+        olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+        st["my_attack_xs"] = list(TO.own_attackers_of(tok_row, olp))
+        st["r_turns"] = max(1.0, min(5.0, float(sc[SC_OPP_LIFE])))
+    return st
+
+
+#: **条件の時計**（T73・2026-09-17・ユーザ決定「両方やりましょうか」）: 条件付きの登場時能力を持つ札の `v` を、t ターン後に**進めた状態**で
+#: 読んだターンごとの並びにする。時計は全部規則と理論から出る（**新定数ゼロ**）:
+#:   ドン: 自分のターンごとに +2（上限 10・ターン開始は全部アクティブ）  相手のドンも +2
+#:   自分のライフ: 受ける本数（守る規則で止めない攻撃）× t        相手のライフ: 自分の攻撃のうち受ける規則（c(x) > Θ）が受けろと言う本数 × t
+#:   トラッシュ: カウンターで切る枚数 ＋ KO される体（ko_p × 場の数）＋ 使うイベント（手札の使えるイベント ÷ 計画の長さ）  × t
+#:   ターン: +2t。場の数・手札枚数はそのまま（限界）。`off` なら今の状態で全 t を読む（T72 まで）。
+COND_CLOCK_MODES = ("off", "on")
+COND_CLOCK_MODE = "on"
+
+
+def set_cond_clock_mode(mode):
+    global COND_CLOCK_MODE
+    if mode not in COND_CLOCK_MODES:
+        raise ValueError("cond clock mode は %s のどれか" % (COND_CLOCK_MODES,))
+    COND_CLOCK_MODE = mode
+    return COND_CLOCK_MODE
+
+
+def add_cond_clock_arg(ap):
+    ap.add_argument("--cond-clock", default=None, choices=COND_CLOCK_MODES,
+                    help="**T73** 条件付きの札の v を t ターン後の状態（ドン +2・ライフ・トラッシュ・ターンの時計）で読む（`on`・既定）か今の状態（`off`）か")
+
+
+def apply_cond_clock_mode(a):
+    if getattr(a, "cond_clock", None) is not None:
+        set_cond_clock_mode(a.cond_clock)
+    return COND_CLOCK_MODE
+
+
+_HAS_COND = {}
+
+
+def has_on_play_condition(cid):
+    """その札の登場時能力に条件が在るか（使い回す）。"""
+    cid = str(cid or "")
+    if cid in _HAS_COND:
+        return _HAS_COND[cid]
+    c = EV._all_cards().get(cid)
+    out = any(bool(ab.get("condition")) for ab in ((c or {}).get("abilities") or [])
+              if (ab.get("trigger") or ab.get("timing")) in EV.CHAR_ON_PLAY_TRIGGERS)
+    _HAS_COND[cid] = out
+    return out
+
+
+def counters_cut(items, xs, take_cost):
+    """相手のターン 1 回にカウンターで切る枚数の期待値（守る規則が止める攻撃の組の枚数の和）。"""
+    its = [(it["counter"], v_scalar(it["v"])) for it in items]
+    n = 0
+    for x in sorted(xs, reverse=True):
+        if x < -TO.PWR_EPS:
+            continue
+        cost, idx = HG.guard_cost_min_v(its, x)
+        if cost is None or float(take_cost) - float(cost) <= 0.0:
+            continue
+        n += len(idx)
+        its = [it for i, it in enumerate(its) if i not in idx]
+    return float(n)
+
+
+def opp_life_loss_per_turn(st):
+    """自分の攻撃のうち、受ける規則（`c(x) > Θ`＝守るより受ける方が安い）が受けろと言う本数＝相手のライフが 1 ターンに減る枚数。"""
+    xs = st.get("my_attack_xs") or []
+    return float(sum(1 for x in xs if x >= -TO.PWR_EPS and float(TO.c_of(x)) > float(TO.THETA)))
+
+
+def project_state(st, t, items, xs, take_cost, turns=PLAN_TURNS):
+    """判断点の状態を t ターン後へ進める（`t = 0` はそのまま・`COND_CLOCK_MODE=off` もそのまま）。"""
+    if not st or int(t) <= 0 or COND_CLOCK_MODE != "on":
+        return st
+    t = int(t)
+    out = dict(st)
+    for p in ("my_", "opp_"):
+        tot = out.get(p + "don_total")
+        if tot is not None:
+            tot2 = min(float(DON_CAP), float(tot) + DON_PER_TURN * t)
+            out[p + "don_total"] = tot2
+            out[p + "don"] = int(round(tot2))
+            out[p + "don_active"] = int(round(tot2))               # ターン開始は全部アクティブ
+    if out.get("my_life") is not None:
+        out["my_life"] = max(0.0, float(out["my_life"]) - expected_taken(items, xs, take_cost) * t)
+    if out.get("opp_life") is not None:
+        out["opp_life"] = max(0.0, float(out["opp_life"]) - opp_life_loss_per_turn(out) * t)
+    if out.get("my_trash") is not None:
+        cut = counters_cut(items, xs, take_cost)
+        ko = float(KO_P) * float(len(out.get("my_field_ids") or []))
+        ev = float(sum(1 for it in items if it.get("event") and v_scalar(it["v"]) > 0.0)) / float(max(1, turns))
+        out["my_trash"] = float(out["my_trash"]) + (cut + ko + ev) * t
+    if out.get("turn") is not None:
+        out["turn"] = int(out["turn"]) + 2 * t
+    return out
 
 
 def inflow_item(item, others, deck, xs, take_cost, cards, olp, r, turns=PLAN_TURNS, field=(), st_base=None):
-    """1 枚の `v` を相方待ちの並びにする（相方待ちの札でなければそのまま）。`others` は同じ手札の残り。
+    """1 枚の `v` をターンごとの並びにする（相方待ちの札＝T70・条件付きの札＝T73・どちらでもなければそのまま）。
+    `others` は同じ手札の残り。t ターン目は `project_state(st_base, t)`（時計を進めた状態）で読む。
     相方が来たときの取り分は `use_value(相方が手札に在る状態) − base`＝効果のコスト・条件・払わない自由を通した値。"""
     import search_price as SP
     target = SP.enabler_target(item["cid"])
-    if target is None:
+    cond = bool(st_base) and COND_CLOCK_MODE == "on" and has_on_play_condition(item["cid"])
+    if target is None and not cond:
         return item
     info = cards.info(item["cid"]) or {}
-    base = _base_value(item["cid"], info, cards, olp, r, field, st_base)
-    if base is None:
+    states = [project_state(st_base, t, others, xs, take_cost, turns) for t in range(turns)]
+    if target is None:                                           # 条件だけ＝時計を進めた状態で読む
+        vs = [use_value(item["cid"], info, olp, r, st=_ctx_with_hand([], cards, olp, r, field, states[t])) for t in range(turns)]
+        if any(v is None for v in vs):
+            return item
+        out = dict(item)
+        out["v_static"] = item["v"]
+        out["v"] = [max(0.0, float(v)) for v in vs]
+        return out
+    bases = [_base_value(item["cid"], info, cards, olp, r, field, states[t]) for t in range(turns)]
+    if any(b is None for b in bases):
         return item
     out = dict(item)
     out["v_static"] = item["v"]
     in_hand = SP.eligible_hand_cards(target, others, cards)
     if in_hand:                                                  # 相方が今在る＝P = 1（どの t でも・一番良い相方）
-        best = max(((_value_with_partner(item["cid"], info, cards, olp, r, c, field, st_base) or 0.0) - base) for c in in_hand)
-        out["v"] = [max(0.0, base + max(0.0, best))] * turns
+        out["v"] = [max(0.0, bases[t] + max(0.0, max(((_value_with_partner(item["cid"], info, cards, olp, r, c, field, states[t]) or 0.0) - bases[t])
+                                                        for c in in_hand))) for t in range(turns)]
         out["p_partner"] = 1.0
         return out
-    if not deck:
-        out["v"] = [base] * turns
-        out["p_partner"] = 0.0
-        return out
-    pool = SP.eligible_deck_cards(target, deck, cards)
+    pool = SP.eligible_deck_cards(target, deck, cards) if deck else []
     if not pool:
-        out["v"] = [base] * turns
+        out["v"] = [max(0.0, b) for b in bases]
         out["p_partner"] = 0.0
         return out
     p = len(pool) / float(len(deck))
-    gains = {}
-    for c in pool:
-        if c not in gains:
-            gains[c] = max(0.0, (_value_with_partner(item["cid"], info, cards, olp, r, c, field, st_base) or 0.0) - base)
-    gain = float(np.mean([gains[c] for c in pool]))
+    uniq = sorted(set(pool))
     n_per = inflow_per_turn(others, xs, take_cost, deck, cards)
-    out["v"] = [max(0.0, base + arrival_prob(p, n_per * t) * gain) for t in range(turns)]
+    vs = []
+    for t in range(turns):
+        gains = {c: max(0.0, (_value_with_partner(item["cid"], info, cards, olp, r, c, field, states[t]) or 0.0) - bases[t]) for c in uniq}
+        gain = float(np.mean([gains[c] for c in pool]))
+        vs.append(max(0.0, bases[t] + arrival_prob(p, n_per * t) * gain))
+    out["v"] = vs
     out["p_partner"] = p
     out["inflow_per_turn"] = n_per
     return out
@@ -520,15 +627,18 @@ def main(argv=None):
     TO.add_surv_mode_arg(ap)
     TO.add_cbar_mode_arg(ap)
     add_inflow_arg(ap)
+    add_cond_clock_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     TO.apply_nu_mode(a)
     TO.apply_surv_mode(a)
     TO.apply_cbar_mode(a)
     apply_inflow_mode(a)
+    apply_cond_clock_mode(a)
     t0 = time.time()
     searches, draws, stats = collect(a.src, a.limit_games)
-    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "cbar_mode": a.cbar_mode, "inflow": INFLOW_MODE, "plan_turns": PLAN_TURNS,
+    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "cbar_mode": a.cbar_mode, "inflow": INFLOW_MODE, "cond_clock": COND_CLOCK_MODE,
+           "plan_turns": PLAN_TURNS,
            "stats": stats, "summary": summarise(searches, draws, a.min_card), "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
     print(txt)

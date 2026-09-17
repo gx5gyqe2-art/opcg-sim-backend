@@ -160,6 +160,21 @@ def _decide_interval(lo, hi, op, target):
     return a if a == b else None
 
 
+def has_don_requirement(cond):
+    """条件の木の中の【ドン!!×N】の N（最大）。無ければ `None`（T74・付ける選択として価格に載せる）。"""
+    if not isinstance(cond, dict):
+        return None
+    best = None
+    if str(cond.get("type") or "") == "HAS_DON":
+        v = _int_value(cond)
+        best = v if v is not None else None
+    for c in cond.get("args") or []:
+        v = has_don_requirement(c)
+        if v is not None and (best is None or v > best):
+            best = v
+    return best
+
+
 def holds(cond, st):
     """**その条件は成り立つか**（`True`／`False`／判らなければ `None`）。
 
