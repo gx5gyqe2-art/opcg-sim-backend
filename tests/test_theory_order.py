@@ -1116,3 +1116,17 @@ def test_the_take_cost_by_life_is_the_measured_lambda_minus_the_hand_share():
     finally:
         T.set_take_mode(before)
     assert T.TAKE_MODE == before
+
+
+def test_the_curve_w_mode_uses_the_same_density_as_the_clock_mode():
+    """**T75**: `curve` は `κ = w(D)/w̄`（`clock` と同じ密度）・`flat` は 1・不正な mode は弾く。"""
+    import theory_order as TO
+    assert TO.state_factor(0.0, "curve") == pytest.approx(TO.state_factor(0.0, "clock")) and TO.state_factor(0.0, "curve") > 1.0
+    assert TO.state_factor(3.0, "curve") < TO.state_factor(0.0, "curve") and TO.state_factor(5.0, "flat") == 1.0
+    before = TO.W_MODE
+    try:
+        assert TO.set_w_mode("curve") == "curve"
+        with pytest.raises(ValueError):
+            TO.set_w_mode("guess")
+    finally:
+        TO.set_w_mode(before)

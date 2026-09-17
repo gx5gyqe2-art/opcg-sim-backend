@@ -251,6 +251,16 @@ def _state_of(sc, ci, idx2cid, tok=None, cards=None):
     return st
 
 
+def _kappa_of_row(sc, tok, t, prof=None):
+    """行の局面の傾き `κ` と時計の差 `d`。`W_MODE=curve`（T75）なら交点の橋の `D`（`crossing_bridge.curve_d_of_row`）、
+    それ以外は盤面の時計（`clock_of_row`・`flat` なら `κ = 1`）。"""
+    if _TO_W_MODE() == "curve" and prof is not None:
+        import crossing_bridge as CB
+        cd = CB.curve_d_of_row(sc, tok, CB.own_turn_index(t), prof)
+        return {"d": cd["d"], "kappa": _TOM.state_factor(cd["d"], "curve"), "tau_me": cd["tau_me"], "tau_opp": cd["tau_opp"]}
+    return clock_of_row(sc, tok)
+
+
 def _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats=None):
     """**T68**: その局の席ごとのデッキ `{who: [card_id]}`（seed から復元・最初の自席ターンの手札で検算。合わなければ席を落とす）。"""
     if not rec_decks or int(seed) not in rec_decks:
@@ -320,7 +330,7 @@ def ledger_value(score, played_v, mode=None):
 
 
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targets="leader",
-            silent="zero", margin_comfort=None, ledger_pricing=None):
+            silent="zero", margin_comfort=None, ledger_pricing=None, harm_profile="cross"):
     """(局, 席) ごとに攻め側と守り側の取りこぼしを足す。
 
     `s`（決める＝行内の最善からの逸脱）は `FLOW_PRICING`、`g`（数える＝`ΔG`）は `ledger_pricing`
@@ -332,12 +342,20 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
     # **T68**: 探す能力の計画価格に要るデッキ（seed から復元・席ごとに手札で検算）
     import search_price as SP
     rec_decks = SP.record_decks(dirs) if EV.SEARCH_PRICE_MODE == "plan" else {}
+    # **T75**: `W_MODE=curve` なら交点の橋の `D`（損害の輪郭に沿った到達ターンの差）で `κ` を出す。輪郭は別のセットのもの（`cross`）
+    prof = None
+    if _TO_W_MODE() == "curve":
+        import crossing_bridge as CB
+        prof = CB.profile_for(dirs, harm_profile)
+        if prof is None:
+            raise ValueError("harm profile が無い（%s・%s）" % (harm_profile, CB.HARM_PROFILE_PATH))
     per = {}
     stats = {"games": 0, "atk_rows": 0, "atk_silent": 0, "grd_rows": 0, "grd_no_attack": 0,
              # **T28-c**: 余裕で払えた守りの行の数
              "grd_comfortable": 0,
              # **T49**: 局面の傾き `κ = w(D)/w̄`（攻めの行）——平均が 1 に戻るかが `w(状態)` の検算
              "w_mode": _TO_W_MODE(), "sigma_turn": _TOM.SIGMA_TURN, "kappa_sum": 0.0, "kappa_n": 0,
+             "harm_profile": (harm_profile if _TO_W_MODE() == "curve" else None),
              # **T58**: 決める価格（`s`）と数える価格（`g`）の規約・読み直した行の数
              "flow_pricing": EV.FLOW_PRICING, "ledger_pricing": ledger_pricing, "ledger_rescored": 0,
              # **T62**: 守りの窓の定義と、自ライフごとの内訳（受けた率・理論が受けろと言う率・`g` の平均）
@@ -415,7 +433,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 if nu_targets == "board":
                     ctx["opp_chars"] = opp_chars_of(tok)
                 # **T49**: 局面の傾き。価格（平均の傾きで書いた時計の差分）に掛けて `ΔG` に足す
-                ck = clock_of_row(sc, tok)
+                ck = _kappa_of_row(sc, tok, t, prof)
                 kap = float(ck["kappa"])
                 stats["kappa_sum"] += kap; stats["kappa_n"] += 1
                 stats["d_bins"][_d_bin(ck["d"])] += 1
@@ -506,7 +524,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 if z != 0.0:
                     gl["z_win"] += int(z > 0); gl["z_n"] += 1
                 bnd = band_of(abs(float(rows["pol_v0"][i])))
-                kap = float(clock_of_row(sc, tok)["kappa"])         # T49（守りの窓も同じ傾き）
+                kap = float(_kappa_of_row(sc, tok, t, prof)["kappa"])   # T49（守りの窓も同じ傾き）・T75（curve）
                 _add(rec, bnd, got["s"] * kap, "grd", g=got["g"] * kap)
                 if got["comfortable"]:
                     stats["grd_comfortable"] += 1
@@ -755,7 +773,7 @@ def main(argv=None):
                          "**2026-09-15 より前の数字と比べるときは `base` を明示する**")
     ap.add_argument("--cond-unknown", type=float, default=1.0,
                     help="**判らない条件の係数**（§0.4 の感度。1.0＝上限・0.0＝下限）")
-    ap.add_argument("--w-mode", default=None, choices=("flat", "clock"),
+    ap.add_argument("--w-mode", default=None, choices=_TOM.W_MODES,
                     help="**T49** 局面の傾き `κ = w(D)/w̄` を掛けるか。省略時は `theory_order.W_MODE`"
                          "（既定 `flat`＝`κ = 1`・盤面の時計では `clock` は説明力を落とした）")
     ap.add_argument("--sigma-turn", type=float, default=None,
@@ -780,6 +798,8 @@ def main(argv=None):
     import hand_plan as _HP
     _HP.add_inflow_arg(ap)
     _HP.add_cond_clock_arg(ap)
+    ap.add_argument("--harm-profile", default="cross", choices=("cross", "real", "syn"),
+                    help="**T75** `--w-mode curve` の輪郭: `cross`（既定・測る記録と別のセット）／`real`／`syn`（`tests/fixtures/harm_profile.json`）")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
@@ -812,7 +832,7 @@ def main(argv=None):
         set_guard_cost_mode(a.guard_cost)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.nu_targets,
-                         a.silent, a.margin_comfort, ledger_pricing=a.ledger_pricing)
+                         a.silent, a.margin_comfort, ledger_pricing=a.ledger_pricing, harm_profile=a.harm_profile)
     # **T49 の検算**: `κ` の平均（`w` の平均が `w̄` に戻れば 1）
     stats["kappa_mean"] = (round(stats["kappa_sum"] / stats["kappa_n"], 4) if stats["kappa_n"] else None)
     stats["w_mean"] = (round(stats["kappa_mean"] * _TO.W_BAR, 4) if stats["kappa_mean"] is not None else None)

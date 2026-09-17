@@ -314,7 +314,10 @@ W_BAR = 0.5 / R_TURNS
 SIGMA_TURN = 1.0
 SIGMA_D = math.sqrt(2.0) * SIGMA_TURN
 CBAR = 1.514
-W_MODES = ("flat", "clock")
+#: **T75（2026-09-17）**: `curve`＝交点の橋（T52）の `D`（損害の輪郭に沿って積んだ両席の到達ターンの差 `τ_opp − τ_me`）で `κ = w(D)/w̄`。
+#: 盤面の時計（`clock`）より `D` が細かく中央に集まる（`W(D)` 0.20 → 0.97）。輪郭は `tests/fixtures/harm_profile.json`（実測の表・
+#: 新定数ゼロ）で、**測る記録と別のセットの輪郭**を使う（`crossing_bridge.profile_for`・§0.1 条件 1）。
+W_MODES = ("flat", "clock", "curve")
 W_MODE = "flat"
 
 
@@ -351,7 +354,7 @@ def w_of_d(d, sigma=None):
 def state_factor(d, mode=None):
     """`κ(状態) = w(D)/w̄`——平均の傾きで書いた価格を局面の傾きに戻す係数。`flat` なら 1。"""
     mode = W_MODE if mode is None else mode
-    if mode != "clock":
+    if mode not in ("clock", "curve"):
         return 1.0
     return float(w_of_d(d) / W_BAR)
 

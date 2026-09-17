@@ -40,7 +40,7 @@ from attack_response import parts  # noqa: E402
 from clock_calib import D_BINS, d_bin  # noqa: E402
 from price_realised import nu_meas_of  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
-from theory_order import (LAM, MU, PWR_EPS, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, SC_MY_DON,  # noqa: E402
+from theory_order import (LAM, MU, PWR_EPS, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, SC_MY_DON, SC_MY_HAND, SLOT_OWN_FIELD,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE,
                           SLOT_OPP_FIELD, THETA, add_nu_mode_arg, apply_nu_mode, attack_value_don,
                           opp_bodies_of, own_attackers_of, score_candidate, slot_power, theta_of)
@@ -58,6 +58,75 @@ def threshold(sc, tok, lam=LAM, mu=MU):
         if float(tok[s, S_IS_CHAR]) > 0.5 and float(tok[s, S_IS_BLOCKER]) > 0.5 and float(tok[s, S_IS_REST]) <= 0.5:
             th += nu_meas_of(slot_power(tok, s) or 0.0, mlp)
     return float(th)
+
+
+def threshold_of_me(sc, tok, lam=LAM, mu=MU):
+    """**自分の耐久**（相手から見たしきい値）: `λ·L_me + μ·H_me + Σν_meas(自分のアクティブなブロッカー)`（T75）。"""
+    sc = np.asarray(sc); tok = np.asarray(tok)
+    olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+    th = lam * float(sc[SC_MY_LIFE]) + mu * float(sc[SC_MY_HAND])
+    for s in range(SLOT_OWN_FIELD.start, SLOT_OWN_FIELD.stop):
+        if float(tok[s, S_IS_CHAR]) > 0.5 and float(tok[s, S_IS_BLOCKER]) > 0.5 and float(tok[s, S_IS_REST]) <= 0.5:
+            th += nu_meas_of(slot_power(tok, s) or 0.0, olp)
+    return float(th)
+
+
+#: **損害の輪郭の正本**（T75）: `tests/fixtures/harm_profile.json`＝`{"real": [...], "syn": [...]}`（自席ターン番号 j ごとの損害の平均・
+#: `harm_profile` の出力・実測の表）。`cross`＝測る記録と別のセットの輪郭を使う（実デッキの記録には合成の輪郭・逆も）。
+HARM_PROFILE_PATH = os.path.join(_ROOT, "tests", "fixtures", "harm_profile.json")
+HARM_PROFILE_NAMES = ("cross", "real", "syn")
+_PROFILES = {}
+
+
+def load_harm_profiles(path=None):
+    """輪郭の表を読む（無ければ空）。"""
+    path = path or HARM_PROFILE_PATH
+    if path not in _PROFILES:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                _PROFILES[path] = json.load(fh)
+        except (OSError, ValueError):
+            _PROFILES[path] = {}
+    return _PROFILES[path]
+
+
+def record_kind(dirs):
+    """記録のセットの種類（`meta_n_record.json` の `decks`: `user` → `real`・それ以外 → `syn`）。判らなければ `None`。"""
+    kinds = set()
+    for d in dirs or ():
+        try:
+            with open(os.path.join(os.path.expanduser(d), "meta_n_record.json"), encoding="utf-8") as fh:
+                kinds.add("real" if str(json.load(fh).get("decks")) == "user" else "syn")
+        except (OSError, ValueError):
+            pass
+    return kinds.pop() if len(kinds) == 1 else None
+
+
+def profile_for(dirs, name="cross", path=None):
+    """測る記録に使う輪郭（`cross`＝別のセット・`real`／`syn`＝指定）。無ければ `None`。"""
+    prof = load_harm_profiles(path)
+    if name == "cross":
+        kind = record_kind(dirs)
+        name = {"real": "syn", "syn": "real"}.get(kind or "", None)
+    if not name:
+        return None
+    v = prof.get(name)
+    return [float(x) for x in v] if v else None
+
+
+def curve_d_of_row(sc, tok, j, prof):
+    """**交点の近さ `D`**（T75）＝両席の到達ターンの差 `τ_opp − τ_me`（正なら自分が先に届く）。
+    `τ_me` は自分が相手の耐久 `Θ_me` に、`τ_opp` は相手が自分の耐久 `Θ_opp` に、同じ輪郭で積んで届くターン数（相手も同じ自席ターン番号 `j` と置く）。"""
+    th_me = threshold(sc, tok)
+    th_opp = threshold_of_me(sc, tok)
+    tau_me = tau_from_profile(th_me, int(j), prof)
+    tau_opp = tau_from_profile(th_opp, int(j), prof)
+    return {"d": float(tau_opp - tau_me), "tau_me": tau_me, "tau_opp": tau_opp, "theta_me": th_me, "theta_opp": th_opp}
+
+
+def own_turn_index(t):
+    """記録のターン番号 `t`（両席で数える・1 始まり）→ 自席ターン番号 `j`（0 始まり）。"""
+    return max(0, (int(t) - 1) // 2)
 
 
 def theory_slope(tok, opp_leader_power, theta=THETA, mu=MU):
