@@ -266,7 +266,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                        "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), "don_k": 1,
                        "attackers": own_attackers_of(tok, float(sc[SC_OPP_LEADER_POWER]) * 1e4),
                        "don_active": float(sc[SC_MY_DON]),   # 登場の機会費用（T43）
-                       "st": _state_of(sc, ex["ci"][i], idx2cid),
+                       "st": _state_of(sc, ex["ci"][i], idx2cid, tok=tok, cards=cards),   # T72: 場の札 id・総在庫も
                        "search_ctx": _search_ctx(sc, tok, ex["ci"][i], idx2cid, cards, decks.get(w)),   # T68
                        "opp_bodies": opp_bodies_of(
                            tok, float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
@@ -492,7 +492,9 @@ def main(argv=None):
     EV.apply_play_now(a)
     _HP.apply_inflow_mode(a)
     t0 = time.time()
+    EV.reset_cond_stats()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
+    stats["cond"] = dict(EV.COND_STATS)                     # T72: 条件の判定（真／偽／判らない）の数
     res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "flow_pricing": EV.FLOW_PRICING,
            "search_price": EV.SEARCH_PRICE_MODE, "hand_meas": HAND_MEAS_MODE,
            "play_now": EV.PLAY_NOW_MODE, "inflow": _HP.INFLOW_MODE, "stats": stats,

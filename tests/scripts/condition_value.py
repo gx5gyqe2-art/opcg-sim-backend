@@ -74,15 +74,19 @@ DECK_KINDS = ("LEADER_NAME", "LEADER_TRAIT", "LEADER_COLOR", "LEADER_ATTRIBUTE")
 META_KINDS = ("TURN_LIMIT", "NONE", "GENERIC", "OTHER")
 #: 合成
 COMPOSE_KINDS = ("AND", "OR", "NOT")
-#: **状態から決められない**条件（カード単位・盤面の細部・履歴）。判定しない（1.0 に倒す）。
-OPAQUE_KINDS = ("HAS_DON", "HAS_TRAIT", "HAS_UNIT", "HAS_ATTRIBUTE", "HAS_CHARACTER",
-                "IS_RESTED", "SOURCE_STATE", "LEADER_STATE", "FIELD_ALL_TRAIT",
-                "FIELD_COST_SUM", "RESTED_COUNT", "EVENT_THIS_TURN",
+#: **盤面の札 id・レスト・ドンの内訳から決まる条件**（T72・2026-09-17・ユーザ決定「読める条件を増やしましょうか」）。
+#: 状態に `my_field_ids`／`opp_field_ids`（場のキャラの札 id・`card_idx` の枠 2〜6／7〜11）・`*_field_rest`・`*_don_total`／`*_don_active`・
+#: `source_rested`・`cards` が在れば判定する（無ければ従来どおり `None`＝1.0）。
+BOARD_KINDS = ("HAS_DON", "HAS_CHARACTER", "SOURCE_STATE", "FIELD_ALL_TRAIT", "RESTED_COUNT")
+#: **状態から決められない**条件（カード単位の細部・履歴）。判定しない（1.0 に倒す）。
+OPAQUE_KINDS = ("HAS_TRAIT", "HAS_UNIT", "HAS_ATTRIBUTE",
+                "IS_RESTED", "LEADER_STATE",
+                "FIELD_COST_SUM", "EVENT_THIS_TURN",
                 "CHAR_KOED_THIS_TURN", "PREV_ACTION", "REVEALED_CARD_TRAIT",
                 "OPPONENT_REMOVAL", "DECLARED_COST_MATCH")
 
 _CLASSES = (("state", STATE_KINDS), ("deck", DECK_KINDS), ("meta", META_KINDS),
-            ("compose", COMPOSE_KINDS), ("opaque", OPAQUE_KINDS))
+            ("compose", COMPOSE_KINDS), ("board", BOARD_KINDS), ("opaque", OPAQUE_KINDS))
 #: ドンの上限（規則）——区間判定の上側に使う
 DON_MAX = 10
 
@@ -186,7 +190,93 @@ def holds(cond, st):
         return None
     if fam == "deck":
         return _holds_deck(kind, cond, st)
+    if fam == "board":
+        return _holds_board(kind, cond, st)
     return _holds_state(kind, cond, st)
+
+
+def _field_ids(st, mine, cond_target=None):
+    """その席の場のキャラの札 id（`is_rest` の絞り込みが在ればレストの列で絞る）。無ければ `None`。"""
+    p = "my_" if mine else "opp_"
+    ids = st.get(p + "field_ids")
+    if ids is None:
+        return None
+    ids = list(ids)
+    want_rest = (cond_target or {}).get("is_rest")
+    if want_rest is not None:
+        rests = st.get(p + "field_rest")
+        if rests is None or len(rests) != len(ids):
+            return None
+        ids = [c for c, r in zip(ids, rests) if bool(r) == bool(want_rest)]
+    return ids
+
+
+def _matching(target, ids, st):
+    """絞り込みに合う札 id（`search_price.eligible_deck_cards`・`cards` は状態から）。読めなければ `None`。"""
+    cards = st.get("cards")
+    if cards is None:
+        return None
+    try:
+        import search_price as SP
+    except Exception:
+        return None
+    t = {k: v for k, v in (target or {}).items() if k != "is_rest"}
+    return SP.eligible_deck_cards(t, list(ids), cards)
+
+
+def _holds_board(kind, cond, st):
+    """盤面の札 id・レスト・ドンの内訳から決まる条件（T72）。"""
+    mine = _mine(cond)
+    op = cond.get("operator")
+    p = "my_" if mine else "opp_"
+    if kind == "HAS_DON":
+        # 【ドン!!×N】＝この札に N 枚付いていれば。**付けられるか**（アクティブなドン ≥ N）で読む＝上限（付ける費用は数えない）
+        n = _int_value(cond)
+        a = st.get(p + "don_active")
+        return None if (n is None or a is None) else int(a) >= int(n)
+    if kind == "HAS_CHARACTER":
+        want = str(cond.get("value") or "")
+        ids = _field_ids(st, mine)
+        if not want or ids is None:
+            return None
+        try:
+            from theory_order import card_identity
+        except Exception:
+            return None
+        names = []
+        for c in ids:
+            names.extend([str(x) for x in ((card_identity(c) or {}).get("names") or [])])
+        info = st.get("my_leader" if mine else "opp_leader") or {}
+        names.extend([str(x) for x in (info.get("names") or [])])
+        return any(want == n or want in n for n in names)
+    if kind == "SOURCE_STATE":
+        r = st.get("source_rested")
+        if r is None:
+            return None
+        v = str(cond.get("value") or "").upper()
+        if v in ("IS_RESTED", "RESTED", "REST"):
+            return bool(r)
+        if v in ("IS_ACTIVE", "ACTIVE"):
+            return not bool(r)
+        return None
+    if kind == "FIELD_ALL_TRAIT":
+        v = cond.get("value")
+        trait = str(v[0] if isinstance(v, (list, tuple)) and v else v or "")
+        ids = _field_ids(st, mine)
+        if not trait or ids is None:
+            return None
+        try:
+            from theory_order import card_identity
+        except Exception:
+            return None
+        return all(trait in [str(t) for t in ((card_identity(c) or {}).get("traits") or [])] for c in ids)
+    if kind == "RESTED_COUNT":
+        rests = st.get(p + "field_rest")
+        val = _int_value(cond)
+        if rests is None or val is None:
+            return None
+        return compare(int(sum(1 for r in rests if r)), op, val)   # 場のキャラのレスト数（リーダー・ドンは数えない＝下限）
+    return None
 
 
 def _holds_deck(kind, cond, st):
@@ -242,12 +332,22 @@ def _holds_state(kind, cond, st):
         return compare(None if t is None else (int(t) + 1) // 2, op, val)
     if kind == "FIELD_COUNT":
         if cond.get("target"):
-            return None                   # 絞り込み付き＝枚数が判らない
+            # **T72**: 絞り込み付きは場の札 id で数える（無ければ従来どおり判定しない）
+            ids = _field_ids(st, mine, cond.get("target"))
+            if ids is None:
+                return None
+            got = _matching(cond.get("target"), ids, st)
+            if got is None:
+                return None
+            return compare(len(got), op, val if val is not None else 1)
         n = st.get(p + "field")
         if n is None:
             return None
         return compare(int(n) + int(bool(st.get(p + "stage"))), op, val)
     if kind == "DON_COUNT":
+        tot = st.get(p + "don_total")
+        if tot is not None:
+            return compare(int(round(float(tot))), op, val)      # T72: 総在庫（付与込み）が読めれば区間ではなく値で
         lo = st.get(p + "don")
         if lo is None:
             return None
@@ -320,6 +420,7 @@ def state_from_scalars(sc, my_leader=None, opp_leader=None, my_stage=False,
           "my_stage": bool(my_stage), "opp_stage": bool(opp_stage)}
     st["my_don_max"] = DON_MAX
     st["opp_don_max"] = DON_MAX
+    st["my_don_active"] = int(round(f(2))); st["opp_don_active"] = int(round(f(4)))   # T72: 【ドン!!×N】の判定
     # **ドンの内訳**（T41・2026-09-15）——レスト（列 3/5）と**ドンデッキ残**（列 66/67 ÷10・v9）。
     # 効果の値付けが「N 枚まで」を実際に動かせる枚数で打ち切るのに使う。列が無い古い記録は省く
     st["my_don_rested"] = int(round(f(3))); st["opp_don_rested"] = int(round(f(5)))

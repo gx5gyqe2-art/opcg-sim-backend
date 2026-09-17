@@ -218,16 +218,37 @@ def move_family(sig):
     return "other"
 
 
-def _state_of(sc, ci, idx2cid):
+def _state_of(sc, ci, idx2cid, tok=None, cards=None):
     """判断点の状態（条件の判定用）。**記録だけで作れる**——リーダーは `card_idx` の
-    0/1（vocab index）・ステージの有無は 22/23。"""
+    0/1（vocab index）・ステージの有無は 22/23。**T72**: 場のキャラの札 id（枠 2〜6／7〜11）とレスト・ドンの総在庫
+    （`tok` が在れば）・`cards` も載せる＝絞り込み付きの場の数・「X がいる」・【ドン!!×N】・総在庫の条件が読める。"""
     try:
         import condition_value as CV
     except Exception:
         return None
     ci = np.asarray(ci)
-    return CV.state_from_scalars(sc, idx2cid.get(int(ci[0])), idx2cid.get(int(ci[1])),
-                                 my_stage=int(ci[22]) > 0, opp_stage=int(ci[23]) > 0)
+    st = CV.state_from_scalars(sc, idx2cid.get(int(ci[0])), idx2cid.get(int(ci[1])),
+                               my_stage=int(ci[22]) > 0, opp_stage=int(ci[23]) > 0)
+    if st is None:
+        return None
+    for key, slots in (("my", GA.SLOT_OWN_FIELD), ("opp", _TOM.SLOT_OPP_FIELD)):
+        ids, rests = [], []
+        for slot in range(slots.start, slots.stop):
+            c = idx2cid.get(int(ci[slot]))
+            if not c:
+                continue
+            ids.append(c)
+            rests.append(bool(float(np.asarray(tok)[slot, _TOM.S_IS_REST]) > 0.5) if tok is not None else False)
+        st[key + "_field_ids"] = ids
+        st[key + "_field_rest"] = rests
+    if tok is not None:
+        import price_realised as PR                       # 遅延（`price_realised` は本器を import する）
+        st["my_don_total"] = PR.don_stock(sc, tok, "me")
+        st["opp_don_total"] = PR.don_stock(sc, tok, "opp")
+    st["source_rested"] = False                             # 登場時の値付け＝出た札はアクティブ
+    if cards is not None:
+        st["cards"] = cards
+    return st
 
 
 def _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats=None):
@@ -381,7 +402,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                        "don_active": float(sc[SC_MY_DON]),   # 登場の機会費用（T43）
                        # **条件の判定に使う状態**（`condition_value.py`・2026-09-14）。
                        # リーダーとステージは `card_idx` の 0/1 と 22/23 に在る。
-                       "st": _state_of(sc, ex["ci"][i], idx2cid),
+                       "st": _state_of(sc, ex["ci"][i], idx2cid, tok=tok, cards=cards),
                        # **T68**: 探す能力の計画価格に要る状態（手札・ドンの枠・来る攻撃・デッキ）。デッキが無ければ `sel(k)` に落ちる
                        "search_ctx": _search_ctx(sc, tok, ex["ci"][i], idx2cid, cards, decks.get(w)),
                        # **効果が取れる相手の体**（価格つき・2026-09-15）——

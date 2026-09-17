@@ -958,7 +958,18 @@ def condition_factor(ab, st=None, offered=False):
         import condition_value as CV
     except Exception:
         return 1.0
+    got = CV.holds((ab or {}).get("condition"), st)          # T72: 判定の結果を数える（読めた率の計測用）
+    COND_STATS["true" if got is True else "false" if got is False else "unknown"] += 1
     return CV.factor(ab, st)
+
+
+#: **条件の判定の結果の数**（T72・計測用）: 状態つきで値付けした条件付き能力が真／偽／判らないのどれだったか
+COND_STATS = {"true": 0, "false": 0, "unknown": 0}
+
+
+def reset_cond_stats():
+    for k in COND_STATS:
+        COND_STATS[k] = 0
 
 
 #: **探す能力の価格の規約**（T68・2026-09-17・ユーザ決定「置き換えましょう」）:

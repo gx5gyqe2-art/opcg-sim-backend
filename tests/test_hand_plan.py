@@ -95,6 +95,7 @@ def test_added_card_gains_reads_each_entering_card_in_the_hand_it_landed_in(monk
     monkeypatch.setattr(HP.HG, "incoming", lambda tok: [])
     monkeypatch.setattr(HP.HG, "take_cost_of", lambda life: 0.087)
     monkeypatch.setattr(HP, "own_field_ids", lambda ci, idx2cid: [])
+    monkeypatch.setattr(HP, "state_of_row", lambda *a, **k: {})                    # T72 の状態もここでは見ない
     monkeypatch.setattr(HP, "apply_inflow", lambda items, *a, **k: list(items))   # T70 の相方待ちはここでは見ない
     seen = []
 
@@ -150,9 +151,9 @@ def test_inflow_item_turns_an_enabler_into_a_per_turn_value(monkeypatch):
     monkeypatch.setattr(SP, "enabler_target", lambda cid, cards_json=None: {"cost_max": 2} if cid == "E" else None)
     monkeypatch.setattr(SP, "eligible_hand_cards", lambda target, items, cards, skip_cid=None: [it["cid"] for it in items if it["cid"] in ("P", "Q")])
     monkeypatch.setattr(SP, "eligible_deck_cards", lambda target, deck, cards: [c for c in deck if c in ("P", "Q")])
-    monkeypatch.setattr(HP, "_base_value", lambda cid, info, cards, olp, r, field=(): 0.10)
+    monkeypatch.setattr(HP, "_base_value", lambda cid, info, cards, olp, r, field=(), st_base=None: 0.10)
     # 相方が手札に在るときの札の値（効果のコスト・条件込み）＝base + 相方の取り分
-    monkeypatch.setattr(HP, "_value_with_partner", lambda cid, info, cards, olp, r, partner, field=(): 0.10 + {"P": 0.12, "Q": 0.10}.get(partner, 0.0) - MU)
+    monkeypatch.setattr(HP, "_value_with_partner", lambda cid, info, cards, olp, r, partner, field=(), st_base=None: 0.10 + {"P": 0.12, "Q": 0.10}.get(partner, 0.0) - MU)
     monkeypatch.setattr(HP, "inflow_per_turn", lambda items, xs, take, deck, cards: 2.0)
     e = {"cid": "E", "cost": 4.0, "v": 0.2, "counter": 0.0, "event": False}
     z = {"cid": "Z", "cost": 5.0, "v": 0.3, "counter": 0.0, "event": False}

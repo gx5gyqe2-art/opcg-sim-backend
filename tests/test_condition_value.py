@@ -107,6 +107,45 @@ def test_a_filtered_field_count_is_not_decided():
     """
     cond = _c("FIELD_COUNT", "GE", 1, target={"cost_max": 2, "card_type": ["CHARACTER"]})
     assert C.holds(cond, _st(my_field=3)) is None
+    # **T72**: 場の札 id と `cards` が在れば数える
+    st = _st(my_field=2); st["my_field_ids"] = ["A", "B"]; st["my_field_rest"] = [False, True]; st["cards"] = _FakeCards()
+    assert C.holds(cond, st) is True                                                        # A（コスト 2）が居る
+    assert C.holds(_c("FIELD_COUNT", "GE", 2, target={"cost_max": 2, "card_type": ["CHARACTER"]}), st) is False
+    assert C.holds(_c("FIELD_COUNT", "GE", 1, target={"cost_max": 2, "card_type": ["CHARACTER"], "is_rest": True}), st) is False   # A はアクティブ
+    assert C.holds(_c("FIELD_COUNT", "GE", 1, target={"cost_min": 5, "card_type": ["CHARACTER"], "is_rest": True}), st) is True    # B（コスト 5）はレスト
+    st2 = _st(); st2["my_field_ids"] = ["A"]; st2["my_field_rest"] = [False]                                                 # cards が無い → 判定しない
+    assert C.holds(cond, st2) is None
+
+
+class _FakeCards:
+    """試験用のカード表（コストだけ）。"""
+
+    def info(self, cid):
+        return {"A": {"cost": 2}, "B": {"cost": 5}}.get(cid)
+
+
+def test_board_conditions_read_the_field_ids_the_don_split_and_the_source_state(monkeypatch):
+    """**T72**: 「X がいる」・特徴だけの場・レストの数・【ドン!!×N】・このキャラの状態・総在庫のドン枚数。"""
+    import search_price as SP
+    monkeypatch.setattr(SP, "card_identity", lambda cid: {"A": {"names": ["ゾロ"], "traits": ["麦わらの一味"]},
+                                                           "B": {"names": ["ミホーク"], "traits": ["王下七武海"]}}.get(cid))
+    import theory_order as TO
+    monkeypatch.setattr(TO, "card_identity", SP.card_identity)
+    st = _st(); st["my_field_ids"] = ["A", "B"]; st["my_field_rest"] = [False, True]; st["opp_field_ids"] = []; st["opp_field_rest"] = []
+    assert C.holds(_c("HAS_CHARACTER", value="ゾロ"), st) is True
+    assert C.holds(_c("HAS_CHARACTER", value="ルフィ"), st) is False
+    assert C.holds(_c("FIELD_ALL_TRAIT", value=["麦わらの一味", False]), st) is False
+    st["my_field_ids"] = ["A"]; st["my_field_rest"] = [False]
+    assert C.holds(_c("FIELD_ALL_TRAIT", value=["麦わらの一味", False]), st) is True
+    assert C.holds(_c("RESTED_COUNT", "GE", 1), st) is False
+    st["my_field_rest"] = [True]
+    assert C.holds(_c("RESTED_COUNT", "GE", 1), st) is True
+    st["my_don_active"] = 3
+    assert C.holds(_c("HAS_DON", "GE", 2), st) is True and C.holds(_c("HAS_DON", "GE", 4), st) is False
+    st["source_rested"] = False
+    assert C.holds(_c("SOURCE_STATE", value="IS_RESTED"), st) is False and C.holds(_c("SOURCE_STATE", value="IS_ACTIVE"), st) is True
+    st["my_don_total"] = 7
+    assert C.holds(_c("DON_COUNT", "GE", 7), st) is True and C.holds(_c("DON_COUNT", "GE", 8), st) is False   # 総在庫が在れば区間ではなく値
 
 
 def test_the_don_count_is_decided_only_when_the_interval_settles_it():
@@ -150,9 +189,13 @@ def test_the_compares_read_both_sides():
 
 def test_an_unreadable_condition_is_none_not_false():
     """**判らないと成り立たないを混ぜない**——混ぜると値が黙って 0 になる。"""
-    for kind in ("HAS_DON", "HAS_CHARACTER", "SOURCE_STATE", "OPPONENT_REMOVAL"):
+    for kind in ("OPPONENT_REMOVAL", "EVENT_THIS_TURN", "LEADER_STATE"):
         assert C.holds(_c(kind), _st()) is None
         assert C.family_of(kind) == "opaque"
+    # **T72**: 盤面の札 id・レスト・ドンの内訳が状態に無ければ、盤面の条件も `None` のまま（偽にしない）
+    for kind in ("HAS_DON", "HAS_CHARACTER", "SOURCE_STATE", "FIELD_ALL_TRAIT", "RESTED_COUNT"):
+        assert C.holds(_c(kind, value=1), _st()) is None
+        assert C.family_of(kind) == "board"
 
 
 def test_without_a_state_nothing_about_the_board_is_decided():

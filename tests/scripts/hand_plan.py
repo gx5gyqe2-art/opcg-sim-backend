@@ -78,12 +78,13 @@ def search_context(sc, tok_row, ci_row, idx2cid, cards, deck):
     r = max(1.0, min(5.0, float(sc[SC_OPP_LIFE])))
     xs = HG.incoming(tok_row); take = HG.take_cost_of(float(sc[SC_MY_LIFE]))
     field = own_field_ids(ci_row, idx2cid)
+    st_base = state_of_row(sc, tok_row, ci_row, idx2cid, cards)                    # T72: 条件の判定に要る状態
     items = hand_items(tok_row, ci_row, idx2cid, cards, olp, r)
-    items = apply_inflow(items, deck, xs, take, cards, olp, r, field=field)        # T70
+    items = apply_inflow(items, deck, xs, take, cards, olp, r, field=field, st_base=st_base)        # T70
     return {"hand_items": items,
             "caps": caps_of(float(sc[SC_MY_DON]), don_stock(sc, tok_row, "me"), r_turns=r),
             "xs": xs, "take": take,
-            "deck": (None if deck is None else list(deck)), "olp": olp, "r": r, "field": field}
+            "deck": (None if deck is None else list(deck)), "olp": olp, "r": r, "field": field, "st_base": st_base}
 
 
 def own_field_ids(ci_row, idx2cid):
@@ -245,25 +246,37 @@ def inflow_per_turn(items, xs, take_cost, deck, cards):
     return DRAWS_PER_TURN + expected_taken(items, xs, take_cost) + expected_search_hits(items, deck, cards)
 
 
-def _ctx_with_hand(hand_cids, cards, olp, r, field=()):
-    """`use_value` に渡す状態（手札の札 id だけ・`v` は要らない）。"""
+def _ctx_with_hand(hand_cids, cards, olp, r, field=(), base=None):
+    """`use_value` に渡す状態（手札の札 id だけ・`v` は要らない）。`base`（判断点の状態・`theory_bridge._state_of`）が在れば
+    その上に載せる＝リーダー・ドン・ライフ等の条件がここでも読める（T72）。"""
     items = [{"cid": str(c), "cost": float((cards.info(c) or {}).get("cost") or 0.0), "v": None, "counter": 0.0,
               "event": bool((cards.info(c) or {}).get("event"))} for c in hand_cids]
-    return {"search_ctx": {"hand_items": items, "cards": cards, "deck": [], "olp": olp, "r": r, "caps": [], "xs": [], "take": 0.0,
-                           "field": list(field)}}
+    st = dict(base or {})
+    st.update({"search_ctx": {"hand_items": items, "cards": cards, "deck": [], "olp": olp, "r": r, "caps": [], "xs": [], "take": 0.0,
+                              "field": list(field)},
+               "source_rested": False, "cards": cards})               # 出た札はアクティブ
+    st.setdefault("my_field_ids", list(field))
+    st.setdefault("my_field_rest", [False] * len(list(field)))
+    return st
 
 
-def _base_value(cid, info, cards, olp, r, field=()):
+def _base_value(cid, info, cards, olp, r, field=(), st_base=None):
     """相方待ちの札の「手札から出す」効果を 0 にした値（`use_value` に空の手札の状態を渡す＝コスト付きなら払わない＝0）。"""
-    return use_value(cid, info, olp, r, st=_ctx_with_hand([], cards, olp, r, field))
+    return use_value(cid, info, olp, r, st=_ctx_with_hand([], cards, olp, r, field, st_base))
 
 
-def _value_with_partner(cid, info, cards, olp, r, partner, field=()):
+def _value_with_partner(cid, info, cards, olp, r, partner, field=(), st_base=None):
     """相方 1 枚が手札に在るときの札の値（効果のコスト・条件・「払わない自由」込み＝`ability_value` をそのまま通す）。"""
-    return use_value(cid, info, olp, r, st=_ctx_with_hand([partner], cards, olp, r, field))
+    return use_value(cid, info, olp, r, st=_ctx_with_hand([partner], cards, olp, r, field, st_base))
 
 
-def inflow_item(item, others, deck, xs, take_cost, cards, olp, r, turns=PLAN_TURNS, field=()):
+def state_of_row(sc, tok_row, ci_row, idx2cid, cards):
+    """判断点の状態（条件の判定用・`theory_bridge._state_of`＝場の札 id・レスト・総在庫・`cards` 込み）。"""
+    from theory_bridge import _state_of
+    return _state_of(sc, ci_row, idx2cid, tok=tok_row, cards=cards)
+
+
+def inflow_item(item, others, deck, xs, take_cost, cards, olp, r, turns=PLAN_TURNS, field=(), st_base=None):
     """1 枚の `v` を相方待ちの並びにする（相方待ちの札でなければそのまま）。`others` は同じ手札の残り。
     相方が来たときの取り分は `use_value(相方が手札に在る状態) − base`＝効果のコスト・条件・払わない自由を通した値。"""
     import search_price as SP
@@ -271,14 +284,14 @@ def inflow_item(item, others, deck, xs, take_cost, cards, olp, r, turns=PLAN_TUR
     if target is None:
         return item
     info = cards.info(item["cid"]) or {}
-    base = _base_value(item["cid"], info, cards, olp, r, field)
+    base = _base_value(item["cid"], info, cards, olp, r, field, st_base)
     if base is None:
         return item
     out = dict(item)
     out["v_static"] = item["v"]
     in_hand = SP.eligible_hand_cards(target, others, cards)
     if in_hand:                                                  # 相方が今在る＝P = 1（どの t でも・一番良い相方）
-        best = max(((_value_with_partner(item["cid"], info, cards, olp, r, c, field) or 0.0) - base) for c in in_hand)
+        best = max(((_value_with_partner(item["cid"], info, cards, olp, r, c, field, st_base) or 0.0) - base) for c in in_hand)
         out["v"] = [max(0.0, base + max(0.0, best))] * turns
         out["p_partner"] = 1.0
         return out
@@ -295,7 +308,7 @@ def inflow_item(item, others, deck, xs, take_cost, cards, olp, r, turns=PLAN_TUR
     gains = {}
     for c in pool:
         if c not in gains:
-            gains[c] = max(0.0, (_value_with_partner(item["cid"], info, cards, olp, r, c, field) or 0.0) - base)
+            gains[c] = max(0.0, (_value_with_partner(item["cid"], info, cards, olp, r, c, field, st_base) or 0.0) - base)
     gain = float(np.mean([gains[c] for c in pool]))
     n_per = inflow_per_turn(others, xs, take_cost, deck, cards)
     out["v"] = [max(0.0, base + arrival_prob(p, n_per * t) * gain) for t in range(turns)]
@@ -304,12 +317,13 @@ def inflow_item(item, others, deck, xs, take_cost, cards, olp, r, turns=PLAN_TUR
     return out
 
 
-def apply_inflow(items, deck, xs, take_cost, cards, olp, r, turns=PLAN_TURNS, field=()):
-    """手札の全部の札に `inflow_item` を当てる（`off` ならそのまま）。`field` は自分の場の札 id（コストを払えるかの判定）。"""
+def apply_inflow(items, deck, xs, take_cost, cards, olp, r, turns=PLAN_TURNS, field=(), st_base=None):
+    """手札の全部の札に `inflow_item` を当てる（`off` ならそのまま）。`field` は自分の場の札 id（コストを払えるかの判定）・
+    `st_base` は判断点の状態（条件の判定・T72）。"""
     if INFLOW_MODE != "on":
         return list(items)
     items = list(items)
-    return [inflow_item(it, items[:k] + items[k + 1:], deck, xs, take_cost, cards, olp, r, turns, field) for k, it in enumerate(items)]
+    return [inflow_item(it, items[:k] + items[k + 1:], deck, xs, take_cost, cards, olp, r, turns, field, st_base) for k, it in enumerate(items)]
 
 
 def card_deltas(rest, card, caps, xs, take_cost):
@@ -336,7 +350,8 @@ def added_card_gains(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, d
     xs = HG.incoming(tok_after)
     take = HG.take_cost_of(float(sc_after[SC_MY_LIFE]))
     items = apply_inflow(hand_items(tok_after, ci_after, idx2cid, cards, olp, r), deck, xs, take, cards, olp, r,
-                         field=own_field_ids(ci_after, idx2cid))   # T70
+                         field=own_field_ids(ci_after, idx2cid),
+                         st_base=state_of_row(sc_after, tok_after, ci_after, idx2cid, cards))   # T70／T72
     used = set()
     out = []
     for cid in added:
@@ -394,7 +409,8 @@ def collect(dirs, limit_games=0):
                         added = spent_cards(hand, hand_ids(ex["ci"][ip], idx2cid))
                         xs = HG.incoming(tok); take = HG.take_cost_of(float(sc[SC_MY_LIFE]))
                         hitems = apply_inflow(hand_items(tok, ex["ci"][i], idx2cid, cards, olp, r), decks.get(w), xs, take, cards, olp, r,
-                                              field=own_field_ids(ex["ci"][i], idx2cid))
+                                              field=own_field_ids(ex["ci"][i], idx2cid),
+                                              st_base=state_of_row(sc, tok, ex["ci"][i], idx2cid, cards))
                         for cid in added:
                             k_ = next((q for q, it in enumerate(hitems) if it["cid"] == cid), None)
                             if k_ is None:
@@ -428,7 +444,8 @@ def collect(dirs, limit_games=0):
             added = spent_cards(after, hand)
             xs2 = HG.incoming(tok2); take2 = HG.take_cost_of(float(sc2[SC_MY_LIFE]))
             hitems2 = apply_inflow(hand_items(tok2, ex["ci"][i2], idx2cid, cards, olp, r), decks.get(w), xs2, take2, cards, olp, r,
-                                   field=own_field_ids(ex["ci"][i2], idx2cid))
+                                   field=own_field_ids(ex["ci"][i2], idx2cid),
+                                   st_base=state_of_row(sc2, tok2, ex["ci"][i2], idx2cid, cards))
             got = []
             for c2 in added:
                 k_ = next((q for q, it in enumerate(hitems2) if it["cid"] == c2), None)

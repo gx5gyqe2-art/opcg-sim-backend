@@ -233,7 +233,7 @@ def card_gain(cid, ctx, cards):
             "counter": b["counter"], "event": bool(info.get("event"))}
     if HP.INFLOW_MODE == "on":                                   # T70: 取れる札が相方待ちの札なら v をターンごとの並びに
         card = HP.inflow_item(card, ctx["hand_items"], ctx.get("deck") or [], ctx["xs"], ctx["take"], cards, ctx["olp"], ctx["r"],
-                              field=ctx.get("field") or ())
+                              field=ctx.get("field") or (), st_base=ctx.get("st_base"))
     d = HP.card_deltas(ctx["hand_items"], card, ctx["caps"], ctx["xs"], ctx["take"])
     _GAIN[key] = float(d["dtotal"])
     return _GAIN[key]
