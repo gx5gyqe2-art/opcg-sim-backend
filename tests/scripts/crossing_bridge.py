@@ -40,7 +40,7 @@ from attack_response import parts  # noqa: E402
 from clock_calib import D_BINS, d_bin  # noqa: E402
 from price_realised import nu_meas_of, side_nu_meas  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
-from theory_order import (LAM, MU, PWR_EPS, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, SC_MY_DON, SC_MY_HAND, SLOT_OWN_FIELD,  # noqa: E402
+from theory_order import (LAM, MU, PWR_EPS, R_TURNS, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, SC_MY_DON, SC_MY_HAND, SLOT_OWN_FIELD,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE,
                           SLOT_OPP_FIELD, THETA, add_nu_mode_arg, apply_nu_mode, attack_value_don,
                           opp_bodies_of, own_attackers_of, score_candidate, slot_power, theta_of)
@@ -257,9 +257,44 @@ def own_turn_index(t):
     return max(0, (int(t) - 1) // 2)
 
 
-def theory_slope(tok, opp_leader_power, theta=THETA, mu=MU):
-    """今の盤面の攻撃手（リーダー＋殴れる体）がリーダーを殴る価格の和＝理論の「1 ターンに積む損害」。"""
-    return float(sum(attack_value_don(float(opp_leader_power) + x, opp_leader_power, True, theta, mu)
+#: **速さ `A` の盤面の項にブロッカーを入れるか**（T92・2026-09-18・ユーザ指示「1で進めてください」）。
+#: `off`＝旧（`attack_value` に `blockers` を渡さない）／`on`＝**規則どおり**渡す。
+#:
+#: **これは欠落であって新しい式ではない**——`attack_value(..., blockers=…)` は T47 から在り、
+#: `ν` の攻撃項も `score_candidate` も渡している。**`A` だけが渡していなかった**。
+#: 規則（`rules/battle.rs` の `has_blocker`）: アクティブなブロッカーはリーダーへの攻撃を横取りできる＝
+#: **その攻撃で取れるのは `min(受ける費用, 守る費用, ブロックの費用)`**。**新定数ゼロ**。
+#:
+#: **効き方は状態で決まる**（実測 2026-09-18）: 平均では `A` の盤面の項が 3.6%／5.0% 下がるだけだが、
+#: **ブロッカーの居るターン（12.1%／12.4%）では 28.6%／34.1% 下がる**。
+SLOPE_BLOCK_MODES = ("off", "on")
+SLOPE_BLOCK_MODE = "off"
+
+
+def set_slope_block_mode(mode):
+    global SLOPE_BLOCK_MODE
+    if mode not in SLOPE_BLOCK_MODES:
+        raise ValueError("slope block mode は %s のどれか" % (SLOPE_BLOCK_MODES,))
+    SLOPE_BLOCK_MODE = mode
+    return SLOPE_BLOCK_MODE
+
+
+def opp_blockers_of(tok, my_leader_power=None, r_turns=R_TURNS, theta=THETA, mu=MU,
+                    ci_row=None, idx2cid=None):
+    """相手の場の**アクティブなブロッカー** `[(パワー, ν(B)), …]`（`theory_order.blockers_of` と同じ規約）。"""
+    mlp = float(my_leader_power if my_leader_power is not None else 5000.0)
+    out = []
+    for b in opp_bodies_of(tok, mlp, r_turns, theta, mu, ci_row=ci_row, idx2cid=idx2cid):
+        if b.get("blocker") and not b.get("is_rest"):
+            out.append((float(b["power"]), float(b["nu"])))
+    return out
+
+
+def theory_slope(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None):
+    """今の盤面の攻撃手（リーダー＋殴れる体）がリーダーを殴る価格の和＝理論の「1 ターンに積む損害」。
+    `SLOPE_BLOCK_MODE=on` なら**相手のアクティブなブロッカー**も応答に入れる（T92）。"""
+    blk = blockers if (SLOPE_BLOCK_MODE == "on" and blockers) else None
+    return float(sum(attack_value_don(float(opp_leader_power) + x, opp_leader_power, True, theta, mu, blockers=blk)
                      for x in own_attackers_of(tok, opp_leader_power)))
 
 
@@ -267,7 +302,12 @@ def seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     """速さを **2 つに分けて**返す（T90）: `(盤面の攻撃手, 今出せる手札の体)`。
     **規則**——手札から出した体は**そのターンには殴れない**（召喚酔い・T84）ので、
     交点まで歩くときは**1 ターン目は盤面だけ・2 ターン目からは両方**になる。"""
-    base = theory_slope(tok_row, olp, theta, mu)
+    blk = None
+    if SLOPE_BLOCK_MODE == "on":
+        sc_a = np.asarray(sc)
+        blk = opp_blockers_of(tok_row, my_leader_power=float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
+                              theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)
+    base = theory_slope(tok_row, olp, theta, mu, blockers=blk)
     if SLOPE_MODE != "hand" or cards is None:
         return base, 0.0
     import hand_plan as HP
@@ -354,7 +394,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     rows_out = []
     ledger = []            # (d) 単位の検算: 勝った席の F_end 対 Θ_start
     turn_harm = []         # 自席ターン番号 j ごとの損害（損害の輪郭＝加速を測る材料）
-    stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "theta_hand": THETA_HAND_MODE, "slope_mode": SLOPE_MODE, "theta_body": THETA_BODY_MODE,
+    stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "theta_hand": THETA_HAND_MODE, "slope_mode": SLOPE_MODE, "theta_body": THETA_BODY_MODE, "slope_block": SLOPE_BLOCK_MODE,
              "race": RACE_MODE,
              "r_deck_n": 0, "r_deck_sum": 0.0, "r_deck_missing": 0,
              "g_sum": 0.0, "g_n": 0, "g_fallback": 0,
@@ -647,6 +687,9 @@ def main(argv=None):
                     help="**T90** 交点の解き方: `static`（旧・`τ = Θ/A`＝的は動かない）／"
                          "`net`（動く的＝1 ターン目は盤面だけ・的は毎ターン相手の補充 `r` だけ下がる・`r` は帳簿の `g`）／"
                          "`deck`（**T91** 同じ動く的で `r` を**規則とデッキの中身だけ**から出す＝`μ ×`切れる札の割合）")
+    ap.add_argument("--slope-block", default=SLOPE_BLOCK_MODE, choices=SLOPE_BLOCK_MODES,
+                    help="**T92** 速さ `A` の盤面の項に相手のアクティブなブロッカーを入れるか: "
+                         "`off`（旧・渡さない）／`on`（規則どおり `attack_value` に渡す＝新定数ゼロ）")
     ap.add_argument("--theta-body", default=THETA_BODY_MODE, choices=THETA_BODY_MODES,
                     help="耐久の体の項: `blockers`（旧・アクティブなブロッカーだけ）／`all`（全キャラ・T82）／"
                          "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）")
@@ -659,6 +702,7 @@ def main(argv=None):
     t0 = time.time()
     set_theta_hand_mode(a.theta_hand)
     set_slope_mode(a.slope_mode)
+    set_slope_block_mode(a.slope_block)
     set_theta_body_mode(a.theta_body)
     set_race_mode(a.race)
     rows_out, ledger, stats, turn_harm = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)

@@ -54,6 +54,39 @@ def test_the_theory_slope_is_the_priced_attack_flow_of_the_board():
     assert CB.theory_slope(tok, 5000.0) == pytest.approx(lead_only + T.attack_value_don(8000.0, 5000.0, True))
 
 
+def test_the_rate_can_count_the_opponents_blockers():
+    """**T92**（ユーザ指示「1で進めてください」）: 速さ `A` の盤面の項に**相手のアクティブなブロッカー**を入れる。
+    **欠落を埋めるだけ**——`attack_value(..., blockers=)` は T47 から在り、`ν` も `score_candidate` も渡している。
+    規則（`rules/battle.rs` の `has_blocker`）: 横取りできるのはアクティブなブロッカーだけ。"""
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, T.S_POWER], tok[1, T.S_POWER] = 0.5, 0.5
+    blk = ((6000.0, 0.05),)                                   # 殴る体より大きいブロッカー（ν = 0.05）
+    assert CB.SLOPE_BLOCK_MODE == "off"                       # 既定は据え置き（採否はユーザ判定）
+    assert CB.theory_slope(tok, 5000.0, blockers=blk) == pytest.approx(CB.theory_slope(tok, 5000.0))  # off では無視
+    try:
+        assert CB.set_slope_block_mode("on") == "on"
+        with_blk = CB.theory_slope(tok, 5000.0, blockers=blk)
+        assert with_blk == pytest.approx(T.attack_value_don(5000.0, 5000.0, True, blockers=blk))
+        assert with_blk < CB.theory_slope(tok, 5000.0)        # 応答が 1 つ増えるので `min` は下がる
+        assert CB.theory_slope(tok, 5000.0, blockers=()) == pytest.approx(CB.theory_slope(tok, 5000.0))
+        with pytest.raises(ValueError):
+            CB.set_slope_block_mode("なにか")
+    finally:
+        CB.set_slope_block_mode("off")
+
+
+def test_the_blockers_of_the_rate_are_the_active_ones():
+    """`opp_blockers_of` は**アクティブなブロッカーだけ**（レスト中は横取りできない・ブロッカーでない体も入らない）。"""
+    tok = np.zeros((22, 24), np.float32)
+    tok[7, T.S_POWER], tok[7, T.S_IS_CHAR] = 0.6, 1.0                 # ブロッカーでない体
+    assert CB.opp_blockers_of(tok) == []
+    tok[7, T.S_IS_BLOCKER] = 1.0
+    got = CB.opp_blockers_of(tok)
+    assert len(got) == 1 and got[0][0] == pytest.approx(6000.0) and got[0][1] > 0.0
+    tok[7, T.S_IS_REST] = 1.0
+    assert CB.opp_blockers_of(tok) == []
+
+
 def test_the_crossing_picks_the_side_that_reaches_its_threshold_first():
     tau_me, tau_opp, pred = CB.predict(0.4, 0.4, 0.2, 0.1)
     assert (tau_me, tau_opp, pred) == (pytest.approx(2.0), pytest.approx(4.0), True)
