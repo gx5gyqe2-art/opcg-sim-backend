@@ -308,6 +308,26 @@ def sigma_t_for(dirs, name="cross", body_mode=None):
     return float(by["syn"]) if kind == "real" else float(by["real"])
 
 
+def w_bar_for(dirs, name="cross", body_mode=None):
+    """**`w̄`（`κ = w(D)/w̄` の分母）を輪郭の表から引く**（T98）。
+
+    `κ` は「この局面の傾き ÷ **平均の**傾き」なので、**分母は定義上 `E[w(D)]`**（検算は「`κ` の平均が 1」）。
+    従来の `0.5/R` は**閉じた形の代用**で、`D` の分布がその形に一致するときだけ等しい。
+    **`σ_T` を実測にし耐久の形を変えたら一致しなくなった**（`blockers` で `κ` の平均 1.505／1.737）ので、
+    **同じ器の実測**を使う＝**新定数ゼロ**。規約は `sigma_t_for` と同じ（耐久の形ごと・別のセット）。"""
+    tbl = (load_harm_profiles() or {}).get("w_bar") or {}
+    by = tbl.get(body_mode or THETA_BODY_MODE) or {}
+    if not by:
+        return None
+    if name in ("real", "syn"):
+        v = by.get(name)
+        return float(v) if v is not None else None
+    kind = record_kind(dirs)
+    if kind is None:
+        return None
+    return float(by["syn"]) if kind == "real" else float(by["real"])
+
+
 def record_kind(dirs):
     """記録のセットの種類（`meta_n_record.json` の `decks`: `user` → `real`・それ以外 → `syn`）。判らなければ `None`。"""
     kinds = set()

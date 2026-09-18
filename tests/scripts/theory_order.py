@@ -391,6 +391,13 @@ def prob_of_d(d, sigma_d=None):
     return 0.5 * (1.0 + math.erf(float(d) / (sd * math.sqrt(2.0))))
 
 
+def set_w_bar(value):
+    """**`κ` の分母 `w̄` を差し替える**（T98）＝`w(D)` の実測の平均。既定の `0.5/R` は閉じた形の代用。"""
+    global W_BAR
+    W_BAR = float(value)
+    return W_BAR
+
+
 def set_sigma_turn(turns):
     """時計 1 本のぶれを差し替える（**感度の幅**として回すためだけ・§0.4 規則 2。既定 1.0 は写し）。"""
     global SIGMA_TURN, SIGMA_D

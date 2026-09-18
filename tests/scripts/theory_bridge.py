@@ -552,6 +552,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
             st = CB.sigma_t_for(dirs, harm_profile)
             if st is not None:
                 _TOM.set_sigma_turn(st)
+            # **T98**: `κ = w(D)/w̄` の分母も**同じ器の実測**（`E[w(D)]`）にする。
+            # `0.5/R` は閉じた形の代用で、`D` の分布が変わると `κ` の平均が 1 から外れる。
+            wb = CB.w_bar_for(dirs, harm_profile)
+            if wb is not None:
+                _TOM.set_w_bar(wb)
     per = {}
     kn_turns = []        # T80: ターンごとの（`D`・生の価格・`ΔW`）＝必要な `κ` を測る材料
     kn_games = []        # T81: 局ごとのターンの並び（窓の広さ・手の型・場の動きで相関を割る）
@@ -559,7 +564,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
              # **T28-c**: 余裕で払えた守りの行の数
              "grd_comfortable": 0,
              # **T49**: 局面の傾き `κ = w(D)/w̄`（攻めの行）——平均が 1 に戻るかが `w(状態)` の検算
-             "w_mode": _TO_W_MODE(), "sigma_turn": _TOM.SIGMA_TURN, "kappa_sum": 0.0, "kappa_n": 0,
+             "w_mode": _TO_W_MODE(), "sigma_turn": _TOM.SIGMA_TURN, "w_bar": _TOM.W_BAR,
+             "kappa_sum": 0.0, "kappa_n": 0,
              "clock_hand": _TOM.CLOCK_HAND_MODE,
              "harm_profile": (harm_profile if _TO_W_MODE() == "curve" else None),
              # **T76**: 耐久の手札項の数え方（`crossing_bridge.THETA_HAND_MODE`）

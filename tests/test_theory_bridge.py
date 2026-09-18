@@ -482,3 +482,18 @@ def test_the_sigma_of_the_clock_is_taken_from_the_measurement(monkeypatch):
     assert st and st != 1.0                                  # 借り物と違う値であること
     TO.set_sigma_turn(st)
     assert got == [pytest.approx(st)]
+
+def test_the_average_slope_is_measured_not_closed_form():
+    """**T98**: `w̄` は `0.5/R` の閉じた形ではなく **`w(D)` の実測の平均**に差し替わる。
+    `κ` の平均が 1 に戻ることが検算なので、**分母が実測でなければその検算が意味を持たない**。"""
+    import crossing_bridge as CB
+    import theory_order as TO
+    old = TO.W_BAR
+    try:
+        wb = CB.w_bar_for(None, "syn")                       # 実を測るときは合成の値（cross）
+        assert wb and abs(wb - 0.5 / TO.R_TURNS) > 1e-6      # 閉じた形と違う値であること
+        assert TO.set_w_bar(wb) == pytest.approx(wb)
+        assert TO.W_BAR == pytest.approx(wb)
+        assert TO.state_factor(0.0, "curve") == pytest.approx(TO.w_of_d(0.0) / wb)
+    finally:
+        TO.set_w_bar(old)

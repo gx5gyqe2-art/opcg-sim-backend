@@ -63,6 +63,23 @@ def test_sigma_t_comes_from_the_measurement_and_follows_the_body_set():
     assert CB.sigma_t_for([], "cross") is None      # 記録の種類が判らなければ引かない
 
 
+def test_w_bar_comes_from_the_measurement_too():
+    """**T98**: `κ = w(D)/w̄` の**分母は定義上 `E[w(D)]`**（検算は「`κ` の平均が 1」）。
+    `0.5/R` は閉じた形の代用で、`σ_T` を実測にし耐久の形を変えたら一致しなくなった
+    （`blockers` で `κ` の平均 1.505／1.737）ので、**同じ器の実測**を使う。規約は `σ_T` と同じ。"""
+    import theory_order as TO
+    b_real, b_syn = CB.w_bar_for(None, "real"), CB.w_bar_for(None, "syn")     # 既定 `blockers`
+    assert b_real and b_syn and b_real > 0.0 and b_syn > 0.0
+    try:
+        CB.set_theta_body_mode("attackable")
+        a_real, a_syn = CB.w_bar_for(None, "real"), CB.w_bar_for(None, "syn")
+    finally:
+        CB.set_theta_body_mode("blockers")
+    assert b_real > a_real and b_syn > a_syn      # `D` が中央に集まるほど `w(D)` の平均は大きい（実測）
+    assert b_real > 0.5 / TO.R_TURNS              # 旧 `0.5/R` より大きい＝`κ` が 1 より大きく出ていた
+    assert CB.w_bar_for([], "cross") is None      # 記録の種類が判らなければ引かない
+
+
 def test_the_threshold_splits_into_life_hand_and_bodies():
     """**T96**（ユーザ指示「Θの方で進めてください」）: `threshold_parts` は `Θ` を **3 つの項**に割り、和は `threshold` と一致する。
     **どの項が終盤に縮まないか**を見るための切り分け。"""
