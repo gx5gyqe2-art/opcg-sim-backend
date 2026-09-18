@@ -35,14 +35,14 @@ def test_the_threshold_is_the_opponents_endurance_in_price_units():
     旧 `blockers`（アクティブなブロッカーだけ・レストは数えない）を明示して算術を固定する（既定は T83 の `attackable`）。"""
     tok = np.zeros((22, 24), np.float32)
     try:
-        CB.set_theta_body_mode("blockers")
+        CB.set_theta_body_mode("blockers")                                           # 既定（T97）
         assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
         tok[7, T.S_POWER], tok[7, T.S_IS_CHAR], tok[7, T.S_IS_BLOCKER] = 0.6, 1.0, 1.0  # アクティブなブロッカー 6000
         assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU + PR.NU_MEAS["leader_to_sat"])
         tok[7, T.S_IS_REST] = 1.0                                                        # `blockers` ではレスト中は数えない
         assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
     finally:
-        CB.set_theta_body_mode("attackable")
+        CB.set_theta_body_mode("blockers")
 
 
 def test_sigma_t_comes_from_the_measurement_and_follows_the_body_set():
@@ -50,13 +50,13 @@ def test_sigma_t_comes_from_the_measurement_and_follows_the_body_set():
     **借り物の 1.0 ではなく交点の橋の実測**（輪郭の表の `sigma_t`）から採る。
     **耐久の体の集合ごとに違う**（`blockers` は `attackable` より小さい）ので追随し、
     **測る記録と別のセット**の値を使う（輪郭と同じ規約）。"""
-    a_real, a_syn = CB.sigma_t_for(None, "real"), CB.sigma_t_for(None, "syn")
-    assert a_real and a_syn and a_real > 0.0 and a_syn > 0.0
+    b_real, b_syn = CB.sigma_t_for(None, "real"), CB.sigma_t_for(None, "syn")     # 既定 `blockers`
+    assert b_real and b_syn and b_real > 0.0 and b_syn > 0.0
     try:
-        CB.set_theta_body_mode("blockers")
-        b_real, b_syn = CB.sigma_t_for(None, "real"), CB.sigma_t_for(None, "syn")
-    finally:
         CB.set_theta_body_mode("attackable")
+        a_real, a_syn = CB.sigma_t_for(None, "real"), CB.sigma_t_for(None, "syn")
+    finally:
+        CB.set_theta_body_mode("blockers")
     assert b_real < a_real and b_syn < a_syn        # 体の項を落とすと τ の残差は小さくなる（実測）
     assert CB.sigma_t_for(None, "real", body_mode="blockers") == b_real
     assert CB.sigma_t_for(None, "なにか") is None or True   # 知らない名前は cross 扱い
@@ -67,7 +67,7 @@ def test_the_threshold_splits_into_life_hand_and_bodies():
     """**T96**（ユーザ指示「Θの方で進めてください」）: `threshold_parts` は `Θ` を **3 つの項**に割り、和は `threshold` と一致する。
     **どの項が終盤に縮まないか**を見るための切り分け。"""
     tok = np.zeros((22, 24), np.float32)
-    tok[7, T.S_POWER], tok[7, T.S_IS_CHAR], tok[7, T.S_IS_REST] = 0.6, 1.0, 1.0   # レストの体（`attackable` で入る）
+    tok[7, T.S_POWER], tok[7, T.S_IS_CHAR], tok[7, T.S_IS_BLOCKER] = 0.6, 1.0, 1.0   # アクティブなブロッカー（既定で入る）
     sc = _sc(3, 4)
     life, hand, body = CB.threshold_parts(sc, tok)
     assert life == pytest.approx(3 * T.LAM)
@@ -103,14 +103,13 @@ def test_a_rested_blocker_is_not_endurance_now_but_comes_back():
     assert CB.resting_blocker_term(tok, T.SLOT_OPP_FIELD, 5000.0) == 0.0
     back = CB.resting_blocker_term(tok, T.SLOT_OPP_FIELD, 5000.0, ci_row=ci, idx2cid=idx2cid, cards=cards)
     assert back > 0.0
-    # 既定の `attackable` は**レストの体として**耐久に数える（ブロッカーかどうかは見ていない）
-    with_rested = CB.threshold(sc, tok)
-    assert with_rested > 3 * T.LAM + 4 * T.MU
-    try:                                                         # 規則どおりに外れるのは `blockers` の側
-        CB.set_theta_body_mode("blockers")
-        assert CB.threshold(sc, tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
-    finally:
+    # **既定（`blockers`）では耐久に入らない**——今は横取りできないから（規則どおり）
+    assert CB.threshold(sc, tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
+    try:                                                         # 旧 `attackable` は**レストの体として**数えていた
         CB.set_theta_body_mode("attackable")
+        assert CB.threshold(sc, tok) > 3 * T.LAM + 4 * T.MU
+    finally:
+        CB.set_theta_body_mode("blockers")
     try:
         CB.set_theta_return_mode("untap")
         # 段差は `j ≥ 2` からしか効かない＝1 ターン目で届くなら τ は変わらない
@@ -421,33 +420,34 @@ def test_the_endurance_counts_bodies_the_same_way_the_harm_side_does():
         with pytest.raises(ValueError):
             CB.set_theta_body_mode("なにか")
     finally:
-        CB.set_theta_body_mode("attackable")
+        CB.set_theta_body_mode("blockers")
 
 
-def test_the_endurance_counts_the_bodies_that_can_absorb_harm():
-    """**T83**（ユーザの問い「理論的に正しいのがそれってことだよね？」への答え）: 耐久は**損害を吸える体**だけを数える。
-    規則（`rust/opcg_engine/src/rules/battle.rs`）は **(a) キャラを殴れるのはレストのときだけ**
-    （`declare_attack`「レスト状態のキャラクターのみ攻撃可能です」）・**(b) リーダーへの攻撃を横取りできるのは
-    アクティブなブロッカー**（`has_blocker` は `!is_rest && KW_BLOCKER`）。よって `attackable` は
-    **レストの体 ＋ アクティブなブロッカー**を数え、**アクティブな非ブロッカーは数えない**（そのターンは的にもならない）。
-    `all`（T82）はそれを数えてしまう＝入れすぎ・`blockers`（旧）はレストの体を落とす＝数え足りない。"""
+def test_the_endurance_counts_only_what_cannot_be_walked_past():
+    """**T83 → T97**: 耐久は「**避けて通れないもの**」だけを数える。
+
+    規則（`rust/opcg_engine/src/rules/battle.rs`）: **キャラを殴れるのはレストのときだけ**（`declare_attack`）・
+    **リーダーへの攻撃を横取りできるのはアクティブなブロッカー**（`has_blocker` は `!is_rest && KW_BLOCKER`）。
+    **T83 は「殴れるか」で決めた**（`attackable`＝レストの体 ＋ アクティブなブロッカー）が、
+    **攻め手は的を選べる**ので**レストの体は 1 体も壊さずに勝てる＝耐久ではない**（T96 の実測でも
+    とどめのターンで 4.07 倍の過大）。**避けて通れないのはアクティブなブロッカーだけ**＝既定は `blockers`（T97）。"""
     sc = _sc(3, 4)
     sc[T.SC_MY_LEADER_POWER] = 0.5
     tok = np.zeros((22, 24), np.float32)
     tok[7, T.S_POWER], tok[7, T.S_IS_CHAR] = 0.5, 1.0                                  # アクティブな非ブロッカー＝吸えない
-    tok[8, T.S_POWER], tok[8, T.S_IS_CHAR], tok[8, T.S_IS_REST] = 0.5, 1.0, 1.0        # レストの体＝殴られる的になれる
+    tok[8, T.S_POWER], tok[8, T.S_IS_CHAR], tok[8, T.S_IS_REST] = 0.5, 1.0, 1.0        # レストの体＝**避けて通れる**
     tok[9, T.S_POWER], tok[9, T.S_IS_CHAR], tok[9, T.S_IS_BLOCKER] = 0.5, 1.0, 1.0     # アクティブなブロッカー＝横取りできる
     base = 3 * T.LAM + 4 * T.MU
     one = PR.NU_MEAS["leader_to_sat"]
-    assert CB.THETA_BODY_MODE == "attackable"          # **既定は規則から出る形**（ユーザ決定 2026-09-18）
+    assert CB.THETA_BODY_MODE == "blockers"            # **既定は規則から出る形**（T97）
+    # 既定: アクティブなブロッカーだけ（レストの体もアクティブな非ブロッカーも入らない）
+    assert CB.threshold(sc, tok) == pytest.approx(base + one)
+    assert not CB._body_absorbs(tok, 7) and not CB._body_absorbs(tok, 8) and CB._body_absorbs(tok, 9)
     try:
         assert CB.set_theta_body_mode("attackable") == "attackable"
-        assert CB.threshold(sc, tok) == pytest.approx(base + 2 * one)                   # レスト 1 ＋ ブロッカー 1（アクティブな非ブロッカーは 0）
+        assert CB.threshold(sc, tok) == pytest.approx(base + 2 * one)                   # 旧: レスト 1 ＋ ブロッカー 1
         assert not CB._body_absorbs(tok, 7) and CB._body_absorbs(tok, 8) and CB._body_absorbs(tok, 9)
-        tok[9, T.S_IS_REST] = 1.0                                                      # レストのブロッカーも「的」として吸える
-        assert CB._body_absorbs(tok, 9)
-        assert CB.threshold(sc, tok) == pytest.approx(base + 2 * one)
-        # 3 つの数え方は順序で挟まる: 旧 ≤ 規則どおり ≤ 全キャラ
+        # 3 つの数え方は順序で挟まる: 規則どおり ≤ 旧（殴れるか） ≤ 全キャラ
         CB.set_theta_body_mode("blockers")
         low = CB.threshold(sc, tok)
         CB.set_theta_body_mode("attackable")
@@ -457,7 +457,7 @@ def test_the_endurance_counts_the_bodies_that_can_absorb_harm():
         assert low < mid < high
         assert CB.threshold_of_me(sc, tok) == pytest.approx(0.0)                        # 自分のライフ・手札・場が空なら 0（どのモードでも）
     finally:
-        CB.set_theta_body_mode("attackable")
+        CB.set_theta_body_mode("blockers")
 
 
 def test_the_race_can_run_against_a_moving_threshold():
