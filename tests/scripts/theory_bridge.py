@@ -392,6 +392,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
             raise ValueError("harm profile が無い（%s・%s）" % (harm_profile, CB.HARM_PROFILE_PATH))
     per = {}
     kn_turns = []        # T80: ターンごとの（`D`・生の価格・`ΔW`）＝必要な `κ` を測る材料
+    kn_games = []        # T81: 局ごとのターンの並び（窓の広さ・手の型・場の動きで相関を割る）
     stats = {"games": 0, "atk_rows": 0, "atk_silent": 0, "grd_rows": 0, "grd_no_attack": 0,
              # **T28-c**: 余裕で払えた守りの行の数
              "grd_comfortable": 0,
@@ -530,11 +531,18 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 g_row = float(g_v) * kap
                 s_row = (float(played_v) - max(scored)) * kap
                 # **T80**: 区間の恒等式のために**生の価格**（`κ` を掛けない）と `D` を席 0 の視点で積む
-                e = kn.setdefault(t, {"d0": None, "g0": 0.0, "r_turns": None})
-                e["g0"] += float(g_v) * (1.0 if w == 0 else -1.0)
+                e = kn.setdefault(t, {"d0": None, "g0": 0.0, "r_turns": None, "g_fam": {}, "chars": None})
+                sgn = 1.0 if w == 0 else -1.0
+                e["g0"] += float(g_v) * sgn
+                fam0 = move_family(json.loads(pol["pol_sig"][b + ch]))                     # T81: 型ごとに割る
+                e["g_fam"][fam0] = e["g_fam"].get(fam0, 0.0) + float(g_v) * sgn
                 if e["d0"] is None:
-                    e["d0"] = float(ck["d"]) * (1.0 if w == 0 else -1.0)
+                    e["d0"] = float(ck["d"]) * sgn
                     e["r_turns"] = float(ctx["r_turns"])
+                    # **T81**: 場のキャラ数（両側の合計）＝時計が跳ねる原因かを分ける
+                    e["chars"] = int(sum(1 for sl in range(GA.SLOT_OWN_FIELD.start, GA.SLOT_OWN_FIELD.stop)
+                                         if float(tok[sl, _TOM.S_IS_CHAR]) > 0.5)
+                                     + sum(1 for _p, _blk in opp_chars_of(tok)))
                 _add(rec, bnd, s_row, "atk", g=g_row)
                 fam = move_family(json.loads(pol["pol_sig"][b + ch]))
                 rec["g_fam"][fam] = rec["g_fam"].get(fam, 0.0) + g_row
@@ -597,8 +605,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                                  _g_of_row(opp_g["sc"], opp_g["tok"], opp_g["ci"], idx2cid, cards,
                                                            g_cache, (1 - w, opp_g["t"]))),
                                           opp=opp_g)["kappa"])
-                e = kn.setdefault(t, {"d0": None, "g0": 0.0, "r_turns": None})   # T80
-                e["g0"] += float(got["g"]) * (1.0 if w == 0 else -1.0)
+                e = kn.setdefault(t, {"d0": None, "g0": 0.0, "r_turns": None, "g_fam": {}, "chars": None})   # T80
+                sgn = 1.0 if w == 0 else -1.0
+                e["g0"] += float(got["g"]) * sgn
+                e["g_fam"]["guard"] = e["g_fam"].get("guard", 0.0) + float(got["g"]) * sgn   # T81
                 _add(rec, bnd, got["s"] * kap, "grd", g=got["g"] * kap)
                 if got["comfortable"]:
                     stats["grd_comfortable"] += 1
@@ -607,6 +617,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
         ts_kn = sorted(t0 for t0, e in kn.items() if e.get("d0") is not None)   # 席 0 視点の `D` が読めたターン
         # **窓は 1 ラウンド（両席が 1 回打つ）**——1 ターンだけの窓では、打つのは手番の席だけなので
         # 生の価格の符号が手番ごとに振れる（測ったのは advantage ではなく手番）。2 ターンで 1 組にする。
+        kn_games.append([dict(kn[t0], turn=t0) for t0 in ts_kn])                   # T81: 局ごとの並び
         for k0 in range(len(ts_kn) - 2):
             a0, b0, c0 = ts_kn[k0], ts_kn[k0 + 1], ts_kn[k0 + 2]
             kn_turns.append({"turn": a0, "d0": kn[a0]["d0"], "r_turns": kn[a0]["r_turns"],
@@ -618,6 +629,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
     import kappa_needed as KN
     stats["kappa_needed"] = KN.summarise(kn_turns)
     stats["kappa_needed_1turn"] = KN.summarise([dict(t, g0=t["g0_turn"], dW=t["dW_turn"]) for t in kn_turns])
+    stats["kappa_split"] = KN.summarise_games(kn_games)        # T81: 相関の中身（窓・型・場の動き）
     stats["last_turn"] = LAST_TURN_MODE
     return per, stats
 

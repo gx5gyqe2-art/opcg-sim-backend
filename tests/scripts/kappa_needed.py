@@ -38,6 +38,12 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
+def _PROB(d):
+    """`W(D) = Φ(D/σ_D)`（`theory_order.prob_of_d`）。"""
+    import theory_order as TO
+    return TO.prob_of_d(d)
+
+
 #: `κ_必要 = ΔW/g` が発散しないための下限（価格の単位・`μ` の 1/10 程度）
 G_FLOOR = 0.005
 #: `|D|` の層（接戦 → 決着）
@@ -68,6 +74,65 @@ def _fit(pairs):
             "corr": (round(float(((g - g.mean()) * (w - w.mean())).mean() / sd), 3) if sd > 0 else None),
             "g_rms": round(float(np.sqrt(gg / len(g))), 4),
             "dW_rms": round(float(np.sqrt((w * w).mean())), 4)}
+
+
+def windows(series, rounds=1):
+    """**ラウンドの窓**（`rounds` ラウンド＝`2 × rounds` ターン）を並べる（T81）。
+
+    `series` は 1 局のターンの並び（`{"d0","g0","g_fam","r_turns","chars"}`・`d0` は席 0 視点）。
+    窓の `g` はその間の**生の価格の和**・`ΔW` は窓の前後の勝率の差・`dchars` は場のキャラ数の変化。
+    """
+    n = 2 * int(rounds)
+    out = []
+    for i in range(len(series) - n):
+        a, b = series[i], series[i + n]
+        fam = {}
+        for k in range(i, i + n):
+            for f, v in (series[k].get("g_fam") or {}).items():
+                fam[f] = fam.get(f, 0.0) + float(v)
+        out.append({"d0": a["d0"], "r_turns": a.get("r_turns"),
+                    "g0": float(sum(series[k]["g0"] for k in range(i, i + n))),
+                    "dW": _PROB(b["d0"]) - _PROB(a["d0"]),
+                    "g_fam": fam,
+                    "dchars": (None if a.get("chars") is None or b.get("chars") is None
+                               else int(b["chars"]) - int(a["chars"]))})
+    return out
+
+
+def summarise_games(games, g_floor=G_FLOOR, max_rounds=3):
+    """**相関 0.36 の中身を割る**（T81）——(a) 窓の広さ（時差か）・(b) 手の型（時計に見えない手か）・
+    (c) 場が動いたか（時計が粗いか）。`games` は局ごとのターンの並び。"""
+    out = {"by_window": {}, "by_family": {}, "by_combo": {}, "by_board_change": {}}
+    for r in range(1, int(max_rounds) + 1):
+        ws = [w for gsr in games for w in windows(gsr, r)]
+        use = [w for w in ws if abs(w["g0"]) >= g_floor]
+        out["by_window"][str(r)] = _fit([(w["g0"], w["dW"]) for w in use])
+    ws = [w for gsr in games for w in windows(gsr, 1)]
+    fams = sorted({f for w in ws for f in (w.get("g_fam") or {})})
+    for f in fams:
+        pairs = [(w["g_fam"].get(f, 0.0), w["dW"]) for w in ws if abs(w["g_fam"].get(f, 0.0)) >= g_floor]
+        out["by_family"][f] = _fit(pairs)
+        # **その型を抜いた残り**との相関（抜くと当てはまりが上がるか）
+        rest = [(w["g0"] - w["g_fam"].get(f, 0.0), w["dW"]) for w in ws
+                if abs(w["g0"] - w["g_fam"].get(f, 0.0)) >= g_floor]
+        out["by_family"][f + "_除いた残り"] = _fit(rest)
+    # **T81**: 時計が見る手（攻め・守り）だけの帳簿＝相関がどこまで上がるか
+    def _sum(w, keys):
+        return float(sum((w.get("g_fam") or {}).get(k, 0.0) for k in keys))
+    out["by_combo"] = {}
+    for name, keys in (("攻め＋守り", ("attack", "guard")),
+                       ("攻め＋守り＋付与", ("attack", "guard", "attach")),
+                       ("攻めだけ", ("attack",))):
+        pairs = [(_sum(w, keys), w["dW"]) for w in ws if abs(_sum(w, keys)) >= g_floor]
+        out["by_combo"][name] = _fit(pairs)
+    drop = [(w["g0"] - _sum(w, ("play", "effect")), w["dW"]) for w in ws
+            if abs(w["g0"] - _sum(w, ("play", "effect"))) >= g_floor]
+    out["by_combo"]["出す＋効果を除いた残り"] = _fit(drop)
+    for name, sel in (("場が動いた", lambda w: w.get("dchars") not in (None, 0)),
+                      ("場は同じ", lambda w: w.get("dchars") == 0)):
+        pairs = [(w["g0"], w["dW"]) for w in ws if sel(w) and abs(w["g0"]) >= g_floor]
+        out["by_board_change"][name] = _fit(pairs)
+    return out
 
 
 def _stat(vals):
