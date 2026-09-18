@@ -910,7 +910,8 @@ def main(argv=None):
     ap.add_argument("--clock-hand", default=_TOM.CLOCK_HAND_MODE, choices=_TOM.CLOCK_HAND_MODES,
                     help="**T78** `--w-mode clock` の時計に手札の 2 つの価値を入れるか（`on`＝耐久は切れる札だけ・速さは今出せる体を足す・自席側のみ）")
     ap.add_argument("--theta-body", default=_CB.THETA_BODY_MODE, choices=_CB.THETA_BODY_MODES,
-                    help="**T82** 耐久の体の項（`--w-mode curve` の `D` に効く）: `blockers`（既定）／`all`（`F` と同じ全キャラ）")
+                    help="耐久の体の項（`--w-mode curve` の `D` に効く）: `blockers`（既定）／`all`（全キャラ・T82）／"
+                         "`attackable`（レストの体 ＋ アクティブなブロッカー＝規則から出る形・T83）")
     ap.add_argument("--last-turn", default=LAST_TURN_MODE, choices=LAST_TURN_MODES,
                     help="**T80 の診断** `drop` なら局の最後のターンの行を落とす（とどめの一撃とその応答を外す）")
     ap.add_argument("--boot-reps", type=int, default=200)

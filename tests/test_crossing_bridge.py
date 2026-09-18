@@ -209,3 +209,38 @@ def test_the_endurance_counts_bodies_the_same_way_the_harm_side_does():
             CB.set_theta_body_mode("なにか")
     finally:
         CB.set_theta_body_mode("blockers")
+
+
+def test_the_endurance_counts_the_bodies_that_can_absorb_harm():
+    """**T83**（ユーザの問い「理論的に正しいのがそれってことだよね？」への答え）: 耐久は**損害を吸える体**だけを数える。
+    規則（`rust/opcg_engine/src/rules/battle.rs`）は **(a) キャラを殴れるのはレストのときだけ**
+    （`declare_attack`「レスト状態のキャラクターのみ攻撃可能です」）・**(b) リーダーへの攻撃を横取りできるのは
+    アクティブなブロッカー**（`has_blocker` は `!is_rest && KW_BLOCKER`）。よって `attackable` は
+    **レストの体 ＋ アクティブなブロッカー**を数え、**アクティブな非ブロッカーは数えない**（そのターンは的にもならない）。
+    `all`（T82）はそれを数えてしまう＝入れすぎ・`blockers`（旧）はレストの体を落とす＝数え足りない。"""
+    sc = _sc(3, 4)
+    sc[T.SC_MY_LEADER_POWER] = 0.5
+    tok = np.zeros((22, 24), np.float32)
+    tok[7, T.S_POWER], tok[7, T.S_IS_CHAR] = 0.5, 1.0                                  # アクティブな非ブロッカー＝吸えない
+    tok[8, T.S_POWER], tok[8, T.S_IS_CHAR], tok[8, T.S_IS_REST] = 0.5, 1.0, 1.0        # レストの体＝殴られる的になれる
+    tok[9, T.S_POWER], tok[9, T.S_IS_CHAR], tok[9, T.S_IS_BLOCKER] = 0.5, 1.0, 1.0     # アクティブなブロッカー＝横取りできる
+    base = 3 * T.LAM + 4 * T.MU
+    one = PR.NU_MEAS["leader_to_sat"]
+    try:
+        assert CB.set_theta_body_mode("attackable") == "attackable"
+        assert CB.threshold(sc, tok) == pytest.approx(base + 2 * one)                   # レスト 1 ＋ ブロッカー 1（アクティブな非ブロッカーは 0）
+        assert not CB._body_absorbs(tok, 7) and CB._body_absorbs(tok, 8) and CB._body_absorbs(tok, 9)
+        tok[9, T.S_IS_REST] = 1.0                                                      # レストのブロッカーも「的」として吸える
+        assert CB._body_absorbs(tok, 9)
+        assert CB.threshold(sc, tok) == pytest.approx(base + 2 * one)
+        # 3 つの数え方は順序で挟まる: 旧 ≤ 規則どおり ≤ 全キャラ
+        CB.set_theta_body_mode("blockers")
+        low = CB.threshold(sc, tok)
+        CB.set_theta_body_mode("attackable")
+        mid = CB.threshold(sc, tok)
+        CB.set_theta_body_mode("all")
+        high = CB.threshold(sc, tok)
+        assert low < mid < high
+        assert CB.threshold_of_me(sc, tok) == pytest.approx(0.0)                        # 自分のライフ・手札・場が空なら 0（どのモードでも）
+    finally:
+        CB.set_theta_body_mode("blockers")

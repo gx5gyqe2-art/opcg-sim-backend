@@ -122,12 +122,24 @@ def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="dtotal"):
     return float(np.mean(vals))
 
 
-#: **耐久の体の項の数え方**（T82・2026-09-18・T81 の結論から）。`blockers`＝旧（**アクティブなブロッカーだけ**）／
-#: `all`＝**場の全キャラ**（`price_realised.side_nu_meas`＝**損害 `F` が使うのと同じ関数**）。
-#: 根拠は T77 と同じ **`F` と `Θ` は同じものに同じ値段を付ける**: `F` の体の項（`attack_response.parts` の `opp_body`）は
-#: `side_nu_meas` で**全キャラ**を数えている（レストもブロッカー以外も・付与ドンを外した素のパワーで）のに、`Θ` は
-#: アクティブなブロッカーだけだった。**体を出す手が時計にまったく見えない**のはこれが原因（T81: 出す手の相関 0.057／0.021）。
-THETA_BODY_MODES = ("blockers", "all")
+#: **耐久の体の項の数え方**。`blockers`＝旧（**アクティブなブロッカーだけ**）／`all`＝**場の全キャラ**
+#: （`price_realised.side_nu_meas`・T82 で測った）／**`attackable`＝規則から出る形**（T83・下記）。
+#:
+#: **T82 の根拠は誤りだった**（2026-09-18・ユーザの問い「理論的に正しいのがそれってことだよね？」で判明）——
+#: 「`F` と `Θ` は同じものに同じ値段を付ける」は**この箇所には当てはまらない**。`F` の体の項
+#: （`attack_response.parts` の `opp_body`）は `side_nu_meas` の**差**＝**場から消えた体**で、消えたら損なのは
+#: レストでもアクティブでも同じ＝全キャラで正しい。`Θ` は**在庫**＝**殺されるまでに損害を吸える体**で、
+#: 吸えるかどうかは規則が決める。
+#:
+#: **規則**（`rust/opcg_engine/src/rules/battle.rs`・エンジンが正本）:
+#:   * `declare_attack`: `target` がキャラで `!is_rest` かつ攻撃側に `KW_ATTACK_ACTIVE` が無ければ
+#:     **「レスト状態のキャラクターのみ攻撃可能です」**＝**的になれるのはレストの体**。
+#:   * `has_blocker`: `!is_rest && KW_BLOCKER && !BLOCKER_DISABLED`＝**リーダーへの攻撃を横取りできるのは
+#:     アクティブなブロッカー**。
+#: ＝**損害を吸える体 = レストの体 ＋ アクティブなブロッカー**（`attackable`・新定数ゼロ）。
+#: `blockers` はレストの体を落とし（T21 で身代わりの価値の大半を運んでいたのは素の体だった）、
+#: `all` はアクティブな非ブロッカーを入れすぎている（そのターンは的にもならずブロックもできない）。
+THETA_BODY_MODES = ("blockers", "all", "attackable")
 THETA_BODY_MODE = "blockers"
 
 
@@ -139,13 +151,26 @@ def set_theta_body_mode(mode):
     return THETA_BODY_MODE
 
 
+def _body_absorbs(tok, s):
+    """**その体は損害を吸えるか**（T83・規則から）。`attackable`＝**レストの体**（攻撃の的になれる）**または
+    アクティブなブロッカー**（リーダーへの攻撃を横取りできる）。`blockers`＝旧（アクティブなブロッカーだけ）。"""
+    if float(tok[s, S_IS_CHAR]) <= 0.5:
+        return False
+    rest = float(tok[s, S_IS_REST]) > 0.5
+    blocker = float(tok[s, S_IS_BLOCKER]) > 0.5
+    if THETA_BODY_MODE == "attackable":
+        return bool(rest or blocker)      # レスト＝的になれる／アクティブなブロッカー＝横取りできる（レストのブロッカーは前者で入る）
+    return bool(blocker and not rest)
+
+
 def _body_term(tok, slots, opp_leader_power):
-    """耐久の体の項（T82）。`all` なら `F` と同じ `side_nu_meas`・`blockers` なら旧（アクティブなブロッカーだけ）。"""
+    """耐久の体の項。`all`＝`F` の `side_nu_meas`（T82・**根拠は誤りだった**・上の注）／
+    `attackable`＝規則から出る形（T83）／`blockers`＝旧。"""
     if THETA_BODY_MODE == "all":
         return float(side_nu_meas(tok, slots, opp_leader_power))
     tot = 0.0
     for s in range(slots.start, slots.stop):
-        if float(tok[s, S_IS_CHAR]) > 0.5 and float(tok[s, S_IS_BLOCKER]) > 0.5 and float(tok[s, S_IS_REST]) <= 0.5:
+        if _body_absorbs(tok, s):
             tot += nu_meas_of(slot_power(tok, s) or 0.0, opp_leader_power)
     return float(tot)
 
@@ -483,7 +508,8 @@ def main(argv=None):
     ap.add_argument("--slope-mode", default=SLOPE_MODE, choices=SLOPE_MODES,
                     help="**T77** 速さ: `board`（既定・今の盤面の攻撃手）／`hand`（手札から今出せる体の攻撃の価格も足す）")
     ap.add_argument("--theta-body", default=THETA_BODY_MODE, choices=THETA_BODY_MODES,
-                    help="**T82** 耐久の体の項: `blockers`（既定・アクティブなブロッカーだけ）／`all`（`F` と同じ全キャラ）")
+                    help="耐久の体の項: `blockers`（既定・アクティブなブロッカーだけ）／`all`（全キャラ・T82）／"
+                         "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）")
     ap.add_argument("--theta-hand", default=THETA_HAND_MODE, choices=THETA_HAND_MODES,
                     help="**T76** 耐久の手札項: `count`（既定・`μ × 枚数`）／`quality`（札ごとの `max(ΔH, ΔG)` の平均を掛ける）")
     add_nu_mode_arg(ap)
