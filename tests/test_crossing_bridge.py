@@ -324,8 +324,9 @@ def test_the_rate_terms_are_separate_quantities():
     sc[T.SC_MY_DON] = 10.0
     db = DR.db()
     body = next(c for c in db.raw_db if DR.body_of(db.get_card(c)) and float(db.get_card(c).power) >= 6000)
-    board, stock, flow, lead, s_rush, f_rush, eff = CB.seat_slope_terms(
+    board, stock, flow, lead, s_rush, f_rush, eff, eff1 = CB.seat_slope_terms(
         sc, tok, None, None, None, 5000.0, deck_ids=[body])
+    assert eff1 == 0.0                                # 既定は `SLOPE_EFFECT_MODE=off`（T108）
     assert s_rush == 0.0 and f_rush == 0.0            # 既定は `RATE_RUSH_MODE=off`（T103）
     assert eff == 0.0                                 # 既定は `SLOPE_EFFECT_MODE=off`（T105）
     assert board == pytest.approx(CB.theory_slope(tok, 5000.0))
@@ -333,7 +334,7 @@ def test_the_rate_terms_are_separate_quantities():
     assert flow == pytest.approx(DR.a_of([body], 5000.0, 10.0))
     assert lead == pytest.approx(board)                              # 場が空ならリーダーが全部
     tok[2, T.S_POWER], tok[2, T.S_IS_CHAR], tok[2, T.S_CAN_ATTACK] = 0.8, 1.0, 1.0
-    board2, _s, _f, lead2, _sr2, _fr2, _e2 = CB.seat_slope_terms(sc, tok, None, None, None, 5000.0)
+    board2, _s, _f, lead2, _sr2, _fr2, _e2, _e12 = CB.seat_slope_terms(sc, tok, None, None, None, 5000.0)
     assert lead2 == pytest.approx(lead) and board2 > lead2           # キャラのぶんはリーダーに入らない
     # 既定（`flow`）では `seat_slope_parts` の 2 つ目は流入
     assert CB.seat_slope_parts(sc, tok, None, None, None, 5000.0, deck_ids=[body])[1] == pytest.approx(flow)
@@ -885,3 +886,24 @@ def test_the_rate_check_can_drop_the_killing_turn():
     assert hp["by_turns_left"]["1"]["n"] == 90 and hp["by_turns_left"]["1"]["ratio"] > 1.0
     assert hp["by_turns_left"]["3"]["ratio"] == pytest.approx(1.0)
     assert hp["by_turns_left"]["3"]["attack_share"] == pytest.approx(0.8)
+
+
+def test_the_hand_can_fire_its_effect_once():
+    """**T108**（T107 が指した先）: T105 は**毎ターン引く 1 枚**（流量）の効果だけを数えていた。
+    **手札に溜まっている札の効果**は**一度きり**に使えるもので、速さの式に 1 項も無かった。
+    歩きでは **1 ターン目に 1 回だけ**乗る（在庫なので繰り返さない）。"""
+    assert CB.SLOPE_EFFECT_MODE == "off" and "hand" in CB.SLOPE_EFFECT_MODES
+    # 流量（`eff`）は毎ターン・在庫（`eff_once`）は 1 ターン目だけ
+    assert CB.rate_at(1, 0.1, 0.0, 0.0, 0.0, eff=0.01) == pytest.approx(0.11)
+    assert CB.rate_at(3, 0.1, 0.0, 0.0, 0.0, eff=0.01) == pytest.approx(0.11)
+    assert CB.rate_at(1, 0.1, 0.0, 0.0, 0.0, eff_once=0.03) == pytest.approx(0.13)
+    assert CB.rate_at(2, 0.1, 0.0, 0.0, 0.0, eff_once=0.03) == pytest.approx(0.10)
+    assert CB.rate_at(3, 0.1, 0.0, 0.0, 0.0, eff_once=0.03) == pytest.approx(0.10)
+    # 負は 0 に倒す
+    assert CB.rate_at(1, 0.1, 0.0, 0.0, 0.0, eff_once=-1.0) == pytest.approx(0.10)
+    # 的に届くのは早くなる（1 ターン目に 1 回ぶん進む）
+    assert CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, eff_once=0.03) < CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0)
+    try:
+        assert CB.set_slope_effect_mode("hand") == "hand"
+    finally:
+        CB.set_slope_effect_mode("off")

@@ -241,6 +241,33 @@ def removal_harm(m, my_leader_power, boards):
     return float(best)
 
 
+def hand_effect_harm(cids, my_leader_power=5000.0, r_turns=3, don=None, boards=None):
+    """**今の手札が今このターン出せる「効果の損害」**（T108・在庫の側・一度きり）。
+
+    T105 の `e_of` は**毎ターン引く 1 枚**（流量）だけを数えていた。**手札に溜まっている札の効果**は
+    **一度きり**に使えるもので、**速さの式にまだ 1 項も入っていない**。
+
+    **1 枚だけ数える**——複数撃つぶんのドンは体にも使えるので**過小側に倒す**（`removal_harm` と同じ規約）。
+    `don` を渡すとそのドンで出せない札は 0（規則の枠）。**打ち筋は入らない**——
+    **どれを使うかではなく「使えるもののうち一番大きいもの」**を規則と原本から決める。
+    """
+    rb = int(max(1, min(5, round(float(r_turns)))))
+    bs = (TO.load_opp_boards() if boards is None else boards).get(rb) or []
+    if not bs or not cids:
+        return 0.0
+    d = db()
+    cap = None if don is None else int(round(float(don)))
+    best = 0.0
+    for cid in cids:
+        m = d.get_card(cid)
+        if m is None:
+            continue
+        if cap is not None and int(getattr(m, "cost", 0) or 0) > cap:
+            continue
+        best = max(best, removal_harm(m, float(my_leader_power), bs))
+    return float(best)
+
+
 def _by_seed(dirs, fn):
     """記録のディレクトリ群 → `{seed: fn(seed, mode, leaders)}`（`meta_games.json` を読んで作り直す）。
 

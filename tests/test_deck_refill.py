@@ -141,3 +141,29 @@ def test_the_effect_harm_comes_from_the_card_master_and_the_board_distribution(m
     profiles[id(both)] = {"thr": ((1000, None, False, "removal", True),
                                   (None, None, False, "removal", True))}
     assert DR.removal_harm(both, mlp, boards) == pytest.approx(best)
+
+
+def test_the_hand_effect_harm_takes_the_best_affordable_card(monkeypatch):
+    """**T108**: `hand_effect_harm` は**今のドンで出せる手札の札のうち、一番大きい除去の損害**。
+    **1 枚だけ**（複数撃つドンは体にも使えるので過小側に倒す）・**打ち方は入らない**。"""
+    boards = {3: [(5000.0, [(3000.0, False), (6000.0, False)])]}
+    monkeypatch.setattr(DR.TO, "load_opp_boards", lambda *_a, **_k: boards)
+
+    class _Card:
+        def __init__(self, cost): self.cost = cost
+
+    cheap_small, dear_big, plain = _Card(2), _Card(9), _Card(1)
+    cards = {"CHEAP": cheap_small, "DEAR": dear_big, "PLAIN": plain}
+    monkeypatch.setattr(DR, "db", lambda: type("D", (), {"get_card": staticmethod(cards.get)})())
+    monkeypatch.setattr(DR.NF, "profile", lambda m: {
+        "thr": ((4000, None, False, "removal", True),) if m is cheap_small else
+               (((None, None, False, "removal", True),) if m is dear_big else ())})
+    small = DR.nu_meas_of(3000.0, 5000.0)
+    big = max(DR.nu_meas_of(3000.0, 5000.0), DR.nu_meas_of(6000.0, 5000.0))
+    # ドン 2 なら安い方しか出せない
+    assert DR.hand_effect_harm(["CHEAP", "DEAR", "PLAIN"], 5000.0, 3, 2) == pytest.approx(small)
+    # ドン 10 なら両方出せる＝大きい方
+    assert DR.hand_effect_harm(["CHEAP", "DEAR", "PLAIN"], 5000.0, 3, 10) == pytest.approx(big)
+    # 除去を持たない札だけなら 0・手札が空なら 0
+    assert DR.hand_effect_harm(["PLAIN"], 5000.0, 3, 10) == pytest.approx(0.0)
+    assert DR.hand_effect_harm([], 5000.0, 3, 10) == pytest.approx(0.0)

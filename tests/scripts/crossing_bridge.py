@@ -672,7 +672,7 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     * **流入** … 毎ターン引く 1 枚がもたらす体（`deck_refill.a_of`・T93）。
       `j` ターン目に引いた札は `j+1` から殴るので、**進むほど積み上がる**（`流入 × (j − 1)`）。
 
-    戻り値は `(盤面, 在庫, 流入, 盤面のうちリーダー, 在庫の速攻ぶん, 流入の速攻ぶん, 効果の損害)`
+    戻り値は `(盤面, 在庫, 流入, 盤面のうちリーダー, 在庫の速攻ぶん, 流入の速攻ぶん, 効果の損害, 在庫の効果)`
     ——**リーダーは KO されない**ので減衰（T95）が掛からない。
     **T103**: 末尾 2 つは**速攻の内訳**（`RATE_RUSH_MODE=on` のときだけ歩きに渡す）。**速攻は出したターン・
     引いたターンからもう殴れる**ので 1 ターン早く積む（規則）。`off` のときは 0 を返す。
@@ -686,14 +686,20 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     lead, chars = theory_slope_parts(tok_row, olp, theta, mu, blockers=blk)
     base = lead + chars
     if SLOPE_MODE != "hand":
-        return base, 0.0, 0.0, lead, 0.0, 0.0, 0.0
-    stock = stock_rush = 0.0
-    if (want_stock or SLOPE_HAND_MODE == "stock") and cards is not None:
+        return base, 0.0, 0.0, lead, 0.0, 0.0, 0.0, 0.0
+    stock = stock_rush = eff_once = 0.0
+    if (want_stock or SLOPE_HAND_MODE == "stock" or SLOPE_EFFECT_MODE == "hand") and cards is not None:
         import hand_plan as HP
         r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
         items = HP.hand_items(tok_row, ci_row, idx2cid, cards, olp, r)
         stock, stock_rush = playable_attack_price(items, cards, float(sc_a[SC_MY_DON]), olp, theta, mu,
                                                   want_rush=True)
+        if SLOPE_EFFECT_MODE == "hand":
+            # **T108**: 在庫（手札）が今このターン出せる効果の損害（一度きり）
+            import deck_refill as DR
+            mlp_h = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
+            eff_once = float(DR.hand_effect_harm([it["cid"] for it in (items or ())], mlp_h, r,
+                                                 float(sc_a[SC_MY_DON])))
     flow = flow_rush = eff = 0.0
     if deck_ids:
         import deck_refill as DR
@@ -701,21 +707,21 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
         flow = float(DR.a_of(deck_ids, olp, don, theta, mu))
         if RATE_RUSH_MODE == "on":
             flow_rush = float(DR.a_of(deck_ids, olp, don, theta, mu, rush_only=True))
-        if SLOPE_EFFECT_MODE == "on":
+        if SLOPE_EFFECT_MODE in ("on", "hand"):
             # **T105**: 効果は**相手の体**から奪うので、自分のリーダーのパワーと
             # 相手の残りライフ（盤面の分布の条件）で読む。
             mlp = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
             eff = float(DR.e_of(deck_ids, mlp, max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE]))), don))
     if RATE_RUSH_MODE != "on":
         stock_rush = flow_rush = 0.0
-    return base, stock, flow, lead, stock_rush, flow_rush, eff
+    return base, stock, flow, lead, stock_rush, flow_rush, eff, eff_once
 
 
 def seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None):
     """速さを **2 つに分けて**返す（T90）: `(盤面の攻撃手, 手札の項)`。
     手札の項は `SLOPE_HAND_MODE` が決める（`stock`＝今出せる体の総額／**`flow`＝毎ターン入ってくるぶん**・T93）。"""
-    base, stock, flow, _lead, _sr, _fr, _ef = seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp,
-                                                               theta, mu, deck_ids)
+    base, stock, flow, _lead, _sr, _fr, _ef, _e1 = seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards,
+                                                                    olp, theta, mu, deck_ids)
     return base, (stock if SLOPE_HAND_MODE == "stock" else flow)
 
 
@@ -860,7 +866,9 @@ RATE_T1_MODE = "off"
 #:
 #: **形は「流量」**——**1 枚は 1 回しか使えない**ので、毎ターン引く 1 枚ぶんが**毎ターン `e` ずつ**入る
 #: （体の攻撃 `a_of` が**毎ターン殴り続けて積み上がる**のとは役割が違う）。
-SLOPE_EFFECT_MODES = ("off", "on")
+#: **T108**: `hand` は `on` に**在庫（手札）の効果**を足す——**一度きり**なので
+#: 歩きでは **1 ターン目に 1 回だけ**乗り、行ごとの `A` には**そのターン撃てる分**として入る。
+SLOPE_EFFECT_MODES = ("off", "on", "hand")
 SLOPE_EFFECT_MODE = "off"
 
 
@@ -889,7 +897,7 @@ def set_rate_rush_mode(name):
 
 
 def rate_at(j, board_lead, board_chars, stock, flow, ko_p=0.0, stock_rush=0.0, flow_rush=0.0,
-            j0=1, eff=0.0):
+            j0=1, eff=0.0, eff_once=0.0):
     """**`j` 自席ターン目の速さ** `R_j`（T94・T95）。**リーダーは減衰しない**（KO されない）。
     `ko_p = 0` なら T94 のまま（減衰なし）＝`board_lead + board_chars + 在庫·[j≥2] + 流入·(j−1)`。
 
@@ -899,7 +907,8 @@ def rate_at(j, board_lead, board_chars, stock, flow, ko_p=0.0, stock_rush=0.0, f
 
     **T103**: `j0` は**この歩きの出発点の絶対の自席ターン番号**（1 始まり）。`RATE_T1_MODE=on` なら
     **絶対の自席ターン 1 の段は 0**（どちらの席も最初のターンはアタックできない・`turn_count <= 2`）。
-    **T105**: `eff` は**効果が出す損害**＝**毎ターン一定**（1 枚は 1 回しか使えないので積み上がらない）。"""
+    **T105**: `eff` は**効果が出す損害**＝**毎ターン一定**（1 枚は 1 回しか使えないので積み上がらない）。
+    **T108**: `eff_once` は**今の手札が出せる分**＝**1 ターン目に 1 回だけ**（在庫なので繰り返さない）。"""
     if RATE_T1_MODE == "on" and int(j0) + int(j) - 1 <= 1:
         return 0.0                                    # **T103**: 自分の最初のターンはアタックできない（規則）
     q = 1.0 - max(0.0, min(1.0, float(ko_p)))
@@ -921,11 +930,14 @@ def rate_at(j, board_lead, board_chars, stock, flow, ko_p=0.0, stock_rush=0.0, f
         m = max(0, int(j))
         out += f_rush * (m if q >= 1.0 else (1.0 - q ** m) / (1.0 - q))
     out += max(0.0, float(eff))                      # **T105**: 効果は毎ターン 1 枚ぶん（積み上がらない）
+    if int(j) <= 1:
+        out += max(0.0, float(eff_once))             # **T108**: 在庫の効果は 1 回だけ
     return float(out)
 
 
 def tau_grow(theta, board_lead, board_chars, stock, flow, r=0.0, cap=RACE_CAP, ko_p=None, step=0.0,
-             shield=0.0, shield_rate=0.0, stock_rush=0.0, flow_rush=0.0, j0=1, refill=0.0, eff=0.0):
+             shield=0.0, shield_rate=0.0, stock_rush=0.0, flow_rush=0.0, j0=1, refill=0.0, eff=0.0,
+             eff_once=0.0):
     """**積み上がる速さ**で的に届くまでのターン数（T94）。端数はそのターンの中で比例配分する。
     `r > 0` なら的も毎ターン `r` 下がる（T90 の動く的と組める）。
     `RATE_DECAY_MODE=ko` なら**盤面が毎ターン `ko_p` で失われる**（T95）。
@@ -947,7 +959,8 @@ def tau_grow(theta, board_lead, board_chars, stock, flow, r=0.0, cap=RACE_CAP, k
         k = float(KO_P)
     f = 0.0
     for j in range(1, int(cap) + 1):
-        add = rate_at(j, board_lead, board_chars, stock, flow, k, stock_rush, flow_rush, j0, eff)
+        add = rate_at(j, board_lead, board_chars, stock, flow, k, stock_rush, flow_rush, j0, eff,
+                      eff_once)
         # **T102／T104**: `j` ターン目までに盾から出せた総額
         # ＝**持っている額**（今の盾 ＋ 補充 `refill × j`）と**出せる上限**（`shield_rate × j`）の小さい方。
         used = min(shield + refill * j, shield_rate * j) if (shield > 0.0 or refill > 0.0) else 0.0
@@ -994,7 +1007,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "rate_walk": RATE_WALK_MODE, "rate_decay": RATE_DECAY_MODE, "stock_n": 0, "stock_sum": 0.0,
              "rate_rush": RATE_RUSH_MODE, "stock_rush_sum": 0.0, "flow_rush_sum": 0.0,
              "rate_t1": RATE_T1_MODE, "tau_capped": 0, "tau_rows": 0,
-             "slope_effect": SLOPE_EFFECT_MODE, "eff_sum": 0.0, "eff_n": 0,
+             "slope_effect": SLOPE_EFFECT_MODE, "eff_sum": 0.0, "eff_n": 0, "eff1_sum": 0.0,
              "theta_hand_blocker": THETA_HAND_BLOCKER_MODE, "hb_sum": 0.0, "hb_n": 0, "hb_hit": 0,
              "theta_return": THETA_RETURN_MODE, "theta_hand_place": THETA_HAND_PLACE,
              "shield_n": 0, "shield_sum": 0.0, "shield_rate_sum": 0.0,
@@ -1144,7 +1157,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                 stock_rush=d.get("slope_stock_rush") or 0.0,
                                 flow_rush=d.get("slope_flow_rush") or 0.0,
                                 j0=int(d.get("j") or 0) + 1, refill=rf,
-                                eff=d.get("slope_eff") or 0.0)
+                                eff=d.get("slope_eff") or 0.0,
+                                eff_once=d.get("slope_eff_once") or 0.0)
             if RACE_MODE in ("net", "deck"):
                 return tau_net(d["theta"], d["slope_board"], d["slope_hand"], d["r_opp"])
             return d["theta"] / max(SLOPE_FLOOR, d["slope_theory"])
@@ -1181,9 +1195,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 dk = (seat_decks.get(seed_g) or (None, None))[w] if seat_decks else None
                 if SLOPE_HAND_MODE == "flow" and not dk:
                     stats["a_flow_missing"] += 1
-                s_board, s_stock, s_flow, s_lead, s_srush, s_frush, s_eff = seat_slope_terms(
+                (s_board, s_stock, s_flow, s_lead, s_srush, s_frush, s_eff,
+                 s_eff1) = seat_slope_terms(
                     sc, tok, _ci, idx2cid, cards, olp, theta, mu, deck_ids=dk,
-                    want_stock=(RATE_WALK_MODE == "grow"))                          # T77／T90／T93／T94／T95
+                    want_stock=(RATE_WALK_MODE == "grow" or SLOPE_EFFECT_MODE == "hand"))                          # T77／T90／T93／T94／T95
                 s_hand = s_stock if SLOPE_HAND_MODE == "stock" else s_flow
                 if SLOPE_HAND_MODE == "flow":
                     stats["a_flow_n"] += 1; stats["a_flow_sum"] += float(s_hand)
@@ -1191,7 +1206,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     stats["stock_n"] += 1; stats["stock_sum"] += float(s_stock)
                     stats["stock_rush_sum"] += float(s_srush); stats["flow_rush_sum"] += float(s_frush)
                 stats["eff_n"] += 1; stats["eff_sum"] += float(s_eff)
-                slope_theory = s_board + s_hand + s_eff          # **T105**: 効果の項（既定は 0）
+                stats["eff1_sum"] += float(s_eff1)
+                slope_theory = s_board + s_hand + s_eff + s_eff1   # **T105／T108**: 効果の項（既定は 0）
                 if RATE_T1_MODE == "on" and j == 0:
                     slope_theory = 0.0            # **T103**: 最初の自席ターンは 1 本も打てない（規則）
                 per_seat[(w, t)] = {"theta": th_w, "slope_hist": slope_hist, "slope_theory": slope_theory,
@@ -1208,7 +1224,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                     # **T103**: 在庫・流入のうち**速攻**のぶん（1 ターン早く殴る）
                                     "slope_stock_rush": s_srush, "slope_flow_rush": s_frush,
                                     # **T105**: 効果が出す損害（毎ターン一定）
-                                    "slope_eff": s_eff,
+                                    # **T108**: 在庫（手札）の効果（一度きり）
+                                    "slope_eff": s_eff, "slope_eff_once": s_eff1,
                                     "r_opp": r_opp_of(1 - w, t),
                                     "r_deck": r_deck_of(1 - w),
                                     "f_real": f_real, "t_left": len(ts) - j, "j": j}
@@ -1599,7 +1616,8 @@ def main(argv=None):
                          "`off`（旧・どこにも入らない）／`on`（**規則どおり**＝出せる 1 体の `ν`）")
     ap.add_argument("--slope-effect", default=SLOPE_EFFECT_MODE, choices=SLOPE_EFFECT_MODES,
                     help="**T105** 速さ `A` に効果が出す損害を入れるか: `off`（旧・攻撃だけ）／"
-                         "`on`（**引いた 1 枚が出す除去の損害**をデッキ平均で毎ターン足す・`deck_refill.e_of`）")
+                         "`on`（**引いた 1 枚が出す除去の損害**をデッキ平均で毎ターン足す・`deck_refill.e_of`）／"
+                         "`hand`（`on` ＋ **在庫（手札）が今出せる分**を一度きり・T108）")
     ap.add_argument("--rate-t1", default=RATE_T1_MODE, choices=RATE_T1_MODES,
                     help="**T103** 最初の自席ターンはアタックできない規則（`turn_count <= 2`）を歩きに入れるか: "
                          "`off`（旧）／`on`（**規則どおり**＝絶対の自席ターン 1 の速さは 0）")
