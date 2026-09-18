@@ -251,3 +251,27 @@ def test_the_endurance_counts_the_bodies_that_can_absorb_harm():
         assert CB.threshold_of_me(sc, tok) == pytest.approx(0.0)                        # 自分のライフ・手札・場が空なら 0（どのモードでも）
     finally:
         CB.set_theta_body_mode("attackable")
+
+
+def test_the_race_can_run_against_a_moving_threshold():
+    """**T90**（ユーザとの整理 2026-09-18「その形で進めてください」）: 交点を**動く的との競争**で解く。
+    **時間軸は流れの側に 1 本だけ**——`Θ` は在庫のまま・`A`（1 ターン目は盤面だけ＝召喚酔い）と
+    相手の補充 `r`（引き 1 枚＝`Θ` の手札項と同じ 1 枚あたりの価格）が時間を持つ。"""
+    assert CB.RACE_MODE == "static"                                  # 既定は旧（採否はユーザ判定）
+    assert CB.tau_net(1.0, 0.25, 0.0, 0.0) == pytest.approx(4.0)     # 的が動かなければ Θ/A
+    assert CB.tau_net(1.0, 0.25, 0.0, 0.05) == pytest.approx(5.0)    # 補充ありなら Θ/(A − r)
+    # **手札の体は 2 ターン目から**（召喚酔い）: 1 ターン目 0.2・以後 0.3 → 0.2+0.3+0.3 = 0.8、残り 0.2 を 4 ターン目の途中で
+    assert CB.tau_net(1.0, 0.2, 0.1, 0.0) == pytest.approx(3.0 + 0.2 / 0.3)
+    assert CB.tau_net(1.0, 0.05, 0.0, 0.05) == pytest.approx(CB.RACE_CAP)   # 追いつけなければ打ち切り
+    assert CB.tau_net(0.0, 0.25, 0.0, 0.0) == pytest.approx(0.0)     # 既に届いている
+    # **輪郭の側で解く形**（T90 の本命）——輪郭は `A` の成長を持っているので、動く的でも追いつける
+    prof = [0.05, 0.10, 0.15, 0.20, 0.25, 0.25]
+    assert CB.tau_from_profile(0.5, 0, prof) == pytest.approx(4.0)                 # 的が動かない
+    assert CB.tau_from_profile(0.5, 0, prof, 1.0, 0.03) > 4.0                      # 動けば伸びる
+    assert CB.tau_from_profile(0.5, 0, prof, 1.0, 0.0) == pytest.approx(4.0)       # r = 0 は従来と同じ
+    try:
+        assert CB.set_race_mode("net") == "net"
+        with pytest.raises(ValueError):
+            CB.set_race_mode("なにか")
+    finally:
+        CB.set_race_mode("static")

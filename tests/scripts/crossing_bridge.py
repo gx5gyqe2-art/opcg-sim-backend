@@ -263,16 +263,66 @@ def theory_slope(tok, opp_leader_power, theta=THETA, mu=MU):
                      for x in own_attackers_of(tok, opp_leader_power)))
 
 
-def seat_slope(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU):
-    """その席が **1 自席ターンに積む損害**（理論）。`SLOPE_MODE=hand`（T77）なら**手札から今出せる体**の攻撃の価格も足す
-    ＝手札の**出す価値**をしきい値ではなく**速さ**に置く（T76 の読み）。"""
+def seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU):
+    """速さを **2 つに分けて**返す（T90）: `(盤面の攻撃手, 今出せる手札の体)`。
+    **規則**——手札から出した体は**そのターンには殴れない**（召喚酔い・T84）ので、
+    交点まで歩くときは**1 ターン目は盤面だけ・2 ターン目からは両方**になる。"""
     base = theory_slope(tok_row, olp, theta, mu)
     if SLOPE_MODE != "hand" or cards is None:
-        return base
+        return base, 0.0
     import hand_plan as HP
     r = max(1.0, min(5.0, float(np.asarray(sc)[SC_OPP_LIFE])))
     items = HP.hand_items(tok_row, ci_row, idx2cid, cards, olp, r)
-    return base + playable_attack_price(items, cards, float(np.asarray(sc)[SC_MY_DON]), olp, theta, mu)
+    return base, float(playable_attack_price(items, cards, float(np.asarray(sc)[SC_MY_DON]), olp, theta, mu))
+
+
+def seat_slope(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU):
+    """その席が **1 自席ターンに積む損害**（理論）。`SLOPE_MODE=hand`（T77）なら**手札から今出せる体**の攻撃の価格も足す
+    ＝手札の**出す価値**をしきい値ではなく**速さ**に置く（T76 の読み）。"""
+    a, b = seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta, mu)
+    return a + b
+
+
+#: **交点の解き方**（T90・2026-09-18・ユーザ決定「その形で進めてください」）。
+#: `static`＝従来（`τ = Θ / A`＝**的が動かない**前提）／**`net`＝動く的との競争**:
+#:
+#: ```
+#: F(t) = Σ_{i≤t} A_i   が   Θ_now + r·t   に届く時刻       （同じ式を `τ = Θ/(A − r)` とも書ける）
+#:   A_1 = 盤面の攻撃手だけ           出したばかりの体は殴れない（召喚酔い・T84 と同じ規則）
+#:   A_i = 盤面 ＋ 手札から出せる体   （i ≥ 2）
+#:   r   = 相手の補充＝**引き 1 枚**（`Θ` の手札項と同じ 1 枚あたりの価格 `g`）
+#: ```
+#:
+#: **時間軸は 1 本に保つ**（ユーザとの整理 2026-09-18）——`Θ` は**在庫のまま**（1 行から読める状態の関数・
+#: `F_end/Θ_start` の検算がそのまま意味を持つ）で、**時間は流れの側（`A` と `r`）に置く**。
+#: **新定数ゼロ**: `r` は `Θ` の手札項が既に使っている `g`（切れる札 1 枚の価格）そのもの。
+#: **根拠は実測**（T89）: 勝った席は**開始時の `Θ` より 18%／9% 多い損害**を与えてようやく倒した＝的が後ろへ下がっている。
+RACE_MODES = ("static", "net")
+RACE_MODE = "static"
+RACE_CAP = 30.0          # 届かないときの打ち切り（ターン）
+
+
+def set_race_mode(mode):
+    global RACE_MODE
+    if mode not in RACE_MODES:
+        raise ValueError("race mode は %s のどれか" % (RACE_MODES,))
+    RACE_MODE = mode
+    return RACE_MODE
+
+
+def tau_net(theta, a_board, a_hand, r, cap=RACE_CAP):
+    """**動く的に届くまでのターン数**（T90）。1 ターン目は `a_board` だけ・2 ターン目から `a_board + a_hand`。
+    的は毎ターン `r` 下がる。届かなければ `cap`。端数はそのターンの中で比例配分する。"""
+    theta = float(theta); r = max(0.0, float(r))
+    f = 0.0
+    for t in range(1, int(cap) + 1):
+        add = float(a_board) + (float(a_hand) if t >= 2 else 0.0)
+        need = theta + r * t
+        if f + add >= need:
+            short = max(0.0, need - f)
+            return float(t - 1) + (short / add if add > SLOPE_FLOOR else 1.0)
+        f += add
+    return float(cap)
 
 
 def harm_of(p):
@@ -294,6 +344,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     ledger = []            # (d) 単位の検算: 勝った席の F_end 対 Θ_start
     turn_harm = []         # 自席ターン番号 j ごとの損害（損害の輪郭＝加速を測る材料）
     stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "theta_hand": THETA_HAND_MODE, "slope_mode": SLOPE_MODE, "theta_body": THETA_BODY_MODE,
+             "race": RACE_MODE,
              "g_sum": 0.0, "g_n": 0, "g_fallback": 0,
              "g_win_sum": 0.0, "g_win_n": 0, "g_lose_sum": 0.0, "g_lose_n": 0}
     games = 0
@@ -394,8 +445,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
                 th_w = threshold(sc, tok, g_hand=g_for(1 - w, t))
                 slope_hist = (f_real / j) if j > 0 else None
-                slope_theory = seat_slope(sc, tok, _ci, idx2cid, cards, olp, theta, mu)   # T77
+                s_board, s_hand = seat_slope_parts(sc, tok, _ci, idx2cid, cards, olp, theta, mu)   # T77／T90
+                slope_theory = s_board + s_hand
                 per_seat[(w, t)] = {"theta": th_w, "slope_hist": slope_hist, "slope_theory": slope_theory,
+                                    # **T90**: 速さを 2 つに分けて持つ（1 ターン目は盤面だけ）と、
+                                    # **相手の補充 `r`**＝`Θ` の手札項と同じ 1 枚あたりの価格（引き 1 枚ぶん）
+                                    "slope_board": s_board, "slope_hand": s_hand,
+                                    "r_opp": float(g_for(1 - w, t) if g_for(1 - w, t) is not None else mu),
                                     "f_real": f_real, "t_left": len(ts) - j, "j": j}
                 turn_harm.append({"j": j, "harm": harm.get((w, t), 0.0), "slope_theory": slope_theory})
                 f_real += harm.get((w, t), 0.0)
@@ -405,8 +461,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 # **T89**: 時間の分解——勝った席が **実際に何自席ターン使ったか**（`turns`）と、
                 # **実際の速さ**（`F_end / turns`）・**理論の速さ**（`slope_theory` の平均）。
                 # 交点の偏り（終局を遅く言う）が `Θ` の側か `A` の側かを分ける材料。
+                p0 = per_seat[(w, ts[0])]
                 ledger.append({"F_end": f_real, "theta_start": th0,
                                "turns": len(ts),
+                               # **T90**: 局の開始で「動く的との競争」を解いたら何ターンか（実測の使用ターン数と比べる）
+                               "tau_net_start": tau_net(th0, p0["slope_board"], p0["slope_hand"], p0["r_opp"]),
                                "rate_real": (f_real / len(ts)) if ts else None,
                                "rate_theory": float(np.mean([per_seat[(w, tt)]["slope_theory"] for tt in ts])),
                                "F_priced_end": sum(priced.get((w, t), 0.0) for t in ts)})
@@ -422,11 +481,19 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 t_opp_act = sum(1 for tt in ts_o if tt > t)
                 rec = {"who": w, "won": won, "t_me_act": me["t_left"], "t_opp_act": t_opp_act,
                        "theta_me": me["theta"], "theta_opp": op["theta"], "j_me": me["j"], "j_opp": op["j"],
-                       "slope_theory_me": me["slope_theory"], "slope_theory_opp": op["slope_theory"]}
+                       "slope_theory_me": me["slope_theory"], "slope_theory_opp": op["slope_theory"],
+                       # **T90**: それぞれが殴っている相手の補充（`Θ` の手札項と同じ 1 枚あたりの価格）
+                       "r_opp_me": me.get("r_opp"), "r_opp_opp": op.get("r_opp")}
                 for sv in SLOPES:
                     s_me = me["slope_" + sv] if me["slope_" + sv] is not None else me["slope_theory"]
                     s_op = op["slope_" + sv] if op["slope_" + sv] is not None else op["slope_theory"]
-                    tau_me, tau_opp, pred = predict(me["theta"], op["theta"], s_me, s_op)
+                    if RACE_MODE == "net" and sv == "theory":
+                        # **T90**: 動く的との競争（1 ターン目は盤面だけ・的は毎ターン `r` 下がる）
+                        tau_me = tau_net(me["theta"], me["slope_board"], me["slope_hand"], me["r_opp"])
+                        tau_opp = tau_net(op["theta"], op["slope_board"], op["slope_hand"], op["r_opp"])
+                        pred = tau_me <= tau_opp
+                    else:
+                        tau_me, tau_opp, pred = predict(me["theta"], op["theta"], s_me, s_op)
                     rec["tau_me_" + sv] = tau_me; rec["tau_opp_" + sv] = tau_opp; rec["pred_" + sv] = pred
                 rows_out.append(rec)
     return rows_out, ledger, stats, turn_harm
@@ -445,15 +512,21 @@ def harm_profile(turn_harm, j_max=12, min_n=20):
     return prof, prof_th
 
 
-def tau_from_profile(theta, j, prof, scale=1.0):
-    """輪郭に沿って損害を積み、`Θ` に届くまでのターン数（端数は比例配分・輪郭の先は最後の値）。"""
+def tau_from_profile(theta, j, prof, scale=1.0, r=0.0):
+    """輪郭に沿って損害を積み、`Θ` に届くまでのターン数（端数は比例配分・輪郭の先は最後の値）。
+
+    **T90**: `r > 0` なら**的が毎ターン `r` 下がる**（相手の補充）＝`Θ + r·(k+1)` に届くまで歩く。
+    **輪郭は `A` の成長を持っている**ので、動く的と競争させるならこちら側で解く
+    （`theory` の一定の `A` では局の序盤〔盤面が空〕に追いつけず打ち切りになる・T90 の実測）。"""
     acc = 0.0
+    r = max(0.0, float(r))
     for k in range(200):
         h = prof[min(j + k, len(prof) - 1)] * scale
         if h <= SLOPE_FLOOR:
             h = SLOPE_FLOOR
-        if acc + h >= theta:
-            return k + (theta - acc) / h
+        need = float(theta) + r * (k + 1)
+        if acc + h >= need:
+            return k + max(0.0, need - acc) / h
         acc += h
     return 200.0
 
@@ -471,8 +544,11 @@ def summarise(rows_out, ledger, turn_harm=None):
                     ("curve_scaled",
                      r["slope_theory_me"] / max(SLOPE_FLOOR, prof_th[min(r["j_me"], len(prof_th) - 1)]),
                      r["slope_theory_opp"] / max(SLOPE_FLOOR, prof_th[min(r["j_opp"], len(prof_th) - 1)]))):
-                tm = tau_from_profile(r["theta_me"], r["j_me"], prof, scale_me)
-                to = tau_from_profile(r["theta_opp"], r["j_opp"], prof, scale_op)
+                # **T90**: `net` なら的が毎ターン相手の補充ぶん下がる（`r_opp_*` は行に載せてある）
+                rr_me = float(r.get("r_opp_me") or 0.0) if RACE_MODE == "net" else 0.0
+                rr_op = float(r.get("r_opp_opp") or 0.0) if RACE_MODE == "net" else 0.0
+                tm = tau_from_profile(r["theta_me"], r["j_me"], prof, scale_me, rr_me)
+                to = tau_from_profile(r["theta_opp"], r["j_opp"], prof, scale_op, rr_op)
                 r["tau_me_" + sv] = tm; r["tau_opp_" + sv] = to; r["pred_" + sv] = (tm <= to)
     if ledger:
         fe = np.array([r["F_end"] for r in ledger]); th0 = np.array([r["theta_start"] for r in ledger])
@@ -494,7 +570,10 @@ def summarise(rows_out, ledger, turn_harm=None):
             # **`Θ` を実際の速さで割ったら何ターンか**（理論の `A` ではなく実測の速さで測った τ）
             "tau_at_real_rate": round(float((th0s / np.maximum(1e-9, rr)).mean()), 2) if len(ok) else None,
             # **`Θ` を理論の速さで割ったら何ターンか**（これが予測の τ）
-            "tau_at_theory_rate": round(float((th0s / np.maximum(1e-9, rt)).mean()), 2) if len(ok) else None}
+            "tau_at_theory_rate": round(float((th0s / np.maximum(1e-9, rt)).mean()), 2) if len(ok) else None,
+            # **T90**: 動く的との競争を局の開始で解いた τ（`turns_mean` と比べる＝これが当たれば時間の形が正しい）
+            "tau_net_start": (round(float(np.mean([r["tau_net_start"] for r in ok if r.get("tau_net_start") is not None])), 2)
+                              if any(r.get("tau_net_start") is not None for r in ok) else None)}
         out["ledger"] = {"winners": len(ledger), "F_end_mean": round(float(fe.mean()), 4),
                          "theta_start_mean": round(float(th0.mean()), 4),
                          "F_end_over_theta_start": round(float(fe.mean() / max(1e-9, th0.mean())), 3),
@@ -534,6 +613,9 @@ def main(argv=None):
     ap.add_argument("--theta-mode", default="const", choices=("const", "board", "max"))
     ap.add_argument("--slope-mode", default=SLOPE_MODE, choices=SLOPE_MODES,
                     help="**T77** 速さ: `board`（既定・今の盤面の攻撃手）／`hand`（手札から今出せる体の攻撃の価格も足す）")
+    ap.add_argument("--race", default=RACE_MODE, choices=RACE_MODES,
+                    help="**T90** 交点の解き方: `static`（旧・`τ = Θ/A`＝的は動かない）／"
+                         "`net`（動く的＝1 ターン目は盤面だけ・的は毎ターン相手の補充 `r` だけ下がる）")
     ap.add_argument("--theta-body", default=THETA_BODY_MODE, choices=THETA_BODY_MODES,
                     help="耐久の体の項: `blockers`（旧・アクティブなブロッカーだけ）／`all`（全キャラ・T82）／"
                          "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）")
@@ -547,6 +629,7 @@ def main(argv=None):
     set_theta_hand_mode(a.theta_hand)
     set_slope_mode(a.slope_mode)
     set_theta_body_mode(a.theta_body)
+    set_race_mode(a.race)
     rows_out, ledger, stats, turn_harm = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
     if stats.get("g_n"):
         stats["g_mean"] = round(stats["g_sum"] / stats["g_n"], 4)
