@@ -364,3 +364,37 @@ def test_the_ledger_convention_is_a_module_constant_with_a_switch():
     finally:
         EV.set_ledger_flow_pricing(before)
     assert EV.LEDGER_FLOW_PRICING == before
+
+
+def test_a_played_body_is_booked_when_it_starts_working():
+    """**T84**（ユーザ決定 2026-09-18）: 出した体の価格の計上時点（`PLAY_BOOK_MODE`）。
+    規則から**次の自席ターンに繰り延べるのは「登場したターンには何もできない体」だけ**——
+    召喚酔いで殴れず（`battle.rs::declare_attack`）・アクティブなので殴られず（`attackable`）・
+    ブロッカーでないのでブロックもできない体。**速攻**（今から殴れる）・**ブロッカー**（相手の次のターンから守れる）・
+    **イベント／ステージ**（その場で解決）・**リーダー**・体を持たない札は `now` のまま。"""
+    class _Cards:
+        def __init__(self, d):
+            self.d = d
+
+        def info(self, cid):
+            return self.d.get(cid)
+
+    cards = _Cards({"plain": {"power": 5000}, "rush": {"power": 5000, "rush": True},
+                    "blk": {"power": 5000, "blocker": True}, "ev": {"event": True, "power": 0},
+                    "stg": {"stage": True, "power": 0}, "ld": {"leader": True, "power": 5000},
+                    "noBody": {"power": 0}})
+    assert B.play_starts_next_turn("plain", cards) is True
+    for cid in ("rush", "blk", "ev", "stg", "ld", "noBody"):
+        assert B.play_starts_next_turn(cid, cards) is False, cid
+    assert B.play_starts_next_turn("missing", cards) is False      # 知らない札は繰り延べない
+    assert B.play_starts_next_turn(None, cards) is False
+    assert B.play_starts_next_turn("plain", None) is False         # カード表が無ければ繰り延べない
+    before = B.PLAY_BOOK_MODE
+    try:
+        assert B.set_play_book_mode("next") == "next"
+        with pytest.raises(ValueError):
+            B.set_play_book_mode("なにか")
+        assert B.PLAY_BOOK_MODE == "next"
+    finally:
+        B.set_play_book_mode(before)
+    assert B.PLAY_BOOK_MODE == "now"                               # 既定は旧のまま（採否はユーザ判定）

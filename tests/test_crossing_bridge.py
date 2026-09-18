@@ -31,12 +31,18 @@ def _sc(opp_life=3, opp_hand=4):
 
 
 def test_the_threshold_is_the_opponents_endurance_in_price_units():
+    """しきい値の形（`λL + gH + Σν_meas(吸える体)`）。**体の集合は `THETA_BODY_MODE` が決める**ので、
+    旧 `blockers`（アクティブなブロッカーだけ・レストは数えない）を明示して算術を固定する（既定は T83 の `attackable`）。"""
     tok = np.zeros((22, 24), np.float32)
-    assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
-    tok[7, T.S_POWER], tok[7, T.S_IS_CHAR], tok[7, T.S_IS_BLOCKER] = 0.6, 1.0, 1.0      # アクティブなブロッカー 6000
-    assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU + PR.NU_MEAS["leader_to_sat"])
-    tok[7, T.S_IS_REST] = 1.0                                                            # レスト中は数えない
-    assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
+    try:
+        CB.set_theta_body_mode("blockers")
+        assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
+        tok[7, T.S_POWER], tok[7, T.S_IS_CHAR], tok[7, T.S_IS_BLOCKER] = 0.6, 1.0, 1.0  # アクティブなブロッカー 6000
+        assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU + PR.NU_MEAS["leader_to_sat"])
+        tok[7, T.S_IS_REST] = 1.0                                                        # `blockers` ではレスト中は数えない
+        assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
+    finally:
+        CB.set_theta_body_mode("attackable")
 
 
 def test_the_theory_slope_is_the_priced_attack_flow_of_the_board():
@@ -198,9 +204,9 @@ def test_the_endurance_counts_bodies_the_same_way_the_harm_side_does():
     tok[9, T.S_POWER], tok[9, T.S_IS_CHAR], tok[9, T.S_IS_BLOCKER] = 0.5, 1.0, 1.0
     tok[9, T.S_IS_REST] = 1.0                                                          # レスト中のブロッカー
     base = 3 * T.LAM + 4 * T.MU
-    assert CB.THETA_BODY_MODE == "blockers"                                            # 既定は旧のまま
-    assert CB.threshold(sc, tok) == pytest.approx(base + PR.NU_MEAS["leader_to_sat"])   # アクティブなブロッカー 1 体だけ
     try:
+        CB.set_theta_body_mode("blockers")
+        assert CB.threshold(sc, tok) == pytest.approx(base + PR.NU_MEAS["leader_to_sat"])   # アクティブなブロッカー 1 体だけ
         assert CB.set_theta_body_mode("all") == "all"
         # **`F` が使う関数そのもの**と一致する（3 体ぜんぶ）
         assert CB.threshold(sc, tok) == pytest.approx(base + PR.side_nu_meas(tok, T.SLOT_OPP_FIELD, 5000.0))
@@ -208,7 +214,7 @@ def test_the_endurance_counts_bodies_the_same_way_the_harm_side_does():
         with pytest.raises(ValueError):
             CB.set_theta_body_mode("なにか")
     finally:
-        CB.set_theta_body_mode("blockers")
+        CB.set_theta_body_mode("attackable")
 
 
 def test_the_endurance_counts_the_bodies_that_can_absorb_harm():
@@ -226,6 +232,7 @@ def test_the_endurance_counts_the_bodies_that_can_absorb_harm():
     tok[9, T.S_POWER], tok[9, T.S_IS_CHAR], tok[9, T.S_IS_BLOCKER] = 0.5, 1.0, 1.0     # アクティブなブロッカー＝横取りできる
     base = 3 * T.LAM + 4 * T.MU
     one = PR.NU_MEAS["leader_to_sat"]
+    assert CB.THETA_BODY_MODE == "attackable"          # **既定は規則から出る形**（ユーザ決定 2026-09-18）
     try:
         assert CB.set_theta_body_mode("attackable") == "attackable"
         assert CB.threshold(sc, tok) == pytest.approx(base + 2 * one)                   # レスト 1 ＋ ブロッカー 1（アクティブな非ブロッカーは 0）
@@ -243,4 +250,4 @@ def test_the_endurance_counts_the_bodies_that_can_absorb_harm():
         assert low < mid < high
         assert CB.threshold_of_me(sc, tok) == pytest.approx(0.0)                        # 自分のライフ・手札・場が空なら 0（どのモードでも）
     finally:
-        CB.set_theta_body_mode("blockers")
+        CB.set_theta_body_mode("attackable")

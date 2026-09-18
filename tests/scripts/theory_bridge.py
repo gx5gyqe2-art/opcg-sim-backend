@@ -135,6 +135,39 @@ GUARD_COST_MODE = "spent"
 #: ——落とした瞬間に差が消えるなら、決着帯の当たりは**勝敗の言い換え**であって価格の正しさの証拠ではない。
 LAST_TURN_MODES = ("keep", "drop")
 LAST_TURN_MODE = "keep"
+#: **出した体の価格をいつ計上するか**（T84・2026-09-18・ユーザ決定「その2つでお願いします」）。
+#: `now`＝従来（出したターンに満額）／`next`＝**効き始める自席ターン（t + 2）に計上する**。
+#: **根拠は規則**（`rust/opcg_engine/src/rules/`）——登場したターンのキャラは
+#:   * **攻撃できない**（`battle.rs::declare_attack` の召喚酔い・**速攻を除く**）＝速さ `A` に入らない
+#:   * **殴られない**（アクティブなので `declare_attack` の的にならない）＝耐久 `Θ` に入らない（T83 の `attackable`）
+#:   * **ブロックもできない**（ブロッカーでなければ `has_blocker` に入らない）
+#: ＝**そのターンは時計を 1 目盛りも動かさない**のに、帳簿は満額で計上している。これが T81 で見つかった
+#: 「出す手は帳簿を動かすが勝率を動かさない」（相関 0.057／0.021・T83 の規則どおりの耐久でも 0.081／0.029）の正体。
+#: **ずらすのは「効き始めるのが次の自席ターンからの体」だけ**＝**速攻は今から効く**・
+#: **ブロッカーは相手の次のターンから守れる**（横取りは攻撃ではないので召喚酔いに当たらない）・
+#: イベント／ステージは効果がその場で解決する＝どれも `now` のまま。**新定数ゼロ**（規則だけ）。
+PLAY_BOOK_MODES = ("now", "next")
+PLAY_BOOK_MODE = "now"
+
+
+def set_play_book_mode(mode):
+    global PLAY_BOOK_MODE
+    if mode not in PLAY_BOOK_MODES:
+        raise ValueError("play book mode は %s のどれか" % (PLAY_BOOK_MODES,))
+    PLAY_BOOK_MODE = mode
+    return PLAY_BOOK_MODE
+
+
+def play_starts_next_turn(cid, cards):
+    """**その手で出した体は次の自席ターンから効くか**（T84・規則から・`PLAY_BOOK_MODE=next` のときだけ使う）。
+    体を持たない札（イベント・ステージ）は `False`（その場で解決）・**速攻**は `False`（今から殴れる）・
+    **ブロッカー**は `False`（相手の次のターンから守れる＝1 ラウンドの窓の中で効く）。それ以外のキャラは `True`。"""
+    info = (cards.info(cid) or {}) if (cards is not None and cid) else None
+    if not info or info.get("leader") or info.get("event") or info.get("stage"):
+        return False
+    if float(info.get("power") or 0.0) <= 0.0:
+        return False
+    return not (info.get("rush") or info.get("blocker"))
 
 
 def set_last_turn_mode(mode):
@@ -403,6 +436,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
              # **T76**: 耐久の手札項の数え方（`crossing_bridge.THETA_HAND_MODE`）
              "theta_hand": __import__("crossing_bridge").THETA_HAND_MODE,
              "theta_body": __import__("crossing_bridge").THETA_BODY_MODE,
+             # **T84**: 出した体の価格を効き始めるターンに計上するか
+             "play_book": PLAY_BOOK_MODE, "play_deferred": 0, "play_deferred_dropped": 0,
              # **T58**: 決める価格（`s`）と数える価格（`g`）の規約・読み直した行の数
              "flow_pricing": EV.FLOW_PRICING, "ledger_pricing": ledger_pricing, "ledger_rescored": 0,
              # **T62**: 守りの窓の定義と、自ライフごとの内訳（受けた率・理論が受けろと言う率・`g` の平均）
@@ -534,9 +569,15 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 # **T80**: 区間の恒等式のために**生の価格**（`κ` を掛けない）と `D` を席 0 の視点で積む
                 e = kn.setdefault(t, {"d0": None, "g0": 0.0, "r_turns": None, "g_fam": {}, "chars": None})
                 sgn = 1.0 if w == 0 else -1.0
-                e["g0"] += float(g_v) * sgn
                 fam0 = move_family(json.loads(pol["pol_sig"][b + ch]))                     # T81: 型ごとに割る
-                e["g_fam"][fam0] = e["g_fam"].get(fam0, 0.0) + float(g_v) * sgn
+                # **T84**: 出した体が効き始めるのが次の自席ターンなら、価格もそのターンに計上する（規則・新定数ゼロ）
+                book = e
+                if PLAY_BOOK_MODE == "next" and fam0 == "play" \
+                        and play_starts_next_turn(str(pol["pol_cid"][b + ch]) or None, cards):
+                    stats["play_deferred"] = stats.get("play_deferred", 0) + 1
+                    book = kn.setdefault(t + 2, {"d0": None, "g0": 0.0, "r_turns": None, "g_fam": {}, "chars": None})
+                book["g0"] += float(g_v) * sgn
+                book["g_fam"][fam0] = book["g_fam"].get(fam0, 0.0) + float(g_v) * sgn
                 if e["d0"] is None:
                     e["d0"] = float(ck["d"]) * sgn
                     e["r_turns"] = float(ctx["r_turns"])
@@ -616,6 +657,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     _add(rec, bnd, got["s"] * kap, "grdc", g=got["g"] * kap)   # **余裕で払えた行だけの別勘定**
         # **T80**: ターンの前後で動いた勝率 `ΔW = W(D の次) − W(D の今)` を、そのターンの**生の価格**と並べる
         ts_kn = sorted(t0 for t0, e in kn.items() if e.get("d0") is not None)   # 席 0 視点の `D` が読めたターン
+        # **T84**: 局が終わって存在しないターンへ繰り延べた価格は落ちる（数だけ残す＝母数が減ったことを隠さない）
+        stats["play_deferred_dropped"] += sum(1 for t0, e in kn.items()
+                                              if e.get("d0") is None and abs(float(e.get("g0") or 0.0)) > 0.0)
         # **窓は 1 ラウンド（両席が 1 回打つ）**——1 ターンだけの窓では、打つのは手番の席だけなので
         # 生の価格の符号が手番ごとに振れる（測ったのは advantage ではなく手番）。2 ターンで 1 組にする。
         kn_games.append([dict(kn[t0], turn=t0) for t0 in ts_kn])                   # T81: 局ごとの並び
@@ -912,6 +956,9 @@ def main(argv=None):
     ap.add_argument("--theta-body", default=_CB.THETA_BODY_MODE, choices=_CB.THETA_BODY_MODES,
                     help="耐久の体の項（`--w-mode curve` の `D` に効く）: `blockers`（既定）／`all`（全キャラ・T82）／"
                          "`attackable`（レストの体 ＋ アクティブなブロッカー＝規則から出る形・T83）")
+    ap.add_argument("--play-book", default=PLAY_BOOK_MODE, choices=PLAY_BOOK_MODES,
+                    help="**T84** 出した体の価格の計上時点: `now`（旧・出したターン）／"
+                         "`next`（効き始める次の自席ターン＝召喚酔い。速攻・ブロッカー・イベント／ステージは `now` のまま）")
     ap.add_argument("--last-turn", default=LAST_TURN_MODE, choices=LAST_TURN_MODES,
                     help="**T80 の診断** `drop` なら局の最後のターンの行を落とす（とどめの一撃とその応答を外す）")
     ap.add_argument("--boot-reps", type=int, default=200)
@@ -924,6 +971,7 @@ def main(argv=None):
     _HP.apply_cond_clock_mode(a)
     _CB.set_theta_hand_mode(a.theta_hand)
     set_last_turn_mode(a.last_turn)
+    set_play_book_mode(a.play_book)
     _CB.set_theta_body_mode(a.theta_body)
     _TOM.set_clock_hand_mode(a.clock_hand)
 

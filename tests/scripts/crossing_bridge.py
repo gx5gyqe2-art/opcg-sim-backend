@@ -6,7 +6,7 @@
 
 ```
 F_w(t)  = 席 w が相手に与えた損害の累積（価格の単位: λ×削ったライフ + μ×切らせた札 + ν×倒した体）
-Θ_w(t)  = 相手を倒すのに残っている量 = λ·L_opp + μ·H_opp + Σν_meas(相手のアクティブなブロッカー)   （T51 の耐久を価格に）
+Θ_w(t)  = 相手を倒すのに残っている量 = λ·L_opp + g·H_opp + Σν_meas(相手の吸える体＝レスト ＋ アクティブなブロッカー・T83)
 傾き    = 損害を積む速さ（1 自席ターンあたり）——`hist`＝これまでの実現の平均／`theory`＝今の盤面の攻撃手の価格の和
 τ_w     = Θ_w / 傾き            あと何ターンで届くか
 勝者    = τ が小さい席（自席が手番なので同数なら自席）・終局 = min τ
@@ -140,7 +140,10 @@ def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="dtotal"):
 #: `blockers` はレストの体を落とし（T21 で身代わりの価値の大半を運んでいたのは素の体だった）、
 #: `all` はアクティブな非ブロッカーを入れすぎている（そのターンは的にもならずブロックもできない）。
 THETA_BODY_MODES = ("blockers", "all", "attackable")
-THETA_BODY_MODE = "blockers"
+#: **既定は `attackable`**（2026-09-18・ユーザ決定「その2つでお願いします」・T83）——**規則から出る唯一の形**で、
+#: **攻撃の手の必要な `κ` が 1.052／1.122＝1 に載り**、`ΔG` の 3 帯すべてが 3 条件中の最良になる。
+#: 以前の数字と比べるときは `--theta-body blockers`（T82 の測定は `all`）。
+THETA_BODY_MODE = "attackable"
 
 
 def set_theta_body_mode(mode):
@@ -508,7 +511,7 @@ def main(argv=None):
     ap.add_argument("--slope-mode", default=SLOPE_MODE, choices=SLOPE_MODES,
                     help="**T77** 速さ: `board`（既定・今の盤面の攻撃手）／`hand`（手札から今出せる体の攻撃の価格も足す）")
     ap.add_argument("--theta-body", default=THETA_BODY_MODE, choices=THETA_BODY_MODES,
-                    help="耐久の体の項: `blockers`（既定・アクティブなブロッカーだけ）／`all`（全キャラ・T82）／"
+                    help="耐久の体の項: `blockers`（旧・アクティブなブロッカーだけ）／`all`（全キャラ・T82）／"
                          "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）")
     ap.add_argument("--theta-hand", default=THETA_HAND_MODE, choices=THETA_HAND_MODES,
                     help="**T76** 耐久の手札項: `count`（既定・`μ × 枚数`）／`quality`（札ごとの `max(ΔH, ΔG)` の平均を掛ける）")

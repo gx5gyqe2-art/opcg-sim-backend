@@ -74,6 +74,9 @@ class Cards:
                     "leader": getattr(getattr(m, "type", None), "name", "") == "LEADER",
                     "removal": bool(forms & set(DR_ROLES.FORMS)),
                     "blocker": "ブロッカー" in (getattr(m, "keywords", ()) or ()),
+                    # **速攻**（`rules/mod.rs::KW_RUSH`）＝登場したターンから攻撃できる＝召喚酔いが無い
+                    # （T84 で「出した体がいつから効くか」を規則どおりに数えるのに使う・2026-09-18）
+                    "rush": "速攻" in (getattr(m, "keywords", ()) or ()),
                     # カウンター値（「守れたのか」を候補一覧から測るのに使う・2026-09-13）
                     "counter": int(getattr(m, "counter", 0) or 0),
                     # 種別とコスト（**カウンターの支払い能力**を測るのに使う・2026-09-13）。
