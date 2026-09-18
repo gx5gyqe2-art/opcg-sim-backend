@@ -184,3 +184,28 @@ def test_the_hand_carries_two_values_cuttable_for_the_threshold_and_playable_for
     with pytest.raises(ValueError):
         CB.set_slope_mode("nope")
     assert CB.SLOPE_MODE == "hand" and CB.THETA_HAND_MODE == "cuttable"   # **既定は T77 の 2 値化**（ユーザ決定 2026-09-17）
+
+
+def test_the_endurance_counts_bodies_the_same_way_the_harm_side_does():
+    """**T82**（T81 の結論）: **`F` と `Θ` は同じものに同じ値段を付ける**。`F` の体の項は `price_realised.side_nu_meas`
+    で**場の全キャラ**を数える（レストもブロッカー以外も・付与ドンを外した素のパワーで）ので、`THETA_BODY_MODE=all` なら
+    `Θ` の体の項も**同じ関数の値**になる。`blockers`（旧）はアクティブなブロッカーだけ。"""
+    sc = _sc(3, 4)
+    sc[T.SC_MY_LEADER_POWER] = 0.5
+    tok = np.zeros((22, 24), np.float32)
+    tok[7, T.S_POWER], tok[7, T.S_IS_CHAR] = 0.6, 1.0                                  # ブロッカーでないキャラ
+    tok[8, T.S_POWER], tok[8, T.S_IS_CHAR], tok[8, T.S_IS_BLOCKER] = 0.5, 1.0, 1.0     # アクティブなブロッカー
+    tok[9, T.S_POWER], tok[9, T.S_IS_CHAR], tok[9, T.S_IS_BLOCKER] = 0.5, 1.0, 1.0
+    tok[9, T.S_IS_REST] = 1.0                                                          # レスト中のブロッカー
+    base = 3 * T.LAM + 4 * T.MU
+    assert CB.THETA_BODY_MODE == "blockers"                                            # 既定は旧のまま
+    assert CB.threshold(sc, tok) == pytest.approx(base + PR.NU_MEAS["leader_to_sat"])   # アクティブなブロッカー 1 体だけ
+    try:
+        assert CB.set_theta_body_mode("all") == "all"
+        # **`F` が使う関数そのもの**と一致する（3 体ぜんぶ）
+        assert CB.threshold(sc, tok) == pytest.approx(base + PR.side_nu_meas(tok, T.SLOT_OPP_FIELD, 5000.0))
+        assert CB.threshold(sc, tok) > base + PR.NU_MEAS["leader_to_sat"]              # 体を出すほど耐久が増える
+        with pytest.raises(ValueError):
+            CB.set_theta_body_mode("なにか")
+    finally:
+        CB.set_theta_body_mode("blockers")

@@ -402,6 +402,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
              "harm_profile": (harm_profile if _TO_W_MODE() == "curve" else None),
              # **T76**: 耐久の手札項の数え方（`crossing_bridge.THETA_HAND_MODE`）
              "theta_hand": __import__("crossing_bridge").THETA_HAND_MODE,
+             "theta_body": __import__("crossing_bridge").THETA_BODY_MODE,
              # **T58**: 決める価格（`s`）と数える価格（`g`）の規約・読み直した行の数
              "flow_pricing": EV.FLOW_PRICING, "ledger_pricing": ledger_pricing, "ledger_rescored": 0,
              # **T62**: 守りの窓の定義と、自ライフごとの内訳（受けた率・理論が受けろと言う率・`g` の平均）
@@ -908,6 +909,8 @@ def main(argv=None):
                          "`quality`（自分の手札の札ごとの `max(ΔH, ΔG)` の平均。1 行から読めるのは自分の手札だけ＝相手側は `μ` のまま）")
     ap.add_argument("--clock-hand", default=_TOM.CLOCK_HAND_MODE, choices=_TOM.CLOCK_HAND_MODES,
                     help="**T78** `--w-mode clock` の時計に手札の 2 つの価値を入れるか（`on`＝耐久は切れる札だけ・速さは今出せる体を足す・自席側のみ）")
+    ap.add_argument("--theta-body", default=_CB.THETA_BODY_MODE, choices=_CB.THETA_BODY_MODES,
+                    help="**T82** 耐久の体の項（`--w-mode curve` の `D` に効く）: `blockers`（既定）／`all`（`F` と同じ全キャラ）")
     ap.add_argument("--last-turn", default=LAST_TURN_MODE, choices=LAST_TURN_MODES,
                     help="**T80 の診断** `drop` なら局の最後のターンの行を落とす（とどめの一撃とその応答を外す）")
     ap.add_argument("--boot-reps", type=int, default=200)
@@ -920,6 +923,7 @@ def main(argv=None):
     _HP.apply_cond_clock_mode(a)
     _CB.set_theta_hand_mode(a.theta_hand)
     set_last_turn_mode(a.last_turn)
+    _CB.set_theta_body_mode(a.theta_body)
     _TOM.set_clock_hand_mode(a.clock_hand)
 
     try:

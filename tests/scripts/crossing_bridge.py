@@ -38,7 +38,7 @@ from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 import guard_afford as GA  # noqa: E402
 from attack_response import parts  # noqa: E402
 from clock_calib import D_BINS, d_bin  # noqa: E402
-from price_realised import nu_meas_of  # noqa: E402
+from price_realised import nu_meas_of, side_nu_meas  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
 from theory_order import (LAM, MU, PWR_EPS, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, SC_MY_DON, SC_MY_HAND, SLOT_OWN_FIELD,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE,
@@ -122,29 +122,51 @@ def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="dtotal"):
     return float(np.mean(vals))
 
 
+#: **耐久の体の項の数え方**（T82・2026-09-18・T81 の結論から）。`blockers`＝旧（**アクティブなブロッカーだけ**）／
+#: `all`＝**場の全キャラ**（`price_realised.side_nu_meas`＝**損害 `F` が使うのと同じ関数**）。
+#: 根拠は T77 と同じ **`F` と `Θ` は同じものに同じ値段を付ける**: `F` の体の項（`attack_response.parts` の `opp_body`）は
+#: `side_nu_meas` で**全キャラ**を数えている（レストもブロッカー以外も・付与ドンを外した素のパワーで）のに、`Θ` は
+#: アクティブなブロッカーだけだった。**体を出す手が時計にまったく見えない**のはこれが原因（T81: 出す手の相関 0.057／0.021）。
+THETA_BODY_MODES = ("blockers", "all")
+THETA_BODY_MODE = "blockers"
+
+
+def set_theta_body_mode(mode):
+    global THETA_BODY_MODE
+    if mode not in THETA_BODY_MODES:
+        raise ValueError("theta body mode は %s のどれか" % (THETA_BODY_MODES,))
+    THETA_BODY_MODE = mode
+    return THETA_BODY_MODE
+
+
+def _body_term(tok, slots, opp_leader_power):
+    """耐久の体の項（T82）。`all` なら `F` と同じ `side_nu_meas`・`blockers` なら旧（アクティブなブロッカーだけ）。"""
+    if THETA_BODY_MODE == "all":
+        return float(side_nu_meas(tok, slots, opp_leader_power))
+    tot = 0.0
+    for s in range(slots.start, slots.stop):
+        if float(tok[s, S_IS_CHAR]) > 0.5 and float(tok[s, S_IS_BLOCKER]) > 0.5 and float(tok[s, S_IS_REST]) <= 0.5:
+            tot += nu_meas_of(slot_power(tok, s) or 0.0, opp_leader_power)
+    return float(tot)
+
+
 def threshold(sc, tok, lam=LAM, mu=MU, g_hand=None):
-    """相手の耐久を価格で: `λ·L_opp + g·H_opp + Σν_meas(アクティブなブロッカー)`。
+    """相手の耐久を価格で: `λ·L_opp + g·H_opp + Σν_meas(相手の体)`（体の数え方は `THETA_BODY_MODE`・T82）。
     `g` は手札 1 枚あたりの価格（`None`＝`μ`＝旧・T76 の `quality` では相手の手札から作った実価格）。"""
     sc = np.asarray(sc); tok = np.asarray(tok)
     mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
     g = float(mu if g_hand is None else g_hand)
-    th = lam * float(sc[SC_OPP_LIFE]) + g * float(sc[SC_OPP_HAND])
-    for s in range(SLOT_OPP_FIELD.start, SLOT_OPP_FIELD.stop):
-        if float(tok[s, S_IS_CHAR]) > 0.5 and float(tok[s, S_IS_BLOCKER]) > 0.5 and float(tok[s, S_IS_REST]) <= 0.5:
-            th += nu_meas_of(slot_power(tok, s) or 0.0, mlp)
-    return float(th)
+    return float(lam * float(sc[SC_OPP_LIFE]) + g * float(sc[SC_OPP_HAND])
+                 + _body_term(tok, SLOT_OPP_FIELD, mlp))
 
 
 def threshold_of_me(sc, tok, lam=LAM, mu=MU, g_hand=None):
-    """**自分の耐久**（相手から見たしきい値）: `λ·L_me + g·H_me + Σν_meas(自分のアクティブなブロッカー)`（T75・`g` は T76）。"""
+    """**自分の耐久**（相手から見たしきい値）: `λ·L_me + g·H_me + Σν_meas(自分の体)`（T75・`g` は T76・体は T82）。"""
     sc = np.asarray(sc); tok = np.asarray(tok)
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     g = float(mu if g_hand is None else g_hand)
-    th = lam * float(sc[SC_MY_LIFE]) + g * float(sc[SC_MY_HAND])
-    for s in range(SLOT_OWN_FIELD.start, SLOT_OWN_FIELD.stop):
-        if float(tok[s, S_IS_CHAR]) > 0.5 and float(tok[s, S_IS_BLOCKER]) > 0.5 and float(tok[s, S_IS_REST]) <= 0.5:
-            th += nu_meas_of(slot_power(tok, s) or 0.0, olp)
-    return float(th)
+    return float(lam * float(sc[SC_MY_LIFE]) + g * float(sc[SC_MY_HAND])
+                 + _body_term(tok, SLOT_OWN_FIELD, olp))
 
 
 #: **損害の輪郭の正本**（T75）: `tests/fixtures/harm_profile.json`＝`{"real": [...], "syn": [...]}`（自席ターン番号 j ごとの損害の平均・
@@ -243,7 +265,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     rows_out = []
     ledger = []            # (d) 単位の検算: 勝った席の F_end 対 Θ_start
     turn_harm = []         # 自席ターン番号 j ごとの損害（損害の輪郭＝加速を測る材料）
-    stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "theta_hand": THETA_HAND_MODE, "slope_mode": SLOPE_MODE,
+    stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "theta_hand": THETA_HAND_MODE, "slope_mode": SLOPE_MODE, "theta_body": THETA_BODY_MODE,
              "g_sum": 0.0, "g_n": 0, "g_fallback": 0,
              "g_win_sum": 0.0, "g_win_n": 0, "g_lose_sum": 0.0, "g_lose_n": 0}
     games = 0
@@ -460,6 +482,8 @@ def main(argv=None):
     ap.add_argument("--theta-mode", default="const", choices=("const", "board", "max"))
     ap.add_argument("--slope-mode", default=SLOPE_MODE, choices=SLOPE_MODES,
                     help="**T77** 速さ: `board`（既定・今の盤面の攻撃手）／`hand`（手札から今出せる体の攻撃の価格も足す）")
+    ap.add_argument("--theta-body", default=THETA_BODY_MODE, choices=THETA_BODY_MODES,
+                    help="**T82** 耐久の体の項: `blockers`（既定・アクティブなブロッカーだけ）／`all`（`F` と同じ全キャラ）")
     ap.add_argument("--theta-hand", default=THETA_HAND_MODE, choices=THETA_HAND_MODES,
                     help="**T76** 耐久の手札項: `count`（既定・`μ × 枚数`）／`quality`（札ごとの `max(ΔH, ΔG)` の平均を掛ける）")
     add_nu_mode_arg(ap)
@@ -469,6 +493,7 @@ def main(argv=None):
     t0 = time.time()
     set_theta_hand_mode(a.theta_hand)
     set_slope_mode(a.slope_mode)
+    set_theta_body_mode(a.theta_body)
     rows_out, ledger, stats, turn_harm = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
     if stats.get("g_n"):
         stats["g_mean"] = round(stats["g_sum"] / stats["g_n"], 4)
