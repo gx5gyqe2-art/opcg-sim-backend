@@ -162,7 +162,10 @@ def _body_absorbs(tok, s):
     rest = float(tok[s, S_IS_REST]) > 0.5
     blocker = float(tok[s, S_IS_BLOCKER]) > 0.5
     if THETA_RETURN_MODE == "untap" and rest and blocker:
-        return False                      # **T96**: レストのブロッカーは今は吸えない（補充の段差へ回す）
+        # **T96**: レストのブロッカーは今は吸えない（補充の段差へ回す）。
+        # **ただしトークンだけでは届かない**——6 列目は `is_blocker_active` なので `rest and blocker` は
+        # 記録上ほぼ成立しない。実際の除外は `THETA_BODY_MODE=blockers`（アクティブなブロッカーだけ）で起きる。
+        return False
     if THETA_BODY_MODE == "attackable":
         return bool(rest or blocker)      # レスト＝的になれる／アクティブなブロッカー＝横取りできる（レストのブロッカーは前者で入る）
     return bool(blocker and not rest)
@@ -213,13 +216,22 @@ def set_theta_return_mode(mode):
     return THETA_RETURN_MODE
 
 
-def resting_blocker_term(tok, slots, opp_leader_power):
-    """**レストのブロッカー**の `ν_meas` の和（T96）＝**次の自席ターンに戻ってくる耐久**。"""
-    tok = np.asarray(tok)
+def resting_blocker_term(tok, slots, opp_leader_power, ci_row=None, idx2cid=None, cards=None):
+    """**レストのブロッカー**の `ν_meas` の和（T96）＝**次の自席ターンに戻ってくる耐久**。
+
+    **トークンの列は使えない**——符号化の 6 列目は `is_blocker_active`
+    （`rust/opcg_engine/src/encode/tokens.rs`: `on_board && Character && !rest && has_keyword(BLOCKER)`）
+    ＝**レストのブロッカーは 0 で、レストの素の体と区別がつかない**。
+    そこで**札の id から原本のキーワードを引く**（`ci_row`／`idx2cid`／`cards` が要る・無ければ 0）。"""
+    if ci_row is None or idx2cid is None or cards is None:
+        return 0.0
+    tok = np.asarray(tok); ci = np.asarray(ci_row)
     tot = 0.0
     for s_i in range(slots.start, slots.stop):
-        if (float(tok[s_i, S_IS_CHAR]) > 0.5 and float(tok[s_i, S_IS_BLOCKER]) > 0.5
-                and float(tok[s_i, S_IS_REST]) > 0.5):
+        if float(tok[s_i, S_IS_CHAR]) <= 0.5 or float(tok[s_i, S_IS_REST]) <= 0.5:
+            continue
+        info = cards.info(idx2cid.get(int(ci[s_i]))) or {}
+        if info.get("blocker"):
             tot += float(nu_meas_of(slot_power(tok, s_i), opp_leader_power))
     return float(tot)
 
@@ -724,7 +736,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 th_w = th_life + th_hand + th_body
                 # **T96**: 次の自席ターンに戻ってくるレストのブロッカー（`untap` のときだけ段差として使う）
                 th_back = (resting_blocker_term(tok, SLOT_OPP_FIELD,
-                                                float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0)
+                                                float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
+                                                ci_row=_ci, idx2cid=idx2cid, cards=cards)
                            if THETA_RETURN_MODE == "untap" else 0.0)
                 slope_hist = (f_real / j) if j > 0 else None
                 dk = (seat_decks.get(seed_g) or (None, None))[w] if seat_decks else None

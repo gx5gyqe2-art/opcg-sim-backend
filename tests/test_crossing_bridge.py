@@ -65,20 +65,36 @@ def test_the_threshold_splits_into_life_hand_and_bodies():
 def test_a_rested_blocker_is_not_endurance_now_but_comes_back():
     """**T96**（ユーザ指摘「レストのブロッカーの意味も考えてみてください」）: 規則では
     **レストのブロッカーは横取りできない**（`has_blocker` が `!is_rest` を要求する）が、
-    **持ち主のターン開始でアンタップして戻る**。だから **今の `Θ` からは外し、`j ≥ 2` の段差**として補充の側へ渡す。"""
+    **持ち主のターン開始でアンタップして戻る**。だから **今の `Θ` からは外し、`j ≥ 2` の段差**として補充の側へ渡す。
+
+    **符号化の制約も一緒に押さえる**——トークンの 6 列目は `is_blocker_active`
+    （`tokens.rs`: `on_board && Character && !rest && has_keyword(BLOCKER)`）なので、
+    **レストのブロッカーはトークン上 0**＝レストの素の体と区別がつかない。判別は**札の id から原本を引く**しかない。"""
+    class _Cards:
+        def info(self, cid):
+            return {"blocker": True} if cid == "B" else {}
+
     tok = np.zeros((22, 24), np.float32)
-    tok[7, T.S_POWER], tok[7, T.S_IS_CHAR], tok[7, T.S_IS_BLOCKER] = 0.6, 1.0, 1.0
+    tok[7, T.S_POWER], tok[7, T.S_IS_CHAR] = 0.6, 1.0
+    tok[7, T.S_IS_REST] = 1.0                                    # レストのブロッカー（列 6 は 0 のまま＝符号化どおり）
+    ci = np.zeros(22, np.int32); ci[7] = 1
+    idx2cid, cards = {1: "B"}, _Cards()
     sc = _sc(3, 4)
     assert CB.THETA_RETURN_MODE == "off"                         # 既定は据え置き（採否はユーザ判定）
-    assert CB.resting_blocker_term(tok, T.SLOT_OPP_FIELD, 5000.0) == 0.0   # アクティブなので「戻る」側ではない
-    active = CB.threshold(sc, tok)
-    tok[7, T.S_IS_REST] = 1.0
-    back = CB.resting_blocker_term(tok, T.SLOT_OPP_FIELD, 5000.0)
+    # **トークンだけでは分からない**（札を渡さなければ 0）
+    assert CB.resting_blocker_term(tok, T.SLOT_OPP_FIELD, 5000.0) == 0.0
+    back = CB.resting_blocker_term(tok, T.SLOT_OPP_FIELD, 5000.0, ci_row=ci, idx2cid=idx2cid, cards=cards)
     assert back > 0.0
+    # 既定の `attackable` は**レストの体として**耐久に数える（ブロッカーかどうかは見ていない）
+    with_rested = CB.threshold(sc, tok)
+    assert with_rested > 3 * T.LAM + 4 * T.MU
+    try:                                                         # 規則どおりに外れるのは `blockers` の側
+        CB.set_theta_body_mode("blockers")
+        assert CB.threshold(sc, tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
+    finally:
+        CB.set_theta_body_mode("attackable")
     try:
         CB.set_theta_return_mode("untap")
-        # レストのブロッカーは**今の `Θ` に入らない**（`attackable` でも外れる）
-        assert CB.threshold(sc, tok) == pytest.approx(active - back)
         # 段差は `j ≥ 2` からしか効かない＝1 ターン目で届くなら τ は変わらない
         assert CB.tau_grow(0.2, 0.25, 0.0, 0.0, 0.0, step=back) == pytest.approx(
             CB.tau_grow(0.2, 0.25, 0.0, 0.0, 0.0))
