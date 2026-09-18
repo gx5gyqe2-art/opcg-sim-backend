@@ -80,6 +80,26 @@ def test_w_bar_comes_from_the_measurement_too():
     assert CB.w_bar_for([], "cross") is None      # 記録の種類が判らなければ引かない
 
 
+def test_the_hand_absorbs_in_whole_guards():
+    """**T99**（ユーザ指示「1から進めてください」）: 切れる札は **`c(x)` 枚ひと組**でしか働かない。
+    規則は「攻撃側のパワー ≥ 対象のパワー」で命中するので、超過 `x` を止めるには `c(x)` 枚要る（`c_of`）＝
+    **1 回分に足りない端数は一生 `F` に入らない＝耐久ではない**。"""
+    mu = T.MU
+    # `c(x) ≤ 1`（超過 0）なら従来どおり 1 枚 = 1 回
+    assert T.c_of(0.0) == pytest.approx(1.0)
+    assert CB.hand_absorb(3, 0.0) == pytest.approx(3 * mu)
+    # 通らない攻撃しか無ければ守る必要が無い＝0
+    assert CB.hand_absorb(3, -1000.0) == 0.0
+    # `c(3000) = 2.78` → 3 枚では 1 回ぶんしか止まらない（端数 0.22 枚は捨てる）
+    c = T.c_of(3000.0)
+    assert c > 2.0
+    assert CB.hand_absorb(3, 3000.0) == pytest.approx(mu * c * 1.0)
+    assert CB.hand_absorb(3, 3000.0) < 3 * mu                       # 端数のぶん小さい
+    # **1 回分に足りなければ 0**（重い攻撃 ＋ 薄い手札＝終盤の形）
+    assert CB.hand_absorb(2, 3000.0) == 0.0
+    assert CB.hand_absorb(0, 0.0) == 0.0
+
+
 def test_the_threshold_splits_into_life_hand_and_bodies():
     """**T96**（ユーザ指示「Θの方で進めてください」）: `threshold_parts` は `Θ` を **3 つの項**に割り、和は `threshold` と一致する。
     **どの項が終盤に縮まないか**を見るための切り分け。"""

@@ -21,6 +21,7 @@ F_w(t)  = 席 w が相手に与えた損害の累積（価格の単位: λ×削�
 """
 import argparse
 import json
+import math
 import os
 import sys
 import time
@@ -42,7 +43,7 @@ from price_realised import nu_meas_of, side_nu_meas  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
 from theory_order import (KO_P, LAM, MU, PWR_EPS, R_TURNS, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, SC_MY_DON, SC_MY_HAND, SLOT_OWN_FIELD,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE,
-                          SLOT_OPP_FIELD, THETA, add_nu_mode_arg, apply_nu_mode, attack_value_don,
+                          SLOT_OPP_FIELD, THETA, add_nu_mode_arg, apply_nu_mode, attack_value_don, c_of,
                           opp_bodies_of, own_attackers_of, score_candidate, slot_power, theta_of)
 
 SLOPES = ("hist", "theory")
@@ -58,7 +59,20 @@ SLOPE_FLOOR = 1e-3
 #: 根拠は**損害 `F` と耐久 `Θ` は同じものに同じ値段を付けなければならない**こと——`F` は切らせた札 1 枚を `μ` で数える（`attack_response.parts`）ので、
 #: `Θ` の手札項も切られる札 1 枚 `μ`。**切られない札（カウンター値 0）は一生 `F` に入らない**＝耐久ではない。T76 で「札の機会費用」を入れて失敗したのは、
 #: `F` が `μ` で数えている物に別の値段を付けたため。出す価値は耐久ではなく**速さ**へ（`SLOPE_MODE`）。
-THETA_HAND_MODES = ("count", "quality", "play", "guard", "cuttable")
+#: `cuttable_cx`＝**T99（2026-09-18・ユーザ指示「1から進めてください」）**: `cuttable` の**端数を落とす**形。
+#: **1 枚で 1 回止まるとは限らない**——規則は「攻撃側のパワー ≥ 対象のパワー」で命中するので、
+#: **超過 `x` の攻撃を止めるには `c(x)` 枚要る**（`c_of`）。よって切れる札は **`c(x)` 枚ひと組でしか働かず、
+#: 1 回分に足りない端数は一生 `F` に入らない＝耐久ではない**:
+#:
+#: ```
+#: Θ_hand = μ × c(x_max) × floor(切れる枚数 / c(x_max))       # c = 1 なら `cuttable` と同じ
+#: ```
+#:
+#: `x_max` は**その席が打てる最大の攻撃の超過**（`own_attackers_of` の最大＝相手が止めねばならない一番重い攻撃）。
+#: **新定数ゼロ**（`c_of` は T61 で測ってある費用曲線）。
+#: **根拠は実測**（T96）: `Θ` は**とどめのターンで実際に要った損害の 1.98 倍**で、残る膨らみは**手札の項**
+#: （0.181 対 要った損害 0.169 とほぼ同額）＝**切れる札が「必ず `μ` ずつ吸う」前提が終盤で破れている**。
+THETA_HAND_MODES = ("count", "quality", "play", "guard", "cuttable", "cuttable_cx")
 #: **既定は `cuttable`**（2026-09-17・ユーザ決定「1は変えましょうか」・T77）。以前の数字と比べるときは `--theta-hand count`。
 THETA_HAND_MODE = "cuttable"
 
@@ -200,11 +214,7 @@ def _body_term(tok, slots, opp_leader_power):
 def threshold(sc, tok, lam=LAM, mu=MU, g_hand=None):
     """相手の耐久を価格で: `λ·L_opp + g·H_opp + Σν_meas(相手の体)`（体の数え方は `THETA_BODY_MODE`・T82）。
     `g` は手札 1 枚あたりの価格（`None`＝`μ`＝旧・T76 の `quality` では相手の手札から作った実価格）。"""
-    sc = np.asarray(sc); tok = np.asarray(tok)
-    mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-    g = float(mu if g_hand is None else g_hand)
-    return float(lam * float(sc[SC_OPP_LIFE]) + g * float(sc[SC_OPP_HAND])
-                 + _body_term(tok, SLOT_OPP_FIELD, mlp))
+    return float(sum(threshold_parts(sc, tok, lam, mu, g_hand)))
 
 
 #: **レストのブロッカーの扱い**（T96・2026-09-18・ユーザ指摘「レストのブロッカーの意味も考えてみてください」）。
@@ -250,13 +260,35 @@ def resting_blocker_term(tok, slots, opp_leader_power, ci_row=None, idx2cid=None
     return float(tot)
 
 
+def hand_absorb(n_cut, x_max, mu=MU):
+    """**手札が実際に吸える額**（T99）＝`μ × c(x_max) × floor(n_cut / c(x_max))`。
+
+    **1 回分に足りない端数は耐久ではない**——`c(x)` 枚そろわないと攻撃は止まらず、その札は一生 `F` に入らない。
+    `c(x_max) ≤ 1` なら従来どおり（1 枚 = 1 回）。`x_max` が負（通らない攻撃しかない）なら止める必要が無いので 0。"""
+    n = max(0.0, float(n_cut))
+    c = float(c_of(float(x_max)))
+    if c <= 0.0:
+        return 0.0                                   # 通らない攻撃＝守る必要が無い
+    if c <= 1.0:
+        return float(mu) * n
+    return float(mu) * c * math.floor(n / c)
+
+
 def threshold_parts(sc, tok, lam=LAM, mu=MU, g_hand=None):
     """耐久 `Θ` を **3 つの項に割って**返す（T96）: `(ライフ, 手札, 体)`。和は `threshold` と一致する。
     **どの項が終盤に縮まないか**を見るための切り分け（T89 が見つけた「残り 1〜2 ターンでも τ が 5 ターン先を指す」）。"""
     sc = np.asarray(sc); tok = np.asarray(tok)
     mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
+    olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     g = float(mu if g_hand is None else g_hand)
-    return (float(lam) * float(sc[SC_OPP_LIFE]), g * float(sc[SC_OPP_HAND]),
+    hand = g * float(sc[SC_OPP_HAND])
+    if THETA_HAND_MODE == "cuttable_cx":
+        # **T99**: 切れる枚数は `g/μ × H`（`g` は 1 枚あたりの価格＝`μ ×` 切れる割合）。
+        # 止めねばならない一番重い攻撃は**その席が打てる最大の攻撃**。
+        xs = own_attackers_of(tok, olp)
+        hand = hand_absorb((g / float(mu)) * float(sc[SC_OPP_HAND]) if mu else 0.0,
+                           max(xs) if xs else -1.0, mu)
+    return (float(lam) * float(sc[SC_OPP_LIFE]), hand,
             float(_body_term(tok, SLOT_OPP_FIELD, mlp)))
 
 
