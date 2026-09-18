@@ -1136,6 +1136,9 @@ def main(argv=None):
     ap.add_argument("--harm-profile", default="cross", choices=("cross", "real", "syn"),
                     help="**T75** `--w-mode curve` の輪郭: `cross`（既定・測る記録と別のセット）／`real`／`syn`（`tests/fixtures/harm_profile.json`）")
     import crossing_bridge as _CB
+    ap.add_argument("--theta-hand-place", default=_CB.THETA_HAND_PLACE, choices=_CB.THETA_HAND_PLACES,
+                    help="**T102** 耐久の手札項の置き場所: `stock`（旧・`Θ` に一括）／"
+                         "`shield`（的の側の有限の盾＝毎ターン規則が許すぶんだけ）")
     ap.add_argument("--theta-hand", default=_CB.THETA_HAND_MODE, choices=_CB.THETA_HAND_MODES,
                     help="**T76** 耐久の手札項（`--w-mode curve` の `D` に効く）: `count`（既定・`μ × 枚数`）／"
                          "`quality`（自分の手札の札ごとの `max(ΔH, ΔG)` の平均。1 行から読めるのは自分の手札だけ＝相手側は `μ` のまま）")
@@ -1167,6 +1170,7 @@ def main(argv=None):
     _HP.apply_inflow_mode(a)
     _HP.apply_cond_clock_mode(a)
     _CB.set_theta_hand_mode(a.theta_hand)
+    _CB.set_theta_hand_place(a.theta_hand_place)
     set_last_turn_mode(a.last_turn)
     set_play_book_mode(a.play_book)
     set_attach_ledger_mode(a.attach_ledger)

@@ -586,3 +586,114 @@ def test_the_refill_can_come_from_the_rules_instead_of_the_play():
     assert DR.r_of(0.5) == pytest.approx(T.MU * 0.5)
     prof = [0.05, 0.10, 0.15, 0.20, 0.25, 0.25]
     assert CB.tau_from_profile(0.5, 0, prof, 1.0, DR.r_of(0.7)) > CB.tau_from_profile(0.5, 0, prof)
+
+
+def test_theta_over_need_is_split_by_whether_tau_was_right():
+    """**T101**（T100 §5 の疑い）: **`Θ` は在庫**だが**「要った損害」は実際にいつ終わったかに依る総量**なので、
+    **理論より早く終わった局では `Θ` > 要 になるのが当たり前**。`theta_check` を
+    **予測 τ が実際の残りターンと近い行**に絞って同じ比を測れるようにした（読み取りだけ・新定数ゼロ）。"""
+    # 当たった行（τ ≒ 残り）は比 1・外れた行（τ が 3 ターン遠い）は比 2 になるよう作る
+    rows = []
+    for _ in range(10):
+        rows.append({"t_left": 2, "j": 0, "tau": 2.2, "theta": 1.0, "need": 1.0,
+                     "th_life": 0.5, "th_hand": 0.3, "th_body": 0.2})
+        rows.append({"t_left": 2, "j": 0, "tau": 5.0, "theta": 2.0, "need": 1.0,
+                     "th_life": 1.0, "th_hand": 0.6, "th_body": 0.4})
+    out = CB.summarise([], [], None, rows)["theta_check"]
+    assert out["n"] == 20
+    # 全部混ぜると 1.5（＝`Θ` が過大に見える）
+    assert out["by_turns_left"]["2"]["theta_over_need"] == pytest.approx(1.5)
+    # **τ が当たった行だけなら 1**＝膨らみの正体は τ の偏りだった、という読み方ができる
+    m = out["tau_matched"]["0.5"]
+    assert m["n"] == 10 and m["share"] == pytest.approx(0.5)
+    assert m["by_turns_left"]["2"]["theta_over_need"] == pytest.approx(1.0)
+    assert m["pooled_theta_over_need"] == pytest.approx(1.0)
+    # 許容を広げれば外れた行も入る（0.5 ⊆ 1.0 ⊆ 2.0）
+    assert out["tau_matched"]["1.0"]["n"] == 10 and out["tau_matched"]["2.0"]["n"] == 10
+    # 対照（外れた行）とその平均のずれも残す
+    assert out["tau_missed"]["n"] == 10
+    assert out["tau_missed"]["theta_over_need"] == pytest.approx(2.0)
+    assert out["tau_missed"]["tau_minus_left"] == pytest.approx(3.0)
+    assert out["tau_minus_left_mean"] == pytest.approx(1.6)
+
+
+def test_the_two_places_that_solve_for_tau_use_the_same_branch():
+    """**T101**: 行の予測（`SLOPES` のループ）と `theta_check` の τ は**同じ式**でなければ、
+    「τ が当たった行」の選び方が予測と食い違う。`collect` の中で 1 本に束ねたことを、
+    式そのもの（`tau_grow`／`tau_net`／`Θ/A`）が既定の切替に従うことで確かめる。"""
+    assert CB.RATE_WALK_MODE == "grow" and CB.RACE_MODE == "static"   # 現在の既定
+    # `grow` の既定では `r = 0`（`static` なので的は動かない）＝`tau_grow` の素の形
+    assert CB.tau_grow(1.0, 0.1, 0.1, 0.0, 0.0, 0.0) == pytest.approx(5.0)
+    # `static` ＋ `flat` なら `Θ / A`（`predict` と同じ）
+    assert CB.predict(1.0, 1.0, 0.25, 0.5)[0] == pytest.approx(4.0)
+
+
+def test_the_hand_is_a_shield_that_takes_time_to_spend():
+    """**T102**（T101 が指した先）: **手札は「使う時間」が要る**——`Θ` に一括で足すと
+    **とどめのターンで倍に見え**（T101: τ を揃えても 1.95／2.01）、**長い局では足りない**（0.58）。
+    同じ `μ × 切れる枚数` を**しきい値から的の側の有限の盾へ移す**（新しい量はゼロ）。"""
+    assert CB.THETA_HAND_PLACE == "stock"                         # 既定は据え置き（採否はユーザ判定）
+    # 盾が無ければ従来どおり: 速さ 0.1／ターンで的 0.5 → 5 ターン
+    assert CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0) == pytest.approx(5.0)
+    # 盾 0.5 を 1 ターンで全部使えるなら、的は 1.0 になる（＝旧 `stock` と同じ）
+    assert CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, shield=0.5) == pytest.approx(10.0)
+    # **毎ターン 0.02 までしか出せないなら、盾は 25 ターンかけてしか出ない**＝間に合った分だけ的が遠のく
+    slow = CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, shield=0.5, shield_rate=0.02)
+    assert slow == pytest.approx(6.4)   # 歩きは 1 ターン刻み（連続なら 0.5/(0.1−0.02) = 6.25）
+    assert 5.0 < slow < 10.0
+    # **とどめが近い（速さが大きい）ほど盾は出てこない**＝`Θ` に一括で足す形より短い
+    fast_stock = CB.tau_grow(0.5, 1.0, 0.0, 0.0, 0.0, shield=0.5)
+    fast_shield = CB.tau_grow(0.5, 1.0, 0.0, 0.0, 0.0, shield=0.5, shield_rate=0.05)
+    assert fast_shield < fast_stock
+    # 輪郭の側でも同じ形（`curve` の読み）
+    prof = [0.1] * 12
+    assert CB.tau_from_profile(0.5, 0, prof) == pytest.approx(5.0)
+    assert CB.tau_from_profile(0.5, 0, prof, 1.0, 0.0, 0.5) == pytest.approx(10.0)
+    assert 5.0 < CB.tau_from_profile(0.5, 0, prof, 1.0, 0.0, 0.5, 0.02) < 10.0
+    try:
+        assert CB.set_theta_hand_place("shield") == "shield"
+        with pytest.raises(ValueError):
+            CB.set_theta_hand_place("なにか")
+    finally:
+        CB.set_theta_hand_place("stock")
+
+
+def test_the_shield_can_only_be_spent_on_attacks_that_exist():
+    """**T102** の上限は**規則から出る**: 宣言された攻撃にしかカウンターは切れず、1 本止めるのに `c(x)` 枚要る。
+    ブロッカーは**安い攻撃から**横取りするので札が要らず、**`c(x) > Θ` の攻撃は受けた方が安い**（T63）。"""
+    old = T.CBAR_MODE
+    try:
+        T.set_cbar_mode("strict")                                  # `conftest` は `loose`（c(0)=1）にしている
+        c0 = T.c_of(0.0)
+        # 攻撃 2 本・ブロッカー 0 → 2 本ぶんの `c` を出せる
+        assert CB.shield_rate_of([0.0, 0.0], 0) == pytest.approx(T.MU * 2 * c0)
+        # ブロッカー 1 は**安い方**を横取りする＝その 1 本ぶんは札が要らない
+        assert CB.shield_rate_of([0.0, 0.0], 1) == pytest.approx(T.MU * c0)
+        assert CB.shield_rate_of([0.0, 0.0], 5) == pytest.approx(0.0)
+        # 通らない攻撃（x < 0）は止める必要が無い
+        assert CB.shield_rate_of([-1000.0], 0) == pytest.approx(0.0)
+        # 攻撃が無ければ札は 1 枚も出ない＝**手札は耐久にならない**
+        assert CB.shield_rate_of([], 0) == pytest.approx(0.0)
+        # **`c(x) > Θ` は受ける**（守る規則・T63）＝その攻撃には札を出さない
+        big = 1e9
+        assert T.c_of(big) > CB.THETA
+        assert CB.shield_rate_of([big], 0) == pytest.approx(0.0)
+    finally:
+        T.set_cbar_mode(old)
+
+
+def test_the_opponents_attacks_are_read_from_the_board_not_the_turn_flag():
+    """**T102**: 相手の攻撃の本数は `can_attack`（自席のターンの旗）では読めない——
+    **相手のターンが来ればレフレッシュで全部アクティブになる**ので、場のキャラ全部 ＋ リーダーを数える。"""
+    tok = np.zeros((22, 24), dtype=np.float32)
+    tok[1, T.S_POWER] = 0.5                                        # 相手リーダー 5000
+    tok[7, T.S_IS_CHAR] = 1.0; tok[7, T.S_POWER] = 0.6             # 相手のキャラ（レスト・旗も無し）
+    tok[7, T.S_IS_REST] = 1.0
+    tok[8, T.S_IS_CHAR] = 1.0; tok[8, T.S_POWER] = 0.4
+    xs = CB.opp_attackers_of(tok, 5000.0)
+    assert xs == pytest.approx([0.0, 1000.0, -1000.0])             # リーダー ＋ 場の 2 体（レストも数える）
+    # 自分のアクティブなブロッカーは相手の攻撃を横取りできる
+    tok[2, T.S_IS_CHAR] = 1.0; tok[2, T.S_IS_BLOCKER] = 1.0
+    assert CB._own_active_blockers(tok) == 1
+    tok[2, T.S_IS_REST] = 1.0
+    assert CB._own_active_blockers(tok) == 0                       # レストのブロッカーは横取りできない

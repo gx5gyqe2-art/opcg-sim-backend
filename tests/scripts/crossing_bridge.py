@@ -42,7 +42,7 @@ from clock_calib import D_BINS, d_bin  # noqa: E402
 from price_realised import nu_meas_of, side_nu_meas  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
 from theory_order import (KO_P, LAM, MU, PWR_EPS, R_TURNS, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, SC_MY_DON, SC_MY_HAND, SLOT_OWN_FIELD,  # noqa: E402
-                          SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE,
+                          SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE, S_POWER,
                           SLOT_OPP_FIELD, THETA, add_nu_mode_arg, apply_nu_mode, attack_value_don, c_of,
                           opp_bodies_of, own_attackers_of, score_candidate, slot_power, theta_of)
 
@@ -318,6 +318,59 @@ def hand_absorb_forced(n_cut, xs, life_opp, n_blockers_opp, mu=MU):
     return float(mu) * c_eff * math.floor(n / c_eff)
 
 
+#: **T102**: 耐久の手札項を**どこに置くか**。
+#: `stock`（旧・`Θ` に一括で足す）／**`shield`**（**的の側の有限の盾**＝毎ターン「規則が許すぶんだけ」減る）。
+#: **根拠**: `Θ` は在庫だが**手札は「使う時間」が要る**——`T101` で、`Θ`/要は τ の当たった行に絞っても
+#: **残り 1 ターンで 1.95／2.01 のまま**（τ の偏りでは説明できない）で、**超過はちょうど手札の項の大きさ**
+#: （実: `Θ` 0.3208 = ライフ 0.1357 ＋ 手札 0.1702 ＋ 体 0.0148 に対し**要った損害は 0.1643 ≒ ライフだけ**）。
+#: 逆に**残り 6+ では手札の項が無いと足りない**（0.652/1.123 = 0.58）＝**手札は長い局でだけ耐久になる**。
+#: **新しい量はゼロ**——同じ `μ × 切れる枚数` を、**しきい値から的の動き方へ移すだけ**。
+THETA_HAND_PLACES = ("stock", "shield")
+THETA_HAND_PLACE = "stock"
+
+
+def set_theta_hand_place(name):
+    global THETA_HAND_PLACE
+    if name not in THETA_HAND_PLACES:
+        raise ValueError("unknown theta hand place: %r" % (name,))
+    THETA_HAND_PLACE = name
+    return THETA_HAND_PLACE
+
+
+def opp_attackers_of(tok, my_leader_power):
+    """**相手が次の自分のターンに打てる攻撃の `x`**（＝パワー − 自分のリーダー）。
+
+    `own_attackers_of` の相手版。**`can_attack` は自席のターンの旗**なので相手側では読めない——
+    **相手のターンが来ればレフレッシュで全部アクティブになる**（規則）ので、
+    **場のキャラは全部 ＋ リーダー**を数える。**打ち筋は入らない**（盤面と規則だけ）。"""
+    tok = np.asarray(tok)
+    xs = [float(tok[1, S_POWER]) * 1e4 - float(my_leader_power)]
+    for s_i in range(SLOT_OPP_FIELD.start, SLOT_OPP_FIELD.stop):
+        if float(tok[s_i, S_IS_CHAR]) > 0.5:
+            xs.append(float(tok[s_i, S_POWER]) * 1e4 - float(my_leader_power))
+    return xs
+
+
+def _own_active_blockers(tok, slots=SLOT_OWN_FIELD):
+    """自分の**アクティブなブロッカー**の数（相手の攻撃を横取りできる数）。"""
+    tok = np.asarray(tok)
+    return sum(1 for s_i in range(slots.start, slots.stop)
+               if (float(tok[s_i, S_IS_CHAR]) > 0.5 and float(tok[s_i, S_IS_BLOCKER]) > 0.5
+                   and float(tok[s_i, S_IS_REST]) <= 0.5))
+
+
+def shield_rate_of(xs, n_blockers_opp, theta=THETA, mu=MU):
+    """**1 守備ターンに手札が吸える上限**（T102・新定数ゼロ）。
+
+    **規則**: 守り手は**宣言された攻撃にしかカウンターを切れない**（存在しない攻撃は止められない）。
+    1 本止めるのに要る枚数は `c(x)`（T61）。**ブロッカーは安い攻撃から横取りする**ので、その分は札を使わない。
+    **`c(x) > Θ` の攻撃は受けた方が安い**（T63 の守る規則＝攻撃の価格が `min(Θ·μ, c(x)·μ)` なのと同じ判断）
+    ので札は出ない。よって上限は `μ × Σ c(x_i)`（残った攻撃のうち `c(x_i) ≤ Θ` のもの）。"""
+    cs = sorted(c for c in (c_of(float(x)) for x in (xs or ())) if c > 0.0)
+    cs = cs[int(max(0, n_blockers_opp)):]                    # ブロッカーは安い方から横取りする
+    return float(mu) * float(sum(c for c in cs if c <= float(theta)))
+
+
 def _opp_active_blockers(tok, slots=SLOT_OPP_FIELD):
     """相手の**アクティブなブロッカー**の数（`has_blocker` と同じ＝`!is_rest && KW_BLOCKER`）。"""
     tok = np.asarray(tok)
@@ -445,8 +498,20 @@ def curve_d_of_row(sc, tok, j, prof, g_hand_of_opp=None, g_hand_of_me=None):
     線形の橋では `g_hand_of_me` だけが入る（相手側は `μ` のまま＝非対称・報告で明示する）。"""
     th_me = threshold(sc, tok, g_hand=g_hand_of_opp)
     th_opp = threshold_of_me(sc, tok, g_hand=g_hand_of_me)
-    tau_me = tau_from_profile(th_me, int(j), prof)
-    tau_opp = tau_from_profile(th_opp, int(j), prof)
+    sh_me = sh_opp = rate_me = rate_opp = 0.0
+    if THETA_HAND_PLACE == "shield":
+        # **T102**: 手札は**しきい値から外し、両席とも有限の盾**にする（対称に読む・§0.05）。
+        sc_a = np.asarray(sc); tok_a = np.asarray(tok)
+        mlp = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
+        olp = float(sc_a[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+        g_o = float(MU if g_hand_of_opp is None else g_hand_of_opp)
+        g_m = float(MU if g_hand_of_me is None else g_hand_of_me)
+        sh_me = g_o * float(sc_a[SC_OPP_HAND]); th_me -= sh_me
+        sh_opp = g_m * float(sc_a[SC_MY_HAND]); th_opp -= sh_opp
+        rate_me = shield_rate_of(own_attackers_of(tok_a, olp), _opp_active_blockers(tok_a))
+        rate_opp = shield_rate_of(opp_attackers_of(tok_a, mlp), _own_active_blockers(tok_a))
+    tau_me = tau_from_profile(th_me, int(j), prof, 1.0, 0.0, sh_me, rate_me)
+    tau_opp = tau_from_profile(th_opp, int(j), prof, 1.0, 0.0, sh_opp, rate_opp)
     return {"d": float(tau_opp - tau_me), "tau_me": tau_me, "tau_opp": tau_opp, "theta_me": th_me, "theta_opp": th_opp}
 
 
@@ -699,13 +764,19 @@ def rate_at(j, board_lead, board_chars, stock, flow, ko_p=0.0):
     return float(out)
 
 
-def tau_grow(theta, board_lead, board_chars, stock, flow, r=0.0, cap=RACE_CAP, ko_p=None, step=0.0):
+def tau_grow(theta, board_lead, board_chars, stock, flow, r=0.0, cap=RACE_CAP, ko_p=None, step=0.0,
+             shield=0.0, shield_rate=0.0):
     """**積み上がる速さ**で的に届くまでのターン数（T94）。端数はそのターンの中で比例配分する。
     `r > 0` なら的も毎ターン `r` 下がる（T90 の動く的と組める）。
     `RATE_DECAY_MODE=ko` なら**盤面が毎ターン `ko_p` で失われる**（T95）。
     `step > 0` なら的が **`j ≥ 2` で 1 回だけ**その分だけ遠のく（T96・レストのブロッカーのアンタップ）。
+    **T102**: `shield > 0` なら**有限の盾**（相手の手札）が**毎ターン `shield_rate` までしか**減らない
+    ——的はそのぶんずつ遠のき、**盾を使い切ったらそれ以上は遠のかない**。`shield_rate = 0` なら一度に全部。
     届かなければ `cap`。"""
     theta = float(theta); r = max(0.0, float(r))
+    shield = max(0.0, float(shield)); shield_rate = max(0.0, float(shield_rate))
+    if shield > 0.0 and shield_rate <= 0.0:
+        shield_rate = shield                                   # 上限が無ければ 1 ターンで全部使える
     k = 0.0
     if ko_p is not None:
         k = float(ko_p)
@@ -714,7 +785,9 @@ def tau_grow(theta, board_lead, board_chars, stock, flow, r=0.0, cap=RACE_CAP, k
     f = 0.0
     for j in range(1, int(cap) + 1):
         add = rate_at(j, board_lead, board_chars, stock, flow, k)
-        need = theta + r * j + (float(step) if j >= 2 else 0.0)
+        # **T102**: `j` ターン目までに盾から出せた総額（毎ターン `shield_rate` まで・在庫 `shield` まで）
+        used = min(shield, shield_rate * j)
+        need = theta + r * j + used + (float(step) if j >= 2 else 0.0)
         if f + add >= need:
             short = max(0.0, need - f)
             return float(j - 1) + (short / add if add > SLOPE_FLOOR else 1.0)
@@ -738,14 +811,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     # **T91**: `deck` なら補充はデッキの中身から（記録の `meta_games.json` の seed で作り直す）。
-    refill = {}
-    if RACE_MODE == "deck":
-        import deck_refill as DR
-        refill = DR.shares_by_seed(dirs)
+    # **T102**: `static` でも**検算の側**（`theta_check`）ではデッキの `r` を使うので常に作る
+    # ——`Θ` は在庫・`要` は総量なので、**両者を比べるには補充を足さないと単位が揃わない**。
+    import deck_refill as DR
+    refill = DR.shares_by_seed(dirs)
     # **T93**: `flow` なら手札の項はそのデッキの平均から（同じく seed で作り直す）。
     seat_decks = {}
     if SLOPE_HAND_MODE == "flow":
-        import deck_refill as DR
         seat_decks = DR.decks_by_seed(dirs)
     rows_out = []
     ledger = []            # (d) 単位の検算: 勝った席の F_end 対 Θ_start
@@ -756,7 +828,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "r_deck_n": 0, "r_deck_sum": 0.0, "r_deck_missing": 0,
              "slope_hand": SLOPE_HAND_MODE, "a_flow_n": 0, "a_flow_sum": 0.0, "a_flow_missing": 0,
              "rate_walk": RATE_WALK_MODE, "rate_decay": RATE_DECAY_MODE, "stock_n": 0, "stock_sum": 0.0,
-             "theta_return": THETA_RETURN_MODE,
+             "theta_return": THETA_RETURN_MODE, "theta_hand_place": THETA_HAND_PLACE,
+             "shield_n": 0, "shield_sum": 0.0, "shield_rate_sum": 0.0,
              "g_sum": 0.0, "g_n": 0, "g_fallback": 0,
              "g_win_sum": 0.0, "g_win_n": 0, "g_lose_sum": 0.0, "g_lose_n": 0}
     games = 0
@@ -864,6 +937,29 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             g = g_for(defender, t)
             return float(g if g is not None else mu)
 
+        def r_deck_of(defender):
+            """**T102**: **デッキだけから出る補充**（`RACE_MODE` に依らない）。
+
+            `theta_check` は `Θ`（在庫）と `要`（総量）を比べるので、**間の守備ターンで戻るぶん**を
+            足さないと単位が揃わない。ここは**検算の側**なので、既定が `static` でも
+            **打ち筋の入らない `deck` の `r`**（T91）を使う。デッキが引けなければ `None`。"""
+            sh = refill.get(seed_g)
+            return float(mu) * float(sh[int(defender)]) if sh is not None else None
+
+        def tau_theory_of(d):
+            """**その席のその行で理論が言う τ**（既定の読み方 1 本・行の予測と同じ式）。
+
+            **T101**: `theta_check` で「τ が当たった行」を選ぶために要る。行ごとの予測
+            （下の `SLOPES` のループ）と**同じ枝**を通るよう、ここに 1 本だけ書いて両方から呼ぶ。"""
+            if RATE_WALK_MODE == "grow":
+                r = d["r_opp"] if RACE_MODE in ("net", "deck") else 0.0
+                return tau_grow(d["theta"], d["slope_lead"], d["slope_board"] - d["slope_lead"],
+                                d["slope_stock"], d["slope_flow"], r, step=d.get("th_back") or 0.0,
+                                shield=d.get("shield") or 0.0, shield_rate=d.get("shield_rate") or 0.0)
+            if RACE_MODE in ("net", "deck"):
+                return tau_net(d["theta"], d["slope_board"], d["slope_hand"], d["r_opp"])
+            return d["theta"] / max(SLOPE_FLOOR, d["slope_theory"])
+
         # 席ごとの自席ターン開始点で、両席の τ を出す（相手は直前の自分のターン開始の値）
         per_seat = {}
         for w in (0, 1):
@@ -873,6 +969,15 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 sc, tok, _ci = turn_start[(w, t)]
                 olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
                 th_life, th_hand, th_body = threshold_parts(sc, tok, g_hand=g_for(1 - w, t))
+                # **T102**: `shield` なら手札は**しきい値から外し、的の側の有限の盾**にする
+                # （毎ターン `shield_rate` までしか出てこない＝**使う時間が要る**）。
+                if THETA_HAND_PLACE == "shield":
+                    shield = float(th_hand)
+                    sh_rate = shield_rate_of(own_attackers_of(tok, olp), _opp_active_blockers(tok), theta, mu)
+                    th_hand = 0.0
+                    stats["shield_n"] += 1; stats["shield_sum"] += shield; stats["shield_rate_sum"] += sh_rate
+                else:
+                    shield = sh_rate = 0.0
                 th_w = th_life + th_hand + th_body
                 # **T96**: 次の自席ターンに戻ってくるレストのブロッカー（`untap` のときだけ段差として使う）
                 th_back = (resting_blocker_term(tok, SLOT_OPP_FIELD,
@@ -893,6 +998,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     stats["stock_n"] += 1; stats["stock_sum"] += float(s_stock)
                 slope_theory = s_board + s_hand
                 per_seat[(w, t)] = {"theta": th_w, "slope_hist": slope_hist, "slope_theory": slope_theory,
+                                    # **T102**: 有限の盾（相手の手札）と 1 ターンの上限
+                                    "shield": shield, "shield_rate": sh_rate,
                                     # **T96**: `Θ` の内訳（どの項が終盤に縮まないか）
                                     "th_life": th_life, "th_hand": th_hand, "th_body": th_body,
                                     "th_back": th_back,
@@ -902,6 +1009,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                     # **T94**: 積み上がる歩きに要る 3 つ目（在庫・段差）
                                     "slope_stock": s_stock, "slope_flow": s_flow, "slope_lead": s_lead,
                                     "r_opp": r_opp_of(1 - w, t),
+                                    "r_deck": r_deck_of(1 - w),
                                     "f_real": f_real, "t_left": len(ts) - j, "j": j}
                 turn_harm.append({"j": j, "harm": harm.get((w, t), 0.0), "slope_theory": slope_theory})
                 f_real += harm.get((w, t), 0.0)
@@ -912,6 +1020,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     d = per_seat[(w, t2)]
                     theta_check.append({"t_left": len(ts) - j2, "j": j2, "theta": d["theta"],
                                         "th_life": d["th_life"], "th_hand": d["th_hand"], "th_body": d["th_body"],
+                                        # **T101**: 理論がその行で言う τ。**`Θ`/要の読みから τ の偏りを外す**ために要る
+                                        # （`Θ` は在庫・`要` は実際にいつ終わったかに依る総量なので、
+                                        #  τ が外れた行では比が 1 にならないのが当たり前）。
+                                        "tau": tau_theory_of(d),
+                                        # **T102**: 間の守備ターンで戻るぶん（デッキだけから・T91）
+                                        "r_deck": d.get("r_deck"),
+                                        # **T102**: 有限の盾（相手の手札）と 1 ターンの上限
+                                        "shield": d.get("shield"), "shield_rate": d.get("shield_rate"),
                                         "need": max(0.0, f_real - d["f_real"])})
                 th0 = per_seat[(w, ts[0])]["theta"]
                 # **T89**: 時間の分解——勝った席が **実際に何自席ターン使ったか**（`turns`）と、
@@ -943,24 +1059,17 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                        # **T94**: 積み上がる歩きの 3 項（`grow` のときだけ使う）
                        "stock_me": me.get("slope_stock"), "stock_opp": op.get("slope_stock"),
                        "flow_me": me.get("slope_flow"), "flow_opp": op.get("slope_flow"),
-                       "board_me": me.get("slope_board"), "board_opp": op.get("slope_board")}
+                       "board_me": me.get("slope_board"), "board_opp": op.get("slope_board"),
+                       # **T102**: 有限の盾（`curve` の読みでも同じ形で使う）
+                       "shield_me": me.get("shield"), "shield_opp": op.get("shield"),
+                       "shield_rate_me": me.get("shield_rate"), "shield_rate_opp": op.get("shield_rate")}
                 for sv in SLOPES:
                     s_me = me["slope_" + sv] if me["slope_" + sv] is not None else me["slope_theory"]
                     s_op = op["slope_" + sv] if op["slope_" + sv] is not None else op["slope_theory"]
-                    if RATE_WALK_MODE == "grow" and sv == "theory":
-                        # **T94**: 積み上がる速さで歩く（盤面 ＋ 在庫の段差 ＋ 流入の積み上がり）。
-                        # 動く的（`net`／`deck`）と組めるよう `r` も渡す。
-                        rm = me["r_opp"] if RACE_MODE in ("net", "deck") else 0.0
-                        ro = op["r_opp"] if RACE_MODE in ("net", "deck") else 0.0
-                        tau_me = tau_grow(me["theta"], me["slope_lead"], me["slope_board"] - me["slope_lead"],
-                                          me["slope_stock"], me["slope_flow"], rm, step=me.get("th_back") or 0.0)
-                        tau_opp = tau_grow(op["theta"], op["slope_lead"], op["slope_board"] - op["slope_lead"],
-                                           op["slope_stock"], op["slope_flow"], ro, step=op.get("th_back") or 0.0)
-                        pred = tau_me <= tau_opp
-                    elif RACE_MODE in ("net", "deck") and sv == "theory":
-                        # **T90**: 動く的との競争（1 ターン目は盤面だけ・的は毎ターン `r` 下がる）
-                        tau_me = tau_net(me["theta"], me["slope_board"], me["slope_hand"], me["r_opp"])
-                        tau_opp = tau_net(op["theta"], op["slope_board"], op["slope_hand"], op["r_opp"])
+                    if sv == "theory" and (RATE_WALK_MODE == "grow" or RACE_MODE in ("net", "deck")):
+                        # **T94**（積み上がる歩き）／**T90**（動く的）。**式は `tau_theory_of` に 1 本だけ置き、
+                        # `theta_check` と同じ枝を通す**（T101）。
+                        tau_me = tau_theory_of(me); tau_opp = tau_theory_of(op)
                         pred = tau_me <= tau_opp
                     else:
                         tau_me, tau_opp, pred = predict(me["theta"], op["theta"], s_me, s_op)
@@ -982,7 +1091,7 @@ def harm_profile(turn_harm, j_max=12, min_n=20):
     return prof, prof_th
 
 
-def tau_from_profile(theta, j, prof, scale=1.0, r=0.0):
+def tau_from_profile(theta, j, prof, scale=1.0, r=0.0, shield=0.0, shield_rate=0.0):
     """輪郭に沿って損害を積み、`Θ` に届くまでのターン数（端数は比例配分・輪郭の先は最後の値）。
 
     **T90**: `r > 0` なら**的が毎ターン `r` 下がる**（相手の補充）＝`Θ + r·(k+1)` に届くまで歩く。
@@ -990,15 +1099,34 @@ def tau_from_profile(theta, j, prof, scale=1.0, r=0.0):
     （`theory` の一定の `A` では局の序盤〔盤面が空〕に追いつけず打ち切りになる・T90 の実測）。"""
     acc = 0.0
     r = max(0.0, float(r))
+    shield = max(0.0, float(shield)); shield_rate = max(0.0, float(shield_rate))
+    if shield > 0.0 and shield_rate <= 0.0:
+        shield_rate = shield
     for k in range(200):
         h = prof[min(j + k, len(prof) - 1)] * scale
         if h <= SLOPE_FLOOR:
             h = SLOPE_FLOOR
-        need = float(theta) + r * (k + 1)
+        # **T102**: 有限の盾（相手の手札）は毎ターン `shield_rate` までしか出てこない
+        need = float(theta) + r * (k + 1) + min(shield, shield_rate * (k + 1))
         if acc + h >= need:
             return k + max(0.0, need - acc) / h
         acc += h
     return 200.0
+
+
+def _full_need(x):
+    """**T102**: 理論が言う「そこから終局までに要る損害の総量」＝
+    **今の在庫 `Θ` ＋ 間の守備ターンで戻る補充 ＋ 盾（相手の手札）のうち出せた分**。
+
+    `Θ` は在庫・`要った損害` は総量なので、**この 3 つを足して初めて単位が揃う**（T101 の読み直し）。
+    `t_left` 自席ターンの間に守る席は `t_left − 1` 回ターンを迎える。"""
+    turns = max(0, int(x["t_left"]) - 1)
+    out = float(x["theta"]) + float(x.get("r_deck") or 0.0) * turns
+    sh = float(x.get("shield") or 0.0)
+    rate = float(x.get("shield_rate") or 0.0)
+    if sh > 0.0:
+        out += min(sh, (rate if rate > 0.0 else sh) * turns)
+    return out
 
 
 def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
@@ -1018,8 +1146,10 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
                 moving = RACE_MODE in ("net", "deck")
                 rr_me = float(r.get("r_opp_me") or 0.0) if moving else 0.0
                 rr_op = float(r.get("r_opp_opp") or 0.0) if moving else 0.0
-                tm = tau_from_profile(r["theta_me"], r["j_me"], prof, scale_me, rr_me)
-                to = tau_from_profile(r["theta_opp"], r["j_opp"], prof, scale_op, rr_op)
+                tm = tau_from_profile(r["theta_me"], r["j_me"], prof, scale_me, rr_me,
+                                      r.get("shield_me") or 0.0, r.get("shield_rate_me") or 0.0)
+                to = tau_from_profile(r["theta_opp"], r["j_opp"], prof, scale_op, rr_op,
+                                      r.get("shield_opp") or 0.0, r.get("shield_rate_opp") or 0.0)
                 r["tau_me_" + sv] = tm; r["tau_opp_" + sv] = to; r["pred_" + sv] = (tm <= to)
     if theta_check:
         # **T96**: `Θ` は終盤に縮むか——**残りターンごと**に `Θ` と「そこから実際に要った損害」を並べる。
@@ -1038,6 +1168,75 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
                 "life": round(float(np.mean([x["th_life"] for x in g])), 4),
                 "hand": round(float(np.mean([x["th_hand"] for x in g])), 4),
                 "body": round(float(np.mean([x["th_body"] for x in g])), 4)}
+        # **T101**: **τ が当たった行だけ**で同じ比を測る。**`Θ` は在庫**だが**`要` は
+        # 「実際にいつ終わったか」に依る総量**なので、**理論より早く終わった局では
+        # `Θ` > 要 になるのが当たり前**（偏りは +2.5 ターン）＝**終盤の膨らみには
+        # `Θ` の誤りと τ の偏りが混ざっている**。当たった行に絞って比が 1 に戻るなら
+        # **直すべきは `Θ` ではなく速さ・時刻の側**。
+        out["theta_check"]["tau_matched"] = {}
+        for tol in (0.5, 1.0, 2.0):
+            sel = [x for x in theta_check
+                   if x.get("tau") is not None and abs(float(x["tau"]) - float(x["t_left"])) <= tol]
+            blk = {"n": len(sel), "share": round(len(sel) / max(1, len(theta_check)), 3), "by_turns_left": {}}
+            byk = {}
+            for x in sel:
+                byk.setdefault(str(int(x["t_left"])) if x["t_left"] <= 5 else "6+", []).append(x)
+            for key in sorted(byk, key=lambda x: (x == "6+", x)):
+                g = byk[key]
+                th = np.array([x["theta"] for x in g]); nd = np.array([x["need"] for x in g])
+                blk["by_turns_left"][key] = {
+                    "n": len(g), "theta": round(float(th.mean()), 4), "need": round(float(nd.mean()), 4),
+                    "theta_over_need": round(float(th.mean() / max(1e-9, nd.mean())), 3),
+                    "life": round(float(np.mean([x["th_life"] for x in g])), 4),
+                    "hand": round(float(np.mean([x["th_hand"] for x in g])), 4),
+                    "body": round(float(np.mean([x["th_body"] for x in g])), 4)}
+            if sel:
+                th = np.array([x["theta"] for x in sel]); nd = np.array([x["need"] for x in sel])
+                blk["pooled_theta_over_need"] = round(float(th.mean() / max(1e-9, nd.mean())), 3)
+            out["theta_check"]["tau_matched"][str(tol)] = blk
+        # **対照**: τ が外れた行（当たった行との差が「τ の偏りぶん」）
+        miss = [x for x in theta_check
+                if x.get("tau") is not None and abs(float(x["tau"]) - float(x["t_left"])) > 1.0]
+        if miss:
+            th = np.array([x["theta"] for x in miss]); nd = np.array([x["need"] for x in miss])
+            out["theta_check"]["tau_missed"] = {
+                "n": len(miss), "theta_over_need": round(float(th.mean() / max(1e-9, nd.mean())), 3),
+                "tau_minus_left": round(float(np.mean([x["tau"] - x["t_left"] for x in miss])), 2)}
+        if theta_check and theta_check[0].get("tau") is not None:
+            out["theta_check"]["tau_minus_left_mean"] = round(
+                float(np.mean([x["tau"] - x["t_left"] for x in theta_check])), 2)
+        # **T102**: **単位を揃えた比**。`Θ` は**今の在庫**・`要` は**そこから終局までの総量**なので、
+        # **間の守備ターンで戻るぶん（補充 `r`・T91 のデッキだけの値）を足さないと比べられない**
+        # ——`t_left` 自席ターンの間に守る席は `t_left − 1` 回ターンを迎える。
+        # **`Θ + r·(t_left − 1)` が `要` に一致するなら `Θ` の水準は正しく、
+        # 序盤の「過小 0.77」は補充の欠落だった**ということになる（新定数ゼロ）。
+        ref = [x for x in theta_check if x.get("r_deck") is not None]
+        if ref:
+            byk = {}
+            for x in ref:
+                byk.setdefault(str(int(x["t_left"])) if x["t_left"] <= 5 else "6+", []).append(x)
+            blk = {"n": len(ref), "by_turns_left": {}}
+            for key in sorted(byk, key=lambda x: (x == "6+", x)):
+                g = byk[key]
+                th = np.array([x["theta"] for x in g]); nd = np.array([x["need"] for x in g])
+                tr = np.array([x["theta"] + x["r_deck"] * max(0, x["t_left"] - 1) for x in g])
+                fl = np.array([_full_need(x) for x in g])
+                blk["by_turns_left"][key] = {
+                    "n": len(g), "theta": round(float(th.mean()), 4),
+                    "theta_plus_refill": round(float(tr.mean()), 4), "need": round(float(nd.mean()), 4),
+                    "theta_over_need": round(float(th.mean() / max(1e-9, nd.mean())), 3),
+                    "with_refill_over_need": round(float(tr.mean() / max(1e-9, nd.mean())), 3),
+                    # **T102**: 盾（相手の手札）も**出せた分だけ**足した形＝**理論が言う総量そのもの**
+                    "full": round(float(fl.mean()), 4),
+                    "full_over_need": round(float(fl.mean() / max(1e-9, nd.mean())), 3)}
+            th = np.array([x["theta"] for x in ref]); nd = np.array([x["need"] for x in ref])
+            tr = np.array([x["theta"] + x["r_deck"] * max(0, x["t_left"] - 1) for x in ref])
+            fl = np.array([_full_need(x) for x in ref])
+            blk["pooled"] = {"theta_over_need": round(float(th.mean() / max(1e-9, nd.mean())), 3),
+                             "with_refill_over_need": round(float(tr.mean() / max(1e-9, nd.mean())), 3),
+                             "full_over_need": round(float(fl.mean() / max(1e-9, nd.mean())), 3),
+                             "r_mean": round(float(np.mean([x["r_deck"] for x in ref])), 4)}
+            out["theta_check"]["with_refill"] = blk
     if ledger:
         fe = np.array([r["F_end"] for r in ledger]); th0 = np.array([r["theta_start"] for r in ledger])
         fp = np.array([r["F_priced_end"] for r in ledger])
@@ -1123,6 +1322,9 @@ def main(argv=None):
     ap.add_argument("--theta-body", default=THETA_BODY_MODE, choices=THETA_BODY_MODES,
                     help="耐久の体の項: `blockers`（旧・アクティブなブロッカーだけ）／`all`（全キャラ・T82）／"
                          "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）")
+    ap.add_argument("--theta-hand-place", default=THETA_HAND_PLACE, choices=THETA_HAND_PLACES,
+                    help="**T102** 耐久の手札項の置き場所: `stock`（旧・`Θ` に一括）／"
+                         "`shield`（**的の側の有限の盾**＝毎ターン規則が許すぶんだけ＝**使う時間が要る**）")
     ap.add_argument("--theta-hand", default=THETA_HAND_MODE, choices=THETA_HAND_MODES,
                     help="**T76** 耐久の手札項: `count`（既定・`μ × 枚数`）／`quality`（札ごとの `max(ΔH, ΔG)` の平均を掛ける）")
     add_nu_mode_arg(ap)
@@ -1131,6 +1333,7 @@ def main(argv=None):
     apply_nu_mode(a)
     t0 = time.time()
     set_theta_hand_mode(a.theta_hand)
+    set_theta_hand_place(a.theta_hand_place)
     set_slope_mode(a.slope_mode)
     set_slope_block_mode(a.slope_block)
     set_slope_hand_mode(a.slope_hand)
