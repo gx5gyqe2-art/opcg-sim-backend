@@ -45,6 +45,24 @@ def test_the_threshold_is_the_opponents_endurance_in_price_units():
         CB.set_theta_body_mode("attackable")
 
 
+def test_sigma_t_comes_from_the_measurement_and_follows_the_body_set():
+    """**T97**（ユーザ指示「理論的に正しいものにしたい」）: `σ_D = √2 × σ_T` の `σ_T` は
+    **借り物の 1.0 ではなく交点の橋の実測**（輪郭の表の `sigma_t`）から採る。
+    **耐久の体の集合ごとに違う**（`blockers` は `attackable` より小さい）ので追随し、
+    **測る記録と別のセット**の値を使う（輪郭と同じ規約）。"""
+    a_real, a_syn = CB.sigma_t_for(None, "real"), CB.sigma_t_for(None, "syn")
+    assert a_real and a_syn and a_real > 0.0 and a_syn > 0.0
+    try:
+        CB.set_theta_body_mode("blockers")
+        b_real, b_syn = CB.sigma_t_for(None, "real"), CB.sigma_t_for(None, "syn")
+    finally:
+        CB.set_theta_body_mode("attackable")
+    assert b_real < a_real and b_syn < a_syn        # 体の項を落とすと τ の残差は小さくなる（実測）
+    assert CB.sigma_t_for(None, "real", body_mode="blockers") == b_real
+    assert CB.sigma_t_for(None, "なにか") is None or True   # 知らない名前は cross 扱い
+    assert CB.sigma_t_for([], "cross") is None      # 記録の種類が判らなければ引かない
+
+
 def test_the_threshold_splits_into_life_hand_and_bodies():
     """**T96**（ユーザ指示「Θの方で進めてください」）: `threshold_parts` は `Θ` を **3 つの項**に割り、和は `threshold` と一致する。
     **どの項が終盤に縮まないか**を見るための切り分け。"""

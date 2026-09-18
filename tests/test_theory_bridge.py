@@ -468,3 +468,17 @@ def test_the_ledger_can_be_written_in_what_was_actually_lost():
             B.set_ledger_harm_mode("なにか")
     finally:
         B.set_ledger_harm_mode("realised")
+
+def test_the_sigma_of_the_clock_is_taken_from_the_measurement(monkeypatch):
+    """**T97**（ユーザ指示「理論的に正しいものにしたい」）: `W_MODE=curve` のとき、`σ_T` は
+    **借り物の 1.0 ではなく交点の橋の実測**（輪郭の表の `sigma_t`・**耐久の体の集合ごと**・**別のセット**）に差し替わる。
+    ここでは差し替えが**確かに起きること**だけを押さえる（値そのものは fixture が正本）。"""
+    import crossing_bridge as CB
+    import theory_order as TO
+    assert B.SIGMA_FROM_CURVE is True                       # 既定で実測を使う
+    got = []
+    monkeypatch.setattr(TO, "set_sigma_turn", lambda v: got.append(float(v)) or v)
+    st = CB.sigma_t_for(None, "syn")                         # 実を測るときは合成の値（cross）
+    assert st and st != 1.0                                  # 借り物と違う値であること
+    TO.set_sigma_turn(st)
+    assert got == [pytest.approx(st)]

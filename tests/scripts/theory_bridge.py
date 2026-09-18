@@ -516,6 +516,16 @@ def _finish_guard(got, played, my_life, z, bnd, kap, w, t, rec, kn, stats, _add)
         _add(rec, bnd, got["s"] * kap, "grdc", g=got["g"] * kap)   # **余裕で払えた行だけの別勘定**
 
 
+#: **`σ_T` を実測から採るか**（T97・2026-09-18・ユーザ指示「理論的に正しいものにしたい」）。
+#: `True`＝**交点の橋の `curve` の終局時刻の残差 σ**（`tests/fixtures/harm_profile.json` の `sigma_t`・
+#: **耐久の体の集合ごと**・**測る記録と別のセット**）を `σ_T` に使う／`False`＝旧（借り物の 1.0）。
+#: **新定数ゼロ**——`σ_D = √2 × σ_T` の形は変えず、**中身を借り物から実測に差し替える**だけ。
+#: T75 の注記「`σ` の出所である時間軸ヘッドの `T` 予測で `D` を作るのが筋」への回答でもある。
+#: **借り物の 1.0 は「時計 1 本のぶれ」の当てずっぽう**で、実測は `attackable` 1.55／1.72・`blockers` 1.09／1.25
+#: ＝**耐久の形を変えると `D` の広がりが変わるのに `σ` が固定だった**のが T96 で比較を壊していた交絡。
+SIGMA_FROM_CURVE = True
+
+
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targets="leader",
             silent="zero", margin_comfort=None, ledger_pricing=None, harm_profile="cross"):
     """(局, 席) ごとに攻め側と守り側の取りこぼしを足す。
@@ -536,6 +546,12 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
         prof = CB.profile_for(dirs, harm_profile)
         if prof is None:
             raise ValueError("harm profile が無い（%s・%s）" % (harm_profile, CB.HARM_PROFILE_PATH))
+        # **T97**: `σ_D = √2 × σ_T` の `σ_T` を**同じ器の実測**から採る（T75 以来の借り物 1.0 を外す）。
+        # **耐久の体の集合ごとに違う**ので `THETA_BODY_MODE` に合わせ、**別のセットの値**を使う（輪郭と同じ規約）。
+        if SIGMA_FROM_CURVE:
+            st = CB.sigma_t_for(dirs, harm_profile)
+            if st is not None:
+                _TOM.set_sigma_turn(st)
     per = {}
     kn_turns = []        # T80: ターンごとの（`D`・生の価格・`ΔW`）＝必要な `κ` を測る材料
     kn_games = []        # T81: 局ごとのターンの並び（窓の広さ・手の型・場の動きで相関を割る）

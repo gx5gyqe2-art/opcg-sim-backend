@@ -274,6 +274,26 @@ def load_harm_profiles(path=None):
     return _PROFILES[path]
 
 
+def sigma_t_for(dirs, name="cross", body_mode=None):
+    """**`σ_T`（終局時刻の残差）を輪郭の表から引く**（T97）。`σ_D = √2 × σ_T` の出所。
+
+    T75 以来 `σ_T` は「時間軸ヘッド r10 の決着ターン誤差 1.0」の**借り物**だったが、
+    **`curve` の τ を出す器が自分の残差を測れる**（`summary.by_slope.curve.sigma_T`）のでそれを使う＝**新定数ゼロ**。
+    **耐久の体の集合ごとに違う**（`blockers` は `attackable` より 3 割小さい）ので分けて持つ。
+    `name="cross"` なら**測る記録と別のセット**の値（§0.1 条件 1・輪郭と同じ規約）。引けなければ `None`。"""
+    tbl = (load_harm_profiles() or {}).get("sigma_t") or {}
+    by = tbl.get(body_mode or THETA_BODY_MODE) or {}
+    if not by:
+        return None
+    if name in ("real", "syn"):
+        v = by.get(name)
+        return float(v) if v is not None else None
+    kind = record_kind(dirs)
+    if kind is None:
+        return None
+    return float(by["syn"]) if kind == "real" else float(by["real"])
+
+
 def record_kind(dirs):
     """記録のセットの種類（`meta_n_record.json` の `decks`: `user` → `real`・それ以外 → `syn`）。判らなければ `None`。"""
     kinds = set()
