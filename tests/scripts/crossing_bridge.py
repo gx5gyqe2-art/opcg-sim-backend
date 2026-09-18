@@ -150,6 +150,53 @@ def playable_attack_price(items, cards, don, olp, theta=THETA, mu=MU, want_rush=
     return (float(best[budget]), float(rush[budget])) if want_rush else float(best[budget])
 
 
+#: **T106**: **相手の手札のブロッカーを耐久に入れるか**（2026-09-18・T96 以来の宿題）。
+#: `off`＝旧（手札のブロッカーは `Θ` のどこにも入らない）／**`on`＝規則どおり**。
+#:
+#: **規則**: **ブロックに召喚酔いは無い**（ユーザ指摘 2026-09-18）——`rules/battle.rs` の `has_blocker` は
+#: `!is_rest && KW_BLOCKER && !BLOCKER_DISABLED` だけを見る（登場ターンかどうかを見ない）＝
+#: **出したブロッカーは相手の次のターンからもう横取りできる**。
+#: よって**手札のブロッカーは「避けて通れない体」の予備**であり、`Θ` の体の項と同じ意味を持つ。
+#: **今はどこにも数えられていない**（盤面の体でも切れる札でもない）＝**欠落**。
+#:
+#: **完全情報で読む**（§0.05）——守る席の手札はその席の行に在るので、`g_for` と同じ経路で引く。
+THETA_HAND_BLOCKER_MODES = ("off", "on")
+THETA_HAND_BLOCKER_MODE = "off"
+
+
+def set_theta_hand_blocker_mode(name):
+    global THETA_HAND_BLOCKER_MODE
+    if name not in THETA_HAND_BLOCKER_MODES:
+        raise ValueError("unknown theta hand blocker mode: %r" % (name,))
+    THETA_HAND_BLOCKER_MODE = name
+    return THETA_HAND_BLOCKER_MODE
+
+
+def hand_blocker_nu(sc, tok_row, ci_row, idx2cid, cards, opp_leader_power):
+    """**その席が手札から出せるブロッカー 1 体の `ν_meas`**（T106・出せなければ 0）。
+
+    **ブロックに召喚酔いが無い**ので、出したブロッカーは**相手の次のターンからもう横取りできる**
+    ＝**盤面のアクティブなブロッカーと同じ意味の耐久**。**次の自分のターンのドン**（今 + 2・上限 10）で
+    払える札だけを見る（規則）。**1 体だけ数える**——1 体は 1 ターンに 1 回しか横取りできず、
+    2 体目を出すドンは体にも使えるので、**過小側に倒す**（`removal_harm` と同じ規約）。
+    """
+    if cards is None or ci_row is None or idx2cid is None:
+        return 0.0
+    import hand_plan as HP
+    sc_a = np.asarray(sc)
+    don = min(10.0, float(sc_a[SC_MY_DON]) + 2.0)
+    r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
+    best = 0.0
+    for it in (HP.hand_items(tok_row, ci_row, idx2cid, cards, float(opp_leader_power), r) or ()):
+        info = (cards.info(it["cid"]) or {})
+        if not info.get("blocker"):
+            continue
+        if float(it.get("cost") or 0.0) > don:
+            continue
+        best = max(best, float(nu_meas_of(float(info.get("power") or 0.0), float(opp_leader_power))))
+    return best
+
+
 def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="dtotal"):
     """**その席の手札 1 枚あたりの価格**（T76）＝自分の手札の札ごとの `max(ΔH_play, ΔG_guard)`（T67）の平均。
     `part="dh"` なら出す側だけ（守る備えを外した切り分け）。手札が空なら `μ`（旧の数え方）。
@@ -388,7 +435,7 @@ def _opp_active_blockers(tok, slots=SLOT_OPP_FIELD):
                    and float(tok[s_i, S_IS_REST]) <= 0.5))
 
 
-def threshold_parts(sc, tok, lam=LAM, mu=MU, g_hand=None):
+def threshold_parts(sc, tok, lam=LAM, mu=MU, g_hand=None, hand_blocker=0.0):
     """耐久 `Θ` を **3 つの項に割って**返す（T96）: `(ライフ, 手札, 体)`。和は `threshold` と一致する。
     **どの項が終盤に縮まないか**を見るための切り分け（T89 が見つけた「残り 1〜2 ターンでも τ が 5 ターン先を指す」）。"""
     sc = np.asarray(sc); tok = np.asarray(tok)
@@ -404,8 +451,10 @@ def threshold_parts(sc, tok, lam=LAM, mu=MU, g_hand=None):
             hand = hand_absorb_forced(n_cut, xs, float(sc[SC_OPP_LIFE]), _opp_active_blockers(tok), mu)
         else:
             hand = hand_absorb(n_cut, max(xs) if xs else -1.0, mu)
-    return (float(lam) * float(sc[SC_OPP_LIFE]), hand,
-            float(_body_term(tok, SLOT_OPP_FIELD, mlp)))
+    body = float(_body_term(tok, SLOT_OPP_FIELD, mlp))
+    if THETA_HAND_BLOCKER_MODE == "on":
+        body += max(0.0, float(hand_blocker))       # **T106**: 手札から出せるブロッカー（召喚酔い無し）
+    return (float(lam) * float(sc[SC_OPP_LIFE]), hand, body)
 
 
 def threshold_of_me(sc, tok, lam=LAM, mu=MU, g_hand=None):
@@ -946,6 +995,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "rate_rush": RATE_RUSH_MODE, "stock_rush_sum": 0.0, "flow_rush_sum": 0.0,
              "rate_t1": RATE_T1_MODE, "tau_capped": 0, "tau_rows": 0,
              "slope_effect": SLOPE_EFFECT_MODE, "eff_sum": 0.0, "eff_n": 0,
+             "theta_hand_blocker": THETA_HAND_BLOCKER_MODE, "hb_sum": 0.0, "hb_n": 0, "hb_hit": 0,
              "theta_return": THETA_RETURN_MODE, "theta_hand_place": THETA_HAND_PLACE,
              "shield_n": 0, "shield_sum": 0.0, "shield_rate_sum": 0.0,
              "g_sum": 0.0, "g_n": 0, "g_fallback": 0,
@@ -1023,6 +1073,21 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 for t in turn_seq[w]:
                     sc, tok, ci = turn_last.get((w, t), turn_start[(w, t)])   # 出した後の手札（ターン最後の行）
                     g_self[(w, t)] = hand_price_mean(sc, tok, ci, idx2cid, cards, mu, part)
+        # **T106**: 席ごとの「手札から出せるブロッカー 1 体の `ν`」（同じく自席の行からしか読めない）
+        hb_self = {}
+        if THETA_HAND_BLOCKER_MODE == "on":
+            for w in (0, 1):
+                for t in turn_seq[w]:
+                    sc, tok, ci = turn_last.get((w, t), turn_start[(w, t)])
+                    olp_w = float(np.asarray(sc)[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+                    hb_self[(w, t)] = hand_blocker_nu(sc, tok, ci, idx2cid, cards, olp_w)
+
+        def hb_for(defender, t):
+            """守る席の直近の自席ターン開始までに持っていた「出せるブロッカー」（無ければ 0）。"""
+            if THETA_HAND_BLOCKER_MODE != "on":
+                return 0.0
+            prev = [tt for tt in turn_seq[defender] if tt <= t]
+            return float(hb_self.get((defender, prev[-1]), 0.0)) if prev else 0.0
 
         def g_for(defender, t):
             """守る席の手札 1 枚あたりの価格（その席の直近の自席ターン開始・無ければ `None`＝`μ`）。
@@ -1092,7 +1157,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             for j, t in enumerate(ts):
                 sc, tok, _ci = turn_start[(w, t)]
                 olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-                th_life, th_hand, th_body = threshold_parts(sc, tok, g_hand=g_for(1 - w, t))
+                th_life, th_hand, th_body = threshold_parts(sc, tok, g_hand=g_for(1 - w, t),
+                                                           hand_blocker=hb_for(1 - w, t))
                 # **T102**: `shield` なら手札は**しきい値から外し、的の側の有限の盾**にする
                 # （毎ターン `shield_rate` までしか出てこない＝**使う時間が要る**）。
                 if THETA_HAND_PLACE == "shield":
@@ -1102,6 +1168,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     stats["shield_n"] += 1; stats["shield_sum"] += shield; stats["shield_rate_sum"] += sh_rate
                 else:
                     shield = sh_rate = 0.0
+                if THETA_HAND_BLOCKER_MODE == "on":
+                    _hb = hb_for(1 - w, t)
+                    stats["hb_n"] += 1; stats["hb_sum"] += _hb; stats["hb_hit"] += int(_hb > 0.0)
                 th_w = th_life + th_hand + th_body
                 # **T96**: 次の自席ターンに戻ってくるレストのブロッカー（`untap` のときだけ段差として使う）
                 th_back = (resting_blocker_term(tok, SLOT_OPP_FIELD,
@@ -1484,6 +1553,10 @@ def main(argv=None):
     ap.add_argument("--theta-body", default=THETA_BODY_MODE, choices=THETA_BODY_MODES,
                     help="耐久の体の項: `blockers`（旧・アクティブなブロッカーだけ）／`all`（全キャラ・T82）／"
                          "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）")
+    ap.add_argument("--theta-hand-blocker", default=THETA_HAND_BLOCKER_MODE,
+                    choices=THETA_HAND_BLOCKER_MODES,
+                    help="**T106** 相手の**手札のブロッカー**を耐久に入れるか（ブロックに召喚酔いは無い）: "
+                         "`off`（旧・どこにも入らない）／`on`（**規則どおり**＝出せる 1 体の `ν`）")
     ap.add_argument("--slope-effect", default=SLOPE_EFFECT_MODE, choices=SLOPE_EFFECT_MODES,
                     help="**T105** 速さ `A` に効果が出す損害を入れるか: `off`（旧・攻撃だけ）／"
                          "`on`（**引いた 1 枚が出す除去の損害**をデッキ平均で毎ターン足す・`deck_refill.e_of`）")
@@ -1508,6 +1581,7 @@ def main(argv=None):
     set_rate_rush_mode(a.rate_rush)
     set_rate_t1_mode(a.rate_t1)
     set_slope_effect_mode(a.slope_effect)
+    set_theta_hand_blocker_mode(a.theta_hand_blocker)
     set_slope_mode(a.slope_mode)
     set_slope_block_mode(a.slope_block)
     set_slope_hand_mode(a.slope_hand)

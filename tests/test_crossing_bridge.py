@@ -803,3 +803,61 @@ def test_the_refill_lands_in_the_shield_not_on_the_target():
     prof = [0.1] * 30
     assert CB.tau_from_profile(0.5, 0, prof, 1.0, 0.0, 0.0, 0.01, 0.08) < CB.tau_from_profile(
         0.5, 0, prof, 1.0, 0.08)
+
+
+def test_a_blocker_in_hand_is_endurance_too():
+    """**T106**（T96 以来の宿題・ユーザ指摘「ブロッカーは出たターンの次の相手のターンにはブロックできます」）:
+    **ブロックに召喚酔いは無い**（`has_blocker` は登場ターンかどうかを見ない）ので、
+    **手札から出せるブロッカーは「避けて通れない体」の予備**＝`Θ` の体の項と同じ意味。
+    **今はどこにも数えられていなかった**（盤面の体でも切れる札でもない）。"""
+    assert CB.THETA_HAND_BLOCKER_MODE == "off"                  # 既定は据え置き（採否はユーザ判定）
+    sc = _sc(3, 4)
+    tok = np.zeros((22, 24), dtype=np.float32)
+    base = CB.threshold(sc, tok)
+    # `off` なら手札のブロッカーを渡しても動かない
+    life, hand, body = CB.threshold_parts(sc, tok, hand_blocker=0.5)
+    assert life + hand + body == pytest.approx(base)
+    try:
+        CB.set_theta_hand_blocker_mode("on")
+        life2, hand2, body2 = CB.threshold_parts(sc, tok, hand_blocker=0.5)
+        assert body2 == pytest.approx(body + 0.5)               # 体の項に載る
+        assert life2 == pytest.approx(life) and hand2 == pytest.approx(hand)
+        assert CB.threshold_parts(sc, tok, hand_blocker=0.0)[2] == pytest.approx(body)
+        assert CB.threshold_parts(sc, tok, hand_blocker=-1.0)[2] == pytest.approx(body)   # 負は 0 に倒す
+        with pytest.raises(ValueError):
+            CB.set_theta_hand_blocker_mode("なにか")
+    finally:
+        CB.set_theta_hand_blocker_mode("off")
+
+
+def test_the_hand_blocker_is_read_from_the_rules_not_the_play():
+    """**T106**: どのブロッカーを数えるかは**次の自分のターンのドン**（今 + 2・上限 10）で払えるかだけで決まる。
+    **1 体だけ**数える（1 体は 1 ターンに 1 回しか横取りできない・過小側に倒す）。"""
+    class _Cards:
+        def __init__(self, tbl): self.tbl = tbl
+        def info(self, cid): return self.tbl.get(cid)
+
+    class _HP:
+        @staticmethod
+        def hand_items(*_a, **_k):
+            return [{"cid": "BLK", "cost": 5}, {"cid": "BIG", "cost": 9}, {"cid": "BODY", "cost": 1}]
+
+    cards = _Cards({"BLK": {"power": 4000, "blocker": True},
+                    "BIG": {"power": 9000, "blocker": True},
+                    "BODY": {"power": 7000}})
+    sys.modules["hand_plan"] = _HP
+    try:
+        sc = _sc(3, 4)
+        sc[T.SC_MY_DON] = 4.0                                   # 次のターンは 6 ドン
+        v = CB.hand_blocker_nu(sc, np.zeros((22, 24), dtype=np.float32), [0] * 22, {}, cards, 5000.0)
+        assert v == pytest.approx(PR.nu_meas_of(4000.0, 5000.0)) # 5 コストは払えるが 9 コストは払えない
+        sc[T.SC_MY_DON] = 8.0                                   # 次は 10 ドン＝両方払える → 高い方
+        v2 = CB.hand_blocker_nu(sc, np.zeros((22, 24), dtype=np.float32), [0] * 22, {}, cards, 5000.0)
+        assert v2 == pytest.approx(PR.nu_meas_of(9000.0, 5000.0)) and v2 >= v
+        sc[T.SC_MY_DON] = 0.0                                   # 次は 2 ドン＝どちらも出せない
+        assert CB.hand_blocker_nu(sc, np.zeros((22, 24), dtype=np.float32), [0] * 22, {},
+                                  cards, 5000.0) == pytest.approx(0.0)
+        # 原本が引けなければ 0（落ちない）
+        assert CB.hand_blocker_nu(sc, None, None, None, None, 5000.0) == pytest.approx(0.0)
+    finally:
+        del sys.modules["hand_plan"]
