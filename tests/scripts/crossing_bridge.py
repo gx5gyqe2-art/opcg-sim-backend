@@ -298,22 +298,52 @@ def theory_slope(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None):
                      for x in own_attackers_of(tok, opp_leader_power)))
 
 
-def seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU):
-    """速さを **2 つに分けて**返す（T90）: `(盤面の攻撃手, 今出せる手札の体)`。
+#: **速さの手札の項を「在庫」で数えるか「流入」で数えるか**（T93・2026-09-18・ユーザ指示「1で進めてください」）。
+#: `stock`＝旧（`playable_attack_price`＝**今のドンで出せる体の総額**）／`flow`＝**毎ターン入ってくるぶん**
+#: （`deck_refill.a_of`＝**引いた 1 枚がもたらす攻撃の価格の期待値**・そのデッキの平均・ドンの枠で絞る）。
+#:
+#: **根拠**（T92 の実測）: 手札の項は `A` の 33.5%／33.4% を占め、**盤面の項だけなら `A` は実績の 0.773／0.754 倍**
+#: ＝**超過は全部ここ**。機構は**在庫を毎ターン繰り返し数えていること**——`playable_attack_price` は
+#: 「今のドンで出せる体の総額」なので、**1 回しか出せない札を毎ターン出せることにしてしまう**。
+#: **T76 が `μ` について確かめたのと同じ取り違え**（「`μ` は**流入**の値であって**在庫**の平均ではない」）が速さの側で起きている。
+#: **在庫は速さではなく「一度きりの上積み」**で、交点まで歩く形（`tau_net`・T90）が**既に 2 ターン目から 1 回だけ**足している。
+#: **新定数ゼロ**（攻撃の価格は `attack_value_don`・残りはデッキの中身・**打ち方は入らない**）。
+SLOPE_HAND_MODES = ("stock", "flow")
+SLOPE_HAND_MODE = "stock"
+
+
+def set_slope_hand_mode(mode):
+    global SLOPE_HAND_MODE
+    if mode not in SLOPE_HAND_MODES:
+        raise ValueError("slope hand mode は %s のどれか" % (SLOPE_HAND_MODES,))
+    SLOPE_HAND_MODE = mode
+    return SLOPE_HAND_MODE
+
+
+def seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None):
+    """速さを **2 つに分けて**返す（T90）: `(盤面の攻撃手, 手札の項)`。
     **規則**——手札から出した体は**そのターンには殴れない**（召喚酔い・T84）ので、
-    交点まで歩くときは**1 ターン目は盤面だけ・2 ターン目からは両方**になる。"""
+    交点まで歩くときは**1 ターン目は盤面だけ・2 ターン目からは両方**になる。
+    手札の項は `SLOPE_HAND_MODE` が決める（`stock`＝今出せる体の総額／`flow`＝毎ターン入ってくるぶん・T93）。"""
+    sc_a = np.asarray(sc)
     blk = None
     if SLOPE_BLOCK_MODE == "on":
-        sc_a = np.asarray(sc)
         blk = opp_blockers_of(tok_row, my_leader_power=float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
                               theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)
     base = theory_slope(tok_row, olp, theta, mu, blockers=blk)
-    if SLOPE_MODE != "hand" or cards is None:
+    if SLOPE_MODE != "hand":
+        return base, 0.0
+    if SLOPE_HAND_MODE == "flow":
+        if not deck_ids:
+            return base, 0.0                       # デッキが引けない文脈では流入を数えない（数は `a_missing`）
+        import deck_refill as DR
+        return base, float(DR.a_of(deck_ids, olp, float(sc_a[SC_MY_DON]), theta, mu))
+    if cards is None:
         return base, 0.0
     import hand_plan as HP
-    r = max(1.0, min(5.0, float(np.asarray(sc)[SC_OPP_LIFE])))
+    r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
     items = HP.hand_items(tok_row, ci_row, idx2cid, cards, olp, r)
-    return base, float(playable_attack_price(items, cards, float(np.asarray(sc)[SC_MY_DON]), olp, theta, mu))
+    return base, float(playable_attack_price(items, cards, float(sc_a[SC_MY_DON]), olp, theta, mu))
 
 
 def seat_slope(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU):
@@ -391,12 +421,18 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     if RACE_MODE == "deck":
         import deck_refill as DR
         refill = DR.shares_by_seed(dirs)
+    # **T93**: `flow` なら手札の項はそのデッキの平均から（同じく seed で作り直す）。
+    seat_decks = {}
+    if SLOPE_HAND_MODE == "flow":
+        import deck_refill as DR
+        seat_decks = DR.decks_by_seed(dirs)
     rows_out = []
     ledger = []            # (d) 単位の検算: 勝った席の F_end 対 Θ_start
     turn_harm = []         # 自席ターン番号 j ごとの損害（損害の輪郭＝加速を測る材料）
     stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "theta_hand": THETA_HAND_MODE, "slope_mode": SLOPE_MODE, "theta_body": THETA_BODY_MODE, "slope_block": SLOPE_BLOCK_MODE,
              "race": RACE_MODE,
              "r_deck_n": 0, "r_deck_sum": 0.0, "r_deck_missing": 0,
+             "slope_hand": SLOPE_HAND_MODE, "a_flow_n": 0, "a_flow_sum": 0.0, "a_flow_missing": 0,
              "g_sum": 0.0, "g_n": 0, "g_fallback": 0,
              "g_win_sum": 0.0, "g_win_n": 0, "g_lose_sum": 0.0, "g_lose_n": 0}
     games = 0
@@ -514,7 +550,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
                 th_w = threshold(sc, tok, g_hand=g_for(1 - w, t))
                 slope_hist = (f_real / j) if j > 0 else None
-                s_board, s_hand = seat_slope_parts(sc, tok, _ci, idx2cid, cards, olp, theta, mu)   # T77／T90
+                dk = (seat_decks.get(seed_g) or (None, None))[w] if seat_decks else None
+                if SLOPE_HAND_MODE == "flow" and not dk:
+                    stats["a_flow_missing"] += 1
+                s_board, s_hand = seat_slope_parts(sc, tok, _ci, idx2cid, cards, olp, theta, mu,
+                                                   deck_ids=dk)                                     # T77／T90／T93
+                if SLOPE_HAND_MODE == "flow":
+                    stats["a_flow_n"] += 1; stats["a_flow_sum"] += float(s_hand)
                 slope_theory = s_board + s_hand
                 per_seat[(w, t)] = {"theta": th_w, "slope_hist": slope_hist, "slope_theory": slope_theory,
                                     # **T90**: 速さを 2 つに分けて持つ（1 ターン目は盤面だけ）と、
@@ -687,6 +729,9 @@ def main(argv=None):
                     help="**T90** 交点の解き方: `static`（旧・`τ = Θ/A`＝的は動かない）／"
                          "`net`（動く的＝1 ターン目は盤面だけ・的は毎ターン相手の補充 `r` だけ下がる・`r` は帳簿の `g`）／"
                          "`deck`（**T91** 同じ動く的で `r` を**規則とデッキの中身だけ**から出す＝`μ ×`切れる札の割合）")
+    ap.add_argument("--slope-hand", default=SLOPE_HAND_MODE, choices=SLOPE_HAND_MODES,
+                    help="**T93** 速さの手札の項: `stock`（旧・今のドンで出せる体の総額）／"
+                         "`flow`（毎ターン入ってくるぶん＝そのデッキの平均・`deck_refill.a_of`）")
     ap.add_argument("--slope-block", default=SLOPE_BLOCK_MODE, choices=SLOPE_BLOCK_MODES,
                     help="**T92** 速さ `A` の盤面の項に相手のアクティブなブロッカーを入れるか: "
                          "`off`（旧・渡さない）／`on`（規則どおり `attack_value` に渡す＝新定数ゼロ）")
@@ -703,6 +748,7 @@ def main(argv=None):
     set_theta_hand_mode(a.theta_hand)
     set_slope_mode(a.slope_mode)
     set_slope_block_mode(a.slope_block)
+    set_slope_hand_mode(a.slope_hand)
     set_theta_body_mode(a.theta_body)
     set_race_mode(a.race)
     rows_out, ledger, stats, turn_harm = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)

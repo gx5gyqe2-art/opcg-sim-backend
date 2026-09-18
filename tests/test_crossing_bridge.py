@@ -75,6 +75,30 @@ def test_the_rate_can_count_the_opponents_blockers():
         CB.set_slope_block_mode("off")
 
 
+def test_the_hand_term_of_the_rate_can_be_a_flow():
+    """**T93**（ユーザ指示「1で進めてください」）: 速さの手札の項を**在庫から流入へ**。
+    `flow` は**そのデッキの平均**（`deck_refill.a_of`）だけを見る＝**手札の中身も打ち方も読まない**。"""
+    import deck_refill as DR
+    assert CB.SLOPE_HAND_MODE == "stock"                     # 既定は据え置き（採否はユーザ判定）
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, T.S_POWER], tok[1, T.S_POWER] = 0.5, 0.5
+    sc = _sc(3, 4)
+    sc[T.SC_MY_DON] = 10.0
+    db = DR.db()
+    body = next(c for c in db.raw_db if DR.body_of(db.get_card(c)) and float(db.get_card(c).power) >= 6000)
+    try:
+        assert CB.set_slope_hand_mode("flow") == "flow"
+        board, hand = CB.seat_slope_parts(sc, tok, None, None, None, 5000.0, deck_ids=[body])
+        assert board == pytest.approx(CB.theory_slope(tok, 5000.0))          # 盤面の項は動かない
+        assert hand == pytest.approx(DR.a_of([body], 5000.0, 10.0))
+        assert hand > 0.0
+        assert CB.seat_slope_parts(sc, tok, None, None, None, 5000.0)[1] == 0.0   # デッキが無ければ流入は数えない
+        with pytest.raises(ValueError):
+            CB.set_slope_hand_mode("なにか")
+    finally:
+        CB.set_slope_hand_mode("stock")
+
+
 def test_the_blockers_of_the_rate_are_the_active_ones():
     """`opp_blockers_of` は**アクティブなブロッカーだけ**（レスト中は横取りできない・ブロッカーでない体も入らない）。"""
     tok = np.zeros((22, 24), np.float32)

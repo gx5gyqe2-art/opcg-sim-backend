@@ -1,8 +1,9 @@
-"""`deck_refill.py`（T91・規則から出る補充 `r`）の算術を固める。
+"""`deck_refill.py`（T91 の補充 `r`・T93 の流入 `a`）の算術を固める。
 
-**要点は「打ち方が入っていないこと」**——`r` はデッキの中身（切れる札の割合）と `μ` だけで決まり、
-記録も打ち回しも読まない。切れる札の定義は**符号化と同じ**（印字カウンター、または【カウンター】で
-パワーを上げるイベント）でなければ `Θ` の手札項とずれるので、そこも押さえる。
+**要点は「打ち方が入っていないこと」**——どちらもデッキの中身と規則だけで決まり、記録も打ち回しも読まない
+（`r` は切れる札の割合 × `μ`・`a` は**山の平均**であって「どの札を選ぶか」ではない）。
+切れる札の定義は**符号化と同じ**（印字カウンター、または【カウンター】でパワーを上げるイベント）で
+なければ `Θ` の手札項とずれるので、そこも押さえる。
 """
 import os
 import sys
@@ -63,9 +64,39 @@ def test_user_decks_give_a_plausible_share():
         assert 0.0 < DR.r_of(s) < T.MU
 
 
+def test_the_inflow_is_the_decks_average_attack_price():
+    """**T93**: 流入 `a` ＝**引いた 1 枚がもたらす攻撃の価格の期待値**（デッキ平均）。
+    体でない札は 0・分母はデッキ全体＝**どの札を選ぶかではなく山の平均**（打ち方が入らない）。"""
+    db = DR.db()
+    body = next(c for c in db.raw_db if DR.body_of(db.get_card(c)) and float(db.get_card(c).power) >= 6000)
+    event = next(c for c in db.raw_db if not DR.body_of(db.get_card(c)))
+    one = T.attack_value_don(float(db.get_card(body).power), 5000.0, True)
+    assert one > 0.0
+    assert DR.a_of([body], 5000.0) == pytest.approx(one)
+    assert DR.a_of([body, event], 5000.0) == pytest.approx(one / 2.0)      # 体でない札も分母に入る
+    assert DR.a_of([event, event], 5000.0) == 0.0
+    assert DR.a_of([], 5000.0) == 0.0
+
+
+def test_the_inflow_respects_the_don_budget():
+    """ドンの枠（規則）で出せない札は流入に入らない＝`don` を下げると `a` は増えない。"""
+    db = DR.db()
+    big = next(c for c in db.raw_db
+               if DR.body_of(db.get_card(c)) and float(db.get_card(c).power) >= 6000
+               and int(db.get_card(c).cost or 0) >= 5)
+    assert DR.a_of([big], 5000.0, int(db.get_card(big).cost)) > 0.0
+    assert DR.a_of([big], 5000.0, 0) == 0.0
+    a_lo, a_hi = DR.a_of([big], 5000.0, 1), DR.a_of([big], 5000.0, 10)
+    assert a_lo <= a_hi
+
+
 def test_pair_shares_is_deterministic_in_the_seed():
     """同じ seed からは同じデッキ＝同じ `r`（記録を作り直さずに引ける根拠）。"""
     a = DR.pair_shares(8801, "user")
     b = DR.pair_shares(8801, "user")
     assert a == b
     assert len(a) == 2 and all(0.0 <= x <= 1.0 for x in a)
+    d1, d2 = DR.pair_decks(8801, "user")
+    assert DR.pair_decks(8801, "user") == (d1, d2)
+    assert len(d1) == len(d2) == 50
+    assert DR.cut_share(d1) == pytest.approx(a[0])          # 割合とデッキは同じ 1 本から出る

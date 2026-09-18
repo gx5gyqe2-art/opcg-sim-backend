@@ -1,4 +1,9 @@
-"""**規則から出る補充 `r`**——耐久 `Θ` は毎ターン「引いた 1 枚」ぶん補充される。T91・2026-09-18・読み取り専用。
+"""**毎ターン引く 1 枚がもたらすもの**——デッキの中身と規則だけから出す「流入」。T91／T93・2026-09-18・読み取り専用。
+
+2 つ在る（どちらも**記録も打ち方も読まない**）:
+
+* **`r`（T91・守る側）**＝耐久 `Θ` の補充＝`μ ×（切れる札の割合）`
+* **`a`（T93・攻める側）**＝速さ `A` の流入＝`E_デッキ[出せる体 1 枚の攻撃の価格]`
 
 **問い**（ユーザ指摘 2026-09-18「穴の大きさを測るのは CPU の打ち方によるんじゃない？」）:
 T90 は動く的の下がる速さ `r` に**帳簿の `g`**（＝相手が**実際にどう打ったか**の記録から出た 1 枚あたりの価格）を
@@ -46,11 +51,13 @@ if _HERE not in sys.path:
 
 from opcg_sim.learned import n_rel_feat as NF  # noqa: E402
 from opcg_sim.loop import decks as D  # noqa: E402
-from theory_order import MU  # noqa: E402
+from theory_order import MU, THETA, attack_value_don  # noqa: E402
 
 _DB = {}
 _SHARE = {}          # (leader_id, tuple(deck_ids)) は重いので id 列の署名でキャッシュ
 _PAIR = {}           # (decks_mode, seed, la, lb) -> (share_p1, share_p2)
+_DECKS = {}          # (decks_mode, seed, la, lb) -> (deck_ids_p1, deck_ids_p2)
+_FLOW = {}           # (deck_ids, 相手リーダー, ドンの枠) -> 流入する速さ `a`
 
 
 def db():
@@ -86,13 +93,24 @@ def cut_share(deck_ids):
     return out
 
 
-def pair_shares(seed, decks_mode, leaders=(None, None)):
-    """1 局の**両席の切れる札の割合** `(p1, p2)`（デッキは seed から決定論で作り直す）。"""
+def pair_decks(seed, decks_mode, leaders=(None, None)):
+    """1 局の**両席のデッキ**（card_id の列・seed から決定論で作り直す）。"""
     la, lb = (leaders or (None, None))[:2]
     key = (decks_mode, int(seed), la, lb)
+    if key in _DECKS:
+        return _DECKS[key]
+    (_l1, d1), (_l2, d2) = D.build_pair(db(), la, lb, int(seed), decks_mode)
+    out = (tuple(d1), tuple(d2))
+    _DECKS[key] = out
+    return out
+
+
+def pair_shares(seed, decks_mode, leaders=(None, None)):
+    """1 局の**両席の切れる札の割合** `(p1, p2)`（デッキは seed から決定論で作り直す）。"""
+    key = (decks_mode, int(seed), (leaders or (None, None))[0], (leaders or (None, None))[1])
     if key in _PAIR:
         return _PAIR[key]
-    (_l1, d1), (_l2, d2) = D.build_pair(db(), la, lb, int(seed), decks_mode)
+    d1, d2 = pair_decks(seed, decks_mode, leaders)
     out = (cut_share(d1), cut_share(d2))
     _PAIR[key] = out
     return out
@@ -103,8 +121,49 @@ def r_of(share, mu=MU):
     return float(mu) * float(share)
 
 
-def shares_by_seed(dirs):
-    """記録のディレクトリ群 → `{seed: (share_p1, share_p2)}`（`meta_games.json` を読んで作り直す）。
+def body_of(m):
+    """その札は**場に出て殴れる体**か（キャラでパワー > 0）。イベント・ステージ・リーダーは違う。"""
+    if getattr(getattr(m, "type", None), "name", "") != "CHARACTER":
+        return False
+    return float(getattr(m, "power", 0) or 0) > 0.0
+
+
+def a_of(deck_ids, opp_leader_power, don=None, theta=THETA, mu=MU):
+    """**流入する速さ `a`**（T93）＝**引いた 1 枚がもたらす攻撃の価格の期待値**（デッキ平均）。
+
+    ```
+    a = (1/N) Σ_{札 ∈ デッキ}  attack_value_don(パワー, 相手リーダー, リーダー狙い)
+    ```
+
+    体でない札（イベント・ステージ）は 0。`don` を渡すと**そのドンで出せない札**（コスト > ドン）も 0
+    ＝規則の枠（ドンは毎ターン +1・上限 10）で絞る。**新定数ゼロ**（攻撃の価格は `attack_value_don`・
+    残りはデッキの中身）。**打ち方は入らない**——どの札を選ぶかではなく**山の平均**を取る。
+    """
+    olp = float(opp_leader_power)
+    cap = None if don is None else int(round(float(don)))
+    key = (tuple(deck_ids), round(olp, 1), cap)
+    if key in _FLOW:
+        return _FLOW[key]
+    d = db()
+    n = 0
+    tot = 0.0
+    for cid in deck_ids:
+        m = d.get_card(cid)
+        if m is None:
+            continue
+        n += 1
+        if not body_of(m):
+            continue
+        if cap is not None and int(getattr(m, "cost", 0) or 0) > cap:
+            continue
+        tot += float(attack_value_don(float(getattr(m, "power", 0) or 0), olp, True, theta, mu))
+    out = (tot / n) if n else 0.0
+    _FLOW[key] = out
+    return out
+
+
+def _by_seed(dirs, fn):
+    """記録のディレクトリ群 → `{seed: fn(seed, mode, leaders)}`（`meta_games.json` を読んで作り直す）。
 
     `who=0`＝p1・`who=1`＝p2（記録の規約）。同じ seed が複数のディレクトリに在れば先勝ち。"""
     out = {}
@@ -120,10 +179,20 @@ def shares_by_seed(dirs):
             if s in out:
                 continue
             try:
-                out[s] = pair_shares(s, mode, tuple(g.get("leaders") or (None, None)))
+                out[s] = fn(s, mode, tuple(g.get("leaders") or (None, None)))
             except Exception:                                # noqa: BLE001
                 continue
     return out
+
+
+def shares_by_seed(dirs):
+    """記録のディレクトリ群 → `{seed: (切れる札の割合 p1, p2)}`（T91 の `r` の材料）。"""
+    return _by_seed(dirs, pair_shares)
+
+
+def decks_by_seed(dirs):
+    """記録のディレクトリ群 → `{seed: (デッキ p1, デッキ p2)}`（T93 の流入 `a` の材料）。"""
+    return _by_seed(dirs, pair_decks)
 
 
 def main(argv=None):
