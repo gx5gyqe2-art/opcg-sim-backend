@@ -80,6 +80,43 @@ def test_w_bar_comes_from_the_measurement_too():
     assert CB.w_bar_for([], "cross") is None      # 記録の種類が判らなければ引かない
 
 
+def test_the_hand_pays_for_the_guards_the_rules_force():
+    """**T100**: T99 は `c(x_max)` 1 本で全札を割ったので端数を捨てすぎた。守り手は攻撃ごとに選ぶので、
+    **規則が決める「必ず守る回数」** `G = max(0, 本数 − ライフ − ブロッカー)`（`board_theta` と同じ式）で
+    1 回あたりの費用を出す。**打ち筋に依らない**（本数・ライフ・ブロッカー・`c_of` だけ）。"""
+    xs = [0.0, 1000.0, 3000.0]                         # c = 1.0 / 1.28 / 2.78
+    assert CB.forced_guards(xs, 1, 0) == 2             # 3 本・ライフ 1・ブロッカー 0 → 2 回は守らねば死ぬ
+    assert CB.forced_guards(xs, 3, 0) == 0             # ライフが足りれば全部受けても死なない
+    assert CB.forced_guards(xs, 1, 2) == 0             # ブロッカーが受けてくれる分は守らなくてよい
+    assert CB.forced_guards([], 1, 0) == 0
+    mu = T.MU
+    import math as _m
+    # **conftest は `CBAR_MODE=loose` を敷く**（そこでは `c(0) = c(1000) = 1`）ので、
+    # **興味のある枝（`c_eff > 1`）を通すために出荷既定の `strict` を明示する**。
+    before = T.CBAR_MODE
+    try:
+        T.set_cbar_mode("strict")
+        cs = sorted(T.c_of(x) for x in xs)
+        c_eff = (cs[0] + cs[1]) / 2.0
+        assert c_eff > 1.0                             # 終盤は 1 枚では足りない
+        # **終盤（G = 2）**: 3 枚では `floor(3/c_eff)` 回ぶんしか止まらない
+        late = CB.hand_absorb_forced(3, xs, 1, 0)
+        assert late == pytest.approx(mu * c_eff * _m.floor(3 / c_eff))
+        assert late < 3 * mu                           # 旧 `cuttable` より小さい
+        # **中盤以降（G = 0）**: 一番安い攻撃の `c` に落ちる＝**削らない**（T99 の削りすぎを避ける）
+        assert CB.hand_absorb_forced(3, xs, 3, 0) == pytest.approx(3 * mu)
+        assert CB.hand_absorb_forced(3, xs, 1, 2) == pytest.approx(3 * mu)
+        # **T99 との違いは中盤以降**——`c(x_max)` は**守る義務が無いターンでも削る**が、
+        # `forced` は `G = 0` なら削らない。そこが T99 の「削りすぎ」の正体。
+        assert CB.hand_absorb(3, max(xs)) < 3 * mu                       # T99 は中盤でも削る
+        assert CB.hand_absorb_forced(3, xs, 3, 0) == pytest.approx(3 * mu)   # T100 は削らない
+    finally:
+        T.set_cbar_mode(before)
+    # 通る攻撃が無ければ 0
+    assert CB.hand_absorb_forced(3, [-1000.0], 1, 0) == 0.0
+    assert CB.hand_absorb_forced(3, [], 1, 0) == 0.0
+
+
 def test_every_hand_mode_has_a_price_source():
     """**T99 で踏んだ穴**: 手札項の数え方を足したのに `part` の対応表に入れ忘れると、
     `crossing_bridge` は `KeyError` で落ち、`theory_bridge` は `.get` が `None` を返して**黙って `μ` に落ちていた**。

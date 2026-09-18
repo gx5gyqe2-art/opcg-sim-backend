@@ -72,7 +72,20 @@ SLOPE_FLOOR = 1e-3
 #: **新定数ゼロ**（`c_of` は T61 で測ってある費用曲線）。
 #: **根拠は実測**（T96）: `Θ` は**とどめのターンで実際に要った損害の 1.98 倍**で、残る膨らみは**手札の項**
 #: （0.181 対 要った損害 0.169 とほぼ同額）＝**切れる札が「必ず `μ` ずつ吸う」前提が終盤で破れている**。
-THETA_HAND_MODES = ("count", "quality", "play", "guard", "cuttable", "cuttable_cx")
+#: `cuttable_forced`＝**T100**: `cuttable_cx` の**粗さの是正**。T99 は `c(x_max)`（一番重い攻撃）1 本で
+#: 全部の札を割ったので**端数を捨てすぎた**。守り手は**攻撃ごとに止めるかを選ぶ**ので、
+#: **規則が決める「必ず守る回数」**（`board_theta` と同じ式・§7）で 1 回あたりの費用を出す:
+#:
+#: ```
+#: G     = max(0, 攻撃の本数 − 相手のライフ − 相手のブロッカー)     必ず守る回数
+#: c_eff = 安い順に G 個の c(x) の平均                              1 回あたりの費用
+#: Θ_hand = μ × c_eff × floor(切れる枚数 / c_eff)
+#: ```
+#:
+#: **G = 0**（全部受けても死なない）なら守る義務は無いので、**一番安い攻撃の `c`** に落とす
+#: （経済的な理由でなら守る＝`theta_of` の `max` と同じ考え方）。**新定数ゼロ**・**打ち筋に依らない**
+#: （本数・ライフ・ブロッカー・`c_of` だけ）。
+THETA_HAND_MODES = ("count", "quality", "play", "guard", "cuttable", "cuttable_cx", "cuttable_forced")
 #: **既定は `cuttable`**（2026-09-17・ユーザ決定「1は変えましょうか」・T77）。以前の数字と比べるときは `--theta-hand count`。
 THETA_HAND_MODE = "cuttable"
 
@@ -81,7 +94,7 @@ THETA_HAND_MODE = "cuttable"
 #: **`cuttable_cx` は 1 枚あたりの価格そのものは `cuttable` と同じ**（`c(x)` のひと組み化は `threshold_parts` の側でやる）。
 #: **知らない名前は `KeyError` で落とす**——黙って別の値で走らないため（T99 でこの穴を踏んだ）。
 THETA_HAND_PART = {"count": None, "quality": "dtotal", "play": "dh", "guard": "dg",
-                   "cuttable": "cuttable", "cuttable_cx": "cuttable"}
+                   "cuttable": "cuttable", "cuttable_cx": "cuttable", "cuttable_forced": "cuttable"}
 
 
 
@@ -282,6 +295,37 @@ def hand_absorb(n_cut, x_max, mu=MU):
     return float(mu) * c * math.floor(n / c)
 
 
+def forced_guards(xs, life_opp, n_blockers_opp):
+    """**相手が必ず守る回数 `G`**（T100・`board_theta` と同じ式・§7）＝`max(0, 本数 − ライフ − ブロッカー)`。
+    **打ち筋に依らない**——本数・ライフ・ブロッカーはすべて規則と盤面から出る。"""
+    return max(0, len(xs or ()) - int(round(float(life_opp))) - int(n_blockers_opp))
+
+
+def hand_absorb_forced(n_cut, xs, life_opp, n_blockers_opp, mu=MU):
+    """**手札が実際に吸える額**（T100）＝`μ × c_eff × floor(切れる枚数 / c_eff)`。
+
+    `c_eff` は**必ず守る G 回**の費用の平均（安い順に G 個）。`G = 0` なら守る義務が無いので
+    **一番安い攻撃の `c`**（経済的な理由でなら守る）。通る攻撃が無ければ 0。"""
+    cs = sorted(c for c in (c_of(float(x)) for x in (xs or ())) if c > 0.0)
+    if not cs:
+        return 0.0                                   # 通らない攻撃しかない＝守る必要が無い
+    g = forced_guards(xs, life_opp, n_blockers_opp)
+    use = cs[:g] if g > 0 else cs[:1]
+    c_eff = sum(use) / len(use)
+    n = max(0.0, float(n_cut))
+    if c_eff <= 1.0:
+        return float(mu) * n
+    return float(mu) * c_eff * math.floor(n / c_eff)
+
+
+def _opp_active_blockers(tok, slots=SLOT_OPP_FIELD):
+    """相手の**アクティブなブロッカー**の数（`has_blocker` と同じ＝`!is_rest && KW_BLOCKER`）。"""
+    tok = np.asarray(tok)
+    return sum(1 for s_i in range(slots.start, slots.stop)
+               if (float(tok[s_i, S_IS_CHAR]) > 0.5 and float(tok[s_i, S_IS_BLOCKER]) > 0.5
+                   and float(tok[s_i, S_IS_REST]) <= 0.5))
+
+
 def threshold_parts(sc, tok, lam=LAM, mu=MU, g_hand=None):
     """耐久 `Θ` を **3 つの項に割って**返す（T96）: `(ライフ, 手札, 体)`。和は `threshold` と一致する。
     **どの項が終盤に縮まないか**を見るための切り分け（T89 が見つけた「残り 1〜2 ターンでも τ が 5 ターン先を指す」）。"""
@@ -290,12 +334,14 @@ def threshold_parts(sc, tok, lam=LAM, mu=MU, g_hand=None):
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     g = float(mu if g_hand is None else g_hand)
     hand = g * float(sc[SC_OPP_HAND])
-    if THETA_HAND_MODE == "cuttable_cx":
-        # **T99**: 切れる枚数は `g/μ × H`（`g` は 1 枚あたりの価格＝`μ ×` 切れる割合）。
-        # 止めねばならない一番重い攻撃は**その席が打てる最大の攻撃**。
+    if THETA_HAND_MODE in ("cuttable_cx", "cuttable_forced"):
+        # **T99／T100**: 切れる枚数は `g/μ × H`（`g` は 1 枚あたりの価格＝`μ ×` 切れる割合）。
         xs = own_attackers_of(tok, olp)
-        hand = hand_absorb((g / float(mu)) * float(sc[SC_OPP_HAND]) if mu else 0.0,
-                           max(xs) if xs else -1.0, mu)
+        n_cut = (g / float(mu)) * float(sc[SC_OPP_HAND]) if mu else 0.0
+        if THETA_HAND_MODE == "cuttable_forced":
+            hand = hand_absorb_forced(n_cut, xs, float(sc[SC_OPP_LIFE]), _opp_active_blockers(tok), mu)
+        else:
+            hand = hand_absorb(n_cut, max(xs) if xs else -1.0, mu)
     return (float(lam) * float(sc[SC_OPP_LIFE]), hand,
             float(_body_term(tok, SLOT_OPP_FIELD, mlp)))
 
