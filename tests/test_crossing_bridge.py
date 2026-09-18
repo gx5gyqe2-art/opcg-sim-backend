@@ -275,3 +275,20 @@ def test_the_race_can_run_against_a_moving_threshold():
             CB.set_race_mode("なにか")
     finally:
         CB.set_race_mode("static")
+
+
+def test_the_refill_can_come_from_the_rules_instead_of_the_play():
+    """**T91**（ユーザ指摘 2026-09-18「穴の大きさを測るのは CPU の打ち方によるんじゃない？」）:
+    動く的の下がる速さ `r` を**帳簿の `g`**（打ち筋が入る）ではなく**デッキの中身**から出す形。
+    的の解き方（`tau_net`／`tau_from_profile`）は `net` と同一で、**変わるのは `r` の出どころだけ**。"""
+    import deck_refill as DR
+    assert "deck" in CB.RACE_MODES
+    assert CB.RACE_MODE == "static"                                  # 既定は据え置き（採否はユーザ判定）
+    try:
+        assert CB.set_race_mode("deck") == "deck"
+    finally:
+        CB.set_race_mode("static")
+    # `r` は `μ ×（切れる札の割合）`＝記録も打ち回しも読まない
+    assert DR.r_of(0.5) == pytest.approx(T.MU * 0.5)
+    prof = [0.05, 0.10, 0.15, 0.20, 0.25, 0.25]
+    assert CB.tau_from_profile(0.5, 0, prof, 1.0, DR.r_of(0.7)) > CB.tau_from_profile(0.5, 0, prof)

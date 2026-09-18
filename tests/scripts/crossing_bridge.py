@@ -297,7 +297,13 @@ def seat_slope(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU):
 #: `F_end/Θ_start` の検算がそのまま意味を持つ）で、**時間は流れの側（`A` と `r`）に置く**。
 #: **新定数ゼロ**: `r` は `Θ` の手札項が既に使っている `g`（切れる札 1 枚の価格）そのもの。
 #: **根拠は実測**（T89）: 勝った席は**開始時の `Θ` より 18%／9% 多い損害**を与えてようやく倒した＝的が後ろへ下がっている。
-RACE_MODES = ("static", "net")
+#:
+#: **`deck`＝T91**（2026-09-18・ユーザ指摘「穴の大きさを測るのは CPU の打ち方によるんじゃない？」）:
+#: `net` の `r` は**帳簿の `g`**＝**相手が実際にどう打ったか**の記録から出た値なので**打ち筋が式に入っている**。
+#: `deck` は `r` を**規則とデッキの中身だけ**から出す（`deck_refill`・`r = μ ×（そのデッキの切れる札の割合）`）。
+#: 引くのは毎ターン 1 枚（規則）・その 1 枚が `Θ` の手札項に載るのは切れる札のときだけ（T77）。
+#: **手札に残すか出すかは `Θ` の中の引っ越し**（手札の項 ↔ 体の項）で `Θ` の増減ではない＝`r` には入らない。
+RACE_MODES = ("static", "net", "deck")
 RACE_MODE = "static"
 RACE_CAP = 30.0          # 届かないときの打ち切り（ターン）
 
@@ -340,11 +346,17 @@ def predict(theta_me, theta_opp, slope_me, slope_opp):
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
+    # **T91**: `deck` なら補充はデッキの中身から（記録の `meta_games.json` の seed で作り直す）。
+    refill = {}
+    if RACE_MODE == "deck":
+        import deck_refill as DR
+        refill = DR.shares_by_seed(dirs)
     rows_out = []
     ledger = []            # (d) 単位の検算: 勝った席の F_end 対 Θ_start
     turn_harm = []         # 自席ターン番号 j ごとの損害（損害の輪郭＝加速を測る材料）
     stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "theta_hand": THETA_HAND_MODE, "slope_mode": SLOPE_MODE, "theta_body": THETA_BODY_MODE,
              "race": RACE_MODE,
+             "r_deck_n": 0, "r_deck_sum": 0.0, "r_deck_missing": 0,
              "g_sum": 0.0, "g_n": 0, "g_fallback": 0,
              "g_win_sum": 0.0, "g_win_n": 0, "g_lose_sum": 0.0, "g_lose_n": 0}
     games = 0
@@ -354,6 +366,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             break
         stats["games"] += 1
         order = list(idx)
+        seed_g = int(rows["seed"][idx[0]]) if len(idx) else -1
         by_seat = {}
         for n, i in enumerate(order):
             if int(rows["kind"][i]) == 0:
@@ -435,6 +448,22 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 stats["g_%s_sum" % side] += float(g); stats["g_%s_n" % side] += 1
             return g
 
+        def r_opp_of(defender, t):
+            """**守る席の補充**（1 守備ターンあたり `Θ` がどれだけ戻るか）。
+
+            `deck`（T91・規則）＝`μ ×（その席のデッキの切れる札の割合）`——**記録も打ち方も見ない**。
+            `net`（T90・旧）＝帳簿の `g`（その席の手札 1 枚あたりの価格）＝**打ち筋が入る**。
+            デッキを引けなかったときだけ `g` に落とす（数は `r_deck_missing` に残す）。"""
+            if RACE_MODE == "deck":
+                sh = refill.get(seed_g)
+                if sh is not None:
+                    r = float(mu) * float(sh[int(defender)])
+                    stats["r_deck_n"] += 1; stats["r_deck_sum"] += r
+                    return r
+                stats["r_deck_missing"] += 1
+            g = g_for(defender, t)
+            return float(g if g is not None else mu)
+
         # 席ごとの自席ターン開始点で、両席の τ を出す（相手は直前の自分のターン開始の値）
         per_seat = {}
         for w in (0, 1):
@@ -451,7 +480,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                     # **T90**: 速さを 2 つに分けて持つ（1 ターン目は盤面だけ）と、
                                     # **相手の補充 `r`**＝`Θ` の手札項と同じ 1 枚あたりの価格（引き 1 枚ぶん）
                                     "slope_board": s_board, "slope_hand": s_hand,
-                                    "r_opp": float(g_for(1 - w, t) if g_for(1 - w, t) is not None else mu),
+                                    "r_opp": r_opp_of(1 - w, t),
                                     "f_real": f_real, "t_left": len(ts) - j, "j": j}
                 turn_harm.append({"j": j, "harm": harm.get((w, t), 0.0), "slope_theory": slope_theory})
                 f_real += harm.get((w, t), 0.0)
@@ -487,7 +516,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 for sv in SLOPES:
                     s_me = me["slope_" + sv] if me["slope_" + sv] is not None else me["slope_theory"]
                     s_op = op["slope_" + sv] if op["slope_" + sv] is not None else op["slope_theory"]
-                    if RACE_MODE == "net" and sv == "theory":
+                    if RACE_MODE in ("net", "deck") and sv == "theory":
                         # **T90**: 動く的との競争（1 ターン目は盤面だけ・的は毎ターン `r` 下がる）
                         tau_me = tau_net(me["theta"], me["slope_board"], me["slope_hand"], me["r_opp"])
                         tau_opp = tau_net(op["theta"], op["slope_board"], op["slope_hand"], op["r_opp"])
@@ -545,8 +574,9 @@ def summarise(rows_out, ledger, turn_harm=None):
                      r["slope_theory_me"] / max(SLOPE_FLOOR, prof_th[min(r["j_me"], len(prof_th) - 1)]),
                      r["slope_theory_opp"] / max(SLOPE_FLOOR, prof_th[min(r["j_opp"], len(prof_th) - 1)]))):
                 # **T90**: `net` なら的が毎ターン相手の補充ぶん下がる（`r_opp_*` は行に載せてある）
-                rr_me = float(r.get("r_opp_me") or 0.0) if RACE_MODE == "net" else 0.0
-                rr_op = float(r.get("r_opp_opp") or 0.0) if RACE_MODE == "net" else 0.0
+                moving = RACE_MODE in ("net", "deck")
+                rr_me = float(r.get("r_opp_me") or 0.0) if moving else 0.0
+                rr_op = float(r.get("r_opp_opp") or 0.0) if moving else 0.0
                 tm = tau_from_profile(r["theta_me"], r["j_me"], prof, scale_me, rr_me)
                 to = tau_from_profile(r["theta_opp"], r["j_opp"], prof, scale_op, rr_op)
                 r["tau_me_" + sv] = tm; r["tau_opp_" + sv] = to; r["pred_" + sv] = (tm <= to)
@@ -615,7 +645,8 @@ def main(argv=None):
                     help="**T77** 速さ: `board`（既定・今の盤面の攻撃手）／`hand`（手札から今出せる体の攻撃の価格も足す）")
     ap.add_argument("--race", default=RACE_MODE, choices=RACE_MODES,
                     help="**T90** 交点の解き方: `static`（旧・`τ = Θ/A`＝的は動かない）／"
-                         "`net`（動く的＝1 ターン目は盤面だけ・的は毎ターン相手の補充 `r` だけ下がる）")
+                         "`net`（動く的＝1 ターン目は盤面だけ・的は毎ターン相手の補充 `r` だけ下がる・`r` は帳簿の `g`）／"
+                         "`deck`（**T91** 同じ動く的で `r` を**規則とデッキの中身だけ**から出す＝`μ ×`切れる札の割合）")
     ap.add_argument("--theta-body", default=THETA_BODY_MODE, choices=THETA_BODY_MODES,
                     help="耐久の体の項: `blockers`（旧・アクティブなブロッカーだけ）／`all`（全キャラ・T82）／"
                          "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）")
