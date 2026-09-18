@@ -158,7 +158,10 @@ LAST_TURN_MODE = "keep"
 #: 付与は打つ価値のある手で、`s` を 0 にすると理論が「ドンを付けるな」と言い出す。
 #: 体が殴らずに終われば（ドンはターン終了で戻る）**損害は実現していない**ので 0 が正しい。
 ATTACH_LEDGER_MODES = ("increment", "in_attack")
-ATTACH_LEDGER_MODE = "increment"
+#: **既定は `in_attack`**（2026-09-18・ユーザ決定「正しく直した上で」・T85）——二重計上は記録で確認した**事実**なので、
+#: 数字の得が小さくても（必要な `κ` 0.502 → 0.509・`g` の実効値 −1.1%）旧を既定に残す理由が無い。
+#: 以前の数字と比べるときは `--attach-ledger increment`。
+ATTACH_LEDGER_MODE = "in_attack"
 
 
 def set_attach_ledger_mode(mode):
@@ -992,8 +995,8 @@ def main(argv=None):
                     help="耐久の体の項（`--w-mode curve` の `D` に効く）: `blockers`（既定）／`all`（全キャラ・T82）／"
                          "`attackable`（レストの体 ＋ アクティブなブロッカー＝規則から出る形・T83）")
     ap.add_argument("--attach-ledger", default=ATTACH_LEDGER_MODE, choices=ATTACH_LEDGER_MODES,
-                    help="**T85** ドン付与の帳簿価格: `increment`（旧・付与の行で増分を計上）／"
-                         "`in_attack`（付与の行は 0＝増分は殴る行の価格に入っている。決める価格 `s` は増分のまま）")
+                    help="**T85** ドン付与の帳簿価格: `in_attack`（既定・付与の行は 0＝増分は殴る行の価格に入っている。"
+                         "決める価格 `s` は増分のまま）／`increment`（旧・付与の行で増分を計上）")
     ap.add_argument("--play-book", default=PLAY_BOOK_MODE, choices=PLAY_BOOK_MODES,
                     help="**T84** 出した体の価格の計上時点: `next`（既定・効き始める次の自席ターン＝召喚酔い。"
                          "速攻・ブロッカー・イベント／ステージは据え置き）／`now`（旧・出したターンに満額）")

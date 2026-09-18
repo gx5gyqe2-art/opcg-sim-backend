@@ -405,14 +405,14 @@ def test_the_attach_is_counted_once_in_the_ledger():
     """**T85**: ドン付与の増分は**殴る行の価格に既に入っている**（記録の `slot_power` は自席のターンに付与ドンを
     載せる）ので、帳簿（`g`・`ΔG`）では**付与の行を 0** にして同じ移転を 1 回だけ数える（T62 と同じ型の直し）。
     **決める価格 `s` は増分のまま**（T58 の分離）。切替の既定は旧（`increment`）。"""
-    assert B.ATTACH_LEDGER_MODE == "increment"
+    assert B.ATTACH_LEDGER_MODE == "in_attack"      # **既定は 1 回だけ数える**（ユーザ決定 2026-09-18）
     assert B.move_family(["DON_BOX", "cid", [], [], None]) == "attach"      # 対象なし＝純粋な付与
     assert B.move_family(["DON_BOX", "cid", ["t"], [], None]) == "attack"   # 対象あり＝殴る手（こちらは 0 にしない）
     try:
-        assert B.set_attach_ledger_mode("in_attack") == "in_attack"
+        assert B.set_attach_ledger_mode("increment") == "increment"        # 旧の規約にも戻せる
         with pytest.raises(ValueError):
             B.set_attach_ledger_mode("なにか")
-        assert B.ATTACH_LEDGER_MODE == "in_attack"
+        assert B.ATTACH_LEDGER_MODE == "increment"
     finally:
-        B.set_attach_ledger_mode("increment")
-    assert B.ATTACH_LEDGER_MODE == "increment"
+        B.set_attach_ledger_mode("in_attack")
+    assert B.ATTACH_LEDGER_MODE == "in_attack"
