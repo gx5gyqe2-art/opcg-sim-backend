@@ -402,7 +402,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             won = z_of[w] > 0.5
             if won and ts:
                 th0 = per_seat[(w, ts[0])]["theta"]
+                # **T89**: 時間の分解——勝った席が **実際に何自席ターン使ったか**（`turns`）と、
+                # **実際の速さ**（`F_end / turns`）・**理論の速さ**（`slope_theory` の平均）。
+                # 交点の偏り（終局を遅く言う）が `Θ` の側か `A` の側かを分ける材料。
                 ledger.append({"F_end": f_real, "theta_start": th0,
+                               "turns": len(ts),
+                               "rate_real": (f_real / len(ts)) if ts else None,
+                               "rate_theory": float(np.mean([per_seat[(w, tt)]["slope_theory"] for tt in ts])),
                                "F_priced_end": sum(priced.get((w, t), 0.0) for t in ts)})
         for w in (0, 1):
             ts = turn_seq[w]; ts_o = turn_seq[1 - w]
@@ -471,6 +477,24 @@ def summarise(rows_out, ledger, turn_harm=None):
     if ledger:
         fe = np.array([r["F_end"] for r in ledger]); th0 = np.array([r["theta_start"] for r in ledger])
         fp = np.array([r["F_priced_end"] for r in ledger])
+        # **T89**: 偏りの分解（勝った席だけ）——終局を遅く言うのは `Θ` の側か `A` の側か。
+        ok = [r for r in ledger if r.get("rate_real")]
+        tn = np.array([float(r.get("turns") or 0) for r in ledger])
+        rr = np.array([float(r["rate_real"]) for r in ok])
+        rt = np.array([float(r["rate_theory"]) for r in ok])
+        th0s = np.array([float(r["theta_start"]) for r in ok])
+        out["rate_check"] = {
+            "n": len(ok),
+            "turns_mean": round(float(tn.mean()), 2) if len(tn) else None,
+            # **実際の速さ**＝勝った席が 1 自席ターンあたり与えた損害（`F_end / 使ったターン数`）
+            "rate_real_mean": round(float(rr.mean()), 4) if len(rr) else None,
+            # **理論の速さ `A`**＝そのターンの `seat_slope` の平均
+            "rate_theory_mean": round(float(rt.mean()), 4) if len(rt) else None,
+            "theory_over_real": round(float(rt.mean() / max(1e-9, rr.mean())), 3) if len(ok) else None,
+            # **`Θ` を実際の速さで割ったら何ターンか**（理論の `A` ではなく実測の速さで測った τ）
+            "tau_at_real_rate": round(float((th0s / np.maximum(1e-9, rr)).mean()), 2) if len(ok) else None,
+            # **`Θ` を理論の速さで割ったら何ターンか**（これが予測の τ）
+            "tau_at_theory_rate": round(float((th0s / np.maximum(1e-9, rt)).mean()), 2) if len(ok) else None}
         out["ledger"] = {"winners": len(ledger), "F_end_mean": round(float(fe.mean()), 4),
                          "theta_start_mean": round(float(th0.mean()), 4),
                          "F_end_over_theta_start": round(float(fe.mean() / max(1e-9, th0.mean())), 3),
