@@ -119,9 +119,13 @@ def set_slope_mode(mode):
     SLOPE_MODE = mode
 
 
-def playable_attack_price(items, cards, don, olp, theta=THETA, mu=MU):
+def playable_attack_price(items, cards, don, olp, theta=THETA, mu=MU, want_rush=False):
     """**今のドンで手札から出せる体**の攻撃の価格の和（T77）＝費用の合計が `don` を超えない範囲での最大（小さなナップサック）。
-    体を持たない札（イベント・ステージ）は 0。"""
+    体を持たない札（イベント・ステージ）は 0。
+
+    **T103**: `want_rush=True` なら `(総額, そのうち速攻の札の額)` を返す。**同じ最適な詰め方の中の内訳**
+    （速攻だけで別にナップサックを解くと、ドンの枠を二重に使ってしまう）。**速攻は出したターンから殴れる**
+    ので歩き（`rate_at`）では 1 ターン早く積む（規則・帳簿側は `play_starts_next_turn` が既に例外にしている）。"""
     cand = []
     for it in items or ():
         info = (cards.info(it["cid"]) or {}) if cards is not None else {}
@@ -131,14 +135,19 @@ def playable_attack_price(items, cards, don, olp, theta=THETA, mu=MU):
         if power <= 0.0:
             continue
         cost = int(round(float(it.get("cost") or 0.0)))
-        cand.append((max(0, cost), float(attack_value_don(power, olp, True, theta, mu))))
+        cand.append((max(0, cost), float(attack_value_don(power, olp, True, theta, mu)),
+                     bool(info.get("rush"))))
     budget = int(max(0, round(float(don))))
+    if budget < 0:
+        return (0.0, 0.0) if want_rush else 0.0
     best = [0.0] * (budget + 1)
-    for cost, val in cand:
+    rush = [0.0] * (budget + 1)                  # 同じ詰め方の中の速攻ぶん（総額の最適化には使わない）
+    for cost, val, is_rush in cand:
         for b in range(budget, cost - 1, -1):
             if best[b - cost] + val > best[b]:
                 best[b] = best[b - cost] + val
-    return float(best[budget]) if budget >= 0 else 0.0
+                rush[b] = rush[b - cost] + (val if is_rush else 0.0)
+    return (float(best[budget]), float(rush[budget])) if want_rush else float(best[budget])
 
 
 def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="dtotal"):
@@ -614,7 +623,10 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     * **流入** … 毎ターン引く 1 枚がもたらす体（`deck_refill.a_of`・T93）。
       `j` ターン目に引いた札は `j+1` から殴るので、**進むほど積み上がる**（`流入 × (j − 1)`）。
 
-    戻り値は `(盤面, 在庫, 流入, 盤面のうちリーダー)`——**リーダーは KO されない**ので減衰（T95）が掛からない。
+    戻り値は `(盤面, 在庫, 流入, 盤面のうちリーダー, 在庫の速攻ぶん, 流入の速攻ぶん)`
+    ——**リーダーは KO されない**ので減衰（T95）が掛からない。
+    **T103**: 末尾 2 つは**速攻の内訳**（`RATE_RUSH_MODE=on` のときだけ歩きに渡す）。**速攻は出したターン・
+    引いたターンからもう殴れる**ので 1 ターン早く積む（規則）。`off` のときは 0 を返す。
     `want_stock=False`（既定）なら在庫は計算しない（`hand_plan` のナップサックは重い）。"""
     sc_a = np.asarray(sc)
     blk = None
@@ -624,24 +636,31 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     lead, chars = theory_slope_parts(tok_row, olp, theta, mu, blockers=blk)
     base = lead + chars
     if SLOPE_MODE != "hand":
-        return base, 0.0, 0.0, lead
-    stock = 0.0
+        return base, 0.0, 0.0, lead, 0.0, 0.0
+    stock = stock_rush = 0.0
     if (want_stock or SLOPE_HAND_MODE == "stock") and cards is not None:
         import hand_plan as HP
         r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
         items = HP.hand_items(tok_row, ci_row, idx2cid, cards, olp, r)
-        stock = float(playable_attack_price(items, cards, float(sc_a[SC_MY_DON]), olp, theta, mu))
-    flow = 0.0
+        stock, stock_rush = playable_attack_price(items, cards, float(sc_a[SC_MY_DON]), olp, theta, mu,
+                                                  want_rush=True)
+    flow = flow_rush = 0.0
     if deck_ids:
         import deck_refill as DR
-        flow = float(DR.a_of(deck_ids, olp, float(sc_a[SC_MY_DON]), theta, mu))
-    return base, stock, flow, lead
+        don = float(sc_a[SC_MY_DON])
+        flow = float(DR.a_of(deck_ids, olp, don, theta, mu))
+        if RATE_RUSH_MODE == "on":
+            flow_rush = float(DR.a_of(deck_ids, olp, don, theta, mu, rush_only=True))
+    if RATE_RUSH_MODE != "on":
+        stock_rush = flow_rush = 0.0
+    return base, stock, flow, lead, stock_rush, flow_rush
 
 
 def seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None):
     """速さを **2 つに分けて**返す（T90）: `(盤面の攻撃手, 手札の項)`。
     手札の項は `SLOPE_HAND_MODE` が決める（`stock`＝今出せる体の総額／**`flow`＝毎ターン入ってくるぶん**・T93）。"""
-    base, stock, flow, _lead = seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta, mu, deck_ids)
+    base, stock, flow, _lead, _sr, _fr = seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp,
+                                                          theta, mu, deck_ids)
     return base, (stock if SLOPE_HAND_MODE == "stock" else flow)
 
 
@@ -671,7 +690,7 @@ def seat_slope(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU):
 #: `deck` は `r` を**規則とデッキの中身だけ**から出す（`deck_refill`・`r = μ ×（そのデッキの切れる札の割合）`）。
 #: 引くのは毎ターン 1 枚（規則）・その 1 枚が `Θ` の手札項に載るのは切れる札のときだけ（T77）。
 #: **手札に残すか出すかは `Θ` の中の引っ越し**（手札の項 ↔ 体の項）で `Θ` の増減ではない＝`r` には入らない。
-RACE_MODES = ("static", "net", "deck")
+RACE_MODES = ("static", "net", "deck", "deck_shield")
 RACE_MODE = "static"
 RACE_CAP = 30.0          # 届かないときの打ち切り（ターン）
 
@@ -750,33 +769,97 @@ def set_rate_decay_mode(mode):
     return RATE_DECAY_MODE
 
 
-def rate_at(j, board_lead, board_chars, stock, flow, ko_p=0.0):
+#: **T103**: **歩きの 1 ターン目に速攻の体を入れるか**（2026-09-18・T102 §8 の 1）。
+#: `off`＝旧（出した体は全部 1 ターン待つ）／**`on`＝規則どおり**（**速攻は出したターンから殴れる**）。
+#:
+#: **これは欠落であって新しい式ではない**——帳簿側は T84 の `play_starts_next_turn` が
+#: **速攻とブロッカーを既に例外**にしている（`PLAY_BOOK_MODE=next` でも即計上）。**歩きだけが例外を持っていなかった**。
+#: **新定数ゼロ**（速攻かどうかはカード原本のキーワード）。
+#:
+#: **なぜ効くか**: `grow` の `R_1` は盤面だけ（≒ `r` = 0.040）なので、**補充を歩きに入れると
+#: 序盤の数ターンが実質ゼロ進行になる**（T102 で偏りが +2.53 → +6.37 に開いた）。
+#: 速攻を 1 ターン目に入れると `R_1` が上がるので、**補充と釣り合わせられる**。
+RATE_RUSH_MODES = ("off", "on")
+RATE_RUSH_MODE = "off"
+
+
+#: **T103**: **どちらの席も「自分の最初のターン」はアタックできない**（規則・`rules/battle.rs::declare_attack`
+#: の `turn_count <= 2`）。歩きはこれを知らず、**局の 1 自席ターン目にも `A` を積んでいた**。
+#: `off`＝旧／**`on`＝規則どおり**（絶対の自席ターン番号が 1 の段は速さ 0）。**新定数ゼロ**。
+#:
+#: **実測が裏づけている**（下の `harm_profile`）: **1 自席ターン目の実際の損害は 0.001／0.000** なのに
+#: 理論は 0.055／0.054 を言っていた（**78 倍／136 倍**）。2 ターン目以降の比は 0.72〜1.72 なので、
+#: **1 ターン目だけが桁で外れている**＝規則の欠落。
+RATE_T1_MODES = ("off", "on")
+RATE_T1_MODE = "off"
+
+
+def set_rate_t1_mode(name):
+    global RATE_T1_MODE
+    if name not in RATE_T1_MODES:
+        raise ValueError("unknown rate t1 mode: %r" % (name,))
+    RATE_T1_MODE = name
+    return RATE_T1_MODE
+
+
+def set_rate_rush_mode(name):
+    global RATE_RUSH_MODE
+    if name not in RATE_RUSH_MODES:
+        raise ValueError("unknown rate rush mode: %r" % (name,))
+    RATE_RUSH_MODE = name
+    return RATE_RUSH_MODE
+
+
+def rate_at(j, board_lead, board_chars, stock, flow, ko_p=0.0, stock_rush=0.0, flow_rush=0.0,
+            j0=1):
     """**`j` 自席ターン目の速さ** `R_j`（T94・T95）。**リーダーは減衰しない**（KO されない）。
-    `ko_p = 0` なら T94 のまま（減衰なし）＝`board_lead + board_chars + 在庫·[j≥2] + 流入·(j−1)`。"""
+    `ko_p = 0` なら T94 のまま（減衰なし）＝`board_lead + board_chars + 在庫·[j≥2] + 流入·(j−1)`。
+
+    **T103**: `stock_rush`／`flow_rush`（在庫・流入のうち**速攻**のぶん）は**1 ターン早い**
+    ——在庫の速攻は `j ≥ 1` から（出したターンに殴れる）・流入の速攻は**引いたターンから**（`Σ_{k=0}^{j−1} q^k`）。
+    どちらも総額の内側なので、残り（`stock − stock_rush`・`flow − flow_rush`）が旧どおりの遅い側。
+
+    **T103**: `j0` は**この歩きの出発点の絶対の自席ターン番号**（1 始まり）。`RATE_T1_MODE=on` なら
+    **絶対の自席ターン 1 の段は 0**（どちらの席も最初のターンはアタックできない・`turn_count <= 2`）。"""
+    if RATE_T1_MODE == "on" and int(j0) + int(j) - 1 <= 1:
+        return 0.0                                    # **T103**: 自分の最初のターンはアタックできない（規則）
     q = 1.0 - max(0.0, min(1.0, float(ko_p)))
     n = max(0, int(j) - 1)
     out = float(board_lead) + float(board_chars) * (q ** n)
+    s_rush = min(float(stock), max(0.0, float(stock_rush)))
+    s_slow = max(0.0, float(stock) - s_rush)
+    if s_rush > 0.0:
+        out += s_rush * (q ** n)                      # 1 ターン目に出して、以後 n ターン場に居る
     if j >= 2:
-        out += float(stock) * (q ** (n - 1))
+        out += s_slow * (q ** (n - 1))
+    f_rush = min(float(flow), max(0.0, float(flow_rush)))
+    f_slow = max(0.0, float(flow) - f_rush)
     if n >= 1:
         # i = 1..j−1 に入った札はそれぞれ (j−1−i) ターン場に居た＝Σ_{k=0}^{j−2} q^k
-        out += float(flow) * (n if q >= 1.0 else (1.0 - q ** n) / (1.0 - q))
+        out += f_slow * (n if q >= 1.0 else (1.0 - q ** n) / (1.0 - q))
+    if f_rush > 0.0:
+        # 速攻は引いたターンから殴る＝i = 1..j の j 枚ぶん＝Σ_{k=0}^{j−1} q^k
+        m = max(0, int(j))
+        out += f_rush * (m if q >= 1.0 else (1.0 - q ** m) / (1.0 - q))
     return float(out)
 
 
 def tau_grow(theta, board_lead, board_chars, stock, flow, r=0.0, cap=RACE_CAP, ko_p=None, step=0.0,
-             shield=0.0, shield_rate=0.0):
+             shield=0.0, shield_rate=0.0, stock_rush=0.0, flow_rush=0.0, j0=1, refill=0.0):
     """**積み上がる速さ**で的に届くまでのターン数（T94）。端数はそのターンの中で比例配分する。
     `r > 0` なら的も毎ターン `r` 下がる（T90 の動く的と組める）。
     `RATE_DECAY_MODE=ko` なら**盤面が毎ターン `ko_p` で失われる**（T95）。
     `step > 0` なら的が **`j ≥ 2` で 1 回だけ**その分だけ遠のく（T96・レストのブロッカーのアンタップ）。
     **T102**: `shield > 0` なら**有限の盾**（相手の手札）が**毎ターン `shield_rate` までしか**減らない
     ——的はそのぶんずつ遠のき、**盾を使い切ったらそれ以上は遠のかない**。`shield_rate = 0` なら一度に全部。
+    **T104**: `refill > 0` なら**補充は盾の在庫に積まれる**（`r` を的に直接足すのではない）
+    ——**引いた札も「使う時間」が要る**ので、**出せる速さ `shield_rate` の上限をそのまま受ける**。
     届かなければ `cap`。"""
     theta = float(theta); r = max(0.0, float(r))
     shield = max(0.0, float(shield)); shield_rate = max(0.0, float(shield_rate))
-    if shield > 0.0 and shield_rate <= 0.0:
-        shield_rate = shield                                   # 上限が無ければ 1 ターンで全部使える
+    refill = max(0.0, float(refill))
+    if (shield > 0.0 or refill > 0.0) and shield_rate <= 0.0:
+        shield_rate = shield + refill                          # 上限が無ければ 1 ターンで全部使える
     k = 0.0
     if ko_p is not None:
         k = float(ko_p)
@@ -784,9 +867,10 @@ def tau_grow(theta, board_lead, board_chars, stock, flow, r=0.0, cap=RACE_CAP, k
         k = float(KO_P)
     f = 0.0
     for j in range(1, int(cap) + 1):
-        add = rate_at(j, board_lead, board_chars, stock, flow, k)
-        # **T102**: `j` ターン目までに盾から出せた総額（毎ターン `shield_rate` まで・在庫 `shield` まで）
-        used = min(shield, shield_rate * j)
+        add = rate_at(j, board_lead, board_chars, stock, flow, k, stock_rush, flow_rush, j0)
+        # **T102／T104**: `j` ターン目までに盾から出せた総額
+        # ＝**持っている額**（今の盾 ＋ 補充 `refill × j`）と**出せる上限**（`shield_rate × j`）の小さい方。
+        used = min(shield + refill * j, shield_rate * j) if (shield > 0.0 or refill > 0.0) else 0.0
         need = theta + r * j + used + (float(step) if j >= 2 else 0.0)
         if f + add >= need:
             short = max(0.0, need - f)
@@ -828,6 +912,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "r_deck_n": 0, "r_deck_sum": 0.0, "r_deck_missing": 0,
              "slope_hand": SLOPE_HAND_MODE, "a_flow_n": 0, "a_flow_sum": 0.0, "a_flow_missing": 0,
              "rate_walk": RATE_WALK_MODE, "rate_decay": RATE_DECAY_MODE, "stock_n": 0, "stock_sum": 0.0,
+             "rate_rush": RATE_RUSH_MODE, "stock_rush_sum": 0.0, "flow_rush_sum": 0.0,
+             "rate_t1": RATE_T1_MODE, "tau_capped": 0, "tau_rows": 0,
              "theta_return": THETA_RETURN_MODE, "theta_hand_place": THETA_HAND_PLACE,
              "shield_n": 0, "shield_sum": 0.0, "shield_rate_sum": 0.0,
              "g_sum": 0.0, "g_n": 0, "g_fallback": 0,
@@ -927,7 +1013,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             `deck`（T91・規則）＝`μ ×（その席のデッキの切れる札の割合）`——**記録も打ち方も見ない**。
             `net`（T90・旧）＝帳簿の `g`（その席の手札 1 枚あたりの価格）＝**打ち筋が入る**。
             デッキを引けなかったときだけ `g` に落とす（数は `r_deck_missing` に残す）。"""
-            if RACE_MODE == "deck":
+            if RACE_MODE in ("deck", "deck_shield"):
                 sh = refill.get(seed_g)
                 if sh is not None:
                     r = float(mu) * float(sh[int(defender)])
@@ -952,10 +1038,15 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             **T101**: `theta_check` で「τ が当たった行」を選ぶために要る。行ごとの予測
             （下の `SLOPES` のループ）と**同じ枝**を通るよう、ここに 1 本だけ書いて両方から呼ぶ。"""
             if RATE_WALK_MODE == "grow":
+                # **T104**: `deck_shield` は補充を**的**ではなく**盾の在庫**に積む（`refill=`）。
                 r = d["r_opp"] if RACE_MODE in ("net", "deck") else 0.0
+                rf = d["r_opp"] if RACE_MODE == "deck_shield" else 0.0
                 return tau_grow(d["theta"], d["slope_lead"], d["slope_board"] - d["slope_lead"],
                                 d["slope_stock"], d["slope_flow"], r, step=d.get("th_back") or 0.0,
-                                shield=d.get("shield") or 0.0, shield_rate=d.get("shield_rate") or 0.0)
+                                shield=d.get("shield") or 0.0, shield_rate=d.get("shield_rate") or 0.0,
+                                stock_rush=d.get("slope_stock_rush") or 0.0,
+                                flow_rush=d.get("slope_flow_rush") or 0.0,
+                                j0=int(d.get("j") or 0) + 1, refill=rf)
             if RACE_MODE in ("net", "deck"):
                 return tau_net(d["theta"], d["slope_board"], d["slope_hand"], d["r_opp"])
             return d["theta"] / max(SLOPE_FLOOR, d["slope_theory"])
@@ -988,7 +1079,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 dk = (seat_decks.get(seed_g) or (None, None))[w] if seat_decks else None
                 if SLOPE_HAND_MODE == "flow" and not dk:
                     stats["a_flow_missing"] += 1
-                s_board, s_stock, s_flow, s_lead = seat_slope_terms(
+                s_board, s_stock, s_flow, s_lead, s_srush, s_frush = seat_slope_terms(
                     sc, tok, _ci, idx2cid, cards, olp, theta, mu, deck_ids=dk,
                     want_stock=(RATE_WALK_MODE == "grow"))                          # T77／T90／T93／T94／T95
                 s_hand = s_stock if SLOPE_HAND_MODE == "stock" else s_flow
@@ -996,7 +1087,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     stats["a_flow_n"] += 1; stats["a_flow_sum"] += float(s_hand)
                 if RATE_WALK_MODE == "grow":
                     stats["stock_n"] += 1; stats["stock_sum"] += float(s_stock)
+                    stats["stock_rush_sum"] += float(s_srush); stats["flow_rush_sum"] += float(s_frush)
                 slope_theory = s_board + s_hand
+                if RATE_T1_MODE == "on" and j == 0:
+                    slope_theory = 0.0            # **T103**: 最初の自席ターンは 1 本も打てない（規則）
                 per_seat[(w, t)] = {"theta": th_w, "slope_hist": slope_hist, "slope_theory": slope_theory,
                                     # **T102**: 有限の盾（相手の手札）と 1 ターンの上限
                                     "shield": shield, "shield_rate": sh_rate,
@@ -1008,10 +1102,15 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                     "slope_board": s_board, "slope_hand": s_hand,
                                     # **T94**: 積み上がる歩きに要る 3 つ目（在庫・段差）
                                     "slope_stock": s_stock, "slope_flow": s_flow, "slope_lead": s_lead,
+                                    # **T103**: 在庫・流入のうち**速攻**のぶん（1 ターン早く殴る）
+                                    "slope_stock_rush": s_srush, "slope_flow_rush": s_frush,
                                     "r_opp": r_opp_of(1 - w, t),
                                     "r_deck": r_deck_of(1 - w),
                                     "f_real": f_real, "t_left": len(ts) - j, "j": j}
-                turn_harm.append({"j": j, "harm": harm.get((w, t), 0.0), "slope_theory": slope_theory})
+                turn_harm.append({"j": j, "harm": harm.get((w, t), 0.0), "slope_theory": slope_theory,
+                                  # **T103**: そのターンの損害のうち**攻撃の価格が説明する分**
+                                  # （`priced` は攻撃の手だけ・`harm` は全部の手）＝**残りは効果が出した損害**。
+                                  "priced": priced.get((w, t), 0.0)})
                 f_real += harm.get((w, t), 0.0)
             won = z_of[w] > 0.5
             if won and ts:
@@ -1066,7 +1165,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 for sv in SLOPES:
                     s_me = me["slope_" + sv] if me["slope_" + sv] is not None else me["slope_theory"]
                     s_op = op["slope_" + sv] if op["slope_" + sv] is not None else op["slope_theory"]
-                    if sv == "theory" and (RATE_WALK_MODE == "grow" or RACE_MODE in ("net", "deck")):
+                    if sv == "theory" and (RATE_WALK_MODE == "grow"
+                                           or RACE_MODE in ("net", "deck", "deck_shield")):
                         # **T94**（積み上がる歩き）／**T90**（動く的）。**式は `tau_theory_of` に 1 本だけ置き、
                         # `theta_check` と同じ枝を通す**（T101）。
                         tau_me = tau_theory_of(me); tau_opp = tau_theory_of(op)
@@ -1074,24 +1174,31 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     else:
                         tau_me, tau_opp, pred = predict(me["theta"], op["theta"], s_me, s_op)
                     rec["tau_me_" + sv] = tau_me; rec["tau_opp_" + sv] = tau_opp; rec["pred_" + sv] = pred
+                    if sv == "theory":
+                        # **T103**: 届かずに打ち切った行の数（「遅い」のか「一生届かない」のかを分ける）
+                        stats["tau_capped"] += int(tau_me >= RACE_CAP) + int(tau_opp >= RACE_CAP)
+                        stats["tau_rows"] += 2
                 rows_out.append(rec)
     return rows_out, ledger, stats, turn_harm, theta_check
 
 
-def harm_profile(turn_harm, j_max=12, min_n=20):
-    """**損害の輪郭**＝自席ターン番号 `j` ごとの損害の平均（と理論の傾きの平均）。標本が薄い先は最後の値を伸ばす。"""
+def harm_profile(turn_harm, j_max=12, min_n=20, key="slope_theory"):
+    """**損害の輪郭**＝自席ターン番号 `j` ごとの損害の平均（と `key` の平均）。標本が薄い先は最後の値を伸ばす。
+
+    **T103**: `key="priced"` にすると 2 本目が**攻撃の価格の実績**になる（`slope_theory` は理論の `A`）。
+    **`harm` は全部の手の損害**なので、差は**効果が出した損害**＝`A` が攻撃しか数えていない穴の大きさ。"""
     prof, prof_th = [], []
     last, last_th = 0.0, 0.0
     for j in range(j_max + 1):
         hs = [r["harm"] for r in turn_harm if r["j"] == j]
-        ts = [r["slope_theory"] for r in turn_harm if r["j"] == j]
+        ts = [r.get(key, 0.0) for r in turn_harm if r["j"] == j]
         if len(hs) >= min_n:
             last, last_th = float(np.mean(hs)), float(np.mean(ts))
         prof.append(last); prof_th.append(last_th)
     return prof, prof_th
 
 
-def tau_from_profile(theta, j, prof, scale=1.0, r=0.0, shield=0.0, shield_rate=0.0):
+def tau_from_profile(theta, j, prof, scale=1.0, r=0.0, shield=0.0, shield_rate=0.0, refill=0.0):
     """輪郭に沿って損害を積み、`Θ` に届くまでのターン数（端数は比例配分・輪郭の先は最後の値）。
 
     **T90**: `r > 0` なら**的が毎ターン `r` 下がる**（相手の補充）＝`Θ + r·(k+1)` に届くまで歩く。
@@ -1100,14 +1207,17 @@ def tau_from_profile(theta, j, prof, scale=1.0, r=0.0, shield=0.0, shield_rate=0
     acc = 0.0
     r = max(0.0, float(r))
     shield = max(0.0, float(shield)); shield_rate = max(0.0, float(shield_rate))
-    if shield > 0.0 and shield_rate <= 0.0:
-        shield_rate = shield
+    refill = max(0.0, float(refill))
+    if (shield > 0.0 or refill > 0.0) and shield_rate <= 0.0:
+        shield_rate = shield + refill
     for k in range(200):
         h = prof[min(j + k, len(prof) - 1)] * scale
         if h <= SLOPE_FLOOR:
             h = SLOPE_FLOOR
-        # **T102**: 有限の盾（相手の手札）は毎ターン `shield_rate` までしか出てこない
-        need = float(theta) + r * (k + 1) + min(shield, shield_rate * (k + 1))
+        # **T102／T104**: 有限の盾（相手の手札 ＋ 補充）は毎ターン `shield_rate` までしか出てこない
+        got = (min(shield + refill * (k + 1), shield_rate * (k + 1))
+               if (shield > 0.0 or refill > 0.0) else 0.0)
+        need = float(theta) + r * (k + 1) + got
         if acc + h >= need:
             return k + max(0.0, need - acc) / h
         acc += h
@@ -1133,8 +1243,20 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
     out = {"n": len(rows_out), "by_slope": {}}
     prof, prof_th = harm_profile(turn_harm or [])
     if turn_harm:
+        _, prof_pr = harm_profile(turn_harm, key="priced")
         out["harm_profile"] = {"harm_by_turn": [round(x, 4) for x in prof],
-                               "theory_slope_by_turn": [round(x, 4) for x in prof_th]}
+                               # **T103**: 実際に打った攻撃の価格（実績）——`harm` との差が**効果の損害**
+                               "priced_by_turn": [round(x, 4) for x in prof_pr],
+                               "attack_share_by_turn": [round(p / h, 3) if h > 1e-9 else None
+                                                        for p, h in zip(prof_pr, prof)],
+                               "theory_slope_by_turn": [round(x, 4) for x in prof_th],
+                               # **T103**: **速さの検算**＝自席ターン番号ごとに「理論の `A` ÷ 実際の損害」。
+                               # 1 なら `A` はその時点で正しい大きさ。**どこで速すぎ／遅すぎかが 1 行で出る**
+                               # （平均が合っていても形が違えば交点の時刻は外れる）。
+                               "ratio_by_turn": [round(t / h, 3) if h > 1e-9 else None
+                                                 for t, h in zip(prof_th, prof)],
+                               "cum_harm_by_turn": [round(float(x), 4) for x in np.cumsum(prof)],
+                               "cum_theory_by_turn": [round(float(x), 4) for x in np.cumsum(prof_th)]}
         # 輪郭の変種: `curve`＝平均の輪郭のまま／`curve_scaled`＝今の盤面の理論の傾きで輪郭を伸縮
         for r in rows_out:
             for sv, scale_me, scale_op in (
@@ -1146,10 +1268,14 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
                 moving = RACE_MODE in ("net", "deck")
                 rr_me = float(r.get("r_opp_me") or 0.0) if moving else 0.0
                 rr_op = float(r.get("r_opp_opp") or 0.0) if moving else 0.0
+                # **T104**: `deck_shield` は補充を盾の在庫へ（出せる速さの上限を受ける）
+                fill = RACE_MODE == "deck_shield"
+                rf_me = float(r.get("r_opp_me") or 0.0) if fill else 0.0
+                rf_op = float(r.get("r_opp_opp") or 0.0) if fill else 0.0
                 tm = tau_from_profile(r["theta_me"], r["j_me"], prof, scale_me, rr_me,
-                                      r.get("shield_me") or 0.0, r.get("shield_rate_me") or 0.0)
+                                      r.get("shield_me") or 0.0, r.get("shield_rate_me") or 0.0, rf_me)
                 to = tau_from_profile(r["theta_opp"], r["j_opp"], prof, scale_op, rr_op,
-                                      r.get("shield_opp") or 0.0, r.get("shield_rate_opp") or 0.0)
+                                      r.get("shield_opp") or 0.0, r.get("shield_rate_opp") or 0.0, rf_op)
                 r["tau_me_" + sv] = tm; r["tau_opp_" + sv] = to; r["pred_" + sv] = (tm <= to)
     if theta_check:
         # **T96**: `Θ` は終盤に縮むか——**残りターンごと**に `Θ` と「そこから実際に要った損害」を並べる。
@@ -1322,6 +1448,12 @@ def main(argv=None):
     ap.add_argument("--theta-body", default=THETA_BODY_MODE, choices=THETA_BODY_MODES,
                     help="耐久の体の項: `blockers`（旧・アクティブなブロッカーだけ）／`all`（全キャラ・T82）／"
                          "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）")
+    ap.add_argument("--rate-t1", default=RATE_T1_MODE, choices=RATE_T1_MODES,
+                    help="**T103** 最初の自席ターンはアタックできない規則（`turn_count <= 2`）を歩きに入れるか: "
+                         "`off`（旧）／`on`（**規則どおり**＝絶対の自席ターン 1 の速さは 0）")
+    ap.add_argument("--rate-rush", default=RATE_RUSH_MODE, choices=RATE_RUSH_MODES,
+                    help="**T103** 歩きの 1 ターン目に速攻の体を入れるか: `off`（旧・全部 1 ターン待つ）／"
+                         "`on`（**規則どおり**＝速攻は出したターン・引いたターンから殴れる）")
     ap.add_argument("--theta-hand-place", default=THETA_HAND_PLACE, choices=THETA_HAND_PLACES,
                     help="**T102** 耐久の手札項の置き場所: `stock`（旧・`Θ` に一括）／"
                          "`shield`（**的の側の有限の盾**＝毎ターン規則が許すぶんだけ＝**使う時間が要る**）")
@@ -1334,6 +1466,8 @@ def main(argv=None):
     t0 = time.time()
     set_theta_hand_mode(a.theta_hand)
     set_theta_hand_place(a.theta_hand_place)
+    set_rate_rush_mode(a.rate_rush)
+    set_rate_t1_mode(a.rate_t1)
     set_slope_mode(a.slope_mode)
     set_slope_block_mode(a.slope_block)
     set_slope_hand_mode(a.slope_hand)

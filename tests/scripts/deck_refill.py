@@ -128,7 +128,7 @@ def body_of(m):
     return float(getattr(m, "power", 0) or 0) > 0.0
 
 
-def a_of(deck_ids, opp_leader_power, don=None, theta=THETA, mu=MU):
+def a_of(deck_ids, opp_leader_power, don=None, theta=THETA, mu=MU, rush_only=False):
     """**流入する速さ `a`**（T93）＝**引いた 1 枚がもたらす攻撃の価格の期待値**（デッキ平均）。
 
     ```
@@ -138,10 +138,13 @@ def a_of(deck_ids, opp_leader_power, don=None, theta=THETA, mu=MU):
     体でない札（イベント・ステージ）は 0。`don` を渡すと**そのドンで出せない札**（コスト > ドン）も 0
     ＝規則の枠（ドンは毎ターン +1・上限 10）で絞る。**新定数ゼロ**（攻撃の価格は `attack_value_don`・
     残りはデッキの中身）。**打ち方は入らない**——どの札を選ぶかではなく**山の平均**を取る。
+
+    **T103**: `rush_only=True` なら**速攻の札だけ**を数える。速攻は**引いたターンからもう殴れる**ので、
+    歩き（`rate_at`）では 1 ターン早く積む（規則・`play_starts_next_turn` が帳簿側で既に使っている例外）。
     """
     olp = float(opp_leader_power)
     cap = None if don is None else int(round(float(don)))
-    key = (tuple(deck_ids), round(olp, 1), cap)
+    key = (tuple(deck_ids), round(olp, 1), cap, bool(rush_only))
     if key in _FLOW:
         return _FLOW[key]
     d = db()
@@ -155,6 +158,9 @@ def a_of(deck_ids, opp_leader_power, don=None, theta=THETA, mu=MU):
         if not body_of(m):
             continue
         if cap is not None and int(getattr(m, "cost", 0) or 0) > cap:
+            continue
+        # **T103**: `rush_only` なら**速攻の札だけ**（引いたターンからもう殴れる＝1 ターン早い）。
+        if rush_only and "速攻" not in (getattr(m, "keywords", ()) or ()):
             continue
         tot += float(attack_value_don(float(getattr(m, "power", 0) or 0), olp, True, theta, mu))
     out = (tot / n) if n else 0.0

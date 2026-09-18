@@ -315,7 +315,8 @@ def test_the_board_can_decay_but_the_leader_never_does():
 
 
 def test_the_rate_terms_are_separate_quantities():
-    """`seat_slope_terms` は `(盤面, 在庫, 流入, リーダー)`。**在庫は要求したときだけ計算する**（重いので）。"""
+    """`seat_slope_terms` は `(盤面, 在庫, 流入, リーダー, 在庫の速攻, 流入の速攻)`（T103 で末尾 2 つが増えた）。
+    **在庫は要求したときだけ計算する**（重いので）。"""
     import deck_refill as DR
     tok = np.zeros((22, 24), np.float32)
     tok[0, T.S_POWER], tok[1, T.S_POWER] = 0.5, 0.5
@@ -323,13 +324,15 @@ def test_the_rate_terms_are_separate_quantities():
     sc[T.SC_MY_DON] = 10.0
     db = DR.db()
     body = next(c for c in db.raw_db if DR.body_of(db.get_card(c)) and float(db.get_card(c).power) >= 6000)
-    board, stock, flow, lead = CB.seat_slope_terms(sc, tok, None, None, None, 5000.0, deck_ids=[body])
+    board, stock, flow, lead, s_rush, f_rush = CB.seat_slope_terms(
+        sc, tok, None, None, None, 5000.0, deck_ids=[body])
+    assert s_rush == 0.0 and f_rush == 0.0            # 既定は `RATE_RUSH_MODE=off`（T103）
     assert board == pytest.approx(CB.theory_slope(tok, 5000.0))
     assert stock == 0.0                                              # `cards` が無ければ在庫は数えられない
     assert flow == pytest.approx(DR.a_of([body], 5000.0, 10.0))
     assert lead == pytest.approx(board)                              # 場が空ならリーダーが全部
     tok[2, T.S_POWER], tok[2, T.S_IS_CHAR], tok[2, T.S_CAN_ATTACK] = 0.8, 1.0, 1.0
-    board2, _s, _f, lead2 = CB.seat_slope_terms(sc, tok, None, None, None, 5000.0)
+    board2, _s, _f, lead2, _sr2, _fr2 = CB.seat_slope_terms(sc, tok, None, None, None, 5000.0)
     assert lead2 == pytest.approx(lead) and board2 > lead2           # キャラのぶんはリーダーに入らない
     # 既定（`flow`）では `seat_slope_parts` の 2 つ目は流入
     assert CB.seat_slope_parts(sc, tok, None, None, None, 5000.0, deck_ids=[body])[1] == pytest.approx(flow)
@@ -697,3 +700,105 @@ def test_the_opponents_attacks_are_read_from_the_board_not_the_turn_flag():
     assert CB._own_active_blockers(tok) == 1
     tok[2, T.S_IS_REST] = 1.0
     assert CB._own_active_blockers(tok) == 0                       # レストのブロッカーは横取りできない
+
+
+def test_the_walk_obeys_the_first_turn_rule():
+    """**T103**: **どちらの席も「自分の最初のターン」はアタックできない**
+    （規則・`rules/battle.rs::declare_attack` の `turn_count <= 2`）。歩きはこれを知らなかった。"""
+    assert CB.RATE_T1_MODE == "off"                                # 既定は据え置き（採否はユーザ判定）
+    try:
+        CB.set_rate_t1_mode("on")
+        # 局の 1 自席ターン目（`j0 = 1`）から歩くと、1 段目は 0
+        assert CB.rate_at(1, 0.05, 0.05, 0.1, 0.02, j0=1) == pytest.approx(0.0)
+        assert CB.rate_at(2, 0.05, 0.05, 0.1, 0.02, j0=1) > 0.0
+        # 途中の行（`j0 ≥ 2`）から歩くなら 1 段目から打てる
+        assert CB.rate_at(1, 0.05, 0.05, 0.1, 0.02, j0=2) > 0.0
+        # 的に届くまでのターン数は 1 つ増える側に動く（1 段ぶん進めないので）
+        assert CB.tau_grow(0.3, 0.1, 0.0, 0.0, 0.0, j0=1) > CB.tau_grow(0.3, 0.1, 0.0, 0.0, 0.0, j0=2)
+        with pytest.raises(ValueError):
+            CB.set_rate_t1_mode("なにか")
+    finally:
+        CB.set_rate_t1_mode("off")
+    # `off` なら `j0` は無視される（旧と完全に同じ）
+    assert CB.rate_at(1, 0.05, 0.05, 0.1, 0.02, j0=1) == pytest.approx(0.1)
+
+
+def test_rush_bodies_attack_the_turn_they_arrive():
+    """**T103**: **速攻は出したターン・引いたターンからもう殴れる**（規則）。
+    帳簿側は T84 の `play_starts_next_turn` が既に例外にしていて、**歩きだけが持っていなかった**。"""
+    assert CB.RATE_RUSH_MODE == "off"                              # 既定は据え置き
+    # 在庫 0.1 が全部速攻なら 1 ターン目から乗る（旧は 2 ターン目から）
+    assert CB.rate_at(1, 0.05, 0.0, 0.1, 0.0) == pytest.approx(0.05)
+    assert CB.rate_at(1, 0.05, 0.0, 0.1, 0.0, stock_rush=0.1) == pytest.approx(0.15)
+    # 速攻ぶんは総額の内側（二重には乗らない）
+    assert CB.rate_at(3, 0.05, 0.0, 0.1, 0.0, stock_rush=0.1) == pytest.approx(
+        CB.rate_at(3, 0.05, 0.0, 0.1, 0.0))
+    # 流入の速攻は**引いたターンから**＝`j` 枚ぶん（旧の遅い側は `j − 1` 枚ぶん）
+    assert CB.rate_at(3, 0.0, 0.0, 0.0, 0.02) == pytest.approx(0.04)
+    assert CB.rate_at(3, 0.0, 0.0, 0.0, 0.02, flow_rush=0.02) == pytest.approx(0.06)
+    # 上限を超えて渡しても総額で抑える
+    assert CB.rate_at(1, 0.0, 0.0, 0.05, 0.0, stock_rush=99.0) == pytest.approx(0.05)
+    try:
+        assert CB.set_rate_rush_mode("on") == "on"
+        with pytest.raises(ValueError):
+            CB.set_rate_rush_mode("なにか")
+    finally:
+        CB.set_rate_rush_mode("off")
+
+
+def test_the_rush_share_comes_out_of_the_same_knapsack():
+    """**T103**: 速攻の内訳は**同じ最適な詰め方の中**から採る（速攻だけで別に解くとドンの枠を二重に使う）。"""
+    class _Cards:
+        def __init__(self, tbl): self.tbl = tbl
+        def info(self, cid): return self.tbl.get(cid)
+    cards = _Cards({"A": {"power": 6000, "rush": True}, "B": {"power": 7000}})
+    items = [{"cid": "A", "cost": 4}, {"cid": "B", "cost": 4}]
+    tot_a, rush_a = CB.playable_attack_price(items, cards, 4, 5000.0, want_rush=True)
+    # ドンが 4 なら 1 枚しか出せない＝価値の大きい B が選ばれ、速攻ぶんは 0
+    assert tot_a > 0.0 and rush_a == pytest.approx(0.0)
+    tot_b, rush_b = CB.playable_attack_price(items, cards, 8, 5000.0, want_rush=True)
+    assert tot_b > tot_a and 0.0 < rush_b < tot_b            # 8 なら両方出せる＝速攻ぶんが立つ
+    assert CB.playable_attack_price(items, cards, 8, 5000.0) == pytest.approx(tot_b)
+
+
+def test_the_rate_is_checked_against_the_realised_harm_per_turn():
+    """**T103**: **速さの検算**——自席ターン番号ごとに「理論の `A` ÷ 実際の損害」を並べる。
+    **平均が合っていても形が違えば交点の時刻は外れる**（T93 は平均を 1.01 に合わせたが偏りは +2.9 残った）。"""
+    turn_harm = []
+    for j, (h, a) in enumerate(((0.0, 0.05), (0.10, 0.05), (0.20, 0.30))):
+        turn_harm += [{"j": j, "harm": h, "slope_theory": a}] * 40      # `min_n` を満たす本数
+    out = CB.summarise([], [], turn_harm)["harm_profile"]
+    assert out["harm_by_turn"][:3] == [0.0, 0.1, 0.2]
+    assert out["theory_slope_by_turn"][:3] == [0.05, 0.05, 0.3]
+    # 損害 0 のターンは比を出さない（割れないので `None`）
+    assert out["ratio_by_turn"][0] is None
+    assert out["ratio_by_turn"][1] == pytest.approx(0.5)               # 遅すぎる
+    assert out["ratio_by_turn"][2] == pytest.approx(1.5)               # 速すぎる
+    # 累積は両方持つ（交点は累積で決まるので、こちらが本番）
+    assert out["cum_harm_by_turn"][2] == pytest.approx(0.3)
+    assert out["cum_theory_by_turn"][2] == pytest.approx(0.4)
+
+
+def test_the_refill_lands_in_the_shield_not_on_the_target():
+    """**T104**（T102・T103 が指した先）: **補充も「使う時間」が要る**——引いた札は手札に入るだけで、
+    **出せる速さは `shield_rate`（宣言された攻撃の本数）が決める**。
+    `Θ + r·j` と直に足すと**上限なしに吸える**ことになり、交点が遠のきすぎる（T102 で偏り +6.37）。"""
+    assert "deck_shield" in CB.RACE_MODES and CB.RACE_MODE == "static"
+    # 盾も補充も無ければ従来どおり
+    assert CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0) == pytest.approx(5.0)
+    # 的に直に足す旧い形（`r`）は上限が無いので、補充が速さに近いと一気に遠のく
+    far = CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, r=0.08)
+    # 盾に積む形なら、**出せる速さ 0.01 で頭打ち**＝遠のき方も 0.01/ターンで止まる
+    near = CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, refill=0.08, shield_rate=0.01)
+    assert near < far
+    assert near == pytest.approx(CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, r=0.01))   # 上限ぶんだけ的が動く
+    # 出せる速さが補充より大きければ、補充はそのまま効く（旧 `r` と一致）
+    assert CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, refill=0.02, shield_rate=9.0) == pytest.approx(
+        CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, r=0.02))
+    # 攻撃が 1 本も無い（`shield_rate = 0`）なら**手札も補充も吸えない**
+    assert CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, shield=0.3, shield_rate=0.0,
+                       refill=0.05) != pytest.approx(5.0)          # 上限が無いときは一度に全部（旧の形）
+    # 輪郭の側も同じ形
+    prof = [0.1] * 30
+    assert CB.tau_from_profile(0.5, 0, prof, 1.0, 0.0, 0.0, 0.01, 0.08) < CB.tau_from_profile(
+        0.5, 0, prof, 1.0, 0.08)
