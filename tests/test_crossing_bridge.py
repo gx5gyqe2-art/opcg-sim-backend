@@ -99,32 +99,58 @@ def test_the_hand_term_of_the_rate_is_a_flow():
         CB.set_slope_hand_mode("flow")
 
 
-def test_the_walk_can_let_the_rate_accumulate():
-    """**T94**（ユーザ指示「1で進めてください」）: 交点までの速さを**規則どおり積み上げる**。
+def test_the_walk_lets_the_rate_accumulate():
+    """**T94**（2026-09-18・ユーザ決定「規定にして」で既定）: 交点までの速さを**規則どおり積み上げる**。
     盤面は毎ターン・**在庫は 2 ターン目からの段差**（召喚酔い）・**流入は進むほど積み上がる**（j で引いた札は j+1 から殴る）。"""
-    assert CB.RATE_WALK_MODE == "flat"                               # 既定は据え置き（採否はユーザ判定）
-    # 在庫も流入も無ければ一定の速さと同じ
-    assert CB.tau_grow(1.0, 0.25, 0.0, 0.0) == pytest.approx(4.0)
+    assert CB.RATE_WALK_MODE == "grow"                               # 既定（以前の数字と比べるときだけ `flat`）
+    # 在庫も流入も無ければ一定の速さと同じ（リーダー 0.25・キャラ 0）
+    assert CB.tau_grow(1.0, 0.25, 0.0, 0.0, 0.0) == pytest.approx(4.0)
     # 在庫 0.1 は 2 ターン目から: 0.25 + 0.35 + 0.35 = 0.95、残り 0.05 を 4 ターン目の 0.35 で
-    assert CB.tau_grow(1.0, 0.25, 0.1, 0.0) == pytest.approx(3.0 + 0.05 / 0.35)
+    assert CB.tau_grow(1.0, 0.25, 0.0, 0.1, 0.0) == pytest.approx(3.0 + 0.05 / 0.35)
     # 流入 0.1 は (j − 1) 倍: 0.25 + 0.35 + 0.45 = 1.05 → 3 ターン目の途中
-    assert CB.tau_grow(1.0, 0.25, 0.0, 0.1) == pytest.approx(2.0 + 0.4 / 0.45)
+    assert CB.tau_grow(1.0, 0.25, 0.0, 0.0, 0.1) == pytest.approx(2.0 + 0.4 / 0.45)
     # 積み上がるほうが一定より早く届く
-    assert CB.tau_grow(1.0, 0.25, 0.1, 0.1) < CB.tau_grow(1.0, 0.25, 0.0, 0.0)
-    assert CB.tau_grow(0.0, 0.25, 0.1, 0.1) == pytest.approx(0.0)    # 既に届いている
-    assert CB.tau_grow(1.0, 0.0, 0.0, 0.0) == pytest.approx(CB.RACE_CAP)   # 届かなければ打ち切り
+    assert CB.tau_grow(1.0, 0.25, 0.0, 0.1, 0.1) < CB.tau_grow(1.0, 0.25, 0.0, 0.0, 0.0)
+    assert CB.tau_grow(0.0, 0.25, 0.0, 0.1, 0.1) == pytest.approx(0.0)    # 既に届いている
+    assert CB.tau_grow(1.0, 0.0, 0.0, 0.0, 0.0) == pytest.approx(CB.RACE_CAP)   # 届かなければ打ち切り
     # 動く的と組める（的が下がるぶん遅くなる）
-    assert CB.tau_grow(1.0, 0.25, 0.1, 0.1, 0.05) > CB.tau_grow(1.0, 0.25, 0.1, 0.1)
-    try:
-        assert CB.set_rate_walk_mode("grow") == "grow"
+    assert CB.tau_grow(1.0, 0.25, 0.0, 0.1, 0.1, 0.05) > CB.tau_grow(1.0, 0.25, 0.0, 0.1, 0.1)
+    try:                                                             # 旧い形も残す＝過去の数字と比べるため
+        assert CB.set_rate_walk_mode("flat") == "flat"
         with pytest.raises(ValueError):
             CB.set_rate_walk_mode("なにか")
     finally:
-        CB.set_rate_walk_mode("flat")
+        CB.set_rate_walk_mode("grow")
 
 
-def test_the_three_rate_terms_are_separate_quantities():
-    """`seat_slope_terms` は `(盤面, 在庫, 流入)`。**在庫は要求したときだけ計算する**（重いので）。"""
+def test_the_board_can_decay_but_the_leader_never_does():
+    """**T95**（ユーザ指示「2で進めてください」）: 盤面は毎自席ターン `ko_p` で失われる。
+    **リーダーは KO されない**ので減衰しない＝速さは 0 に落ちず、流入のぶん `1/ko_p` に飽和する。"""
+    assert CB.RATE_DECAY_MODE == "off"                               # 既定は据え置き（採否はユーザ判定）
+    # `ko_p = 0` なら T94 のまま
+    assert CB.rate_at(3, 0.05, 0.05, 0.1, 0.02, 0.0) == pytest.approx(0.05 + 0.05 + 0.1 + 0.04)
+    q = 1.0 - 0.289
+    assert CB.rate_at(1, 0.05, 0.05, 0.1, 0.02, 0.289) == pytest.approx(0.05 + 0.05)          # 1 ターン目は減衰前
+    assert CB.rate_at(2, 0.05, 0.05, 0.1, 0.02, 0.289) == pytest.approx(0.05 + 0.05 * q + 0.1 + 0.02)
+    assert CB.rate_at(3, 0.05, 0.05, 0.1, 0.02, 0.289) == pytest.approx(
+        0.05 + 0.05 * q ** 2 + 0.1 * q + 0.02 * (1.0 + q))
+    # **リーダーは残る**＝遠い先でも速さはリーダー ＋ 流入の飽和 `flow/ko_p` を下回らない
+    far = CB.rate_at(60, 0.05, 0.05, 0.1, 0.02, 0.289)
+    assert far == pytest.approx(0.05 + 0.02 / 0.289, abs=1e-6)
+    # 減衰を入れると届くのが遅くなる
+    assert CB.tau_grow(1.0, 0.05, 0.05, 0.1, 0.02, ko_p=0.289) > CB.tau_grow(1.0, 0.05, 0.05, 0.1, 0.02, ko_p=0.0)
+    try:
+        assert CB.set_rate_decay_mode("ko") == "ko"
+        assert CB.tau_grow(1.0, 0.05, 0.05, 0.1, 0.02) == pytest.approx(
+            CB.tau_grow(1.0, 0.05, 0.05, 0.1, 0.02, ko_p=T.KO_P))     # 既定の `ko_p` を拾う
+        with pytest.raises(ValueError):
+            CB.set_rate_decay_mode("なにか")
+    finally:
+        CB.set_rate_decay_mode("off")
+
+
+def test_the_rate_terms_are_separate_quantities():
+    """`seat_slope_terms` は `(盤面, 在庫, 流入, リーダー)`。**在庫は要求したときだけ計算する**（重いので）。"""
     import deck_refill as DR
     tok = np.zeros((22, 24), np.float32)
     tok[0, T.S_POWER], tok[1, T.S_POWER] = 0.5, 0.5
@@ -132,10 +158,14 @@ def test_the_three_rate_terms_are_separate_quantities():
     sc[T.SC_MY_DON] = 10.0
     db = DR.db()
     body = next(c for c in db.raw_db if DR.body_of(db.get_card(c)) and float(db.get_card(c).power) >= 6000)
-    board, stock, flow = CB.seat_slope_terms(sc, tok, None, None, None, 5000.0, deck_ids=[body])
+    board, stock, flow, lead = CB.seat_slope_terms(sc, tok, None, None, None, 5000.0, deck_ids=[body])
     assert board == pytest.approx(CB.theory_slope(tok, 5000.0))
     assert stock == 0.0                                              # `cards` が無ければ在庫は数えられない
     assert flow == pytest.approx(DR.a_of([body], 5000.0, 10.0))
+    assert lead == pytest.approx(board)                              # 場が空ならリーダーが全部
+    tok[2, T.S_POWER], tok[2, T.S_IS_CHAR], tok[2, T.S_CAN_ATTACK] = 0.8, 1.0, 1.0
+    board2, _s, _f, lead2 = CB.seat_slope_terms(sc, tok, None, None, None, 5000.0)
+    assert lead2 == pytest.approx(lead) and board2 > lead2           # キャラのぶんはリーダーに入らない
     # 既定（`flow`）では `seat_slope_parts` の 2 つ目は流入
     assert CB.seat_slope_parts(sc, tok, None, None, None, 5000.0, deck_ids=[body])[1] == pytest.approx(flow)
 
