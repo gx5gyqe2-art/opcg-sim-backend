@@ -99,6 +99,47 @@ def test_the_hand_term_of_the_rate_is_a_flow():
         CB.set_slope_hand_mode("flow")
 
 
+def test_the_walk_can_let_the_rate_accumulate():
+    """**T94**（ユーザ指示「1で進めてください」）: 交点までの速さを**規則どおり積み上げる**。
+    盤面は毎ターン・**在庫は 2 ターン目からの段差**（召喚酔い）・**流入は進むほど積み上がる**（j で引いた札は j+1 から殴る）。"""
+    assert CB.RATE_WALK_MODE == "flat"                               # 既定は据え置き（採否はユーザ判定）
+    # 在庫も流入も無ければ一定の速さと同じ
+    assert CB.tau_grow(1.0, 0.25, 0.0, 0.0) == pytest.approx(4.0)
+    # 在庫 0.1 は 2 ターン目から: 0.25 + 0.35 + 0.35 = 0.95、残り 0.05 を 4 ターン目の 0.35 で
+    assert CB.tau_grow(1.0, 0.25, 0.1, 0.0) == pytest.approx(3.0 + 0.05 / 0.35)
+    # 流入 0.1 は (j − 1) 倍: 0.25 + 0.35 + 0.45 = 1.05 → 3 ターン目の途中
+    assert CB.tau_grow(1.0, 0.25, 0.0, 0.1) == pytest.approx(2.0 + 0.4 / 0.45)
+    # 積み上がるほうが一定より早く届く
+    assert CB.tau_grow(1.0, 0.25, 0.1, 0.1) < CB.tau_grow(1.0, 0.25, 0.0, 0.0)
+    assert CB.tau_grow(0.0, 0.25, 0.1, 0.1) == pytest.approx(0.0)    # 既に届いている
+    assert CB.tau_grow(1.0, 0.0, 0.0, 0.0) == pytest.approx(CB.RACE_CAP)   # 届かなければ打ち切り
+    # 動く的と組める（的が下がるぶん遅くなる）
+    assert CB.tau_grow(1.0, 0.25, 0.1, 0.1, 0.05) > CB.tau_grow(1.0, 0.25, 0.1, 0.1)
+    try:
+        assert CB.set_rate_walk_mode("grow") == "grow"
+        with pytest.raises(ValueError):
+            CB.set_rate_walk_mode("なにか")
+    finally:
+        CB.set_rate_walk_mode("flat")
+
+
+def test_the_three_rate_terms_are_separate_quantities():
+    """`seat_slope_terms` は `(盤面, 在庫, 流入)`。**在庫は要求したときだけ計算する**（重いので）。"""
+    import deck_refill as DR
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, T.S_POWER], tok[1, T.S_POWER] = 0.5, 0.5
+    sc = _sc(3, 4)
+    sc[T.SC_MY_DON] = 10.0
+    db = DR.db()
+    body = next(c for c in db.raw_db if DR.body_of(db.get_card(c)) and float(db.get_card(c).power) >= 6000)
+    board, stock, flow = CB.seat_slope_terms(sc, tok, None, None, None, 5000.0, deck_ids=[body])
+    assert board == pytest.approx(CB.theory_slope(tok, 5000.0))
+    assert stock == 0.0                                              # `cards` が無ければ在庫は数えられない
+    assert flow == pytest.approx(DR.a_of([body], 5000.0, 10.0))
+    # 既定（`flow`）では `seat_slope_parts` の 2 つ目は流入
+    assert CB.seat_slope_parts(sc, tok, None, None, None, 5000.0, deck_ids=[body])[1] == pytest.approx(flow)
+
+
 def test_the_blockers_of_the_rate_are_the_active_ones():
     """`opp_blockers_of` は**アクティブなブロッカーだけ**（レスト中は横取りできない・ブロッカーでない体も入らない）。"""
     tok = np.zeros((22, 24), np.float32)

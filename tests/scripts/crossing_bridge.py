@@ -331,11 +331,18 @@ def set_slope_hand_mode(mode):
     return SLOPE_HAND_MODE
 
 
-def seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None):
-    """速さを **2 つに分けて**返す（T90）: `(盤面の攻撃手, 手札の項)`。
-    **規則**——手札から出した体は**そのターンには殴れない**（召喚酔い・T84）ので、
-    交点まで歩くときは**1 ターン目は盤面だけ・2 ターン目からは両方**になる。
-    手札の項は `SLOPE_HAND_MODE` が決める（`stock`＝今出せる体の総額／`flow`＝毎ターン入ってくるぶん・T93）。"""
+def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None,
+                     want_stock=False):
+    """速さを **3 つに分けて**返す（T94）: `(盤面, 在庫, 流入)`。**規則から出る 3 つの別の量**:
+
+    * **盤面** … 今場に居る攻撃手。**毎ターン殴る**。
+    * **在庫** … 今の手札から出せる体の総額（`playable_attack_price`）。
+      出したターンは殴れない（召喚酔い・T84）ので **2 自席ターン目から毎回**殴る＝**段差**。
+      **一度きりの放出ではない**（ユーザの問い 2026-09-18「貯金はプレイした時に放出するってイメージで良い？」）。
+    * **流入** … 毎ターン引く 1 枚がもたらす体（`deck_refill.a_of`・T93）。
+      `j` ターン目に引いた札は `j+1` から殴るので、**進むほど積み上がる**（`流入 × (j − 1)`）。
+
+    `want_stock=False`（既定）なら在庫は計算しない（`hand_plan` のナップサックは重い）。"""
     sc_a = np.asarray(sc)
     blk = None
     if SLOPE_BLOCK_MODE == "on":
@@ -343,23 +350,29 @@ def seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
                               theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)
     base = theory_slope(tok_row, olp, theta, mu, blockers=blk)
     if SLOPE_MODE != "hand":
-        return base, 0.0
-    if SLOPE_HAND_MODE == "flow":
-        if not deck_ids:
-            return base, 0.0                       # デッキが引けない文脈では流入を数えない（数は `a_missing`）
+        return base, 0.0, 0.0
+    stock = 0.0
+    if (want_stock or SLOPE_HAND_MODE == "stock") and cards is not None:
+        import hand_plan as HP
+        r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
+        items = HP.hand_items(tok_row, ci_row, idx2cid, cards, olp, r)
+        stock = float(playable_attack_price(items, cards, float(sc_a[SC_MY_DON]), olp, theta, mu))
+    flow = 0.0
+    if deck_ids:
         import deck_refill as DR
-        return base, float(DR.a_of(deck_ids, olp, float(sc_a[SC_MY_DON]), theta, mu))
-    if cards is None:
-        return base, 0.0
-    import hand_plan as HP
-    r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
-    items = HP.hand_items(tok_row, ci_row, idx2cid, cards, olp, r)
-    return base, float(playable_attack_price(items, cards, float(sc_a[SC_MY_DON]), olp, theta, mu))
+        flow = float(DR.a_of(deck_ids, olp, float(sc_a[SC_MY_DON]), theta, mu))
+    return base, stock, flow
+
+
+def seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None):
+    """速さを **2 つに分けて**返す（T90）: `(盤面の攻撃手, 手札の項)`。
+    手札の項は `SLOPE_HAND_MODE` が決める（`stock`＝今出せる体の総額／**`flow`＝毎ターン入ってくるぶん**・T93）。"""
+    base, stock, flow = seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta, mu, deck_ids)
+    return base, (stock if SLOPE_HAND_MODE == "stock" else flow)
 
 
 def seat_slope(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU):
-    """その席が **1 自席ターンに積む損害**（理論）。`SLOPE_MODE=hand`（T77）なら**手札から今出せる体**の攻撃の価格も足す
-    ＝手札の**出す価値**をしきい値ではなく**速さ**に置く（T76 の読み）。"""
+    """その席が **1 自席ターンに積む損害**（理論）。`SLOPE_MODE=hand`（T77）なら手札の項も足す。"""
     a, b = seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta, mu)
     return a + b
 
@@ -412,6 +425,46 @@ def tau_net(theta, a_board, a_hand, r, cap=RACE_CAP):
     return float(cap)
 
 
+#: **交点までの速さを「積み上がる」形で歩くか**（T94・2026-09-18・ユーザ指示「1で進めてください」）。
+#: `flat`＝旧（`τ = Θ / A`＝**速さは一定**）／`grow`＝**規則どおり積み上がる**:
+#:
+#: ```
+#: j 自席ターン目の速さ  R_j = 盤面 ＋ 在庫·[j ≥ 2] ＋ 流入·(j − 1)
+#:   盤面 … 毎ターン殴る
+#:   在庫 … 今の手札の体。出したターンは殴れない（召喚酔い）ので **2 ターン目からの段差**（毎回殴る）
+#:   流入 … 毎ターン引く 1 枚（T93 の `a`）。j で引いた札は j+1 から殴るので **進むほど積み上がる**
+#: ```
+#:
+#: **新定数ゼロ**（3 つの項はどれも既に在る量）。**一定の速さでは時刻が当たらない**（T93 で確定）——
+#: 損害の輪郭は 0.001 → 0.25/ターンと加速するので、平均の速さで到着時刻を言えば必ず遅く言う。
+#: **本モードはその加速を規則から作る**（輪郭という実測の借り物を使わずに）。
+RATE_WALK_MODES = ("flat", "grow")
+RATE_WALK_MODE = "flat"
+
+
+def set_rate_walk_mode(mode):
+    global RATE_WALK_MODE
+    if mode not in RATE_WALK_MODES:
+        raise ValueError("rate walk mode は %s のどれか" % (RATE_WALK_MODES,))
+    RATE_WALK_MODE = mode
+    return RATE_WALK_MODE
+
+
+def tau_grow(theta, board, stock, flow, r=0.0, cap=RACE_CAP):
+    """**積み上がる速さ**で的に届くまでのターン数（T94）。端数はそのターンの中で比例配分する。
+    `r > 0` なら的も毎ターン `r` 下がる（T90 の動く的と組める）。届かなければ `cap`。"""
+    theta = float(theta); r = max(0.0, float(r))
+    f = 0.0
+    for j in range(1, int(cap) + 1):
+        add = float(board) + (float(stock) if j >= 2 else 0.0) + float(flow) * max(0, j - 1)
+        need = theta + r * j
+        if f + add >= need:
+            short = max(0.0, need - f)
+            return float(j - 1) + (short / add if add > SLOPE_FLOOR else 1.0)
+        f += add
+    return float(cap)
+
+
 def harm_of(p):
     """実現の部品（`attack_response.parts`）のうち**相手に与えた損害**だけ（相手ライフ・相手手札・相手の体）。"""
     return float(p["opp_life"] + p["opp_hand"] + p["opp_body"])
@@ -444,6 +497,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "race": RACE_MODE,
              "r_deck_n": 0, "r_deck_sum": 0.0, "r_deck_missing": 0,
              "slope_hand": SLOPE_HAND_MODE, "a_flow_n": 0, "a_flow_sum": 0.0, "a_flow_missing": 0,
+             "rate_walk": RATE_WALK_MODE, "stock_n": 0, "stock_sum": 0.0,
              "g_sum": 0.0, "g_n": 0, "g_fallback": 0,
              "g_win_sum": 0.0, "g_win_n": 0, "g_lose_sum": 0.0, "g_lose_n": 0}
     games = 0
@@ -564,15 +618,21 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 dk = (seat_decks.get(seed_g) or (None, None))[w] if seat_decks else None
                 if SLOPE_HAND_MODE == "flow" and not dk:
                     stats["a_flow_missing"] += 1
-                s_board, s_hand = seat_slope_parts(sc, tok, _ci, idx2cid, cards, olp, theta, mu,
-                                                   deck_ids=dk)                                     # T77／T90／T93
+                s_board, s_stock, s_flow = seat_slope_terms(sc, tok, _ci, idx2cid, cards, olp, theta, mu,
+                                                            deck_ids=dk,
+                                                            want_stock=(RATE_WALK_MODE == "grow"))  # T77／T90／T93／T94
+                s_hand = s_stock if SLOPE_HAND_MODE == "stock" else s_flow
                 if SLOPE_HAND_MODE == "flow":
                     stats["a_flow_n"] += 1; stats["a_flow_sum"] += float(s_hand)
+                if RATE_WALK_MODE == "grow":
+                    stats["stock_n"] += 1; stats["stock_sum"] += float(s_stock)
                 slope_theory = s_board + s_hand
                 per_seat[(w, t)] = {"theta": th_w, "slope_hist": slope_hist, "slope_theory": slope_theory,
                                     # **T90**: 速さを 2 つに分けて持つ（1 ターン目は盤面だけ）と、
                                     # **相手の補充 `r`**＝`Θ` の手札項と同じ 1 枚あたりの価格（引き 1 枚ぶん）
                                     "slope_board": s_board, "slope_hand": s_hand,
+                                    # **T94**: 積み上がる歩きに要る 3 つ目（在庫・段差）
+                                    "slope_stock": s_stock, "slope_flow": s_flow,
                                     "r_opp": r_opp_of(1 - w, t),
                                     "f_real": f_real, "t_left": len(ts) - j, "j": j}
                 turn_harm.append({"j": j, "harm": harm.get((w, t), 0.0), "slope_theory": slope_theory})
@@ -605,11 +665,23 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                        "theta_me": me["theta"], "theta_opp": op["theta"], "j_me": me["j"], "j_opp": op["j"],
                        "slope_theory_me": me["slope_theory"], "slope_theory_opp": op["slope_theory"],
                        # **T90**: それぞれが殴っている相手の補充（`Θ` の手札項と同じ 1 枚あたりの価格）
-                       "r_opp_me": me.get("r_opp"), "r_opp_opp": op.get("r_opp")}
+                       "r_opp_me": me.get("r_opp"), "r_opp_opp": op.get("r_opp"),
+                       # **T94**: 積み上がる歩きの 3 項（`grow` のときだけ使う）
+                       "stock_me": me.get("slope_stock"), "stock_opp": op.get("slope_stock"),
+                       "flow_me": me.get("slope_flow"), "flow_opp": op.get("slope_flow"),
+                       "board_me": me.get("slope_board"), "board_opp": op.get("slope_board")}
                 for sv in SLOPES:
                     s_me = me["slope_" + sv] if me["slope_" + sv] is not None else me["slope_theory"]
                     s_op = op["slope_" + sv] if op["slope_" + sv] is not None else op["slope_theory"]
-                    if RACE_MODE in ("net", "deck") and sv == "theory":
+                    if RATE_WALK_MODE == "grow" and sv == "theory":
+                        # **T94**: 積み上がる速さで歩く（盤面 ＋ 在庫の段差 ＋ 流入の積み上がり）。
+                        # 動く的（`net`／`deck`）と組めるよう `r` も渡す。
+                        rm = me["r_opp"] if RACE_MODE in ("net", "deck") else 0.0
+                        ro = op["r_opp"] if RACE_MODE in ("net", "deck") else 0.0
+                        tau_me = tau_grow(me["theta"], me["slope_board"], me["slope_stock"], me["slope_flow"], rm)
+                        tau_opp = tau_grow(op["theta"], op["slope_board"], op["slope_stock"], op["slope_flow"], ro)
+                        pred = tau_me <= tau_opp
+                    elif RACE_MODE in ("net", "deck") and sv == "theory":
                         # **T90**: 動く的との競争（1 ターン目は盤面だけ・的は毎ターン `r` 下がる）
                         tau_me = tau_net(me["theta"], me["slope_board"], me["slope_hand"], me["r_opp"])
                         tau_opp = tau_net(op["theta"], op["slope_board"], op["slope_hand"], op["r_opp"])
@@ -740,6 +812,9 @@ def main(argv=None):
                     help="**T90** 交点の解き方: `static`（旧・`τ = Θ/A`＝的は動かない）／"
                          "`net`（動く的＝1 ターン目は盤面だけ・的は毎ターン相手の補充 `r` だけ下がる・`r` は帳簿の `g`）／"
                          "`deck`（**T91** 同じ動く的で `r` を**規則とデッキの中身だけ**から出す＝`μ ×`切れる札の割合）")
+    ap.add_argument("--rate-walk", default=RATE_WALK_MODE, choices=RATE_WALK_MODES,
+                    help="**T94** 交点までの速さ: `flat`（旧・一定）／"
+                         "`grow`（規則どおり積み上がる＝盤面 ＋ 在庫·[j≥2] ＋ 流入·(j−1)）")
     ap.add_argument("--slope-hand", default=SLOPE_HAND_MODE, choices=SLOPE_HAND_MODES,
                     help="**T93** 速さの手札の項: `stock`（旧・今のドンで出せる体の総額＝在庫）／"
                          "**`flow`（既定**・毎ターン入ってくるぶん＝そのデッキの平均・`deck_refill.a_of`）")
@@ -760,6 +835,7 @@ def main(argv=None):
     set_slope_mode(a.slope_mode)
     set_slope_block_mode(a.slope_block)
     set_slope_hand_mode(a.slope_hand)
+    set_rate_walk_mode(a.rate_walk)
     set_theta_body_mode(a.theta_body)
     set_race_mode(a.race)
     rows_out, ledger, stats, turn_harm = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
