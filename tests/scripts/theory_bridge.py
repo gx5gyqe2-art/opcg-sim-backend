@@ -146,6 +146,29 @@ LAST_TURN_MODE = "keep"
 #: **ずらすのは「効き始めるのが次の自席ターンからの体」だけ**＝**速攻は今から効く**・
 #: **ブロッカーは相手の次のターンから守れる**（横取りは攻撃ではないので召喚酔いに当たらない）・
 #: イベント／ステージは効果がその場で解決する＝どれも `now` のまま。**新定数ゼロ**（規則だけ）。
+#: **ドン付与の帳簿価格**（T85・2026-09-18）。`increment`＝従来（付与の行で `attach_value` の増分を計上）／
+#: **`in_attack`＝付与の行は 0**（増分は**その体が殴る行の価格に既に入っている**ので、同じ移転を 1 回だけ数える）。
+#: **根拠は記録**（2026-09-18 実測・実デッキ 8 ファイル）——攻撃は全部 `DON_BOX`（対象付き）の形で来て、
+#: 価格の元になる `slot_power` は**自席のターンには付与ドンを載せたパワー**になっている。
+#: 攻撃の行 2,071 のうち **521（25%）が既に付与ドンの乗った体で殴っており**、他の増強が混ざらない行では
+#: **102 件がパワー = 印字 + 1000k**（＝増分が攻撃の価格に入っている）・**入っていないのは 3 件**だけだった。
+#: ＝**付与の行と攻撃の行で同じ +1000k を 2 回数えている**。T62 で守りの窓について直したのと同じ型の誤りで、
+#: 零和の帳簿では**同じ移転は 1 回**（払われた所＝攻撃の行）で数える。**新定数ゼロ**。
+#: **決める価格 `s` は増分のまま**（T58 の分離: 決めるのは `option`・数えるのは `exercise`）——
+#: 付与は打つ価値のある手で、`s` を 0 にすると理論が「ドンを付けるな」と言い出す。
+#: 体が殴らずに終われば（ドンはターン終了で戻る）**損害は実現していない**ので 0 が正しい。
+ATTACH_LEDGER_MODES = ("increment", "in_attack")
+ATTACH_LEDGER_MODE = "increment"
+
+
+def set_attach_ledger_mode(mode):
+    global ATTACH_LEDGER_MODE
+    if mode not in ATTACH_LEDGER_MODES:
+        raise ValueError("attach ledger mode は %s のどれか" % (ATTACH_LEDGER_MODES,))
+    ATTACH_LEDGER_MODE = mode
+    return ATTACH_LEDGER_MODE
+
+
 PLAY_BOOK_MODES = ("now", "next")
 #: **既定は `next`**（2026-09-18・ユーザ決定「規定にして」・T84）——規則が「登場したターンの体は何もできない」と言うので、
 #: 出したターンに計上するのは**帳簿の付け間違い**。局所の恒等式の相関が 0.388 → 0.535（実）／0.432 → 0.554（合成）・
@@ -442,6 +465,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
              "theta_body": __import__("crossing_bridge").THETA_BODY_MODE,
              # **T84**: 出した体の価格を効き始めるターンに計上するか
              "play_book": PLAY_BOOK_MODE, "play_deferred": 0, "play_deferred_dropped": 0,
+             # **T85**: 付与の帳簿価格の規約と、0 にした行の数
+             "attach_ledger": ATTACH_LEDGER_MODE, "attach_zeroed": 0,
              # **T58**: 決める価格（`s`）と数える価格（`g`）の規約・読み直した行の数
              "flow_pricing": EV.FLOW_PRICING, "ledger_pricing": ledger_pricing, "ledger_rescored": 0,
              # **T62**: 守りの窓の定義と、自ライフごとの内訳（受けた率・理論が受けろと言う率・`g` の平均）
@@ -568,6 +593,12 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 g_v = ledger_value(lambda: _score(b + ch), played_v, ledger_pricing)
                 if g_v != played_v:
                     stats["ledger_rescored"] += 1          # 規約で値が動いた行（付与・流れの行）だけ数える
+                # **T85**: 付与の増分は殴る行の価格に入っているので、帳簿では付与の行を 0 にする（移転は 1 回）
+                if ATTACH_LEDGER_MODE == "in_attack" \
+                        and move_family(json.loads(pol["pol_sig"][b + ch])) == "attach":
+                    if abs(float(g_v)) > 0.0:
+                        stats["attach_zeroed"] = stats.get("attach_zeroed", 0) + 1
+                    g_v = 0.0
                 g_row = float(g_v) * kap
                 s_row = (float(played_v) - max(scored)) * kap
                 # **T80**: 区間の恒等式のために**生の価格**（`κ` を掛けない）と `D` を席 0 の視点で積む
@@ -960,6 +991,9 @@ def main(argv=None):
     ap.add_argument("--theta-body", default=_CB.THETA_BODY_MODE, choices=_CB.THETA_BODY_MODES,
                     help="耐久の体の項（`--w-mode curve` の `D` に効く）: `blockers`（既定）／`all`（全キャラ・T82）／"
                          "`attackable`（レストの体 ＋ アクティブなブロッカー＝規則から出る形・T83）")
+    ap.add_argument("--attach-ledger", default=ATTACH_LEDGER_MODE, choices=ATTACH_LEDGER_MODES,
+                    help="**T85** ドン付与の帳簿価格: `increment`（旧・付与の行で増分を計上）／"
+                         "`in_attack`（付与の行は 0＝増分は殴る行の価格に入っている。決める価格 `s` は増分のまま）")
     ap.add_argument("--play-book", default=PLAY_BOOK_MODE, choices=PLAY_BOOK_MODES,
                     help="**T84** 出した体の価格の計上時点: `next`（既定・効き始める次の自席ターン＝召喚酔い。"
                          "速攻・ブロッカー・イベント／ステージは据え置き）／`now`（旧・出したターンに満額）")
@@ -976,6 +1010,7 @@ def main(argv=None):
     _CB.set_theta_hand_mode(a.theta_hand)
     set_last_turn_mode(a.last_turn)
     set_play_book_mode(a.play_book)
+    set_attach_ledger_mode(a.attach_ledger)
     _CB.set_theta_body_mode(a.theta_body)
     _TOM.set_clock_hand_mode(a.clock_hand)
 
