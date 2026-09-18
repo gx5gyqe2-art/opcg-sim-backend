@@ -416,3 +416,31 @@ def test_the_attach_is_counted_once_in_the_ledger():
     finally:
         B.set_attach_ledger_mode("in_attack")
     assert B.ATTACH_LEDGER_MODE == "in_attack"
+
+
+def test_the_guard_window_can_be_priced_against_every_attack_of_the_turn():
+    """**T86**: 守りの窓の「攻め手の価格」は `max_attack`（旧・そのターン最大の攻撃 1 本）か
+    **`all_attacks`**（そのターンに相手が打った攻撃の価格の和＝帳簿の攻めの行と同じ数）。
+    旧は `actual`（`spent`＝窓の間に消えた札の総額＝**全部の攻撃への支払い**）と釣り合っておらず、
+    **攻め手の行が既に数えた移転を守り側でもう一度数えていた**（記録: 攻撃のあったターンの 73%／67% が 2 本以上）。"""
+    assert B.GUARD_PRICE_MODE == "max_attack"          # 既定は旧のまま（採否はユーザ判定）
+    try:
+        assert B.set_guard_price_mode("all_attacks") == "all_attacks"
+        with pytest.raises(ValueError):
+            B.set_guard_price_mode("なにか")
+    finally:
+        B.set_guard_price_mode("max_attack")
+    # 切り出した確定処理（T86）: `g` は `price − actual`・帯と型に同じ値が入る
+    kn, stats, rec = {}, {"grd_rows": 0, "grd_by_life": {}, "grd_comfortable": 0}, {}
+    seen = []
+    got = {"g": 0.25, "g_paid": -0.5, "g_delta": 0.25, "price": 0.75, "s": -0.1,
+           "theory_says": "take", "can_guard": True, "comfortable": False}
+    B._finish_guard(got, "take", 3.0, 1.0, "close", 2.0, 0, 4, rec, kn, stats,
+                    lambda *a, **k: seen.append((a, k)))
+    assert stats["grd_rows"] == 1 and stats["grd_by_life"]["3"]["n"] == 1
+    assert stats["grd_by_life"]["3"]["g_delta"] == pytest.approx(0.25)
+    assert kn[4]["g0"] == pytest.approx(0.25) and kn[4]["g_fam"]["guard"] == pytest.approx(0.25)
+    assert seen and seen[0][1]["g"] == pytest.approx(0.5)        # `κ = 2` を掛けた値が帯に入る
+    kn2, stats2 = {}, {"grd_rows": 0, "grd_by_life": {}, "grd_comfortable": 0}
+    B._finish_guard(got, "take", 3.0, 1.0, "close", 1.0, 1, 5, rec, kn2, stats2, lambda *a, **k: None)
+    assert kn2[5]["g0"] == pytest.approx(-0.25)                  # 席 1 は符号が反転する
