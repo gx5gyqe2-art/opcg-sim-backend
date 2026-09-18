@@ -147,7 +147,11 @@ LAST_TURN_MODE = "keep"
 #: **ブロッカーは相手の次のターンから守れる**（横取りは攻撃ではないので召喚酔いに当たらない）・
 #: イベント／ステージは効果がその場で解決する＝どれも `now` のまま。**新定数ゼロ**（規則だけ）。
 PLAY_BOOK_MODES = ("now", "next")
-PLAY_BOOK_MODE = "now"
+#: **既定は `next`**（2026-09-18・ユーザ決定「規定にして」・T84）——規則が「登場したターンの体は何もできない」と言うので、
+#: 出したターンに計上するのは**帳簿の付け間違い**。局所の恒等式の相関が 0.388 → 0.535（実）／0.432 → 0.554（合成）・
+#: 出す手 0.081 → 0.427／0.029 → 0.344・攻撃の `κ = 1.05／1.12` は不変。**価格そのものは変えていない**（計上時点だけ）ので
+#: `ΔG`・`ΔS`・交点の橋は動かない。以前の数字と比べるときは `--play-book now`。
+PLAY_BOOK_MODE = "next"
 
 
 def set_play_book_mode(mode):
@@ -957,8 +961,8 @@ def main(argv=None):
                     help="耐久の体の項（`--w-mode curve` の `D` に効く）: `blockers`（既定）／`all`（全キャラ・T82）／"
                          "`attackable`（レストの体 ＋ アクティブなブロッカー＝規則から出る形・T83）")
     ap.add_argument("--play-book", default=PLAY_BOOK_MODE, choices=PLAY_BOOK_MODES,
-                    help="**T84** 出した体の価格の計上時点: `now`（旧・出したターン）／"
-                         "`next`（効き始める次の自席ターン＝召喚酔い。速攻・ブロッカー・イベント／ステージは `now` のまま）")
+                    help="**T84** 出した体の価格の計上時点: `next`（既定・効き始める次の自席ターン＝召喚酔い。"
+                         "速攻・ブロッカー・イベント／ステージは据え置き）／`now`（旧・出したターンに満額）")
     ap.add_argument("--last-turn", default=LAST_TURN_MODE, choices=LAST_TURN_MODES,
                     help="**T80 の診断** `drop` なら局の最後のターンの行を落とす（とどめの一撃とその応答を外す）")
     ap.add_argument("--boot-reps", type=int, default=200)

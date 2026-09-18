@@ -390,11 +390,12 @@ def test_a_played_body_is_booked_when_it_starts_working():
     assert B.play_starts_next_turn(None, cards) is False
     assert B.play_starts_next_turn("plain", None) is False         # カード表が無ければ繰り延べない
     before = B.PLAY_BOOK_MODE
+    assert before == "next"                                        # **既定は規則どおりの計上時点**（ユーザ決定 2026-09-18）
     try:
-        assert B.set_play_book_mode("next") == "next"
+        assert B.set_play_book_mode("now") == "now"                # 旧の計上時点にも戻せる（以前の数字と比べるとき）
         with pytest.raises(ValueError):
             B.set_play_book_mode("なにか")
-        assert B.PLAY_BOOK_MODE == "next"
+        assert B.PLAY_BOOK_MODE == "now"
     finally:
         B.set_play_book_mode(before)
-    assert B.PLAY_BOOK_MODE == "now"                               # 既定は旧のまま（採否はユーザ判定）
+    assert B.PLAY_BOOK_MODE == "next"
