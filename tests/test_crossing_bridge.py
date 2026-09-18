@@ -861,3 +861,27 @@ def test_the_hand_blocker_is_read_from_the_rules_not_the_play():
         assert CB.hand_blocker_nu(sc, None, None, None, None, 5000.0) == pytest.approx(0.0)
     finally:
         del sys.modules["hand_plan"]
+
+
+def test_the_rate_check_can_drop_the_killing_turn():
+    """**T107**: 速さの検算を**終わりからの距離**でも読み、**とどめのターンを外した**形も出す。
+    **勝った席の最後の自席ターンは必要なだけ削って終わる**ので、そのターンだけ
+    「盤面の大きさ」と「実際に出した損害」が構造的にずれる（`A` の誤りではない）。"""
+    turn_harm = []
+    for j in range(3):
+        # とどめのターン（残り 1）は損害が小さい＝比が大きく出る
+        turn_harm += [{"j": j, "harm": 0.05, "slope_theory": 0.20, "priced": 0.04,
+                       "t_left": 1, "won": True}] * 30
+        # それ以外のターンは比 1
+        turn_harm += [{"j": j, "harm": 0.20, "slope_theory": 0.20, "priced": 0.16,
+                       "t_left": 3, "won": True}] * 30
+    hp = CB.summarise([], [], turn_harm)["harm_profile"]
+    # 全行だと比は 1 より大きく出る（とどめのターンが混ざるので）
+    assert hp["ratio_by_turn"][0] > 1.0
+    # **とどめを外すと 1 に戻る**＝ずれの正体はそのターンだった、と読める
+    assert hp["excl_last_turn"]["ratio_by_turn"][0] == pytest.approx(1.0)
+    assert hp["excl_last_turn"]["n"] == 90
+    # 終わりからの距離でも読める
+    assert hp["by_turns_left"]["1"]["n"] == 90 and hp["by_turns_left"]["1"]["ratio"] > 1.0
+    assert hp["by_turns_left"]["3"]["ratio"] == pytest.approx(1.0)
+    assert hp["by_turns_left"]["3"]["attack_share"] == pytest.approx(0.8)

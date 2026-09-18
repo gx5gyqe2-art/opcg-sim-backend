@@ -1215,7 +1215,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 turn_harm.append({"j": j, "harm": harm.get((w, t), 0.0), "slope_theory": slope_theory,
                                   # **T103**: そのターンの損害のうち**攻撃の価格が説明する分**
                                   # （`priced` は攻撃の手だけ・`harm` は全部の手）＝**残りは効果が出した損害**。
-                                  "priced": priced.get((w, t), 0.0)})
+                                  "priced": priced.get((w, t), 0.0),
+                                  # **T107**: 速さの検算を**終わりからの距離**でも読むための 2 つ
+                                  # （`j` は始まりからの距離・**長引いた局は攻め手が上手く行っていない局**なので
+                                  #  `j` の大きいところは標本が偏る）。
+                                  "t_left": len(ts) - j, "won": bool(z_of.get(w, 0.0) > 0.5)})
                 f_real += harm.get((w, t), 0.0)
             won = z_of[w] > 0.5
             if won and ts:
@@ -1362,6 +1366,42 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
                                                  for t, h in zip(prof_th, prof)],
                                "cum_harm_by_turn": [round(float(x), 4) for x in np.cumsum(prof)],
                                "cum_theory_by_turn": [round(float(x), 4) for x in np.cumsum(prof_th)]}
+        # **T107**: 同じ検算を**終わりからの距離**（残りターン）で読む。`j`（始まりからの距離）で
+        # 見ると **7 ターン目以降は「まだ終わっていない局」しか標本に無い**＝攻め手が上手く行っていない局に偏る。
+        # **残りターンで揃えれば、その偏りは消える**（どの局も終わりは 1 回だけ持つ）。
+        if any("t_left" in r for r in turn_harm):
+            by_left, by_out = {}, {}
+            for r in turn_harm:
+                tl = int(r.get("t_left") or 0)
+                by_left.setdefault(str(tl) if tl <= 5 else "6+", []).append(r)
+                if int(r["j"]) >= 6:                       # 自席ターン 7 目以降（0 始まり）
+                    by_out.setdefault("win" if r.get("won") else "lose", []).append(r)
+
+            def _ratio(g):
+                h = float(np.mean([x["harm"] for x in g])); t = float(np.mean([x["slope_theory"] for x in g]))
+                pr = float(np.mean([x.get("priced", 0.0) for x in g]))
+                return {"n": len(g), "harm": round(h, 4), "theory": round(t, 4), "priced": round(pr, 4),
+                        "ratio": round(t / h, 3) if h > 1e-9 else None,
+                        "attack_share": round(pr / h, 3) if h > 1e-9 else None}
+            out["harm_profile"]["by_turns_left"] = {
+                k: _ratio(g) for k, g in sorted(by_left.items(), key=lambda kv: (kv[0] == "6+", kv[0]))}
+            if by_out:
+                out["harm_profile"]["late_by_outcome"] = {k: _ratio(g) for k, g in sorted(by_out.items())}
+            # **T107**: **とどめのターンを外した**同じ検算。勝った席の最後の自席ターンは
+            # **必要なだけ削って終わる**（相手のライフが 1 なら 1 本で終わる）ので、
+            # **そのターンだけ「盤面の大きさ」と「実際に出した損害」が構造的にずれる**。
+            # `A` の誤りなのか、**最後のターンが途中で終わるから**なのかを分ける。
+            excl = [r for r in turn_harm if int(r.get("t_left") or 0) >= 2]
+            if excl:
+                pr_x, th_x = harm_profile(excl), harm_profile(excl, key="priced")
+                out["harm_profile"]["excl_last_turn"] = {
+                    "n": len(excl),
+                    "harm_by_turn": [round(x, 4) for x in pr_x[0]],
+                    "theory_slope_by_turn": [round(x, 4) for x in pr_x[1]],
+                    "ratio_by_turn": [round(t / h, 3) if h > 1e-9 else None
+                                      for t, h in zip(pr_x[1], pr_x[0])],
+                    "attack_share_by_turn": [round(p / h, 3) if h > 1e-9 else None
+                                             for p, h in zip(th_x[1], pr_x[0])]}
         # 輪郭の変種: `curve`＝平均の輪郭のまま／`curve_scaled`＝今の盤面の理論の傾きで輪郭を伸縮
         for r in rows_out:
             for sv, scale_me, scale_op in (
