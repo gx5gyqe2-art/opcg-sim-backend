@@ -80,6 +80,19 @@ def test_w_bar_comes_from_the_measurement_too():
     assert CB.w_bar_for([], "cross") is None      # 記録の種類が判らなければ引かない
 
 
+def test_every_hand_mode_has_a_price_source():
+    """**T99 で踏んだ穴**: 手札項の数え方を足したのに `part` の対応表に入れ忘れると、
+    `crossing_bridge` は `KeyError` で落ち、`theory_bridge` は `.get` が `None` を返して**黙って `μ` に落ちていた**。
+    **全モードが表に在ること**と、**知らない名前は落ちること**を押さえる。"""
+    import theory_bridge as TB  # noqa: F401  （同じ表を使うことの確認）
+    for m in CB.THETA_HAND_MODES:
+        assert m in CB.THETA_HAND_PART
+    assert CB.THETA_HAND_PART["count"] is None                       # `count` は `μ`
+    assert CB.THETA_HAND_PART["cuttable_cx"] == "cuttable"           # 1 枚あたりの価格は同じ
+    with pytest.raises(KeyError):
+        CB.THETA_HAND_PART["なにか"]
+
+
 def test_the_hand_absorbs_in_whole_guards():
     """**T99**（ユーザ指示「1から進めてください」）: 切れる札は **`c(x)` 枚ひと組**でしか働かない。
     規則は「攻撃側のパワー ≥ 対象のパワー」で命中するので、超過 `x` を止めるには `c(x)` 枚要る（`c_of`）＝

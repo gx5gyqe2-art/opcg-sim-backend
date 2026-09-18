@@ -77,6 +77,14 @@ THETA_HAND_MODES = ("count", "quality", "play", "guard", "cuttable", "cuttable_c
 THETA_HAND_MODE = "cuttable"
 
 
+#: **1 枚あたりの価格の出どころ**（`hand_price_mean` の `part`）。`count` は `None`（＝`μ`）。
+#: **`cuttable_cx` は 1 枚あたりの価格そのものは `cuttable` と同じ**（`c(x)` のひと組み化は `threshold_parts` の側でやる）。
+#: **知らない名前は `KeyError` で落とす**——黙って別の値で走らないため（T99 でこの穴を踏んだ）。
+THETA_HAND_PART = {"count": None, "quality": "dtotal", "play": "dh", "guard": "dg",
+                   "cuttable": "cuttable", "cuttable_cx": "cuttable"}
+
+
+
 def set_theta_hand_mode(mode):
     global THETA_HAND_MODE
     if mode not in THETA_HAND_MODES:
@@ -773,7 +781,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         # **T76**: 席ごとの手札 1 枚あたりの価格（自席の行からしか読めない）。守る席の直近の自席ターン開始の値を耐久に使う。
         g_self = {}
         if THETA_HAND_MODE != "count":
-            part = {"quality": "dtotal", "play": "dh", "guard": "dg", "cuttable": "cuttable"}[THETA_HAND_MODE]
+            part = THETA_HAND_PART[THETA_HAND_MODE]
             for w in (0, 1):
                 for t in turn_seq[w]:
                     sc, tok, ci = turn_last.get((w, t), turn_start[(w, t)])   # 出した後の手札（ターン最後の行）

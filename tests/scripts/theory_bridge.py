@@ -401,15 +401,15 @@ def _kappa_of_row(sc, tok, t, prof=None, g_me=None, g_opp=None, opp=None):
                         opp_tok=(None if opp is None else opp["tok"]))
 
 
-#: 耐久の手札項の数え方 → `crossing_bridge.hand_price_mean` の `part`（`count` は `None`＝`μ`）
-_THETA_HAND_PART = {"quality": "dtotal", "play": "dh", "guard": "dg", "cuttable": "cuttable"}
+#: 耐久の手札項の数え方 → `crossing_bridge.hand_price_mean` の `part`（正本は `crossing_bridge.THETA_HAND_PART`）。
+#: **知らない名前は `KeyError` で落とす**——旧い `.get(...)` は `None` を返して**黙って `μ` に落ちていた**（T99 で踏んだ）。
 
 
 def _g_of_row(sc, tok, ci_row, idx2cid, cards, cache, key):
     """**T76／T79**: **その行の席の**手札 1 枚あたりの価格（`crossing_bridge.hand_price_mean`）。
     `W_MODE=curve` のときだけ計算し、`key`（席とターン）で使い回す。`THETA_HAND_MODE=count` なら `None`（＝`μ`）。"""
     import crossing_bridge as CB
-    part = _THETA_HAND_PART.get(CB.THETA_HAND_MODE)
+    part = CB.THETA_HAND_PART[CB.THETA_HAND_MODE]
     if _TO_W_MODE() != "curve" or part is None:
         return None
     if key not in cache:
