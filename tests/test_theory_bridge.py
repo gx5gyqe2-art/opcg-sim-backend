@@ -461,10 +461,10 @@ def test_the_ledger_can_be_written_in_what_was_actually_lost():
     import crossing_bridge as CB
     from attack_response import parts
     assert B.realised_harm(sc, tok, sc2, tok2) == pytest.approx(CB.harm_of(parts(sc, tok, sc2, tok2)))
-    assert B.LEDGER_HARM_MODE == "price"                                    # 既定は旧（採否はユーザ判定）
+    assert B.LEDGER_HARM_MODE == "realised"     # **既定は実現**（ユーザ決定 2026-09-18・`exercise` の規約どおり）
     try:
-        assert B.set_ledger_harm_mode("realised") == "realised"
+        assert B.set_ledger_harm_mode("price") == "price"                   # 旧の規約にも戻せる（比較用）
         with pytest.raises(ValueError):
             B.set_ledger_harm_mode("なにか")
     finally:
-        B.set_ledger_harm_mode("price")
+        B.set_ledger_harm_mode("realised")

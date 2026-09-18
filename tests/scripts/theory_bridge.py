@@ -174,7 +174,13 @@ LAST_TURN_MODE = "keep"
 #: **決める価格 `s` は理論の価格のまま**（T58 の分離・`s` は「その局面で最善だったか」を測るので実現では書けない）。
 #: **新定数ゼロ**（`λ`・`μ`・`ν_meas` の写しで実現を数えるだけ）。
 LEDGER_HARM_MODES = ("price", "realised")
-LEDGER_HARM_MODE = "price"
+#: **既定は `realised`**（2026-09-18・ユーザ決定「規定は正しいものにしてください」・T87）——**理論的に正しいのはこれ**:
+#:   * **T58 の規約**（ユーザ決定）「決めるのは `option`・**数えるのは `exercise`**」＝帳簿は**起きたことを数える**。
+#:   * **§0.1 の整合**: 帳簿が交点の橋の `F` と**同じ式**になる（同じものに同じ値段）。
+#:   * **零和**: 実現の損害は**相手が実際に失った額そのもの**なので零和が定義から成り立つ（価格では成り立たない）。
+#: **数字は一長一短**（恒等式は改善・順序付けは悪化）だが、**T82 → T83 と同じ判断**——規則・規約から出る形を採り、
+#: 見かけの良い数字で選ばない。以前の数字と比べるときは `--ledger-harm price`。
+LEDGER_HARM_MODE = "realised"
 
 
 def set_ledger_harm_mode(mode):
@@ -1117,8 +1123,8 @@ def main(argv=None):
                     help="耐久の体の項（`--w-mode curve` の `D` に効く）: `blockers`（既定）／`all`（全キャラ・T82）／"
                          "`attackable`（レストの体 ＋ アクティブなブロッカー＝規則から出る形・T83）")
     ap.add_argument("--ledger-harm", default=LEDGER_HARM_MODE, choices=LEDGER_HARM_MODES,
-                    help="**T87** 帳簿の書き方: `price`（旧・理論の価格）／"
-                         "`realised`（攻めの行は実際に相手が失った額・守りの窓の `g` は 0＝移転は 1 回。`s` は価格のまま）")
+                    help="**T87** 帳簿の書き方: `realised`（既定・攻めの行は実際に相手が失った額・守りの窓の `g` は 0＝移転は 1 回。"
+                         "`s` は価格のまま）／`price`（旧・理論の価格）")
     ap.add_argument("--guard-price", default=GUARD_PRICE_MODE, choices=GUARD_PRICE_MODES,
                     help="**T86** 守りの窓の攻め手の価格: `max_attack`（旧・そのターン最大の攻撃 1 本）／"
                          "`all_attacks`（そのターンに相手が打った攻撃の価格の和＝攻めの行と同じ数）")
