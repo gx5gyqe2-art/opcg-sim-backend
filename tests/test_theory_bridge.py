@@ -444,3 +444,27 @@ def test_the_guard_window_can_be_priced_against_every_attack_of_the_turn():
     kn2, stats2 = {}, {"grd_rows": 0, "grd_by_life": {}, "grd_comfortable": 0}
     B._finish_guard(got, "take", 3.0, 1.0, "close", 1.0, 1, 5, rec, kn2, stats2, lambda *a, **k: None)
     assert kn2[5]["g0"] == pytest.approx(-0.25)                  # 席 1 は符号が反転する
+
+
+def test_the_ledger_can_be_written_in_what_was_actually_lost():
+    """**T87**（T86 の結論）: 帳簿を**実際に失われた額**で書く切替。`realised_harm` は
+    `attack_response.parts` の相手ライフ・相手手札・相手の体の和＝**交点の橋が `F` を積むのに使う式と同じ**
+    （`crossing_bridge.harm_of`）。ライフ 1 枚 ＋ 手札 1 枚なら `λ + μ` ちょうど。"""
+    import numpy as np
+    import theory_order as T
+    sc, sc2 = np.zeros(70, np.float32), np.zeros(70, np.float32)
+    sc[T.SC_OPP_LIFE], sc2[T.SC_OPP_LIFE] = 4, 3
+    sc[T.SC_OPP_HAND], sc2[T.SC_OPP_HAND] = 5, 4
+    tok, tok2 = np.zeros((22, 24), np.float32), np.zeros((22, 24), np.float32)
+    assert B.realised_harm(sc, tok, sc2, tok2) == pytest.approx(T.LAM + T.MU)
+    assert B.realised_harm(sc, tok, sc, tok) == pytest.approx(0.0)          # 何も失っていなければ 0
+    import crossing_bridge as CB
+    from attack_response import parts
+    assert B.realised_harm(sc, tok, sc2, tok2) == pytest.approx(CB.harm_of(parts(sc, tok, sc2, tok2)))
+    assert B.LEDGER_HARM_MODE == "price"                                    # 既定は旧（採否はユーザ判定）
+    try:
+        assert B.set_ledger_harm_mode("realised") == "realised"
+        with pytest.raises(ValueError):
+            B.set_ledger_harm_mode("なにか")
+    finally:
+        B.set_ledger_harm_mode("price")

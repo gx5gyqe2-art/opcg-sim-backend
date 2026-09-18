@@ -121,7 +121,10 @@ MARGIN_COMFORT = 2000.0
 #: `paid`＝従来＝**−実際に払った額**（守れば `c(x)·μ`・受ければ `Θ·μ`）／`delta`＝**攻め手の価格 − 実際に払った額**
 #: （攻め手の価格＝`min(c(x)·μ, Θ·μ)`＝相手が最安の応答をしたときに失う額）。零和なので同じ移転は攻め手の行で 1 回だけ数え、
 #: 受け手の行には見積もりとの差分だけを載せる（`paid` は同じ移転を両席で二重に数え、払える席ほど損に見えた＝守り側の `ΔG` が反対向き）。
-GUARD_G_MODES = ("paid", "delta")
+#: **T87**: `zero`＝**守りの窓は帳簿に何も足さない**（移転は攻め手の行に 1 回・窓は `s` 専任）。
+#: `realised`（帳簿ぜんたいを実現で書く）と違い、**攻めの側は理論の価格のまま**＝
+#: 「二重計上だけを止めたら何が起きるか」を分けて測るための第 3 の形（T86 で守り側が主犯と分かったので）。
+GUARD_G_MODES = ("paid", "delta", "zero")
 GUARD_G_MODE = "delta"
 #: **守りの窓で「払った額」をどう読むか**（T64・2026-09-16）。`formula`＝式の費用（守れば `c(x)·μ`・受ければ `Θ·μ`）／
 #: `spent`＝**実際に手札から消えた札の価値の和**（`hand_spend.use_value`・切った札の機会費用）＋ 受けたなら `Θ·μ`。
@@ -160,6 +163,36 @@ LAST_TURN_MODE = "keep"
 #: **決める価格 `s` は増分のまま**（T58 の分離: 決めるのは `option`・数えるのは `exercise`）——
 #: 付与は打つ価値のある手で、`s` を 0 にすると理論が「ドンを付けるな」と言い出す。
 #: 体が殴らずに終われば（ドンはターン終了で戻る）**損害は実現していない**ので 0 が正しい。
+#: **帳簿を「理論の価格」で書くか「実際に失われた額」で書くか**（T87・2026-09-18・T86 の結論）。
+#: `price`＝従来（攻めの行は `score_candidate` の価格・守りの窓は `price − 支払い`）／
+#: **`realised`＝攻めの行は「その手で相手が実際に失った額」**（`attack_response.parts` の相手ライフ・相手手札・相手の体＝
+#: `crossing_bridge.harm_of` と**同じ関数**）・**守りの窓の `g` は 0**（移転は攻め手の行に 1 回だけ）。
+#: **根拠**（T86）: 守りの `g` を「理論の価格 − 実際の支払い」で作る形は**2 つの別の物差しの差**なので、
+#: どちらの誤差も `g` に入る。しかも価格は実際の支払いより 3〜5 割大きく、**攻撃の本数とともに開く**
+#: （T64: 守り手は一番安い札から切る）。`exercise` の規約（T58・**数えるのは起きたこと**）を徹底すれば、
+#: **帳簿は `price_realised` の `F`（交点の橋が積む損害）と同じ物**になり、2 つの橋が同じ量を数える（§0.1 の整合）。
+#: **決める価格 `s` は理論の価格のまま**（T58 の分離・`s` は「その局面で最善だったか」を測るので実現では書けない）。
+#: **新定数ゼロ**（`λ`・`μ`・`ν_meas` の写しで実現を数えるだけ）。
+LEDGER_HARM_MODES = ("price", "realised")
+LEDGER_HARM_MODE = "price"
+
+
+def set_ledger_harm_mode(mode):
+    global LEDGER_HARM_MODE
+    if mode not in LEDGER_HARM_MODES:
+        raise ValueError("ledger harm mode は %s のどれか" % (LEDGER_HARM_MODES,))
+    LEDGER_HARM_MODE = mode
+    return LEDGER_HARM_MODE
+
+
+def realised_harm(sc, tok, sc2, tok2):
+    """**その手で相手が実際に失った額**（T87）＝`attack_response.parts` の相手ライフ・相手手札・相手の体。
+    交点の橋が `F` を積むのに使っている `crossing_bridge.harm_of` と**同じ式**（遅延 import＝循環を避ける）。"""
+    from attack_response import parts as _parts          # 遅延（`attack_response` は `price_realised` を import する）
+    p = _parts(sc, tok, sc2, tok2)
+    return float(p["opp_life"] + p["opp_hand"] + p["opp_body"])
+
+
 #: **守りの窓の「攻め手の価格」をどう取るか**（T86・2026-09-18）。`max_attack`＝従来（**そのターン最大の攻撃 1 本**の
 #: `min(受ける費用, 守る費用)`）／**`all_attacks`＝そのターンに相手が実際に打った攻撃の価格の和**（帳簿の攻めの行と同じ数）。
 #: **根拠は記録**（2026-09-18 実測）——**攻撃のあったターンの 73%（実）／67%（合成）が 2 本以上**（平均 2.41／2.13 本）。
@@ -278,7 +311,8 @@ def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=N
     # **T62**: 攻め手の価格＝相手が最安の応答をしたときに失う額（払えるかは攻め手には見えない＝`min` そのもの）
     price = min(cost_take, cost_guard)
     g_delta = float(price) - float(actual)
-    g = g_delta if (GUARD_G_MODE if guard_g is None else guard_g) == "delta" else g_paid
+    _gm = GUARD_G_MODE if guard_g is None else guard_g
+    g = 0.0 if _gm == "zero" else (g_delta if _gm == "delta" else g_paid)
     if played == "guard" and not can_guard:
         # 守れないはずの行で守っている＝予算の見積りが渋い。**誤りにしない**
         actual = best
@@ -515,6 +549,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
              "attach_ledger": ATTACH_LEDGER_MODE, "attach_zeroed": 0,
              # **T86**: 守りの窓の攻め手の価格の取り方と、そのターンの攻撃の本数ごとの内訳
              "guard_price": GUARD_PRICE_MODE, "grd_by_attacks": {}, "grd_took_n": 0.0,
+             # **T87**: 帳簿を実現で書くか・実現で書けた行／書けなかった行（次の行が同じターンに無い＝ターン末）
+             "ledger_harm": LEDGER_HARM_MODE, "harm_rows": 0, "harm_unbracketed": 0,
              # **T58**: 決める価格（`s`）と数える価格（`g`）の規約・読み直した行の数
              "flow_pricing": EV.FLOW_PRICING, "ledger_pricing": ledger_pricing, "ledger_rescored": 0,
              # **T62**: 守りの窓の定義と、自ライフごとの内訳（受けた率・理論が受けろと言う率・`g` の平均）
@@ -550,6 +586,16 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
         last_turn = max([int(rows["turn"][i]) for i in idx] or [0])        # T80: とどめのターン
         kn = {}          # T80: ターンごとの `{d0（席 0 視点）, g0（生の価格・席 0 − 席 1）, r_turns}`
         atk_turn, atk_turn_n = {}, {}     # T86: (席, ターン) → 打った攻撃の価格の和・本数
+        # **T87**: 行 → **同じ席の次の行**（実現の損害を読む区間・`crossing_bridge` の `nxt` と同じ作り）
+        nxt_same_seat = {}
+        if LEDGER_HARM_MODE == "realised":
+            by_seat = {}
+            for n0, i0 in enumerate(idx):
+                if int(rows["kind"][i0]) == 0:
+                    by_seat.setdefault(int(rows["who"][i0]), []).append(n0)
+            for _w0, ns in by_seat.items():
+                for a0, b0 in zip(ns, ns[1:]):
+                    nxt_same_seat[a0] = b0
         pending_grd = []                  # T86: `all_attacks` のときは攻めの行を全部読んだ後に確定する
         for n, i in enumerate(idx):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
@@ -643,6 +689,17 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 g_v = ledger_value(lambda: _score(b + ch), played_v, ledger_pricing)
                 if g_v != played_v:
                     stats["ledger_rescored"] += 1          # 規約で値が動いた行（付与・流れの行）だけ数える
+                # **T87**: 帳簿を実現で書く——その手で相手が実際に失った額（次の同席の行までの差）。
+                # 次の行が同じターンに無い（＝ターン末で区間が閉じない）行は 0 にし、数だけ残す。
+                if LEDGER_HARM_MODE == "realised":
+                    j2 = nxt_same_seat.get(n)
+                    i2 = idx[j2] if j2 is not None else None
+                    if i2 is not None and int(rows["turn"][i2]) == t:
+                        g_v = realised_harm(sc, tok, ex["sc"][i2], ex["tok"][i2])
+                        stats["harm_rows"] += 1
+                    else:
+                        g_v = 0.0
+                        stats["harm_unbracketed"] += 1
                 # **T85**: 付与の増分は殴る行の価格に入っているので、帳簿では付与の行を 0 にする（移転は 1 回）
                 if ATTACH_LEDGER_MODE == "in_attack" \
                         and move_family(json.loads(pol["pol_sig"][b + ch])) == "attach":
@@ -725,7 +782,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                         stats["grd_spent_sum"] = stats.get("grd_spent_sum", 0.0) + paid_v
                         got["g_paid"] = -actual
                         got["g_delta"] = got["price"] - actual
-                        got["g"] = got["g_delta"] if GUARD_G_MODE == "delta" else got["g_paid"]
+                        got["g"] = (0.0 if GUARD_G_MODE == "zero" else
+                                    got["g_delta"] if GUARD_G_MODE == "delta" else got["g_paid"])
                 bnd = band_of(abs(float(rows["pol_v0"][i])))
                 opp_g = _opp_view(first_main, opp_turns, ex, w, t)    # T79: 相手の直近の行（完全情報）
                 kap = float(_kappa_of_row(sc, tok, t, prof,           # T49（守りの窓も同じ傾き）・T75（curve）
@@ -735,8 +793,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                                  _g_of_row(opp_g["sc"], opp_g["tok"], opp_g["ci"], idx2cid, cards,
                                                            g_cache, (1 - w, opp_g["t"]))),
                                           opp=opp_g)["kappa"])
+                if LEDGER_HARM_MODE == "realised":
+                    # **T87**: 移転は攻め手の行に 1 回だけ入っている＝守りの窓は帳簿に何も足さない（`s` 専任）
+                    got = dict(got, g=0.0, g_delta=0.0)
                 # **T86**: `all_attacks` なら攻めの行を全部読み終えてから確定する（そのターンの攻撃の価格の和が要る）
-                if GUARD_PRICE_MODE == "all_attacks":
+                if GUARD_PRICE_MODE == "all_attacks" and LEDGER_HARM_MODE != "realised":
                     pending_grd.append((got, played, float(sc[SC_MY_LIFE]), z, bnd, kap, w, t, rec))
                 else:
                     _finish_guard(got, played, float(sc[SC_MY_LIFE]), z, bnd, kap, w, t, rec, kn, stats, _add)
@@ -747,7 +808,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
             got = dict(got, price=price_all)
             actual = -float(got["g_paid"])                       # 実際に払った額（`spent` 込み）
             got["g_delta"] = price_all - actual
-            got["g"] = got["g_delta"] if GUARD_G_MODE == "delta" else got["g_paid"]
+            got["g"] = (0.0 if GUARD_G_MODE == "zero" else
+                        got["g_delta"] if GUARD_G_MODE == "delta" else got["g_paid"])
             ga = stats["grd_by_attacks"].setdefault(str(min(n_atk, 5)),
                                                     {"n": 0, "price": 0.0, "actual": 0.0, "g_delta": 0.0})
             ga["n"] += 1; ga["price"] += price_all; ga["actual"] += actual; ga["g_delta"] += got["g_delta"]
@@ -1054,6 +1116,9 @@ def main(argv=None):
     ap.add_argument("--theta-body", default=_CB.THETA_BODY_MODE, choices=_CB.THETA_BODY_MODES,
                     help="耐久の体の項（`--w-mode curve` の `D` に効く）: `blockers`（既定）／`all`（全キャラ・T82）／"
                          "`attackable`（レストの体 ＋ アクティブなブロッカー＝規則から出る形・T83）")
+    ap.add_argument("--ledger-harm", default=LEDGER_HARM_MODE, choices=LEDGER_HARM_MODES,
+                    help="**T87** 帳簿の書き方: `price`（旧・理論の価格）／"
+                         "`realised`（攻めの行は実際に相手が失った額・守りの窓の `g` は 0＝移転は 1 回。`s` は価格のまま）")
     ap.add_argument("--guard-price", default=GUARD_PRICE_MODE, choices=GUARD_PRICE_MODES,
                     help="**T86** 守りの窓の攻め手の価格: `max_attack`（旧・そのターン最大の攻撃 1 本）／"
                          "`all_attacks`（そのターンに相手が打った攻撃の価格の和＝攻めの行と同じ数）")
@@ -1078,6 +1143,7 @@ def main(argv=None):
     set_play_book_mode(a.play_book)
     set_attach_ledger_mode(a.attach_ledger)
     set_guard_price_mode(a.guard_price)
+    set_ledger_harm_mode(a.ledger_harm)
     _CB.set_theta_body_mode(a.theta_body)
     _TOM.set_clock_hand_mode(a.clock_hand)
 
