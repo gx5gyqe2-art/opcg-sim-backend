@@ -161,6 +161,8 @@ def _body_absorbs(tok, s):
         return False
     rest = float(tok[s, S_IS_REST]) > 0.5
     blocker = float(tok[s, S_IS_BLOCKER]) > 0.5
+    if THETA_RETURN_MODE == "untap" and rest and blocker:
+        return False                      # **T96**: レストのブロッカーは今は吸えない（補充の段差へ回す）
     if THETA_BODY_MODE == "attackable":
         return bool(rest or blocker)      # レスト＝的になれる／アクティブなブロッカー＝横取りできる（レストのブロッカーは前者で入る）
     return bool(blocker and not rest)
@@ -186,6 +188,50 @@ def threshold(sc, tok, lam=LAM, mu=MU, g_hand=None):
     g = float(mu if g_hand is None else g_hand)
     return float(lam * float(sc[SC_OPP_LIFE]) + g * float(sc[SC_OPP_HAND])
                  + _body_term(tok, SLOT_OPP_FIELD, mlp))
+
+
+#: **レストのブロッカーの扱い**（T96・2026-09-18・ユーザ指摘「レストのブロッカーの意味も考えてみてください」）。
+#: `off`＝旧（`THETA_BODY_MODE` に任せる）／`untap`＝**今の `Θ` からは外し、補充の側へ「段差」として渡す**。
+#:
+#: **規則**（`rust/opcg_engine/src/rules/battle.rs`）:
+#:   * `has_blocker` は **`!is_rest`** を要求する＝**レストのブロッカーは横取りできない**（レストがブロックの費用）。
+#:   * `refresh_phase`（持ち主のターン開始）で**アンタップする**＝**次の攻撃ターンには戻っている**。
+#: ＝**今は耐久ではないが、次のターンからは耐久**。**`Θ` は在庫・時間は流れの側**（T90 のユーザとの整理）に従うと、
+#: 置き場所は **`Θ` ではなく補充 `r` の側の「段差」**（`j ≥ 2` で 1 回）になる。
+#:
+#: **速さの側と鏡像**（T94）: 攻めは**召喚酔い**で在庫が `j ≥ 2` から効き、守りは**アンタップ**で
+#: レストのブロッカーが `j ≥ 2` から効く。**どちらも 1 ターン遅れて効き始める同じ形**。
+THETA_RETURN_MODES = ("off", "untap")
+THETA_RETURN_MODE = "off"
+
+
+def set_theta_return_mode(mode):
+    global THETA_RETURN_MODE
+    if mode not in THETA_RETURN_MODES:
+        raise ValueError("theta return mode は %s のどれか" % (THETA_RETURN_MODES,))
+    THETA_RETURN_MODE = mode
+    return THETA_RETURN_MODE
+
+
+def resting_blocker_term(tok, slots, opp_leader_power):
+    """**レストのブロッカー**の `ν_meas` の和（T96）＝**次の自席ターンに戻ってくる耐久**。"""
+    tok = np.asarray(tok)
+    tot = 0.0
+    for s_i in range(slots.start, slots.stop):
+        if (float(tok[s_i, S_IS_CHAR]) > 0.5 and float(tok[s_i, S_IS_BLOCKER]) > 0.5
+                and float(tok[s_i, S_IS_REST]) > 0.5):
+            tot += float(nu_meas_of(slot_power(tok, s_i), opp_leader_power))
+    return float(tot)
+
+
+def threshold_parts(sc, tok, lam=LAM, mu=MU, g_hand=None):
+    """耐久 `Θ` を **3 つの項に割って**返す（T96）: `(ライフ, 手札, 体)`。和は `threshold` と一致する。
+    **どの項が終盤に縮まないか**を見るための切り分け（T89 が見つけた「残り 1〜2 ターンでも τ が 5 ターン先を指す」）。"""
+    sc = np.asarray(sc); tok = np.asarray(tok)
+    mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
+    g = float(mu if g_hand is None else g_hand)
+    return (float(lam) * float(sc[SC_OPP_LIFE]), g * float(sc[SC_OPP_HAND]),
+            float(_body_term(tok, SLOT_OPP_FIELD, mlp)))
 
 
 def threshold_of_me(sc, tok, lam=LAM, mu=MU, g_hand=None):
@@ -501,10 +547,12 @@ def rate_at(j, board_lead, board_chars, stock, flow, ko_p=0.0):
     return float(out)
 
 
-def tau_grow(theta, board_lead, board_chars, stock, flow, r=0.0, cap=RACE_CAP, ko_p=None):
+def tau_grow(theta, board_lead, board_chars, stock, flow, r=0.0, cap=RACE_CAP, ko_p=None, step=0.0):
     """**積み上がる速さ**で的に届くまでのターン数（T94）。端数はそのターンの中で比例配分する。
     `r > 0` なら的も毎ターン `r` 下がる（T90 の動く的と組める）。
-    `RATE_DECAY_MODE=ko` なら**盤面が毎ターン `ko_p` で失われる**（T95）。届かなければ `cap`。"""
+    `RATE_DECAY_MODE=ko` なら**盤面が毎ターン `ko_p` で失われる**（T95）。
+    `step > 0` なら的が **`j ≥ 2` で 1 回だけ**その分だけ遠のく（T96・レストのブロッカーのアンタップ）。
+    届かなければ `cap`。"""
     theta = float(theta); r = max(0.0, float(r))
     k = 0.0
     if ko_p is not None:
@@ -514,7 +562,7 @@ def tau_grow(theta, board_lead, board_chars, stock, flow, r=0.0, cap=RACE_CAP, k
     f = 0.0
     for j in range(1, int(cap) + 1):
         add = rate_at(j, board_lead, board_chars, stock, flow, k)
-        need = theta + r * j
+        need = theta + r * j + (float(step) if j >= 2 else 0.0)
         if f + add >= need:
             short = max(0.0, need - f)
             return float(j - 1) + (short / add if add > SLOPE_FLOOR else 1.0)
@@ -549,12 +597,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         seat_decks = DR.decks_by_seed(dirs)
     rows_out = []
     ledger = []            # (d) 単位の検算: 勝った席の F_end 対 Θ_start
+    theta_check = []       # **T96**: 行ごとの `Θ` 対「そこから終局までに実際に要った損害」
     turn_harm = []         # 自席ターン番号 j ごとの損害（損害の輪郭＝加速を測る材料）
     stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "theta_hand": THETA_HAND_MODE, "slope_mode": SLOPE_MODE, "theta_body": THETA_BODY_MODE, "slope_block": SLOPE_BLOCK_MODE,
              "race": RACE_MODE,
              "r_deck_n": 0, "r_deck_sum": 0.0, "r_deck_missing": 0,
              "slope_hand": SLOPE_HAND_MODE, "a_flow_n": 0, "a_flow_sum": 0.0, "a_flow_missing": 0,
              "rate_walk": RATE_WALK_MODE, "rate_decay": RATE_DECAY_MODE, "stock_n": 0, "stock_sum": 0.0,
+             "theta_return": THETA_RETURN_MODE,
              "g_sum": 0.0, "g_n": 0, "g_fallback": 0,
              "g_win_sum": 0.0, "g_win_n": 0, "g_lose_sum": 0.0, "g_lose_n": 0}
     games = 0
@@ -670,7 +720,12 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             for j, t in enumerate(ts):
                 sc, tok, _ci = turn_start[(w, t)]
                 olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-                th_w = threshold(sc, tok, g_hand=g_for(1 - w, t))
+                th_life, th_hand, th_body = threshold_parts(sc, tok, g_hand=g_for(1 - w, t))
+                th_w = th_life + th_hand + th_body
+                # **T96**: 次の自席ターンに戻ってくるレストのブロッカー（`untap` のときだけ段差として使う）
+                th_back = (resting_blocker_term(tok, SLOT_OPP_FIELD,
+                                                float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0)
+                           if THETA_RETURN_MODE == "untap" else 0.0)
                 slope_hist = (f_real / j) if j > 0 else None
                 dk = (seat_decks.get(seed_g) or (None, None))[w] if seat_decks else None
                 if SLOPE_HAND_MODE == "flow" and not dk:
@@ -685,6 +740,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     stats["stock_n"] += 1; stats["stock_sum"] += float(s_stock)
                 slope_theory = s_board + s_hand
                 per_seat[(w, t)] = {"theta": th_w, "slope_hist": slope_hist, "slope_theory": slope_theory,
+                                    # **T96**: `Θ` の内訳（どの項が終盤に縮まないか）
+                                    "th_life": th_life, "th_hand": th_hand, "th_body": th_body,
+                                    "th_back": th_back,
                                     # **T90**: 速さを 2 つに分けて持つ（1 ターン目は盤面だけ）と、
                                     # **相手の補充 `r`**＝`Θ` の手札項と同じ 1 枚あたりの価格（引き 1 枚ぶん）
                                     "slope_board": s_board, "slope_hand": s_hand,
@@ -696,6 +754,12 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 f_real += harm.get((w, t), 0.0)
             won = z_of[w] > 0.5
             if won and ts:
+                # **T96**: 行ごとに `Θ` と**そこから終局までに実際に要った損害**を並べる
+                for j2, t2 in enumerate(ts):
+                    d = per_seat[(w, t2)]
+                    theta_check.append({"t_left": len(ts) - j2, "j": j2, "theta": d["theta"],
+                                        "th_life": d["th_life"], "th_hand": d["th_hand"], "th_body": d["th_body"],
+                                        "need": max(0.0, f_real - d["f_real"])})
                 th0 = per_seat[(w, ts[0])]["theta"]
                 # **T89**: 時間の分解——勝った席が **実際に何自席ターン使ったか**（`turns`）と、
                 # **実際の速さ**（`F_end / turns`）・**理論の速さ**（`slope_theory` の平均）。
@@ -736,9 +800,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                         rm = me["r_opp"] if RACE_MODE in ("net", "deck") else 0.0
                         ro = op["r_opp"] if RACE_MODE in ("net", "deck") else 0.0
                         tau_me = tau_grow(me["theta"], me["slope_lead"], me["slope_board"] - me["slope_lead"],
-                                          me["slope_stock"], me["slope_flow"], rm)
+                                          me["slope_stock"], me["slope_flow"], rm, step=me.get("th_back") or 0.0)
                         tau_opp = tau_grow(op["theta"], op["slope_lead"], op["slope_board"] - op["slope_lead"],
-                                           op["slope_stock"], op["slope_flow"], ro)
+                                           op["slope_stock"], op["slope_flow"], ro, step=op.get("th_back") or 0.0)
                         pred = tau_me <= tau_opp
                     elif RACE_MODE in ("net", "deck") and sv == "theory":
                         # **T90**: 動く的との競争（1 ターン目は盤面だけ・的は毎ターン `r` 下がる）
@@ -749,7 +813,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                         tau_me, tau_opp, pred = predict(me["theta"], op["theta"], s_me, s_op)
                     rec["tau_me_" + sv] = tau_me; rec["tau_opp_" + sv] = tau_opp; rec["pred_" + sv] = pred
                 rows_out.append(rec)
-    return rows_out, ledger, stats, turn_harm
+    return rows_out, ledger, stats, turn_harm, theta_check
 
 
 def harm_profile(turn_harm, j_max=12, min_n=20):
@@ -784,7 +848,7 @@ def tau_from_profile(theta, j, prof, scale=1.0, r=0.0):
     return 200.0
 
 
-def summarise(rows_out, ledger, turn_harm=None):
+def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
     out = {"n": len(rows_out), "by_slope": {}}
     prof, prof_th = harm_profile(turn_harm or [])
     if turn_harm:
@@ -804,6 +868,23 @@ def summarise(rows_out, ledger, turn_harm=None):
                 tm = tau_from_profile(r["theta_me"], r["j_me"], prof, scale_me, rr_me)
                 to = tau_from_profile(r["theta_opp"], r["j_opp"], prof, scale_op, rr_op)
                 r["tau_me_" + sv] = tm; r["tau_opp_" + sv] = to; r["pred_" + sv] = (tm <= to)
+    if theta_check:
+        # **T96**: `Θ` は終盤に縮むか——**残りターンごと**に `Θ` と「そこから実際に要った損害」を並べる。
+        # 比が 1 なら `Θ` は正しい大きさ。**1 を大きく超えるなら `Θ` が過大＝τ が遠くを指す**。
+        by = {}
+        for r in theta_check:
+            key = str(int(r["t_left"])) if r["t_left"] <= 5 else "6+"
+            by.setdefault(key, []).append(r)
+        out["theta_check"] = {"n": len(theta_check), "by_turns_left": {}}
+        for key in sorted(by, key=lambda x: (x == "6+", x)):
+            g = by[key]
+            th = np.array([x["theta"] for x in g]); nd = np.array([x["need"] for x in g])
+            out["theta_check"]["by_turns_left"][key] = {
+                "n": len(g), "theta": round(float(th.mean()), 4), "need": round(float(nd.mean()), 4),
+                "theta_over_need": round(float(th.mean() / max(1e-9, nd.mean())), 3),
+                "life": round(float(np.mean([x["th_life"] for x in g])), 4),
+                "hand": round(float(np.mean([x["th_hand"] for x in g])), 4),
+                "body": round(float(np.mean([x["th_body"] for x in g])), 4)}
     if ledger:
         fe = np.array([r["F_end"] for r in ledger]); th0 = np.array([r["theta_start"] for r in ledger])
         fp = np.array([r["F_priced_end"] for r in ledger])
@@ -871,6 +952,9 @@ def main(argv=None):
                     help="**T90** 交点の解き方: `static`（旧・`τ = Θ/A`＝的は動かない）／"
                          "`net`（動く的＝1 ターン目は盤面だけ・的は毎ターン相手の補充 `r` だけ下がる・`r` は帳簿の `g`）／"
                          "`deck`（**T91** 同じ動く的で `r` を**規則とデッキの中身だけ**から出す＝`μ ×`切れる札の割合）")
+    ap.add_argument("--theta-return", default=THETA_RETURN_MODE, choices=THETA_RETURN_MODES,
+                    help="**T96** レストのブロッカー: `off`（旧）／"
+                         "`untap`（今の `Θ` から外し、`j ≥ 2` の段差として補充の側へ＝規則どおり）")
     ap.add_argument("--rate-decay", default=RATE_DECAY_MODE, choices=RATE_DECAY_MODES,
                     help="**T95** 盤面が減ることを歩きに入れるか: `off`（旧・死なない前提）／"
                          "`ko`（毎自席ターン `ko_p`＝0.289 で失われる・T60 の生存の重みと同じ量）")
@@ -899,16 +983,17 @@ def main(argv=None):
     set_slope_hand_mode(a.slope_hand)
     set_rate_walk_mode(a.rate_walk)
     set_rate_decay_mode(a.rate_decay)
+    set_theta_return_mode(a.theta_return)
     set_theta_body_mode(a.theta_body)
     set_race_mode(a.race)
-    rows_out, ledger, stats, turn_harm = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
+    rows_out, ledger, stats, turn_harm, theta_check = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
     if stats.get("g_n"):
         stats["g_mean"] = round(stats["g_sum"] / stats["g_n"], 4)
     for side in ("win", "lose"):
         if stats.get("g_%s_n" % side):
             stats["g_%s_mean" % side] = round(stats["g_%s_sum" % side] / stats["g_%s_n" % side], 4)
     res = {"nu_mode": a.nu_mode, "stats": stats, "frozen": {"lambda": LAM, "mu": MU, "theta": a.theta},
-           "summary": summarise(rows_out, ledger, turn_harm), "seconds": round(time.time() - t0, 1)}
+           "summary": summarise(rows_out, ledger, turn_harm, theta_check), "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
     print(txt)
     if a.out:

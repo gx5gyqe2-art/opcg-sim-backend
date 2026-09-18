@@ -45,6 +45,51 @@ def test_the_threshold_is_the_opponents_endurance_in_price_units():
         CB.set_theta_body_mode("attackable")
 
 
+def test_the_threshold_splits_into_life_hand_and_bodies():
+    """**T96**（ユーザ指示「Θの方で進めてください」）: `threshold_parts` は `Θ` を **3 つの項**に割り、和は `threshold` と一致する。
+    **どの項が終盤に縮まないか**を見るための切り分け。"""
+    tok = np.zeros((22, 24), np.float32)
+    tok[7, T.S_POWER], tok[7, T.S_IS_CHAR], tok[7, T.S_IS_REST] = 0.6, 1.0, 1.0   # レストの体（`attackable` で入る）
+    sc = _sc(3, 4)
+    life, hand, body = CB.threshold_parts(sc, tok)
+    assert life == pytest.approx(3 * T.LAM)
+    assert hand == pytest.approx(4 * T.MU)
+    assert body > 0.0
+    assert life + hand + body == pytest.approx(CB.threshold(sc, tok))
+    # `g_hand` を渡すと手札の項だけが動く
+    l2, h2, b2 = CB.threshold_parts(sc, tok, g_hand=0.5 * T.MU)
+    assert (l2, b2) == (pytest.approx(life), pytest.approx(body))
+    assert h2 == pytest.approx(hand / 2.0)
+
+
+def test_a_rested_blocker_is_not_endurance_now_but_comes_back():
+    """**T96**（ユーザ指摘「レストのブロッカーの意味も考えてみてください」）: 規則では
+    **レストのブロッカーは横取りできない**（`has_blocker` が `!is_rest` を要求する）が、
+    **持ち主のターン開始でアンタップして戻る**。だから **今の `Θ` からは外し、`j ≥ 2` の段差**として補充の側へ渡す。"""
+    tok = np.zeros((22, 24), np.float32)
+    tok[7, T.S_POWER], tok[7, T.S_IS_CHAR], tok[7, T.S_IS_BLOCKER] = 0.6, 1.0, 1.0
+    sc = _sc(3, 4)
+    assert CB.THETA_RETURN_MODE == "off"                         # 既定は据え置き（採否はユーザ判定）
+    assert CB.resting_blocker_term(tok, T.SLOT_OPP_FIELD, 5000.0) == 0.0   # アクティブなので「戻る」側ではない
+    active = CB.threshold(sc, tok)
+    tok[7, T.S_IS_REST] = 1.0
+    back = CB.resting_blocker_term(tok, T.SLOT_OPP_FIELD, 5000.0)
+    assert back > 0.0
+    try:
+        CB.set_theta_return_mode("untap")
+        # レストのブロッカーは**今の `Θ` に入らない**（`attackable` でも外れる）
+        assert CB.threshold(sc, tok) == pytest.approx(active - back)
+        # 段差は `j ≥ 2` からしか効かない＝1 ターン目で届くなら τ は変わらない
+        assert CB.tau_grow(0.2, 0.25, 0.0, 0.0, 0.0, step=back) == pytest.approx(
+            CB.tau_grow(0.2, 0.25, 0.0, 0.0, 0.0))
+        # 2 ターン目までかかるなら、その分だけ遠のく
+        assert CB.tau_grow(0.4, 0.25, 0.0, 0.0, 0.0, step=back) > CB.tau_grow(0.4, 0.25, 0.0, 0.0, 0.0)
+        with pytest.raises(ValueError):
+            CB.set_theta_return_mode("なにか")
+    finally:
+        CB.set_theta_return_mode("off")
+
+
 def test_the_theory_slope_is_the_priced_attack_flow_of_the_board():
     tok = np.zeros((22, 24), np.float32)
     tok[0, T.S_POWER], tok[1, T.S_POWER] = 0.5, 0.5
