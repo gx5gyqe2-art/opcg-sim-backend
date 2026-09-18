@@ -100,3 +100,44 @@ def test_pair_shares_is_deterministic_in_the_seed():
     assert DR.pair_decks(8801, "user") == (d1, d2)
     assert len(d1) == len(d2) == 50
     assert DR.cut_share(d1) == pytest.approx(a[0])          # 割合とデッキは同じ 1 本から出る
+
+
+def test_the_effect_harm_comes_from_the_card_master_and_the_board_distribution(monkeypatch):
+    """**T105**: **引いた 1 枚が出す効果の損害**（`e_of`／`removal_harm`）。
+    **除去のしきい値は原本から**（`n_rel_feat.profile` の `thr`）・**損害は `ν_meas`**（`Θ` の体の項と同じ式）・
+    **盤面は測った分布**（T46 と同じ資産）。**打ち方はどこにも入らない**。"""
+    boards = [(5000.0, [(3000.0, False), (6000.0, False)])]
+    mlp = 5000.0
+    profiles = {}
+    monkeypatch.setattr(DR.NF, "profile", lambda m: profiles.get(id(m), {"thr": ()}))
+
+    class _Card:
+        pass
+
+    plain = _Card()
+    profiles[id(plain)] = {"thr": ()}
+    assert DR.removal_harm(plain, mlp, boards) == pytest.approx(0.0)          # 除去が無ければ 0
+
+    # しきい値なし（何でも倒せる）＝**届く体のうち `ν` が一番大きいもの**
+    anyone = _Card()
+    profiles[id(anyone)] = {"thr": ((None, None, False, "removal", True),)}
+    best = max(DR.nu_meas_of(3000.0, mlp), DR.nu_meas_of(6000.0, mlp))
+    assert DR.removal_harm(anyone, mlp, boards) == pytest.approx(best)
+
+    # しきい値 4000 なら 6000 の体には届かない
+    small = _Card()
+    profiles[id(small)] = {"thr": ((4000, None, False, "removal", True),)}
+    assert DR.removal_harm(small, mlp, boards) == pytest.approx(DR.nu_meas_of(3000.0, mlp))
+    # 届く体が 1 つも無ければ 0
+    tiny = _Card()
+    profiles[id(tiny)] = {"thr": ((1000, None, False, "removal", True),)}
+    assert DR.removal_harm(tiny, mlp, boards) == pytest.approx(0.0)
+    # **止める系（lock）は損害ではない**——体は残るので `ν` を奪わない
+    lock = _Card()
+    profiles[id(lock)] = {"thr": ((None, None, False, "lock", True),)}
+    assert DR.removal_harm(lock, mlp, boards) == pytest.approx(0.0)
+    # 2 つ持つ札は**大きい方**（1 枚で 1 体・過小側に倒す）
+    both = _Card()
+    profiles[id(both)] = {"thr": ((1000, None, False, "removal", True),
+                                  (None, None, False, "removal", True))}
+    assert DR.removal_harm(both, mlp, boards) == pytest.approx(best)

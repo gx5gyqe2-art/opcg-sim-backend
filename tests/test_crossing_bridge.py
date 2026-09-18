@@ -315,7 +315,7 @@ def test_the_board_can_decay_but_the_leader_never_does():
 
 
 def test_the_rate_terms_are_separate_quantities():
-    """`seat_slope_terms` は `(盤面, 在庫, 流入, リーダー, 在庫の速攻, 流入の速攻)`（T103 で末尾 2 つが増えた）。
+    """`seat_slope_terms` は `(盤面, 在庫, 流入, リーダー, 在庫の速攻, 流入の速攻, 効果)`（T103／T105 で末尾が増えた）。
     **在庫は要求したときだけ計算する**（重いので）。"""
     import deck_refill as DR
     tok = np.zeros((22, 24), np.float32)
@@ -324,15 +324,16 @@ def test_the_rate_terms_are_separate_quantities():
     sc[T.SC_MY_DON] = 10.0
     db = DR.db()
     body = next(c for c in db.raw_db if DR.body_of(db.get_card(c)) and float(db.get_card(c).power) >= 6000)
-    board, stock, flow, lead, s_rush, f_rush = CB.seat_slope_terms(
+    board, stock, flow, lead, s_rush, f_rush, eff = CB.seat_slope_terms(
         sc, tok, None, None, None, 5000.0, deck_ids=[body])
     assert s_rush == 0.0 and f_rush == 0.0            # 既定は `RATE_RUSH_MODE=off`（T103）
+    assert eff == 0.0                                 # 既定は `SLOPE_EFFECT_MODE=off`（T105）
     assert board == pytest.approx(CB.theory_slope(tok, 5000.0))
     assert stock == 0.0                                              # `cards` が無ければ在庫は数えられない
     assert flow == pytest.approx(DR.a_of([body], 5000.0, 10.0))
     assert lead == pytest.approx(board)                              # 場が空ならリーダーが全部
     tok[2, T.S_POWER], tok[2, T.S_IS_CHAR], tok[2, T.S_CAN_ATTACK] = 0.8, 1.0, 1.0
-    board2, _s, _f, lead2, _sr2, _fr2 = CB.seat_slope_terms(sc, tok, None, None, None, 5000.0)
+    board2, _s, _f, lead2, _sr2, _fr2, _e2 = CB.seat_slope_terms(sc, tok, None, None, None, 5000.0)
     assert lead2 == pytest.approx(lead) and board2 > lead2           # キャラのぶんはリーダーに入らない
     # 既定（`flow`）では `seat_slope_parts` の 2 つ目は流入
     assert CB.seat_slope_parts(sc, tok, None, None, None, 5000.0, deck_ids=[body])[1] == pytest.approx(flow)

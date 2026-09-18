@@ -51,6 +51,8 @@ if _HERE not in sys.path:
 
 from opcg_sim.learned import n_rel_feat as NF  # noqa: E402
 from opcg_sim.loop import decks as D  # noqa: E402
+import theory_order as TO  # noqa: E402
+from price_realised import nu_meas_of  # noqa: E402
 from theory_order import MU, THETA, attack_value_don  # noqa: E402
 
 _DB = {}
@@ -58,6 +60,7 @@ _SHARE = {}          # (leader_id, tuple(deck_ids)) は重いので id 列の署
 _PAIR = {}           # (decks_mode, seed, la, lb) -> (share_p1, share_p2)
 _DECKS = {}          # (decks_mode, seed, la, lb) -> (deck_ids_p1, deck_ids_p2)
 _FLOW = {}           # (deck_ids, 相手リーダー, ドンの枠) -> 流入する速さ `a`
+_EFF = {}            # (deck_ids, R, 自リーダー, ドンの枠) -> 効果が出す損害 `e`（T105）
 
 
 def db():
@@ -166,6 +169,76 @@ def a_of(deck_ids, opp_leader_power, don=None, theta=THETA, mu=MU, rush_only=Fal
     out = (tot / n) if n else 0.0
     _FLOW[key] = out
     return out
+
+
+def e_of(deck_ids, my_leader_power=5000.0, r_turns=3, don=None, boards=None):
+    """**引いた 1 枚が出す「効果の損害」の期待値**（T105・デッキ平均）。
+
+    **問い**（T103 の速さの検算）: **実際に打った攻撃は 1 ターンの損害の 79〜92% しか説明しない**。
+    残り 8〜21% は**効果が出した損害**（KO・除去）で、速さ `A` には 1 項も入っていなかった。
+
+    ```
+    e = (1/N) Σ_{札 ∈ デッキ}  max_{その札の除去能力}  E_盤面[ max ν(倒せる体) ]
+    ```
+
+    * **除去能力としきい値は原本から読む**（`n_rel_feat.profile` の `thr`＝相手を対象にした
+      KO／バウンス／レスト系と `power_max`）。**パーサの出力であって打ち方ではない**。
+    * **倒せる体の損害は `ν_meas`**（`price_realised`・`Θ` の体の項と同じ式）。
+    * **盤面は測った分布**（`theory_order.load_opp_boards`・T46 の `OPTION_MODE=dist` と同じ資産）。
+      **ここだけが記録由来**で、他は全部デッキ表と規則。
+    * **1 枚は 1 回しか使えない**ので、これは**流量**（毎ターン 1 枚引く ＝ 毎ターン `e` ずつ）であって
+      積み上がらない——体の攻撃（`a_of`）が**毎ターン殴り続ける**のと役割が違う。
+
+    `don` を渡すとそのドンで出せない札は 0（`a_of` と同じ規則の枠）。
+    """
+    rb = int(max(1, min(5, round(float(r_turns)))))
+    bs = (TO.load_opp_boards() if boards is None else boards).get(rb) or []
+    if not bs:
+        return 0.0
+    mlp = float(my_leader_power)
+    cap = None if don is None else int(round(float(don)))
+    key = (tuple(deck_ids), rb, round(mlp, 1), cap)
+    if boards is None and key in _EFF:
+        return _EFF[key]
+    d = db()
+    n = 0
+    tot = 0.0
+    for cid in deck_ids:
+        m = d.get_card(cid)
+        if m is None:
+            continue
+        n += 1
+        if cap is not None and int(getattr(m, "cost", 0) or 0) > cap:
+            continue
+        tot += removal_harm(m, mlp, bs)
+    out = (tot / n) if n else 0.0
+    if boards is None:
+        _EFF[key] = out
+    return out
+
+
+def removal_harm(m, my_leader_power, boards):
+    """その札 1 枚が**相手から奪える体の損害**（`ν_meas`）の期待値。除去能力が無ければ 0。
+
+    しきい値（`power_max`）に合う体だけが対象。**1 枚で 1 体**（複数体を取る能力も 1 体ぶんで数える＝
+    過小側に倒す）。**コストのしきい値（`cost_max`）は盤面の分布がコストを持たないので見ない**（限界）。"""
+    thr = [t for t in (NF.profile(m).get("thr") or ()) if len(t) >= 4 and t[3] == "removal"]
+    if not thr:
+        return 0.0
+    mlp = float(my_leader_power)
+    best = 0.0
+    for t in thr:
+        pmax = t[0]
+        tot = 0.0
+        for _rec_mlp, bodies in boards:
+            v = 0.0
+            for tp, _blk in bodies:
+                if pmax is not None and float(tp) > float(pmax) + 1e-6:
+                    continue
+                v = max(v, float(nu_meas_of(float(tp), mlp)))
+            tot += v
+        best = max(best, tot / len(boards))
+    return float(best)
 
 
 def _by_seed(dirs, fn):
