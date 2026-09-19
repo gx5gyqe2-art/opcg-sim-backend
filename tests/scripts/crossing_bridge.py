@@ -1712,7 +1712,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                     "r_opp": r_opp_of(1 - w, t),
                                     "r_deck": r_deck_of(1 - w),
                                     "f_real": f_real, "t_left": len(ts) - j, "j": j}
-                turn_harm.append({"j": j, "harm": harm.get((w, t), 0.0), "slope_theory": slope_theory,
+                # **T112**: `g`（局の序数）と `who`（席）は 3 つの出口（`turn_harm`／`theta_check`／
+                # `rows_out`）を**同じ鍵で突き合わせる**ために置く（`bias_budget.py` が偏りを
+                # 「A の軌跡」と「的と要の差」へ分けるとき、どちらの母数でも同じ行を指せる）。
+                turn_harm.append({"g": games, "who": w,
+                                  "j": j, "harm": harm.get((w, t), 0.0), "slope_theory": slope_theory,
                                   # **T103**: そのターンの損害のうち**攻撃の価格が説明する分**
                                   # （`priced` は攻撃の手だけ・`harm` は全部の手）＝**残りは効果が出した損害**。
                                   "priced": priced.get((w, t), 0.0),
@@ -1726,7 +1730,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 # **T96**: 行ごとに `Θ` と**そこから終局までに実際に要った損害**を並べる
                 for j2, t2 in enumerate(ts):
                     d = per_seat[(w, t2)]
-                    theta_check.append({"t_left": len(ts) - j2, "j": j2, "theta": d["theta"],
+                    theta_check.append({"g": games, "who": w,
+                                        "t_left": len(ts) - j2, "j": j2, "theta": d["theta"],
                                         "th_life": d["th_life"], "th_hand": d["th_hand"], "th_body": d["th_body"],
                                         # **T101**: 理論がその行で言う τ。**`Θ`/要の読みから τ の偏りを外す**ために要る
                                         # （`Θ` は在庫・`要` は実際にいつ終わったかに依る総量なので、
@@ -1759,7 +1764,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     continue                                   # 相手がまだ 1 ターンも打っていない
                 op = per_seat[(1 - w, prev_o[-1])]
                 t_opp_act = sum(1 for tt in ts_o if tt > t)
-                rec = {"who": w, "won": won, "t_me_act": me["t_left"], "t_opp_act": t_opp_act,
+                rec = {"g": games, "who": w, "won": won,
+                       "t_me_act": me["t_left"], "t_opp_act": t_opp_act,
                        "theta_me": me["theta"], "theta_opp": op["theta"], "j_me": me["j"], "j_opp": op["j"],
                        "slope_theory_me": me["slope_theory"], "slope_theory_opp": op["slope_theory"],
                        # **T90**: それぞれが殴っている相手の補充（`Θ` の手札項と同じ 1 枚あたりの価格）
