@@ -12,6 +12,11 @@ CI下限>0.50・void は母数から外して件数を必ず載せる）＝集�
 **seed 衝突は黙って畳まない**: 同じ seed が複数シャードに現れたら帯設計のミス（同じ対局を
 二重計上すると CI が不当に狭まる）なので、重複を数えて明示し、既定では判定を出さずに落とす。
 
+**候補席の探索設定も同じ扱い**（2026-09-09・WP `rs-search-arena`）: 台帳の行に `cand_opts` が
+載っていれば読み取って判定に添える。シャードで設定が割れていたら別々の測定を混ぜている
+＝既定では判定を出さずに落とす（`--allow-mixed-cand-opts` で強制可）。`cand_opts` の無い
+歴代の台帳は「既定で回した」ものとして数える＝そのまま読める。
+
 実行例:
   python -m opcg_sim.loop.arena_merge --in "/home/user/arena_c9/*/random_*.jsonl"
 """
@@ -36,6 +41,25 @@ def read_ledger(path):
             sc = r.get("score")
             done[int(r["seed"])] = None if sc is None else float(sc)
     return done
+
+
+def read_cand_opts(paths):
+    """台帳の行に載った**候補席の探索設定**を集める（pure・返り値は正規化 JSON 文字列の集合）。
+
+    判定は設定に紐づく（同じネットでも `worlds` や選択規則が違えば別の測定）ので、
+    シャードを跨いで設定が割れていたら合算してはいけない。既定で回した行には `cand_opts`
+    が無い＝`"{}"`（既定）として数える＝歴代の台帳もそのまま読める。
+    """
+    seen = set()
+    for p in paths:
+        with open(p) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                opts = json.loads(line).get("cand_opts") or {}
+                seen.add(json.dumps(opts, ensure_ascii=False, sort_keys=True))
+    return seen
 
 
 def merge_ledgers(paths):
@@ -78,6 +102,9 @@ def main():
     ap.add_argument("--label", default="", help="出力に付ける見出し（条件名など）")
     ap.add_argument("--allow-dup-seeds", action="store_true",
                     help="seed 衝突があっても判定を出す（既定は落とす＝二重計上を隠さない）")
+    ap.add_argument("--allow-mixed-cand-opts", action="store_true",
+                    help="シャードで候補席の探索設定が割れていても判定を出す"
+                         "（既定は落とす＝違う設定の測定を混ぜない）")
     args = ap.parse_args()
 
     paths = []
@@ -89,7 +116,10 @@ def main():
         return 2
 
     merged, dups, per_file = merge_ledgers(paths)
+    cand_opts = sorted(read_cand_opts(paths))
     head = f"[{args.label}] " if args.label else ""
+    if cand_opts != ["{}"]:
+        print(f"候補席の探索設定: {', '.join(cand_opts)}", flush=True)
     for p, d in per_file:
         r = summarize(d, args.frac)
         if r:
@@ -101,12 +131,20 @@ def main():
         if not args.allow_dup_seeds:
             print("判定は出さない（--allow-dup-seeds で強制可）", flush=True)
             return 1
+    if len(cand_opts) > 1:
+        print(f"⚠ 候補席の探索設定が {len(cand_opts)} 通りに割れている＝別々の測定を混ぜている",
+              flush=True)
+        if not args.allow_mixed_cand_opts:
+            print("判定は出さない（--allow-mixed-cand-opts で強制可）", flush=True)
+            return 1
     res = summarize(merged, args.frac)
     if res is None:
         print("有効ペアが無い（全 void）＝判定を出さない", flush=True)
         return 1
     res["shards"] = len(paths)
     res["dup_seeds"] = len(dups)
+    if cand_opts != ["{}"]:
+        res["cand_opts"] = [json.loads(s) for s in cand_opts]
     print(f"{head}ARENA_MERGE_FINAL " + json.dumps(res, ensure_ascii=False), flush=True)
     return 0 if res["promoted"] else 1
 

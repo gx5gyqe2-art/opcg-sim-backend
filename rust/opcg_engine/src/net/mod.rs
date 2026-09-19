@@ -11,7 +11,8 @@ pub mod npz;
 pub mod nrel;
 
 use crate::encode::{
-    EffTables, Encoding, Vocab, D_SC, EXTRA_DIM, N_CARD_IDX, N_OPP, N_OWN, N_TOK, R_DIM, S_DIM,
+    EffTables, Encoding, Vocab, D_SC, D_SC_V13, ENC_VERSION, ENC_VERSION_V13, EXTRA_DIM,
+    N_CARD_IDX, N_OPP, N_OWN, N_TOK, R_DIM, S_DIM, S_DIM_V13,
 };
 use crate::state::EngineError;
 use serde_json::{json, Value};
@@ -20,15 +21,19 @@ use std::sync::OnceLock;
 
 pub const D_STRUCT: usize = 64;
 pub const D_ZONE: usize = 5;
-/// D_STRUCT + S_DIM + D_ZONE
-pub const D_X: usize = 89;
+/// D_STRUCT + S_DIM + D_ZONE（v14＝91・v13＝89）
+pub const D_X: usize = D_STRUCT + S_DIM + D_ZONE;
+/// v13 の `Wt` の行数（npz の pad で使う）
+pub const D_X_V13: usize = D_STRUCT + S_DIM_V13 + D_ZONE;
 pub const D_T: usize = 48;
 pub const D_R: usize = 32;
 pub const D_C: usize = 32;
 /// D_T + 2*D_R + D_C
 pub const D_H: usize = 144;
-/// D_SC + 2*D_H
-pub const D_Z: usize = 411;
+/// D_SC + 2*D_H（v14＝415・v13＝411）
+pub const D_Z: usize = D_SC + 2 * D_H;
+/// v13 の `W1` の行数（npz の pad で使う）
+pub const D_Z_V13: usize = D_SC_V13 + 2 * D_H;
 pub const D_E: usize = 64;
 pub const D_AB: usize = 24;
 /// `n_eff.F_CAND`＝7＋64×2＋4
@@ -65,6 +70,9 @@ pub struct NRelWeights {
     pub meta_json: String,
     /// `vocab_ids`（index 1.. の card_id）。
     pub vocab_ids: Vec<String>,
+    /// npz の meta `enc_version`（無ければ 13）。**読んだままの版**＝pad した後も 13 のまま。
+    /// 候補行の対象（§20.9 の A）はこの版で分岐する＝v13 のネットは 1 bit も変わらない。
+    pub enc_version: u32,
 }
 
 /// 方策の候補 1 件（Python `_cand_rows`＋`nrel_priors` の budget）。
@@ -104,6 +112,7 @@ pub fn load_npz(path: &str) -> Result<NRelWeights, EngineError> {
     };
     // meta の `ablate`（JSON 文字列。壊れていても落とさない＝Python の `except` と同じ）
     let mut ablate = HashSet::new();
+    let mut enc_version = ENC_VERSION_V13;
     if let Ok(Value::Object(m)) = serde_json::from_str::<Value>(&meta_json) {
         if let Some(Value::Array(a)) = m.get("ablate") {
             for v in a {
@@ -112,14 +121,22 @@ pub fn load_npz(path: &str) -> Result<NRelWeights, EngineError> {
                 }
             }
         }
+        if let Some(v) = m.get("enc_version").and_then(Value::as_u64) {
+            enc_version = v as u32;
+        }
     }
     let vocab_ids = match arrays.get("vocab_ids") {
         Some(a) => a.to_strings("vocab_ids")?,
         None => Vec::new(),
     };
+    // 符号化 v13 のネット（r3／a1）は**新しい列の重みを 0 で埋めて**読む（§20.9 の E）。
+    // 入力の並びが x=[構造64, S, ゾーン5]・z=[scalars, mean h, max h] なので、埋める位置は
+    // `Wt` が 64+20 行目の後ろ・`W1` が 123 行目の後ろ。0 を掛けて足すだけ＝**値は不変**。
+    let wt = pad_rows(mat("Wt")?, D_STRUCT + S_DIM_V13, D_X, "Wt")?;
+    let w1 = pad_rows(w1, D_SC_V13, D_Z, "W1")?;
     Ok(NRelWeights {
         wa: mat("Wa")?, ba: vec("ba")?,
-        wt: mat("Wt")?, bt: vec("bt")?,
+        wt, bt: vec("bt")?,
         wr: mat("Wr")?, br: vec("br")?,
         wc: mat("Wc")?, bc: vec("bc")?,
         w1, b1: vec("b1")?,
@@ -131,7 +148,31 @@ pub fn load_npz(path: &str) -> Result<NRelWeights, EngineError> {
         ablate,
         meta_json,
         vocab_ids,
+        enc_version,
     })
+}
+
+/// 行列 `w` の `at` 行目の後ろへ 0 の行を挿して `want` 行にする（Python `n_rel._pad_rows`）。
+///
+/// 既に `want` 行なら何もしない＝冪等。行数が `want` でも `want - n_new` でもなければエラー
+/// （黙って別の形のネットを読まない）。
+fn pad_rows(w: Mat, at: usize, want: usize, name: &str) -> Result<Mat, EngineError> {
+    if w.rows == want {
+        return Ok(w);
+    }
+    if w.rows > want || at > w.rows {
+        return Err(EngineError::BadPayload(format!(
+            "net: {name} が {} 行（{want} 行が要る）",
+            w.rows
+        )));
+    }
+    let n_new = want - w.rows;
+    let mut data = Vec::with_capacity(want * w.cols);
+    data.extend_from_slice(&w.data[..at * w.cols]);
+    // `repeat(..).take(..)`（`repeat_n` は Rust 1.82 以降＝この crate の MSRV 1.75 より新しい）
+    data.extend(std::iter::repeat(0.0f32).take(n_new * w.cols));
+    data.extend_from_slice(&w.data[at * w.cols..]);
+    Ok(Mat { rows: want, cols: w.cols, data })
 }
 
 /// `NRelNet.card_table()` [n × D_STRUCT]（プロセスで 1 度計算して持つ）。
@@ -285,6 +326,8 @@ fn summary(n: &LoadedNet) -> String {
     json!({
         "hidden": n.weights.hidden,
         "ablate": ablate,
+        "enc_version": n.weights.enc_version,
+        "enc_version_current": ENC_VERSION,
         "vocab_ids": n.vocab.ids,
         "card_table_rows": n.tab.len() / D_STRUCT,
         "meta": n.weights.meta_json,

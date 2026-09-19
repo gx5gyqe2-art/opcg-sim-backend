@@ -417,8 +417,13 @@ def _uuid_card(manager, uuid):
     return _uuid_index(manager).get(uuid)
 
 
-def _cand_row(net, tab, manager, mv, vocab, uidx=None):
-    """1候補 → 訓練と同一の素性139次元（serve 版）。`uidx` は `_uuid_index` の再利用。"""
+def _cand_row(net, tab, manager, mv, vocab, uidx=None, ids=None):
+    """1候補 → 訓練と同一の素性139次元（serve 版）。`uidx` は `_uuid_index` の再利用。
+
+    `ids`＝`(主体 uuid, 対象 uuid)` の上書き（符号化 v14 の §20.9-A: 効果の対象選択は
+    `payload.target_ids` を持たないので、呼び出し側が `selected_uuids[0]` と効果の発生源を
+    詰める）。`None` なら今までどおり `card_uuid`／`payload.uuid`／`target_ids[0]` を読む。
+    """
     if uidx is None:
         uidx = _uuid_index(manager)
     x = np.zeros(F_CAND, np.float32)
@@ -429,11 +434,13 @@ def _cand_row(net, tab, manager, mv, vocab, uidx=None):
         x[NA - 1] = 1.0
     p = mv.get("payload") or {}
     ci = ti = 0
-    c = uidx.get(mv.get("card_uuid") or p.get("uuid"))
+    su, tu = ids if ids is not None else (mv.get("card_uuid") or p.get("uuid"),
+                                          (p.get("target_ids") or [None])[0])
+    c = uidx.get(su)
     if c is not None:
         ci = vocab.get(getattr(getattr(c, "master", None), "card_id", None), 0)
     x[NA:NA + D_CARD_FEAT] = tab[ci]
-    tids = p.get("target_ids") or []
+    tids = [tu] if tu else []
     if tids:
         t = uidx.get(tids[0])
         if t is not None:
