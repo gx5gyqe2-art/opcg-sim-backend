@@ -241,6 +241,29 @@ def removal_harm(m, my_leader_power, boards):
     return float(best)
 
 
+_CEFF = {}           # (cid, R, 自リーダー) -> その札 1 枚の効果の損害（T109・財布のナップサックが枚ごとに引く）
+
+
+def card_effect_harm(cid, my_leader_power=5000.0, r_turns=3, boards=None):
+    """**その札 1 枚**の効果の損害（`removal_harm` の 1 枚版・キャッシュあり）。
+
+    **T109**（財布を 1 つにする）で要る——`hand_effect_harm` は「手札のうち一番大きいもの」を返すが、
+    **1 つのナップサックに手札を入れる**には**札ごとの値**が必要になる。中身は `removal_harm` そのままで、
+    **体を持たない札（イベント・ステージ）も除去なら値を持つ**（規則どおり・`playable_attack_price` は
+    体だけ見ていたので、そこだけでは落ちていた）。"""
+    rb = int(max(1, min(5, round(float(r_turns)))))
+    mlp = float(my_leader_power)
+    key = (str(cid), rb, round(mlp, 1))
+    if boards is None and key in _CEFF:
+        return _CEFF[key]
+    bs = (TO.load_opp_boards() if boards is None else boards).get(rb) or []
+    m = db().get_card(cid) if cid else None
+    out = 0.0 if (not bs or m is None) else float(removal_harm(m, mlp, bs))
+    if boards is None:
+        _CEFF[key] = out
+    return out
+
+
 def hand_effect_harm(cids, my_leader_power=5000.0, r_turns=3, don=None, boards=None):
     """**今の手札が今このターン出せる「効果の損害」**（T108・在庫の側・一度きり）。
 

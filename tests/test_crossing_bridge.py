@@ -29,13 +29,18 @@ import theory_order as T  # noqa: E402
 _SHIPPED = {n: getattr(CB, n) for n in (
     "THETA_HAND_MODE", "THETA_HAND_PLACE", "THETA_BODY_MODE", "THETA_HAND_BLOCKER_MODE",
     "THETA_RETURN_MODE", "SLOPE_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE", "SLOPE_EFFECT_MODE",
-    "RATE_WALK_MODE", "RATE_DECAY_MODE", "RATE_T1_MODE", "RATE_RUSH_MODE", "RACE_MODE")}
+    "RATE_WALK_MODE", "RATE_DECAY_MODE", "RATE_T1_MODE", "RATE_RUSH_MODE", "RACE_MODE",
+    "DON_PURSE_MODE")}
 
 
 def test_the_shipped_defaults_are_the_ones_we_decided():
     """**既定の一覧をラチェットする**（`docs/cpu_theory_gap.md` §9.2 の表と 1 対 1）。
 
-    **2026-09-19 のユーザ決定**（「1は規定、2は正しいものに直してください」）で 4 つ動いた:
+    **2026-09-19 のユーザ指示**（「使用できるドンと使ったドンの整合が取れるように最後まで進めてください」）で
+    `DON_PURSE_MODE=all`（T109）が入った——**財布が 1 つになって初めて帳尻が合う**
+    （理論の使いすぎ 22.0% → 0.0%）。
+
+    **同日のユーザ決定**（「1は規定、2は正しいものに直してください」）で 4 つ動いた:
     `SLOPE_EFFECT_MODE=hand`（T108）・`RATE_T1_MODE=on`・`RATE_RUSH_MODE=on`・
     `THETA_HAND_BLOCKER_MODE=on`（T103／T106＝**規則として正しい形**）。
     **黙って既定が変わると 2 つの橋の数字が比較不能になる**ので、ここで固定する。"""
@@ -54,6 +59,7 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "RATE_T1_MODE": "on",                    # T103・2026-09-19
         "RATE_RUSH_MODE": "on",                  # T103・2026-09-19
         "RACE_MODE": "static",                   # T90／T91／T104（切替として残す）
+        "DON_PURSE_MODE": "all",                 # T109・2026-09-19
     }
 
 
@@ -960,3 +966,118 @@ def test_the_hand_can_fire_its_effect_once():
             CB.set_slope_effect_mode("なにか")
     finally:
         CB.set_slope_effect_mode("hand")
+
+
+def test_one_purse_pays_for_each_card_once(monkeypatch):
+    """**T109**（ユーザ指示「使用できるドンと使ったドンの整合が取れるように」）: **支払いも付与も
+    同じアクティブから出る**のが規則なのに、`stock`（T77・体）と `e₁`（T108・効果）は**別々に同じドンを
+    使えた**。`DON_PURSE_MODE=one` は**手札を 1 つのナップサックに入れ、1 枚 1 回だけ払う**。"""
+    import deck_refill as DR
+
+    class _Cards:
+        def __init__(self, tbl): self.tbl = tbl
+        def info(self, cid): return self.tbl.get(cid)
+    # A＝体だけ・B＝効果だけ（イベント＝体を持たない）・どちらもコスト 4
+    cards = _Cards({"A": {"power": 6000, "cost": 4}, "B": {"power": 0, "cost": 4, "event": True}})
+    monkeypatch.setattr(DR, "card_effect_harm", lambda cid, *a, **k: 0.05 if cid == "B" else 0.0)
+    items = [{"cid": "A", "cost": 4}, {"cid": "B", "cost": 4}]
+    # ドン 4 なら**どちらか 1 枚だけ**——旧 `off` は両方（体も効果も）数えられた
+    atk, rush, eff, paid = CB.hand_purse(items, cards, 4, 5000.0)
+    assert paid == pytest.approx(4.0)                     # 払ったのは 1 枚ぶん
+    assert (atk > 0.0) != (eff > 0.0)                     # 体か効果のどちらか片方しか立たない
+    # ドン 8 なら両方買える＝両方立つ（払いは 8）
+    atk2, _r2, eff2, paid2 = CB.hand_purse(items, cards, 8, 5000.0)
+    assert paid2 == pytest.approx(8.0) and atk2 > 0.0 and eff2 == pytest.approx(0.05)
+    # **払いは絶対に財布を超えない**（不変量）
+    for don in range(0, 11):
+        assert CB.hand_purse(items, cards, don, 5000.0)[3] <= don + 1e-9
+
+
+def test_the_purse_keeps_bodyless_removal_that_the_old_form_dropped(monkeypatch):
+    """**T109 の副産物**: `playable_attack_price` は**体を持つ札だけ**を候補にしていたので、
+    **除去を持つイベント・ステージは丸ごと落ちていた**。財布のナップサックは**規則どおり**
+    「体か効果のどちらかが在れば候補」なので拾う。"""
+    import deck_refill as DR
+
+    class _Cards:
+        def __init__(self, tbl): self.tbl = tbl
+        def info(self, cid): return self.tbl.get(cid)
+    cards = _Cards({"E": {"power": 0, "cost": 2, "event": True}})
+    monkeypatch.setattr(DR, "card_effect_harm", lambda cid, *a, **k: 0.07)
+    items = [{"cid": "E", "cost": 2}]
+    assert CB.playable_attack_price(items, cards, 5, 5000.0) == pytest.approx(0.0)   # 旧: 0
+    atk, _r, eff, paid = CB.hand_purse(items, cards, 5, 5000.0)
+    assert atk == pytest.approx(0.0) and eff == pytest.approx(0.07) and paid == pytest.approx(2.0)
+
+
+def test_the_knapsack_reports_what_it_spent():
+    """**T109**: 帳尻を取るには**詰め方が使ったドン**が要る（`want_cost`）。
+    **同じ詰め方の中の額**なので、価値の内訳（速攻）と矛盾しない。"""
+    class _Cards:
+        def __init__(self, tbl): self.tbl = tbl
+        def info(self, cid): return self.tbl.get(cid)
+    cards = _Cards({"A": {"power": 6000, "rush": True}, "B": {"power": 7000}})
+    items = [{"cid": "A", "cost": 4}, {"cid": "B", "cost": 3}]
+    tot, rush, paid = CB.playable_attack_price(items, cards, 7, 5000.0, want_rush=True, want_cost=True)
+    assert paid == pytest.approx(7.0) and rush > 0.0 and tot > rush
+    tot1, rush1, paid1 = CB.playable_attack_price(items, cards, 3, 5000.0, want_rush=True, want_cost=True)
+    assert paid1 == pytest.approx(3.0) and rush1 == pytest.approx(0.0) and tot1 > 0.0
+    assert CB.playable_attack_price(items, cards, 0, 5000.0, want_cost=True)[2] == pytest.approx(0.0)
+
+
+def test_the_purse_picks_one_option_per_group():
+    """**T109**: 財布のナップサックは**組ごとに 1 つだけ**選ぶ（手札の 1 枚は「出す／出さない」・
+    場の攻め手は「付与 `k` 枚」のうち 1 つ）。**同じ組から 2 つ取れたら付与を二重に買える**。"""
+    g = [[(0, {}), (1, {"attach": 1.0}), (2, {"attach": 1.5})]]
+    p = CB.purse_plan(g, 4)
+    assert p["attach"] == pytest.approx(1.5) and p["paid"] == 2.0     # 3 枚買って 2.5 にはならない
+    assert CB.purse_plan(g, 1)["attach"] == pytest.approx(1.0)
+    assert CB.purse_plan(g, 0)["paid"] == 0.0 and CB.purse_plan(g, 0)["attach"] == 0.0
+    # 2 つの組なら両方から 1 つずつ取れる
+    g2 = g + [[(0, {}), (2, {"atk": 3.0, "rush": 3.0})]]
+    p2 = CB.purse_plan(g2, 4)
+    assert p2["atk"] == pytest.approx(3.0) and p2["rush"] == pytest.approx(3.0)
+    assert p2["attach"] == pytest.approx(1.5) and p2["paid"] == 4.0   # 4 なら体 2 ＋ 付与 2
+    # **財布が足りなければ組の中で安い方に落ちる**（付与 2 枚 → 1 枚）＝取り合いが起きる
+    p3 = CB.purse_plan(g2, 3)
+    assert p3["atk"] == pytest.approx(3.0) and p3["attach"] == pytest.approx(1.0) and p3["paid"] == 3.0
+    # **払いは財布を超えない**（不変量）
+    for b in range(0, 8):
+        assert CB.purse_plan(g2, b)["paid"] <= b + 1e-9
+
+
+def test_the_attach_comes_out_of_the_same_purse():
+    """**T109**（ユーザ指示の核心「アクティブ・レスト・付与・ドンデッキの適切な箇所から使う」）:
+    **付与（アクティブ → 付与）は手札を出すのと同じアクティブ**から出る（`ops.rs::attach_don`）。
+
+    `attack_value_don`（T45）は `max_k [増分 − k·δ]` を取っていたが、**そのドンをどこからも引いて
+    いなかった**（実測 0.10 枚/ターンが無料で湧いていた）。`all` では**盤面を素殴りに戻し**、
+    付与を**財布の中の選択肢**にする＝**変えるのは出所だけ**（値段は T45 のまま・新定数ゼロ）。
+
+    **`δ` を落とすのは誤り**（2026-09-19 に測って捨てた）——財布はふつう余る（要求 5.78 対 在る 6.01）ので
+    **制約が値段の代わりにならず**、落とすと `A` が 3〜6 割膨らんで速さの検算が 1.25〜1.59 に壊れた。"""
+    tok = np.zeros((22, 24), np.float32)
+    olp = 5000.0
+    # 自分のリーダー 5000（枠 0）＋ 4000 のキャラ（枠 2）＝ 1 枚付けて通る体（T45）
+    tok[0, T.S_POWER], tok[0, T.S_CAN_ATTACK] = 0.5, 1.0
+    tok[2, T.S_POWER], tok[2, T.S_IS_CHAR], tok[2, T.S_CAN_ATTACK] = 0.4, 1.0, 1.0
+    g = CB.attach_groups(tok, olp, delta=0.0)
+    assert g, "1000 低い体には付与の選択肢が立つ（値段 0 なら必ず）"
+    # **`δ` を払うので、増分が `k·δ` を超えない付与は選択肢にならない**（T45 と同じ値付け）
+    assert CB.attach_groups(tok, olp, delta=1e6) == []
+    # **リーダーとキャラは別の名前**（リーダーは KO されない＝減衰の掛かる側と分ける・T95）
+    names = {k for opts in g for _c, parts in opts for k in parts}
+    assert names <= {"attach", "attach_lead"}
+    # 財布が 0 なら 1 枚も付けられない
+    assert CB.purse_plan(g, 0)["paid"] == 0.0
+    # 盤面の項は `with_don` で素殴りに戻る（付与を財布で買うので二重に数えない）
+    lead_don, chars_don = CB.theory_slope_parts(tok, olp)
+    lead_raw, chars_raw = CB.theory_slope_parts(tok, olp, with_don=False)
+    assert chars_don > chars_raw and lead_don == pytest.approx(lead_raw)
+    try:
+        assert CB.set_don_purse_mode("all") == "all"
+        assert CB.set_don_purse_mode("one") == "one"
+        with pytest.raises(ValueError):
+            CB.set_don_purse_mode("なにか")
+    finally:
+        CB.set_don_purse_mode("all")

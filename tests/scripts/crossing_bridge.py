@@ -41,9 +41,10 @@ from attack_response import parts  # noqa: E402
 from clock_calib import D_BINS, d_bin  # noqa: E402
 from price_realised import nu_meas_of, side_nu_meas  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
-from theory_order import (KO_P, LAM, MU, PWR_EPS, R_TURNS, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, SC_MY_DON, SC_MY_HAND, SLOT_OWN_FIELD,  # noqa: E402
+from theory_order import (DELTA, KO_P, LAM, MU, PWR_EPS, R_TURNS, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, SC_MY_DON, SC_MY_HAND, SLOT_OWN_FIELD,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE, S_POWER,
-                          SLOT_OPP_FIELD, THETA, add_nu_mode_arg, apply_nu_mode, attack_value_don, c_of,
+                          SLOT_OPP_FIELD, THETA, add_nu_mode_arg, apply_nu_mode, attack_value,
+                          attack_value_don, c_of,
                           opp_bodies_of, own_attackers_of, score_candidate, slot_power, theta_of)
 
 SLOPES = ("hist", "theory")
@@ -119,7 +120,8 @@ def set_slope_mode(mode):
     SLOPE_MODE = mode
 
 
-def playable_attack_price(items, cards, don, olp, theta=THETA, mu=MU, want_rush=False):
+def playable_attack_price(items, cards, don, olp, theta=THETA, mu=MU, want_rush=False,
+                          want_cost=False):
     """**今のドンで手札から出せる体**の攻撃の価格の和（T77）＝費用の合計が `don` を超えない範囲での最大（小さなナップサック）。
     体を持たない札（イベント・ステージ）は 0。
 
@@ -138,15 +140,17 @@ def playable_attack_price(items, cards, don, olp, theta=THETA, mu=MU, want_rush=
         cand.append((max(0, cost), float(attack_value_don(power, olp, True, theta, mu)),
                      bool(info.get("rush"))))
     budget = int(max(0, round(float(don))))
-    if budget < 0:
-        return (0.0, 0.0) if want_rush else 0.0
     best = [0.0] * (budget + 1)
     rush = [0.0] * (budget + 1)                  # 同じ詰め方の中の速攻ぶん（総額の最適化には使わない）
+    paid = [0.0] * (budget + 1)                  # **T109**: 同じ詰め方が使ったドン（財布の帳尻に要る）
     for cost, val, is_rush in cand:
         for b in range(budget, cost - 1, -1):
             if best[b - cost] + val > best[b]:
                 best[b] = best[b - cost] + val
                 rush[b] = rush[b - cost] + (val if is_rush else 0.0)
+                paid[b] = paid[b - cost] + cost
+    if want_cost:
+        return float(best[budget]), float(rush[budget]), float(paid[budget])
     return (float(best[budget]), float(rush[budget])) if want_rush else float(best[budget])
 
 
@@ -614,13 +618,16 @@ def opp_blockers_of(tok, my_leader_power=None, r_turns=R_TURNS, theta=THETA, mu=
     return out
 
 
-def theory_slope_parts(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None):
+def theory_slope_parts(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None, with_don=True):
     """盤面の速さを **2 つに分けて**返す: `(リーダー, キャラ)`（T95）。
     **規則**——**リーダーは KO されない**（`rules/battle.rs`: リーダーへの攻撃はライフを削る）ので、
-    盤面の減衰（`ko_p`）が掛かるのは**キャラの側だけ**。`own_attackers_of` は枠 0（自分のリーダー）を先頭に返す。"""
+    盤面の減衰（`ko_p`）が掛かるのは**キャラの側だけ**。`own_attackers_of` は枠 0（自分のリーダー）を先頭に返す。
+
+    **T109**: `with_don=False` なら**素殴りだけ**（付与を財布のナップサックで買うとき・`DON_PURSE_MODE=all`）。"""
     blk = blockers if (SLOPE_BLOCK_MODE == "on" and blockers) else None
     xs = own_attackers_of(tok, opp_leader_power)
-    vals = [attack_value_don(float(opp_leader_power) + x, opp_leader_power, True, theta, mu, blockers=blk) for x in xs]
+    fn = attack_value_don if with_don else attack_value
+    vals = [fn(float(opp_leader_power) + x, opp_leader_power, True, theta, mu, blockers=blk) for x in xs]
     return (float(vals[0]) if vals else 0.0), float(sum(vals[1:]))
 
 
@@ -686,7 +693,9 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     if SLOPE_BLOCK_MODE == "on":
         blk = opp_blockers_of(tok_row, my_leader_power=float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
                               theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)
-    lead, chars = theory_slope_parts(tok_row, olp, theta, mu, blockers=blk)
+    # **T109**: `all` なら盤面は**素殴り**で数え、付与は財布のナップサックの中で買う（二重に数えない）。
+    lead, chars = theory_slope_parts(tok_row, olp, theta, mu, blockers=blk,
+                                     with_don=(DON_PURSE_MODE != "all"))
     base = lead + chars
     if SLOPE_MODE != "hand":
         return base, 0.0, 0.0, lead, 0.0, 0.0, 0.0, 0.0
@@ -695,14 +704,28 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
         import hand_plan as HP
         r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
         items = HP.hand_items(tok_row, ci_row, idx2cid, cards, olp, r)
-        stock, stock_rush = playable_attack_price(items, cards, float(sc_a[SC_MY_DON]), olp, theta, mu,
-                                                  want_rush=True)
-        if SLOPE_EFFECT_MODE == "hand":
-            # **T108**: 在庫（手札）が今このターン出せる効果の損害（一度きり）
-            import deck_refill as DR
-            mlp_h = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-            eff_once = float(DR.hand_effect_harm([it["cid"] for it in (items or ())], mlp_h, r,
-                                                 float(sc_a[SC_MY_DON])))
+        mlp_h = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
+        if DON_PURSE_MODE in ("one", "all"):
+            # **T109**: 財布は 1 つ——**体と効果を同じナップサックで買う**（1 枚 1 回だけ払う）。
+            g = hand_groups(items, cards, olp, theta, mu, mlp_h, r,
+                            with_don=(DON_PURSE_MODE != "all"))
+            if DON_PURSE_MODE == "all":
+                # **付与も同じ財布から**（`attack_value_don` が無料で付けていたドン）
+                g = g + attach_groups(tok_row, olp, theta, mu, blockers=blk)
+            pl = purse_plan(g, float(sc_a[SC_MY_DON]))
+            stock, stock_rush, eff_once = pl["atk"], pl["rush"], pl["eff"]
+            lead += pl["attach_lead"]
+            base += pl["attach_lead"] + pl["attach"]
+            if SLOPE_EFFECT_MODE != "hand":
+                eff_once = 0.0
+        else:
+            stock, stock_rush = playable_attack_price(items, cards, float(sc_a[SC_MY_DON]), olp, theta, mu,
+                                                      want_rush=True)
+            if SLOPE_EFFECT_MODE == "hand":
+                # **T108**: 在庫（手札）が今このターン出せる効果の損害（一度きり）
+                import deck_refill as DR
+                eff_once = float(DR.hand_effect_harm([it["cid"] for it in (items or ())], mlp_h, r,
+                                                     float(sc_a[SC_MY_DON])))
     flow = flow_rush = eff = 0.0
     if deck_ids:
         import deck_refill as DR
@@ -891,6 +914,152 @@ def set_slope_effect_mode(name):
     return SLOPE_EFFECT_MODE
 
 
+#: **財布は 1 つ**（T109・ユーザ指示 2026-09-19「使用できるドンと使ったドンの整合が取れるように」）。
+#:
+#: **規則**（`journal.rs::DonZone` の 4 ゾーンと `ops.rs`／`turn.rs` の全経路を数え上げた）:
+#: **支払い（アクティブ → レスト）も付与（アクティブ → 付与）も、同じ「自分のターン開始時のアクティブ」から出る**。
+#: **ドンは 4 ゾーンの間を動くだけで増えない**＝席ごとの合計はリーダーのルールで決まる定数
+#: （既定 10・OP15-058 エネルは 6）。器は `don_ledger.py`（記録 5,918 席行で**破れ 0**）。
+#:
+#: **欠陥**: `off`（旧）では **`stock`（T77・体を出す）と `e₁`（T108・効果を撃つ）が別々に同じドンを使える**。
+#: 実測で**自席ターンの 22% で理論が在るドンより多くを要求**していた（`don_ledger` の `over_share`）。
+#: T108 の報告 §5「上手くいかなかった 2」で名指しした穴がこれ。
+#:
+#: `one`＝**手札を 1 つのナップサックに入れる**——札ごとの重みは**そのカードのコスト（1 回だけ）**、
+#: 値は**体の攻撃 ＋ その札自身の効果の損害**。**副産物として 2 つ正しくなる**:
+#: (a) **イベント・ステージも除去なら値を持つ**（`playable_attack_price` は体だけ見ていたので丸ごと落ちていた）、
+#: (b) **出した札はどれも自分の効果を撃つ**（T108 は 1 枚だけ数える過小側の規約だった）。**新定数ゼロ**。
+#: `all`＝`one` に**付与（アクティブ → 付与）も同じ財布から出す**ことを加える——`attack_value_don`（T45）は
+#: 場の攻め手に**ドンを無料で付けて**値を出しており（実測 0.10 枚/ターン）、そのドンは規則では
+#: **手札を出すのと同じアクティブ**から来る。`all` では**盤面の項を素殴り（`attack_value`）に戻し**、
+#: 付与は**財布のナップサックの中の選択肢**（攻め手ごとに `k = 0..ATTACK_DON_MAX` の 1 つ）にする。
+DON_PURSE_MODES = ("off", "one", "all")
+#: **既定は `all`**（2026-09-19・ユーザ指示「使用できるドンと使ったドンの整合が取れるように最後まで進めてください」）。
+#: **帳尻が合うのはこの形だけ**——理論が在るドンより多くを要求する自席ターンの割合は
+#: **`off` 22.0% → `one` 4.4% → `all` 0.0%**（`don_ledger` 実測・実 40 局）。
+#: 数字は**実で単調に良くなり**（勝者の的中 0.6628 → 0.6642 → **0.6654**）**合成はわずかに下がる**
+#: （0.6421 → 0.6376 → 0.6381）。**帳簿（線形の橋）と `curve` は小数 4 桁まで不変＝費用ゼロ**。
+#: **以前の数字と比べるときは `--don-purse off`**。
+DON_PURSE_MODE = "all"
+
+
+def set_don_purse_mode(name):
+    global DON_PURSE_MODE
+    if name not in DON_PURSE_MODES:
+        raise ValueError("unknown don purse mode: %r" % (name,))
+    DON_PURSE_MODE = name
+    return DON_PURSE_MODE
+
+
+#: 財布の内訳の名前（**1 つの詰め方の中の内訳**なので、足し合わせても二重にならない）
+PURSE_PARTS = ("atk", "rush", "eff", "attach", "attach_lead")
+
+
+def purse_plan(groups, budget):
+    """**組ごとに 1 つだけ選ぶナップサック**（T109 の財布）＝`{atk, rush, eff, attach, paid}`。
+
+    `groups` は `[[(費用, {内訳}), ...], ...]`——**1 つの組の中からは 1 つしか選べない**
+    （手札の 1 枚は「出す／出さない」・場の攻め手は「付与 `k` 枚」のうち 1 つ）。
+    最適化の対象は**内訳の合計**（`atk + eff + attach`）で、`rush` は**同じ詰め方の中の内訳**
+    （別に解くとドンの枠を二重に使う・T103 と同じ規約）。"""
+    n = int(max(0, round(float(budget))))
+    best = [0.0] * (n + 1)
+    acc = [{k: 0.0 for k in PURSE_PARTS + ("paid",)} for _ in range(n + 1)]
+    for g in groups:
+        nb, na = list(best), [dict(x) for x in acc]
+        for cost, parts in g:
+            c = int(max(0, round(float(cost))))
+            if c > n:
+                continue
+            val = (float(parts.get("atk", 0.0)) + float(parts.get("eff", 0.0))
+                   + float(parts.get("attach", 0.0)) + float(parts.get("attach_lead", 0.0)))
+            for b in range(n, c - 1, -1):
+                if best[b - c] + val > nb[b] + 1e-12:
+                    nb[b] = best[b - c] + val
+                    d = dict(acc[b - c])
+                    for k in PURSE_PARTS:
+                        d[k] += float(parts.get(k, 0.0))
+                    d["paid"] += c
+                    na[b] = d
+        best, acc = nb, na
+    out = dict(acc[n])
+    out["value"] = float(best[n])
+    return out
+
+
+def hand_groups(items, cards, olp, theta=THETA, mu=MU, mlp=5000.0, r_turns=3, with_don=True):
+    """**手札の枠ごとの組**（出す／出さない）。値は `体の攻撃 ＋ その札自身の効果の損害`。
+
+    `with_don=False` なら体の攻撃は**素殴り**（`attack_value`）——付与を財布の中の別の選択肢に
+    するとき（`DON_PURSE_MODE=all`）に二重に数えないため。"""
+    import deck_refill as DR
+    out = []
+    for it in items or ():
+        info = (cards.info(it["cid"]) or {}) if cards is not None else {}
+        power = float(info.get("power") or 0.0)
+        body = 0.0
+        if power > 0.0 and not info.get("event") and not info.get("stage"):
+            body = float(attack_value_don(power, olp, True, theta, mu) if with_don
+                         else attack_value(power, olp, True, theta, mu))
+        eff = float(DR.card_effect_harm(it["cid"], float(mlp), r_turns))
+        if body <= 0.0 and eff <= 0.0:
+            continue
+        cost = max(0, int(round(float(it.get("cost") or 0.0))))
+        parts = {"atk": body, "eff": eff}
+        if info.get("rush"):
+            parts["rush"] = body
+        out.append([(0, {}), (cost, parts)])
+    return out
+
+
+def TO_ATTACK_DON_MAX():
+    """付与の上限（`theory_order.ATTACK_DON_MAX`）は走行中に切り替わりうるので**呼ぶ時に読む**。"""
+    import theory_order as _TO
+    return int(_TO.ATTACK_DON_MAX)
+
+
+def attach_groups(tok, olp, theta=THETA, mu=MU, blockers=None, max_don=None, delta=None):
+    """**場の攻め手ごとの組**（付与 `k = 0..ATTACK_DON_MAX` のうち 1 つ）。値は**素殴りからの増分 − k·δ**。
+
+    **規則**: 付与はアクティブ → 付与（`ops.rs::attach_don`）＝**手札を出すのと同じ財布**。
+    `attack_value_don`（T45）は同じ `max_k [増分 − k·δ]` を取っていたが、**そのドンをどこからも引いて
+    いなかった**（実測 0.10 枚/ターン が無料で湧いていた）。ここでは**値段は T45 のまま**にして、
+    **ドンだけを財布から出す**——**変えるのは出所だけ**（新定数ゼロ・新しい値付けもしない）。
+
+    **`δ` を落とさない理由は実測**: 財布はふつう余る（自席ターンあたり 要求 5.78 対 在る 6.01）ので
+    **制約が値段の代わりにならない**。落とすと速さ `A` が 3〜6 割膨らみ、速さの検算が
+    0.97〜1.12 → 1.25〜1.59 に壊れた（2026-09-19 実測・`docs/reports/2026-09-19_don_purse.md` §5）。"""
+    max_don = TO_ATTACK_DON_MAX() if max_don is None else int(max_don)
+    delta = DELTA if delta is None else float(delta)
+    out = []
+    for i, x in enumerate(own_attackers_of(tok, olp)):
+        # **枠 0 は自分のリーダー**（`own_attackers_of` の並び）＝**KO されない**ので減衰の掛かる側と分ける
+        name = "attach_lead" if i == 0 else "attach"
+        p = float(olp) + float(x)
+        base = float(attack_value(p, olp, True, theta, mu, blockers=blockers))
+        opts = [(0, {})]
+        for k in range(1, max_don + 1):
+            gain = float(attack_value(p + 1000.0 * k, olp, True, theta, mu, blockers=blockers)) - base
+            if gain - k * delta > 0.0:
+                opts.append((k, {name: gain - k * delta}))
+        if len(opts) > 1:
+            out.append(opts)
+    return out
+
+
+def hand_purse(items, cards, don, olp, theta=THETA, mu=MU, mlp=5000.0, r_turns=3):
+    """**財布 1 つのナップサック**（T109）＝`(体の攻撃, そのうち速攻, 効果の損害, 使ったドン)`。
+
+    **1 枚 1 回だけ払う**——`playable_attack_price`（体）と `hand_effect_harm`（効果）は
+    **同じアクティブを別々に使えた**。ここでは**同じ詰め方**から両方の内訳を返す。
+
+    値は `体の攻撃 + その札の効果の損害` の和を最大化する（**規則と原本だけ**・打ち筋は入らない）。
+    体を持たない札は攻撃 0・除去を持たない札は効果 0 で、**どちらか在れば候補に残る**。"""
+    g = hand_groups(items, cards, olp, theta, mu, mlp, r_turns, with_don=True)
+    p = purse_plan(g, don)
+    return float(p["atk"]), float(p["rush"]), float(p["eff"]), float(p["paid"])
+
+
 def set_rate_t1_mode(name):
     global RATE_T1_MODE
     if name not in RATE_T1_MODES:
@@ -1019,6 +1188,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "rate_rush": RATE_RUSH_MODE, "stock_rush_sum": 0.0, "flow_rush_sum": 0.0,
              "rate_t1": RATE_T1_MODE, "tau_capped": 0, "tau_rows": 0,
              "slope_effect": SLOPE_EFFECT_MODE, "eff_sum": 0.0, "eff_n": 0, "eff1_sum": 0.0,
+             "don_purse": DON_PURSE_MODE,
              "theta_hand_blocker": THETA_HAND_BLOCKER_MODE, "hb_sum": 0.0, "hb_n": 0, "hb_hit": 0,
              "theta_return": THETA_RETURN_MODE, "theta_hand_place": THETA_HAND_PLACE,
              "shield_n": 0, "shield_sum": 0.0, "shield_rate_sum": 0.0,
@@ -1629,6 +1799,10 @@ def main(argv=None):
                     help="**T105** 速さ `A` に効果が出す損害を入れるか: `off`（旧・攻撃だけ）／"
                          "`on`（**引いた 1 枚が出す除去の損害**をデッキ平均で毎ターン足す・`deck_refill.e_of`）／"
                          "`hand`（`on` ＋ **在庫（手札）が今出せる分**を一度きり・T108）")
+    ap.add_argument("--don-purse", default=DON_PURSE_MODE, choices=DON_PURSE_MODES,
+                    help="**T109** 体を出すドンと効果を撃つドンを 1 つの財布にするか: "
+                         "`off`（旧・`stock` と `e₁` が別々に同じアクティブを使える＝自席ターンの 22% で使いすぎ）／"
+                         "`one`（**規則どおり**＝手札を 1 つのナップサックに入れ、1 枚 1 回だけ払う）")
     ap.add_argument("--rate-t1", default=RATE_T1_MODE, choices=RATE_T1_MODES,
                     help="**T103** 最初の自席ターンはアタックできない規則（`turn_count <= 2`）を歩きに入れるか: "
                          "`off`（旧）／`on`（**規則どおり**＝絶対の自席ターン 1 の速さは 0）")
@@ -1650,6 +1824,7 @@ def main(argv=None):
     set_rate_rush_mode(a.rate_rush)
     set_rate_t1_mode(a.rate_t1)
     set_slope_effect_mode(a.slope_effect)
+    set_don_purse_mode(a.don_purse)
     set_theta_hand_blocker_mode(a.theta_hand_blocker)
     set_slope_mode(a.slope_mode)
     set_slope_block_mode(a.slope_block)
