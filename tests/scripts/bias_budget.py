@@ -281,7 +281,9 @@ def collect_budget(dirs, limit_games=0, theta=None, mu=None, require_static=True
            "modes": {"race": CB.RACE_MODE, "theta_hand_place": CB.THETA_HAND_PLACE,
                      "theta_return": CB.THETA_RETURN_MODE, "rate_decay": CB.RATE_DECAY_MODE,
                      "rate_walk": CB.RATE_WALK_MODE, "don_purse": CB.DON_PURSE_MODE,
-                     "theta_don": CB.THETA_DON_MODE},
+                     "theta_don": CB.THETA_DON_MODE, "theta_hand": CB.THETA_HAND_MODE,
+                     "theta_hand_window": CB.THETA_HAND_WINDOW, "rate_don": CB.RATE_DON_MODE,
+                     "rate_don_pay": CB.RATE_DON_PAY, "rate_ramp": CB.RATE_RAMP},
            "games": stats.get("games"), "rows_out": len(rows_out), "blocks": len(blocks)}
     return out, {"turns": by_turn, "rows": by_row}
 
@@ -293,7 +295,16 @@ def main(argv=None):
     ap.add_argument("--json", default="")
     ap.add_argument("--no-require-static", dest="require_static", action="store_false",
                     help="的が動く構成でも強行する（分解は恒等式でなくなる）")
+    # **T114／T116**: 切替ごとに分解を測り直せるようにする（**報告の数を再現する唯一の道**）
+    ap.add_argument("--rate-don", default=CB.RATE_DON_MODE, choices=CB.RATE_DON_MODES)
+    ap.add_argument("--rate-don-pay", default="on", choices=("on", "off"))
+    ap.add_argument("--rate-ramp", type=float, default=CB.RATE_RAMP)
+    ap.add_argument("--theta-hand", default=CB.THETA_HAND_MODE, choices=CB.THETA_HAND_MODES)
+    ap.add_argument("--theta-hand-window", default=CB.THETA_HAND_WINDOW, choices=CB.THETA_HAND_WINDOWS)
     a = ap.parse_args(argv)
+    CB.set_theta_hand_mode(a.theta_hand)
+    CB.set_theta_hand_window(a.theta_hand_window)
+    CB.set_rate_don_mode(a.rate_don, pay=(a.rate_don_pay == "on"), ramp=a.rate_ramp)
     out, _rows = collect_budget(a.src, a.games, require_static=a.require_static)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:

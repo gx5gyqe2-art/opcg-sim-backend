@@ -74,6 +74,30 @@ def parts(sc, tok, sc2, tok2):
     }
 
 
+def parts_mirror(sc, tok, sc2, tok2):
+    """**2 行目が相手席の視点で書かれているときの `parts`**（T113・2026-09-19）。
+
+    記録の行は**その行を打つ席の視点**で符号化されている（`sc[0]` はその席のライフ）。
+    ターンの括りを「そのターンに残っている最後の行」で閉じると、**その最後の行は相手席の行になりうる**
+    （相手の応答窓・箱の commit）。そのとき列の対応だけを入れ替えれば同じ差分が読める:
+    ライフ 1↔0・手札 7↔6・自場↔相手場。
+
+    **物差し（リーダーパワー）は 1 行目のものを両辺に使う**——`parts` と同じ規約
+    （区間の中で物差しを動かすと体の項が差分ではなくなる）。"""
+    mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
+    olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+    return {
+        "opp_life": LAM * (float(sc[SC_OPP_LIFE]) - float(sc2[SC_MY_LIFE])),
+        "opp_hand": MU * (float(sc[SC_OPP_HAND]) - float(sc2[SC_MY_HAND])),
+        "opp_body": side_nu_meas(tok, SLOT_OPP_FIELD, mlp) - side_nu_meas(tok2, SLOT_OWN_FIELD, mlp),
+        "my_life": LAM * (float(sc2[SC_OPP_LIFE]) - float(sc[SC_MY_LIFE])),
+        "my_hand": MU * (float(sc2[SC_OPP_HAND]) - float(sc[SC_MY_HAND])),
+        "my_body": side_nu_meas(tok2, SLOT_OPP_FIELD, olp) - side_nu_meas(tok, SLOT_OWN_FIELD, olp),
+        "don": DELTA * ((don_stock(sc2, tok2, "opp") - don_stock(sc, tok, "me"))
+                        - (don_stock(sc2, tok2, "me") - don_stock(sc, tok, "opp"))),
+    }
+
+
 def classify(sc, tok, sc2, tok2):
     dl = float(sc[SC_OPP_LIFE]) - float(sc2[SC_OPP_LIFE])
     dh = float(sc[SC_OPP_HAND]) - float(sc2[SC_OPP_HAND])

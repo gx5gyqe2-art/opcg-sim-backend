@@ -384,9 +384,68 @@ def clocks(my_life, opp_life, my_hand, opp_hand, a_me, a_opp, b_me=0, b_opp=0, c
     return t_me, t_opp
 
 
-def prob_of_d(d, sigma_d=None):
+#: **T118（2026-09-19）**: 勝率の読みの**誤差の物差し**。`abs`＝`D/σ_D`（T80・ターンの絶対差）／
+#: `rel`＝`D/(σ_rel · s)`（`s` は 1 次同次な局面の尺度＝既定は `√(τ_me² + τ_opp²)`）。
+#: **根拠は実測**（`2026-09-19_win_calib.md`）——**予測 τ の五分位ごとに「予測 ÷ 実際」が 0.85 → 2.84 と伸びる**
+#: （合成 0.93 → 2.75）。長い時計の行では差も比例して伸びるので、**同じ `σ` で割ると決着帯を言い過ぎる**
+#: （最上位 10 分位で予測 0.91 対 実勝率 0.65）。
+#: **これは「乗法の誤差模型の厳密な帰結」ではない**（対数残差の sd は逆に縮む＝前提は偽）。
+#: **長い時計の行の予測が体系的に伸びていることに対する経験的な平坦化**であり、
+#: **定数は `σ_T` と同じ器の相対版**（`sigma_rel`・別のセットから引く）なので**当てはめではない**。
+#: **識別力の上がりは「比で読む」ことの効果**で、1 次同次な尺度（`hyp`／`sum`／`mean`／`max`／`geo`）は
+#: **AUC が完全に一致する**＝`hyp` が唯一正しい形なのではない（反証で確認）。
+W_ERR_MODES = ("abs", "rel")
+W_ERR_MODE = "abs"
+#: `rel` の `σ`（相対残差の sd）。`None` なら `sigma_rel_for(dirs)` で輪郭の表から引く。
+SIGMA_REL = None
+
+
+def set_w_err_mode(mode):
+    global W_ERR_MODE
+    if mode not in W_ERR_MODES:
+        raise ValueError("w err mode は %s のどれか" % (W_ERR_MODES,))
+    W_ERR_MODE = mode
+    return W_ERR_MODE
+
+
+def set_sigma_rel(value):
+    """`rel` の `σ`（相対残差の sd）を差し替える。**輪郭の表から引いた値を入れる**のが既定の使い方。"""
+    global SIGMA_REL
+    SIGMA_REL = None if value is None else float(value)
+    return SIGMA_REL
+
+
+def clock_scale(t_me, t_opp, mode="hyp"):
+    """**1 次同次な局面の尺度**（`rel` の分母に掛ける `s`）。
+
+    `D` と同じ単位（ターン）で、**両方の時計を c 倍すれば `s` も c 倍**になるものだけを置く
+    ——そうでないと「比で読む」ことにならない。**どれを選んでも識別力は同じ**（実測で AUC が一致）なので、
+    既定は `hyp`（`√(τ_me² + τ_opp²)`・どちらかが 0 でも 0 にならない）。"""
+    a = max(0.0, float(t_me)); b = max(0.0, float(t_opp))
+    if mode == "sum":
+        return a + b
+    if mode == "mean":
+        return 0.5 * (a + b)
+    if mode == "max":
+        return max(a, b)
+    if mode == "geo":
+        return math.sqrt(a * b)
+    return math.sqrt(a * a + b * b)
+
+
+def prob_of_d(d, sigma_d=None, t_me=None, t_opp=None, scale_mode="hyp"):
     """**時計の差 `D` から勝率へ**（T80）＝`W(D) = Φ(D/σ_D)`。`w_of_d`（密度）の**積分**で、同じ `σ_D` を使う。
-    `κ = w(D)/w̄` が微分の形なら、こちらが積分の形＝「今の勝率」。**新しい定数は無い**。"""
+    `κ = w(D)/w̄` が微分の形なら、こちらが積分の形＝「今の勝率」。**新しい定数は無い**。
+
+    **T118**: `W_ERR_MODE == "rel"` かつ 2 本の時計が渡されたときは、物差しを
+    `σ_rel × s(τ_me, τ_opp)` にする（`s` は 1 次同次＝比で読む）。`σ_rel` が無ければ `abs` に落ちる。"""
+    if (W_ERR_MODE == "rel" and sigma_d is None and SIGMA_REL is not None
+            and t_me is not None and t_opp is not None):
+        s = clock_scale(t_me, t_opp, scale_mode)
+        sd = float(SIGMA_REL) * s
+        if sd <= 0.0:
+            return 0.5
+        return 0.5 * (1.0 + math.erf(float(d) / (sd * math.sqrt(2.0))))
     sd = SIGMA_D if sigma_d is None else float(sigma_d)
     return 0.5 * (1.0 + math.erf(float(d) / (sd * math.sqrt(2.0))))
 

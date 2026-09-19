@@ -30,7 +30,7 @@ _SHIPPED = {n: getattr(CB, n) for n in (
     "THETA_HAND_MODE", "THETA_HAND_PLACE", "THETA_BODY_MODE", "THETA_HAND_BLOCKER_MODE",
     "THETA_RETURN_MODE", "SLOPE_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE", "SLOPE_EFFECT_MODE",
     "RATE_WALK_MODE", "RATE_DECAY_MODE", "RATE_T1_MODE", "RATE_RUSH_MODE", "RACE_MODE",
-    "DON_PURSE_MODE", "THETA_DON_MODE")}
+    "DON_PURSE_MODE", "THETA_DON_MODE", "THETA_HAND_WINDOW", "RATE_DON_MODE")}
 
 
 def test_the_shipped_defaults_are_the_ones_we_decided():
@@ -63,6 +63,8 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "RACE_MODE": "static",                   # T90／T91／T104（切替として残す）
         "DON_PURSE_MODE": "all",                 # T109・2026-09-19
         "THETA_DON_MODE": "rule",                # T110・2026-09-19
+        "THETA_HAND_WINDOW": "off",              # T116・2026-09-19（切替として残す）
+        "RATE_DON_MODE": "off",                  # T114・2026-09-19（切替として残す）
     }
 
 

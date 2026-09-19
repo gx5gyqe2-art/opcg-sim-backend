@@ -980,6 +980,35 @@ def slope(pairs, key="dS"):
     return float((xd * (y - y.mean())).sum() / (xd * xd).sum())
 
 
+def corr_of(pairs, key="dS"):
+    """**尺度に依らない結びつき**（`ΔG` と勝敗の相関・T119）。
+
+    **`slope` は尺度で動く**（帳簿を c 倍すれば 1/c 倍になる）ので、**一律の縮小で「傾きが 1 に寄った」と
+    言えてしまう**——実測: 帳簿全体を 0.65 倍すると前向きの傾きは 0.4614 → 0.7098 と 1 へ 54% 寄るが、
+    **相関と AUC は 1 ビットも動かない**。だから**較正（傾き）と判別（相関・AUC）は別の 2 つの必要条件**で、
+    どちらも出さないと「良くなった」の意味が決まらない。"""
+    x = np.array([p[key] for p in pairs], np.float64)
+    y = np.array([p["z"] for p in pairs], np.float64)
+    if len(x) < 10 or float(x.var()) <= 0.0 or float(y.var()) <= 0.0:
+        return None
+    return float(np.corrcoef(x, y)[0, 1])
+
+
+def slope_rev(pairs, key="dS"):
+    """**後ろ向きの傾き**（勝敗 1 単位あたり帳簿がどれだけ動くか・T119）。
+
+    **これは「恒等式が 1 と言う量」ではない**——`z − 0.5 = ΔG` を**期待値で厳密に満たす**帳簿を作って測ると
+    前向きの傾きが 1.00 になり、**後ろ向きは `4·var(p)`（実測 0.15〜0.27）にしかならない**（反証で確認）。
+    `rev = 1` を満たせるのは `ΔG ≡ ±0.5` の**全知の帳簿だけ**。
+    出す理由は**「11」と「1」を同じ表に並べない**ため（単位が違うものを比べていた）。"""
+    x = np.array([p[key] for p in pairs], np.float64)
+    y = np.array([p["z"] for p in pairs], np.float64)
+    if len(x) < 10 or float(y.var()) <= 0.0:
+        return None
+    yd = y - y.mean()
+    return float((yd * (x - x.mean())).sum() / (yd * yd).sum())
+
+
 def _boot(pairs, reps=200, seed=0, key="dS"):
     if reps <= 0 or len(pairs) < 10:
         return [None, None]
@@ -1071,6 +1100,11 @@ def summarise(pairs, reps=200, seed=0):
                             is not None else None),
                     "slope": (round(slope(pairs, key), 5)
                               if slope(pairs, key) is not None else None),
+                    # **T119**: 尺度に依らない結びつきと、後ろ向きの傾き（**目標値は 1 ではない**）
+                    "corr": (round(corr_of(pairs, key), 4)
+                             if corr_of(pairs, key) is not None else None),
+                    "slope_rev": (round(slope_rev(pairs, key), 5)
+                                  if slope_rev(pairs, key) is not None else None),
                     "slope_ci95": _boot(pairs, reps, seed, key)}
     if has_g:
         # **T40**: `ΔG`（選んだ手の変化量）の判定と**較正表**（当てはめない——等分位ごとの実勝率）
