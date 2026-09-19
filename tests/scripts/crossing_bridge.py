@@ -179,6 +179,78 @@ def set_theta_hand_blocker_mode(name):
     return THETA_HAND_BLOCKER_MODE
 
 
+#: **耐久の側もドンを払う**（T110・ユーザ指示 2026-09-19「それは直しましょうか」＝T109 §10 の 1）。
+#:
+#: **T109 で財布を 1 つにしたのは速さ `A` の側だけ**だった。**耐久 `Θ` の側は 2 か所でドンを誤っていた**:
+#:
+#: 1. **手札のブロッカーの予算**（T106・`hand_blocker_nu`）が `min(10, 今のアクティブ + 2)` だった。
+#:    **規則はそうではない**——リフレッシュで**レストも付与も全部アクティブへ戻り**（`turn.rs`）、
+#:    そのあとドン!!フェイズが**ドンデッキから `min(2, 残り)`** 足す。つまり
+#:    **次の自分のターンのアクティブ ＝ アクティブ ＋ レスト ＋ 付与 ＋ min(2, デッキ)**。
+#:    旧式は**自席ターン終わりの行で測る**ので（使い残し 0.53）**大幅に過小**で、しかも
+#:    **上限 10 を決め打ち**していた（OP15-058 エネルは 6）。
+#: 2. **カウンター・イベントが無料**だった（`THETA_HAND_MODE=cuttable` は「カウンター値 > 0」だけ見る）。
+#:    **規則は払う**——`rules/battle.rs::apply_counter` は **EVENT なら `pay_cost`**、
+#:    印字カウンターの札はそのまま足せる＝無料。**イベントを切るドンは相手のターンに在るドン**＝
+#:    **自席ターンで使い残したぶんだけ**（実測 0.53 枚）。
+#:
+#: `off`＝旧（両方そのまま）／`blocker`＝1 だけ／**`rule`＝両方**（規則どおり）。**新定数ゼロ**。
+THETA_DON_MODES = ("off", "blocker", "rule")
+#: **既定は `rule`**（2026-09-19・ユーザ指示「それは直しましょうか」）——**どちらも規則がそう言っている**。
+#: **効き方は大きい**: 手札のブロッカーが立つ行が **3.4% → 44.0%（実）／10.9% → 29.3%（合成）**、
+#: 項の大きさが **0.0038 → 0.0550／0.0079 → 0.0304**（14 倍／3.9 倍）＝**旧の予算は桁で間違っていた**。
+#: `curve` の的中は上がり（0.5839 → **0.5983**／0.5996 → 0.6004）**`theory` の的中はわずかに下がる**
+#: （0.6654 → 0.6631／0.6381 → 0.6340）。**`Θ` が変わるので `σ_T` と `w̄` は測り直した**（T97／T98 の規約）。
+#: **以前の数字と比べるときは `--theta-don off`**。
+THETA_DON_MODE = "rule"
+
+
+def set_theta_don_mode(name):
+    global THETA_DON_MODE
+    if name not in THETA_DON_MODES:
+        raise ValueError("unknown theta don mode: %r" % (name,))
+    THETA_DON_MODE = name
+    return THETA_DON_MODE
+
+
+def next_turn_don(sc, tok):
+    """**次の自分のターンに使えるアクティブ**（規則・T110）＝`アクティブ ＋ レスト ＋ 付与 ＋ min(2, デッキ)`。
+
+    根拠は `rules/turn.rs`: **リフレッシュでレストも付与も全部アクティブへ戻り**、
+    そのあと `don_phase` が**ドンデッキから `min(2, 残り)`** をアクティブへ足す。
+    **上限は要らない**——4 ゾーンの合計はリーダーのルールで決まる定数なので、
+    **この式は自動的にその定数を超えない**（`don_ledger` が不変量として押さえている）。"""
+    import don_ledger as DL
+    z = DL.zones_of(sc, tok, "me")
+    return float(z["active"] + z["rested"] + z["attached"] + min(2.0, z["deck"]))
+
+
+def cuttable_share(items, don=None):
+    """**切れる札の割合**（T77 の `cuttable`）——`don` を渡すと**カウンター・イベントはドンを払う**（T110）。
+
+    **規則**（`rules/battle.rs::apply_counter`）: **EVENT は `pay_cost` が要る**・
+    それ以外は印字カウンターをそのまま足せる＝無料。**イベントを切るドンは相手のターンに在るドン**＝
+    自席ターンで使い残したぶん。**値はどの札も `μ` 1 枚ぶんで同じ**なので、
+    **安い順に取るのがそのまま最適**（ナップサックを解くのと一致する）。"""
+    if not items:
+        return 0.0
+    free = [it for it in items if float(it.get("counter") or 0.0) > 0.0 and not it.get("event")]
+    evs = sorted((it for it in items if float(it.get("counter") or 0.0) > 0.0 and it.get("event")),
+                 key=lambda it: float(it.get("cost") or 0.0))
+    n = len(free)
+    if don is None:
+        n += len(evs)
+    else:
+        left = float(don)
+        for it in evs:
+            c = float(it.get("cost") or 0.0)
+            if c > left + 1e-9:
+                continue
+            left -= c
+            n += 1
+    return float(n) / float(len(items))
+
+
 def hand_blocker_nu(sc, tok_row, ci_row, idx2cid, cards, opp_leader_power):
     """**その席が手札から出せるブロッカー 1 体の `ν_meas`**（T106・出せなければ 0）。
 
@@ -191,7 +263,9 @@ def hand_blocker_nu(sc, tok_row, ci_row, idx2cid, cards, opp_leader_power):
         return 0.0
     import hand_plan as HP
     sc_a = np.asarray(sc)
-    don = min(10.0, float(sc_a[SC_MY_DON]) + 2.0)
+    # **T110**: 規則どおりの予算（リフレッシュで全部戻る ＋ ドンデッキから min(2, 残り)）。
+    don = (next_turn_don(sc, tok_row) if THETA_DON_MODE in ("blocker", "rule")
+           else min(10.0, float(sc_a[SC_MY_DON]) + 2.0))
     r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
     best = 0.0
     for it in (HP.hand_items(tok_row, ci_row, idx2cid, cards, float(opp_leader_power), r) or ()):
@@ -204,7 +278,7 @@ def hand_blocker_nu(sc, tok_row, ci_row, idx2cid, cards, opp_leader_power):
     return best
 
 
-def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="dtotal"):
+def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="dtotal", don=None):
     """**その席の手札 1 枚あたりの価格**（T76）＝自分の手札の札ごとの `max(ΔH_play, ΔG_guard)`（T67）の平均。
     `part="dh"` なら出す側だけ（守る備えを外した切り分け）。手札が空なら `μ`（旧の数え方）。
     来る攻撃・受ける損・ドンの枠はその席の行から採る（`hand_plan.search_context`）。"""
@@ -214,7 +288,8 @@ def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="dtotal"):
     if not items:
         return float(mu)
     if part == "cuttable":                       # T77: 切れる札だけが μ を持つ（1 枚あたりの平均にすると μ × 切れる枚数 / 枚数）
-        return float(mu) * float(np.mean([1.0 if float(it.get("counter") or 0.0) > 0.0 else 0.0 for it in items]))
+        # **T110**: `don` を渡すと**カウンター・イベントはドンを払う**（`apply_counter` の規則）
+        return float(mu) * cuttable_share(items, don)
     vals = [float(HP.card_deltas(items[:k] + items[k + 1:], it, ctx["caps"], ctx["xs"], ctx["take"])[part])
             for k, it in enumerate(items)]
     return float(np.mean(vals))
@@ -1189,6 +1264,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "rate_t1": RATE_T1_MODE, "tau_capped": 0, "tau_rows": 0,
              "slope_effect": SLOPE_EFFECT_MODE, "eff_sum": 0.0, "eff_n": 0, "eff1_sum": 0.0,
              "don_purse": DON_PURSE_MODE,
+             "theta_don": THETA_DON_MODE, "hb_don_sum": 0.0, "cut_share_sum": 0.0, "cut_n": 0,
              "theta_hand_blocker": THETA_HAND_BLOCKER_MODE, "hb_sum": 0.0, "hb_n": 0, "hb_hit": 0,
              "theta_return": THETA_RETURN_MODE, "theta_hand_place": THETA_HAND_PLACE,
              "shield_n": 0, "shield_sum": 0.0, "shield_rate_sum": 0.0,
@@ -1266,7 +1342,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             for w in (0, 1):
                 for t in turn_seq[w]:
                     sc, tok, ci = turn_last.get((w, t), turn_start[(w, t)])   # 出した後の手札（ターン最後の行）
-                    g_self[(w, t)] = hand_price_mean(sc, tok, ci, idx2cid, cards, mu, part)
+                    # **T110**: `rule` なら**カウンター・イベントはドンを払う**。切るドンは
+                    # **相手のターンに在るドン**＝自席ターンで使い残したアクティブ（この行の `sc[2]`）。
+                    don_left = (float(np.asarray(sc)[SC_MY_DON]) if THETA_DON_MODE == "rule" else None)
+                    g_self[(w, t)] = hand_price_mean(sc, tok, ci, idx2cid, cards, mu, part, don_left)
         # **T106**: 席ごとの「手札から出せるブロッカー 1 体の `ν`」（同じく自席の行からしか読めない）
         hb_self = {}
         if THETA_HAND_BLOCKER_MODE == "on":
@@ -1803,6 +1882,10 @@ def main(argv=None):
                     help="**T109** 体を出すドンと効果を撃つドンを 1 つの財布にするか: "
                          "`off`（旧・`stock` と `e₁` が別々に同じアクティブを使える＝自席ターンの 22% で使いすぎ）／"
                          "`one`（**規則どおり**＝手札を 1 つのナップサックに入れ、1 枚 1 回だけ払う）")
+    ap.add_argument("--theta-don", default=THETA_DON_MODE, choices=THETA_DON_MODES,
+                    help="**T110** 耐久 `Θ` の側もドンを規則どおり払うか: `off`（旧）／"
+                         "`blocker`（手札のブロッカーの予算を**規則の次ターンのアクティブ**にする）／"
+                         "`rule`（それ ＋ **カウンター・イベントは使い残しのドンで払う**）")
     ap.add_argument("--rate-t1", default=RATE_T1_MODE, choices=RATE_T1_MODES,
                     help="**T103** 最初の自席ターンはアタックできない規則（`turn_count <= 2`）を歩きに入れるか: "
                          "`off`（旧）／`on`（**規則どおり**＝絶対の自席ターン 1 の速さは 0）")
@@ -1825,6 +1908,7 @@ def main(argv=None):
     set_rate_t1_mode(a.rate_t1)
     set_slope_effect_mode(a.slope_effect)
     set_don_purse_mode(a.don_purse)
+    set_theta_don_mode(a.theta_don)
     set_theta_hand_blocker_mode(a.theta_hand_blocker)
     set_slope_mode(a.slope_mode)
     set_slope_block_mode(a.slope_block)

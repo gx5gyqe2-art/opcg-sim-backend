@@ -30,7 +30,7 @@ _SHIPPED = {n: getattr(CB, n) for n in (
     "THETA_HAND_MODE", "THETA_HAND_PLACE", "THETA_BODY_MODE", "THETA_HAND_BLOCKER_MODE",
     "THETA_RETURN_MODE", "SLOPE_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE", "SLOPE_EFFECT_MODE",
     "RATE_WALK_MODE", "RATE_DECAY_MODE", "RATE_T1_MODE", "RATE_RUSH_MODE", "RACE_MODE",
-    "DON_PURSE_MODE")}
+    "DON_PURSE_MODE", "THETA_DON_MODE")}
 
 
 def test_the_shipped_defaults_are_the_ones_we_decided():
@@ -38,7 +38,9 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
 
     **2026-09-19 のユーザ指示**（「使用できるドンと使ったドンの整合が取れるように最後まで進めてください」）で
     `DON_PURSE_MODE=all`（T109）が入った——**財布が 1 つになって初めて帳尻が合う**
-    （理論の使いすぎ 22.0% → 0.0%）。
+    （理論の使いすぎ 22.0% → 0.0%）。**続く「それは直しましょうか」で `THETA_DON_MODE=rule`（T110）**
+    ——**耐久の側もドンを規則どおり払う**（手札のブロッカーの予算＝次ターンのアクティブ・
+    カウンター・イベントは使い残しで払う）。
 
     **同日のユーザ決定**（「1は規定、2は正しいものに直してください」）で 4 つ動いた:
     `SLOPE_EFFECT_MODE=hand`（T108）・`RATE_T1_MODE=on`・`RATE_RUSH_MODE=on`・
@@ -60,6 +62,7 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "RATE_RUSH_MODE": "on",                  # T103・2026-09-19
         "RACE_MODE": "static",                   # T90／T91／T104（切替として残す）
         "DON_PURSE_MODE": "all",                 # T109・2026-09-19
+        "THETA_DON_MODE": "rule",                # T110・2026-09-19
     }
 
 
@@ -888,8 +891,14 @@ def test_a_blocker_in_hand_is_endurance_too():
 
 
 def test_the_hand_blocker_is_read_from_the_rules_not_the_play():
-    """**T106**: どのブロッカーを数えるかは**次の自分のターンのドン**（今 + 2・上限 10）で払えるかだけで決まる。
-    **1 体だけ**数える（1 体は 1 ターンに 1 回しか横取りできない・過小側に倒す）。"""
+    """**T106**: どのブロッカーを数えるかは**次の自分のターンのドン**で払えるかだけで決まる。
+    **1 体だけ**数える（1 体は 1 ターンに 1 回しか横取りできない・過小側に倒す）。
+
+    **T110 でその「次のターンのドン」が規則どおりになった**——旧 `min(10, 今のアクティブ + 2)` は
+    **レストと付与が戻ることを見ておらず**（自席ターン終わりの行で測るので使い残しは 0.5 枚しか無い）、
+    **上限 10 も決め打ち**だった。新 `rule` は `アクティブ ＋ レスト ＋ 付与 ＋ min(2, デッキ)`。"""
+    import don_ledger as DL
+
     class _Cards:
         def __init__(self, tbl): self.tbl = tbl
         def info(self, cid): return self.tbl.get(cid)
@@ -902,21 +911,34 @@ def test_the_hand_blocker_is_read_from_the_rules_not_the_play():
     cards = _Cards({"BLK": {"power": 4000, "blocker": True},
                     "BIG": {"power": 9000, "blocker": True},
                     "BODY": {"power": 7000}})
+    tok = np.zeros((22, 24), dtype=np.float32)
     sys.modules["hand_plan"] = _HP
     try:
+        assert CB.THETA_DON_MODE == "rule"       # **2026-09-19 から既定**（ユーザ指示「それは直しましょうか」）
         sc = _sc(3, 4)
-        sc[T.SC_MY_DON] = 4.0                                   # 次のターンは 6 ドン
-        v = CB.hand_blocker_nu(sc, np.zeros((22, 24), dtype=np.float32), [0] * 22, {}, cards, 5000.0)
-        assert v == pytest.approx(PR.nu_meas_of(4000.0, 5000.0)) # 5 コストは払えるが 9 コストは払えない
-        sc[T.SC_MY_DON] = 8.0                                   # 次は 10 ドン＝両方払える → 高い方
-        v2 = CB.hand_blocker_nu(sc, np.zeros((22, 24), dtype=np.float32), [0] * 22, {}, cards, 5000.0)
+        # 使い残し 1・レスト 3・デッキ 6 → 次のターンは 1 + 3 + 0 + 2 = 6 ドン
+        sc[DL.SC_MY_ACTIVE], sc[DL.SC_MY_RESTED] = 1.0, 3.0
+        sc[DL.SC_MY_DON_DECK] = 6 / DL.DECK_SCALE
+        v = CB.hand_blocker_nu(sc, tok, [0] * 22, {}, cards, 5000.0)
+        assert v == pytest.approx(PR.nu_meas_of(4000.0, 5000.0))  # 5 コストは払えるが 9 は払えない
+        # 付与も戻る——付与 4 を足すと 10 ドン＝両方払える → 高い方
+        sc[DL.SC_MY_LEADER_DON] = 4 / DL.ATT_SCALE
+        sc[DL.SC_MY_DON_DECK] = 2 / DL.DECK_SCALE
+        v2 = CB.hand_blocker_nu(sc, tok, [0] * 22, {}, cards, 5000.0)
         assert v2 == pytest.approx(PR.nu_meas_of(9000.0, 5000.0)) and v2 >= v
-        sc[T.SC_MY_DON] = 0.0                                   # 次は 2 ドン＝どちらも出せない
-        assert CB.hand_blocker_nu(sc, np.zeros((22, 24), dtype=np.float32), [0] * 22, {},
-                                  cards, 5000.0) == pytest.approx(0.0)
+        # 全部使い切って付与も無くデッキも尽きていれば 0（規則どおり 1 枚も増えない）
+        sc[DL.SC_MY_ACTIVE] = sc[DL.SC_MY_RESTED] = 0.0
+        sc[DL.SC_MY_LEADER_DON] = sc[DL.SC_MY_DON_DECK] = 0.0
+        assert CB.hand_blocker_nu(sc, tok, [0] * 22, {}, cards, 5000.0) == pytest.approx(0.0)
+        # **旧 `off` は使い残しだけを見るので、同じ行でも桁が違う**（3 ドン＝どちらも出せない）
+        CB.set_theta_don_mode("off")
+        sc[DL.SC_MY_ACTIVE], sc[DL.SC_MY_RESTED] = 1.0, 3.0
+        sc[DL.SC_MY_DON_DECK] = 6 / DL.DECK_SCALE
+        assert CB.hand_blocker_nu(sc, tok, [0] * 22, {}, cards, 5000.0) == pytest.approx(0.0)
         # 原本が引けなければ 0（落ちない）
         assert CB.hand_blocker_nu(sc, None, None, None, None, 5000.0) == pytest.approx(0.0)
     finally:
+        CB.set_theta_don_mode("rule")
         del sys.modules["hand_plan"]
 
 
@@ -1081,3 +1103,62 @@ def test_the_attach_comes_out_of_the_same_purse():
             CB.set_don_purse_mode("なにか")
     finally:
         CB.set_don_purse_mode("all")
+
+
+def test_the_next_turns_don_is_what_the_rules_give_back():
+    """**T110**（ユーザ指示「それは直しましょうか」＝T109 §10 の 1）: **耐久の側もドンを規則どおり払う**。
+
+    T106 の手札のブロッカーは予算を `min(10, 今のアクティブ + 2)` にしていたが、**規則はそうではない**:
+    リフレッシュで**レストも付与も全部アクティブへ戻り**（`rules/turn.rs`）、そのあと `don_phase` が
+    **ドンデッキから `min(2, 残り)`** 足す。よって
+    **次の自分のターンのアクティブ ＝ アクティブ ＋ レスト ＋ 付与 ＋ min(2, デッキ)**。
+
+    **上限は要らない**——4 ゾーンの合計はリーダーのルールが決める定数なので、この式は自動でその中に収まる。"""
+    import don_ledger as DL
+    sc = np.zeros(70, np.float32)
+    tok = np.zeros((22, 24), np.float32)
+    sc[DL.SC_MY_ACTIVE], sc[DL.SC_MY_RESTED] = 1, 4
+    sc[DL.SC_MY_LEADER_DON] = 2 / DL.ATT_SCALE                    # 付与 2
+    sc[DL.SC_MY_DON_DECK] = 3 / DL.DECK_SCALE                     # デッキ 3
+    assert CB.next_turn_don(sc, tok) == pytest.approx(9.0)        # 1 + 4 + 2 + min(2, 3)
+    # **ドンデッキが尽きたら足されない**（`don_phase` は空なら飛ばす）
+    sc[DL.SC_MY_DON_DECK] = 0.0
+    sc[DL.SC_MY_ACTIVE] = 4
+    assert CB.next_turn_don(sc, tok) == pytest.approx(10.0)       # 4 + 4 + 2 + 0
+    # **1 枚しか残っていなければ 1 枚だけ**
+    sc[DL.SC_MY_DON_DECK] = 1 / DL.DECK_SCALE
+    sc[DL.SC_MY_ACTIVE] = 3
+    assert CB.next_turn_don(sc, tok) == pytest.approx(10.0)       # 3 + 4 + 2 + min(2, 1)
+    # **6 枚のリーダー（OP15-058）でも式は自動で収まる**——合計が 6 しか無いので 6 を超えない
+    sc2 = np.zeros(70, np.float32)
+    sc2[DL.SC_MY_ACTIVE], sc2[DL.SC_MY_DON_DECK] = 4, 2 / DL.DECK_SCALE
+    assert CB.next_turn_don(sc2, np.zeros((22, 24), np.float32)) == pytest.approx(6.0)
+    # 旧式は自席ターン終わり（使い残しが少ない）で測るので大幅に過小
+    try:
+        assert CB.set_theta_don_mode("off") == "off"
+        assert CB.set_theta_don_mode("blocker") == "blocker"
+        assert CB.set_theta_don_mode("rule") == "rule"
+        with pytest.raises(ValueError):
+            CB.set_theta_don_mode("なにか")
+    finally:
+        CB.set_theta_don_mode(_SHIPPED["THETA_DON_MODE"])
+
+
+def test_a_counter_event_has_to_be_paid_for():
+    """**T110**: `rules/battle.rs::apply_counter` は **EVENT なら `pay_cost`**・
+    印字カウンターの札はそのまま足せる＝**無料**。`cuttable` は「カウンター値 > 0」だけ見ていたので
+    **イベントを無料で切れる前提**だった。**切るドンは相手のターンに在るドン**＝自席ターンの使い残し。
+
+    **値はどの札も `μ` 1 枚ぶんで同じ**なので**安い順に取るのがそのまま最適**（ナップサックと一致）。"""
+    ev1 = {"cid": "e1", "counter": 1000, "cost": 1, "event": True}
+    ev2 = {"cid": "e2", "counter": 2000, "cost": 2, "event": True}
+    printed = {"cid": "p", "counter": 1000, "cost": 3, "event": False}
+    plain = {"cid": "x", "counter": 0, "cost": 1, "event": False}
+    items = [ev1, ev2, printed, plain]
+    assert CB.cuttable_share(items) == pytest.approx(3 / 4)        # 旧＝イベントも無料
+    assert CB.cuttable_share(items, 0.0) == pytest.approx(1 / 4)   # ドンが無ければ印字だけ
+    assert CB.cuttable_share(items, 1.0) == pytest.approx(2 / 4)   # 安い方（コスト 1）を 1 枚
+    assert CB.cuttable_share(items, 3.0) == pytest.approx(3 / 4)   # 1 + 2 で両方
+    assert CB.cuttable_share([], 5.0) == 0.0
+    # **印字カウンターはドンが 0 でも数える**（規則どおり無料）
+    assert CB.cuttable_share([printed], 0.0) == pytest.approx(1.0)
