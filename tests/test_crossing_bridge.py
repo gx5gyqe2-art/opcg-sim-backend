@@ -1162,3 +1162,76 @@ def test_a_counter_event_has_to_be_paid_for():
     assert CB.cuttable_share([], 5.0) == 0.0
     # **印字カウンターはドンが 0 でも数える**（規則どおり無料）
     assert CB.cuttable_share([printed], 0.0) == pytest.approx(1.0)
+
+
+def test_the_purse_frontier_needs_no_exchange_rate():
+    """**T111**（ユーザの問い「1本にまとめた定数はどんな意味を持つ？」）: 財布を 1 本にするには
+    `価値 = A の分 + ρ × Θ の分` の `ρ` が要るが、**`ρ` は定数ではない**——
+
+    * **次元が [1/ターン]**（`A` は価格/ターン・`Θ` は価格）＝**率**。`ρ = 1` は「耐久は 1 ターンで効く」
+      と宣言するのと同じで、**時間の単位を変えると値が変わる**。
+    * レースから出る値は `ρ = (∂D/∂Θ_me)/(∂D/∂A_me) = A_me²/(A_opp·Θ_opp) = (1/τ_me)·(A_me/A_opp)`
+      ＝**局面の量**（どちらが速い側か）。**定数に固めると打ち筋を式に入れる**ことになる。
+
+    **だから `ρ` を置かない**——`D` は両軸で単調増なので**最適点はパレート境界上に在り**、
+    **境界の各点で `D` を直に測れば交換レートは現れない**。"""
+    g = [[(0, {}), (3, {"atk": 0.10, "rush": 0.10})], [(0, {}), (3, {"theta_body": 0.08})]]
+    # 予算 3 = どちらか片方しか買えない＝本物のトレードオフ
+    front = CB.purse_pareto(g, 3)
+    assert [(round(a, 3), round(t, 3)) for a, t, _p in front] == [(0.1, 0.0), (0.0, 0.08)]
+    # **予算が足りれば両方**＝境界は 1 点に潰れる（取り合いが無い）
+    assert len(CB.purse_pareto(g, 6)) == 1
+    # **内訳（witness）も運ぶ**——歩きは `atk`（段差）と `eff`（一度きり）で扱いが違うので潰せない
+    assert front[0][2]["rush"] == pytest.approx(0.10) and front[0][2]["paid"] == 3.0
+    # **自分が速いほど耐久を買う**（`τ = Θ/A` が凸なので追加の速さの効きが落ちる）
+    fast = CB.choose_by_race(front, 0.30, 0.60, 0.10, 0.60)
+    assert fast[1] == pytest.approx(0.08) and fast[0] == pytest.approx(0.0)
+    # **相手が速いほど速さを買う**（耐久 1 単位が買うターンが短い＝レースするしかない）
+    slow = CB.choose_by_race(front, 0.10, 0.60, 0.30, 0.60)
+    assert slow[0] == pytest.approx(0.10) and slow[1] == pytest.approx(0.0)
+    # `D` の値そのものも 2 つの時計の差（`τ_opp − τ_me`）
+    assert CB.race_margin(0.2, 0.6, 0.2, 0.6) == pytest.approx(0.0)
+    assert CB.race_margin(0.4, 0.6, 0.2, 0.6) > 0.0          # 自分が速い＝margin は正
+    assert CB.race_margin(0.0, 0.6, 0.2, 0.6) < 0.0          # 速さ 0 は床で割る（落ちない）
+
+
+def test_the_endurance_options_are_the_two_the_rules_allow():
+    """**T111**: 耐久に行ける選択肢は**規則が許す 2 つだけ**——
+    **出せるブロッカー**（`theta_body = ν_meas`・ブロックに召喚酔いは無い）と
+    **構えるカウンター・イベント**（`theta_hand = μ`・`apply_counter` が `pay_cost` を要求する）。
+    **印字カウンターの札は無料**なので財布には入らない（`cuttable_share` が別に数える）。"""
+    class _Cards:
+        def __init__(self, tbl): self.tbl = tbl
+        def info(self, cid): return self.tbl.get(cid)
+    cards = _Cards({"B": {"power": 6000, "blocker": True, "cost": 4},
+                    "E": {"power": 0, "event": True, "cost": 2},
+                    "P": {"power": 5000, "cost": 3},
+                    "N": {"power": 3000, "cost": 1}})
+    # `event` は**枠のほうにも載る**（`hand_plan.hand_items` が付ける）——`cuttable_share` は枠を見る
+    items = [{"cid": "B", "cost": 4, "counter": 0, "event": False},
+             {"cid": "E", "cost": 2, "counter": 1000, "event": True},
+             {"cid": "P", "cost": 3, "counter": 1000, "event": False},
+             {"cid": "N", "cost": 1, "counter": 0, "event": False}]
+    g = CB.theta_groups(items, cards, 5000.0)
+    kinds = sorted({k for opts in g for _c, parts in opts for k in parts})
+    assert kinds == ["theta_body", "theta_hand"]
+    assert len(g) == 2                       # ブロッカー B とカウンター・イベント E だけ
+    # 印字カウンターの非イベント（P）は**無料**なので財布の外
+    assert CB.theta_groups([items[2]], cards, 5000.0) == []
+    # `don_left` を渡すと払えないイベントは落ちる（`theta_body` は残る）
+    g0 = CB.theta_groups(items, cards, 5000.0, don_left=0.0)
+    assert sorted({k for opts in g0 for _c, parts in opts for k in parts}) == ["theta_body"]
+    # 無料で切れる札の 1 枚あたり＝印字カウンターの非イベントだけ（4 枚中 1 枚）
+    assert CB.free_cuttable_g(items) == pytest.approx(T.MU * 1 / 4)
+
+
+def test_the_opponents_board_speed_is_readable_from_my_row():
+    """**T111**: `A_opp` は**その席の行から読める**（相手の盤面の攻め手＝枠 1 と 7〜11・`opp_attackers_of`）。
+    **`A_opp` が要るのは配分を決めるため**で、これが読めなければレースで割れない。"""
+    tok = np.zeros((22, 24), np.float32)
+    assert CB.opp_board_slope(tok, 5000.0) == pytest.approx(0.0)      # 誰も居なければ 0
+    tok[1, T.S_POWER] = 0.5                                           # 相手のリーダー 5000
+    one = CB.opp_board_slope(tok, 5000.0)
+    assert one > 0.0
+    tok[7, T.S_POWER], tok[7, T.S_IS_CHAR] = 0.6, 1.0                 # 相手の体 6000
+    assert CB.opp_board_slope(tok, 5000.0) > one                      # 攻め手が増えれば速くなる
