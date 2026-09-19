@@ -23,6 +23,55 @@ import price_realised as PR  # noqa: E402
 import theory_order as T  # noqa: E402
 
 
+
+#: **出荷時の既定**を import の瞬間に写し取る（`conftest` の autouse も各テストの try/finally も
+#: まだ走っていない時点の値）＝**ファイルの既定そのもの**をラチェットするための控え。
+_SHIPPED = {n: getattr(CB, n) for n in (
+    "THETA_HAND_MODE", "THETA_HAND_PLACE", "THETA_BODY_MODE", "THETA_HAND_BLOCKER_MODE",
+    "THETA_RETURN_MODE", "SLOPE_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE", "SLOPE_EFFECT_MODE",
+    "RATE_WALK_MODE", "RATE_DECAY_MODE", "RATE_T1_MODE", "RATE_RUSH_MODE", "RACE_MODE")}
+
+
+def test_the_shipped_defaults_are_the_ones_we_decided():
+    """**既定の一覧をラチェットする**（`docs/cpu_theory_gap.md` §9.2 の表と 1 対 1）。
+
+    **2026-09-19 のユーザ決定**（「1は規定、2は正しいものに直してください」）で 4 つ動いた:
+    `SLOPE_EFFECT_MODE=hand`（T108）・`RATE_T1_MODE=on`・`RATE_RUSH_MODE=on`・
+    `THETA_HAND_BLOCKER_MODE=on`（T103／T106＝**規則として正しい形**）。
+    **黙って既定が変わると 2 つの橋の数字が比較不能になる**ので、ここで固定する。"""
+    assert _SHIPPED == {
+        "THETA_HAND_MODE": "cuttable",          # T77
+        "THETA_HAND_PLACE": "stock",            # T102（切替として残す）
+        "THETA_BODY_MODE": "blockers",           # T97
+        "THETA_HAND_BLOCKER_MODE": "on",         # T106・2026-09-19
+        "THETA_RETURN_MODE": "off",              # T96（切替として残す）
+        "SLOPE_MODE": "hand",                    # T77
+        "SLOPE_HAND_MODE": "flow",               # T93
+        "SLOPE_BLOCK_MODE": "off",               # T92（切替として残す）
+        "SLOPE_EFFECT_MODE": "hand",             # T105／T108・2026-09-19
+        "RATE_WALK_MODE": "grow",                # T94
+        "RATE_DECAY_MODE": "off",                # T95（切替として残す）
+        "RATE_T1_MODE": "on",                    # T103・2026-09-19
+        "RATE_RUSH_MODE": "on",                  # T103・2026-09-19
+        "RACE_MODE": "static",                   # T90／T91／T104（切替として残す）
+    }
+
+
+def _tg(*a, **k):
+    """**歩きの代数は「局の途中の行」で確かめる**（`j0=2`）。
+
+    `RATE_T1_MODE=on`（2026-09-19 から既定）は**局の 1 自席ターン目だけ**速さを 0 にする規則
+    （`turn_count <= 2`）なので、**閉じた代数を固定するテストには掛けない**——
+    規則そのものは `test_the_walk_obeys_the_first_turn_rule` が `j0` を明示して固定する。"""
+    k.setdefault("j0", 2)
+    return CB.tau_grow(*a, **k)
+
+
+def _ra(*a, **k):
+    """`rate_at` の代数も同じ（`j0=2`＝局の途中の行）。"""
+    k.setdefault("j0", 2)
+    return CB.rate_at(*a, **k)
+
 def _sc(opp_life=3, opp_hand=4):
     sc = np.zeros(70, np.float32)
     sc[T.SC_OPP_LIFE], sc[T.SC_OPP_HAND] = opp_life, opp_hand
@@ -200,10 +249,10 @@ def test_a_rested_blocker_is_not_endurance_now_but_comes_back():
     try:
         CB.set_theta_return_mode("untap")
         # 段差は `j ≥ 2` からしか効かない＝1 ターン目で届くなら τ は変わらない
-        assert CB.tau_grow(0.2, 0.25, 0.0, 0.0, 0.0, step=back) == pytest.approx(
-            CB.tau_grow(0.2, 0.25, 0.0, 0.0, 0.0))
+        assert _tg(0.2, 0.25, 0.0, 0.0, 0.0, step=back) == pytest.approx(
+            _tg(0.2, 0.25, 0.0, 0.0, 0.0))
         # 2 ターン目までかかるなら、その分だけ遠のく
-        assert CB.tau_grow(0.4, 0.25, 0.0, 0.0, 0.0, step=back) > CB.tau_grow(0.4, 0.25, 0.0, 0.0, 0.0)
+        assert _tg(0.4, 0.25, 0.0, 0.0, 0.0, step=back) > _tg(0.4, 0.25, 0.0, 0.0, 0.0)
         with pytest.raises(ValueError):
             CB.set_theta_return_mode("なにか")
     finally:
@@ -269,17 +318,17 @@ def test_the_walk_lets_the_rate_accumulate():
     盤面は毎ターン・**在庫は 2 ターン目からの段差**（召喚酔い）・**流入は進むほど積み上がる**（j で引いた札は j+1 から殴る）。"""
     assert CB.RATE_WALK_MODE == "grow"                               # 既定（以前の数字と比べるときだけ `flat`）
     # 在庫も流入も無ければ一定の速さと同じ（リーダー 0.25・キャラ 0）
-    assert CB.tau_grow(1.0, 0.25, 0.0, 0.0, 0.0) == pytest.approx(4.0)
+    assert _tg(1.0, 0.25, 0.0, 0.0, 0.0) == pytest.approx(4.0)
     # 在庫 0.1 は 2 ターン目から: 0.25 + 0.35 + 0.35 = 0.95、残り 0.05 を 4 ターン目の 0.35 で
-    assert CB.tau_grow(1.0, 0.25, 0.0, 0.1, 0.0) == pytest.approx(3.0 + 0.05 / 0.35)
+    assert _tg(1.0, 0.25, 0.0, 0.1, 0.0) == pytest.approx(3.0 + 0.05 / 0.35)
     # 流入 0.1 は (j − 1) 倍: 0.25 + 0.35 + 0.45 = 1.05 → 3 ターン目の途中
-    assert CB.tau_grow(1.0, 0.25, 0.0, 0.0, 0.1) == pytest.approx(2.0 + 0.4 / 0.45)
+    assert _tg(1.0, 0.25, 0.0, 0.0, 0.1) == pytest.approx(2.0 + 0.4 / 0.45)
     # 積み上がるほうが一定より早く届く
-    assert CB.tau_grow(1.0, 0.25, 0.0, 0.1, 0.1) < CB.tau_grow(1.0, 0.25, 0.0, 0.0, 0.0)
-    assert CB.tau_grow(0.0, 0.25, 0.0, 0.1, 0.1) == pytest.approx(0.0)    # 既に届いている
-    assert CB.tau_grow(1.0, 0.0, 0.0, 0.0, 0.0) == pytest.approx(CB.RACE_CAP)   # 届かなければ打ち切り
+    assert _tg(1.0, 0.25, 0.0, 0.1, 0.1) < _tg(1.0, 0.25, 0.0, 0.0, 0.0)
+    assert _tg(0.0, 0.25, 0.0, 0.1, 0.1) == pytest.approx(0.0)    # 既に届いている
+    assert _tg(1.0, 0.0, 0.0, 0.0, 0.0) == pytest.approx(CB.RACE_CAP)   # 届かなければ打ち切り
     # 動く的と組める（的が下がるぶん遅くなる）
-    assert CB.tau_grow(1.0, 0.25, 0.0, 0.1, 0.1, 0.05) > CB.tau_grow(1.0, 0.25, 0.0, 0.1, 0.1)
+    assert _tg(1.0, 0.25, 0.0, 0.1, 0.1, 0.05) > _tg(1.0, 0.25, 0.0, 0.1, 0.1)
     try:                                                             # 旧い形も残す＝過去の数字と比べるため
         assert CB.set_rate_walk_mode("flat") == "flat"
         with pytest.raises(ValueError):
@@ -293,21 +342,21 @@ def test_the_board_can_decay_but_the_leader_never_does():
     **リーダーは KO されない**ので減衰しない＝速さは 0 に落ちず、流入のぶん `1/ko_p` に飽和する。"""
     assert CB.RATE_DECAY_MODE == "off"                               # 既定は据え置き（採否はユーザ判定）
     # `ko_p = 0` なら T94 のまま
-    assert CB.rate_at(3, 0.05, 0.05, 0.1, 0.02, 0.0) == pytest.approx(0.05 + 0.05 + 0.1 + 0.04)
+    assert _ra(3, 0.05, 0.05, 0.1, 0.02, 0.0) == pytest.approx(0.05 + 0.05 + 0.1 + 0.04)
     q = 1.0 - 0.289
-    assert CB.rate_at(1, 0.05, 0.05, 0.1, 0.02, 0.289) == pytest.approx(0.05 + 0.05)          # 1 ターン目は減衰前
-    assert CB.rate_at(2, 0.05, 0.05, 0.1, 0.02, 0.289) == pytest.approx(0.05 + 0.05 * q + 0.1 + 0.02)
-    assert CB.rate_at(3, 0.05, 0.05, 0.1, 0.02, 0.289) == pytest.approx(
+    assert _ra(1, 0.05, 0.05, 0.1, 0.02, 0.289) == pytest.approx(0.05 + 0.05)          # 1 ターン目は減衰前
+    assert _ra(2, 0.05, 0.05, 0.1, 0.02, 0.289) == pytest.approx(0.05 + 0.05 * q + 0.1 + 0.02)
+    assert _ra(3, 0.05, 0.05, 0.1, 0.02, 0.289) == pytest.approx(
         0.05 + 0.05 * q ** 2 + 0.1 * q + 0.02 * (1.0 + q))
     # **リーダーは残る**＝遠い先でも速さはリーダー ＋ 流入の飽和 `flow/ko_p` を下回らない
-    far = CB.rate_at(60, 0.05, 0.05, 0.1, 0.02, 0.289)
+    far = _ra(60, 0.05, 0.05, 0.1, 0.02, 0.289)
     assert far == pytest.approx(0.05 + 0.02 / 0.289, abs=1e-6)
     # 減衰を入れると届くのが遅くなる
-    assert CB.tau_grow(1.0, 0.05, 0.05, 0.1, 0.02, ko_p=0.289) > CB.tau_grow(1.0, 0.05, 0.05, 0.1, 0.02, ko_p=0.0)
+    assert _tg(1.0, 0.05, 0.05, 0.1, 0.02, ko_p=0.289) > _tg(1.0, 0.05, 0.05, 0.1, 0.02, ko_p=0.0)
     try:
         assert CB.set_rate_decay_mode("ko") == "ko"
-        assert CB.tau_grow(1.0, 0.05, 0.05, 0.1, 0.02) == pytest.approx(
-            CB.tau_grow(1.0, 0.05, 0.05, 0.1, 0.02, ko_p=T.KO_P))     # 既定の `ko_p` を拾う
+        assert _tg(1.0, 0.05, 0.05, 0.1, 0.02) == pytest.approx(
+            _tg(1.0, 0.05, 0.05, 0.1, 0.02, ko_p=T.KO_P))     # 既定の `ko_p` を拾う
         with pytest.raises(ValueError):
             CB.set_rate_decay_mode("なにか")
     finally:
@@ -628,7 +677,7 @@ def test_the_two_places_that_solve_for_tau_use_the_same_branch():
     式そのもの（`tau_grow`／`tau_net`／`Θ/A`）が既定の切替に従うことで確かめる。"""
     assert CB.RATE_WALK_MODE == "grow" and CB.RACE_MODE == "static"   # 現在の既定
     # `grow` の既定では `r = 0`（`static` なので的は動かない）＝`tau_grow` の素の形
-    assert CB.tau_grow(1.0, 0.1, 0.1, 0.0, 0.0, 0.0) == pytest.approx(5.0)
+    assert _tg(1.0, 0.1, 0.1, 0.0, 0.0, 0.0) == pytest.approx(5.0)
     # `static` ＋ `flat` なら `Θ / A`（`predict` と同じ）
     assert CB.predict(1.0, 1.0, 0.25, 0.5)[0] == pytest.approx(4.0)
 
@@ -639,16 +688,16 @@ def test_the_hand_is_a_shield_that_takes_time_to_spend():
     同じ `μ × 切れる枚数` を**しきい値から的の側の有限の盾へ移す**（新しい量はゼロ）。"""
     assert CB.THETA_HAND_PLACE == "stock"                         # 既定は据え置き（採否はユーザ判定）
     # 盾が無ければ従来どおり: 速さ 0.1／ターンで的 0.5 → 5 ターン
-    assert CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0) == pytest.approx(5.0)
+    assert _tg(0.5, 0.1, 0.0, 0.0, 0.0) == pytest.approx(5.0)
     # 盾 0.5 を 1 ターンで全部使えるなら、的は 1.0 になる（＝旧 `stock` と同じ）
-    assert CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, shield=0.5) == pytest.approx(10.0)
+    assert _tg(0.5, 0.1, 0.0, 0.0, 0.0, shield=0.5) == pytest.approx(10.0)
     # **毎ターン 0.02 までしか出せないなら、盾は 25 ターンかけてしか出ない**＝間に合った分だけ的が遠のく
-    slow = CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, shield=0.5, shield_rate=0.02)
+    slow = _tg(0.5, 0.1, 0.0, 0.0, 0.0, shield=0.5, shield_rate=0.02)
     assert slow == pytest.approx(6.4)   # 歩きは 1 ターン刻み（連続なら 0.5/(0.1−0.02) = 6.25）
     assert 5.0 < slow < 10.0
     # **とどめが近い（速さが大きい）ほど盾は出てこない**＝`Θ` に一括で足す形より短い
-    fast_stock = CB.tau_grow(0.5, 1.0, 0.0, 0.0, 0.0, shield=0.5)
-    fast_shield = CB.tau_grow(0.5, 1.0, 0.0, 0.0, 0.0, shield=0.5, shield_rate=0.05)
+    fast_stock = _tg(0.5, 1.0, 0.0, 0.0, 0.0, shield=0.5)
+    fast_shield = _tg(0.5, 1.0, 0.0, 0.0, 0.0, shield=0.5, shield_rate=0.05)
     assert fast_shield < fast_stock
     # 輪郭の側でも同じ形（`curve` の読み）
     prof = [0.1] * 12
@@ -707,45 +756,45 @@ def test_the_opponents_attacks_are_read_from_the_board_not_the_turn_flag():
 def test_the_walk_obeys_the_first_turn_rule():
     """**T103**: **どちらの席も「自分の最初のターン」はアタックできない**
     （規則・`rules/battle.rs::declare_attack` の `turn_count <= 2`）。歩きはこれを知らなかった。"""
-    assert CB.RATE_T1_MODE == "off"                                # 既定は据え置き（採否はユーザ判定）
+    assert CB.RATE_T1_MODE == "on"        # **2026-09-19 から既定**（ユーザ決定「2は正しいものに直してください」）
     try:
-        CB.set_rate_t1_mode("on")
         # 局の 1 自席ターン目（`j0 = 1`）から歩くと、1 段目は 0
         assert CB.rate_at(1, 0.05, 0.05, 0.1, 0.02, j0=1) == pytest.approx(0.0)
         assert CB.rate_at(2, 0.05, 0.05, 0.1, 0.02, j0=1) > 0.0
         # 途中の行（`j0 ≥ 2`）から歩くなら 1 段目から打てる
         assert CB.rate_at(1, 0.05, 0.05, 0.1, 0.02, j0=2) > 0.0
         # 的に届くまでのターン数は 1 つ増える側に動く（1 段ぶん進めないので）
-        assert CB.tau_grow(0.3, 0.1, 0.0, 0.0, 0.0, j0=1) > CB.tau_grow(0.3, 0.1, 0.0, 0.0, 0.0, j0=2)
+        assert CB.tau_grow(0.3, 0.1, 0.0, 0.0, 0.0, j0=1) > CB.tau_grow(
+            0.3, 0.1, 0.0, 0.0, 0.0, j0=2)
         with pytest.raises(ValueError):
             CB.set_rate_t1_mode("なにか")
     finally:
         CB.set_rate_t1_mode("off")
     # `off` なら `j0` は無視される（旧と完全に同じ）
-    assert CB.rate_at(1, 0.05, 0.05, 0.1, 0.02, j0=1) == pytest.approx(0.1)
+    assert _ra(1, 0.05, 0.05, 0.1, 0.02, j0=1) == pytest.approx(0.1)
 
 
 def test_rush_bodies_attack_the_turn_they_arrive():
     """**T103**: **速攻は出したターン・引いたターンからもう殴れる**（規則）。
     帳簿側は T84 の `play_starts_next_turn` が既に例外にしていて、**歩きだけが持っていなかった**。"""
-    assert CB.RATE_RUSH_MODE == "off"                              # 既定は据え置き
+    assert CB.RATE_RUSH_MODE == "on"      # **2026-09-19 から既定**（規則どおり・量は小さい）
     # 在庫 0.1 が全部速攻なら 1 ターン目から乗る（旧は 2 ターン目から）
-    assert CB.rate_at(1, 0.05, 0.0, 0.1, 0.0) == pytest.approx(0.05)
-    assert CB.rate_at(1, 0.05, 0.0, 0.1, 0.0, stock_rush=0.1) == pytest.approx(0.15)
+    assert _ra(1, 0.05, 0.0, 0.1, 0.0) == pytest.approx(0.05)
+    assert _ra(1, 0.05, 0.0, 0.1, 0.0, stock_rush=0.1) == pytest.approx(0.15)
     # 速攻ぶんは総額の内側（二重には乗らない）
-    assert CB.rate_at(3, 0.05, 0.0, 0.1, 0.0, stock_rush=0.1) == pytest.approx(
-        CB.rate_at(3, 0.05, 0.0, 0.1, 0.0))
+    assert _ra(3, 0.05, 0.0, 0.1, 0.0, stock_rush=0.1) == pytest.approx(
+        _ra(3, 0.05, 0.0, 0.1, 0.0))
     # 流入の速攻は**引いたターンから**＝`j` 枚ぶん（旧の遅い側は `j − 1` 枚ぶん）
-    assert CB.rate_at(3, 0.0, 0.0, 0.0, 0.02) == pytest.approx(0.04)
-    assert CB.rate_at(3, 0.0, 0.0, 0.0, 0.02, flow_rush=0.02) == pytest.approx(0.06)
+    assert _ra(3, 0.0, 0.0, 0.0, 0.02) == pytest.approx(0.04)
+    assert _ra(3, 0.0, 0.0, 0.0, 0.02, flow_rush=0.02) == pytest.approx(0.06)
     # 上限を超えて渡しても総額で抑える
-    assert CB.rate_at(1, 0.0, 0.0, 0.05, 0.0, stock_rush=99.0) == pytest.approx(0.05)
+    assert _ra(1, 0.0, 0.0, 0.05, 0.0, stock_rush=99.0) == pytest.approx(0.05)
     try:
-        assert CB.set_rate_rush_mode("on") == "on"
+        assert CB.set_rate_rush_mode("off") == "off"
         with pytest.raises(ValueError):
             CB.set_rate_rush_mode("なにか")
     finally:
-        CB.set_rate_rush_mode("off")
+        CB.set_rate_rush_mode("on")
 
 
 def test_the_rush_share_comes_out_of_the_same_knapsack():
@@ -787,18 +836,18 @@ def test_the_refill_lands_in_the_shield_not_on_the_target():
     `Θ + r·j` と直に足すと**上限なしに吸える**ことになり、交点が遠のきすぎる（T102 で偏り +6.37）。"""
     assert "deck_shield" in CB.RACE_MODES and CB.RACE_MODE == "static"
     # 盾も補充も無ければ従来どおり
-    assert CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0) == pytest.approx(5.0)
+    assert _tg(0.5, 0.1, 0.0, 0.0, 0.0) == pytest.approx(5.0)
     # 的に直に足す旧い形（`r`）は上限が無いので、補充が速さに近いと一気に遠のく
-    far = CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, r=0.08)
+    far = _tg(0.5, 0.1, 0.0, 0.0, 0.0, r=0.08)
     # 盾に積む形なら、**出せる速さ 0.01 で頭打ち**＝遠のき方も 0.01/ターンで止まる
-    near = CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, refill=0.08, shield_rate=0.01)
+    near = _tg(0.5, 0.1, 0.0, 0.0, 0.0, refill=0.08, shield_rate=0.01)
     assert near < far
-    assert near == pytest.approx(CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, r=0.01))   # 上限ぶんだけ的が動く
+    assert near == pytest.approx(_tg(0.5, 0.1, 0.0, 0.0, 0.0, r=0.01))   # 上限ぶんだけ的が動く
     # 出せる速さが補充より大きければ、補充はそのまま効く（旧 `r` と一致）
-    assert CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, refill=0.02, shield_rate=9.0) == pytest.approx(
-        CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, r=0.02))
+    assert _tg(0.5, 0.1, 0.0, 0.0, 0.0, refill=0.02, shield_rate=9.0) == pytest.approx(
+        _tg(0.5, 0.1, 0.0, 0.0, 0.0, r=0.02))
     # 攻撃が 1 本も無い（`shield_rate = 0`）なら**手札も補充も吸えない**
-    assert CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, shield=0.3, shield_rate=0.0,
+    assert _tg(0.5, 0.1, 0.0, 0.0, 0.0, shield=0.3, shield_rate=0.0,
                        refill=0.05) != pytest.approx(5.0)          # 上限が無いときは一度に全部（旧の形）
     # 輪郭の側も同じ形
     prof = [0.1] * 30
@@ -811,14 +860,15 @@ def test_a_blocker_in_hand_is_endurance_too():
     **ブロックに召喚酔いは無い**（`has_blocker` は登場ターンかどうかを見ない）ので、
     **手札から出せるブロッカーは「避けて通れない体」の予備**＝`Θ` の体の項と同じ意味。
     **今はどこにも数えられていなかった**（盤面の体でも切れる札でもない）。"""
-    assert CB.THETA_HAND_BLOCKER_MODE == "off"                  # 既定は据え置き（採否はユーザ判定）
+    assert CB.THETA_HAND_BLOCKER_MODE == "on"   # **2026-09-19 から既定**（規則がそう言っている）
     sc = _sc(3, 4)
     tok = np.zeros((22, 24), dtype=np.float32)
     base = CB.threshold(sc, tok)
-    # `off` なら手札のブロッカーを渡しても動かない
-    life, hand, body = CB.threshold_parts(sc, tok, hand_blocker=0.5)
-    assert life + hand + body == pytest.approx(base)
     try:
+        # `off`（旧）なら手札のブロッカーを渡しても動かない
+        CB.set_theta_hand_blocker_mode("off")
+        life, hand, body = CB.threshold_parts(sc, tok, hand_blocker=0.5)
+        assert life + hand + body == pytest.approx(base)
         CB.set_theta_hand_blocker_mode("on")
         life2, hand2, body2 = CB.threshold_parts(sc, tok, hand_blocker=0.5)
         assert body2 == pytest.approx(body + 0.5)               # 体の項に載る
@@ -828,7 +878,7 @@ def test_a_blocker_in_hand_is_endurance_too():
         with pytest.raises(ValueError):
             CB.set_theta_hand_blocker_mode("なにか")
     finally:
-        CB.set_theta_hand_blocker_mode("off")
+        CB.set_theta_hand_blocker_mode("on")
 
 
 def test_the_hand_blocker_is_read_from_the_rules_not_the_play():
@@ -892,18 +942,21 @@ def test_the_hand_can_fire_its_effect_once():
     """**T108**（T107 が指した先）: T105 は**毎ターン引く 1 枚**（流量）の効果だけを数えていた。
     **手札に溜まっている札の効果**は**一度きり**に使えるもので、速さの式に 1 項も無かった。
     歩きでは **1 ターン目に 1 回だけ**乗る（在庫なので繰り返さない）。"""
-    assert CB.SLOPE_EFFECT_MODE == "off" and "hand" in CB.SLOPE_EFFECT_MODES
+    assert CB.SLOPE_EFFECT_MODE == "hand"   # **2026-09-19 から既定**（ユーザ決定「1は規定」）
     # 流量（`eff`）は毎ターン・在庫（`eff_once`）は 1 ターン目だけ
-    assert CB.rate_at(1, 0.1, 0.0, 0.0, 0.0, eff=0.01) == pytest.approx(0.11)
-    assert CB.rate_at(3, 0.1, 0.0, 0.0, 0.0, eff=0.01) == pytest.approx(0.11)
-    assert CB.rate_at(1, 0.1, 0.0, 0.0, 0.0, eff_once=0.03) == pytest.approx(0.13)
-    assert CB.rate_at(2, 0.1, 0.0, 0.0, 0.0, eff_once=0.03) == pytest.approx(0.10)
-    assert CB.rate_at(3, 0.1, 0.0, 0.0, 0.0, eff_once=0.03) == pytest.approx(0.10)
+    assert _ra(1, 0.1, 0.0, 0.0, 0.0, eff=0.01) == pytest.approx(0.11)
+    assert _ra(3, 0.1, 0.0, 0.0, 0.0, eff=0.01) == pytest.approx(0.11)
+    assert _ra(1, 0.1, 0.0, 0.0, 0.0, eff_once=0.03) == pytest.approx(0.13)
+    assert _ra(2, 0.1, 0.0, 0.0, 0.0, eff_once=0.03) == pytest.approx(0.10)
+    assert _ra(3, 0.1, 0.0, 0.0, 0.0, eff_once=0.03) == pytest.approx(0.10)
     # 負は 0 に倒す
-    assert CB.rate_at(1, 0.1, 0.0, 0.0, 0.0, eff_once=-1.0) == pytest.approx(0.10)
+    assert _ra(1, 0.1, 0.0, 0.0, 0.0, eff_once=-1.0) == pytest.approx(0.10)
     # 的に届くのは早くなる（1 ターン目に 1 回ぶん進む）
-    assert CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0, eff_once=0.03) < CB.tau_grow(0.5, 0.1, 0.0, 0.0, 0.0)
+    assert _tg(0.5, 0.1, 0.0, 0.0, 0.0, eff_once=0.03) < _tg(0.5, 0.1, 0.0, 0.0, 0.0)
     try:
-        assert CB.set_slope_effect_mode("hand") == "hand"
+        assert CB.set_slope_effect_mode("off") == "off"
+        assert CB.set_slope_effect_mode("on") == "on"
+        with pytest.raises(ValueError):
+            CB.set_slope_effect_mode("なにか")
     finally:
-        CB.set_slope_effect_mode("off")
+        CB.set_slope_effect_mode("hand")
