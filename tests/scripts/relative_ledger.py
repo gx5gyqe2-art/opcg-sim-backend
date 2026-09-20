@@ -95,15 +95,20 @@ def clocks_of(st, prof=None):
 
     **`T_me` は「自分が相手を倒しきるまで」**＝相手の耐久 `Θ_opp` を自分の速さで削る時間、
     **`T_opp` は「相手が自分を倒しきるまで」**。`KV.D_MODE` が読み方を決める
-    （`curve`＝輪郭を歩く〔帳簿の正本〕／`clock`＝`min(CAP, Θ/A)`）。
+    （`curve`＝輪郭を歩く〔帳簿の正本〕／**`curve_scaled`＝輪郭をその席の `A` で伸縮**〔T126〕／`clock`＝`min(CAP, Θ/A)`）。
 
     **`D = T_opp − T_me`** は `KV.d_of` と同じ値になる（同じ関数を呼んでいる）。"""
     th_me, th_opp, a_me, a_opp, j = st
-    if KV.D_MODE == "curve":
+    if KV.D_MODE in ("curve", "curve_scaled"):
         if prof is None:
-            raise ValueError("D_MODE=curve には損害の輪郭が要る（profile_for）")
-        t_me = float(CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof))
-        t_opp = float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof))
+            raise ValueError("D_MODE=%s には損害の輪郭が要る（profile_for）" % KV.D_MODE)
+        # **T126**: `curve_scaled` は**削る側の速さ**で輪郭を伸縮する（`kappa_vector.d_of` と同じ式）
+        s_me = s_opp = 1.0
+        if KV.D_MODE == "curve_scaled":
+            s_me = KV.profile_scale(a_me, j)      # 自分が相手を倒すまで＝**自分**の速さ
+            s_opp = KV.profile_scale(a_opp, j)    # 相手が自分を倒すまで＝**相手**の速さ
+        t_me = float(CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof, s_me))
+        t_opp = float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof, s_opp))
     else:
         t_me = KV.tau_of(th_opp, a_me)
         t_opp = KV.tau_of(th_me, a_opp)
@@ -202,8 +207,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     prof = CB.profile_for(dirs)
-    if KV.D_MODE == "curve" and not prof:
-        raise ValueError("D_MODE=curve なのに損害の輪郭が引けない（%s）" % (dirs,))
+    if KV.D_MODE in ("curve", "curve_scaled") and not prof:
+        raise ValueError("D_MODE=KV.D_MODE なのに損害の輪郭が引けない（%s）" % (dirs,))
+    if KV.D_MODE == "curve_scaled":
+        # **T126**: 輪郭をその席の `A` で伸縮する読み＝分母が要る（引けなければ落ちる）
+        _th = CB.profile_th_for(dirs)
+        if not _th:
+            raise ValueError("curve_scaled なのに理論の速さの輪郭が引けない（%s）" % (dirs,))
+        KV.set_profile_th(_th)
     sr = CB.sigma_rel_for(dirs, slope="curve")
     if sr is None:
         raise ValueError("σ_rel が引けない＝黙って別の物差しに落とさない（T118 の規約）")

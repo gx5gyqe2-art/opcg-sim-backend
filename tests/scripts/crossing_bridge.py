@@ -761,6 +761,20 @@ def profile_for(dirs, name="cross", path=None):
     return [float(x) for x in v] if v else None
 
 
+def profile_th_for(dirs, name="cross", path=None):
+    """**理論の速さの輪郭**（T126）＝`curve_scaled` の分母。規約は `profile_for` と同じ（`cross`＝別のセット）。
+
+    **無ければ `None`**（`curve_scaled` を頼んだのに引けなければ呼ぶ側が落ちる＝黙って `curve` に落ちない）。"""
+    tbl = (load_harm_profiles(path) or {}).get("theory_slope") or {}
+    if name == "cross":
+        kind = record_kind(dirs)
+        name = {"real": "syn", "syn": "real"}.get(kind or "", None)
+    if not name:
+        return None
+    v = tbl.get(name)
+    return [float(x) for x in v] if v else None
+
+
 def curve_d_of_row(sc, tok, j, prof, g_hand_of_opp=None, g_hand_of_me=None):
     """**交点の近さ `D`**（T75）＝両席の到達ターンの差 `τ_opp − τ_me`（正なら自分が先に届く）。
     `τ_me` は自分が相手の耐久 `Θ_me` に、`τ_opp` は相手が自分の耐久 `Θ_opp` に、同じ輪郭で積んで届くターン数（相手も同じ自席ターン番号 `j` と置く）。

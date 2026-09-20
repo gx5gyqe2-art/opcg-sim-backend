@@ -121,10 +121,41 @@ TAU_CAP = CB.RACE_CAP
 AXES = ("th_me", "th_opp", "a_me", "a_opp")
 
 #: **`D` の読み方**（上の表）。`curve`＝**帳簿の正本**（輪郭・軸は 2 本）／`clock`＝2 本の時計（軸は 4 本）。
-D_MODES = ("curve", "clock")
+D_MODES = ("curve", "curve_scaled", "clock")
 D_MODE = "curve"
 #: 読みごとに**生きている軸**。`curve` に速さの軸は**存在しない**（輪郭は固定の表）。
-LIVE_AXES = {"curve": ("th_me", "th_opp"), "clock": AXES}
+#: **`curve_scaled` は 4 本とも生きている**——輪郭をその席の `A` で伸縮するので速さが時計に入る。
+LIVE_AXES = {"curve": ("th_me", "th_opp"), "curve_scaled": AXES, "clock": AXES}
+
+#: **`curve_scaled` の分母**（`crossing_bridge.profile_th_for` が返す理論の速さの輪郭）。
+#: 読む側が `set_profile_th` で入れる。**入っていないのに `curve_scaled` を頼んだら落ちる**
+#: （黙って `curve` に落ちない＝T118 の規約と同じ）。
+PROFILE_TH = None
+
+
+def set_profile_th(prof_th):
+    global PROFILE_TH
+    PROFILE_TH = list(prof_th) if prof_th else None
+    return PROFILE_TH
+
+
+def profile_scale(rate, j, prof_th=None):
+    """**輪郭をその席の速さで伸縮する倍率**＝`A / prof_th[j]`（橋の `curve_scaled` と同じ式・T126）。
+
+    **これが入ると輪郭の読みが尺度不変になる**——輪郭は比 `prof/prof_th`（無次元）としてしか入らず、
+    **単位は `A` が持つ**ので、通貨を c 倍すれば 1 ターンの損害も `Θ` も同じだけ c 倍になる
+    （T122 の P5 が `curve` で 96.2% 破れていた患部）。
+    **`prof_th[0] = 0` を分母にしてはいけない**（T126 で踏んだ）——`RATE_T1_MODE=on` は
+    「最初の自席ターンは 1 本も打てない」という**規則**なので、そこに典型の速さは**存在しない**。
+    床 `SLOPE_FLOOR` で割ると倍率が 55 倍まで飛び、**5.0% の行が打ち切りに貼り付いた**（実測）。
+    **規則どおりに「速さが定義される最初のターン」まで進めて割る**（新定数ゼロ）。"""
+    th = prof_th if prof_th is not None else PROFILE_TH
+    if not th:
+        raise ValueError("curve_scaled には理論の速さの輪郭が要る（profile_th_for）")
+    i = min(max(0, int(j)), len(th) - 1)
+    while i < len(th) - 1 and float(th[i]) <= CB.SLOPE_FLOOR:
+        i += 1                                  # 速さが定義される最初のターンまで進める
+    return float(rate) / max(CB.SLOPE_FLOOR, float(th[i]))
 
 
 def set_d_mode(name):
@@ -145,11 +176,16 @@ def d_of(st, prof=None):
     `st` は `(Θ_me, Θ_opp, A_me, A_opp, j)`。`j` は自席ターン番号（輪郭の読み出し位置）。
     `curve` は `crossing_bridge.tau_from_profile`（**帳簿が使っているのと同じ関数**）。"""
     th_me, th_opp, a_me, a_opp, j = st
-    if D_MODE == "curve":
+    if D_MODE in ("curve", "curve_scaled"):
         if prof is None:
-            raise ValueError("D_MODE=curve には損害の輪郭が要る（profile_for）")
-        return float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof)
-                     - CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof))
+            raise ValueError("D_MODE=%s には損害の輪郭が要る（profile_for）" % D_MODE)
+        # **T126**: `curve_scaled` は**その席の速さ**で輪郭を伸縮する（相手の時計は相手の `A` で）
+        s_me = s_opp = 1.0
+        if D_MODE == "curve_scaled":
+            s_me = profile_scale(a_opp, j)      # 自分が死ぬまで＝**相手**が削る速さ
+            s_opp = profile_scale(a_me, j)      # 相手が死ぬまで＝**自分**が削る速さ
+        return float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof, s_me)
+                     - CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof, s_opp))
     return tau_of(th_me, a_opp) - tau_of(th_opp, a_me)
 
 
@@ -191,7 +227,9 @@ def grad_of(st, prof=None):
     if D_MODE == "clock":
         return grad_clock(th_me, th_opp, a_me, a_opp)
     g = {k: 0.0 for k in AXES}
-    for k, i in (("th_me", 0), ("th_opp", 1)):
+    axes = (("th_me", 0), ("th_opp", 1)) if D_MODE == "curve" else (
+        ("th_me", 0), ("th_opp", 1), ("a_me", 2), ("a_opp", 3))
+    for k, i in axes:
         x = float(st[i])
         h = max(1e-6, 1e-4 * max(1.0, abs(x)))
         up = list(st); up[i] = x + h
@@ -323,8 +361,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     prof = CB.profile_for(dirs)
-    if D_MODE == "curve" and not prof:
-        raise ValueError("D_MODE=curve なのに損害の輪郭が引けない（%s）" % (dirs,))
+    if D_MODE in ("curve", "curve_scaled") and not prof:
+        raise ValueError("D_MODE=D_MODE なのに損害の輪郭が引けない（%s）" % (dirs,))
+    if D_MODE == "curve_scaled":
+        # **T126**: 輪郭をその席の `A` で伸縮する読み＝分母が要る（引けなければ落ちる）
+        _th = CB.profile_th_for(dirs)
+        if not _th:
+            raise ValueError("curve_scaled なのに理論の速さの輪郭が引けない（%s）" % (dirs,))
+        set_profile_th(_th)
     # **物差し（T118）**: `W_ERR_MODE=rel` なら `σ_rel × s(τ_me, τ_opp)`。**別のセットの値を使う**（§0.1 条件 1）。
     sr = None
     if TO.W_ERR_MODE == "rel":

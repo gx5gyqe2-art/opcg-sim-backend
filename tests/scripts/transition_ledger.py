@@ -200,8 +200,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     prof = CB.profile_for(dirs)
-    if KV.D_MODE == "curve" and not prof:
-        raise ValueError("D_MODE=curve なのに損害の輪郭が引けない（%s）" % (dirs,))
+    if KV.D_MODE in ("curve", "curve_scaled") and not prof:
+        raise ValueError("D_MODE=KV.D_MODE なのに損害の輪郭が引けない（%s）" % (dirs,))
+    if KV.D_MODE == "curve_scaled":
+        # **T126**: 輪郭をその席の `A` で伸縮する読み＝分母が要る（引けなければ落ちる）
+        _th = CB.profile_th_for(dirs)
+        if not _th:
+            raise ValueError("curve_scaled なのに理論の速さの輪郭が引けない（%s）" % (dirs,))
+        KV.set_profile_th(_th)
     sr = CB.sigma_rel_for(dirs, slope="curve")
     if sr is None:
         raise ValueError("σ_rel が引けない＝黙って別の物差しに落とさない（T118 の規約）")

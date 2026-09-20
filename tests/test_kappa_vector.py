@@ -29,6 +29,7 @@ _SCRIPTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts")
 if _SCRIPTS not in sys.path:
     sys.path.insert(0, _SCRIPTS)
 
+import crossing_bridge as CB  # noqa: E402
 import kappa_vector as KV  # noqa: E402
 import theory_order as TO  # noqa: E402
 
@@ -392,3 +393,80 @@ def test_the_ledger_can_take_a_row_without_two_clocks():
     finally:
         TO.set_sigma_rel(None)
     assert a != pytest.approx(b)
+
+
+# --------------------------------------------------------------------------- 7. T126: 輪郭を速さで伸縮する読み
+@pytest.fixture
+def _prof_th():
+    old = KV.PROFILE_TH
+    KV.set_profile_th([0.0, 0.08, 0.12, 0.19, 0.24, 0.30])
+    yield
+    KV.set_profile_th(old)
+
+
+def test_curve_scaled_is_a_third_reading_with_all_four_axes_live():
+    assert "curve_scaled" in KV.D_MODES
+    assert KV.LIVE_AXES["curve_scaled"] == KV.AXES
+    assert KV.LIVE_AXES["curve"] == ("th_me", "th_opp")
+
+
+def test_profile_scale_needs_the_theory_rate_curve():
+    old = KV.PROFILE_TH
+    KV.set_profile_th(None)
+    try:
+        with pytest.raises(ValueError):
+            KV.profile_scale(0.1, 2)
+    finally:
+        KV.set_profile_th(old)
+
+
+def test_profile_scale_is_the_rate_over_the_typical_rate(_prof_th):
+    assert KV.profile_scale(0.24, 3) == pytest.approx(0.24 / 0.19)
+    assert KV.profile_scale(0.19, 3) == pytest.approx(1.0)      # 典型どおりなら伸縮しない
+
+
+def test_profile_scale_skips_the_first_turn_where_no_rate_exists(_prof_th):
+    """**`prof_th[0] = 0` を分母にしない**（`RATE_T1_MODE=on`＝最初の自席ターンは打てない規則）。
+
+    床で割ると倍率が 55 倍に飛び、**5.0% の行が打ち切りに貼り付いた**（T126 で踏んだ）。
+    **速さが定義される最初のターンまで進めて割る**。"""
+    assert KV.profile_scale(0.08, 0) == pytest.approx(0.08 / 0.08)   # j=0 → j=1 の値で割る
+    assert KV.profile_scale(0.08, 0) != pytest.approx(0.08 / CB.SLOPE_FLOOR)
+
+
+def test_profile_scale_clamps_past_the_end_of_the_curve(_prof_th):
+    assert KV.profile_scale(0.3, 99) == pytest.approx(0.3 / 0.30)
+
+
+def test_curve_scaled_lets_the_rate_move_the_clock(_prof_th):
+    """**これが T126 の狙い**——`curve` では体を出しても `D` が 1 ビットも動かない。"""
+    prof = [0.05, 0.1, 0.2, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
+    st = (0.9, 0.6, 0.12, 0.10, 2)
+    fast = (0.9, 0.6, 0.24, 0.10, 2)
+    KV.set_d_mode("curve")
+    assert KV.d_of(fast, prof) == pytest.approx(KV.d_of(st, prof))     # 動かない（患部）
+    KV.set_d_mode("curve_scaled")
+    assert KV.d_of(fast, prof) > KV.d_of(st, prof)                     # 速くなれば有利になる
+
+
+def test_curve_scaled_gives_the_rate_axes_a_gradient(_prof_th):
+    prof = [0.05, 0.1, 0.2, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
+    KV.set_d_mode("curve_scaled")
+    g = KV.grad_of((0.9, 0.6, 0.12, 0.10, 2), prof)
+    assert g["a_me"] > 0.0 and g["a_opp"] < 0.0
+    KV.set_d_mode("curve")
+    g2 = KV.grad_of((0.9, 0.6, 0.12, 0.10, 2), prof)
+    assert g2["a_me"] == 0.0 and g2["a_opp"] == 0.0
+
+
+def test_curve_scaled_still_needs_the_harm_curve(_prof_th):
+    KV.set_d_mode("curve_scaled")
+    with pytest.raises(ValueError):
+        KV.d_of((0.9, 0.6, 0.12, 0.10, 2))
+
+
+def test_profile_th_for_follows_the_cross_convention():
+    """**分母も `profile_for` と同じ規約**（`cross`＝測る記録と別のセット・§0.1 条件 1）。"""
+    assert CB.profile_th_for(None, "real")[1] == pytest.approx(0.0773)
+    assert CB.profile_th_for(None, "syn")[1] == pytest.approx(0.0815)
+    assert CB.profile_th_for(None, "real")[0] == 0.0          # 最初の自席ターンは打てない規則
