@@ -155,7 +155,23 @@ def profile_scale(rate, j, prof_th=None):
     i = min(max(0, int(j)), len(th) - 1)
     while i < len(th) - 1 and float(th[i]) <= CB.SLOPE_FLOOR:
         i += 1                                  # 速さが定義される最初のターンまで進める
-    return float(rate) / max(CB.SLOPE_FLOOR, float(th[i]))
+    sc = float(rate) / max(CB.SLOPE_FLOOR, float(th[i]))
+    if SCALE_CLAMP:
+        sc = min(max(sc, SCALE_CLAMP[0]), SCALE_CLAMP[1])   # 診断用（上の注記）
+    return sc
+
+
+#: **診断用の倍率の締め**（T126 の追試・**モデルの提案ではない**）。
+#: `curve_scaled` が判別を失う原因が**倍率の尾**（中央 0.676 に対し 99% 点 55.1・打ち切りに貼り付く行 5.0%）
+#: なのかを切り分けるためだけの締め。**定数を 2 つ置くので理論には入れられない**——
+#: 「A を時計に入れるのが正しいか」と「今の A の推定が使えるか」を分けるために測る。
+SCALE_CLAMP = None
+
+
+def set_scale_clamp(lo_hi):
+    global SCALE_CLAMP
+    SCALE_CLAMP = tuple(float(x) for x in lo_hi) if lo_hi else None
+    return SCALE_CLAMP
 
 
 def set_d_mode(name):

@@ -388,12 +388,16 @@ def main(argv=None):
                     help="**T122/§17.9.6-1**: κ の物差しを W に合わせるか（既定は現状の `abs`）")
     ap.add_argument("--scale-a", type=float, default=1.0, help="**P7**: 両席の A に共通の掛け算誤差")
     ap.add_argument("--scale-currency", type=float, default=1.0, help="**P5**: 耐久と価格を同時に c 倍")
+    ap.add_argument("--scale-clamp", dest="clamp", default="",
+                    help="**診断用**（例 0.5,2）: `curve_scaled` の倍率を締める。モデルの提案ではない")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
     if a.d_mode:
         KV.set_d_mode(a.d_mode)
     if a.kappa_sigma:
         TO.set_kappa_sigma_mode(a.kappa_sigma)
+    if a.clamp:
+        KV.set_scale_clamp([float(x) for x in a.clamp.split(",")])
     out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:

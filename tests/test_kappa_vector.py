@@ -470,3 +470,16 @@ def test_profile_th_for_follows_the_cross_convention():
     assert CB.profile_th_for(None, "real")[1] == pytest.approx(0.0773)
     assert CB.profile_th_for(None, "syn")[1] == pytest.approx(0.0815)
     assert CB.profile_th_for(None, "real")[0] == 0.0          # 最初の自席ターンは打てない規則
+
+
+def test_scale_clamp_is_a_diagnostic_and_off_by_default(_prof_th):
+    """**倍率の締めは診断用**（定数を 2 つ置くので理論には入れられない）。既定は無し。"""
+    assert KV.SCALE_CLAMP is None
+    try:
+        KV.set_scale_clamp((0.5, 2.0))
+        assert KV.profile_scale(9.9, 3) == pytest.approx(2.0)      # 上で止まる
+        assert KV.profile_scale(0.001, 3) == pytest.approx(0.5)    # 下で止まる
+        assert KV.profile_scale(0.19, 3) == pytest.approx(1.0)     # 帯の中は素通し
+    finally:
+        KV.set_scale_clamp(None)
+    assert KV.profile_scale(9.9, 3) > 2.0                          # 外せば元に戻る
