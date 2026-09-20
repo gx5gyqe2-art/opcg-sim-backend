@@ -506,7 +506,7 @@ def _finish_guard(got, played, my_life, z, bnd, kap, w, t, rec, kn, stats, _add)
     gl["can_guard"] += int(got["can_guard"]); gl["g_paid"] += got["g_paid"]; gl["g_delta"] += got["g_delta"]
     if z != 0.0:
         gl["z_win"] += int(z > 0); gl["z_n"] += 1
-    e = kn.setdefault(t, {"d0": None, "g0": 0.0, "r_turns": None, "g_fam": {}, "chars": None})   # T80
+    e = kn.setdefault(t, {"d0": None, "t_me0": None, "t_opp0": None, "g0": 0.0, "r_turns": None, "g_fam": {}, "chars": None})   # T80
     sgn = 1.0 if w == 0 else -1.0
     e["g0"] += float(got["g"]) * sgn
     e["g_fam"]["guard"] = e["g_fam"].get("guard", 0.0) + float(got["g"]) * sgn   # T81
@@ -552,6 +552,15 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
             st = CB.sigma_t_for(dirs, harm_profile)
             if st is not None:
                 _TOM.set_sigma_turn(st)
+        # **T118**: `W_ERR_MODE=rel` なら物差しは `σ_rel × s(τ_me, τ_opp)`。**`σ_rel` は `curve` の読みのもの**
+        # （`d0` は `curve_d_of_row` が出すので）。**引けなければ落ちる**——黙って `abs` で走ると
+        # 「どの物差しで測ったか分からない数字」が出てしまう（T97 の借り物 σ と同じ型の事故）。
+        if _TOM.W_ERR_MODE == "rel":
+            sr = CB.sigma_rel_for(dirs, harm_profile, slope="curve")
+            if sr is None:
+                raise ValueError("W_ERR_MODE=rel なのに σ_rel が引けない（%s・%s）＝黙って abs に落とさない"
+                                 % (harm_profile, CB.HARM_PROFILE_PATH))
+            _TOM.set_sigma_rel(sr)
             # **T98**: `κ = w(D)/w̄` の分母も**同じ器の実測**（`E[w(D)]`）にする。
             # `0.5/R` は閉じた形の代用で、`D` の分布が変わると `κ` の平均が 1 から外れる。
             wb = CB.w_bar_for(dirs, harm_profile)
@@ -741,7 +750,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 g_row = float(g_v) * kap
                 s_row = (float(played_v) - max(scored)) * kap
                 # **T80**: 区間の恒等式のために**生の価格**（`κ` を掛けない）と `D` を席 0 の視点で積む
-                e = kn.setdefault(t, {"d0": None, "g0": 0.0, "r_turns": None, "g_fam": {}, "chars": None})
+                e = kn.setdefault(t, {"d0": None, "t_me0": None, "t_opp0": None, "g0": 0.0, "r_turns": None, "g_fam": {}, "chars": None})
                 sgn = 1.0 if w == 0 else -1.0
                 fam0 = move_family(json.loads(pol["pol_sig"][b + ch]))                     # T81: 型ごとに割る
                 # **T84**: 出した体が効き始めるのが次の自席ターンなら、価格もそのターンに計上する（規則・新定数ゼロ）
@@ -749,11 +758,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 if PLAY_BOOK_MODE == "next" and fam0 == "play" \
                         and play_starts_next_turn(str(pol["pol_cid"][b + ch]) or None, cards):
                     stats["play_deferred"] = stats.get("play_deferred", 0) + 1
-                    book = kn.setdefault(t + 2, {"d0": None, "g0": 0.0, "r_turns": None, "g_fam": {}, "chars": None})
+                    book = kn.setdefault(t + 2, {"d0": None, "t_me0": None, "t_opp0": None, "g0": 0.0, "r_turns": None, "g_fam": {}, "chars": None})
                 book["g0"] += float(g_v) * sgn
                 book["g_fam"][fam0] = book["g_fam"].get(fam0, 0.0) + float(g_v) * sgn
                 if e["d0"] is None:
                     e["d0"] = float(ck["d"]) * sgn
+                    # **T118**: `rel` の物差しは 2 本の時計から作るので**席 0 視点で**持つ（`sgn<0` なら入れ替え）
+                    e["t_me0"] = float(ck["tau_me"] if sgn > 0 else ck["tau_opp"])
+                    e["t_opp0"] = float(ck["tau_opp"] if sgn > 0 else ck["tau_me"])
                     e["r_turns"] = float(ctx["r_turns"])
                     # **T81**: 場のキャラ数（両側の合計）＝時計が跳ねる原因かを分ける
                     e["chars"] = int(sum(1 for sl in range(GA.SLOT_OWN_FIELD.start, GA.SLOT_OWN_FIELD.stop)
@@ -854,10 +866,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
             a0, b0, c0 = ts_kn[k0], ts_kn[k0 + 1], ts_kn[k0 + 2]
             kn_turns.append({"turn": a0, "d0": kn[a0]["d0"], "r_turns": kn[a0]["r_turns"],
                              "g0": kn[a0]["g0"] + kn[b0]["g0"],
-                             "dW": _TOM.prob_of_d(kn[c0]["d0"]) - _TOM.prob_of_d(kn[a0]["d0"]),
+                             "dW": _W_of(kn[c0]) - _W_of(kn[a0]),
                              # 診断: 1 ターンだけの窓（手番の交代が入ったまま）
                              "g0_turn": kn[a0]["g0"],
-                             "dW_turn": _TOM.prob_of_d(kn[b0]["d0"]) - _TOM.prob_of_d(kn[a0]["d0"])})
+                             "dW_turn": _W_of(kn[b0]) - _W_of(kn[a0])})
     import kappa_needed as KN
     stats["kappa_needed"] = KN.summarise(kn_turns)
     stats["kappa_needed_1turn"] = KN.summarise([dict(t, g0=t["g0_turn"], dW=t["dW_turn"]) for t in kn_turns])
@@ -978,6 +990,11 @@ def slope(pairs, key="dS"):
         return None
     xd = x - x.mean()
     return float((xd * (y - y.mean())).sum() / (xd * xd).sum())
+
+
+def _W_of(e):
+    """**その時点の勝率**（T80）。`W_ERR_MODE=rel` なら 2 本の時計も渡す（T118・物差しが局面で変わる）。"""
+    return _TOM.prob_of_d(e["d0"], t_me=e.get("t_me0"), t_opp=e.get("t_opp0"))
 
 
 def corr_of(pairs, key="dS"):

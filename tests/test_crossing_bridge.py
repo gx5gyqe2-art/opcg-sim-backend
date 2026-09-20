@@ -42,12 +42,19 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
     ——**耐久の側もドンを規則どおり払う**（手札のブロッカーの予算＝次ターンのアクティブ・
     カウンター・イベントは使い残しで払う）。
 
+    **2026-09-20 のユーザ決定**（「効果があったものの規定はオンにしないの？」→「3 本すべて」）で 3 本動いた:
+    `RATE_DON_MODE=flow`（T114・歩きの成長を規則のドンから）・`THETA_HAND_MODE=cuttable_forced` ＋
+    `THETA_HAND_WINDOW=horizon`（T116・手札は守る窓が開く分だけ的に入る）・
+    `theory_order.W_ERR_MODE=rel`（T118・勝率を比で読む）。**T114 と T116 は対で採る**
+    ——単独では合成が動かないが、**組むと両記録で 5 軸が改善する**（偏り・的中・σ_T・`curve` の偏り・`Θ`/要）。
+    **代金は ±1 当たりと `curve` の的中、そして線形の橋**（`dG` の AUC 0.696 → 0.660／0.720 → 0.692）。
+
     **同日のユーザ決定**（「1は規定、2は正しいものに直してください」）で 4 つ動いた:
     `SLOPE_EFFECT_MODE=hand`（T108）・`RATE_T1_MODE=on`・`RATE_RUSH_MODE=on`・
     `THETA_HAND_BLOCKER_MODE=on`（T103／T106＝**規則として正しい形**）。
     **黙って既定が変わると 2 つの橋の数字が比較不能になる**ので、ここで固定する。"""
     assert _SHIPPED == {
-        "THETA_HAND_MODE": "cuttable",          # T77
+        "THETA_HAND_MODE": "cuttable_forced",   # T77／T100・2026-09-20（T116 と対で採用）
         "THETA_HAND_PLACE": "stock",            # T102（切替として残す）
         "THETA_BODY_MODE": "blockers",           # T97
         "THETA_HAND_BLOCKER_MODE": "on",         # T106・2026-09-19
@@ -63,9 +70,38 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "RACE_MODE": "static",                   # T90／T91／T104（切替として残す）
         "DON_PURSE_MODE": "all",                 # T109・2026-09-19
         "THETA_DON_MODE": "rule",                # T110・2026-09-19
-        "THETA_HAND_WINDOW": "off",              # T116・2026-09-19（切替として残す）
-        "RATE_DON_MODE": "off",                  # T114・2026-09-19（切替として残す）
+        "THETA_HAND_WINDOW": "horizon",          # T116・2026-09-20
+        "RATE_DON_MODE": "flow",                 # T114・2026-09-20
     }
+
+
+#: **2026-09-20**: 既定が `THETA_HAND_MODE=cuttable_forced`（T116 と対で採用）になったので、
+#: **しきい値の算術を固定するテストは自分で形を明示する**（`μ × 枚数` の素の形を測っているもの）。
+#: **既定そのものは上の `test_the_shipped_defaults_are_the_ones_we_decided` がラチェットする**ので、
+#: ここで形を固定するのは「算術の検算」と「既定の検算」を分けるためであって既定を隠すためではない。
+_PLAIN_HAND_TESTS = (
+    "test_the_threshold_is_the_opponents_endurance_in_price_units",
+    "test_the_threshold_splits_into_life_hand_and_bodies",
+    "test_a_rested_blocker_is_not_endurance_now_but_comes_back",
+    "test_theta_hand_mode_prices_the_hand_by_quality_instead_of_the_count",
+    "test_the_hand_carries_two_values_cuttable_for_the_threshold_and_playable_for_the_rate",
+    "test_the_endurance_counts_bodies_the_same_way_the_harm_side_does",
+    "test_the_endurance_counts_only_what_cannot_be_walked_past",
+)
+
+
+@pytest.fixture(autouse=True)
+def _plain_hand(request):
+    """上の一覧のテストだけ **`THETA_HAND_MODE=cuttable`**（`g` をそのまま掛ける素の形）で回す。"""
+    if request.node.name.split("[")[0] not in _PLAIN_HAND_TESTS:
+        yield
+        return
+    old = CB.THETA_HAND_MODE
+    CB.set_theta_hand_mode("cuttable")
+    try:
+        yield
+    finally:
+        CB.set_theta_hand_mode(old)
 
 
 def _tg(*a, **k):

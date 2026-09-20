@@ -1,9 +1,10 @@
 """`crossing_bridge` の**規則のドンの列**（T114）と**手札の窓の上限**（T116）と
 **相手のドンでの判定**（T120）と**勝率の物差し**（T118）の代数を固める。
 
-どれも**切替で既定は `off`**（既存の挙動）なので、押さえるのは 4 つ:
+**T114（`flow`）・T116（`horizon`）・T118（`rel`）は 2026-09-20 に既定になった**（ユーザ決定「3 本すべて」）。
+押さえるのは 4 つ:
 
-1. **`off` と恒等**（列が一定なら新しい形は旧の式と同じ値を出す）。
+1. **`off` と恒等**（列が一定なら新しい形は旧の式と同じ値を出す＝`off` に戻せば旧の挙動）。
 2. **規則が出る**（ドンは毎ターン +2・席の総量で飽和・`next_turn_don` は同じ式の延長）。
 3. **窓の上限は `min(手札, SR·τ)`**（`τ` は歩き自身が出す・`τ=0` なら手札は 1 円も入らない）。
 4. **相手の判定は相手のドンで**（自分のドンを使っていたのが T120 の患部）。
@@ -116,9 +117,10 @@ def test_the_window_cap_is_the_rate_times_the_turns_that_remain():
 
 
 def test_the_window_modes_are_the_two_the_walk_can_produce():
-    """切替は `off`／`horizon`（手札抜きの地平で 1 回）／`fixpoint`（反復）の 3 つだけ。"""
+    """切替は `off`／`horizon`（手札抜きの地平で 1 回）／`fixpoint`（反復）の 3 つだけ。
+    **既定は `horizon`**（2026-09-20・ユーザ決定「3 本すべて」）。"""
     assert CB.THETA_HAND_WINDOWS == ("off", "horizon", "fixpoint")
-    assert CB.THETA_HAND_WINDOW == "off"
+    assert CB.THETA_HAND_WINDOW == "horizon"
     with pytest.raises(ValueError):
         CB.set_theta_hand_window("なにか")
 
@@ -154,10 +156,19 @@ def test_the_relative_scale_is_first_order_homogeneous():
     assert TO.clock_scale(3.0, 4.0, "sum") == pytest.approx(7.0)
 
 
-def test_the_probability_falls_back_to_the_absolute_scale_by_default():
-    """**既定は `abs`**（T80 のまま）＝2 本の時計を渡しても値は変わらない。"""
-    assert TO.W_ERR_MODE == "abs"
-    assert TO.prob_of_d(1.0) == pytest.approx(TO.prob_of_d(1.0, t_me=3.0, t_opp=4.0))
+def test_the_probability_falls_back_to_the_absolute_scale_when_sigma_rel_is_missing():
+    """**既定は `rel`**（2026-09-20）だが、**`σ_rel` が無ければ `abs` に落ちる**
+    ——黙って別の物差しで走らないための安全側。**立てる責任は呼ぶ側**（`theory_bridge` は
+    引けなければ `ValueError` で落ちる）。"""
+    assert TO.W_ERR_MODE == "rel"
+    old = TO.SIGMA_REL
+    try:
+        TO.set_sigma_rel(None)
+        assert TO.prob_of_d(1.0) == pytest.approx(TO.prob_of_d(1.0, t_me=3.0, t_opp=4.0))
+        TO.set_sigma_rel(0.2)
+        assert TO.prob_of_d(1.0) != pytest.approx(TO.prob_of_d(1.0, t_me=3.0, t_opp=4.0))
+    finally:
+        TO.set_sigma_rel(old)
 
 
 def test_the_relative_reading_flattens_the_long_clocks():

@@ -87,8 +87,9 @@ SLOPE_FLOOR = 1e-3
 #: （経済的な理由でなら守る＝`theta_of` の `max` と同じ考え方）。**新定数ゼロ**・**打ち筋に依らない**
 #: （本数・ライフ・ブロッカー・`c_of` だけ）。
 THETA_HAND_MODES = ("count", "quality", "play", "guard", "cuttable", "cuttable_cx", "cuttable_forced")
+#: **出荷既定は `cuttable_forced`**（2026-09-20・ユーザ決定「3 本すべて」・T100 の形を T116 の窓の上限と対で採った）。
 #: **既定は `cuttable`**（2026-09-17・ユーザ決定「1は変えましょうか」・T77）。以前の数字と比べるときは `--theta-hand count`。
-THETA_HAND_MODE = "cuttable"
+THETA_HAND_MODE = "cuttable_forced"
 
 
 #: **1 枚あたりの価格の出どころ**（`hand_price_mean` の `part`）。`count` は `None`（＝`μ`）。
@@ -266,7 +267,14 @@ def purse_series(sc, tok, jmax=10):
 #: **水準だけのプラセボ（`flow` を一律 c 倍）は失敗する**（当たり 0.4086／0.4276 < 今の 0.5085／0.5255）＝
 #: **患部の読み（成長が要る）は正しい**。判定の場は T18（出口）。
 RATE_DON_MODES = ("off", "flow", "purse")
-RATE_DON_MODE = "off"
+#: **出荷既定は `flow`**（2026-09-20・ユーザ決定「3 本すべて」）。**T116 と対で採った**——
+#: 単独では合成が +0.005 しか動かないが、**T116 と組むと両記録で 5 軸が改善する**
+#: （偏り 2.563 → **1.608**／2.601 → **1.744**・的中 0.6631 → **0.7164**／0.6340 → **0.6428**・
+#: σ_T 4.19 → **1.59**／4.16 → **1.48**・`curve` の偏り 0.239 → 0.088／0.455 → 0.286・
+#: `Θ`/要 1.816 → 1.383／1.999 → 1.611）。**理論の読みで退行する軸は無い**。
+#: 代金は **±1 当たり**（0.454 → 0.342／0.441 → 0.286＝残る偏りが系統誤差になり σ が締まった結果）と
+#: **`curve` の的中 −0.01〜0.02**。`purse` は切替として残す（財布ごと解き直す形）。
+RATE_DON_MODE = "flow"
 #: `purse`／`flow` のとき、**引いた 1 枚のドンを財布から払わせる**か（T114 の反証が要求した修正）。
 #: `True`（既定）＝残ったドンで絞る（悲観側の下限）／`False`＝設計の初版（払わせない＝上端）。
 RATE_DON_PAY = True
@@ -556,7 +564,9 @@ THETA_HAND_PLACE = "stock"
 #: **1.3485 → 0.6309（実）／1.2601 → 0.4950（合成）**・平均 0.2433 → 0.0442／0.2961 → 0.0582。
 #: **6+ 帯の不足は動かない**——そこの不足は**体の項**（不足の 99.2%）で手札ではない（反証で判明）。
 THETA_HAND_WINDOWS = ("off", "horizon", "fixpoint")
-THETA_HAND_WINDOW = "off"
+#: **出荷既定は `horizon`**（2026-09-20・ユーザ決定「3 本すべて」・`THETA_HAND_MODE=cuttable_forced` と対）。
+#: `fixpoint` は反復で `τ` が伸びるので切る額が減る＝**`horizon` の方が効く**（実測）。
+THETA_HAND_WINDOW = "horizon"
 
 
 def set_theta_hand_window(name):
@@ -719,14 +729,15 @@ def record_kind(dirs):
     return kinds.pop() if len(kinds) == 1 else None
 
 
-def sigma_rel_for(dirs, name="cross", body_mode=None):
+def sigma_rel_for(dirs, name="cross", body_mode=None, slope="theory"):
     """**`σ_rel`（予測 τ に対する相対残差の sd）を輪郭の表から引く**（T118）。
 
     `theory_order.W_ERR_MODE == "rel"` の物差し。規約は `sigma_t_for`／`w_bar_for` と同じ
     ——**耐久の形ごと**・**測る記録と別のセット**（§0.1 条件 1）。引けなければ `None`（`abs` に落ちる）。
-    **読みごとに違う**（`theory` の τ と `curve` の τ は別の器）ので表は読みで分けて持つ。"""
+    **読みごとに分けて持つ**（`theory` の τ と `curve` の τ は別の器なので同じ `σ` を使ってはいけない
+    ——T97 の「借り物の σ」と同じ誤りを繰り返さないため）。値の出所は `summarise` の `by_slope[*].sigma_rel`。"""
     tbl = (load_harm_profiles() or {}).get("sigma_rel") or {}
-    by = tbl.get(body_mode or THETA_BODY_MODE) or {}
+    by = (tbl.get(body_mode or THETA_BODY_MODE) or {}).get(slope) or {}
     if not by:
         return None
     if name in ("real", "syn"):
