@@ -479,12 +479,46 @@ def w_of_d(d, sigma=None):
     return math.exp(-0.5 * z * z) / (sigma * math.sqrt(2.0 * math.pi))
 
 
-def state_factor(d, mode=None):
-    """`κ(状態) = w(D)/w̄`——平均の傾きで書いた価格を局面の傾きに戻す係数。`flat` なら 1。"""
+#: **`κ` が使う物差しを `W` に合わせるか**（T122・`game_theory.md` §17.9.6-1）。
+#:
+#: **齟齬**: `κ = w(D)/w̄` は**勝率曲線の導関数**のはずなのに、`w_of_d` は `σ_D`（既定 1.4142）を使い、
+#: **出荷の `W`（`prob_of_d`）は T118 以降 `σ_rel · s(τ_me, τ_opp)` を使っている**（例で 2.7569）。
+#: **T118 以降、`κ` は `W` の微分になっていない**——`σ` が約 2 倍小さい＝**接戦帯を本来より鋭く重み付け**していた。
+#:
+#: `abs`＝**現状のまま**（既定・以前の数字と比べられる）／`match`＝**`W` と同じ物差しを使う**
+#: （2 本の時計が渡されたときだけ。渡されなければ `abs` と同じ）。**新定数ゼロ**（`σ_rel` は既測）。
+KAPPA_SIGMA_MODES = ("abs", "match")
+KAPPA_SIGMA_MODE = "abs"
+
+
+def set_kappa_sigma_mode(name):
+    global KAPPA_SIGMA_MODE
+    if name not in KAPPA_SIGMA_MODES:
+        raise ValueError("KAPPA_SIGMA_MODE は %s のどれか（%r）" % (KAPPA_SIGMA_MODES, name))
+    KAPPA_SIGMA_MODE = name
+    return KAPPA_SIGMA_MODE
+
+
+def state_factor(d, mode=None, t_me=None, t_opp=None, scale_mode="hyp"):
+    """`κ(状態) = w(D)/w̄`——平均の傾きで書いた価格を局面の傾きに戻す係数。`flat` なら 1。
+
+    **T122**: `KAPPA_SIGMA_MODE == "match"` かつ 2 本の時計が渡されたときは、`w` の物差しを
+    `prob_of_d` と同じ `σ_rel · s` にする（＝`κ` を本当に `W` の微分にする）。`w̄` は分母なので
+    そのまま（尺度に依らない量〔AUC・相関〕は `w̄` で動かない）。"""
     mode = W_MODE if mode is None else mode
     if mode not in ("clock", "curve"):
         return 1.0
-    return float(w_of_d(d) / W_BAR)
+    sd = None
+    if (KAPPA_SIGMA_MODE == "match" and SIGMA_REL is not None
+            and t_me is not None and t_opp is not None):
+        s = clock_scale(t_me, t_opp, scale_mode)
+        if s > 0.0:
+            # **床が要る**（T122 で踏んだ）——`κ` は**密度** `φ(z)/σ` なので `σ → 0` で発散する
+            # （両席の時計が同時に 0 へ行く行＝どちらも今死ぬ、で実際に起きた: `sep` が 2 万に飛んだ）。
+            # `rel` の物差しは T118 の実測では `abs` より**広い**（例で 2.76 対 1.41）ので、
+            # **狭くなる行は `rel` の測った範囲の外**＝`abs` に留める。**新しい定数は置かない**（既存の `σ_D`）。
+            sd = max(float(SIGMA_REL) * s, SIGMA_D)
+    return float(w_of_d(d, sd) / W_BAR)
 
 
 def clock_of_row(sc, tok_row, mode=None, opp_sc=None, opp_tok=None):

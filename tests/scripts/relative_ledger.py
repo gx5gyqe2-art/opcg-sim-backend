@@ -1,0 +1,395 @@
+#!/usr/bin/env python3
+"""**紐付けの法則を測る**（T122・2026-09-20・`game_theory.md` §17.9・ユーザ指示「進めてみてください」）。
+
+## 法則（§17.9・測る前に書いてある）
+
+出荷の勝率は `W = Φ(D/(σ_rel·s))` で `D` も `s` も時計について **1 次同次**。したがって
+**`z` は 0 次同次＝`W` は 2 本の時計の「比」 `r = T_me/T_opp` だけの関数**。そこから 1 行で出る:
+
+    ΔW = K(r) · Δ log( T_opp / T_me )          K(r) = φ(z)·r(1+r) / ( σ_rel·(1+r²)^{3/2} )
+
+**4 つの軸はすべて同じスカラー `K` を共有し、違うのは分母だけ**（攻撃 `p/Θ_opp`・守り `p/Θ_me`・
+体 `ΔA/A_me`・遅く `ΔA/A_opp`）。つまり**価格は絶対額ではなく「相対変化」で入る**。
+
+## 2×2 ＋ 3（腕の組み方）
+
+**「相対化」と「重み」のどちらが効くのかを分けて測る**ため、2×2 に組む:
+
+|  | 重み無し（`κ=1`） | 重み `K(r)` |
+|---|---|---|
+| **絶対額の価格** | `abs_flat`（T121 の勝者） | `plac_K`（法則の重みだけ・相対化しない） |
+| **相対変化** | `rel_flat`（相対化だけ） | **`rel_K`（法則そのもの）** |
+
+* `abs_kappa` … **出荷の帳簿**（`κ = w(D)/w̄`）
+* `rel_exact` … **一次近似をやめる**（`Φ(z') − Φ(z)` を直に引く・P3）
+* `plac_shift` … **プラセボ**: `K` を**前の局の同じ行番号**から取る（重みと局面の結びつきだけ壊す）
+
+## **判定に AUC を単独で使ってはいけない**（本器で気づいたこと）
+
+**局ごとの帳簿の和を AUC で読むと、決着帯を増幅した腕が機械的に勝つ**——決着帯では勝敗が
+**もう決まっている**ので、そこを大きく数えるほど「当たる」。`K(r)` は決着帯で 0 に落ちる
+（`r → 0` で `K ∝ r`）＝**`ΔW` として正しい振る舞い**なのに、AUC では罰される。
+
+**だから本器は 3 つを並べて出す**:
+
+1. **`auc` / `corr`（全帯）**——参考。決着帯の寄与が入る。
+2. **`before`（最後の自席ターンを外した帯）**——**勝敗がまだ決まっていない帯での判別**＝こちらを主に読む。
+3. **`sep` と `bias`（当てはめゼロの較正）**——`ΔW` の帳簿なら
+   `Σ ≈ z − W₀` なので **`sep = 平均(Σ|勝) − 平均(Σ|負)` は 1 に、`bias = 平均(Σ) − (平均 z − 平均 W₀)` は 0** に
+   なるべき。**係数を 1 つも当てはめずに較正を読める**（T119 の「判別と較正は別の 2 条件」の較正側）。
+
+**`Δ log(T_opp/T_me)` は近道の式（`p/Θ`）ではなく、時計を作り直して引く**——
+`curve` の読みでは `T = Θ/A` ではない（輪郭を歩く）ので、近道は成り立たない。
+**法則の形（対数比の差）は読みに依らないので、そちらを実装する**。
+
+## 検算の予告（§17.9.8・ここで測るもの）
+
+* **P1**: `rel_flat` が `abs_flat` と `abs_kappa` の両方に勝つ（AUC・相関・両記録）
+* **P2**: `rel_K` が P1 の判別力を落とさずに較正（`slope_fwd` が 1 へ）を改善する＝**判別と較正の両立**
+* **P3**: `rel_exact` が `rel_K` に勝つのは**最後の自席ターンだけ**（他の帯では差が出ない）
+* **P5**: **通貨の一律の付け替えで帳簿は 1 ビットも動いてはならない**（`Θ` と価格を同時に c 倍）
+* **P7**: **両席の `A` に共通の掛け算誤差**を入れても相対の腕は動かない（`abs` の腕は動く）
+
+**P4（守りと攻めが同じ `K` を共有するか）と P6（4 軸の重みの比）はこの母数では測れない**
+——守りの窓の行が記録に無く（P8 待ち）、`a_opp` の軸もほぼ空（`card_effect_harm` が
+【起動メイン】のほぼ全部に 0 を返す）。**測れないものは測れないと書く**。
+
+使い方:
+
+    python tests/scripts/relative_ledger.py --in <records_dir> [--games N] [--d-mode curve|clock] [--json out.json]
+"""
+
+import argparse
+import json
+import math
+import os
+import sys
+
+import numpy as np
+
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
+import crossing_bridge as CB  # noqa: E402
+import guard_afford as GA  # noqa: E402
+import kappa_vector as KV  # noqa: E402
+import theory_order as TO  # noqa: E402
+from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
+from theory_order import (MU, SC_MY_DON, SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER,  # noqa: E402
+                          SC_OPP_LIFE, THETA, opp_bodies_of, own_attackers_of, score_candidate,
+                          slot_power, theta_of)
+
+#: 時計の床（0 割りと `log 0` を避ける・`crossing_bridge.SLOPE_FLOOR` と同じ意味）
+T_FLOOR = 1e-6
+#: 腕の名前（出力の順序もこれ）
+ARMS = ("abs_flat", "abs_kappa", "rel_flat", "rel_K", "rel_exact", "plac_K", "plac_shift")
+
+
+def clocks_of(st, prof=None):
+    """状態 `(Θ_me, Θ_opp, A_me, A_opp, j)` → **2 本の時計 `(T_me, T_opp)`**（§17.9 の記号）。
+
+    **`T_me` は「自分が相手を倒しきるまで」**＝相手の耐久 `Θ_opp` を自分の速さで削る時間、
+    **`T_opp` は「相手が自分を倒しきるまで」**。`KV.D_MODE` が読み方を決める
+    （`curve`＝輪郭を歩く〔帳簿の正本〕／`clock`＝`min(CAP, Θ/A)`）。
+
+    **`D = T_opp − T_me`** は `KV.d_of` と同じ値になる（同じ関数を呼んでいる）。"""
+    th_me, th_opp, a_me, a_opp, j = st
+    if KV.D_MODE == "curve":
+        if prof is None:
+            raise ValueError("D_MODE=curve には損害の輪郭が要る（profile_for）")
+        t_me = float(CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof))
+        t_opp = float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof))
+    else:
+        t_me = KV.tau_of(th_opp, a_me)
+        t_opp = KV.tau_of(th_me, a_opp)
+    return max(T_FLOOR, t_me), max(T_FLOOR, t_opp)
+
+
+def z_of(t_me, t_opp, sigma_rel):
+    """`z = D / (σ_rel·s)`＝**0 次同次**（2 本を同時に c 倍しても動かない）。"""
+    s = TO.clock_scale(t_me, t_opp)
+    if s <= 0.0 or sigma_rel <= 0.0:
+        return 0.0
+    return (float(t_opp) - float(t_me)) / (float(sigma_rel) * s)
+
+
+def w_of(t_me, t_opp, sigma_rel):
+    """`W = Φ(z)`（出荷の `prob_of_d` と同じ式・引数を時計で受ける形）。"""
+    return 0.5 * (1.0 + math.erf(z_of(t_me, t_opp, sigma_rel) / math.sqrt(2.0)))
+
+
+def k_of(t_me, t_opp, sigma_rel):
+    """**法則のスカラー `K(r)`**（§17.9.3）＝`φ(z)·r(1+r) / (σ_rel·(1+r²)^{3/2})`・`r = T_me/T_opp`。
+
+    **これは `dW/dlog(T_opp/T_me)` そのもの**（`game_theory.md` §17.9.9 の検算が 8 桁で一致）。
+    `s` に `hyp` 以外を選ぶと `K` の閉じた形は変わるが、**判別は変わらない**（どれも `r` の単調関数・T118）。"""
+    r = float(t_me) / max(T_FLOOR, float(t_opp))
+    z = z_of(t_me, t_opp, sigma_rel)
+    phi = math.exp(-0.5 * z * z) / math.sqrt(2.0 * math.pi)
+    return phi * r * (1.0 + r) / (max(1e-12, float(sigma_rel)) * (1.0 + r * r) ** 1.5)
+
+
+def dlog_of(st0, st1, prof=None):
+    """**`Δ log(T_opp/T_me)`**——**時計を作り直して引く**（近道の `p/Θ` は `T=Θ/A` のときしか成り立たない）。"""
+    a0, b0 = clocks_of(st0, prof)
+    a1, b1 = clocks_of(st1, prof)
+    return math.log(b1 / a1) - math.log(b0 / a0)
+
+
+def calib_of(xs, zs, w0s):
+    """**当てはめゼロの較正**（`ΔW` の帳簿なら `Σ ≈ z − W₀`）。
+
+    `sep` = 平均(Σ|勝) − 平均(Σ|負)（**理想 1.0**）・`bias` = 平均(Σ) − (平均 z − 平均 W₀)（**理想 0**）。
+    **係数を 1 つも当てはめない**ので、傾き（回帰）と違って尺度の取り替えに騙されない（T119）。
+
+    **注意**: `sep = 1` が厳密に成り立つのは **`W₀` が勝ち負けで釣り合っているとき**
+    （`sep = 1 − 平均(W₀|勝) + 平均(W₀|負)`）。**釣り合いも一緒に出す**（`w0_gap`）ので、
+    `sep` を読むときは必ずそちらを見る。両席を同じ母数で積んでいるので構造的にはほぼ 0 になる。"""
+    x = np.asarray(xs, float); z = np.asarray(zs, float); w0 = np.asarray(w0s, float)
+    pos, neg = z > 0.5, z <= 0.5
+    if not pos.any() or not neg.any():
+        return {"sep": None, "bias": None}
+    return {"sep": round(float(x[pos].mean() - x[neg].mean()), 4),
+            "bias": round(float(x.mean() - (z.mean() - w0.mean())), 4),
+            # `sep` の理想が 1 になる条件（勝ち負けで `W₀` が釣り合っているか）
+            "w0_gap": round(float(w0[pos].mean() - w0[neg].mean()), 4)}
+
+
+#: **不変量の検算に使う倍率**（値は何でもよい・法則が厳密に不変なので）。`P5`＝通貨／`P7`＝両席の速さ。
+INV_C5, INV_C7 = 3.0, 1.3
+
+
+def _invariance(inv, st0, dx, prof, sigma_rel, dl, kk, capped):
+    """**行ごとに P5／P7 を厳密に検算する**（腕の AUC を run ごとに比べるのではなく一致を見る）。
+
+    **P5**: 耐久も価格も同時に c 倍（＝通貨の付け替え）／**P7**: 両席の速さを同時に c 倍。
+    どちらも **`r` が不変なので `Δlog` と `K` は 1 ビットも動いてはならない**。
+    **打ち切り（`TAU_CAP`）と床は絶対量**なので、そこに当たった行だけは動く＝**別に数える**。
+    **倍率を掛けた側で初めて打ち切りを跨ぐ行も在る**ので、**両方の状態を見て**「打ち切り無しでも破れたか」を数える。"""
+    for tag, st0b, dxb in (
+            ("p5", (st0[0] * INV_C5, st0[1] * INV_C5, st0[2], st0[3], st0[4]),
+             {k: v * INV_C5 for k, v in dx.items() if k in ("th_me", "th_opp")}
+             | {k: v for k, v in dx.items() if k in ("a_me", "a_opp")}),
+            ("p7", (st0[0], st0[1], st0[2] * INV_C7, st0[3] * INV_C7, st0[4]),
+             {k: v for k, v in dx.items() if k in ("th_me", "th_opp")}
+             | {k: v * INV_C7 for k, v in dx.items() if k in ("a_me", "a_opp")})):
+        st1b = KV.apply_dx(st0b, dxb)
+        a, b = clocks_of(st0b, prof)
+        a1, b1 = clocks_of(st1b, prof)
+        dlb = dlog_of(st0b, st1b, prof)
+        kb = k_of(a, b, sigma_rel)
+        err = max(abs(dlb - dl), abs(kb - kk))
+        lim = KV.TAU_CAP - 1e-9
+        hit = capped or a >= lim or b >= lim or a1 >= lim or b1 >= lim
+        inv[tag + "_n"] += 1
+        inv[tag + "_max"] = max(inv[tag + "_max"], err)
+        if err > 1e-9:
+            inv[tag + "_bad"] += 1
+            if not hit:
+                inv[tag + "_bad_offcap"] += 1
+
+
+def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency=1.0):
+    """記録を 1 度読んで **7 つの腕**を並べる（席×局ごとに積む）。
+
+    `scale_a`（**P7**）は**両席の `A` に共通の掛け算誤差**を入れる／`scale_currency`（**P5**）は
+    **耐久も価格も同時に c 倍**する＝どちらも**相対の腕は 1 ビットも動いてはならない**。"""
+    cards = PL.Cards()
+    idx2cid = {i: c for c, i in GA._vocab().items()}
+    prof = CB.profile_for(dirs)
+    if KV.D_MODE == "curve" and not prof:
+        raise ValueError("D_MODE=curve なのに損害の輪郭が引けない（%s）" % (dirs,))
+    sr = CB.sigma_rel_for(dirs, slope="curve")
+    if sr is None:
+        raise ValueError("σ_rel が引けない＝黙って別の物差しに落とさない（T118 の規約）")
+    TO.set_sigma_rel(sr)
+    arms = {k: [] for k in ARMS}
+    # **決着帯を外した帯**（最後の自席ターンを落とす）＝勝敗がまだ決まっていない所での判別
+    before = {k: [] for k in ARMS}
+    # **P3**: 最後の自席ターンだけ（とどめの帯・厳密形が効くならここだけで効くはず）
+    last = {k: [] for k in ARMS}
+    zs, w0s = [], []
+    rs = []
+    stats = {"games": 0, "rows": 0, "priced": 0, "dead": 0, "last_turn_rows": 0, "capped": 0,
+             "k_sum": 0.0, "dlog_abs_sum": 0.0, "by_family": {},
+             # **P5／P7 を行ごとに厳密に検算する**（AUC の比較ではなく一致の検算）
+             "inv": {"p5_n": 0, "p5_bad": 0, "p5_max": 0.0, "p5_bad_offcap": 0,
+                     "p7_n": 0, "p7_bad": 0, "p7_max": 0.0, "p7_bad_offcap": 0}}
+    prev_ks = []                          # プラセボ用: **前の局**の同じ行番号の `K`
+    games = 0
+    for r, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS,
+                                                 extra_fn=_extra):
+        games += 1
+        if limit_games and games > limit_games:
+            break
+        stats["games"] += 1
+        acc = {k: 0.0 for k in arms}
+        acc_before = {k: 0.0 for k in arms}
+        acc_last = {k: 0.0 for k in arms}
+        cur_ks = []
+        w0 = None
+        z_of_seat = {}
+        rate_at_turn, g_at_turn = {}, {}
+        for i in idx:
+            if int(r["kind"][i]) != 0:
+                continue
+            w, t = int(r["who"][i]), int(r["turn"][i])
+            if PL.is_own_turn(w, t) and (w, t) not in rate_at_turn:
+                rate_at_turn[(w, t)] = KV.rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
+                                                      idx2cid, cards, theta, mu) * float(scale_a)
+                g_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
+        last_turn_of = {}
+        for (w, t) in rate_at_turn:
+            last_turn_of[w] = max(t, last_turn_of.get(w, -1))
+
+        def _opp_at(w, t):
+            ts = [tt for (ww, tt) in rate_at_turn if ww == 1 - w and tt < t]
+            if not ts:
+                return None
+            key = (1 - w, max(ts))
+            return rate_at_turn[key], g_at_turn[key]
+        for i in idx:
+            z = float(r["z"][i])
+            if z != 0.0:
+                z_of_seat[int(r["who"][i])] = 1.0 if z > 0 else 0.0
+            if int(r["kind"][i]) != 0:
+                continue
+            w, t = int(r["who"][i]), int(r["turn"][i])
+            if not PL.is_own_turn(w, t):
+                continue
+            k = int(L[i]); ch = int(r["pol_chosen"][i])
+            if k < 1 or ch < 0 or ch >= k:
+                continue
+            stats["rows"] += 1
+            pair = _opp_at(w, t)
+            if pair is None:
+                continue
+            ao, g_opp = pair
+            sc, tok, ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
+            b = int(ptr[i]) + ch
+            sig = json.loads(pol["pol_sig"][b])
+            fam = move_family(sig)
+            st0 = KV.state_of_row(sc, tok, rate_at_turn[(w, t)], ao, CB.own_turn_index(t),
+                                  g_me=g_at_turn[(w, t)], g_opp=g_opp)
+            # **P5**: 通貨の付け替え＝耐久も価格も同じ c 倍（速さはそのまま＝時計は c 倍される）
+            st0 = (st0[0] * scale_currency, st0[1] * scale_currency, st0[2], st0[3], st0[4])
+            rt = max(1.0, min(5.0, float(np.asarray(sc)[SC_OPP_LIFE])))
+            th = theta_of(tok, float(np.asarray(sc)[SC_MY_LIFE]), float(np.asarray(sc)[SC_MY_DON]),
+                          mode="const", theta=theta)
+            olp = float(np.asarray(sc)[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+            mlp = float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
+            ctx = {"theta": th, "mu": mu, "opp_leader_power": olp, "my_leader_power": mlp,
+                   "r_turns": rt, "don_k": 1, "attackers": own_attackers_of(tok, olp),
+                   "don_active": float(np.asarray(sc)[SC_MY_DON]),
+                   "st": _state_of(sc, ci, idx2cid),
+                   "opp_bodies": opp_bodies_of(tok, mlp, rt, th, mu, ci_row=ci, idx2cid=idx2cid)}
+            tl = sig[2] if len(sig) > 2 else None
+            v = score_candidate(sig, str(pol["pol_cid"][b]) or None,
+                                (str(pol["pol_tcid"][b]) or None) if tl else None, ctx, cards,
+                                src_power=slot_power(tok, int(pol["pol_si"][b])),
+                                tgt_power=slot_power(tok, int(pol["pol_ti"][b])),
+                                don_k=int(pol["pol_k"][b]))
+            if v is None:
+                continue
+            v = float(v) * float(scale_currency)
+            stats["priced"] += 1
+            stats["by_family"][fam] = stats["by_family"].get(fam, 0) + 1
+            dx = KV.axis_of_move(fam, v, sig, str(pol["pol_cid"][b]) or None, cards, sc, tok, olp, rt,
+                                 don_k=int(pol["pol_k"][b]))
+            st1 = KV.apply_dx(st0, dx)
+            t_me, t_opp = clocks_of(st0, prof)
+            d = t_opp - t_me
+            kk = k_of(t_me, t_opp, sr)
+            dl = dlog_of(st0, st1, prof)
+            if dl == 0.0:
+                stats["dead"] += 1
+            stats["k_sum"] += kk
+            rs.append(t_me / max(T_FLOOR, t_opp))
+            stats["dlog_abs_sum"] += abs(dl)
+            # **打ち切りに当たっているか**——`tau_of`／輪郭の打ち切りは**絶対量**なので、
+            # そこに当たった行では下の不変量（P5・P7）が成り立たない（破れの出どころ）。
+            capped = (t_me >= KV.TAU_CAP - 1e-9) or (t_opp >= KV.TAU_CAP - 1e-9)
+            stats["capped"] += int(capped)
+            _invariance(stats["inv"], st0, dx, prof, sr, dl, kk, capped)
+            sgn = 1.0 if w == 0 else -1.0                # 席 0 の視点で積む（帳簿と同じ）
+            if w0 is None:                               # **較正用**: 席 0 視点の開始時の勝率
+                w0 = w_of(t_me, t_opp, sr) if w == 0 else 1.0 - w_of(t_me, t_opp, sr)
+            ex_w = w_of(*clocks_of(st1, prof), sigma_rel=sr) - w_of(t_me, t_opp, sr)
+            plac_k = prev_ks[len(cur_ks)] if len(cur_ks) < len(prev_ks) else kk
+            cur_ks.append(kk)
+            one = {"abs_flat": v * sgn,
+                   "abs_kappa": v * sgn * float(TO.state_factor(d, "curve", t_me=t_me, t_opp=t_opp)),
+                   "rel_flat": dl * sgn,
+                   "rel_K": kk * dl * sgn,
+                   "rel_exact": ex_w * sgn,
+                   "plac_K": kk * v * sgn,
+                   "plac_shift": plac_k * dl * sgn}
+            is_last = (t == last_turn_of.get(w))         # **P3**: 最後の自席ターンか
+            stats["last_turn_rows"] += int(is_last)
+            for kk2, val in one.items():
+                acc[kk2] += val
+                (acc_last if is_last else acc_before)[kk2] += val
+        prev_ks = cur_ks
+        if len(z_of_seat) < 2:
+            continue
+        zs.append(z_of_seat.get(0, 0.0))
+        w0s.append(0.5 if w0 is None else w0)
+        for kk2 in arms:
+            arms[kk2].append(acc[kk2]); before[kk2].append(acc_before[kk2])
+            last[kk2].append(acc_last[kk2])
+    n = max(1, stats["priced"])
+    out = {"games": stats["games"], "rows": stats["rows"], "priced": stats["priced"],
+           "d_mode": KV.D_MODE, "sigma_rel": round(sr, 4),
+           "kappa_sigma_mode": TO.KAPPA_SIGMA_MODE,
+           "scale_a": scale_a, "scale_currency": scale_currency,
+           "dead_rows": stats["dead"], "dead_share": round(stats["dead"] / n, 4),
+           "last_turn_rows": stats["last_turn_rows"],
+           "capped_share": round(stats["capped"] / n, 4),
+           "K_mean": round(stats["k_sum"] / n, 4),
+           # `r` は片側の時計が 0 に行く行で発散するので**中央値**で読む（平均は尾に支配される）
+           "r_median": round(float(np.median(rs)) if rs else 0.0, 4),
+           "dlog_abs_mean": round(stats["dlog_abs_sum"] / n, 5),
+           "w0_mean": round(float(np.mean(w0s)) if w0s else 0.5, 4),
+           "by_family": stats["by_family"],
+           # **P5／P7**: 行ごとの厳密な検算（`bad_offcap` が 0 なら「破れは打ち切りだけ」）
+           "invariance": {k: (round(v, 12) if isinstance(v, float) else v)
+                          for k, v in stats["inv"].items()},
+           # 全帯（参考・決着帯の寄与が入る）＋**当てはめゼロの較正**
+           "arms": {kk: dict(KV._score(arms[kk], zs), **calib_of(arms[kk], zs, w0s)) for kk in ARMS},
+           # **主に読む帯**: 最後の自席ターンを外した＝勝敗がまだ決まっていない所
+           "before": {kk: KV._score(before[kk], zs) for kk in ARMS},
+           # **P3**: とどめの帯だけ（厳密形が効くならここだけで効くはず）
+           "last_turn": {kk: KV._score(last[kk], zs) for kk in ARMS}}
+    return out
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="紐付けの法則を測る（T122）")
+    ap.add_argument("--in", dest="src", nargs="+", required=True)
+    ap.add_argument("--games", type=int, default=0)
+    ap.add_argument("--d-mode", dest="d_mode", choices=KV.D_MODES, default=None)
+    ap.add_argument("--kappa-sigma", dest="kappa_sigma", choices=TO.KAPPA_SIGMA_MODES, default=None,
+                    help="**T122/§17.9.6-1**: κ の物差しを W に合わせるか（既定は現状の `abs`）")
+    ap.add_argument("--scale-a", type=float, default=1.0, help="**P7**: 両席の A に共通の掛け算誤差")
+    ap.add_argument("--scale-currency", type=float, default=1.0, help="**P5**: 耐久と価格を同時に c 倍")
+    ap.add_argument("--json", default="")
+    a = ap.parse_args(argv)
+    if a.d_mode:
+        KV.set_d_mode(a.d_mode)
+    if a.kappa_sigma:
+        TO.set_kappa_sigma_mode(a.kappa_sigma)
+    out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency)
+    print(json.dumps(out, ensure_ascii=False, indent=2))
+    if a.json:
+        with open(a.json, "w", encoding="utf-8") as f:
+            json.dump(out, f, ensure_ascii=False, indent=2)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
