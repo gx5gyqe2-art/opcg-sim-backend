@@ -109,6 +109,10 @@ def clocks_of(st, prof=None):
             s_opp = KV.profile_scale(a_opp, j)    # 相手が自分を倒すまで＝**相手**の速さ
         t_me = float(CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof, s_me))
         t_opp = float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof, s_opp))
+    elif KV.D_MODE == "theory":
+        # **T127**: 加速を状態から出す（表を使わない）。削る側の速さでそれぞれ歩く。
+        t_me = KV.tau_theory(th_opp, a_me, KV.RATE_SHAPE["me"], j)
+        t_opp = KV.tau_theory(th_me, a_opp, KV.RATE_SHAPE["opp"], j)
     else:
         t_me = KV.tau_of(th_opp, a_me)
         t_opp = KV.tau_of(th_me, a_opp)
@@ -177,9 +181,13 @@ def _invariance(inv, st0, dx, prof, sigma_rel, dl, kk, capped):
     **打ち切り（`TAU_CAP`）と床は絶対量**なので、そこに当たった行だけは動く＝**別に数える**。
     **倍率を掛けた側で初めて打ち切りを跨ぐ行も在る**ので、**両方の状態を見て**「打ち切り無しでも破れたか」を数える。"""
     for tag, st0b, dxb in (
-            ("p5", (st0[0] * INV_C5, st0[1] * INV_C5, st0[2], st0[3], st0[4]),
-             {k: v * INV_C5 for k, v in dx.items() if k in ("th_me", "th_opp")}
-             | {k: v for k, v in dx.items() if k in ("a_me", "a_opp")}),
+            # **P5 は通貨の付け替え**なので **`A` も同じだけ倍にする**（`A` は「損害/ターン」）。
+            # **T127 で直した**——`curve` の読みでは `A` が時計に入らないので無害だったが、
+            # `A` が時計に入る読み（`curve_scaled`／`theory`）では**耐久だけ 3 倍にするのは
+            # 単位の変更ではなく物理の変更**（同じ速さで 3 倍の耐久＝3 倍の時間）になっていた。
+            # **T122／T126 の P5 の数字はこの誤った定義で測ったもの**（`curve` については結論は変わらない）。
+            ("p5", (st0[0] * INV_C5, st0[1] * INV_C5, st0[2] * INV_C5, st0[3] * INV_C5, st0[4]),
+             {k: v * INV_C5 for k, v in dx.items()}),
             ("p7", (st0[0], st0[1], st0[2] * INV_C7, st0[3] * INV_C7, st0[4]),
              {k: v for k, v in dx.items() if k in ("th_me", "th_opp")}
              | {k: v * INV_C7 for k, v in dx.items() if k in ("a_me", "a_opp")})):
@@ -246,6 +254,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
         w0 = None
         z_of_seat = {}
         rate_at_turn, g_at_turn = {}, {}
+        shape_at = {}
         for i in idx:
             if int(r["kind"][i]) != 0:
                 continue
@@ -254,6 +263,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                 rate_at_turn[(w, t)] = KV.rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
                                                       idx2cid, cards, theta, mu) * float(scale_a)
                 g_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
+                shape_at[(w, t)] = (KV.rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
+                                                       idx2cid, cards, theta, mu)
+                                       if KV.D_MODE == "theory" else None)
         last_turn_of = {}
         for (w, t) in rate_at_turn:
             last_turn_of[w] = max(t, last_turn_of.get(w, -1))
@@ -280,6 +292,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
             pair = _opp_at(w, t)
             if pair is None:
                 continue
+            if KV.D_MODE == "theory":
+                # **T127**: 席ごとの速さの形（相手は直近の自席ターンの形）を行ごとに入れる
+                _ts = [tt for (ww, tt) in rate_at_turn if ww == 1 - w and tt < t]
+                KV.set_rate_shape(shape_at.get((w, t)),
+                             shape_at.get((1 - w, max(_ts))) if _ts else None)
             ao, g_opp = pair
             sc, tok, ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
             b = int(ptr[i]) + ch

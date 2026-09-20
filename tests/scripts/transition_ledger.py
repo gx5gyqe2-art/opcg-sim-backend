@@ -235,6 +235,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
         stats["games"] += 1
         # 席ごとの速さ（その席の自席ターンの**最初の行**から・`crossing_bridge` の `turn_start` と同じ規約）
         rate_at, g_at, sched_at = {}, {}, {}
+        shape_at = {}
         for i in idx:
             if int(r["kind"][i]) != 0:
                 continue
@@ -243,6 +244,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
                 rate_at[(w, t)] = KV.rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
                                                  idx2cid, cards, theta, mu)
                 g_at[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
+                shape_at[(w, t)] = (KV.rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
+                                                       idx2cid, cards, theta, mu)
+                                       if KV.D_MODE == "theory" else None)
                 sched_at[(w, t)] = None
                 if BOUNDARY_MODE in ("rules", "don") and CB.RATE_DON_MODE != "off":
                     _sc, _tok, _ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
@@ -268,6 +272,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
             me, op = _latest(w, t), _latest(1 - w, t)
             if me is None or op is None:
                 continue
+            if KV.D_MODE == "theory":
+                # **T127**: 席ごとの速さの形（相手は直近の自席ターンの形）を行ごとに入れる
+                _ts = [tt for (ww, tt) in rate_at if ww == 1 - w and tt < t]
+                KV.set_rate_shape(shape_at.get((w, t)),
+                             shape_at.get((1 - w, max(_ts))) if _ts else None)
             sc, tok, ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
             st = KV.state_of_row(sc, tok, me[0], op[0], CB.own_turn_index(t),
                                  g_me=me[1], g_opp=op[1])

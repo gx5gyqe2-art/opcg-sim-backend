@@ -483,3 +483,79 @@ def test_scale_clamp_is_a_diagnostic_and_off_by_default(_prof_th):
     finally:
         KV.set_scale_clamp(None)
     assert KV.profile_scale(9.9, 3) > 2.0                          # 外せば元に戻る
+
+
+# --------------------------------------------------------------------------- 8. T127: 積み上がる歩きの読み
+@pytest.fixture
+def _shape():
+    old = dict(KV.RATE_SHAPE)
+    yield
+    KV.RATE_SHAPE.update(old)
+
+
+def test_theory_is_a_fourth_reading_with_all_four_axes_live():
+    assert "theory" in KV.D_MODES
+    assert KV.LIVE_AXES["theory"] == KV.AXES
+
+
+def test_rate_shape_is_normalised_to_one(_shape):
+    KV.set_rate_shape((1.0, 2.0, 1.0, 0.0), (0.0, 0.0, 0.0, 0.0))
+    assert sum(KV.RATE_SHAPE["me"]) == pytest.approx(1.0)
+    assert KV.RATE_SHAPE["me"] == pytest.approx((0.25, 0.5, 0.25, 0.0))
+    assert KV.RATE_SHAPE["opp"] == (0.0, 1.0, 0.0, 0.0)      # 全部 0 なら盤面に倒す
+
+
+def test_theory_uses_no_table_at_all(_shape):
+    """**表を一切使わない**（加速は状態から出る）＝輪郭を渡さなくても解ける。"""
+    KV.set_d_mode("theory")
+    KV.set_rate_shape((0.3, 0.4, 0.2, 0.1), (0.3, 0.4, 0.2, 0.1))
+    assert math.isfinite(KV.d_of((0.9, 0.6, 0.12, 0.10, 2)))   # prof を渡さない
+
+
+def test_theory_lets_the_rate_move_the_clock(_shape):
+    KV.set_d_mode("theory")
+    KV.set_rate_shape((0.3, 0.4, 0.2, 0.1), (0.3, 0.4, 0.2, 0.1))
+    st = (0.9, 0.6, 0.12, 0.10, 2)
+    assert KV.d_of((0.9, 0.6, 0.24, 0.10, 2)) > KV.d_of(st)
+
+
+def test_theory_is_exactly_invariant_to_a_currency_rescale(_shape):
+    """**P5（単位の付け替え）は設計から出る**——`Θ` と `A` を同じだけ倍にすれば `τ` は不変。
+
+    **表を使わないので単位は `A` だけが持つ**。これが `curve` にできないこと（T126 の患部）。"""
+    KV.set_d_mode("theory")
+    KV.set_rate_shape((0.3, 0.4, 0.2, 0.1), (0.3, 0.4, 0.2, 0.1))
+    st = (0.9, 0.6, 0.12, 0.10, 2)
+    for c in (0.5, 3.0, 7.0):
+        assert KV.d_of((st[0] * c, st[1] * c, st[2] * c, st[3] * c, st[4])) == pytest.approx(KV.d_of(st))
+
+
+def test_acceleration_and_p7_cannot_both_hold(_shape):
+    """**加速する時計は `A` について 1 次同次になれない**（T127 で踏んだ・P7 は要求として過剰だった）。
+
+    `R_k = A·f(k)` で `f` が増えるなら `Σ_{k≤τ} f` を `1/c` にする `τ` は `τ/c` より大きい。
+    **一定の形なら厳密に通り、加速する形なら通らない**——これを両方固定する。"""
+    KV.set_d_mode("theory")
+    st = (0.9, 0.6, 0.12, 0.10, 2)
+    fast = (0.9, 0.6, 0.12 * 1.3, 0.10 * 1.3, 2)
+    KV.set_rate_shape((0.0, 1.0, 0.0, 0.0), (0.0, 1.0, 0.0, 0.0))     # 一定（加速なし）
+    assert KV.d_of(fast) == pytest.approx(KV.d_of(st) / 1.3)
+    KV.set_rate_shape((0.3, 0.4, 0.2, 0.1), (0.3, 0.4, 0.2, 0.1))     # 加速あり
+    assert KV.d_of(fast) > KV.d_of(st) / 1.3
+
+
+def test_a_constant_shape_degenerates_to_the_clock_reading(_shape):
+    """形が全部盤面なら `tau_grow` は `Θ/A` に退化する（既定がそれ＝読みの連続性）。"""
+    KV.set_rate_shape((0.0, 1.0, 0.0, 0.0), (0.0, 1.0, 0.0, 0.0))
+    KV.set_d_mode("theory")
+    a = KV.d_of((0.9, 0.6, 0.12, 0.10, 4))
+    KV.set_d_mode("clock")
+    assert a == pytest.approx(KV.d_of((0.9, 0.6, 0.12, 0.10, 4)), rel=1e-9)
+
+
+def test_theory_gives_the_rate_axes_a_gradient(_shape):
+    KV.set_d_mode("theory")
+    KV.set_rate_shape((0.3, 0.4, 0.2, 0.1), (0.3, 0.4, 0.2, 0.1))
+    g = KV.grad_of((0.9, 0.6, 0.12, 0.10, 2))
+    assert g["a_me"] > 0.0 and g["a_opp"] < 0.0
+    assert g["th_me"] > 0.0 and g["th_opp"] < 0.0

@@ -121,11 +121,12 @@ TAU_CAP = CB.RACE_CAP
 AXES = ("th_me", "th_opp", "a_me", "a_opp")
 
 #: **`D` の読み方**（上の表）。`curve`＝**帳簿の正本**（輪郭・軸は 2 本）／`clock`＝2 本の時計（軸は 4 本）。
-D_MODES = ("curve", "curve_scaled", "clock")
+D_MODES = ("curve", "curve_scaled", "clock", "theory")
 D_MODE = "curve"
 #: 読みごとに**生きている軸**。`curve` に速さの軸は**存在しない**（輪郭は固定の表）。
 #: **`curve_scaled` は 4 本とも生きている**——輪郭をその席の `A` で伸縮するので速さが時計に入る。
-LIVE_AXES = {"curve": ("th_me", "th_opp"), "curve_scaled": AXES, "clock": AXES}
+LIVE_AXES = {"curve": ("th_me", "th_opp"), "curve_scaled": AXES, "clock": AXES,
+             "theory": AXES}
 
 #: **`curve_scaled` の分母**（`crossing_bridge.profile_th_for` が返す理論の速さの輪郭）。
 #: 読む側が `set_profile_th` で入れる。**入っていないのに `curve_scaled` を頼んだら落ちる**
@@ -174,6 +175,50 @@ def set_scale_clamp(lo_hi):
     return SCALE_CLAMP
 
 
+#: **`theory`（積み上がる歩き・T94）の速さの形**＝席ごとの `(リーダー, 盤面のキャラ, 在庫, 流入)` を
+#: **和が 1 になるよう正規化した割合**。歩きの各項はこの割合 × その席の `A` で作る。
+#:
+#: **なぜ割合で持つか**: 状態は `A` をスカラーで持っている（軸は 4 本のまま）。`ΔA` を割合で配れば
+#: **歩きは `Θ` と `A` を同じだけ倍にしても不変**（＝**P5・通貨の付け替え**が設計から出る）
+#: ——輪郭と違い**絶対のターン番号の表を一切使わない**ので、単位は `A` だけが持つ。
+#:
+#: **ただし P7（両席の `A` を c 倍しても `D` が 1/c になる）は満たさない**（T127 で踏んだ）。
+#: `R_k = A·f(k)` で `f` が増えるなら `Σ_{k≤τ} f` が `1/c` になる `τ` は `τ/c` より大きい
+#: ——**加速する時計は原理的に `A` について 1 次同次になれない**。**加速と P7 は両立しない**ので、
+#: **P7 は要求として過剰だった**（`curve` で「0 行の破れ」だったのは満たしていたからではなく
+#: `A` が時計に入っていなかったから・T126）。**単位の不変量は P5 の方**であり、そちらは厳密に通る。
+#: （代わりに「出した体は `stock` へ」という T84 の遅れは**この形では表現していない**＝一次の近似・報告で明示する。）
+#: 既定は `(0, 1, 0, 0)`＝全部が盤面＝**一定の速さ**（`tau_grow` が `Θ/A` に退化する）。
+RATE_SHAPE = {"me": (0.0, 1.0, 0.0, 0.0), "opp": (0.0, 1.0, 0.0, 0.0)}
+
+
+def _norm_shape(terms):
+    """`(リーダー, 盤面, 在庫, 流入)` を**和が 1 になるよう**正規化（全部 0 なら全部盤面に倒す）。"""
+    v = [max(0.0, float(x)) for x in terms]
+    tot = sum(v)
+    return tuple(x / tot for x in v) if tot > 0.0 else (0.0, 1.0, 0.0, 0.0)
+
+
+def set_rate_shape(me_terms=None, opp_terms=None):
+    """席ごとの速さの形を入れる（`theory` の読みだけが使う）。`None` は据え置き。"""
+    if me_terms is not None:
+        RATE_SHAPE["me"] = _norm_shape(me_terms)
+    if opp_terms is not None:
+        RATE_SHAPE["opp"] = _norm_shape(opp_terms)
+    return RATE_SHAPE
+
+
+def tau_theory(theta, rate, shape, j):
+    """**積み上がる歩き**（T94）で `Θ` に届くまでのターン数。**表を一切使わない**（加速は状態から出る）。
+
+    `R_k = リーダー ＋ 盤面·(1−ko_p)^{k−1} ＋ 在庫·[k≥2] ＋ 流入·(k−1)`（`crossing_bridge.rate_at`）を
+    `shape × rate` で作って歩く。**`A` について 1 次同次**なので、通貨の付け替えにも
+    両席共通の速さの誤差にも構造的に強い。"""
+    lead, chars, stock, flow = (float(x) * max(0.0, float(rate)) for x in shape)
+    return float(CB.tau_grow(max(0.0, float(theta)), lead, chars, stock, flow,
+                             j0=int(j) + 1))
+
+
 def set_d_mode(name):
     global D_MODE
     if name not in D_MODES:
@@ -202,6 +247,10 @@ def d_of(st, prof=None):
             s_opp = profile_scale(a_me, j)      # 相手が死ぬまで＝**自分**が削る速さ
         return float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof, s_me)
                      - CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof, s_opp))
+    if D_MODE == "theory":
+        # **T127**: 加速を**状態から**出す（表を使わない）。削る側の速さでそれぞれ歩く。
+        return (tau_theory(th_me, a_opp, RATE_SHAPE["opp"], j)
+                - tau_theory(th_opp, a_me, RATE_SHAPE["me"], j))
     return tau_of(th_me, a_opp) - tau_of(th_opp, a_me)
 
 
@@ -245,6 +294,7 @@ def grad_of(st, prof=None):
     g = {k: 0.0 for k in AXES}
     axes = (("th_me", 0), ("th_opp", 1)) if D_MODE == "curve" else (
         ("th_me", 0), ("th_opp", 1), ("a_me", 2), ("a_opp", 3))
+    # `theory` は表を使わないので輪郭は要らない（`d_of` が無視する）
     for k, i in axes:
         x = float(st[i])
         h = max(1e-6, 1e-4 * max(1.0, abs(x)))
@@ -272,6 +322,18 @@ def g_of_row(sc, tok, ci_row, idx2cid, cards):
     if part is None:
         return None
     return CB.hand_price_mean(sc, tok, ci_row, idx2cid, cards, part=part)
+
+
+def rate_terms_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU):
+    """その席の**速さの内訳** `(リーダー, 盤面のキャラ, 在庫, 流入)`（T94・`seat_slope_terms` の頭 4 つ）。
+
+    **`rate_of_row` と同じ行（その席のターンの最初の行）で呼ぶ。** 返すのは生の額で、
+    使う側は `set_rate_shape` で割合に正規化する。"""
+    sc = np.asarray(sc); tok = np.asarray(tok)
+    olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+    base, stock, flow, lead = CB.seat_slope_terms(sc, tok, ci_row, idx2cid, cards, olp, theta, mu,
+                                                  want_stock=True)[:4]
+    return (float(lead), max(0.0, float(base) - float(lead)), float(stock), float(flow))
 
 
 def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None):
@@ -409,6 +471,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
         z_of = {}
         # **1 周目**: 席ごとに「その自席ターンの**最初の**決定行」から `A` を作る（橋と同じ `turn_start`）。
         rate_at_turn, g_at_turn = {}, {}
+        shape_at = {}
         for i in idx:
             if int(r["kind"][i]) != 0:
                 continue
@@ -417,6 +480,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
                 rate_at_turn[(w, t)] = rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
                                                    idx2cid, cards, theta, mu)
                 g_at_turn[(w, t)] = g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
+                shape_at[(w, t)] = (rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
+                                                       idx2cid, cards, theta, mu)
+                                       if D_MODE == "theory" else None)
 
         def _opp_at(w, t):
             """相手の **(A, g)**＝相手の**直近の自席ターンの最初の行**から読んだもの。無ければ `None`。"""
@@ -440,7 +506,12 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
             stats["rows"] += 1
             pair = _opp_at(w, t)
             if pair is None:
-                continue                       # 相手がまだ 1 ターンも打っていない（橋と同じ扱い）
+                continue
+            if D_MODE == "theory":
+                # **T127**: 席ごとの速さの形（相手は直近の自席ターンの形）を行ごとに入れる
+                _ts = [tt for (ww, tt) in rate_at_turn if ww == 1 - w and tt < t]
+                set_rate_shape(shape_at.get((w, t)),
+                             shape_at.get((1 - w, max(_ts))) if _ts else None)                       # 相手がまだ 1 ターンも打っていない（橋と同じ扱い）
             ao, g_opp = pair
             sc, tok, ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
             b = int(ptr[i]) + ch
