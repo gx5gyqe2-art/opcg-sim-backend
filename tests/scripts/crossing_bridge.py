@@ -1866,6 +1866,59 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             prev = [tt for tt in turn_seq[defender] if tt <= t]
             return float(hb_self.get((defender, prev[-1]), 0.0)) if prev else 0.0
 
+        def guard_read_for(defender, t, xs):
+            """**守る席が「切るかどうか」を決める材料**（T130・ユーザ指摘 2026-09-20
+            「カウンター値と次ターン以降に出したいカードの都合じゃない？」）。
+
+            `T129` の守りの列は**枚数と体の大きさ**しか見ていなかった。**決めているのは 2 つ**:
+            **その札のカウンター値**（足りなければ止められない）と
+            **その札を次ターン以降に出したい度**（切ったら失う分＝機会費用）。
+            **どちらも既にある**（`hand_items` の `counter` と `v`・`hand_guard.guard_cost_min_v` は
+            **カウンター値が足りる組のうち出す価値の和が最小のもの**を選び、`guard_value` は
+            **受けるより安いときだけ切る**）。**出荷の `Θ` がこれを使っていない**だけ。
+
+            **手札の中身はその席の行にしか無い**（T76）ので、**守る席の直近の自席ターンの最後の行**から読む
+            （`g_for` と同じ規約）。読めなければ全部 `None`。"""
+            prev = [tt for tt in turn_seq[defender] if tt <= t]
+            if not prev:
+                return {}
+            sc_d, tok_d, ci_d = turn_last.get((defender, prev[-1]), turn_start[(defender, prev[-1])])
+            import hand_guard as HG
+            import hand_plan as HP
+            sc_da = np.asarray(sc_d)
+            olp_d = float(sc_da[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+            r_d = max(1.0, min(5.0, float(sc_da[SC_OPP_LIFE])))
+            items = HP.hand_items(tok_d, ci_d, idx2cid, cards, olp_d, r_d) if cards is not None else []
+            if not items:
+                return {"d_ctr_sum": 0.0, "d_ctr_n": 0, "d_play_sum": 0.0,
+                        "d_cut": 0.0, "d_guard_value": 0.0}
+            pairs = [(it["counter"], HP.v_scalar(it["v"])) for it in items]
+            take = HG.take_cost_of(float(sc_da[SC_MY_LIFE]), mu)
+            return {
+                # **カウンター値**（印字＋イベントの上げ幅）——足りなければそもそも止められない
+                "d_ctr_sum": float(sum(p for p, _v in pairs)),
+                "d_ctr_n": int(sum(1 for p, _v in pairs if p > 0.0)),
+                # **次ターン以降に出したい度**＝切ったら失う分（機会費用）
+                "d_play_sum": float(sum(0.0 if v is None else float(v) for _p, v in pairs)),
+                # **実際に何枚切るか**（カウンター値が足りる組のうち出す価値の和が最小・受けるより安いときだけ）
+                "d_cut": float(HP.counters_cut(items, xs, take)),
+                # **守りの備えの額**（止めて浮かせた分の和・地平の中で 1 枚 1 回）
+                "d_guard_value": float(HG.guard_value(pairs, xs, take)),
+            }
+
+        def through_for(tok, olp, defender, t):
+            """**通った本数**＝`攻撃の本数 − 切られた本数 − ブロックされた本数`（T130・**規則だけ**）。
+
+            **`d_cut` と `d_attacks` を別々に見ると打ち消し合う**（本数が多いほど切る枚数も増える）ので、
+            **組にした量で読む**。**新定数ゼロ**——3 つとも既に在る量。
+            **予告（測る前に書く）**: これが本体なら**両記録で正に出て、どちらの片割れより大きい**はず
+            （通る本数が多いほど実際の損害は `A` の見積もりを上回る）。"""
+            n = len(own_attackers_of(tok, olp))
+            g = guard_read_for(defender, t, own_attackers_of(tok, olp))
+            if "d_cut" not in g:
+                return {}
+            return {"d_through": float(max(0.0, n - g["d_cut"] - _opp_active_blockers(tok)))}
+
         def g_for(defender, t):
             """守る席の手札 1 枚あたりの価格（その席の直近の自席ターン開始・無ければ `None`＝`μ`）。
             **勝った席と負けた席で分けて集計する**（T76 の切り分け: 勝つ席ほど手札を場に出していて 1 枚あたりが安い、を確かめる）。"""
@@ -2061,7 +2114,12 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                                                 _opp_active_blockers(tok))),
                                   # 二重計上の判定に要る（`Θ` のどの項に守りが既に入っているか）
                                   "th_body": float(th_body), "th_hand": float(th_hand),
-                                  "theta": float(th_w)})
+                                  "theta": float(th_w),
+                                  # **T130**: **守る席が「切るか受けるか」を決める材料**
+                                  # （カウンター値・出したい度・実際に切る枚数・備えの額）と、
+                                  # **その組＝通った本数**（片割れだけ見ると打ち消し合う）
+                                  **guard_read_for(1 - w, t, own_attackers_of(tok, olp)),
+                                  **through_for(tok, olp, 1 - w, t)})
                 f_real += harm.get((w, t), 0.0)
             won = z_of[w] > 0.5
             if won and ts:

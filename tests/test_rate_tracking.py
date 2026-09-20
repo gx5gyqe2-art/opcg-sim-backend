@@ -182,3 +182,55 @@ def test_a_pure_turn_number_trend_shows_up_raw_and_vanishes_once_partialled():
     t = RT.defence_table(rows, np.asarray(resid), js=np.asarray(js))
     assert abs(t["d_life"]["corr_resid"]) == pytest.approx(1.0, abs=1e-6)   # 生では満点に見える
     assert t["d_life"]["corr_resid_j"] is None                              # `j` を抜くと何も残らない
+
+
+def test_a_column_readable_on_only_some_rows_is_measured_on_those_rows():
+    """**T130**: 守る席の手札は**その席が 1 度も打っていない局面では読めない**（T76）。
+    **列を丸ごと落とさず**、読める行だけで測って **`n` で母数を開示する**
+    （黙って別の母数で比べないため）。"""
+    rows, resid, js = [], [], []
+    for i in range(100):
+        r = {"g": i, "who": 0, "j": i % 4, "harm": 0.0, "slope_theory": 0.0, "t_left": 3}
+        if i >= 40:                                  # 前半 40 行は読めない
+            r["d_ctr_sum"] = float(i)
+        rows.append(r); resid.append(float(i)); js.append(i % 4)
+    t = RT.defence_table(rows, np.asarray(resid), js=np.asarray(js))
+    assert t["d_ctr_sum"]["n"] == 60                 # 読めた行だけ
+    assert t["d_ctr_sum"]["mean"] == pytest.approx(np.arange(40, 100).mean())
+    assert t["d_ctr_sum"]["corr_resid"] == pytest.approx(1.0, abs=1e-6)   # 残差と揃って動く
+
+
+def test_the_new_columns_are_the_two_the_user_named():
+    """**T130**（ユーザ指摘「カウンター値と次ターン以降に出したいカードの都合じゃない？」）:
+    **決めている 2 つ**が表に在り、**`Θ` には入っていない**と印がついている。"""
+    flags = {k: in_theta for k, _label, in_theta in RT.DEFENCE}
+    assert flags["d_ctr_sum"] is False               # カウンター値
+    assert flags["d_play_sum"] is False              # 次ターン以降に出したい度（機会費用）
+    assert flags["d_cut"] is False                   # 値と機会費用を天秤にかけた結果
+    assert flags["d_guard_value"] is False
+
+
+def test_the_common_subset_table_lines_the_columns_up_on_one_denominator():
+    """**T130**: 列ごとに読める行数が違うと**どちらが大きいか言えない**
+    （2026-09-20 に 2,947 行の列と 3,247 行の列を並べて比べかけた）。
+    **全部の列が読める行だけ**の表を別に出す。"""
+    rows = []
+    for i in range(100):
+        r = {"g": i, "who": 0, "j": i % 4, "harm": 0.1, "slope_theory": 0.1,
+             "t_left": 3, "d_attacks": float(i % 3)}
+        if i >= 40:
+            r["d_cut"] = float(i % 2)
+        rows.append(r)
+    out = RT.measure(rows, [0.1] * 6, [0.1] * 6)
+    assert out["defence"]["d_attacks"]["n"] == 100          # 生の表は列ごとの母数
+    assert out["defence"]["d_cut"]["n"] == 60
+    assert out["defence_common"]["d_attacks"]["n"] == 60    # 揃えた表は 1 つの母数
+    assert out["defence_common"]["d_cut"]["n"] == 60
+
+
+def test_no_common_table_when_every_column_is_readable_everywhere():
+    """揃える必要が無ければ出さない（同じ表を 2 回出して読み手を迷わせない）。"""
+    rows = _rows(60)
+    for r in rows:
+        r["d_attacks"] = 2.0
+    assert "defence_common" not in RT.measure(rows, [0.15] * 6, [0.15] * 6)

@@ -93,6 +93,16 @@ DEFENCE = (
     ("d_shield_rate", "盾の 1 ターンの上限（T102）",             True),
     ("d_forced",      "規則が強いる守りの回数 G（T100）",        False),
     ("d_attacks",     "自分の攻撃の本数（守りではなく攻めの量）", False),
+    # **T130**（ユーザ指摘 2026-09-20「カウンター値と次ターン以降に出したいカードの都合じゃない？」）
+    # ——T129 の列は**枚数と体の大きさ**しか見ていなかった。**決めているのはこの 2 つ**。
+    ("d_ctr_sum",     "相手の手札のカウンター値の合計",           False),
+    ("d_ctr_n",       "カウンターが付いている枚数",               False),
+    ("d_play_sum",    "相手の手札の「出したい度」の合計（機会費用）", False),
+    ("d_cut",         "実際に切る枚数（値と機会費用を天秤に）",     False),
+    ("d_guard_value", "守りの備えの額（止めて浮かせた分）",        False),
+    # **組にした量**（T130）——`d_cut` と `d_attacks` は逆向きで互いに相関するので、
+    # **片割れだけ見ると打ち消し合う**。**予告: これが本体なら両記録で正・どちらの片割れより大きい。**
+    ("d_through",     "通った本数＝本数 − 切られた − ブロック",     False),
 )
 
 
@@ -119,18 +129,25 @@ def defence_table(rows, resid, js=None):
     `js` を渡すと **`j` ごとの平均を両側から引いた相関** `corr_resid_j` も出す
     ——**これが本命**（生の相関はターン番号の影を含む・`demean_by` の注記）。"""
     out = {}
-    rj = demean_by(resid, js) if js is not None else None
+    resid = np.asarray(resid, float)
+    js = None if js is None else np.asarray(js, int)
     for key, label, in_theta in DEFENCE:
-        xs = [r.get(key) for r in rows]
-        if any(x is None for x in xs):
+        # **読める行だけで測る**（列ごとに母数が違ってよい）——守る席の手札は
+        # **その席が 1 度も打っていない局面では読めない**（T76）。**列を丸ごと落とさない**で
+        # **`n` を出して母数を開示する**（黙って別の母数で比べないため）。
+        m = np.array([r.get(key) is not None for r in rows])
+        if not m.any():
             continue
-        c = corr(xs, resid)
-        row = {"label": label, "in_theta": bool(in_theta),
-               "mean": round(float(np.mean(np.asarray(xs, float))), 4),
-               "nonzero_share": round(float(np.mean(np.asarray(xs, float) > 0.0)), 4),
+        xs = np.array([float(r[key]) for r in rows if r.get(key) is not None])
+        rr = resid[m]
+        c = corr(xs, rr)
+        row = {"label": label, "in_theta": bool(in_theta), "n": int(m.sum()),
+               "mean": round(float(xs.mean()), 4),
+               "nonzero_share": round(float(np.mean(xs > 0.0)), 4),
                "corr_resid": (round(c, 4) if c is not None else None)}
-        if rj is not None:
-            cj = corr(demean_by(xs, js), rj)
+        if js is not None:
+            jj = js[m]
+            cj = corr(demean_by(xs, jj), demean_by(rr, jj))
             row["corr_resid_j"] = (round(cj, 4) if cj is not None else None)
         out[key] = row
     return out
@@ -188,6 +205,14 @@ def measure(turn_harm, prof, prof_th, include_last=False):
     out["by_j"] = by_j
     # **T129**: `A` の外れを守りの量で説明できるか（当てはめゼロ・相関だけ・`j` の影を抜いた列つき）
     out["defence"] = defence_table(rows, harm - a, js=js)
+    # **T130**: **母数を揃えた表**——列ごとに読める行数が違う（守る席の手札は読めない行がある）ので、
+    # **全部の列が読める行だけ**でもう 1 度並べる。**揃えないと「どちらが大きいか」を言えない**
+    # （2026-09-20 に 2,947 行の列と 3,247 行の列を並べて比べかけた）。
+    keys = [k for k, _l, _t in DEFENCE if k in out["defence"]]
+    m = np.array([all(r.get(k) is not None for k in keys) for r in rows])
+    if m.any() and int(m.sum()) < len(rows):
+        sub = [r for r, ok in zip(rows, m) if ok]
+        out["defence_common"] = defence_table(sub, (harm - a)[m], js=js[m])
     return out
 
 
