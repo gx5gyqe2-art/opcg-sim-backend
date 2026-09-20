@@ -203,3 +203,111 @@ def test_mix_replaces_only_the_named_axes():
 
 def test_causes_are_the_two_rule_origins():
     assert TL.CAUSES == ("turn_boundary", "same_turn")
+
+
+# --------------------------------------------------------------------------- T124: 境目の値付け
+@pytest.fixture
+def _plain_boundary():
+    old = TL.BOUNDARY_MODE
+    yield
+    TL.set_boundary_mode(old)
+
+
+def test_boundary_mode_defaults_to_off():
+    """**既定は据え置き**（採否はユーザ判断・T123 の測り方をそのまま再現できる）。"""
+    assert TL.BOUNDARY_MODE == "off"
+    with pytest.raises(ValueError):
+        TL.set_boundary_mode("draw_and_untap")
+
+
+def test_boundary_dx_puts_the_draw_and_untap_on_the_waking_seats_endurance(_plain_boundary):
+    """**引きとアンタップは起きる席の `Θ`**（規則）——次に動くのが席 0 なら `th_me`、席 1 なら `th_opp`。"""
+    import numpy as np
+    tok = np.zeros((22, 24), float)
+    TL.set_boundary_mode("draw")
+    a = TL.boundary_dx(tok, None, None, None, 5000.0, 0.04, None, 3, next_is_seat0=True)
+    b = TL.boundary_dx(tok, None, None, None, 5000.0, 0.04, None, 3, next_is_seat0=False)
+    assert a == {"th_me": pytest.approx(0.04), "a_me": 0.0}
+    assert b == {"th_opp": pytest.approx(0.04), "a_opp": 0.0}
+
+
+def test_boundary_dx_puts_the_don_step_on_the_waking_seats_rate(_plain_boundary):
+    """**ドン +2 と召喚酔いの解除は起きる席の `A`**＝規則のドンの列の段差（T114）。"""
+    import numpy as np
+    tok = np.zeros((22, 24), float)
+    TL.set_boundary_mode("don")
+    sched = [0.05, 0.09, 0.14, 0.20, 0.20]
+    d = TL.boundary_dx(tok, None, None, None, 5000.0, 0.04, sched, 3, next_is_seat0=True)
+    assert d["a_me"] == pytest.approx(sched[3] - sched[2])        # j=3 の段差
+    assert d["th_me"] == pytest.approx(0.0)                       # `don` だけなので Θ は動かない
+
+
+def test_boundary_dx_is_zero_when_the_mode_is_off(_plain_boundary):
+    import numpy as np
+    TL.set_boundary_mode("off")
+    d = TL.boundary_dx(np.zeros((22, 24), float), None, None, None, 5000.0, 0.9,
+                       [0.05, 0.5], 1, next_is_seat0=True)
+    assert d == {"th_me": pytest.approx(0.0), "a_me": pytest.approx(0.0)}
+
+
+def test_boundary_dx_adds_the_three_rules_when_full(_plain_boundary):
+    """`rules` は 3 つの和（部分モードの和と一致する＝取りこぼしも重複も無い）。"""
+    import numpy as np
+    tok = np.zeros((22, 24), float)
+    sched = [0.05, 0.09, 0.14, 0.20]
+    kw = dict(mlp=5000.0, g_next=0.04, sched=sched, j_next=2, next_is_seat0=True)
+    parts = {}
+    for m in ("draw", "untap", "don"):
+        TL.set_boundary_mode(m)
+        parts[m] = TL.boundary_dx(tok, None, None, None, **kw)
+    TL.set_boundary_mode("rules")
+    full = TL.boundary_dx(tok, None, None, None, **kw)
+    assert full["th_me"] == pytest.approx(sum(p["th_me"] for p in parts.values()))
+    assert full["a_me"] == pytest.approx(sum(p["a_me"] for p in parts.values()))
+
+
+def test_the_don_step_cannot_move_the_curve_reading(_plain_boundary):
+    """**`curve` には速さの軸が無いので `don` は 1 ビットも効かない**（T121 の帰結・実測と一致）。"""
+    import numpy as np
+    KV.set_d_mode("curve")
+    TL.set_boundary_mode("don")
+    st0 = (0.9, 0.6, 0.12, 0.10, 2)
+    dx = TL.boundary_dx(np.zeros((22, 24), float), None, None, None, 5000.0, 0.04,
+                        [0.05, 0.09, 0.30], 2, next_is_seat0=True)
+    assert _w(KV.apply_dx(st0, dx), _RAMP_PROF) == pytest.approx(_w(st0, _RAMP_PROF))
+
+
+def test_the_don_step_does_move_the_clock_reading(_plain_boundary):
+    KV.set_d_mode("clock")
+    TL.set_boundary_mode("don")
+    import numpy as np
+    st0 = (0.9, 0.6, 0.12, 0.10, 2)
+    dx = TL.boundary_dx(np.zeros((22, 24), float), None, None, None, 5000.0, 0.04,
+                        [0.05, 0.09, 0.30], 2, next_is_seat0=True)
+    assert dx["a_me"] > 0.0
+    assert _w(KV.apply_dx(st0, dx)) > _w(st0)
+
+
+def test_the_boundary_price_never_moves_the_wrong_seat(_plain_boundary):
+    """**起きる席以外の軸は触らない**（境目で相手が得をしない＝規則どおり）。"""
+    import numpy as np
+    TL.set_boundary_mode("rules")
+    d0 = TL.boundary_dx(np.zeros((22, 24), float), None, None, None, 5000.0, 0.04,
+                        [0.05, 0.2], 1, next_is_seat0=True)
+    assert set(d0) == {"th_me", "a_me"}
+    d1 = TL.boundary_dx(np.zeros((22, 24), float), None, None, None, 5000.0, 0.04,
+                        [0.05, 0.2], 1, next_is_seat0=False)
+    assert set(d1) == {"th_opp", "a_opp"}
+
+
+def test_the_schedule_step_is_clamped_at_the_ends(_plain_boundary):
+    """列の外を指しても落ちない（最後の値を伸ばす＝`rate_at` と同じ規約）。"""
+    import numpy as np
+    TL.set_boundary_mode("don")
+    sched = [0.05, 0.09]
+    for j in (0, 1, 2, 99):
+        d = TL.boundary_dx(np.zeros((22, 24), float), None, None, None, 5000.0, 0.0,
+                           sched, j, next_is_seat0=True)
+        assert math.isfinite(d["a_me"])
+    assert TL.boundary_dx(np.zeros((22, 24), float), None, None, None, 5000.0, 0.0,
+                          sched, 99, next_is_seat0=True)["a_me"] == pytest.approx(0.0)

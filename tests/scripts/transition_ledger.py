@@ -57,6 +57,7 @@ import kappa_vector as KV  # noqa: E402
 import relative_ledger as RL  # noqa: E402
 import theory_order as TO  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
+from theory_order import SLOT_OPP_FIELD as TO_SLOT_OPP_FIELD  # noqa: E402
 from theory_order import (MU, SC_MY_DON, SC_MY_HAND, SC_MY_LEADER_POWER, SC_MY_LIFE,  # noqa: E402
                           SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE, THETA, opp_bodies_of,
                           own_attackers_of, score_candidate, slot_power, theta_of)
@@ -65,6 +66,65 @@ from theory_order import (MU, SC_MY_DON, SC_MY_HAND, SC_MY_LEADER_POWER, SC_MY_L
 AXES5 = ("th_me", "th_opp", "a_me", "a_opp", "j")
 #: `residual` を規則の出どころで分ける区分
 CAUSES = ("turn_boundary", "same_turn")
+
+#: **ターンの境目に値段を付けるか**（T124・残差の 1/3・密度は最悪）。
+#:
+#: **境目で起きることは全部規則である**（誰も手を打っていないのに時計が動く）:
+#:
+#: | 規則 | 動く軸 | 既にある量 |
+#: |---|---|---|
+#: | **引き 1 枚** | 引いた席の `Θ`（手札の項） | `g`＝切れる札 1 枚あたりの価格（T76／T99） |
+#: | **アンタップ** | 起きる席の `Θ`（体の項・レストのブロッカーが的に戻る） | `resting_blocker_term`（T96） |
+#: | **ドン +2 ＋ 召喚酔いの解除** | 起きる席の `A` | 規則のドンの列の段差 `sched[j+1] − sched[j]`（T114） |
+#:
+#: **新定数ゼロ**——3 つとも既に測って在る量で、新しい係数は 1 つも置かない。
+#: `off`＝境目を値付けしない（T123 の測り方）／`rules`＝上の 3 つを当てる。
+#: `rules`＝3 つ全部／**`draw_untap`＝推薦形**（`don` を外す）／`draw`・`untap`・`don`＝内訳。
+#:
+#: **`don` は外す**（T124 の実測）——**`A` は毎ターンその席の行から読み直している**ので、
+#: 規則のドンの列の段差をもう 1 回足すと**二重計上になる**。`clock` の読みで実際に悪化した
+#: （境目の残差 0.2286 → 0.2651・`priced_share` が 1 を超える＝行き過ぎ）。
+#: `curve` では `A` が時計に入らないので `rules` と `draw_untap` は同じ値になる。
+BOUNDARY_MODES = ("off", "rules", "draw_untap", "draw", "untap", "don")
+BOUNDARY_MODE = "off"
+
+
+def set_boundary_mode(name):
+    global BOUNDARY_MODE
+    if name not in BOUNDARY_MODES:
+        raise ValueError("BOUNDARY_MODE は %s のどれか（%r）" % (BOUNDARY_MODES, name))
+    BOUNDARY_MODE = name
+    return BOUNDARY_MODE
+
+
+def boundary_dx(tok, ci_row, idx2cid, cards, mlp, g_next, sched, j_next, next_is_seat0):
+    """**ターンの境目で規則が動かす分**（席 0 の視点の `Δx`・新定数ゼロ）。
+
+    `tok`／`ci_row` は**境目の直前の行**（前のターンの最後の行）で、**次に動く席はその行の相手**。
+    だから起きる側の枠は `SLOT_OPP_FIELD`・リーダーのパワーは `mlp`（T96 と同じ渡し方）。
+
+    * **引き 1 枚** … 引いた席の `Θ` に `g`（切れる札 1 枚あたりの価格）。
+      **手札の項は `cuttable_forced` では枚数に線形でない**（守りの強制で上限が付く）ので、
+      これは**一次の近似**である——そう書いておく（上限に当たっている行では過大になる）。
+    * **アンタップ** … レストのブロッカーが的に戻る（`resting_blocker_term`）。
+    * **ドン +2 ＋ 召喚酔いの解除** … 規則のドンの列の段差。`sched` が無ければ 0（`RATE_DON_MODE=off`）。
+    """
+    use_draw = BOUNDARY_MODE in ("rules", "draw_untap", "draw")
+    use_untap = BOUNDARY_MODE in ("rules", "draw_untap", "untap")
+    use_don = BOUNDARY_MODE in ("rules", "don")
+    d_th = (float(g_next or 0.0) if use_draw else 0.0)
+    if use_untap:
+        d_th += float(CB.resting_blocker_term(tok, TO_SLOT_OPP_FIELD, mlp, ci_row=ci_row,
+                                              idx2cid=idx2cid, cards=cards))
+    d_a = 0.0
+    if sched and use_don:
+        j = max(0, int(j_next))
+        lo = sched[min(max(0, j - 1), len(sched) - 1)]
+        hi = sched[min(j, len(sched) - 1)]
+        d_a = float(hi) - float(lo)
+    if next_is_seat0:
+        return {"th_me": d_th, "a_me": d_a}
+    return {"th_opp": d_th, "a_opp": d_a}
 
 
 def _swap_state(st):
@@ -161,7 +221,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
             break
         stats["games"] += 1
         # 席ごとの速さ（その席の自席ターンの**最初の行**から・`crossing_bridge` の `turn_start` と同じ規約）
-        rate_at, g_at = {}, {}
+        rate_at, g_at, sched_at = {}, {}, {}
         for i in idx:
             if int(r["kind"][i]) != 0:
                 continue
@@ -170,12 +230,18 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
                 rate_at[(w, t)] = KV.rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
                                                  idx2cid, cards, theta, mu)
                 g_at[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
+                sched_at[(w, t)] = None
+                if BOUNDARY_MODE in ("rules", "don") and CB.RATE_DON_MODE != "off":
+                    _sc, _tok, _ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
+                    _olp = float(np.asarray(_sc)[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+                    sched_at[(w, t)] = CB.seat_slope_sched(_sc, _tok, _ci, idx2cid, cards, _olp,
+                                                          theta, mu, jmax=int(CB.RACE_CAP))
 
         def _latest(w, t):
             ts = [tt for (ww, tt) in rate_at if ww == w and tt <= t]
             return (rate_at[(w, max(ts))], g_at[(w, max(ts))]) if ts else None
 
-        seq = []            # (席 0 視点の状態, 手の Δx〔席 0 視点〕, ターン番号, 手の型)
+        seq = []            # (席 0 視点の状態, 手の Δx〔席 0 視点〕, ターン番号, 手の型, 境目の材料)
         z_of = {}
         for i in idx:
             z = float(r["z"][i])
@@ -221,7 +287,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
                                          sc, tok, olp, rt, don_k=int(pol["pol_k"][b]))
             if w == 1:
                 st, dx = _swap_state(st), _swap_dx(dx)
-            seq.append((st, dx, t, fam))
+            seq.append((st, dx, t, fam,
+                        (tok, ci, float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0, w)))
         if len(seq) < 2 or len(z_of) < 2:
             continue
         w_first = RL.w_of(*RL.clocks_of(seq[0][0], prof), sigma_rel=sr)
@@ -231,12 +298,26 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
         stats["terminal_sum"] += z_of.get(0, 0.0) - w_last
         stats["terminal_abs_sum"] += abs(z_of.get(0, 0.0) - w_last)
         run = 0.0
-        for (st0, dx0, t0, fam0), (st1, _dx1, t1, _f1) in zip(seq, seq[1:]):
+        for (st0, dx0, t0, fam0, bi0), (st1, _dx1, t1, _f1, _b1) in zip(seq, seq[1:]):
             w0 = RL.w_of(*RL.clocks_of(st0, prof), sigma_rel=sr)
             w1 = RL.w_of(*RL.clocks_of(st1, prof), sigma_rel=sr)
             gap = w1 - w0
             run += gap
-            priced = (RL.w_of(*RL.clocks_of(KV.apply_dx(st0, dx0), prof), sigma_rel=sr) - w0) if dx0 else 0.0
+            dx_use = dict(dx0)
+            if BOUNDARY_MODE != "off" and t1 != t0:
+                # **境目は「打ち手のいない手」として同じ行に相乗りさせる**（規則の 3 つ）
+                tok0, ci0, mlp0, w_row = bi0
+                w_next = 1 - w_row                       # 次に動く席＝この行の相手
+                ts = [tt for (ww, tt) in rate_at if ww == w_next and tt > t0]
+                key_prev = [tt for (ww, tt) in rate_at if ww == w_next and tt <= t0]
+                sched = sched_at.get((w_next, max(key_prev))) if key_prev else None
+                j_next = CB.own_turn_index(min(ts)) if ts else CB.own_turn_index(t0) + 1
+                g_next = g_at.get((w_next, min(ts))) if ts else None
+                bdx = boundary_dx(tok0, ci0, idx2cid, cards, mlp0, g_next, sched, j_next,
+                                  next_is_seat0=(w_next == 0))
+                for kk3, vv3 in bdx.items():
+                    dx_use[kk3] = dx_use.get(kk3, 0.0) + vv3
+            priced = (RL.w_of(*RL.clocks_of(KV.apply_dx(st0, dx_use), prof), sigma_rel=sr) - w0) if dx_use else 0.0
             resid = gap - priced
             stats["gaps"] += 1
             acc["gap"] += gap; acc["gap_abs"] += abs(gap)
@@ -249,7 +330,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
                 acc["fam_priced_abs"][fam0] = acc["fam_priced_abs"].get(fam0, 0.0) + abs(priced)
                 acc["fam_n"][fam0] = acc["fam_n"].get(fam0, 0) + 1
             # **残りを 5 つの軸へ配る**（`priced` が説明した分を引いた状態から `st1` まで）
-            base = KV.apply_dx(st0, dx0) if dx0 else st0
+            base = KV.apply_dx(st0, dx_use) if dx_use else st0
             w_base = RL.w_of(*RL.clocks_of(base, prof), sigma_rel=sr)
             sh = shapley(base, st1, prof, sr)
             acc["cross_n"][cause] += 1
@@ -263,7 +344,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
     n = max(1, stats["gaps"]); ng = max(1, stats["games"])
     tot_abs = max(1e-12, acc["gap_abs"])
     out = {"games": stats["games"], "rows": stats["rows"], "gaps": stats["gaps"],
-           "d_mode": KV.D_MODE, "sigma_rel": round(sr, 4),
+           "d_mode": KV.D_MODE, "boundary_mode": BOUNDARY_MODE, "sigma_rel": round(sr, 4),
            # **恒等式の検算**（配分の和が差に一致すること・telescoping が閉じること）
            "identity_max_abs_error": round(stats["identity_max_err"], 12),
            "w_first_mean": round(stats["w_first_sum"] / ng, 4),
@@ -313,10 +394,14 @@ def main(argv=None):
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--d-mode", dest="d_mode", choices=KV.D_MODES, default=None)
+    ap.add_argument("--boundary", choices=BOUNDARY_MODES, default=None,
+                    help="**T124**: ターンの境目を規則から値付けするか（既定 `off`）")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
     if a.d_mode:
         KV.set_d_mode(a.d_mode)
+    if a.boundary:
+        set_boundary_mode(a.boundary)
     out = collect(a.src, a.games)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:
