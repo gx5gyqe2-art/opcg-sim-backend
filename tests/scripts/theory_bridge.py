@@ -763,9 +763,16 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 book["g_fam"][fam0] = book["g_fam"].get(fam0, 0.0) + float(g_v) * sgn
                 if e["d0"] is None:
                     e["d0"] = float(ck["d"]) * sgn
-                    # **T118**: `rel` の物差しは 2 本の時計から作るので**席 0 視点で**持つ（`sgn<0` なら入れ替え）
-                    e["t_me0"] = float(ck["tau_me"] if sgn > 0 else ck["tau_opp"])
-                    e["t_opp0"] = float(ck["tau_opp"] if sgn > 0 else ck["tau_me"])
+                    # **T118**: `rel` の物差しは 2 本の時計から作るので**席 0 視点で**持つ（`sgn<0` なら入れ替え）。
+                    # **`W_MODE` が `curve` 以外なら 2 本の時計は存在しない**ので `None`（＝`abs` の物差しへ）
+                    # ——`κ` の形を比べる腕（`flat`）を回すために要る（T121 で `KeyError` で落ちていた）。
+                    _tm, _to = ck.get("tau_me"), ck.get("tau_opp")
+                    if _tm is None or _to is None:
+                        e["t_me0"] = e["t_opp0"] = None
+                        stats["w_noclock"] = stats.get("w_noclock", 0) + 1
+                    else:
+                        e["t_me0"] = float(_tm if sgn > 0 else _to)
+                        e["t_opp0"] = float(_to if sgn > 0 else _tm)
                     e["r_turns"] = float(ctx["r_turns"])
                     # **T81**: 場のキャラ数（両側の合計）＝時計が跳ねる原因かを分ける
                     e["chars"] = int(sum(1 for sl in range(GA.SLOT_OWN_FIELD.start, GA.SLOT_OWN_FIELD.stop)
