@@ -342,6 +342,25 @@ def counters_cut(items, xs, take_cost):
     return float(n)
 
 
+def attacks_stopped(items, xs, take_cost):
+    """**止めた攻撃の本数**（T131・`counters_cut` と**同じ規則・違う単位**）。
+
+    `counters_cut` が返すのは**切った札の枚数**（1 本止めるのに 2 枚使うことがある）。
+    **「何本通ったか」を数えるにはこちらが要る**——**本数から枚数を引いてはいけない**
+    （2026-09-20 に踏んだ単位の誤り: 平均の割引率が 0.36 まで落ちた）。"""
+    its = [(it["counter"], v_scalar(it["v"])) for it in items]
+    n = 0
+    for x in sorted(xs, reverse=True):
+        if x < -TO.PWR_EPS:
+            continue
+        cost, idx = HG.guard_cost_min_v(its, x)
+        if cost is None or float(take_cost) - float(cost) <= 0.0:
+            continue
+        n += 1                                   # **本数**（`counters_cut` は `len(idx)`＝枚数）
+        its = [it for i, it in enumerate(its) if i not in idx]
+    return float(n)
+
+
 def opp_life_loss_per_turn(st):
     """自分の攻撃のうち、受ける規則（`c(x) > Θ`＝守るより受ける方が安い）が受けろと言う本数＝相手のライフが 1 ターンに減る枚数。"""
     xs = st.get("my_attack_xs") or []

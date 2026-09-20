@@ -234,3 +234,15 @@ def test_no_common_table_when_every_column_is_readable_everywhere():
     for r in rows:
         r["d_attacks"] = 2.0
     assert "defence_common" not in RT.measure(rows, [0.15] * 6, [0.15] * 6)
+
+
+def test_stopped_counts_attacks_while_cut_counts_cards():
+    """**T131 の訂正**: **1 本止めるのに 2 枚使うことがある**——
+    **本数から枚数を引くと単位が合わない**（割引率が 0.36 まで落ちた実害）。"""
+    import hand_plan as HP
+    # カウンター 1000 が 2 枚。超過 1000 の攻撃 1 本は **2 枚**使って **1 本**止まる。
+    items = [{"counter": 1000.0, "v": None}, {"counter": 1000.0, "v": None}]
+    xs = [1000.0]
+    take = 1.0                                        # 受けると高いので必ず守る
+    assert HP.counters_cut(items, xs, take) == 2.0    # 枚数
+    assert HP.attacks_stopped(items, xs, take) == 1.0  # 本数

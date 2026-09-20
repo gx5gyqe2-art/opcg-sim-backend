@@ -850,17 +850,83 @@ def opp_blockers_of(tok, my_leader_power=None, r_turns=R_TURNS, theta=THETA, mu=
     return out
 
 
-def theory_slope_parts(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None, with_don=True):
+#: **通った本数で盤面の項を割り引くか**（T131・2026-09-20・ユーザ決定「入れてみてください」）。
+#:
+#: `A` の盤面の項は**「殴れる体の総額」**で、**何本が実際に届くかを見ていない**。
+#: T130 の実測では **`通った本数 = 本数 − 切られた本数 − ブロック`** が
+#: **`A` の外れといちばん強く動く**（`j` 抜きで実 **+0.256**／合成 +0.095・本数だけの +0.226／+0.110 より上）。
+#: **正の相関＝通る本数が多いほど `A` は少なく見積もる**ので、**通らないときに割り引く**のが正しい向き。
+#:
+#: ```
+#: 盤面の項 ← 盤面の項 × (通った本数 / 本数)      （無次元の比＝単位は変わらない＝P5 を壊さない）
+#: ```
+#:
+#: **モード**:
+#: * `off`（既定）… 旧のまま。
+#: * **`cut`** … `通った = 本数 − 切られた本数`。**ブロッカーは引かない**
+#:   ——既定ではブロッカーは**耐久 `Θ` の体の項に在る**（`THETA_BODY_MODE=blockers`）ので、
+#:   **ここでも引くと同じ規則を 2 か所で数える**（T97／T129 で 2 度踏んだ型）。
+#: * `cut_block` … ブロッカーも引く。**`--theta-body none` と対でだけ使う**（`Θ` を空にしてから移す）。
+#:
+#: **新定数ゼロ**——`切られた本数` は `hand_plan.counters_cut`（**カウンター値が足りる組のうち
+#: 出す価値の和が最小のものを、受けるより安いときだけ切る**＝ユーザ指摘の 2 要素の天秤）。
+#: **打ち筋は入らない**（記録の「実際に切ったか」ではなく、**規則と相手の手札の中身**から解く）。
+#: **完全情報の前提**（§0.05）——相手の手札を見る。
+#:
+#: **渡し忘れが起きたら落とす**: 守る席の手札は**攻める席の行からは読めない**ので、
+#: この割引は `collect` が計算して渡すしかない。**渡されないまま `off` 以外で走ると黙って 1.0 になる**
+#: ——**それは今日 2 度踏んだ事故**（T128 の減衰・T129 のブロッカー）なので、**例外で落とす**。
+RATE_THROUGH_MODES = ("off", "cut", "cut_block")
+RATE_THROUGH_MODE = "off"
+
+
+def set_rate_through_mode(mode):
+    global RATE_THROUGH_MODE
+    if mode not in RATE_THROUGH_MODES:
+        raise ValueError("rate through mode は %s のどれか" % (RATE_THROUGH_MODES,))
+    RATE_THROUGH_MODE = mode
+    return RATE_THROUGH_MODE
+
+
+def through_scale(n_attacks, stopped, blockers_n):
+    """**通った割合** `通った本数 / 本数`（`RATE_THROUGH_MODE` に従う・`off` なら 1.0）。
+
+    **無次元の比**なので**単位は変わらない**（P5 を壊さない）。本数 0 なら 1.0（割り引くものが無い）。
+
+    **`stopped` は「止めた本数」**（`hand_plan.attacks_stopped`）——**切った枚数ではない**。
+    **1 本止めるのに 2 枚使うことがある**ので、**本数から枚数を引くと単位が合わない**
+    （2026-09-20 に踏んだ: 平均の割引率が 0.36 まで落ちた）。"""
+    if RATE_THROUGH_MODE == "off":
+        return 1.0
+    n = float(n_attacks)
+    if n <= 0.0:
+        return 1.0
+    through = n - max(0.0, float(stopped))
+    if RATE_THROUGH_MODE == "cut_block":
+        through -= max(0.0, float(blockers_n))
+    return max(0.0, min(1.0, through / n))
+
+
+def theory_slope_parts(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None, with_don=True,
+                       through=None):
     """盤面の速さを **2 つに分けて**返す: `(リーダー, キャラ)`（T95）。
     **規則**——**リーダーは KO されない**（`rules/battle.rs`: リーダーへの攻撃はライフを削る）ので、
     盤面の減衰（`ko_p`）が掛かるのは**キャラの側だけ**。`own_attackers_of` は枠 0（自分のリーダー）を先頭に返す。
 
-    **T109**: `with_don=False` なら**素殴りだけ**（付与を財布のナップサックで買うとき・`DON_PURSE_MODE=all`）。"""
+    **T109**: `with_don=False` なら**素殴りだけ**（付与を財布のナップサックで買うとき・`DON_PURSE_MODE=all`）。
+    **T131**: `through`（通った割合）を渡すと**両方に掛ける**——**リーダーの攻撃も答えられる**ので
+    減衰（KO されない）とは別で、**どちらも同じ割合で割り引く**。
+    **`RATE_THROUGH_MODE != "off"` なのに渡されなければ落とす**（黙って 1.0 にしない・上の注記）。"""
+    if RATE_THROUGH_MODE != "off" and through is None:
+        raise ValueError("RATE_THROUGH_MODE=%r なのに通った割合が渡されていない"
+                         "＝黙って 1.0 で走らない（守る席の手札は攻める席の行からは読めない）"
+                         % (RATE_THROUGH_MODE,))
+    thr = 1.0 if through is None else max(0.0, min(1.0, float(through)))
     blk = blockers if (SLOPE_BLOCK_MODE == "on" and blockers) else None
     xs = own_attackers_of(tok, opp_leader_power)
     fn = attack_value_don if with_don else attack_value
     vals = [fn(float(opp_leader_power) + x, opp_leader_power, True, theta, mu, blockers=blk) for x in xs]
-    return (float(vals[0]) if vals else 0.0), float(sum(vals[1:]))
+    return (thr * float(vals[0]) if vals else 0.0), thr * float(sum(vals[1:]))
 
 
 def theory_slope(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None):
@@ -904,7 +970,7 @@ def set_slope_hand_mode(mode):
 
 
 def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None,
-                     want_stock=False, alloc=None):
+                     want_stock=False, alloc=None, through=None):
     """速さを **3 つに分けて**返す（T94）: `(盤面, 在庫, 流入)`。**規則から出る 3 つの別の量**:
 
     * **盤面** … 今場に居る攻撃手。**毎ターン殴る**。
@@ -927,7 +993,8 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
                               theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)
     # **T109**: `all` なら盤面は**素殴り**で数え、付与は財布のナップサックの中で買う（二重に数えない）。
     lead, chars = theory_slope_parts(tok_row, olp, theta, mu, blockers=blk,
-                                     with_don=(DON_PURSE_MODE not in ("all", "race")))
+                                     with_don=(DON_PURSE_MODE not in ("all", "race")),
+                                     through=through)          # **T131**
     base = lead + chars
     if SLOPE_MODE != "hand":
         return base, 0.0, 0.0, lead, 0.0, 0.0, 0.0, 0.0
@@ -983,7 +1050,7 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
 
 
 def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None,
-                     jmax=10, blockers=None):
+                     jmax=10, blockers=None, through=None):
     """**`j` ごとの速さの列 `R_1..R_jmax`**（T114・`RATE_DON_MODE != "off"` のときだけ使う）。
 
     規則のドンの列 `d_i`（`purse_series`）で**その i で買えるもの**を解き直す:
@@ -1008,7 +1075,8 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
                                    my_leader_power=float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
                                    theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)
     lead0, chars0 = theory_slope_parts(tok_row, olp, theta, mu, blockers=blockers,
-                                       with_don=(DON_PURSE_MODE not in ("all", "race")))
+                                       with_don=(DON_PURSE_MODE not in ("all", "race")),
+                                       through=through)        # **T131**
     ds = purse_series(sc, tok_row, jmax)
     r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
     mlp = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
@@ -1073,11 +1141,13 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     return out
 
 
-def seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None):
+def seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None,
+                     through=None):
     """速さを **2 つに分けて**返す（T90）: `(盤面の攻撃手, 手札の項)`。
     手札の項は `SLOPE_HAND_MODE` が決める（`stock`＝今出せる体の総額／**`flow`＝毎ターン入ってくるぶん**・T93）。"""
     base, stock, flow, _lead, _sr, _fr, _ef, _e1 = seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards,
-                                                                    olp, theta, mu, deck_ids)
+                                                                    olp, theta, mu, deck_ids,
+                                                                    through=through)
     return base, (stock if SLOPE_HAND_MODE == "stock" else flow)
 
 
@@ -1691,6 +1761,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     theta_check = []       # **T96**: 行ごとの `Θ` 対「そこから終局までに実際に要った損害」
     turn_harm = []         # 自席ターン番号 j ごとの損害（損害の輪郭＝加速を測る材料）
     stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "theta_hand": THETA_HAND_MODE, "slope_mode": SLOPE_MODE, "theta_body": THETA_BODY_MODE, "slope_block": SLOPE_BLOCK_MODE,
+             # **T131**: 通った割合の開示（平均と、手札が読めず割り引けなかった行の数）
+             "rate_through": RATE_THROUGH_MODE, "through_n": 0, "through_sum": 0.0,
+             "through_missing": 0,
              "race": RACE_MODE,
              "r_deck_n": 0, "r_deck_sum": 0.0, "r_deck_missing": 0,
              "slope_hand": SLOPE_HAND_MODE, "a_flow_n": 0, "a_flow_sum": 0.0, "a_flow_missing": 0,
@@ -1891,7 +1964,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             items = HP.hand_items(tok_d, ci_d, idx2cid, cards, olp_d, r_d) if cards is not None else []
             if not items:
                 return {"d_ctr_sum": 0.0, "d_ctr_n": 0, "d_play_sum": 0.0,
-                        "d_cut": 0.0, "d_guard_value": 0.0}
+                        "d_cut": 0.0, "d_stopped": 0.0, "d_guard_value": 0.0}
             pairs = [(it["counter"], HP.v_scalar(it["v"])) for it in items]
             take = HG.take_cost_of(float(sc_da[SC_MY_LIFE]), mu)
             return {
@@ -1902,6 +1975,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 "d_play_sum": float(sum(0.0 if v is None else float(v) for _p, v in pairs)),
                 # **実際に何枚切るか**（カウンター値が足りる組のうち出す価値の和が最小・受けるより安いときだけ）
                 "d_cut": float(HP.counters_cut(items, xs, take)),
+                # **T131**: **止めた「本数」**——`d_cut` は**枚数**（1 本に 2 枚使うことがある）。
+                # **「何本通ったか」を数えるにはこちら**（本数から枚数を引いてはいけない）。
+                "d_stopped": float(HP.attacks_stopped(items, xs, take)),
                 # **守りの備えの額**（止めて浮かせた分の和・地平の中で 1 枚 1 回）
                 "d_guard_value": float(HG.guard_value(pairs, xs, take)),
             }
@@ -1915,9 +1991,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             （通る本数が多いほど実際の損害は `A` の見積もりを上回る）。"""
             n = len(own_attackers_of(tok, olp))
             g = guard_read_for(defender, t, own_attackers_of(tok, olp))
-            if "d_cut" not in g:
+            if "d_stopped" not in g:
                 return {}
-            return {"d_through": float(max(0.0, n - g["d_cut"] - _opp_active_blockers(tok)))}
+            # **T131 の訂正**: 引くのは**止めた本数**（`d_stopped`）であって切った枚数（`d_cut`）ではない。
+            return {"d_through": float(max(0.0, n - g["d_stopped"] - _opp_active_blockers(tok)))}
 
         def g_for(defender, t):
             """守る席の手札 1 枚あたりの価格（その席の直近の自席ターン開始・無ければ `None`＝`μ`）。
@@ -2017,17 +2094,31 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 dk = (seat_decks.get(seed_g) or (None, None))[w] if seat_decks else None
                 if SLOPE_HAND_MODE == "flow" and not dk:
                     stats["a_flow_missing"] += 1
+                # **T131**: **通った割合**（本数 − 切られた本数 〔− ブロック〕）÷ 本数。
+                # **守る席の手札は攻める席の行からは読めない**ので、ここで作って渡す。
+                thr = None
+                if RATE_THROUGH_MODE != "off":
+                    _gr = guard_read_for(1 - w, t, own_attackers_of(tok, olp))
+                    if "d_stopped" not in _gr:
+                        # 守る席がまだ 1 度も打っていない＝手札が読めない。**1.0 で埋めない**
+                        # （割り引かない＝旧の値）ことを**数えて開示する**。
+                        stats["through_missing"] += 1
+                        thr = 1.0
+                    else:
+                        thr = through_scale(len(own_attackers_of(tok, olp)), _gr["d_stopped"],
+                                            _opp_active_blockers(tok))
+                        stats["through_n"] += 1; stats["through_sum"] += float(thr)
                 (s_board, s_stock, s_flow, s_lead, s_srush, s_frush, s_eff,
                  s_eff1) = seat_slope_terms(
                     sc, tok, _ci, idx2cid, cards, olp, theta, mu, deck_ids=dk,
                     want_stock=(RATE_WALK_MODE == "grow" or SLOPE_EFFECT_MODE == "hand"),
-                    alloc=alloc_self.get((w, t)))                          # T77／T90／T93／T94／T95
+                    alloc=alloc_self.get((w, t)), through=thr)             # T77／T90／T93／T94／T95／T131
                 s_hand = s_stock if SLOPE_HAND_MODE == "stock" else s_flow
                 sched = None
                 if RATE_DON_MODE != "off":
                     # **T114**: 規則のドンの列から `R_j` を作る（`off` なら作らない＝旧の式）
                     sched = seat_slope_sched(sc, tok, _ci, idx2cid, cards, olp, theta, mu,
-                                             deck_ids=dk, jmax=int(RACE_CAP))
+                                             deck_ids=dk, jmax=int(RACE_CAP), through=thr)
                     stats["sched_n"] += 1
                     stats["sched_j1_sum"] += float(sched[0]); stats["sched_j5_sum"] += float(sched[4])
                 if SLOPE_HAND_MODE == "flow":
@@ -2496,6 +2587,10 @@ def main(argv=None):
     ap.add_argument("--slope-hand", default=SLOPE_HAND_MODE, choices=SLOPE_HAND_MODES,
                     help="**T93** 速さの手札の項: `stock`（旧・今のドンで出せる体の総額＝在庫）／"
                          "**`flow`（既定**・毎ターン入ってくるぶん＝そのデッキの平均・`deck_refill.a_of`）")
+    ap.add_argument("--rate-through", default=RATE_THROUGH_MODE, choices=RATE_THROUGH_MODES,
+                    help="**T131** 盤面の項を**通った割合**で割り引くか: "
+                         "`off`（旧）／**`cut`**（本数 − 切られた本数・**ブロッカーは引かない**＝`Θ` に在るので二重計上しない）／"
+                         "`cut_block`（ブロッカーも引く・**`--theta-body none` と対でだけ**）")
     ap.add_argument("--slope-block", default=SLOPE_BLOCK_MODE, choices=SLOPE_BLOCK_MODES,
                     help="**T92** 速さ `A` の盤面の項に相手のアクティブなブロッカーを入れるか: "
                          "`off`（旧・渡さない）／`on`（規則どおり `attack_value` に渡す＝新定数ゼロ）")
@@ -2558,6 +2653,7 @@ def main(argv=None):
     set_theta_hand_blocker_mode(a.theta_hand_blocker)
     set_slope_mode(a.slope_mode)
     set_slope_block_mode(a.slope_block)
+    set_rate_through_mode(a.rate_through)          # **T131**
     set_slope_hand_mode(a.slope_hand)
     set_rate_walk_mode(a.rate_walk)
     set_rate_decay_mode(a.rate_decay)
