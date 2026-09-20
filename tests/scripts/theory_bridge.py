@@ -550,8 +550,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
         # **耐久の体の集合ごとに違う**ので `THETA_BODY_MODE` に合わせ、**別のセットの値**を使う（輪郭と同じ規約）。
         if SIGMA_FROM_CURVE:
             st = CB.sigma_t_for(dirs, harm_profile)
-            if st is not None:
-                _TOM.set_sigma_turn(st)
+            if st is None:
+                # **T129**（2026-09-20）: **黙って前の σ を使い回さない**。`σ_T` は**耐久の体の集合ごと**に
+                # 表から引くので、**表に無い形（例: `--theta-body none`）では引けない**——そのまま走ると
+                # 「**どの物差しで測ったか分からない数字**」が出る。すぐ下の `σ_rel` は最初からこう書いてある。
+                raise ValueError("σ_T が引けない（体の形 %r・%s・%s）＝黙って前の値を使い回さない"
+                                 % (CB.THETA_BODY_MODE, harm_profile, CB.HARM_PROFILE_PATH))
+            _TOM.set_sigma_turn(st)
         # **T118**: `W_ERR_MODE=rel` なら物差しは `σ_rel × s(τ_me, τ_opp)`。**`σ_rel` は `curve` の読みのもの**
         # （`d0` は `curve_d_of_row` が出すので）。**引けなければ落ちる**——黙って `abs` で走ると
         # 「どの物差しで測ったか分からない数字」が出てしまう（T97 の借り物 σ と同じ型の事故）。

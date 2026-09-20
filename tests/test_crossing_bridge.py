@@ -1299,3 +1299,64 @@ def test_the_opponents_board_speed_is_readable_from_my_row():
     assert one > 0.0
     tok[7, T.S_POWER], tok[7, T.S_IS_CHAR] = 0.6, 1.0                 # 相手の体 6000
     assert CB.opp_board_slope(tok, 5000.0) > one                      # 攻め手が増えれば速くなる
+
+
+def test_the_body_term_can_move_to_the_rate_side():
+    """**T129**（ユーザ決定 2026-09-20「相手の守りは入れましょう」）: **足すのではなく移す**。
+
+    ブロッカーは既定で `Θ`（的の遠さ）に在る。規則としては「リーダーへの攻撃を**横取りする**」＝
+    **そのターン届く量が減る**話なので速さ `A` の側。**両方に入れると同じ規則を 2 か所で数える**
+    （T97 の実害）ので、移すには `Θ` 側を空にする必要がある＝`THETA_BODY_MODE=none`。
+    """
+    tok = np.zeros((22, 24), np.float32)
+    s0 = T.SLOT_OPP_FIELD.start
+    tok[s0, T.S_POWER], tok[s0, T.S_IS_CHAR], tok[s0, T.S_IS_BLOCKER] = 0.6, 1.0, 1.0
+    sc = _sc(3, 4)
+    with_body = CB.threshold(sc, tok)
+    try:
+        assert CB.set_theta_body_mode("none") == "none"
+        without = CB.threshold(sc, tok)
+        # 体の項だけが消える（ライフと手札はそのまま）
+        life, hand, body = CB.threshold_parts(sc, tok)
+        assert body == 0.0
+        assert without == pytest.approx(life + hand)
+    finally:
+        CB.set_theta_body_mode("blockers")
+    assert with_body > without                       # 既定では体の項が在る
+    assert CB.THETA_BODY_MODE == "blockers"          # 既定は据え置き（採否はユーザ判定）
+    with pytest.raises(ValueError):
+        CB.set_theta_body_mode("なにか")
+
+
+def test_the_blockers_also_bite_on_the_scheduled_path():
+    """**T129**（2026-09-20）: **列を作る道でもブロッカーが効く**。
+
+    `rate_at` を通る道では `seat_slope_terms` が自分でブロッカーを引いていたのに、**列の道は
+    呼び出し側に任せていて橋は渡していなかった**＝`SLOPE_BLOCK_MODE=on` が**歩きに効いていなかった**
+    （行ごとの `slope_theory` だけが動く）。**T128 の減衰と同じ型の取りこぼし。**
+    **渡されなければ規則どおり自分で引く**ことをここで固定する（既定は `off` なので出荷の値は不動）。
+    """
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, T.S_POWER] = 0.5                                   # 自リーダー 5000
+    s0 = T.SLOT_OWN_FIELD.start
+    tok[s0, T.S_POWER], tok[s0, T.S_IS_CHAR], tok[s0, T.S_CAN_ATTACK] = 0.7, 1.0, 1.0
+    b0 = T.SLOT_OPP_FIELD.start                               # 相手のアクティブなブロッカー
+    tok[b0, T.S_POWER], tok[b0, T.S_IS_CHAR], tok[b0, T.S_IS_BLOCKER] = 0.6, 1.0, 1.0
+    sc = _sc(3, 4)
+    base = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6)
+    try:
+        CB.set_slope_block_mode("on")
+        blk = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6)
+    finally:
+        CB.set_slope_block_mode("off")
+    assert blk[1] < base[1]                                   # 横取りされる分だけ速さが落ちる
+    assert all(x <= y + 1e-12 for x, y in zip(blk, base))      # どの段でも増えない
+    assert CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6) == base   # 既定は不動
+    assert CB.SLOPE_BLOCK_MODE == "off"
+
+
+def test_a_body_mode_without_a_yardstick_entry_is_not_silently_borrowed():
+    """**T129**: `σ_T` は**耐久の体の集合ごと**に表から引く。表に無い形では **`None` を返す**
+    ——`theory_bridge` はそこで落ちる（**黙って前の σ を使い回さない**・すぐ下の `σ_rel` と同じ規約）。"""
+    assert CB.sigma_t_for(None, "real", body_mode="blockers") is not None
+    assert CB.sigma_t_for(None, "real", body_mode="none") is None      # T129 の新しい形は表に無い

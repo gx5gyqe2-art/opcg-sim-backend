@@ -399,7 +399,18 @@ def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="dtotal", d
 #: ＝**損害を吸える体 = レストの体 ＋ アクティブなブロッカー**（`attackable`・新定数ゼロ）。
 #: `blockers` はレストの体を落とし（T21 で身代わりの価値の大半を運んでいたのは素の体だった）、
 #: `all` はアクティブな非ブロッカーを入れすぎている（そのターンは的にもならずブロックもできない）。
-THETA_BODY_MODES = ("blockers", "all", "attackable")
+#: **`none`＝T129**（2026-09-20・ユーザ決定「相手の守りは入れましょう」）: **体の項を `Θ` から外す**。
+#: **足すのではなく置き場所を移すための片方**——`SLOPE_BLOCK_MODE=on` と**対で使う**。
+#:
+#: **理由は T97 が既に書いていて、まだやっていなかったこと**:
+#: > 盤面の体は**速さ `A`（殴る）に入るのが正しい**のに `attackable` は `Θ` にも入れていたので
+#: > `D = τ_opp − τ_me` が盤面の厚みを 2 回拾っていた。**失われた信号は速さの側で取り直す**（`Θ` に戻さない）。
+#:
+#: **規則の読み**: アクティブなブロッカーは「リーダーへの攻撃を**横取りする**」（`has_blocker`）。
+#: 横取りされると**そのターン届く量が減る**＝**速さの話**であって「的が遠い」話ではない。
+#: **`blockers` と `SLOPE_BLOCK_MODE=on` を両方入れると同じ規則を 2 か所で数える**ので、
+#: **移すには `Θ` 側を空にする必要がある**（それがこのモード）。**新定数ゼロ**（どちらの式も既存）。
+THETA_BODY_MODES = ("blockers", "all", "attackable", "none")
 #: **既定は `blockers`**（2026-09-18・ユーザ指示「理論的に正しいものにしたい」・T97 で `attackable` から戻した）。
 #:
 #: **T83 の問いの立て方が誤りだった**（T96 で判明）——`attackable` は「**殴れるか**」で耐久を決めたが、
@@ -447,7 +458,9 @@ def _body_absorbs(tok, s):
 
 def _body_term(tok, slots, opp_leader_power):
     """耐久の体の項。`all`＝`F` の `side_nu_meas`（T82・**根拠は誤りだった**・上の注）／
-    `attackable`＝規則から出る形（T83）／`blockers`＝旧。"""
+    `attackable`＝規則から出る形（T83）／`blockers`＝旧／**`none`＝速さの側へ移す**（T129）。"""
+    if THETA_BODY_MODE == "none":
+        return 0.0                            # **T129**: 体は `A` の側で数える（`SLOPE_BLOCK_MODE=on` と対）
     if THETA_BODY_MODE == "all":
         return float(side_nu_meas(tok, slots, opp_leader_power))
     tot = 0.0
@@ -983,6 +996,17 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     `d_i` が一定なら**今の `rate_at` と恒等**（Σ が `[j≥2]·在庫 + 流入·(j−1)` に畳まれる）＝
     `off` が今の挙動、という設計。返すのは長さ `jmax` のリスト（`rate_at(..., sched=)` に渡す）。"""
     sc_a = np.asarray(sc)
+    # **T129**（2026-09-20・ユーザ決定「相手の守りは入れましょう」）: **ブロッカーを自分で引く**。
+    # `rate_at` を通る道では `seat_slope_terms` が引いていたのに、**列を作るこの道は呼び出し側に任せていた**
+    # ——そして**橋の呼び出しは渡していなかった**ので、`SLOPE_BLOCK_MODE=on` は
+    # **歩きに 1 ビットも効いていなかった**（2026-09-20 実測: `--slope-block on` で
+    # 的中・偏り・σ_T・within1 がバイト一致・行ごとの `slope_theory` だけが動いていた）。
+    # **T128 の減衰と同じ型の取りこぼし**（T114 で既定になったとき規則を 2 つ引き継がなかった）。
+    # **渡されたらそれを使い、渡されなければ規則どおり自分で引く**＝呼び出し側の渡し忘れが起きない形。
+    if blockers is None and SLOPE_BLOCK_MODE == "on":
+        blockers = opp_blockers_of(tok_row,
+                                   my_leader_power=float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
+                                   theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)
     lead0, chars0 = theory_slope_parts(tok_row, olp, theta, mu, blockers=blockers,
                                        with_don=(DON_PURSE_MODE not in ("all", "race")))
     ds = purse_series(sc, tok_row, jmax)
@@ -2011,7 +2035,33 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                   # **T107**: 速さの検算を**終わりからの距離**でも読むための 2 つ
                                   # （`j` は始まりからの距離・**長引いた局は攻め手が上手く行っていない局**なので
                                   #  `j` の大きいところは標本が偏る）。
-                                  "t_left": len(ts) - j, "won": bool(z_of.get(w, 0.0) > 0.5)})
+                                  "t_left": len(ts) - j, "won": bool(z_of.get(w, 0.0) > 0.5),
+                                  # **T129**（ユーザ決定 2026-09-20「相手の守りは入れましょう」）:
+                                  # **相手の守りの量**を並べて置く（`rate_tracking` が「`A` の外れを
+                                  # どの守りが説明するか」を測るのに要る）。**値は 1 つも動かない**
+                                  # ——列を足すだけ（T112 で `g`／`who` を足したのと同じ形）。
+                                  # **どれも規則と盤面から出る**（打ち筋は入らない）。
+                                  # `d_blk_n`／`d_blk_nu`＝相手のアクティブなブロッカーの数と体の総額
+                                  #   （**注意: これは既に `Θ` の体の項に在る**＝`THETA_BODY_MODE=blockers`。
+                                  #    二重計上の候補なので、`th_body` と並べて読む）。
+                                  # `d_hand`＝相手の手札の枚数／`d_life`＝相手のライフ
+                                  # `d_shield`／`d_shield_rate`＝有限の盾とその 1 ターンの上限（T102・**`Θ` に在る**）
+                                  # `d_forced`＝**規則が強いる守りの回数 `G`**（T100・`Θ` には数として入っていない）
+                                  # `d_attacks`＝自分の攻撃の本数（`G` の分母・**守りではなく攻めの量**）
+                                  "d_blk_n": int(_opp_active_blockers(tok)),
+                                  "d_blk_nu": float(sum(nu for _p, nu in opp_blockers_of(
+                                      tok, my_leader_power=float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
+                                      theta=theta, mu=mu, ci_row=_ci, idx2cid=idx2cid))),
+                                  "d_hand": float(np.asarray(sc)[SC_OPP_HAND]),
+                                  "d_life": float(np.asarray(sc)[SC_OPP_LIFE]),
+                                  "d_shield": float(shield), "d_shield_rate": float(sh_rate),
+                                  "d_attacks": int(len(own_attackers_of(tok, olp))),
+                                  "d_forced": int(forced_guards(own_attackers_of(tok, olp),
+                                                                float(np.asarray(sc)[SC_OPP_LIFE]),
+                                                                _opp_active_blockers(tok))),
+                                  # 二重計上の判定に要る（`Θ` のどの項に守りが既に入っているか）
+                                  "th_body": float(th_body), "th_hand": float(th_hand),
+                                  "theta": float(th_w)})
                 f_real += harm.get((w, t), 0.0)
             won = z_of[w] > 0.5
             if won and ts:
@@ -2393,7 +2443,8 @@ def main(argv=None):
                          "`off`（旧・渡さない）／`on`（規則どおり `attack_value` に渡す＝新定数ゼロ）")
     ap.add_argument("--theta-body", default=THETA_BODY_MODE, choices=THETA_BODY_MODES,
                     help="耐久の体の項: `blockers`（旧・アクティブなブロッカーだけ）／`all`（全キャラ・T82）／"
-                         "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）")
+                         "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）／"
+                         "`none`（**体を `Θ` から外して速さの側へ移す**・T129・`--slope-block on` と対で使う）")
     ap.add_argument("--theta-hand-blocker", default=THETA_HAND_BLOCKER_MODE,
                     choices=THETA_HAND_BLOCKER_MODES,
                     help="**T106** 相手の**手札のブロッカー**を耐久に入れるか（ブロックに召喚酔いは無い）: "

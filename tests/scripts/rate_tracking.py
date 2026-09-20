@@ -79,6 +79,63 @@ def at(prof, j):
     return float(prof[min(int(j), len(prof) - 1)])
 
 
+#: **相手の守りの量**（T129・ユーザ決定 2026-09-20「相手の守りは入れましょう」）。
+#: **`A` の外れ（実測 − `A`）をどれが説明するか**を並べて測る。
+#: **`in_theta` は「その量が既に耐久 `Θ` に入っているか」**——入っているものを `A` からも引くと
+#: **同じ規則を 2 か所で数える**（T97 で `attackable` が盤面の厚みを `Θ` と `A` で 2 回拾って `D` を壊した実害）。
+#: **`Θ` に在る量で説明できてしまった場合は「入れる」ではなく「置き場所を移す」問題になる。**
+DEFENCE = (
+    ("d_blk_n",       "相手のアクティブなブロッカーの数",        True),
+    ("d_blk_nu",      "同・体の総額（ν）",                       True),
+    ("d_hand",        "相手の手札の枚数",                        True),
+    ("d_life",        "相手のライフ",                            True),
+    ("d_shield",      "有限の盾（守りに出せる額・T102）",        True),
+    ("d_shield_rate", "盾の 1 ターンの上限（T102）",             True),
+    ("d_forced",      "規則が強いる守りの回数 G（T100）",        False),
+    ("d_attacks",     "自分の攻撃の本数（守りではなく攻めの量）", False),
+)
+
+
+def demean_by(xs, js):
+    """`j`（自席ターン番号）ごとの平均を引く＝**ターン番号の影を抜く**。
+
+    **これをやらないと「守りが効いた」と「ターンが進んだ」を取り違える**——
+    ライフも手札もブロッカーも `j` とともに動くので、生の相関は `j` の傾向をそのまま拾う
+    （2026-09-20 の実測: `d_life` の生の相関は実 +0.164・合成 −0.021 と**符号が割れた**）。"""
+    xs = np.asarray(xs, float); js = np.asarray(js, int)
+    out = xs.astype(float).copy()
+    for j in np.unique(js):
+        m = js == j
+        out[m] = xs[m] - xs[m].mean()
+    return out
+
+
+def defence_table(rows, resid, js=None):
+    """守りの量ごとに **`A` の外れとの相関**を出す（当てはめゼロ・符号の向きも出す）。
+
+    `resid` は **実測の損害 − `A`**（正なら理論が少なく見積もった）。
+    **守りが強いほど `A` は多く見積まれる**はずなので、**相関は負に出るのが予想**。
+
+    `js` を渡すと **`j` ごとの平均を両側から引いた相関** `corr_resid_j` も出す
+    ——**これが本命**（生の相関はターン番号の影を含む・`demean_by` の注記）。"""
+    out = {}
+    rj = demean_by(resid, js) if js is not None else None
+    for key, label, in_theta in DEFENCE:
+        xs = [r.get(key) for r in rows]
+        if any(x is None for x in xs):
+            continue
+        c = corr(xs, resid)
+        row = {"label": label, "in_theta": bool(in_theta),
+               "mean": round(float(np.mean(np.asarray(xs, float))), 4),
+               "nonzero_share": round(float(np.mean(np.asarray(xs, float) > 0.0)), 4),
+               "corr_resid": (round(c, 4) if c is not None else None)}
+        if rj is not None:
+            cj = corr(demean_by(xs, js), rj)
+            row["corr_resid_j"] = (round(cj, 4) if cj is not None else None)
+        out[key] = row
+    return out
+
+
 def measure(turn_harm, prof, prof_th, include_last=False):
     """`turn_harm` の行から 3 つの量を出す（当てはめゼロ）。"""
     rows = [r for r in turn_harm
@@ -129,6 +186,8 @@ def measure(turn_harm, prof, prof_th, include_last=False):
                         "corr": (round(corr(a[m], harm[m]), 4)
                                  if corr(a[m], harm[m]) is not None else None)}
     out["by_j"] = by_j
+    # **T129**: `A` の外れを守りの量で説明できるか（当てはめゼロ・相関だけ・`j` の影を抜いた列つき）
+    out["defence"] = defence_table(rows, harm - a, js=js)
     return out
 
 

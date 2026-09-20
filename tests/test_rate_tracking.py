@@ -118,3 +118,67 @@ def test_by_j_skips_thin_buckets_and_keeps_the_counts():
     out = RT.measure(rows, [0.15] * 6, [0.15] * 6)
     assert "9" not in out["by_j"]                      # n < 20 は出さない
     assert sum(v["n"] for v in out["by_j"].values()) == 200
+
+
+# --------------------------------------------------------------------------- 4. T129: 守りの量の表
+def test_the_defence_table_flags_what_theta_already_holds():
+    """**二重計上の判定に要る**——`in_theta` は「その量が既に耐久 `Θ` に入っているか」。
+
+    ブロッカーは `THETA_BODY_MODE=blockers`（既定）で `Θ` の体の項に在り、盾は T102 で `Θ` の手札の項に在る。
+    **`Θ` に在る量を `A` からも引くと同じ規則を 2 か所で数える**（T97 の実害）。
+    `G`（規則が強いる守りの回数）と攻撃の本数は `Θ` に**数としては**入っていない。
+    """
+    flags = {k: in_theta for k, _label, in_theta in RT.DEFENCE}
+    for k in ("d_blk_n", "d_blk_nu", "d_hand", "d_life", "d_shield", "d_shield_rate"):
+        assert flags[k] is True, k
+    for k in ("d_forced", "d_attacks"):
+        assert flags[k] is False, k
+
+
+def test_the_defence_correlation_is_against_the_residual_and_keeps_its_sign():
+    """**守りが強いほど `A` は多く見積まれる**＝外れ（実測 − `A`）との相関は**負**に出る向きを固定する。"""
+    rows, resid = [], []
+    for i in range(200):
+        blk = float(i % 4)
+        r = -0.02 * blk                        # 守りが厚い行ほど理論が多く見積もる
+        rows.append({"g": i, "who": 0, "j": 2, "harm": 0.1 + r, "slope_theory": 0.1,
+                     "t_left": 3, "d_blk_n": blk, "d_forced": 0.0})
+        resid.append(r)
+    t = RT.defence_table(rows, np.asarray(resid))
+    assert t["d_blk_n"]["corr_resid"] == pytest.approx(-1.0, abs=1e-6)
+    assert t["d_blk_n"]["in_theta"] is True
+    assert t["d_forced"]["corr_resid"] is None          # 定数の列は相関を出さない（None）
+    assert "d_hand" not in t                            # 無い列は黙って落とす（落ちない）
+
+
+def test_measure_carries_the_defence_table_through():
+    rows = _rows(60)
+    for i, r in enumerate(rows):
+        r["d_blk_n"] = float(i % 3)
+    out = RT.measure(rows, [0.15] * 6, [0.15] * 6)
+    assert "d_blk_n" in out["defence"]
+    assert out["defence"]["d_blk_n"]["nonzero_share"] == pytest.approx(2.0 / 3.0, abs=0.02)
+
+
+def test_demean_by_removes_the_turn_number_trend():
+    """**ターン番号の影を抜く**——`j` ごとの平均を引いたら、各 `j` の平均は厳密に 0。"""
+    js = np.array([0, 0, 1, 1, 2, 2])
+    xs = np.array([1.0, 3.0, 10.0, 20.0, 5.0, 5.0])
+    d = RT.demean_by(xs, js)
+    assert d == pytest.approx([-1.0, 1.0, -5.0, 5.0, 0.0, 0.0])
+    for j in (0, 1, 2):
+        assert d[js == j].mean() == pytest.approx(0.0, abs=1e-12)
+
+
+def test_a_pure_turn_number_trend_shows_up_raw_and_vanishes_once_partialled():
+    """**この器が在る理由**——`j` の関数でしかない量は、生の相関では出て、`j` を抜くと消える。"""
+    rows, resid, js = [], [], []
+    for i in range(300):
+        j = i % 5
+        rows.append({"g": i, "who": 0, "j": j, "harm": 0.0, "slope_theory": 0.0,
+                     "t_left": 3, "d_life": 5.0 - j, "d_forced": 0.0})
+        resid.append(0.02 * j)                       # 外れも `j` だけの関数
+        js.append(j)
+    t = RT.defence_table(rows, np.asarray(resid), js=np.asarray(js))
+    assert abs(t["d_life"]["corr_resid"]) == pytest.approx(1.0, abs=1e-6)   # 生では満点に見える
+    assert t["d_life"]["corr_resid_j"] is None                              # `j` を抜くと何も残らない
