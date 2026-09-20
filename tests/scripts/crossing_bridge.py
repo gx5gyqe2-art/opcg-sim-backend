@@ -907,6 +907,28 @@ def through_scale(n_attacks, stopped, blockers_n):
     return max(0.0, min(1.0, through / n))
 
 
+def _budget_gap(pairs, xs, take_cost):
+    """**財布を共有しているか否かの差**（T132）＝`独立に取った節約 − 1 つの手札で取った節約`。
+
+    `A` は**攻撃 1 本ごとに独立に** `min(守る, 受ける)` を取る（`attack_value`・`game_theory.md` §14.1）。
+    **守り手の手札は 1 ターンで 1 つ**なので、**独立に取ると同じ札を何度も使えることになる**
+    ——**守りが安く見え、`A` は損害を少なく見積もる**。
+
+    **差は 0 以上**（共有の方が節約できない）。**式の形の違いだけで、新しい量も機構の推測も無い。**"""
+    import hand_guard as HG
+    take = float(take_cost)
+    indep = 0.0
+    for x in xs:
+        if x < -PWR_EPS:
+            continue
+        cost, _idx = HG.guard_cost_min_v(list(pairs), x)      # **毎回手札全部**が使える前提
+        if cost is None:
+            continue                                          # 止められない＝受ける（節約 0）
+        indep += max(0.0, take - float(cost))
+    shared = float(HG.guard_value(list(pairs), xs, take, turns=1))   # **1 ターン・使った札は減る**
+    return max(0.0, indep - shared)
+
+
 def theory_slope_parts(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None, with_don=True,
                        through=None):
     """盤面の速さを **2 つに分けて**返す: `(リーダー, キャラ)`（T95）。
@@ -1964,7 +1986,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             items = HP.hand_items(tok_d, ci_d, idx2cid, cards, olp_d, r_d) if cards is not None else []
             if not items:
                 return {"d_ctr_sum": 0.0, "d_ctr_n": 0, "d_play_sum": 0.0,
-                        "d_cut": 0.0, "d_stopped": 0.0, "d_guard_value": 0.0}
+                        "d_cut": 0.0, "d_stopped": 0.0, "d_guard_value": 0.0,
+                        "d_budget_gap": 0.0}
             pairs = [(it["counter"], HP.v_scalar(it["v"])) for it in items]
             take = HG.take_cost_of(float(sc_da[SC_MY_LIFE]), mu)
             return {
@@ -1980,6 +2003,21 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 "d_stopped": float(HP.attacks_stopped(items, xs, take)),
                 # **守りの備えの額**（止めて浮かせた分の和・地平の中で 1 枚 1 回）
                 "d_guard_value": float(HG.guard_value(pairs, xs, take)),
+                # **T132**（ユーザ指示 2026-09-20「測ってみて」）: **財布を共有しているか否かの差**。
+                #
+                # `A` は**攻撃 1 本ごとに独立に** `min(守る, 受ける)` を取る（`attack_value`）。
+                # **だが守り手の手札は 1 ターンで 1 つ**——2 本目は 1 本目で使った札をもう使えない。
+                # **独立に取ると「同じ札を何度も使える」ことになり、守りが安く見える＝`A` は損害を少なく見積もる。**
+                #
+                # ```
+                # 独立   = Σ_本 max(0, 受ける費用 − その 1 本を手札全部で止める最小費用)
+                # 共有   = guard_value(…, turns=1)   （大きい順に当てて、使った札は減らす）
+                # 差     = 独立 − 共有 ≥ 0           （**式の形の違いだけ**・機構の推測ではない）
+                # ```
+                #
+                # **予告**: 差は**正**で、**本数とともに増え**、**`A` の外れと正に相関する**はず
+                # （本数が多いほど使い回しの過大が効く＝T130 の「攻撃の本数 +0.226／+0.110」の正体の候補）。
+                "d_budget_gap": float(_budget_gap(pairs, xs, take)),
             }
 
         def through_for(tok, olp, defender, t):

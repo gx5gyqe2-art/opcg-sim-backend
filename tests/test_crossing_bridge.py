@@ -1410,3 +1410,27 @@ def test_a_missing_through_share_is_loud_not_silently_one():
         CB.theory_slope_parts(tok, 5000.0, through=1.0)       # 渡せば通る
     finally:
         CB.set_rate_through_mode("off")
+
+
+def test_the_budget_gap_is_zero_for_one_attack_and_positive_when_cards_are_reused():
+    """**T132**（ユーザ指示 2026-09-20「測ってみて」）: **財布を共有しているか否かの差**。
+
+    **1 本しか来なければ差は 0**（使い回しが起きない）。
+    **2 本来て手札が 1 枚しか無ければ**、独立に取ると**同じ 1 枚で両方止められる**ことになり、
+    共有では 1 本しか止まらない＝**差が出る**。**差は必ず 0 以上。**"""
+    pairs = [(2000.0, 0.05)]                       # カウンター 2000 の札 1 枚
+    take = 1.0                                     # 受けると高い＝必ず守りたい
+    assert CB._budget_gap(pairs, [1000.0], take) == pytest.approx(0.0)        # 1 本なら差ゼロ
+    gap = CB._budget_gap(pairs, [1000.0, 1000.0], take)
+    assert gap > 0.0                                                          # 2 本目で使い回しが露出
+    assert gap == pytest.approx(take - 0.05)                                  # 2 本目ぶんまるごと
+    assert CB._budget_gap(pairs, [], take) == 0.0
+    # 止められない攻撃は両方で節約 0 ＝差に寄与しない
+    assert CB._budget_gap(pairs, [9000.0, 9000.0], take) == pytest.approx(0.0)
+
+
+def test_the_budget_gap_never_goes_negative():
+    """共有の方が節約できることは無い（同じ札を 2 回使えないので）。"""
+    pairs = [(1000.0, 0.02), (2000.0, 0.09), (1000.0, 0.01)]
+    for xs in ([0.0], [0.0, 1000.0], [1000.0, 1000.0, 2000.0], [500.0] * 5):
+        assert CB._budget_gap(pairs, xs, 1.0) >= 0.0
