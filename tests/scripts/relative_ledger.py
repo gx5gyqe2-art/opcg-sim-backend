@@ -407,6 +407,8 @@ def main(argv=None):
     ap.add_argument("--d-mode", dest="d_mode", choices=KV.D_MODES, default=None)
     ap.add_argument("--kappa-sigma", dest="kappa_sigma", choices=TO.KAPPA_SIGMA_MODES, default=None,
                     help="**T122/§17.9.6-1**: κ の物差しを W に合わせるか（既定は現状の `abs`）")
+    ap.add_argument("--theta-side", dest="theta_side", choices=CB.THETA_SIDE_MODES, default=None,
+                    help="**T133**: `Θ` を両席で同じ式にするか（既定は現状の `legacy`）")
     ap.add_argument("--scale-a", type=float, default=1.0, help="**P7**: 両席の A に共通の掛け算誤差")
     ap.add_argument("--scale-currency", type=float, default=1.0, help="**P5**: 耐久と価格を同時に c 倍")
     ap.add_argument("--scale-clamp", dest="clamp", default="",
@@ -417,6 +419,8 @@ def main(argv=None):
         KV.set_d_mode(a.d_mode)
     if a.kappa_sigma:
         TO.set_kappa_sigma_mode(a.kappa_sigma)
+    if a.theta_side:
+        CB.set_theta_side_mode(a.theta_side)          # **T133**
     if a.clamp:
         KV.set_scale_clamp([float(x) for x in a.clamp.split(",")])
     out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency)

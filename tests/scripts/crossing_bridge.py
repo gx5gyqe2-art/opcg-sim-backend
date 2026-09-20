@@ -640,30 +640,83 @@ def _opp_active_blockers(tok, slots=SLOT_OPP_FIELD):
                    and float(tok[s_i, S_IS_REST]) <= 0.5))
 
 
-def threshold_parts(sc, tok, lam=LAM, mu=MU, g_hand=None, hand_blocker=0.0):
-    """耐久 `Θ` を **3 つの項に割って**返す（T96）: `(ライフ, 手札, 体)`。和は `threshold` と一致する。
-    **どの項が終盤に縮まないか**を見るための切り分け（T89 が見つけた「残り 1〜2 ターンでも τ が 5 ターン先を指す」）。"""
+#: **`Θ` を両席で同じ式にするか**（T133・2026-09-20・ユーザ提案「一つづつ丁寧に比較しましょうか」）。
+#:
+#: **見つかった欠陥**: **`Θ` は席ごとに別の式で計算されていた**——
+#: `threshold_parts`（相手の耐久）は `THETA_HAND_MODE=cuttable_forced`（**規則が強いる守りで実際に吸える額**・T100）
+#: を通すのに、`threshold_of_me`（自分の耐久）は **`g × 枚数` のまま**だった。
+#: **同じ「手札」という要素に 2 つの違う式**が当たっている。
+#: **T79 で「1 行の器を完全情報で対称にする」と言ったのに、この項だけ対称になっていなかった。**
+#:
+#: **鏡にするのに要る部品は全部在った**——`opp_attackers_of`（相手が私に投げる攻撃）・
+#: `_own_active_blockers`（私のブロッカー）。**新定数ゼロ・新しい量ゼロ**（同じ式を鏡に当てるだけ）。
+#:
+#: **不変量**（テストで固定）: **盤面が左右対称なら両席の `Θ` は等しくなければならない**。
+#: `legacy` ではこれが破れる。
+#:
+#: `legacy`＝従来（既定・出荷の値を動かさない）／`symmetric`＝同じ式を両側へ。
+THETA_SIDE_MODES = ("legacy", "symmetric")
+THETA_SIDE_MODE = "legacy"
+
+
+def set_theta_side_mode(mode):
+    global THETA_SIDE_MODE
+    if mode not in THETA_SIDE_MODES:
+        raise ValueError("theta side mode は %s のどれか" % (THETA_SIDE_MODES,))
+    THETA_SIDE_MODE = mode
+    return THETA_SIDE_MODE
+
+
+def threshold_parts_side(sc, tok, side, lam=LAM, mu=MU, g_hand=None, hand_blocker=0.0):
+    """耐久 `Θ` を **3 つの項に割って**返す（T96）: `(ライフ, 手札, 体)`。
+
+    `side="opp"`＝**相手の耐久**（従来の `threshold_parts`）／`side="me"`＝**自分の耐久**（T133・同じ式を鏡に）。
+    **鏡にするとき入れ替わるのは 5 つ**（どれも既にある量）:
+    ライフ・手札の枚数・場の枠・**守らされる攻撃**（`own_attackers_of` ↔ `opp_attackers_of`）・
+    **吸う側のブロッカー**（`_opp_active_blockers` ↔ `_own_active_blockers`）。"""
     sc = np.asarray(sc); tok = np.asarray(tok)
     mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+    if side == "opp":
+        life, hand_n = float(sc[SC_OPP_LIFE]), float(sc[SC_OPP_HAND])
+        slots, body_ref = SLOT_OPP_FIELD, mlp
+        xs = own_attackers_of(tok, olp)          # 私が投げる攻撃＝相手が守らされる
+        n_blk = _opp_active_blockers(tok)        # 吸う側（相手）のブロッカー
+    elif side == "me":
+        life, hand_n = float(sc[SC_MY_LIFE]), float(sc[SC_MY_HAND])
+        slots, body_ref = SLOT_OWN_FIELD, olp
+        xs = opp_attackers_of(tok, mlp)          # 相手が投げる攻撃＝私が守らされる
+        n_blk = _own_active_blockers(tok)        # 吸う側（私）のブロッカー
+    else:
+        raise ValueError("side は 'opp' か 'me'（%r）" % (side,))
     g = float(mu if g_hand is None else g_hand)
-    hand = g * float(sc[SC_OPP_HAND])
+    hand = g * hand_n
     if THETA_HAND_MODE in ("cuttable_cx", "cuttable_forced"):
         # **T99／T100**: 切れる枚数は `g/μ × H`（`g` は 1 枚あたりの価格＝`μ ×` 切れる割合）。
-        xs = own_attackers_of(tok, olp)
-        n_cut = (g / float(mu)) * float(sc[SC_OPP_HAND]) if mu else 0.0
+        n_cut = (g / float(mu)) * hand_n if mu else 0.0
         if THETA_HAND_MODE == "cuttable_forced":
-            hand = hand_absorb_forced(n_cut, xs, float(sc[SC_OPP_LIFE]), _opp_active_blockers(tok), mu)
+            hand = hand_absorb_forced(n_cut, xs, life, n_blk, mu)
         else:
             hand = hand_absorb(n_cut, max(xs) if xs else -1.0, mu)
-    body = float(_body_term(tok, SLOT_OPP_FIELD, mlp))
+    body = float(_body_term(tok, slots, body_ref))
     if THETA_HAND_BLOCKER_MODE == "on":
         body += max(0.0, float(hand_blocker))       # **T106**: 手札から出せるブロッカー（召喚酔い無し）
-    return (float(lam) * float(sc[SC_OPP_LIFE]), hand, body)
+    return (float(lam) * life, hand, body)
 
 
-def threshold_of_me(sc, tok, lam=LAM, mu=MU, g_hand=None):
-    """**自分の耐久**（相手から見たしきい値）: `λ·L_me + g·H_me + Σν_meas(自分の体)`（T75・`g` は T76・体は T82）。"""
+def threshold_parts(sc, tok, lam=LAM, mu=MU, g_hand=None, hand_blocker=0.0):
+    """**相手の耐久**の 3 つの項（`threshold_parts_side(..., "opp")` の薄い包み）。"""
+    return threshold_parts_side(sc, tok, "opp", lam, mu, g_hand, hand_blocker)
+
+
+def threshold_of_me(sc, tok, lam=LAM, mu=MU, g_hand=None, hand_blocker=0.0):
+    """**自分の耐久**（相手から見たしきい値）。
+
+    **`THETA_SIDE_MODE=symmetric` なら `threshold_parts` と同じ式を鏡に当てる**（T133）。
+    `legacy`（既定）は従来の `λ·L_me + g·H_me + Σν_meas(自分の体)`
+    ——**手札の項だけが相手側と違う式**（`cuttable_forced` を通らない）。"""
+    if THETA_SIDE_MODE == "symmetric":
+        return float(sum(threshold_parts_side(sc, tok, "me", lam, mu, g_hand, hand_blocker)))
     sc = np.asarray(sc); tok = np.asarray(tok)
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     g = float(mu if g_hand is None else g_hand)
@@ -2625,6 +2678,9 @@ def main(argv=None):
     ap.add_argument("--slope-hand", default=SLOPE_HAND_MODE, choices=SLOPE_HAND_MODES,
                     help="**T93** 速さの手札の項: `stock`（旧・今のドンで出せる体の総額＝在庫）／"
                          "**`flow`（既定**・毎ターン入ってくるぶん＝そのデッキの平均・`deck_refill.a_of`）")
+    ap.add_argument("--theta-side", default=THETA_SIDE_MODE, choices=THETA_SIDE_MODES,
+                    help="**T133** `Θ` を両席で同じ式にするか: `legacy`（従来・自分の耐久だけ `g × 枚数`）／"
+                         "**`symmetric`**（`threshold_parts` と同じ式を鏡に当てる）")
     ap.add_argument("--rate-through", default=RATE_THROUGH_MODE, choices=RATE_THROUGH_MODES,
                     help="**T131** 盤面の項を**通った割合**で割り引くか: "
                          "`off`（旧）／**`cut`**（本数 − 切られた本数・**ブロッカーは引かない**＝`Θ` に在るので二重計上しない）／"
@@ -2692,6 +2748,7 @@ def main(argv=None):
     set_slope_mode(a.slope_mode)
     set_slope_block_mode(a.slope_block)
     set_rate_through_mode(a.rate_through)          # **T131**
+    set_theta_side_mode(a.theta_side)              # **T133**
     set_slope_hand_mode(a.slope_hand)
     set_rate_walk_mode(a.rate_walk)
     set_rate_decay_mode(a.rate_decay)

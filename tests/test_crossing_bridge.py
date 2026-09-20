@@ -1434,3 +1434,103 @@ def test_the_budget_gap_never_goes_negative():
     pairs = [(1000.0, 0.02), (2000.0, 0.09), (1000.0, 0.01)]
     for xs in ([0.0], [0.0, 1000.0], [1000.0, 1000.0, 2000.0], [500.0] * 5):
         assert CB._budget_gap(pairs, xs, 1.0) >= 0.0
+
+
+# --------------------------------------------------------------------------- T133: Θ を両席で同じ式に
+def _mirror_row(life=3.0, hand=5.0, n_char=2, pw=0.6):
+    """**左右対称の盤面**（両席が同じライフ・同じ手札・同じ体・同じリーダー）。
+
+    **`CAN_ATTACK` は自席にだけ立てる**（規則・その旗は手番の側でしか意味を持たない）——
+    相手側は `opp_attackers_of` が「相手のターンが来れば全部アクティブ」と規則から数える。
+    """
+    sc = np.zeros(70, np.float32)
+    sc[T.SC_MY_LIFE] = sc[T.SC_OPP_LIFE] = life
+    sc[T.SC_MY_HAND] = sc[T.SC_OPP_HAND] = hand
+    sc[T.SC_MY_LEADER_POWER] = sc[T.SC_OPP_LEADER_POWER] = 0.5
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, T.S_POWER] = tok[1, T.S_POWER] = 0.5              # 両リーダー 5000
+    for k in range(n_char):
+        own, opp = T.SLOT_OWN_FIELD.start + k, T.SLOT_OPP_FIELD.start + k
+        for s_i in (own, opp):
+            tok[s_i, T.S_POWER], tok[s_i, T.S_IS_CHAR] = pw, 1.0
+        tok[own, T.S_CAN_ATTACK] = 1.0
+    return sc, tok
+
+
+def test_a_mirrored_board_alone_does_not_expose_the_seat_asymmetry():
+    """**測ってみて分かったこと**（T133・2026-09-20）——**この不変量では差を検出できない**。
+
+    左右対称でライフに余裕があると、**リーダーの攻撃は超過 0 で「1 枚で止まる」**ので
+    `hand_absorb_forced` の `c_eff` が 1.0 になり、**`μ × 枚数` に戻って従来の式と一致してしまう**。
+    **検算を立てるときは「差が出る条件」まで書く**（最初の設計はここを外した）。
+    **さらに体が小さいと `CBAR_MODE` にも依存する**（テスト環境の `loose` では `c_of(1000) = 1.0`）。
+    """
+    sc, tok = _mirror_row(life=3.0, n_char=2)
+    legacy = abs(CB.threshold(sc, tok) - CB.threshold_of_me(sc, tok))
+    assert legacy == pytest.approx(0.0, abs=1e-9)              # **従来でも破れない盤面が在る**
+
+
+def test_the_two_seats_endurance_must_agree_once_guards_are_forced():
+    """**T133**（ユーザ提案 2026-09-20「一つづつ丁寧に比較しましょうか」）: **`Θ` の式は席に依らない**。
+
+    **見つかった欠陥**: `threshold_parts`（相手）は `cuttable_forced`（**規則が強いる守りで実際に吸える額**）
+    を通るのに `threshold_of_me`（自分）は `g × 枚数` のままだった＝**同じ「手札」に 2 つの式**。
+    **差が出るのは守りを強いられる盤面**（本数 > ライフ ＋ ブロッカー）——
+    そこでは `c_eff > 1` になり、**組にして端数を捨てる床**が効く。**実測で 23.1% の行がこれに当たる。**
+    """
+    # **4 本 対 ライフ 1 ＝ 3 回は守らされる**・**体は 10000**——
+    # **体が小さいと `CBAR_MODE=loose`（テスト環境）では `c_of(1000) = 1.0` になって差が消える**
+    # （2026-09-20 に踏んだ: 盤面の選び方が環境の設定に依存していた）。
+    sc, tok = _mirror_row(life=1.0, hand=5.0, n_char=3, pw=1.0)
+    assert CB.THETA_HAND_MODE == "cuttable_forced"             # 既定（食い違いの所在）
+    assert CB.THETA_SIDE_MODE == "legacy"                      # 既定は据え置き
+    legacy_gap = abs(CB.threshold(sc, tok) - CB.threshold_of_me(sc, tok))
+    try:
+        CB.set_theta_side_mode("symmetric")
+        sym_gap = abs(CB.threshold(sc, tok) - CB.threshold_of_me(sc, tok))
+    finally:
+        CB.set_theta_side_mode("legacy")
+    assert legacy_gap > 1e-9          # **従来は破れる**（同じ盤面なのに席で違う）
+    assert sym_gap == pytest.approx(0.0, abs=1e-9)             # **鏡にすると一致する**
+    with pytest.raises(ValueError):
+        CB.set_theta_side_mode("なにか")
+
+
+def test_the_side_wrapper_reproduces_the_opponent_formula_exactly():
+    """`threshold_parts` は `threshold_parts_side(..., "opp")` の薄い包み＝**値は 1 つも動かない**。"""
+    sc, tok = _mirror_row()
+    assert CB.threshold_parts(sc, tok) == CB.threshold_parts_side(sc, tok, "opp")
+    assert CB.threshold_parts(sc, tok, g_hand=0.04, hand_blocker=0.01) == \
+        CB.threshold_parts_side(sc, tok, "opp", g_hand=0.04, hand_blocker=0.01)
+    with pytest.raises(ValueError):
+        CB.threshold_parts_side(sc, tok, "どちらでもない")
+
+
+def test_the_asymmetry_is_exactly_the_cuttable_branch():
+    """**食い違いは手札の項だけ**——`count`（`g × 枚数`）なら両モードで一致する。"""
+    sc, tok = _mirror_row()
+    old = CB.THETA_HAND_MODE
+    try:
+        CB.set_theta_hand_mode("count")
+        a = CB.threshold_of_me(sc, tok)
+        CB.set_theta_side_mode("symmetric")
+        b = CB.threshold_of_me(sc, tok)
+        assert a == pytest.approx(b)                           # 手札の項が同じ式なら差は出ない
+    finally:
+        CB.set_theta_side_mode("legacy")
+        CB.set_theta_hand_mode(old)
+
+
+def test_the_symmetric_form_never_claims_more_endurance_than_the_old_one():
+    """`hand_absorb_forced` は `μ × 枚数` の**床**（組にして端数を捨てる）なので、
+    **鏡にすると自分の耐久は増えない**——向きを固定する。"""
+    sc, tok = _mirror_row(life=1.0, hand=5.0, n_char=3, pw=1.0)
+    for life, hand in ((1.0, 2.0), (1.0, 5.0), (2.0, 9.0)):
+        sc[T.SC_MY_LIFE], sc[T.SC_MY_HAND] = life, hand
+        legacy = CB.threshold_of_me(sc, tok)
+        try:
+            CB.set_theta_side_mode("symmetric")
+            sym = CB.threshold_of_me(sc, tok)
+        finally:
+            CB.set_theta_side_mode("legacy")
+        assert sym <= legacy + 1e-9, (life, hand, sym, legacy)
