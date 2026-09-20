@@ -82,7 +82,8 @@ def row_split(sc, tok, ci_row, idx2cid, cards, deck_me=None, deck_opp=None,
     items = HP.hand_items(tok, ci_row, idx2cid, cards, olp, r) or []
 
     # --- 財布の外に在る土台（配分では動かない分）
-    lead, chars = CB.theory_slope_parts(tok, olp, theta, mu, with_don=False)
+    lead, chars = CB.theory_slope_parts(tok, olp, theta, mu, with_don=False,
+                                        life_opp=float(sc[TO.SC_OPP_LIFE]))   # **T134**
     base_a = lead + chars
     if deck_me:
         base_a += float(DR.a_of(deck_me, olp, don, theta, mu))

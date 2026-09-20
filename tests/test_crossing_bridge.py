@@ -1534,3 +1534,84 @@ def test_the_symmetric_form_never_claims_more_endurance_than_the_old_one():
         finally:
             CB.set_theta_side_mode("legacy")
         assert sym <= legacy + 1e-9, (life, hand, sym, legacy)
+
+
+# --------------------------------------------------------------------------- T134: 受ける費用を守る側のライフで
+def test_the_take_branch_reads_the_defenders_life():
+    """**T134**（ユーザ提案「2 つの指標間と席間の扱いをそろえましょうか」の突き合わせ表 ③）。
+
+    攻撃 1 回の価格は `min(c(x)·μ〔守られる〕, Θ·μ〔受けられる〕, ブロック)`。
+    **「受けられる」側に定数を渡していた**——`theta_take(ライフ)` は既に在り、
+    **守りの規則・線形の橋・実現の帳簿の 4 つでは使われている**のに**交点の橋の `A` だけが渡していなかった**。
+    **既定の `TAKE_MODE=lethal` ではライフ 0 のときだけ値が変わる**＝
+    **`A` は「この攻撃が通れば勝ち」を一度も見ていなかった**（T117 と同じ患部）。
+    """
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, T.S_POWER] = 0.5                                    # リーダーだけ（超過 0）
+    assert CB.SLOPE_TAKE_MODE == "const"                       # 既定は据え置き
+    base = CB.theory_slope(tok, 5000.0)
+    assert CB.theory_slope(tok, 5000.0, life_opp=0.0) == pytest.approx(base)   # `const` なら無視
+    try:
+        CB.set_slope_take_mode("life")
+        # **ライフが残っているうちは `theta_take` が定数を返す**（`TAKE_MODE=lethal` の規則）
+        assert CB.theory_slope(tok, 5000.0, life_opp=3.0) == pytest.approx(base)
+        # **ライフ 0＝この 1 本が通れば勝ち**——価格が変わる
+        lethal = CB.theory_slope(tok, 5000.0, life_opp=0.0)
+        assert lethal != pytest.approx(base)
+    finally:
+        CB.set_slope_take_mode("const")
+    with pytest.raises(ValueError):
+        CB.set_slope_take_mode("なにか")
+
+
+def test_a_missing_defender_life_is_loud_not_silently_constant():
+    """**T131 で決めた規約**——切替を入れたのに渡し忘れたら**黙って旧の値にならず落ちる**。"""
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, T.S_POWER] = 0.5
+    CB.theory_slope_parts(tok, 5000.0)                         # `const` なら渡さなくてよい
+    try:
+        CB.set_slope_take_mode("life")
+        with pytest.raises(ValueError):
+            CB.theory_slope_parts(tok, 5000.0)                 # 渡し忘れ＝落ちる
+        CB.theory_slope_parts(tok, 5000.0, life_opp=2.0)       # 渡せば通る
+    finally:
+        CB.set_slope_take_mode("const")
+
+
+def test_the_take_branch_only_binds_when_it_is_the_cheaper_response():
+    """**素殴りなら `min` の枝**なので、守る方が安い攻撃では値が動かない
+    ——**`Θ` の `λ·L`（在庫）と二重計上にならない**理由でもある（こちらは「この 1 本の価格」）。"""
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, T.S_POWER] = 0.5
+    s0 = T.SLOT_OWN_FIELD.start
+    # **超過 0 の体**＝`c(0) = 1 枚`で止まるので守る方が安い（受ける費用が動いても `min` は変わらない）
+    tok[s0, T.S_POWER], tok[s0, T.S_IS_CHAR], tok[s0, T.S_CAN_ATTACK] = 0.5, 1.0, 1.0
+    _lead, chars_const = CB.theory_slope_parts(tok, 5000.0, with_don=False)
+    try:
+        CB.set_slope_take_mode("life")
+        _l2, chars_life = CB.theory_slope_parts(tok, 5000.0, with_don=False, life_opp=0.0)
+    finally:
+        CB.set_slope_take_mode("const")
+    assert chars_life == pytest.approx(chars_const)             # 守る方が安い枝は動かない
+
+
+def test_at_lethal_the_higher_take_cost_makes_don_worth_attaching():
+    """**ドン込みの価格では動く**（`attack_value_don` は `max_k [圧力(k) − k·δ]`）——
+    **受ける費用が高いほど「ドンを付けて押し通す」が得になる**。
+
+    **とどめの場面で正しい挙動**（そこだけ押し通す価値が跳ねる）。
+    **最初に書いたテストはこれを「動かないはず」と書いて外した**——記録として残す。
+    """
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, T.S_POWER] = 0.5
+    s0 = T.SLOT_OWN_FIELD.start
+    tok[s0, T.S_POWER], tok[s0, T.S_IS_CHAR], tok[s0, T.S_CAN_ATTACK] = 0.5, 1.0, 1.0
+    _lead, chars_const = CB.theory_slope_parts(tok, 5000.0)     # ドン込み（既定）
+    try:
+        CB.set_slope_take_mode("life")
+        _l2, chars_lethal = CB.theory_slope_parts(tok, 5000.0, life_opp=0.0)
+        _l3, chars_safe = CB.theory_slope_parts(tok, 5000.0, life_opp=3.0)
+    finally:
+        CB.set_slope_take_mode("const")
+    assert chars_lethal > chars_const                           # とどめでは跳ねる
+    assert chars_safe == pytest.approx(chars_const)             # ライフが残っていれば不動

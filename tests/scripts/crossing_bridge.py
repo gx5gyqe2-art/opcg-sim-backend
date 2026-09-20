@@ -44,7 +44,7 @@ from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # 
 from theory_order import (DELTA, KO_P, LAM, MU, PWR_EPS, R_TURNS, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, SC_MY_DON, SC_MY_HAND, SLOT_OWN_FIELD, clock_scale,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE, S_POWER,
                           SLOT_OPP_FIELD, THETA, add_nu_mode_arg, apply_nu_mode, attack_value,
-                          attack_value_don, c_of,
+                          attack_value_don, c_of, theta_take,
                           opp_bodies_of, own_attackers_of, score_candidate, slot_power, theta_of)
 
 SLOPES = ("hist", "theory")
@@ -982,8 +982,38 @@ def _budget_gap(pairs, xs, take_cost):
     return max(0.0, indep - shared)
 
 
+#: **攻撃の価格の「受けられたとき」を守る側のライフで読むか**（T134・2026-09-20・
+#: ユーザ提案「2 つの指標間と席間の扱いをそろえましょうか」の突き合わせ表 ③）。
+#:
+#: **見つかった欠陥**: 攻撃 1 回の価格は `min(c(x)·μ〔守られる〕, Θ·μ〔受けられる〕, ブロック)` だが、
+#: **「受けられる」側の `Θ` に定数を渡していた**。**ライフ別の受ける費用 `theta_take(ライフ)` は既に在り**、
+#: **守りの規則（`hand_guard`）・線形の橋（`theory_bridge`）・実現の帳簿（`attack_response`／`price_realised`）
+#: の 4 つでは使われている**のに、**交点の橋の `A` だけが渡していなかった**。
+#: **同じ「ライフ」という要素に、器ごとに違う扱い**。
+#:
+#: **既定の `TAKE_MODE=lethal` では「ライフ 0 のときだけ」値が変わる**ので、
+#: **`A` は「この攻撃が通れば勝ち」を一度も見ていなかった**——**T117（とどめの規則の的中 0.23）と同じ患部**。
+#:
+#: **二重計上ではない**——`Θ` の `λ·L` は「全部でどれだけ要るか」（在庫）、
+#: こちらは「**この 1 本が通ったとき相手が失う額**」（価格）。**同じ要素が水準と価格として 1 回ずつ入る**のは
+#: 突き合わせ表の原則どおり（T133 §1）。
+#:
+#: **新定数ゼロ**（`theta_take` は既にある式・`LAM_BY_LIFE` は実測）。
+#: **渡し忘れは落とす**（T131 で決めた規約——黙って定数に落ちない）。
+SLOPE_TAKE_MODES = ("const", "life")
+SLOPE_TAKE_MODE = "const"
+
+
+def set_slope_take_mode(mode):
+    global SLOPE_TAKE_MODE
+    if mode not in SLOPE_TAKE_MODES:
+        raise ValueError("slope take mode は %s のどれか" % (SLOPE_TAKE_MODES,))
+    SLOPE_TAKE_MODE = mode
+    return SLOPE_TAKE_MODE
+
+
 def theory_slope_parts(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None, with_don=True,
-                       through=None):
+                       through=None, life_opp=None):
     """盤面の速さを **2 つに分けて**返す: `(リーダー, キャラ)`（T95）。
     **規則**——**リーダーは KO されない**（`rules/battle.rs`: リーダーへの攻撃はライフを削る）ので、
     盤面の減衰（`ko_p`）が掛かるのは**キャラの側だけ**。`own_attackers_of` は枠 0（自分のリーダー）を先頭に返す。
@@ -997,17 +1027,24 @@ def theory_slope_parts(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None,
                          "＝黙って 1.0 で走らない（守る席の手札は攻める席の行からは読めない）"
                          % (RATE_THROUGH_MODE,))
     thr = 1.0 if through is None else max(0.0, min(1.0, float(through)))
+    # **T134**: 「受けられたとき」を**守る側のライフ**で読む（`min` の 2 本目の枝）。
+    if SLOPE_TAKE_MODE == "life" and life_opp is None:
+        raise ValueError("SLOPE_TAKE_MODE='life' なのに守る側のライフが渡されていない"
+                         "＝黙って定数に落とさない（`sc[SC_OPP_LIFE]` を渡す）")
+    th_atk = float(theta) if life_opp is None or SLOPE_TAKE_MODE != "life" else \
+        float(theta_take(float(life_opp), theta=theta, mu=mu))
     blk = blockers if (SLOPE_BLOCK_MODE == "on" and blockers) else None
     xs = own_attackers_of(tok, opp_leader_power)
     fn = attack_value_don if with_don else attack_value
-    vals = [fn(float(opp_leader_power) + x, opp_leader_power, True, theta, mu, blockers=blk) for x in xs]
+    vals = [fn(float(opp_leader_power) + x, opp_leader_power, True, th_atk, mu, blockers=blk) for x in xs]
     return (thr * float(vals[0]) if vals else 0.0), thr * float(sum(vals[1:]))
 
 
-def theory_slope(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None):
+def theory_slope(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None, life_opp=None):
     """今の盤面の攻撃手（リーダー＋殴れる体）がリーダーを殴る価格の和＝理論の「1 ターンに積む損害」。
-    `SLOPE_BLOCK_MODE=on` なら**相手のアクティブなブロッカー**も応答に入れる（T92）。"""
-    lead, chars = theory_slope_parts(tok, opp_leader_power, theta, mu, blockers)
+    `SLOPE_BLOCK_MODE=on` なら**相手のアクティブなブロッカー**も応答に入れる（T92）。
+    **T134**: `life_opp` を渡すと「受けられたとき」を守る側のライフで読む。"""
+    lead, chars = theory_slope_parts(tok, opp_leader_power, theta, mu, blockers, life_opp=life_opp)
     return lead + chars
 
 
@@ -1069,7 +1106,8 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     # **T109**: `all` なら盤面は**素殴り**で数え、付与は財布のナップサックの中で買う（二重に数えない）。
     lead, chars = theory_slope_parts(tok_row, olp, theta, mu, blockers=blk,
                                      with_don=(DON_PURSE_MODE not in ("all", "race")),
-                                     through=through)          # **T131**
+                                     through=through,                      # **T131**
+                                     life_opp=float(sc_a[SC_OPP_LIFE]))    # **T134**
     base = lead + chars
     if SLOPE_MODE != "hand":
         return base, 0.0, 0.0, lead, 0.0, 0.0, 0.0, 0.0
@@ -1151,7 +1189,8 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
                                    theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)
     lead0, chars0 = theory_slope_parts(tok_row, olp, theta, mu, blockers=blockers,
                                        with_don=(DON_PURSE_MODE not in ("all", "race")),
-                                       through=through)        # **T131**
+                                       through=through,                    # **T131**
+                                       life_opp=float(sc_a[SC_OPP_LIFE]))  # **T134**
     ds = purse_series(sc, tok_row, jmax)
     r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
     mlp = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
@@ -1635,7 +1674,8 @@ def race_alloc(sc, tok, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU,
     r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
     don = float(sc_a[SC_MY_DON])
     items = HP_hand_items(tok, ci_row, idx2cid, cards, olp, r)
-    lead, chars = theory_slope_parts(tok, olp, theta, mu, with_don=False)
+    lead, chars = theory_slope_parts(tok, olp, theta, mu, with_don=False,
+                                     life_opp=float(sc_a[SC_OPP_LIFE]))   # **T134**
     base_a = lead + chars
     if deck_me:
         import deck_refill as DR
@@ -2678,6 +2718,10 @@ def main(argv=None):
     ap.add_argument("--slope-hand", default=SLOPE_HAND_MODE, choices=SLOPE_HAND_MODES,
                     help="**T93** 速さの手札の項: `stock`（旧・今のドンで出せる体の総額＝在庫）／"
                          "**`flow`（既定**・毎ターン入ってくるぶん＝そのデッキの平均・`deck_refill.a_of`）")
+    ap.add_argument("--slope-take", default=SLOPE_TAKE_MODE, choices=SLOPE_TAKE_MODES,
+                    help="**T134** 攻撃の価格の「受けられたとき」を守る側のライフで読むか: "
+                         "`const`（従来・定数 `Θ`）／**`life`**（`theta_take(ライフ)`＝**他の 4 つの器が既に使っている式**・"
+                         "既定の `TAKE_MODE=lethal` ではライフ 0 のときだけ変わる＝**とどめが見えるようになる**）")
     ap.add_argument("--theta-side", default=THETA_SIDE_MODE, choices=THETA_SIDE_MODES,
                     help="**T133** `Θ` を両席で同じ式にするか: `legacy`（従来・自分の耐久だけ `g × 枚数`）／"
                          "**`symmetric`**（`threshold_parts` と同じ式を鏡に当てる）")
@@ -2749,6 +2793,7 @@ def main(argv=None):
     set_slope_block_mode(a.slope_block)
     set_rate_through_mode(a.rate_through)          # **T131**
     set_theta_side_mode(a.theta_side)              # **T133**
+    set_slope_take_mode(a.slope_take)              # **T134**
     set_slope_hand_mode(a.slope_hand)
     set_rate_walk_mode(a.rate_walk)
     set_rate_decay_mode(a.rate_decay)
