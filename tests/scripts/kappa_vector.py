@@ -175,8 +175,10 @@ def set_scale_clamp(lo_hi):
     return SCALE_CLAMP
 
 
-#: **`theory`（積み上がる歩き・T94）の速さの形**＝席ごとの `(リーダー, 盤面のキャラ, 在庫, 流入)` を
+#: **`theory`（積み上がる歩き・T94）の速さの形**＝席ごとの
+#: `(リーダー, 盤面のキャラ, 在庫, 流入, 在庫の速攻, 流入の速攻, 効果, 在庫の効果)` を
 #: **和が 1 になるよう正規化した割合**。歩きの各項はこの割合 × その席の `A` で作る。
+#: **速攻の 2 つは在庫・流入の内側**なので、和を取る分母には入れない（`_norm_shape`）。
 #:
 #: **なぜ割合で持つか**: 状態は `A` をスカラーで持っている（軸は 4 本のまま）。`ΔA` を割合で配れば
 #: **歩きは `Θ` と `A` を同じだけ倍にしても不変**（＝**P5・通貨の付け替え**が設計から出る）
@@ -188,15 +190,24 @@ def set_scale_clamp(lo_hi):
 #: **P7 は要求として過剰だった**（`curve` で「0 行の破れ」だったのは満たしていたからではなく
 #: `A` が時計に入っていなかったから・T126）。**単位の不変量は P5 の方**であり、そちらは厳密に通る。
 #: （代わりに「出した体は `stock` へ」という T84 の遅れは**この形では表現していない**＝一次の近似・報告で明示する。）
-#: 既定は `(0, 1, 0, 0)`＝全部が盤面＝**一定の速さ**（`tau_grow` が `Θ/A` に退化する）。
-RATE_SHAPE = {"me": (0.0, 1.0, 0.0, 0.0), "opp": (0.0, 1.0, 0.0, 0.0)}
+#: 既定は `(0, 1, 0, 0, 0, 0, 0, 0)`＝全部が盤面＝**一定の速さ**（`tau_grow` が `Θ/A` に退化する）。
+SHAPE_N = 8
+FLAT_SHAPE = (0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+#: 和の分母に入る枠（速攻の 2 つ＝添字 4・5 は在庫・流入の内側なので二重に数えない）
+SHAPE_TOTAL_IX = (0, 1, 2, 3, 6, 7)
+RATE_SHAPE = {"me": FLAT_SHAPE, "opp": FLAT_SHAPE}
 
 
 def _norm_shape(terms):
-    """`(リーダー, 盤面, 在庫, 流入)` を**和が 1 になるよう**正規化（全部 0 なら全部盤面に倒す）。"""
-    v = [max(0.0, float(x)) for x in terms]
-    tot = sum(v)
-    return tuple(x / tot for x in v) if tot > 0.0 else (0.0, 1.0, 0.0, 0.0)
+    """8 つの項を**和が 1 になるよう**正規化（全部 0 なら全部盤面に倒す）。
+
+    項は `(リーダー, 盤面, 在庫, 流入, 在庫の速攻, 流入の速攻, 効果, 在庫の効果)`
+    ——**速攻の 2 つは在庫・流入の内側**（`seat_slope_terms` の規約）なので**分母に入れない**。
+    短い列を渡したら残りは 0 とみなす（旧 4 項の呼び出しをそのまま受ける）。"""
+    v = [max(0.0, float(x)) for x in terms] + [0.0] * SHAPE_N
+    v = v[:SHAPE_N]
+    tot = sum(v[i] for i in SHAPE_TOTAL_IX)
+    return tuple(x / tot for x in v) if tot > 0.0 else FLAT_SHAPE
 
 
 def set_rate_shape(me_terms=None, opp_terms=None):
@@ -211,11 +222,14 @@ def set_rate_shape(me_terms=None, opp_terms=None):
 def tau_theory(theta, rate, shape, j):
     """**積み上がる歩き**（T94）で `Θ` に届くまでのターン数。**表を一切使わない**（加速は状態から出る）。
 
-    `R_k = リーダー ＋ 盤面·(1−ko_p)^{k−1} ＋ 在庫·[k≥2] ＋ 流入·(k−1)`（`crossing_bridge.rate_at`）を
-    `shape × rate` で作って歩く。**`A` について 1 次同次**なので、通貨の付け替えにも
-    両席共通の速さの誤差にも構造的に強い。"""
-    lead, chars, stock, flow = (float(x) * max(0.0, float(rate)) for x in shape)
+    `R_k = リーダー ＋ 盤面·(1−ko_p)^{k−1} ＋ 在庫·[k≥2] ＋ 流入·(k−1) ＋ 効果 ＋ 在庫の効果·[k≤1]`
+    （`crossing_bridge.rate_at`・速攻は 1 ターン早く積む）を `shape × rate` で作って歩く。
+    **`A` について 1 次同次**なので、通貨の付け替えにも両席共通の速さの誤差にも構造的に強い。"""
+    sh = list(shape) + [0.0] * SHAPE_N
+    lead, chars, stock, flow, s_rush, f_rush, eff, eff1 = (
+        float(x) * max(0.0, float(rate)) for x in sh[:SHAPE_N])
     return float(CB.tau_grow(max(0.0, float(theta)), lead, chars, stock, flow,
+                             stock_rush=s_rush, flow_rush=f_rush, eff=eff, eff_once=eff1,
                              j0=int(j) + 1))
 
 
@@ -304,15 +318,48 @@ def grad_of(st, prof=None):
     return g
 
 
-def rate_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU):
-    """その席の **A**（1 自席ターンに積む損害）。**橋と同じ `seat_slope`**（`SLOPE_*` の既定に従う）。
+def rate_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=None, j=None):
+    """その席の **A**（1 自席ターンに積む損害）。**橋の `slope_theory` と同じ式**（T128）。
+
+    ```
+    A = 盤面 ＋ 手札の項（`SLOPE_HAND_MODE`）＋ 効果の流入 ＋ 在庫の効果
+    ```
+
+    **`deck_ids` を必ず渡す**（T128）——既定の `SLOPE_HAND_MODE=flow`／`SLOPE_EFFECT_MODE=hand`
+    では**流入と効果の項がデッキの中身から出る**ので、渡さないと `A` が**盤面だけ**になる。
+    2026-09-20 に実測: 渡さないと `A` は `j` によらずほぼ一定（0.055）で、
+    橋の実測（`j=5` で 0.204）に対し**伸びが丸ごと消える**。
+    `j`（自席ターン番号・0 始まり）を渡すと **T103 の規則**（最初の自席ターンは 1 本も打てない）も
+    橋と同じく適用する。
 
     **必ずその席のターンの「最初の行」で呼ぶ**——ターン途中の行では殴り終わった体の
     `CAN_ATTACK` が落ちていて `A` がほぼ 0 になり、`τ = Θ/A` が数百ターンに飛ぶ（実測）。
     橋も `turn_start[(w, t)]` で読んでいる（`crossing_bridge.collect`）。"""
-    sc = np.asarray(sc); tok = np.asarray(tok)
-    olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-    return float(CB.seat_slope(sc, tok, ci_row, idx2cid, cards, olp, theta, mu))
+    if j is not None and CB.RATE_T1_MODE == "on" and int(j) == 0:
+        return 0.0
+    lead, chars, stock, flow, _sr, _fr, eff, eff1 = rate_terms_of_row(
+        sc, tok, ci_row, idx2cid, cards, theta, mu, deck_ids=deck_ids)
+    hand = stock if CB.SLOPE_HAND_MODE == "stock" else flow
+    return float(lead + chars + hand + eff + eff1)
+
+
+def _seat_decks(dirs):
+    """記録から `{seed: (デッキ p1, デッキ p2)}` を引く（**T128**・`A` の流入と効果の材料）。
+
+    **橋と同じ解決**（`crossing_bridge.collect`）。引けなければ `None` を返さず**落とす**
+    ——黙って `A` が盤面だけに落ちると、伸びが丸ごと消えたまま数字が出てしまう（2026-09-20 の実害）。"""
+    import deck_refill as DR
+    sd = DR.decks_by_seed(dirs)
+    if not sd:
+        raise ValueError("デッキが引けない＝`A` の流入・効果の項が作れない（%s）" % (dirs,))
+    return sd
+
+
+def _deck_of(seat_decks, seed, w):
+    """`(seed, 席)` → その席のデッキの card id 列（無ければ `None`）。"""
+    if not seat_decks:
+        return None
+    return (seat_decks.get(int(seed)) or (None, None))[int(w)]
 
 
 def g_of_row(sc, tok, ci_row, idx2cid, cards):
@@ -324,16 +371,20 @@ def g_of_row(sc, tok, ci_row, idx2cid, cards):
     return CB.hand_price_mean(sc, tok, ci_row, idx2cid, cards, part=part)
 
 
-def rate_terms_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU):
-    """その席の**速さの内訳** `(リーダー, 盤面のキャラ, 在庫, 流入)`（T94・`seat_slope_terms` の頭 4 つ）。
+def rate_terms_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=None):
+    """その席の**速さの内訳** 8 項
+    `(リーダー, 盤面のキャラ, 在庫, 流入, 在庫の速攻, 流入の速攻, 効果, 在庫の効果)`
+    （T94／T103／T105／T108・`seat_slope_terms` の並べ替え）。
 
+    **`deck_ids` を必ず渡す**（T128・`rate_of_row` の注記と同じ）——流入・効果はデッキの中身から出る。
     **`rate_of_row` と同じ行（その席のターンの最初の行）で呼ぶ。** 返すのは生の額で、
-    使う側は `set_rate_shape` で割合に正規化する。"""
+    使う側は `set_rate_shape` で割合に正規化する（**速攻の 2 つは在庫・流入の内側**）。"""
     sc = np.asarray(sc); tok = np.asarray(tok)
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-    base, stock, flow, lead = CB.seat_slope_terms(sc, tok, ci_row, idx2cid, cards, olp, theta, mu,
-                                                  want_stock=True)[:4]
-    return (float(lead), max(0.0, float(base) - float(lead)), float(stock), float(flow))
+    base, stock, flow, lead, s_rush, f_rush, eff, eff1 = CB.seat_slope_terms(
+        sc, tok, ci_row, idx2cid, cards, olp, theta, mu, deck_ids=deck_ids, want_stock=True)
+    return (float(lead), max(0.0, float(base) - float(lead)), float(stock), float(flow),
+            float(s_rush), float(f_rush), float(eff), float(eff1))
 
 
 def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None):
@@ -454,6 +505,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
         if sr is None:
             raise ValueError("W_ERR_MODE=rel なのに σ_rel が引けない＝黙って abs に落とさない")
         TO.set_sigma_rel(sr)
+    # **T128**: `A` の流入・効果の項は**デッキの中身から出る**（`SLOPE_HAND_MODE=flow`／
+    # `SLOPE_EFFECT_MODE=hand`）。渡さないと `A` が**盤面だけ**になり、伸びが丸ごと消える。
+    seat_decks = _seat_decks(dirs)
     arms = {k: [] for k in ("flat", "scalar", "vector", "exact", "exactw",
                             "plac_axis", "plac_mag")}
     zs = []
@@ -472,16 +526,19 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
         # **1 周目**: 席ごとに「その自席ターンの**最初の**決定行」から `A` を作る（橋と同じ `turn_start`）。
         rate_at_turn, g_at_turn = {}, {}
         shape_at = {}
+        seed_g = int(r["seed"][idx[0]]) if len(idx) else -1
         for i in idx:
             if int(r["kind"][i]) != 0:
                 continue
             w, t = int(r["who"][i]), int(r["turn"][i])
             if PL.is_own_turn(w, t) and (w, t) not in rate_at_turn:
+                dk = _deck_of(seat_decks, seed_g, w)             # **T128**
                 rate_at_turn[(w, t)] = rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
-                                                   idx2cid, cards, theta, mu)
+                                                   idx2cid, cards, theta, mu, deck_ids=dk,
+                                                   j=CB.own_turn_index(t))
                 g_at_turn[(w, t)] = g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
                 shape_at[(w, t)] = (rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
-                                                       idx2cid, cards, theta, mu)
+                                                       idx2cid, cards, theta, mu, deck_ids=dk)
                                        if D_MODE == "theory" else None)
 
         def _opp_at(w, t):

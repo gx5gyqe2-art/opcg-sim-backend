@@ -1008,20 +1008,27 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
             att[i], attl[i] = float(pl["attach"]), float(pl["attach_lead"])
             paid[i] = float(pl.get("paid") or 0.0)
             e1[i] = float(pl["eff"]) if SLOPE_EFFECT_MODE == "hand" else 0.0
+    # **T128**: 盤面が `ko_p` で失われる（T95）。**列を作る道でも効くようにした**——
+    # `rate_at` は `sched` が在ると**先頭で返す**ので、`RATE_DON_MODE != "off"`（2026-09-19 から既定）の
+    # 下では **`RATE_DECAY_MODE=ko` が 1 ビットも効いていなかった**（2026-09-20 に実測で確認・
+    # `--rate-decay ko` の出力が既定とバイト一致）。**既定は `off` のままなので値は動かない**。
+    # **リーダーは KO されないので減衰しない**（T95）・**効果は体ではないので減衰しない**（`rate_at` と同じ）。
+    q = 1.0 - max(0.0, min(1.0, float(KO_P))) if RATE_DECAY_MODE == "ko" else 1.0
     out = []
     for j in range(1, jmax + 1):
         if RATE_T1_MODE == "on" and j <= 1:
             out.append(0.0)
             continue
         lead = lead0 + attl[j]
-        val = lead + chars0 + att[j]
+        val = lead + (chars0 + att[j]) * (q ** (j - 1))
         # 在庫: 速攻は出したターンから・素の体は翌ターンから（T84／T103）＝**増分を段ごとに積む**
+        # （`i` 段で入った体は `j` では `j − i` ターン場に居た＝`rate_at` と同じ数え方）
         for i in range(1, j + 1):
             dr = max(0.0, rush[i] - rush[i - 1])
-            val += dr if RATE_RUSH_MODE == "on" else 0.0
+            val += dr * (q ** (j - i)) if RATE_RUSH_MODE == "on" else 0.0
             if i <= j - 1:
                 da = max(0.0, (atk[i] - atk[i - 1]) - (dr if RATE_RUSH_MODE == "on" else 0.0))
-                val += da
+                val += da * (q ** (j - i - 1))
         # 流入: 引いた 1 枚を**その時点のドン**で読む（払わせるなら残ったドンで絞る）
         for i in range(1, j + 1):
             d_i = ds[min(i, len(ds)) - 1]
@@ -1030,9 +1037,9 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
                 continue
             f = float(DR.a_of(deck_ids, olp, don_i, theta, mu))
             fr = float(DR.a_of(deck_ids, olp, don_i, theta, mu, rush_only=True)) if RATE_RUSH_MODE == "on" else 0.0
-            val += fr if i <= j else 0.0
+            val += fr * (q ** (j - i)) if i <= j else 0.0
             if i <= j - 1:
-                val += max(0.0, f - fr)
+                val += max(0.0, f - fr) * (q ** (j - i - 1))
         if deck_ids and SLOPE_EFFECT_MODE in ("on", "hand"):
             d_j = ds[min(j, len(ds)) - 1]
             val += float(DR.e_of(deck_ids, mlp, r, max(0.0, d_j - paid[j]) if RATE_DON_PAY else d_j))

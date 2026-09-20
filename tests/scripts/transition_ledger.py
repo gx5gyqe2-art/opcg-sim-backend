@@ -212,6 +212,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
     if sr is None:
         raise ValueError("σ_rel が引けない＝黙って別の物差しに落とさない（T118 の規約）")
     TO.set_sigma_rel(sr)
+    seat_decks = KV._seat_decks(dirs)     # **T128**: `A` の流入・効果はデッキの中身から出る
     acc = {"gap": 0.0, "gap_abs": 0.0, "priced": 0.0, "priced_abs": 0.0,
            "resid": 0.0, "resid_abs": 0.0,
            "by_axis": {a: 0.0 for a in AXES5}, "by_axis_abs": {a: 0.0 for a in AXES5},
@@ -236,23 +237,27 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
         # 席ごとの速さ（その席の自席ターンの**最初の行**から・`crossing_bridge` の `turn_start` と同じ規約）
         rate_at, g_at, sched_at = {}, {}, {}
         shape_at = {}
+        seed_g = int(r["seed"][idx[0]]) if len(idx) else -1
         for i in idx:
             if int(r["kind"][i]) != 0:
                 continue
             w, t = int(r["who"][i]), int(r["turn"][i])
             if PL.is_own_turn(w, t) and (w, t) not in rate_at:
+                dk = KV._deck_of(seat_decks, seed_g, w)            # **T128**
                 rate_at[(w, t)] = KV.rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
-                                                 idx2cid, cards, theta, mu)
+                                                 idx2cid, cards, theta, mu, deck_ids=dk,
+                                                 j=CB.own_turn_index(t))
                 g_at[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
                 shape_at[(w, t)] = (KV.rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
-                                                       idx2cid, cards, theta, mu)
+                                                       idx2cid, cards, theta, mu, deck_ids=dk)
                                        if KV.D_MODE == "theory" else None)
                 sched_at[(w, t)] = None
                 if BOUNDARY_MODE in ("rules", "don") and CB.RATE_DON_MODE != "off":
                     _sc, _tok, _ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
                     _olp = float(np.asarray(_sc)[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
                     sched_at[(w, t)] = CB.seat_slope_sched(_sc, _tok, _ci, idx2cid, cards, _olp,
-                                                          theta, mu, jmax=int(CB.RACE_CAP))
+                                                          theta, mu, deck_ids=dk,
+                                                          jmax=int(CB.RACE_CAP))
 
         def _latest(w, t):
             ts = [tt for (ww, tt) in rate_at if ww == w and tt <= t]

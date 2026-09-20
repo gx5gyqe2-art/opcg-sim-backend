@@ -227,6 +227,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
     if sr is None:
         raise ValueError("σ_rel が引けない＝黙って別の物差しに落とさない（T118 の規約）")
     TO.set_sigma_rel(sr)
+    seat_decks = KV._seat_decks(dirs)     # **T128**: `A` の流入・効果はデッキの中身から出る
     arms = {k: [] for k in ARMS}
     # **決着帯を外した帯**（最後の自席ターンを落とす）＝勝敗がまだ決まっていない所での判別
     before = {k: [] for k in ARMS}
@@ -255,16 +256,19 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
         z_of_seat = {}
         rate_at_turn, g_at_turn = {}, {}
         shape_at = {}
+        seed_g = int(r["seed"][idx[0]]) if len(idx) else -1
         for i in idx:
             if int(r["kind"][i]) != 0:
                 continue
             w, t = int(r["who"][i]), int(r["turn"][i])
             if PL.is_own_turn(w, t) and (w, t) not in rate_at_turn:
+                dk = KV._deck_of(seat_decks, seed_g, w)            # **T128**
                 rate_at_turn[(w, t)] = KV.rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
-                                                      idx2cid, cards, theta, mu) * float(scale_a)
+                                                      idx2cid, cards, theta, mu, deck_ids=dk,
+                                                      j=CB.own_turn_index(t)) * float(scale_a)
                 g_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
                 shape_at[(w, t)] = (KV.rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
-                                                       idx2cid, cards, theta, mu)
+                                                       idx2cid, cards, theta, mu, deck_ids=dk)
                                        if KV.D_MODE == "theory" else None)
         last_turn_of = {}
         for (w, t) in rate_at_turn:

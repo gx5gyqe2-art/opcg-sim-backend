@@ -501,8 +501,56 @@ def test_theory_is_a_fourth_reading_with_all_four_axes_live():
 def test_rate_shape_is_normalised_to_one(_shape):
     KV.set_rate_shape((1.0, 2.0, 1.0, 0.0), (0.0, 0.0, 0.0, 0.0))
     assert sum(KV.RATE_SHAPE["me"]) == pytest.approx(1.0)
-    assert KV.RATE_SHAPE["me"] == pytest.approx((0.25, 0.5, 0.25, 0.0))
-    assert KV.RATE_SHAPE["opp"] == (0.0, 1.0, 0.0, 0.0)      # 全部 0 なら盤面に倒す
+    # **短い列は残りを 0 とみなす**（旧 4 項の呼び出しをそのまま受ける）
+    assert KV.RATE_SHAPE["me"] == pytest.approx((0.25, 0.5, 0.25, 0.0, 0.0, 0.0, 0.0, 0.0))
+    assert KV.RATE_SHAPE["opp"] == KV.FLAT_SHAPE             # 全部 0 なら盤面に倒す
+
+
+def test_rate_shape_does_not_double_count_the_rush_terms():
+    """**T128**: 速攻の 2 つ（添字 4・5）は**在庫・流入の内側**なので和の分母に入れない。"""
+    # 盤面 1・在庫 1（うち速攻 1）＝総額は 2 であって 3 ではない
+    sh = KV._norm_shape((0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0))
+    assert sh[1] == pytest.approx(0.5) and sh[2] == pytest.approx(0.5)
+    assert sh[4] == pytest.approx(0.5)                       # 速攻も同じ分母で割る
+    assert sum(sh[i] for i in KV.SHAPE_TOTAL_IX) == pytest.approx(1.0)
+
+
+def test_rate_shape_carries_the_effect_terms():
+    """**T128**: 効果（添字 6）と在庫の効果（添字 7）は**分母に入る**（`A` の一部）。"""
+    sh = KV._norm_shape((0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 2.0, 1.0))
+    assert sh == pytest.approx((0.0, 0.25, 0.0, 0.0, 0.0, 0.0, 0.5, 0.25))
+
+
+def test_rate_of_row_includes_the_deck_inflow_and_the_effect_terms(monkeypatch):
+    """**T128**: `deck_ids` を渡さないと `A` は**盤面だけ**になる（伸びが丸ごと消える実害）。"""
+    import deck_refill as DR
+    sc, tok = _ctx()
+    board = KV.rate_of_row(sc, tok, None, {}, None)                       # 渡さない＝盤面だけ
+    monkeypatch.setattr(DR, "a_of", lambda *a, **k: 0.0 if k.get("rush_only") else 0.07)
+    monkeypatch.setattr(DR, "e_of", lambda *a, **k: 0.02)
+    got = KV.rate_of_row(sc, tok, None, {}, None, deck_ids=["X"] * 50)
+    assert got == pytest.approx(board + 0.09)                             # 流入 0.07 ＋ 効果 0.02
+
+
+def test_rate_of_row_obeys_the_first_own_turn_rule():
+    """**T103**: 最初の自席ターンは 1 本も打てない（規則）＝橋の `slope_theory` と同じ扱い。"""
+    sc, tok = _ctx()
+    assert KV.rate_of_row(sc, tok, None, {}, None, j=0) == 0.0
+    assert KV.rate_of_row(sc, tok, None, {}, None, j=1) == KV.rate_of_row(sc, tok, None, {}, None)
+
+
+def test_rate_terms_of_row_returns_all_eight_terms():
+    sc, tok = _ctx()
+    terms = KV.rate_terms_of_row(sc, tok, None, {}, None)
+    assert len(terms) == KV.SHAPE_N
+
+
+def test_deck_of_picks_the_seats_own_deck():
+    seat_decks = {7: (["a"], ["b"])}
+    assert KV._deck_of(seat_decks, 7, 0) == ["a"]
+    assert KV._deck_of(seat_decks, 7, 1) == ["b"]
+    assert KV._deck_of(seat_decks, 8, 0) is None            # 知らない seed は None
+    assert KV._deck_of(None, 7, 0) is None
 
 
 def test_theory_uses_no_table_at_all(_shape):

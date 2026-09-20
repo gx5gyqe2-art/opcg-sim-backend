@@ -410,6 +410,32 @@ def test_the_board_can_decay_but_the_leader_never_does():
         CB.set_rate_decay_mode("off")
 
 
+def test_the_decay_also_bites_on_the_scheduled_path():
+    """**T128**（2026-09-20）: **列を作る道でも減衰が効く**。
+
+    `rate_at` は `sched` が在ると**先頭で返す**ので、**`RATE_DON_MODE != "off"`（既定）の下では
+    `RATE_DECAY_MODE=ko` が 1 ビットも効いていなかった**（`--rate-decay ko` の出力が既定とバイト一致）。
+    **切替が名乗ったことをするか**をここで固定する（既定は `off` なので出荷の値は動かない）。
+    """
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, T.S_POWER] = 0.5                       # リーダー 5000（KO されない＝減衰しない）
+    s0 = T.SLOT_OWN_FIELD.start                           # 盤面のキャラ 1 体（殴れる）
+    tok[s0, T.S_POWER], tok[s0, T.S_IS_CHAR], tok[s0, T.S_CAN_ATTACK] = 0.6, 1.0, 1.0
+    sc = _sc(3, 4)
+    base = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6)
+    try:
+        CB.set_rate_decay_mode("ko")
+        dec = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6)
+    finally:
+        CB.set_rate_decay_mode("off")
+    assert base[0] == dec[0] == 0.0                       # 最初の自席ターンは規則で 0（T103）
+    assert dec[1] < base[1]                               # 2 段目からは盤面が減っている
+    assert all(d <= b + 1e-12 for d, b in zip(dec, base))  # どの段でも増えない
+    assert dec[-1] < base[-1] * 0.9                       # 先へ行くほど差が開く
+    # **既定では何も変わらない**（切替を入れなければ出荷の値はそのまま）
+    assert CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6) == base
+
+
 def test_the_rate_terms_are_separate_quantities():
     """`seat_slope_terms` は `(盤面, 在庫, 流入, リーダー, 在庫の速攻, 流入の速攻, 効果)`（T103／T105 で末尾が増えた）。
     **在庫は要求したときだけ計算する**（重いので）。"""
