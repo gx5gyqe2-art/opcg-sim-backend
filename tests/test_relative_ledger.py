@@ -279,3 +279,34 @@ def test_kappa_sigma_match_falls_back_when_the_clocks_are_missing():
 def test_flat_mode_is_still_exactly_one():
     TO.set_kappa_sigma_mode("match")
     assert TO.state_factor(1.0, "flat", t_me=3.0, t_opp=9.0) == 1.0
+
+
+def test_the_ledger_exposes_both_seat_switches_and_they_reach_the_module(monkeypatch):
+    """**T134**: **切替が器の側に無いと「動かなかった」を誤って読む**——本 T で実際に踏んだ
+    （`--theta-side` だけ渡した測定を「①＋③」と名付けていた）。**帳簿にも両方在ることを固定する。**"""
+    import crossing_bridge as CB                       # noqa: PLC0415
+    a = RL.build_parser().parse_args(["--in", "x", "--theta-side", "symmetric",
+                                      "--slope-take", "life"])
+    assert (a.theta_side, a.slope_take) == ("symmetric", "life")
+    monkeypatch.setattr(RL, "collect", lambda *args, **kw: {})
+    try:
+        RL.main(["--in", "x", "--theta-side", "symmetric", "--slope-take", "life"])
+        assert (CB.THETA_SIDE_MODE, CB.SLOPE_TAKE_MODE) == ("symmetric", "life")
+    finally:
+        CB.set_theta_side_mode("legacy")
+        CB.set_slope_take_mode("const")
+
+
+def test_the_curve_reading_cannot_measure_a_switch_that_only_moves_the_rate():
+    """**T134 の教訓**: 既定の `D_MODE=curve` は**速さの軸を持たない**（`d_of` は `a_me`／`a_opp` を
+    一度も読まない）＝**`A` だけを動かす切替は帳簿の既定では厳密に 0**。**「動かなかった」を
+    「効かなかった」と読まないための固定**（`--d-mode theory` で測ること）。"""
+    KV.set_d_mode("curve")
+    prof = {1: 0.1, 2: 0.2, 3: 0.3, 4: 0.4, 5: 0.5}
+    st_slow = (1.0, 1.0, 0.05, 0.05, 2)
+    st_fast = (1.0, 1.0, 5.00, 5.00, 2)
+    assert KV.d_of(st_slow, prof) == KV.d_of(st_fast, prof)
+    KV.set_d_mode("theory")
+    KV.set_rate_shape(None, None)
+    assert KV.d_of((1.0, 2.0, 0.05, 0.05, 2)) != KV.d_of((1.0, 2.0, 5.00, 0.05, 2))
+    KV.set_d_mode("curve")

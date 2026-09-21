@@ -400,7 +400,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
     return out
 
 
-def main(argv=None):
+def build_parser():
+    """**T134**: 引数の組み立てを分ける——**切替が器に無いと「動かなかった」を誤って読む**ので、
+    テストから**同じ parser を見て**居ることを確かめられるようにする（本 T で実際に踏んだ）。"""
     ap = argparse.ArgumentParser(description="紐付けの法則を測る（T122）")
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
@@ -409,18 +411,26 @@ def main(argv=None):
                     help="**T122/§17.9.6-1**: κ の物差しを W に合わせるか（既定は現状の `abs`）")
     ap.add_argument("--theta-side", dest="theta_side", choices=CB.THETA_SIDE_MODES, default=None,
                     help="**T133**: `Θ` を両席で同じ式にするか（既定は現状の `legacy`）")
+    ap.add_argument("--slope-take", dest="slope_take", choices=CB.SLOPE_TAKE_MODES, default=None,
+                    help="**T134**: `A` の「受ける費用」を自分のライフで決めるか（既定は現状の `const`）")
     ap.add_argument("--scale-a", type=float, default=1.0, help="**P7**: 両席の A に共通の掛け算誤差")
     ap.add_argument("--scale-currency", type=float, default=1.0, help="**P5**: 耐久と価格を同時に c 倍")
     ap.add_argument("--scale-clamp", dest="clamp", default="",
                     help="**診断用**（例 0.5,2）: `curve_scaled` の倍率を締める。モデルの提案ではない")
     ap.add_argument("--json", default="")
-    a = ap.parse_args(argv)
+    return ap
+
+
+def main(argv=None):
+    a = build_parser().parse_args(argv)
     if a.d_mode:
         KV.set_d_mode(a.d_mode)
     if a.kappa_sigma:
         TO.set_kappa_sigma_mode(a.kappa_sigma)
     if a.theta_side:
         CB.set_theta_side_mode(a.theta_side)          # **T133**
+    if a.slope_take:
+        CB.set_slope_take_mode(a.slope_take)          # **T134**
     if a.clamp:
         KV.set_scale_clamp([float(x) for x in a.clamp.split(",")])
     out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency)
