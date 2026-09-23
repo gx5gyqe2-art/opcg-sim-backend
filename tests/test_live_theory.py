@@ -106,7 +106,7 @@ def test_raw_candidates_builds_sig_cid_slot_and_k_from_legal_and_index():
     assert c["sig"] == LT.RG.move_sig(legal[0])
     assert c["cid"] == "OP01-001" and c["tcid"] == "OP02-002"
     assert c["si"] == 3 and c["ti"] == 9
-    assert c["k"] == 1
+    assert c["k"] == 1 and c["k_raw"] == 1
     assert c["n"] == pytest.approx(3.0) and c["q"] == pytest.approx(0.5)
 
 
@@ -115,7 +115,9 @@ def test_raw_candidates_missing_target_gives_none_tcid_and_default_slot():
     out = {"kind": "main", "groups": [{"rep": 0, "n": 1.0, "q": 0.0}], "stats": {"legal": legal}}
     game = _FakeGame(dump_index={"cids": {"u1": "OP01-001"}, "slots": {"u1": 5}})
     c = LT.raw_candidates(game, "p1", out)[0]
-    assert c["tcid"] is None and c["ti"] == -1 and c["k"] == -1
+    assert c["tcid"] is None and c["ti"] == -1
+    # `k`（`score_candidate` 向け）は -1 化・`k_raw`（照合向け）は生の `None` のまま——別の意味なので混ぜない
+    assert c["k"] == -1 and c["k_raw"] is None
 
 
 def test_raw_candidates_resolves_select_effect_source_from_pending():

@@ -123,7 +123,12 @@ def raw_candidates(game, name, out):
         gk = RG._don_k(rep)
         cands.append({"sig": sig, "cid": cids.get(su) or None, "tcid": (cids.get(tu) or None) if tu else None,
                      "si": slots.get(su, -1) if su else -1, "ti": slots.get(tu, -1) if tu else -1,
-                     "k": -1 if gk is None else int(gk), "n": float(g["n"]), "q": float(g["q"])})
+                     # **`k`**＝記録の `pol_k` と同じ規約（`-1`＝DON_BOX でない・`score_candidate` の既定回避）。
+                     # **`k_raw`**＝`RG._don_k` の生の値（`None` もありうる）——`record_gen.__call__` が
+                     # 実際に選んだ候補を照合するのに使うのはこちら（`out.get("k")` と `None` どうしも
+                     # 一致させる必要があるため・T141 の `find_chosen` が使う）。
+                     "k": -1 if gk is None else int(gk), "k_raw": gk,
+                     "n": float(g["n"]), "q": float(g["q"])})
     return cands
 
 
