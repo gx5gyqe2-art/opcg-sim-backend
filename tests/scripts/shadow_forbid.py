@@ -134,6 +134,9 @@ def shadow_row(sc, tok, ci, cards, idx2cid, cands, out, move, theta=THETA, mu=MU
            "s_cast": s_cast, "forbidden_cast": (bool(s_cast < -TOL) if s_cast is not None else None),
            "played_family": move_family(cands[chosen]["sig"]),
            "best_family": move_family(cands[best_i]["sig"]),
+           # `cands` への index（`chosen`＝実際に選んだ候補・`best_index`＝理論の最善）。
+           # **T142** が「置き換える」ときに `out["groups"][best_index]["rep"]` から実際の手を引くのに使う。
+           "chosen_index": chosen, "best_index": best_i,
            "n_cands": len(scored)}
 
 
