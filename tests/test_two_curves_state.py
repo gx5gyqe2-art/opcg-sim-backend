@@ -117,6 +117,70 @@ def test_state_by_turn_ignores_rows_with_kind_not_zero(monkeypatch):
     assert set(out.keys()) == {(1, 2)}
 
 
+def test_state_by_turn_adds_no_parts_by_default(monkeypatch):
+    """**T143**: `with_parts` の既定は `False`＝従来の 8 量だけ（T137c の表は 1 ビットも動かない）。"""
+    entries = [(0, 1, 0), (1, 2, 0)]
+    rows, ex, idx = _rows_ex(entries)
+    monkeypatch.setattr(TS.KV, "_deck_of", lambda *a, **k: None)
+    monkeypatch.setattr(TS.KV, "rate_of_row", lambda *a, **k: 1.0)
+    monkeypatch.setattr(TS.KV, "g_of_row", lambda *a, **k: None)
+    monkeypatch.setattr(TS.KV, "state_of_row", lambda sc, tok, a_me, a_opp, j, g_me=None, g_opp=None:
+                        (0.0, 0.0, a_me, a_opp, j))
+    monkeypatch.setattr(TS.CB, "threshold_parts",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("呼ばれてはいけない")))
+    out = TS.state_by_turn(rows, ex, idx, object(), {}, {}, seed_g=1)
+    assert set(out[(1, 2)].keys()) == set(TS.STATE_KEYS)
+
+
+def test_state_by_turn_parts_use_the_same_row_and_the_opponents_hand_price(monkeypatch):
+    """**T143**: 3 項は**同じ行**の `sc`／`tok` と、`th_opp` に渡したのと**同じ相手の手札価格**で割る。"""
+    entries = [(0, 1, 0), (1, 2, 0)]
+    rows, ex, idx = _rows_ex(entries)
+    g_by_id = {id(ex["sc"][0]): 0.031, id(ex["sc"][1]): 0.047}
+    calls = []
+    monkeypatch.setattr(TS.KV, "_deck_of", lambda *a, **k: None)
+    monkeypatch.setattr(TS.KV, "rate_of_row", lambda *a, **k: 1.0)
+    monkeypatch.setattr(TS.KV, "g_of_row", lambda sc, *a, **k: g_by_id[id(sc)])
+    monkeypatch.setattr(TS.KV, "state_of_row", lambda sc, tok, a_me, a_opp, j, g_me=None, g_opp=None:
+                        (0.0, 0.3, a_me, a_opp, j))
+
+    def fake_parts(sc, tok, g_hand=None):
+        calls.append((id(sc), id(tok), g_hand))
+        return (0.1362, 0.11, 0.0538)
+
+    monkeypatch.setattr(TS.CB, "threshold_parts", fake_parts)
+    out = TS.state_by_turn(rows, ex, idx, object(), {}, {}, seed_g=1, with_parts=True)
+    st = out[(1, 2)]
+    # 席1の t=2 の行（ex の 1 番）と、相手（席0）の直近の自席ターン（t=1・ex の 0 番）の手札価格
+    assert calls == [(id(ex["sc"][1]), id(ex["tok"][1]), pytest.approx(0.031))]
+    assert (st["th_opp_life"], st["th_opp_hand"], st["th_opp_body"]) == pytest.approx((0.1362, 0.11, 0.0538))
+
+
+def test_state_by_turn_parts_sum_back_to_th_opp_on_a_real_board(monkeypatch):
+    """**T143 の恒等式**: 本物の `state_of_row`／`threshold_parts` で、**3 項の和 = `th_opp`**（ビット一致）。
+    盤面は相手のライフ 2・手札 4・場のブロッカー 1 体（`THETA_HAND_MODE` などは出荷既定のまま）。"""
+    entries = [(0, 1, 0), (1, 2, 0)]
+    rows, ex, idx = _rows_ex(entries)
+    sc = _sc(life_me=3.0, life_opp=2.0, hand_me=5.0, hand_opp=4.0)
+    sc[TO.SC_MY_LEADER_POWER] = 0.5; sc[TO.SC_OPP_LEADER_POWER] = 0.5
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, TO.S_POWER] = 0.5; tok[1, TO.S_POWER] = 0.5
+    s_opp = TO.SLOT_OPP_FIELD.start
+    tok[s_opp, TO.S_POWER], tok[s_opp, TO.S_IS_CHAR], tok[s_opp, TO.S_IS_BLOCKER] = 0.4, 1.0, 1.0
+    s_own = TO.SLOT_OWN_FIELD.start
+    tok[s_own, TO.S_POWER], tok[s_own, TO.S_IS_CHAR], tok[s_own, TO.S_CAN_ATTACK] = 0.7, 1.0, 1.0
+    ex["sc"][1], ex["tok"][1] = sc, tok
+    monkeypatch.setattr(TS.KV, "_deck_of", lambda *a, **k: None)
+    monkeypatch.setattr(TS.KV, "rate_of_row", lambda *a, **k: 0.1)
+    monkeypatch.setattr(TS.KV, "g_of_row", lambda *a, **k: 0.04)
+    out = TS.state_by_turn(rows, ex, idx, object(), {}, {}, seed_g=1, with_parts=True)
+    st = out[(1, 2)]
+    parts = st["th_opp_life"] + st["th_opp_hand"] + st["th_opp_body"]
+    assert parts == st["th_opp"]                                   # 同じ 3 つの浮動小数を同じ順に足す
+    assert st["th_opp_life"] == pytest.approx(TO.LAM * 2.0)       # ライフの項は λ × 相手のライフ
+    assert st["th_opp_body"] > 0.0                                 # アクティブなブロッカー 1 体
+
+
 # ---- 2. collect ---------------------------------------------------------------------------------
 
 def test_collect_matches_dump_and_state_by_seed_and_turn(monkeypatch):

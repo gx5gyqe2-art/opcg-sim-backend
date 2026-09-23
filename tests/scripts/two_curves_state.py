@@ -59,12 +59,16 @@ from theory_order import MU, SC_MY_HAND, SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LIFE, T
 STATE_KEYS = ("th_me", "th_opp", "a_me", "a_opp", "life_me", "life_opp", "hand_me", "hand_opp")
 
 
-def state_by_turn(rows, ex, idx, cards, idx2cid, seat_decks, seed_g, theta=THETA, mu=MU):
+def state_by_turn(rows, ex, idx, cards, idx2cid, seat_decks, seed_g, theta=THETA, mu=MU, with_parts=False):
     """局 1 本ぶんの `(w, t)`（自席ターン・その最初の `kind=0` 行）→ 状態 dict（8 量）。
 
     **`kappa_vector.collect` の一次通過と同じ規約**——`A` はその席のターンの最初の行から
     （`rate_of_row` の注記どおり）・相手の `A`／手札価格は**相手の直近の自席ターン**から読む
-    （`_opp_at` と同じ形）。相手がまだ 1 ターンも打っていない席は state が無い（`None` を返さず省く）。"""
+    （`_opp_at` と同じ形）。相手がまだ 1 ターンも打っていない席は state が無い（`None` を返さず省く）。
+
+    **T143**: `with_parts=True` なら `th_opp` を**同じ引数の `crossing_bridge.threshold_parts`**
+    で 3 項（`th_opp_life`／`th_opp_hand`／`th_opp_body`）にも割って添える
+    （`threshold` は `threshold_parts` の和なので**足すと `th_opp` に戻る**）。"""
     rate_at_turn, g_at_turn, first_row = {}, {}, {}
     for i in idx:
         if int(rows["kind"][i]) != 0:
@@ -98,6 +102,10 @@ def state_by_turn(rows, ex, idx, cards, idx2cid, seat_decks, seed_g, theta=THETA
         out[(w, t)] = {"th_me": th_me, "th_opp": th_opp, "a_me": a_me2, "a_opp": a_opp2,
                        "life_me": float(sc_a[SC_MY_LIFE]), "life_opp": float(sc_a[SC_OPP_LIFE]),
                        "hand_me": float(sc_a[SC_MY_HAND]), "hand_opp": float(sc_a[SC_OPP_HAND])}
+        if with_parts:
+            p_life, p_hand, p_body = CB.threshold_parts(sc, tok, g_hand=g_opp)
+            out[(w, t)].update({"th_opp_life": float(p_life), "th_opp_hand": float(p_hand),
+                                "th_opp_body": float(p_body)})
     return out
 
 

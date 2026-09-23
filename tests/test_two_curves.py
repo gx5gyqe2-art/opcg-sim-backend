@@ -168,6 +168,26 @@ def test_two_curves_family_breakdown_sums_to_the_turn_total(monkeypatch):
     assert curves[0]["g_fam"][0] == {"attack": pytest.approx(1.5)}
 
 
+def test_two_curves_realised_parts_sum_back_to_r(monkeypatch):
+    """**T143**: `r_life`／`r_hand`／`r_body` は `harm_of` の 3 項を分けて積んだだけ——
+    **足すと `r` に戻る**・部品はそれぞれ正しい項（相手のライフ・手札・体）から来る。"""
+    entries = [(1, 0, 1, 0, 1, 0, 0.0), (1, 0, 3, 0, 1, 0, 1.0)]
+    rows, pol, ex, L, ptr, idx = _fake_rows(entries)
+    seq = iter([{"opp_life": 0.2724, "opp_hand": -0.0981, "opp_body": 0.03},
+                {"opp_life": 0.1362, "opp_hand": 0.0551, "opp_body": 0.0}])
+    monkeypatch.setattr(TC, "_price_row", lambda *a, **k: 0.0)
+    monkeypatch.setattr(TC.AR, "parts", lambda *a, **k: next(seq))
+    monkeypatch.setattr(TC.AR, "parts_mirror", lambda *a, **k: {"opp_life": 0.0, "opp_hand": 0.0, "opp_body": 0.0})
+    curves, _winner = TC.two_curves_for_game(rows, pol, ex, L, ptr, idx, object(), {})
+    c = curves[0]
+    assert c["r_life"] == pytest.approx([0.2724, 0.4086])
+    assert c["r_hand"] == pytest.approx([-0.0981, -0.0430])
+    assert c["r_body"] == pytest.approx([0.03, 0.03])
+    for n in range(len(c["r"])):
+        assert c["r_life"][n] + c["r_hand"][n] + c["r_body"][n] == pytest.approx(c["r"][n], abs=1e-12)
+    assert curves[1]["r_life"] == [] and curves[1]["r_hand"] == [] and curves[1]["r_body"] == []
+
+
 def test_two_curves_skips_rows_with_no_valid_choice(monkeypatch):
     entries = [(1, 0, 1, 0, 0, -1, 0.0)]          # k=0（候補無し）
     rows, pol, ex, L, ptr, idx = _fake_rows(entries)

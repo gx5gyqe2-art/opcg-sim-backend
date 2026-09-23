@@ -2221,6 +2221,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
                 th_life, th_hand, th_body = threshold_parts(sc, tok, g_hand=g_for(1 - w, t),
                                                            hand_blocker=hb_for(1 - w, t))
+                # **T143**: 体の項のうち**手札のブロッカー**（T106）の分——`threshold_parts_side` が
+                # 体に足した額そのもの（値は動かさない・内訳として持つだけ）
+                th_hb = max(0.0, float(hb_for(1 - w, t))) if THETA_HAND_BLOCKER_MODE == "on" else 0.0
                 if DON_PURSE_MODE == "race":
                     # **T111**: 守る席が**構えると決めたカウンター・イベント**（`μ` の絶対量・
                     # `g_hand` は無料の札だけを数えているので二重にならない）
@@ -2289,6 +2292,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                     "shield": shield, "shield_rate": sh_rate,
                                     # **T96**: `Θ` の内訳（どの項が終盤に縮まないか）
                                     "th_life": th_life, "th_hand": th_hand, "th_body": th_body,
+                                    # **T143**: 窓（T116）を掛ける前の手札の項と、体の項のうち手札のブロッカーの分
+                                    # （`th_hand` は下で窓が掛かると書き換わる＝両方を並べて持つ）
+                                    "th_hand_raw": th_hand, "th_hb": th_hb,
                                     "th_back": th_back,
                                     # **T90**: 速さを 2 つに分けて持つ（1 ターン目は盤面だけ）と、
                                     # **相手の補充 `r`**＝`Θ` の手札項と同じ 1 枚あたりの価格（引き 1 枚ぶん）
@@ -2371,8 +2377,12 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 for j2, t2 in enumerate(ts):
                     d = per_seat[(w, t2)]
                     theta_check.append({"g": games, "who": w,
+                                        # **T143**: 記録の `seed` と絶対のターン番号——**決着の旗**
+                                        # （`lethal_rule.settled_map` の `(seed, w, t)`）と同じ鍵で突き合わせる
+                                        "seed": seed_g, "t": t2,
                                         "t_left": len(ts) - j2, "j": j2, "theta": d["theta"],
                                         "th_life": d["th_life"], "th_hand": d["th_hand"], "th_body": d["th_body"],
+                                        "th_hand_raw": d.get("th_hand_raw"), "th_hb": d.get("th_hb"),
                                         # **T101**: 理論がその行で言う τ。**`Θ`/要の読みから τ の偏りを外す**ために要る
                                         # （`Θ` は在庫・`要` は実際にいつ終わったかに依る総量なので、
                                         #  τ が外れた行では比が 1 にならないのが当たり前）。

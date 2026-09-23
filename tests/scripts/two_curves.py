@@ -93,7 +93,10 @@ def _price_row(sc, tok, ci, cards, idx2cid, sig, cid, tcid, si, ti, k, theta, mu
 
 def two_curves_for_game(rows, pol, ex, L, ptr, idx, cards, idx2cid, theta=THETA, mu=MU):
     """1 局ぶんの `G(t)`／`R(t)`（局×席の累積系列）。戻り値: `{(w): {"turns": [...], "g": [...], "r": [...]}}`
-    ＋ `winner`（0/1/None）。`turns` はその席の自席ターン番号の並び（昇順）。"""
+    ＋ `winner`（0/1/None）。`turns` はその席の自席ターン番号の並び（昇順）。
+
+    **T143**: `r_life`／`r_hand`／`r_body` は `R(t)` を `harm_of` の 3 項（相手のライフ・手札・体）に
+    分けた累積——**足すと `r` に戻る**（新しい量ではなく、同じ差分を足す前に分けて持つだけ）。"""
     order = list(idx)
     by_seat = {}
     for n, i in enumerate(order):
@@ -112,6 +115,8 @@ def two_curves_for_game(rows, pol, ex, L, ptr, idx, cards, idx2cid, theta=THETA,
     g_turn = {}            # (w, t) -> 理論値の和
     r_turn = {}             # (w, t) -> 実現の損害の和
     g_fam_turn = {}        # (w, t) -> {型: 理論値の和}（T137b・g_turn の分割・和は g_turn と一致する）
+    # (w, t) -> 実現の損害の 3 部品（T143・`harm_of` の 3 項をそのまま分けて積む＝和は r_turn と一致する）
+    r_part_turn = {}
     z_of = {}
     for n, i in enumerate(order):
         w, t = int(rows["who"][i]), int(rows["turn"][i])
@@ -126,6 +131,7 @@ def two_curves_for_game(rows, pol, ex, L, ptr, idx, cards, idx2cid, theta=THETA,
         sc, tok, ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
         if (w, t) not in g_turn:
             g_turn[(w, t)] = 0.0; r_turn[(w, t)] = 0.0; g_fam_turn[(w, t)] = {}
+            r_part_turn[(w, t)] = {"life": 0.0, "hand": 0.0, "body": 0.0}
             turn_seq[w].append(t)
         # ---- R(t): T113 のブラケット（次の行 → 実現の損害） ----
         j = nxt.get(n)
@@ -139,6 +145,8 @@ def two_curves_for_game(rows, pol, ex, L, ptr, idx, cards, idx2cid, theta=THETA,
         if i2 is not None:
             p = (AR.parts_mirror if mirror else AR.parts)(sc, tok, ex["sc"][i2], ex["tok"][i2])
             r_turn[(w, t)] += harm_of(p)
+            rp = r_part_turn[(w, t)]
+            rp["life"] += float(p["opp_life"]); rp["hand"] += float(p["opp_hand"]); rp["body"] += float(p["opp_body"])
         # ---- G(t): 選んだ候補の理論値（帳簿の規約） ----
         b = int(ptr[i]) + ch
         sig = json.loads(pol["pol_sig"][b])
@@ -158,12 +166,18 @@ def two_curves_for_game(rows, pol, ex, L, ptr, idx, cards, idx2cid, theta=THETA,
     for w in (0, 1):
         ts = turn_seq[w]
         g_cum, r_cum, g_fam = [], [], []
+        r_life, r_hand, r_body = [], [], []
         gs = rs = 0.0
+        ls = hs = bs = 0.0
         for t in ts:
             gs += g_turn.get((w, t), 0.0); rs += r_turn.get((w, t), 0.0)
             g_cum.append(gs); r_cum.append(rs)
             g_fam.append(g_fam_turn.get((w, t), {}))     # **その 1 ターンの**（累積ではない）型別内訳
-        out[w] = {"turns": ts, "g": g_cum, "r": r_cum, "g_fam": g_fam}
+            rp = r_part_turn.get((w, t)) or {"life": 0.0, "hand": 0.0, "body": 0.0}
+            ls += rp["life"]; hs += rp["hand"]; bs += rp["body"]
+            r_life.append(ls); r_hand.append(hs); r_body.append(bs)
+        out[w] = {"turns": ts, "g": g_cum, "r": r_cum, "g_fam": g_fam,
+                  "r_life": r_life, "r_hand": r_hand, "r_body": r_body}
     return out, winner
 
 
