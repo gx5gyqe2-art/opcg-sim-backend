@@ -1188,3 +1188,79 @@ def test_the_win_probability_is_the_integral_of_the_same_density():
     assert T.prob_of_d(20.0) == pytest.approx(1.0, abs=1e-6)
     # σ を広げれば同じ `D` での勝率は 0.5 に近づく（`w_of_d` と同じ `σ_D` を使っている検算）
     assert T.prob_of_d(1.0, sigma_d=10.0) < T.prob_of_d(1.0, sigma_d=1.0)
+
+
+# ---- T150b: 攻撃・純付与のドン機会費用（既定 off） ------------------------------------------------
+
+def test_attack_don_cost_is_zero_by_default_and_when_k_is_zero(monkeypatch):
+    ctx = dict(CTX, attackers=[-1000.0], don_active=3.0)
+    assert T.ATTACK_DON_COST_MODE == "off"
+    assert T.attack_don_cost(ctx, 2) == 0.0                  # 既定 off
+    T.set_attack_don_cost_mode("opportunity")
+    try:
+        assert T.attack_don_cost(ctx, 0) == 0.0              # k<=0 は常に 0
+        assert T.attack_don_cost(dict(CTX), 2) == 0.0        # 盤面（attackers/don_active）が無い
+    finally:
+        T.set_attack_don_cost_mode("off")
+
+
+def test_attack_don_cost_reuses_don_opportunity_exactly(monkeypatch):
+    ctx = dict(CTX, attackers=[-1000.0, 0.0], don_active=2.0)
+    T.set_attack_don_cost_mode("opportunity")
+    try:
+        got = T.attack_don_cost(ctx, 2, theta=1.15, mu=0.05)
+        assert got == pytest.approx(T.don_opportunity([-1000.0, 0.0], 2.0, 2, 1.15, 0.05))
+        assert got > 0.0
+    finally:
+        T.set_attack_don_cost_mode("off")
+
+
+def test_set_attack_don_cost_mode_rejects_unknown_values():
+    with pytest.raises(ValueError):
+        T.set_attack_don_cost_mode("delta")
+
+
+def test_score_candidate_default_off_is_unchanged_by_the_don_cost_switch():
+    """**回帰の検算**: 既定（`off`）では `score_candidate` の攻撃・純付与の価格は本 T の前と
+    1 ビットも変わらない（`attack_don_cost` は既定で常に 0 を返すため）。"""
+    cards = _cards()
+    box = T.score_candidate(["DON_BOX", "u", ["t"], [], None], "C_ATK", "C_LEAD", CTX, cards)
+    assert box == pytest.approx(T.attack_value(8000, 5000, True, 1.15, 0.05))
+    bare = T.score_candidate(["DON_BOX", "u", [], [], None], "C_ATK", None, CTX, cards)
+    assert bare == pytest.approx(T.attach_value(7000, 5000, 1, 1.15, 0.05))
+
+
+def test_score_candidate_subtracts_the_don_cost_from_an_attack_when_on():
+    """**T150b**: 盤面付きの ctx で `opportunity` を立てると、`DON_BOX` 攻撃（対象あり）の価格が
+    `attack_value − attack_don_cost` になる（k=0 の素殴りは変わらない）。"""
+    cards = _cards()
+    # 攻撃手 1 体（自分・x=-1000）＋アクティブなドン 1 枚だけ＝その 1 枚を払う機会費用が乗る
+    ctx = dict(CTX, attackers=[-1000.0], don_active=1.0)
+    T.set_attack_don_cost_mode("opportunity")
+    try:
+        with_k1 = T.score_candidate(["DON_BOX", "u", ["t"], [], None], "C_ATK", "C_LEAD", ctx, cards, don_k=1)
+        raw = T.attack_value(8000, 5000, True, 1.15, 0.05)
+        cost = T.attack_don_cost(ctx, 1, 1.15, 0.05)
+        assert cost > 0.0
+        assert with_k1 == pytest.approx(raw - cost)
+        assert with_k1 < raw
+
+        bare = T.score_candidate(["ATTACK", "u", ["t"], [], None], "C_ATK", "C_LEAD", ctx, cards, don_k=0)
+        assert bare == pytest.approx(T.attack_value(7000, 5000, True, 1.15, 0.05))   # k=0 は不変
+    finally:
+        T.set_attack_don_cost_mode("off")
+
+
+def test_score_candidate_subtracts_the_don_cost_from_a_pure_attach_when_on():
+    cards = _cards()
+    ctx = dict(CTX, attackers=[-1000.0], don_active=2.0)
+    T.set_attack_don_cost_mode("opportunity")
+    try:
+        got = T.score_candidate(["DON_BOX", "u", [], [], None], "C_ATK", None, ctx, cards, don_k=2)
+        raw = T.attach_value(9000, 5000, 2, 1.15, 0.05)
+        cost = T.attack_don_cost(ctx, 2, 1.15, 0.05)
+        assert cost > 0.0
+        assert got == pytest.approx(raw - cost)
+        assert got < raw
+    finally:
+        T.set_attack_don_cost_mode("off")

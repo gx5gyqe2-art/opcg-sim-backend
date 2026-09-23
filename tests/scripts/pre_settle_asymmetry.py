@@ -29,6 +29,20 @@ T146a（`2026-09-23_presettle_sigma.md`）は「σ_rel が決着後の行を混�
 2. 優勢側だけで対数損失を測るとコインに負ける幅が広がり、劣勢側だけならコインに近いか勝つ。
 3. 優勢側の過大評価は序盤（`j_me` が小さい）ほど大きい（T118 の「相手の速さが後から育つ」機構どおり）。
 
+**実測後（測った後に足した検算・T149a）**: 予告 3 は外れ、終盤ほど大きかった。**行は独立ではない**——
+1 局の中で同じ席が優勢のまま続けば、その局の終盤の行がまとめて 1 つの外れを反映する。**局を単位に
+束ねても「終盤 > 序盤」が残るか**を、`per_game_gap`／`bootstrap_stage_diff` で確かめる（局の復元抽出・
+新しい式は書かない・既存の `p`／`z` の平均を局単位でまとめるだけ）——**残った**（局の束ねの見かけ
+ではない・`2026-09-23_presettle_late_robust.md`）。
+
+**T149b**: 経過（段）と残り時間（`s`＝`clock_scale`）の 2 軸に分けたところ、**段の中で `s` を追っても
+一貫した傾向は無いが、`s` をそろえて段を比べると経過の効果が残った**（`2026-09-23_presettle_s_axis.md`）
+——**σ の伸縮不足より、経過そのもの（生存・まだ決め切れていない選択効果）を支持する形**。
+
+**T149c**: 終盤の優勢側行を「序盤から同じ席が優勢のまま（`persistent`）」と「終盤で新しく優勢に
+なった（`flipped`）」に分ける（`survivorship_split`）——`persistent` が多く・`gap` も大きいなら、
+「局がまだ終わっていないこと自体」が勝率の読みに無い情報だという読みを支持する。
+
 使い方:
 
     python tests/scripts/pre_settle_asymmetry.py --in <records_dir> [<records_dir> ...] \
@@ -83,7 +97,10 @@ def rows_with_p(rows_out, slope="theory", sigma_rel=None, w_err="rel"):
     out = []
     for r, (d, tm, to, z), pi in zip(rows_out, rs, p):
         out.append({"p": float(pi), "z": float(z), "d": float(d), "won": bool(r["won"]),
-                    "j_me": int(r["j_me"]), "stage": stage_of(r["j_me"])})
+                    "j_me": int(r["j_me"]), "stage": stage_of(r["j_me"]),
+                    "seed": r.get("seed"), "who": r.get("who"),
+                    # **T149b**: `s`＝`theory_order.clock_scale`（`W(D)` の物差しがそのまま使う残り時間の尺度）
+                    "s": float(TO.clock_scale(tm, to))})
     return out
 
 
@@ -129,6 +146,144 @@ def gap_of(score):
     return float(sum(b["n"] * b["gap"] for b in bins) / n)
 
 
+def mean_gap(rows):
+    """**符号つきの較正の差**＝`mean(p) − mean(z)`。`gap_of`（`calibration` の n 重み平均）と**恒等式で
+    一致する**（分位で束ねても崩れない・T149a で確かめる不変量。`calib_bins` が値を 4 桁に丸めるので
+    完全なビット一致ではなく丸め誤差 1e-3 程度）。空なら `None`。"""
+    if not rows:
+        return None
+    return float(np.mean([r["p"] for r in rows]) - np.mean([r["z"] for r in rows]))
+
+
+def per_game_gap(rows):
+    """行を局（`seed`）ごとにまとめ、**局ごとの** `mean(p − z)` を返す（`{seed: gap}`）。
+    **T149a**: 1 局が多くの行を出すほど大きく数える行単位の平均と違い、**局 1 つ＝1 票**にする土台。"""
+    acc = {}
+    for r in rows:
+        acc.setdefault(r["seed"], []).append(r["p"] - r["z"])
+    return {s: float(np.mean(vs)) for s, vs in acc.items()}
+
+
+def game_weighted_gap(rows):
+    """**局を 1 票ずつ数えた較正の差**（`per_game_gap` の値の平均）。空／局が無ければ `None`。"""
+    pg = per_game_gap(rows)
+    return float(np.mean(list(pg.values()))) if pg else None
+
+
+def bootstrap_stage_diff(rows, stage_a="late", stage_b="early", n_boot=2000, seed=0):
+    """**T149a**: 優勢（または劣勢）側の行を局×段に束ね、**局を単位にした復元抽出**で
+    `mean(stage_a) − mean(stage_b)` の分布を作る（既定 late−early・新しい式は書かない）。
+    局が 5 未満なら測らない（母数不足）。"""
+    by_seed_stage = {}
+    for r in rows:
+        by_seed_stage.setdefault(r["seed"], {}).setdefault(r["stage"], []).append(r["p"] - r["z"])
+    seeds = list(by_seed_stage.keys())
+    if len(seeds) < 5:
+        return {"n_games": len(seeds), "diff": None, "ci95": None}
+
+    def stage_mean(sample_seeds, stage):
+        vals = [float(np.mean(by_seed_stage[s][stage])) for s in sample_seeds if stage in by_seed_stage[s]]
+        return float(np.mean(vals)) if vals else None
+
+    point_a = stage_mean(seeds, stage_a)
+    point_b = stage_mean(seeds, stage_b)
+    rng = np.random.default_rng(seed)
+    diffs = []
+    for _ in range(n_boot):
+        samp = rng.choice(seeds, size=len(seeds), replace=True)
+        a, b = stage_mean(list(samp), stage_a), stage_mean(list(samp), stage_b)
+        if a is not None and b is not None:
+            diffs.append(a - b)
+    diffs = np.asarray(diffs, float)
+    ci = ([float(np.percentile(diffs, 2.5)), float(np.percentile(diffs, 97.5))]
+          if len(diffs) else None)
+    return {"n_games": len(seeds), "point_" + stage_a: point_a, "point_" + stage_b: point_b,
+            "diff": (point_a - point_b) if (point_a is not None and point_b is not None) else None,
+            "ci95": ci, "n_boot_valid": int(len(diffs)),
+            "excludes_zero": bool(ci and (ci[0] > 0 or ci[1] < 0))}
+
+
+#: **T149b**: 「残り時間」の軸を割る分位数（既定 4 分位・各段の中で別々に切る）。
+S_QUANTILES = 4
+
+
+def s_axis_table(rows, n_q=S_QUANTILES):
+    """**T149b**: 優勢側の行を、**経過**（`stage`）×**残り時間**（`s`＝`clock_scale` の分位・
+    段ごとに別々に切る）の 2 次元で割り、`mean_gap` を出す。
+
+    `σ_rel·s` の伸縮が残り時間を正しく織り込んでいるなら、**同じ段の中で `s` の分位を追っても
+    `gap` は平らなはず**（`s` は既に物差しに入っている軸）。段をまたいで `gap` が変わるのに、
+    段の中で `s` を追っても変わらなければ、**残り時間の伸縮ではなく経過そのもの**（生存・選択・
+    T149c）が疑わしくなる。逆に段の中でも `s` の分位を追うほど `gap` が増えれば、**伸縮の不足**
+    （T146a の候補 1）が疑わしい。当てはめではなく観察——新しい価格式は書かない。"""
+    out = {}
+    for st in STAGES:
+        sub = [r for r in rows if r["stage"] == st]
+        if len(sub) < n_q * 5:
+            out[st] = {"n": len(sub), "quantiles": []}
+            continue
+        ss = np.asarray([r["s"] for r in sub], float)
+        edges = np.quantile(ss, np.linspace(0, 1, n_q + 1))
+        cells = []
+        for i in range(n_q):
+            lo, hi = edges[i], edges[i + 1]
+            m = (ss >= lo) & (ss <= hi) if i == n_q - 1 else (ss >= lo) & (ss < hi)
+            cell_rows = [r for r, keep in zip(sub, m) if keep]
+            cells.append({"q": i + 1, "n": len(cell_rows), "s_lo": round(float(lo), 3),
+                         "s_hi": round(float(hi), 3), "gap": mean_gap(cell_rows)})
+        out[st] = {"n": len(sub), "quantiles": cells}
+    return out
+
+
+def early_leader_of(rows):
+    """**T149c**: 局（`seed`）ごとに、**序盤で最初に優勢だった席**を返す（`{seed: 優勢の who}`）。
+    行の `p` はその行自身の席（`who`）から見た予測なので、`p<0.5` の行は**もう片方の席**が優勢
+    （`1 - who`）。序盤の行が無い・最初の序盤行が `p==0.5` なら入れない（判定不能は「無い」で扱う）。"""
+    first = {}
+    for r in rows:
+        if r["stage"] != "early" or r["seed"] in first:
+            continue
+        if r["p"] == 0.5:
+            continue
+        first[r["seed"]] = r["who"] if r["p"] > 0.5 else (1 - r["who"])
+    return first
+
+
+def survivorship_split(rows):
+    """**T149c**: 終盤（`stage=="late"`）の優勢側の行を、**序盤から同じ席が優勢のまま続いている
+    （persistent）**か、**終盤になって新しく優勢になった（flipped）**か、**序盤のデータが無い
+    （no_early_data）**かに分け、`mean_gap` を比べる。
+
+    `persistent` が多く・`gap` も大きいなら、**「局がまだ終わっていないこと自体」が勝率の読みに
+    無い情報**という読みを支持する（序盤に優勢と読まれたのに終盤まで決め切れていない局は、
+    その時点で理論の見立てが外れていた可能性が高い局の集まりだから）。当てはめではなく観察。"""
+    leader = early_leader_of(rows)
+    late_fav = [r for r in rows if r["stage"] == "late" and r["p"] > 0.5]
+    groups = {"persistent": [], "flipped": [], "no_early_data": []}
+    for r in late_fav:
+        el = leader.get(r["seed"])
+        if el is None:
+            groups["no_early_data"].append(r)
+        elif el == r["who"]:
+            groups["persistent"].append(r)
+        else:
+            groups["flipped"].append(r)
+    return {name: {"n": len(rs), "gap": mean_gap(rs), "n_games": len(per_game_gap(rs))}
+           for name, rs in groups.items()}
+
+
+def robustness_check(rows):
+    """**T149a のまとめ**: 優勢側・劣勢側それぞれで、行単位／局単位の較正の差と、
+    late−early の局単位ブートストラップを並べる。"""
+    out = {}
+    for name, pred in (("favorite", lambda r: r["p"] > 0.5), ("underdog", lambda r: r["p"] < 0.5)):
+        sub = [r for r in rows if pred(r)]
+        out[name] = {"row_weighted_gap": mean_gap(sub), "game_weighted_gap": game_weighted_gap(sub),
+                     "n_games": len(per_game_gap(sub)),
+                     "late_minus_early": bootstrap_stage_diff(sub, "late", "early")}
+    return out
+
+
 def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel"):
     """記録を 1 度読み（決着前だけ）、優勢／劣勢・序盤〜終盤で割った較正を返す。"""
     old = CB.PRE_SETTLE_MODE
@@ -147,7 +302,17 @@ def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel"):
            "favorite_signed_gap": gap_of(fs["favorite"]["score"]),
            "underdog_signed_gap": gap_of(fs["underdog"]["score"]),
            "stage_split": ss,
-           "stage_gaps": {fav: {st: gap_of(ss[fav][st]["score"]) for st in STAGES} for fav in ("favorite", "underdog")}}
+           "stage_gaps": {fav: {st: gap_of(ss[fav][st]["score"]) for st in STAGES} for fav in ("favorite", "underdog")},
+           # **T149a**: 行単位の恒等式検算（`mean_gap` == `gap_of`）＋局単位の頑健性
+           "mean_gap_check": {"favorite": mean_gap([r for r in rows if r["p"] > 0.5]),
+                              "underdog": mean_gap([r for r in rows if r["p"] < 0.5])},
+           "robustness": robustness_check(rows),
+           # **T149b**: 優勢側の gap を経過（段）×残り時間（s の分位）で割る
+           "s_axis": {"favorite": s_axis_table([r for r in rows if r["p"] > 0.5]),
+                      "underdog": s_axis_table([r for r in rows if r["p"] < 0.5])},
+           # **T149c**: 終盤の優勢側行を「序盤から同じ席が優勢のまま（persistent）」か
+           # 「終盤で新しく優勢になった（flipped）」かに分ける
+           "survivorship": survivorship_split(rows)}
 
 
 def main(argv=None):

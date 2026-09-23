@@ -758,6 +758,33 @@ def play_cost_term(ctx, cost, mu, theta=THETA):
     return float(cost) * 0.66 * mu
 
 
+#: **T150b**（2026-09-23）: `ATTACK`／`DON_BOX`（対象あり）・純付与が固定する k 枚のドンの機会費用を
+#: 引くか。**既定 `off`**（T41 以降のほぼ全実測はこの経路を通っておらず、既定を変えると影響が及ぶため）。
+#: `opportunity`＝**`PLAY` が既に使っている盤面依存の機会費用**（`don_opportunity`／`_attach_total`）を
+#: 再利用する（T150a で確認済み・新しい定数は作らない・定額の `DELTA` は使わない＝T147a の反省）。
+ATTACK_DON_COST_MODES = ("off", "opportunity")
+ATTACK_DON_COST_MODE = "off"
+
+
+def set_attack_don_cost_mode(mode):
+    global ATTACK_DON_COST_MODE
+    if mode not in ATTACK_DON_COST_MODES:
+        raise ValueError("ATTACK_DON_COST_MODE は %r のどれか（%r）" % (ATTACK_DON_COST_MODES, mode))
+    ATTACK_DON_COST_MODE = mode
+
+
+def attack_don_cost(ctx, k, theta=THETA, mu=MU):
+    """**T150b**: この候補が固定する `k` 枚のドンの機会費用（`ATTACK_DON_COST_MODE=="opportunity"`
+    のときだけ・`k<=0` または盤面（`ctx["attackers"]`／`ctx["don_active"]`）が無ければ 0）。"""
+    if ATTACK_DON_COST_MODE != "opportunity" or k <= 0:
+        return 0.0
+    attackers = ctx.get("attackers")
+    don_active = ctx.get("don_active")
+    if attackers is None or don_active is None:
+        return 0.0
+    return don_opportunity(attackers, don_active, k, theta, mu)
+
+
 
 _IDENT = {}
 
@@ -1293,11 +1320,13 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
         if at == "DON_BOX":
             sp += 1000.0 * k
         blockers = blockers_of(ctx)
+        # **T150b**: この攻撃が固定する k 枚のドンの機会費用（既定 off では常に 0）
+        dcost = attack_don_cost(ctx, k, theta, mu)
         if tgt is None and tgt_power is None:         # 対象のカードが引けない＝リーダー扱い
-            return attack_value(sp, ctx["opp_leader_power"], True, theta, mu, blockers=blockers)
+            return attack_value(sp, ctx["opp_leader_power"], True, theta, mu, blockers=blockers) - dcost
         tp = float(tgt["power"]) if tgt_power is None else float(tgt_power)
         if tgt is not None and tgt.get("leader"):
-            return attack_value(sp, tp, True, theta, mu, blockers=blockers)
+            return attack_value(sp, tp, True, theta, mu, blockers=blockers) - dcost
         nu_t = nu_of(tp, ctx["my_leader_power"], ctx["r_turns"], theta, mu,
                      is_blocker=(tgt or {}).get("blocker"))
         if (tgt or {}).get("blocker"):
@@ -1306,9 +1335,10 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
                 if abs(pb - tp) <= PWR_EPS:
                     blockers = blockers[:i] + blockers[i + 1:]
                     break
-        return attack_value(sp, tp, False, theta, mu, nu_target=nu_t, blockers=blockers)
+        return attack_value(sp, tp, False, theta, mu, nu_target=nu_t, blockers=blockers) - dcost
     if at in ("ATTACH_DON", "DON_BOX"):
-        return attach_value(sp, ctx["opp_leader_power"], k, theta, mu)
+        # **T150b**: 純付与も同じ k 枚を固定する（既定 off では常に 0）
+        return attach_value(sp, ctx["opp_leader_power"], k, theta, mu) - attack_don_cost(ctx, k, theta, mu)
     if at == "ACTIVATE_MAIN":
         # **起動メイン**——カードは既に場に在るので `μ` は引かない（コストは能力の中に在る）
         # 条件はエンジンが検査済み。**対象は盤面から選ぶ**

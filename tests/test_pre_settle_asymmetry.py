@@ -13,6 +13,7 @@
 import os
 import sys
 
+import numpy as np
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -90,3 +91,164 @@ def test_collect_forces_pre_settle_on_and_restores_the_previous_mode(monkeypatch
     assert seen["pre_settle_mode"] == "on"
     assert PA.CB.PRE_SETTLE_MODE == "off"          # 呼び出し前の値に戻っている
     assert out["n"] == 0 and out["games"] == 0
+
+
+# ---- T149a: 局を単位にした頑健性 ---------------------------------------------------------------
+
+def _rowg(p, z, seed, stage="early"):
+    return {"p": p, "z": z, "d": 0.0, "won": bool(z), "j_me": 0, "stage": stage, "seed": seed}
+
+
+def test_mean_gap_matches_gap_of_up_to_the_bin_table_s_rounding():
+    """**T149a の恒等式**: `mean_gap`（`mean(p)-mean(z)`）は `gap_of`（分位で束ねた n 重み平均）と
+    一致する——分位で切っても符号つきの差の合計は保たれる（`calib_bins` が 4 桁に丸めるので
+    完全なビット一致ではないが、丸め誤差 1e-3 の範囲で一致する）。"""
+    import random
+    random.seed(0)
+    rows = [_rowg(random.random(), random.randint(0, 1), s) for s in range(30)]
+    assert PA.mean_gap(rows) == pytest.approx(np.mean([r["p"] for r in rows]) - np.mean([r["z"] for r in rows]))
+    sc = PA.score_group(rows)
+    if sc and "calibration" in sc:
+        assert PA.mean_gap(rows) == pytest.approx(PA.gap_of(sc), abs=1e-3)
+
+
+def test_per_game_gap_averages_within_each_seed_first():
+    rows = [_rowg(0.9, 1, seed=1), _rowg(0.9, 1, seed=1), _rowg(0.1, 0, seed=2)]
+    pg = PA.per_game_gap(rows)
+    assert pg == {1: pytest.approx(-0.1), 2: pytest.approx(0.1)}
+
+
+def test_game_weighted_gap_gives_each_game_one_vote():
+    """**核心**: 局 1（行 2 本）と局 2（行 1 本）は行単位では 2:1 だが、局単位では 1:1。"""
+    rows = [_rowg(0.9, 1, seed=1)] * 2 + [_rowg(0.1, 0, seed=2)] * 1
+    assert PA.mean_gap(rows) != pytest.approx(PA.game_weighted_gap(rows))
+    assert PA.game_weighted_gap(rows) == pytest.approx((-0.1 + 0.1) / 2)
+
+
+def test_bootstrap_stage_diff_needs_at_least_five_games():
+    rows = [_rowg(0.9, 1, seed=s, stage="late") for s in range(3)]
+    out = PA.bootstrap_stage_diff(rows)
+    assert out["n_games"] == 3 and out["diff"] is None and out["ci95"] is None
+
+
+def test_bootstrap_stage_diff_detects_a_real_late_minus_early_gap():
+    """**T149a**: late の行だけ大きく過大評価する局を作り、`diff` が正で 0 を跨がないことを確かめる
+    （合成データでの検算・実データの当否とは別）。"""
+    rows = []
+    for s in range(20):
+        rows.append(_rowg(0.55, 0.5, seed=s, stage="early"))    # 序盤はほぼ較正が合う
+        rows.append(_rowg(0.9, 0.5, seed=s, stage="late"))      # 終盤は大きく過大評価
+    out = PA.bootstrap_stage_diff(rows, n_boot=500, seed=1)
+    assert out["n_games"] == 20
+    assert out["diff"] == pytest.approx(0.35, abs=1e-9)
+    assert out["excludes_zero"] is True
+
+
+def test_bootstrap_stage_diff_is_deterministic_given_the_same_seed():
+    rows = [_rowg(0.5 + 0.01 * i, i % 2, seed=i, stage=("late" if i % 2 else "early")) for i in range(20)]
+    a = PA.bootstrap_stage_diff(rows, n_boot=200, seed=7)
+    b = PA.bootstrap_stage_diff(rows, n_boot=200, seed=7)
+    assert a["ci95"] == b["ci95"]
+
+
+def test_robustness_check_splits_favorite_and_underdog_and_reports_game_counts():
+    rows = ([_rowg(0.9, 1, seed=s, stage="early") for s in range(6)]
+           + [_rowg(0.1, 0, seed=s + 100, stage="late") for s in range(6)])
+    out = PA.robustness_check(rows)
+    assert set(out) == {"favorite", "underdog"}
+    assert out["favorite"]["n_games"] == 6 and out["underdog"]["n_games"] == 6
+    assert out["favorite"]["row_weighted_gap"] == pytest.approx(-0.1)
+
+
+# ---- T149b: 経過 × 残り時間の 2 次元表 ----------------------------------------------------------
+
+def _rows_p(pz_stage_s):
+    """`[(p, z, stage, s), ...]` から行を作る（`seed` は連番で局を分ける）。"""
+    return [dict(_rowg(p, z, seed=i, stage=st), s=s) for i, (p, z, st, s) in enumerate(pz_stage_s)]
+
+
+def test_s_axis_table_reports_n_and_cells_below_the_row_floor():
+    rows = _rows_p([(0.9, 1, "early", float(i)) for i in range(10)])
+    out = PA.s_axis_table(rows, n_q=4)
+    assert out["early"]["n"] == 10 and out["early"]["quantiles"] == []   # 10 < 4*5=20 で分位を出さない
+    assert out["mid"]["n"] == 0 and out["late"]["n"] == 0
+
+
+def test_s_axis_table_splits_into_quantiles_that_cover_every_row():
+    rows = _rows_p([(0.9, 1, "early", float(i)) for i in range(40)])
+    out = PA.s_axis_table(rows, n_q=4)
+    cells = out["early"]["quantiles"]
+    assert len(cells) == 4
+    assert sum(c["n"] for c in cells) == 40                # 取りこぼしなし
+    assert [c["q"] for c in cells] == [1, 2, 3, 4]
+
+
+def test_s_axis_table_detects_a_within_stage_trend_when_present():
+    """**T149b の核心**: `s` が大きいほど過大評価が増える合成データを作り、`gap` がその分位で
+    単調に増えることを確かめる（実データの当否とは別の器の検算）。"""
+    rows = []
+    for i in range(40):
+        s = float(i)
+        p = 0.5 + 0.01 * s          # s が大きいほど予測が高く（過大評価が増える）
+        rows.append(dict(_rowg(p, 0.5, seed=i, stage="early"), s=s))
+    out = PA.s_axis_table(rows, n_q=4)
+    gaps = [c["gap"] for c in out["early"]["quantiles"]]
+    assert gaps == sorted(gaps) and gaps[0] < gaps[-1]
+
+
+def test_s_axis_table_is_flat_when_only_stage_drives_the_gap():
+    """**T149b の対照**: `s` を段の中でランダムに散らし、過大評価は段だけで決まる合成データを作ると、
+    段の中の分位を追っても `gap` はほぼ平ら（経過そのものが主因という読みの検算）。"""
+    import random
+    random.seed(3)
+    rows = []
+    for i in range(40):
+        s = random.random() * 10           # s は段の中でランダム（gap と無関係）
+        rows.append(dict(_rowg(0.8, 0.5, seed=i, stage="late"), s=s))   # gap は段だけで固定
+    out = PA.s_axis_table(rows, n_q=4)
+    gaps = [c["gap"] for c in out["late"]["quantiles"]]
+    assert max(gaps) - min(gaps) < 0.05      # ほぼ平ら（固定した gap=0.3 の周りに収まる）
+
+
+# ---- T149c: 生存の選択（序盤から続く優勢 vs 終盤で新しく優勢）--------------------------------------
+
+def _rowgw(p, z, seed, who, stage="early"):
+    return {"p": p, "z": z, "d": 0.0, "won": bool(z), "j_me": 0, "stage": stage, "seed": seed, "who": who}
+
+
+def test_early_leader_of_picks_the_first_early_row_per_game_and_skips_ties():
+    rows = [_rowgw(0.9, 1, seed=1, who=0, stage="early"),
+            _rowgw(0.2, 1, seed=1, who=0, stage="mid"),      # 同じ局・後の行は無視（最初だけ使う）
+            _rowgw(0.5, 1, seed=2, who=0, stage="early"),    # ちょうど 0.5 は判定不能
+            _rowgw(0.3, 0, seed=3, who=1, stage="mid")]       # 序盤の行が無い局
+    out = PA.early_leader_of(rows)
+    assert out == {1: 0}
+
+
+def test_early_leader_of_flips_the_seat_when_this_row_s_own_seat_is_the_underdog():
+    """`p<0.5` の行は自分の席が劣勢＝優勢はもう片方の席（`1 - who`）。"""
+    rows = [_rowgw(0.2, 0, seed=5, who=0, stage="early")]
+    assert PA.early_leader_of(rows) == {5: 1}
+
+
+def test_survivorship_split_separates_persistent_from_flipped():
+    rows = [
+        _rowgw(0.9, 1, seed=1, who=0, stage="early"),        # 局 1: 序盤は席 0 が優勢
+        _rowgw(0.8, 1, seed=1, who=0, stage="late"),         # 終盤も席 0 が優勢＝persistent
+        _rowgw(0.2, 0, seed=2, who=0, stage="early"),        # 局 2: 序盤は席 1 が優勢（席 0 視点で劣勢）
+        _rowgw(0.7, 0, seed=2, who=0, stage="late"),         # 終盤は席 0 が優勢＝flipped
+        _rowgw(0.6, 1, seed=3, who=0, stage="late"),         # 局 3: 序盤の行が無い＝no_early_data
+    ]
+    out = PA.survivorship_split(rows)
+    assert out["persistent"]["n"] == 1 and out["flipped"]["n"] == 1
+    assert out["no_early_data"]["n"] == 1
+    assert out["persistent"]["gap"] == pytest.approx(0.8 - 1)
+    assert out["flipped"]["gap"] == pytest.approx(0.7 - 0)
+
+
+def test_survivorship_split_counts_games_not_just_rows():
+    rows = [_rowgw(0.9, 1, seed=1, who=0, stage="early"),
+            _rowgw(0.8, 1, seed=1, who=0, stage="late"),
+            _rowgw(0.7, 1, seed=1, who=0, stage="late")]     # 同じ局から late の行が 2 本
+    out = PA.survivorship_split(rows)
+    assert out["persistent"]["n"] == 2 and out["persistent"]["n_games"] == 1
