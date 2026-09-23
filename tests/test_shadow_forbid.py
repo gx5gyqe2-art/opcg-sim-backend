@@ -315,3 +315,45 @@ def test_seq_prices_le_mode_reads_the_best_attack_with_no_more_don():
     assert out[0]["price"] == pytest.approx(0.20) and n_re == 1
     assert SF._reread_index(cands, 0, priced, mode="attack_le") is True
     assert SF._reread_index(cands, 0, priced, mode="attack") is False
+
+
+def test_seq_prices_delta_mode_subtracts_the_attach_move_s_own_k_times_delta():
+    """**T147a**: `attack_le_delta` は `attack_le` と同じ候補（k' ≤ k）から最大を取り、**この付与
+    候補自身の `k`**（借りた攻撃候補の `k'` ではない）に δ を掛けて引く。"""
+    cands = [_c(["DON_BOX", "X", [], [], None], 3),           # 純付与 X・3 枚
+             _c(["DON_BOX", "X", ["L"], [], None], 1)]        # X が 1 枚で殴る（k'=1 ≤ k=3）
+    priced = [{"price": 0.03}, {"price": 0.50}]
+    out, n_re, n_attach = SF.seq_prices(cands, priced, mode="attack_le_delta", delta=0.02)
+    assert out[0]["price"] == pytest.approx(0.50 - 3 * 0.02)   # k=3（付与自身）で割り引く・k'=1 ではない
+    assert (n_re, n_attach) == (1, 1)
+
+
+def test_seq_prices_delta_mode_matches_attack_le_s_candidate_selection():
+    """**T147a**: 読み替えの対象になる候補の集合は `attack_le` と同一（δ の有無だけが違う）——
+    `attack_le` で読み替えられない付与（枚数が全部より多い）は `attack_le_delta` でも読み替えられない。"""
+    cands = [_c(["DON_BOX", "X", [], [], None], 1), _c(["DON_BOX", "X", ["L"], [], None], 5)]
+    priced = [{"price": 0.03}, {"price": 0.90}]
+    out_le, n_re_le, _ = SF.seq_prices(cands, priced, mode="attack_le")
+    out_d, n_re_d, _ = SF.seq_prices(cands, priced, mode="attack_le_delta", delta=0.02)
+    assert n_re_le == 0 and n_re_d == 0
+    assert out_le[0]["price"] == out_d[0]["price"] == pytest.approx(0.03)
+
+
+def test_seq_prices_delta_defaults_to_theory_order_delta():
+    cands = [_c(["DON_BOX", "X", [], [], None], 2), _c(["DON_BOX", "X", ["L"], [], None], 2)]
+    priced = [{"price": 0.03}, {"price": 0.40}]
+    out, _n_re, _n_attach = SF.seq_prices(cands, priced, mode="attack_le_delta")
+    assert out[0]["price"] == pytest.approx(0.40 - 2 * SF.DELTA)
+
+
+def test_reread_index_treats_attack_le_delta_like_attack_le():
+    cands = [_c(["DON_BOX", "X", [], [], None], 3), _c(["DON_BOX", "X", ["L"], [], None], 1)]
+    priced = [{"price": 0.03}, {"price": 0.50}]
+    assert SF._reread_index(cands, 0, priced, mode="attack_le_delta") is True
+    assert SF._reread_index(cands, 0, priced, mode="attack") is False   # k' != k なので厳密一致は不成立
+
+
+def test_set_seq_mode_accepts_attack_le_delta():
+    SF.set_seq_mode("attack_le_delta")
+    assert SF.SEQ_MODE == "attack_le_delta"
+    SF.set_seq_mode("off")

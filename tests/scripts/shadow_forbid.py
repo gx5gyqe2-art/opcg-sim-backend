@@ -88,7 +88,7 @@ import guard_afford as GA  # noqa: E402
 import live_theory as LT  # noqa: E402
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from theory_bridge import move_family  # noqa: E402
-from theory_order import MU, THETA  # noqa: E402
+from theory_order import DELTA, MU, THETA  # noqa: E402
 
 #: `s < -TOL` を「理論が禁じる」と呼ぶ（浮動小数の丸め誤差を吸収するだけ・新しい判断基準ではない）。
 TOL = 1e-9
@@ -96,9 +96,14 @@ TOL = 1e-9
 
 #: **T144**（2026-09-23）: 純付与を 2 手の系列として読むか。`off`＝T141 のまま（静的な `attach_value`）／
 #: `attack`＝**同じカード・同じ枚数の攻撃候補の最大価格**に読み替える（下の `seq_prices`）／
-#: `attack_le`＝**同じカード・枚数が同じか少ない攻撃候補の最大価格**（測った後に足した第 2 の読み・T144 §4）。
-SEQ_MODES = ("off", "attack", "attack_le")
+#: `attack_le`＝**同じカード・枚数が同じか少ない攻撃候補の最大価格**（測った後に足した第 2 の読み・T144 §4）／
+#: `attack_le_delta`＝**`attack_le` に、その付与が使うドン k 枚の機会費用 `k·δ` を引く**
+#: （T147a・2026-09-23・新定数ゼロ＝`theory_order.DELTA` を再利用）。
+SEQ_MODES = ("off", "attack", "attack_le", "attack_le_delta")
 SEQ_MODE = "off"
+
+#: **T147a**: `attack_le` と同じ照合規則（`k' ≤ k`）を使うモード（δ 割引の有無だけが違う）。
+_LE_MATCH_MODES = ("attack_le", "attack_le_delta")
 
 
 def set_seq_mode(mode):
@@ -120,7 +125,7 @@ def _k_of(c, default):
     return int(c["k"]) if c["k"] is not None and c["k"] >= 0 else default
 
 
-def seq_prices(cands, priced, mode=None):
+def seq_prices(cands, priced, mode=None, delta=None):
     """**純付与の価格を、それが準備する攻撃の価格に読み替える**（T144・新定数ゼロ）。
 
     規則: 付与したドンは**自分のターン中だけ** +1000 で、次のリフレッシュで戻る＝純付与そのものは
@@ -138,8 +143,21 @@ def seq_prices(cands, priced, mode=None):
     **k ∈ {0, 相手を越える最小, カウンター 2 枚要求}**、純付与の箱に **k ∈ {1, 全部, 【ドン!!×N】の不足分}** しか
     出さない＝2 つの組はめったに重ならない（1 枚の付与に 1 枚の攻撃候補が在るのは、1 枚でちょうど越えるときだけ）。その付与の
     攻撃としての価値は「しきい値を越えない分は変わらない」＝**枚数が同じか少ない攻撃候補の最大価格**で読む。
-    `mode` を省けば `SEQ_MODE` に従う。戻り値: `(読み替えた priced, 読み替えた件数, 純付与の件数)`。"""
+
+    **`attack_le_delta`**（T147a）: 借りてきた攻撃の価格は `score_candidate` がそのまま返す**生の**
+    `attack_value(+1000k')`——**k' 枚のドンの機会費用を引いていない**（`theory_order.attack_value_don`
+    は `nu_of` の中でだけ `max_k[attack_value(+1000k) − k·δ]` の形で使われ、`score_candidate` が個々の
+    `DON_BOX` 攻撃候補を値付けするときは通っていない）。**この付与の行自体が実際に固定する DON は
+    `k` 枚**（借りた攻撃が使う `k'（≤k）` ではなく、この付与候補そのものの `k`）なので、
+    `v ← max{price(c)} − k·δ` として、その `k` 枚を他に回せた機会費用を引く。`δ`（T57 で実測・
+    `nu_of` の DON 代替価値と同じ定数）は新しく作らない。
+
+    `mode` を省けば `SEQ_MODE` に従う。`delta` を省けば `theory_order.DELTA`。
+    戻り値: `(読み替えた priced, 読み替えた件数, 純付与の件数)`。"""
     mode = SEQ_MODE if mode is None else mode
+    dlt = float(DELTA if delta is None else delta)
+    use_delta = mode == "attack_le_delta"
+    match_mode = "attack_le" if mode in _LE_MATCH_MODES else mode
     atk = {}
     for c, p in zip(cands, priced):
         if p["price"] is None or not _is_box_attack(c["sig"]):
@@ -151,8 +169,8 @@ def seq_prices(cands, priced, mode=None):
             n_attach += 1
             k = _k_of(c, 1)
             vs = [pr for kk, pr in atk.get(c["sig"][1], [])
-                  if (kk <= k if mode == "attack_le" else kk == k)]
-            v = max(vs) if vs else None
+                  if (kk <= k if match_mode == "attack_le" else kk == k)]
+            v = (max(vs) - (k * dlt if use_delta else 0.0)) if vs else None
             if v is not None:
                 out.append(dict(p, price=v))
                 n_re += 1
@@ -162,12 +180,14 @@ def seq_prices(cands, priced, mode=None):
 
 
 def _reread_index(cands, i, priced, mode=None):
-    """候補 `i`（純付与）が読み替えの対象になった（同じ uuid・読みに合う k の攻撃候補が在った）か。"""
+    """候補 `i`（純付与）が読み替えの対象になった（同じ uuid・読みに合う k の攻撃候補が在った）か。
+    **δ 割引の有無は「対象になったか」に影響しない**（`attack_le`／`attack_le_delta` は同じ照合規則）。"""
     mode = SEQ_MODE if mode is None else mode
+    match_mode = "attack_le" if mode in _LE_MATCH_MODES else mode
     c = cands[i]
     k = _k_of(c, 1)
     return any(_is_box_attack(o["sig"]) and o["sig"][1] == c["sig"][1]
-               and (_k_of(o, 0) <= k if mode == "attack_le" else _k_of(o, 0) == k)
+               and (_k_of(o, 0) <= k if match_mode == "attack_le" else _k_of(o, 0) == k)
                and p["price"] is not None for o, p in zip(cands, priced))
 
 
