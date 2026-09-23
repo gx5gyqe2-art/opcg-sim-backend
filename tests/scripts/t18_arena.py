@@ -28,35 +28,41 @@ T141 の申し送りどおり `attach` は対象から除く）なら、**その
 手だけを差し替える**）。`observer` の後・`apply` の前に呼ばれるので、**候補・訪問分布・π は
 探索が選んだそのまま**（介入は「打つ手」だけ）。
 
-## 乾式運転で見つかった制約（`DON_BOX` は置き換え先にできない）
+## 乾式運転で見つかった制約と、その解き方（T142 → T142b）
 
-**最初の設計は予告 1 で落ちた**——`legal[rep]` をそのまま `apply_game_action` に渡すと、
-2 局とも `ValueError: 不明なアクションです: DON_BOX …` で `GameAborted`。原因を
-`rust/opcg_engine/src/rules/actions.rs` の `apply_game_action` で確認した——**認識する
-`action_type` は `PLAY`／`TURN_END`／`ATTACK`／`ATTACH_DON`／`ACTIVATE_MAIN`／
-`RESOLVE_EFFECT_SELECTION`／`MULLIGAN`／`KEEP_HAND` だけで、`DON_BOX` は無い**。`DON_BOX` は
-**探索が使う箱レベルのマクロ手**（「ドンを k 枚付けてから殴る」）で、`legal`／`groups` には
-値付け・照合のために現れるが、**実際に適用できる原始手への展開（原始化）は探索の内部**にあり、
-Python から「この候補を選んで」と渡して原始化させる口は今の API に無い。
-**この符号化では攻撃は全部 `DON_BOX` の形で来る**（`theory_order.score_candidate` の docstring
-どおり）ので、**`best_family` が `attack`／`attach` の置き換えは行わない**（`make_swap` が
-`n_best_is_macro` として数え、元の手をそのまま打たせる）。T141 の実測では理論の最善が `attack`
-になる割合が最も高かった（禁じられた行の 55.0%／51.5%）ので、**この制約は介入の対象を大きく
-狭める**——**残せるのは最善が `play`／`effect`／`end` のときだけ**。原始化の口を Python 側に開ける
-（またはメイン枠の `commit` 機構を経由する）ことは §8 のユーザ判断に残す。
+**T142 の最初の設計は落ちた**——`legal[rep]` をそのまま `apply_game_action` に渡すと、
+`ValueError: 不明なアクションです: DON_BOX …` で `GameAborted`。`rust/opcg_engine/src/rules/actions.rs`
+の `apply_game_action` が認識するのは**原始手**（`PLAY`／`TURN_END`／`ATTACK`／`ATTACK_CONFIRM`／
+`ATTACH_DON`／`ACTIVATE_MAIN`／`RESOLVE_EFFECT_SELECTION`／`MULLIGAN`／`KEEP_HAND`）だけで、
+`DON_BOX`（「ドンを k 枚付けてから殴る」箱レベルのマクロ手）は無い。T142 は置き換え先を原始手に
+限って動かした（`docs/reports/2026-09-23_t18_arena.md`・介入できたのは禁じられた行の 27.7%／23.5%）。
 
-## 予告（測る前に書く・上の制約を踏まえて書き直した）
+**T142b（2026-09-23）で解いた——エンジンは変えない**。探索自身が `DON_BOX` を打つときの仕組みを
+そのまま Python で真似る:
 
-1. **10 局とも例外なく最後まで打てる**（`GameAborted` が 0 件）——`swap` が返す手は
-   **`best_family` が `play`／`effect`／`end` のときだけ**`legal` の実在の要素に置き換わる
-   （`attack`／`attach` は置き換えない）ので、規則違反・未対応の手を注入しない。
-2. **介入の頻度は T141 の「最善が `play`／`effect`／`end` だった」割合に近い値になる**——実測
-   （T141・禁じられた行のうち best_family の内訳）から、`play`＋`effect`＋`end` の合計は
-   実 36.7%+6.4%+1.9%=**45.0%**・合成 38.3%+5.5%+4.0%=**47.8%**（`n_forbid` に対する割合）。
-   ただし**介入は打ち回しそのものを変える**ので、後続の決定点の分布は T141（無介入）の記録とは
-   違う経路を辿る——**近い値になるはず**という予告であって、一致を主張しない。
-3. **介入した対局のほうが手数・ターン数が動く**——**方向は予告しない**（今回の置き換え先は
-   `attack` を除くので、T141 の「攻撃寄りで速くなる」という直観はそのままは効かない）。
+* 探索は `don_box_first_primitive(box)` の**最初の 1 原始手**だけを打ち、残りを
+  `carry.commit = [{"kind": "box", "sig": move_sig(box), "left": 総数 − 1}]` に積む
+  （総数 = 付けるドン k 枚 ＋ 殴るなら 1）。次の決定点で `commit_step` が残りを 1 手ずつ
+  （`left ≤ 1` かつ的があれば `ATTACK`・それ以外は `ATTACH_DON`）打つ。
+* `box_first_primitive`／`box_total`／`expand_replacement` がこの規則の Python 版。`make_swap` は
+  置き換え先が `DON_BOX` なら最初の原始手を返し、**`out["commit"]` を書き換える**（`driver.run_game`
+  は `swap` の後に `carries[name].put(out)` で `out["commit"]` を読む）。
+* **元の手の `commit` は必ず捨てる**——探索が `DON_BOX` を選んでいた場合、置き換えた後にも元の箱の
+  残りが次の決定点で打たれてしまう（T142 の器にも潜んでいた欠陥・置き換え先が原始手でも同じ）。
+* `commit_step` は `sig` が合法手に見つからなければ**黙って畳む**ので、箱が最後まで打たれたかは
+  `make_box_tracker`（`observer`）が数える（`box_completed`／`box_broken`）。
+
+## 予告（T142b・測る前に書く）
+
+1. **20 局とも例外なく最後まで打てる**（`GameAborted` 0 件）——置き換えは常に原始手で届く。
+2. **`attach` 以外の禁じられた行はすべて介入できる**（`n_forbidden == n_exempt + n_intervened`・
+   `n_no_replacement == 0`）。
+3. **置き換えた箱はほぼ最後まで打たれる**（`box_broken` は `box_completed` より十分小さい）——
+   壊れるのは途中で盤面が変わって同じ `sig` の合法手が消えたときだけ。
+
+**T144 の切替（`--seq`）**: `shadow_forbid.SEQ_MODE` を `attack`／`attack_le` にすると、純付与は
+「それが準備する攻撃の価格」で読まれる。読み替えられた付与の行は `played_reread` が立ち、`attach` でも
+対象外にしない（読み替えられない付与は今までどおり対象外）。既定は `off`＝T142b のまま。
 
 使い方:
 
@@ -78,6 +84,7 @@ if _HERE not in sys.path:
 from opcg_sim.loop import decks as D  # noqa: E402
 from opcg_sim.loop import driver as DR  # noqa: E402
 from opcg_sim.loop import engine as E  # noqa: E402
+from opcg_sim.loop import record_gen as RG  # noqa: E402
 import guard_afford as GA  # noqa: E402
 import live_theory as LT  # noqa: E402
 import shadow_forbid as SF  # noqa: E402
@@ -86,6 +93,55 @@ from theory_order import MU, THETA  # noqa: E402
 
 #: 「禁じる」対象から除く型（T141 の申し送り——系列の価値を見ない `s` の守備範囲の外）。
 EXEMPT_FAMILIES = ("attach",)
+
+
+#: `apply_game_action`／`apply_battle_action` が直接受ける原始手（`rust/opcg_engine/src/rules/actions.rs`）。
+PRIMITIVE_ATS = ("PLAY", "TURN_END", "ATTACK", "ATTACK_CONFIRM", "ATTACH_DON", "ACTIVATE_MAIN",
+                 "RESOLVE_EFFECT_SELECTION")
+
+
+def box_total(mv):
+    """`DON_BOX` の総原始手数（付与 k 枚＋攻撃形なら 1）。**Rust `search/decide.rs::box_total` と同じ式**。"""
+    p = mv.get("payload") or {}
+    k = int(float(p.get("don_k") or 0))
+    return k + (1 if p.get("target_ids") else 0)
+
+
+def box_first_primitive(mv):
+    """`DON_BOX` → 先頭の原始手。**Rust `search/decide.rs::don_box_first_primitive` と同じ規則**
+    （`k ≤ 0` かつ対象あり＝`ATTACK`・それ以外＝`ATTACH_DON`）。`DON_BOX` 以外は素通し。"""
+    if mv.get("action_type") != "DON_BOX":
+        return mv
+    p = mv.get("payload") or {}
+    k = int(float(p.get("don_k") or 0))
+    uuid = p.get("uuid")
+    tids = list(p.get("target_ids") or ())
+    if k <= 0 and tids:
+        return {"kind": "game", "action_type": "ATTACK", "payload": {"uuid": uuid, "target_ids": tids}}
+    return {"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": uuid}}
+
+
+def expand_replacement(rep_move):
+    """置き換え先（`legal` の要素）→ `(今打つ原始手, 次の decide に持ち越す残り手順)`。
+
+    **乾式運転で見つけた壁（2026-09-23）への対処**: `DON_BOX` は探索の箱レベルのマクロ手で
+    `apply_game_action` は認識しない。探索自身は「先頭の原始手を打ち、残りを
+    `[{"kind": "box", "sig": move_sig, "left": total − 1}]` として持ち越す」（`decide.rs` の ⑥ と
+    `commit_step`）——**同じ形をここで作る**。Rust 側は変えない（持ち越しの読み手は既存の
+    `commit_step`・`move_sig` は `don_k` を含まないので次の decide の合法手に照合できる）。
+    原始手でも `DON_BOX` でもない（`SETUP_BOX` 等）なら `(None, None)`＝置き換えない。"""
+    at = rep_move.get("action_type")
+    if at == "DON_BOX":
+        total = box_total(rep_move)
+        if total < 1:
+            return None, None
+        commit = ([{"kind": "box", "sig": RG.move_sig(rep_move), "left": total - 1}]
+                  if total > 1 else [])
+        return box_first_primitive(rep_move), commit
+    if at in PRIMITIVE_ATS:
+        # 素の手は残り手順を持たない（`PLAY`／`ACTIVATE_MAIN` の効果対話は次の decide が窓として解く）
+        return rep_move, []
+    return None, None
 
 
 def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMILIES):
@@ -99,7 +155,10 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
     stats.setdefault("n_seen", 0)
     stats.setdefault("n_forbidden", 0)
     stats.setdefault("n_exempt", 0)
-    stats.setdefault("n_best_is_macro", 0)
+    stats.setdefault("n_box_replacement", 0)
+    stats.setdefault("box_completed", 0)
+    stats.setdefault("box_broken", 0)
+    stats.setdefault("pending_box", {})
     stats.setdefault("n_intervened", 0)
     stats.setdefault("n_no_replacement", 0)
     stats.setdefault("interventions", [])
@@ -118,20 +177,10 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
         if not row["forbidden"]:
             return move
         stats["n_forbidden"] += 1
-        if row["played_family"] in exempt:
+        # **T144**: 付与が攻撃の価格に読み替えられた行（`shadow_forbid.SEQ_MODE` が `off` 以外）は、
+        # もう「系列の価値を測れない型」ではないので対象外にしない。読み替えられない付与は今までどおり外す。
+        if row["played_family"] in exempt and not row.get("played_reread"):
             stats["n_exempt"] += 1
-            return move
-        # **配線の発見（乾式運転で見つけた・2026-09-23）**: `DON_BOX` は探索が使う **箱レベルの
-        # マクロ手**（「k 枚ドンを付けてから殴る」）で、`rust/opcg_engine/src/rules/actions.rs` の
-        # `apply_game_action` は `DON_BOX` を**そもそも認識しない**（`ATTACK`／`PLAY`／`ATTACH_DON`／
-        # `ACTIVATE_MAIN`／`TURN_END` 等の**原始手**だけを受ける）。この符号化では**攻撃は全部
-        # `DON_BOX` の形で来る**（`theory_order.score_candidate` の docstring どおり）ので、
-        # `attack`（`DON_BOX` に対象あり）と `attach`（同・対象なし）は `legal[rep]` をそのまま
-        # 適用できない——**箱の原始化は探索の内部**にあり、Python から任意の候補を選んで原始化させる
-        # 口は今の API に無い。**`best_family` がこの 2 つなら置き換えない**（`attach` は既に
-        # `exempt` の既定に入っているが、`best_family`＝置き換え先として選ばれる場合はここで別途止める）。
-        if row["best_family"] in ("attack", "attach"):
-            stats["n_best_is_macro"] += 1
             return move
         groups = out.get("groups") or []
         legal = (out.get("stats") or {}).get("legal") or []
@@ -143,13 +192,57 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
         if rep is None or rep >= len(legal) or legal[rep] is None:
             stats["n_no_replacement"] += 1
             return move
+        new_move, commit = expand_replacement(legal[rep])
+        if new_move is None:
+            stats["n_no_replacement"] += 1
+            return move
+        # **探索が元の手のために積んだ残り手順を捨て、置き換え先の残り手順に差し替える**
+        # （driver は `swap` の後に `out["commit"]` を持ち越す＝ここで書き換えれば次の decide に届く）。
+        # 捨て忘れると、次の decide が**元の箱の続き**（元のカードへのドン付与など）を機械実行する。
+        out["commit"] = commit
+        if legal[rep].get("action_type") == "DON_BOX":
+            stats["n_box_replacement"] += 1
+            left = len(commit) and commit[0]["left"]
+            if left:
+                stats["pending_box"][name] = left       # 次の decide から `commit` が left 回続くはず
+            else:
+                stats["box_completed"] += 1             # 1 手で終わる箱
         stats["n_intervened"] += 1
         stats["interventions"].append({"turn": turn, "step": step, "who": name,
                                        "played_family": row["played_family"],
                                        "best_family": row["best_family"], "s": row["s"]})
-        return legal[rep]
+        return new_move
 
     return swap
+
+
+def make_box_tracker(stats):
+    """`driver.run_game(observer=…)` に渡す観測。**置き換えた箱が最後まで実行されたか**を数える。
+
+    Rust の `commit_step` は持ち越した手順が合法手に照合できないと**黙ってコミットを畳む**
+    （「契約違反／消化完了」）＝異常終了しないまま箱が途中で消えうる。`swap` が積んだ
+    `pending_box[seat] = left` に対して、その席の次の決定が `kind == "commit"` で `left` 回続けば
+    `box_completed`、途中で別の種類の決定が来たら `box_broken`。"""
+    stats.setdefault("box_completed", 0)
+    stats.setdefault("box_broken", 0)
+    stats.setdefault("pending_box", {})
+
+    def observer(game, name, turn, step, out, move):
+        left = stats["pending_box"].get(name, 0)
+        if not left:
+            return
+        if out.get("kind") == "commit":
+            left -= 1
+            if left == 0:
+                stats["box_completed"] += 1
+                stats["pending_box"].pop(name, None)
+            else:
+                stats["pending_box"][name] = left
+        else:
+            stats["box_broken"] += 1
+            stats["pending_box"].pop(name, None)
+
+    return observer
 
 
 def dry_run(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns=4, worlds=4,
@@ -170,14 +263,16 @@ def dry_run(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns
         swap = make_swap(cards, idx2cid, theta, mu, stats, exempt)
         aborted = None
         try:
-            res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, swap=swap)
+            res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, swap=swap,
+                              observer=make_box_tracker(stats))
         except DR.GameAborted as exc:                                  # noqa: BLE001
             aborted = str(exc)
             res = {"winner": None, "turns": None, "steps": None}
         games.append({"seed": seed, "winner": res.get("winner"), "turns": res.get("turns"),
                      "steps": res.get("steps"), "aborted": aborted,
                      "n_seen": stats["n_seen"], "n_forbidden": stats["n_forbidden"],
-                     "n_exempt": stats["n_exempt"], "n_best_is_macro": stats["n_best_is_macro"],
+                     "n_exempt": stats["n_exempt"], "n_box_replacement": stats["n_box_replacement"],
+                     "box_completed": stats["box_completed"], "box_broken": stats["box_broken"],
                      "n_intervened": stats["n_intervened"],
                      "n_no_replacement": stats["n_no_replacement"],
                      "interventions": stats["interventions"]})
@@ -193,13 +288,16 @@ def summarise(games):
     n_seen = sum(g["n_seen"] for g in games)
     n_forbidden = sum(g["n_forbidden"] for g in games)
     n_exempt = sum(g["n_exempt"] for g in games)
-    n_best_is_macro = sum(g.get("n_best_is_macro", 0) for g in games)
+    n_box_replacement = sum(g.get("n_box_replacement", 0) for g in games)
+    box_completed = sum(g.get("box_completed", 0) for g in games)
+    box_broken = sum(g.get("box_broken", 0) for g in games)
     n_intervened = sum(g["n_intervened"] for g in games)
     n_no_replacement = sum(g["n_no_replacement"] for g in games)
     return {
         "n_games": len(games), "n_aborted": n_aborted, "n_no_winner": n_no_winner,
         "n_seen": n_seen, "n_forbidden": n_forbidden, "n_exempt": n_exempt,
-        "n_best_is_macro": n_best_is_macro,
+        "n_box_replacement": n_box_replacement,
+        "box_completed": box_completed, "box_broken": box_broken,
         "n_intervened": n_intervened, "n_no_replacement": n_no_replacement,
         "intervene_rate": round(n_intervened / n_seen, 4) if n_seen else None,
         "forbid_rate": round(n_forbidden / n_seen, 4) if n_seen else None,
@@ -216,12 +314,15 @@ def build_parser():
     ap.add_argument("--decks", default="synth", choices=("singleton", "synth", "synth_dig",
                                                           "synth_roles", "user"))
     ap.add_argument("--sims", type=int, default=64)
+    ap.add_argument("--seq", default="off", choices=SF.SEQ_MODES,
+                    help="**T144** 付与を攻撃の価格に読み替えるか（`off` 以外なら、読み替えた付与は対象外にしない）")
     ap.add_argument("--json", default="")
     return ap
 
 
 def main(argv=None):
     a = build_parser().parse_args(argv)
+    SF.set_seq_mode(a.seq)                          # **T144**
     seeds = [a.seed_base + i for i in range(a.games)]
     games = dry_run(seeds, a.decks, sims=a.sims)
     out = {"games": games, "summary": summarise(games)}

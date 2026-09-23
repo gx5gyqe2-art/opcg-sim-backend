@@ -2417,6 +2417,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 op = per_seat[(1 - w, prev_o[-1])]
                 t_opp_act = sum(1 for tt in ts_o if tt > t)
                 rec = {"g": games, "who": w, "won": won,
+                       # **T145**: 決着の旗（`lethal_rule.settled_map` の `(seed, w, t)`）と同じ鍵——
+                       # `--pre-settle` が落とした行と残した行を**同じ予測のまま**突き合わせるのに要る
+                       "seed": seed_g, "t": t,
                        "t_me_act": me["t_left"], "t_opp_act": t_opp_act,
                        "theta_me": me["theta"], "theta_opp": op["theta"], "j_me": me["j"], "j_opp": op["j"],
                        "slope_theory_me": me["slope_theory"], "slope_theory_opp": op["slope_theory"],

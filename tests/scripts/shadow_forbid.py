@@ -45,6 +45,22 @@ T140 は既存の記録の seed を打ち直して「生=記録」を検算し�
 新しい seed**で対局を生成しながら測る——T18／T142 は arena で新しく打った対局を使うので、
 「まだ記録が無い局面でも測れる」ことを本 T で確かめておく（既存記録の再生に頼らない経路）。
 
+## T144（2026-09-23）: 付与を 2 手の系列として読む（`--seq attack`）
+
+T141 で `attach` の禁じ率は 93%／91% だった。原因は単位のずれ——付与の静的価格は「攻撃の価値の
+**増分**」、攻撃候補は「**総額**」で、同じ行に並べると付与は構造的に負ける。規則上、付与したドンは
+自分のターン中だけ効き、価値は同じターンにその k 枚を乗せて殴る攻撃にしかない。その攻撃は同じ行に
+`DON_BOX(同じ uuid, 対象, 同じ k)` として在る。`seq_prices` は純付与の価格をその攻撃候補の最大価格に
+読み替える（式は関数の docstring・新定数ゼロ）。
+
+**予告（測る前に書く）**:
+
+1. **`attach` の禁じ率は大きく下がり、`attack` の禁じ率（T141 で 49%／40%）の近くまで落ちる**——
+   読み替えた付与は、自分が準備する攻撃と同じ価格になるので、その攻撃より上の候補が在るときだけ禁じられる。
+2. **`attach` 以外の型の禁じ率は下がらない**（読み替えは純付与の価格を上げるだけ＝行の最大値は
+   上がるか据え置き。付与が最大値になる行では他の型の `s` が下がり、禁じ率はむしろ上がりうる）。
+3. **読み替えできない純付与（同じ uuid・同じ k の攻撃候補が無い）が一定数残る**——出たら件数を書く。
+
 使い方:
 
     python tests/scripts/shadow_forbid.py --games 10 --seed-base 50000 --decks user [--json out.json]
@@ -78,6 +94,83 @@ from theory_order import MU, THETA  # noqa: E402
 TOL = 1e-9
 
 
+#: **T144**（2026-09-23）: 純付与を 2 手の系列として読むか。`off`＝T141 のまま（静的な `attach_value`）／
+#: `attack`＝**同じカード・同じ枚数の攻撃候補の最大価格**に読み替える（下の `seq_prices`）／
+#: `attack_le`＝**同じカード・枚数が同じか少ない攻撃候補の最大価格**（測った後に足した第 2 の読み・T144 §4）。
+SEQ_MODES = ("off", "attack", "attack_le")
+SEQ_MODE = "off"
+
+
+def set_seq_mode(mode):
+    global SEQ_MODE
+    if mode not in SEQ_MODES:
+        raise ValueError("SEQ_MODE は %r のどれか（%r）" % (SEQ_MODES, mode))
+    SEQ_MODE = mode
+
+
+def _is_pure_attach(sig):
+    return bool(sig) and sig[0] in ("DON_BOX", "ATTACH_DON") and not (len(sig) > 2 and sig[2])
+
+
+def _is_box_attack(sig):
+    return bool(sig) and sig[0] == "DON_BOX" and len(sig) > 2 and bool(sig[2])
+
+
+def _k_of(c, default):
+    return int(c["k"]) if c["k"] is not None and c["k"] >= 0 else default
+
+
+def seq_prices(cands, priced, mode=None):
+    """**純付与の価格を、それが準備する攻撃の価格に読み替える**（T144・新定数ゼロ）。
+
+    規則: 付与したドンは**自分のターン中だけ** +1000 で、次のリフレッシュで戻る＝純付与そのものは
+    損害を生まない。価値は「同じターンにそのカードがその k 枚を乗せて殴る攻撃」にしかない。
+    その攻撃は同じ行の候補に `DON_BOX(同じ uuid, 対象, 同じ k)` として既に在り、
+    `score_candidate` が `+1000k` 込みで値付けしている。静的な `attach_value` は**攻撃の価値の増分**
+    （`theory_order.attach_value`）で、攻撃候補は**総額**——**同じ行に並べると単位がずれ、付与は
+    構造的に必ず負ける**（T141 の `attach` の禁じ率 93% の正体）。
+
+    読み替え: 純付与（uuid=X・k 枚）の価格 ← `max{price(c) : c は DON_BOX 攻撃・c.uuid=X・c.k=k}`。
+    同じ X・同じ k の攻撃候補が無ければ**静的価格のまま**（今のターンに殴れない＝【ドン!!×N】の
+    条件付け等の別の用途・T74 が扱う）。`ATTACH_DON`（1 枚）は k=1 として扱う。
+
+    **`attack_le`**（測った後の第 2 の読み）: 箱の生成器（`rust/.../search/macro.rs`）は攻撃の箱に
+    **k ∈ {0, 相手を越える最小, カウンター 2 枚要求}**、純付与の箱に **k ∈ {1, 全部, 【ドン!!×N】の不足分}** しか
+    出さない＝2 つの組はめったに重ならない（1 枚の付与に 1 枚の攻撃候補が在るのは、1 枚でちょうど越えるときだけ）。その付与の
+    攻撃としての価値は「しきい値を越えない分は変わらない」＝**枚数が同じか少ない攻撃候補の最大価格**で読む。
+    `mode` を省けば `SEQ_MODE` に従う。戻り値: `(読み替えた priced, 読み替えた件数, 純付与の件数)`。"""
+    mode = SEQ_MODE if mode is None else mode
+    atk = {}
+    for c, p in zip(cands, priced):
+        if p["price"] is None or not _is_box_attack(c["sig"]):
+            continue
+        atk.setdefault(c["sig"][1], []).append((_k_of(c, 0), float(p["price"])))
+    out, n_re, n_attach = [], 0, 0
+    for c, p in zip(cands, priced):
+        if _is_pure_attach(c["sig"]) and p["price"] is not None:
+            n_attach += 1
+            k = _k_of(c, 1)
+            vs = [pr for kk, pr in atk.get(c["sig"][1], [])
+                  if (kk <= k if mode == "attack_le" else kk == k)]
+            v = max(vs) if vs else None
+            if v is not None:
+                out.append(dict(p, price=v))
+                n_re += 1
+                continue
+        out.append(p)
+    return out, n_re, n_attach
+
+
+def _reread_index(cands, i, priced, mode=None):
+    """候補 `i`（純付与）が読み替えの対象になった（同じ uuid・読みに合う k の攻撃候補が在った）か。"""
+    mode = SEQ_MODE if mode is None else mode
+    c = cands[i]
+    k = _k_of(c, 1)
+    return any(_is_box_attack(o["sig"]) and o["sig"][1] == c["sig"][1]
+               and (_k_of(o, 0) <= k if mode == "attack_le" else _k_of(o, 0) == k)
+               and p["price"] is not None for o, p in zip(cands, priced))
+
+
 def find_chosen(cands, out, move):
     """`out`／`move` から実際に選んだ候補の index（無ければ `None`）。
 
@@ -107,6 +200,9 @@ def shadow_row(sc, tok, ci, cards, idx2cid, cands, out, move, theta=THETA, mu=MU
     `forbidden`（全精度）と `forbidden_cast`（キャスト後）を両方返す——`s` が 0 のすぐそばの行だけ、
     キャストで判定が入れ替わりうる（新しい判断基準ではなく、T140 の対照をそのまま使う）。"""
     priced = LT.price_candidates(sc, tok, ci, cards, idx2cid, cands, theta, mu)
+    n_re = 0
+    if SEQ_MODE != "off":
+        priced, n_re, _n_attach = seq_prices(cands, priced)
     scored = _best(priced)
     if scored is None:
         return None
@@ -122,6 +218,8 @@ def shadow_row(sc, tok, ci, cards, idx2cid, cands, out, move, theta=THETA, mu=MU
     c_sc, c_tok, c_ci = LT.cast_row(sc, tok, ci)
     priced_cast = LT.price_candidates(c_sc.astype(np.float32), c_tok.astype(np.float32),
                                      c_ci.astype(np.int64), cards, idx2cid, cands, theta, mu)
+    if SEQ_MODE != "off":
+        priced_cast, _r, _a = seq_prices(cands, priced_cast)
     scored_cast = _best(priced_cast)
     if scored_cast is not None:
         played_c = next((v for i, v in scored_cast if i == chosen), None)
@@ -137,6 +235,10 @@ def shadow_row(sc, tok, ci, cards, idx2cid, cands, out, move, theta=THETA, mu=MU
            # `cands` への index（`chosen`＝実際に選んだ候補・`best_index`＝理論の最善）。
            # **T142** が「置き換える」ときに `out["groups"][best_index]["rep"]` から実際の手を引くのに使う。
            "chosen_index": chosen, "best_index": best_i,
+           # **T144**: 選んだ手が純付与で、攻撃の価格に読み替えられたか（`SEQ_MODE` が `off` 以外のときだけ真になりうる）
+           "played_reread": bool(SEQ_MODE != "off" and n_re > 0
+                                 and _is_pure_attach(cands[chosen]["sig"])
+                                 and _reread_index(cands, chosen, priced)),
            "n_cands": len(scored)}
 
 
@@ -215,12 +317,15 @@ def build_parser():
     ap.add_argument("--decks", default="synth", choices=("singleton", "synth", "synth_dig",
                                                           "synth_roles", "user"))
     ap.add_argument("--sims", type=int, default=64)
+    ap.add_argument("--seq", default="off", choices=SEQ_MODES,
+                    help="T144: 純付与を攻撃の価格に読み替える（attack）か T141 のまま（off）")
     ap.add_argument("--json", default="")
     return ap
 
 
 def main(argv=None):
     a = build_parser().parse_args(argv)
+    set_seq_mode(a.seq)
     seeds = [a.seed_base + i for i in range(a.games)]
     rows, meta = collect(seeds, a.decks, sims=a.sims)
     out = {"meta": meta, "summary": summarise(rows)}

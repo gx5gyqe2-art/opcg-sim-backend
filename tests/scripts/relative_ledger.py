@@ -207,20 +207,29 @@ def _invariance(inv, st0, dx, prof, sigma_rel, dl, kk, capped):
                 inv[tag + "_bad_offcap"] += 1
 
 
-def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency=1.0, pre_settle=False):
+def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency=1.0, pre_settle=False,
+            parts=False):
     """記録を 1 度読んで **7 つの腕**を並べる（席×局ごとに積む）。
 
     `scale_a`（**P7**）は**両席の `A` に共通の掛け算誤差**を入れる／`scale_currency`（**P5**）は
     **耐久も価格も同時に c 倍**する＝どちらも**相対の腕は 1 ビットも動いてはならない**。
 
     **T138b**: `pre_settle=True` なら決着後（`lethal_rule.settled_map` が `True`）の行を読まない——
-    **`before`（最後の自席ターンを外すだけの目分量）を、規則の決着点に差し替える**。"""
+    **`before`（最後の自席ターンを外すだけの目分量）を、規則の決着点に差し替える**。
+
+    **T145**: `parts=True` なら `rel_K` の局ごとの和を**勝者／敗者の最後の自席ターン**と**宣言した行**に
+    割って出す（`out["parts"]`）——T138b の `arms` の符号反転が「決着後を除いた」ことではなく
+    「**片方の席の最後のターンだけ**を除いた」ことから来るかを、同じ行の上で確かめる。"""
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     settled = None
-    if pre_settle:
+    flags = None                          # **T145**: 落とさずに旗だけ読む（`parts`）
+    if pre_settle or parts:
         import lethal_rule as LR
-        settled = LR.settled_map(dirs, limit_games)
+        flags = LR.settled_map(dirs, limit_games)
+        if pre_settle:
+            settled = flags
+    part_rows = []                        # **T145**: 局ごとの `rel_K` の内訳（席 0 視点）
     prof = CB.profile_for(dirs)
     if KV.D_MODE in ("curve", "curve_scaled") and not prof:
         raise ValueError("D_MODE=KV.D_MODE なのに損害の輪郭が引けない（%s）" % (dirs,))
@@ -258,6 +267,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
         acc = {k: 0.0 for k in arms}
         acc_before = {k: 0.0 for k in arms}
         acc_last = {k: 0.0 for k in arms}
+        # **T145**: `rel_K` を (席, 最後の自席ターンか, 宣言した行か) で割る（席 0 視点のまま積む）
+        acc_part = {}
         cur_ks = []
         w0 = None
         z_of_seat = {}
@@ -375,6 +386,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
             for kk2, val in one.items():
                 acc[kk2] += val
                 (acc_last if is_last else acc_before)[kk2] += val
+            if flags is not None:
+                pk = (w, bool(is_last), bool(flags.get((seed_g, w, t))))
+                acc_part[pk] = acc_part.get(pk, 0.0) + one["rel_K"]
         prev_ks = cur_ks
         if len(z_of_seat) < 2:
             continue
@@ -383,6 +397,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
         for kk2 in arms:
             arms[kk2].append(acc[kk2]); before[kk2].append(acc_before[kk2])
             last[kk2].append(acc_last[kk2])
+        if flags is not None:
+            part_rows.append((z_of_seat.get(0, 0.0), acc["rel_K"], acc_part))
     n = max(1, stats["priced"])
     out = {"games": stats["games"], "rows": stats["rows"], "priced": stats["priced"],
            "d_mode": KV.D_MODE, "sigma_rel": round(sr, 4),
@@ -407,7 +423,44 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
            "before": {kk: KV._score(before[kk], zs) for kk in ARMS},
            # **P3**: とどめの帯だけ（厳密形が効くならここだけで効くはず）
            "last_turn": {kk: KV._score(last[kk], zs) for kk in ARMS}}
+    if flags is not None:
+        out["parts"] = parts_of(part_rows)
     return out
+
+
+def parts_of(part_rows):
+    """**T145**: `rel_K` の局ごとの和を割った表。`part_rows` は `(z0, 全体の和, {(席, 最後か, 宣言か): 和})`。
+
+    * `mean_winner_view` … 各部分の和を**勝者の視点**に直した平均（勝者の最後のターン・敗者の最後のターン・
+      宣言した行〔勝者／敗者〕・それ以外）。**正なら勝者の側に積んでいる**。
+    * `auc` … 全体の和から部分を引いた「腕」の AUC（`z` は席 0 の勝敗）:
+      `all`（全行）／`minus_declared`（宣言した行を引く＝T138b の `--pre-settle on` と同じ行）／
+      `minus_both_last`（両席の最後の自席ターンを引く＝`before` と同じ行）／
+      `minus_winner_last`・`minus_loser_last`（片方の席の最後のターンだけ引く）。"""
+    names = ("winner_last", "loser_last", "winner_declared", "loser_declared", "rest")
+    sums = {k: [] for k in names}
+    arms = {k: [] for k in ("all", "minus_declared", "minus_both_last", "minus_winner_last",
+                            "minus_loser_last")}
+    zs = []
+    for z0, tot, part in part_rows:
+        win = 0 if z0 > 0.5 else 1
+        sg = 1.0 if win == 0 else -1.0                   # 席 0 視点 → 勝者視点
+        wl = sum(v for (w, lt, _d), v in part.items() if w == win and lt)
+        ll = sum(v for (w, lt, _d), v in part.items() if w != win and lt)
+        wd = sum(v for (w, _lt, d), v in part.items() if w == win and d)
+        ld = sum(v for (w, _lt, d), v in part.items() if w != win and d)
+        rest = sum(v for (_w, lt, d), v in part.items() if not lt and not d)
+        for k, v in zip(names, (wl, ll, wd, ld, rest)):
+            sums[k].append(v * sg)
+        zs.append(z0)
+        arms["all"].append(tot)
+        arms["minus_declared"].append(tot - wd - ld)
+        arms["minus_both_last"].append(tot - wl - ll)
+        arms["minus_winner_last"].append(tot - wl)
+        arms["minus_loser_last"].append(tot - ll)
+    return {"games": len(zs),
+            "mean_winner_view": {k: round(float(np.mean(v)) if v else 0.0, 5) for k, v in sums.items()},
+            "auc": {k: KV._score(v, zs).get("auc") for k, v in arms.items()}}
 
 
 def build_parser():
@@ -429,6 +482,8 @@ def build_parser():
                     help="**診断用**（例 0.5,2）: `curve_scaled` の倍率を締める。モデルの提案ではない")
     ap.add_argument("--pre-settle", dest="pre_settle", default="off", choices=("off", "on"),
                     help="**T138b** 決着後（`lethal_rule.settled_map`）の行を除いて測るか")
+    ap.add_argument("--parts", action="store_true",
+                    help="**T145** `rel_K` の和を勝者／敗者の最後のターンと宣言した行に割って出す")
     ap.add_argument("--json", default="")
     return ap
 
@@ -446,7 +501,7 @@ def main(argv=None):
     if a.clamp:
         KV.set_scale_clamp([float(x) for x in a.clamp.split(",")])
     out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency,
-                  pre_settle=(a.pre_settle == "on"))
+                  pre_settle=(a.pre_settle == "on"), parts=a.parts)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:

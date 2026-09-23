@@ -247,3 +247,71 @@ def test_cli_builds_seed_range_and_reaches_collect(monkeypatch, tmp_path):
     saved = json.loads(out_json.read_text(encoding="utf-8"))
     assert saved["meta"] == {"n_games": 3, "n_dropped": 0}
     assert saved["summary"]["n"] == 1
+
+
+# ---- 5. seq_prices（T144・純付与を攻撃の価格に読み替える）------------------------------------
+
+def _c(sig, k):
+    return {"sig": sig, "cid": None, "tcid": None, "si": -1, "ti": -1, "k": k, "k_raw": k}
+
+
+def test_seq_prices_rereads_a_pure_attach_as_the_attack_it_prepares():
+    cands = [_c(["DON_BOX", "X", [], [], None], 2),           # 純付与 X・2 枚
+             _c(["DON_BOX", "X", ["L"], [], None], 2),        # X が 2 枚乗せて殴る
+             _c(["DON_BOX", "X", ["C"], [], None], 2),        # 同・別の対象
+             _c(["DON_BOX", "X", ["L"], [], None], 0)]        # 枚数が違う攻撃は数えない
+    priced = [{"price": 0.03}, {"price": 0.30}, {"price": 0.25}, {"price": 0.50}]
+    out, n_re, n_attach = SF.seq_prices(cands, priced)
+    assert out[0]["price"] == pytest.approx(0.30)           # 同じ X・同じ k の攻撃の最大
+    assert [p["price"] for p in out[1:]] == [0.30, 0.25, 0.50]
+    assert (n_re, n_attach) == (1, 1)
+
+
+def test_seq_prices_keeps_the_static_price_when_the_card_cannot_attack_this_turn():
+    cands = [_c(["DON_BOX", "X", [], [], None], 1), _c(["DON_BOX", "Y", ["L"], [], None], 1)]
+    priced = [{"price": 0.03}, {"price": 0.30}]
+    out, n_re, n_attach = SF.seq_prices(cands, priced)
+    assert out[0]["price"] == pytest.approx(0.03) and (n_re, n_attach) == (0, 1)
+
+
+def test_seq_prices_treats_a_single_attach_don_as_one_card():
+    cands = [_c(["ATTACH_DON", "X", [], [], None], -1), _c(["DON_BOX", "X", ["L"], [], None], 1)]
+    priced = [{"price": 0.03}, {"price": 0.30}]
+    out, n_re, _ = SF.seq_prices(cands, priced)
+    assert out[0]["price"] == pytest.approx(0.30) and n_re == 1
+
+
+def test_shadow_row_in_seq_mode_no_longer_forbids_an_attach_that_prepares_the_best_attack(monkeypatch):
+    sigs = [["DON_BOX", "X", [], [], None], ["DON_BOX", "X", ["L"], [], None], ["PLAY", "u3", [], [], None]]
+    cands = [_c(sigs[0], 2), _c(sigs[1], 2), _c(sigs[2], -1)]
+    cands[2]["k_raw"] = None
+    monkeypatch.setattr(LT, "price_candidates",
+                        lambda sc, tok, ci, cards, idx2cid, cands_, theta, mu:
+                            [dict(c, price=p) for c, p in zip(cands_, (0.03, 0.30, 0.10))])
+    out = {"sig": sigs[0], "k": 2}
+    monkeypatch.setattr(SF, "SEQ_MODE", "off")
+    assert SF.shadow_row(_SC, _TOK, _CI, None, None, cands, out, move={})["forbidden"] is True
+    monkeypatch.setattr(SF, "SEQ_MODE", "attack")
+    row = SF.shadow_row(_SC, _TOK, _CI, None, None, cands, out, move={})
+    assert row["forbidden"] is False and row["played_reread"] is True
+
+
+def test_set_seq_mode_rejects_unknown_values():
+    with pytest.raises(ValueError):
+        SF.set_seq_mode("both")
+
+
+def test_seq_prices_le_mode_reads_the_best_attack_with_no_more_don():
+    """**T144 §4（`attack_le`）**: 箱の生成器はしきい値を越える枚数しか攻撃候補を出さない——
+    k=0 の攻撃しか無い体への 1 枚の付与は、`attack` では読み替わらず、`attack_le` では k≤1 の攻撃の最大で読む。
+    枚数が多い攻撃（k=3）は数えない。"""
+    cands = [_c(["DON_BOX", "X", [], [], None], 1),
+             _c(["DON_BOX", "X", ["L"], [], None], 0),
+             _c(["DON_BOX", "X", ["C"], [], None], 3)]
+    priced = [{"price": 0.03}, {"price": 0.20}, {"price": 0.40}]
+    out, n_re, _ = SF.seq_prices(cands, priced, mode="attack")
+    assert out[0]["price"] == pytest.approx(0.03) and n_re == 0
+    out, n_re, _ = SF.seq_prices(cands, priced, mode="attack_le")
+    assert out[0]["price"] == pytest.approx(0.20) and n_re == 1
+    assert SF._reread_index(cands, 0, priced, mode="attack_le") is True
+    assert SF._reread_index(cands, 0, priced, mode="attack") is False

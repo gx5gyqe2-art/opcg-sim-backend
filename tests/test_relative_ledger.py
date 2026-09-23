@@ -338,3 +338,41 @@ def test_the_curve_reading_cannot_measure_a_switch_that_only_moves_the_rate():
     KV.set_rate_shape(None, None)
     assert KV.d_of((1.0, 2.0, 0.05, 0.05, 2)) != KV.d_of((1.0, 2.0, 5.00, 0.05, 2))
     KV.set_d_mode("curve")
+
+
+def test_parts_split_the_game_sum_by_winner_and_loser_last_turns():
+    """**T145**: `parts_of` は局ごとの `rel_K` の和を勝者／敗者の最後のターン・宣言した行に割る。
+    **勝者の視点に直す**（席 1 が勝った局は符号を返す）・腕は全体の和から部分を引いた値。"""
+    rows = []
+    for g in range(12):
+        win = g % 2                                  # 勝者の席を交互に
+        sg = 1.0 if win == 0 else -1.0               # 勝者視点 → 席 0 視点
+        # 勝者の最後のターン（宣言した行）+3・敗者の最後のターン +2（敗者視点）・それ以外は勝者に +0.5
+        part = {(win, True, True): 3.0 * sg, (1 - win, True, False): -2.0 * sg,
+                (win, False, False): 0.5 * sg}
+        tot = sum(part.values())
+        rows.append((1.0 if win == 0 else 0.0, tot, part))
+    out = RL.parts_of(rows)
+    m = out["mean_winner_view"]
+    assert out["games"] == 12
+    assert m["winner_last"] == pytest.approx(3.0) and m["winner_declared"] == pytest.approx(3.0)
+    assert m["loser_last"] == pytest.approx(-2.0) and m["loser_declared"] == 0.0
+    assert m["rest"] == pytest.approx(0.5)
+    # 全体は勝者に +1.5・宣言（勝者の最後）を引くと −1.5＝**符号が反転**・両方の最後を引くと +0.5
+    assert out["auc"]["all"] == 1.0
+    assert out["auc"]["minus_declared"] == 0.0
+    assert out["auc"]["minus_winner_last"] == 0.0
+    assert out["auc"]["minus_both_last"] == 1.0
+    assert out["auc"]["minus_loser_last"] == 1.0
+
+
+def test_parts_flag_reaches_collect_and_reads_flags_without_dropping_rows(monkeypatch):
+    """**T145**: `--parts` は `collect(..., parts=True)` に届き、`parts=True` は旗を読むだけで
+    行を落とさない（`pre_settle` は `False` のまま）。"""
+    called = {}
+    monkeypatch.setattr(RL, "collect", lambda *a, **kw: called.update(kw) or {})
+    RL.main(["--in", "x", "--parts"])
+    assert called["parts"] is True and called["pre_settle"] is False
+    called.clear()
+    RL.main(["--in", "x"])
+    assert called["parts"] is False
