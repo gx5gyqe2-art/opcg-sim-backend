@@ -48,6 +48,14 @@ T117（「今このターンで殺せるか」・2026-09-19）を**決着の定�
 **`precision_winner` が 1 に届かない分**は、(a) 定義の誤り（理論）か (b) 詰みが在ったのに CPU が決めなかった（打ち筋・§8.5）。
 記録からは分けられないので、**`false_declared` の行で「実際にそのターン何本通ったか」を添えて**後で見分けられるようにする。
 
+## T138a（2026-09-23）: 決着フラグを他の器へ渡す
+
+`collect` の内部ループを共有下請け `_iter_declared_games` に分離し、`settled_map(dirs) -> {(seed, w, t): bool}`
+を追加した。**判定の式（`lethal_of_row`）は 1 か所のまま**——`collect` と `settled_map` が別の答えを出す経路が無い。
+`two_curves`（T137d）・`win_calib`／`relative_ledger`／`crossing_bridge`（T138b）が「このターンより後は決着後」を
+読む入口になる。**この分離で出力は 1 バイトも変わらない**（実記録 w41・合成 w39+w42 で旧版と `json.load` の
+辞書が完全一致することを確認済み）。
+
 使い方:
 
     python tests/scripts/lethal_rule.py --in <records_dir> [--games N] [--don on|off]
@@ -311,9 +319,11 @@ def declare_metrics(games):
                               zip(*np.unique(leads_arr, return_counts=True))} if leads_arr.size else {}}}
 
 
-def collect(dirs, limit_games=0, with_don=True, dump=None):
-    """記録を 1 度読んで決着の指標と内訳を出す。守り手の手札は**相手席の直近の自席ターンの最後の行**から読む。
-    `dump` に list を渡すと**宣言した行と勝者の最後のターンの全内訳**を積む（診断用・取りこぼしも読める）。"""
+def _iter_declared_games(dirs, limit_games=0, with_don=True):
+    """**T138a**: `collect`／`settled_map` が共有する下請け——記録を 1 度読んで、局ごとに
+    `(seed_g, winner, t_end, rows)` を返す（`rows` = `[(w, t, declared, killed_now, dd, hand_missing, life_counter)]`）。
+    `dd` は `lethal_of_row` の内訳（`hand_missing` 行では `{}`）。**判定の式は 1 か所**（`lethal_of_row`）に
+    しかない＝`collect` と `settled_map` が別の答えを出す経路が無い。"""
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     import deck_refill as DR
@@ -322,18 +332,12 @@ def collect(dirs, limit_games=0, with_don=True, dump=None):
     if LETHAL_LIFE_MODE == "draw" and not decks:
         raise ValueError("LETHAL_LIFE_MODE='draw' なのにデッキが引けない（%s）" % (dirs,))
     avg_cache = {}
-    games_out = []
-    stats = {"games": 0, "rows": 0, "hand_missing": 0, "with_don": with_don,
-             "hand_mode": LETHAL_HAND_MODE, "stop_mode": LETHAL_STOP_MODE, "life_mode": LETHAL_LIFE_MODE,
-             "by_life": {},                           # 相手ライフ別: 宣言数・勝者の宣言数
-             "false_rows": []}                        # 敗者の席で宣言した行の内訳（先頭 200 件）
     games = 0
     for r, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS,
                                                  extra_fn=_extra):
         games += 1
         if limit_games and games > limit_games:
             break
-        stats["games"] += 1
         seed_g = int(r["seed"][idx[0]]) if len(idx) else -1
         sh = refill.get(seed_g)
         dk = decks.get(seed_g) if decks else None
@@ -359,7 +363,6 @@ def collect(dirs, limit_games=0, with_don=True, dump=None):
         for w in (0, 1):
             for t in turn_seq[w]:
                 sc, tok, _ci = turn_start[(w, t)]
-                stats["rows"] += 1
                 d = 1 - w
                 prev = [tt for tt in turn_seq[d] if tt < t]
                 counters = items = costs = None
@@ -374,8 +377,7 @@ def collect(dirs, limit_games=0, with_don=True, dump=None):
                     take = HG.take_cost_of(float(np.asarray(sc_d)[SC_MY_LIFE]), MU)
                 elif LETHAL_HAND_MODE == "actual":
                     # 相手がまだ 1 度も打っていない（先手の 1 ターン目）＝手札は初手 5 枚のまま読めない → 宣言しない
-                    stats["hand_missing"] += 1
-                    rows_out.append((w, t, False, False))
+                    rows_out.append((w, t, False, False, {}, True, None))
                     continue
                 cs = float(sh[d]) if sh is not None else None
                 lc = None
@@ -389,17 +391,50 @@ def collect(dirs, limit_games=0, with_don=True, dump=None):
                 declared, dd = lethal_of_row(sc, tok, with_don, counters, cs, take, items, life_counter=lc,
                                              defender_costs=costs)
                 killed_now = bool(winner == w and t == t_end)
+                rows_out.append((w, t, declared, killed_now, dd, False, lc))
+        yield seed_g, winner, t_end, rows_out
+
+
+def settled_map(dirs, limit_games=0, with_don=True):
+    """**T138a**: 局×席×ターンの決着フラグ `{(seed, w, t): declared(bool)}`。**判定は `lethal_of_row` そのもの**
+    （`collect` と同じ下請け `_iter_declared_games` を読むだけ）——他の器（`two_curves`・`win_calib`・
+    `relative_ledger`・`crossing_bridge`）が「このターンより後は決着後」を読むための入口。
+    **手札が読めない行（先手 1 ターン目）は `False`**（宣言しない・`collect` と同じ規約）。"""
+    out = {}
+    for seed_g, _winner, _t_end, rows in _iter_declared_games(dirs, limit_games, with_don):
+        for w, t, declared, _killed_now, _dd, _hand_missing, _lc in rows:
+            out[(seed_g, w, t)] = bool(declared)
+    return out
+
+
+def collect(dirs, limit_games=0, with_don=True, dump=None):
+    """記録を 1 度読んで決着の指標と内訳を出す。守り手の手札は**相手席の直近の自席ターンの最後の行**から読む。
+    `dump` に list を渡すと**宣言した行と勝者の最後のターンの全内訳**を積む（診断用・取りこぼしも読める）。"""
+    games_out = []
+    stats = {"games": 0, "rows": 0, "hand_missing": 0, "with_don": with_don,
+             "hand_mode": LETHAL_HAND_MODE, "stop_mode": LETHAL_STOP_MODE, "life_mode": LETHAL_LIFE_MODE,
+             "by_life": {},                           # 相手ライフ別: 宣言数・勝者の宣言数
+             "false_rows": []}                        # 敗者の席で宣言した行の内訳（先頭 200 件）
+    for seed_g, winner, t_end, rows in _iter_declared_games(dirs, limit_games, with_don):
+        stats["games"] += 1
+        rows_out = []
+        for w, t, declared, killed_now, dd, hand_missing, lc in rows:
+            stats["rows"] += 1
+            if hand_missing:
+                stats["hand_missing"] += 1
                 rows_out.append((w, t, declared, killed_now))
-                if declared:
-                    lk = str(int(dd["life"]))
-                    bl = stats["by_life"].setdefault(lk, {"declared": 0, "winner": 0, "killed_now": 0})
-                    bl["declared"] += 1; bl["winner"] += int(winner == w); bl["killed_now"] += int(killed_now)
-                if dump is not None and (declared or killed_now):
-                    # **宣言した行**と**勝者の最後のターン（取りこぼしの診断用）**を積む
-                    dump.append({"seed": seed_g, "w": w, "t": t, "t_end": int(t_end), "declared": bool(declared),
-                                 "winner": winner, "life_counter": lc, **dd})
-                if declared and winner is not None and w != winner and len(stats["false_rows"]) < 200:
-                    stats["false_rows"].append({"seed": seed_g, "w": w, "t": t, "t_end": int(t_end), **dd})
+                continue
+            rows_out.append((w, t, declared, killed_now))
+            if declared:
+                lk = str(int(dd["life"]))
+                bl = stats["by_life"].setdefault(lk, {"declared": 0, "winner": 0, "killed_now": 0})
+                bl["declared"] += 1; bl["winner"] += int(winner == w); bl["killed_now"] += int(killed_now)
+            if dump is not None and (declared or killed_now):
+                # **宣言した行**と**勝者の最後のターン（取りこぼしの診断用）**を積む
+                dump.append({"seed": seed_g, "w": w, "t": t, "t_end": int(t_end), "declared": bool(declared),
+                             "winner": winner, "life_counter": lc, **dd})
+            if declared and winner is not None and w != winner and len(stats["false_rows"]) < 200:
+                stats["false_rows"].append({"seed": seed_g, "w": w, "t": t, "t_end": int(t_end), **dd})
         games_out.append((winner, t_end, rows_out))
     out = declare_metrics(games_out)
     out.update({k: v for k, v in stats.items() if k != "false_rows"})

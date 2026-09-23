@@ -273,3 +273,72 @@ def test_row_uses_the_opponents_active_don_as_the_event_budget():
     sc[LR.SC_OPP_DON_ACTIVE] = 1.0
     ok1, d1 = LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[4000.0], defender_costs=[1.0])
     assert ok0 and d0["stops"] == 0 and (not ok1) and d1["stops"] == 1
+
+
+# ---- 8. 決着フラグの切り出し（T138a・settled_map） --------------------------------------------------
+#
+# `collect` と `settled_map` は同じ下請け `_iter_declared_games` を読む（判定の式は `lethal_of_row` 1 か所）。
+# 実記録での**同値性**（旧 `collect` と全く同じ JSON を出す）は pytest では確かめられない
+# （このスイートはどの器も real の記録ディレクトリを読まない・`tests/_bootstrap.py` の方針どおり）ので、
+# `docs/reports/2026-09-23_...` の A/B 比較（w41／w39+w42 で `json.load` した辞書が完全一致）で確認済み。
+# ここでは**下請けを差し替えて**、2 つの入口が同じ行から同じ答えを作ることを固定する。
+
+def _fake_generator(rows_by_game):
+    def gen(dirs, limit_games, with_don):
+        return iter(rows_by_game)
+    return gen
+
+
+def test_settled_map_keys_are_seed_w_t_and_values_are_bool(monkeypatch):
+    rows_by_game = [
+        (101, 0, 5, [(0, 1, False, False, {}, False, None),
+                     (0, 3, True, False, {"life": 2.0}, False, 900.0),
+                     (1, 2, False, False, {}, True, None)]),          # hand_missing 行も乗る（False のまま）
+    ]
+    monkeypatch.setattr(LR, "_iter_declared_games", _fake_generator(rows_by_game))
+    sm = LR.settled_map(["x"])
+    assert sm == {(101, 0, 1): False, (101, 0, 3): True, (101, 1, 2): False}
+    assert all(isinstance(v, bool) for v in sm.values())
+
+
+def test_settled_map_merges_multiple_games_without_key_collision(monkeypatch):
+    rows_by_game = [
+        (1, 0, 1, [(0, 1, True, True, {"life": 0.0}, False, 0.0)]),
+        (2, 0, 1, [(0, 1, False, True, {"life": 0.0}, False, 0.0)]),   # 別局の同じ (w, t) は別 key（seed が違う）
+    ]
+    monkeypatch.setattr(LR, "_iter_declared_games", _fake_generator(rows_by_game))
+    sm = LR.settled_map(["x"])
+    assert sm == {(1, 0, 1): True, (2, 0, 1): False}
+
+
+def test_collect_and_settled_map_agree_on_the_same_underlying_rows(monkeypatch):
+    """**同じ下請けを読む 2 つの入口が食い違わない**——`collect` の宣言総数と `settled_map` の
+    True の数が一致する（判定の式が 1 か所にしか無いことの検算）。"""
+    rows_by_game = [
+        (202, 0, 4, [(0, 1, False, False, {}, False, None),
+                     (0, 3, True, False, {"life": 1.0}, False, 800.0),
+                     (1, 2, True, False, {"life": 0.0}, False, 800.0),
+                     (1, 4, False, True, {"life": 3.0}, False, 800.0)]),
+    ]
+    monkeypatch.setattr(LR, "_iter_declared_games", _fake_generator(rows_by_game))
+    sm = LR.settled_map(["x"])
+    out = LR.collect(["x"])
+    assert sum(sm.values()) == out["declared"] == 2
+
+
+def test_collect_dump_still_carries_life_counter_alongside_the_row_details(monkeypatch):
+    """**回帰止め**: `_iter_declared_games` への分離で `life_counter` が `dd` に紛れ込み、`false_rows`
+    に漏れて出力が変わる事故を一度踏んだ（本 T で発見・修正）。`dump` には引き続き乗り、
+    `false_rows`（敗者側の宣言）には乗らないことを固定する。"""
+    rows_by_game = [
+        (303, 0, 2, [(0, 1, True, False, {"life": 1.0}, False, 777.0),          # 勝者側の宣言（dump のみ）
+                     (1, 1, True, False, {"life": 5.0}, False, 555.0),          # 敗者側の宣言（false_rows にも乗る）
+                     (0, 2, False, True, {"life": 0.0}, False, 333.0)]),
+    ]
+    monkeypatch.setattr(LR, "_iter_declared_games", _fake_generator(rows_by_game))
+    dump = []
+    out = LR.collect(["x"], dump=dump)
+    winner_row = next(r for r in dump if r["w"] == 0 and r["t"] == 1)
+    assert winner_row["life_counter"] == 777.0
+    assert out["false_rows_sample"] == [{"seed": 303, "w": 1, "t": 1, "t_end": 2, "life": 5.0}]
+    assert "life_counter" not in out["false_rows_sample"][0]
