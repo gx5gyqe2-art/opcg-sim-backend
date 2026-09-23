@@ -41,7 +41,22 @@ T146a（`2026-09-23_presettle_sigma.md`）は「σ_rel が決着後の行を混�
 
 **T149c**: 終盤の優勢側行を「序盤から同じ席が優勢のまま（`persistent`）」と「終盤で新しく優勢に
 なった（`flipped`）」に分ける（`survivorship_split`）——`persistent` が多く・`gap` も大きいなら、
-「局がまだ終わっていないこと自体」が勝率の読みに無い情報だという読みを支持する。
+「局がまだ終わっていないこと自体」が勝率の読みに無い情報だという読みを支持する。**結果は記録間で
+向きが割れた**（実は `flipped`（0.386）≫`persistent`（0.112）・合成は `persistent`（0.264）＞
+`flipped`（0.233））——T149c の報告は「2 値化ではなく連続変数（継続ターン数）で見る」を未着手の
+候補として挙げた。
+
+**T149f**（本節・T149c の未着手候補）: `persistent`／`flipped` の 2 値化を、**その席が何ターン連続で
+優勢（`p>0.5`）だったか**という連続変数（`leader_streak_of`）に置き換え、終盤の優勢側行を継続ターン数の
+分位で割って `gap` を見る（`streak_axis_table`）。**予告（測る前）**:
+
+1. **実は単調減少**を予告する——`flipped`（継続の短い側）の `gap`（0.386）が `persistent`（継続の
+   長い側）の `gap`（0.112）よりずっと大きいので、継続が短いほど `gap` が大きいはず。
+2. **合成は実よりずっと平坦**を予告する——`persistent`（0.264）と `flipped`（0.233）の差が小さいので、
+   継続ターン数を分位で割っても傾向は弱いか一貫しないはず。
+3. **2 値化の境目（1 ターン）をまたいだだけの見かけの逆転**である可能性——連続変数で見ると、実・合成
+   どちらも同じ形（例: 継続 1〜2 ターンだけ高い・その先は平坦）で、2 値の境目の取り方が記録間の
+   「向きの逆転」を作っていただけ、という可能性も観察する（当てはめない・予告はしない）。
 
 使い方:
 
@@ -272,6 +287,48 @@ def survivorship_split(rows):
            for name, rs in groups.items()}
 
 
+def leader_streak_of(rows):
+    """**T149f**: 各行について、**その席（`who`）がその行まで何ターン連続で優勢（`p>0.5`）だったか**
+    を数える（同じ `seed`・`who` の行を `j_me` 昇順に並べ、この行を含めて `p>0.5` が続く長さ）。
+    `survivorship_split` の `persistent`／`flipped` の 2 値化を連続変数に置き換える（T149c の報告が
+    挙げた未着手の候補）。`p<=0.5` の行は 0（優勢でない行に継続は無い）。戻り値は
+    `{(seed, who, j_me): streak}`。"""
+    by_key = {}
+    for r in rows:
+        by_key.setdefault((r["seed"], r["who"]), []).append(r)
+    out = {}
+    for rs in by_key.values():
+        streak = 0
+        for r in sorted(rs, key=lambda r: r["j_me"]):
+            streak = streak + 1 if r["p"] > 0.5 else 0
+            out[(r["seed"], r["who"], r["j_me"])] = streak
+    return out
+
+
+#: **T149f**: 継続ターン数を割る分位数（既定 4 分位・`S_QUANTILES` と揃える）。
+STREAK_QUANTILES = S_QUANTILES
+
+
+def streak_axis_table(rows, n_q=STREAK_QUANTILES):
+    """**T149f**: `survivorship_split` と同じ集合（終盤・優勢側の行）を、連続変数の継続ターン数
+    （`leader_streak_of`）の分位で割り、`mean_gap` を出す。`n` が `n_q*5` 未満なら分位を作らず `n` だけ
+    返す（`s_axis_table` と同じ規約）。当てはめではなく観察。"""
+    streaks = leader_streak_of(rows)
+    late_fav = [r for r in rows if r["stage"] == "late" and r["p"] > 0.5]
+    if len(late_fav) < n_q * 5:
+        return {"n": len(late_fav), "quantiles": []}
+    vals = np.asarray([streaks.get((r["seed"], r["who"], r["j_me"]), 1) for r in late_fav], float)
+    edges = np.quantile(vals, np.linspace(0, 1, n_q + 1))
+    cells = []
+    for i in range(n_q):
+        lo, hi = edges[i], edges[i + 1]
+        m = (vals >= lo) & (vals <= hi) if i == n_q - 1 else (vals >= lo) & (vals < hi)
+        cell_rows = [r for r, keep in zip(late_fav, m) if keep]
+        cells.append({"q": i + 1, "n": len(cell_rows), "streak_lo": float(lo), "streak_hi": float(hi),
+                     "gap": mean_gap(cell_rows)})
+    return {"n": len(late_fav), "quantiles": cells}
+
+
 def robustness_check(rows):
     """**T149a のまとめ**: 優勢側・劣勢側それぞれで、行単位／局単位の較正の差と、
     late−early の局単位ブートストラップを並べる。"""
@@ -312,7 +369,9 @@ def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel"):
                       "underdog": s_axis_table([r for r in rows if r["p"] < 0.5])},
            # **T149c**: 終盤の優勢側行を「序盤から同じ席が優勢のまま（persistent）」か
            # 「終盤で新しく優勢になった（flipped）」かに分ける
-           "survivorship": survivorship_split(rows)}
+           "survivorship": survivorship_split(rows),
+           # **T149f**: persistent/flipped の 2 値化を継続ターン数の連続変数に置き換える
+           "streak_axis": streak_axis_table(rows)}
 
 
 def main(argv=None):

@@ -252,3 +252,64 @@ def test_survivorship_split_counts_games_not_just_rows():
             _rowgw(0.7, 1, seed=1, who=0, stage="late")]     # 同じ局から late の行が 2 本
     out = PA.survivorship_split(rows)
     assert out["persistent"]["n"] == 2 and out["persistent"]["n_games"] == 1
+
+
+# ---- T149f: 優勢の継続ターン数（連続変数・persistent/flipped の 2 値化の置き換え）------------------
+
+def _rowgwj(p, z, seed, who, stage, j_me):
+    return {"p": p, "z": z, "d": 0.0, "won": bool(z), "j_me": j_me, "stage": stage, "seed": seed, "who": who}
+
+
+def test_leader_streak_of_counts_consecutive_favorable_turns():
+    rows = [_rowgwj(0.9, 1, seed=1, who=0, stage="early", j_me=0),
+            _rowgwj(0.9, 1, seed=1, who=0, stage="early", j_me=1),
+            _rowgwj(0.4, 1, seed=1, who=0, stage="mid", j_me=2),      # 優勢が切れる（p<=0.5）
+            _rowgwj(0.9, 1, seed=1, who=0, stage="late", j_me=3)]
+    out = PA.leader_streak_of(rows)
+    assert out[(1, 0, 0)] == 1
+    assert out[(1, 0, 1)] == 2
+    assert out[(1, 0, 2)] == 0
+    assert out[(1, 0, 3)] == 1
+
+
+def test_leader_streak_of_is_independent_per_seed_and_who():
+    rows = [_rowgwj(0.9, 1, seed=1, who=0, stage="early", j_me=0),
+            _rowgwj(0.9, 1, seed=1, who=1, stage="early", j_me=0),
+            _rowgwj(0.9, 1, seed=2, who=0, stage="early", j_me=0)]
+    out = PA.leader_streak_of(rows)
+    assert out[(1, 0, 0)] == 1 and out[(1, 1, 0)] == 1 and out[(2, 0, 0)] == 1
+
+
+def test_streak_axis_table_reports_n_and_no_quantiles_below_the_row_floor():
+    rows = [_rowgwj(0.9, 1, seed=i, who=0, stage="late", j_me=0) for i in range(10)]
+    out = PA.streak_axis_table(rows, n_q=4)
+    assert out["n"] == 10 and out["quantiles"] == []       # 10 < 4*5=20 で分位を出さない
+
+
+def test_streak_axis_table_splits_into_quantiles_that_cover_every_late_favorite_row():
+    rows = []
+    for i in range(40):
+        k = i % 10 + 1                                     # 継続ターン数 1..10 を繰り返す
+        for j in range(k - 1):
+            rows.append(_rowgwj(0.9, 1, seed=i, who=0, stage="early", j_me=j))
+        rows.append(_rowgwj(0.9, 1, seed=i, who=0, stage="late", j_me=k - 1))
+    out = PA.streak_axis_table(rows, n_q=4)
+    cells = out["quantiles"]
+    assert len(cells) == 4
+    assert sum(c["n"] for c in cells) == 40                 # 取りこぼしなし
+    assert [c["q"] for c in cells] == [1, 2, 3, 4]
+
+
+def test_streak_axis_table_detects_a_trend_when_gap_depends_on_streak():
+    """**T149f の核心**: 継続ターン数が長いほど過大評価が増える合成データを作り、`gap` がその分位で
+    単調に増えることを確かめる（実データの当否とは別の器の検算・`test_s_axis_table_detects_...` と同じ形）。"""
+    rows = []
+    for i in range(40):
+        k = i % 10 + 1
+        for j in range(k - 1):
+            rows.append(_rowgwj(0.9, 1, seed=i, who=0, stage="early", j_me=j))
+        p = 0.5 + 0.03 * k                                  # 継続が長いほど過大評価が増える
+        rows.append(_rowgwj(p, 0.0, seed=i, who=0, stage="late", j_me=k - 1))
+    out = PA.streak_axis_table(rows, n_q=4)
+    gaps = [c["gap"] for c in out["quantiles"]]
+    assert gaps == sorted(gaps) and gaps[0] < gaps[-1]
