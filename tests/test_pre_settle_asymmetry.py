@@ -313,3 +313,101 @@ def test_streak_axis_table_detects_a_trend_when_gap_depends_on_streak():
     out = PA.streak_axis_table(rows, n_q=4)
     gaps = [c["gap"] for c in out["quantiles"]]
     assert gaps == sorted(gaps) and gaps[0] < gaps[-1]
+
+
+# ---- T149g: 優勢の揺れやすさ（劣勢側デッキの除去・妨害の形の枚数）--------------------------------
+
+class _FakeDB:
+    def __init__(self, table):
+        self._t = table
+
+    def get_card(self, cid):
+        return self._t.get(cid)
+
+
+class _FakeCards:
+    def __init__(self, table):
+        self.db = _FakeDB(table)
+
+
+def test_forms_of_returns_empty_for_an_unknown_card():
+    assert PA._forms_of("nope", _FakeCards({})) == set()
+
+
+def test_deck_volatility_counts_cards_that_have_any_form(monkeypatch):
+    table = {"a": "master_a", "b": "master_b", "c": "master_c"}
+    forms = {"master_a": {"KO:field:on_play"}, "master_b": {"lock:field:activate"}, "master_c": set()}
+    monkeypatch.setattr(PA.DR, "classify", lambda m: forms[m])
+    cards = _FakeCards(table)
+    assert PA.deck_volatility(["a", "b", "c", "a"], cards) == 3     # a・b は形を持つ（a は 2 回）・c は 0
+
+
+def test_deck_volatility_is_zero_for_an_empty_deck():
+    assert PA.deck_volatility([], _FakeCards({})) == 0
+
+
+def test_add_volatility_sets_none_on_every_row_when_decks_are_unreadable(monkeypatch):
+    def _raise(dirs):
+        raise ValueError("no meta_games.json")
+    monkeypatch.setattr(PA.KV, "_seat_decks", _raise)
+    rows = [_rowgw(0.9, 1, seed=1, who=0, stage="late"), _rowgw(0.8, 1, seed=2, who=1, stage="late")]
+    out = PA.add_volatility(rows, ["<ignored>"])
+    assert out[0]["v_opp"] is None and out[1]["v_opp"] is None
+
+
+def test_add_volatility_reads_the_opposing_seat_s_deck_and_caches_per_game(monkeypatch):
+    """**T149g-1 の核心**: `v_opp` は`自分`のデッキではなく `1 - who`（劣勢側）のデッキから読む。"""
+    seat_decks = {5: (["x"], ["y", "y"])}
+    monkeypatch.setattr(PA.KV, "_seat_decks", lambda dirs: seat_decks)
+    monkeypatch.setattr(PA.KV, "_deck_of",
+                        lambda sd, seed, w: (sd.get(int(seed)) or (None, None))[int(w)])
+    monkeypatch.setattr(PA.DR, "classify", lambda m: {"KO:field:on_play"})   # 全カードが形を持つ
+
+    class _StubDB:
+        def get_card(self, cid):
+            return cid
+
+    class _StubCards:
+        def __init__(self):
+            self.db = _StubDB()
+
+    monkeypatch.setattr(PA.PL, "Cards", _StubCards)
+    rows = [_rowgw(0.9, 1, seed=5, who=0, stage="late")]     # who=0 → 劣勢側 who=1 → デッキ ("y","y")
+    out = PA.add_volatility(rows, ["<ignored>"])
+    assert out[0]["v_opp"] == 2
+
+
+def test_streak_by_volatility_table_reports_n_and_no_bands_below_the_row_floor():
+    rows = [dict(_rowgwj(0.9, 1, seed=i, who=0, stage="late", j_me=0), v_opp=5) for i in range(10)]
+    out = PA.streak_by_volatility_table(rows, n_q=4)
+    assert out["n"] == 10 and out["bands"] == {}
+
+
+def test_streak_by_volatility_table_excludes_rows_without_v_opp():
+    rows = [dict(_rowgwj(0.9, 1, seed=i, who=0, stage="late", j_me=0), v_opp=None) for i in range(40)]
+    out = PA.streak_by_volatility_table(rows, n_q=4)
+    assert out["n"] == 0 and out["bands"] == {}
+
+
+def test_streak_by_volatility_table_splits_by_median_and_detects_opposite_trends_per_band():
+    """**T149g-2 の核心**: 高 v_opp 帯・低 v_opp 帯でそれぞれ**逆の**傾向を持つ合成データを作り、
+    2 つの帯が別々に検出されることを確かめる（実データの当否とは別の器の検算・T149f のパターンと同じ形）。"""
+    rows = []
+    for i in range(40):
+        k = i % 10 + 1
+        for j in range(k - 1):
+            rows.append(dict(_rowgwj(0.9, 1, seed=("lo", i), who=0, stage="early", j_me=j), v_opp=0))
+        p = 0.5 + 0.03 * (11 - k)                            # 低 v_opp: 継続が短いほど gap が大きい
+        rows.append(dict(_rowgwj(p, 0.0, seed=("lo", i), who=0, stage="late", j_me=k - 1), v_opp=0))
+    for i in range(40):
+        k = i % 10 + 1
+        for j in range(k - 1):
+            rows.append(dict(_rowgwj(0.9, 1, seed=("hi", i), who=0, stage="early", j_me=j), v_opp=10))
+        p = 0.5 + 0.03 * k                                   # 高 v_opp: 継続が長いほど gap が大きい
+        rows.append(dict(_rowgwj(p, 0.0, seed=("hi", i), who=0, stage="late", j_me=k - 1), v_opp=10))
+    out = PA.streak_by_volatility_table(rows, n_q=4)
+    assert out["median_v_opp"] == pytest.approx(5.0)
+    lo_gaps = [c["gap"] for c in out["bands"]["low"]["quantiles"]]
+    hi_gaps = [c["gap"] for c in out["bands"]["high"]["quantiles"]]
+    assert lo_gaps == sorted(lo_gaps, reverse=True) and lo_gaps[0] > lo_gaps[-1]
+    assert hi_gaps == sorted(hi_gaps) and hi_gaps[0] < hi_gaps[-1]

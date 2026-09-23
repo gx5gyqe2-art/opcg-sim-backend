@@ -163,6 +163,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                    "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), "don_k": 1,
                    "attackers": own_attackers_of(tok, olp), "don_active": float(sc[SC_MY_DON]),
                    "st": _state_of(sc, ex["ci"][i], idx2cid),
+                   # **T150f-2**: 見送った登場の価値（`misalloc_play`）に要る手札の card_id 列
+                   "hand": _TO.hand_ids_of(ex["ci"][i], idx2cid),
                    "opp_bodies": opp_bodies_of(tok, mlp, max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), th, mu,
                                                ci_row=ex["ci"][i], idx2cid=idx2cid)}
             tl = sig[2] if len(sig) > 2 else None

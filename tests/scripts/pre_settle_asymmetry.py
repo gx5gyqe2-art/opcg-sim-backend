@@ -56,7 +56,24 @@ T146a（`2026-09-23_presettle_sigma.md`）は「σ_rel が決着後の行を混�
    継続ターン数を分位で割っても傾向は弱いか一貫しないはず。
 3. **2 値化の境目（1 ターン）をまたいだだけの見かけの逆転**である可能性——連続変数で見ると、実・合成
    どちらも同じ形（例: 継続 1〜2 ターンだけ高い・その先は平坦）で、2 値の境目の取り方が記録間の
-   「向きの逆転」を作っていただけ、という可能性も観察する（当てはめない・予告はしない）。
+   「向きの逆転」を作っていただけ、という可能性も観察する（当てはめない・予告はしない）。**結果**:
+   予告 3 は否定された（連続変数でも実と合成の逆転は残った・`2026-09-23_presettle_streak.md`）。
+
+**T149g**（本節・機構の候補「優勢の揺れやすさ」）: T149f で逆転がアーティファクトでないと確定した
+ので、次の候補は**両記録の性質そのものの違い**——除去・妨害の量。`v_opp`＝終盤の優勢側から見た
+**劣勢側デッキ**の揺れやすさ（除去・妨害の形〔`deck_roles.FORMS`〕を持つカードの枚数・50 枚中・
+`meta_games.json` があるデッキから読む・新定数ゼロ）。`streak_by_volatility_table`——終盤・優勢側の
+行を `v_opp` の中央値で 2 分し、それぞれの帯で `streak_axis_table`（継続ターン数の分位×`gap`）を出す。
+
+**予告（測る前）**:
+
+1. **高 v_opp 帯は継続が短いほど `gap` が大きい**（実の形に近い）——除去が多いデッキと当たっていると
+   「できたばかりの優勢」が理論の読みより不安定になりやすいはず。
+2. **低 v_opp 帯は継続が長いほど `gap` が大きい**（合成の形に近い）——除去が少ないと盤面が単調に
+   育ち、「長く続く優勢」の複利効果を理論が過小評価しやすいはず。
+3. **実と合成それぞれの全体（T149f）を、同じ v_opp 帯で比べると同じ形になる**——記録間の逆転が
+   `v_opp` の分布の違いで畳めるなら、この予告が本 T の核心。**殺す基準**: 高 v_opp 帯と低 v_opp 帯の
+   形が記録間で一致しなければ、揺れやすさは機構ではない（T149d は保留のまま）。
 
 使い方:
 
@@ -79,8 +96,11 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 import crossing_bridge as CB  # noqa: E402
+import kappa_vector as KV  # noqa: E402
 import theory_order as TO  # noqa: E402
 import win_calib as WC  # noqa: E402
+from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
+from opcg_sim.loop import deck_roles as DR  # noqa: E402
 from theory_order import MU, THETA  # noqa: E402
 
 #: 序盤／中盤／終盤の境目（自席ターン番号 `j_me`・0 始まり）。**新しい閾値ではなく境目を宣言するだけ**
@@ -341,6 +361,57 @@ def robustness_check(rows):
     return out
 
 
+def _forms_of(cid, cards):
+    """カード `cid` の形（`deck_roles.FORMS` の接頭辞の集合）。カードが引けなければ空。"""
+    m = cards.db.get_card(cid)
+    if m is None:
+        return set()
+    return {s.split(":")[0] for s in DR.classify(m)}
+
+
+def deck_volatility(deck_ids, cards):
+    """**T149g-1**: デッキの揺れやすさ＝除去・妨害の形（`deck_roles.FORMS`＝KO/bounce/deck/trash/
+    lock/reduce）を**どれか 1 つでも持つ**カードの枚数（50 枚のデッキそのものが物差し・新定数ゼロ）。"""
+    return sum(1 for cid in deck_ids if _forms_of(cid, cards))
+
+
+def add_volatility(rows, dirs):
+    """**T149g-1**: 各行に**劣勢側**（`1 - who`）デッキの揺れやすさ `v_opp` を足す（`seed`／`who` から
+    `kappa_vector._seat_decks`／`_deck_of` で引く）。`meta_games.json` が無い記録では全行 `None`
+    （目分量で埋めない）。同じ局・同じ席は同じデッキなので局単位でキャッシュする。"""
+    try:
+        seat_decks = KV._seat_decks(dirs)
+    except ValueError:
+        for r in rows:
+            r["v_opp"] = None
+        return rows
+    cards = PL.Cards()
+    cache = {}
+    for r in rows:
+        key = (r["seed"], 1 - r["who"])
+        if key not in cache:
+            deck = KV._deck_of(seat_decks, r["seed"], 1 - r["who"])
+            cache[key] = deck_volatility(deck, cards) if deck else None
+        r["v_opp"] = cache[key]
+    return rows
+
+
+def streak_by_volatility_table(rows, n_q=STREAK_QUANTILES):
+    """**T149g-2**: 終盤・優勢側の行を `v_opp`（劣勢側デッキの揺れやすさ）の中央値で 2 分し、
+    それぞれの帯で継続ターン数の分位×`gap`（`streak_axis_table` の再利用）を出す。`v_opp` が無い
+    行（`add_volatility` が `None` を付けた・`meta_games.json` 無し）は集計から外す。当てはめない。"""
+    have_v = [r for r in rows if r.get("v_opp") is not None]
+    late_fav = [r for r in have_v if r["stage"] == "late" and r["p"] > 0.5]
+    if len(late_fav) < n_q * 5 * 2:
+        return {"n": len(late_fav), "median_v_opp": None, "bands": {}}
+    med = float(np.median([r["v_opp"] for r in late_fav]))
+    bands = {}
+    for name, pred in (("high", lambda v: v >= med), ("low", lambda v: v < med)):
+        band_rows = [r for r in have_v if pred(r["v_opp"])]
+        bands[name] = streak_axis_table(band_rows, n_q)
+    return {"n": len(late_fav), "median_v_opp": med, "bands": bands}
+
+
 def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel"):
     """記録を 1 度読み（決着前だけ）、優勢／劣勢・序盤〜終盤で割った較正を返す。"""
     old = CB.PRE_SETTLE_MODE
@@ -352,6 +423,7 @@ def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel"):
     if sigma_rel is None:
         sigma_rel = CB.sigma_rel_for(dirs)
     rows = rows_with_p(rows_out, slope, sigma_rel, w_err)
+    rows = add_volatility(rows, dirs)          # **T149g-1**: 各行に劣勢側デッキの v_opp を足す
     fs = favorite_split(rows)
     ss = stage_split(rows)
     return {"games": stats.get("games"), "n": len(rows), "sigma_rel": sigma_rel, "w_err": w_err,
@@ -371,7 +443,9 @@ def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel"):
            # 「終盤で新しく優勢になった（flipped）」かに分ける
            "survivorship": survivorship_split(rows),
            # **T149f**: persistent/flipped の 2 値化を継続ターン数の連続変数に置き換える
-           "streak_axis": streak_axis_table(rows)}
+           "streak_axis": streak_axis_table(rows),
+           # **T149g**: 継続ターン数×劣勢側デッキの揺れやすさ（v_opp）の 2 次元
+           "streak_by_volatility": streak_by_volatility_table(rows)}
 
 
 def main(argv=None):

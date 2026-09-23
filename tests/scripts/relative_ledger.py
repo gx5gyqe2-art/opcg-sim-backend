@@ -339,6 +339,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                    "r_turns": rt, "don_k": 1, "attackers": own_attackers_of(tok, olp),
                    "don_active": float(np.asarray(sc)[SC_MY_DON]),
                    "st": _state_of(sc, ci, idx2cid),
+                   # **T150f-2**: 見送った登場の価値（`misalloc_play`）に要る手札の card_id 列
+                   "hand": TO.hand_ids_of(ci, idx2cid),
                    "opp_bodies": opp_bodies_of(tok, mlp, rt, th, mu, ci_row=ci, idx2cid=idx2cid)}
             tl = sig[2] if len(sig) > 2 else None
             v = score_candidate(sig, str(pol["pol_cid"][b]) or None,

@@ -680,6 +680,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                        "st": _state_of(sc, ex["ci"][i], idx2cid, tok=tok, cards=cards),
                        # **T68**: 探す能力の計画価格に要る状態（手札・ドンの枠・来る攻撃・デッキ）。デッキが無ければ `sel(k)` に落ちる
                        "search_ctx": _search_ctx(sc, tok, ex["ci"][i], idx2cid, cards, decks.get(w)),
+                       # **T150f-2**: 見送った登場の価値（`misalloc_play`）に要る手札の card_id 列
+                       "hand": _TOM.hand_ids_of(ex["ci"][i], idx2cid),
                        # **効果が取れる相手の体**（価格つき・2026-09-15）——
                        # `ν` は動かさず、**効果の値が盤面で変わる**
                        "opp_bodies": opp_bodies_of(

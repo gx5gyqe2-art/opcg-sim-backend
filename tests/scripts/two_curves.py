@@ -54,7 +54,7 @@ import guard_afford as GA  # noqa: E402
 import theory_bridge as TB  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
 from theory_order import (MU, SC_MY_DON, SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER,  # noqa: E402
-                          SC_OPP_LIFE, THETA, opp_bodies_of, own_attackers_of, score_candidate,
+                          SC_OPP_LIFE, THETA, hand_ids_of, opp_bodies_of, own_attackers_of, score_candidate,
                           slot_power, theta_of)
 
 
@@ -74,6 +74,8 @@ def _price_row(sc, tok, ci, cards, idx2cid, sig, cid, tcid, si, ti, k, theta, mu
     ctx = {"theta": th, "mu": mu, "opp_leader_power": olp, "my_leader_power": mlp, "r_turns": r, "don_k": 1,
            "attackers": own_attackers_of(tok_a, olp), "don_active": float(sc_a[SC_MY_DON]),
            "st": _state_of(sc, ci, idx2cid, tok=tok, cards=cards),
+           # **T150f-2**: 見送った登場の価値（`misalloc_play`）に要る手札の card_id 列
+           "hand": hand_ids_of(ci, idx2cid),
            "opp_bodies": opp_bodies_of(tok_a, mlp, r, th, mu, ci_row=ci, idx2cid=idx2cid)}
 
     def _score():

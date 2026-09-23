@@ -720,6 +720,18 @@ def own_attackers_of(tok_row, opp_leader_power):
     return xs
 
 
+def hand_ids_of(ci_row, idx2cid):
+    """**T150f-2**: 手札の枠（`SLOT_HAND`）に在る card_id の列（空の枠は落とす・重複を持ち得る・
+    `guard_afford.hand_ids`／`hand_spend.hand_ids` と同じ規約）。`ctx["hand"]` に積む素材。"""
+    ci = np.asarray(ci_row)
+    out = []
+    for s in range(SLOT_HAND.start, SLOT_HAND.stop):
+        cid = idx2cid.get(int(ci[s]))
+        if cid:
+            out.append(str(cid))
+    return out
+
+
 def _attach_total(attackers_x, n_don, theta=THETA, mu=MU):
     """ドン `n_don` 枚を攻撃手に**貪欲に**配ったときの攻撃の価値の増分の和（リーダー狙い）。"""
     if n_don <= 0 or not attackers_x:
@@ -751,6 +763,50 @@ def don_opportunity(attackers_x, don_active, cost, theta=THETA, mu=MU):
                - _attach_total(attackers_x, max(0, n - c), theta, mu))
 
 
+def _attach_total_forced(attackers_x, n_don, pin_idx, pin_k, theta=THETA, mu=MU):
+    """**T150f-1**: `_attach_total` の強制配分版。`attackers_x[pin_idx]` に `pin_k` 枚を
+    先に固定してから、残り `n_don − pin_k` 枚を貪欲に配る（固定した体にもさらに乗ってよい）。
+    `pin_idx` が範囲外／`pin_k<=0` なら素の `_attach_total`（強制なし）に落ちる。"""
+    if n_don <= 0 or not attackers_x:
+        return 0.0
+    if pin_idx is None or not (0 <= pin_idx < len(attackers_x)) or pin_k <= 0:
+        return _attach_total(attackers_x, n_don, theta, mu)
+    pin_k = min(int(pin_k), int(n_don))
+    k = [0] * len(attackers_x)
+    total = 0.0
+    x_pin = attackers_x[pin_idx]
+    for _ in range(pin_k):
+        gain = (attack_value(x_pin + 1000.0 * (k[pin_idx] + 1), 0.0, True, theta, mu)
+                - attack_value(x_pin + 1000.0 * k[pin_idx], 0.0, True, theta, mu))
+        k[pin_idx] += 1
+        total += gain
+    for _ in range(int(n_don) - pin_k):
+        best, bi = 0.0, -1
+        for i, x in enumerate(attackers_x):
+            gain = (attack_value(x + 1000.0 * (k[i] + 1), 0.0, True, theta, mu)
+                    - attack_value(x + 1000.0 * k[i], 0.0, True, theta, mu))
+            if gain > best + 1e-12:
+                best, bi = gain, i
+        if bi < 0:
+            break
+        k[bi] += 1
+        total += best
+    return float(total)
+
+
+def don_misalloc(attackers_x, don_active, pin_idx, pin_k, theta=THETA, mu=MU):
+    """**T150f-1**: この体に `pin_k` 枚を強制したことで生じる**配分ずれの損**＝
+    「貪欲な最適配分の総価値」−「この体に強制した配分の総価値」（常に ≥0）。
+    `pin_idx` を同定できない場合の扱いは呼び出し側（`attack_don_cost`）に任せる。"""
+    n = int(round(float(don_active)))
+    c = int(round(float(pin_k)))
+    if c <= 0 or n <= 0 or pin_idx is None:
+        return 0.0
+    best = _attach_total(attackers_x, n, theta, mu)
+    forced = _attach_total_forced(attackers_x, n, pin_idx, c, theta, mu)
+    return max(0.0, best - forced)
+
+
 def play_cost_term(ctx, cost, mu, theta=THETA):
     """登場・イベントの価格から引く費用。`state` で盤面が渡っていれば機会費用、無ければ従来の定額。"""
     if PLAY_COST_MODE == "state" and ctx.get("attackers") is not None and ctx.get("don_active") is not None:
@@ -758,11 +814,58 @@ def play_cost_term(ctx, cost, mu, theta=THETA):
     return float(cost) * 0.66 * mu
 
 
+def play_price_of(cid, ctx, cards, theta=THETA, mu=MU):
+    """**T150f-2**: 任意のカード `cid` を**今すぐ出したときの価格**（`score_candidate` の `PLAY` 枝と
+    同じ式を共有する・体を持たない札は効果の値・体を持つ札は `_char_play_value`）。読めなければ `None`。
+    `foregone_play_value`（見送った登場の価値）から手札の各札を採点するのに使う。"""
+    src = cards.info(cid) if cid else None
+    if src is None:
+        return None
+    if src.get("event") or src.get("stage"):
+        ev = _effect_value(cid, "on_play", _effect_state(ctx), ctx.get("opp_bodies"))
+        if ev is None:
+            return None
+        return ev - mu - play_cost_term(ctx, float(src.get("cost") or 0), mu, theta)
+    return _char_play_value(cid, src, ctx, theta, mu, 0)
+
+
+def foregone_play_value(ctx, k, cards, theta=THETA, mu=MU):
+    """**T150f-2**: `FP(k)`＝見送った登場の価値——`ctx["hand"]`（`hand_ids_of`）の中で費用 `<=k` の
+    札を今出したときの最良の価格（`play_price_of` の再利用・新しい定数は増やさない）。手札が無い・
+    `k<=0`・読めない札しか無ければ 0（`hand_spend.use_value` と同じ規約で 0 が床＝出さない自由がある）。"""
+    if k <= 0 or not ctx.get("hand"):
+        return 0.0
+    best = 0.0
+    for cid in ctx["hand"]:
+        src = cards.info(cid) if cid else None
+        if src is None or float(src.get("cost") or 0) > k + 1e-9:
+            continue
+        v = play_price_of(cid, ctx, cards, theta, mu)
+        if v is not None and v > best:
+            best = v
+    return best
+
+
+def _don_cost_total(ctx, k, cards, theta=THETA, mu=MU, src_x=None):
+    """**T150f-1/T150f-2**: `score_candidate` の攻撃・純付与の両枝が共有する費用の合計——
+    `attack_don_cost`（ドンの配分ずれ）＋（`ATTACK_DON_COST_MODE=="misalloc_play"` のときだけ）
+    `foregone_play_value`（見送った登場）。`misalloc_play` 以外では `attack_don_cost` と完全に一致する。"""
+    cost = attack_don_cost(ctx, k, theta, mu, src_x=src_x)
+    if ATTACK_DON_COST_MODE == "misalloc_play":
+        cost += foregone_play_value(ctx, k, cards, theta, mu)
+    return cost
+
+
 #: **T150b**（2026-09-23）: `ATTACK`／`DON_BOX`（対象あり）・純付与が固定する k 枚のドンの機会費用を
 #: 引くか。**既定 `off`**（T41 以降のほぼ全実測はこの経路を通っておらず、既定を変えると影響が及ぶため）。
 #: `opportunity`＝**`PLAY` が既に使っている盤面依存の機会費用**（`don_opportunity`／`_attach_total`）を
 #: 再利用する（T150a で確認済み・新しい定数は作らない・定額の `DELTA` は使わない＝T147a の反省）。
-ATTACK_DON_COST_MODES = ("off", "opportunity")
+#: **T150f-1**: `opportunity` は候補の体を見ない（`V(n)−V(n−k)`＝行の全 k>0 候補に同額）ため、
+#: 最良の体自身の DON 利益を費用として相殺してしまう欠陥がある（T150c の予告 2/3 が外れた理由）。
+#: `misalloc`＝**候補依存**——この体に k 枚を強制した「配分ずれの損」（`don_misalloc`）に置き換える
+#: （体を同定できなければ `opportunity` と同じ `V(n)−V(n−k)` に落ちる＝極限一致・新しい定数なし）。
+#: `misalloc_play`＝`misalloc` に加えて、見送った登場（手札の cost≤k のカード）の価値も引く（T150f-2）。
+ATTACK_DON_COST_MODES = ("off", "opportunity", "misalloc", "misalloc_play")
 ATTACK_DON_COST_MODE = "off"
 
 
@@ -773,16 +876,32 @@ def set_attack_don_cost_mode(mode):
     ATTACK_DON_COST_MODE = mode
 
 
-def attack_don_cost(ctx, k, theta=THETA, mu=MU):
-    """**T150b**: この候補が固定する `k` 枚のドンの機会費用（`ATTACK_DON_COST_MODE=="opportunity"`
-    のときだけ・`k<=0` または盤面（`ctx["attackers"]`／`ctx["don_active"]`）が無ければ 0）。"""
-    if ATTACK_DON_COST_MODE != "opportunity" or k <= 0:
+def attack_don_cost(ctx, k, theta=THETA, mu=MU, src_x=None):
+    """**T150b/T150f-1**: この候補が固定する `k` 枚のドンの機会費用（既定 `off` では常に 0）。
+
+    `opportunity`＝候補非依存の `V(n)−V(n−k)`（`don_opportunity`）。
+    `misalloc`／`misalloc_play`＝**候補依存**——`src_x`（この候補の体の x＝パワー−相手リーダー・
+    DON_BOX の +1000k を足す前）で `ctx["attackers"]` の中の当の体を `PWR_EPS` で同定し、
+    その体に `k` 枚を強制した配分ずれの損（`don_misalloc`）を返す。同定できなければ
+    `opportunity` と同じ式に落ちる（新しい定数を増やさない・極限で一致する）。
+    """
+    if ATTACK_DON_COST_MODE == "off" or k <= 0:
         return 0.0
     attackers = ctx.get("attackers")
     don_active = ctx.get("don_active")
     if attackers is None or don_active is None:
         return 0.0
-    return don_opportunity(attackers, don_active, k, theta, mu)
+    if ATTACK_DON_COST_MODE == "opportunity":
+        return don_opportunity(attackers, don_active, k, theta, mu)
+    pin_idx = None
+    if src_x is not None:
+        for i, x in enumerate(attackers):
+            if abs(x - src_x) <= PWR_EPS:
+                pin_idx = i
+                break
+    if pin_idx is None:
+        return don_opportunity(attackers, don_active, k, theta, mu)
+    return don_misalloc(attackers, don_active, pin_idx, k, theta, mu)
 
 
 
@@ -1314,14 +1433,16 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
     # 記録の `pol_k`（`-1` は DON_BOX でない）を優先し、無ければ `ctx` の仮定に落ちる
     k = float(ctx["don_k"]) if (don_k is None or int(don_k) < 0) else float(don_k)
     if at == "ATTACK" or (at == "DON_BOX" and has_target):
+        # **T150f-1**: 機会費用の候補依存の同定に使う「ドン加算前」の x（misalloc のときだけ要る）
+        src_x = sp - ctx["opp_leader_power"]
         # DON_BOX ならドン k 枚を付けてから殴る＝パワーは 1000k 上がる。
         # **`don_k` は記録に無い**（`move_sig` は 5 要素で付与枚数は payload にしか無い）ので
         # 仮定値 `ctx["don_k"]` を足し、`--don-k` で感度を見る。
         if at == "DON_BOX":
             sp += 1000.0 * k
         blockers = blockers_of(ctx)
-        # **T150b**: この攻撃が固定する k 枚のドンの機会費用（既定 off では常に 0）
-        dcost = attack_don_cost(ctx, k, theta, mu)
+        # **T150b/T150f-2**: この攻撃が固定する k 枚のドンの機会費用＋（misalloc_play だけ）見送った登場（既定 off では常に 0）
+        dcost = _don_cost_total(ctx, k, cards, theta, mu, src_x=src_x)
         if tgt is None and tgt_power is None:         # 対象のカードが引けない＝リーダー扱い
             return attack_value(sp, ctx["opp_leader_power"], True, theta, mu, blockers=blockers) - dcost
         tp = float(tgt["power"]) if tgt_power is None else float(tgt_power)
@@ -1337,8 +1458,11 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
                     break
         return attack_value(sp, tp, False, theta, mu, nu_target=nu_t, blockers=blockers) - dcost
     if at in ("ATTACH_DON", "DON_BOX"):
-        # **T150b**: 純付与も同じ k 枚を固定する（既定 off では常に 0）
-        return attach_value(sp, ctx["opp_leader_power"], k, theta, mu) - attack_don_cost(ctx, k, theta, mu)
+        # **T150b/T150f-2**: 純付与も同じ費用を払う（既定 off では常に 0）。付与先の体そのものが
+        # `src_x`（DON_BOX の +1000k はこの枝には掛からない・T150f-1）。
+        src_x = sp - ctx["opp_leader_power"]
+        return (attach_value(sp, ctx["opp_leader_power"], k, theta, mu)
+               - _don_cost_total(ctx, k, cards, theta, mu, src_x=src_x))
     if at == "ACTIVATE_MAIN":
         # **起動メイン**——カードは既に場に在るので `μ` は引かない（コストは能力の中に在る）
         # 条件はエンジンが検査済み。**対象は盤面から選ぶ**
@@ -1349,14 +1473,9 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
     if at == "PLAY":
         if src is None:
             return None
-        if src.get("event") or src.get("stage"):
-            # **体を持たない札**（イベント・ステージ）は**効果の値**で見る（P2-1・§14.1.3）。
-            # 札 1 枚とドンを払って効果だけを買う形。
-            ev = _effect_value(cid, "on_play", _effect_state(ctx), ctx.get("opp_bodies"))
-            if ev is None:
-                return None
-            return ev - mu - play_cost_term(ctx, float(src.get("cost") or 0), mu, theta)
-        return _char_play_value(cid, src, ctx, theta, mu, k)
+        # **T150f-2**: `play_price_of` に切り出した（`foregone_play_value` と同じ式を共有する）。
+        # 体を持たない札（イベント・ステージ）は効果の値・体を持つ札は `_char_play_value`（P2-1・§14.1.3）。
+        return play_price_of(cid, ctx, cards, theta, mu)
     return None
 
 

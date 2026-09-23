@@ -1264,3 +1264,229 @@ def test_score_candidate_subtracts_the_don_cost_from_a_pure_attach_when_on():
         assert got < raw
     finally:
         T.set_attack_don_cost_mode("off")
+
+
+# ---- T150f-1: 候補依存の配分ずれ損（misalloc）------------------------------------------------------
+
+def test_attach_total_forced_falls_back_to_the_plain_greedy_without_a_pin():
+    attackers = [-1000.0, -5000.0]
+    assert T._attach_total_forced(attackers, 2.0, None, 1, 1.15, 0.05) == \
+        pytest.approx(T._attach_total(attackers, 2.0, 1.15, 0.05))
+    assert T._attach_total_forced(attackers, 2.0, 5, 1, 1.15, 0.05) == \
+        pytest.approx(T._attach_total(attackers, 2.0, 1.15, 0.05))      # 範囲外の pin_idx も同じ
+    assert T._attach_total_forced(attackers, 2.0, 0, 0, 1.15, 0.05) == \
+        pytest.approx(T._attach_total(attackers, 2.0, 1.15, 0.05))      # pin_k<=0 も同じ
+
+
+def test_attach_total_forced_matches_greedy_when_the_pinned_body_is_already_optimal():
+    """**最良の体に強制しても損は出ない**——貪欲がどうせ選ぶ体なら、強制配分の総額は素の貪欲と一致する。"""
+    attackers = [-1000.0, -5000.0]                    # 最良は idx=0（唯一 c(x)>0 になる体）
+    assert T._attach_total_forced(attackers, 1.0, 0, 1, 1.15, 0.05) == \
+        pytest.approx(T._attach_total(attackers, 1.0, 1.15, 0.05))
+
+
+def test_don_misalloc_is_zero_when_the_pinned_body_is_the_greedy_optimal_choice():
+    attackers = [-1000.0, -5000.0]
+    assert T.don_misalloc(attackers, 1.0, 0, 1, 1.15, 0.05) == pytest.approx(0.0)
+
+
+def test_don_misalloc_is_positive_when_the_pinned_body_is_not_optimal():
+    """**弱い体に強制すると損が出る**——ドン 1 枚しかない局面でそれを弱い体（利得 0）に固定すると、
+    強い体（利得 0.05）に配れば得られたはずの価値をそのまま失う。"""
+    attackers = [-1000.0, -5000.0]
+    assert T.don_misalloc(attackers, 1.0, 1, 1, 1.15, 0.05) == pytest.approx(0.05)
+
+
+def test_don_misalloc_is_maximal_when_slack_is_zero_and_drops_once_a_spare_don_recovers_it():
+    """**損は「余裕の有無」で決まる段付きの構造**——この箱（0→1.0 の 1 段しか無い体の組）では、
+    固定した分だけしかドンが無ければ（`n == pin_k`）損は丸ごと出るが、**1 枚でも余れば**その
+    1 枚が最良の体に回って貪欲の最適に追いつくため、損は 0 に戻る（「縮む」ではなく 0/最大 の 2 値）。"""
+    attackers = [-1000.0, -5000.0]
+    loss_scarce = T.don_misalloc(attackers, 1.0, 1, 1, 1.15, 0.05)      # n=1=pin_k（余裕ゼロ）
+    loss_slack = T.don_misalloc(attackers, 2.0, 1, 1, 1.15, 0.05)       # n=2（1 枚の余裕）
+    assert loss_scarce > 0.0
+    assert loss_slack == pytest.approx(0.0)
+    assert loss_scarce > loss_slack
+
+
+def test_don_misalloc_is_zero_without_a_pin_index_or_a_nonpositive_pin():
+    attackers = [-1000.0, -5000.0]
+    assert T.don_misalloc(attackers, 1.0, None, 1, 1.15, 0.05) == 0.0
+    assert T.don_misalloc(attackers, 1.0, 0, 0, 1.15, 0.05) == 0.0
+    assert T.don_misalloc(attackers, 0.0, 0, 1, 1.15, 0.05) == 0.0    # don_active<=0
+
+
+_MIS_CTX = {"theta": 10.0, "mu": 0.05, "opp_leader_power": 5000.0, "my_leader_power": 5000.0,
+           "r_turns": 3, "don_k": 1}
+
+
+def test_attack_don_cost_misalloc_identifies_the_candidate_s_own_body_by_src_x():
+    """**T150f-1**: `misalloc` は `src_x` で `ctx["attackers"]` の中の当の体を同定し、
+    `opportunity`（候補非依存）と違う値を出す——最良の体（`src_x=-1000`）は 0、
+    弱い体（`src_x=-5000`）は正（`don_misalloc` と一致）。"""
+    ctx = dict(_MIS_CTX, attackers=[-1000.0, -5000.0], don_active=1.0)
+    T.set_attack_don_cost_mode("misalloc")
+    try:
+        best = T.attack_don_cost(ctx, 1, src_x=-1000.0)
+        worst = T.attack_don_cost(ctx, 1, src_x=-5000.0)
+        assert best == pytest.approx(0.0)
+        assert worst == pytest.approx(T.don_misalloc([-1000.0, -5000.0], 1.0, 1, 1))
+        assert worst > best
+    finally:
+        T.set_attack_don_cost_mode("off")
+
+
+def test_attack_don_cost_misalloc_falls_back_to_opportunity_when_the_body_is_not_found():
+    """**同定不能なら `opportunity` と同じ式に落ちる**（極限で一致・新しい定数を増やさない）。"""
+    ctx = dict(_MIS_CTX, attackers=[-1000.0, -5000.0], don_active=1.0)
+    T.set_attack_don_cost_mode("misalloc")
+    try:
+        got = T.attack_don_cost(ctx, 1, src_x=999999.0)          # どの attacker とも合致しない
+        assert got == pytest.approx(T.don_opportunity([-1000.0, -5000.0], 1.0, 1))
+        got_none = T.attack_don_cost(ctx, 1, src_x=None)         # src_x を渡さない呼び出しも同じ
+        assert got_none == pytest.approx(T.don_opportunity([-1000.0, -5000.0], 1.0, 1))
+    finally:
+        T.set_attack_don_cost_mode("off")
+
+
+_MIS_ATTACKERS = [-1000.0, -5000.0]                    # 最良＝idx0・最弱＝idx1（唯一 c(x)>0 になる体が idx0）
+
+
+def test_score_candidate_misalloc_charges_the_weak_body_more_than_the_strong_one_for_an_attack():
+    """**T150f-1 の核心（ATTACK/DON_BOX 対象あり枝）**: `misalloc` は**この候補の体が貪欲の最適か**
+    で分ける——強い体（`src_x=-1000`＝`attackers[0]`）は費用 0、弱い体（`src_x=-5000`）は
+    `don_misalloc` と同額の費用が乗って素の攻撃価値より下がる（`opportunity` なら両方同額だった）。"""
+    cards = _cards()
+    ctx = dict(_MIS_CTX, theta=1.15, mu=0.05, attackers=_MIS_ATTACKERS, don_active=1.0)
+    T.set_attack_don_cost_mode("misalloc")
+    try:
+        strong = T.score_candidate(["DON_BOX", "u", ["t"], [], None], "C_ATK", None, ctx, cards,
+                                   src_power=4000.0, don_k=1)                # src_x = 4000-5000 = -1000
+        weak = T.score_candidate(["DON_BOX", "u", ["t"], [], None], "C_ATK", None, ctx, cards,
+                                 src_power=0.0, don_k=1)                     # src_x = 0-5000 = -5000
+        cost_strong = T.attack_don_cost(ctx, 1, 1.15, 0.05, src_x=-1000.0)
+        cost_weak = T.attack_don_cost(ctx, 1, 1.15, 0.05, src_x=-5000.0)
+        assert cost_strong == pytest.approx(0.0)
+        assert cost_weak == pytest.approx(T.don_misalloc(_MIS_ATTACKERS, 1.0, 1, 1, 1.15, 0.05))
+        assert cost_weak > 0.0
+        assert strong == pytest.approx(T.attack_value(5000.0, 5000.0, True, 1.15, 0.05) - cost_strong)
+        assert weak == pytest.approx(T.attack_value(1000.0, 5000.0, True, 1.15, 0.05) - cost_weak)
+        assert weak < strong
+    finally:
+        T.set_attack_don_cost_mode("off")
+
+
+def test_score_candidate_misalloc_charges_the_weak_body_more_than_the_strong_one_for_a_pure_attach():
+    """**同じ核心・純付与枝**（`ATTACH_DON`／`DON_BOX` 対象なし）。弱い体（`src_x=-5000`）は自分の
+    攻撃が通らない（`attach_value` が早期に 0 を返す）ので、費用を引くと**素の価格 0 のまま負**に
+    なる——「他の体が欲しがっていたドンを無駄にした」ことがそのまま負の価格として出る。"""
+    cards = _cards()
+    ctx = dict(_MIS_CTX, theta=1.15, mu=0.05, attackers=_MIS_ATTACKERS, don_active=1.0)
+    T.set_attack_don_cost_mode("misalloc")
+    try:
+        strong = T.score_candidate(["DON_BOX", "u", [], [], None], "C_ATK", None, ctx, cards,
+                                   src_power=4000.0, don_k=1)
+        weak = T.score_candidate(["DON_BOX", "u", [], [], None], "C_ATK", None, ctx, cards,
+                                 src_power=0.0, don_k=1)
+        cost_weak = T.attack_don_cost(ctx, 1, 1.15, 0.05, src_x=-5000.0)
+        assert cost_weak > 0.0
+        assert strong == pytest.approx(T.attach_value(4000.0, 5000.0, 1, 1.15, 0.05))          # 費用 0
+        assert weak == pytest.approx(T.attach_value(0.0, 5000.0, 1, 1.15, 0.05) - cost_weak)    # 素 − 費用
+        assert weak < 0.0
+        assert weak < strong
+    finally:
+        T.set_attack_don_cost_mode("off")
+
+
+def test_attack_don_cost_itself_does_not_distinguish_misalloc_from_misalloc_play():
+    """**T150f-2 の役割分担**: `attack_don_cost` は DON の配分ずれ**だけ**を返す——見送った登場の
+    価値（`foregone_play_value`）は `score_candidate` が別に足す `_don_cost_total` の役目なので、
+    `attack_don_cost` を直に呼ぶ限り `misalloc`／`misalloc_play` は同じ値になる。"""
+    ctx = dict(_MIS_CTX, attackers=[-1000.0, -5000.0], don_active=1.0)
+    T.set_attack_don_cost_mode("misalloc_play")
+    try:
+        got = T.attack_don_cost(ctx, 1, src_x=-5000.0)
+    finally:
+        T.set_attack_don_cost_mode("misalloc")
+    want = T.attack_don_cost(ctx, 1, src_x=-5000.0)
+    T.set_attack_don_cost_mode("off")
+    assert got == pytest.approx(want)
+
+
+# ---- T150f-2: 手札の可視化と見送った登場の価値（FP(k)）---------------------------------------------
+
+def test_hand_ids_of_reads_the_hand_slot_and_drops_empty_slots():
+    ci = [0] * 22
+    ci[T.SLOT_HAND.start] = 5
+    ci[T.SLOT_HAND.start + 1] = 0                  # 空の枠（idx2cid に無い）
+    ci[T.SLOT_HAND.stop - 1] = 7
+    idx2cid = {5: "C_ATK", 7: "C_CHAR"}
+    assert T.hand_ids_of(ci, idx2cid) == ["C_ATK", "C_CHAR"]
+
+
+def test_play_price_of_matches_the_play_branch_and_is_none_for_an_unreadable_card():
+    """**T150f-2**: `play_price_of` は `PLAY` 枝が計算する価格そのもの（切り出しただけ・二重に
+    定義しない）。架空の cid（効果 JSON に無い）は `PLAY` 枝と同じ理由で `None`。"""
+    van = _vanilla_cid()
+    cards = _StubCards({van: {"power": 7000, "cost": 3, "leader": False, "event": False}})
+    price = T.play_price_of(van, CTX, cards, CTX["theta"], CTX["mu"])
+    direct = T.score_candidate(["PLAY", "u", [], [], None], van, None, CTX, cards)
+    assert price is not None
+    assert price == pytest.approx(direct)
+    assert T.play_price_of("C_ATK", CTX, _cards(), CTX["theta"], CTX["mu"]) is None    # 効果 JSON に無い架空のカード
+    assert T.play_price_of(None, CTX, _cards(), CTX["theta"], CTX["mu"]) is None
+
+
+def test_foregone_play_value_is_zero_without_a_hand_or_a_nonpositive_k():
+    van = _vanilla_cid()
+    cards = _StubCards({van: {"power": 7000, "cost": 3, "leader": False, "event": False}})
+    assert T.foregone_play_value(dict(CTX, hand=[van]), 0, cards) == 0.0      # k<=0
+    assert T.foregone_play_value(dict(CTX, hand=[]), 3, cards) == 0.0        # 手札が空
+    assert T.foregone_play_value(dict(CTX), 3, cards) == 0.0                 # hand キー自体が無い
+
+
+def test_foregone_play_value_filters_by_cost_and_picks_the_best_affordable_card():
+    """**T150f-2 の核心**: `FP(k)` は費用 `<=k` の札だけを見て、その中の最良の `play_price_of` を返す
+    （`hand_spend.use_value` と同じ 0 の床）。"""
+    van = _vanilla_cid()
+    cards = _StubCards({van: {"power": 7000, "cost": 3, "leader": False, "event": False}})
+    ctx = dict(CTX, hand=[van])
+    assert T.foregone_play_value(ctx, 2, cards) == 0.0                        # cost=3 > k=2 で買えない
+    price = T.play_price_of(van, ctx, cards)
+    assert price > 0.0
+    assert T.foregone_play_value(ctx, 3, cards) == pytest.approx(price)       # cost=3 <= k=3 で買える
+    assert T.foregone_play_value(ctx, 5, cards) == pytest.approx(price)       # 余裕があっても同じ最良値
+
+
+def test_score_candidate_misalloc_play_also_subtracts_the_foregone_play_value():
+    """**T150f-2 の核心（`score_candidate` への配線）**: `misalloc_play` は `misalloc`（配分ずれ損）に
+    加えて、見送った登場の価値も引く——弱い体の攻撃候補（`misalloc` だけでも費用が乗る）が、
+    手札に安い札（`cost<=k`）を持つぶんさらに下がる。"""
+    van = _vanilla_cid()
+    hand_stub = _StubCards({van: {"power": 7000, "cost": 1, "leader": False, "event": False}})
+    board_cards = _cards()
+
+    class _Both:
+        def info(self, cid):
+            return hand_stub.info(cid) or board_cards.info(cid)
+
+    cards = _Both()
+    ctx = dict(_MIS_CTX, theta=1.15, mu=0.05, attackers=_MIS_ATTACKERS, don_active=1.0, hand=[van])
+    sig = ["DON_BOX", "u", ["t"], [], None]
+
+    T.set_attack_don_cost_mode("misalloc")
+    try:
+        price_misalloc_only = T.score_candidate(sig, "C_ATK", None, ctx, cards, src_power=0.0, don_k=1)
+    finally:
+        T.set_attack_don_cost_mode("off")
+
+    T.set_attack_don_cost_mode("misalloc_play")
+    try:
+        price_misalloc_play = T.score_candidate(sig, "C_ATK", None, ctx, cards, src_power=0.0, don_k=1)
+        fp = T.foregone_play_value(ctx, 1, cards, 1.15, 0.05)
+    finally:
+        T.set_attack_don_cost_mode("off")
+
+    assert fp > 0.0
+    assert price_misalloc_play == pytest.approx(price_misalloc_only - fp)
+    assert price_misalloc_play < price_misalloc_only

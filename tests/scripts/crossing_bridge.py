@@ -45,7 +45,7 @@ from theory_order import (DELTA, KO_P, LAM, MU, PWR_EPS, R_TURNS, S_IS_BLOCKER, 
                           SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE, S_POWER,
                           SLOT_OPP_FIELD, THETA, add_nu_mode_arg, apply_nu_mode, attack_value,
                           attack_value_don, c_of, theta_take,
-                          opp_bodies_of, own_attackers_of, score_candidate, slot_power, theta_of)
+                          hand_ids_of, opp_bodies_of, own_attackers_of, score_candidate, slot_power, theta_of)
 
 SLOPES = ("hist", "theory")
 SLOPE_FLOOR = 1e-3
@@ -2007,6 +2007,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             ctx = {"theta": th, "mu": mu, "opp_leader_power": olp, "my_leader_power": mlp, "r_turns": r, "don_k": 1,
                    "attackers": own_attackers_of(tok, olp), "don_active": float(sc[SC_MY_DON]),
                    "st": _state_of(sc, ex["ci"][i], idx2cid),
+                   # **T150f-2**: 見送った登場の価値（`misalloc_play`）に要る手札の card_id 列
+                   "hand": hand_ids_of(ex["ci"][i], idx2cid),
                    "opp_bodies": opp_bodies_of(tok, mlp, r, th, mu, ci_row=ex["ci"][i], idx2cid=idx2cid)}
             tl = sig[2] if len(sig) > 2 else None
             v = score_candidate(sig, str(pol["pol_cid"][b]) or None, (str(pol["pol_tcid"][b]) or None) if tl else None,
