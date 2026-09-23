@@ -150,6 +150,24 @@ def test_two_curves_accumulates_in_turn_order_per_seat(monkeypatch):
     assert curves[1]["r"] == pytest.approx([0.25])
 
 
+def test_two_curves_family_breakdown_sums_to_the_turn_total(monkeypatch):
+    """**T137b の材料**: `g_fam`（型別の内訳・その 1 ターンぶん）の和は `g` の**増分**と一致する
+    （`g_turn` を分割しただけで、新しい量は作っていない）。"""
+    entries = [(1, 0, 1, 0, 1, 0, 1.0), (1, 0, 3, 0, 1, 0, 0.0)]
+    rows, pol, ex, L, ptr, idx = _fake_rows(entries)
+    monkeypatch.setattr(TC, "move_family", lambda sig: "attack")
+    seq_g = iter([1.5, 0.5])
+    monkeypatch.setattr(TC, "_price_row", lambda *a, **k: next(seq_g))
+    monkeypatch.setattr(TC.AR, "parts", lambda *a, **k: {"opp_life": 0.0, "opp_hand": 0.0, "opp_body": 0.0})
+    monkeypatch.setattr(TC.AR, "parts_mirror", lambda *a, **k: {"opp_life": 0.0, "opp_hand": 0.0, "opp_body": 0.0})
+    curves, _winner = TC.two_curves_for_game(rows, pol, ex, L, ptr, idx, object(), {})
+    assert len(curves[0]["g_fam"]) == 2
+    g_incr = [curves[0]["g"][0]] + [b - a for a, b in zip(curves[0]["g"], curves[0]["g"][1:])]
+    for incr, fam in zip(g_incr, curves[0]["g_fam"]):
+        assert sum(fam.values()) == pytest.approx(incr)
+    assert curves[0]["g_fam"][0] == {"attack": pytest.approx(1.5)}
+
+
 def test_two_curves_skips_rows_with_no_valid_choice(monkeypatch):
     entries = [(1, 0, 1, 0, 0, -1, 0.0)]          # k=0（候補無し）
     rows, pol, ex, L, ptr, idx = _fake_rows(entries)

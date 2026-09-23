@@ -111,6 +111,7 @@ def two_curves_for_game(rows, pol, ex, L, ptr, idx, cards, idx2cid, theta=THETA,
     turn_seq = {0: [], 1: []}
     g_turn = {}            # (w, t) -> 理論値の和
     r_turn = {}             # (w, t) -> 実現の損害の和
+    g_fam_turn = {}        # (w, t) -> {型: 理論値の和}（T137b・g_turn の分割・和は g_turn と一致する）
     z_of = {}
     for n, i in enumerate(order):
         w, t = int(rows["who"][i]), int(rows["turn"][i])
@@ -124,7 +125,7 @@ def two_curves_for_game(rows, pol, ex, L, ptr, idx, cards, idx2cid, theta=THETA,
             continue
         sc, tok, ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
         if (w, t) not in g_turn:
-            g_turn[(w, t)] = 0.0; r_turn[(w, t)] = 0.0
+            g_turn[(w, t)] = 0.0; r_turn[(w, t)] = 0.0; g_fam_turn[(w, t)] = {}
             turn_seq[w].append(t)
         # ---- R(t): T113 のブラケット（次の行 → 実現の損害） ----
         j = nxt.get(n)
@@ -147,6 +148,8 @@ def two_curves_for_game(rows, pol, ex, L, ptr, idx, cards, idx2cid, theta=THETA,
                          int(pol["pol_si"][b]), int(pol["pol_ti"][b]), int(pol["pol_k"][b]), theta, mu)
         if g_v is not None:
             g_turn[(w, t)] += g_v
+            fam = move_family(sig)
+            g_fam_turn[(w, t)][fam] = g_fam_turn[(w, t)].get(fam, 0.0) + g_v
     winner = None
     for w, zz in z_of.items():
         if zz > 0.5:
@@ -154,12 +157,13 @@ def two_curves_for_game(rows, pol, ex, L, ptr, idx, cards, idx2cid, theta=THETA,
     out = {}
     for w in (0, 1):
         ts = turn_seq[w]
-        g_cum, r_cum = [], []
+        g_cum, r_cum, g_fam = [], [], []
         gs = rs = 0.0
         for t in ts:
             gs += g_turn.get((w, t), 0.0); rs += r_turn.get((w, t), 0.0)
             g_cum.append(gs); r_cum.append(rs)
-        out[w] = {"turns": ts, "g": g_cum, "r": r_cum}
+            g_fam.append(g_fam_turn.get((w, t), {}))     # **その 1 ターンの**（累積ではない）型別内訳
+        out[w] = {"turns": ts, "g": g_cum, "r": r_cum, "g_fam": g_fam}
     return out, winner
 
 
