@@ -207,13 +207,20 @@ def _invariance(inv, st0, dx, prof, sigma_rel, dl, kk, capped):
                 inv[tag + "_bad_offcap"] += 1
 
 
-def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency=1.0):
+def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency=1.0, pre_settle=False):
     """記録を 1 度読んで **7 つの腕**を並べる（席×局ごとに積む）。
 
     `scale_a`（**P7**）は**両席の `A` に共通の掛け算誤差**を入れる／`scale_currency`（**P5**）は
-    **耐久も価格も同時に c 倍**する＝どちらも**相対の腕は 1 ビットも動いてはならない**。"""
+    **耐久も価格も同時に c 倍**する＝どちらも**相対の腕は 1 ビットも動いてはならない**。
+
+    **T138b**: `pre_settle=True` なら決着後（`lethal_rule.settled_map` が `True`）の行を読まない——
+    **`before`（最後の自席ターンを外すだけの目分量）を、規則の決着点に差し替える**。"""
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
+    settled = None
+    if pre_settle:
+        import lethal_rule as LR
+        settled = LR.settled_map(dirs, limit_games)
     prof = CB.profile_for(dirs)
     if KV.D_MODE in ("curve", "curve_scaled") and not prof:
         raise ValueError("D_MODE=KV.D_MODE なのに損害の輪郭が引けない（%s）" % (dirs,))
@@ -289,6 +296,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
             w, t = int(r["who"][i]), int(r["turn"][i])
             if not PL.is_own_turn(w, t):
                 continue
+            if settled is not None and settled.get((seed_g, w, t)):
+                continue                                  # **T138b**: 決着後の行は除く（pre_settle）
             k = int(L[i]); ch = int(r["pol_chosen"][i])
             if k < 1 or ch < 0 or ch >= k:
                 continue
@@ -378,6 +387,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
     out = {"games": stats["games"], "rows": stats["rows"], "priced": stats["priced"],
            "d_mode": KV.D_MODE, "sigma_rel": round(sr, 4),
            "kappa_sigma_mode": TO.KAPPA_SIGMA_MODE,
+           "pre_settle": bool(pre_settle),
            "scale_a": scale_a, "scale_currency": scale_currency,
            "dead_rows": stats["dead"], "dead_share": round(stats["dead"] / n, 4),
            "last_turn_rows": stats["last_turn_rows"],
@@ -417,6 +427,8 @@ def build_parser():
     ap.add_argument("--scale-currency", type=float, default=1.0, help="**P5**: 耐久と価格を同時に c 倍")
     ap.add_argument("--scale-clamp", dest="clamp", default="",
                     help="**診断用**（例 0.5,2）: `curve_scaled` の倍率を締める。モデルの提案ではない")
+    ap.add_argument("--pre-settle", dest="pre_settle", default="off", choices=("off", "on"),
+                    help="**T138b** 決着後（`lethal_rule.settled_map`）の行を除いて測るか")
     ap.add_argument("--json", default="")
     return ap
 
@@ -433,7 +445,8 @@ def main(argv=None):
         CB.set_slope_take_mode(a.slope_take)          # **T134**
     if a.clamp:
         KV.set_scale_clamp([float(x) for x in a.clamp.split(",")])
-    out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency)
+    out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency,
+                  pre_settle=(a.pre_settle == "on"))
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:

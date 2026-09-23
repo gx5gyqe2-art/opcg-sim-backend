@@ -161,6 +161,7 @@ def collect_calib(dirs, limit_games=0, slope="theory", sigma_rel=None, scale_mod
     z = [r[3] for r in rs]
     old = TO.W_ERR_MODE
     out = {"slope": slope, "games": stats.get("games"), "rows": len(rs),
+           "pre_settle": CB.PRE_SETTLE_MODE,
            "sigma_d": round(float(TO.SIGMA_D), 4), "scale_mode": scale_mode,
            "stretch": stretch(rs)}
     try:
@@ -187,8 +188,11 @@ def main(argv=None):
                     help="`rel` の σ（省略時は輪郭の表から別のセットの値を引く）")
     ap.add_argument("--scale", default="hyp", choices=("hyp", "sum", "mean", "max", "geo"))
     ap.add_argument("--bins", type=int, default=10)
+    ap.add_argument("--pre-settle", default=CB.PRE_SETTLE_MODE, choices=CB.PRE_SETTLE_MODES,
+                    help="**T138b** 決着後（`lethal_rule.settled_map`）の行を除いて較正を測るか")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
+    CB.set_pre_settle_mode(a.pre_settle)            # **T138b**
     sr = a.sigma_rel if a.sigma_rel is not None else CB.sigma_rel_for(a.src)
     out = collect_calib(a.src, a.games, a.slope, sr, a.scale, a.bins)
     print(json.dumps(out, ensure_ascii=False, indent=2))

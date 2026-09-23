@@ -1859,9 +1859,31 @@ def predict(theta_me, theta_opp, slope_me, slope_opp):
     return tau_me, tau_opp, (tau_me <= tau_opp)
 
 
+#: **T138b**: `rows_out`（`W(D)` の較正が読む行）を決着後（`lethal_rule.settled_map` が `True`）
+#: の行だけ除いて作るか。**T80 の「最後のターンを落とすと数字の 2〜3 割が消える」を、
+#: 目分量の 1 ターンではなく規則の決着点で正確に切る**——`ledger`／`theta_check`／`turn_harm`
+#: （決着の器ではない集計）は対象外。既定 `off`＝従来どおり全行。
+PRE_SETTLE_MODES = ("off", "on")
+PRE_SETTLE_MODE = "off"
+
+
+def set_pre_settle_mode(mode):
+    global PRE_SETTLE_MODE
+    if mode not in PRE_SETTLE_MODES:
+        raise ValueError("pre-settle mode は %s のどれか" % (PRE_SETTLE_MODES,))
+    PRE_SETTLE_MODE = mode
+    return PRE_SETTLE_MODE
+
+
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
+    # **T138b**: 決着後の行を `rows_out` から除く（`ledger`／`theta_check`／`turn_harm` は触らない）。
+    # **記録をもう 1 度読む**（`lethal_rule` は独立の下請け・`settled_map` の判定式は 1 か所にしか無い）。
+    settled = None
+    if PRE_SETTLE_MODE == "on":
+        import lethal_rule as LR
+        settled = LR.settled_map(dirs, limit_games)
     # **T91**: `deck` なら補充はデッキの中身から（記録の `meta_games.json` の seed で作り直す）。
     # **T102**: `static` でも**検算の側**（`theta_check`）ではデッキの `r` を使うので常に作る
     # ——`Θ` は在庫・`要` は総量なので、**両者を比べるには補充を足さないと単位が揃わない**。
@@ -2376,6 +2398,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             ts = turn_seq[w]; ts_o = turn_seq[1 - w]
             won = z_of[w] > 0.5
             for j, t in enumerate(ts):
+                if settled is not None and settled.get((seed_g, w, t)):
+                    continue                          # **T138b**: 決着後の行は除く（pre_settle）
                 me = per_seat[(w, t)]
                 prev_o = [tt for tt in ts_o if tt < t]
                 if not prev_o:
@@ -2774,11 +2798,15 @@ def main(argv=None):
                     help="**T116** 手札のうち**守る窓が開く分だけ**を的に入れるか（`min(手札, SR·τ)`）: "
                          "`off`（旧・全部入る）／`horizon`（手札抜きの `τ0` で 1 回切る）／"
                          "`fixpoint`（切った的で `τ` を引き直して 3 回反復）")
+    ap.add_argument("--pre-settle", default=PRE_SETTLE_MODE, choices=PRE_SETTLE_MODES,
+                    help="**T138b** `W(D)` の較正が読む行から決着後（`lethal_rule.settled_map`）を除くか: "
+                         "`off`（旧・全行）／`on`（決着前の行だけ）")
     add_nu_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_nu_mode(a)
     t0 = time.time()
+    set_pre_settle_mode(a.pre_settle)               # **T138b**
     set_theta_hand_mode(a.theta_hand)
     set_theta_hand_place(a.theta_hand_place)
     set_theta_hand_window(a.theta_hand_window)

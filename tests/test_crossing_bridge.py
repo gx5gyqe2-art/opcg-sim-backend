@@ -1615,3 +1615,43 @@ def test_at_lethal_the_higher_take_cost_makes_don_worth_attaching():
         CB.set_slope_take_mode("const")
     assert chars_lethal > chars_const                           # とどめでは跳ねる
     assert chars_safe == pytest.approx(chars_const)             # ライフが残っていれば不動
+
+
+def test_set_pre_settle_mode_rejects_unknown_names():
+    """**T138b**: 決着後の行を除く切替。既定は `off`（従来どおり全行）で、未知の値は落ちる（規約どおり）。"""
+    assert CB.PRE_SETTLE_MODE == "off"
+    try:
+        CB.set_pre_settle_mode("on")
+        assert CB.PRE_SETTLE_MODE == "on"
+    finally:
+        CB.set_pre_settle_mode("off")
+    with pytest.raises(ValueError):
+        CB.set_pre_settle_mode("なにか")
+    assert CB.PRE_SETTLE_MODE == "off"                          # 落ちても既定のまま
+
+
+def test_pre_settle_off_skips_the_settled_map_lookup(monkeypatch):
+    """**T138b**: `pre_settle=off`（既定）なら `lethal_rule.settled_map` を一度も呼ばない
+    ——`collect()` を素通しする既存の呼び出し（記録を読まない他のテスト）に副作用が出ないための固定。"""
+    import lethal_rule as LR
+    calls = []
+    monkeypatch.setattr(LR, "settled_map", lambda *a, **k: calls.append(1) or {})
+    monkeypatch.setattr(CB.PL, "iter_games", lambda *a, **k: iter([]))
+    assert CB.PRE_SETTLE_MODE == "off"
+    CB.collect(["x"])
+    assert calls == []
+
+
+def test_pre_settle_on_reads_the_settled_map_once(monkeypatch):
+    """**T138b**: `pre_settle=on` なら `settled_map(dirs, limit_games)` を 1 回だけ呼ぶ
+    （`collect()` は記録をもう 1 度読み直す下請けとして扱う・`two_curves_settle.py` と同じ規約）。"""
+    import lethal_rule as LR
+    calls = []
+    monkeypatch.setattr(LR, "settled_map", lambda dirs, limit_games: calls.append((dirs, limit_games)) or {})
+    monkeypatch.setattr(CB.PL, "iter_games", lambda *a, **k: iter([]))
+    try:
+        CB.set_pre_settle_mode("on")
+        CB.collect(["x"], 5)
+    finally:
+        CB.set_pre_settle_mode("off")
+    assert calls == [(["x"], 5)]

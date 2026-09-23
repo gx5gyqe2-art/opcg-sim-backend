@@ -297,6 +297,34 @@ def test_the_ledger_exposes_both_seat_switches_and_they_reach_the_module(monkeyp
         CB.set_slope_take_mode("const")
 
 
+def test_pre_settle_defaults_to_off_and_the_cli_flag_reaches_collect(monkeypatch):
+    """**T138b**: `--pre-settle` は `collect(..., pre_settle=True/False)` にそのまま届く
+    （既定は `off`＝`False`・省略した呼び出しでも壊れない）。"""
+    called = {}
+    monkeypatch.setattr(RL, "collect", lambda *a, **kw: called.update(kw) or {})
+    RL.main(["--in", "x"])
+    assert called["pre_settle"] is False
+    called.clear()
+    RL.main(["--in", "x", "--pre-settle", "on"])
+    assert called["pre_settle"] is True
+
+
+def test_pre_settle_only_reads_the_settled_map_when_asked(monkeypatch):
+    """**T138b**: `pre_settle=True` のときだけ `lethal_rule.settled_map(dirs, limit_games)` を
+    1 回読む（`off` は記録をもう 1 度読み直すコストを払わない）。"""
+    import lethal_rule as LR
+    calls = []
+    monkeypatch.setattr(LR, "settled_map", lambda dirs, limit_games: calls.append((dirs, limit_games)) or {})
+    monkeypatch.setattr(RL.PL, "iter_games", lambda *a, **k: iter([]))
+    monkeypatch.setattr(RL.CB, "profile_for", lambda dirs: [0.2] * 12)
+    monkeypatch.setattr(RL.CB, "sigma_rel_for", lambda dirs, slope="curve": 1.0)
+    monkeypatch.setattr(RL.KV, "_seat_decks", lambda dirs: {})
+    out = RL.collect(["x"], 7, pre_settle=False)
+    assert calls == [] and out["pre_settle"] is False
+    out2 = RL.collect(["x"], 7, pre_settle=True)
+    assert calls == [(["x"], 7)] and out2["pre_settle"] is True
+
+
 def test_the_curve_reading_cannot_measure_a_switch_that_only_moves_the_rate():
     """**T134 の教訓**: 既定の `D_MODE=curve` は**速さの軸を持たない**（`d_of` は `a_me`／`a_opp` を
     一度も読まない）＝**`A` だけを動かす切替は帳簿の既定では厳密に 0**。**「動かなかった」を
