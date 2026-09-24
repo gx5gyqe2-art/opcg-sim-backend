@@ -564,6 +564,20 @@ def test_the_residual_uses_the_side_that_actually_reached_and_the_ledger_check_i
     assert out["ledger"]["F_priced_over_F_real"] == pytest.approx(0.5)
 
 
+def test_sigma_rel_drops_rows_whose_scale_is_zero_instead_of_dividing_by_a_floor():
+    """**T154**: 両席の τ が 0 の行は相対残差が 0/0＝定義できない。床 1e-9 で割ると 1 行で σ_rel が 1e7 級に
+    壊れる（`mirror`＋`game` の既定で実際に起きた）。母数から外し、外した行数を `n_scale0` に出す。"""
+    rows = [_row(True, 2.0, 6.0, 2, 4)] * 30 + [_row(False, 5.0, 3.0, 4, 2)] * 30
+    o_clean = CB.summarise(rows, [])["by_slope"]["hist"]
+    assert o_clean["n_scale0"] == 0 and o_clean["sigma_rel"] is not None
+    o = CB.summarise(rows + [_row(True, 0.0, 0.0, 1, 1)] * 3, [])["by_slope"]["hist"]
+    assert o["n_scale0"] == 3
+    assert o["sigma_rel"] == pytest.approx(o_clean["sigma_rel"])          # 尺度 0 の行は σ_rel に入らない
+    assert o["sigma_rel"] < 10.0                                          # 床で割った 1e7 級にならない
+    only0 = CB.summarise([_row(True, 0.0, 0.0, 1, 1)] * 5, [])["by_slope"]["hist"]
+    assert only0["sigma_rel"] is None and only0["n_scale0"] == 5
+
+
 def test_the_harm_profile_extends_its_last_value_and_the_profile_crossing_interpolates():
     """損害の輪郭は `j` ごとの平均・薄い先は最後の値を伸ばす。輪郭に沿った交点は端数を比例配分する。"""
     th = [{"j": 0, "harm": 0.05, "slope_theory": 0.1}] * 20 + [{"j": 1, "harm": 0.15, "slope_theory": 0.2}] * 20 + \

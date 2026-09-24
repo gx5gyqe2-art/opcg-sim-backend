@@ -2928,9 +2928,14 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
         # **新定数ゼロ**のまま `W_ERR_MODE=rel` の物差しに使える（輪郭の表へ写して別のセットから引く）。
         scale = np.array([clock_scale(min(r["tau_me_" + sv], 30.0), min(r["tau_opp_" + sv], 30.0))
                           for r in rows_out], float)
+        # **T154（2026-09-24）**: 尺度が 0 の行（両席の τ が 0＝どちらも既に届いている）は相対残差が 0/0 で
+        # **定義できない**ので σ_rel の母数から外す（床 1e-9 で割ると 1 行で σ_rel が 1e7 級に壊れる——
+        # `mirror`＋`game` の既定で初めてそういう行が現れた）。外した行数は `n_scale0` に出す。
+        has_scale = scale > 0.0
         o = {"sign_accuracy": round(float((pred == (z > 0.5)).mean()), 4),
              "bias": round(float(res.mean()), 3), "sigma_T": round(float(res.std()), 3),
-             "sigma_rel": round(float((res / np.maximum(1e-9, scale)).std()), 4),
+             "sigma_rel": (round(float((res[has_scale] / scale[has_scale]).std()), 4) if has_scale.any() else None),
+             "n_scale0": int((~has_scale).sum()),
              # **T114**: `τ` が **±1 ターン内**に入る行の割合（偏りと違い**行ごとの当たり**を見る）
              "within1": round(float((np.abs(res) <= 1.0).mean()), 4),
              "mae": round(float(np.abs(res).mean()), 3),
