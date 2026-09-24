@@ -187,10 +187,29 @@ def primary_action(cid, triggers=EV.ACTIVATE_TRIGGERS):
     return "?"
 
 
+def row_ctx(sc, tok, ci_row, idx2cid, cards, deck, theta=THETA, mu=MU, theta_mode="const"):
+    """自席の判断点 1 行の価格の文脈（`score_candidate` に渡す `ctx`・本器と `play_body_check` が共有する）。"""
+    from theory_bridge import _search_ctx      # 遅延 import（橋は本器を import しない）
+    th = theta_of(tok, float(sc[SC_MY_LIFE]), float(sc[SC_MY_DON]),
+                  mode=theta_mode, theta=_TO.theta_take(float(sc[SC_OPP_LIFE]), theta=theta))   # T63
+    return {"theta": th, "mu": mu,
+            "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
+            "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
+            "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), "don_k": 1,
+            "attackers": own_attackers_of(tok, float(sc[SC_OPP_LEADER_POWER]) * 1e4),
+            "don_active": float(sc[SC_MY_DON]),   # 登場の機会費用（T43）
+            "st": _state_of(sc, ci_row, idx2cid, tok=tok, cards=cards),   # T72: 場の札 id・総在庫も
+            "search_ctx": _search_ctx(sc, tok, ci_row, idx2cid, cards, deck),   # T68
+            "opp_bodies": opp_bodies_of(
+                tok, float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
+                max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), th, mu,
+                ci_row=ci_row, idx2cid=idx2cid)}
+
+
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     """(局, 席) ごとに、手の型ごとの価格と実現を足す。"""
     from attack_response import parts          # 遅延 import（attack_response は本器を import する）
-    from theory_bridge import _search_ctx, _seat_decks   # T68（遅延 import・橋は本器を import しない）
+    from theory_bridge import _seat_decks   # T68（遅延 import・橋は本器を import しない）
     import search_price as SP
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
@@ -258,20 +277,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 if int(rows["turn"][i2]) != t:
                     stats["no_next"] += 1      # ターン最後の行＝相手のターンが挟まる
                     continue
-                th = theta_of(tok, float(sc[SC_MY_LIFE]), float(sc[SC_MY_DON]),
-                              mode=theta_mode, theta=_TO.theta_take(float(sc[SC_OPP_LIFE]), theta=theta))   # T63
-                ctx = {"theta": th, "mu": mu,
-                       "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
-                       "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
-                       "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), "don_k": 1,
-                       "attackers": own_attackers_of(tok, float(sc[SC_OPP_LEADER_POWER]) * 1e4),
-                       "don_active": float(sc[SC_MY_DON]),   # 登場の機会費用（T43）
-                       "st": _state_of(sc, ex["ci"][i], idx2cid, tok=tok, cards=cards),   # T72: 場の札 id・総在庫も
-                       "search_ctx": _search_ctx(sc, tok, ex["ci"][i], idx2cid, cards, decks.get(w)),   # T68
-                       "opp_bodies": opp_bodies_of(
-                           tok, float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
-                           max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), th, mu,
-                           ci_row=ex["ci"][i], idx2cid=idx2cid)}
+                ctx = row_ctx(sc, tok, ex["ci"][i], idx2cid, cards, decks.get(w), theta, mu, theta_mode)
+                th = ctx["theta"]
                 b = int(ptr[i]) + ch
                 sig = json.loads(pol["pol_sig"][b])
                 tl = sig[2] if len(sig) > 2 else None
