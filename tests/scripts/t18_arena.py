@@ -244,10 +244,17 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
             else:
                 stats["box_completed"] += 1             # 1 手で終わる箱
         stats["n_intervened"] += 1
+        ch_i = row.get("chosen_index")
+        ch_c, rep_c = (cands[ch_i] if ch_i is not None and ch_i < len(cands) else {}), (cands[bi] if bi < len(cands) else {})
         stats["interventions"].append({"turn": turn, "step": step, "who": name,
                                        "played_family": row["played_family"],
                                        "best_family": row["best_family"], "s": row["s"],
-                                       "arm": arm, "rep_family": SF.move_family(RG.move_sig(legal[rep]))})
+                                       "arm": arm, "rep_family": SF.move_family(RG.move_sig(legal[rep])),
+                                       # **T18 の分析（2026-09-24）**: 探索がその 2 手をどう見ていたか
+                                       # （訪問数 n・平均価値 q・`raw_candidates` の列）
+                                       "chosen_n": ch_c.get("n"), "chosen_q": ch_c.get("q"),
+                                       "rep_n": rep_c.get("n"), "rep_q": rep_c.get("q"),
+                                       "n_cands": len(cands)})
         return new_move
 
     return swap
@@ -364,7 +371,8 @@ def t18_pairs(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_tur
                          "n_exempt": stats["n_exempt"], "n_box_replacement": stats["n_box_replacement"],
                          "box_completed": stats["box_completed"], "box_broken": stats["box_broken"],
                          "n_intervened": stats["n_intervened"],
-                         "n_no_replacement": stats["n_no_replacement"]})
+                         "n_no_replacement": stats["n_no_replacement"],
+                         "interventions": stats["interventions"]})   # T18 の分析用（1 件ごとの記録）
     return games
 
 
