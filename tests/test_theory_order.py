@@ -1497,35 +1497,38 @@ def test_score_candidate_misalloc_play_also_subtracts_the_foregone_play_value():
 # 2 本の時計は各席の自席ターンで数えるので、同じ段数なら手番の席が先に届く＝私が先なのは `D > −1/2`。
 # `half` は `W(D + 1/2)`（規則から・当てはめた定数ではない）。既定 `off` は従来どおり `W(D)`。
 
-def test_w_mover_mode_defaults_to_off_and_rejects_unknown():
-    assert T.W_MOVER_MODE == "off" and T.mover_shift() == 0.0
+def test_w_mover_mode_defaults_to_half_and_only_the_two_clock_rows_get_the_shift():
+    """**既定は `half`**（2026-09-24 採用・ユーザ決定）——ただし掛かるのは `mover=True`（ターン開始の 2 本の時計の行＝
+    `win_calib.probs_of`）だけ。1 行の器（`mover` 省略＝`False`）はずらさない（ターン途中の行では一律 +1/2 が行き過ぎる）。"""
+    assert T.W_MOVER_MODE == "half"
+    assert T.mover_shift() == 0.5 and T.mover_shift(mover=True) == 0.5 and T.mover_shift(mover=False) == 0.0
     try:
-        assert T.set_w_mover_mode("half") == "half" and T.mover_shift() == 0.5
+        assert T.set_w_mover_mode("off") == "off" and T.mover_shift() == 0.0
     finally:
-        T.set_w_mover_mode("off")
+        T.set_w_mover_mode("half")
     with pytest.raises(ValueError):
         T.set_w_mover_mode("なにか")
-    assert T.W_MOVER_MODE == "off"
+    assert T.W_MOVER_MODE == "half"
 
 
 def test_w_mover_half_recentres_w_at_minus_half_and_makes_the_pair_antisymmetric():
-    """`p(d) + p(−1 − d) == 1`——鏡の対（`d_a + d_b = −1`・T151 の対の恒等式）が `half` で反対称になる。
-    `off` では `p(0) = 0.5`（手番の半ターンを落としている）。"""
-    old_err, old_sig = T.W_ERR_MODE, T.SIGMA_REL
+    """`p(d) + p(−1 − d) == 1`——鏡の対（`d_a + d_b = −1`・T151 の対の恒等式）が `half` で反対称になる
+    （`mover=True` の行だけ）。`off`／`mover=False` では `p(0) = 0.5`（手番の半ターンを落としている）。"""
+    old_err, old_sig, old_mv = T.W_ERR_MODE, T.SIGMA_REL, T.W_MOVER_MODE
     try:
         T.set_w_err_mode("rel"); T.set_sigma_rel(0.17)
         T.set_w_mover_mode("off")
-        assert T.prob_of_d(0.0, t_me=5, t_opp=5) == pytest.approx(0.5)
-        assert T.prob_of_d(-0.5, t_me=5, t_opp=5) < 0.5
+        assert T.prob_of_d(0.0, t_me=5, t_opp=5, mover=True) == pytest.approx(0.5)
+        assert T.prob_of_d(-0.5, t_me=5, t_opp=5, mover=True) < 0.5
         T.set_w_mover_mode("half")
-        assert T.prob_of_d(-0.5, t_me=5, t_opp=5) == pytest.approx(0.5)     # 中心が −1/2 へ
-        assert T.prob_of_d(0.0, t_me=5, t_opp=5) > 0.5
+        assert T.prob_of_d(0.0, t_me=5, t_opp=5) == pytest.approx(0.5)               # 1 行の器（mover 省略）はずらさない
+        assert T.prob_of_d(-0.5, t_me=5, t_opp=5, mover=True) == pytest.approx(0.5)  # 中心が −1/2 へ
+        assert T.prob_of_d(0.0, t_me=5, t_opp=5, mover=True) > 0.5
         for d in (-3.0, -1.0, -0.5, 0.0, 0.7, 2.0):
-            assert T.prob_of_d(d, t_me=5, t_opp=5) + T.prob_of_d(-1.0 - d, t_me=5, t_opp=5) == pytest.approx(1.0)
-        # 密度も同じだけずれる（`W` の微分であり続ける）
-        assert T.w_of_d(-0.5) == pytest.approx(T.w_of_d(0.0) if False else T.w_of_d(-0.5))
-        peak_half = T.w_of_d(-0.5)
-        T.set_w_mover_mode("off")
-        assert T.w_of_d(0.0) == pytest.approx(peak_half)                      # `off` の山（0）＝`half` の山（−1/2）
+            assert (T.prob_of_d(d, t_me=5, t_opp=5, mover=True)
+                    + T.prob_of_d(-1.0 - d, t_me=5, t_opp=5, mover=True)) == pytest.approx(1.0)
+        # 密度も同じだけずれる（`W` の微分であり続ける）——`mover=True` のときだけ
+        assert T.w_of_d(-0.5, mover=True) == pytest.approx(T.w_of_d(0.0))            # `half` の山（−1/2）＝ずらさない山（0）
+        assert T.w_of_d(0.0, mover=False) == pytest.approx(T.w_of_d(0.0))
     finally:
-        T.set_w_mover_mode("off"); T.set_w_err_mode(old_err); T.set_sigma_rel(old_sig)
+        T.set_w_mover_mode(old_mv); T.set_w_err_mode(old_err); T.set_sigma_rel(old_sig)

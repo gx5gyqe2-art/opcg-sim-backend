@@ -1909,8 +1909,10 @@ def pre_settle_skip(mode, settled, first_turn, seed_g, w, t):
 #: 残る非対称（開示）: 相手の体のパワーは w の行の列 0＝**相手の手番でないときの値**（`YOUR_TURN` の
 #: パッシブが載らない・`OPPONENT_TURN` のパッシブが載る）——エンジンは手番側のパッシブしか計算しないので
 #: w の行からは読めない。`mirror_view` の docstring に列ごとの扱いを書いた。
+#: **既定は `mirror`（2026-09-24 採用・ユーザ決定「推薦の通りでいきましょう」・`2026-09-24_opp_clock_freshness.md`）**。
+#: `prev_start` は旧の数字と比べるときの対照（T151 以前の報告の数字はこちら）。
 OPP_CLOCK_MODES = ("prev_start", "mirror")
-OPP_CLOCK_MODE = "prev_start"
+OPP_CLOCK_MODE = "mirror"
 
 
 def set_opp_clock_mode(mode):

@@ -1708,15 +1708,16 @@ def test_pre_settle_game_reads_the_settled_map_once_and_derives_the_first_turn(m
 # 相手の席から見た鏡（`mirror_view`）にして同じ `seat_row` で読む。**既定の道は 1 ビットも動かない**
 # （2026-09-24・実 20 局で rows_out／ledger／stats／theta_check／turn_harm のハッシュが HEAD と一致）。
 
-def test_set_opp_clock_mode_defaults_to_prev_start_and_rejects_unknown():
-    assert CB.OPP_CLOCK_MODE == "prev_start"
+def test_set_opp_clock_mode_defaults_to_mirror_and_rejects_unknown():
+    """**既定は `mirror`**（2026-09-24 採用・ユーザ決定）。`prev_start` は旧の数字との対照。"""
+    assert CB.OPP_CLOCK_MODE == "mirror"
     try:
-        assert CB.set_opp_clock_mode("mirror") == "mirror"
+        assert CB.set_opp_clock_mode("prev_start") == "prev_start"
     finally:
-        CB.set_opp_clock_mode("prev_start")
+        CB.set_opp_clock_mode("mirror")
     with pytest.raises(ValueError):
         CB.set_opp_clock_mode("なにか")
-    assert CB.OPP_CLOCK_MODE == "prev_start"
+    assert CB.OPP_CLOCK_MODE == "mirror"
 
 
 def _mirror_fixture():
@@ -1812,11 +1813,11 @@ def test_mirror_view_without_cards_keeps_the_blocker_column_as_is_and_empty_hand
 
 def test_opp_clock_mirror_on_empty_records_builds_no_rows_and_default_counts_no_mirror_rows(monkeypatch):
     monkeypatch.setattr(CB.PL, "iter_games", lambda *a, **k: iter([]))
-    rows, _l, stats, _t, _c = CB.collect(["x"])
+    rows, _l, stats, _t, _c = CB.collect(["x"])                  # 既定（mirror）
     assert rows == [] and stats["mirror_rows"] == 0
     try:
-        CB.set_opp_clock_mode("mirror")
+        CB.set_opp_clock_mode("prev_start")
         rows2, _l2, stats2, _t2, _c2 = CB.collect(["x"])
     finally:
-        CB.set_opp_clock_mode("prev_start")
+        CB.set_opp_clock_mode("mirror")
     assert rows2 == [] and stats2["mirror_rows"] == 0

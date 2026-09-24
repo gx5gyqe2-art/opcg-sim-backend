@@ -450,9 +450,16 @@ def clock_scale(t_me, t_opp, mode="hyp"):
 #: `predict` の同点の扱い（`τ_me <= τ_opp` で勝ち）はこれと整合しているが、`Φ(D/σ)` は `D=0` で 0.5 を
 #: 返していた＝**手番の半ターンを落としていた**。従来の読み方（相手の時計を相手の前ターン開始から読む・
 #: `OPP_CLOCK_MODE=prev_start`）では相手の時計が約 1 段古いぶん `D` が約 +1 されていたので、実質の中心は
-#: `−1`（半ターン**行き過ぎ**＝自席びいき）だった。`off`＝従来（既定・出荷の値を動かさない）／`half`＝`W(D + 1/2)`。
+#: `−1`（半ターン**行き過ぎ**＝自席びいき）だった。`off`＝従来／`half`＝`W(D + 1/2)`。
+#:
+#: **既定は `half`（2026-09-24 採用・ユーザ決定「推薦の通りでいきましょう」）。掛かる先は交点の橋の行の p だけ**
+#: （`win_calib.probs_of` が `mover=True` で呼ぶ・行は**ターン開始**の 2 本の時計＝半ターンが正確な瞬間）。
+#: **1 行の器（線形の橋の κ・`relative_ledger`・`kappa_vector`・`kappa_needed`）には掛けない**（`mover=False` が既定）
+#: ——それらは**ターンの途中の行**で、手番の有利はターンの最初の手で +1/2・最後の手で −1/2 と行ごとに違うので、
+#: 一律 +1/2 は最初の手以外で行き過ぎる（T151 で `dG` が両記録で悪化した機構）。正しい形は「ターン内の進み具合で
+#: ずらす」＝T153 候補。それまでは掛けない（ターン全体で平均すればほぼ 0＝一律 +1/2 より誤差が小さい）。
 W_MOVER_MODES = ("off", "half")
-W_MOVER_MODE = "off"
+W_MOVER_MODE = "half"
 
 
 def set_w_mover_mode(mode):
@@ -463,19 +470,21 @@ def set_w_mover_mode(mode):
     return W_MOVER_MODE
 
 
-def mover_shift():
-    """`W`／`w` に足す手番の半ターン（`half` なら 0.5・`off` なら 0）。"""
-    return 0.5 if W_MOVER_MODE == "half" else 0.0
+def mover_shift(mover=True):
+    """`W`／`w` に足す手番の半ターン（`half` かつ `mover` なら 0.5・それ以外は 0）。
+    `mover`＝**ターン開始の 2 本の時計の行か**（交点の橋の `rows_out`＝`win_calib.probs_of`）。1 行の器は `False`。"""
+    return 0.5 if (mover and W_MOVER_MODE == "half") else 0.0
 
 
-def prob_of_d(d, sigma_d=None, t_me=None, t_opp=None, scale_mode="hyp"):
+def prob_of_d(d, sigma_d=None, t_me=None, t_opp=None, scale_mode="hyp", mover=False):
     """**時計の差 `D` から勝率へ**（T80）＝`W(D) = Φ(D/σ_D)`。`w_of_d`（密度）の**積分**で、同じ `σ_D` を使う。
     `κ = w(D)/w̄` が微分の形なら、こちらが積分の形＝「今の勝率」。**新しい定数は無い**。
 
     **T118**: `W_ERR_MODE == "rel"` かつ 2 本の時計が渡されたときは、物差しを
     `σ_rel × s(τ_me, τ_opp)` にする（`s` は 1 次同次＝比で読む）。`σ_rel` が無ければ `abs` に落ちる。
-    **T151-2**: `W_MOVER_MODE=half` なら `D + 1/2`（手番の半ターン・`w_of_d` も同じだけずらす）。"""
-    d = float(d) + mover_shift()
+    **T151-2**: `mover=True`（ターン開始の 2 本の時計の行）かつ `W_MOVER_MODE=half` なら `D + 1/2`（手番の半ターン）。
+    1 行の器（ターン途中の行）は `mover=False` のまま＝ずらさない（採用時のユーザ決定 2026-09-24・上の注）。"""
+    d = float(d) + mover_shift(mover)
     if (W_ERR_MODE == "rel" and sigma_d is None and SIGMA_REL is not None
             and t_me is not None and t_opp is not None):
         s = clock_scale(t_me, t_opp, scale_mode)
@@ -502,10 +511,11 @@ def set_sigma_turn(turns):
     return SIGMA_D
 
 
-def w_of_d(d, sigma=None):
-    """傾き `w(D)`＝時計の差 `D` の正規密度（`∫ w dD = 1`＝大差の負けから大差の勝ちまでで勝率が 1 動く）。"""
+def w_of_d(d, sigma=None, mover=False):
+    """傾き `w(D)`＝時計の差 `D` の正規密度（`∫ w dD = 1`＝大差の負けから大差の勝ちまでで勝率が 1 動く）。
+    `mover`（T151-2）: ターン開始の 2 本の時計の行なら `W` と同じ半ターンをずらす（1 行の器は `False`＝ずらさない）。"""
     sigma = SIGMA_D if sigma is None else float(sigma)
-    z = (float(d) + mover_shift()) / sigma           # **T151-2**: `W` と同じ半ターン（`half` のときだけ）
+    z = (float(d) + mover_shift(mover)) / sigma      # **T151-2**: `W` と同じ半ターン（`mover` かつ `half` のときだけ）
     return math.exp(-0.5 * z * z) / (sigma * math.sqrt(2.0 * math.pi))
 
 

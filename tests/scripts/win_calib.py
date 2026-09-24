@@ -71,7 +71,8 @@ def probs_of(rs, sigma_rel=None, scale_mode="hyp"):
     try:
         if sigma_rel is not None:
             TO.set_sigma_rel(sigma_rel)
-        return [TO.prob_of_d(d, t_me=tm, t_opp=to, scale_mode=scale_mode) for d, tm, to, _z in rs]
+        # **T151-2**: `rows_out` は**ターン開始の 2 本の時計**の行＝手番の半ターンが正確に掛かる瞬間（`mover=True`）。
+        return [TO.prob_of_d(d, t_me=tm, t_opp=to, scale_mode=scale_mode, mover=True) for d, tm, to, _z in rs]
     finally:
         TO.set_sigma_rel(old)
 
