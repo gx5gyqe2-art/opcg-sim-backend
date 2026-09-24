@@ -257,7 +257,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
                     _olp = float(np.asarray(_sc)[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
                     sched_at[(w, t)] = CB.seat_slope_sched(_sc, _tok, _ci, idx2cid, cards, _olp,
                                                           theta, mu, deck_ids=dk,
-                                                          jmax=int(CB.RACE_CAP))
+                                                          jmax=int(CB.RACE_CAP),
+                                                          j0=CB.own_turn_index(t) + 1)   # **T152**
 
         def _latest(w, t):
             ts = [tt for (ww, tt) in rate_at if ww == w and tt <= t]

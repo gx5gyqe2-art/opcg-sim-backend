@@ -1165,8 +1165,40 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     return base, stock, flow, lead, stock_rush, flow_rush, eff, eff_once
 
 
+#: **T152（2026-09-24・ユーザ決定「推薦の通りでいきましょう」）: 列の第 1 段に T103 の規則をどう当てるか**。
+#:
+#: **欠陥**: `seat_slope_sched` は列の先頭 `R_1` を**無条件に** 0 にしていた（`j <= 1`）。`rate_at` の規則は
+#: `j0 + j − 1 <= 1`（**局の最初の自席ターンだけ**殴れない・T103）だが、`rate_at` は `sched` が在ると
+#: その規則を通らず `sched[0]` を返す＝既定（`RATE_DON_MODE=flow`）では**全ての歩きの第 1 段が 0**
+#: （実 5 局 65 本の歩きで `sched_j1_sum = 0.0`・`rate_at(j=1, j0=3, sched) = 0`）。**両席に対称**なので
+#: T151 の反対称の結論には効かないが、**全ての τ を約 1 ターン膨らませる**（T146b の「τ の偏り +1.6」・
+#: T118／T151 の最上位分位の相手の τ の残差 ≈7／≈4.5 の候補）。
+#:
+#: `walk`＝旧（既定・出荷の値を動かさない）／`game`＝**規則どおり**（`j0` を受け取り、`j0 + j − 1 <= 1` のときだけ 0）。
+#: **新定数ゼロ・新しい量ゼロ**（`rate_at` の既存の規則を列にも通すだけ）。
+#:
+#: **予告（測る前に書く・`2026-09-24_walk_first_step.md`）**:
+#: P1 勝った行の自分の τ の残差（1.18／1.31）と負けた行の相手の τ の残差（0.92／1.25）が**両記録で約 1 縮む**
+#:    （殺す基準: どちらかの記録で 0.5 未満しか縮まない）／
+#: P2 交点の橋（全行）の偏り 1.008／1.225 が **0.5 以上縮む**（殺す基準: 両記録で縮まない）・`within1` 上昇／
+#: P3 **「どちらが勝つか」は動かない**——両時計が同じだけ縮むので的中は ±0.01・対の和 −1 は ±0.02／
+#: P4 最上位分位の相手の τ の残差（6.87／4.42）が **約 1 縮む**（殺す基準: 0.5 未満＝その帯は別の欠陥）／
+#: P5 較正の観察（予告ではない）: 尺度 `s = √(τ_me²+τ_opp²)` が縮むぶん p は極端になる＝優勢／劣勢の
+#:    |gap| は**両側とも同じ向きに**動く（反対称は保たれる）。幅の作り直し（σ）は次の T。
+SCHED_T1_MODES = ("walk", "game")
+SCHED_T1_MODE = "walk"
+
+
+def set_sched_t1_mode(mode):
+    global SCHED_T1_MODE
+    if mode not in SCHED_T1_MODES:
+        raise ValueError("sched t1 mode は %s のどれか" % (SCHED_T1_MODES,))
+    SCHED_T1_MODE = mode
+    return SCHED_T1_MODE
+
+
 def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None,
-                     jmax=10, blockers=None, through=None):
+                     jmax=10, blockers=None, through=None, j0=1):
     """**`j` ごとの速さの列 `R_1..R_jmax`**（T114・`RATE_DON_MODE != "off"` のときだけ使う）。
 
     規則のドンの列 `d_i`（`purse_series`）で**その i で買えるもの**を解き直す:
@@ -1225,7 +1257,9 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     q = 1.0 - max(0.0, min(1.0, float(KO_P))) if RATE_DECAY_MODE == "ko" else 1.0
     out = []
     for j in range(1, jmax + 1):
-        if RATE_T1_MODE == "on" and j <= 1:
+        # **T152**: `walk`＝旧（列の第 1 段は無条件に 0）／`game`＝`rate_at` と同じ規則（局の最初の自席ターンだけ 0）
+        first_zero = (j <= 1) if SCHED_T1_MODE == "walk" else (int(j0) + j - 1 <= 1)
+        if RATE_T1_MODE == "on" and first_zero:
             out.append(0.0)
             continue
         lead = lead0 + attl[j]
@@ -2413,7 +2447,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             if RATE_DON_MODE != "off":
                 # **T114**: 規則のドンの列から `R_j` を作る（`off` なら作らない＝旧の式）
                 sched = seat_slope_sched(sc, tok, _ci, idx2cid, cards, olp, theta, mu,
-                                         deck_ids=dk, jmax=int(RACE_CAP), through=thr)
+                                         deck_ids=dk, jmax=int(RACE_CAP), through=thr,
+                                         j0=int(j) + 1)                  # **T152**: この歩きの出発点（絶対の自席ターン・1 始まり）
                 stats["sched_n"] += 1
                 stats["sched_j1_sum"] += float(sched[0]); stats["sched_j5_sum"] += float(sched[4])
             if SLOPE_HAND_MODE == "flow":
@@ -2996,6 +3031,8 @@ def main(argv=None):
                          "`mirror`（同じ瞬間＝自席ターンの最後の行を相手の席から見た鏡・相手側はリフレッシュ後）")
     ap.add_argument("--w-mover", default=TO.W_MOVER_MODE, choices=TO.W_MOVER_MODES,
                     help="**T151-2** 手番の半ターン: `off`（旧）／`half`（`W(D + 1/2)`・規則から）")
+    ap.add_argument("--sched-t1", default=SCHED_T1_MODE, choices=SCHED_T1_MODES,
+                    help="**T152** 列の第 1 段: `walk`（旧・全ての歩きの第 1 段が 0）／`game`（規則・局の最初の自席ターンだけ 0）")
     add_nu_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
@@ -3004,6 +3041,7 @@ def main(argv=None):
     set_pre_settle_mode(a.pre_settle)               # **T138b**
     set_opp_clock_mode(a.opp_clock)                 # **T151-2**
     TO.set_w_mover_mode(a.w_mover)                  # **T151-2**
+    set_sched_t1_mode(a.sched_t1)                   # **T152**
     set_theta_hand_mode(a.theta_hand)
     set_theta_hand_place(a.theta_hand_place)
     set_theta_hand_window(a.theta_hand_window)
