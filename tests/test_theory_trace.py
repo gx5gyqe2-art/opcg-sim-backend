@@ -157,8 +157,10 @@ def test_summarise_counts_main_rows_and_forbidden_share():
                             {"kind": "window"}, {"kind": "commit"}]},
              {"decisions": [{"kind": "main", "forbidden": True}]}]
     s = TT.summarise(games)
-    assert s == {"n_games": 2, "n_decisions": 5, "n_main": 3, "n_forbidden": 2, "forbid_rate": pytest.approx(2 / 3, abs=1e-4)}
-    assert TT.summarise([]) == {"n_games": 0, "n_decisions": 0, "n_main": 0, "n_forbidden": 0, "forbid_rate": None}
+    assert s == {"n_games": 2, "n_decisions": 5, "n_main": 3, "n_forbidden": 2,
+                 "forbid_rate": pytest.approx(2 / 3, abs=1e-4), "n_intervened": 0}   # 介入なしの局だけなら勝敗の欄は無い
+    assert TT.summarise([]) == {"n_games": 0, "n_decisions": 0, "n_main": 0, "n_forbidden": 0, "forbid_rate": None,
+                                "n_intervened": 0}
 
 
 def test_cli_builds_seed_range_sets_seq_mode_and_writes_json(monkeypatch, tmp_path):
@@ -180,3 +182,52 @@ def test_cli_builds_seed_range_sets_seq_mode_and_writes_json(monkeypatch, tmp_pa
     assert saved["meta"]["seq"] == "attack_le" and saved["meta"]["summary"]["n_games"] == 2
     assert saved["meta"]["mu"] == pytest.approx(TT.MU)
     assert [g["seed"] for g in saved["games"]] == [1300000, 1300001]
+
+
+# ---- 5. 介入つき版（2026-09-24・ユーザ要望「介入つき版の棋譜も作れる？」）------------------------------
+
+def test_mark_intervention_keeps_the_search_move_and_writes_the_played_candidate():
+    t = TT.uuid_table(_board())
+    rec = {"move": "出す: ゾロ", "su": "H1", "tu": None,
+           "cands": [{"d": "出す: ゾロ", "su": "H1", "tu": None},
+                     {"d": "付与2→攻撃: ナミ → 白ひげ", "su": "C1", "tu": "L2"}]}
+    new = {"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": "C1"}}   # 箱の先頭の原始手
+    TT.mark_intervention(rec, new, t, {"rep_index": 1, "redirected": True})
+    assert rec["intervened"] is True and rec["search_move"] == "出す: ゾロ"
+    assert rec["move"] == "付与2→攻撃: ナミ → 白ひげ"          # 先頭の原始手ではなく箱全体で書く
+    assert (rec["su"], rec["tu"]) == ("C1", "L2") and rec["played_index"] == 1 and rec["redirected"] is True
+
+
+def test_mark_intervention_without_a_record_falls_back_to_the_primitive_move():
+    t = TT.uuid_table(_board())
+    rec = {"move": "ターン終了", "su": None, "tu": None}
+    TT.mark_intervention(rec, {"action_type": "PLAY", "payload": {"uuid": "H1"}}, t, None)
+    assert rec["move"] == "出す: ゾロ" and rec["search_move"] == "ターン終了" and rec["su"] == "H1"
+    assert "played_index" not in rec
+
+
+def test_collect_runs_both_seats_for_pairs_and_wires_make_swap(monkeypatch):
+    calls, made = [], []
+    monkeypatch.setattr(TT.PL, "Cards", lambda: None)
+    monkeypatch.setattr(TT.GA, "_vocab", lambda: {})
+    monkeypatch.setattr(TT.E, "engine", lambda: None)
+    monkeypatch.setattr(TT.E, "SeatSpec", lambda *a, **k: object())
+    monkeypatch.setattr(TT.D, "load_db", lambda: object())
+    monkeypatch.setattr(TT.D, "leader_pair", lambda db, seed, mode: ("la", "lb"))
+    monkeypatch.setattr(TT.D, "build_pair", lambda db, la, lb, seed, decks: (("L1", []), ("L2", [])))
+
+    def fake_make_swap(*a, **kw):
+        made.append((kw.get("seats"), kw.get("arm"), kw.get("attach_static")))
+        return lambda game, name, turn, step, out, move: move
+
+    monkeypatch.setattr(TT.TA, "make_swap", fake_make_swap)
+    monkeypatch.setattr(TT.DR, "run_game", lambda seed, seats, p1, p2, **kw: calls.append((seed, kw.get("swap") is not None))
+                        or {"winner": "p1", "turns": 7})
+    games = TT.collect([5], "synth_roles", sims=4, intervene="pairs")
+    assert made == [({"p1"}, "theory", True), ({"p2"}, "theory", True)]
+    assert calls == [(5, True), (5, True)]
+    assert [g["intervened"] for g in games] == ["p1", "p2"] and games[0]["arm"] == "theory"
+    assert TT.summarise(games)["intervened_seat_wins"] == "1/2"
+    calls.clear()
+    games = TT.collect([5], "synth_roles", sims=4)                         # 既定＝介入なし
+    assert calls == [(5, False)] and games[0]["intervened"] is None and games[0]["arm"] is None

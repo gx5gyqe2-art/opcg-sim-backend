@@ -48,6 +48,7 @@ input[type=range]{width:100px}
 .tick{flex:0 0 7px;height:16px;border-radius:2px;background:var(--line);cursor:pointer;border:none;padding:0}
 .tick.main{background:var(--ink-3);opacity:.45}
 .tick.forb{opacity:1;background:var(--bad)}
+.tick.iv{opacity:1;background:var(--theory)}
 .tick.p2{height:10px;align-self:flex-end}
 .tick.cur{outline:2px solid var(--focus);outline-offset:1px}
 .tick.hid{display:none}
@@ -109,6 +110,7 @@ svg.arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
 .pill.bad{background:var(--bad-soft);color:var(--bad)}
 .pill.ok{background:var(--chip);color:var(--ok)}
 .pill.muted{background:var(--chip);color:var(--ink-2)}
+.pill.iv{background:var(--theory);color:#fff}
 .cands{display:flex;flex-direction:column}
 .cand{display:grid;grid-template-columns:22px minmax(0,1fr) 94px;gap:4px 8px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:4px}
 .cand:last-child{border-bottom:none}
@@ -137,6 +139,8 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
 .dl .item:hover{background:var(--chip)}
 .dl .item.cur{background:var(--search-soft)}
 .dl .item.forb .mv{color:var(--bad);font-weight:500}
+.dl .item.iv .mv{color:var(--theory);font-weight:600}
+.dl .item .was{display:block;font-size:10px;color:var(--ink-3);font-weight:400}
 .dl .t{color:var(--ink-3);font-size:10px;line-height:1.3}
 .dl .s{font-size:11px;color:var(--ink-3)}
 .dl .s.neg{color:var(--bad);font-weight:600}
@@ -163,6 +167,7 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
     <button id="nextforb" class="primary" title="次の食い違い（f）">次の食い違い</button>
     <label class="chk"><input type="checkbox" id="onlyMain" checked> 決定点だけ</label>
     <label class="chk"><input type="checkbox" id="onlyForb"> 食い違いだけ</label>
+    <label class="chk" id="onlyIvWrap" hidden><input type="checkbox" id="onlyIv"> 介入だけ</label>
     <label class="chk">差 ≥ <span class="mono" id="thrv">0.0</span> 枚 <input type="range" id="thr" min="0" max="4" step="0.25" value="0"></label>
   </div>
   <div class="timeline" id="timeline" aria-label="決定点の並び"></div>
@@ -182,6 +187,7 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
       <dl>
         <dt><span class="sw" style="background:var(--arrow-s)"></span>探索</dt><dd>CPU が実際に打った手。盤面では青緑の枠と矢印。</dd>
         <dt><span class="sw" style="background:var(--arrow-t)"></span>理論</dt><dd>同じ候補を理論で値付けして一番高い手。盤面では橙の枠と矢印。</dd>
+        <dt><span class="pill iv">介入</span></dt><dd>介入つきの局だけ。理論が損と読んだ手を、理論の最善に差し替えて実際に打った決定点。盤面の橙の矢印が実際に打った手、青緑の破線が探索が打とうとした手。</dd>
         <dt><span class="sw" style="background:var(--arrow-b)"></span>戦闘中</dt><dd>守りの窓など、攻撃の途中の決定点で攻撃側と対象を赤で結ぶ。</dd>
         <dt>理論の値</dt><dd>単位は「手札 1 枚ぶんの価値」（枚）。差は打った手 − 理論の最善で、負なら理論はその手を損と読んでいる。</dd>
         <dt>候補</dt><dd>行を押すと、その手を盤面に灰色の矢印で重ねる。カードを押すと拡大。</dd>
@@ -242,13 +248,17 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
     DATA = obj; gi = 0; di = 0; preview = null;
     try{ const s = JSON.parse(localStorage.getItem("ttv2-pos")||"null"); if (s && s.seed_base === obj.meta?.seed_base && s.gi < obj.games.length){ gi = s.gi; di = s.di; } }catch(e){}
     const m = obj.meta || {};
-    $("#meta").textContent = `${obj.games.length} 局・読み ${m.seq||"?"}・sims ${m.sims||"?"}${m.summary ? `・決定点 ${m.summary.n_main} のうち食い違い ${m.summary.n_forbidden}（${Math.round((m.summary.forbid_rate||0)*100)}%）` : ""}`;
+    const hasIv = obj.games.some(G => G.intervened);
+    $("#onlyIvWrap").hidden = !hasIv;
+    $("#meta").textContent = `${obj.games.length} 局・読み ${m.seq||"?"}・sims ${m.sims||"?"}${hasIv ? `・介入つき（${m.arm === "placebo" ? "プラセボ" : "理論"}・介入 ${m.summary?.n_intervened ?? "?"} 回・介入した席の勝ち ${m.summary?.intervened_seat_wins ?? "?"}）` : ""}${m.summary && !hasIv ? `・決定点 ${m.summary.n_main} のうち食い違い ${m.summary.n_forbidden}（${Math.round((m.summary.forbid_rate||0)*100)}%）` : ""}`;
     const g = $("#game"); g.innerHTML = "";
     obj.games.forEach((G, i) => {
       const b = G.decisions[0]?.board;
       const nf = G.decisions.filter(d => d.forbidden).length;
+      const ni = G.decisions.filter(d => d.intervened).length;
       const o = document.createElement("option"); o.value = i;
-      o.textContent = `#${G.seed} ${b?.p1?.leader?.name || G.leaders?.p1} vs ${b?.p2?.leader?.name || G.leaders?.p2}・勝者 ${G.winner||"—"}・食い違い ${nf}`;
+      o.textContent = `#${G.seed} ${b?.p1?.leader?.name || G.leaders?.p1} vs ${b?.p2?.leader?.name || G.leaders?.p2}・勝者 ${G.winner||"—"}` +
+        (G.intervened ? `・${G.intervened} に介入 ${ni} 回（${G.winner === G.intervened ? "介入側の勝ち" : "介入側の負け"}）` : `・食い違い ${nf}`);
       g.appendChild(o);
     });
     g.value = gi; render();
@@ -256,6 +266,7 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
   function visible(d){
     if ($("#onlyMain").checked && d.kind !== "main") return false;
     if ($("#onlyForb").checked && !d.forbidden) return false;
+    if (!$("#onlyIvWrap").hidden && $("#onlyIv").checked && !d.intervened) return false;
     const thr = parseFloat($("#thr").value);
     if (thr > 0 && !(d.s_mu != null && -d.s_mu >= thr)) return false;
     return true;
@@ -272,7 +283,7 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
     const tl = $("#timeline"); tl.innerHTML = "";
     D.forEach((x, i) => {
       const b = document.createElement("button");
-      b.className = "tick" + (x.kind === "main" ? " main" : "") + (x.forbidden ? " forb" : "") + (x.seat === "p2" ? " p2" : "") + (i === di ? " cur" : "") + (visible(x) ? "" : " hid");
+      b.className = "tick" + (x.kind === "main" ? " main" : "") + (x.intervened ? " iv" : x.forbidden ? " forb" : "") + (x.seat === "p2" ? " p2" : "") + (i === di ? " cur" : "") + (visible(x) ? "" : " hid");
       b.title = `T${x.turn} ${x.seat} ${x.move}${x.s_mu != null ? ` 差 ${fmt(x.s_mu)}` : ""}`;
       b.setAttribute("aria-label", b.title);
       b.addEventListener("click", () => go(i));
@@ -281,7 +292,7 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
     const ct = tl.querySelector(".tick.cur"); if (ct) tl.scrollLeft = ct.offsetLeft - tl.clientWidth / 2;
     // board
     $("#mat").innerHTML = half(d.board, "p2", d, true) +
-      `<div class="center"><span class="who">ターン ${d.turn}・${d.seat} の番</span><span>${esc(d.phase||"")}</span><span>決定点 ${d.i+1}／${D.length}</span><span>局 #${G.seed}${G.winner ? `・勝者 ${G.winner}` : ""}</span></div>` +
+      `<div class="center"><span class="who">ターン ${d.turn}・${d.seat} の番</span><span>${esc(d.phase||"")}</span><span>決定点 ${d.i+1}／${D.length}</span><span>局 #${G.seed}${G.winner ? `・勝者 ${G.winner}` : ""}${G.intervened ? `・${G.intervened} に介入` : ""}</span></div>` +
       half(d.board, "p1", d, false) + `<svg class="arrows" id="arrows" aria-hidden="true"></svg>`;
     renderPanel(G, d);
     renderList(D);
@@ -294,6 +305,14 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
     if (d.kind === "main" && cands){
       const ch = d.chosen != null ? cands[d.chosen] : null, bt = d.best != null ? cands[d.best] : null;
       const agree = d.best != null && d.best === d.chosen;
+      if (d.intervened){
+        const pl = d.played_index != null ? cands[d.played_index] : null;
+        v = `<div class="vline"><span class="pill iv">介入</span><span class="sub">理論が損と読んだので差し替えた</span></div>` +
+            `<div class="vline"><span class="pill search">探索の手</span><span class="mv" style="text-decoration:line-through;text-decoration-color:var(--ink-3)">${esc(d.search_move || (ch ? ch.d : ""))}</span></div>` +
+            `<div class="vline"><span class="pill theory">実際に打った</span><span class="mv">${esc(pl ? pl.d : d.move)}</span></div>` +
+            (d.redirected ? `<div class="sub">理論の最善は「${esc(bt ? bt.d : "")}」。付与は殴るまで一続きで打つ形に折り返した。</div>` : "") +
+            `<div class="vline"><span class="pill bad">差 <span class="mono">${fmt(d.s_mu)}</span> 枚</span></div>`;
+      } else
       v = `<div class="vline"><span class="pill search">探索</span><span class="mv">${esc(ch ? ch.d : d.move)}</span></div>` +
           (bt && !agree ? `<div class="vline"><span class="pill theory">理論</span><span class="mv">${esc(bt.d)}</span></div>` : "") +
           `<div class="vline">${d.s_mu == null ? `<span class="pill muted">判定なし（値付けできる候補が 2 本未満）</span>` : d.forbidden ? `<span class="pill bad">食い違い・差 <span class="mono">${fmt(d.s_mu)}</span> 枚</span>` : `<span class="pill ok">理論も同じ手</span>`}</div>`;
@@ -317,6 +336,7 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
         const marks = [];
         if (i === d.chosen) marks.push(`<span class="pill search">探索</span>`);
         if (i === d.best) marks.push(`<span class="pill theory">理論の最善</span>`);
+        if (d.intervened && i === d.played_index) marks.push(`<span class="pill iv">実際に打った</span>`);
         if (c.src != null && c.src !== i) marks.push(`<span class="sub">実行は #${c.src+1}</span>`);
         const tw = c.p == null ? 0 : Math.min(100, Math.abs(c.p) / pmax * 100);
         const sw = (c.n || 0) / nsum * 100;
@@ -342,8 +362,8 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
     D.forEach((x, i) => {
       if (!visible(x)) return;
       const it = document.createElement("div");
-      it.className = "item" + (i === di ? " cur" : "") + (x.forbidden ? " forb" : "");
-      it.innerHTML = `<div class="t">T${x.turn}<br>${x.seat}</div><div class="mv">${esc(x.move)}</div><div class="s mono${x.s_mu < -1e-9 ? " neg" : ""}">${x.s_mu != null ? fmt(x.s_mu) : ""}</div>`;
+      it.className = "item" + (i === di ? " cur" : "") + (x.intervened ? " iv" : x.forbidden ? " forb" : "");
+      it.innerHTML = `<div class="t">T${x.turn}<br>${x.seat}</div><div class="mv">${esc(x.move)}${x.intervened ? `<span class="was">探索: ${esc(x.search_move)}</span>` : ""}</div><div class="s mono${x.s_mu < -1e-9 ? " neg" : ""}">${x.s_mu != null ? fmt(x.s_mu) : ""}</div>`;
       it.addEventListener("click", () => go(i));
       list.appendChild(it);
     });
@@ -364,8 +384,9 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
     };
     if (d.battle) mark(d.battle.a, d.battle.t, "hb", "hb", "var(--arrow-b)");
     if (d.cands){
-      if (d.best != null && d.best !== d.chosen){ const c = d.cands[d.best]; mark(c.src != null ? d.cands[c.src]?.su ?? c.su : c.su, c.src != null ? d.cands[c.src]?.tu ?? c.tu : c.tu, "ht", "tt", "var(--arrow-t)"); }
-      if (d.chosen != null){ const c = d.cands[d.chosen]; mark(c.su, c.tu, "hs", "ts", "var(--arrow-s)"); }
+      if (d.intervened && d.played_index != null && d.cands[d.played_index]){ const c = d.cands[d.played_index]; mark(c.su, c.tu, "ht", "tt", "var(--arrow-t)"); }
+      else if (d.best != null && d.best !== d.chosen){ const c = d.cands[d.best]; mark(c.src != null ? d.cands[c.src]?.su ?? c.su : c.su, c.src != null ? d.cands[c.src]?.tu ?? c.tu : c.tu, "ht", "tt", "var(--arrow-t)"); }
+      if (d.chosen != null){ const c = d.cands[d.chosen]; mark(c.su, c.tu, "hs", "ts", d.intervened ? "var(--arrow-s)|dash" : "var(--arrow-s)"); }
       if (preview != null && d.cands[preview]){ const c = d.cands[preview]; mark(c.su, c.tu, "hp", "hp", "var(--arrow-p)"); }
     } else {
       mark(d.su, d.tu, "hs", "ts", "var(--arrow-s)");
@@ -374,7 +395,8 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
     const cs = getComputedStyle(document.documentElement);
     const col = v => cs.getPropertyValue(v.slice(4, -1)).trim() || "#fff";
     let html = `<defs>${["--arrow-s","--arrow-t","--arrow-b","--arrow-p"].map(k => `<marker id="m${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${col(`var(${k})`)}"/></marker>`).join("")}</defs>`;
-    for (const [a, b, c] of lines){
+    for (const [a, b, c0] of lines){
+      const dashed = c0.endsWith("|dash"); const c = c0.replace("|dash", "");
       const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
       const x1 = ra.left + ra.width/2 - box.left, y1 = ra.top + ra.height/2 - box.top;
       const x2 = rb.left + rb.width/2 - box.left, y2 = rb.top + rb.height/2 - box.top;
@@ -383,7 +405,7 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
       const pad = Math.min(ra.height, rb.height) * 0.3;
       const sx = x1 + dx/len*pad, sy = y1 + dy/len*pad, ex = x2 - dx/len*pad, ey = y2 - dy/len*pad;
       const mx = (sx+ex)/2 - dy/len*18, my = (sy+ey)/2 + dx/len*18;
-      html += `<path d="M${sx},${sy} Q${mx},${my} ${ex},${ey}" fill="none" stroke="${col(c)}" stroke-width="3.2" stroke-linecap="round" ${k === "--arrow-p" ? 'stroke-dasharray="6 5"' : ""} marker-end="url(#m${k})" opacity=".95"/>`;
+      html += `<path d="M${sx},${sy} Q${mx},${my} ${ex},${ey}" fill="none" stroke="${col(c)}" stroke-width="3.2" stroke-linecap="round" ${(k === "--arrow-p" || dashed) ? 'stroke-dasharray="6 5"' : ""} marker-end="url(#m${k})" opacity=".95"/>`;
     }
     svg.innerHTML = html;
   }
@@ -398,7 +420,7 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
   $("#next").addEventListener("click", () => step(1));
   $("#nextforb").addEventListener("click", nextForb);
   $("#game").addEventListener("change", e => { gi = parseInt(e.target.value, 10); go(0); });
-  ["onlyMain","onlyForb"].forEach(id => $("#"+id).addEventListener("change", render));
+  ["onlyMain","onlyForb","onlyIv"].forEach(id => $("#"+id).addEventListener("change", render));
   $("#thr").addEventListener("input", e => { $("#thrv").textContent = Number(e.target.value).toFixed(1); render(); });
   $("#file").addEventListener("change", e => {
     const f = e.target.files && e.target.files[0]; if (!f) return;

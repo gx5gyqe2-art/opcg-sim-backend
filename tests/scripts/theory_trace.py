@@ -32,6 +32,7 @@ CPU（探索）が実際に打った対局を歩き、**決定点ごとに**「�
 import argparse
 import json
 import os
+import random
 import sys
 
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -47,6 +48,7 @@ from opcg_sim.loop import engine as E  # noqa: E402
 import guard_afford as GA  # noqa: E402
 import live_theory as LT  # noqa: E402
 import shadow_forbid as SF  # noqa: E402
+import t18_arena as TA  # noqa: E402
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from theory_order import MU, THETA  # noqa: E402
 
@@ -212,9 +214,38 @@ def annotate_main(cands, priced, chosen, table, legal, groups, mu=MU):
 
 # ---- 歩く ----------------------------------------------------------------------------------------
 
+def mark_intervention(rec, new_move, table, iv):
+    """介入した決定点の記録を書き換える（**介入つき版**・2026-09-24）。
+
+    `rec["move"]`（探索が選んだ手の説明）を `rec["search_move"]` に退避し、実際に盤面へ出した手
+    （`new_move`＝置き換え先の先頭の原始手）で `move`／`su`／`tu` を上書きする。`iv` は
+    `t18_arena.make_swap` が積んだ介入記録の最後の 1 件で、`rep_index`（実際に打たせた候補・
+    T156(a) の折り返し後）と `redirected` を写す——ビューアーはこの index の候補を
+    「実際に打った手」として盤面に重ねる。"""
+    rec["intervened"] = True
+    rec["search_move"] = rec.get("move")
+    rec["move"] = describe(new_move, table)
+    rec["su"], rec["tu"] = actors(new_move)
+    if iv:
+        rec["played_index"] = iv.get("rep_index")
+        rec["redirected"] = bool(iv.get("redirected"))
+        cands = rec.get("cands") or []
+        pi = rec["played_index"]
+        if pi is not None and 0 <= pi < len(cands):
+            rec["move"] = cands[pi]["d"]            # 箱（付与→攻撃）なら先頭の原始手ではなく箱全体で書く
+            rec["su"], rec["tu"] = cands[pi].get("su"), cands[pi].get("tu")
+    return rec
+
+
 def collect(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns=4, worlds=4,
-            theta=THETA, mu=MU, max_steps=DR.DEFAULT_MAX_STEPS):
-    """`seeds` を今ここに打ちながら（介入なし）決定点ごとの注釈を集める。"""
+            theta=THETA, mu=MU, max_steps=DR.DEFAULT_MAX_STEPS, intervene=None, arm="theory",
+            attach_static=True):
+    """`seeds` を今ここに打ちながら決定点ごとの注釈を集める。
+
+    `intervene`（省略時 `None`＝介入なし・影の判定だけ）: `"p1"`／`"p2"`＝その席だけに介入、
+    `"pairs"`＝seed ごとに p1 だけ・p2 だけの 2 局（`t18_arena.t18_pairs` と同じ片席介入のペア）。
+    介入は `t18_arena.make_swap`（T18・T156(a) の折り返し込み）をそのまま使う——理論が禁じた手を
+    理論の最善に差し替える。`arm`／`attach_static` の意味も T18 と同じ。"""
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     E.engine()
@@ -223,7 +254,9 @@ def collect(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns
                       prune_futile=E.GEN_PRUNE_FUTILE, **search)
     db = D.load_db()
     games = []
-    for seed in seeds:
+    runs = [(seed, s) for seed in seeds
+            for s in ([None] if not intervene else (["p1", "p2"] if intervene == "pairs" else [intervene]))]
+    for seed, iv_seat in runs:
         la, lb = D.leader_pair(db, seed, "random")
         p1, p2 = D.build_pair(db, la, lb, seed, decks_mode)
         decisions = []
@@ -261,10 +294,28 @@ def collect(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns
             _d[-1]["events"] = [e.get("message") or e.get("type") for e in (events or [])
                                 if isinstance(e, dict)][:12]
 
+        swap = None
+        if iv_seat:
+            stats = {}
+            # プラセボの乱数は `t18_pairs` と同じ (seed, 席) の規約
+            rng = random.Random(int(seed) * 2 + (0 if iv_seat == "p1" else 1))
+            inner = TA.make_swap(cards, idx2cid, theta, mu, stats, seats={iv_seat},
+                                 attach_static=attach_static, arm=arm, rng=rng)
+
+            def swap(game, name, turn, step, out, move, _d=decisions, _inner=inner, _st=stats):
+                table = uuid_table(json.loads(game.board_json()))
+                n0 = len(_st.get("interventions") or [])
+                new = _inner(game, name, turn, step, out, move)
+                ivs = _st.get("interventions") or []
+                if new is not move and _d and len(ivs) > n0:
+                    mark_intervention(_d[-1], new, table, ivs[-1])
+                return new
+
         res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, observer=observer, post=post,
-                          max_steps=max_steps)
+                          max_steps=max_steps, swap=swap)
         games.append({"seed": seed, "leaders": {"p1": p1[0], "p2": p2[0]}, "winner": res.get("winner"),
-                      "turns": res.get("turns"), "decisions": decisions})
+                      "turns": res.get("turns"), "intervened": iv_seat, "arm": (arm if iv_seat else None),
+                      "decisions": decisions})
     return games
 
 
@@ -272,9 +323,15 @@ def summarise(games):
     """局ごとの行数と、main 行のうち理論が禁じた行の割合（ビューアーの見出し用）。"""
     n_main = sum(1 for g in games for d in g["decisions"] if d.get("kind") == "main")
     n_forb = sum(1 for g in games for d in g["decisions"] if d.get("forbidden"))
-    return {"n_games": len(games), "n_decisions": sum(len(g["decisions"]) for g in games),
-            "n_main": n_main, "n_forbidden": n_forb,
-            "forbid_rate": round(n_forb / n_main, 4) if n_main else None}
+    n_iv = sum(1 for g in games for d in g["decisions"] if d.get("intervened"))
+    iv_games = [g for g in games if g.get("intervened")]
+    out = {"n_games": len(games), "n_decisions": sum(len(g["decisions"]) for g in games),
+           "n_main": n_main, "n_forbidden": n_forb,
+           "forbid_rate": round(n_forb / n_main, 4) if n_main else None, "n_intervened": n_iv}
+    if iv_games:
+        won = sum(1 for g in iv_games if g.get("winner") == g["intervened"])
+        out["intervened_seat_wins"] = f"{won}/{len(iv_games)}"
+    return out
 
 
 def build_parser():
@@ -286,6 +343,10 @@ def build_parser():
     ap.add_argument("--sims", type=int, default=64)
     ap.add_argument("--seq", default="attack_any", choices=SF.SEQ_MODES,
                     help="純付与の読み替え（T144／T155b・既定 attack_any＝T18 と同じ読み）")
+    ap.add_argument("--intervene", default="none", choices=("none", "p1", "p2", "pairs"),
+                    help="介入つき版: 理論が禁じた手を理論の最善に差し替える席（pairs＝seed ごとに p1・p2 の 2 局）")
+    ap.add_argument("--arm", default="theory", choices=("theory", "placebo"),
+                    help="介入の腕（T18 と同じ・placebo＝同じ行で無作為な別の手）")
     ap.add_argument("--json", default="")
     return ap
 
@@ -294,8 +355,10 @@ def main(argv=None):
     a = build_parser().parse_args(argv)
     SF.set_seq_mode(a.seq)
     seeds = [a.seed_base + i for i in range(a.games)]
-    games = collect(seeds, a.decks, sims=a.sims)
+    iv = None if a.intervene == "none" else a.intervene
+    games = collect(seeds, a.decks, sims=a.sims, intervene=iv, arm=a.arm)
     out = {"meta": {"seq": a.seq, "decks": a.decks, "sims": a.sims, "mu": MU,
+                    "intervene": iv, "arm": (a.arm if iv else None),
                     "seed_base": a.seed_base, "games": a.games, "summary": summarise(games)},
            "games": games}
     if a.json:

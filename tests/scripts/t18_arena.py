@@ -289,6 +289,8 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
                                        "chosen_n": ch_c.get("n"), "chosen_q": ch_c.get("q"),
                                        "rep_n": rep_c.get("n"), "rep_q": rep_c.get("q"),
                                        "n_cands": len(cands),
+                                       # **棋譜ビューアー（2026-09-24）**: 実際に打たせた候補の index（折り返し後）
+                                       "rep_index": bi,
                                        # **T156(a)**: 置き換え先が読み替えられた純付与から攻撃候補へ折り返されたか
                                        "redirected": bool(bi != bi_drawn)})
         return new_move
