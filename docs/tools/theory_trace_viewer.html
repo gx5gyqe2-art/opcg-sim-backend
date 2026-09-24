@@ -161,7 +161,7 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
 <header class="bar">
   <div class="row"><h1>理論と探索の棋譜</h1><span class="sub" id="meta"></span></div>
   <div class="row" style="margin-top:5px">
-    <label class="chk">局 <select id="game"></select></label>
+    <div class="nav" style="flex:1 1 100%;gap:6px"><button id="gprev" title="前の局">◀ 局</button><label class="chk" style="flex:1">局 <select id="game"></select></label><button id="gnext" title="次の局">局 ▶</button></div>
     <button id="prev" title="前の決定点（←）">← 前</button>
     <button id="next" title="次の決定点（→）">次 →</button>
     <button id="nextforb" class="primary" title="次の食い違い（f）">次の食い違い</button>
@@ -257,7 +257,7 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
       const nf = G.decisions.filter(d => d.forbidden).length;
       const ni = G.decisions.filter(d => d.intervened).length;
       const o = document.createElement("option"); o.value = i;
-      o.textContent = `#${G.seed} ${b?.p1?.leader?.name || G.leaders?.p1} vs ${b?.p2?.leader?.name || G.leaders?.p2}・勝者 ${G.winner||"—"}` +
+      o.textContent = `${i+1}/${obj.games.length} ${b?.p1?.leader?.name || G.leaders?.p1} vs ${b?.p2?.leader?.name || G.leaders?.p2}・勝者 ${G.winner||"—"}` +
         (G.intervened ? `・${G.intervened} に介入 ${ni} 回（${G.winner === G.intervened ? "介入側の勝ち" : "介入側の負け"}）` : `・食い違い ${nf}`);
       g.appendChild(o);
     });
@@ -420,6 +420,9 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
   $("#next").addEventListener("click", () => step(1));
   $("#nextforb").addEventListener("click", nextForb);
   $("#game").addEventListener("change", e => { gi = parseInt(e.target.value, 10); go(0); });
+  const gstep = dir => { if (!DATA) return; gi = (gi + dir + DATA.games.length) % DATA.games.length; $("#game").value = gi; go(0); };
+  $("#gprev").addEventListener("click", () => gstep(-1));
+  $("#gnext").addEventListener("click", () => gstep(1));
   ["onlyMain","onlyForb","onlyIv"].forEach(id => $("#"+id).addEventListener("change", render));
   $("#thr").addEventListener("input", e => { $("#thrv").textContent = Number(e.target.value).toFixed(1); render(); });
   $("#file").addEventListener("change", e => {
