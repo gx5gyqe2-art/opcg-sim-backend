@@ -32,10 +32,12 @@
 body{margin:0;background:var(--paper);color:var(--ink);font-family:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:14px;line-height:1.5}
 .mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
 .wrap{max-width:1280px;margin:0 auto;padding-inline:16px;padding-block:0 32px}
-header.bar{background:var(--paper);border-bottom:1px solid var(--line);padding-block:14px 6px}
-.dock{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;gap:8px;justify-content:center;padding:8px 16px calc(8px + env(safe-area-inset-bottom,0px));background:var(--paper);border-top:1px solid var(--line);box-shadow:0 -2px 8px rgba(0,0,0,.08)}
-.dock button{flex:1 1 0;max-width:160px;padding:9px 6px}
-.wrap{padding-bottom:calc(72px + env(safe-area-inset-bottom,0px))!important}
+header.bar{background:var(--paper);border-bottom:1px solid var(--line);padding-block:56px 6px}
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;flex-direction:column;gap:6px;align-items:center;padding:8px 16px calc(8px + env(safe-area-inset-bottom,0px));background:var(--paper);border-top:1px solid var(--line);box-shadow:0 -2px 8px rgba(0,0,0,.08)}
+.dock .drow{display:flex;gap:8px;width:100%;max-width:520px;align-items:center}
+.dock button{flex:1 1 0;padding:9px 6px}
+.dock .gname{flex:3 1 0;font-size:12px;text-align:center;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wrap{padding-bottom:calc(120px + env(safe-area-inset-bottom,0px))!important}
 .row{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
 h1{font-size:16px;margin:0;font-weight:700}
 .sub{color:var(--ink-3);font-size:12px}
@@ -201,7 +203,10 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
   </aside>
 </main>
 </div>
-<nav class="dock" aria-label="移動"><button id="dprev">← 前</button><button id="dforb" class="primary">次の食い違い</button><button id="dnext">次 →</button></nav>
+<nav class="dock" aria-label="移動">
+  <div class="drow"><button id="dgprev">◀ 局</button><span class="gname" id="dgname"></span><button id="dgnext">局 ▶</button></div>
+  <div class="drow"><button id="dprev">← 前</button><button id="dforb" class="primary">次の食い違い</button><button id="dnext">次 →</button></div>
+</nav>
 <div class="zoom" id="zoom" hidden></div>
 
 <script type="application/json" id="trace-data">/*__TRACE_DATA__*/null</script>
@@ -282,6 +287,7 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
     if (!DATA){ $("#mat").innerHTML = `<div class="empty" style="color:var(--mat-ink-2)">「別の棋譜 JSON を開く」から theory_trace.py の出力を選んでください。</div>`; return; }
     const G = DATA.games[gi], D = G.decisions;
     if (di >= D.length) di = 0;
+    { const o = $("#game").options[gi]; $("#dgname").textContent = o ? o.textContent : ""; }
     const d = D[di];
     // timeline
     const tl = $("#timeline"); tl.innerHTML = "";
@@ -423,6 +429,8 @@ details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
   $("#prev").addEventListener("click", () => step(-1));
   $("#next").addEventListener("click", () => step(1));
   $("#nextforb").addEventListener("click", nextForb);
+  $("#dgprev").addEventListener("click", () => gstep(-1));
+  $("#dgnext").addEventListener("click", () => gstep(1));
   $("#dprev").addEventListener("click", () => step(-1));
   $("#dnext").addEventListener("click", () => step(1));
   $("#dforb").addEventListener("click", nextForb);
