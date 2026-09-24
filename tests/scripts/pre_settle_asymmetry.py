@@ -415,25 +415,33 @@ def streak_by_volatility_table(rows, n_q=STREAK_QUANTILES):
     return {"n": len(late_fav), "median_v_opp": med, "bands": bands}
 
 
-def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel", pre_settle="on"):
+def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel", pre_settle="on",
+            opp_clock=None, w_mover=None):
     """記録を 1 度読み（決着前だけ）、優勢／劣勢・序盤〜終盤で割った較正を返す。
 
     **T151-3**: `pre_settle` は `crossing_bridge.PRE_SETTLE_MODES` のどれか（既定 `on`＝従来・`game`＝どちらかの
-    席の最初の宣言ターン以降を両席とも落とす・`off`＝全行）。"""
-    old = CB.PRE_SETTLE_MODE
+    席の最初の宣言ターン以降を両席とも落とす・`off`＝全行）。
+    **T151-2**: `opp_clock`（`crossing_bridge.OPP_CLOCK_MODES`・相手の時計をどの瞬間から読むか）と
+    `w_mover`（`theory_order.W_MOVER_MODES`・手番の半ターン）。`None` なら今の値のまま。"""
+    old = CB.PRE_SETTLE_MODE; old_oc = CB.OPP_CLOCK_MODE; old_wm = TO.W_MOVER_MODE
     try:
         CB.set_pre_settle_mode(pre_settle)
+        if opp_clock is not None:
+            CB.set_opp_clock_mode(opp_clock)
+        if w_mover is not None:
+            TO.set_w_mover_mode(w_mover)
         rows_out, _ledger, stats, _th, _tc = CB.collect(dirs, limit_games, THETA, MU, "const")
+        if sigma_rel is None:
+            sigma_rel = CB.sigma_rel_for(dirs)
+        rows = rows_with_p(rows_out, slope, sigma_rel, w_err)     # `p` は `w_mover` の下で出す
+        opp_clock_used, w_mover_used = CB.OPP_CLOCK_MODE, TO.W_MOVER_MODE
     finally:
-        CB.set_pre_settle_mode(old)
-    if sigma_rel is None:
-        sigma_rel = CB.sigma_rel_for(dirs)
-    rows = rows_with_p(rows_out, slope, sigma_rel, w_err)
+        CB.set_pre_settle_mode(old); CB.set_opp_clock_mode(old_oc); TO.set_w_mover_mode(old_wm)
     rows = add_volatility(rows, dirs)          # **T149g-1**: 各行に劣勢側デッキの v_opp を足す
     fs = favorite_split(rows)
     ss = stage_split(rows)
     return {"games": stats.get("games"), "n": len(rows), "sigma_rel": sigma_rel, "w_err": w_err,
-           "pre_settle": pre_settle,
+           "pre_settle": pre_settle, "opp_clock": opp_clock_used, "w_mover": w_mover_used,
            # **T151**: 両席の行をまとめた mean p／mean z（完全情報で対称なら mean p ≈ 0.5）と優勢側の行の比率
            "overall": {"mean_p": float(np.mean([r["p"] for r in rows])) if rows else None,
                        "mean_z": float(np.mean([r["z"] for r in rows])) if rows else None,
@@ -468,9 +476,13 @@ def main(argv=None):
     ap.add_argument("--w-err", default="rel", choices=("abs", "rel"))
     ap.add_argument("--pre-settle", default="on", choices=CB.PRE_SETTLE_MODES,
                     help="**T151-3** `on`（従来・宣言した席の行だけ除く）／`game`（両席とも除く）／`off`")
+    ap.add_argument("--opp-clock", default=None, choices=CB.OPP_CLOCK_MODES,
+                    help="**T151-2** 相手の時計の瞬間: `prev_start`（従来）／`mirror`（同じ瞬間）")
+    ap.add_argument("--w-mover", default=None, choices=TO.W_MOVER_MODES,
+                    help="**T151-2** 手番の半ターン: `off`（従来）／`half`（`W(D + 1/2)`）")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
-    out = collect(a.src, a.games, a.slope, a.sigma_rel, a.w_err, a.pre_settle)
+    out = collect(a.src, a.games, a.slope, a.sigma_rel, a.w_err, a.pre_settle, a.opp_clock, a.w_mover)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:

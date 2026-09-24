@@ -114,6 +114,33 @@ def calib_bins(p, z, nbin=10):
     return out
 
 
+def tau_resid_by_bin(rows_out, p, nbin=10, cap=None):
+    """**T151-4（P4）**: `p` の等頻度 `nbin` 箱ごとの **τ の残差**（理論 − 実際）を 2 本の時計で分けて出す。
+    `resid_opp = min(τ_opp, cap) − t_opp_act`（相手が実際にあと何自席ターン打ったか）・
+    `resid_me = min(τ_me, cap) − t_me_act`。T118 が最上位帯で見つけた「相手の τ の残差 +10.7 対 自分の +1.4」を
+    切替（`--opp-clock`）の前後で同じ物差しで測るための器。`won`／`lost` の全体も出す（`summarise` の `bias` と同じ
+    ——勝った行は `resid_me`・負けた行は `resid_opp`）。`calib_bins` と同じ切り方（`argsort` の等頻度）。"""
+    cap = CB.RACE_CAP if cap is None else float(cap)
+    p = np.asarray(p, float)
+    ro = np.array([min(float(r["tau_opp_theory"]), cap) - float(r["t_opp_act"]) for r in rows_out], float)
+    rm = np.array([min(float(r["tau_me_theory"]), cap) - float(r["t_me_act"]) for r in rows_out], float)
+    won = np.array([bool(r["won"]) for r in rows_out])
+    idx = np.argsort(p, kind="mergesort")
+    edges = np.linspace(0, len(p), nbin + 1).astype(int)
+    bins = []
+    for b in range(nbin):
+        sl = idx[edges[b]:edges[b + 1]]
+        if not len(sl):
+            continue
+        bins.append({"bin": b + 1, "n": int(len(sl)), "p_mean": round(float(p[sl].mean()), 4),
+                     "resid_opp": round(float(ro[sl].mean()), 3), "resid_me": round(float(rm[sl].mean()), 3)})
+    return {"bins": bins,
+            "won_resid_me": round(float(rm[won].mean()), 3) if won.any() else None,
+            "lost_resid_opp": round(float(ro[~won].mean()), 3) if (~won).any() else None,
+            "all_resid_opp": round(float(ro.mean()), 3) if len(ro) else None,
+            "all_resid_me": round(float(rm.mean()), 3) if len(rm) else None}
+
+
 def score(p, z, nbin=10):
     """対数損失・Brier・AUC・ECE と、**コイン（定数予測）との比較**。"""
     p = np.clip(np.asarray(p, float), EPS, 1.0 - EPS); z = np.asarray(z, float)

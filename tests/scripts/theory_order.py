@@ -440,12 +440,42 @@ def clock_scale(t_me, t_opp, mode="hyp"):
     return math.sqrt(a * a + b * b)
 
 
+#: **手番の半ターン**（T151-2・2026-09-24・規則から・**当てはめた定数ではない**）。
+#:
+#: 2 本の時計は**それぞれの席の自席ターン**で数える（`τ_me`＝私が今のターンから何自席ターンで届くか・
+#: `τ_opp`＝相手が**次の**自分のターンから何自席ターンで届くか）。ターンは交互なので、私の `k` 番目の段は
+#: `t + 2(k−1)`・相手の `k` 番目の段は `t + 1 + 2(k−1)`＝**同じ段数なら手番の私が先に届く**。
+#: 連続の時刻で書くと `T_me = t + 2(τ_me − 1)`・`T_opp = t + 1 + 2(τ_opp − 1)` で、私が先なのは
+#: `τ_opp − τ_me > −1/2`。だから `W` の中心は `D = 0` ではなく **`D = −1/2`**＝`W(D + 1/2)`。
+#: `predict` の同点の扱い（`τ_me <= τ_opp` で勝ち）はこれと整合しているが、`Φ(D/σ)` は `D=0` で 0.5 を
+#: 返していた＝**手番の半ターンを落としていた**。従来の読み方（相手の時計を相手の前ターン開始から読む・
+#: `OPP_CLOCK_MODE=prev_start`）では相手の時計が約 1 段古いぶん `D` が約 +1 されていたので、実質の中心は
+#: `−1`（半ターン**行き過ぎ**＝自席びいき）だった。`off`＝従来（既定・出荷の値を動かさない）／`half`＝`W(D + 1/2)`。
+W_MOVER_MODES = ("off", "half")
+W_MOVER_MODE = "off"
+
+
+def set_w_mover_mode(mode):
+    global W_MOVER_MODE
+    if mode not in W_MOVER_MODES:
+        raise ValueError("w mover mode は %s のどれか" % (W_MOVER_MODES,))
+    W_MOVER_MODE = mode
+    return W_MOVER_MODE
+
+
+def mover_shift():
+    """`W`／`w` に足す手番の半ターン（`half` なら 0.5・`off` なら 0）。"""
+    return 0.5 if W_MOVER_MODE == "half" else 0.0
+
+
 def prob_of_d(d, sigma_d=None, t_me=None, t_opp=None, scale_mode="hyp"):
     """**時計の差 `D` から勝率へ**（T80）＝`W(D) = Φ(D/σ_D)`。`w_of_d`（密度）の**積分**で、同じ `σ_D` を使う。
     `κ = w(D)/w̄` が微分の形なら、こちらが積分の形＝「今の勝率」。**新しい定数は無い**。
 
     **T118**: `W_ERR_MODE == "rel"` かつ 2 本の時計が渡されたときは、物差しを
-    `σ_rel × s(τ_me, τ_opp)` にする（`s` は 1 次同次＝比で読む）。`σ_rel` が無ければ `abs` に落ちる。"""
+    `σ_rel × s(τ_me, τ_opp)` にする（`s` は 1 次同次＝比で読む）。`σ_rel` が無ければ `abs` に落ちる。
+    **T151-2**: `W_MOVER_MODE=half` なら `D + 1/2`（手番の半ターン・`w_of_d` も同じだけずらす）。"""
+    d = float(d) + mover_shift()
     if (W_ERR_MODE == "rel" and sigma_d is None and SIGMA_REL is not None
             and t_me is not None and t_opp is not None):
         s = clock_scale(t_me, t_opp, scale_mode)
@@ -475,7 +505,7 @@ def set_sigma_turn(turns):
 def w_of_d(d, sigma=None):
     """傾き `w(D)`＝時計の差 `D` の正規密度（`∫ w dD = 1`＝大差の負けから大差の勝ちまでで勝率が 1 動く）。"""
     sigma = SIGMA_D if sigma is None else float(sigma)
-    z = float(d) / sigma
+    z = (float(d) + mover_shift()) / sigma           # **T151-2**: `W` と同じ半ターン（`half` のときだけ）
     return math.exp(-0.5 * z * z) / (sigma * math.sqrt(2.0 * math.pi))
 
 

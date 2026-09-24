@@ -68,3 +68,29 @@ def test_collect_calib_echoes_the_current_pre_settle_mode(monkeypatch):
         assert out2["pre_settle"] == "on"
     finally:
         CB.set_pre_settle_mode("off")
+
+
+# ---- T151-4（P4）: τ の残差を p の分位で割る（tau_resid_by_bin） ----------------------------------
+
+def _rrow(tau_me, tau_opp, t_me, t_opp, won):
+    return {"tau_me_theory": tau_me, "tau_opp_theory": tau_opp, "t_me_act": t_me, "t_opp_act": t_opp, "won": won}
+
+
+def test_tau_resid_by_bin_splits_the_two_clocks_and_the_won_lost_rows():
+    rows = [_rrow(3.0, 9.0, 2, 4, True),      # 勝ち: resid_me = +1・resid_opp = +5
+            _rrow(6.0, 2.0, 5, 3, False),     # 負け: resid_me = +1・resid_opp = −1
+            _rrow(40.0, 4.0, 6, 4, False)]    # τ_me は cap（30）で切られる → resid_me = 24
+    out = WC.tau_resid_by_bin(rows, [0.9, 0.2, 0.1], nbin=3, cap=30.0)
+    assert out["won_resid_me"] == pytest.approx(1.0)
+    assert out["lost_resid_opp"] == pytest.approx((-1.0 + 0.0) / 2.0)
+    assert out["all_resid_opp"] == pytest.approx((5.0 - 1.0 + 0.0) / 3.0, abs=1e-3)    # 出力は 3 桁丸め
+    assert out["all_resid_me"] == pytest.approx((1.0 + 1.0 + 24.0) / 3.0, abs=1e-3)
+    # 分位は p の昇順（calib_bins と同じ切り方）: 最上位の箱が p=0.9 の行
+    assert [b["p_mean"] for b in out["bins"]] == [0.1, 0.2, 0.9]
+    assert out["bins"][-1]["resid_opp"] == pytest.approx(5.0) and out["bins"][-1]["resid_me"] == pytest.approx(1.0)
+
+
+def test_tau_resid_by_bin_handles_one_sided_outcomes():
+    rows = [_rrow(3.0, 9.0, 2, 4, True)]
+    out = WC.tau_resid_by_bin(rows, [0.7], nbin=1)
+    assert out["lost_resid_opp"] is None and out["won_resid_me"] == pytest.approx(1.0)

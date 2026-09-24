@@ -43,9 +43,12 @@ from price_realised import nu_meas_of, side_nu_meas  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
 from theory_order import (DELTA, KO_P, LAM, MU, PWR_EPS, R_TURNS, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, SC_MY_DON, SC_MY_HAND, SLOT_OWN_FIELD, clock_scale,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE, S_POWER,
+                          S_CAN_ATTACK, SLOT_HAND,                                       # T151-2（mirror_view）
                           SLOT_OPP_FIELD, THETA, add_nu_mode_arg, apply_nu_mode, attack_value,
                           attack_value_don, c_of, theta_take,
                           hand_ids_of, opp_bodies_of, own_attackers_of, score_candidate, slot_power, theta_of)
+
+import theory_order as TO  # noqa: E402  （T151-2: `--w-mover` の切替を渡す）
 
 SLOPES = ("hist", "theory")
 SLOPE_FLOOR = 1e-3
@@ -1890,6 +1893,118 @@ def pre_settle_skip(mode, settled, first_turn, seed_g, w, t):
     return bool(settled.get((seed_g, w, t)))
 
 
+#: **相手の時計をどの瞬間から読むか**（T151-2・2026-09-24・ユーザ決定「それでお願いします」）。
+#:
+#: `prev_start`＝従来（既定）: 行 `(w, t)` の相手の役は `per_seat[(1-w, 相手の前ターン)]`＝**相手のターン開始の値**
+#: ——私の耐久 `Θ_w` は相手の前ターンの攻撃で削られる**前**・相手の速さ `A_{1-w}` はそのターンに出した体を
+#: 含まない（T120 が `race_alloc` で「次ターンに殴る体を 0.8／0.7 体落とす」と見つけたのと同じ古さ）＝
+#: **両方とも `τ_opp` を膨らませ、手番の席に甘い**（実測: 両席の行の mean p 0.568／0.594・対の和 −1 が +0.168／+0.211）。
+#:
+#: `mirror`＝**同じ瞬間**: 行 `(w, t)` の相手の役を、**w のターン t の最後の行**（`turn_last`）を**相手の席から見た鏡**
+#: （`mirror_view`）にして、**同じ `seat_row`** で読む。相手のターン t+1 に w が向き合う状態そのもの——
+#: w の側は**出した後・殴った後**（手札は出した後・殴ったブロッカーはレストのまま・切るドンは使い残し＝
+#: `Θ_opp` を `turn_last` から読む従来の規約〔T76／T110〕の鏡）・相手の側は**出した体を含み、リフレッシュ後**
+#: （レスト解除・召喚酔い解除・付与ドンが戻る・ドンデッキから +2＝`next_turn_don` と同じ規則）。
+#: **新定数ゼロ・新しい量ゼロ**（同じ式を鏡の行に当てるだけ）。
+#: 残る非対称（開示）: 相手の体のパワーは w の行の列 0＝**相手の手番でないときの値**（`YOUR_TURN` の
+#: パッシブが載らない・`OPPONENT_TURN` のパッシブが載る）——エンジンは手番側のパッシブしか計算しないので
+#: w の行からは読めない。`mirror_view` の docstring に列ごとの扱いを書いた。
+OPP_CLOCK_MODES = ("prev_start", "mirror")
+OPP_CLOCK_MODE = "prev_start"
+
+
+def set_opp_clock_mode(mode):
+    global OPP_CLOCK_MODE
+    if mode not in OPP_CLOCK_MODES:
+        raise ValueError("opp clock mode は %s のどれか" % (OPP_CLOCK_MODES,))
+    OPP_CLOCK_MODE = mode
+    return OPP_CLOCK_MODE
+
+
+#: トークンの列（`rust/opcg_engine/src/encode/tokens.rs`）: 2＝付与ドン/5・4＝召喚酔い・20＝**視点の相手が手番のとき**のパワー
+_TOK_ATTACHED, _TOK_SICK, _TOK_POWER_OTHER = 2, 4, 20
+#: スカラー（`scalars.rs`）: 8/9＝場のキャラ数・11＝手番フラグ
+_SC_MY_FIELD_N, _SC_OPP_FIELD_N, _SC_IS_MY_TURN = 8, 9, 11
+
+
+def mirror_view(sc, tok, ci, tok_hand=None, ci_hand=None, cards=None, idx2cid=None):
+    """**行を相手の席から見た行に組み替える**（T151-2・鏡）——相手の**次のターン開始**の状態を、
+    今の行から規則で作る。返り値は `(sc', tok', ci')`（元は触らない）。
+
+    **枠**（`tokens.rs`）: 0↔1（リーダー）・2..6↔7..11（場）・12..21（手札）は**相手の直近の自席行**
+    （`tok_hand`／`ci_hand`）から（手札の中身はその席の行にしか無い・T76）。無ければ空。
+    **新しい自分側（＝相手の体）にはリフレッシュを当てる**（`rules/turn.rs` `refresh_all`・`reset_player_status`）:
+    レスト 0・召喚酔い 0・`can_attack`＝ユニットなら 1・付与ドン 0（戻る）・パワー＝列 0（相手の枠の列 0 は
+    「手番でないとき」＝付与ドン無し＝戻った後と同じ）・**ブロッカーは札の情報で立て直す**（列 6 は
+    「非レストのブロッカー」なので、殴ってレストしたブロッカーは 0 になっている）。
+    **新しい相手側（＝w の体）はそのまま**（レスト・付与はw の次のリフレッシュまで残る）・パワーは列 20
+    （w の枠の列 20＝「相手が手番のとき」＝付与ドン無し）・`can_attack` 0。
+    **スカラー**: ライフ 0↔1・手札 6↔7・場の数 8↔9・リーダーパワー 12↔13 を入れ替え、**ドンは規則で**——
+    新しい自分のアクティブ＝相手の `アクティブ＋レスト＋付与＋min(2, デッキ)`（`next_turn_don` と同じ式）・
+    レスト 0・リーダー付与 0・ドンデッキ −min(2, デッキ)。新しい相手側のドンは w の今の 4 ゾーンそのまま。
+    手番フラグ 11＝1。**他の列（集約・16..66・68..）は入れ替えない**——`seat_row` の道は読まない（監査済み）。"""
+    import don_ledger as DL
+    sc = np.asarray(sc, dtype=float); tok = np.asarray(tok, dtype=float)
+    S = sc.copy(); T = tok.copy()
+    C = None if ci is None else np.asarray(ci).copy()
+    own = list(range(SLOT_OWN_FIELD.start, SLOT_OWN_FIELD.stop))
+    opp = list(range(SLOT_OPP_FIELD.start, SLOT_OPP_FIELD.stop))
+    ci_a = None if ci is None else np.asarray(ci)
+    # 新しい自分側 ← 相手の枠（リフレッシュ後）
+    for new_i, old_i in [(0, 1)] + list(zip(own, opp)):
+        row = tok[old_i].copy()
+        p0 = float(tok[old_i, S_POWER])
+        row[S_POWER] = p0; row[_TOK_POWER_OTHER] = p0
+        row[_TOK_ATTACHED] = 0.0; row[S_IS_REST] = 0.0; row[_TOK_SICK] = 0.0
+        is_char = float(tok[old_i, S_IS_CHAR]) > 0.5
+        row[S_CAN_ATTACK] = 1.0 if (new_i == 0 or is_char) else 0.0
+        if new_i != 0:
+            if not is_char:
+                row[S_IS_BLOCKER] = 0.0
+            elif cards is not None and ci_a is not None and idx2cid is not None:
+                cid = idx2cid.get(int(ci_a[old_i]))
+                info = (cards.info(cid) or {}) if cid else {}
+                row[S_IS_BLOCKER] = 1.0 if info.get("blocker") else 0.0
+            # 札が引けなければ列 6 をそのまま（レストしたブロッカーは落ちる・過小側）
+        T[new_i] = row
+    # 新しい相手側 ← 自分の枠（そのまま・パワーは「相手が手番のとき」の列）
+    for new_i, old_i in [(1, 0)] + list(zip(opp, own)):
+        row = tok[old_i].copy()
+        row[S_POWER] = float(tok[old_i, _TOK_POWER_OTHER]); row[_TOK_POWER_OTHER] = float(tok[old_i, S_POWER])
+        row[S_CAN_ATTACK] = 0.0
+        T[new_i] = row
+    # 手札＝相手の直近の自席行から
+    th = None if tok_hand is None else np.asarray(tok_hand, dtype=float)
+    for s in range(SLOT_HAND.start, SLOT_HAND.stop):
+        T[s] = th[s] if th is not None else 0.0
+    if C is not None:
+        old = np.asarray(ci)
+        C[0], C[1] = old[1], old[0]
+        for new_i, old_i in zip(own, opp):
+            C[new_i] = old[old_i]
+        for new_i, old_i in zip(opp, own):
+            C[new_i] = old[old_i]
+        ch = None if ci_hand is None else np.asarray(ci_hand)
+        for s in range(SLOT_HAND.start, SLOT_HAND.stop):
+            C[s] = ch[s] if ch is not None else 0
+        if len(old) >= SLOT_HAND.stop + 2:
+            C[SLOT_HAND.stop], C[SLOT_HAND.stop + 1] = old[SLOT_HAND.stop + 1], old[SLOT_HAND.stop]
+    # スカラー
+    for a, b in ((SC_MY_LIFE, SC_OPP_LIFE), (SC_MY_HAND, SC_OPP_HAND), (_SC_MY_FIELD_N, _SC_OPP_FIELD_N),
+                 (SC_MY_LEADER_POWER, SC_OPP_LEADER_POWER)):
+        S[a], S[b] = sc[b], sc[a]
+    zo = DL.zones_of(sc, tok, "opp")
+    plus = min(2.0, float(zo["deck"]))
+    S[DL.SC_MY_ACTIVE] = float(zo["active"] + zo["rested"] + zo["attached"] + plus)
+    S[DL.SC_MY_RESTED] = 0.0
+    S[DL.SC_MY_LEADER_DON] = 0.0
+    S[DL.SC_MY_DON_DECK] = (float(zo["deck"]) - plus) / DL.DECK_SCALE
+    S[DL.SC_OPP_ACTIVE] = sc[DL.SC_MY_ACTIVE]; S[DL.SC_OPP_RESTED] = sc[DL.SC_MY_RESTED]
+    S[DL.SC_OPP_LEADER_DON] = sc[DL.SC_MY_LEADER_DON]; S[DL.SC_OPP_DON_DECK] = sc[DL.SC_MY_DON_DECK]
+    S[_SC_IS_MY_TURN] = 1.0
+    return S, T, C
+
+
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
@@ -1915,7 +2030,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     ledger = []            # (d) 単位の検算: 勝った席の F_end 対 Θ_start
     theta_check = []       # **T96**: 行ごとの `Θ` 対「そこから終局までに実際に要った損害」
     turn_harm = []         # 自席ターン番号 j ごとの損害（損害の輪郭＝加速を測る材料）
-    stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "theta_hand": THETA_HAND_MODE, "slope_mode": SLOPE_MODE, "theta_body": THETA_BODY_MODE, "slope_block": SLOPE_BLOCK_MODE,
+    stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "mirror_rows": 0, "theta_hand": THETA_HAND_MODE, "slope_mode": SLOPE_MODE, "theta_body": THETA_BODY_MODE, "slope_block": SLOPE_BLOCK_MODE,
              # **T131**: 通った割合の開示（平均と、手札が読めず割り引けなかった行の数）
              "rate_through": RATE_THROUGH_MODE, "through_n": 0, "through_sum": 0.0,
              "through_missing": 0,
@@ -2231,7 +2346,128 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 return tau_net(d["theta"], d["slope_board"], d["slope_hand"], d["r_opp"])
             return d["theta"] / max(SLOPE_FLOOR, d["slope_theory"])
 
-        # 席ごとの自席ターン開始点で、両席の τ を出す（相手は直前の自分のターン開始の値）
+        def seat_row(w, t, j, sc, tok, _ci, f_real, t_left, stats):
+            """**1 席・1 ターン開始点の理論の読み**（`per_seat[(w, t)]` の中身・T151-2 で関数に切り出した）。
+
+            `w`＝**攻める席**（`Θ` は `1 − w` の耐久・`A` は `w` の速さ）・`(sc, tok, _ci)`＝その席の視点の行・
+            `j`＝その席の自席ターンの序数（0 始まり）・`f_real`＝それまでの実現の損害・`t_left`＝残りの自席ターン数。
+            **既定の道（me 役）は切り出す前と 1 ビットも変わらない**（同じ式・同じ順）。**T151-2 の `mirror`**
+            は同じ関数を**相手の席から見た鏡の行**（`mirror_view`）と `w := 1 − w` で呼ぶ＝**式は 1 本のまま**
+            （守る席の手札・ブロッカー・切るドンは `g_for(1-w, t)`／`hb_for(1-w, t)`／`guard_read_for` が
+            **その席の直近の自席ターンの最後の行**から読む＝両役で同じ規約）。`stats` は数える先（鏡では捨てる）。"""
+            olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+            th_life, th_hand, th_body = threshold_parts(sc, tok, g_hand=g_for(1 - w, t),
+                                                       hand_blocker=hb_for(1 - w, t))
+            # **T143**: 体の項のうち**手札のブロッカー**（T106）の分——`threshold_parts_side` が
+            # 体に足した額そのもの（値は動かさない・内訳として持つだけ）
+            th_hb = max(0.0, float(hb_for(1 - w, t))) if THETA_HAND_BLOCKER_MODE == "on" else 0.0
+            if DON_PURSE_MODE == "race":
+                # **T111**: 守る席が**構えると決めたカウンター・イベント**（`μ` の絶対量・
+                # `g_hand` は無料の札だけを数えているので二重にならない）
+                th_hand += float((alloc_for(1 - w, t) or {}).get("theta_hand") or 0.0)
+            # **T102**: `shield` なら手札は**しきい値から外し、的の側の有限の盾**にする
+            # （毎ターン `shield_rate` までしか出てこない＝**使う時間が要る**）。
+            if THETA_HAND_PLACE == "shield":
+                shield = float(th_hand)
+                sh_rate = shield_rate_of(own_attackers_of(tok, olp), _opp_active_blockers(tok), theta, mu)
+                th_hand = 0.0
+                stats["shield_n"] += 1; stats["shield_sum"] += shield; stats["shield_rate_sum"] += sh_rate
+            else:
+                shield = sh_rate = 0.0
+            if THETA_HAND_BLOCKER_MODE == "on":
+                _hb = hb_for(1 - w, t)
+                stats["hb_n"] += 1; stats["hb_sum"] += _hb; stats["hb_hit"] += int(_hb > 0.0)
+            th_w = th_life + th_hand + th_body
+            # **T96**: 次の自席ターンに戻ってくるレストのブロッカー（`untap` のときだけ段差として使う）
+            th_back = (resting_blocker_term(tok, SLOT_OPP_FIELD,
+                                            float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
+                                            ci_row=_ci, idx2cid=idx2cid, cards=cards)
+                       if THETA_RETURN_MODE == "untap" else 0.0)
+            slope_hist = (f_real / j) if j > 0 else None
+            dk = (seat_decks.get(seed_g) or (None, None))[w] if seat_decks else None
+            if SLOPE_HAND_MODE == "flow" and not dk:
+                stats["a_flow_missing"] += 1
+            # **T131**: **通った割合**（本数 − 切られた本数 〔− ブロック〕）÷ 本数。
+            # **守る席の手札は攻める席の行からは読めない**ので、ここで作って渡す。
+            thr = None
+            if RATE_THROUGH_MODE != "off":
+                _gr = guard_read_for(1 - w, t, own_attackers_of(tok, olp))
+                if "d_stopped" not in _gr:
+                    # 守る席がまだ 1 度も打っていない＝手札が読めない。**1.0 で埋めない**
+                    # （割り引かない＝旧の値）ことを**数えて開示する**。
+                    stats["through_missing"] += 1
+                    thr = 1.0
+                else:
+                    thr = through_scale(len(own_attackers_of(tok, olp)), _gr["d_stopped"],
+                                        _opp_active_blockers(tok))
+                    stats["through_n"] += 1; stats["through_sum"] += float(thr)
+            (s_board, s_stock, s_flow, s_lead, s_srush, s_frush, s_eff,
+             s_eff1) = seat_slope_terms(
+                sc, tok, _ci, idx2cid, cards, olp, theta, mu, deck_ids=dk,
+                want_stock=(RATE_WALK_MODE == "grow" or SLOPE_EFFECT_MODE == "hand"),
+                alloc=alloc_self.get((w, t)), through=thr)             # T77／T90／T93／T94／T95／T131
+            s_hand = s_stock if SLOPE_HAND_MODE == "stock" else s_flow
+            sched = None
+            if RATE_DON_MODE != "off":
+                # **T114**: 規則のドンの列から `R_j` を作る（`off` なら作らない＝旧の式）
+                sched = seat_slope_sched(sc, tok, _ci, idx2cid, cards, olp, theta, mu,
+                                         deck_ids=dk, jmax=int(RACE_CAP), through=thr)
+                stats["sched_n"] += 1
+                stats["sched_j1_sum"] += float(sched[0]); stats["sched_j5_sum"] += float(sched[4])
+            if SLOPE_HAND_MODE == "flow":
+                stats["a_flow_n"] += 1; stats["a_flow_sum"] += float(s_hand)
+            if RATE_WALK_MODE == "grow":
+                stats["stock_n"] += 1; stats["stock_sum"] += float(s_stock)
+                stats["stock_rush_sum"] += float(s_srush); stats["flow_rush_sum"] += float(s_frush)
+            stats["eff_n"] += 1; stats["eff_sum"] += float(s_eff)
+            stats["eff1_sum"] += float(s_eff1)
+            slope_theory = s_board + s_hand + s_eff + s_eff1   # **T105／T108**: 効果の項（既定は 0）
+            if RATE_T1_MODE == "on" and j == 0:
+                slope_theory = 0.0            # **T103**: 最初の自席ターンは 1 本も打てない（規則）
+            d = {"theta": th_w, "slope_hist": slope_hist, "slope_theory": slope_theory,
+                                # **T102**: 有限の盾（相手の手札）と 1 ターンの上限
+                                "shield": shield, "shield_rate": sh_rate,
+                                # **T96**: `Θ` の内訳（どの項が終盤に縮まないか）
+                                "th_life": th_life, "th_hand": th_hand, "th_body": th_body,
+                                # **T143**: 窓（T116）を掛ける前の手札の項と、体の項のうち手札のブロッカーの分
+                                # （`th_hand` は下で窓が掛かると書き換わる＝両方を並べて持つ）
+                                "th_hand_raw": th_hand, "th_hb": th_hb,
+                                "th_back": th_back,
+                                # **T90**: 速さを 2 つに分けて持つ（1 ターン目は盤面だけ）と、
+                                # **相手の補充 `r`**＝`Θ` の手札項と同じ 1 枚あたりの価格（引き 1 枚ぶん）
+                                "slope_board": s_board, "slope_hand": s_hand,
+                                # **T94**: 積み上がる歩きに要る 3 つ目（在庫・段差）
+                                "slope_stock": s_stock, "slope_flow": s_flow, "slope_lead": s_lead,
+                                # **T103**: 在庫・流入のうち**速攻**のぶん（1 ターン早く殴る）
+                                "slope_stock_rush": s_srush, "slope_flow_rush": s_frush,
+                                # **T105**: 効果が出す損害（毎ターン一定）
+                                # **T108**: 在庫（手札）の効果（一度きり）
+                                "slope_eff": s_eff, "slope_eff_once": s_eff1,
+                                "r_opp": r_opp_of(1 - w, t),
+                                "r_deck": r_deck_of(1 - w),
+                                "f_real": f_real, "t_left": len(ts) - j, "j": j,
+                                "sched": sched}          # **T114**（`off` なら None）
+            if THETA_HAND_WINDOW != "off" and th_hand > 0.0:
+                # **T116**: 手札は**守る窓が開く分しか的に入らない**（`SR × τ`）。
+                # `τ` は**歩き自身**が出す（`tau_theory_of` の 1 本を通す＝T101 の規約）。
+                d0 = d
+                sr = shield_rate_of(own_attackers_of(tok, olp), _opp_active_blockers(tok), theta, mu)
+                bare = th_life + th_body
+                tau_h = tau_theory_of(dict(d0, theta=bare))          # 手札抜きの地平 τ0
+                cap = min(th_hand, sr * max(0.0, tau_h))
+                for _ in range(3 if THETA_HAND_WINDOW == "fixpoint" else 0):
+                    tau_h = tau_theory_of(dict(d0, theta=bare + cap))
+                    cap = min(th_hand, sr * max(0.0, tau_h))
+                stats["thw_n"] += 1; stats["thw_cut_sum"] += float(th_hand - cap)
+                stats["thw_hit"] += int(cap < th_hand - 1e-12); stats["thw_tau_sum"] += float(tau_h)
+                th_hand = cap
+                th_w = bare + cap
+                d0["theta"] = th_w; d0["th_hand"] = cap
+                d0["shield_rate"] = d0.get("shield_rate") or 0.0
+            return d
+
+        # 席ごとの自席ターン開始点で、両席の τ を出す（相手は直前の自分のターン開始の値・
+        # **T151-2 `mirror`** なら相手の時計は下の `op_mirror` から）
         per_seat = {}
         for w in (0, 1):
             ts = turn_seq[w]
@@ -2239,114 +2475,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             for j, t in enumerate(ts):
                 sc, tok, _ci = turn_start[(w, t)]
                 olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-                th_life, th_hand, th_body = threshold_parts(sc, tok, g_hand=g_for(1 - w, t),
-                                                           hand_blocker=hb_for(1 - w, t))
-                # **T143**: 体の項のうち**手札のブロッカー**（T106）の分——`threshold_parts_side` が
-                # 体に足した額そのもの（値は動かさない・内訳として持つだけ）
-                th_hb = max(0.0, float(hb_for(1 - w, t))) if THETA_HAND_BLOCKER_MODE == "on" else 0.0
-                if DON_PURSE_MODE == "race":
-                    # **T111**: 守る席が**構えると決めたカウンター・イベント**（`μ` の絶対量・
-                    # `g_hand` は無料の札だけを数えているので二重にならない）
-                    th_hand += float((alloc_for(1 - w, t) or {}).get("theta_hand") or 0.0)
-                # **T102**: `shield` なら手札は**しきい値から外し、的の側の有限の盾**にする
-                # （毎ターン `shield_rate` までしか出てこない＝**使う時間が要る**）。
-                if THETA_HAND_PLACE == "shield":
-                    shield = float(th_hand)
-                    sh_rate = shield_rate_of(own_attackers_of(tok, olp), _opp_active_blockers(tok), theta, mu)
-                    th_hand = 0.0
-                    stats["shield_n"] += 1; stats["shield_sum"] += shield; stats["shield_rate_sum"] += sh_rate
-                else:
-                    shield = sh_rate = 0.0
-                if THETA_HAND_BLOCKER_MODE == "on":
-                    _hb = hb_for(1 - w, t)
-                    stats["hb_n"] += 1; stats["hb_sum"] += _hb; stats["hb_hit"] += int(_hb > 0.0)
-                th_w = th_life + th_hand + th_body
-                # **T96**: 次の自席ターンに戻ってくるレストのブロッカー（`untap` のときだけ段差として使う）
-                th_back = (resting_blocker_term(tok, SLOT_OPP_FIELD,
-                                                float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
-                                                ci_row=_ci, idx2cid=idx2cid, cards=cards)
-                           if THETA_RETURN_MODE == "untap" else 0.0)
-                slope_hist = (f_real / j) if j > 0 else None
-                dk = (seat_decks.get(seed_g) or (None, None))[w] if seat_decks else None
-                if SLOPE_HAND_MODE == "flow" and not dk:
-                    stats["a_flow_missing"] += 1
-                # **T131**: **通った割合**（本数 − 切られた本数 〔− ブロック〕）÷ 本数。
-                # **守る席の手札は攻める席の行からは読めない**ので、ここで作って渡す。
-                thr = None
-                if RATE_THROUGH_MODE != "off":
-                    _gr = guard_read_for(1 - w, t, own_attackers_of(tok, olp))
-                    if "d_stopped" not in _gr:
-                        # 守る席がまだ 1 度も打っていない＝手札が読めない。**1.0 で埋めない**
-                        # （割り引かない＝旧の値）ことを**数えて開示する**。
-                        stats["through_missing"] += 1
-                        thr = 1.0
-                    else:
-                        thr = through_scale(len(own_attackers_of(tok, olp)), _gr["d_stopped"],
-                                            _opp_active_blockers(tok))
-                        stats["through_n"] += 1; stats["through_sum"] += float(thr)
-                (s_board, s_stock, s_flow, s_lead, s_srush, s_frush, s_eff,
-                 s_eff1) = seat_slope_terms(
-                    sc, tok, _ci, idx2cid, cards, olp, theta, mu, deck_ids=dk,
-                    want_stock=(RATE_WALK_MODE == "grow" or SLOPE_EFFECT_MODE == "hand"),
-                    alloc=alloc_self.get((w, t)), through=thr)             # T77／T90／T93／T94／T95／T131
-                s_hand = s_stock if SLOPE_HAND_MODE == "stock" else s_flow
-                sched = None
-                if RATE_DON_MODE != "off":
-                    # **T114**: 規則のドンの列から `R_j` を作る（`off` なら作らない＝旧の式）
-                    sched = seat_slope_sched(sc, tok, _ci, idx2cid, cards, olp, theta, mu,
-                                             deck_ids=dk, jmax=int(RACE_CAP), through=thr)
-                    stats["sched_n"] += 1
-                    stats["sched_j1_sum"] += float(sched[0]); stats["sched_j5_sum"] += float(sched[4])
-                if SLOPE_HAND_MODE == "flow":
-                    stats["a_flow_n"] += 1; stats["a_flow_sum"] += float(s_hand)
-                if RATE_WALK_MODE == "grow":
-                    stats["stock_n"] += 1; stats["stock_sum"] += float(s_stock)
-                    stats["stock_rush_sum"] += float(s_srush); stats["flow_rush_sum"] += float(s_frush)
-                stats["eff_n"] += 1; stats["eff_sum"] += float(s_eff)
-                stats["eff1_sum"] += float(s_eff1)
-                slope_theory = s_board + s_hand + s_eff + s_eff1   # **T105／T108**: 効果の項（既定は 0）
-                if RATE_T1_MODE == "on" and j == 0:
-                    slope_theory = 0.0            # **T103**: 最初の自席ターンは 1 本も打てない（規則）
-                per_seat[(w, t)] = {"theta": th_w, "slope_hist": slope_hist, "slope_theory": slope_theory,
-                                    # **T102**: 有限の盾（相手の手札）と 1 ターンの上限
-                                    "shield": shield, "shield_rate": sh_rate,
-                                    # **T96**: `Θ` の内訳（どの項が終盤に縮まないか）
-                                    "th_life": th_life, "th_hand": th_hand, "th_body": th_body,
-                                    # **T143**: 窓（T116）を掛ける前の手札の項と、体の項のうち手札のブロッカーの分
-                                    # （`th_hand` は下で窓が掛かると書き換わる＝両方を並べて持つ）
-                                    "th_hand_raw": th_hand, "th_hb": th_hb,
-                                    "th_back": th_back,
-                                    # **T90**: 速さを 2 つに分けて持つ（1 ターン目は盤面だけ）と、
-                                    # **相手の補充 `r`**＝`Θ` の手札項と同じ 1 枚あたりの価格（引き 1 枚ぶん）
-                                    "slope_board": s_board, "slope_hand": s_hand,
-                                    # **T94**: 積み上がる歩きに要る 3 つ目（在庫・段差）
-                                    "slope_stock": s_stock, "slope_flow": s_flow, "slope_lead": s_lead,
-                                    # **T103**: 在庫・流入のうち**速攻**のぶん（1 ターン早く殴る）
-                                    "slope_stock_rush": s_srush, "slope_flow_rush": s_frush,
-                                    # **T105**: 効果が出す損害（毎ターン一定）
-                                    # **T108**: 在庫（手札）の効果（一度きり）
-                                    "slope_eff": s_eff, "slope_eff_once": s_eff1,
-                                    "r_opp": r_opp_of(1 - w, t),
-                                    "r_deck": r_deck_of(1 - w),
-                                    "f_real": f_real, "t_left": len(ts) - j, "j": j,
-                                    "sched": sched}          # **T114**（`off` なら None）
-                if THETA_HAND_WINDOW != "off" and th_hand > 0.0:
-                    # **T116**: 手札は**守る窓が開く分しか的に入らない**（`SR × τ`）。
-                    # `τ` は**歩き自身**が出す（`tau_theory_of` の 1 本を通す＝T101 の規約）。
-                    d0 = per_seat[(w, t)]
-                    sr = shield_rate_of(own_attackers_of(tok, olp), _opp_active_blockers(tok), theta, mu)
-                    bare = th_life + th_body
-                    tau_h = tau_theory_of(dict(d0, theta=bare))          # 手札抜きの地平 τ0
-                    cap = min(th_hand, sr * max(0.0, tau_h))
-                    for _ in range(3 if THETA_HAND_WINDOW == "fixpoint" else 0):
-                        tau_h = tau_theory_of(dict(d0, theta=bare + cap))
-                        cap = min(th_hand, sr * max(0.0, tau_h))
-                    stats["thw_n"] += 1; stats["thw_cut_sum"] += float(th_hand - cap)
-                    stats["thw_hit"] += int(cap < th_hand - 1e-12); stats["thw_tau_sum"] += float(tau_h)
-                    th_hand = cap
-                    th_w = bare + cap
-                    d0["theta"] = th_w; d0["th_hand"] = cap
-                    d0["shield_rate"] = d0.get("shield_rate") or 0.0
+                d = seat_row(w, t, j, sc, tok, _ci, f_real, len(ts) - j, stats)
+                per_seat[(w, t)] = d
+                slope_theory = d["slope_theory"]; shield = d["shield"]; sh_rate = d["shield_rate"]
+                th_body = d["th_body"]; th_hand = d["th_hand"]; th_w = d["theta"]
                 # **T112**: `g`（局の序数）と `who`（席）は 3 つの出口（`turn_harm`／`theta_check`／
                 # `rows_out`）を**同じ鍵で突き合わせる**ために置く（`bias_budget.py` が偏りを
                 # 「A の軌跡」と「的と要の差」へ分けるとき、どちらの母数でも同じ行を指せる）。
@@ -2424,6 +2556,28 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                "rate_real": (f_real / len(ts)) if ts else None,
                                "rate_theory": float(np.mean([per_seat[(w, tt)]["slope_theory"] for tt in ts])),
                                "F_priced_end": sum(priced.get((w, t), 0.0) for t in ts)})
+        # **T151-2 `mirror`**: 行 `(w, t)` の相手の役を**同じ瞬間**から読む——w のターン t の最後の行
+        # （`turn_last`＝相手のターン t+1 に w が向き合う状態）を相手の席から見た鏡にし、同じ `seat_row` で
+        # `w := 1 − w` として読む。`j`＝相手の次の自席ターンの序数（`len(prev_o)`）。`stats` は捨てる
+        # （`g_for` の g_* カウンタだけは閉包で共有＝`mirror` のときだけ両役ぶん数える・開示）。
+        op_mirror = {}
+        if OPP_CLOCK_MODE == "mirror":
+            import collections
+            sink = collections.defaultdict(float)
+            for w in (0, 1):
+                ts = turn_seq[w]; ts_o = turn_seq[1 - w]
+                for j, t in enumerate(ts):
+                    prev_o = [tt for tt in ts_o if tt < t]
+                    if not prev_o:
+                        continue
+                    sc_l, tok_l, ci_l = turn_last.get((w, t), turn_start[(w, t)])
+                    sc_b, tok_b, ci_b = turn_last.get((1 - w, prev_o[-1]), turn_start[(1 - w, prev_o[-1])])
+                    sc_m, tok_m, ci_m = mirror_view(sc_l, tok_l, ci_l, tok_hand=tok_b, ci_hand=ci_b,
+                                                    cards=cards, idx2cid=idx2cid)
+                    f_o = float(per_seat[(1 - w, prev_o[-1])]["f_real"]) + harm.get((1 - w, prev_o[-1]), 0.0)
+                    op_mirror[(w, t)] = seat_row(1 - w, t, len(prev_o), sc_m, tok_m, ci_m, f_o,
+                                                 sum(1 for tt in ts_o if tt > t), sink)
+                    stats["mirror_rows"] += 1
         for w in (0, 1):
             ts = turn_seq[w]; ts_o = turn_seq[1 - w]
             won = z_of[w] > 0.5
@@ -2434,7 +2588,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 prev_o = [tt for tt in ts_o if tt < t]
                 if not prev_o:
                     continue                                   # 相手がまだ 1 ターンも打っていない
-                op = per_seat[(1 - w, prev_o[-1])]
+                op = op_mirror[(w, t)] if OPP_CLOCK_MODE == "mirror" else per_seat[(1 - w, prev_o[-1])]
                 t_opp_act = sum(1 for tt in ts_o if tt > t)
                 rec = {"g": games, "who": w, "won": won,
                        # **T145**: 決着の旗（`lethal_rule.settled_map` の `(seed, w, t)`）と同じ鍵——
@@ -2835,12 +2989,19 @@ def main(argv=None):
                     help="**T138b** `W(D)` の較正が読む行から決着後（`lethal_rule.settled_map`）を除くか: "
                          "`off`（旧・全行）／`on`（宣言した席の行だけ除く）／"
                          "`game`（**T151-3** どちらかの席の最初の宣言ターン以降を両席とも除く）")
+    ap.add_argument("--opp-clock", default=OPP_CLOCK_MODE, choices=OPP_CLOCK_MODES,
+                    help="**T151-2** 相手の時計をどの瞬間から読むか: `prev_start`（旧・相手の前ターン開始）／"
+                         "`mirror`（同じ瞬間＝自席ターンの最後の行を相手の席から見た鏡・相手側はリフレッシュ後）")
+    ap.add_argument("--w-mover", default=TO.W_MOVER_MODE, choices=TO.W_MOVER_MODES,
+                    help="**T151-2** 手番の半ターン: `off`（旧）／`half`（`W(D + 1/2)`・規則から）")
     add_nu_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_nu_mode(a)
     t0 = time.time()
     set_pre_settle_mode(a.pre_settle)               # **T138b**
+    set_opp_clock_mode(a.opp_clock)                 # **T151-2**
+    TO.set_w_mover_mode(a.w_mover)                  # **T151-2**
     set_theta_hand_mode(a.theta_hand)
     set_theta_hand_place(a.theta_hand_place)
     set_theta_hand_window(a.theta_hand_window)

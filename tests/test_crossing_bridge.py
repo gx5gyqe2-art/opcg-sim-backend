@@ -1700,3 +1700,123 @@ def test_pre_settle_game_reads_the_settled_map_once_and_derives_the_first_turn(m
         CB.set_pre_settle_mode("off")
     assert calls == [(["x"], 3)] and firsts == [1]
     assert "game" in CB.PRE_SETTLE_MODES
+
+
+# ---- T151-2: 相手の時計を同じ瞬間から読む（opp_clock=mirror・mirror_view） ----------------------------
+#
+# 既定 `prev_start` は従来どおり（`op = per_seat[(1-w, 相手の前ターン)]`）。`mirror` は w のターン t の最後の行を
+# 相手の席から見た鏡（`mirror_view`）にして同じ `seat_row` で読む。**既定の道は 1 ビットも動かない**
+# （2026-09-24・実 20 局で rows_out／ledger／stats／theta_check／turn_harm のハッシュが HEAD と一致）。
+
+def test_set_opp_clock_mode_defaults_to_prev_start_and_rejects_unknown():
+    assert CB.OPP_CLOCK_MODE == "prev_start"
+    try:
+        assert CB.set_opp_clock_mode("mirror") == "mirror"
+    finally:
+        CB.set_opp_clock_mode("prev_start")
+    with pytest.raises(ValueError):
+        CB.set_opp_clock_mode("なにか")
+    assert CB.OPP_CLOCK_MODE == "prev_start"
+
+
+def _mirror_fixture():
+    """自分＝席 A の行。A のリーダー 0・場 2..6・手札 12..21／相手＝リーダー 1・場 7..11。"""
+    import don_ledger as DL
+    n_slot, n_col = 22, 22
+    tok = np.zeros((n_slot, n_col), float)
+    # 自分のリーダー: パワー 0.5（手番のとき・付与 1 ドン込み）／列 20＝0.4（相手の手番のとき）
+    tok[0, CB.S_POWER] = 0.5; tok[0, CB._TOK_POWER_OTHER] = 0.4; tok[0, CB._TOK_ATTACHED] = 0.2
+    # 相手のリーダー: 列 0＝0.45（相手の手番でない＝付与無し）／列 20＝0.55（相手の手番）
+    tok[1, CB.S_POWER] = 0.45; tok[1, CB._TOK_POWER_OTHER] = 0.55; tok[1, CB._TOK_ATTACHED] = 0.2
+    # 自分の体（枠 2）: レスト中（殴った）・ブロッカー（列 6 は非レストのブロッカーなので 0）
+    tok[2, CB.S_IS_CHAR] = 1.0; tok[2, CB.S_POWER] = 0.6; tok[2, CB._TOK_POWER_OTHER] = 0.5; tok[2, CB.S_IS_REST] = 1.0
+    tok[2, CB._TOK_ATTACHED] = 0.2
+    # 相手の体（枠 7）: そのターンに出た（召喚酔い）・レスト（殴った）ブロッカー・付与 1
+    tok[7, CB.S_IS_CHAR] = 1.0; tok[7, CB.S_POWER] = 0.3; tok[7, CB._TOK_POWER_OTHER] = 0.4
+    tok[7, CB.S_IS_REST] = 1.0; tok[7, CB._TOK_SICK] = 1.0; tok[7, CB._TOK_ATTACHED] = 0.2; tok[7, CB.S_IS_BLOCKER] = 0.0
+    # 相手の体（枠 8）: アクティブな非ブロッカー
+    tok[8, CB.S_IS_CHAR] = 1.0; tok[8, CB.S_POWER] = 0.7; tok[8, CB._TOK_POWER_OTHER] = 0.7
+    # 自分の手札（枠 12）: 何か
+    tok[12, CB.S_COUNTER if hasattr(CB, "S_COUNTER") else 7] = 1.0
+    sc = np.zeros(123, float)
+    sc[CB.SC_MY_LIFE], sc[CB.SC_OPP_LIFE] = 2.0, 4.0
+    sc[CB.SC_MY_HAND], sc[CB.SC_OPP_HAND] = 3.0, 6.0
+    sc[CB._SC_MY_FIELD_N], sc[CB._SC_OPP_FIELD_N] = 1.0, 2.0
+    sc[CB.SC_MY_LEADER_POWER], sc[CB.SC_OPP_LEADER_POWER] = 0.5, 0.6
+    sc[DL.SC_MY_ACTIVE], sc[DL.SC_MY_RESTED] = 1.0, 5.0        # 自分: 使い残し 1・使った 5
+    sc[DL.SC_OPP_ACTIVE], sc[DL.SC_OPP_RESTED] = 0.0, 3.0      # 相手: アクティブ 0・レスト 3
+    sc[DL.SC_MY_LEADER_DON], sc[DL.SC_OPP_LEADER_DON] = 0.2, 0.2   # リーダー付与 1 ずつ（×5）
+    sc[DL.SC_MY_DON_DECK], sc[DL.SC_OPP_DON_DECK] = 0.3, 0.1   # ドンデッキ 3・1（×10）
+    sc[CB._SC_IS_MY_TURN] = 1.0
+    ci = np.zeros(24, int)
+    ci[0], ci[1], ci[2], ci[7], ci[8], ci[12], ci[22], ci[23] = 11, 22, 33, 44, 55, 66, 77, 88
+    tok_b = np.zeros((n_slot, n_col), float); tok_b[12, 7] = 2.0; tok_b[13, 7] = 0.5
+    ci_b = np.zeros(24, int); ci_b[12], ci_b[13] = 101, 102
+    return sc, tok, ci, tok_b, ci_b
+
+
+class _Cards:
+    def __init__(self, blockers):
+        self._b = set(blockers)
+
+    def info(self, cid):
+        return {"blocker": cid in self._b}
+
+
+def test_mirror_view_swaps_sides_and_refreshes_only_the_new_own_side():
+    sc, tok, ci, tok_b, ci_b = _mirror_fixture()
+    idx2cid = {44: "OPP_BLOCKER", 55: "OPP_VANILLA", 33: "MY_BLOCKER", 11: "L1", 22: "L2"}
+    S, T, C = CB.mirror_view(sc, tok, ci, tok_hand=tok_b, ci_hand=ci_b, cards=_Cards({"OPP_BLOCKER", "MY_BLOCKER"}), idx2cid=idx2cid)
+    # 元は触らない
+    assert tok[7, CB.S_IS_REST] == 1.0 and sc[CB.SC_MY_LIFE] == 2.0
+    # 新しい自分側＝相手の枠（リフレッシュ後）
+    assert T[0, CB.S_POWER] == pytest.approx(0.45) and T[0, CB._TOK_ATTACHED] == 0.0 and T[0, CB.S_CAN_ATTACK] == 1.0
+    assert T[2, CB.S_IS_CHAR] == 1.0 and T[2, CB.S_IS_REST] == 0.0 and T[2, CB._TOK_SICK] == 0.0
+    assert T[2, CB.S_CAN_ATTACK] == 1.0 and T[2, CB._TOK_ATTACHED] == 0.0
+    assert T[2, CB.S_IS_BLOCKER] == 1.0            # 殴ってレストしていたブロッカーが札の情報で立ち直る
+    assert T[2, CB.S_POWER] == pytest.approx(0.3)   # 相手の枠の列 0＝付与無しのパワー
+    assert T[3, CB.S_IS_CHAR] == 1.0 and T[3, CB.S_IS_BLOCKER] == 0.0 and T[3, CB.S_CAN_ATTACK] == 1.0
+    assert T[4, CB.S_IS_CHAR] == 0.0 and T[4, CB.S_CAN_ATTACK] == 0.0
+    # 新しい相手側＝自分の枠（そのまま・パワーは「相手が手番のとき」の列）
+    assert T[1, CB.S_POWER] == pytest.approx(0.4) and T[1, CB._TOK_ATTACHED] == pytest.approx(0.2)
+    assert T[7, CB.S_IS_CHAR] == 1.0 and T[7, CB.S_IS_REST] == 1.0 and T[7, CB._TOK_ATTACHED] == pytest.approx(0.2)
+    assert T[7, CB.S_POWER] == pytest.approx(0.5) and T[7, CB.S_CAN_ATTACK] == 0.0
+    # 手札＝相手の直近の行から
+    assert T[12, 7] == 2.0 and T[13, 7] == 0.5 and C[12] == 101 and C[13] == 102
+    # card_idx の入れ替え（リーダー・場・ステージ）
+    assert C[0] == 22 and C[1] == 11 and C[2] == 44 and C[3] == 55 and C[7] == 33 and C[22] == 88 and C[23] == 77
+
+
+def test_mirror_view_scalars_follow_the_refresh_rule():
+    import don_ledger as DL
+    sc, tok, ci, tok_b, ci_b = _mirror_fixture()
+    S, T, C = CB.mirror_view(sc, tok, ci, tok_hand=tok_b, ci_hand=ci_b)
+    assert S[CB.SC_MY_LIFE] == 4.0 and S[CB.SC_OPP_LIFE] == 2.0
+    assert S[CB.SC_MY_HAND] == 6.0 and S[CB.SC_OPP_HAND] == 3.0
+    assert S[CB._SC_MY_FIELD_N] == 2.0 and S[CB._SC_OPP_FIELD_N] == 1.0
+    assert S[CB.SC_MY_LEADER_POWER] == 0.6 and S[CB.SC_OPP_LEADER_POWER] == 0.5
+    # 相手のドン: アクティブ 0 ＋ レスト 3 ＋ 付与（リーダー 1 ＋ 枠 7 の 1）＋ min(2, デッキ 1) ＝ 6
+    assert S[DL.SC_MY_ACTIVE] == pytest.approx(6.0) and S[DL.SC_MY_RESTED] == 0.0 and S[DL.SC_MY_LEADER_DON] == 0.0
+    assert S[DL.SC_MY_DON_DECK] == pytest.approx(0.0)          # デッキ 1 − 1 = 0
+    # 自分のドンはそのまま相手側へ
+    assert S[DL.SC_OPP_ACTIVE] == 1.0 and S[DL.SC_OPP_RESTED] == 5.0 and S[DL.SC_OPP_LEADER_DON] == pytest.approx(0.2)
+    assert S[DL.SC_OPP_DON_DECK] == pytest.approx(0.3) and S[CB._SC_IS_MY_TURN] == 1.0
+
+
+def test_mirror_view_without_cards_keeps_the_blocker_column_as_is_and_empty_hand_when_no_partner_row():
+    sc, tok, ci, _tb, _cb = _mirror_fixture()
+    S, T, C = CB.mirror_view(sc, tok, ci)
+    assert T[2, CB.S_IS_BLOCKER] == 0.0            # 札が引けなければ列 6 のまま（過小側・開示）
+    assert float(np.abs(T[CB.SLOT_HAND]).sum()) == 0.0 and int(np.abs(C[CB.SLOT_HAND]).sum()) == 0
+
+
+def test_opp_clock_mirror_on_empty_records_builds_no_rows_and_default_counts_no_mirror_rows(monkeypatch):
+    monkeypatch.setattr(CB.PL, "iter_games", lambda *a, **k: iter([]))
+    rows, _l, stats, _t, _c = CB.collect(["x"])
+    assert rows == [] and stats["mirror_rows"] == 0
+    try:
+        CB.set_opp_clock_mode("mirror")
+        rows2, _l2, stats2, _t2, _c2 = CB.collect(["x"])
+    finally:
+        CB.set_opp_clock_mode("prev_start")
+    assert rows2 == [] and stats2["mirror_rows"] == 0
