@@ -81,6 +81,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
+from opcg_sim.loop import arena as AR  # noqa: E402  （T148: pair_level_ci の正本）
 from opcg_sim.loop import decks as D  # noqa: E402
 from opcg_sim.loop import driver as DR  # noqa: E402
 from opcg_sim.loop import engine as E  # noqa: E402
@@ -144,12 +145,18 @@ def expand_replacement(rep_move):
     return None, None
 
 
-def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMILIES):
+def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMILIES, seats=None):
     """`driver.run_game(swap=…)` に渡す関数を作る。`stats`（省略可）に介入の実績を積む。
 
     **盤面には触れない**——`out`（探索の結果・候補・π はそのまま）を読むだけで、返す `move` だけが
     実対局に出る。置き換えは `out["groups"][best_index]["rep"]` が指す `legal` の要素そのもの
-    （新しい手を作らない・既存の合法手を選び直すだけ）。"""
+    （新しい手を作らない・既存の合法手を選び直すだけ）。
+
+    **T148**: `seats`（省略可・既定 `None`）——介入する席の名前の集合（`driver.run_game` が渡す
+    `name`・`{"p1","p2"}` の部分集合）。`None` なら**両席**に介入する（T142／T142b の乾式運転と
+    1 ビットも変わらない・後方互換）。**両席に同じ理論で介入すると効果が相殺する**（両方が同じ規則で
+    「損な手」を避けるので、片方だけが強くなったわけではない）ので、**T18 の勝率判定には必ず 1 席だけ**
+    （`seats={"p1"}` 等）を渡す——`t18_pairs`（下）が seed ごとに `p1`／`p2` を入れ替えて両方測る。"""
     if stats is None:
         stats = {}
     stats.setdefault("n_seen", 0)
@@ -164,6 +171,8 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
     stats.setdefault("interventions", [])
 
     def swap(game, name, turn, step, out, move):
+        if seats is not None and name not in seats:            # **T148**: 介入しない席はそのまま打つ
+            return move
         if out.get("kind") != "main":
             return move
         sc, tok, ci = LT.raw_row(game, name)
@@ -246,8 +255,10 @@ def make_box_tracker(stats):
 
 
 def dry_run(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns=4, worlds=4,
-           theta=THETA, mu=MU, exempt=EXEMPT_FAMILIES):
-    """`seeds` を介入つきで打ち、局ごとの結果と介入の実績を返す（**乾式運転**・判定はしない）。"""
+           theta=THETA, mu=MU, exempt=EXEMPT_FAMILIES, seats=None):
+    """`seeds` を介入つきで打ち、局ごとの結果と介入の実績を返す（**乾式運転**・判定はしない）。
+
+    **T148**: `seats`（省略可）を `make_swap` にそのまま渡す（`None`＝両席・後方互換）。"""
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     E.engine()
@@ -260,7 +271,7 @@ def dry_run(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns
         la, lb = D.leader_pair(db, seed, "random")
         p1, p2 = D.build_pair(db, la, lb, seed, decks_mode)
         stats = {}
-        swap = make_swap(cards, idx2cid, theta, mu, stats, exempt)
+        swap = make_swap(cards, idx2cid, theta, mu, stats, exempt, seats=seats)
         aborted = None
         try:
             res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, swap=swap,
@@ -277,6 +288,86 @@ def dry_run(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns
                      "n_no_replacement": stats["n_no_replacement"],
                      "interventions": stats["interventions"]})
     return games
+
+
+#: **T148**: どちらの原始の席名（`driver.run_game` が渡す `name`）の相手か。
+_OTHER_SEAT = {"p1": "p2", "p2": "p1"}
+
+
+def t18_pairs(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns=4, worlds=4,
+             theta=THETA, mu=MU, exempt=EXEMPT_FAMILIES):
+    """**T148**: 1 つの seed につき **2 局**——理論の介入を **p1 だけ**に入れた局と **p2 だけ**に入れた局
+    （`opcg_sim.loop.arena` と同じ「同 seed・席を入れ替えたペア」規約・リーダー対は入れ替わらない）。
+    **両席に同じ規則で介入すると効果が相殺する**（`make_swap` の docstring）ので、**片席だけへの介入**が
+    T18 の勝率判定に要る唯一の形。返り値は局ごとの記録（`dry_run` と同じ形＋`intervened`＝介入された席）。"""
+    cards = PL.Cards()
+    idx2cid = {i: c for c, i in GA._vocab().items()}
+    E.engine()
+    search = {"worlds": int(worlds)} if worlds else {}
+    spec = E.SeatSpec(net, sims=sims, dirichlet_eps=dirichlet_eps, temp_turns=temp_turns,
+                      prune_futile=E.GEN_PRUNE_FUTILE, **search)
+    db = D.load_db()
+    games = []
+    for seed in seeds:
+        la, lb = D.leader_pair(db, seed, "random")
+        for intervened in ("p1", "p2"):
+            p1, p2 = D.build_pair(db, la, lb, seed, decks_mode)
+            stats = {}
+            swap = make_swap(cards, idx2cid, theta, mu, stats, exempt, seats={intervened})
+            aborted = None
+            try:
+                res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, swap=swap,
+                                  observer=make_box_tracker(stats))
+            except DR.GameAborted as exc:                              # noqa: BLE001
+                aborted = str(exc)
+                res = {"winner": None, "turns": None, "steps": None}
+            winner = res.get("winner")
+            games.append({"seed": seed, "intervened": intervened, "winner": winner,
+                         "turns": res.get("turns"), "steps": res.get("steps"), "aborted": aborted,
+                         # **`score`**＝介入された席の勝率（`opcg_sim.loop.arena.pair_level_ci` の規約）。
+                         # `winner is None`（打ち切り・引き分け）は `void`（母数に入れない・0.5 で埋めない）。
+                         "score": (None if (aborted or winner is None)
+                                  else (1.0 if winner == intervened else 0.0)),
+                         "n_seen": stats["n_seen"], "n_forbidden": stats["n_forbidden"],
+                         "n_exempt": stats["n_exempt"], "n_box_replacement": stats["n_box_replacement"],
+                         "box_completed": stats["box_completed"], "box_broken": stats["box_broken"],
+                         "n_intervened": stats["n_intervened"],
+                         "n_no_replacement": stats["n_no_replacement"]})
+    return games
+
+
+def summarise_pairs(games):
+    """**T148**: `t18_pairs` の出力 → 介入された席の**ペア水準勝率＋95% CI**（`arena.pair_level_ci`・
+    同 seed の p1/p2 介入 2 局の平均を 1 ペアのスコアにする）＋配線の健全性（`dry_run` の `summarise` と同じ列）。
+    **void（どちらかの局が打ち切り・引き分け）はペアごと母数から外し、件数を必ず載せる**（黙って落とさない）。"""
+    if not games:
+        return {"n_games": 0, "n_pairs": 0}
+    by_seed = {}
+    for g in games:
+        by_seed.setdefault(g["seed"], {})[g["intervened"]] = g
+    pair_scores, void_seeds = [], []
+    for seed, by_side in by_seed.items():
+        a, b = by_side.get("p1"), by_side.get("p2")
+        if a is None or b is None or a["score"] is None or b["score"] is None:
+            void_seeds.append(seed)
+            continue
+        pair_scores.append((a["score"] + b["score"]) / 2.0)
+    n_aborted = sum(1 for g in games if g["aborted"])
+    n_no_winner = sum(1 for g in games if not g["aborted"] and g["winner"] is None)
+    n_seen = sum(g["n_seen"] for g in games)
+    n_forbidden = sum(g["n_forbidden"] for g in games)
+    n_intervened = sum(g["n_intervened"] for g in games)
+    out = {"n_games": len(games), "n_pairs": len(by_seed), "n_void_pairs": len(void_seeds),
+           "void_seeds": void_seeds, "n_scored_pairs": len(pair_scores),
+           "n_aborted": n_aborted, "n_no_winner": n_no_winner,
+           "n_seen": n_seen, "n_forbidden": n_forbidden, "n_intervened": n_intervened,
+           "intervene_rate": round(n_intervened / n_seen, 4) if n_seen else None,
+           "forbid_rate": round(n_forbidden / n_seen, 4) if n_seen else None}
+    if pair_scores:
+        out["ci"] = AR.pair_level_ci(pair_scores)
+    else:
+        out["ci"] = None
+    return out
 
 
 def summarise(games):
@@ -307,8 +398,12 @@ def summarise(games):
 
 
 def build_parser():
-    ap = argparse.ArgumentParser(description="T18 の器の乾式運転（T142・判定はしない）")
-    ap.add_argument("--games", type=int, default=10)
+    ap = argparse.ArgumentParser(description="T18 の器（T142 の乾式運転／T148 の片席介入・判定は本番の T18）")
+    ap.add_argument("--games", type=int, default=10,
+                    help="乾式運転（両席介入）の局数。**`--pairs` と同時には使わない**")
+    ap.add_argument("--pairs", type=int, default=0,
+                    help="**T148**: 片席介入のペア数（seed 1 つにつき p1／p2 に介入した 2 局）。"
+                         "指定すると乾式運転ではなく判定用の勝率＋95%% CI を出す")
     ap.add_argument("--seed-base", type=int, required=True,
                     help="既存の記録の seed 帯と重ならない値にする（新しい局を打つ）")
     ap.add_argument("--decks", default="synth", choices=("singleton", "synth", "synth_dig",
@@ -317,19 +412,36 @@ def build_parser():
     ap.add_argument("--seq", default="off", choices=SF.SEQ_MODES,
                     help="**T144** 付与を攻撃の価格に読み替えるか（`off` 以外なら、読み替えた付与は対象外にしない）")
     ap.add_argument("--json", default="")
+    ap.add_argument("--result", default="",
+                    help="**T148**（`n_loop_ops.md` の規約）: `RESULT.json`（機械可読の納品物）を書くパス")
     return ap
 
 
 def main(argv=None):
     a = build_parser().parse_args(argv)
     SF.set_seq_mode(a.seq)                          # **T144**
-    seeds = [a.seed_base + i for i in range(a.games)]
-    games = dry_run(seeds, a.decks, sims=a.sims)
-    out = {"games": games, "summary": summarise(games)}
+    if a.pairs:
+        seeds = [a.seed_base + i for i in range(a.pairs)]
+        games = t18_pairs(seeds, a.decks, sims=a.sims)
+        summary = summarise_pairs(games)
+        out = {"games": games, "summary": summary}
+        status = "done" if summary.get("ci") is not None else "no_data"
+        result = {"status": status, "task": "T148", "seed_base": a.seed_base, "pairs": a.pairs,
+                  "decks": a.decks, "seq": a.seq, "summary": summary}
+    else:
+        seeds = [a.seed_base + i for i in range(a.games)]
+        games = dry_run(seeds, a.decks, sims=a.sims)
+        summary = summarise(games)
+        out = {"games": games, "summary": summary}
+        result = {"status": "done", "task": "T142_dry_run", "seed_base": a.seed_base,
+                  "games": a.games, "decks": a.decks, "seq": a.seq, "summary": summary}
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False, indent=2)
+    if a.result:
+        with open(a.result, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
     return 0
 
 

@@ -272,6 +272,132 @@ def test_cli_builds_seed_range_and_reaches_dry_run(monkeypatch, tmp_path):
     assert saved["summary"]["n_games"] == 2
 
 
+# ---- 4. T148: 片席介入（make_swap の seats・t18_pairs・summarise_pairs） -----------------------
+
+def test_swap_seats_none_intervenes_on_both_seats_unchanged_from_t142(monkeypatch):
+    """`seats` を渡さない（既定 `None`）なら乾式運転（T142）と 1 ビットも変わらない——両席に介入する。"""
+    sigs = [["ATTACK", "u1", ["u2"], [], None], ["PLAY", "u3", [], [], None]]
+    cands = _cands(*sigs)
+    legal = [{"action_type": "ATTACK", "payload": {"uuid": "u1", "target_ids": ["u2"]}},
+            {"action_type": "PLAY", "payload": {"uuid": "u3"}}]
+    groups = [{"rep": 0, "n": 1.0, "q": 0.0}, {"rep": 1, "n": 1.0, "q": 0.0}]
+    out = _out(groups, legal, sig=sigs[0], k=None)
+    monkeypatch.setattr(LT, "raw_row", lambda game, name: (_SC, _TOK, _CI))
+    monkeypatch.setattr(LT, "raw_candidates", lambda game, name, out_: cands)
+    monkeypatch.setattr(LT, "price_candidates",
+                        lambda sc, tok, ci, cards, idx2cid, cands_, theta, mu:
+                            [dict(c, price=p) for c, p in zip(cands_, (0.10, 0.30))])
+    for name in ("p1", "p2"):
+        stats = {}
+        swap = TA.make_swap(cards=None, idx2cid=None, stats=stats)          # seats 省略
+        got = swap(game=None, name=name, turn=1, step=0, out=out, move={"action_type": "ATTACK"})
+        assert got == {"action_type": "PLAY", "payload": {"uuid": "u3"}}
+        assert stats["n_intervened"] == 1
+
+
+def test_swap_seats_restricts_intervention_to_the_named_seat(monkeypatch):
+    """**T148**: `seats={"p1"}` なら `p2` の行は `raw_row` すら呼ばずそのまま返す（数えもしない）。"""
+    calls = []
+    monkeypatch.setattr(LT, "raw_row", lambda game, name: calls.append(name) or (_SC, _TOK, _CI))
+    monkeypatch.setattr(LT, "raw_candidates", lambda game, name, out_: [])
+    stats = {}
+    swap = TA.make_swap(cards=None, idx2cid=None, stats=stats, seats={"p1"})
+    move = {"action_type": "TURN_END"}
+    got_p2 = swap(game=None, name="p2", turn=1, step=0, out={"kind": "main"}, move=move)
+    assert got_p2 is move and calls == [] and stats["n_seen"] == 0
+    got_p1 = swap(game=None, name="p1", turn=1, step=0, out={"kind": "main"}, move=move)
+    assert got_p1 is move and calls == ["p1"]                 # p1 は見に行く（候補が無く介入しないだけ）
+
+
+def test_summarise_pairs_is_empty_for_no_games():
+    out = TA.summarise_pairs([])
+    assert out == {"n_games": 0, "n_pairs": 0}
+
+
+def _pgame(seed, intervened, winner, aborted=None, n_seen=1, n_forbidden=0, n_intervened=0):
+    score = None if (aborted or winner is None) else (1.0 if winner == intervened else 0.0)
+    return {"seed": seed, "intervened": intervened, "winner": winner, "turns": 10, "steps": 80,
+            "aborted": aborted, "score": score, "n_seen": n_seen, "n_forbidden": n_forbidden,
+            "n_exempt": 0, "n_box_replacement": 0, "box_completed": 0, "box_broken": 0,
+            "n_intervened": n_intervened, "n_no_replacement": 0}
+
+
+def test_summarise_pairs_averages_the_two_intervened_sides_per_seed():
+    """1 seed の p1 介入局・p2 介入局を平均して 1 ペアのスコアにする（`arena.pair_level_ci` の規約）。"""
+    games = [_pgame(1, "p1", "p1"),      # 介入された p1 が勝った → score 1.0
+            _pgame(1, "p2", "p1"),       # 介入された p2 が負けた（勝者は p1）→ score 0.0
+            _pgame(2, "p1", "p1"), _pgame(2, "p2", "p2")]      # 2 局とも介入された側が勝った → 1.0/1.0
+    out = TA.summarise_pairs(games)
+    assert out["n_games"] == 4 and out["n_pairs"] == 2 and out["n_scored_pairs"] == 2
+    assert out["ci"]["win_rate"] == pytest.approx((0.5 + 1.0) / 2.0)
+
+
+def test_summarise_pairs_treats_no_winner_or_aborted_as_void_and_counts_them():
+    games = [_pgame(1, "p1", "p1"), _pgame(1, "p2", None),                    # 引き分け・void
+            _pgame(2, "p1", "p1"), _pgame(2, "p2", "p2", aborted="boom")]     # 打ち切り・void
+    out = TA.summarise_pairs(games)
+    assert out["n_pairs"] == 2 and out["n_void_pairs"] == 2 and out["n_scored_pairs"] == 0
+    assert set(out["void_seeds"]) == {1, 2} and out["ci"] is None
+    assert out["n_aborted"] == 1 and out["n_no_winner"] == 1
+
+
+def test_summarise_pairs_reports_intervention_rate_across_all_rows():
+    games = [_pgame(1, "p1", "p1", n_seen=10, n_forbidden=4, n_intervened=2),
+            _pgame(1, "p2", "p1", n_seen=8, n_forbidden=2, n_intervened=1)]
+    out = TA.summarise_pairs(games)
+    assert out["n_seen"] == 18 and out["n_forbidden"] == 6 and out["n_intervened"] == 3
+    assert out["intervene_rate"] == pytest.approx(3 / 18, abs=1e-4)
+
+
+def test_t18_pairs_calls_run_game_twice_per_seed_with_seats_swapped(monkeypatch):
+    """**T148**: seed 1 つにつき `p1` だけ介入した局・`p2` だけ介入した局の 2 局を打つ。"""
+    import types
+    calls = []
+
+    def fake_run_game(seed, specs, p1, p2, swap=None, observer=None):
+        calls.append(seed)
+        # `swap` に渡された `seats` を覗く（`make_swap` の閉包は直接読めないので、実際に呼んで確かめる）
+        move = {"action_type": "TURN_END"}
+        kept_p1 = swap(game=None, name="p1", turn=1, step=0, out={"kind": "window"}, move=move)
+        kept_p2 = swap(game=None, name="p2", turn=1, step=0, out={"kind": "window"}, move=move)
+        assert kept_p1 is move and kept_p2 is move          # window 行は両席とも素通し（介入の有無は判定できない）
+        return {"winner": "p1", "turns": 10, "steps": 80}
+
+    monkeypatch.setattr(TA.D, "load_db", lambda: object())
+    monkeypatch.setattr(TA.D, "leader_pair", lambda db, seed, mode: ("la", "lb"))
+    monkeypatch.setattr(TA.D, "build_pair", lambda db, la, lb, seed, decks: ("p1_deck", "p2_deck"))
+    monkeypatch.setattr(TA.E, "engine", lambda: None)
+    monkeypatch.setattr(TA.E, "SeatSpec", lambda *a, **k: object())
+    monkeypatch.setattr(TA.DR, "run_game", fake_run_game)
+    monkeypatch.setattr(TA.PL, "Cards", lambda: None)
+    monkeypatch.setattr(TA.GA, "_vocab", lambda: {})
+
+    games = TA.t18_pairs([777], "user", sims=4)
+    assert calls == [777, 777]                              # 同じ seed で 2 局
+    assert [g["intervened"] for g in games] == ["p1", "p2"]
+    assert all(g["winner"] == "p1" for g in games)
+    assert games[0]["score"] == 1.0 and games[1]["score"] == 0.0   # p1 が勝った局：介入 p1→1.0／介入 p2→0.0
+
+
+def test_cli_pairs_flag_reaches_t18_pairs_and_writes_result_json(monkeypatch, tmp_path):
+    captured = {}
+
+    def fake_t18_pairs(seeds, decks_mode, sims=64, **kw):
+        captured.update(seeds=seeds, decks_mode=decks_mode)
+        return [_pgame(s, side, "p1") for s in seeds for side in ("p1", "p2")]
+
+    monkeypatch.setattr(TA, "t18_pairs", fake_t18_pairs)
+    result_json = tmp_path / "RESULT.json"
+    rc = TA.main(["--pairs", "2", "--seed-base", "70000", "--decks", "user",
+                 "--result", str(result_json)])
+    assert rc == 0
+    assert captured["seeds"] == [70000, 70001] and captured["decks_mode"] == "user"
+    import json
+    saved = json.loads(result_json.read_text(encoding="utf-8"))
+    assert saved["status"] == "done" and saved["task"] == "T148"
+    assert saved["summary"]["n_pairs"] == 2
+
+
 # ---- 4. make_box_tracker ------------------------------------------------------------------------
 
 def test_box_tracker_counts_a_box_that_runs_to_the_end():
