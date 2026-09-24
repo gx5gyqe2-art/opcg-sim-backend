@@ -1,174 +1,255 @@
 <title>理論と探索の棋譜</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 :root{
-  --paper:#f2f4f7; --panel:#ffffff; --ink:#1d2430; --ink-2:#4e5866; --ink-3:#8791a0; --line:#d9dee6;
-  --theory:#b8760f; --theory-bg:#fbf1dc; --search:#1e7f87; --search-bg:#dff2f3;
-  --bad:#b0303c; --bad-bg:#f9e3e5; --warn:#c48a15; --ok:#3a7d44;
-  --fam-play:#3d5cb8; --fam-attack:#b0303c; --fam-attach:#8a5cc7; --fam-effect:#1e7f87; --fam-end:#8791a0;
-  --mover:#eaf6f7; --chip:#eef1f5; --focus:#2f6fd6;
+  --paper:#eef1f4; --panel:#ffffff; --ink:#1b222c; --ink-2:#4d5765; --ink-3:#86909e; --line:#d6dce4; --chip:#edf0f4;
+  --mat:#203642; --mat-2:#2a4452; --mat-line:#3b5a6a; --mat-ink:#dce7ec; --mat-ink-2:#9db3bf;
+  --search:#1f8c95; --search-soft:#d8f0f1; --theory:#b9780e; --theory-soft:#faefd6;
+  --bad:#b3303b; --bad-soft:#f8e1e3; --ok:#357a40; --focus:#2f6fd6;
+  --arrow-s:#3cc6cf; --arrow-t:#f4b23c; --arrow-b:#ef6470; --arrow-p:#c9d4da;
+  --fam-play:#3d5cb8; --fam-attack:#b3303b; --fam-attach:#8a5cc7; --fam-effect:#1f8c95; --fam-end:#86909e;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --paper:#141922; --panel:#1c2331; --ink:#e7ebf1; --ink-2:#b4bcc8; --ink-3:#7f8998; --line:#2e3746;
-    --theory:#e6a83b; --theory-bg:#3a2e14; --search:#4fc0c8; --search-bg:#153538;
-    --bad:#ee6b76; --bad-bg:#3d1c21; --warn:#e0b04a; --ok:#6fc07a;
-    --fam-play:#8aa4f0; --fam-attack:#ee6b76; --fam-attach:#bd9cf2; --fam-effect:#4fc0c8; --fam-end:#7f8998;
-    --mover:#1b2f33; --chip:#262f3d; --focus:#7aa7ff;
+    --paper:#11161d; --panel:#19212b; --ink:#e6ebf1; --ink-2:#b0b9c5; --ink-3:#7c8796; --line:#2b3542; --chip:#232d39;
+    --mat:#172a33; --mat-2:#1f3843; --mat-line:#33505e;
+    --search:#49c3cb; --search-soft:#15363a; --theory:#eaa93f; --theory-soft:#3a2d13;
+    --bad:#ee6b76; --bad-soft:#3b1b20; --ok:#6fc07a; --focus:#7aa7ff;
+    --fam-play:#8aa4f0; --fam-attack:#ee6b76; --fam-attach:#bd9cf2; --fam-effect:#49c3cb; --fam-end:#7c8796;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
-  --paper:#141922; --panel:#1c2331; --ink:#e7ebf1; --ink-2:#b4bcc8; --ink-3:#7f8998; --line:#2e3746;
-  --theory:#e6a83b; --theory-bg:#3a2e14; --search:#4fc0c8; --search-bg:#153538;
-  --bad:#ee6b76; --bad-bg:#3d1c21; --warn:#e0b04a; --ok:#6fc07a;
-  --fam-play:#8aa4f0; --fam-attack:#ee6b76; --fam-attach:#bd9cf2; --fam-effect:#4fc0c8; --fam-end:#7f8998;
-  --mover:#1b2f33; --chip:#262f3d; --focus:#7aa7ff;
+  --paper:#11161d; --panel:#19212b; --ink:#e6ebf1; --ink-2:#b0b9c5; --ink-3:#7c8796; --line:#2b3542; --chip:#232d39;
+  --mat:#172a33; --mat-2:#1f3843; --mat-line:#33505e;
+  --search:#49c3cb; --search-soft:#15363a; --theory:#eaa93f; --theory-soft:#3a2d13;
+  --bad:#ee6b76; --bad-soft:#3b1b20; --ok:#6fc07a; --focus:#7aa7ff;
+  --fam-play:#8aa4f0; --fam-attack:#ee6b76; --fam-attach:#bd9cf2; --fam-effect:#49c3cb; --fam-end:#7c8796;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:14px;line-height:1.5}
 .mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
-.wrap{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:0 32px}
-header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line);padding-block:10px 8px}
-header .row{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
-h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.01em}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:16px;padding-block:0 32px}
+header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--paper);border-bottom:1px solid var(--line);padding-block:8px 6px}
+.row{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+h1{font-size:16px;margin:0;font-weight:700}
 .sub{color:var(--ink-3);font-size:12px}
-select,button,input[type=file]{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+select,button,input[type=file]{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 9px}
 button{cursor:pointer}
 button:hover{border-color:var(--ink-3)}
-button:focus-visible,select:focus-visible,label:focus-within{outline:2px solid var(--focus);outline-offset:2px}
+button:focus-visible,select:focus-visible,.cand:focus-visible,.card:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 button.primary{border-color:var(--theory);color:var(--theory);font-weight:500}
-label.chk{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--ink-2)}
-input[type=range]{width:110px}
-.timeline{display:flex;gap:2px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:thin}
-.tick{flex:0 0 7px;height:18px;border-radius:2px;background:var(--line);cursor:pointer;border:none;padding:0}
+label.chk{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--ink-2);min-width:0;max-width:100%}
+label.chk select{min-width:0;max-width:100%;flex:1 1 180px}
+input[type=range]{width:100px}
+.timeline{display:flex;gap:2px;overflow-x:auto;padding:6px 0 2px;scrollbar-width:thin}
+.tick{flex:0 0 7px;height:16px;border-radius:2px;background:var(--line);cursor:pointer;border:none;padding:0}
 .tick.main{background:var(--ink-3);opacity:.45}
 .tick.forb{opacity:1;background:var(--bad)}
-.tick.p2{height:12px;align-self:flex-end}
+.tick.p2{height:10px;align-self:flex-end}
 .tick.cur{outline:2px solid var(--focus);outline-offset:1px}
 .tick.hid{display:none}
-main{display:grid;gap:16px;grid-template-columns:1fr;padding-top:12px}
-.list{order:2}.detail{order:1}
-@media (min-width:900px){main{grid-template-columns:300px 1fr}.list{order:1}.detail{order:2}}
-.list{background:var(--panel);border:1px solid var(--line);border-radius:8px;max-height:40vh;overflow:auto}
-@media (min-width:900px){.list{max-height:78vh}}
-label.chk{max-width:100%;min-width:0}
-label.chk select{flex:1 1 160px;min-width:0;max-width:100%;text-overflow:ellipsis}
-.list .item{display:grid;grid-template-columns:44px 1fr auto;gap:8px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}
-.list .item:last-child{border-bottom:none}
-.list .item:hover{background:var(--chip)}
-.list .item.cur{background:var(--search-bg)}
-.list .item.forb .mv{color:var(--bad);font-weight:500}
-.list .t{color:var(--ink-3);font-size:11px}
-.list .s{font-size:11px;color:var(--ink-3)}
-.list .s.neg{color:var(--bad);font-weight:500}
-.detail{display:flex;flex-direction:column;gap:14px;min-width:0}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
-.verdict{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline}
-.verdict .big{font-size:18px;font-weight:700}
-.pill{display:inline-block;border-radius:999px;padding:1px 9px;font-size:12px;font-weight:500;line-height:1.6}
-.pill.search{background:var(--search-bg);color:var(--search)}
-.pill.theory{background:var(--theory-bg);color:var(--theory)}
-.pill.bad{background:var(--bad-bg);color:var(--bad)}
+
+main{display:grid;gap:14px;grid-template-columns:minmax(0,1fr);padding-top:12px}
+@media (min-width:1000px){main{grid-template-columns:minmax(0,1fr) 390px;align-items:start}}
+
+/* ---- 盤面 ---- */
+.mat{position:relative;container-type:inline-size;background:var(--mat);border-radius:12px;padding:10px;color:var(--mat-ink);
+  --cw:min(74px,11.2cqi); --ch:calc(var(--cw)*1.4); --gap:min(8px,1.4cqi)}
+.half{display:flex;flex-direction:column;gap:var(--gap);padding:8px;border-radius:9px;border:1px solid transparent}
+.half.mover{background:var(--mat-2);border-color:var(--mat-line)}
+.half.top{flex-direction:column-reverse}
+.lane{display:flex;gap:var(--gap);align-items:center;justify-content:center;min-height:var(--ch)}
+.slot{width:var(--cw);height:var(--ch);flex:0 0 var(--cw);border-radius:5px;border:1px dashed var(--mat-line);position:relative;display:flex;align-items:center;justify-content:center}
+.slot.field{border-color:transparent}
+.slot .lbl{position:absolute;left:0;right:0;bottom:-15px;text-align:center;font-size:10px;color:var(--mat-ink-2);white-space:nowrap}
+.half.top .slot .lbl{bottom:auto;top:-15px}
+.half .lane:nth-child(2){margin-bottom:14px}
+.half.top .lane:nth-child(2){margin-bottom:0;margin-top:14px}
+.center{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:center;padding:6px 4px;font-size:12px;color:var(--mat-ink-2)}
+.center .who{color:var(--mat-ink);font-weight:700}
+.hand{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;padding-top:4px}
+.hand .card{--cw2:calc(var(--cw)*.86);width:var(--cw2);height:calc(var(--cw2)*1.4)}
+.half.top .hand .card{--cw2:calc(var(--cw)*.72)}
+.handlbl{font-size:10px;color:var(--mat-ink-2);text-align:center}
+
+.card{position:relative;width:var(--cw);height:var(--ch);border-radius:5px;background:#0d1a20;overflow:visible;flex:0 0 auto;cursor:zoom-in;transition:transform .15s}
+.card img{display:block;width:100%;height:100%;object-fit:cover;border-radius:5px}
+.card .nm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;padding:3px;color:#e6eef2;border:1px solid var(--mat-line);border-radius:5px}
+.card.rest{transform:rotate(90deg) scale(.78)}
+.card.rest img{filter:brightness(.72)}
+.card .pw{position:absolute;left:50%;bottom:-3px;transform:translateX(-50%);background:rgba(10,20,26,.86);color:#fff;font:600 10px/1.35 "IBM Plex Mono",monospace;padding:0 4px;border-radius:3px;white-space:nowrap}
+.card .dn{position:absolute;right:-5px;top:-5px;background:#7f4fc4;color:#fff;font:600 10px/1.5 "IBM Plex Mono",monospace;padding:0 5px;border-radius:999px;box-shadow:0 0 0 2px var(--mat)}
+.card.rest .pw,.card.rest .dn{transform:rotate(-90deg)}
+.card.rest .pw{left:auto;right:-10px;bottom:40%}
+.card.hs{box-shadow:0 0 0 3px var(--arrow-s)}
+.card.ts{box-shadow:0 0 0 3px var(--arrow-s),0 0 0 6px rgba(60,198,207,.25)}
+.card.ht{box-shadow:0 0 0 3px var(--arrow-t)}
+.card.tt{box-shadow:0 0 0 3px var(--arrow-t),0 0 0 6px rgba(244,178,60,.25)}
+.card.hs.ht{box-shadow:0 0 0 3px var(--arrow-s),0 0 0 6px var(--arrow-t)}
+.card.hp{box-shadow:0 0 0 3px var(--arrow-p)}
+.card.hb{box-shadow:0 0 0 3px var(--arrow-b)}
+.stack{position:relative;width:var(--cw);height:var(--ch)}
+.stack .card{position:absolute;left:0;top:0}
+.stack .cnt{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(10,20,26,.84);color:#fff;font:600 13px/1.4 "IBM Plex Mono",monospace;padding:1px 7px;border-radius:5px;pointer-events:none}
+.don .cnt{font-size:11px;white-space:nowrap}
+svg.arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+
+/* ---- 右の列 ---- */
+.panel{display:flex;flex-direction:column;gap:12px;min-width:0}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:11px 13px}
+.verdict{display:flex;flex-direction:column;gap:6px}
+.vline{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.vline .mv{font-size:15px;font-weight:700}
+.pill{display:inline-block;border-radius:999px;padding:0 9px;font-size:12px;font-weight:500;line-height:1.7;white-space:nowrap}
+.pill.search{background:var(--search-soft);color:var(--search)}
+.pill.theory{background:var(--theory-soft);color:var(--theory)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
 .pill.ok{background:var(--chip);color:var(--ok)}
 .pill.muted{background:var(--chip);color:var(--ink-2)}
-.side{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--panel)}
-.side.mover{background:var(--mover);border-color:var(--search)}
-.side h3{margin:0 0 6px;font-size:13px;display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
-.side h3 .who{font-weight:700}
-.stats{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink-2)}
-.zone{margin-top:6px}
-.zone .zl{font-size:11px;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase}
-.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:3px}
-.c{display:inline-flex;gap:5px;align-items:baseline;background:var(--chip);border-radius:5px;padding:2px 7px;font-size:12px;line-height:1.5;max-width:100%}
-.c .nm{font-weight:500;overflow-wrap:anywhere}
-.c .num{color:var(--ink-3);font-size:11px}
-.c.rest{opacity:.6;text-decoration:line-through;text-decoration-color:var(--ink-3)}
-.c.leader{border:1px solid var(--line);background:transparent}
-.c .don{color:var(--fam-attach);font-weight:500}
-.c .kw{color:var(--ink-3);font-size:10px}
-table{border-collapse:collapse;width:100%;font-size:13px}
-th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-th{font-size:11px;color:var(--ink-3);font-weight:500;letter-spacing:.05em}
-td.num,th.num{text-align:right}
-tr.chosen td{background:var(--search-bg)}
-tr.best td{box-shadow:inset 3px 0 0 var(--theory)}
-tr.chosen.best td{background:var(--theory-bg)}
-.fam{display:inline-block;font-size:11px;border-radius:4px;padding:0 6px;color:#fff;line-height:1.7}
+.cands{display:flex;flex-direction:column}
+.cand{display:grid;grid-template-columns:22px minmax(0,1fr) 94px;gap:4px 8px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:4px}
+.cand:last-child{border-bottom:none}
+.cand:hover,.cand.prev{background:var(--chip)}
+.cand.chosen{background:var(--search-soft)}
+.cand .ix{color:var(--ink-3);font-size:11px;text-align:right}
+.cand .d{font-size:13px;overflow-wrap:anywhere}
+.cand .marks{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
+.bars{display:flex;flex-direction:column;gap:3px}
+.bar{position:relative;height:13px;background:var(--chip);border-radius:3px;overflow:hidden}
+.bar i{position:absolute;top:0;bottom:0;left:0;border-radius:3px}
+.bar.t i{background:var(--theory)}
+.bar.t.neg i{background:var(--bad)}
+.bar.s i{background:var(--search)}
+.bar b{position:relative;font:500 10px/13px "IBM Plex Mono",monospace;padding-left:4px;color:var(--ink);mix-blend-mode:normal}
+.fam{display:inline-block;font-size:10px;border-radius:3px;padding:0 5px;color:#fff;line-height:1.6}
 .fam.play{background:var(--fam-play)}.fam.attack{background:var(--fam-attack)}.fam.attach{background:var(--fam-attach)}.fam.effect{background:var(--fam-effect)}.fam.end{background:var(--fam-end)}.fam.other{background:var(--ink-3)}
-.marks{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
-.tbl{overflow-x:auto}
-.ev{font-size:12px;color:var(--ink-2);display:flex;flex-wrap:wrap;gap:4px 10px}
+.legendbars{display:flex;gap:12px;font-size:11px;color:var(--ink-3);margin-bottom:4px}
+.legendbars span::before{content:"";display:inline-block;width:10px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.legendbars .lt::before{background:var(--theory)}.legendbars .ls::before{background:var(--search)}
+.ev{display:flex;flex-wrap:wrap;gap:4px 6px;font-size:12px}
 .ev span{background:var(--chip);border-radius:4px;padding:1px 7px}
-.legend{font-size:12px;color:var(--ink-2)}
-.legend dl{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:8px 0 0}
+details.list summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
+.dl{max-height:46vh;overflow:auto;margin-top:6px}
+.dl .item{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:6px;align-items:center;padding:5px 6px;border-bottom:1px solid var(--line);cursor:pointer;font-size:12px}
+.dl .item:hover{background:var(--chip)}
+.dl .item.cur{background:var(--search-soft)}
+.dl .item.forb .mv{color:var(--bad);font-weight:500}
+.dl .t{color:var(--ink-3);font-size:10px;line-height:1.3}
+.dl .s{font-size:11px;color:var(--ink-3)}
+.dl .s.neg{color:var(--bad);font-weight:600}
+.legend dl{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:6px 0 0;font-size:12px;color:var(--ink-2)}
 .legend dt{font-weight:500;color:var(--ink)}
 .legend dd{margin:0}
-.empty{padding:28px;text-align:center;color:var(--ink-3)}
-.nav{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-kbd{font:inherit;font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--chip)}
-@media (prefers-reduced-motion:no-preference){.list .item,tr td{transition:background .12s}}
+.sw{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:middle;margin-right:4px}
+.zoom{position:fixed;inset:0;background:rgba(5,10,14,.72);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;cursor:zoom-out}
+.zoom figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:8px;color:#fff;max-width:100%}
+.zoom img{width:min(300px,78vw);height:auto;border-radius:10px;image-rendering:auto}
+.zoom figcaption{font-size:14px;text-align:center}
+[hidden]{display:none!important}
+.empty{padding:24px;text-align:center;color:var(--ink-3)}
+@media (prefers-reduced-motion:reduce){.card{transition:none}}
 </style>
 
 <div class="wrap">
 <header class="bar">
-  <div class="row">
-    <h1>理論と探索の棋譜</h1>
-    <span class="sub" id="meta"></span>
-  </div>
-  <div class="row" style="margin-top:6px">
+  <div class="row"><h1>理論と探索の棋譜</h1><span class="sub" id="meta"></span></div>
+  <div class="row" style="margin-top:5px">
     <label class="chk">局 <select id="game"></select></label>
-    <div class="nav">
-      <button id="prev" title="前の決定点（←）">← 前</button>
-      <button id="next" title="次の決定点（→）">次 →</button>
-      <button id="nextforb" class="primary" title="次の食い違い（f）">次の食い違い</button>
-    </div>
+    <button id="prev" title="前の決定点（←）">← 前</button>
+    <button id="next" title="次の決定点（→）">次 →</button>
+    <button id="nextforb" class="primary" title="次の食い違い（f）">次の食い違い</button>
     <label class="chk"><input type="checkbox" id="onlyMain" checked> 決定点だけ</label>
     <label class="chk"><input type="checkbox" id="onlyForb"> 食い違いだけ</label>
     <label class="chk">差 ≥ <span class="mono" id="thrv">0.0</span> 枚 <input type="range" id="thr" min="0" max="4" step="0.25" value="0"></label>
-    <label class="chk">JSON を開く <input type="file" id="file" accept=".json,application/json"></label>
   </div>
   <div class="timeline" id="timeline" aria-label="決定点の並び"></div>
 </header>
 
 <main>
-  <aside class="list" id="list" aria-label="決定点の一覧"></aside>
-  <section class="detail" id="detail"></section>
+  <section>
+    <div class="mat" id="mat"></div>
+  </section>
+  <aside class="panel">
+    <div class="box verdict" id="verdict"></div>
+    <div class="box" id="candbox"></div>
+    <div class="box" id="evbox" hidden></div>
+    <details class="box list" id="listbox" open><summary>決定点の一覧</summary><div class="dl" id="list"></div></details>
+    <div class="box legend">
+      <strong>読み方</strong>
+      <dl>
+        <dt><span class="sw" style="background:var(--arrow-s)"></span>探索</dt><dd>CPU が実際に打った手。盤面では青緑の枠と矢印。</dd>
+        <dt><span class="sw" style="background:var(--arrow-t)"></span>理論</dt><dd>同じ候補を理論で値付けして一番高い手。盤面では橙の枠と矢印。</dd>
+        <dt><span class="sw" style="background:var(--arrow-b)"></span>戦闘中</dt><dd>守りの窓など、攻撃の途中の決定点で攻撃側と対象を赤で結ぶ。</dd>
+        <dt>理論の値</dt><dd>単位は「手札 1 枚ぶんの価値」（枚）。差は打った手 − 理論の最善で、負なら理論はその手を損と読んでいる。</dd>
+        <dt>候補</dt><dd>行を押すと、その手を盤面に灰色の矢印で重ねる。カードを押すと拡大。</dd>
+        <dt>盤面</dt><dd>下が p1、上が p2。手番側の半分が明るい。完全情報なので両者の手札が見える。横向きはレスト、紫の数字は付与ドン。</dd>
+      </dl>
+    </div>
+    <label class="chk sub">別の棋譜 JSON を開く <input type="file" id="file" accept=".json,application/json"></label>
+  </aside>
 </main>
-
-<section class="card legend" style="margin-top:16px">
-  <strong>読み方</strong>
-  <dl>
-    <dt>探索</dt><dd>CPU（MCTS）が実際に打った手。候補表では <span class="pill search">探索</span>、n は訪問数、q は探索の平均価値。</dd>
-    <dt>理論</dt><dd>同じ候補を理論の価格式で値付けした値。単位は「手札 1 枚ぶんの価値」（枚）。候補表で最も高い手が <span class="pill theory">理論の最善</span>。</dd>
-    <dt>差</dt><dd>打った手の価格 − 理論の最善の価格。負なら理論は打った手を損と読んでいる（<span class="pill bad">食い違い</span>）。大きさは手札何枚ぶんか。</dd>
-    <dt>付与の読み</dt><dd>ドンを付けるだけの手は「その札がこのターンに最終的に何枚乗せて殴る攻撃」の価格で読む（実行の折り返し先を「→ #番号」で示す）。</dd>
-    <dt>盤面</dt><dd>完全情報で表示（両席の手札の中身が見える）。手番側の枠が色つき。取り消し線はレスト。</dd>
-  </dl>
-</section>
 </div>
+<div class="zoom" id="zoom" hidden></div>
 
 <script type="application/json" id="trace-data">/*__TRACE_DATA__*/null</script>
+<script type="application/json" id="card-images">/*__CARD_IMAGES__*/null</script>
 <script>
 (function(){
   const $ = s => document.querySelector(s);
-  let DATA = null, gi = 0, di = 0;
-  const famJp = {play:"出す", attack:"攻撃", attach:"付与", effect:"効果", end:"終了"};
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   const fmt = (v, d=2) => (v === null || v === undefined || Number.isNaN(v)) ? "—" : Number(v).toFixed(d);
+  const famJp = {play:"出す", attack:"攻撃", attach:"付与", effect:"効果", end:"終了"};
+  const IMG_BASE = "https://storage.googleapis.com/opcg-images/";
+  let IMAGES = null, DATA = null, gi = 0, di = 0, preview = null;
+  try { IMAGES = JSON.parse(document.getElementById("card-images").textContent.replace(/^\s*\/\*__CARD_IMAGES__\*\//, "") || "null"); } catch(e) { IMAGES = null; }
+  const img = key => IMAGES ? (IMAGES[key] || null) : (key === "__back" ? IMG_BASE + "OPCG_back.png" : key === "__don" ? IMG_BASE + "DON.png" : IMG_BASE + key + ".png");
 
+  // ---- カード ----
+  function cardEl(c, opts){
+    opts = opts || {};
+    if (!c) return "";
+    const src = c.card_id ? img(c.card_id) : null;
+    const face = src ? `<img src="${src}" alt="${esc(c.name)}" loading="lazy" decoding="async">` : `<span class="nm">${esc(c.name)}</span>`;
+    const pw = (opts.power !== false && c.power != null && c.power !== 0) ? `<span class="pw">${c.power}</span>` : "";
+    const dn = c.don ? `<span class="dn">+${c.don}</span>` : "";
+    return `<div class="card${c.rest ? " rest" : ""}" tabindex="0" data-u="${esc(c.u||"")}" data-cid="${esc(c.card_id||"")}" data-name="${esc(c.name)}" title="${esc(c.name)}">${face}${pw}${dn}</div>`;
+  }
+  function backStack(n, key, label, extra){
+    const src = img(key);
+    const face = src ? `<img src="${src}" alt="">` : "";
+    return `<div class="slot" style="border-color:transparent"><div class="stack ${key === "__don" ? "don" : ""}">${n > 0 || extra ? `<div class="card" style="cursor:default">${face}</div>` : ""}<span class="cnt">${extra || n}</span></div><span class="lbl">${label}</span></div>`;
+  }
+  function half(b, seat, d, top){
+    const s = b[seat];
+    const mover = d.seat === seat;
+    const field = [];
+    for (let i = 0; i < 5; i++) field.push(`<div class="slot field">${s.field[i] ? cardEl(s.field[i]) : ""}</div>`);
+    const extraField = s.field.slice(5).map(c => `<div class="slot field">${cardEl(c)}</div>`).join("");
+    const lane1 = `<div class="lane">${backStack(s.life, "__back", "ライフ")}${field.join("")}${extraField}${backStack(s.deck, "__back", "山札")}</div>`;
+    const donTxt = `起${s.don_active}/${s.don_active + s.don_rested}`;
+    const trash = s.trash ? `<div class="slot" style="border-color:transparent" title="トラッシュ ${s.trash} 枚"><div class="stack">${cardEl({card_id: s.trash_top, name: "トラッシュ"}, {power:false})}<span class="cnt">${s.trash}</span></div><span class="lbl">トラッシュ</span></div>`
+                          : `<div class="slot" title="トラッシュ"><span class="lbl">トラッシュ</span></div>`;
+    const lane2 = `<div class="lane">${backStack(0, "__don", `ドン 山${s.don_deck}`, donTxt)}<div class="slot" style="border-color:transparent" title="リーダー">${cardEl(s.leader)}</div><div class="slot" title="ステージ">${s.stage ? cardEl(s.stage, {power:false}) : ""}</div>${trash}</div>`;
+    const hand = `<div><div class="hand">${s.hand.map(c => cardEl(c, {power:false})).join("") || `<span class="handlbl">手札なし</span>`}</div><div class="handlbl">手札 ${s.hand.length}</div></div>`;
+    return `<div class="half${top ? " top" : ""}${mover ? " mover" : ""}" data-seat="${seat}">${lane1}${lane2}${hand}</div>`;
+  }
+
+  // ---- 読み込み ----
   function load(obj){
-    DATA = obj; gi = 0; di = 0;
-    try{ const s = JSON.parse(localStorage.getItem("ttv-pos")||"null"); if (s && s.seed_base === obj.meta?.seed_base && s.gi < obj.games.length){ gi = s.gi; di = s.di; } }catch(e){}
+    DATA = obj; gi = 0; di = 0; preview = null;
+    try{ const s = JSON.parse(localStorage.getItem("ttv2-pos")||"null"); if (s && s.seed_base === obj.meta?.seed_base && s.gi < obj.games.length){ gi = s.gi; di = s.di; } }catch(e){}
     const m = obj.meta || {};
-    $("#meta").textContent = `${obj.games.length} 局・読み ${m.seq||"?"}・sims ${m.sims||"?"}・${m.decks||""}${m.summary ? `・決定点 ${m.summary.n_main} のうち食い違い ${m.summary.n_forbidden}（${Math.round((m.summary.forbid_rate||0)*100)}%）` : ""}`;
+    $("#meta").textContent = `${obj.games.length} 局・読み ${m.seq||"?"}・sims ${m.sims||"?"}${m.summary ? `・決定点 ${m.summary.n_main} のうち食い違い ${m.summary.n_forbidden}（${Math.round((m.summary.forbid_rate||0)*100)}%）` : ""}`;
     const g = $("#game"); g.innerHTML = "";
     obj.games.forEach((G, i) => {
-      const b = G.decisions[0]?.board; const n1 = b?.p1?.leader?.name || G.leaders?.p1, n2 = b?.p2?.leader?.name || G.leaders?.p2;
+      const b = G.decisions[0]?.board;
       const nf = G.decisions.filter(d => d.forbidden).length;
-      const o = document.createElement("option"); o.value = i; o.textContent = `#${G.seed}  ${n1} vs ${n2}  勝者 ${G.winner||"—"}  食い違い ${nf}`; g.appendChild(o);
+      const o = document.createElement("option"); o.value = i;
+      o.textContent = `#${G.seed} ${b?.p1?.leader?.name || G.leaders?.p1} vs ${b?.p2?.leader?.name || G.leaders?.p2}・勝者 ${G.winner||"—"}・食い違い ${nf}`;
+      g.appendChild(o);
     });
     g.value = gi; render();
   }
@@ -176,125 +257,170 @@ kbd{font:inherit;font-size:11px;border:1px solid var(--line);border-bottom-width
     if ($("#onlyMain").checked && d.kind !== "main") return false;
     if ($("#onlyForb").checked && !d.forbidden) return false;
     const thr = parseFloat($("#thr").value);
-    if (thr > 0 && !(d.s_mu !== null && d.s_mu !== undefined && -d.s_mu >= thr)) return false;
+    if (thr > 0 && !(d.s_mu != null && -d.s_mu >= thr)) return false;
     return true;
   }
-  function save(){ try{ localStorage.setItem("ttv-pos", JSON.stringify({seed_base: DATA.meta?.seed_base, gi, di})); }catch(e){} }
+  function save(){ try{ localStorage.setItem("ttv2-pos", JSON.stringify({seed_base: DATA.meta?.seed_base, gi, di})); }catch(e){} }
 
+  // ---- 描画 ----
   function render(){
-    if (!DATA){ $("#detail").innerHTML = `<div class="card empty">上の「JSON を開く」から theory_trace.py の出力を選んでください。</div>`; return; }
-    const G = DATA.games[gi]; const D = G.decisions;
+    if (!DATA){ $("#mat").innerHTML = `<div class="empty" style="color:var(--mat-ink-2)">「別の棋譜 JSON を開く」から theory_trace.py の出力を選んでください。</div>`; return; }
+    const G = DATA.games[gi], D = G.decisions;
     if (di >= D.length) di = 0;
+    const d = D[di];
     // timeline
     const tl = $("#timeline"); tl.innerHTML = "";
-    D.forEach((d, i) => {
+    D.forEach((x, i) => {
       const b = document.createElement("button");
-      b.className = "tick" + (d.kind === "main" ? " main" : "") + (d.forbidden ? " forb" : "") + (d.seat === "p2" ? " p2" : "") + (i === di ? " cur" : "") + (visible(d) ? "" : " hid");
-      b.title = `T${d.turn} ${d.seat} ${d.move}${d.s_mu != null ? ` 差 ${fmt(d.s_mu)}` : ""}`;
-      b.addEventListener("click", () => { di = i; render(); });
+      b.className = "tick" + (x.kind === "main" ? " main" : "") + (x.forbidden ? " forb" : "") + (x.seat === "p2" ? " p2" : "") + (i === di ? " cur" : "") + (visible(x) ? "" : " hid");
+      b.title = `T${x.turn} ${x.seat} ${x.move}${x.s_mu != null ? ` 差 ${fmt(x.s_mu)}` : ""}`;
+      b.setAttribute("aria-label", b.title);
+      b.addEventListener("click", () => go(i));
       tl.appendChild(b);
     });
-    // list
-    const list = $("#list"); list.innerHTML = "";
-    D.forEach((d, i) => {
-      if (!visible(d)) return;
-      const it = document.createElement("div");
-      it.className = "item" + (i === di ? " cur" : "") + (d.forbidden ? " forb" : "");
-      it.innerHTML = `<div class="t">T${d.turn}<br>${d.seat}</div><div class="mv">${esc(d.move)}</div><div class="s mono ${d.s_mu < -1e-9 ? "neg" : ""}">${d.s_mu != null ? fmt(d.s_mu) : ""}</div>`;
-      it.addEventListener("click", () => { di = i; render(); });
-      list.appendChild(it);
-    });
-    const cur = list.querySelector(".item.cur"); if (cur) cur.scrollIntoView({block:"nearest"});
-    const ct = tl.querySelector(".tick.cur"); if (ct) ct.scrollIntoView({inline:"center", block:"nearest"});
-    renderDetail(G, D[di]);
+    const ct = tl.querySelector(".tick.cur"); if (ct) tl.scrollLeft = ct.offsetLeft - tl.clientWidth / 2;
+    // board
+    $("#mat").innerHTML = half(d.board, "p2", d, true) +
+      `<div class="center"><span class="who">ターン ${d.turn}・${d.seat} の番</span><span>${esc(d.phase||"")}</span><span>決定点 ${d.i+1}／${D.length}</span><span>局 #${G.seed}${G.winner ? `・勝者 ${G.winner}` : ""}</span></div>` +
+      half(d.board, "p1", d, false) + `<svg class="arrows" id="arrows" aria-hidden="true"></svg>`;
+    renderPanel(G, d);
+    renderList(D);
+    requestAnimationFrame(() => decorate(d));
     save();
   }
-
-  function side(b, seat, G, d){
-    const s = b[seat]; const mover = d.seat === seat;
-    const chip = (c, hand) => {
-      if (!c) return "";
-      const num = hand ? `<span class="num">${c.cost ?? "-"}c/${c.power ?? "-"}${c.counter ? `/C${c.counter}` : ""}</span>`
-                       : `<span class="num">${c.power ?? "-"}${c.cost != null && c.cost !== 0 ? ` ${c.cost}c` : ""}</span>${c.don ? `<span class="don">+${c.don}D</span>` : ""}${c.kw ? `<span class="kw">${esc(c.kw.join(" "))}</span>` : ""}`;
-      return `<span class="c${c.rest ? " rest" : ""}"><span class="nm">${esc(c.name)}</span>${num}</span>`;
-    };
-    const L = s.leader ? `<span class="c leader${s.leader.rest ? " rest" : ""}"><span class="nm">${esc(s.leader.name)}</span><span class="num">${s.leader.power}</span>${s.leader.don ? `<span class="don">+${s.leader.don}D</span>` : ""}</span>` : "";
-    return `<div class="side${mover ? " mover" : ""}">
-      <h3><span class="who">${seat}${mover ? "（手番）" : ""}</span>${L}${G.winner === seat ? `<span class="pill ok">勝者</span>` : ""}</h3>
-      <div class="stats mono"><span>ライフ ${s.life}</span><span>ドン 起 ${s.don_active}／休 ${s.don_rested}／山 ${s.don_deck}</span><span>山札 ${s.deck}</span><span>トラッシュ ${s.trash}</span>${s.stage ? `<span>ステージ ${esc(s.stage)}</span>` : ""}</div>
-      <div class="zone"><div class="zl">場 ${s.field.length}</div><div class="chips">${s.field.map(c => chip(c,false)).join("") || "<span class='sub'>なし</span>"}</div></div>
-      <div class="zone"><div class="zl">手札 ${s.hand.length}</div><div class="chips">${s.hand.map(c => chip(c,true)).join("") || "<span class='sub'>なし</span>"}</div></div>
-    </div>`;
-  }
-
-  function renderDetail(G, d){
-    if (!d){ $("#detail").innerHTML = `<div class="card empty">決定点がありません。</div>`; return; }
-    const opp = d.seat === "p1" ? "p2" : "p1";
-    let verdict = "";
-    if (d.kind === "main" && d.cands){
-      const best = d.best != null ? d.cands[d.best] : null;
-      const chosen = d.chosen != null ? d.cands[d.chosen] : null;
+  function renderPanel(G, d){
+    const cands = d.cands || null;
+    let v = "";
+    if (d.kind === "main" && cands){
+      const ch = d.chosen != null ? cands[d.chosen] : null, bt = d.best != null ? cands[d.best] : null;
       const agree = d.best != null && d.best === d.chosen;
-      verdict = `<div class="card"><div class="verdict">
-        <span class="pill search">探索</span><span class="big">${esc(chosen ? chosen.d : d.move)}</span>
-        ${best && !agree ? `<span class="pill theory">理論の最善</span><span class="big">${esc(best.d)}</span>` : ""}
-        ${d.s_mu != null ? (d.forbidden ? `<span class="pill bad">食い違い 差 <span class="mono">${fmt(d.s_mu)}</span> 枚</span>` : `<span class="pill ok">一致（差 <span class="mono">${fmt(d.s_mu)}</span>）</span>`) : `<span class="pill muted">判定なし（値付けできる候補が 2 本未満）</span>`}
-      </div></div>`;
+      v = `<div class="vline"><span class="pill search">探索</span><span class="mv">${esc(ch ? ch.d : d.move)}</span></div>` +
+          (bt && !agree ? `<div class="vline"><span class="pill theory">理論</span><span class="mv">${esc(bt.d)}</span></div>` : "") +
+          `<div class="vline">${d.s_mu == null ? `<span class="pill muted">判定なし（値付けできる候補が 2 本未満）</span>` : d.forbidden ? `<span class="pill bad">食い違い・差 <span class="mono">${fmt(d.s_mu)}</span> 枚</span>` : `<span class="pill ok">理論も同じ手</span>`}</div>`;
     } else {
-      verdict = `<div class="card"><div class="verdict"><span class="pill muted">${d.kind === "window" ? "対話の窓（守り・効果の選択）" : d.kind === "commit" ? "箱の続き（機械実行）" : esc(d.kind)}</span><span class="big">${esc(d.move)}</span></div></div>`;
+      const k = d.kind === "window" ? "守り・効果の窓" : d.kind === "commit" ? "箱の続き（機械的に実行）" : (d.kind || "");
+      v = `<div class="vline"><span class="pill muted">${esc(k)}</span><span class="mv">${esc(d.move)}</span></div><div class="sub">この決定点は理論の候補表を作らない（メインフェイズの手だけを値付けしている）。</div>`;
     }
-    const head = `<div class="sub">決定点 ${d.i+1}／${G.decisions.length}・ターン ${d.turn}・${esc(d.phase||"")}・局 #${G.seed}</div>`;
-    const board = `<div style="display:grid;gap:8px">${side(d.board, opp, G, d)}${side(d.board, d.seat, G, d)}</div>`;
-    let table = "";
-    if (d.kind === "main" && d.cands){
-      const order = d.cands.map((c, i) => i).sort((a, b) => {
-        const pa = d.cands[a].p, pb = d.cands[b].p;
-        if (pa == null && pb == null) return 0; if (pa == null) return 1; if (pb == null) return -1; return pb - pa;
+    $("#verdict").innerHTML = v;
+    const cb = $("#candbox");
+    if (d.kind === "main" && cands){
+      const priced = cands.filter(c => c.p != null).map(c => Math.abs(c.p));
+      const pmax = Math.max(0.5, ...priced);
+      const nsum = cands.reduce((a, c) => a + (c.n || 0), 0) || 1;
+      const order = cands.map((c, i) => i).sort((a, b) => {
+        const pa = cands[a].p, pb = cands[b].p;
+        if (pa == null && pb == null) return (cands[b].n||0) - (cands[a].n||0);
+        if (pa == null) return 1; if (pb == null) return -1; return pb - pa;
       });
-      const rows = order.map(i => {
-        const c = d.cands[i];
+      cb.innerHTML = `<div class="legendbars"><span class="lt">理論の値（枚）</span><span class="ls">探索の訪問の割合</span></div><div class="cands">` + order.map(i => {
+        const c = cands[i];
         const marks = [];
         if (i === d.chosen) marks.push(`<span class="pill search">探索</span>`);
         if (i === d.best) marks.push(`<span class="pill theory">理論の最善</span>`);
-        const src = (c.src != null && c.src !== i) ? `<span class="sub">→ 実行は #${c.src+1}</span>` : "";
-        return `<tr class="${i === d.chosen ? "chosen" : ""} ${i === d.best ? "best" : ""}">
-          <td class="mono num">${i+1}</td>
-          <td><div>${esc(c.d)}</div><div class="marks">${marks.join("")}${src}</div></td>
-          <td><span class="fam ${famJp[c.fam] ? c.fam : "other"}">${famJp[c.fam] || esc(c.fam)}</span></td>
-          <td class="mono num">${c.p == null ? "—" : fmt(c.p)}</td>
-          <td class="mono num">${c.n == null ? "—" : Math.round(c.n)}</td>
-          <td class="mono num">${fmt(c.q, 3)}</td></tr>`;
-      }).join("");
-      table = `<div class="card"><div class="tbl"><table><thead><tr><th class="num">#</th><th>候補の手</th><th>型</th><th class="num">理論（枚）</th><th class="num">探索 n</th><th class="num">q</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-    }
-    const ev = d.events && d.events.length ? `<div class="card"><div class="zl sub" style="margin-bottom:4px">打った後に起きたこと</div><div class="ev">${d.events.map(e => `<span>${esc(e)}</span>`).join("")}</div></div>` : "";
-    $("#detail").innerHTML = head + verdict + board + table + ev;
+        if (c.src != null && c.src !== i) marks.push(`<span class="sub">実行は #${c.src+1}</span>`);
+        const tw = c.p == null ? 0 : Math.min(100, Math.abs(c.p) / pmax * 100);
+        const sw = (c.n || 0) / nsum * 100;
+        return `<div class="cand${i === d.chosen ? " chosen" : ""}${preview === i ? " prev" : ""}" tabindex="0" data-i="${i}">
+          <span class="ix mono">${i+1}</span>
+          <div><div class="d"><span class="fam ${famJp[c.fam] ? c.fam : "other"}">${famJp[c.fam] || esc(c.fam)}</span> ${esc(c.d)}</div><div class="marks">${marks.join("")}</div></div>
+          <div class="bars"><div class="bar t${c.p != null && c.p < 0 ? " neg" : ""}"><i style="width:${tw}%"></i><b>${c.p == null ? "—" : fmt(c.p)}</b></div><div class="bar s"><i style="width:${sw}%"></i><b>${Math.round(sw)}%</b></div></div>
+        </div>`;
+      }).join("") + `</div>`;
+      cb.hidden = false;
+      cb.querySelectorAll(".cand").forEach(el => {
+        const f = () => { const i = +el.dataset.i; preview = preview === i ? null : i; cb.querySelectorAll(".cand").forEach(x => x.classList.toggle("prev", +x.dataset.i === preview)); decorate(d); };
+        el.addEventListener("click", f);
+        el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); f(); } });
+      });
+    } else { cb.innerHTML = ""; cb.hidden = true; }
+    const ev = $("#evbox");
+    if (d.events && d.events.length){ ev.innerHTML = `<div class="sub" style="margin-bottom:4px">打った後に起きたこと</div><div class="ev">${d.events.map(e => `<span>${esc(e)}</span>`).join("")}</div>`; ev.hidden = false; }
+    else { ev.hidden = true; }
+  }
+  function renderList(D){
+    const list = $("#list"); list.innerHTML = "";
+    D.forEach((x, i) => {
+      if (!visible(x)) return;
+      const it = document.createElement("div");
+      it.className = "item" + (i === di ? " cur" : "") + (x.forbidden ? " forb" : "");
+      it.innerHTML = `<div class="t">T${x.turn}<br>${x.seat}</div><div class="mv">${esc(x.move)}</div><div class="s mono${x.s_mu < -1e-9 ? " neg" : ""}">${x.s_mu != null ? fmt(x.s_mu) : ""}</div>`;
+      it.addEventListener("click", () => go(i));
+      list.appendChild(it);
+    });
+    const cur = list.querySelector(".item.cur");
+    if (cur && (cur.offsetTop < list.scrollTop || cur.offsetTop > list.scrollTop + list.clientHeight - 30)) list.scrollTop = cur.offsetTop - list.clientHeight / 3;
   }
 
-  function step(dir){
-    if (!DATA) return; const D = DATA.games[gi].decisions;
-    for (let i = di + dir; i >= 0 && i < D.length; i += dir){ if (visible(D[i])) { di = i; render(); return; } }
+  // ---- 枠と矢印 ----
+  function decorate(d){
+    const mat = $("#mat"); const svg = $("#arrows"); if (!mat || !svg) return;
+    mat.querySelectorAll(".card").forEach(el => el.classList.remove("hs","ts","ht","tt","hp","hb"));
+    const find = u => u ? mat.querySelector(`.card[data-u="${CSS.escape(u)}"]`) : null;
+    const lines = [];
+    const mark = (su, tu, a, t, color) => {
+      const s = find(su), g = find(tu);
+      if (s) s.classList.add(a); if (g) g.classList.add(t);
+      if (s && g) lines.push([s, g, color]);
+    };
+    if (d.battle) mark(d.battle.a, d.battle.t, "hb", "hb", "var(--arrow-b)");
+    if (d.cands){
+      if (d.best != null && d.best !== d.chosen){ const c = d.cands[d.best]; mark(c.src != null ? d.cands[c.src]?.su ?? c.su : c.su, c.src != null ? d.cands[c.src]?.tu ?? c.tu : c.tu, "ht", "tt", "var(--arrow-t)"); }
+      if (d.chosen != null){ const c = d.cands[d.chosen]; mark(c.su, c.tu, "hs", "ts", "var(--arrow-s)"); }
+      if (preview != null && d.cands[preview]){ const c = d.cands[preview]; mark(c.su, c.tu, "hp", "hp", "var(--arrow-p)"); }
+    } else {
+      mark(d.su, d.tu, "hs", "ts", "var(--arrow-s)");
+    }
+    const box = mat.getBoundingClientRect();
+    const cs = getComputedStyle(document.documentElement);
+    const col = v => cs.getPropertyValue(v.slice(4, -1)).trim() || "#fff";
+    let html = `<defs>${["--arrow-s","--arrow-t","--arrow-b","--arrow-p"].map(k => `<marker id="m${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${col(`var(${k})`)}"/></marker>`).join("")}</defs>`;
+    for (const [a, b, c] of lines){
+      const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+      const x1 = ra.left + ra.width/2 - box.left, y1 = ra.top + ra.height/2 - box.top;
+      const x2 = rb.left + rb.width/2 - box.left, y2 = rb.top + rb.height/2 - box.top;
+      const k = c.slice(4, -1);
+      const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+      const pad = Math.min(ra.height, rb.height) * 0.3;
+      const sx = x1 + dx/len*pad, sy = y1 + dy/len*pad, ex = x2 - dx/len*pad, ey = y2 - dy/len*pad;
+      const mx = (sx+ex)/2 - dy/len*18, my = (sy+ey)/2 + dx/len*18;
+      html += `<path d="M${sx},${sy} Q${mx},${my} ${ex},${ey}" fill="none" stroke="${col(c)}" stroke-width="3.2" stroke-linecap="round" ${k === "--arrow-p" ? 'stroke-dasharray="6 5"' : ""} marker-end="url(#m${k})" opacity=".95"/>`;
+    }
+    svg.innerHTML = html;
   }
-  function nextForb(){
-    if (!DATA) return; const D = DATA.games[gi].decisions;
-    for (let i = di + 1; i < D.length; i++){ if (D[i].forbidden && visible(D[i])) { di = i; render(); return; } }
-    for (let i = 0; i <= di; i++){ if (D[i].forbidden && visible(D[i])) { di = i; render(); return; } }
-  }
+
+  // ---- 操作 ----
+  function go(i){ di = i; preview = null; render(); }
+  function step(dir){ if (!DATA) return; const D = DATA.games[gi].decisions; for (let i = di + dir; i >= 0 && i < D.length; i += dir){ if (visible(D[i])) { go(i); return; } } }
+  function nextForb(){ if (!DATA) return; const D = DATA.games[gi].decisions;
+    for (let i = di + 1; i < D.length; i++){ if (D[i].forbidden && visible(D[i])) { go(i); return; } }
+    for (let i = 0; i <= di; i++){ if (D[i].forbidden && visible(D[i])) { go(i); return; } } }
   $("#prev").addEventListener("click", () => step(-1));
   $("#next").addEventListener("click", () => step(1));
   $("#nextforb").addEventListener("click", nextForb);
-  $("#game").addEventListener("change", e => { gi = parseInt(e.target.value, 10); di = 0; render(); });
+  $("#game").addEventListener("change", e => { gi = parseInt(e.target.value, 10); go(0); });
   ["onlyMain","onlyForb"].forEach(id => $("#"+id).addEventListener("change", render));
   $("#thr").addEventListener("input", e => { $("#thrv").textContent = Number(e.target.value).toFixed(1); render(); });
   $("#file").addEventListener("change", e => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
-    const r = new FileReader(); r.onload = () => { try { load(JSON.parse(r.result)); } catch(err) { $("#detail").innerHTML = `<div class="card empty">JSON を読めませんでした: ${esc(err.message)}</div>`; } }; r.readAsText(f);
+    const r = new FileReader(); r.onload = () => { try { load(JSON.parse(r.result)); } catch(err) { $("#verdict").innerHTML = `<div class="empty">JSON を読めませんでした: ${esc(err.message)}</div>`; } }; r.readAsText(f);
   });
   document.addEventListener("keydown", e => {
     if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+    if (!$("#zoom").hidden && e.key === "Escape") { $("#zoom").hidden = true; return; }
     if (e.key === "ArrowLeft") step(-1); else if (e.key === "ArrowRight") step(1); else if (e.key === "f") nextForb();
   });
-  const embedded = JSON.parse(document.getElementById("trace-data").textContent.replace(/^\s*\/\*__TRACE_DATA__\*\//, "") || "null");
+  $("#mat").addEventListener("click", e => {
+    const c = e.target.closest(".card[data-cid]"); if (!c || !c.dataset.cid) return;
+    const src = img(c.dataset.cid); if (!src) return;
+    $("#zoom").innerHTML = `<figure><img src="${src}" alt=""><figcaption>${esc(c.dataset.name)}<br><span class="mono" style="opacity:.7">${esc(c.dataset.cid)}</span></figcaption></figure>`;
+    $("#zoom").hidden = false;
+  });
+  $("#zoom").addEventListener("click", () => { $("#zoom").hidden = true; });
+  let rt = null;
+  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { if (DATA) decorate(DATA.games[gi].decisions[di]); }, 80); });
+
+  let embedded = null;
+  try { embedded = JSON.parse(document.getElementById("trace-data").textContent.replace(/^\s*\/\*__TRACE_DATA__\*\//, "") || "null"); } catch(e) { embedded = null; }
   if (embedded) load(embedded); else render();
 })();
 </script>

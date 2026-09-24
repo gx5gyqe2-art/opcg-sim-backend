@@ -75,11 +75,16 @@ def uuid_table(board):
     return table
 
 
+def short(uuid):
+    """uuid の先頭 8 文字（ビューアーが盤面のカードと手の主体・対象を突き合わせる鍵）。"""
+    return str(uuid)[:8] if uuid else None
+
+
 def _card(c, hand=False):
     if not isinstance(c, dict):
         return None
     d = {"name": c.get("name") or c.get("card_id") or "?", "card_id": c.get("card_id"),
-         "cost": c.get("cost"), "power": c.get("power")}
+         "cost": c.get("cost"), "power": c.get("power"), "u": short(c.get("uuid"))}
     if hand:
         d["counter"] = c.get("counter")
     else:
@@ -97,14 +102,17 @@ def compact_side(side, deck_count):
     stage = side.get("stage") or zones.get("stage")
     if isinstance(stage, list):
         stage = stage[0] if stage else None
+    trash = zones.get("trash") or []
     return {
         "leader": _card(side.get("leader")),
         "life": int(side.get("life_count") or len(zones.get("life") or [])),
         "deck": int(deck_count or 0),
         "hand": [_card(c, hand=True) for c in zones.get("hand") or []],
         "field": [_card(c) for c in zones.get("field") or []],
-        "stage": (_card(stage) or {}).get("name") if stage else None,
-        "trash": len(zones.get("trash") or []),
+        "stage": _card(stage) if stage else None,
+        "trash": len(trash),
+        # トラッシュの一番上（最後に置かれた札）——盤面の絵で山の表に出すため
+        "trash_top": (trash[-1].get("card_id") if trash and isinstance(trash[-1], dict) else None),
         "don_active": sum(1 for x in side.get("don_active") or [] if not x.get("attached_to")),
         "don_rested": sum(1 for x in side.get("don_rested") or [] if not x.get("attached_to")),
         "don_deck": int(side.get("don_deck_count") or 0),
@@ -123,6 +131,16 @@ def _nm(table, uuid):
         return "?"
     e = table.get(uuid)
     return e["name"] if e else "?" + str(uuid)[:4]
+
+
+def actors(move):
+    """手の主体と対象の短い uuid `(su, tu)`（盤面の絵で枠を付けるため・無ければ `None`）。"""
+    if not isinstance(move, dict):
+        return None, None
+    p = move.get("payload") or {}
+    su = p.get("uuid") or move.get("card_uuid")
+    tids = list(p.get("target_ids") or [])
+    return short(su), short(tids[0]) if tids else None
 
 
 def describe(move, table):
@@ -173,7 +191,8 @@ def annotate_main(cands, priced, chosen, table, legal, groups, mu=MU):
     for i, (c, p) in enumerate(zip(cands, priced)):
         mv = legal[groups[i]["rep"]] if i < len(groups) and groups[i].get("rep") is not None else None
         price = p.get("price")
-        out.append({"d": describe(mv, table), "fam": SF.move_family(c["sig"]),
+        su, tu = actors(mv)
+        out.append({"d": describe(mv, table), "fam": SF.move_family(c["sig"]), "su": su, "tu": tu,
                     "p": (round(float(price) / mu, 3) if price is not None else None),
                     "n": c.get("n"), "q": (round(float(c["q"]), 3) if c.get("q") is not None else None),
                     "k": c.get("k"), "src": p.get("src_index")})
@@ -217,6 +236,10 @@ def collect(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns
                    "kind": out.get("kind"), "phase": info.get("current_phase"),
                    "board": compact_board(board, json.loads(game.deck_counts_json())),
                    "move": describe(move, table), "events": []}
+            rec["su"], rec["tu"] = actors(move)
+            ab = board.get("active_battle") or None
+            if ab:
+                rec["battle"] = {"a": short(ab.get("attacker_uuid")), "t": short(ab.get("target_uuid"))}
             if out.get("kind") == "main":
                 cands = LT.raw_candidates(game, name, out)
                 groups = out.get("groups") or []

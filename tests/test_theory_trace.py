@@ -61,9 +61,11 @@ def test_uuid_table_covers_both_seats_and_all_zones():
 
 def test_compact_side_keeps_hand_contents_and_counts_unattached_don_only():
     s = TT.compact_side(_board()["players"]["p1"], deck_count=30)
-    assert s["leader"] == {"name": "ルフィ", "card_id": "OP01-001", "cost": None, "power": 5000, "rest": False, "don": 1}
+    assert s["leader"] == {"name": "ルフィ", "card_id": "OP01-001", "cost": None, "power": 5000, "u": "L1",
+                           "rest": False, "don": 1}
     assert s["life"] == 4 and s["deck"] == 30 and s["trash"] == 1 and s["stage"] is None
-    assert s["hand"] == [{"name": "ゾロ", "card_id": "OP01-025", "cost": 3, "power": 5000, "counter": 1000}]
+    assert s["trash_top"] is None                                   # トラッシュの札に card_id が無い
+    assert s["hand"] == [{"name": "ゾロ", "card_id": "OP01-025", "cost": 3, "power": 5000, "u": "H1", "counter": 1000}]
     assert s["field"][0]["rest"] is True and s["field"][0]["don"] == 1 and s["field"][0]["kw"] == ["BLOCKER"]
     assert s["don_active"] == 1 and s["don_rested"] == 1 and s["don_deck"] == 5   # 付与済み d2 は数えない
 
@@ -89,6 +91,21 @@ def test_describe_names_cards_and_don_counts():
     assert TT.describe(None, t) == "?"
 
 
+def test_actors_returns_short_actor_and_target_uuids():
+    assert TT.actors({"action_type": "DON_BOX", "payload": {"uuid": "abcdefghij", "target_ids": ["0123456789"]}}) \
+        == ("abcdefgh", "01234567")
+    assert TT.actors({"kind": "battle", "action_type": "SELECT_COUNTER", "card_uuid": "zzzzzzzzzz"}) == ("zzzzzzzz", None)
+    assert TT.actors({"action_type": "TURN_END"}) == (None, None) and TT.actors(None) == (None, None)
+
+
+def test_compact_side_keeps_the_stage_card_and_the_trash_top_card_id():
+    side = dict(_board()["players"]["p1"])
+    side["zones"] = dict(side["zones"], stage=[{"uuid": "S1", "card_id": "OP01-100", "name": "メリー号"}],
+                         trash=[{"uuid": "T1", "card_id": "OP01-050"}, {"uuid": "T2", "card_id": "OP01-051"}])
+    s = TT.compact_side(side, deck_count=1)
+    assert s["stage"]["name"] == "メリー号" and s["stage"]["u"] == "S1" and s["trash_top"] == "OP01-051"
+
+
 # ---- 3. 決定点の注釈 --------------------------------------------------------------------------------
 
 def _cands():
@@ -110,6 +127,7 @@ def test_annotate_main_marks_best_and_s_in_mu_units_and_tolerates_unpriced():
     assert [c["fam"] for c in out] == ["play", "attack", "end"]
     assert out[0]["p"] == pytest.approx(2.0) and out[1]["p"] == pytest.approx(6.0) and out[2]["p"] is None
     assert out[1]["src"] == 1 and out[0]["src"] is None
+    assert (out[0]["su"], out[0]["tu"]) == ("H1", None) and (out[1]["su"], out[1]["tu"]) == ("C1", "L2")
     assert out[0]["n"] == 10.0 and out[0]["q"] == pytest.approx(0.2)
     assert best == 1 and s_mu == pytest.approx(-4.0) and forbidden is True
 
