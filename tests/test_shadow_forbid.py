@@ -497,3 +497,33 @@ def test_cli_json_includes_the_followup_table_and_strips_the_trace_from_meta(mon
     assert saved["meta"] == {"n_games": 1, "n_dropped": 0}
     assert saved["followups"]["n_attach"] == 1
     assert saved["followups"]["table"]["reread/forbidden"]["atk_later"] == 1.0
+
+
+# ---- 8. T155b: attack_any（同じカードの攻撃候補を枚数を問わず読む）------------------------------
+
+def test_seq_prices_any_mode_reads_the_best_attack_of_the_same_card_whatever_the_don_count():
+    cands = [_c(["DON_BOX", "X", [], [], None], 1),           # 1 枚付ける
+             _c(["DON_BOX", "X", ["L"], [], None], 0),        # 0 枚で殴る
+             _c(["DON_BOX", "X", ["L"], [], None], 3),        # 3 枚乗せて殴る（k を超える）
+             _c(["DON_BOX", "Y", ["L"], [], None], 1)]        # 別のカード
+    priced = [{"price": 0.03}, {"price": 0.20}, {"price": 0.45}, {"price": 0.90}]
+    out_le, n_le, _ = SF.seq_prices(cands, priced, mode="attack_le")
+    out_any, n_any, _ = SF.seq_prices(cands, priced, mode="attack_any")
+    assert out_le[0]["price"] == pytest.approx(0.20) and out_any[0]["price"] == pytest.approx(0.45)
+    assert n_le == n_any == 1
+    assert [p["price"] for p in out_any[1:]] == [0.20, 0.45, 0.90]
+    assert SF._reread_index(cands, 0, priced, mode="attack_any") is True
+
+
+def test_seq_prices_any_mode_still_keeps_the_static_price_when_the_card_has_no_attack_at_all():
+    cands = [_c(["DON_BOX", "X", [], [], None], 1), _c(["DON_BOX", "Y", ["L"], [], None], 4)]
+    priced = [{"price": 0.03}, {"price": 0.30}]
+    out, n_re, _ = SF.seq_prices(cands, priced, mode="attack_any")
+    assert out[0]["price"] == pytest.approx(0.03) and n_re == 0
+    assert SF._reread_index(cands, 0, priced, mode="attack_any") is False
+
+
+def test_set_seq_mode_accepts_attack_any():
+    SF.set_seq_mode("attack_any")
+    assert SF.SEQ_MODE == "attack_any"
+    SF.set_seq_mode("off")

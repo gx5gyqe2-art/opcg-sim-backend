@@ -99,7 +99,8 @@ TOL = 1e-9
 #: `attack_le`＝**同じカード・枚数が同じか少ない攻撃候補の最大価格**（測った後に足した第 2 の読み・T144 §4）／
 #: `attack_le_delta`＝**`attack_le` に、その付与が使うドン k 枚の機会費用 `k·δ` を引く**
 #: （T147a・2026-09-23・新定数ゼロ＝`theory_order.DELTA` を再利用）。
-SEQ_MODES = ("off", "attack", "attack_le", "attack_le_delta")
+#: `attack_any`＝**T155b（2026-09-24）**: 同じカードの攻撃候補を**枚数を問わず**読む（下の `seq_prices`）。
+SEQ_MODES = ("off", "attack", "attack_le", "attack_le_delta", "attack_any")
 SEQ_MODE = "off"
 
 #: **T147a**: `attack_le` と同じ照合規則（`k' ≤ k`）を使うモード（δ 割引の有無だけが違う）。
@@ -152,6 +153,16 @@ def seq_prices(cands, priced, mode=None, delta=None):
     `v ← max{price(c)} − k·δ` として、その `k` 枚を他に回せた機会費用を引く。`δ`（T57 で実測・
     `nu_of` の DON 代替価値と同じ定数）は新しく作らない。
 
+    **`attack_any`**（T155b・2026-09-24・T155 の実測の後に足した第 4 の読み）: 同じカードの攻撃候補の最大価格を
+    **枚数を問わず**読む。根拠は規則と T155 の実測——ドンは 1 ターンのうちに**何度かに分けて**付けられる（箱の生成器は
+    「1 枚付ける」「全部付ける」「攻撃の箱」を別々の決定点に出す）ので、「今 k 枚付ける」手の価値は「このカードが
+    このターンに最終的に何枚乗せて殴るか」で決まり、k 以下に限る理由が無い。T155 で読み替えても禁じられた付与の
+    31%／36% は**理論の最善が同じカード**（枚数が違う攻撃か付与）で、その 100%／100%（攻撃）・49%／64%（付与）が
+    同じターンの後で実際に打たれていた＝「順番」の問題であって「どちらか」ではない。
+    **予告（測る前に書く・T155 と同じ 20 局×2）**: (1) 付与の禁じ率は `attack_le` の 60%／58% から**攻撃自身の
+    禁じ率（49%／41%）±5 ポイント**まで下がる（殺す基準: 55% 超のまま）。(2) 理論の最善が「出す手」の禁じ行
+    （41／58 件・枚数に依らない）は**動かない**。(3) 付与以外の型は 1 行も動かない。
+
     `mode` を省けば `SEQ_MODE` に従う。`delta` を省けば `theory_order.DELTA`。
     戻り値: `(読み替えた priced, 読み替えた件数, 純付与の件数)`。"""
     mode = SEQ_MODE if mode is None else mode
@@ -169,7 +180,7 @@ def seq_prices(cands, priced, mode=None, delta=None):
             n_attach += 1
             k = _k_of(c, 1)
             vs = [pr for kk, pr in atk.get(c["sig"][1], [])
-                  if (kk <= k if match_mode == "attack_le" else kk == k)]
+                  if (True if match_mode == "attack_any" else kk <= k if match_mode == "attack_le" else kk == k)]
             v = (max(vs) - (k * dlt if use_delta else 0.0)) if vs else None
             if v is not None:
                 out.append(dict(p, price=v))
@@ -187,7 +198,7 @@ def _reread_index(cands, i, priced, mode=None):
     c = cands[i]
     k = _k_of(c, 1)
     return any(_is_box_attack(o["sig"]) and o["sig"][1] == c["sig"][1]
-               and (_k_of(o, 0) <= k if match_mode == "attack_le" else _k_of(o, 0) == k)
+               and (True if match_mode == "attack_any" else _k_of(o, 0) <= k if match_mode == "attack_le" else _k_of(o, 0) == k)
                and p["price"] is not None for o, p in zip(cands, priced))
 
 
