@@ -55,6 +55,14 @@ WP `rs-eps-explore`）を足すだけ。`dump_io.py` は**無い列を `None` �
 読める。補助教師の中身は下の `aux_from_ledger` が正本。
 対局メタ（seed・両席のリーダー・両席の型）は part ごとの sidecar `meta_games.json` にも書く（層別の集計用）。
 
+**dump v5**（既定・2026-09-24・P8・`2026-09-24_p8_defender_columns.md`）: v4 の列は 1 バイトも変えず、**守る側の補助教師 2 列**
+（`aux_def(D,6,4)`／`aux_def_row(D,2)`）を足すだけ。`aux_tok`（相手側の活動）の**裏返し**——行の
+視点自身の 6 枠（L ＋場 5）ごとに、次の相手ターンで狙われた回数・ブロックした回数・失ったライフ
+（リーダー枠だけ）・場を離れた先（トラッシュ／手札／デッキ・戦闘か効果かも読める）、行単位で
+そのターンに使ったカウンター・ブロックの回数。**訓練は読まない**（`dump_io.py` の読み込み列に
+無い＝理論の計器専用・学習・生成・serve の挙動は 1 bit も変わらない）。中身は `aux_def_from_ledger`
+が正本。`--no-aux` なら他の補助教師と同じく全 0。
+
 **符号化 v14**（2026-09-11・計画 §20.9・`meta_n_record.json` の `enc_version`＝14）: 列の**名前**は
 1 つも変わらないが、`tokens` が `[22,20]→[22,22]`・`scalars` が `123→127` になる（append-only）。
 `dump_io` が v13 の波を 0 埋めで v14 の形に揃えるので、**波を混ぜて訓練できる**。併せて
@@ -89,7 +97,7 @@ ENC_VERSION_V2 = 13    # dump v2／v3／波 29 まで（v12 ＋ グローバル�
 #: 符号化 v14（2026-09-11・§20.9）。**列の形が変わる唯一の欄**（tokens 22×22・scalars 127）。
 #: `dump_io` は v13 の波を 0 埋めで v14 の形に揃えて読む＝波を混ぜて訓練できる。
 ENC_VERSION_V14 = NL.NR_ENC_VERSION    # 14
-DUMP_VERSION = 4       # v3 ＋ 補助教師の列（aux／aux_tok／aux_mask）＋ deck_kinds 列（§20.8）
+DUMP_VERSION = 5       # v4 ＋ 守る側の補助教師（aux_def／aux_def_row・P8・`2026-09-24_p8_defender_columns.md`）
 #: `--decks` の既定（歴代の波は全て synth＝規約を変えない）。
 DEFAULT_DECKS = "synth"
 
@@ -122,24 +130,51 @@ AUX_POWER_SCALE = 10000.0
 #: 攻撃宣言の action_type（`rules::actions` の `"ATTACK" | "ATTACK_CONFIRM"`）。
 ATTACK_ATS = ("ATTACK", "ATTACK_CONFIRM")
 
+# --- 守る側の補助教師（dump v5・P8・`2026-09-24_p8_defender_columns.md`）------------------------------
+#: `aux_def` の枠（**自分** L ＋ 自分場 5＝`aux_tok` の裏返し）と列。窓は `aux_tok` と同じ
+#: 「この行の後、相手の手番が 1 回終わるまで」（A）。**訓練は読まない**（`dump_io` の読み込み列に
+#: 足していない・理論の計器だけが読む＝学習・生成・serve の挙動は 1 bit も変わらない）。
+AUX_DEF_SLOTS = 6
+#: `left_dest`（体が場を離れた先）の符号: 0=場に残った・1=戦闘で倒れた（トラッシュ）・
+#: 2=効果でトラッシュへ（KO）・3=効果で手札へ（バウンス）・4=効果でデッキへ（戻す効果）。
+#: リーダー枠（枠 0）は場を離れないので常に 0。良し悪しは入れない（起きたことの符号だけ）。
+LEFT_DEST_TRASH_BATTLE, LEFT_DEST_TRASH_EFFECT, LEFT_DEST_HAND, LEFT_DEST_DECK = 1, 2, 3, 4
+AUX_DEF_COLS = ("targeted", "blocked", "life_lost", "left_dest")
+AUX_DEF_DIM = len(AUX_DEF_COLS)             # 4
+#: そのターン全体（窓 A）で自分が払ったカウンター・宣言したブロックの回数（枠に依らない）。
+AUX_DEF_ROW_COLS = ("counters_used", "blocks")
+AUX_DEF_ROW_DIM = len(AUX_DEF_ROW_COLS)     # 2
+#: ブロック宣言・カウンター選択の action_type（`rules::actions` の `ACT_SELECT_BLOCKER`／
+#: `ACT_SELECT_COUNTER`＝台帳では `"SELECT_BLOCKER"`／`"SELECT_COUNTER"`）。
+BLOCK_AT, COUNTER_AT = "SELECT_BLOCKER", "SELECT_COUNTER"
+
 
 def snapshot(game):
     """台帳の 1 枚（`board_json` から補助教師に要る欄だけ抜く）。1 手あたり約 0.2ms。
 
     盤面は動かさない。`power`／`n` は**場のキャラだけ**（リーダー・ステージは含めない）。
+    `hand`／`trash`／`life_ids`＝各席の手札・トラッシュ・ライフの uuid 集合（P8・`2026-09-24_p8_defender_columns.md`）。
+    体が場を離れた先を判定するためだけに持つ（`hand`／`deck`／`trash`／`field`／`life` の
+    5 ゾーンが全てで、`field` に残っていなければこの 3 集合のどれかに入る・無ければ `deck` の
+    残差＝`interact.rs` の named zone 表がこの 5 つだけであることを確認済み）。
     """
     b = json.loads(game.board_json())
     ti = b.get("turn_info") or {}
     out = {"turn": int(ti.get("turn_count") or 0), "tp": ti.get("active_player_id"),
-           "life": {}, "power": {}, "n": {}, "field": {}, "leader": {}, "names": {}}
+           "life": {}, "power": {}, "n": {}, "field": {}, "leader": {}, "names": {},
+           "hand": {}, "trash": {}, "life_ids": {}}
     for nm, p in (b.get("players") or {}).items():
-        field = ((p.get("zones") or {}).get("field")) or []
+        zones = p.get("zones") or {}
+        field = zones.get("field") or []
         leader = p.get("leader") or {}
         out["life"][nm] = int(p.get("life_count") or 0)
         out["power"][nm] = float(sum(int(c.get("power") or 0) for c in field))
         out["n"][nm] = float(len(field))
         out["field"][nm] = [c.get("uuid") for c in field]
         out["leader"][nm] = leader.get("uuid")
+        out["hand"][nm] = {c.get("uuid") for c in (zones.get("hand") or [])}
+        out["trash"][nm] = {c.get("uuid") for c in (zones.get("trash") or [])}
+        out["life_ids"][nm] = {c.get("uuid") for c in (zones.get("life") or [])}
         names = {c.get("uuid"): c.get("name") for c in field}
         if leader.get("uuid"):
             names[leader["uuid"]] = leader.get("name")
@@ -153,6 +188,9 @@ def step_record(name, move, events):
     `eff_src`＝効果イベントの**発生源カードの uuid**（Rust `push_effect_events` の
     `source_uuid`・WP `rs-replace-rest-fix`／計画 §20.8.4-2）。同名のカードが並んでも
     「どの枠が能力を発動したか」を取り違えない（旧実装は `card_name` 一致だった）。
+    `target`＝攻撃宣言（`ATTACK`／`ATTACK_CONFIRM`）の対象 uuid（`payload.target_ids[0]`・
+    P8・`2026-09-24_p8_defender_columns.md`）。それ以外の手では `None`（**今まで捨てていた欄**・`rules/actions.rs` の
+    `apply_game_action` が読む `target_ids` と同じキー）。
     """
     payload = (move.get("payload") or {}) if move else {}
     eff, eff_src = {}, []
@@ -162,10 +200,12 @@ def step_record(name, move, events):
         pl = ev.get("player")
         eff[pl] = eff.get(pl, 0) + 1
         eff_src.append((pl, ev.get("source_uuid")))
-    return {"actor": name,
-            "at": (move.get("action_type") or payload.get("action_type")) if move else None,
+    at = (move.get("action_type") or payload.get("action_type")) if move else None
+    tids = payload.get("target_ids")
+    target = tids[0] if at in ATTACK_ATS and isinstance(tids, list) and tids else None
+    return {"actor": name, "at": at,
             "uuid": (move.get("card_uuid") or payload.get("uuid")) if move else None,
-            "eff": eff, "eff_src": eff_src}
+            "target": target, "eff": eff, "eff_src": eff_src}
 
 
 def turn_segments(snaps, steps):
@@ -281,6 +321,79 @@ def _fill_tok(out, snaps, steps, a0, a1, me, opp, cur):
         j = pos.get(u)
         if j is not None:
             out[j, 2] = 1.0
+
+
+def _fill_def(out, out_row, snaps, steps, a0, a1, me, opp, cur, end):
+    """自分 6 枠（**行の時点**の自分 L ＋ 自分場 5）×[狙われた回数, ブロックした回数,
+    失ったライフ（リーダー枠だけ）, 場を離れた先]（`_fill_tok` の裏返し・P8・`2026-09-24_p8_defender_columns.md`）。
+
+    「狙われた回数」は相手の攻撃宣言の対象 uuid がこの枠（**行の時点**の並び）に一致した回数
+    （`step_record` が積む `target`）。「場を離れた先」は窓の終わり（`end`＝`snaps[a1+1]`）で
+    その uuid がどのゾーンに居るかで判る——`hand`／`trash`／`field` のどれにも無ければ `deck`
+    の残差（`snapshot` の docstring・5 ゾーンの表を確認済み）。**戦闘で倒れたか効果で倒れたか**
+    は「窓の中でこの枠が攻撃の対象になったか」で近似する——**限界**: 対象になって守り切った
+    （ブロック／カウンターで生き残った）体が、同じ窓の中で**別の**効果に倒れても「戦闘」に
+    数える（台帳に「バトルで倒れた」という直接の事象が無いための近似・§18 の限界と同種）。
+    ブロック・カウンターの回数は行の視点（`me`）自身が打った手をそのまま数える。
+    """
+    slots = [cur["leader"][me]] + (list(cur["field"][me]) + [None] * 5)[:5]
+    pos = {u: j for j, u in enumerate(slots) if u}
+    if pos:
+        for k in range(a0, a1 + 1):
+            st = steps[k]
+            if st["actor"] == opp and st["at"] in ATTACK_ATS:
+                j = pos.get(st.get("target"))
+                if j is not None:
+                    out[j, 0] += 1.0
+            elif st["actor"] == me and st["at"] == BLOCK_AT:
+                j = pos.get(st["uuid"])
+                if j is not None:
+                    out[j, 1] += 1.0
+        out[0, 2] = max(0.0, snaps[a0]["life"][me] - snaps[a1 + 1]["life"][me])   # リーダー枠のみ
+        for j, u in enumerate(slots):
+            if j == 0 or not u:
+                continue                                       # リーダー枠は場を離れない・空枠は無視
+            if u in end["field"].get(me, ()):
+                continue                                       # 場に残った（left_dest=0）
+            if u in end["trash"].get(me, ()):
+                out[j, 3] = LEFT_DEST_TRASH_BATTLE if out[j, 0] > 0 else LEFT_DEST_TRASH_EFFECT
+            elif u in end["hand"].get(me, ()):
+                out[j, 3] = LEFT_DEST_HAND
+            else:
+                out[j, 3] = LEFT_DEST_DECK                       # 残差＝デッキへ戻る効果
+    for k in range(a0, a1 + 1):
+        st = steps[k]
+        if st["actor"] != me:
+            continue
+        if st["at"] == COUNTER_AT:
+            out_row[0] += 1.0
+        elif st["at"] == BLOCK_AT:
+            out_row[1] += 1.0
+
+
+def aux_def_from_ledger(snaps, steps, row_step, row_who):
+    """台帳 →（`aux_def [D,6,4]`, `aux_def_row [D,2]`）。`aux_from_ledger` の窓 A の**裏返し**
+    （自分側の被弾・ブロック・場を離れた先・P8・`2026-09-24_p8_defender_columns.md`）。`aux_from_ledger` とは独立に窓を
+    探す（同じ 5 行・意図的な重複——2 つの関数は互いを呼ばず、どちらかを直しても他方の既存の
+    契約・テストに触れない）。行が A に届かない行は全 0（マスクは `aux_mask` をそのまま使う＝
+    同じ窓なので両方に効く）。**訓練は読まない**（`dump_io` の読み込み列には無い）。新定数ゼロ。
+    """
+    D = len(row_step)
+    aux_def = np.zeros((D, AUX_DEF_SLOTS, AUX_DEF_DIM), np.float32)
+    aux_def_row = np.zeros((D, AUX_DEF_ROW_DIM), np.float32)
+    if not steps:
+        return aux_def, aux_def_row
+    segs = turn_segments(snaps, steps)
+    for d in range(D):
+        t = int(row_step[d])
+        me = row_who[d]
+        opp = "p2" if me == "p1" else "p1"
+        a = next((s for s in segs if s["tp"] == opp and s["i1"] >= t), None)
+        if a is None:
+            continue
+        a0, a1 = max(t, a["i0"]), a["i1"]
+        _fill_def(aux_def[d], aux_def_row[d], snaps, steps, a0, a1, me, opp, snaps[t], snaps[a1 + 1])
+    return aux_def, aux_def_row
 
 
 # --- 両方向の ε 探索（dump v4・計画 §20.8.5）--------------------------------
@@ -491,6 +604,10 @@ class _Recorder:
         """台帳 → 行ごとの補助教師（`aux`／`aux_tok`／`aux_mask`）。"""
         return aux_from_ledger(self.snaps, self.steps, self.rows["step"], self.rows["who"])
 
+    def aux_def(self):
+        """台帳 → 行ごとの守る側の補助教師（`aux_def`／`aux_def_row`・P8・`2026-09-24_p8_defender_columns.md`）。"""
+        return aux_def_from_ledger(self.snaps, self.steps, self.rows["step"], self.rows["who"])
+
     def swap(self, game, name, turn, step, out, move):
         """`driver.run_game(swap=…)`＝**観測の後**に実対局へ出す手だけを差し替える（§20.8.5）。
 
@@ -650,6 +767,7 @@ def play_one(seed):
     kj = {"p1": json.dumps(kinds[0] or {}, ensure_ascii=False, separators=(",", ":")),
           "p2": json.dumps(kinds[1] or {}, ensure_ascii=False, separators=(",", ":"))}
     aux, aux_tok, aux_mask = rec.aux()          # dump v4 の追加列（§20.8.2・--no-aux なら全 0）
+    aux_def, aux_def_row = rec.aux_def()        # dump v5 の追加列（P8・`2026-09-24_p8_defender_columns.md`・--no-aux なら全 0）
     # dump v3: tokens／scalars は float16・card_idx は int16 で持つ（cast するだけ・§18.5）
     out = {"tokens": np.array(rows["tokens"], np.float32).astype(DT_V3["tokens"]),
             "pol_si": np.array(pol["si"], np.int16),
@@ -689,7 +807,9 @@ def play_one(seed):
                       "removal_legal_rows": rec.removal_legal_rows}}
     if aux_on:
         out.update({"aux": aux.astype(np.float16), "aux_tok": aux_tok.astype(np.float16),
-                    "aux_mask": aux_mask})
+                    "aux_mask": aux_mask,
+                    # dump v5: 守る側の補助教師（P8・`2026-09-24_p8_defender_columns.md`）。**訓練は読まない**（理論の計器専用）。
+                    "aux_def": aux_def.astype(np.float16), "aux_def_row": aux_def_row.astype(np.float16)})
     return out
 
 
@@ -699,6 +819,7 @@ _POL_KEYS = ("pol_n", "pol_q", "pol_k", "pol_sig", "pol_cid", "pol_tcid", "pol_p
 _TOK_KEYS = ("tokens", "pol_si", "pol_ti")            # NRel 用（v2 で追加・v3 も同じ列）
 _V4_KEYS = ("deck_kinds", "forced", "forced_sig", "pol_v0")   # v4 で追加（§20.8／§20.8.5／§20.8.9／§20.6.1）
 _AUX_KEYS = ("aux", "aux_tok", "aux_mask")            # 補助教師（v4 で追加・§20.8.2）
+_AUX_DEF_KEYS = ("aux_def", "aux_def_row")            # 守る側の補助教師（v5 で追加・P8・`2026-09-24_p8_defender_columns.md`）
 
 
 def main(argv=None):
@@ -724,8 +845,9 @@ def main(argv=None):
                     help="デッキの中身（既定 synth＝歴代の波と同じ規約）。"
                          "synth_roles=除去の型を色ごとに差し込む（教材の対照・§20.8.1）")
     ap.add_argument("--no-aux", action="store_true",
-                    help="補助教師の列（aux／aux_tok／aux_mask・§20.8.2）を書かない＝dump v3 の"
-                         "列だけにする。台帳（1 手 0.2ms の board_json）も積まない")
+                    help="補助教師の列（aux／aux_tok／aux_mask・§20.8.2・aux_def／aux_def_row・"
+                         "P8・`2026-09-24_p8_defender_columns.md`）を書かない＝dump v3 の列だけにする。"
+                         "台帳（1 手 0.2ms の board_json）も積まない")
     ap.add_argument("--eps-play", type=float, default=0.0,
                     help="両方向 ε 探索の「打つ側」（§20.8.5）。木が除去でない手を選んだのに"
                          "候補に除去があれば、確率 P でその中の N 最大へ差し替える（既定 0＝無効）")

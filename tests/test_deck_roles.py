@@ -263,10 +263,20 @@ def test_record_gen_declares_the_v4_column():
     from opcg_sim.loop import record_gen as G
     # v4 の行ごとの追加列は 4 本（`deck_kinds`＝§20.8.1／`forced`＝ε 探索・§20.8.5／`forced_sig`＝
     # 差し替えた手の move_sig・§20.8.9／`pol_v0`＝根の価値の推定・改良方策 π' の材料・§20.6.1）。
-    # 候補ごとの `pol_p` は `_POL_KEYS`。
-    assert G.DUMP_VERSION == 4 and G._V4_KEYS == ("deck_kinds", "forced", "forced_sig", "pol_v0")
+    # 候補ごとの `pol_p` は `_POL_KEYS`。**v4 の列自体は v5（P8・`2026-09-24_p8_defender_columns.md`）でも 1 バイトも変えない**
+    # ——`DUMP_VERSION` は現行版を指す（v4 のときに書かれたこのテストが v5 昇格後も緑であることは
+    # `test_record_gen_declares_the_v5_column` が確かめる）。
+    assert G._V4_KEYS == ("deck_kinds", "forced", "forced_sig", "pol_v0")
     assert "pol_p" in G._POL_KEYS
     assert G.DEFAULT_DECKS == "synth"           # 既定の波の規約は変えない
+
+
+def test_record_gen_declares_the_v5_column():
+    from opcg_sim.loop import record_gen as G
+    # v5 の行ごとの追加列は 2 本（`aux_def`＝守る側 6 枠×4・`aux_def_row`＝そのターンの
+    # カウンター/ブロック回数×2・P8・`2026-09-24_p8_defender_columns.md`）。訓練は読まない（`dump_io` の読み込み列に無い）。
+    assert G.DUMP_VERSION == 5 and G._AUX_DEF_KEYS == ("aux_def", "aux_def_row")
+    assert (G.AUX_DEF_SLOTS, G.AUX_DEF_DIM, G.AUX_DEF_ROW_DIM) == (6, 4, 2)
 
 
 @pytest.mark.cpu_infra
