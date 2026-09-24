@@ -72,6 +72,7 @@ T141 の申し送りどおり `attach` は対象から除く）なら、**その
 import argparse
 import json
 import os
+import random
 import sys
 
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -145,7 +146,8 @@ def expand_replacement(rep_move):
     return None, None
 
 
-def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMILIES, seats=None):
+def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMILIES, seats=None,
+              attach_static=False, arm="theory", rng=None):
     """`driver.run_game(swap=…)` に渡す関数を作る。`stats`（省略可）に介入の実績を積む。
 
     **盤面には触れない**——`out`（探索の結果・候補・π はそのまま）を読むだけで、返す `move` だけが
@@ -156,7 +158,18 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
     `name`・`{"p1","p2"}` の部分集合）。`None` なら**両席**に介入する（T142／T142b の乾式運転と
     1 ビットも変わらない・後方互換）。**両席に同じ理論で介入すると効果が相殺する**（両方が同じ規則で
     「損な手」を避けるので、片方だけが強くなったわけではない）ので、**T18 の勝率判定には必ず 1 席だけ**
-    （`seats={"p1"}` 等）を渡す——`t18_pairs`（下）が seed ごとに `p1`／`p2` を入れ替えて両方測る。"""
+    （`seats={"p1"}` 等）を渡す——`t18_pairs`（下）が seed ごとに `p1`／`p2` を入れ替えて両方測る。
+
+    **T18（2026-09-24・ユーザ決定「(a)＋(c)・暫定」）**:
+    * `attach_static=True`——読み替えられなかった付与（殴れない札への付け・T155 で 100% が攻撃候補の無い札・
+      規則上の価値が無い）も**対象外にしない**。既定 `False`（T144 までと同じ）。
+    * `arm="placebo"`——**同じ行**（理論が禁じた行・同じ除外規則）で、理論の最善ではなく**選んだ手以外の候補を
+      一様に 1 つ**引いて置き換える（`rng`・`random.Random`）。介入の率・型・局面を主腕と揃えたまま「理論が
+      指した先」だけを無作為にする＝2026-09-19 §9 の「プラセボは主条件の率・型に合わせる」を行単位で満たす。
+      新定数ゼロ。既定 `"theory"`。"""
+    if arm not in ("theory", "placebo"):
+        raise ValueError("arm は theory か placebo（%r）" % (arm,))
+    rng = rng or random.Random(0)
     if stats is None:
         stats = {}
     stats.setdefault("n_seen", 0)
@@ -188,12 +201,15 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
         stats["n_forbidden"] += 1
         # **T144**: 付与が攻撃の価格に読み替えられた行（`shadow_forbid.SEQ_MODE` が `off` 以外）は、
         # もう「系列の価値を測れない型」ではないので対象外にしない。読み替えられない付与は今までどおり外す。
-        if row["played_family"] in exempt and not row.get("played_reread"):
+        if row["played_family"] in exempt and not row.get("played_reread") and not attach_static:
             stats["n_exempt"] += 1
             return move
         groups = out.get("groups") or []
         legal = (out.get("stats") or {}).get("legal") or []
         bi = row["best_index"]
+        if arm == "placebo":                                    # **T18**: 同じ行で、選んだ手以外を一様に引く
+            others = [i for i in range(len(groups)) if i != row["chosen_index"]]
+            bi = rng.choice(others) if others else None
         if bi is None or bi >= len(groups):
             stats["n_no_replacement"] += 1
             return move
@@ -219,7 +235,8 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
         stats["n_intervened"] += 1
         stats["interventions"].append({"turn": turn, "step": step, "who": name,
                                        "played_family": row["played_family"],
-                                       "best_family": row["best_family"], "s": row["s"]})
+                                       "best_family": row["best_family"], "s": row["s"],
+                                       "arm": arm, "rep_family": SF.move_family(RG.move_sig(legal[rep]))})
         return new_move
 
     return swap
@@ -295,7 +312,7 @@ _OTHER_SEAT = {"p1": "p2", "p2": "p1"}
 
 
 def t18_pairs(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns=4, worlds=4,
-             theta=THETA, mu=MU, exempt=EXEMPT_FAMILIES):
+             theta=THETA, mu=MU, exempt=EXEMPT_FAMILIES, attach_static=False, arm="theory"):
     """**T148**: 1 つの seed につき **2 局**——理論の介入を **p1 だけ**に入れた局と **p2 だけ**に入れた局
     （`opcg_sim.loop.arena` と同じ「同 seed・席を入れ替えたペア」規約・リーダー対は入れ替わらない）。
     **両席に同じ規則で介入すると効果が相殺する**（`make_swap` の docstring）ので、**片席だけへの介入**が
@@ -313,7 +330,10 @@ def t18_pairs(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_tur
         for intervened in ("p1", "p2"):
             p1, p2 = D.build_pair(db, la, lb, seed, decks_mode)
             stats = {}
-            swap = make_swap(cards, idx2cid, theta, mu, stats, exempt, seats={intervened})
+            # **T18**: プラセボの乱数は (seed, 席) で決まる＝再現できる・主腕と同じ局面列を歩く（CRN）
+            rng = random.Random(int(seed) * 2 + (0 if intervened == "p1" else 1))
+            swap = make_swap(cards, idx2cid, theta, mu, stats, exempt, seats={intervened},
+                             attach_static=attach_static, arm=arm, rng=rng)
             aborted = None
             try:
                 res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, swap=swap,
@@ -322,7 +342,7 @@ def t18_pairs(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_tur
                 aborted = str(exc)
                 res = {"winner": None, "turns": None, "steps": None}
             winner = res.get("winner")
-            games.append({"seed": seed, "intervened": intervened, "winner": winner,
+            games.append({"seed": seed, "intervened": intervened, "arm": arm, "winner": winner,
                          "turns": res.get("turns"), "steps": res.get("steps"), "aborted": aborted,
                          # **`score`**＝介入された席の勝率（`opcg_sim.loop.arena.pair_level_ci` の規約）。
                          # `winner is None`（打ち切り・引き分け）は `void`（母数に入れない・0.5 で埋めない）。
@@ -411,6 +431,10 @@ def build_parser():
     ap.add_argument("--sims", type=int, default=64)
     ap.add_argument("--seq", default="off", choices=SF.SEQ_MODES,
                     help="**T144** 付与を攻撃の価格に読み替えるか（`off` 以外なら、読み替えた付与は対象外にしない）")
+    ap.add_argument("--attach-static", default="off", choices=("on", "off"),
+                    help="**T18**: 読み替えられなかった付与（殴れない札への付け）も介入の対象にする（(c)・既定 off）")
+    ap.add_argument("--arm", default="theory", choices=("theory", "placebo"),
+                    help="**T18**: theory＝理論の最善に置き換える／placebo＝同じ行で選んだ手以外を一様に引く")
     ap.add_argument("--json", default="")
     ap.add_argument("--result", default="",
                     help="**T148**（`n_loop_ops.md` の規約）: `RESULT.json`（機械可読の納品物）を書くパス")
@@ -422,12 +446,13 @@ def main(argv=None):
     SF.set_seq_mode(a.seq)                          # **T144**
     if a.pairs:
         seeds = [a.seed_base + i for i in range(a.pairs)]
-        games = t18_pairs(seeds, a.decks, sims=a.sims)
+        games = t18_pairs(seeds, a.decks, sims=a.sims, attach_static=(a.attach_static == "on"), arm=a.arm)
         summary = summarise_pairs(games)
         out = {"games": games, "summary": summary}
         status = "done" if summary.get("ci") is not None else "no_data"
-        result = {"status": status, "task": "T148", "seed_base": a.seed_base, "pairs": a.pairs,
-                  "decks": a.decks, "seq": a.seq, "summary": summary}
+        result = {"status": status, "task": "T18", "seed_base": a.seed_base, "pairs": a.pairs,
+                  "decks": a.decks, "seq": a.seq, "attach_static": a.attach_static, "arm": a.arm,
+                  "summary": summary}
     else:
         seeds = [a.seed_base + i for i in range(a.games)]
         games = dry_run(seeds, a.decks, sims=a.sims)

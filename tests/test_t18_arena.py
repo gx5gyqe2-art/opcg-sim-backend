@@ -20,6 +20,7 @@
 import os
 import sys
 
+import json
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
@@ -394,7 +395,7 @@ def test_cli_pairs_flag_reaches_t18_pairs_and_writes_result_json(monkeypatch, tm
     assert captured["seeds"] == [70000, 70001] and captured["decks_mode"] == "user"
     import json
     saved = json.loads(result_json.read_text(encoding="utf-8"))
-    assert saved["status"] == "done" and saved["task"] == "T148"
+    assert saved["status"] == "done" and saved["task"] == "T18"
     assert saved["summary"]["n_pairs"] == 2
 
 
@@ -448,3 +449,109 @@ def test_cli_seq_flag_reaches_shadow_forbid(monkeypatch):
     TA.main(["--games", "1", "--seed-base", "60000"])
     TA.main(["--games", "1", "--seed-base", "60000", "--seq", "attack_le"])
     assert seen == ["off", "attack_le"]
+
+
+# ---- 5. T18: 読み替えられない付与も対象にする（attach_static）／プラセボの腕 ---------------------
+
+def _forbidden_attach_setup(monkeypatch):
+    """純付与（禁じられる・読み替え無し）と出す手が 2 本並ぶ行。既定では attach は対象外。"""
+    sigs = [["DON_BOX", "u1", [], [], None], ["PLAY", "u3", [], [], None]]
+    cands = _cands(*sigs)
+    legal = [{"action_type": "DON_BOX", "payload": {"uuid": "u1"}},
+            {"action_type": "PLAY", "payload": {"uuid": "u3"}}]
+    groups = [{"rep": 0, "n": 1.0, "q": 0.0}, {"rep": 1, "n": 1.0, "q": 0.0}]
+    out = _out(groups, legal, sig=sigs[0], k=None)
+    monkeypatch.setattr(LT, "raw_row", lambda game, name: (_SC, _TOK, _CI))
+    monkeypatch.setattr(LT, "raw_candidates", lambda game, name, out_: cands)
+    monkeypatch.setattr(LT, "price_candidates",
+                        lambda sc, tok, ci, cards, idx2cid, cands_, theta, mu:
+                            [dict(c, price=p) for c, p in zip(cands_, (0.05, 0.40))])
+    return legal, out
+
+
+def test_swap_attach_static_intervenes_on_an_unreread_attach(monkeypatch):
+    legal, out = _forbidden_attach_setup(monkeypatch)
+    stats = {}
+    swap = TA.make_swap(cards=None, idx2cid=None, stats=stats)                       # 既定＝対象外
+    assert swap(game=None, name="p1", turn=1, step=0, out=out, move=legal[0]) is legal[0]
+    assert stats["n_exempt"] == 1 and stats["n_intervened"] == 0
+    stats = {}
+    swap = TA.make_swap(cards=None, idx2cid=None, stats=stats, attach_static=True)   # (c)
+    got = swap(game=None, name="p1", turn=1, step=0, out=out, move=legal[0])
+    assert got is legal[1] and stats["n_exempt"] == 0 and stats["n_intervened"] == 1
+    assert stats["interventions"][0]["arm"] == "theory" and stats["interventions"][0]["rep_family"] == "play"
+
+
+def test_swap_placebo_replaces_with_a_uniformly_drawn_other_candidate_on_the_same_rows(monkeypatch):
+    import random
+    sigs = [["ATTACK", "u1", ["u2"], [], None], ["PLAY", "u3", [], [], None], ["PLAY", "u4", [], [], None]]
+    cands = _cands(*sigs)
+    legal = [{"action_type": "ATTACK", "payload": {"uuid": "u1", "target_ids": ["u2"]}},
+            {"action_type": "PLAY", "payload": {"uuid": "u3"}}, {"action_type": "PLAY", "payload": {"uuid": "u4"}}]
+    groups = [{"rep": i, "n": 1.0, "q": 0.0} for i in range(3)]
+    monkeypatch.setattr(LT, "raw_row", lambda game, name: (_SC, _TOK, _CI))
+    monkeypatch.setattr(LT, "raw_candidates", lambda game, name, out_: cands)
+    monkeypatch.setattr(LT, "price_candidates",
+                        lambda sc, tok, ci, cards, idx2cid, cands_, theta, mu:
+                            [dict(c, price=p) for c, p in zip(cands_, (0.10, 0.30, 0.20))])   # 最善は u3
+    picks = set()
+    for k in range(20):
+        out = _out(groups, legal, sig=sigs[0], k=None)
+        stats = {}
+        swap = TA.make_swap(cards=None, idx2cid=None, stats=stats, arm="placebo", rng=random.Random(k))
+        got = swap(game=None, name="p1", turn=1, step=0, out=out, move=legal[0])
+        assert got is not legal[0] and got in (legal[1], legal[2])       # 選んだ手以外のどれか
+        assert stats["n_intervened"] == 1 and stats["interventions"][0]["arm"] == "placebo"
+        picks.add(legal.index(got))
+    assert picks == {1, 2}                                                # 一様に引く＝両方出る
+    # 禁じられていない行では主腕と同じく介入しない（同じ行だけがプラセボの対象）
+    out = _out(groups, legal, sig=sigs[1], k=None)
+    stats = {}
+    swap = TA.make_swap(cards=None, idx2cid=None, stats=stats, arm="placebo", rng=random.Random(0))
+    assert swap(game=None, name="p1", turn=1, step=0, out=out, move=legal[1]) is legal[1]
+    assert stats["n_intervened"] == 0
+
+
+def test_make_swap_rejects_an_unknown_arm():
+    with pytest.raises(ValueError):
+        TA.make_swap(cards=None, idx2cid=None, arm="なにか")
+
+
+def test_t18_pairs_threads_arm_and_attach_static_and_records_the_arm(monkeypatch):
+    seen = []
+    orig = TA.make_swap
+
+    def spy_make_swap(*a, **kw):
+        seen.append((kw.get("arm"), kw.get("attach_static"), kw.get("seats"), kw.get("rng") is not None))
+        return orig(*a, **kw)
+
+    monkeypatch.setattr(TA, "make_swap", spy_make_swap)
+    monkeypatch.setattr(TA.D, "load_db", lambda: object())
+    monkeypatch.setattr(TA.D, "leader_pair", lambda db, seed, mode: ("la", "lb"))
+    monkeypatch.setattr(TA.D, "build_pair", lambda db, la, lb, seed, decks: ("p1_deck", "p2_deck"))
+    monkeypatch.setattr(TA.E, "engine", lambda: None)
+    monkeypatch.setattr(TA.E, "SeatSpec", lambda *a, **k: object())
+    monkeypatch.setattr(TA.DR, "run_game", lambda *a, **k: {"winner": "p2", "turns": 9, "steps": 70})
+    monkeypatch.setattr(TA.PL, "Cards", lambda: None)
+    monkeypatch.setattr(TA.GA, "_vocab", lambda: {})
+    games = TA.t18_pairs([5], "synth_roles", sims=4, attach_static=True, arm="placebo")
+    assert seen == [("placebo", True, {"p1"}, True), ("placebo", True, {"p2"}, True)]
+    assert [g["arm"] for g in games] == ["placebo", "placebo"]
+
+
+def test_cli_arm_and_attach_static_reach_t18_pairs_and_the_result(monkeypatch, tmp_path):
+    captured = {}
+
+    def fake_t18_pairs(seeds, decks_mode, sims=64, **kw):
+        captured.update(kw)
+        return [_pgame(s, side, "p1") for s in seeds for side in ("p1", "p2")]
+
+    monkeypatch.setattr(TA, "t18_pairs", fake_t18_pairs)
+    res = tmp_path / "RESULT.json"
+    rc = TA.main(["--pairs", "2", "--seed-base", "1300000", "--decks", "synth_roles", "--seq", "attack_any",
+                  "--attach-static", "on", "--arm", "placebo", "--result", str(res)])
+    assert rc == 0 and captured == {"attach_static": True, "arm": "placebo"}
+    saved = json.loads(res.read_text(encoding="utf-8"))
+    assert saved["task"] == "T18" and saved["arm"] == "placebo" and saved["attach_static"] == "on"
+    assert saved["seq"] == "attack_any" and SF.SEQ_MODE == "attack_any"
+    SF.set_seq_mode("off")
