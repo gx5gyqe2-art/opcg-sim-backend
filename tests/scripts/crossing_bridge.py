@@ -1185,8 +1185,10 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
 #: P4 最上位分位の相手の τ の残差（6.87／4.42）が **約 1 縮む**（殺す基準: 0.5 未満＝その帯は別の欠陥）／
 #: P5 較正の観察（予告ではない）: 尺度 `s = √(τ_me²+τ_opp²)` が縮むぶん p は極端になる＝優勢／劣勢の
 #:    |gap| は**両側とも同じ向きに**動く（反対称は保たれる）。幅の作り直し（σ）は次の T。
+#: **既定は `game`（2026-09-24 採用・ユーザ決定「1は規定で」）**。`walk` は T152 以前の数字との対照。
+#: 較正（σ_rel の固定表）は次の T で新しい既定の上で作り直す（それまで対数損失は借り物の σ で読まれる）。
 SCHED_T1_MODES = ("walk", "game")
-SCHED_T1_MODE = "walk"
+SCHED_T1_MODE = "game"
 
 
 def set_sched_t1_mode(mode):
