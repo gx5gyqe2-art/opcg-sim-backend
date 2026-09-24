@@ -407,6 +407,24 @@ def settled_map(dirs, limit_games=0, with_don=True):
     return out
 
 
+def first_declared_turn(settled):
+    """**T151-3**: `settled_map` の `{(seed, w, t): declared}` から**局ごとの最初の宣言ターン** `{seed: t*}` を
+    作る（**どちらの席が宣言したかを問わない**・`min`）。`crossing_bridge --pre-settle game` が「t ≥ t* の行を
+    **両席とも**落とす」ために読む。宣言の無い局は載らない（＝その局は 1 行も落ちない）。
+
+    **なぜ要るか**: `on` は宣言した席の `(seed, w, t)` だけを落とすので、優勢側の「詰められる」行は消えるのに
+    劣勢側の鏡の行（同じ局面を反対から見た行）は残る＝標本が席で非対称になる（T145 §2 が帳簿で見つけた
+    「片方の席の行だけを抜くと残った側に偏る」と同じ話を、較正の行にも当てる）。**新定数ゼロ**。"""
+    out = {}
+    for (seed_g, _w, t), declared in settled.items():
+        if not declared:
+            continue
+        t = int(t)
+        if seed_g not in out or t < out[seed_g]:
+            out[seed_g] = t
+    return out
+
+
 def collect(dirs, limit_games=0, with_don=True, dump=None):
     """記録を 1 度読んで決着の指標と内訳を出す。守り手の手札は**相手席の直近の自席ターンの最後の行**から読む。
     `dump` に list を渡すと**宣言した行と勝者の最後のターンの全内訳**を積む（診断用・取りこぼしも読める）。"""

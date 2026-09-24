@@ -134,6 +134,9 @@ def rows_with_p(rows_out, slope="theory", sigma_rel=None, w_err="rel"):
         out.append({"p": float(pi), "z": float(z), "d": float(d), "won": bool(r["won"]),
                     "j_me": int(r["j_me"]), "stage": stage_of(r["j_me"]),
                     "seed": r.get("seed"), "who": r.get("who"),
+                    # **T151-1**: 絶対のターン番号と、行が読んだ 2 つの時計（`seat_pair_symmetry` が
+                    # 相手の次の行と組にして恒等式 `d_w(t)+d_{1−w}(t+1) = τ_opp(w,t) − τ_me(1−w,t+1)` を検算する）
+                    "t": r.get("t"), "j_opp": r.get("j_opp"), "tau_me": float(tm), "tau_opp": float(to),
                     # **T149b**: `s`＝`theory_order.clock_scale`（`W(D)` の物差しがそのまま使う残り時間の尺度）
                     "s": float(TO.clock_scale(tm, to))})
     return out
@@ -412,11 +415,14 @@ def streak_by_volatility_table(rows, n_q=STREAK_QUANTILES):
     return {"n": len(late_fav), "median_v_opp": med, "bands": bands}
 
 
-def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel"):
-    """記録を 1 度読み（決着前だけ）、優勢／劣勢・序盤〜終盤で割った較正を返す。"""
+def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel", pre_settle="on"):
+    """記録を 1 度読み（決着前だけ）、優勢／劣勢・序盤〜終盤で割った較正を返す。
+
+    **T151-3**: `pre_settle` は `crossing_bridge.PRE_SETTLE_MODES` のどれか（既定 `on`＝従来・`game`＝どちらかの
+    席の最初の宣言ターン以降を両席とも落とす・`off`＝全行）。"""
     old = CB.PRE_SETTLE_MODE
     try:
-        CB.set_pre_settle_mode("on")
+        CB.set_pre_settle_mode(pre_settle)
         rows_out, _ledger, stats, _th, _tc = CB.collect(dirs, limit_games, THETA, MU, "const")
     finally:
         CB.set_pre_settle_mode(old)
@@ -427,6 +433,11 @@ def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel"):
     fs = favorite_split(rows)
     ss = stage_split(rows)
     return {"games": stats.get("games"), "n": len(rows), "sigma_rel": sigma_rel, "w_err": w_err,
+           "pre_settle": pre_settle,
+           # **T151**: 両席の行をまとめた mean p／mean z（完全情報で対称なら mean p ≈ 0.5）と優勢側の行の比率
+           "overall": {"mean_p": float(np.mean([r["p"] for r in rows])) if rows else None,
+                       "mean_z": float(np.mean([r["z"] for r in rows])) if rows else None,
+                       "favorite_share": (sum(1 for r in rows if r["p"] > 0.5) / len(rows)) if rows else None},
            "favorite_split": fs,
            "favorite_signed_gap": gap_of(fs["favorite"]["score"]),
            "underdog_signed_gap": gap_of(fs["underdog"]["score"]),
@@ -455,9 +466,11 @@ def main(argv=None):
     ap.add_argument("--slope", default="theory")
     ap.add_argument("--sigma-rel", type=float, default=None)
     ap.add_argument("--w-err", default="rel", choices=("abs", "rel"))
+    ap.add_argument("--pre-settle", default="on", choices=CB.PRE_SETTLE_MODES,
+                    help="**T151-3** `on`（従来・宣言した席の行だけ除く）／`game`（両席とも除く）／`off`")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
-    out = collect(a.src, a.games, a.slope, a.sigma_rel, a.w_err)
+    out = collect(a.src, a.games, a.slope, a.sigma_rel, a.w_err, a.pre_settle)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:

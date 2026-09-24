@@ -1655,3 +1655,48 @@ def test_pre_settle_on_reads_the_settled_map_once(monkeypatch):
     finally:
         CB.set_pre_settle_mode("off")
     assert calls == [(["x"], 5)]
+
+
+# ---- T151-3: 局単位の決着前フィルタ（pre_settle=game） ------------------------------------------
+#
+# `on` は宣言した席の `(seed, w, t)` だけを落とす＝優勢側の「詰められる」行は消えるのに劣勢側の鏡の行は残る。
+# `game` は**どちらかの席**の最初の宣言ターン `t*` 以降を**両席とも**落とす。判定は純関数 `pre_settle_skip`。
+
+_SETTLED = {(9, 0, 1): False, (9, 1, 2): False, (9, 0, 3): False, (9, 1, 4): True, (9, 0, 5): True}
+_FIRST = {9: 4}
+
+
+def test_pre_settle_skip_off_never_drops():
+    assert not CB.pre_settle_skip("off", _SETTLED, _FIRST, 9, 1, 4)
+    assert not CB.pre_settle_skip("on", None, None, 9, 1, 4)     # 地図が無ければ落とさない
+
+
+def test_pre_settle_skip_on_drops_only_the_declaring_seat_row():
+    assert CB.pre_settle_skip("on", _SETTLED, _FIRST, 9, 1, 4)
+    assert not CB.pre_settle_skip("on", _SETTLED, _FIRST, 9, 0, 3)   # 席 0 の 3 は残る（鏡の行）
+    assert not CB.pre_settle_skip("on", _SETTLED, _FIRST, 9, 0, 1)
+
+
+def test_pre_settle_skip_game_drops_both_seats_from_the_first_declared_turn():
+    assert CB.pre_settle_skip("game", _SETTLED, _FIRST, 9, 1, 4)
+    assert CB.pre_settle_skip("game", _SETTLED, _FIRST, 9, 0, 5)
+    assert CB.pre_settle_skip("game", _SETTLED, _FIRST, 9, 0, 7)      # 宣言の無い後のターンも落ちる（t ≥ t*）
+    assert not CB.pre_settle_skip("game", _SETTLED, _FIRST, 9, 0, 3)  # t* より前は両席とも残る
+    assert not CB.pre_settle_skip("game", _SETTLED, _FIRST, 8, 0, 9)  # 宣言の無い局は 1 行も落ちない
+
+
+def test_pre_settle_game_reads_the_settled_map_once_and_derives_the_first_turn(monkeypatch):
+    import lethal_rule as LR
+    calls = []
+    monkeypatch.setattr(LR, "settled_map", lambda dirs, limit_games: calls.append((dirs, limit_games)) or dict(_SETTLED))
+    firsts = []
+    real_first = LR.first_declared_turn
+    monkeypatch.setattr(LR, "first_declared_turn", lambda s: firsts.append(1) or real_first(s))
+    monkeypatch.setattr(CB.PL, "iter_games", lambda *a, **k: iter([]))
+    try:
+        CB.set_pre_settle_mode("game")
+        CB.collect(["x"], 3)
+    finally:
+        CB.set_pre_settle_mode("off")
+    assert calls == [(["x"], 3)] and firsts == [1]
+    assert "game" in CB.PRE_SETTLE_MODES

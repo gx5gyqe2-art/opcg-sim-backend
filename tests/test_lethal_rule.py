@@ -342,3 +342,23 @@ def test_collect_dump_still_carries_life_counter_alongside_the_row_details(monke
     assert winner_row["life_counter"] == 777.0
     assert out["false_rows_sample"] == [{"seed": 303, "w": 1, "t": 1, "t_end": 2, "life": 5.0}]
     assert "life_counter" not in out["false_rows_sample"][0]
+
+
+# ---- 9. 局ごとの最初の宣言ターン（T151-3・first_declared_turn） -----------------------------------
+#
+# `--pre-settle game` は「どちらかの席が最初に宣言したターン以降を**両席とも**落とす」。
+# `on` は宣言した席の行だけを落とすので、優勢側の行が消えても劣勢側の鏡の行が残る（標本が席で非対称）。
+
+def test_first_declared_turn_takes_the_min_over_both_seats():
+    settled = {(7, 0, 1): False, (7, 1, 2): False, (7, 0, 5): True, (7, 1, 4): True, (7, 0, 7): True}
+    assert LR.first_declared_turn(settled) == {7: 4}           # 席 1 の 4 が席 0 の 5 より早い
+
+
+def test_first_declared_turn_omits_games_without_a_declaration():
+    settled = {(1, 0, 1): False, (1, 1, 2): False, (2, 0, 3): True}
+    out = LR.first_declared_turn(settled)
+    assert out == {2: 3} and 1 not in out                        # 宣言の無い局は載らない＝1 行も落ちない
+
+
+def test_first_declared_turn_is_a_pure_function_of_the_map():
+    assert LR.first_declared_turn({}) == {}

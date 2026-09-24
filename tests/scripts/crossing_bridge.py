@@ -1863,7 +1863,10 @@ def predict(theta_me, theta_opp, slope_me, slope_opp):
 #: の行だけ除いて作るか。**T80 の「最後のターンを落とすと数字の 2〜3 割が消える」を、
 #: 目分量の 1 ターンではなく規則の決着点で正確に切る**——`ledger`／`theta_check`／`turn_harm`
 #: （決着の器ではない集計）は対象外。既定 `off`＝従来どおり全行。
-PRE_SETTLE_MODES = ("off", "on")
+#: **T151-3**: `game` は**どちらかの席が最初に宣言したターン `t*` 以降の行を両席とも**落とす
+#: （`lethal_rule.first_declared_turn`）。`on` は宣言した席の行だけを落とすので、優勢側の行が消えても
+#: 劣勢側の鏡の行は残る＝標本が席で非対称になる（T145 §2 の帳簿の話を較正の行にも当てる）。
+PRE_SETTLE_MODES = ("off", "on", "game")
 PRE_SETTLE_MODE = "off"
 
 
@@ -1875,15 +1878,30 @@ def set_pre_settle_mode(mode):
     return PRE_SETTLE_MODE
 
 
+def pre_settle_skip(mode, settled, first_turn, seed_g, w, t):
+    """**T138b／T151-3**: `rows_out` の行 `(seed, w, t)` を決着後として落とすか（**純関数**・`collect` の
+    ループはこれを呼ぶだけ）。`off`＝落とさない／`on`＝**その席**が宣言した行だけ／`game`＝**どちらかの席**の
+    最初の宣言ターン `t*` 以降を**両席とも**（`first_turn = lethal_rule.first_declared_turn(settled)`）。"""
+    if mode == "off" or settled is None:
+        return False
+    if mode == "game":
+        ts = (first_turn or {}).get(seed_g)
+        return ts is not None and int(t) >= int(ts)
+    return bool(settled.get((seed_g, w, t)))
+
+
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     # **T138b**: 決着後の行を `rows_out` から除く（`ledger`／`theta_check`／`turn_harm` は触らない）。
     # **記録をもう 1 度読む**（`lethal_rule` は独立の下請け・`settled_map` の判定式は 1 か所にしか無い）。
     settled = None
-    if PRE_SETTLE_MODE == "on":
+    settled_first = None
+    if PRE_SETTLE_MODE in ("on", "game"):
         import lethal_rule as LR
         settled = LR.settled_map(dirs, limit_games)
+        if PRE_SETTLE_MODE == "game":
+            settled_first = LR.first_declared_turn(settled)   # **T151-3**: 局ごとの最初の宣言ターン
     # **T91**: `deck` なら補充はデッキの中身から（記録の `meta_games.json` の seed で作り直す）。
     # **T102**: `static` でも**検算の側**（`theta_check`）ではデッキの `r` を使うので常に作る
     # ——`Θ` は在庫・`要` は総量なので、**両者を比べるには補充を足さないと単位が揃わない**。
@@ -2410,8 +2428,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             ts = turn_seq[w]; ts_o = turn_seq[1 - w]
             won = z_of[w] > 0.5
             for j, t in enumerate(ts):
-                if settled is not None and settled.get((seed_g, w, t)):
-                    continue                          # **T138b**: 決着後の行は除く（pre_settle）
+                if pre_settle_skip(PRE_SETTLE_MODE, settled, settled_first, seed_g, w, t):
+                    continue                          # **T138b／T151-3**: 決着後の行は除く（pre_settle）
                 me = per_seat[(w, t)]
                 prev_o = [tt for tt in ts_o if tt < t]
                 if not prev_o:
@@ -2815,7 +2833,8 @@ def main(argv=None):
                          "`fixpoint`（切った的で `τ` を引き直して 3 回反復）")
     ap.add_argument("--pre-settle", default=PRE_SETTLE_MODE, choices=PRE_SETTLE_MODES,
                     help="**T138b** `W(D)` の較正が読む行から決着後（`lethal_rule.settled_map`）を除くか: "
-                         "`off`（旧・全行）／`on`（決着前の行だけ）")
+                         "`off`（旧・全行）／`on`（宣言した席の行だけ除く）／"
+                         "`game`（**T151-3** どちらかの席の最初の宣言ターン以降を両席とも除く）")
     add_nu_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
