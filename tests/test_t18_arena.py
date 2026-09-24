@@ -649,3 +649,167 @@ def test_t18_pairs_and_cli_thread_cutoff_and_restrict(monkeypatch, tmp_path):
 
 def test_cutoff_mu_zero_means_the_existing_rounding_only_line():
     assert TA._RESTRICT_SETS[""] is None
+
+
+# ---- 7. T156(a): 読み替えられた純付与を、価格を借りた攻撃そのものへ差し替える ------------------------
+#
+# ユーザ決定（2026-09-24「aでいきましょう」）。理論の最善（または placebo の無作為な引き）が読み替え
+# られた純付与（`shadow_forbid.SEQ_MODE` 下で価格を攻撃候補から借りている）なら、`redirect_reread` で
+# その攻撃候補そのものに差し替える——1 手目（`ATTACH_DON`）だけでなく `commit` の `sig` も攻撃の型に
+# なるので、`commit_step` が残りを機械的に殴りまで進める（`2026-09-24_t18_why.md` の連鎖を断つ）。
+
+def test_redirect_reread_follows_reread_src_when_present():
+    row = {"reread_src": [2, None, None]}
+    assert TA.redirect_reread(row, 0) == 2            # 読み替えられた純付与(0) → 価格の出どころ(2)
+    assert TA.redirect_reread(row, 1) == 1             # None（読み替えなし）→ そのまま
+
+
+def test_redirect_reread_is_a_no_op_without_usable_reread_src():
+    assert TA.redirect_reread({}, 3) == 3                          # キーが無い（SEQ_MODE=off 等）
+    assert TA.redirect_reread({"reread_src": []}, 0) == 0           # 空リスト
+    assert TA.redirect_reread({"reread_src": [1]}, 5) == 5          # index が範囲外
+    assert TA.redirect_reread({"reread_src": [1]}, None) is None    # bi 自体が無い
+
+
+def test_swap_leaves_a_non_reread_best_untouched(monkeypatch):
+    """**対照**: 理論の最善が読み替えられた純付与**ではない**（無関係な出す手）なら、`redirect_reread`
+    は何もしない——次のテスト（最善が読み替え済みの純付与）との対。"""
+    atk_sig = ["DON_BOX", "u1", ["u9"], [], None]            # 実際に選んだ手（index0・k=2）
+    attach_sig = ["DON_BOX", "u1", [], [], None]             # 同じ u1・別の k=1（index1・attack_any で index0 から借りる）
+    play_sig = ["PLAY", "u3", [], [], None]                  # best（index2・読み替えとは無関係）
+    cands = [{"sig": atk_sig, "cid": None, "tcid": None, "si": -1, "ti": -1, "k": 2, "k_raw": 2},
+            {"sig": attach_sig, "cid": None, "tcid": None, "si": -1, "ti": -1, "k": 1, "k_raw": 1},
+            {"sig": play_sig, "cid": None, "tcid": None, "si": -1, "ti": -1, "k": -1, "k_raw": None}]
+    legal = [{"action_type": "DON_BOX", "payload": {"uuid": "u1", "target_ids": ["u9"], "don_k": 2}},
+            {"action_type": "DON_BOX", "payload": {"uuid": "u1", "don_k": 1}},
+            {"action_type": "PLAY", "payload": {"uuid": "u3"}}]
+    groups = [{"rep": 0, "n": 1.0, "q": 0.0}, {"rep": 1, "n": 1.0, "q": 0.0}, {"rep": 2, "n": 3.0, "q": 0.5}]
+    out = _out(groups, legal, sig=atk_sig, k=2)
+    monkeypatch.setattr(LT, "raw_row", lambda game, name: (_SC, _TOK, _CI))
+    monkeypatch.setattr(LT, "raw_candidates", lambda game, name, out_: cands)
+    # played(攻撃)=0.05・純付与(読み替え前・使われない)=0.01・出す手(best)=0.40 → forbidden（s=-0.35）
+    monkeypatch.setattr(LT, "price_candidates",
+                        lambda sc, tok, ci, cards, idx2cid, cands_, theta, mu:
+                            [dict(c, price=p) for c, p in zip(cands_, (0.05, 0.01, 0.40))])
+    SF.set_seq_mode("attack_any")
+    try:
+        stats = {}
+        swap = TA.make_swap(cards=None, idx2cid=None, stats=stats, attach_static=True)
+        got = swap(game=None, name="p1", turn=1, step=0, out=out, move=legal[0])
+    finally:
+        SF.set_seq_mode("off")
+    assert got is legal[2] and stats["n_redirected"] == 0 and stats["interventions"][0]["rep_family"] == "play"
+
+
+def test_swap_redirects_to_the_attack_when_the_theory_s_best_is_the_reread_attach_itself(monkeypatch):
+    # 純付与の読み替え後の価格（0.40・攻撃(index0=0.05)から借りる）が best になる形にする。
+    atk_sig = ["DON_BOX", "u1", ["u9"], [], None]
+    attach_sig = ["DON_BOX", "u1", [], [], None]
+    play_sig = ["PLAY", "u3", [], [], None]
+    cands = [{"sig": play_sig, "cid": None, "tcid": None, "si": -1, "ti": -1, "k": -1, "k_raw": None},
+            {"sig": attach_sig, "cid": None, "tcid": None, "si": -1, "ti": -1, "k": 2, "k_raw": 2},
+            {"sig": atk_sig, "cid": None, "tcid": None, "si": -1, "ti": -1, "k": 2, "k_raw": 2}]
+    legal = [{"action_type": "PLAY", "payload": {"uuid": "u3"}},
+            {"action_type": "DON_BOX", "payload": {"uuid": "u1", "don_k": 2}},
+            {"action_type": "DON_BOX", "payload": {"uuid": "u1", "target_ids": ["u9"], "don_k": 2}}]
+    groups = [{"rep": 0, "n": 1.0, "q": 0.0}, {"rep": 1, "n": 1.0, "q": 0.0}, {"rep": 2, "n": 3.0, "q": 0.5}]
+    out = _out(groups, legal, sig=play_sig, k=None)          # played＝出す手（禁じられる）
+    monkeypatch.setattr(LT, "raw_row", lambda game, name: (_SC, _TOK, _CI))
+    monkeypatch.setattr(LT, "raw_candidates", lambda game, name, out_: cands)
+    # play=0.05（禁じられる）・純付与=読み替え前 0.03（使われない）・攻撃=0.40（純付与が借りる価格の出どころ）
+    monkeypatch.setattr(LT, "price_candidates",
+                        lambda sc, tok, ci, cards, idx2cid, cands_, theta, mu:
+                            [dict(c, price=p) for c, p in zip(cands_, (0.05, 0.03, 0.40))])
+    SF.set_seq_mode("attack_any")
+    try:
+        stats = {}
+        swap = TA.make_swap(cards=None, idx2cid=None, stats=stats, attach_static=True)
+        got = swap(game=None, name="p1", turn=1, step=0, out=out, move=legal[0])
+    finally:
+        SF.set_seq_mode("off")
+    # 理論の最善（index1・読み替え後 0.40）は純付与だが、置き換え先は index2 の攻撃そのもの。
+    # 1 手目は同じ ATTACH_DON でも、commit の sig は攻撃の型（対象つき）＝ commit_step が殴りまで進める。
+    assert got == {"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": "u1"}}
+    assert out["commit"] == [{"kind": "box", "sig": TA.RG.move_sig(legal[2]), "left": 2}]
+    assert stats["n_redirected"] == 1 and stats["n_intervened"] == 1
+    assert stats["interventions"][0]["redirected"] is True
+    assert stats["interventions"][0]["rep_family"] == "attack"
+
+
+class _FixedChoiceRng:
+    """`random.Random` の代わりに常に同じ index を引く（プラセボの折り返しを再現するため）。"""
+
+    def __init__(self, pick):
+        self._pick = pick
+
+    def choice(self, seq):
+        return self._pick
+
+
+def test_swap_placebo_also_redirects_a_reread_attach_it_draws(monkeypatch):
+    atk_sig = ["DON_BOX", "u1", ["u9"], [], None]
+    attach_sig = ["DON_BOX", "u1", [], [], None]
+    play_sig = ["PLAY", "u3", [], [], None]
+    cands = [{"sig": play_sig, "cid": None, "tcid": None, "si": -1, "ti": -1, "k": -1, "k_raw": None},
+            {"sig": attach_sig, "cid": None, "tcid": None, "si": -1, "ti": -1, "k": 2, "k_raw": 2},
+            {"sig": atk_sig, "cid": None, "tcid": None, "si": -1, "ti": -1, "k": 2, "k_raw": 2}]
+    legal = [{"action_type": "PLAY", "payload": {"uuid": "u3"}},
+            {"action_type": "DON_BOX", "payload": {"uuid": "u1", "don_k": 2}},
+            {"action_type": "DON_BOX", "payload": {"uuid": "u1", "target_ids": ["u9"], "don_k": 2}}]
+    groups = [{"rep": 0, "n": 1.0, "q": 0.0}, {"rep": 1, "n": 1.0, "q": 0.0}, {"rep": 2, "n": 3.0, "q": 0.5}]
+    out = _out(groups, legal, sig=play_sig, k=None)
+    monkeypatch.setattr(LT, "raw_row", lambda game, name: (_SC, _TOK, _CI))
+    monkeypatch.setattr(LT, "raw_candidates", lambda game, name, out_: cands)
+    monkeypatch.setattr(LT, "price_candidates",
+                        lambda sc, tok, ci, cards, idx2cid, cands_, theta, mu:
+                            [dict(c, price=p) for c, p in zip(cands_, (0.05, 0.03, 0.40))])
+    SF.set_seq_mode("attack_any")
+    try:
+        stats = {}
+        swap = TA.make_swap(cards=None, idx2cid=None, stats=stats, attach_static=True,
+                            arm="placebo", rng=_FixedChoiceRng(1))     # 純付与(index1)を引かせる
+        got = swap(game=None, name="p1", turn=1, step=0, out=out, move=legal[0])
+    finally:
+        SF.set_seq_mode("off")
+    assert got == {"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": "u1"}}
+    assert out["commit"] == [{"kind": "box", "sig": TA.RG.move_sig(legal[2]), "left": 2}]
+    assert stats["n_redirected"] == 1 and stats["interventions"][0]["arm"] == "placebo"
+
+
+def test_swap_placebo_redirect_that_loops_back_to_the_played_move_counts_as_no_replacement(monkeypatch):
+    """**稀な折り返し**: プラセボが引いた純付与が、たまたま**実際に選んだ手そのもの**（別の k の同じ u1 の
+    攻撃）から価格を借りていた場合、置き換えは打ち回しを変えない＝`n_no_replacement` に数える。"""
+    atk_sig = ["DON_BOX", "u1", ["u9"], [], None]           # 選んだ手そのもの（index0・k=2）
+    attach_sig = ["DON_BOX", "u1", [], [], None]            # 同じ u1・別の k=1（index1・attack_any で index0 から借りる）
+    play_sig = ["PLAY", "u3", [], [], None]                 # best（index2・forbidden を作るためだけの存在）
+    cands = [{"sig": atk_sig, "cid": None, "tcid": None, "si": -1, "ti": -1, "k": 2, "k_raw": 2},
+            {"sig": attach_sig, "cid": None, "tcid": None, "si": -1, "ti": -1, "k": 1, "k_raw": 1},
+            {"sig": play_sig, "cid": None, "tcid": None, "si": -1, "ti": -1, "k": -1, "k_raw": None}]
+    legal = [{"action_type": "DON_BOX", "payload": {"uuid": "u1", "target_ids": ["u9"], "don_k": 2}},
+            {"action_type": "DON_BOX", "payload": {"uuid": "u1", "don_k": 1}},
+            {"action_type": "PLAY", "payload": {"uuid": "u3"}}]
+    groups = [{"rep": 0, "n": 1.0, "q": 0.0}, {"rep": 1, "n": 1.0, "q": 0.0}, {"rep": 2, "n": 3.0, "q": 0.5}]
+    out = _out(groups, legal, sig=atk_sig, k=2)              # played＝攻撃そのもの
+    monkeypatch.setattr(LT, "raw_row", lambda game, name: (_SC, _TOK, _CI))
+    monkeypatch.setattr(LT, "raw_candidates", lambda game, name, out_: cands)
+    # played(攻撃)=0.20・純付与=読み替え後に同じ 0.20 を借りる・best(出す手)=0.35 → forbidden（s=-0.15）
+    monkeypatch.setattr(LT, "price_candidates",
+                        lambda sc, tok, ci, cards, idx2cid, cands_, theta, mu:
+                            [dict(c, price=p) for c, p in zip(cands_, (0.20, 0.01, 0.35))])
+    SF.set_seq_mode("attack_any")
+    try:
+        stats = {}
+        swap = TA.make_swap(cards=None, idx2cid=None, stats=stats, attach_static=True,
+                            arm="placebo", rng=_FixedChoiceRng(1))     # 純付与(index1)を引かせる
+        got = swap(game=None, name="p1", turn=1, step=0, out=out, move=legal[0])
+    finally:
+        SF.set_seq_mode("off")
+    assert got is legal[0]                                    # 実際に選んだ手のまま（打ち回しは不変）
+    assert stats["n_no_replacement"] == 1 and stats["n_intervened"] == 0
+
+
+def test_summarise_pairs_reports_the_redirect_rate():
+    games = [_pgame(1, "p1", "p1", n_seen=10, n_forbidden=4, n_intervened=2), _pgame(1, "p2", "p1")]
+    games[0]["n_redirected"] = 1
+    out = TA.summarise_pairs(games)
+    assert out["n_redirected"] == 1 and out["redirect_rate"] == pytest.approx(0.5)  # 2 件中 1 件

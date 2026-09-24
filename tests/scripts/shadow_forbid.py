@@ -164,26 +164,32 @@ def seq_prices(cands, priced, mode=None, delta=None):
     （41／58 件・枚数に依らない）は**動かない**。(3) 付与以外の型は 1 行も動かない。
 
     `mode` を省けば `SEQ_MODE` に従う。`delta` を省けば `theory_order.DELTA`。
-    戻り値: `(読み替えた priced, 読み替えた件数, 純付与の件数)`。"""
+    戻り値: `(読み替えた priced, 読み替えた件数, 純付与の件数)`。**読み替えた `priced[i]` は
+    `src_index`（価格を借りた攻撃候補の `cands`/`groups` index）を持つ**——T156(a) が `make_swap` で
+    置き換え先をこの攻撃そのものに差し替えるのに使う（下記）。"""
     mode = SEQ_MODE if mode is None else mode
     dlt = float(DELTA if delta is None else delta)
     use_delta = mode == "attack_le_delta"
     match_mode = "attack_le" if mode in _LE_MATCH_MODES else mode
     atk = {}
-    for c, p in zip(cands, priced):
+    for i, (c, p) in enumerate(zip(cands, priced)):
         if p["price"] is None or not _is_box_attack(c["sig"]):
             continue
-        atk.setdefault(c["sig"][1], []).append((_k_of(c, 0), float(p["price"])))
+        atk.setdefault(c["sig"][1], []).append((_k_of(c, 0), float(p["price"]), i))
     out, n_re, n_attach = [], 0, 0
     for c, p in zip(cands, priced):
         if _is_pure_attach(c["sig"]) and p["price"] is not None:
             n_attach += 1
             k = _k_of(c, 1)
-            vs = [pr for kk, pr in atk.get(c["sig"][1], [])
+            vs = [(pr, i) for kk, pr, i in atk.get(c["sig"][1], [])
                   if (True if match_mode == "attack_any" else kk <= k if match_mode == "attack_le" else kk == k)]
-            v = (max(vs) - (k * dlt if use_delta else 0.0)) if vs else None
-            if v is not None:
-                out.append(dict(p, price=v))
+            if vs:
+                pr_max, src_i = max(vs, key=lambda t: t[0])
+                v = pr_max - (k * dlt if use_delta else 0.0)
+                # **T156(a)**: `src_index`＝この価格を借りた攻撃候補（`cands`/`groups` の index）。
+                # `make_swap` がこの付与を置き換え先に選んだとき、付与そのもの（1 手目だけ実行される）
+                # ではなく**この index の実際の攻撃**に差し替えるための手がかり（下記 docstring 追記）。
+                out.append(dict(p, price=v, src_index=src_i))
                 n_re += 1
                 continue
         out.append(p)
@@ -239,6 +245,9 @@ def shadow_row(sc, tok, ci, cards, idx2cid, cands, out, move, theta=THETA, mu=MU
     n_re = 0
     if SEQ_MODE != "off":
         priced, n_re, _n_attach = seq_prices(cands, priced)
+    # **T156(a)**: 候補ごとの `src_index`（読み替えた純付与が価格を借りた攻撃候補の index・
+    # 読み替えていなければ `None`）。`make_swap` が置き換え先をこの攻撃そのものに差し替えるのに使う。
+    reread_src = [p.get("src_index") for p in priced]
     scored = _best(priced)
     if scored is None:
         return None
@@ -275,7 +284,10 @@ def shadow_row(sc, tok, ci, cards, idx2cid, cands, out, move, theta=THETA, mu=MU
            "played_reread": bool(SEQ_MODE != "off" and n_re > 0
                                  and _is_pure_attach(cands[chosen]["sig"])
                                  and _reread_index(cands, chosen, priced)),
-           "n_cands": len(scored)}
+           "n_cands": len(scored),
+           # **T156(a)**: `cands` と同じ長さのリスト。`reread_src[i]` は `cands[i]` が読み替えられた
+           # 純付与なら価格を借りた攻撃候補の index、そうでなければ `None`。
+           "reread_src": reread_src}
 
 
 def collect(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns=4, worlds=4,

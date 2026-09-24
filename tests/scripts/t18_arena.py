@@ -146,6 +146,28 @@ def expand_replacement(rep_move):
     return None, None
 
 
+def redirect_reread(row, bi):
+    """**T156(a)**（2026-09-24・ユーザ決定「aでいきましょう」）: 置き換え先の候補 `bi` が
+    `shadow_forbid.seq_prices` に読み替えられた純付与（`SEQ_MODE` の下で、価格を「同じカードが
+    最終的に何枚乗せて殴る攻撃」から借りている）なら、**その攻撃候補の index**（`row["reread_src"]`）に
+    差し替える。`bi` がそれ以外（生の攻撃・出す手・効果……）か、対象外なら `bi` のまま。
+
+    **理由（`2026-09-24_t18_why.md`・`_t18_why2.md`）**: 純付与の価格は「付けて→（同じターンの後で）
+    殴る」という 2 手の計画の価値。従来は置き換え先をそのまま実行し（`expand_replacement` が先頭の
+    `ATTACH_DON` だけを打ち、殴りは次の決定点の探索に委ねる）——探索が別の手を選べば、次の決定点で
+    また同じ攻撃の価値を借りた付与が「最善」に見え、**同じ未来の攻撃の価値を決定点ごとに何度も計上する
+    連鎖**が起きていた（介入 826 件中 41% が付与への置き換え、うち 89% が同じターンで再介入）。
+    **ここでは価格が指す手（攻撃そのもの）を直接打つ**ので、連鎖の前提（付けた後に必ず殴る）が
+    構造的に保証される。新しい価格式・新しい探索の変更は無い（`seq_prices` が既に計算している
+    `src_index` をそのまま使う・新定数ゼロ）。`arm="placebo"` の無作為な引きにも同じ経路を通す
+    （理論の指した先だけを無作為にする、という T18 のプラセボの設計は変えない）。"""
+    src = row.get("reread_src")
+    if not src or bi is None or bi >= len(src):
+        return bi
+    s = src[bi]
+    return bi if s is None else s
+
+
 def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMILIES, seats=None,
               attach_static=False, arm="theory", rng=None, cutoff=None, restrict=None):
     """`driver.run_game(swap=…)` に渡す関数を作る。`stats`（省略可）に介入の実績を積む。
@@ -174,7 +196,10 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
     * `restrict`（省略可）——**型の組**の集合 `{(played_family, best_family), …}`。渡すと、禁じられた行のうち
       この組に一致する行だけに介入する（一致しない行は `n_exempt` に数える・`attach_static`／`exempt` の判定の
       **後**に効く＝両方の絞り込みが重なってよい）。T155 が「本物の対立」と確認した「付けて殴る vs 手札を出す」
-      を測るときは `restrict={("attach","play")}`。"""
+      を測るときは `restrict={("attach","play")}`。
+
+    **T156(a)（2026-09-24）**: 置き換え先が読み替えられた純付与なら、`redirect_reread` で価格を
+    借りた攻撃候補に差し替える（下記 `swap`）。`stats["n_redirected"]` に件数を積む。"""
     if arm not in ("theory", "placebo"):
         raise ValueError("arm は theory か placebo（%r）" % (arm,))
     rng = rng or random.Random(0)
@@ -183,6 +208,7 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
     stats.setdefault("n_seen", 0)
     stats.setdefault("n_forbidden", 0)
     stats.setdefault("n_exempt", 0)
+    stats.setdefault("n_redirected", 0)
     stats.setdefault("n_box_replacement", 0)
     stats.setdefault("box_completed", 0)
     stats.setdefault("box_broken", 0)
@@ -221,9 +247,17 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
         if arm == "placebo":                                    # **T18**: 同じ行で、選んだ手以外を一様に引く
             others = [i for i in range(len(groups)) if i != row["chosen_index"]]
             bi = rng.choice(others) if others else None
-        if bi is None or bi >= len(groups):
+        bi_drawn = bi                                            # **T156(a)**: 読み替え前（記録用）
+        if bi is not None:
+            bi = redirect_reread(row, bi)
+        # **T156(a)**: 読み替え後に「選んだ手そのもの」へ折り返した（プラセボの無作為な引きだけで
+        # 起こりうる稀な一致・理論の腕では forbidden の前提〔played < best〕と両立しない）なら、
+        # 置き換えても打ち回しが変わらないので「置き換え無し」として数える。
+        if bi is None or bi >= len(groups) or bi == row.get("chosen_index"):
             stats["n_no_replacement"] += 1
             return move
+        if bi != bi_drawn:
+            stats["n_redirected"] += 1
         rep = groups[bi].get("rep")
         if rep is None or rep >= len(legal) or legal[rep] is None:
             stats["n_no_replacement"] += 1
@@ -254,7 +288,9 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
                                        # （訪問数 n・平均価値 q・`raw_candidates` の列）
                                        "chosen_n": ch_c.get("n"), "chosen_q": ch_c.get("q"),
                                        "rep_n": rep_c.get("n"), "rep_q": rep_c.get("q"),
-                                       "n_cands": len(cands)})
+                                       "n_cands": len(cands),
+                                       # **T156(a)**: 置き換え先が読み替えられた純付与から攻撃候補へ折り返されたか
+                                       "redirected": bool(bi != bi_drawn)})
         return new_move
 
     return swap
@@ -321,6 +357,7 @@ def dry_run(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns
                      "box_completed": stats["box_completed"], "box_broken": stats["box_broken"],
                      "n_intervened": stats["n_intervened"],
                      "n_no_replacement": stats["n_no_replacement"],
+                     "n_redirected": stats["n_redirected"],           # **T156(a)**
                      "interventions": stats["interventions"]})
     return games
 
@@ -372,6 +409,7 @@ def t18_pairs(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_tur
                          "box_completed": stats["box_completed"], "box_broken": stats["box_broken"],
                          "n_intervened": stats["n_intervened"],
                          "n_no_replacement": stats["n_no_replacement"],
+                         "n_redirected": stats["n_redirected"],       # **T156(a)**
                          "interventions": stats["interventions"]})   # T18 の分析用（1 件ごとの記録）
     return games
 
@@ -397,10 +435,13 @@ def summarise_pairs(games):
     n_seen = sum(g["n_seen"] for g in games)
     n_forbidden = sum(g["n_forbidden"] for g in games)
     n_intervened = sum(g["n_intervened"] for g in games)
+    n_redirected = sum(g.get("n_redirected", 0) for g in games)      # **T156(a)**
     out = {"n_games": len(games), "n_pairs": len(by_seed), "n_void_pairs": len(void_seeds),
            "void_seeds": void_seeds, "n_scored_pairs": len(pair_scores),
            "n_aborted": n_aborted, "n_no_winner": n_no_winner,
            "n_seen": n_seen, "n_forbidden": n_forbidden, "n_intervened": n_intervened,
+           "n_redirected": n_redirected,
+           "redirect_rate": round(n_redirected / n_intervened, 4) if n_intervened else None,
            "intervene_rate": round(n_intervened / n_seen, 4) if n_seen else None,
            "forbid_rate": round(n_forbidden / n_seen, 4) if n_seen else None}
     if pair_scores:
@@ -424,12 +465,15 @@ def summarise(games):
     box_broken = sum(g.get("box_broken", 0) for g in games)
     n_intervened = sum(g["n_intervened"] for g in games)
     n_no_replacement = sum(g["n_no_replacement"] for g in games)
+    n_redirected = sum(g.get("n_redirected", 0) for g in games)      # **T156(a)**
     return {
         "n_games": len(games), "n_aborted": n_aborted, "n_no_winner": n_no_winner,
         "n_seen": n_seen, "n_forbidden": n_forbidden, "n_exempt": n_exempt,
         "n_box_replacement": n_box_replacement,
         "box_completed": box_completed, "box_broken": box_broken,
         "n_intervened": n_intervened, "n_no_replacement": n_no_replacement,
+        "n_redirected": n_redirected,
+        "redirect_rate": round(n_redirected / n_intervened, 4) if n_intervened else None,
         "intervene_rate": round(n_intervened / n_seen, 4) if n_seen else None,
         "forbid_rate": round(n_forbidden / n_seen, 4) if n_seen else None,
         "turns_mean": round(sum(g["turns"] for g in games if g["turns"] is not None)

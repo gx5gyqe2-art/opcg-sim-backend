@@ -527,3 +527,53 @@ def test_set_seq_mode_accepts_attack_any():
     SF.set_seq_mode("attack_any")
     assert SF.SEQ_MODE == "attack_any"
     SF.set_seq_mode("off")
+
+
+# ---- 9. T156(a): src_index／reread_src（読み替え先の攻撃候補を辿れるようにする）------------------
+#
+# `t18_arena.make_swap` が純付与を置き換え先に選んだとき、付与そのもの（1 手目だけ実行される）ではなく
+# **価格を借りた攻撃候補**に差し替えるための手がかり（`2026-09-24_t18_why.md` の連鎖を断つ・T156(a)）。
+
+def test_seq_prices_records_which_attack_candidate_a_reread_price_was_borrowed_from():
+    cands = [_c(["DON_BOX", "X", [], [], None], 2),           # 純付与 X・2 枚（index 0）
+             _c(["DON_BOX", "X", ["L"], [], None], 2),        # X が 2 枚乗せて殴る（index 1・価格最大）
+             _c(["DON_BOX", "X", ["C"], [], None], 2)]        # 同・別の対象（index 2）
+    priced = [{"price": 0.03}, {"price": 0.30}, {"price": 0.25}]
+    out, n_re, _n_attach = SF.seq_prices(cands, priced)
+    assert out[0]["price"] == pytest.approx(0.30) and out[0]["src_index"] == 1  # 最大価格の候補を指す
+    assert "src_index" not in out[1] and "src_index" not in out[2]              # 攻撃自身は読み替えられない
+    assert n_re == 1
+
+
+def test_seq_prices_any_mode_records_the_source_regardless_of_don_count():
+    cands = [_c(["DON_BOX", "X", [], [], None], 1),           # 1 枚付ける（index 0）
+             _c(["DON_BOX", "X", ["L"], [], None], 0),        # 0 枚で殴る（index 1）
+             _c(["DON_BOX", "X", ["L"], [], None], 3)]        # 3 枚乗せて殴る（index 2・価格最大）
+    priced = [{"price": 0.03}, {"price": 0.20}, {"price": 0.45}]
+    out, _n_re, _n_attach = SF.seq_prices(cands, priced, mode="attack_any")
+    assert out[0]["price"] == pytest.approx(0.45) and out[0]["src_index"] == 2  # k を超えた攻撃を指す
+
+
+def test_seq_prices_no_source_when_the_card_has_no_matching_attack():
+    cands = [_c(["DON_BOX", "X", [], [], None], 1), _c(["DON_BOX", "Y", ["L"], [], None], 4)]
+    priced = [{"price": 0.03}, {"price": 0.30}]
+    out, n_re, _ = SF.seq_prices(cands, priced, mode="attack_any")
+    assert "src_index" not in out[0] and n_re == 0                              # 読み替えられない＝手がかりも無い
+
+
+def test_shadow_row_exposes_reread_src_parallel_to_cands(monkeypatch):
+    sigs = [["DON_BOX", "X", [], [], None], ["DON_BOX", "X", ["L"], [], None], ["PLAY", "u3", [], [], None]]
+    cands = [_c(sigs[0], 2), _c(sigs[1], 2), _c(sigs[2], -1)]
+    cands[2]["k_raw"] = None
+    monkeypatch.setattr(LT, "price_candidates",
+                        lambda sc, tok, ci, cards, idx2cid, cands_, theta, mu:
+                            [dict(c, price=p) for c, p in zip(cands_, (0.03, 0.30, 0.10))])
+    out = {"sig": sigs[0], "k": 2}
+    monkeypatch.setattr(SF, "SEQ_MODE", "off")
+    row_off = SF.shadow_row(_SC, _TOK, _CI, None, None, cands, out, move={})
+    assert row_off["reread_src"] == [None, None, None]      # 読み替えていなければ全て None
+    monkeypatch.setattr(SF, "SEQ_MODE", "attack")
+    row = SF.shadow_row(_SC, _TOK, _CI, None, None, cands, out, move={})
+    assert row["reread_src"] == [1, None, None]              # 純付与(0) は攻撃(1) から価格を借りた
+    assert row["forbidden"] is False and row["played_reread"] is True         # T144 の既存の判定は不変
+    SF.set_seq_mode("off")
