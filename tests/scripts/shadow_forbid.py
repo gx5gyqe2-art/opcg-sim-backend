@@ -272,28 +272,49 @@ def collect(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns
     spec = E.SeatSpec(net, sims=sims, dirichlet_eps=dirichlet_eps, temp_turns=temp_turns,
                       prune_futile=E.GEN_PRUNE_FUTILE, **search)
     db = D.load_db()
-    rows = []
+    rows, trace = [], []
     n_games = n_dropped = 0
     for seed in seeds:
         la, lb = D.leader_pair(db, seed, "random")
         p1, p2 = D.build_pair(db, la, lb, seed, decks_mode)
 
-        def observer(game, name, turn, step, out, move):
+        def observer(game, name, turn, step, out, move, _seed=seed):
             if out.get("kind") != "main":
                 return
             sc, tok, ci = LT.raw_row(game, name)
             cands = LT.raw_candidates(game, name, out)
             if not cands:
                 return
+            # **T155**: 判定できない行（候補 2 本未満・値付け不能）も**打たれた手だけは**残す＝
+            # 同じターンの「続き」（付けた札がその後殴ったか等）を欠けなく追えるようにする。
+            ch = find_chosen(cands, out, move)
+            sig = cands[ch]["sig"] if ch is not None else (out.get("sig") or RG.move_sig(move))
+            trace.append({"seed": int(_seed), "name": name, "turn": int(turn), "step": int(step),
+                          "sig": list(sig), "family": move_family(sig),
+                          "k": (cands[ch]["k"] if ch is not None else -1)})
             row = shadow_row(sc, tok, ci, cards, idx2cid, cands, out, move, theta, mu)
             if row is not None:
+                row.update(sequence_columns(cands, row, _seed, name, turn, step))
                 rows.append(row)
 
         res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, observer=observer)
         if res["winner"] is None:
             n_dropped += 1
         n_games += 1
-    return rows, {"n_games": n_games, "n_dropped": n_dropped}
+    return rows, {"n_games": n_games, "n_dropped": n_dropped, "trace": trace}
+
+
+def sequence_columns(cands, row, seed, name, turn, step):
+    """**T155**: 行に「どの局・どの席・どのターン・何手目か」と、選んだ手／理論の最善の署名を添える
+    （判定は 1 ビットも変えない・`turn_followups` が同じターンの続きを引くための鍵）。
+    `has_attack_any_k`＝選んだ手の札に**枚数を問わず**攻撃候補が 1 つでも在ったか（無ければ、その札は
+    今のターンに殴れない＝召喚酔い・レスト・【ドン!!×N】の条件付け等の別の用途）。"""
+    ch, bi = row["chosen_index"], row["best_index"]
+    u = cands[ch]["sig"][1]
+    return {"seed": int(seed), "name": name, "turn": int(turn), "step": int(step),
+            "chosen_sig": list(cands[ch]["sig"]), "best_sig": list(cands[bi]["sig"]),
+            "chosen_cid": cands[ch].get("cid"), "chosen_k": cands[ch].get("k", -1),
+            "has_attack_any_k": any(_is_box_attack(c["sig"]) and c["sig"][1] == u for c in cands)}
 
 
 def summarise(rows):
@@ -329,6 +350,70 @@ def summarise(rows):
     }
 
 
+def turn_followups(rows, trace):
+    """**T155（2026-09-24・ユーザ指示「もっと詰めてから考えましょう」）**: 純付与の行ごとに、**同じターンの続き**で
+    何が起きたかを引く（新定数ゼロ・判定は変えない・観測だけ）。
+
+    問い: 付与を「それが準備する攻撃の価格」で読んでも（T144 `attack_le`）付与の禁じ率は 63%／60% で頭打ちだった。
+    残りは「理論の正しい判定」か「物差しがまだ読めていない何か」か。式ではなく**打たれた続き**で割る:
+
+    * `atk_later`＝付けた札が**同じターンの後で殴った**（読み替えの前提そのもの）。
+    * `act_later`＝付けた札が同じターンの後で起動メインを使った（【ドン!!×N】の条件付けの用途）。
+    * `best_later`＝理論が最善と言った手（同じ型・同じ札）が**同じターンの後で実際に打たれた**＝付与と最善は
+      「どちらか」ではなく「順番」の問題だった（1 手だけ見る物差しは順番を読めない）。
+
+    **予告（測る前に書く・T144 の seed 帯 50000〜／51000〜・各 20 局・`--seq attack_le`）**:
+
+    1. 読み替えられた付与のうち理論の最善が「出す手」だった禁じ行では、**その出す手が同じターンの後で打たれた行が
+       半分以上**（順番の問題）。殺す基準: 3 割未満なら「どちらか」の判定として理論を信じる。
+    2. 読み替えられた付与では **7 割以上で付けた札が同じターンの後で殴る**（読み替えの前提が記録で立つ）。
+       殺す基準: 5 割未満なら `attack_le` の読み自体を疑う。
+    3. 読み替えられなかった付与（静的価格のまま・禁じ率 8 割）は **7 割以上が「その札に攻撃候補が 1 つも無い」**
+       （今のターンに殴れない札への付与）——観察。起動メインを後で使う割合も観察。
+    4. 付与以外の型の行と `forbidden` の判定は T144 と同じ seed で**ビット一致**（列を足しただけ）。
+
+    戻り値: 付与の行だけ（元の行に `atk_later`／`act_later`／`best_later`／`n_later` を足した dict の列）。"""
+    by_turn = {}
+    for t in trace:
+        by_turn.setdefault((t["seed"], t["name"], t["turn"]), []).append(t)
+    out = []
+    for r in rows:
+        if r.get("played_family") != "attach" or "seed" not in r:
+            continue
+        later = [t for t in by_turn.get((r["seed"], r["name"], r["turn"]), []) if t["step"] > r["step"]]
+        u = r["chosen_sig"][1]
+        b = r["best_sig"]
+        out.append(dict(r,
+                        n_later=len(later),
+                        atk_later=any(t["family"] == "attack" and t["sig"][1] == u for t in later),
+                        act_later=any(t["family"] == "effect" and t["sig"][1] == u for t in later),
+                        best_later=any(t["family"] == r["best_family"] and t["sig"][1] == b[1] for t in later)))
+    return out
+
+
+def followup_table(rows, trace):
+    """`turn_followups` → 「読み替えた／静的のまま」×「禁じた／禁じない」の 4 マスと、禁じた行の理論の最善の型別の内訳。"""
+    fu = turn_followups(rows, trace)
+    def cell(rs):
+        n = len(rs)
+        def rate(key):
+            return round(sum(1 for r in rs if r[key]) / n, 4) if n else None
+        return {"n": n, "atk_later": rate("atk_later"), "act_later": rate("act_later"),
+                "best_later": rate("best_later"), "has_attack_any_k": rate("has_attack_any_k")}
+    tab = {}
+    for reread in (True, False):
+        for forb in (True, False):
+            rs = [r for r in fu if bool(r.get("played_reread")) == reread and bool(r["forbidden"]) == forb]
+            key = ("reread" if reread else "static") + "/" + ("forbidden" if forb else "ok")
+            tab[key] = cell(rs)
+            if forb:
+                by_best = {}
+                for r in rs:
+                    by_best.setdefault(r["best_family"], []).append(r)
+                tab[key]["by_best_family"] = {k: cell(v) for k, v in sorted(by_best.items(), key=lambda kv: -len(kv[1]))}
+    return {"n_attach": len(fu), "table": tab}
+
+
 def build_parser():
     ap = argparse.ArgumentParser(description="影の介入——理論なら禁じた手の率と型を数える（T141）")
     ap.add_argument("--games", type=int, default=10)
@@ -348,7 +433,8 @@ def main(argv=None):
     set_seq_mode(a.seq)
     seeds = [a.seed_base + i for i in range(a.games)]
     rows, meta = collect(seeds, a.decks, sims=a.sims)
-    out = {"meta": meta, "summary": summarise(rows)}
+    trace = meta.pop("trace", [])
+    out = {"meta": meta, "summary": summarise(rows), "followups": followup_table(rows, trace)}   # T155
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:

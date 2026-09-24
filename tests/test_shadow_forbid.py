@@ -357,3 +357,143 @@ def test_set_seq_mode_accepts_attack_le_delta():
     SF.set_seq_mode("attack_le_delta")
     assert SF.SEQ_MODE == "attack_le_delta"
     SF.set_seq_mode("off")
+
+
+# ---- 7. T155: 同じターンの続き（turn_followups／followup_table／sequence_columns）------------
+
+def _row(seed, name, turn, step, chosen_sig, best_sig, forbidden=True, reread=True, fam="attach", best_fam="play"):
+    return {"s": -0.05 if forbidden else 0.0, "forbidden": forbidden, "played_family": fam,
+            "best_family": best_fam, "played_reread": reread, "seed": seed, "name": name, "turn": turn,
+            "step": step, "chosen_sig": chosen_sig, "best_sig": best_sig, "has_attack_any_k": reread}
+
+
+def _t(seed, name, turn, step, sig):
+    return {"seed": seed, "name": name, "turn": turn, "step": step, "sig": sig,
+            "family": SF.move_family(sig), "k": -1}
+
+
+def test_sequence_columns_records_keys_sigs_and_whether_the_card_has_any_attack_candidate():
+    cands = [_c(["DON_BOX", "X", [], [], None], 1), _c(["DON_BOX", "X", ["L"], [], None], 2),
+             _c(["PLAY", "H", [], [], None], -1)]
+    cands[0]["cid"] = "OP01-001"
+    row = {"chosen_index": 0, "best_index": 2}
+    col = SF.sequence_columns(cands, row, 7, "p2", 3, 11)
+    assert (col["seed"], col["name"], col["turn"], col["step"]) == (7, "p2", 3, 11)
+    assert col["chosen_sig"] == ["DON_BOX", "X", [], [], None] and col["best_sig"] == ["PLAY", "H", [], [], None]
+    assert col["chosen_cid"] == "OP01-001" and col["chosen_k"] == 1
+    assert col["has_attack_any_k"] is True
+    row2 = {"chosen_index": 2, "best_index": 0}
+    assert SF.sequence_columns(cands, row2, 7, "p2", 3, 11)["has_attack_any_k"] is False
+
+
+def test_turn_followups_flags_an_attack_by_the_same_card_later_in_the_same_turn():
+    attach = ["DON_BOX", "X", [], [], None]
+    rows = [_row(1, "p1", 2, 5, attach, ["PLAY", "H", [], [], None])]
+    trace = [_t(1, "p1", 2, 5, attach),
+             _t(1, "p1", 2, 6, ["DON_BOX", "X", ["L"], [], None]),      # X が後で殴る
+             _t(1, "p1", 2, 7, ["TURN_END", None, [], [], None])]
+    fu = SF.turn_followups(rows, trace)
+    assert len(fu) == 1 and fu[0]["atk_later"] is True and fu[0]["best_later"] is False
+    assert fu[0]["act_later"] is False and fu[0]["n_later"] == 2
+
+
+def test_turn_followups_flags_the_theory_best_move_when_it_is_played_later_in_the_turn():
+    attach = ["DON_BOX", "X", [], [], None]
+    best = ["PLAY", "H", [], [], None]
+    rows = [_row(1, "p1", 2, 5, attach, best)]
+    trace = [_t(1, "p1", 2, 5, attach), _t(1, "p1", 2, 8, best)]
+    fu = SF.turn_followups(rows, trace)
+    assert fu[0]["best_later"] is True and fu[0]["atk_later"] is False
+
+
+def test_turn_followups_ignores_other_turns_other_seats_and_earlier_steps():
+    attach = ["DON_BOX", "X", [], [], None]
+    rows = [_row(1, "p1", 2, 5, attach, ["PLAY", "H", [], [], None])]
+    trace = [_t(1, "p1", 2, 3, ["DON_BOX", "X", ["L"], [], None]),      # 前の手
+             _t(1, "p1", 4, 9, ["DON_BOX", "X", ["L"], [], None]),      # 別のターン
+             _t(1, "p2", 2, 6, ["DON_BOX", "X", ["L"], [], None]),      # 別の席
+             _t(2, "p1", 2, 6, ["PLAY", "H", [], [], None])]            # 別の局
+    fu = SF.turn_followups(rows, trace)
+    assert fu[0]["atk_later"] is False and fu[0]["best_later"] is False and fu[0]["n_later"] == 0
+
+
+def test_turn_followups_flags_an_activated_ability_of_the_attached_card():
+    attach = ["DON_BOX", "X", [], [], None]
+    rows = [_row(1, "p1", 2, 5, attach, ["PLAY", "H", [], [], None], reread=False)]
+    trace = [_t(1, "p1", 2, 6, ["ACTIVATE_MAIN", "X", [], [], None])]
+    assert SF.turn_followups(rows, trace)[0]["act_later"] is True
+
+
+def test_turn_followups_only_returns_attach_rows_that_carry_sequence_columns():
+    rows = [{"s": -0.1, "forbidden": True, "played_family": "attach", "best_family": "play"},   # 鍵が無い（旧形）
+            _row(1, "p1", 2, 5, ["ATTACK", "X", ["L"], [], None], ["PLAY", "H", [], [], None], fam="attack")]
+    assert SF.turn_followups(rows, []) == []
+
+
+def test_followup_table_splits_reread_and_static_attaches_and_breaks_forbidden_down_by_best_family():
+    attach = ["DON_BOX", "X", [], [], None]
+    best_play, best_atk = ["PLAY", "H", [], [], None], ["DON_BOX", "Y", ["L"], [], None]
+    rows = [_row(1, "p1", 2, 1, attach, best_play, forbidden=True, reread=True, best_fam="play"),
+            _row(1, "p1", 2, 2, attach, best_atk, forbidden=True, reread=True, best_fam="attack"),
+            _row(1, "p1", 2, 3, attach, best_play, forbidden=False, reread=True),
+            _row(1, "p1", 2, 4, attach, best_play, forbidden=True, reread=False)]
+    trace = [_t(1, "p1", 2, 5, ["DON_BOX", "X", ["L"], [], None]), _t(1, "p1", 2, 6, best_play)]
+    tab = SF.followup_table(rows, trace)
+    assert tab["n_attach"] == 4
+    t = tab["table"]
+    assert t["reread/forbidden"]["n"] == 2 and t["reread/forbidden"]["atk_later"] == 1.0
+    assert t["reread/forbidden"]["by_best_family"]["play"]["best_later"] == 1.0
+    assert t["reread/forbidden"]["by_best_family"]["attack"]["best_later"] == 0.0   # Y は殴っていない
+    assert t["reread/ok"]["n"] == 1 and "by_best_family" not in t["reread/ok"]
+    assert t["static/forbidden"]["n"] == 1 and t["static/forbidden"]["has_attack_any_k"] == 0.0
+    assert t["static/ok"] == {"n": 0, "atk_later": None, "act_later": None, "best_later": None, "has_attack_any_k": None}
+
+
+def test_collect_keeps_a_trace_of_every_main_decision_and_adds_sequence_columns(monkeypatch):
+    cands = [_c(["DON_BOX", "X", [], [], None], 1), _c(["DON_BOX", "X", ["L"], [], None], 1)]
+    outs = [{"kind": "main", "sig": cands[0]["sig"], "k": 1},          # 付与（判定できる行）
+            {"kind": "main", "sig": cands[1]["sig"], "k": 1},          # 攻撃（判定できない行＝行にはならないが trace には残る）
+            {"kind": "window"}]
+
+    def fake_run_game(seed, seats, p1, p2, observer=None):
+        for i, out in enumerate(outs):
+            observer(None, "p1", 4, 20 + i, out, {"action_type": "X"})
+        return {"winner": "p1"}
+
+    fake_rows = iter([{"s": -0.1, "forbidden": True, "played_family": "attach", "best_family": "attack",
+                       "chosen_index": 0, "best_index": 1, "played_reread": True}, None])
+    monkeypatch.setattr(SF.DR, "run_game", fake_run_game)
+    monkeypatch.setattr(SF.LT, "raw_row", lambda game, name: (_SC, _TOK, _CI))
+    monkeypatch.setattr(SF.LT, "raw_candidates", lambda game, name, out: cands)
+    monkeypatch.setattr(SF, "shadow_row", lambda *a, **k: next(fake_rows))
+    monkeypatch.setattr(SF.PL, "Cards", lambda: None)
+    monkeypatch.setattr(SF.GA, "_vocab", lambda: {})
+    monkeypatch.setattr(SF.E, "engine", lambda: None)
+    monkeypatch.setattr(SF.E, "SeatSpec", lambda *a, **k: None)
+    monkeypatch.setattr(SF.D, "load_db", lambda: None)
+    monkeypatch.setattr(SF.D, "leader_pair", lambda db, seed, mode: (None, None))
+    monkeypatch.setattr(SF.D, "build_pair", lambda db, la, lb, seed, mode: (None, None))
+    rows, meta = SF.collect([9], "user", sims=1)
+    assert meta["n_games"] == 1 and meta["n_dropped"] == 0
+    assert [t["step"] for t in meta["trace"]] == [20, 21] and meta["trace"][1]["family"] == "attack"
+    assert len(rows) == 1 and (rows[0]["seed"], rows[0]["name"], rows[0]["turn"], rows[0]["step"]) == (9, "p1", 4, 20)
+    fu = SF.turn_followups(rows, meta["trace"])
+    assert fu[0]["atk_later"] is True and fu[0]["best_later"] is True
+
+
+def test_cli_json_includes_the_followup_table_and_strips_the_trace_from_meta(monkeypatch, tmp_path):
+    attach = ["DON_BOX", "X", [], [], None]
+
+    def fake_collect(seeds, decks_mode, sims=64, **kw):
+        rows = [_row(seeds[0], "p1", 2, 5, attach, ["PLAY", "H", [], [], None])]
+        rows[0].update({"n_cands": 2})
+        trace = [_t(seeds[0], "p1", 2, 6, ["DON_BOX", "X", ["L"], [], None])]
+        return rows, {"n_games": 1, "n_dropped": 0, "trace": trace}
+
+    monkeypatch.setattr(SF, "collect", fake_collect)
+    out_json = tmp_path / "out.json"
+    assert SF.main(["--games", "1", "--seed-base", "1", "--decks", "user", "--json", str(out_json)]) == 0
+    saved = json.loads(out_json.read_text(encoding="utf-8"))
+    assert saved["meta"] == {"n_games": 1, "n_dropped": 0}
+    assert saved["followups"]["n_attach"] == 1
+    assert saved["followups"]["table"]["reread/forbidden"]["atk_later"] == 1.0
