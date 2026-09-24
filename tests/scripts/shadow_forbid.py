@@ -222,14 +222,19 @@ def _best(priced_list):
     return scored
 
 
-def shadow_row(sc, tok, ci, cards, idx2cid, cands, out, move, theta=THETA, mu=MU):
+def shadow_row(sc, tok, ci, cards, idx2cid, cands, out, move, theta=THETA, mu=MU, cutoff=None):
     """1 main 行ぶんの影の判定。値付けできない・候補 2 本未満・選んだ候補が見つからなければ
     `None`（母数から除く——`theory_bridge.collect` の無言行の扱いと同じ）。
 
     **T140 の所見**（`PLAY` は格納精度〔float16〕で価格が判定の分岐をまたぐことがある）を踏まえ、
     **全精度**（`sc`／`tok`／`ci` のまま）と**記録と同じキャストを揃えた値**の両方で判定し、
     `forbidden`（全精度）と `forbidden_cast`（キャスト後）を両方返す——`s` が 0 のすぐそばの行だけ、
-    キャストで判定が入れ替わりうる（新しい判断基準ではなく、T140 の対照をそのまま使う）。"""
+    キャストで判定が入れ替わりうる（新しい判断基準ではなく、T140 の対照をそのまま使う）。
+
+    **T18-b（2026-09-24）**: `cutoff`（省略可）——**逸脱の大きさ**の線。省略時は既存どおり `TOL`
+    （丸め誤差の吸収だけ・「少しでも劣れば禁じる」）。`cutoff` を渡すと `s < -cutoff` で判定する
+    （例: `2 * theory_order.MU`）。判定基準を差し替えるだけで式は増えない。"""
+    tol = TOL if cutoff is None else float(cutoff)
     priced = LT.price_candidates(sc, tok, ci, cards, idx2cid, cands, theta, mu)
     n_re = 0
     if SEQ_MODE != "off":
@@ -259,8 +264,8 @@ def shadow_row(sc, tok, ci, cards, idx2cid, cands, out, move, theta=THETA, mu=MU
     else:
         s_cast = None
 
-    return {"s": s, "forbidden": bool(s < -TOL),
-           "s_cast": s_cast, "forbidden_cast": (bool(s_cast < -TOL) if s_cast is not None else None),
+    return {"s": s, "forbidden": bool(s < -tol),
+           "s_cast": s_cast, "forbidden_cast": (bool(s_cast < -tol) if s_cast is not None else None),
            "played_family": move_family(cands[chosen]["sig"]),
            "best_family": move_family(cands[best_i]["sig"]),
            # `cands` への index（`chosen`＝実際に選んだ候補・`best_index`＝理論の最善）。

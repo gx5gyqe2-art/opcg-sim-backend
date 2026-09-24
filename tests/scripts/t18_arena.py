@@ -147,7 +147,7 @@ def expand_replacement(rep_move):
 
 
 def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMILIES, seats=None,
-              attach_static=False, arm="theory", rng=None):
+              attach_static=False, arm="theory", rng=None, cutoff=None, restrict=None):
     """`driver.run_game(swap=…)` に渡す関数を作る。`stats`（省略可）に介入の実績を積む。
 
     **盤面には触れない**——`out`（探索の結果・候補・π はそのまま）を読むだけで、返す `move` だけが
@@ -166,7 +166,15 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
     * `arm="placebo"`——**同じ行**（理論が禁じた行・同じ除外規則）で、理論の最善ではなく**選んだ手以外の候補を
       一様に 1 つ**引いて置き換える（`rng`・`random.Random`）。介入の率・型・局面を主腕と揃えたまま「理論が
       指した先」だけを無作為にする＝2026-09-19 §9 の「プラセボは主条件の率・型に合わせる」を行単位で満たす。
-      新定数ゼロ。既定 `"theory"`。"""
+      新定数ゼロ。既定 `"theory"`。
+
+    **T18（2026-09-24・ユーザ決定「dでやりましょう」＝(b)＋(c) を両方測る）**:
+    * `cutoff`（省略可）——**逸脱の大きさ**の線（`shadow_forbid.shadow_row` にそのまま渡す）。
+      `s < -cutoff` の行だけを禁じたと数える。省略時は既存どおり（丸め誤差だけ）。
+    * `restrict`（省略可）——**型の組**の集合 `{(played_family, best_family), …}`。渡すと、禁じられた行のうち
+      この組に一致する行だけに介入する（一致しない行は `n_exempt` に数える・`attach_static`／`exempt` の判定の
+      **後**に効く＝両方の絞り込みが重なってよい）。T155 が「本物の対立」と確認した「付けて殴る vs 手札を出す」
+      を測るときは `restrict={("attach","play")}`。"""
     if arm not in ("theory", "placebo"):
         raise ValueError("arm は theory か placebo（%r）" % (arm,))
     rng = rng or random.Random(0)
@@ -192,7 +200,7 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
         cands = LT.raw_candidates(game, name, out)
         if not cands:
             return move
-        row = SF.shadow_row(sc, tok, ci, cards, idx2cid, cands, out, move, theta, mu)
+        row = SF.shadow_row(sc, tok, ci, cards, idx2cid, cands, out, move, theta, mu, cutoff=cutoff)
         if row is None:
             return move
         stats["n_seen"] += 1
@@ -202,6 +210,9 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
         # **T144**: 付与が攻撃の価格に読み替えられた行（`shadow_forbid.SEQ_MODE` が `off` 以外）は、
         # もう「系列の価値を測れない型」ではないので対象外にしない。読み替えられない付与は今までどおり外す。
         if row["played_family"] in exempt and not row.get("played_reread") and not attach_static:
+            stats["n_exempt"] += 1
+            return move
+        if restrict is not None and (row["played_family"], row["best_family"]) not in restrict:
             stats["n_exempt"] += 1
             return move
         groups = out.get("groups") or []
@@ -312,7 +323,8 @@ _OTHER_SEAT = {"p1": "p2", "p2": "p1"}
 
 
 def t18_pairs(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns=4, worlds=4,
-             theta=THETA, mu=MU, exempt=EXEMPT_FAMILIES, attach_static=False, arm="theory"):
+             theta=THETA, mu=MU, exempt=EXEMPT_FAMILIES, attach_static=False, arm="theory",
+             cutoff=None, restrict=None):
     """**T148**: 1 つの seed につき **2 局**——理論の介入を **p1 だけ**に入れた局と **p2 だけ**に入れた局
     （`opcg_sim.loop.arena` と同じ「同 seed・席を入れ替えたペア」規約・リーダー対は入れ替わらない）。
     **両席に同じ規則で介入すると効果が相殺する**（`make_swap` の docstring）ので、**片席だけへの介入**が
@@ -333,7 +345,7 @@ def t18_pairs(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_tur
             # **T18**: プラセボの乱数は (seed, 席) で決まる＝再現できる・主腕と同じ局面列を歩く（CRN）
             rng = random.Random(int(seed) * 2 + (0 if intervened == "p1" else 1))
             swap = make_swap(cards, idx2cid, theta, mu, stats, exempt, seats={intervened},
-                             attach_static=attach_static, arm=arm, rng=rng)
+                             attach_static=attach_static, arm=arm, rng=rng, cutoff=cutoff, restrict=restrict)
             aborted = None
             try:
                 res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, swap=swap,
@@ -435,24 +447,34 @@ def build_parser():
                     help="**T18**: 読み替えられなかった付与（殴れない札への付け）も介入の対象にする（(c)・既定 off）")
     ap.add_argument("--arm", default="theory", choices=("theory", "placebo"),
                     help="**T18**: theory＝理論の最善に置き換える／placebo＝同じ行で選んだ手以外を一様に引く")
+    ap.add_argument("--cutoff-mu", type=float, default=0.0,
+                    help="**T18-b（案 b）**: 逸脱の大きさの線（手札 1 枚の価値＝μ の倍数）。0＝既定（丸め誤差だけ）")
+    ap.add_argument("--restrict", default="", choices=("", "attach:play"),
+                    help="**T18-c（案 c）**: 型の組に絞る（`attach:play`＝付けて殴る vs 手札を出す・T155 の本物の対立）")
     ap.add_argument("--json", default="")
     ap.add_argument("--result", default="",
                     help="**T148**（`n_loop_ops.md` の規約）: `RESULT.json`（機械可読の納品物）を書くパス")
     return ap
 
 
+_RESTRICT_SETS = {"": None, "attach:play": {("attach", "play")}}
+
+
 def main(argv=None):
     a = build_parser().parse_args(argv)
     SF.set_seq_mode(a.seq)                          # **T144**
+    cutoff = (a.cutoff_mu * MU) if a.cutoff_mu else None
+    restrict = _RESTRICT_SETS[a.restrict]
     if a.pairs:
         seeds = [a.seed_base + i for i in range(a.pairs)]
-        games = t18_pairs(seeds, a.decks, sims=a.sims, attach_static=(a.attach_static == "on"), arm=a.arm)
+        games = t18_pairs(seeds, a.decks, sims=a.sims, attach_static=(a.attach_static == "on"), arm=a.arm,
+                          cutoff=cutoff, restrict=restrict)
         summary = summarise_pairs(games)
         out = {"games": games, "summary": summary}
         status = "done" if summary.get("ci") is not None else "no_data"
         result = {"status": status, "task": "T18", "seed_base": a.seed_base, "pairs": a.pairs,
                   "decks": a.decks, "seq": a.seq, "attach_static": a.attach_static, "arm": a.arm,
-                  "summary": summary}
+                  "cutoff_mu": a.cutoff_mu, "restrict": a.restrict, "summary": summary}
     else:
         seeds = [a.seed_base + i for i in range(a.games)]
         games = dry_run(seeds, a.decks, sims=a.sims)

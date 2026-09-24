@@ -550,8 +550,102 @@ def test_cli_arm_and_attach_static_reach_t18_pairs_and_the_result(monkeypatch, t
     res = tmp_path / "RESULT.json"
     rc = TA.main(["--pairs", "2", "--seed-base", "1300000", "--decks", "synth_roles", "--seq", "attack_any",
                   "--attach-static", "on", "--arm", "placebo", "--result", str(res)])
-    assert rc == 0 and captured == {"attach_static": True, "arm": "placebo"}
+    assert rc == 0
+    assert captured == {"attach_static": True, "arm": "placebo", "cutoff": None, "restrict": None}
     saved = json.loads(res.read_text(encoding="utf-8"))
     assert saved["task"] == "T18" and saved["arm"] == "placebo" and saved["attach_static"] == "on"
     assert saved["seq"] == "attack_any" and SF.SEQ_MODE == "attack_any"
     SF.set_seq_mode("off")
+
+
+# ---- 6. T18-b/c: 逸脱の大きさの線（cutoff）・型の組で絞る（restrict） -----------------------------
+
+def test_swap_cutoff_only_intervenes_when_the_deviation_exceeds_the_line(monkeypatch):
+    sigs = [["ATTACK", "u1", ["u2"], [], None], ["PLAY", "u3", [], [], None]]
+    cands = _cands(*sigs)
+    legal = [{"action_type": "ATTACK", "payload": {"uuid": "u1", "target_ids": ["u2"]}},
+            {"action_type": "PLAY", "payload": {"uuid": "u3"}}]
+    groups = [{"rep": 0, "n": 1.0, "q": 0.0}, {"rep": 1, "n": 1.0, "q": 0.0}]
+    out = _out(groups, legal, sig=sigs[0], k=None)
+    monkeypatch.setattr(LT, "raw_row", lambda game, name: (_SC, _TOK, _CI))
+    monkeypatch.setattr(LT, "raw_candidates", lambda game, name, out_: cands)
+    monkeypatch.setattr(LT, "price_candidates",
+                        lambda sc, tok, ci, cards, idx2cid, cands_, theta, mu:
+                            [dict(c, price=p) for c, p in zip(cands_, (0.10, 0.11))])   # s = -0.01（小さい）
+    stats = {}
+    swap = TA.make_swap(cards=None, idx2cid=None, stats=stats, cutoff=0.02)      # 線 0.02 > |s|=0.01
+    assert swap(game=None, name="p1", turn=1, step=0, out=out, move=legal[0]) is legal[0]
+    assert stats["n_forbidden"] == 0 and stats["n_intervened"] == 0             # 線を超えないので禁じない
+    stats = {}
+    swap = TA.make_swap(cards=None, idx2cid=None, stats=stats, cutoff=0.005)     # 線 0.005 < |s|=0.01
+    got = swap(game=None, name="p1", turn=1, step=0, out=out, move=legal[0])
+    assert got is legal[1] and stats["n_intervened"] == 1
+
+
+def test_swap_restrict_only_intervenes_on_the_listed_family_pair(monkeypatch):
+    attach = ["DON_BOX", "u1", [], [], None]
+    play = ["PLAY", "u3", [], [], None]
+    atk = ["DON_BOX", "u4", ["u5"], [], None]
+    cands = _cands(attach, play, atk)
+    legal = [{"action_type": "DON_BOX", "payload": {"uuid": "u1"}}, {"action_type": "PLAY", "payload": {"uuid": "u3"}},
+            {"action_type": "DON_BOX", "payload": {"uuid": "u4", "target_ids": ["u5"]}}]
+    groups = [{"rep": i, "n": 1.0, "q": 0.0} for i in range(3)]
+    monkeypatch.setattr(LT, "raw_row", lambda game, name: (_SC, _TOK, _CI))
+    monkeypatch.setattr(LT, "raw_candidates", lambda game, name, out_: cands)
+    # best=play（対象・(attach, play) に一致）
+    monkeypatch.setattr(LT, "price_candidates",
+                        lambda sc, tok, ci, cards, idx2cid, cands_, theta, mu:
+                            [dict(c, price=p) for c, p in zip(cands_, (0.05, 0.40, 0.10))])
+    stats = {}
+    # **restrict は attach_static／exempt の判定の後に効く**（docstring）——attach 家族は既定で
+    # 対象外なので、restrict に attach を含む組を測るときは attach_static=True と一緒に使う。
+    swap = TA.make_swap(cards=None, idx2cid=None, stats=stats, attach_static=True, restrict={("attach", "play")})
+    out = _out(groups, legal, sig=attach, k=None)
+    got = swap(game=None, name="p1", turn=1, step=0, out=out, move=legal[0])
+    assert got is legal[1] and stats["n_intervened"] == 1 and stats["n_exempt"] == 0
+    # best=attack（別の組・restrict に無い）→ 対象外
+    monkeypatch.setattr(LT, "price_candidates",
+                        lambda sc, tok, ci, cards, idx2cid, cands_, theta, mu:
+                            [dict(c, price=p) for c, p in zip(cands_, (0.05, 0.10, 0.40))])
+    stats = {}
+    swap = TA.make_swap(cards=None, idx2cid=None, stats=stats, attach_static=True, restrict={("attach", "play")})
+    out = _out(groups, legal, sig=attach, k=None)
+    got = swap(game=None, name="p1", turn=1, step=0, out=out, move=legal[0])
+    assert got is legal[0] and stats["n_intervened"] == 0 and stats["n_exempt"] == 1
+
+
+def test_t18_pairs_and_cli_thread_cutoff_and_restrict(monkeypatch, tmp_path):
+    seen = []
+    orig = TA.make_swap
+
+    def spy_make_swap(*a, **kw):
+        seen.append((kw.get("cutoff"), kw.get("restrict")))
+        return orig(*a, **kw)
+
+    monkeypatch.setattr(TA, "make_swap", spy_make_swap)
+    monkeypatch.setattr(TA.D, "load_db", lambda: object())
+    monkeypatch.setattr(TA.D, "leader_pair", lambda db, seed, mode: ("la", "lb"))
+    monkeypatch.setattr(TA.D, "build_pair", lambda db, la, lb, seed, decks: ("p1_deck", "p2_deck"))
+    monkeypatch.setattr(TA.E, "engine", lambda: None)
+    monkeypatch.setattr(TA.E, "SeatSpec", lambda *a, **k: object())
+    monkeypatch.setattr(TA.DR, "run_game", lambda *a, **k: {"winner": "p2", "turns": 9, "steps": 70})
+    monkeypatch.setattr(TA.PL, "Cards", lambda: None)
+    monkeypatch.setattr(TA.GA, "_vocab", lambda: {})
+    TA.t18_pairs([9], "synth_roles", sims=4, cutoff=2 * TA.MU, restrict={("attach", "play")})
+    assert seen == [(2 * TA.MU, {("attach", "play")}), (2 * TA.MU, {("attach", "play")})]
+
+    def fake_t18_pairs(seeds, decks_mode, sims=64, **kw):
+        assert kw["cutoff"] == pytest.approx(2 * TA.MU) and kw["restrict"] == {("attach", "play")}
+        return [_pgame(s, side, "p1") for s in seeds for side in ("p1", "p2")]
+
+    monkeypatch.setattr(TA, "t18_pairs", fake_t18_pairs)
+    res = tmp_path / "RESULT.json"
+    rc = TA.main(["--pairs", "1", "--seed-base", "1300000", "--decks", "synth_roles",
+                  "--cutoff-mu", "2", "--restrict", "attach:play", "--result", str(res)])
+    assert rc == 0
+    saved = json.loads(res.read_text(encoding="utf-8"))
+    assert saved["cutoff_mu"] == 2.0 and saved["restrict"] == "attach:play"
+
+
+def test_cutoff_mu_zero_means_the_existing_rounding_only_line():
+    assert TA._RESTRICT_SETS[""] is None
