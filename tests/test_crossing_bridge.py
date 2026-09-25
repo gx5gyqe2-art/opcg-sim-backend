@@ -246,6 +246,109 @@ def test_the_hand_absorbs_in_whole_guards():
     assert CB.hand_absorb(0, 0.0) == 0.0
 
 
+def test_the_hand_absorbs_by_price_order_per_attack():
+    """**T158**（T99 が指した先）: `hand_absorb` は一番重い攻撃 1 本の `c(x_max)` で全札を割り、
+    `hand_absorb_forced` は必ず守る `G` 回の**平均費用**で割る——どちらも「同じ大きさの組」で割る
+    粗さが残る。**実際の守り手は攻撃ごとに止めるかを選ぶ**ので、`cuttable_seq`（`hand_absorb_seq`）は
+    **その席が受ける攻撃を安い順に並べ、手札が尽きるまで攻撃ごとにその `c(x_i)` 枚をそのまま割り当てる**。"""
+    mu = T.MU
+    before = T.CBAR_MODE
+    try:
+        T.set_cbar_mode("strict")
+        xs = [0.0, 1000.0, 3000.0]                         # c = 1.00 / 1.28 / 2.78（安い順）
+        cs = sorted(T.c_of(x) for x in xs)
+        assert cs[0] < cs[1] < cs[2]
+        # 手札 3.5 枚: 1 本目・2 本目は丸ごと止まり、3 本目は端数が足りず打ち切り
+        n_cut = cs[0] + cs[1] + 1.5
+        got = CB.hand_absorb_seq(n_cut, xs, mu)
+        assert got == pytest.approx(mu * (cs[0] + cs[1]))
+        assert got < n_cut * mu                            # 端数のぶん小さい（一生 F に入らない）
+        # `hand_absorb`（x_max 1 本）とも `hand_absorb_forced`（G 本の平均費用）とも異なる値になる
+        # （`forced` は `G=2` の平均費用 `c_eff=(cs[0]+cs[1])/2` で `floor(n_cut/c_eff)=3` 回ぶん吸う）
+        assert got != pytest.approx(CB.hand_absorb(n_cut, max(xs), mu))
+        assert got != pytest.approx(CB.hand_absorb_forced(n_cut, xs, 1, 0, mu))
+        # 通らない攻撃しか無ければ守る必要が無い＝0
+        assert CB.hand_absorb_seq(3, [-1000.0], mu) == 0.0
+        assert CB.hand_absorb_seq(3, [], mu) == 0.0
+        # **1 回分に足りなければ 0**（一番安い攻撃の 1 回分にも届かない薄い手札）
+        assert CB.hand_absorb_seq(cs[0] - 0.5, xs, mu) == 0.0
+    finally:
+        T.set_cbar_mode(before)
+
+
+def test_the_hand_absorbed_by_price_order_does_not_carry_the_remainder_forward():
+    """**T158**: ちょうど 2 本ぶん割り切ったところで止めると、**余りは 0 で次の攻撃には回らない**
+    （3 本目の費用に満たない余りを 3 本目に一部だけ充てることはしない）。"""
+    mu = T.MU
+    before = T.CBAR_MODE
+    try:
+        T.set_cbar_mode("strict")
+        xs = [0.0, 1000.0, 3000.0]
+        cs = sorted(T.c_of(x) for x in xs)
+        # 手札はちょうど 1 本目 ＋ 2 本目の費用の和＝2 本ぶん止めて余りは正確に 0
+        n_cut = cs[0] + cs[1]
+        got = CB.hand_absorb_seq(n_cut, xs, mu)
+        assert got == pytest.approx(mu * (cs[0] + cs[1]))
+        # 3 本目に余りが回っていれば `got` はこれより大きくなるはずだが、そうならない
+        assert got < mu * (cs[0] + cs[1] + cs[2])
+        # 手札を少し増やしても（3 本目の費用 `cs[2]` ≥ 2 には届かない量）絵柄は変わらない
+        assert cs[2] > 1.0                             # 増分 0.5 が 3 本目には遠く届かないことの前提
+        got_more = CB.hand_absorb_seq(n_cut + 0.5, xs, mu)
+        assert got_more == pytest.approx(mu * (cs[0] + cs[1]))   # 3 本目は依然として 0 本ぶん
+    finally:
+        T.set_cbar_mode(before)
+
+
+def test_selecting_cuttable_seq_leaves_the_older_hand_modes_byte_for_byte():
+    """**「off は旧のまま」の作法**——`cuttable_seq`（T158）を `THETA_HAND_MODES` に足しても、
+    既存のモード（`count`／`cuttable`／`cuttable_forced`）を選んでいるときの `threshold_parts` の
+    出力は`threshold_parts_side` に元からある分岐（`cuttable_cx`＝`hand_absorb`／
+    `cuttable_forced`＝`hand_absorb_forced`／`count`＝素の `g × 枚数`）そのままで、
+    1 バイトも変わらない（`cuttable`（`_cx` 無し）は `g` の出どころが違うだけでこの分岐自体を通らない）。"""
+    sc, tok = _mirror_row(life=1.0, hand=5.0, n_char=3, pw=1.0)
+    olp = float(np.asarray(sc)[T.SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+    xs = CB.own_attackers_of(tok, olp)
+    n_blk = CB._opp_active_blockers(tok)
+    hand_n = float(np.asarray(sc)[T.SC_OPP_HAND])
+    life = float(np.asarray(sc)[T.SC_OPP_LIFE])
+    mu = T.MU
+    old = CB.THETA_HAND_MODE
+    try:
+        CB.set_theta_hand_mode("count")
+        _, hand, _ = CB.threshold_parts(sc, tok)
+        assert hand == pytest.approx(mu * hand_n)
+        CB.set_theta_hand_mode("cuttable_cx")
+        _, hand, _ = CB.threshold_parts(sc, tok)
+        assert hand == pytest.approx(CB.hand_absorb(hand_n, max(xs) if xs else -1.0, mu))
+        CB.set_theta_hand_mode("cuttable_forced")
+        _, hand, _ = CB.threshold_parts(sc, tok)
+        assert hand == pytest.approx(CB.hand_absorb_forced(hand_n, xs, life, n_blk, mu))
+    finally:
+        CB.set_theta_hand_mode(old)
+
+
+def test_cuttable_seq_is_wired_into_threshold_parts_and_rejects_unknown_modes():
+    """**T158**: `THETA_HAND_MODE=cuttable_seq` を選ぶと `threshold_parts` の手札の項が
+    `hand_absorb_seq` そのものになる。**知らない名前は `set_theta_hand_mode` で `ValueError`**
+    （T99 で踏んだ「黙って別の値で走る」穴を避ける）。"""
+    sc, tok = _mirror_row(life=1.0, hand=5.0, n_char=3, pw=1.0)
+    olp = float(np.asarray(sc)[T.SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+    xs = CB.own_attackers_of(tok, olp)
+    hand_n = float(np.asarray(sc)[T.SC_OPP_HAND])
+    mu = T.MU
+    old = CB.THETA_HAND_MODE
+    try:
+        CB.set_theta_hand_mode("cuttable_seq")
+        assert CB.THETA_HAND_MODE == "cuttable_seq"
+        _, hand, _ = CB.threshold_parts(sc, tok)
+        assert hand == pytest.approx(CB.hand_absorb_seq(hand_n, xs, mu))
+    finally:
+        CB.set_theta_hand_mode(old)
+    with pytest.raises(ValueError):
+        CB.set_theta_hand_mode("cuttable_seqq")
+    assert CB.THETA_HAND_MODE == old                                    # 失敗した切替は既定を汚さない
+
+
 def test_the_threshold_splits_into_life_hand_and_bodies():
     """**T96**（ユーザ指示「Θの方で進めてください」）: `threshold_parts` は `Θ` を **3 つの項**に割り、和は `threshold` と一致する。
     **どの項が終盤に縮まないか**を見るための切り分け。"""

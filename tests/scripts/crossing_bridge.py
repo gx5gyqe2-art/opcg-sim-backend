@@ -91,9 +91,10 @@ SLOPE_FLOOR = 1e-3
 #: **G = 0**（全部受けても死なない）なら守る義務は無いので、**一番安い攻撃の `c`** に落とす
 #: （経済的な理由でなら守る＝`theta_of` の `max` と同じ考え方）。**新定数ゼロ**・**打ち筋に依らない**
 #: （本数・ライフ・ブロッカー・`c_of` だけ）。
-THETA_HAND_MODES = ("count", "quality", "play", "guard", "cuttable", "cuttable_cx", "cuttable_forced")
+THETA_HAND_MODES = ("count", "quality", "play", "guard", "cuttable", "cuttable_cx", "cuttable_forced", "cuttable_seq")
 #: **出荷既定は `cuttable_forced`**（2026-09-20・ユーザ決定「3 本すべて」・T100 の形を T116 の窓の上限と対で採った）。
 #: **既定は `cuttable`**（2026-09-17・ユーザ決定「1は変えましょうか」・T77）。以前の数字と比べるときは `--theta-hand count`。
+#: **`cuttable_seq`（T158）は切替として追加**——既定はまだ `cuttable_forced`（H-2 の計測待ち）。
 THETA_HAND_MODE = "cuttable_forced"
 
 
@@ -101,7 +102,8 @@ THETA_HAND_MODE = "cuttable_forced"
 #: **`cuttable_cx` は 1 枚あたりの価格そのものは `cuttable` と同じ**（`c(x)` のひと組み化は `threshold_parts` の側でやる）。
 #: **知らない名前は `KeyError` で落とす**——黙って別の値で走らないため（T99 でこの穴を踏んだ）。
 THETA_HAND_PART = {"count": None, "quality": "dtotal", "play": "dh", "guard": "dg",
-                   "cuttable": "cuttable", "cuttable_cx": "cuttable", "cuttable_forced": "cuttable"}
+                   "cuttable": "cuttable", "cuttable_cx": "cuttable", "cuttable_forced": "cuttable",
+                   "cuttable_seq": "cuttable"}
 
 
 
@@ -563,6 +565,30 @@ def hand_absorb_forced(n_cut, xs, life_opp, n_blockers_opp, mu=MU):
     return float(mu) * c_eff * math.floor(n / c_eff)
 
 
+def hand_absorb_seq(n_cut, xs, mu=MU):
+    """**手札が実際に吸える額**（T158）＝**攻撃ごとに安い順へ `c(x_i)` 枚をそのまま割り当てる**貪欲法。
+
+    `hand_absorb`（T99）は**一番重い攻撃 1 本**の `c(x_max)` で全札を割り、
+    `hand_absorb_forced`（T100）は**必ず守る `G` 回の平均費用**で割る——どちらも
+    「同じ大きさの組」で割る粗さが残る（T99 が指した先）。**実際の守り手は攻撃ごとに
+    止めるかを選ぶ**（安く止まるものから止める・T64「一番安い札から切る」と同じ規則）ので、
+    **その席が受ける攻撃を `c(x)` の安い順に並べ、手札が尽きるまで攻撃ごとにその `c(x_i)`
+    枚をそのまま割り当てる**。**端数は一生 `F` に入らない**——足りなくなった攻撃で打ち切り、
+    それ以降の攻撃も止められない。通る攻撃が無ければ 0。"""
+    cs = sorted(c for c in (c_of(float(x)) for x in (xs or ())) if c > 0.0)
+    if not cs:
+        return 0.0                                   # 通らない攻撃しかない＝守る必要が無い
+    remaining = max(0.0, float(n_cut))
+    absorbed = 0.0
+    for c in cs:
+        if remaining >= c:
+            absorbed += c
+            remaining -= c
+        else:
+            break                                     # 端数は次以降の攻撃も止められない（一生 F に入らない）
+    return float(mu) * absorbed
+
+
 #: **T102**: 耐久の手札項を**どこに置くか**。
 #: `stock`（旧・`Θ` に一括で足す）／**`shield`**（**的の側の有限の盾**＝毎ターン「規則が許すぶんだけ」減る）。
 #: **根拠**: `Θ` は在庫だが**手札は「使う時間」が要る**——`T101` で、`Θ`/要は τ の当たった行に絞っても
@@ -698,11 +724,13 @@ def threshold_parts_side(sc, tok, side, lam=LAM, mu=MU, g_hand=None, hand_blocke
         raise ValueError("side は 'opp' か 'me'（%r）" % (side,))
     g = float(mu if g_hand is None else g_hand)
     hand = g * hand_n
-    if THETA_HAND_MODE in ("cuttable_cx", "cuttable_forced"):
-        # **T99／T100**: 切れる枚数は `g/μ × H`（`g` は 1 枚あたりの価格＝`μ ×` 切れる割合）。
+    if THETA_HAND_MODE in ("cuttable_cx", "cuttable_forced", "cuttable_seq"):
+        # **T99／T100／T158**: 切れる枚数は `g/μ × H`（`g` は 1 枚あたりの価格＝`μ ×` 切れる割合）。
         n_cut = (g / float(mu)) * hand_n if mu else 0.0
         if THETA_HAND_MODE == "cuttable_forced":
             hand = hand_absorb_forced(n_cut, xs, life, n_blk, mu)
+        elif THETA_HAND_MODE == "cuttable_seq":
+            hand = hand_absorb_seq(n_cut, xs, mu)          # **T158**: 攻撃ごとに安い順へ割り当てる
         else:
             hand = hand_absorb(n_cut, max(xs) if xs else -1.0, mu)
     body = float(_body_term(tok, slots, body_ref))
@@ -3036,7 +3064,8 @@ def main(argv=None):
                     help="**T102** 耐久の手札項の置き場所: `stock`（旧・`Θ` に一括）／"
                          "`shield`（**的の側の有限の盾**＝毎ターン規則が許すぶんだけ＝**使う時間が要る**）")
     ap.add_argument("--theta-hand", default=THETA_HAND_MODE, choices=THETA_HAND_MODES,
-                    help="**T76** 耐久の手札項: `count`（既定・`μ × 枚数`）／`quality`（札ごとの `max(ΔH, ΔG)` の平均を掛ける）")
+                    help="**T76** 耐久の手札項: `count`（`μ × 枚数`）／`quality`（札ごとの `max(ΔH, ΔG)` の平均を掛ける）／"
+                         "`cuttable_forced`（既定・T100）／`cuttable_seq`（**T158**・攻撃ごとに安い順へ `c(x_i)` 枚を割り当てる）")
     ap.add_argument("--rate-don", default=RATE_DON_MODE, choices=RATE_DON_MODES,
                     help="**T114** 歩きの成長を規則のドンの列から作るか: `off`（旧・`flow·(j−1)`）／"
                          "`flow`（流入だけ `d_i` で絞る）／`purse`（財布ごと `d_i` で解き直す）")
