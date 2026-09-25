@@ -2641,6 +2641,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                        "seed": seed_g, "t": t,
                        "t_me_act": me["t_left"], "t_opp_act": t_opp_act,
                        "theta_me": me["theta"], "theta_opp": op["theta"], "j_me": me["j"], "j_opp": op["j"],
+                       # **C-5c**: 各歩きの的に 2 段目から戻るレスト中のブロッカー（`untap` 以外は 0）
+                       "th_back_me": float(me.get("th_back") or 0.0), "th_back_opp": float(op.get("th_back") or 0.0),
                        "slope_theory_me": me["slope_theory"], "slope_theory_opp": op["slope_theory"],
                        # **T90**: それぞれが殴っている相手の補充（`Θ` の手札項と同じ 1 枚あたりの価格）
                        "r_opp_me": me.get("r_opp"), "r_opp_opp": op.get("r_opp"),
@@ -2687,16 +2689,20 @@ def harm_profile(turn_harm, j_max=12, min_n=20, key="slope_theory"):
     return prof, prof_th
 
 
-def tau_from_profile(theta, j, prof, scale=1.0, r=0.0, shield=0.0, shield_rate=0.0, refill=0.0):
+def tau_from_profile(theta, j, prof, scale=1.0, r=0.0, shield=0.0, shield_rate=0.0, refill=0.0,
+                     step=0.0):
     """輪郭に沿って損害を積み、`Θ` に届くまでのターン数（端数は比例配分・輪郭の先は最後の値）。
 
     **T90**: `r > 0` なら**的が毎ターン `r` 下がる**（相手の補充）＝`Θ + r·(k+1)` に届くまで歩く。
     **輪郭は `A` の成長を持っている**ので、動く的と競争させるならこちら側で解く
-    （`theory` の一定の `A` では局の序盤〔盤面が空〕に追いつけず打ち切りになる・T90 の実測）。"""
+    （`theory` の一定の `A` では局の序盤〔盤面が空〕に追いつけず打ち切りになる・T90 の実測）。
+    **C-5c**: `step > 0` なら**2 段目から**的がその分だけ遠のく（`tau_grow` の `step` と同じ規約＝
+    レスト中のブロッカーが持ち主の次のリフレッシュで戻る・T96）。"""
     acc = 0.0
     r = max(0.0, float(r))
     shield = max(0.0, float(shield)); shield_rate = max(0.0, float(shield_rate))
     refill = max(0.0, float(refill))
+    step = max(0.0, float(step))
     if (shield > 0.0 or refill > 0.0) and shield_rate <= 0.0:
         shield_rate = shield + refill
     for k in range(200):
@@ -2706,7 +2712,7 @@ def tau_from_profile(theta, j, prof, scale=1.0, r=0.0, shield=0.0, shield_rate=0
         # **T102／T104**: 有限の盾（相手の手札 ＋ 補充）は毎ターン `shield_rate` までしか出てこない
         got = (min(shield + refill * (k + 1), shield_rate * (k + 1))
                if (shield > 0.0 or refill > 0.0) else 0.0)
-        need = float(theta) + r * (k + 1) + got
+        need = float(theta) + r * (k + 1) + got + (step if k >= 1 else 0.0)
         if acc + h >= need:
             return k + max(0.0, need - acc) / h
         acc += h
@@ -2798,9 +2804,11 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
                 rf_me = float(r.get("r_opp_me") or 0.0) if fill else 0.0
                 rf_op = float(r.get("r_opp_opp") or 0.0) if fill else 0.0
                 tm = tau_from_profile(r["theta_me"], r["j_me"], prof, scale_me, rr_me,
-                                      r.get("shield_me") or 0.0, r.get("shield_rate_me") or 0.0, rf_me)
+                                      r.get("shield_me") or 0.0, r.get("shield_rate_me") or 0.0, rf_me,
+                                      step=r.get("th_back_me") or 0.0)
                 to = tau_from_profile(r["theta_opp"], r["j_opp"], prof, scale_op, rr_op,
-                                      r.get("shield_opp") or 0.0, r.get("shield_rate_opp") or 0.0, rf_op)
+                                      r.get("shield_opp") or 0.0, r.get("shield_rate_opp") or 0.0, rf_op,
+                                      step=r.get("th_back_opp") or 0.0)
                 r["tau_me_" + sv] = tm; r["tau_opp_" + sv] = to; r["pred_" + sv] = (tm <= to)
     if theta_check:
         # **T96**: `Θ` は終盤に縮むか——**残りターンごと**に `Θ` と「そこから実際に要った損害」を並べる。

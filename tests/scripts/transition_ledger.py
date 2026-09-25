@@ -137,22 +137,31 @@ def boundary_dx(tok, ci_row, idx2cid, cards, mlp, g_next, sched, j_next, next_is
 
 def _swap_state(st):
     """席 1 の視点の状態を**席 0 の視点**に写す（`Θ` と `A` を入れ替え・`j` は共通）。"""
-    th_me, th_opp, a_me, a_opp, j = st
-    return (th_opp, th_me, a_opp, a_me, j)
+    st = tuple(st)
+    th_me, th_opp, a_me, a_opp, j = st[:5]
+    out = (th_opp, th_me, a_opp, a_me, j)
+    if len(st) == 7:                       # **C-5c**: 戻る分も入れ替える
+        out += (st[6], st[5])
+    return out
 
 
 def _swap_dx(dx):
     """席 1 の視点の `Δx` を**席 0 の視点**に写す（軸の名前を入れ替えるだけ・符号は変えない）。"""
-    m = {"th_me": "th_opp", "th_opp": "th_me", "a_me": "a_opp", "a_opp": "a_me"}
+    m = {"th_me": "th_opp", "th_opp": "th_me", "a_me": "a_opp", "a_opp": "a_me",
+         "th_me_back": "th_opp_back", "th_opp_back": "th_me_back"}      # **C-5c**: 戻る分も入れ替える
     return {m.get(k, k): v for k, v in dx.items()}
 
 
 def _mix(st0, st1, keys):
-    """`keys` の軸だけ `st1` の値にした中間状態（シャープレイの部分集合の評価に使う）。"""
+    """`keys` の軸だけ `st1` の値にした中間状態（シャープレイの部分集合の評価に使う）。
+    **C-5c**: 7 つ組では耐久の軸は戻る分も一緒に動く（`th_me`＝添字 0 と 5・`th_opp`＝添字 1 と 6）。"""
+    st0 = tuple(st0); st1 = tuple(st1)
     out = list(st0)
-    for i, name in enumerate(AXES5):
-        if name in keys:
-            out[i] = st1[i]
+    idx = {"th_me": (0, 5), "th_opp": (1, 6), "a_me": (2,), "a_opp": (3,), "j": (4,)}
+    for k in keys:
+        for i in idx[k]:
+            if i < len(out):
+                out[i] = st1[i]
     return tuple(out)
 
 
@@ -341,7 +350,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
                              shape_at.get((1 - w, max(_ts))) if _ts else None)
             sc, tok, ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
             st = KV.state_of_row(sc, tok, me[0], op[0], CB.own_turn_index(t),
-                                 g_me=me[1], g_opp=op[1])
+                                 g_me=me[1], g_opp=op[1], ci_row=ci, idx2cid=idx2cid, cards=cards)
             stats["rows"] += 1
             # その行で選ばれた手の `Δx`（無ければ空＝値段の付かない行）
             dx = {}; fam = "none"; mv = None
@@ -493,13 +502,17 @@ def main(argv=None):
     ap.add_argument("--boundary", choices=BOUNDARY_MODES, default=None,
                     help="**T124**: ターンの境目を規則から値付けするか（既定 `off`）")
     ap.add_argument("--attack-rest", dest="attack_rest", choices=KV.ATTACK_REST_MODES, default=None,
-                    help="攻撃した体のレスト費用をΘ_meへ足すか（C-2・既定off）")
+                    help="攻撃した体のレスト費用をΘ_meへ足すか（C-2・既定off／C-5c `return`）")
+    ap.add_argument("--theta-return", dest="theta_return", choices=CB.THETA_RETURN_MODES, default=None,
+                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 off）")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
     if a.d_mode:
         KV.set_d_mode(a.d_mode)
     if a.boundary:
         set_boundary_mode(a.boundary)
+    if a.theta_return:
+        CB.set_theta_return_mode(a.theta_return)
     if a.attack_rest:
         KV.set_attack_rest_mode(a.attack_rest)
     out = collect(a.src, a.games)

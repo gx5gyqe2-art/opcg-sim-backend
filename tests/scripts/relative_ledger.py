@@ -98,7 +98,8 @@ def clocks_of(st, prof=None):
     （`curve`＝輪郭を歩く〔帳簿の正本〕／**`curve_scaled`＝輪郭をその席の `A` で伸縮**〔T126〕／`clock`＝`min(CAP, Θ/A)`）。
 
     **`D = T_opp − T_me`** は `KV.d_of` と同じ値になる（同じ関数を呼んでいる）。"""
-    th_me, th_opp, a_me, a_opp, j = st
+    # **C-5c**: 7 つ組なら末尾の**戻る分**（レスト中のブロッカー）が各歩きの的に 2 段目から足される
+    th_me, th_opp, a_me, a_opp, j, b_me, b_opp = KV.split_state(st)
     if KV.D_MODE in ("curve", "curve_scaled"):
         if prof is None:
             raise ValueError("D_MODE=%s には損害の輪郭が要る（profile_for）" % KV.D_MODE)
@@ -107,15 +108,15 @@ def clocks_of(st, prof=None):
         if KV.D_MODE == "curve_scaled":
             s_me = KV.profile_scale(a_me, j)      # 自分が相手を倒すまで＝**自分**の速さ
             s_opp = KV.profile_scale(a_opp, j)    # 相手が自分を倒すまで＝**相手**の速さ
-        t_me = float(CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof, s_me))
-        t_opp = float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof, s_opp))
+        t_me = float(CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof, s_me, step=b_opp))
+        t_opp = float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof, s_opp, step=b_me))
     elif KV.D_MODE == "theory":
         # **T127**: 加速を状態から出す（表を使わない）。削る側の速さでそれぞれ歩く。
-        t_me = KV.tau_theory(th_opp, a_me, KV.RATE_SHAPE["me"], j)
-        t_opp = KV.tau_theory(th_me, a_opp, KV.RATE_SHAPE["opp"], j)
+        t_me = KV.tau_theory(th_opp, a_me, KV.RATE_SHAPE["me"], j, step=b_opp)
+        t_opp = KV.tau_theory(th_me, a_opp, KV.RATE_SHAPE["opp"], j, step=b_me)
     else:
-        t_me = KV.tau_of(th_opp, a_me)
-        t_opp = KV.tau_of(th_me, a_opp)
+        t_me = KV.tau_of(th_opp, a_me, step=b_opp)
+        t_opp = KV.tau_of(th_me, a_opp, step=b_me)
     return max(T_FLOOR, t_me), max(T_FLOOR, t_opp)
 
 
@@ -186,10 +187,12 @@ def _invariance(inv, st0, dx, prof, sigma_rel, dl, kk, capped):
             # `A` が時計に入る読み（`curve_scaled`／`theory`）では**耐久だけ 3 倍にするのは
             # 単位の変更ではなく物理の変更**（同じ速さで 3 倍の耐久＝3 倍の時間）になっていた。
             # **T122／T126 の P5 の数字はこの誤った定義で測ったもの**（`curve` については結論は変わらない）。
-            ("p5", (st0[0] * INV_C5, st0[1] * INV_C5, st0[2] * INV_C5, st0[3] * INV_C5, st0[4]),
+            # **C-5c**: 7 つ組なら**戻る分も同じ通貨**（P5 では c 倍・P7 ではそのまま）
+            ("p5", (st0[0] * INV_C5, st0[1] * INV_C5, st0[2] * INV_C5, st0[3] * INV_C5, st0[4])
+                   + tuple(x * INV_C5 for x in st0[5:]),
              {k: v * INV_C5 for k, v in dx.items()}),
-            ("p7", (st0[0], st0[1], st0[2] * INV_C7, st0[3] * INV_C7, st0[4]),
-             {k: v for k, v in dx.items() if k in ("th_me", "th_opp")}
+            ("p7", (st0[0], st0[1], st0[2] * INV_C7, st0[3] * INV_C7, st0[4]) + tuple(st0[5:]),
+             {k: v for k, v in dx.items() if k in ("th_me", "th_opp", "th_me_back", "th_opp_back")}
              | {k: v * INV_C7 for k, v in dx.items() if k in ("a_me", "a_opp")})):
         st1b = KV.apply_dx(st0b, dxb)
         a, b = clocks_of(st0b, prof)
@@ -327,9 +330,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
             sig = json.loads(pol["pol_sig"][b])
             fam = move_family(sig)
             st0 = KV.state_of_row(sc, tok, rate_at_turn[(w, t)], ao, CB.own_turn_index(t),
-                                  g_me=g_at_turn[(w, t)], g_opp=g_opp)
+                                  g_me=g_at_turn[(w, t)], g_opp=g_opp, ci_row=ci, idx2cid=idx2cid, cards=cards)
             # **P5**: 通貨の付け替え＝耐久も価格も同じ c 倍（速さはそのまま＝時計は c 倍される）
-            st0 = (st0[0] * scale_currency, st0[1] * scale_currency, st0[2], st0[3], st0[4])
+            st0 = ((st0[0] * scale_currency, st0[1] * scale_currency, st0[2], st0[3], st0[4])
+                   + tuple(x * scale_currency for x in st0[5:]))     # 戻る分も同じ通貨（C-5c）
             rt = max(1.0, min(5.0, float(np.asarray(sc)[SC_OPP_LIFE])))
             th = theta_of(tok, float(np.asarray(sc)[SC_MY_LIFE]), float(np.asarray(sc)[SC_MY_DON]),
                           mode="const", theta=theta)
@@ -479,7 +483,9 @@ def build_parser():
     ap.add_argument("--slope-take", dest="slope_take", choices=CB.SLOPE_TAKE_MODES, default=None,
                     help="**T134**: `A` の「受ける費用」を自分のライフで決めるか（既定は現状の `const`）")
     ap.add_argument("--attack-rest", dest="attack_rest", choices=KV.ATTACK_REST_MODES, default=None,
-                    help="**C-2**: 攻撃した体のレスト費用をΘ_meへ足すか（既定 `off`）")
+                    help="**C-2**: 攻撃した体のレスト費用をΘ_meへ足すか（既定 `off`・C-5c は `return`）")
+    ap.add_argument("--theta-return", dest="theta_return", choices=CB.THETA_RETURN_MODES, default=None,
+                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 `off`）")
     ap.add_argument("--scale-a", type=float, default=1.0, help="**P7**: 両席の A に共通の掛け算誤差")
     ap.add_argument("--scale-currency", type=float, default=1.0, help="**P5**: 耐久と価格を同時に c 倍")
     ap.add_argument("--scale-clamp", dest="clamp", default="",
@@ -504,6 +510,8 @@ def main(argv=None):
         CB.set_slope_take_mode(a.slope_take)          # **T134**
     if a.attack_rest:
         KV.set_attack_rest_mode(a.attack_rest)        # **C-2**
+    if a.theta_return:
+        CB.set_theta_return_mode(a.theta_return)      # **C-5c**
     if a.clamp:
         KV.set_scale_clamp([float(x) for x in a.clamp.split(",")])
     out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency,

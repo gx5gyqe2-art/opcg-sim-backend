@@ -71,13 +71,17 @@ def build_parser():
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--d-mode", default=None, choices=KV.D_MODES)
     ap.add_argument("--attack-rest", dest="attack_rest", default=None, choices=KV.ATTACK_REST_MODES,
-                    help="**C-2**: 攻撃した体のレスト費用をΘ_meへ足すか（既定 `off`）")
+                    help="**C-2**: 攻撃した体のレスト費用をΘ_meへ足すか（既定 `off`・C-5c は `return`）")
+    ap.add_argument("--theta-return", dest="theta_return", default=None, choices=KV.CB.THETA_RETURN_MODES,
+                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 `off`）")
     ap.add_argument("--json", default="")
     return ap
 
 
 def main(argv=None):
     a = build_parser().parse_args(argv)
+    if a.theta_return:
+        KV.CB.set_theta_return_mode(a.theta_return)
     out = collect(a.src, a.games, a.d_mode, a.attack_rest)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:

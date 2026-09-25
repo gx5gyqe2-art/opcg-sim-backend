@@ -96,7 +96,7 @@ def state_by_turn(rows, ex, idx, cards, idx2cid, seat_decks, seed_g, theta=THETA
             continue
         a_opp, g_opp = pair
         sc, tok = ex["sc"][first_row[(w, t)]], ex["tok"][first_row[(w, t)]]
-        th_me, th_opp, a_me2, a_opp2, _j = KV.state_of_row(
+        th_me, th_opp, a_me2, a_opp2, _j = KV.state5_of_row(
             sc, tok, a_me, a_opp, CB.own_turn_index(t), g_me=g_at_turn[(w, t)], g_opp=g_opp)
         sc_a = np.asarray(sc)
         out[(w, t)] = {"th_me": th_me, "th_opp": th_opp, "a_me": a_me2, "a_opp": a_opp2,

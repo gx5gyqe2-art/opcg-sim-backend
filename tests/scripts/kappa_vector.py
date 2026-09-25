@@ -125,8 +125,22 @@ AXES = ("th_me", "th_opp", "a_me", "a_opp")
 #: 次の自席ターンまで`Θ_me`の体の項（`THETA_BODY_MODE=blockers`）から抜ける分を価格にも足す**。
 #: 規則: `has_blocker`は`!is_rest`を要求（`rust/opcg_engine/src/rules/battle.rs`）。値は`_body_term`と
 #: 同じ単位（`crossing_bridge.nu_meas_of`）。**新定数ゼロ**（既存の式の再利用）。
-ATTACK_REST_MODES = ("off", "body")
+#: **`return`（C-5c・正しい形）**: 攻めたブロッカーの `ν_meas` を**消さずに「戻る側」へ移す**
+#: （`th_me` −ν・`th_me_back` +ν・総量は不変）——状態が `THETA_RETURN_MODE=untap` の 7 つ組
+#: （戻る分を持つ）であることが前提（5 つ組に `*_back` を足すと `apply_dx` が落ちる＝黙って捨てない）。
+ATTACK_REST_MODES = ("off", "body", "return")
 ATTACK_REST_MODE = "off"
+
+
+def split_state(st):
+    """状態を **7 つ**に揃えて返す `(Θ_me, Θ_opp, A_me, A_opp, j, 戻る_me, 戻る_opp)`（C-5c）。
+    5 つ組（既定・`THETA_RETURN_MODE=off`）は戻る分 0 として読む。"""
+    st = tuple(st)
+    if len(st) == 5:
+        return st + (0.0, 0.0)
+    if len(st) == 7:
+        return st
+    raise ValueError("状態は 5 つ組か 7 つ組（%d）" % len(st))
 
 
 def set_attack_rest_mode(mode):
@@ -235,18 +249,19 @@ def set_rate_shape(me_terms=None, opp_terms=None):
     return RATE_SHAPE
 
 
-def tau_theory(theta, rate, shape, j):
+def tau_theory(theta, rate, shape, j, step=0.0):
     """**積み上がる歩き**（T94）で `Θ` に届くまでのターン数。**表を一切使わない**（加速は状態から出る）。
 
     `R_k = リーダー ＋ 盤面·(1−ko_p)^{k−1} ＋ 在庫·[k≥2] ＋ 流入·(k−1) ＋ 効果 ＋ 在庫の効果·[k≤1]`
     （`crossing_bridge.rate_at`・速攻は 1 ターン早く積む）を `shape × rate` で作って歩く。
-    **`A` について 1 次同次**なので、通貨の付け替えにも両席共通の速さの誤差にも構造的に強い。"""
+    **`A` について 1 次同次**なので、通貨の付け替えにも両席共通の速さの誤差にも構造的に強い。
+    `step`＝**2 段目から的に戻るレスト中のブロッカー**（C-5c・`tau_grow` の `step`）。"""
     sh = list(shape) + [0.0] * SHAPE_N
     lead, chars, stock, flow, s_rush, f_rush, eff, eff1 = (
         float(x) * max(0.0, float(rate)) for x in sh[:SHAPE_N])
     return float(CB.tau_grow(max(0.0, float(theta)), lead, chars, stock, flow,
                              stock_rush=s_rush, flow_rush=f_rush, eff=eff, eff_once=eff1,
-                             j0=int(j) + 1))
+                             j0=int(j) + 1, step=max(0.0, float(step))))
 
 
 def set_d_mode(name):
@@ -256,9 +271,14 @@ def set_d_mode(name):
     D_MODE = name
 
 
-def tau_of(theta, rate):
-    """**片側の時計** `τ = min(CAP, Θ/A)`（`clock` の読み・T90 の `static`）。"""
-    return min(float(TAU_CAP), float(theta) / max(A_FLOOR, float(rate)))
+def tau_of(theta, rate, step=0.0):
+    """**片側の時計** `τ = min(CAP, Θ/A)`（`clock` の読み・T90 の `static`）。
+    `step > 0`（C-5c）なら 1 段目に届かなければ的が `step` 遠のく＝`(Θ + step)/A`。"""
+    a = max(A_FLOOR, float(rate))
+    th = float(theta); step = max(0.0, float(step))
+    if step > 0.0 and th > a:
+        th += step
+    return min(float(TAU_CAP), th / a)
 
 
 def d_of(st, prof=None):
@@ -266,7 +286,7 @@ def d_of(st, prof=None):
 
     `st` は `(Θ_me, Θ_opp, A_me, A_opp, j)`。`j` は自席ターン番号（輪郭の読み出し位置）。
     `curve` は `crossing_bridge.tau_from_profile`（**帳簿が使っているのと同じ関数**）。"""
-    th_me, th_opp, a_me, a_opp, j = st
+    th_me, th_opp, a_me, a_opp, j, b_me, b_opp = split_state(st)
     if D_MODE in ("curve", "curve_scaled"):
         if prof is None:
             raise ValueError("D_MODE=%s には損害の輪郭が要る（profile_for）" % D_MODE)
@@ -275,22 +295,31 @@ def d_of(st, prof=None):
         if D_MODE == "curve_scaled":
             s_me = profile_scale(a_opp, j)      # 自分が死ぬまで＝**相手**が削る速さ
             s_opp = profile_scale(a_me, j)      # 相手が死ぬまで＝**自分**が削る速さ
-        return float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof, s_me)
-                     - CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof, s_opp))
+        return float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof, s_me, step=b_me)
+                     - CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof, s_opp, step=b_opp))
     if D_MODE == "theory":
         # **T127**: 加速を**状態から**出す（表を使わない）。削る側の速さでそれぞれ歩く。
-        return (tau_theory(th_me, a_opp, RATE_SHAPE["opp"], j)
-                - tau_theory(th_opp, a_me, RATE_SHAPE["me"], j))
-    return tau_of(th_me, a_opp) - tau_of(th_opp, a_me)
+        return (tau_theory(th_me, a_opp, RATE_SHAPE["opp"], j, step=b_me)
+                - tau_theory(th_opp, a_me, RATE_SHAPE["me"], j, step=b_opp))
+    return tau_of(th_me, a_opp, step=b_me) - tau_of(th_opp, a_me, step=b_opp)
 
 
 def apply_dx(st, dx):
-    """`(Θ_me, Θ_opp, A_me, A_opp, j)` に `Δx` を足す（**耐久は 0 未満に、速さは床未満にしない**＝規則）。"""
-    th_me, th_opp, a_me, a_opp, j = st
-    return (max(0.0, float(th_me) + float(dx.get("th_me", 0.0))),
-            max(0.0, float(th_opp) + float(dx.get("th_opp", 0.0))),
-            max(A_FLOOR, float(a_me) + float(dx.get("a_me", 0.0))),
-            max(A_FLOOR, float(a_opp) + float(dx.get("a_opp", 0.0))), j)
+    """`(Θ_me, Θ_opp, A_me, A_opp, j[, 戻る_me, 戻る_opp])` に `Δx` を足す（**耐久は 0 未満に、速さは床未満に
+    しない**＝規則）。5 つ組に `th_*_back` を足すことはできない（戻る分を持たない状態＝落とす）。"""
+    st = tuple(st)
+    has_back = ("th_me_back" in dx) or ("th_opp_back" in dx)
+    if len(st) == 5 and has_back:
+        raise ValueError("戻る分（th_*_back）は THETA_RETURN_MODE=untap の 7 つ組にしか足せない")
+    th_me, th_opp, a_me, a_opp, j, b_me, b_opp = split_state(st)
+    out = (max(0.0, float(th_me) + float(dx.get("th_me", 0.0))),
+           max(0.0, float(th_opp) + float(dx.get("th_opp", 0.0))),
+           max(A_FLOOR, float(a_me) + float(dx.get("a_me", 0.0))),
+           max(A_FLOOR, float(a_opp) + float(dx.get("a_opp", 0.0))), j)
+    if len(st) == 7:
+        out += (max(0.0, float(b_me) + float(dx.get("th_me_back", 0.0))),
+                max(0.0, float(b_opp) + float(dx.get("th_opp_back", 0.0))))
+    return out
 
 
 def grad_clock(th_me, th_opp, a_me, a_opp):
@@ -318,7 +347,7 @@ def grad_of(st, prof=None):
     `curve` の `τ` は輪郭に沿った区分線形なので、中心差分は**その `τ` における輪郭の高さの逆数**
     `1/prof[j+τ]` をそのまま返す（解析と同じ値・刻みは数値の都合で式の定数ではない）。
     **生きていない軸は 0**（`curve` に速さの軸は存在しない）。"""
-    th_me, th_opp, a_me, a_opp, j = st
+    th_me, th_opp, a_me, a_opp, j = split_state(st)[:5]
     if D_MODE == "clock":
         return grad_clock(th_me, th_opp, a_me, a_opp)
     g = {k: 0.0 for k in AXES}
@@ -403,17 +432,34 @@ def rate_terms_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_
             float(s_rush), float(f_rush), float(eff), float(eff1))
 
 
-def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None):
+def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, idx2cid=None, cards=None):
     """行から **(Θ_me, Θ_opp, A_me, A_opp, j)** を組む（両席・完全情報・§0.05）。
 
     `Θ` は**その行**から両席分読める（`threshold` と `threshold_of_me` が対の式）。
     **手札 1 枚あたりの価格は両席それぞれの手札から**（T79・`curve_d_of_row` と同じ渡し方）
     ——`scalar` の腕を**帳簿の `κ` そのもの**にするために要る（`μ` で代用すると別物になる）。
-    `A` は**両席ぶんをターンの最初の行から**渡してもらう（`rate_of_row` の注意書き）。"""
+    `A` は**両席ぶんをターンの最初の行から**渡してもらう（`rate_of_row` の注意書き）。
+
+    **C-5c**: `CB.THETA_RETURN_MODE=untap` なら **7 つ組**——末尾に**レスト中のブロッカー**
+    `(戻る_me, 戻る_opp)`（`resting_blocker_term`・札の原本から読む＝`ci_row`／`idx2cid`／`cards` が要る）。
+    歩きはこれを**2 段目から**的に足す（持ち主の次のリフレッシュで戻る・T96）。`Θ` 本体はアクティブな
+    ブロッカーだけのまま（既定と同じ数字）。"""
     sc = np.asarray(sc); tok = np.asarray(tok)
-    return (float(CB.threshold_of_me(sc, tok, g_hand=g_me)),
-            float(CB.threshold(sc, tok, g_hand=g_opp)),
-            float(a_me), float(a_opp), int(j))
+    st = (float(CB.threshold_of_me(sc, tok, g_hand=g_me)),
+          float(CB.threshold(sc, tok, g_hand=g_opp)),
+          float(a_me), float(a_opp), int(j))
+    if CB.THETA_RETURN_MODE != "untap":
+        return st
+    olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+    mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
+    b_me = CB.resting_blocker_term(tok, TO.SLOT_OWN_FIELD, olp, ci_row=ci_row, idx2cid=idx2cid, cards=cards)
+    b_opp = CB.resting_blocker_term(tok, TO.SLOT_OPP_FIELD, mlp, ci_row=ci_row, idx2cid=idx2cid, cards=cards)
+    return st + (float(b_me), float(b_opp))
+
+
+def state5_of_row(*args, **kwargs):
+    """`state_of_row` の**最初の 5 つだけ**（戻る分を読まない器の互換用・C-5c）。"""
+    return tuple(state_of_row(*args, **kwargs))[:5]
 
 
 def axis_of_move(fam, v, sig, cid, cards, sc, tok, olp, r_turns, don_k=0):
@@ -426,13 +472,15 @@ def axis_of_move(fam, v, sig, cid, cards, sc, tok, olp, r_turns, don_k=0):
     v = float(v)
     if fam == "attack":
         out["th_opp"] = -v                      # 相手の耐久を削る（価格の単位のまま）
-        if ATTACK_REST_MODE == "body":
+        if ATTACK_REST_MODE in ("body", "return"):
             info = cards.info(cid) if (cards is not None and cid) else None
             if info and info.get("blocker") and not info.get("event"):
                 p = float(info.get("power") or 0.0)
                 nu = float(CB.nu_meas_of(p, olp))
                 if nu > 0.0:
                     out["th_me"] = -nu           # 攻めてレストになる分、自分の耐久の体の項から抜ける（C-2）
+                    if ATTACK_REST_MODE == "return":
+                        out["th_me_back"] = nu   # **C-5c**: 消さずに「次の自席ターンから戻る側」へ移す
     elif fam == "play":
         info = cards.info(cid) if (cards is not None and cid) else None
         p = float((info or {}).get("power") or 0.0)
@@ -598,7 +646,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
             sig = json.loads(pol["pol_sig"][b])
             fam = move_family(sig)
             st0 = state_of_row(sc, tok, rate_at_turn[(w, t)], ao, CB.own_turn_index(t),
-                               g_me=g_at_turn[(w, t)], g_opp=g_opp)
+                               g_me=g_at_turn[(w, t)], g_opp=g_opp, ci_row=ci, idx2cid=idx2cid, cards=cards)
             rt = max(1.0, min(5.0, float(np.asarray(sc)[SC_OPP_LIFE])))
             th = theta_of(tok, float(np.asarray(sc)[SC_MY_LIFE]), float(np.asarray(sc)[SC_MY_DON]),
                           mode="const", theta=theta)
@@ -681,11 +729,15 @@ def main(argv=None):
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--d-mode", dest="d_mode", choices=D_MODES, default=None)
     ap.add_argument("--attack-rest", dest="attack_rest", choices=ATTACK_REST_MODES, default=None,
-                    help="攻撃した体のレスト費用をΘ_meへ足すか（C-2・既定off）")
+                    help="攻撃した体のレスト費用をΘ_meへ足すか（C-2・既定off／C-5c `return`）")
+    ap.add_argument("--theta-return", dest="theta_return", choices=CB.THETA_RETURN_MODES, default=None,
+                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 off）")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
     if a.d_mode:
         set_d_mode(a.d_mode)
+    if a.theta_return:
+        CB.set_theta_return_mode(a.theta_return)
     if a.attack_rest:
         set_attack_rest_mode(a.attack_rest)
     out = collect(a.src, a.games)

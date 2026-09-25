@@ -165,7 +165,7 @@ class _LiveState:
             return None
         key = (1 - w, max(ts))
         a_opp, g_opp = self.rate_at_turn[key], self.g_at_turn[key]
-        th_me, th_opp, a_me2, a_opp2, _j = KV.state_of_row(
+        th_me, th_opp, a_me2, a_opp2, _j = KV.state5_of_row(
             sc, tok, self.rate_at_turn[(w, t)], a_opp, j, g_me=self.g_at_turn[(w, t)], g_opp=g_opp)
         return {"th_me": th_me, "th_opp": th_opp, "a_me": a_me2, "a_opp": a_opp2}
 
