@@ -132,6 +132,8 @@ def build_parser():
                          "margin=-1 が `econ`〔T130 の受けるより安いときだけ切る〕でどう動くかの検算に使う）")
     ap.add_argument("--life", default=None, choices=LR.LETHAL_LIFE_MODES,
                     help="lethal_rule の --life をそのまま通す（既定 draw）")
+    ap.add_argument("--avg-counter", default=None, choices=LR.AVG_COUNTER_MODES,
+                    help="lethal_rule の --avg-counter をそのまま通す（既定 printed）")
     ap.add_argument("--json", default="")
     return ap
 
@@ -144,6 +146,8 @@ def main(argv=None):
         LR.set_lethal_stop_mode(a.stop)
     if a.life:
         LR.set_lethal_life_mode(a.life)
+    if a.avg_counter:
+        LR.set_avg_counter_mode(a.avg_counter)
     out = collect(a.src, a.games, a.don == "on")
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:

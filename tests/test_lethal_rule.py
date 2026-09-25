@@ -36,10 +36,12 @@ def _defaults():
     LR.set_lethal_hand_mode("actual")
     LR.set_lethal_stop_mode("max")
     LR.set_lethal_life_mode("off")          # 既定は `draw` だが、規則 1〜5 のテストはライフの札なしで読む
+    LR.set_avg_counter_mode("printed")
     yield
     LR.set_lethal_hand_mode("actual")
     LR.set_lethal_stop_mode("max")
     LR.set_lethal_life_mode("draw")
+    LR.set_avg_counter_mode("printed")
 
 
 # ---- 1. 切れるだけ切る ---------------------------------------------------------------------------
@@ -209,8 +211,9 @@ def test_metrics_are_empty_safe():
 
 def test_cli_exposes_all_switches_and_they_reach_the_module(monkeypatch):
     monkeypatch.setattr(LR, "collect", lambda *a, **k: {})
-    LR.main(["--in", "x", "--hand", "share", "--stop", "econ", "--life", "off"])
-    assert (LR.LETHAL_HAND_MODE, LR.LETHAL_STOP_MODE, LR.LETHAL_LIFE_MODE) == ("share", "econ", "off")
+    LR.main(["--in", "x", "--hand", "share", "--stop", "econ", "--life", "off", "--avg-counter", "rules"])
+    assert (LR.LETHAL_HAND_MODE, LR.LETHAL_STOP_MODE, LR.LETHAL_LIFE_MODE, LR.AVG_COUNTER_MODE) == \
+        ("share", "econ", "off", "rules")
 
 
 # ---- 6. 受けたライフの札は手札に入る（規則・`rules/battle.rs`） -----------------------------------
@@ -362,3 +365,54 @@ def test_first_declared_turn_omits_games_without_a_declaration():
 
 def test_first_declared_turn_is_a_pure_function_of_the_map():
     assert LR.first_declared_turn({}) == {}
+
+
+# ---- 10. `avg_counter` の数え方（P8-7(b) 候補(c)・2026-09-25） ------------------------------------
+#
+# `EB01-028`（ゴムゴムのチャンピオン回転弾）は印字カウンター0だが【カウンター】能力でパワー+2000。
+# `EB01-022`（イナズマ）は印字カウンター1000でイベント能力は無い。
+# `printed`（既定）は前者を0として数え、`rules`（P8-7(b) 候補(c)）は【カウンター】の上げ幅も数える。
+
+def test_avg_counter_printed_mode_ignores_the_counter_event_boost():
+    from opcg_sim.learned.train import plan_labels as PL
+    cards = PL.Cards()
+    LR.set_avg_counter_mode("printed")
+    assert LR.avg_counter(["EB01-028", "EB01-022"], cards) == pytest.approx(500.0)   # (0 + 1000) / 2
+
+
+def test_avg_counter_rules_mode_counts_the_counter_event_boost():
+    from opcg_sim.learned.train import plan_labels as PL
+    cards = PL.Cards()
+    LR.set_avg_counter_mode("rules")
+    assert LR.avg_counter(["EB01-028", "EB01-022"], cards) == pytest.approx(1500.0)  # (2000 + 1000) / 2
+
+
+def test_avg_counter_rules_mode_takes_the_larger_of_printed_and_event():
+    from opcg_sim.learned.train import plan_labels as PL
+    cards = PL.Cards()
+    LR.set_avg_counter_mode("rules")
+    # イナズマは印字1000・イベント無し(0) → max(1000, 0) = 1000 のまま(printedと同じ)
+    assert LR.avg_counter(["EB01-022"], cards) == pytest.approx(1000.0)
+
+
+def test_avg_counter_skips_unknown_card_ids_in_both_modes():
+    from opcg_sim.learned.train import plan_labels as PL
+    cards = PL.Cards()
+    LR.set_avg_counter_mode("printed")
+    assert LR.avg_counter(["__no_such_card__"], cards) == 0.0
+    LR.set_avg_counter_mode("rules")
+    assert LR.avg_counter(["__no_such_card__"], cards) == 0.0
+
+
+def test_avg_counter_returns_zero_for_an_empty_deck():
+    from opcg_sim.learned.train import plan_labels as PL
+    cards = PL.Cards()
+    for mode in LR.AVG_COUNTER_MODES:
+        LR.set_avg_counter_mode(mode)
+        assert LR.avg_counter([], cards) == 0.0
+    LR.set_avg_counter_mode("printed")
+
+
+def test_set_avg_counter_mode_rejects_unknown_modes():
+    with pytest.raises(ValueError):
+        LR.set_avg_counter_mode("bogus")

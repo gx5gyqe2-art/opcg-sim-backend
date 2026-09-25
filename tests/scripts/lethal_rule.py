@@ -96,6 +96,11 @@ LETHAL_STOP_MODE = "max"
 #: **受けたライフの札を守り手のカウンターに数えるか**——`draw`（既定・規則）／`off`（T117 の旧規約）
 LETHAL_LIFE_MODES = ("draw", "off")
 LETHAL_LIFE_MODE = "draw"
+#: **ライフ札の平均カウンター値の数え方**（P8-7(b) 候補(c)・2026-09-25）——
+#: `printed`（既定・旧来）は印字カウンターだけを数える。`rules` は `deck_refill.is_cuttable`／
+#: `hand_guard.counter_of` と同じ定義（印字カウンターと【カウンター】イベントの上げ幅の大きい方）に揃える。
+AVG_COUNTER_MODES = ("printed", "rules")
+AVG_COUNTER_MODE = "printed"
 #: 1 体に付けられるドンの上限（規則）
 DON_PER_BODY = 4
 #: 状態スカラーの **相手のアクティブなドン**（`encoder.py` の並び: 0 自ライフ・1 相手ライフ・2 自アクティブ・3 自レスト・4 相手アクティブ）
@@ -126,12 +131,35 @@ def set_lethal_life_mode(mode):
     return LETHAL_LIFE_MODE
 
 
+def set_avg_counter_mode(mode):
+    global AVG_COUNTER_MODE
+    if mode not in AVG_COUNTER_MODES:
+        raise ValueError("avg counter mode は %s のどれか" % (AVG_COUNTER_MODES,))
+    AVG_COUNTER_MODE = mode
+    return AVG_COUNTER_MODE
+
+
 def avg_counter(deck_ids, cards):
-    """**デッキ 1 枚あたりの平均カウンター値**（ライフから手札に入る札の読み・T91 の `cut_share` と同じ規約＝完全なデッキ組成）。"""
+    """**デッキ 1 枚あたりの平均カウンター値**（ライフから手札に入る札の読み・T91 の `cut_share` と同じ規約＝完全なデッキ組成）。
+    `AVG_COUNTER_MODE=printed`（既定）は印字カウンターだけを数える。`rules`（P8-7(b) 候補(c)）は
+    【カウンター】イベントの上げ幅も数える——`is_cuttable`／`counter_of` が既に使っている定義に揃えるだけ
+    （新定数ゼロ）。"""
     vals = []
-    for cid in deck_ids or ():
-        info = cards.info(cid) or {}
-        vals.append(float(info.get("counter") or 0.0))
+    if AVG_COUNTER_MODE == "rules":
+        import deck_refill as DR
+        from opcg_sim.learned import n_rel_feat as NF
+        d = DR.db()
+        for cid in deck_ids or ():
+            m = d.get_card(cid)
+            if m is None:
+                continue
+            printed = float(getattr(m, "counter", 0) or 0.0)
+            cev = float(NF.profile(m).get("counter_event") or 0.0)
+            vals.append(max(printed, cev))
+    else:
+        for cid in deck_ids or ():
+            info = cards.info(cid) or {}
+            vals.append(float(info.get("counter") or 0.0))
     return float(np.mean(vals)) if vals else 0.0
 
 
@@ -471,6 +499,8 @@ def build_parser():
                     help="守り手がどこまで切るか（既定 `max`＝切れるだけ・`econ`＝受けるより安いときだけ）")
     ap.add_argument("--life", default=None, choices=LETHAL_LIFE_MODES,
                     help="受けたライフの札を守り手のカウンターに数えるか（既定 `draw`＝規則・`off`＝T117 の旧規約）")
+    ap.add_argument("--avg-counter", default=None, choices=AVG_COUNTER_MODES,
+                    help="ライフ札の平均カウンター値の数え方（既定 `printed`＝印字のみ・`rules`＝カウンターイベント込み）")
     ap.add_argument("--json", default="")
     ap.add_argument("--dump", default="", help="宣言した行の全内訳を JSON に書く（診断用）")
     return ap
@@ -484,6 +514,8 @@ def main(argv=None):
         set_lethal_stop_mode(a.stop)
     if a.life:
         set_lethal_life_mode(a.life)
+    if a.avg_counter:
+        set_avg_counter_mode(a.avg_counter)
     dump = [] if a.dump else None
     out = collect(a.src, a.games, a.don == "on", dump=dump)
     print(json.dumps(out, ensure_ascii=False, indent=2))
