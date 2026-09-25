@@ -40,6 +40,8 @@ import guard_afford as GA  # noqa: E402
 import theory_order as TO  # noqa: E402
 from theory_order import DELTA, MU, POL_COLS, SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE  # noqa: E402
 from theory_bridge import ROW_COLS, _extra, move_family  # noqa: E402
+from theory_bridge import is_decision_row as TB_is_decision_row  # noqa: E402  (D-5)
+from theory_bridge import add_decision_row_arg, apply_decision_row  # noqa: E402  (D-5)
 from hand_spend import hand_ids, spent_cards, use_value  # noqa: E402
 from onplay_parts import look_k  # noqa: E402
 from price_realised import primary_action  # noqa: E402
@@ -66,7 +68,7 @@ def collect(dirs, limit_games=0):
         for n, i in enumerate(order):
             w = int(rows["who"][i])
             by_seat_all.setdefault(w, []).append(n)
-            if int(rows["kind"][i]) == 0:
+            if TB_is_decision_row(rows, pol, L, ptr, i):
                 by_seat_main.setdefault(w, []).append(n)
         nxt = {}
         for w, ns in by_seat_main.items():
@@ -79,7 +81,7 @@ def collect(dirs, limit_games=0):
         first_main_seen = set()
         for n, i in enumerate(order):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
-            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+            if t < 1 or not PL.is_own_turn(w, t) or not TB_is_decision_row(rows, pol, L, ptr, i):
                 continue
             sc = ex["sc"][i]
             olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
@@ -191,6 +193,7 @@ def summarise(searches, draws, min_card=8):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    add_decision_row_arg(ap)
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--min-card", type=int, default=8)
@@ -199,6 +202,7 @@ def main(argv=None):
     TO.add_cbar_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    apply_decision_row(a)
     TO.apply_nu_mode(a)
     TO.apply_surv_mode(a)
     TO.apply_cbar_mode(a)

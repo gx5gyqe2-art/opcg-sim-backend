@@ -356,6 +356,50 @@ def move_family(sig):
     return "other"
 
 
+#: **D-5（2026-09-25）物差しの窓の「次の判断点」**。エンジンは効果の途中の選択（ドン‼️−N で戻すドン・
+#: サーチで取る札など）で中断し、その答えを**自分の kind 0 の行**（候補が全部 `RESOLVE_EFFECT_SELECTION`）
+#: として記録する。`any`（旧）はこの問いの行も判断点に数えるので、手の窓が**効果の解決前で閉じる**
+#: （実記録の登場の 45%・`2026-09-25_d4_review.md`）。`main` は問いの行を判断点から外す＝窓は問いの答えの
+#: 後の本当の判断点まで伸び、問いの行自体も窓の始まりにならない（T47 が kind 1/2 に当てた直しと同じ）。
+#: 問いの行の候補に通常の手が混ざる行は実・合成とも 0（全部か無しか）なので先頭の候補だけで判定できる。
+DECISION_ROW_MODES = ("any", "main")
+DECISION_ROW_MODE = "any"
+SELECTION_ACTION = "RESOLVE_EFFECT_SELECTION"
+
+
+def set_decision_row_mode(mode):
+    global DECISION_ROW_MODE
+    if mode not in DECISION_ROW_MODES:
+        raise ValueError("decision row mode は %s のどれか" % (DECISION_ROW_MODES,))
+    DECISION_ROW_MODE = mode
+    return DECISION_ROW_MODE
+
+
+def add_decision_row_arg(ap):
+    ap.add_argument("--decision-rows", default=None, choices=DECISION_ROW_MODES,
+                    help="**D-5** 次の判断点: `main`（効果の途中の選択の問いの行を外す）／`any`（既定・旧）")
+
+
+def apply_decision_row(a):
+    if getattr(a, "decision_rows", None) is not None:
+        set_decision_row_mode(a.decision_rows)
+    return DECISION_ROW_MODE
+
+
+def is_selection_row(pol, L, ptr, i):
+    """その行が効果の途中の選択の問い（候補が `RESOLVE_EFFECT_SELECTION`）か。"""
+    if int(L[i]) < 1:
+        return False
+    return json.loads(pol["pol_sig"][int(ptr[i])])[0] == SELECTION_ACTION
+
+
+def is_decision_row(rows, pol, L, ptr, i):
+    """「次の判断点」の並びに入れる行か（kind 0・`main` なら選択の問いの行を除く）。"""
+    if int(rows["kind"][i]) != 0:
+        return False
+    return DECISION_ROW_MODE == "any" or not is_selection_row(pol, L, ptr, i)
+
+
 def _state_of(sc, ci, idx2cid, tok=None, cards=None):
     """判断点の状態（条件の判定用）。**記録だけで作れる**——リーダーは `card_idx` の
     0/1（vocab index）・ステージの有無は 22/23。**T72**: 場のキャラの札 id（枠 2〜6／7〜11）とレスト・ドンの総在庫
@@ -633,7 +677,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
         if LEDGER_HARM_MODE == "realised":
             by_seat = {}
             for n0, i0 in enumerate(idx):
-                if int(rows["kind"][i0]) == 0:
+                if is_decision_row(rows, pol, L, ptr, i0):                     # D-5
                     by_seat.setdefault(int(rows["who"][i0]), []).append(n0)
             for _w0, ns in by_seat.items():
                 for a0, b0 in zip(ns, ns[1:]):
@@ -659,7 +703,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 continue
             sc, tok = ex["sc"][i], ex["tok"][i]
             if PL.is_own_turn(w, t):
-                if int(rows["kind"][i]) != 0:
+                if not is_decision_row(rows, pol, L, ptr, i):
                     continue
                 k = int(L[i])
                 ch = int(rows["pol_chosen"][i])
@@ -1157,6 +1201,7 @@ def summarise(pairs, reps=200, seed=0):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    add_decision_row_arg(ap)
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA, help="**P3** の暫定値（§0.4）")
@@ -1231,6 +1276,7 @@ def main(argv=None):
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    apply_decision_row(a)
     EV.apply_search_price(a)
     EV.apply_play_now(a)
     EV.apply_cost_afford(a)
@@ -1274,7 +1320,7 @@ def main(argv=None):
     stats["kappa_mean"] = (round(stats["kappa_sum"] / stats["kappa_n"], 4) if stats["kappa_n"] else None)
     stats["w_mean"] = (round(stats["kappa_mean"] * _TO.W_BAR, 4) if stats["kappa_mean"] is not None else None)
     pairs = pair_games(per, a.silent)
-    res = {"stats": stats,
+    res = {"stats": stats, "decision_rows": DECISION_ROW_MODE,
            "provisional": {"P3_theta": a.theta, "P2_silent": a.silent,
                            "T28c_margin": a.margin_comfort, "w_mode": _TO.W_MODE,
                            "flow_pricing": stats["flow_pricing"], "ledger_pricing": stats["ledger_pricing"],

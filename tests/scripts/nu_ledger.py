@@ -33,6 +33,8 @@ from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 import guard_afford as GA  # noqa: E402
 from price_realised import NU_MEAS, SAT_OVER_PWR, state_meas  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
+from theory_bridge import is_decision_row as TB_is_decision_row  # noqa: E402  (D-5)
+from theory_bridge import add_decision_row_arg, apply_decision_row  # noqa: E402  (D-5)
 from theory_order import (KO_P, MU, PWR_EPS, S_CAN_ATTACK, S_IS_BLOCKER, S_IS_CHAR, S_POWER,  # noqa: E402
                           SC_MY_DON, SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE,
                           SLOT_OWN_FIELD, THETA, add_nu_mode_arg, apply_nu_mode, ko_p_of, nu_of,
@@ -71,7 +73,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         order = list(idx)
         by_seat = {}
         for n, i in enumerate(order):
-            if int(rows["kind"][i]) == 0:          # 次の**判断点**で挟む（`price_realised` と同じ・T47）
+            if TB_is_decision_row(rows, pol, L, ptr, i):          # 次の**判断点**で挟む（`price_realised` と同じ・T47）
                 by_seat.setdefault(int(rows["who"][i]), []).append(n)
         nxt = {}
         for w, ns in by_seat.items():
@@ -82,7 +84,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         turn_attacked = {}
         for n, i in enumerate(order):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
-            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+            if t < 1 or not PL.is_own_turn(w, t) or not TB_is_decision_row(rows, pol, L, ptr, i):
                 continue
             k = int(L[i]); ch = int(rows["pol_chosen"][i])
             if k < 1 or ch < 0 or ch >= k:
@@ -192,6 +194,7 @@ def summarise(atk, body):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    add_decision_row_arg(ap)
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA)
@@ -199,6 +202,7 @@ def main(argv=None):
     add_nu_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    apply_decision_row(a)
     apply_nu_mode(a)
     t0 = time.time()
     atk, body, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)

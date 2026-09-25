@@ -53,6 +53,8 @@ import attack_response as AR  # noqa: E402
 import guard_afford as GA  # noqa: E402
 import theory_bridge as TB  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
+from theory_bridge import is_decision_row as TB_is_decision_row  # noqa: E402  (D-5)
+from theory_bridge import add_decision_row_arg, apply_decision_row  # noqa: E402  (D-5)
 from theory_order import (MU, SC_MY_DON, SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER,  # noqa: E402
                           SC_OPP_LIFE, THETA, hand_ids_of, opp_bodies_of, own_attackers_of, score_candidate,
                           slot_power, theta_of)
@@ -102,7 +104,7 @@ def two_curves_for_game(rows, pol, ex, L, ptr, idx, cards, idx2cid, theta=THETA,
     order = list(idx)
     by_seat = {}
     for n, i in enumerate(order):
-        if int(rows["kind"][i]) == 0:
+        if TB_is_decision_row(rows, pol, L, ptr, i):
             by_seat.setdefault(int(rows["who"][i]), []).append(n)
     nxt = {}
     for _w, ns in by_seat.items():
@@ -125,7 +127,7 @@ def two_curves_for_game(rows, pol, ex, L, ptr, idx, cards, idx2cid, theta=THETA,
         z = float(rows["z"][i])
         if z != 0.0:
             z_of[w] = 1.0 if z > 0 else 0.0
-        if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+        if t < 1 or not PL.is_own_turn(w, t) or not TB_is_decision_row(rows, pol, L, ptr, i):
             continue
         k = int(L[i]); ch = int(rows["pol_chosen"][i])
         if k < 1 or ch < 0 or ch >= k:
@@ -241,6 +243,7 @@ def verify_against_crossing_bridge(dirs, limit_games=0, theta=THETA, mu=MU):
 
 def build_parser():
     ap = argparse.ArgumentParser(description="2 本の曲線（理論の累積 G(t)・棋譜の累積 R(t)）を作る（T137a）")
+    add_decision_row_arg(ap)
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--verify", action="store_true", help="crossing_bridge の F_end_mean と独立実装で突き合わせる")
@@ -251,6 +254,7 @@ def build_parser():
 
 def main(argv=None):
     a = build_parser().parse_args(argv)
+    apply_decision_row(a)
     dump = [] if a.dump else None
     out = collect(a.src, a.games, dump=dump)
     if a.verify:

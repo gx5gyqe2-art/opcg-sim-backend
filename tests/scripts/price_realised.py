@@ -65,6 +65,8 @@ import guard_afford as GA  # noqa: E402
 import effect_value as EV  # noqa: E402
 from theory_bridge import (MOVE_FAMILIES, POL_COLS, ROW_COLS, _extra, _state_of,  # noqa: E402
                            move_family)
+from theory_bridge import is_decision_row as TB_is_decision_row  # noqa: E402  (D-5)
+from theory_bridge import add_decision_row_arg, apply_decision_row  # noqa: E402  (D-5)
 import theory_order as _TO  # noqa: E402
 from theory_order import (own_attackers_of, play_value, LAM, MU, PWR_EPS, S_IS_CHAR, S_POWER, SC_MY_DON, SC_MY_HAND,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE,
@@ -235,7 +237,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         # リーダー攻撃の実現 0.038 → 0.074・T47）。
         by_seat = {}
         for n, i in enumerate(order):
-            if int(rows["kind"][i]) == 0:
+            if TB_is_decision_row(rows, pol, L, ptr, i):
                 by_seat.setdefault(int(rows["who"][i]), []).append(n)
         nxt = {}
         for w, ns in by_seat.items():
@@ -247,7 +249,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         turn_end_row = {}
         for n, i in enumerate(order):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
-            if t >= 1 and PL.is_own_turn(w, t) and int(rows["kind"][i]) == 0:
+            if t >= 1 and PL.is_own_turn(w, t) and TB_is_decision_row(rows, pol, L, ptr, i):
                 turn_end_row[(w, t)] = i                                        # 後の行で上書き＝最後が残る
         for n, i in enumerate(order):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
@@ -268,7 +270,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 continue
             i2 = order[j]
             if PL.is_own_turn(w, t):
-                if int(rows["kind"][i]) != 0:
+                if not TB_is_decision_row(rows, pol, L, ptr, i):
                     continue
                 k = int(L[i]); ch = int(rows["pol_chosen"][i])
                 if k < 1 or ch < 0 or ch >= k:
@@ -469,6 +471,7 @@ def summarise(per, reps=200, seed=0):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    add_decision_row_arg(ap)
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA)
@@ -490,6 +493,7 @@ def main(argv=None):
     _HP.add_cond_clock_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    apply_decision_row(a)
     apply_nu_mode(a)
     _TO.apply_surv_mode(a)
     _TO.apply_cbar_mode(a)
@@ -508,7 +512,7 @@ def main(argv=None):
     stats["cond"] = dict(EV.COND_STATS)                     # T72: 条件の判定（真／偽／判らない）の数
     res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "flow_pricing": EV.FLOW_PRICING,
            "search_price": EV.SEARCH_PRICE_MODE, "hand_meas": HAND_MEAS_MODE,
-           "play_now": EV.PLAY_NOW_MODE, "cost_afford": EV.COST_AFFORD_MODE,
+           "play_now": EV.PLAY_NOW_MODE, "cost_afford": EV.COST_AFFORD_MODE, "decision_rows": apply_decision_row(a),
            "inflow": _HP.INFLOW_MODE, "cond_clock": _HP.COND_CLOCK_MODE, "stats": stats,
            "frozen": {"lambda": LAM, "mu": MU, "delta": DELTA, "nu_meas": NU_MEAS, "theta": a.theta},
            "summary": summarise(per, a.boot_reps, a.seed), "seconds": round(time.time() - t0, 1)}

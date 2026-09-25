@@ -62,6 +62,8 @@ import hand_plan as HP  # noqa: E402
 import price_realised as PR  # noqa: E402
 from price_realised import don_stock, state_meas  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, move_family  # noqa: E402
+from theory_bridge import is_decision_row as TB_is_decision_row  # noqa: E402  (D-5)
+from theory_bridge import add_decision_row_arg, apply_decision_row  # noqa: E402  (D-5)
 from theory_order import (MU, S_IS_CHAR, SC_MY_DON, SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE,  # noqa: E402
                           SLOT_OWN_FIELD, THETA, play_cost_term, play_value, score_candidate, slot_power)
 from opcg_sim.loop.record_gen import (LEFT_DEST_DECK, LEFT_DEST_HAND, LEFT_DEST_TRASH_BATTLE,  # noqa: E402
@@ -193,14 +195,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         decks = _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats)
         by_seat = {}
         for n, i in enumerate(order):
-            if int(rows["kind"][i]) == 0:
+            if TB_is_decision_row(rows, pol, L, ptr, i):
                 by_seat.setdefault(int(rows["who"][i]), []).append(n)
         nxt = {a: b for ns in by_seat.values() for a, b in zip(ns, ns[1:])}
         # 席ごとの自席ターン開始の盤面・枠ごとの攻撃の実現・登場の行
         turn_start, turn_seq, atk_real, plays = {}, {}, {}, []
         for n, i in enumerate(order):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
-            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+            if t < 1 or not PL.is_own_turn(w, t) or not TB_is_decision_row(rows, pol, L, ptr, i):
                 continue
             k = int(L[i]); ch = int(rows["pol_chosen"][i])
             if k < 1 or ch < 0 or ch >= k:
@@ -328,10 +330,12 @@ def summarise(rows, mu=MU):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    add_decision_row_arg(ap)
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    apply_decision_row(a)
     t0 = time.time()
     rows, stats = collect(a.src, a.limit_games)
     res = {"stats": stats, "mu": MU, "summary": summarise(rows), "seconds": round(time.time() - t0, 1)}

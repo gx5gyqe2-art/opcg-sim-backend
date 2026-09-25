@@ -36,6 +36,8 @@ from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 import guard_afford as GA  # noqa: E402
 from price_realised import DELTA, SC_OPP_HAND, don_stock, side_nu_meas  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
+from theory_bridge import is_decision_row as TB_is_decision_row  # noqa: E402  (D-5)
+from theory_bridge import add_decision_row_arg, apply_decision_row  # noqa: E402  (D-5)
 import theory_order as _TO  # noqa: E402
 from theory_order import (LAM, MU, PWR_EPS, SC_MY_DON, SC_MY_HAND, SC_MY_LEADER_POWER, SC_MY_LIFE,  # noqa: E402
                           SC_OPP_LEADER_POWER, SC_OPP_LIFE, SLOT_OPP_FIELD, SLOT_OWN_FIELD, THETA,
@@ -132,7 +134,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         order = list(idx)
         by_seat = {}
         for n, i in enumerate(order):
-            if int(rows["kind"][i]) == 0:
+            if TB_is_decision_row(rows, pol, L, ptr, i):
                 by_seat.setdefault(int(rows["who"][i]), []).append(n)
         nxt = {}
         for w, ns in by_seat.items():
@@ -140,7 +142,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 nxt[a] = b
         for n, i in enumerate(order):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
-            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+            if t < 1 or not PL.is_own_turn(w, t) or not TB_is_decision_row(rows, pol, L, ptr, i):
                 continue
             k = int(L[i]); ch = int(rows["pol_chosen"][i])
             if k < 1 or ch < 0 or ch >= k:
@@ -231,6 +233,7 @@ def summarise(rows):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    add_decision_row_arg(ap)
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA)
@@ -241,6 +244,7 @@ def main(argv=None):
     _TO.add_take_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    apply_decision_row(a)
     _TO.apply_surv_mode(a)
     _TO.apply_cbar_mode(a)
     _TO.apply_take_mode(a)
