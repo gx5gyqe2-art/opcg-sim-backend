@@ -718,13 +718,19 @@ def threshold_of_me(sc, tok, lam=LAM, mu=MU, g_hand=None, hand_blocker=0.0):
     **`THETA_SIDE_MODE=symmetric` なら `threshold_parts` と同じ式を鏡に当てる**（T133）。
     `legacy`（既定）は従来の `λ·L_me + g·H_me + Σν_meas(自分の体)`
     ——**手札の項だけが相手側と違う式**（`cuttable_forced` を通らない）。"""
+    return float(sum(threshold_of_me_parts(sc, tok, lam, mu, g_hand, hand_blocker)))
+
+
+def threshold_of_me_parts(sc, tok, lam=LAM, mu=MU, g_hand=None, hand_blocker=0.0):
+    """**自分の耐久の 3 つの項** `(ライフ, 手札, 体)`（`threshold_of_me` の内訳・C-5）。
+    `symmetric` なら `threshold_parts_side(…, "me")`・`legacy` は `(λ·L_me, g·H_me, Σν_meas(自分の体))`。"""
     if THETA_SIDE_MODE == "symmetric":
-        return float(sum(threshold_parts_side(sc, tok, "me", lam, mu, g_hand, hand_blocker)))
+        return threshold_parts_side(sc, tok, "me", lam, mu, g_hand, hand_blocker)
     sc = np.asarray(sc); tok = np.asarray(tok)
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     g = float(mu if g_hand is None else g_hand)
-    return float(lam * float(sc[SC_MY_LIFE]) + g * float(sc[SC_MY_HAND])
-                 + _body_term(tok, SLOT_OWN_FIELD, olp))
+    return (float(lam) * float(sc[SC_MY_LIFE]), g * float(sc[SC_MY_HAND]),
+            float(_body_term(tok, SLOT_OWN_FIELD, olp)))
 
 
 #: **損害の輪郭の正本**（T75）: `tests/fixtures/harm_profile.json`＝`{"real": [...], "syn": [...]}`（自席ターン番号 j ごとの損害の平均・

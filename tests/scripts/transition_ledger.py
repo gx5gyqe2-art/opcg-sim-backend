@@ -182,6 +182,59 @@ def shapley(st0, st1, prof, sigma_rel):
     return out
 
 
+def _row_basics(sc, tok):
+    """**C-5**: 1 行の基本量（攻め手＝その行の席の視点・規則が動かす量だけ）。"""
+    sc = np.asarray(sc); tok = np.asarray(tok)
+    def _n(slots, pred):
+        return sum(1 for s in range(slots.start, slots.stop) if pred(s))
+    is_chr = lambda s: float(tok[s, TO.S_IS_CHAR]) > 0.5
+    is_blk = lambda s: is_chr(s) and float(tok[s, TO.S_IS_BLOCKER]) > 0.5 and float(tok[s, TO.S_IS_REST]) <= 0.5
+    is_rest = lambda s: is_chr(s) and float(tok[s, TO.S_IS_REST]) > 0.5
+    return {"my_life": float(sc[SC_MY_LIFE]), "my_hand": float(sc[TO.SC_MY_HAND]),
+            "my_don": float(sc[SC_MY_DON]),
+            "opp_life": float(sc[SC_OPP_LIFE]), "opp_hand": float(sc[TO.SC_OPP_HAND]),
+            "n_me_chr": _n(TO.SLOT_OWN_FIELD, is_chr), "n_me_blk": _n(TO.SLOT_OWN_FIELD, is_blk),
+            "n_me_rest": _n(TO.SLOT_OWN_FIELD, is_rest),
+            "n_opp_chr": _n(TO.SLOT_OPP_FIELD, is_chr), "n_opp_blk": _n(TO.SLOT_OPP_FIELD, is_blk)}
+
+
+def attack_detail(bi0, bi1, sh, cards):
+    """**C-5**: 攻撃の遷移に**攻め手視点**の内訳を添える（診断用・既定の集計には触れない）。
+
+    * `sh_att` … シャープレイ配分を**攻め手視点**へ写したもの。`sh` は席 0 視点（`_swap_state`）なので、
+      席 1 の行は**軸を入れ替え・符号を反転**する（席 1 の勝率の差 ＝ −席 0 の勝率の差）。
+    * `me0`/`me1`・`opp0`/`opp1` … 両席の耐久の 3 項 `(ライフ, 手札, 体)`（同じターンなので `g` は行 0 のもの）。
+    * `mv` … 打った攻撃（攻め手の枠 `si`・的 `ti`・札 id・ブロッカーか・リーダーか・パワー・付けたドン・価格）。
+    * `row0`/`row1` … 基本量（`_row_basics`）。"""
+    tok0, _ci0, _mlp0, w, sc0, mv, g_me0, g_opp0 = bi0
+    tok1, _ci1, _mlp1, _w1, sc1, _mv1, _g_me1, _g_opp1 = bi1
+    if int(w) == 1:
+        sh_att = {"th_me": -sh["th_opp"], "th_opp": -sh["th_me"], "a_me": -sh["a_opp"],
+                  "a_opp": -sh["a_me"], "j": -sh["j"]}
+    else:
+        sh_att = dict(sh)
+    me0 = CB.threshold_of_me_parts(sc0, tok0, g_hand=g_me0)
+    me1 = CB.threshold_of_me_parts(sc1, tok1, g_hand=g_me0)
+    opp0 = CB.threshold_parts(sc0, tok0, g_hand=g_opp0)
+    opp1 = CB.threshold_parts(sc1, tok1, g_hand=g_opp0)
+    mv = dict(mv or {})
+    si = mv.get("si")
+    info = (cards.info(mv.get("cid")) or {}) if (cards is not None and mv.get("cid")) else {}
+    tok0a, tok1a = np.asarray(tok0), np.asarray(tok1)
+    mv.update({"leader": (si == 0),
+               "blocker": bool(info.get("blocker")) and not info.get("event"),
+               "printed_power": float(info.get("power") or 0.0),
+               "src_power": TO.slot_power(tok0a, si),
+               "target_leader": (mv.get("ti") == 1),
+               "src_rest1": (float(tok1a[int(si), TO.S_IS_REST]) > 0.5) if si is not None and 0 <= int(si) < tok1a.shape[0] else None,
+               "src_blk0": (float(tok0a[int(si), TO.S_IS_BLOCKER]) > 0.5) if si is not None and 0 <= int(si) < tok0a.shape[0] else None,
+               "src_blk1": (float(tok1a[int(si), TO.S_IS_BLOCKER]) > 0.5) if si is not None and 0 <= int(si) < tok1a.shape[0] else None})
+    return {"sh_att": {a: float(v) for a, v in sh_att.items()},
+            "me0": [float(x) for x in me0], "me1": [float(x) for x in me1],
+            "opp0": [float(x) for x in opp0], "opp1": [float(x) for x in opp1],
+            "mv": mv, "row0": _row_basics(sc0, tok0), "row1": _row_basics(sc1, tok1)}
+
+
 def _priority(acc):
     """**残差を 3 つに割る**（全部 `|·|` の割合・手当てが別々なので分ける）。
 
@@ -291,7 +344,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
                                  g_me=me[1], g_opp=op[1])
             stats["rows"] += 1
             # その行で選ばれた手の `Δx`（無ければ空＝値段の付かない行）
-            dx = {}; fam = "none"
+            dx = {}; fam = "none"; mv = None
             k = int(L[i]); ch = int(r["pol_chosen"][i])
             if k >= 1 and 0 <= ch < k:
                 b = int(ptr[i]) + ch
@@ -313,13 +366,17 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
                                     src_power=slot_power(tok, int(pol["pol_si"][b])),
                                     tgt_power=slot_power(tok, int(pol["pol_ti"][b])),
                                     don_k=int(pol["pol_k"][b]))
+                mv = {"si": int(pol["pol_si"][b]), "ti": int(pol["pol_ti"][b]),
+                      "cid": str(pol["pol_cid"][b]) or None, "don_k": int(pol["pol_k"][b]),
+                      "v": (float(v) if v is not None else None)}
                 if v is not None:
                     dx = KV.axis_of_move(fam, float(v), sig, str(pol["pol_cid"][b]) or None, cards,
                                          sc, tok, olp, rt, don_k=int(pol["pol_k"][b]))
             if w == 1:
                 st, dx = _swap_state(st), _swap_dx(dx)
             seq.append((st, dx, t, fam,
-                        (tok, ci, float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0, w, sc)))
+                        (tok, ci, float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0, w, sc,
+                         mv, me[1], op[1])))
         if len(seq) < 2 or len(z_of) < 2:
             continue
         w_first = RL.w_of(*RL.clocks_of(seq[0][0], prof), sigma_rel=sr)
@@ -337,7 +394,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
             dx_use = dict(dx0)
             if BOUNDARY_MODE != "off" and t1 != t0:
                 # **境目は「打ち手のいない手」として同じ行に相乗りさせる**（規則の 3 つ）
-                tok0, ci0, mlp0, w_row = bi0
+                tok0, ci0, mlp0, w_row = bi0[0], bi0[1], bi0[2], bi0[3]
                 w_next = 1 - w_row                       # 次に動く席＝この行の相手
                 ts = [tt for (ww, tt) in rate_at if ww == w_next and tt > t0]
                 key_prev = [tt for (ww, tt) in rate_at if ww == w_next and tt <= t0]
@@ -371,8 +428,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
             if dump is not None and cause == "same_turn" and fam0 == "attack":
                 # **C-1**: 攻撃の型の遷移に、結果の分類（`attack_response.classify`）と軸の配分を添える
                 resp = AR.classify(bi0[4], bi0[0], bi1[4], bi1[0])
-                dump.append({"seed": seed_g, "w": int(bi0[3]), "t": int(t0), "resid_abs": abs(resid),
-                            "resp": resp, "sh": {a: float(v) for a, v in sh.items()}})
+                row_d = {"seed": seed_g, "w": int(bi0[3]), "t": int(t0), "resid_abs": abs(resid),
+                         "resp": resp, "sh": {a: float(v) for a, v in sh.items()}}
+                row_d.update(attack_detail(bi0, bi1, sh, cards))      # **C-5**
+                dump.append(row_d)
             # **配分の恒等式**: シャープレイ値の和は厳密に `W(st1) − W(base)` に一致する
             stats["identity_max_err"] = max(stats["identity_max_err"],
                                             abs(sum(sh.values()) - (w1 - w_base)))
