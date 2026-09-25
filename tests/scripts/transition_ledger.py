@@ -51,6 +51,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
+import attack_response as AR  # noqa: E402
 import crossing_bridge as CB  # noqa: E402
 import guard_afford as GA  # noqa: E402
 import kappa_vector as KV  # noqa: E402
@@ -318,7 +319,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
             if w == 1:
                 st, dx = _swap_state(st), _swap_dx(dx)
             seq.append((st, dx, t, fam,
-                        (tok, ci, float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0, w)))
+                        (tok, ci, float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0, w, sc)))
         if len(seq) < 2 or len(z_of) < 2:
             continue
         w_first = RL.w_of(*RL.clocks_of(seq[0][0], prof), sigma_rel=sr)
@@ -328,7 +329,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
         stats["terminal_sum"] += z_of.get(0, 0.0) - w_last
         stats["terminal_abs_sum"] += abs(z_of.get(0, 0.0) - w_last)
         run = 0.0
-        for (st0, dx0, t0, fam0, bi0), (st1, _dx1, t1, _f1, _b1) in zip(seq, seq[1:]):
+        for (st0, dx0, t0, fam0, bi0), (st1, _dx1, t1, _f1, bi1) in zip(seq, seq[1:]):
             w0 = RL.w_of(*RL.clocks_of(st0, prof), sigma_rel=sr)
             w1 = RL.w_of(*RL.clocks_of(st1, prof), sigma_rel=sr)
             gap = w1 - w0
@@ -359,8 +360,6 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
                 acc["fam_abs"][fam0] = acc["fam_abs"].get(fam0, 0.0) + abs(resid)
                 acc["fam_priced_abs"][fam0] = acc["fam_priced_abs"].get(fam0, 0.0) + abs(priced)
                 acc["fam_n"][fam0] = acc["fam_n"].get(fam0, 0) + 1
-                if dump is not None and fam0 == "attack":
-                    dump.append({"seed": seed_g, "w": int(bi0[3]), "t": int(t0), "resid_abs": abs(resid)})
             # **残りを 5 つの軸へ配る**（`priced` が説明した分を引いた状態から `st1` まで）
             base = KV.apply_dx(st0, dx_use) if dx_use else st0
             w_base = RL.w_of(*RL.clocks_of(base, prof), sigma_rel=sr)
@@ -369,6 +368,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
             for a, val in sh.items():
                 acc["by_axis"][a] += val; acc["by_axis_abs"][a] += abs(val)
                 acc["cross_abs"][cause][a] += abs(val)
+            if dump is not None and cause == "same_turn" and fam0 == "attack":
+                # **C-1**: 攻撃の型の遷移に、結果の分類（`attack_response.classify`）と軸の配分を添える
+                resp = AR.classify(bi0[4], bi0[0], bi1[4], bi1[0])
+                dump.append({"seed": seed_g, "w": int(bi0[3]), "t": int(t0), "resid_abs": abs(resid),
+                            "resp": resp, "sh": {a: float(v) for a, v in sh.items()}})
             # **配分の恒等式**: シャープレイ値の和は厳密に `W(st1) − W(base)` に一致する
             stats["identity_max_err"] = max(stats["identity_max_err"],
                                             abs(sum(sh.values()) - (w1 - w_base)))
