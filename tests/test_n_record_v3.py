@@ -148,3 +148,41 @@ def test_aux_columns_ride_along(game):
         assert np.array_equal(plain[k], r[k]), k             # 台帳は局そのものを変えない
     for k in ("tokens", "scalars", "card_idx"):
         assert np.array_equal(plain[k], r[k]), k
+
+
+def test_record_gen_cli_writes_aux_def_to_the_shard(tmp_path):
+    """`G.play_one` の戻り値に列が在ることと、`main()`（実際の CLI・shard 書き出し）が**その列を
+    実際に npz へ書く**ことは別の契約——`main()` は `_ROW_KEYS`＋`_POL_KEYS`＋`_TOK_KEYS`＋`_V4_KEYS`＋
+    `_AUX_KEYS`＋`_AUX_DEF_KEYS`（`--no-aux` なら aux 系を全部外す）を明示的に選んで書く。
+    `test_aux_columns_ride_along` は `play_one` を直接読むだけで CLI の鍵選びを通らないので、
+    この経路は別にテストする（P8 実装時、`main()` の `keys` に `_AUX_DEF_KEYS` を足し忘れて
+    実生成では列が落ちる欠陥を作った・その再発防止）。"""
+    pytest.importorskip("opcg_engine", reason="Rust エンジンが要る（make rust-develop）")
+    from opcg_sim.learned.train import dump_io as DIO
+    out = str(tmp_path / "rec")
+    rc = G.main(["--games", "2", "--seed-base", "990101", "--workers", "1", "--sims", "8", "--out", out])
+    assert rc == 0
+    files = DIO.shard_files(out)
+    assert files, "シャードが 1 本も出ていない"
+    for f in files:
+        with np.load(f, allow_pickle=True) as d:
+            assert "aux_def" in d.files and "aux_def_row" in d.files
+            n = len(d["z"])
+            assert d["aux_def"].shape == (n, G.AUX_DEF_SLOTS, G.AUX_DEF_DIM)
+            assert d["aux_def_row"].shape == (n, G.AUX_DEF_ROW_DIM)
+            assert d["aux_def"].dtype == np.float16 and d["aux_def_row"].dtype == np.float16
+
+
+def test_record_gen_cli_no_aux_drops_aux_def_too(tmp_path):
+    """`--no-aux` は `aux`／`aux_tok`／`aux_mask` と同じく `aux_def`／`aux_def_row` も書かない。"""
+    pytest.importorskip("opcg_engine", reason="Rust エンジンが要る（make rust-develop）")
+    from opcg_sim.learned.train import dump_io as DIO
+    out = str(tmp_path / "rec_noaux")
+    rc = G.main(["--games", "2", "--seed-base", "990201", "--workers", "1", "--sims", "8",
+                "--no-aux", "--out", out])
+    assert rc == 0
+    files = DIO.shard_files(out)
+    assert files, "シャードが 1 本も出ていない"
+    for f in files:
+        with np.load(f, allow_pickle=True) as d:
+            assert not any(k.startswith("aux") for k in d.files)

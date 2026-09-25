@@ -877,7 +877,8 @@ def main(argv=None):
     t0 = time.time()
     if args.dump_v2:
         print("[note] --dump-v2 は廃止（既定が dump v3・列は同じで dtype だけ半分）", flush=True)
-    keys = _ROW_KEYS + _POL_KEYS + _TOK_KEYS + _V4_KEYS + (() if args.no_aux else _AUX_KEYS)
+    keys = (_ROW_KEYS + _POL_KEYS + _TOK_KEYS + _V4_KEYS
+           + (() if args.no_aux else _AUX_KEYS + _AUX_DEF_KEYS))   # v5: aux_def／aux_def_row も同じ旗（P8）
     buf = {k: [] for k in keys}
     games = []                                         # part の sidecar（対局メタ）
     shard = n_rows = n_drop = n_main = 0

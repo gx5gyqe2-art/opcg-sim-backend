@@ -25,8 +25,18 @@ T18-why2（`2026-09-24_t18_why2.md`）は 6 局の影の判定から「安い体
 - **比の水準そのもの**は 1 を下回ってよい——在庫は攻撃しか数えない（ブロック・相手の除去を吸った分・抑止は
   体に帰属できない・T50 で 0.5〜0.77）。**読むのは帯をまたいだ傾きだけ**。
 
-**限界**: 体の同一性は枠 × `card_idx`（記録に uuid が無い・P8）。登場した枠は「次の判断点で同じ札が新しく居る枠」。
-相手が除去に払った札・ドンは体に帰属できない（大きい体ほど除去を吸うなら、在庫は大きい体を低く見せる向きに偏る）。
+**限界**: 体の同一性は枠 × `card_idx`（記録に uuid が無い・波が dump v5 以降なら `fate`〔下記〕で補える）。
+登場した枠は「次の判断点で同じ札が新しく居る枠」。相手が除去に払った札・ドンは体に帰属できない
+（大きい体ほど除去を吸うなら、在庫は大きい体を低く見せる向きに偏る）。
+
+## 追記（P8-7(a)・2026-09-25・dump v5 の `aux_def` が要る）
+
+上の限界の後半——「除去を引き受けた分」——を、`record_gen.aux_def_from_ledger`（P8）の
+`left_dest`（uuid で追った場を離れた先）で読める波では測る。体が消えた最後の生存ターン開始の行で
+`aux_def` を引き、**戦闘（`LEFT_DEST_TRASH_BATTLE`）か効果（トラッシュ／手札／デッキ）か**を
+`fate` に積む。v4 以前の波（`aux_def` が無い）や自分のターン中に消えた体（窓 A の外）は `None`。
+**効果で消えた割合が費用帯・`ν` 帯を跨いで大きい側で高いなら、大きい体は在庫が数えない
+「除去を引き受ける」分で稼いでいる**——T157 の「確定できない」の一角がここで閉じる。
 
 使い方: `OPCG_LOG_SILENT=1 python tests/scripts/play_body_check.py --in <n_records>... [--out x.json]`
 """
@@ -54,6 +64,8 @@ from price_realised import don_stock, state_meas  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, move_family  # noqa: E402
 from theory_order import (MU, S_IS_CHAR, SC_MY_DON, SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE,  # noqa: E402
                           SLOT_OWN_FIELD, THETA, play_cost_term, play_value, score_candidate, slot_power)
+from opcg_sim.loop.record_gen import (LEFT_DEST_DECK, LEFT_DEST_HAND, LEFT_DEST_TRASH_BATTLE,  # noqa: E402
+                                      LEFT_DEST_TRASH_EFFECT)
 
 #: 費用帯（印字のコスト）。境目は規則の数字だけ（1〜2＝序盤に出す札・10 は上限）
 COST_BANDS = (("c1_2", 1, 2), ("c3_4", 3, 4), ("c5_6", 5, 6), ("c7_10", 7, 10))
@@ -116,11 +128,14 @@ def hand_card_value(sc, tok, ci_row, idx2cid, cards, cid, deck=None):
 
 def follow_body(turn_start, ts, j, slot, cid_idx, atk_real):
     """登場したターン（`ts[j]`）から、枠 `slot` に同じ札が居る間の攻撃の実現を足す（`nu_stock` の作法）。
-    戻り値: 在庫・攻撃回数・生きて迎えた自席ターン数（登場ターンを含む）・終局前に消えたか。"""
+    戻り値: 在庫・攻撃回数・生きて迎えた自席ターン数（登場ターンを含む）・終局前に消えたか。
+    `turn_start[t]` は `(sc, tok, ci, ...)`——3 要素目までを読む（4 要素目〔行 index〕は `effect_fate` 用・
+    ここでは無視）。"""
     stock, n_atk, turns_alive, died = 0.0, 0, 0, False
     for kk in range(0, len(ts) - j):
         if kk > 0:
-            _sc2, tok2, ci2 = turn_start[ts[j + kk]]
+            entry = turn_start[ts[j + kk]]
+            tok2, ci2 = entry[1], entry[2]
             if not (float(tok2[slot, S_IS_CHAR]) > 0.5 and int(ci2[slot]) == int(cid_idx)):
                 died = True
                 break
@@ -129,6 +144,29 @@ def follow_body(turn_start, ts, j, slot, cid_idx, atk_real):
         stock += sum(got)
         n_atk += len(got)
     return stock, n_atk, turns_alive, died
+
+
+def effect_fate(turn_start, ts, j, turns_alive, slot, aux_def):
+    """`follow_body` が確認した**最後の生存ターン開始の行**で `aux_def`（P8）の `left_dest` を読み、
+    体が消えた先を返す（`record_gen.LEFT_DEST_*` の符号・0＝消えていない／記録がここで尽きた）。
+    `aux_def` が無い波（v4 以前）や、範囲外（`turns_alive` が `ts` の残りより長い）なら `None`。
+    `turn_start[t]` は `(sc, tok, ci, i)`——4 要素目が npz の行 index（`aux_def` の索引に使う）。
+
+    **限界**: `aux_def` の窓は「次の相手ターン」だけ（`_fill_def` の docstring）——自分のターン中に
+    消えた体（相手の効果が自分のメインフェイズの外で撃たれることは無いので稀）は読めない。
+    """
+    if aux_def is None or j + turns_alive - 1 >= len(ts):
+        return None
+    i = turn_start[ts[j + turns_alive - 1]][3]
+    a_idx = slot - SLOT_OWN_FIELD.start + 1
+    return int(round(float(aux_def[i, a_idx, 3])))
+
+
+def _extra_def(dd, n):
+    """`theory_bridge._extra` ＋ `aux_def`（無い波は `None`・P8・dump v5）。"""
+    out = dict(_extra(dd, n))
+    out["aux_def"] = np.asarray(dd["aux_def"])[:n].astype(np.float32) if "aux_def" in dd.files else None
+    return out
 
 
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
@@ -140,13 +178,16 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     idx2cid = {i: c for c, i in vocab.items()}
     rec_decks = SP.record_decks(dirs) if EV.SEARCH_PRICE_MODE == "plan" else {}
     out = []
-    stats = {"games": 0, "play_rows": 0, "no_slot": 0, "no_hand": 0, "silent": 0, "search_deck_ok": 0, "search_deck_bad": 0}
+    stats = {"games": 0, "play_rows": 0, "no_slot": 0, "no_hand": 0, "silent": 0, "search_deck_ok": 0,
+             "search_deck_bad": 0, "no_aux_def": 0}
     games = 0
-    for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
+    for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra_def):
         games += 1
         if limit_games and games > limit_games:
             break
         stats["games"] += 1
+        if ex.get("aux_def") is None:
+            stats["no_aux_def"] += 1
         order = list(idx)
         seed = int(rows["seed"][idx[0]])
         decks = _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats)
@@ -166,7 +207,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 continue
             sc, tok = ex["sc"][i], ex["tok"][i]
             if t not in turn_start.setdefault(w, {}):
-                turn_start[w][t] = (sc, tok, np.asarray(ex["ci"][i]))
+                turn_start[w][t] = (sc, tok, np.asarray(ex["ci"][i]), i)   # i＝aux_def の索引（P8）
                 turn_seq.setdefault(w, []).append(t)
             b = int(ptr[i]) + ch
             sig = json.loads(pol["pol_sig"][b])
@@ -220,8 +261,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 jj = ts.index(t)
                 ts_map = turn_start[w]
                 stock, n_atk, alive, died = follow_body(ts_map, ts, jj, slot, cid_idx, atk_real.get(w, {}))
+                fate = effect_fate(ts_map, ts, jj, alive, slot, ex.get("aux_def")) if died else None
                 row.update({"stock": stock, "n_atk": n_atk, "turns_alive": alive, "died": died,
-                            "turns_left": len(ts) - jj})
+                            "turns_left": len(ts) - jj, "fate": fate})
             out.append(row)
     return out, stats
 
@@ -258,6 +300,16 @@ def block(rs, mu=MU):
                   "attacks": _m(tracked, "n_atk", 3),
                   "died_share": round(float(np.mean([r["died"] for r in tracked])), 3),
                   "real_per_attack_cards": (round(sum(r["stock"] for r in tracked) / max(1, sum(r["n_atk"] for r in tracked)) / mu, 3))})
+        # P8-7(a): 消えた体のうち、戦闘か効果（トラッシュ／手札／デッキ）かの内訳（`aux_def` が要る）
+        fates = [r["fate"] for r in tracked if r.get("fate") is not None]
+        if fates:
+            o["fate_n"] = len(fates)
+            o["battle_share"] = round(float(np.mean([f == LEFT_DEST_TRASH_BATTLE for f in fates])), 3)
+            o["effect_trash_share"] = round(float(np.mean([f == LEFT_DEST_TRASH_EFFECT for f in fates])), 3)
+            o["effect_hand_share"] = round(float(np.mean([f == LEFT_DEST_HAND for f in fates])), 3)
+            o["effect_deck_share"] = round(float(np.mean([f == LEFT_DEST_DECK for f in fates])), 3)
+            o["effect_removed_share"] = round(float(np.mean(
+                [f in (LEFT_DEST_TRASH_EFFECT, LEFT_DEST_HAND, LEFT_DEST_DECK) for f in fates])), 3)
     return o
 
 

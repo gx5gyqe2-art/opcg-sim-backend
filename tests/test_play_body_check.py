@@ -54,12 +54,13 @@ def test_landing_slot_is_the_slot_where_the_card_newly_appears():
 
 
 def test_follow_body_sums_attacks_while_alive_and_marks_removal():
-    """登場ターンから、枠に同じ札が居る間の攻撃の実現を足す。消えたら止めて died。終局まで居れば died=False。"""
+    """登場ターンから、枠に同じ札が居る間の攻撃の実現を足す。消えたら止めて died。終局まで居れば died=False。
+    `turn_start` の値は 3 要素（`(sc, tok, ci)`・4 要素目〔行 index〕を足しても崩れないことも見る）。"""
     s = SLOT_OWN_FIELD.start
     alive = _board({s: 5})
     gone = _board({})
     ts = [1, 3, 5, 7]
-    turn_start = {1: (None, *alive), 3: (None, *alive), 5: (None, *gone), 7: (None, *alive)}
+    turn_start = {1: (None, *alive), 3: (None, *alive), 5: (None, *gone), 7: (None, *alive, 99)}
     atk = {(3, s): [0.05, 0.02], (5, s): [0.9], (7, s): [0.9]}
     stock, n_atk, turns, died = PB.follow_body(turn_start, ts, 0, s, 5, atk)
     assert stock == pytest.approx(0.07) and n_atk == 2 and turns == 2 and died is True
@@ -67,10 +68,51 @@ def test_follow_body_sums_attacks_while_alive_and_marks_removal():
     assert stock == pytest.approx(0.9) and n_atk == 1 and turns == 1 and died is False
 
 
-def _row(cost_band="c1_2", nu=0.06, price=-0.01, stock=0.06, dg=0.0, slot=10, died=True):
+# --- P8-7(a): aux_def から場を離れた先を読む（effect_fate） -----------------
+def test_effect_fate_reads_left_dest_at_the_last_alive_turn_start():
+    """`turns_alive`（`follow_body` が確認した最後の生存ターン数）から `ts` の該当行を引き、
+    その行 index で `aux_def` の左端の枠（`a_idx = slot - SLOT_OWN_FIELD.start + 1`）を読む。"""
+    s = SLOT_OWN_FIELD.start
+    alive = _board({s: 5})
+    ts = [1, 3, 5]
+    aux_def = np.zeros((3, 6, 4), dtype=np.float32)
+    aux_def[1, 1, 3] = PB.LEFT_DEST_TRASH_EFFECT       # 行 index 1（ts[1]=3）の枠 1（=field slot s）
+    turn_start = {1: (None, *alive, 0), 3: (None, *alive, 1), 5: (None, *alive, 2)}
+    # turns_alive=2 → 最後の生存ターンは ts[0+2-1]=ts[1]=3 → 行 index 1
+    assert PB.effect_fate(turn_start, ts, 0, 2, s, aux_def) == PB.LEFT_DEST_TRASH_EFFECT
+
+
+def test_effect_fate_is_none_without_aux_def_or_out_of_range():
+    s = SLOT_OWN_FIELD.start
+    alive = _board({s: 5})
+    ts = [1, 3]
+    turn_start = {1: (None, *alive, 0), 3: (None, *alive, 1)}
+    assert PB.effect_fate(turn_start, ts, 0, 1, s, None) is None                      # aux_def が無い波
+    assert PB.effect_fate(turn_start, ts, 0, 5, s, np.zeros((2, 6, 4))) is None        # ts の外
+
+
+def _row(cost_band="c1_2", nu=0.06, price=-0.01, stock=0.06, dg=0.0, slot=10, died=True, fate=None):
     return {"cost_band": cost_band, "nu_band": PB.nu_band(nu), "price": price, "nu": nu, "mu": MU,
             "opportunity": 0.01, "effect": 0.0, "dg": dg, "dh": 0.05, "counter": 1000.0, "counter_card": False,
-            "slot": slot, "stock": stock, "n_atk": 2, "turns_alive": 3, "turns_left": 4, "died": died}
+            "slot": slot, "stock": stock, "n_atk": 2, "turns_alive": 3, "turns_left": 4, "died": died,
+            "fate": fate}
+
+
+def test_block_reports_fate_shares_when_present():
+    rs = [_row(fate=PB.LEFT_DEST_TRASH_BATTLE), _row(fate=PB.LEFT_DEST_TRASH_EFFECT),
+          _row(fate=PB.LEFT_DEST_HAND), _row(fate=None)]
+    o = PB.block(rs)
+    assert o["fate_n"] == 3                                    # fate=None の行は数えない
+    assert o["battle_share"] == pytest.approx(1 / 3, abs=1e-3)
+    assert o["effect_trash_share"] == pytest.approx(1 / 3, abs=1e-3)
+    assert o["effect_hand_share"] == pytest.approx(1 / 3, abs=1e-3)
+    assert o["effect_deck_share"] == pytest.approx(0.0, abs=1e-3)
+    assert o["effect_removed_share"] == pytest.approx(2 / 3, abs=1e-3)
+
+
+def test_block_has_no_fate_keys_when_no_fate_is_known():
+    o = PB.block([_row(), _row(fate=None)])
+    assert "fate_n" not in o and "effect_removed_share" not in o
 
 
 def test_block_reports_card_units_and_stock_over_nu_on_tracked_rows_only():
