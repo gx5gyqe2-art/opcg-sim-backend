@@ -1195,6 +1195,7 @@ def main(argv=None):
                          "**2026-09-16 より前の `ΔG` と比べるときは `option` を明示する**")
     EV.add_search_price_arg(ap)
     EV.add_play_now_arg(ap)
+    EV.add_don_cost_gate_arg(ap)
     import hand_plan as _HP
     _HP.add_inflow_arg(ap)
     _HP.add_cond_clock_arg(ap)
@@ -1232,6 +1233,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     EV.apply_search_price(a)
     EV.apply_play_now(a)
+    EV.apply_don_cost_gate(a)
     _HP.apply_inflow_mode(a)
     _HP.apply_cond_clock_mode(a)
     _CB.set_theta_hand_mode(a.theta_hand)

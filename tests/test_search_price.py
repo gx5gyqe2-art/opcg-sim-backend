@@ -307,3 +307,23 @@ def test_a_return_don_cost_is_unpayable_when_there_is_not_enough_active_don():
         EV.set_don_cost_gate_mode("off")
     with pytest.raises(ValueError):
         EV.set_don_cost_gate_mode("guess")
+
+
+def test_the_cli_arg_actually_reaches_the_mode():
+    """**D-2/D-3**: `add_don_cost_gate_arg` を足しても `apply_don_cost_gate` を呼び忘れると
+    CLI で切替を渡しても何も変わらない（`price_realised.py` の最初の計測で実際に踏んだ配線漏れ・
+    `off`/`check` の出力が1バイトも変わらなかった）。`apply_don_cost_gate(a)` 自体がその橋渡しを
+    正しく行うことを固定する。"""
+    import argparse
+    before = EV.DON_COST_GATE_MODE
+    try:
+        ap = argparse.ArgumentParser()
+        EV.add_don_cost_gate_arg(ap)
+        a = ap.parse_args([])
+        assert EV.apply_don_cost_gate(a) == "off"                    # 省略時は不動
+        assert EV.DON_COST_GATE_MODE == "off"
+        a = ap.parse_args(["--don-cost-gate", "check"])
+        assert EV.apply_don_cost_gate(a) == "check"                  # 渡せば実際に切り替わる
+        assert EV.DON_COST_GATE_MODE == "check"
+    finally:
+        EV.set_don_cost_gate_mode(before)
