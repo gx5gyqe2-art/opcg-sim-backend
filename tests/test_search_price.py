@@ -275,19 +275,19 @@ def test_a_don_attach_requirement_is_a_choice_that_costs_n_active_don_for_a_turn
 def test_a_return_don_cost_is_unpayable_when_there_is_not_enough_active_don():
     """**D-2**: `RETURN_DON`（`target=None`・【メイン】ドン‼️-N のイベント本文の形・OP15-074〜078 等）は
     元々 `_cost_unpayable` の場・手札の判定（`target` 必須）を素通りして常に「払える」扱いだった
-    （D-1 の未確定点(i)）。`DON_COST_GATE_MODE="check"` なら `st["my_don_active"]`
+    （D-1 の未確定点(i)）。`COST_AFFORD_MODE="check"` なら `st["my_don_active"]`
     （`condition_value.state_from_scalars` が既に積む・T72／`_don_attach_cost` と同じ場所）と比べる。
     既定 `off` は旧のまま・状態が無ければ払えるとして読む（上限）。"""
     ret_don = {"type": "RETURN_DON", "target": None, "value": {"base": 1}}
     draw = {"type": "DRAW", "value": {"base": 1}, "target": None}
     ab = {"trigger": "ON_PLAY", "cost": ret_don, "effect": draw}
-    assert EV.DON_COST_GATE_MODE == "off"                                              # 既定
+    assert EV.COST_AFFORD_MODE == "off"                                                # 既定
     assert EV._cost_unpayable([ret_don], None, None) is False                          # 状態なし＝上限
     assert EV._cost_unpayable([ret_don], None, {"my_don_active": 0}) is False           # 既定 off は場・手札コストと同じ従来どおり
     v_off, _ = EV.ability_value(ab, st={"my_don_active": 0})
     assert v_off == pytest.approx(MU - EV.DELTA)                                       # 従来どおり払える前提で値付け
     try:
-        EV.set_don_cost_gate_mode("check")
+        EV.set_cost_afford_mode("check")
         assert EV._cost_unpayable([ret_don], None, None) is False                      # 状態なし＝上限（check でも変わらない）
         assert EV._cost_unpayable([ret_don], None, {}) is False                        # my_don_active が無ければ上限
         assert EV._cost_unpayable([ret_don], None, {"my_don_active": 0}) is True        # アクティブなドンが無い → 払えない
@@ -304,26 +304,166 @@ def test_a_return_don_cost_is_unpayable_when_there_is_not_enough_active_don():
         ctx = _ctx(["BIG"], [4, 6, 7, 10]); ctx["cards"] = cards; ctx["field"] = ["CNT"]
         assert EV._cost_unpayable([bounce], None, {"search_ctx": {**ctx, "field": ["CNT"]}, "my_don_active": 5}) is True
     finally:
-        EV.set_don_cost_gate_mode("off")
+        EV.set_cost_afford_mode("off")
     with pytest.raises(ValueError):
-        EV.set_don_cost_gate_mode("guess")
+        EV.set_cost_afford_mode("guess")
 
 
 def test_the_cli_arg_actually_reaches_the_mode():
-    """**D-2/D-3**: `add_don_cost_gate_arg` を足しても `apply_don_cost_gate` を呼び忘れると
+    """**D-2/D-3**: `add_cost_afford_arg` を足しても `apply_cost_afford` を呼び忘れると
     CLI で切替を渡しても何も変わらない（`price_realised.py` の最初の計測で実際に踏んだ配線漏れ・
-    `off`/`check` の出力が1バイトも変わらなかった）。`apply_don_cost_gate(a)` 自体がその橋渡しを
+    `off`/`check` の出力が1バイトも変わらなかった）。`apply_cost_afford(a)` 自体がその橋渡しを
     正しく行うことを固定する。"""
     import argparse
-    before = EV.DON_COST_GATE_MODE
+    before = EV.COST_AFFORD_MODE
     try:
         ap = argparse.ArgumentParser()
-        EV.add_don_cost_gate_arg(ap)
+        EV.add_cost_afford_arg(ap)
         a = ap.parse_args([])
-        assert EV.apply_don_cost_gate(a) == "off"                    # 省略時は不動
-        assert EV.DON_COST_GATE_MODE == "off"
-        a = ap.parse_args(["--don-cost-gate", "check"])
-        assert EV.apply_don_cost_gate(a) == "check"                  # 渡せば実際に切り替わる
-        assert EV.DON_COST_GATE_MODE == "check"
+        assert EV.apply_cost_afford(a) == "off"                      # 省略時は不動
+        assert EV.COST_AFFORD_MODE == "off"
+        a = ap.parse_args(["--cost-afford", "check"])
+        assert EV.apply_cost_afford(a) == "check"                    # 渡せば実際に切り替わる
+        assert EV.COST_AFFORD_MODE == "check"
     finally:
-        EV.set_don_cost_gate_mode(before)
+        EV.set_cost_afford_mode(before)
+
+
+def test_a_rest_don_cost_needs_active_don_too_not_just_return_don():
+    """**D-4**: `REST_DON`（ドン‼️をレストにするだけのコスト・恒久には失わない）も `RETURN_DON` と同じく
+    アクティブなドンが N 枚要る。D-2 は `RETURN_DON` だけ見ていて、この型は同じ穴が残っていた。"""
+    rest_don = {"type": "REST_DON", "target": None, "value": {"base": 2}}
+    assert EV._cost_unpayable([rest_don], None, {"my_don_active": 1}) is False          # off は不変（旧どおり払える）
+    try:
+        EV.set_cost_afford_mode("check")
+        assert EV._cost_unpayable([rest_don], None, {"my_don_active": 1}) is True       # 2 枚要るのに 1 枚
+        assert EV._cost_unpayable([rest_don], None, {"my_don_active": 2}) is False       # ちょうど払える
+    finally:
+        EV.set_cost_afford_mode("off")
+
+
+def test_a_self_targeting_cost_is_always_payable_under_check_but_not_off():
+    """**D-4**: 「このカードをレストにする」等（`ref_id=="self"`）は能力を持つカード自身が対象——
+    判定時点で必ず場に在る（登場時なら出た札はアクティブ）ので常に払える。`check` 以前は場の一覧の中から
+    探しており、他に場の札が無いと常に「払えない」誤判定だった（実測で確認）。`off` はその旧挙動を保つ。"""
+    self_rest = {"type": "REST", "target": {"zone": "FIELD", "player": "SELF", "count": 1, "ref_id": "self"}}
+    cards = _Cards(_TABLE)
+    ctx = {"cards": cards, "field": [], "hand_items": []}                              # 場に他の札が無い
+    assert EV._cost_unpayable([self_rest], None, {"search_ctx": ctx}) is True           # off（旧）＝誤って払えない
+    try:
+        EV.set_cost_afford_mode("check")
+        assert EV._cost_unpayable([self_rest], None, {"search_ctx": ctx}) is False      # check＝自分自身は常に在る
+    finally:
+        EV.set_cost_afford_mode("off")
+
+
+def test_a_leader_targeting_cost_is_payable_even_with_an_empty_field():
+    """**D-4**: 場の一覧を絞り込む関数（`eligible_deck_cards`）はリーダーを最初から除くので、
+    `card_type` に`"LEADER"`を含む対象は場が空だと`check`以前は常に「払えない」誤判定だった
+    （実測で確認・「自分のリーダーのパワー-5000」等）。リーダーは常に場に在る。"""
+    leader_cost = {"type": "BUFF", "target": {"zone": "FIELD", "player": "SELF", "count": 1, "card_type": ["LEADER"]},
+                   "value": {"base": -5000}}
+    cards = _Cards(_TABLE)
+    ctx = {"cards": cards, "field": [], "hand_items": []}
+    assert EV._cost_unpayable([leader_cost], None, {"search_ctx": ctx}) is True         # off（旧）＝誤って払えない
+    try:
+        EV.set_cost_afford_mode("check")
+        assert EV._cost_unpayable([leader_cost], None, {"search_ctx": ctx}) is False    # check＝リーダーは常に在る
+        # 素性が読めなければ上限（払えるとして読む）——st["my_leader"] が無いのと同じ扱い
+        assert EV._cost_unpayable([leader_cost], None, {"search_ctx": ctx, "my_leader": None}) is False
+    finally:
+        EV.set_cost_afford_mode("off")
+
+
+def test_a_leader_targeting_cost_with_a_trait_filter_checks_the_actual_leader():
+    """**D-4（実装レビューで確認した実害）**: `card_type` に`"LEADER"`が在るだけで常に払える、では
+    「特徴《ドレスローザ》のリーダーかステージ」（OP10-043等15枚）のような絞り込みを無視してしまう。
+    `st["my_leader"]`（`condition_value.leader_info`と同じ素性の形）に実際に合うかを見る。"""
+    dressrosa_leader_or_stage = {"type": "REST", "target": {
+        "zone": "FIELD", "player": "SELF", "count": 1, "card_type": ["LEADER", "STAGE"], "traits": ["ドレスローザ"]}}
+    cards = _Cards(_TABLE)
+    ctx = {"cards": cards, "field": [], "hand_items": []}
+    try:
+        EV.set_cost_afford_mode("check")
+        other_leader = {"names": ["だれか"], "traits": ["麦わらの一味"], "colors": [], "attribute": None}
+        assert EV._cost_unpayable([dressrosa_leader_or_stage], None,
+                                   {"search_ctx": ctx, "my_leader": other_leader}) is True    # 特徴が合わない
+        dressrosa_leader = {"names": ["だれか"], "traits": ["ドレスローザ"], "colors": [], "attribute": None}
+        assert EV._cost_unpayable([dressrosa_leader_or_stage], None,
+                                   {"search_ctx": ctx, "my_leader": dressrosa_leader}) is False  # 特徴が合う
+    finally:
+        EV.set_cost_afford_mode("off")
+
+
+def test_attaching_ones_own_active_don_as_a_cost_also_needs_active_don():
+    """**D-4（実装レビューで確認した実害）**: `ATTACH_DON` を自分のキャラ等へ「アクティブなドン‼️」を
+    付与するコストとして使うカード（EB04-009等5枚）は、`target` を持つので場の判定は掛かるが、
+    アクティブなドンの枚数チェック（`RETURN_DON`／`REST_DON`だけ見ていた）の対象外だった。"""
+    attach_own_active = {"type": "ATTACH_DON", "raw_text": "自分の「Xレイリー」1枚にアクティブのドン!!1枚を付与する",
+                          "target": {"zone": "FIELD", "player": "SELF", "count": 1, "card_type": ["LEADER", "CHARACTER"],
+                                     "names": ["Xレイリー"]}, "value": {"base": 1}}
+    cards = _Cards(_TABLE)
+    ctx = _ctx(["SMALL"], [4, 6, 7, 10]); ctx["cards"] = cards; ctx["field"] = []
+    other_leader = {"names": ["だれか"], "traits": [], "colors": [], "attribute": None}  # card_type にLEADERも
+    # 在るので、対象の名前(Xレイリー)に合わないリーダーを明示して素性チェックで弾かせる（上限の抜け道を塞ぐ）
+    assert EV._cost_unpayable([attach_own_active], None, {"my_don_active": 0}) is False   # off は不変（ドン枚数は見ない）
+    try:
+        EV.set_cost_afford_mode("check")
+        assert EV._cost_unpayable([attach_own_active], None,
+                                   {"search_ctx": ctx, "my_don_active": 0, "my_leader": other_leader}) is True   # アクティブなドンが無い
+        assert EV._cost_unpayable([attach_own_active], None,
+                                   {"search_ctx": ctx, "my_don_active": 1, "my_leader": other_leader}) is True   # ドンは足りるが対象の場札が無い
+        opp_attach = dict(attach_own_active); opp_target = dict(attach_own_active["target"]); opp_target["player"] = "OPPONENT"
+        opp_attach["target"] = opp_target
+        assert EV._cost_unpayable([opp_attach], None, {"my_don_active": 0}) is False       # 相手対象は既存の足切りの外
+    finally:
+        EV.set_cost_afford_mode("off")
+
+
+def test_a_count_of_zero_is_always_payable_under_the_new_mode():
+    """**D-4（実装レビューで確認した潜在バグ）**: `target.count == 0`（「0枚を…」）は `n or 1` だと
+    偽値として `1` に化けて誤って「払えない」判定になりかねない。`None` との比較にして直した
+    （実在のカードには `count == 0` の対象コストは無い・将来の保険）。"""
+    zero_count = {"type": "TRASH", "target": {"zone": "FIELD", "player": "SELF", "count": 0, "card_type": ["CHARACTER"]}}
+    cards = _Cards(_TABLE)
+    ctx = {"cards": cards, "field": [], "hand_items": []}
+    try:
+        EV.set_cost_afford_mode("check")
+        assert EV._cost_unpayable([zero_count], None, {"search_ctx": ctx}) is False       # 0 枚要る＝常に払える
+    finally:
+        EV.set_cost_afford_mode("off")
+
+
+def test_the_required_count_is_checked_only_under_the_new_mode():
+    """**D-4**: 旧は「1 枚合えば払える」で `target.count` を見ていなかった。`check` は要る枚数と比べる。"""
+    two_chars = {"type": "TRASH", "target": {"zone": "FIELD", "player": "SELF", "count": 2, "card_type": ["CHARACTER"]}}
+    cards = _Cards(_TABLE)
+    ctx = {"cards": cards, "field": ["SMALL"], "hand_items": []}                       # 合う札は 1 枚だけ
+    assert EV._cost_unpayable([two_chars], None, {"search_ctx": ctx}) is False          # off（旧）＝1 枚在れば払える
+    try:
+        EV.set_cost_afford_mode("check")
+        assert EV._cost_unpayable([two_chars], None, {"search_ctx": ctx}) is True       # check＝2 枚要るのに 1 枚
+        ctx2 = {"cards": cards, "field": ["SMALL", "MID"], "hand_items": []}
+        assert EV._cost_unpayable([two_chars], None, {"search_ctx": ctx2}) is False     # 2 枚在れば払える
+    finally:
+        EV.set_cost_afford_mode("off")
+
+
+def test_life_and_trash_zone_costs_are_checked_by_count_only_under_the_new_mode():
+    """**D-4**: 「自分のライフの上から1枚を…」「自分のトラッシュの…N枚を…」のような、枚数だけで
+    絞り込みの無いライフ／トラッシュゾーンのコストは、`check` 以前は判定対象にすら入っていなかった。
+    個々の札の素性を追う記録が無いので、絞り込み（特徴・名前）は見ず枚数だけ見る（上限として読む規約）。"""
+    life_cost = {"type": "TRASH", "target": {"zone": "LIFE", "player": "SELF", "count": 1}}
+    trash_cost = {"type": "DECK_BOTTOM", "target": {"zone": "TRASH", "player": "SELF", "count": 3, "traits": ["CP"]}}
+    cards = _Cards(_TABLE)
+    ctx = {"cards": cards, "field": [], "hand_items": []}
+    assert EV._cost_unpayable([life_cost], None, {"search_ctx": ctx, "my_life": 0}) is False    # off はゾーンごと見ない
+    assert EV._cost_unpayable([trash_cost], None, {"search_ctx": ctx, "my_trash": 0}) is False
+    try:
+        EV.set_cost_afford_mode("check")
+        assert EV._cost_unpayable([life_cost], None, {"search_ctx": ctx, "my_life": 0}) is True    # ライフが無い
+        assert EV._cost_unpayable([life_cost], None, {"search_ctx": ctx, "my_life": 1}) is False
+        assert EV._cost_unpayable([trash_cost], None, {"search_ctx": ctx, "my_trash": 2}) is True  # 3 枚要るのに 2 枚
+        assert EV._cost_unpayable([trash_cost], None, {"search_ctx": ctx, "my_trash": 3}) is False  # 絞り込みは見ない（上限）
+    finally:
+        EV.set_cost_afford_mode("off")

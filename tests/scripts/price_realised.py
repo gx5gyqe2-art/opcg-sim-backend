@@ -484,7 +484,7 @@ def main(argv=None):
     EV.add_search_price_arg(ap)
     add_hand_meas_arg(ap)
     EV.add_play_now_arg(ap)
-    EV.add_don_cost_gate_arg(ap)
+    EV.add_cost_afford_arg(ap)
     import hand_plan as _HP
     _HP.add_inflow_arg(ap)
     _HP.add_cond_clock_arg(ap)
@@ -499,7 +499,7 @@ def main(argv=None):
     EV.apply_search_price(a)
     apply_hand_meas(a)
     EV.apply_play_now(a)
-    EV.apply_don_cost_gate(a)
+    EV.apply_cost_afford(a)
     _HP.apply_inflow_mode(a)
     _HP.apply_cond_clock_mode(a)
     t0 = time.time()
@@ -508,7 +508,7 @@ def main(argv=None):
     stats["cond"] = dict(EV.COND_STATS)                     # T72: 条件の判定（真／偽／判らない）の数
     res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "flow_pricing": EV.FLOW_PRICING,
            "search_price": EV.SEARCH_PRICE_MODE, "hand_meas": HAND_MEAS_MODE,
-           "play_now": EV.PLAY_NOW_MODE, "don_cost_gate": EV.DON_COST_GATE_MODE,
+           "play_now": EV.PLAY_NOW_MODE, "cost_afford": EV.COST_AFFORD_MODE,
            "inflow": _HP.INFLOW_MODE, "cond_clock": _HP.COND_CLOCK_MODE, "stats": stats,
            "frozen": {"lambda": LAM, "mu": MU, "delta": DELTA, "nu_meas": NU_MEAS, "theta": a.theta},
            "summary": summarise(per, a.boot_reps, a.seed), "seconds": round(time.time() - t0, 1)}

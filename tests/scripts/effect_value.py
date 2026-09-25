@@ -1050,48 +1050,83 @@ def _play_from_hand_now(target, st, card, n, mu):
     return float(sum(max(0.0, v) for v in vals[:max(1, int(n))]))
 
 
-#: **ドン!!コストの支払い可否**（D-2・2026-09-25・`docs/reports/2026-09-25_d1_price_mismatch_diagnosis.md`の
-#: 未確定点(i)）: `_cost_unpayable` は元々 `target` を持つ場・手札コスト（戻す・捨てる・KO）しか見ておらず、
-#: `RETURN_DON`（`target=None`・`DON_LOSS`）は素通りして常に「払える」扱いだった——【メイン】ドン‼️-N の
-#: イベント（OP15-074〜078 等）がアクティブなドンを使い切った後に出た行でも効果が起きた前提で値付けされ、
-#: 実測で`play`の"?"バケットの符号が反転する原因になった（D-1）。`check`＝`st["my_don_active"]`
-#: （`theory_bridge._state_of` が積む・アクティブなドンの実数）と比べて払えなければ 0（既存の場・手札コスト判定と
-#: 独立に効く）。既定 `off`（旧のまま・状態が無い行は `check` でも「払える」に落ちる＝上限）。
-DON_COST_GATE_MODES = ("off", "check")
-DON_COST_GATE_MODE = "off"
+#: **コストの支払い可否**（D-2で`RETURN_DON`だけ着手・D-4で全種へ拡張・2026-09-25・
+#: `docs/reports/2026-09-25_d1_price_mismatch_diagnosis.md`の未確定点(i)）: `_cost_unpayable` は元々
+#: `target` を持つ場・手札コスト（戻す・捨てる・KO）の**1枚在るか**しか見ておらず、次を取りこぼしていた
+#: （実測でカード DB の全コストを棚卸しして確認・2026-09-25「ドン以外のコストは正しくなってるの？」）:
+#: 1. **`RETURN_DON`／`REST_DON`**（`target=None`・ドン‼️を払うコスト）は素通りして常に「払える」扱い（D-2は
+#:    `RETURN_DON`だけ直した・`REST_DON`は同じ穴が残っていた）。
+#: 2. **自分自身が対象**（`ref_id=="self"`・「このカードをレストにする」等）を場の一覧の中から探していた——
+#:    その能力を持つカード自身は判定時点で必ず場に在る（登場時なら出た札はアクティブ）のに、他に場の札が
+#:    無いと常に「払えない」誤判定（実測で確認）。
+#: 3. **リーダーが対象**（`card_type` に`"LEADER"`を含む）は場の一覧の絞り込み関数がリーダーを最初から除くので
+#:    常に「払えない」誤判定（実測で確認）。
+#: 4. **要る枚数**（`target.count`）を見ておらず、1枚合えば何枚要る効果でも「払える」扱い。
+#: 5. **ライフ／トラッシュ**ゾーンのコスト（枚数だけで絞り込みの無い「自分のライフの上から1枚を…」等）は
+#:    ゾーンとして判定対象にすら入っていなかった。
+#: `check`＝上記を全部直した形で判定する。**新定数ゼロ**（`st["my_life"]`／`st["my_trash"]` は
+#: `condition_value.state_from_scalars` が既に積む）。ライフ・トラッシュは**枚数だけ**判定する
+#: （個々の札の素性を追う記録が無いため・絞り込み〔特徴・名前〕は上限として読む＝ファイルの他の場所と
+#: 同じ「読めないものは払えるとして読む」規約）。既定 `off`（旧のまま・状態が無い行は `check` でも
+#: 「払える」に落ちる＝上限）。
+#:
+#: **実装時のレビュー（ワークフロー・独立3観点×検証）で2件の実害を確認・その場で直した**:
+#: リーダー対象は上の3.の直しだけだと`card_type`に`"LEADER"`が在れば絞り込み（特徴・名前等）を無視して
+#: 常に払える扱いになる誤りが残っていた（「特徴《ドレスローザ》のリーダー」等15枚）——`st["my_leader"]`
+#: （素性・`condition_value.leader_info`）と`_matches_identity`で実際に絞り込みに合うか見るよう直した。
+#: `ATTACH_DON`を自分のアクティブなドンを付与するコストとして使うカード（5枚・raw_textに「アクティブ」と
+#: 明記）はドンの在庫チェックの外だった——`target`を持つので3.までの対象別チェックには掛かるが、
+#: アクティブなドンの枚数チェック自体が`RETURN_DON`／`REST_DON`しか見ていなかったため。同じ在庫チェックに含めた
+#: （対象が相手の場合は既存の`_side(t)!="SELF"`の足切りで対象外のまま）。
+COST_AFFORD_MODES = ("off", "check")
+COST_AFFORD_MODE = "off"
+#: `target=None`でドン‼️を要るコスト——値付け（`RETURN_DON`は`don_loss`で恒久・`REST_DON`は`tempo`で一時的）は
+#: 別だが、どちらも「アクティブなドンが N 枚要る」点は同じなので支払い可否はまとめて見る。
+DON_ZONE_COST_TYPES = ("RETURN_DON", "REST_DON")
 
 
-def set_don_cost_gate_mode(mode):
-    global DON_COST_GATE_MODE
-    if mode not in DON_COST_GATE_MODES:
-        raise ValueError("don cost gate mode は %s のどれか" % (DON_COST_GATE_MODES,))
-    DON_COST_GATE_MODE = mode
-    return DON_COST_GATE_MODE
+def set_cost_afford_mode(mode):
+    global COST_AFFORD_MODE
+    if mode not in COST_AFFORD_MODES:
+        raise ValueError("cost afford mode は %s のどれか" % (COST_AFFORD_MODES,))
+    COST_AFFORD_MODE = mode
+    return COST_AFFORD_MODE
 
 
-def add_don_cost_gate_arg(ap):
-    ap.add_argument("--don-cost-gate", default=None, choices=DON_COST_GATE_MODES,
-                    help="**D-2** ドン!!コスト（`RETURN_DON` 等）の支払い可否: `check`（`st[\"my_don_active\"]` と比べる）"
-                         "／`off`（既定・旧・常に払えるとして読む）")
+def add_cost_afford_arg(ap):
+    ap.add_argument("--cost-afford", default=None, choices=COST_AFFORD_MODES,
+                    help="**D-4** コストの支払い可否: `check`（ドン‼️・場／手札の自分自身・リーダー・枚数・"
+                         "ライフ／トラッシュの枚数を見る）／`off`（既定・旧・常に払えるとして読む）")
 
 
-def apply_don_cost_gate(a):
-    if getattr(a, "don_cost_gate", None) is not None:
-        set_don_cost_gate_mode(a.don_cost_gate)
-    return DON_COST_GATE_MODE
+def apply_cost_afford(a):
+    if getattr(a, "cost_afford", None) is not None:
+        set_cost_afford_mode(a.cost_afford)
+    return COST_AFFORD_MODE
 
 
 def _cost_unpayable(cost_acts, card, st):
-    """**コストを払える札が無いか**（T70／D-2でドン!!コストも追加）: 自分の場（`search_ctx["field"]`）か
-    手札（`hand_items`）から絞り込みつきで札を要求するコスト（戻す・捨てる・KO 等）で、合う札が 1 枚も無ければ
-    `True`。**ドン!!コスト**（`RETURN_DON` 等・`DON_LOSS`）は `DON_COST_GATE_MODE=="check"` のときだけ
-    `st["my_don_active"]` と比べる（既定 `off`・場・手札の判定とは独立）。状態が無ければ `False`（払えるとして
-    読む＝上限）。"""
-    if DON_COST_GATE_MODE == "check" and st:
+    """**コストを払える札が無いか**（T70／D-2/D-4）。**既定 `off` は D-2 以前と 1 バイトも変わらない**——
+    自分自身・リーダー・枚数・ライフ／トラッシュの扱いは全部 `COST_AFFORD_MODE=="check"` の中だけで効く。
+    `check`: **ドン‼️を要るコスト**（`RETURN_DON`／`REST_DON`・`target=None`、および自分のアクティブな
+    ドンを付与する`ATTACH_DON`）は `st["my_don_active"]` と比べる（`search_ctx` が無い行でも効く・
+    D-2 と同じ独立した判定）。**場・手札・ライフ・トラッシュから札を要るコスト**（`target` が在る）は、
+    自分自身（`ref_id=="self"`・判定時点で必ず場に在る）を素通りし、リーダー（`card_type` に`"LEADER"`）は
+    素性（`st["my_leader"]`）が絞り込みに合えば払える札として数えたうえで、絞り込みに合う札の数が
+    `target.count`（枚数）以上あるかを見る。ライフ・トラッシュは枚数のみ（個々の札の素性を追う記録が無い）。
+    状態が無ければ `False`（払えるとして読む＝上限）。"""
+    check = COST_AFFORD_MODE == "check"
+    if check and st:
         have = st.get("my_don_active")
         if have is not None:
             for e in cost_acts:
-                if str(e.get("type") or "") in DON_LOSS:
+                et = str(e.get("type") or "")
+                t0 = e.get("target") or {}
+                # `ATTACH_DON` を自分のキャラ等へ付ける自分自身のコストは、raw_text が「アクティブ」と
+                # 明記するものだけアクティブなドンを要る（対象は別途この後の場チェックにもかかる）。
+                is_don_cost = et in DON_ZONE_COST_TYPES or (
+                    et == "ATTACH_DON" and _side(t0) == "SELF" and "アクティブ" in str(e.get("raw_text") or ""))
+                if is_don_cost:
                     need = _magnitude(e)
                     if need > float(have) + 1e-9:
                         return True
@@ -1110,13 +1145,31 @@ def _cost_unpayable(cost_acts, card, st):
         t = e.get("target") or {}
         if not t or _side(t) != "SELF":
             continue
+        if check and t.get("ref_id") == "self":
+            continue                                                  # D-4: 自分自身は常に在る
         zones = _zone(t)
+        leader_ok = 0
+        if check and "LEADER" in [str(x).upper() for x in (t.get("card_type") or [])]:
+            my_leader = st.get("my_leader")
+            # 素性（特徴・色・属性・名前）が読めなければ払えるとして読む（上限）。読めれば絞り込みに
+            # 実際に合うかを見る——「特徴《ドレスローザ》のリーダー」等、素性を問う対象があるため。
+            leader_ok = 1 if (my_leader is None or _matches_identity(t, my_leader)) else 0
+        if check:
+            n = t.get("count")
+            need_n = None if (n is not None and float(n) < 0) else (1.0 if n is None else float(n))  # -1(全部) は床なし
+        else:
+            need_n = 1.0                                              # 旧＝枚数は見ない（1 枚在るかだけ）
+        matched = None
         if zones == ["FIELD"] and ctx.get("field") is not None:
-            if not SP.eligible_deck_cards(t, list(ctx["field"]), cards):
-                return True
+            matched = len(SP.eligible_deck_cards(t, list(ctx["field"]), cards)) + leader_ok
         elif zones == ["HAND"] and ctx.get("hand_items") is not None:
-            if not SP.eligible_hand_cards(t, ctx["hand_items"], cards, skip_cid=cid):
-                return True
+            matched = len(SP.eligible_hand_cards(t, ctx["hand_items"], cards, skip_cid=cid))
+        elif check and zones == ["LIFE"]:
+            matched = st.get("my_life")
+        elif check and zones == ["TRASH"]:
+            matched = st.get("my_trash")
+        if matched is not None and need_n is not None and matched < need_n:
+            return True
     return False
 
 
