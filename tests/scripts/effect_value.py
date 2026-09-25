@@ -1078,11 +1078,17 @@ def _play_from_hand_now(target, st, card, n, mu):
 #: 明記）はドンの在庫チェックの外だった——`target`を持つので3.までの対象別チェックには掛かるが、
 #: アクティブなドンの枚数チェック自体が`RETURN_DON`／`REST_DON`しか見ていなかったため。同じ在庫チェックに含めた
 #: （対象が相手の場合は既存の`_side(t)!="SELF"`の足切りで対象外のまま）。
+#:
+#: **見直しで直した規則の誤り**（2026-09-25・エンジン `effects/resolver.rs::can_satisfy_node_on` と
+#: `rules/actions.rs` の PLAY と突き合わせ）: D-2 と上の初版は、ドン‼️−N（`RETURN_DON`）も
+#: アクティブなドンの枚数と比べていたが、エンジンは**場のドンの合計**（アクティブ＋レスト＋付与中＝
+#: `st["my_don_total"]`）で判定する（レストのドンも戻せる）。逆に、ドンをレストにするコスト（`REST_DON`・
+#: アクティブなドンを付ける`ATTACH_DON`）は、手札から出した札の**コストを先に払った後**のアクティブな
+#: ドンで判定する（エンジンは出す札のコストをアクティブなドンのレストで先に払ってから登場時・【メイン】
+#: を解決する）。状態を渡して呼ぶ経路は全部「手札から出す」文脈（登場時・イベント・手札の計画価格）で、
+#: 効果でただで出す相方（T70）は状態を渡さないのでこの判定に来ない。
 COST_AFFORD_MODES = ("off", "check")
 COST_AFFORD_MODE = "off"
-#: `target=None`でドン‼️を要るコスト——値付け（`RETURN_DON`は`don_loss`で恒久・`REST_DON`は`tempo`で一時的）は
-#: 別だが、どちらも「アクティブなドンが N 枚要る」点は同じなので支払い可否はまとめて見る。
-DON_ZONE_COST_TYPES = ("RETURN_DON", "REST_DON")
 
 
 def set_cost_afford_mode(mode):
@@ -1108,9 +1114,9 @@ def apply_cost_afford(a):
 def _cost_unpayable(cost_acts, card, st):
     """**コストを払える札が無いか**（T70／D-2/D-4）。**既定 `off` は D-2 以前と 1 バイトも変わらない**——
     自分自身・リーダー・枚数・ライフ／トラッシュの扱いは全部 `COST_AFFORD_MODE=="check"` の中だけで効く。
-    `check`: **ドン‼️を要るコスト**（`RETURN_DON`／`REST_DON`・`target=None`、および自分のアクティブな
-    ドンを付与する`ATTACH_DON`）は `st["my_don_active"]` と比べる（`search_ctx` が無い行でも効く・
-    D-2 と同じ独立した判定）。**場・手札・ライフ・トラッシュから札を要るコスト**（`target` が在る）は、
+    `check`: **ドン‼️−N**（`RETURN_DON`）は場のドンの合計 `st["my_don_total"]` と、**ドンをレストにする
+    コスト**（`REST_DON`・自分のアクティブなドンを付与する`ATTACH_DON`）は出す札のコストを払った後の
+    アクティブなドン `st["my_don_active"] − cost` と比べる（`search_ctx` が無い行でも効く・読めなければ上限）。**場・手札・ライフ・トラッシュから札を要るコスト**（`target` が在る）は、
     自分自身（`ref_id=="self"`・判定時点で必ず場に在る）を素通りし、リーダー（`card_type` に`"LEADER"`）は
     素性（`st["my_leader"]`）が絞り込みに合えば払える札として数えたうえで、絞り込みに合う札の数が
     `target.count`（枚数）以上あるかを見る。ライフ・トラッシュは枚数のみ（個々の札の素性を追う記録が無い）。
@@ -1118,18 +1124,25 @@ def _cost_unpayable(cost_acts, card, st):
     check = COST_AFFORD_MODE == "check"
     if check and st:
         have = st.get("my_don_active")
-        if have is not None:
-            for e in cost_acts:
-                et = str(e.get("type") or "")
-                t0 = e.get("target") or {}
-                # `ATTACH_DON` を自分のキャラ等へ付ける自分自身のコストは、raw_text が「アクティブ」と
-                # 明記するものだけアクティブなドンを要る（対象は別途この後の場チェックにもかかる）。
-                is_don_cost = et in DON_ZONE_COST_TYPES or (
-                    et == "ATTACH_DON" and _side(t0) == "SELF" and "アクティブ" in str(e.get("raw_text") or ""))
-                if is_don_cost:
-                    need = _magnitude(e)
-                    if need > float(have) + 1e-9:
-                        return True
+        total = st.get("my_don_total")
+        # 登場時・イベントの値付けは「手札から出した後」に解決する——エンジンは出す札のコストを
+        # アクティブなドンをレストにして先に払う（`rules/actions.rs` の PLAY: `pay_cost` → 解決）。
+        paid = float((card or {}).get("cost") or 0.0)
+        for e in cost_acts:
+            et = str(e.get("type") or "")
+            t0 = e.get("target") or {}
+            need = None
+            if et == "RETURN_DON":
+                # ドン‼️−N は場のドン（アクティブ＋レスト＋付与中）の合計で判定（エンジンの
+                # `can_satisfy_node_on` と同じ）。出す札のコストはレストにするだけで場から減らない。
+                pool = None if total is None else float(total)
+                need = _magnitude(e)
+            elif et == "REST_DON" or (
+                    et == "ATTACH_DON" and _side(t0) == "SELF" and "アクティブ" in str(e.get("raw_text") or "")):
+                pool = None if have is None else max(0.0, float(have) - paid)
+                need = _magnitude(e)
+            if need is not None and pool is not None and need > pool + 1e-9:
+                return True
     if not st or not st.get("search_ctx"):
         return False
     ctx = st["search_ctx"]

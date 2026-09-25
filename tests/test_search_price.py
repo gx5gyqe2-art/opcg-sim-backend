@@ -289,14 +289,20 @@ def test_a_return_don_cost_is_unpayable_when_there_is_not_enough_active_don():
     try:
         EV.set_cost_afford_mode("check")
         assert EV._cost_unpayable([ret_don], None, None) is False                      # 状態なし＝上限（check でも変わらない）
-        assert EV._cost_unpayable([ret_don], None, {}) is False                        # my_don_active が無ければ上限
-        assert EV._cost_unpayable([ret_don], None, {"my_don_active": 0}) is True        # アクティブなドンが無い → 払えない
-        assert EV._cost_unpayable([ret_don], None, {"my_don_active": 1}) is False       # ちょうど払える
+        assert EV._cost_unpayable([ret_don], None, {}) is False                        # 場のドンの合計が無ければ上限
+        assert EV._cost_unpayable([ret_don], None, {"my_don_total": 0}) is True         # 場にドンが無い → 払えない
+        assert EV._cost_unpayable([ret_don], None, {"my_don_total": 1}) is False        # ちょうど払える
+        # **見直し（2026-09-25）**: ドン‼️−N はレストのドンも戻せる（エンジン `can_satisfy_node_on` は
+        # アクティブ＋レスト＋付与中の合計で判定）。D-2 はアクティブだけと比べていた＝厳しすぎた。
+        assert EV._cost_unpayable([ret_don], None, {"my_don_active": 0, "my_don_total": 3}) is False
+        assert EV._cost_unpayable([ret_don], None, {"my_don_active": 0}) is False       # 合計が読めない＝上限（アクティブは下限にすぎない）
         two_don = {"type": "RETURN_DON", "target": None, "value": {"base": 2}}
-        assert EV._cost_unpayable([two_don], None, {"my_don_active": 1}) is True        # 2 枚要るのに 1 枚しか無い
-        v0, _ = EV.ability_value(ab, st={"my_don_active": 0})
+        assert EV._cost_unpayable([two_don], None, {"my_don_total": 1}) is True         # 2 枚要るのに 1 枚しか無い
+        # 出す札のコストはレストで払うだけ＝場のドンの合計は減らない
+        assert EV._cost_unpayable([ret_don], {"cost": 5}, {"my_don_active": 5, "my_don_total": 5}) is False
+        v0, _ = EV.ability_value(ab, st={"my_don_total": 0})
         assert v0 == 0.0                                                               # 払えない → 効果は起きない（登場時）
-        va, _ = EV.ability_value(ab, st={"my_don_active": 0}, offered=True)
+        va, _ = EV.ability_value(ab, st={"my_don_total": 0}, offered=True)
         assert va == pytest.approx(MU - EV.DELTA)                                      # 起動メイン（候補に出た＝払う前提）はゲートを通らない
         # 場・手札の判定は独立に効き続ける（既存の T70 の道は素通りしない）
         bounce = {"type": "BOUNCE", "target": {"zone": "FIELD", "player": "SELF", "card_type": ["CHARACTER"], "cost_min": 2, "count": 1}}
@@ -338,6 +344,13 @@ def test_a_rest_don_cost_needs_active_don_too_not_just_return_don():
         EV.set_cost_afford_mode("check")
         assert EV._cost_unpayable([rest_don], None, {"my_don_active": 1}) is True       # 2 枚要るのに 1 枚
         assert EV._cost_unpayable([rest_don], None, {"my_don_active": 2}) is False       # ちょうど払える
+        # **見直し（2026-09-25）**: 手札から出す札はコストをアクティブなドンのレストで**先に**払ってから
+        # 登場時・【メイン】を解決する（エンジン `rules/actions.rs` の PLAY）＝残りのアクティブで判定する。
+        assert EV._cost_unpayable([rest_don], {"cost": 3}, {"my_don_active": 4}) is True   # 4 − 3 = 1 < 2
+        assert EV._cost_unpayable([rest_don], {"cost": 3}, {"my_don_active": 5}) is False  # 5 − 3 = 2
+        assert EV._cost_unpayable([rest_don], {"cost": 3}, {"my_don_total": 9}) is False   # アクティブが読めない＝上限
+        # レストにするコストは場の合計ではなくアクティブで見る（レストのドンはもうレストにできない）
+        assert EV._cost_unpayable([rest_don], None, {"my_don_active": 1, "my_don_total": 9}) is True
     finally:
         EV.set_cost_afford_mode("off")
 
