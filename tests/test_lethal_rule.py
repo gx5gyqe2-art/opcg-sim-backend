@@ -36,12 +36,12 @@ def _defaults():
     LR.set_lethal_hand_mode("actual")
     LR.set_lethal_stop_mode("max")
     LR.set_lethal_life_mode("off")          # 既定は `draw` だが、規則 1〜5 のテストはライフの札なしで読む
-    LR.set_avg_counter_mode("printed")
+    LR.set_avg_counter_mode("rules")
     yield
     LR.set_lethal_hand_mode("actual")
     LR.set_lethal_stop_mode("max")
     LR.set_lethal_life_mode("draw")
-    LR.set_avg_counter_mode("printed")
+    LR.set_avg_counter_mode("rules")
 
 
 # ---- 1. 切れるだけ切る ---------------------------------------------------------------------------

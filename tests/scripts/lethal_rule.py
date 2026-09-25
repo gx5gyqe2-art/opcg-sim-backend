@@ -96,11 +96,11 @@ LETHAL_STOP_MODE = "max"
 #: **受けたライフの札を守り手のカウンターに数えるか**——`draw`（既定・規則）／`off`（T117 の旧規約）
 LETHAL_LIFE_MODES = ("draw", "off")
 LETHAL_LIFE_MODE = "draw"
-#: **ライフ札の平均カウンター値の数え方**（P8-7(b) 候補(c)・2026-09-25）——
-#: `printed`（既定・旧来）は印字カウンターだけを数える。`rules` は `deck_refill.is_cuttable`／
-#: `hand_guard.counter_of` と同じ定義（印字カウンターと【カウンター】イベントの上げ幅の大きい方）に揃える。
+#: **ライフ札の平均カウンター値の数え方**（P8-7(b) 候補(c)・2026-09-25・2026-09-25 に既定採用）——
+#: `rules`（既定）は `deck_refill.is_cuttable`／`hand_guard.counter_of` と同じ定義（印字カウンターと
+#: 【カウンター】イベントの上げ幅の大きい方）に揃える。`printed`（旧来）は印字カウンターだけを数える。
 AVG_COUNTER_MODES = ("printed", "rules")
-AVG_COUNTER_MODE = "printed"
+AVG_COUNTER_MODE = "rules"
 #: 1 体に付けられるドンの上限（規則）
 DON_PER_BODY = 4
 #: 状態スカラーの **相手のアクティブなドン**（`encoder.py` の並び: 0 自ライフ・1 相手ライフ・2 自アクティブ・3 自レスト・4 相手アクティブ）
@@ -500,7 +500,7 @@ def build_parser():
     ap.add_argument("--life", default=None, choices=LETHAL_LIFE_MODES,
                     help="受けたライフの札を守り手のカウンターに数えるか（既定 `draw`＝規則・`off`＝T117 の旧規約）")
     ap.add_argument("--avg-counter", default=None, choices=AVG_COUNTER_MODES,
-                    help="ライフ札の平均カウンター値の数え方（既定 `printed`＝印字のみ・`rules`＝カウンターイベント込み）")
+                    help="ライフ札の平均カウンター値の数え方（既定 `rules`＝印字とカウンターイベントの大きい方・`printed`＝旧来）")
     ap.add_argument("--json", default="")
     ap.add_argument("--dump", default="", help="宣言した行の全内訳を JSON に書く（診断用）")
     return ap

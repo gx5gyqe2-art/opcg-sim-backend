@@ -133,7 +133,7 @@ def build_parser():
     ap.add_argument("--life", default=None, choices=LR.LETHAL_LIFE_MODES,
                     help="lethal_rule の --life をそのまま通す（既定 draw）")
     ap.add_argument("--avg-counter", default=None, choices=LR.AVG_COUNTER_MODES,
-                    help="lethal_rule の --avg-counter をそのまま通す（既定 printed）")
+                    help="lethal_rule の --avg-counter をそのまま通す（既定 rules）")
     ap.add_argument("--json", default="")
     return ap
 
