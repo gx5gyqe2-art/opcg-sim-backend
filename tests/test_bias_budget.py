@@ -177,20 +177,27 @@ def test_two_paths_that_disagree_about_tau_fail_loudly():
 # ---------------------------------------------------------------- 成り立つ条件
 
 def test_the_decomposition_only_claims_to_be_exact_on_a_static_target():
-    """**的が動く構成では降りる**（第 2 項の意味が変わるので恒等式として売らない）。"""
-    assert BB.static_target() is True        # 出荷既定
-    old = CB.RACE_MODE
+    """**的が動く構成では降りる**（第 2 項の意味が変わるので恒等式として売らない）。
+    **C-5c（2026-09-25）以降、出荷既定は的が動く**（`THETA_RETURN_MODE=untap`＝レスト中のブロッカーが
+    2 段目から戻る）ので、既定のままでは降りる。恒等式として読むなら `--theta-return off` で回す。"""
+    assert BB.static_target() is False       # 出荷既定（untap）
+    old, old_ret = CB.RACE_MODE, CB.THETA_RETURN_MODE
     try:
+        CB.set_theta_return_mode("off")
+        assert BB.static_target() is True
         CB.set_race_mode("net")
         assert BB.static_target() is False
         with pytest.raises(SystemExit):
             BB.collect_budget(["/nonexistent"], 1)
     finally:
         CB.set_race_mode(old)
+        CB.set_theta_return_mode(old_ret)
 
 
 def test_every_mode_that_moves_the_target_is_named():
     """**的を動かす 4 つの切替**が条件に全部入っている（1 つ足したら落ちる）。"""
+    base = {n: getattr(CB, n) for n in ("RACE_MODE", "THETA_HAND_PLACE", "THETA_RETURN_MODE", "RATE_DECAY_MODE")}
+    CB.THETA_RETURN_MODE = "off"                 # 他の 3 つを測るために的を止めておく（既定は untap）
     for name, off, on in (("RACE_MODE", "static", "net"),
                           ("THETA_HAND_PLACE", "stock", "shield"),
                           ("THETA_RETURN_MODE", "off", "untap"),
@@ -203,3 +210,5 @@ def test_every_mode_that_moves_the_target_is_named():
             assert BB.static_target() is True, name
         finally:
             setattr(CB, name, old)
+    for n, v in base.items():
+        setattr(CB, n, v)

@@ -296,12 +296,14 @@ def test_the_rate_moving_families_are_exactly_the_ones_curve_cannot_price():
 
 
 # --------------------------------------------------------------------------- 4b. C-2: 攻撃した体のレスト費用
-def test_attack_rest_mode_defaults_to_off():
-    assert KV.ATTACK_REST_MODE == "off"
+def test_attack_rest_mode_defaults_to_return():
+    """**C-5c で既定に採用**（2026-09-25・ユーザ決定）——攻めたブロッカーは消さずに戻る側へ移す。"""
+    assert KV.ATTACK_REST_MODE == "return"
 
 
 def test_attack_rest_off_never_touches_theta_me():
-    """**既定は旧のまま**——ブロッカーで攻めても `th_me` は動かない。"""
+    """**`off`（旧）**——ブロッカーで攻めても `th_me` は動かない。"""
+    KV.set_attack_rest_mode("off")
     class _C:
         def info(self, cid):
             return {"power": 5000.0, "blocker": True}

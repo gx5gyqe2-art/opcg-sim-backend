@@ -30,7 +30,7 @@
 
 ## 成り立つ条件（既定で成り立つ・破れたら器が黙らずに落ちる）
 
-既定の `RACE_MODE=static`・`THETA_HAND_PLACE=stock`・`THETA_RETURN_MODE=off`・`RATE_DECAY_MODE=off` では
+`RACE_MODE=static`・`THETA_HAND_PLACE=stock`・`THETA_RETURN_MODE=off`（**C-5c 以降は既定でない**）・`RATE_DECAY_MODE=off` では
 `tau_grow` の的は**定数 `Θ`**（`need = theta + r·j + 盾 + 段差` の後ろ 3 項が 0）。
 このとき**速さの列だけを差し替えた歩き**が作れる＝分解が恒等式になる。
 的が動く構成（`race`／`shield`／`untap`／`decay`）では第 2 項の意味が変わるので、
@@ -70,7 +70,8 @@ CAP = CB.RACE_CAP
 
 
 def static_target():
-    """**的が定数か**（分解が恒等式になる条件）。既定の構成では真。"""
+    """**的が定数か**（分解が恒等式になる条件）。**C-5c（2026-09-25）以降の既定では偽**
+    （`THETA_RETURN_MODE=untap` で的が 2 段目から動く）——恒等式として読むなら `--theta-return off` で回す。"""
     return (CB.RACE_MODE == "static" and CB.THETA_HAND_PLACE == "stock"
             and CB.THETA_RETURN_MODE == "off" and CB.RATE_DECAY_MODE == "off")
 
@@ -301,7 +302,10 @@ def main(argv=None):
     ap.add_argument("--rate-ramp", type=float, default=CB.RATE_RAMP)
     ap.add_argument("--theta-hand", default=CB.THETA_HAND_MODE, choices=CB.THETA_HAND_MODES)
     ap.add_argument("--theta-hand-window", default=CB.THETA_HAND_WINDOW, choices=CB.THETA_HAND_WINDOWS)
+    ap.add_argument("--theta-return", default=CB.THETA_RETURN_MODE, choices=CB.THETA_RETURN_MODES,
+                    help="**C-5c**: 既定 `untap` では的が動く＝恒等式として読むなら `off`")
     a = ap.parse_args(argv)
+    CB.set_theta_return_mode(a.theta_return)
     CB.set_theta_hand_mode(a.theta_hand)
     CB.set_theta_hand_window(a.theta_hand_window)
     CB.set_rate_don_mode(a.rate_don, pay=(a.rate_don_pay == "on"), ramp=a.rate_ramp)

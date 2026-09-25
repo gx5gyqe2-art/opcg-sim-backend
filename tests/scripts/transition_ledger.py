@@ -502,9 +502,9 @@ def main(argv=None):
     ap.add_argument("--boundary", choices=BOUNDARY_MODES, default=None,
                     help="**T124**: ターンの境目を規則から値付けするか（既定 `off`）")
     ap.add_argument("--attack-rest", dest="attack_rest", choices=KV.ATTACK_REST_MODES, default=None,
-                    help="攻撃した体のレスト費用をΘ_meへ足すか（C-2・既定off／C-5c `return`）")
+                    help="攻撃した体のレスト費用をΘ_meへ足すか（既定 `return`・C-5c／`body`＝C-2／`off`＝旧）")
     ap.add_argument("--theta-return", dest="theta_return", choices=CB.THETA_RETURN_MODES, default=None,
-                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 off）")
+                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 untap）")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
     if a.d_mode:

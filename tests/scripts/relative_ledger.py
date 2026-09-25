@@ -483,9 +483,9 @@ def build_parser():
     ap.add_argument("--slope-take", dest="slope_take", choices=CB.SLOPE_TAKE_MODES, default=None,
                     help="**T134**: `A` の「受ける費用」を自分のライフで決めるか（既定は現状の `const`）")
     ap.add_argument("--attack-rest", dest="attack_rest", choices=KV.ATTACK_REST_MODES, default=None,
-                    help="**C-2**: 攻撃した体のレスト費用をΘ_meへ足すか（既定 `off`・C-5c は `return`）")
+                    help="**C-2**: 攻撃した体のレスト費用をΘ_meへ足すか（既定 `return`・C-5c／`body`＝C-2／`off`＝旧）")
     ap.add_argument("--theta-return", dest="theta_return", choices=CB.THETA_RETURN_MODES, default=None,
-                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 `off`）")
+                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 `untap`）")
     ap.add_argument("--scale-a", type=float, default=1.0, help="**P7**: 両席の A に共通の掛け算誤差")
     ap.add_argument("--scale-currency", type=float, default=1.0, help="**P5**: 耐久と価格を同時に c 倍")
     ap.add_argument("--scale-clamp", dest="clamp", default="",

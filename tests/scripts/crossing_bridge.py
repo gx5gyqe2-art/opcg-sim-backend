@@ -491,7 +491,9 @@ def threshold(sc, tok, lam=LAM, mu=MU, g_hand=None):
 #: **速さの側と鏡像**（T94）: 攻めは**召喚酔い**で在庫が `j ≥ 2` から効き、守りは**アンタップ**で
 #: レストのブロッカーが `j ≥ 2` から効く。**どちらも 1 ターン遅れて効き始める同じ形**。
 THETA_RETURN_MODES = ("off", "untap")
-THETA_RETURN_MODE = "off"
+#: **既定は `untap`**（2026-09-25・C-5c・ユーザ決定「aでお願いします」・`2026-09-25_c5c_theta_return.md`）——
+#: 帳簿の状態（7 つ組）・両方の歩き（輪郭・積み上がり）に通した形で採用。以前の数字と比べるときは `--theta-return off`。
+THETA_RETURN_MODE = "untap"
 
 
 def set_theta_return_mode(mode):

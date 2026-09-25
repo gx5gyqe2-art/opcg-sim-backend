@@ -58,7 +58,7 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "THETA_HAND_PLACE": "stock",            # T102（切替として残す）
         "THETA_BODY_MODE": "blockers",           # T97
         "THETA_HAND_BLOCKER_MODE": "on",         # T106・2026-09-19
-        "THETA_RETURN_MODE": "off",              # T96（切替として残す）
+        "THETA_RETURN_MODE": "untap",            # T96・**C-5c で既定に採用**（2026-09-25）
         "SLOPE_MODE": "hand",                    # T77
         "SLOPE_HAND_MODE": "flow",               # T93
         "SLOPE_BLOCK_MODE": "off",               # T92（切替として残す）
@@ -281,7 +281,7 @@ def test_a_rested_blocker_is_not_endurance_now_but_comes_back():
     ci = np.zeros(22, np.int32); ci[7] = 1
     idx2cid, cards = {1: "B"}, _Cards()
     sc = _sc(3, 4)
-    assert CB.THETA_RETURN_MODE == "off"                         # 既定は据え置き（採否はユーザ判定）
+    assert CB.THETA_RETURN_MODE == "untap"                       # **C-5c で既定に採用**（2026-09-25・ユーザ決定）
     # **トークンだけでは分からない**（札を渡さなければ 0）
     assert CB.resting_blocker_term(tok, T.SLOT_OPP_FIELD, 5000.0) == 0.0
     back = CB.resting_blocker_term(tok, T.SLOT_OPP_FIELD, 5000.0, ci_row=ci, idx2cid=idx2cid, cards=cards)
@@ -303,7 +303,7 @@ def test_a_rested_blocker_is_not_endurance_now_but_comes_back():
         with pytest.raises(ValueError):
             CB.set_theta_return_mode("なにか")
     finally:
-        CB.set_theta_return_mode("off")
+        CB.set_theta_return_mode("untap")
 
 
 def test_the_theory_slope_is_the_priced_attack_flow_of_the_board():

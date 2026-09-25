@@ -129,7 +129,8 @@ AXES = ("th_me", "th_opp", "a_me", "a_opp")
 #: （`th_me` −ν・`th_me_back` +ν・総量は不変）——状態が `THETA_RETURN_MODE=untap` の 7 つ組
 #: （戻る分を持つ）であることが前提（5 つ組に `*_back` を足すと `apply_dx` が落ちる＝黙って捨てない）。
 ATTACK_REST_MODES = ("off", "body", "return")
-ATTACK_REST_MODE = "off"
+#: **既定は `return`**（2026-09-25・C-5c・ユーザ決定）。`body`（C-2・永久の損失の近似）は不採用・切替として残す。
+ATTACK_REST_MODE = "return"
 
 
 def split_state(st):
@@ -729,9 +730,9 @@ def main(argv=None):
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--d-mode", dest="d_mode", choices=D_MODES, default=None)
     ap.add_argument("--attack-rest", dest="attack_rest", choices=ATTACK_REST_MODES, default=None,
-                    help="攻撃した体のレスト費用をΘ_meへ足すか（C-2・既定off／C-5c `return`）")
+                    help="攻撃した体のレスト費用（既定 `return`＝戻る側へ移す・C-5c／`body`＝C-2 の近似／`off`＝旧）")
     ap.add_argument("--theta-return", dest="theta_return", choices=CB.THETA_RETURN_MODES, default=None,
-                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 off）")
+                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 untap）")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
     if a.d_mode:

@@ -71,9 +71,9 @@ def build_parser():
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--d-mode", default=None, choices=KV.D_MODES)
     ap.add_argument("--attack-rest", dest="attack_rest", default=None, choices=KV.ATTACK_REST_MODES,
-                    help="**C-2**: 攻撃した体のレスト費用をΘ_meへ足すか（既定 `off`・C-5c は `return`）")
+                    help="**C-2**: 攻撃した体のレスト費用をΘ_meへ足すか（既定 `return`・C-5c／`body`＝C-2／`off`＝旧）")
     ap.add_argument("--theta-return", dest="theta_return", default=None, choices=KV.CB.THETA_RETURN_MODES,
-                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 `off`）")
+                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 `untap`）")
     ap.add_argument("--json", default="")
     return ap
 

@@ -126,6 +126,7 @@ def _board_with_a_rested_blocker():
 
 def test_state_of_row_carries_the_rested_blocker_as_returning_stock_under_untap():
     sc, tok, ci, idx2cid, cards = _board_with_a_rested_blocker()
+    CB.set_theta_return_mode("off")
     st_off = KV.state_of_row(sc, tok, 0.1, 0.1, 2, ci_row=ci, idx2cid=idx2cid, cards=cards)
     assert len(st_off) == 5
     CB.set_theta_return_mode("untap")
