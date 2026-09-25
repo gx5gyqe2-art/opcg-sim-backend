@@ -1067,8 +1067,9 @@ def _play_from_hand_now(target, st, card, n, mu):
 #: `check`＝上記を全部直した形で判定する。**新定数ゼロ**（`st["my_life"]`／`st["my_trash"]` は
 #: `condition_value.state_from_scalars` が既に積む）。ライフ・トラッシュは**枚数だけ**判定する
 #: （個々の札の素性を追う記録が無いため・絞り込み〔特徴・名前〕は上限として読む＝ファイルの他の場所と
-#: 同じ「読めないものは払えるとして読む」規約）。既定 `off`（旧のまま・状態が無い行は `check` でも
-#: 「払える」に落ちる＝上限）。
+#: 同じ「読めないものは払えるとして読む」規約）。**既定 `check`**（ユーザ決定 2026-09-25・D-5 の物差しの上で値段と実現を
+#: 両記録で近づけた・`2026-09-25_d5_decision_rows.md`）。状態が無い行は `check` でも「払える」に落ちる＝上限。
+#: `off`＝旧（常に払えるとして読む）。
 #:
 #: **実装時のレビュー（ワークフロー・独立3観点×検証）で2件の実害を確認・その場で直した**:
 #: リーダー対象は上の3.の直しだけだと`card_type`に`"LEADER"`が在れば絞り込み（特徴・名前等）を無視して
@@ -1088,7 +1089,7 @@ def _play_from_hand_now(target, st, card, n, mu):
 #: を解決する）。状態を渡して呼ぶ経路は全部「手札から出す」文脈（登場時・イベント・手札の計画価格）で、
 #: 効果でただで出す相方（T70）は状態を渡さないのでこの判定に来ない。
 COST_AFFORD_MODES = ("off", "check")
-COST_AFFORD_MODE = "off"
+COST_AFFORD_MODE = "check"
 
 
 def set_cost_afford_mode(mode):
@@ -1102,7 +1103,7 @@ def set_cost_afford_mode(mode):
 def add_cost_afford_arg(ap):
     ap.add_argument("--cost-afford", default=None, choices=COST_AFFORD_MODES,
                     help="**D-4** コストの支払い可否: `check`（ドン‼️・場／手札の自分自身・リーダー・枚数・"
-                         "ライフ／トラッシュの枚数を見る）／`off`（既定・旧・常に払えるとして読む）")
+                         "ライフ／トラッシュの枚数を見る・既定）／`off`（旧・常に払えるとして読む）")
 
 
 def apply_cost_afford(a):
@@ -1112,7 +1113,7 @@ def apply_cost_afford(a):
 
 
 def _cost_unpayable(cost_acts, card, st):
-    """**コストを払える札が無いか**（T70／D-2/D-4）。**既定 `off` は D-2 以前と 1 バイトも変わらない**——
+    """**コストを払える札が無いか**（T70／D-2/D-4）。**`off` は D-2 以前と 1 バイトも変わらない**（既定は `check`・2026-09-25）——
     自分自身・リーダー・枚数・ライフ／トラッシュの扱いは全部 `COST_AFFORD_MODE=="check"` の中だけで効く。
     `check`: **ドン‼️−N**（`RETURN_DON`）は場のドンの合計 `st["my_don_total"]` と、**ドンをレストにする
     コスト**（`REST_DON`・自分のアクティブなドンを付与する`ATTACH_DON`）は出す札のコストを払った後の

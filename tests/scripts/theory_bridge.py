@@ -362,8 +362,9 @@ def move_family(sig):
 #: （実記録の登場の 45%・`2026-09-25_d4_review.md`）。`main` は問いの行を判断点から外す＝窓は問いの答えの
 #: 後の本当の判断点まで伸び、問いの行自体も窓の始まりにならない（T47 が kind 1/2 に当てた直しと同じ）。
 #: 問いの行の候補に通常の手が混ざる行は実・合成とも 0（全部か無しか）なので先頭の候補だけで判定できる。
+#: **既定 `main`**（ユーザ決定 2026-09-25・`2026-09-25_d5_decision_rows.md`）。`any` は旧の数字を再現するときだけ。
 DECISION_ROW_MODES = ("any", "main")
-DECISION_ROW_MODE = "any"
+DECISION_ROW_MODE = "main"
 SELECTION_ACTION = "RESOLVE_EFFECT_SELECTION"
 
 
@@ -377,7 +378,7 @@ def set_decision_row_mode(mode):
 
 def add_decision_row_arg(ap):
     ap.add_argument("--decision-rows", default=None, choices=DECISION_ROW_MODES,
-                    help="**D-5** 次の判断点: `main`（効果の途中の選択の問いの行を外す）／`any`（既定・旧）")
+                    help="**D-5** 次の判断点: `main`（既定・効果の途中の選択の問いの行を外す）／`any`（旧）")
 
 
 def apply_decision_row(a):
@@ -390,7 +391,8 @@ def is_selection_row(pol, L, ptr, i):
     """その行が効果の途中の選択の問い（候補が `RESOLVE_EFFECT_SELECTION`）か。"""
     if int(L[i]) < 1:
         return False
-    return json.loads(pol["pol_sig"][int(ptr[i])])[0] == SELECTION_ACTION
+    sig = json.loads(pol["pol_sig"][int(ptr[i])])
+    return bool(sig) and sig[0] == SELECTION_ACTION
 
 
 def is_decision_row(rows, pol, L, ptr, i):

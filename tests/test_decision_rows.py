@@ -34,13 +34,18 @@ def test_a_selection_prompt_row_is_recognised_by_its_candidates():
     assert TB.is_selection_row(pol, L, ptr, 0) is False
     assert TB.is_selection_row(pol, L, ptr, 1) is True
     assert TB.is_selection_row(pol, L, ptr, 3) is False           # 候補が無い行は問いではない
+    assert TB.is_selection_row({"pol_sig": ["[]"]}, [1], [0], 0) is False   # 空の署名も問いではない
 
 
-def test_the_default_keeps_every_kind0_row_exactly_as_before():
+def test_main_is_the_default_and_any_keeps_every_kind0_row_exactly_as_before():
     rows, pol, L, ptr = _game()
-    assert TB.DECISION_ROW_MODE == "any"
-    got = [TB.is_decision_row(rows, pol, L, ptr, i) for i in range(4)]
-    assert got == [int(k) == 0 for k in rows["kind"]]              # 旧 `kind == 0` と 1 行も違わない
+    assert TB.DECISION_ROW_MODE == "main"                          # D-5 の採否（ユーザ決定 2026-09-25）
+    try:
+        TB.set_decision_row_mode("any")
+        got = [TB.is_decision_row(rows, pol, L, ptr, i) for i in range(4)]
+        assert got == [int(k) == 0 for k in rows["kind"]]          # 旧 `kind == 0` と 1 行も違わない
+    finally:
+        TB.set_decision_row_mode("main")
 
 
 def test_main_drops_only_the_selection_prompt_rows():
@@ -50,7 +55,7 @@ def test_main_drops_only_the_selection_prompt_rows():
         got = [TB.is_decision_row(rows, pol, L, ptr, i) for i in range(4)]
         assert got == [True, False, False, True]                   # 問いの行（1）と kind 1（2）だけ外れる
     finally:
-        TB.set_decision_row_mode("any")
+        TB.set_decision_row_mode("main")
     with pytest.raises(ValueError):
         TB.set_decision_row_mode("guess")
 
@@ -59,11 +64,11 @@ def test_the_cli_flag_actually_reaches_the_mode():
     ap = argparse.ArgumentParser()
     TB.add_decision_row_arg(ap)
     try:
-        assert TB.apply_decision_row(ap.parse_args([])) == "any"
-        assert TB.apply_decision_row(ap.parse_args(["--decision-rows", "main"])) == "main"
-        assert TB.DECISION_ROW_MODE == "main"
+        assert TB.apply_decision_row(ap.parse_args([])) == "main"                  # 省略時は不動
+        assert TB.apply_decision_row(ap.parse_args(["--decision-rows", "any"])) == "any"
+        assert TB.DECISION_ROW_MODE == "any"
     finally:
-        TB.set_decision_row_mode("any")
+        TB.set_decision_row_mode("main")
 
 
 def test_every_next_decision_window_uses_the_shared_check():

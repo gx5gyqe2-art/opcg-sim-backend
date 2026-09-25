@@ -23,6 +23,24 @@ import effect_value as EV  # noqa: E402
 import search_price as SP  # noqa: E402
 from theory_order import KO_P, MU  # noqa: E402
 
+#: 読み込み時点の既定（D-5 の採否で `check`・2026-09-25）
+_DEFAULT_COST_AFFORD = EV.COST_AFFORD_MODE
+
+
+@pytest.fixture(autouse=True)
+def _cost_afford_off_baseline():
+    """各テストは旧（`off`）を基準に書かれている——既定が `check` になったので、テストの中の
+    「`off` は旧のまま」「`check` にすると…」の対比がそのまま読めるよう入口で `off` にし、出口で戻す。"""
+    before = EV.COST_AFFORD_MODE
+    EV.set_cost_afford_mode("off")
+    yield
+    EV.set_cost_afford_mode(before)
+
+
+def test_the_cost_check_is_the_default():
+    """**D-5 の採否（ユーザ決定 2026-09-25）**: コストの支払い判定（エンジンと同じ規則）が既定。"""
+    assert _DEFAULT_COST_AFFORD == "check"
+
 
 class _Cards:
     """試験用のカード表（`plan_labels.Cards.info` と同じ欄）。"""
@@ -277,11 +295,11 @@ def test_a_return_don_cost_is_unpayable_when_there_is_not_enough_active_don():
     元々 `_cost_unpayable` の場・手札の判定（`target` 必須）を素通りして常に「払える」扱いだった
     （D-1 の未確定点(i)）。`COST_AFFORD_MODE="check"` なら `st["my_don_active"]`
     （`condition_value.state_from_scalars` が既に積む・T72／`_don_attach_cost` と同じ場所）と比べる。
-    既定 `off` は旧のまま・状態が無ければ払えるとして読む（上限）。"""
+    `off`（旧）は払えるとして読む・状態が無ければ払えるとして読む（上限）。既定は `check`（D-5）。"""
     ret_don = {"type": "RETURN_DON", "target": None, "value": {"base": 1}}
     draw = {"type": "DRAW", "value": {"base": 1}, "target": None}
     ab = {"trigger": "ON_PLAY", "cost": ret_don, "effect": draw}
-    assert EV.COST_AFFORD_MODE == "off"                                                # 既定
+    assert EV.COST_AFFORD_MODE == "off"                                                # 旧を基準に読む（入口の fixture）
     assert EV._cost_unpayable([ret_don], None, None) is False                          # 状態なし＝上限
     assert EV._cost_unpayable([ret_don], None, {"my_don_active": 0}) is False           # 既定 off は場・手札コストと同じ従来どおり
     v_off, _ = EV.ability_value(ab, st={"my_don_active": 0})
