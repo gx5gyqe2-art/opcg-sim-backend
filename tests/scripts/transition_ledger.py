@@ -195,8 +195,10 @@ def _priority(acc):
             "turn_boundary": round(acc["by_cause_abs"]["turn_boundary"] / tot, 4)}
 
 
-def collect(dirs, limit_games=0, theta=THETA, mu=MU):
-    """記録を 1 度読んで **`W` の差を `priced` と `residual` に割り、`residual` を軸と区分へ配る**。"""
+def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
+    """記録を 1 度読んで **`W` の差を `priced` と `residual` に割り、`residual` を軸と区分へ配る**。
+    `dump` に list を渡すと**攻撃の行（`same_turn`・`fam0=="attack"`）の残差を局×席×ターンごとに積む**
+    （P8-7(c)・診断用・既定の集計には触らない）。"""
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     prof = CB.profile_for(dirs)
@@ -357,6 +359,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
                 acc["fam_abs"][fam0] = acc["fam_abs"].get(fam0, 0.0) + abs(resid)
                 acc["fam_priced_abs"][fam0] = acc["fam_priced_abs"].get(fam0, 0.0) + abs(priced)
                 acc["fam_n"][fam0] = acc["fam_n"].get(fam0, 0) + 1
+                if dump is not None and fam0 == "attack":
+                    dump.append({"seed": seed_g, "w": int(bi0[3]), "t": int(t0), "resid_abs": abs(resid)})
             # **残りを 5 つの軸へ配る**（`priced` が説明した分を引いた状態から `st1` まで）
             base = KV.apply_dx(st0, dx_use) if dx_use else st0
             w_base = RL.w_of(*RL.clocks_of(base, prof), sigma_rel=sr)
