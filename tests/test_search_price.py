@@ -270,3 +270,40 @@ def test_a_don_attach_requirement_is_a_choice_that_costs_n_active_don_for_a_turn
     tiny = {"trigger": "ON_ATTACK", "effect": {"type": "DRAW", "value": {"base": 1}, "target": None},
             "condition": {"type": "HAS_DON", "operator": "GE", "value": 9, "player": "SELF", "args": []}}
     assert EV.ability_value(tiny, st={"my_don_active": 10, "r_turns": 1.0})[0] == 0.0  # 費用 9δ > μ → 付けない
+
+
+def test_a_return_don_cost_is_unpayable_when_there_is_not_enough_active_don():
+    """**D-2**: `RETURN_DON`（`target=None`・【メイン】ドン‼️-N のイベント本文の形・OP15-074〜078 等）は
+    元々 `_cost_unpayable` の場・手札の判定（`target` 必須）を素通りして常に「払える」扱いだった
+    （D-1 の未確定点(i)）。`DON_COST_GATE_MODE="check"` なら `st["my_don_active"]`
+    （`condition_value.state_from_scalars` が既に積む・T72／`_don_attach_cost` と同じ場所）と比べる。
+    既定 `off` は旧のまま・状態が無ければ払えるとして読む（上限）。"""
+    ret_don = {"type": "RETURN_DON", "target": None, "value": {"base": 1}}
+    draw = {"type": "DRAW", "value": {"base": 1}, "target": None}
+    ab = {"trigger": "ON_PLAY", "cost": ret_don, "effect": draw}
+    assert EV.DON_COST_GATE_MODE == "off"                                              # 既定
+    assert EV._cost_unpayable([ret_don], None, None) is False                          # 状態なし＝上限
+    assert EV._cost_unpayable([ret_don], None, {"my_don_active": 0}) is False           # 既定 off は場・手札コストと同じ従来どおり
+    v_off, _ = EV.ability_value(ab, st={"my_don_active": 0})
+    assert v_off == pytest.approx(MU - EV.DELTA)                                       # 従来どおり払える前提で値付け
+    try:
+        EV.set_don_cost_gate_mode("check")
+        assert EV._cost_unpayable([ret_don], None, None) is False                      # 状態なし＝上限（check でも変わらない）
+        assert EV._cost_unpayable([ret_don], None, {}) is False                        # my_don_active が無ければ上限
+        assert EV._cost_unpayable([ret_don], None, {"my_don_active": 0}) is True        # アクティブなドンが無い → 払えない
+        assert EV._cost_unpayable([ret_don], None, {"my_don_active": 1}) is False       # ちょうど払える
+        two_don = {"type": "RETURN_DON", "target": None, "value": {"base": 2}}
+        assert EV._cost_unpayable([two_don], None, {"my_don_active": 1}) is True        # 2 枚要るのに 1 枚しか無い
+        v0, _ = EV.ability_value(ab, st={"my_don_active": 0})
+        assert v0 == 0.0                                                               # 払えない → 効果は起きない（登場時）
+        va, _ = EV.ability_value(ab, st={"my_don_active": 0}, offered=True)
+        assert va == pytest.approx(MU - EV.DELTA)                                      # 起動メイン（候補に出た＝払う前提）はゲートを通らない
+        # 場・手札の判定は独立に効き続ける（既存の T70 の道は素通りしない）
+        bounce = {"type": "BOUNCE", "target": {"zone": "FIELD", "player": "SELF", "card_type": ["CHARACTER"], "cost_min": 2, "count": 1}}
+        cards = _Cards(_TABLE)
+        ctx = _ctx(["BIG"], [4, 6, 7, 10]); ctx["cards"] = cards; ctx["field"] = ["CNT"]
+        assert EV._cost_unpayable([bounce], None, {"search_ctx": {**ctx, "field": ["CNT"]}, "my_don_active": 5}) is True
+    finally:
+        EV.set_don_cost_gate_mode("off")
+    with pytest.raises(ValueError):
+        EV.set_don_cost_gate_mode("guess")

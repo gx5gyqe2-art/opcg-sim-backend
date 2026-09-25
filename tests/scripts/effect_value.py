@@ -1050,9 +1050,51 @@ def _play_from_hand_now(target, st, card, n, mu):
     return float(sum(max(0.0, v) for v in vals[:max(1, int(n))]))
 
 
+#: **ドン!!コストの支払い可否**（D-2・2026-09-25・`docs/reports/2026-09-25_d1_price_mismatch_diagnosis.md`の
+#: 未確定点(i)）: `_cost_unpayable` は元々 `target` を持つ場・手札コスト（戻す・捨てる・KO）しか見ておらず、
+#: `RETURN_DON`（`target=None`・`DON_LOSS`）は素通りして常に「払える」扱いだった——【メイン】ドン‼️-N の
+#: イベント（OP15-074〜078 等）がアクティブなドンを使い切った後に出た行でも効果が起きた前提で値付けされ、
+#: 実測で`play`の"?"バケットの符号が反転する原因になった（D-1）。`check`＝`st["my_don_active"]`
+#: （`theory_bridge._state_of` が積む・アクティブなドンの実数）と比べて払えなければ 0（既存の場・手札コスト判定と
+#: 独立に効く）。既定 `off`（旧のまま・状態が無い行は `check` でも「払える」に落ちる＝上限）。
+DON_COST_GATE_MODES = ("off", "check")
+DON_COST_GATE_MODE = "off"
+
+
+def set_don_cost_gate_mode(mode):
+    global DON_COST_GATE_MODE
+    if mode not in DON_COST_GATE_MODES:
+        raise ValueError("don cost gate mode は %s のどれか" % (DON_COST_GATE_MODES,))
+    DON_COST_GATE_MODE = mode
+    return DON_COST_GATE_MODE
+
+
+def add_don_cost_gate_arg(ap):
+    ap.add_argument("--don-cost-gate", default=None, choices=DON_COST_GATE_MODES,
+                    help="**D-2** ドン!!コスト（`RETURN_DON` 等）の支払い可否: `check`（`st[\"my_don_active\"]` と比べる）"
+                         "／`off`（既定・旧・常に払えるとして読む）")
+
+
+def apply_don_cost_gate(a):
+    if getattr(a, "don_cost_gate", None) is not None:
+        set_don_cost_gate_mode(a.don_cost_gate)
+    return DON_COST_GATE_MODE
+
+
 def _cost_unpayable(cost_acts, card, st):
-    """**コストを払える札が無いか**（T70）: 自分の場（`search_ctx["field"]`）か手札（`hand_items`）から絞り込みつきで
-    札を要求するコスト（戻す・捨てる・KO 等）で、合う札が 1 枚も無ければ `True`。状態が無ければ `False`（払えるとして読む＝上限）。"""
+    """**コストを払える札が無いか**（T70／D-2でドン!!コストも追加）: 自分の場（`search_ctx["field"]`）か
+    手札（`hand_items`）から絞り込みつきで札を要求するコスト（戻す・捨てる・KO 等）で、合う札が 1 枚も無ければ
+    `True`。**ドン!!コスト**（`RETURN_DON` 等・`DON_LOSS`）は `DON_COST_GATE_MODE=="check"` のときだけ
+    `st["my_don_active"]` と比べる（既定 `off`・場・手札の判定とは独立）。状態が無ければ `False`（払えるとして
+    読む＝上限）。"""
+    if DON_COST_GATE_MODE == "check" and st:
+        have = st.get("my_don_active")
+        if have is not None:
+            for e in cost_acts:
+                if str(e.get("type") or "") in DON_LOSS:
+                    need = _magnitude(e)
+                    if need > float(have) + 1e-9:
+                        return True
     if not st or not st.get("search_ctx"):
         return False
     ctx = st["search_ctx"]
