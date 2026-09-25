@@ -51,7 +51,7 @@
 
 | 型 | 動かす軸 | Δx の単位 |
 |---|---|---|
-| 攻撃 | **`Θ_opp` を削る** | 価格（そのまま） |
+| 攻撃 | **`Θ_opp` を削る**（＋`ATTACK_REST_MODE=body`なら**ブロッカーが攻めてレストになる分`Θ_me`も削る**・C-2） | 価格（そのまま） |
 | 出す | **`A_me` を上げる** | **1 ターンあたり**（`attack_value`＝体の毎ターンの攻撃の価値） |
 | 付与 | **`A_me` を上げる** | 1 ターンあたり（`attack_value(p+1000k) − attack_value(p)`） |
 | 効果・除去 | **`Θ_opp` を削る ＋ `A_opp` を下げる** | 価格 ＋ 1 ターンあたり |
@@ -119,6 +119,22 @@ A_FLOOR = CB.SLOPE_FLOOR
 TAU_CAP = CB.RACE_CAP
 #: 軸の名前（順序は固定・プラセボの置換もこの順で回す）
 AXES = ("th_me", "th_opp", "a_me", "a_opp")
+
+#: **攻撃した体のレスト費用**（C-2・2026-09-25・`2026-09-25_c1_attack_axis_by_result.md` の候補(a)）。
+#: `off`＝旧（攻撃は`Θ_opp`しか動かさない）／`body`＝**攻めた体がブロッカーなら、攻撃でレストになり
+#: 次の自席ターンまで`Θ_me`の体の項（`THETA_BODY_MODE=blockers`）から抜ける分を価格にも足す**。
+#: 規則: `has_blocker`は`!is_rest`を要求（`rust/opcg_engine/src/rules/battle.rs`）。値は`_body_term`と
+#: 同じ単位（`crossing_bridge.nu_meas_of`）。**新定数ゼロ**（既存の式の再利用）。
+ATTACK_REST_MODES = ("off", "body")
+ATTACK_REST_MODE = "off"
+
+
+def set_attack_rest_mode(mode):
+    global ATTACK_REST_MODE
+    if mode not in ATTACK_REST_MODES:
+        raise ValueError("attack rest mode は %s のどれか" % (ATTACK_REST_MODES,))
+    ATTACK_REST_MODE = mode
+    return ATTACK_REST_MODE
 
 #: **`D` の読み方**（上の表）。`curve`＝**帳簿の正本**（輪郭・軸は 2 本）／`clock`＝2 本の時計（軸は 4 本）。
 D_MODES = ("curve", "curve_scaled", "clock", "theory")
@@ -410,6 +426,13 @@ def axis_of_move(fam, v, sig, cid, cards, sc, tok, olp, r_turns, don_k=0):
     v = float(v)
     if fam == "attack":
         out["th_opp"] = -v                      # 相手の耐久を削る（価格の単位のまま）
+        if ATTACK_REST_MODE == "body":
+            info = cards.info(cid) if (cards is not None and cid) else None
+            if info and info.get("blocker") and not info.get("event"):
+                p = float(info.get("power") or 0.0)
+                nu = float(CB.nu_meas_of(p, olp))
+                if nu > 0.0:
+                    out["th_me"] = -nu           # 攻めてレストになる分、自分の耐久の体の項から抜ける（C-2）
     elif fam == "play":
         info = cards.info(cid) if (cards is not None and cid) else None
         p = float((info or {}).get("power") or 0.0)
@@ -636,7 +659,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
             arms[kk].append(acc[kk])
     n = max(1, stats["priced"])
     out = {"games": stats["games"], "rows": stats["rows"], "priced": stats["priced"],
-           "d_mode": D_MODE, "live_axes": list(LIVE_AXES[D_MODE]),
+           "d_mode": D_MODE, "live_axes": list(LIVE_AXES[D_MODE]), "attack_rest_mode": ATTACK_REST_MODE,
            # **その読みに軸が無い手の割合**（件数と価格の絶対値・帳簿が値付けできない分）
            "dead_rows": stats["dead"], "dead_share": round(stats["dead"] / n, 4),
            "dead_value_share": round(stats["dead_v"] / max(1e-12, stats["dead_v"] + stats["live_v"]), 4),
@@ -657,10 +680,14 @@ def main(argv=None):
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--d-mode", dest="d_mode", choices=D_MODES, default=None)
+    ap.add_argument("--attack-rest", dest="attack_rest", choices=ATTACK_REST_MODES, default=None,
+                    help="攻撃した体のレスト費用をΘ_meへ足すか（C-2・既定off）")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
     if a.d_mode:
         set_d_mode(a.d_mode)
+    if a.attack_rest:
+        set_attack_rest_mode(a.attack_rest)
     out = collect(a.src, a.games)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:

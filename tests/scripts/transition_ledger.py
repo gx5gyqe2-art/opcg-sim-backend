@@ -381,6 +381,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
     tot_abs = max(1e-12, acc["gap_abs"])
     out = {"games": stats["games"], "rows": stats["rows"], "gaps": stats["gaps"],
            "d_mode": KV.D_MODE, "boundary_mode": BOUNDARY_MODE, "sigma_rel": round(sr, 4),
+           "attack_rest_mode": KV.ATTACK_REST_MODE,
            # **恒等式の検算**（配分の和が差に一致すること・telescoping が閉じること）
            "identity_max_abs_error": round(stats["identity_max_err"], 12),
            "w_first_mean": round(stats["w_first_sum"] / ng, 4),
@@ -432,12 +433,16 @@ def main(argv=None):
     ap.add_argument("--d-mode", dest="d_mode", choices=KV.D_MODES, default=None)
     ap.add_argument("--boundary", choices=BOUNDARY_MODES, default=None,
                     help="**T124**: ターンの境目を規則から値付けするか（既定 `off`）")
+    ap.add_argument("--attack-rest", dest="attack_rest", choices=KV.ATTACK_REST_MODES, default=None,
+                    help="攻撃した体のレスト費用をΘ_meへ足すか（C-2・既定off）")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
     if a.d_mode:
         KV.set_d_mode(a.d_mode)
     if a.boundary:
         set_boundary_mode(a.boundary)
+    if a.attack_rest:
+        KV.set_attack_rest_mode(a.attack_rest)
     out = collect(a.src, a.games)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:

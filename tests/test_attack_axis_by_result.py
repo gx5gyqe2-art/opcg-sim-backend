@@ -92,3 +92,40 @@ def test_collect_does_not_touch_d_mode_when_omitted(monkeypatch):
         assert seen["d_mode_at_call"] == "clock"          # 渡さなければ既定(現状の値)のまま
     finally:
         KV.set_d_mode(old)
+
+
+def test_collect_passes_attack_rest_through_to_kappa_vector(monkeypatch):
+    """**C-2**: `attack_rest`を渡すと`kappa_vector.ATTACK_REST_MODE`を切り替えてから呼ぶ。"""
+    import kappa_vector as KV
+    seen = {}
+
+    def fake_tl_collect(dirs, limit_games, dump=None):
+        seen["mode_at_call"] = KV.ATTACK_REST_MODE
+        return {"games": 0, "resid_priority": {"attack_rows": None}}
+
+    monkeypatch.setattr(AX.TL, "collect", fake_tl_collect)
+    old = KV.ATTACK_REST_MODE
+    try:
+        out = AX.collect(["dummy"], attack_rest="body")
+        assert seen["mode_at_call"] == "body"
+        assert out["attack_rest_mode"] == "body"
+    finally:
+        KV.set_attack_rest_mode(old)
+
+
+def test_collect_does_not_touch_attack_rest_mode_when_omitted(monkeypatch):
+    import kappa_vector as KV
+    seen = {}
+
+    def fake_tl_collect(dirs, limit_games, dump=None):
+        seen["mode_at_call"] = KV.ATTACK_REST_MODE
+        return {"games": 0, "resid_priority": {"attack_rows": None}}
+
+    monkeypatch.setattr(AX.TL, "collect", fake_tl_collect)
+    old = KV.ATTACK_REST_MODE
+    KV.set_attack_rest_mode("body")
+    try:
+        AX.collect(["dummy"])
+        assert seen["mode_at_call"] == "body"             # 渡さなければ既定(現状の値)のまま
+    finally:
+        KV.set_attack_rest_mode(old)

@@ -404,7 +404,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
     n = max(1, stats["priced"])
     out = {"games": stats["games"], "rows": stats["rows"], "priced": stats["priced"],
            "d_mode": KV.D_MODE, "sigma_rel": round(sr, 4),
-           "kappa_sigma_mode": TO.KAPPA_SIGMA_MODE,
+           "kappa_sigma_mode": TO.KAPPA_SIGMA_MODE, "attack_rest_mode": KV.ATTACK_REST_MODE,
            "pre_settle": bool(pre_settle),
            "scale_a": scale_a, "scale_currency": scale_currency,
            "dead_rows": stats["dead"], "dead_share": round(stats["dead"] / n, 4),
@@ -478,6 +478,8 @@ def build_parser():
                     help="**T133**: `Θ` を両席で同じ式にするか（既定は現状の `legacy`）")
     ap.add_argument("--slope-take", dest="slope_take", choices=CB.SLOPE_TAKE_MODES, default=None,
                     help="**T134**: `A` の「受ける費用」を自分のライフで決めるか（既定は現状の `const`）")
+    ap.add_argument("--attack-rest", dest="attack_rest", choices=KV.ATTACK_REST_MODES, default=None,
+                    help="**C-2**: 攻撃した体のレスト費用をΘ_meへ足すか（既定 `off`）")
     ap.add_argument("--scale-a", type=float, default=1.0, help="**P7**: 両席の A に共通の掛け算誤差")
     ap.add_argument("--scale-currency", type=float, default=1.0, help="**P5**: 耐久と価格を同時に c 倍")
     ap.add_argument("--scale-clamp", dest="clamp", default="",
@@ -500,6 +502,8 @@ def main(argv=None):
         CB.set_theta_side_mode(a.theta_side)          # **T133**
     if a.slope_take:
         CB.set_slope_take_mode(a.slope_take)          # **T134**
+    if a.attack_rest:
+        KV.set_attack_rest_mode(a.attack_rest)        # **C-2**
     if a.clamp:
         KV.set_scale_clamp([float(x) for x in a.clamp.split(",")])
     out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency,
