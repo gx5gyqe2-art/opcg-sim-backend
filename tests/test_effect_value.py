@@ -833,7 +833,7 @@ def _price(cid, trig, mode, st=None, ob=None):
 
 
 def test_pricing_fixes_default_is_all_and_the_switch_parses_and_restores():
-    assert E.PRICING_FIX == frozenset(E.PRICING_FIXES) and len(E.PRICING_FIXES) == 6
+    assert E.PRICING_FIX == frozenset(E.PRICING_FIXES) and len(E.PRICING_FIXES) == 7
     assert E.parse_pricing_fixes("all") == frozenset(E.PRICING_FIXES)
     assert E.parse_pricing_fixes("legacy") == frozenset()
     assert E.parse_pricing_fixes("draw_n,opp_subject") == {"draw_n", "opp_subject"}
@@ -926,7 +926,7 @@ def test_L_a_optional_actions_and_their_followups_are_one_block():
            "raw_text": "相手は自身のアクティブのドン!!1枚をドン!!デッキに戻してもよい",
            "value": {"base": 1, "multiplier": 1, "divisor": 1}}
     args = (E.MU, E.LAM, E.DELTA, E.NU_AVG, E.THETA, E.KO_P, None, 0, None, None)
-    assert E._block_value(ret, [], [], args, None) == pytest.approx(0.0)                   # 相手は損なら選ばない
+    assert E._block_value(ret, [], [], [], args, None) == pytest.approx(0.0)                   # 相手は損なら選ばない
 
 
 def test_L_c_setting_base_power_is_the_difference_from_the_targets_current_power():
@@ -977,3 +977,118 @@ def test_all_fixes_together_never_price_an_ability_above_one_game():
         for ab in c.get("abilities") or []:
             v, _u = E.ability_value(ab, card=c, st=_ST, opp_bodies=_OB)
             assert v is None or abs(v) < 1.0, (cid, ab.get("trigger"), v)
+
+
+# ---- L のレビューの直し（2026-09-26）: 敵対的レビューで見つかった 9 件をそれぞれ縛る ----
+
+def _st_field(field, **kw):
+    """自分の場（札 id の並び）を載せた状態。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    s = dict(_ST, **kw)
+    s["search_ctx"] = {"field": list(field), "cards": PL.Cards()}
+    return s
+
+
+_OB8 = _OB + [{"power": 9000.0, "cost": 8, "nu": 0.2112, "blocker": False, "is_rest": True}]
+
+
+def test_Lr1_opponent_chosen_pay_or_else_takes_the_cheaper_of_paying_and_the_else_branch():
+    """「相手は手札 3 枚を捨ててもよい。そうしなかった場合、相手のコスト 6 以下のキャラ 1 枚までを KO」（OP17-117）:
+    相手は安い方を選ぶ＝`min(3μ, KO)`。直す前（2b50f835）は「そうしなかった場合」の枝を読まず `min(0, 3μ)` = 0。"""
+    assert _price("OP17-117", "TRIGGER", "legacy") == pytest.approx(3 * E.MU)
+    assert _price("OP17-117", "TRIGGER", "optional_block") == pytest.approx(min(3 * E.MU, E.NU_AVG))
+    assert _price("OP17-117", "TRIGGER", "optional_block", st=_ST, ob=_OB8) == pytest.approx(0.1503)   # 取れる最良（コスト 6 以下）
+    # OP05-099「相手はライフ 1 枚をトラッシュに置いてもよい。そうしなかった場合、パワー −2000」: min(λ, −2000 の値) − レストの費用
+    rest = E.NU_AVG / E.R_TURNS
+    assert _price("OP05-099", "ON_OPP_ATTACK", "optional_block") == pytest.approx(
+        min(E.LAM, E.power_value(2000.0)) - rest)
+
+
+def test_Lr2_per_card_counts_use_the_state_or_the_old_reading_and_whole_steps():
+    """「トラッシュから任意の枚数…置いた枚数 3 枚につき +1000」（OP07-091）: 状態にトラッシュの枚数が無ければ n の最大を
+    仮定しない（直す前は容量 5 枚で +1666 と読み 0.1549）。在れば ⌊n/3⌋ 段。"""
+    assert _price("OP07-091", "ON_ATTACK", "optional_block") == pytest.approx(_price("OP07-091", "ON_ATTACK", "legacy"))
+    c, ab = _card_ab("OP07-091", "ON_ATTACK")
+    head = next(a for a in E.walk_actions(ab["effect"]) if a.get("type") == "DECK_BOTTOM")
+    dep = next(a for a in E.walk_actions(ab["effect"]) if E._per_count(a))
+    olp = float(c["power"]) + 1000.0                                             # +1000 で相手リーダーに並ぶ盤面
+    st5 = dict(_ST, my_trash=5, opp_leader_power=olp)
+    args = (E.MU, E.LAM, E.DELTA, E.NU_AVG, E.THETA, E.KO_P, c, 0, None, st5)
+    one_step = E.buff_delta(float(c["power"]), 1000.0, olp)                      # 5 枚置いても 1 段（⌊5/3⌋ = 1）
+    assert one_step > 0.0
+    assert E._block_value(head, [dep], [], [], args, st5) == pytest.approx(one_step)
+    st2 = dict(st5, my_trash=2)
+    assert E._block_value(head, [dep], [], [], args[:-1] + (st2,), st2) == pytest.approx(0.0)   # 2 枚では 0 段
+
+
+def test_Lr3_alternatives_are_the_best_one_not_the_sum_and_keep_the_texts_filter():
+    """「相手のコスト 6 以下のキャラ 1 枚までを、KO するか、持ち主の手札に戻す」（OP05-096 トリガー）は**どちらか 1 つ**＝
+    最大（直す前は両方を足して 0.1623）。戻す側はパーサが絞り込みを落としているので最初の選択肢の対象を写す。"""
+    assert _price("OP05-096", "TRIGGER", "either_side") == pytest.approx(E.NU_AVG)
+    # メイン（コスト 1 以下）: 盤面にコスト 1 以下が居なければどの選択肢も空振り＝0（直す前は戻す側がコスト 8 の体を取った）
+    assert _price("OP05-096", "ACTIVATE_MAIN", "either_side", st=_ST, ob=_OB8) == pytest.approx(0.0)
+    # 「持ち主のライフの上か下に」（OP03-123）は同じ動作の 2 つの置き方＝1 回ぶん
+    assert _price("OP03-123", "ON_PLAY", "either_side") == pytest.approx(E.LAM - E.NU_AVG)
+    # 一般の規則（`choice_max`）は別の名前: どちらの側でも取れる動作を含まない選択肢は `either_side` だけでは最大にしない
+    c, ab = _card_ab("EB01-052", "ON_PLAY")
+    with E.pricing_fixes("either_side"):
+        assert not E.qualified_choices(ab["effect"])
+    with E.pricing_fixes("choice_max"):
+        assert E.qualified_choices(ab["effect"])
+    with E.pricing_fixes("legacy"):
+        assert not E.qualified_choices(ab["effect"])
+
+
+def test_Lr4_opponent_stages_are_not_assumed_to_exist():
+    """「コスト 1 のステージ 1 枚を持ち主のデッキの下に置くことができる」コスト（OP06-111・OP06-114）: 相手の盤面の情報に
+    ステージは無いので相手の側では払えない＝旧と同じ自分の損（直す前は常に相手の側で払えて得になった）。"""
+    for cid, trig in (("OP06-111", "ACTIVATE_MAIN"), ("OP06-114", "ON_PLAY")):
+        assert _price(cid, trig, "either_side") == pytest.approx(_price(cid, trig, "legacy")), cid
+
+
+def test_Lr5_an_either_side_cost_with_no_body_on_either_side_is_unpayable():
+    """OP04-055 のコスト（キャラ 1 枚を持ち主のデッキの下）: 両側の場が空なら払えない＝能力は 0（直す前は費用 0 で 0.0536）。"""
+    assert _price("OP04-055", "ACTIVATE_MAIN", "either_side", st=_st_field([]), ob=[]) == 0.0
+    assert _price("OP04-055", "ACTIVATE_MAIN", "either_side", st=_st_field([]), ob=_OB) > 0.0     # 相手の側で払える
+
+
+def test_Lr6_both_sides_effects_read_both_sides_the_same_way():
+    """「コスト 3 以下のキャラすべてを持ち主のデッキの下に。お互い手札 5 枚まで捨てる」（OP05-058）: 自分の場が読めない
+    なら両側とも平均の見積もり（打ち消して 0）。直す前は自分 5 体 × 平均・相手は盤面で −0.4745。"""
+    assert _price("OP05-058", "ACTIVATE_MAIN", "either_side", st=_ST, ob=_OB) == pytest.approx(0.0, abs=1e-12)
+    # 両側読めれば両側を盤面で: 自分の場が空・相手はコスト 3 以下 1 体（ν 0.069）
+    assert _price("OP05-058", "ACTIVATE_MAIN", "either_side", st=_st_field([]), ob=_OB) == pytest.approx(0.069)
+
+
+def test_Lr7_drawing_up_to_a_hand_size_draws_the_difference():
+    """「自分の手札が 3 枚になるようにカードを引く」（OP02-051）は N − 今の手札（手札 5 枚なら 0 枚）。手札が判らなければ従来の 1 枚。"""
+    c, ab = _card_ab("OP02-051", "ON_PLAY")
+    draw = next(a for a in E.walk_actions(ab["effect"]) if a.get("type") == "DRAW")
+    assert E.action_value(draw, st={"my_hand": 5}) == pytest.approx(0.0)
+    assert E.action_value(draw, st={"my_hand": 1}) == pytest.approx(2 * E.MU)
+    assert E.action_value(draw) == pytest.approx(E.MU)
+    with E.pricing_fixes("legacy"):
+        assert E.action_value(draw, st={"my_hand": 5}) == pytest.approx(E.MU)
+
+
+def test_Lr8_leader_and_this_character_are_both_set():
+    """「自分のリーダーとこのキャラを、このターン中、元々のパワー 7000 に」（OP16-015）: 2 体とも（ほかのキャラは混ぜない）。"""
+    c, ab = _card_ab("OP16-015", "ON_OPP_ATTACK")
+    setp = E.walk_actions(ab["effect"])[0]
+    st = dict(_ST, my_leader_power=5000.0)
+    lead = E.action_value(dict(setp, raw_text="", value={"base": 2000.0, "multiplier": 1, "divisor": 1},
+                               target=dict(setp["target"], card_type=["LEADER"])), card=c, st=st)
+    me = E.action_value(dict(setp, raw_text="", value={"base": 7000.0 - float(c["power"]), "multiplier": 1, "divisor": 1},
+                             target=dict(setp["target"], card_type=[], select_mode="SOURCE")), card=c, st=st)
+    assert E.action_value(setp, card=c, st=st) == pytest.approx(lead + me)
+    # 自分の場にほかのキャラが居ても混ぜない
+    assert E.action_value(setp, card=c, st=_st_field(["OP16-015"] * 3, my_leader_power=5000.0)) == pytest.approx(lead + me)
+
+
+def test_Lr9_resting_n_opponent_don_counts_n():
+    """「相手のドン!!2 枚までを、レストにする」（P-060）の 2 は値の欄＝2 枚（直す前は 1 枚）。"""
+    c, ab = _card_ab("P-060", "ACTIVATE_MAIN")
+    rest = E.walk_actions(ab["effect"])[0]
+    assert E.action_value(rest) == pytest.approx(2 * E.DELTA / E.R_TURNS)
+    with E.pricing_fixes("opp_subject"):
+        assert E.action_value(rest) == pytest.approx(E.DELTA / E.R_TURNS)

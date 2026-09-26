@@ -55,6 +55,7 @@ ENGINE_ACTIONS = opcg_sim.src.models.enums.ActionType の全メンバ（Rust の
 """
 import argparse
 import json
+import math
 import os
 import re
 import sys
@@ -609,6 +610,10 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         stock, turns, gain = TEMPO[at]
         per = {"nu": nu, "don": delta, "attack": theta * mu * R_TURNS}[stock]
         turns = DURATION_TURNS.get(str(effect.get("duration") or ""), turns)
+        if stock == "don" and not effect.get("target") and _fix("draw_n"):
+            m = _value_count(effect)
+            if m is not None:
+                n = min(m, ZONE_CAPACITY["DON"])      # L(d): 「ドン!!N枚(まで)をレストにする」の N も値の欄に入る
         if stock == "nu" and opp and not gain:
             # **相手の体を止めるなら、止められる体の価格で値付けする**
             picked = _pick_opp(target, opp_bodies, n)
@@ -713,9 +718,15 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         cnt = n
         if _fix("draw_n") and at == "DRAW":
             # L(d): 「カードを N 枚引く」の N は対象欄ではなく値（`value.base`）に入る（対象欄は空＝既定 1 枚）
-            m = _magnitude(effect)
-            if m > 0 and not (effect.get("value") or {}).get("dynamic_source"):
-                cnt = m
+            m = _value_count(effect)
+            if m is not None:
+                if "になるように" in str(effect.get("raw_text") or ""):
+                    # 「手札が N 枚になるように引く」＝引くのは N − 今の手札（手札が判らなければ従来の 1 枚）
+                    hand = (st or {}).get("my_hand")
+                    if hand is not None:
+                        cnt = max(0.0, m - float(hand))
+                else:
+                    cnt = m
         amt = cnt * mu
         return amt if not opp else -amt
     if kind == "hand_loss":
@@ -807,18 +818,27 @@ def _is_set_power(effect):
 #:
 #: | 名前 | 誤り（直す前） | 直した読み |
 #: |---|---|---|
-#: | `draw_n` | 「カードを N 枚引く」を 1 枚と数えた（対象欄の既定 1 を読み、値の N を読まない） | N 枚 × 手札 1 枚の価値 |
-#: | `either_side` | 「持ち主の〜」（どちらの側のキャラでも取れる）を自分の損として数えた | 発動した側が選ぶ＝自分の体・相手の体（盤面から）の得な方。「〜まで」は 0 で床。「すべて」「お互い」は両側の和 |
-#: | `optional_block` | 「〜してもよい」「〜まで」を強制の損として数えた（「任意の枚数」を 50→4.88 枚の損・「捨てた枚数につき+1000」を 0） | 任意の動作と、それに従う後続（「そうした場合」「〜枚数につき」）を 1 つの塊として `max(0, 塊)`。「枚数につき」は `max_n [後続(n) − n × 1 枚の損]` |
+#: | `draw_n` | 「カードを N 枚引く」「相手のドン!!N 枚までをレストにする」を 1 枚と数えた（対象欄の既定 1 を読み、値の N を読まない） | N 枚。「手札が N 枚になるように引く」は N − 今の手札（手札が判らなければ従来） |
+#: | `either_side` | 「持ち主の〜」（どちらの側のキャラでも取れる）を自分の損として数えた | 発動した側が選ぶ＝自分の体・相手の体（盤面から）の得な方。「〜まで」は 0 で床。「すべて」「お互い」は両側の和（両側を同じ読みで）。相手のステージは盤面に無いので取れる前提にしない。どちらにも取れる体が無いコストは払えない。この形を含む選択肢は `choice_max` と同じく最大を取る |
+#: | `optional_block` | 「〜してもよい」「〜まで」を強制の損として数えた（「任意の枚数」を 50→4.88 枚の損・「捨てた枚数につき+1000」を 0） | 任意の動作と、それに従う後続（「そうした場合」「〜枚数につき」）を 1 つの塊として、選ぶ側が自分なら `max(する, しない)`・相手なら `min(する, しない)`（「しない」は「そうしなかった場合」の枝・無ければ 0）。「N 枚につき」は `max_n [後続(⌊n/N⌋) − n × 1 枚の損]`（n の上限が状態から読めなければ従来の読みで床だけ取る） |
 #: | `base_power` | 「元々のパワーを X にする」を X − 発動したカードの印刷のパワーで数えた（リーダー対象・「相手のリーダーと同じ」を X=0） | X − 対象の今のパワー。X も今のパワーも盤面から読む。読めなければ `None` |
 #: | `opp_subject` | 対象欄の無い「相手の〜」「相手は〜」を自分の側として数えた（例: 相手のドンをレストにする＝負） | 相手の資源が動く（符号が反転） |
 #: | `revealed_src` | 見た・公開した札を動かす動作（パーサが「場」と読む）を場の体を失うと数えた | 出どころは見た札（`TEMP`・通貨を持たない） |
-PRICING_FIXES = ("draw_n", "either_side", "optional_block", "base_power", "opp_subject", "revealed_src")
+#: | `choice_max` | 「以下から 1 つを選ぶ」「A するか、B する」（`Choice` の選択肢）を全部足した（全部起きる扱い） | 選ぶ側が自分なら選択肢の最大・相手なら最小。**一般の規則の変更**なので別の名前で持つ（`either_side` は自分を含む選択肢だけに同じ規則を当てる） |
+PRICING_FIXES = ("draw_n", "either_side", "optional_block", "base_power", "opp_subject", "revealed_src", "choice_max")
 PRICING_FIX = frozenset(PRICING_FIXES)
 
 
 def _fix(name):
     return name in PRICING_FIX
+
+
+def _value_count(effect):
+    """値の欄に入った枚数 N（「カード N 枚を引く」「ドン!!N 枚までをレストにする」）。式（`dynamic_source`）や 0 なら `None`。"""
+    m = _magnitude(effect)
+    if m > 0 and not (effect.get("value") or {}).get("dynamic_source"):
+        return m
+    return None
 
 
 def parse_pricing_fixes(spec):
@@ -953,40 +973,69 @@ def _either_side_value(effect, mu, lam, delta, nu, theta, ko_p, card, depth, opp
     zones = _zone(target)
     n = _count(target, zones)
     body_field = zones == ["FIELD"] and is_body(target)
-    n_own = None
-    if body_field:
-        pw = _own_field_powers(target, st)
-        if pw is not None:
-            n_own = len(pw)
+    stage_like = zones == ["FIELD"] and not is_body(target)    # ステージ等＝相手の盤面の情報に無い
+    n_own, opp_has = _either_side_counts(effect, st, opp_bodies)
     args = (mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st)
+    both = (str(target.get("select_mode") or "").upper() == "ALL"
+            or "お互い" in str(effect.get("raw_text") or ""))
+    if both:
+        if body_field and (n_own is None or opp_bodies is None):
+            # **両側を同じ読みで**: 片側の盤面しか読めないなら、両側とも平均の体の見積もりにする（片側だけ盤面で読むと偏る）
+            no_board = (mu, lam, delta, nu, theta, ko_p, card, depth, None, st)
+            own_v = action_value(_with_target(effect, player="SELF"), *no_board)
+            opp_v = action_value(_with_target(effect, player="OPPONENT"), *no_board)
+        else:
+            own_v = (0.0 if n_own == 0 else action_value(
+                _with_target(effect, player="SELF", **({} if n_own is None else {"count": float(n_own)})), *args))
+            opp_v = action_value(_with_target(effect, player="OPPONENT"), *args)
+        if own_v is None or opp_v is None:
+            return None
+        return own_v + opp_v
     if n_own is None:
         own_v = action_value(_with_target(effect, player="SELF"), *args)
     elif n_own == 0:
         own_v = 0.0
     else:
         own_v = action_value(_with_target(effect, player="SELF", count=min(n, float(n_own))), *args)
-    opp_v = action_value(_with_target(effect, player="OPPONENT"), *args)
-    both = (str(target.get("select_mode") or "").upper() == "ALL"
-            or "お互い" in str(effect.get("raw_text") or ""))
-    if both:
-        if own_v is None or opp_v is None:
-            return None
-        return own_v + opp_v
-    opp_has = None
-    if body_field and opp_bodies is not None:
-        got = _pick_opp(target, opp_bodies, n)
-        if got is not None:
-            opp_has = len(got)
     opts = []
     if n_own != 0:
         opts.append(own_v)
-    if opp_has != 0:
-        opts.append(opp_v)
+    if opp_has != 0 and not stage_like:
+        opts.append(action_value(_with_target(effect, player="OPPONENT"), *args))
     if _is_optional_act(effect):
         opts.append(0.0)
     if any(v is None for v in opts):
         return None
     return max(opts) if opts else 0.0
+
+
+def _either_side_counts(effect, st, opp_bodies):
+    """どちらの側でも取れる動作の、自分の側・相手の側の取れる体の数（読めなければ `None`）。
+    **相手のステージは盤面の情報に無い**ので、ステージ等の体でない対象は相手の側を 0 とする（在る前提にしない）。"""
+    target = effect.get("target") or {}
+    zones = _zone(target)
+    if zones != ["FIELD"]:
+        return None, None
+    if not is_body(target):
+        return None, 0
+    pw = _own_field_powers(target, st)
+    n_own = None if pw is None else len(pw)
+    opp_has = None
+    if opp_bodies is not None:
+        got = _pick_opp(target, opp_bodies, _count(target, zones))
+        if got is not None:
+            opp_has = len(got)
+    return n_own, opp_has
+
+
+def either_side_unpayable(effect, st, opp_bodies):
+    """**L(b)**: どちらの側でも払えるコスト（「キャラ 1 枚を持ち主のデッキの下に置く」）が**どちらの側にも払える体が無い**か。
+    両側とも読めて 0 のときだけ真（読めない側は払えるとして読む＝ファイルの他の場所と同じ上限の規約）。"""
+    target = effect.get("target") or {}
+    if _side(target) != "ALL" or _own_specific(effect):
+        return False
+    n_own, opp_has = _either_side_counts(effect, st, opp_bodies)
+    return n_own == 0 and opp_has == 0
 
 
 def _set_power_x(effect, st, opp_bodies):
@@ -1030,14 +1079,25 @@ def _set_power_value(effect, mu, lam, delta, nu, theta, ko_p, card, depth, opp_b
         return 0.0
     args = (mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st)
 
-    def priced(cur):
-        e2 = _with_target(effect, count=1)
+    def priced(cur, **tk):
+        e2 = _with_target(effect, count=1, **tk)
         e2["value"] = {"base": float(x) - float(cur), "multiplier": 1, "divisor": 1}
         e2["raw_text"] = ""                   # もう「設定」ではなく差（従来の `BUFF` の読みに渡す）
         return action_value(e2, *args)
 
     n = int(max(0.0, _count(target, zones)))
     up_to = _is_optional_act(effect)
+    types0 = [str(t).upper() for t in (target.get("card_type") or [])]
+    if (_side(target) != "OPPONENT" and "LEADER" in types0
+            and re.search(r"リーダーと(この|自身)", str(effect.get("raw_text") or ""))):
+        # 「自分のリーダーとこのキャラを、元々のパワー X にする」＝**2 体とも**（ほかの自分のキャラは混ぜない）
+        mlp = (st or {}).get("my_leader_power")
+        pw = (card or {}).get("power")
+        if mlp is None or pw is None:
+            return None
+        a = priced(mlp, card_type=["LEADER"], select_mode="CHOOSE")
+        b = priced(pw, card_type=[], select_mode="SOURCE")
+        return None if a is None or b is None else float(a + b)
     if _side(target) == "OPPONENT":
         if opp_bodies is None or eligible_bodies(target, opp_bodies) is None:
             return None
@@ -1085,6 +1145,21 @@ def _prev_branch(x):
         return False
     c = x.get("condition") or {}
     return c.get("type") == "PREV_ACTION" and str(c.get("value")) == "SUCCEEDED"
+
+
+def _prev_branch_parts(x):
+    """「そうした場合」「そうしなかった場合」の枝から `(した場合の動作, しなかった場合の動作)`。その形でなければ `None`。"""
+    if not isinstance(x, dict) or x.get("node") != "Branch":
+        return None
+    c = x.get("condition") or {}
+    if c.get("type") != "PREV_ACTION":
+        return None
+    yes, no = walk_actions(x.get("if_true")), walk_actions(x.get("if_false"))
+    if str(c.get("value")) == "SUCCEEDED":
+        return yes, no
+    if str(c.get("value")) == "SKIPPED":
+        return no, yes
+    return None
 
 
 def _following(root, e):
@@ -1162,43 +1237,58 @@ def optional_blocks(effect, acts, skip=()):
                 deps.append(x)
             elif _is_optional_act(x):
                 break
-        branch = []
+        did, didnt = [], []
         nxt = [y for y in _following(effect, e) if isinstance(y, dict)]
-        if nxt and _prev_branch(nxt[0]):
-            branch = walk_actions(nxt[0].get("if_true"))
+        for y in nxt[:2]:                     # 「そうした場合」「そうしなかった場合」は直後に 1〜2 つ並ぶ
+            parts = _prev_branch_parts(y)
+            if parts is None:
+                break
+            did += parts[0]
+            didnt += parts[1]
         for x in deps:
             used.add(id(x))
         used.add(id(e))
-        out.append((e, deps, branch))
+        out.append((e, deps, did, didnt))
     return out
 
 
-def _block_value(e, deps, branch, args, st, orig=None):
-    """**L(a)**: 塊の価値。選ぶ側が自分なら `max(0, 塊)`・相手（「相手は…てもよい」）なら `min(0, 塊)`。
+#: 「N 枚につき」の n の上限を状態から読むゾーン（読めなければ n の最大を仮定しない）
+_ZONE_COUNT_KEY = {"HAND": "my_hand", "LIFE": "my_life", "TRASH": "my_trash"}
 
-    「枚数につき」の後続があれば、動かす枚数 n を選べる＝`max_n [後続(n) − n × 1 枚の損]`（n = 0 を含む）。
-    n の上限は手札なら今の手札の枚数（状態が無ければ帯の容量）・場なら自分の場の取れる体の数。
+
+def _block_value(e, deps, did, didnt, args, st, orig=None):
+    """**L(a)**: 塊の価値。選ぶ側が自分なら `max(する, しない)`・相手（「相手は…てもよい」）なら `min(する, しない)`。
+
+    「する」＝任意の動作 ＋「そうした場合」の枝、「しない」＝「そうしなかった場合」の枝（無ければ 0）。
+    「N 枚につき」の後続があれば、動かす枚数 n を選べる＝`max_n [後続(⌊n/N⌋ 段) − n × 1 枚の損]`（n = 0 は「しない」）。
+    n の上限は状態から読む（手札・ライフ・トラッシュの枚数・自分の場の取れる体）。**読めなければ n の最大を仮定せず**、
+    従来の読み（後続は 0）で「する／しない」だけを比べる。
     """
     by_opp = opp_chooses((orig or e).get("raw_text"))
     pick = min if by_opp else max
     v_e = action_value(e, *args)
-    rest = [action_value(x, *args) for x in branch]
-    if v_e is None or any(v is None for v in rest):
+    yes = [action_value(x, *args) for x in did]
+    no = [action_value(x, *args) for x in didnt]
+    if v_e is None or any(v is None for v in yes + no):
         return None
+    dont = sum(no) if no else 0.0
     if not deps:
-        return pick(0.0, v_e + sum(rest))
+        return pick(dont, v_e + sum(yes))
     t = e.get("target") or {}
     zones = _zone(t)
     cnt = t.get("count")
     raw_n = float("inf") if (cnt is not None and float(cnt) < 0) else (1.0 if cnt is None else float(cnt))
     cap = None
-    if zones == ["HAND"] and st and st.get("my_hand") is not None:
-        cap = float(st["my_hand"])
+    if len(zones) == 1 and zones[0] in _ZONE_COUNT_KEY and st and st.get(_ZONE_COUNT_KEY[zones[0]]) is not None:
+        cap = float(st[_ZONE_COUNT_KEY[zones[0]]])
     elif zones == ["FIELD"]:
         pw = _own_field_powers(t, st)
         cap = None if pw is None else float(len(pw))
     if cap is None:
-        cap = float(int(_count(t, zones)))
+        legacy = [action_value(d, *args) for d in deps]
+        if any(v is None for v in legacy):
+            return None
+        return pick(dont, v_e + sum(yes) + sum(legacy))
     nmax = int(max(0.0, min(raw_n, cap)))
     unit = action_value(_with_target(e, count=1), *args)
     if unit is None:
@@ -1208,21 +1298,107 @@ def _block_value(e, deps, branch, args, st, orig=None):
     vals = []
     for k in choices:
         if k == 0:
-            vals.append(0.0)
+            vals.append(dont)
             continue
-        tot = k * unit + sum(rest)
+        tot = k * unit + sum(yes)
         for d in deps:
             dv = d.get("value") or {}
             mul = float(dv.get("multiplier") or 1.0)
             div = float(dv.get("divisor") or 1.0) or 1.0
+            steps = math.floor(k / div + 1e-9)                 # 「3 枚につき +1000」＝⌊n/3⌋ 段（連続にしない）
             d2 = dict(d)
-            d2["value"] = {"base": k * mul / div, "multiplier": 1, "divisor": 1}
-            v = action_value(d2, *args)
+            d2["value"] = {"base": steps * mul, "multiplier": 1, "divisor": 1}
+            v = action_value(d2, *args) if steps > 0 else 0.0
             if v is None:
                 return None
             tot += v
         vals.append(tot)
     return pick(vals)
+
+
+def qualified_choices(effect):
+    """**L（`choice_max`／`either_side`）**: 最大（相手が選ぶなら最小）を取る選択肢の節の `id` の集合。
+
+    `choice_max` なら全部の `Choice`。`either_side` だけなら**どちらの側でも取れる動作を含む** `Choice` だけ
+    （「KO するか、持ち主の手札に戻す」を 2 つの除去として足さない）。どちらも無効なら空。
+    """
+    if not (_fix("choice_max") or _fix("either_side")):
+        return set()
+    out = set()
+
+    def rec(o):
+        if isinstance(o, dict):
+            if o.get("node") == "Choice" and isinstance(o.get("options"), list):
+                if _fix("choice_max") or any(
+                        _side(a.get("target") or {}) == "ALL" and not _own_specific(a) for a in walk_actions(o)):
+                    out.add(id(o))
+            for v in o.values():
+                rec(v)
+        elif isinstance(o, list):
+            for v in o:
+                rec(v)
+
+    rec(effect)
+    return out
+
+
+_FILTER_KEYS = ("player", "card_type", "cost_max", "cost_min", "power_max", "power_min", "is_rest",
+                "traits", "names", "colors", "attributes", "exclude_names", "count", "is_up_to", "select_mode")
+
+
+def choice_inherits(effect, qual):
+    """**L(b)**: 選択肢の後ろの枝が対象の絞り込みを失っている形（「相手のコスト 1 以下のキャラ 1 枚までを、KO するか、
+    持ち主の手札に戻すか…」の「持ち主の手札に戻す」はパーサが絞り込み無し・両側で出す）に、**最初の選択肢の対象**を写す。
+    本文に「キャラ」を含まない（対象を書き直していない）場の動作だけ。`{id(動作): 対象を写した動作}`。"""
+    out = {}
+
+    def rec(o):
+        if isinstance(o, dict):
+            if id(o) in qual:
+                opts = [walk_actions(x) for x in o["options"]]
+                tmpl = next((a for acts in opts for a in acts
+                             if _zone(a.get("target") or {}) == ["FIELD"] and "キャラ" in str(a.get("raw_text") or "")), None)
+                if tmpl is not None:
+                    tt = tmpl.get("target") or {}
+                    for acts in opts:
+                        for a in acts:
+                            t = a.get("target") or {}
+                            if (a is not tmpl and _zone(t) == ["FIELD"] and _side(t) == "ALL"
+                                    and "キャラ" not in str(a.get("raw_text") or "")):
+                                out[id(a)] = _with_target(a, **{k: tt.get(k) for k in _FILTER_KEYS if k in tt})
+            for v in o.values():
+                rec(v)
+        elif isinstance(o, list):
+            for v in o:
+                rec(v)
+
+    rec(effect)
+    return out
+
+
+def _tree_total(node, vals, qual):
+    """効果木を `walk_actions` と同じ順で辿って動作の値を足す。**`qual` の選択肢は最大（相手が選ぶなら最小）**。"""
+    if isinstance(node, list):
+        return sum(_tree_total(x, vals, qual) for x in node)
+    if not isinstance(node, dict):
+        return 0.0
+    tot = 0.0
+    if node.get("type"):
+        tot += vals.get(id(node), 0.0)
+    sub = node.get("sub_effect")
+    if isinstance(sub, (dict, list)):
+        tot += _tree_total(sub, vals, qual)
+    for key in ("actions", "effects", "options"):
+        v = node.get(key)
+        if not isinstance(v, list):
+            continue
+        if key == "options" and id(node) in qual:
+            parts = [_tree_total(x, vals, qual) for x in v]
+            if parts:
+                tot += (min if str(node.get("player") or "").upper() == "OPPONENT" else max)(parts)
+        else:
+            tot += sum(_tree_total(x, vals, qual) for x in v)
+    return tot
 
 
 def revealed_moves(acts):
@@ -1698,20 +1874,27 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
     found = _search_plan(acts, card, st)
     # **L(f)**: 見た・公開した札の移動は出どころを見た札に置き換える／**L(a)**: 任意の動作と後続は塊で値付けする
     repl = revealed_moves(acts) if _fix("revealed_src") else {}
+    # **L（`choice_max`／`either_side`）**: 選択肢は最大を取る節と、絞り込みを失った枝への対象の写し
+    qual = qualified_choices(ab.get("effect"))
+    if qual:
+        for k, v in choice_inherits(ab.get("effect"), qual).items():
+            repl.setdefault(k, v)
     use = [repl.get(id(e), e) for e in acts]
     blocks = []
     in_block = set()
+    vals = {}                                              # id(元の動作) → 値（選択肢を最大で読むときに使う）
     if _fix("optional_block"):
         skip = {id(u) for u, e in zip(use, acts) if found is not None and e is found[2]}
         # 後続の枝は元の効果木の中で探す（置き換えた動作は同一性が変わるので元の動作で探す）
         pos = {id(e): i for i, e in enumerate(acts)}
         for b in optional_blocks(ab.get("effect"), acts, skip):
-            e0, deps0, branch = b
-            blocks.append((use[pos[id(e0)]], [use[pos[id(d)]] for d in deps0], branch, e0))
+            e0, deps0, did, didnt = b
+            blocks.append((use[pos[id(e0)]], [use[pos[id(d)]] for d in deps0], did, didnt, e0))
             in_block.update(id(x) for x in [e0] + deps0)
     for e, u in zip(acts, use):
         if found is not None and e is found[2]:
             total += found[0]
+            vals[id(e)] = found[0]
             continue
         if id(e) in in_block:
             continue
@@ -1720,19 +1903,26 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
             unpriced.append((str(e.get("type") or "?"), _unpriced_family(e)))
         else:
             total += v
+            vals[id(e)] = v
     bargs = (mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st)
-    for u, deps, branch, e0 in blocks:
-        v = _block_value(u, deps, branch, bargs, st, orig=e0)
+    for u, deps, did, didnt, e0 in blocks:
+        v = _block_value(u, deps, did, didnt, bargs, st, orig=e0)
         if v is None:
             unpriced.append((str(e0.get("type") or "?"), _unpriced_family(e0)))
         else:
             total += v
+            vals[id(e0)] = v
+    if qual and not unpriced:
+        total = _tree_total(ab.get("effect"), vals, qual)
     if selection and found is None:
         total += _sel_premium(selection_k(acts))
     cost = ab.get("cost") or {}
     cost_acts = walk_actions(cost)
     if cost_acts and not offered and _cost_unpayable(cost_acts, card, st):
         return 0.0, []                                     # T70: 払える札が場・手札に無い＝効果は起きない（登場時）
+    if (cost_acts and not offered and _fix("either_side")
+            and any(either_side_unpayable(e, st, opp_bodies) for e in cost_acts)):
+        return 0.0, []                                     # L(b): どちらの側にも払える体が無い＝払えない＝効果は起きない
     for e in cost_acts:
         v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st=st)
         if v is None:
