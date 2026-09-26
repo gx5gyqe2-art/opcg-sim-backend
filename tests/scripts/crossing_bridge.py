@@ -51,6 +51,7 @@ from theory_order import (DELTA, KO_P, LAM, MU, PWR_EPS, R_TURNS, S_IS_BLOCKER, 
                           hand_ids_of, opp_bodies_of, own_attackers_of, score_candidate, slot_power, theta_of)
 
 import theory_order as TO  # noqa: E402  （T151-2: `--w-mover` の切替を渡す）
+import cut_price as CP  # noqa: E402  （N-3: 切らせた札の値段を守り手の手札で読む）
 
 SLOPES = ("hist", "theory")
 SLOPE_FLOOR = 1e-3
@@ -589,6 +590,50 @@ def hand_absorb_seq(n_cut, xs, mu=MU):
     return float(mu) * absorbed
 
 
+def hand_cut_count(g, hand_n, xs, life_opp, n_blockers_opp, mu=MU):
+    """**N-3**: 耐久の手札の項が言う「**切る枚数**」（旧の式から値段 `μ` を外したもの）。
+
+    `count`＝全部の枚数・`cuttable`＝切れる枚数・`cuttable_cx`／`cuttable_forced`／`cuttable_seq`＝
+    それぞれ `hand_absorb`／`hand_absorb_forced`／`hand_absorb_seq` の `μ ×` の中身（同じ式・同じ端数の落とし方）。
+    `quality`／`play`／`guard` は 1 枚あたりの値段そのものを読み替える形なので数に戻せない＝`N-3` とは組めない（落とす）。"""
+    n = max(0.0, float(hand_n))
+    if THETA_HAND_MODE == "count":
+        return n
+    if THETA_HAND_MODE not in ("cuttable", "cuttable_cx", "cuttable_forced", "cuttable_seq"):
+        raise ValueError("N-3（cut price joint）は THETA_HAND_MODE=%r と組めない（数に戻せない）" % (THETA_HAND_MODE,))
+    n_cut = (float(g) / float(mu)) * n if mu else 0.0
+    if THETA_HAND_MODE == "cuttable":
+        return n_cut
+    cs = sorted(c for c in (c_of(float(x)) for x in (xs or ())) if c > 0.0)
+    if THETA_HAND_MODE == "cuttable_cx":
+        c = float(c_of(float(max(xs)))) if xs else -1.0
+        if c <= 0.0:
+            return 0.0
+        return max(0.0, n_cut) if c <= 1.0 else c * math.floor(max(0.0, n_cut) / c)
+    if not cs:
+        return 0.0
+    if THETA_HAND_MODE == "cuttable_forced":
+        gg = forced_guards(xs, life_opp, n_blockers_opp)
+        use = cs[:gg] if gg > 0 else cs[:1]
+        c_eff = sum(use) / len(use)
+        return max(0.0, n_cut) if c_eff <= 1.0 else c_eff * math.floor(max(0.0, n_cut) / c_eff)
+    remaining, absorbed = max(0.0, n_cut), 0.0
+    for c in cs:
+        if remaining >= c:
+            absorbed += c
+            remaining -= c
+        else:
+            break
+    return absorbed
+
+
+def shield_count_of(xs, n_blockers_opp, theta=THETA):
+    """**N-3**: `shield_rate_of` の `μ ×` の中身（1 守備ターンに切れる枚数の上限）。"""
+    cs = sorted(c for c in (c_of(float(x)) for x in (xs or ())) if c > 0.0)
+    cs = cs[int(max(0, n_blockers_opp)):]
+    return float(sum(c for c in cs if c <= float(theta)))
+
+
 #: **T102**: 耐久の手札項を**どこに置くか**。
 #: `stock`（旧・`Θ` に一括で足す）／**`shield`**（**的の側の有限の盾**＝毎ターン「規則が許すぶんだけ」減る）。
 #: **根拠**: `Θ` は在庫だが**手札は「使う時間」が要る**——`T101` で、`Θ`/要は τ の当たった行に絞っても
@@ -723,6 +768,14 @@ def threshold_parts_side(sc, tok, side, lam=LAM, mu=MU, g_hand=None, hand_blocke
     else:
         raise ValueError("side は 'opp' か 'me'（%r）" % (side,))
     g = float(mu if g_hand is None else g_hand)
+    cv = CP.active()
+    if cv is not None:
+        # **N-3**: 数（切る枚数）は旧の式のまま、値段だけを守り手の手札の価値の減りで読む（`cut_price` の注）
+        hand = float(cv.price(hand_cut_count(g, hand_n, xs, life, n_blk, mu)))
+        body = float(_body_term(tok, slots, body_ref))
+        if THETA_HAND_BLOCKER_MODE == "on":
+            body += max(0.0, float(hand_blocker))
+        return (float(lam) * life, hand, body)
     hand = g * hand_n
     if THETA_HAND_MODE in ("cuttable_cx", "cuttable_forced", "cuttable_seq"):
         # **T99／T100／T158**: 切れる枚数は `g/μ × H`（`g` は 1 枚あたりの価格＝`μ ×` 切れる割合）。
@@ -761,6 +814,12 @@ def threshold_of_me_parts(sc, tok, lam=LAM, mu=MU, g_hand=None, hand_blocker=0.0
     sc = np.asarray(sc); tok = np.asarray(tok)
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     g = float(mu if g_hand is None else g_hand)
+    cv = CP.active()
+    if cv is not None:
+        # **N-3**: 旧の `g × 枚数`＝`μ × 切れる枚数` の数はそのまま・値段を自分の手札の価値の減りで読む
+        return (float(lam) * float(sc[SC_MY_LIFE]),
+                float(cv.price((g / float(mu)) * float(sc[SC_MY_HAND]) if mu else 0.0)),
+                float(_body_term(tok, SLOT_OWN_FIELD, olp)))
     return (float(lam) * float(sc[SC_MY_LIFE]), g * float(sc[SC_MY_HAND]),
             float(_body_term(tok, SLOT_OWN_FIELD, olp)))
 
@@ -989,14 +1048,20 @@ def profile_th_for(dirs, name="cross", path=None):
     return [float(x) for x in v] if v else None
 
 
-def curve_d_of_row(sc, tok, j, prof, g_hand_of_opp=None, g_hand_of_me=None):
+def curve_d_of_row(sc, tok, j, prof, g_hand_of_opp=None, g_hand_of_me=None, cut_opp=None, cut_me=None):
     """**交点の近さ `D`**（T75）＝両席の到達ターンの差 `τ_opp − τ_me`（正なら自分が先に届く）。
     `τ_me` は自分が相手の耐久 `Θ_me` に、`τ_opp` は相手が自分の耐久 `Θ_opp` に、同じ輪郭で積んで届くターン数（相手も同じ自席ターン番号 `j` と置く）。
     `g_hand_of_opp`／`g_hand_of_me` は**その席の手札**の 1 枚あたりの価格（T76・`None` なら `μ`）。1 行からは自分の手札しか読めないので、
     線形の橋では `g_hand_of_me` だけが入る（相手側は `μ` のまま＝非対称・報告で明示する）。"""
-    th_me = threshold(sc, tok, g_hand=g_hand_of_opp)
-    th_opp = threshold_of_me(sc, tok, g_hand=g_hand_of_me)
+    # **N-3**: `cut_opp`／`cut_me`＝その席の値段の窓（`cut_price.CutView`・`None` なら旧の `μ`）。
+    # 相手の耐久は相手の手札・自分の耐久は自分の手札で読む（文脈は項ごとに入れ替える）。
+    with CP.defending(cut_opp):
+        th_me = threshold(sc, tok, g_hand=g_hand_of_opp)
+    with CP.defending(cut_me):
+        th_opp = threshold_of_me(sc, tok, g_hand=g_hand_of_me)
     sh_me = sh_opp = rate_me = rate_opp = 0.0
+    if THETA_HAND_PLACE == "shield" and (cut_opp is not None or cut_me is not None):
+        raise ValueError("N-3（cut price joint）は THETA_HAND_PLACE=shield と組めない")
     if THETA_HAND_PLACE == "shield":
         # **T102**: 手札は**しきい値から外し、両席とも有限の盾**にする（対称に読む・§0.05）。
         sc_a = np.asarray(sc); tok_a = np.asarray(tok)
@@ -2210,6 +2275,15 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     seat_decks = {}
     if SLOPE_HAND_MODE == "flow":
         seat_decks = DR.decks_by_seed(dirs)
+    # **N-3**: 切らせた札の値段を守り手の手札で読むなら、組めない形を先に落とす（黙って旧の値段に落ちない）
+    cut_decks = None
+    if CP.joint_on():
+        if THETA_HAND_MODE not in ("cuttable", "cuttable_cx", "cuttable_forced", "cuttable_seq"):
+            raise ValueError("N-3（cut price joint）は THETA_HAND_MODE=%r と組めない" % (THETA_HAND_MODE,))
+        if DON_PURSE_MODE == "race" or THETA_HAND_PLACE == "shield":
+            raise ValueError("N-3（cut price joint）は DON_PURSE_MODE=race／THETA_HAND_PLACE=shield と組めない")
+        import deck_refill as _DR
+        cut_decks = _DR.decks_by_seed(dirs)
     rows_out = []
     ledger = []            # (d) 単位の検算: 勝った席の F_end 対 Θ_start
     theta_check = []       # **T96**: 行ごとの `Θ` 対「そこから終局までに実際に要った損害」
@@ -2242,6 +2316,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "shield_n": 0, "shield_sum": 0.0, "shield_rate_sum": 0.0,
              "g_sum": 0.0, "g_n": 0, "g_fallback": 0,
              "g_win_sum": 0.0, "g_win_n": 0, "g_lose_sum": 0.0, "g_lose_n": 0}
+    if CP.joint_on():
+        stats["cut_price"] = CP.CUT_PRICE_MODE                    # **N-3**（`flat` では欄を足さない＝出力は旧と同じ）
     games = 0
     for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
         games += 1
@@ -2265,6 +2341,22 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         last_of_turn = {}
         for n, i in enumerate(order):
             last_of_turn[int(rows["turn"][i])] = n
+        # **N-3**: 守り手の値段の曲線（枠＝その席の直近の自席ターンの最後の行＝`turn_last`／`g_for` と同じ）と、
+        # 攻め手のターンの間に守り手の手札から出ていった札の値段の直し（`cut_price` の注）。`flat` では作らない。
+        cut = None
+        if CP.joint_on():
+            own_last = {}
+            for n, i in enumerate(order):
+                w0, t0 = int(rows["who"][i]), int(rows["turn"][i])
+                if t0 < 1 or not PL.is_own_turn(w0, t0) or not TB_is_decision_row(rows, pol, L, ptr, i):
+                    continue
+                k0 = int(L[i]); ch0 = int(rows["pol_chosen"][i])
+                if k0 < 1 or ch0 < 0 or ch0 >= k0:
+                    continue
+                own_last[(w0, t0)] = i                      # `turn_last` と同じ行（同じ条件で最後の行）
+            cut = CP.CutFrames(order, rows, ex, idx2cid, cards, own_last, mu,
+                               decks=(cut_decks.get(seed_g) if cut_decks else None),
+                               don_rule=(THETA_DON_MODE == "rule"), stats=stats)
         turn_start = {}       # (w, t) -> (sc, tok, ci)
         turn_last = {}        # (w, t) -> その席のそのターン最後の行（T76: 出した後の手札で 1 枚あたりの価格を測る）
         turn_seq = {0: [], 1: []}
@@ -2293,14 +2385,19 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             # （終局のターンの最後の手＝相手の応答窓や箱の commit で閉じる）の実現と価格を両方落としていた。
             j = nxt.get(n)
             mirror = False
+            n2 = None
             if j is not None and int(rows["turn"][order[j]]) == t:
-                i2 = order[j]
+                i2 = order[j]; n2 = j
             else:
                 m = last_of_turn.get(t)
                 i2 = order[m] if (m is not None and m > n) else None
+                n2 = m if i2 is not None else None
                 mirror = i2 is not None and int(rows["who"][i2]) != w
             if i2 is not None:
                 p = (parts_mirror if mirror else parts)(sc, tok, ex["sc"][i2], ex["tok"][i2])
+                if cut is not None:
+                    # **N-3**: 旧の `μ × 手札の枚数の差` に、この括りの中の応答で守り手の手札から出ていった札の値段の直しを足す
+                    p = dict(p, opp_hand=p["opp_hand"] + cut.bracket_corr(w, t, n, n2))
                 harm[(w, t)] += harm_of(p)
                 stats["rows_bracketed"] += 1
                 if mirror:
@@ -2328,9 +2425,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                    "hand": hand_ids_of(ex["ci"][i], idx2cid),
                    "opp_bodies": opp_bodies_of(tok, mlp, r, th, mu, ci_row=ex["ci"][i], idx2cid=idx2cid)}
             tl = sig[2] if len(sig) > 2 else None
-            v = score_candidate(sig, str(pol["pol_cid"][b]) or None, (str(pol["pol_tcid"][b]) or None) if tl else None,
-                                ctx, cards, src_power=slot_power(tok, int(pol["pol_si"][b])),
-                                tgt_power=slot_power(tok, int(pol["pol_ti"][b])), don_k=int(pol["pol_k"][b]))
+            with CP.defending(None if cut is None else cut.view(1 - w, t, float(sc[SC_OPP_HAND]))):   # **N-3**
+                v = score_candidate(sig, str(pol["pol_cid"][b]) or None, (str(pol["pol_tcid"][b]) or None) if tl else None,
+                                    ctx, cards, src_power=slot_power(tok, int(pol["pol_si"][b])),
+                                    tgt_power=slot_power(tok, int(pol["pol_ti"][b])), don_k=int(pol["pol_k"][b]))
             if v is not None:
                 priced[(w, t)] += float(v)
         if len(z_of) < 2 or not turn_seq[0] or not turn_seq[1]:
@@ -2531,6 +2629,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             return d["theta"] / max(SLOPE_FLOOR, d["slope_theory"])
 
         def seat_row(w, t, j, sc, tok, _ci, f_real, t_left, stats):
+            """**N-3**: 守り手 `1 − w` の値段の文脈の中で `_seat_row` を読む（`flat` なら文脈に入らない＝旧のまま）。"""
+            if cut is None:
+                return _seat_row(w, t, j, sc, tok, _ci, f_real, t_left, stats)
+            with CP.defending(cut.view(1 - w, t, float(np.asarray(sc)[SC_OPP_HAND]))):
+                return _seat_row(w, t, j, sc, tok, _ci, f_real, t_left, stats)
+
+        def _seat_row(w, t, j, sc, tok, _ci, f_real, t_left, stats):
             """**1 席・1 ターン開始点の理論の読み**（`per_seat[(w, t)]` の中身・T151-2 で関数に切り出した）。
 
             `w`＝**攻める席**（`Θ` は `1 − w` の耐久・`A` は `w` の速さ）・`(sc, tok, _ci)`＝その席の視点の行・
@@ -2639,10 +2744,17 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 sr = shield_rate_of(own_attackers_of(tok, olp), _opp_active_blockers(tok), theta, mu)
                 bare = th_life + th_body
                 tau_h = tau_theory_of(dict(d0, theta=bare))          # 手札抜きの地平 τ0
-                cap = min(th_hand, sr * max(0.0, tau_h))
+                _cv = CP.active()
+                if _cv is not None:
+                    # **N-3**: 上限も「切れる枚数 × τ」の数のまま、値段だけ守り手の手札で読む
+                    _src = shield_count_of(own_attackers_of(tok, olp), _opp_active_blockers(tok), theta)
+                    cap = min(th_hand, _cv.price(_src * max(0.0, tau_h)))
+                else:
+                    cap = min(th_hand, sr * max(0.0, tau_h))
                 for _ in range(3 if THETA_HAND_WINDOW == "fixpoint" else 0):
                     tau_h = tau_theory_of(dict(d0, theta=bare + cap))
-                    cap = min(th_hand, sr * max(0.0, tau_h))
+                    cap = (min(th_hand, _cv.price(_src * max(0.0, tau_h))) if _cv is not None
+                           else min(th_hand, sr * max(0.0, tau_h)))
                 stats["thw_n"] += 1; stats["thw_cut_sum"] += float(th_hand - cap)
                 stats["thw_hit"] += int(cap < th_hand - 1e-12); stats["thw_tau_sum"] += float(tau_h)
                 th_hand = cap
@@ -3275,10 +3387,12 @@ def main(argv=None):
     ap.add_argument("--sched-t1", default=SCHED_T1_MODE, choices=SCHED_T1_MODES,
                     help="**T152** 列の第 1 段: `walk`（旧・全ての歩きの第 1 段が 0）／`game`（規則・局の最初の自席ターンだけ 0）")
     add_nu_mode_arg(ap)
+    CP.add_cut_price_arg(ap)                        # **N-3**
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_decision_row(a)
     apply_nu_mode(a)
+    CP.apply_cut_price(a)                           # **N-3**
     t0 = time.time()
     set_pre_settle_mode(a.pre_settle)               # **T138b**
     set_opp_clock_mode(a.opp_clock)                 # **T151-2**

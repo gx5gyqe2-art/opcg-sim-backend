@@ -1211,6 +1211,12 @@ def theta_of(tok_row, life, my_don=0.0, mode="const", theta=THETA, don_share=DON
     return max(float(theta), b)
 
 
+#: **N-3（2026-09-26）: 切らせる札の値段の差し替え口**。`None`（既定）なら旧の `c(x)·μ`＝1 ビットも変わらない。
+#: `cut_price.defending(view)` の中でだけ「守り手の手札の 1 枚 1 役の価値の減り」（`view.price(c)`）に替わる
+#: ——`attack_value` の守る値段・`block_cost` のブロックしてから切る値段・`attach_value` の増分の 3 か所だけ（数 `c(x)` は変えない）。
+CUT_PRICER = None
+
+
 def block_cost(power, blocker_power, nu_blocker, mu=MU):
     """**ブロッカー B で受ける費用**（T47）——`P < P_B` なら B は無傷で 0、そうでなければ
     **B を失う（`ν(B)`）か、ブロックしてから B をカウンターで守る（`c(P − P_B)·μ`）かの安い方**。
@@ -1218,6 +1224,8 @@ def block_cost(power, blocker_power, nu_blocker, mu=MU):
     xb = float(power) - float(blocker_power)
     if xb < -PWR_EPS:
         return 0.0
+    if CUT_PRICER is not None:                       # **N-3**: 切らせる札の値段を守り手の手札で読む（文脈の中だけ）
+        return float(min(float(nu_blocker), CUT_PRICER(c_of(xb), mu)))
     return float(min(float(nu_blocker), c_of(xb) * mu))
 
 
@@ -1231,7 +1239,7 @@ def attack_value(power, target_power, is_leader, theta=THETA, mu=MU, nu_target=N
     x = float(power) - float(target_power)
     if x < -PWR_EPS:
         return 0.0                       # 通らない＝価値 0（テンポだけ払う・§14.2）
-    guard = c_of(x) * mu
+    guard = c_of(x) * mu if CUT_PRICER is None else CUT_PRICER(c_of(x), mu)     # **N-3**（文脈の中だけ）
     take = (theta * mu) if is_leader else (
         float(nu_target) if nu_target is not None else theta * mu)
     best = min(guard, take)
@@ -1513,6 +1521,8 @@ def attach_value(power, target_power, k=1, theta=THETA, mu=MU):
     if x0 < -PWR_EPS:
         return 0.0                       # 通らない攻撃は付与しても通らない
     x1 = x0 + 1000.0 * int(k)
+    if CUT_PRICER is not None:                       # **N-3**: `attack_value` の増分と同じ値段で（文脈の中だけ）
+        return (min(CUT_PRICER(c_of(x1), mu), theta * mu) - min(CUT_PRICER(c_of(x0), mu), theta * mu))
     return (min(c_of(x1), theta) - min(c_of(x0), theta)) * mu
 
 
@@ -1585,6 +1595,18 @@ def blockers_of(ctx):
     return out
 
 
+def _nu_of_other_side(*args, **kwargs):
+    """**N-3**: 相手の体の `ν`（その体が**こちらを**殴る攻撃の値）は、守り手が逆の席なので**旧の値段で**読む
+    （`CUT_PRICER` は「相手が守り手」の文脈の値段＝この体の攻撃には当たらない）。`None` のときは `nu_of` そのもの。"""
+    global CUT_PRICER
+    prev = CUT_PRICER
+    CUT_PRICER = None
+    try:
+        return nu_of(*args, **kwargs)
+    finally:
+        CUT_PRICER = prev
+
+
 def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, don_k=None):
     """候補 1 つの理論値（値付けできなければ `None`）。
 
@@ -1636,8 +1658,8 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
         tp = float(tgt["power"]) if tgt_power is None else float(tgt_power)
         if tgt is not None and tgt.get("leader"):
             return attack_value(sp, tp, True, theta, mu, blockers=blockers) - dcost
-        nu_t = nu_of(tp, ctx["my_leader_power"], ctx["r_turns"], theta, mu,
-                     is_blocker=(tgt or {}).get("blocker"))
+        nu_t = _nu_of_other_side(tp, ctx["my_leader_power"], ctx["r_turns"], theta, mu,
+                                 is_blocker=(tgt or {}).get("blocker"))
         if (tgt or {}).get("blocker"):
             # 対象そのものはその攻撃をブロックできない——同じパワーのブロッカーを 1 つ外す
             for i, (pb, _nb) in enumerate(blockers):

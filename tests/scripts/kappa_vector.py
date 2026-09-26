@@ -106,6 +106,7 @@ if _HERE not in sys.path:
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 import crossing_bridge as CB  # noqa: E402
+import cut_price as CP  # noqa: E402  （N-3）
 import guard_afford as GA  # noqa: E402
 import theory_order as TO  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
@@ -408,6 +409,25 @@ def _deck_of(seat_decks, seed, w):
     return (seat_decks.get(int(seed)) or (None, None))[int(w)]
 
 
+def _deck_pair(seat_decks, seed):
+    """**N-3**: `(席 0 のデッキ, 席 1 のデッキ)`（無ければ `None`）——`cut_price.CutFrames` に渡す。"""
+    if not seat_decks:
+        return None
+    return (_deck_of(seat_decks, seed, 0), _deck_of(seat_decks, seed, 1))
+
+
+def frame_rows_of(r, idx):
+    """**N-3**: 各席の**自席ターンの最初の行**（`kind == 0`）＝帳簿が `rate_at`／`g_at` を読む行と同じ行。"""
+    out = {}
+    for i in idx:
+        if int(r["kind"][i]) != 0:
+            continue
+        w, t = int(r["who"][i]), int(r["turn"][i])
+        if PL.is_own_turn(w, t) and (w, t) not in out:
+            out[(w, t)] = i
+    return out
+
+
 def g_of_row(sc, tok, ci_row, idx2cid, cards):
     """**その席の手札 1 枚あたりの価格**（T76／T79・帳簿の `_g_of_row` と同じ式）。
     `THETA_HAND_MODE` が `count` なら `None`（＝`μ`）。"""
@@ -433,7 +453,8 @@ def rate_terms_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_
             float(s_rush), float(f_rush), float(eff), float(eff1))
 
 
-def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, idx2cid=None, cards=None):
+def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, idx2cid=None, cards=None,
+                 cut_me=None, cut_opp=None):
     """行から **(Θ_me, Θ_opp, A_me, A_opp, j)** を組む（両席・完全情報・§0.05）。
 
     `Θ` は**その行**から両席分読める（`threshold` と `threshold_of_me` が対の式）。
@@ -446,9 +467,12 @@ def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, id
     歩きはこれを**2 段目から**的に足す（持ち主の次のリフレッシュで戻る・T96）。`Θ` 本体はアクティブな
     ブロッカーだけのまま（既定と同じ数字）。"""
     sc = np.asarray(sc); tok = np.asarray(tok)
-    st = (float(CB.threshold_of_me(sc, tok, g_hand=g_me)),
-          float(CB.threshold(sc, tok, g_hand=g_opp)),
-          float(a_me), float(a_opp), int(j))
+    # **N-3**: `cut_me`／`cut_opp`＝その席の値段の窓（`cut_price.CutView`・`None` なら旧の `μ`）。
+    with CP.defending(cut_me):
+        th_me = float(CB.threshold_of_me(sc, tok, g_hand=g_me))
+    with CP.defending(cut_opp):
+        th_opp = float(CB.threshold(sc, tok, g_hand=g_opp))
+    st = (th_me, th_opp, float(a_me), float(a_opp), int(j))
     if CB.THETA_RETURN_MODE != "untap":
         return st
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0

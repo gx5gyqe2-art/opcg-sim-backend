@@ -78,6 +78,7 @@ from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 import crossing_bridge as CB  # noqa: E402
 import guard_afford as GA  # noqa: E402
 import kappa_vector as KV  # noqa: E402
+import cut_price as CP  # noqa: E402  （N-3）
 import theory_order as TO  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
 from theory_order import (MU, SC_MY_DON, SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER,  # noqa: E402
@@ -278,19 +279,26 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
         rate_at_turn, g_at_turn = {}, {}
         shape_at = {}
         seed_g = int(r["seed"][idx[0]]) if len(idx) else -1
+        # **N-3**: 値段の枠＝各席の自席ターンの最初の行（`g_at_turn` と同じ行・同じ「イベントは全部切れる」規約）
+        cut = (CP.CutFrames(list(idx), r, ex, idx2cid, cards, KV.frame_rows_of(r, idx), mu,
+                            decks=KV._deck_pair(seat_decks, seed_g), don_rule=False, stats=stats)
+               if CP.joint_on() else None)
         for i in idx:
             if int(r["kind"][i]) != 0:
                 continue
             w, t = int(r["who"][i]), int(r["turn"][i])
             if PL.is_own_turn(w, t) and (w, t) not in rate_at_turn:
                 dk = KV._deck_of(seat_decks, seed_g, w)            # **T128**
-                rate_at_turn[(w, t)] = KV.rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
-                                                      idx2cid, cards, theta, mu, deck_ids=dk,
-                                                      j=CB.own_turn_index(t)) * float(scale_a)
+                # **N-3**: 速さ（攻撃の価格の和）は守り手＝相手の値段で読む
+                with CP.defending(None if cut is None else
+                                  cut.view(1 - w, t, float(np.asarray(ex["sc"][i])[TO.SC_OPP_HAND]))):
+                    rate_at_turn[(w, t)] = KV.rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
+                                                          idx2cid, cards, theta, mu, deck_ids=dk,
+                                                          j=CB.own_turn_index(t)) * float(scale_a)
+                    shape_at[(w, t)] = (KV.rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
+                                                           idx2cid, cards, theta, mu, deck_ids=dk)
+                                           if KV.D_MODE == "theory" else None)
                 g_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
-                shape_at[(w, t)] = (KV.rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
-                                                       idx2cid, cards, theta, mu, deck_ids=dk)
-                                       if KV.D_MODE == "theory" else None)
         last_turn_of = {}
         for (w, t) in rate_at_turn:
             last_turn_of[w] = max(t, last_turn_of.get(w, -1))
@@ -329,8 +337,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
             b = int(ptr[i]) + ch
             sig = json.loads(pol["pol_sig"][b])
             fam = move_family(sig)
+            cut_me = cut_opp = None
+            if cut is not None:                          # **N-3**: 両席の値段の窓（今の枚数で）
+                cut_me = cut.view(w, t, float(np.asarray(sc)[TO.SC_MY_HAND]))
+                cut_opp = cut.view(1 - w, t, float(np.asarray(sc)[TO.SC_OPP_HAND]))
             st0 = KV.state_of_row(sc, tok, rate_at_turn[(w, t)], ao, CB.own_turn_index(t),
-                                  g_me=g_at_turn[(w, t)], g_opp=g_opp, ci_row=ci, idx2cid=idx2cid, cards=cards)
+                                  g_me=g_at_turn[(w, t)], g_opp=g_opp, ci_row=ci, idx2cid=idx2cid, cards=cards,
+                                  cut_me=cut_me, cut_opp=cut_opp)
             # **P5**: 通貨の付け替え＝耐久も価格も同じ c 倍（速さはそのまま＝時計は c 倍される）
             st0 = ((st0[0] * scale_currency, st0[1] * scale_currency, st0[2], st0[3], st0[4])
                    + tuple(x * scale_currency for x in st0[5:]))     # 戻る分も同じ通貨（C-5c）
@@ -347,18 +360,20 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                    "hand": TO.hand_ids_of(ci, idx2cid),
                    "opp_bodies": opp_bodies_of(tok, mlp, rt, th, mu, ci_row=ci, idx2cid=idx2cid)}
             tl = sig[2] if len(sig) > 2 else None
-            v = score_candidate(sig, str(pol["pol_cid"][b]) or None,
-                                (str(pol["pol_tcid"][b]) or None) if tl else None, ctx, cards,
-                                src_power=slot_power(tok, int(pol["pol_si"][b])),
-                                tgt_power=slot_power(tok, int(pol["pol_ti"][b])),
-                                don_k=int(pol["pol_k"][b]))
+            with CP.defending(cut_opp):                  # **N-3**: 攻め手の手の値段は守り手＝相手の値段で
+                v = score_candidate(sig, str(pol["pol_cid"][b]) or None,
+                                    (str(pol["pol_tcid"][b]) or None) if tl else None, ctx, cards,
+                                    src_power=slot_power(tok, int(pol["pol_si"][b])),
+                                    tgt_power=slot_power(tok, int(pol["pol_ti"][b])),
+                                    don_k=int(pol["pol_k"][b]))
             if v is None:
                 continue
             v = float(v) * float(scale_currency)
             stats["priced"] += 1
             stats["by_family"][fam] = stats["by_family"].get(fam, 0) + 1
-            dx = KV.axis_of_move(fam, v, sig, str(pol["pol_cid"][b]) or None, cards, sc, tok, olp, rt,
-                                 don_k=int(pol["pol_k"][b]))
+            with CP.defending(cut_opp):
+                dx = KV.axis_of_move(fam, v, sig, str(pol["pol_cid"][b]) or None, cards, sc, tok, olp, rt,
+                                     don_k=int(pol["pol_k"][b]))
             st1 = KV.apply_dx(st0, dx)
             t_me, t_opp = clocks_of(st0, prof)
             d = t_opp - t_me
@@ -431,6 +446,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
            "last_turn": {kk: KV._score(last[kk], zs) for kk in ARMS}}
     if flags is not None:
         out["parts"] = parts_of(part_rows)
+    if CP.joint_on():                     # **N-3**（`flat` では欄を足さない＝出力は旧と同じ）
+        out["cut_price"] = {"mode": CP.CUT_PRICE_MODE,
+                            **{k: v for k, v in stats.items() if str(k).startswith("cut_")}}
     return out
 
 
@@ -494,6 +512,7 @@ def build_parser():
                     help="**T138b** 決着後（`lethal_rule.settled_map`）の行を除いて測るか")
     ap.add_argument("--parts", action="store_true",
                     help="**T145** `rel_K` の和を勝者／敗者の最後のターンと宣言した行に割って出す")
+    CP.add_cut_price_arg(ap)                       # **N-3**
     ap.add_argument("--json", default="")
     return ap
 
@@ -514,6 +533,7 @@ def main(argv=None):
         CB.set_theta_return_mode(a.theta_return)      # **C-5c**
     if a.clamp:
         KV.set_scale_clamp([float(x) for x in a.clamp.split(",")])
+    CP.apply_cut_price(a)                          # **N-3**
     out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency,
                   pre_settle=(a.pre_settle == "on"), parts=a.parts)
     print(json.dumps(out, ensure_ascii=False, indent=2))
