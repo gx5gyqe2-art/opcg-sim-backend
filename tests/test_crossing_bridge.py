@@ -502,7 +502,8 @@ def _actx(budget, att1, later, cand, kmax=10, flow=None, price=None):
     key = ("test", budget, tuple(att1), tuple(later), tuple((c, tuple(sorted(p.items())), bx, ru) for c, p, bx, ru in cand),
            tuple(flow), tuple(tuple(r) for r in price), kmax)
     return {"budget": budget, "att1": att1, "later": later, "cand": cand, "price": price, "flow": flow,
-            "kmax": kmax, "key": key, "fixed": None, "olp": 5000.0, "mlp": 5000.0, "lam": T.LAM, "mu": T.MU}
+            "kmax": kmax, "key": key, "fixed": None, "olp": 5000.0, "mlp": 5000.0, "lam": T.LAM,
+            "lam_net": T.THETA * T.MU, "mu": T.MU}
 
 
 def test_attaching_one_don_raises_the_required_counters_by_exactly_1000():
@@ -535,20 +536,20 @@ def test_the_same_don_is_either_played_or_attached_never_both():
 
 
 def test_the_attackers_best_split_beats_all_attach_and_all_play():
-    """**H-4b**: 攻め手の財布 2・手札に費用 1 の体（超過 1000・次のターンから殴る）・リーダー（超過 0）。
-    守る側はライフ 2・カウンター 1000・2000・1000。攻め手の目的は**早く倒す**。
-    * **全部出す**（体を出して付与 0）: 守る側は 3 ターン生き延びる。
-    * **全部付ける**（リーダー +2000）: 同じく 3 ターン。
-    * **最善の分け方**（体を出す ＋ リーダーに 1 枚）: **2 ターンで倒れる**＝両方より早い。"""
-    cards = [(1000.0, 0.0), (2000.0, 0.0), (1000.0, 0.0)]
+    """**H-4b／H-4d**: 攻め手の財布 3・手札に費用 1 の**速攻**の体（超過 0・出したターンから殴る）・リーダー（超過 0）。
+    守る側はライフ 0・カウンター 2000 が 2 枚。攻め手の第一の目的は**このターンに倒す**。
+    * **全部出す**（体を出して付与 0）: 要る合計 1000 と 1000 → 2 枚で両方止まり、守る側は生き延びる。
+    * **全部付ける**（リーダー +3000）: 要る合計 4000 → 2 枚で止まり、生き延びる。
+    * **最善の分け方**（体を出す ＋ リーダーに 2 枚）: 要る合計 3000 と 1000 → 2000×2 では両方止まらず**このターンに倒れる**。"""
+    cards = [(2000.0, 0.0), (2000.0, 0.0)]
     P = CB.rule_guard_plan_bo
-    all_play = P(cards, 0.0, [0.0], [0.0, 1000.0], [], 2, None)
-    all_attach = P(cards, 0.0, [2000.0], [2000.0], [], 2, None)
-    ax = _actx(2, [(0, 0.0)], [(0, 0.0)], [(1, {"atk": 0.0, "eff": 0.0}, 1000.0, False)])
-    cut, st, plan = CB.rule_don_solve(cards, 0.0, [], 2, ax, None)
-    assert all_play[2] == 3 and all_attach[2] == 3
-    assert plan["play"] == (0,) and plan["k"] == (1,) and plan["paid"] == 2.0
-    assert plan["alive"] == 2 and plan["alive"] < all_play[2] and plan["alive"] < all_attach[2]
+    all_play = P(cards, 0.0, [0.0, 0.0], [0.0, 0.0], [], 0, None)
+    all_attach = P(cards, 0.0, [3000.0], [3000.0], [], 0, None)
+    ax = _actx(3, [(0, 0.0)], [(0, 0.0)], [(1, {"atk": 0.0, "eff": 0.0}, 0.0, True)])
+    cut, st, plan = CB.rule_don_solve(cards, 0.0, [], 0, ax, None)
+    assert all_play[2] >= 1 and all_attach[2] >= 1
+    assert plan["play"] == (0,) and plan["k"] == (2,) and plan["paid"] == 3.0
+    assert plan["alive"] == 0 and (cut, st) == (0, 0)
 
 
 def test_the_speed_value_breaks_ties_that_do_not_change_the_kill_turn():
@@ -571,16 +572,51 @@ def test_the_speed_value_breaks_ties_that_do_not_change_the_kill_turn():
 
 
 def test_the_attachment_value_is_the_exact_first_turn_harm_and_the_don_is_charged_once():
-    """**H-4b（レビュー指摘 1）**: 付与の値打ち（速さの側が読む）＝**付与で増える 1 ターン目の損害の厳密な値**
-    （守る側の最善応答で `λ × 取ったライフ ＋ μ × 切らせた札 ＋ ν × 倒したブロッカー`）。ドン 1 枚の代わりの価値（`δ`）は
-    引かない＝付けたドンは `paid`（引いた 1 枚に回らない）で 1 回だけ払う。
+    """**H-4b／H-4d（D1）**: 付与の値打ち（速さの側が読む）＝**付与で増える 1 ターン目の損害の厳密な値**。ドン 1 枚の代わりの
+    価値は引かない（付けたドンは `paid` で 1 回だけ払う）。**通った命中の値段は `λ − h·μ`**（取ったライフの札は守る側の手札に
+    入る・速さの側の `attack_value` の `Θ·μ` と同じ・T77）。
     守る側 2000 1 枚・ライフ 1・超過 1000 の攻撃 1 本: 付与なしなら 2000 で止める（`μ`）、付与 1 枚なら止められず
-    ライフを取る（`λ`）＝増分 `λ − μ`。"""
+    ライフを 1 枚取る（`λ − h·μ`・まだ倒れない）＝増分 `λ − h·μ − μ = (Θ − 1)·μ`。"""
     ax = _actx(1, [(0, 1000.0)], [(0, 1000.0)], [])
     _c, _s, plan = CB.rule_don_solve([(2000.0, 0.0)], 0.0, [], 1, ax, 1)
     assert plan["k"] == (1,)
-    assert plan["attach_lead"] == pytest.approx(T.LAM - T.MU) and plan["attach"] == pytest.approx(0.0)
+    lam_net = T.LAM - T.H_LIFE_TO_HAND * T.MU
+    assert lam_net == pytest.approx(T.THETA * T.MU, abs=1e-5)
+    assert plan["attach_lead"] == pytest.approx(T.THETA * T.MU - T.MU) and plan["attach"] == pytest.approx(0.0)
     assert plan["paid"] == 1.0                                  # 付けたドンは財布から消える（1 回だけ）
+
+
+def test_the_kill_turn_reaches_the_whole_remaining_endurance():
+    """**H-4d（D2）**: とどめの段の損害は**残っている耐久の全部**（`λ × 残りのライフ ＋ μ × 残っている切れる札 ＋ ν × 場の
+    ブロッカー`）。レビューの最小の例（ライフ 0・2000 が 1 枚・リーダー超過 1000・付与 1 枚）で、旧版は倒す計画の増分が
+    **−μ**（倒れる段を「ライフ 0・札 0」と数えていた）。今は倒す段 `μ`（残っていた 1 枚が要らなくなる）− 付与なし `μ`
+    （1 枚で止める）＝ 0 で、**負にならない**。さらに無作為の盤面で、**倒す付与の増分はどの倒さない付与の増分より小さくない**。"""
+    ax = _actx(1, [(0, 1000.0)], [(0, 1000.0)], [])
+    _c, _s, plan = CB.rule_don_solve([(2000.0, 0.0)], 0.0, [], 0, ax, None)
+    assert plan["k"] == (1,) and plan["alive"] == 0
+    assert plan["incr"] == pytest.approx(0.0) and plan["incr"] >= 0.0
+    import itertools
+    import random
+    rng = random.Random(5)
+    checked = 0
+    for it in range(300):
+        cards = [(float(rng.choice([1000, 2000])), 0.0) for _ in range(rng.randint(0, 3))]
+        blk = [float(rng.choice([0, 1000, 2000]))] if rng.random() < 0.4 else []
+        life = rng.randint(0, 2)
+        xs = [float(rng.choice([-1000, 0, 1000])) for _ in range(rng.randint(1, 3))]
+        a1 = _actx(3, [(j, x) for j, x in enumerate(xs)], [(j, x) for j, x in enumerate(xs)], [])
+        f0 = CB.step_harm(CB.rule_guard_plan_bo(cards, 0.0, xs, xs, blk, life, None)[4], a1)
+        kill, nokill = [], []
+        for ks in itertools.product(range(4), repeat=len(xs)):
+            if sum(ks) > 3:
+                continue
+            xk = [x + 1000.0 * k for x, k in zip(xs, ks)]
+            r = CB.rule_guard_plan_bo(cards, 0.0, xk, xk, blk, life, None)
+            (kill if r[2] == 0 else nokill).append(CB.step_harm(r[4], a1) - f0)
+        if kill and nokill:
+            assert min(kill) >= max(nokill) - 1e-12, it
+            checked += 1
+    assert checked > 20
 
 
 def test_the_defender_assigns_blockers_optimally_not_always_to_the_heaviest_attack():
@@ -617,7 +653,7 @@ def test_the_truncated_search_matches_full_enumeration():
         ax["key"] = ax["key"] + (it,)
         turns = rng.choice([None, 1, 2])
         _cut, _st, plan = CB.rule_don_solve(cards, don, blk, life, ax, turns)
-        got = (plan["alive"], -round(plan["value"], 12), plan["paid"])
+        got = (0 if plan["alive"] == 0 else 1, -round(plan["value"], 12), plan["paid"])
         best = None
         for mask in range(1 << len(cand)):
             play = [i for i in range(len(cand)) if mask >> i & 1]
@@ -633,14 +669,14 @@ def test_the_truncated_search_matches_full_enumeration():
                 xf = [att1[j][1] + 1000.0 * ks[j] for j in range(len(att1))] + bn
                 xl = [x + 1000.0 * kslot.get(s, 0) for s, x in later] + bl
                 return CB.rule_guard_plan_bo(cards, don, xf, xl, blk, life, turns)
-            f0 = CB.first_turn_harm(run([0] * len(att1))[4], ax)
+            f0 = CB.step_harm(run([0] * len(att1))[4], ax)
             for ks in itertools.product(range(kmax + 1), repeat=len(att1)):
                 if sum(ks) > budget - cost:
                     continue
                 r = run(list(ks))
                 paid = cost + sum(ks)
-                val = atk + (CB.first_turn_harm(r[4], ax) - f0) + flow[budget - paid]
-                key = (r[2], -round(val, 12), float(paid))
+                val = atk + (CB.step_harm(r[4], ax) - f0) + flow[budget - paid]
+                key = (0 if r[2] == 0 else 1, -round(val, 12), float(paid))
                 if best is None or key < best:
                     best = key
         assert got == best, (it, got, best)
@@ -677,6 +713,44 @@ def test_the_rate_side_reads_the_same_plan_as_the_endurance_side():
     assert sched[1] == pytest.approx(board + 0.011)
     assert sched[2] == pytest.approx(board + 0.011)
     assert sched != sched0                                             # 計画を渡さない既定の財布とは別物
+
+
+def test_the_attachment_increment_is_per_step_against_the_defenders_state_at_that_step():
+    """**H-4d（D3）**: 付与の増分は**段ごと**に、その段の守る側の状態（減った手札・倒れたブロッカー）で読む
+    ＝計画の道筋の各段の損害 − 付与なしの道筋の各段の損害。守る側 1000・2000・2000・ライフ 1・超過 1000 の攻撃 2 本・
+    財布 1: キャラに付けると 1 段目は止めるのに 1 枚多く要り（`+μ`）、**そのぶん手札が早く尽きる**ので 2 段目は 1 枚少ない（`−μ`）。
+    1 段目の増分を毎段足すと（旧版）この減りが消える。速さの列（`seat_slope_sched`）は段ごとの増分を読み、道筋が尽きた先は 0。"""
+    cards = [(1000.0, 0.0), (2000.0, 0.0), (2000.0, 0.0)]
+    xs = [(0, 1000.0), (1, 1000.0)]
+    ax = _actx(1, xs, xs, [])
+    _c, _s, plan = CB.rule_don_solve(cards, 0.0, [], 1, ax, None)
+    assert plan["k"] == (0, 1)
+    p_plan = CB.rule_guard_plan_bo(cards, 0.0, list(plan["xs_first"]), list(plan["xs_later"]), [], 1, None)[5]
+    p_bare = CB.rule_guard_plan_bo(cards, 0.0, [1000.0, 1000.0], [1000.0, 1000.0], [], 1, None)[5]
+    tot = [a + b for a, b in plan["attach_steps"]]
+    for j, v in enumerate(tot):
+        want = CB.step_harm(p_plan[j], ax) - (CB.step_harm(p_bare[j], ax) if j < len(p_bare) else 0.0)
+        assert v == pytest.approx(want)
+    assert tot[0] == pytest.approx(T.MU) and tot[1] == pytest.approx(-T.MU)
+    sc, tok = _mirror_row(life=3.0, hand=5.0, n_char=2, pw=0.6)
+    olp = float(np.asarray(sc)[T.SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+
+    class _NoCards:
+        def info(self, _cid):
+            return {}
+    p2 = {"atk": 0.0, "rush": 0.0, "eff": 0.0, "attach": 0.003, "attach_lead": 0.002, "paid": 1.0,
+          "attach_steps": ((0.002, 0.003), (0.001, 0.0))}
+    old_t1 = CB.RATE_T1_MODE
+    try:
+        CB.set_rate_t1_mode("off")
+        sched = CB.seat_slope_sched(sc, tok, np.zeros(22, np.int64), {}, _NoCards(), olp, jmax=3, plan=p2)
+    finally:
+        CB.set_rate_t1_mode(old_t1)
+    bare = CB.theory_slope_parts(tok, olp, with_don=False, life_opp=float(sc[T.SC_OPP_LIFE]))
+    b0 = bare[0] + bare[1]
+    assert sched[0] == pytest.approx(b0 + 0.005)
+    assert sched[1] == pytest.approx(b0 + 0.001)
+    assert sched[2] == pytest.approx(b0)
 
 
 def test_the_purse_witness_reproduces_purse_plan_exactly():
