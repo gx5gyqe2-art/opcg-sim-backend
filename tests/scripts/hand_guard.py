@@ -80,6 +80,74 @@ def guard_value(items, xs, take_cost, s=1.0 - KO_P, turns=GUARD_TURNS):
     return float(total)
 
 
+def guard_value_exact(items, xs, take_cost, s=1.0 - KO_P, turns=GUARD_TURNS, start=0):
+    """**守る備えの厳密な最大値**（G-2 の修正・2026-09-26）——`guard_value` と**同じ目的・同じ割引・同じ地平**で、
+    貪欲な割り当てではなく**全部の割り当ての最大**を取る:
+
+        max over 互いに素な札の組の割り当て {(t, x) → S}:  Σ s^(start+t) · (受ける損 − Σ_{i∈S} v_i)
+        ただし各組 S はカウンター合計 ≥ x + 1000（同値は命中）・割り当てない攻撃は受ける（節約 0）
+
+    `items` = [(counter, v), …]（`v` の `None` は 0・`guard_cost_min_v` と同じ）・`xs` は来る攻撃（毎ターン同じと置く）。
+    `start` は最初の相手ターンの割引の指数（`guard_value` は 0。**G-2 の判断では 1**＝今の窓から 1 ラウンド後）。
+
+    * **札が増えて下がることが無い**（手札が大きいほど選べる割り当てが増えるだけ）＝`guard_value`（貪欲）の癖が無い。
+    * 数えるのはカウンター値が正の札だけ（カウンター 0 の札は組を足りさせず、`v ≥ 0` なら組に入れて得をしない）。
+    * `v ≥ 0` なら各組は**過不足の無い組**（どの札を抜いても足りない）だけ調べれば足りる（余計な札は `Σv` を増やすだけ）。
+      負の `v` が在るときは足りる組を全部調べる（`use_value` は 0 で床を打つので記録の行では起きない）。
+    * 計算は「攻撃の並びの何本目まで決めたか × 残りの札」の再帰（メモ化）＝札 k 枚で状態は高々 2^k・攻撃ごと。
+    **新定数ゼロ**。`guard_value` は他の器が使うので変えない。"""
+    take = float(take_cost)
+    cards = [(float(c), (0.0 if v is None else float(v))) for c, v in items]
+    cards = [cv for cv in cards if cv[0] > 0.0]
+    k = len(cards)
+    atks = [(t, float(x)) for t in range(int(turns)) for x in sorted(xs, reverse=True) if float(x) >= -PWR_EPS]
+    if k == 0 or not atks:
+        return 0.0
+    full = (1 << k) - 1
+    csum = [0.0] * (1 << k)
+    vsum = [0.0] * (1 << k)
+    for m in range(1, 1 << k):
+        low = m & -m
+        i = low.bit_length() - 1
+        csum[m] = csum[m ^ low] + cards[i][0]
+        vsum[m] = vsum[m ^ low] + cards[i][1]
+    minimal_only = all(v >= 0.0 for _c, v in cards)
+    sets_of = {}
+    for _t, x in atks:
+        if x in sets_of:
+            continue
+        need = x + 1000.0 - PWR_EPS
+        ok = []
+        for m in range(1, 1 << k):
+            if csum[m] < need or take - vsum[m] <= 0.0:
+                continue                                   # 足りない／受ける方が安い（割り当てない方が得）
+            if minimal_only and any(csum[m ^ (1 << i)] >= need for i in range(k) if m >> i & 1):
+                continue                                   # 余計な札を含む＝同じ攻撃を安く止める部分組が在る
+            ok.append((m, take - vsum[m]))
+        sets_of[x] = ok
+    disc = [float(s) ** (int(start) + t) for t in range(int(turns))]
+    memo = {}
+
+    def best(j, avail):
+        if j == len(atks) or avail == 0:
+            return 0.0
+        key = (j, avail)
+        if key in memo:
+            return memo[key]
+        t, x = atks[j]
+        out = best(j + 1, avail)                           # この攻撃は受ける
+        w = disc[t]
+        for m, sav in sets_of[x]:
+            if m & avail == m:
+                cand = w * sav + best(j + 1, avail & ~m)
+                if cand > out:
+                    out = cand
+        memo[key] = out
+        return out
+
+    return float(best(0, full))
+
+
 def delta_g(items, extra, xs, take_cost, s=1.0 - KO_P, turns=GUARD_TURNS):
     """`ΔG(札)` = 札を足した備え − 元の備え（≥ 0）。"""
     return guard_value(list(items) + [extra], xs, take_cost, s, turns) - guard_value(items, xs, take_cost, s, turns)

@@ -202,8 +202,12 @@ def test_the_margin_is_how_much_the_guard_overshoots_the_attack():
     got = B.guard_step(tok, sc, "take", free=5000.0, paid=[])
     assert got["margin"] == pytest.approx(2000.0)
     assert got["comfortable"] is True             # 既定の閾値 2000 にちょうど届く
-    tight = B.guard_step(tok, sc, "take", free=3500.0, paid=[])
+    # **G-2**: 守れるのは合計 ≥ 超過 + 1000（同値は命中）＝超過 3000 なら 4000 から。余裕は定義どおり「守る力 − 超過」のまま
+    tight = B.guard_step(tok, sc, "take", free=4500.0, paid=[])
     assert tight["can_guard"] is True and tight["comfortable"] is False
+    assert tight["margin"] == pytest.approx(1500.0)
+    assert B.guard_step(tok, sc, "take", free=3500.0, paid=[])["can_guard"] is False    # 旧（lenient）では守れた扱い
+    assert B.guard_step(tok, sc, "take", free=3500.0, paid=[], afford="lenient")["can_guard"] is True
 
 
 def test_the_comfort_threshold_is_a_provisional_value_you_can_sweep():
@@ -229,7 +233,7 @@ def test_the_gain_of_a_guard_row_is_minus_what_was_actually_paid():
     assert got_g["g"] == pytest.approx(-B.c_of(got_g["x"]) * 0.0551)
     assert got_t["g"] == pytest.approx(-1.15 * 0.0551)
     # 払えなかった行: `s` は 0（誤りでない）だが `g` は受けた損をそのまま持つ
-    # （`x = 0` は 0 パワーでも守れるので、守れない行は相手リーダーを大きくして作る）
+    # （G-2 より前の `lenient` では `x = 0` は 0 パワーでも守れた扱いだったので、守れない行は相手リーダーを大きくして作る）
     poor = B.guard_step(_tok(opp_lead=8000), sc, "take", free=0.0, paid=[], theta=1.15, mu=0.0551, guard_g="paid")
     assert poor["can_guard"] is False
     assert poor["s"] == 0.0 and poor["g"] == pytest.approx(-1.15 * 0.0551)
