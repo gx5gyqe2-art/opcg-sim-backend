@@ -303,3 +303,24 @@ def test_threshold_parts_use_count_times_price():
         assert got[1] == pytest.approx(cv.Lx(n), abs=1e-12)          # 予約そのものなら ḡ × N = L(N)
     finally:
         CB.set_theta_hand_mode(old)
+
+
+def test_value_caches_do_not_leak_across_contexts():
+    """覚えておく値（選択肢の価値・デッキの流入）は文脈の中では覚えも読みもしない——守り手ごとに値が違うので、
+    覚えると別の守り手・旧の値段の読みへ漏れる（実測で守りの窓の判断が 2 行ずれた）。"""
+    import deck_refill as DR
+    cv = _curve([(1.0, 0.0, 1000.0), (1.0, 0.2, 1000.0)], xs=[0.0])
+    cv.reserve = 1.0
+    T._OPTION_CACHE.clear()
+    base = T.option_value(6000.0, 5000.0, 3.0)
+    with CP.defending(cv.view(kind="avg")):
+        inside = T.option_value(6000.0, 5000.0, 3.0)
+    T._OPTION_CACHE.clear()
+    with CP.defending(cv.view(kind="avg")):
+        inside2 = T.option_value(6000.0, 5000.0, 3.0)
+    after = T.option_value(6000.0, 5000.0, 3.0)
+    assert inside == inside2 and after == base
+    n0 = len(DR._FLOW)
+    with CP.defending(cv.view(kind="avg")):
+        DR.a_of(("OP01-001",) * 3, 5000.0) if hasattr(DR, "a_of") else None
+    assert len(DR._FLOW) == n0

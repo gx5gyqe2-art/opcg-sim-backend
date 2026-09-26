@@ -1336,7 +1336,8 @@ def option_value(power, opp_leader_power, r_turns, theta=THETA, mu=MU, my_leader
     mlp = float(olp if my_leader_power is None else my_leader_power)
     # 同梱の分布で引くときだけ覚える（`boards` を明示した呼び出しは検算用＝毎回計算する）
     key = (int(round(float(power) / 100.0)), rb, int(round(olp / 100.0)), int(round(mlp / 100.0)),
-           round(float(theta), 4), round(float(mu), 5), round(float(ko_p), 4), SURV_MODE) if boards is None else None
+           round(float(theta), 4), round(float(mu), 5), round(float(ko_p), 4), SURV_MODE) \
+        if (boards is None and CUT_PRICER is None) else None     # **N-3**: 守り手の値段の文脈の中では覚えない（値が守り手ごとに違う）
     if key is not None and key in _OPTION_CACHE:
         return _OPTION_CACHE[key]
     bs = (load_opp_boards() if boards is None else boards).get(rb) or []
