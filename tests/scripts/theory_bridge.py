@@ -1558,6 +1558,7 @@ def main(argv=None):
     EV.add_search_price_arg(ap)
     EV.add_play_now_arg(ap)
     EV.add_cost_afford_arg(ap)
+    EV.add_pricing_fixes_arg(ap)
     import hand_plan as _HP
     _HP.add_inflow_arg(ap)
     _HP.add_cond_clock_arg(ap)
@@ -1599,6 +1600,7 @@ def main(argv=None):
     EV.apply_search_price(a)
     EV.apply_play_now(a)
     EV.apply_cost_afford(a)
+    pricing_fixes = EV.apply_pricing_fixes(a)                  # L
     _HP.apply_inflow_mode(a)
     _HP.apply_cond_clock_mode(a)
     _CB.set_theta_hand_mode(a.theta_hand)
@@ -1649,6 +1651,7 @@ def main(argv=None):
                            "guard_afford": effective_guard_afford(), "guard_afford_requested": GUARD_AFFORD_MODE,   # G-2
                            "guard_s_cost": GUARD_S_COST_MODE,
                            "play_now": EV.PLAY_NOW_MODE, "inflow": _HP.INFLOW_MODE, "cond_clock": _HP.COND_CLOCK_MODE,
+                           "pricing_fixes": pricing_fixes,                                              # L
                            "note": "§0.4 の暫定値。感度を付けて読む"},
            "summary": summarise(pairs, a.boot_reps, a.seed),
            # **T28-b: 行ごとに帯で切ってから足した版**（判定の主はこちら）

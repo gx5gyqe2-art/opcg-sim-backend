@@ -666,21 +666,22 @@ def test_a_rush_grant_is_priced_by_the_granted_bodys_own_attack_when_the_board_i
 
 
 def test_setting_the_power_to_x_is_priced_as_the_difference_from_the_printed_power():
-    """「元々のパワー 7000 にする」は `BUFF +7000` に読まれているが、価値は **7000 − 印刷のパワー**。
-    相手の体（「パワー 0 にする」）は今のパワーが判らないので従来どおり。"""
-    setp = _act("BUFF", "SELF", base=7000)
-    setp["raw_text"] = "このキャラを、元々のパワー7000にする"
-    assert E._is_set_power(setp) is True
-    assert E.action_value(setp, card={"power": 5000}) == pytest.approx(E.power_value(2000.0))
-    assert E.action_value(setp, card={"power": 7000}) == pytest.approx(0.0)
-    assert E.action_value(setp) == pytest.approx(E.power_value(7000.0))                    # カードが無ければ従来
-    plain = _act("BUFF", "SELF", base=7000)
-    plain["raw_text"] = "このキャラのパワー+7000"
-    assert E._is_set_power(plain) is False
-    assert E.action_value(plain, card={"power": 5000}) == pytest.approx(E.power_value(7000.0))
-    zero = _act("BUFF", "OPPONENT", base=0)
-    zero["raw_text"] = "相手のキャラ1枚を、パワー0にする"
-    assert E.action_value(zero, card={"power": 5000}) == pytest.approx(0.0)                 # 従来（0 のまま）
+    """（**L 以前＝`legacy`**）「元々のパワー 7000 にする」は `BUFF +7000` に読まれているが、価値は **7000 − 印刷のパワー**。
+    相手の体（「パワー 0 にする」）は今のパワーが判らないので従来どおり。既定（L(c)）は下の L のテストが縛る。"""
+    with E.pricing_fixes("legacy"):
+        setp = _act("BUFF", "SELF", base=7000)
+        setp["raw_text"] = "このキャラを、元々のパワー7000にする"
+        assert E._is_set_power(setp) is True
+        assert E.action_value(setp, card={"power": 5000}) == pytest.approx(E.power_value(2000.0))
+        assert E.action_value(setp, card={"power": 7000}) == pytest.approx(0.0)
+        assert E.action_value(setp) == pytest.approx(E.power_value(7000.0))                    # カードが無ければ従来
+        plain = _act("BUFF", "SELF", base=7000)
+        plain["raw_text"] = "このキャラのパワー+7000"
+        assert E._is_set_power(plain) is False
+        assert E.action_value(plain, card={"power": 5000}) == pytest.approx(E.power_value(7000.0))
+        zero = _act("BUFF", "OPPONENT", base=0)
+        zero["raw_text"] = "相手のキャラ1枚を、パワー0にする"
+        assert E.action_value(zero, card={"power": 5000}) == pytest.approx(0.0)                 # 従来（0 のまま）
 
 
 def test_exercise_mode_prices_delayed_effects_at_the_row_that_uses_them():
@@ -810,3 +811,169 @@ def test_the_flow_pricing_context_restores_the_mode_even_on_error():
         with E.flow_pricing("なにか"):
             pass
     assert E.FLOW_PRICING == "option"
+
+
+# ---- L（2026-09-26・ユーザ決定「3はa」）: 規則どおりの値付けの直し 6 つ（既定は全部入り・`legacy` は直す前と同じ） ----
+
+_ST = {"opp_leader_power": 5000.0, "my_leader_power": 5000.0, "r_turns": 4.0, "my_hand": 5, "attackers": [0.0]}
+_OB = [{"power": 6000.0, "cost": 4, "nu": 0.1503, "blocker": False, "is_rest": True},
+       {"power": 3000.0, "cost": 2, "nu": 0.069, "blocker": True, "is_rest": False}]
+
+
+def _card_ab(cid, trig):
+    c = E._all_cards()[cid]
+    return c, next(a for a in c["abilities"] if a.get("trigger") == trig)
+
+
+def _price(cid, trig, mode, st=None, ob=None):
+    """実カードの能力の値（選択の利得は外す＝分布の波及を混ぜない）。"""
+    c, ab = _card_ab(cid, trig)
+    with E.pricing_fixes(mode):
+        return E.ability_value(ab, card=c, st=st, opp_bodies=ob, selection=False)[0]
+
+
+def test_pricing_fixes_default_is_all_and_the_switch_parses_and_restores():
+    assert E.PRICING_FIX == frozenset(E.PRICING_FIXES) and len(E.PRICING_FIXES) == 6
+    assert E.parse_pricing_fixes("all") == frozenset(E.PRICING_FIXES)
+    assert E.parse_pricing_fixes("legacy") == frozenset()
+    assert E.parse_pricing_fixes("draw_n,opp_subject") == {"draw_n", "opp_subject"}
+    assert E.parse_pricing_fixes("-draw_n") == frozenset(E.PRICING_FIXES) - {"draw_n"}
+    for bad in ("draw", "draw_n,-opp_subject"):
+        with pytest.raises(ValueError):
+            E.parse_pricing_fixes(bad)
+    with pytest.raises(RuntimeError):
+        with E.pricing_fixes("legacy"):
+            assert E.PRICING_FIX == frozenset()
+            raise RuntimeError("途中で落ちても")
+    assert E.PRICING_FIX == frozenset(E.PRICING_FIXES)
+    import argparse
+    ap = argparse.ArgumentParser()
+    E.add_pricing_fixes_arg(ap)
+    try:
+        assert E.apply_pricing_fixes(ap.parse_args([])) == ",".join(E.PRICING_FIXES)     # 省略時は不動
+        assert E.apply_pricing_fixes(ap.parse_args(["--pricing-fixes", "legacy"])) == "legacy"
+        assert E.PRICING_FIX == frozenset()
+    finally:
+        E.set_pricing_fixes("all")
+
+
+def test_legacy_reproduces_the_old_prices_of_the_reviewers_examples():
+    """`legacy` は直す前の数字そのもの（レビューの例のカード・2026-09-26 の旧コードで出した値）。"""
+    old = {("EB01-027", "ON_PLAY"): 0.0, ("EB03-022", "ON_PLAY"): -0.1087, ("OP03-001", "ON_ATTACK"): -0.268888,
+           ("OP02-059", "ON_ATTACK"): -0.1653, ("EB04-052", "ON_ATTACK"): -0.1087, ("OP17-043", "ON_PLAY"): -0.0277,
+           ("EB04-010", "ON_PLAY"): 0.0, ("ST02-008", "ON_ATTACK"): -E.DELTA / E.R_TURNS,
+           ("OP16-074", "ON_PLAY"): -E.DELTA, ("OP04-011", "ON_ATTACK"): -0.1087,
+           ("OP05-058", "ACTIVATE_MAIN"): -0.812388}
+    for (cid, trig), v in old.items():
+        assert _price(cid, trig, "legacy") == pytest.approx(v, abs=1e-6), (cid, trig)
+
+
+def test_each_fix_moves_only_its_own_abilities():
+    """直しは 1 つずつ効く——`draw_n` だけ入れても「持ち主の〜」は旧のまま、等。"""
+    assert _price("EB03-022", "ON_PLAY", "draw_n") == _price("EB03-022", "ON_PLAY", "legacy")
+    assert _price("EB01-027", "ON_PLAY", "either_side") == _price("EB01-027", "ON_PLAY", "legacy")
+    assert _price("OP04-011", "ON_ATTACK", "optional_block") == _price("OP04-011", "ON_ATTACK", "legacy")
+    assert _price("OP16-074", "ON_PLAY", "revealed_src") == _price("OP16-074", "ON_PLAY", "legacy")
+    assert _price("EB04-052", "ON_ATTACK", "opp_subject") == _price("EB04-052", "ON_ATTACK", "legacy")
+    assert _price("OP03-001", "ON_ATTACK", "base_power") == _price("OP03-001", "ON_ATTACK", "legacy")
+
+
+def test_L_d_drawing_n_cards_is_n_cards():
+    """「カード 2 枚を引き、手札 1 枚を捨てる」（EB01-027）は旧 0（1 枚と数えた）→ 手札 1 枚ぶん。4 枚引く（OP05-118）は 4μ。"""
+    assert _price("EB01-027", "ON_PLAY", "draw_n") == pytest.approx(E.MU)
+    assert _price("OP05-118", "ON_PLAY", "legacy") == pytest.approx(E.MU)
+    assert _price("OP05-118", "ON_PLAY", "draw_n") == pytest.approx(4 * E.MU)
+    dyn = {"type": "DRAW", "value": {"base": 0, "multiplier": 1, "divisor": 1, "dynamic_source": "COUNT_QUERY"}}
+    assert E.action_value(dyn) == pytest.approx(E.MU)                                      # 数が式なら従来（1 枚）
+
+
+def test_L_b_either_side_targets_take_the_better_side():
+    """「コスト 4 以下のキャラ 1 枚までを持ち主のデッキの下」（EB03-022）: 旧は自分の体の損 −ν̄。
+    発動した側が選ぶ＝盤面の相手の体（取れる中で最良）・盤面が無ければ相手の平均の体・取れる体が無ければ 0（「まで」）。"""
+    assert _price("EB03-022", "ON_PLAY", "either_side") == pytest.approx(E.NU_AVG)
+    assert _price("EB03-022", "ON_PLAY", "either_side", st=_ST, ob=_OB) == pytest.approx(0.1503)
+    assert _price("EB03-022", "ON_PLAY", "either_side", st=_ST, ob=[]) == pytest.approx(0.0)
+    # 「このキャラを持ち主の手札に戻す」（ST12-012）は選べない＝自分の札のまま
+    assert _price("ST12-012", "ACTIVATE_MAIN", "either_side") == _price("ST12-012", "ACTIVATE_MAIN", "legacy")
+    # 「キャラすべてを」「お互いは」（OP05-058）は両側の和（盤面が無ければ打ち消し合って 0）
+    assert _price("OP05-058", "ACTIVATE_MAIN", "either_side") == pytest.approx(0.0, abs=1e-12)
+    # 「キャラ 1 枚を持ち主のデッキの下に置く」コスト（OP04-055）は相手の体でも払える＝得にもなる
+    assert _price("OP04-055", "ACTIVATE_MAIN", "legacy") == pytest.approx(0.0)
+    assert _price("OP04-055", "ACTIVATE_MAIN", "either_side", st=_ST, ob=_OB) > 0.0
+
+
+def test_L_a_optional_actions_and_their_followups_are_one_block():
+    """「〜してもよい」「〜まで」は選ばない自由がある＝塊で `max(0, 塊)`。
+
+    - OP02-059「1 枚引き 1 枚捨て、その後手札 3 枚までを捨てる」: 旧 −3μ → 0。
+    - OP03-001「任意の枚数捨ててもよい。1 枚につき +1000」: 旧 −4.88μ（50 枚を容量で打ち切り）・後続 0 → `max_n [後続(n) − nμ]`。
+    - OP16-035「手札 1 枚を捨ててもよい。そうした場合、リーダーにレストのドン 3 枚まで付与」: 旧は後続の枝を読まず −μ。
+    - 「相手は…戻してもよい」（OP15-059）は選ぶのが相手＝`min(0, 塊)`。
+    """
+    assert _price("OP02-059", "ON_ATTACK", "optional_block") == pytest.approx(0.0)
+    assert _price("OP03-001", "ON_ATTACK", "optional_block") == pytest.approx(0.0)       # +1000 は μ に届かない（盤面なし）
+    c, _ab = _card_ab("OP03-001", "ON_ATTACK")
+    st = dict(_ST, opp_leader_power=6000.0)
+    per_n = [E.buff_delta(float(c["power"]), 1000.0 * n, 6000.0) - n * E.MU for n in range(1, 6)]
+    assert _price("OP03-001", "ON_ATTACK", "optional_block", st=st) == pytest.approx(max([0.0] + per_n))
+    assert max(per_n) < 0.0              # +1000 1 回ぶんの攻撃の価格の差は手札 1 枚に届かない＝捨てない（旧は −4.88μ の損）
+    rest = _price("OP16-035", "ON_PLAY", "optional_block") - max(0.0, 3 * E.DELTA / E.R_TURNS - E.MU)
+    assert rest == pytest.approx(_price("OP16-035", "ON_PLAY", "legacy") + E.MU)           # 旧＝相手 1 枚レスト − μ
+    got = _price("OP16-035", "ON_PLAY", "optional_block", st=_ST)
+    attach = E.buff_delta(5000.0, 3000.0, 5000.0)
+    assert got == pytest.approx(_price("OP16-035", "ON_PLAY", "legacy", st=_ST) + E.MU + max(0.0, attach - E.MU))
+    ret = {"type": "RETURN_DON", "is_optional": True, "target": None,
+           "raw_text": "相手は自身のアクティブのドン!!1枚をドン!!デッキに戻してもよい",
+           "value": {"base": 1, "multiplier": 1, "divisor": 1}}
+    args = (E.MU, E.LAM, E.DELTA, E.NU_AVG, E.THETA, E.KO_P, None, 0, None, None)
+    assert E._block_value(ret, [], [], args, None) == pytest.approx(0.0)                   # 相手は損なら選ばない
+
+
+def test_L_c_setting_base_power_is_the_difference_from_the_targets_current_power():
+    """「元々のパワーを X にする」＝X − 対象の今のパワー（X も今のパワーも盤面から）。読めなければ `None`。
+
+    - EB04-052「このキャラの元々のパワーは相手のリーダーと同じ」: 旧 X=0 → −(4000 の上限つき換算)。直すと 5000−4000=+1000。
+    - OP17-043「自分のリーダーを元々のパワー 6000 に（次の相手のターン終了時まで）」: 旧 6000−7000（発動カードの印刷）→ リーダーの今のパワーとの差。
+    - EB04-010「相手のキャラ 1 枚までを、パワー 0 に」: 旧 0 → 盤面で一番パワーの高い体を 0 に。
+    """
+    assert _price("EB04-052", "ON_ATTACK", "base_power") is None                            # 相手のリーダーが判らない
+    assert _price("EB04-052", "ON_ATTACK", "base_power", st=_ST) == pytest.approx(E.buff_delta(4000.0, 1000.0, 5000.0))
+    assert _price("OP17-043", "ON_PLAY", "base_power") is None
+    assert _price("OP17-043", "ON_PLAY", "base_power", st=_ST) == pytest.approx(2.0 * E.buff_delta(5000.0, 1000.0, 5000.0))
+    assert _price("OP17-043", "ON_PLAY", "base_power", st=dict(_ST, my_leader_power=7000.0)) == \
+        pytest.approx(-E.power_value(1000.0))
+    assert _price("EB04-010", "ON_PLAY", "base_power") is None
+    assert _price("EB04-010", "ON_PLAY", "base_power", st=_ST, ob=_OB) == pytest.approx(E.power_value(6000.0))
+    assert _price("EB04-010", "ON_PLAY", "base_power", st=_ST, ob=[]) == pytest.approx(0.0)
+    c, ab = _card_ab("EB04-052", "ON_ATTACK")
+    assert E.ability_value(ab, card=c)[1] == [("BUFF", "board")]                              # 「盤面が要る」類として数える
+
+
+def test_L_e_targetless_opponent_effects_move_the_opponents_resources():
+    """対象欄の無い「相手のドン!!1枚までを、レストにする」（ST02-008）・「相手は自身の場のドン!!1枚をドン!!デッキに戻す」（OP16-074）
+    は旧で自分の損（負）→ 相手の損（正）。「相手の場のドンと同じ枚数になるように自分の場のドンを戻す」（OP08-074）は自分の資源のまま。"""
+    assert _price("ST02-008", "ON_ATTACK", "opp_subject") == pytest.approx(E.DELTA / E.R_TURNS)
+    assert _price("OP16-074", "ON_PLAY", "opp_subject") == pytest.approx(E.DELTA)
+    assert _price("OP08-074", "ACTIVATE_MAIN", "opp_subject") == _price("OP08-074", "ACTIVATE_MAIN", "legacy")
+    assert E.opp_subject("相手は自身の場のドン!!1枚をドン!!デッキに戻す") is True
+    assert E.opp_subject("相手のライフが離れた時、カード2枚を引く") is False                  # 契機の節は落とす
+    assert E.opp_subject("次の相手のターン終了時まで、相手の登場時効果は無効になる") is True
+    assert E.opp_subject("このターン終了時、相手の場のドン!!の枚数と同じ枚数になるように自分の場のドン!!をドン!!デッキに戻す") is False
+
+
+def test_L_f_moving_a_revealed_card_does_not_lose_a_field_body():
+    """「デッキの上から 1 枚を公開し…公開したカードをデッキの下に置く」（OP04-011）: パーサは場の札として出す（旧 −ν̄）。
+    出どころは公開した札＝通貨を持たない（0）。「5 枚見て、カード 2 枚までをトラッシュに置く」（OP03-083）も同じ。"""
+    assert _price("OP04-011", "ON_ATTACK", "revealed_src") == pytest.approx(0.0)
+    assert _price("OP03-083", "ON_PLAY", "revealed_src") == pytest.approx(0.0)
+    c, ab = _card_ab("OP04-011", "ON_ATTACK")
+    repl = E.revealed_moves(E.walk_actions(ab["effect"]))
+    assert len(repl) == 1 and list(repl.values())[0]["target"]["zone"] == "TEMP"
+
+
+def test_all_fixes_together_never_price_an_ability_above_one_game():
+    """全部入り（既定）でも能力 1 つが勝率 1 を超えない（桁の打ち切りが崩れていない）。"""
+    for cid, c in E._all_cards().items():
+        for ab in c.get("abilities") or []:
+            v, _u = E.ability_value(ab, card=c, st=_ST, opp_bodies=_OB)
+            assert v is None or abs(v) < 1.0, (cid, ab.get("trigger"), v)
