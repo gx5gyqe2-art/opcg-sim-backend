@@ -119,6 +119,15 @@ def don_stock(sc, tok, side="me"):
     return float(sc[a]) + float(sc[r]) + float(sc[ld]) * 5.0 + attached
 
 
+def don_attached(sc, tok, side="me"):
+    """**付与中のドン**＝リーダー付与＋キャラ付与（`don_stock` の付与の部分）。"""
+    _a, _r, ld = SC_DON[side]
+    slots = SLOT_OWN_FIELD if side == "me" else SLOT_OPP_FIELD
+    attached = sum(float(tok[s, S_ATTACHED_DON]) * 5.0 for s in range(slots.start, slots.stop)
+                   if float(tok[s, S_IS_CHAR]) > 0.5)
+    return float(sc[ld]) * 5.0 + attached
+
+
 def state_meas(sc, tok):
     """**実測の価格で評価した盤面**（自席から見た差）。"""
     mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
@@ -179,6 +188,22 @@ FLOW_ACTS = frozenset({"ACTIVE_DON", "ATTACH_DON", "GRANT_KEYWORD", "BUFF", "BP_
 
 #: **F-4**: 攻撃の行を「攻め手が【アタック時】能力を持つか」で層別した表を出すか（既定 `False`＝出力は従来のまま）
 ATTACK_SPLIT = False
+
+
+def passive_class(cid, info, ctx, theta, mu):
+    """**F-4**: 登場の行の継続効果の値が物差しに見えるか（`none`＝足す値が無い／`visible`＝殴る側のパワーの上昇だけ
+    ＝次の判断点の体の帯に現れる／`invisible`＝生存・ブロッカー・守る側・キーワード等を含む）。切替に依らず同じ行を分ける。"""
+    if not info or info.get("event") or info.get("stage") or info.get("leader"):
+        return "none"
+    try:
+        parts = _TO.passive_parts(cid, info, ctx, theta, mu)
+    except Exception:
+        return "none"
+    if abs(parts["total"]) <= 1e-12 and not parts["bad"]:
+        return "none"
+    if abs(parts["total"] - parts["visible"]) <= 1e-12:
+        return "visible"
+    return "invisible"
 
 
 def has_on_attack(cid):
@@ -340,7 +365,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             rec["rows"].append({"fam": fam, "price": float(v), "real": float(real), "real_te": float(real_te),
                                 "gross": float(gross), "act": act, "cid": cid, "turn": t, "play_parts": play_parts,
                                 "hand_gains": list(gains),                                  # T69: 窓で手札に入った札の gain
-                                "on_attack": has_on_attack(cid) if fam == "attack" else None})   # F-4: 層別用（出力には出ない）
+                                "on_attack": has_on_attack(cid) if fam == "attack" else None,   # F-4: 層別用（出力には出ない）
+                                "pas_class": (passive_class(cid, info, ctx, th, mu)
+                                              if (ATTACK_SPLIT and fam == "play") else None)})
             # **ターン単位の恒等式**——価格の和 対 「最初の自分の行 → 最後の自分の行」の実現
             tk = rec["turns"].setdefault(t, {"price": 0.0, "first": None, "last": None, "acts": set()})
             tk["price"] += float(v)
@@ -406,6 +433,10 @@ def summarise(per, reps=200, seed=0):
             continue
         out["by_family"][f] = block(rs)
     if ATTACK_SPLIT:
+        # **F-4**: 登場の行を継続効果の値の見え方で層別する（`passive_class`）
+        out["play_by_passive_class"] = {k: block(rs) for k, rs in (
+            (k, [r for r in allrows if r["fam"] == "play" and r.get("pas_class") == k])
+            for k in ("none", "visible", "invisible")) if len(rs) >= 10}
         # **F-4**: 攻撃の行を攻め手の【アタック時】能力の有無で層別する
         out["attack_by_on_attack"] = {k: block(rs) for k, rs in (
             ("with", [r for r in allrows if r["fam"] == "attack" and r.get("on_attack")]),
@@ -512,6 +543,7 @@ def main(argv=None):
     _HP.add_cond_clock_arg(ap)
     _TO.add_attack_ability_arg(ap)
     _TO.add_passive_body_arg(ap)
+    EV.add_f_pricing_fixes_arg(ap)
     ap.add_argument("--attack-split", action="store_true",
                     help="**F-4** 攻撃の行を攻め手の【アタック時】能力の有無で層別した表も出す")
     ap.add_argument("--out", default="")
@@ -519,6 +551,7 @@ def main(argv=None):
     apply_decision_row(a)
     _TO.apply_attack_ability(a)
     _TO.apply_passive_body(a)
+    EV.apply_f_pricing_fixes(a)
     _TO.reset_wiring_stats()
     global ATTACK_SPLIT
     ATTACK_SPLIT = bool(a.attack_split)
@@ -539,6 +572,8 @@ def main(argv=None):
     EV.reset_cond_stats()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
     stats["cond"] = dict(EV.COND_STATS)                     # T72: 条件の判定（真／偽／判らない）の数
+    if EV.F_PRICING_FIX:
+        stats["f_pricing_fixes"] = EV.apply_f_pricing_fixes(a)          # on のときだけ刻む（既定の出力は従来のまま）
     if _TO.ATTACK_ABILITY_MODE != "off" or _TO.PASSIVE_BODY_MODE != "off":
         # F-2/F-3a: 切替 on のときだけ刻む（off の出力は従来と同じ）
         stats["wiring"] = {"attack_ability": _TO.ATTACK_ABILITY_MODE, "passive_body": _TO.PASSIVE_BODY_MODE,

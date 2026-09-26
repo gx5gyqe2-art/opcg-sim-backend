@@ -508,10 +508,13 @@ def main(argv=None):
                     help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 untap）")
     TO.add_attack_ability_arg(ap)
     TO.add_passive_body_arg(ap)
+    import effect_value as _EV
+    _EV.add_f_pricing_fixes_arg(ap)
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
     TO.apply_attack_ability(a)
     TO.apply_passive_body(a)
+    _EV.apply_f_pricing_fixes(a)
     if a.d_mode:
         KV.set_d_mode(a.d_mode)
     if a.boundary:

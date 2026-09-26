@@ -209,16 +209,6 @@ def test_a_passive_survive_card_adds_ko_p_times_its_own_nu():
     assert _play("OP02-102", 6000, ctx) == pytest.approx(off + kp * nu)
 
 
-def test_a_rush_grant_is_priced_as_one_attack_and_follows_its_condition():
-    """EB02-052: リーダーが特徴《空島》なら【速攻】——`granted_attack_value`（その体のリーダーへの攻撃 1 回）。"""
-    T.set_passive_body_mode("on")
-    yes = _ctx(_st(my_leader={"traits": ["空島"], "names": [], "colors": [], "attribute": ""}))
-    no = _ctx(_st(my_leader={"traits": ["麦わらの一味"], "names": [], "colors": [], "attribute": ""}))
-    v_yes, _ = EV.continuous_body_value("EB02-052", st=T._effect_state(yes), nu=0.1, ko_p=0.3)
-    v_no, _ = EV.continuous_body_value("EB02-052", st=T._effect_state(no), nu=0.1, ko_p=0.3)
-    power = float(EV._all_cards()["EB02-052"].get("power") or 0)
-    assert v_yes == pytest.approx(T.attack_value_don(power, OLP, True, TH, MU))
-    assert v_no == 0.0
 
 
 def test_reactive_and_already_reflected_passives_add_nothing():
@@ -306,44 +296,8 @@ def _body_nu(p, blk=None, dp=None):
     return T.nu_of(p, OLP, 4.0, TH, MU, is_blocker=blk, my_leader_power=5000.0, def_power=dp)
 
 
-def test_fix_b_own_power_buff_is_fed_into_the_body_price_when_its_condition_holds():
-    """EB01-058: 【ドン!!×1】【自分のターン中】自分のライフ 2 枚以下なら +2000——登場の行の体は印刷の値なので差を足す。"""
-    T.set_passive_body_mode("on")
-    p = 3000.0
-    ab = next(a for a in EV._all_cards()["EB01-058"]["abilities"] if a.get("trigger") == "YOUR_TURN")
-    yes = _play_ctx(my_life=2, my_don_active=3)
-    st = T._effect_state(yes)
-    want = (T.nu_of(p + 2000, OLP, 4.0, TH, MU, is_blocker=False, my_leader_power=5000.0, def_power=p)
-            - T.nu_of(p, OLP, 4.0, TH, MU, is_blocker=False, my_leader_power=5000.0)
-            - EV._don_attach_cost(ab, st, False))
-    assert want > 0.0
-    got = T.passive_body_value("EB01-058", {"power": p, "blocker": False}, yes)
-    assert got == pytest.approx(want)
-    no = _play_ctx(my_life=4, my_don_active=3)
-    assert T.passive_body_value("EB01-058", {"power": p, "blocker": False}, no) == pytest.approx(0.0)
 
 
-def test_fix_b_conditional_blocker_grant_turns_the_blocker_flag_on():
-    """EB04-057: 【ドン!!×1】このキャラは【ブロッカー】を得る——付けられるなら体をブロッカーとして値付けする。"""
-    T.set_passive_body_mode("on")
-    p = 4000.0
-    ctx = _play_ctx(my_don_active=2)
-    st = T._effect_state(ctx)
-    mods = EV.continuous_self_mods("EB04-057", st=st)
-    assert mods["blocker"] is True and mods["atk"] == 0.0
-    ab = next(a for a in EV._all_cards()["EB04-057"]["abilities"] if a.get("trigger") == "PASSIVE"
-              and "ブロッカー" in (a.get("raw_text") or ""))
-    body = (T.nu_of(p, OLP, 4.0, TH, MU, is_blocker=True, my_leader_power=5000.0, def_power=p)
-            - T.nu_of(p, OLP, 4.0, TH, MU, is_blocker=False, my_leader_power=5000.0)
-            - EV._don_attach_cost(ab, st, False))
-    assert body > 0.0
-    cont, _bad = EV.continuous_body_value("EB04-057", st=st, nu=T.nu_of(p, OLP, 4.0, TH, MU, is_blocker=True,
-                                          my_leader_power=5000.0, def_power=p),
-                                          ko_p=T.ko_p_of(p) if T.NU_MODE == "pair" else T.KO_P)
-    got = T.passive_body_value("EB04-057", {"power": p, "blocker": False}, ctx)
-    assert got == pytest.approx(body + cont)
-    # 付けられない（アクティブなドン 0）なら付与は起きない
-    assert EV.continuous_self_mods("EB04-057", st=T._effect_state(_play_ctx(my_don_active=0)))["blocker"] is False
 
 
 def test_fix_c_opponent_turn_power_only_raises_the_defence_side():
@@ -379,27 +333,244 @@ def test_fix_c_opponent_turn_blocker_and_immunities_are_in_the_body():
     assert bad == 0 and v == pytest.approx(0.3 * 0.12)
 
 
-def test_fix_d_printed_keywords_are_priced_and_conditional_is_not_above_unconditional():
-    """印刷の速攻（EB01-003）・ダブルアタック（EB04-023）は条件つきの付与と同じ式。条件つき ≤ 条件なし。"""
+
+
+# ---------------------------------------------------------------------------
+# 手で計算した期待値（関数を通さずに書いた数字）——conftest で `CBAR_MODE=loose`・`SURV_MODE=once`・`OPTION_MODE=off`
+# ---------------------------------------------------------------------------
+
+#: `Θ = round((λ − h·μ)/μ, 4)` を手で: (0.1362 − 0.89·0.0551)/0.0551 = 1.58187…
+TH_HAND = 1.5819
+MU_HAND = 0.0551
+LAM_HAND = 0.1362
+
+
+def test_hand_computed_attack_and_self_buff_values():
+    """EB01-003（5000・相手ライフ 2 以下で +2000）: 5000 対 5000 は超過 0 → `c = 1.00` 枚、
+    7000 対 5000 は超過 2000 → `c = 1.28` 枚（`loose`）。どちらも `Θ = 1.5819` 未満なので守る側の費用が価格。"""
+    assert TH == pytest.approx(TH_HAND, abs=1e-12)
+    T.set_attack_ability_mode("on")
+    assert _attack("EB01-003", 5000, _ctx(_st(opp_life=4))) == pytest.approx(1.00 * MU_HAND)
+    assert _attack("EB01-003", 5000, _ctx(_st(opp_life=2))) == pytest.approx(1.28 * MU_HAND)
+
+
+def test_rush_is_never_counted_on_the_play_row():
+    """**F review 7**: 速攻で打つ攻撃はその攻撃の行が価格を持つ（`price_realised` の option の規約でも別の行）——
+    登場の行では印刷の速攻（EB01-003）も条件つきの速攻の付与（EB02-052）も 0。"""
     T.set_passive_body_mode("on")
-    st = T._effect_state(_play_ctx())
-    rush = EV.printed_keyword_value(dict(EV._all_cards()["EB01-003"], power=5000), ("速攻",), st=st)
-    assert rush == pytest.approx(T.attack_value_don(5000, OLP, True, TH, MU))
-    da = EV.printed_keyword_value(dict(EV._all_cards()["EB04-023"], power=9000), ("ダブルアタック",), st=st)
-    assert da == pytest.approx(EV.keyword_delta("ダブルアタック", 9000, OLP, TH, MU, T.LAM) * 4.0)
-    assert EV.printed_keyword_value({"power": 5000}, ("ブロッカー",), st=st) == 0.0     # ブロッカーは ν に在る
-    # 条件つきの速攻（EB02-052・印刷 11000）と、同じ体に印刷の速攻が在る場合を比べる
     lead = {"traits": ["空島"], "names": [], "colors": [], "attribute": ""}
-    st2 = T._effect_state(_play_ctx(my_leader=lead))
-    cond, _ = EV.continuous_body_value("EB02-052", st=st2, nu=0.1, ko_p=0.3)
-    printed = EV.printed_keyword_value(dict(EV._all_cards()["EB02-052"]), ("速攻",), st=st2)
-    assert 0.0 < cond <= printed + 1e-12
-    # 登場の価格にも入る（off なら入らない）
-    ctx = _play_ctx()
+    ctx = _play_ctx(my_leader=lead)
+    assert T.passive_parts("EB01-003", {"power": 5000, "blocker": False}, ctx)["kw"] == 0.0
+    assert EV.continuous_body_value("EB02-052", st=T._effect_state(ctx), nu=0.1, ko_p=0.3) == (0.0, 0)
+    ctx2 = _play_ctx()
     T.set_passive_body_mode("off")
-    off = _play("EB01-003", 5000, ctx)
+    off = _play("EB01-003", 5000, ctx2)
     T.set_passive_body_mode("on")
-    assert _play("EB01-003", 5000, ctx) == pytest.approx(off + rush)
+    assert _play("EB01-003", 5000, ctx2) == off
+
+
+def test_fix_b_own_power_buff_with_don_cost_charged_every_used_turn():
+    """EB01-058（3000・【ドン!!×1】【自分のターン中】ライフ 2 以下で +2000）。**F review 5**: 付ける費用は使うターンごと
+    ＝`1 × δ / R × (生きて迎えるターン)`。`SURV_MODE=once` なら重みの和は `R` そのもの（4）＝`0.0277 / 4 × 4 = 0.0277`。"""
+    T.set_passive_body_mode("on")
+    p = 3000.0
+    yes = _play_ctx(my_life=2, my_don_active=3)
+    mods = EV.continuous_self_mods("EB01-058", st=dict(T._effect_state(yes), don_turns=4.0))
+    assert mods["don_cost"] == pytest.approx(0.0277)
+    want = (T.nu_of(p + 2000, OLP, 4.0, TH, MU, is_blocker=False, my_leader_power=5000.0, def_power=p)
+            - T.nu_of(p, OLP, 4.0, TH, MU, is_blocker=False, my_leader_power=5000.0) - 0.0277)
+    got = T.passive_parts("EB01-058", {"power": p, "blocker": False}, yes)
+    assert got["body"] == pytest.approx(max(want, 0.0))
+    assert got["visible"] == pytest.approx(got["body"])           # 殴る側のパワーだけ＝物差しに見える
+    no = _play_ctx(my_life=4, my_don_active=3)
+    assert T.passive_body_value("EB01-058", {"power": p, "blocker": False}, no) == pytest.approx(0.0)
+
+
+def test_fix_b_conditional_blocker_grant_turns_the_blocker_flag_on():
+    """EB04-057: 【ドン!!×1】このキャラは【ブロッカー】を得る——付けられるなら体をブロッカーとして値付けする。"""
+    T.set_passive_body_mode("on")
+    p = 4000.0
+    ctx = _play_ctx(my_don_active=2)
+    st = T._effect_state(ctx)
+    mods = EV.continuous_self_mods("EB04-057", st=st)
+    assert mods["blocker"] is True and mods["atk"] == 0.0
+    got = T.passive_parts("EB04-057", {"power": p, "blocker": False}, ctx)
+    # ブロックの項（手で）: 0.773 × Θ × μ × (1 − ko_p(4000))・`once` の生存の重み（ko_p(4000) = 0.3297 の帯）
+    block_hand = 0.773 * TH_HAND * MU_HAND * (1.0 - 0.3297)
+    assert got["body"] == pytest.approx(max(block_hand - 0.0277, 0.0), abs=1e-6)
+    assert got["visible"] == 0.0                                 # ブロッカーは物差しに現れない
+    assert EV.continuous_self_mods("EB04-057", st=T._effect_state(_play_ctx(my_don_active=0)))["blocker"] is False
+
+
+def test_double_attack_uses_the_survival_weighted_turn_count():
+    """**F review 6**: 印刷のダブルアタック（EB04-023・9000）は `keyword_delta × 生きて迎えるターン`（登場のターンは含まない）。
+    手で: 9000 対 5000 は超過 4000 → `c = 2.78`。受ける費用が `Θ` → `2Θ` で `min(2.78, 1.5819)·μ` → `min(2.78, 3.1638)·μ`。"""
+    st = dict(T._effect_state(_play_ctx()), perm_turns=1.7)
+    da = EV.printed_keyword_value(dict(EV._all_cards()["EB04-023"], power=9000), ("ダブルアタック",), st=st)
+    assert da == pytest.approx((2.78 - TH_HAND) * MU_HAND * 1.7, abs=1e-6)
+    T.set_passive_body_mode("on")
+    got = T.passive_parts("EB04-023", {"power": 9000, "blocker": False}, _play_ctx())
+    assert got["kw"] == pytest.approx((2.78 - TH_HAND) * MU_HAND * 4.0, abs=1e-6)   # `once` の重み＝R＝4
+    # 条件つき（体のパーツ）≤ 印刷（同じ重み）
+    card = {"power": 9000, "abilities": [{"trigger": "PASSIVE", "raw_text": "このキャラは【ダブルアタック】を得る。",
+            "condition": {"type": "LIFE_COUNT", "operator": "LE", "value": 2, "player": "SELF"},
+            "effect": {"type": "GRANT_KEYWORD", "status": "ダブルアタック", "duration": "INSTANT", "raw_text": "",
+                       "target": {"select_mode": "SOURCE", "player": "SELF"}}}]}
+    for life in (1, 4):
+        cond, _ = EV.continuous_body_value("X", st=dict(st, my_life=life), nu=0.1, ko_p=0.3, cards={"X": card})
+        assert cond <= da + 1e-12
+
+
+def test_unblockable_is_read_from_the_card_text():
+    """**F review 8**: OP16-032／033／096 の【ブロック不可】は DB の `keywords` に無い——本文の頭から読む。価格は `BLOCK_PREMIUM` 0.035。"""
+    for cid in ("OP16-032", "OP16-033", "OP16-096"):
+        assert "ブロック不可" in T.printed_keywords(cid)
+    assert "速攻" not in T.printed_keywords("EB02-052")              # 条件つきの付与は頭に来ない
+    T.set_passive_body_mode("on")
+    got = T.passive_parts("OP16-032", {"power": 7000, "blocker": False}, _play_ctx())
+    assert got["kw"] == pytest.approx(0.035)
+
+
+# ---------------------------------------------------------------------------
+# F の値付けの直し（`--f-pricing-fixes`・既定は空）
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def _ffix_restore():
+    before = EV.F_PRICING_FIX
+    yield
+    EV.set_f_pricing_fixes(before)
+
+
+def test_f_fixes_default_is_empty_and_setter_rejects_unknown(_ffix_restore):
+    assert EV.F_PRICING_FIX == frozenset()
+    assert EV.set_f_pricing_fixes("all") == EV.F_PRICING_FIXES
+    assert EV.set_f_pricing_fixes("none") == ()
+    with pytest.raises(ValueError):
+        EV.set_f_pricing_fixes("bogus")
+
+
+def test_branch_then_charges_the_life_to_hand_after_playing(_ffix_restore):
+    """**branch_then**（レビュー 3）: OP08-098 の「登場させた場合、自分のライフの上から 1 枚を手札に加える」。
+    手で: ライフ → 手札は `μ − λ = 0.0551 − 0.1362 = −0.0811`。相方の値は盤面なしなら `ν̄ − μ = 0.1087 − 0.0551 = 0.0536`
+    ＝直す前は 0.0536、直した後は「登場させる／させない」の塊が `max(0, 0.0536 − 0.0811) = 0`。"""
+    c = EV._all_cards()["OP08-098"]
+    ab = c["abilities"][0]
+    got = EV.branch_actions(ab["effect"], None)
+    assert [e["type"] for e in got] == ["MOVE_CARD"]
+    assert EV.action_value(got[0], card=c) == pytest.approx(MU_HAND - LAM_HAND)
+    v0, _ = EV.ability_value(ab, card=c)
+    assert v0 == pytest.approx(0.1087 - MU_HAND)
+    EV.set_f_pricing_fixes("branch_then")
+    v1, _ = EV.ability_value(ab, card=c)
+    assert v1 == pytest.approx(0.0)
+
+
+def test_branch_then_follows_the_state_condition(_ffix_restore):
+    eff = {"node": "Branch", "condition": {"type": "LIFE_COUNT", "operator": "LE", "value": 1, "player": "SELF"},
+           "if_true": {"type": "DRAW", "value": {"base": 1}, "raw_text": "カード1枚を引く"},
+           "if_false": None}
+    assert len(EV.branch_actions(eff, {"my_life": 1})) == 1
+    assert EV.branch_actions(eff, {"my_life": 3}) == []
+    assert len(EV.branch_actions(eff, None)) == 1                   # 判らない＝上限（起きる側）
+
+
+def test_ko_effect_share_uses_the_effect_removal_share_by_cost(_ffix_restore):
+    """**ko_effect_share**（レビュー 4）: 「効果で KO されない」はコスト帯の効果で離れる割合（5〜6 は 0.1988）、
+    「バトルで KO されない」はその残り（1〜2 は 1 − 0.2855）。手で: 0.3 × 0.12 × 0.1988 と 0.3 × 0.12 × 0.7145。"""
+    eff = {"type": "PREVENT_LEAVE", "status": "EFFECT_KO", "raw_text": "このキャラは効果でKOされない",
+           "target": {"select_mode": "SOURCE", "player": "SELF"}}
+    bat = {"type": "PREVENT_LEAVE", "status": "BATTLE_KO", "raw_text": "このキャラはバトルでKOされない",
+           "target": {"select_mode": "SOURCE", "player": "SELF"}}
+    assert EV.action_value(eff, nu=0.12, ko_p=0.3, card={"cost": 5}) == pytest.approx(0.036)
+    EV.set_f_pricing_fixes("ko_effect_share")
+    assert EV.action_value(eff, nu=0.12, ko_p=0.3, card={"cost": 5}) == pytest.approx(0.3 * 0.12 * 0.1988)
+    assert EV.action_value(bat, nu=0.12, ko_p=0.3, card={"cost": 2}) == pytest.approx(0.3 * 0.12 * (1 - 0.2855))
+
+
+def test_state_filters_read_the_dynamic_cost_cap_and_attached_don(_ffix_restore):
+    """**state_filters**（レビュー 2・10）: 「自分の場のドン!!の枚数以下のコスト」（OP08-098）は場のドン 3 なら
+    コスト 5 の OP15-114 を取れない。「ドン!!が付与されている」相手の体は付与中のものだけ。"""
+    import search_price as SP
+    from opcg_sim.learned.train import plan_labels as PL
+    cards = PL.Cards()
+    t = {"card_type": ["CHARACTER"], "cost_max_dynamic": "DON_COUNT_FIELD"}
+    both = ["OP15-114", "OP15-110"]
+    assert SP.eligible_deck_cards(t, both, cards) == both
+    assert SP.eligible_deck_cards(t, both, cards, st={"my_don_total": 3}) == ["OP15-110"]
+    bodies = [_body(3000), dict(_body(2000), attached_don=1)]
+    bodies[0]["attached_don"] = 0
+    tgt = {"min_attached_don": 1, "power_max": 3000, "card_type": ["CHARACTER"], "player": "OPPONENT"}
+    assert EV.eligible_bodies(tgt, bodies) is None                  # 既定は読めない＝盤面を使わない
+    EV.set_f_pricing_fixes("state_filters")
+    assert EV.eligible_bodies(tgt, bodies) == [bodies[1]["nu"]]
+    EV.set_f_pricing_fixes("none")
+    with EV.opaque_as_upper():                                      # 攻撃の行の上限読みでも同じく読める
+        assert EV.eligible_bodies(tgt, bodies) == [bodies[1]["nu"]]
+
+
+def test_attached_don_condition_counts_only_attached_don(_ffix_restore):
+    """**attached_don_cond**（レビュー 9）: ST31-004「付与されているドン!!が合計 3 枚以上」。パーサは `DON_COUNT` で出すが
+    エンジン（`effects/cond.rs`）は本文の「付与」で付与中だけを数える＝パーサの誤りではなく理論側の読み違い。"""
+    import condition_value as CV
+    ab = next(a for a in EV._all_cards()["ST31-004"]["abilities"] if a.get("trigger") == "PASSIVE")
+    st = {"my_don_total": 8, "my_don_attached": 2}
+    assert CV.holds(ab["condition"], st) is True
+    EV.set_f_pricing_fixes("attached_don_cond")
+    assert CV.holds(ab["condition"], st) is False
+    assert CV.holds(ab["condition"], dict(st, my_don_attached=3)) is True
+    assert CV.holds(ab["condition"], {"my_don_total": 8}) is None
+
+
+def test_hand_board_prices_the_partner_against_the_real_board(_ffix_restore):
+    """**hand_board**（レビュー 1）: OP15-114（登場時: 相手のキャラすべて −2000、その後パワー 0 以下を KO）は
+    盤面なしだと相手の体を 5 体取る扱い。相手の場が空なら 0（手で）。"""
+    v_none, _ = EV.card_value("OP15-114", EV.CHAR_ON_PLAY_TRIGGERS, no_ability=0.0)
+    assert v_none > 0.3
+    EV.set_f_pricing_fixes("hand_board")
+    v_empty, _ = EV.card_value("OP15-114", EV.CHAR_ON_PLAY_TRIGGERS, no_ability=0.0, opp_bodies=[])
+    assert v_empty == pytest.approx(0.0)
+
+
+def test_hand_board_passes_board_and_state_to_the_partner(monkeypatch, _ffix_restore):
+    import hand_spend as HS
+    seen = {}
+
+    def fake(cid, info, olp, r, cards=None, st=None, opp_bodies=None):
+        seen.update(cid=cid, st=st, opp_bodies=opp_bodies)
+        return 0.2
+
+    monkeypatch.setattr(HS, "free_value", fake)
+    from opcg_sim.learned.train import plan_labels as PL
+    cards = PL.Cards()
+    st = {"search_ctx": {"cards": cards, "hand_items": [{"cid": "OP15-110"}], "olp": 5000.0, "r": 4.0},
+          "attack_ctx": {"x": 1}, "my_life": 3}
+    tgt = {"zone": "HAND", "card_type": ["CHARACTER"], "player": "SELF"}
+    board = [_body(3000)]
+    EV.set_f_pricing_fixes("hand_board")
+    got = EV._play_from_hand_now(tgt, st, {"card_id": "OP08-098"}, 1, MU_HAND, board)
+    assert got == pytest.approx(0.2 - MU_HAND)
+    assert seen["opp_bodies"] is board and "attack_ctx" not in seen["st"] and seen["st"]["my_life"] == 3
+
+
+def test_fix_a_trait_filter_on_traitless_bodies_is_read_as_upper():
+    """レビュー 11: 素性の判らない体に特徴の絞り込み——既定は `None`（平均の体に落ちる）、攻撃の行では「合う」として読む。"""
+    bodies = [_body(3000)]
+    for b in bodies:
+        for k in ("traits", "names", "colors", "attribute"):
+            b.pop(k)
+    tgt = {"traits": ["ワノ国"], "player": "OPPONENT", "card_type": ["CHARACTER"]}
+    assert EV.eligible_bodies(tgt, bodies) is None
+    with EV.opaque_as_upper():
+        assert EV.eligible_bodies(tgt, bodies) == [bodies[0]["nu"]]
+
+
+def test_passive_parts_separates_what_the_yardstick_can_see():
+    """`visible`＝殴る側のパワーの上昇だけ（次の判断点の体の帯に現れる）。生存・ブロッカー・キーワードは見えない。"""
+    T.set_passive_body_mode("on")
+    got = T.passive_parts("OP02-102", {"power": 6000, "blocker": False}, _play_ctx())
+    assert got["visible"] == 0.0 and got["total"] > 0.0
 
 
 # ---------------------------------------------------------------------------

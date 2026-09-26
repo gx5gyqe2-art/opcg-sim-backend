@@ -1265,59 +1265,100 @@ def printed_keywords(cid):
             m = D.load_db().get_card(cid)
         except Exception:
             m = None
-        _KEYWORDS[cid] = tuple(str(getattr(k, "value", k)) for k in (getattr(m, "keywords", None) or ()))
+        got = [str(getattr(k, "value", k)) for k in (getattr(m, "keywords", None) or ())]
+        # **F review 8**: DB の `keywords` に入らない印刷のキーワード（【ブロック不可】等）を本文から読む——
+        # 本文の区切り（" / "）の頭に【キーワード】が在るものだけ（「〜場合、【速攻】を得る」のような条件つきは頭に来ない）
+        try:
+            import effect_value as EV
+            text = str((EV._all_cards().get(str(cid)) or {}).get("effect_text") or "")
+            for seg in text.split(" / "):
+                for kwd in EV.KEYWORD_PER_TURN:
+                    if seg.strip().startswith("【%s】" % kwd) and kwd not in got:
+                        got.append(kwd)
+        except Exception:
+            pass
+        _KEYWORDS[cid] = tuple(got)
     return _KEYWORDS[cid]
 
 
-def passive_body_value(cid, src, ctx, theta=THETA, mu=MU):
-    """**F-3a**: キャラ `cid` の登場の価格に足す、継続効果と印刷のキーワードの値。3 つの和:
+def passive_parts(cid, src, ctx, theta=THETA, mu=MU):
+    """**F-3a**: キャラ `cid` の登場の価格に足す、継続効果と印刷のキーワードの値の**内訳**（副作用なし）。
+
+    `{"total", "body", "cont", "kw", "visible", "bad", "mods"}`。3 つの和:
 
     1. **体の価格の差**（F fix B/C）: 継続効果がこの体自身に与えるパワーとブロッカー（条件は状態から判定・
        `effect_value.continuous_self_mods`）を入れた `ν` − 印刷の値の `ν`。【自分のターン中】の上昇は殴る側・
-       【相手のターン中】は守る側（`nu_of(def_power=…)`）・【常時】は両方。【ドン!!×N】の費用は引く。
+       【相手のターン中】は守る側（`nu_of(def_power=…)`）・【常時】は両方。
+       **【ドン!!×N】は使うターンごとに払う**（F review 5）——利得（`ν`）が生きて迎えるターンの重みで数えるので、
+       費用 `N·δ/R` も同じ重みのターン数（`surv_turns`）を掛ける。付けない自由があるので費用を要さない読みと `max`。
+       **条件はこの 1 行の状態で 1 度だけ判定し、以後ずっと成り立つ（成り立たない）と読む**（限界・状態が変われば変わる）。
        **場に出た後はエンジンがトークンに書くので攻撃の行には足さない**——足すのは印刷の値で読む登場の行だけ。
     2. **トークンに届かない継続効果**（`effect_value.continuous_body_value`）: 生存・テンポ・非ブロッカーのキーワード。
        生存の `ko_p × ν` の `ν` と `ko_p` は 1. を入れた後のこの体のもの。
-    3. **印刷のキーワード**（F fix D・`effect_value.printed_keyword_value`）: 速攻・ダブルアタック・バニッシュ・ブロック不可を
-       条件つきの付与と同じ式で（条件つき ≤ 条件なし）。
+    3. **印刷のキーワード**（F fix D・`effect_value.printed_keyword_value`）: ダブルアタック・バニッシュ・ブロック不可
+       （ブロック不可は本文の【ブロック不可】からも読む・F review 8）。**速攻は数えない**（F review 7: 速攻で打つ攻撃は
+       その攻撃の行が価格を持つ＝登場の行で数えると同じ攻撃を 2 度数える。条件つきの速攻の付与も同じ）。
+       ダブルアタック・バニッシュの回数は**生きて迎えるターンの重み**（F review 6・登場のターンは含まない）。
+
+    `visible`＝**物差し（`price_realised` の実現）に次の判断点までに現れる部分**＝殴る側のパワーの上昇による体の帯の変化
+    （守る側のパワー・ブロッカー・生存・キーワードは実現に現れない）。
     """
-    try:
-        import effect_value as EV
-    except Exception:
-        return 0.0
+    import effect_value as EV
     st = _effect_state(ctx)
     pw = float(src.get("power") or 0.0)
     blk0 = src.get("blocker")
     args = (ctx["opp_leader_power"], ctx["r_turns"], theta, mu)
     kw = dict(opp_chars=ctx.get("opp_chars"), my_leader_power=ctx["my_leader_power"])
-    WIRING_STATS["play_char"] += 1
+    kp0 = ko_p_of(pw) if NU_MODE == "pair" else KO_P
+    turns = surv_turns(ctx["r_turns"], kp0)
+    st["don_turns"] = turns                       # F review 5
+    st["perm_turns"] = turns                      # F review 6
     mods = EV.continuous_self_mods(cid, st=st)
     atk, dfn = pw + mods["atk"], pw + mods["def"]
     blk = bool(blk0) or bool(mods["blocker"])
     nu0 = nu_of(pw, *args, is_blocker=blk0, **kw)
+    dc = 0.0
     if mods["n"]:
         nu1 = nu_of(atk, *args, is_blocker=(True if blk else blk0), def_power=dfn, **kw)
-        body = nu1 - nu0 - float(mods["don_cost"])
+        dc = float(mods["don_cost"])
+        body = nu1 - nu0 - dc
         if mods["don_cost"] > 0.0:
             # 【ドン!!×N】は付けない自由がある（`ability_value` の T74 と同じ床）＝費用を要さない能力だけの読みと `max`
             a_f, d_f = pw + mods["atk_free"], pw + mods["def_free"]
             blk_f = bool(blk0) or bool(mods["blocker_free"])
             nu_f = nu_of(a_f, *args, is_blocker=(True if blk_f else blk0), def_power=d_f, **kw)
             if nu_f - nu0 > body:
-                nu1, atk, dfn, body = nu_f, a_f, d_f, nu_f - nu0
-        WIRING_STATS["passive_self_mods"] += 1
+                nu1, atk, dfn, body, dc = nu_f, a_f, d_f, nu_f - nu0, 0.0
     else:
         nu1, body = nu0, 0.0
+    visible = 0.0
+    if mods["n"] and atk != pw:
+        visible = nu_of(atk, *args, is_blocker=blk0, def_power=pw, **kw) - nu0 - dc
     kp = ko_p_of(dfn) if NU_MODE == "pair" else KO_P
     v, bad = EV.continuous_body_value(cid, st=st, nu=nu1, ko_p=kp, opp_bodies=ctx.get("opp_bodies"))
-    kv = EV.printed_keyword_value(dict(EV._all_cards().get(str(cid)) or {}, power=pw), printed_keywords(cid),
+    kws = tuple(k for k in printed_keywords(cid) if k not in EV.ONCE_ON_ATTACK_ROW)
+    kv = EV.printed_keyword_value(dict(EV._all_cards().get(str(cid)) or {}, power=pw), kws,
                                   st=st, opp_bodies=ctx.get("opp_bodies"))
-    if kv:
-        WIRING_STATS["passive_keyword"] += 1
     tot = float(body) + float(v) + float(kv)
-    if bad:
-        WIRING_STATS["passive_unpriced"] += int(bad)
-    if abs(tot) > 0.0 or bad:
+    return {"total": tot, "body": float(body), "cont": float(v), "kw": float(kv), "visible": float(visible),
+            "bad": int(bad), "mods": int(mods["n"])}
+
+
+def passive_body_value(cid, src, ctx, theta=THETA, mu=MU):
+    """**F-3a**: `passive_parts` の合計（`WIRING_STATS` に内訳を数える）。"""
+    try:
+        parts = passive_parts(cid, src, ctx, theta, mu)
+    except ImportError:
+        return 0.0
+    tot = parts["total"]
+    WIRING_STATS["play_char"] += 1
+    if parts["mods"]:
+        WIRING_STATS["passive_self_mods"] += 1
+    if parts["kw"]:
+        WIRING_STATS["passive_keyword"] += 1
+    if parts["bad"]:
+        WIRING_STATS["passive_unpriced"] += int(parts["bad"])
+    if abs(tot) > 0.0 or parts["bad"]:
         WIRING_STATS["passive_with_ability"] += 1
     if abs(tot) > 0.0:
         WIRING_STATS["passive_nonzero"] += 1
@@ -1386,6 +1427,8 @@ def opp_bodies_of(tok_row, my_leader_power, r_turns=4.128, theta=THETA, mu=MU,
                 "cost": float(tok[si, S_COST]) * 10.0,
                 "is_rest": float(tok[si, S_IS_REST]) > 0.5,
                 "blocker": blk,
+                # 付与中のドン（F の直し `state_filters`／攻撃の行の上限読みだけが読む＝「ドン!!が付与されている」）
+                "attached_don": int(round(float(tok[si, S_ATTACHED_DON]) * 5.0)),
                 "nu": nu_of(pw, float(my_leader_power), r_turns, theta, mu, ko_p=ko_p,
                             is_blocker=blk)}
         if ci_row is not None and idx2cid is not None:
@@ -2111,11 +2154,14 @@ def main(argv=None):
     add_nu_mode_arg(ap)
     add_attack_ability_arg(ap)
     add_passive_body_arg(ap)
+    import effect_value as _EV
+    _EV.add_f_pricing_fixes_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_nu_mode(a)
     apply_attack_ability(a)
     apply_passive_body(a)
+    _EV.apply_f_pricing_fixes(a)
 
     t0 = time.time()
     recs, stats = collect(a.src, a.holdout_mod, a.limit_games, a.theta, a.mu,
@@ -2128,7 +2174,8 @@ def main(argv=None):
            "saturation_x": saturation_x(a.theta),
            # F-2/F-3a の切替は on のときだけ刻む（off の出力は従来と 1 バイトも変えない）
            "args": {k: v for k, v in vars(a).items()
-                    if k != "out" and not (k in ("attack_ability", "passive_body") and v == "off")},
+                    if k != "out" and not (k in ("attack_ability", "passive_body") and v == "off")
+                    and not (k == "f_pricing_fixes" and v is None)},
            "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
     print(txt)

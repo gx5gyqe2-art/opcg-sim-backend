@@ -727,6 +727,9 @@ def _state_of(sc, ci, idx2cid, tok=None, cards=None):
         import price_realised as PR                       # 遅延（`price_realised` は本器を import する）
         st["my_don_total"] = PR.don_stock(sc, tok, "me")
         st["opp_don_total"] = PR.don_stock(sc, tok, "opp")
+        # 付与中のドン（リーダー ＋ キャラ・`attached_don_cond` だけが読む）
+        st["my_don_attached"] = PR.don_attached(sc, tok, "me")
+        st["opp_don_attached"] = PR.don_attached(sc, tok, "opp")
     st["source_rested"] = False                             # 登場時の値付け＝出た札はアクティブ
     if cards is not None:
         st["cards"] = cards
@@ -1595,6 +1598,7 @@ def main(argv=None):
     ap.add_argument("--seed", type=int, default=0)
     _TOM.add_attack_ability_arg(ap)
     _TOM.add_passive_body_arg(ap)
+    EV.add_f_pricing_fixes_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_decision_row(a)
@@ -1602,6 +1606,7 @@ def main(argv=None):
     apply_guard_s_cost(a)                                      # G-2
     _TOM.apply_attack_ability(a)
     _TOM.apply_passive_body(a)
+    EV.apply_f_pricing_fixes(a)
     _TOM.reset_wiring_stats()
     EV.apply_search_price(a)
     EV.apply_play_now(a)
@@ -1646,6 +1651,8 @@ def main(argv=None):
     # **T49 の検算**: `κ` の平均（`w` の平均が `w̄` に戻れば 1）
     stats["kappa_mean"] = (round(stats["kappa_sum"] / stats["kappa_n"], 4) if stats["kappa_n"] else None)
     stats["w_mean"] = (round(stats["kappa_mean"] * _TO.W_BAR, 4) if stats["kappa_mean"] is not None else None)
+    if EV.F_PRICING_FIX:
+        stats["f_pricing_fixes"] = EV.apply_f_pricing_fixes(a)          # on のときだけ刻む
     if _TOM.ATTACK_ABILITY_MODE != "off" or _TOM.PASSIVE_BODY_MODE != "off":
         # F-2/F-3a: 切替 on のときだけ刻む（off の出力は従来と同じ）
         stats["wiring"] = {"attack_ability": _TOM.ATTACK_ABILITY_MODE, "passive_body": _TOM.PASSIVE_BODY_MODE,
