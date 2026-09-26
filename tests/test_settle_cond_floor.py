@@ -271,6 +271,51 @@ def test_sigma_rel_whole_mle_recovers_a_known_width_from_simulated_records():
     assert abs(naive - 0.4) > 0.02
 
 
+def _race_sim(sigma, n, seed):
+    """2 本の時計の競争（`whole_turn_race_prob` と同じ規則）: 行の持ち主が手番・`k_me ≤ k_opp` なら持ち主の勝ち。
+    記録に残るのは勝った席が届いた段と、両席の予測の時計だけ（負けた席がいつ届いたかは残らない＝選び方がある）。"""
+    rng = np.random.default_rng(seed)
+    tm = rng.uniform(0.0, 8.0, n); to = rng.uniform(0.0, 8.0, n)
+    tm[: n // 10] = 0.0
+    xm = tm + sigma * np.maximum(1.0, tm) * rng.standard_normal(n)
+    xo = to + sigma * np.maximum(1.0, to) * rng.standard_normal(n)
+    km = np.maximum(1, np.ceil(xm)).astype(int); ko = np.maximum(1, np.ceil(xo)).astype(int)
+    won = km <= ko
+    return np.where(won, tm, to), np.where(won, km, ko), np.where(won, to, tm), won
+
+
+def test_sigma_rel_whole_mle_with_the_censored_loser_recovers_sigma_from_a_race():
+    """勝った席だけの尤度は「早く届いた方が勝つ」選び方を幅に混ぜる（模擬で約 +5%）。負けた席の打ち切り
+    （手番の私が段 a で勝った→相手は `X > a − 1`・相手が段 a で勝った→私は `X > a`）を入れると取り戻せる。"""
+    for sigma, seed in ((0.25, 1), (0.4, 2), (0.6, 3)):
+        tw, aw, tl, wm = _race_sim(sigma, 20000, seed)
+        got = CB.sigma_rel_whole_mle(tw, aw, tl, wm)
+        assert got == pytest.approx(sigma, rel=0.02)
+        winner_only = CB.sigma_rel_whole_mle(tw, aw)
+        assert abs(winner_only - sigma) > abs(got - sigma)
+
+
+def test_the_censored_loser_uses_the_race_step_convention():
+    """1 行で因子を書き下して照合: 私（手番）が段 2 で勝った→相手 `P(X > 1)`・相手が段 2 で勝った→私 `P(X > 2)`・
+    段 1 で勝った手番の私→相手の因子は 1（打ち切りなし）。"""
+    def loglik(sigma, rows):
+        out = 0.0
+        for tw, a, tl, first in rows:
+            cw, cl = sigma * max(1.0, tw), sigma * max(1.0, tl)
+            pw = _phi((a - tw) / cw) - (_phi((a - 1 - tw) / cw) if a >= 2 else 0.0)
+            thr = a - 1 if first else a
+            pl = (1.0 - _phi((thr - tl) / cl)) if thr >= 1 else 1.0
+            if pw <= 0.0 or pl <= 0.0:
+                return -math.inf                                                  # 素朴な式が桁落ちする狭すぎる幅
+            out += math.log(pw) + math.log(pl)
+        return out
+    rows = [(1.2, 2, 3.0, True), (2.5, 2, 0.4, False), (0.3, 1, 0.2, True), (3.0, 5, 6.0, True), (0.0, 2, 1.5, False)]
+    got = CB.sigma_rel_whole_mle(*zip(*[(r[0], r[1], r[2], r[3]) for r in rows]))
+    grid = [x / 1000.0 for x in range(50, 3000)]
+    best = max(grid, key=lambda s: loglik(s, rows))
+    assert got == pytest.approx(best, abs=1e-3)
+
+
 def test_sigma_rel_whole_mle_edges():
     assert CB.sigma_rel_whole_mle([], []) is None
     tau = np.array([0.0, 0.5, 1.3, 2.7, 4.0]); act = np.array([1, 1, 2, 3, 4])   # 全行が予測どおりの段
@@ -387,8 +432,10 @@ def test_summarise_reports_the_integer_residual_next_to_the_old_one_without_chan
     assert o["late_int"] == pytest.approx(0.25) and o["early_int"] == 0.0 and o["mae_int"] == pytest.approx(0.25)
     assert o["sigma_rel_floor"] is not None
     # K-5: 勝った席の届いた段 2・1・2・1（τ 1.4・0.3・2.7・0）——⌈2.7⌉ = 3 ≠ 2 の外れがあるので幅は正
+    # 負けた席の打ち切り: 負けた席の τ 3.0・2.0・3.0・2.0／勝ったのは手番の席か True・True・False・False
     assert o["sigma_rel_whole"] == pytest.approx(round(CB.sigma_rel_whole_mle(
-        [1.4] * 10 + [0.3] * 10 + [2.7] * 10 + [0.0] * 10, [2] * 10 + [1] * 10 + [2] * 10 + [1] * 10), 4))
+        [1.4] * 10 + [0.3] * 10 + [2.7] * 10 + [0.0] * 10, [2] * 10 + [1] * 10 + [2] * 10 + [1] * 10,
+        [3.0] * 10 + [2.0] * 10 + [3.0] * 10 + [2.0] * 10, [True] * 20 + [False] * 20), 4))
     assert o["sigma_rel_whole"] > 0.0
 
 

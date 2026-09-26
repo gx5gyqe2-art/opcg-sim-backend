@@ -880,7 +880,9 @@ def _log_upper_tail(z):
 
 
 def _log_interval(lo, hi):
-    """`log P(lo < Z ≤ hi)`（`lo` は `-inf` 可）。両端が同じ側の裾なら裾の対数の差で読む（桁落ちしない）。"""
+    """`log P(lo < Z ≤ hi)`（`lo` は `-inf`・`hi` は `+inf` 可）。両端が同じ側の裾なら裾の対数の差で読む（桁落ちしない）。"""
+    if hi == math.inf:
+        return _log_upper_tail(lo)
     if lo == -math.inf:
         return _log_upper_tail(-hi)
     if lo >= 0.0:
@@ -892,54 +894,64 @@ def _log_interval(lo, hi):
     return a + math.log1p(-math.exp(b - a))
 
 
-def sigma_rel_whole_mle(tau_w, act_w):
+def sigma_rel_whole_mle(tau_w, act_w, tau_l=None, winner_on_move=None):
     """**K-5: `whole` の形と揃えた幅 σ の最尤**（`theory_order.SETTLE_COND_MODE` の注）。
 
     `tau_w`＝勝った席の時計（`summarise` と同じ 30 の打ち切り）・`act_w`＝その席が実際に届いた段（今のターンを 1 と
-    数える自席ターン数）。**尤度は規則から**: `whole` の式では届く段は `k = max(1, ⌈X⌉)`・`X ~ N(τ, (σ·c)²)`・
-    `c = max(1, τ)`（まだ打つ自席ターンの数・`TO.whole_clock_scale`）なので、観測 `a` の確率は
+    数える自席ターン数）・`tau_l`＝負けた席の時計・`winner_on_move`＝勝った席が行の持ち主（手番の席）か。
+    **尤度は規則から**（`theory_order.whole_turn_race_prob` と同じ段の数え方・同じ幅）: 届く段は `k = max(1, ⌈X⌉)`・
+    `X ~ N(τ, (σ·c)²)`・`c = max(1, τ)`（まだ打つ自席ターンの数・`TO.whole_clock_scale`）。行ごとの因子は 2 つ:
 
-        P(a) = Φ((a − τ)/(σ c)) − Φ((a − 1 − τ)/(σ c))    （a ≥ 2）
-        P(1) = Φ((1 − τ)/(σ c))                            （今のターンで届いた）
+    * **勝った席が段 `a` で届いた**: `P(a − 1 < X_w ≤ a)`（`a ≥ 2`）・`P(X_w ≤ 1)`（`a = 1`）。
+    * **負けた席はそれまでに届かなかった**（打ち切りの観測・K-5 の修正）: 手番の私が段 `a` で勝ったなら相手は
+      `k_opp ≥ a`＝`P(X_l > a − 1)`（`a = 1` なら 1）、相手が段 `a` で勝ったなら私は相手の第 `a` 段の前（私の第 `a` 段）
+      までに届いていない＝`k_me ≥ a + 1`＝`P(X_l > a)`。`whole` の式は 2 本の時計の競争なので、勝った側だけを見ると
+      「勝った＝早く届いた方」の選び方が幅に混ざる——負けた側の打ち切りを入れて初めて式と同じ事象の尤度になる。
 
-    で、`Σ log P(a_i)` を σ について最大にする。**見えるのは勝った席の 1 本だけ**（負けた席がいつ届いたかは記録に無い）
-    ので 1 本の時計の幅をそのまま測る——従来の `σ_rel`（残差 ÷ `√(τ_me² + τ_opp²)`）は 1 本の残差を 2 本分の尺度で
-    割り（過小）、整数の丸めを連続の誤差に混ぜていた（`whole` は丸めを式の中で数える）。
+    `Σ log(因子)` を σ について最大にする。`tau_l`／`winner_on_move` を省くと勝った席の因子だけ（修正前）。
 
-    **最大は 1 つ**: 精度 `β = 1/σ` で書くと各項は `P(β(a − 1 − τ)/c < Z ≤ β(a − τ)/c)`＝凸な集合
-    `{(β, z): β l ≤ z ≤ β u}` の上で対数凹な密度を積分したものなので、Prékopa の定理で `log P` は β について凹。
-    だから β の傾き（単調に減る）の符号が変わる点を 2 分法で解く（上下端は倍々に広げる・固定の範囲や反復回数を置かない）。
-    傾きが至る所で正（全行が予測どおりの段で届いた）なら境界解 0 を返す。行が無ければ `None`。"""
+    **最大は 1 つ**: 精度 `β = 1/σ` で書くとどの因子も `P(β l < Z ≤ β u)`（打ち切りは `u = +∞`）＝凸な集合
+    `{(β, z): β l ≤ z ≤ β u}` の上で対数凹な密度を積分したものなので、Prékopa の定理で `log` は β について凹（打ち切りの
+    因子を足しても変わらない）。だから β の傾き（単調に減る）の符号が変わる点を 2 分法で解く（上下端は倍々に広げる・
+    固定の範囲や反復回数を置かない）。全因子が予測どおり（`l < 0 ≤ u`）なら境界解 0。行が無ければ `None`。"""
     tw = [float(x) for x in tau_w]
     aw = [max(1, int(a)) for a in act_w]
     if not tw:
         return None
-    rows = []
+    rows = []                                            # 標準化した区間 (u, l)・`P(β l < Z ≤ β u)`
     for t, a in zip(tw, aw):
         c = TO.whole_clock_scale(t)
         rows.append(((a - t) / c, ((a - 1 - t) / c) if a >= 2 else -math.inf))
+    if tau_l is not None:
+        for t, a, first in zip(tau_l, aw, winner_on_move):
+            thr = (a - 1) if first else a                # 負けた席が届いていないと分かっている段の境目
+            if thr >= 1:
+                t = float(t)
+                rows.append((math.inf, (thr - t) / TO.whole_clock_scale(t)))
     if all(u >= 0.0 and l < 0.0 for u, l in rows):
-        return 0.0      # 全行が予測どおりの段（τ ∈ (a − 1, a]）＝尤度は β について凹で上に有界→単調に上がる＝境界解 0
+        return 0.0      # 全因子が予測どおり＝尤度は β について凹で上に有界→単調に上がる＝境界解 0
 
     def slope(beta):                                     # d/dβ Σ log P
         g = 0.0
         for u, l in rows:
-            zu = beta * u
+            zu = beta * u if u != math.inf else math.inf
             zl = beta * l if l != -math.inf else -math.inf
             lp = _log_interval(zl, zu)
-            g += math.exp(-0.5 * zu * zu - _LOG_SQRT_2PI - lp) * u
+            if u != math.inf:
+                g += math.exp(-0.5 * zu * zu - _LOG_SQRT_2PI - lp) * u
             if l != -math.inf:
                 g -= math.exp(-0.5 * zl * zl - _LOG_SQRT_2PI - lp) * l
         return g
 
-    sd0 = float(np.std([u for u, _l in rows]))           # 出発点（データの散らばり・凹なので答えには効かない）
+    fin = [u for u, _l in rows if u != math.inf]
+    sd0 = float(np.std(fin)) if fin else 0.0             # 出発点（データの散らばり・凹なので答えには効かない）
     lo = hi = 1.0 / sd0 if sd0 > 0.0 else 1.0
-    while slope(hi) > 0.0:                               # 外れた行が 1 つでも在れば β → ∞ で尤度は −∞＝必ず負に変わる
+    while slope(hi) > 0.0:                               # 外れた因子が 1 つでも在れば β → ∞ で尤度は −∞＝必ず負に変わる
         hi *= 2.0
     while slope(lo) < 0.0:
         lo *= 0.5
         if lo <= 0.0:
-            return math.inf                              # 反対の境界（起きない: β → 0 で全行の P → 0）
+            return math.inf                              # 反対の境界（起きない: β → 0 で区間の因子は 0 へ）
     while True:
         mid = 0.5 * (lo + hi)
         if mid <= lo or mid >= hi:
@@ -3138,13 +3150,15 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
         o["sigma_rel_floor"] = (round(float(sigma_rel_mle(res, scale, TO.TURN_ROUND_VAR, TO.TURN_ROUND_MEAN)), 4)
                                 if has_scale.any() else None)
         # **K-5（2026-09-26・報告のみ・既存の欄は不変）**: `whole` の形と揃えた幅（勝った席が届いた段を区間で観測・
-        # 1 本の時計の幅 `σ·max(1, τ)`）。`SETTLE_COND_MODE=whole` の表（`sigma_rel_whole`）の出所。全行（尺度 0 の行も
+        # 負けた席はそれまでに届かなかった＝打ち切り・1 本の時計の幅 `σ·max(1, τ)`）。`SETTLE_COND_MODE=whole` の表（`sigma_rel_whole`）の出所。全行（尺度 0 の行も
         # 定義できる＝`max(1, τ)` は 0 にならない）。
-        tw_, aw_ = [], []
+        tw_, aw_, tl_, wm_ = [], [], [], []
         for r in rows_out:
-            k, act = ((r["tau_me_" + sv], r["t_me_act"]) if r["won"] else (r["tau_opp_" + sv], r["t_opp_act"]))
-            tw_.append(min(float(k), 30.0)); aw_.append(int(act))
-        swm = sigma_rel_whole_mle(tw_, aw_)
+            k, act, kl = ((r["tau_me_" + sv], r["t_me_act"], r["tau_opp_" + sv]) if r["won"]
+                          else (r["tau_opp_" + sv], r["t_opp_act"], r["tau_me_" + sv]))
+            tw_.append(min(float(k), 30.0)); aw_.append(int(act)); tl_.append(min(float(kl), 30.0))
+            wm_.append(bool(r["won"]))                   # 行の持ち主（手番の席）が勝ったか
+        swm = sigma_rel_whole_mle(tw_, aw_, tl_, wm_)    # 負けた席の打ち切りも入れる（K-5 の修正）
         o["sigma_rel_whole"] = round(float(swm), 4) if swm is not None else None
         # **K（2026-09-26・報告のみ）**: **整数ターンの残差** `max(1, ⌈τ⌉) − t_act`。時計は「(段数 − 1) ＋ 割合」、
         # 実際の残りは「今のターンを 1 と数える整数」なので、上の `τ − t_act` は**完璧な予測でも (−1, 0] に入り平均 ≈ −0.5**。
