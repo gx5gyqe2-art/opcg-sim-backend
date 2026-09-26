@@ -44,6 +44,7 @@ s_t     = −( 実際に払った費用 − min(2 つのうち払えた方) )
 > 合計 ≥ 超過＝`lenient`）。守る費用を**この手札で実際に失う価値**で測る切替 `GUARD_S_COST_MODE=hand`（既定は
 > 従来の `c(x)·μ`＝`curve`）。**G-2 の修正（2026-09-26）**: `hand` の守る備えは厳密な最大（`guard_value_exact`）を
 > 1 ラウンド割り引いて読む。失う価値は T67 の札ごとの価値 `max(ΔH, ΔG)` とは違う量（`GUARD_S_COST_MODES` の注記）。
+> **N-2（2026-09-26）**: `GUARD_S_COST_MODE=joint`＝手札の価値を 1 枚 1 役の最適な割り当て（`hand_joint.py`）で読む切替（既定は `curve` のまま）。
 
 ## 暫定値（§0.4 の台帳・**感度を付けて回す**）
 
@@ -333,7 +334,7 @@ def effective_guard_afford(afford=None, s_cost=None):
     実行全体の記録（`stats`・`provisional`）の `guard_afford` はこれ・指定された値は `guard_afford_requested` に別に刻む。"""
     am = GUARD_AFFORD_MODE if afford is None else afford
     sm = GUARD_S_COST_MODE if s_cost is None else s_cost
-    return "rule" if sm == "hand" else am
+    return "rule" if sm in ("hand", "joint") else am
 
 
 def afford_need(x, mode=None):
@@ -382,7 +383,16 @@ def afford_need(x, mode=None):
 #: * **ブロッカーが居る行は従来どおり `c(x)·μ`**（限界: ブロッカーで止めた行の値段はまだ手札で測らない）。
 #: * **帳簿（`g`・`g_paid`・`g_delta`・`price`）は変えない**＝この切替は判断（`s`・`theory_says`）だけに効く。
 #:   帳簿の「払った額」の切替は `GUARD_COST_MODE`（名前が似ているが別物）。
-GUARD_S_COST_MODES = ("curve", "hand")
+#:
+#: **`joint`（N-2・2026-09-26・ユーザ決定 判断6(a)・判断7(a)）**＝手札の価値を**1 枚 1 役の最適な割り当て**
+#: （`hand_joint.JointValuer`・各札を 出す／カウンター／持つ のどれか 1 つに割り当てた最大）で読み、守る費用＝
+#: **過不足の無い**止める組 `S` のうち `V(手札) − V(手札 − S)` が最小の組の値。規則（x + 1000・イベントのドン）と V を読む時点
+#: （次の自席ターンの枠・これから来る相手ターンを 1 ラウンド割り引く）・ブロッカーの行・帳簿を変えないことは `hand` と同じ。
+#: `hand` との違いは V だけ: `hand` の V は出す計画と守る備えを**全部の札で別々に**読んだ和（両方に立つ札を 2 度数える）。
+#: 相方待ち／条件の時計の札が在る手札では、残った札（切った札を除く）で読み直す（`hand` と同じ）——その手札では単調性が
+#: 保証できないので割り当ては全部調べ、差は 0 で床を打つ。調べる組は `hand` と違い**常に過不足の無い組だけ**
+#: （余計な札まで切って損が減るのは読み直しの癖で、実際の選択肢ではない）。
+GUARD_S_COST_MODES = ("curve", "hand", "joint")
 GUARD_S_COST_MODE = "curve"
 
 
@@ -397,7 +407,8 @@ def set_guard_s_cost_mode(mode):
 def add_guard_s_cost_arg(ap):
     ap.add_argument("--guard-s-cost", default=None, choices=GUARD_S_COST_MODES,
                     help="**G-2** 守りの判断の守る費用: `curve`（既定・c(x)·μ）／"
-                         "`hand`（止める札の組のうち、使うと手札の価値が一番減らない組の減り・判断だけに効き帳簿は変えない）")
+                         "`hand`（止める札の組のうち、使うと手札の価値が一番減らない組の減り・判断だけに効き帳簿は変えない）／"
+                         "`joint`（**N-2** 同じ形で、手札の価値を 1 枚 1 役の最適な割り当てで読む）")
 
 
 def apply_guard_s_cost(a):
@@ -553,6 +564,75 @@ def guard_hand_cost(hand, x, budget):
     return {"cost": float(best[0]), "set": tuple(sorted(best[1])), "n_sets": len(found)}
 
 
+def _inflow_sensitive(item, ctx):
+    """その札の `v` を残りの手札で読み直すか（`hand_plan.inflow_item` がそのまま返さない札＝相方待ち・条件の時計）。"""
+    import hand_plan as HP
+    import search_price as SP
+    if HP.INFLOW_MODE != "on" or item is None:
+        return False
+    if SP.enabler_target(item["cid"]) is not None:
+        return True
+    return bool(ctx.get("st_base")) and HP.COND_CLOCK_MODE == "on" and HP.has_on_play_condition(item["cid"])
+
+
+def joint_valuer(hand):
+    """**N-2: この手札の 1 枚 1 役の V**（`hand_joint.JointValuer`・手札の読みに 1 つだけ作って使い回す）。
+    読み直す札が 1 枚も無い手札は静的（単調＝絞ってよい）。在れば残った札で `apply_inflow` を読み直す（`_hand_v` と同じ）。"""
+    got = hand.get("_joint")
+    if got is not None and got[0] is hand.get("inflow") and got[1] is hand["slots"]:
+        return got[2]                                           # 同じ読み（複写した dict で中身を差し替えたら作り直す）
+    import hand_joint as HJ
+    slots = hand["slots"]
+    ctx = hand.get("inflow")
+    mu = float(hand["mu"])
+    reread = ctx is not None and any(_inflow_sensitive(s_.get("item"), ctx) for s_ in slots)
+
+    def plan_items_of(keep):
+        idx = sorted(keep)
+        known = [slots[i]["item"] for i in idx if slots[i].get("item") is not None]
+        if reread and known:
+            import hand_plan as HP
+            known = HP.apply_inflow(known, ctx["deck"], hand["xs_future"], hand["take"], ctx["cards"], ctx["olp"], ctx["r"],
+                                    field=ctx["field"], st_base=ctx["st_base"])
+        rest = [slots[i] for i in idx if slots[i].get("item") is None]
+        return [(float(it["cost"]), (mu if it["v"] is None else it["v"])) for it in list(known) + rest]
+
+    got = HJ.JointValuer([float(s_["counter"]) for s_ in slots], plan_items_of, hand["caps"], hand["xs_future"],
+                         hand["take"], start=1, monotone=not reread)
+    hand["_joint"] = (ctx, slots, got)
+    return got
+
+
+def guard_joint_cost(hand, x, budget):
+    """**N-2: 超過 `x` を今止める、1 枚 1 役の V で読んだ最小の損**（`guard_hand_cost` と同じ戻り値の形）。
+    候補は**過不足の無い**止める組だけ（合計は `Σ 無料 ＋ knapsack(有料, 今のアクティブなドン)`・`x + 1000` 以上）。"""
+    slots = hand["slots"]
+    x = float(x)
+    if x < -PWR_EPS:
+        return {"cost": 0.0, "set": (), "n_sets": 0}
+    need = afford_need(x, "rule")
+    cand = [i for i, s_ in enumerate(slots) if _payable(s_, budget)]
+    found = []
+    for r_ in range(1, len(cand) + 1):
+        for S in itertools.combinations(cand, r_):
+            ss = set(S)
+            if any(f <= ss for f in found):
+                continue
+            tot = sum(float(slots[i]["free"]) for i in S) \
+                + GA.knapsack([slots[i]["paid"] for i in S if slots[i]["paid"] is not None], budget)
+            if tot >= need:
+                found.append(frozenset(S))
+    if not found:
+        return {"cost": None, "set": None, "n_sets": 0}
+    jv = joint_valuer(hand)
+    best = None
+    for S in found:
+        lost = jv.loss(S)
+        if best is None or lost < best[0]:
+            best = (lost, S)
+    return {"cost": float(best[0]), "set": tuple(sorted(best[1])), "n_sets": len(found)}
+
+
 def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=None, guard_g=None,
                afford=None, s_cost=None, hand=None):
     """**守りの窓 1 つ**の取りこぼし（`≤ 0`）と、判定に使った内訳。
@@ -562,8 +642,8 @@ def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=N
     両方 `g_paid`／`g_delta` としても返す。
 
     **G-2**: `afford`（省略時 `GUARD_AFFORD_MODE`）＝守れたかの閾値（`rule`＝合計 ≥ 超過 + 1000・`lenient`＝旧）。
-    `s_cost`（省略時 `GUARD_S_COST_MODE`）＝判断の守る費用（`curve`＝`c(x)·μ`・`hand`＝`guard_hand_cost`）。
-    `hand`＝`guard_hand_reading` の戻り値（`hand` のとき必須・`curve` では枚数の監査にだけ使う）。
+    `s_cost`（省略時 `GUARD_S_COST_MODE`）＝判断の守る費用（`curve`＝`c(x)·μ`・`hand`＝`guard_hand_cost`・`joint`＝`guard_joint_cost`〔N-2〕）。
+    `hand`＝`guard_hand_reading` の戻り値（`hand`／`joint` のとき必須・`curve` では枚数の監査にだけ使う）。
     `curve` では従来の欄は 1 ビットも変えない（新しい欄を足すだけ）。`hand` では**守れたかは規則どおり**
     （ブロッカー or 止める組が在る）・**帳簿の欄（`g`・`g_paid`・`g_delta`・`price`）は `c(x)·μ` のまま**。
     """
@@ -585,16 +665,16 @@ def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=N
     cost_guard = float(c_of(x)) * float(mu)
     # **G-2**: 判断に使う守る費用（`curve` なら `cost_guard` と同じもの＝従来と 1 ビットも違わない）
     cost_guard_s, source, hc = cost_guard, "curve", None
-    if _sm == "hand":
+    if _sm in ("hand", "joint"):
         if hand is None or hand.get("caps") is None:
-            raise ValueError("GUARD_S_COST_MODE=hand には手札の読み（guard_hand_reading(values=True)）が要る")
-        hc = guard_hand_cost(hand, x, budget)
+            raise ValueError("GUARD_S_COST_MODE=%s には手札の読み（guard_hand_reading(values=True)）が要る" % _sm)
+        hc = (guard_hand_cost if _sm == "hand" else guard_joint_cost)(hand, x, budget)
         # 守れたかは**規則どおり**（`GUARD_AFFORD_MODE` に依らない）: 止める組が在るのは `Σ無料 + knapsack ≥ x + 1000` と同値
         can_guard = bool(blocker or hc["cost"] is not None)
         if blocker:
             source = "blocker"                    # 限界: ブロッカーの行は従来の値段のまま
         elif hc["cost"] is not None:
-            cost_guard_s, source = float(hc["cost"]), "hand"
+            cost_guard_s, source = float(hc["cost"]), _sm       # `hand`／`joint`（`cost_guard_hand` はどちらの値も入る）
     best = min(cost_take, cost_guard_s) if can_guard else cost_take
     actual = cost_guard if played == "guard" else cost_take
     actual_s = cost_guard_s if played == "guard" else cost_take
@@ -853,7 +933,7 @@ def _finish_guard(got, played, my_life, z, bnd, kap, w, t, rec, kn, stats, _add)
     # **G-2**: 判断の守る費用を手札で測った行の内訳（式の費用と並べる・`hand` のときだけ立つ）
     if got.get("cost_guard_hand") is not None:
         stats["grd_hand_rows"] = stats.get("grd_hand_rows", 0) + 1
-        stats["grd_hand_priced"] = stats.get("grd_hand_priced", 0) + int(got.get("cost_guard_source") == "hand")
+        stats["grd_hand_priced"] = stats.get("grd_hand_priced", 0) + int(got.get("cost_guard_source") in ("hand", "joint"))
         stats["grd_hand_cost_sum"] = stats.get("grd_hand_cost_sum", 0.0) + float(got["cost_guard_hand"])
         stats["grd_hand_curve_sum"] = stats.get("grd_hand_curve_sum", 0.0) + float(got["cost_guard_curve"])
     e = kn.setdefault(t, {"d0": None, "t_me0": None, "t_opp0": None, "g0": 0.0, "r_turns": None, "g_fam": {}, "chars": None})   # T80
@@ -1165,7 +1245,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 # （既定の `curve` は枚数の監査だけ＝遅くしない）。V の守る備えの受ける損は判断の受ける費用と同じ `Θ·μ`。
                 has_attack = any(x0 >= -PWR_EPS for x0 in incoming_x(tok))   # 無ければ guard_step が None を返す
                 hand_rd = guard_hand_reading(tok, sc, ex["ci"][i], idx2cid, cards, take=float(th_g) * float(mu), mu=mu,
-                                             deck=decks.get(w), values=(GUARD_S_COST_MODE == "hand" and has_attack))
+                                             deck=decks.get(w), values=(GUARD_S_COST_MODE in ("hand", "joint") and has_attack))
                 got = guard_step(tok, sc, played, free, paid, th_g, mu, margin_comfort, hand=hand_rd)
                 if got is None:
                     stats["grd_no_attack"] += 1
