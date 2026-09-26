@@ -597,3 +597,37 @@ def test_cli_flags_follow_the_mode_switch_convention():
     assert T.apply_passive_body(a) == "on" and T.PASSIVE_BODY_MODE == "on"
     with pytest.raises(SystemExit):
         ap.parse_args(["--attack-ability", "bogus"])
+
+
+def test_switches_off_never_reach_the_new_code_on_a_real_record_sample(tmp_path, monkeypatch):
+    """**切替を切った状態の同一性**（実デッキの記録 2 局・`record_gen --decks user`）: 既定（切替 off・F の直し空）で
+    `price_realised` を回すと、F-2／F-3a／F の直しの関数は 1 度も呼ばれない（呼ばれたら落ちる）——
+    かつ出力は落とさずに回した結果と 1 バイトも変わらない。"""
+    pytest.importorskip("opcg_engine", reason="Rust エンジンが要る（make rust-develop）")
+    import json
+    from opcg_sim.loop import record_gen as G
+    import price_realised as PR
+    out = str(tmp_path / "rec")
+    assert G.main(["--games", "2", "--seed-base", "990401", "--workers", "1", "--sims", "8",
+                   "--decks", "user", "--out", out]) == 0
+    a_json = tmp_path / "a.json"
+    assert PR.main(["--in", out, "--boot-reps", "10", "--out", str(a_json)]) == 0
+
+    def boom(*_a, **_k):
+        raise AssertionError("切替 off で新しい道に入った")
+
+    for mod, names in ((T, ("attack_ability_value", "passive_parts", "passive_body_value", "printed_keywords")),
+                       (EV, ("attack_self_value", "continuous_body_value", "continuous_self_mods",
+                             "printed_keyword_value", "branch_actions", "survive_share", "dynamic_cost_cap"))):
+        for n in names:
+            monkeypatch.setattr(mod, n, boom)
+    monkeypatch.setattr(EV.opaque_as_upper, "__enter__", boom)
+    # `action_value` は `attack_self_value` をモジュールの名前で引くので、off でも呼ばれてから None を返す——
+    # 呼ばれること自体は許し、攻撃の文脈（`attack_ctx`）が無ければ従来の道に戻ることだけを縛る
+    monkeypatch.setattr(EV, "attack_self_value", lambda e, at, st, *a, **k: (boom() if (st or {}).get("attack_ctx") else None))
+    b_json = tmp_path / "b.json"
+    assert PR.main(["--in", out, "--boot-reps", "10", "--out", str(b_json)]) == 0
+    a = json.loads(a_json.read_text(encoding="utf-8")); b = json.loads(b_json.read_text(encoding="utf-8"))
+    a.pop("seconds"); b.pop("seconds")
+    assert a == b
+    assert a["stats"]["scored"] > 0
