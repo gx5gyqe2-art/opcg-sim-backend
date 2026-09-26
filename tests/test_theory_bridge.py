@@ -22,6 +22,16 @@ import theory_bridge as B  # noqa: E402
 import theory_order as T  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _pin_curve_guard_cost():
+    """以下の代数は守る費用を旧の `c(x)·μ`（`GUARD_S_COST_MODE=curve`）で書いてある——既定は N-2 の `joint`
+    （2026-09-26・手札の読みが要る）なので、ここでは `curve` を明示して固定し、終わったら戻す。"""
+    old = B.GUARD_S_COST_MODE
+    B.set_guard_s_cost_mode("curve")
+    yield
+    B.set_guard_s_cost_mode(old)
+
+
 def _tok(opp_lead=5000, my_lead=5000, blocker=False):
     tok = np.zeros((22, 24), np.float32)
     tok[0, T.S_POWER] = my_lead / 1e4

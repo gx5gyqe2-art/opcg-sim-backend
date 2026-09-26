@@ -1,5 +1,5 @@
 """**N-1／N-2（2026-09-26・ユーザ決定 判断6(a)・判断7(a)）**: 手札の価値＝**1 枚 1 役の最適な割り当て**の値（`hand_joint.py`）と、
-守りの判断の守る費用をそれで読む切替 `theory_bridge.GUARD_S_COST_MODE=joint`（既定は `curve` のまま）。
+守りの判断の守る費用をそれで読む切替 `theory_bridge.GUARD_S_COST_MODE=joint`（**2026-09-26 から既定**・ユーザ決定「判断1の続き→(a)」）。
 
 押さえること: 独立の総当たり（札ごとに 出す／カウンター／持つ を全部試す）と一致・両方に立つ札は代わりが無ければ
 良い方の役の値で、代わりが在れば小さい・同じ大物の 2 枚目は安い・要る数を超えたカウンターは守りでは 0・
@@ -26,6 +26,8 @@ import hand_guard as HG  # noqa: E402
 import hand_joint as HJ  # noqa: E402
 import hand_plan as HP  # noqa: E402
 import theory_bridge as B  # noqa: E402
+
+_SHIPPED_S_COST = B.GUARD_S_COST_MODE          # 収集時（どのテストも切替を触る前）の出荷時の既定
 import theory_order as T  # noqa: E402
 
 MU = T.MU
@@ -203,15 +205,24 @@ def _hand(slots, xs_future=(1000.0,), caps=CAPS, take=TAKE):
             "mu": MU, "inflow": None}
 
 
-def test_the_switch_exists_and_the_default_is_unchanged():
-    assert B.GUARD_S_COST_MODE == "curve"
+def test_joint_is_the_shipped_default():
+    """出荷時の既定は `joint`（2026-09-26・ユーザ決定「判断1の続き→(a)」）——収集時に写した値で見る
+    （他のテストが切替を触っても、戻し忘れがここを黙って通さない）。旧の `curve` は切替で残る。"""
+    assert _SHIPPED_S_COST == "joint"
     assert B.GUARD_S_COST_MODES == ("curve", "hand", "joint")
     assert B.effective_guard_afford("lenient", "joint") == "rule"
+    old = B.GUARD_S_COST_MODE
     try:
-        B.set_guard_s_cost_mode("joint")
-        assert B.GUARD_S_COST_MODE == "joint"
-    finally:
         B.set_guard_s_cost_mode("curve")
+        assert B.GUARD_S_COST_MODE == "curve"
+        B.set_guard_s_cost_mode(_SHIPPED_S_COST)
+        # 既定のままでは手札の読みが要る（`curve` の式に黙って落ちない）
+        with pytest.raises(ValueError):
+            B.guard_step(_tok(6000), _sc(), "take", 2000.0, [])
+        got = B.guard_step(_tok(opp_lead=6000), _sc(don=5), "take", 2000.0, [], hand=_hand([_slot(2000.0, 0.03, cost=2)]))
+        assert got["s_cost_mode"] == "joint" and got["cost_guard_source"] == "joint"
+    finally:
+        B.set_guard_s_cost_mode(old)
     with pytest.raises(ValueError):
         B.guard_step(_tok(6000), _sc(), "take", 2000.0, [], s_cost="joint")      # 手札の読みが要る
 

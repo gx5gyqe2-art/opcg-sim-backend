@@ -2,7 +2,8 @@
 
 1. **守れたかを規則どおりに判定する**（`GUARD_AFFORD_MODE`・既定 `rule`）——同じパワーは命中するので、超過 `x` を止めるには
    カウンター合計が `x + 1000` 以上要る。旧 `lenient`（合計 ≥ `x`）は超過 0 ならカウンター 0 枚でも「守れた」にしていた。
-2. **守る費用をこの手札で実際に失う価値で測る切替**（`GUARD_S_COST_MODE`・既定 `curve`＝従来の `c(x)·μ`・`hand` が新形）——
+2. **守る費用をこの手札で実際に失う価値で測る切替**（`GUARD_S_COST_MODE`・`curve`＝従来の `c(x)·μ`・`hand` が新形。
+   **既定は 2026-09-26 から N-2 の `joint`**＝`test_hand_joint.py`。本ファイルの代数は `curve` を明示して固定する）——
    止める札の組 `S` のうち `V(手札) − V(手札 − S)` が一番小さい組の減り。`V` は出す計画（T66）＋ **これから来る**
    相手ターンの守る備え（T67 と同じ目的を**厳密な最大**で解いたもの・今の窓から **1 ラウンド割り引く**）を次の自席ターンの時点で読んだもの。
 
@@ -39,6 +40,18 @@ MU = T.MU
 TAKE = T.THETA * T.MU
 S_DISC = 1.0 - T.KO_P
 LIFE0_TAKE = T.theta_take(0.0) * T.MU                           # ライフ 0 で受ける損（致死）
+
+_SHIPPED_S_COST = B.GUARD_S_COST_MODE          # 収集時（どのテストも切替を触る前）の出荷時の既定
+
+
+@pytest.fixture(autouse=True)
+def _pin_curve_guard_cost():
+    """本ファイルの代数（旧との一致・`hand` との比べ）は、切替を省いた呼び出しを旧の `c(x)·μ` として書いてある——
+    既定は N-2 の `joint`（手札の読みが要る）なので `curve` を明示して固定し、終わったら戻す。"""
+    old = B.GUARD_S_COST_MODE
+    B.set_guard_s_cost_mode("curve")
+    yield
+    B.set_guard_s_cost_mode(old)
 
 
 def _tok(opp_lead=5000, my_lead=5000, blocker=False):
@@ -117,7 +130,7 @@ def _grid():
 
 def test_the_defaults_are_the_rule_and_the_old_cost():
     assert B.GUARD_AFFORD_MODE == "rule"          # 既定は規則どおり（ユーザ決定 2026-09-25）
-    assert B.GUARD_S_COST_MODE == "curve"         # 判断の守る費用は従来のまま（`hand` は測ってから採否）
+    assert _SHIPPED_S_COST == "joint"             # 判断の守る費用は N-2 の 1 枚 1 役（ユーザ決定 2026-09-26「判断1の続き→(a)」）
     assert B.GUARD_AFFORD_MODES == ("rule", "lenient") and B.GUARD_S_COST_MODES == ("curve", "hand", "joint")
 
 
@@ -133,7 +146,7 @@ def test_unknown_modes_are_refused_everywhere():
             B.guard_step(_tok(6000), _sc(), "take", 9000.0, [], afford=bad)
         with pytest.raises(ValueError):
             B.guard_step(_tok(6000), _sc(), "take", 9000.0, [], s_cost=bad)
-    assert B.GUARD_AFFORD_MODE == "rule" and B.GUARD_S_COST_MODE == "curve"
+    assert B.GUARD_AFFORD_MODE == "rule" and B.GUARD_S_COST_MODE == "curve"      # 弾かれた指定は今の値（ここでは固定した `curve`）を変えない
 
 
 def test_the_cli_flags_reach_the_modes():
@@ -142,7 +155,7 @@ def test_the_cli_flags_reach_the_modes():
     B.add_guard_s_cost_arg(ap)
     try:
         a = ap.parse_args([])
-        assert B.apply_guard_afford(a) == "rule" and B.apply_guard_s_cost(a) == "curve"      # 省略時は不動
+        assert B.apply_guard_afford(a) == "rule" and B.apply_guard_s_cost(a) == "curve"      # 省略時は不動（固定した `curve` のまま）
         a = ap.parse_args(["--guard-afford", "lenient", "--guard-s-cost", "hand"])
         assert B.apply_guard_afford(a) == "lenient" and B.GUARD_AFFORD_MODE == "lenient"
         assert B.apply_guard_s_cost(a) == "hand" and B.GUARD_S_COST_MODE == "hand"

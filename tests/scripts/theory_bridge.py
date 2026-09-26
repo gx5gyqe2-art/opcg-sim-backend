@@ -44,7 +44,8 @@ s_t     = −( 実際に払った費用 − min(2 つのうち払えた方) )
 > 合計 ≥ 超過＝`lenient`）。守る費用を**この手札で実際に失う価値**で測る切替 `GUARD_S_COST_MODE=hand`（既定は
 > 従来の `c(x)·μ`＝`curve`）。**G-2 の修正（2026-09-26）**: `hand` の守る備えは厳密な最大（`guard_value_exact`）を
 > 1 ラウンド割り引いて読む。失う価値は T67 の札ごとの価値 `max(ΔH, ΔG)` とは違う量（`GUARD_S_COST_MODES` の注記）。
-> **N-2（2026-09-26）**: `GUARD_S_COST_MODE=joint`＝手札の価値を 1 枚 1 役の最適な割り当て（`hand_joint.py`）で読む切替（既定は `curve` のまま）。
+> **N-2（2026-09-26）**: `GUARD_S_COST_MODE=joint`＝手札の価値を 1 枚 1 役の最適な割り当て（`hand_joint.py`）で読む切替。
+> **既定は `joint`**（ユーザ決定 2026-09-26「判断1の続き→(a)」・旧の `c(x)·μ` は `--guard-s-cost curve` で再現）。
 
 ## 暫定値（§0.4 の台帳・**感度を付けて回す**）
 
@@ -346,7 +347,7 @@ def afford_need(x, mode=None):
 
 
 #: **G-2: 守りの判断（`s`）の「守る費用」を何で測るか**（2026-09-25・ユーザ決定「これで行きましょう」）。
-#: `curve`（既定・従来）＝デッキ平均の必要枚数 × 手札 1 枚の一律の値段（`c(x)·μ`）。
+#: `curve`（旧の既定・N-2 まで）＝デッキ平均の必要枚数 × 手札 1 枚の一律の値段（`c(x)·μ`）。
 #: `hand`＝**この手札で実際に失うもの**: カウンター合計が `x + 1000` に届く手札の組 `S` のうち
 #: （【カウンター】イベントの上げ幅は**今のアクティブなドンで払える分だけ**＝`guard_afford.knapsack` と同じ規則）、
 #: **使ったときに手札の価値が一番減らない組の減り**:
@@ -392,8 +393,14 @@ def afford_need(x, mode=None):
 #: 相方待ち／条件の時計の札が在る手札では、残った札（切った札を除く）で読み直す（`hand` と同じ）——その手札では単調性が
 #: 保証できないので割り当ては全部調べ、差は 0 で床を打つ。調べる組は `hand` と違い**常に過不足の無い組だけ**
 #: （余計な札まで切って損が減るのは読み直しの癖で、実際の選択肢ではない）。
+#:
+#: **既定は `joint`**（2026-09-26・ユーザ決定「判断1の続き→(a)」・`docs/reports/2026-09-26_n2_joint_hand_guard_cost.md`）。
+#: 勝者−敗者の守りの罰点の差（負＝勝者の方が理論から外れる逆転）が実記録・合成とも `curve` より縮む（数字は報告の表が正本）。
+#: 帳簿（`g`・`price`）と守りを読まない橋は変わらない。旧の `curve` は `--guard-s-cost curve`
+#: （テストで旧の代数を見るときは `curve` を明示して固定する）。**`joint` では守りの窓ごとに手札の読みが要る**
+#: （`guard_step(hand=)`・`guard_hand_reading(values=True)`）＝橋の実行時間は `curve` のほぼ 2 倍。
 GUARD_S_COST_MODES = ("curve", "hand", "joint")
-GUARD_S_COST_MODE = "curve"
+GUARD_S_COST_MODE = "joint"
 
 
 def set_guard_s_cost_mode(mode):
@@ -406,9 +413,9 @@ def set_guard_s_cost_mode(mode):
 
 def add_guard_s_cost_arg(ap):
     ap.add_argument("--guard-s-cost", default=None, choices=GUARD_S_COST_MODES,
-                    help="**G-2** 守りの判断の守る費用: `curve`（既定・c(x)·μ）／"
+                    help="**G-2** 守りの判断の守る費用: `curve`（旧・c(x)·μ）／"
                          "`hand`（止める札の組のうち、使うと手札の価値が一番減らない組の減り・判断だけに効き帳簿は変えない）／"
-                         "`joint`（**N-2** 同じ形で、手札の価値を 1 枚 1 役の最適な割り当てで読む）")
+                         "`joint`（**N-2・既定** 同じ形で、手札の価値を 1 枚 1 役の最適な割り当てで読む）")
 
 
 def apply_guard_s_cost(a):
@@ -422,7 +429,7 @@ def guard_hand_reading(tok, sc, ci_row, idx2cid, cards, take, mu=MU, deck=None, 
 
     枠ごとの無料／有料のカウンターの分け方は **`guard_afford.hand_counters` と同じ**（同じ枠・同じ式）＝
     `Σ free` と `paid` の並びは `hand_counters` の戻り値と一致する（テストで固定）。`values=False` なら枚数の監査だけ
-    （既定の `curve` で遅くしない）。`values=True` なら V の材料——札ごとの使ったときの価値（`hand_plan.hand_items`）・
+    （`curve` で遅くしない）。`values=True` なら V の材料——札ごとの使ったときの価値（`hand_plan.hand_items`）・
     次の自席ターンからの出す計画の枠・これから来る攻撃・受ける損・相方待ち／条件の時計の状態（`hand_plan.apply_inflow`）。
     相手リーダーのパワーと残りターンは `spent` の分岐と同じ読み方。"""
     tok = np.asarray(tok)
@@ -1242,7 +1249,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 th_g = theta_of(tok, float(sc[SC_MY_LIFE]), float(sc[SC_MY_DON]), mode=theta_mode,
                                 theta=_TOM.theta_take(float(sc[SC_MY_LIFE]), theta=theta))   # T63: 自分のライフ
                 # **G-2**: 手札の読み（`spent` の分岐と同じ入力）。値まで読むのは判断の守る費用を手札で測るときだけ
-                # （既定の `curve` は枚数の監査だけ＝遅くしない）。V の守る備えの受ける損は判断の受ける費用と同じ `Θ·μ`。
+                # （`curve` は枚数の監査だけ＝遅くしない・既定の `joint` は値まで読む）。V の守る備えの受ける損は判断の受ける費用と同じ `Θ·μ`。
                 has_attack = any(x0 >= -PWR_EPS for x0 in incoming_x(tok))   # 無ければ guard_step が None を返す
                 hand_rd = guard_hand_reading(tok, sc, ex["ci"][i], idx2cid, cards, take=float(th_g) * float(mu), mu=mu,
                                              deck=decks.get(w), values=(GUARD_S_COST_MODE in ("hand", "joint") and has_attack))
