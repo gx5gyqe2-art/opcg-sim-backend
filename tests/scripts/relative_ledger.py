@@ -292,13 +292,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                                                       idx2cid, cards, theta, mu, deck_ids=dk,
                                                       j=CB.own_turn_index(t)) * float(scale_a)
                 g_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
-            if CB.THETA_HAND_MODE in ("rule",) + CB.RULE_DON_MODES and PL.is_own_turn(w, t):
-                # **H-4**: `rule` は守る席の**実際の札**を読むので、相手の手札は**その席のターンの最後の行**
-                # （出した後＝相手のターンに持っている手札・使い残したドン）から読む。値は上書きで最後の行が残る。
-                g_last_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
                 shape_at[(w, t)] = (KV.rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
                                                        idx2cid, cards, theta, mu, deck_ids=dk)
                                        if KV.D_MODE == "theory" else None)
+            if CB.THETA_HAND_MODE in ("rule",) + CB.RULE_DON_MODES and PL.is_own_turn(w, t):
+                # **H-4**: `rule` は守る席の**実際の札**を読むので、相手の手札は**その席のターンの最後の行**
+                # （出した後＝相手のターンに持っている手札・使い残したドン）から読む。値は上書きで最後の行が残る。
+                # （**H-4d**: `shape_at` はこの枝の外＝既定の `--d-mode theory` でも埋まる。H-4 で誤ってこの枝に入っていた。）
+                g_last_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
         if CB.THETA_HAND_MODE in CB.RULE_DON_MODES:
             # **H-4b（T109）**: 攻め手の計画は**そのターンの最初の行**で、守る席の手札（相手の直近のターンの
             # 最後の行）に対して 1 回だけ選ぶ。**速さ（`rate_at_turn`）も耐久（下の `state_of_row`）も同じ計画を読む**。
@@ -317,6 +318,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                 rate_at_turn[(w, t)] = KV.rate_of_row(ex["sc"][i0], ex["tok"][i0], ex["ci"][i0],
                                                       idx2cid, cards, theta, mu, deck_ids=dk,
                                                       j=CB.own_turn_index(t), plan=plan) * float(scale_a)
+                if KV.D_MODE == "theory":
+                    shape_at[(w, t)] = KV.rate_terms_of_row(ex["sc"][i0], ex["tok"][i0], ex["ci"][i0],
+                                                            idx2cid, cards, theta, mu, deck_ids=dk, plan=plan)
         last_turn_of = {}
         for (w, t) in rate_at_turn:
             last_turn_of[w] = max(t, last_turn_of.get(w, -1))

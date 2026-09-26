@@ -376,3 +376,36 @@ def test_parts_flag_reaches_collect_and_reads_flags_without_dropping_rows(monkey
     called.clear()
     RL.main(["--in", "x"])
     assert called["parts"] is False
+
+
+def test_theory_d_mode_fills_the_rate_shape_in_the_default_hand_mode(monkeypatch):
+    """**H-4d（レビュー指摘 D4）**: `--d-mode theory` の帳簿は席ごとの速さの形（`shape_at`）を
+    **その席のターンの最初の行で必ず埋める**。H-4 でこの代入が `rule` 系の枝の中へ入り、**既定の手札の形では
+    一度も埋まらなかった**（`set_rate_shape(None, None)`＝rel_K が既定で変わっていた）。
+    3 行の合成の局（席 0 → 席 1 → 席 0）で、席 0 の 2 回目のターンの行に**両席の形**が渡ることを確かめる。"""
+    rows = {"kind": np.zeros(3, np.int64), "who": np.array([0, 1, 0]), "turn": np.array([1, 2, 3]),
+            "z": np.zeros(3), "pol_chosen": np.zeros(3, np.int64), "seed": np.zeros(3, np.int64)}
+    ex = {"sc": np.zeros((3, 70), np.float32), "tok": np.zeros((3, 22, 24), np.float32),
+          "ci": np.zeros((3, 22), np.int64)}
+    game = (rows, {"pol_sig": ["[]"]}, ex, np.ones(3, np.int64), np.zeros(3, np.int64), [0, 1, 2])
+    monkeypatch.setattr(RL.PL, "iter_games", lambda *a, **k: iter([game]))
+    monkeypatch.setattr(RL.CB, "profile_for", lambda dirs: [0.2] * 12)
+    monkeypatch.setattr(RL.CB, "sigma_rel_for", lambda dirs, slope="curve": 1.0)
+    monkeypatch.setattr(RL.KV, "_seat_decks", lambda dirs: {})
+    monkeypatch.setattr(RL.KV, "rate_of_row", lambda *a, **k: 0.1)
+    monkeypatch.setattr(RL.KV, "g_of_row", lambda *a, **k: None)
+    monkeypatch.setattr(RL.KV, "rate_terms_of_row", lambda *a, **k: ("shape",))
+    seen = []
+
+    class _Stop(Exception):
+        pass
+
+    def _record(me, opp):
+        seen.append((me, opp))
+        raise _Stop()
+    monkeypatch.setattr(RL.KV, "set_rate_shape", _record)
+    monkeypatch.setattr(RL.KV, "D_MODE", "theory")
+    with pytest.raises(_Stop):
+        RL.collect(["x"], 0)
+    assert RL.CB.THETA_HAND_MODE == "cuttable_forced"
+    assert seen == [(("shape",), ("shape",))]
