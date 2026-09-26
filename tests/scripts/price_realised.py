@@ -177,6 +177,17 @@ DON_COST = 0.66 * MU
 FLOW_ACTS = frozenset({"ACTIVE_DON", "ATTACH_DON", "GRANT_KEYWORD", "BUFF", "BP_BUFF", "REST"})
 
 
+#: **F-4**: 攻撃の行を「攻め手が【アタック時】能力を持つか」で層別した表を出すか（既定 `False`＝出力は従来のまま）
+ATTACK_SPLIT = False
+
+
+def has_on_attack(cid):
+    """攻め手のカードが【アタック時】能力を持つか（F-4 の層別）。"""
+    c = EV._all_cards().get(cid) if cid else None
+    return bool(c) and any((ab.get("trigger") or ab.get("timing")) in EV.ON_ATTACK_TRIGGERS
+                           for ab in (c.get("abilities") or []))
+
+
 def primary_action(cid, triggers=EV.ACTIVATE_TRIGGERS):
     """その契機の最初の能力の最初の動作の型（効果の型の内訳用）。読めなければ `"?"`。"""
     c = EV._all_cards().get(cid) if cid else None
@@ -328,7 +339,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             rec["price"][fam] += float(v); rec["real"][fam] += float(real); rec["n"][fam] += 1
             rec["rows"].append({"fam": fam, "price": float(v), "real": float(real), "real_te": float(real_te),
                                 "gross": float(gross), "act": act, "cid": cid, "turn": t, "play_parts": play_parts,
-                                "hand_gains": list(gains)})                                 # T69: 窓で手札に入った札の gain
+                                "hand_gains": list(gains),                                  # T69: 窓で手札に入った札の gain
+                                "on_attack": has_on_attack(cid) if fam == "attack" else None})   # F-4: 層別用（出力には出ない）
             # **ターン単位の恒等式**——価格の和 対 「最初の自分の行 → 最後の自分の行」の実現
             tk = rec["turns"].setdefault(t, {"price": 0.0, "first": None, "last": None, "acts": set()})
             tk["price"] += float(v)
@@ -393,6 +405,11 @@ def summarise(per, reps=200, seed=0):
         if len(rs) < 10:
             continue
         out["by_family"][f] = block(rs)
+    if ATTACK_SPLIT:
+        # **F-4**: 攻撃の行を攻め手の【アタック時】能力の有無で層別する
+        out["attack_by_on_attack"] = {k: block(rs) for k, rs in (
+            ("with", [r for r in allrows if r["fam"] == "attack" and r.get("on_attack")]),
+            ("without", [r for r in allrows if r["fam"] == "attack" and not r.get("on_attack")])) if len(rs) >= 10}
     # 効果の型の内訳（最初の動作の型ごと）
     eff = [r for r in allrows if r["fam"] == "effect"]
     acts = {}
@@ -495,12 +512,16 @@ def main(argv=None):
     _HP.add_cond_clock_arg(ap)
     _TO.add_attack_ability_arg(ap)
     _TO.add_passive_body_arg(ap)
+    ap.add_argument("--attack-split", action="store_true",
+                    help="**F-4** 攻撃の行を攻め手の【アタック時】能力の有無で層別した表も出す")
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_decision_row(a)
     _TO.apply_attack_ability(a)
     _TO.apply_passive_body(a)
     _TO.reset_wiring_stats()
+    global ATTACK_SPLIT
+    ATTACK_SPLIT = bool(a.attack_split)
     apply_nu_mode(a)
     _TO.apply_surv_mode(a)
     _TO.apply_cbar_mode(a)

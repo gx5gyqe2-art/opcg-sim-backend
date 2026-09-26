@@ -1115,6 +1115,7 @@ PASSIVE_BODY_MODES = ("off", "on")
 PASSIVE_BODY_MODE = "off"
 #: 切替 on のときの内訳（何本に値が付き、何本が読めなかったか）。**off では触らない**。
 WIRING_STATS = {"attack_cand": 0, "attack_with_ability": 0, "attack_nonzero": 0, "attack_unpriced": 0,
+                "attack_target_removed": 0, "passive_self_mods": 0, "passive_keyword": 0,
                 "attack_sum": 0.0, "play_char": 0, "passive_with_ability": 0, "passive_nonzero": 0,
                 "passive_unpriced": 0, "passive_sum": 0.0}
 
@@ -1175,25 +1176,8 @@ def slot_don(tok_row, slot):
     return int(round(float(tok_row[s, S_ATTACHED_DON]) * 5.0))
 
 
-def attack_ability_value(cid, ctx, actx, k=0, src_don=None):
-    """**F-2**: 攻め手 `cid` の【アタック時】能力の値（持たなければ 0・読めなければ 0 として数え `WIRING_STATS` に残す）。
-
-    `actx` は攻撃の価格に使った `{power（ドン k 枚後）, target_power, is_leader, nu_target, blockers, theta, mu}`
-    ——攻め手自身への上昇はこの攻撃の価格の差で読む（`effect_value.attack_self_value`）。
-    状態は `_effect_state(ctx)` に**攻撃の行の差分**だけを重ねる（呼び側の `ctx["st"]` は書き換えない）:
-    `source_rested=True`（アタックでレスト）・`source_paid=0`（出す費用は払わない）・`my_don_active −= k`（DON_BOX で付けた分）・
-    `source_don_attached = 付与 + k`（記録の付与が読めるときだけ＝【ドン!!×N】の判定）。
-    """
-    try:
-        import effect_value as EV
-    except Exception:
-        return 0.0
-    WIRING_STATS["attack_cand"] += 1
-    c = EV._all_cards().get(str(cid) or "") if cid else None
-    if not c or not any((ab.get("trigger") or ab.get("timing")) in EV.ON_ATTACK_TRIGGERS
-                        for ab in (c.get("abilities") or [])):
-        return 0.0
-    WIRING_STATS["attack_with_ability"] += 1
+def _ability_on_attack(EV, cid, ctx, actx, k, src_don, opp_bodies):
+    """【アタック時】能力の値（`card_value`）。読めなければ `None`。"""
     st = _effect_state(ctx)
     st["attack_ctx"] = dict(actx)
     st["source_rested"] = True
@@ -1202,40 +1186,143 @@ def attack_ability_value(cid, ctx, actx, k=0, src_don=None):
         st["my_don_active"] = max(0, int(st["my_don_active"]) - int(round(float(k))))
     if src_don is not None:
         st["source_don_attached"] = int(src_don) + int(round(float(k)))
-    v, _unp = EV.card_value(cid, EV.ON_ATTACK_TRIGGERS, st=st, offered=False, no_ability=0.0,
-                            opp_bodies=ctx.get("opp_bodies"))
-    if v is None:
+    with EV.opaque_as_upper():             # F fix A: 対象を取れるかを盤面で決める（読めない絞り込みは上限）
+        v, _unp = EV.card_value(cid, EV.ON_ATTACK_TRIGGERS, st=st, offered=False, no_ability=0.0,
+                                opp_bodies=opp_bodies)
+    return v
+
+
+def _target_index(bodies, target_power, target_blocker=None):
+    """相手の体の並びの中で**攻撃の対象**に当たる体の位置（パワーが `PWR_EPS` で一致・ブロッカーの旗が合うものを先に）。無ければ `None`。"""
+    hits = [i for i, b in enumerate(bodies or ()) if abs(float(b.get("power") or 0.0) - float(target_power)) <= PWR_EPS]
+    if not hits:
+        return None
+    if target_blocker is not None:
+        for i in hits:
+            if bool(bodies[i].get("blocker")) == bool(target_blocker):
+                return i
+    return hits[0]
+
+
+def attack_ability_value(cid, ctx, actx, k=0, src_don=None, base=0.0, target_blocker=None):
+    """**F-2**: 攻め手 `cid` の【アタック時】能力を足した**攻撃の価格**（能力を持たなければ `base` そのもの・読めなければ `base`）。
+
+    `base` は攻撃の価格（`attack_value`・ドンの費用を引く前）。`actx` は攻撃の価格に使った
+    `{power（ドン k 枚後）, target_power, is_leader, nu_target, blockers, theta, mu}`
+    ——攻め手自身への上昇はこの攻撃の価格の差で読む（`effect_value.attack_self_value`）。
+    状態は `_effect_state(ctx)` に**攻撃の行の差分**だけを重ねる（呼び側の `ctx["st"]` は書き換えない）:
+    `source_rested=True`（アタックでレスト）・`source_paid=0`（出す費用は払わない）・`my_don_active −= k`（DON_BOX で付けた分）・
+    `source_don_attached = 付与 + k`（記録の付与が読めるときだけ＝【ドン!!×N】の判定）。
+
+    **F fix A（2026-09-26）**: キャラ狙いで、能力が**攻撃の対象そのもの**を場から離せるとき、対象が離れればバトルは終わる。
+    だから `max( 攻撃 ＋ 能力（対象以外の相手の体から選ぶ）, 能力（対象も含めて選ぶ・バトルは終わる＝攻め手自身の上昇は 0） )`。
+    能力が相手の体に触らなければ前者が常に大きい＝従来と同じ値。対象を盤面の中で同定できなければ従来どおり足す。
+    """
+    try:
+        import effect_value as EV
+    except Exception:
+        return float(base)
+    WIRING_STATS["attack_cand"] += 1
+    c = EV._all_cards().get(str(cid) or "") if cid else None
+    if not c or not any((ab.get("trigger") or ab.get("timing")) in EV.ON_ATTACK_TRIGGERS
+                        for ab in (c.get("abilities") or [])):
+        return float(base)
+    WIRING_STATS["attack_with_ability"] += 1
+    bodies = ctx.get("opp_bodies")
+    ti = None if (actx.get("is_leader") or bodies is None) else _target_index(bodies, actx["target_power"], target_blocker)
+    if ti is None:
+        v = _ability_on_attack(EV, cid, ctx, actx, k, src_don, bodies)
+        total = None if v is None else float(base) + float(v)
+    else:
+        others = list(bodies[:ti]) + list(bodies[ti + 1:])
+        v_keep = _ability_on_attack(EV, cid, ctx, actx, k, src_don, others)
+        v_end = _ability_on_attack(EV, cid, ctx, dict(actx, ended=True), k, src_don, bodies)
+        if v_keep is None or v_end is None:
+            total = None
+        else:
+            total = max(float(base) + float(v_keep), float(v_end))
+            if total > float(base) + float(v_keep) + 1e-12:
+                WIRING_STATS["attack_target_removed"] += 1
+    if total is None:
         WIRING_STATS["attack_unpriced"] += 1
-        return 0.0
-    if abs(float(v)) > 0.0:
+        return float(base)
+    if abs(total - float(base)) > 0.0:
         WIRING_STATS["attack_nonzero"] += 1
-    WIRING_STATS["attack_sum"] += float(v)
-    return float(v)
+    WIRING_STATS["attack_sum"] += total - float(base)
+    return float(total)
+
+
+_KEYWORDS = {}
+
+
+def printed_keywords(cid):
+    """カードに**印刷された**キーワード（カード DB の `keywords`・文字列）。判らなければ空。"""
+    if not cid:
+        return ()
+    if cid not in _KEYWORDS:
+        try:
+            from opcg_sim.loop import decks as D
+            m = D.load_db().get_card(cid)
+        except Exception:
+            m = None
+        _KEYWORDS[cid] = tuple(str(getattr(k, "value", k)) for k in (getattr(m, "keywords", None) or ()))
+    return _KEYWORDS[cid]
 
 
 def passive_body_value(cid, src, ctx, theta=THETA, mu=MU):
-    """**F-3a**: キャラ `cid` の体に足す継続効果の値（`effect_value.continuous_body_value`）。
+    """**F-3a**: キャラ `cid` の登場の価格に足す、継続効果と印刷のキーワードの値。3 つの和:
 
-    生存の値 `ko_p × ν` の `ν` と `ko_p` は**この体のもの**（`nu_of` と同じ引数・`pair` なら `ko_p_of(パワー)`）。"""
+    1. **体の価格の差**（F fix B/C）: 継続効果がこの体自身に与えるパワーとブロッカー（条件は状態から判定・
+       `effect_value.continuous_self_mods`）を入れた `ν` − 印刷の値の `ν`。【自分のターン中】の上昇は殴る側・
+       【相手のターン中】は守る側（`nu_of(def_power=…)`）・【常時】は両方。【ドン!!×N】の費用は引く。
+       **場に出た後はエンジンがトークンに書くので攻撃の行には足さない**——足すのは印刷の値で読む登場の行だけ。
+    2. **トークンに届かない継続効果**（`effect_value.continuous_body_value`）: 生存・テンポ・非ブロッカーのキーワード。
+       生存の `ko_p × ν` の `ν` と `ko_p` は 1. を入れた後のこの体のもの。
+    3. **印刷のキーワード**（F fix D・`effect_value.printed_keyword_value`）: 速攻・ダブルアタック・バニッシュ・ブロック不可を
+       条件つきの付与と同じ式で（条件つき ≤ 条件なし）。
+    """
     try:
         import effect_value as EV
     except Exception:
         return 0.0
+    st = _effect_state(ctx)
     pw = float(src.get("power") or 0.0)
-    kp = ko_p_of(pw) if NU_MODE == "pair" else KO_P
-    nu_self = nu_of(pw, ctx["opp_leader_power"], ctx["r_turns"], theta, mu, is_blocker=src.get("blocker"),
-                    opp_chars=ctx.get("opp_chars"), my_leader_power=ctx["my_leader_power"])
+    blk0 = src.get("blocker")
+    args = (ctx["opp_leader_power"], ctx["r_turns"], theta, mu)
+    kw = dict(opp_chars=ctx.get("opp_chars"), my_leader_power=ctx["my_leader_power"])
     WIRING_STATS["play_char"] += 1
-    v, bad = EV.continuous_body_value(cid, st=_effect_state(ctx), nu=nu_self, ko_p=kp,
-                                      opp_bodies=ctx.get("opp_bodies"))
+    mods = EV.continuous_self_mods(cid, st=st)
+    atk, dfn = pw + mods["atk"], pw + mods["def"]
+    blk = bool(blk0) or bool(mods["blocker"])
+    nu0 = nu_of(pw, *args, is_blocker=blk0, **kw)
+    if mods["n"]:
+        nu1 = nu_of(atk, *args, is_blocker=(True if blk else blk0), def_power=dfn, **kw)
+        body = nu1 - nu0 - float(mods["don_cost"])
+        if mods["don_cost"] > 0.0:
+            # 【ドン!!×N】は付けない自由がある（`ability_value` の T74 と同じ床）＝費用を要さない能力だけの読みと `max`
+            a_f, d_f = pw + mods["atk_free"], pw + mods["def_free"]
+            blk_f = bool(blk0) or bool(mods["blocker_free"])
+            nu_f = nu_of(a_f, *args, is_blocker=(True if blk_f else blk0), def_power=d_f, **kw)
+            if nu_f - nu0 > body:
+                nu1, atk, dfn, body = nu_f, a_f, d_f, nu_f - nu0
+        WIRING_STATS["passive_self_mods"] += 1
+    else:
+        nu1, body = nu0, 0.0
+    kp = ko_p_of(dfn) if NU_MODE == "pair" else KO_P
+    v, bad = EV.continuous_body_value(cid, st=st, nu=nu1, ko_p=kp, opp_bodies=ctx.get("opp_bodies"))
+    kv = EV.printed_keyword_value(dict(EV._all_cards().get(str(cid)) or {}, power=pw), printed_keywords(cid),
+                                  st=st, opp_bodies=ctx.get("opp_bodies"))
+    if kv:
+        WIRING_STATS["passive_keyword"] += 1
+    tot = float(body) + float(v) + float(kv)
     if bad:
         WIRING_STATS["passive_unpriced"] += int(bad)
-    if abs(float(v)) > 0.0 or bad:
+    if abs(tot) > 0.0 or bad:
         WIRING_STATS["passive_with_ability"] += 1
-    if abs(float(v)) > 0.0:
+    if abs(tot) > 0.0:
         WIRING_STATS["passive_nonzero"] += 1
-    WIRING_STATS["passive_sum"] += float(v)
-    return float(v)
+    WIRING_STATS["passive_sum"] += tot
+    return tot
 
 
 _IDENT = {}
@@ -1610,8 +1697,11 @@ def shield_of(power, opp_leader_power):
 
 
 def nu_of(power, opp_leader_power, r_turns, theta=THETA, mu=MU, block_p=None, ko_p=KO_P,
-          is_blocker=None, opp_chars=None, my_leader_power=None, mode=None):
+          is_blocker=None, opp_chars=None, my_leader_power=None, mode=None, def_power=None):
     """場のキャラ 1 体の価格 `ν`（`game_theory.md` §14.1）。
+
+    `def_power`（F fix C・既定 `None`＝`power` と同じ＝従来と 1 ビットも変わらない）は**相手の手番のパワー**——
+    【相手のターン中】の上昇は殴る側には効かず、倒されにくさ（`ko_p` の形）と身代わりの帯にだけ効く。
 
     残り `r_turns` ターンぶんの攻撃の価値＋ブロックの option value − KO される損。
 
@@ -1629,8 +1719,9 @@ def nu_of(power, opp_leader_power, r_turns, theta=THETA, mu=MU, block_p=None, ko
     # **P5 と P4 は対で入れる**（T21）——身代わりを足すと `ν` は上がり、`ko_p` の形を
     # 入れると帯ごとに上下する。**片方だけ入れると全体が悪化する**と測定で判っている。
     mode = NU_MODE if mode is None else mode
-    shield = shield_of(power, opp_leader_power) if mode == "pair" else 0.0
-    kp = ko_p_of(power) if mode == "pair" else float(ko_p)
+    dp = power if def_power is None else def_power
+    shield = shield_of(dp, opp_leader_power) if mode == "pair" else 0.0
+    kp = ko_p_of(dp) if mode == "pair" else float(ko_p)
     atk = attack_stream(power, opp_leader_power, r_turns, theta, mu, opp_chars,
                         my_leader_power, kp)
     block = float(block_p) * theta * mu             # 1 回ぶんの攻撃を消す価値
@@ -1792,14 +1883,15 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
                     if abs(pb - tp) <= PWR_EPS:
                         blockers = blockers[:i] + blockers[i + 1:]
                         break
-        v = attack_value(sp, tp, lead, theta, mu, nu_target=nu_t, blockers=blockers) - dcost
+        v = attack_value(sp, tp, lead, theta, mu, nu_target=nu_t, blockers=blockers)
         if ATTACK_ABILITY_MODE == "on":
             # **F-2**: 攻め手の【アタック時】能力（攻撃の価格と同じ `P`・対象・ブロッカー・`Θ` で読む）
-            v += attack_ability_value(cid, ctx, {"power": sp, "target_power": tp, "is_leader": lead,
-                                                 "nu_target": nu_t, "blockers": list(blockers),
-                                                 "theta": theta, "mu": mu},
-                                      k=(k if at == "DON_BOX" else 0), src_don=src_don)
-        return v
+            v = attack_ability_value(cid, ctx, {"power": sp, "target_power": tp, "is_leader": lead,
+                                                "nu_target": nu_t, "blockers": list(blockers),
+                                                "theta": theta, "mu": mu},
+                                     k=(k if at == "DON_BOX" else 0), src_don=src_don, base=v,
+                                     target_blocker=(tgt or {}).get("blocker") if tgt is not None else None)
+        return v - dcost
     if at in ("ATTACH_DON", "DON_BOX"):
         # **T150b/T150f-2**: 純付与も同じ費用を払う（既定 off では常に 0）。付与先の体そのものが
         # `src_x`（DON_BOX の +1000k はこの枝には掛からない・T150f-1）。

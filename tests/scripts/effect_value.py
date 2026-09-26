@@ -362,6 +362,24 @@ OPAQUE_TARGET_KEYS = ("flags", "exclude_ids", "is_vanilla", "is_unique_name",
                       "save_id")
 
 
+#: **F fix A**: 攻撃の行の【アタック時】を値付けしている間だけ真（`opaque_as_upper`）——読めない絞り込み（「ドン!!が付与されている」等）を
+#: **上限として読む**（取れるとして、読める絞り込みだけで盤面から選ぶ）。偽（既定）なら従来どおり `None`＝盤面を使わない。
+#: 攻撃の対象を能力が取れるかを盤面で決めないと、対象が居なくても平均の体を取る値が付いて二重になる（レビュー A）。
+_OPAQUE_UPPER = [False]
+
+
+class opaque_as_upper:
+    """`with opaque_as_upper():` の間だけ読めない絞り込みを上限として読む（抜けるときに必ず戻す）。"""
+
+    def __enter__(self):
+        self._before = _OPAQUE_UPPER[0]
+        _OPAQUE_UPPER[0] = True
+
+    def __exit__(self, *_exc):
+        _OPAQUE_UPPER[0] = self._before
+        return False
+
+
 def eligible_bodies(target, bodies):
     """**その動作が実際に取れる相手の体**を価格の高い順で返す（読めなければ `None`）。
 
@@ -385,7 +403,7 @@ def eligible_bodies(target, bodies):
     t = target or {}
     for k in OPAQUE_TARGET_KEYS:
         v = t.get(k)
-        if v not in (None, [], (), "", False, 0):
+        if v not in (None, [], (), "", False, 0) and not _OPAQUE_UPPER[0]:
             return None
     # **素性で絞る指定は、体の側にその素性が在るときだけ判定する**（2026-09-15）
     for k, need in FILTER_NEEDS.items():
@@ -1556,6 +1574,13 @@ def attack_self_value(effect, at, st, opp, theta=THETA, mu=MU, lam=LAM):
     actx = (st or {}).get("attack_ctx")
     if actx is None or opp or not _is_source_target(effect):
         return None
+    if actx.get("ended"):
+        # **F fix A**: 能力が攻撃の対象そのものを場から離した読み＝バトルは終わる＝攻め手自身の上昇は何も生まない
+        if at in ("BUFF", "BP_BUFF") and _magnitude(effect) > 0 and not _is_set_power(effect):
+            return 0.0
+        if at in KEYWORD_KINDS and str(effect.get("status") or "") in ("ダブルアタック", "バニッシュ"):
+            return 0.0
+        return None
     from theory_order import attack_value
     p = float(actx["power"]); tp = float(actx["target_power"]); lead = bool(actx["is_leader"])
     th = float(actx["theta"]); m = float(actx["mu"])
@@ -1579,14 +1604,22 @@ def attack_self_value(effect, at, st, opp, theta=THETA, mu=MU, lam=LAM):
 
 #: **F-2**: 攻撃の行で解決する契機
 ON_ATTACK_TRIGGERS = ("ON_ATTACK",)
-#: **F-3a**: 継続効果として再計算される契機（`rust/.../effects/passives.rs::recalc_steps` の自分側）
-CONTINUOUS_TRIGGERS = ("PASSIVE", "YOUR_TURN")
-#: **F-3a**: エンジンの再計算が**トークンに書き込む**ので理論に既に届いている動作——パワー（列 0）・コスト（手札の自己コスト）・
-#: 名前の読み替え・恒等式の勝利。キーワード付与は**ブロッカーだけ**が列 6 に届く（`KEYWORD_REFLECTED`）。
+#: **F-3a**: 継続効果として再計算される契機（`rust/.../effects/passives.rs::recalc_steps`）——
+#: **【相手のターン中】も含む**（F fix C・2026-09-26: エンジンは `OPPONENT_TURN` も境界ごとに再適用する＝
+#: 守る側のパワー・ブロッカー・KO／レストされない耐性は生存に効く）。
+CONTINUOUS_TRIGGERS = ("PASSIVE", "YOUR_TURN", "OPPONENT_TURN")
+#: 自分の手番に効く契機（攻める側のパワー）・相手の手番に効く契機（守る側のパワーとブロッカー）
+ATTACK_SIDE_TRIGGERS = ("PASSIVE", "YOUR_TURN")
+DEFENCE_SIDE_TRIGGERS = ("PASSIVE", "OPPONENT_TURN")
+#: **F-3a**: エンジンの再計算が**場に居る体のトークンに書き込む**動作——パワー（列 0）・コスト・名前の読み替え・勝利。
+#: キーワード付与は**ブロッカーだけ**が列 6 に届く（`KEYWORD_REFLECTED`）。**登場の行は印刷の値で体を値付けする**ので、
+#: 自分自身へのパワー上昇とブロッカーの付与は `continuous_self_mods` が体の価格の差として別に足す（F fix B）。
 REFLECTED_KINDS = ("BUFF", "BP_BUFF", "COST_BUFF", "COST_CHANGE", "SET_COST", "RULE_PROCESSING", "VICTORY")
 KEYWORD_REFLECTED = ("ブロッカー",)
 #: **F-3a**: エンジンが「継続効果ではない」として再計算で飛ばす能力（`passives.rs::is_reactive_passive` と同じ語）
 REACTIVE_PATTERNS = ("された時、", "した時、", "受けた時、", "なった時、", "離れた時、")
+#: **F fix D**: 印刷のキーワードのうち登場の価格に足すもの（`KEYWORD_PER_TURN` の式・ブロッカーは既に `ν` に在る）
+PRINTED_KEYWORDS = tuple(k for k in KEYWORD_PER_TURN if k != "ブロッカー")
 
 
 def is_reactive(ab):
@@ -1597,13 +1630,8 @@ def is_reactive(ab):
     return any(p in txt for p in REACTIVE_PATTERNS)
 
 
-def _strip_children(e):
-    """動作 1 つだけの浅い写し（`walk_actions` が子を二度辿らないように子の鍵を落とす）。"""
-    return {k: v for k, v in e.items() if k not in ("sub_effect", "actions", "effects", "options")}
-
-
 def _unreflected(e):
-    """その動作は**トークンに届いていない**（理論から見えない）か。"""
+    """その動作は**場に居る体のトークンに届いていない**（理論から見えない）か。"""
     at = str(e.get("type") or "")
     if at in REFLECTED_KINDS:
         return False
@@ -1612,19 +1640,57 @@ def _unreflected(e):
     return True
 
 
+def _is_cost_buff(e):
+    """`BUFF` の形で出る**コスト**の増減（パーサは `status == "COST_REDUCTION"` で出す）。"""
+    at = str(e.get("type") or "")
+    if at in ("COST_BUFF", "COST_CHANGE", "SET_COST"):
+        return True
+    return str(e.get("status") or "") == "COST_REDUCTION"
+
+
+def _neutralized(effect, keep):
+    """効果木を**形のまま**写し、`keep` を満たさない動作を印（`SELECT`＝値 0）に替える。`(写し, 残した動作の数)`。
+
+    木を平らにしないのは、L の直し（「〜してもよい」の塊・「そうした場合」の枝・選択肢の最大）が木の形を読むから。
+    消した動作は任意・「〜まで」の旗も落とす（空の塊を作らない）。継続効果の「攻撃ごと」のキーワード
+    （ダブルアタック・バニッシュ）は期間が書かれていなければ `PERMANENT`（体が居る間ずっと）として読む。
+    """
+    kept = [0]
+
+    def rec(o):
+        if isinstance(o, list):
+            return [rec(x) for x in o]
+        if not isinstance(o, dict):
+            return o
+        d = {k: rec(v) for k, v in o.items()}
+        if d.get("type"):
+            if keep(o):
+                kept[0] += 1
+                got = KEYWORD_PER_TURN.get(str(d.get("status") or ""))
+                if (str(d.get("type")) in KEYWORD_KINDS and got is not None and got[0] == "turn"
+                        and str(d.get("duration") or "") not in DURATION_TURNS):
+                    d["duration"] = "PERMANENT"
+            else:
+                d["type"] = "SELECT"
+                d.pop("is_optional", None)
+                if isinstance(d.get("target"), dict):
+                    d["target"] = dict(d["target"], is_up_to=False)
+        return d
+
+    return rec(effect), kept[0]
+
+
 def continuous_body_value(cid, st=None, nu=NU_AVG, ko_p=KO_P, opp_bodies=None, cards=None):
-    """**F-3a（2026-09-26）**: キャラの【常時】／【自分のターン中】の継続効果のうち、**トークンに届いていない**部分の価格。
+    """**F-3a（2026-09-26）**: キャラの【常時】／【自分のターン中】／【相手のターン中】の継続効果のうち、
+    **トークンに届かない**部分の価格。`(値, 読めなかった能力の数)` を返す。能力を持たなければ `(0.0, 0)`。
 
-    `(値, 読めなかった能力の数)` を返す。能力を持たなければ `(0.0, 0)`。
-
-    - **反応型は除く**（`is_reactive`＝エンジン自身が再計算で飛ばす）。
-    - **届いている動作は除く**（`REFLECTED_KINDS`・ブロッカーの付与）——パワーとブロッカーは `slot_power`／`is_blocker_active`
-      から既に `ν` に入っているので、ここで足すと二重になる。
-    - 残りの動作は**既存の値付けそのもの**（`ability_value`）で読む: 生存（`SURVIVE_KINDS`＝`ko_p × ν`）・テンポ（`TEMPO`）・
-      キーワード（速攻＝`granted_attack_value`・アクティブへの攻撃＝`active_target_option`・ブロック不可＝`BLOCK_PREMIUM`・
-      ダブルアタック／バニッシュ＝`keyword_delta` × 効く攻撃の回数）。**継続効果は体が居る間ずっと効く**ので、
-      回数を掛ける型（`turn`）は期間が書かれていなければ `PERMANENT`（残りターン）として読む（`attack_turns_of` の既存の規約）。
-    - **置換（`REPLACE_EFFECT`＝「KO される場合、代わりに〜できる」）の「代わりに」の部分は KO が来たときだけ起きる**ので
+    - **反応型は除く**（`is_reactive`＝エンジン自身が再計算で飛ばす・F-3b の領分）。
+    - **パワー・コスト・ブロッカーの付与は除く**（`REFLECTED_KINDS`）——自分自身へのパワーとブロッカーは
+      `continuous_self_mods` が体の価格の差で足す（ここで足すと二重）。
+    - 残りの動作は**既存の値付けそのもの**（`ability_value`・木の形のまま）: 生存（`SURVIVE_KINDS`＝`ko_p × ν`）・
+      テンポ（`TEMPO`）・キーワード（速攻＝`granted_attack_value`・アクティブへの攻撃＝`active_target_option`・
+      ブロック不可＝`BLOCK_PREMIUM`・ダブルアタック／バニッシュ＝`keyword_delta` × 残りターン）。
+    - **置換（「KO される場合、代わりに〜できる」）の「代わりに」の部分は KO が来たときだけ起きる**ので
       `ko_p` を掛け、生存の値と合わせて **0 に床**（払わない自由がある）。
     - 条件は `st` から判定（`condition_factor`・`offered=False`）。**新定数ゼロ**。
     """
@@ -1635,34 +1701,103 @@ def continuous_body_value(cid, st=None, nu=NU_AVG, ko_p=KO_P, opp_bodies=None, c
     for ab in (c.get("abilities") or []):
         if (ab.get("trigger") or ab.get("timing")) not in CONTINUOUS_TRIGGERS or is_reactive(ab):
             continue
-        acts = [_strip_children(e) for e in walk_actions(ab.get("effect")) if _unreflected(e)]
-        if not acts:
+        tree, n = _neutralized(ab.get("effect"), _unreflected)
+        if not n:
             continue
-        for e in acts:
-            got = KEYWORD_PER_TURN.get(str(e.get("status") or ""))
-            if (str(e.get("type") or "") in KEYWORD_KINDS and got is not None and got[0] == "turn"
-                    and str(e.get("duration") or "") not in DURATION_TURNS):
-                e["duration"] = "PERMANENT"
-        replace = any(str(e.get("type") or "") == "REPLACE_EFFECT" for e in acts)
-        if replace:
-            surv = [e for e in acts if family_of(str(e.get("type") or "")) == "survive"]
-            rest = [e for e in acts if family_of(str(e.get("type") or "")) != "survive"]
-            v1, _u1 = ability_value({**ab, "effect": {"actions": surv}}, nu=nu, ko_p=ko_p, card=c,
-                                    st=st, opp_bodies=opp_bodies)
-            v2, _u2 = ability_value({**ab, "effect": {"actions": rest}, "cost": None}, nu=nu, ko_p=ko_p,
-                                    card=c, selection=False, st=st, opp_bodies=opp_bodies) if rest else (0.0, [])
+        acts = walk_actions(ab.get("effect"))
+        if any(str(e.get("type") or "") == "REPLACE_EFFECT" for e in acts):
+            surv, _n1 = _neutralized(ab.get("effect"), lambda e: _unreflected(e) and family_of(str(e.get("type") or "")) == "survive")
+            rest, n2 = _neutralized(ab.get("effect"), lambda e: _unreflected(e) and family_of(str(e.get("type") or "")) != "survive")
+            v1, _u1 = ability_value({**ab, "effect": surv}, nu=nu, ko_p=ko_p, card=c, st=st, opp_bodies=opp_bodies)
+            v2, _u2 = (ability_value({**ab, "effect": rest, "cost": None}, nu=nu, ko_p=ko_p, card=c, selection=False,
+                                     st=st, opp_bodies=opp_bodies) if n2 else (0.0, []))
             if v1 is None or v2 is None:
                 bad += 1
                 continue
             total += max(0.0, float(v1) + float(ko_p) * float(v2))
             continue
-        v, _u = ability_value({**ab, "effect": {"actions": acts}}, nu=nu, ko_p=ko_p, card=c,
-                              st=st, opp_bodies=opp_bodies)
+        v, _u = ability_value({**ab, "effect": tree}, nu=nu, ko_p=ko_p, card=c, st=st, opp_bodies=opp_bodies)
         if v is None:
             bad += 1
             continue
         total += float(v)
     return float(total), bad
+
+
+def continuous_self_mods(cid, st=None, cards=None):
+    """**F fix B/C（2026-09-26）**: 継続効果が**この体自身**に与えるパワーとブロッカー（登場の行で体の価格に入れる分）。
+
+    `{"atk": 攻める側のパワーの増減, "def": 守る側のパワーの増減, "blocker": ブロッカーを得るか, "don_cost": 【ドン!!×N】の費用,
+    "n": 効いた能力の数}`。**場に出た後はエンジンがトークンに書く**が、**登場の行の体の価格は印刷の値で読む**ので、
+    ここで条件を状態から判定し（`condition_factor`）、成り立つ能力の分だけ動かす:
+
+    - パワー（`BUFF`／`BP_BUFF`・自分自身・コストの増減と「X にする」と式の値は除く）: 【常時】は両側・【自分のターン中】は
+      攻める側・【相手のターン中】は守る側。
+    - ブロッカーの付与（自分自身）: 【常時】【相手のターン中】だけ（ブロックは相手の手番に起きる）。
+    - 【ドン!!×N】の費用 `N·δ/R`（`_don_attach_cost`・既存）——**付けない自由がある**ので、呼び側は
+      「費用を要さない能力だけ」（`*_free`）の読みとの `max` を取る。同じ能力に見えない動作が在れば
+      `continuous_body_value` 側が既に引くので、ここでは引かない（二重に引かない）。
+    """
+    out = {"atk": 0.0, "def": 0.0, "blocker": False, "don_cost": 0.0, "n": 0,
+           # 【ドン!!×N】を要さない能力だけの分（付けない自由＝費用を払わない読みとの `max` に使う）
+           "atk_free": 0.0, "def_free": 0.0, "blocker_free": False}
+    c = (cards or _all_cards()).get(str(cid) or "")
+    if not c:
+        return out
+    for ab in (c.get("abilities") or []):
+        trg = ab.get("trigger") or ab.get("timing")
+        if trg not in CONTINUOUS_TRIGGERS or is_reactive(ab):
+            continue
+        acts = walk_actions(ab.get("effect"))
+        mine = []
+        for e in acts:
+            if not _is_source_target(e):
+                continue
+            at = str(e.get("type") or "")
+            if (at in ("BUFF", "BP_BUFF") and not _is_cost_buff(e) and not _is_set_power(e)
+                    and not (e.get("value") or {}).get("dynamic_source") and _magnitude(e) != 0.0):
+                mine.append(("power", _magnitude(e)))
+            elif at in KEYWORD_KINDS and str(e.get("status") or "") == "ブロッカー" and trg in DEFENCE_SIDE_TRIGGERS:
+                mine.append(("blocker", None))
+        if not mine:
+            continue
+        f = condition_factor(ab, st, False)
+        if f <= 0.0:
+            continue
+        dc = _don_attach_cost(ab, st, False)
+        free = dc <= 0.0
+        for kind, mag in mine:
+            if kind == "power":
+                if trg in ATTACK_SIDE_TRIGGERS:
+                    out["atk"] += float(f) * float(mag)
+                    out["atk_free"] += float(f) * float(mag) if free else 0.0
+                if trg in DEFENCE_SIDE_TRIGGERS:
+                    out["def"] += float(f) * float(mag)
+                    out["def_free"] += float(f) * float(mag) if free else 0.0
+            else:
+                out["blocker"] = True
+                out["blocker_free"] = out["blocker_free"] or free
+        out["n"] += 1
+        if not any(_unreflected(e) for e in acts):
+            out["don_cost"] += dc
+    return out
+
+
+def printed_keyword_value(card, keywords, st=None, opp_bodies=None):
+    """**F fix D（2026-09-26）**: 印刷のキーワード（速攻・ダブルアタック・バニッシュ・ブロック不可 …）の登場の価格。
+
+    **条件つきの付与と同じ式**（`action_value` のキーワードの枝を、自分自身への恒久の付与として呼ぶ）——
+    これで「条件つき ≤ 条件なし」が成り立つ（条件つきは係数 0／1 が掛かるだけ）。ブロッカーは `ν` に在るので除く。"""
+    tot = 0.0
+    for kw in keywords or ():
+        if kw not in PRINTED_KEYWORDS:
+            continue
+        e = {"type": "KEYWORD", "status": kw, "duration": "PERMANENT",
+             "target": {"select_mode": "SOURCE", "player": "SELF"}}
+        v = action_value(e, card=card, opp_bodies=opp_bodies, st=st)
+        if v is not None:
+            tot += float(v)
+    return float(tot)
 
 
 def _referenced_ability(at, effect, card, mu, lam, delta, nu, theta, ko_p, depth):
