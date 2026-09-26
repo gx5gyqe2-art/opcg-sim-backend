@@ -279,10 +279,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
         rate_at_turn, g_at_turn = {}, {}
         shape_at = {}
         seed_g = int(r["seed"][idx[0]]) if len(idx) else -1
-        # **N-3**: 値段の枠＝各席の自席ターンの最初の行（`g_at_turn` と同じ行・同じ「イベントは全部切れる」規約）
-        cut = (CP.CutFrames(list(idx), r, ex, idx2cid, cards, KV.frame_rows_of(r, idx), mu,
-                            decks=KV._deck_pair(seat_decks, seed_g), don_rule=False, stats=stats)
-               if CP.joint_on() else None)
+        # **N-3**: 値段の枠。守り手（相手）の枠は**その席の直近の自席ターンの最後の行**（こちらのターンの間の手札そのもの）・
+        # 自分の枠は**今の自席ターンの最初の行**（`g_at_turn` と同じ行）。カウンター・イベントは `g_at_turn` と同じく全部切れる。
+        cut = cut_me_fr = None
+        if CP.joint_on():
+            cut = CP.CutFrames(list(idx), r, ex, idx2cid, cards, KV.frame_rows_of(r, idx, last=True), mu,
+                               decks=KV._deck_pair(seat_decks, seed_g), don_rule=False, stats=stats)
+            cut_me_fr = CP.CutFrames(list(idx), r, ex, idx2cid, cards, KV.frame_rows_of(r, idx), mu,
+                                     decks=KV._deck_pair(seat_decks, seed_g), don_rule=False, stats=stats)
         for i in idx:
             if int(r["kind"][i]) != 0:
                 continue
@@ -339,7 +343,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
             fam = move_family(sig)
             cut_me = cut_opp = None
             if cut is not None:                          # **N-3**: 両席の値段の窓（今の枚数で）
-                cut_me = cut.view(w, t, float(np.asarray(sc)[TO.SC_MY_HAND]))
+                cut_me = cut_me_fr.view(w, t, float(np.asarray(sc)[TO.SC_MY_HAND]))
                 cut_opp = cut.view(1 - w, t, float(np.asarray(sc)[TO.SC_OPP_HAND]))
             st0 = KV.state_of_row(sc, tok, rate_at_turn[(w, t)], ao, CB.own_turn_index(t),
                                   g_me=g_at_turn[(w, t)], g_opp=g_opp, ci_row=ci, idx2cid=idx2cid, cards=cards,

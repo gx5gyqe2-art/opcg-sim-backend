@@ -416,14 +416,15 @@ def _deck_pair(seat_decks, seed):
     return (_deck_of(seat_decks, seed, 0), _deck_of(seat_decks, seed, 1))
 
 
-def frame_rows_of(r, idx):
-    """**N-3**: 各席の**自席ターンの最初の行**（`kind == 0`）＝帳簿が `rate_at`／`g_at` を読む行と同じ行。"""
+def frame_rows_of(r, idx, last=False):
+    """**N-3**: 各席の**自席ターンの最初の行**（`kind == 0`）＝帳簿が `rate_at`／`g_at` を読む行と同じ行。
+    `last=True` なら**最後の行**＝次の相手ターンの間の手札そのもの（守り手の枠・`crossing_bridge` の `turn_last` と同じ考え方）。"""
     out = {}
     for i in idx:
         if int(r["kind"][i]) != 0:
             continue
         w, t = int(r["who"][i]), int(r["turn"][i])
-        if PL.is_own_turn(w, t) and (w, t) not in out:
+        if PL.is_own_turn(w, t) and (last or (w, t) not in out):
             out[(w, t)] = i
     return out
 

@@ -606,7 +606,7 @@ def hand_cut_count(g, hand_n, xs, life_opp, n_blockers_opp, mu=MU):
         return n_cut
     cs = sorted(c for c in (c_of(float(x)) for x in (xs or ())) if c > 0.0)
     if THETA_HAND_MODE == "cuttable_cx":
-        c = float(c_of(float(max(xs)))) if xs else -1.0
+        c = float(c_of(float(max(xs)) if xs else -1.0))       # `threshold_parts_side` が `hand_absorb` に渡すのと同じ
         if c <= 0.0:
             return 0.0
         return max(0.0, n_cut) if c <= 1.0 else c * math.floor(max(0.0, n_cut) / c)
