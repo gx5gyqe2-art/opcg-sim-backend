@@ -476,19 +476,139 @@ def mover_shift(mover=True):
     return 0.5 if (mover and W_MOVER_MODE == "half") else 0.0
 
 
-def prob_of_d(d, sigma_d=None, t_me=None, t_opp=None, scale_mode="hyp", mover=False):
+#: **K-2: 整数ターンの床**（2026-09-26・規則から・**当てはめた定数ではない**）。
+#:
+#: 局は**整数の自席ターン**で終わる。時計は「(段数 − 1) ＋ そのターン内の割合」という連続値だが、割合の部分は
+#: 規則の量ではない（ターン内で損害を按分しただけ）。私が勝つのは「私が届く段 ≤ 相手が届く段」のときで、
+#: 真の 2 本の時計の差を `x` とすると、2 つの割合が一様（情報なし）なら**差の整数部は `x` の小数部で決まる 2 択**
+#: になり、`P(勝ち | x) = clip(x + 1, 0, 1)`＝**中心 −1/2・幅 1 の一様な核**（分散 **1/12**）を `x` に畳み込んだ形になる
+#: （中心 −1/2 が T151 の手番の半ターン・分散 1/12 が本切替の床）。**差に掛かる核は 1 本だけ**——2 本の時計の
+#: 割合はそれぞれ一様でも、差の整数部は `x` の小数部と合同なので、2 本分（1/6）にはならない。
+#: `on` は `W` の幅を `√((σ_rel·s)² + 1/12)` にする（一様な核を正規で近似して σ と二乗和で合わせる・
+#: `σ_rel` の測り直し〔`crossing_bridge.sigma_rel_mle`〕も同じ正規の形で揃える）。
+#: 掛かる先は**交点の橋の行（`mover=True`）だけ**（1 行の器には掛けない・手番の半ターンと同じ範囲）。
+#: `σ_rel` は `on` のとき**床を入れた形で測り直した表**（`harm_profile.json` の `sigma_rel_floor`）を
+#: `crossing_bridge.sigma_rel_for` が引く。既定は `off`（従来と 1 ビットも変わらない）。
+SIGMA_FLOOR_MODES = ("off", "on")
+SIGMA_FLOOR_MODE = "off"
+#: 幅 1 の一様分布の分散（`∫_{-1/2}^{1/2} u² du`）。**規則（整数ターン）から出る数で当てはめではない**。
+TURN_ROUND_VAR = 1.0 / 12.0
+#: 時計 1 本の丸めの平均: 真の時計 − その整数の段（今のターンを 1 と数える実際の残り）∈ (−1, 0]・割合が一様なら −1/2
+#: （`σ_rel` を床つきで測り直すときに残差から引く・`crossing_bridge.sigma_rel_mle`）。`W` の中では 2 本で打ち消し、
+#: 手番の半ターン（T151）として既に入っている。
+TURN_ROUND_MEAN = -0.5
+
+
+def set_sigma_floor_mode(mode):
+    global SIGMA_FLOOR_MODE
+    if mode not in SIGMA_FLOOR_MODES:
+        raise ValueError("sigma floor mode は %s のどれか" % (SIGMA_FLOOR_MODES,))
+    SIGMA_FLOOR_MODE = mode
+    return SIGMA_FLOOR_MODE
+
+
+#: **K-1: 決着前の条件と揃えた時計**（2026-09-26・規則から・**当てはめた定数ではない**）。
+#:
+#: 決着前フィルタ（`crossing_bridge.pre_settle_skip`）が残す行は「行の持ち主が**いま**規則上の詰みを持たない」行
+#: ——つまり**持ち主の今のターン（歩きの第 1 段）は決着の段ではない**。理論の時計は Θ を「最善で守る相手」に対する
+#: 耐久として読むので、理論自身の言葉でも「第 1 段で届く」は「いま詰みがある」と同じ事象。ところが `W` は
+#: この条件を知らずに全体の分布（第 1 段で届く＝相手に手番が回らずに確実に勝つ質量を含む）から勝率を出していた。
+#:
+#: **正確な形**（規則だけ）: 私が届く段 `k_me = max(1, ⌈X_me⌉)`・相手が届く段 `k_opp = max(1, ⌈X_opp⌉)`（どちらも
+#: 自席ターンで数え、同じ段なら手番の私が先）。**私の勝ち ⇔ k_me ≤ k_opp ⇔ X_opp > k_me − 1**。`X` は真の連続の時計で、
+#: 行の予測のまわりに `N(τ, (σ_rel·τ)²)`（`σ_rel·s` を 2 本の時計に分けた形・`s² = τ_me² + τ_opp²`）。
+#: 決着前の行では `k_me ≥ 2` が分かっているので
+#:
+#:     p = Σ_{k≥2} P(k_me = k) · P(X_opp > k − 1)  /  P(X_me > 1)
+#:
+#: **手番の半ターンはこの式の中に在る**（同じ段数なら私が先＝`X_opp > k − 1` の「− 1」）。T151 の `D + 1/2` は
+#: 私の段の中の割合を平均（1/2）で置いた近似で、条件の下では割合が一様でなくなる——`τ_me ≤ 1` の行では
+#: `X_me` が 1 のすぐ上に寄り（第 2 段の頭）、私の手番の有利は相手の第 1 段に先を越されて**消える**（p → P(X_opp > 1)）。
+#: 条件を「私の段を次のターンから数え直す」と書き直しても同じ式になる（相手が手番側になって −1/2、私の時計が
+#: 1 段減って +1——打ち消して元の +1/2）ので、半ターンを別に足したり引いたりはしない。
+#:
+#: `on`＝決着前の行（行に `settled_me=False`）で上の式・詰みのある行（`settled_me=True`・決着前フィルタ `off` の
+#: 参照測定で残る行）は `k ≥ 1` の同じ式。`whole`＝**対照**: 条件を掛けず（`k ≥ 1`）同じ整数ターンの式だけ使う
+#: （条件の効果と、割合を平均で置かない効果を分けて読むため）。`on`／`whole` は `W_MOVER_MODE=half`・
+#: `W_ERR_MODE=rel`・`mover=True`・2 本の時計が在るときだけ掛かり、それ以外は従来の式。整数ターンを正確に数える
+#: ので `SIGMA_FLOOR_MODE`（床）はこの式には足さない（二重に数えない）——`on` の床は `σ_rel` の表（床を抜いた
+#: 連続の誤差）を選ぶことにだけ効く。既定は `off`（従来と 1 ビットも変わらない）。
+SETTLE_COND_MODES = ("off", "on", "whole")
+SETTLE_COND_MODE = "off"
+
+
+def set_settle_cond_mode(mode):
+    global SETTLE_COND_MODE
+    if mode not in SETTLE_COND_MODES:
+        raise ValueError("settle cond mode は %s のどれか" % (SETTLE_COND_MODES,))
+    SETTLE_COND_MODE = mode
+    return SETTLE_COND_MODE
+
+
+def _upper(x, mu, sd):
+    """`P(X > x)`・`X ~ N(mu, sd²)`（`sd = 0` なら点）。裾は `erfc` で相対精度を保つ。"""
+    if sd <= 0.0:
+        return 1.0 if mu > x else 0.0
+    return 0.5 * math.erfc((float(x) - float(mu)) / (float(sd) * math.sqrt(2.0)))
+
+
+def whole_turn_race_prob(t_me, t_opp, sd_me, sd_opp, k0=1):
+    """**K-1**: 整数ターンの競争の勝率 `P(k_me ≤ k_opp | k_me ≥ k0)`（`SETTLE_COND_MODE` の注の式）。
+
+    `k_me = max(1, ⌈X_me⌉)`・`k_opp = max(1, ⌈X_opp⌉)`・`X ~ N(τ, sd²)`。`P(k_opp ≥ k) = 1`（`k ≤ 1`）／
+    `P(X_opp > k − 1)`（`k ≥ 2`）。和は**裾の確率が浮動小数で 0 になるまで**（打ち切りの定数を置かない）。
+    `k0 = 2` で条件の質量が 0（`sd_me = 0` かつ `τ_me ≤ 1`、または裾の下位桁あふれ）のときは極限
+    ＝`X_me` が 1 のすぐ上＝`k_me = 2` を返す。"""
+    t_me = max(0.0, float(t_me)); t_opp = max(0.0, float(t_opp))
+    sd_me = max(0.0, float(sd_me)); sd_opp = max(0.0, float(sd_opp))
+    k0 = max(1, int(k0))
+
+    def opp_reaches_after(k):                       # P(k_opp ≥ k)
+        return 1.0 if k <= 1 else _upper(k - 1, t_opp, sd_opp)
+
+    denom = 1.0 if k0 <= 1 else _upper(k0 - 1, t_me, sd_me)
+    if denom <= 0.0:
+        return opp_reaches_after(k0)                # 極限: 私は第 k0 段の頭で届く
+    num = 0.0
+    k = k0
+    tail_lo = denom                                  # P(X_me > k − 1)（k0 = 1 なら全質量）
+    while True:
+        tail_hi = _upper(k, t_me, sd_me)             # P(X_me > k)
+        pk = tail_lo - tail_hi                       # P(k_me = k)
+        q = opp_reaches_after(k)
+        num += pk * q
+        if tail_hi <= 0.0 or q <= 0.0:
+            break
+        tail_lo = tail_hi
+        k += 1
+    return min(1.0, max(0.0, num / denom))
+
+
+def prob_of_d(d, sigma_d=None, t_me=None, t_opp=None, scale_mode="hyp", mover=False, first_open=True):
     """**時計の差 `D` から勝率へ**（T80）＝`W(D) = Φ(D/σ_D)`。`w_of_d`（密度）の**積分**で、同じ `σ_D` を使う。
     `κ = w(D)/w̄` が微分の形なら、こちらが積分の形＝「今の勝率」。**新しい定数は無い**。
 
     **T118**: `W_ERR_MODE == "rel"` かつ 2 本の時計が渡されたときは、物差しを
     `σ_rel × s(τ_me, τ_opp)` にする（`s` は 1 次同次＝比で読む）。`σ_rel` が無ければ `abs` に落ちる。
     **T151-2**: `mover=True`（ターン開始の 2 本の時計の行）かつ `W_MOVER_MODE=half` なら `D + 1/2`（手番の半ターン）。
-    1 行の器（ターン途中の行）は `mover=False` のまま＝ずらさない（採用時のユーザ決定 2026-09-24・上の注）。"""
+    1 行の器（ターン途中の行）は `mover=False` のまま＝ずらさない（採用時のユーザ決定 2026-09-24・上の注）。
+    **K-1**: `SETTLE_COND_MODE` が `on`／`whole` で、交点の橋の行（`mover=True`・`half`・`rel`・2 本の時計が在る）なら
+    整数ターンの競争（`whole_turn_race_prob`）で読む。`first_open`＝**持ち主の今のターンが決着の段でありうるか**
+    （決着前の行は `False`＝`on` なら `k_me ≥ 2` の条件）。
+    **K-2**: `SIGMA_FLOOR_MODE=on` かつ `mover=True` なら幅に整数ターンの床 1/12 を二乗和で足す。"""
+    if (SETTLE_COND_MODE != "off" and mover and W_MOVER_MODE == "half" and W_ERR_MODE == "rel"
+            and sigma_d is None and SIGMA_REL is not None and t_me is not None and t_opp is not None
+            and scale_mode == "hyp"):                     # 2 本への分け方は `hyp`（`s² = τ_me² + τ_opp²`）だけが整合
+        k0 = 2 if (SETTLE_COND_MODE == "on" and not first_open) else 1
+        sr = float(SIGMA_REL)
+        return whole_turn_race_prob(t_me, t_opp, sr * max(0.0, float(t_me)), sr * max(0.0, float(t_opp)), k0)
     d = float(d) + mover_shift(mover)
     if (W_ERR_MODE == "rel" and sigma_d is None and SIGMA_REL is not None
             and t_me is not None and t_opp is not None):
         s = clock_scale(t_me, t_opp, scale_mode)
         sd = float(SIGMA_REL) * s
+        if mover and SIGMA_FLOOR_MODE == "on":
+            sd = math.sqrt(sd * sd + TURN_ROUND_VAR)    # **K-2**: 整数ターンの床（規則）
         if sd <= 0.0:
             return 0.5
         return 0.5 * (1.0 + math.erf(float(d) / (sd * math.sqrt(2.0))))

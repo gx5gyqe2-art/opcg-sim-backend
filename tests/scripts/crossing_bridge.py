@@ -842,8 +842,11 @@ def sigma_rel_for(dirs, name="cross", body_mode=None, slope="theory"):
     `theory_order.W_ERR_MODE == "rel"` の物差し。規約は `sigma_t_for`／`w_bar_for` と同じ
     ——**耐久の形ごと**・**測る記録と別のセット**（§0.1 条件 1）。引けなければ `None`（`abs` に落ちる）。
     **読みごとに分けて持つ**（`theory` の τ と `curve` の τ は別の器なので同じ `σ` を使ってはいけない
-    ——T97 の「借り物の σ」と同じ誤りを繰り返さないため）。値の出所は `summarise` の `by_slope[*].sigma_rel`。"""
-    tbl = (load_harm_profiles() or {}).get("sigma_rel") or {}
+    ——T97 の「借り物の σ」と同じ誤りを繰り返さないため）。値の出所は `summarise` の `by_slope[*].sigma_rel`。
+    **K-2**: `theory_order.SIGMA_FLOOR_MODE=on` なら**床を入れた形で測り直した表**（`sigma_rel_floor`・出所は
+    `summarise` の `by_slope[*].sigma_rel_floor`＝`sigma_rel_mle` に床 1/12 を入れたもの）を同じ規約で引く。"""
+    key = "sigma_rel_floor" if TO.SIGMA_FLOOR_MODE == "on" else "sigma_rel"
+    tbl = (load_harm_profiles() or {}).get(key) or {}
     by = (tbl.get(body_mode or THETA_BODY_MODE) or {}).get(slope) or {}
     if not by:
         return None
@@ -2088,7 +2091,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     # **記録をもう 1 度読む**（`lethal_rule` は独立の下請け・`settled_map` の判定式は 1 か所にしか無い）。
     settled = None
     settled_first = None
-    if PRE_SETTLE_MODE in ("on", "game"):
+    # **K-1**: `SETTLE_COND_MODE=on` なら決着前フィルタが `off` でも行ごとの決着の旗が要る（`settled_me`）
+    if PRE_SETTLE_MODE in ("on", "game") or TO.SETTLE_COND_MODE == "on":
         import lethal_rule as LR
         settled = LR.settled_map(dirs, limit_games)
         if PRE_SETTLE_MODE == "game":
@@ -2685,6 +2689,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                        # **T102**: 有限の盾（`curve` の読みでも同じ形で使う）
                        "shield_me": me.get("shield"), "shield_opp": op.get("shield"),
                        "shield_rate_me": me.get("shield_rate"), "shield_rate_opp": op.get("shield_rate")}
+                if TO.SETTLE_COND_MODE == "on":
+                    # **K-1**: 行の持ち主がいま規則上の詰みを持つか（`lethal_rule.settled_map`・決着前の行は常に False）
+                    rec["settled_me"] = bool(settled.get((seed_g, w, t))) if settled is not None else True
                 for sv in SLOPES:
                     s_me = me["slope_" + sv] if me["slope_" + sv] is not None else me["slope_theory"]
                     s_op = op["slope_" + sv] if op["slope_" + sv] is not None else op["slope_theory"]
@@ -2764,6 +2771,53 @@ def _full_need(x):
     if sh > 0.0:
         out += min(sh, (rate if rate > 0.0 else sh) * turns)
     return out
+
+
+def sigma_rel_mle(res, scale, floor_var=0.0, floor_mean=0.0):
+    """**`σ_rel` を正規の最尤で測る**（K-2・2026-09-26）。残差 `r_i`（予測 τ − 実際の残り）を
+    `r_i ~ N(m·s_i + floor_mean, σ²·s_i² + floor_var)` とみて `(m, σ)` を同時に最尤推定し `σ` を返す（`s_i > 0` の行だけ）。
+
+    **`floor_var = floor_mean = 0` なら従来の手順そのもの**——`r_i/s_i ~ N(m, σ²)` の最尤は `m = mean(r/s)`・`σ = std(r/s)`
+    （`summarise` の `sigma_rel` と同じ式・同じ母数）。**床（1/12＝整数ターンの丸め・`TO.TURN_ROUND_VAR`）を入れる**と、
+    幅は「局面に比例する連続の誤差」＋「規則が決める丸め」の 2 項になり、同じ最尤で `σ` を測り直す。丸めは
+    **平均も規則で決まる**（真の時計 − その整数の段 ∈ (−1, 0]・割合が一様なら平均 −1/2＝`TO.TURN_ROUND_MEAN`）ので
+    `floor_mean` で引いておく——引かないと一定の −1/2 が比例の幅に混ざる（当てはめの
+    つまみは無い）。`σ` は分散の方程式（対数尤度の `σ²` での微分 = 0）を 2 分法で解く——上端は従来の値から
+    倍々に広げて符号が変わるところ（固定の範囲を置かない）・`σ² = 0` で既に負なら境界解 0。"""
+    r = np.asarray(res, float) - float(floor_mean); s = np.asarray(scale, float)
+    m_ = s > 0.0
+    r = r[m_]; s = s[m_]
+    if not len(r):
+        return None
+    if floor_var <= 0.0:
+        return float((r / s).std())               # 従来（`floor_mean = 0` なら `summarise` の `sigma_rel` と同じ）
+    v0 = float(floor_var)
+    s2 = s * s
+
+    def m_hat(sig2):
+        v = sig2 * s2 + v0
+        return float((r * s / v).sum() / (s2 / v).sum())
+
+    def score(sig2):                                      # d logL / d σ²（×2）
+        v = sig2 * s2 + v0
+        e = r - m_hat(sig2) * s
+        return float((s2 * (e * e / (v * v) - 1.0 / v)).sum())
+
+    if score(0.0) <= 0.0:
+        return 0.0
+    hi = max(float((r / s).var()), 1e-12)
+    while score(hi) > 0.0:
+        hi *= 2.0
+    lo = 0.0
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if mid <= lo or mid >= hi:
+            break
+        if score(mid) > 0.0:
+            lo = mid
+        else:
+            hi = mid
+    return float(math.sqrt(0.5 * (lo + hi)))
 
 
 def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
@@ -2987,6 +3041,23 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
              "mae": round(float(np.abs(res).mean()), 3),
              "tau_me_median": round(float(np.median([min(r["tau_me_" + sv], 30.0) for r in rows_out])), 3),
              "win_by_D": {}}
+        # **K-2（2026-09-26・報告のみ・既存の欄は不変）**: 床（整数ターンの丸め 1/12）を入れた形で最尤に測った
+        # `σ_rel`（`sigma_rel_mle`）。`SIGMA_FLOOR_MODE=on` の表（`sigma_rel_floor`）の出所。
+        o["sigma_rel_floor"] = (round(float(sigma_rel_mle(res, scale, TO.TURN_ROUND_VAR, TO.TURN_ROUND_MEAN)), 4)
+                                if has_scale.any() else None)
+        # **K（2026-09-26・報告のみ）**: **整数ターンの残差** `max(1, ⌈τ⌉) − t_act`。時計は「(段数 − 1) ＋ 割合」、
+        # 実際の残りは「今のターンを 1 と数える整数」なので、上の `τ − t_act` は**完璧な予測でも (−1, 0] に入り平均 ≈ −0.5**。
+        # 整数に揃えれば完璧な予測は 0＝`bias_int` がそのまま「何ターン遅く言ったか」。
+        res_int = []
+        for r in rows_out:
+            k, act = ((r["tau_me_" + sv], r["t_me_act"]) if r["won"] else (r["tau_opp_" + sv], r["t_opp_act"]))
+            res_int.append(max(1, math.ceil(min(float(k), 30.0))) - int(act))
+        res_int = np.array(res_int, float)
+        o["bias_int"] = round(float(res_int.mean()), 3)
+        o["mae_int"] = round(float(np.abs(res_int).mean()), 3)
+        o["exact_int"] = round(float((res_int == 0).mean()), 4)
+        o["late_int"] = round(float((res_int > 0).mean()), 4)
+        o["early_int"] = round(float((res_int < 0).mean()), 4)
         for lo, hi, name in D_BINS:
             m = (d > lo) & (d <= hi)
             if m.sum() >= 20:

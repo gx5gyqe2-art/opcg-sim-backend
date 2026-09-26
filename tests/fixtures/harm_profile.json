@@ -73,6 +73,19 @@
    }
   }
  },
+ "_note_sigma_rel_floor": "K-2（2026-09-26）: `SIGMA_FLOOR_MODE=on` の `σ_rel`。`W` の幅を `√((σ_rel·s)² + 1/12)`（整数ターンの床）にする形で、**同じ残差・同じ母数（全行・尺度 0 の行は除く）・同じ cross 規約**のまま、正規の最尤 `r ~ N(m·s − 1/2, σ²·s² + 1/12)` で測り直した値（`crossing_bridge.sigma_rel_mle`・床 0 なら従来の `std(r/s)` と同じ式。−1/2 と 1/12 は整数ターンの丸めの平均と分散＝規則から）。出所は `summarise` の `by_slope[*].sigma_rel_floor`（f86e7d30 の上・既定の構成・`crossing_bridge.py --in w41`／`--in w39 w42`）。同じ実行で従来の `sigma_rel`（theory）は実 0.3067／合成 0.3292（表の 0.3078／0.3301 は T154 時点の値・表は触っていない）。",
+ "sigma_rel_floor": {
+  "blockers": {
+   "theory": {
+    "real": 0.2084,
+    "syn": 0.1946
+   },
+   "curve": {
+    "real": 0.2106,
+    "syn": 0.2344
+   }
+  }
+ },
  "_note_theory_slope": "**理論の速さの輪郭**（T126・2026-09-20）＝自席ターン番号 j ごとの `slope_theory` の平均（`crossing_bridge.summarise` の `harm_profile.theory_slope_by_turn` の写し・`harm_profile()` の 2 本目）。**`curve_scaled` の読みの分母**——その席の `A` をこの「典型の速さ」で割った比で輪郭を伸縮する。**これがあると輪郭の読みが尺度不変になる**（輪郭は比 `prof/prof_th`〔無次元〕としてしか入らず、単位は `A` が持つ）＝T122 の P5 が `curve` で 96.2% 破れていた患部。**j=0 は 0.0**（`RATE_T1_MODE=on`＝最初の自席ターンは 1 本も打てない規則）なので、**割るときは `SLOPE_FLOOR` で床を張る**（橋の `curve_scaled` と同じ）。取り直しは `harm_by_turn` と同じパスで（同じ run の同じ表から両方写す）。",
  "theory_slope": {
   "real": [
