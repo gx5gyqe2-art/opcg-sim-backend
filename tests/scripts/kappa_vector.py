@@ -364,7 +364,7 @@ def grad_of(st, prof=None):
     return g
 
 
-def rate_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=None, j=None):
+def rate_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=None, j=None, plan=None):
     """その席の **A**（1 自席ターンに積む損害）。**橋の `slope_theory` と同じ式**（T128）。
 
     ```
@@ -383,8 +383,9 @@ def rate_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=No
     橋も `turn_start[(w, t)]` で読んでいる（`crossing_bridge.collect`）。"""
     if j is not None and CB.RATE_T1_MODE == "on" and int(j) == 0:
         return 0.0
+    # **H-4b**: `plan`（`rule_don` 系の攻め手の計画）を渡すと速さの側も**耐久と同じ計画**を読む（T109）
     lead, chars, stock, flow, _sr, _fr, eff, eff1 = rate_terms_of_row(
-        sc, tok, ci_row, idx2cid, cards, theta, mu, deck_ids=deck_ids)
+        sc, tok, ci_row, idx2cid, cards, theta, mu, deck_ids=deck_ids, plan=plan)
     hand = stock if CB.SLOPE_HAND_MODE == "stock" else flow
     return float(lead + chars + hand + eff + eff1)
 
@@ -417,7 +418,7 @@ def g_of_row(sc, tok, ci_row, idx2cid, cards):
     return CB.hand_price_mean(sc, tok, ci_row, idx2cid, cards, part=part)
 
 
-def rate_terms_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=None):
+def rate_terms_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=None, plan=None):
     """その席の**速さの内訳** 8 項
     `(リーダー, 盤面のキャラ, 在庫, 流入, 在庫の速攻, 流入の速攻, 効果, 在庫の効果)`
     （T94／T103／T105／T108・`seat_slope_terms` の並べ替え）。
@@ -428,12 +429,13 @@ def rate_terms_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_
     sc = np.asarray(sc); tok = np.asarray(tok)
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     base, stock, flow, lead, s_rush, f_rush, eff, eff1 = CB.seat_slope_terms(
-        sc, tok, ci_row, idx2cid, cards, olp, theta, mu, deck_ids=deck_ids, want_stock=True)
+        sc, tok, ci_row, idx2cid, cards, olp, theta, mu, deck_ids=deck_ids, want_stock=True, plan=plan)
     return (float(lead), max(0.0, float(base) - float(lead)), float(stock), float(flow),
             float(s_rush), float(f_rush), float(eff), float(eff1))
 
 
-def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, idx2cid=None, cards=None):
+def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, idx2cid=None, cards=None,
+                 don_plan=None):
     """行から **(Θ_me, Θ_opp, A_me, A_opp, j)** を組む（両席・完全情報・§0.05）。
 
     `Θ` は**その行**から両席分読める（`threshold` と `threshold_of_me` が対の式）。
@@ -446,11 +448,11 @@ def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, id
     歩きはこれを**2 段目から**的に足す（持ち主の次のリフレッシュで戻る・T96）。`Θ` 本体はアクティブな
     ブロッカーだけのまま（既定と同じ数字）。"""
     sc = np.asarray(sc); tok = np.asarray(tok)
-    # **H-4b**: `rule_don` のときだけ攻め手（この行の席）の財布を渡す（他のモードは None＝何も変えない）
-    actx = (CB.attacker_ctx(sc, tok, ci_row, idx2cid, cards)
-            if CB.THETA_HAND_MODE in CB.RULE_DON_MODES and ci_row is not None else None)
+    # **H-4b**: `rule_don` 系は**速さ（`a_me`）を作ったのと同じ計画**（`don_plan`）を耐久にも渡す（T109）。
+    # 計画が無ければ攻め手の財布を渡さない＝付与 0 の `rule` に落ちる（速さの側も計画なし＝両側で付与 0）。
     st = (float(CB.threshold_of_me(sc, tok, g_hand=g_me)),
-          float(CB.threshold(sc, tok, g_hand=g_opp, attacker=actx)),
+          float(CB.threshold(sc, tok, g_hand=g_opp,
+                             plan=(don_plan if CB.THETA_HAND_MODE in CB.RULE_DON_MODES else None))),
           float(a_me), float(a_opp), int(j))
     if CB.THETA_RETURN_MODE != "untap":
         return st

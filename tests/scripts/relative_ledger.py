@@ -277,6 +277,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
         z_of_seat = {}
         rate_at_turn, g_at_turn = {}, {}
         g_last_at_turn = {}                                   # **H-4**（`rule` のときだけ埋まる）
+        first_i = {}                                          # **H-4b**: (席, ターン) → その席のターンの最初の行
+        plan_at_turn = {}                                     # **H-4b**: (席, ターン) → 攻め手の計画（`rule_don` 系）
         shape_at = {}
         seed_g = int(r["seed"][idx[0]]) if len(idx) else -1
         for i in idx:
@@ -284,6 +286,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                 continue
             w, t = int(r["who"][i]), int(r["turn"][i])
             if PL.is_own_turn(w, t) and (w, t) not in rate_at_turn:
+                first_i[(w, t)] = i
                 dk = KV._deck_of(seat_decks, seed_g, w)            # **T128**
                 rate_at_turn[(w, t)] = KV.rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
                                                       idx2cid, cards, theta, mu, deck_ids=dk,
@@ -296,6 +299,24 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                 shape_at[(w, t)] = (KV.rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
                                                        idx2cid, cards, theta, mu, deck_ids=dk)
                                        if KV.D_MODE == "theory" else None)
+        if CB.THETA_HAND_MODE in CB.RULE_DON_MODES:
+            # **H-4b（T109）**: 攻め手の計画は**そのターンの最初の行**で、守る席の手札（相手の直近のターンの
+            # 最後の行）に対して 1 回だけ選ぶ。**速さ（`rate_at_turn`）も耐久（下の `state_of_row`）も同じ計画を読む**。
+            for (w, t), i0 in first_i.items():
+                ts_o = [tt for (ww, tt) in g_last_at_turn if ww == 1 - w and tt < t]
+                if not ts_o:
+                    continue
+                g_def = g_last_at_turn[(1 - w, max(ts_o))]
+                dk = KV._deck_of(seat_decks, seed_g, w)
+                actx = CB.attacker_ctx(ex["sc"][i0], ex["tok"][i0], ex["ci"][i0], idx2cid, cards, theta, mu,
+                                       deck_ids=dk)
+                plan = CB.rule_don_plan_for(ex["sc"][i0], ex["tok"][i0], g_def, actx)
+                if plan is None:
+                    continue
+                plan_at_turn[(w, t)] = plan
+                rate_at_turn[(w, t)] = KV.rate_of_row(ex["sc"][i0], ex["tok"][i0], ex["ci"][i0],
+                                                      idx2cid, cards, theta, mu, deck_ids=dk,
+                                                      j=CB.own_turn_index(t), plan=plan) * float(scale_a)
         last_turn_of = {}
         for (w, t) in rate_at_turn:
             last_turn_of[w] = max(t, last_turn_of.get(w, -1))
@@ -335,7 +356,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
             sig = json.loads(pol["pol_sig"][b])
             fam = move_family(sig)
             st0 = KV.state_of_row(sc, tok, rate_at_turn[(w, t)], ao, CB.own_turn_index(t),
-                                  g_me=g_at_turn[(w, t)], g_opp=g_opp, ci_row=ci, idx2cid=idx2cid, cards=cards)
+                                  g_me=g_at_turn[(w, t)], g_opp=g_opp, ci_row=ci, idx2cid=idx2cid, cards=cards,
+                                  don_plan=plan_at_turn.get((w, t)))
             # **P5**: 通貨の付け替え＝耐久も価格も同じ c 倍（速さはそのまま＝時計は c 倍される）
             st0 = ((st0[0] * scale_currency, st0[1] * scale_currency, st0[2], st0[3], st0[4])
                    + tuple(x * scale_currency for x in st0[5:]))     # 戻る分も同じ通貨（C-5c）

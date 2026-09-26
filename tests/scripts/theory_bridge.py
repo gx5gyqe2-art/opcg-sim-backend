@@ -849,12 +849,17 @@ def _g_of_row(sc, tok, ci_row, idx2cid, cards, cache, key):
     return cache[key]
 
 
-def _attacker_of(sc, tok, ci_row, idx2cid, cards):
-    """**H-4b**: `THETA_HAND_MODE=rule_don` のときだけ攻め手（この行の席）の財布を読む（他のモードは None＝何も変えない）。"""
+def _attacker_of(sc, tok, ci_row, idx2cid, cards, deck_ids=None):
+    """**H-4b**: `THETA_HAND_MODE=rule_don` 系のときだけ攻め手（この行の席）の財布を読む（他のモードは None＝何も変えない）。
+
+    **T109 について**: この器の時間は**損害の輪郭**（`tau_from_profile`＝記録の平均の損害の列）から出て、
+    速さの財布（`seat_slope_terms`）を 1 度も通らない＝**ドンを使う速さの側がここには無い**ので、
+    攻め手の計画は耐久の側だけが読む（同じドンを 2 回使う相手が居ない）。引いた 1 枚の値打ちは
+    その席のデッキ（`deck_ids`）から読む（交点の橋と同じ計画を選ぶため）。"""
     import crossing_bridge as CB
     if CB.THETA_HAND_MODE not in CB.RULE_DON_MODES or _TO_W_MODE() != "curve":
         return None
-    return CB.attacker_ctx(sc, tok, ci_row, idx2cid, cards)
+    return CB.attacker_ctx(sc, tok, ci_row, idx2cid, cards, deck_ids=deck_ids)
 
 
 def _g_opp_of(opp, last_main, ex, idx2cid, cards, cache, seat):
@@ -1161,7 +1166,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                    g_me=_g_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t)),
                                    g_opp=(None if opp is None else
                                           _g_opp_of(opp, last_main, ex, idx2cid, cards, g_cache, 1 - w)),
-                                   opp=opp, attacker=_attacker_of(sc, tok, ex["ci"][i], idx2cid, cards))
+                                   opp=opp, attacker=_attacker_of(sc, tok, ex["ci"][i], idx2cid, cards,
+                                                                  deck_ids=(decks or {}).get(w)))
                 kap = float(ck["kappa"])
                 stats["kappa_sum"] += kap; stats["kappa_n"] += 1
                 stats["d_bins"][_d_bin(ck["d"])] += 1
@@ -1314,7 +1320,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                           g_opp=(None if opp_g is None else
                                                  _g_opp_of(opp_g, last_main, ex, idx2cid, cards, g_cache, 1 - w)),
                                           opp=opp_g,
-                                          attacker=_attacker_of(sc, tok, ex["ci"][i], idx2cid, cards))["kappa"])
+                                          attacker=_attacker_of(sc, tok, ex["ci"][i], idx2cid, cards,
+                                                                deck_ids=(decks or {}).get(w)))["kappa"])
                 if LEDGER_HARM_MODE == "realised":
                     # **T87**: 移転は攻め手の行に 1 回だけ入っている＝守りの窓は帳簿に何も足さない（`s` 専任）
                     got = dict(got, g=0.0, g_delta=0.0)
