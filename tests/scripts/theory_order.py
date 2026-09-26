@@ -1176,8 +1176,41 @@ def slot_don(tok_row, slot):
     return int(round(float(tok_row[s, S_ATTACHED_DON]) * 5.0))
 
 
-def _ability_on_attack(EV, cid, ctx, actx, k, src_don, opp_bodies):
-    """【アタック時】能力の値（`card_value`）。読めなければ `None`。"""
+_REMOVE_KINDS = ("KO", "BOUNCE", "DECK_BOTTOM", "TRASH", "MOVE_CARD", "MOVE", "MOVE_TO_HAND", "DECK_TOP")
+
+
+def _on_attack_acts(card):
+    import effect_value as EV
+    return [e for ab in (card.get("abilities") or []) if (ab.get("trigger") or ab.get("timing")) in EV.ON_ATTACK_TRIGGERS
+            for e in EV.walk_actions(ab.get("effect"))]
+
+
+def _removes_from_field(card):
+    """【アタック時】に**相手の場の体を場から離す**動作が在るか（KO・バウンス・デッキ／トラッシュ送り）。"""
+    import effect_value as EV
+    for e in _on_attack_acts(card):
+        t = e.get("target") or {}
+        if str(e.get("type") or "") in _REMOVE_KINDS and EV._side(t) in ("OPPONENT", "ALL") \
+                and (str(e.get("type")) in ("KO", "BOUNCE") or "FIELD" in EV._zone(t)):
+            return True
+    return False
+
+
+def _target_power_down(card):
+    """【アタック時】に**相手の体のパワーを下げる**量（選んで 1 体・最大のもの）。無ければ 0。"""
+    import effect_value as EV
+    best = 0.0
+    for e in _on_attack_acts(card):
+        t = e.get("target") or {}
+        if (str(e.get("type") or "") in ("BUFF", "BP_BUFF") and EV._side(t) == "OPPONENT"
+                and EV._magnitude(e) < 0 and not EV._is_set_power(e)):
+            best = max(best, -EV._magnitude(e))
+    return best
+
+
+def _ability_on_attack(EV, cid, ctx, actx, k, src_don, opp_bodies, drop_power_down=False):
+    """【アタック時】能力の値（`card_value`）。読めなければ `None`。
+    `drop_power_down`（レビュー 3 の 5）: 相手の体のパワー低下を攻撃の対象に使った読み＝その動作を値付けから外す。"""
     st = _effect_state(ctx)
     st["attack_ctx"] = dict(actx)
     st["source_rested"] = True
@@ -1186,9 +1219,22 @@ def _ability_on_attack(EV, cid, ctx, actx, k, src_don, opp_bodies):
         st["my_don_active"] = max(0, int(st["my_don_active"]) - int(round(float(k))))
     if src_don is not None:
         st["source_don_attached"] = int(src_don) + int(round(float(k)))
+        st["source_don_pre"] = int(src_don)          # 付ける前に付いていた枚数（条件のために付けたドンの費用・レビュー 3 の 8）
+    cards = None
+    if drop_power_down:
+        c0 = EV._all_cards().get(str(cid)) or {}
+        abs_ = []
+        for ab in (c0.get("abilities") or []):
+            if (ab.get("trigger") or ab.get("timing")) in EV.ON_ATTACK_TRIGGERS:
+                tree, _n = EV._neutralized(ab.get("effect"), lambda e: not (
+                    str(e.get("type") or "") in ("BUFF", "BP_BUFF") and EV._side(e.get("target") or {}) == "OPPONENT"
+                    and EV._magnitude(e) < 0))
+                ab = dict(ab, effect=tree)
+            abs_.append(ab)
+        cards = {str(cid): dict(c0, abilities=abs_)}
     with EV.opaque_as_upper():             # F fix A: 対象を取れるかを盤面で決める（読めない絞り込みは上限）
         v, _unp = EV.card_value(cid, EV.ON_ATTACK_TRIGGERS, st=st, offered=False, no_ability=0.0,
-                                opp_bodies=opp_bodies)
+                                opp_bodies=opp_bodies, cards=cards)
     return v
 
 
@@ -1236,12 +1282,25 @@ def attack_ability_value(cid, ctx, actx, k=0, src_don=None, base=0.0, target_blo
     else:
         others = list(bodies[:ti]) + list(bodies[ti + 1:])
         v_keep = _ability_on_attack(EV, cid, ctx, actx, k, src_don, others)
-        v_end = _ability_on_attack(EV, cid, ctx, dict(actx, ended=True), k, src_don, bodies)
-        if v_keep is None or v_end is None:
+        # **レビュー 3 の 5**: 対象に効く動作を 2 つに分ける——**場から離す**（KO・手札／デッキ／トラッシュへ）ならバトルは終わる、
+        # **パワーを下げる**ならバトルは続き攻撃が通りやすくなる（攻撃の価格を下げた後のパワーで読み直す）
+        v_end = (_ability_on_attack(EV, cid, ctx, dict(actx, ended=True), k, src_don, bodies)
+                 if _removes_from_field(c) else None)
+        dmag = _target_power_down(c)
+        v_dbf = None
+        if dmag and v_keep is not None:
+            rest = _ability_on_attack(EV, cid, ctx, actx, k, src_don, others, drop_power_down=True)
+            if rest is not None:
+                tp2 = max(0.0, float(actx["target_power"]) - float(dmag))
+                atk2 = attack_value(actx["power"], tp2, False, actx["theta"], actx["mu"],
+                                    nu_target=actx.get("nu_target"), blockers=actx.get("blockers"))
+                v_dbf = float(atk2) + float(rest)
+        if v_keep is None:
             total = None
         else:
-            total = max(float(base) + float(v_keep), float(v_end))
-            if total > float(base) + float(v_keep) + 1e-12:
+            opts = [float(base) + float(v_keep)] + [x for x in (v_end, v_dbf) if x is not None]
+            total = max(opts)
+            if v_end is not None and total == v_end and total > opts[0] + 1e-12:
                 WIRING_STATS["attack_target_removed"] += 1
     if total is None:
         WIRING_STATS["attack_unpriced"] += 1

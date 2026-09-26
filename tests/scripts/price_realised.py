@@ -171,7 +171,29 @@ def quality_correction(gains, mu=MU):
     return float(sum(float(g) - float(mu) for g in gains))
 
 
+#: **F-4（レビュー 3 の 6）**: 物差しを固める——実現の側の手札の質（`hand_quality_delta`）を、F の値付けの直しと
+#: 2 つの切替を**切った**値付けで読む（価格の側だけが動く比較にする）。既定 `False`＝従来どおり今の値付けで読む。
+FREEZE_YARDSTICK = False
+
+
+class _frozen_pricing:
+    def __enter__(self):
+        self._b = (EV.F_PRICING_FIX, _TO.ATTACK_ABILITY_MODE, _TO.PASSIVE_BODY_MODE)
+        if FREEZE_YARDSTICK:
+            EV.set_f_pricing_fixes("none"); _TO.set_attack_ability_mode("off"); _TO.set_passive_body_mode("off")
+
+    def __exit__(self, *_e):
+        if FREEZE_YARDSTICK:
+            EV.set_f_pricing_fixes(self._b[0]); _TO.set_attack_ability_mode(self._b[1]); _TO.set_passive_body_mode(self._b[2])
+        return False
+
+
 def hand_quality_delta(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, mu=MU, deck=None):
+    with _frozen_pricing():
+        return _hand_quality_delta(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, mu, deck)
+
+
+def _hand_quality_delta(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, mu=MU, deck=None):
     """**T69**: 窓の中で手札に入った札の補正 `(Σ(gain − μ), [gain, …])`。`count` なら `(0, [])`。`deck` は T70 の相方待ちに使う。"""
     if HAND_MEAS_MODE != "quality":
         return 0.0, []
@@ -544,6 +566,8 @@ def main(argv=None):
     _TO.add_attack_ability_arg(ap)
     _TO.add_passive_body_arg(ap)
     EV.add_f_pricing_fixes_arg(ap)
+    ap.add_argument("--freeze-yardstick", action="store_true",
+                    help="**F-4** 実現の側の手札の質を、F の直しと切替を切った値付けで読む（物差しを固める）")
     ap.add_argument("--attack-split", action="store_true",
                     help="**F-4** 攻撃の行を攻め手の【アタック時】能力の有無で層別した表も出す")
     ap.add_argument("--out", default="")
@@ -553,8 +577,9 @@ def main(argv=None):
     _TO.apply_passive_body(a)
     EV.apply_f_pricing_fixes(a)
     _TO.reset_wiring_stats()
-    global ATTACK_SPLIT
+    global ATTACK_SPLIT, FREEZE_YARDSTICK
     ATTACK_SPLIT = bool(a.attack_split)
+    FREEZE_YARDSTICK = bool(a.freeze_yardstick)
     apply_nu_mode(a)
     _TO.apply_surv_mode(a)
     _TO.apply_cbar_mode(a)

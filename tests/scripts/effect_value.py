@@ -693,14 +693,7 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         amt = n * per                         # `stock`／`once` は期間を掛けない
         return amt if not opp else -amt
     if fam == "survive":
-        if _ffix("ko_effect_share") and not opp and str(target.get("select_mode") or "").upper() == "ALL":
-            # 「自分の〜キャラすべては」＝守られるのは場に居る合う体だけ（読めれば在る数で打ち切る）
-            own = _own_field_powers(target, st)
-            if own is not None:
-                n = min(n, float(len(own)))
         amt = n * ko_p * field_value(target, nu)
-        if _ffix("ko_effect_share"):
-            amt *= survive_share(effect, card)      # 効果だけ／戦闘だけの耐性は、その理由で場を離れる割合だけ
         return amt if not opp else -amt
     if fam == "ability":
         gain = ABILITY_KINDS[at]
@@ -829,11 +822,14 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         # 相手の体（「パワー 0 にする」）は今のパワーが判らないので従来どおり（上限で打ち切られる）。
         if _is_set_power(effect) and not opp and card is not None and card.get("power") is not None:
             mag = mag - float(card.get("power") or 0.0)
-        if _ffix("hand_board") and opp and mag < 0 and opp_bodies is not None:
+        if (_ffix("hand_board") or _OPAQUE_UPPER[0]) and opp and mag < 0 and opp_bodies is not None:
+            # 攻撃の行（上限読みの間）も同じ——対象以外に取れる体が居ないのに汎用の値を付けると、攻撃の対象に使う読みと二重になる
             # **hand_board**: 相手の体のパワーを下げる動作も、盤面で取れる体の数で打ち切る（居なければ 0）
             picked = _pick_opp(target, opp_bodies, n, st)
             if picked is not None:
-                n = float(len(picked))
+                # 「相手のリーダーかキャラ 1 枚まで」はリーダーも取れる（レビュー 3・OP05-005 が盤面空で 0 になっていた）
+                leader_ok = "LEADER" in [str(x).upper() for x in (target.get("card_type") or [])]
+                n = min(float(n), float(len(picked)) + (1.0 if leader_ok else 0.0))
         # **自分の体のパワー上昇は `ν` への変換**（T55・ユーザ決定）＝その体の攻撃の価格の差 × 効く攻撃の回数。
         # 盤面が無ければ従来のドン換算（上限つき）。相手の体を下げる側は従来のまま（今のパワーが判らない）。
         if not opp and mag > 0:
@@ -956,9 +952,12 @@ def apply_pricing_fixes(a):
 #: | `hand_board` | 「手札から登場させる」の相方の登場時効果を盤面なしで値付けした（相手の体を全部取る扱い・OP15-114 が 0.82）・相手の体のパワー低下を盤面を見ずに 5 体ぶん数えた | 相方の登場時効果も今の盤面（取れる相手の体・状態）で読む・パワー低下は取れる体の数で打ち切る |
 #: | `state_filters` | 「自分の場のドン!!の枚数以下のコスト」等の動的なコスト上限・「ドン!!が付与されている」を読まなかった | 状態から読めれば絞り込みに使う（手札の相方・相手の体とも） |
 #: | `branch_then` | 「〜した場合、…」の枝（`Branch`）の中の動作を一度も数えなかった（「ライフの上から 1 枚を手札に」−0.081 が抜けた） | 条件を状態から判定して、起きる側の枝の動作を数える。「登場させた場合」は「そうした場合」と同じ塊として読む |
-#: | `ko_effect_share` | 「効果で KO されない／場を離れない」を、戦闘も含む KO 率 × 体で数えた | 効果で場を離れる割合だけ（`EFFECT_EXIT_SHARE`・記録の実測の写し）。「バトルで KO されない」はその残り |
+#: | `look_return` | 「ライフの上から 1 枚を見て、ライフの上か下に置く」の戻しを、見た札（`TEMP`）がライフに**増える**（+λ）と数えた（OP03-099 が 0.136 高い） | ライフ・デッキを見た札がそこへ戻るのは並べ替え（0） |
+#:
+#: **レビュー 3 で `ko_effect_share` を外した**（効果で離れる割合の表は評価に使う局と同じ局＝w41／w39／w42 で測られていて、
+#: 実と合成を混ぜていた。別の記録で測り直すまで使わない・効果は測れるほど無かった）。
 #: | `attached_don_cond` | 条件「付与されているドン!!が N 枚以上」を場のドンの総数で判定した（エンジンは本文の「付与」で付与中だけを数える） | 付与中のドンの枚数で判定（読めなければ判らない） |
-F_PRICING_FIXES = ("hand_board", "state_filters", "branch_then", "ko_effect_share", "attached_don_cond")
+F_PRICING_FIXES = ("hand_board", "state_filters", "branch_then", "attached_don_cond", "look_return")
 F_PRICING_FIX = frozenset()
 
 
@@ -1008,32 +1007,6 @@ def apply_f_pricing_fixes(a):
     if getattr(a, "f_pricing_fixes", None) is not None:
         set_f_pricing_fixes(a.f_pricing_fixes)
     return ",".join(x for x in F_PRICING_FIXES if x in F_PRICING_FIX) or "none"
-
-
-#: **効果で場を離れる割合**（`ko_effect_share`）＝場を離れた体のうち効果で離れた割合（戦闘 ＋ 効果で割る）。
-#: `docs/reports/2026-09-25_p8_7a_body_removal.md` の実局 300 ＋ 合成局 900 局の表を**行数で合わせた写し**
-#: （費用の帯ごと・新しく当てはめた定数ではない）。「効果」は自分の効果で送った分も含む（`aux_def` が撃ち手を区別しない＝上限側）。
-EFFECT_EXIT_SHARE = ((2, 0.2855), (4, 0.1904), (6, 0.1988), (99, 0.1561))
-
-
-def effect_exit_share(cost):
-    c = float(cost or 0.0)
-    for hi, v in EFFECT_EXIT_SHARE:
-        if c <= hi:
-            return float(v)
-    return float(EFFECT_EXIT_SHARE[-1][1])
-
-
-def survive_share(effect, card):
-    """**生存の動作が守る KO の割合**（`ko_effect_share`）: 効果だけ・戦闘だけ・両方（1）。"""
-    st_ = str(effect.get("status") or "").upper()
-    raw = str(effect.get("raw_text") or "")
-    s = effect_exit_share((card or {}).get("cost"))
-    if st_ == "BATTLE_KO" or "バトル" in raw:
-        return 1.0 - s
-    if st_ in ("EFFECT_KO", "LEAVE") or "効果" in raw:
-        return s
-    return 1.0
 
 
 #: 動的なコスト上限 → 状態の鍵（`rust/.../effects/matcher.rs` の `cost_max_dynamic` と同じ対応）
@@ -1303,37 +1276,114 @@ def _unpriced_family(e):
     return family_of(at)
 
 
+def _deck_of_state(st):
+    """完全情報の前提で読める自分のデッキ（`search_ctx["deck"]`・記録の seed から復元した構成）。無ければ `None`。"""
+    ctx = (st or {}).get("search_ctx") or {}
+    deck = ctx.get("deck")
+    return (list(deck), ctx.get("cards")) if deck else (None, None)
+
+
+def _revealed_matches(cid, want, cards):
+    """公開した札 `cid` が `REVEALED_CARD_TRAIT` の値（特徴・コスト・パワー・名前・種別）に合うか（`effects/cond.rs` の写し）。"""
+    info = (cards.info(cid) if cards is not None else None) or {}
+    try:
+        from theory_order import card_identity
+        ident = card_identity(cid) or {}
+    except Exception:
+        ident = {}
+    trait = want.get("trait")
+    if trait:
+        traits = [str(t) for t in (ident.get("traits") or [])]
+        ok = any(str(trait) in t for t in traits) if want.get("trait_contains") else (str(trait) in traits)
+        if not ok:
+            return False
+    ops = {"LE": lambda a, b: a <= b, "GE": lambda a, b: a >= b, "EQ": lambda a, b: a == b,
+           "LT": lambda a, b: a < b, "GT": lambda a, b: a > b}
+    if want.get("cost") is not None:
+        if not ops.get(str(want.get("cost_op") or "LE"), ops["LE"])(float(info.get("cost") or 0), float(want["cost"])):
+            return False
+    if want.get("power") is not None:
+        if not ops.get(str(want.get("power_op") or "GE"), ops["GE"])(float(info.get("power") or 0), float(want["power"])):
+            return False
+    if want.get("name"):
+        names = [str(x) for x in (ident.get("names") or [])]
+        if not any(str(want["name"]) == n or str(want["name"]) in n for n in names):
+            return False
+    ctype = {"キャラ": "char", "イベント": "event", "ステージ": "stage"}.get(str(want.get("card_type") or ""))
+    if ctype == "char" and (info.get("event") or info.get("stage") or info.get("leader")):
+        return False
+    if ctype == "event" and not info.get("event"):
+        return False
+    if ctype == "stage" and not info.get("stage"):
+        return False
+    return True
+
+
+def branch_probability(cond, st):
+    """**branch_then**（レビュー 3）: 公開した札で決まる条件が成り立つ確率＝**デッキの構成の中で合う札の割合**
+    （完全情報の前提・記録の seed から復元したデッキ）。`DECLARED_COST_MATCH` は宣言する側が最も多いコストを選ぶ＝
+    その割合。デッキが読めなければ `None`（呼び側は上限＝成り立つ側で読む）。**新定数ゼロ**。"""
+    deck, cards = _deck_of_state(st)
+    if not deck:
+        return None
+    kind = cond.get("type")
+    if kind == "REVEALED_CARD_TRAIT":
+        want = cond.get("value")
+        if not isinstance(want, dict):
+            return 1.0
+        return float(sum(1 for c in deck if _revealed_matches(c, want, cards))) / float(len(deck))
+    if kind == "DECLARED_COST_MATCH":
+        from collections import Counter as _C
+        costs = _C(int(float((cards.info(c) or {}).get("cost") or 0)) for c in deck) if cards is not None else None
+        if not costs:
+            return None
+        return float(max(costs.values())) / float(len(deck))
+    return None
+
+
 def branch_actions(effect, st=None, consumed=()):
-    """**branch_then**: 効果木の `Branch` のうち**起きる側**の動作（入れ子も辿る・`consumed` の動作を含む枝は除く）。
+    """**branch_then**: 効果木の `Branch` の動作と**起きる重み**の並び `[(動作, 重み), …]`（入れ子も辿る・
+    `consumed` の動作を含む枝は除く）。
 
     起きる側: 「そうしなかった場合」（`SKIPPED`）は前の動作が起きた読みで `if_false`・他の「〜した場合」は `if_true`・
-    状態の条件は `condition_value.holds`（偽なら `if_false`・判らなければ `if_true`＝上限の規約）。"""
+    状態の条件は `condition_value.holds`（偽なら `if_false`）。**公開した札で決まる条件**（`REVEALED_CARD_TRAIT`・
+    `DECLARED_COST_MATCH`）は**デッキの構成から出した確率 p** で両側を重み付けする（`if_true` を p・`if_false` を 1 − p）。
+    それ以外の判らない条件とデッキが読めない場合は `if_true` を満額（上限の規約）。"""
     out = []
 
-    def side_of(c):
-        if c.get("type") == "PREV_ACTION":
-            return "if_false" if str(c.get("value")) == "SKIPPED" else "if_true"
-        try:
-            import condition_value as CV
-            got = CV.holds(c, st)
-        except Exception:
-            got = None
-        return "if_false" if got is False else "if_true"
+    def add(node, w):
+        acts = walk_actions(node) if node else []
+        if not any(id(a) in consumed for a in acts):
+            out.extend((a, w) for a in acts)
 
-    def rec(o):
+    def rec(o, w=1.0):
         if isinstance(o, dict):
             if o.get("node") == "Branch":
-                chosen = o.get(side_of(o.get("condition") or {}))
-                acts = walk_actions(chosen) if chosen else []
-                if not any(id(a) in consumed for a in acts):
-                    out.extend(acts)
-                rec(chosen)
+                c = o.get("condition") or {}
+                if c.get("type") == "PREV_ACTION":
+                    sides = [("if_false" if str(c.get("value")) == "SKIPPED" else "if_true", 1.0)]
+                else:
+                    p = branch_probability(c, st) if c.get("type") in ("REVEALED_CARD_TRAIT", "DECLARED_COST_MATCH") else None
+                    if p is not None:
+                        sides = [("if_true", p), ("if_false", 1.0 - p)]
+                    else:
+                        try:
+                            import condition_value as CV
+                            got = CV.holds(c, st)
+                        except Exception:
+                            got = None
+                        sides = [("if_false" if got is False else "if_true", 1.0)]
+                for key, sw in sides:
+                    if sw <= 0.0:
+                        continue
+                    add(o.get(key), w * sw)
+                    rec(o.get(key), w * sw)
                 return
             for v in o.values():
-                rec(v)
+                rec(v, w)
         elif isinstance(o, list):
             for v in o:
-                rec(v)
+                rec(v, w)
 
     rec(effect)
     return out
@@ -1599,6 +1649,31 @@ def _tree_total(node, vals, qual):
         else:
             tot += sum(_tree_total(x, vals, qual) for x in v)
     return tot
+
+
+def look_returns(acts):
+    """**look_return**（F の直し・レビュー 3）: 「ライフ／デッキの上から見て、そこへ戻す」の戻しを並べ替え（0）として読む。
+
+    パーサは `LOOK_LIFE` の後の「ライフの上か下に置く」を**見た札（`TEMP`）→ ライフ**の移動で出すので、
+    従来はライフが 1 枚**増える**（+λ）と数えた（OP03-099・自分のライフで +0.136／相手のライフで −0.136）。
+    見た札は元のゾーンから取り出していない（`LOOK_LIFE` は観測）＝出どころを見たゾーンに置き換える（ゾーン内の移動＝0）。"""
+    out = {}
+    seen = None
+    for e in acts:
+        at = str(e.get("type") or "")
+        if at == "LOOK_LIFE":
+            seen = "LIFE"
+            continue
+        if at == "LOOK":
+            seen = "DECK"
+            continue
+        if seen is None or family_of(at) != "move":
+            continue
+        t = e.get("target") or {}
+        dest = str(e.get("destination") or MOVE_DEFAULT_DEST.get(at) or "").upper()
+        if _zone(t) == ["TEMP"] and dest == seen:
+            out[id(e)] = _with_target(e, zone=seen)
+    return out
 
 
 def revealed_moves(acts):
@@ -2159,6 +2234,8 @@ def _play_from_hand_now(target, st, card, n, mu, opp_bodies=None):
     board = _ffix("hand_board")
     # 相方の状態からは手札の文脈（`search_ctx`）も落とす——相方がさらに「手札から登場させる」を持つと無限に辿る（実測）
     st2 = {k: v for k, v in st.items() if k not in _ROW_ONLY_KEYS + ("search_ctx",)} if board else None
+    if st2 is not None:
+        st2["source_paid"] = 0.0          # 効果でただで出す相方は印刷のコストを払わない（レビュー 3・レストのドンのコストを誤って払えない扱いにしていた）
     for c in SP.eligible_hand_cards(target, ctx["hand_items"], cards, skip_cid=cid,
                                     st=(st if _ffix("state_filters") else None)):
         if board:
@@ -2356,6 +2433,9 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
     found = _search_plan(acts, card, st)
     # **L(f)**: 見た・公開した札の移動は出どころを見た札に置き換える／**L(a)**: 任意の動作と後続は塊で値付けする
     repl = revealed_moves(acts) if _fix("revealed_src") else {}
+    if _ffix("look_return"):
+        for k_, v_ in look_returns(acts).items():
+            repl.setdefault(k_, v_)
     # **L（`choice_max`／`either_side`）**: 選択肢は最大を取る節と、絞り込みを失った枝への対象の写し
     qual = qualified_choices(ab.get("effect"))
     if qual:
@@ -2399,12 +2479,12 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
     if _ffix("branch_then"):
         # **branch_then**: 「〜した場合、…」の枝の動作（塊が既に読んだ枝は除く）
         consumed = {id(x) for b in blocks for x in (list(b[2]) + list(b[3]))}
-        for e in branch_actions(ab.get("effect"), st, consumed):
+        for e, w in branch_actions(ab.get("effect"), st, consumed):
             v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st=st)
             if v is None:
                 unpriced.append((str(e.get("type") or "?"), _unpriced_family(e)))
             else:
-                total += v
+                total += w * v
     if selection and found is None:
         total += _sel_premium(selection_k(acts))
     cost = ab.get("cost") or {}
@@ -2442,7 +2522,19 @@ def _don_attach_cost(ab, st, offered):
     if offered or not st:
         return 0.0
     if st.get("source_don_attached") is not None:
-        return 0.0          # F-2: 攻撃の行＝付けるドンは DON_BOX の手そのもの（攻撃の価格・機会費用の側で数える）
+        # F-2: 攻撃の行。**既に付いていたドンで足りる分は費用 0**（付けたのは前の手）。足りない分を DON_BOX で付けて
+        # 満たすなら、その枚数の 1 ターンの使用権 `N·δ/R` を払う（レビュー 3 の 8: 付けて殴る手が条件を満たすだけで
+        # 理論の最善になっていた＝付けるドンの使い道を無料に読んでいた）
+        try:
+            import condition_value as CV
+            need = CV.has_don_requirement((ab or {}).get("condition"))
+        except Exception:
+            need = None
+        pre = st.get("source_don_pre")
+        if not need or pre is None:
+            return 0.0
+        r = float(st.get("r_turns") or 0.0) or 4.0
+        return max(0.0, float(need) - float(pre)) * DELTA / max(1.0, r)
     try:
         import condition_value as CV
     except Exception:
