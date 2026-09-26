@@ -12,7 +12,9 @@
      他の列（z・pol_n・sig 等）は v2 から変えていない。
   3. dump の 1 行（card_idx＋tokens）から `relations_from_dump` で R を再計算できる（形状）。
      訓練は float32 へ上げてから渡す（`dump_io.rows_f32`）。
-  4. meta は `dump_version=3`・`enc_version` は v2 と同じ 13（符号化は変えていない）。
+  4. meta は `dump_version=5`（v3 の列＋補助教師の 3 列・§20.8.2＋守る側の補助教師 2 列・
+     P8・`2026-09-24_p8_defender_columns.md`）・`enc_version` は **14**（符号化 v14＝tokens 22×22・scalars 127・§20.9）。
+     `--no-aux` は v3 の列だけを書く（`dump_version=3`）。
 
 fp16 の丸めが forward に与える差は 1 バッチ最大 1.07e-4（`docs/reports/2026-09-07_train_profile.md`
 §3）＝v_mse 0.53 の水準に対して無視できる（1 エポックの val v_mse 相対差 0.09% を実測・
@@ -60,7 +62,7 @@ def game():
 def test_dump_v3_rows_and_dtypes(game):
     _seed, r = game
     n = len(r["z"])
-    assert r["scalars"].shape == (n, E.scalars_dim(13))
+    assert r["scalars"].shape == (n, E.scalars_dim(G.ENC_VERSION_V14))
     assert r["scalars"].dtype == np.float16
     assert r["tokens"].shape == (n, NR.N_TOK, NR.S_DIM) and r["tokens"].dtype == np.float16
     assert r["card_idx"].shape == (n, G.MAX_CI) and r["card_idx"].dtype == np.int16
@@ -76,8 +78,9 @@ def test_dump_v3_rows_and_dtypes(game):
     # 変えていない列（v2 のまま）
     assert r["z"].dtype == np.float32 and r["pol_n"].dtype == np.float32
     assert r["turn"].dtype == np.int16 and r["seed"].dtype == np.int64
-    # v13 の先頭 94 列は v12 の定義（append-only）＝列数だけここで固定
-    assert E.scalars_dim(13) - E.scalars_dim(12) == NR.EXTRA_DIM
+    # v14 の先頭 94 列は v12 の定義・その後ろが `EXTRA_COLS`（append-only）＝列数だけ固定
+    assert E.scalars_dim(G.ENC_VERSION_V14) - E.scalars_dim(12) == NR.EXTRA_DIM
+    assert E.scalars_dim(13) - E.scalars_dim(12) == NR.EXTRA_DIM_V13
 
 
 # --- 2. cast しただけ -------------------------------------------------------
@@ -115,6 +118,71 @@ def test_relations_from_dump_row(game):
 
 # --- 4. meta の版 -----------------------------------------------------------
 def test_meta_versions():
-    assert G.DUMP_VERSION == 3
-    assert G.ENC_VERSION_V2 == 13                            # 符号化は v2 から変えていない
+    assert G.DUMP_VERSION == 5                               # v4 ＋ 守る側の補助教師 2 列（P8・`2026-09-24_p8_defender_columns.md`）
+    assert G.ENC_VERSION_V2 == 13                            # 波 29 までの符号化（過去の meta）
+    assert G.ENC_VERSION_V14 == 14                           # 現行（§20.9・列の形が変わる唯一の欄）
+    assert G.TOKENS_SHAPE == (NR.N_TOK, NR.S_DIM) == (22, 22)
     assert set(G.DT_V3) == {"tokens", "scalars", "card_idx"}
+
+
+def test_aux_columns_ride_along(game):
+    """v4 の追加列は行数が揃い、v3 の列を 1 つも動かさない（`--no-aux` は列そのものが無い）。"""
+    _seed, r = game
+    n = len(r["z"])
+    assert r["aux"].shape == (n, len(G.AUX_COLS)) and r["aux"].dtype == np.float16
+    assert r["aux_tok"].shape == (n, G.AUX_TOK_SLOTS, G.AUX_TOK_DIM)
+    assert r["aux_mask"].shape == (n,) and r["aux_mask"].dtype == np.int8
+    assert set(np.unique(r["aux_mask"]).tolist()) <= {0, 1}
+    assert (np.asarray(r["aux"], np.float32) >= 0).all(), "補助教師は「起きたこと」＝符号なし"
+    # v5: 守る側の補助教師（P8・`2026-09-24_p8_defender_columns.md`）も同じ行数で載る
+    assert r["aux_def"].shape == (n, G.AUX_DEF_SLOTS, G.AUX_DEF_DIM) and r["aux_def"].dtype == np.float16
+    assert r["aux_def_row"].shape == (n, G.AUX_DEF_ROW_DIM) and r["aux_def_row"].dtype == np.float16
+    assert (np.asarray(r["aux_def"], np.float32) >= 0).all(), "守る側の補助教師も符号なし"
+    G._G["aux"] = False                                      # --no-aux（台帳を積まない）
+    try:
+        plain = G.play_one(_seed)
+    finally:
+        G._G["aux"] = True
+    assert plain is not None and not any(k.startswith("aux") for k in plain)
+    for k in ("z", "who", "kind", "turn", "step", "pol_len", "pol_chosen", "pol_n", "pol_si"):
+        assert np.array_equal(plain[k], r[k]), k             # 台帳は局そのものを変えない
+    for k in ("tokens", "scalars", "card_idx"):
+        assert np.array_equal(plain[k], r[k]), k
+
+
+def test_record_gen_cli_writes_aux_def_to_the_shard(tmp_path):
+    """`G.play_one` の戻り値に列が在ることと、`main()`（実際の CLI・shard 書き出し）が**その列を
+    実際に npz へ書く**ことは別の契約——`main()` は `_ROW_KEYS`＋`_POL_KEYS`＋`_TOK_KEYS`＋`_V4_KEYS`＋
+    `_AUX_KEYS`＋`_AUX_DEF_KEYS`（`--no-aux` なら aux 系を全部外す）を明示的に選んで書く。
+    `test_aux_columns_ride_along` は `play_one` を直接読むだけで CLI の鍵選びを通らないので、
+    この経路は別にテストする（P8 実装時、`main()` の `keys` に `_AUX_DEF_KEYS` を足し忘れて
+    実生成では列が落ちる欠陥を作った・その再発防止）。"""
+    pytest.importorskip("opcg_engine", reason="Rust エンジンが要る（make rust-develop）")
+    from opcg_sim.learned.train import dump_io as DIO
+    out = str(tmp_path / "rec")
+    rc = G.main(["--games", "2", "--seed-base", "990101", "--workers", "1", "--sims", "8", "--out", out])
+    assert rc == 0
+    files = DIO.shard_files(out)
+    assert files, "シャードが 1 本も出ていない"
+    for f in files:
+        with np.load(f, allow_pickle=True) as d:
+            assert "aux_def" in d.files and "aux_def_row" in d.files
+            n = len(d["z"])
+            assert d["aux_def"].shape == (n, G.AUX_DEF_SLOTS, G.AUX_DEF_DIM)
+            assert d["aux_def_row"].shape == (n, G.AUX_DEF_ROW_DIM)
+            assert d["aux_def"].dtype == np.float16 and d["aux_def_row"].dtype == np.float16
+
+
+def test_record_gen_cli_no_aux_drops_aux_def_too(tmp_path):
+    """`--no-aux` は `aux`／`aux_tok`／`aux_mask` と同じく `aux_def`／`aux_def_row` も書かない。"""
+    pytest.importorskip("opcg_engine", reason="Rust エンジンが要る（make rust-develop）")
+    from opcg_sim.learned.train import dump_io as DIO
+    out = str(tmp_path / "rec_noaux")
+    rc = G.main(["--games", "2", "--seed-base", "990201", "--workers", "1", "--sims", "8",
+                "--no-aux", "--out", out])
+    assert rc == 0
+    files = DIO.shard_files(out)
+    assert files, "シャードが 1 本も出ていない"
+    for f in files:
+        with np.load(f, allow_pickle=True) as d:
+            assert not any(k.startswith("aux") for k in d.files)

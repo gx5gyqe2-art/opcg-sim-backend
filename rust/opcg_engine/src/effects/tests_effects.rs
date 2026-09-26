@@ -167,7 +167,7 @@ fn every_suspension_kind_has_the_python_request_shape() {
     super::interact::suspend_for_target_selection(
         &mut s, &masters, Seat::P1,
         &[crate::model::TargetRef::Card(t1), crate::model::TargetRef::Card(t2)],
-        &q, Some(src), None, &stack, &ctx,
+        &q, Some(src), None, &stack, &ctx, None,
     )
     .expect("suspend");
     let req = request(&mut s, &masters);
@@ -318,40 +318,172 @@ fn entry(uuid: &str, side: &'static str, zone: &'static str, value: i32) -> supe
     }
 }
 
-/// Python `choose_selection` のゾーン意味論（4 規則＋判別不能は `None`）。
+/// Python `choose_selection` のゾーン意味論（4 規則＋判別不能は `None`）。`intent` は
+/// `SelectionIntent::Unknown` で固定し、WP `rs-select-fix` 以前の挙動がそのまま残っていることを
+/// 確かめる（`hand`/`field` の既定は Unknown のときは変わらない＝min 件・価値昇順）。
 #[test]
 fn choose_selection_follows_the_zone_semantics() {
     use super::interact::choose_selection;
+    use crate::model::SelectionIntent::Unknown;
     // 獲得系（自分の山札／トラッシュ）＝ max 件・価値降順
     let gain = vec![
         entry("a", "own", "deck", 10),
         entry("b", "own", "trash", 30),
         entry("c", "own", "deck", 20),
     ];
-    assert_eq!(choose_selection(&gain, 0, 2), Some(vec!["b".into(), "c".into()]));
+    assert_eq!(
+        choose_selection(&gain, 0, 2, Unknown),
+        Some(vec!["b".into(), "c".into()])
+    );
 
-    // コスト系（自分の手札／場）＝ min 件・価値昇順
+    // コスト系（自分の手札／場・intent 不明）＝ min 件・価値昇順
     let cost = vec![
         entry("a", "own", "hand", 300),
         entry("b", "own", "hand", 100),
         entry("c", "own", "field", 200),
     ];
-    assert_eq!(choose_selection(&cost, 1, 3), Some(vec!["b".into()]));
+    assert_eq!(choose_selection(&cost, 1, 3, Unknown), Some(vec!["b".into()]));
 
     // 対象系（相手側）＝ max 件・価値降順
     let target = vec![entry("a", "opp", "field", 1), entry("b", "opp", "field", 9)];
-    assert_eq!(choose_selection(&target, 0, 1), Some(vec!["b".into()]));
+    assert_eq!(choose_selection(&target, 0, 1, Unknown), Some(vec!["b".into()]));
 
     // 公開一時領域は `min_n == 0` のときだけ獲得系
     let temp = vec![entry("a", "own", "temp", 1), entry("b", "own", "temp", 9)];
-    assert_eq!(choose_selection(&temp, 0, 1), Some(vec!["b".into()]));
-    assert_eq!(choose_selection(&temp, 1, 1), None, "強制の TEMP は判別しない");
+    assert_eq!(choose_selection(&temp, 0, 1, Unknown), Some(vec!["b".into()]));
+    assert_eq!(
+        choose_selection(&temp, 1, 1, Unknown),
+        None,
+        "強制の TEMP は判別しない"
+    );
 
-    // 混在・ゾーン不明・max<1 は判別しない
+    // 混在（自分・相手）・ゾーン不明（ライフ）・max<1 は判別しない
     let mixed = vec![entry("a", "own", "hand", 1), entry("b", "opp", "field", 2)];
-    assert_eq!(choose_selection(&mixed, 0, 2), None);
-    assert_eq!(choose_selection(&gain, 0, 0), None);
-    assert!(choose_selection(&[], 0, 1).is_none());
+    assert_eq!(choose_selection(&mixed, 0, 2, Unknown), None);
+    let life = vec![entry("a", "own", "life", 1), entry("b", "own", "field", 2)];
+    assert_eq!(choose_selection(&life, 0, 2, Unknown), None, "ライフ混在は判別しない");
+    assert_eq!(choose_selection(&gain, 0, 0, Unknown), None);
+    assert!(choose_selection(&[], 0, 1, Unknown).is_none());
+}
+
+/// WP `rs-select-fix`: 自分の手札／場／リーダー／ステージへの up_to 選択は `intent` で
+/// max/min を分ける（`docs/reports/2026-09-08_select_default_rca.md` §Q4・
+/// `docs/rust_engine_plan.md` §8.27.2 案①）。
+#[test]
+fn choose_selection_uses_intent_for_own_hand_field_selections() {
+    use super::interact::choose_selection;
+    use crate::model::SelectionIntent::{Benefit, Cost};
+
+    // 利益系（例: 万雷／神の裁きの自分への +1000）＝ max 件・価値降順
+    // （万雷の「自分のリーダーかキャラ1枚まで」と同型: min=0・max=1・単なる hand/field ではなく
+    // 下のテストで leader も混ぜる）。
+    let benefit = vec![
+        entry("a", "own", "hand", 100),
+        entry("b", "own", "field", 300),
+        entry("c", "own", "field", 200),
+    ];
+    assert_eq!(
+        choose_selection(&benefit, 0, 2, Benefit),
+        Some(vec!["b".into(), "c".into()]),
+        "利益系は max 件・価値降順（相手側の対象系と同じ扱い）"
+    );
+
+    // コスト系（例: 自分のキャラを1枚までレストにできる）＝ min 件・価値昇順（従来のまま）
+    let cost = vec![
+        entry("a", "own", "hand", 300),
+        entry("b", "own", "hand", 100),
+        entry("c", "own", "field", 200),
+    ];
+    assert_eq!(
+        choose_selection(&cost, 1, 3, Cost),
+        Some(vec!["b".into()]),
+        "コスト系は今までどおり min 件・価値昇順"
+    );
+
+    // 自分のリーダー＋キャラの混在（万雷／神避／EB01-019 の「自分のリーダーかキャラ1枚まで」）:
+    // 以前は `zones_in(&["hand","field"])` に leader が含まれず `None` に落ちていた
+    // （RCA (a) の直接の原因）。今は own 側として扱われ、`None` にならない。
+    let leader_and_field = vec![
+        entry("leader", "own", "leader", 5000),
+        entry("char", "own", "field", 3000),
+    ];
+    assert_eq!(
+        choose_selection(&leader_and_field, 0, 1, Benefit),
+        Some(vec!["leader".into()]),
+        "リーダー+キャラの混在は None に落ちず、利益系なら価値降順で選ぶ"
+    );
+    assert!(
+        choose_selection(&leader_and_field, 0, 1, Cost).is_some(),
+        "コスト系でも混在は None に落ちない（min 件・価値昇順で解決する）"
+    );
+
+    // ステージも同じ「own」バケットに含める。
+    let leader_and_stage = vec![
+        entry("leader", "own", "leader", 10),
+        entry("stage", "own", "stage", 20),
+    ];
+    assert_eq!(
+        choose_selection(&leader_and_stage, 0, 1, Benefit),
+        Some(vec!["stage".into()])
+    );
+}
+
+/// WP `rs-select-fix`: `classify_intent` の分類表（RCA Q4 の代表ケースを 1 つずつ）。
+#[test]
+fn classify_intent_matches_the_rca_q4_table() {
+    use super::ast::ActionType;
+    use super::interact::classify_intent;
+    use crate::model::SelectionIntent::{Benefit, Cost, Unknown};
+
+    // 万雷／神の裁き型: プレーンな BUFF（status なし）・正の値＝利益。
+    let plain_buff = testkit::action(ActionType::Buff, 1000);
+    assert_eq!(classify_intent(&plain_buff), Benefit);
+
+    // DEBUFF エイリアス相当（負の値の BUFF・自分に当てるカードは無いが符号則の確認）＝コスト。
+    let mut negative_buff = testkit::action(ActionType::Buff, -1000);
+    negative_buff.status = None;
+    assert_eq!(classify_intent(&negative_buff), Cost);
+
+    // 神避型: status なしの BUFF（正の値）＝利益（上と同型）。
+    let kamisake = testkit::action(ActionType::Buff, 3000);
+    assert_eq!(classify_intent(&kamisake), Benefit);
+
+    // カウンター値の増減（status=COUNTER）: 正の値＝利益。
+    let mut counter_buff = testkit::action(ActionType::Buff, 1000);
+    counter_buff.status = Some("COUNTER".into());
+    assert_eq!(classify_intent(&counter_buff), Benefit);
+
+    // 自分のパワーを上書き（POWER_OVERRIDE）は符号を問わず利益。
+    let mut power_override = testkit::action(ActionType::Buff, 5000);
+    power_override.status = Some("POWER_OVERRIDE".into());
+    assert_eq!(classify_intent(&power_override), Benefit);
+
+    // ブロッカー無効化を自分に付与できるカードは無いが、status の分岐だけ確認（常に利益）。
+    let mut blocker_disable = testkit::action(ActionType::Buff, 0);
+    blocker_disable.status = Some("BLOCKER_DISABLE".into());
+    assert_eq!(classify_intent(&blocker_disable), Benefit);
+
+    // 自分のコストを下げる（COST_REDUCTION・負の値）＝利益／上げる（正の値）＝コスト。
+    let mut cost_down = testkit::action(ActionType::Buff, -1);
+    cost_down.status = Some("COST_REDUCTION".into());
+    assert_eq!(classify_intent(&cost_down), Benefit);
+    let mut cost_up = testkit::action(ActionType::Buff, 1);
+    cost_up.status = Some("COST_REDUCTION".into());
+    assert_eq!(classify_intent(&cost_up), Cost);
+
+    // GRANT_KEYWORD／RAMP_DON 等の利益系（EB02-018 のダブルアタック付与型）。
+    assert_eq!(classify_intent(&testkit::action(ActionType::GrantKeyword, 0)), Benefit);
+    assert_eq!(classify_intent(&testkit::action(ActionType::RampDon, 1)), Benefit);
+    assert_eq!(classify_intent(&testkit::action(ActionType::Draw, 1)), Benefit);
+
+    // REST／KO／TRASH 等のコスト系（自分のキャラを1枚までレストにできる 型）。
+    assert_eq!(classify_intent(&testkit::action(ActionType::Rest, 0)), Cost);
+    assert_eq!(classify_intent(&testkit::action(ActionType::Ko, 0)), Cost);
+    assert_eq!(classify_intent(&testkit::action(ActionType::Trash, 0)), Cost);
+
+    // 分類不能（SEARCH 相当の SELECT／ARRANGE 系アクションは今回の DB に無いので Select で代用）。
+    assert_eq!(classify_intent(&testkit::action(ActionType::Select, 0)), Unknown);
+    assert_eq!(classify_intent(&testkit::action(ActionType::Look, 0)), Unknown);
 }
 
 /// Python `default_interaction_payload`: 判別できない要求は**候補の先頭から min 件**、
@@ -377,6 +509,47 @@ fn default_payload_falls_back_to_the_first_min_candidates() {
 
     // 候補が無い要求（CONFIRM 系）でも同じ既定を返す。
     let payload = super::interact::default_interaction_payload(&state, &masters, Some(&json!({})));
+    assert_eq!(payload["selected_uuids"], json!([]));
+    assert_eq!(payload["accepted"], true);
+}
+
+/// WP `rs-select-fix`: `pending["intent"]` が `default_interaction_payload` まで届く
+/// （`rules/pending.rs::get_pending_request` → JSON → ここ）ことを、pending を直接組んで確かめる。
+#[test]
+fn default_payload_reads_intent_from_the_pending_json() {
+    let mut b = BoardBuilder::new().turn(3, Seat::P1);
+    let a = b.put_field(Seat::P1, M_CHAR); // 場のキャラ2枚（own/field）
+    let c = b.put_field(Seat::P1, M_CHAR);
+    let (masters, state) = b.build();
+    let uuids = vec![state.card(a).uuid.clone(), state.card(c).uuid.clone()];
+    let pending_benefit = json!({
+        "player_id": "p1",
+        "selectable_uuids": uuids,
+        "constraints": {"min": 0, "max": 1},
+        "intent": "BENEFIT",
+    });
+    let payload =
+        super::interact::default_interaction_payload(&state, &masters, Some(&pending_benefit));
+    // 利益系＝max 件・価値降順（この盤面は同カードなので同値＝安定ソートで先頭が残る）。
+    assert_eq!(payload["selected_uuids"], json!([uuids[0]]));
+
+    let pending_cost = json!({
+        "player_id": "p1",
+        "selectable_uuids": uuids,
+        "constraints": {"min": 0, "max": 1},
+        "intent": "COST",
+    });
+    let payload = super::interact::default_interaction_payload(&state, &masters, Some(&pending_cost));
+    // コスト系（min=0）＝0 件（"1 枚まで" の既定は「選ばない」のまま）。
+    assert_eq!(payload["selected_uuids"], json!([]));
+
+    // intent キーが無ければ Unknown（従来どおりの挙動）。
+    let pending_none = json!({
+        "player_id": "p1",
+        "selectable_uuids": uuids,
+        "constraints": {"min": 0, "max": 1},
+    });
+    let payload = super::interact::default_interaction_payload(&state, &masters, Some(&pending_none));
     assert_eq!(payload["selected_uuids"], json!([]));
     assert_eq!(payload["accepted"], true);
 }
@@ -532,10 +705,15 @@ fn audit_oracle_matches_python() {
 }
 
 /// 照合から外す欄（要求 id は毎回変わる。ハーネス `_strip_request_id` と同じ）。
+///
+/// `intent` は WP `rs-select-fix`（§8.27.3）で追加した Rust だけの欄（フロントは無視してよい・
+/// Python には無い＝この録画済み oracle フィクスチャにも無い）なので、`request_id` と同じく
+/// 照合から外す。
 fn strip_request_id(state: &Value) -> Value {
     let mut v = state.clone();
     if let Some(req) = v.get_mut("pending_request").and_then(|r| r.as_object_mut()) {
         req.remove("request_id");
+        req.remove("intent");
     }
     v
 }
