@@ -844,8 +844,14 @@ def sigma_rel_for(dirs, name="cross", body_mode=None, slope="theory"):
     **読みごとに分けて持つ**（`theory` の τ と `curve` の τ は別の器なので同じ `σ` を使ってはいけない
     ——T97 の「借り物の σ」と同じ誤りを繰り返さないため）。値の出所は `summarise` の `by_slope[*].sigma_rel`。
     **K-2**: `theory_order.SIGMA_FLOOR_MODE=on` なら**床を入れた形で測り直した表**（`sigma_rel_floor`・出所は
-    `summarise` の `by_slope[*].sigma_rel_floor`＝`sigma_rel_mle` に床 1/12 を入れたもの）を同じ規約で引く。"""
-    key = "sigma_rel_floor" if TO.SIGMA_FLOOR_MODE == "on" else "sigma_rel"
+    `summarise` の `by_slope[*].sigma_rel_floor`＝`sigma_rel_mle` に床 1/12 を入れたもの）を同じ規約で引く。
+    **K-5**: `theory_order.SETTLE_COND_MODE=whole` なら **`whole` の形と揃えて測った表**（`sigma_rel_whole`・出所は
+    `summarise` の `by_slope[*].sigma_rel_whole`＝`sigma_rel_whole_mle`）を同じ規約で引く（床の切替より先に見る
+    ——`whole` は整数ターンを式の中で数えるので床を足さない）。"""
+    if TO.SETTLE_COND_MODE == "whole":
+        key = "sigma_rel_whole"
+    else:
+        key = "sigma_rel_floor" if TO.SIGMA_FLOOR_MODE == "on" else "sigma_rel"
     tbl = (load_harm_profiles() or {}).get(key) or {}
     by = (tbl.get(body_mode or THETA_BODY_MODE) or {}).get(slope) or {}
     if not by:
@@ -857,6 +863,92 @@ def sigma_rel_for(dirs, name="cross", body_mode=None, slope="theory"):
     if kind is None:
         return None
     return float(by["syn"]) if kind == "real" else float(by["real"])
+
+
+_LOG_SQRT_2PI = 0.5 * math.log(2.0 * math.pi)
+
+
+def _log_upper_tail(z):
+    """`log P(Z > z)`（`Z` は標準正規）。`erfc` が浮動小数で潰れる裾だけ漸近展開
+    `P(Z > z) = φ(z)/z · (1 − 1/z² + 3/z⁴ − …)` の最初の 3 項で読む（数値の扱いで、当てはめの数ではない）。"""
+    z = float(z)
+    v = 0.5 * math.erfc(z / math.sqrt(2.0))
+    if v >= sys.float_info.min:
+        return math.log(v)
+    t2 = 1.0 / (z * z)
+    return -0.5 * z * z - math.log(z) - _LOG_SQRT_2PI + math.log1p(-t2 + 3.0 * t2 * t2)
+
+
+def _log_interval(lo, hi):
+    """`log P(lo < Z ≤ hi)`（`lo` は `-inf` 可）。両端が同じ側の裾なら裾の対数の差で読む（桁落ちしない）。"""
+    if lo == -math.inf:
+        return _log_upper_tail(-hi)
+    if lo >= 0.0:
+        a, b = _log_upper_tail(lo), _log_upper_tail(hi)
+    elif hi <= 0.0:
+        a, b = _log_upper_tail(-hi), _log_upper_tail(-lo)
+    else:
+        return math.log(0.5 * (math.erf(hi / math.sqrt(2.0)) - math.erf(lo / math.sqrt(2.0))))
+    return a + math.log1p(-math.exp(b - a))
+
+
+def sigma_rel_whole_mle(tau_w, act_w):
+    """**K-5: `whole` の形と揃えた幅 σ の最尤**（`theory_order.SETTLE_COND_MODE` の注）。
+
+    `tau_w`＝勝った席の時計（`summarise` と同じ 30 の打ち切り）・`act_w`＝その席が実際に届いた段（今のターンを 1 と
+    数える自席ターン数）。**尤度は規則から**: `whole` の式では届く段は `k = max(1, ⌈X⌉)`・`X ~ N(τ, (σ·c)²)`・
+    `c = max(1, τ)`（まだ打つ自席ターンの数・`TO.whole_clock_scale`）なので、観測 `a` の確率は
+
+        P(a) = Φ((a − τ)/(σ c)) − Φ((a − 1 − τ)/(σ c))    （a ≥ 2）
+        P(1) = Φ((1 − τ)/(σ c))                            （今のターンで届いた）
+
+    で、`Σ log P(a_i)` を σ について最大にする。**見えるのは勝った席の 1 本だけ**（負けた席がいつ届いたかは記録に無い）
+    ので 1 本の時計の幅をそのまま測る——従来の `σ_rel`（残差 ÷ `√(τ_me² + τ_opp²)`）は 1 本の残差を 2 本分の尺度で
+    割り（過小）、整数の丸めを連続の誤差に混ぜていた（`whole` は丸めを式の中で数える）。
+
+    **最大は 1 つ**: 精度 `β = 1/σ` で書くと各項は `P(β(a − 1 − τ)/c < Z ≤ β(a − τ)/c)`＝凸な集合
+    `{(β, z): β l ≤ z ≤ β u}` の上で対数凹な密度を積分したものなので、Prékopa の定理で `log P` は β について凹。
+    だから β の傾き（単調に減る）の符号が変わる点を 2 分法で解く（上下端は倍々に広げる・固定の範囲や反復回数を置かない）。
+    傾きが至る所で正（全行が予測どおりの段で届いた）なら境界解 0 を返す。行が無ければ `None`。"""
+    tw = [float(x) for x in tau_w]
+    aw = [max(1, int(a)) for a in act_w]
+    if not tw:
+        return None
+    rows = []
+    for t, a in zip(tw, aw):
+        c = TO.whole_clock_scale(t)
+        rows.append(((a - t) / c, ((a - 1 - t) / c) if a >= 2 else -math.inf))
+    if all(u >= 0.0 and l < 0.0 for u, l in rows):
+        return 0.0      # 全行が予測どおりの段（τ ∈ (a − 1, a]）＝尤度は β について凹で上に有界→単調に上がる＝境界解 0
+
+    def slope(beta):                                     # d/dβ Σ log P
+        g = 0.0
+        for u, l in rows:
+            zu = beta * u
+            zl = beta * l if l != -math.inf else -math.inf
+            lp = _log_interval(zl, zu)
+            g += math.exp(-0.5 * zu * zu - _LOG_SQRT_2PI - lp) * u
+            if l != -math.inf:
+                g -= math.exp(-0.5 * zl * zl - _LOG_SQRT_2PI - lp) * l
+        return g
+
+    sd0 = float(np.std([u for u, _l in rows]))           # 出発点（データの散らばり・凹なので答えには効かない）
+    lo = hi = 1.0 / sd0 if sd0 > 0.0 else 1.0
+    while slope(hi) > 0.0:                               # 外れた行が 1 つでも在れば β → ∞ で尤度は −∞＝必ず負に変わる
+        hi *= 2.0
+    while slope(lo) < 0.0:
+        lo *= 0.5
+        if lo <= 0.0:
+            return math.inf                              # 反対の境界（起きない: β → 0 で全行の P → 0）
+    while True:
+        mid = 0.5 * (lo + hi)
+        if mid <= lo or mid >= hi:
+            break
+        if slope(mid) > 0.0:
+            lo = mid
+        else:
+            hi = mid
+    return float(1.0 / (0.5 * (lo + hi)))
 
 
 def profile_for(dirs, name="cross", path=None):
@@ -3045,6 +3137,15 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
         # `σ_rel`（`sigma_rel_mle`）。`SIGMA_FLOOR_MODE=on` の表（`sigma_rel_floor`）の出所。
         o["sigma_rel_floor"] = (round(float(sigma_rel_mle(res, scale, TO.TURN_ROUND_VAR, TO.TURN_ROUND_MEAN)), 4)
                                 if has_scale.any() else None)
+        # **K-5（2026-09-26・報告のみ・既存の欄は不変）**: `whole` の形と揃えた幅（勝った席が届いた段を区間で観測・
+        # 1 本の時計の幅 `σ·max(1, τ)`）。`SETTLE_COND_MODE=whole` の表（`sigma_rel_whole`）の出所。全行（尺度 0 の行も
+        # 定義できる＝`max(1, τ)` は 0 にならない）。
+        tw_, aw_ = [], []
+        for r in rows_out:
+            k, act = ((r["tau_me_" + sv], r["t_me_act"]) if r["won"] else (r["tau_opp_" + sv], r["t_opp_act"]))
+            tw_.append(min(float(k), 30.0)); aw_.append(int(act))
+        swm = sigma_rel_whole_mle(tw_, aw_)
+        o["sigma_rel_whole"] = round(float(swm), 4) if swm is not None else None
         # **K（2026-09-26・報告のみ）**: **整数ターンの残差** `max(1, ⌈τ⌉) − t_act`。時計は「(段数 − 1) ＋ 割合」、
         # 実際の残りは「今のターンを 1 と数える整数」なので、上の `τ − t_act` は**完璧な予測でも (−1, 0] に入り平均 ≈ −0.5**。
         # 整数に揃えれば完璧な予測は 0＝`bias_int` がそのまま「何ターン遅く言ったか」。

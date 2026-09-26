@@ -198,11 +198,120 @@ def test_settle_cond_routes_prob_of_d_through_the_race_only_on_turn_start_rows()
     assert p_closed == pytest.approx(T.whole_turn_race_prob(tm, to, 0.3 * tm, 0.3 * to, 2))
     assert p_open == pytest.approx(T.whole_turn_race_prob(tm, to, 0.3 * tm, 0.3 * to, 1))
     assert p_closed < p_open
-    T.set_settle_cond_mode("whole")                                              # 対照: 条件を掛けない
-    assert T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=True, first_open=False) == pytest.approx(p_open)
+    T.set_settle_cond_mode("whole")                                              # 条件を掛けない・幅はまだ打つターン数（K-5）
+    assert T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=True, first_open=False) == pytest.approx(
+        T.whole_turn_race_prob(tm, to, 0.3 * 1.0, 0.3 * to, 1))
+    tm = 1.4                                                                      # τ ≥ 1 なら幅は `on` と同じ σ·τ
+    assert T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=True, first_open=False) == pytest.approx(
+        T.whole_turn_race_prob(tm, to, 0.3 * tm, 0.3 * to, 1))
     T.set_settle_cond_mode("on"); T.set_w_mover_mode("off")                       # 半ターンを使わない構成には掛けない
     assert T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=True, first_open=False) == pytest.approx(
         _phi((to - tm) / (0.3 * math.hypot(tm, to))))
+
+
+# ---- K-5: `whole` の幅（まだ打つターン数）と、それに揃えた測り方 -------------------------------------------
+
+def test_whole_width_is_the_number_of_turns_still_to_play():
+    """時計 1 本の幅の尺度は `max(1, τ)`＝今のターンは τ がいくら小さくても丸ごと 1 ターン打たれる。"""
+    assert [T.whole_clock_scale(x) for x in (0.0, 1e-9, 0.4, 1.0, 3.2)] == [1.0, 1.0, 1.0, 1.0, 3.2]
+    T.set_w_err_mode("rel"); T.set_sigma_rel(0.4); T.set_w_mover_mode("half"); T.set_settle_cond_mode("whole")
+    for d, tm, to in _GRID:
+        want = T.whole_turn_race_prob(tm, to, 0.4 * max(1.0, tm), 0.4 * max(1.0, to), 1)
+        assert T.prob_of_d(d, t_me=tm, t_opp=to, mover=True) == want
+        assert T.prob_of_d(d, t_me=tm, t_opp=to, mover=True, first_open=False) == want   # 条件は掛けない
+
+
+@pytest.mark.parametrize("tm,to", [(0.0, 0.0), (0.0, 1.3), (0.3, 2.5), (2.2, 0.0), (0.9, 0.2)])
+def test_whole_with_the_turn_width_matches_a_simulation_of_the_rule(tm, to):
+    sm, so = 0.4 * T.whole_clock_scale(tm), 0.4 * T.whole_clock_scale(to)
+    mc, n = _mc(tm, to, sm, so, 1)
+    tol = 5.0 * math.sqrt(max(mc * (1.0 - mc), 1e-4) / n)
+    assert T.whole_turn_race_prob(tm, to, sm, so, 1) == pytest.approx(mc, abs=tol)
+
+
+def test_whole_never_says_exactly_0_or_1_at_tiny_clocks():
+    """従来の幅 `σ·τ` は `τ = 0` で幅 0＝「いま届く」を確率 1 と言っていた（p がちょうど 1／相手なら 0）。"""
+    assert T.whole_turn_race_prob(0.0, 2.0, 0.0, 0.4 * 2.0, 1) == 1.0                # 弱点（従来の幅）
+    T.set_w_err_mode("rel"); T.set_sigma_rel(0.4); T.set_w_mover_mode("half"); T.set_settle_cond_mode("whole")
+    tiny = (0.0, 1e-9, 0.01, 0.3, 0.9)
+    for tm in tiny:
+        for to in tiny + (1.5, 3.0):
+            p = T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=True)
+            q = T.prob_of_d(tm - to, t_me=to, t_opp=tm, mover=True)
+            assert 0.0 < p < 1.0 and 0.0 < q < 1.0
+            if tm == to:
+                assert p > 0.5                                                   # 同じ段なら手番の私が先
+
+
+def test_log_interval_is_exact_in_the_body_and_finite_in_the_far_tails():
+    for lo, hi in [(-0.5, 0.7), (2.0, 3.0), (-3.0, -2.0), (-math.inf, 1.0), (-math.inf, -2.5)]:
+        direct = _phi(hi) - (0.0 if lo == -math.inf else _phi(lo))
+        assert CB._log_interval(lo, hi) == pytest.approx(math.log(direct), rel=1e-9)
+    far = CB._log_interval(40.0, 41.0)                                           # 直接の差は 0（桁落ち）
+    assert math.isfinite(far) and far == pytest.approx(-0.5 * 1600 - math.log(40.0) - 0.5 * math.log(2 * math.pi), abs=1e-3)
+    assert CB._log_interval(-41.0, -40.0) == pytest.approx(far)
+    assert CB._log_interval(-math.inf, -40.0) == pytest.approx(far, abs=1e-3)
+
+
+def _whole_sim(sigma, n, seed):
+    rng = np.random.default_rng(seed)
+    tau = rng.uniform(0.0, 8.0, n)
+    tau[: n // 10] = 0.0                                                          # 「いま届く」と言う行も混ぜる
+    x = tau + sigma * np.maximum(1.0, tau) * rng.standard_normal(n)
+    return tau, np.maximum(1, np.ceil(x)).astype(int)
+
+
+def test_sigma_rel_whole_mle_recovers_a_known_width_from_simulated_records():
+    for sigma, seed in ((0.25, 1), (0.4, 2), (0.6, 3)):
+        tau, act = _whole_sim(sigma, 20000, seed)
+        assert CB.sigma_rel_whole_mle(tau, act) == pytest.approx(sigma, rel=0.03)
+    # 従来の手順の 1 本版（残差の sd ÷ 尺度）は丸めを混ぜる＝同じ記録で別の数になる
+    tau, act = _whole_sim(0.4, 20000, 2)
+    naive = float(((tau - act) / np.maximum(1.0, tau)).std())
+    assert abs(naive - 0.4) > 0.02
+
+
+def test_sigma_rel_whole_mle_edges():
+    assert CB.sigma_rel_whole_mle([], []) is None
+    tau = np.array([0.0, 0.5, 1.3, 2.7, 4.0]); act = np.array([1, 1, 2, 3, 4])   # 全行が予測どおりの段
+    assert CB.sigma_rel_whole_mle(tau, act) == 0.0                                # 境界解（狭いほど尤度が上がる）
+    one_off = CB.sigma_rel_whole_mle(np.r_[tau, 1.3], np.r_[act, 4])              # 1 行外れると幅が要る
+    assert 0.0 < one_off < math.inf
+
+
+def test_sigma_rel_for_reads_the_whole_table_when_whole_is_on(monkeypatch, tmp_path):
+    prof = {"sigma_rel": {"blockers": {"theory": {"real": 0.31, "syn": 0.33}}},
+            "sigma_rel_floor": {"blockers": {"theory": {"real": 0.21, "syn": 0.23}}},
+            "sigma_rel_whole": {"blockers": {"theory": {"real": 0.41, "syn": 0.43}}}}
+    monkeypatch.setattr(CB, "load_harm_profiles", lambda path=None: prof)
+    d_real = tmp_path / "w_real"; d_real.mkdir()
+    (d_real / "meta_n_record.json").write_text('{"decks": "user"}', encoding="utf-8")
+    T.set_settle_cond_mode("whole")
+    assert CB.sigma_rel_for([str(d_real)]) == pytest.approx(0.43)                 # 別のセット（cross）
+    T.set_sigma_floor_mode("on")                                                  # `whole` は床を足さない＝表も `whole`
+    assert CB.sigma_rel_for([str(d_real)]) == pytest.approx(0.43)
+    T.set_settle_cond_mode("on")                                                  # `on` は従来の表のまま
+    assert CB.sigma_rel_for([str(d_real)]) == pytest.approx(0.23)
+    T.set_settle_cond_mode("off"); T.set_sigma_floor_mode("off")
+    assert CB.sigma_rel_for([str(d_real)]) == pytest.approx(0.33)
+
+
+def test_the_fixture_carries_the_whole_table():
+    prof = CB.load_harm_profiles()
+    tbl = prof["sigma_rel_whole"]["blockers"]
+    for slope in ("theory", "curve"):
+        assert set(tbl[slope]) == {"real", "syn"} and all(0.0 < v < 1.0 for v in tbl[slope].values())
+    old = prof["sigma_rel"]["blockers"]["theory"]
+    assert all(tbl["theory"][k] > old[k] for k in ("real", "syn"))              # 従来の手順は幅を小さく測っていた
+
+
+def test_off_stays_bit_identical_after_whole_was_used():
+    T.set_w_err_mode("rel"); T.set_sigma_rel(0.3078); T.set_w_mover_mode("half")
+    base = [T.prob_of_d(d, t_me=tm, t_opp=to, mover=True) for d, tm, to in _GRID]
+    T.set_settle_cond_mode("whole")
+    [T.prob_of_d(d, t_me=tm, t_opp=to, mover=True) for d, tm, to in _GRID]
+    T.set_settle_cond_mode("off")
+    assert [T.prob_of_d(d, t_me=tm, t_opp=to, mover=True) for d, tm, to in _GRID] == base
 
 
 # ---- 配線（win_calib／pre_settle_asymmetry／crossing_bridge） ----------------------------------------
@@ -277,6 +386,10 @@ def test_summarise_reports_the_integer_residual_next_to_the_old_one_without_chan
     assert o["bias_int"] == pytest.approx(0.25) and o["exact_int"] == pytest.approx(0.75)
     assert o["late_int"] == pytest.approx(0.25) and o["early_int"] == 0.0 and o["mae_int"] == pytest.approx(0.25)
     assert o["sigma_rel_floor"] is not None
+    # K-5: 勝った席の届いた段 2・1・2・1（τ 1.4・0.3・2.7・0）——⌈2.7⌉ = 3 ≠ 2 の外れがあるので幅は正
+    assert o["sigma_rel_whole"] == pytest.approx(round(CB.sigma_rel_whole_mle(
+        [1.4] * 10 + [0.3] * 10 + [2.7] * 10 + [0.0] * 10, [2] * 10 + [1] * 10 + [2] * 10 + [1] * 10), 4))
+    assert o["sigma_rel_whole"] > 0.0
 
 
 def test_tau_resid_by_bin_reports_integer_residuals():

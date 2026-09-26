@@ -86,6 +86,19 @@
    }
   }
  },
+ "_note_sigma_rel_whole": "K-5（2026-09-26・ユーザ決定「2はb」）: `SETTLE_COND_MODE=whole` の `σ_rel`（時計 1 本の幅 `σ·max(1, τ)` の σ）。**`whole` の式と同じ形の尤度**で測った値——勝った席が実際に届いた段 `a`（今のターンを 1 と数える自席ターン数）を `k = max(1, ⌈X⌉)`・`X ~ N(τ, (σ·max(1, τ))²)` の実現とみて `P(a − 1 < X ≤ a)`（`a = 1` は `P(X ≤ 1)`）の積を σ について最大にする（`crossing_bridge.sigma_rel_whole_mle`・精度 1/σ について凹＝最大は 1 つ・新定数ゼロ）。**同じ行（全行・30 の打ち切り）・同じ cross 規約**。出所は `summarise` の `by_slope[*].sigma_rel_whole`（既定の構成・`crossing_bridge.py --in w41`／`--in w39 w42`）。同じ実行で従来の `sigma_rel`（theory）は実 0.3067／合成 0.3292——従来の手順は勝った席 1 本の残差を 2 本分の尺度 `√(τ_me²+τ_opp²)` で割り、整数の丸めを連続の誤差に混ぜるので幅を小さく測っていた。",
+ "sigma_rel_whole": {
+  "blockers": {
+   "theory": {
+    "real": 0.402,
+    "syn": 0.3914
+   },
+   "curve": {
+    "real": 0.3396,
+    "syn": 0.3799
+   }
+  }
+ },
  "_note_theory_slope": "**理論の速さの輪郭**（T126・2026-09-20）＝自席ターン番号 j ごとの `slope_theory` の平均（`crossing_bridge.summarise` の `harm_profile.theory_slope_by_turn` の写し・`harm_profile()` の 2 本目）。**`curve_scaled` の読みの分母**——その席の `A` をこの「典型の速さ」で割った比で輪郭を伸縮する。**これがあると輪郭の読みが尺度不変になる**（輪郭は比 `prof/prof_th`〔無次元〕としてしか入らず、単位は `A` が持つ）＝T122 の P5 が `curve` で 96.2% 破れていた患部。**j=0 は 0.0**（`RATE_T1_MODE=on`＝最初の自席ターンは 1 本も打てない規則）なので、**割るときは `SLOPE_FLOOR` で床を張る**（橋の `curve_scaled` と同じ）。取り直しは `harm_by_turn` と同じパスで（同じ run の同じ表から両方写す）。",
  "theory_slope": {
   "real": [
