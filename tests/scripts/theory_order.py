@@ -888,6 +888,8 @@ def opp_chars_of(tok_row):
 
 #: トークンの列（`n_rel_feat.S_COLS`）。`cost_now` は `/10`・`is_rest` は旗。
 S_COST, S_IS_REST = 1, 3
+#: 付いているドン（`attached_don/5`・`n_rel_feat.S_COLS_V13` の 3 番目・`price_realised.S_ATTACHED_DON` と同じ）
+S_ATTACHED_DON = 2
 #: 「今攻撃できるか」の旗（`n_rel_feat.S_COLS_V13` の 5 番目）
 S_CAN_ATTACK = 5
 #: 登場・イベントの費用（ドン）の引き方（T43・2026-09-16）。
@@ -1091,6 +1093,149 @@ def attack_don_cost(ctx, k, theta=THETA, mu=MU, src_x=None):
         return don_opportunity(attackers, don_active, k, theta, mu)
     return don_misalloc(attackers, don_active, pin_idx, k, theta, mu)
 
+
+
+#: **F-2（2026-09-26）**: 攻撃（`ATTACK`／対象付き `DON_BOX`）の価格に**攻め手自身の【アタック時】能力**の値を足すか。
+#: `off`（既定）＝従来（攻め手の `abilities` を読まない＝256 本が値付けゼロ・`2026-09-25_f1_attack_ability_inventory.md` の発見 1）／
+#: `on`＝`effect_value.card_value(攻め手, ON_ATTACK)` を足す（`attack_ability_value`）。**新定数ゼロ**——中身の値付けは
+#: 登場時・起動メインと同じ `ability_value` の再帰で、違うのは次の 3 点だけ:
+#: (1) **条件は状態から判定**（`offered=False`＝`condition_value`）。【ドン!!×N】は攻め手に**付いている**枚数（記録の付与 ＋ DON_BOX の k）で読む。
+#: (2) **攻め手自身へのパワー上昇・ダブルアタック・バニッシュは「この攻撃の価格の差」**（`effect_value.attack_self_value`）——
+#:     攻撃の価格そのもの（`attack_value(P)`）に上乗せする形なので二重にならない（`P + ΔP` の価格 − `P` の価格）。
+#: (3) 場に居る札の能力なので出す費用は払わない（`source_paid=0`）・攻め手はアタックでレストになっている（`source_rested`）。
+#: **T89（`2026-09-18_rate_and_time.md`）は自己強化 62 本を記録で数えただけ**（読み取りのみ・`A` にも攻撃の価格にも入れていない）
+#: ので、ここで足しても T89 の分とは重ならない。**記録の枠のパワー（`slot_power`）は宣言前の値**＝【アタック時】の上昇はまだ載っていない
+#: （【常時】【自分のターン中】の上昇は既に載っている＝そちらは足さない・F-3a の `REFLECTED_KINDS`）。
+ATTACK_ABILITY_MODES = ("off", "on")
+ATTACK_ABILITY_MODE = "off"
+#: **F-3a（2026-09-26）**: キャラの登場の価格（体の価値 `ν` の側）に**【常時】／【自分のターン中】の継続効果のうち理論から見えない部分**を足すか。
+#: `off`（既定）＝従来／`on`＝`effect_value.continuous_body_value` を `_char_play_value` に足す（体の価格の唯一の入口）。
+#: パワー（トークン列 0）とブロッカー（列 6）はエンジンの再計算が既に書き込んでいるので除く。反応型（「〜された時、」）は除く（F-3b）。
+PASSIVE_BODY_MODES = ("off", "on")
+PASSIVE_BODY_MODE = "off"
+#: 切替 on のときの内訳（何本に値が付き、何本が読めなかったか）。**off では触らない**。
+WIRING_STATS = {"attack_cand": 0, "attack_with_ability": 0, "attack_nonzero": 0, "attack_unpriced": 0,
+                "attack_sum": 0.0, "play_char": 0, "passive_with_ability": 0, "passive_nonzero": 0,
+                "passive_unpriced": 0, "passive_sum": 0.0}
+
+
+def reset_wiring_stats():
+    for k in WIRING_STATS:
+        WIRING_STATS[k] = 0.0 if isinstance(WIRING_STATS[k], float) else 0
+
+
+def set_attack_ability_mode(mode):
+    global ATTACK_ABILITY_MODE
+    if mode not in ATTACK_ABILITY_MODES:
+        raise ValueError("attack ability mode は %s のどれか（%r）" % (ATTACK_ABILITY_MODES, mode))
+    ATTACK_ABILITY_MODE = mode
+    return ATTACK_ABILITY_MODE
+
+
+def add_attack_ability_arg(ap):
+    ap.add_argument("--attack-ability", default=None, choices=ATTACK_ABILITY_MODES,
+                    help="**F-2** 攻撃の価格に攻め手の【アタック時】能力の値を足すか（省略時は `theory_order.ATTACK_ABILITY_MODE`＝`off`）")
+
+
+def apply_attack_ability(a):
+    if getattr(a, "attack_ability", None) is not None:
+        set_attack_ability_mode(a.attack_ability)
+    a.attack_ability = ATTACK_ABILITY_MODE
+    return ATTACK_ABILITY_MODE
+
+
+def set_passive_body_mode(mode):
+    global PASSIVE_BODY_MODE
+    if mode not in PASSIVE_BODY_MODES:
+        raise ValueError("passive body mode は %s のどれか（%r）" % (PASSIVE_BODY_MODES, mode))
+    PASSIVE_BODY_MODE = mode
+    return PASSIVE_BODY_MODE
+
+
+def add_passive_body_arg(ap):
+    ap.add_argument("--passive-body", default=None, choices=PASSIVE_BODY_MODES,
+                    help="**F-3a** 登場の価格（体）に【常時】／【自分のターン中】の見えない継続効果の値を足すか"
+                         "（省略時は `theory_order.PASSIVE_BODY_MODE`＝`off`）")
+
+
+def apply_passive_body(a):
+    if getattr(a, "passive_body", None) is not None:
+        set_passive_body_mode(a.passive_body)
+    a.passive_body = PASSIVE_BODY_MODE
+    return PASSIVE_BODY_MODE
+
+
+def slot_don(tok_row, slot):
+    """枠 index → **付いているドンの枚数**（トークン列 2＝`attached_don/5`）。枠が無ければ `None`。"""
+    if slot is None or int(slot) < 0:
+        return None
+    s = int(slot)
+    if s >= tok_row.shape[0]:
+        return None
+    return int(round(float(tok_row[s, S_ATTACHED_DON]) * 5.0))
+
+
+def attack_ability_value(cid, ctx, actx, k=0, src_don=None):
+    """**F-2**: 攻め手 `cid` の【アタック時】能力の値（持たなければ 0・読めなければ 0 として数え `WIRING_STATS` に残す）。
+
+    `actx` は攻撃の価格に使った `{power（ドン k 枚後）, target_power, is_leader, nu_target, blockers, theta, mu}`
+    ——攻め手自身への上昇はこの攻撃の価格の差で読む（`effect_value.attack_self_value`）。
+    状態は `_effect_state(ctx)` に**攻撃の行の差分**だけを重ねる（呼び側の `ctx["st"]` は書き換えない）:
+    `source_rested=True`（アタックでレスト）・`source_paid=0`（出す費用は払わない）・`my_don_active −= k`（DON_BOX で付けた分）・
+    `source_don_attached = 付与 + k`（記録の付与が読めるときだけ＝【ドン!!×N】の判定）。
+    """
+    try:
+        import effect_value as EV
+    except Exception:
+        return 0.0
+    WIRING_STATS["attack_cand"] += 1
+    c = EV._all_cards().get(str(cid) or "") if cid else None
+    if not c or not any((ab.get("trigger") or ab.get("timing")) in EV.ON_ATTACK_TRIGGERS
+                        for ab in (c.get("abilities") or [])):
+        return 0.0
+    WIRING_STATS["attack_with_ability"] += 1
+    st = _effect_state(ctx)
+    st["attack_ctx"] = dict(actx)
+    st["source_rested"] = True
+    st["source_paid"] = 0.0
+    if st.get("my_don_active") is not None:
+        st["my_don_active"] = max(0, int(st["my_don_active"]) - int(round(float(k))))
+    if src_don is not None:
+        st["source_don_attached"] = int(src_don) + int(round(float(k)))
+    v, _unp = EV.card_value(cid, EV.ON_ATTACK_TRIGGERS, st=st, offered=False, no_ability=0.0,
+                            opp_bodies=ctx.get("opp_bodies"))
+    if v is None:
+        WIRING_STATS["attack_unpriced"] += 1
+        return 0.0
+    if abs(float(v)) > 0.0:
+        WIRING_STATS["attack_nonzero"] += 1
+    WIRING_STATS["attack_sum"] += float(v)
+    return float(v)
+
+
+def passive_body_value(cid, src, ctx, theta=THETA, mu=MU):
+    """**F-3a**: キャラ `cid` の体に足す継続効果の値（`effect_value.continuous_body_value`）。
+
+    生存の値 `ko_p × ν` の `ν` と `ko_p` は**この体のもの**（`nu_of` と同じ引数・`pair` なら `ko_p_of(パワー)`）。"""
+    try:
+        import effect_value as EV
+    except Exception:
+        return 0.0
+    pw = float(src.get("power") or 0.0)
+    kp = ko_p_of(pw) if NU_MODE == "pair" else KO_P
+    nu_self = nu_of(pw, ctx["opp_leader_power"], ctx["r_turns"], theta, mu, is_blocker=src.get("blocker"),
+                    opp_chars=ctx.get("opp_chars"), my_leader_power=ctx["my_leader_power"])
+    WIRING_STATS["play_char"] += 1
+    v, bad = EV.continuous_body_value(cid, st=_effect_state(ctx), nu=nu_self, ko_p=kp,
+                                      opp_bodies=ctx.get("opp_bodies"))
+    if bad:
+        WIRING_STATS["passive_unpriced"] += int(bad)
+    if abs(float(v)) > 0.0 or bad:
+        WIRING_STATS["passive_with_ability"] += 1
+    if abs(float(v)) > 0.0:
+        WIRING_STATS["passive_nonzero"] += 1
+    WIRING_STATS["passive_sum"] += float(v)
+    return float(v)
 
 
 _IDENT = {}
@@ -1585,13 +1730,14 @@ def blockers_of(ctx):
     return out
 
 
-def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, don_k=None):
+def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, don_k=None, src_don=None):
     """候補 1 つの理論値（値付けできなければ `None`）。
 
     `sig` は `[action_type, uuid, target_ids, selected_uuids, accepted]`（`record_gen.move_sig`）。
     `ctx` は `{"opp_leader_power", "my_leader_power", "r_turns", "theta", "mu", "don_k"}`。
     `src_power`／`tgt_power` を渡せば**印字ではなく今のパワー**で値付けする（枠から採った値）。
     `don_k` を渡せば**その候補の実際の付与枚数**を使う（`ctx["don_k"]` の仮定より優先）。
+    `src_don`（F-2）は攻め手に**既に付いている**ドンの枚数（`slot_don`）——`ATTACK_ABILITY_MODE=on` の【ドン!!×N】の判定にだけ使う。
 
     > **付与枚数は記録に在る**（2026-09-13 に判明）＝**`pol_k` 列**（`record_gen` の
     > `_don_k(rep)`＝`payload["don_k"]`・`-1` は DON_BOX でない候補）。`move_sig` が 5 要素で
@@ -1632,19 +1778,28 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
         # **T150b/T150f-2**: この攻撃が固定する k 枚のドンの機会費用＋（misalloc_play だけ）見送った登場（既定 off では常に 0）
         dcost = _don_cost_total(ctx, k, cards, theta, mu, src_x=src_x)
         if tgt is None and tgt_power is None:         # 対象のカードが引けない＝リーダー扱い
-            return attack_value(sp, ctx["opp_leader_power"], True, theta, mu, blockers=blockers) - dcost
-        tp = float(tgt["power"]) if tgt_power is None else float(tgt_power)
-        if tgt is not None and tgt.get("leader"):
-            return attack_value(sp, tp, True, theta, mu, blockers=blockers) - dcost
-        nu_t = nu_of(tp, ctx["my_leader_power"], ctx["r_turns"], theta, mu,
-                     is_blocker=(tgt or {}).get("blocker"))
-        if (tgt or {}).get("blocker"):
-            # 対象そのものはその攻撃をブロックできない——同じパワーのブロッカーを 1 つ外す
-            for i, (pb, _nb) in enumerate(blockers):
-                if abs(pb - tp) <= PWR_EPS:
-                    blockers = blockers[:i] + blockers[i + 1:]
-                    break
-        return attack_value(sp, tp, False, theta, mu, nu_target=nu_t, blockers=blockers) - dcost
+            tp, lead = ctx["opp_leader_power"], True
+        else:
+            tp = float(tgt["power"]) if tgt_power is None else float(tgt_power)
+            lead = bool(tgt is not None and tgt.get("leader"))
+        nu_t = None
+        if not lead:
+            nu_t = nu_of(tp, ctx["my_leader_power"], ctx["r_turns"], theta, mu,
+                         is_blocker=(tgt or {}).get("blocker"))
+            if (tgt or {}).get("blocker"):
+                # 対象そのものはその攻撃をブロックできない——同じパワーのブロッカーを 1 つ外す
+                for i, (pb, _nb) in enumerate(blockers):
+                    if abs(pb - tp) <= PWR_EPS:
+                        blockers = blockers[:i] + blockers[i + 1:]
+                        break
+        v = attack_value(sp, tp, lead, theta, mu, nu_target=nu_t, blockers=blockers) - dcost
+        if ATTACK_ABILITY_MODE == "on":
+            # **F-2**: 攻め手の【アタック時】能力（攻撃の価格と同じ `P`・対象・ブロッカー・`Θ` で読む）
+            v += attack_ability_value(cid, ctx, {"power": sp, "target_power": tp, "is_leader": lead,
+                                                 "nu_target": nu_t, "blockers": list(blockers),
+                                                 "theta": theta, "mu": mu},
+                                      k=(k if at == "DON_BOX" else 0), src_don=src_don)
+        return v
     if at in ("ATTACH_DON", "DON_BOX"):
         # **T150b/T150f-2**: 純付与も同じ費用を払う（既定 off では常に 0）。付与先の体そのものが
         # `src_x`（DON_BOX の +1000k はこの枝には掛からない・T150f-1）。
@@ -1689,6 +1844,9 @@ def _char_play_value(cid, src, ctx, theta, mu, k):
     ev = _effect_value(cid, "char_on_play", _effect_state(ctx), ctx.get("opp_bodies"))
     if ev is None:
         return None
+    if PASSIVE_BODY_MODE == "on":
+        # **F-3a**: 体の価格に、トークンに届いていない継続効果（生存・非ブロッカーのキーワード・テンポ）を足す
+        return base + ev + passive_body_value(cid, src, ctx, theta, mu)
     return base + ev
 
 
@@ -1768,7 +1926,8 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
                                               tcid, ctx, cards,
                                               src_power=slot_power(tok, pol["pol_si"][j]),
                                               tgt_power=slot_power(tok, pol["pol_ti"][j]),
-                                              don_k=pol["pol_k"][j]))
+                                              don_k=pol["pol_k"][j],
+                                              src_don=slot_don(tok, pol["pol_si"][j])))
             stats["cand"] += k
             stats["cand_scored"] += sum(1 for t in theory if t is not None)
             r = row_order(pol["pol_n"][b:b + k], pol["pol_q"][b:b + k], pol["pol_p"][b:b + k],
@@ -1858,9 +2017,13 @@ def main(argv=None):
     ap.add_argument("--don-k", type=int, default=1,
                     help="DON_BOX の付与枚数の仮定（記録に無いので感度を見る・既定 1）")
     add_nu_mode_arg(ap)
+    add_attack_ability_arg(ap)
+    add_passive_body_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_nu_mode(a)
+    apply_attack_ability(a)
+    apply_passive_body(a)
 
     t0 = time.time()
     recs, stats = collect(a.src, a.holdout_mod, a.limit_games, a.theta, a.mu,
@@ -1871,7 +2034,9 @@ def main(argv=None):
            "by_band": {b: block([r for r in recs if r["band"] == b])
                        for b in ("close", "mid", "decided")},
            "saturation_x": saturation_x(a.theta),
-           "args": {k: v for k, v in vars(a).items() if k != "out"},
+           # F-2/F-3a の切替は on のときだけ刻む（off の出力は従来と 1 バイトも変えない）
+           "args": {k: v for k, v in vars(a).items()
+                    if k != "out" and not (k in ("attack_ability", "passive_body") and v == "off")},
            "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
     print(txt)

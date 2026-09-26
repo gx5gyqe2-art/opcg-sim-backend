@@ -288,7 +288,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                     (str(pol["pol_tcid"][b]) or None) if tl else None, ctx, cards,
                                     src_power=slot_power(tok, pol["pol_si"][b]),
                                     tgt_power=slot_power(tok, pol["pol_ti"][b]),
-                                    don_k=pol["pol_k"][b])
+                                    don_k=pol["pol_k"][b],
+                                    src_don=_TO.slot_don(tok, pol["pol_si"][b]))      # F-2（切替 on のときだけ使う）
                 fam = move_family(sig)
                 if v is None:
                     stats["silent"] += 1
@@ -492,9 +493,14 @@ def main(argv=None):
     import hand_plan as _HP
     _HP.add_inflow_arg(ap)
     _HP.add_cond_clock_arg(ap)
+    _TO.add_attack_ability_arg(ap)
+    _TO.add_passive_body_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_decision_row(a)
+    _TO.apply_attack_ability(a)
+    _TO.apply_passive_body(a)
+    _TO.reset_wiring_stats()
     apply_nu_mode(a)
     _TO.apply_surv_mode(a)
     _TO.apply_cbar_mode(a)
@@ -512,6 +518,10 @@ def main(argv=None):
     EV.reset_cond_stats()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
     stats["cond"] = dict(EV.COND_STATS)                     # T72: 条件の判定（真／偽／判らない）の数
+    if _TO.ATTACK_ABILITY_MODE != "off" or _TO.PASSIVE_BODY_MODE != "off":
+        # F-2/F-3a: 切替 on のときだけ刻む（off の出力は従来と同じ）
+        stats["wiring"] = {"attack_ability": _TO.ATTACK_ABILITY_MODE, "passive_body": _TO.PASSIVE_BODY_MODE,
+                           **{k: (round(v, 5) if isinstance(v, float) else v) for k, v in _TO.WIRING_STATS.items()}}
     res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "flow_pricing": EV.FLOW_PRICING,
            "search_price": EV.SEARCH_PRICE_MODE, "hand_meas": HAND_MEAS_MODE,
            "play_now": EV.PLAY_NOW_MODE, "cost_afford": EV.COST_AFFORD_MODE, "pricing_fixes": pricing_fixes,

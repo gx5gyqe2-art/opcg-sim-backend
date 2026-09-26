@@ -1021,8 +1021,13 @@ def test_the_walk_obeys_the_first_turn_rule():
             CB.set_rate_t1_mode("なにか")
     finally:
         CB.set_rate_t1_mode("off")
-    # `off` なら `j0` は無視される（旧と完全に同じ）
-    assert _ra(1, 0.05, 0.05, 0.1, 0.02, j0=1) == pytest.approx(0.1)
+    try:
+        # `off` なら `j0` は無視される（旧と完全に同じ）
+        assert _ra(1, 0.05, 0.05, 0.1, 0.02, j0=1) == pytest.approx(0.1)
+    finally:
+        # **既定へ戻す**（2026-09-26）——戻さないと同じワーカーで後に走る `test_kappa_vector` の
+        # `rate_of_row(j=0)` が `off` を読んで落ちる（xdist の割り振り次第で出るテスト間の漏れ）
+        CB.set_rate_t1_mode("on")
 
 
 def test_rush_bodies_attack_the_turn_they_arrive():

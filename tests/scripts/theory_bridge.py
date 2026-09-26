@@ -1069,7 +1069,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                            _ctx, cards,
                                            src_power=slot_power(_tok, pol["pol_si"][j]),
                                            tgt_power=slot_power(_tok, pol["pol_ti"][j]),
-                                           don_k=pol["pol_k"][j])
+                                           don_k=pol["pol_k"][j],
+                                           src_don=_TOM.slot_don(_tok, pol["pol_si"][j]))   # F-2（on のときだけ使う）
                 vals = [_score(j) for j in range(b, b + k)]
                 scored = [v for v in vals if v is not None]
                 played_v = vals[ch]
@@ -1592,11 +1593,16 @@ def main(argv=None):
                     help="**T80 の診断** `drop` なら局の最後のターンの行を落とす（とどめの一撃とその応答を外す）")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
+    _TOM.add_attack_ability_arg(ap)
+    _TOM.add_passive_body_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_decision_row(a)
     apply_guard_afford(a)                                      # G-2
     apply_guard_s_cost(a)                                      # G-2
+    _TOM.apply_attack_ability(a)
+    _TOM.apply_passive_body(a)
+    _TOM.reset_wiring_stats()
     EV.apply_search_price(a)
     EV.apply_play_now(a)
     EV.apply_cost_afford(a)
@@ -1640,6 +1646,10 @@ def main(argv=None):
     # **T49 の検算**: `κ` の平均（`w` の平均が `w̄` に戻れば 1）
     stats["kappa_mean"] = (round(stats["kappa_sum"] / stats["kappa_n"], 4) if stats["kappa_n"] else None)
     stats["w_mean"] = (round(stats["kappa_mean"] * _TO.W_BAR, 4) if stats["kappa_mean"] is not None else None)
+    if _TOM.ATTACK_ABILITY_MODE != "off" or _TOM.PASSIVE_BODY_MODE != "off":
+        # F-2/F-3a: 切替 on のときだけ刻む（off の出力は従来と同じ）
+        stats["wiring"] = {"attack_ability": _TOM.ATTACK_ABILITY_MODE, "passive_body": _TOM.PASSIVE_BODY_MODE,
+                           **{k: (round(v, 5) if isinstance(v, float) else v) for k, v in _TOM.WIRING_STATS.items()}}
     pairs = pair_games(per, a.silent)
     res = {"stats": stats, "decision_rows": DECISION_ROW_MODE,
            "provisional": {"P3_theta": a.theta, "P2_silent": a.silent,

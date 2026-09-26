@@ -247,6 +247,9 @@ def _holds_board(kind, cond, st):
     if kind == "HAS_DON":
         # 【ドン!!×N】＝この札に N 枚付いていれば。**付けられるか**（アクティブなドン ≥ N）で読む＝上限（付ける費用は数えない）
         n = _int_value(cond)
+        if mine and st.get("source_don_attached") is not None:
+            # **F-2**: 攻撃の行では【ドン!!×N】＝攻め手に**今付いている**枚数（DON_BOX の k 枚を足した後）で判定する
+            return None if n is None else int(st["source_don_attached"]) >= int(n)
         a = st.get(p + "don_active")
         return None if (n is None or a is None) else int(a) >= int(n)
     if kind == "HAS_CHARACTER":
