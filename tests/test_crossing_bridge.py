@@ -408,7 +408,7 @@ def test_the_rule_hand_beats_the_greedy_allocation_on_a_hand_built_case():
     3000 に当てて**両方止めて生き延びる**（3 枚切る）。`Θ_hand = μ × 3`。"""
     cards = [1000.0, 3000.0, 1000.0]
     assert _greedy_cheapest_first(cards, [1000.0, 2000.0], 0) == (0, 0)
-    assert CB._rule_guard_plan([(c, 0.0) for c in cards], 0.0, [1000.0, 2000.0], [1000.0, 2000.0], [], 0, 1) == (3, 2)
+    assert CB.rule_guard_plan([(c, 0.0) for c in cards], 0.0, [1000.0, 2000.0], [1000.0, 2000.0], [], 0, 1) == (3, 2)
     sc, tok = _rule_row(life=0.0, hand=3.0, xs=(1000.0, 2000.0))
     old = CB.THETA_HAND_MODE
     try:
@@ -419,7 +419,7 @@ def test_the_rule_hand_beats_the_greedy_allocation_on_a_hand_built_case():
     # 地平は「倒れるまで」: 1 ターン目で全部使い切り、2 ターン目は止められず倒れる＝切るのは 3 枚
     assert hand == pytest.approx(3 * T.MU)
     # 最適な割り当ては貪欲より多く止める（同じ札・同じ攻撃）
-    assert CB._rule_guard_plan([(c, 0.0) for c in cards], 0.0, [1000.0, 2000.0], [1000.0, 2000.0], [], 0, 1)[1] \
+    assert CB.rule_guard_plan([(c, 0.0) for c in cards], 0.0, [1000.0, 2000.0], [1000.0, 2000.0], [], 0, 1)[1] \
         > _greedy_cheapest_first(cards, [1000.0, 2000.0], 0)[1]
 
 
@@ -449,7 +449,7 @@ def test_the_rule_hand_pays_event_counters_with_the_don_left_each_defending_turn
     """**H-4**: イベントのカウンターは**相手のターンに在るドン**で払う（`apply_counter` の `pay_cost`）。
     ドン 1 では費用 2 のイベント（+2000）を切れず、2 なら切れる。**ドンは守備ターンごとに戻る**ので、
     同じ費用のイベント 2 枚は 1 ターンに 1 枚ずつなら両方使える（手札全体で 1 回払う形ではない）。"""
-    plan = CB._rule_guard_plan
+    plan = CB.rule_guard_plan
     assert plan([(2000.0, 2.0)], 1.0, [1000.0], [1000.0], [], 0, 1) == (0, 0)
     assert plan([(2000.0, 2.0)], 2.0, [1000.0], [1000.0], [], 0, 1) == (1, 1)
     # 印字のカウンターは無料（ドン 0 でも切れる）
@@ -482,14 +482,159 @@ def test_the_rule_hand_is_priced_per_card_cut_not_per_life_saved():
     ライフに余裕があっても、地平の中で止められる攻撃は止める（防いだ損害の最大）＝札 2 枚・地平 2 ターンで 2 本。
     地平を 1 ターンに切ると（T116 の窓）1 本しか止められない。"""
     cards = [(2000.0, 0.0), (2000.0, 0.0)]
-    assert CB._rule_guard_plan(cards, 0.0, [0.0], [0.0], [], 3, 2) == (2, 2)
-    assert CB._rule_guard_plan(cards, 0.0, [0.0], [0.0], [], 3, 1) == (1, 1)
+    assert CB.rule_guard_plan(cards, 0.0, [0.0], [0.0], [], 3, 2) == (2, 2)
+    assert CB.rule_guard_plan(cards, 0.0, [0.0], [0.0], [], 3, 1) == (1, 1)
     sc, tok = _rule_row(life=3.0, hand=2.0, xs=(0.0,))
     assert CB._rule_hand_term(sc, tok, "opp", _read([2000.0, 2000.0]), T.MU, turns=2, count=False) \
         == pytest.approx(2 * T.MU)
     # 手札が空（読めた上で 0 枚）なら 0・通る攻撃が無ければ 0
-    assert CB._rule_guard_plan([], 0.0, [0.0], [0.0], [], 0, None) == (0, 0)
-    assert CB._rule_guard_plan(cards, 0.0, [-1000.0], [-1000.0], [], 0, None) == (0, 0)
+    assert CB.rule_guard_plan([], 0.0, [0.0], [0.0], [], 0, None) == (0, 0)
+    assert CB.rule_guard_plan(cards, 0.0, [-1000.0], [-1000.0], [], 0, None) == (0, 0)
+
+
+# ---- H-4b: 攻め手の付与（財布は 1 つ・最善応答・`THETA_HAND_MODE=rule_don`） ---------------------------
+
+
+def _actx(budget, att1, later, cand, kmax=10):
+    """手で組んだ攻め手の財布（`attacker_ctx` と同じ形・値段は 0＝耐久の勝負だけで決まる）。"""
+    price = [[0.0] * (kmax + 1) for _ in att1]
+    key = ("test", budget, tuple(att1), tuple(later), tuple((c, bx, ru) for c, _p, bx, ru in cand))
+    return {"budget": budget, "att1": att1, "later": later, "cand": cand, "price": price, "kmax": kmax, "key": key}
+
+
+def test_attaching_one_don_raises_the_required_counters_by_exactly_1000():
+    """**H-4b**: 付与 1 枚＝パワー +1000＝止めるのに要るカウンターの合計が**ちょうど 1000** 上がる。
+    守る側 2000 1 枚・超過 1000（要る合計 2000）は止まるが、付与 1 枚で要る合計 3000 になり止まらない。
+    攻め手は財布 1 枚をリーダーに付けて守る側に止めさせない（ライフ 0 なので倒れる＝切らない）。"""
+    cards = [(2000.0, 0.0)]
+    assert CB.rule_guard_plan(cards, 0.0, [1000.0], [1000.0], [], 0, 1) == (1, 1)
+    assert CB.rule_guard_plan(cards, 0.0, [2000.0], [2000.0], [], 0, 1) == (0, 0)
+    ax = _actx(1, [(0, 1000.0)], [(0, 1000.0)], [])
+    cut, st, plan = CB.rule_don_solve(cards, 0.0, [], 0, ax, 1)
+    assert (cut, st) == (0, 0)
+    assert plan["k"] == (1,) and plan["xs_first"] == (2000.0,) and plan["paid"] == 1.0
+    # 付与は 1 枚ごとに 1000: 超過 0 に 2 枚付けると超過 2000（要る合計 3000）
+    ax2 = _actx(2, [(0, 0.0)], [(0, 0.0)], [])
+    _c, _s, plan2 = CB.rule_don_solve([(1000.0, 0.0), (1000.0, 0.0)], 0.0, [], 0, ax2, 1)
+    assert plan2["xs_first"][0] - 0.0 == pytest.approx(1000.0 * plan2["k"][0])
+
+
+def test_the_same_don_is_either_played_or_attached_never_both():
+    """**H-4b（T109）**: 出す札の費用 ＋ 付与の枚数 ≤ 財布。財布 3・費用 2 の体を出したら付与は高々 1 枚。
+    どの計画を選んでも `paid` は財布を超えない（札を出しても付与しても同じドンを 2 回使わない）。"""
+    cand = [(2, {"atk": 0.0, "eff": 0.0}, 0.0, False)]
+    import itertools
+    for life, cs in itertools.product((0, 1, 2), ([1000.0], [2000.0, 1000.0], [2000.0, 2000.0, 1000.0])):
+        ax = _actx(3, [(0, 0.0)], [(0, 0.0)], cand)
+        _c, _s, plan = CB.rule_don_solve([(c, 0.0) for c in cs], 0.0, [], life, ax, None)
+        assert plan["paid"] <= 3.0
+        if plan["play"]:
+            assert sum(plan["k"]) <= 1
+    # 手で確かめる: 出した体は 2 ターン目の並びに入り、付与は財布の残りだけ
+    ax = _actx(3, [(0, 0.0)], [(0, 0.0)], cand)
+    _c, _s, plan = CB.rule_don_solve([(2000.0, 0.0), (2000.0, 0.0), (2000.0, 0.0)], 0.0, [], 0, ax, None)
+    assert plan["paid"] == 2.0 * len(plan["play"]) + sum(plan["k"]) <= 3.0
+
+
+def test_the_attackers_best_split_beats_all_attach_and_all_play():
+    """**H-4b**: 攻め手の財布 2・手札に費用 1 の体（超過 1000・次のターンから殴る）・リーダー（超過 0）。
+    守る側はライフ 2・カウンター 1000・2000・1000。攻め手の目的は**早く倒す**（守る側が生き延びるターン数 最小）。
+    * **全部出す**（体を出して付与 0）: 守る側は 3 ターン生き延びる（3 本止める）。
+    * **全部付ける**（リーダー +2000）: 同じく 3 ターン生き延びる。
+    * **最善の分け方**（体を出す ＋ リーダーに 1 枚）: **2 ターンで倒れる**＝両方より早い。"""
+    cards = [(1000.0, 0.0), (2000.0, 0.0), (1000.0, 0.0)]
+    P3 = CB.rule_guard_plan3
+    all_play = P3(cards, 0.0, [0.0], [0.0, 1000.0], [], 2, None)
+    all_attach = P3(cards, 0.0, [2000.0], [2000.0], [], 2, None)
+    ax = _actx(2, [(0, 0.0)], [(0, 0.0)], [(1, {"atk": 0.0, "eff": 0.0}, 1000.0, False)])
+    cut, st, plan = CB.rule_don_solve(cards, 0.0, [], 2, ax, None)
+    split = P3(cards, 0.0, list(plan["xs_first"]), list(plan["xs_later"]), [], 2, None)
+    assert all_play[2] == 3 and all_attach[2] == 3
+    assert plan["play"] == (0,) and plan["k"] == (1,) and plan["paid"] == 2.0
+    assert split[2] == 2 and split[2] < all_play[2] and split[2] < all_attach[2]
+    assert (cut, st) == (split[0], split[1])
+
+
+def test_the_rate_side_reads_the_same_plan_as_the_endurance_side():
+    """**H-4b（T109）**: 速さの側（`seat_slope_terms`・`seat_slope_sched`）に計画を渡すと、財布のナップサックを
+    解かずに**その計画の内訳をそのまま**読む（耐久と速さで別の配分を持たない）。"""
+    sc, tok = _mirror_row(life=3.0, hand=5.0, n_char=2, pw=0.6)
+    olp = float(np.asarray(sc)[T.SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+    plan = {"atk": 0.011, "rush": 0.0, "eff": 0.007, "attach": 0.003, "attach_lead": 0.002, "paid": 3.0}
+
+    class _NoCards:
+        def info(self, _cid):
+            return {}
+    base, stock, _f, lead, _sr, _fr, _ef, e1 = CB.seat_slope_terms(sc, tok, np.zeros(22, np.int64), {}, _NoCards(),
+                                                                    olp, want_stock=True, plan=plan)
+    bare = CB.theory_slope_parts(tok, olp, with_don=False, life_opp=float(sc[T.SC_OPP_LIFE]))
+    assert stock == pytest.approx(0.011)                              # 出した体は計画の `atk`
+    assert lead == pytest.approx(bare[0] + 0.002)                     # リーダーは素殴り ＋ 計画の付与
+    assert base == pytest.approx(bare[0] + bare[1] + 0.002 + 0.003)   # 盤面は素殴り ＋ 計画の付与（財布を解き直さない）
+
+
+def test_the_purse_witness_reproduces_purse_plan_exactly():
+    """**H-4b（`rule_don_purse`）**: 速さの側の計画の中身を読む `purse_plan_witness` は `purse_plan` と**同じ選び方**
+    （選んだ選択肢の内訳を足すと `purse_plan` の内訳と一致する）。"""
+    groups = [[(0, {}), (2, {"atk": 0.05, "eff": 0.0})], [(0, {}), (1, {"atk": 0.0, "eff": 0.03})],
+              [(0, {}), (1, {"attach_lead": 0.02}), (2, {"attach_lead": 0.035})],
+              [(0, {}), (1, {"attach": 0.015})]]
+    for budget in range(0, 7):
+        pick = CB.purse_plan_witness(groups, budget)
+        pl = CB.purse_plan(groups, budget)
+        tot = {k: 0.0 for k in CB.PURSE_PARTS}
+        paid = 0
+        for g, oi in zip(groups, pick):
+            c, parts = g[oi]
+            paid += c
+            for k in tot:
+                tot[k] += float(parts.get(k, 0.0))
+        for k in CB.PURSE_PARTS:
+            assert tot[k] == pytest.approx(pl[k])
+        assert paid == pytest.approx(pl["paid"]) and paid <= budget
+
+
+def test_rule_don_purse_keeps_the_speed_sides_split_and_only_moves_the_attachments():
+    """**H-4b（`rule_don_purse`・T109）**: 出す札と付与の**枚数**は速さの側の財布の計画そのまま
+    （引いた 1 枚に残るドンも同じ）で、耐久の勝負が決めるのは**どの体に付けるか**だけ。
+    速さの側は値段（平均の曲線）でリーダー（超過 −1000）に 1 枚付けて命中させるが、守る側の実際の手札（2000 が 1 枚・
+    ライフ 1）に対しては、それだと 2000 でどちらか 1 本止められる。**超過 1000 のキャラに付ける**と要る合計 3000 で
+    止められない（リーダーは届かない）＝**止められる本数 1 → 0**。同じ 1 枚の付け替えだけで、支払いは同じ。"""
+    price = [[0.0, 0.02] + [-1.0] * 9, [0.0, 0.01] + [-1.0] * 9]
+    ax = {"budget": 1, "att1": [(0, -1000.0), (2, 1000.0)], "later": [(0, -1000.0), (2, 1000.0)], "cand": [],
+          "price": price, "kmax": 10, "key": ("purse-test",), "fixed": None}
+    play, ks, _g = CB.speed_plan_of(ax)
+    assert play == () and ks == (1, 0)                      # 速さの側: リーダーに 1 枚（値段が高い方）
+    ax["fixed"] = (play, int(sum(ks)))
+    ax["key"] = ax["key"] + (("fixed",) + ax["fixed"],)
+    cut, st, plan = CB.rule_don_solve([(2000.0, 0.0)], 0.0, [], 1, ax, 1)
+    assert sum(plan["k"]) == 1 and plan["paid"] == 1.0 and plan["play"] == ()   # 枚数・支払いは同じ
+    assert plan["k"] == (0, 1)                              # 付け替えた: キャラ（超過 1000 → 2000）
+    assert (cut, st) == (0, 0)                              # 1 本も止められない
+    # 付け替えなかったら（速さの側のまま）守る側は 1 本止める
+    assert CB.rule_guard_plan([(2000.0, 0.0)], 0.0, [0.0, 1000.0], [0.0, 1000.0], [], 1, 1) == (1, 1)
+    # 速さの側も同じ計画を読む: 付与の値段は付け替えた先の値段
+    assert plan["attach"] == pytest.approx(0.01) and plan["attach_lead"] == pytest.approx(0.0)
+
+
+def test_rule_don_without_the_attackers_purse_falls_back_to_rule_and_counts_it():
+    """**H-4b**: 攻め手の財布が読めない（`attacker=None`）ときは付与 0 の `rule` と同じ値に落ち、数を残す。
+    既定（`cuttable_forced`）の手札の項は `rule_don` を足しても変わらない。"""
+    sc, tok = _rule_row(life=0.0, hand=3.0, xs=(1000.0, 2000.0))
+    cards = [1000.0, 3000.0, 1000.0]
+    old = CB.THETA_HAND_MODE
+    try:
+        CB.set_theta_hand_mode("rule")
+        r = CB.threshold_parts(sc, tok, g_hand=_read(cards))[1]
+        CB.set_theta_hand_mode("rule_don")
+        CB._rule_stats_reset()
+        rd = CB.threshold_parts(sc, tok, g_hand=_read(cards))[1]
+        assert rd == pytest.approx(r)
+        assert CB.RULE_STATS.get("rule_don_fallback") == 1
+        assert CB.THETA_HAND_PART["rule_don"] == "rule"
+    finally:
+        CB.set_theta_hand_mode(old)
+    assert CB.THETA_HAND_MODE == "cuttable_forced"
 
 
 def test_selecting_rule_leaves_the_other_modes_and_falls_back_loudly_when_the_hand_is_unread():

@@ -289,7 +289,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                                                       idx2cid, cards, theta, mu, deck_ids=dk,
                                                       j=CB.own_turn_index(t)) * float(scale_a)
                 g_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
-            if CB.THETA_HAND_MODE == "rule" and PL.is_own_turn(w, t):
+            if CB.THETA_HAND_MODE in ("rule",) + CB.RULE_DON_MODES and PL.is_own_turn(w, t):
                 # **H-4**: `rule` は守る席の**実際の札**を読むので、相手の手札は**その席のターンの最後の行**
                 # （出した後＝相手のターンに持っている手札・使い残したドン）から読む。値は上書きで最後の行が残る。
                 g_last_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)

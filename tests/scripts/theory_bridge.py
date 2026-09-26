@@ -820,13 +820,14 @@ def _state_of(sc, ci, idx2cid, tok=None, cards=None):
     return st
 
 
-def _kappa_of_row(sc, tok, t, prof=None, g_me=None, g_opp=None, opp=None):
+def _kappa_of_row(sc, tok, t, prof=None, g_me=None, g_opp=None, opp=None, attacker=None):
     """行の局面の傾き `κ` と時計の差 `d`。`W_MODE=curve`（T75）なら交点の橋の `D`（`crossing_bridge.curve_d_of_row`）、
     それ以外は盤面の時計（`clock_of_row`・`flat` なら `κ = 1`）。
     `g_me`／`g_opp`（T76・**T79 で両側**）は手札 1 枚あたりの価格。`opp`（T79）は相手の直近の行＝時計の相手側もそこから読む。"""
     if _TO_W_MODE() == "curve" and prof is not None:
         import crossing_bridge as CB
-        cd = CB.curve_d_of_row(sc, tok, CB.own_turn_index(t), prof, g_hand_of_opp=g_opp, g_hand_of_me=g_me)
+        cd = CB.curve_d_of_row(sc, tok, CB.own_turn_index(t), prof, g_hand_of_opp=g_opp, g_hand_of_me=g_me,
+                               attacker=attacker)                     # **H-4b**（`rule_don` だけが読む）
         return {"d": cd["d"], "kappa": _TOM.state_factor(cd["d"], "curve"), "tau_me": cd["tau_me"], "tau_opp": cd["tau_opp"]}
     return clock_of_row(sc, tok, opp_sc=(None if opp is None else opp["sc"]),
                         opp_tok=(None if opp is None else opp["tok"]))
@@ -848,12 +849,20 @@ def _g_of_row(sc, tok, ci_row, idx2cid, cards, cache, key):
     return cache[key]
 
 
+def _attacker_of(sc, tok, ci_row, idx2cid, cards):
+    """**H-4b**: `THETA_HAND_MODE=rule_don` のときだけ攻め手（この行の席）の財布を読む（他のモードは None＝何も変えない）。"""
+    import crossing_bridge as CB
+    if CB.THETA_HAND_MODE not in CB.RULE_DON_MODES or _TO_W_MODE() != "curve":
+        return None
+    return CB.attacker_ctx(sc, tok, ci_row, idx2cid, cards)
+
+
 def _g_opp_of(opp, last_main, ex, idx2cid, cards, cache, seat):
     """**相手の手札 1 枚あたりの価格**（T79）。**H-4**: `THETA_HAND_MODE=rule` だけは守る席の**実際の札**を読むので、
     相手の**直近の自席ターンの最後の main 行**（出した後の手札・使い残したドン）から読む（鍵も別）。
     他のモードは従来どおり**最初の行**（`opp`）から（1 ビットも変えない）。"""
     import crossing_bridge as CB
-    if CB.THETA_HAND_MODE == "rule" and (seat, opp["t"]) in last_main:
+    if CB.THETA_HAND_MODE in ("rule",) + CB.RULE_DON_MODES and (seat, opp["t"]) in last_main:
         i = last_main[(seat, opp["t"])]
         return _g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards, cache, ("last", seat, opp["t"]))
     return _g_of_row(opp["sc"], opp["tok"], opp["ci"], idx2cid, cards, cache, (seat, opp["t"]))
@@ -1152,7 +1161,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                    g_me=_g_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t)),
                                    g_opp=(None if opp is None else
                                           _g_opp_of(opp, last_main, ex, idx2cid, cards, g_cache, 1 - w)),
-                                   opp=opp)
+                                   opp=opp, attacker=_attacker_of(sc, tok, ex["ci"][i], idx2cid, cards))
                 kap = float(ck["kappa"])
                 stats["kappa_sum"] += kap; stats["kappa_n"] += 1
                 stats["d_bins"][_d_bin(ck["d"])] += 1
@@ -1304,7 +1313,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                                          g_cache, (w, t)),
                                           g_opp=(None if opp_g is None else
                                                  _g_opp_of(opp_g, last_main, ex, idx2cid, cards, g_cache, 1 - w)),
-                                          opp=opp_g)["kappa"])
+                                          opp=opp_g,
+                                          attacker=_attacker_of(sc, tok, ex["ci"][i], idx2cid, cards))["kappa"])
                 if LEDGER_HARM_MODE == "realised":
                     # **T87**: 移転は攻め手の行に 1 回だけ入っている＝守りの窓は帳簿に何も足さない（`s` 専任）
                     got = dict(got, g=0.0, g_delta=0.0)

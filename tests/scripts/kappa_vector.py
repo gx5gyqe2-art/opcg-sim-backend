@@ -446,8 +446,11 @@ def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, id
     歩きはこれを**2 段目から**的に足す（持ち主の次のリフレッシュで戻る・T96）。`Θ` 本体はアクティブな
     ブロッカーだけのまま（既定と同じ数字）。"""
     sc = np.asarray(sc); tok = np.asarray(tok)
+    # **H-4b**: `rule_don` のときだけ攻め手（この行の席）の財布を渡す（他のモードは None＝何も変えない）
+    actx = (CB.attacker_ctx(sc, tok, ci_row, idx2cid, cards)
+            if CB.THETA_HAND_MODE in CB.RULE_DON_MODES and ci_row is not None else None)
     st = (float(CB.threshold_of_me(sc, tok, g_hand=g_me)),
-          float(CB.threshold(sc, tok, g_hand=g_opp)),
+          float(CB.threshold(sc, tok, g_hand=g_opp, attacker=actx)),
           float(a_me), float(a_opp), int(j))
     if CB.THETA_RETURN_MODE != "untap":
         return st
