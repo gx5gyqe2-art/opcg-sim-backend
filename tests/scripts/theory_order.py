@@ -553,7 +553,7 @@ def set_sigma_floor_mode(mode):
 #:   表は `harm_profile.json` の `sigma_rel_whole`（同じ行・同じ打ち切り・同じ cross 規約）で、`sigma_rel_for` は
 #:   `SETTLE_COND_MODE=whole` のときこれを引く。`on` の幅（`σ·τ`・従来の表）は K-3 で測ったまま変えない。
 SETTLE_COND_MODES = ("off", "on", "whole")
-SETTLE_COND_MODE = "off"
+SETTLE_COND_MODE = "whole"
 
 
 def set_settle_cond_mode(mode):

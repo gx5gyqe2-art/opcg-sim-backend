@@ -33,9 +33,18 @@ import theory_order as T  # noqa: E402
 import win_calib as WC  # noqa: E402
 
 
+_SHIPPED_SETTLE_COND = T.SETTLE_COND_MODE
+
+
+def test_whole_is_the_shipped_default():
+    """K-4（ユーザ決定 2026-09-26「aでお願いします」）: 整数ターンの式と合わせた幅が既定。"""
+    assert _SHIPPED_SETTLE_COND == "whole"
+
+
 @pytest.fixture(autouse=True)
 def _restore_modes():
     old = (T.SETTLE_COND_MODE, T.SIGMA_FLOOR_MODE, T.W_ERR_MODE, T.SIGMA_REL, T.W_MOVER_MODE, CB.PRE_SETTLE_MODE)
+    T.set_settle_cond_mode("off")      # 以下の代数は旧の Φ の形（off）を基準に書いてある
     yield
     T.set_settle_cond_mode(old[0]); T.set_sigma_floor_mode(old[1]); T.set_w_err_mode(old[2])
     T.set_sigma_rel(old[3]); T.set_w_mover_mode(old[4]); CB.set_pre_settle_mode(old[5])

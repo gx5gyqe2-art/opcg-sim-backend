@@ -1514,8 +1514,9 @@ def test_w_mover_mode_defaults_to_half_and_only_the_two_clock_rows_get_the_shift
 def test_w_mover_half_recentres_w_at_minus_half_and_makes_the_pair_antisymmetric():
     """`p(d) + p(−1 − d) == 1`——鏡の対（`d_a + d_b = −1`・T151 の対の恒等式）が `half` で反対称になる
     （`mover=True` の行だけ）。`off`／`mover=False` では `p(0) = 0.5`（手番の半ターンを落としている）。"""
-    old_err, old_sig, old_mv = T.W_ERR_MODE, T.SIGMA_REL, T.W_MOVER_MODE
+    old_err, old_sig, old_mv, old_sc = T.W_ERR_MODE, T.SIGMA_REL, T.W_MOVER_MODE, T.SETTLE_COND_MODE
     try:
+        T.set_settle_cond_mode("off")                                 # Φ の形の代数（整数ターンの式は別に試す）
         T.set_w_err_mode("rel"); T.set_sigma_rel(0.17)
         T.set_w_mover_mode("off")
         assert T.prob_of_d(0.0, t_me=5, t_opp=5, mover=True) == pytest.approx(0.5)
@@ -1532,3 +1533,4 @@ def test_w_mover_half_recentres_w_at_minus_half_and_makes_the_pair_antisymmetric
         assert T.w_of_d(0.0, mover=False) == pytest.approx(T.w_of_d(0.0))
     finally:
         T.set_w_mover_mode(old_mv); T.set_w_err_mode(old_err); T.set_sigma_rel(old_sig)
+        T.set_settle_cond_mode(old_sc)
