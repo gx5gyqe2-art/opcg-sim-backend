@@ -552,6 +552,19 @@ def test_hand_board_passes_board_and_state_to_the_partner(monkeypatch, _ffix_res
     got = EV._play_from_hand_now(tgt, st, {"card_id": "OP08-098"}, 1, MU_HAND, board)
     assert got == pytest.approx(0.2 - MU_HAND)
     assert seen["opp_bodies"] is board and "attack_ctx" not in seen["st"] and seen["st"]["my_life"] == 3
+    assert "search_ctx" not in seen["st"]                           # 相方の相方を辿って無限に回らない
+
+
+def test_hand_board_does_not_recurse_through_a_partner_that_also_plays_from_hand(_ffix_restore):
+    """相方自身も「手札から登場させる」を持つ（OP08-098 を手札に 2 枚）——状態から手札の文脈を落として 1 段で止まる。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    cards = PL.Cards()
+    st = {"search_ctx": {"cards": cards, "hand_items": [{"cid": "OP08-098"}, {"cid": "OP08-098"}], "olp": 5000.0, "r": 4.0},
+          "my_life": 3, "my_don_total": 6}
+    tgt = {"zone": "HAND", "card_type": ["CHARACTER"], "player": "SELF"}
+    EV.set_f_pricing_fixes("all")
+    got = EV._play_from_hand_now(tgt, st, {"card_id": "X"}, 1, MU_HAND, [])
+    assert got is not None and got >= 0.0
 
 
 def test_fix_a_trait_filter_on_traitless_bodies_is_read_as_upper():

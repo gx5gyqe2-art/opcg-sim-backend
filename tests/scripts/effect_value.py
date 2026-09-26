@@ -2157,7 +2157,8 @@ def _play_from_hand_now(target, st, card, n, mu, opp_bodies=None):
     cid = str((card or {}).get("card_id") or (card or {}).get("id") or "") or None
     vals = []
     board = _ffix("hand_board")
-    st2 = {k: v for k, v in st.items() if k not in _ROW_ONLY_KEYS} if board else None
+    # 相方の状態からは手札の文脈（`search_ctx`）も落とす——相方がさらに「手札から登場させる」を持つと無限に辿る（実測）
+    st2 = {k: v for k, v in st.items() if k not in _ROW_ONLY_KEYS + ("search_ctx",)} if board else None
     for c in SP.eligible_hand_cards(target, ctx["hand_items"], cards, skip_cid=cid,
                                     st=(st if _ffix("state_filters") else None)):
         if board:
