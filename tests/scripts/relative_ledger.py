@@ -276,6 +276,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
         w0 = None
         z_of_seat = {}
         rate_at_turn, g_at_turn = {}, {}
+        g_last_at_turn = {}                                   # **H-4**（`rule` のときだけ埋まる）
         shape_at = {}
         seed_g = int(r["seed"][idx[0]]) if len(idx) else -1
         for i in idx:
@@ -288,6 +289,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                                                       idx2cid, cards, theta, mu, deck_ids=dk,
                                                       j=CB.own_turn_index(t)) * float(scale_a)
                 g_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
+            if CB.THETA_HAND_MODE == "rule" and PL.is_own_turn(w, t):
+                # **H-4**: `rule` は守る席の**実際の札**を読むので、相手の手札は**その席のターンの最後の行**
+                # （出した後＝相手のターンに持っている手札・使い残したドン）から読む。値は上書きで最後の行が残る。
+                g_last_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
                 shape_at[(w, t)] = (KV.rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
                                                        idx2cid, cards, theta, mu, deck_ids=dk)
                                        if KV.D_MODE == "theory" else None)
@@ -300,7 +305,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
             if not ts:
                 return None
             key = (1 - w, max(ts))
-            return rate_at_turn[key], g_at_turn[key]
+            return rate_at_turn[key], g_last_at_turn.get(key, g_at_turn[key])
         for i in idx:
             z = float(r["z"][i])
             if z != 0.0:

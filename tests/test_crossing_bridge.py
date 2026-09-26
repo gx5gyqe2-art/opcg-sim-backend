@@ -349,6 +349,180 @@ def test_cuttable_seq_is_wired_into_threshold_parts_and_rejects_unknown_modes():
     assert CB.THETA_HAND_MODE == old                                    # 失敗した切替は既定を汚さない
 
 
+# ---- H-4: 規則から導いた手札の項（`THETA_HAND_MODE=rule`） ---------------------------------------
+
+
+def _rule_row(life=0.0, hand=3.0, xs=(1000.0, 2000.0), blockers=()):
+    """攻め手の行: 相手（守る側）のリーダー 5000・攻撃の超過 `xs`（リーダー＋キャラ）・相手のアクティブなブロッカー。"""
+    sc = np.zeros(70, np.float32)
+    sc[T.SC_OPP_LIFE], sc[T.SC_OPP_HAND] = life, hand
+    sc[T.SC_MY_LEADER_POWER] = sc[T.SC_OPP_LEADER_POWER] = 0.5
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, T.S_POWER] = (5000.0 + xs[0]) / 1e4
+    tok[1, T.S_POWER] = 0.5
+    for k, x in enumerate(xs[1:]):
+        s_i = T.SLOT_OWN_FIELD.start + k
+        tok[s_i, T.S_POWER], tok[s_i, T.S_IS_CHAR], tok[s_i, T.S_CAN_ATTACK] = (5000.0 + x) / 1e4, 1.0, 1.0
+    for k, p in enumerate(blockers):
+        s_i = T.SLOT_OPP_FIELD.start + k
+        tok[s_i, T.S_POWER], tok[s_i, T.S_IS_CHAR], tok[s_i, T.S_IS_BLOCKER] = p / 1e4, 1.0, 1.0
+    return sc, tok
+
+
+def _read(counters, don=0.0, events=()):
+    """守る席の手札の読み（`HandRead`）: `counters` のカウンター値・`events` の添字はイベント（費用 = 値 1000 ごとに 1）。"""
+    items = [{"counter": float(c), "event": k in events, "cost": (float(c) / 1000.0 if k in events else 3.0)}
+             for k, c in enumerate(counters)]
+    return CB.hand_read_of_items(items, don, T.MU)
+
+
+def _greedy_cheapest_first(cards, xs, life):
+    """**比べる相手の貪欲**（T64「安い方から」の攻撃ごとの版）: 安い攻撃から、足りる組のうち**札の少ない**
+    （同じなら合計の小さい）ものを取る。生き延びられなければ切らない（同じ規則）。"""
+    import itertools
+    avail = list(range(len(cards)))
+    stops = cut = 0
+    hits = sorted(x for x in xs if x >= -T.PWR_EPS)
+    for x in hits:
+        need = x + 1000.0 - T.PWR_EPS
+        best = None
+        for r in range(1, len(avail) + 1):
+            for c in itertools.combinations(avail, r):
+                s = sum(cards[i] for i in c)
+                if s >= need and (best is None or s < sum(cards[i] for i in best)):
+                    best = c
+            if best:
+                break
+        if best:
+            stops += 1; cut += len(best)
+            avail = [i for i in avail if i not in best]
+    if len(hits) - stops > life:
+        return 0, 0
+    return cut, stops
+
+
+def test_the_rule_hand_beats_the_greedy_allocation_on_a_hand_built_case():
+    """**H-4**: 手札 1000・3000・1000、攻撃の超過 1000 と 2000（要る合計 2000 と 3000）、ライフ 0。
+    **貪欲**（安い攻撃に一番少ない札）は 2000 の攻撃に 3000 を 1 枚当て、残り 1000＋1000 では 3000 に届かず
+    **2 本目が通って倒れる**（倒れるターンには切らない＝0 枚）。**最適**は 1000＋1000 を 2000 に、3000 を
+    3000 に当てて**両方止めて生き延びる**（3 枚切る）。`Θ_hand = μ × 3`。"""
+    cards = [1000.0, 3000.0, 1000.0]
+    assert _greedy_cheapest_first(cards, [1000.0, 2000.0], 0) == (0, 0)
+    assert CB._rule_guard_plan([(c, 0.0) for c in cards], 0.0, [1000.0, 2000.0], [1000.0, 2000.0], [], 0, 1) == (3, 2)
+    sc, tok = _rule_row(life=0.0, hand=3.0, xs=(1000.0, 2000.0))
+    old = CB.THETA_HAND_MODE
+    try:
+        CB.set_theta_hand_mode("rule")
+        _, hand, _ = CB.threshold_parts(sc, tok, g_hand=_read(cards))
+    finally:
+        CB.set_theta_hand_mode(old)
+    # 地平は「倒れるまで」: 1 ターン目で全部使い切り、2 ターン目は止められず倒れる＝切るのは 3 枚
+    assert hand == pytest.approx(3 * T.MU)
+    # 最適な割り当ては貪欲より多く止める（同じ札・同じ攻撃）
+    assert CB._rule_guard_plan([(c, 0.0) for c in cards], 0.0, [1000.0, 2000.0], [1000.0, 2000.0], [], 0, 1)[1] \
+        > _greedy_cheapest_first(cards, [1000.0, 2000.0], 0)[1]
+
+
+def test_the_rule_hand_reads_the_actual_counter_values():
+    """**H-4**: 切れる札の**枚数も割合も同じ**（2 枚・全部切れる）なのに、**値**が 1000＋1000 か 2000＋2000 かで
+    止められる本数が変わる（超過 1000＝要る合計 2000 の攻撃 1 本・ライフ 0・1 ターン）。
+    既定の形（平均の曲線 `c(x)`）は枚数しか見ないので両者を区別できない。"""
+    sc, tok = _rule_row(life=0.0, hand=2.0, xs=(1000.0,))
+    old = CB.THETA_HAND_MODE
+    try:
+        CB.set_theta_hand_mode("cuttable_forced")
+        f_small = CB.threshold_parts(sc, tok, g_hand=float(_read([1000.0, 1000.0])))[1]
+        f_big = CB.threshold_parts(sc, tok, g_hand=float(_read([2000.0, 2000.0])))[1]
+        CB.set_theta_hand_mode("rule")
+        r_small = CB._rule_hand_term(sc, tok, "opp", _read([1000.0, 1000.0]), T.MU, turns=1, count=False)
+        r_big = CB._rule_hand_term(sc, tok, "opp", _read([2000.0, 2000.0]), T.MU, turns=1, count=False)
+    finally:
+        CB.set_theta_hand_mode(old)
+    assert f_small == pytest.approx(f_big)                          # 旧の形は値を見ない
+    assert r_small == pytest.approx(2 * T.MU)                       # 1000＋1000 で 1 本（2 枚切る）
+    assert r_big == pytest.approx(1 * T.MU)                         # 2000 1 枚で 1 本（1 枚だけ切る）
+    # 足りなければ切らない（1000 1 枚では 2000 に届かない・ライフ 0 で倒れる）
+    assert CB._rule_hand_term(sc, tok, "opp", _read([1000.0]), T.MU, turns=1, count=False) == 0.0
+
+
+def test_the_rule_hand_pays_event_counters_with_the_don_left_each_defending_turn():
+    """**H-4**: イベントのカウンターは**相手のターンに在るドン**で払う（`apply_counter` の `pay_cost`）。
+    ドン 1 では費用 2 のイベント（+2000）を切れず、2 なら切れる。**ドンは守備ターンごとに戻る**ので、
+    同じ費用のイベント 2 枚は 1 ターンに 1 枚ずつなら両方使える（手札全体で 1 回払う形ではない）。"""
+    plan = CB._rule_guard_plan
+    assert plan([(2000.0, 2.0)], 1.0, [1000.0], [1000.0], [], 0, 1) == (0, 0)
+    assert plan([(2000.0, 2.0)], 2.0, [1000.0], [1000.0], [], 0, 1) == (1, 1)
+    # 印字のカウンターは無料（ドン 0 でも切れる）
+    assert plan([(2000.0, 0.0)], 0.0, [1000.0], [1000.0], [], 0, 1) == (1, 1)
+    # 1 ターンに 2 本（ライフ 0 で両方止めねばならない）: ドン 2 では 2 枚目を払えず倒れる＝切らない
+    assert plan([(2000.0, 2.0), (2000.0, 2.0)], 2.0, [1000.0, 1000.0], [1000.0, 1000.0], [], 0, 1) == (0, 0)
+    # 1 ターンに 1 本・ライフ 1・2 ターン: 毎ターン 1 枚ずつ払えるので 2 本とも止める
+    assert plan([(2000.0, 2.0), (2000.0, 2.0)], 2.0, [1000.0], [1000.0], [], 1, 2) == (2, 2)
+    # `hand_price_mean` 経由の `HandRead` もドンを持つ（`cuttable_share` と同じ値＋中身）
+    r = _read([2000.0], don=1.0, events=(0,))
+    assert r.cards == ((2000.0, 2.0),) and r.don == 1.0
+    assert float(r) == pytest.approx(T.MU * CB.cuttable_share([{"counter": 2000.0, "event": True, "cost": 2.0}], None))
+
+
+def test_the_rule_hand_lets_blockers_take_the_heaviest_attack_and_fall_when_overpowered():
+    """**H-4**: アクティブなブロッカーは**一番重い攻撃**を横取りする（札で止めるのが一番高い攻撃を札抜きで消す）。
+    攻撃側のパワー ≥ ブロッカーのパワーなら倒れて次のターンは居ない。"""
+    tl = CB._rule_turn_lists
+    # ブロッカー 6000（余裕 1000）: 超過 2000 の攻撃を横取りして倒れる → 2 ターン目は両方来る
+    assert tl([0.0, 2000.0], [0.0, 2000.0], [1000.0], 2) == [(0.0,), (0.0, 2000.0)]
+    # ブロッカー 8000（余裕 3000）: 超過 2000 を横取りして生き残る → 毎ターン同じ
+    assert tl([0.0, 2000.0], [0.0, 2000.0], [3000.0], 2) == [(0.0,), (0.0,)]
+    # 命中しない攻撃（超過 < 0）は並びに入らない
+    assert tl([-1000.0, 0.0], [-1000.0, 0.0], [], 1) == [(0.0,)]
+
+
+def test_the_rule_hand_is_priced_per_card_cut_not_per_life_saved():
+    """**H-4（T77 を守る）**: `F` は切らせた札 1 枚を `μ` で数えるので、手札の項は **`μ × 切る枚数`**。
+    救ったライフの本数（`λ` の単位）は足さない（ライフは後で取られるときにライフの項が数える）。
+    ライフに余裕があっても、地平の中で止められる攻撃は止める（防いだ損害の最大）＝札 2 枚・地平 2 ターンで 2 本。
+    地平を 1 ターンに切ると（T116 の窓）1 本しか止められない。"""
+    cards = [(2000.0, 0.0), (2000.0, 0.0)]
+    assert CB._rule_guard_plan(cards, 0.0, [0.0], [0.0], [], 3, 2) == (2, 2)
+    assert CB._rule_guard_plan(cards, 0.0, [0.0], [0.0], [], 3, 1) == (1, 1)
+    sc, tok = _rule_row(life=3.0, hand=2.0, xs=(0.0,))
+    assert CB._rule_hand_term(sc, tok, "opp", _read([2000.0, 2000.0]), T.MU, turns=2, count=False) \
+        == pytest.approx(2 * T.MU)
+    # 手札が空（読めた上で 0 枚）なら 0・通る攻撃が無ければ 0
+    assert CB._rule_guard_plan([], 0.0, [0.0], [0.0], [], 0, None) == (0, 0)
+    assert CB._rule_guard_plan(cards, 0.0, [-1000.0], [-1000.0], [], 0, None) == (0, 0)
+
+
+def test_selecting_rule_leaves_the_other_modes_and_falls_back_loudly_when_the_hand_is_unread():
+    """**H-4「off は旧のまま」**: `rule` を足しても既定（`cuttable_forced`）の手札の項は `hand_absorb_forced`
+    そのまま。`rule` でも**守る席の手札が読めない**（`g_hand` が `HandRead` でない＝`None` か数）ときは
+    **既定の形に落ち、その回数を `RULE_STATS` に残す**（黙って別の値にしない）。"""
+    sc, tok = _mirror_row(life=1.0, hand=5.0, n_char=3, pw=1.0)
+    olp = float(np.asarray(sc)[T.SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+    xs = CB.own_attackers_of(tok, olp)
+    n_blk = CB._opp_active_blockers(tok)
+    hand_n = float(np.asarray(sc)[T.SC_OPP_HAND])
+    life = float(np.asarray(sc)[T.SC_OPP_LIFE])
+    mu = T.MU
+    old = CB.THETA_HAND_MODE
+    try:
+        CB.set_theta_hand_mode("cuttable_forced")
+        base = CB.threshold_parts(sc, tok)
+        assert base[1] == pytest.approx(CB.hand_absorb_forced(hand_n, xs, life, n_blk, mu))
+        CB.set_theta_hand_mode("rule")
+        CB._rule_stats_reset()
+        assert CB.threshold_parts(sc, tok) == base                 # g_hand=None → 既定の形
+        assert CB.threshold_parts(sc, tok, g_hand=0.7 * mu)[1] == pytest.approx(
+            CB.hand_absorb_forced(0.7 * hand_n, xs, life, n_blk, mu))
+        assert CB.RULE_STATS["rule_fallback"] == 2 and CB.RULE_STATS["rule_n"] == 0
+        CB.threshold_parts(sc, tok, g_hand=_read([1000.0] * 5))
+        assert CB.RULE_STATS["rule_n"] == 1
+        # `THETA_HAND_PART` に `rule` が在る（`KeyError` で落ちない）・知らない名前は拒む
+        assert CB.THETA_HAND_PART["rule"] == "rule"
+    finally:
+        CB.set_theta_hand_mode(old)
+    assert CB.THETA_HAND_MODE == "cuttable_forced"
+
+
 def test_the_threshold_splits_into_life_hand_and_bodies():
     """**T96**（ユーザ指示「Θの方で進めてください」）: `threshold_parts` は `Θ` を **3 つの項**に割り、和は `threshold` と一致する。
     **どの項が終盤に縮まないか**を見るための切り分け。"""

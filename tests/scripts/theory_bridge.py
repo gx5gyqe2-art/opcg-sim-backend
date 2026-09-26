@@ -848,6 +848,17 @@ def _g_of_row(sc, tok, ci_row, idx2cid, cards, cache, key):
     return cache[key]
 
 
+def _g_opp_of(opp, last_main, ex, idx2cid, cards, cache, seat):
+    """**相手の手札 1 枚あたりの価格**（T79）。**H-4**: `THETA_HAND_MODE=rule` だけは守る席の**実際の札**を読むので、
+    相手の**直近の自席ターンの最後の main 行**（出した後の手札・使い残したドン）から読む（鍵も別）。
+    他のモードは従来どおり**最初の行**（`opp`）から（1 ビットも変えない）。"""
+    import crossing_bridge as CB
+    if CB.THETA_HAND_MODE == "rule" and (seat, opp["t"]) in last_main:
+        i = last_main[(seat, opp["t"])]
+        return _g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards, cache, ("last", seat, opp["t"]))
+    return _g_of_row(opp["sc"], opp["tok"], opp["ci"], idx2cid, cards, cache, (seat, opp["t"]))
+
+
 def _opp_view(first_main, opp_turns, ex, w, t):
     """**T79（完全情報・§0.05）**: 同じ局の**相手の直近の自席ターン最初の行**（`sc`／`tok`／`ci`）。
     相手の手札はその席の行にしか無いので、両側を読むにはこれと組にする。まだ相手が打っていなければ `None`。"""
@@ -1060,10 +1071,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
         # **T64**: 守りの窓で実際に消えた札を読むため、席ごとの次の自席ターンの最初の main 行を引く。
         # **T79**: 同じ表を「相手の直近の行」を引くのにも使う（完全情報・§0.05）ので**常に作る**。
         first_main = {}
+        last_main = {}
         for i in idx:
             w0, t0 = int(rows["who"][i]), int(rows["turn"][i])
             if t0 >= 1 and PL.is_own_turn(w0, t0) and int(rows["kind"][i]) == 0 and (w0, t0) not in first_main:
                 first_main[(w0, t0)] = i
+            if t0 >= 1 and PL.is_own_turn(w0, t0) and int(rows["kind"][i]) == 0:
+                last_main[(w0, t0)] = i        # **H-4**: その席のターンの最後の main 行（`rule` の相手の手札）
         opp_turns = {0: sorted(t0 for (w0, t0) in first_main if w0 == 0),
                      1: sorted(t0 for (w0, t0) in first_main if w0 == 1)}
         last_turn = max([int(rows["turn"][i]) for i in idx] or [0])        # T80: とどめのターン
@@ -1137,8 +1151,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 ck = _kappa_of_row(sc, tok, t, prof,
                                    g_me=_g_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t)),
                                    g_opp=(None if opp is None else
-                                          _g_of_row(opp["sc"], opp["tok"], opp["ci"], idx2cid, cards,
-                                                    g_cache, (1 - w, opp["t"]))),
+                                          _g_opp_of(opp, last_main, ex, idx2cid, cards, g_cache, 1 - w)),
                                    opp=opp)
                 kap = float(ck["kappa"])
                 stats["kappa_sum"] += kap; stats["kappa_n"] += 1
@@ -1290,8 +1303,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                           g_me=_g_of_row(sc, tok, ex["ci"][i], idx2cid, cards,
                                                          g_cache, (w, t)),
                                           g_opp=(None if opp_g is None else
-                                                 _g_of_row(opp_g["sc"], opp_g["tok"], opp_g["ci"], idx2cid, cards,
-                                                           g_cache, (1 - w, opp_g["t"]))),
+                                                 _g_opp_of(opp_g, last_main, ex, idx2cid, cards, g_cache, 1 - w)),
                                           opp=opp_g)["kappa"])
                 if LEDGER_HARM_MODE == "realised":
                     # **T87**: 移転は攻め手の行に 1 回だけ入っている＝守りの窓は帳簿に何も足さない（`s` 専任）
