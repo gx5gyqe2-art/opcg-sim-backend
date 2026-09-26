@@ -118,7 +118,7 @@ def _grid():
 def test_the_defaults_are_the_rule_and_the_old_cost():
     assert B.GUARD_AFFORD_MODE == "rule"          # 既定は規則どおり（ユーザ決定 2026-09-25）
     assert B.GUARD_S_COST_MODE == "curve"         # 判断の守る費用は従来のまま（`hand` は測ってから採否）
-    assert B.GUARD_AFFORD_MODES == ("rule", "lenient") and B.GUARD_S_COST_MODES == ("curve", "hand")
+    assert B.GUARD_AFFORD_MODES == ("rule", "lenient") and B.GUARD_S_COST_MODES == ("curve", "hand", "joint")
 
 
 def test_unknown_modes_are_refused_everywhere():
