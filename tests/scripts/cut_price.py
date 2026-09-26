@@ -18,24 +18,30 @@ N-2 が守りの判断の守る費用をそれで測った（既定）。本器�
 
 ```
 V(K)        = 1 枚 1 役の手札の価値（N-1）                     K は枠の札の部分集合
-切った組 S の値段      = V(K) − V(K − S)                        （損害の側・実際に切った組）
-L(k)        = min_{|T| = k, T ⊆ 切れる札} [ V(全部) − V(全部 − T) ]   （切る k 枚の最安の値段）
+切った組 S の値段      = V(K) − V(K − S)                        （実現の損害の側・実際に切った組・順に読む）
+L(k)        = min_{|T| = k, T ⊆ 切れる札} [ V(全部) − V(全部 − T) ]   （切る k 枚の最安の値段＝最安の組 T* を順に切った損害の和）
 Lx(x)       = L を実数へ: 端数は隣の 2 点の直線・切れる札の数 n を越えた分は 1 枚 μ（手札に無い札は旧と同じ値段）
-耐久の手札の項 = Lx(m + N*) − Lx(m)                            N* は旧の式が言う「切る枚数」（数は変えない）
-攻撃の守る値段 = Lx(m + c(x)) − Lx(m)                           c(x) は旧の費用曲線の枚数（数は変えない）
-m           = 枠からこれまでに減った切れる枚数（枚数から: 切れる割合 × (枠の枚数 − 今の枚数)・0 で床）
+N_f         = 枠の時点で耐久の式が言う「切る枚数」（予約・`reserve_of_row`）
+ḡ           = Lx(N_f) / N_f                                    （予約の 1 枚あたりの平均の値段）
+耐久の手札の項 = ḡ × N*                                         N* は旧の式が言う「切る枚数」（数は変えない）
+攻撃の守る値段 = ḡ × c(x)                                       c(x) は旧の費用曲線の枚数（数は変えない）
 ```
 
+**理論の側は枠の中で線形のまま `μ` を `ḡ` に替える**——速さ（`A`）は攻撃を 1 本ずつ独立に値付けし、予約の何枚目を
+どの攻撃が切らせるかを持たないので、予約の値段を攻撃の本数で配るには平均しか無い。これで**予約の `N_f` 枚ぶんの攻撃の値段の和
+＝耐久の手札の項＝守り手が予約の組 `T*` を順に切ったときの実現の損害の和＝`L(N_f)`**（3 つが厳密に同じ額）。
+安い順の切れ目で配る形（`joint_slice`）は診断として残す（`CutView` の注）。
+
 **数は変えず、1 枚あたりの値段だけを変える**——`c(x)`・`N*`・実際に減った枚数はどれも旧の式のまま。
-全部の札が一律 `μ` の札なら `L(k) = kμ` で旧の値に厳密に戻る（テスト）。数の側を規則から作り直す線（H-4 の
-`rule`／`rule_don`）とは直交する: H-4 が「どの札を何枚」を出せば、本器の `set_loss`（組の値段）／`Lx` がそれに値段を付ける。
+全部の札が一律 `μ` の札なら `L(k) = kμ`・`ḡ = μ` で旧の値に厳密に戻る（テスト）。数の側を規則から作り直す線（H-4 の
+`rule`／`rule_don`）とは直交する: H-4 が「どの札を何枚」を出せば、本器の `set_loss`（組の値段）／`Lx`／`ḡ` がそれに値段を付ける。
 
 **不変量**（`tests/test_cut_price.py`）:
 
 1. **望遠鏡**: 枠の札を順に切る列 `S1, S2, …` の値段の和は `V(全部) − V(全部 − ∪S)`（途中の手札で読む限り厳密）。
-   耐久の手札の項 `L(N*)` は最安の組 `T*` の値段なので、守り手が `T*` を順に切れば**予約された耐久と切らせた損害が厳密に一致**する。
+   `L(k)` は最安の組 `T*` の値段なので、守り手が `T*` を順に切れば**予約された耐久と切らせた損害が厳密に一致**する。
    守り手が高い札を切れば損害は耐久の予約より大きい（損をした分がそのまま帳簿に出る）。
-2. **一律の値段への還元**: 札が全部 `v = μ`・カウンターの役が効かない（来る攻撃が無い）なら `L(k) = kμ`・`Lx(m + k) − Lx(m) = kμ`。
+2. **一律の値段への還元**: 札が全部 `v = μ`・カウンターの役が効かない（来る攻撃が無い）なら `L(k) = kμ`・`ḡ = μ`。
 3. **単調**: `L` は減らない（単調な `V` では証明つき・読み直しのある手札では累積の最大で床を打つ）。
 
 **使い方**: 呼ぶ側が守り手の枠から `CutCurve` を作り（`curve_of_row`）、今の枚数で `view(今の枚数)` を取り、
@@ -58,8 +64,10 @@ if _HERE not in sys.path:
 import theory_order as TO  # noqa: E402
 from theory_order import MU, SC_MY_HAND, SC_MY_LIFE  # noqa: E402
 
-#: **切替**: `flat`＝旧（1 枚一律 `μ`・既定）／`joint`＝N-3（1 枚 1 役の価値の減り・損害と耐久の両側を同時に）。
-CUT_PRICE_MODES = ("flat", "joint")
+#: **切替**: `flat`＝旧（1 枚一律 `μ`・既定）／`joint`＝N-3（1 枚 1 役の価値の減り・損害と耐久の両側を同時に・
+#: 予約の平均の値段 `ḡ = L(N_f)/N_f` で理論の側を線形に読む）／`joint_slice`＝同じ曲線を**安い順の切れ目**で読む診断の腕
+#: （攻撃 1 本ごとに一番安い札から数える＝速さが攻撃を独立に数えるので安い札を何度も使い回す・下の注）。
+CUT_PRICE_MODES = ("flat", "joint", "joint_slice")
 CUT_PRICE_MODE = "flat"
 
 _EPS = 1e-12
@@ -86,7 +94,7 @@ def apply_cut_price(a):
 
 
 def joint_on():
-    return CUT_PRICE_MODE == "joint"
+    return CUT_PRICE_MODE in ("joint", "joint_slice")
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -122,7 +130,7 @@ class CutCurve:
     `cand` は切れる札の枠の添字、`h0` は枠の手札の枚数（今の枚数から `m` を出す基準）、`share` は切れる割合
     （`cuttable_share`・`m` の換算）、`cids` は枠ごとの札 id（実際に切った組を id から添字へ写す）。"""
 
-    def __init__(self, valuer, cand, h0, share, mu=MU, cids=None):
+    def __init__(self, valuer, cand, h0, share, mu=MU, cids=None, reserve=None):
         self.valuer = valuer
         self.cand = list(cand)
         self.n0 = len(self.cand)
@@ -130,7 +138,18 @@ class CutCurve:
         self.share = float(share)
         self.mu = float(mu)
         self.cids = list(cids) if cids is not None else None
+        self.reserve = None if reserve is None else float(reserve)
         self._L = None
+
+    @property
+    def gbar(self):
+        """**予約の平均の値段** `ḡ = Lx(N_f) / N_f`——`N_f` は枠の時点で耐久の式が言う「切る枚数」（`reserve`）。
+        予約が 0 枚（来る攻撃が無い等）なら切れる札全部 `n0` の平均・切れる札が無ければ `μ`。
+        全部の札が一律 `μ` なら `μ`（テスト）。"""
+        n = self.reserve if (self.reserve is not None and self.reserve > 1e-9) else float(self.n0)
+        if n <= 1e-9:
+            return self.mu
+        return float(self.Lx(n) / n)
 
     # --- 値段 ---
     def full(self):
@@ -181,9 +200,11 @@ class CutCurve:
         """枠からこれまでに減った切れる枚数（切れる割合 × 減った枚数・0 で床）。"""
         return max(0.0, self.share * (self.h0 - float(hand_now)))
 
-    def view(self, hand_now=None):
-        """今の枚数（省略＝枠のまま）での値段の窓。"""
-        return CutView(self, 0.0 if hand_now is None else self.m_of(hand_now))
+    def view(self, hand_now=None, kind=None):
+        """今の枚数（省略＝枠のまま）での値段の窓。`kind` は `avg`（`joint`）／`slice`（`joint_slice`）・省略は切替から。"""
+        if kind is None:
+            kind = "slice" if CUT_PRICE_MODE == "joint_slice" else "avg"
+        return CutView(self, 0.0 if hand_now is None else self.m_of(hand_now), kind)
 
     # --- 実際に切った組 ---
     def keep_of_ids(self, ids):
@@ -202,16 +223,28 @@ class CutCurve:
 
 
 class CutView:
-    """`CutCurve` を `m`（これまでに減った切れる枚数）で切った窓。`price(k) = Lx(m + k) − Lx(m)`。"""
+    """`CutCurve` の値段の窓。
 
-    def __init__(self, curve, m=0.0):
+    * `avg`（`joint`・既定）: `price(k) = k · ḡ`——**枠の中では 1 枚あたり一定**（予約の平均）。理論の側（攻撃の守る値段・
+      `Θ` の手札の項・窓の上限）は枚数に線形のまま `μ` を `ḡ` に替えるだけ＝予約の `N_f` 枚ぶんの攻撃の値段の和も、
+      `Θ` の手札の項も、守り手が予約の組を順に切ったときの実現の損害の和も**同じ `L(N_f)`**。
+    * `slice`（`joint_slice`・診断）: `price(k) = Lx(m + k) − Lx(m)`（`m` はこれまでに減った切れる枚数）——安い順の切れ目。
+      速さ（`A`）は攻撃を 1 本ずつ独立に値付けする（`m` を積まない）ので、凸な曲線では**一番安い札を攻撃の本数だけ
+      使い回す**＝攻撃の値段が系統的に安く出る（40 局の予備測定で理論の速さ −30%・終局の偏り +1.0 ターン）。"""
+
+    def __init__(self, curve, m=0.0, kind="avg"):
         self.curve = curve
         self.m = float(m)
+        if kind not in ("avg", "slice"):
+            raise ValueError("kind は avg／slice")
+        self.kind = kind
 
     def price(self, k, mu=None):
         k = float(k)
         if k <= 0.0:
             return 0.0
+        if self.kind == "avg":
+            return float(k * self.curve.gbar)
         return float(self.curve.Lx(self.m + k) - self.curve.Lx(self.m))
 
 
@@ -281,7 +314,21 @@ def curve_of_row(sc, tok, ci_row, idx2cid, cards, deck=None, don=None, mu=MU):
     share = (len(cand) / float(len(items))) if items else 0.0
     valuer = TB.joint_valuer(hand)
     return CutCurve(valuer, cand, float(sc[SC_MY_HAND]), share, mu,
-                    cids=[s_.get("cid") for s_ in slots])
+                    cids=[s_.get("cid") for s_ in slots],
+                    reserve=reserve_of_row(sc, tok, share, mu))
+
+
+def reserve_of_row(sc, tok, share, mu=MU):
+    """**枠の時点の予約 `N_f`**＝その席の耐久の手札の項が言う「切る枚数」（`crossing_bridge.hand_cut_count`・
+    `threshold_parts_side(…, "me")` と同じ入力: 相手の場の攻撃〔レフレッシュで全部殴れる〕・自分のライフ・自分のアクティブな
+    ブロッカー・切れる割合 × 手札の枚数）。窓の上限（T116）は `τ` が要るので掛けない（限界）。"""
+    import numpy as np
+    import crossing_bridge as CB
+    sc = np.asarray(sc); tok = np.asarray(tok)
+    mlp = float(sc[TO.SC_MY_LEADER_POWER]) * 1e4 or 5000.0
+    xs = CB.opp_attackers_of(tok, mlp)
+    return float(CB.hand_cut_count(float(mu) * float(share), float(sc[SC_MY_HAND]), xs, float(sc[SC_MY_LIFE]),
+                                   CB._own_active_blockers(tok), mu))
 
 
 # ---------------------------------------------------------------------------------------------------------------

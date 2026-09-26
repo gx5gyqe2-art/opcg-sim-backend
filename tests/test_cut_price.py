@@ -71,9 +71,18 @@ def test_L_by_hand_without_guard_role():
     assert L == pytest.approx([0.0, 0.03, 0.12], abs=1e-12)
     assert cv.Lx(1.5) == pytest.approx(0.03 + 0.5 * 0.09, abs=1e-12)
     assert cv.Lx(3.0) == pytest.approx(0.12 + MU, abs=1e-12)
-    assert cv.view().price(1.28) == pytest.approx(0.03 + 0.28 * 0.09, abs=1e-12)
+    assert cv.view(kind="slice").price(1.28) == pytest.approx(0.03 + 0.28 * 0.09, abs=1e-12)
     # m = 1 枚ぶん消費した後の 1 枚＝2 枚目の値段
-    assert CP.CutView(cv, 1.0).price(1.0) == pytest.approx(0.09, abs=1e-12)
+    assert CP.CutView(cv, 1.0, "slice").price(1.0) == pytest.approx(0.09, abs=1e-12)
+    # 予約の平均（`joint`）: 予約 2 枚なら ḡ = 0.12 / 2・予約 1.5 枚なら Lx(1.5) / 1.5・予約が無ければ切れる札全部の平均
+    cv.reserve = 2.0
+    assert cv.gbar == pytest.approx(0.06, abs=1e-12)
+    assert cv.view(kind="avg").price(1.28) == pytest.approx(1.28 * 0.06, abs=1e-12)
+    cv.reserve = 1.5
+    assert cv.gbar == pytest.approx((0.03 + 0.5 * 0.09) / 1.5, abs=1e-12)
+    cv.reserve = 0.0
+    assert cv.gbar == pytest.approx(0.06, abs=1e-12)
+    assert _curve([(1.0, 0.05, 0.0)]).gbar == MU                  # 切れる札が無い＝旧の値段
 
 
 def test_L_by_hand_with_guard_role():
@@ -96,7 +105,11 @@ def test_flat_cards_recover_mu(n):
     assert cv.L() == pytest.approx([k * MU for k in range(n + 1)], abs=1e-12)
     for m in (0.0, 0.5, 1.0):
         for k in (0.3, 1.0, 1.28, 2.25, n + 1.5):
-            assert CP.CutView(cv, m).price(k) == pytest.approx(k * MU, abs=1e-12)
+            assert CP.CutView(cv, m, "slice").price(k) == pytest.approx(k * MU, abs=1e-12)
+    for res in (None, 0.0, 1.0, 1.28 * 2, float(n)):
+        cv.reserve = res
+        assert cv.gbar == pytest.approx(MU, abs=1e-15)
+        assert CP.CutView(cv, 0.0, "avg").price(2.25) == pytest.approx(2.25 * MU, abs=1e-15)
 
 
 def test_flat_view_leaves_attack_prices_unchanged():
@@ -187,10 +200,17 @@ def test_telescoping_and_endurance_equals_booked_harm():
             for T_ in itertools.combinations(cv.cand, k):
                 assert cv.set_loss(full, T_) >= L[k] - 1e-12
         assert all(L[i + 1] >= L[i] - 1e-15 for i in range(len(L) - 1))
-        v = cv.view()
+        v = cv.view(kind="slice")
         for a, b in ((0.5, 0.7), (1.0, 1.28), (0.2, 3.0)):
-            assert v.price(a) + CP.CutView(cv, a).price(b) == pytest.approx(v.price(a + b), abs=1e-12)
+            assert v.price(a) + CP.CutView(cv, a, "slice").price(b) == pytest.approx(v.price(a + b), abs=1e-12)
             assert v.price(a) >= 0.0
+        # 予約の平均: 予約 N 枚ぶんの攻撃の値段の和（1 本 c 枚をどう分けても）＝耐久の予約 L(N)
+        for N in range(1, cv.n0 + 1):
+            cv.reserve = float(N)
+            va = cv.view(kind="avg")
+            cs = [0.5, 1.28, float(N) - 1.78] if N > 1.78 else [float(N)]
+            assert sum(va.price(c) for c in cs) == pytest.approx(L[N], abs=1e-12)
+            assert va.price(float(N)) == pytest.approx(L[N], abs=1e-12)
 
 
 def test_realised_corrections_telescope_over_snapshots():
@@ -232,7 +252,9 @@ def test_context_is_scoped_and_nested():
     cv = _curve([(1.0, 0.03, 1000.0), (1.0, 0.09, 2000.0)])
     x = 1000.0                                      # c(x) = 1.28 枚
     flat = T.attack_value(5000.0 + x, 5000.0, True)
-    with CP.defending(cv.view()):
+    with CP.defending(cv.view(kind="avg")):
+        assert T.attack_value(5000.0 + x, 5000.0, True) == pytest.approx(min(cv.gbar * T.c_of(x), TAKE), abs=1e-12)
+    with CP.defending(cv.view(kind="slice")):
         joint = T.attack_value(5000.0 + x, 5000.0, True)
         assert joint == pytest.approx(min(cv.Lx(T.c_of(x)), TAKE), abs=1e-12)
         with CP.defending(None):
@@ -271,9 +293,13 @@ def test_threshold_parts_use_count_times_price():
         assert flat == pytest.approx(base, abs=1e-15)
         cv = _curve([(1.0, 0.03, 1000.0), (1.0, 0.09, 2000.0), (1.0, 0.02, 1000.0)])
         n = CB.hand_cut_count(g, 5.0, CB.own_attackers_of(tok, 5000.0), 2.0, 0, MU)
-        with CP.defending(cv.view()):
+        with CP.defending(cv.view(kind="slice")):
             got = CB.threshold_parts(sc, tok, g_hand=g)
         assert got[0] == base[0] and got[2] == base[2]
         assert got[1] == pytest.approx(cv.Lx(n), abs=1e-12)
+        cv.reserve = n
+        with CP.defending(cv.view(kind="avg")):
+            got = CB.threshold_parts(sc, tok, g_hand=g)
+        assert got[1] == pytest.approx(cv.Lx(n), abs=1e-12)          # 予約そのものなら ḡ × N = L(N)
     finally:
         CB.set_theta_hand_mode(old)
