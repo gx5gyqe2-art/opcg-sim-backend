@@ -305,22 +305,103 @@ def test_threshold_parts_use_count_times_price():
         CB.set_theta_hand_mode(old)
 
 
-def test_value_caches_do_not_leak_across_contexts():
-    """覚えておく値（選択肢の価値・デッキの流入）は文脈の中では覚えも読みもしない——守り手ごとに値が違うので、
-    覚えると別の守り手・旧の値段の読みへ漏れる（実測で守りの窓の判断が 2 行ずれた）。"""
+def test_value_caches_are_keyed_by_the_pricing_context():
+    """覚えておく値（選択肢の価値・デッキの流入）は**値段の文脈を鍵に入れて**覚える——守り手ごとに値が違うので、
+    鍵に入れないと別の守り手・旧の値段の読みへ漏れる（実測で守りの窓の判断が 2 行ずれた）。安い順の切れ目の窓は覚えない。"""
     import deck_refill as DR
-    cv = _curve([(1.0, 0.0, 1000.0), (1.0, 0.2, 1000.0)], xs=[0.0])
-    cv.reserve = 1.0
-    T._OPTION_CACHE.clear()
-    base = T.option_value(6000.0, 5000.0, 3.0)
+    deck = ("OP01-013", "OP01-016", "OP01-025", "ST01-012")
+    cheap = _curve([(1.0, 0.0, 1000.0), (1.0, 0.0, 1000.0)])       # 来る攻撃なし・出す価値なし＝切っても何も失わない
+    cheap.reserve = 1.0
+    assert cheap.gbar == 0.0
+    dear = _curve([(1.0, 0.3, 1000.0)])
+    dear.reserve = 1.0
+    T._OPTION_CACHE.clear(); DR._FLOW.clear()
+    base_o, base_f = T.option_value(6000.0, 5000.0, 3.0), DR.a_of(deck, 5000.0)
+    with CP.defending(cheap.view(kind="avg")):
+        o1, f1 = T.option_value(6000.0, 5000.0, 3.0), DR.a_of(deck, 5000.0)
+    with CP.defending(dear.view(kind="avg")):
+        o2, f2 = T.option_value(6000.0, 5000.0, 3.0), DR.a_of(deck, 5000.0)
+    assert f1 < base_f < f2 or f1 < f2                     # 値段で流入の攻撃の値が動く
+    # 覚えた値を読み直しても同じ（鍵が違う＝混ざらない）・外では旧の値のまま
+    with CP.defending(cheap.view(kind="avg")):
+        assert (T.option_value(6000.0, 5000.0, 3.0), DR.a_of(deck, 5000.0)) == (o1, f1)
+    with CP.defending(dear.view(kind="avg")):
+        assert (T.option_value(6000.0, 5000.0, 3.0), DR.a_of(deck, 5000.0)) == (o2, f2)
+    assert (T.option_value(6000.0, 5000.0, 3.0), DR.a_of(deck, 5000.0)) == (base_o, base_f)
+    # 切れ目の窓（1 枚あたり一定でない）は覚えない
+    n_f = len(DR._FLOW)
+    with CP.defending(dear.view(kind="slice")):
+        DR.a_of(deck, 4000.0)
+    assert len(DR._FLOW) == n_f
+
+
+def test_search_gain_cache_is_keyed_by_the_pricing_context(monkeypatch):
+    """探す値（`search_price.card_gain`）も同じ規約（鍵に値段の文脈・切れ目の窓では覚えない）。"""
+    import search_price as SP
+    calls = []
+    monkeypatch.setattr(SP, "_card_body", lambda cid, cards: {"cost": 1.0, "counter": 1000.0})
+    monkeypatch.setattr(SP, "use_value", lambda *a, **k: 0.05, raising=False)
+
+    class _C:
+        def info(self, cid):
+            return {"cost": 1}
+
+    def fake_deltas(items, card, caps, xs, take):
+        calls.append(T.CUT_PRICER_KEY)
+        return {"dtotal": 0.01 if T.CUT_PRICER is None else T.CUT_PRICER(1.0, MU)}
+    monkeypatch.setattr(SP.HP, "card_deltas", fake_deltas)
+    ctx = {"hand_items": [], "caps": [1, 1], "xs": [], "take": 0.1, "olp": 5000.0, "r": 3.0}
+    SP._GAIN.clear()
+    base = SP.card_gain("X", ctx, _C())
+    dear = _curve([(1.0, 0.3, 1000.0)]); dear.reserve = 1.0
+    with CP.defending(dear.view(kind="avg")):
+        inside = SP.card_gain("X", ctx, _C())
+    assert inside == pytest.approx(dear.gbar) and base == 0.01
+    assert SP.card_gain("X", ctx, _C()) == 0.01            # 外へ漏れない
+    n = len(SP._GAIN)
+    with CP.defending(dear.view(kind="slice")):
+        SP.card_gain("X", ctx, _C())
+    assert len(SP._GAIN) == n
+
+
+def test_other_side_turns_off_both_the_price_hook_and_the_hand_term_context():
+    """**B3**: 相手の体の値（逆の席）を読む間は、攻撃の値段の差し替え口と手札の項の文脈（`active()`）が**両方**旧に戻る。"""
+    cv = _curve([(1.0, 0.03, 1000.0)]); cv.reserve = 1.0
+    seen = []
+    orig = T.nu_of
+
+    def spy(*a, **k):
+        seen.append((T.CUT_PRICER, CP.active(), T.CUT_PRICER_KEY, T.CUT_TAKE_CARD))
+        return orig(*a, **k)
+    T.nu_of = spy
+    try:
+        with CP.defending(cv.view(kind="avg")):
+            T._nu_of_other_side(6000.0, 5000.0, 3.0)
+            assert CP.active() is not None and T.CUT_PRICER is not None
+    finally:
+        T.nu_of = orig
+    assert seen == [(None, None, None, None)]
+    # 攻撃の流れの中の相手の体の `ν`・`opp_bodies_of` も逆の席として旧の値段
+    tok = np.zeros((24, 40), dtype=np.float32)
+    tok[7, T.S_IS_CHAR] = 1.0; tok[7, T.S_POWER] = 0.6
+    flat = T.opp_bodies_of(tok, 5000.0, 3.0)
+    flat_s = T.attack_stream(7000.0, 5000.0, 3.0, opp_chars=[(6000.0, False)])
     with CP.defending(cv.view(kind="avg")):
-        inside = T.option_value(6000.0, 5000.0, 3.0)
-    T._OPTION_CACHE.clear()
-    with CP.defending(cv.view(kind="avg")):
-        inside2 = T.option_value(6000.0, 5000.0, 3.0)
-    after = T.option_value(6000.0, 5000.0, 3.0)
-    assert inside == inside2 and after == base
-    n0 = len(DR._FLOW)
-    with CP.defending(cv.view(kind="avg")):
-        DR.a_of(("OP01-001",) * 3, 5000.0) if hasattr(DR, "a_of") else None
-    assert len(DR._FLOW) == n0
+        assert T.opp_bodies_of(tok, 5000.0, 3.0)[0]["nu"] == flat[0]["nu"]
+        T.attack_stream(7000.0, 5000.0, 3.0, opp_chars=[(6000.0, False)])   # 走ること（値は守り手の値段で変わってよい）
+    assert T.attack_stream(7000.0, 5000.0, 3.0, opp_chars=[(6000.0, False)]) == flat_s
+
+
+def test_value_and_reserve_read_the_same_attackers_with_the_rules_power():
+    """**B1**: 枠は守り手の自席ターンの行＝トークンの自分のリーダーには自分が付けたドン（自分のターンだけ +1000）が乗る。
+    V（来る攻撃）と予約 `N_f` は同じ、相手のターンの規則どおりのパワー（付与ドン無し＝`SC_MY_LEADER_POWER`）で読む。"""
+    sc = np.zeros(16, dtype=np.float32)
+    sc[T.SC_MY_LEADER_POWER] = 0.5; sc[T.SC_OPP_LEADER_POWER] = 0.5; sc[T.SC_MY_LIFE] = 3.0; sc[T.SC_MY_HAND] = 0.0
+    tok = np.zeros((24, 40), dtype=np.float32)
+    tok[0, T.S_POWER] = 0.7                          # 自分のリーダー: 5000 ＋ 付与ドン 2 枚（自分のターンだけ）
+    tok[1, T.S_POWER] = 0.5                          # 相手のリーダー 5000
+    tok[7, T.S_IS_CHAR] = 1.0; tok[7, T.S_POWER] = 0.6
+    xs = CP.defender_incoming(sc, tok)
+    assert xs == pytest.approx([1000.0, 0.0], abs=1e-3)  # トークンのまま読むと [−1000, −2000]＝全部通らない（旧の誤り）
+    assert sorted(x for x in CP.defender_attackers(sc, tok)) == pytest.approx([0.0, 1000.0], abs=1e-3)
+    assert sorted(HG.incoming(tok)) == []            # 旧の読み（守りの窓の行では正しい・枠の行では誤り）

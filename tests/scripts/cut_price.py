@@ -67,8 +67,22 @@ from theory_order import MU, SC_MY_HAND, SC_MY_LIFE  # noqa: E402
 #: **切替**: `flat`＝旧（1 枚一律 `μ`・既定）／`joint`＝N-3（1 枚 1 役の価値の減り・損害と耐久の両側を同時に・
 #: 予約の平均の値段 `ḡ = L(N_f)/N_f` で理論の側を線形に読む）／`joint_slice`＝同じ曲線を**安い順の切れ目**で読む診断の腕
 #: （攻撃 1 本ごとに一番安い札から数える＝速さが攻撃を独立に数えるので安い札を何度も使い回す・下の注）。
-CUT_PRICE_MODES = ("flat", "joint", "joint_slice")
+#: 切り分けの腕（レビュー 2026-09-30）: `joint_theta`＝**耐久の側だけ**（`Θ` の手札の項と窓の上限は `ḡ`・攻撃の値段・
+#: 速さ・実現の損害は旧の `μ`＝T77 を破る対照）／`joint_floor`＝`ḡ` を `μ` で床打ちした `joint`（安すぎる枠の影響の切り分け）。
+CUT_PRICE_MODES = ("flat", "joint", "joint_slice", "joint_theta", "joint_floor")
 CUT_PRICE_MODE = "flat"
+#: **B4（T77）**: 受けたとき手札に入るライフの札の値段。`mu`＝旧（受ける費用 `λ − h·μ`・実現の `−μ`）／
+#: `gbar`＝守る側と同じ `ḡ`（受ける費用 `λ − h·ḡ`・実現の損害でも攻め手のターンの間に入った札を `ḡ` で数える）。
+CUT_TAKE_MODES = ("mu", "gbar")
+CUT_TAKE_MODE = "mu"
+
+
+def set_cut_take_mode(mode):
+    global CUT_TAKE_MODE
+    if mode not in CUT_TAKE_MODES:
+        raise ValueError("cut take mode は %s のどれか" % (CUT_TAKE_MODES,))
+    CUT_TAKE_MODE = mode
+    return CUT_TAKE_MODE
 
 _EPS = 1e-12
 
@@ -84,17 +98,27 @@ def set_cut_price_mode(mode):
 def add_cut_price_arg(ap):
     ap.add_argument("--cut-price", default=None, choices=CUT_PRICE_MODES,
                     help="**N-3** 切らせた札の値段: `flat`（既定・1 枚一律 μ）／"
-                         "`joint`（1 枚 1 役の手札の価値の減り・損害の側と耐久の側を同時に）")
+                         "`joint`（1 枚 1 役の手札の価値の減り・損害の側と耐久の側を同時に）／"
+                         "`joint_slice`（安い順の切れ目・診断）／`joint_theta`（耐久の側だけ・対照）／`joint_floor`（ḡ を μ で床打ち）")
+    ap.add_argument("--cut-take", default=None, choices=CUT_TAKE_MODES,
+                    help="**N-3 B4** 受けたとき手札に入るライフの札の値段: `mu`（既定）／`gbar`（守る側と同じ ḡ）")
 
 
 def apply_cut_price(a):
     if getattr(a, "cut_price", None) is not None:
         set_cut_price_mode(a.cut_price)
+    if getattr(a, "cut_take", None) is not None:
+        set_cut_take_mode(a.cut_take)
     return CUT_PRICE_MODE
 
 
 def joint_on():
-    return CUT_PRICE_MODE in ("joint", "joint_slice")
+    return CUT_PRICE_MODE != "flat"
+
+
+def harm_side_on():
+    """損害の側（攻撃の値段・速さ・実現の損害）も新しい値段で読むか（`joint_theta` だけが耐久の側に限る）。"""
+    return joint_on() and CUT_PRICE_MODE != "joint_theta"
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -149,7 +173,8 @@ class CutCurve:
         n = self.reserve if (self.reserve is not None and self.reserve > 1e-9) else float(self.n0)
         if n <= 1e-9:
             return self.mu
-        return float(self.Lx(n) / n)
+        g = float(self.Lx(n) / n)
+        return max(g, self.mu) if CUT_PRICE_MODE == "joint_floor" else g
 
     # --- 値段 ---
     def full(self):
@@ -267,22 +292,33 @@ _STACK = []
 
 
 def active():
-    """今の文脈の値段の窓（無ければ `None`＝旧の値段）。"""
+    """今の文脈の値段の窓（無ければ `None`＝旧の値段）。**相手の体の値（逆の席）を読んでいる間は `None`**
+    （`theory_order._nu_of_other_side`・B3: 攻撃の値段の差し替え口と手札の項の文脈を必ず一緒に外す）。"""
+    if TO.CUT_OTHER_SIDE > 0:
+        return None
     return _STACK[-1] if _STACK else None
 
 
 @contextlib.contextmanager
 def defending(view):
     """**この中で呼んだ旧の式は、守り手 `view` の値段で読む**。`view=None` なら旧の値段（何もしない）。
-    `theory_order.CUT_PRICER` を差し替え、出るときに必ず戻す（入れ子可）。"""
-    prev = TO.CUT_PRICER
+    `theory_order.CUT_PRICER`（攻撃の値段）・`CUT_PRICER_KEY`（覚えておく値の鍵）・`CUT_TAKE_CARD`（B4）を差し替え、
+    出るときに必ず戻す（入れ子可）。`joint_theta` では攻撃の値段は差し替えない（耐久の側だけ）。"""
+    prev = (TO.CUT_PRICER, TO.CUT_PRICER_KEY, TO.CUT_TAKE_CARD)
     _STACK.append(view)
-    TO.CUT_PRICER = (None if view is None else (lambda c, mu, _v=view: _v.price(c, mu)))
+    if view is None or CUT_PRICE_MODE == "joint_theta":
+        TO.CUT_PRICER, TO.CUT_PRICER_KEY, TO.CUT_TAKE_CARD = None, None, None
+    else:
+        TO.CUT_PRICER = (lambda c, mu, _v=view: _v.price(c, mu))
+        avg = getattr(view, "kind", None) == "avg"
+        g = float(view.curve.gbar) if avg else None
+        TO.CUT_PRICER_KEY = ("avg", round(g, 12)) if avg else None
+        TO.CUT_TAKE_CARD = (g if CUT_TAKE_MODE == "gbar" else None) if avg else None
     try:
         yield view
     finally:
         _STACK.pop()
-        TO.CUT_PRICER = prev
+        TO.CUT_PRICER, TO.CUT_PRICER_KEY, TO.CUT_TAKE_CARD = prev
 
 
 def price_active(k, mu=MU):
@@ -305,6 +341,11 @@ def curve_of_row(sc, tok, ci_row, idx2cid, cards, deck=None, don=None, mu=MU):
     sc = np.asarray(sc)
     take = float(TO.theta_take(float(sc[SC_MY_LIFE]))) * float(mu)
     hand = TB.guard_hand_reading(tok, sc, ci_row, idx2cid, cards, take=take, mu=mu, deck=deck, values=True)
+    # **B1（レビュー 2026-09-30）**: 枠は守り手の**自席ターン**の行なので、トークンの自分のリーダーのパワーには自分が付けた
+    # ドン（自分のターンだけ +1000）が乗っている＝相手のターンには規則上存在しないパワー。`HG.incoming` はそれを守る側に
+    # 使うので来る攻撃が −2000 などに見え、カウンターの守りの役が全部 0 になっていた（`L(k)=0`・`ḡ≈0`）。
+    # 相手のターンの規則どおりのパワー（`SC_MY_LEADER_POWER`＝付与ドンを載せない値）で読み、**予約 `N_f` と同じ攻撃の並び**を使う。
+    hand["xs_future"] = defender_incoming(sc, tok)
     slots = hand["slots"]
     if not slots:
         return None
@@ -313,9 +354,27 @@ def curve_of_row(sc, tok, ci_row, idx2cid, cards, deck=None, don=None, mu=MU):
     cand = [items_pos[k] for k in cuttable_indices(items, don)]
     share = (len(cand) / float(len(items))) if items else 0.0
     valuer = TB.joint_valuer(hand)
-    return CutCurve(valuer, cand, float(sc[SC_MY_HAND]), share, mu,
-                    cids=[s_.get("cid") for s_ in slots],
-                    reserve=reserve_of_row(sc, tok, share, mu))
+    cv = CutCurve(valuer, cand, float(sc[SC_MY_HAND]), share, mu,
+                  cids=[s_.get("cid") for s_ in slots],
+                  reserve=reserve_of_row(sc, tok, share, mu))
+    cv.xs_future = list(hand["xs_future"])            # V が読んだ来る攻撃（テストで `N_f` の攻撃と一致を見る）
+    return cv
+
+
+def defender_incoming(sc, tok):
+    """**守り手の枠から見た、次の相手ターンに来る攻撃の超過**（高い順・通らないものは落とす）。
+    守る側は**相手のターンの**自分のリーダーのパワー（付与ドン無し＝`SC_MY_LEADER_POWER`）、攻める側は相手のリーダーと
+    場のキャラ全部（相手のターンにはリフレッシュで全部殴れる・`crossing_bridge.opp_attackers_of`）＝`reserve_of_row` と同じ並び。"""
+    return sorted((float(x) for x in defender_attackers(sc, tok) if float(x) >= -TO.PWR_EPS), reverse=True)
+
+
+def defender_attackers(sc, tok):
+    """`reserve_of_row` と `defender_incoming` が共有する攻撃の並び（超過 `x`・通らないものも含む）。"""
+    import numpy as np
+    import crossing_bridge as CB
+    sc = np.asarray(sc); tok = np.asarray(tok)
+    mlp = float(sc[TO.SC_MY_LEADER_POWER]) * 1e4 or 5000.0
+    return CB.opp_attackers_of(tok, mlp)
 
 
 def reserve_of_row(sc, tok, share, mu=MU):
@@ -325,8 +384,7 @@ def reserve_of_row(sc, tok, share, mu=MU):
     import numpy as np
     import crossing_bridge as CB
     sc = np.asarray(sc); tok = np.asarray(tok)
-    mlp = float(sc[TO.SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-    xs = CB.opp_attackers_of(tok, mlp)
+    xs = defender_attackers(sc, tok)
     return float(CB.hand_cut_count(float(mu) * float(share), float(sc[SC_MY_HAND]), xs, float(sc[SC_MY_LIFE]),
                                    CB._own_active_blockers(tok), mu))
 
@@ -354,7 +412,7 @@ def _minus(a, b):
     return out
 
 
-def realised_corrections(curve, frame_ids, snaps, final_ids=None, mu=MU):
+def realised_corrections(curve, frame_ids, snaps, final_ids=None, mu=MU, add_price=None):
     """**攻め手のターンの中で守り手の手札から出ていった札の値段の直し**（実現の損害 `F` の手札の部分）。
 
     `frame_ids`＝枠の手札（札 id）・`snaps`＝攻め手のターンの間の守り手の行の `[(位置, 手札の id), …]`（記録の順）・
@@ -376,6 +434,14 @@ def realised_corrections(curve, frame_ids, snaps, final_ids=None, mu=MU):
         _p0, a = chain[k]
         p1, b = chain[k + 1]
         gone = _minus(a, b)
+        if add_price is not None and p1 != "final":
+            # **B4**: 攻め手のターンの間に手札へ入った札（受けたライフの札など）を `μ` ではなく `add_price` で数える
+            # （旧の `μ × 枚数の差` は入った札を `−μ` で数えている＝直しは `+(μ − add_price)` × 入った枚数）。
+            # 次の自席ターンの読みとの間の増えは引きを含むので数えない（旧の枚数の差にも入っていない）。
+            added = _minus(b, a)
+            if added:
+                pos_a = p1 if p1 is not None else chain[k][0]
+                out.append((pos_a, (float(mu) - float(add_price)) * len(added)))
         if not gone:
             continue
         pos = chain[k][0] if chain[k][0] is not None else chain[k + 1][0]
@@ -504,7 +570,8 @@ class CutFrames:
                     final = HS.hand_ids(self.ex["ci"][i], self.idx2cid)
             if final is None:
                 self._st("cut_corr_nofinal")
-            out = realised_corrections(cv, frame_ids, snaps, final, self.mu)
+            out = realised_corrections(cv, frame_ids, snaps, final, self.mu,
+                                       add_price=(cv.gbar if CUT_TAKE_MODE == "gbar" else None))
             self._st("cut_corr_turns")
             self._st("cut_corr_n", len(out))
             self.stats["cut_corr_sum"] = self.stats.get("cut_corr_sum", 0.0) + float(sum(c for _p, c in out))
@@ -513,6 +580,6 @@ class CutFrames:
 
     def bracket_corr(self, w, t, n_lo, n_hi):
         """括り（攻め手の行の位置 `n_lo` から閉じる行の位置 `n_hi`）の中の応答の直しの和。"""
-        if n_hi is None:
-            return 0.0
+        if n_hi is None or not harm_side_on():
+            return 0.0                                  # `joint_theta`（耐久の側だけ）は実現の損害を旧のまま
         return sum_in(self.corrections(w, t), n_lo, n_hi)

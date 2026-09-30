@@ -1154,7 +1154,7 @@ def opp_bodies_of(tok_row, my_leader_power, r_turns=4.128, theta=THETA, mu=MU,
                 "cost": float(tok[si, S_COST]) * 10.0,
                 "is_rest": float(tok[si, S_IS_REST]) > 0.5,
                 "blocker": blk,
-                "nu": nu_of(pw, float(my_leader_power), r_turns, theta, mu, ko_p=ko_p,
+                "nu": _nu_of_other_side(pw, float(my_leader_power), r_turns, theta, mu, ko_p=ko_p,
                             is_blocker=blk)}
         if ci_row is not None and idx2cid is not None:
             # **枠の素性**（特徴・色・名前・属性）——`card_idx` の並びはトークンと同じ
@@ -1215,6 +1215,19 @@ def theta_of(tok_row, life, my_don=0.0, mode="const", theta=THETA, don_share=DON
 #: `cut_price.defending(view)` の中でだけ「守り手の手札の 1 枚 1 役の価値の減り」（`view.price(c)`）に替わる
 #: ——`attack_value` の守る値段・`block_cost` のブロックしてから切る値段・`attach_value` の増分の 3 か所だけ（数 `c(x)` は変えない）。
 CUT_PRICER = None
+#: **N-3**: 覚えておく値（選択肢の価値・デッキの流入・探す値）の鍵に足す値段の識別子。`None`＝旧の値段
+#: （`cut_price.defending` が「1 枚あたり一定の値段」のときだけ `("avg", ḡ)` を入れる・それ以外の窓では覚えない）。
+CUT_PRICER_KEY = None
+#: **N-3**: 受ける費用 `Θ·μ = λ − h·μ` の中の「手札に入るライフの札」の値段（`None`＝旧の `μ`）。
+#: `cut_price` の `CUT_TAKE_MODE=gbar` のとき守り手の `ḡ` が入る（T77: 守る側と同じ値段で数える）。
+CUT_TAKE_CARD = None
+#: **N-3**: いま「相手の体の値（こちらが守り手）」を読んでいる深さ（>0 なら値段の文脈を無効にする）。
+CUT_OTHER_SIDE = 0
+
+
+def _cut_cache_ok():
+    """覚えてよいか: 旧の値段か、1 枚あたり一定の値段の窓（鍵に `ḡ` が入る）のとき。"""
+    return CUT_PRICER is None or CUT_PRICER_KEY is not None
 
 
 def block_cost(power, blocker_power, nu_blocker, mu=MU):
@@ -1242,6 +1255,9 @@ def attack_value(power, target_power, is_leader, theta=THETA, mu=MU, nu_target=N
     guard = c_of(x) * mu if CUT_PRICER is None else CUT_PRICER(c_of(x), mu)     # **N-3**（文脈の中だけ）
     take = (theta * mu) if is_leader else (
         float(nu_target) if nu_target is not None else theta * mu)
+    if CUT_PRICER is not None and CUT_TAKE_CARD is not None and is_leader:
+        # **N-3（B4）**: 受けたとき手札に入るライフの札も守る側と同じ値段で（`λ − h·ḡ`＝`Θ·μ + h·(μ − ḡ)`）
+        take = take + H_LIFE_TO_HAND * (float(mu) - float(CUT_TAKE_CARD))
     best = min(guard, take)
     for pb, nub in (blockers or ()):
         best = min(best, block_cost(power, pb, nub, mu))
@@ -1337,7 +1353,8 @@ def option_value(power, opp_leader_power, r_turns, theta=THETA, mu=MU, my_leader
     # 同梱の分布で引くときだけ覚える（`boards` を明示した呼び出しは検算用＝毎回計算する）
     key = (int(round(float(power) / 100.0)), rb, int(round(olp / 100.0)), int(round(mlp / 100.0)),
            round(float(theta), 4), round(float(mu), 5), round(float(ko_p), 4), SURV_MODE) \
-        if (boards is None and CUT_PRICER is None) else None     # **N-3**: 守り手の値段の文脈の中では覚えない（値が守り手ごとに違う）
+        + (CUT_PRICER_KEY, CUT_TAKE_CARD) \
+        if (boards is None and _cut_cache_ok()) else None     # **N-3**: 値段の文脈は鍵に入れる（覚えられない窓では覚えない）
     if key is not None and key in _OPTION_CACHE:
         return _OPTION_CACHE[key]
     bs = (load_opp_boards() if boards is None else boards).get(rb) or []
@@ -1405,7 +1422,8 @@ def attack_stream(power, opp_leader_power, r_turns, theta=THETA, mu=MU, opp_char
     bodies = []
     for entry in opp_chars:
         tp, blk = (entry if isinstance(entry, (tuple, list)) else (entry, None))
-        bodies.append((float(tp), bool(blk), nu_of(tp, mlp, r_turns, theta, mu, ko_p=ko_p, is_blocker=blk)))
+        bodies.append((float(tp), bool(blk), _nu_of_other_side(tp, mlp, r_turns, theta, mu, ko_p=ko_p,
+                                                              is_blocker=blk)))   # **N-3**: 相手の体＝逆の席
     # **相手のブロッカー**（T47）——盤面の体のうちブロッカーは、リーダー狙いも他の体狙いも受けに来る
     blockers = [(tp, nu_t) for tp, blk, nu_t in bodies if blk]
     lead = attack_value_don(power, opp_leader_power, True, theta, mu, blockers=blockers)
@@ -1599,13 +1617,15 @@ def blockers_of(ctx):
 def _nu_of_other_side(*args, **kwargs):
     """**N-3**: 相手の体の `ν`（その体が**こちらを**殴る攻撃の値）は、守り手が逆の席なので**旧の値段で**読む
     （`CUT_PRICER` は「相手が守り手」の文脈の値段＝この体の攻撃には当たらない）。`None` のときは `nu_of` そのもの。"""
-    global CUT_PRICER
-    prev = CUT_PRICER
-    CUT_PRICER = None
+    global CUT_PRICER, CUT_PRICER_KEY, CUT_OTHER_SIDE, CUT_TAKE_CARD
+    prev = (CUT_PRICER, CUT_PRICER_KEY, CUT_TAKE_CARD)
+    CUT_PRICER, CUT_PRICER_KEY, CUT_TAKE_CARD = None, None, None
+    CUT_OTHER_SIDE += 1                  # `cut_price.active()` も `None` を返す（手札の項も旧の値段）
     try:
         return nu_of(*args, **kwargs)
     finally:
-        CUT_PRICER = prev
+        CUT_OTHER_SIDE -= 1
+        CUT_PRICER, CUT_PRICER_KEY, CUT_TAKE_CARD = prev
 
 
 def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, don_k=None):
