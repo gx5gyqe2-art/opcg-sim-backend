@@ -3,10 +3,12 @@
 **当てはめない・回帰しない**器なので、しきい値・傾き・交点・予測勝者の定義がそのまま出ること、
 残差が「実際に届いた側の τ 対 その側の残りターン」で作られること、単位の検算が比そのままであることを値で押さえる。
 """
+import math
 import os
 import sys
 
 import numpy as np
+
 import pytest
 
 pytestmark = pytest.mark.cpu_infra
@@ -559,6 +561,20 @@ def test_the_attackers_best_split_beats_all_attach_and_all_play():
         == pytest.approx(plan["tau"])
 
 
+def test_the_plan_is_compared_in_whole_turns_so_a_kill_now_beats_a_fractionally_earlier_crossing():
+    """**H-4e（E4 の見直し）**: 時刻は**整数のターン**。財布 3・残ったドンで引く札の効果が 1 枚あたり 0.01 を足す。
+    リーダーに 2 枚だけ付けると守る側は札 2 枚で生き延び（耐久を使い切る）、残ったドン 1 枚の分だけ歩きの端数は
+    1 より小さい。体を出してリーダーに 2 枚ならこのターンに倒す（端数 1.0）。端数で比べると前者が「早い」が、
+    勝負が付くのは後者——整数のターンで比べ、同じターンなら倒す方を選ぶ。"""
+    cards = [(2000.0, 0.0), (2000.0, 0.0)]
+    ax = _actx(3, [(0, 0.0)], [(0, 0.0)], [(1, {"atk": 0.0, "eff": 0.0}, 0.0, True)], e_tab=[0.0, 0.01, 0.02, 0.03])
+    lone = CB.rule_guard_plan_ex(cards, 0.0, [2000.0], [2000.0], [], 0, None)
+    tau_lone = CB.walk_crossing(lone["harms"], lone["theta"], ax, 2, 0.0, 0.0, 0.0)
+    _c, _s, plan = CB.rule_don_solve(cards, 0.0, [], 0, ax, None)
+    assert lone["alive"] >= 1.0 and tau_lone < plan["tau"] <= 1.0          # 端数では倒さない方が「早い」
+    assert plan["play"] == (0,) and plan["k"] == (2,) and plan["alive"] == 0.0
+
+
 def test_a_life_card_taken_this_turn_can_counter_a_later_attack():
     """**H-4e（E1）**: 命中で取られたライフの札は**すぐに手札に入り、同じターンの後の攻撃にカウンターとして切れる**。
     守る側は手札なし・ライフ 1・攻撃 2 本（超過 0）。ライフの札が必ず 1000 のカウンターなら、1 本目を受けて手に入れた
@@ -637,7 +653,7 @@ def test_the_plan_is_chosen_by_the_walks_crossing_time_and_the_truncation_is_exa
         ax = _actx(budget, att1, later, cand, kmax=kmax, a_tab=a_tab, board=round(rng.random() * 0.05, 4))
         ax["key"] = ax["key"] + (it,)
         _cut, _st, plan = CB.rule_don_solve(cards, don, blk, life, ax, None, lt)
-        got = (round(plan["tau"], 9), round(plan["alive"], 9), -round(plan["value"], 12), plan["paid"])
+        got = (math.ceil(round(plan["tau"], 9) - 1e-9), round(plan["alive"], 9), -round(plan["value"], 12), plan["paid"])
         prices = CB._prices_of(ax)
         best = None
         for mask in range(1 << len(cand)):
@@ -664,7 +680,7 @@ def test_the_plan_is_chosen_by_the_walks_crossing_time_and_the_truncation_is_exa
                 incr = (r["harms"][0] if r["harms"] else 0.0) - (h0[0] if h0 else 0.0)
                 val = atk + incr + ax["flow"][budget - paid]
                 tau = CB.walk_crossing(r["harms"], r["theta"], ax, paid, atk, rush, 0.0)
-                key = (round(tau, 9), round(float(r["alive"]), 9), -round(val, 12), float(paid))
+                key = (math.ceil(round(tau, 9) - 1e-9), round(float(r["alive"]), 9), -round(val, 12), float(paid))
                 if best is None or key < best:
                     best = key
         assert got == best, (it, got, best)

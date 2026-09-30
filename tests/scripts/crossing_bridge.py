@@ -939,8 +939,9 @@ def _rule_hand_term(sc, tok, side, g_hand, mu=MU, turns=None, count=True):
 #    * 引いた 1 枚の速さ（`deck_refill.a_of`）は財布を 1 つにする形では**素殴り**（H-4e・E6）——既定の
 #      `attack_value_don` は付与のドンを財布の外で無料で付けている（T109 の漏れ・既定は変えない）。
 # 5. **攻め手の目的（第一原理・H-4e の E4）**: 攻め手の本当の目的は競争に勝つこと＝**歩きが耐久に届く時刻の最小**
-#    （`walk_crossing`・計画の道筋の損害 ＋ 道筋の先の素の速さ ＋ DP の外の項）。同じ時刻なら (2) **守る側がこのターンを
-#    生き延びる確率の最小**（耐久を使い切った段と実際に倒した段は歩きの上で同じ時刻＝倒した方が本当は早い）、
+#    （`walk_crossing`・計画の道筋の損害 ＋ 道筋の先の素の速さ ＋ DP の外の項）を**整数のターンで**（端数は切り上げ・
+#    規則の上の時刻はターン。端数で比べると倒さずに耐久を使い切る計画がこのターンに倒す計画より早く見える）。
+#    同じターンなら (2) **守る側がこのターンを生き延びる確率の最小**（倒した方が本当は早い）、
 #    (3) **速さの側の値打ちの最大**（出す札の `atk ＋ eff` ＋ 付与の 1 段目の厳密な増分 ＋ 残ったドンで引いた 1 枚が
 #    出す分）、(4) **使うドンが少ない方**。H-4d の「このターンに倒せればそれ・それ以外は値打ち」は、2 ターン目以降の
 #    倒し方を値打ち（1 段目だけ）で選んでいた＝時刻で選ぶ形に置き換えた。
@@ -1493,10 +1494,9 @@ def rule_don_solve(cards_d, don_d, blk, life, actx, turns=None, life_types=()):
     attach_lead, paid}` ＋ `play`・`k`・`xs_first`／`xs_later`・`harm_steps`（道筋の段ごとの損害・E3）・`theta`・`tau`
     （歩きの交わる時刻・E4）・`value`（速さの値打ち）。`attach`＝**道筋の 1 段あたりの平均の損害 − 盤面の素殴り**
     （1 本の速さしか読まない器〔線形の橋・帳簿〕が読む・E5）。
-    攻め手の目的は (**歩きが耐久に届く時刻** 最小, 守る側がこのターンを生き延びる確率 最小, 速さの値打ち 最大,
-    使うドン 最小)（E4）。2 番目は時刻の細分: 歩きは耐久をちょうど使い切った段と、そこで実際に倒した段を同じ時刻に
-    読む（ライフ 0 のとどめの値段は残りの耐久＝0・E2）。実際に倒せば競争はそこで終わり、生き延びれば倒れるのは
-    次の段なので、同じ時刻なら倒す側が早い。"""
+    攻め手の目的は (**歩きが耐久に届くターン**〔整数・端数は切り上げ〕 最小, 守る側がこのターンを生き延びる確率 最小,
+    速さの値打ち 最大, 使うドン 最小)（E4）。時刻は整数のターン——規則の上で勝負が付くのはターン単位で、歩きの端数は
+    読み方にすぎない。2 番目はその細分: 同じターンに届くなら、実際に倒す計画が早い（倒さなければ倒れるのは次のターン）。"""
     key = (tuple(sorted((float(c), float(d)) for c, d in cards_d or ())), float(don_d),
            tuple(sorted(float(m) for m in blk or ())), int(max(0, round(float(life)))),
            None if turns is None else int(turns), tuple(life_types or ()), actx["key"])
@@ -1556,7 +1556,11 @@ def rule_don_solve(cards_d, don_d, blk, life, actx, turns=None, life_types=()):
                 incr = (h[0] if h else 0.0) - h1_bare
                 val = p_parts["atk"] + p_parts["eff"] + incr + float(flow[max(0, budget - paid)])
                 tau = walk_crossing(h, res["theta"], actx, paid, p_parts["atk"], p_parts["rush"], eff_now)
-                score = (round(tau, 9), round(float(res["alive"]), 9), -round(val, 12), paid)
+                # **時刻は何ターン目か（整数）**——歩きの端数（ターンの中の何割で耐久を使い切るか）は規則の上の時刻ではない。
+                # 端数で比べると、倒さずに耐久を使い切る計画（残ったドンで引く札の分だけ端数が小さい）が、このターンに
+                # 実際に倒す計画より「早い」ことになる（実測: 実戦の倒れたターンで 58/300 が「生き延びる」と読まれた・
+                # 整数ターンでは 30/300・倒せる計画が 1 つでもあれば選ぶ形で 27/300）。
+                score = (int(math.ceil(round(tau, 9) - 1e-9)), round(float(res["alive"]), 9), -round(val, 12), paid)
                 if best is None or score < best[0]:
                     best = (score, res, {"atk": p_parts["atk"], "rush": p_parts["rush"], "eff": p_parts["eff"],
                                          "incr": incr, "paid": float(paid), "play": tuple(play),
