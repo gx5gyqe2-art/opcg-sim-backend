@@ -53,7 +53,7 @@ from opcg_sim.learned import n_rel_feat as NF  # noqa: E402
 from opcg_sim.loop import decks as D  # noqa: E402
 import theory_order as TO  # noqa: E402
 from price_realised import nu_meas_of  # noqa: E402
-from theory_order import MU, THETA, attack_value_don  # noqa: E402
+from theory_order import MU, THETA, attack_value, attack_value_don  # noqa: E402
 
 _DB = {}
 _SHARE = {}          # (leader_id, tuple(deck_ids)) は重いので id 列の署名でキャッシュ
@@ -131,7 +131,7 @@ def body_of(m):
     return float(getattr(m, "power", 0) or 0) > 0.0
 
 
-def a_of(deck_ids, opp_leader_power, don=None, theta=THETA, mu=MU, rush_only=False):
+def a_of(deck_ids, opp_leader_power, don=None, theta=THETA, mu=MU, rush_only=False, with_don=True):
     """**流入する速さ `a`**（T93）＝**引いた 1 枚がもたらす攻撃の価格の期待値**（デッキ平均）。
 
     ```
@@ -147,7 +147,7 @@ def a_of(deck_ids, opp_leader_power, don=None, theta=THETA, mu=MU, rush_only=Fal
     """
     olp = float(opp_leader_power)
     cap = None if don is None else int(round(float(don)))
-    key = (tuple(deck_ids), round(olp, 1), cap, bool(rush_only))
+    key = (tuple(deck_ids), round(olp, 1), cap, bool(rush_only)) + (() if with_don else ("bare",))
     if key in _FLOW:
         return _FLOW[key]
     d = db()
@@ -165,7 +165,10 @@ def a_of(deck_ids, opp_leader_power, don=None, theta=THETA, mu=MU, rush_only=Fal
         # **T103**: `rush_only` なら**速攻の札だけ**（引いたターンからもう殴れる＝1 ターン早い）。
         if rush_only and "速攻" not in (getattr(m, "keywords", ()) or ()):
             continue
-        tot += float(attack_value_don(float(getattr(m, "power", 0) or 0), olp, True, theta, mu))
+        # **H-4e（E6）**: `with_don=False` なら**素殴り**——`attack_value_don` は付与のドンを**財布の外で無料で**付けている
+        # （T109 の財布の漏れ）。財布を 1 つにする形（`rule_don` 系）はこちらを使う（付けるなら財布の中で払う）。
+        pw = float(getattr(m, "power", 0) or 0)
+        tot += float(attack_value_don(pw, olp, True, theta, mu) if with_don else attack_value(pw, olp, True, theta, mu))
     out = (tot / n) if n else 0.0
     _FLOW[key] = out
     return out

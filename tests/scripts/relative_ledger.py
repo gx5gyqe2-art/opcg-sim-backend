@@ -300,6 +300,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                 # （出した後＝相手のターンに持っている手札・使い残したドン）から読む。値は上書きで最後の行が残る。
                 # （**H-4d**: `shape_at` はこの枝の外＝既定の `--d-mode theory` でも埋まる。H-4 で誤ってこの枝に入っていた。）
                 g_last_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
+                if CB.THETA_HAND_MODE in CB.RULE_DON_MODES:
+                    # **H-4e（E1）**: 取られたライフの札の分布（その席のデッキ）
+                    g_last_at_turn[(w, t)] = CB.with_life_types(g_last_at_turn[(w, t)],
+                                                                KV._deck_of(seat_decks, seed_g, w))
         if CB.THETA_HAND_MODE in CB.RULE_DON_MODES:
             # **H-4b（T109）**: 攻め手の計画は**そのターンの最初の行**で、守る席の手札（相手の直近のターンの
             # 最後の行）に対して 1 回だけ選ぶ。**速さ（`rate_at_turn`）も耐久（下の `state_of_row`）も同じ計画を読む**。
@@ -310,7 +314,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                 g_def = g_last_at_turn[(1 - w, max(ts_o))]
                 dk = KV._deck_of(seat_decks, seed_g, w)
                 actx = CB.attacker_ctx(ex["sc"][i0], ex["tok"][i0], ex["ci"][i0], idx2cid, cards, theta, mu,
-                                       deck_ids=dk)
+                                       deck_ids=dk,
+                                       no_attack_now=(CB.RATE_T1_MODE == "on" and CB.own_turn_index(t) == 0))
                 plan = CB.rule_don_plan_for(ex["sc"][i0], ex["tok"][i0], g_def, actx)
                 if plan is None:
                     continue

@@ -849,7 +849,7 @@ def _g_of_row(sc, tok, ci_row, idx2cid, cards, cache, key):
     return cache[key]
 
 
-def _attacker_of(sc, tok, ci_row, idx2cid, cards, deck_ids=None):
+def _attacker_of(sc, tok, ci_row, idx2cid, cards, deck_ids=None, t=None):
     """**H-4b**: `THETA_HAND_MODE=rule_don` 系のときだけ攻め手（この行の席）の財布を読む（他のモードは None＝何も変えない）。
 
     **T109 について**: この器の時間は**損害の輪郭**（`tau_from_profile`＝記録の平均の損害の列）から出て、
@@ -859,17 +859,21 @@ def _attacker_of(sc, tok, ci_row, idx2cid, cards, deck_ids=None):
     import crossing_bridge as CB
     if CB.THETA_HAND_MODE not in CB.RULE_DON_MODES or _TO_W_MODE() != "curve":
         return None
-    return CB.attacker_ctx(sc, tok, ci_row, idx2cid, cards, deck_ids=deck_ids)
+    return CB.attacker_ctx(sc, tok, ci_row, idx2cid, cards, deck_ids=deck_ids,
+                           no_attack_now=(t is not None and CB.RATE_T1_MODE == "on" and CB.own_turn_index(t) == 0))
 
 
-def _g_opp_of(opp, last_main, ex, idx2cid, cards, cache, seat):
+def _g_opp_of(opp, last_main, ex, idx2cid, cards, cache, seat, deck=None):
     """**相手の手札 1 枚あたりの価格**（T79）。**H-4**: `THETA_HAND_MODE=rule` だけは守る席の**実際の札**を読むので、
     相手の**直近の自席ターンの最後の main 行**（出した後の手札・使い残したドン）から読む（鍵も別）。
     他のモードは従来どおり**最初の行**（`opp`）から（1 ビットも変えない）。"""
     import crossing_bridge as CB
     if CB.THETA_HAND_MODE in ("rule",) + CB.RULE_DON_MODES and (seat, opp["t"]) in last_main:
         i = last_main[(seat, opp["t"])]
-        return _g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards, cache, ("last", seat, opp["t"]))
+        g = _g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards, cache, ("last", seat, opp["t"]))
+        if CB.THETA_HAND_MODE in CB.RULE_DON_MODES:
+            g = CB.with_life_types(g, deck)                # **H-4e（E1）**: 取られたライフの札（その席のデッキ）
+        return g
     return _g_of_row(opp["sc"], opp["tok"], opp["ci"], idx2cid, cards, cache, (seat, opp["t"]))
 
 
@@ -1165,9 +1169,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 ck = _kappa_of_row(sc, tok, t, prof,
                                    g_me=_g_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t)),
                                    g_opp=(None if opp is None else
-                                          _g_opp_of(opp, last_main, ex, idx2cid, cards, g_cache, 1 - w)),
+                                          _g_opp_of(opp, last_main, ex, idx2cid, cards, g_cache, 1 - w,
+                                                    deck=(decks or {}).get(1 - w))),
                                    opp=opp, attacker=_attacker_of(sc, tok, ex["ci"][i], idx2cid, cards,
-                                                                  deck_ids=(decks or {}).get(w)))
+                                                                  deck_ids=(decks or {}).get(w), t=t))
                 kap = float(ck["kappa"])
                 stats["kappa_sum"] += kap; stats["kappa_n"] += 1
                 stats["d_bins"][_d_bin(ck["d"])] += 1
@@ -1318,10 +1323,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                           g_me=_g_of_row(sc, tok, ex["ci"][i], idx2cid, cards,
                                                          g_cache, (w, t)),
                                           g_opp=(None if opp_g is None else
-                                                 _g_opp_of(opp_g, last_main, ex, idx2cid, cards, g_cache, 1 - w)),
+                                                 _g_opp_of(opp_g, last_main, ex, idx2cid, cards, g_cache, 1 - w,
+                                                           deck=(decks or {}).get(1 - w))),
                                           opp=opp_g,
                                           attacker=_attacker_of(sc, tok, ex["ci"][i], idx2cid, cards,
-                                                                deck_ids=(decks or {}).get(w)))["kappa"])
+                                                                deck_ids=(decks or {}).get(w), t=t))["kappa"])
                 if LEDGER_HARM_MODE == "realised":
                     # **T87**: 移転は攻め手の行に 1 回だけ入っている＝守りの窓は帳簿に何も足さない（`s` 専任）
                     got = dict(got, g=0.0, g_delta=0.0)
