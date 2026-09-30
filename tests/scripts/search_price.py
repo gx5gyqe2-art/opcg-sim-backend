@@ -151,12 +151,12 @@ def enabler_target(cid, cards_json=None):
     return out
 
 
-def eligible_hand_cards(target, items, cards, skip_cid=None):
+def eligible_hand_cards(target, items, cards, skip_cid=None, st=None):
     """手札（`hand_items`）のうち絞り込みに合う札（`skip_cid` は 1 枚だけ除く＝出す札そのもの）。"""
     cids = [it["cid"] for it in items]
     if skip_cid and skip_cid in cids:
         cids.remove(skip_cid)
-    return eligible_deck_cards(target, cids, cards)
+    return eligible_deck_cards(target, cids, cards, st=st)
 
 
 def _card_body(cid, cards):
@@ -167,9 +167,13 @@ def _card_body(cid, cards):
             "counter": float(info.get("counter") or 0.0), "card_type": kind, **ident}
 
 
-def eligible_deck_cards(target, deck_cids, cards):
-    """絞り込みに合うデッキの札（card_id の並び・同じ札は枚数ぶん）。読めない絞り込みは無視（上限として読む）。"""
+def eligible_deck_cards(target, deck_cids, cards, st=None):
+    """絞り込みに合うデッキの札（card_id の並び・同じ札は枚数ぶん）。読めない絞り込みは無視（上限として読む）。
+
+    `st` を渡すと（`effect_value` の F の直し `state_filters` のときだけ呼び側が渡す）、動的なコスト上限
+    （「自分の場のドン!!の枚数以下のコスト」等・`effect_value.dynamic_cost_cap`）を状態から読んで絞る。"""
     t = target or {}
+    dyn_cap = EV.dynamic_cost_cap(t, st) if st is not None else None
     types = [str(x).upper() for x in (t.get("card_type") or [])]
     names = list(t.get("names") or [])
     name_or_type = "NAME_OR_TYPE" in [str(f) for f in (t.get("flags") or [])]
@@ -189,6 +193,8 @@ def eligible_deck_cards(target, deck_cids, cards):
         if not EV._matches_identity(rest, b):
             continue
         if t.get("cost_max") is not None and b["cost"] > float(t["cost_max"]):
+            continue
+        if dyn_cap is not None and b["cost"] > dyn_cap:
             continue
         if t.get("cost_min") is not None and b["cost"] < float(t["cost_min"]):
             continue

@@ -362,7 +362,25 @@ OPAQUE_TARGET_KEYS = ("flags", "exclude_ids", "is_vanilla", "is_unique_name",
                       "save_id")
 
 
-def eligible_bodies(target, bodies):
+#: **F fix A**: 攻撃の行の【アタック時】を値付けしている間だけ真（`opaque_as_upper`）——読めない絞り込み（「ドン!!が付与されている」等）を
+#: **上限として読む**（取れるとして、読める絞り込みだけで盤面から選ぶ）。偽（既定）なら従来どおり `None`＝盤面を使わない。
+#: 攻撃の対象を能力が取れるかを盤面で決めないと、対象が居なくても平均の体を取る値が付いて二重になる（レビュー A）。
+_OPAQUE_UPPER = [False]
+
+
+class opaque_as_upper:
+    """`with opaque_as_upper():` の間だけ読めない絞り込みを上限として読む（抜けるときに必ず戻す）。"""
+
+    def __enter__(self):
+        self._before = _OPAQUE_UPPER[0]
+        _OPAQUE_UPPER[0] = True
+
+    def __exit__(self, *_exc):
+        _OPAQUE_UPPER[0] = self._before
+        return False
+
+
+def eligible_bodies(target, bodies, st=None):
     """**その動作が実際に取れる相手の体**を価格の高い順で返す（読めなければ `None`）。
 
     ユーザ指摘 2026-09-15「**登場時効果は `ν` ではなくて効果に紐づく価値を変動させるべき**」
@@ -385,15 +403,23 @@ def eligible_bodies(target, bodies):
     t = target or {}
     for k in OPAQUE_TARGET_KEYS:
         v = t.get(k)
-        if v not in (None, [], (), "", False, 0):
+        if (v not in (None, [], (), "", False, 0) and not _OPAQUE_UPPER[0]
+                and not _readable_state_filter(k, t, bodies, st)):
             return None
     # **素性で絞る指定は、体の側にその素性が在るときだけ判定する**（2026-09-15）
-    for k, need in FILTER_NEEDS.items():
+    for k, need in list(FILTER_NEEDS.items()):
         v = t.get(k)
         if v in (None, [], (), "", False, 0):
             continue
         if any(need not in (b or {}) for b in bodies):
+            if _OPAQUE_UPPER[0]:
+                # **F fix A の残り**（レビュー 11）: 攻撃の行では素性の判らない体を「合う」として読む（上限）——
+                # `None` に落とすと平均の体の値に戻り、対象を取る二重計上が蘇る
+                t = {kk: vv for kk, vv in t.items() if kk != k}
+                continue
             return None
+    cap = dynamic_cost_cap(t, st) if _readable_state_filter("cost_max_dynamic", t, bodies, st) else None
+    min_att = t.get("min_attached_don") if _readable_state_filter("min_attached_don", t, bodies, st) else None
     out = []
     for b in bodies:
         pw = float(b.get("power") or 0.0)
@@ -409,6 +435,10 @@ def eligible_bodies(target, bodies):
             if cost is None or float(cost) < float(t["cost_min"]):
                 continue
         if t.get("is_rest") and not b.get("is_rest"):
+            continue
+        if cap is not None and (cost is None or float(cost) > cap):
+            continue
+        if min_att and float(b.get("attached_don") or 0.0) < float(min_att):
             continue
         if not _matches_identity(t, b):
             continue
@@ -445,14 +475,14 @@ def _matches_identity(t, b):
     return True
 
 
-def _pick_opp(target, opp_bodies, n):
+def _pick_opp(target, opp_bodies, n, st=None):
     """**相手の体に触る動作が実際に取る対象**（価格の高い順に `n` 体・読めなければ `None`）。
 
     **体を持たない対象（ステージ）には当てない**——`field_value` の規約と同じ。
     """
     if opp_bodies is None or not is_body(target):
         return None
-    got = eligible_bodies(target, opp_bodies)
+    got = eligible_bodies(target, opp_bodies, st)
     if got is None:
         return None
     return _take(got, n)
@@ -586,6 +616,10 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
     （ユーザ指摘 2026-09-15「**`ν` ではなくて効果に紐づく価値を変動させるべき**」）
     ——`ν` は動かさず、**効果の値が盤面で変わる**。**対象が居なければ 0**（空振り）。
     """
+    if effect.get("_pd") and (st or {}).get("pd_gain") is not None:
+        # **レビュー 4 の D2**: 攻撃の対象へのパワー低下を読み直す値付けで、印を付けた動作は「その攻撃の価格の増分」
+        # （`theory_order.attack_ability_value` が積む）——能力の条件・コスト・付けない自由の床はそのまま掛かる
+        return float(st["pd_gain"])
     at = str(effect.get("type") or "")
     target = effect.get("target") or {}
     side = _side(target)
@@ -603,6 +637,11 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         return 0.0
     if fam in ("board", "unknown", "absent"):
         return None
+    # **F-2**: 攻撃の行（`st["attack_ctx"]` が在るときだけ＝`theory_order.ATTACK_ABILITY_MODE=on`）では、
+    # 攻め手**自身**へのパワー上昇・ダブルアタック・バニッシュを「**今のこの攻撃**の価格の差」で読む。
+    got = attack_self_value(effect, at, st, opp, theta, mu, lam)
+    if got is not None:
+        return got
     if fam == "identity":
         v = IDENTITY[at]
         return v if not opp else -v
@@ -616,7 +655,7 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
                 n = min(m, ZONE_CAPACITY["DON"])      # L(d): 「ドン!!N枚(まで)をレストにする」の N も値の欄に入る
         if stock == "nu" and opp and not gain:
             # **相手の体を止めるなら、止められる体の価格で値付けする**
-            picked = _pick_opp(target, opp_bodies, n)
+            picked = _pick_opp(target, opp_bodies, n, st)
             if picked is not None:
                 amt = sum(picked) * turns / R_TURNS
                 return amt if opp else -amt
@@ -675,7 +714,7 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         fv = field_value(target, nu)      # ステージは `ν` ではなく「能力 1 つ」
         if opp and "FIELD" in zs and len(zs) == 1:
             # **相手の場から動かすなら、動かせる体の価格で値付けする**
-            picked = _pick_opp(target, opp_bodies, n)
+            picked = _pick_opp(target, opp_bodies, n, st)
             if picked is not None:
                 dst = {"FIELD": None, "HAND": mu, "LIFE": lam}.get(dest, 0.0)
                 if dst is not None:
@@ -694,11 +733,11 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
     if kind is None:
         return None
     if kind == "nu_loss":
-        picked = _pick_opp(target, opp_bodies, n) if opp else None
+        picked = _pick_opp(target, opp_bodies, n, st) if opp else None
         amt = sum(picked) if picked is not None else n * field_value(target, nu)
         return amt if opp else -amt
     if kind == "bounce":
-        picked = _pick_opp(target, opp_bodies, n) if opp else None
+        picked = _pick_opp(target, opp_bodies, n, st) if opp else None
         if picked is not None:
             amt = sum(v - mu for v in picked)     # 場から消えるが手札が 1 枚増える
         else:
@@ -708,10 +747,14 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         zone = zones[0] if zones else ""
         fv = field_value(target, nu)
         if zone in PLAY_FROM_HAND_ZONES and not opp:
-            now = _play_from_hand_now(target, st, card, n, mu)          # T70: 今の手札に出せる札が在るか
+            now = _play_from_hand_now(target, st, card, n, mu, opp_bodies)   # T70: 今の手札に出せる札が在るか
             if now is not None:
                 return now
         per = fv - mu if zone in PLAY_FROM_HAND_ZONES else fv
+        if _ffix("trash_pool") and zone == "TRASH" and not opp:
+            pr = trash_has_match(target, st)
+            if pr is not None:
+                per *= pr                         # **D5**: トラッシュに合う札が在る確率（デッキの構成から）
         amt = n * per
         return amt if not opp else -amt
     if kind == "hand_gain":
@@ -787,6 +830,21 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         # 相手の体（「パワー 0 にする」）は今のパワーが判らないので従来どおり（上限で打ち切られる）。
         if _is_set_power(effect) and not opp and card is not None and card.get("power") is not None:
             mag = mag - float(card.get("power") or 0.0)
+        if (_OPAQUE_UPPER[0] and opp and mag < 0 and opp_bodies is not None and (st or {}).get("attack_ctx")
+                and str(effect.get("status") or "") != "COST_REDUCTION"):
+            # **レビュー 4 の D6**: 攻撃の行の「相手のキャラ 1 枚まで −N」（攻撃の対象以外に使う読み）は、**このターンの
+            # 残りの攻撃手がその体を殴る価格の増分**の最良（取れる体 × 残りの攻撃手）。殴れる手が無ければ 0。
+            got = debuff_follow_up_value(target, -mag, opp_bodies, st)
+            if got is not None:
+                return got
+        if (_ffix("hand_board") or _OPAQUE_UPPER[0]) and opp and mag < 0 and opp_bodies is not None:
+            # 攻撃の行（上限読みの間）も同じ——対象以外に取れる体が居ないのに汎用の値を付けると、攻撃の対象に使う読みと二重になる
+            # **hand_board**: 相手の体のパワーを下げる動作も、盤面で取れる体の数で打ち切る（居なければ 0）
+            picked = _pick_opp(target, opp_bodies, n, st)
+            if picked is not None:
+                # 「相手のリーダーかキャラ 1 枚まで」はリーダーも取れる（レビュー 3・OP05-005 が盤面空で 0 になっていた）
+                leader_ok = "LEADER" in [str(x).upper() for x in (target.get("card_type") or [])]
+                n = min(float(n), float(len(picked)) + (1.0 if leader_ok else 0.0))
         # **自分の体のパワー上昇は `ν` への変換**（T55・ユーザ決定）＝その体の攻撃の価格の差 × 効く攻撃の回数。
         # 盤面が無ければ従来のドン換算（上限つき）。相手の体を下げる側は従来のまま（今のパワーが判らない）。
         if not opp and mag > 0:
@@ -800,6 +858,37 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         good = up if not opp else not up
         return amt if good else -amt
     return None
+
+
+def debuff_follow_up_value(target, dmag, opp_bodies, st):
+    """**D6**: 攻撃の行で相手の体のパワーを `dmag` 下げる価値＝取れる体 b（絞り込み・盤面）と、今の攻撃手を除く
+    このターンの攻撃手 a（`st["attackers"]` の `x = パワー − 相手リーダー`）の組で
+    `max_{a,b} [attack_value(a, P_b − dmag, ν_b) − attack_value(a, P_b, ν_b)]`（0 に床）。**新定数ゼロ**（攻撃の価格そのもの）。"""
+    actx = (st or {}).get("attack_ctx") or {}
+    xs = list((st or {}).get("attackers") or [])
+    olp = (st or {}).get("opp_leader_power")
+    if olp is None:
+        return None
+    sx = actx.get("src_x")
+    if sx is not None:
+        for i, x in enumerate(xs):
+            if abs(float(x) - float(sx)) <= 10.0:
+                xs.pop(i)                          # 今殴っている体はもう殴れない
+                break
+    if _pick_opp(target, opp_bodies, 1, st) is None:
+        return None
+    from theory_order import attack_value
+    th, m = float(actx.get("theta") or THETA), float(actx.get("mu") or MU)
+    best = 0.0
+    for b in opp_bodies:
+        if not _pick_opp(target, [b], 1, st):
+            continue
+        pb, nb = float(b.get("power") or 0.0), float(b.get("nu") or 0.0)
+        for x in xs:
+            a = float(x) + float(olp)
+            gain = attack_value(a, max(0.0, pb - dmag), False, th, m, nu_target=nb) - attack_value(a, pb, False, th, m, nu_target=nb)
+            best = max(best, float(gain))
+    return float(best)
 
 
 def _is_set_power(effect):
@@ -867,9 +956,26 @@ def set_pricing_fixes(spec):
     if bad:
         raise ValueError("知らない直し: %s" % bad)
     if new != PRICING_FIX:
-        _CACHE.pop("sel", None)
-    PRICING_FIX = new
+        _stash_sel()
+        PRICING_FIX = new
+        _restore_sel()
     return tuple(x for x in PRICING_FIXES if x in PRICING_FIX)
+
+
+def _sel_key():
+    return ("sel", PRICING_FIX, globals().get("F_PRICING_FIX", frozenset()))
+
+
+def _stash_sel():
+    """選択の分布の覚えを、今の直しの集合の鍵で退避する（集合を替えるたびに作り直すと遅い・値は同じ）。"""
+    if "sel" in _CACHE:
+        _CACHE[_sel_key()] = _CACHE.pop("sel")
+
+
+def _restore_sel():
+    v = _CACHE.get(_sel_key())
+    if v is not None:
+        _CACHE["sel"] = v
 
 
 class pricing_fixes:
@@ -898,6 +1004,102 @@ def apply_pricing_fixes(a):
     if getattr(a, "pricing_fixes", None) is not None:
         set_pricing_fixes(a.pricing_fixes)
     return ",".join(x for x in PRICING_FIXES if x in PRICING_FIX) or "legacy"
+
+
+#: **F の値付けの直し**（2026-09-26・F-4 の独立レビュー 2 回目）。**既定は空＝従来と 1 ビットも変わらない**
+#: （L と同じ「名前つきの直し」の形・`--f-pricing-fixes all` で全部入り）。既定の値付けの道（登場時・起動メイン・
+#: 【アタック時】の中身）に効く直しだけをここに置く（切替の中だけで効く直しは切替そのものに入れた）。
+#:
+#: | 名前 | 誤り（直す前） | 直した読み |
+#: |---|---|---|
+#: | `hand_board` | 「手札から登場させる」の相方の登場時効果を盤面なしで値付けした（相手の体を全部取る扱い・OP15-114 が 0.82）・相手の体のパワー低下を盤面を見ずに 5 体ぶん数えた | 相方の登場時効果も今の盤面（取れる相手の体・状態）で読む・パワー低下は取れる体の数で打ち切る |
+#: | `state_filters` | 「自分の場のドン!!の枚数以下のコスト」等の動的なコスト上限・「ドン!!が付与されている」を読まなかった | 状態から読めれば絞り込みに使う（手札の相方・相手の体とも） |
+#: | `branch_then` | 「〜した場合、…」の枝（`Branch`）の中の動作を一度も数えなかった（「ライフの上から 1 枚を手札に」−0.081 が抜けた） | 条件を状態から判定して、起きる側の枝の動作を数える。「登場させた場合」は「そうした場合」と同じ塊として読む |
+#: | `trash_pool` | 「トラッシュから登場させる」を、合う札がトラッシュに在るかを見ずに満額で数えた（EB03-045） | 見えていない自分の札の池からトラッシュの枚数ぶん取った超幾何の確率で重み付け |
+#: | `look_return` | 「ライフの上から 1 枚を見て、ライフの上か下に置く」の戻しを、見た札（`TEMP`）がライフに**増える**（+λ）と数えた（OP03-099 が 0.136 高い） | ライフ・デッキを見た札がそこへ戻るのは並べ替え（0） |
+#:
+#: **レビュー 3 で `ko_effect_share` を外した**（効果で離れる割合の表は評価に使う局と同じ局＝w41／w39／w42 で測られていて、
+#: 実と合成を混ぜていた。別の記録で測り直すまで使わない・効果は測れるほど無かった）。
+#: | `attached_don_cond` | 条件「付与されているドン!!が N 枚以上」を場のドンの総数で判定した（エンジンは本文の「付与」で付与中だけを数える） | 付与中のドンの枚数で判定（読めなければ判らない） |
+F_PRICING_FIXES = ("hand_board", "state_filters", "branch_then", "attached_don_cond", "look_return", "trash_pool")
+F_PRICING_FIX = frozenset()
+
+
+def _ffix(name):
+    return name in F_PRICING_FIX
+
+
+def set_f_pricing_fixes(spec):
+    """F の直しの集合を替える（`all`／`none`／名前のカンマ区切り、または集合）。選択の分布の覚えを捨てる。"""
+    global F_PRICING_FIX
+    if isinstance(spec, str):
+        sp = spec.strip()
+        new = (frozenset(F_PRICING_FIXES) if sp == "all" else frozenset() if sp in ("none", "legacy", "")
+               else frozenset(x.strip() for x in sp.split(",") if x.strip()))
+    else:
+        new = frozenset(spec)
+    bad = [x for x in new if x not in F_PRICING_FIXES]
+    if bad:
+        raise ValueError("f pricing fixes は all／none／%s のカンマ区切り: %s" % (F_PRICING_FIXES, bad))
+    if new != F_PRICING_FIX:
+        _stash_sel()
+        F_PRICING_FIX = new
+        _restore_sel()
+    return tuple(x for x in F_PRICING_FIXES if x in F_PRICING_FIX)
+
+
+class f_pricing_fixes:
+    """`with f_pricing_fixes("all"):` の間だけ F の直しを替え、抜けるときに必ず戻す。"""
+
+    def __init__(self, spec):
+        self.spec = spec
+
+    def __enter__(self):
+        self._before = F_PRICING_FIX
+        return set_f_pricing_fixes(self.spec)
+
+    def __exit__(self, *_exc):
+        set_f_pricing_fixes(self._before)
+        return False
+
+
+def add_f_pricing_fixes_arg(ap):
+    ap.add_argument("--f-pricing-fixes", default=None,
+                    help="**F** 値付けの直し: `none`（既定・従来）／`all`／%s のカンマ区切り" % ",".join(F_PRICING_FIXES))
+
+
+def apply_f_pricing_fixes(a):
+    if getattr(a, "f_pricing_fixes", None) is not None:
+        set_f_pricing_fixes(a.f_pricing_fixes)
+    return ",".join(x for x in F_PRICING_FIXES if x in F_PRICING_FIX) or "none"
+
+
+#: 動的なコスト上限 → 状態の鍵（`rust/.../effects/matcher.rs` の `cost_max_dynamic` と同じ対応）
+_DYN_CAP_KEYS = {"DON_COUNT_FIELD": ("my_don_total",), "DON_COUNT_FIELD_OPPONENT": ("opp_don_total",),
+                 "LIFE_COUNT_OPPONENT": ("opp_life",), "LIFE_COUNT_SELF": ("my_life",),
+                 "LIFE_COUNT_BOTH": ("my_life", "opp_life")}
+
+
+def dynamic_cost_cap(target, st):
+    """「自分の場のドン!!の枚数以下のコスト」等の動的な上限を状態から（読めなければ `None`）。"""
+    keys = _DYN_CAP_KEYS.get(str((target or {}).get("cost_max_dynamic") or ""))
+    if not keys or not st:
+        return None
+    vals = [st.get(k) for k in keys]
+    if any(v is None for v in vals):
+        return None
+    return float(sum(int(round(float(v))) for v in vals))
+
+
+def _readable_state_filter(key, t, bodies, st):
+    """読めない絞り込みの鍵のうち、状態・盤面から読めるもの（`state_filters` か攻撃の行の上限読み）。"""
+    if not (_ffix("state_filters") or _OPAQUE_UPPER[0]):
+        return False
+    if key == "cost_max_dynamic":
+        return dynamic_cost_cap(t, st) is not None
+    if key == "min_attached_don":
+        return all("attached_don" in (b or {}) for b in (bodies or ()))
+    return False
 
 
 _LEAD_DURATION = re.compile(r"^(次の(相手|自分)の(ターン終了時|エンドフェイズ終了時|ターン開始時)まで|このターン中)、")
@@ -1139,6 +1341,197 @@ def _unpriced_family(e):
     return family_of(at)
 
 
+def _own_pool(st):
+    """見えていない自分の札の池＝デッキの構成 − 手札 − 場（`search_price.remaining_deck`・完全情報の前提）と `cards`。"""
+    ctx = (st or {}).get("search_ctx") or {}
+    deck, cards = ctx.get("deck"), ctx.get("cards") or (st or {}).get("cards")
+    if not deck:
+        return None, cards
+    import search_price as SP
+    hand = [it.get("cid") if isinstance(it, dict) else it for it in (ctx.get("hand_items") or [])]
+    return SP.remaining_deck(deck, [h for h in hand if h], ctx.get("field") or ()), cards
+
+
+def trash_has_match(target, st):
+    """**D5（trash_pool）**: トラッシュに絞り込みに合う札が 1 枚以上在る確率。トラッシュの中身は記録に無いので、
+    見えていない自分の札の池（N 枚・合う札 K 枚）から今のトラッシュの枚数 T 枚を取った超幾何の `1 − C(N−K, T)/C(N, T)`。
+    読めなければ `None`。**新定数ゼロ**（デッキの構成と枚数だけ）。"""
+    pool, cards = _own_pool(st)
+    t = (st or {}).get("my_trash")
+    if not pool or cards is None or t is None:
+        return None
+    import search_price as SP
+    from math import comb
+    n_ = len(pool)
+    k_ = len(SP.eligible_deck_cards(target, pool, cards, st=st))
+    t_ = int(min(max(0, int(t)), n_))
+    if t_ == 0 or k_ == 0:
+        return 0.0
+    return 1.0 - comb(n_ - k_, t_) / comb(n_, t_)
+
+
+def _deck_of_state(st):
+    """完全情報の前提で読める自分のデッキ（`search_ctx["deck"]`・記録の seed から復元した構成）。無ければ `None`。"""
+    ctx = (st or {}).get("search_ctx") or {}
+    deck = ctx.get("deck")
+    return (list(deck), ctx.get("cards")) if deck else (None, None)
+
+
+def _revealed_matches(cid, want, cards):
+    """公開した札 `cid` が `REVEALED_CARD_TRAIT` の値（特徴・コスト・パワー・名前・種別）に合うか（`effects/cond.rs` の写し）。"""
+    info = (cards.info(cid) if cards is not None else None) or {}
+    try:
+        from theory_order import card_identity
+        ident = card_identity(cid) or {}
+    except Exception:
+        ident = {}
+    trait = want.get("trait")
+    if trait:
+        traits = [str(t) for t in (ident.get("traits") or [])]
+        ok = any(str(trait) in t for t in traits) if want.get("trait_contains") else (str(trait) in traits)
+        if not ok:
+            return False
+    ops = {"LE": lambda a, b: a <= b, "GE": lambda a, b: a >= b, "EQ": lambda a, b: a == b,
+           "LT": lambda a, b: a < b, "GT": lambda a, b: a > b}
+    if want.get("cost") is not None:
+        if not ops.get(str(want.get("cost_op") or "LE"), ops["LE"])(float(info.get("cost") or 0), float(want["cost"])):
+            return False
+    if want.get("power") is not None:
+        if not ops.get(str(want.get("power_op") or "GE"), ops["GE"])(float(info.get("power") or 0), float(want["power"])):
+            return False
+    if want.get("name"):
+        names = [str(x) for x in (ident.get("names") or [])]
+        if not any(str(want["name"]) == n or str(want["name"]) in n for n in names):
+            return False
+    ctype = {"キャラ": "char", "イベント": "event", "ステージ": "stage"}.get(str(want.get("card_type") or ""))
+    if ctype == "char" and (info.get("event") or info.get("stage") or info.get("leader")):
+        return False
+    if ctype == "event" and not info.get("event"):
+        return False
+    if ctype == "stage" and not info.get("stage"):
+        return False
+    return True
+
+
+def _reveal_pool(reveal, st):
+    """公開・宣言した札の池（**D3**）: 相手の手札（`REVEAL` 相手の手札）・相手の残りの山（「相手のデッキ」）・自分の残りの山。"""
+    t = (reveal or {}).get("target") or {}
+    raw = str((reveal or {}).get("raw_text") or "")
+    cards = ((st or {}).get("search_ctx") or {}).get("cards") or (st or {}).get("cards")
+    opp = _side(t) == "OPPONENT" or "相手の" in raw
+    zone = _zone(t)
+    if opp and ("HAND" in zone or "手札" in raw):
+        return (st or {}).get("opp_hand_ids"), cards
+    if opp:
+        return (st or {}).get("opp_deck_remaining"), cards
+    return _own_pool(st)
+
+
+def _reveal_before(root, branch):
+    """`branch` の直前（同じ並びの前の要素）で札を見せる動作（`LOOK`・`REVEAL`・`DECLARE_COST`・`LOOK_LIFE`）。"""
+    found = []
+
+    def rec(o):
+        if found:
+            return
+        if isinstance(o, list):
+            for i, y in enumerate(o):
+                if y is branch:
+                    for prev in reversed(o[:i]):
+                        for a in reversed(walk_actions(prev)):
+                            if str(a.get("type") or "") in ("LOOK", "REVEAL", "DECLARE_COST", "LOOK_LIFE"):
+                                found.append(a)
+                                return
+                    found.append(None)
+                    return
+            for y in o:
+                rec(y)
+        elif isinstance(o, dict):
+            for v in o.values():
+                rec(v)
+
+    rec(root)
+    return found[0] if found else None
+
+
+def branch_probability(cond, st, reveal=None):
+    """**branch_then**（レビュー 3）: 公開した札で決まる条件が成り立つ確率＝**デッキの構成の中で合う札の割合**
+    （完全情報の前提・記録の seed から復元したデッキ）。`DECLARED_COST_MATCH` は宣言する側が最も多いコストを選ぶ＝
+    その割合。デッキが読めなければ `None`（呼び側は上限＝成り立つ側で読む）。**新定数ゼロ**。"""
+    if reveal is not None or (st or {}).get("_pool_mode") == "reveal":
+        deck, cards = _reveal_pool(reveal, st)                # D3: 見せた札の池（その時点の残り・相手の山／手札）
+    else:
+        deck, cards = _deck_of_state(st)
+    if not deck:
+        return None
+    kind = cond.get("type")
+    if kind == "REVEALED_CARD_TRAIT":
+        want = cond.get("value")
+        if not isinstance(want, dict):
+            return 1.0
+        return float(sum(1 for c in deck if _revealed_matches(c, want, cards))) / float(len(deck))
+    if kind == "DECLARED_COST_MATCH":
+        from collections import Counter as _C
+        costs = _C(int(float((cards.info(c) or {}).get("cost") or 0)) for c in deck) if cards is not None else None
+        if not costs:
+            return None
+        return float(max(costs.values())) / float(len(deck))
+    return None
+
+
+def branch_sides(branch, st, root=None):
+    """`Branch` の起きる側と重み `[(鍵, 重み), …]`（`branch_actions` と `_tree_total` が共有する）。"""
+    c = branch.get("condition") or {}
+    if c.get("type") == "PREV_ACTION":
+        return [("if_false" if str(c.get("value")) == "SKIPPED" else "if_true", 1.0)]
+    if c.get("type") in ("REVEALED_CARD_TRAIT", "DECLARED_COST_MATCH"):
+        rv = _reveal_before(root, branch) if root is not None else None
+        p = branch_probability(c, st, reveal=rv if rv is not None else {})
+        if p is not None:
+            return [("if_true", p), ("if_false", 1.0 - p)]
+    try:
+        import condition_value as CV
+        got = CV.holds(c, st)
+    except Exception:
+        got = None
+    return [("if_false" if got is False else "if_true", 1.0)]
+
+
+def branch_actions(effect, st=None, consumed=()):
+    """**branch_then**: 効果木の `Branch` の動作と**起きる重み**の並び `[(動作, 重み), …]`（入れ子も辿る・
+    `consumed` の動作を含む枝は除く）。
+
+    起きる側: 「そうしなかった場合」（`SKIPPED`）は前の動作が起きた読みで `if_false`・他の「〜した場合」は `if_true`・
+    状態の条件は `condition_value.holds`（偽なら `if_false`）。**公開した札で決まる条件**（`REVEALED_CARD_TRAIT`・
+    `DECLARED_COST_MATCH`）は**デッキの構成から出した確率 p** で両側を重み付けする（`if_true` を p・`if_false` を 1 − p）。
+    それ以外の判らない条件とデッキが読めない場合は `if_true` を満額（上限の規約）。"""
+    out = []
+
+    def add(node, w):
+        acts = walk_actions(node) if node else []
+        if not any(id(a) in consumed for a in acts):
+            out.extend((a, w) for a in acts)
+
+    def rec(o, w=1.0):
+        if isinstance(o, dict):
+            if o.get("node") == "Branch":
+                sides = branch_sides(o, st, effect)
+                for key, sw in sides:
+                    if sw <= 0.0:
+                        continue
+                    add(o.get(key), w * sw)
+                    rec(o.get(key), w * sw)
+                return
+            for v in o.values():
+                rec(v, w)
+        elif isinstance(o, list):
+            for v in o:
+                rec(v, w)
+
+    rec(effect)
+    return out
+
+
 def _prev_branch(x):
     """「そうした場合、…」＝直前の動作が行われたときだけ解決する枝か。"""
     if not isinstance(x, dict) or x.get("node") != "Branch":
@@ -1155,7 +1548,7 @@ def _prev_branch_parts(x):
     if c.get("type") != "PREV_ACTION":
         return None
     yes, no = walk_actions(x.get("if_true")), walk_actions(x.get("if_false"))
-    if str(c.get("value")) == "SUCCEEDED":
+    if str(c.get("value")) == "SUCCEEDED" or (_ffix("branch_then") and str(c.get("value")) == "PLAYED_CARD"):
         return yes, no
     if str(c.get("value")) == "SKIPPED":
         return no, yes
@@ -1376,29 +1769,66 @@ def choice_inherits(effect, qual):
     return out
 
 
-def _tree_total(node, vals, qual):
-    """効果木を `walk_actions` と同じ順で辿って動作の値を足す。**`qual` の選択肢は最大（相手が選ぶなら最小）**。"""
+def _tree_total(node, vals, qual, br=None):
+    """効果木を `walk_actions` と同じ順で辿って動作の値を足す。**`qual` の選択肢は最大（相手が選ぶなら最小）**。
+
+    `br = (st, consumed, root)`（**D1**・`branch_then` のときだけ）: `Branch` も辿り、起きる側を重みつきで足す——
+    **選択肢の中の枝は選択肢の一部**として最大の中で比べる（外で足すと「1 つを選ぶ」の最大の上に枝を重ねてしまう）。"""
     if isinstance(node, list):
-        return sum(_tree_total(x, vals, qual) for x in node)
+        return sum(_tree_total(x, vals, qual, br) for x in node)
     if not isinstance(node, dict):
         return 0.0
+    if br is not None and node.get("node") == "Branch":
+        st_, consumed, root = br
+        tot = 0.0
+        for key, w in branch_sides(node, st_, root):
+            side = node.get(key)
+            if not side or any(id(a) in consumed for a in walk_actions(side)):
+                continue
+            tot += w * _tree_total(side, vals, qual, br)
+        return tot
     tot = 0.0
     if node.get("type"):
         tot += vals.get(id(node), 0.0)
     sub = node.get("sub_effect")
     if isinstance(sub, (dict, list)):
-        tot += _tree_total(sub, vals, qual)
+        tot += _tree_total(sub, vals, qual, br)
     for key in ("actions", "effects", "options"):
         v = node.get(key)
         if not isinstance(v, list):
             continue
         if key == "options" and id(node) in qual:
-            parts = [_tree_total(x, vals, qual) for x in v]
+            parts = [_tree_total(x, vals, qual, br) for x in v]
             if parts:
                 tot += (min if str(node.get("player") or "").upper() == "OPPONENT" else max)(parts)
         else:
-            tot += sum(_tree_total(x, vals, qual) for x in v)
+            tot += sum(_tree_total(x, vals, qual, br) for x in v)
     return tot
+
+
+def look_returns(acts):
+    """**look_return**（F の直し・レビュー 3）: 「ライフ／デッキの上から見て、そこへ戻す」の戻しを並べ替え（0）として読む。
+
+    パーサは `LOOK_LIFE` の後の「ライフの上か下に置く」を**見た札（`TEMP`）→ ライフ**の移動で出すので、
+    従来はライフが 1 枚**増える**（+λ）と数えた（OP03-099・自分のライフで +0.136／相手のライフで −0.136）。
+    見た札は元のゾーンから取り出していない（`LOOK_LIFE` は観測）＝出どころを見たゾーンに置き換える（ゾーン内の移動＝0）。"""
+    out = {}
+    seen = None
+    for e in acts:
+        at = str(e.get("type") or "")
+        if at == "LOOK_LIFE":
+            seen = "LIFE"
+            continue
+        if at == "LOOK":
+            seen = "DECK"
+            continue
+        if seen is None or family_of(at) != "move":
+            continue
+        t = e.get("target") or {}
+        dest = str(e.get("destination") or MOVE_DEFAULT_DEST.get(at) or "").upper()
+        if _zone(t) == ["TEMP"] and dest == seen:
+            out[id(e)] = _with_target(e, zone=seen)
+    return out
 
 
 def revealed_moves(acts):
@@ -1458,6 +1888,8 @@ def attack_turns_of(effect, st):
     if d in ("THIS_TURN", "THIS_BATTLE", "INSTANT", ""):
         return 1.0
     if d == "PERMANENT":
+        if (st or {}).get("perm_turns") is not None:
+            return float(st["perm_turns"])            # F review 6: 継続効果＝生きて迎えるターンの重み（登場のターンは含まない）
         return float((st or {}).get("r_turns") or R_TURNS)
     return float(DURATION_TURNS.get(d, 1.0))
 
@@ -1524,6 +1956,268 @@ def granted_attack_value(effect, card, st, theta=THETA, mu=MU, at=None):
         return 0.0                                   # 付与できる攻撃手が居ない＝殴れない
     from theory_order import attack_value_don
     return float(attack_value_don(pw, float(st["opp_leader_power"]), True, theta, mu))
+
+
+def _is_source_target(effect):
+    """その動作の対象が**能力を持つカード自身**か（`select_mode == "SOURCE"`・自分側）。"""
+    t = effect.get("target") or {}
+    return (str(t.get("select_mode") or "").upper() == "SOURCE"
+            and str(t.get("player") or "SELF").upper() == "SELF")
+
+
+def attack_self_value(effect, at, st, opp, theta=THETA, mu=MU, lam=LAM):
+    """**F-2（2026-09-26）**: 攻撃の行で解決する【アタック時】の、**攻め手自身**に効く動作の価格。
+
+    `st["attack_ctx"]`（`theory_order.score_candidate` が `ATTACK_ABILITY_MODE=on` のときだけ積む）が無ければ `None`
+    ＝従来の値付けに落ちる（**切替 off では 1 バイトも動かない**）。在れば:
+
+    - **パワー上昇**（`BUFF`／`BP_BUFF`・対象が自分自身・正の量・「X にする」ではない）＝
+      `attack_value(P + ΔP, 対象) − attack_value(P, 対象)`（`P` はドン k 枚を足した後の攻め手のパワー・
+      対象・ブロッカー・`Θ` は `score_candidate` が攻撃の価格に使ったものと同じ）。**このバトルの 1 回**だけ数える。
+    - **ダブルアタック**／**バニッシュ**（自分自身に付与）＝リーダー狙いのときだけ、受ける費用を `2Θ`／`λ/μ` に
+      替えた差（`keyword_delta` と同じ置き換え・この攻撃 1 回ぶん）。キャラ狙いは 0（ライフを削らない）。
+
+    `FLOW_PRICING=exercise`（帳簿）でも 0 にしない——ここが「使った行」そのものだから（T54/T58 の規約どおり）。
+    **新定数ゼロ**（`attack_value` と既存の置き換えだけ）。
+    """
+    actx = (st or {}).get("attack_ctx")
+    if actx is None or opp or not _is_source_target(effect):
+        return None
+    if actx.get("ended"):
+        # **F fix A**: 能力が攻撃の対象そのものを場から離した読み＝バトルは終わる＝攻め手自身の上昇は何も生まない
+        if at in ("BUFF", "BP_BUFF") and _magnitude(effect) > 0 and not _is_set_power(effect):
+            return 0.0
+        if at in KEYWORD_KINDS and str(effect.get("status") or "") in ("ダブルアタック", "バニッシュ"):
+            return 0.0
+        return None
+    from theory_order import attack_value
+    p = float(actx["power"]); tp = float(actx["target_power"]); lead = bool(actx["is_leader"])
+    th = float(actx["theta"]); m = float(actx["mu"])
+    nu_t = actx.get("nu_target"); blk = actx.get("blockers")
+    base = attack_value(p, tp, lead, th, m, nu_t, blk)
+    if at in ("BUFF", "BP_BUFF"):
+        mag = _magnitude(effect)
+        if mag <= 0 or _is_set_power(effect):
+            return None
+        return float(attack_value(p + mag, tp, lead, th, m, nu_t, blk) - base)
+    if at in KEYWORD_KINDS:
+        status = str(effect.get("status") or "")
+        if status not in ("ダブルアタック", "バニッシュ"):
+            return None
+        if not lead:
+            return 0.0
+        th2 = 2.0 * th if status == "ダブルアタック" else float(lam) / m
+        return float(attack_value(p, tp, True, th2, m, nu_t, blk) - base)
+    return None
+
+
+#: **F-2**: 攻撃の行で解決する契機
+ON_ATTACK_TRIGGERS = ("ON_ATTACK",)
+#: **F-3a**: 継続効果として再計算される契機（`rust/.../effects/passives.rs::recalc_steps`）——
+#: **【相手のターン中】も含む**（F fix C・2026-09-26: エンジンは `OPPONENT_TURN` も境界ごとに再適用する＝
+#: 守る側のパワー・ブロッカー・KO／レストされない耐性は生存に効く）。
+CONTINUOUS_TRIGGERS = ("PASSIVE", "YOUR_TURN", "OPPONENT_TURN")
+#: 自分の手番に効く契機（攻める側のパワー）・相手の手番に効く契機（守る側のパワーとブロッカー）
+ATTACK_SIDE_TRIGGERS = ("PASSIVE", "YOUR_TURN")
+DEFENCE_SIDE_TRIGGERS = ("PASSIVE", "OPPONENT_TURN")
+#: **F-3a**: エンジンの再計算が**場に居る体のトークンに書き込む**動作——パワー（列 0）・コスト・名前の読み替え・勝利。
+#: キーワード付与は**ブロッカーだけ**が列 6 に届く（`KEYWORD_REFLECTED`）。**登場の行は印刷の値で体を値付けする**ので、
+#: 自分自身へのパワー上昇とブロッカーの付与は `continuous_self_mods` が体の価格の差として別に足す（F fix B）。
+REFLECTED_KINDS = ("BUFF", "BP_BUFF", "COST_BUFF", "COST_CHANGE", "SET_COST", "RULE_PROCESSING", "VICTORY")
+KEYWORD_REFLECTED = ("ブロッカー",)
+#: **F-3a**: エンジンが「継続効果ではない」として再計算で飛ばす能力（`passives.rs::is_reactive_passive` と同じ語）
+REACTIVE_PATTERNS = ("された時、", "した時、", "受けた時、", "なった時、", "離れた時、")
+#: **F fix D**: 印刷のキーワードのうち登場の価格に足すもの（`KEYWORD_PER_TURN` の式・ブロッカーは既に `ν` に在る）
+PRINTED_KEYWORDS = tuple(k for k in KEYWORD_PER_TURN if k != "ブロッカー")
+#: **F review 7**: 登場の行では数えないキーワード——速攻で打つ攻撃はその攻撃の行が価格を持つ（登場の行でも数えると 2 度）
+ONCE_ON_ATTACK_ROW = ("速攻", "速攻:キャラ")
+
+
+def _keep_continuous(e):
+    """継続効果の値付けで残す動作＝トークンに届かず、攻撃の行で数える速攻の付与でもないもの。"""
+    if not _unreflected(e):
+        return False
+    if str(e.get("type") or "") in KEYWORD_KINDS and str(e.get("status") or "") in ONCE_ON_ATTACK_ROW:
+        return False
+    return True
+
+
+def is_reactive(ab):
+    """**イベント誘発の能力か**（`passives.rs::is_reactive_passive` の写し＝先頭の動作の本文 ＋ 能力の本文に語が在るか）。"""
+    acts = walk_actions((ab or {}).get("effect"))
+    first = str((acts[0].get("raw_text") if acts else "") or "")
+    txt = first + " " + str((ab or {}).get("raw_text") or "")
+    return any(p in txt for p in REACTIVE_PATTERNS)
+
+
+def _unreflected(e):
+    """その動作は**場に居る体のトークンに届いていない**（理論から見えない）か。"""
+    at = str(e.get("type") or "")
+    if at in REFLECTED_KINDS:
+        return False
+    if at in KEYWORD_KINDS and str(e.get("status") or "") in KEYWORD_REFLECTED:
+        return False
+    return True
+
+
+def _is_cost_buff(e):
+    """`BUFF` の形で出る**コスト**の増減（パーサは `status == "COST_REDUCTION"` で出す）。"""
+    at = str(e.get("type") or "")
+    if at in ("COST_BUFF", "COST_CHANGE", "SET_COST"):
+        return True
+    return str(e.get("status") or "") == "COST_REDUCTION"
+
+
+def _neutralized(effect, keep):
+    """効果木を**形のまま**写し、`keep` を満たさない動作を印（`SELECT`＝値 0）に替える。`(写し, 残した動作の数)`。
+
+    木を平らにしないのは、L の直し（「〜してもよい」の塊・「そうした場合」の枝・選択肢の最大）が木の形を読むから。
+    消した動作は任意・「〜まで」の旗も落とす（空の塊を作らない）。継続効果の「攻撃ごと」のキーワード
+    （ダブルアタック・バニッシュ）は期間が書かれていなければ `PERMANENT`（体が居る間ずっと）として読む。
+    """
+    kept = [0]
+
+    def rec(o):
+        if isinstance(o, list):
+            return [rec(x) for x in o]
+        if not isinstance(o, dict):
+            return o
+        d = {k: rec(v) for k, v in o.items()}
+        if d.get("type"):
+            if keep(o):
+                kept[0] += 1
+                got = KEYWORD_PER_TURN.get(str(d.get("status") or ""))
+                if (str(d.get("type")) in KEYWORD_KINDS and got is not None and got[0] == "turn"
+                        and str(d.get("duration") or "") not in DURATION_TURNS):
+                    d["duration"] = "PERMANENT"
+            else:
+                d["type"] = "SELECT"
+                d.pop("is_optional", None)
+                if isinstance(d.get("target"), dict):
+                    d["target"] = dict(d["target"], is_up_to=False)
+        return d
+
+    return rec(effect), kept[0]
+
+
+def continuous_body_value(cid, st=None, nu=NU_AVG, ko_p=KO_P, opp_bodies=None, cards=None):
+    """**F-3a（2026-09-26）**: キャラの【常時】／【自分のターン中】／【相手のターン中】の継続効果のうち、
+    **トークンに届かない**部分の価格。`(値, 読めなかった能力の数)` を返す。能力を持たなければ `(0.0, 0)`。
+
+    - **反応型は除く**（`is_reactive`＝エンジン自身が再計算で飛ばす・F-3b の領分）。
+    - **パワー・コスト・ブロッカーの付与は除く**（`REFLECTED_KINDS`）——自分自身へのパワーとブロッカーは
+      `continuous_self_mods` が体の価格の差で足す（ここで足すと二重）。
+    - 残りの動作は**既存の値付けそのもの**（`ability_value`・木の形のまま）: 生存（`SURVIVE_KINDS`＝`ko_p × ν`）・
+      テンポ（`TEMPO`）・キーワード（速攻＝`granted_attack_value`・アクティブへの攻撃＝`active_target_option`・
+      ブロック不可＝`BLOCK_PREMIUM`・ダブルアタック／バニッシュ＝`keyword_delta` × 残りターン）。
+    - **置換（「KO される場合、代わりに〜できる」）の「代わりに」の部分は KO が来たときだけ起きる**ので
+      `ko_p` を掛け、生存の値と合わせて **0 に床**（払わない自由がある）。
+    - 条件は `st` から判定（`condition_factor`・`offered=False`）。**新定数ゼロ**。
+    """
+    c = (cards or _all_cards()).get(str(cid) or "")
+    if not c:
+        return 0.0, 0
+    total, bad = 0.0, 0
+    for ab in (c.get("abilities") or []):
+        if (ab.get("trigger") or ab.get("timing")) not in CONTINUOUS_TRIGGERS or is_reactive(ab):
+            continue
+        tree, n = _neutralized(ab.get("effect"), _keep_continuous)
+        if not n:
+            continue
+        acts = walk_actions(ab.get("effect"))
+        if any(str(e.get("type") or "") == "REPLACE_EFFECT" for e in acts):
+            surv, _n1 = _neutralized(ab.get("effect"), lambda e: _keep_continuous(e) and family_of(str(e.get("type") or "")) == "survive")
+            rest, n2 = _neutralized(ab.get("effect"), lambda e: _keep_continuous(e) and family_of(str(e.get("type") or "")) != "survive")
+            v1, _u1 = ability_value({**ab, "effect": surv}, nu=nu, ko_p=ko_p, card=c, st=st, opp_bodies=opp_bodies)
+            v2, _u2 = (ability_value({**ab, "effect": rest, "cost": None}, nu=nu, ko_p=ko_p, card=c, selection=False,
+                                     st=st, opp_bodies=opp_bodies) if n2 else (0.0, []))
+            if v1 is None or v2 is None:
+                bad += 1
+                continue
+            total += max(0.0, float(v1) + float(ko_p) * float(v2))
+            continue
+        v, _u = ability_value({**ab, "effect": tree}, nu=nu, ko_p=ko_p, card=c, st=st, opp_bodies=opp_bodies)
+        if v is None:
+            bad += 1
+            continue
+        total += float(v)
+    return float(total), bad
+
+
+def continuous_self_mods(cid, st=None, cards=None):
+    """**F fix B/C（2026-09-26）**: 継続効果が**この体自身**に与えるパワーとブロッカー（登場の行で体の価格に入れる分）。
+
+    `{"atk": 攻める側のパワーの増減, "def": 守る側のパワーの増減, "blocker": ブロッカーを得るか, "don_cost": 【ドン!!×N】の費用,
+    "n": 効いた能力の数}`。**場に出た後はエンジンがトークンに書く**が、**登場の行の体の価格は印刷の値で読む**ので、
+    ここで条件を状態から判定し（`condition_factor`）、成り立つ能力の分だけ動かす:
+
+    - パワー（`BUFF`／`BP_BUFF`・自分自身・コストの増減と「X にする」と式の値は除く）: 【常時】は両側・【自分のターン中】は
+      攻める側・【相手のターン中】は守る側。
+    - ブロッカーの付与（自分自身）: 【常時】【相手のターン中】だけ（ブロックは相手の手番に起きる）。
+    - 【ドン!!×N】の費用 `N·δ/R`（`_don_attach_cost`・既存）——**付けない自由がある**ので、呼び側は
+      「費用を要さない能力だけ」（`*_free`）の読みとの `max` を取る。同じ能力に見えない動作が在れば
+      `continuous_body_value` 側が既に引くので、ここでは引かない（二重に引かない）。
+    """
+    out = {"atk": 0.0, "def": 0.0, "blocker": False, "don_cost": 0.0, "n": 0,
+           # 【ドン!!×N】を要さない能力だけの分（付けない自由＝費用を払わない読みとの `max` に使う）
+           "atk_free": 0.0, "def_free": 0.0, "blocker_free": False}
+    c = (cards or _all_cards()).get(str(cid) or "")
+    if not c:
+        return out
+    for ab in (c.get("abilities") or []):
+        trg = ab.get("trigger") or ab.get("timing")
+        if trg not in CONTINUOUS_TRIGGERS or is_reactive(ab):
+            continue
+        acts = walk_actions(ab.get("effect"))
+        mine = []
+        for e in acts:
+            if not _is_source_target(e):
+                continue
+            at = str(e.get("type") or "")
+            if (at in ("BUFF", "BP_BUFF") and not _is_cost_buff(e) and not _is_set_power(e)
+                    and not (e.get("value") or {}).get("dynamic_source") and _magnitude(e) != 0.0):
+                mine.append(("power", _magnitude(e)))
+            elif at in KEYWORD_KINDS and str(e.get("status") or "") == "ブロッカー" and trg in DEFENCE_SIDE_TRIGGERS:
+                mine.append(("blocker", None))
+        if not mine:
+            continue
+        f = condition_factor(ab, st, False)
+        if f <= 0.0:
+            continue
+        dc = _don_attach_cost(ab, st, False)
+        free = dc <= 0.0
+        for kind, mag in mine:
+            if kind == "power":
+                if trg in ATTACK_SIDE_TRIGGERS:
+                    out["atk"] += float(f) * float(mag)
+                    out["atk_free"] += float(f) * float(mag) if free else 0.0
+                if trg in DEFENCE_SIDE_TRIGGERS:
+                    out["def"] += float(f) * float(mag)
+                    out["def_free"] += float(f) * float(mag) if free else 0.0
+            else:
+                out["blocker"] = True
+                out["blocker_free"] = out["blocker_free"] or free
+        out["n"] += 1
+        if not any(_unreflected(e) for e in acts):
+            out["don_cost"] += dc
+    return out
+
+
+def printed_keyword_value(card, keywords, st=None, opp_bodies=None):
+    """**F fix D（2026-09-26）**: 印刷のキーワード（速攻・ダブルアタック・バニッシュ・ブロック不可 …）の登場の価格。
+
+    **条件つきの付与と同じ式**（`action_value` のキーワードの枝を、自分自身への恒久の付与として呼ぶ）——
+    これで「条件つき ≤ 条件なし」が成り立つ（条件つきは係数 0／1 が掛かるだけ）。ブロッカーは `ν` に在るので除く。"""
+    tot = 0.0
+    for kw in keywords or ():
+        if kw not in PRINTED_KEYWORDS:
+            continue
+        e = {"type": "KEYWORD", "status": kw, "duration": "PERMANENT",
+             "target": {"select_mode": "SOURCE", "player": "SELF"}}
+        v = action_value(e, card=card, opp_bodies=opp_bodies, st=st)
+        if v is not None:
+            tot += float(v)
+    return float(tot)
 
 
 def _referenced_ability(at, effect, card, mu, lam, delta, nu, theta, ko_p, depth):
@@ -1672,7 +2366,11 @@ def apply_play_now(a):
     return PLAY_NOW_MODE
 
 
-def _play_from_hand_now(target, st, card, n, mu):
+#: 攻撃の行・継続効果の値付けだけが積む状態の鍵（相方の登場時効果を読むときは落とす）
+_ROW_ONLY_KEYS = ("attack_ctx", "source_paid", "source_don_attached", "source_rested", "don_turns", "perm_turns")
+
+
+def _play_from_hand_now(target, st, card, n, mu, opp_bodies=None):
     """**今の手札から出せる札の値**（T70）＝合う札のうち値（`free_value` − μ）の大きい `n` 枚の和。合う札が無ければ 0。
     `hand` でなければ／状態が無ければ `None`（旧価格に落ちる）。"""
     if PLAY_NOW_MODE != "hand" or not st or not st.get("search_ctx"):
@@ -1688,8 +2386,21 @@ def _play_from_hand_now(target, st, card, n, mu):
         return None
     cid = str((card or {}).get("card_id") or (card or {}).get("id") or "") or None
     vals = []
-    for c in SP.eligible_hand_cards(target, ctx["hand_items"], cards, skip_cid=cid):
-        fv = free_value(c, cards.info(c), ctx["olp"], ctx["r"])
+    board = _ffix("hand_board")
+    # 相方の状態からは手札の文脈（`search_ctx`）も落とす——相方がさらに「手札から登場させる」を持つと無限に辿る（実測）
+    st2 = {k: v for k, v in st.items() if k not in _ROW_ONLY_KEYS + ("search_ctx",)} if board else None
+    if st2 is not None:
+        # 効果でただで出す相方は印刷のコストを払わない（レビュー 3）。ただし**外側の札が払った分**はアクティブなドンから
+        # 既に減っている（レビュー 4 の D4）＝外側の支払い（攻撃の行なら 0・登場の行なら外側の札のコスト）を引き継ぐ
+        outer = st.get("source_paid")
+        st2["source_paid"] = float(outer) if outer is not None else float((card or {}).get("cost") or 0.0)
+    for c in SP.eligible_hand_cards(target, ctx["hand_items"], cards, skip_cid=cid,
+                                    st=(st if _ffix("state_filters") else None)):
+        if board:
+            # **hand_board**: 相方の登場時効果も今の盤面と状態で読む（盤面なしだと相手の体を全部取る扱いになる）
+            fv = free_value(c, cards.info(c), ctx["olp"], ctx["r"], st=st2, opp_bodies=opp_bodies)
+        else:
+            fv = free_value(c, cards.info(c), ctx["olp"], ctx["r"])
         vals.append((NU_AVG if fv is None else float(fv)) - float(mu))
     vals.sort(reverse=True)
     return float(sum(max(0.0, v) for v in vals[:max(1, int(n))]))
@@ -1774,6 +2485,10 @@ def _cost_unpayable(cost_acts, card, st):
         # 登場時・イベントの値付けは「手札から出した後」に解決する——エンジンは出す札のコストを
         # アクティブなドンをレストにして先に払う（`rules/actions.rs` の PLAY: `pay_cost` → 解決）。
         paid = float((card or {}).get("cost") or 0.0)
+        if st.get("source_paid") is not None:
+            # **F-2**: 【アタック時】は場に居る札の能力＝出す費用は払わない。攻撃の行は DON_BOX の k 枚を
+            # 引いた後のアクティブなドンを `my_don_active` に積んで渡す（`theory_order.attack_ability_value`）
+            paid = float(st["source_paid"])
         for e in cost_acts:
             et = str(e.get("type") or "")
             t0 = e.get("target") or {}
@@ -1851,6 +2566,8 @@ def _search_plan(acts, card, st):
     n = _count(target, ["TEMP"])
     cid = str((card or {}).get("id") or (card or {}).get("card_id") or "") or None
     cost = float((card or {}).get("cost") or 0.0) if cid else 0.0
+    if st.get("source_paid") is not None:
+        cost = float(st["source_paid"])                      # F-2: 【アタック時】は出す費用を払わない
     v = SP.search_value(ctx, k, target, cards, take_n=int(max(1.0, n)), played_cid=cid, played_cost=cost)
     return float(v), int(k), act
 
@@ -1874,6 +2591,9 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
     found = _search_plan(acts, card, st)
     # **L(f)**: 見た・公開した札の移動は出どころを見た札に置き換える／**L(a)**: 任意の動作と後続は塊で値付けする
     repl = revealed_moves(acts) if _fix("revealed_src") else {}
+    if _ffix("look_return"):
+        for k_, v_ in look_returns(acts).items():
+            repl.setdefault(k_, v_)
     # **L（`choice_max`／`either_side`）**: 選択肢は最大を取る節と、絞り込みを失った枝への対象の写し
     qual = qualified_choices(ab.get("effect"))
     if qual:
@@ -1912,7 +2632,23 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
         else:
             total += v
             vals[id(e0)] = v
-    if qual and not unpriced:
+    if _ffix("branch_then"):
+        # **branch_then**: 「〜した場合、…」の枝の動作（塊が既に読んだ枝は除く）。**D1**: 選択肢が在れば
+        # 木を辿って枝も選択肢の中で比べる（`_tree_total` の `br`）・無ければ重みつきで足す
+        consumed = {id(x) for b in blocks for x in (list(b[2]) + list(b[3]))}
+        extra = 0.0
+        for e, w in branch_actions(ab.get("effect"), st, consumed):
+            v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st=st)
+            if v is None:
+                unpriced.append((str(e.get("type") or "?"), _unpriced_family(e)))
+            else:
+                vals[id(e)] = v
+                extra += w * v
+        if qual and not unpriced:
+            total = _tree_total(ab.get("effect"), vals, qual, br=(st, consumed, ab.get("effect")))
+        else:
+            total += extra
+    elif qual and not unpriced:
         total = _tree_total(ab.get("effect"), vals, qual)
     if selection and found is None:
         total += _sel_premium(selection_k(acts))
@@ -1950,6 +2686,20 @@ def _don_attach_cost(ab, st, offered):
     状態が無ければ 0（上限として読む）。効果がこの費用に届かなければ付けない＝0 に床（呼び側の `total` は負にしない）。"""
     if offered or not st:
         return 0.0
+    if st.get("source_don_attached") is not None:
+        # F-2: 攻撃の行。**既に付いていたドンで足りる分は費用 0**（付けたのは前の手）。足りない分を DON_BOX で付けて
+        # 満たすなら、その枚数の 1 ターンの使用権 `N·δ/R` を払う（レビュー 3 の 8: 付けて殴る手が条件を満たすだけで
+        # 理論の最善になっていた＝付けるドンの使い道を無料に読んでいた）
+        try:
+            import condition_value as CV
+            need = CV.has_don_requirement((ab or {}).get("condition"))
+        except Exception:
+            need = None
+        pre = st.get("source_don_pre")
+        if not need or pre is None:
+            return 0.0
+        r = float(st.get("r_turns") or 0.0) or 4.0
+        return max(0.0, float(need) - float(pre)) * DELTA / max(1.0, r)
     try:
         import condition_value as CV
     except Exception:
@@ -1958,7 +2708,8 @@ def _don_attach_cost(ab, st, offered):
     if not n:
         return 0.0
     r = float(st.get("r_turns") or 0.0) or 4.0
-    return float(n) * DELTA / max(1.0, r)
+    # **F review 5**: 継続効果の【ドン!!×N】は使うターンごとに払う（利得と同じ重みのターン数・`theory_order.passive_parts` が積む）
+    return float(n) * DELTA / max(1.0, r) * float(st.get("don_turns") or 1.0)
 
 
 #: 登場時に解決する契機（イベントを `PLAY` したときに効くもの）。

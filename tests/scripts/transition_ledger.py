@@ -374,7 +374,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
                                     (str(pol["pol_tcid"][b]) or None) if tl else None, ctx, cards,
                                     src_power=slot_power(tok, int(pol["pol_si"][b])),
                                     tgt_power=slot_power(tok, int(pol["pol_ti"][b])),
-                                    don_k=int(pol["pol_k"][b]))
+                                    don_k=int(pol["pol_k"][b]),
+                                    src_don=TO.slot_don(tok, int(pol["pol_si"][b])))   # F-2（切替 on のときだけ使う）
                 mv = {"si": int(pol["pol_si"][b]), "ti": int(pol["pol_ti"][b]),
                       "cid": str(pol["pol_cid"][b]) or None, "don_k": int(pol["pol_k"][b]),
                       "v": (float(v) if v is not None else None)}
@@ -505,8 +506,15 @@ def main(argv=None):
                     help="攻撃した体のレスト費用をΘ_meへ足すか（既定 `return`・C-5c／`body`＝C-2／`off`＝旧）")
     ap.add_argument("--theta-return", dest="theta_return", choices=CB.THETA_RETURN_MODES, default=None,
                     help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 untap）")
+    TO.add_attack_ability_arg(ap)
+    TO.add_passive_body_arg(ap)
+    import effect_value as _EV
+    _EV.add_f_pricing_fixes_arg(ap)
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
+    TO.apply_attack_ability(a)
+    TO.apply_passive_body(a)
+    _EV.apply_f_pricing_fixes(a)
     if a.d_mode:
         KV.set_d_mode(a.d_mode)
     if a.boundary:

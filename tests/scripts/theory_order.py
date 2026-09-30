@@ -888,6 +888,8 @@ def opp_chars_of(tok_row):
 
 #: トークンの列（`n_rel_feat.S_COLS`）。`cost_now` は `/10`・`is_rest` は旗。
 S_COST, S_IS_REST = 1, 3
+#: 付いているドン（`attached_don/5`・`n_rel_feat.S_COLS_V13` の 3 番目・`price_realised.S_ATTACHED_DON` と同じ）
+S_ATTACHED_DON = 2
 #: 「今攻撃できるか」の旗（`n_rel_feat.S_COLS_V13` の 5 番目）
 S_CAN_ATTACK = 5
 #: 登場・イベントの費用（ドン）の引き方（T43・2026-09-16）。
@@ -1093,6 +1095,373 @@ def attack_don_cost(ctx, k, theta=THETA, mu=MU, src_x=None):
 
 
 
+#: **F-2（2026-09-26）**: 攻撃（`ATTACK`／対象付き `DON_BOX`）の価格に**攻め手自身の【アタック時】能力**の値を足すか。
+#: `off`（既定）＝従来（攻め手の `abilities` を読まない＝256 本が値付けゼロ・`2026-09-25_f1_attack_ability_inventory.md` の発見 1）／
+#: `on`＝`effect_value.card_value(攻め手, ON_ATTACK)` を足す（`attack_ability_value`）。**新定数ゼロ**——中身の値付けは
+#: 登場時・起動メインと同じ `ability_value` の再帰で、違うのは次の 3 点だけ:
+#: (1) **条件は状態から判定**（`offered=False`＝`condition_value`）。【ドン!!×N】は攻め手に**付いている**枚数（記録の付与 ＋ DON_BOX の k）で読む。
+#: (2) **攻め手自身へのパワー上昇・ダブルアタック・バニッシュは「この攻撃の価格の差」**（`effect_value.attack_self_value`）——
+#:     攻撃の価格そのもの（`attack_value(P)`）に上乗せする形なので二重にならない（`P + ΔP` の価格 − `P` の価格）。
+#: (3) 場に居る札の能力なので出す費用は払わない（`source_paid=0`）・攻め手はアタックでレストになっている（`source_rested`）。
+#: **T89（`2026-09-18_rate_and_time.md`）は自己強化 62 本を記録で数えただけ**（読み取りのみ・`A` にも攻撃の価格にも入れていない）
+#: ので、ここで足しても T89 の分とは重ならない。**記録の枠のパワー（`slot_power`）は宣言前の値**＝【アタック時】の上昇はまだ載っていない
+#: （【常時】【自分のターン中】の上昇は既に載っている＝そちらは足さない・F-3a の `REFLECTED_KINDS`）。
+ATTACK_ABILITY_MODES = ("off", "on")
+ATTACK_ABILITY_MODE = "off"
+#: **F-3a（2026-09-26）**: キャラの登場の価格（体の価値 `ν` の側）に**【常時】／【自分のターン中】の継続効果のうち理論から見えない部分**を足すか。
+#: `off`（既定）＝従来／`on`＝`effect_value.continuous_body_value` を `_char_play_value` に足す（体の価格の唯一の入口）。
+#: パワー（トークン列 0）とブロッカー（列 6）はエンジンの再計算が既に書き込んでいるので除く。反応型（「〜された時、」）は除く（F-3b）。
+PASSIVE_BODY_MODES = ("off", "on")
+PASSIVE_BODY_MODE = "off"
+#: 切替 on のときの内訳（何本に値が付き、何本が読めなかったか）。**off では触らない**。
+WIRING_STATS = {"attack_cand": 0, "attack_with_ability": 0, "attack_nonzero": 0, "attack_unpriced": 0,
+                "attack_target_removed": 0, "passive_self_mods": 0, "passive_keyword": 0,
+                "attack_sum": 0.0, "play_char": 0, "passive_with_ability": 0, "passive_nonzero": 0,
+                "passive_unpriced": 0, "passive_sum": 0.0}
+
+
+def reset_wiring_stats():
+    for k in WIRING_STATS:
+        WIRING_STATS[k] = 0.0 if isinstance(WIRING_STATS[k], float) else 0
+
+
+def set_attack_ability_mode(mode):
+    global ATTACK_ABILITY_MODE
+    if mode not in ATTACK_ABILITY_MODES:
+        raise ValueError("attack ability mode は %s のどれか（%r）" % (ATTACK_ABILITY_MODES, mode))
+    ATTACK_ABILITY_MODE = mode
+    return ATTACK_ABILITY_MODE
+
+
+def add_attack_ability_arg(ap):
+    ap.add_argument("--attack-ability", default=None, choices=ATTACK_ABILITY_MODES,
+                    help="**F-2** 攻撃の価格に攻め手の【アタック時】能力の値を足すか（省略時は `theory_order.ATTACK_ABILITY_MODE`＝`off`）")
+
+
+def apply_attack_ability(a):
+    if getattr(a, "attack_ability", None) is not None:
+        set_attack_ability_mode(a.attack_ability)
+    a.attack_ability = ATTACK_ABILITY_MODE
+    return ATTACK_ABILITY_MODE
+
+
+def set_passive_body_mode(mode):
+    global PASSIVE_BODY_MODE
+    if mode not in PASSIVE_BODY_MODES:
+        raise ValueError("passive body mode は %s のどれか（%r）" % (PASSIVE_BODY_MODES, mode))
+    PASSIVE_BODY_MODE = mode
+    return PASSIVE_BODY_MODE
+
+
+def add_passive_body_arg(ap):
+    ap.add_argument("--passive-body", default=None, choices=PASSIVE_BODY_MODES,
+                    help="**F-3a** 登場の価格（体）に【常時】／【自分のターン中】の見えない継続効果の値を足すか"
+                         "（省略時は `theory_order.PASSIVE_BODY_MODE`＝`off`）")
+
+
+def apply_passive_body(a):
+    if getattr(a, "passive_body", None) is not None:
+        set_passive_body_mode(a.passive_body)
+    a.passive_body = PASSIVE_BODY_MODE
+    return PASSIVE_BODY_MODE
+
+
+def slot_don(tok_row, slot):
+    """枠 index → **付いているドンの枚数**（トークン列 2＝`attached_don/5`）。枠が無ければ `None`。"""
+    if slot is None or int(slot) < 0:
+        return None
+    s = int(slot)
+    if s >= tok_row.shape[0]:
+        return None
+    return int(round(float(tok_row[s, S_ATTACHED_DON]) * 5.0))
+
+
+_REMOVE_KINDS = ("KO", "BOUNCE", "DECK_BOTTOM", "TRASH", "MOVE_CARD", "MOVE", "MOVE_TO_HAND", "DECK_TOP")
+
+
+def _on_attack_acts(card):
+    import effect_value as EV
+    return [e for ab in (card.get("abilities") or []) if (ab.get("trigger") or ab.get("timing")) in EV.ON_ATTACK_TRIGGERS
+            for e in EV.walk_actions(ab.get("effect"))]
+
+
+def _removes_from_field(card):
+    """【アタック時】に**相手の場の体を場から離す**動作が在るか（KO・バウンス・デッキ／トラッシュ送り）。"""
+    import effect_value as EV
+    for e in _on_attack_acts(card):
+        t = e.get("target") or {}
+        if str(e.get("type") or "") in _REMOVE_KINDS and EV._side(t) in ("OPPONENT", "ALL") \
+                and (str(e.get("type")) in ("KO", "BOUNCE") or "FIELD" in EV._zone(t)):
+            return True
+    return False
+
+
+def _target_power_down(card):
+    """【アタック時】に**相手の体のパワーを下げる**量（選んで 1 体・最大のもの）。無ければ 0。"""
+    import effect_value as EV
+    best = 0.0
+    for e in _on_attack_acts(card):
+        t = e.get("target") or {}
+        if _is_power_down(EV, e):
+            best = max(best, -EV._magnitude(e))
+    return best
+
+
+def _is_power_down(EV, e):
+    """相手の体の**パワー**を下げる動作か（コストの増減〔`COST_REDUCTION`〕・「X にする」は除く・レビュー 4 の D2）。"""
+    t = e.get("target") or {}
+    return (str(e.get("type") or "") in ("BUFF", "BP_BUFF") and EV._side(t) == "OPPONENT"
+            and EV._magnitude(e) < 0 and not EV._is_set_power(e) and str(e.get("status") or "") != "COST_REDUCTION")
+
+
+def _mark_power_down(EV, o):
+    """効果木の写しで、相手の体のパワー低下の動作に `_pd` の印を付ける（D2）。"""
+    if isinstance(o, list):
+        return [_mark_power_down(EV, x) for x in o]
+    if not isinstance(o, dict):
+        return o
+    d = {k: _mark_power_down(EV, v) for k, v in o.items()}
+    if d.get("type") and _is_power_down(EV, d):
+        d["_pd"] = True
+    return d
+
+
+def _ability_on_attack(EV, cid, ctx, actx, k, src_don, opp_bodies, drop_power_down=False, pd_gain=None):
+    """【アタック時】能力の値（`card_value`）。読めなければ `None`。
+    `drop_power_down`（レビュー 3 の 5）: 相手の体のパワー低下を攻撃の対象に使った読み＝その動作を値付けから外す。"""
+    st = _effect_state(ctx)
+    st["attack_ctx"] = dict(actx)
+    st["source_rested"] = True
+    st["source_paid"] = 0.0
+    if st.get("my_don_active") is not None:
+        st["my_don_active"] = max(0, int(st["my_don_active"]) - int(round(float(k))))
+    if src_don is not None:
+        st["source_don_attached"] = int(src_don) + int(round(float(k)))
+        st["source_don_pre"] = int(src_don)          # 付ける前に付いていた枚数（条件のために付けたドンの費用・レビュー 3 の 8）
+    cards = None
+    if pd_gain is not None:
+        c0 = EV._all_cards().get(str(cid)) or {}
+        cards = {str(cid): dict(c0, abilities=[
+            dict(ab, effect=_mark_power_down(EV, ab.get("effect")))
+            if (ab.get("trigger") or ab.get("timing")) in EV.ON_ATTACK_TRIGGERS else ab
+            for ab in (c0.get("abilities") or [])])}
+        st["pd_gain"] = float(pd_gain)
+    if drop_power_down:
+        c0 = EV._all_cards().get(str(cid)) or {}
+        abs_ = []
+        for ab in (c0.get("abilities") or []):
+            if (ab.get("trigger") or ab.get("timing")) in EV.ON_ATTACK_TRIGGERS:
+                tree, _n = EV._neutralized(ab.get("effect"), lambda e: not (
+                    str(e.get("type") or "") in ("BUFF", "BP_BUFF") and EV._side(e.get("target") or {}) == "OPPONENT"
+                    and EV._magnitude(e) < 0))
+                ab = dict(ab, effect=tree)
+            abs_.append(ab)
+        cards = {str(cid): dict(c0, abilities=abs_)}
+    with EV.opaque_as_upper():             # F fix A: 対象を取れるかを盤面で決める（読めない絞り込みは上限）
+        v, _unp = EV.card_value(cid, EV.ON_ATTACK_TRIGGERS, st=st, offered=False, no_ability=0.0,
+                                opp_bodies=opp_bodies, cards=cards)
+    return v
+
+
+def _target_index(bodies, target_power, target_blocker=None):
+    """相手の体の並びの中で**攻撃の対象**に当たる体の位置（パワーが `PWR_EPS` で一致・ブロッカーの旗が合うものを先に）。無ければ `None`。"""
+    hits = [i for i, b in enumerate(bodies or ()) if abs(float(b.get("power") or 0.0) - float(target_power)) <= PWR_EPS]
+    if not hits:
+        return None
+    if target_blocker is not None:
+        for i in hits:
+            if bool(bodies[i].get("blocker")) == bool(target_blocker):
+                return i
+    return hits[0]
+
+
+def attack_ability_value(cid, ctx, actx, k=0, src_don=None, base=0.0, target_blocker=None):
+    """**F-2**: 攻め手 `cid` の【アタック時】能力を足した**攻撃の価格**（能力を持たなければ `base` そのもの・読めなければ `base`）。
+
+    `base` は攻撃の価格（`attack_value`・ドンの費用を引く前）。`actx` は攻撃の価格に使った
+    `{power（ドン k 枚後）, target_power, is_leader, nu_target, blockers, theta, mu}`
+    ——攻め手自身への上昇はこの攻撃の価格の差で読む（`effect_value.attack_self_value`）。
+    状態は `_effect_state(ctx)` に**攻撃の行の差分**だけを重ねる（呼び側の `ctx["st"]` は書き換えない）:
+    `source_rested=True`（アタックでレスト）・`source_paid=0`（出す費用は払わない）・`my_don_active −= k`（DON_BOX で付けた分）・
+    `source_don_attached = 付与 + k`（記録の付与が読めるときだけ＝【ドン!!×N】の判定）。
+
+    **F fix A（2026-09-26）**: キャラ狙いで、能力が**攻撃の対象そのもの**を場から離せるとき、対象が離れればバトルは終わる。
+    だから `max( 攻撃 ＋ 能力（対象以外の相手の体から選ぶ）, 能力（対象も含めて選ぶ・バトルは終わる＝攻め手自身の上昇は 0） )`。
+    能力が相手の体に触らなければ前者が常に大きい＝従来と同じ値。対象を盤面の中で同定できなければ従来どおり足す。
+    """
+    try:
+        import effect_value as EV
+    except Exception:
+        return float(base)
+    WIRING_STATS["attack_cand"] += 1
+    c = EV._all_cards().get(str(cid) or "") if cid else None
+    if not c or not any((ab.get("trigger") or ab.get("timing")) in EV.ON_ATTACK_TRIGGERS
+                        for ab in (c.get("abilities") or [])):
+        return float(base)
+    WIRING_STATS["attack_with_ability"] += 1
+    bodies = ctx.get("opp_bodies")
+    ti = None if (actx.get("is_leader") or bodies is None) else _target_index(bodies, actx["target_power"], target_blocker)
+    if ti is None:
+        v = _ability_on_attack(EV, cid, ctx, actx, k, src_don, bodies)
+        total = None if v is None else float(base) + float(v)
+    else:
+        others = list(bodies[:ti]) + list(bodies[ti + 1:])
+        v_keep = _ability_on_attack(EV, cid, ctx, actx, k, src_don, others)
+        # **レビュー 3 の 5**: 対象に効く動作を 2 つに分ける——**場から離す**（KO・手札／デッキ／トラッシュへ）ならバトルは終わる、
+        # **パワーを下げる**ならバトルは続き攻撃が通りやすくなる（攻撃の価格を下げた後のパワーで読み直す）
+        v_end = (_ability_on_attack(EV, cid, ctx, dict(actx, ended=True), k, src_don, bodies)
+                 if _removes_from_field(c) else None)
+        # **レビュー 4 の D2**: 対象へのパワー低下は**能力の値付けの中で**読み直す——低下の動作を「この攻撃の価格の増分」
+        # （`pd_gain`）で値付けし、能力の条件・コスト・付けない自由の床・【ドン!!×N】の費用はそのまま掛ける。
+        # 対象がその動作の絞り込み（コスト・パワー・特徴等）に合わなければ使えない。
+        v_dbf = None
+        tb = bodies[ti]
+        dmag = 0.0
+        st_f = _effect_state(ctx)
+        for e in _on_attack_acts(c):
+            if _is_power_down(EV, e):
+                with EV.opaque_as_upper():
+                    picked = EV._pick_opp(e.get("target") or {}, [tb], 1, st_f)
+                if picked:
+                    dmag = max(dmag, -EV._magnitude(e))
+        if dmag and v_keep is not None:
+            tp2 = max(0.0, float(actx["target_power"]) - float(dmag))
+            atk2 = attack_value(actx["power"], tp2, False, actx["theta"], actx["mu"],
+                                nu_target=actx.get("nu_target"), blockers=actx.get("blockers"))
+            gain = float(atk2) - float(base)
+            v_pd = _ability_on_attack(EV, cid, ctx, actx, k, src_don, others, pd_gain=gain)
+            if v_pd is not None:
+                v_dbf = float(base) + float(v_pd)
+        if v_keep is None:
+            total = None
+        else:
+            opts = [float(base) + float(v_keep)] + [x for x in (v_end, v_dbf) if x is not None]
+            total = max(opts)
+            if v_end is not None and total == v_end and total > opts[0] + 1e-12:
+                WIRING_STATS["attack_target_removed"] += 1
+    if total is None:
+        WIRING_STATS["attack_unpriced"] += 1
+        return float(base)
+    if abs(total - float(base)) > 0.0:
+        WIRING_STATS["attack_nonzero"] += 1
+    WIRING_STATS["attack_sum"] += total - float(base)
+    return float(total)
+
+
+_KEYWORDS = {}
+
+
+def printed_keywords(cid):
+    """カードに**印刷された**キーワード（カード DB の `keywords`・文字列）。判らなければ空。"""
+    if not cid:
+        return ()
+    if cid not in _KEYWORDS:
+        try:
+            from opcg_sim.loop import decks as D
+            m = D.load_db().get_card(cid)
+        except Exception:
+            m = None
+        got = [str(getattr(k, "value", k)) for k in (getattr(m, "keywords", None) or ())]
+        # **F review 8**: DB の `keywords` に入らない印刷のキーワード（【ブロック不可】等）を本文から読む——
+        # 本文の区切り（" / "）の頭に【キーワード】が在るものだけ（「〜場合、【速攻】を得る」のような条件つきは頭に来ない）
+        try:
+            import effect_value as EV
+            text = str((EV._all_cards().get(str(cid)) or {}).get("effect_text") or "")
+            for seg in text.split(" / "):
+                for kwd in EV.KEYWORD_PER_TURN:
+                    if seg.strip().startswith("【%s】" % kwd) and kwd not in got:
+                        got.append(kwd)
+        except Exception:
+            pass
+        _KEYWORDS[cid] = tuple(got)
+    return _KEYWORDS[cid]
+
+
+def passive_parts(cid, src, ctx, theta=THETA, mu=MU):
+    """**F-3a**: キャラ `cid` の登場の価格に足す、継続効果と印刷のキーワードの値の**内訳**（副作用なし）。
+
+    `{"total", "body", "cont", "kw", "visible", "bad", "mods"}`。3 つの和:
+
+    1. **体の価格の差**（F fix B/C）: 継続効果がこの体自身に与えるパワーとブロッカー（条件は状態から判定・
+       `effect_value.continuous_self_mods`）を入れた `ν` − 印刷の値の `ν`。【自分のターン中】の上昇は殴る側・
+       【相手のターン中】は守る側（`nu_of(def_power=…)`）・【常時】は両方。
+       **【ドン!!×N】は使うターンごとに払う**（F review 5）——利得（`ν`）が生きて迎えるターンの重みで数えるので、
+       費用 `N·δ/R` も同じ重みのターン数（`surv_turns`）を掛ける。付けない自由があるので費用を要さない読みと `max`。
+       **条件はこの 1 行の状態で 1 度だけ判定し、以後ずっと成り立つ（成り立たない）と読む**（限界・状態が変われば変わる）。
+       **場に出た後はエンジンがトークンに書くので攻撃の行には足さない**——足すのは印刷の値で読む登場の行だけ。
+    2. **トークンに届かない継続効果**（`effect_value.continuous_body_value`）: 生存・テンポ・非ブロッカーのキーワード。
+       生存の `ko_p × ν` の `ν` と `ko_p` は 1. を入れた後のこの体のもの。
+    3. **印刷のキーワード**（F fix D・`effect_value.printed_keyword_value`）: ダブルアタック・バニッシュ・ブロック不可
+       （ブロック不可は本文の【ブロック不可】からも読む・F review 8）。**速攻は数えない**（F review 7: 速攻で打つ攻撃は
+       その攻撃の行が価格を持つ＝登場の行で数えると同じ攻撃を 2 度数える。条件つきの速攻の付与も同じ）。
+       ダブルアタック・バニッシュの回数は**生きて迎えるターンの重み**（F review 6・登場のターンは含まない）。
+
+    `visible`＝**物差し（`price_realised` の実現）に次の判断点までに現れる部分**＝殴る側のパワーの上昇による体の帯の変化
+    （守る側のパワー・ブロッカー・生存・キーワードは実現に現れない）。
+    """
+    import effect_value as EV
+    st = _effect_state(ctx)
+    pw = float(src.get("power") or 0.0)
+    blk0 = src.get("blocker")
+    args = (ctx["opp_leader_power"], ctx["r_turns"], theta, mu)
+    kw = dict(opp_chars=ctx.get("opp_chars"), my_leader_power=ctx["my_leader_power"])
+    kp0 = ko_p_of(pw) if NU_MODE == "pair" else KO_P
+    turns = surv_turns(ctx["r_turns"], kp0)
+    st["don_turns"] = turns                       # F review 5
+    st["perm_turns"] = turns                      # F review 6
+    mods = EV.continuous_self_mods(cid, st=st)
+    atk, dfn = pw + mods["atk"], pw + mods["def"]
+    blk = bool(blk0) or bool(mods["blocker"])
+    nu0 = nu_of(pw, *args, is_blocker=blk0, **kw)
+    dc = 0.0
+    if mods["n"]:
+        nu1 = nu_of(atk, *args, is_blocker=(True if blk else blk0), def_power=dfn, **kw)
+        dc = float(mods["don_cost"])
+        body = nu1 - nu0 - dc
+        if mods["don_cost"] > 0.0:
+            # 【ドン!!×N】は付けない自由がある（`ability_value` の T74 と同じ床）＝費用を要さない能力だけの読みと `max`
+            a_f, d_f = pw + mods["atk_free"], pw + mods["def_free"]
+            blk_f = bool(blk0) or bool(mods["blocker_free"])
+            nu_f = nu_of(a_f, *args, is_blocker=(True if blk_f else blk0), def_power=d_f, **kw)
+            if nu_f - nu0 > body:
+                nu1, atk, dfn, body, dc = nu_f, a_f, d_f, nu_f - nu0, 0.0
+    else:
+        nu1, body = nu0, 0.0
+    visible = 0.0
+    if mods["n"] and atk != pw:
+        visible = nu_of(atk, *args, is_blocker=blk0, def_power=pw, **kw) - nu0 - dc
+    kp = ko_p_of(dfn) if NU_MODE == "pair" else KO_P
+    v, bad = EV.continuous_body_value(cid, st=st, nu=nu1, ko_p=kp, opp_bodies=ctx.get("opp_bodies"))
+    kws = tuple(k for k in printed_keywords(cid) if k not in EV.ONCE_ON_ATTACK_ROW)
+    kv = EV.printed_keyword_value(dict(EV._all_cards().get(str(cid)) or {}, power=pw), kws,
+                                  st=st, opp_bodies=ctx.get("opp_bodies"))
+    tot = float(body) + float(v) + float(kv)
+    return {"total": tot, "body": float(body), "cont": float(v), "kw": float(kv), "visible": float(visible),
+            "bad": int(bad), "mods": int(mods["n"])}
+
+
+def passive_body_value(cid, src, ctx, theta=THETA, mu=MU):
+    """**F-3a**: `passive_parts` の合計（`WIRING_STATS` に内訳を数える）。"""
+    try:
+        parts = passive_parts(cid, src, ctx, theta, mu)
+    except ImportError:
+        return 0.0
+    tot = parts["total"]
+    WIRING_STATS["play_char"] += 1
+    if parts["mods"]:
+        WIRING_STATS["passive_self_mods"] += 1
+    if parts["kw"]:
+        WIRING_STATS["passive_keyword"] += 1
+    if parts["bad"]:
+        WIRING_STATS["passive_unpriced"] += int(parts["bad"])
+    if abs(tot) > 0.0 or parts["bad"]:
+        WIRING_STATS["passive_with_ability"] += 1
+    if abs(tot) > 0.0:
+        WIRING_STATS["passive_nonzero"] += 1
+    WIRING_STATS["passive_sum"] += tot
+    return tot
+
+
 _IDENT = {}
 
 
@@ -1154,6 +1523,8 @@ def opp_bodies_of(tok_row, my_leader_power, r_turns=4.128, theta=THETA, mu=MU,
                 "cost": float(tok[si, S_COST]) * 10.0,
                 "is_rest": float(tok[si, S_IS_REST]) > 0.5,
                 "blocker": blk,
+                # 付与中のドン（F の直し `state_filters`／攻撃の行の上限読みだけが読む＝「ドン!!が付与されている」）
+                "attached_don": int(round(float(tok[si, S_ATTACHED_DON]) * 5.0)),
                 "nu": nu_of(pw, float(my_leader_power), r_turns, theta, mu, ko_p=ko_p,
                             is_blocker=blk)}
         if ci_row is not None and idx2cid is not None:
@@ -1465,8 +1836,11 @@ def shield_of(power, opp_leader_power):
 
 
 def nu_of(power, opp_leader_power, r_turns, theta=THETA, mu=MU, block_p=None, ko_p=KO_P,
-          is_blocker=None, opp_chars=None, my_leader_power=None, mode=None):
+          is_blocker=None, opp_chars=None, my_leader_power=None, mode=None, def_power=None):
     """場のキャラ 1 体の価格 `ν`（`game_theory.md` §14.1）。
+
+    `def_power`（F fix C・既定 `None`＝`power` と同じ＝従来と 1 ビットも変わらない）は**相手の手番のパワー**——
+    【相手のターン中】の上昇は殴る側には効かず、倒されにくさ（`ko_p` の形）と身代わりの帯にだけ効く。
 
     残り `r_turns` ターンぶんの攻撃の価値＋ブロックの option value − KO される損。
 
@@ -1484,8 +1858,9 @@ def nu_of(power, opp_leader_power, r_turns, theta=THETA, mu=MU, block_p=None, ko
     # **P5 と P4 は対で入れる**（T21）——身代わりを足すと `ν` は上がり、`ko_p` の形を
     # 入れると帯ごとに上下する。**片方だけ入れると全体が悪化する**と測定で判っている。
     mode = NU_MODE if mode is None else mode
-    shield = shield_of(power, opp_leader_power) if mode == "pair" else 0.0
-    kp = ko_p_of(power) if mode == "pair" else float(ko_p)
+    dp = power if def_power is None else def_power
+    shield = shield_of(dp, opp_leader_power) if mode == "pair" else 0.0
+    kp = ko_p_of(dp) if mode == "pair" else float(ko_p)
     atk = attack_stream(power, opp_leader_power, r_turns, theta, mu, opp_chars,
                         my_leader_power, kp)
     block = float(block_p) * theta * mu             # 1 回ぶんの攻撃を消す価値
@@ -1585,13 +1960,14 @@ def blockers_of(ctx):
     return out
 
 
-def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, don_k=None):
+def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, don_k=None, src_don=None):
     """候補 1 つの理論値（値付けできなければ `None`）。
 
     `sig` は `[action_type, uuid, target_ids, selected_uuids, accepted]`（`record_gen.move_sig`）。
     `ctx` は `{"opp_leader_power", "my_leader_power", "r_turns", "theta", "mu", "don_k"}`。
     `src_power`／`tgt_power` を渡せば**印字ではなく今のパワー**で値付けする（枠から採った値）。
     `don_k` を渡せば**その候補の実際の付与枚数**を使う（`ctx["don_k"]` の仮定より優先）。
+    `src_don`（F-2）は攻め手に**既に付いている**ドンの枚数（`slot_don`）——`ATTACK_ABILITY_MODE=on` の【ドン!!×N】の判定にだけ使う。
 
     > **付与枚数は記録に在る**（2026-09-13 に判明）＝**`pol_k` 列**（`record_gen` の
     > `_don_k(rep)`＝`payload["don_k"]`・`-1` は DON_BOX でない候補）。`move_sig` が 5 要素で
@@ -1632,19 +2008,29 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
         # **T150b/T150f-2**: この攻撃が固定する k 枚のドンの機会費用＋（misalloc_play だけ）見送った登場（既定 off では常に 0）
         dcost = _don_cost_total(ctx, k, cards, theta, mu, src_x=src_x)
         if tgt is None and tgt_power is None:         # 対象のカードが引けない＝リーダー扱い
-            return attack_value(sp, ctx["opp_leader_power"], True, theta, mu, blockers=blockers) - dcost
-        tp = float(tgt["power"]) if tgt_power is None else float(tgt_power)
-        if tgt is not None and tgt.get("leader"):
-            return attack_value(sp, tp, True, theta, mu, blockers=blockers) - dcost
-        nu_t = nu_of(tp, ctx["my_leader_power"], ctx["r_turns"], theta, mu,
-                     is_blocker=(tgt or {}).get("blocker"))
-        if (tgt or {}).get("blocker"):
-            # 対象そのものはその攻撃をブロックできない——同じパワーのブロッカーを 1 つ外す
-            for i, (pb, _nb) in enumerate(blockers):
-                if abs(pb - tp) <= PWR_EPS:
-                    blockers = blockers[:i] + blockers[i + 1:]
-                    break
-        return attack_value(sp, tp, False, theta, mu, nu_target=nu_t, blockers=blockers) - dcost
+            tp, lead = ctx["opp_leader_power"], True
+        else:
+            tp = float(tgt["power"]) if tgt_power is None else float(tgt_power)
+            lead = bool(tgt is not None and tgt.get("leader"))
+        nu_t = None
+        if not lead:
+            nu_t = nu_of(tp, ctx["my_leader_power"], ctx["r_turns"], theta, mu,
+                         is_blocker=(tgt or {}).get("blocker"))
+            if (tgt or {}).get("blocker"):
+                # 対象そのものはその攻撃をブロックできない——同じパワーのブロッカーを 1 つ外す
+                for i, (pb, _nb) in enumerate(blockers):
+                    if abs(pb - tp) <= PWR_EPS:
+                        blockers = blockers[:i] + blockers[i + 1:]
+                        break
+        v = attack_value(sp, tp, lead, theta, mu, nu_target=nu_t, blockers=blockers)
+        if ATTACK_ABILITY_MODE == "on":
+            # **F-2**: 攻め手の【アタック時】能力（攻撃の価格と同じ `P`・対象・ブロッカー・`Θ` で読む）
+            v = attack_ability_value(cid, ctx, {"power": sp, "target_power": tp, "is_leader": lead,
+                                                "nu_target": nu_t, "blockers": list(blockers),
+                                                "theta": theta, "mu": mu, "src_x": src_x},
+                                     k=(k if at == "DON_BOX" else 0), src_don=src_don, base=v,
+                                     target_blocker=(tgt or {}).get("blocker") if tgt is not None else None)
+        return v - dcost
     if at in ("ATTACH_DON", "DON_BOX"):
         # **T150b/T150f-2**: 純付与も同じ費用を払う（既定 off では常に 0）。付与先の体そのものが
         # `src_x`（DON_BOX の +1000k はこの枝には掛からない・T150f-1）。
@@ -1689,6 +2075,9 @@ def _char_play_value(cid, src, ctx, theta, mu, k):
     ev = _effect_value(cid, "char_on_play", _effect_state(ctx), ctx.get("opp_bodies"))
     if ev is None:
         return None
+    if PASSIVE_BODY_MODE == "on":
+        # **F-3a**: 体の価格に、トークンに届いていない継続効果（生存・非ブロッカーのキーワード・テンポ）を足す
+        return base + ev + passive_body_value(cid, src, ctx, theta, mu)
     return base + ev
 
 
@@ -1768,7 +2157,8 @@ def collect(dirs, holdout_mod=7, limit_games=0, theta=THETA, mu=MU,
                                               tcid, ctx, cards,
                                               src_power=slot_power(tok, pol["pol_si"][j]),
                                               tgt_power=slot_power(tok, pol["pol_ti"][j]),
-                                              don_k=pol["pol_k"][j]))
+                                              don_k=pol["pol_k"][j],
+                                              src_don=slot_don(tok, pol["pol_si"][j])))
             stats["cand"] += k
             stats["cand_scored"] += sum(1 for t in theory if t is not None)
             r = row_order(pol["pol_n"][b:b + k], pol["pol_q"][b:b + k], pol["pol_p"][b:b + k],
@@ -1858,9 +2248,16 @@ def main(argv=None):
     ap.add_argument("--don-k", type=int, default=1,
                     help="DON_BOX の付与枚数の仮定（記録に無いので感度を見る・既定 1）")
     add_nu_mode_arg(ap)
+    add_attack_ability_arg(ap)
+    add_passive_body_arg(ap)
+    import effect_value as _EV
+    _EV.add_f_pricing_fixes_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_nu_mode(a)
+    apply_attack_ability(a)
+    apply_passive_body(a)
+    _EV.apply_f_pricing_fixes(a)
 
     t0 = time.time()
     recs, stats = collect(a.src, a.holdout_mod, a.limit_games, a.theta, a.mu,
@@ -1871,7 +2268,10 @@ def main(argv=None):
            "by_band": {b: block([r for r in recs if r["band"] == b])
                        for b in ("close", "mid", "decided")},
            "saturation_x": saturation_x(a.theta),
-           "args": {k: v for k, v in vars(a).items() if k != "out"},
+           # F-2/F-3a の切替は on のときだけ刻む（off の出力は従来と 1 バイトも変えない）
+           "args": {k: v for k, v in vars(a).items()
+                    if k != "out" and not (k in ("attack_ability", "passive_body") and v == "off")
+                    and not (k == "f_pricing_fixes" and v is None)},
            "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
     print(txt)

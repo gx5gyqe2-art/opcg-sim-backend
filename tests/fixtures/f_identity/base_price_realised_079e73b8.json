@@ -1,0 +1,136 @@
+{
+  "nu_mode": "pair",
+  "surv_mode": "geo",
+  "flow_pricing": "option",
+  "search_price": "plan",
+  "hand_meas": "quality",
+  "play_now": "hand",
+  "cost_afford": "check",
+  "pricing_fixes": "draw_n,either_side,optional_block,base_power,opp_subject,revealed_src,choice_max",
+  "decision_rows": "main",
+  "inflow": "on",
+  "cond_clock": "on",
+  "stats": {
+    "games": 2,
+    "own_rows": 133,
+    "scored": 113,
+    "no_next": 202,
+    "silent": 0,
+    "search_price": "plan",
+    "search_deck_ok": 4,
+    "search_deck_bad": 0,
+    "hand_meas": "quality",
+    "hand_added": 19,
+    "hand_quality_sum": -0.06898202451167651,
+    "hand_gain_sum": 0.9779179754883236,
+    "cond": {
+      "true": 255,
+      "false": 190,
+      "unknown": 0
+    }
+  },
+  "frozen": {
+    "lambda": 0.1362,
+    "mu": 0.0551,
+    "delta": 0.0277,
+    "nu_meas": {
+      "lt_leader": 0.069,
+      "leader_to_sat": 0.1503,
+      "over_sat": 0.2112
+    },
+    "theta": 1.5819
+  },
+  "summary": {
+    "by_family": {
+      "attack": {
+        "n": 40,
+        "price_mean": 0.07471,
+        "real_mean": 0.08047,
+        "gross_mean": 0.07471,
+        "real_turn_end_mean": 0.14317,
+        "price_p10_p50_p90": [
+          0.0551,
+          0.0705,
+          0.0872
+        ],
+        "real_p10_p50_p90": [
+          0.0551,
+          0.0811,
+          0.1102
+        ],
+        "ratio_real_over_price": 1.077,
+        "ratio_real_over_gross": 1.077,
+        "corr": 0.5816,
+        "slope_real_on_price": 0.6752
+      },
+      "attach": {
+        "n": 37,
+        "price_mean": 0.01906,
+        "real_mean": -0.0,
+        "gross_mean": 0.01906,
+        "real_turn_end_mean": 0.13346,
+        "price_p10_p50_p90": [
+          0.0,
+          0.0,
+          0.0314
+        ],
+        "real_p10_p50_p90": [
+          -0.0,
+          -0.0,
+          0.0
+        ],
+        "ratio_real_over_price": -0.0,
+        "ratio_real_over_gross": -0.0,
+        "corr": 0.1624,
+        "slope_real_on_price": 0.0001
+      },
+      "play": {
+        "n": 26,
+        "price_mean": 0.05006,
+        "real_mean": 0.03808,
+        "gross_mean": 0.06495,
+        "real_turn_end_mean": 0.1074,
+        "price_p10_p50_p90": [
+          -0.0551,
+          0.026,
+          0.1793
+        ],
+        "real_p10_p50_p90": [
+          -0.0698,
+          0.0137,
+          0.1662
+        ],
+        "ratio_real_over_price": 0.761,
+        "ratio_real_over_gross": 0.586,
+        "corr": 0.744,
+        "slope_real_on_price": 0.8528
+      },
+      "effect": {
+        "n": 10,
+        "price_mean": 0.04883,
+        "real_mean": 0.03047,
+        "gross_mean": 0.04883,
+        "real_turn_end_mean": 0.11508,
+        "price_p10_p50_p90": [
+          0.0094,
+          0.0134,
+          0.1385
+        ],
+        "real_p10_p50_p90": [
+          0.0,
+          0.0,
+          0.1108
+        ],
+        "ratio_real_over_price": 0.624,
+        "ratio_real_over_gross": 0.624,
+        "corr": 0.9435,
+        "slope_real_on_price": 0.7447
+      }
+    },
+    "effect_by_action": {},
+    "play_by_onplay_action": {},
+    "turns_by_flow_effect": {},
+    "games": 2
+  },
+  "seconds": 2.6
+}

@@ -814,10 +814,24 @@ def _state_of(sc, ci, idx2cid, tok=None, cards=None):
         import price_realised as PR                       # 遅延（`price_realised` は本器を import する）
         st["my_don_total"] = PR.don_stock(sc, tok, "me")
         st["opp_don_total"] = PR.don_stock(sc, tok, "opp")
+        # 付与中のドン（リーダー ＋ キャラ・`attached_don_cond` だけが読む）
+        st["my_don_attached"] = PR.don_attached(sc, tok, "me")
+        st["opp_don_attached"] = PR.don_attached(sc, tok, "opp")
     st["source_rested"] = False                             # 登場時の値付け＝出た札はアクティブ
     if cards is not None:
         st["cards"] = cards
     return st
+
+
+def opp_pools(opp_ci, my_ci, idx2cid, opp_deck):
+    """**レビュー 4 の D3**（完全情報）: 相手の手札（相手の直近の行の手札の枠）と相手の残りの山
+    （相手のデッキの構成 − 相手の手札 − 相手の場）。公開した札の確率を相手の札の池で出すのに使う。"""
+    import search_price as SP
+    hand = [] if opp_ci is None else _TOM.hand_ids_of(opp_ci, idx2cid)
+    field = [c for c in (idx2cid.get(int(x)) for x in np.asarray(my_ci)[_TOM.SLOT_OPP_FIELD]) if c]
+    out = {"opp_hand_ids": hand if opp_ci is not None else None}
+    out["opp_deck_remaining"] = SP.remaining_deck(opp_deck, hand, field) if opp_deck else None
+    return out
 
 
 def _kappa_of_row(sc, tok, t, prof=None, g_me=None, g_opp=None, opp=None):
@@ -1134,6 +1148,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     ctx["opp_chars"] = opp_chars_of(tok)
                 # **T49**: 局面の傾き。価格（平均の傾きで書いた時計の差分）に掛けて `ΔG` に足す
                 opp = _opp_view(first_main, opp_turns, ex, w, t)          # T79: 相手の直近の行（完全情報）
+                if EV.F_PRICING_FIX and ctx.get("st") is not None:
+                    ctx["st"].update(opp_pools(None if opp is None else opp["ci"], ex["ci"][i], idx2cid, decks.get(1 - w)))
                 ck = _kappa_of_row(sc, tok, t, prof,
                                    g_me=_g_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t)),
                                    g_opp=(None if opp is None else
@@ -1156,7 +1172,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                            _ctx, cards,
                                            src_power=slot_power(_tok, pol["pol_si"][j]),
                                            tgt_power=slot_power(_tok, pol["pol_ti"][j]),
-                                           don_k=pol["pol_k"][j])
+                                           don_k=pol["pol_k"][j],
+                                           src_don=_TOM.slot_don(_tok, pol["pol_si"][j]))   # F-2（on のときだけ使う）
                 vals = [_score(j) for j in range(b, b + k)]
                 scored = [v for v in vals if v is not None]
                 played_v = vals[ch]
@@ -1679,11 +1696,18 @@ def main(argv=None):
                     help="**T80 の診断** `drop` なら局の最後のターンの行を落とす（とどめの一撃とその応答を外す）")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
+    _TOM.add_attack_ability_arg(ap)
+    _TOM.add_passive_body_arg(ap)
+    EV.add_f_pricing_fixes_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_decision_row(a)
     apply_guard_afford(a)                                      # G-2
     apply_guard_s_cost(a)                                      # G-2
+    _TOM.apply_attack_ability(a)
+    _TOM.apply_passive_body(a)
+    EV.apply_f_pricing_fixes(a)
+    _TOM.reset_wiring_stats()
     EV.apply_search_price(a)
     EV.apply_play_now(a)
     EV.apply_cost_afford(a)
@@ -1727,6 +1751,12 @@ def main(argv=None):
     # **T49 の検算**: `κ` の平均（`w` の平均が `w̄` に戻れば 1）
     stats["kappa_mean"] = (round(stats["kappa_sum"] / stats["kappa_n"], 4) if stats["kappa_n"] else None)
     stats["w_mean"] = (round(stats["kappa_mean"] * _TO.W_BAR, 4) if stats["kappa_mean"] is not None else None)
+    if EV.F_PRICING_FIX:
+        stats["f_pricing_fixes"] = EV.apply_f_pricing_fixes(a)          # on のときだけ刻む
+    if _TOM.ATTACK_ABILITY_MODE != "off" or _TOM.PASSIVE_BODY_MODE != "off":
+        # F-2/F-3a: 切替 on のときだけ刻む（off の出力は従来と同じ）
+        stats["wiring"] = {"attack_ability": _TOM.ATTACK_ABILITY_MODE, "passive_body": _TOM.PASSIVE_BODY_MODE,
+                           **{k: (round(v, 5) if isinstance(v, float) else v) for k, v in _TOM.WIRING_STATS.items()}}
     pairs = pair_games(per, a.silent)
     res = {"stats": stats, "decision_rows": DECISION_ROW_MODE,
            "provisional": {"P3_theta": a.theta, "P2_silent": a.silent,

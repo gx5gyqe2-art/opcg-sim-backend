@@ -247,6 +247,9 @@ def _holds_board(kind, cond, st):
     if kind == "HAS_DON":
         # 【ドン!!×N】＝この札に N 枚付いていれば。**付けられるか**（アクティブなドン ≥ N）で読む＝上限（付ける費用は数えない）
         n = _int_value(cond)
+        if mine and st.get("source_don_attached") is not None:
+            # **F-2**: 攻撃の行では【ドン!!×N】＝攻め手に**今付いている**枚数（DON_BOX の k 枚を足した後）で判定する
+            return None if n is None else int(st["source_don_attached"]) >= int(n)
         a = st.get(p + "don_active")
         return None if (n is None or a is None) else int(a) >= int(n)
     if kind == "HAS_CHARACTER":
@@ -360,6 +363,17 @@ def _holds_state(kind, cond, st):
             return None
         return compare(int(n) + int(bool(st.get(p + "stage"))), op, val)
     if kind == "DON_COUNT":
+        raw = str(cond.get("raw_text") or "")
+        if "付与" in raw and "同じ" not in raw:
+            try:
+                import effect_value as EV
+                fixed = EV._ffix("attached_don_cond")
+            except Exception:
+                fixed = False
+            if fixed:
+                # **attached_don_cond**（F の直し）: 「付与されているドン!!が N 枚」は付与中のドンだけ（`effects/cond.rs` と同じ）
+                att = st.get(p + "don_attached")
+                return None if att is None else compare(int(round(float(att))), op, val)
         tot = st.get(p + "don_total")
         if tot is not None:
             return compare(int(round(float(tot))), op, val)      # T72: 総在庫（付与込み）が読めれば区間ではなく値で
