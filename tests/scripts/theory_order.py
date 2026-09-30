@@ -1202,13 +1202,31 @@ def _target_power_down(card):
     best = 0.0
     for e in _on_attack_acts(card):
         t = e.get("target") or {}
-        if (str(e.get("type") or "") in ("BUFF", "BP_BUFF") and EV._side(t) == "OPPONENT"
-                and EV._magnitude(e) < 0 and not EV._is_set_power(e)):
+        if _is_power_down(EV, e):
             best = max(best, -EV._magnitude(e))
     return best
 
 
-def _ability_on_attack(EV, cid, ctx, actx, k, src_don, opp_bodies, drop_power_down=False):
+def _is_power_down(EV, e):
+    """相手の体の**パワー**を下げる動作か（コストの増減〔`COST_REDUCTION`〕・「X にする」は除く・レビュー 4 の D2）。"""
+    t = e.get("target") or {}
+    return (str(e.get("type") or "") in ("BUFF", "BP_BUFF") and EV._side(t) == "OPPONENT"
+            and EV._magnitude(e) < 0 and not EV._is_set_power(e) and str(e.get("status") or "") != "COST_REDUCTION")
+
+
+def _mark_power_down(EV, o):
+    """効果木の写しで、相手の体のパワー低下の動作に `_pd` の印を付ける（D2）。"""
+    if isinstance(o, list):
+        return [_mark_power_down(EV, x) for x in o]
+    if not isinstance(o, dict):
+        return o
+    d = {k: _mark_power_down(EV, v) for k, v in o.items()}
+    if d.get("type") and _is_power_down(EV, d):
+        d["_pd"] = True
+    return d
+
+
+def _ability_on_attack(EV, cid, ctx, actx, k, src_don, opp_bodies, drop_power_down=False, pd_gain=None):
     """【アタック時】能力の値（`card_value`）。読めなければ `None`。
     `drop_power_down`（レビュー 3 の 5）: 相手の体のパワー低下を攻撃の対象に使った読み＝その動作を値付けから外す。"""
     st = _effect_state(ctx)
@@ -1221,6 +1239,13 @@ def _ability_on_attack(EV, cid, ctx, actx, k, src_don, opp_bodies, drop_power_do
         st["source_don_attached"] = int(src_don) + int(round(float(k)))
         st["source_don_pre"] = int(src_don)          # 付ける前に付いていた枚数（条件のために付けたドンの費用・レビュー 3 の 8）
     cards = None
+    if pd_gain is not None:
+        c0 = EV._all_cards().get(str(cid)) or {}
+        cards = {str(cid): dict(c0, abilities=[
+            dict(ab, effect=_mark_power_down(EV, ab.get("effect")))
+            if (ab.get("trigger") or ab.get("timing")) in EV.ON_ATTACK_TRIGGERS else ab
+            for ab in (c0.get("abilities") or [])])}
+        st["pd_gain"] = float(pd_gain)
     if drop_power_down:
         c0 = EV._all_cards().get(str(cid)) or {}
         abs_ = []
@@ -1286,15 +1311,27 @@ def attack_ability_value(cid, ctx, actx, k=0, src_don=None, base=0.0, target_blo
         # **パワーを下げる**ならバトルは続き攻撃が通りやすくなる（攻撃の価格を下げた後のパワーで読み直す）
         v_end = (_ability_on_attack(EV, cid, ctx, dict(actx, ended=True), k, src_don, bodies)
                  if _removes_from_field(c) else None)
-        dmag = _target_power_down(c)
+        # **レビュー 4 の D2**: 対象へのパワー低下は**能力の値付けの中で**読み直す——低下の動作を「この攻撃の価格の増分」
+        # （`pd_gain`）で値付けし、能力の条件・コスト・付けない自由の床・【ドン!!×N】の費用はそのまま掛ける。
+        # 対象がその動作の絞り込み（コスト・パワー・特徴等）に合わなければ使えない。
         v_dbf = None
+        tb = bodies[ti]
+        dmag = 0.0
+        st_f = _effect_state(ctx)
+        for e in _on_attack_acts(c):
+            if _is_power_down(EV, e):
+                with EV.opaque_as_upper():
+                    picked = EV._pick_opp(e.get("target") or {}, [tb], 1, st_f)
+                if picked:
+                    dmag = max(dmag, -EV._magnitude(e))
         if dmag and v_keep is not None:
-            rest = _ability_on_attack(EV, cid, ctx, actx, k, src_don, others, drop_power_down=True)
-            if rest is not None:
-                tp2 = max(0.0, float(actx["target_power"]) - float(dmag))
-                atk2 = attack_value(actx["power"], tp2, False, actx["theta"], actx["mu"],
-                                    nu_target=actx.get("nu_target"), blockers=actx.get("blockers"))
-                v_dbf = float(atk2) + float(rest)
+            tp2 = max(0.0, float(actx["target_power"]) - float(dmag))
+            atk2 = attack_value(actx["power"], tp2, False, actx["theta"], actx["mu"],
+                                nu_target=actx.get("nu_target"), blockers=actx.get("blockers"))
+            gain = float(atk2) - float(base)
+            v_pd = _ability_on_attack(EV, cid, ctx, actx, k, src_don, others, pd_gain=gain)
+            if v_pd is not None:
+                v_dbf = float(base) + float(v_pd)
         if v_keep is None:
             total = None
         else:
@@ -1990,7 +2027,7 @@ def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, 
             # **F-2**: 攻め手の【アタック時】能力（攻撃の価格と同じ `P`・対象・ブロッカー・`Θ` で読む）
             v = attack_ability_value(cid, ctx, {"power": sp, "target_power": tp, "is_leader": lead,
                                                 "nu_target": nu_t, "blockers": list(blockers),
-                                                "theta": theta, "mu": mu},
+                                                "theta": theta, "mu": mu, "src_x": src_x},
                                      k=(k if at == "DON_BOX" else 0), src_don=src_don, base=v,
                                      target_blocker=(tgt or {}).get("blocker") if tgt is not None else None)
         return v - dcost

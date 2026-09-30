@@ -616,6 +616,10 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
     （ユーザ指摘 2026-09-15「**`ν` ではなくて効果に紐づく価値を変動させるべき**」）
     ——`ν` は動かさず、**効果の値が盤面で変わる**。**対象が居なければ 0**（空振り）。
     """
+    if effect.get("_pd") and (st or {}).get("pd_gain") is not None:
+        # **レビュー 4 の D2**: 攻撃の対象へのパワー低下を読み直す値付けで、印を付けた動作は「その攻撃の価格の増分」
+        # （`theory_order.attack_ability_value` が積む）——能力の条件・コスト・付けない自由の床はそのまま掛かる
+        return float(st["pd_gain"])
     at = str(effect.get("type") or "")
     target = effect.get("target") or {}
     side = _side(target)
@@ -747,6 +751,10 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
             if now is not None:
                 return now
         per = fv - mu if zone in PLAY_FROM_HAND_ZONES else fv
+        if _ffix("trash_pool") and zone == "TRASH" and not opp:
+            pr = trash_has_match(target, st)
+            if pr is not None:
+                per *= pr                         # **D5**: トラッシュに合う札が在る確率（デッキの構成から）
         amt = n * per
         return amt if not opp else -amt
     if kind == "hand_gain":
@@ -822,6 +830,13 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         # 相手の体（「パワー 0 にする」）は今のパワーが判らないので従来どおり（上限で打ち切られる）。
         if _is_set_power(effect) and not opp and card is not None and card.get("power") is not None:
             mag = mag - float(card.get("power") or 0.0)
+        if (_OPAQUE_UPPER[0] and opp and mag < 0 and opp_bodies is not None and (st or {}).get("attack_ctx")
+                and str(effect.get("status") or "") != "COST_REDUCTION"):
+            # **レビュー 4 の D6**: 攻撃の行の「相手のキャラ 1 枚まで −N」（攻撃の対象以外に使う読み）は、**このターンの
+            # 残りの攻撃手がその体を殴る価格の増分**の最良（取れる体 × 残りの攻撃手）。殴れる手が無ければ 0。
+            got = debuff_follow_up_value(target, -mag, opp_bodies, st)
+            if got is not None:
+                return got
         if (_ffix("hand_board") or _OPAQUE_UPPER[0]) and opp and mag < 0 and opp_bodies is not None:
             # 攻撃の行（上限読みの間）も同じ——対象以外に取れる体が居ないのに汎用の値を付けると、攻撃の対象に使う読みと二重になる
             # **hand_board**: 相手の体のパワーを下げる動作も、盤面で取れる体の数で打ち切る（居なければ 0）
@@ -843,6 +858,37 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         good = up if not opp else not up
         return amt if good else -amt
     return None
+
+
+def debuff_follow_up_value(target, dmag, opp_bodies, st):
+    """**D6**: 攻撃の行で相手の体のパワーを `dmag` 下げる価値＝取れる体 b（絞り込み・盤面）と、今の攻撃手を除く
+    このターンの攻撃手 a（`st["attackers"]` の `x = パワー − 相手リーダー`）の組で
+    `max_{a,b} [attack_value(a, P_b − dmag, ν_b) − attack_value(a, P_b, ν_b)]`（0 に床）。**新定数ゼロ**（攻撃の価格そのもの）。"""
+    actx = (st or {}).get("attack_ctx") or {}
+    xs = list((st or {}).get("attackers") or [])
+    olp = (st or {}).get("opp_leader_power")
+    if olp is None:
+        return None
+    sx = actx.get("src_x")
+    if sx is not None:
+        for i, x in enumerate(xs):
+            if abs(float(x) - float(sx)) <= 10.0:
+                xs.pop(i)                          # 今殴っている体はもう殴れない
+                break
+    if _pick_opp(target, opp_bodies, 1, st) is None:
+        return None
+    from theory_order import attack_value
+    th, m = float(actx.get("theta") or THETA), float(actx.get("mu") or MU)
+    best = 0.0
+    for b in opp_bodies:
+        if not _pick_opp(target, [b], 1, st):
+            continue
+        pb, nb = float(b.get("power") or 0.0), float(b.get("nu") or 0.0)
+        for x in xs:
+            a = float(x) + float(olp)
+            gain = attack_value(a, max(0.0, pb - dmag), False, th, m, nu_target=nb) - attack_value(a, pb, False, th, m, nu_target=nb)
+            best = max(best, float(gain))
+    return float(best)
 
 
 def _is_set_power(effect):
@@ -952,12 +998,13 @@ def apply_pricing_fixes(a):
 #: | `hand_board` | 「手札から登場させる」の相方の登場時効果を盤面なしで値付けした（相手の体を全部取る扱い・OP15-114 が 0.82）・相手の体のパワー低下を盤面を見ずに 5 体ぶん数えた | 相方の登場時効果も今の盤面（取れる相手の体・状態）で読む・パワー低下は取れる体の数で打ち切る |
 #: | `state_filters` | 「自分の場のドン!!の枚数以下のコスト」等の動的なコスト上限・「ドン!!が付与されている」を読まなかった | 状態から読めれば絞り込みに使う（手札の相方・相手の体とも） |
 #: | `branch_then` | 「〜した場合、…」の枝（`Branch`）の中の動作を一度も数えなかった（「ライフの上から 1 枚を手札に」−0.081 が抜けた） | 条件を状態から判定して、起きる側の枝の動作を数える。「登場させた場合」は「そうした場合」と同じ塊として読む |
+#: | `trash_pool` | 「トラッシュから登場させる」を、合う札がトラッシュに在るかを見ずに満額で数えた（EB03-045） | 見えていない自分の札の池からトラッシュの枚数ぶん取った超幾何の確率で重み付け |
 #: | `look_return` | 「ライフの上から 1 枚を見て、ライフの上か下に置く」の戻しを、見た札（`TEMP`）がライフに**増える**（+λ）と数えた（OP03-099 が 0.136 高い） | ライフ・デッキを見た札がそこへ戻るのは並べ替え（0） |
 #:
 #: **レビュー 3 で `ko_effect_share` を外した**（効果で離れる割合の表は評価に使う局と同じ局＝w41／w39／w42 で測られていて、
 #: 実と合成を混ぜていた。別の記録で測り直すまで使わない・効果は測れるほど無かった）。
 #: | `attached_don_cond` | 条件「付与されているドン!!が N 枚以上」を場のドンの総数で判定した（エンジンは本文の「付与」で付与中だけを数える） | 付与中のドンの枚数で判定（読めなければ判らない） |
-F_PRICING_FIXES = ("hand_board", "state_filters", "branch_then", "attached_don_cond", "look_return")
+F_PRICING_FIXES = ("hand_board", "state_filters", "branch_then", "attached_don_cond", "look_return", "trash_pool")
 F_PRICING_FIX = frozenset()
 
 
@@ -1276,6 +1323,35 @@ def _unpriced_family(e):
     return family_of(at)
 
 
+def _own_pool(st):
+    """見えていない自分の札の池＝デッキの構成 − 手札 − 場（`search_price.remaining_deck`・完全情報の前提）と `cards`。"""
+    ctx = (st or {}).get("search_ctx") or {}
+    deck, cards = ctx.get("deck"), ctx.get("cards") or (st or {}).get("cards")
+    if not deck:
+        return None, cards
+    import search_price as SP
+    hand = [it.get("cid") if isinstance(it, dict) else it for it in (ctx.get("hand_items") or [])]
+    return SP.remaining_deck(deck, [h for h in hand if h], ctx.get("field") or ()), cards
+
+
+def trash_has_match(target, st):
+    """**D5（trash_pool）**: トラッシュに絞り込みに合う札が 1 枚以上在る確率。トラッシュの中身は記録に無いので、
+    見えていない自分の札の池（N 枚・合う札 K 枚）から今のトラッシュの枚数 T 枚を取った超幾何の `1 − C(N−K, T)/C(N, T)`。
+    読めなければ `None`。**新定数ゼロ**（デッキの構成と枚数だけ）。"""
+    pool, cards = _own_pool(st)
+    t = (st or {}).get("my_trash")
+    if not pool or cards is None or t is None:
+        return None
+    import search_price as SP
+    from math import comb
+    n_ = len(pool)
+    k_ = len(SP.eligible_deck_cards(target, pool, cards, st=st))
+    t_ = int(min(max(0, int(t)), n_))
+    if t_ == 0 or k_ == 0:
+        return 0.0
+    return 1.0 - comb(n_ - k_, t_) / comb(n_, t_)
+
+
 def _deck_of_state(st):
     """完全情報の前提で読める自分のデッキ（`search_ctx["deck"]`・記録の seed から復元した構成）。無ければ `None`。"""
     ctx = (st or {}).get("search_ctx") or {}
@@ -1319,11 +1395,55 @@ def _revealed_matches(cid, want, cards):
     return True
 
 
-def branch_probability(cond, st):
+def _reveal_pool(reveal, st):
+    """公開・宣言した札の池（**D3**）: 相手の手札（`REVEAL` 相手の手札）・相手の残りの山（「相手のデッキ」）・自分の残りの山。"""
+    t = (reveal or {}).get("target") or {}
+    raw = str((reveal or {}).get("raw_text") or "")
+    cards = ((st or {}).get("search_ctx") or {}).get("cards") or (st or {}).get("cards")
+    opp = _side(t) == "OPPONENT" or "相手の" in raw
+    zone = _zone(t)
+    if opp and ("HAND" in zone or "手札" in raw):
+        return (st or {}).get("opp_hand_ids"), cards
+    if opp:
+        return (st or {}).get("opp_deck_remaining"), cards
+    return _own_pool(st)
+
+
+def _reveal_before(root, branch):
+    """`branch` の直前（同じ並びの前の要素）で札を見せる動作（`LOOK`・`REVEAL`・`DECLARE_COST`・`LOOK_LIFE`）。"""
+    found = []
+
+    def rec(o):
+        if found:
+            return
+        if isinstance(o, list):
+            for i, y in enumerate(o):
+                if y is branch:
+                    for prev in reversed(o[:i]):
+                        for a in reversed(walk_actions(prev)):
+                            if str(a.get("type") or "") in ("LOOK", "REVEAL", "DECLARE_COST", "LOOK_LIFE"):
+                                found.append(a)
+                                return
+                    found.append(None)
+                    return
+            for y in o:
+                rec(y)
+        elif isinstance(o, dict):
+            for v in o.values():
+                rec(v)
+
+    rec(root)
+    return found[0] if found else None
+
+
+def branch_probability(cond, st, reveal=None):
     """**branch_then**（レビュー 3）: 公開した札で決まる条件が成り立つ確率＝**デッキの構成の中で合う札の割合**
     （完全情報の前提・記録の seed から復元したデッキ）。`DECLARED_COST_MATCH` は宣言する側が最も多いコストを選ぶ＝
     その割合。デッキが読めなければ `None`（呼び側は上限＝成り立つ側で読む）。**新定数ゼロ**。"""
-    deck, cards = _deck_of_state(st)
+    if reveal is not None or (st or {}).get("_pool_mode") == "reveal":
+        deck, cards = _reveal_pool(reveal, st)                # D3: 見せた札の池（その時点の残り・相手の山／手札）
+    else:
+        deck, cards = _deck_of_state(st)
     if not deck:
         return None
     kind = cond.get("type")
@@ -1339,6 +1459,24 @@ def branch_probability(cond, st):
             return None
         return float(max(costs.values())) / float(len(deck))
     return None
+
+
+def branch_sides(branch, st, root=None):
+    """`Branch` の起きる側と重み `[(鍵, 重み), …]`（`branch_actions` と `_tree_total` が共有する）。"""
+    c = branch.get("condition") or {}
+    if c.get("type") == "PREV_ACTION":
+        return [("if_false" if str(c.get("value")) == "SKIPPED" else "if_true", 1.0)]
+    if c.get("type") in ("REVEALED_CARD_TRAIT", "DECLARED_COST_MATCH"):
+        rv = _reveal_before(root, branch) if root is not None else None
+        p = branch_probability(c, st, reveal=rv if rv is not None else {})
+        if p is not None:
+            return [("if_true", p), ("if_false", 1.0 - p)]
+    try:
+        import condition_value as CV
+        got = CV.holds(c, st)
+    except Exception:
+        got = None
+    return [("if_false" if got is False else "if_true", 1.0)]
 
 
 def branch_actions(effect, st=None, consumed=()):
@@ -1359,20 +1497,7 @@ def branch_actions(effect, st=None, consumed=()):
     def rec(o, w=1.0):
         if isinstance(o, dict):
             if o.get("node") == "Branch":
-                c = o.get("condition") or {}
-                if c.get("type") == "PREV_ACTION":
-                    sides = [("if_false" if str(c.get("value")) == "SKIPPED" else "if_true", 1.0)]
-                else:
-                    p = branch_probability(c, st) if c.get("type") in ("REVEALED_CARD_TRAIT", "DECLARED_COST_MATCH") else None
-                    if p is not None:
-                        sides = [("if_true", p), ("if_false", 1.0 - p)]
-                    else:
-                        try:
-                            import condition_value as CV
-                            got = CV.holds(c, st)
-                        except Exception:
-                            got = None
-                        sides = [("if_false" if got is False else "if_true", 1.0)]
+                sides = branch_sides(o, st, effect)
                 for key, sw in sides:
                     if sw <= 0.0:
                         continue
@@ -1626,28 +1751,40 @@ def choice_inherits(effect, qual):
     return out
 
 
-def _tree_total(node, vals, qual):
-    """効果木を `walk_actions` と同じ順で辿って動作の値を足す。**`qual` の選択肢は最大（相手が選ぶなら最小）**。"""
+def _tree_total(node, vals, qual, br=None):
+    """効果木を `walk_actions` と同じ順で辿って動作の値を足す。**`qual` の選択肢は最大（相手が選ぶなら最小）**。
+
+    `br = (st, consumed, root)`（**D1**・`branch_then` のときだけ）: `Branch` も辿り、起きる側を重みつきで足す——
+    **選択肢の中の枝は選択肢の一部**として最大の中で比べる（外で足すと「1 つを選ぶ」の最大の上に枝を重ねてしまう）。"""
     if isinstance(node, list):
-        return sum(_tree_total(x, vals, qual) for x in node)
+        return sum(_tree_total(x, vals, qual, br) for x in node)
     if not isinstance(node, dict):
         return 0.0
+    if br is not None and node.get("node") == "Branch":
+        st_, consumed, root = br
+        tot = 0.0
+        for key, w in branch_sides(node, st_, root):
+            side = node.get(key)
+            if not side or any(id(a) in consumed for a in walk_actions(side)):
+                continue
+            tot += w * _tree_total(side, vals, qual, br)
+        return tot
     tot = 0.0
     if node.get("type"):
         tot += vals.get(id(node), 0.0)
     sub = node.get("sub_effect")
     if isinstance(sub, (dict, list)):
-        tot += _tree_total(sub, vals, qual)
+        tot += _tree_total(sub, vals, qual, br)
     for key in ("actions", "effects", "options"):
         v = node.get(key)
         if not isinstance(v, list):
             continue
         if key == "options" and id(node) in qual:
-            parts = [_tree_total(x, vals, qual) for x in v]
+            parts = [_tree_total(x, vals, qual, br) for x in v]
             if parts:
                 tot += (min if str(node.get("player") or "").upper() == "OPPONENT" else max)(parts)
         else:
-            tot += sum(_tree_total(x, vals, qual) for x in v)
+            tot += sum(_tree_total(x, vals, qual, br) for x in v)
     return tot
 
 
@@ -2235,7 +2372,10 @@ def _play_from_hand_now(target, st, card, n, mu, opp_bodies=None):
     # 相方の状態からは手札の文脈（`search_ctx`）も落とす——相方がさらに「手札から登場させる」を持つと無限に辿る（実測）
     st2 = {k: v for k, v in st.items() if k not in _ROW_ONLY_KEYS + ("search_ctx",)} if board else None
     if st2 is not None:
-        st2["source_paid"] = 0.0          # 効果でただで出す相方は印刷のコストを払わない（レビュー 3・レストのドンのコストを誤って払えない扱いにしていた）
+        # 効果でただで出す相方は印刷のコストを払わない（レビュー 3）。ただし**外側の札が払った分**はアクティブなドンから
+        # 既に減っている（レビュー 4 の D4）＝外側の支払い（攻撃の行なら 0・登場の行なら外側の札のコスト）を引き継ぐ
+        outer = st.get("source_paid")
+        st2["source_paid"] = float(outer) if outer is not None else float((card or {}).get("cost") or 0.0)
     for c in SP.eligible_hand_cards(target, ctx["hand_items"], cards, skip_cid=cid,
                                     st=(st if _ffix("state_filters") else None)):
         if board:
@@ -2474,17 +2614,24 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
         else:
             total += v
             vals[id(e0)] = v
-    if qual and not unpriced:
-        total = _tree_total(ab.get("effect"), vals, qual)
     if _ffix("branch_then"):
-        # **branch_then**: 「〜した場合、…」の枝の動作（塊が既に読んだ枝は除く）
+        # **branch_then**: 「〜した場合、…」の枝の動作（塊が既に読んだ枝は除く）。**D1**: 選択肢が在れば
+        # 木を辿って枝も選択肢の中で比べる（`_tree_total` の `br`）・無ければ重みつきで足す
         consumed = {id(x) for b in blocks for x in (list(b[2]) + list(b[3]))}
+        extra = 0.0
         for e, w in branch_actions(ab.get("effect"), st, consumed):
             v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st=st)
             if v is None:
                 unpriced.append((str(e.get("type") or "?"), _unpriced_family(e)))
             else:
-                total += w * v
+                vals[id(e)] = v
+                extra += w * v
+        if qual and not unpriced:
+            total = _tree_total(ab.get("effect"), vals, qual, br=(st, consumed, ab.get("effect")))
+        else:
+            total += extra
+    elif qual and not unpriced:
+        total = _tree_total(ab.get("effect"), vals, qual)
     if selection and found is None:
         total += _sel_premium(selection_k(acts))
     cost = ab.get("cost") or {}
