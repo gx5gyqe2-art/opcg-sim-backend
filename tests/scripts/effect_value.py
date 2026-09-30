@@ -956,9 +956,26 @@ def set_pricing_fixes(spec):
     if bad:
         raise ValueError("知らない直し: %s" % bad)
     if new != PRICING_FIX:
-        _CACHE.pop("sel", None)
-    PRICING_FIX = new
+        _stash_sel()
+        PRICING_FIX = new
+        _restore_sel()
     return tuple(x for x in PRICING_FIXES if x in PRICING_FIX)
+
+
+def _sel_key():
+    return ("sel", PRICING_FIX, globals().get("F_PRICING_FIX", frozenset()))
+
+
+def _stash_sel():
+    """選択の分布の覚えを、今の直しの集合の鍵で退避する（集合を替えるたびに作り直すと遅い・値は同じ）。"""
+    if "sel" in _CACHE:
+        _CACHE[_sel_key()] = _CACHE.pop("sel")
+
+
+def _restore_sel():
+    v = _CACHE.get(_sel_key())
+    if v is not None:
+        _CACHE["sel"] = v
 
 
 class pricing_fixes:
@@ -1025,8 +1042,9 @@ def set_f_pricing_fixes(spec):
     if bad:
         raise ValueError("f pricing fixes は all／none／%s のカンマ区切り: %s" % (F_PRICING_FIXES, bad))
     if new != F_PRICING_FIX:
-        _CACHE.pop("sel", None)
-    F_PRICING_FIX = new
+        _stash_sel()
+        F_PRICING_FIX = new
+        _restore_sel()
     return tuple(x for x in F_PRICING_FIXES if x in F_PRICING_FIX)
 
 
