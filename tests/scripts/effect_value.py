@@ -1006,8 +1006,9 @@ def apply_pricing_fixes(a):
     return ",".join(x for x in PRICING_FIXES if x in PRICING_FIX) or "legacy"
 
 
-#: **F の値付けの直し**（2026-09-26・F-4 の独立レビュー 2 回目）。**既定は空＝従来と 1 ビットも変わらない**
-#: （L と同じ「名前つきの直し」の形・`--f-pricing-fixes all` で全部入り）。既定の値付けの道（登場時・起動メイン・
+#: **F の値付けの直し**（2026-09-26・F-4 の独立レビュー 2 回目）。**既定は全部入り**（F-5・ユーザ決定 2026-09-30・
+#: `docs/reports/2026-09-30_f_pricing_fixes_adoption.md`）。旧の値付け（079e73b8 まで）は `--f-pricing-fixes none`（別名 `legacy`）で
+#: 1 ビットも変わらず再現する（L と同じ「名前つきの直し」の形・テストで旧の代数を見るときは `none` を明示して固定する）。既定の値付けの道（登場時・起動メイン・
 #: 【アタック時】の中身）に効く直しだけをここに置く（切替の中だけで効く直しは切替そのものに入れた）。
 #:
 #: | 名前 | 誤り（直す前） | 直した読み |
@@ -1022,7 +1023,7 @@ def apply_pricing_fixes(a):
 #: 実と合成を混ぜていた。別の記録で測り直すまで使わない・効果は測れるほど無かった）。
 #: | `attached_don_cond` | 条件「付与されているドン!!が N 枚以上」を場のドンの総数で判定した（エンジンは本文の「付与」で付与中だけを数える） | 付与中のドンの枚数で判定（読めなければ判らない） |
 F_PRICING_FIXES = ("hand_board", "state_filters", "branch_then", "attached_don_cond", "look_return", "trash_pool")
-F_PRICING_FIX = frozenset()
+F_PRICING_FIX = frozenset(F_PRICING_FIXES)          # F-5（2026-09-30）: 既定は全部入り
 
 
 def _ffix(name):
@@ -1065,7 +1066,7 @@ class f_pricing_fixes:
 
 def add_f_pricing_fixes_arg(ap):
     ap.add_argument("--f-pricing-fixes", default=None,
-                    help="**F** 値付けの直し: `none`（既定・従来）／`all`／%s のカンマ区切り" % ",".join(F_PRICING_FIXES))
+                    help="**F** 値付けの直し: `all`（既定・F-5）／`none`（=`legacy`・079e73b8 までの旧の値付け）／%s のカンマ区切り" % ",".join(F_PRICING_FIXES))
 
 
 def apply_f_pricing_fixes(a):

@@ -406,7 +406,7 @@ def test_unblockable_is_read_from_the_card_text():
 
 
 # ---------------------------------------------------------------------------
-# F の値付けの直し（`--f-pricing-fixes`・既定は空）
+# F の値付けの直し（`--f-pricing-fixes`・既定は全部入り＝F-5・旧は `none`）
 # ---------------------------------------------------------------------------
 
 
@@ -417,8 +417,25 @@ def _ffix_restore():
     EV.set_f_pricing_fixes(before)
 
 
-def test_f_fixes_default_is_empty_and_setter_rejects_unknown(_ffix_restore):
-    assert EV.F_PRICING_FIX == frozenset()
+def test_f_fixes_default_is_the_full_set():
+    """**F-5 のラチェット**（ユーザ決定 2026-09-30）: 出荷の既定は F の直しの**全部入り**・2 つの切替（攻撃時・常時）は off。
+    モジュールの状態を漏らさないよう別プロセスで読む（他のテストが集合を替えていても既定を見る）。"""
+    import subprocess
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    code = ("import os, sys; sys.path.insert(0, 'tests'); sys.path.insert(0, 'tests/scripts'); import _bootstrap; "
+            "import effect_value as EV, theory_order as T; "
+            "print(sorted(EV.F_PRICING_FIX) == sorted(EV.F_PRICING_FIXES), len(EV.F_PRICING_FIXES), "
+            "T.ATTACK_ABILITY_MODE, T.PASSIVE_BODY_MODE)")
+    r = subprocess.run([sys.executable, "-c", code], cwd=root, capture_output=True, text=True, timeout=300,
+                       env=dict(os.environ, OPCG_LOG_SILENT="1"))
+    assert r.returncode == 0, r.stderr[-2000:]
+    assert r.stdout.split()[-4:] == ["True", "6", "off", "off"]
+    assert set(EV.F_PRICING_FIXES) == {"hand_board", "state_filters", "branch_then", "attached_don_cond",
+                                       "look_return", "trash_pool"}
+
+
+def test_f_fixes_setter_legacy_and_rejects_unknown(_ffix_restore):
+    assert EV.set_f_pricing_fixes("legacy") == ()
     assert EV.set_f_pricing_fixes("all") == EV.F_PRICING_FIXES
     assert EV.set_f_pricing_fixes("none") == ()
     with pytest.raises(ValueError):
@@ -448,6 +465,7 @@ def test_state_filters_read_the_dynamic_cost_cap_and_attached_don(_ffix_restore)
     both = ["OP15-114", "OP15-110"]
     assert SP.eligible_deck_cards(t, both, cards) == both
     assert SP.eligible_deck_cards(t, both, cards, st={"my_don_total": 3}) == ["OP15-110"]
+    EV.set_f_pricing_fixes("none")                                  # 旧の集合を明示（F-5 で既定は全部入り）
     bodies = [_body(3000), dict(_body(2000), attached_don=1)]
     bodies[0]["attached_don"] = 0
     tgt = {"min_attached_don": 1, "power_max": 3000, "card_type": ["CHARACTER"], "player": "OPPONENT"}
@@ -464,6 +482,7 @@ def test_attached_don_condition_counts_only_attached_don(_ffix_restore):
     エンジン（`effects/cond.rs`）は本文の「付与」で付与中だけを数える＝パーサの誤りではなく理論側の読み違い。"""
     import condition_value as CV
     ab = next(a for a in EV._all_cards()["ST31-004"]["abilities"] if a.get("trigger") == "PASSIVE")
+    EV.set_f_pricing_fixes("none")                                  # 旧の集合を明示（F-5 で既定は全部入り）
     st = {"my_don_total": 8, "my_don_attached": 2}
     assert CV.holds(ab["condition"], st) is True
     EV.set_f_pricing_fixes("attached_don_cond")
@@ -615,6 +634,7 @@ def test_look_return_prices_life_reordering_as_zero_review3_7():
     st = dict(_st(), attack_ctx=actx, source_don_attached=1, source_don_pre=1)
     before = EV.F_PRICING_FIX
     try:
+        EV.set_f_pricing_fixes("none")                              # 旧の集合を明示（F-5 で既定は全部入り）
         v0, _ = EV.ability_value(ab, card=c, st=st)
         assert v0 == pytest.approx(0.1362 + 0.28 * 0.0551)
         EV.set_f_pricing_fixes("look_return")
@@ -675,6 +695,7 @@ def test_branch_then_state_conditions_and_prev_action(_ffix_restore):
     got = EV.branch_actions(ab["effect"], None)
     assert [(e["type"], w) for e, w in got] == [("MOVE_CARD", 1.0)]
     assert EV.action_value(got[0][0], card=c) == pytest.approx(0.0551 - 0.1362)
+    EV.set_f_pricing_fixes("none")                                  # 旧の集合を明示（F-5 で既定は全部入り）
     v0, _ = EV.ability_value(ab, card=c)
     assert v0 == pytest.approx(0.1087 - 0.0551)
     EV.set_f_pricing_fixes("branch_then")
@@ -730,6 +751,10 @@ for mod, names in ((T, ("attack_ability_value", "passive_parts", "passive_body_v
 EV.opaque_as_upper.__enter__ = boom
 _orig = EV.attack_self_value
 EV.attack_self_value = lambda e, at, st, *a, **k: (boom() if (st or {}).get("attack_ctx") else None)
+# F-5（2026-09-30）で既定が全部入りになった＝**旧の集合（`none`）を明示**して 079e73b8 の再現を見る。
+# N-2（2026-09-26）で守る費用の既定が `joint` になった＝079e73b8 当時の `curve` を明示する（F と独立の変更）。
+EV.set_f_pricing_fixes("none")
+TB.set_guard_s_cost_mode("curve")
 rec, out, which = sys.argv[1], sys.argv[2], sys.argv[3]
 if which == "price_realised":
     rc = PR.main(["--in", rec, "--boot-reps", "10", "--out", out])
@@ -742,9 +767,11 @@ sys.exit(rc)
 
 
 def test_switches_off_match_recorded_base_outputs_of_079e73b8(tmp_path):
-    """**切替を切った状態の同一性**（レビュー 3 の 9）: 実デッキの記録 2 局（`tests/fixtures/f_identity/rec`・
+    """**旧の集合の同一性**（レビュー 3 の 9・F-5 で意味を固定）: 実デッキの記録 2 局（`tests/fixtures/f_identity/rec`・
     `record_gen --decks user --seed-base 990401`）に対し、**079e73b8 のコードで記録した出力**
-    （`base_*_079e73b8.json`）と、今のコードの既定（切替 off・F の直し空）の出力が秒数を除いて一致する。
+    （`base_*_079e73b8.json`）と、今のコードで**旧の集合**（切替 off・F の直し `none`・守る費用 `curve`＝どれも明示）
+    の出力が秒数を除いて一致する＝`--f-pricing-fixes none` は 079e73b8 の値付けを 1 ビットも変えずに再現する。
+    （F-5 で出荷の既定は全部入りになった——既定そのものは `test_f_fixes_default_is_the_full_set` がラチェットする。）
     別プロセスで回す（出荷の既定のまま・テスト間でモジュールの状態を漏らさない）。新しい道の関数に罠を掛けても
     一致する＝既定では一度も通らない。"""
     import json
@@ -895,6 +922,7 @@ def test_d5_play_from_trash_is_weighted_by_the_chance_a_match_is_there(_ffix_res
     tgt = {"card_type": ["CHARACTER"], "cost_max": 3, "zone": "TRASH", "player": "SELF"}
     assert EV.trash_has_match(tgt, st) == pytest.approx(0.5)
     assert EV.trash_has_match(tgt, dict(st, my_trash=0)) == 0.0
+    EV.set_f_pricing_fixes("none")                                  # 旧の集合を明示（F-5 で既定は全部入り）
     e = {"type": "PLAY_CARD", "target": tgt, "raw_text": ""}
     base = EV.action_value(e, card={}, st=st)
     EV.set_f_pricing_fixes("trash_pool")

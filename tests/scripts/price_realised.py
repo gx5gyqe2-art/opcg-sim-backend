@@ -604,7 +604,7 @@ def main(argv=None):
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
     stats["cond"] = dict(EV.COND_STATS)                     # T72: 条件の判定（真／偽／判らない）の数
     if EV.F_PRICING_FIX:
-        stats["f_pricing_fixes"] = EV.apply_f_pricing_fixes(a)          # on のときだけ刻む（既定の出力は従来のまま）
+        stats["f_pricing_fixes"] = EV.apply_f_pricing_fixes(a)          # 空でないときだけ刻む（`none`＝旧の値付けの出力は 079e73b8 と同じ）
     if _TO.ATTACK_ABILITY_MODE != "off" or _TO.PASSIVE_BODY_MODE != "off":
         # F-2/F-3a: 切替 on のときだけ刻む（off の出力は従来と同じ）
         stats["wiring"] = {"attack_ability": _TO.ATTACK_ABILITY_MODE, "passive_body": _TO.PASSIVE_BODY_MODE,

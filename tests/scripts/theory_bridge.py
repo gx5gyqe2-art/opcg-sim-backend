@@ -1752,7 +1752,7 @@ def main(argv=None):
     stats["kappa_mean"] = (round(stats["kappa_sum"] / stats["kappa_n"], 4) if stats["kappa_n"] else None)
     stats["w_mean"] = (round(stats["kappa_mean"] * _TO.W_BAR, 4) if stats["kappa_mean"] is not None else None)
     if EV.F_PRICING_FIX:
-        stats["f_pricing_fixes"] = EV.apply_f_pricing_fixes(a)          # on のときだけ刻む
+        stats["f_pricing_fixes"] = EV.apply_f_pricing_fixes(a)          # 空でないときだけ刻む（`none` の出力は 079e73b8 と同じ）
     if _TOM.ATTACK_ABILITY_MODE != "off" or _TOM.PASSIVE_BODY_MODE != "off":
         # F-2/F-3a: 切替 on のときだけ刻む（off の出力は従来と同じ）
         stats["wiring"] = {"attack_ability": _TOM.ATTACK_ABILITY_MODE, "passive_body": _TOM.PASSIVE_BODY_MODE,

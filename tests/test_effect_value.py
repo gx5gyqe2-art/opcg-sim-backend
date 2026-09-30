@@ -28,6 +28,17 @@ import effect_value as E  # noqa: E402
 import theory_order as T  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _f_fixes_legacy():
+    """**F-5（2026-09-30）**: 出荷の既定は F の値付けの直しの全部入りになった。このファイルの期待値は L までの代数
+    （F の直しを入れる前）で手計算したもの＝**旧の集合（`none`）を明示して固定**し、終わったら戻す（主張は弱めない）。
+    F の直しの期待値は `test_attack_passive_wiring.py`、既定のラチェットは同ファイルの `test_f_fixes_default_is_the_full_set`。"""
+    before = E.F_PRICING_FIX
+    E.set_f_pricing_fixes("none")
+    yield
+    E.set_f_pricing_fixes(before)
+
+
 def _act(kind, player="SELF", count=1, base=0, zone=None, up_to=False, card_type=None,
          status=None, duration=None, dest=None):
     return {"type": kind, "value": {"base": base, "multiplier": 1, "divisor": 1},
