@@ -1112,6 +1112,7 @@ def rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns=
 
 _RULE_EX_SETS = {}
 _RULE_EX_MEMO = {}
+_RULE_EX_CTX = {}
 
 
 def _rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns, life_types,
@@ -1145,12 +1146,13 @@ def _rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns
         return zero
     hits_f = tuple(sorted(float(x) for x in xs_first or () if float(x) >= -PWR_EPS))
     hits_l = tuple(sorted(float(x) for x in xs_later or () if float(x) >= -PWR_EPS))
-    don = float(don)
+    don = round(float(don), 9)
     NT = len(types)
     kinds_t = tuple(kinds)
     # 計画の列挙（`rule_don_solve`）は同じ守る側に対して何百回も呼ぶ——結果は下の文脈と状態だけで決まるので、
     # 呼び出しをまたいで覚える（値は 1 つも変わらない・速さのためだけ）。
-    ctx = (kinds_t, types, hits_l, don, L0, lam, lam_net, mu, olp, mlp)
+    ctx = _RULE_EX_CTX.setdefault((kinds_t, types, hits_l, don, L0, lam, lam_net, mu, olp, mlp), len(_RULE_EX_CTX))
+    kid = _RULE_EX_CTX.setdefault(("kinds", kinds_t), len(_RULE_EX_CTX))
     set_cache = _RULE_EX_SETS
     if len(set_cache) > 400000:
         set_cache.clear()
@@ -1158,7 +1160,7 @@ def _rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns
     def counter_sets(x, hand, dl):
         """超過 `x` を止める**過不足の無い**札の組（種類ごとの枚数）→ `(新しい手札, 払ったドンの残り, 枚数)` の列。
         過不足が無い＝どの 1 枚を外しても足りない（切る枚数の最小を探す守る側は、余る組を選ぶ理由が無い）。"""
-        ck = (kinds_t, x, hand, dl)
+        ck = (kid, x, hand, dl)
         if ck in set_cache:
             return set_cache[ck]
         need = float(x) + 1000.0 - PWR_EPS
@@ -1190,6 +1192,10 @@ def _rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns
     memo = _RULE_EX_MEMO
     if len(memo) > 600000:
         memo.clear()
+        set_cache.clear()
+        _RULE_EX_CTX.clear()      # 文脈の番号も振り直す（覚えた値と一緒に捨てる）
+        ctx = _RULE_EX_CTX.setdefault((kinds_t, types, hits_l, don, L0, lam, lam_net, mu, olp, mlp), 0)
+        kid = _RULE_EX_CTX.setdefault(("kinds", kinds_t), 1)
 
     def better(a, b):
         """守る側の比較（期待値・同点は誤差で）。"""
@@ -1238,7 +1244,7 @@ def _rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns
         return within(t, hits, hand, blk, (), don, lf)
 
     def within(t, rem, hand, ready, rested, dl, lf):
-        key = (ctx, cap - t, rem, hand, ready, rested, round(dl, 9), lf)   # `t` は残りの段数だけが効く
+        key = (ctx, cap - t, rem, hand, ready, rested, dl, lf)   # `t` は残りの段数だけが効く（`dl` は丸め済み）
         if key in memo:
             return memo[key]
         if not rem:
@@ -1279,7 +1285,7 @@ def _rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns
                 if better(cand, best_def):
                     best_def = cand
             # カウンターを切る
-            for nh, dl2, nc in counter_sets(x, hand, round(dl, 9)):
+            for nh, dl2, nc in counter_sets(x, hand, dl):
                 r = within(t, rest_rem, nh, ready, rested, dl2, lf)
                 cand = (r[0] + 1.0, r[1] + nc, r[2], r[3] + 1.0, add_h(r[4], 0, mu * nc))
                 if better(cand, best_def):
