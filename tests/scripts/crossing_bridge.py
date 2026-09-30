@@ -1110,14 +1110,28 @@ def rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns=
     return out
 
 
+_RULE_EX_SETS = {}
+_RULE_EX_MEMO = {}
+
+
 def _rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns, life_types,
                         lam, lam_net, mu, olp, mlp):
-    known = tuple(sorted(((float(c), float(d)) for c, d in cards or () if float(c) > 0.0), reverse=True))
-    k = len(known)
     types = tuple((float(c), float(d), float(p)) for c, d, p in (life_types or ()) if float(p) > 0.0)
     p_none = max(0.0, 1.0 - sum(p for _c, _d, p in types))
+    # 手札の状態は**札の種類（カウンター値, 払うドン）ごとの枚数**——同じ種類の札は入れ替えても同じ（厳密）。
+    # 読めた手札の札と、取られたライフから入った札は同じ種類なら区別しない。
+    kinds = sorted({(float(c), float(d)) for c, d in cards or () if float(c) > 0.0}
+                   | {(c, d) for c, d, _p in types}, reverse=True)
+    kind_ix = {kd: i for i, kd in enumerate(kinds)}
+    NK = len(kinds)
+    cnt0 = [0] * NK
+    for c, d in cards or ():
+        if float(c) > 0.0:
+            cnt0[kind_ix[(float(c), float(d))]] += 1
+    cnt0 = tuple(cnt0)
+    type_ix = tuple(kind_ix[(c, d)] for c, d, _p in types)
     L0 = int(max(0, round(float(life))))
-    cap = (k + 2 * L0 + 2) if turns is None else int(max(0, turns))
+    cap = (sum(cnt0) + 2 * L0 + 2) if turns is None else int(max(0, turns))
     blk0 = tuple(sorted((float(m) for m in blk_margins or ()), reverse=True))
     nu_of = {}
 
@@ -1133,46 +1147,49 @@ def _rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns
     hits_l = tuple(sorted(float(x) for x in xs_later or () if float(x) >= -PWR_EPS))
     don = float(don)
     NT = len(types)
-    set_cache = {}
+    kinds_t = tuple(kinds)
+    # 計画の列挙（`rule_don_solve`）は同じ守る側に対して何百回も呼ぶ——結果は下の文脈と状態だけで決まるので、
+    # 呼び出しをまたいで覚える（値は 1 つも変わらない・速さのためだけ）。
+    ctx = (kinds_t, types, hits_l, don, L0, lam, lam_net, mu, olp, mlp)
+    set_cache = _RULE_EX_SETS
+    if len(set_cache) > 400000:
+        set_cache.clear()
 
-    def counter_sets(x, kmask, added, dl):
-        """超過 `x` を止める**過不足の無い**札の組 → `(新しい手札, 新しい追加札, 払ったドン, 枚数)` の列。"""
-        ck = (x, kmask, added, dl)
+    def counter_sets(x, hand, dl):
+        """超過 `x` を止める**過不足の無い**札の組（種類ごとの枚数）→ `(新しい手札, 払ったドンの残り, 枚数)` の列。
+        過不足が無い＝どの 1 枚を外しても足りない（切る枚数の最小を探す守る側は、余る組を選ぶ理由が無い）。"""
+        ck = (kinds_t, x, hand, dl)
         if ck in set_cache:
             return set_cache[ck]
-        items = [(known[i][0], known[i][1], ("k", i)) for i in range(k) if kmask >> i & 1]
-        for ti in range(NT):
-            for _ in range(added[ti]):
-                items.append((types[ti][0], types[ti][1], ("a", ti)))
         need = float(x) + 1000.0 - PWR_EPS
         res = {}
-        n_it = len(items)
-        for m in range(1, 1 << n_it):
-            s = 0.0; dc = 0.0
-            for i in range(n_it):
-                if m >> i & 1:
-                    s += items[i][0]; dc += items[i][1]
-            if s < need or dc > dl + 1e-9:
-                continue
-            if any((s - items[i][0]) >= need for i in range(n_it) if m >> i & 1):
-                continue
-            km = kmask; ad = list(added); nc = 0
-            for i in range(n_it):
-                if m >> i & 1:
-                    nc += 1
-                    tag = items[i][2]
-                    if tag[0] == "k":
-                        km &= ~(1 << tag[1])
-                    else:
-                        ad[tag[1]] -= 1
-            kk = (km, tuple(ad), round(dl - dc, 9))
-            if kk not in res:
-                res[kk] = nc
-        out = [(km, ad, dl2, nc) for (km, ad, dl2), nc in res.items()]
+        use = [0] * NK
+
+        def rec(i, s, dc):
+            if dc > dl + 1e-9:
+                return
+            if i == NK:
+                if s < need:
+                    return
+                if any(use[q] > 0 and s - kinds[q][0] >= need for q in range(NK)):
+                    return
+                nh = tuple(hand[q] - use[q] for q in range(NK))
+                kk = (nh, round(dl - dc, 9))
+                if kk not in res:
+                    res[kk] = sum(use)
+                return
+            for n_ in range(hand[i] + 1):
+                use[i] = n_
+                rec(i + 1, s + n_ * kinds[i][0], dc + n_ * kinds[i][1])
+            use[i] = 0
+        rec(0, 0.0, 0.0)
+        out = [(nh, dl2, nc) for (nh, dl2), nc in res.items()]
         set_cache[ck] = out
         return out
 
-    memo = {}
+    memo = _RULE_EX_MEMO
+    if len(memo) > 600000:
+        memo.clear()
 
     def better(a, b):
         """守る側の比較（期待値・同点は誤差で）。"""
@@ -1182,7 +1199,17 @@ def _rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns
             return a[0] > b[0]
         if abs(a[1] - b[1]) > _FEQ:
             return a[1] < b[1]
-        return a[2] > b[2] + _FEQ
+        if abs(a[2] - b[2]) > _FEQ:
+            return a[2] > b[2]
+        # 同じなら**損害を遅らせる方**（早い段の損害が小さい方・段の順に比べる）——守る側は歩きが耐久に届く時刻を
+        # 遅らせたい（攻め手の目的 E4 の裏返し）。切る札の総数は同じなので耐久は変わらず、時刻だけが変わる。
+        ha, hb = a[4], b[4]
+        for q in range(max(len(ha), len(hb))):
+            u = ha[q] if q < len(ha) else 0.0
+            v = hb[q] if q < len(hb) else 0.0
+            if abs(u - v) > _FEQ:
+                return u < v
+        return False
 
     def add_h(h, j, v):
         h = list(h) + [0.0] * max(0, j + 1 - len(h))
@@ -1201,21 +1228,21 @@ def _rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns
             harms = tuple(hh)
         return (prev, cut, alive, st, harms)
 
-    def turn(t, kmask, added, lf, blk):
+    def turn(t, hand, lf, blk):
         """t 段目の始まり（ブロッカーは全部戻っている・ドンは満タン）。"""
         if t >= cap:
             return (0.0, 0.0, 0.0, 0.0, ())
         hits = hits_f if t == 0 else hits_l
         if not hits and t >= 1:
             return (0.0, 0.0, float(cap - t), 0.0, ())       # 以後ずっと命中が無い
-        return within(t, hits, kmask, added, blk, (), don, lf)
+        return within(t, hits, hand, blk, (), don, lf)
 
-    def within(t, rem, kmask, added, ready, rested, dl, lf):
-        key = (t, rem, kmask, added, ready, rested, round(dl, 9), lf)
+    def within(t, rem, hand, ready, rested, dl, lf):
+        key = (ctx, cap - t, rem, hand, ready, rested, round(dl, 9), lf)   # `t` は残りの段数だけが効く
         if key in memo:
             return memo[key]
         if not rem:
-            r = turn(t + 1, kmask, added, lf, tuple(sorted(ready + rested, reverse=True)))
+            r = turn(t + 1, hand, lf, tuple(sorted(ready + rested, reverse=True)))
             out = (r[0], r[1], r[2] + 1.0, r[3], (0.0,) + tuple(r[4]))
             memo[key] = out
             return out
@@ -1231,10 +1258,10 @@ def _rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns
             else:
                 parts = []
                 for ti in range(NT):
-                    ad = list(added); ad[ti] += 1
-                    parts.append((types[ti][2], within(t, rest_rem, kmask, tuple(ad), ready, rested, dl, lf - 1)))
+                    nh = list(hand); nh[type_ix[ti]] += 1
+                    parts.append((types[ti][2], within(t, rest_rem, tuple(nh), ready, rested, dl, lf - 1)))
                 if p_none > 0.0:
-                    parts.append((p_none, within(t, rest_rem, kmask, added, ready, rested, dl, lf - 1)))
+                    parts.append((p_none, within(t, rest_rem, hand, ready, rested, dl, lf - 1)))
                 r = comb(parts)
                 cand = (r[0], r[1], r[2], r[3], add_h(r[4], 0, lam_net))
             best_def = cand
@@ -1244,16 +1271,16 @@ def _rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns
                     continue
                 nr = ready[:bi] + ready[bi + 1:]
                 if x >= m - PWR_EPS:
-                    r = within(t, rest_rem, kmask, added, nr, rested, dl, lf)
+                    r = within(t, rest_rem, hand, nr, rested, dl, lf)
                     cand = (r[0] + 1.0, r[1], r[2], r[3], add_h(r[4], 0, nu(m)))
                 else:
-                    r = within(t, rest_rem, kmask, added, nr, tuple(sorted(rested + (m,), reverse=True)), dl, lf)
+                    r = within(t, rest_rem, hand, nr, tuple(sorted(rested + (m,), reverse=True)), dl, lf)
                     cand = (r[0] + 1.0, r[1], r[2], r[3], r[4])
                 if better(cand, best_def):
                     best_def = cand
             # カウンターを切る
-            for km, ad, dl2, nc in counter_sets(x, kmask, added, round(dl, 9)):
-                r = within(t, rest_rem, km, ad, ready, rested, dl2, lf)
+            for nh, dl2, nc in counter_sets(x, hand, round(dl, 9)):
+                r = within(t, rest_rem, nh, ready, rested, dl2, lf)
                 cand = (r[0] + 1.0, r[1] + nc, r[2], r[3] + 1.0, add_h(r[4], 0, mu * nc))
                 if better(cand, best_def):
                     best_def = cand
@@ -1263,8 +1290,7 @@ def _rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns
         memo[key] = best_att
         return best_att
 
-    kfull = (1 << k) - 1
-    r = turn(0, kfull, tuple([0] * NT), L0, blk0)
+    r = turn(0, cnt0, L0, blk0)
     prev, cut, alive, st, harms = r
     harms = tuple(harms)                                     # 道筋が覆う段の数だけ（倒れた段・地平まで）
     return {"cut": cut, "stopped": st, "alive": alive, "prevented": prev, "harms": harms,
