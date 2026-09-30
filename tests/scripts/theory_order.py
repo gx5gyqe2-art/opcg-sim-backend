@@ -803,7 +803,16 @@ def c_of(x, mode=None):
     if x < -PWR_EPS:
         return 0.0                       # 通らない攻撃＝守る必要が無い
     mode = CBAR_MODE if mode is None else mode
-    return cbar_of(x + 1000.0) if mode == "strict" else cbar_of(max(x, 1000.0))
+    key = (x, mode, CBAR_SLOPE, id(CBAR_CURVE))           # 純関数の覚え書き（N-3 の計測で 800 万回呼ばれる）
+    got = _C_OF_MEMO.get(key)
+    if got is None:
+        got = cbar_of(x + 1000.0) if mode == "strict" else cbar_of(max(x, 1000.0))
+        if len(_C_OF_MEMO) < 200000:
+            _C_OF_MEMO[key] = got
+    return got
+
+
+_C_OF_MEMO = {}
 
 
 #: トークンの 1 枠あたりのパワー列（現在パワーは /1e4 で入っている）

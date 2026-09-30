@@ -170,11 +170,18 @@ class CutCurve:
         """**予約の平均の値段** `ḡ = Lx(N_f) / N_f`——`N_f` は枠の時点で耐久の式が言う「切る枚数」（`reserve`）。
         予約が 0 枚（来る攻撃が無い等）なら切れる札全部 `n0` の平均・切れる札が無ければ `μ`。
         全部の札が一律 `μ` なら `μ`（テスト）。"""
+        key = (self.reserve, CUT_PRICE_MODE)
+        got = self.__dict__.get("_gbar_memo")
+        if got is not None and got[0] == key:
+            return got[1]
         n = self.reserve if (self.reserve is not None and self.reserve > 1e-9) else float(self.n0)
         if n <= 1e-9:
-            return self.mu
-        g = float(self.Lx(n) / n)
-        return max(g, self.mu) if CUT_PRICE_MODE == "joint_floor" else g
+            g = self.mu
+        else:
+            g = float(self.Lx(n) / n)
+            g = max(g, self.mu) if CUT_PRICE_MODE == "joint_floor" else g
+        self._gbar_memo = (key, g)
+        return g
 
     # --- 値段 ---
     def full(self):
@@ -312,9 +319,7 @@ def defending(view):
         TO.CUT_PRICER = (lambda c, mu, _v=view: _v.price(c, mu))
         avg = getattr(view, "kind", None) == "avg"
         g = float(view.curve.gbar) if avg else None
-        # 覚えておく値の鍵は `ḡ` を μ の 1% の目で丸める（数値の許容・模型の定数ではない）——鍵を枠ごとに別にすると
-        # 選択肢の価値などを毎回計算し直して計測が 10 倍以上遅くなる（実測）。値段そのものは丸めない（不変量は厳密のまま）。
-        TO.CUT_PRICER_KEY = ("avg", round(g / float(view.curve.mu), 2)) if avg else None
+        TO.CUT_PRICER_KEY = ("avg", round(g, 12)) if avg else None     # 覚えておく値の鍵（ḡ ごとに別）
         TO.CUT_TAKE_CARD = (g if CUT_TAKE_MODE == "gbar" else None) if avg else None
     try:
         yield view
