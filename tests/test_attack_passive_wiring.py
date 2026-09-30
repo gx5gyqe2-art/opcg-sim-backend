@@ -761,3 +761,153 @@ def test_switches_off_match_recorded_base_outputs_of_079e73b8(tmp_path):
         want = json.loads(open(os.path.join(_FIX, "base_%s_079e73b8.json" % name), encoding="utf-8").read())
         got.pop("seconds", None); want.pop("seconds", None)
         assert got == want, name
+
+
+# ---------------------------------------------------------------------------
+# F レビュー 4（D1〜D6）——出荷の費用曲線 `strict`（c(x) = c̄(x+1000): x=0 → 1.00・x=1000 → 1.28・x=2000 → 2.25 枚）でも
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def _strict():
+    before = T.CBAR_MODE
+    T.set_cbar_mode("strict")
+    yield
+    T.set_cbar_mode(before)
+
+
+def test_strict_curve_hand_values(_strict):
+    """出荷の `strict` で手計算: 5000 対 5000（超過 0）は 1.00μ、6000 対 5000 は 1.28μ、7000 対 5000 は 2.25μ ＞ Θ=1.5819 → Θμ。"""
+    assert T.attack_value(5000, 5000, True, TH_HAND, MU_HAND) == pytest.approx(1.00 * MU_HAND)
+    assert T.attack_value(6000, 5000, True, TH_HAND, MU_HAND) == pytest.approx(1.28 * MU_HAND)
+    assert T.attack_value(7000, 5000, True, TH_HAND, MU_HAND) == pytest.approx(TH_HAND * MU_HAND)
+    T.set_attack_ability_mode("on")
+    # EB01-003（相手ライフ 2 以下で +2000）: 5000 → 7000 ＝ Θμ（頭打ち）
+    assert _attack("EB01-003", 5000, _ctx(_st(opp_life=2))) == pytest.approx(TH_HAND * MU_HAND)
+
+
+def test_d1_branch_inside_a_choice_is_one_of_the_options(_ffix_restore):
+    """**D1**: OP14-069「以下から 1 つを選ぶ: ・リーダーが《ドンキホーテ海賊団》なら KO／・相手のキャラ 3 枚までをレストにできない」。
+    枝（条件つきの KO）は選択肢の 1 つ＝**最大の中で比べる**。手で: KO は平均の体 0.1087・レストにできないは
+    3 × 0.1087 × 2 ターン / 4.128 = 0.15799、コスト ドン!!−3 = 3 × 0.0277。→ max(0.1087, 0.15799) − 0.0831 = 0.07489
+    （旧: 枝を選択肢の外で重ねて 0.1087 + 0.15799 − 0.0831 = 0.1836）。"""
+    c = EV._all_cards()["OP14-069"]
+    ab = c["abilities"][0]
+    st = {"my_leader": {"traits": ["ドンキホーテ海賊団"], "names": [], "colors": [], "attribute": ""}, "my_don_total": 6}
+    EV.set_f_pricing_fixes("branch_then")
+    v, _ = EV.ability_value(ab, card=c, st=st)
+    assert v == pytest.approx(max(0.1087, 3 * 0.1087 * 2 / 4.128) - 3 * 0.0277, abs=1e-6)
+
+
+def test_d2_power_down_on_target_respects_the_ability_condition(_strict):
+    """**D2**: EB01-006（【ドン!!×2】相手のキャラ 1 枚まで −3000）の 6000 が唯一の 7000 を殴る。
+    ドン 2 枚が付いていれば対象は 4000 → 超過 2000 ＝ 2.25μ = 0.123975（`ν(対象)` より安い）。
+    **付いていなければ能力は起きない**＝素の攻撃（6000 対 7000 は通らない）＝ 0。"""
+    T.set_attack_ability_mode("on")
+    tgt = _body(7000)
+    ctx = _ctx(_st(), opp_bodies=[tgt])
+    assert T.nu_of(7000, 5000.0, 4.0, TH, MU, is_blocker=None) > 0.124
+    assert _attack("EB01-006", 6000, ctx, don_k=0, src_don=2, tgt="C7", tgt_power=7000) == pytest.approx(2.25 * MU_HAND)
+    assert _attack("EB01-006", 6000, ctx, don_k=0, src_don=0, tgt="C7", tgt_power=7000) == pytest.approx(0.0)
+    # コストの減少（`COST_REDUCTION`）はパワー低下ではない
+    assert T._is_power_down(EV, {"type": "BUFF", "status": "COST_REDUCTION", "value": {"base": -2},
+                                 "target": {"player": "OPPONENT"}}) is False
+
+
+def test_d2_power_down_respects_the_target_filter(_strict):
+    """絞り込み（コスト 2 以下）に合わない対象には使えない＝パワー低下の読み直しは起きない。"""
+    T.set_attack_ability_mode("on")
+    card = {"power": 6000, "abilities": [{"trigger": "ON_ATTACK", "raw_text": "", "effect": {
+        "type": "BUFF", "duration": "THIS_TURN", "value": {"base": -3000}, "raw_text": "相手のコスト2以下のキャラ1枚までを、パワー-3000",
+        "target": {"player": "OPPONENT", "select_mode": "CHOOSE", "card_type": ["CHARACTER"], "cost_max": 2,
+                   "count": 1, "is_up_to": True, "zone": "FIELD"}}}]}
+    EV._all_cards()["ZZ-PD"] = card
+    try:
+        big = _body(7000, cost=5)
+        assert _attack("ZZ-PD", 6000, _ctx(_st(), opp_bodies=[big]), tgt="C7", tgt_power=7000) == pytest.approx(0.0)
+        small = _body(7000, cost=2)
+        assert _attack("ZZ-PD", 6000, _ctx(_st(), opp_bodies=[small]), tgt="C7", tgt_power=7000) == pytest.approx(2.25 * MU_HAND)
+    finally:
+        EV._all_cards().pop("ZZ-PD", None)
+
+
+def test_d3_declared_cost_uses_the_opponents_remaining_deck(_ffix_restore):
+    """**D3**: OP11-066「任意のコストを宣言し、**相手の**デッキの上から 1 枚を公開」——確率は相手の残りの山の最多のコストの割合。
+    相手の山 [3,3,5,1] → 0.5・自分の山 [2,2,2,2]（→ 1.0）は使わない。"""
+    c = EV._all_cards()["OP11-066"]
+    ab = c["abilities"][0]
+    br = next(x for x in ab["effect"]["actions"] if isinstance(x, dict) and x.get("node") == "Branch")
+    cards = _FakeCards({"A": {"cost": 3}, "B": {"cost": 3}, "C": {"cost": 5}, "D": {"cost": 1}, "M": {"cost": 2}})
+    st = {"search_ctx": {"deck": ["M", "M", "M", "M"], "cards": cards}, "opp_deck_remaining": ["A", "B", "C", "D"]}
+    assert EV.branch_sides(br, st, ab["effect"]) == [("if_true", 0.5), ("if_false", 0.5)]
+
+
+def test_d3_revealing_the_opponents_hand_uses_its_composition(_ffix_restore):
+    """OP01-063「相手の手札 1 枚を選び公開、イベントなら…」——相手の手札 [イベント, キャラ, キャラ, キャラ] → 0.25。"""
+    c = EV._all_cards()["OP01-063"]
+    ab = next(a for a in c["abilities"] if a.get("trigger") == "ACTIVATE_MAIN")
+    br = next(x for x in ab["effect"]["actions"] if isinstance(x, dict) and x.get("node") == "Branch")
+    cards = _FakeCards({"E": {"event": True}, "C": {}, "M": {"event": True}})
+    st = {"search_ctx": {"deck": ["M"] * 4, "cards": cards}, "opp_hand_ids": ["E", "C", "C", "C"]}
+    assert EV.branch_sides(br, st, ab["effect"]) == [("if_true", 0.25), ("if_false", 0.75)]
+
+
+def test_d3_own_reveal_uses_the_remaining_deck_minus_hand_and_field(_ffix_restore):
+    cards = _FakeCards({"A": {}, "B": {}})
+    st = {"search_ctx": {"deck": ["A", "A", "B", "B"], "cards": cards, "hand_items": [{"cid": "A"}], "field": ["A"]}}
+    pool, _c = EV._own_pool(st)
+    assert sorted(pool) == ["B", "B"]
+
+
+def test_d4_free_partner_inherits_the_outer_payment(monkeypatch, _ffix_restore):
+    """**D4**: 外側の札（コスト 4）を手から出し、その登場時で OP16-006（ドン 2 枚をレストにできる）をただで出す。
+    アクティブ 5 から外側の 4 を払った残り 1 ＜ 2 ＝相方のコストは払えない。攻撃の行（外側の支払い 0）なら払える。"""
+    import hand_spend as HS
+    seen = {}
+
+    def fake(cid, info, olp, r, cards=None, st=None, opp_bodies=None):
+        seen["st"] = st
+        return 0.1
+
+    monkeypatch.setattr(HS, "free_value", fake)
+    from opcg_sim.learned.train import plan_labels as PL
+    cards = PL.Cards()
+    tgt = {"zone": "HAND", "card_type": ["CHARACTER"], "player": "SELF"}
+    EV.set_f_pricing_fixes("hand_board")
+    st = {"search_ctx": {"cards": cards, "hand_items": [{"cid": "OP16-006"}], "olp": 5000.0, "r": 4.0}, "my_don_active": 5}
+    EV._play_from_hand_now(tgt, st, {"card_id": "OUTER", "cost": 4}, 1, MU_HAND, [])
+    assert seen["st"]["source_paid"] == 4.0
+    partner = EV._all_cards()["OP16-006"]
+    ab = next(a for a in partner["abilities"] if a.get("trigger") == "ON_PLAY")
+    cost_acts = EV.walk_actions(ab.get("cost") or {})
+    assert EV._cost_unpayable(cost_acts, dict(partner, cost=5), seen["st"]) is True
+    EV._play_from_hand_now(tgt, dict(st, source_paid=0.0), {"card_id": "OUTER", "cost": 4}, 1, MU_HAND, [])
+    assert seen["st"]["source_paid"] == 0.0
+    assert EV._cost_unpayable(cost_acts, dict(partner, cost=5), seen["st"]) is False
+
+
+def test_d5_play_from_trash_is_weighted_by_the_chance_a_match_is_there(_ffix_restore):
+    """**D5（trash_pool）**: 見えていない札の池 4 枚（合う札 1 枚）からトラッシュ 2 枚 → 1 − C(3,2)/C(4,2) = 0.5。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    cards = PL.Cards()
+    pool = ["OP15-110", "OP15-114", "OP15-114", "OP15-114"]
+    st = {"search_ctx": {"deck": pool, "cards": cards, "hand_items": [], "field": []}, "my_trash": 2}
+    tgt = {"card_type": ["CHARACTER"], "cost_max": 3, "zone": "TRASH", "player": "SELF"}
+    assert EV.trash_has_match(tgt, st) == pytest.approx(0.5)
+    assert EV.trash_has_match(tgt, dict(st, my_trash=0)) == 0.0
+    e = {"type": "PLAY_CARD", "target": tgt, "raw_text": ""}
+    base = EV.action_value(e, card={}, st=st)
+    EV.set_f_pricing_fixes("trash_pool")
+    assert EV.action_value(e, card={}, st=st) == pytest.approx(0.5 * base)
+
+
+def test_d6_leader_attack_debuff_is_priced_by_a_follow_up_attack(_strict):
+    """**D6**: リーダーを殴る行の「相手のキャラ 1 枚まで −1000」＝このターンの残りの攻撃手がその体を殴る価格の増分。
+    相手の 6000（ν 0.1）・残りの攻撃手 5000（今の攻め手 7000 は除く）: 5000 対 6000 は通らない（0）→ 5000 対 5000 は
+    超過 0 ＝ 1.00μ。殴れる手が居なければ 0。"""
+    b = _body(6000, nu=0.1)
+    actx = {"power": 7000.0, "target_power": 5000.0, "is_leader": True, "theta": TH_HAND, "mu": MU_HAND, "src_x": 2000.0}
+    st = {"attack_ctx": actx, "attackers": [2000.0, 0.0], "opp_leader_power": 5000.0}
+    tgt = {"player": "OPPONENT", "card_type": ["CHARACTER"], "count": 1, "is_up_to": True, "zone": "FIELD"}
+    assert EV.debuff_follow_up_value(tgt, 1000.0, [b], st) == pytest.approx(1.00 * MU_HAND)
+    assert EV.debuff_follow_up_value(tgt, 1000.0, [b], dict(st, attackers=[2000.0])) == 0.0

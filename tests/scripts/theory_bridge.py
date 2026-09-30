@@ -736,6 +736,17 @@ def _state_of(sc, ci, idx2cid, tok=None, cards=None):
     return st
 
 
+def opp_pools(opp_ci, my_ci, idx2cid, opp_deck):
+    """**レビュー 4 の D3**（完全情報）: 相手の手札（相手の直近の行の手札の枠）と相手の残りの山
+    （相手のデッキの構成 − 相手の手札 − 相手の場）。公開した札の確率を相手の札の池で出すのに使う。"""
+    import search_price as SP
+    hand = [] if opp_ci is None else _TOM.hand_ids_of(opp_ci, idx2cid)
+    field = [c for c in (idx2cid.get(int(x)) for x in np.asarray(my_ci)[_TOM.SLOT_OPP_FIELD]) if c]
+    out = {"opp_hand_ids": hand if opp_ci is not None else None}
+    out["opp_deck_remaining"] = SP.remaining_deck(opp_deck, hand, field) if opp_deck else None
+    return out
+
+
 def _kappa_of_row(sc, tok, t, prof=None, g_me=None, g_opp=None, opp=None):
     """行の局面の傾き `κ` と時計の差 `d`。`W_MODE=curve`（T75）なら交点の橋の `D`（`crossing_bridge.curve_d_of_row`）、
     それ以外は盤面の時計（`clock_of_row`・`flat` なら `κ = 1`）。
@@ -1050,6 +1061,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     ctx["opp_chars"] = opp_chars_of(tok)
                 # **T49**: 局面の傾き。価格（平均の傾きで書いた時計の差分）に掛けて `ΔG` に足す
                 opp = _opp_view(first_main, opp_turns, ex, w, t)          # T79: 相手の直近の行（完全情報）
+                if EV.F_PRICING_FIX and ctx.get("st") is not None:
+                    ctx["st"].update(opp_pools(None if opp is None else opp["ci"], ex["ci"][i], idx2cid, decks.get(1 - w)))
                 ck = _kappa_of_row(sc, tok, t, prof,
                                    g_me=_g_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t)),
                                    g_opp=(None if opp is None else

@@ -309,8 +309,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
             if t >= 1 and PL.is_own_turn(w, t) and TB_is_decision_row(rows, pol, L, ptr, i):
                 turn_end_row[(w, t)] = i                                        # 後の行で上書き＝最後が残る
+        last_ci = {}                                                            # D3: 席ごとの直近の行（相手の手札）
         for n, i in enumerate(order):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
+            prev_opp_ci = last_ci.get(1 - w)
+            last_ci[w] = ex["ci"][i]
             if t < 1:
                 continue
             z = float(rows["z"][i])
@@ -338,6 +341,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     stats["no_next"] += 1      # ターン最後の行＝相手のターンが挟まる
                     continue
                 ctx = row_ctx(sc, tok, ex["ci"][i], idx2cid, cards, decks.get(w), theta, mu, theta_mode)
+                if EV.F_PRICING_FIX and ctx.get("st") is not None:
+                    from theory_bridge import opp_pools
+                    ctx["st"].update(opp_pools(prev_opp_ci, ex["ci"][i], idx2cid, decks.get(1 - w)))
                 th = ctx["theta"]
                 b = int(ptr[i]) + ch
                 sig = json.loads(pol["pol_sig"][b])
