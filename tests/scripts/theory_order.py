@@ -1353,7 +1353,7 @@ def option_value(power, opp_leader_power, r_turns, theta=THETA, mu=MU, my_leader
     # 同梱の分布で引くときだけ覚える（`boards` を明示した呼び出しは検算用＝毎回計算する）
     key = (int(round(float(power) / 100.0)), rb, int(round(olp / 100.0)), int(round(mlp / 100.0)),
            round(float(theta), 4), round(float(mu), 5), round(float(ko_p), 4), SURV_MODE) \
-        + (CUT_PRICER_KEY, CUT_TAKE_CARD) \
+        + (CUT_PRICER_KEY, CUT_TAKE_CARD is not None) \
         if (boards is None and _cut_cache_ok()) else None     # **N-3**: 値段の文脈は鍵に入れる（覚えられない窓では覚えない）
     if key is not None and key in _OPTION_CACHE:
         return _OPTION_CACHE[key]

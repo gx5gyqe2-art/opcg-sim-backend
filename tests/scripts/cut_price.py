@@ -312,7 +312,9 @@ def defending(view):
         TO.CUT_PRICER = (lambda c, mu, _v=view: _v.price(c, mu))
         avg = getattr(view, "kind", None) == "avg"
         g = float(view.curve.gbar) if avg else None
-        TO.CUT_PRICER_KEY = ("avg", round(g, 12)) if avg else None
+        # 覚えておく値の鍵は `ḡ` を μ の 1% の目で丸める（数値の許容・模型の定数ではない）——鍵を枠ごとに別にすると
+        # 選択肢の価値などを毎回計算し直して計測が 10 倍以上遅くなる（実測）。値段そのものは丸めない（不変量は厳密のまま）。
+        TO.CUT_PRICER_KEY = ("avg", round(g / float(view.curve.mu), 2)) if avg else None
         TO.CUT_TAKE_CARD = (g if CUT_TAKE_MODE == "gbar" else None) if avg else None
     try:
         yield view
