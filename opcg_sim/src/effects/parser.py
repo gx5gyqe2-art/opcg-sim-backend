@@ -132,6 +132,12 @@ class EffectParser:
         if not norm or norm.strip() in ['なし', 'None', '']:
             return []
 
+        # 「【ブロッカー】(説明)【自分のターン終了時】…」のように、キーワードの説明括弧の直後へ区切りなしで
+        # 次の能力が続く表記（P-079）。説明括弧が次の能力の本文に混ざり、括弧内の「このカードをレストにし」が
+        # 誤った効果になっていた。キーワード＋説明括弧を別セグメントに切り離す。
+        norm = re.sub(_nfc(r'(【(?:ブロッカー|速攻[^】]*|ダブルアタック|バニッシュ|ブロック不可|貫通)】)\s*[(（][^()（）]*[)）](?=\s*【)'),
+                      r'\1 / ', norm)
+
         segments = re.split(r'\s*/\s*|\n', norm)
         segments = [s.strip() for s in segments if s.strip()]
 

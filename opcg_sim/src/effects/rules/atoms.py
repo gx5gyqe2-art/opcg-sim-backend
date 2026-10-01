@@ -1781,6 +1781,10 @@ def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
             return None
         value = -int(m2.group(1))
     tq = _buff_target(t)
+    # 枚数指定の無い「自分の手札の青のイベントを、コスト-1」は該当する全てへの常在（1 枚選ぶ対話ではない: OP01-067）。
+    if tq.select_mode == "CHOOSE" and tq.zone == Zone.HAND and not re.search(_nfc(r"[\d０-９]+枚"), t):
+        tq.count = -1
+        tq.select_mode = "ALL"
     buff = GameAction(
         type=ActionType.BUFF,
         target=tq,
@@ -2107,6 +2111,14 @@ def _reveal_hand(ctx: ParseContext) -> Optional[GameAction]:
         return None
     tq = parse_target(t)
     tq.zone = Zone.HAND
+    # 枚数指定の無い「手札を公開する」（「相手は自身の手札を1枚捨て、手札を公開する」）は
+    # 手札全体の公開で、公開するのは直前の句の主語（相手）側（OP07-090。従来は自分の手札1枚だった）。
+    if re.match(_nfc(r"^手札を公開"), t.strip()):
+        tq.player = Player.OPPONENT
+        tq.count = -1
+        tq.select_mode = "ALL"
+        tq.save_id = "revealed_cards"
+        return GameAction(type=ActionType.REVEAL, target=tq, raw_text=t)
     # 「まで」のみ可変枚数（0..N）。「できる/ことができる」はコストの任意性であって枚数ではない
     # （「イベント2枚を公開することができる」＝ちょうど2枚を任意で公開。cost_optional 側で処理）。
     # 従来は「できる」でも is_up_to=True となり 2枚未満でもコストを払えてしまった（OP12-001）。
@@ -2679,6 +2691,11 @@ def _trash_target(ctx: ParseContext) -> Optional[GameAction]:
     tq = parse_target(t)
     if _nfc("まで") in t:
         tq.is_up_to = True
+    # 側・種類・ゾーンの無い「カードN枚までを、トラッシュに置く」は直前に見た（LOOK→TEMP）カードから選ぶ
+    # （OP03-083。従来は場のカードが対象で、実行すると場のカードをトラッシュへ送った）。
+    if re.match(_nfc(r"^カード[\d０-９]+枚(?:まで)?を、?トラッシュに置"), t.strip()):
+        tq.zone = Zone.TEMP
+        tq.player = Player.SELF
     return GameAction(type=ActionType.TRASH, target=tq, raw_text=t)
 
 
