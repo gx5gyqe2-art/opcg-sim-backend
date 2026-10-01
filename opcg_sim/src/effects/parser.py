@@ -2198,7 +2198,12 @@ class EffectParser:
 
         # 「（このリーダー/キャラが）（相手のキャラと）バトルしている場合」(OP12-020): 進行中の
         # バトル文脈の条件。FIELD_COUNT（「キャラ」+「いる」を含むため誤分類しうる）より先に捌く。
+        # 「このターン中、…相手のキャラとバトルしている」は進行中のバトルではなく、このターンに
+        # 相手のキャラとバトルしたことがある（起動メイン中は進行中のバトルが無い＝常に偽になっていた）。
         if _nfc("バトルしている") in norm_text:
+            if _nfc("このターン中") in norm_text and _nfc("キャラとバトル") in norm_text:
+                return Condition(type=ConditionType.SOURCE_STATE, value="BATTLED_CHAR_THIS_TURN",
+                                 player=p, raw_text=norm_text)
             return Condition(type=ConditionType.SOURCE_STATE, value="IN_BATTLE", player=p, raw_text=norm_text)
 
         # 「このターン中、（相手/自分の）キャラがKOされている場合」: ターン内に当該プレイヤーの

@@ -327,3 +327,55 @@ def test_opponent_dynamic_cost_cap_does_not_flip_the_hand_owner():
                     "特徴《ビッグ・マム海賊団》を持つキャラカード1枚までを、登場させる。"), "PLAY_CARD")
     assert p["target"].get("player", "SELF") == "SELF" and p["target"]["zone"] == "HAND"
     assert p["target"]["cost_max_dynamic"] == "DON_COUNT_FIELD_OPPONENT"
+
+
+# --- WP「G3_engine」: 対話・遅延・一回限りの割引・分配（エンジン側は rust/.../effects/tests_g3.rs）----------
+
+def test_g3_delay_until_the_opponents_next_main_phase():
+    rest = _one(_parse("【自分のターン中】【登場時】自分のリーダーが多色で、相手の場のドン!!が7枚以下の場合、"
+                       "次の相手のメインフェイズ開始時、相手は自身のアクティブのドン!!1枚をレストにする。"), "REST_DON")
+    assert rest["delay"] == "OPP_MAIN_START"
+
+
+def test_g3_next_play_discount_is_marked_once():
+    for text in ("【起動メイン】【ターン1回】自分のキャラが1枚以下の場合、このターン中、次に自分が手札から登場させる"
+                 "コスト3以上の特徴《ワノ国》を持つキャラカードの支払うコストは1少なくなる。",
+                 "【起動メイン】【ターン1回】ドン!!-1:このターン中、次に自分が手札から登場させるコスト4以上の"
+                 "「トラファルガー・ロー」の支払うコストは2少なくなる。"):
+        b = _one(_parse(text), "BUFF")
+        assert b["status"] == "COST_REDUCTION" and "NEXT_PLAY_ONCE" in b["target"]["flags"]
+    # 常時の軽減（「次に」なし）には付かない
+    plain = _one(_parse("【自分のターン中】自分の手札の青のイベントは、コスト-1。"), "BUFF")
+    assert "NEXT_PLAY_ONCE" not in plain["target"]["flags"]
+
+
+def test_g3_two_tier_pick_is_a_group_distribution():
+    abs_ = _parse("【登場時】自分のトラッシュのコスト4以下のキャラカード1枚までとコスト2以下のキャラカード1枚までを選び、"
+                  "1枚を登場させ、残りをレストで登場させる。")
+    sel = _actions(abs_, "SELECT")
+    assert [s["target"]["save_id"] for s in sel] == ["_sel_a", "_sel_b"]
+    assert "EXCLUDE_SAVED:_sel_a" in sel[1]["target"]["flags"]
+    plays = _actions(abs_, "PLAY_CARD")
+    assert plays[0]["target"]["select_mode"] == "GROUP_FIRST" and plays[0]["target"]["ref_id"] == "_sel_a+_sel_b"
+    assert plays[1]["target"]["select_mode"] == "REMAINING" and plays[1]["status"] == "RESTED"
+
+
+def test_g3_revealed_cards_are_played_from_the_saved_group():
+    abs_ = _parse("【登場時】自分の手札から、特徴《ドレスローザ》を持つコスト7以下のキャラカード2枚までを、公開する。"
+                  "公開したカードのうち1枚を登場させ、残りがコスト4以下ならレストで登場させる。")
+    first, rest = _actions(abs_, "PLAY_CARD")
+    assert first["target"]["select_mode"] == "GROUP_FIRST" and first["target"]["ref_id"] == "revealed_cards"
+    assert rest["target"]["select_mode"] == "REMAINING" and rest["target"]["cost_max"] == 4
+
+
+def test_g3_battled_this_turn_is_not_an_in_progress_battle():
+    abs_ = _parse("【ドン!!×3】【起動メイン】【ターン1回】このターン中、このリーダーが相手のキャラとバトルしている場合、"
+                  "このリーダーをアクティブにする。")
+    conds = [d for d in _walk(abs_) if d.get("node") == "Condition" and d.get("type") == "SOURCE_STATE"]
+    assert [c["value"] for c in conds] == ["BATTLED_CHAR_THIS_TURN"]
+
+
+def test_g3_name_or_typed_name():
+    abs_ = _parse("このキャラがKOされる場合、代わりに自分の、「魚人島」かリーダーの「しらほし」1枚を、レストにできる。")
+    tqs = [d for d in _walk(abs_) if d.get("node") == "TargetQuery" and d.get("names")]
+    assert tqs and all("NAME_OR_TYPED_NAME" in t["flags"] and "NAME_OR_TYPE" not in t["flags"] for t in tqs)

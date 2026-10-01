@@ -30,6 +30,8 @@ from .rules import ParseContext, RuleRegistry, default_registry
 _DELAY_TURN_END_RE = re.compile(_nfc(r"ターン終了時(?!まで)[、にはのでも]"))
 # 「このバトル終了時、〜」＝バトルの終わりまで遅らせる（エンジンは finish_attack で解決する）。
 _DELAY_BATTLE_END_RE = re.compile(_nfc(r"このバトル終了時[、にはのでも]"))
+# 「次の相手のメインフェイズ開始時、〜」＝相手のメインフェイズが始まるまで遅らせる（PRB02-005）。
+_DELAY_OPP_MAIN_START_RE = re.compile(_nfc(r"次の相手のメインフェイズ開始時[、にはのでも]"))
 
 
 def _mark_arrange(node: EffectNode) -> None:
@@ -75,6 +77,7 @@ class EffectParserV2(EffectParser):
         """
         ctx = ParseContext(text=text, is_cost=is_cost)
         delayed = ("BATTLE_END" if _DELAY_BATTLE_END_RE.search(_nfc(text))
+                   else "OPP_MAIN_START" if _DELAY_OPP_MAIN_START_RE.search(_nfc(text))
                    else "TURN_END" if _DELAY_TURN_END_RE.search(_nfc(text)) else None)
         result = self.registry.apply(ctx)
         if result is not None:

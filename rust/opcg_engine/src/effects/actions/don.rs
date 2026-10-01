@@ -79,10 +79,10 @@ pub fn apply_target(
     value: i32,
     source_card: Option<CardIdx>,
 ) -> Result<(), EngineError> {
-    let _ = (masters, owner, source_list, source_card);
+    let _ = (owner, source_list, source_card);
     match action.ty {
         ActionType::AttachDon => {
-            attach_don(s, actor, action, target, value);
+            attach_don(s, masters, actor, action, target, value);
             Ok(())
         }
         _ => Err(EngineError::Unimplemented(format!(
@@ -308,7 +308,14 @@ fn move_attached_don(s: &mut Session, actor: Seat, value: i32) -> bool {
 /// status に `"RESTED"` を含めば**既にレストのドン!!だけ**を付与する（アクティブは巻き込まない）。
 /// `"OPP"` を含めば相手のドン!!プールから付与する。どちらも無ければ アクティブ優先・
 /// 尽きたらレスト（1 枚ごとにプールを選び直す＝Python の `for` 内 `or`）。
-fn attach_don(s: &mut Session, actor: Seat, action: &GameAction, target: CardIdx, value: i32) {
+fn attach_don(
+    s: &mut Session,
+    masters: &MasterTable,
+    actor: Seat,
+    action: &GameAction,
+    target: CardIdx,
+    value: i32,
+) {
     let st = action.status.as_deref().unwrap_or("");
     let from_rested = st.contains("RESTED");
     let from_opp = st.contains("OPP");
@@ -322,6 +329,7 @@ fn attach_don(s: &mut Session, actor: Seat, action: &GameAction, target: CardIdx
         actor
     };
     let n = if value > 0 { value } else { 1 };
+    let mut attached_any = false;
     for _ in 0..n {
         let ok = if st.contains("MOVE") {
             move_attached_to(s, don_owner, target)
@@ -331,6 +339,12 @@ fn attach_don(s: &mut Session, actor: Seat, action: &GameAction, target: CardIdx
         if !ok {
             break;
         }
+        attached_any = true;
+    }
+    // 「ドン!!が付与された時」の誘発（反応型は再計算で動かないためここで積む。消化は呼び出し側）。
+    if attached_any {
+        let host_owner = s.state().card(target).owner;
+        let _ = super::super::triggers::enqueue_don_attached_listeners(s, masters, target, host_owner);
     }
 }
 

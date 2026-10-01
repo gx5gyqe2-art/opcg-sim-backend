@@ -648,7 +648,10 @@ impl Resolver {
         }
 
         // 遅延実行（「このターン終了時、〜」）
-        if matches!(action.delay.as_deref(), Some("TURN_END") | Some("BATTLE_END"))
+        if matches!(
+            action.delay.as_deref(),
+            Some("TURN_END") | Some("BATTLE_END") | Some("OPP_MAIN_START")
+        )
             && !self.context.flushing_delayed
         {
             let mut pending = s.state().pending_end_of_turn.clone();
@@ -657,6 +660,7 @@ impl Resolver {
                 node: node_ref.clone(),
                 source_card,
                 battle_end: action.delay.as_deref() == Some("BATTLE_END"),
+                main_start: action.delay.as_deref() == Some("OPP_MAIN_START"),
                 saved_targets: self.context.saved_targets.clone(),
             });
             s.edit().set_pending_end_of_turn(pending);
@@ -665,10 +669,17 @@ impl Resolver {
 
         // 任意効果（「〜してもよい」）
         if action.is_optional && !self.context.is_confirmed(node_ref) {
+            // 「相手は…ドン!!を…してもよい」（RAMP_DON／RETURN_DON の status=OPPONENT*）は
+            // 任意の可否を決めるのが相手（ドン!!プールの持ち主）。
+            let confirmer = if matches!(action.ty, ActionType::RampDon | ActionType::ReturnDon) {
+                super::interact::don_pool_player(actor, action)
+            } else {
+                actor
+            };
             super::interact::suspend_for_optional_confirmation(
                 s,
                 masters,
-                actor,
+                confirmer,
                 node_ref,
                 source_card,
                 &self.execution_stack,
@@ -1034,6 +1045,14 @@ impl Resolver {
             if let Some(save_id) = query.save_id.as_ref() {
                 self.context.set_saved(save_id, resumed.clone());
             }
+            // 選択グループから選んだ分は消費済みにする（残りは「残りを〜」が拾う）。
+            if query.select_mode == "GROUP_FIRST" && query.ref_id.is_some() {
+                let uuids: Vec<String> = resumed
+                    .iter()
+                    .map(|t| s.state().target_uuid(*t).to_owned())
+                    .collect();
+                self.context.consume(SEL_GROUP_ID, uuids);
+            }
             // 「そのキャラ/そのカード」の coreference 用の既定キー。
             if query.select_mode == "CHOOSE"
                 && query.ref_id.is_none()
@@ -1062,22 +1081,50 @@ impl Resolver {
             return self.resolve_targets(s, masters, actor, &q, source_card, action);
         }
 
-        // 選択グループ分配（§7-1）: 先頭 M 枚を取り、消費済みとして記録する。
+        // 選択グループ分配（§7-1）: M 枚を取り、消費済みとして記録する。
+        // グループは保存済みの選択（`a+b` で複数をまとめられる）。`_sel_group` 以外から作った
+        // グループは `_sel_group` へ写し、後続の「残りを〜」がその残余を参照できるようにする。
+        // 候補が M 枚より多いときは選ぶのはプレイヤー（SELECT_TARGET）。
         if query.select_mode == "GROUP_FIRST" {
             if let Some(ref_id) = query.ref_id.as_ref() {
-                let group = self.context.saved(ref_id).cloned().unwrap_or_default();
-                let consumed: Vec<String> = self.context.consumed(ref_id).to_vec();
+                if ref_id != SEL_GROUP_ID && self.context.saved(SEL_GROUP_ID).is_none() {
+                    let mut merged: Vec<TargetRef> = Vec::new();
+                    for key in ref_id.split('+') {
+                        for t in self.context.saved(key).cloned().unwrap_or_default() {
+                            if !merged.contains(&t) {
+                                merged.push(t);
+                            }
+                        }
+                    }
+                    self.context.set_saved(SEL_GROUP_ID, merged);
+                }
+                let group = self.context.saved(SEL_GROUP_ID).cloned().unwrap_or_default();
+                let consumed: Vec<String> = self.context.consumed(SEL_GROUP_ID).to_vec();
                 let avail: Vec<TargetRef> = group
                     .into_iter()
                     .filter(|t| !consumed.contains(&s.state().target_uuid(*t).to_owned()))
                     .collect();
                 let n = if query.count > 0 { query.count as usize } else { 1 };
+                if avail.len() > n && !s.state().in_passive_recalc {
+                    super::interact::suspend_for_target_selection(
+                        s,
+                        masters,
+                        actor,
+                        &avail,
+                        query,
+                        source_card,
+                        action.map(|(_, r)| r),
+                        &self.execution_stack,
+                        &self.context,
+                    )?;
+                    return Ok(None);
+                }
                 let picked: Vec<TargetRef> = avail.into_iter().take(n).collect();
                 let uuids: Vec<String> = picked
                     .iter()
                     .map(|t| s.state().target_uuid(*t).to_owned())
                     .collect();
-                self.context.consume(ref_id, uuids);
+                self.context.consume(SEL_GROUP_ID, uuids);
                 return Ok(Some(picked));
             }
         }
@@ -1146,10 +1193,20 @@ impl Resolver {
                 if !group.is_empty() {
                     let group = group.clone();
                     let consumed: Vec<String> = self.context.consumed(SEL_GROUP_ID).to_vec();
+                    // 「残りがコストN以下なら」: 残余をコストで絞る（条件を満たさない残りは何もしない）。
                     return Ok(Some(
                         group
                             .into_iter()
                             .filter(|t| !consumed.contains(&s.state().target_uuid(*t).to_owned()))
+                            .filter(|t| match t.card() {
+                                Some(c) => {
+                                    let card = s.state().card(c);
+                                    let cost = card.current_cost(masters.get(card.master));
+                                    query.cost_max.map_or(true, |x| cost <= x)
+                                        && query.cost_min.map_or(true, |x| cost >= x)
+                                }
+                                None => true,
+                            })
                             .collect(),
                     ));
                 }
@@ -1174,6 +1231,14 @@ impl Resolver {
             source_card,
             &self.context,
         )?;
+
+        // 「すでに選んだカードを除く」（EXCLUDE_SAVED:<save_id>）: 別の選択で選んだカードは選べない。
+        for f in &query.flags {
+            if let Some(save_id) = f.strip_prefix("EXCLUDE_SAVED:") {
+                let taken = self.context.saved(save_id).cloned().unwrap_or_default();
+                candidates.retain(|t| !taken.contains(t));
+            }
+        }
 
         // 「捨てたカードと同じカード名を持つ」（SAME_NAME_AS:<save_id>・EB02-039）: 保存済みのカードと
         // 同名のものだけを候補に残す（保存が無ければ誰も同名でない＝対象なし）。
@@ -1549,10 +1614,15 @@ impl Resolver {
             } else {
                 Position::Bottom
             };
+            // 「持ち主が好きな順番で」: 相手の場のカードを並べるのはその持ち主（相手）。
+            let arranger = match action.target.as_ref() {
+                Some(q) if q.player == PlayerRef::Opponent && needs_reorder => actor.other(),
+                _ => actor,
+            };
             super::interact::suspend_for_arrange(
                 s,
                 masters,
-                actor,
+                arranger,
                 source_card,
                 targets.to_vec(),
                 crate::model::ArrangeDest::Deck,

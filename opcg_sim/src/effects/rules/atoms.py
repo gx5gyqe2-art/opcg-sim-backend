@@ -1959,6 +1959,11 @@ def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
     if tq.select_mode == "CHOOSE" and tq.zone == Zone.HAND and not re.search(_nfc(r"[\d０-９]+枚"), t):
         tq.count = -1
         tq.select_mode = "ALL"
+    # 「このターン中、次に自分が手札から登場させる〜の支払うコストは N 少なくなる」(OP02-025/OP12-061):
+    # 該当する手札全てへの常時軽減ではなく、次に登場させた 1 枚への一回限りの軽減。エンジンは
+    # 手札の該当カード全てに軽減を掛けておき、そのうち 1 枚を登場させた時点で残りを外す。
+    if re.search(_nfc(r"次に自分が手札から登場させる"), t):
+        tq.flags.add("NEXT_PLAY_ONCE")
     buff = GameAction(
         type=ActionType.BUFF,
         target=tq,
@@ -2730,6 +2735,21 @@ def _each_name_play(ctx: ParseContext) -> Optional[EffectNode]:
     return Sequence(actions=nodes)
 
 
+@rule("revealed_group_play", priority=71)
+def _revealed_group_play(ctx: ParseContext) -> Optional[GameAction]:
+    """「公開したカードのうち1枚を登場させ」→ 公開した（保存済みの）カードから 1 枚を選んで登場。
+
+    公開は手札のまま（TEMP へ移さない）ので TEMP 対象では空になる。公開時の保存 id
+    （revealed_cards）を選択グループとして参照し、残りは後続の「残りが…レストで登場」が拾う（OP10-058）。"""
+    t = ctx.text
+    m = re.search(_nfc(r"公開したカードのうち[、]?([\d０-９]+)枚を登場"), t)
+    if not m:
+        return None
+    tq = TargetQuery(player=Player.SELF, zone=Zone.HAND, count=_to_int(m.group(1)),
+                     select_mode="GROUP_FIRST", ref_id="revealed_cards")
+    return GameAction(type=ActionType.PLAY_CARD, target=tq, destination=Zone.FIELD, raw_text=t)
+
+
 @rule("dual_tier_play_from_trash", priority=68)
 def _dual_tier_play_from_trash(ctx: ParseContext) -> Optional[EffectNode]:
     t = ctx.text
@@ -2775,6 +2795,22 @@ def _dual_tier_play_from_trash(ctx: ParseContext) -> Optional[EffectNode]:
             status="RESTED" if rested else None,
             raw_text=t,
         )
+
+    # 「…Aと…Bを選び、1枚を登場させ、残りをレストで登場させる」(OP06-086): 各ティアから選んだ
+    # 2 枚のうち 1 枚（選ぶのはプレイヤー）をアクティブで登場させ、残りは後続の「残りを
+    # レストで登場」が拾う（選択グループ `_sel_group`）。ティア固定の近似はしない。
+    if not rest_both and re.search(_nfc(r"選び、[\d０-９]枚を登場"), t) and not exact2:
+        sel_a = _tier(c1, rested=False)
+        sel_b = _tier(c2, rested=False)
+        sel_a.type = sel_b.type = ActionType.SELECT
+        sel_a.destination = sel_b.destination = None
+        sel_a.target.save_id, sel_b.target.save_id = "_sel_a", "_sel_b"
+        sel_b.target.flags.add("EXCLUDE_SAVED:_sel_a")  # 同じカードを 2 ティアで選ばない
+        play = GameAction(
+            type=ActionType.PLAY_CARD, destination=Zone.FIELD, raw_text=t,
+            target=TargetQuery(player=Player.SELF, zone=sel_a.target.zone, count=1,
+                               select_mode="GROUP_FIRST", ref_id="_sel_a+_sel_b"))
+        return Sequence(actions=[sel_a, sel_b, play])
 
     # 「1枚を登場させ(active)」= 上位ティア(コストX) / 「残りをレストで登場」= 下位ティア(コストY)。
     return Sequence(actions=[_tier(c1, rested=rest_both), _tier(c2, rested=rest_second or rest_both, exact=exact2)])

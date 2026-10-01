@@ -431,10 +431,20 @@ fn winning_a_character_battle_kos_the_target_and_records_the_event() {
     let p2 = s.state().player(Seat::P2);
     assert!(p2.field.is_empty());
     assert_eq!(p2.trash, vec![victim]);
-    assert_eq!(
-        s.state().turn_events,
-        vec![("CHAR_KOED_p2".to_string(), 1)]
-    );
+    // バトルした双方に「相手のキャラとバトルした」印（BATTLED_CHAR_<uuid>）も付く（OP12-020）。
+    let koed: Vec<_> = s
+        .state()
+        .turn_events
+        .iter()
+        .filter(|(k, _)| !k.starts_with("BATTLED_CHAR_"))
+        .cloned()
+        .collect();
+    assert_eq!(koed, vec![("CHAR_KOED_p2".to_string(), 1)]);
+    let battled = |c| {
+        let key = format!("BATTLED_CHAR_{}", s.state().card(c).uuid);
+        s.state().turn_events.iter().any(|(k, _)| *k == key)
+    };
+    assert!(battled(atk) && battled(victim));
     assert!(!s.state().card(victim).is_rest, "トラッシュでレストは解除");
 }
 

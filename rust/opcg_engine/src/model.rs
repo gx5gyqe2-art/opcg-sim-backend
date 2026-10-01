@@ -1238,6 +1238,8 @@ pub struct DelayedAction {
     pub source_card: Option<CardIdx>,
     /// 「このバトル終了時、〜」の予約（バトルの終わりに解決する。ターン終了では解決しない）。
     pub battle_end: bool,
+    /// 「次の相手のメインフェイズ開始時、〜」の予約（予約者の相手のメインフェイズが始まるときに解決する）。
+    pub main_start: bool,
     /// 予約時点の保存済み対象（「この効果で登場させたキャラ」等の参照をターン終了時にも解くため）。
     pub saved_targets: Vec<(String, Vec<TargetRef>)>,
 }

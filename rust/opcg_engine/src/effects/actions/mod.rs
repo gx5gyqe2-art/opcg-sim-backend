@@ -323,7 +323,7 @@ pub fn run_target_loop_with(
                 }
                 Some(TargetHandler::Rest) => rest(s, masters, actor, target, source_card)?,
                 Some(TargetHandler::Active) => active(s, target, owner),
-                Some(TargetHandler::Buff) => buff(s, masters, action, target, value)?,
+                Some(TargetHandler::Buff) => buff(s, masters, action, target, value, source_card)?,
                 None => group.expect("checked above")(
                     s, masters, actor, action, target, owner, source_list, value, source_card,
                 )?,
@@ -479,6 +479,7 @@ fn buff(
     action: &GameAction,
     target: CardIdx,
     value: i32,
+    source_card: Option<CardIdx>,
 ) -> Result<(), EngineError> {
     let _ = masters;
     match action.status.as_deref() {
@@ -500,13 +501,27 @@ fn buff(
         }
         Some("COST_REDUCTION") => {
             if is_timed(action.duration) {
+                // 「次に登場させる〜のコストは N 少なくなる」: 一回限り＝発生源ごとの印を付ける
+                // （1 枚を登場させたら `consume_next_play_discounts` が残りを外す）。
+                let once = action
+                    .target
+                    .as_ref()
+                    .is_some_and(|q| q.flags.iter().any(|f| f == "NEXT_PLAY_ONCE"));
+                let flag = if once {
+                    let src = source_card
+                        .map(|c| s.state().card(c).uuid.clone())
+                        .unwrap_or_default();
+                    format!("{}{src}", continuous::NEXT_PLAY_FLAG)
+                } else {
+                    String::new()
+                };
                 continuous::apply(
                     s,
                     target,
                     ContinuousKind::Cost,
                     action.duration,
                     value,
-                    "",
+                    &flag,
                     "",
                     expire_turn_for(s, action.duration),
                 );
