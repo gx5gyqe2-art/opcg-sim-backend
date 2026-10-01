@@ -294,6 +294,15 @@ pub fn check_condition(
                 CondValue::Str(s) => (Some(s.as_str()), 1),
                 _ => (None, 1),
             };
+            // 名前の末尾が `_SEAT` なら、条件の対象席の記録を引く（`HAND_DISCARDED_BY_EFFECT_P1` 等）。
+            let seat_name: String;
+            let name = match name.and_then(|n| n.strip_suffix("_SEAT")) {
+                Some(base) => {
+                    seat_name = format!("{base}_{}", target_seat.name());
+                    Some(seat_name.as_str())
+                }
+                None => name,
+            };
             let occurred = name.map(event_count).unwrap_or(0);
             compare(occurred, cond.operator, threshold)
         }

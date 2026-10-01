@@ -1236,6 +1236,8 @@ pub struct DelayedAction {
     pub player: Seat,
     pub node: crate::effects::NodeRef,
     pub source_card: Option<CardIdx>,
+    /// 「このバトル終了時、〜」の予約（バトルの終わりに解決する。ターン終了では解決しない）。
+    pub battle_end: bool,
 }
 
 /// 誘発待ち行列の 1 件（Python `_pending_triggers`／`_battle_triggers`）。
@@ -1251,6 +1253,8 @@ pub struct PendingTrigger {
     pub ability: u32,
     pub optional: bool,
     pub confirmed: bool,
+    /// 誘発の契機になったカード（バトルした相手など）。解決時に文脈の `trigger_subject` へ載せる。
+    pub subject: Option<CardIdx>,
 }
 
 /// 盤面全体（Python `GameManager`＋両 `Player`）。

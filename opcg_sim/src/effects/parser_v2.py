@@ -28,6 +28,8 @@ from .rules import ParseContext, RuleRegistry, default_registry
 # 「このターン終了時、〜」「ターン終了時に〜」= 遅延実行（ターン終了フックで解決）。
 # 「ターン終了時まで」は期間（duration）であって遅延ではないため除外する。
 _DELAY_TURN_END_RE = re.compile(_nfc(r"ターン終了時(?!まで)[、にはのでも]"))
+# 「このバトル終了時、〜」＝バトルの終わりまで遅らせる（エンジンは finish_attack で解決する）。
+_DELAY_BATTLE_END_RE = re.compile(_nfc(r"このバトル終了時[、にはのでも]"))
 
 
 def _mark_arrange(node: EffectNode) -> None:
@@ -72,12 +74,13 @@ class EffectParserV2(EffectParser):
         ルールが一致すればその結果を、なければレガシー実装にフォールバックする。
         """
         ctx = ParseContext(text=text, is_cost=is_cost)
-        delayed = bool(_DELAY_TURN_END_RE.search(_nfc(text)))
+        delayed = ("BATTLE_END" if _DELAY_BATTLE_END_RE.search(_nfc(text))
+                   else "TURN_END" if _DELAY_TURN_END_RE.search(_nfc(text)) else None)
         result = self.registry.apply(ctx)
         if result is not None:
             self.rule_hits.append(result.rule_name)
             if delayed:
-                _mark_delay(result.node, "TURN_END")
+                _mark_delay(result.node, delayed)
             _mark_arrange(result.node)
             return result.node
 
@@ -85,7 +88,7 @@ class EffectParserV2(EffectParser):
         self.unmatched.append(ctx.text)
         node = super()._parse_atomic_action(text, is_cost)
         if delayed and node is not None:
-            _mark_delay(node, "TURN_END")
+            _mark_delay(node, delayed)
         if isinstance(node, GameAction) and node.type == ActionType.OTHER:
             self.fallback_other.append(ctx.text)
         return node

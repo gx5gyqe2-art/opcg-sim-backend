@@ -630,10 +630,27 @@ class EffectParser:
             # ライフ1枚を手札に加える」で MOVE_CARD 対象にアマゾン・リリー/九蛇/power5000 が混入）。
             if trigger in (TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE,
                            TriggerType.ON_LEAVE, TriggerType.ON_EVENT_PLAY, TriggerType.ON_OPP_PLAY,
-                           TriggerType.ON_REST):
+                           TriggerType.ON_REST, TriggerType.ON_LIFE_DECREASE):
                 effect_text = re.sub(
-                    _nfc(r'^[^。：:]*?(?:された|なった|与えた|離れた|発動した|登場させた)時、'),
+                    _nfc(r'^[^。：:]*?(?:された|なった|与えた|離れた|発動した|登場させた|'
+                         r'戻った|加わった|KOした)時、'),
                     '', effect_text).strip()
+            elif trigger in (TriggerType.YOUR_TURN, TriggerType.OPPONENT_TURN, TriggerType.PASSIVE):
+                # エンジンが誘発句を raw_text から読む常在型の反応（引いた時／捨てられた時／バトル終了時）。
+                # 句が効果本体に残ると対象解析が句の語を拾う（OP05-053 の「ドローフェイズ以外」等）。
+                effect_text = re.sub(
+                    _nfc(r'^[^。：:]*?(?:カードを引いた|手札が捨てられた|バトルしたバトル終了|'
+                         r'アタックされた|アタックした)時、'),
+                    '', effect_text).strip()
+
+            # 「〜を捨てて発動できる。X」＝手札を捨てるのは発動コスト（任意）。効果側に残すと
+            # 捨てられなくても X が実行される（OP17-040）。
+            if cost_node is None:
+                m_inline = re.match(_nfc(r'^(.+?を捨て)て発動できる[。、]?(.*)$'), effect_text, re.DOTALL)
+                if m_inline and m_inline.group(2).strip():
+                    cost_node = self._parse_cost_node(m_inline.group(1) + _nfc('ることができる'))
+                    effect_text = m_inline.group(2).strip()
+                    cost_optional = True
 
             # 効果先頭のゲート条件「〜の場合、」は、後続が単一文（内部に「。」が無く、連用形で
             # 連なる複数アクション）のとき ability.condition へ引き上げる。従来は先頭アクションのみ
@@ -1189,13 +1206,21 @@ class EffectParser:
         # 【ターン中】タグ + 本文の KO/ライフダメージ誘発は、本来その イベント誘発
         # （ON_KO/ON_DAMAGE_DEALT_TO_LIFE）でありターン中は CONTEXT 条件として後段で保全される。
         # コスト節の後（「手札2枚を捨てる：相手のキャラがKOされた時、〜」OP03-076）も含めて上書きする。
+        # 発動した時（ON_EVENT_PLAY）・登場させた時（ON_OPP_PLAY）・場を離れた／手札に戻った時
+        # （ON_LEAVE）・ライフが離れた時（ON_LIFE_DECREASE）も同じ扱い。エンジンが誘発句を raw_text から
+        # 読んで対応するイベントで積む（`triggers.rs`）。
         primary_reactive = embedded if embedded in (
             TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE, TriggerType.ON_REST,
-            TriggerType.ON_LEAVE) else None
+            TriggerType.ON_EVENT_PLAY, TriggerType.ON_OPP_PLAY, TriggerType.ON_LEAVE,
+            TriggerType.ON_LIFE_DECREASE) else None
         # 「自分の効果で場を離れた時」は専用のターン内イベント（EVENT_THIS_TURN）で表現済み
         # （OP07-038/OP08-046）＝ON_LEAVE 誘発には載せない。
         if primary_reactive == TriggerType.ON_LEAVE and _nfc("自分の効果で場を離れた時") in norm_text:
             primary_reactive = None
+        # 「【トリガー】が発動した時、〜」の【トリガー】は能力の見出しではなく誘発句の目的語。
+        if (embedded == TriggerType.ON_EVENT_PLAY
+                and re.search(_nfc(r'【トリガー】が発動した時'), norm_text)):
+            return TriggerType.ON_EVENT_PLAY
         if _nfc("【自分のターン中】") in norm_text: return primary_reactive or TriggerType.YOUR_TURN
         if _nfc("【相手のターン中】") in norm_text: return primary_reactive or TriggerType.OPPONENT_TURN
         if _nfc("【カウンター】") in norm_text: return TriggerType.COUNTER
@@ -1261,23 +1286,37 @@ class EffectParser:
         # 相手ライフへのダメージ誘発（「このリーダーのアタックによって、相手のライフにダメージを与えた時」）
         if re.search(_nfc(r'ライフに.{0,8}ダメージを与えた時'), norm_text):
             return TriggerType.ON_DAMAGE_DEALT_TO_LIFE
-        # KO 誘発（主語不問:「相手のキャラがKOされた時」「…キャラがKOされた時」）
-        if re.search(_nfc(r'KOされた時'), norm_text):
+        # KO 誘発（主語不問:「相手のキャラがKOされた時」「…キャラがKOされた時」）。
+        # 「このキャラのバトルによって相手のキャラをKOした時」（KOした側）も ON_KO（エンジンは
+        # raw_text の「KOした時」でアタッカー側の誘発として扱う）。
+        if re.search(_nfc(r'KOされた時|KOした時'), norm_text):
             return TriggerType.ON_KO
-        # 場を離れた誘発（「自分の…キャラが場を離れた時」）
-        if re.search(_nfc(r'場を離れた時'), norm_text):
+        # 場を離れた誘発（「自分の…キャラが場を離れた時」「…が自分の効果で持ち主の手札に戻った時」）
+        if re.search(_nfc(r'場を離れた時|手札に戻った時'), norm_text):
             return TriggerType.ON_LEAVE
+        # ライフが離れた／0枚になった／手札に加わった誘発（主語の自分／相手はエンジンが raw_text で読む）
+        if re.search(_nfc(r'ライフが(?:離れた|0枚になった|手札に加わった)時'), norm_text):
+            return TriggerType.ON_LIFE_DECREASE
         # レスト誘発（「（この）キャラが（自分の/相手の効果で）レストになった時」）。
         # 主語（このキャラ/キャラ）・要因（自分の効果で/相手の効果で/アタック）は raw_text から
         # エンジン側で解釈する（_rest_subject_matches）。「レストの場合」等の状態参照は別物。
         if re.search(_nfc(r'レストになった時'), norm_text):
             return TriggerType.ON_REST
-        # イベント発動誘発（「自分がイベントを発動した時」）
-        if re.search(_nfc(r'イベントを発動した時'), norm_text):
+        # 発動誘発（「自分がイベントを発動した時」「相手が【ブロッカー】かイベントを発動した時」
+        # 「相手がイベントか【トリガー】を発動した時」「【トリガー】が発動した時」）。
+        if re.search(_nfc(r'(?:イベント|【ブロッカー】|【トリガー】)[^。、]{0,12}?(?:を|が)発動した時'), norm_text):
             return TriggerType.ON_EVENT_PLAY
-        # 相手の登場誘発（「相手が…登場させた時」）
-        if re.search(_nfc(r'相手が[^。]{0,30}登場させた時'), norm_text):
+        # キャラの登場誘発（「相手が…登場させた時」「自分が…登場させた時」。主語はエンジンが読む）
+        if re.search(_nfc(r'(?:相手|自分)が[^。]{0,40}登場させた時'), norm_text):
             return TriggerType.ON_OPP_PLAY
+        # 「…とバトルしたバトル終了時」: 専用の種別が無いので常在型の反応（エンジンが raw_text で読む）。
+        if re.search(_nfc(r'バトルしたバトル終了時'), norm_text):
+            return TriggerType.PASSIVE
+        # 他のカードのアタック誘発（「自分の…リーダーがアタックした時かアタックされた時」）。
+        # 「このリーダー/キャラが」は ON_ATTACK 側が扱う。専用の種別が無いので常在型の反応。
+        if re.search(_nfc(r'自分の(?:[^。、]*?)(?:リーダー|キャラ)が(?:アタックした|アタックされた)'), norm_text) \
+                and not re.search(_nfc(r'この(?:リーダー|キャラ)がアタック'), norm_text):
+            return TriggerType.PASSIVE
         return None
 
     def _parse_to_node(self, text: str, is_cost: bool = False) -> EffectNode:
@@ -1682,6 +1721,14 @@ class EffectParser:
             return Condition(type=ConditionType.FIELD_COUNT, target=tq_c, operator=CompareOperator.LT,
                              value=1, player=tq_c.player, raw_text=norm_text)
 
+        # 「効果で自分の手札が捨てられているターン中」（ST33-004）: このターンに効果で手札が捨てられた
+        # という事実の条件（手札 0 枚ではない）。エンジンが捨てるたびにターン内イベントを記録する。
+        if re.search(_nfc(r'効果で(自分|相手)の手札が捨てられている'), norm_text):
+            return Condition(type=ConditionType.EVENT_THIS_TURN,
+                             value=("HAND_DISCARDED_BY_EFFECT_SEAT", 1),
+                             operator=CompareOperator.GE,
+                             player=(Player.OPPONENT if _nfc('相手の手札') in norm_text else Player.SELF),
+                             raw_text=norm_text)
         # 置換の対象指定「（自分の）「X」がKOされる/場を離れる（場合）」: 離れるカードが名前 X か
         # （OP12-061「自分の「トラファルガー・ロー」がKOされる場合」）。離脱カードを source_card として
         # 評価する SOURCE_STATE("NAME", X) にする。従来は GENERIC で名称限定が脱落していた。

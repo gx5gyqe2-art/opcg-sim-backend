@@ -56,7 +56,7 @@ fn has_trigger(master: &CardMaster, abilities: &AbilityTable) -> bool {
 }
 
 /// Python `if txt and txt.strip() not in ["", "なし", "-"]`（＝バニラなら通す）。
-fn is_vanilla_text(effect_text: &str) -> bool {
+pub(super) fn is_vanilla_text(effect_text: &str) -> bool {
     if effect_text.is_empty() {
         return true;
     }

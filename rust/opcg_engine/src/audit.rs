@@ -629,13 +629,16 @@ pub fn effect_probe(
     let fired = if trigger == "ON_PLAY" {
         rules::actions::play_card_action(&mut session, masters, Seat::P1, source)
     } else {
-        crate::effects::resolver::game_resolve_ability(
+        // 「バトルした相手のキャラ」（trigger_subject）を指す能力が空振りしないよう、契機カードに
+        // 相手の場の先頭を渡す（誘発の待ち行列が積む `subject` の代わり）。
+        let subject = session.state().player(Seat::P2).field.first().copied();
+        crate::effects::resolver::game_resolve_ability_with_subject(
             &mut session,
             masters,
             Seat::P1,
             source,
             ability_index,
-            false,
+            subject,
         )
     };
     stages.push(Value::Array(session.action_events().to_vec()));

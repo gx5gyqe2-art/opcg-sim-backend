@@ -308,16 +308,28 @@ pub fn run_target_loop_with(
                 continue;
             }
         }
-        match handler.as_ref() {
-            Some(TargetHandler::Ko) => ko(s, masters, actor, target, owner, source_card)?,
-            Some(TargetHandler::Discard) => discard(s, masters, target, owner)?,
-            Some(TargetHandler::Rest) => rest(s, masters, actor, target, source_card)?,
-            Some(TargetHandler::Active) => active(s, target, owner),
-            Some(TargetHandler::Buff) => buff(s, masters, action, target, value)?,
-            None => group.expect("checked above")(
-                s, masters, actor, action, target, owner, source_list, value, source_card,
-            )?,
-        }
+        let prev_actor = s.set_effect_actor(Some((actor, source_card)));
+        let applied = (|| -> Result<(), EngineError> {
+            match handler.as_ref() {
+                Some(TargetHandler::Ko) => ko(s, masters, actor, target, owner, source_card)?,
+                Some(TargetHandler::Discard) => {
+                    discard(s, masters, target, owner)?;
+                    // 手札から効果で捨てられた（コスト含む）＝「効果で自分の手札が捨てられた時」。
+                    if source_list == Some(CardZone::Hand) {
+                        triggers::on_hand_discarded_by_effect(s, masters, owner)?;
+                    }
+                }
+                Some(TargetHandler::Rest) => rest(s, masters, actor, target, source_card)?,
+                Some(TargetHandler::Active) => active(s, target, owner),
+                Some(TargetHandler::Buff) => buff(s, masters, action, target, value)?,
+                None => group.expect("checked above")(
+                    s, masters, actor, action, target, owner, source_list, value, source_card,
+                )?,
+            }
+            Ok(())
+        })();
+        s.set_effect_actor(prev_actor);
+        applied?;
     }
     Ok(success)
 }
@@ -345,6 +357,9 @@ fn draw(
         return Ok(true);
     }
     crate::rules::turn::draw_card(s, masters, target_player, value.max(0) as u32)?;
+    if value > 0 {
+        triggers::on_card_drawn_by_effect(s, masters, target_player)?;
+    }
     Ok(true)
 }
 
@@ -595,10 +610,10 @@ pub fn move_card(
                 continuous::drop_for(s, &uuid);
             }
             ops::LeaveKind::LifeDecrease => {
-                triggers::enqueue_life_decrease(s, masters, ev.count)?;
+                triggers::enqueue_life_decrease(s, masters, ev.owner, ev.count, dest_zone == Zone::Hand)?;
             }
             ops::LeaveKind::OnLeave => {
-                triggers::enqueue_on_leave(s, masters, ev.card, ev.owner)?;
+                triggers::enqueue_on_leave(s, masters, ev.card, ev.owner, dest_zone == Zone::Hand)?;
             }
         }
     }

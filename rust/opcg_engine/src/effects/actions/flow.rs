@@ -140,6 +140,7 @@ fn execute_event(
 ) -> Result<bool, EngineError> {
     for ev in targets {
         record_event_played(s, masters, *ev);
+        triggers::enqueue_activation_listeners(s, masters, triggers::Activation::Event, actor)?;
         if let Some(index) = main_event_ability(s, masters, *ev)? {
             crate::effects::resolver::game_resolve_ability(s, masters, actor, *ev, index, false)?;
         }

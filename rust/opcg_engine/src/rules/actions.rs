@@ -140,6 +140,12 @@ pub fn play_card_action(
             ));
         }
         record_event_played(s, masters, card);
+        crate::effects::triggers::enqueue_activation_listeners(
+            s,
+            masters,
+            crate::effects::triggers::Activation::Event,
+            seat,
+        )?;
         let ids = masters.get(s.state().card(card).master).ability_ids.clone();
         for (index, id) in ids.iter().enumerate() {
             let trigger = crate::effects::ability(masters, *id)?.trigger;
