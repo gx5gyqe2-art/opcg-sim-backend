@@ -156,6 +156,11 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if _nfc("カード名の異なる") in tgt_text or _nfc("カード名が異なる") in tgt_text:
         tq.is_unique_name = True
 
+    # 「捨てたカードと同じカード名を持つ」: コストで捨てたカードと同名に限る（EB02-039）。
+    #   コスト側の捨て札対象を save_id=discarded_card に保存し、resolver が名前で絞る。
+    if _nfc("捨てたカードと同じカード名") in tgt_text:
+        tq.flags.add("SAME_NAME_AS:discarded_card")
+
     # 「【ブロッカー】を持つ（キャラ）」等のキーワード所持の絞り込み（ST01-016/ST30-012）。
     #   従来は欄が無く任意の相手キャラを選べた。【トリガー】は別機構（HAS_TRIGGER）。
     for _kw in re.findall(_nfc(r'【(ブロッカー|速攻|ダブルアタック|バニッシュ|ブロック不可)】を持つ'), tgt_text):

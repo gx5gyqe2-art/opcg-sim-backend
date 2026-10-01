@@ -1887,6 +1887,16 @@ def _execute_main(ctx: ParseContext) -> Optional[GameAction]:
 def _shuffle(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("シャッフル") not in ctx.text:
         return None
+    # 「自分のトラッシュのカードN枚をデッキに戻しシャッフルできる」（OP05-080）: トラッシュ N 枚の移動＋
+    # シャッフル。従来はシャッフルだけで、トラッシュ N 枚の要件と移動が無かった。
+    m_tr = re.search(_nfc(r"トラッシュのカード([\d０-９]+)枚をデッキに戻し"), ctx.text)
+    if m_tr:
+        move = GameAction(
+            type=ActionType.MOVE_CARD,
+            target=TargetQuery(zone=Zone.TRASH, player=Player.SELF, count=_to_int(m_tr.group(1)),
+                               is_strict_count=True),
+            destination=Zone.DECK, raw_text=ctx.text)
+        return Sequence(actions=[move, GameAction(type=ActionType.SHUFFLE, raw_text=ctx.text)])
     # 「相手のデッキをシャッフルする」: 対象は相手デッキ（executor が target.player で判定）
     tq = None
     if _nfc("相手の") in ctx.text:

@@ -271,6 +271,15 @@ class EffectParser:
             q = getattr(n, "target", None)
             return q is not None and q.ref_id == "selected_card"
 
+        # 「捨てたカードと同じカード名」（SAME_NAME_AS:discarded_card）の参照元＝コストの捨て札を保存させる。
+        if any(f.startswith("SAME_NAME_AS:") for n in nodes
+               for f in (getattr(getattr(n, "target", None), "flags", None) or ())):
+            for n in nodes:
+                tq = getattr(n, "target", None)
+                if (isinstance(n, GameAction) and n.type == ActionType.DISCARD and tq is not None
+                        and tq.save_id is None):
+                    tq.save_id = "discarded_card"
+
         # 「その後、そのキャラのコスト/パワーがN以下の場合、KOする」= 直前に選んだキャラへの条件付き実行。
         # 未評価の GENERIC 条件＋対象なしの KO になっていた（OP06-074/OP09-098）。選んだキャラへの
         # 参照（ref_id）にコスト/パワーの上下限を持たせ、エンジンが参照先を絞って実行する（REF_FILTER）。

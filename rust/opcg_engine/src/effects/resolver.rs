@@ -1077,6 +1077,24 @@ impl Resolver {
             &self.context,
         )?;
 
+        // 「捨てたカードと同じカード名を持つ」（SAME_NAME_AS:<save_id>・EB02-039）: 保存済みのカードと
+        // 同名のものだけを候補に残す（保存が無ければ誰も同名でない＝対象なし）。
+        for f in &query.flags {
+            if let Some(save_id) = f.strip_prefix("SAME_NAME_AS:") {
+                let names: Vec<String> = self
+                    .context
+                    .saved_cards(save_id)
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|c| masters.get(s.state().card(*c).master).name.clone())
+                    .collect();
+                candidates.retain(|t| match t.card() {
+                    Some(c) => names.contains(&masters.get(s.state().card(c).master).name),
+                    None => false,
+                });
+            }
+        }
+
         // コストで「状態を変える」対象は、まだその状態でないカードに限る。
         if let Some((node, node_ref)) = action {
             if node_ref.is_cost_node() {
