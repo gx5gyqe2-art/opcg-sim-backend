@@ -765,6 +765,12 @@ impl Resolver {
             }
         };
 
+        // 対象を取る行動が 0 枚だった（「2枚まで捨てる」で 0 枚等）なら、直前の枚数は 0 に更新する
+        // （古い枚数が残ると「捨てた枚数と同じ枚数」が前の行動の枚数で動いてしまう）。
+        if action.target.is_some() && targets.is_empty() && action.ty != ActionType::Select {
+            self.context.prev_action_count = Some(0);
+        }
+
         // PREV_ACTION 条件評価用: ターゲットの有無を記録
         self.context.last_had_targets = if action.target.is_some() {
             Some(!targets.is_empty())
@@ -830,6 +836,12 @@ impl Resolver {
         // 除去置換の内側中断を検知するためのフラグ（Python `_replacement_suspended`）。
         s.edit()
             .set_mgr_flag(crate::journal::MgrFlagField::ReplacementSuspended, false);
+        // 「引いた枚数分」のために、ドローは実際に手札へ増えた枚数を数える（DRAW は対象を持たない）。
+        let drawer = match action.target.as_ref() {
+            Some(q) if q.player == PlayerRef::Opponent => actor.other(),
+            _ => actor,
+        };
+        let hand_before = s.state().player(drawer).hand.len() as i32;
         let success = super::actions::apply_action(
             s,
             masters,
@@ -840,6 +852,7 @@ impl Resolver {
             value,
             source_card,
         )?;
+        let drawn = s.state().player(drawer).hand.len() as i32 - hand_before;
         if s.state().replacement_suspended && !self.execution_stack.is_empty() {
             super::interact::defer_resolver_stack(
                 s,
@@ -890,8 +903,13 @@ impl Resolver {
         }
 
         // 文脈依存スケーリング（§7-5「捨てたカード1枚につき」等）
-        if success && action.ty != ActionType::Select {
+        // SHUFFLE は枚数を持たない帳簿上の動作（「戻し、シャッフルする。戻した枚数分引く」で
+        // 直前の枚数を 0 に潰さない）ので記録しない。
+        if success && action.ty != ActionType::Select && action.ty != ActionType::Shuffle {
             let mut cnt = targets.len() as i32;
+            if action.ty == ActionType::Draw {
+                cnt = drawn.max(0);
+            }
             if matches!(
                 action.ty,
                 ActionType::RestDon | ActionType::ActiveDon | ActionType::ReturnDon
@@ -992,6 +1010,18 @@ impl Resolver {
             if let Some(saved) = self.context.saved(save_id) {
                 return Ok(Some(saved.clone()));
             }
+        }
+
+        // 「引いた／戻した枚数分〜を捨てる」: 直前アクションの枚数を count に読み替える（0 枚なら対象なし）。
+        if query.count_dynamic.as_deref() == Some("PREV_ACTION_COUNT") {
+            let n = self.context.prev_action_count.unwrap_or(0);
+            if n <= 0 {
+                return Ok(Some(Vec::new()));
+            }
+            let mut q = query.clone();
+            q.count = n;
+            q.count_dynamic = None;
+            return self.resolve_targets(s, masters, actor, &q, source_card, action);
         }
 
         // 選択グループ分配（§7-1）: 先頭 M 枚を取り、消費済みとして記録する。

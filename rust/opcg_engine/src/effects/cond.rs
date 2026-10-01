@@ -215,11 +215,17 @@ pub fn check_condition(
             threshold_or_raw_text(cond, target_val),
         ),
         C::HandCount => compare(tp.hand.len() as i32, cond.operator, target_val),
-        C::TrashCount => compare(
-            tp.trash.len() as i32,
-            cond.operator,
-            threshold_or_raw_text(cond, target_val),
-        ),
+        C::TrashCount => {
+            // 「トラッシュにイベントが4枚以上」等は種類で絞った一致数（target を持つとき）。
+            // target 無し＝トラッシュ全枚数（「トラッシュが5枚以上」）。
+            let current = match &cond.target {
+                Some(q) => {
+                    get_target_cards(state, masters, abilities, q, actor, source, ctx)?.len() as i32
+                }
+                None => tp.trash.len() as i32,
+            };
+            compare(current, cond.operator, threshold_or_raw_text(cond, target_val))
+        }
         C::DeckCount => compare(tp.deck.len() as i32, cond.operator, target_val),
         C::FieldCount => {
             let current = match &cond.target {
@@ -776,6 +782,21 @@ mod tests {
         assert!(f.check(&cond("FIELD_COST_SUM", json!({"value": 8, "operator": "EQ"}))));
         // OPPONENT 指定は相手側を数える（p2: life 1 / hand 0）
         assert!(f.check(&cond("LIFE_COUNT", json!({"player": "OPPONENT", "value": 1, "operator": "EQ"}))));
+    }
+
+    #[test]
+    fn trash_count_with_a_target_counts_only_that_kind() {
+        let f = fixture();
+        // p1 のトラッシュは「トラッシュA（イベント）」1 枚だけ。
+        let q = |ct: &str| {
+            crate::effects::matcher::tests::query_json(&format!(
+                r#""zone":"TRASH","card_type":["{ct}"],"count":-1,"select_mode":"ALL""#
+            ))
+        };
+        assert!(f.check(&cond("TRASH_COUNT", json!({"target": q("EVENT"), "value": 1, "operator": "GE"}))));
+        assert!(!f.check(&cond("TRASH_COUNT", json!({"target": q("EVENT"), "value": 2, "operator": "GE"}))));
+        // 種類が違えば数えない（トラッシュ全枚数 1 ではなく 0 枚）。
+        assert!(!f.check(&cond("TRASH_COUNT", json!({"target": q("CHARACTER"), "value": 1, "operator": "GE"}))));
     }
 
     #[test]

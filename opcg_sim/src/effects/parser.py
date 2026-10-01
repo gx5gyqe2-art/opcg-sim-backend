@@ -1126,14 +1126,21 @@ class EffectParser:
         if len(parts) > 1:
             _bare_buff_re = re.compile(_nfc(r'^(?:パワー|コスト)[ 　]*[+＋\-－−‐]\d'))
             _subj_re = re.compile(_nfc(r'(この(?:キャラ|リーダー|カード))(?:は|の)?'))
+            # 「…N枚につき、パワー+1000し、コスト+2」の「N枚につき」は後続の裸の増減句にも掛かる
+            # （EB04-048: トラッシュ5枚につきコスト+2。継承しないとコスト+2 が固定値になる）。
+            _per_re = re.compile(_nfc(r'([^、。：:]*?[\d０-９]+枚につき)、'))
             _carry_subj = None
+            _carry_per = None
             for _pi, _p in enumerate(parts):
                 if _carry_subj and _bare_buff_re.match(_p):
-                    parts[_pi] = _carry_subj + 'の' + _p
+                    parts[_pi] = (_carry_subj + 'は、' + _carry_per + _p) if _carry_per \
+                        else (_carry_subj + 'の' + _p)
                 else:
                     _sm = _subj_re.search(_p)
                     if _sm:
                         _carry_subj = _sm.group(1)
+                        _pm = _per_re.search(_p)
+                        _carry_per = (_pm.group(1) + '、') if _pm else None
 
         if len(parts) > 1:
             return Sequence(actions=[self._parse_logic_block(p, is_cost) for p in parts])
@@ -1596,6 +1603,19 @@ class EffectParser:
                 if len(name_conds) == 1:
                     return name_conds[0]
                 return Condition(type=ConditionType.AND, args=name_conds, raw_text=norm_text)
+            # 「トラッシュに<種類>が N枚以上ある」(OP12-059/063/065/066 のイベント4枚以上 等)は
+            # トラッシュ全枚数ではなく、その種類のカードだけを数える。種類（イベント/キャラ/ステージ・
+            # 特徴・色・コスト 等）を TargetQuery（zone=TRASH）で持たせ、エンジンが一致数を数える。
+            typed_m = re.search(_nfc(r'トラッシュ(?:に|の)(?P<what>[^、。]*?)が[\d０-９]+枚'), norm_text)
+            if typed_m and typed_m.group('what').strip() not in ('', 'カード', 'あるカード'):
+                tq = parse_target(typed_m.group('what'))
+                tq.zone = Zone.TRASH
+                tq.player = p
+                tq.count = -1
+                tq.select_mode = "ALL"
+                tq.is_up_to = False
+                return Condition(type=ConditionType.TRASH_COUNT, target=tq, operator=operator,
+                                 value=value, player=p, raw_text=norm_text)
             return Condition(type=ConditionType.TRASH_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 
         # デッキ枚数（「自分のデッキが20枚以下の場合」等）。"デッキの上から…" は除外。

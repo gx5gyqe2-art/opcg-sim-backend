@@ -56,6 +56,19 @@ def _don_cost_circled(ctx: ParseContext) -> Optional[GameAction]:
     return None
 
 
+# 直前アクションの枚数を参照する句（「戻した／置いた／捨てた／引いた枚数分」「捨てた枚数と同じ枚数」）。
+# resolver が直前アクションの枚数を `PREV_ACTION_COUNT` に記録する（ドローは実際に引けた枚数）。
+_PREV_COUNT_RE = re.compile(_nfc(
+    r"(?:戻した|置いた|捨てた|引いた|KOした|レストにした|加えた)(?:カードの)?枚数(?:分|と同じ枚数|と同数)"))
+
+
+def _prev_count_value(t: str) -> Optional[ValueSource]:
+    """「（直前に）<戻した/置いた/捨てた/引いた>枚数分」を PREV_ACTION_COUNT の値にする。無ければ None。"""
+    if _PREV_COUNT_RE.search(_nfc(t)):
+        return ValueSource(base=0, dynamic_source="PREV_ACTION_COUNT")
+    return None
+
+
 # ---------------------------------------------------------------------------
 # ドロー: 「カードN枚を引く」
 # ---------------------------------------------------------------------------
@@ -84,7 +97,7 @@ def _draw(ctx: ParseContext) -> Optional[GameAction]:
     return GameAction(
         type=ActionType.DRAW,
         target=tq,
-        value=_per_n_value(t, x) or ValueSource(base=x),
+        value=_per_n_value(t, x) or _prev_count_value(t) or ValueSource(base=x),
         raw_text=t,
     )
 
@@ -214,6 +227,46 @@ def _compound_self_and_other(ctx: ParseContext) -> Optional[EffectNode]:
 
 
 # ---------------------------------------------------------------------------
+# 「キャラN枚までとリーダーを／このキャラと自分のリーダー1枚までを、<動詞句>」= 両方へ同じ動詞。
+#   「と」（両方）を単一クエリ（card_type=[LEADER,CHARACTER]・count=N まで）に潰すと、リーダーが
+#   N 枚の枠を消費する／片方にしか効果が乗らない（EB04-013・P-036）。キャラ側とリーダー側を
+#   それぞれ単独の句として既存ルールで解析し直し、Sequence にする。
+# ---------------------------------------------------------------------------
+_CHAR_AND_LEADER_RE = re.compile(_nfc(
+    r"^(?P<pre>.*?キャラ)(?P<n>[\d０-９]+)枚(?P<up>まで)?と(?:自分の)?リーダー(?:[\d０-９]+枚)?(?:まで)?を、?(?P<verb>.+)$"))
+_THIS_AND_LEADER_RE = re.compile(_nfc(
+    r"^この(?P<kind>キャラ)と(?:自分の)?リーダー(?:[\d０-９]+枚)?(?:まで)?(?:を|は)、?(?P<verb>.+)$"))
+
+
+@rule("char_and_leader_dual", priority=94)
+def _char_and_leader_dual(ctx: ParseContext) -> Optional[EffectNode]:
+    from .base import default_registry
+    t = ctx.text
+    m = _CHAR_AND_LEADER_RE.match(t)
+    owner = "相手の" if _nfc("相手") in t else "自分の"
+    if m:
+        verb = m.group("verb")
+        char_txt = f"{m.group('pre')}{m.group('n')}枚{m.group('up') or ''}を、{verb}"
+        leader_txt = f"{owner}リーダーを、{verb}"
+    else:
+        m = _THIS_AND_LEADER_RE.match(t)
+        if not m:
+            return None
+        verb = m.group("verb")
+        joint = "は、" if re.match(_nfc(r"このターン中|このバトル中"), verb) else "を、"
+        char_txt = f"このキャラ{joint}{verb}"
+        leader_txt = f"自分のリーダー{joint}{verb}"
+    nodes = []
+    for sub in (char_txt, leader_txt):
+        res = default_registry.apply(ParseContext(text=sub, is_cost=ctx.is_cost))
+        if res is None or not isinstance(res.node, GameAction) or res.node.type == ActionType.OTHER:
+            return None
+        res.node.raw_text = t
+        nodes.append(res.node)
+    return Sequence(actions=nodes)
+
+
+# ---------------------------------------------------------------------------
 # 自己レスト（コスト): 「このキャラ／このリーダーをレストにできる」
 # ---------------------------------------------------------------------------
 @rule("rest_self_cost", priority=90)
@@ -315,6 +368,10 @@ def _discard(ctx: ParseContext) -> Optional[GameAction]:
     if m_down:
         tq.count = _to_int(m_down.group(1))
         tq.count_dynamic = "DOWN_TO_N"
+        tq.is_up_to = False
+    elif _prev_count_value(t) is not None and re.search(_nfc(r"枚数分.*捨てる"), t):
+        # 「引いた枚数分自分の手札を捨てる」: 捨てる枚数は直前アクションの枚数（EB04-011）。
+        tq.count_dynamic = "PREV_ACTION_COUNT"
         tq.is_up_to = False
     elif _nfc("まで") in t:
         tq.is_up_to = True
@@ -2313,15 +2370,24 @@ def _dual_tier_play_from_trash(ctx: ParseContext) -> Optional[EffectNode]:
     if _nfc("トラッシュ") not in t or _nfc("登場") not in t:
         return None
     m = re.search(_nfc(r"コスト(\d+)以下.*?と.*?コスト(\d+)以下"), t)
+    exact2 = False
+    if not m:
+        # 「コスト4以下と1のキャラカード1枚ずつまで」(OP14-084)＝第2ティアはコスト丁度 1。
+        m = re.search(_nfc(r"コスト(\d+)以下と(\d+)の"), t)
+        exact2 = m is not None
     if not m:
         return None
     c1, c2 = int(m.group(1)), int(m.group(2))
+    # レストで登場するのは、本文が明示したときだけ（EB03-049 は「1枚ずつまでを、登場させる」＝通常登場）。
+    #   「残りをレストで登場」(OP06-086)＝第2ティアのみレスト／「レストで登場」＝両ティア。
+    rest_second = _nfc("残りをレスト") in t
+    rest_both = (not rest_second) and bool(re.search(_nfc(r"レストで登場"), t))
 
     # 主語修飾（特徴《X》/名前「X」/ゾーン「手札かトラッシュ」/色）は parse_target に拾わせ、
     # 両ティアで共有する（従来は CHARACTER/TRASH 固定で特徴・手札が脱落: EB03-049）。
     base = parse_target(t)
 
-    def _tier(cost_max: int, rested: bool) -> GameAction:
+    def _tier(cost_max: int, rested: bool, exact: bool = False) -> GameAction:
         tq = TargetQuery(
             player=base.player or Player.SELF,
             zone=base.zone if base.zone not in (Zone.FIELD, None) else Zone.TRASH,
@@ -2332,6 +2398,8 @@ def _dual_tier_play_from_trash(ctx: ParseContext) -> Optional[EffectNode]:
             attributes=list(base.attributes),
             cost_max=cost_max, count=1, is_up_to=True,
         )
+        if exact:
+            tq.cost_min = cost_max
         return GameAction(
             type=ActionType.PLAY_CARD,
             target=tq,
@@ -2341,7 +2409,7 @@ def _dual_tier_play_from_trash(ctx: ParseContext) -> Optional[EffectNode]:
         )
 
     # 「1枚を登場させ(active)」= 上位ティア(コストX) / 「残りをレストで登場」= 下位ティア(コストY)。
-    return Sequence(actions=[_tier(c1, rested=False), _tier(c2, rested=True)])
+    return Sequence(actions=[_tier(c1, rested=rest_both), _tier(c2, rested=rest_second or rest_both, exact=exact2)])
 
 
 @rule("play_card_from_zone", priority=52)
@@ -2550,7 +2618,7 @@ def _mill_deck(ctx: ParseContext) -> Optional[GameAction]:
     return GameAction(
         type=ActionType.TRASH_FROM_DECK,
         target=None,
-        value=ValueSource(base=_first_int(t, 1)),
+        value=_prev_count_value(t) or ValueSource(base=_first_int(t, 1)),
         status="OPPONENT" if (_nfc("相手") in t and _nfc("自分") not in t) else None,
         raw_text=t,
     )
@@ -2694,6 +2762,9 @@ def _attack_active(ctx: ParseContext) -> Optional[GameAction]:
         return None
     duration = "THIS_TURN" if _nfc("このターン中") in t else "PERMANENT"
     tq = parse_target(t)
+    # 「アクティブのキャラにも」は付与先ではなく**アタック先**の修飾。parse_target が
+    # 付与先へ is_rest=False（アクティブのキャラだけ）を付けると、レストの自軍が選べない。
+    tq.is_rest = None
     if re.search(_nfc(r"このキャラは"), t):
         tq = TargetQuery(select_mode="SOURCE")
     return GameAction(
