@@ -517,6 +517,7 @@ def build_parser():
     ap.add_argument("--parts", action="store_true",
                     help="**T145** `rel_K` の和を勝者／敗者の最後のターンと宣言した行に割って出す")
     CP.add_cut_price_arg(ap)                       # **N-3**
+    TO.add_defender_power_arg(ap)                  # 2b
     ap.add_argument("--json", default="")
     return ap
 
@@ -538,6 +539,7 @@ def main(argv=None):
     if a.clamp:
         KV.set_scale_clamp([float(x) for x in a.clamp.split(",")])
     CP.apply_cut_price(a)                          # **N-3**
+    TO.apply_defender_power(a)                     # 2b
     out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency,
                   pre_settle=(a.pre_settle == "on"), parts=a.parts)
     print(json.dumps(out, ensure_ascii=False, indent=2))

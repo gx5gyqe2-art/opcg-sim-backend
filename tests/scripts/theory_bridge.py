@@ -471,7 +471,7 @@ def guard_hand_reading(tok, sc, ci_row, idx2cid, cards, take, mu=MU, deck=None, 
         total = don_stock(sc, tok, "me")
         nxt = float(total) + float(HP.DON_PER_TURN)              # 次の自席ターン: 全部アクティブ ＋ ドン!!フェイズの 2 枚（上限 10）
         out["caps"] = HP.caps_of(min(float(HP.DON_CAP), nxt), nxt, r_turns=r_opp)
-        out["xs_future"] = HG.incoming(tok)                      # T67 と同じ「今の相手の場が毎ターン来る」
+        out["xs_future"] = HP.incoming_of_row(sc, tok, ci, idx2cid)   # T67 と同じ「今の相手の場が毎ターン来る」（2b: 規則どおりの守る側）
         out["inflow"] = {"deck": deck, "cards": cards, "olp": olp, "r": r_opp,
                          "field": HP.own_field_ids(ci, idx2cid),
                          "st_base": HP.state_of_row(sc, tok, ci, idx2cid, cards)}
@@ -1729,10 +1729,12 @@ def main(argv=None):
     _TOM.add_passive_body_arg(ap)
     EV.add_f_pricing_fixes_arg(ap)
     _CP.add_cut_price_arg(ap)                                  # **N-3**
+    _TOM.add_defender_power_arg(ap)                            # 2b
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_decision_row(a)
     _CP.apply_cut_price(a)                                     # **N-3**
+    _TOM.apply_defender_power(a)                               # 2b
     apply_guard_afford(a)                                      # G-2
     apply_guard_s_cost(a)                                      # G-2
     _TOM.apply_attack_ability(a)

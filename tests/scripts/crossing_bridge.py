@@ -3388,11 +3388,13 @@ def main(argv=None):
                     help="**T152** 列の第 1 段: `walk`（旧・全ての歩きの第 1 段が 0）／`game`（規則・局の最初の自席ターンだけ 0）")
     add_nu_mode_arg(ap)
     CP.add_cut_price_arg(ap)                        # **N-3**
+    TO.add_defender_power_arg(ap)                   # 2b
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_decision_row(a)
     apply_nu_mode(a)
     CP.apply_cut_price(a)                           # **N-3**
+    TO.apply_defender_power(a)                      # 2b
     t0 = time.time()
     set_pre_settle_mode(a.pre_settle)               # **T138b**
     set_opp_clock_mode(a.opp_clock)                 # **T151-2**

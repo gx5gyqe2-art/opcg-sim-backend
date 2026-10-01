@@ -73,14 +73,23 @@ def caps_of(don_active, don_total, turns=PLAN_TURNS, r_turns=None):
     return out
 
 
+def incoming_of_row(sc, tok_row, ci_row=None, idx2cid=None, st=None):
+    """**行の来る攻撃の超過**（`hand_guard.incoming` と同じ並び）——守る側は `theory_order.defender_power`
+    （既定 `rule`＝相手のターンの規則どおりのパワー・自席の行の付与ドンを外す／`token`＝旧のトークン列 0）。"""
+    mine = TO.defender_power(tok_row, sc, ci_row, idx2cid, st=st)
+    if mine is None:
+        return HG.incoming(tok_row)
+    return [x for x in TO.incoming_x(tok_row, mine=mine) if x >= -TO.PWR_EPS]
+
+
 def search_context(sc, tok_row, ci_row, idx2cid, cards, deck):
     """**探す能力の価格に要る状態**（T68）＝今の手札（`hand_items`）・ドンの枠（`caps`・`R` 依存の後ろ枠）・来る攻撃・
     受ける損・自分のデッキ（`search_price.deck_of` で seed から復元した並び・`None` なら価格は従来の `sel(k)` に落ちる）。"""
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     r = max(1.0, min(5.0, float(sc[SC_OPP_LIFE])))
-    xs = HG.incoming(tok_row); take = HG.take_cost_of(float(sc[SC_MY_LIFE]))
     field = own_field_ids(ci_row, idx2cid)
     st_base = state_of_row(sc, tok_row, ci_row, idx2cid, cards)                    # T72: 条件の判定に要る状態
+    xs = incoming_of_row(sc, tok_row, ci_row, idx2cid, st=st_base); take = HG.take_cost_of(float(sc[SC_MY_LIFE]))   # 2b
     items = hand_items(tok_row, ci_row, idx2cid, cards, olp, r)
     items = apply_inflow(items, deck, xs, take, cards, olp, r, field=field, st_base=st_base)        # T70
     return {"hand_items": items,
@@ -475,7 +484,7 @@ def added_card_gains(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, d
     olp = float(sc_after[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     r = max(1.0, min(5.0, float(sc_after[SC_OPP_LIFE])))
     caps = caps_of(float(sc_after[SC_MY_DON]), don_stock(sc_after, tok_after, "me"), r_turns=r)
-    xs = HG.incoming(tok_after)
+    xs = incoming_of_row(sc_after, tok_after, ci_after, idx2cid)          # 2b: 守る側は規則どおりのパワー
     take = HG.take_cost_of(float(sc_after[SC_MY_LIFE]))
     items = apply_inflow(hand_items(tok_after, ci_after, idx2cid, cards, olp, r), deck, xs, take, cards, olp, r,
                          field=own_field_ids(ci_after, idx2cid),
@@ -535,7 +544,7 @@ def collect(dirs, limit_games=0):
                     ip = order[p]
                     if int(round(float(ex["sc"][ip][SC_MY_LIFE]))) == int(round(float(sc[SC_MY_LIFE]))):
                         added = spent_cards(hand, hand_ids(ex["ci"][ip], idx2cid))
-                        xs = HG.incoming(tok); take = HG.take_cost_of(float(sc[SC_MY_LIFE]))
+                        xs = incoming_of_row(sc, tok, ex["ci"][i], idx2cid); take = HG.take_cost_of(float(sc[SC_MY_LIFE]))
                         hitems = apply_inflow(hand_items(tok, ex["ci"][i], idx2cid, cards, olp, r), decks.get(w), xs, take, cards, olp, r,
                                               field=own_field_ids(ex["ci"][i], idx2cid),
                                               st_base=state_of_row(sc, tok, ex["ci"][i], idx2cid, cards))
@@ -570,7 +579,7 @@ def collect(dirs, limit_games=0):
             caps2 = caps_of(float(sc2[SC_MY_DON]), don_stock(sc2, tok2, "me"), r_turns=r)
             after = hand_ids(ex["ci"][i2], idx2cid)
             added = spent_cards(after, hand)
-            xs2 = HG.incoming(tok2); take2 = HG.take_cost_of(float(sc2[SC_MY_LIFE]))
+            xs2 = incoming_of_row(sc2, tok2, ex["ci"][i2], idx2cid); take2 = HG.take_cost_of(float(sc2[SC_MY_LIFE]))
             hitems2 = apply_inflow(hand_items(tok2, ex["ci"][i2], idx2cid, cards, olp, r), decks.get(w), xs2, take2, cards, olp, r,
                                    field=own_field_ids(ex["ci"][i2], idx2cid),
                                    st_base=state_of_row(sc2, tok2, ex["ci"][i2], idx2cid, cards))

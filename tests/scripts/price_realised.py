@@ -570,6 +570,7 @@ def main(argv=None):
     _HP.add_inflow_arg(ap)
     _HP.add_cond_clock_arg(ap)
     _TO.add_attack_ability_arg(ap)
+    _TO.add_defender_power_arg(ap)                 # 2b
     _TO.add_passive_body_arg(ap)
     EV.add_f_pricing_fixes_arg(ap)
     ap.add_argument("--freeze-yardstick", action="store_true",
@@ -580,6 +581,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     apply_decision_row(a)
     _TO.apply_attack_ability(a)
+    _TO.apply_defender_power(a)                    # 2b
     _TO.apply_passive_body(a)
     EV.apply_f_pricing_fixes(a)
     _TO.reset_wiring_stats()

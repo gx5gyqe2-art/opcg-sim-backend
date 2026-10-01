@@ -709,11 +709,13 @@ def state_factor(d, mode=None, t_me=None, t_opp=None, scale_mode="hyp"):
     return float(w_of_d(d, sd) / W_BAR)
 
 
-def clock_of_row(sc, tok_row, mode=None, opp_sc=None, opp_tok=None):
+def clock_of_row(sc, tok_row, mode=None, opp_sc=None, opp_tok=None, ci_row=None, idx2cid=None):
     """判断点の行（`scalars`・トークン）から時計と `κ` を出す。
 
     `A_me`＝自分のリーダー＋場のキャラのうち**相手リーダーを越える**もの（レスト中も次のターンは殴れる
     ので旗は見ない）・`A_opp`＝来る攻撃のうち `x ≥ 0`（`incoming_x`）・ブロッカーは両側の旗の数。
+    **2026-10-01（残り 2b）**: `A_opp` の守る側は `defender_power(…)`（既定 `rule`＝相手のターンの規則どおりのパワー・
+    自席の行の付与ドンを外す）。`ci_row`／`idx2cid` を渡せばリーダー自身の手番つきの継続効果も入れ替える。
     """
     sc = np.asarray(sc); tok = np.asarray(tok_row)
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
@@ -721,7 +723,7 @@ def clock_of_row(sc, tok_row, mode=None, opp_sc=None, opp_tok=None):
     for s in range(SLOT_OWN_FIELD.start, SLOT_OWN_FIELD.stop):
         if float(tok[s, S_IS_CHAR]) > 0.5 and (slot_power(tok, s) or 0.0) >= olp - PWR_EPS:
             a_me += 1
-    a_opp = sum(1 for x in incoming_x(tok) if x >= -PWR_EPS)
+    a_opp = sum(1 for x in incoming_x(tok, mine=defender_power(tok, sc, ci_row, idx2cid)) if x >= -PWR_EPS)
     b_opp = sum(1 for _p, blk in opp_chars_of(tok) if blk)
     # **T78**（T77 の横展開）: 手札の 2 つの価値を時計へ。**T79（完全情報・§0.05）**: 相手の行（`opp_sc`／`opp_tok`）を
     # 渡せば相手側も同じ形で読む（記録には両席の行が在る）。渡さなければ自席側だけ直る（片側＝T78 の形）。
@@ -898,6 +900,40 @@ def leader_power_opp_turn(tok_row, sc=None, ci_row=None, idx2cid=None, st=None):
         st2["source_don_attached"] = int(round(float(tok[0, S_ATTACHED_DON]) * 5.0))
     m = EV.continuous_self_mods(lid, st=st2)
     return float(p - float(m["atk"]) + float(m["def"]))
+
+
+#: **来る攻撃を守る側のパワーの読み**（2026-10-01・N-3 採用の残り 2b）: `rule`（既定）＝`leader_power_opp_turn`
+#: （相手のターンの規則どおり・自席の行の付与ドンを外す）／`token`＝旧（トークン列 0 の今のパワー＝自席の行では付与ドンが
+#: 載る＝実 w41 の自席の行の約半分で来る攻撃の超過が小さく見えていた）。探す値の状態（`hand_plan.search_context`）・
+#: 物差しの入った札（`added_card_gains`）・守りの読み（`guard_hand_reading`）・盤面の時計（`clock_of_row`）が読む。
+DEFENDER_POWER_MODES = ("rule", "token")
+DEFENDER_POWER_MODE = "rule"
+
+
+def set_defender_power_mode(mode):
+    global DEFENDER_POWER_MODE
+    if mode not in DEFENDER_POWER_MODES:
+        raise ValueError("defender power mode は %s のどれか" % (DEFENDER_POWER_MODES,))
+    DEFENDER_POWER_MODE = mode
+    return DEFENDER_POWER_MODE
+
+
+def add_defender_power_arg(ap):
+    ap.add_argument("--defender-power", default=None, choices=DEFENDER_POWER_MODES,
+                    help="**2b** 来る攻撃を守る側のパワー: `rule`（既定・相手のターンの規則どおり）／`token`（旧・今のパワー）")
+
+
+def apply_defender_power(a):
+    if getattr(a, "defender_power", None) is not None:
+        set_defender_power_mode(a.defender_power)
+    return DEFENDER_POWER_MODE
+
+
+def defender_power(tok_row, sc=None, ci_row=None, idx2cid=None, st=None):
+    """切替どおりの守る側のパワー（`token` なら `None`＝`incoming_x` の旧の読み）。"""
+    if DEFENDER_POWER_MODE == "token" or sc is None or tok_row is None:
+        return None
+    return leader_power_opp_turn(tok_row, sc, ci_row, idx2cid, st=st)
 
 
 def incoming_x(tok_row, don=0, mine=None):

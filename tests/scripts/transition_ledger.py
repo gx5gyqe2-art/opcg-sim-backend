@@ -534,9 +534,11 @@ def main(argv=None):
     import effect_value as _EV
     _EV.add_f_pricing_fixes_arg(ap)
     CP.add_cut_price_arg(ap)                       # **N-3**
+    TO.add_defender_power_arg(ap)                  # 2b
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
     CP.apply_cut_price(a)
+    TO.apply_defender_power(a)                     # 2b
     TO.apply_attack_ability(a)
     TO.apply_passive_body(a)
     _EV.apply_f_pricing_fixes(a)
