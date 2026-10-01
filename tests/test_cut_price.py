@@ -503,3 +503,58 @@ def test_end_of_turn_frames_read_the_next_opponent_turn_leader_power():
             assert cv.reserve == pytest.approx(CP.reserve_of_row(sc, tok, cv.share, MU, mlp=cv.mlp))
         assert stats.get("cut_mlp_next", 0) + stats.get("cut_mlp_rule", 0) == stats.get("cut_frames", 0)
     assert n_next >= 10
+
+
+# ---- 2026-10-01 の点検: 守りの窓で窓が先読みしない ----
+
+def test_guard_rows_read_no_frame_after_the_row():
+    """守りの窓（守り手 `w` の行・攻め手 `1 − w` のターン `t` の途中）で攻め手の値段の窓を引くとき、
+    **攻め手のターン末の枠**（`end_of_turn=True`）はそのターンの最後の行と次のターンの最初の行＝この行より後ろを読む（先読み）。
+    **今のターンの最初の行**（`theory_bridge` の `first_main`・T79 の相手の行と同じ）はこの行より前。実記録 2 局で全部の守りの窓を確かめる。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    n_guard = n_flag_old = 0
+    for rows, ex, order, idx2cid, cards, own_last in _fixture_frames():
+        first_main = {}
+        for i in order:
+            w0, t0 = int(rows["who"][i]), int(rows["turn"][i])
+            if t0 >= 1 and PL.is_own_turn(w0, t0) and int(rows["kind"][i]) == 0 and (w0, t0) not in first_main:
+                first_main[(w0, t0)] = i
+        old = CP.CutFrames(order, rows, ex, idx2cid, cards, own_last, MU, end_of_turn=True)
+        new = CP.CutFrames(order, rows, ex, idx2cid, cards, first_main, MU)
+        for n, i in enumerate(order):
+            w, t = int(rows["who"][i]), int(rows["turn"][i])
+            if t < 1 or PL.is_own_turn(w, t):
+                continue                                  # 守りの窓＝相手のターンの自分の行
+            n_guard += 1
+            p_new = new.lookahead_pos(1 - w, t)
+            assert p_new is None or p_new <= n
+            p_old = old.lookahead_pos(1 - w, t)
+            if p_old is not None and p_old > n:
+                n_flag_old += 1
+    assert n_guard >= 20
+    assert n_flag_old >= 1                                # 旧の引き方は先読みしていた（検出器が働く）
+
+
+_TB_RUNNER = r"""
+import json, os, sys
+sys.path.insert(0, os.path.join(os.getcwd(), "tests")); sys.path.insert(0, os.path.join(os.getcwd(), "tests", "scripts"))
+import _bootstrap  # noqa
+import theory_bridge as TB
+rc = TB.main(["--in", sys.argv[1], "--boot-reps", "10", "--out", sys.argv[2]])
+sys.exit(rc)
+"""
+
+
+def test_linear_bridge_never_reads_a_frame_after_the_row(tmp_path):
+    """線形の橋（出荷の既定 `joint`）の全部の窓の引き（攻めの行・守りの窓）が、呼んだ行より後ろの行を読まない
+    （`CutFrames.view(at_n=)` の `cut_lookahead` が 0）。別プロセス・実記録 2 局。"""
+    import json
+    import subprocess
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out = str(tmp_path / "tb.json")
+    r = subprocess.run([sys.executable, "-c", _TB_RUNNER, _REC, out], cwd=root,
+                       env=dict(os.environ, OPCG_LOG_SILENT="1"), capture_output=True, text=True, timeout=900)
+    assert r.returncode == 0, r.stderr[-2000:]
+    st = json.loads(open(out, encoding="utf-8").read())["stats"]
+    assert st.get("cut_lookups", 0) >= 50
+    assert st.get("cut_lookahead", 0) == 0

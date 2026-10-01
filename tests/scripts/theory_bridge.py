@@ -1169,8 +1169,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     ctx["st"].update(opp_pools(None if opp is None else opp["ci"], ex["ci"][i], idx2cid, decks.get(1 - w)))
                 cut_me = cut_opp = None
                 if cut_opp_fr is not None:                                # **N-3**: 両席の値段の窓（今の枚数で）
-                    cut_me = cut_me_fr.view(w, t, float(sc[SC_MY_HAND]))
-                    cut_opp = cut_opp_fr.view(1 - w, t, float(sc[SC_OPP_HAND]))
+                    cut_me = cut_me_fr.view(w, t, float(sc[SC_MY_HAND]), at_n=n)
+                    cut_opp = cut_opp_fr.view(1 - w, t, float(sc[SC_OPP_HAND]), at_n=n)
                 ck = _kappa_of_row(sc, tok, t, prof,
                                    g_me=_g_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t)),
                                    g_opp=(None if opp is None else
@@ -1337,9 +1337,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                           opp=opp_g,
                                           # **N-3**: 守りの窓の席（w）と攻め手（1 − w）の値段の窓
                                           cut_me=(None if cut_me_fr is None else
-                                                  cut_me_fr.view(w, t, float(sc[SC_MY_HAND]))),
-                                          cut_opp=(None if cut_opp_fr is None else
-                                                   cut_opp_fr.view(1 - w, t, float(sc[SC_OPP_HAND]))))["kappa"])
+                                                  cut_me_fr.view(w, t, float(sc[SC_MY_HAND]), at_n=n)),
+                                          # **2026-10-01 の点検（先読みの修正）**: 守りの窓は攻め手（1 − w）のターン t の
+                                          # 途中＝攻め手のターン末の枠（`cut_opp_fr`）はこの行より後ろ（とその次のターン）を読む。
+                                          # 攻め手の値段はこの行までに在る攻め手の直近の行＝**今のターンの最初の行**
+                                          # （`cut_me_fr` の枠・`opp_g`〔T79〕・κ の相手の時計と同じ行・パワーは行から規則で読む）。
+                                          cut_opp=(None if cut_me_fr is None else
+                                                   cut_me_fr.view(1 - w, t, float(sc[SC_OPP_HAND]), at_n=n)))["kappa"])
                 if LEDGER_HARM_MODE == "realised":
                     # **T87**: 移転は攻め手の行に 1 回だけ入っている＝守りの窓は帳簿に何も足さない（`s` 専任）
                     got = dict(got, g=0.0, g_delta=0.0)

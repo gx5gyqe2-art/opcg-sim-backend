@@ -583,8 +583,31 @@ class CutFrames:
                     self.stats["cut_L1_sum"] = self.stats.get("cut_L1_sum", 0.0) + float(L[1])
         return self._curves[key]
 
-    def view(self, d, t, hand_now):
-        """席 `d` が守り手の値段の窓（今の枚数 `hand_now`）。枠が無ければ `None`（旧の値段）。"""
+    def lookahead_pos(self, d, t):
+        """席 `d`・ターン `t` の窓が読む**一番後ろの行の位置**（`order` の中の位置）——枠の行と、ターン末の枠なら
+        次の相手ターンの最初の行（2a のパワー）。枠が無ければ `None`。"""
+        key = self.frame_key(d, t)
+        if key is None:
+            return None
+        if not hasattr(self, "_posmap"):
+            self._posmap = {int(i): n for n, i in enumerate(self.order)}
+        last = self._posmap.get(int(self.frame_rows[key]), -1)
+        if self.end_of_turn:
+            for n, i in enumerate(self.order):
+                if int(self.rows["who"][i]) == 1 - int(key[0]) and int(self.rows["turn"][i]) == int(key[1]) + 1:
+                    last = max(last, n)
+                    break
+        return last
+
+    def view(self, d, t, hand_now, at_n=None):
+        """席 `d` が守り手の値段の窓（今の枚数 `hand_now`）。枠が無ければ `None`（旧の値段）。
+        `at_n`（呼ぶ行の `order` の中の位置）を渡せば、窓がその行より後ろの行を読むかを数える（`cut_lookahead`・
+        2026-10-01 の点検: 守りの窓で攻め手の進行中のターンの末の枠を読んでいた＝先読み。器は 0 を保つ）。"""
+        if at_n is not None:
+            self._st("cut_lookups")
+            p = self.lookahead_pos(d, t)
+            if p is not None and p > int(at_n):
+                self._st("cut_lookahead")
         cv = self.curve(d, t)
         if cv is None:
             self._st("cut_view_flat")
