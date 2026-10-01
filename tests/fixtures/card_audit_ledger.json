@@ -1,4 +1,157 @@
 {
- "cards": {},
+ "cards": {
+  "EB02-030": {
+   "ast_sha": "92243441e7fe4dff",
+   "note": "【カウンター】イベントの『このターン中の置換』が PASSIVE 能力になっている（COUNTER トリガーが無い）。パーサ",
+   "probe_sha": "d3adc71d5da22424",
+   "reviewed": "2026-10-01",
+   "text_sha": "b91bf6d45909941c",
+   "verdict": "ng"
+  },
+  "EB04-011": {
+   "ast_sha": "d32fc6568cfc026d",
+   "note": "【速攻:キャラ】が未処理（keywords に入らず登場ターンに攻撃できない）。エンジン/ローダ",
+   "probe_sha": "875520cb5bc0fe00",
+   "reviewed": "2026-10-01",
+   "text_sha": "f53b1e0dc90b33fd",
+   "verdict": "ng"
+  },
+  "OP05-100": {
+   "ast_sha": "56047b1cfede562b",
+   "note": "『ルフィがいる場合この効果は無効』が RULE_PROCESSING（実行時 no-op）で、ルフィがいてもライフ→トラッシュ置換が有効のまま。パーサ/エンジン",
+   "probe_sha": "1bd42a55acd607d2",
+   "reviewed": "2026-10-01",
+   "text_sha": "6669f418aa8516b8",
+   "verdict": "ng"
+  },
+  "OP06-086": {
+   "ast_sha": "55e8aaf11ca3c12c",
+   "note": "『1枚を登場させ、残りをレストで登場』が固定割当（コスト4以下=通常・コスト2以下=レスト）になり選択が無い。残りの句は未実行。パーサ",
+   "probe_sha": "4d03bb103d979bd2",
+   "reviewed": "2026-10-01",
+   "text_sha": "16d2e93c5673184b",
+   "verdict": "ng"
+  },
+  "OP07-026": {
+   "ast_sha": "1029cc3db0f88c11",
+   "note": "UNCOVERED は期間句（FREEZE 系が内包）。キャラ/ドン!!の二択 Choice で本文どおり",
+   "probe_sha": "c7bb1ab04f2abdbf",
+   "reviewed": "2026-10-01",
+   "text_sha": "76df9dc6db577aaa",
+   "verdict": "ok"
+  },
+  "OP15-092": {
+   "ast_sha": "025dfcd3cf718483",
+   "note": "20枚以上の『相手のターン中、リーダーを元々のパワー7000』に相手ターン限定の条件が無い（自分ターンにも適用）。パーサ",
+   "probe_sha": "834a0317b8f64b76",
+   "reviewed": "2026-10-01",
+   "text_sha": "90a4e662f50feb3e",
+   "verdict": "ng"
+  },
+  "OP16-032": {
+   "ast_sha": "3aa0915ee46a1e3a",
+   "note": "【ブロック不可】が未処理（ブロックされる）。エンジン/ローダ",
+   "probe_sha": "bb2d1cf413f67c20",
+   "reviewed": "2026-10-01",
+   "text_sha": "3788dc6e444bbe8c",
+   "verdict": "ng"
+  },
+  "OP16-033": {
+   "ast_sha": "b0b10e64a742a2ef",
+   "note": "【ブロック不可】が未処理（ブロックされる）。エンジン/ローダ",
+   "probe_sha": "1bd42a55acd607d2",
+   "reviewed": "2026-10-01",
+   "text_sha": "d738a66124d5042b",
+   "verdict": "ng"
+  },
+  "OP16-089": {
+   "ast_sha": "9f3642bccde76c51",
+   "note": "【速攻:キャラ】が未処理。エンジン/ローダ",
+   "probe_sha": "704d499d98a41306",
+   "reviewed": "2026-10-01",
+   "text_sha": "ab7a73e48861ce14",
+   "verdict": "ng"
+  },
+  "OP16-096": {
+   "ast_sha": "618f1626ecf57579",
+   "note": "【ブロック不可】が未処理。エンジン/ローダ",
+   "probe_sha": "7e376dac2bf0361b",
+   "reviewed": "2026-10-01",
+   "text_sha": "16ad37112b51dded",
+   "verdict": "ng"
+  },
+  "OP17-003": {
+   "ast_sha": "bbabb823b5d99467",
+   "note": "【速攻:キャラ】が未処理。エンジン/ローダ",
+   "probe_sha": "4736fa2c01452ad2",
+   "reviewed": "2026-10-01",
+   "text_sha": "496247a9ac2f8281",
+   "verdict": "ng"
+  },
+  "OP17-027": {
+   "ast_sha": "b95d5836da9645d7",
+   "note": "【速攻:キャラ】が未処理。エンジン/ローダ",
+   "probe_sha": "f5b6d223955ed813",
+   "reviewed": "2026-10-01",
+   "text_sha": "10826a0771031d25",
+   "verdict": "ng"
+  },
+  "OP17-048": {
+   "ast_sha": "78538cbef29ac400",
+   "note": "【速攻:キャラ】が未処理。エンジン/ローダ",
+   "probe_sha": "842f8153b85f2801",
+   "reviewed": "2026-10-01",
+   "text_sha": "08f284417457fcdf",
+   "verdict": "ng"
+  },
+  "OP17-069": {
+   "ast_sha": "f23b14d642091a3f",
+   "note": "【速攻:キャラ】が未処理。エンジン/ローダ",
+   "probe_sha": "98cdd48dd7c4d485",
+   "reviewed": "2026-10-01",
+   "text_sha": "b1a8e66d1ba65b10",
+   "verdict": "ng"
+  },
+  "OP17-112": {
+   "ast_sha": "7f207d7c2f1aeaad",
+   "note": "【登場時】の『カード1枚を引き』が脱落（Choice のみ）。パーサ",
+   "probe_sha": "19f4a08af75feba5",
+   "reviewed": "2026-10-01",
+   "text_sha": "7010e56d4c496d73",
+   "verdict": "ng"
+  },
+  "P-075": {
+   "ast_sha": "017f24d14f16f2c6",
+   "note": "区切り無しの【アタック時】能力が【登場時】能力に畳まれ、登場時にドロー/捨てが走る（ON_ATTACK 能力が無い）。パーサ",
+   "probe_sha": "70e1befe50e2b4f1",
+   "reviewed": "2026-10-01",
+   "text_sha": "e1d8d8771a121d10",
+   "verdict": "ng"
+  },
+  "ST28-004": {
+   "ast_sha": "d82a06c549d5a0cf",
+   "note": "NOT_FIRED はプローブ盤面に付与ドン!!が無くコスト不成立のため。構造は本文どおり",
+   "probe_sha": "ecce6338af2da640",
+   "reviewed": "2026-10-01",
+   "text_sha": "f62d6a8f6fcaf88e",
+   "verdict": "ok"
+  },
+  "ST29-014": {
+   "ast_sha": "364411862300a9ea",
+   "note": "【速攻:キャラ】が未処理。エンジン/ローダ",
+   "probe_sha": "6ec8fe9d190f589d",
+   "reviewed": "2026-10-01",
+   "text_sha": "cf2c8c2b9426db7e",
+   "verdict": "ng"
+  },
+  "ST32-005": {
+   "ast_sha": "ae93cf1ac694b7e7",
+   "note": "【速攻:キャラ】が未処理。エンジン/ローダ",
+   "probe_sha": "7c4fe4a3545cab78",
+   "reviewed": "2026-10-01",
+   "text_sha": "ad02e9c669ef1b89",
+   "verdict": "ng"
+  }
+ },
  "version": 1
 }
