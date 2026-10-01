@@ -100,9 +100,10 @@ def test_replace_alternative_conditions_and_target_swap():
     assert {c.type.name for c in _conds(heal.condition)} >= {"LIFE_HAND_SUM", "FIELD_COUNT"}
     ab = _ability("【メイン】相手のコスト4以下のキャラ1枚までを選び、KOする。自分のトラッシュが15枚以上ある場合、"
                   "相手のコスト4以下のキャラの代わりに相手のコスト6以下のキャラを選ぶ。")
-    first, second = ab.effect.actions
-    assert first.condition.type.name == "NOT"
-    assert second.if_true.target.cost_max == 6
+    # 条件付きの対象差し替え（F の Branch 表現）: 満たせば cost6 以下、満たさなければ cost4 以下。
+    br = ab.effect
+    assert br.if_true.target.cost_max == 6
+    assert br.if_false.target.cost_max == 4
 
 
 def test_triggers_for_leave_and_rest_and_self_play_from_trash():

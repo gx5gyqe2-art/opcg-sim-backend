@@ -155,7 +155,9 @@ def test_leader_attack_scoped_blocker_lock():
     """「自分のリーダーがアタックする際、相手は【ブロッカー】を発動できない」は制限（OP13-057）。"""
     ab = parse("【メイン】自分のドン‼1枚をレストにできる：自分のライフが1枚以下の場合、相手は、このターン中、自分のリーダーがアタックする際【ブロッカー】を発動できない。")
     act = actions(ab[0].effect)[0]
-    assert act.type == ActionType.RULE_PROCESSING and act.status == "OPP_NO_BLOCK_VS_LEADER"
+    # リーダーのアタック時だけ封じる＝リーダーに【ブロック不可】をこのターン中付与する表現（A の方式）。
+    assert act.type == ActionType.GRANT_KEYWORD and act.status == "ブロック不可"
+    assert act.target.card_type == ["LEADER"]
 
 
 def test_opponent_chooses_and_draws():
