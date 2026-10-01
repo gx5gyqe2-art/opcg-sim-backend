@@ -164,7 +164,17 @@ pub fn get_target_cards(
                 }
                 ZoneRef::Hand => candidates.extend(p.hand.iter().map(|c| TargetRef::Card(*c))),
                 ZoneRef::Trash => candidates.extend(p.trash.iter().map(|c| TargetRef::Card(*c))),
-                ZoneRef::Life => candidates.extend(p.life.iter().map(|c| TargetRef::Card(*c))),
+                ZoneRef::Life => {
+                    // 「ライフの上か下から1枚」: 先頭（上）と末尾（下）の 2 枚だけが候補。
+                    if query.has_flag("LIFE_TOP_OR_BOTTOM") {
+                        candidates.extend(p.life.first().map(|c| TargetRef::Card(*c)));
+                        if p.life.len() > 1 {
+                            candidates.extend(p.life.last().map(|c| TargetRef::Card(*c)));
+                        }
+                    } else {
+                        candidates.extend(p.life.iter().map(|c| TargetRef::Card(*c)));
+                    }
+                }
                 ZoneRef::Temp => {
                     candidates.extend(p.temp_zone.iter().map(|c| TargetRef::Card(*c)))
                 }
@@ -583,6 +593,18 @@ pub(crate) mod tests {
             f.run(&query(r#""cost_max":3,"flags":["ORIGINAL_COST"],"card_type":["CHARACTER"]"#), "p1-char-a"),
             ["p1-char-a"]
         );
+    }
+
+    /// 「ライフの上か下から1枚」（`LIFE_TOP_OR_BOTTOM`）は先頭と末尾の 2 枚だけが候補になる。
+    #[test]
+    fn life_top_or_bottom_limits_the_candidates_to_the_two_ends() {
+        let f = fixture();
+        let all = f.run(&query(r#""zone":"LIFE","count":-1"#), "p1-char-a");
+        let ends = f.run(&query(r#""zone":"LIFE","count":-1,"flags":["LIFE_TOP_OR_BOTTOM"]"#), "p1-char-a");
+        assert!(ends.len() <= 2, "{ends:?}");
+        if all.len() > 2 {
+            assert_eq!(ends, vec![all[0].clone(), all[all.len() - 1].clone()]);
+        }
     }
 
     #[test]

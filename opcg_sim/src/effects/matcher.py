@@ -403,6 +403,11 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if chooser is not None:
         tq.chooser = chooser
 
+    # 「ライフの上か下から1枚を〜」: 選べるのはライフの一番上か一番下の 1 枚だけ（任意のライフではない）。
+    #   エンジンの matcher が LIFE ゾーンの候補を先頭と末尾に絞る（2026-10-01 カード効果監査・43 枚）。
+    if tq.zone == Zone.LIFE and re.search(_nfc(r"ライフの上か下から"), tgt_text):
+        tq.flags.add("LIFE_TOP_OR_BOTTOM")
+
     return tq
 
 def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:

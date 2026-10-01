@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import List, Optional
 
 from ..models.effect_types import EffectNode, GameAction, Sequence, _nfc
@@ -27,6 +28,22 @@ from .rules import ParseContext, RuleRegistry, default_registry
 # 「このターン終了時、〜」「ターン終了時に〜」= 遅延実行（ターン終了フックで解決）。
 # 「ターン終了時まで」は期間（duration）であって遅延ではないため除外する。
 _DELAY_TURN_END_RE = re.compile(_nfc(r"ターン終了時(?!まで)[、にはのでも]"))
+
+
+def _mark_arrange(node: EffectNode) -> None:
+    """「（…を）好きな順番でデッキの下に置く」の DECK_BOTTOM に status=ARRANGE を付ける。
+
+    ルールによっては並び替えの指定（ARRANGE）が落ち、複数枚を置くコスト・効果が固定順になっていた
+    （2026-10-01 カード効果監査・約 40 枚）。エンジンは ARRANGE かつ対象 2 枚以上のときだけ
+    順序選択へ中断するので、1 枚だけの句に付けても無害。
+    """
+    if isinstance(node, GameAction):
+        if (node.type == ActionType.DECK_BOTTOM and not node.status
+                and "好きな順番" in unicodedata.normalize("NFC", node.raw_text or "")):
+            node.status = "ARRANGE"
+        return
+    for child in getattr(node, "actions", None) or []:
+        _mark_arrange(child)
 
 
 def _mark_delay(node: EffectNode, delay: str) -> None:
@@ -61,6 +78,7 @@ class EffectParserV2(EffectParser):
             self.rule_hits.append(result.rule_name)
             if delayed:
                 _mark_delay(result.node, "TURN_END")
+            _mark_arrange(result.node)
             return result.node
 
         # フォールバック（=未対応として記録）
