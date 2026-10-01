@@ -818,19 +818,25 @@ def _summary_md(report: Dict[str, dict], diff: dict, load_fail: Optional[dict]) 
     return "\n".join(lines)
 
 
+# TargetQuery の欄のうち、既定値（null／空／False／-1以外）でないものを**全部**出す
+# （2026-10-01: 旧 show は一部の欄しか出さず、is_vanilla／power_min／ORIGINAL_POWER／
+# count_dynamic／ref_id などが見えないために、レビューで ng の誤判定と ok の見逃しの両方が出た）。
+_TARGET_SKIP = {"node", "raw_text", "chooser", "player", "zone", "count", "is_up_to", "select_mode"}
+
+
 def _target_summary(t: Optional[dict]) -> str:
     if not t:
         return ""
     parts = [f"{t.get('player')}/{t.get('zone')}"]
-    for k in ("card_type", "traits", "names", "exclude_names", "colors", "attributes", "flags"):
-        if t.get(k):
-            parts.append(f"{k}={t[k]}")
-    for k in ("cost_min", "cost_max", "power_min", "power_max", "is_rest", "cost_max_dynamic"):
-        if t.get(k) is not None:
-            parts.append(f"{k}={t[k]}")
+    for k, v in t.items():
+        if k in _TARGET_SKIP or v in (None, [], False, "", {}):
+            continue
+        parts.append(f"{k}={v}")
     parts.append(f"count={t.get('count')}{'まで' if t.get('is_up_to') else ''}")
     if t.get("select_mode") and t["select_mode"] != "CHOOSE":
         parts.append(f"mode={t['select_mode']}")
+    if t.get("chooser"):
+        parts.append(f"chooser={t['chooser']}")
     return " ".join(parts)
 
 
@@ -840,6 +846,8 @@ def _value_summary(v: Optional[dict]) -> str:
     s = str(v.get("base"))
     if v.get("dynamic_source"):
         s += f" dyn={v['dynamic_source']}×{v.get('multiplier')}/{v.get('divisor')}"
+    if v.get("ref_id"):
+        s += f" ref={v['ref_id']}"
     return s
 
 
@@ -887,6 +895,9 @@ def cmd_show(args) -> int:
                     extra.append("任意")
                 if n.get("status"):
                     extra.append(f"status={n['status']}")
+                for k in ("delay", "face_up", "is_rest"):
+                    if n.get(k) is not None:
+                        extra.append(f"{k}={n[k]}")
                 print(f"  - {a['path']:<16} {a['type']:<18} [{st.get(a['path'], '-')}] "
                       f"値={_value_summary(n.get('value'))} {' '.join(extra)}")
                 print(f"      「{a['raw_text']}」")

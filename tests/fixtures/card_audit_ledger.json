@@ -2,7 +2,7 @@
  "cards": {
   "EB01-001": {
    "ast_sha": "5734ddf3d9c9980b",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "772736d4f2b3d0c6",
    "reviewed": "2026-10-01",
    "text_sha": "2cdcd6ed7425e577",
@@ -10,7 +10,7 @@
   },
   "EB01-002": {
    "ast_sha": "472eaf1ff0d4739b",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "4f3c7b5142d8ac41",
    "reviewed": "2026-10-01",
    "text_sha": "62b8d96623e666c6",
@@ -18,7 +18,7 @@
   },
   "EB01-003": {
    "ast_sha": "4a5bac272c1a47de",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "92977347ca0f3079",
    "reviewed": "2026-10-01",
    "text_sha": "5cc1041401654257",
@@ -26,7 +26,7 @@
   },
   "EB01-004": {
    "ast_sha": "705a66f860246bd1",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "6d9f0aec973b9028",
    "reviewed": "2026-10-01",
    "text_sha": "896c180f0996eba6",
@@ -34,7 +34,7 @@
   },
   "EB01-006": {
    "ast_sha": "7dae225daf83af46",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "786925fd66e88c4d",
    "reviewed": "2026-10-01",
    "text_sha": "df5866e75d69cff1",
@@ -42,7 +42,7 @@
   },
   "EB01-007": {
    "ast_sha": "acaecc6480f7e711",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "facd5e80011b78e6",
    "reviewed": "2026-10-01",
    "text_sha": "7194fadf158acb5f",
@@ -50,7 +50,7 @@
   },
   "EB01-008": {
    "ast_sha": "8a3813c8b5db3e3c",
-   "note": "パーサ/エンジン: 置換のstatusがLEAVEで「効果によるKO」限定でなく（バウンス等にも作用）、かつ相手の効果時のみ発動する実装＝自分の効果によるKOを置換しない",
+   "note": "パーサ/エンジン: 置換 status=LEAVE が「効果によるKO」限定でなくバウンス等も置換し、エンジンは相手の効果時のみ（本文は自分の効果によるKOも対象） [厳格レビュー]",
    "probe_sha": "1bd42a55acd607d2",
    "reviewed": "2026-10-01",
    "text_sha": "1a01623f91ffb8c3",
@@ -58,7 +58,7 @@
   },
   "EB01-009": {
    "ast_sha": "3a869ebac325eb50",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "6614fc51f9a66118",
    "reviewed": "2026-10-01",
    "text_sha": "b3de1efe692b45d3",
@@ -66,7 +66,7 @@
   },
   "EB01-010": {
    "ast_sha": "71a45dcceab79330",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "9b20dddebb8cd048",
    "reviewed": "2026-10-01",
    "text_sha": "6ca5a070c75c9a0b",
@@ -74,7 +74,7 @@
   },
   "EB01-011": {
    "ast_sha": "ffe58df18d146ae9",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応。QUALIFIER_GAP(できる)は起動メインのコスト全体の任意性=起動の任意で表現済み [厳格レビュー]",
    "probe_sha": "0ebf0985af4c315b",
    "reviewed": "2026-10-01",
    "text_sha": "c8fcf5fe75a89df0",
@@ -82,7 +82,7 @@
   },
   "EB01-012": {
    "ast_sha": "f4fd4d2e4db23d3d",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "557b70a84332d80e",
    "reviewed": "2026-10-01",
    "text_sha": "6a2604c1a5bcd00b",
@@ -90,7 +90,7 @@
   },
   "EB01-013": {
    "ast_sha": "574b4e2b937c3eca",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応。QUALIFIER_GAP(できる)は起動の任意性で表現済み [厳格レビュー]",
    "probe_sha": "136abdaf862ba925",
    "reviewed": "2026-10-01",
    "text_sha": "a84286ce1ac7aec4",
@@ -98,7 +98,7 @@
   },
   "EB01-014": {
    "ast_sha": "454634427f2a8009",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "6017fd9bb5c49467",
    "reviewed": "2026-10-01",
    "text_sha": "373d2dfd0bc0d384",
@@ -106,7 +106,7 @@
   },
   "EB01-015": {
    "ast_sha": "4d41b221981ad6dc",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "7c4fe4a3545cab78",
    "reviewed": "2026-10-01",
    "text_sha": "eb97168b689dec81",
@@ -114,7 +114,7 @@
   },
   "EB01-016": {
    "ast_sha": "7e0af96a2d91e9cd",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応。QUALIFIER_GAP無し(できる=起動の任意) [厳格レビュー]",
    "probe_sha": "c94e5aaae5b66f5b",
    "reviewed": "2026-10-01",
    "text_sha": "e9751a4f32aa3831",
@@ -122,7 +122,7 @@
   },
   "EB01-017": {
    "ast_sha": "97d170e1550eee4a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": null,
    "reviewed": "2026-10-01",
    "text_sha": "d340336909617292",
@@ -130,7 +130,7 @@
   },
   "EB01-019": {
    "ast_sha": "5128100fcf383b89",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "ec4cd0ac5cebb224",
    "reviewed": "2026-10-01",
    "text_sha": "53c11a253e61a713",
@@ -138,7 +138,7 @@
   },
   "EB01-020": {
    "ast_sha": "e210e9318057c6b8",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "eb4ae59742646f03",
    "reviewed": "2026-10-01",
    "text_sha": "8a20d55f86bdcd4e",
@@ -146,7 +146,7 @@
   },
   "EB01-021": {
    "ast_sha": "bad0fecec54ba14a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "328b3025ce1d9c3c",
    "reviewed": "2026-10-01",
    "text_sha": "387be797f859bd7b",
@@ -154,7 +154,7 @@
   },
   "EB01-022": {
    "ast_sha": "9d3f8b5a725b9257",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "0cd41e0ca2c67f27",
    "reviewed": "2026-10-01",
    "text_sha": "34919c9d50eb24b5",
@@ -162,7 +162,7 @@
   },
   "EB01-023": {
    "ast_sha": "b17dc42972a36bef",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "f00acb61420be547",
    "reviewed": "2026-10-01",
    "text_sha": "b29c5e432c6e9e33",
@@ -170,7 +170,7 @@
   },
   "EB01-024": {
    "ast_sha": "f83bf6f27f09994a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "b6e7ab75ca7c42cb",
    "reviewed": "2026-10-01",
    "text_sha": "ba94b1d43f59d56c",
@@ -178,7 +178,7 @@
   },
   "EB01-026": {
    "ast_sha": "be07301c231e26a3",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "b8d1ea389035e359",
    "reviewed": "2026-10-01",
    "text_sha": "d17c74a7942d6383",
@@ -186,7 +186,7 @@
   },
   "EB01-027": {
    "ast_sha": "d3678d174396a236",
-   "note": "『B・W』を含む特徴は完全一致で判定（現DBのリーダーでは差が出ない） [サブエージェント1次レビュー]",
+   "note": "全句対応。LEADER_TRAIT は完全一致だが現DBリーダーは王下七武海/B・Wのみで等価 [厳格レビュー]",
    "probe_sha": "2b1b521f499498fa",
    "reviewed": "2026-10-01",
    "text_sha": "74f3debd64d4ebfb",
@@ -194,7 +194,7 @@
   },
   "EB01-028": {
    "ast_sha": "83839a57bbf6a64f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "f7ca37ef12c5b585",
    "reviewed": "2026-10-01",
    "text_sha": "54016dd6bd4594f5",
@@ -202,7 +202,7 @@
   },
   "EB01-029": {
    "ast_sha": "8ef33a341faf15b0",
-   "note": "パーサ/エンジン: 「公開したカードをデッキの下に置く」のDECK_BOTTOM対象が zone=FIELD・ref無しで公開カードを指さない（場のカードを動かし得る）",
+   "note": "パーサ: 「公開したカードをデッキの下に置く」の DECK_BOTTOM が zone=FIELD・ref無しで公開カードを指さず場のカードを動かし得る [厳格レビュー]",
    "probe_sha": "4890e5e02512fb9e",
    "reviewed": "2026-10-01",
    "text_sha": "43bb3348ef07d7a2",
@@ -210,15 +210,15 @@
   },
   "EB01-030": {
    "ast_sha": "cc290188b139ff75",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "パーサ/エンジン: コストの「好きな順番で」デッキの下に置く（ARRANGE 無し・順序固定＝QUALIFIER_GAP 欠落） [厳格レビュー]",
    "probe_sha": "2326d0bbeea28bac",
    "reviewed": "2026-10-01",
    "text_sha": "ba6e64742ded1a51",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB01-031": {
    "ast_sha": "53802a0b90ab4934",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "675ba725000c0e1d",
    "reviewed": "2026-10-01",
    "text_sha": "aa692055e7b99189",
@@ -226,7 +226,7 @@
   },
   "EB01-033": {
    "ast_sha": "ed8ffdb86db083f5",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "11b26773f559b941",
    "reviewed": "2026-10-01",
    "text_sha": "6d1bbd4d041e9a8d",
@@ -234,7 +234,7 @@
   },
   "EB01-034": {
    "ast_sha": "26477cf08de1cdad",
-   "note": "同左 [サブエージェント1次レビュー]",
+   "note": "全句対応。LEADER_TRAIT B・W は等価(上記) [厳格レビュー]",
    "probe_sha": "26c8093983351fb6",
    "reviewed": "2026-10-01",
    "text_sha": "525c50e3fa048e68",
@@ -242,7 +242,7 @@
   },
   "EB01-035": {
    "ast_sha": "f9e23df39dfc250b",
-   "note": "同左 [サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "c7fe46d11ecc7674",
    "reviewed": "2026-10-01",
    "text_sha": "5deaf24d262deeed",
@@ -250,7 +250,7 @@
   },
   "EB01-036": {
    "ast_sha": "68c21ae10bdab00b",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "08b754758b6a3f61",
    "reviewed": "2026-10-01",
    "text_sha": "9f66f8d470df6789",
@@ -258,7 +258,7 @@
   },
   "EB01-037": {
    "ast_sha": "3438a1a5664b4f8a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "6c96793176709dc5",
    "reviewed": "2026-10-01",
    "text_sha": "eb53d552ad5da2ac",
@@ -266,15 +266,15 @@
   },
   "EB01-038": {
    "ast_sha": "860823156b17f160",
-   "note": "同左 [サブエージェント1次レビュー]",
+   "note": "パーサ: 【トリガー】「ドン!!-1:」が cost_optional=False（ドン!!-Nは戻すことができる＝任意）で払うかを選べず強制 [厳格レビュー]",
    "probe_sha": "d9a6055dfb5deb36",
    "reviewed": "2026-10-01",
    "text_sha": "39776ab7c7dcaf1c",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB01-039": {
    "ast_sha": "c8479bf0500998b3",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "f401661b9c50db12",
    "reviewed": "2026-10-01",
    "text_sha": "737a7c19fc154fab",
@@ -282,7 +282,7 @@
   },
   "EB01-040": {
    "ast_sha": "6f64f28795a9b315",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "bb2346d1b0183917",
    "reviewed": "2026-10-01",
    "text_sha": "44c58a3c191619ca",
@@ -290,7 +290,7 @@
   },
   "EB01-042": {
    "ast_sha": "a7980187b384b04e",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応。QUALIFIER_GAP(できる)は起動の任意性で表現済み [厳格レビュー]",
    "probe_sha": "66f7eec8b12e8356",
    "reviewed": "2026-10-01",
    "text_sha": "3d865f08ef609d97",
@@ -298,15 +298,15 @@
   },
   "EB01-043": {
    "ast_sha": "fdb2a373407411b8",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "パーサ/エンジン: コストの「好きな順番で」デッキの下に置く（ARRANGE 無し・QUALIFIER_GAP 欠落） [厳格レビュー]",
    "probe_sha": "b88bc85fda2b57c0",
    "reviewed": "2026-10-01",
    "text_sha": "c6df55fbb4190eaa",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB01-044": {
    "ast_sha": "c43d20d7c6414275",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応を確認 [厳格レビュー]",
    "probe_sha": "394a77b72c5756bc",
    "reviewed": "2026-10-01",
    "text_sha": "718ad5399191720e",
@@ -314,15 +314,15 @@
   },
   "EB01-045": {
    "ast_sha": "774d80dff7ebe52a",
-   "note": "パーサ: 条件「相手のコスト0のキャラがいる」でコスト0の絞り込みが脱落（相手キャラ1枚以上で成立してしまう）",
+   "note": "全句対応。条件にコスト0絞り込み(cost_min=max=0)あり・matcher適用 [厳格レビュー]",
    "probe_sha": "a0916671fbeee365",
    "reviewed": "2026-10-01",
    "text_sha": "44a69d716e2a57f3",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB01-046": {
    "ast_sha": "3a6f3c5af6edecac",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "68a7002bca250b20",
    "reviewed": "2026-10-01",
    "text_sha": "ec5ed8adce789b0d",
@@ -330,7 +330,7 @@
   },
   "EB01-047": {
    "ast_sha": "9356cb1639339e67",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "197261df275ba80a",
    "reviewed": "2026-10-01",
    "text_sha": "b7d81ed7c5e5d0a5",
@@ -338,7 +338,7 @@
   },
   "EB01-048": {
    "ast_sha": "cba8a73aae6b47cc",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "b772711167eaf44b",
    "reviewed": "2026-10-01",
    "text_sha": "f8cd86695846e1ac",
@@ -346,7 +346,7 @@
   },
   "EB01-049": {
    "ast_sha": "30b12bd5cd95b603",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "1729dfd3435756a5",
    "reviewed": "2026-10-01",
    "text_sha": "b59d34c79219c73b",
@@ -354,15 +354,15 @@
   },
   "EB01-050": {
    "ast_sha": "50c19e9229f89849",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "HEAL(heal=deck_to_life)はデッキ上をライフの一番下へpush＝本文「ライフの上に加える」と逆、「まで」の任意性も無く強制。エンジン [厳格レビュー]",
    "probe_sha": "7b1b2850ded494f3",
    "reviewed": "2026-10-01",
    "text_sha": "d251d31fc8f45a4e",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB01-051": {
    "ast_sha": "7b5811cc78ba59e2",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "e37797d0d4ff9b23",
    "reviewed": "2026-10-01",
    "text_sha": "5d4c5336df07e4d8",
@@ -370,7 +370,7 @@
   },
   "EB01-052": {
    "ast_sha": "ce723a702af2ac0f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "9801ed6a50b64b17",
    "reviewed": "2026-10-01",
    "text_sha": "9e2ca48b450353a2",
@@ -378,7 +378,7 @@
   },
   "EB01-053": {
    "ast_sha": "341fac240bbfc7ee",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "8aa7d74a3188ce70",
    "reviewed": "2026-10-01",
    "text_sha": "5f2e7166839ac2dd",
@@ -386,7 +386,7 @@
   },
   "EB01-054": {
    "ast_sha": "9184e6bb23fe375a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "1729dfd3435756a5",
    "reviewed": "2026-10-01",
    "text_sha": "d2206b0858e4f8d8",
@@ -394,7 +394,7 @@
   },
   "EB01-056": {
    "ast_sha": "d26a026d2373f219",
-   "note": "「ライフの上か下から」の上/下の選択がノードに無い（対象はSELF/LIFE count=1のみ）。パーサ",
+   "note": "「ライフの上か下から」の上/下選択が無い（QUALIFIER_GAP本物。LIFEは隠しゾーンで常に上から自動取得）。パーサ/エンジン [厳格レビュー]",
    "probe_sha": "e1a86f0fabba6496",
    "reviewed": "2026-10-01",
    "text_sha": "558ddf9d8da11afe",
@@ -402,15 +402,15 @@
   },
   "EB01-057": {
    "ast_sha": "73b9a2e5ce9e8ba8",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "HEAL がデッキ上をライフの一番下へ置く＝本文「ライフの上に加える」と逆（「まで」任意性も無い）。エンジン [厳格レビュー]",
    "probe_sha": "7b1b2850ded494f3",
    "reviewed": "2026-10-01",
    "text_sha": "2642ec7feecf90b6",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB01-058": {
    "ast_sha": "b283feb48f838e49",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "1679d38daf253a1e",
    "reviewed": "2026-10-01",
    "text_sha": "646a838781efafa3",
@@ -418,15 +418,15 @@
   },
   "EB01-059": {
    "ast_sha": "3e381c75c3ae6809",
-   "note": "「ライフが1枚になるように」が TRASH count=1（1枚だけ置く）で、1枚になるまで置く意味になっていない。パーサ（コーディネータ抜き取り確認で検出）",
+   "note": "[厳格レビュー]",
    "probe_sha": "5ef41c1ab3f7f8aa",
    "reviewed": "2026-10-01",
    "text_sha": "95264d7ecb03fe1f",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB01-060": {
    "ast_sha": "cbf96b0b01f8d722",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "f76e1f01467831a5",
    "reviewed": "2026-10-01",
    "text_sha": "75f32d132df77146",
@@ -434,7 +434,7 @@
   },
   "EB01-061": {
    "ast_sha": "3c60e1de40173758",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "bee04ca42fe752fe",
    "reviewed": "2026-10-01",
    "text_sha": "8158a70bfb8adf16",
@@ -442,7 +442,7 @@
   },
   "EB02-002": {
    "ast_sha": "018b66a6cbf015e8",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "a517dea89af289a3",
    "reviewed": "2026-10-01",
    "text_sha": "76cddc5ea8cda0f1",
@@ -450,7 +450,7 @@
   },
   "EB02-003": {
    "ast_sha": "3a15ae0fee1395e9",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "45eaba22baad01a3",
    "reviewed": "2026-10-01",
    "text_sha": "750499ae30a297af",
@@ -458,7 +458,7 @@
   },
   "EB02-005": {
    "ast_sha": "e52dfdfafefb4ffb",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "f69473f2ce1abc48",
    "reviewed": "2026-10-01",
    "text_sha": "d554cbfeb55f2984",
@@ -466,7 +466,7 @@
   },
   "EB02-006": {
    "ast_sha": "80338dd512fc9783",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "5dae1ad06cb6706e",
    "reviewed": "2026-10-01",
    "text_sha": "1bc1495c14d08e3d",
@@ -474,7 +474,7 @@
   },
   "EB02-007": {
    "ast_sha": "e183bfb65c2b9f1a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "3c344eafd47fe0dc",
    "reviewed": "2026-10-01",
    "text_sha": "5ea5e3fb03ec7eb8",
@@ -482,7 +482,7 @@
   },
   "EB02-008": {
    "ast_sha": "f8f0514474bcbb13",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "c8de4db79d125a68",
    "reviewed": "2026-10-01",
    "text_sha": "18d57be08b038017",
@@ -490,7 +490,7 @@
   },
   "EB02-009": {
    "ast_sha": "7a1cd35e002eed1c",
-   "note": "「付与されているドン!!」＝付与済みドンを付け替える移動元の句が脱落（ATTACH_DONに移動元指定なし）。パーサ",
+   "note": "「付与されているドン!!」＝付与済みドンを付け替える移動元の句が脱落（ATTACH_DONはプールのアクティブ優先で付与するだけ）。パーサ/エンジン [厳格レビュー]",
    "probe_sha": "5c5d578f6889f7e5",
    "reviewed": "2026-10-01",
    "text_sha": "a6c738a2ca154320",
@@ -498,15 +498,15 @@
   },
   "EB02-010": {
    "ast_sha": "923a86dff84812a0",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "条件「場のキャラが特徴《麦わらの一味》のみ」のFIELD_ALL_TRAITはキャラ0枚でfalse（cond.rs）。「のみ」は空でも成立と読むのが自然で不一致の疑い（要裁定）。エンジン [厳格レビュー]",
    "probe_sha": "f6f319d6818be19a",
    "reviewed": "2026-10-01",
    "text_sha": "256668fb125c52b2",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB02-011": {
    "ast_sha": "a09280a7b9b93bb5",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "271a9291a1fcb61e",
    "reviewed": "2026-10-01",
    "text_sha": "f06841653d255e76",
@@ -514,7 +514,7 @@
   },
   "EB02-012": {
    "ast_sha": "f98b978b02daa3da",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "95011e87801360c0",
    "reviewed": "2026-10-01",
    "text_sha": "5d4e3e802e7a46fb",
@@ -522,7 +522,7 @@
   },
   "EB02-013": {
    "ast_sha": "797c10d0b9f6848f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "4dc2d7e4cf2d5ed6",
    "reviewed": "2026-10-01",
    "text_sha": "5bb6b5f026bad303",
@@ -530,7 +530,7 @@
   },
   "EB02-014": {
    "ast_sha": "1ebabe0d92d203a0",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "7e376dac2bf0361b",
    "reviewed": "2026-10-01",
    "text_sha": "c7235a9e8e0ccfe3",
@@ -538,7 +538,7 @@
   },
   "EB02-015": {
    "ast_sha": "e45d15cee3291954",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "b6abf1ebf58907c7",
    "reviewed": "2026-10-01",
    "text_sha": "c498b3835b5e4261",
@@ -546,7 +546,7 @@
   },
   "EB02-016": {
    "ast_sha": "9ba2969ab04c5184",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "4e066edb52981cbf",
    "reviewed": "2026-10-01",
    "text_sha": "6d34c37bb7de8c73",
@@ -554,7 +554,7 @@
   },
   "EB02-017": {
    "ast_sha": "56587d868b026731",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "f1e7f2675777c486",
    "reviewed": "2026-10-01",
    "text_sha": "50620ee19bfe8674",
@@ -562,7 +562,7 @@
   },
   "EB02-018": {
    "ast_sha": "12a51cd75227dc63",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "5a7712dd5a80db97",
    "reviewed": "2026-10-01",
    "text_sha": "d1acbb3fb54f7c78",
@@ -570,7 +570,7 @@
   },
   "EB02-019": {
    "ast_sha": "a97a3761164e02c4",
-   "note": "「登場したターンにキャラへアタックできる」を【速攻】全般へ写像＝リーダーにもアタックできてしまう（速攻:キャラ未処理類型）。パーサ/エンジン",
+   "note": "「キャラへアタックできる」を【速攻】全般に写像＝リーダーにもアタック可になり過大（速攻:キャラ未処理の既知）。パーサ/エンジン [厳格レビュー]",
    "probe_sha": "a54ba110a18eff35",
    "reviewed": "2026-10-01",
    "text_sha": "cc4ae93245de079c",
@@ -578,7 +578,7 @@
   },
   "EB02-020": {
    "ast_sha": "f8f0514474bcbb13",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "c8de4db79d125a68",
    "reviewed": "2026-10-01",
    "text_sha": "43806d1e2a79f7f4",
@@ -586,23 +586,23 @@
   },
   "EB02-021": {
    "ast_sha": "6df78e06b5df6324",
-   "note": "「選んだキャラは次の自分のリフレッシュフェイズでアクティブにならない」のFREEZE対象が OPPONENT/FIELD（選んだ自分のキャラを参照すべき）で、自分/相手が逆。パーサ",
+   "note": "[厳格レビュー]",
    "probe_sha": "52602c08697ceee4",
    "reviewed": "2026-10-01",
    "text_sha": "dc0a7ab9563ff320",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB02-022": {
    "ast_sha": "f00078e3930a485a",
-   "note": "条件の「パワー5000以上の」絞りが脱落（FIELD_COUNTにpower_min無し）、かつ対象の「元々の効果のない」(vanilla)絞りが脱落。パーサ",
+   "note": "[厳格レビュー]",
    "probe_sha": "7e376dac2bf0361b",
    "reviewed": "2026-10-01",
    "text_sha": "914d02cabde19ee9",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB02-023": {
    "ast_sha": "d6d4d81655e53fe9",
-   "note": "誘発句「相手のキャラが自分の効果で持ち主の手札に戻った時」が脱落（YOUR_TURNのみでLOOKのraw内に埋没）、「デッキの上か下に置く」の上/下選択もDECK_BOTTOM固定。パーサ/エンジン",
+   "note": "誘発句「相手のキャラが自分の効果で持ち主の手札に戻った時」が脱落（YOUR_TURNのみでLOOKのraw内に埋没、手札に戻った時のトリガー種別がエンジンに無く発動契機が無い）。パーサ/エンジン [厳格レビュー]",
    "probe_sha": "a23838d39bc6acb7",
    "reviewed": "2026-10-01",
    "text_sha": "e7bf401aa051faf5",
@@ -610,7 +610,7 @@
   },
   "EB02-024": {
    "ast_sha": "930f9d8d659eb5dd",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "9dedd1dca54f9a9d",
    "reviewed": "2026-10-01",
    "text_sha": "b609cd6ad7adc13c",
@@ -618,7 +618,7 @@
   },
   "EB02-025": {
    "ast_sha": "923aad3e9b505ab7",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "4c575a94c6185159",
    "reviewed": "2026-10-01",
    "text_sha": "976ab617395c7557",
@@ -626,7 +626,7 @@
   },
   "EB02-026": {
    "ast_sha": "730f7071b560c7a9",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "0cd41e0ca2c67f27",
    "reviewed": "2026-10-01",
    "text_sha": "167ac9333c11f681",
@@ -634,7 +634,7 @@
   },
   "EB02-027": {
    "ast_sha": "fcf1d854f9db58e1",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "0a88a3eee17059cb",
    "reviewed": "2026-10-01",
    "text_sha": "31a62728aedb6328",
@@ -642,7 +642,7 @@
   },
   "EB02-028": {
    "ast_sha": "da3f30cc73ed9352",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "509c4cb1e7cf5ccf",
    "reviewed": "2026-10-01",
    "text_sha": "0db551081b11fa04",
@@ -658,7 +658,7 @@
   },
   "EB02-031": {
    "ast_sha": "f8f0514474bcbb13",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "c8de4db79d125a68",
    "reviewed": "2026-10-01",
    "text_sha": "75f0cf7f6a0b247b",
@@ -666,7 +666,7 @@
   },
   "EB02-032": {
    "ast_sha": "e10ccec88b763f1c",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "4dc2d7e4cf2d5ed6",
    "reviewed": "2026-10-01",
    "text_sha": "49d63666a80ab31d",
@@ -674,7 +674,7 @@
   },
   "EB02-033": {
    "ast_sha": "381ed76d4bdc81de",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "cd2da63e6ebb3d1c",
    "reviewed": "2026-10-01",
    "text_sha": "b0b606422dadf415",
@@ -682,7 +682,7 @@
   },
   "EB02-035": {
    "ast_sha": "33dfe33a52fa38a1",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "0e24dd08d9971e3f",
    "reviewed": "2026-10-01",
    "text_sha": "89ae08e8f7a50ef7",
@@ -690,7 +690,7 @@
   },
   "EB02-036": {
    "ast_sha": "50c388015768eb5f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "7abc873f1edc3f61",
    "reviewed": "2026-10-01",
    "text_sha": "6ec16ad6ce4121e3",
@@ -698,7 +698,7 @@
   },
   "EB02-037": {
    "ast_sha": "17fb534f99a4de91",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "1e3b50f2d8fd35b7",
    "reviewed": "2026-10-01",
    "text_sha": "dea24010146d74f3",
@@ -706,7 +706,7 @@
   },
   "EB02-038": {
    "ast_sha": "b06b0d72a1f2704f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "7e376dac2bf0361b",
    "reviewed": "2026-10-01",
    "text_sha": "a87b236ca13f958d",
@@ -714,7 +714,7 @@
   },
   "EB02-039": {
    "ast_sha": "25368a6a434905f3",
-   "note": "『捨てたカードと同じカード名を持つ』句が対象条件から脱落（トラッシュのパワー5000-7000キャラなら何でも可になる）。パーサ/エンジン",
+   "note": "『捨てたカードと同じカード名を持つ』句が対象に無い（トラッシュのパワー5000-7000キャラなら何でも可）。パーサ/エンジン [厳格レビュー]",
    "probe_sha": "7753b2cb8d2a4452",
    "reviewed": "2026-10-01",
    "text_sha": "6069d520a6479c91",
@@ -722,7 +722,7 @@
   },
   "EB02-040": {
    "ast_sha": "f8f0514474bcbb13",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "c8de4db79d125a68",
    "reviewed": "2026-10-01",
    "text_sha": "fa5045e4cb3cc51c",
@@ -730,7 +730,7 @@
   },
   "EB02-041": {
    "ast_sha": "949b4b26dd322af7",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "6ccdde8cfc3e386e",
    "reviewed": "2026-10-01",
    "text_sha": "8724af75d9155c5f",
@@ -738,7 +738,7 @@
   },
   "EB02-044": {
    "ast_sha": "d1df166f8d8e6fde",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "7e376dac2bf0361b",
    "reviewed": "2026-10-01",
    "text_sha": "558349f8908d0895",
@@ -746,15 +746,15 @@
   },
   "EB02-045": {
    "ast_sha": "6cfde8464a779f4a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "コスト『好きな順番でデッキの下に置く』の順序指定が脱落（コスト DECK_BOTTOM に ARRANGE 無し・QUALIFIER_GAP 該当）。パーサ [厳格レビュー]",
    "probe_sha": "0b2816fc39811770",
    "reviewed": "2026-10-01",
    "text_sha": "c788fa55d60f747f",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB02-046": {
    "ast_sha": "5b2110817485d8fe",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "0a57924d925c7d5f",
    "reviewed": "2026-10-01",
    "text_sha": "66c75e526ae683b6",
@@ -762,7 +762,7 @@
   },
   "EB02-047": {
    "ast_sha": "e91283f52b16b939",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "9607a4d6c60ce045",
    "reviewed": "2026-10-01",
    "text_sha": "67abb38ac94899da",
@@ -770,7 +770,7 @@
   },
   "EB02-048": {
    "ast_sha": "5cab083febc96988",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "23b6ff0c7e02ad57",
    "reviewed": "2026-10-01",
    "text_sha": "2e0eb1fc9050bca5",
@@ -778,7 +778,7 @@
   },
   "EB02-049": {
    "ast_sha": "e5e9cd393239a33c",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "ceb745d4155ff9b8",
    "reviewed": "2026-10-01",
    "text_sha": "350427abe488301d",
@@ -786,7 +786,7 @@
   },
   "EB02-050": {
    "ast_sha": "f8f0514474bcbb13",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "c8de4db79d125a68",
    "reviewed": "2026-10-01",
    "text_sha": "b4532926185982e2",
@@ -794,7 +794,7 @@
   },
   "EB02-051": {
    "ast_sha": "d436dd6593a06201",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "36b1df801901e464",
    "reviewed": "2026-10-01",
    "text_sha": "0044087d53a1e6c6",
@@ -802,7 +802,7 @@
   },
   "EB02-052": {
    "ast_sha": "9bfc62686dfe9588",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "0d5086ab54aa6cc9",
    "reviewed": "2026-10-01",
    "text_sha": "4d0f895ac0198d2d",
@@ -810,7 +810,7 @@
   },
   "EB02-053": {
    "ast_sha": "bcdc7509a7c0149c",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "376bfac44594f4b6",
    "reviewed": "2026-10-01",
    "text_sha": "552a857129f123d3",
@@ -818,7 +818,7 @@
   },
   "EB02-054": {
    "ast_sha": "06d74135865ef269",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "4ca5a6e811b5370d",
    "reviewed": "2026-10-01",
    "text_sha": "0d527b36abdd21a0",
@@ -826,7 +826,7 @@
   },
   "EB02-055": {
    "ast_sha": "ed737cbb23334892",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "ef98e35ca86afd3a",
    "reviewed": "2026-10-01",
    "text_sha": "353938946ad97ac4",
@@ -834,7 +834,7 @@
   },
   "EB02-056": {
    "ast_sha": "c6b0faa1d685b04f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "b5b9a37f8f8287bd",
    "reviewed": "2026-10-01",
    "text_sha": "f1b8389f51ea1eb6",
@@ -842,7 +842,7 @@
   },
   "EB02-057": {
    "ast_sha": "0a932500e248f0df",
-   "note": "コストの『ライフの上か下から1枚』の上/下選択が脱落、効果側の『表向きで』も脱落。パーサ",
+   "note": "コスト『ライフの上か下から1枚』の上/下の選択が無い（コスト MOVE_CARD に dest/位置選択無し）。パーサ [厳格レビュー]",
    "probe_sha": "2788774d95e3621d",
    "reviewed": "2026-10-01",
    "text_sha": "4c1910b58a7e5e97",
@@ -850,7 +850,7 @@
   },
   "EB02-058": {
    "ast_sha": "f8f0514474bcbb13",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "c8de4db79d125a68",
    "reviewed": "2026-10-01",
    "text_sha": "38bca13c08c92554",
@@ -858,7 +858,7 @@
   },
   "EB02-059": {
    "ast_sha": "19112e4884547dbc",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "4a5f2ae2b445d045",
    "reviewed": "2026-10-01",
    "text_sha": "bc3ea854457940cd",
@@ -866,7 +866,7 @@
   },
   "EB02-060": {
    "ast_sha": "8711e71add73767b",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "872f28cddb24ea06",
    "reviewed": "2026-10-01",
    "text_sha": "bea4aed1906853f8",
@@ -874,15 +874,15 @@
   },
   "EB02-061": {
    "ast_sha": "e3fa15118cf930eb",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "コスト『アクティブのドン!!2枚』の「アクティブの」限定が無く、レスト/付与中のドンも戻せる。パーサ/エンジン [厳格レビュー]",
    "probe_sha": "46b9ce2e087691d1",
    "reviewed": "2026-10-01",
    "text_sha": "32a668cad551ac47",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB03-001": {
    "ast_sha": "d7a8f85afec77726",
-   "note": "能力1の『【アタック時】効果を持たないキャラ』の絞り込みが脱落（GRANT_KEYWORD対象がキャラ全般）。能力0の置換も条件がSOURCE_STATE[SELF]で『元々のコスト4以上のキャラ』(KOされる側)を指しているか疑わしい。パーサ",
+   "note": "『元々のコスト4以上』の元々が欄に無い（SOURCE_STATE COST）・置換の『できる』任意も欄無し。パーサ/エンジン [厳格レビュー]",
    "probe_sha": "4644a40503b670a9",
    "reviewed": "2026-10-01",
    "text_sha": "bf24a3da7542395f",
@@ -890,23 +890,23 @@
   },
   "EB03-003": {
    "ast_sha": "24055448f561379d",
-   "note": "『元々の効果のない』の絞り込みが脱落（パワー6000以下のキャラなら何でも登場）。パーサ",
+   "note": "[厳格レビュー]",
    "probe_sha": "db7672b57db56e7f",
    "reviewed": "2026-10-01",
    "text_sha": "51bb8132505ea791",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB03-004": {
    "ast_sha": "a0c2e040a306858e",
-   "note": "条件『元々のパワー6000以上のキャラがいない』がFIELD_COUNT[SELF LT 1]になりパワー6000以上/元々の絞り込みが脱落（キャラが1枚でもいれば不発）。パーサ",
+   "note": "[厳格レビュー]",
    "probe_sha": "fe9f96634e762557",
    "reviewed": "2026-10-01",
    "text_sha": "c9ce3ac577f40c57",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB03-005": {
    "ast_sha": "3b7bd59c7a797cda",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "7e376dac2bf0361b",
    "reviewed": "2026-10-01",
    "text_sha": "b1c7cd3eb39975b5",
@@ -914,7 +914,7 @@
   },
   "EB03-006": {
    "ast_sha": "0567194780bc073d",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "1c2068bdba7fe4a2",
    "reviewed": "2026-10-01",
    "text_sha": "c4281591699ffbc2",
@@ -922,15 +922,15 @@
   },
   "EB03-007": {
    "ast_sha": "802ed0437029bad2",
-   "note": "『元々の効果のない』の絞り込みが脱落。パーサ",
+   "note": "[厳格レビュー]",
    "probe_sha": "7e376dac2bf0361b",
    "reviewed": "2026-10-01",
    "text_sha": "af37ce5a1905d82f",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB03-008": {
    "ast_sha": "5179ed5d1f99382c",
-   "note": "対象に本文に無い is_rest=False（アクティブ限定）が混入。『アクティブのキャラにもアタックできる』の句が対象絞り込みに誤って掛かっている。パーサ",
+   "note": "『アクティブのキャラにもアタックできる』の『アクティブの』（攻撃先）を対象の状態 is_rest=False と誤読し、レストの自軍を選べない。パーサ [厳格レビュー]",
    "probe_sha": "46aa29dda6387747",
    "reviewed": "2026-10-01",
    "text_sha": "af9e32dfed788d92",
@@ -938,23 +938,23 @@
   },
   "EB03-009": {
    "ast_sha": "4c522ace06d449ec",
-   "note": "『元々の効果のない』の絞り込みが脱落。パーサ",
+   "note": "[厳格レビュー]",
    "probe_sha": "07ee9b1fd50d8b86",
    "reviewed": "2026-10-01",
    "text_sha": "d4a980ac806fb397",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB03-010": {
    "ast_sha": "3bebd0dd4e41583d",
-   "note": "card_type=[CHARACTER,EVENT]に power_max=1000が一括で掛かり、パワーを持たないイベントが選べない恐れ（パワー条件はキャラのみ）。パーサ/エンジン要確認",
+   "note": "[厳格レビュー]",
    "probe_sha": "f1e7f2675777c486",
    "reviewed": "2026-10-01",
    "text_sha": "e83f6cfb73cfd540",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB03-011": {
    "ast_sha": "0b94c2c0008ebd8b",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "de191756e857ce7a",
    "reviewed": "2026-10-01",
    "text_sha": "707a009df3344343",
@@ -962,7 +962,7 @@
   },
   "EB03-012": {
    "ast_sha": "4f00e6b12e131697",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "80bdc8da4a2259b8",
    "reviewed": "2026-10-01",
    "text_sha": "639079677ec86b81",
@@ -970,7 +970,7 @@
   },
   "EB03-013": {
    "ast_sha": "ff2a03242698ed66",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "8e9ac6692fd32062",
    "reviewed": "2026-10-01",
    "text_sha": "80b10e2799bab6d8",
@@ -978,7 +978,7 @@
   },
   "EB03-014": {
    "ast_sha": "f21953998dfa2e97",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "4cec14d4f8d2edf5",
    "reviewed": "2026-10-01",
    "text_sha": "7a11b55f95155f49",
@@ -986,7 +986,7 @@
   },
   "EB03-015": {
    "ast_sha": "8be513ddf0b7f9bc",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "68cb10a7458d2012",
    "reviewed": "2026-10-01",
    "text_sha": "f1e4cd12fff969d4",
@@ -994,7 +994,7 @@
   },
   "EB03-016": {
    "ast_sha": "ebcc106f4f0f5a59",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "QG能1: 起動メインのコスト=自発発動で任意性は構造的に成立→欠落でない [厳格レビュー]",
    "probe_sha": "01c2bcfad73016b7",
    "reviewed": "2026-10-01",
    "text_sha": "9fa223dc0213a648",
@@ -1002,7 +1002,7 @@
   },
   "EB03-017": {
    "ast_sha": "c8e3d016669170cc",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "ca356a56f223cb76",
    "reviewed": "2026-10-01",
    "text_sha": "4e0a8f59f6ef2650",
@@ -1010,7 +1010,7 @@
   },
   "EB03-018": {
    "ast_sha": "d332a0bbac426ed5",
-   "note": "能力0『相手の効果でKOされず』が脱落（GRANT_KEYWORD ブロッカーのみ）。パーサ",
+   "note": "能0『相手の効果でKOされず』が脱落（GRANT_KEYWORD ブロッカーのみ）。パーサ [厳格レビュー]",
    "probe_sha": "4ee26812c4a94cb9",
    "reviewed": "2026-10-01",
    "text_sha": "00987c41bd14a1a5",
@@ -1018,7 +1018,7 @@
   },
   "EB03-019": {
    "ast_sha": "97d170e1550eee4a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "ブロッカーのみ [厳格レビュー]",
    "probe_sha": null,
    "reviewed": "2026-10-01",
    "text_sha": "6f496bfa5baaf3cd",
@@ -1026,7 +1026,7 @@
   },
   "EB03-020": {
    "ast_sha": "900a963fa9f0b632",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "FILM条件・ref_id=selected_card で『そのカード』対応を確認 [厳格レビュー]",
    "probe_sha": "857d9c36267a1278",
    "reviewed": "2026-10-01",
    "text_sha": "04f971bff13283e8",
@@ -1034,7 +1034,7 @@
   },
   "EB03-021": {
    "ast_sha": "05c5de6b013e9ab8",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "9362ca8481f495f0",
    "reviewed": "2026-10-01",
    "text_sha": "b3dc117073b26080",
@@ -1042,7 +1042,7 @@
   },
   "EB03-022": {
    "ast_sha": "d0f45ac7c534ae1e",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "0a88a3eee17059cb",
    "reviewed": "2026-10-01",
    "text_sha": "6c715494cf5f4c13",
@@ -1050,7 +1050,7 @@
   },
   "EB03-023": {
    "ast_sha": "891b73558aa41c3d",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "QG上か下: dest_position=CHOOSE で ARRANGE_DECK 中断し表現済み [厳格レビュー]",
    "probe_sha": "0192103ffaa4c4ca",
    "reviewed": "2026-10-01",
    "text_sha": "2b2ced51a927e996",
@@ -1058,7 +1058,7 @@
   },
   "EB03-024": {
    "ast_sha": "33dcfb12fecf079f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "6ca6834d960c89d4",
    "reviewed": "2026-10-01",
    "text_sha": "59c84473892a610d",
@@ -1066,7 +1066,7 @@
   },
   "EB03-025": {
    "ast_sha": "b4e7bc89a62714c4",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "8e0d5d33246ac5b8",
    "reviewed": "2026-10-01",
    "text_sha": "52bf5e7ae63e795f",
@@ -1074,7 +1074,7 @@
   },
   "EB03-026": {
    "ast_sha": "ae18d78be42c69d8",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "chooser=OPPONENT で相手選択を確認 [厳格レビュー]",
    "probe_sha": "706c35cda6580550",
    "reviewed": "2026-10-01",
    "text_sha": "8adc12b991936ea0",
@@ -1082,7 +1082,7 @@
   },
   "EB03-027": {
    "ast_sha": "9d26aeb383740714",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "b8d1ea389035e359",
    "reviewed": "2026-10-01",
    "text_sha": "67dae64ae5aee801",
@@ -1090,7 +1090,7 @@
   },
   "EB03-028": {
    "ast_sha": "2390ef5b3d68e6a8",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "QG能1: 起動メインのコストで決着（手札条件はコストで変動しない） [厳格レビュー]",
    "probe_sha": "edfecfd5eca0374c",
    "reviewed": "2026-10-01",
    "text_sha": "ca6c56a6985b5e58",
@@ -1098,7 +1098,7 @@
   },
   "EB03-029": {
    "ast_sha": "9058f3a215c637b9",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "51992455a2324de1",
    "reviewed": "2026-10-01",
    "text_sha": "5f87c3146e5f62cd",
@@ -1106,7 +1106,7 @@
   },
   "EB03-031": {
    "ast_sha": "b83483e98d4d11f2",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "cc29ac9055b3cd4c",
    "reviewed": "2026-10-01",
    "text_sha": "85c984f8ca8a9ffa",
@@ -1114,7 +1114,7 @@
   },
   "EB03-032": {
    "ast_sha": "b6f5b234c6191578",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "3aebfb8414806366",
    "reviewed": "2026-10-01",
    "text_sha": "24c815f15c56820f",
@@ -1122,7 +1122,7 @@
   },
   "EB03-033": {
    "ast_sha": "74f10530eed662e1",
-   "note": "『自分の効果によってドン!!がデッキに戻された時』が EVENT_THIS_TURN 状態条件になり『自分の効果による』限定と発火契機（戻された時点）が不明確。相手ターン中の起動契機が無く不発の恐れ。パーサ/エンジン",
+   "note": "限定語『自分の効果によって』が脱落（DON_RETURNED は戻した理由を区別せず、時トリガーをターン内イベント状態で近似）。パーサ/エンジン [厳格レビュー]",
    "probe_sha": "08b754758b6a3f61",
    "reviewed": "2026-10-01",
    "text_sha": "863e9ed9472c1f5b",
@@ -1130,7 +1130,7 @@
   },
   "EB03-034": {
    "ast_sha": "278184353d518be6",
-   "note": "『自分の手札1枚をデッキの上に置く』が DECK_BOTTOM（下）になっている。パーサ",
+   "note": "[HEAL-LIFE-BOTTOM] エンジン: 「デッキの上から1枚を(までを)ライフの上に加える」が HEAL＝deck_to_life でライフの一番下に追加される（ops.rs deck_to_life／zone.rs heal）。 能1。（能0 の『デッキの上に置く』は dest_position=TOP で正しい） [厳格レビュー]",
    "probe_sha": "b9f5bd9bb6919687",
    "reviewed": "2026-10-01",
    "text_sha": "01733ec3013dd66f",
@@ -1138,7 +1138,7 @@
   },
   "EB03-035": {
    "ast_sha": "4b53e52ed8a3fb88",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "DON_COUNT_COMPARE LE 0 は offset 比較で真偽一致 [厳格レビュー]",
    "probe_sha": "08b754758b6a3f61",
    "reviewed": "2026-10-01",
    "text_sha": "3984454b514b472b",
@@ -1146,7 +1146,7 @@
   },
   "EB03-036": {
    "ast_sha": "b2a582e03fc72270",
-   "note": "『元々のコスト3以下』の「元々」が脱落（cost_max=3 のみ・エンジンは現在コストで判定）。パーサ",
+   "note": "『元々のコスト3以下』が現在コストで判定（元々のコスト欄がエンジンに無い・QG）。エンジン [厳格レビュー]",
    "probe_sha": "6f47dd3fec0ff718",
    "reviewed": "2026-10-01",
    "text_sha": "27a890cc887d19d6",
@@ -1154,7 +1154,7 @@
   },
   "EB03-037": {
    "ast_sha": "2ec6c4ff90fa4ed2",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "1f32cfd3736b85cf",
    "reviewed": "2026-10-01",
    "text_sha": "fb6a968ad893f54f",
@@ -1162,7 +1162,7 @@
   },
   "EB03-038": {
    "ast_sha": "5f2d0df9a3a27f2f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "60870a8f5e7ceef9",
    "reviewed": "2026-10-01",
    "text_sha": "8c346f87d17e441a",
@@ -1170,15 +1170,15 @@
   },
   "EB03-039": {
    "ast_sha": "459f65840ce68d00",
-   "note": "『元々の効果のない』(vanilla)の絞りが脱落（パワー6000以下のキャラなら何でも登場）。パーサ",
+   "note": "is_vanilla=True を JSON で確認（旧台帳の脱落は現パーサで解消） [厳格レビュー]",
    "probe_sha": "2bfdc2b6a2bbe520",
    "reviewed": "2026-10-01",
    "text_sha": "4194196e506c9a10",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB03-041": {
    "ast_sha": "9386f0515b1c9897",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "f81bd79f30572960",
    "reviewed": "2026-10-01",
    "text_sha": "676c792273f37a57",
@@ -1186,7 +1186,7 @@
   },
   "EB03-042": {
    "ast_sha": "718a3fb3f6b9c659",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "コスト+4 は符号付き COST_REDUCTION 加算で一致 [厳格レビュー]",
    "probe_sha": "4c5a7dbd978c3d4c",
    "reviewed": "2026-10-01",
    "text_sha": "d0b1226eab4c7bea",
@@ -1194,7 +1194,7 @@
   },
   "EB03-043": {
    "ast_sha": "e2f585817a5c319e",
-   "note": "コストの『好きな順番でデッキの下に置く』の順序指定が脱落（ARRANGE 無し・2枚固定順）。パーサ",
+   "note": "『好きな順番で』デッキの下に置く（コスト）の順序選択が脱落（ARRANGE 無し・QG）。パーサ [厳格レビュー]",
    "probe_sha": "d82a6cd7c6e234fc",
    "reviewed": "2026-10-01",
    "text_sha": "232cad54ec6b0bc9",
@@ -1202,7 +1202,7 @@
   },
   "EB03-044": {
    "ast_sha": "9c7844eed0ef7382",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "7e400412ffc34662",
    "reviewed": "2026-10-01",
    "text_sha": "64ec8d9eddb07b07",
@@ -1210,7 +1210,7 @@
   },
   "EB03-045": {
    "ast_sha": "581d5bc17ecb8588",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "3ce8149b795f65c8",
    "reviewed": "2026-10-01",
    "text_sha": "aa5edcb44db6ffad",
@@ -1218,7 +1218,7 @@
   },
   "EB03-046": {
    "ast_sha": "8cfd2b98e2e7bf2a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "COST_0_OR_GE_8 を matcher が処理 [厳格レビュー]",
    "probe_sha": "7233e68645780c7a",
    "reviewed": "2026-10-01",
    "text_sha": "a308de9116f3941d",
@@ -1226,7 +1226,7 @@
   },
   "EB03-047": {
    "ast_sha": "4cce51724f264e25",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "374e2583aea9799a",
    "reviewed": "2026-10-01",
    "text_sha": "d1e4a1c64c2a5a09",
@@ -1234,7 +1234,7 @@
   },
   "EB03-048": {
    "ast_sha": "cdebfcf1e6de65b7",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "FIRED_EMPTY はプローブ盤面に該当無しのみ [厳格レビュー]",
    "probe_sha": "94fd48435711c9d3",
    "reviewed": "2026-10-01",
    "text_sha": "fc54ffd6a279b9ac",
@@ -1242,7 +1242,7 @@
   },
   "EB03-049": {
    "ast_sha": "eab837cf8f831c52",
-   "note": "2つ目のPLAY_CARD(コスト4以下)に status=RESTED が付与されているが本文は『登場させる』のみでレスト指定なし。パーサ",
+   "note": "2つ目の PLAY_CARD に status=RESTED が付くが本文に『レストで』は無い（登場後レストになる誤り）。パーサ [厳格レビュー]",
    "probe_sha": "a53d66082de57950",
    "reviewed": "2026-10-01",
    "text_sha": "ec0b6674f49cc7cd",
@@ -1250,7 +1250,7 @@
   },
   "EB03-050": {
    "ast_sha": "449ae688638fcf6c",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "70b862ef937f60e8",
    "reviewed": "2026-10-01",
    "text_sha": "6c8011ed9ca747c7",
@@ -1258,7 +1258,7 @@
   },
   "EB03-051": {
    "ast_sha": "e765d8bccba470d2",
-   "note": "条件『表向きのライフがある』が LIFE_COUNT[SELF EQ 0]（ライフ0枚）になり意味が逆／表向き絞りが脱落。パーサ",
+   "note": "条件『表向きのライフがある』が LIFE_COUNT EQ 0（ライフ0枚の意味で真偽逆・表向き限定も無い）。パーサ [厳格レビュー]",
    "probe_sha": "280e2d70fa8cf1e3",
    "reviewed": "2026-10-01",
    "text_sha": "713c6263e9b04596",
@@ -1266,15 +1266,15 @@
   },
   "EB03-052": {
    "ast_sha": "6a7fd85a089de509",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[HEAL-LIFE-BOTTOM] エンジン: 「デッキの上から1枚を(までを)ライフの上に加える」が HEAL＝deck_to_life でライフの一番下に追加される（ops.rs deck_to_life／zone.rs heal）。 QG『できる』は起動メインのコストで決着 [厳格レビュー]",
    "probe_sha": "f698021ad6e88992",
    "reviewed": "2026-10-01",
    "text_sha": "2045790e462f3f26",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB03-053": {
    "ast_sha": "43fc3bffd48013c6",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "ライフ『上から』は resolver が隠しゾーンで自動取得 [厳格レビュー]",
    "probe_sha": "7799e48a64a3d229",
    "reviewed": "2026-10-01",
    "text_sha": "05958c4961f76984",
@@ -1282,23 +1282,23 @@
   },
   "EB03-054": {
    "ast_sha": "f111d2f47d1b5b32",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[HEAL-LIFE-BOTTOM] エンジン: 「デッキの上から1枚を(までを)ライフの上に加える」が HEAL＝deck_to_life でライフの一番下に追加される（ops.rs deck_to_life／zone.rs heal）。 能0。 [厳格レビュー]",
    "probe_sha": "b1d7b5b55052ef09",
    "reviewed": "2026-10-01",
    "text_sha": "5e01d05ca27fdaae",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB03-055": {
    "ast_sha": "b72f6e6287c40a61",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "エンジン: デッキ→ライフの HEAL は常にライフの『下』へ積む(zone.rs heal/ops::deck_to_life=life.push)。本文は『ライフの上に加える』＋『2枚まで』なので位置と任意枚数が不一致(強制2枚)。他句は一致 [厳格レビュー]",
    "probe_sha": "1f69cc3de1c6c4cc",
    "reviewed": "2026-10-01",
    "text_sha": "8f356c7529e52af7",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB03-056": {
    "ast_sha": "b64a67be9bf25f8f",
-   "note": "「元々のコスト3以下」の「元々の」が脱落（ORIGINAL_COST 相当のフラグ無し・cost_max=3 のみ）。パーサ/エンジン",
+   "note": "本文『元々のコスト3以下』に対応する欄が無く、現在コスト3以下として解釈される(QUALIFIER_GAP・エンジン/パーサ) [厳格レビュー]",
    "probe_sha": "96b3376f498cabbd",
    "reviewed": "2026-10-01",
    "text_sha": "4c9f13a7ca073039",
@@ -1306,7 +1306,7 @@
   },
   "EB03-057": {
    "ast_sha": "5e4be85453e9187f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応: ワノ国リーダーにレストドン3枚まで付与／KO時 相手ライフ上1枚までトラッシュ [厳格レビュー]",
    "probe_sha": "a2ec8ec0d24e757d",
    "reviewed": "2026-10-01",
    "text_sha": "6610dd0c8bc110ce",
@@ -1314,7 +1314,7 @@
   },
   "EB03-058": {
    "ast_sha": "5b13350c8e226ff7",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "自分のターン中+ライフ2枚以下でドロー1／トリガー リーダー名ベガパンク条件でこのカード登場。全句一致 [厳格レビュー]",
    "probe_sha": "1b3e7d204db2ab83",
    "reviewed": "2026-10-01",
    "text_sha": "a3dbcb6fc61ebb84",
@@ -1322,7 +1322,7 @@
   },
   "EB03-059": {
    "ast_sha": "7f785a7ea9995b60",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "条件AND(エッグヘッド,ライフ2以上)・手札のトリガー持ちキャラ1枚までを face_up=true でライフ上へ／トリガー ルフィ除外コスト6以下キャラ1枚まで このターンアタック不可。全句一致 [厳格レビュー]",
    "probe_sha": "bdbef9d3d984cabc",
    "reviewed": "2026-10-01",
    "text_sha": "f251becb4bfb8908",
@@ -1330,7 +1330,7 @@
   },
   "EB03-060": {
    "ast_sha": "7aada8e2a9f2d38c",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "リーダー名ナミ条件・LOOK4・コスト2〜8を1枚まで手札・残りをARRANGEでデッキ下／トリガーはメイン発動。全句一致 [厳格レビュー]",
    "probe_sha": "c8de4db79d125a68",
    "reviewed": "2026-10-01",
    "text_sha": "b99a60327ed610ab",
@@ -1338,7 +1338,7 @@
   },
   "EB03-061": {
    "ast_sha": "a1c54f64a4283a7a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "起動メイン ターン1回・ドン1アクティブ→相手のキャラ(コスト4以下)かドンをレスト(CHOICE・相手側)／ターン終了時 ドン1レストコスト任意→FILMキャラ1枚までアクティブ。一致 [厳格レビュー]",
    "probe_sha": "c571c37702bb3b5a",
    "reviewed": "2026-10-01",
    "text_sha": "4ba838913c543a7c",
@@ -1346,15 +1346,15 @@
   },
   "EB03-062": {
    "ast_sha": "6fa8ef73134ca862",
-   "note": "cost_optional=false だが起動メインなので発動しない選択で等価（ok） [サブエージェント1次レビュー]",
+   "note": "エンジン: 『デッキの上から1枚までをライフの上に加える』の HEAL がライフの下へ積まれ位置不一致(上でない)。コスト任意(QUALIFIER_GAP)は起動メインのコスト全払いで表現済みと判断。他句一致 [厳格レビュー]",
    "probe_sha": "bf04c77114bd4338",
    "reviewed": "2026-10-01",
    "text_sha": "d276816485186880",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB04-001": {
    "ast_sha": "d43ef255c69c9b98",
-   "note": "「手札に加えることができる」の任意（できる）が脱落（then の MOVE_CARD が is_optional=false）。パーサ",
+   "note": "パーサ: 『その後、…ライフの上から1枚を手札に加えることができる』が任意(is_optional)にならず強制MOVE_CARD(QUALIFIER_GAP)。他句は一致 [厳格レビュー]",
    "probe_sha": "583c4153ca816cdd",
    "reviewed": "2026-10-01",
    "text_sha": "79cd25feccd5d197",
@@ -1362,7 +1362,7 @@
   },
   "EB04-002": {
    "ast_sha": "173374842dd61740",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "LOOK4・「ジュエリー・ボニー」以外のエッグヘッドか麦わらの一味(OR traits)1枚まで手札・残りデッキ下ARRANGE。全句一致 [厳格レビュー]",
    "probe_sha": "e4e8031be8cc28ac",
    "reviewed": "2026-10-01",
    "text_sha": "91f619df3b223b2e",
@@ -1370,7 +1370,7 @@
   },
   "EB04-003": {
    "ast_sha": "6dee95a22b2c0f5b",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "速攻キーワード／相手のターン中 海軍リーダーを元々パワー7000(POWER_OVERRIDE)。全句一致 [厳格レビュー]",
    "probe_sha": "23fdaaf18eda1f91",
    "reviewed": "2026-10-01",
    "text_sha": "b14ba336da8a7eee",
@@ -1378,7 +1378,7 @@
   },
   "EB04-004": {
    "ast_sha": "7e572423c56bd020",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "アタック時 自分のリーダーを次の相手エンド終了時まで元々パワー7000(POWER_OVERRIDE, UNTIL_NEXT_TURN_END)。一致(is_up_to は無害な緩み) [厳格レビュー]",
    "probe_sha": "535bfce8312dea12",
    "reviewed": "2026-10-01",
    "text_sha": "294e124472ad1a38",
@@ -1386,7 +1386,7 @@
   },
   "EB04-005": {
    "ast_sha": "5112520649fe1d74",
-   "note": "条件「…が2枚以上いない場合」の否定が脱落（FIELD_COUNT GE 2 のまま＝真偽が逆）。パーサ",
+   "note": "パーサ: 『2枚以上いない場合』が FIELD_COUNT GE 2 のまま(否定が肯定のまま・QUALIFIER_GAP)で真偽が逆。元々パワーは ORIGINAL_POWER flag で表現 [厳格レビュー]",
    "probe_sha": "5b2e29c8c92f936f",
    "reviewed": "2026-10-01",
    "text_sha": "47d2545d0b86ff98",
@@ -1394,7 +1394,7 @@
   },
   "EB04-006": {
    "ast_sha": "622f721230939c81",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "LOOK7・「ルルシア王国」(名前)1枚まで手札・残りデッキ下ARRANGE。全句一致 [厳格レビュー]",
    "probe_sha": "89efb8a90e38845b",
    "reviewed": "2026-10-01",
    "text_sha": "d87483b5bbba4a96",
@@ -1402,15 +1402,15 @@
   },
   "EB04-007": {
    "ast_sha": "f5bceb79f52cd700",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "エンジン: 【速攻:キャラ】付与(GRANT_KEYWORD 速攻:キャラ)は未処理の既知ng。他句(登場時リーダー+2000次の相手エンドまで／パワー8000以上条件)は一致 [厳格レビュー]",
    "probe_sha": "0c519a194a1ac41c",
    "reviewed": "2026-10-01",
    "text_sha": "03979301913af9ae",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB04-008": {
    "ast_sha": "c4d5050706994247",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "メイン ライフ2以下条件→相手キャラ1枚まで このターン-3000／カウンター 自分のリーダーこのバトル+3000。一致 [厳格レビュー]",
    "probe_sha": "2512a5173d0c2dee",
    "reviewed": "2026-10-01",
    "text_sha": "e89137549a873f27",
@@ -1418,7 +1418,7 @@
   },
   "EB04-009": {
    "ast_sha": "50d3c166e9c94e7a",
-   "note": "【カウンター】「自分のキャラか「シルバーズ・レイリー」1枚」が card_type=CHARACTER AND names=レイリー に固定化（キャラ全般 OR レイリー のはず）。パーサ",
+   "note": "パーサ: カウンター『自分のキャラか「シルバーズ・レイリー」1枚まで』が card_type=[CHARACTER]かつnames=[レイリー]のAND扱いで、任意のキャラ／レイリー(リーダー含む)のOR構造が失われている。メイン側(コスト任意ATTACH_DON→相手キャラ-2000)は一致 [厳格レビュー]",
    "probe_sha": "8327b19c62371600",
    "reviewed": "2026-10-01",
    "text_sha": "5590c540189cdc0e",
@@ -1426,7 +1426,7 @@
   },
   "EB04-010": {
    "ast_sha": "adcaeaf7c3b2a977",
-   "note": "「元々のコスト1のキャラ」の「元々の」が脱落（cost_min=cost_max=1 のみ・現在コスト判定になる）。パーサ/エンジン",
+   "note": "本文『元々のコスト1のキャラすべて』に対応する欄が無く現在コスト=1で判定(QUALIFIER_GAP・エンジン/パーサ)。登場時のパワー0(POWER_OVERRIDE)は一致 [厳格レビュー]",
    "probe_sha": "d4d39954d5ab070d",
    "reviewed": "2026-10-01",
    "text_sha": "f78eb41e96e2adb2",
@@ -1442,7 +1442,7 @@
   },
   "EB04-012": {
    "ast_sha": "7dd821f110a12823",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "起動メイン ターン1回・SOURCE_STATE ENTERED_THIS_TURN条件・ワノ国リーダーをアクティブ。全句一致 [厳格レビュー]",
    "probe_sha": "7f6f9f3bd5f9c401",
    "reviewed": "2026-10-01",
    "text_sha": "2d5070e875b92621",
@@ -1450,7 +1450,7 @@
   },
   "EB04-013": {
    "ast_sha": "f6ffb3b381394ad0",
-   "note": "「特徴ミンク族を持つキャラ2枚までと、リーダー」が LEADER|CHARACTER 合算2枚上限・リーダーにも特徴要求に固定化（キャラ2枚まで＋リーダー別枠）。パーサ",
+   "note": "パーサ: 『ミンク族キャラ2枚までとリーダー』が card_type=[LEADER,CHARACTER] traits=ミンク族 count=2まで の1クエリになり、リーダーが2枚枠を消費する(正:キャラ2枚まで＋リーダー) [厳格レビュー]",
    "probe_sha": "51b36479e5d0438f",
    "reviewed": "2026-10-01",
    "text_sha": "c9551f62e69481c0",
@@ -1458,7 +1458,7 @@
   },
   "EB04-014": {
    "ast_sha": "a9644e91b6b3cb17",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "ブロッカー／起動メイン ターン1回・ワノ国リーダーにレストのドン1枚まで付与(RESTED)。一致 [厳格レビュー]",
    "probe_sha": "4a0e9a85abefa626",
    "reviewed": "2026-10-01",
    "text_sha": "37de17edeb7eae49",
@@ -1466,7 +1466,7 @@
   },
   "EB04-015": {
    "ast_sha": "812fcc9c0f4539a6",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "ブロッカー／KO時 カード1枚レスト(任意コスト)→リーダー魚人族or人魚族条件・手札から緑コスト6以下キャラ1枚まで登場。全句一致 [厳格レビュー]",
    "probe_sha": "5c41ad92e15d542c",
    "reviewed": "2026-10-01",
    "text_sha": "d96545ab9383d1aa",
@@ -1474,15 +1474,15 @@
   },
   "EB04-016": {
    "ast_sha": "1a83eacf28f882bc",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "エンジン: 『キャラの効果で』限定が無く、CANNOT_ACTIVATE_DON が全てのドンアクティブ化効果(イベント/リーダー効果含む)を止める(don.rs:219)。他句(ドン1アクティブ→その後制限／海王類3枚以上でコスト8以下レスト)は一致 [厳格レビュー]",
    "probe_sha": "9390d8c267d928da",
    "reviewed": "2026-10-01",
    "text_sha": "2b02cad6d0885aca",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB04-017": {
    "ast_sha": "24f15162150cfa13",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "自分のターン中 ミンク族キャラ3枚以上→相手キャラ全てコスト-1(ALL)／登場時 リーダーミンク族→手札のコスト5以下ミンク族キャラ1枚まで登場。一致 [厳格レビュー]",
    "probe_sha": "af6058f699cc5de3",
    "reviewed": "2026-10-01",
    "text_sha": "8618f13f3f68ab59",
@@ -1490,7 +1490,7 @@
   },
   "EB04-018": {
    "ast_sha": "4265af8a607756c5",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "登場時 このキャラレスト(任意コスト)→相手のレストでパワー8000以下のキャラ1枚までKO。一致 [厳格レビュー]",
    "probe_sha": "6a36ee03219b968f",
    "reviewed": "2026-10-01",
    "text_sha": "d36e1139f2f8c5a8",
@@ -1498,7 +1498,7 @@
   },
   "EB04-019": {
    "ast_sha": "80eb4d8b293853b8",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "メイン カード1枚レスト(任意コスト)・リーダーミンク族条件→相手キャラ1枚まで このターンコスト-3／カウンター ミンク族のリーダーかキャラ1枚まで+3000(THIS_BATTLE)。一致 [厳格レビュー]",
    "probe_sha": "d7d09f684f1a388a",
    "reviewed": "2026-10-01",
    "text_sha": "31b2e917b3171f86",
@@ -1506,7 +1506,7 @@
   },
   "EB04-020": {
    "ast_sha": "07a98739e588e133",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "カウンター 魚人族リーダーかキャラ1枚まで+3000(バトル中)→その後 魚人族キャラ1枚までアクティブ／トリガー 相手コスト4以下キャラ1枚までレスト。一致 [厳格レビュー]",
    "probe_sha": "d4cb5221ea2a743c",
    "reviewed": "2026-10-01",
    "text_sha": "23c52f6104beef7d",
@@ -1514,7 +1514,7 @@
   },
   "EB04-021": {
    "ast_sha": "1cab18fc4be0efef",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "登場時 リーダー名ビビ条件→2枚引く→手札1枚捨てる(必須)／起動メイン ターン1回 手札1枚捨て(任意)→リーダーかキャラ1枚にレストドン1枚まで付与。一致 [厳格レビュー]",
    "probe_sha": "04a695217c1abfc6",
    "reviewed": "2026-10-01",
    "text_sha": "4ccc88f8137ebdab",
@@ -1522,7 +1522,7 @@
   },
   "EB04-022": {
    "ast_sha": "5c22fc625f225842",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "登場時 手札2枚捨て(任意コスト)・相手手札6枚以上条件→相手が手札2枚をARRANGEでデッキ下(chooser=OPPONENT)／ドン×1アタック時 手札1枚捨て(任意)→相手キャラ1枚までこのターン-2000。一致(条件はコスト前判定だが実害なし) [厳格レビュー]",
    "probe_sha": "338a656f6a3ade90",
    "reviewed": "2026-10-01",
    "text_sha": "5232823ca0c47b21",
@@ -1530,7 +1530,7 @@
   },
   "EB04-023": {
    "ast_sha": "4fbb067c2edf8698",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "ダブルアタック／登場時 アクティブのリーダーこのターン-5000(任意コスト,is_rest=False)→2枚引く。一致 [厳格レビュー]",
    "probe_sha": "cf10ae62138d4adf",
    "reviewed": "2026-10-01",
    "text_sha": "10b99d3c2e19105b",
@@ -1538,15 +1538,15 @@
   },
   "EB04-024": {
    "ast_sha": "56b5d25952b5fa2c",
-   "note": "cost_optional=false だが起動メインなので発動しない選択で等価（ok） [サブエージェント1次レビュー]",
+   "note": "エンジン: GRANT_KEYWORD『ブロック不可』は未処理の既知ng(付与しても効果なし)。コスト(レスト+手札1枚捨て)の任意(QUALIFIER_GAP)は起動メインのコスト全払いで表現済み。他句は一致 [厳格レビュー]",
    "probe_sha": "4ca7826123bf2ae3",
    "reviewed": "2026-10-01",
    "text_sha": "35d6b6225db8a232",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB04-025": {
    "ast_sha": "1e276b3a9af2b72c",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "登場時 手札からビビ以外コスト8以下アラバスタ王国キャラ1枚まで登場→その後 相手が手札1枚をデッキ下(chooser=OPPONENT)。一致 [厳格レビュー]",
    "probe_sha": "5791680e4eb4b73c",
    "reviewed": "2026-10-01",
    "text_sha": "ad8646c2ca8ffa06",
@@ -1554,7 +1554,7 @@
   },
   "EB04-026": {
    "ast_sha": "d8860f06d42bd10f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "登場時 相手コスト1以下キャラ1枚まで持ち主デッキ下／アタック時 1枚引く→手札1枚捨てる。一致 [厳格レビュー]",
    "probe_sha": "bd778c7bb61cf8ec",
    "reviewed": "2026-10-01",
    "text_sha": "baea47651a5504b5",
@@ -1562,7 +1562,7 @@
   },
   "EB04-027": {
    "ast_sha": "dd4936e46347dd49",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "登場時 2枚引く→手札1枚捨てる／トリガー 手札からパワー5000以下トリガー持ちキャラ1枚まで登場。一致 [厳格レビュー]",
    "probe_sha": "5dda8ed8487774df",
    "reviewed": "2026-10-01",
    "text_sha": "205d8babd9865254",
@@ -1570,7 +1570,7 @@
   },
   "EB04-028": {
    "ast_sha": "5403ace8dd93e9ec",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "メイン 手札1枚捨て(任意)・リーダー海軍条件→相手パワー10000以下キャラ2枚まで次の相手エンド終了時までアタック不可／トリガー コスト5以下キャラ1枚まで(ALL)持ち主手札へ。一致 [厳格レビュー]",
    "probe_sha": "a8d40990af0c2c44",
    "reviewed": "2026-10-01",
    "text_sha": "c091838adc09fcca",
@@ -1578,7 +1578,7 @@
   },
   "EB04-029": {
    "ast_sha": "449e6a4ac7f83927",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "メイン リーダーサンジ条件・LOOK3・「サンジ」かイベント(NAME_OR_TYPE)1枚まで手札→残りトラッシュ／カウンター 手札1枚捨て(任意)→「サンジ」1枚まで+4000(バトル中)。一致(FIRED_EMPTYはプローブにサンジ/イベントが無いだけ) [厳格レビュー]",
    "probe_sha": "822813b9a620b42c",
    "reviewed": "2026-10-01",
    "text_sha": "98288458f9335995",
@@ -1586,7 +1586,7 @@
   },
   "EB04-030": {
    "ast_sha": "d8d7f3bd2ecaef1e",
-   "note": "KOされる場合の置換は status=LEAVE の既存慣例（できる任意は置換側で扱う） [サブエージェント1次レビュー]",
+   "note": "置換(KOされる場合代わりにドン1枚戻す・任意はraw_text処理・LEAVE/DEFERRED既知)／登場時 ドン-2コスト・リーダー百獣海賊団条件(先頭ゲートは能力全体を支配する仕様)→速攻付与(THIS_TURN)→その後 相手コスト7以下キャラ1枚までレスト。一致 [厳格レビュー]",
    "probe_sha": "da9936f622bd9dfd",
    "reviewed": "2026-10-01",
    "text_sha": "40a8349f87b01cca",
@@ -1594,7 +1594,7 @@
   },
   "EB04-031": {
    "ast_sha": "a2b47103e53fe111",
-   "note": "同上。「他のキング」は EXCLUDE_SOURCE+names で正しい [サブエージェント1次レビュー]",
+   "note": "置換(KO時ドン戻し・既知)／起動メイン ターン1回・リーダー百獣海賊団かつ他のキング不在(EXCLUDE_SOURCE names=キング count LT 1=真偽一致)→RAMP_DONアクティブ1→さらにレスト1。一致 [厳格レビュー]",
    "probe_sha": "18ffc64f0de18eca",
    "reviewed": "2026-10-01",
    "text_sha": "1ed14b3e2a9fd0f6",
@@ -1602,7 +1602,7 @@
   },
   "EB04-032": {
    "ast_sha": "2641ac3b1b9d888a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "登場時 手札の百獣海賊団カード1枚捨て(任意)→2枚引く／起動メイン ターン1回・ドン2枚レスト(任意)・リーダー百獣海賊団条件→RAMP_DONレスト1。一致 [厳格レビュー]",
    "probe_sha": "b1e6da8e022ed28c",
    "reviewed": "2026-10-01",
    "text_sha": "913076bdd3dfede8",
@@ -1610,7 +1610,7 @@
   },
   "EB04-033": {
    "ast_sha": "18e789c376322c6a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "登場時 ドン-1・フォクシー海賊団キャラ3枚以上条件→相手の元々パワー6000以下(ORIGINAL_POWER flag)キャラ1枚までKO。一致 [厳格レビュー]",
    "probe_sha": "6c96793176709dc5",
    "reviewed": "2026-10-01",
    "text_sha": "7873094d94e82668",
@@ -1618,15 +1618,15 @@
   },
   "EB04-034": {
    "ast_sha": "b6320a7399cd8de8",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "条件「トラッシュにイベントが4枚以上」がTRASH_COUNT GE4で種類(イベント)を持たず、エンジンはトラッシュ全枚数を数える（パーサ/エンジン） [厳格レビュー]",
    "probe_sha": "e41ae0d616e1493c",
    "reviewed": "2026-10-01",
    "text_sha": "a9a375423ac744f8",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB04-035": {
    "ast_sha": "295da0458c06d106",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "08b754758b6a3f61",
    "reviewed": "2026-10-01",
    "text_sha": "db12f8f3e9ccb6eb",
@@ -1634,7 +1634,7 @@
   },
   "EB04-036": {
    "ast_sha": "30d092ecbf64e7ae",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "e02d05608716cc96",
    "reviewed": "2026-10-01",
    "text_sha": "66c90eda4bd685d9",
@@ -1642,7 +1642,7 @@
   },
   "EB04-037": {
    "ast_sha": "5cc3812527e889b0",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "f1e7f2675777c486",
    "reviewed": "2026-10-01",
    "text_sha": "528cb659b5a079b9",
@@ -1650,7 +1650,7 @@
   },
   "EB04-038": {
    "ast_sha": "6159d09346e9d0a0",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "29f284984dcdbbd1",
    "reviewed": "2026-10-01",
    "text_sha": "4e830af6d6582603",
@@ -1658,7 +1658,7 @@
   },
   "EB04-039": {
    "ast_sha": "dd93e8e53c8c552f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "dce064d777020a23",
    "reviewed": "2026-10-01",
    "text_sha": "8474acc501ebe4ef",
@@ -1666,7 +1666,7 @@
   },
   "EB04-040": {
    "ast_sha": "f92c2f64a7530c52",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "e56d4eacd66426d5",
    "reviewed": "2026-10-01",
    "text_sha": "d9388e8242ab5996",
@@ -1674,7 +1674,7 @@
   },
   "EB04-041": {
    "ast_sha": "6bd92b0444976c0d",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "bd272cf1f74700de",
    "reviewed": "2026-10-01",
    "text_sha": "d05c1ddcc30ac6c3",
@@ -1682,7 +1682,7 @@
   },
   "EB04-042": {
    "ast_sha": "c61f44bec4a5ecc7",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "3ec6617b696e5e83",
    "reviewed": "2026-10-01",
    "text_sha": "6d01797a76975077",
@@ -1690,7 +1690,7 @@
   },
   "EB04-043": {
    "ast_sha": "afe5bffa19726c61",
-   "note": "パーサ: 条件の「黒の」（色）が脱落（OPPONENT_REMOVAL は cost_max/trigger のみ）",
+   "note": "元々のコスト5以下の欄なし・できる(任意)と好きな順番の並び替えが無い（エンジン） [厳格レビュー]",
    "probe_sha": "cb91e2d3fee5a135",
    "reviewed": "2026-10-01",
    "text_sha": "d1fc8485719d76dd",
@@ -1698,7 +1698,7 @@
   },
   "EB04-044": {
    "ast_sha": "04ea0754e9ab6b5e",
-   "note": "パーサ: 「リーダーが『海軍』を含む特徴を持ち」の条件が脱落（TURN_LIMIT のみ）",
+   "note": "能力0の「リーダーが『海軍』を含む特徴を持ち」が条件に無く(TURN_LIMITのみ)エンジンもraw_textを読まない＝無条件で置換が働く（パーサ） [厳格レビュー]",
    "probe_sha": "d3adc71d5da22424",
    "reviewed": "2026-10-01",
    "text_sha": "b5d7f83995e50676",
@@ -1706,7 +1706,7 @@
   },
   "EB04-045": {
    "ast_sha": "7843d3c8a76571aa",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "0669e3bff6fce685",
    "reviewed": "2026-10-01",
    "text_sha": "bce9457db11ce767",
@@ -1714,7 +1714,7 @@
   },
   "EB04-046": {
    "ast_sha": "69e2b16920f14715",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "cd507aec06b4a7c4",
    "reviewed": "2026-10-01",
    "text_sha": "fb0ff0102612179e",
@@ -1722,7 +1722,7 @@
   },
   "EB04-047": {
    "ast_sha": "54235bab8522c9c5",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "bbb1d563370bbc22",
    "reviewed": "2026-10-01",
    "text_sha": "68c761ab81e7b58f",
@@ -1730,7 +1730,7 @@
   },
   "EB04-048": {
    "ast_sha": "d81574a5f0df8f6b",
-   "note": "パーサ/エンジン: LEADER_TRAIT が「『CP』を含む特徴」を完全一致で判定（実リーダーはCP9/CP0なので永久に不成立）",
+   "note": "「トラッシュ5枚につき、パワー+1000し、コスト+2」のコスト+2が5枚毎に増えず固定+2（パーサ） [厳格レビュー]",
    "probe_sha": "e92d228aeb8f6ddc",
    "reviewed": "2026-10-01",
    "text_sha": "017c6446def4537c",
@@ -1738,23 +1738,23 @@
   },
   "EB04-049": {
    "ast_sha": "5ffc7a3608e5589f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "「相手の元々のコスト5以下」がcost_max=5のみで元々を区別しない（エンジンに欄なし） [厳格レビュー]",
    "probe_sha": "e37797d0d4ff9b23",
    "reviewed": "2026-10-01",
    "text_sha": "7e241168485e1ddd",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB04-050": {
    "ast_sha": "b4f3b4ec61c79524",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "「アクティブのキャラにもアタックできる」のアクティブが攻撃側(付与先)のis_rest=Falseとして誤って付いている（パーサ・実害は小） [厳格レビュー]",
    "probe_sha": "4d5121dc4717d07f",
    "reviewed": "2026-10-01",
    "text_sha": "8fc89df7ac0334df",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "EB04-051": {
    "ast_sha": "befbd19c8c4401ba",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "ae5fef0929fdb7d4",
    "reviewed": "2026-10-01",
    "text_sha": "58c54baf92759b14",
@@ -1762,7 +1762,7 @@
   },
   "EB04-052": {
    "ast_sha": "2fb1f7c69098dbb7",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "76e4c03ab1600f2b",
    "reviewed": "2026-10-01",
    "text_sha": "1acdb642c89669d9",
@@ -1770,7 +1770,7 @@
   },
   "EB04-053": {
    "ast_sha": "441c78067401d403",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "f00acb61420be547",
    "reviewed": "2026-10-01",
    "text_sha": "0fed1d2daadc04eb",
@@ -1778,7 +1778,7 @@
   },
   "EB04-054": {
    "ast_sha": "bb03d0ee5582f527",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "a304670450df99d7",
    "reviewed": "2026-10-01",
    "text_sha": "8392c950688d63f6",
@@ -1786,7 +1786,7 @@
   },
   "EB04-055": {
    "ast_sha": "b147753b38e802d2",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "416320e77df7cf88",
    "reviewed": "2026-10-01",
    "text_sha": "5e32b7244cdb64f3",
@@ -1794,7 +1794,7 @@
   },
   "EB04-056": {
    "ast_sha": "cf099370b1c4f3d8",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "254f5cbdfb270e77",
    "reviewed": "2026-10-01",
    "text_sha": "bf5e8eb4e1463b76",
@@ -1802,7 +1802,7 @@
   },
   "EB04-057": {
    "ast_sha": "82d2ba42d8c3e4c2",
-   "note": "PREVENT_LEAVE に「相手の効果で」の区別は無いがエンジン既定の挙動として許容 [サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "4771731667c2dc00",
    "reviewed": "2026-10-01",
    "text_sha": "a43262b911f82a73",
@@ -1810,7 +1810,7 @@
   },
   "EB04-058": {
    "ast_sha": "2522be4db0d44b03",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "7b1b2850ded494f3",
    "reviewed": "2026-10-01",
    "text_sha": "6ab4a33f4d4e9b4d",
@@ -1818,7 +1818,7 @@
   },
   "EB04-059": {
    "ast_sha": "a555b88fa524a3ec",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "6b9b6c2502d99432",
    "reviewed": "2026-10-01",
    "text_sha": "d926514504eee42c",
@@ -1826,7 +1826,7 @@
   },
   "EB04-060": {
    "ast_sha": "a16cbca96a470ba1",
-   "note": "パーサ: コストの「ライフの上か下から」の選択が脱落（位置指定なし）",
+   "note": "コスト「ライフの上か下から1枚」の上/下の選択が無い・「表向きで」ライフに加えるの表向き指定が無い（パーサ） [厳格レビュー]",
    "probe_sha": "d4b9542effab998a",
    "reviewed": "2026-10-01",
    "text_sha": "266750940adc09ea",
@@ -1834,7 +1834,7 @@
   },
   "EB04-061": {
    "ast_sha": "5a6c2044d15db531",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "6a8903d55efc79a2",
    "reviewed": "2026-10-01",
    "text_sha": "cf9e9381fc864727",
@@ -1842,7 +1842,7 @@
   },
   "OP01-001": {
    "ast_sha": "3b42dc314766777c",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "8fc2f08068626a59",
    "reviewed": "2026-10-01",
    "text_sha": "6c7685d6139ccac8",
@@ -1850,7 +1850,7 @@
   },
   "OP01-002": {
    "ast_sha": "5113f3b6fb4c236b",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "0c9ed300c468b3f9",
    "reviewed": "2026-10-01",
    "text_sha": "2f8cd01fff0dbb1f",
@@ -1858,7 +1858,7 @@
   },
   "OP01-003": {
    "ast_sha": "ef342c5cc2cb2873",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "a9ccbf283857d3f7",
    "reviewed": "2026-10-01",
    "text_sha": "3fbce937387401a3",
@@ -1866,7 +1866,7 @@
   },
   "OP01-004": {
    "ast_sha": "f4da0ef7df3e6777",
-   "note": "パーサ: 「相手がイベントを発動した時」の誘発条件が脱落（YOUR_TURN＋TURN_LIMIT/DON のみで毎回ドローしうる）",
+   "note": "「相手がイベントを発動した時」の誘発条件が無く、自ターン中に無条件でドローしうる（パーサ/エンジン） [厳格レビュー]",
    "probe_sha": "f00acb61420be547",
    "reviewed": "2026-10-01",
    "text_sha": "4d3b63ed13e0b6b3",
@@ -1874,7 +1874,7 @@
   },
   "OP01-005": {
    "ast_sha": "6a828fd48e22ac20",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "4ee519661560f77b",
    "reviewed": "2026-10-01",
    "text_sha": "e99834921823d833",
@@ -1882,7 +1882,7 @@
   },
   "OP01-006": {
    "ast_sha": "8c3ec7f13e5cd107",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "33ba64b2864f05c3",
    "reviewed": "2026-10-01",
    "text_sha": "852164c9a737dc5d",
@@ -1890,7 +1890,7 @@
   },
   "OP01-007": {
    "ast_sha": "b2fdd21d4c5ce58e",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "1729dfd3435756a5",
    "reviewed": "2026-10-01",
    "text_sha": "b35bfd788d06664c",
@@ -1898,7 +1898,7 @@
   },
   "OP01-008": {
    "ast_sha": "f297e3285c48a04d",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "83249427f251a738",
    "reviewed": "2026-10-01",
    "text_sha": "b788d4f482138396",
@@ -1906,7 +1906,7 @@
   },
   "OP01-009": {
    "ast_sha": "c61b3cc7e44d8b55",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "4e4d68611ee87186",
    "reviewed": "2026-10-01",
    "text_sha": "37ea45f97ee97520",
@@ -1914,7 +1914,7 @@
   },
   "OP01-011": {
    "ast_sha": "ad6b4814f713cb40",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "e15de8c4d57afbcf",
    "reviewed": "2026-10-01",
    "text_sha": "66257f88fb21efbd",
@@ -1922,7 +1922,7 @@
   },
   "OP01-013": {
    "ast_sha": "61b169464437dc38",
-   "note": "パーサ: 「このキャラにレストのドン!!2枚まで付与」の対象が自キャラ全体から2枚選ぶ形（このキャラ固定でない・枚数が対象数に化ける）",
+   "note": "「このキャラにレストのドン!!2枚までを付与」の付与先がこのキャラ固定でなく自分のキャラ2枚までの選択対象になっている（パーサ） [厳格レビュー]",
    "probe_sha": "28d081d2f9789986",
    "reviewed": "2026-10-01",
    "text_sha": "d55411bc41f4b5a8",
@@ -1930,7 +1930,7 @@
   },
   "OP01-014": {
    "ast_sha": "b986094d88b5a312",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "7e376dac2bf0361b",
    "reviewed": "2026-10-01",
    "text_sha": "454322285b55dd0f",
@@ -1938,7 +1938,7 @@
   },
   "OP01-015": {
    "ast_sha": "83ccb40271bdf1de",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "aa2da9b0093dd0f3",
    "reviewed": "2026-10-01",
    "text_sha": "7cd47722812ee2ce",
@@ -1946,7 +1946,7 @@
   },
   "OP01-016": {
    "ast_sha": "56587d868b026731",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "f1e7f2675777c486",
    "reviewed": "2026-10-01",
    "text_sha": "50620ee19bfe8674",
@@ -1954,7 +1954,7 @@
   },
   "OP01-017": {
    "ast_sha": "6a6a043bd0b450ca",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "1729dfd3435756a5",
    "reviewed": "2026-10-01",
    "text_sha": "421220112e9a84f1",
@@ -1962,7 +1962,7 @@
   },
   "OP01-019": {
    "ast_sha": "d49a2d365fabf7d4",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "adc98c5b30e063c5",
    "reviewed": "2026-10-01",
    "text_sha": "975f17214f07431d",
@@ -1970,7 +1970,7 @@
   },
   "OP01-020": {
    "ast_sha": "094cb7ea4a5bf16f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "fc0510c48a3a942b",
    "reviewed": "2026-10-01",
    "text_sha": "1610a710629939aa",
@@ -1978,7 +1978,7 @@
   },
   "OP01-021": {
    "ast_sha": "d07953f6355ca5f2",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "d33acd38e055f390",
    "reviewed": "2026-10-01",
    "text_sha": "01faa25121310633",
@@ -1986,7 +1986,7 @@
   },
   "OP01-022": {
    "ast_sha": "220b8e6b0707c113",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "69a02679a62e225f",
    "reviewed": "2026-10-01",
    "text_sha": "e29bc428895c0186",
@@ -1994,7 +1994,7 @@
   },
   "OP01-024": {
    "ast_sha": "2fa72c33998dd2d2",
-   "note": "【ドン!!×2】の「属性(打)を持つキャラとのバトルではKOされない」の属性(打)限定が脱落し、無条件のBATTLE_KO防止になっている（パーサ）",
+   "note": "【ドン!!×2】の「属性 (打)を持つキャラとのバトルではKOされない」の属性限定がノードに無く、エンジンは raw_text の「属性(打)」(空白なし)を正規表現で読むが本文は「属性 (打)」と空白入りで不一致→無条件のBATTLE_KO防止になる（パーサ/エンジン） [厳格レビュー]",
    "probe_sha": "82a3828f4a7c55d6",
    "reviewed": "2026-10-01",
    "text_sha": "4f71f770e532477f",
@@ -2002,7 +2002,7 @@
   },
   "OP01-025": {
    "ast_sha": "97d170e1550eee4a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": null,
    "reviewed": "2026-10-01",
    "text_sha": "ea677b62716d01bc",
@@ -2010,7 +2010,7 @@
   },
   "OP01-026": {
    "ast_sha": "e9d4af053d716a09",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "bc6245ad515189f7",
    "reviewed": "2026-10-01",
    "text_sha": "03b4e671ed450bf6",
@@ -2018,7 +2018,7 @@
   },
   "OP01-027": {
    "ast_sha": "ddfff4c41e07d453",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "eb9b38e27879c67b",
    "reviewed": "2026-10-01",
    "text_sha": "d17a0b1698080079",
@@ -2026,7 +2026,7 @@
   },
   "OP01-028": {
    "ast_sha": "dde4fe857604090a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "9143ca09ccc7f262",
    "reviewed": "2026-10-01",
    "text_sha": "16138bb55656f792",
@@ -2034,7 +2034,7 @@
   },
   "OP01-029": {
    "ast_sha": "26a4a4c4073b5ba8",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "cb3b61077aa0d320",
    "reviewed": "2026-10-01",
    "text_sha": "bb250d90828849f8",
@@ -2042,7 +2042,7 @@
   },
   "OP01-030": {
    "ast_sha": "b14fa407aee3770b",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "a83fadc56db2e0cd",
    "reviewed": "2026-10-01",
    "text_sha": "6204ae93262c36f5",
@@ -2050,7 +2050,7 @@
   },
   "OP01-031": {
    "ast_sha": "f3707ebd287c5aac",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "7934b7c197e767a5",
    "reviewed": "2026-10-01",
    "text_sha": "0a32adb741d6a74e",
@@ -2058,7 +2058,7 @@
   },
   "OP01-032": {
    "ast_sha": "a87a3b2e452c6794",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "64510e3a671d9abe",
    "reviewed": "2026-10-01",
    "text_sha": "f32dc88c7ad55883",
@@ -2066,7 +2066,7 @@
   },
   "OP01-033": {
    "ast_sha": "9facc077037a85b8",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "7c4fe4a3545cab78",
    "reviewed": "2026-10-01",
    "text_sha": "cd4c3c4a960cd9e5",
@@ -2074,7 +2074,7 @@
   },
   "OP01-034": {
    "ast_sha": "d5413f7b749932a7",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "3384a092cbf63317",
    "reviewed": "2026-10-01",
    "text_sha": "e770036887ee5a01",
@@ -2082,7 +2082,7 @@
   },
   "OP01-035": {
    "ast_sha": "56f6090d39881dde",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "7c4fe4a3545cab78",
    "reviewed": "2026-10-01",
    "text_sha": "03ea0cecdc0d3d85",
@@ -2090,7 +2090,7 @@
   },
   "OP01-037": {
    "ast_sha": "c61b3cc7e44d8b55",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "ef7a4c6e67bf5267",
    "reviewed": "2026-10-01",
    "text_sha": "0baba6681e7fb538",
@@ -2098,7 +2098,7 @@
   },
   "OP01-038": {
    "ast_sha": "b650f232e3e78a5a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "4155a6e2b8164777",
    "reviewed": "2026-10-01",
    "text_sha": "7db2f2542e3af488",
@@ -2106,7 +2106,7 @@
   },
   "OP01-039": {
    "ast_sha": "73fc58ec37534979",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "f00acb61420be547",
    "reviewed": "2026-10-01",
    "text_sha": "d31ea45dc962a2f4",
@@ -2114,7 +2114,7 @@
   },
   "OP01-040": {
    "ast_sha": "009db179326e685a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "f6900f305b96ad6c",
    "reviewed": "2026-10-01",
    "text_sha": "5b8279a24b57a8fb",
@@ -2122,7 +2122,7 @@
   },
   "OP01-041": {
    "ast_sha": "f76092413eb04c22",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "0cee3d5964922282",
    "reviewed": "2026-10-01",
    "text_sha": "e605e6ea17a4f24d",
@@ -2130,7 +2130,7 @@
   },
   "OP01-042": {
    "ast_sha": "81a43533ec44bb6d",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "d14281b7e62dfcee",
    "reviewed": "2026-10-01",
    "text_sha": "1f3a74f085030cf3",
@@ -2138,7 +2138,7 @@
   },
   "OP01-044": {
    "ast_sha": "085cfe0f4fae800e",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "7e376dac2bf0361b",
    "reviewed": "2026-10-01",
    "text_sha": "bf353605b2ff037b",
@@ -2146,7 +2146,7 @@
   },
   "OP01-046": {
    "ast_sha": "aa04839dc3d15fe3",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "8c80637b22ce9a78",
    "reviewed": "2026-10-01",
    "text_sha": "ec6bd08d1c3c958c",
@@ -2154,7 +2154,7 @@
   },
   "OP01-047": {
    "ast_sha": "6708608395f489b9",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "b45cf95b16bf93ee",
    "reviewed": "2026-10-01",
    "text_sha": "a9afb2435145f50c",
@@ -2162,7 +2162,7 @@
   },
   "OP01-048": {
    "ast_sha": "3be5d49c80b7a6e1",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "7c4fe4a3545cab78",
    "reviewed": "2026-10-01",
    "text_sha": "6e151b391a1d3b9a",
@@ -2170,7 +2170,7 @@
   },
   "OP01-049": {
    "ast_sha": "cf3fe48578640cab",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "7e376dac2bf0361b",
    "reviewed": "2026-10-01",
    "text_sha": "0ae864790fc860eb",
@@ -2178,7 +2178,7 @@
   },
   "OP01-050": {
    "ast_sha": "a47f90150adc6aaf",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "7e376dac2bf0361b",
    "reviewed": "2026-10-01",
    "text_sha": "f35ef2f6e104e282",
@@ -2186,7 +2186,7 @@
   },
   "OP01-051": {
    "ast_sha": "e29e1f2379e7e85c",
-   "note": "「キッド以外にアタックできない」の「以外」(除外)が落ち、names=[キッド]の肯定フィルタ＋対象選択(CHOOSE)のATTACK_DISABLEになっている（パーサ）。リーダーへの攻撃可否も未表現",
+   "note": "能力0「相手はキャラの「ユースタス・キッド」以外にアタックできない」が、ATTACK_DISABLEの対象=相手場のnames=[キッド]（以外の反転・攻撃対象制限でなく相手キャラへの攻撃禁止フラグ）になり意味が違う（QUALIFIER_GAP 以外は本当の欠落・パーサ/エンジン） [厳格レビュー]",
    "probe_sha": "0daab82df5fb5645",
    "reviewed": "2026-10-01",
    "text_sha": "7845abfd2eea759c",
@@ -2194,7 +2194,7 @@
   },
   "OP01-052": {
    "ast_sha": "308c5487afe5eb9f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "f00acb61420be547",
    "reviewed": "2026-10-01",
    "text_sha": "32714f47fc919178",
@@ -2202,7 +2202,7 @@
   },
   "OP01-054": {
    "ast_sha": "8db6bc7911b9d267",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "1729dfd3435756a5",
    "reviewed": "2026-10-01",
    "text_sha": "83bc8032007bffb9",
@@ -2210,7 +2210,7 @@
   },
   "OP01-055": {
    "ast_sha": "c82fcef2ae83923b",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "3baa2b9ca4c55ae3",
    "reviewed": "2026-10-01",
    "text_sha": "3164f905a7281d9b",
@@ -2218,7 +2218,7 @@
   },
   "OP01-056": {
    "ast_sha": "065ddad213d96df3",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "bd694e059a56450c",
    "reviewed": "2026-10-01",
    "text_sha": "cf3ec51f77c99a72",
@@ -2226,7 +2226,7 @@
   },
   "OP01-057": {
    "ast_sha": "cd755b6f7607b940",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "6785be499387624b",
    "reviewed": "2026-10-01",
    "text_sha": "aa19dd9313675a57",
@@ -2234,7 +2234,7 @@
   },
   "OP01-058": {
    "ast_sha": "b36baa18a290e0da",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "602f4dea72db78f2",
    "reviewed": "2026-10-01",
    "text_sha": "c6e8584957a1c4ce",
@@ -2242,7 +2242,7 @@
   },
   "OP01-059": {
    "ast_sha": "98b6b8d11ad3fdff",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "97965cbf68712997",
    "reviewed": "2026-10-01",
    "text_sha": "71173ef2c3efd161",
@@ -2250,7 +2250,7 @@
   },
   "OP01-060": {
    "ast_sha": "f72021d7582ff4e1",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "[厳格レビュー]",
    "probe_sha": "0a63d6366b882b85",
    "reviewed": "2026-10-01",
    "text_sha": "66e69febea16873c",
@@ -2258,7 +2258,7 @@
   },
   "OP01-061": {
    "ast_sha": "a19cb4f09d456429",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "08b754758b6a3f61",
    "reviewed": "2026-10-01",
    "text_sha": "5d345f74a181e8c4",
@@ -2266,7 +2266,7 @@
   },
   "OP01-062": {
    "ast_sha": "8791b3910b3eb31a",
-   "note": "『カード1枚を引くことができる』の任意(できる)がDRAWノードに付かず強制ドローになる(パーサ)。要確認",
+   "note": "「カード1枚を引くことができる」の任意性が欄に無い（DRAW に is_optional/cost_optional なし・エンジンも DRAW では raw の「できる」を読まない）＝強制ドローになる。パーサ/エンジン [厳格レビュー]",
    "probe_sha": "f00acb61420be547",
    "reviewed": "2026-10-01",
    "text_sha": "7bf6cbf5450da11a",
@@ -2274,7 +2274,7 @@
   },
   "OP01-063": {
    "ast_sha": "4a0bdfb30c59a0e9",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "479c95ed5768114d",
    "reviewed": "2026-10-01",
    "text_sha": "403fc2c495ef7d3b",
@@ -2282,7 +2282,7 @@
   },
   "OP01-064": {
    "ast_sha": "6d64aae066de663d",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "8e0d5d33246ac5b8",
    "reviewed": "2026-10-01",
    "text_sha": "4775dc5f487107e1",
@@ -2290,15 +2290,15 @@
   },
   "OP01-067": {
    "ast_sha": "0951e560c23a835f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "「手札の青のイベントを、コスト-1」は手札の該当イベント全部への常在だが、対象が count=1 select_mode=CHOOSE（1枚選択/対話）になっている。パーサ [厳格レビュー]",
    "probe_sha": "1fb5dc5de1f5dfdf",
    "reviewed": "2026-10-01",
    "text_sha": "6590d54faac0b98f",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "OP01-068": {
    "ast_sha": "d8448245b03ae37e",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "2862cf415e3371f5",
    "reviewed": "2026-10-01",
    "text_sha": "2d0f6da5a5fa46d8",
@@ -2306,7 +2306,7 @@
   },
   "OP01-069": {
    "ast_sha": "3f354d1b6ca02cc4",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "d7e9444d0ab7be6a",
    "reviewed": "2026-10-01",
    "text_sha": "f33be5079090f316",
@@ -2314,7 +2314,7 @@
   },
   "OP01-070": {
    "ast_sha": "dbff8ff7e73152c7",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "0a88a3eee17059cb",
    "reviewed": "2026-10-01",
    "text_sha": "0265f37d4e825841",
@@ -2322,7 +2322,7 @@
   },
   "OP01-071": {
    "ast_sha": "4104fe311cc90aa5",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "ef83bc28b8317f37",
    "reviewed": "2026-10-01",
    "text_sha": "12a1b3f0d750dc74",
@@ -2330,7 +2330,7 @@
   },
   "OP01-072": {
    "ast_sha": "691fe62ef04e595d",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "cbb8fe44537a634a",
    "reviewed": "2026-10-01",
    "text_sha": "57008ff57b8c3570",
@@ -2338,7 +2338,7 @@
   },
   "OP01-073": {
    "ast_sha": "fd4a70190bda1ada",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応・QUALIFIER_GAP決着済み（上か下は ARRANGE_DECK/dest_position CHOOSE で表現） [厳格レビュー]",
    "probe_sha": "0192103ffaa4c4ca",
    "reviewed": "2026-10-01",
    "text_sha": "6c71b7fb427d0504",
@@ -2346,7 +2346,7 @@
   },
   "OP01-074": {
    "ast_sha": "968e7ef06bd49a09",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "7e376dac2bf0361b",
    "reviewed": "2026-10-01",
    "text_sha": "801b31e37ec040e9",
@@ -2354,7 +2354,7 @@
   },
   "OP01-075": {
    "ast_sha": "8daec0702ad6c396",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "a282d2604f2cc88d",
    "reviewed": "2026-10-01",
    "text_sha": "c17838307211049c",
@@ -2362,7 +2362,7 @@
   },
   "OP01-077": {
    "ast_sha": "fd4a70190bda1ada",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応・QUALIFIER_GAP決着済み（上か下は ARRANGE_DECK/dest_position CHOOSE で表現） [厳格レビュー]",
    "probe_sha": "0192103ffaa4c4ca",
    "reviewed": "2026-10-01",
    "text_sha": "7ef42d8911f15ab2",
@@ -2370,7 +2370,7 @@
   },
   "OP01-078": {
    "ast_sha": "fdb57db9af9ff706",
-   "note": "『【ドン!!×1】【アタック時】/【ブロック時】』のドン!!×1条件がブロック時能力(能力1)に掛かっていない(パーサ)",
+   "note": "「【ドン!!×1】【アタック時】/【ブロック時】」の【ドン!!×1】が【ブロック時】側の能力1に付いていない（HAS_DON 条件欠落）。パーサ [厳格レビュー]",
    "probe_sha": "ca07dfc64ef5d5e5",
    "reviewed": "2026-10-01",
    "text_sha": "3793f38b4abe11b9",
@@ -2378,7 +2378,7 @@
   },
   "OP01-079": {
    "ast_sha": "5e812f8f8bf311c2",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "02a0eaad7dd48891",
    "reviewed": "2026-10-01",
    "text_sha": "c16092ca57a72f67",
@@ -2386,7 +2386,7 @@
   },
   "OP01-080": {
    "ast_sha": "4e3fef9567df22c4",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "f00acb61420be547",
    "reviewed": "2026-10-01",
    "text_sha": "08ab188c625b27fd",
@@ -2394,7 +2394,7 @@
   },
   "OP01-082": {
    "ast_sha": "c61b3cc7e44d8b55",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "939dd6a3281a160d",
    "reviewed": "2026-10-01",
    "text_sha": "8b523d5f6b00b87d",
@@ -2402,7 +2402,7 @@
   },
   "OP01-083": {
    "ast_sha": "c7aa165555ee103c",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "63da8d82a072a695",
    "reviewed": "2026-10-01",
    "text_sha": "93206268d7499928",
@@ -2410,7 +2410,7 @@
   },
   "OP01-084": {
    "ast_sha": "6d040e74829d707c",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "299a480b934362d5",
    "reviewed": "2026-10-01",
    "text_sha": "39a6a32fff6f1a7c",
@@ -2418,7 +2418,7 @@
   },
   "OP01-085": {
    "ast_sha": "1f7e0b6092702681",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "0fa778228bbf3d29",
    "reviewed": "2026-10-01",
    "text_sha": "23d8d2f802a88da5",
@@ -2426,7 +2426,7 @@
   },
   "OP01-086": {
    "ast_sha": "9bb044729fd63654",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "47d4c397e673eb60",
    "reviewed": "2026-10-01",
    "text_sha": "22c3beffe8695cde",
@@ -2434,7 +2434,7 @@
   },
   "OP01-087": {
    "ast_sha": "149505a164e8b89f",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "fae82636432329ce",
    "reviewed": "2026-10-01",
    "text_sha": "e50ed660153b9cd2",
@@ -2442,7 +2442,7 @@
   },
   "OP01-088": {
    "ast_sha": "2091834f67d11e6c",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応・QUALIFIER_GAP決着済み（上か下は ARRANGE_DECK/dest_position CHOOSE で表現） [厳格レビュー]",
    "probe_sha": "8c81cd0c427c4b5c",
    "reviewed": "2026-10-01",
    "text_sha": "49a6a808405ca799",
@@ -2450,7 +2450,7 @@
   },
   "OP01-089": {
    "ast_sha": "a53a734b69d94a82",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "b8d1ea389035e359",
    "reviewed": "2026-10-01",
    "text_sha": "7965187f45a4122c",
@@ -2458,7 +2458,7 @@
   },
   "OP01-090": {
    "ast_sha": "564af28caca89cd5",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "f1e7f2675777c486",
    "reviewed": "2026-10-01",
    "text_sha": "3eefaf6daf32678d",
@@ -2466,7 +2466,7 @@
   },
   "OP01-091": {
    "ast_sha": "7b733227413a9f05",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "c1329e4f78be736f",
    "reviewed": "2026-10-01",
    "text_sha": "87fd2160d7865254",
@@ -2474,7 +2474,7 @@
   },
   "OP01-093": {
    "ast_sha": "f71df9568c294a55",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "ef783fc60989c046",
    "reviewed": "2026-10-01",
    "text_sha": "62c928c8954bfe6d",
@@ -2482,7 +2482,7 @@
   },
   "OP01-094": {
    "ast_sha": "88a34ac28a20ec13",
-   "note": "『このキャラ以外のキャラすべてをKO』の対象がSELF/FIELDのみで相手キャラが含まれない(両陣営が正)(パーサ)",
+   "note": "「このキャラ以外のキャラすべてを、KOする」は両陣営のキャラが対象なのに target.player=SELF で相手キャラが除外される。パーサ [厳格レビュー]",
    "probe_sha": "0d9aa7a2a7101c40",
    "reviewed": "2026-10-01",
    "text_sha": "47b68b102675706a",
@@ -2490,7 +2490,7 @@
   },
   "OP01-095": {
    "ast_sha": "e91b6520d3b61a62",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "f00acb61420be547",
    "reviewed": "2026-10-01",
    "text_sha": "348c8fac928f7437",
@@ -2498,7 +2498,7 @@
   },
   "OP01-096": {
    "ast_sha": "35864b1e89d9683a",
-   "note": "『相手のコスト3以下1枚までと、相手のコスト2以下1枚までをKO』の2つ目の対象(コスト2以下)が脱落(パーサ)",
+   "note": "「コスト3以下のキャラ1枚までと、相手のコスト2以下のキャラ1枚まで」の2つ目の対象（コスト2以下）が欠落、KOはコスト3以下1枚のみ。パーサ [厳格レビュー]",
    "probe_sha": "3406b5bd2f0e283e",
    "reviewed": "2026-10-01",
    "text_sha": "dd8bd3fb32c265bb",
@@ -2506,7 +2506,7 @@
   },
   "OP01-097": {
    "ast_sha": "703acd11cb2d621d",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "a82a6a914fb76991",
    "reviewed": "2026-10-01",
    "text_sha": "511711d36859ec99",
@@ -2514,7 +2514,7 @@
   },
   "OP01-098": {
    "ast_sha": "930b8e7f3888be7d",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "34780b4915b5a2fb",
    "reviewed": "2026-10-01",
    "text_sha": "daeed25c42552676",
@@ -2522,7 +2522,7 @@
   },
   "OP01-099": {
    "ast_sha": "78b36762e5a4b6e4",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "8bdf4c2692be7bd3",
    "reviewed": "2026-10-01",
    "text_sha": "0ccfd9d37acfb392",
@@ -2530,7 +2530,7 @@
   },
   "OP01-100": {
    "ast_sha": "97d170e1550eee4a",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": null,
    "reviewed": "2026-10-01",
    "text_sha": "4a60d5701be0e61f",
@@ -2538,7 +2538,7 @@
   },
   "OP01-101": {
    "ast_sha": "9471cc3ee644c699",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "14050b92302a337f",
    "reviewed": "2026-10-01",
    "text_sha": "88fd3a83d2fbb1ef",
@@ -2546,7 +2546,7 @@
   },
   "OP01-102": {
    "ast_sha": "78640e2e3582f809",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "938dcc5a20af23da",
    "reviewed": "2026-10-01",
    "text_sha": "8d42e9d94644d0e8",
@@ -2554,7 +2554,7 @@
   },
   "OP01-104": {
    "ast_sha": "c61b3cc7e44d8b55",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "46b90f7c38e306c3",
    "reviewed": "2026-10-01",
    "text_sha": "0fb1f0fe585ad354",
@@ -2562,7 +2562,7 @@
   },
   "OP01-105": {
    "ast_sha": "3f7c49a4db286848",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "072ba79d0e182032",
    "reviewed": "2026-10-01",
    "text_sha": "e0ce18723fc2c625",
@@ -2570,7 +2570,7 @@
   },
   "OP01-106": {
    "ast_sha": "a43074cea98657c6",
-   "note": "[サブエージェント1次レビュー]",
+   "note": "全句対応 [厳格レビュー]",
    "probe_sha": "c87d644859dc0b4b",
    "reviewed": "2026-10-01",
    "text_sha": "3625595013f5a476",
