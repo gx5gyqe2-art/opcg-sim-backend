@@ -260,9 +260,10 @@ pub fn run_target_loop_with(
         let Some((owner, source_list)) = ops::find_card_location(s.state(), target) else {
             continue;
         };
-        // 相手の効果で場のカードを除去する場合、保護／置換を確認する。
+        // 相手の効果で場のカードを除去する場合、保護／置換を確認する。自分の効果の KO も
+        // 「効果でKOされない／KOされる場合」の句は受ける（「相手の効果で」の句は各判定が弾く）。
         if LEAVE_ACTIONS.contains(&action.ty)
-            && actor != owner
+            && (actor != owner || action.ty == ActionType::Ko)
             && source_list == Some(CardZone::Field)
             && skip_guards != Some(target)
         {
@@ -279,7 +280,7 @@ pub fn run_target_loop_with(
             }
             // 任意の置換（「代わりに〜できる」）は、先に被除去側へ確認してから実行する
             // （断れば本来の除去を続行・`suspend_for_battle_ko_replacement` と同じ作り）。
-            if let Some(repl) = find_replacement(s, masters, target, guard_statuses)? {
+            if let Some(repl) = find_replacement_by(s, masters, target, guard_statuses, Some(actor))? {
                 if repl.sub_is_optional {
                     let remaining = &targets[i + 1..];
                     if !remaining.is_empty() {
@@ -297,7 +298,7 @@ pub fn run_target_loop_with(
                     return Ok(success);
                 }
             }
-            if active_replacement(s, masters, target, guard_statuses)? {
+            if active_replacement_by(s, masters, target, guard_statuses, Some(actor))? {
                 if s.state().active_interaction().is_some() {
                     let remaining = &targets[i + 1..];
                     if !remaining.is_empty() {
@@ -681,6 +682,28 @@ pub fn find_replacement(
     status_values: &[&str],
 ) -> Result<Option<rules::Replacement>, EngineError> {
     rules::find_replacement(s, masters, card, status_values)
+}
+
+/// [`find_replacement`] に除去を行った効果の実行者を渡す版（自分の効果の KO にも置換を適用する）。
+pub fn find_replacement_by(
+    s: &Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+) -> Result<Option<rules::Replacement>, EngineError> {
+    rules::find_replacement_by(s, masters, card, status_values, actor)
+}
+
+/// [`active_replacement`] に除去を行った効果の実行者を渡す版。
+pub fn active_replacement_by(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+) -> Result<bool, EngineError> {
+    rules::active_replacement_by(s, masters, card, status_values, actor)
 }
 
 /// Python `guards._active_replacement`（本体は群 E＝[`rules::active_replacement`]）。

@@ -216,12 +216,9 @@ class EffectParser:
                             and _nfc("アタックした時かアタックされた時") in _nfc(seg)):
                         import dataclasses
                         abilities.append(dataclasses.replace(ab, trigger=TriggerType.ON_OPP_ATTACK))
-                    # 「KOされた時か、（相手の効果で）場を離れた時」は ON_KO と ON_LEAVE の両方で誘発する
-                    # （OP10-042）。ON_KO 側だけだと効果で場を離れた（バウンス等）時が脱落する。
-                    if (ab.trigger == TriggerType.ON_KO
-                            and re.search(_nfc(r"KOされた時か、[^。]*場を離れた時"), _nfc(seg))):
-                        import dataclasses
-                        abilities.append(dataclasses.replace(ab, trigger=TriggerType.ON_LEAVE))
+                    # 「KOされた時か、（相手の効果で）場を離れた時」は ON_KO 1 本のまま持つ（OP10-042）。
+                    # ON_LEAVE へ複製すると相手の効果で KO されたとき両方が誘発し【ターン1回】も割れる。
+                    # 離脱側（バウンス等）はエンジンが ON_KO 能力の句を読んで積む。
             except Exception as e:
                 pass
 
@@ -466,6 +463,24 @@ class EffectParser:
             # B は A を置き換えるので、A が行われる場面（A の条件成立）でだけ成立する
             # （OP04-040: ライフ＋手札が4枚以下でない時にコスト8以上だけで HEAL が出てはいけない）。
             cur.condition = Condition(type=ConditionType.AND, args=[prev_cond, cur_cond])
+            # 「Aの代わりにBできる」の B が任意（できる）で A が単一の行動なら、B を断ったときは
+            # A を行う（B だけの任意枝だと断った場合に A も B も起きない・OP04-040）。
+            # 択一（Choice）にして、どちらかを必ず行う。
+            cur_act = getattr(cur, "if_true", None)
+            prev_act = getattr(prev, "if_true", None)
+            if (isinstance(cur, Branch) and isinstance(prev, Branch)
+                    and isinstance(cur_act, GameAction) and isinstance(prev_act, GameAction)
+                    and cur_act.is_optional and getattr(cur, "if_false", None) is None
+                    and getattr(prev, "if_false", None) is None):
+                import copy
+                new_act = copy.deepcopy(cur_act)
+                new_act.is_optional = False
+                old_act = copy.deepcopy(prev_act)
+                cur.if_true = Choice(
+                    message=_nfc("効果を選択してください"),
+                    options=[new_act, old_act],
+                    option_labels=[new_act.raw_text or "", old_act.raw_text or ""],
+                )
 
     # 「手札のこのカードは、…コスト±N」の符号記号
     _HAND_COST_RE = re.compile(
@@ -815,7 +830,9 @@ class EffectParser:
                         # 「〜し、〜できる」の複合は全体が任意（先頭の動作が確認点）。
                         effect_node.actions[0].is_optional = True
                 if repl_split is not None:
-                    self._fix_replacement_self_targets(effect_node)
+                    self._fix_replacement_self_targets(
+                        effect_node,
+                        any(c.type == ConditionType.OPPONENT_REMOVAL for c in repl_split["conds"]))
                 effect_node = GameAction(
                     type=ActionType.REPLACE_EFFECT,
                     status=repl_status,
@@ -996,7 +1013,7 @@ class EffectParser:
         body = re.sub(_nfc(r'^そのキャラは(?:KOされる|場を離れる)代わりに、?'), _nfc('代わりに、そのキャラを、'), body)
         return {"status": status, "body": body, "conds": conds}
 
-    def _fix_replacement_self_targets(self, node) -> None:
+    def _fix_replacement_self_targets(self, node, other_subject: bool = False) -> None:
         """置換の本体（代わりに〜）の「このキャラを／そのキャラを」の対象を直す。
 
         「このキャラ」＝置換能力の持ち主（SOURCE）、「そのキャラ」＝除去されるカード
@@ -1006,11 +1023,17 @@ class EffectParser:
         if node is None:
             return
         for a in getattr(node, "actions", None) or []:
-            self._fix_replacement_self_targets(a)
+            self._fix_replacement_self_targets(a, other_subject)
         if not isinstance(node, GameAction) or node.target is None:
             return
         raw = _nfc(node.raw_text or "")
-        if re.search(_nfc(r'そのキャラを'), raw):
+        if (other_subject and node.type == ActionType.MOVE_CARD and node.target.select_mode == "SOURCE"
+                and not re.search(_nfc(r'このキャラ|そのキャラ'), raw)):
+            # 他のキャラを守る置換の「代わりに〜ライフの上に加える」は主語が省かれ、動かすのは
+            # 離れる側のキャラ（除去されるカード）。保護者（SOURCE）ではない（OP11-101）。
+            node.target.ref_id = "removed_card"
+            node.target.select_mode = "CHOOSE"
+        elif re.search(_nfc(r'そのキャラを'), raw):
             node.target.ref_id = "removed_card"
             node.target.select_mode = "CHOOSE"
         elif re.search(_nfc(r'(?:代わりに|、)このキャラを'), raw) and node.target.select_mode != "SOURCE":
@@ -1018,7 +1041,7 @@ class EffectParser:
             node.target.player = Player.SELF
             node.target.count = 1
         if node.sub_effect is not None:
-            self._fix_replacement_self_targets(node.sub_effect)
+            self._fix_replacement_self_targets(node.sub_effect, other_subject)
 
     def _replacement_status(self, norm_text: str) -> Optional[str]:
         """置換効果（「代わりに〜」）の対象除去種別を返す。
@@ -1039,7 +1062,7 @@ class EffectParser:
         (r'^(?:自分の)?場のドン[ 　]*(?:!!|‼)?が(\d+)枚以上[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED", None),
         (r'^(?:自分の)?場のドン[ 　]*(?:!!|‼)?が自分の効果によって[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED_OWN", 1),
         (r'^(?:自分の)?場のドン[ 　]*(?:!!|‼)?が[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED", 1),
-        (r'^[^。]*?キャラが自分の効果で場を離れた時、', "CHAR_LEFT_BY_OWN_EFFECT", 1),
+        (r'^[^。]*?キャラが自分の効果で場を離れた時、', "CHAR_LEFT_BY_OWN_EFFECT_SEAT", 1),
         (r'^自分の特徴《海軍》を持つカードの効果で[^。]*?捨てられた時、', "NAVY_DISCARD", 1),
         (r'^自分の【トリガー】を持つキャラが登場した時、', "TRIGGER_CHAR_PLAYED", 1),
     )
@@ -1056,6 +1079,9 @@ class EffectParser:
             rest = t[m.end():].strip()
             # 「〜時、発動できる。」形は「発動できる。」を取り除いて本体を残す。
             rest = re.sub(_nfc(r'^発動できる[。、]?'), '', rest).strip()
+            # 反応は捨てたカード 1 枚ごとに誘発するので「捨てた枚数分」は 1 枚分になる（OP12-040）。
+            if ev_name == "NAVY_DISCARD":
+                rest = rest.replace(_nfc('捨てた枚数分'), '')
             cond = Condition(type=ConditionType.EVENT_THIS_TURN, value=(ev_name, ev_min),
                              operator=CompareOperator.GE, player=Player.SELF, raw_text=t)
             return cond, rest

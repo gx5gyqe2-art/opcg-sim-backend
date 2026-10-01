@@ -672,7 +672,8 @@ pub fn resolve_interaction(
                     } else {
                         &["LEAVE"]
                     };
-                    let replaced = accepted && super::actions::active_replacement(s, masters, target, guard)?;
+                    let replaced = accepted
+                        && super::actions::active_replacement_by(s, masters, target, guard, Some(rr.actor))?;
                     if !replaced {
                         // 断った（または置換不成立）＝本来の除去を続行（保護・置換は確認済み）。
                         super::actions::run_target_loop_with(

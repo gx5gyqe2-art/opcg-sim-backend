@@ -599,6 +599,10 @@ pub fn leave_subject_matches(
     if pre.contains("相手の効果で") && effect_actor != Some(ability_owner.other()) {
         return false;
     }
+    // 要因が「効果で」とだけ書かれた句（OP08-056）: 効果の外（バトル KO など）では誘発しない。
+    if pre.contains("効果で") && effect_actor.is_none() {
+        return false;
+    }
     let master = s.state().card(leaving_card).master;
     let traits = find_traits(&pre);
     if !traits.is_empty() && !traits_match(masters, master, &traits) {
@@ -620,9 +624,18 @@ pub fn enqueue_on_leave(
     dest_hand: bool,
 ) -> Result<(), EngineError> {
     let actor = s.effect_actor();
+    // 「キャラが自分の効果で場を離れた時」（OP07-038）用: 効果でキャラが場を離れた事実を、
+    // 効果の実行者の席ごとに記録する（バトル KO などの効果外は記録しない）。
+    if let Some(a) = actor {
+        if masters.get(s.state().card(leaving_card).master).ty == CardType::Character {
+            ops::record_turn_event(s, &format!("CHAR_LEFT_BY_OWN_EFFECT_{}", a.name()), 1);
+        }
+    }
     for owner in [Seat::P1, Seat::P2] {
         let mut holders: Vec<CardIdx> = s.state().player(owner).leader.into_iter().collect();
         holders.extend(s.state().player(owner).field.iter().copied());
+        // ステージも「自分の〜キャラが効果で場を離れた時」の持ち主になりうる（OP08-056・OP09-080）。
+        holders.extend(s.state().player(owner).stage);
         for holder in holders {
             if holder == leaving_card {
                 continue;
@@ -630,7 +643,11 @@ pub fn enqueue_on_leave(
             let ids = masters.get(s.state().card(holder).master).ability_ids.clone();
             for (index, id) in ids.iter().enumerate() {
                 let ab = ability(masters, *id)?;
-                if ab.trigger != TriggerType::OnLeave {
+                // 「KOされた時か、相手の効果で場を離れた時」は 1 本の ON_KO 能力として持ち、
+                // 離脱側（バウンス等）の半分をここで積む（KO の半分は `enqueue_ko_listeners`・
+                // 契機カードで重複を弾く＝【ターン1回】も共有される・OP10-042）。
+                let twin = ab.trigger == TriggerType::OnKo && is_ko_or_leave_twin(&ab.raw_text);
+                if ab.trigger != TriggerType::OnLeave && !twin {
                     continue;
                 }
                 if !timing_ok(s, &ab.raw_text, owner) {
@@ -642,7 +659,11 @@ pub fn enqueue_on_leave(
                     continue;
                 }
                 let optional = ab.raw_text.contains("発動できる");
-                enqueue_trigger(s, owner, holder, index, optional);
+                if twin {
+                    enqueue_trigger_with_subject(s, owner, holder, index, optional, Some(leaving_card));
+                } else {
+                    enqueue_trigger(s, owner, holder, index, optional);
+                }
             }
         }
     }
@@ -845,11 +866,26 @@ pub fn enqueue_ko_listeners(
                     continue;
                 }
                 let optional = ab.raw_text.contains("発動できる");
-                enqueue_trigger(s, owner, holder, index, optional);
+                if is_ko_or_leave_twin(&ab.raw_text) {
+                    // 同じ離脱で `enqueue_on_leave` が積み済みなら二重に積まない。
+                    let dup = s.state().pending_triggers.iter().any(|t| {
+                        t.card == holder && t.ability == index as u32 && t.subject == Some(koed_card)
+                    });
+                    if !dup {
+                        enqueue_trigger_with_subject(s, owner, holder, index, optional, Some(koed_card));
+                    }
+                } else {
+                    enqueue_trigger(s, owner, holder, index, optional);
+                }
             }
         }
     }
     Ok(())
+}
+
+/// 「KOされた時か、(相手の効果で)場を離れた時」（KO と効果での離脱を 1 能力で受ける句）。
+fn is_ko_or_leave_twin(raw: &str) -> bool {
+    raw.contains("KOされた時か") && raw.contains("場を離れた時")
 }
 
 /// ライフが離れた時の誘発句が、この離脱に当てはまるか。
@@ -1130,9 +1166,17 @@ pub fn enqueue_battle_triggers(
 ) -> Result<Vec<PendingTrigger>, EngineError> {
     let mut triggers: Vec<PendingTrigger> = Vec::new();
     let ids = masters.get(s.state().card(attacker).master).ability_ids.clone();
+    let battle_target = s.state().active_battle.as_ref().map(|b| b.target);
+    let target_ty = battle_target.map(|t| masters.get(s.state().card(t).master).ty);
     for (index, id) in ids.iter().enumerate() {
         let ab = ability(masters, *id)?;
         if ab.trigger == TriggerType::OnAttack {
+            // 「相手のリーダー／キャラにアタックした時」: 攻撃先の種類が合うときだけ（OP12-081）。
+            if let Some(want) = attack_target_type_in(&ab.raw_text) {
+                if target_ty.is_some_and(|ty| ty != want) {
+                    continue;
+                }
+            }
             triggers.push(PendingTrigger {
                 player: attacker_owner,
                 card: attacker,
@@ -1159,7 +1203,6 @@ pub fn enqueue_battle_triggers(
     }
     // 他のカードの「自分の…リーダー／キャラがアタックした時（かアタックされた時）」。
     // 「このリーダー／このキャラが」は発生源自身の ON_ATTACK が担当するので除く。
-    let battle_target = s.state().active_battle.as_ref().map(|b| b.target);
     let mut third_party: Vec<(Seat, CardIdx, usize, bool)> = Vec::new();
     for owner in [Seat::P1, Seat::P2] {
         let mut holders: Vec<CardIdx> = s.state().player(owner).leader.into_iter().collect();
@@ -1231,7 +1274,14 @@ pub fn enqueue_battle_triggers(
     for card in opp_cards {
         let ids = masters.get(s.state().card(card).master).ability_ids.clone();
         for (index, id) in ids.iter().enumerate() {
-            if ability(masters, *id)?.trigger == TriggerType::OnOppAttack {
+            let ab = ability(masters, *id)?;
+            if ab.trigger == TriggerType::OnOppAttack {
+                // 「相手のキャラ／リーダーがアタックした時」: アタッカーの種類が合うときだけ（OP11-088）。
+                if let Some(want) = attacker_type_in(&ab.raw_text) {
+                    if masters.get(s.state().card(attacker).master).ty != want {
+                        continue;
+                    }
+                }
                 triggers.push(PendingTrigger {
                     player: target_owner,
                     card,
@@ -1244,6 +1294,28 @@ pub fn enqueue_battle_triggers(
         }
     }
     Ok(triggers)
+}
+
+/// 「相手のリーダーにアタックした時」「相手のキャラにアタックした時」の攻撃先の種類。
+fn attack_target_type_in(raw: &str) -> Option<CardType> {
+    if raw.contains("相手のリーダーにアタックした時") {
+        Some(CardType::Leader)
+    } else if raw.contains("相手のキャラにアタックした時") {
+        Some(CardType::Character)
+    } else {
+        None
+    }
+}
+
+/// 「相手のキャラがアタックした時」「相手のリーダーがアタックした時」のアタッカーの種類。
+fn attacker_type_in(raw: &str) -> Option<CardType> {
+    if raw.contains("相手のキャラがアタックした時") {
+        Some(CardType::Character)
+    } else if raw.contains("相手のリーダーがアタックした時") {
+        Some(CardType::Leader)
+    } else {
+        None
+    }
 }
 
 /// Python `battle.handle_block` の ON_BLOCK 分岐（【ブロック時】）。
@@ -1590,8 +1662,30 @@ pub fn on_hand_discarded_by_effect(
         &format!("HAND_DISCARDED_BY_EFFECT_{}", owner_of_hand.name()),
         1,
     );
-    enqueue_reactive(s, masters, false, None, |_s, ab, owner, _holder| {
-        let Some(pre) = clause_before(&ab.raw_text, "手札が捨てられた時") else {
+    // 捨てさせた効果の発生源（「特徴《海軍》を持つカードの効果で」の判定用・OP12-040）。
+    let source = s.effect_source();
+    if let Some(src) = source {
+        let m = masters.get(s.state().card(src).master);
+        if s.state().card(src).owner == owner_of_hand && m.traits.iter().any(|t| t.contains("海軍")) {
+            ops::record_turn_event(s, "NAVY_DISCARD", 1);
+        }
+    }
+    enqueue_reactive(s, masters, false, None, |s, ab, owner, _holder| {
+        let raw = &ab.raw_text;
+        // 「…カードの効果で自分の手札からカードが捨てられた時」: 発生源の特徴を絞る句。
+        if let Some(pre) = clause_before(raw, "手札からカードが捨てられた時") {
+            let traits = find_traits(&pre);
+            let src_ok = match source {
+                Some(src) => {
+                    s.state().card(src).owner == owner
+                        && (traits.is_empty()
+                            || traits_match(masters, s.state().card(src).master, &traits))
+                }
+                None => false,
+            };
+            return pre.contains("効果で") && src_ok && side_ok(side_of(&pre), owner, owner_of_hand);
+        }
+        let Some(pre) = clause_before(raw, "手札が捨てられた時") else {
             return false;
         };
         pre.contains("効果で") && side_ok(side_of(&pre), owner, owner_of_hand)
