@@ -522,7 +522,10 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if _nfc("にする") in t:
         return None  # 「パワーをNにする」は base_power_override 系（別ルールで対応予定）
-    tq = _buff_target(t)
+    # 「<数える対象>N枚につき、<対象>は…パワー±N」: 対象は「につき、」の後ろだけから作る。数える側の
+    # 特徴・側（「自分の場の特徴《麦わらの一味》を持つカード1枚につき」）を対象の絞り込みに混ぜると、
+    # 相手キャラが麦わら持ちに限られていた（ST31-004）。
+    tq = _buff_target(re.sub(_nfc(r"^.*?枚につき、?"), "", t, count=1) or t)
     x = _to_int(m.group(1))
     buff = GameAction(
         type=ActionType.BUFF,
@@ -867,6 +870,11 @@ def _field_char_to_life(ctx: ParseContext) -> Optional[GameAction]:
         # 「相手の」「自分の」明示はそれぞれ OPPONENT / SELF として尊重する。
         if tq.player == Player.SELF and _nfc("自分") not in t:
             tq.player = Player.ALL
+        # 源ゾーンの明示が無い「キャラカード」は場のキャラではなく、直前に見た（LOOK→TEMP）カード
+        # （ST13-002「デッキの上から5枚を見て、コスト5のキャラカード1枚までを、ライフの上に…」）。
+        if _nfc("キャラカード") in t and tq.player != Player.OPPONENT:
+            tq.zone = Zone.TEMP
+            tq.player = Player.SELF
         if _nfc("まで") in t:
             tq.is_up_to = True
     elif _nfc("代わりに") in t:
@@ -2282,6 +2290,10 @@ def _bounce(ctx: ParseContext) -> Optional[GameAction]:
         tq.player = Player.ALL
     if _nfc("まで") in t:
         tq.is_up_to = True
+    # 「自分の、「X」と「Y」すべてを…」のように名前だけで指す場合も対象はキャラ（リーダー「サンジ」や
+    # ステージを巻き込まない: ST26-001）。
+    if not tq.card_type and tq.names:
+        tq.card_type = ["CHARACTER"]
     return GameAction(type=ActionType.BOUNCE, target=tq, raw_text=t)
 
 
@@ -2543,6 +2555,19 @@ def _play_card_from_zone(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("まで") in t:
         tq.is_up_to = True
     status = "RESTED" if re.search(_nfc(r"レストで(、)?登場"), t) else None
+    # 「「A」と「B」と「C」それぞれ1枚ずつまでを、登場させる」= 名前ごとに 1 枚ずつ（最大 3 枚）。
+    # 従来は 3 名の OR で合計 1 枚までになっていた（ST13-006）。
+    if len(tq.names) >= 2 and _nfc("それぞれ") in t:
+        import copy
+        acts = []
+        for nm in tq.names:
+            q = copy.deepcopy(tq)
+            q.names = [nm]
+            q.count = 1
+            q.is_up_to = True
+            acts.append(GameAction(type=ActionType.PLAY_CARD, target=q,
+                                   destination=Zone.FIELD, status=status, raw_text=t))
+        return Sequence(actions=acts)
     return GameAction(
         type=ActionType.PLAY_CARD,
         target=tq,

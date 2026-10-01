@@ -1773,6 +1773,18 @@ class EffectParser:
                 thr, cnt_op = 1, CompareOperator.LT  # 1枚もいない
             else:
                 thr, cnt_op = 1, CompareOperator.GE  # 「いる」=1枚以上
+            # 「「A」と「B」がいる」= 両方の名前のカードがいる（AND）。従来は names=[A,B] の OR で
+            # どちらか 1 枚で真になった（ST30-016）。
+            if (len(tq.names) >= 2 and re.search(_nfc(r'」と「'), norm_text)
+                    and cnt_op == CompareOperator.GE and "NAME_OR_TYPE" not in tq.flags):
+                import copy
+                subs = []
+                for nm in tq.names:
+                    q = copy.deepcopy(tq)
+                    q.names = [nm]
+                    subs.append(Condition(type=ConditionType.FIELD_COUNT, target=q,
+                                          operator=cnt_op, value=thr, player=q.player, raw_text=norm_text))
+                return Condition(type=ConditionType.AND, args=subs, player=tq.player, raw_text=norm_text)
             return Condition(type=ConditionType.FIELD_COUNT, target=tq,
                              operator=cnt_op, value=thr, player=tq.player, raw_text=norm_text)
 
