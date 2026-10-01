@@ -1031,11 +1031,16 @@ def _life_recover(ctx: ParseContext) -> Optional[GameAction]:
     # 「ライフが0枚になった時、」の 0 を拾い value=0 になる（OP05-098）。
     m_n = re.search(_nfc(r'デッキの上から[^。\d]*?(\d+)枚'), t)
     n = int(m_n.group(1)) if m_n else _first_int(t, 1)
+    # 「N枚まで」「〜てもよい／できる」は任意（加えないことを選べる）。N>1 の「2枚まで」は
+    # 0 枚か N 枚の二択で近似する（枚数を選ぶ UI は無い）。強制だと加えたくない場面でも加わる
+    # （2026-10-01 カード効果監査・約 30 枚）。
+    optional = bool(re.search(_nfc(r"まで|てもよい|ことができる"), t))
     return GameAction(
         type=ActionType.HEAL,
         target=None,
         value=ValueSource(base=n),
         raw_text=t,
+        is_optional=optional,
     )
 
 

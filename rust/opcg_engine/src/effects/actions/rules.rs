@@ -402,6 +402,35 @@ pub struct Replacement {
     pub sub_is_optional: bool,
 }
 
+/// 置換の本文から読む適用範囲:
+///
+/// - 主語が「このキャラ」「このリーダー」（自己置換）なら、保護者＝除去されるカード自身のときだけ成立する
+///   （従来は保護者が場の誰でも、持ち主のどのカードの除去でも成立していた）。
+/// - 【相手のターン中】は相手の手番のとき、【自分のターン中】は持ち主の手番のときだけ成立する。
+fn replacement_scope_matches(
+    raw: &str,
+    protector: CardIdx,
+    removed: CardIdx,
+    owner: Seat,
+    turn_player: Seat,
+) -> bool {
+    if raw.contains("【相手のターン中】") && turn_player == owner {
+        return false;
+    }
+    if raw.contains("【自分のターン中】") && turn_player != owner {
+        return false;
+    }
+    let mut body = raw.trim_start();
+    while let Some(rest) = body.strip_prefix('【') {
+        match rest.find('】') {
+            Some(i) => body = rest[i + '】'.len_utf8()..].trim_start(),
+            None => break,
+        }
+    }
+    let self_subject = body.starts_with("このキャラ") || body.starts_with("このリーダー");
+    !self_subject || protector == removed
+}
+
 /// Python `guards._find_replacement`。
 pub fn find_replacement(
     s: &Session,
@@ -455,6 +484,11 @@ pub fn find_replacement(
                 .as_deref()
                 .is_some_and(|st| status_values.contains(&st))
             {
+                continue;
+            }
+            // 適用範囲（本文の主語・ターン限定）。パーサは置換の本文を `raw_text` に丸ごと残すだけで
+            // 主語や【相手のターン中】を条件にしないので、ここで読む（2026-10-01 カード効果監査・約 50 枚）。
+            if !replacement_scope_matches(&eff.raw_text, protector, card, owner, s.state().turn_player) {
                 continue;
             }
             // 自己無効化（「キャラの「X」がいる場合、この効果は無効になる」OP05-100）。

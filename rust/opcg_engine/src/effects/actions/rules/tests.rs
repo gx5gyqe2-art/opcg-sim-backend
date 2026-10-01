@@ -945,3 +945,67 @@ fn the_turn_limit_falls_back_to_the_raw_text() {
     assert_eq!(limit("1ターンに1回だけ"), Some(1));
     assert_eq!(limit("このキャラは場を離れない"), None);
 }
+
+// --- 置換の適用範囲（2026-10-01 カード効果監査）---------------------------------
+
+/// 「このキャラが場を離れる場合、代わりに〜」は**そのキャラ自身**の除去でだけ成立する。
+/// 従来は場の他のキャラ（同じ持ち主）が除去されても成立した。
+#[test]
+fn a_self_replacement_does_not_protect_other_characters() {
+    let repl = ability_json(
+        "PASSIVE",
+        json!({"node": "GameAction", "type": "REPLACE_EFFECT",
+               "target": query_json(r#""select_mode":"SOURCE""#), "value": value_json(0),
+               "duration": "INSTANT", "status": "LEAVE", "destination": null, "is_rest": null,
+               "dest_position": null, "raw_text": "このキャラが場を離れる場合、代わりに1枚引く",
+               "sub_effect": action_json("DRAW", Value::Null, value_json(1)),
+               "is_optional": false, "delay": null, "face_up": null}),
+        "このキャラが場を離れる場合、代わりに1枚引く",
+    );
+    let cards = json!({
+        "LD": master_json("LD", "LEADER", json!([])),
+        "V": master_json("V", "CHARACTER", json!([])),
+        "RP": master_json("RP", "CHARACTER", json!([repl])),
+    });
+    let (masters, s) = board(
+        cards,
+        json!([]),
+        json!([card_json("RP", "p2-rp", "p2"), card_json("V", "p2-victim", "p2")]),
+        json!([]),
+    );
+    let rp = find(&s, "p2-rp");
+    let victim = find(&s, "p2-victim");
+    assert!(find_replacement(&s, &masters, rp, &["LEAVE"]).unwrap().is_some(), "自身の除去では成立");
+    assert!(
+        find_replacement(&s, &masters, victim, &["LEAVE"]).unwrap().is_none(),
+        "他のキャラの除去では成立しない"
+    );
+}
+
+/// 【相手のターン中】の置換は相手の手番でだけ成立する（`board` の手番は p1＝p2 から見て相手）。
+#[test]
+fn an_opponent_turn_replacement_only_applies_on_the_opponents_turn() {
+    let text = "【相手のターン中】このキャラが場を離れる場合、代わりに1枚引く";
+    let mk = |raw: &str| {
+        ability_json(
+            "PASSIVE",
+            json!({"node": "GameAction", "type": "REPLACE_EFFECT",
+                   "target": query_json(r#""select_mode":"SOURCE""#), "value": value_json(0),
+                   "duration": "INSTANT", "status": "LEAVE", "destination": null, "is_rest": null,
+                   "dest_position": null, "raw_text": raw,
+                   "sub_effect": action_json("DRAW", Value::Null, value_json(1)),
+                   "is_optional": false, "delay": null, "face_up": null}),
+            raw,
+        )
+    };
+    for (raw, expect) in [(text, true), ("【自分のターン中】このキャラが場を離れる場合、代わりに1枚引く", false)] {
+        let cards = json!({
+            "LD": master_json("LD", "LEADER", json!([])),
+            "V": master_json("V", "CHARACTER", json!([])),
+            "RP": master_json("RP", "CHARACTER", json!([mk(raw)])),
+        });
+        let (masters, s) = board(cards, json!([]), json!([card_json("RP", "p2-rp", "p2")]), json!([]));
+        let rp = find(&s, "p2-rp");
+        assert_eq!(find_replacement(&s, &masters, rp, &["LEAVE"]).unwrap().is_some(), expect, "{raw}");
+    }
+}
