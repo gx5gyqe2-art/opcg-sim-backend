@@ -822,6 +822,7 @@ def _summary_md(report: Dict[str, dict], diff: dict, load_fail: Optional[dict]) 
 # （2026-10-01: 旧 show は一部の欄しか出さず、is_vanilla／power_min／ORIGINAL_POWER／
 # count_dynamic／ref_id などが見えないために、レビューで ng の誤判定と ok の見逃しの両方が出た）。
 _TARGET_SKIP = {"node", "raw_text", "chooser", "player", "zone", "count", "is_up_to", "select_mode"}
+_FALSE_IS_DEFAULT = {"is_strict_count", "is_unique_name", "is_vanilla"}
 
 
 def _target_summary(t: Optional[dict]) -> str:
@@ -829,8 +830,10 @@ def _target_summary(t: Optional[dict]) -> str:
         return ""
     parts = [f"{t.get('player')}/{t.get('zone')}"]
     for k, v in t.items():
-        if k in _TARGET_SKIP or v in (None, [], False, "", {}):
+        if k in _TARGET_SKIP or v is None or v == [] or v == "" or v == {}:
             continue
+        if v is False and k in _FALSE_IS_DEFAULT:
+            continue          # 既定が False の欄。is_rest=False（アクティブ指定）等の null 既定の欄は出す
         parts.append(f"{k}={v}")
     parts.append(f"count={t.get('count')}{'まで' if t.get('is_up_to') else ''}")
     if t.get("select_mode") and t["select_mode"] != "CHOOSE":
