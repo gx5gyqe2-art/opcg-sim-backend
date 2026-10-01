@@ -33,6 +33,7 @@ if _SCRIPTS not in sys.path:
 import cut_price as CP  # noqa: E402
 
 _SHIPPED_MODE = CP.CUT_PRICE_MODE                  # 収集時の出荷時の既定
+_SHIPPED_TAKE = CP.CUT_TAKE_MODE
 import crossing_bridge as CB  # noqa: E402
 import hand_guard as HG  # noqa: E402
 import hand_joint as HJ  # noqa: E402
@@ -55,8 +56,13 @@ def _curve(items, xs=(), take=TAKE, caps=BIG, start=1, cand=None, h0=None, cids=
 
 # ---- 出荷時の既定 ----
 
-def test_shipped_default_is_flat():
-    assert _SHIPPED_MODE == "flat"
+def test_shipped_default_is_joint_with_gbar():
+    """**ラチェット**（2026-10-01・ユーザ決定「規則どおりの N-3 の読みへ今切り替える」）: 出荷の既定は `joint`（予約の平均の
+    値段 `ḡ` を損害と耐久の両側に）＋受けたライフの札も `ḡ`（`gbar`・T77）。旧の `flat`＋`mu` は切替で再現する。
+    文脈の外（器が守り手の窓に入る前）では値段の差し替え口は空。"""
+    assert _SHIPPED_MODE == "joint"
+    assert _SHIPPED_TAKE == "gbar"
+    assert "flat" in CP.CUT_PRICE_MODES and "mu" in CP.CUT_TAKE_MODES
     assert T.CUT_PRICER is None
     assert CP.active() is None
 
@@ -309,6 +315,15 @@ def test_value_caches_are_keyed_by_the_pricing_context():
     """覚えておく値（選択肢の価値・デッキの流入）は**値段の文脈を鍵に入れて**覚える——守り手ごとに値が違うので、
     鍵に入れないと別の守り手・旧の値段の読みへ漏れる（実測で守りの窓の判断が 2 行ずれた）。安い順の切れ目の窓は覚えない。"""
     import deck_refill as DR
+    old_take = CP.CUT_TAKE_MODE
+    CP.set_cut_take_mode("mu")                     # 旧の代数で鍵だけを見る（受けたライフの札の値段は別の切替）
+    try:
+        _check_value_caches(DR)
+    finally:
+        CP.set_cut_take_mode(old_take)
+
+
+def _check_value_caches(DR):
     deck = ("OP01-013", "OP01-016", "OP01-025", "ST01-012")
     cheap = _curve([(1.0, 0.0, 1000.0), (1.0, 0.0, 1000.0)])       # 来る攻撃なし・出す価値なし＝切っても何も失わない
     cheap.reserve = 1.0

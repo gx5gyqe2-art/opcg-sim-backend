@@ -757,6 +757,9 @@ EV.set_f_pricing_fixes("none")
 TB.set_guard_s_cost_mode("curve")
 # 2026-10-01（残り 2b）で来る攻撃を守る側のパワーの既定が `rule` になった＝079e73b8 当時の `token` を明示する。
 T.set_defender_power_mode("token")
+# 2026-10-01 で切らせた札の値段の既定が `joint`＋`gbar` になった＝079e73b8 当時の `flat`＋`mu` を明示する。
+import cut_price as CP
+CP.set_cut_price_mode("flat"); CP.set_cut_take_mode("mu")
 rec, out, which = sys.argv[1], sys.argv[2], sys.argv[3]
 if which == "price_realised":
     rc = PR.main(["--in", rec, "--boot-reps", "10", "--out", out])

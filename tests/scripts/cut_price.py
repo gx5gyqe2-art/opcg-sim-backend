@@ -47,7 +47,8 @@ N_f         = 枠の時点で耐久の式が言う「切る枚数」（予約・
 **使い方**: 呼ぶ側が守り手の枠から `CutCurve` を作り（`curve_of_row`）、今の枚数で `view(今の枚数)` を取り、
 `with defending(view):` の中で旧の式を呼ぶ。`theory_order.attack_value`／`block_cost`／`attach_value` と
 `crossing_bridge` の手札の項・窓の上限は、この文脈の中でだけ新しい値段になる（外では 1 ビットも変わらない）。
-既定の `CUT_PRICE_MODE=flat` では誰も文脈に入らない＝**旧と完全に同じ数字**。
+**既定は `joint`＋`gbar`**（2026-10-01・ユーザ決定「規則どおりの N-3 の読みへ今切り替える（数字が落ちても）」）。
+`CUT_PRICE_MODE=flat`（`--cut-price flat --cut-take mu`）では誰も文脈に入らない＝**旧と完全に同じ数字**（再現用）。
 """
 import contextlib
 import math
@@ -64,17 +65,17 @@ if _HERE not in sys.path:
 import theory_order as TO  # noqa: E402
 from theory_order import MU, SC_MY_HAND, SC_MY_LIFE  # noqa: E402
 
-#: **切替**: `flat`＝旧（1 枚一律 `μ`・既定）／`joint`＝N-3（1 枚 1 役の価値の減り・損害と耐久の両側を同時に・
+#: **切替**: `flat`＝旧（1 枚一律 `μ`・2026-10-01 までの既定）／`joint`＝N-3（**既定**・1 枚 1 役の価値の減り・損害と耐久の両側を同時に・
 #: 予約の平均の値段 `ḡ = L(N_f)/N_f` で理論の側を線形に読む）／`joint_slice`＝同じ曲線を**安い順の切れ目**で読む診断の腕
 #: （攻撃 1 本ごとに一番安い札から数える＝速さが攻撃を独立に数えるので安い札を何度も使い回す・下の注）。
 #: 切り分けの腕（レビュー 2026-09-30）: `joint_theta`＝**耐久の側だけ**（`Θ` の手札の項と窓の上限は `ḡ`・攻撃の値段・
 #: 速さ・実現の損害は旧の `μ`＝T77 を破る対照）／`joint_floor`＝`ḡ` を `μ` で床打ちした `joint`（安すぎる枠の影響の切り分け）。
 CUT_PRICE_MODES = ("flat", "joint", "joint_slice", "joint_theta", "joint_floor")
-CUT_PRICE_MODE = "flat"
+CUT_PRICE_MODE = "joint"
 #: **B4（T77）**: 受けたとき手札に入るライフの札の値段。`mu`＝旧（受ける費用 `λ − h·μ`・実現の `−μ`）／
-#: `gbar`＝守る側と同じ `ḡ`（受ける費用 `λ − h·ḡ`・実現の損害でも攻め手のターンの間に入った札を `ḡ` で数える）。
+#: `gbar`＝守る側と同じ `ḡ`（**既定**・2026-10-01・受ける費用 `λ − h·ḡ`・実現の損害でも攻め手のターンの間に入った札を `ḡ` で数える）。
 CUT_TAKE_MODES = ("mu", "gbar")
-CUT_TAKE_MODE = "mu"
+CUT_TAKE_MODE = "gbar"
 
 
 def set_cut_take_mode(mode):
@@ -97,11 +98,11 @@ def set_cut_price_mode(mode):
 
 def add_cut_price_arg(ap):
     ap.add_argument("--cut-price", default=None, choices=CUT_PRICE_MODES,
-                    help="**N-3** 切らせた札の値段: `flat`（既定・1 枚一律 μ）／"
-                         "`joint`（1 枚 1 役の手札の価値の減り・損害の側と耐久の側を同時に）／"
+                    help="**N-3** 切らせた札の値段: `flat`（旧・1 枚一律 μ）／"
+                         "`joint`（既定・1 枚 1 役の手札の価値の減り・損害の側と耐久の側を同時に）／"
                          "`joint_slice`（安い順の切れ目・診断）／`joint_theta`（耐久の側だけ・対照）／`joint_floor`（ḡ を μ で床打ち）")
     ap.add_argument("--cut-take", default=None, choices=CUT_TAKE_MODES,
-                    help="**N-3 B4** 受けたとき手札に入るライフの札の値段: `mu`（既定）／`gbar`（守る側と同じ ḡ）")
+                    help="**N-3 B4** 受けたとき手札に入るライフの札の値段: `gbar`（既定・守る側と同じ ḡ）／`mu`（旧）")
 
 
 def apply_cut_price(a):
