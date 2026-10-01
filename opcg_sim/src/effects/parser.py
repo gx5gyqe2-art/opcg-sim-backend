@@ -600,11 +600,10 @@ class EffectParser:
             if not repl_status and trigger != TriggerType.PASSIVE:
                 self._mark_optional_effects(effect_node)
             if repl_status and effect_node is not None:
-                # 「代わりに〜できる／てもよい」は任意の置換（払うかを選べる）。**バトル KO の置換**は
-                # エンジンが sub_effect の is_optional を見て先に確認する（accept→置換・decline→KO）。
-                # 効果除去の置換（status=LEAVE 等）は確認先行の経路がまだ無く、任意にすると「断れば
-                # 無償で守られる」不具合になるので、強制のまま残す（既知の未対応・台帳の note 参照）。
-                if (repl_status == "BATTLE_KO" and isinstance(effect_node, GameAction)
+                # 「代わりに〜できる／てもよい」は任意の置換（払うかを選べる）。バトル KO・効果除去の
+                # どちらもエンジンが sub_effect の is_optional を見て先に確認する
+                # （accept→置換・decline→本来の KO／除去）。
+                if (isinstance(effect_node, GameAction)
                         and re.search(_nfc(r"できる|てもよい"), _nfc(text))):
                     effect_node.is_optional = True
                 effect_node = GameAction(

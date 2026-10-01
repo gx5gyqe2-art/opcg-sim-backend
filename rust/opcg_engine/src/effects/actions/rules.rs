@@ -618,7 +618,12 @@ pub fn active_replacement_with(
     if outer.is_some() {
         s.edit().pop_interaction(); // Python `gm.active_interaction = None`
     }
-    Resolver::resumed(vec![found.sub.clone()], EffectContext::new())
+    // 任意の置換（「代わりに〜できる」）は成立前に確認済み＝sub の任意確認を二重に聞かない。
+    let mut sub_ctx = EffectContext::new();
+    if found.sub_is_optional {
+        sub_ctx.confirm(found.sub.clone());
+    }
+    Resolver::resumed(vec![found.sub.clone()], sub_ctx)
         .process_stack(s, masters, owner, Some(card))?;
     let suspended = s.state().active_interaction().is_some();
 
