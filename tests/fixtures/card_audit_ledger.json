@@ -209,8 +209,8 @@
    "verdict": "ng"
   },
   "EB01-030": {
-   "ast_sha": "cc290188b139ff75",
-   "note": "パーサ/エンジン: コストの「好きな順番で」デッキの下に置く（ARRANGE 無し・順序固定＝QUALIFIER_GAP 欠落） [厳格レビュー]",
+   "ast_sha": "897b7ea8e0b6db2f",
+   "note": "パーサ: コスト「このカードと手札1枚を…置くことができる」の任意（できる）が欄に無い（cost_optional=False・任意性の脱落は未修正） [修正後再判定]",
    "probe_sha": "2326d0bbeea28bac",
    "reviewed": "2026-10-01",
    "text_sha": "ba6e64742ded1a51",
@@ -297,12 +297,12 @@
    "verdict": "ok"
   },
   "EB01-043": {
-   "ast_sha": "fdb2a373407411b8",
-   "note": "パーサ/エンジン: コストの「好きな順番で」デッキの下に置く（ARRANGE 無し・QUALIFIER_GAP 欠落） [厳格レビュー]",
-   "probe_sha": "b88bc85fda2b57c0",
+   "ast_sha": "0a6d3fbf05d29098",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "a204ea9a51f44ce0",
    "reviewed": "2026-10-01",
    "text_sha": "c6df55fbb4190eaa",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB01-044": {
    "ast_sha": "c43d20d7c6414275",
@@ -393,12 +393,12 @@
    "verdict": "ok"
   },
   "EB01-056": {
-   "ast_sha": "d26a026d2373f219",
-   "note": "「ライフの上か下から」の上/下選択が無い（QUALIFIER_GAP本物。LIFEは隠しゾーンで常に上から自動取得）。パーサ/エンジン [厳格レビュー]",
+   "ast_sha": "c9b66d46e0e68e0f",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "e1a86f0fabba6496",
    "reviewed": "2026-10-01",
    "text_sha": "558ddf9d8da11afe",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB01-057": {
    "ast_sha": "8bc4398c63d76aa0",
@@ -569,12 +569,12 @@
    "verdict": "ok"
   },
   "EB02-019": {
-   "ast_sha": "a97a3761164e02c4",
-   "note": "「キャラへアタックできる」が status=速攻（リーダーにも可）で付与され速攻:キャラになっていない。パーサ [修正後再判定]",
+   "ast_sha": "6c6db6355856800f",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "a54ba110a18eff35",
    "reviewed": "2026-10-01",
    "text_sha": "cc4ae93245de079c",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB02-020": {
    "ast_sha": "f8f0514474bcbb13",
@@ -649,12 +649,12 @@
    "verdict": "ok"
   },
   "EB02-030": {
-   "ast_sha": "92243441e7fe4dff",
-   "note": "置換の任意(できる)脱落・「すべて」(count=-1)なし・条件がGENERIC（パーサ/エンジン） [修正後再判定]",
+   "ast_sha": "f8b7ee1af0202e1f",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "d3adc71d5da22424",
    "reviewed": "2026-10-01",
    "text_sha": "b91bf6d45909941c",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB02-031": {
    "ast_sha": "f8f0514474bcbb13",
@@ -745,12 +745,12 @@
    "verdict": "ok"
   },
   "EB02-045": {
-   "ast_sha": "6cfde8464a779f4a",
-   "note": "コスト『好きな順番でデッキの下に置く』の順序指定が脱落（コスト DECK_BOTTOM に ARRANGE 無し・QUALIFIER_GAP 該当）。パーサ [厳格レビュー]",
-   "probe_sha": "0b2816fc39811770",
+   "ast_sha": "48b2d589c86e979e",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "d25250aec0a68394",
    "reviewed": "2026-10-01",
    "text_sha": "c788fa55d60f747f",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB02-046": {
    "ast_sha": "5b2110817485d8fe",
@@ -841,12 +841,12 @@
    "verdict": "ok"
   },
   "EB02-057": {
-   "ast_sha": "0a932500e248f0df",
-   "note": "コスト『ライフの上か下から1枚』の上/下の選択が無い（コスト MOVE_CARD に dest/位置選択無し）。パーサ [厳格レビュー]",
+   "ast_sha": "d2893203fa9bd347",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "2788774d95e3621d",
    "reviewed": "2026-10-01",
    "text_sha": "4c1910b58a7e5e97",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB02-058": {
    "ast_sha": "f8f0514474bcbb13",
@@ -1193,12 +1193,12 @@
    "verdict": "ok"
   },
   "EB03-043": {
-   "ast_sha": "e2f585817a5c319e",
-   "note": "『好きな順番で』デッキの下に置く（コスト）の順序選択が脱落（ARRANGE 無し・QG）。パーサ [厳格レビュー]",
-   "probe_sha": "d82a6cd7c6e234fc",
+   "ast_sha": "f385727a7c724156",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "2a33c2ac3cd45376",
    "reviewed": "2026-10-01",
    "text_sha": "232cad54ec6b0bc9",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB03-044": {
    "ast_sha": "9c7844eed0ef7382",
@@ -1689,8 +1689,8 @@
    "verdict": "ok"
   },
   "EB04-043": {
-   "ast_sha": "afe5bffa19726c61",
-   "note": "置換の任意(できる)脱落・好きな順番なし・元々のコスト5以下の黒の「黒」条件なし（OPPONENT_REMOVAL にcolor無し）・ORIGINAL_COST flag無し [修正後再判定]",
+   "ast_sha": "5f11fc28e4b64673",
+   "note": "パーサ/エンジン: 条件に「元々のコスト」(ORIGINAL_COST)と「黒」が無く、効果KO限定の置換の任意性もエンジン欠落（#8） [修正後再判定]",
    "probe_sha": "cb91e2d3fee5a135",
    "reviewed": "2026-10-01",
    "text_sha": "d1fc8485719d76dd",
@@ -1825,12 +1825,12 @@
    "verdict": "ok"
   },
   "EB04-060": {
-   "ast_sha": "a16cbca96a470ba1",
-   "note": "コスト「ライフの上か下から1枚」の上/下の選択が無い・「表向きで」ライフに加えるの表向き指定が無い（パーサ） [厳格レビュー]",
+   "ast_sha": "5539a11bd645ea8b",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "d4b9542effab998a",
    "reviewed": "2026-10-01",
    "text_sha": "266750940adc09ea",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "EB04-061": {
    "ast_sha": "5a6c2044d15db531",
@@ -4065,12 +4065,12 @@
    "verdict": "ok"
   },
   "OP03-080": {
-   "ast_sha": "4fb265fba850b8aa",
-   "note": "パーサ/エンジン: コストの「好きな順番でデッキの下に置く」の順序指定が脱落（コスト DECK_BOTTOM に ARRANGE 無し・QUALIFIER_GAP 決着: 他欄で表現されず）",
-   "probe_sha": "d82a6cd7c6e234fc",
+   "ast_sha": "a09aaee76422d60d",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "2a33c2ac3cd45376",
    "reviewed": "2026-10-01",
    "text_sha": "cd6e6707c0270cb1",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP03-081": {
    "ast_sha": "893aa30679deadc6",
@@ -4129,12 +4129,12 @@
    "verdict": "ok"
   },
   "OP03-092": {
-   "ast_sha": "717ff75c342d5431",
-   "note": "パーサ/エンジン: コストの「好きな順番でデッキの下に置く」の順序指定が脱落（ARRANGE 無し・QUALIFIER_GAP 決着: 他欄で表現されず）。LEADER条件は無いが同上",
-   "probe_sha": "45cd45669d202e04",
+   "ast_sha": "56b65a06e723e50e",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "8a7473bf855be835",
    "reviewed": "2026-10-01",
    "text_sha": "3d5de5f00402a4f5",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP03-093": {
    "ast_sha": "1015345e0648dc5a",
@@ -4193,20 +4193,20 @@
    "verdict": "ok"
   },
   "OP03-100": {
-   "ast_sha": "740c57ceccc6e36b",
-   "note": "コスト「ライフの上か下から1枚をトラッシュ」の上/下選択が無い（QUALIFIER_GAP本物・TRASH SELF/LIFE に位置欄無し）。パーサ/エンジン",
+   "ast_sha": "d25cd2ce594a13ad",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "d38bd73245e1462e",
    "reviewed": "2026-10-01",
    "text_sha": "3d024b36f59c6d49",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP03-102": {
-   "ast_sha": "c9c86e2aa312f673",
-   "note": "「ライフの上か下から」の上か下の選択が無い（未修正） [修正後再判定]",
+   "ast_sha": "c755aa4a0a5cafda",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "75c5c29446982280",
    "reviewed": "2026-10-01",
    "text_sha": "90481bde43b3c9de",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP03-104": {
    "ast_sha": "b568f6e2e2b896b0",
@@ -4241,20 +4241,20 @@
    "verdict": "ok"
   },
   "OP03-109": {
-   "ast_sha": "7c9851f802b65019",
-   "note": "「ライフの上か下から」の上か下の選択が無い（未修正） [修正後再判定]",
+   "ast_sha": "9391fdd8c0a5bd24",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "61b2262092febd49",
    "reviewed": "2026-10-01",
    "text_sha": "fabbd6127d420a45",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP03-110": {
-   "ast_sha": "c09641a38b9380c0",
-   "note": "コスト「ライフの上か下から1枚を手札に加える」の上/下選択が無い(QG本物・MOVE_CARD SELF/LIFE に位置欄無し)。パーサ/エンジン",
+   "ast_sha": "5bead7371f8acc4d",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "20407e3f3afe8f09",
    "reviewed": "2026-10-01",
    "text_sha": "c18f798b454659b2",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP03-112": {
    "ast_sha": "59aee0916430b9c7",
@@ -5017,9 +5017,9 @@
    "verdict": "ok"
   },
   "OP04-090": {
-   "ast_sha": "2626fa960d621125",
-   "note": "parser: 「このキャラは、次のリフレッシュフェイズでアクティブにならない」の FREEZE 対象が OPPONENT のキャラ1枚（自キャラ SOURCE であるべき）。「好きな順番」の並び替えも無い（副次）。",
-   "probe_sha": "8bfac591c13b4726",
+   "ast_sha": "768df00a524d3b8b",
+   "note": "パーサ: 「このキャラは次のリフレッシュフェイズでアクティブにならない」の FREEZE が OPPONENT/FIELD の相手キャラ対象になっている（自身のはず） [修正後再判定]",
+   "probe_sha": "b5edd552935945f5",
    "reviewed": "2026-10-01",
    "text_sha": "7b6a1fb511122899",
    "verdict": "ng"
@@ -5065,12 +5065,12 @@
    "verdict": "ok"
   },
   "OP04-096": {
-   "ast_sha": "3bdaafbb1b1ed9e5",
-   "note": "「登場したターンにキャラへアタックできる」が status=速攻（リーダーにも可）で付与＝速攻:キャラになっていない。パーサ [修正後再判定]",
+   "ast_sha": "35ee7e254af6440f",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "7f9f21bc8e47b019",
    "reviewed": "2026-10-01",
    "text_sha": "1dbab69383c5c798",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP04-097": {
    "ast_sha": "285d26975f003e1c",
@@ -5113,12 +5113,12 @@
    "verdict": "ok"
   },
   "OP04-102": {
-   "ast_sha": "2b8f33d9c89869b9",
-   "note": "parser/engine: コスト「ライフの上か下から1枚」の上下選択が無い（QUALIFIER_GAP 未決着: MOVE_CARD LIFE count=1 のみで選択対話も出ない）。",
+   "ast_sha": "3030d08933deae62",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "da634ef7f8d5a922",
    "reviewed": "2026-10-01",
    "text_sha": "ed83489a89c105b8",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP04-103": {
    "ast_sha": "e3a27c62f410a299",
@@ -5201,12 +5201,12 @@
    "verdict": "ok"
   },
   "OP04-115": {
-   "ast_sha": "7cac7b7d146bdc95",
-   "note": "パーサ: コスト「ライフの上か下から1枚を手札に加える」の上/下選択が無い（QUALIFIER_GAP本物・自動取得）",
+   "ast_sha": "1313800c991c03be",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "2ee7fccfdb633533",
    "reviewed": "2026-10-01",
    "text_sha": "2cc0e9b3b1e49d69",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP04-116": {
    "ast_sha": "1c22a63d4e2a4cf8",
@@ -5217,12 +5217,12 @@
    "verdict": "ok"
   },
   "OP04-117": {
-   "ast_sha": "03198a4086047cba",
-   "note": "パーサ: トリガーのコスト「ライフの上か下から1枚を手札に加える」の上/下選択が無い（QUALIFIER_GAP本物）。メイン側は一致",
+   "ast_sha": "705032fcc945a2ba",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "89e9e872a1e96da7",
    "reviewed": "2026-10-01",
    "text_sha": "966af8a8e6976595",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP04-118": {
    "ast_sha": "3f428253e3eef040",
@@ -5833,12 +5833,12 @@
    "verdict": "ok"
   },
   "OP05-079": {
-   "ast_sha": "b8ac6f836a228dc4",
-   "note": "「好きな順番で」: DECK_BOTTOM に status=ARRANGE が無く順序指定が脱落(QUALIFIER_GAP 決着せず・probeにARRANGE_DECK無し)。パーサ/エンジン",
-   "probe_sha": "05d850d79eae3540",
+   "ast_sha": "6d43bb61b0cdd8d3",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "181e91654ec1037a",
    "reviewed": "2026-10-01",
    "text_sha": "323e4252e4b6d443",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP05-080": {
    "ast_sha": "5a88a605b6011311",
@@ -5857,9 +5857,9 @@
    "verdict": "ok"
   },
   "OP05-082": {
-   "ast_sha": "f78535c149707adb",
-   "note": "コストの「トラッシュ2枚を好きな順番でデッキの下」に ARRANGE が無い(QUALIFIER_GAP 決着せず)。他句(REST self・HAND_COUNT OPP GE6・相手が1枚捨てる)は一致。パーサ/エンジン",
-   "probe_sha": "343105d0de7a83d3",
+   "ast_sha": "46cf313a923ecc87",
+   "note": "パーサ/エンジン: コスト「レストにし…置くことができる」の任意（できる）が脱落（cost_optional=False） [修正後再判定]",
+   "probe_sha": "f2cfb99b29ae0d10",
    "reviewed": "2026-10-01",
    "text_sha": "0af1aac2d1fb7776",
    "verdict": "ng"
@@ -5897,9 +5897,9 @@
    "verdict": "ok"
   },
   "OP05-088": {
-   "ast_sha": "76b9cb18df56292c",
-   "note": "コスト「トラッシュ2枚を好きな順番でデッキの下」に ARRANGE が無い(QUALIFIER_GAP 決着せず)。ドン1レスト・self REST・黒コスト3-5キャラ1枚まで手札は一致。パーサ/エンジン",
-   "probe_sha": "a4f5f271830992d0",
+   "ast_sha": "7a532c42372383de",
+   "note": "パーサ/エンジン: コスト「レストにし…置くことができる」の任意（できる）が脱落（cost_optional=False） [修正後再判定]",
+   "probe_sha": "07e3bf74ccbb6b41",
    "reviewed": "2026-10-01",
    "text_sha": "98a318fbb28bff23",
    "verdict": "ng"
@@ -5937,12 +5937,12 @@
    "verdict": "ok"
   },
   "OP05-093": {
-   "ast_sha": "38ff002f7f3cddd9",
-   "note": "コスト「トラッシュ3枚を好きな順番でデッキの下」に ARRANGE が無い(QUALIFIER_GAP 決着せず)。KO2本(コスト2以下/コスト1以下 各1枚まで)は一致。パーサ/エンジン",
-   "probe_sha": "1202a27bc3a994b4",
+   "ast_sha": "66ec5c635e5512f7",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "5926c727b9bd9ca2",
    "reviewed": "2026-10-01",
    "text_sha": "a60c514720301ccd",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP05-094": {
    "ast_sha": "9c1334a479914fa2",
@@ -6129,12 +6129,12 @@
    "verdict": "ok"
   },
   "OP05-119": {
-   "ast_sha": "56059aeeebea1698",
-   "note": "パーサ/エンジン: 「このキャラ以外のキャラすべてを好きな順番でデッキの下に置く」の順序指定が脱落（DECK_BOTTOM mode=ALL に ARRANGE 無し・QUALIFIER_GAP 他欄で表現されず）。他句は一致",
-   "probe_sha": "b42c8a762e9f3591",
+   "ast_sha": "c7e6bf3673447335",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "05f1bd48c0adc505",
    "reviewed": "2026-10-01",
    "text_sha": "cf9afa53742756d7",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP06-001": {
    "ast_sha": "d82a56c1c2e7ad1e",
@@ -6545,8 +6545,8 @@
    "verdict": "ok"
   },
   "OP06-056": {
-   "ast_sha": "6ff988cbdccd07e1",
-   "note": "parser/engine: 「好きな順番で」デッキの下に置く（2枚）の並び替えが無い・順序固定（QUALIFIER_GAP 欠落・他欄で表現されず）。cost2/cost1各1枚まで・TRIGGER は一致",
+   "ast_sha": "91fee65445f19796",
+   "note": "パーサ/エンジン: 2枚（コスト2以下・1以下）を「好きな順番で」置く並び替えが、各1枚の別 DECK_BOTTOM に割れて ARRANGE 対話が出ない [修正後再判定]",
    "probe_sha": "c075daaee145cc55",
    "reviewed": "2026-10-01",
    "text_sha": "db17192a51c6388f",
@@ -6561,12 +6561,12 @@
    "verdict": "ok"
   },
   "OP06-058": {
-   "ast_sha": "201a202e85a40bce",
-   "note": "parser/engine: 「好きな順番で」デッキ下（最大2枚）の並び替えが無い（QUALIFIER_GAP 欠落）。cost6以下2枚まで・トリガーは一致",
-   "probe_sha": "4f0e861f39c987f6",
+   "ast_sha": "0abcf2c1baa8e180",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "92a2867a1da0328e",
    "reviewed": "2026-10-01",
    "text_sha": "32e8533c7484fc6b",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP06-059": {
    "ast_sha": "aa6127f9967f75b1",
@@ -6737,12 +6737,12 @@
    "verdict": "ok"
   },
   "OP06-081": {
-   "ast_sha": "4daf9f6cce90bd8e",
-   "note": "parser/engine: コスト「トラッシュ2枚を好きな順番でデッキの下に戻す」の並び替えが無い（ARRANGE無し・QUALIFIER_GAP 欠落）。KO cost2以下は一致",
-   "probe_sha": "d82a6cd7c6e234fc",
+   "ast_sha": "5e4e69bd24e0e545",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "2a33c2ac3cd45376",
    "reviewed": "2026-10-01",
    "text_sha": "4ac424b5e2c3eada",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP06-082": {
    "ast_sha": "12a69372516c510b",
@@ -6809,12 +6809,12 @@
    "verdict": "ok"
   },
   "OP06-090": {
-   "ast_sha": "8166101a4c61b02a",
-   "note": "パーサ/エンジン: コストの「好きな順番で」デッキの下に戻す順序指定が脱落（ARRANGE無し・QUALIFIER_GAP本物。前例EB01-030等）",
-   "probe_sha": "827d90099b018721",
+   "ast_sha": "c9f27159801048da",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "9f3b30dace44c442",
    "reviewed": "2026-10-01",
    "text_sha": "879fcbff8553862c",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP06-091": {
    "ast_sha": "28c2fe915d49cdab",
@@ -6825,12 +6825,12 @@
    "verdict": "ok"
   },
   "OP06-092": {
-   "ast_sha": "0c348053cb616b6d",
-   "note": "パーサ/エンジン: 選択肢2「好きな順番でデッキの下に置く」の順序指定が脱落（DECK_BOTTOM に ARRANGE 無し・QUALIFIER_GAP本物）",
-   "probe_sha": "8e8dc68f65e1f85d",
+   "ast_sha": "464bca3e349a4cf9",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "b1c44f5a9c88a5ee",
    "reviewed": "2026-10-01",
    "text_sha": "4f21bdf7e13b5f8c",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP06-093": {
    "ast_sha": "0282bc942810be59",
@@ -6921,12 +6921,12 @@
    "verdict": "ok"
   },
   "OP06-106": {
-   "ast_sha": "a55f065b91f2300a",
-   "note": "パーサ/エンジン: コスト「ライフの上か下から1枚を手札に加える」の上/下の選択が無い（QUALIFIER_GAP本物・コスト MOVE_CARD に位置選択無し。前例 EB02-057）",
+   "ast_sha": "0acfca2e95ee2a45",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "0b71cc567007b728",
    "reviewed": "2026-10-01",
    "text_sha": "3a5c1dba2a69dbbf",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP06-107": {
    "ast_sha": "3e69d0bf26da4273",
@@ -7257,12 +7257,12 @@
    "verdict": "ok"
   },
   "OP07-032": {
-   "ast_sha": "4190ac3671ed411f",
-   "note": "「登場したターンにキャラへアタックできる」が status=速攻（リーダーにも可）で付与＝速攻:キャラになっていない。パーサ [修正後再判定]",
+   "ast_sha": "f37c50b4b2730b70",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "170ff7c1edd9a9c8",
    "reviewed": "2026-10-01",
    "text_sha": "1188c181b1cfaf69",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP07-033": {
    "ast_sha": "9dd60917fa5427bc",
@@ -7633,12 +7633,12 @@
    "verdict": "ok"
   },
   "OP07-080": {
-   "ast_sha": "9cbc7aba9996e388",
-   "note": "パーサ/エンジン: コストの「好きな順番でデッキの下に置く」に status=ARRANGE が無く並び順の選択が欠落（QUALIFIER_GAP は実欠落）",
-   "probe_sha": "f2713635633dd6fd",
+   "ast_sha": "2bfd1857b0b9889b",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "4c038b8de7ed505a",
    "reviewed": "2026-10-01",
    "text_sha": "27815cc8f153220e",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP07-081": {
    "ast_sha": "d97a85a97082208f",
@@ -7657,12 +7657,12 @@
    "verdict": "ok"
   },
   "OP07-083": {
-   "ast_sha": "be89aa27124e5298",
-   "note": "パーサ/エンジン: コストの「好きな順番でデッキの下に置く」に ARRANGE が無く並び順の選択が欠落（QUALIFIER_GAP は実欠落）",
-   "probe_sha": "48775b4814565c76",
+   "ast_sha": "01348ce040dab68d",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "f470b53b38ed592a",
    "reviewed": "2026-10-01",
    "text_sha": "4b031ede4b14db31",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP07-084": {
    "ast_sha": "97d170e1550eee4a",
@@ -7713,28 +7713,28 @@
    "verdict": "ng"
   },
   "OP07-091": {
-   "ast_sha": "879bfa01cd159443",
-   "note": "パーサ/エンジン: 「任意の枚数好きな順番でデッキの下に置く」の DECK_BOTTOM に status=ARRANGE が無く並び順の選択が欠落（QUALIFIER_GAP は実欠落）",
-   "probe_sha": "77bead88e93cdbfc",
+   "ast_sha": "4a1761a61219bd03",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "d95a192d5cd0b1bb",
    "reviewed": "2026-10-01",
    "text_sha": "4c352e1203c38732",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP07-092": {
-   "ast_sha": "b65e98fb00bbd3ef",
-   "note": "パーサ/エンジン: コストの「好きな順番で」デッキの下に置く順序指定が脱落（ARRANGE 無し・QUALIFIER_GAP 本物）",
-   "probe_sha": "d82a6cd7c6e234fc",
+   "ast_sha": "f506556a195536ec",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "2a33c2ac3cd45376",
    "reviewed": "2026-10-01",
    "text_sha": "e99aab89603f478e",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP07-093": {
-   "ast_sha": "35ff55e9e6a3ad41",
-   "note": "パーサ/エンジン: コストの「好きな順番で」デッキの下に置く順序指定が脱落（ARRANGE 無し・QUALIFIER_GAP 本物）",
-   "probe_sha": "766bbf484cae5a7e",
+   "ast_sha": "ccf9b9fa3184bd90",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "1f4f5ef3548abf64",
    "reviewed": "2026-10-01",
    "text_sha": "1572138e6c4bc7a8",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP07-094": {
    "ast_sha": "47e44b0052a786f3",
@@ -7857,12 +7857,12 @@
    "verdict": "ok"
   },
   "OP07-110": {
-   "ast_sha": "a642700f455145ff",
-   "note": "パーサ/エンジン: コスト「ライフの上か下から1枚」の上/下選択が無い（Choice/dest_position 無し・QUALIFIER_GAP 本物）",
+   "ast_sha": "08b37168fd66fe42",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "5fb55eda3784fd8e",
    "reviewed": "2026-10-01",
    "text_sha": "fae245a77c047f2d",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP07-111": {
    "ast_sha": "54cd2670bf8c0077",
@@ -7873,12 +7873,12 @@
    "verdict": "ok"
   },
   "OP07-112": {
-   "ast_sha": "e482b138d0bc1cfd",
-   "note": "パーサ/エンジン: コスト「ライフの上か下から1枚」の上/下選択が無い（QUALIFIER_GAP 本物）",
-   "probe_sha": "ffa0db672ec53d6e",
+   "ast_sha": "96d5b383f59eddc2",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "735040b25f89d23f",
    "reviewed": "2026-10-01",
    "text_sha": "97c583457c973be2",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP07-113": {
    "ast_sha": "b51354254bfab376",
@@ -8282,7 +8282,7 @@
   },
   "OP08-049": {
    "ast_sha": "7ad15d3874f09be4",
-   "note": "パーサ: 「デッキの上か下に置く」が dest_position=None で常に下（上か下の選択が無い）。QUALIFIER_GAP 実在",
+   "note": "【登場時】「上か下に置く」の選択肢が無い（LOOK→DECK_BOTTOM 固定で必ず下）。未修正・パーサ/エンジン [修正後再判定]",
    "probe_sha": "e5a1eb68ddb4ab35",
    "reviewed": "2026-10-01",
    "text_sha": "41c814ad25b912a7",
@@ -8521,12 +8521,12 @@
    "verdict": "ok"
   },
   "OP08-081": {
-   "ast_sha": "cbfe37bd26cb8c5c",
-   "note": "パーサ/エンジン: コストの「好きな順番でデッキの下に置く」の並び替えが無い（DECK_BOTTOM に ARRANGE 無し・QUALIFIER_GAP本物。前例 OP06-090）。CP含む特徴3枚・KO cost0 は一致",
-   "probe_sha": "f5d43c4f17da9daf",
+   "ast_sha": "79de5a42b74e968c",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "2a33c2ac3cd45376",
    "reviewed": "2026-10-01",
    "text_sha": "1e931fa0b834e966",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP08-082": {
    "ast_sha": "826b07bb3f9f6813",
@@ -8617,12 +8617,12 @@
    "verdict": "ok"
   },
   "OP08-094": {
-   "ast_sha": "68c46fc854c69195",
-   "note": "パーサ/エンジン: メイン/カウンター両方でコスト「トラッシュ3枚を好きな順番でデッキの下に」の並び替えが無い（QUALIFIER_GAP本物。前例 OP06-090）。KO cost2以下・トリガー EXECUTE_MAIN は一致",
-   "probe_sha": "fbf7786f1fa47ae9",
+   "ast_sha": "aed96dde1908cfdc",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "c4c8a1c73378a15b",
    "reviewed": "2026-10-01",
    "text_sha": "d6a673f5ec709c0f",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP08-095": {
    "ast_sha": "7aaa752ec3520a6e",
@@ -8777,12 +8777,12 @@
    "verdict": "ok"
   },
   "OP08-116": {
-   "ast_sha": "e50637990cd4e3f2",
-   "note": "パーサ/エンジン: 「ライフの上か下から1枚を手札に加えてもよい」の上/下の選択が無い（QUALIFIER_GAP本物・前例OP06-106/EB02-057）。他句(+4000・そうした場合・表向きライフ上)は一致",
+   "ast_sha": "db5f6eb6e9f8adde",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "9c76fea66540a6e5",
    "reviewed": "2026-10-01",
    "text_sha": "587f769be819ec34",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP08-117": {
    "ast_sha": "716c670a1150808e",
@@ -9009,12 +9009,12 @@
    "verdict": "ok"
   },
   "OP09-028": {
-   "ast_sha": "274e4744058c7052",
-   "note": "パーサ/エンジン: コスト「ライフの上か下から1枚」の上/下選択が無い（QUALIFIER_GAP本物・EB01-056等と同型）。他句一致",
+   "ast_sha": "f3a70190134ceb04",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "2d427a0aca0e06de",
    "reviewed": "2026-10-01",
    "text_sha": "9fe6d8aa57306451",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP09-029": {
    "ast_sha": "5910df4100f5f916",
@@ -9241,12 +9241,12 @@
    "verdict": "ng"
   },
   "OP09-060": {
-   "ast_sha": "fc8d0c712c0d36b5",
-   "note": "パーサ/エンジン: コスト「手札2枚を好きな順番でデッキの下に置き」の順序指定が脱落（DECK_BOTTOMにARRANGE無し・QUALIFIER_GAP本物）",
-   "probe_sha": "9f9457f4abf5a8a4",
+   "ast_sha": "a4a112eba64ae99d",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "3ed2a01b81fe9c77",
    "reviewed": "2026-10-01",
    "text_sha": "4847e1aaaa8e06b8",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP09-061": {
    "ast_sha": "062da24a9d79e07a",
@@ -9553,20 +9553,20 @@
    "verdict": "ok"
   },
   "OP09-103": {
-   "ast_sha": "45136b9902d57bb5",
-   "note": "パーサ/エンジン: 「ライフの上か下から1枚」の上か下選択が無い(QG 上か下は本当の欠落・LIFE常に先頭自動取得)",
+   "ast_sha": "f281916327a60e8a",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "8e4e30dba7d332ad",
    "reviewed": "2026-10-01",
    "text_sha": "7b59e6451c394091",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP09-104": {
-   "ast_sha": "2b92141419d12055",
-   "note": "パーサ/エンジン: 「ライフの上か下から1枚を手札に加える」の上か下選択が無い(QG 上か下は本当の欠落)",
+   "ast_sha": "cfe89573f54f1056",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "a2bfb6272ff8463f",
    "reviewed": "2026-10-01",
    "text_sha": "a893341115009208",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP09-105": {
    "ast_sha": "b3139a88060ea336",
@@ -9865,16 +9865,16 @@
    "verdict": "ok"
   },
   "OP10-026": {
-   "ast_sha": "6e8ac4cffb938456",
-   "note": "パーサ: コスト「好きな順番で」デッキの下に置く の ARRANGE 無し（QUALIFIER_GAP 欠落・順序固定）",
+   "ast_sha": "b4a6cfeea059e26d",
+   "note": "「置くことができる:」の任意が脱落（cost_optional=False）。未修正・パーサ [修正後再判定]",
    "probe_sha": "6b35b5c3a86d5162",
    "reviewed": "2026-10-01",
    "text_sha": "8773c0e7d0dd727f",
    "verdict": "ng"
   },
   "OP10-027": {
-   "ast_sha": "8f5a571e6337bf3b",
-   "note": "パーサ: コスト「好きな順番で」デッキの下に置く の ARRANGE 無し（QUALIFIER_GAP 欠落・順序固定）",
+   "ast_sha": "5d04a3adc35fb409",
+   "note": "「置くことができる:」の任意が脱落（cost_optional=False）。未修正・パーサ [修正後再判定]",
    "probe_sha": "6b35b5c3a86d5162",
    "reviewed": "2026-10-01",
    "text_sha": "32da7edd0ab0b70e",
@@ -10337,12 +10337,12 @@
    "verdict": "ok"
   },
   "OP10-092": {
-   "ast_sha": "d73ecfb7413c5845",
-   "note": "パーサ/エンジン: コストの「好きな順番で」デッキの下に置く並び替えが無い(QG本物)。他句は一致",
-   "probe_sha": "5c1f4be9a980749c",
+   "ast_sha": "e7999fddf283bbba",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "8092c3053b02333e",
    "reviewed": "2026-10-01",
    "text_sha": "5f074656593efd5c",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP10-093": {
    "ast_sha": "8887214e0f4c47a9",
@@ -10417,12 +10417,12 @@
    "verdict": "ok"
   },
   "OP10-103": {
-   "ast_sha": "2f943e38f8ea9b10",
-   "note": "パーサ/エンジン: コスト「ライフの上か下から1枚」の上/下選択が無い(QG本物)。他句は一致",
+   "ast_sha": "27172acccfa7efc3",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "0b71cc567007b728",
    "reviewed": "2026-10-01",
    "text_sha": "a693b9a4d2e4dc1f",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP10-104": {
    "ast_sha": "7f2ab44b2e71a5b6",
@@ -10441,12 +10441,12 @@
    "verdict": "ok"
   },
   "OP10-107": {
-   "ast_sha": "b866481dde9257c5",
-   "note": "パーサ/エンジン: コスト「ライフの上か下から1枚」の上/下選択が無い(QG本物)。他句は一致",
+   "ast_sha": "7158f44e2b971d07",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "0b71cc567007b728",
    "reviewed": "2026-10-01",
    "text_sha": "c40e6a5ef9c7c790",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP10-108": {
    "ast_sha": "affca2cd182cc006",
@@ -10529,12 +10529,12 @@
    "verdict": "ok"
   },
   "OP10-118": {
-   "ast_sha": "8eb804c703c8ef43",
-   "note": "パーサ/エンジン: アタック時コスト「好きな順番でデッキの下に置く」の並び替えが無い(QG)。他句は一致",
-   "probe_sha": "e50df8c1e4437d2f",
+   "ast_sha": "471ea224aed78795",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "e1a55a71421aadd9",
    "reviewed": "2026-10-01",
    "text_sha": "098a1b7cf02878bb",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP10-119": {
    "ast_sha": "1b0065b39c841e4f",
@@ -10545,8 +10545,8 @@
    "verdict": "ok"
   },
   "OP11-001": {
-   "ast_sha": "14140145aa3c40fc",
-   "note": "元々のパワー7000以下（ORIGINAL_POWER無し）・任意脱落・好きな順番なし（未修正）。能力0の速攻:キャラ付与は一致 [修正後再判定]",
+   "ast_sha": "f0f1cfa615009464",
+   "note": "能力1: 置換の「元々のパワー7000以下」が ORIGINAL_POWER 無し・置換「代わりに〜できる」を断れない（効果除去置換の任意性が構造的欠落）。パーサ/エンジン [修正後再判定]",
    "probe_sha": "33520d1b13a34722",
    "reviewed": "2026-10-01",
    "text_sha": "c53466192fd5719c",
@@ -10713,12 +10713,12 @@
    "verdict": "ok"
   },
   "OP11-027": {
-   "ast_sha": "44ad7d9751ce2161",
-   "note": "パーサ: 「キャラへアタックできる」が status=速攻 でリーダーにもアタック可になる（速攻:キャラ にならない） [修正後再判定]",
+   "ast_sha": "88f1fba87c272a0b",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "bb745b12757c18d6",
    "reviewed": "2026-10-01",
    "text_sha": "a1d94a1ba473af17",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP11-028": {
    "ast_sha": "b66ea8808334717d",
@@ -10745,12 +10745,12 @@
    "verdict": "ok"
   },
   "OP11-031": {
-   "ast_sha": "aaf288882ddac862",
-   "note": "パーサ: 「登場したターンにキャラへアタックできる」付与が status=速攻 でリーダーにもアタック可になる [修正後再判定]",
+   "ast_sha": "e96fefbd5a16c221",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "02ebb99d1c75527f",
    "reviewed": "2026-10-01",
    "text_sha": "fde924e01ee3d782",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP11-034": {
    "ast_sha": "6f8abb8bc3d6cd68",
@@ -11009,12 +11009,12 @@
    "verdict": "ok"
   },
   "OP11-072": {
-   "ast_sha": "e43fa9a0d7140c8a",
-   "note": "『好きな順番で』デッキの下に置く（相手のトラッシュ2枚）の順序指定が脱落（ARRANGE 無し・QUALIFIER_GAP本物）。パーサ/エンジン",
-   "probe_sha": "f10dcdcafa761ddb",
+   "ast_sha": "c403b27502c47667",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "56a4d02cb19da21f",
    "reviewed": "2026-10-01",
    "text_sha": "a6fa577eb470505e",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP11-073": {
    "ast_sha": "44cda1e10946fbab",
@@ -11137,12 +11137,12 @@
    "verdict": "ok"
   },
   "OP11-091": {
-   "ast_sha": "b1b22f34456f2f5f",
-   "note": "『好きな順番で』デッキの下に置く（イベント3枚）の順序指定が脱落（ARRANGE 無し・QUALIFIER_GAP本物）。パーサ/エンジン",
-   "probe_sha": "77712e6e6fe0b98c",
+   "ast_sha": "c4d3c9e07a2acae1",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "181e91654ec1037a",
    "reviewed": "2026-10-01",
    "text_sha": "3eafd5f28d026564",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP11-092": {
    "ast_sha": "be0f2bb2b5993882",
@@ -11153,12 +11153,12 @@
    "verdict": "ng"
   },
   "OP11-095": {
-   "ast_sha": "211c96a2943b8147",
-   "note": "コスト『海軍カード3枚を好きな順番でデッキの下に置く』の順序指定が脱落（コスト DECK_BOTTOM に ARRANGE 無し・QUALIFIER_GAP本物）。パーサ/エンジン",
-   "probe_sha": "de0f48d0881ff4a4",
+   "ast_sha": "74718601a5495969",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "a77e5a6fb6e4f733",
    "reviewed": "2026-10-01",
    "text_sha": "fae5e571c92bc425",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP11-096": {
    "ast_sha": "bf9023811c82a843",
@@ -11233,12 +11233,12 @@
    "verdict": "ok"
   },
   "OP11-106": {
-   "ast_sha": "758da0588c11ab61",
-   "note": "コスト『ライフの上か下から1枚』の上/下の選択が無い（隠しゾーンは常に上から自動取得・前例EB01-056）。パーサ/エンジン",
+   "ast_sha": "8f71ebdc231550dd",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "30cb5c2355a9b249",
    "reviewed": "2026-10-01",
    "text_sha": "fa7ec6d7545e23fb",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP11-107": {
    "ast_sha": "799b608e7a515a77",
@@ -11265,8 +11265,8 @@
    "verdict": "ok"
   },
   "OP11-110": {
-   "ast_sha": "b70300a1e515dca2",
-   "note": "置換: 「できる」任意が脱落・REST対象(魚人島かしらほし)が名前OR型で強制（エンジン）。登場時の上か下の選択も無し [修正後再判定]",
+   "ast_sha": "6876fe1619ce136c",
+   "note": "能力0: KO 置換「代わりにレストにできる」を断れない（効果除去/KO置換の任意性が構造的欠落）、対象も「魚人島」ステージ/リーダーのしらほしを LEADER 限定で表現。エンジン/パーサ [修正後再判定]",
    "probe_sha": "e5b000cef74a51a7",
    "reviewed": "2026-10-01",
    "text_sha": "f7cb448fc4f55f97",
@@ -11321,12 +11321,12 @@
    "verdict": "ok"
   },
   "OP11-119": {
-   "ast_sha": "e668adeef08dd1b1",
-   "note": "エンジン/パーサ: アタック時コストの「好きな順番」で戻す並び替えが未対応 [修正後再判定]",
-   "probe_sha": "fa083e99a9836c05",
+   "ast_sha": "0a3e8f69f4ac62ff",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "39906187fdbeb2ec",
    "reviewed": "2026-10-01",
    "text_sha": "0e75d250962e1b72",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP12-001": {
    "ast_sha": "0578cfc41042f3cb",
@@ -11897,12 +11897,12 @@
    "verdict": "ok"
   },
   "OP12-091": {
-   "ast_sha": "42e00fc00716b18e",
-   "note": "パーサ/エンジン: 好きな順番(ARRANGE)が無く並べ替え選択が欠落(QUALIFIER_GAP欠落)",
-   "probe_sha": "329defffbfeea5f6",
+   "ast_sha": "698029f0cb88ef17",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "e9cfb1f7bff5e4b0",
    "reviewed": "2026-10-01",
    "text_sha": "31da6b647f2a922e",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP12-093": {
    "ast_sha": "067f1d891a494774",
@@ -11913,12 +11913,12 @@
    "verdict": "ok"
   },
   "OP12-094": {
-   "ast_sha": "9da50b69d59eb66b",
-   "note": "パーサ/エンジン: 好きな順番(ARRANGE)が無く並べ替え選択が欠落(QUALIFIER_GAP欠落)",
-   "probe_sha": "b88bc85fda2b57c0",
+   "ast_sha": "cb04dd43340f241b",
+   "note": "[厳格レビュー・修正後再判定]",
+   "probe_sha": "a204ea9a51f44ce0",
    "reviewed": "2026-10-01",
    "text_sha": "bfdb3bc9af37da69",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP12-095": {
    "ast_sha": "cb921b1ca841ed07",
@@ -13585,12 +13585,12 @@
    "verdict": "ok"
   },
   "OP14-090": {
-   "ast_sha": "bee4a62914b06bac",
-   "note": "付与が status=速攻 でリーダーにも攻撃可（【速攻:キャラ】相当＝キャラのみ、になっていない）（パーサ） [修正後再判定]",
+   "ast_sha": "c4b9bd213491e718",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "964d668a3da13d3f",
    "reviewed": "2026-10-01",
    "text_sha": "f375d66a28fac7bf",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP14-091": {
    "ast_sha": "92cbc592c5ef92d8",
@@ -13601,8 +13601,8 @@
    "verdict": "ok"
   },
   "OP14-092": {
-   "ast_sha": "95d36381b07ec273",
-   "note": "置換: 「できる」任意脱落・好きな順番の並び替え無し（エンジン） [修正後再判定]",
+   "ast_sha": "b71864aa18e4bc19",
+   "note": "置換「代わりに〜置くことができる」の任意性が構造的欠落（断れない）。エンジン [修正後再判定]",
    "probe_sha": "1bd42a55acd607d2",
    "reviewed": "2026-10-01",
    "text_sha": "960f6b0a1a110f4f",
@@ -13673,12 +13673,12 @@
    "verdict": "ok"
   },
   "OP14-103": {
-   "ast_sha": "047d8e8d5baafba7",
-   "note": "パーサ/エンジン: コスト『ライフの上か下から1枚』の上/下の選択が無い（QG本物・前例 EB01-056）",
+   "ast_sha": "e14f8cc50341b8e1",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "b4232e98eaee3ef4",
    "reviewed": "2026-10-01",
    "text_sha": "6138a2ed2779f707",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP14-104": {
    "ast_sha": "7547bd1ad10b8c3c",
@@ -14417,9 +14417,9 @@
    "verdict": "ok"
   },
   "OP15-080": {
-   "ast_sha": "b10afdece60b1c5d",
-   "note": "パーサ: 能力0 条件の「パワー10000以上の」が脱落(HAS_CHARACTER ゲッコー・モリアのみ)・「他の」オーズも自身を除く表現無し。能力1 「このキャラカードをトラッシュから登場」が汎用 SELF/TRASH CHARACTER(自身限定無し・前例OP09-052)・「好きな順番」(QUALIFIER_GAP)",
-   "probe_sha": "027d498b4fbb8e1d",
+   "ast_sha": "b7ab3cc78e3b77f4",
+   "note": "能力0: 条件「パワー10000以上の『ゲッコー・モリア』」のパワー閾値が HAS_CHARACTER に無い（名前のみ）。パーサ [修正後再判定]",
+   "probe_sha": "cafc9a3245025542",
    "reviewed": "2026-10-01",
    "text_sha": "fbcd2423715b630c",
    "verdict": "ng"
@@ -15905,9 +15905,9 @@
    "verdict": "ng"
   },
   "OP17-041": {
-   "ast_sha": "9eb3a01ed666ba0f",
-   "note": "「持ち主が好きな順番でデッキの下」の順番選択が未実装（エンジン） [修正後再判定]",
-   "probe_sha": "f11dea90b3c0094d",
+   "ast_sha": "99eb7d68c185cc36",
+   "note": "「持ち主が好きな順番で」の並び替えの選択者(chooser=持ち主=相手)が無く、効果の使用者が並べる。パーサ [修正後再判定]",
+   "probe_sha": "25aed2c677540061",
    "reviewed": "2026-10-01",
    "text_sha": "a4bb07c7b013b7e6",
    "verdict": "ng"
@@ -16313,8 +16313,8 @@
    "verdict": "ok"
   },
   "OP17-095": {
-   "ast_sha": "08fb94503f819d8f",
-   "note": "パーサ/エンジン: 置換の任意（できる）が強制・「好きな順番でデッキの下」の並び替えが無い [修正後再判定]",
+   "ast_sha": "bb1ee1576c636cfd",
+   "note": "能力1: 置換「代わりに〜できる」を断れない（効果除去置換の任意性が構造的欠落）。エンジン [修正後再判定]",
    "probe_sha": "2b65f588825ced73",
    "reviewed": "2026-10-01",
    "text_sha": "2c9470e77f9fde33",
@@ -16441,9 +16441,9 @@
    "verdict": "ok"
   },
   "OP17-112": {
-   "ast_sha": "7f207d7c2f1aeaad",
-   "note": "【登場時】の『カード1枚を引き』が脱落（Choice のみ）。パーサ",
-   "probe_sha": "19f4a08af75feba5",
+   "ast_sha": "2ff9c3176b5f41b8",
+   "note": "【登場時】「カード1枚を引き」の DRAW ノードが無い（UNCOVERED_TEXT）。パーサ [修正後再判定]",
+   "probe_sha": "156e454cd0aaec01",
    "reviewed": "2026-10-01",
    "text_sha": "7010e56d4c496d73",
    "verdict": "ng"
@@ -16737,8 +16737,8 @@
    "verdict": "ok"
   },
   "P-036": {
-   "ast_sha": "5527e63630c14ed0",
-   "note": "パーサ: 効果『このキャラと自分のリーダー1枚まで』が LEADER|CHARACTER から1枚選択になり両方に付与されない／コスト『ライフの上か下』の選択肢(QUALIFIER_GAP)が表現されず",
+   "ast_sha": "572b2439dc37449e",
+   "note": "「このキャラと自分のリーダー1枚までを」が両方でなく1体選択(count=1まで)になり、片方にしかバフが乗らない。パーサ [修正後再判定]",
    "probe_sha": "9251182c4c44c38f",
    "reviewed": "2026-10-01",
    "text_sha": "54a6bd28ec236960",
@@ -17129,12 +17129,12 @@
    "verdict": "ng"
   },
   "P-091": {
-   "ast_sha": "12c42a0ad12594d9",
-   "note": "『登場したターンにキャラへアタックできる』が GRANT_KEYWORD 速攻（リーダーにも可）で、速攻:キャラになっていない。パーサ [修正後再判定]",
+   "ast_sha": "b98a55f40630b0bd",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "b7f079f7960a5094",
    "reviewed": "2026-10-01",
    "text_sha": "27dc03efefa1b311",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "P-092": {
    "ast_sha": "dcda5130880c0fce",
@@ -17241,8 +17241,8 @@
    "verdict": "ok"
   },
   "P-105": {
-   "ast_sha": "083cf2784a90bf01",
-   "note": "パーサ: パッシブ「【ブロッカー】を得て、コスト+4」のうちブロッカー付与が脱落（BUFF COST_REDUCTION 4 のみ）。また登場時コスト「ライフの上か下から1枚」の上/下選択が無い(QUALIFIER_GAP本物・前例)",
+   "ast_sha": "cd1e0867c87ce36f",
+   "note": "能力0: 「【ブロッカー】を得て」が欠落し、コスト+4 が COST_REDUCTION（符号/種別違い）で表現。パーサ [修正後再判定]",
    "probe_sha": "0f43b3152362cfe6",
    "reviewed": "2026-10-01",
    "text_sha": "d631c0546423e43e",
@@ -17513,8 +17513,8 @@
    "verdict": "ng"
   },
   "PRB02-016": {
-   "ast_sha": "a77ea1b77e6d3f98",
-   "note": "『ライフの上か下から』の選択肢が無い・『手札に加えることができる』の任意性が欄に無い（QUALIFIER_GAP 2件）。パーサ",
+   "ast_sha": "1da7b98cdf41f0b9",
+   "note": "能力0: 「ライフの上か下から1枚を手札に加えることができる」の任意が脱落（cost_optional=False）。パーサ [修正後再判定]",
    "probe_sha": "4fc41b8c26e8b11c",
    "reviewed": "2026-10-01",
    "text_sha": "59b5f2ce980d537e",
@@ -18161,12 +18161,12 @@
    "verdict": "ok"
   },
   "ST07-001": {
-   "ast_sha": "d5cc7ab600131b46",
-   "note": "コスト「ライフの上か下から1枚」の上/下選択が無い（MOVE_CARD SELF/LIFE 位置欄なし・QUALIFIER_GAP 本物）。他句(LIFE<=2, 手札1まで→ライフ上)は一致。パーサ/エンジン",
+   "ast_sha": "87ed8618995ebe6b",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "0b71cc567007b728",
    "reviewed": "2026-10-01",
    "text_sha": "825606f429093f88",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST07-003": {
    "ast_sha": "2e556f2f2002f531",
@@ -18177,20 +18177,20 @@
    "verdict": "ok"
   },
   "ST07-004": {
-   "ast_sha": "2793640125bba30b",
-   "note": "コスト「ライフの上か下から1枚を手札」の上/下選択が無い（QUALIFIER_GAP 本物）。バニッシュ+1000 THIS_BATTLE は一致。パーサ/エンジン",
+   "ast_sha": "5efcb76acd413230",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "3821f9b27b8e8cb3",
    "reviewed": "2026-10-01",
    "text_sha": "2f43878434a2e11a",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST07-005": {
-   "ast_sha": "eb4663714d1aef3b",
-   "note": "パーサ/エンジン: コスト「ライフの上か下から1枚」の上/下選択が無い（未修正） [修正後再判定]",
+   "ast_sha": "ed5ae43a228c417b",
+   "note": "[厳格レビュー・修正後再判定]",
    "probe_sha": "75c5c29446982280",
    "reviewed": "2026-10-01",
    "text_sha": "6cc97b505fd2701c",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST07-007": {
    "ast_sha": "c61b3cc7e44d8b55",
@@ -18209,8 +18209,8 @@
    "verdict": "ok"
   },
   "ST07-009": {
-   "ast_sha": "efe1aaaf3d68cee2",
-   "note": "起動メインのコスト「ライフの上か下から1枚」の上/下選択が無い（QG本物）。他句(REST self・コスト3以下KO・トリガー捨てて登場)は一致。パーサ/エンジン",
+   "ast_sha": "c0dcc2d7efa65929",
+   "note": "能力0: 「ライフの上か下から1枚を手札に加えることができる」の任意が脱落（cost_optional=False）。パーサ [修正後再判定]",
    "probe_sha": "8c78f512534fcd2d",
    "reviewed": "2026-10-01",
    "text_sha": "5c3a96b1e170b378",
@@ -18257,8 +18257,8 @@
    "verdict": "ok"
   },
   "ST07-017": {
-   "ast_sha": "b7ad240149dc17a6",
-   "note": "起動メインコスト「ライフの上か下から1枚」の上/下選択が無い（QG本物・任意はコスト任意で同値）。効果の自分コスト3キャラ→ライフ上表向き は一致。パーサ/エンジン",
+   "ast_sha": "297567873283f3ec",
+   "note": "起動メインのコスト『ライフの上か下から1枚を手札に加えることができる』の任意性（できる）が cost_optional=False で脱落（パーサ） [修正後再判定]",
    "probe_sha": "5694b9236dd4f944",
    "reviewed": "2026-10-01",
    "text_sha": "debe375ec89849ce",
@@ -18385,20 +18385,20 @@
    "verdict": "ok"
   },
   "ST09-007": {
-   "ast_sha": "7eb5a53337121316",
-   "note": "コスト「ライフの上か下から1枚」の上/下の選択が無い（QUALIFIER_GAP本物・MOVE_CARDに位置選択無し）。パーサ/エンジン",
+   "ast_sha": "30fa94f826008119",
+   "note": "全句が対応ノードと一致（LIFE_TOP_OR_BOTTOM/任意/HEAL上積み等の修正で解消） [厳格レビュー・修正後再判定]",
    "probe_sha": "2ab35fc2a0ac870c",
    "reviewed": "2026-10-01",
    "text_sha": "c931c6859967b521",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST09-008": {
-   "ast_sha": "ec0701e4dcf517e2",
-   "note": "コスト「ライフの上か下から1枚」の上/下の選択が無い（QUALIFIER_GAP本物・MOVE_CARDに位置選択無し）。パーサ/エンジン 登場(手札コスト4以下黄ワノ国キャラ1まで)・ドン×1は一致",
+   "ast_sha": "52e5488a96a5ab06",
+   "note": "全句が対応ノードと一致（LIFE_TOP_OR_BOTTOM/任意/HEAL上積み等の修正で解消） [厳格レビュー・修正後再判定]",
    "probe_sha": "2d427a0aca0e06de",
    "reviewed": "2026-10-01",
    "text_sha": "8b62309ac1db54ed",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST09-009": {
    "ast_sha": "292bcef22ef79e34",
@@ -18409,20 +18409,20 @@
    "verdict": "ok"
   },
   "ST09-010": {
-   "ast_sha": "e296381662246b74",
-   "note": "エンジン: 置換の任意（できる）が強制・「ライフの上か下」の選択が無い・KOのみの置換が LEAVE 全般 [修正後再判定]",
+   "ast_sha": "c65dbfd839fb9a31",
+   "note": "KO置換『代わりに〜置くことができる』の任意性が構造的に欠落（効果除去置換は強制・エンジン） [修正後再判定]",
    "probe_sha": "1bd42a55acd607d2",
    "reviewed": "2026-10-01",
    "text_sha": "1e917f52564a0008",
    "verdict": "ng"
   },
   "ST09-012": {
-   "ast_sha": "ed542285c983f99a",
-   "note": "コスト「ライフの上か下から1枚」の上/下の選択が無い（QUALIFIER_GAP本物・MOVE_CARDに位置選択無し）。パーサ/エンジン BUFF+2000 UNTIL_NEXT_TURN_END自身は一致",
+   "ast_sha": "b06303af04fdd2d5",
+   "note": "全句が対応ノードと一致（LIFE_TOP_OR_BOTTOM/任意/HEAL上積み等の修正で解消） [厳格レビュー・修正後再判定]",
    "probe_sha": "bfcac4905b75f910",
    "reviewed": "2026-10-01",
    "text_sha": "1bd667d8b440f892",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST09-014": {
    "ast_sha": "47d6493dfad69268",
@@ -18746,19 +18746,19 @@
   },
   "ST13-004": {
    "ast_sha": "e2bf0c9956d43d94",
-   "note": "『ライフを好きな順番で置く』が未修正（ORDER_LIFE は対話経由のみ・順番選択が実質反映されない）。エンジン [修正後再判定]",
+   "note": "全句が対応ノードと一致（LIFE_TOP_OR_BOTTOM/任意/HEAL上積み等の修正で解消） [厳格レビュー・修正後再判定]",
    "probe_sha": "9912cf53ac0e525a",
    "reviewed": "2026-10-01",
    "text_sha": "73e5154829563de0",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST13-005": {
-   "ast_sha": "8340d236957fad99",
-   "note": "パーサ/エンジン: コスト「ライフの上か下から1枚」の上/下選択が無い（QG本物・SELF/LIFE count=1 のみ・前例 EB01-056）。他句一致",
+   "ast_sha": "d7a053ef0599e02b",
+   "note": "全句が対応ノードと一致（LIFE_TOP_OR_BOTTOM/任意/HEAL上積み等の修正で解消） [厳格レビュー・修正後再判定]",
    "probe_sha": "5fdbe1dcac2b0630",
    "reviewed": "2026-10-01",
    "text_sha": "4758a2c24ea3dbd1",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST13-006": {
    "ast_sha": "c4498980824a901d",
@@ -18777,12 +18777,12 @@
    "verdict": "ok"
   },
   "ST13-008": {
-   "ast_sha": "1a289681f59ad5c8",
-   "note": "パーサ/エンジン: コスト「ライフの上か下から1枚」の上/下選択が無い（QG本物・前例 EB01-056）。KO 句は一致",
+   "ast_sha": "7044ee5226536d67",
+   "note": "全句が対応ノードと一致（LIFE_TOP_OR_BOTTOM/任意/HEAL上積み等の修正で解消） [厳格レビュー・修正後再判定]",
    "probe_sha": "1184873324ff6d90",
    "reviewed": "2026-10-01",
    "text_sha": "b637db5e9481ac5a",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST13-009": {
    "ast_sha": "d5da821ffff34340",
@@ -18809,12 +18809,12 @@
    "verdict": "ok"
   },
   "ST13-012": {
-   "ast_sha": "46c50d1ad14ab56f",
-   "note": "パーサ/エンジン: コスト「ライフの上か下から1枚を手札に加える」の上/下選択が無い（QG本物・前例 OP06-106）。ORDER_LIFE は一致",
+   "ast_sha": "c480eede683c6680",
+   "note": "全句が対応ノードと一致（LIFE_TOP_OR_BOTTOM/任意/HEAL上積み等の修正で解消） [厳格レビュー・修正後再判定]",
    "probe_sha": "19fd71864cb37e0a",
    "reviewed": "2026-10-01",
    "text_sha": "82c4a3c3ff113699",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST13-013": {
    "ast_sha": "9a62ded3f8793b36",
@@ -18849,20 +18849,20 @@
    "verdict": "ok"
   },
   "ST13-017": {
-   "ast_sha": "4011f227cf0d33b5",
-   "note": "パーサ/エンジン: トリガーのコスト「ライフの上か下から1枚」の上/下選択が無い（QG本物）。カウンター側は一致",
+   "ast_sha": "72082ac7f08401ac",
+   "note": "全句が対応ノードと一致（LIFE_TOP_OR_BOTTOM/任意/HEAL上積み等の修正で解消） [厳格レビュー・修正後再判定]",
    "probe_sha": "ffcb5dc6ebcd5f51",
    "reviewed": "2026-10-01",
    "text_sha": "27a144de23e640bc",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST13-018": {
-   "ast_sha": "89306301e7509b33",
-   "note": "パーサ/エンジン: トリガーのコスト「ライフの上か下から1枚」の上/下選択が無い（QG本物）。カウンター側(LIFE_COUNT EQ0 でドロー)は一致",
+   "ast_sha": "8876159abc697140",
+   "note": "全句が対応ノードと一致（LIFE_TOP_OR_BOTTOM/任意/HEAL上積み等の修正で解消） [厳格レビュー・修正後再判定]",
    "probe_sha": "a1ca578862a71bff",
    "reviewed": "2026-10-01",
    "text_sha": "ce6617289ce554dd",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST13-019": {
    "ast_sha": "a94ebb8e4dd5a549",
@@ -19401,12 +19401,12 @@
    "verdict": "ng"
   },
   "ST22-015": {
-   "ast_sha": "03d822f5eab17e9c",
-   "note": "パーサ/エンジン: 『ライフの上か下から1枚』の選択が無く(QUALIFIER_GAP 上か下・LIFEは常に上)欠落。他句は一致",
+   "ast_sha": "6f091ec0d0e04916",
+   "note": "全句が対応ノードと一致（LIFE_TOP_OR_BOTTOM/任意/HEAL上積み等の修正で解消） [厳格レビュー・修正後再判定]",
    "probe_sha": "9184c6ba52cc5c57",
    "reviewed": "2026-10-01",
    "text_sha": "ce5f14e76b306c04",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST22-016": {
    "ast_sha": "e2157827fcb727da",
@@ -19705,12 +19705,12 @@
    "verdict": "ok"
   },
   "ST29-007": {
-   "ast_sha": "a9fde716fe09ff1f",
-   "note": "能0 コスト『ライフの上か下から1枚』の上/下選択が無い（QUALIFIER_GAP本物・EB01-056等と同判定）。パーサ/エンジン",
+   "ast_sha": "b5a09f4c0469cc9d",
+   "note": "全句が対応ノードと一致（LIFE_TOP_OR_BOTTOM/任意/HEAL上積み等の修正で解消） [厳格レビュー・修正後再判定]",
    "probe_sha": "762ddfdd99e4311f",
    "reviewed": "2026-10-01",
    "text_sha": "85a8ceb30776f07b",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST29-008": {
    "ast_sha": "24b4a040dfe29586",
@@ -20137,12 +20137,12 @@
    "verdict": "ok"
   },
   "ST36-005": {
-   "ast_sha": "e202e6485276c86c",
-   "note": "QUALIFIER_GAP2件とも実在欠落: 「ライフの上か下から1枚」の上/下限定がFACE_UP_LIFEの対象(SELF/LIFE count=1)に無く、エンジンは位置を制限せず任意ライフを選べる。パーサ/エンジン（他句は対応）",
-   "probe_sha": "db13e1b843736ee4",
+   "ast_sha": "415fdb0d695abbaa",
+   "note": "全句が対応ノードと一致（LIFE_TOP_OR_BOTTOM/任意/HEAL上積み等の修正で解消） [厳格レビュー・修正後再判定]",
+   "probe_sha": "09529591913a5b05",
    "reviewed": "2026-10-01",
    "text_sha": "3b1d4b409ff52ecd",
-   "verdict": "ng"
+   "verdict": "ok"
   }
  },
  "version": 1
