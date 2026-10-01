@@ -617,9 +617,14 @@ def _power_swap(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
-def _subject_text(t: str) -> str:
-    """「<主語>は、…」「<主語>を、…」の主語部分（無ければ空）。"""
-    m = re.match(_nfc(r"^(?:このターン中、|次の[^、]*まで、)?(.+?)(?:は|を)、?"), t.strip())
+def _subject_text(t: str, particle: str = "は") -> str:
+    """「<主語>は、…」（particle="を" なら「<主語>を、…」）の主語部分（無ければ空）。
+
+    「は」は最初の出現まで（「特徴《X》を持つキャラは」の「を持つ」で切らない）、
+    「を」は「を、」までを最長一致で取る。"""
+    pat = r"^(?:このターン中、|次の[^、]*まで、)?(.+?)は、?" if particle == "は" else \
+        r"^(?:このターン中、|次の[^、]*まで、)?(.+)を、"
+    m = re.match(_nfc(pat), t.strip())
     return m.group(1) if m else ""
 
 
@@ -655,7 +660,7 @@ def _set_power(ctx: ParseContext) -> Optional[GameAction]:
     m = re.search(_nfc(r"パワー(?:を)?(\d+)に(?:なる|する)"), t)
     if not m:
         return None
-    multi = _multi_subject_targets(_subject_text(t))
+    multi = _multi_subject_targets(_subject_text(t, "を"))
     if multi:
         return Sequence(actions=[
             GameAction(type=ActionType.BUFF, status="POWER_OVERRIDE", target=tq_,
@@ -3131,6 +3136,15 @@ def _self_effect_disabled(ctx: ParseContext) -> Optional[GameAction]:
     # 異なり（特定トリガーのみ無効・対象が相手）SOURCE 全無効では不正確なため対象外。
     if not re.search(_nfc(r"効果が無効になる"), t):
         return None
+    # 「自分の、リーダーと『X』を含む特徴を持たないキャラすべては、効果が無効になる」= 主語が自身でない
+    # 範囲指定（OP13-064）。従来は自身 1 枚の DISABLE_ABILITY（エンジンでは何もしない）に縮退していた。
+    # 常在の再計算ごとに該当カードへ「効果を無効にする」を掛ける（NEGATE_EFFECT・このターン中）。
+    subj = _subject_text(t)
+    if subj and not re.fullmatch(_nfc(r"この(?:キャラ|カード|リーダー)"), subj):
+        tq = parse_target(subj)
+        tq.count = -1
+        tq.select_mode = "ALL"
+        return GameAction(type=ActionType.NEGATE_EFFECT, target=tq, duration="THIS_TURN", raw_text=t)
     return GameAction(
         type=ActionType.DISABLE_ABILITY,
         target=TargetQuery(select_mode="SOURCE"),

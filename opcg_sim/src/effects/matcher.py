@@ -197,6 +197,14 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             
     tq.traits.extend(final_traits)
 
+    # 「《X》(を含む特徴)を持たない」= その特徴を持たないカードに限る（OP13-064）。包含の traits には
+    # 入れず LACKS_TRAIT[_PARTIAL]:X として matcher に渡す。
+    for _lt in re.finditer(_nfc(r'[《<『]([^》>』]+)[》>』](を含む特徴)?を持たない'), tgt_text):
+        if _lt.group(1) in tq.traits:
+            tq.traits.remove(_lt.group(1))
+        tq.flags.add(("LACKS_TRAIT_PARTIAL:" if _lt.group(2) else "LACKS_TRAIT:") + _lt.group(1))
+        tq.flags.discard("NAME_PARTIAL")
+
     # 「《特徴》（を持つキャラカード）か「名前」」= 特徴 OR 名前。「か」が名前/特徴の開き括弧へ
     # かかる場合に OR とみなす（OP11-022「《海王類》を持つキャラカードか「メガロ」」）。
     # 「「名前」か特徴《X》を持つ」順（か→「特徴」→《）も OR（OP15-073/101）。

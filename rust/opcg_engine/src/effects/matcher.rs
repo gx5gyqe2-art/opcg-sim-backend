@@ -328,6 +328,18 @@ pub fn get_target_cards(
         }) {
             continue;
         }
+        // 「《X》(を含む特徴)を持たない」: その特徴を持たないカードに限る。
+        if query.flags.iter().any(|f| {
+            if let Some(t) = f.strip_prefix("LACKS_TRAIT_PARTIAL:") {
+                master.traits.iter().any(|x| x.contains(t))
+            } else if let Some(t) = f.strip_prefix("LACKS_TRAIT:") {
+                master.traits.iter().any(|x| x == t)
+            } else {
+                false
+            }
+        }) {
+            continue;
+        }
         // 「単色の」: 色を 1 色だけ持つカード。
         if query.has_flag("SINGLE_COLOR") && master.colors.len() != 1 {
             continue;
