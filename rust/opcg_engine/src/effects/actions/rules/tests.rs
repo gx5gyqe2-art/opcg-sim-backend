@@ -1069,3 +1069,60 @@ fn an_opponent_turn_replacement_only_applies_on_the_opponents_turn() {
         assert_eq!(find_replacement(&s, &masters, rp, &["LEAVE"]).unwrap().is_some(), expect, "{raw}");
     }
 }
+
+// --- 置換の限定句（OPPONENT_REMOVAL.target）・複数 status・KOされない保護の範囲 ---------
+
+/// 除去されるカードを TargetQuery で絞る（元々のコスト）・status のカンマ区切り。
+#[test]
+fn a_replacement_scope_query_limits_which_removed_card_is_protected() {
+    let cond = json!({"node": "Condition", "type": "OPPONENT_REMOVAL", "player": "SELF",
+        "operator": "EQ", "value": {"trigger": "KO"}, "args": [], "raw_text": "",
+        "target": query_json(r#""card_type":["CHARACTER"],"cost_max":2,"flags":["ORIGINAL_COST"]"#)});
+    let mut repl = ability_json(
+        "PASSIVE",
+        json!({"node": "GameAction", "type": "REPLACE_EFFECT",
+               "target": null, "value": value_json(0), "duration": "INSTANT",
+               "status": "EFFECT_KO,BATTLE_KO", "destination": null, "is_rest": null,
+               "dest_position": null, "raw_text": "自分の元々のコスト2以下のキャラがKOされる場合、代わりに1枚引く",
+               "sub_effect": json!({"node": "GameAction", "type": "DRAW", "target": null,
+                   "value": value_json(1), "duration": "INSTANT", "status": null,
+                   "destination": null, "is_rest": null, "dest_position": null, "raw_text": "",
+                   "sub_effect": null, "is_optional": false, "delay": null, "face_up": null}),
+               "is_optional": false, "delay": null, "face_up": null}),
+        "自分の元々のコスト2以下のキャラがKOされる場合、代わりに1枚引く",
+    );
+    repl["condition"] = cond;
+    let mut big = master_json("BIG", "CHARACTER", json!([]));
+    big["cost"] = json!(5);
+    let cards = json!({
+        "LD": master_json("LD", "LEADER", json!([])),
+        "V": master_json("V", "CHARACTER", json!([])),
+        "BIG": big,
+        "RP": master_json("RP", "CHARACTER", json!([repl])),
+    });
+    let (masters, s) = board(
+        cards,
+        json!([]),
+        json!([card_json("RP", "p2-rp", "p2"), card_json("V", "p2-small", "p2"), card_json("BIG", "p2-big", "p2")]),
+        json!([]),
+    );
+    let (small, big) = (find(&s, "p2-small"), find(&s, "p2-big"));
+    // 効果KO・バトルKOのどちらの status でも見つかる（カンマ区切り）。
+    assert!(find_replacement(&s, &masters, small, &["EFFECT_KO"]).unwrap().is_some());
+    assert!(find_replacement(&s, &masters, small, &["BATTLE_KO"]).unwrap().is_some());
+    // バウンス等（LEAVE）はこの置換の対象外。
+    assert!(find_replacement(&s, &masters, small, &["LEAVE"]).unwrap().is_none());
+    // 元々のコスト 5 のキャラは対象外。
+    assert!(find_replacement(&s, &masters, big, &["EFFECT_KO"]).unwrap().is_none());
+}
+
+/// 修飾なしの「KOされない」（status=EFFECT_KO,BATTLE_KO）は継続効果の旗を両方立てる。
+#[test]
+fn an_unqualified_ko_immunity_sets_both_flags() {
+    let (_m, mut s) = board(vanilla_cards(), json!([]), json!([card_json("V", "p2-v", "p2")]), json!([]));
+    let v = find(&s, "p2-v");
+    let a = action("PREVENT_LEAVE", r#""status":"EFFECT_KO,BATTLE_KO","duration":"THIS_TURN""#);
+    prevent_leave(&mut s, &a, v);
+    assert!(crate::rules::has_flag(s.state(), v, "PREVENT_EFFECT_KO"));
+    assert!(crate::rules::has_flag(s.state(), v, "PREVENT_BATTLE_KO"));
+}

@@ -761,6 +761,50 @@ pub fn register_granted_replacements(
     Ok(())
 }
 
+/// 持ち主のリーダー／場の有効な PASSIVE のうち、本文（raw_text）に `needle` を含むものがあるか
+/// （「ルール上、〜」の規則書き換え能力を本文で見分ける）。
+fn has_rule_passive(
+    s: &Session,
+    masters: &MasterTable,
+    seat: Seat,
+    needle: &str,
+) -> Result<bool, EngineError> {
+    let mut units: Vec<CardIdx> = Vec::new();
+    units.extend(s.state().player(seat).leader);
+    units.extend(s.state().player(seat).field.iter().copied());
+    for card in units {
+        if s.state().card(card).negated || crate::rules::is_effect_negated(s.state(), card) {
+            continue;
+        }
+        for id in &masters.get(s.state().card(card).master).ability_ids {
+            let ab = ability(masters, *id)?;
+            if ab.trigger == TriggerType::Passive && ab.raw_text.contains(needle) {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+/// 「ルール上、自分はデッキが0枚でも敗北せず、…ターン終了時に敗北する」（OP15-022）の PASSIVE を持つか。
+pub fn has_deckout_delay(
+    s: &Session,
+    masters: &MasterTable,
+    seat: Seat,
+) -> Result<bool, EngineError> {
+    has_rule_passive(s, masters, seat, "デッキが0枚でも敗北せず")
+}
+
+/// 「ルール上、自分の表向きのライフは手札に加わる代わりにデッキの下に置かれる」（ST13-003）の
+/// PASSIVE を持つか。
+pub fn has_face_up_life_to_deck_rule(
+    s: &Session,
+    masters: &MasterTable,
+    seat: Seat,
+) -> Result<bool, EngineError> {
+    has_rule_passive(s, masters, seat, "表向きのライフは手札に加わる代わりにデッキの下に置かれる")
+}
+
 /// Python `battle._has_deckout_win_replace`（デッキアウト敗北→勝利の置換 PASSIVE を持つか）。
 pub fn has_deckout_win_replace(
     s: &Session,

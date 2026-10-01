@@ -86,6 +86,7 @@ class EffectParser:
         ("相手のキャラがアタックした時", "ON_OPP_ATTACK"),
         ("相手がアタックした時", "ON_OPP_ATTACK"),
         ("ライフが離れた時", "ON_LIFE_DECREASE"),
+        ("レストになった時", "ON_REST"),
     )
 
     def _strip_text_trigger(self, trigger, effect_text: str):
@@ -195,6 +196,12 @@ class EffectParser:
                             and _nfc("アタックした時かアタックされた時") in _nfc(seg)):
                         import dataclasses
                         abilities.append(dataclasses.replace(ab, trigger=TriggerType.ON_OPP_ATTACK))
+                    # 「KOされた時か、（相手の効果で）場を離れた時」は ON_KO と ON_LEAVE の両方で誘発する
+                    # （OP10-042）。ON_KO 側だけだと効果で場を離れた（バウンス等）時が脱落する。
+                    if (ab.trigger == TriggerType.ON_KO
+                            and re.search(_nfc(r"KOされた時か、[^。]*場を離れた時"), _nfc(seg))):
+                        import dataclasses
+                        abilities.append(dataclasses.replace(ab, trigger=TriggerType.ON_LEAVE))
             except Exception as e:
                 pass
 
@@ -303,12 +310,35 @@ class EffectParser:
             cur_cond = getattr(cur, "condition", None)
             prev = acts[i - 1]
             prev_cond = getattr(prev, "condition", None)
+            # 「Aの代わりにBを選ぶ」（OP04-094）: 先行の除去 A の対象を B の対象へ差し替える択一。
+            sel_m = re.search(_nfc(r'の代わりに(?P<y>[^。]+?)を選ぶ'), text)
+            if (sel_m and cur_cond is not None and isinstance(cur, Branch)
+                    and isinstance(cur.if_true, GameAction) and cur.if_true.type == ActionType.SELECT):
+                base = prev.if_true if isinstance(prev, Branch) else prev
+                if isinstance(base, GameAction) and base.target is not None:
+                    import copy
+                    alt = copy.deepcopy(base)
+                    alt.target = parse_target(_nfc(sel_m.group("y")))
+                    alt.target.is_up_to = base.target.is_up_to
+                    alt.target.count = base.target.count
+                    alt.raw_text = _nfc(cur.if_true.raw_text or text)
+                    not_cur = Condition(type=ConditionType.NOT, args=[cur_cond])
+                    if isinstance(prev, Branch):
+                        prev.condition = (not_cur if prev_cond is None else Condition(
+                            type=ConditionType.AND, args=[prev_cond, not_cur]))
+                    else:
+                        acts[i - 1] = Branch(condition=not_cur, if_true=prev)
+                    acts[i] = Branch(condition=cur_cond, if_true=alt)
+                    continue
             if cur_cond is None or prev_cond is None:
                 continue
             prev.condition = Condition(
                 type=ConditionType.AND,
                 args=[prev_cond, Condition(type=ConditionType.NOT, args=[cur_cond])],
             )
+            # B は A を置き換えるので、A が行われる場面（A の条件成立）でだけ成立する
+            # （OP04-040: ライフ＋手札が4枚以下でない時にコスト8以上だけで HEAL が出てはいけない）。
+            cur.condition = Condition(type=ConditionType.AND, args=[prev_cond, cur_cond])
 
     # 「手札のこのカードは、…コスト±N」の符号記号
     _HAND_COST_RE = re.compile(
@@ -458,8 +488,9 @@ class EffectParser:
                 # 任意性ではない（2026-06-27: パーサが一律 optional 化していたため、レストを断って無制限
                 # 起動できる不具合があった＝REPEAT_CAP が覆い隠していた）。源を消費するので自己制限が効く。
                 if (cost_optional and trigger == TriggerType.ACTIVATE_MAIN
-                        and any(_nfc(s) in cost_text for s in
-                                ("このキャラ", "このリーダー", "このステージ", "このカード"))):
+                        and (re.search(_nfc(r"このキャラ(?!以外)"), cost_text)
+                             or any(_nfc(s) in cost_text for s in
+                                    ("このリーダー", "このステージ", "このカード")))):
                     cost_optional = False
 
             # 【ドン!!×N】は「このカードにドン!!がN枚以上付与されている」発動条件であり、
@@ -594,6 +625,12 @@ class EffectParser:
             if (activation_optional and isinstance(effect_node, GameAction)
                     and effect_node.type != ActionType.OTHER):
                 effect_node.is_optional = True
+            elif (activation_optional and isinstance(effect_node, Sequence) and effect_node.actions
+                    and isinstance(effect_node.actions[0], GameAction)
+                    and effect_node.actions[0].type != ActionType.OTHER
+                    and not effect_node.actions[0].is_optional):
+                # 複合効果の「発動できる」は先頭の動作を確認点にする（PRB02-009）。
+                effect_node.actions[0].is_optional = True
 
             # 置換効果（「(このキャラ/他のキャラが)KOされる/場を離れる場合、代わりに〜」）。
             # 「…される場合」はゲート条件ではなくトリガー文脈なので、REPLACE_EFFECT で
@@ -748,10 +785,20 @@ class EffectParser:
         m = self._REPL_HEAD_RE.match(t)
         if not m:
             return None
-        c1 = self._REPL_CLAUSE_RE.match(m.group("head"))
+        head = m.group("head")
+        # 「KOされるか（、）相手の効果で場を離れる場合」（OP13-046）は 1 つの節に 2 つの除去種別。
+        dual = re.match(_nfc(r'^(?P<pre>.+?)(?:が|は)KOされるか、?(?P<mod>相手の効果で|相手によって)場を離れる場合$'), head)
+        if dual:
+            head = dual.group("pre") + _nfc("がKOされる場合")
+            extra_status = self._repl_status_of(dual.group("mod"), _nfc("場を離れる"))
+        else:
+            extra_status = None
+        c1 = self._REPL_CLAUSE_RE.match(head)
         if not c1:
             return None
         statuses = [self._repl_status_of(c1.group("mod"), c1.group("kind"))]
+        if extra_status:
+            statuses.append(extra_status)
         if m.group("head2"):
             c2 = self._REPL_CLAUSE2_RE.match(m.group("head2"))
             if not c2:
@@ -1030,7 +1077,8 @@ class EffectParser:
         # （ON_KO/ON_DAMAGE_DEALT_TO_LIFE）でありターン中は CONTEXT 条件として後段で保全される。
         # コスト節の後（「手札2枚を捨てる：相手のキャラがKOされた時、〜」OP03-076）も含めて上書きする。
         primary_reactive = embedded if embedded in (
-            TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE, TriggerType.ON_REST) else None
+            TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE, TriggerType.ON_REST,
+            TriggerType.ON_LEAVE) else None
         if _nfc("【自分のターン中】") in norm_text: return primary_reactive or TriggerType.YOUR_TURN
         if _nfc("【相手のターン中】") in norm_text: return primary_reactive or TriggerType.OPPONENT_TURN
         if _nfc("【カウンター】") in norm_text: return TriggerType.COUNTER

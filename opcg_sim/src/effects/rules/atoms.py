@@ -770,6 +770,10 @@ def _life_face(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ライフ") not in t:
         return None
+    # 「ルール上、表向きのライフは〜代わりにデッキの下に置かれる」（ST13-003）は規則の書き換えであって
+    # ライフを表向きにする能動動作ではない（エンジンが raw_text で読む RULE_PROCESSING）。
+    if _nfc("ルール上") in t:
+        return None
     # 「（源）から…ライフの上/下に（表向きで）加える」は既存ライフの反転ではなく移動(MOVE_CARD)。
     #   - 手札／デッキ／トラッシュ源 → hand_to_life / life_recover（OP07-097 等）。
     #   - 場のキャラ → field_char_to_life（OP03-123 等。priority が上なので通常はそちらが先取り）。
@@ -2430,6 +2434,22 @@ def _play_from_deck(ctx: ParseContext) -> Optional[GameAction]:
         target=tq,
         destination=Zone.FIELD,
         status=status,
+        raw_text=t,
+    )
+
+
+@rule("play_self_from_trash", priority=76)
+def _play_self_from_trash(ctx: ParseContext) -> Optional[GameAction]:
+    """「このキャラカードをトラッシュから（レストで）登場させる」＝自分自身（トラッシュにある発生源）を
+    登場させる。汎用の PLAY_CARD はトラッシュの任意のキャラを選べてしまう（OP09-052／OP16-014 等）。"""
+    t = ctx.text
+    if not re.search(_nfc(r"このキャラカードを、?トラッシュから(?:レストで)?、?登場(?:させる)?$"), t.strip()):
+        return None
+    return GameAction(
+        type=ActionType.PLAY_CARD,
+        target=TargetQuery(player=Player.SELF, zone=Zone.TRASH, count=1, ref_id="self"),
+        destination=Zone.FIELD,
+        status="RESTED" if _nfc("レストで") in t else None,
         raw_text=t,
     )
 

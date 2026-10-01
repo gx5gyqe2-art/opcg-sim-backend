@@ -563,6 +563,17 @@ pub fn move_card(
     dest_player: Seat,
     dest_position: Position,
 ) -> Result<(), EngineError> {
+    // 「表向きのライフは手札に加わる代わりにデッキの下に置かれる」（ST13-003）: 効果でライフから
+    // 手札へ加わる場合も同じ（バトルのダメージは battle.rs が同じ判定をする）。
+    let (dest_zone, dest_position) = if dest_zone == Zone::Hand
+        && s.state().card(card).is_face_up
+        && ops::find_card_location(s.state(), card).is_some_and(|(_, z)| z == Some(CardZone::Life))
+        && rules::has_face_up_life_to_deck_rule(s, masters, s.state().card(card).owner)?
+    {
+        (Zone::Deck, Position::Bottom)
+    } else {
+        (dest_zone, dest_position)
+    };
     let events = ops::move_card(s, masters, card, dest_zone, dest_player, dest_position)?;
     for ev in events {
         match ev.kind {
