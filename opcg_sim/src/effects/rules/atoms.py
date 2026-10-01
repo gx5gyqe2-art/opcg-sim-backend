@@ -263,6 +263,9 @@ def _char_and_leader_dual(ctx: ParseContext) -> Optional[EffectNode]:
             return None
         res.node.raw_text = t
         nodes.append(res.node)
+    # 「このキャラと自分のリーダー1枚までを」: リーダー側の「まで」を保つ（任意＝0 枚選択可）。
+    if _THIS_AND_LEADER_RE.match(t) and _nfc("まで") in t and nodes[1].target is not None:
+        nodes[1].target.is_up_to = True
     return Sequence(actions=nodes)
 
 
@@ -494,6 +497,12 @@ def _buff_target(t: str) -> TargetQuery:
     それ以外は通常の parse_target に委ねる。"""
     if re.search(_nfc(r"この(キャラ|リーダー|カード)(?:は|の)"), t) and _nfc("以外") not in t:
         return TargetQuery(select_mode="SOURCE")
+    # 「自分のリーダーは、…自分のキャラ1枚につきパワー+1000」(P-024): 付与先は主語のリーダーのみ。
+    # 「キャラ1枚につき」の数える側の語が付与先クエリに混ざらないようにする。
+    m_ld = re.match(_nfc(r"^(自分|相手)のリーダーは"), t)
+    if m_ld:
+        return TargetQuery(card_type=["LEADER"],
+                           player=Player.OPPONENT if m_ld.group(1) == _nfc("相手") else Player.SELF)
     return parse_target(t)
 
 
@@ -779,7 +788,8 @@ def _grant_keyword_choice(ctx: ParseContext):
 @rule("grant_keyword", priority=63)
 def _grant_keyword(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
-    if _nfc("得る") not in t:
+    # 連用形「【ブロッカー】を得て、コスト+4」(P-105) の「得て」も付与。
+    if _nfc("得る") not in t and not re.search(_nfc(r"】を得て$"), t):
         return None
     m = _KEYWORD_GRANT_RE.search(t)
     if not m:
@@ -2111,6 +2121,11 @@ def _blocker_disable(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ブロッカー") not in t or _nfc("発動できない") not in t:
         return None
+    # 「このターン中、自分のリーダーがアタックする際、相手は【ブロッカー】を発動できない」(OP13-057)
+    # = 相手のキャラを個別に無効化するのではなく、リーダーのアタック時だけブロックを封じる制限。
+    if re.search(_nfc(r"自分のリーダーがアタックする際"), t):
+        return GameAction(type=ActionType.RULE_PROCESSING, status="OPP_NO_BLOCK_VS_LEADER",
+                          duration=_duration_of(t), raw_text=t)
     # 「コスト5以下のキャラの【ブロッカー】」等の制約は述部側に現れるため、
     # 全文を parse_target に渡して cost/power 上限・特徴を保全する。
     # 「自分のリーダーがアタックする際」のようなタイミング限定句は player 判定を
@@ -2263,7 +2278,7 @@ def _scry_place(ctx: ParseContext) -> Optional[GameAction]:
     → DECK_BOTTOM(TEMP)。LOOK 直後に「上か下」を選んで置くパターン。
 
     「好きな順番」付きは temp_to_deck が担当。「残り」付きは
-    remaining_deck_top_or_bottom が担当。選択 UI 未実装のため下に保守的フォールバック。
+    remaining_deck_top_or_bottom が担当。上下は dest_position=CHOOSE（ARRANGE_DECK 対話で選ぶ）。
     """
     t = ctx.text
     if not re.search(_nfc(r"デッキの上か下に置く"), t):
@@ -2275,6 +2290,8 @@ def _scry_place(ctx: ParseContext) -> Optional[GameAction]:
     return GameAction(
         type=ActionType.DECK_BOTTOM,
         target=TargetQuery(player=Player.SELF, zone=Zone.TEMP),
+        # 「上か下」はプレイヤーが選ぶ（OP08-049。従来は選択が無く常にデッキの下だった）。
+        dest_position=_deck_position(t),
         raw_text=t,
     )
 
@@ -2360,8 +2377,49 @@ def _dual_tier_removal(ctx: ParseContext) -> Optional[EffectNode]:
                 tq.flags.add("ORIGINAL_POWER")
         return GameAction(type=act_type, target=tq, destination=dest, raw_text=t)
 
+    # 「好きな順番でデッキの下に置く」: 2 ティアを別々の DECK_BOTTOM にすると 1 枚ずつの配置になり、
+    # 並び順の選択（ARRANGE）が出ない。各ティアを SELECT で選んで保存し、両方をまとめて 1 回の
+    # DECK_BOTTOM(ARRANGE) で置く（OP06-056）。
+    if act_type == ActionType.DECK_BOTTOM and _arrange_status(t):
+        sel_a = _tier(m.group("f1"), m.group("t1"))
+        sel_b = _tier(m.group("f2"), m.group("t2"))
+        sel_a.type = sel_b.type = ActionType.SELECT
+        sel_a.target.save_id, sel_b.target.save_id = "_arr_a", "_arr_b"
+        put = GameAction(type=ActionType.DECK_BOTTOM, status="ARRANGE", raw_text=t,
+                         target=TargetQuery(player=player, zone=Zone.FIELD, count=-1,
+                                            select_mode="ALL", ref_id="_arr_a+_arr_b"))
+        return Sequence(actions=[sel_a, sel_b, put])
     return Sequence(actions=[_tier(m.group("f1"), m.group("t1")),
                              _tier(m.group("f2"), m.group("t2"))])
+
+
+_EACH_NAMES_RE = re.compile(_nfc(r"((?:「[^」]+」と)+「[^」]+」)それぞれ[\d０-９]+枚(?:ずつ)?(?:まで)?"))
+
+
+@rule("each_name_play", priority=69)
+def _each_name_play(ctx: ParseContext) -> Optional[EffectNode]:
+    """「「A」と「B」と「C」それぞれ1枚ずつまでを、登場させる」→ 名前ごとに 1 枚までの PLAY_CARD を並べる。
+
+    名前を 1 つのクエリ（names=[A,B,C]・合計 1 枚まで）に潰すと、3 名を同時に登場させられない
+    （OP16-105）。コスト上限・特徴などの共通条件は parse_target から全てに引き継ぐ。"""
+    t = ctx.text
+    m = _EACH_NAMES_RE.search(t)
+    if not m or _nfc("登場") not in t:
+        return None
+    names = re.findall(_nfc(r"「([^」]+)」"), m.group(1))
+    base = parse_target(t.replace(m.group(0), "カード1枚"))
+    nodes = []
+    for nm in names:
+        tq = TargetQuery(
+            player=base.player or Player.SELF,
+            zone=base.zone if base.zone not in (Zone.FIELD, None) else Zone.TRASH,
+            card_type=list(base.card_type) or ["CHARACTER"],
+            traits=list(base.traits), names=[nm], colors=list(base.colors),
+            attributes=list(base.attributes),
+            cost_min=base.cost_min, cost_max=base.cost_max, count=1, is_up_to=True)
+        nodes.append(GameAction(type=ActionType.PLAY_CARD, target=tq, destination=Zone.FIELD,
+                                status="RESTED" if _nfc("レストで登場") in t else None, raw_text=t))
+    return Sequence(actions=nodes)
 
 
 @rule("dual_tier_play_from_trash", priority=68)
@@ -2380,7 +2438,9 @@ def _dual_tier_play_from_trash(ctx: ParseContext) -> Optional[EffectNode]:
     c1, c2 = int(m.group(1)), int(m.group(2))
     # レストで登場するのは、本文が明示したときだけ（EB03-049 は「1枚ずつまでを、登場させる」＝通常登場）。
     #   「残りをレストで登場」(OP06-086)＝第2ティアのみレスト／「レストで登場」＝両ティア。
-    rest_second = _nfc("残りをレスト") in t
+    # 「…を選び、1枚を登場させ、残りをレストで登場させる」は原子句が「1枚を登場させ」で切れる（残りの句は
+    # 別の原子句になる）ため、「選び、1枚を登場させ」の形でも第 2 ティアをレスト登場にする。
+    rest_second = _nfc("残りをレスト") in t or bool(re.search(_nfc(r"選び、[\d０-９]枚を登場"), t))
     rest_both = (not rest_second) and bool(re.search(_nfc(r"レストで登場"), t))
 
     # 主語修飾（特徴《X》/名前「X」/ゾーン「手札かトラッシュ」/色）は parse_target に拾わせ、

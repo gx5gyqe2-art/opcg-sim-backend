@@ -73,7 +73,7 @@ pub fn game_handler(
         // `mod.rs::apply_action` が「全群 `None` なら対象ループへ落ちる」に直ったので、
         // ここで自前に `run_target_loop` を呼ぶ回避策は不要になった（Python の `when=` 偽と
         // 同じフォールスルーが `apply_action` 側で成立する）。
-        ActionType::SwapPower => Some(Ok(swap_power(s, masters, targets))),
+        ActionType::SwapPower => Some(Ok(swap_power(s, masters, action, targets))),
         _ => None,
     }
 }
@@ -147,11 +147,19 @@ fn disable_opp_onplay(s: &mut Session, actor: Seat, action: &GameAction) -> bool
 /// 2 体の元々パワー（`master.power`）を相互に `base_power_override` へ上書きする
 /// （絶対値の base 上書き＝`reset_turn_status` で失効＝このターン中）。
 /// 対象が 2 枚未満なら何もしない（Python も同じ。`targets` に `None` は入らない）。
-fn swap_power(s: &mut Session, masters: &MasterTable, targets: &[CardIdx]) -> bool {
+fn swap_power(s: &mut Session, masters: &MasterTable, action: &GameAction, targets: &[CardIdx]) -> bool {
     if targets.len() >= 2 {
         let (a, b) = (targets[0], targets[1]);
         let pa = masters.get(s.state().card(a).master).power;
         let pb = masters.get(s.state().card(b).master).power;
+        // 「このバトル中、元々のパワーを入れ替える」（OP14-009）は期限付き。base_power_override に
+        // 書くとバトル後もターン終了まで残るので、差分の継続効果（バトル終了で失効）にする。
+        if action.duration == Duration::ThisBattle {
+            let expire = expire_turn_for(s, action.duration);
+            continuous::apply(s, a, ContinuousKind::Power, action.duration, pb - pa, "", "", expire);
+            continuous::apply(s, b, ContinuousKind::Power, action.duration, pa - pb, "", "", expire);
+            return true;
+        }
         let mut e = s.edit();
         e.set_card_opt_i32(a, CardOptI32Field::BasePowerOverride, Some(pb));
         e.set_card_opt_i32(b, CardOptI32Field::BasePowerOverride, Some(pa));
@@ -654,6 +662,25 @@ mod tests {
 
         assert_eq!(s.state().card(small).base_power_override, Some(9000));
         assert_eq!(s.state().card(big).base_power_override, Some(3000));
+    }
+
+    /// 「このバトル中」の入れ替えは base_power_override ではなく期限付きの差分（OP14-009）。
+    #[test]
+    fn swap_power_this_battle_is_a_timed_delta() {
+        let mut b = BoardBuilder::new().turn(3, Seat::P1);
+        let small = b.put_field(Seat::P1, M_CHAR); // power 3000
+        let big = b.put_field(Seat::P2, M_BIG); // power 9000
+        let (masters, state) = b.build();
+        let mut s = Session::new(state);
+
+        let mut a = testkit::action(ActionType::SwapPower, 0);
+        a.duration = Duration::ThisBattle;
+        assert!(run(&mut s, &masters, &a, &[small, big], 0));
+
+        assert_eq!(s.state().card(small).base_power_override, None);
+        assert_eq!(s.state().card(small).timed_power, 6000);
+        assert_eq!(s.state().card(big).timed_power, -6000);
+        assert!(effects(&s).iter().all(|e| e.duration == Duration::ThisBattle));
     }
 
     /// 対象が 1 枚以下なら何もしない（`valid` が 2 未満）。

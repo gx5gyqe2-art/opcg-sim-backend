@@ -253,7 +253,7 @@ pub fn run_target_loop(
             } else {
                 &["LEAVE"]
             };
-            if active_protection(s, masters, target, guard_statuses, Some(actor))? {
+            if active_protection_from(s, masters, target, guard_statuses, Some(actor), source_card)? {
                 continue;
             }
             if active_replacement(s, masters, target, guard_statuses)? {
@@ -533,6 +533,7 @@ pub fn move_card(
                 continuous::drop_for(s, &uuid);
             }
             ops::LeaveKind::LifeDecrease => {
+                ops::record_life_left(s, ev.owner, ev.count);
                 triggers::enqueue_life_decrease(s, masters, ev.count)?;
             }
             ops::LeaveKind::OnLeave => {
@@ -559,6 +560,18 @@ pub fn active_protection(
     actor: Option<Seat>,
 ) -> Result<bool, EngineError> {
     rules::active_protection(s, masters, card, status_values, actor, None)
+}
+
+/// [`active_protection`] に除去する効果の発生源（`source_card`）を渡す版（発生源の属性で守りが変わる OP11-005）。
+pub fn active_protection_from(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+    origin: Option<CardIdx>,
+) -> Result<bool, EngineError> {
+    rules::active_protection_with_origin(s, masters, card, status_values, actor, None, origin)
 }
 
 /// [`active_protection`] にバトル相手（Python の `attacker=`）を渡す版。

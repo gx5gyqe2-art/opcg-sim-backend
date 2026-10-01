@@ -31,6 +31,9 @@ fn bad(msg: impl Into<String>) -> EngineError {
 /// `BLOCKER_DISABLED` も見る）。Python のまま移す。
 pub fn has_blocker(s: &Session, seat: Seat) -> bool {
     let st = s.state();
+    if super::blocking_suppressed(st) {
+        return false;
+    }
     st.player(seat).field.iter().any(|c| {
         !st.card(*c).is_rest
             && has_keyword(st, *c, KW_BLOCKER)
@@ -409,6 +412,10 @@ pub fn finish_attack(
         apply_passive_effects(s, masters, tp)?;
     }
     // ライフが離れた回数ぶん ON_LIFE_DECREASE を積み、【トリガー】と共に消化する。
+    if life_lost > 0 {
+        let defender = s.state().card(target).owner;
+        ops::record_life_left(s, defender, life_lost);
+    }
     if life_lost > 0 && s.state().winner.is_none() {
         triggers::enqueue_life_decrease(s, masters, life_lost)?;
     }

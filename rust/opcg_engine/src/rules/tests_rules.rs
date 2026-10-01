@@ -282,6 +282,32 @@ fn only_rested_characters_can_be_attacked() {
     battle::declare_attack(&mut s, &masters, atk, rested_target).expect("レストなら狙える");
 }
 
+/// 「リーダーがアタックする際【ブロッカー】を発動できない」（OP13-057）: 制限を持つ側のリーダーの
+/// アタックだけブロックできない（キャラのアタックには効かない）。
+#[test]
+fn leader_attack_block_lock_suppresses_only_leader_attacks() {
+    use crate::model::{ActiveBattle, Restriction};
+    let mut b = BoardBuilder::new().turn(3, Seat::P1);
+    let atk = b.put_field(Seat::P1, M_BIG);
+    let _blocker = b.put_field(Seat::P2, M_BLOCKER);
+    let (_masters, mut s) = session(b.build());
+    let leader = s.state().player(Seat::P1).leader.unwrap();
+    let target = s.state().player(Seat::P2).leader.unwrap();
+    let turn = s.state().turn_count;
+    s.edit().set_restrictions(
+        Seat::P1,
+        vec![Restriction { key: "OPP_NO_BLOCK_VS_LEADER".into(), expire: turn, min_cost: None }],
+    );
+    let battle = |attacker| ActiveBattle {
+        attacker, target, attacker_owner: Seat::P1, target_owner: Seat::P2, counter_buff: 0,
+    };
+    s.edit().set_active_battle(Some(battle(atk)));
+    assert!(battle::has_blocker(&s, Seat::P2), "キャラのアタックには効かない");
+    s.edit().set_active_battle(Some(battle(leader)));
+    assert!(!battle::has_blocker(&s, Seat::P2), "リーダーのアタックはブロックできない");
+    assert!(pending::blocker_candidates(s.state(), Seat::P2).is_empty());
+}
+
 /// Python `_advance_battle_triggers`: ブロッカーが居れば BLOCK_STEP、居なければ BATTLE_COUNTER。
 #[test]
 fn a_blocker_on_the_field_routes_the_attack_through_the_block_step() {

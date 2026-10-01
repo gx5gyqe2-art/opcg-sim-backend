@@ -458,7 +458,8 @@ def qualifier_gaps(ability: dict) -> List[str]:
         need('"is_vanilla": true' in blob, "元々の効果のない（is_vanilla 無し）")
     if re.search(r"[上下]か[上下]|上または下", raw):
         need(any(n.get("node") == "Choice" and len(n.get("options") or []) >= 2
-                 for n in walk_nodes(ability)), "上か下（選択肢が無い）")
+                 for n in walk_nodes(ability)) or '"dest_position": "CHOOSE"' in blob,
+             "上か下（選択肢が無い）")
     if re.search(r"ことができる|てもよい", raw):
         need(bool(ability.get("cost_optional")) or any(n.get("is_optional") for n in acts), "任意（できる）が欄に無い")
     if "以外" in raw:

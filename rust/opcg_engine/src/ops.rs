@@ -514,6 +514,11 @@ pub fn set_rest(s: &mut Session, card: CardIdx, value: bool) {
     s.edit().set_card_bool(card, CardBoolField::IsRest, value);
 }
 
+/// ライフが離れた事実（「相手のライフが離れているターン中」P-120 用）。`seat` のライフが `n` 枚離れた。
+pub fn record_life_left(s: &mut Session, seat: Seat, n: i32) {
+    record_turn_event(s, &format!("LIFE_LEFT_{}", seat.name()), n);
+}
+
 /// Python `GameManager.record_turn_event`。
 pub fn record_turn_event(s: &mut Session, name: &str, n: i32) {
     s.edit().record_turn_event(name, n);

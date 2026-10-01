@@ -623,6 +623,7 @@ impl Resolver {
                 player: actor,
                 node: node_ref.clone(),
                 source_card,
+                saved_targets: self.context.saved_targets.clone(),
             });
             s.edit().set_pending_end_of_turn(pending);
             return Ok(true);
@@ -755,7 +756,10 @@ impl Resolver {
         node_ref: &NodeRef,
         source_card: Option<CardIdx>,
     ) -> Result<bool, EngineError> {
-        let targets = match action.target.as_ref() {
+        // DEAL_DAMAGE の target はダメージを受ける側（player）を表すだけで、カードを選ぶ対象ではない
+        // （FIELD の既定のままだと相手キャラの選択が出る／相手キャラ不在で不発になる）。
+        let action_target = if action.ty == ActionType::DealDamage { None } else { action.target.as_ref() };
+        let targets = match action_target {
             None => Vec::new(),
             Some(query) => {
                 match self.resolve_targets(s, masters, actor, query, source_card, Some((action, node_ref)))? {
@@ -767,18 +771,18 @@ impl Resolver {
 
         // 対象を取る行動が 0 枚だった（「2枚まで捨てる」で 0 枚等）なら、直前の枚数は 0 に更新する
         // （古い枚数が残ると「捨てた枚数と同じ枚数」が前の行動の枚数で動いてしまう）。
-        if action.target.is_some() && targets.is_empty() && action.ty != ActionType::Select {
+        if action_target.is_some() && targets.is_empty() && action.ty != ActionType::Select {
             self.context.prev_action_count = Some(0);
         }
 
         // PREV_ACTION 条件評価用: ターゲットの有無を記録
-        self.context.last_had_targets = if action.target.is_some() {
+        self.context.last_had_targets = if action_target.is_some() {
             Some(!targets.is_empty())
         } else {
             None
         };
 
-        if let Some(query) = action.target.as_ref() {
+        if let Some(query) = action_target {
             if targets.is_empty() && !query.is_up_to {
                 // Python の失敗履歴（`{"action":..,"success":False,"reason":"No targets found"}`）。
                 self.action_history.push(serde_json::json!({
@@ -1046,9 +1050,44 @@ impl Resolver {
 
         if let Some(ref_id) = query.ref_id.as_ref() {
             if ref_id == "self" {
-                return Ok(Some(source_card.into_iter().map(TargetRef::Card).collect()));
+                // 「コストN以上のこのキャラを…」(OP16-084)の修飾語＝現在のコストが範囲外なら対象にならない。
+                let in_range = |c: CardIdx| {
+                    let card = s.state().card(c);
+                    let cost = card.current_cost(masters.get(card.master));
+                    query.cost_min.map_or(true, |m| cost >= m) && query.cost_max.map_or(true, |m| cost <= m)
+                };
+                return Ok(Some(
+                    source_card.into_iter().filter(|c| in_range(*c)).map(TargetRef::Card).collect(),
+                ));
+            }
+            // 「a+b」＝保存済みの複数の選択をまとめた参照（重複は 1 枚にする）。
+            if ref_id.contains('+') {
+                let mut merged: Vec<TargetRef> = Vec::new();
+                for key in ref_id.split('+') {
+                    for t in self.context.saved(key).cloned().unwrap_or_default() {
+                        if !merged.contains(&t) {
+                            merged.push(t);
+                        }
+                    }
+                }
+                return Ok(Some(merged));
             }
             if let Some(saved) = self.context.saved(ref_id) {
+                // 「この効果で登場させたキャラ」は今も場にいるものだけ（KO・バウンス済みは対象外）。
+                if ref_id == "played_by_effect" {
+                    let on_field: Vec<TargetRef> = saved
+                        .iter()
+                        .copied()
+                        .filter(|t| match t.card() {
+                            Some(c) => {
+                                let owner = s.state().card(c).owner;
+                                s.state().player(owner).field.contains(&c)
+                            }
+                            None => false,
+                        })
+                        .collect();
+                    return Ok(Some(on_field));
+                }
                 return Ok(Some(saved.clone()));
             }
             // ref_id 指定なのに保存対象が無い＝対象なし（場全体クエリへ落とさない）。
@@ -1136,7 +1175,13 @@ impl Resolver {
         // 組み合わせは無い）。
         if let Some(psum_max) = query.power_sum_max {
             if !candidates.is_empty() {
+                // フラグ SUM_COST（「コストの合計がN以下」）のときは現在のコストで数える。
+                let by_cost = query.flags.iter().any(|f| f == "SUM_COST");
                 let power_of = |t: TargetRef| match t.card() {
+                    Some(c) if by_cost => {
+                        let card = s.state().card(c);
+                        card.current_cost(masters.get(card.master))
+                    }
                     Some(c) => masters.get(s.state().card(c).master).power,
                     None => 0,
                 };

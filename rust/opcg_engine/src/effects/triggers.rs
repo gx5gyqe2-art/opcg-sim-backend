@@ -313,6 +313,10 @@ pub fn ko_trigger_matches(
     effect_controller: Option<Seat>,
 ) -> bool {
     let raw = &ab.raw_text;
+    // 「このキャラのバトルによって相手のキャラをKOした時」は KO した側の誘発（自身の KO では発火しない）。
+    if raw.contains("のバトルによって") && raw.contains("KOした時") {
+        return false;
+    }
     if !raw.contains("KOされた時") {
         return true; // ブラケット【KO時】等：要因を問わず発火
     }
@@ -351,6 +355,25 @@ pub fn resolve_on_ko(
     ops::record_turn_event(s, &name, 1);
     // 他カードの「…キャラがKOされた時」リスナーを積む（自身の【KO時】とは独立）。
     enqueue_ko_listeners(s, masters, card, owner)?;
+    // 「このキャラのバトルによって相手のキャラをKOした時」: バトルで KO したアタッカー自身の誘発。
+    if cause == "BATTLE" {
+        if let Some(battle) = s.state().active_battle.clone() {
+            if battle.target == card && battle.attacker != card && battle.attacker_owner != owner {
+                let attacker = battle.attacker;
+                let ids = masters.get(s.state().card(attacker).master).ability_ids.clone();
+                for (index, id) in ids.iter().enumerate() {
+                    let ab = ability(masters, *id)?;
+                    if ab.trigger == TriggerType::OnKo
+                        && ab.raw_text.contains("のバトルによって")
+                        && ab.raw_text.contains("KOした時")
+                    {
+                        let optional = ab.raw_text.contains("発動できる");
+                        enqueue_trigger(s, battle.attacker_owner, attacker, index, optional);
+                    }
+                }
+            }
+        }
+    }
     let ids = masters.get(s.state().card(card).master).ability_ids.clone();
     for (index, id) in ids.iter().enumerate() {
         let ab = ability(masters, *id)?;
@@ -822,6 +845,7 @@ pub fn flush_pending_end_of_turn(
     for item in pending {
         let mut ctx = EffectContext::new();
         ctx.flushing_delayed = true;
+        ctx.saved_targets = item.saved_targets.clone();
         if s.state().active_interaction().is_some() {
             // 中断中は直接実行できない＝deferred 継続へ退避する。
             super::interact::defer_resolver_stack(

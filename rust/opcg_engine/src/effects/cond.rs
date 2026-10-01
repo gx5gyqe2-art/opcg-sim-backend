@@ -284,7 +284,11 @@ pub fn check_condition(
                 CondValue::Str(s) => (Some(s.as_str()), 1),
                 _ => (None, 1),
             };
-            let occurred = name.map(event_count).unwrap_or(0);
+            // 「相手のライフが離れているターン中」(P-120): 行動主体から見た相手のライフ離脱。
+            let occurred = match name {
+                Some("OPP_LIFE_LEFT") => event_count(&format!("LIFE_LEFT_{}", opponent.name())),
+                other => other.map(event_count).unwrap_or(0),
+            };
             compare(occurred, cond.operator, threshold)
         }
         C::LifeCountCompare => compare(

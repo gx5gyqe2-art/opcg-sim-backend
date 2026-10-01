@@ -166,6 +166,7 @@ pub fn suspend_for_choice(
     let super::ast::EffectNode::Choice {
         message,
         option_labels,
+        player: choice_player,
         ..
     } = node
     else {
@@ -181,16 +182,22 @@ pub fn suspend_for_choice(
     let name = card_name(s, masters, source_card);
     let mut cont = continuation(execution_stack, context, source_card);
     cont.node = Some(node_ref.clone());
+    // 「相手は以下から1つを選ぶ」（OP17-049）: 選ぶのは相手（効果の責任者は変わらない）。
+    let chooser = if choice_player == super::ast::PlayerRef::Opponent {
+        actor.other()
+    } else {
+        actor
+    };
     s.edit().set_interaction(Interaction {
         kind: InteractionKind::Choice,
-        player: actor,
+        player: chooser,
         message: format!("「{name}」の効果: {base_msg}"),
         candidates: Vec::new(),
         selectable: None,
         constraints: None,
         can_skip: false,
         source_card: None,
-        owner: actor,
+        owner: chooser,
         options: option_labels,
         allow_position: false,
         allow_reorder: false,
@@ -568,7 +575,9 @@ pub fn resolve_interaction(
                 }
             }
             s.edit().pop_interaction();
-            resolver.process_stack(s, masters, actor, Some(source_card))?;
+            // 選んだ側（相手が選ぶ Choice）ではなく効果の責任者として選ばれた枝を実行する。
+            let controller = s.state().card(source_card).owner;
+            resolver.process_stack(s, masters, controller, Some(source_card))?;
             history = resolver.action_history;
         }
         InteractionKind::ConfirmOptional => {

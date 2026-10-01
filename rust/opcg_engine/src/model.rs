@@ -1220,6 +1220,8 @@ pub struct DelayedAction {
     pub player: Seat,
     pub node: crate::effects::NodeRef,
     pub source_card: Option<CardIdx>,
+    /// 予約時点の保存済み対象（「この効果で登場させたキャラ」等の参照をターン終了時にも解くため）。
+    pub saved_targets: Vec<(String, Vec<TargetRef>)>,
 }
 
 /// 誘発待ち行列の 1 件（Python `_pending_triggers`／`_battle_triggers`）。
