@@ -1213,10 +1213,6 @@ class EffectParser:
             TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE, TriggerType.ON_REST,
             TriggerType.ON_EVENT_PLAY, TriggerType.ON_OPP_PLAY, TriggerType.ON_LEAVE,
             TriggerType.ON_LIFE_DECREASE) else None
-        # 「自分の効果で場を離れた時」は専用のターン内イベント（EVENT_THIS_TURN）で表現済み
-        # （OP07-038/OP08-046）＝ON_LEAVE 誘発には載せない。
-        if primary_reactive == TriggerType.ON_LEAVE and _nfc("自分の効果で場を離れた時") in norm_text:
-            primary_reactive = None
         # 「【トリガー】が発動した時、〜」の【トリガー】は能力の見出しではなく誘発句の目的語。
         if (embedded == TriggerType.ON_EVENT_PLAY
                 and re.search(_nfc(r'【トリガー】が発動した時'), norm_text)):
