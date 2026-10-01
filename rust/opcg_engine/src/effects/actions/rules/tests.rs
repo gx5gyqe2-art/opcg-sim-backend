@@ -487,6 +487,42 @@ fn a_once_per_turn_protection_is_consumed_after_one_use() {
     );
 }
 
+/// 継続効果の再計算（盤面が動くたびに走る）は、置換の常在を「実行」しても【ターン1回】を消費しない。
+/// 消費すると最初の再計算で使い切られ、KO の場面で置換が出なくなる（2026-10-01 実対局検証・ST09-010）。
+#[test]
+fn passive_recalc_does_not_consume_the_once_per_turn_of_a_replacement() {
+    let sub = json!({"node": "GameAction", "type": "DRAW", "target": null,
+        "value": value_json(1), "duration": "INSTANT", "status": null,
+        "destination": null, "is_rest": null, "dest_position": null, "raw_text": "",
+        "sub_effect": null, "is_optional": true, "delay": null, "face_up": null});
+    let mut repl = ability_json(
+        "PASSIVE",
+        json!({"node": "GameAction", "type": "REPLACE_EFFECT",
+               "target": query_json(r#""select_mode":"SOURCE""#), "value": value_json(0),
+               "duration": "INSTANT", "status": "LEAVE", "destination": null,
+               "is_rest": null, "dest_position": null,
+               "raw_text": "【ターン1回】このキャラが場を離れる場合、代わりに1枚引いてもよい",
+               "sub_effect": sub, "is_optional": false, "delay": null, "face_up": null}),
+        "【ターン1回】このキャラが場を離れる場合、代わりに1枚引いてもよい",
+    );
+    repl["condition"] = json!({"node": "Condition", "type": "TURN_LIMIT", "operator": "EQ",
+        "player": "SELF", "value": 1, "target": null, "args": [], "raw_text": ""});
+    let cards = json!({
+        "LD": master_json("LD", "LEADER", json!([])),
+        "V": master_json("V", "CHARACTER", json!([])),
+        "RP": master_json("RP", "CHARACTER", json!([repl])),
+    });
+    let (masters, mut s) = board(cards, json!([]), json!([card_json("RP", "p2-rp", "p2")]), json!([]));
+    let rp = find(&s, "p2-rp");
+    for _ in 0..3 {
+        crate::effects::passives::apply_passive_effects(&mut s, &masters, Seat::P1).expect("recalc");
+    }
+    assert!(
+        find_replacement(&s, &masters, rp, &["LEAVE"]).expect("scan").is_some(),
+        "再計算を何度挟んでも、ターン1回の置換は残っている"
+    );
+}
+
 // --- 置換（`guards._find_replacement`／`_active_replacement`）---------------------
 
 /// 「場を離れる場合、代わりに〜」の PASSIVE 置換が成立すると、本来の除去は行われず
