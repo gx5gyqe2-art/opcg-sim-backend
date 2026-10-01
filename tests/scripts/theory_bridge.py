@@ -594,6 +594,7 @@ def joint_valuer(hand):
     ctx = hand.get("inflow")
     mu = float(hand["mu"])
     reread = ctx is not None and any(_inflow_sensitive(s_.get("item"), ctx) for s_ in slots)
+    memo = {} if _TOM.SPEED_MEMO else None                      # この手札の読みの間だけの覚え書き（2026-10-01・値は同じ）
 
     def plan_items_of(keep):
         idx = sorted(keep)
@@ -601,7 +602,7 @@ def joint_valuer(hand):
         if reread and known:
             import hand_plan as HP
             known = HP.apply_inflow(known, ctx["deck"], hand["xs_future"], hand["take"], ctx["cards"], ctx["olp"], ctx["r"],
-                                    field=ctx["field"], st_base=ctx["st_base"])
+                                    field=ctx["field"], st_base=ctx["st_base"], memo=memo)
         rest = [slots[i] for i in idx if slots[i].get("item") is None]
         return [(float(it["cost"]), (mu if it["v"] is None else it["v"])) for it in list(known) + rest]
 

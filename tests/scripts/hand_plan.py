@@ -378,8 +378,28 @@ def opp_life_loss_per_turn(st):
     return float(sum(1 for x in xs if x >= -TO.PWR_EPS and float(TO.c_of(x)) > float(TO.THETA)))
 
 
-def project_state(st, t, items, xs, take_cost, turns=PLAN_TURNS):
-    """判断点の状態を t ターン後へ進める（`t = 0` はそのまま・`COND_CLOCK_MODE=off` もそのまま）。"""
+def _hand_stats(items, xs, take_cost, deck=None, cards=None, memo=None, search=False):
+    """`project_state`／`inflow_per_turn` が残りの手札から読む量（受ける本数・切る枚数・使うイベントの数〔・探す当たり〕）。
+    `memo`（1 つの手札の読みの間だけ生きる辞書）が在れば残りの手札の並びを鍵に覚える（2026-10-01・値は同じ）。"""
+    key = None
+    if memo is not None:
+        key = ("stats", tuple((str(it.get("cid")), float(it["counter"]), v_scalar(it["v"]), bool(it.get("event")))
+                              for it in items), tuple(float(x) for x in xs), float(take_cost), bool(search))
+        got = memo.get(key)
+        if got is not None:
+            return got
+    out = {"taken": expected_taken(items, xs, take_cost), "cut": counters_cut(items, xs, take_cost),
+           "ev": float(sum(1 for it in items if it.get("event") and v_scalar(it["v"]) > 0.0))}
+    if search:
+        out["hits"] = expected_search_hits(items, deck, cards)
+    if key is not None:
+        memo[key] = out
+    return out
+
+
+def project_state(st, t, items, xs, take_cost, turns=PLAN_TURNS, pre=None):
+    """判断点の状態を t ターン後へ進める（`t = 0` はそのまま・`COND_CLOCK_MODE=off` もそのまま）。
+    `pre`（`_hand_stats` の戻り値）を渡せば残りの手札の量を読み直さない（同じ式・同じ値）。"""
     if not st or int(t) <= 0 or COND_CLOCK_MODE != "on":
         return st
     t = int(t)
@@ -392,46 +412,82 @@ def project_state(st, t, items, xs, take_cost, turns=PLAN_TURNS):
             out[p + "don"] = int(round(tot2))
             out[p + "don_active"] = int(round(tot2))               # ターン開始は全部アクティブ
     if out.get("my_life") is not None:
-        out["my_life"] = max(0.0, float(out["my_life"]) - expected_taken(items, xs, take_cost) * t)
+        taken = expected_taken(items, xs, take_cost) if pre is None else pre["taken"]
+        out["my_life"] = max(0.0, float(out["my_life"]) - taken * t)
     if out.get("opp_life") is not None:
         out["opp_life"] = max(0.0, float(out["opp_life"]) - opp_life_loss_per_turn(out) * t)
     if out.get("my_trash") is not None:
-        cut = counters_cut(items, xs, take_cost)
+        cut = counters_cut(items, xs, take_cost) if pre is None else pre["cut"]
         ko = float(KO_P) * float(len(out.get("my_field_ids") or []))
-        ev = float(sum(1 for it in items if it.get("event") and v_scalar(it["v"]) > 0.0)) / float(max(1, turns))
+        ev = (float(sum(1 for it in items if it.get("event") and v_scalar(it["v"]) > 0.0)) if pre is None
+              else pre["ev"]) / float(max(1, turns))
         out["my_trash"] = float(out["my_trash"]) + (cut + ko + ev) * t
     if out.get("turn") is not None:
         out["turn"] = int(out["turn"]) + 2 * t
     return out
 
 
-def inflow_item(item, others, deck, xs, take_cost, cards, olp, r, turns=PLAN_TURNS, field=(), st_base=None):
+#: `project_state` が動かす状態の欄（これ以外は判断点の状態のまま＝覚え書きの鍵はこの欄だけで足りる）
+_PROJ_KEYS = ("my_don_total", "my_don", "my_don_active", "opp_don_total", "opp_don", "opp_don_active",
+              "my_life", "opp_life", "my_trash", "turn")
+
+
+def _state_sig(st):
+    return None if not st else tuple(st.get(k) for k in _PROJ_KEYS)
+
+
+def _uv_memo(memo, kind, cid, info, olp, r, partner, cards, field, state):
+    """読み直しの値（`kind`: `cond`＝`use_value(空の手札)`・`base`＝`_base_value`・`partner`＝`_value_with_partner`）の
+    覚え書き（2026-10-01・値は同じ・呼ぶ関数は従来どおり）。
+
+    `memo` は**1 つの手札の読みの間だけ**生きる辞書（`theory_bridge.joint_valuer` が作る）——その間は判断点の状態
+    （`st_base`）・`cards`・`olp`・`r`・`field`・切替が変わらないので、鍵は札・相方・時計を進めた欄（`_PROJ_KEYS`）と
+    値段の文脈で足りる。`memo` が `None`（または 1 枚あたり一定でない値段の窓）なら覚えない（従来どおり）。"""
+    def call():
+        if kind == "cond":
+            return use_value(cid, info, olp, r, st=_ctx_with_hand([], cards, olp, r, field, state))
+        if kind == "base":
+            return _base_value(cid, info, cards, olp, r, field, state)
+        return _value_with_partner(cid, info, cards, olp, r, partner, field, state)
+    if memo is None or (TO.CUT_PRICER is not None and TO.CUT_PRICER_KEY is None):
+        return call()
+    key = (kind, str(cid), partner, _state_sig(state), TO.CUT_PRICER is None, TO.CUT_PRICER_KEY, TO.CUT_TAKE_CARD,
+           TO.CUT_OTHER_SIDE > 0)
+    if key not in memo:
+        memo[key] = call()
+    return memo[key]
+
+
+def inflow_item(item, others, deck, xs, take_cost, cards, olp, r, turns=PLAN_TURNS, field=(), st_base=None, memo=None):
     """1 枚の `v` をターンごとの並びにする（相方待ちの札＝T70・条件付きの札＝T73・どちらでもなければそのまま）。
     `others` は同じ手札の残り。t ターン目は `project_state(st_base, t)`（時計を進めた状態）で読む。
-    相方が来たときの取り分は `use_value(相方が手札に在る状態) − base`＝効果のコスト・条件・払わない自由を通した値。"""
+    相方が来たときの取り分は `use_value(相方が手札に在る状態) − base`＝効果のコスト・条件・払わない自由を通した値。
+    `memo`（2026-10-01）＝1 つの手札の読みの間だけ生きる覚え書き（`_uv_memo`・値は同じ）。"""
     import search_price as SP
     target = SP.enabler_target(item["cid"])
     cond = bool(st_base) and COND_CLOCK_MODE == "on" and has_on_play_condition(item["cid"])
     if target is None and not cond:
         return item
     info = cards.info(item["cid"]) or {}
-    states = [project_state(st_base, t, others, xs, take_cost, turns) for t in range(turns)]
+    pre = (_hand_stats(others, xs, take_cost, deck, cards, memo, search=target is not None)
+           if memo is not None else None)
+    states = [project_state(st_base, t, others, xs, take_cost, turns, pre=pre) for t in range(turns)]
     if target is None:                                           # 条件だけ＝時計を進めた状態で読む
-        vs = [use_value(item["cid"], info, olp, r, st=_ctx_with_hand([], cards, olp, r, field, states[t])) for t in range(turns)]
+        vs = [_uv_memo(memo, "cond", item["cid"], info, olp, r, None, cards, field, states[t]) for t in range(turns)]
         if any(v is None for v in vs):
             return item
         out = dict(item)
         out["v_static"] = item["v"]
         out["v"] = [max(0.0, float(v)) for v in vs]
         return out
-    bases = [_base_value(item["cid"], info, cards, olp, r, field, states[t]) for t in range(turns)]
+    bases = [_uv_memo(memo, "base", item["cid"], info, olp, r, None, cards, field, states[t]) for t in range(turns)]
     if any(b is None for b in bases):
         return item
     out = dict(item)
     out["v_static"] = item["v"]
     in_hand = SP.eligible_hand_cards(target, others, cards)
     if in_hand:                                                  # 相方が今在る＝P = 1（どの t でも・一番良い相方）
-        out["v"] = [max(0.0, bases[t] + max(0.0, max(((_value_with_partner(item["cid"], info, cards, olp, r, c, field, states[t]) or 0.0) - bases[t])
+        out["v"] = [max(0.0, bases[t] + max(0.0, max(((_uv_memo(memo, "partner", item["cid"], info, olp, r, c, cards, field, states[t]) or 0.0) - bases[t])
                                                         for c in in_hand))) for t in range(turns)]
         out["p_partner"] = 1.0
         return out
@@ -442,10 +498,11 @@ def inflow_item(item, others, deck, xs, take_cost, cards, olp, r, turns=PLAN_TUR
         return out
     p = len(pool) / float(len(deck))
     uniq = sorted(set(pool))
-    n_per = inflow_per_turn(others, xs, take_cost, deck, cards)
+    n_per = (inflow_per_turn(others, xs, take_cost, deck, cards) if pre is None
+             else DRAWS_PER_TURN + pre["taken"] + pre["hits"])
     vs = []
     for t in range(turns):
-        gains = {c: max(0.0, (_value_with_partner(item["cid"], info, cards, olp, r, c, field, states[t]) or 0.0) - bases[t]) for c in uniq}
+        gains = {c: max(0.0, (_uv_memo(memo, "partner", item["cid"], info, olp, r, c, cards, field, states[t]) or 0.0) - bases[t]) for c in uniq}
         gain = float(np.mean([gains[c] for c in pool]))
         vs.append(max(0.0, bases[t] + arrival_prob(p, n_per * t) * gain))
     out["v"] = vs
@@ -454,13 +511,14 @@ def inflow_item(item, others, deck, xs, take_cost, cards, olp, r, turns=PLAN_TUR
     return out
 
 
-def apply_inflow(items, deck, xs, take_cost, cards, olp, r, turns=PLAN_TURNS, field=(), st_base=None):
+def apply_inflow(items, deck, xs, take_cost, cards, olp, r, turns=PLAN_TURNS, field=(), st_base=None, memo=None):
     """手札の全部の札に `inflow_item` を当てる（`off` ならそのまま）。`field` は自分の場の札 id（コストを払えるかの判定）・
-    `st_base` は判断点の状態（条件の判定・T72）。"""
+    `st_base` は判断点の状態（条件の判定・T72）。`memo` は `inflow_item` の覚え書き（同じ手札の読みの間だけ）。"""
     if INFLOW_MODE != "on":
         return list(items)
     items = list(items)
-    return [inflow_item(it, items[:k] + items[k + 1:], deck, xs, take_cost, cards, olp, r, turns, field, st_base) for k, it in enumerate(items)]
+    return [inflow_item(it, items[:k] + items[k + 1:], deck, xs, take_cost, cards, olp, r, turns, field, st_base, memo=memo)
+            for k, it in enumerate(items)]
 
 
 def card_deltas(rest, card, caps, xs, take_cost):

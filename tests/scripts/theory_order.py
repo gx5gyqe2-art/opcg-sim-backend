@@ -255,10 +255,21 @@ def add_surv_mode_arg(ap):
                          "**2026-09-16 より前の数字と比べるときは `once` を明示する**")
 
 
+#: **値を変えない高速化の切替**（2026-10-01・N-3 採用の 3）: `True`（既定）＝純関数の覚え書きと厳密な打ち切りを使う
+#: （`attack_value_don` の覚え書きと上限での打ち切り・`option_value` の同じ盤面・`attack_stream` の相手の体の `ν`・
+#: `turn_weights`・手札の読み直しの `use_value`）。`False`＝旧の計算そのもの。**どちらでも値は 1 ビットも変わらない**
+#: （`tests/test_speed_memo.py` が実記録と乱数の標本で確かめる）。
+SPEED_MEMO = True
+
+
 def turn_weights(r_turns, ko_p, mode=None):
     """t ターン目（t = 1, 2, …）の重みの並び。`once` は 1（生存は外で一度）・`geo` は `(1 − ko_p)^t`。
     端数のターンは比例配分（`attack_stream` と同じ）。"""
     mode = SURV_MODE if mode is None else mode
+    key = (float(r_turns), float(ko_p), mode) if SPEED_MEMO else None   # 純関数の覚え書き（2026-10-01・値は同じ）
+    got = _TW_MEMO.get(key) if key is not None else None
+    if got is not None:
+        return list(got)
     s = (1.0 - float(ko_p)) if mode == "geo" else 1.0
     out = []
     r = max(0.0, float(r_turns))
@@ -268,7 +279,14 @@ def turn_weights(r_turns, ko_p, mode=None):
         out.append(share * (s ** t))
         r -= share
         t += 1
+    if key is not None:
+        if len(_TW_MEMO) >= 100000:
+            _TW_MEMO.clear()
+        _TW_MEMO[key] = tuple(out)
     return out
+
+
+_TW_MEMO = {}
 
 
 def surv_turns(r_turns, ko_p, mode=None):
@@ -1730,6 +1748,21 @@ def attack_value(power, target_power, is_leader, theta=THETA, mu=MU, nu_target=N
     return float(best)
 
 
+_ATTACK_VALUE_ORIG = attack_value
+
+
+def _attack_bound(is_leader, theta, mu, nu_target, blockers):
+    """`attack_value` がどのパワーでも越えない値＝`min(受ける値, 各ブロッカーの ν)`（`attack_value` と同じ式で受ける値を読む）。"""
+    take = (theta * mu) if is_leader else (
+        float(nu_target) if nu_target is not None else theta * mu)
+    if CUT_PRICER is not None and CUT_TAKE_CARD is not None and is_leader:
+        take = take + H_LIFE_TO_HAND * (float(mu) - float(CUT_TAKE_CARD))
+    b = take
+    for _pb, nub in (blockers or ()):
+        b = min(b, float(nub))
+    return float(b)
+
+
 #: ドン 1 個の価格（実測・`game_theory.md` §18・`effect_value.DELTA` と同じ）——**ドンの代替価値**
 #: （登場・他の体への付与を平均したもの）として「ドンを付けて殴る」の使用コストに使う（T45）
 DELTA = 0.0277
@@ -1750,15 +1783,45 @@ def attack_value_don(power, target_power, is_leader, theta=THETA, mu=MU, nu_targ
     `c(0)·μ − 2δ ≈ 0`＝今までどおり 0。リーダー以上の体は素殴りが最善のまま（`Θ·μ` で頭打ち）。
     """
     mode = ATTACK_DON_MODE if mode is None else mode
+    # **覚え書き**（2026-10-01・N-3 採用の 3: 値を変えない高速化）——純関数（引数＋値段の文脈＋費用曲線の切替）。
+    # 1 つの値段の文脈の中で同じ引数が平均 25 回呼ばれる（実 10 局で 110 万回・異なる引数 4.4 万）。
+    # 鍵は `option_value` の覚え書きと同じ値段の文脈（`CUT_PRICER_KEY`・`CUT_TAKE_CARD`）。1 枚あたり一定でない窓
+    # （`CUT_PRICER_KEY is None` で `CUT_PRICER` が在る＝安い順の切れ目）では覚えない。
+    key = None
+    if SPEED_MEMO and _cut_cache_ok():
+        key = (float(power), float(target_power), bool(is_leader), float(theta), float(mu),
+               None if nu_target is None else float(nu_target), float(delta), int(max_don), mode,
+               tuple((float(pb), float(nb)) for pb, nb in (blockers or ())),
+               CUT_PRICER_KEY if CUT_PRICER is not None else None,
+               CUT_TAKE_CARD if CUT_PRICER is not None else None,
+               CBAR_MODE, CBAR_SLOPE, id(CBAR_CURVE), H_LIFE_TO_HAND, id(c_of), id(attack_value))
+        got = _AVD_MEMO.get(key)
+        if got is not None:
+            return got
     best = attack_value(power, target_power, is_leader, theta, mu, nu_target, blockers)
-    if mode != "don":
-        return best
-    for k in range(1, int(max_don) + 1):
-        v = attack_value(float(power) + 1000.0 * k, target_power, is_leader, theta, mu, nu_target,
-                         blockers) - k * float(delta)
-        if v > best:
-            best = v
-    return float(best)
+    if mode == "don":
+        # **打ち切り**（2026-10-01・値は同じ）: `attack_value` は常に `上限 = min(受ける値, 各ブロッカーの ν)` 以下。
+        # k 枚で上限に届いたら、k' > k の値は `上限 − k'δ < 上限 − kδ ≤ best`＝最大を変えない（δ > 0 のときだけ）。
+        bound = _attack_bound(is_leader, theta, mu, nu_target, blockers) \
+            if (SPEED_MEMO and float(delta) > 0.0 and attack_value is _ATTACK_VALUE_ORIG) else None
+        if bound is None or best < bound:
+            for k in range(1, int(max_don) + 1):
+                raw = attack_value(float(power) + 1000.0 * k, target_power, is_leader, theta, mu, nu_target,
+                                   blockers)
+                v = raw - k * float(delta)
+                if v > best:
+                    best = v
+                if bound is not None and raw >= bound:
+                    break
+    best = float(best)
+    if key is not None:
+        if len(_AVD_MEMO) >= 400000:
+            _AVD_MEMO.clear()
+        _AVD_MEMO[key] = best
+    return best
+
+
+_AVD_MEMO = {}
 
 
 #: **相手の体を倒せる潜在価値**（T46・2026-09-16・ユーザ決定「今の場ではなく分布で」）。
@@ -1832,11 +1895,16 @@ def option_value(power, opp_leader_power, r_turns, theta=THETA, mu=MU, my_leader
     tot = 0.0
     global _OPTION_DEPTH
     _OPTION_DEPTH += 1
+    seen = {}       # 同じ盤面（体の並びは結果に効かない＝並べ替えた組）は 1 度だけ読む（2026-10-01・足す順と値は同じ）
     try:
         for _mlp_rec, bodies in bs:
             chars = [(float(tp), bool(blk)) for tp, blk in bodies]
             # 盤面モードの `attack_stream`（高い順に 1 ターン 1 体・端数は比例配分）を分布の上で平均する
-            tot += attack_stream(power, olp, r, theta, mu, chars or None, mlp, ko_p) - lead * surv_turns(r, ko_p)
+            bk = tuple(sorted(chars)) if SPEED_MEMO else object()
+            got = seen.get(bk)
+            if got is None:
+                got = seen[bk] = attack_stream(power, olp, r, theta, mu, chars or None, mlp, ko_p) - lead * surv_turns(r, ko_p)
+            tot += got
     finally:
         _OPTION_DEPTH -= 1
     val = float(tot / len(bs))
@@ -1885,11 +1953,20 @@ def attack_stream(power, opp_leader_power, r_turns, theta=THETA, mu=MU, opp_char
                if _OPTION_DEPTH == 0 else 0.0)
         return lead * surv_turns(r, ko_p) + opt  # 選択肢は `R` ターンぶんの総額（流量ではない）・`geo` は重みの和（T60）
     mlp = float(opp_leader_power if my_leader_power is None else my_leader_power)
-    bodies = []
-    for entry in opp_chars:
-        tp, blk = (entry if isinstance(entry, (tuple, list)) else (entry, None))
-        bodies.append((float(tp), bool(blk), _nu_of_other_side(tp, mlp, r_turns, theta, mu, ko_p=ko_p,
-                                                              is_blocker=blk)))   # **N-3**: 相手の体＝逆の席
+    # **覚え書き**（2026-10-01・値は同じ）: 相手の体の `ν` は旧の値段で読む（`_nu_of_other_side`）＝値段の文脈に依らない。
+    # 同じ盤面が値段の文脈ごとに読み直されていた（`option_value` の分布の盤面）ので、盤面と `ν` の切替を鍵に覚える。
+    ents = [(entry if isinstance(entry, (tuple, list)) else (entry, None)) for entry in opp_chars]
+    bkey = (tuple((float(tp), blk) for tp, blk in ents), mlp, float(r_turns), float(theta), float(mu), float(ko_p),
+            _OPTION_DEPTH > 0) + _nu_globals_key()
+    bodies = _BODIES_MEMO.get(bkey) if SPEED_MEMO else None
+    if bodies is None:
+        bodies = []
+        for tp, blk in ents:
+            bodies.append((float(tp), bool(blk), _nu_of_other_side(tp, mlp, r_turns, theta, mu, ko_p=ko_p,
+                                                                  is_blocker=blk)))   # **N-3**: 相手の体＝逆の席
+        if len(_BODIES_MEMO) >= 200000:
+            _BODIES_MEMO.clear()
+        _BODIES_MEMO[bkey] = bodies = tuple(bodies)
     # **相手のブロッカー**（T47）——盤面の体のうちブロッカーは、リーダー狙いも他の体狙いも受けに来る
     blockers = [(tp, nu_t) for tp, blk, nu_t in bodies if blk]
     lead = attack_value_don(power, opp_leader_power, True, theta, mu, blockers=blockers)
@@ -1906,6 +1983,9 @@ def attack_stream(power, opp_leader_power, r_turns, theta=THETA, mu=MU, opp_char
     for i, w in enumerate(turn_weights(r, ko_p)):
         total += w * max(vals[i] if i < len(vals) else lead, lead)
     return float(total)
+
+
+_BODIES_MEMO = {}
 
 
 def add_nu_mode_arg(ap):
@@ -2096,6 +2176,16 @@ def _nu_of_other_side(*args, **kwargs):
     finally:
         CUT_OTHER_SIDE -= 1
         CUT_PRICER, CUT_PRICER_KEY, CUT_TAKE_CARD = prev
+
+
+def _nu_globals_key():
+    """`nu_of`（盤面なし・旧の値段）が読む切替・表・関数の全部（覚え書きの鍵・2026-10-01）。
+    関数や表の差し替え（テストの monkeypatch）も `id` で鍵に入る。"""
+    return (NU_MODE, SURV_MODE, OPTION_MODE, ATTACK_DON_MODE, CBAR_MODE, CBAR_SLOPE, id(CBAR_CURVE),
+            BLOCK_P_BLOCKER, id(KO_P_CURVE), id(SHIELD_TERM), SAT_OVER_PWR, KO_P, DELTA, ATTACK_DON_MAX,
+            H_LIFE_TO_HAND, id(_OPP_BOARDS), id(load_opp_boards),
+            id(nu_of), id(attack_stream), id(option_value), id(attack_value_don), id(attack_value), id(c_of),
+            id(shield_of), id(ko_p_of), id(surv_turns), id(turn_weights), id(_nu_of_other_side))
 
 
 def score_candidate(sig, cid, tcid, ctx, cards, src_power=None, tgt_power=None, don_k=None, src_don=None):
