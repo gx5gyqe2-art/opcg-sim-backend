@@ -202,22 +202,24 @@ fn prevent_leave(s: &mut Session, action: &GameAction, target: CardIdx) {
     ) {
         return;
     }
-    let flag = format!("PREVENT_{}", action.status.as_deref().unwrap_or("LEAVE"));
+    // status はカンマ区切りで複数持てる（修飾なしの「KOされない」＝EFFECT_KO,BATTLE_KO）。
     let expire_turn = if action.duration == Duration::UntilNextTurnEnd {
         s.state().turn_count + 1
     } else {
         0
     };
-    super::continuous::apply(
-        s,
-        target,
-        ContinuousKind::Flag,
-        action.duration,
-        0,
-        &flag,
-        "",
-        expire_turn,
-    );
+    for st in action.status.as_deref().unwrap_or("LEAVE").split(',') {
+        super::continuous::apply(
+            s,
+            target,
+            ContinuousKind::Flag,
+            action.duration,
+            0,
+            &format!("PREVENT_{st}"),
+            "",
+            expire_turn,
+        );
+    }
 }
 
 /// Python `per_target.attack_disable`（`ATTACK_DISABLE` と `RESTRICTION` の共通ハンドラ）。
@@ -306,10 +308,11 @@ pub fn active_protection(
             else {
                 continue;
             };
+            // status はカンマ区切りで複数持てる（「KOされる場合」＝EFFECT_KO,BATTLE_KO 等）。
             if !eff
                 .status
                 .as_deref()
-                .is_some_and(|st| status_values.contains(&st))
+                .is_some_and(|st| st.split(',').any(|one| status_values.contains(&one)))
             {
                 continue;
             }
@@ -357,11 +360,12 @@ pub fn active_protection(
                     continue;
                 }
             }
-            // 属性限定のバトル KO 耐性（「属性《斬》を持つカードとのバトルでKOされず」OP08-114）。
-            if let Some(req) = required_battle_attribute(&eff.raw_text) {
+            // 相手を限定したバトル KO 耐性（「属性《斬》を持つカードとのバトルでKOされず」OP08-114・
+            // 「リーダーとのバトルでKOされない」ST08-002・「属性(特)を持たないキャラとの…」P-025）。
+            if let Some(filter) = battle_opponent_filter(&eff.raw_text) {
                 let ok = attacker.is_some_and(|a| {
-                    let attr = masters.get(s.state().card(a).master).attribute;
-                    attr != crate::model::Attribute::None && attr.value() == req
+                    let m = masters.get(s.state().card(a).master);
+                    filter.matches(m.attribute, m.ty)
                 });
                 if !ok {
                     continue;
@@ -427,7 +431,8 @@ fn replacement_scope_matches(
             None => break,
         }
     }
-    let self_subject = body.starts_with("このキャラ") || body.starts_with("このリーダー");
+    let self_subject = (body.starts_with("このキャラ") && !body.starts_with("このキャラ以外"))
+        || body.starts_with("このリーダー");
     !self_subject || protector == removed
 }
 
@@ -479,10 +484,11 @@ pub fn find_replacement(
             ) else {
                 continue;
             };
+            // status はカンマ区切りで複数持てる（「KOされる場合」＝EFFECT_KO,BATTLE_KO 等）。
             if !eff
                 .status
                 .as_deref()
-                .is_some_and(|st| status_values.contains(&st))
+                .is_some_and(|st| st.split(',').any(|one| status_values.contains(&one)))
             {
                 continue;
             }
@@ -532,7 +538,7 @@ pub fn find_replacement(
                 owner,
                 sub,
                 &sub_ref,
-                Some(card),
+                Some(protector),
             )? {
                 continue;
             }
@@ -622,9 +628,13 @@ pub fn active_replacement_with(
     let mut sub_ctx = EffectContext::new();
     if found.sub_is_optional {
         sub_ctx.confirm(found.sub.clone());
+        sub_ctx.confirm(found.sub.child(0));
     }
+    // 「そのキャラ」（除去されるカード）は ref_id=removed_card で参照する。「このキャラ」は
+    // 置換能力の持ち主（他のキャラを守る型では除去されるカードと別）なので発生源は持ち主にする。
+    sub_ctx.set_saved("removed_card", vec![crate::model::TargetRef::Card(card)]);
     Resolver::resumed(vec![found.sub.clone()], sub_ctx)
-        .process_stack(s, masters, owner, Some(card))?;
+        .process_stack(s, masters, owner, Some(found.protector))?;
     let suspended = s.state().active_interaction().is_some();
 
     // 発動成立 → 【ターン1回】の使用回数を消費する。
@@ -864,59 +874,74 @@ fn set_used_count(s: &mut Session, card: CardIdx, key: u32, n: u32) {
 
 /// `getattr(sub, "is_optional", False)`（`GameAction` 以外のノードは属性を持たない＝False）。
 fn node_is_optional(node: &EffectNode) -> bool {
-    matches!(node, EffectNode::Action(a) if a.is_optional)
+    match node {
+        EffectNode::Action(a) => a.is_optional,
+        // 「〜をレストにし、手札1枚を捨てることができる」＝全体が任意（先頭の動作が確認点）。
+        EffectNode::Sequence(v) => v.first().is_some_and(node_is_optional),
+        _ => false,
+    }
 }
 
-/// Python の正規表現
-/// `属性[(（《]([斬打射特知])[)）》]を持つ(?:カード|キャラ)?との(?:バトル|戦闘)` を手で解く。
-///
-/// 一致すれば要求属性（1 文字）を返す。regex クレートを足さずに済むよう、括弧の 3 種類・
-/// 任意の「カード／キャラ」・「バトル／戦闘」を素直に走査する。
-fn required_battle_attribute(text: &str) -> Option<&'static str> {
-    const ATTRS: [&str; 5] = ["斬", "打", "射", "特", "知"];
-    const OPEN: [&str; 3] = ["(", "（", "《"];
-    const CLOSE: [&str; 3] = [")", "）", "》"];
-    let mut rest = text;
-    while let Some(pos) = rest.find("属性") {
-        let after = &rest[pos + "属性".len()..];
-        let mut matched = None;
-        for (i, open) in OPEN.iter().enumerate() {
-            let Some(body) = after.strip_prefix(*open) else {
-                continue;
-            };
-            for attr in ATTRS {
-                let Some(tail) = body.strip_prefix(attr) else {
-                    continue;
-                };
-                let Some(tail) = tail.strip_prefix(CLOSE[i]) else {
-                    continue;
-                };
-                let Some(tail) = tail.strip_prefix("を持つ") else {
-                    continue;
-                };
-                // `(?:カード|キャラ)?` は任意。
-                let tail = tail
-                    .strip_prefix("カード")
-                    .or_else(|| tail.strip_prefix("キャラ"))
-                    .unwrap_or(tail);
-                let Some(tail) = tail.strip_prefix("との") else {
-                    continue;
-                };
-                if tail.starts_with("バトル") || tail.starts_with("戦闘") {
-                    matched = Some(attr);
-                }
-                break;
-            }
-            if matched.is_some() {
-                break;
+/// 「〜とのバトルでKOされない」の「〜」（バトル相手の限定）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BattleOpponentFilter {
+    /// 要求属性（1 文字）と、否定（「を持たない」）か。
+    attr: Option<(&'static str, bool)>,
+    /// 相手の種類の限定（リーダーのみ／キャラのみ）。両方書かれていれば `None`。
+    kind: Option<CardType>,
+}
+
+impl BattleOpponentFilter {
+    fn matches(&self, attribute: crate::model::Attribute, ty: CardType) -> bool {
+        if self.kind.is_some_and(|k| k != ty) {
+            return false;
+        }
+        match self.attr {
+            None => true,
+            Some((want, negated)) => {
+                let has = attribute != crate::model::Attribute::None && attribute.value() == want;
+                has != negated
             }
         }
-        if matched.is_some() {
-            return matched;
-        }
-        rest = after;
     }
-    None
+}
+
+/// 本文の「…とのバトル（戦闘）」の直前の句から、バトル相手の限定（属性・リーダー/キャラ）を読む。
+/// 限定が無ければ `None`（無条件のバトル KO 耐性）。属性の括弧前の空白・「持つ／持たない」・
+/// 「リーダーとキャラ」（＝種類は限定しない）に対応する。
+fn battle_opponent_filter(text: &str) -> Option<BattleOpponentFilter> {
+    const ATTRS: [&str; 5] = ["斬", "打", "射", "特", "知"];
+    const OPEN: [char; 3] = ['(', '（', '《'];
+    let end = ["とのバトル", "との戦闘"].iter().filter_map(|k| text.find(k)).min()?;
+    let head = &text[..end];
+    let start = head
+        .rfind(['。', '、', '」', '】'])
+        .map(|i| i + head[i..].chars().next().map_or(1, char::len_utf8))
+        .unwrap_or(0);
+    let clause = &head[start..];
+    let mut attr = None;
+    if let Some(pos) = clause.find("属性") {
+        let after = clause[pos + "属性".len()..].trim_start_matches([' ', '\u{3000}']);
+        let mut chars = after.chars();
+        if chars.next().is_some_and(|c| OPEN.contains(&c)) {
+            let body = chars.as_str();
+            attr = ATTRS.iter().copied().find(|a| body.starts_with(a)).map(|a| {
+                let negated = body.contains("を持たない") || body.contains("以外");
+                (a, negated)
+            });
+        }
+    }
+    let leader = clause.contains("リーダー");
+    let chara = clause.contains("キャラ");
+    let kind = match (leader, chara) {
+        (true, false) => Some(CardType::Leader),
+        (false, true) => Some(CardType::Character),
+        _ => None,
+    };
+    if attr.is_none() && kind.is_none() {
+        return None;
+    }
+    Some(BattleOpponentFilter { attr, kind })
 }
 
 /// Python の正規表現 `「([^」]+)」がい[るて][^。]*?この効果は無効` を手で解く。

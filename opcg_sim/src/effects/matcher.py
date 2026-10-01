@@ -197,6 +197,9 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 空になっていた。「」か」直後に種類語が続く場合に OR とみなす。
     if tq.names and tq.card_type and re.search(_nfc(r'」か(?:イベント|キャラクター|キャラ|リーダー|ステージ)'), tgt_text):
         tq.flags.add("NAME_OR_TYPE")
+    # 逆順「<種類>か「名前」」（OP04-082「自分のリーダーか「コリーダコロシアム」」）も 種類 OR 名前。
+    elif tq.names and tq.card_type and re.search(_nfc(r'(?:イベント|キャラクター|キャラ|リーダー|ステージ)か、?「'), tgt_text):
+        tq.flags.add("NAME_OR_TYPE")
 
     # 「「名前」か<色>の<種類>」= 名前 OR (色∧種類)（OP12-006/014「「モンキー・D・ルフィ」か
     # 赤のイベント」）。「」か」の直後が色語のため上の NAME_OR_TYPE に該当せず、名前∧色∧種類の

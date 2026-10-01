@@ -917,23 +917,34 @@ fn counter_step_offers_counter_events_the_player_can_pay_for() {
 
 // --- テキストの走査（Python の正規表現の手書き実装）------------------------------
 
-/// `属性[(（《]([斬打射特知])[)）》]を持つ(?:カード|キャラ)?との(?:バトル|戦闘)` と同じ判定。
+/// 「〜とのバトルでKOされない」の相手限定（属性・持たない・リーダー/キャラ・空白入り）を読む。
 #[test]
-fn the_battle_attribute_pattern_matches_the_python_regex() {
-    assert_eq!(
-        required_battle_attribute("このキャラは、属性《斬》を持つカードとのバトルではKOされない"),
-        Some("斬")
-    );
-    assert_eq!(
-        required_battle_attribute("属性(打)を持つとの戦闘で"),
-        Some("打")
-    );
-    assert_eq!(
-        required_battle_attribute("属性（知）を持つキャラとのバトル"),
-        Some("知")
-    );
-    assert_eq!(required_battle_attribute("このキャラはKOされない"), None);
-    assert_eq!(required_battle_attribute("属性《斬》を持つキャラをKOする"), None);
+fn the_battle_opponent_filter_reads_attribute_and_kind() {
+    use crate::model::{Attribute, CardType};
+    let f = |s: &str| battle_opponent_filter(s);
+    // 従来の形（属性のみ）。
+    let slash = f("このキャラは、属性《斬》を持つカードとのバトルではKOされない").unwrap();
+    assert_eq!(slash.attr, Some(("斬", false)));
+    assert_eq!(slash.kind, None);
+    // 括弧の前に空白（OP01-024）・キャラ限定。
+    let hit = f("【ドン!!×2】このキャラは、属性 (打)を持つキャラとのバトルではKOされない。").unwrap();
+    assert_eq!(hit.attr, Some(("打", false)));
+    assert_eq!(hit.kind, Some(CardType::Character));
+    // 「リーダーとキャラ」は種類を限定しない（P-007）。
+    let both = f("属性(打)を持つリーダーとキャラとのバトルでKOされない").unwrap();
+    assert_eq!(both.kind, None);
+    // 「持たない」は否定（P-025）。
+    let neg = f("属性(特)を持たないキャラとのバトルでKOされない").unwrap();
+    assert_eq!(neg.attr, Some(("特", true)));
+    assert!(neg.matches(Attribute::Slash, CardType::Character));
+    assert!(!neg.matches(Attribute::Special, CardType::Character));
+    // リーダー限定（ST08-002）。
+    let leader = f("このキャラは、リーダーとのバトルでKOされない").unwrap();
+    assert!(leader.matches(Attribute::None, CardType::Leader));
+    assert!(!leader.matches(Attribute::None, CardType::Character));
+    // 限定が無ければ None。
+    assert!(f("このキャラはKOされない").is_none());
+    assert!(f("属性《斬》を持つキャラをKOする").is_none());
 }
 
 /// `「([^」]+)」がい[るて][^。]*?この効果は無効` と同じ判定。

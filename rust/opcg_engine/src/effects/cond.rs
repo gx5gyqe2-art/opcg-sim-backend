@@ -577,6 +577,15 @@ pub fn check_condition(
             let Some(m) = master_of(source) else {
                 return Ok(false);
             };
+            // 除去されるカードの絞り込み（TargetQuery）。保護者（host）を発生源として照合する
+            // ＝「このキャラ以外」（EXCLUDE_SOURCE）は保護者自身を除く。
+            if let Some(q) = cond.target.as_ref() {
+                let removed = source.expect("master_of(source) が Some");
+                let pool = get_target_cards(state, masters, abilities, q, actor, host.or(source), ctx)?;
+                if !pool.contains(&crate::model::TargetRef::Card(removed)) {
+                    return Ok(false);
+                }
+            }
             let Some(_) = cond.value.as_dict() else {
                 return Ok(true); // Python: dict でなければ素通り
             };

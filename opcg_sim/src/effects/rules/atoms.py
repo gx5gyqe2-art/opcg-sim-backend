@@ -512,6 +512,16 @@ def _leader_and_char_dual(ctx: ParseContext):
     return Sequence(actions=[leader, char])
 
 
+def _ko_protect_status(t: str) -> str:
+    """「KOされない」の保護範囲: バトルでのみ＝BATTLE_KO・効果でのみ＝EFFECT_KO・修飾なしは両方
+    （カンマ区切り。本文どおり「KOされない」は効果KOもバトルKOも防ぐ）。"""
+    if _nfc("バトルで") in t or re.search(_nfc(r"バトル(?:に|で)?(?:より|よって)?KOされ"), t):
+        return "BATTLE_KO"
+    if re.search(_nfc(r"効果(?:で|によって)KOされ"), t):
+        return "EFFECT_KO"
+    return "EFFECT_KO,BATTLE_KO"
+
+
 @rule("power_buff", priority=60)
 def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -532,10 +542,10 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
     # 複合句「バトルでKOされず、パワー±N」: 除去保護とバフを両方生成する
     # （grant_keyword はパワー増減を伴う句を本ルールに委ねるため、ここで拾わないと
     #   保護側が黙って脱落する）。
-    if re.search(_nfc(r"バトルでKOされ(ず|ない)"), t):
+    if re.search(_nfc(r"(?:バトルで|相手の効果で|効果で)?KOされ(ず|ない)"), t):
         prevent = GameAction(
             type=ActionType.PREVENT_LEAVE, target=TargetQuery(select_mode="SOURCE"),
-            status="BATTLE_KO", duration=_duration_of(t), raw_text=t,
+            status=_ko_protect_status(t), duration=_duration_of(t), raw_text=t,
         )
         return Sequence(actions=[prevent, buff])
     # 複合句「（対象）は【X】を得て、パワー±N」: キーワード付与とバフを両方生成する
@@ -653,7 +663,9 @@ def _prevent_leave_and_keyword(ctx: ParseContext):
     GRANT_KEYWORD のみが残り、トラッシュ7枚以上の除去保護(ナス寿郎/ウォーキュリー/マーズ)が
     脱落していた。条件(トラッシュ7枚以上)は ability 側に lift されるので原子句は分割しない。"""
     t = ctx.text
-    if not (_nfc("場を離れない") in t or _nfc("場を離れず") in t):
+    leave = _nfc("場を離れない") in t or _nfc("場を離れず") in t
+    ko = bool(re.search(_nfc(r"KOされ(?:ず|ない)"), t)) and not leave
+    if not (leave or ko):
         return None
     if _nfc("得る") not in t:
         return None
@@ -663,7 +675,7 @@ def _prevent_leave_and_keyword(ctx: ParseContext):
     keyword = m.group(1)
     src = TargetQuery(select_mode="SOURCE")
     prevent = GameAction(type=ActionType.PREVENT_LEAVE, target=TargetQuery(select_mode="SOURCE"),
-                         status="LEAVE", raw_text=t)
+                         status="LEAVE" if leave else _ko_protect_status(t), raw_text=t)
     grant = GameAction(type=ActionType.GRANT_KEYWORD, target=src, status=keyword,
                        duration=_duration_of(t), raw_text=t)
     return Sequence(actions=[prevent, grant])
@@ -1465,7 +1477,7 @@ def _prevent_leave(ctx: ParseContext) -> Optional[GameAction]:
         # 「効果でKOされない」は KO 限定の除去保護(EFFECT_KO)。手札に戻す/山札の下に置く等の
         # 非KO除去には効かない（従来は広い LEAVE に倒し、あらゆる除去に耐性が付いていた）。
         # 「バトルでKOされない」は BATTLE_KO。修飾なし「KOされない」はバトル保護として維持。
-        status = "EFFECT_KO" if _nfc("効果でKOされ") in t else "BATTLE_KO"
+        status = _ko_protect_status(t)
     else:
         return None
     # 主語の修飾（「自分の特徴《X》を持つキャラすべては」等）を保全する。
@@ -1507,7 +1519,8 @@ def _prevent_ko_and_rest(ctx: ParseContext) -> Optional[EffectNode]:
         return None
     # 「相手の効果で」KO されない＝KO 限定の効果除去保護（EFFECT_KO、非KO除去には効かない）。
     # 明示が無ければバトルKO保護。
-    ko_status = "EFFECT_KO" if (_nfc("相手の効果") in t or _nfc("効果で") in t) else "BATTLE_KO"
+    ko_status = ("EFFECT_KO" if (_nfc("相手の効果") in t or _nfc("効果で") in t)
+                 else _ko_protect_status(t))
     prevent_ko = GameAction(
         type=ActionType.PREVENT_LEAVE,
         target=TargetQuery(select_mode="SOURCE"),
