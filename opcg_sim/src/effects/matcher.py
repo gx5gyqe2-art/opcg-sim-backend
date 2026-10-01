@@ -133,7 +133,10 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 名前は複数併記され得る（「「X」と「Y」すべて」ST30-001 /「「X」か「Y」」）。findall で全て拾い、
     # matcher は names を OR（いずれかの名前）として扱う。
     for _nm in re.findall(r'「([^」]+)」', tgt_text):
-        if (f'「{_nm}」' + _nfc(ParserKeyword.EXCEPT)) not in tgt_text:
+        # 本文の「ケイミ―」(U+2015 水平線) はカード名の長音符「ー」(U+30FC) の表記ゆれ（OP06-025）。
+        _raw_nm = _nm
+        _nm = _nm.replace("\u2015", "\u30fc")
+        if (f'「{_raw_nm}」' + _nfc(ParserKeyword.EXCEPT)) not in tgt_text:
             tq.names.append(_nm)
         else:
             # 「「◯◯」以外のキャラ」: その名前を除外対象にする（従来は無視され、

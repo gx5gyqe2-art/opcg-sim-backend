@@ -206,7 +206,7 @@ fn record_event_played(s: &mut Session, masters: &MasterTable, card: CardIdx) {
 }
 
 /// Python `play_card_action` の【トリガー】判定（`trigger_text` 非空 or TRIGGER 能力）。
-fn has_trigger_icon(
+pub(crate) fn has_trigger_icon(
     s: &Session,
     masters: &MasterTable,
     card: CardIdx,

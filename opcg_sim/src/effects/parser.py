@@ -364,7 +364,7 @@ class EffectParser:
             # 保全する（後段の clean_text がタグを除去するとスコープが失われ、全効果無効と
             # 区別できなくなるため）。同時に、この【登場時】がトリガー誤検出（ON_PLAY）の原因に
             # なっていたのを解消する（このセグメントの真のトリガーは【起動メイン】等）。OP09-081。
-            norm_text = re.sub(_nfc(r'(相手の)【(登場時)】(効果)'), r'\1\2\3', norm_text)
+            norm_text = re.sub(_nfc(r'(相手の|自分の)【(登場時)】(効果)'), r'\1\2\3', norm_text)
 
             # 参照発動「このカードの【登場時】/【KO時】効果を発動する」の参照タグも
             # 非タグ化して保全する（clean_text のタグ除去で参照先が消え、常に
@@ -519,7 +519,7 @@ class EffectParser:
             effect_node = self._parse_to_node(effect_text)
 
             # カテゴリH: 先頭ゲート条件が「。その後、」をまたいで後続を無条件化する漏れを是正する。
-            effect_node = self._lift_h_gate(effect_node)
+            effect_node = self._lift_h_gate(effect_node, effect_text)
 
             # ゲーム開始時のデッキサーチはルール上シャッフルを伴う（OP13-079）。
             if (trigger == TriggerType.GAME_START and effect_node is not None
@@ -739,7 +739,7 @@ class EffectParser:
             return cond, rest
         return None, effect_text
 
-    def _lift_h_gate(self, effect_node):
+    def _lift_h_gate(self, effect_node, text: str = ''):
         """カテゴリH 是正: 先頭ゲート条件が「。その後、」をまたいで後続を無条件化する漏れを直す。
 
         effect が Sequence で、(無条件セットアップの後)先頭が `Branch(if_false=None)` かつ、その後ろに
@@ -764,7 +764,13 @@ class EffectParser:
             return effect_node
         tail = acts[branch_idx + 1:]
         # 後続に独立条件の Branch が混在するなら触らない（文ごとに別条件＝H ではない）。
-        if any(isinstance(t, Branch) for t in tail):
+        # ただし「。その後、<条件>の場合、…」は先頭ゲートの内側に続く手順なので、入れ子にして
+        # 先頭条件で支配する（OP09-019「…場合、A。その後、…がいる場合、カードを引く」）。
+        def _then_branch(t):
+            c = getattr(t, 'condition', None)
+            return (isinstance(t, Branch) and c is not None and c.raw_text
+                    and (_nfc('その後、') + _nfc(c.raw_text)) in _nfc(text))
+        if any(isinstance(t, Branch) and not _then_branch(t) for t in tail):
             return effect_node
         # 漏れている実効果（非TEMP）が無ければ何もしない（無害なデッキ整理のみは据え置き）。
         if not any(_h_is_genuine(t) for t in tail):
@@ -1005,6 +1011,16 @@ class EffectParser:
     def _parse_to_node(self, text: str, is_cost: bool = False) -> EffectNode:
         norm_text = _nfc(text)
 
+        # 複合主語「自分の「X」すべてとこのキャラは／を、…」(OP15-071): 名前指定の全体と自身を
+        # 別々のアクションに展開する（片方だけでは「すべて」または自身が脱落する）。
+        _cs = re.match(_nfc(r'^(自分の「[^」]+」すべて)と(このキャラ)(は|を)、?(.+)$'), norm_text, re.DOTALL)
+        if _cs:
+            _rest = _cs.group(4)
+            return Sequence(actions=[
+                self._parse_to_node(_cs.group(1) + _cs.group(3) + _rest, is_cost),
+                self._parse_to_node(_cs.group(2) + _nfc('は、') + _rest, is_cost),
+            ])
+
         # 選択肢「以下から…選ぶ」: 「・」項目（または改行区切りの各文）を options として
         # Choice を生成する。後続の「。」分割より前に処理しないと選択肢構造が壊れるため、
         # ここで最優先に捌く。「…の場合、以下から…選ぶ」の先頭条件ゲートは Branch でラップ。
@@ -1156,6 +1172,12 @@ class EffectParser:
 
     def _parse_logic_block(self, text: str, is_cost: bool) -> EffectNode:
         norm_text = _nfc(text)
+
+        # 「このキャラが属性(打)を持つキャラとバトルする時、…」(ST05-010): バトル相手の属性ゲート。
+        _bt = re.match(_nfc(r'^(このキャラが属性[(（][^)）]+[)）]を持つキャラとバトル)する時、(.+)$'), norm_text, re.DOTALL)
+        if _bt:
+            return Branch(condition=self._parse_condition_obj(_bt.group(1)),
+                          if_true=self._parse_to_node(_bt.group(2), is_cost))
 
         # 条件分岐
         match = re.search(_nfc(r'^(.+?)(?:場合|なら|することで)、(.+)$'), norm_text)
@@ -1465,6 +1487,19 @@ class EffectParser:
         if _nfc("宣言したコスト") in norm_text and _nfc("同じ") in norm_text:
             return Condition(type=ConditionType.DECLARED_COST_MATCH, raw_text=norm_text)
 
+        # バトル文脈の条件（ST05-010／OP11-088／ST02-010）。バトル中の相手・攻撃者を見る。
+        _am = re.search(_nfc(r'属性[(（]([^)）]+)[)）]を持つ'), norm_text)
+        if _am and re.match(_nfc(r'^そのキャラが'), norm_text):
+            # 「相手のキャラがアタックした時」の「そのキャラ」＝攻撃者。
+            return Condition(type=ConditionType.SOURCE_STATE, value=("ATTACKER_ATTRIBUTE", _am.group(1)),
+                             player=Player.SELF, raw_text=norm_text)
+        if _am and re.match(_nfc(r'^このキャラが属性[(（][^)）]+[)）]を持つキャラとバトル'), norm_text):
+            return Condition(type=ConditionType.SOURCE_STATE, value=("BATTLE_OPP_ATTRIBUTE", _am.group(1)),
+                             player=Player.SELF, raw_text=norm_text)
+        if re.match(_nfc(r'^このキャラが相手のキャラとバトルした$'), norm_text):
+            return Condition(type=ConditionType.SOURCE_STATE, value=("BATTLE_OPP_TYPE", "CHARACTER"),
+                             player=Player.SELF, raw_text=norm_text)
+
         # 比較演算子と数値を抽出
         operator = CompareOperator.EQ
         value = 0
@@ -1680,7 +1715,7 @@ class EffectParser:
                                        operator=CompareOperator.HAS if _contains else CompareOperator.EQ)
                 # 「特徴《X》を持つか「Y」の場合」= 特徴 OR リーダー名（ST23-002 赤髪海賊団 or ウタ／
                 # ワノ国 or エース）。従来は trait のみ返り、名前指定リーダーで常に不成立だった。
-                if name_matches and _nfc("か「") in norm_text:
+                if name_matches and (_nfc("か「") in norm_text or re.search(_nfc(r'」か特徴'), norm_text)):
                     nval = name_matches[0] if len(name_matches) == 1 else name_matches
                     name_cond = Condition(type=ConditionType.LEADER_NAME, value=nval, player=p, raw_text=norm_text)
                     trait_cond = Condition(type=ConditionType.OR, player=p,
@@ -1691,7 +1726,13 @@ class EffectParser:
                 return trait_cond
             if name_matches:
                 val = name_matches[0] if len(name_matches) == 1 else name_matches
-                return Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)
+                name_cond = Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)
+                # 「「X」か多色の場合」(OP13-051): 名前 OR 多色。
+                if re.search(_nfc(r'」か多色'), norm_text):
+                    return Condition(type=ConditionType.OR, player=p, raw_text=norm_text, args=[
+                        name_cond,
+                        Condition(type=ConditionType.LEADER_COLOR, value=_nfc("多色"), player=p, raw_text=norm_text)])
+                return name_cond
             if _nfc("多色") in norm_text:
                 return Condition(type=ConditionType.LEADER_COLOR, value=_nfc("多色"), player=p, raw_text=norm_text)
             # 単色リーダー条件（「自分のリーダーが青を含む」等）
@@ -1816,6 +1857,19 @@ class EffectParser:
                 _nfc('以下'): CompareOperator.LE,
             }.get(has_char_count_m.group(3) or '', CompareOperator.GE)
             return Condition(type=ConditionType.HAS_CHARACTER, value=(char_name, count_thr), operator=cnt_op, player=p, raw_text=norm_text)
+        # 複数名の並記「「A」と「B」がいる」= 各名前が場にいる条件の AND（OP15-064/072・OP16-040）。
+        # 従来は最後の名前だけを拾い、他の名前の要件が脱落していた。
+        has_multi_m = re.search(_nfc(r'((?:「[^」]+」と)+「[^」]+」)が(?:い(る|ない)|あ(る|ない))'), norm_text)
+        if has_multi_m:
+            names = re.findall(_nfc(r'「([^」]+)」'), has_multi_m.group(1))
+            present = (has_multi_m.group(2) or has_multi_m.group(3)) == _nfc('る')
+            op = CompareOperator.GE if present else CompareOperator.EQ
+            subs = [Condition(type=ConditionType.HAS_CHARACTER, value=nm, operator=op, player=p, raw_text=norm_text)
+                    for nm in names]
+            # 「AとBがいない」は「どちらもいない」ではなく「揃っていない」だが、既存の単名と同じ
+            # 規約で各名の不在の AND にはせず OR にする。
+            return Condition(type=ConditionType.AND if present else ConditionType.OR, args=subs,
+                             player=p, raw_text=norm_text)
         # 存在/不在
         has_char_m = re.search(_nfc(r'「([^」]+)」が(?:い(る|ない)|あ(る|ない))'), norm_text)
         if has_char_m:
@@ -1823,7 +1877,21 @@ class EffectParser:
             present_part = has_char_m.group(2) or has_char_m.group(3)
             present = present_part == _nfc('る')
             op = CompareOperator.GE if present else CompareOperator.EQ
-            return Condition(type=ConditionType.HAS_CHARACTER, value=char_name, operator=op, player=p, raw_text=norm_text)
+            # 「パワーN以上の「X」」「他の「X」」は target で絞る（OP15-080）。
+            _hc_tq = None
+            _pw = re.search(_nfc(r'パワー(\d+)(以上|以下)の「'), norm_text)
+            _other = re.search(_nfc(r'他の「'), norm_text)
+            if _pw or _other:
+                _hc_tq = TargetQuery(player=p, raw_text=norm_text)
+                if _other:
+                    _hc_tq.flags.add("EXCLUDE_SOURCE")
+            if _pw and _hc_tq is not None:
+                if _pw.group(2) == _nfc('以上'):
+                    _hc_tq.power_min = int(_pw.group(1))
+                else:
+                    _hc_tq.power_max = int(_pw.group(1))
+            return Condition(type=ConditionType.HAS_CHARACTER, value=char_name, operator=op, player=p,
+                             target=_hc_tq, raw_text=norm_text)
 
         # RESTED_COUNT: レスト状態のカード総数（フィールド＋ドン!!）
         if _nfc("レストのカード") in norm_text:
@@ -1961,6 +2029,16 @@ class EffectParser:
             eff_node = self._parse_to_node(eff_text, is_cost)
             if eff_node is None:
                 continue
+            # 「20枚以上ある場合、相手のターン中、…」: 項目頭の手番限定は効果の外側の条件にする
+            # （落とすと相手ターン限定の効果が常時になる。OP15-092）。
+            _turn_m = re.match(_nfc(r'^(相手|自分)のターン中、'), eff_text)
+            if _turn_m:
+                eff_node = Branch(
+                    condition=Condition(
+                        type=ConditionType.CONTEXT,
+                        value="OPPONENT_TURN" if _turn_m.group(1) == _nfc("相手") else "MY_TURN",
+                        raw_text=_turn_m.group(0)),
+                    if_true=eff_node)
             cond = Condition(type=ctype, operator=CompareOperator.GE, value=thr,
                              player=cplayer, raw_text=opt)
             branches.append(Branch(condition=cond, if_true=eff_node))
@@ -1987,7 +2065,7 @@ class EffectParser:
         chooser = Player.OPPONENT if re.search(_nfc(r'相手は\s*以下から'), head) else Player.SELF
         choice = Choice(
             message=_nfc("効果を選択してください"),
-            options=[self._parse_to_node(opt, is_cost) for opt in options],
+            options=[self._lift_h_gate(self._parse_to_node(opt, is_cost), opt) for opt in options],
             option_labels=options,
             player=chooser,
         )

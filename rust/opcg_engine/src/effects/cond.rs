@@ -422,6 +422,37 @@ pub fn check_condition(
                             .ok_or_else(|| bad("SOURCE_STATE COST: expected an integer".into()))?;
                         compare(masters.get(card.master).cost, cond.operator, threshold)
                     }
+                    // バトル文脈: 攻撃者の属性（「そのキャラが属性(斬)を持つ」）／
+                    // 発動元と戦っている相手の属性・種類。バトルが無ければ偽。
+                    (Some("ATTACKER_ATTRIBUTE"), Some(v)) => {
+                        let want = v.as_str().ok_or_else(|| {
+                            bad("SOURCE_STATE ATTACKER_ATTRIBUTE: expected a string".into())
+                        })?;
+                        state.active_battle.as_ref().is_some_and(|ab| {
+                            masters.get(state.card(ab.attacker).master).attribute.value() == want
+                        })
+                    }
+                    (Some(key @ ("BATTLE_OPP_ATTRIBUTE" | "BATTLE_OPP_TYPE")), Some(v)) => {
+                        let want = v.as_str().ok_or_else(|| {
+                            bad(format!("SOURCE_STATE {key}: expected a string"))
+                        })?;
+                        let idx = source.expect("source is present");
+                        state.active_battle.as_ref().is_some_and(|ab| {
+                            let opp = if ab.attacker == idx {
+                                ab.target
+                            } else if ab.target == idx {
+                                ab.attacker
+                            } else {
+                                return false;
+                            };
+                            let m = masters.get(state.card(opp).master);
+                            if key == "BATTLE_OPP_ATTRIBUTE" {
+                                m.attribute.value() == want
+                            } else {
+                                m.ty.name() == want
+                            }
+                        })
+                    }
                     _ => false,
                 },
                 _ => false,
@@ -442,9 +473,7 @@ pub fn check_condition(
                 .as_str()
                 .ok_or_else(|| bad("FIELD_ALL_TRAIT: the trait must be a string".into()))?;
             let contains = truthy(&items[1]);
-            if tp.field.is_empty() {
-                return Ok(false);
-            }
+            // 「のみ」は空でも成立（all の空は真）＝キャラがいなければ「麦わらの一味のみ」を満たす。
             tp.field.iter().all(|c| {
                 let traits = &masters.get(state.card(*c).master).traits;
                 if contains {
@@ -467,13 +496,36 @@ pub fn check_condition(
             } else {
                 master_of(tp.leader)
             };
+            // target の絞り込み: 「他の」(EXCLUDE_SOURCE)＝発動元自身を数えない／
+            // 「パワーN以上の」＝現在パワーで絞る（OP15-080）。
+            let exclude_source = cond.target.as_ref().is_some_and(|q| q.has_flag("EXCLUDE_SOURCE"));
+            let (pw_min, pw_max) = cond
+                .target
+                .as_ref()
+                .map_or((None, None), |q| (q.power_min, q.power_max));
+            let don_turn = |c: CardIdx| state.card(c).owner == state.turn_player;
+            let passes = |c: CardIdx| -> bool {
+                if exclude_source && source == Some(c) {
+                    return false;
+                }
+                if pw_min.is_none() && pw_max.is_none() {
+                    return true;
+                }
+                let card = state.card(c);
+                let power = card.get_power(masters.get(card.master), don_turn(c));
+                pw_min.map_or(true, |m| power >= m) && pw_max.map_or(true, |m| power <= m)
+            };
             let count_named = |name: &str| -> i32 {
                 let mut n = pool
                     .iter()
-                    .filter(|c| matches_name(masters.get(state.card(**c).master), name, true))
+                    .filter(|c| {
+                        passes(**c) && matches_name(masters.get(state.card(**c).master), name, true)
+                    })
                     .count() as i32;
-                if leader_master.is_some_and(|m| matches_name(m, name, true)) {
-                    n += 1;
+                if let (Some(leader), Some(m)) = (tp.leader, leader_master) {
+                    if passes(leader) && matches_name(m, name, true) {
+                        n += 1;
+                    }
                 }
                 n
             };
@@ -494,11 +546,12 @@ pub fn check_condition(
                                 .iter()
                                 .copied()
                                 .filter(|c| {
-                                    matches_name(masters.get(state.card(*c).master), name, true)
+                                    passes(*c)
+                                        && matches_name(masters.get(state.card(*c).master), name, true)
                                 })
                                 .collect();
                             if let (Some(leader), Some(m)) = (tp.leader, leader_master) {
-                                if matches_name(m, name, true) {
+                                if passes(leader) && matches_name(m, name, true) {
                                     candidates.push(leader);
                                 }
                             }

@@ -60,3 +60,24 @@ def test_cost_pair_is_a_range():
 def test_trait_partial_flag():
     ab = _abilities("【登場時】自分の手札から『ロックス海賊団』を含む特徴を持つカード1枚を捨てることができる:カード1枚を引く。")[0]
     assert "TRAIT_PARTIAL" in _flat(ab.cost)[0].target.flags
+
+
+def test_multi_name_has_character_is_and():
+    ab = _abilities("【起動メイン】自分の「サトリ」と「ホトリ」がいる場合、カード1枚を引く。")[0]
+    assert ab.condition.type.name == "AND" and len(ab.condition.args) == 2
+
+
+def test_hand_reveal_leading_gate_covers_then_clause():
+    ab = _abilities("【メイン】自分のリーダーが特徴《赤髪海賊団》を持つ場合、相手のキャラ1枚までを、このターン中、パワー-3000。"
+                    "その後、相手のパワー5000以上のキャラがいる場合、カード1枚を引く。")[0]
+    assert ab.condition is not None and ab.condition.type.name == "LEADER_TRAIT"
+
+
+def test_self_onplay_negation_is_a_passive_marker():
+    ab = _abilities("自分の【登場時】効果は無効になる。")[0]
+    assert ab.trigger.name == "PASSIVE" and ab.effect.status == "NEGATE_OWN_ONPLAY"
+
+
+def test_face_down_life_cost_direction():
+    ab = _abilities("【登場時】自分の表向きのライフ1枚を裏向きにできる:カード1枚を引く。")[0]
+    assert _flat(ab.cost)[0].status == "DOWN"

@@ -89,7 +89,10 @@ pub fn card_type(state: &GameState, masters: &MasterTable, card: CardIdx) -> Car
 /// `flags` と `timed_flags` の和に含まれるか（Python `f in card.flags or f in card.timed_flags`）。
 pub fn has_flag(state: &GameState, card: CardIdx, flag: &str) -> bool {
     let c = state.card(card);
-    c.flags.iter().any(|f| f == flag) || c.timed_flags.iter().any(|f| f == flag)
+    // 常在効果由来の ATTACK_DISABLE は再計算でリセットされる current_keywords に載る（status.rs）。
+    c.flags.iter().any(|f| f == flag)
+        || c.timed_flags.iter().any(|f| f == flag)
+        || (flag == "ATTACK_DISABLE" && c.current_keywords.iter().any(|f| f == flag))
 }
 
 pub fn has_timed_flag(state: &GameState, card: CardIdx, flag: &str) -> bool {

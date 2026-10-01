@@ -178,6 +178,13 @@ fn grant_keyword(s: &mut Session, action: &GameAction, target: CardIdx) {
             None => return, // Python: `if keyword:` が偽＝何もしない
         },
     };
+    // 常在効果の再計算中の期間なし付与（「…の場合、このキャラは【ブロッカー】を得る」）は、再計算の
+    // たびにリセットされる `current_keywords` へ載せる。継続効果（Permanent）へ載せると条件が
+    // 偽に戻っても外れない（OP12-089/OP12-100 等）。
+    if s.state().in_passive_recalc && action.duration == Duration::Instant {
+        add_recalc_keyword(s, target, &keyword);
+        return;
+    }
     let duration = keyword_duration(action.duration);
     continuous::apply(
         s,
@@ -191,6 +198,16 @@ fn grant_keyword(s: &mut Session, action: &GameAction, target: CardIdx) {
     );
 }
 
+/// 再計算でリセットされる `current_keywords` へキーワード（や ATTACK_DISABLE の印）を足す。
+fn add_recalc_keyword(s: &mut Session, target: CardIdx, keyword: &str) {
+    let mut kws = s.state().card(target).current_keywords.clone();
+    if !kws.iter().any(|k| k == keyword) {
+        kws.push(keyword.to_owned());
+        kws.sort();
+        s.edit().set_card_strs(target, crate::journal::CardStrsField::CurrentKeywords, kws);
+    }
+}
+
 /// Python `per_target.attack_disable`（`ATTACK_DISABLE` 側。`RESTRICTION` は群 E）。
 ///
 /// 「（このターン中／次の相手のターン終了時まで）アタックできない」。アタック税
@@ -201,6 +218,13 @@ fn attack_disable(s: &mut Session, action: &GameAction, target: CardIdx) {
         Some(st) if st.starts_with(ATTACK_TAX_PREFIX) => st.to_owned(),
         _ => FLAG_ATTACK_DISABLE.to_owned(),
     };
+    // 常在効果の再計算中（期間句の無い PASSIVE「手札が5枚以上ある場合、このキャラはアタックできない」）は
+    // 再計算のたびにリセットされる `current_keywords` へ載せる。`timed_flags`（THIS_TURN）へ載せると
+    // 条件が偽に戻っても外れない（OP11-058）。判定は `rules::has_flag` が両方を見る。
+    if flag == FLAG_ATTACK_DISABLE && s.state().in_passive_recalc && action.duration == Duration::Instant {
+        add_recalc_keyword(s, target, &flag);
+        return;
+    }
     timed_flag(s, target, action.duration, &flag);
 }
 
@@ -443,6 +467,22 @@ mod tests {
             assert_eq!(s.state().card(c).timed_flags, vec!["ATTACK_DISABLE".to_string()]);
             assert_eq!(effects(&s)[0].duration, Duration::ThisTurn, "{duration:?}");
         }
+    }
+
+    /// 常在効果の再計算中の ATTACK_DISABLE は timed_flags ではなく再計算でリセットされる
+    /// current_keywords に載る（条件が偽に戻ったら外れる。OP11-058）。
+    #[test]
+    fn passive_attack_disable_is_reset_by_the_recalc() {
+        let (masters, mut s, c) = board();
+        s.edit().set_mgr_flag(crate::journal::MgrFlagField::InPassiveRecalc, true);
+        let mut a = testkit::action(ActionType::AttackDisable, 0);
+        a.duration = Duration::Instant;
+        run(&mut s, &masters, &a, &[c], 0);
+        assert!(s.state().card(c).timed_flags.is_empty());
+        assert!(crate::rules::has_flag(s.state(), c, "ATTACK_DISABLE"));
+        let kws = masters.get(s.state().card(c).master).keywords.clone();
+        s.edit().set_card_strs(c, crate::journal::CardStrsField::CurrentKeywords, kws);
+        assert!(!crate::rules::has_flag(s.state(), c, "ATTACK_DISABLE"));
     }
 
     /// `UNTIL_NEXT_TURN_END` だけが期限つきで残る。

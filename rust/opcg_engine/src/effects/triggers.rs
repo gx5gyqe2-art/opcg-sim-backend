@@ -929,8 +929,8 @@ pub fn resolve_on_play(
     seat: Seat,
     card: CardIdx,
 ) -> Result<(), EngineError> {
-    let onplay_negated =
-        s.state().player(seat).negate_onplay_until >= s.state().turn_count;
+    let onplay_negated = s.state().player(seat).negate_onplay_until >= s.state().turn_count
+        || own_onplay_negated(s, masters, seat);
     if crate::rules::is_effect_negated(s.state(), card) || onplay_negated {
         return Ok(());
     }
@@ -946,6 +946,26 @@ pub fn resolve_on_play(
         }
     }
     Ok(())
+}
+
+/// 「自分の【登場時】効果は無効になる」（常在・OP09-081）を持つカードが自分側にあるか。
+/// 効果による登場でも手札からの登場でも、自分の【登場時】は解決されない。
+pub fn own_onplay_negated(s: &Session, masters: &MasterTable, seat: Seat) -> bool {
+    use super::ast::ActionType;
+    units_with_stage(s, seat).into_iter().any(|c| {
+        if crate::rules::is_effect_negated(s.state(), c) {
+            return false;
+        }
+        masters.get(s.state().card(c).master).ability_ids.iter().any(|id| {
+            ability(masters, *id).is_ok_and(|ab| {
+                ab.trigger == TriggerType::Passive
+                    && ab.effect.as_ref().is_some_and(|e| {
+                        super::actions::find_action(e, ActionType::RuleProcessing)
+                            .is_some_and(|a| a.status.as_deref() == Some("NEGATE_OWN_ONPLAY"))
+                    })
+            })
+        })
+    })
 }
 
 /// リーダー＋場＋ステージ（Python の `_units(pl)`）。

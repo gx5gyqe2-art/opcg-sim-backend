@@ -776,7 +776,11 @@ def _life_face(ctx: ParseContext) -> Optional[GameAction]:
     # 「ライフの上/下に…加える」表記はいずれも移動なので、ここでは扱わない。
     if _nfc("加える") in t and re.search(_nfc(r"ライフの(上|下)"), t):
         return None
-    if _nfc("表向き") in t:
+    # 向きは動詞に掛かる側で決める（「表向きのライフ1枚を裏向きにできる」は DOWN。ST13-009）。
+    m_dir = re.search(_nfc(r"(表向き|裏向き)(?:に(?:する|でき|し)|で(?:加え|置))"), t)
+    if m_dir:
+        status = "UP" if m_dir.group(1) == _nfc("表向き") else "DOWN"
+    elif _nfc("表向き") in t:
         status = "UP"
     elif _nfc("裏向き") in t:
         status = "DOWN"
@@ -3039,6 +3043,16 @@ def _bare_number_cost_noop(ctx: ParseContext) -> Optional[GameAction]:
 #   「効果が無効になる」(自動詞) は self_effect_disabled(p64) が DISABLE_ABILITY を担う。
 #   「相手の…効果は無効になる」(スコープ付き相手無効) は scoped_negate_onplay(p65) が担当する。
 # ---------------------------------------------------------------------------
+@rule("negate_own_onplay", priority=67)
+def _negate_own_onplay(ctx: ParseContext) -> Optional[GameAction]:
+    """「自分の登場時効果は無効になる」(OP09-081 の常在)→ RULE_PROCESSING(status=NEGATE_OWN_ONPLAY)。
+    エンジンは自分側の【登場時】解決をスキップする（triggers::own_onplay_negated）。"""
+    t = ctx.text
+    if not re.search(_nfc(r"^自分の登場時効果は無効になる"), t.strip()):
+        return None
+    return GameAction(type=ActionType.RULE_PROCESSING, status="NEGATE_OWN_ONPLAY", raw_text=t)
+
+
 @rule("self_effect_negated_noop", priority=63)
 def _self_effect_negated_noop(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
