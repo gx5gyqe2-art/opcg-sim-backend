@@ -46,7 +46,7 @@ use crate::ops;
 use crate::state::EngineError;
 
 use super::ast::{
-    ActionType, Condition, ConditionType, EffectNode, GameAction, PlayerRef, TargetQuery,
+    Ability, ActionType, Condition, ConditionType, EffectNode, GameAction, PlayerRef, TargetQuery,
     TriggerType, ZoneRef,
 };
 use super::{ability_of, EffectContext, NodeRef, NodeRoot};
@@ -125,6 +125,15 @@ pub fn turn_limit_of(cond: Option<&Condition>) -> Option<i32> {
 /// Rust は呼び出し側が最初からカード内 index を持っているので、それがそのままキー。
 pub fn ability_key(index: usize) -> u32 {
     index as u32
+}
+
+/// 置換（`REPLACE_EFFECT`）・保護（`PREVENT_LEAVE`）の常在か（先頭の動作で判定）。
+fn is_removal_guard(ability: &Ability) -> bool {
+    ability
+        .effect
+        .as_ref()
+        .and_then(super::passives::find_first_action)
+        .is_some_and(|a| matches!(a.ty, ActionType::ReplaceEffect | ActionType::PreventLeave))
 }
 
 /// Python `CardInstance.ability_used_this_turn.get(key, 0)`。
@@ -385,7 +394,11 @@ impl Resolver {
         }
 
         // 発動成立 → 使用回数を消費する。
-        if turn_limit.is_some() {
+        // 例外: 継続効果の再計算が「実行」する置換・保護の常在（【ターン1回】…KOされる場合、代わりに／
+        // KOされない）。これらの効果は本体では何もせず（実際の発動は除去の瞬間に `rules::active_*` が
+        // 判定し、そこで回数を消費する）、再計算のたびに消費すると、盤面が 1 度動いただけで
+        // 「ターン1回」が使い切られて、肝心の KO の場面で働かなくなる（2026-10-01 実対局検証）。
+        if turn_limit.is_some() && !(s.state().in_passive_recalc && is_removal_guard(ability)) {
             set_used_count(s, source_card, limit_key, used + 1);
         }
 
