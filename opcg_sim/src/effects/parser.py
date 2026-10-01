@@ -1079,6 +1079,10 @@ class EffectParser:
         primary_reactive = embedded if embedded in (
             TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE, TriggerType.ON_REST,
             TriggerType.ON_LEAVE) else None
+        # 「自分の効果で場を離れた時」は専用のターン内イベント（EVENT_THIS_TURN）で表現済み
+        # （OP07-038/OP08-046）＝ON_LEAVE 誘発には載せない。
+        if primary_reactive == TriggerType.ON_LEAVE and _nfc("自分の効果で場を離れた時") in norm_text:
+            primary_reactive = None
         if _nfc("【自分のターン中】") in norm_text: return primary_reactive or TriggerType.YOUR_TURN
         if _nfc("【相手のターン中】") in norm_text: return primary_reactive or TriggerType.OPPONENT_TURN
         if _nfc("【カウンター】") in norm_text: return TriggerType.COUNTER
