@@ -615,3 +615,214 @@ mod flow {
         assert_eq!(s.state().pending_triggers.len(), 1);
     }
 }
+
+/// カード効果監査 WP=G2_trigger（誘発の読みの修正）の単体テスト。
+mod g2_trigger {
+    use super::*;
+    use crate::model::{ActiveBattle, MasterIdx};
+
+    fn give(masters: &mut MasterTable, master: MasterIdx, trigger: TriggerType, raw: &str) {
+        let id = masters.abilities.abilities.len() as u32;
+        masters.abilities.abilities.push(testkit::ability(trigger, testkit::draw(1), raw));
+        masters.masters[master as usize].ability_ids = vec![id];
+    }
+
+    fn turn_event(s: &Session, name: &str) -> Option<i32> {
+        s.state().turn_events.iter().find(|(k, _)| k == name).map(|(_, v)| *v)
+    }
+
+    /// OP08-056・OP09-080: ステージが「…キャラが（相手の）効果で場を離れた時」の持ち主になる。
+    #[test]
+    fn a_stage_listens_for_characters_leaving_by_effect() {
+        let mut b = BoardBuilder::new().turn(3, Seat::P1);
+        let stage = b.put_stage(Seat::P1, crate::testkit::M_STAGE);
+        let mine = b.put_field(Seat::P1, M_BIG);
+        let (mut masters, state) = b.build();
+        give(
+            &mut masters,
+            crate::testkit::M_STAGE,
+            TriggerType::OnLeave,
+            "【自分のターン中】【ターン1回】自分の『麦わらの一味』を含む特徴を持つキャラが効果で場を離れた時、カード1枚を引く。",
+        );
+        let mut s = Session::new(state);
+        // 効果の外（バトル KO など）では「効果で」の句は誘発しない。
+        triggers::enqueue_on_leave(&mut s, &masters, mine, Seat::P1, false).unwrap();
+        assert!(queued(&s).is_empty());
+        s.set_effect_actor(Some((Seat::P2, None)));
+        triggers::enqueue_on_leave(&mut s, &masters, mine, Seat::P1, false).unwrap();
+        s.set_effect_actor(None);
+        assert_eq!(queued(&s), vec![(Seat::P1, stage)]);
+    }
+
+    /// OP09-080: 「相手の効果で」は自分の効果では誘発しない（ステージ持ち主でも同じ）。
+    #[test]
+    fn a_stage_opponent_effect_clause_ignores_own_effects() {
+        let mut b = BoardBuilder::new().turn(4, Seat::P2);
+        let stage = b.put_stage(Seat::P1, crate::testkit::M_STAGE);
+        let mine = b.put_field(Seat::P1, M_BIG);
+        let (mut masters, state) = b.build();
+        give(
+            &mut masters,
+            crate::testkit::M_STAGE,
+            TriggerType::OnLeave,
+            "【相手のターン中】このステージをレストにできる:自分の特徴《麦わらの一味》を持つキャラが相手の効果で場を離れた時、ドン!!デッキからドン!!1枚までを、レストで追加する。",
+        );
+        let mut s = Session::new(state);
+        s.set_effect_actor(Some((Seat::P1, None)));
+        triggers::enqueue_on_leave(&mut s, &masters, mine, Seat::P1, false).unwrap();
+        assert!(queued(&s).is_empty());
+        s.set_effect_actor(Some((Seat::P2, None)));
+        triggers::enqueue_on_leave(&mut s, &masters, mine, Seat::P1, false).unwrap();
+        s.set_effect_actor(None);
+        assert_eq!(queued(&s), vec![(Seat::P1, stage)]);
+    }
+
+    /// OP07-038: 効果でキャラが場を離れた事実が実行者の席ごとに記録される（バトル KO は記録しない）。
+    #[test]
+    fn a_character_leaving_by_effect_is_recorded_per_actor() {
+        let mut b = BoardBuilder::new().turn(3, Seat::P1);
+        let theirs = b.put_field(Seat::P2, M_BIG);
+        let (masters, state) = b.build();
+        let mut s = Session::new(state);
+        triggers::enqueue_on_leave(&mut s, &masters, theirs, Seat::P2, false).unwrap();
+        assert_eq!(turn_event(&s, "CHAR_LEFT_BY_OWN_EFFECT_p1"), None);
+        s.set_effect_actor(Some((Seat::P1, None)));
+        triggers::enqueue_on_leave(&mut s, &masters, theirs, Seat::P2, false).unwrap();
+        s.set_effect_actor(None);
+        assert_eq!(turn_event(&s, "CHAR_LEFT_BY_OWN_EFFECT_p1"), Some(1));
+        assert_eq!(turn_event(&s, "CHAR_LEFT_BY_OWN_EFFECT_p2"), None);
+    }
+
+    const KO_OR_LEAVE: &str = "【相手のターン中】【ターン1回】自分の特徴《麦わらの一味》を持つキャラがKOされた時か、相手の効果で場を離れた時、発動できる。自分の手札が5枚以下の場合、カード1枚を引く。";
+
+    fn ko_or_leave_board() -> (MasterTable, Session, CardIdx, CardIdx) {
+        let mut b = BoardBuilder::new().turn(4, Seat::P2);
+        let holder = b.leader(Seat::P1);
+        let mine = b.put_field(Seat::P1, M_BIG);
+        let (mut masters, state) = b.build();
+        give(&mut masters, crate::testkit::M_LEADER, TriggerType::OnKo, KO_OR_LEAVE);
+        (masters, Session::new(state), holder, mine)
+    }
+
+    /// OP10-042: 「KOされた時か相手の効果で場を離れた時」は 1 能力＝相手の効果での KO でも 1 回だけ積む。
+    #[test]
+    fn ko_or_leave_clause_fires_once_for_a_ko_by_an_opponent_effect() {
+        let (masters, mut s, holder, mine) = ko_or_leave_board();
+        s.set_effect_actor(Some((Seat::P2, None)));
+        triggers::enqueue_on_leave(&mut s, &masters, mine, Seat::P1, false).unwrap();
+        s.set_effect_actor(None);
+        triggers::enqueue_ko_listeners(&mut s, &masters, mine, Seat::P1).unwrap();
+        assert_eq!(queued(&s), vec![(Seat::P1, holder)]);
+    }
+
+    #[test]
+    fn ko_or_leave_clause_covers_bounce_and_battle_ko() {
+        // 相手の効果で手札へ戻る（KO ではない）＝離脱側で 1 回。
+        let (masters, mut s, _holder, mine) = ko_or_leave_board();
+        s.set_effect_actor(Some((Seat::P2, None)));
+        triggers::enqueue_on_leave(&mut s, &masters, mine, Seat::P1, true).unwrap();
+        s.set_effect_actor(None);
+        assert_eq!(queued(&s).len(), 1);
+        // バトル KO（効果の外）＝離脱側は積まず KO 側で 1 回。
+        let (masters, mut s, _holder, mine) = ko_or_leave_board();
+        triggers::enqueue_on_leave(&mut s, &masters, mine, Seat::P1, false).unwrap();
+        assert!(queued(&s).is_empty());
+        triggers::enqueue_ko_listeners(&mut s, &masters, mine, Seat::P1).unwrap();
+        assert_eq!(queued(&s).len(), 1);
+    }
+
+    fn battle(s: &mut Session, attacker: CardIdx, target: CardIdx, ao: Seat, to: Seat) {
+        s.edit().set_active_battle(Some(ActiveBattle {
+            attacker,
+            target,
+            attacker_owner: ao,
+            target_owner: to,
+            counter_buff: 0,
+        }));
+    }
+
+    /// OP11-088: 「相手のキャラがアタックした時」はリーダーのアタックでは誘発しない。
+    #[test]
+    fn opponent_character_attack_clause_ignores_a_leader_attack() {
+        let raw = "【ターン1回】相手のキャラがアタックした時、発動できる。そのキャラが属性(斬)を持つ場合、このキャラは、このバトル中、パワー+5000。";
+        let mut b = BoardBuilder::new().turn(3, Seat::P1);
+        let holder = b.put_field(Seat::P2, M_CHAR);
+        let atk_leader = b.leader(Seat::P1);
+        let atk_char = b.put_field(Seat::P1, M_BIG);
+        let (mut masters, state) = b.build();
+        give(&mut masters, M_CHAR, TriggerType::OnOppAttack, raw);
+        let mut s = Session::new(state);
+        battle(&mut s, atk_leader, holder, Seat::P1, Seat::P2);
+        let t = triggers::enqueue_battle_triggers(&mut s, &masters, atk_leader, Seat::P1, Seat::P2).unwrap();
+        assert!(t.is_empty(), "リーダーのアタックでは誘発しない");
+        battle(&mut s, atk_char, holder, Seat::P1, Seat::P2);
+        let t = triggers::enqueue_battle_triggers(&mut s, &masters, atk_char, Seat::P1, Seat::P2).unwrap();
+        assert_eq!(t.len(), 1);
+    }
+
+    /// OP12-081: 「相手のリーダーにアタックした時」はキャラへのアタックでは誘発しない。
+    #[test]
+    fn attack_on_the_opponents_leader_clause_checks_the_target() {
+        let raw = "このリーダーが相手のリーダーにアタックした時、自分のコスト8以上のキャラが2枚以上いる場合、カード1枚を引く。";
+        let mut b = BoardBuilder::new().turn(3, Seat::P1);
+        let leader = b.leader(Seat::P1);
+        let opp_leader = b.leader(Seat::P2);
+        let opp_char = b.put_field(Seat::P2, M_CHAR);
+        let (mut masters, state) = b.build();
+        give(&mut masters, crate::testkit::M_LEADER, TriggerType::OnAttack, raw);
+        let mut s = Session::new(state);
+        battle(&mut s, leader, opp_char, Seat::P1, Seat::P2);
+        let t = triggers::enqueue_battle_triggers(&mut s, &masters, leader, Seat::P1, Seat::P2).unwrap();
+        assert!(t.is_empty(), "キャラへのアタックでは誘発しない");
+        battle(&mut s, leader, opp_leader, Seat::P1, Seat::P2);
+        let t = triggers::enqueue_battle_triggers(&mut s, &masters, leader, Seat::P1, Seat::P2).unwrap();
+        assert_eq!(t.len(), 1);
+    }
+
+    /// OP17-040: 「自分の『ロックス海賊団』を含む特徴を持つリーダーがアタックした時かアタックされた時」。
+    #[test]
+    fn own_trait_leader_attacks_or_is_attacked_clause_fires_from_a_character() {
+        let raw = "【ターン1回】自分の『ロックス海賊団』を含む特徴を持つリーダーがアタックした時かアタックされた時、自分の手札1枚を捨てて発動できる。自分のリーダーを、このバトル中、パワー+3000。";
+        let mut b = BoardBuilder::new().turn(3, Seat::P1);
+        let leader = b.leader(Seat::P1);
+        let opp_leader = b.leader(Seat::P2);
+        let holder = b.put_field(Seat::P1, M_CHAR);
+        let (mut masters, state) = b.build();
+        masters.masters[crate::testkit::M_LEADER as usize].traits = vec!["ロックス海賊団".into()];
+        give(&mut masters, M_CHAR, TriggerType::Passive, raw);
+        let mut s = Session::new(state);
+        battle(&mut s, leader, opp_leader, Seat::P1, Seat::P2);
+        let t = triggers::enqueue_battle_triggers(&mut s, &masters, leader, Seat::P1, Seat::P2).unwrap();
+        assert_eq!(t.iter().filter(|p| p.card == holder).count(), 1, "アタックした時");
+        battle(&mut s, opp_leader, leader, Seat::P2, Seat::P1);
+        let t = triggers::enqueue_battle_triggers(&mut s, &masters, opp_leader, Seat::P2, Seat::P1).unwrap();
+        assert_eq!(t.iter().filter(|p| p.card == holder).count(), 1, "アタックされた時");
+    }
+
+    /// OP12-040: 「自分の特徴《海軍》を持つカードの効果で自分の手札からカードが捨てられた時」。
+    #[test]
+    fn navy_effect_discard_fires_per_discarded_card() {
+        let raw = "自分の特徴《海軍》を持つカードの効果で自分の手札からカードが捨てられた時、カードを引く。";
+        let mut b = BoardBuilder::new().turn(3, Seat::P1);
+        let holder = b.leader(Seat::P1);
+        let navy = b.put_field(Seat::P1, crate::testkit::M_BLOCKER);
+        let other = b.put_field(Seat::P1, M_BIG);
+        let (mut masters, state) = b.build();
+        masters.masters[crate::testkit::M_BLOCKER as usize].traits = vec!["海軍".into()];
+        give(&mut masters, crate::testkit::M_LEADER, TriggerType::Passive, raw);
+        let mut s = Session::new(state);
+        // 海軍でないカードの効果・相手の手札では誘発しない。
+        s.set_effect_actor(Some((Seat::P1, Some(other))));
+        triggers::on_hand_discarded_by_effect(&mut s, &masters, Seat::P1).unwrap();
+        s.set_effect_actor(Some((Seat::P1, Some(navy))));
+        triggers::on_hand_discarded_by_effect(&mut s, &masters, Seat::P2).unwrap();
+        assert!(queued(&s).is_empty());
+        assert_eq!(turn_event(&s, "NAVY_DISCARD"), None);
+        // 海軍のカードの効果で自分の手札が 2 枚捨てられる＝2 回。
+        triggers::on_hand_discarded_by_effect(&mut s, &masters, Seat::P1).unwrap();
+        triggers::on_hand_discarded_by_effect(&mut s, &masters, Seat::P1).unwrap();
+        s.set_effect_actor(None);
+        assert_eq!(queued(&s), vec![(Seat::P1, holder), (Seat::P1, holder)]);
+        assert_eq!(turn_event(&s, "NAVY_DISCARD"), Some(2));
+    }
+}

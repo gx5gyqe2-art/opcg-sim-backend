@@ -119,3 +119,63 @@ def test_hand_discarded_this_turn_condition_is_an_event_not_a_hand_count():
     ab = _first("手札のこのカードは、効果で自分の手札が捨てられているターン中、コスト-3。")
     assert ab.condition.type.name == "EVENT_THIS_TURN"
     assert ab.condition.value == ("HAND_DISCARDED_BY_EFFECT_SEAT", 1)
+
+
+# --- カード効果監査 WP=G2_trigger（誘発の読み） ------------------------------------------
+
+def test_char_left_by_own_effect_event_is_recorded_per_seat():
+    """OP07-038: 「キャラが自分の効果で場を離れた時」＝実行者の席ごとのターン内イベント。"""
+    ab = _first("【自分のターン中】【ターン1回】キャラが自分の効果で場を離れた時、発動できる。"
+                "自分の手札が5枚以下の場合、カード1枚を引く。")
+    assert ab.trigger.name == "ON_LEAVE"
+
+    def conds(c):
+        if c is None:
+            return []
+        return [c] + [x for a in (getattr(c, "args", None) or []) for x in conds(a)]
+    ev = [c for c in conds(ab.condition) if c.type.name == "EVENT_THIS_TURN"]
+    assert ev and ev[0].value == ("CHAR_LEFT_BY_OWN_EFFECT_SEAT", 1)
+
+
+def test_ko_or_leave_clause_stays_one_on_ko_ability():
+    """OP10-042: 「KOされた時か、相手の効果で場を離れた時」は ON_KO 1 本（ON_LEAVE へ複製しない）。"""
+    abs_ = EffectParserV2().parse_card_text(
+        "【相手のターン中】【ターン1回】自分の特徴《ドレスローザ》を持つキャラがKOされた時か、"
+        "相手の効果で場を離れた時、発動できる。自分の手札が5枚以下の場合、カード1枚を引く。")
+    assert [a.trigger.name for a in abs_] == ["ON_KO"]
+
+
+def test_navy_discard_draws_one_per_discarded_card():
+    """OP12-040: 反応は捨てたカード 1 枚ごと＝「捨てた枚数分」は 1 枚分。"""
+    ab = _first("自分の特徴《海軍》を持つカードの効果で自分の手札からカードが捨てられた時、"
+                "捨てた枚数分カードを引く。")
+    draw = [a for a in _actions(ab.effect) if a.type.name == "DRAW"][0]
+    assert draw.value.dynamic_source is None and draw.value.base == 1
+
+
+def test_optional_instead_branch_becomes_a_choice_with_the_original_action():
+    """OP04-040: 「引く代わりに〜できる」を断ったとき通常のドローが残る＝択一にする。"""
+    ab = _first("【ドン!!×1】【アタック時】自分のライフと手札の合計枚数が4枚以下の場合、カード1枚を引く。"
+                "自分のコスト8以上のキャラがいる場合、カード1枚を引く代わりに自分のデッキの上から1枚までを、ライフの上に加えることができる。")
+    seen = []
+
+    def walk(n):
+        if n is None:
+            return
+        if type(n).__name__ == "Choice":
+            seen.append([o.type.name for o in n.options])
+        for k in ("actions", "options"):
+            for x in getattr(n, k, None) or []:
+                walk(x)
+        for k in ("if_true", "if_false"):
+            walk(getattr(n, k, None))
+    walk(ab.effect)
+    assert seen == [["HEAL", "DRAW"]]
+
+
+def test_protecting_replacement_moves_the_removed_character():
+    """OP11-101: 他のキャラを守る置換の「ライフの上に加える」対象は離れる側のキャラ。"""
+    ab = _first("【ターン1回】「カポネ・ベッジ」以外の自分の特徴《超新星》を持つキャラが相手の効果で場を離れる場合、"
+                "代わりに自分のライフの上に裏向きで加えることができる。")
+    sub = [a for a in _actions(ab.effect) if a.type.name == "MOVE_CARD"][0]
+    assert sub.target.ref_id == "removed_card"

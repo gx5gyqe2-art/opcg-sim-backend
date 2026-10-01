@@ -309,9 +309,13 @@ pub fn active_protection_with_origin(
     let owner = s.state().card(card).owner;
 
     // トリガー効果が継続効果として付与した期間付き保護（`flags | timed_flags`）。
-    for st in status_values {
-        if crate::rules::has_flag(s.state(), card, &format!("PREVENT_{st}")) {
-            return Ok(true);
+    // 期間付きの保護フラグは「相手の効果で」か「効果で」かを持たないので、従来どおり相手の効果にだけ効く
+    // （自分の効果の KO までは止めない）。
+    if actor != Some(owner) {
+        for st in status_values {
+            if crate::rules::has_flag(s.state(), card, &format!("PREVENT_{st}")) {
+                return Ok(true);
+            }
         }
     }
 
@@ -334,7 +338,16 @@ pub fn active_protection_with_origin(
         let ids = masters.get(s.state().card(protector).master).ability_ids.clone();
         for (index, id) in ids.iter().enumerate() {
             let ab = ability(masters, *id)?;
-            if ab.trigger != TriggerType::Passive {
+            // 常在に加え、手番限定の常在（【相手のターン中】＝OPPONENT_TURN・【自分のターン中】＝YOUR_TURN）も
+            // 持ち主から見た手番が合うときだけ守る（ST14-009）。
+            let turn_player = s.state().turn_player;
+            let trigger_ok = match ab.trigger {
+                TriggerType::Passive => true,
+                TriggerType::OpponentTurn => turn_player != s.state().card(protector).owner,
+                TriggerType::YourTurn => turn_player == s.state().card(protector).owner,
+                _ => false,
+            };
+            if !trigger_ok {
                 continue;
             }
             let Some(effect) = ab.effect.as_ref() else {
@@ -350,6 +363,10 @@ pub fn active_protection_with_origin(
                 .as_deref()
                 .is_some_and(|st| st.split(',').any(|one| status_values.contains(&one)))
             {
+                continue;
+            }
+            // 自分の効果による除去（actor＝持ち主）には「相手の効果で」の保護は働かない。
+            if actor == Some(owner) && opp_only_removal(&eff.raw_text) {
                 continue;
             }
             // 保護対象クエリ: `SOURCE`（既定）は protector 自身だけを守る。範囲クエリは
@@ -422,8 +439,13 @@ pub fn active_protection_with_origin(
             // その属性を持たないときだけ守る（発生源が不明なら守る側へ倒す）。
             if let Some(lacked) = lacked_source_attribute(&eff.raw_text) {
                 if let Some(src) = origin {
-                    let attr = masters.get(s.state().card(src).master).attribute;
-                    if attr != crate::model::Attribute::None && attr.value() == lacked {
+                    let sm = masters.get(s.state().card(src).master);
+                    // 「…キャラの効果で」＝発生源がキャラのときだけ（イベント／ステージ／リーダーの効果は
+                    // 属性が無くても「属性を持たないキャラ」ではないので守らない）。
+                    if sm.ty != CardType::Character && eff.raw_text.contains("を持たないキャラの効果") {
+                        continue;
+                    }
+                    if sm.attribute != crate::model::Attribute::None && sm.attribute.value() == lacked {
                         continue;
                     }
                 }
@@ -500,6 +522,32 @@ pub fn find_replacement(
     card: CardIdx,
     status_values: &[&str],
 ) -> Result<Option<Replacement>, EngineError> {
+    find_replacement_by(s, masters, card, status_values, None)
+}
+
+/// 「相手の効果で…される場合」のように相手の効果だけを対象にする句か。
+///
+/// 除去を述べる句（「KOされ」「場を離れ」「されない」等の手前まで）に「相手の」を含むものを
+/// 相手専用とみなす（【相手のターン中】の手番タグは除く）。置換の代わりの行動に出る「相手の
+/// キャラ」等を拾わないよう、除去の述語より前だけを見る。
+fn opp_only_removal(raw: &str) -> bool {
+    let cut = ["KOされ", "場を離れ", "離れる", "離れない", "離れず"]
+        .iter()
+        .filter_map(|m| raw.find(m))
+        .min()
+        .unwrap_or(raw.len());
+    raw[..cut].replace("【相手のターン中】", "").contains("相手の")
+}
+
+/// [`find_replacement`] に除去を行った効果の実行者（`actor`）を渡す版。持ち主自身の効果による
+/// 除去（`actor == owner`）には「相手の効果で」の置換を適用しない（OP11-101）。`None` は従来どおり。
+pub fn find_replacement_by(
+    s: &Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+) -> Result<Option<Replacement>, EngineError> {
     if s.state().card(card).negated {
         return Ok(None);
     }
@@ -552,6 +600,9 @@ pub fn find_replacement(
             // 適用範囲（本文の主語・ターン限定）。パーサは置換の本文を `raw_text` に丸ごと残すだけで
             // 主語や【相手のターン中】を条件にしないので、ここで読む（2026-10-01 カード効果監査・約 50 枚）。
             if !replacement_scope_matches(&eff.raw_text, protector, card, owner, s.state().turn_player) {
+                continue;
+            }
+            if actor == Some(owner) && opp_only_removal(&eff.raw_text) {
                 continue;
             }
             // 自己無効化（「キャラの「X」がいる場合、この効果は無効になる」OP05-100）。
@@ -659,8 +710,19 @@ pub fn active_replacement(
     card: CardIdx,
     status_values: &[&str],
 ) -> Result<bool, EngineError> {
+    active_replacement_by(s, masters, card, status_values, None)
+}
+
+/// [`active_replacement`] に除去を行った効果の実行者を渡す版（[`find_replacement_by`]）。
+pub fn active_replacement_by(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+) -> Result<bool, EngineError> {
     let can_suspend = !status_values.contains(&"BATTLE_KO");
-    active_replacement_with(s, masters, card, status_values, can_suspend)
+    active_replacement_inner(s, masters, card, status_values, can_suspend, actor)
 }
 
 /// [`active_replacement`] の `can_suspend` を明示する版（バトル KO 経路は `false`）。
@@ -671,7 +733,18 @@ pub fn active_replacement_with(
     status_values: &[&str],
     can_suspend: bool,
 ) -> Result<bool, EngineError> {
-    let Some(found) = find_replacement(s, masters, card, status_values)? else {
+    active_replacement_inner(s, masters, card, status_values, can_suspend, None)
+}
+
+fn active_replacement_inner(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    can_suspend: bool,
+    actor: Option<Seat>,
+) -> Result<bool, EngineError> {
+    let Some(found) = find_replacement_by(s, masters, card, status_values, actor)? else {
         return Ok(false);
     };
     let owner = s.state().card(card).owner;

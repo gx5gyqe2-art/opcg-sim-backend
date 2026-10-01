@@ -155,6 +155,7 @@ fn reactive_re_search(text: &str) -> bool {
         "加わった時、",
         "与えた時、",
         "終了時、",
+        "捨てられた時、",
     ] {
         if text.contains(pat) {
             return true;
@@ -252,6 +253,7 @@ mod tests {
     fn reactive_regex_matches_the_python_alternation() {
         assert!(reactive_re_search("相手のキャラが登場した時、ドローする"));
         assert!(reactive_re_search("ライフが離れた時、"));
+        assert!(reactive_re_search("カードの効果で自分の手札からカードが捨てられた時、カードを引く。"));
         assert!(reactive_re_search("ダメージを受けた時、"));
         assert!(reactive_re_search("レストになった時、"));
         // 「時、」が続かない（＝常在の記述）ものは反応型ではない。

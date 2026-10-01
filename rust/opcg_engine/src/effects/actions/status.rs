@@ -234,7 +234,10 @@ fn attack_disable(s: &mut Session, action: &GameAction, target: CardIdx) {
     // 常在効果の再計算中（期間句の無い PASSIVE「手札が5枚以上ある場合、このキャラはアタックできない」）は
     // 再計算のたびにリセットされる `current_keywords` へ載せる。`timed_flags`（THIS_TURN）へ載せると
     // 条件が偽に戻っても外れない（OP11-058）。判定は `rules::has_flag` が両方を見る。
-    if flag == FLAG_ATTACK_DISABLE && s.state().in_passive_recalc && action.duration == Duration::Instant {
+    if flag == FLAG_ATTACK_DISABLE
+        && s.state().in_passive_recalc
+        && action.duration != Duration::UntilNextTurnEnd
+    {
         add_recalc_keyword(s, target, &flag);
         return;
     }
@@ -502,6 +505,18 @@ mod tests {
         let kws = masters.get(s.state().card(c).master).keywords.clone();
         s.edit().set_card_strs(c, crate::journal::CardStrsField::CurrentKeywords, kws);
         assert!(!crate::rules::has_flag(s.state(), c, "ATTACK_DISABLE"));
+    }
+
+    /// 条件付き常在の ATTACK_DISABLE は期間が THIS_TURN と読まれていても再計算で外れる（OP11-058）。
+    #[test]
+    fn passive_attack_disable_with_this_turn_duration_is_also_recalculated() {
+        let (masters, mut s, c) = board();
+        s.edit().set_mgr_flag(crate::journal::MgrFlagField::InPassiveRecalc, true);
+        let mut a = testkit::action(ActionType::AttackDisable, 0);
+        a.duration = Duration::ThisTurn;
+        run(&mut s, &masters, &a, &[c], 0);
+        assert!(s.state().card(c).timed_flags.is_empty());
+        assert!(crate::rules::has_flag(s.state(), c, "ATTACK_DISABLE"));
     }
 
     /// `UNTIL_NEXT_TURN_END` だけが期限つきで残る。

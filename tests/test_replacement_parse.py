@@ -112,7 +112,8 @@ def test_triggers_for_leave_and_rest_and_self_play_from_trash():
     assert ab.trigger.name == "ON_LEAVE"
     abs_ = P.parse_card_text(_nfc("【相手のターン中】【ターン1回】自分の特徴《ドレスローザ》を持つキャラがKOされた時か、"
                                   "相手の効果で場を離れた時、発動できる。カード1枚を引く。"))
-    assert {a.trigger.name for a in abs_} == {"ON_KO", "ON_LEAVE"}
+    # 「KOされた時か〜離れた時」は ON_KO 1 本（離脱側はエンジンが句を読んで積む・OP10-042）。
+    assert [a.trigger.name for a in abs_] == ["ON_KO"]
     ab = _ability("このキャラが相手の効果でレストになった時、発動できる。このキャラをトラッシュに置き、カード2枚を引くことができる。")
     assert ab.trigger.name == "ON_REST" and ab.effect.actions[0].is_optional
     ab = _ability("【相手のターン中】自分の手札1枚を捨てることができる:このキャラが相手の効果でKOされた時、"
