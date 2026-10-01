@@ -51,9 +51,12 @@ def test_bounce_self_is_source_not_a_free_choice():
 def test_trash_self_play_and_recover_are_source_in_trash():
     play = _one(_parse("【KO時】自分の手札から『白ひげ海賊団』を含む特徴を持つカード1枚を捨てることができる:"
                        "自分のライフが2枚以下の場合、このキャラカードをトラッシュからレストで登場させる。"), "PLAY_CARD")
-    assert play["target"]["select_mode"] == "SOURCE" and play["status"] == "RESTED"
+    # 自身を指す表現は 2 通り（A_target: select_mode=SOURCE／E_replace: ref_id=self）。どちらもエンジンが自身に解決する。
+    def _is_self(t):
+        return t["select_mode"] == "SOURCE" or t.get("ref_id") == "self"
+    assert _is_self(play["target"]) and play["status"] == "RESTED"
     mv = _one(_parse("【KO時】このキャラカードをトラッシュから手札に加える。"), "MOVE_CARD")
-    assert mv["target"]["select_mode"] == "SOURCE" and mv["target"]["zone"] == "TRASH"
+    assert _is_self(mv["target"]) and mv["target"]["zone"] == "TRASH"
     assert mv["destination"] == "HAND"
 
 
