@@ -83,6 +83,9 @@ pub fn declare_attack(
             "登場したターンのキャラクターは攻撃できません（速攻を除く）。",
         ));
     }
+    if super::attack_target_banned(s.state(), masters, attacker, target) {
+        return Err(bad("効果により、そのカードにはアタックできません。"));
+    }
     if card_type(s.state(), masters, target) == CardType::Leader
         && super::active_restriction_mut(s, attacker_owner, "CANNOT_ATTACK_LEADER").is_some()
     {

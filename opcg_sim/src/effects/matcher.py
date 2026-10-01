@@ -27,7 +27,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 対象側ではない（「自分の手札から…相手の場のドン‼の枚数以下のコストを持つ『X』」で
     # player を OPPONENT に誤判定し相手手札を見てしまう: OP08-062 カタクリ）。
     player_text = re.sub(
-        _nfc(r'(?:相手の|自分の|お互いの)?場のドン(?:!!|‼)?の枚数(?:分)?以下のコストを持つ'),
+        _nfc(r'(?:相手の|自分の|お互いの)?場のドン(?:!!|‼)?の枚数(?:分)?以下のコストを持(?:つ|ち)'),
         '', player_text)
     # 期間/タイミング句の「相手の」は対象側ではないため除去する
     # （「自分のリーダーを、次の相手のターン終了時まで、パワー+2000」で OPPONENT 誤判定を防ぐ）。
@@ -136,7 +136,8 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         # 本文の「ケイミ―」(U+2015 水平線) はカード名の長音符「ー」(U+30FC) の表記ゆれ（OP06-025）。
         _raw_nm = _nm
         _nm = _nm.replace("\u2015", "\u30fc")
-        if (f'「{_raw_nm}」' + _nfc(ParserKeyword.EXCEPT)) not in tgt_text:
+        # 「「X」以外で、…」「「X」以外の…」のどちらも除外名（従来は「以外の」だけ＝ST12-003 の「以外で」は包含になった）。
+        if (f'「{_raw_nm}」' + _nfc(ParserKeyword.EXCEPT)) not in tgt_text and (f'「{_raw_nm}」以外') not in tgt_text:
             tq.names.append(_nm)
         else:
             # 「「◯◯」以外のキャラ」: その名前を除外対象にする（従来は無視され、
@@ -152,13 +153,28 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 「（このキャラ）他の」「このキャラ以外」: ソース自身を候補から除外する。
     # 例: EB02-018「自分のキャラの他の『バギー』がいない場合」（自分自身を数えない）、
     # OP04-111「このキャラ以外の自分の特徴《ホーミーズ》を持つキャラ」（自身をコストに使わない）。
-    if _nfc("他の") in tgt_text or _nfc("このキャラ以外") in tgt_text or _nfc("以外の自分") in tgt_text:
+    if (_nfc("他の") in tgt_text or _nfc("このキャラ以外") in tgt_text or _nfc("このカード以外") in tgt_text
+            or _nfc("以外の自分") in tgt_text):
         tq.flags.add("EXCLUDE_SOURCE")
 
     # 「カード名の異なる…N枚」: 選ぶカードはすべて名前が異なる（distinct）。matcher が名前重複を
     # 除外して候補化することで、同名を複数選べないようにする（OP16-060/OP16-034/038 等）。
     if _nfc("カード名の異なる") in tgt_text or _nfc("カード名が異なる") in tgt_text:
         tq.is_unique_name = True
+
+    # 「捨てたカードと同じカード名を持つ」: コストで捨てたカードと同名に限る（EB02-039）。
+    #   コスト側の捨て札対象を save_id=discarded_card に保存し、resolver が名前で絞る。
+    if _nfc("捨てたカードと同じカード名") in tgt_text:
+        tq.flags.add("SAME_NAME_AS:discarded_card")
+
+    # 「【ブロッカー】を持つ（キャラ）」等のキーワード所持の絞り込み（ST01-016/ST30-012）。
+    #   従来は欄が無く任意の相手キャラを選べた。【トリガー】は別機構（HAS_TRIGGER）。
+    for _kw in re.findall(_nfc(r'【(ブロッカー|速攻|ダブルアタック|バニッシュ|ブロック不可)】を持つ'), tgt_text):
+        tq.flags.add("HAS_KEYWORD:" + _kw)
+
+    # 「単色の（リーダー/キャラ）」: 色を 1 色だけ持つカード（OP17-005）。matcher が色数で絞る。
+    if _nfc("単色の") in tgt_text:
+        tq.flags.add("SINGLE_COLOR")
 
     # 「【X】効果を持たないキャラ」: 指定トリガー種別を持たないカードに限定（EB03-001/PRB01-001）。
     _lacks = re.search(_nfc(r'【(登場時|アタック時|ブロック時|KO時|トリガー)】効果を持たない'), tgt_text)
@@ -192,6 +208,14 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             
     tq.traits.extend(final_traits)
 
+    # 「《X》(を含む特徴)を持たない」= その特徴を持たないカードに限る（OP13-064）。包含の traits には
+    # 入れず LACKS_TRAIT[_PARTIAL]:X として matcher に渡す。
+    for _lt in re.finditer(_nfc(r'[《<『]([^》>』]+)[》>』](を含む特徴)?を持たない'), tgt_text):
+        if _lt.group(1) in tq.traits:
+            tq.traits.remove(_lt.group(1))
+        tq.flags.add(("LACKS_TRAIT_PARTIAL:" if _lt.group(2) else "LACKS_TRAIT:") + _lt.group(1))
+        tq.flags.discard("NAME_PARTIAL")
+
     # 「《特徴》（を持つキャラカード）か「名前」」= 特徴 OR 名前。「か」が名前/特徴の開き括弧へ
     # かかる場合に OR とみなす（OP11-022「《海王類》を持つキャラカードか「メガロ」」）。
     # 「「名前」か特徴《X》を持つ」順（か→「特徴」→《）も OR（OP15-073/101）。
@@ -202,6 +226,14 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # card_type が AND になり、両立しない条件（サンジという名のイベントは無い）で対象が常に
     # 空になっていた。「」か」直後に種類語が続く場合に OR とみなす。
     if tq.names and tq.card_type and re.search(_nfc(r'」か(?:イベント|キャラクター|キャラ|リーダー|ステージ)'), tgt_text):
+        tq.flags.add("NAME_OR_TYPE")
+
+    # 「自分の<種類>か「名前」」= 種類 OR 名前（逆順。EB04-009/OP12-016/018/019「自分のキャラか
+    # 「シルバーズ・レイリー」1枚まで」）。従来は card_type∧names の AND になりリーダーのレイリーも
+    # 他のキャラも選べなかった。種類語が「自分の/相手の」直後に来る単純形に限る（特徴/色/コストで
+    # 修飾された「…キャラカードか「サンジ」」は別の OR 合成＝TRAIT_OR_NAME が担当）。
+    if tq.names and tq.card_type and re.search(
+            _nfc(r'(?:自分の|相手の)(?:イベント|キャラクター|キャラ|リーダー|ステージ)か、?「'), tgt_text):
         tq.flags.add("NAME_OR_TYPE")
 
     # 「「名前」か<色>の<種類>」= 名前 OR (色∧種類)（OP12-006/014「「モンキー・D・ルフィ」か
@@ -215,6 +247,24 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
 
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
+
+    # 「特徴《A》か属性(斬)を持つ」「「名前」か属性(斬)を持つ」= 名前・特徴・属性のいずれか（OR）。
+    #   従来は特徴∧属性（両方持つ）の AND になっていた（ST12-003/ST32-003）。
+    if tq.attributes and (tq.names or tq.traits) and re.search(
+            _nfc(r'(?:」|》|』)か、?属性[((]'), tgt_text):
+        tq.flags.add("SELECTOR_OR")
+
+    # 「<色>の<種類A>か<コスト条件>の<種類B>」（OP12-017「赤のイベントかコスト3以上のキャラカード」）
+    #   = (色∧種類A) OR (コスト∧種類B)。色は種類A にだけ・コストは種類B にだけ掛かる
+    #   （単純 AND では赤でもコスト3以上でもあるカードしか選べなかった）。
+    m_scoped = re.search(_nfc(
+        r'(?:赤|青|緑|黄|黒|紫)の(イベント|キャラクター|キャラ|ステージ)か'
+        r'(?:コスト\d+以[上下])の(イベント|キャラクター|キャラ|ステージ)'), tgt_text)
+    if m_scoped:
+        _tn = {_nfc("イベント"): "EVENT", _nfc("キャラクター"): "CHARACTER",
+               _nfc("キャラ"): "CHARACTER", _nfc("ステージ"): "STAGE"}
+        tq.flags.add("COLORS_ONLY_" + _tn[m_scoped.group(1)])
+        tq.flags.add("COST_ONLY_" + _tn[m_scoped.group(2)])
 
     # 「属性《X》を持つカードか<種類/色>」= 属性 OR (種類∧色)（OP12-034 ペローナ
     # 「属性(斬)を持つカードか緑のイベント」）。従来は属性・種類・色がすべて AND になり、
@@ -343,7 +393,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 「ならない/にする/にし/にできる」を含むと丸ごと抑制され、OP15-077 雷龍
     # 「相手のレストの…キャラ…アクティブにならない」でレスト対象制限が脱落し、
     # アクティブなキャラも対象にできていた。
-    rest_mod = re.search(_nfc(r'(レスト|アクティブ)の[^。、]*?(?:キャラ|カード|リーダー)'), tgt_text)
+    rest_mod = re.search(_nfc(r'(レスト|アクティブ)の、?[^。、]*?(?:キャラ|カード|リーダー|ステージ)'), tgt_text)
     if rest_mod:
         tq.is_rest = (rest_mod.group(1) == _nfc("レスト"))
         # 「レストのリーダーか、…のキャラ」(PRB02-017): 状態修飾は直後のリーダーだけに掛かり、

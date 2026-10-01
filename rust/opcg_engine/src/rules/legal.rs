@@ -177,6 +177,9 @@ fn main_actions(
             if char_only && card_type(state, masters, *tgt) == CardType::Leader {
                 continue;
             }
+            if super::attack_target_banned(state, masters, *atk, *tgt) {
+                continue;
+            }
             moves.push(game_move(
                 "ATTACK",
                 json!({"uuid": uuid(*atk), "target_ids": [uuid(*tgt)]}),

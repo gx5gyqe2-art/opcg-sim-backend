@@ -1009,3 +1009,57 @@ fn an_opponent_turn_replacement_only_applies_on_the_opponents_turn() {
         assert_eq!(find_replacement(&s, &masters, rp, &["LEAVE"]).unwrap().is_some(), expect, "{raw}");
     }
 }
+
+// --- カード効果監査（2026-10-01・WP A_target） -------------------------------------
+
+/// 「相手はキャラの「X」以外にアタックできない」（OP01-051/OP17-044/P-067）は**相手側**の制限として
+/// 登録され、常在の再計算（条件が崩れた場合の撤去）で毎回作り直される。
+#[test]
+fn attack_char_only_is_registered_on_the_opponent_and_cleared_by_a_recalc() {
+    let (masters, mut s) = board(vanilla_cards(), json!([]), json!([]), json!([]));
+    let a = action("RULE_PROCESSING", r#""status":"ATTACK_CHAR_ONLY:ユースタス・キッド""#);
+    assert_eq!(apply(&mut s, &masters, Seat::P1, &a, &[]), Ok(true));
+    assert!(s.state().player(Seat::P1).restrictions.is_empty(), "自分側には載らない");
+    let recs = &s.state().player(Seat::P2).restrictions;
+    assert_eq!(recs.len(), 1);
+    assert_eq!(recs[0].key, "ATTACK_CHAR_ONLY:ユースタス・キッド");
+    assert_eq!(recs[0].expire, 4);
+
+    crate::effects::passives::apply_passive_effects(&mut s, &masters, Seat::P1).unwrap();
+    assert!(s.state().player(Seat::P2).restrictions.is_empty(), "再計算で消える（PASSIVE が無ければ復活しない）");
+}
+
+/// 「相手の元々のパワーN以下のキャラの効果でKOされない」（OP14-003）: 除去を行った効果の発生源が
+/// 印刷パワーN以下のキャラのときだけ守る。
+#[test]
+fn effect_ko_protection_depends_on_the_removal_sources_printed_power() {
+    let guard = ability_json(
+        "PASSIVE",
+        json!({"node": "GameAction", "type": "PREVENT_LEAVE",
+               "target": query_json(r#""select_mode":"SOURCE""#), "value": value_json(0),
+               "duration": "INSTANT", "status": "EFFECT_KO", "destination": null, "is_rest": null,
+               "dest_position": null,
+               "raw_text": "このキャラは相手の元々のパワー5000以下のキャラの効果でKOされない",
+               "sub_effect": null, "is_optional": false, "delay": null, "face_up": null}),
+        "このキャラは相手の元々のパワー5000以下のキャラの効果でKOされない",
+    );
+    let mut cards = json!({
+        "LD": master_json("LD", "LEADER", json!([])),
+        "V": master_json("V", "CHARACTER", json!([])),
+        "GD": master_json("GD", "CHARACTER", json!([guard])),
+        "BIG": master_json("BIG", "CHARACTER", json!([])),
+    });
+    cards["BIG"]["power"] = json!(9000);
+    let (masters, mut s) = board(
+        cards,
+        json!([card_json("V", "p1-small", "p1"), card_json("BIG", "p1-big", "p1")]),
+        json!([card_json("GD", "p2-gd", "p2")]),
+        json!([]),
+    );
+    let gd = find(&s, "p2-gd");
+    let (small, big) = (find(&s, "p1-small"), find(&s, "p1-big"));
+    let st = &["LEAVE", "EFFECT_KO"];
+    assert_eq!(active_protection(&mut s, &masters, gd, st, Some(Seat::P1), Some(small)), Ok(true));
+    assert_eq!(active_protection(&mut s, &masters, gd, st, Some(Seat::P1), Some(big)), Ok(false));
+    assert_eq!(active_protection(&mut s, &masters, gd, st, Some(Seat::P1), None), Ok(false));
+}

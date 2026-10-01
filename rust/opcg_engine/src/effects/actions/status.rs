@@ -46,6 +46,8 @@ const FLAG_CANNOT_REST: &str = "CANNOT_REST";
 /// ＝このフラグは [`super::rest`]（`actor != owner`）だけが見る。KO 耐性は従来どおり
 /// `PREVENT_LEAVE` 経路。
 pub(crate) const FLAG_CANNOT_BE_RESTED_BY_OPP: &str = "CANNOT_BE_RESTED_BY_OPP";
+/// 発生源が相手のリーダー／キャラの効果によるレストだけを弾く版（OP15-024）。
+pub(crate) const FLAG_CANNOT_BE_RESTED_BY_OPP_LC: &str = "CANNOT_BE_RESTED_BY_OPP_LC";
 /// Python `per_target.freeze` が `flags`（`timed_flags` ではない）へ直接書くフラグ。
 const FLAG_FREEZE: &str = "FREEZE";
 /// Python `per_target.negate_effect` が載せる継続フラグ（`CardInstance.is_effect_negated`）。
@@ -216,6 +218,9 @@ fn add_recalc_keyword(s: &mut Session, target: CardIdx, keyword: &str) {
 fn attack_disable(s: &mut Session, action: &GameAction, target: CardIdx) {
     let flag = match action.status.as_deref() {
         Some(st) if st.starts_with(ATTACK_TAX_PREFIX) => st.to_owned(),
+        // 「リーダーにアタックできない」「相手の元々のコストN以下のキャラへアタックできない」＝
+        // 攻撃先を縛るフラグ（`rules::attack_target_banned` が見る）。全アタック禁止ではない。
+        Some(st) if st.starts_with("ATTACK_BAN_") => st.to_owned(),
         _ => FLAG_ATTACK_DISABLE.to_owned(),
     };
     // 常在効果の再計算中（期間句の無い PASSIVE「手札が5枚以上ある場合、このキャラはアタックできない」）は
@@ -248,7 +253,13 @@ fn prevent_rest(
     source_card: Option<CardIdx>,
 ) {
     let flag = if source_card == Some(target) {
-        FLAG_CANNOT_BE_RESTED_BY_OPP
+        // 「相手のリーダーとキャラの効果でレストにされず」は発生源がリーダー／キャラの効果だけを弾く
+        // （相手のイベント・ステージの効果では守られない: OP15-024）。
+        if action.raw_text.contains("リーダーとキャラの効果で") {
+            FLAG_CANNOT_BE_RESTED_BY_OPP_LC
+        } else {
+            FLAG_CANNOT_BE_RESTED_BY_OPP
+        }
     } else {
         FLAG_CANNOT_REST
     };

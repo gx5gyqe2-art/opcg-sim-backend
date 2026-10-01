@@ -367,6 +367,7 @@ make test-slow   # 重テストだけ
 | ファイル | 役割 |
 |---|---|
 | `tests/test_effect_oracle_gate.py` | 静的 text↔AST 整合性 HAS_OTHER/PER_TURN_LIMIT_GAP/UP_TO_GAP = 0 のラチェット（§5） |
+| `tests/test_audit_fix_a_target.py` | カード効果監査の欠陥（自身を指す句・公開/登場カードの参照・攻撃先制限・ブロック不可付与・択一の共有対象・OR/除外/種別スコープ・条件の否定/他の/コスト後評価ほか）の解析構造を実文で固定（必須/標準・WP A_target） |
 | `tests/test_effect_event_dest.py` | **EFFECT イベントの行き先（dest）記録**: 移動系（MOVE_CARD 等）の eventLog に dest（"LIFE" 等）が additive に載る／非移動系（LOOK）には載せない。実カード OP16-119 のライフ追加で固定（フロントの効果表示の根拠） |
 | `tests/test_structural_gate.py` | 構造不変条件4スキャン＋条件偽パスのラチェット（カテゴリH 再発防止。§5/§8.5） |
 | `tests/test_interaction_stack.py` | 中断スタック（`active_interaction` 互換プロパティ／`push_interaction`）のセマンティクス |

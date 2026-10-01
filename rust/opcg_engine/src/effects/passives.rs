@@ -65,6 +65,18 @@ pub fn apply_passive_effects(
         }
     }
 
+    // 常在の「相手は…以外にアタックできない」制限は再計算のたびに作り直す（条件が崩れたら消える）。
+    for seat in [player, opponent] {
+        let recs = s.state().player(seat).restrictions.clone();
+        if recs.iter().any(|r| r.key.starts_with(crate::rules::ATTACK_CHAR_ONLY_PREFIX)) {
+            let kept: Vec<_> = recs
+                .into_iter()
+                .filter(|r| !r.key.starts_with(crate::rules::ATTACK_CHAR_ONLY_PREFIX))
+                .collect();
+            s.edit().set_restrictions(seat, kept);
+        }
+    }
+
     // Step 2/3 で適用される INSTANT パワーバフは passive_power（再計算レイヤ）へ載せる。
     s.edit().set_mgr_flag(MgrFlagField::InPassiveRecalc, true);
     let result = recalc_steps(s, masters, player, opponent);
@@ -171,7 +183,9 @@ pub fn apply_hand_self_cost(
                 let Some(EffectNode::Action(eff)) = ab.effect.as_ref() else {
                     continue;
                 };
-                if eff.status.as_deref() != Some("COST_REDUCTION") {
+                // 手札の自己値: コスト増減（COST_REDUCTION）と、カウンター値の付与（COUNTER・OP17-118）。
+                let is_counter = eff.status.as_deref() == Some("COUNTER");
+                if eff.status.as_deref() != Some("COST_REDUCTION") && !is_counter {
                     continue;
                 }
                 let Some(tq) = eff.target.as_ref() else {
@@ -194,6 +208,11 @@ pub fn apply_hand_self_cost(
                     )? {
                         continue;
                     }
+                }
+                if is_counter {
+                    let v = s.state().card(card).passive_counter + eff.value.base;
+                    s.edit().set_card_i32(card, CardI32Field::PassiveCounter, v);
+                    continue;
                 }
                 let v = s.state().card(card).cost_buff + eff.value.base;
                 s.edit().set_card_i32(card, CardI32Field::CostBuff, v);

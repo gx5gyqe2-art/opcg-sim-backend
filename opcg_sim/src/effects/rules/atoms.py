@@ -13,8 +13,8 @@ import re
 import unicodedata
 from typing import Optional
 
-from ...models.effect_types import Choice, EffectNode, GameAction, Sequence, TargetQuery, ValueSource
-from ...models.enums import ActionType, Player, Zone
+from ...models.effect_types import Branch, Choice, Condition, EffectNode, GameAction, Sequence, TargetQuery, ValueSource
+from ...models.enums import ActionType, ConditionType, Player, Zone
 from ..matcher import parse_target
 from .base import ParseContext, rule, _nfc
 
@@ -532,7 +532,13 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if _nfc("にする") in t:
         return None  # 「パワーをNにする」は base_power_override 系（別ルールで対応予定）
-    tq = _buff_target(t)
+    # 「<数える対象>N枚につき、<対象>は…パワー±N」: 対象は「につき、」の後ろだけから作る。数える側の
+    # 特徴・側（「自分の場の特徴《麦わらの一味》を持つカード1枚につき」）を対象の絞り込みに混ぜると、
+    # 相手キャラが麦わら持ちに限られていた（ST31-004）。
+    _after_per = re.sub(_nfc(r"^.*?枚につき、?"), "", t, count=1)
+    # 「につき」の後ろに対象（キャラ/リーダー…）があるときだけそれを使う（「このキャラは、…5枚につき、
+    # パワー+1000」のように主語が前に来る形は全文のまま）。
+    tq = _buff_target(_after_per if re.search(_nfc(r"キャラ|リーダー|カード|ステージ"), _after_per) else t)
     x = _to_int(m.group(1))
     buff = GameAction(
         type=ActionType.BUFF,
@@ -624,6 +630,40 @@ def _power_swap(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+def _subject_text(t: str, particle: str = "は") -> str:
+    """「<主語>は、…」（particle="を" なら「<主語>を、…」）の主語部分（無ければ空）。
+
+    「は」は最初の出現まで（「特徴《X》を持つキャラは」の「を持つ」で切らない）、
+    「を」は「を、」までを最長一致で取る。"""
+    pat = r"^(?:このターン中、|次の[^、]*まで、)?(.+?)は、?" if particle == "は" else \
+        r"^(?:このターン中、|次の[^、]*まで、)?(.+)を、"
+    m = re.match(_nfc(pat), t.strip())
+    return m.group(1) if m else ""
+
+
+def _multi_subject_targets(subject: str) -> Optional[list]:
+    """「<X>とこのキャラ」（X と自身の両方）の主語を [X の対象, 自身] に分解する。
+
+    X は「自分のリーダー」か、名前・特徴などで絞った「自分の…すべて」。従来は「このキャラ」を
+    含むだけで自身 1 枚に縮退し、X が脱落していた（OP15-070/OP16-015）。
+    """
+    m = re.match(_nfc(r"^(.+?)と、?この(?:キャラ|カード)$"), subject)
+    if not m:
+        return None
+    left = m.group(1)
+    if re.fullmatch(_nfc(r"自分のリーダー"), left):
+        first = TargetQuery(card_type=["LEADER"])
+    else:
+        first = parse_target(left)
+        if not first.card_type:
+            first.card_type = ["CHARACTER"]
+        if _nfc("すべて") in left:
+            first.count = -1
+            first.select_mode = "ALL"
+    return [first, TargetQuery(select_mode="SOURCE")]
+
+
+
 @rule("set_power", priority=59)
 def _set_power(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -633,6 +673,12 @@ def _set_power(ctx: ParseContext) -> Optional[GameAction]:
     m = re.search(_nfc(r"パワー(?:を)?(\d+)に(?:なる|する)"), t)
     if not m:
         return None
+    multi = _multi_subject_targets(_subject_text(t, "を"))
+    if multi:
+        return Sequence(actions=[
+            GameAction(type=ActionType.BUFF, status="POWER_OVERRIDE", target=tq_,
+                       value=ValueSource(base=int(m.group(1))), duration=_duration_of(t), raw_text=t)
+            for tq_ in multi])
     tq = _buff_target(t)
     if _nfc("まで") in t:
         tq.is_up_to = True
@@ -743,7 +789,25 @@ def _grant_keyword(ctx: ParseContext) -> Optional[GameAction]:
     if re.search(_nfc(rf"パワー{_SIGN}[\d０-９]+"), t):
         return None
     keyword = m.group(1)
-    if re.search(_nfc(r"この(カード|キャラ|リーダー)"), t):
+    subject = _subject_text(t)
+    multi = _multi_subject_targets(subject)
+    if multi:
+        # 「自分の「シュラ」すべてとこのキャラは【ブロック不可】を得る」: 両方に付与する（OP15-070）。
+        return Sequence(actions=[
+            GameAction(type=ActionType.GRANT_KEYWORD, target=tq_, status=keyword,
+                       duration=_duration_of(t), raw_text=t) for tq_ in multi])
+    if subject and _nfc("以外") in subject and re.search(_nfc(r"^この(?:カード|キャラ)以外"), subject):
+        # 「このキャラ以外の自分のコスト3以上の赤のキャラすべては、【速攻】を得る」: 他のキャラ全て（OP04-118）。
+        tq = parse_target(subject)
+        tq.count = -1
+        tq.select_mode = "ALL"
+    elif subject and not re.search(_nfc(r"この(カード|キャラ|リーダー)"), subject):
+        # 主語が自身でないなら主語だけから対象を作る（述語の「属性(斬)を得る」等を絞り込みに混ぜない: OP15-093）。
+        tq = parse_target(subject)
+        if _nfc("すべて") in subject:
+            tq.count = -1
+            tq.select_mode = "ALL"
+    elif re.search(_nfc(r"この(カード|キャラ|リーダー)"), t):
         tq = TargetQuery(select_mode="SOURCE")
     else:
         tq = parse_target(t)
@@ -828,6 +892,11 @@ def _field_char_to_life(ctx: ParseContext) -> Optional[GameAction]:
         # 「相手の」「自分の」明示はそれぞれ OPPONENT / SELF として尊重する。
         if tq.player == Player.SELF and _nfc("自分") not in t:
             tq.player = Player.ALL
+        # 源ゾーンの明示が無い「キャラカード」は場のキャラではなく、直前に見た（LOOK→TEMP）カード
+        # （ST13-002「デッキの上から5枚を見て、コスト5のキャラカード1枚までを、ライフの上に…」）。
+        if _nfc("キャラカード") in t and tq.player != Player.OPPONENT:
+            tq.zone = Zone.TEMP
+            tq.player = Player.SELF
         if _nfc("まで") in t:
             tq.is_up_to = True
     elif _nfc("代わりに") in t:
@@ -1648,6 +1717,26 @@ def _attack_disable(ctx: ParseContext) -> Optional[GameAction]:
     # 効果コントローラー自身の攻撃側制限。self_cannot(CANNOT_ATTACK_LEADER) に委ねる。
     if _nfc("自分は") in t and re.search(_nfc(r"リーダーにアタック"), t):
         return None
+    # 「相手はキャラの「X」以外にアタックできない」= 相手の攻撃先を X という名前のキャラに限る
+    # （リーダーへは制限なし）。従来は相手場の「X」を ATTACK_DISABLE の対象にしており、攻撃先の制限に
+    # なっていなかった（OP01-051/OP17-044/P-067）。エンジンが相手側の制限として登録・強制する。
+    m_only = re.search(_nfc(r"相手は(?:キャラの)?「([^」]+)」以外(?:の?キャラ)?に(?:は)?アタックできない"), t)
+    if m_only:
+        return GameAction(type=ActionType.RULE_PROCESSING,
+                          status="ATTACK_CHAR_ONLY:" + m_only.group(1),
+                          duration=_duration_of(t), raw_text=t)
+    # 「このキャラは、登場したターン中、リーダーにアタックできない」/「このリーダーは、このターン中、
+    # 相手の元々のコストN以下のキャラへアタックできない」= 自カードの攻撃先の制限（全アタック禁止ではない）。
+    m_ban_leader = re.search(_nfc(r"^この(?:リーダー|キャラ|カード)は、?(?:登場したターン中、?)?(?:このターン中、?)?リーダーにアタックできない"), t.strip())
+    m_ban_cost = re.search(_nfc(r"^この(?:リーダー|キャラ|カード)は、?(?:このターン中、?)?相手の元々のコスト(\d+)以下のキャラへ(?:は)?アタックできない"), t.strip())
+    if m_ban_leader or m_ban_cost:
+        status = "ATTACK_BAN_LEADER" if m_ban_leader else f"ATTACK_BAN_CHAR_OCOST_LE_{m_ban_cost.group(1)}"
+        act = GameAction(type=ActionType.ATTACK_DISABLE, target=TargetQuery(select_mode="SOURCE"),
+                         status=status, duration="THIS_TURN", raw_text=t)
+        if m_ban_leader and _nfc("登場したターン") in t:
+            return Branch(condition=Condition(type=ConditionType.SOURCE_STATE, value="ENTERED_THIS_TURN",
+                                              raw_text=t), if_true=act)
+        return act
     # 「このリーダー/キャラ/カードは、…（相手の…へ）アタックできない」= 効果保持カード自身の
     # 攻撃側制限。対象（〜へ）ではなく自カード(SOURCE)に制限フラグを乗せる（OP12-020）。
     # 対象限定（コストN以下のキャラへ等）はエンジン未モデルのため、自カードのアタック制限に近似する。
@@ -1709,6 +1798,10 @@ def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
             return None
         value = -int(m2.group(1))
     tq = _buff_target(t)
+    # 枚数指定の無い「自分の手札の青のイベントを、コスト-1」は該当する全てへの常在（1 枚選ぶ対話ではない: OP01-067）。
+    if tq.select_mode == "CHOOSE" and tq.zone == Zone.HAND and not re.search(_nfc(r"[\d０-９]+枚"), t):
+        tq.count = -1
+        tq.select_mode = "ALL"
     buff = GameAction(
         type=ActionType.BUFF,
         target=tq,
@@ -1811,6 +1904,16 @@ def _execute_main(ctx: ParseContext) -> Optional[GameAction]:
 def _shuffle(ctx: ParseContext) -> Optional[GameAction]:
     if _nfc("シャッフル") not in ctx.text:
         return None
+    # 「自分のトラッシュのカードN枚をデッキに戻しシャッフルできる」（OP05-080）: トラッシュ N 枚の移動＋
+    # シャッフル。従来はシャッフルだけで、トラッシュ N 枚の要件と移動が無かった。
+    m_tr = re.search(_nfc(r"トラッシュのカード([\d０-９]+)枚をデッキに戻し"), ctx.text)
+    if m_tr:
+        move = GameAction(
+            type=ActionType.MOVE_CARD,
+            target=TargetQuery(zone=Zone.TRASH, player=Player.SELF, count=_to_int(m_tr.group(1)),
+                               is_strict_count=True),
+            destination=Zone.DECK, raw_text=ctx.text)
+        return Sequence(actions=[move, GameAction(type=ActionType.SHUFFLE, raw_text=ctx.text)])
     # 「相手のデッキをシャッフルする」: 対象は相手デッキ（executor が target.player で判定）
     tq = None
     if _nfc("相手の") in ctx.text:
@@ -2035,6 +2138,14 @@ def _reveal_hand(ctx: ParseContext) -> Optional[GameAction]:
         return None
     tq = parse_target(t)
     tq.zone = Zone.HAND
+    # 枚数指定の無い「手札を公開する」（「相手は自身の手札を1枚捨て、手札を公開する」）は
+    # 手札全体の公開で、公開するのは直前の句の主語（相手）側（OP07-090。従来は自分の手札1枚だった）。
+    if re.match(_nfc(r"^手札を公開"), t.strip()):
+        tq.player = Player.OPPONENT
+        tq.count = -1
+        tq.select_mode = "ALL"
+        tq.save_id = "revealed_cards"
+        return GameAction(type=ActionType.REVEAL, target=tq, raw_text=t)
     # 「まで」のみ可変枚数（0..N）。「できる/ことができる」はコストの任意性であって枚数ではない
     # （「イベント2枚を公開することができる」＝ちょうど2枚を任意で公開。cost_optional 側で処理）。
     # 従来は「できる」でも is_up_to=True となり 2枚未満でもコストを払えてしまった（OP12-001）。
@@ -2081,6 +2192,35 @@ def _blocker_disable(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     if _nfc("ブロッカー") not in t or _nfc("発動できない") not in t:
         return None
+    # 「（相手は、このターン中、）選んだ／その付与した／その…カードがアタックする場合【ブロッカー】を
+    # 発動できない」= **アタックする側のカード**を相手のブロッカーに阻まれない状態にする
+    # （＝【ブロック不可】をこのターン中だけ付与するのと同じ）。従来は BLOCKER_DISABLE を相手場の
+    # 参照先(selected_card=自分のカード)へ向けており、相手のブロッカーが止まらなかった
+    # （OP07-057/OP12-077/OP12-016/ST01-016/ST21-003）。
+    m_atk = re.search(_nfc(r"(選んだ|その付与した|その)(?:リーダーかキャラ|リーダー|キャラ|カード)が"
+                           r"アタックする(?:場合|際)"), t)
+    if m_atk:
+        return GameAction(
+            type=ActionType.GRANT_KEYWORD,
+            target=TargetQuery(ref_id="selected_card"),
+            status="ブロック不可",
+            duration="THIS_TURN",
+            raw_text=t,
+        )
+    # 「（このターン中、）自分のリーダー／キャラがアタックする際【ブロッカー】を発動できない」
+    # = 自分のそのカードに同じ【ブロック不可】（OP13-057。従来は相手場全体に BLOCKER_DISABLE だった）。
+    m_own = re.search(_nfc(r"自分の(リーダー|キャラ)が[^、]*アタックする(?:場合|際)"), t)
+    if m_own:
+        is_leader = m_own.group(1) == _nfc("リーダー")
+        return GameAction(
+            type=ActionType.GRANT_KEYWORD,
+            target=TargetQuery(card_type=["LEADER" if is_leader else "CHARACTER"],
+                               count=1 if is_leader else -1,
+                               select_mode="CHOOSE" if is_leader else "ALL"),
+            status="ブロック不可",
+            duration="THIS_TURN",
+            raw_text=t,
+        )
     # 「コスト5以下のキャラの【ブロッカー】」等の制約は述部側に現れるため、
     # 全文を parse_target に渡して cost/power 上限・特徴を保全する。
     # 「自分のリーダーがアタックする際」のようなタイミング限定句は player 判定を
@@ -2178,6 +2318,11 @@ def _bounce(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if _nfc("手札から") in t:
         return None  # 「手札から何かして手札に戻す」等の誤検知を避ける
+    # 「（このターン終了時、）このキャラ(カード)を持ち主の手札に戻す」= 自身を戻す（対象選択ではない）。
+    # 従来は汎用の ALL/FIELD CHARACTER になり、盤面の任意のキャラを戻せた（OP04-009/ST12-012）。
+    if re.search(_nfc(r"この(?:キャラ|カード|リーダー)(?:カード)?を、?(?:持ち主の)?手札に戻"), t):
+        return GameAction(type=ActionType.BOUNCE,
+                          target=TargetQuery(select_mode="SOURCE"), raw_text=t)
     tq = parse_target(t)
     # 側の明示で対象を決める（テキスト準拠）:
     #   「相手の」明示 → OPPONENT（parse_target で解決済み）
@@ -2189,7 +2334,43 @@ def _bounce(ctx: ParseContext) -> Optional[GameAction]:
         tq.player = Player.ALL
     if _nfc("まで") in t:
         tq.is_up_to = True
+    # 「自分の、「X」と「Y」すべてを…」のように名前だけで指す場合も対象はキャラ（リーダー「サンジ」や
+    # ステージを巻き込まない: ST26-001）。
+    if not tq.card_type and tq.names:
+        tq.card_type = ["CHARACTER"]
     return GameAction(type=ActionType.BOUNCE, target=tq, raw_text=t)
+
+
+@rule("bounce_or_deck_bottom", priority=76)
+def _bounce_or_deck_bottom(ctx: ParseContext) -> Optional[EffectNode]:
+    """「（対象）を、持ち主の手札かデッキの下に戻す」→ Choice[BOUNCE, DECK_BOTTOM]（対象は場のキャラ）。
+
+    従来は deck_bottom_general が拾い、対象が zone=[HAND,DECK] のキャラ（場のキャラではない）になり、
+    手札かデッキの下かの択一も表現されなかった（OP04-043/OP11-050）。
+    """
+    t = ctx.text
+    m = re.search(_nfc(r"^(.+?)を、?持ち主の手札かデッキの下に(?:戻す|置く)"), t)
+    if not m:
+        return None
+    desc = m.group(1) + _nfc("を")
+    tq = parse_target(desc)
+    tq.zone = Zone.FIELD
+    if tq.player != Player.OPPONENT and _nfc("自分の") not in desc:
+        tq.player = Player.ALL
+    if _nfc("まで") in desc:
+        tq.is_up_to = True
+
+    def _opt(ty):
+        return GameAction(type=ty, target=_clone_target(tq), raw_text=t)
+
+    return Choice(message=_nfc("戻し先を選ぶ"),
+                  option_labels=[_nfc("持ち主の手札に戻す"), _nfc("持ち主のデッキの下に置く")],
+                  options=[_opt(ActionType.BOUNCE), _opt(ActionType.DECK_BOTTOM)])
+
+
+def _clone_target(tq: TargetQuery) -> TargetQuery:
+    import copy
+    return copy.deepcopy(tq)
 
 
 @rule("deck_bottom_general", priority=55)
@@ -2290,7 +2471,7 @@ def _remaining_deck_top_or_bottom(ctx: ParseContext) -> Optional[GameAction]:
 # ---------------------------------------------------------------------------
 _DUAL_REMOVAL_RE = re.compile(_nfc(
     r"(?P<f1>(?:コスト|パワー)\d+以下)の(?P<t1>キャラ|ステージ)[\d０-９]*枚まで(?:と、?|、と)"
-    r"\s*(?P<f2>(?:コスト|パワー)\d+以下)の(?P<t2>キャラ|ステージ)[\d０-９]*枚までを、?"
+    r"\s*(?:相手の|自分の)?(?P<f2>(?:コスト|パワー)\d+以下)の(?P<t2>キャラ|ステージ)[\d０-９]*枚までを、?"
     r"(?P<verb>KOする|持ち主の手札に戻す|手札に戻す|持ち主のデッキの下|デッキの下)"))
 
 
@@ -2324,6 +2505,9 @@ def _dual_tier_removal(ctx: ParseContext) -> Optional[EffectNode]:
                          count=1, is_up_to=True)
         if _nfc("コスト") in crit:
             tq.cost_max = n
+            # 「元々の、コストN以下」は印刷コストで絞る（両ティア。OP10-098）。
+            if original:
+                tq.flags.add("ORIGINAL_COST")
         else:
             tq.power_max = n
             if original:
@@ -2387,6 +2571,16 @@ def _play_card_from_zone(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if re.search(_nfc(r"この(カード|キャラ|リーダー)を"), t):
         return None  # play_self が担当
+    # 「このキャラカードをトラッシュから（レストで）登場させる」= 自身（トラッシュにある発生源）を登場。
+    # 従来は汎用の SELF/TRASH CHARACTER になり、トラッシュの任意のキャラを出せた（OP02-018/ST30-008）。
+    if re.search(_nfc(r"この(?:カード|キャラカード)を、?(?:トラッシュ|手札)から"), t):
+        return GameAction(
+            type=ActionType.PLAY_CARD,
+            target=TargetQuery(zone=Zone.TRASH, select_mode="SOURCE"),
+            destination=Zone.FIELD,
+            status="RESTED" if re.search(_nfc(r"レストで(、)?登場"), t) else None,
+            raw_text=t,
+        )
     has_hand = _nfc("手札") in t
     has_trash = _nfc("トラッシュ") in t
     if not has_hand and not has_trash:
@@ -2404,7 +2598,25 @@ def _play_card_from_zone(ctx: ParseContext) -> Optional[GameAction]:
         tq.zone = Zone.HAND
     if _nfc("まで") in t:
         tq.is_up_to = True
+    # 「コストの合計がN以下になるように」: 合計コストの上限（resolver が貪欲に収める）。従来は欄が無く
+    # 上限なしで登場できた（OP17-118）。
+    m_sum = re.search(_nfc(r"コストの合計が([\d０-９]+)以下"), t)
+    if m_sum:
+        tq.flags.add(f"COST_SUM_MAX:{_to_int(m_sum.group(1))}")
     status = "RESTED" if re.search(_nfc(r"レストで(、)?登場"), t) else None
+    # 「「A」と「B」と「C」それぞれ1枚ずつまでを、登場させる」= 名前ごとに 1 枚ずつ（最大 3 枚）。
+    # 従来は 3 名の OR で合計 1 枚までになっていた（ST13-006）。
+    if len(tq.names) >= 2 and _nfc("それぞれ") in t:
+        import copy
+        acts = []
+        for nm in tq.names:
+            q = copy.deepcopy(tq)
+            q.names = [nm]
+            q.count = 1
+            q.is_up_to = True
+            acts.append(GameAction(type=ActionType.PLAY_CARD, target=q,
+                                   destination=Zone.FIELD, status=status, raw_text=t))
+        return Sequence(actions=acts)
     return GameAction(
         type=ActionType.PLAY_CARD,
         target=tq,
@@ -2511,6 +2723,11 @@ def _trash_target(ctx: ParseContext) -> Optional[GameAction]:
     tq = parse_target(t)
     if _nfc("まで") in t:
         tq.is_up_to = True
+    # 側・種類・ゾーンの無い「カードN枚までを、トラッシュに置く」は直前に見た（LOOK→TEMP）カードから選ぶ
+    # （OP03-083。従来は場のカードが対象で、実行すると場のカードをトラッシュへ送った）。
+    if re.match(_nfc(r"^カード[\d０-９]+枚(?:まで)?を、?トラッシュに置"), t.strip()):
+        tq.zone = Zone.TEMP
+        tq.player = Player.SELF
     return GameAction(type=ActionType.TRASH, target=tq, raw_text=t)
 
 
@@ -2527,6 +2744,15 @@ def _self_to_hand(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if _nfc("手札に加える") not in t and _nfc("手札に加えてもよい") not in t:
         return None
+    # 「このキャラカードをトラッシュから手札に加える」= 自身（トラッシュにある発生源）を手札へ。
+    # 従来は汎用の SELF/TRASH CHARACTER になり、トラッシュの任意のキャラを回収できた（OP15-042）。
+    if re.search(_nfc(r"この(?:カード|キャラカード)を、?トラッシュから"), t):
+        return GameAction(
+            type=ActionType.MOVE_CARD,
+            target=TargetQuery(zone=Zone.TRASH, select_mode="SOURCE"),
+            destination=Zone.HAND,
+            raw_text=t,
+        )
     # 明示ソース（「トラッシュから」「ライフから」）は別ルールに委ねる
     if _nfc("トラッシュ") in t or _nfc("ライフ") in t:
         return None
@@ -2720,7 +2946,10 @@ def _attack_active(ctx: ParseContext) -> Optional[GameAction]:
     if not re.search(_nfc(r"アクティブ.*キャラ.*アタックできる"), t):
         return None
     duration = "THIS_TURN" if _nfc("このターン中") in t else "PERMANENT"
-    tq = parse_target(t)
+    # 対象は主語（「…は、」より前）だけで決める。述語の「アクティブのキャラにも」を含めると
+    # card_type に CHARACTER が混入し、リーダー限定の付与がキャラも選べた（OP11-010）。
+    m_subj = re.match(_nfc(r"^(.+?)は、?"), t.strip())
+    tq = parse_target(m_subj.group(1)) if m_subj else parse_target(t)
     if re.search(_nfc(r"このキャラは"), t):
         tq = TargetQuery(select_mode="SOURCE")
     return GameAction(
@@ -2764,6 +2993,10 @@ def _freeze_target(ctx: ParseContext) -> Optional[EffectNode]:
         )
         return Choice(message="アクティブにならない対象を選ぶ", option_labels=["キャラ", "ドン!!"],
                       options=[char_action, don_action])
+    # 「このキャラは、次の自分のリフレッシュフェイズでアクティブにならない」= 自身をフリーズする
+    # （従来は相手キャラ 1 枚が対象だった: OP04-090）。
+    if re.match(_nfc(r"^(?:その後、)?この(?:キャラ|カード|リーダー)は"), t.strip()):
+        return GameAction(type=ActionType.FREEZE, target=TargetQuery(select_mode="SOURCE"), raw_text=t)
     tq = parse_target(t)
     # 「お互いの（リフレッシュフェイズ）」や側未指定の「すべて」（鳥カゴ OP05-040 等）は両側が対象（ALL）。
     # それ以外（多くは「相手の…キャラ」）は OPPONENT 既定を維持する。
@@ -2952,6 +3185,15 @@ def _self_effect_disabled(ctx: ParseContext) -> Optional[GameAction]:
     # 異なり（特定トリガーのみ無効・対象が相手）SOURCE 全無効では不正確なため対象外。
     if not re.search(_nfc(r"効果が無効になる"), t):
         return None
+    # 「自分の、リーダーと『X』を含む特徴を持たないキャラすべては、効果が無効になる」= 主語が自身でない
+    # 範囲指定（OP13-064）。従来は自身 1 枚の DISABLE_ABILITY（エンジンでは何もしない）に縮退していた。
+    # 常在の再計算ごとに該当カードへ「効果を無効にする」を掛ける（NEGATE_EFFECT・このターン中）。
+    subj = _subject_text(t)
+    if subj and not re.fullmatch(_nfc(r"この(?:キャラ|カード|リーダー)"), subj):
+        tq = parse_target(subj)
+        tq.count = -1
+        tq.select_mode = "ALL"
+        return GameAction(type=ActionType.NEGATE_EFFECT, target=tq, duration="THIS_TURN", raw_text=t)
     return GameAction(
         type=ActionType.DISABLE_ABILITY,
         target=TargetQuery(select_mode="SOURCE"),
@@ -3208,6 +3450,23 @@ def _revealed_to_deck_top(ctx: ParseContext) -> Optional[GameAction]:
                            select_mode="ALL", ref_id="revealed_cards"),
         destination=Zone.DECK,
         dest_position="TOP",
+        raw_text=t,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 公開したカードをデッキの下へ: 「公開したカードをデッキの下に置く」（EB01-029/OP04-011）
+#   公開（LOOK→TEMP）済みのデッキトップを、デッキの下へ戻す。従来は汎用の deck_bottom_general が
+#   拾い、対象が SELF/FIELD（場のカード）になって場のカードをデッキ下へ動かしていた。
+# ---------------------------------------------------------------------------
+@rule("revealed_to_deck_bottom", priority=64)
+def _revealed_to_deck_bottom(ctx: ParseContext) -> Optional[GameAction]:
+    t = ctx.text
+    if not re.search(_nfc(r"公開した(?:カード|残り)を?、?デッキの下に置く"), t):
+        return None
+    return GameAction(
+        type=ActionType.DECK_BOTTOM,
+        target=TargetQuery(player=Player.SELF, zone=Zone.TEMP, count=-1, select_mode="ALL"),
         raw_text=t,
     )
 

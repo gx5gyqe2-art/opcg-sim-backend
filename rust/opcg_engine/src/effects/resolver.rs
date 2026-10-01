@@ -1019,7 +1019,24 @@ impl Resolver {
                 return Ok(Some(source_card.into_iter().map(TargetRef::Card).collect()));
             }
             if let Some(saved) = self.context.saved(ref_id) {
-                return Ok(Some(saved.clone()));
+                let mut out = saved.clone();
+                // 「そのキャラのコスト／パワーがN以下の場合」: 参照先をコスト／パワーで絞る。
+                if query.flags.iter().any(|f| f == "REF_FILTER") {
+                    out.retain(|t| match t.card() {
+                        Some(c) => {
+                            let card = s.state().card(c);
+                            let m = masters.get(card.master);
+                            let cost = card.current_cost(m);
+                            let power = card.get_power(m, card.owner == s.state().turn_player);
+                            query.cost_max.map_or(true, |x| cost <= x)
+                                && query.cost_min.map_or(true, |x| cost >= x)
+                                && query.power_max.map_or(true, |x| power <= x)
+                                && query.power_min.map_or(true, |x| power >= x)
+                        }
+                        None => true,
+                    });
+                }
+                return Ok(Some(out));
             }
             // ref_id 指定なのに保存対象が無い＝対象なし（場全体クエリへ落とさない）。
             return Ok(Some(Vec::new()));
@@ -1059,6 +1076,24 @@ impl Resolver {
             source_card,
             &self.context,
         )?;
+
+        // 「捨てたカードと同じカード名を持つ」（SAME_NAME_AS:<save_id>・EB02-039）: 保存済みのカードと
+        // 同名のものだけを候補に残す（保存が無ければ誰も同名でない＝対象なし）。
+        for f in &query.flags {
+            if let Some(save_id) = f.strip_prefix("SAME_NAME_AS:") {
+                let names: Vec<String> = self
+                    .context
+                    .saved_cards(save_id)
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|c| masters.get(s.state().card(*c).master).name.clone())
+                    .collect();
+                candidates.retain(|t| match t.card() {
+                    Some(c) => names.contains(&masters.get(s.state().card(c).master).name),
+                    None => false,
+                });
+            }
+        }
 
         // コストで「状態を変える」対象は、まだその状態でないカードに限る。
         if let Some((node, node_ref)) = action {
@@ -1127,6 +1162,43 @@ impl Resolver {
                     if total + p <= psum_max {
                         chosen.push(t);
                         total += p;
+                    }
+                }
+                if let Some(save_id) = query.save_id.as_ref() {
+                    self.context.set_saved(save_id, chosen.clone());
+                }
+                return Ok(Some(chosen));
+            }
+        }
+
+        // 「コストの合計がN以下になるように登場させる」（COST_SUM_MAX:N・OP17-118）: 合計コストが上限に
+        // 収まるよう、コストの高いものから貪欲に取る（枚数は count まで）。選択の対話は挟まない。
+        if let Some(cap) = query
+            .flags
+            .iter()
+            .find_map(|f| f.strip_prefix("COST_SUM_MAX:").and_then(|n| n.parse::<i32>().ok()))
+        {
+            if !candidates.is_empty() {
+                let cost_of = |t: TargetRef| match t.card() {
+                    Some(c) => {
+                        let card = s.state().card(c);
+                        card.current_cost(masters.get(card.master))
+                    }
+                    None => 0,
+                };
+                let cap_n = if query.count > 0 { query.count as usize } else { candidates.len() };
+                let mut ordered = candidates.clone();
+                ordered.sort_by_key(|t| std::cmp::Reverse(cost_of(*t)));
+                let mut chosen: Vec<TargetRef> = Vec::new();
+                let mut total = 0;
+                for t in ordered {
+                    if chosen.len() >= cap_n {
+                        break;
+                    }
+                    let c = cost_of(t);
+                    if total + c <= cap {
+                        chosen.push(t);
+                        total += c;
                     }
                 }
                 if let Some(save_id) = query.save_id.as_ref() {
