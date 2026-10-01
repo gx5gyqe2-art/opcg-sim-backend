@@ -230,8 +230,10 @@ def _ctx_key(ctx):
 
 def card_gain(cid, ctx, cards):
     """デッキの札 1 枚を今の手札に加えたときの `max(ΔH_play, ΔG_guard)`（同じ手札・同じ札は使い回す）。"""
-    key = (_ctx_key(ctx), str(cid))
-    if key in _GAIN:
+    import theory_order as _TO
+    key = ((_ctx_key(ctx), str(cid)) + ((_TO.CUT_PRICER_KEY, _TO.CUT_TAKE_CARD is not None) if _TO.CUT_PRICER is not None else ())
+           if _TO._cut_cache_ok() else None)                   # **N-3**: 値段の文脈は鍵に入れる
+    if key is not None and key in _GAIN:
         return _GAIN[key]
     b = _card_body(cid, cards)
     info = cards.info(cid) or {}
@@ -241,6 +243,8 @@ def card_gain(cid, ctx, cards):
         card = HP.inflow_item(card, ctx["hand_items"], ctx.get("deck") or [], ctx["xs"], ctx["take"], cards, ctx["olp"], ctx["r"],
                               field=ctx.get("field") or (), st_base=ctx.get("st_base"))
     d = HP.card_deltas(ctx["hand_items"], card, ctx["caps"], ctx["xs"], ctx["take"])
+    if key is None:
+        return float(d["dtotal"])
     _GAIN[key] = float(d["dtotal"])
     return _GAIN[key]
 

@@ -147,8 +147,12 @@ def a_of(deck_ids, opp_leader_power, don=None, theta=THETA, mu=MU, rush_only=Fal
     """
     olp = float(opp_leader_power)
     cap = None if don is None else int(round(float(don)))
+    import theory_order as _TO
     key = (tuple(deck_ids), round(olp, 1), cap, bool(rush_only))
-    if key in _FLOW:
+    if _TO.CUT_PRICER is not None:
+        # **N-3**: 守り手の値段の文脈は鍵に入れる（1 枚あたり一定の窓だけ・それ以外は覚えない）
+        key = (key + (_TO.CUT_PRICER_KEY, _TO.CUT_TAKE_CARD is not None)) if _TO._cut_cache_ok() else None
+    if key is not None and key in _FLOW:
         return _FLOW[key]
     d = db()
     n = 0
@@ -167,7 +171,8 @@ def a_of(deck_ids, opp_leader_power, don=None, theta=THETA, mu=MU, rush_only=Fal
             continue
         tot += float(attack_value_don(float(getattr(m, "power", 0) or 0), olp, True, theta, mu))
     out = (tot / n) if n else 0.0
-    _FLOW[key] = out
+    if key is not None:
+        _FLOW[key] = out
     return out
 
 
