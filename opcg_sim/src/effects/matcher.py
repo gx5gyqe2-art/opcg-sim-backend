@@ -146,7 +146,8 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 「（このキャラ）他の」「このキャラ以外」: ソース自身を候補から除外する。
     # 例: EB02-018「自分のキャラの他の『バギー』がいない場合」（自分自身を数えない）、
     # OP04-111「このキャラ以外の自分の特徴《ホーミーズ》を持つキャラ」（自身をコストに使わない）。
-    if _nfc("他の") in tgt_text or _nfc("このキャラ以外") in tgt_text or _nfc("以外の自分") in tgt_text:
+    if (_nfc("他の") in tgt_text or _nfc("このキャラ以外") in tgt_text or _nfc("このカード以外") in tgt_text
+            or _nfc("以外の自分") in tgt_text):
         tq.flags.add("EXCLUDE_SOURCE")
 
     # 「カード名の異なる…N枚」: 選ぶカードはすべて名前が異なる（distinct）。matcher が名前重複を

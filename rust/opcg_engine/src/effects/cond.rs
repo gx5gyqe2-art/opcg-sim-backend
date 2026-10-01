@@ -449,9 +449,20 @@ pub fn check_condition(
             } else {
                 master_of(tp.leader)
             };
+            // 「自分の他の「X」がいない」: 発動元自身は数えない（条件の target に EXCLUDE_SOURCE を立てる）。
+            let exclude: Option<CardIdx> = if cond
+                .target
+                .as_ref()
+                .is_some_and(|q| q.has_flag("EXCLUDE_SOURCE"))
+            {
+                source
+            } else {
+                None
+            };
             let count_named = |name: &str| -> i32 {
                 let mut n = pool
                     .iter()
+                    .filter(|c| Some(**c) != exclude)
                     .filter(|c| matches_name(masters.get(state.card(**c).master), name, true))
                     .count() as i32;
                 if leader_master.is_some_and(|m| matches_name(m, name, true)) {

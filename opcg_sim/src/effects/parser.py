@@ -264,6 +264,32 @@ class EffectParser:
             q = getattr(n, "target", None)
             return q is not None and q.ref_id == "selected_card"
 
+        # 「その後、そのキャラのコスト/パワーがN以下の場合、KOする」= 直前に選んだキャラへの条件付き実行。
+        # 未評価の GENERIC 条件＋対象なしの KO になっていた（OP06-074/OP09-098）。選んだキャラへの
+        # 参照（ref_id）にコスト/パワーの上下限を持たせ、エンジンが参照先を絞って実行する（REF_FILTER）。
+        if any(is_producer(n) for n in nodes):
+            for n in nodes:
+                cond = getattr(n, "condition", None)
+                act = getattr(n, "if_true", None)
+                if not (isinstance(n, Branch) and cond is not None and cond.type == ConditionType.GENERIC
+                        and isinstance(act, GameAction)):
+                    continue
+                m = re.search(_nfc(r"そのキャラの(コスト|パワー)が(\d+)(以下|以上)"), cond.raw_text or "")
+                if not m:
+                    continue
+                tq = TargetQuery(ref_id="selected_card", flags={"REF_FILTER"})
+                v = int(m.group(2))
+                if m.group(1) == _nfc("コスト"):
+                    if m.group(3) == _nfc("以下"):
+                        tq.cost_max = v
+                    else:
+                        tq.cost_min = v
+                elif m.group(3) == _nfc("以下"):
+                    tq.power_max = v
+                else:
+                    tq.power_min = v
+                act.target = tq
+                n.condition = None
         if not any(is_producer(n) for n in nodes):
             # 直前の PLAY_CARD（「登場させた場合、そのキャラは…」）が producer の代わりになる:
             # 登場させたカードを save_id="played_card" に保存し、「そのキャラ」をそこへ結ぶ
@@ -1733,9 +1759,15 @@ class EffectParser:
                     _nfc('より多い'): CompareOperator.GT,
                     _nfc('未満'): CompareOperator.LT,
                 }.get(mc.group(2), CompareOperator.GE)
-                # 「N枚いない」→ 実質 N枚未満
-                if _nfc("いない") in norm_text and mc.group(2) is None:
-                    cnt_op = CompareOperator.LT
+                # 「N枚いない」→ 実質 N枚未満。「N枚以上いない」「N枚以下いない」は否定なので反転する
+                # （EB04-005「2枚以上いない場合」が GE 2 のまま＝真偽が逆だった）。
+                if _nfc("いない") in norm_text:
+                    cnt_op = {
+                        CompareOperator.GE: CompareOperator.LT,
+                        CompareOperator.LE: CompareOperator.GT,
+                        CompareOperator.GT: CompareOperator.LE,
+                        CompareOperator.LT: CompareOperator.GE,
+                    }.get(cnt_op, CompareOperator.LT) if mc.group(2) is not None else CompareOperator.LT
             elif _nfc("いない") in norm_text:
                 thr, cnt_op = 1, CompareOperator.LT  # 1枚もいない
             else:
@@ -1793,7 +1825,11 @@ class EffectParser:
             present_part = has_char_m.group(2) or has_char_m.group(3)
             present = present_part == _nfc('る')
             op = CompareOperator.GE if present else CompareOperator.EQ
-            return Condition(type=ConditionType.HAS_CHARACTER, value=char_name, operator=op, player=p, raw_text=norm_text)
+            # 「自分の他の「X」がいない」: 発動元自身を数えない（従来は自身を数えて常に偽＝起動不能: OP07-060/OP17-010）。
+            tgt = TargetQuery(player=p, flags={"EXCLUDE_SOURCE"}) if re.search(
+                _nfc(r'他の「' + re.escape(char_name) + r'」'), norm_text) else None
+            return Condition(type=ConditionType.HAS_CHARACTER, value=char_name, operator=op, player=p,
+                             target=tgt, raw_text=norm_text)
 
         # RESTED_COUNT: レスト状態のカード総数（フィールド＋ドン!!）
         if _nfc("レストのカード") in norm_text:
@@ -1995,16 +2031,36 @@ class EffectParser:
         if not left or not right:
             return None
         chooser = Player.OPPONENT if re.search(_nfc(r'相手は'), norm[:boundary]) else Player.SELF
+        # 末尾の「。その後、…」は択一のどれを選んでも行う後続句＝最後の選択肢の中に閉じ込めず外へ出す
+        # （OP05-096「…ライフの上か下に表向きで置く。その後、…カード1枚を引く」）。
+        tail_text = None
+        m_tail = re.search(_nfc(r'。(?=その後)'), right)
+        if m_tail:
+            tail_text = right[m_tail.end():].strip()
+            right = right[:m_tail.start()].strip()
+        # 右側が対象を持たない動詞句（「持ち主の手札に戻す」等）なら、左側の対象を共有する
+        # （「相手のコスト1以下のキャラ1枚までを、KOするか、持ち主の手札に戻すか、…」で
+        #  2 つ目以降の選択肢が対象（コスト上限・相手側）を失っていた: OP05-096）。
+        right_head = right.split(_nfc('。'))[0]
+        sep = left.rfind(_nfc('を、'))
+        if (sep > 0 and _nfc('を') not in right_head
+                and not re.search(_nfc(r'(キャラ|ステージ|リーダー|カード|ドン)'), right_head)):
+            right = f"{left[:sep]}を、{right}"
         opt_a = self._parse_to_node(left, is_cost)
         opt_b = self._parse_to_node(right, is_cost)
         if not (self._node_has_real_action(opt_a) and self._node_has_real_action(opt_b)):
             return None  # どちらかが空振りなら択一にしない（レガシー解釈へ委ねる）
-        return Choice(
+        choice = Choice(
             message=_nfc("効果を選択してください"),
             options=[opt_a, opt_b],
             option_labels=[left, right],
             player=chooser,
         )
+        if tail_text:
+            tail = self._parse_to_node(tail_text, is_cost)
+            if self._node_has_real_action(tail):
+                return Sequence(actions=[choice, tail])
+        return choice
 
     def _parse_target_alternative_choice(self, text: str, is_cost: bool) -> Optional[EffectNode]:
         """「<A対象>か、<B対象><枚数>を、<動詞>」形式の対象択一を Choice 化する（無ければ None）。

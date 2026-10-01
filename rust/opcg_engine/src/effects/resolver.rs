@@ -1019,7 +1019,24 @@ impl Resolver {
                 return Ok(Some(source_card.into_iter().map(TargetRef::Card).collect()));
             }
             if let Some(saved) = self.context.saved(ref_id) {
-                return Ok(Some(saved.clone()));
+                let mut out = saved.clone();
+                // 「そのキャラのコスト／パワーがN以下の場合」: 参照先をコスト／パワーで絞る。
+                if query.flags.iter().any(|f| f == "REF_FILTER") {
+                    out.retain(|t| match t.card() {
+                        Some(c) => {
+                            let card = s.state().card(c);
+                            let m = masters.get(card.master);
+                            let cost = card.current_cost(m);
+                            let power = card.get_power(m, card.owner == s.state().turn_player);
+                            query.cost_max.map_or(true, |x| cost <= x)
+                                && query.cost_min.map_or(true, |x| cost >= x)
+                                && query.power_max.map_or(true, |x| power <= x)
+                                && query.power_min.map_or(true, |x| power >= x)
+                        }
+                        None => true,
+                    });
+                }
+                return Ok(Some(out));
             }
             // ref_id 指定なのに保存対象が無い＝対象なし（場全体クエリへ落とさない）。
             return Ok(Some(Vec::new()));

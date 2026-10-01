@@ -159,7 +159,9 @@ def _ko(ctx: ParseContext) -> Optional[GameAction]:
     # KO する誤りになる（OP05-040/OP06-081/ST08-005/ST27-005「コストN以下のキャラ(すべて)をKO」）。
     # 「そのキャラ/選んだキャラ」を指す素の「KOする」（対象記述なし）はここでは触れない（参照系は別）。
     if (tq.player == Player.SELF and _nfc("キャラ") in t
-            and not re.search(_nfc(r"相手|自分|このキャラ|このカード|味方|お互い|持ち主"), t)):
+            and not re.search(_nfc(r"相手|自分|このキャラ|このカード|味方|お互い|持ち主"),
+                              t.replace(_nfc("このキャラ以外"), ""))):
+        # 「このキャラ以外のキャラすべて」は両陣営のキャラが対象（OP01-094）。
         tq.player = Player.ALL
     return GameAction(type=ActionType.KO, target=tq, raw_text=t)
 
@@ -612,6 +614,35 @@ def _power_swap(ctx: ParseContext) -> Optional[GameAction]:
     )
 
 
+def _subject_text(t: str) -> str:
+    """「<主語>は、…」「<主語>を、…」の主語部分（無ければ空）。"""
+    m = re.match(_nfc(r"^(?:このターン中、|次の[^、]*まで、)?(.+?)(?:は|を)、?"), t.strip())
+    return m.group(1) if m else ""
+
+
+def _multi_subject_targets(subject: str) -> Optional[list]:
+    """「<X>とこのキャラ」（X と自身の両方）の主語を [X の対象, 自身] に分解する。
+
+    X は「自分のリーダー」か、名前・特徴などで絞った「自分の…すべて」。従来は「このキャラ」を
+    含むだけで自身 1 枚に縮退し、X が脱落していた（OP15-070/OP16-015）。
+    """
+    m = re.match(_nfc(r"^(.+?)と、?この(?:キャラ|カード)$"), subject)
+    if not m:
+        return None
+    left = m.group(1)
+    if re.fullmatch(_nfc(r"自分のリーダー"), left):
+        first = TargetQuery(card_type=["LEADER"])
+    else:
+        first = parse_target(left)
+        if not first.card_type:
+            first.card_type = ["CHARACTER"]
+        if _nfc("すべて") in left:
+            first.count = -1
+            first.select_mode = "ALL"
+    return [first, TargetQuery(select_mode="SOURCE")]
+
+
+
 @rule("set_power", priority=59)
 def _set_power(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -621,6 +652,12 @@ def _set_power(ctx: ParseContext) -> Optional[GameAction]:
     m = re.search(_nfc(r"パワー(?:を)?(\d+)に(?:なる|する)"), t)
     if not m:
         return None
+    multi = _multi_subject_targets(_subject_text(t))
+    if multi:
+        return Sequence(actions=[
+            GameAction(type=ActionType.BUFF, status="POWER_OVERRIDE", target=tq_,
+                       value=ValueSource(base=int(m.group(1))), duration=_duration_of(t), raw_text=t)
+            for tq_ in multi])
     tq = _buff_target(t)
     if _nfc("まで") in t:
         tq.is_up_to = True
@@ -731,7 +768,25 @@ def _grant_keyword(ctx: ParseContext) -> Optional[GameAction]:
     if re.search(_nfc(rf"パワー{_SIGN}[\d０-９]+"), t):
         return None
     keyword = m.group(1)
-    if re.search(_nfc(r"この(カード|キャラ|リーダー)"), t):
+    subject = _subject_text(t)
+    multi = _multi_subject_targets(subject)
+    if multi:
+        # 「自分の「シュラ」すべてとこのキャラは【ブロック不可】を得る」: 両方に付与する（OP15-070）。
+        return Sequence(actions=[
+            GameAction(type=ActionType.GRANT_KEYWORD, target=tq_, status=keyword,
+                       duration=_duration_of(t), raw_text=t) for tq_ in multi])
+    if subject and _nfc("以外") in subject and re.search(_nfc(r"^この(?:カード|キャラ)以外"), subject):
+        # 「このキャラ以外の自分のコスト3以上の赤のキャラすべては、【速攻】を得る」: 他のキャラ全て（OP04-118）。
+        tq = parse_target(subject)
+        tq.count = -1
+        tq.select_mode = "ALL"
+    elif subject and not re.search(_nfc(r"この(カード|キャラ|リーダー)"), subject):
+        # 主語が自身でないなら主語だけから対象を作る（述語の「属性(斬)を得る」等を絞り込みに混ぜない: OP15-093）。
+        tq = parse_target(subject)
+        if _nfc("すべて") in subject:
+            tq.count = -1
+            tq.select_mode = "ALL"
+    elif re.search(_nfc(r"この(カード|キャラ|リーダー)"), t):
         tq = TargetQuery(select_mode="SOURCE")
     else:
         tq = parse_target(t)
@@ -2328,7 +2383,7 @@ def _remaining_deck_top_or_bottom(ctx: ParseContext) -> Optional[GameAction]:
 # ---------------------------------------------------------------------------
 _DUAL_REMOVAL_RE = re.compile(_nfc(
     r"(?P<f1>(?:コスト|パワー)\d+以下)の(?P<t1>キャラ|ステージ)[\d０-９]*枚まで(?:と、?|、と)"
-    r"\s*(?P<f2>(?:コスト|パワー)\d+以下)の(?P<t2>キャラ|ステージ)[\d０-９]*枚までを、?"
+    r"\s*(?:相手の|自分の)?(?P<f2>(?:コスト|パワー)\d+以下)の(?P<t2>キャラ|ステージ)[\d０-９]*枚までを、?"
     r"(?P<verb>KOする|持ち主の手札に戻す|手札に戻す|持ち主のデッキの下|デッキの下)"))
 
 
