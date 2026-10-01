@@ -81,6 +81,15 @@ def _draw(ctx: ParseContext) -> Optional[GameAction]:
     tq = None
     if re.search(_nfc(r"相手は[^。]*引"), t):
         tq = TargetQuery(player=Player.OPPONENT, zone=Zone.DECK, count=x)
+    # 「手札がN枚になるようにカードを引く」(OP02-051/069): N − 現在の手札枚数（下限 0）だけ引く。
+    m_to = re.search(_nfc(r"手札が([\d０-９]+)枚になるように"), t)
+    if m_to:
+        return GameAction(
+            type=ActionType.DRAW,
+            target=tq,
+            value=ValueSource(base=_to_int(m_to.group(1)), dynamic_source="HAND_TO_N"),
+            raw_text=t,
+        )
     return GameAction(
         type=ActionType.DRAW,
         target=tq,
@@ -158,8 +167,11 @@ def _ko(ctx: ParseContext) -> Optional[GameAction]:
     # どちらのプレイヤーのキャラも対象（ALL）。parse_target 既定 SELF のままだと自分のキャラだけを
     # KO する誤りになる（OP05-040/OP06-081/ST08-005/ST27-005「コストN以下のキャラ(すべて)をKO」）。
     # 「そのキャラ/選んだキャラ」を指す素の「KOする」（対象記述なし）はここでは触れない（参照系は別）。
+    # 「このキャラ以外のキャラすべて」の「このキャラ」は除外指定であって側の指定ではない
+    # （OP08-119: 自分のキャラだけでなく相手のキャラも KO する）。
+    t_side = re.sub(_nfc(r"この(?:キャラ|カード)以外"), "", t)
     if (tq.player == Player.SELF and _nfc("キャラ") in t
-            and not re.search(_nfc(r"相手|自分|このキャラ|このカード|味方|お互い|持ち主"), t)):
+            and not re.search(_nfc(r"相手|自分|このキャラ|このカード|味方|お互い|持ち主"), t_side)):
         tq.player = Player.ALL
     return GameAction(type=ActionType.KO, target=tq, raw_text=t)
 
@@ -1693,7 +1705,7 @@ def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
             return None
         value = -int(m2.group(1))
     tq = _buff_target(t)
-    return GameAction(
+    buff = GameAction(
         type=ActionType.BUFF,
         target=tq,
         value=_per_n_value(t, value) or ValueSource(base=value),
@@ -1701,6 +1713,17 @@ def _cost_change(ctx: ParseContext) -> Optional[GameAction]:
         duration=_duration_of(t),
         raw_text=t,
     )
+    # 複合句「（対象）は【X】を得て、コスト±N」: キーワード付与とコスト増減を両方生成する
+    # （power_buff の「得て、パワー±N」と同じ。OP12-089/OP12-100/PRB02-015/ST35-004 で
+    #   【ブロッカー】が脱落していた）。
+    km = _KEYWORD_GRANT_RE.search(t)
+    if km and _nfc("得") in t:
+        grant = GameAction(
+            type=ActionType.GRANT_KEYWORD, target=tq, status=km.group(1),
+            duration=_duration_of(t), raw_text=t,
+        )
+        return Sequence(actions=[grant, buff])
+    return buff
 
 
 # ---------------------------------------------------------------------------

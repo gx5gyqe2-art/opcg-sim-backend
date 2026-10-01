@@ -18,7 +18,7 @@
 
 use super::ast::{AbilityTable, PlayerRef, TargetQuery, TriggerType, ZoneRef};
 use super::{EffectContext, TargetRef};
-use crate::model::{CardIdx, CardInstance, CardMaster, GameState, MasterTable, Seat};
+use crate::model::{CardIdx, CardInstance, CardMaster, CardType, GameState, MasterTable, Seat};
 use crate::state::EngineError;
 use std::collections::HashSet;
 
@@ -359,16 +359,27 @@ pub fn get_target_cards(
             !names.is_empty() && names.iter().any(|n| matches_name(master, n, partial))
         };
         // Python `_excluded()`: 除外名は**常に部分一致なし**（partial を渡さない）。
+        // REST_LEADER_ONLY（「レストのリーダーか、「X」以外のキャラ」）: 「X以外」は後ろのキャラ
+        // だけに掛かり、リーダーは除外名の対象外。
         let excluded = || -> bool {
             !query.exclude_names.is_empty()
+                && !(query.has_flag("REST_LEADER_ONLY") && master.ty == CardType::Leader)
                 && query
                     .exclude_names
                     .iter()
                     .any(|en| matches_name(master, en, false))
         };
+        // 「『X』を含む特徴」（TRAIT_PARTIAL）は特徴名の部分一致（「元ロックス海賊団」等も該当）。
+        let trait_partial = query.has_flag("TRAIT_PARTIAL");
         let trait_in = || -> bool {
             !query.traits.is_empty()
-                && query.traits.iter().any(|t| master.traits.contains(t))
+                && query.traits.iter().any(|t| {
+                    if trait_partial {
+                        master.traits.iter().any(|x| x.contains(t.as_str()))
+                    } else {
+                        master.traits.contains(t)
+                    }
+                })
         };
 
         if query.has_flag("NAME_OR_COLORTYPE") {
@@ -413,7 +424,10 @@ pub fn get_target_cards(
             }
         }
 
-        if query.is_rest.is_some_and(|r| card.is_rest != r) {
+        // REST_LEADER_ONLY（「レストのリーダーか、…のキャラ」）: 状態の絞りはリーダーだけに掛かる。
+        if query.is_rest.is_some_and(|r| card.is_rest != r)
+            && !(query.has_flag("REST_LEADER_ONLY") && master.ty != CardType::Leader)
+        {
             continue;
         }
 

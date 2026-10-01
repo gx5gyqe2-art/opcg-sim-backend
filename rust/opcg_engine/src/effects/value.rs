@@ -11,7 +11,7 @@
 //!     multiplier != 1 なら * multiplier
 //! ```
 //!
-//! `dynamic_source` は 5 種:
+//! `dynamic_source` は 6 種（下の 5 種＋`HAND_TO_N`＝手札がN枚になるまで引く）:
 //! `COUNT_REFERENCE`（自分のトラッシュ枚数）／`PREV_ACTION_COUNT`（直前アクションの枚数）／
 //! `COUNT_QUERY`（範囲クエリの該当数）／`REFERENCE_POWER`（参照カードの現在パワー）／
 //! `REFERENCE_BASE_POWER`（参照カードの印刷時パワー）。それ以外の文字列は `base` に落ちる。
@@ -61,6 +61,9 @@ fn dynamic_value(
 ) -> Result<i32, EngineError> {
     match value.dynamic_source.as_deref() {
         Some("COUNT_REFERENCE") => Ok(state.player(actor).trash.len() as i32),
+        // 「手札がN枚になるようにカードを引く」: 不足分（N − 現在の手札枚数・下限 0）だけ引く。
+        // `base` が目標の手札枚数。
+        Some("HAND_TO_N") => Ok((value.base - state.player(actor).hand.len() as i32).max(0)),
         // 文脈依存「直前アクションで捨てた/戻した/KO した…カードN枚につき」（§7-5）。
         // §11.6: 未設定（`None`）は Python の `context.get("_last_action_count", 0)` と同じ 0。
         Some("PREV_ACTION_COUNT") => Ok(ctx.prev_action_count.unwrap_or(0)),
@@ -213,6 +216,20 @@ mod tests {
             calculate_value(&state, &masters, &masters.abilities, &vs, Seat::P1, &[], &ctx).unwrap(),
             5000
         );
+    }
+
+    #[test]
+    fn hand_to_n_draws_only_the_shortfall() {
+        let (masters, state) = testkit::effect_board();
+        let hand = state.player(Seat::P1).hand.len() as i32;
+        let calc = |n: i32| {
+            let vs = source(json!({"dynamic_source": "HAND_TO_N", "base": n}));
+            calculate_value(&state, &masters, &masters.abilities, &vs, Seat::P1, &[], &EffectContext::default())
+                .unwrap()
+        };
+        assert_eq!(calc(hand + 2), 2);
+        assert_eq!(calc(hand), 0);
+        assert_eq!(calc(0), 0);
     }
 
     #[test]

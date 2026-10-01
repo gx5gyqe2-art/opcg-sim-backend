@@ -209,17 +209,27 @@ pub fn check_condition(
             };
             compare(current, cond.operator, threshold_or_raw_text(cond, target_val))
         }
-        C::LifeCount => compare(
-            tp.life.len() as i32,
-            cond.operator,
-            threshold_or_raw_text(cond, target_val),
-        ),
+        C::LifeCount => {
+            // target があれば「表向きのライフ」のように絞った枚数を数える。
+            let current = match &cond.target {
+                Some(q) => {
+                    get_target_cards(state, masters, abilities, q, actor, source, ctx)?.len() as i32
+                }
+                None => tp.life.len() as i32,
+            };
+            compare(current, cond.operator, threshold_or_raw_text(cond, target_val))
+        }
         C::HandCount => compare(tp.hand.len() as i32, cond.operator, target_val),
-        C::TrashCount => compare(
-            tp.trash.len() as i32,
-            cond.operator,
-            threshold_or_raw_text(cond, target_val),
-        ),
+        C::TrashCount => {
+            // target があれば「トラッシュのイベント」のように種類等で絞った枚数を数える。
+            let current = match &cond.target {
+                Some(q) => {
+                    get_target_cards(state, masters, abilities, q, actor, source, ctx)?.len() as i32
+                }
+                None => tp.trash.len() as i32,
+            };
+            compare(current, cond.operator, threshold_or_raw_text(cond, target_val))
+        }
         C::DeckCount => compare(tp.deck.len() as i32, cond.operator, target_val),
         C::FieldCount => {
             let current = match &cond.target {
@@ -325,14 +335,22 @@ pub fn check_condition(
         },
         C::LeaderTrait => match master_of(tp.leader) {
             None => false,
-            Some(m) => match &cond.value {
-                CondValue::Str(s) => m.traits.contains(s),
-                CondValue::List(items) => items
-                    .iter()
-                    .filter_map(CondValue::as_str)
-                    .any(|t| m.traits.iter().any(|x| x == t)),
-                _ => false,
-            },
+            Some(m) => {
+                // operator=HAS は「『X』を含む特徴」（部分一致。CP9／CP0 は『CP』を含む）。
+                let contains = cond.operator == CompareOperator::Has;
+                let hit = |want: &str| -> bool {
+                    if contains {
+                        m.traits.iter().any(|x| x.contains(want))
+                    } else {
+                        m.traits.iter().any(|x| x == want)
+                    }
+                };
+                match &cond.value {
+                    CondValue::Str(s) => hit(s),
+                    CondValue::List(items) => items.iter().filter_map(CondValue::as_str).any(hit),
+                    _ => false,
+                }
+            }
         },
         C::HasTrait | C::HasAttribute | C::HasUnit => {
             // condition.target が無ければ「その側の場」を数えるクエリを合成する。
@@ -602,7 +620,13 @@ pub fn check_condition(
                 let want = t
                     .as_str()
                     .ok_or_else(|| bad("OPPONENT_REMOVAL.trait: expected a string".into()))?;
-                if !m.traits.iter().any(|x| x == want) {
+                let contains = cond.value.dict_get("trait_contains").is_some_and(truthy);
+                let ok = if contains {
+                    m.traits.iter().any(|x| x.contains(want))
+                } else {
+                    m.traits.iter().any(|x| x == want)
+                };
+                if !ok {
                     return Ok(false);
                 }
             }

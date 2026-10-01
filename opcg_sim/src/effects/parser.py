@@ -1135,6 +1135,19 @@ class EffectParser:
                     if _sm:
                         _carry_subj = _sm.group(1)
 
+        # 「次の相手のターン終了時まで、1枚をパワー-3000し、残りをパワー-2000」: 後続の「残りを…」
+        # は期間句を持たないが、先行句の期間（このターン中／このバトル中／次の…まで）を引き継ぐ
+        # （継承しないと INSTANT のまま＝次の相手ターンまで持続しない。OP08-118）。
+        if len(parts) > 1:
+            _dur_re = re.compile(_nfc(
+                r'このバトル中|このターン中|次の(?:自分の|相手の)?(?:ターン|エンドフェイズ)(?:開始|終了)時まで'))
+            for _pi in range(1, len(parts)):
+                _p = parts[_pi]
+                if _p.startswith(_nfc('残りを')) and not _dur_re.search(_p):
+                    _dm = _dur_re.search(parts[_pi - 1])
+                    if _dm:
+                        parts[_pi] = _dm.group(0) + _nfc('、') + _p
+
         if len(parts) > 1:
             return Sequence(actions=[self._parse_logic_block(p, is_cost) for p in parts])
         elif parts:
@@ -1574,7 +1587,22 @@ class EffectParser:
                              value=offset, player=Player.SELF, raw_text=norm_text)
 
         if _nfc("ライフ") in norm_text:
-            return Condition(type=ConditionType.LIFE_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
+            # 「表向きの／裏向きのライフがある」: 向きで絞った枚数（target の is_face_up を数える）。
+            # 枚数の指定が無い「ある／ない」は 1 枚以上／0 枚（既定の EQ 0 だと「ある」が逆になる）。
+            _life_op, _life_val = operator, value
+            if not nums:
+                if _nfc("ない") in norm_text:
+                    _life_op, _life_val = CompareOperator.EQ, 0
+                elif _nfc("ある") in norm_text:
+                    _life_op, _life_val = CompareOperator.GE, 1
+            _life_tq = None
+            _face = re.search(_nfc(r'(表向き|裏向き)の?ライフ'), norm_text)
+            if _face:
+                _life_tq = TargetQuery(zone=Zone.LIFE, player=p,
+                                       is_face_up=(_face.group(1) == _nfc('表向き')),
+                                       count=_life_val, raw_text=norm_text)
+            return Condition(type=ConditionType.LIFE_COUNT, operator=_life_op, value=_life_val, player=p,
+                             target=_life_tq, raw_text=norm_text)
 
         if _nfc("手札") in norm_text:
             return Condition(type=ConditionType.HAND_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
@@ -1596,7 +1624,17 @@ class EffectParser:
                 if len(name_conds) == 1:
                     return name_conds[0]
                 return Condition(type=ConditionType.AND, args=name_conds, raw_text=norm_text)
-            return Condition(type=ConditionType.TRASH_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
+            # 「トラッシュにイベントが4枚以上ある」: 種類（イベント／キャラ／ステージ）や特徴で絞った
+            # 枚数。絞りが無ければ総枚数（target なし）。
+            _trash_tq = None
+            _tq = parse_target(norm_text)
+            if _tq.card_type or _tq.traits or _tq.colors or _tq.attributes:
+                _tq.zone = Zone.TRASH
+                _tq.player = p
+                _tq.count = value
+                _trash_tq = _tq
+            return Condition(type=ConditionType.TRASH_COUNT, operator=operator, value=value, player=p,
+                             target=_trash_tq, raw_text=norm_text)
 
         # デッキ枚数（「自分のデッキが20枚以下の場合」等）。"デッキの上から…" は除外。
         if _nfc("デッキが") in norm_text:
@@ -1635,7 +1673,11 @@ class EffectParser:
                     return Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)
             if trait_match:
                 tval = trait_all[0] if len(trait_all) == 1 else trait_all
-                trait_cond = Condition(type=ConditionType.LEADER_TRAIT, value=tval, player=p, raw_text=norm_text)
+                # 「『X』を含む特徴を持つ」は部分一致（CP9／CP0 は『CP』を含む）＝operator=HAS。
+                # 《X》の特徴名そのものは完全一致（既定 EQ）。
+                _contains = bool(re.search(_nfc(r'[』」]を含む特徴'), norm_text))
+                trait_cond = Condition(type=ConditionType.LEADER_TRAIT, value=tval, player=p, raw_text=norm_text,
+                                       operator=CompareOperator.HAS if _contains else CompareOperator.EQ)
                 # 「特徴《X》を持つか「Y」の場合」= 特徴 OR リーダー名（ST23-002 赤髪海賊団 or ウタ／
                 # ワノ国 or エース）。従来は trait のみ返り、名前指定リーダーで常に不成立だった。
                 if name_matches and _nfc("か「") in norm_text:
@@ -1799,6 +1841,11 @@ class EffectParser:
             if pow_min_m: val["power_min"] = int(pow_min_m.group(1))
             if cost_max_m: val["cost_max"] = int(cost_max_m.group(1))
             if trait_m: val["trait"] = trait_m.group(1)
+            # 「『X』を含む特徴を持つキャラが…」は部分一致（OP17-021）。
+            contains_m = re.search(_nfc(r'[『「]([^』」]+)[』」]を含む特徴'), norm_text)
+            if contains_m:
+                val["trait"] = contains_m.group(1)
+                val["trait_contains"] = True
             return Condition(type=ConditionType.OPPONENT_REMOVAL, value=val, player=p, raw_text=norm_text)
 
         # FIELD_COUNT_COMPARE: 自分と相手の場キャラ数の相対比較（「N枚以上少ない/多い」も対応）

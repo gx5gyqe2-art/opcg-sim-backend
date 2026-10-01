@@ -142,6 +142,9 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     
     if _nfc("含む") in tgt_text:
         tq.flags.add("NAME_PARTIAL")
+    # 「『X』を含む特徴を持つ」は特徴名の部分一致（「元ロックス海賊団」等も該当）。
+    if re.search(_nfc(r'[』」]を含む特徴'), tgt_text):
+        tq.flags.add("TRAIT_PARTIAL")
 
     # 「（このキャラ）他の」「このキャラ以外」: ソース自身を候補から除外する。
     # 例: EB02-018「自分のキャラの他の『バギー』がいない場合」（自分自身を数えない）、
@@ -231,7 +234,8 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.flags.add("COST_0_OR_GE_8")
     # コスト範囲「コストNからM」（N以上M以下）。範囲表記は単一しきい値より先に判定する
     #   （従来は「コスト3」だけを拾い cost_max=3 に縮退していた: OP10-099）。
-    m_crange = None if "COST_0_OR_GE_8" in tq.flags else re.search(_nfc(ParserKeyword.COST + r'(\d+)から(\d+)'), tgt_text)
+    # 連続する 2 値の並記「コスト3と4の」（P-084）も範囲（3 以上 4 以下）として扱う。
+    m_crange = None if "COST_0_OR_GE_8" in tq.flags else re.search(_nfc(ParserKeyword.COST + r'(\d+)(?:から|と)(\d+)'), tgt_text)
     if m_crange:
         # 「元々のコストN〜M」は印刷コスト（master.cost）で絞る（効果で増減した現在コストではない）。
         if _nfc("元々") in tgt_text[max(0, m_crange.start() - 4):m_crange.start()]:
@@ -339,6 +343,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     rest_mod = re.search(_nfc(r'(レスト|アクティブ)の[^。、]*?(?:キャラ|カード|リーダー)'), tgt_text)
     if rest_mod:
         tq.is_rest = (rest_mod.group(1) == _nfc("レスト"))
+        # 「レストのリーダーか、…のキャラ」(PRB02-017): 状態修飾は直後のリーダーだけに掛かり、
+        # 並記されたキャラには掛からない（レストでないキャラも対象）。
+        if (rest_mod.group(0).endswith(_nfc("リーダー"))
+                and "LEADER" in tq.card_type and "CHARACTER" in tq.card_type
+                and re.match(_nfc(r'か'), tgt_text[rest_mod.end():])):
+            tq.flags.add("REST_LEADER_ONLY")
     elif (_nfc("にする") not in tgt_text and _nfc("にし") not in tgt_text
             and _nfc("ならない") not in tgt_text and _nfc("にでき") not in tgt_text
             and _nfc("にされ") not in tgt_text
@@ -581,7 +591,13 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         _partial = "NAME_PARTIAL" in query.flags
         def _name_in(names):  # noqa: E306
             return bool(names) and any(card.master.matches_name(n, partial=_partial) for n in names)
+        def _trait_hit():  # noqa: E306
+            if "TRAIT_PARTIAL" in query.flags:
+                return any(x in c for x in query.traits for c in card.master.traits)
+            return any(t in card.master.traits for t in query.traits)
         def _excluded():  # noqa: E306
+            if "REST_LEADER_ONLY" in query.flags and card.master.type.name == "LEADER":
+                return False
             return query.exclude_names and any(card.master.matches_name(en) for en in query.exclude_names)
         if "NAME_OR_COLORTYPE" in query.flags:
             # 上の合成OR（名前 OR 色∧種類）で判定済み。除外名のみここで適用。
@@ -593,7 +609,7 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             if _excluded(): continue
         elif "TRAIT_OR_NAME" in query.flags and (query.names or query.traits):
             name_ok = _name_in(query.names)
-            trait_ok = bool(query.traits) and any(t in card.master.traits for t in query.traits)
+            trait_ok = bool(query.traits) and _trait_hit()
             if not (name_ok or trait_ok): continue
             if _excluded(): continue
         else:
@@ -602,7 +618,7 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
             if _excluded(): continue
 
-            if query.traits and not any(t in card.master.traits for t in query.traits):
+            if query.traits and not _trait_hit():
                 # 「《特徴》か【トリガー】を持つ」は特徴 OR トリガー所持。特徴不一致でも
                 # トリガー所持なら通す（OP05-002）。それ以外は従来どおり除外。
                 if "TRAIT_OR_TRIGGER" not in query.flags:
@@ -611,7 +627,8 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
                     ab.trigger == TriggerType.TRIGGER for ab in getattr(card.master, "abilities", ()))
                 if not _trig:
                     continue
-        if query.is_rest is not None and card.is_rest != query.is_rest: continue
+        if (query.is_rest is not None and card.is_rest != query.is_rest
+                and not ("REST_LEADER_ONLY" in query.flags and card.master.type.name != "LEADER")): continue
 
         # 「【トリガー】を持つカード」フィルタ: トリガー能力（master.trigger_text 非空、または
         # TriggerType.TRIGGER 能力）を持つカードのみに限定する（OP16-080 等）。

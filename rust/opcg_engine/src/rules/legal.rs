@@ -96,7 +96,9 @@ fn main_actions(
 
     // --- 登場（コストを active ドン!! で払える手札。イベントは【メイン】効果が要る）------
     let cannot_play_hand = super::active_restriction(state, seat, "CANNOT_PLAY_FROM_HAND").is_some();
-    let char_restricted = super::active_restriction(state, seat, "CANNOT_PLAY_CHARACTER").is_some();
+    // 「元々のコストN以上のキャラを登場できない」は min_cost 以上だけを禁じる（無指定なら全キャラ）。
+    // `play_card_action` の検証と同じ規則（元々のコスト＝master.cost）。
+    let char_restriction = super::active_restriction(state, seat, "CANNOT_PLAY_CHARACTER");
     for c in &p.hand {
         let card = state.card(*c);
         if card.current_cost(masters.get(card.master)) > don_active {
@@ -109,8 +111,13 @@ fn main_actions(
         if card_type(state, masters, *c) == CardType::Event {
             continue;
         }
-        if card_type(state, masters, *c) == CardType::Character && char_restricted {
-            continue;
+        if card_type(state, masters, *c) == CardType::Character {
+            if let Some(rec) = char_restriction {
+                let base_cost = masters.get(card.master).cost;
+                if rec.min_cost.is_none() || base_cost >= rec.min_cost.unwrap_or(0) {
+                    continue;
+                }
+            }
         }
         moves.push(game_move("PLAY", json!({"uuid": uuid(*c)})));
     }
