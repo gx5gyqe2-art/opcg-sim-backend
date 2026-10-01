@@ -487,7 +487,7 @@ CASES = [
                 "effect": {
                     "kind": "action",
                     "type": "REPLACE_EFFECT",
-                    "status": "LEAVE",
+                    "status": "EFFECT_KO,BATTLE_KO",
                     "sub_effect": {"type": "DISCARD", "target": {"zone": "HAND"}},
                 },
             }

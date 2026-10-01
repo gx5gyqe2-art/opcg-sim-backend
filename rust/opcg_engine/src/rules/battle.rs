@@ -305,6 +305,19 @@ pub fn resolve_attack(s: &mut Session, masters: &MasterTable) -> Result<(), Engi
                     trigger_ability_index(s, masters, life_card)?
                 };
                 let dest = if banish { Zone::Trash } else { Zone::Hand };
+                // 「表向きのライフは手札に加わる代わりにデッキの下に置かれる」（ST13-003）。
+                let dest = if dest == Zone::Hand
+                    && s.state().card(life_card).is_face_up
+                    && crate::effects::actions::rules::has_face_up_life_to_deck_rule(
+                        s,
+                        masters,
+                        target_owner,
+                    )?
+                {
+                    Zone::Deck
+                } else {
+                    dest
+                };
                 crate::effects::actions::move_card(
                     s,
                     masters,
@@ -422,28 +435,28 @@ pub fn finish_attack(
 /// の置換〔`VICTORY`／`REPLACE_DECKOUT_LOSS`・OP03-040 等〕を
 /// [`crate::effects::actions::rules::has_deckout_win_replace`] に接続した）。
 pub fn check_victory(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
-    if s.state().player(Seat::P1).deck.is_empty() {
-        let winner = if crate::effects::actions::rules::has_deckout_win_replace(
-            s,
-            masters,
-            Seat::P1,
-        )? {
-            Seat::P1
+    for seat in [Seat::P1, Seat::P2] {
+        if !s.state().player(seat).deck.is_empty() {
+            continue;
+        }
+        // 「ルール上、デッキが0枚でも敗北せず、0枚になったターン終了時に敗北する」（OP15-022）:
+        // 即敗北にせず記録だけ残し、ターン終了時（`end_turn`）に敗北させる。
+        if crate::effects::actions::rules::has_deckout_delay(s, masters, seat)? {
+            ops::record_turn_event(s, &deckout_delay_event(seat), 1);
+            continue;
+        }
+        let winner = if crate::effects::actions::rules::has_deckout_win_replace(s, masters, seat)? {
+            seat
         } else {
-            Seat::P2
+            seat.other()
         };
         s.edit().set_winner(Some(winner));
-    } else if s.state().player(Seat::P2).deck.is_empty() {
-        let winner = if crate::effects::actions::rules::has_deckout_win_replace(
-            s,
-            masters,
-            Seat::P2,
-        )? {
-            Seat::P2
-        } else {
-            Seat::P1
-        };
-        s.edit().set_winner(Some(winner));
+        break;
     }
     Ok(())
+}
+
+/// デッキ0枚の敗北を持ち越した事実の記録名（ターン内イベント）。
+pub fn deckout_delay_event(seat: Seat) -> String {
+    format!("DECKOUT_DELAY_{}", seat.name())
 }

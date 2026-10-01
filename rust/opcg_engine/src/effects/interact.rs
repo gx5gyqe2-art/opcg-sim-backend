@@ -299,6 +299,49 @@ pub fn suspend_for_battle_ko_replacement(
     });
 }
 
+/// 任意の効果除去置換の確認（バトル KO 版の `suspend_for_battle_ko_replacement` の効果除去版）。
+/// 受け入れれば置換を実行して除去をスキップ・断れば本来の除去を続行する。
+#[allow(clippy::too_many_arguments)]
+pub fn suspend_for_removal_replacement(
+    s: &mut Session,
+    masters: &MasterTable,
+    actor: Seat,
+    action: &NodeRef,
+    action_body: &super::ast::GameAction,
+    target: CardIdx,
+    target_owner: Seat,
+    value: i32,
+    effect_source: Option<CardIdx>,
+) {
+    let name = card_name(s, masters, Some(target));
+    let cont = Box::new(Continuation {
+        source_card: Some(target),
+        removal_replace: Some(crate::model::RemovalReplaceContinuation {
+            actor,
+            action: action.clone(),
+            action_body: Box::new(action_body.clone()),
+            value,
+            effect_source,
+        }),
+        ..Default::default()
+    });
+    s.edit().set_interaction(Interaction {
+        kind: InteractionKind::ConfirmOptional,
+        player: target_owner,
+        message: format!("「{name}」が効果で場を離れます。代わりの効果を使用しますか？"),
+        candidates: Vec::new(),
+        selectable: None,
+        constraints: None,
+        can_skip: true,
+        source_card: Some(target),
+        owner: target_owner,
+        options: Vec::new(),
+        allow_position: false,
+        allow_reorder: false,
+        continuation: Some(cont),
+    });
+}
+
 /// Python `_suspend_for_arrange`（ARRANGE_DECK）。
 #[allow(clippy::too_many_arguments)]
 pub fn suspend_for_arrange(
@@ -610,6 +653,33 @@ pub fn resolve_interaction(
                 crate::rules::battle::finish_attack(s, masters, target, bk.life_lost)?;
                 return Ok(());
             }
+            if let Some(rr) = cont.removal_replace.clone() {
+                s.edit().pop_interaction();
+                let target = source_card;
+                {
+                    let a = &*rr.action_body;
+                    let guard: &[&str] = if a.ty == super::ast::ActionType::Ko {
+                        &["LEAVE", "EFFECT_KO"]
+                    } else {
+                        &["LEAVE"]
+                    };
+                    let replaced = accepted && super::actions::active_replacement(s, masters, target, guard)?;
+                    if !replaced {
+                        // 断った（または置換不成立）＝本来の除去を続行（保護・置換は確認済み）。
+                        super::actions::run_target_loop_with(
+                            s,
+                            masters,
+                            rr.actor,
+                            a,
+                            &rr.action,
+                            &[TargetRef::Card(target)],
+                            rr.value,
+                            rr.effect_source,
+                            Some(target),
+                        )?;
+                    }
+                }
+            } else {
             s.edit().pop_interaction();
             if let Some(ability_id) = cont.confirm_ability {
                 if accepted {
@@ -634,6 +704,7 @@ pub fn resolve_interaction(
                 }
                 resolver.process_stack(s, masters, actor, Some(source_card))?;
                 history = resolver.action_history;
+            }
             }
         }
         InteractionKind::ArrangeDeck => {

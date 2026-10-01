@@ -169,6 +169,14 @@ pub fn end_turn(s: &mut Session, masters: &MasterTable) -> Result<(), EngineErro
     triggers::flush_pending_end_of_turn(s, masters)?;
     let turn_count = s.state().turn_count;
     continuous::expire(s, ExpireEvent::TurnEnd, turn_count);
+    // デッキが0枚になったターンの終了時に敗北する（OP15-022 の持ち越し）。
+    for seat in [Seat::P1, Seat::P2] {
+        let name = super::battle::deckout_delay_event(seat);
+        let hit = s.state().turn_events.iter().any(|(k, n)| *k == name && *n > 0);
+        if hit && s.state().winner.is_none() {
+            s.edit().set_winner(Some(seat.other()));
+        }
+    }
     switch_turn(s, masters)
 }
 
