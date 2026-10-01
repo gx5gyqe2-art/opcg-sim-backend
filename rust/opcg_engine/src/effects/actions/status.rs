@@ -199,6 +199,9 @@ fn grant_keyword(s: &mut Session, action: &GameAction, target: CardIdx) {
 fn attack_disable(s: &mut Session, action: &GameAction, target: CardIdx) {
     let flag = match action.status.as_deref() {
         Some(st) if st.starts_with(ATTACK_TAX_PREFIX) => st.to_owned(),
+        // 「リーダーにアタックできない」「相手の元々のコストN以下のキャラへアタックできない」＝
+        // 攻撃先を縛るフラグ（`rules::attack_target_banned` が見る）。全アタック禁止ではない。
+        Some(st) if st.starts_with("ATTACK_BAN_") => st.to_owned(),
         _ => FLAG_ATTACK_DISABLE.to_owned(),
     };
     timed_flag(s, target, action.duration, &flag);

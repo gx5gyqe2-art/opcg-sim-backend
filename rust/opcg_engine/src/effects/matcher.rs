@@ -73,6 +73,21 @@ fn filter_cost(query: &TargetQuery, card: &CardInstance, master: &CardMaster) ->
     }
 }
 
+/// 「<色>の<種類A>か<コスト>の<種類B>」（OP12-017）のように、絞り込みが特定の種類にだけ掛かる
+/// 場合の判定。`<prefix><種類名>` のフラグが 1 つも無ければ常に掛かる（通常の AND）。
+fn scope_applies(query: &TargetQuery, prefix: &str, ty_name: &str) -> bool {
+    let mut any = false;
+    for f in &query.flags {
+        if let Some(t) = f.strip_prefix(prefix) {
+            any = true;
+            if t == ty_name {
+                return true;
+            }
+        }
+    }
+    !any
+}
+
 /// §11.5 の契約（戻り値だけ `TargetRef`＝ドン!!も返せる。理由は `effects/mod.rs`）。
 ///
 /// `actor` は Python 側に対応物が無い（`matcher.get_target_cards(game_manager, query, source_card)`
@@ -151,8 +166,11 @@ pub fn get_target_cards(
             match z {
                 ZoneRef::Field => {
                     candidates.extend(p.field.iter().map(|c| TargetRef::Card(*c)));
+                    // 「自分のキャラか「X」」（NAME_OR_TYPE）は名前側でリーダーも拾う
+                    // （リーダーの「シルバーズ・レイリー」。種類に LEADER が無くても候補に入れる）。
                     if query.card_type.is_empty()
                         || query.card_type.iter().any(|t| t == "LEADER")
+                        || (query.has_flag("NAME_OR_TYPE") && !query.names.is_empty())
                     {
                         if let Some(leader) = p.leader {
                             candidates.push(TargetRef::Card(leader));
@@ -286,6 +304,7 @@ pub fn get_target_cards(
                 continue;
             }
             if !query.colors.is_empty()
+                && scope_applies(query, "COLORS_ONLY_", master.ty.name())
                 && !query
                     .colors
                     .iter()
@@ -302,16 +321,18 @@ pub fn get_target_cards(
 
         // --- コスト ---------------------------------------------------------------
         let cost = filter_cost(query, card, master);
-        if query.has_flag("COST_0_OR_GE_8") && !(cost == 0 || cost >= 8) {
+        // 「赤のイベントかコスト3以上のキャラ」: コスト条件は COST_ONLY_<種類> の種類にだけ掛かる。
+        let cost_scoped = scope_applies(query, "COST_ONLY_", master.ty.name());
+        if cost_scoped && query.has_flag("COST_0_OR_GE_8") && !(cost == 0 || cost >= 8) {
             continue;
         }
-        if query.cost_max.is_some_and(|m| cost > m) {
+        if cost_scoped && query.cost_max.is_some_and(|m| cost > m) {
             continue;
         }
-        if query.cost_min.is_some_and(|m| cost < m) {
+        if cost_scoped && query.cost_min.is_some_and(|m| cost < m) {
             continue;
         }
-        if dynamic_cost_max.is_some_and(|m| cost > m) {
+        if cost_scoped && dynamic_cost_max.is_some_and(|m| cost > m) {
             continue;
         }
 

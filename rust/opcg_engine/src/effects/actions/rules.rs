@@ -128,6 +128,27 @@ pub fn apply_target(
 /// ガード（`status in SELF_RESTRICTION_KEYS`）が偽なら Python は対象ループへ落ち、そこは no-op。
 /// どちらも success=true なので、ここでは `false` を返さない（モジュール docstring 参照）。
 fn rule_processing_self_restriction(s: &mut Session, actor: Seat, action: &GameAction) -> bool {
+    // 「相手はキャラの「X」以外にアタックできない」（常在）: 相手側の攻撃先制限として登録する
+    // （`rules::attack_target_banned` が強制。常在の再計算ごとに作り直す＝`passives` が毎回消す）。
+    if let Some(st) = action
+        .status
+        .as_deref()
+        .filter(|st| st.starts_with(crate::rules::ATTACK_CHAR_ONLY_PREFIX))
+    {
+        let opp = actor.other();
+        let mut recs = s.state().player(opp).restrictions.clone();
+        let rec = Restriction {
+            key: st.to_owned(),
+            expire: s.state().turn_count,
+            min_cost: None,
+        };
+        match recs.iter_mut().find(|r| r.key == st) {
+            Some(slot) => *slot = rec,
+            None => recs.push(rec),
+        }
+        s.edit().set_restrictions(opp, recs);
+        return true;
+    }
     let Some(status) = action
         .status
         .as_deref()

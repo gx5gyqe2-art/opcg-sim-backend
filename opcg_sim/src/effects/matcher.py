@@ -198,6 +198,14 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if tq.names and tq.card_type and re.search(_nfc(r'」か(?:イベント|キャラクター|キャラ|リーダー|ステージ)'), tgt_text):
         tq.flags.add("NAME_OR_TYPE")
 
+    # 「自分の<種類>か「名前」」= 種類 OR 名前（逆順。EB04-009/OP12-016/018/019「自分のキャラか
+    # 「シルバーズ・レイリー」1枚まで」）。従来は card_type∧names の AND になりリーダーのレイリーも
+    # 他のキャラも選べなかった。種類語が「自分の/相手の」直後に来る単純形に限る（特徴/色/コストで
+    # 修飾された「…キャラカードか「サンジ」」は別の OR 合成＝TRAIT_OR_NAME が担当）。
+    if tq.names and tq.card_type and re.search(
+            _nfc(r'(?:自分の|相手の)(?:イベント|キャラクター|キャラ|リーダー|ステージ)か、?「'), tgt_text):
+        tq.flags.add("NAME_OR_TYPE")
+
     # 「「名前」か<色>の<種類>」= 名前 OR (色∧種類)（OP12-006/014「「モンキー・D・ルフィ」か
     # 赤のイベント」）。「」か」の直後が色語のため上の NAME_OR_TYPE に該当せず、名前∧色∧種類の
     # AND に縮退して候補ゼロになっていた。matcher が name_ok or (type∧color) で照合する。
@@ -209,6 +217,18 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
 
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
+
+    # 「<色>の<種類A>か<コスト条件>の<種類B>」（OP12-017「赤のイベントかコスト3以上のキャラカード」）
+    #   = (色∧種類A) OR (コスト∧種類B)。色は種類A にだけ・コストは種類B にだけ掛かる
+    #   （単純 AND では赤でもコスト3以上でもあるカードしか選べなかった）。
+    m_scoped = re.search(_nfc(
+        r'(?:赤|青|緑|黄|黒|紫)の(イベント|キャラクター|キャラ|ステージ)か'
+        r'(?:コスト\d+以[上下])の(イベント|キャラクター|キャラ|ステージ)'), tgt_text)
+    if m_scoped:
+        _tn = {_nfc("イベント"): "EVENT", _nfc("キャラクター"): "CHARACTER",
+               _nfc("キャラ"): "CHARACTER", _nfc("ステージ"): "STAGE"}
+        tq.flags.add("COLORS_ONLY_" + _tn[m_scoped.group(1)])
+        tq.flags.add("COST_ONLY_" + _tn[m_scoped.group(2)])
 
     # 「属性《X》を持つカードか<種類/色>」= 属性 OR (種類∧色)（OP12-034 ペローナ
     # 「属性(斬)を持つカードか緑のイベント」）。従来は属性・種類・色がすべて AND になり、
@@ -336,7 +356,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 「ならない/にする/にし/にできる」を含むと丸ごと抑制され、OP15-077 雷龍
     # 「相手のレストの…キャラ…アクティブにならない」でレスト対象制限が脱落し、
     # アクティブなキャラも対象にできていた。
-    rest_mod = re.search(_nfc(r'(レスト|アクティブ)の[^。、]*?(?:キャラ|カード|リーダー)'), tgt_text)
+    rest_mod = re.search(_nfc(r'(レスト|アクティブ)の、?[^。、]*?(?:キャラ|カード|リーダー|ステージ)'), tgt_text)
     if rest_mod:
         tq.is_rest = (rest_mod.group(1) == _nfc("レスト"))
     elif (_nfc("にする") not in tgt_text and _nfc("にし") not in tgt_text

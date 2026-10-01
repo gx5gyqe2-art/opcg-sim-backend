@@ -82,6 +82,50 @@ pub fn attack_tax_need(state: &GameState, card: CardIdx) -> Option<usize> {
         .max()
 }
 
+/// 「相手はキャラの「X」以外にアタックできない」の制限キー接頭辞（`ATTACK_CHAR_ONLY:<名前>`）。
+/// 相手側 `restrictions` に常在の再計算ごとに登録される（`effects::passives` が毎回消す）。
+pub const ATTACK_CHAR_ONLY_PREFIX: &str = "ATTACK_CHAR_ONLY:";
+
+/// `attacker` が `target` へアタックできない（攻撃先の制限に当たる）か。
+///
+/// - 攻撃側カードの `ATTACK_BAN_LEADER`（リーダーへ不可）／`ATTACK_BAN_CHAR_OCOST_LE_<n>`
+///   （元々のコストが n 以下のキャラへ不可）フラグ。
+/// - 攻撃側プレイヤーに掛かる `ATTACK_CHAR_ONLY:<名前>`（キャラへは該当名のカードにしかアタックできない。
+///   リーダーへは制限なし）。
+pub fn attack_target_banned(
+    state: &GameState,
+    masters: &MasterTable,
+    attacker: CardIdx,
+    target: CardIdx,
+) -> bool {
+    let a = state.card(attacker);
+    let t = state.card(target);
+    let tm = masters.get(t.master);
+    for f in a.flags.iter().chain(a.timed_flags.iter()) {
+        if f == "ATTACK_BAN_LEADER" && tm.ty == CardType::Leader {
+            return true;
+        }
+        if let Some(n) = f.strip_prefix("ATTACK_BAN_CHAR_OCOST_LE_") {
+            if tm.ty == CardType::Character && n.parse::<i32>().is_ok_and(|n| tm.cost <= n) {
+                return true;
+            }
+        }
+    }
+    if tm.ty == CardType::Character {
+        for r in &state.player(a.owner).restrictions {
+            if state.turn_count > r.expire {
+                continue;
+            }
+            if let Some(name) = r.key.strip_prefix(ATTACK_CHAR_ONLY_PREFIX) {
+                if !crate::effects::matcher::matches_name(tm, name, false) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 pub fn card_type(state: &GameState, masters: &MasterTable, card: CardIdx) -> CardType {
     masters.get(state.card(card).master).ty
 }

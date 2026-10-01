@@ -13,8 +13,8 @@ import re
 import unicodedata
 from typing import Optional
 
-from ...models.effect_types import Choice, EffectNode, GameAction, Sequence, TargetQuery, ValueSource
-from ...models.enums import ActionType, Player, Zone
+from ...models.effect_types import Branch, Choice, Condition, EffectNode, GameAction, Sequence, TargetQuery, ValueSource
+from ...models.enums import ActionType, ConditionType, Player, Zone
 from ..matcher import parse_target
 from .base import ParseContext, rule, _nfc
 
@@ -1632,6 +1632,26 @@ def _attack_disable(ctx: ParseContext) -> Optional[GameAction]:
     # 効果コントローラー自身の攻撃側制限。self_cannot(CANNOT_ATTACK_LEADER) に委ねる。
     if _nfc("自分は") in t and re.search(_nfc(r"リーダーにアタック"), t):
         return None
+    # 「相手はキャラの「X」以外にアタックできない」= 相手の攻撃先を X という名前のキャラに限る
+    # （リーダーへは制限なし）。従来は相手場の「X」を ATTACK_DISABLE の対象にしており、攻撃先の制限に
+    # なっていなかった（OP01-051/OP17-044/P-067）。エンジンが相手側の制限として登録・強制する。
+    m_only = re.search(_nfc(r"相手は(?:キャラの)?「([^」]+)」以外(?:の?キャラ)?に(?:は)?アタックできない"), t)
+    if m_only:
+        return GameAction(type=ActionType.RULE_PROCESSING,
+                          status="ATTACK_CHAR_ONLY:" + m_only.group(1),
+                          duration=_duration_of(t), raw_text=t)
+    # 「このキャラは、登場したターン中、リーダーにアタックできない」/「このリーダーは、このターン中、
+    # 相手の元々のコストN以下のキャラへアタックできない」= 自カードの攻撃先の制限（全アタック禁止ではない）。
+    m_ban_leader = re.search(_nfc(r"^この(?:リーダー|キャラ|カード)は、?(?:登場したターン中、?)?(?:このターン中、?)?リーダーにアタックできない"), t.strip())
+    m_ban_cost = re.search(_nfc(r"^この(?:リーダー|キャラ|カード)は、?(?:このターン中、?)?相手の元々のコスト(\d+)以下のキャラへ(?:は)?アタックできない"), t.strip())
+    if m_ban_leader or m_ban_cost:
+        status = "ATTACK_BAN_LEADER" if m_ban_leader else f"ATTACK_BAN_CHAR_OCOST_LE_{m_ban_cost.group(1)}"
+        act = GameAction(type=ActionType.ATTACK_DISABLE, target=TargetQuery(select_mode="SOURCE"),
+                         status=status, duration="THIS_TURN", raw_text=t)
+        if m_ban_leader and _nfc("登場したターン") in t:
+            return Branch(condition=Condition(type=ConditionType.SOURCE_STATE, value="ENTERED_THIS_TURN",
+                                              raw_text=t), if_true=act)
+        return act
     # 「このリーダー/キャラ/カードは、…（相手の…へ）アタックできない」= 効果保持カード自身の
     # 攻撃側制限。対象（〜へ）ではなく自カード(SOURCE)に制限フラグを乗せる（OP12-020）。
     # 対象限定（コストN以下のキャラへ等）はエンジン未モデルのため、自カードのアタック制限に近似する。
@@ -2342,6 +2362,9 @@ def _dual_tier_removal(ctx: ParseContext) -> Optional[EffectNode]:
                          count=1, is_up_to=True)
         if _nfc("コスト") in crit:
             tq.cost_max = n
+            # 「元々の、コストN以下」は印刷コストで絞る（両ティア。OP10-098）。
+            if original:
+                tq.flags.add("ORIGINAL_COST")
         else:
             tq.power_max = n
             if original:
@@ -2757,7 +2780,10 @@ def _attack_active(ctx: ParseContext) -> Optional[GameAction]:
     if not re.search(_nfc(r"アクティブ.*キャラ.*アタックできる"), t):
         return None
     duration = "THIS_TURN" if _nfc("このターン中") in t else "PERMANENT"
-    tq = parse_target(t)
+    # 対象は主語（「…は、」より前）だけで決める。述語の「アクティブのキャラにも」を含めると
+    # card_type に CHARACTER が混入し、リーダー限定の付与がキャラも選べた（OP11-010）。
+    m_subj = re.match(_nfc(r"^(.+?)は、?"), t.strip())
+    tq = parse_target(m_subj.group(1)) if m_subj else parse_target(t)
     if re.search(_nfc(r"このキャラは"), t):
         tq = TargetQuery(select_mode="SOURCE")
     return GameAction(
