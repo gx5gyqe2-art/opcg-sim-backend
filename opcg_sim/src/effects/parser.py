@@ -1676,7 +1676,8 @@ class EffectParser:
                 trait_cond = Condition(type=ConditionType.LEADER_TRAIT, value=tval, player=p, raw_text=norm_text)
                 # 「特徴《X》を持つか「Y」の場合」= 特徴 OR リーダー名（ST23-002 赤髪海賊団 or ウタ／
                 # ワノ国 or エース）。従来は trait のみ返り、名前指定リーダーで常に不成立だった。
-                if name_matches and _nfc("か「") in norm_text:
+                if name_matches and (_nfc("か「") in norm_text
+                                     or re.search(_nfc(r'」か(?:特徴)?[《<『]'), norm_text)):
                     nval = name_matches[0] if len(name_matches) == 1 else name_matches
                     name_cond = Condition(type=ConditionType.LEADER_NAME, value=nval, player=p, raw_text=norm_text)
                     trait_cond = Condition(type=ConditionType.OR, player=p,

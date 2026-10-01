@@ -312,11 +312,25 @@ pub fn get_target_cards(
             {
                 continue;
             }
+            // SELECTOR_OR（名前／特徴／属性のいずれか）のときは後段でまとめて判定する。
             if !query.attributes.is_empty()
+                && !query.has_flag("SELECTOR_OR")
                 && !query.attributes.iter().any(|a| a == master.attribute.value())
             {
                 continue;
             }
+        }
+
+        // 「【ブロッカー】を持つ」等: 現在そのキーワードを持つカードに限る（効果無効なら持たない）。
+        if query.flags.iter().any(|f| {
+            f.strip_prefix("HAS_KEYWORD:")
+                .is_some_and(|kw| !crate::rules::has_keyword(state, card_idx, kw))
+        }) {
+            continue;
+        }
+        // 「単色の」: 色を 1 色だけ持つカード。
+        if query.has_flag("SINGLE_COLOR") && master.colors.len() != 1 {
+            continue;
         }
 
         // --- コスト ---------------------------------------------------------------
@@ -392,7 +406,18 @@ pub fn get_target_cards(
                 && query.traits.iter().any(|t| master.traits.contains(t))
         };
 
-        if query.has_flag("NAME_OR_COLORTYPE") {
+        if query.has_flag("SELECTOR_OR") {
+            // 「特徴《A》か属性(斬)を持つ」「「ペローナ」か属性(斬)を持つ」: 指定された名前・特徴・属性の
+            // いずれかに当てはまればよい（他の絞り込み＝種類／コスト／除外名は AND のまま）。
+            let attr_ok = !query.attributes.is_empty()
+                && query.attributes.iter().any(|a| a == master.attribute.value());
+            if !(name_in(&query.names) || trait_in() || attr_ok) {
+                continue;
+            }
+            if excluded() {
+                continue;
+            }
+        } else if query.has_flag("NAME_OR_COLORTYPE") {
             if excluded() {
                 continue;
             }

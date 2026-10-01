@@ -2285,6 +2285,38 @@ def _bounce(ctx: ParseContext) -> Optional[GameAction]:
     return GameAction(type=ActionType.BOUNCE, target=tq, raw_text=t)
 
 
+@rule("bounce_or_deck_bottom", priority=76)
+def _bounce_or_deck_bottom(ctx: ParseContext) -> Optional[EffectNode]:
+    """「（対象）を、持ち主の手札かデッキの下に戻す」→ Choice[BOUNCE, DECK_BOTTOM]（対象は場のキャラ）。
+
+    従来は deck_bottom_general が拾い、対象が zone=[HAND,DECK] のキャラ（場のキャラではない）になり、
+    手札かデッキの下かの択一も表現されなかった（OP04-043/OP11-050）。
+    """
+    t = ctx.text
+    m = re.search(_nfc(r"^(.+?)を、?持ち主の手札かデッキの下に(?:戻す|置く)"), t)
+    if not m:
+        return None
+    desc = m.group(1) + _nfc("を")
+    tq = parse_target(desc)
+    tq.zone = Zone.FIELD
+    if tq.player != Player.OPPONENT and _nfc("自分の") not in desc:
+        tq.player = Player.ALL
+    if _nfc("まで") in desc:
+        tq.is_up_to = True
+
+    def _opt(ty):
+        return GameAction(type=ty, target=_clone_target(tq), raw_text=t)
+
+    return Choice(message=_nfc("戻し先を選ぶ"),
+                  option_labels=[_nfc("持ち主の手札に戻す"), _nfc("持ち主のデッキの下に置く")],
+                  options=[_opt(ActionType.BOUNCE), _opt(ActionType.DECK_BOTTOM)])
+
+
+def _clone_target(tq: TargetQuery) -> TargetQuery:
+    import copy
+    return copy.deepcopy(tq)
+
+
 @rule("deck_bottom_general", priority=55)
 def _deck_bottom_general(ctx: ParseContext) -> Optional[GameAction]:
     """「（対象）を（持ち主の/好きな順番で）デッキの下に置く/戻す」→ DECK_BOTTOM。
@@ -2882,6 +2914,10 @@ def _freeze_target(ctx: ParseContext) -> Optional[EffectNode]:
         )
         return Choice(message="アクティブにならない対象を選ぶ", option_labels=["キャラ", "ドン!!"],
                       options=[char_action, don_action])
+    # 「このキャラは、次の自分のリフレッシュフェイズでアクティブにならない」= 自身をフリーズする
+    # （従来は相手キャラ 1 枚が対象だった: OP04-090）。
+    if re.match(_nfc(r"^(?:その後、)?この(?:キャラ|カード|リーダー)は"), t.strip()):
+        return GameAction(type=ActionType.FREEZE, target=TargetQuery(select_mode="SOURCE"), raw_text=t)
     tq = parse_target(t)
     # 「お互いの（リフレッシュフェイズ）」や側未指定の「すべて」（鳥カゴ OP05-040 等）は両側が対象（ALL）。
     # それ以外（多くは「相手の…キャラ」）は OPPONENT 既定を維持する。

@@ -133,7 +133,8 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 名前は複数併記され得る（「「X」と「Y」すべて」ST30-001 /「「X」か「Y」」）。findall で全て拾い、
     # matcher は names を OR（いずれかの名前）として扱う。
     for _nm in re.findall(r'「([^」]+)」', tgt_text):
-        if (f'「{_nm}」' + _nfc(ParserKeyword.EXCEPT)) not in tgt_text:
+        # 「「X」以外で、…」「「X」以外の…」のどちらも除外名（従来は「以外の」だけ＝ST12-003 の「以外で」は包含になった）。
+        if (f'「{_nm}」' + _nfc(ParserKeyword.EXCEPT)) not in tgt_text and (f'「{_nm}」以外') not in tgt_text:
             tq.names.append(_nm)
         else:
             # 「「◯◯」以外のキャラ」: その名前を除外対象にする（従来は無視され、
@@ -154,6 +155,15 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 除外して候補化することで、同名を複数選べないようにする（OP16-060/OP16-034/038 等）。
     if _nfc("カード名の異なる") in tgt_text or _nfc("カード名が異なる") in tgt_text:
         tq.is_unique_name = True
+
+    # 「【ブロッカー】を持つ（キャラ）」等のキーワード所持の絞り込み（ST01-016/ST30-012）。
+    #   従来は欄が無く任意の相手キャラを選べた。【トリガー】は別機構（HAS_TRIGGER）。
+    for _kw in re.findall(_nfc(r'【(ブロッカー|速攻|ダブルアタック|バニッシュ|ブロック不可)】を持つ'), tgt_text):
+        tq.flags.add("HAS_KEYWORD:" + _kw)
+
+    # 「単色の（リーダー/キャラ）」: 色を 1 色だけ持つカード（OP17-005）。matcher が色数で絞る。
+    if _nfc("単色の") in tgt_text:
+        tq.flags.add("SINGLE_COLOR")
 
     # 「【X】効果を持たないキャラ」: 指定トリガー種別を持たないカードに限定（EB03-001/PRB01-001）。
     _lacks = re.search(_nfc(r'【(登場時|アタック時|ブロック時|KO時|トリガー)】効果を持たない'), tgt_text)
@@ -218,6 +228,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
 
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
+
+    # 「特徴《A》か属性(斬)を持つ」「「名前」か属性(斬)を持つ」= 名前・特徴・属性のいずれか（OR）。
+    #   従来は特徴∧属性（両方持つ）の AND になっていた（ST12-003/ST32-003）。
+    if tq.attributes and (tq.names or tq.traits) and re.search(
+            _nfc(r'(?:」|》|』)か、?属性[((]'), tgt_text):
+        tq.flags.add("SELECTOR_OR")
 
     # 「<色>の<種類A>か<コスト条件>の<種類B>」（OP12-017「赤のイベントかコスト3以上のキャラカード」）
     #   = (色∧種類A) OR (コスト∧種類B)。色は種類A にだけ・コストは種類B にだけ掛かる
