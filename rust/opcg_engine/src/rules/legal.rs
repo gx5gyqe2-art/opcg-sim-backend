@@ -257,7 +257,9 @@ fn has_activatable_main(
                 continue;
             }
         }
-        if ability_effect_is_inert(state, seat, ab.effect.as_ref()) {
+        // 「キャラの効果でドン!!をアクティブにできない」は発生源がキャラのときだけ効く。
+        let from_character = masters.get(state.card(card).master).ty == CardType::Character;
+        if ability_effect_is_inert(state, seat, ab.effect.as_ref(), from_character) {
             continue;
         }
         return Ok(true);
@@ -271,6 +273,7 @@ fn ability_effect_is_inert(
     state: &GameState,
     seat: Seat,
     node: Option<&crate::effects::ast::EffectNode>,
+    from_character: bool,
 ) -> bool {
     use crate::effects::ast::{ActionType, EffectNode};
     let Some(node) = node else {
@@ -279,10 +282,10 @@ fn ability_effect_is_inert(
     match node {
         EffectNode::Sequence(items) => items
             .iter()
-            .all(|n| ability_effect_is_inert(state, seat, Some(n))),
+            .all(|n| ability_effect_is_inert(state, seat, Some(n), from_character)),
         EffectNode::Choice { options, .. } => options
             .iter()
-            .all(|n| ability_effect_is_inert(state, seat, Some(n))),
+            .all(|n| ability_effect_is_inert(state, seat, Some(n), from_character)),
         // Python は `actions`／`options` を持たない非 GameAction（Branch）を False にする。
         EffectNode::Branch { .. } => false,
         EffectNode::Action(a) => match a.ty {
@@ -294,7 +297,7 @@ fn ability_effect_is_inert(
                 }
             },
             ActionType::ActiveDon if a.target.is_none() => {
-                if super::active_restriction(state, seat, "CANNOT_ACTIVATE_DON").is_some() {
+                if from_character && super::active_restriction(state, seat, "CANNOT_ACTIVATE_DON").is_some() {
                     return true;
                 }
                 state.player(seat).don_rested.is_empty()

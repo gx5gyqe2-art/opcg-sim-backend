@@ -1157,6 +1157,15 @@ def _don_opponent(t: str) -> Optional[str]:
     return "OPPONENT" if (_nfc("相手") in t and _nfc("自分") not in t) else None
 
 
+def _don_return_status(t: str) -> Optional[str]:
+    """RETURN_DON の status。「アクティブのドン!!N枚を戻す」は戻す候補をアクティブ状態に限る
+    （ACTIVE／相手側なら OPPONENT_ACTIVE。EB02-061・OP16-060・OP15-059）。"""
+    opp = _don_opponent(t)
+    if re.search(_nfc(r"アクティブの(?:ドン|DON)"), t):
+        return "OPPONENT_ACTIVE" if opp else "ACTIVE"
+    return opp
+
+
 @rule("don_phase_routing", priority=86)
 def _don_phase_routing(ctx: ParseContext) -> Optional[GameAction]:
     """「自分のドン‼フェイズに置かれるドン‼…は、…に付与される」= ドン配置の常在ルール変更。
@@ -1264,16 +1273,42 @@ def _don_attach(ctx: ParseContext) -> Optional[GameAction]:
         pre = t[max(0, don_m.start() - 8):don_m.start()]
         if _nfc("相手") in pre:
             from_opp_pool = True
-    is_rested = _nfc("レストのドン") in t or _nfc("コストエリアのドン") in t
+    # 「このキャラ／このリーダーに（レストの）ドン!!N枚までを付与する」は付与先が発動元自身（OP01-013）。
+    # 従来は「に付与」が無い語順のため全文が付与先として解析され、N 枚が対象数に化けていた。
+    if re.search(_nfc(r"この(?:キャラ|リーダー|カード)に(?:レストの|コストエリアの)?(?:ドン|DON)"), t):
+        recipient = TargetQuery(zone=Zone.FIELD, player=Player.SELF, count=1, select_mode="SOURCE")
+    # 「相手のキャラ1枚に相手のコストエリアのドン!!…」のようにドン!!句の直前が長い修飾（コストエリアの）で
+    # 窓（8文字）に「相手」が入らない場合も相手のプール（OP15-025/028）。
+    if re.search(_nfc(r"相手の(?:レストの|コストエリアの|アクティブの)?(?:ドン|DON)"), t[ni_idx:] if has_ni_attach else t):
+        from_opp_pool = True
+    # 「コストエリアのドン!!」はレスト／アクティブを問わない（レストに限定しない）。レストと明示した
+    # 「レストのドン!!」だけがレストのドン!!のみ（OP15-023/025/028 は従来レスト限定に化けていた）。
+    is_rested = _nfc("レストのドン") in t
+    # 「（リーダーかキャラ1枚に）持ち主の（レストの）ドン!!」: ドン!!は付与先カードの持ち主のプールから。
+    # 付与先は持ち主を問わず両陣営から選べる（OP15-010/012/017/023）。
+    owner_don = bool(re.search(_nfc(r"持ち主の(?:レストの|コストエリアの|アクティブの)?(?:ドン|DON)"), t))
+    if owner_don:
+        from_opp_pool = False
+        if recipient.player == Player.OWNER:
+            recipient.player = Player.ALL
     status_parts = []
+    # 「自分の付与されているドン!!（合計）N枚までを、…に付与する」は付与済みのドン!!を付け替える
+    # （プールのドン!!を新規に付与するのではない＝EB02-009・OP07-001）。
+    if re.search(_nfc(r"^(?:自分の)?付与されている(?:ドン|DON)"), t):
+        status_parts.append("MOVE")
     if is_rested:
         status_parts.append("RESTED")
     if from_opp_pool:
         status_parts.append("OPP")
+    if owner_don:
+        status_parts.append("OWNER")
+    # 「キャラすべてにドン!!1枚ずつまで」の値は受け手 1 体あたりの枚数（「すべて」由来の 99 に退化させない。
+    # エンジンは対象ごとに value 枚付与する＝OP04-004）。
+    per_m = re.search(_nfc(r'(\d+)[ 　]*枚[ 　]*ずつ'), t)
     return GameAction(
         type=ActionType.ATTACH_DON,
         target=recipient,
-        value=ValueSource(base=_don_count(t)),
+        value=ValueSource(base=int(per_m.group(1)) if per_m else _don_count(t)),
         status="_".join(status_parts) if status_parts else None,
         duration=_duration_of(t),
         raw_text=t,
@@ -1315,6 +1350,15 @@ def _don_set_active(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if not re.search(_nfc(r"アクティブに(する|できる|し$)"), t.strip()):
         return None
+    # 「このキャラか自分のドン!!N枚までを、アクティブにする」（OP13-035・ST?）= このキャラをアクティブに
+    # するか、ドン!!をアクティブにするかの択一。従来はドン側だけで「このキャラ」が脱落していた。
+    if re.match(_nfc(r"^このキャラか(?:自分の)?ドン"), t.strip()):
+        self_tq = TargetQuery(zone=Zone.FIELD, player=Player.SELF, count=1, select_mode="SOURCE")
+        return Choice(
+            message="アクティブにする対象を選ぶ", option_labels=["このキャラ", "ドン!!"],
+            options=[GameAction(type=ActionType.ACTIVE, target=self_tq, raw_text="このキャラ"),
+                     GameAction(type=ActionType.ACTIVE_DON, target=None,
+                                value=ValueSource(base=_don_count(t)), raw_text=t)])
     return GameAction(
         type=ActionType.ACTIVE_DON,
         target=None,
@@ -1389,6 +1433,25 @@ def _rest_char_or_don(ctx: ParseContext) -> Optional[EffectNode]:
                   options=[char_action, don_action])
 
 
+@rule("rest_leader_or_don", priority=77)
+def _rest_leader_or_don(ctx: ParseContext) -> Optional[EffectNode]:
+    """「自分の、属性(斬)を持つリーダーかドン!!1枚をレストにできる」→ Choice[REST(リーダー), REST_DON]。
+
+    リーダーをレストにする選択肢が脱落し REST_DON だけになっていた（ST32-001）。
+    """
+    t = ctx.text
+    m = re.search(_nfc(r"(?:属性[ 　]*[（(]([^）)]+)[）)]を持つ)?リーダーか(?:自分の)?ドン[ 　]*(?:!!|‼)[ 　]*(\d+)[ 　]*枚[^、。]*?レストに(?:する|できる)"), t)
+    if not m:
+        return None
+    leader_tq = TargetQuery(zone=Zone.FIELD, player=Player.SELF, card_type=["LEADER"], count=1)
+    if m.group(1):
+        leader_tq.attributes.append(m.group(1))
+    rest_leader = GameAction(type=ActionType.REST, target=leader_tq, raw_text=t)
+    rest_don = GameAction(type=ActionType.REST_DON, value=ValueSource(base=int(m.group(2))), raw_text=t)
+    return Choice(message="レストにする対象を選ぶ", option_labels=["リーダー", "ドン!!"],
+                  options=[rest_leader, rest_don])
+
+
 @rule("don_set_rest", priority=74)
 def _don_set_rest(ctx: ParseContext) -> Optional[GameAction]:
     """「（自分の）ドン!!N枚をレストにする/できる」→ REST_DON（アクティブ→レスト）。多くはコスト。"""
@@ -1399,7 +1462,9 @@ def _don_set_rest(ctx: ParseContext) -> Optional[GameAction]:
     # 「レストにしてもよい」（任意）も受ける。
     if not re.search(_nfc(r"レストに(する|できる|してもよい|し[、。]|し$)"), t.strip()):
         return None
-    if _nfc("アクティブ") in t:
+    # 「アクティブにする」はドンのアクティブ化。「アクティブのドン!!N枚をレストにする」は
+    # アクティブ状態のドンをレストにする（REST_DON は元々アクティブからだけ取る＝PRB02-005）。
+    if re.search(_nfc(r"アクティブ(?!の(?:ドン|DON))"), t):
         return None
     # 「ドン!!が付与されているキャラをレストにする」等、ドン!!が修飾語として使われている場合は
     # キャラを対象とする REST に委ねる（ドン!!自体をレストにするわけではない）
@@ -1444,7 +1509,7 @@ def _don_return_deck(ctx: ParseContext) -> Optional[GameAction]:
         type=ActionType.RETURN_DON,
         target=None,
         value=ValueSource(base=_don_count(t)),
-        status=_don_opponent(t),
+        status=_don_return_status(t),
         raw_text=t,
     )
 
@@ -1727,6 +1792,14 @@ def _don_return(ctx: ParseContext) -> Optional[GameAction]:
 # ドン!!追加: 「ドン!!デッキからドン!!N枚までを、アクティブ/レストで追加する」
 #   「レストで追加」は従来 OTHER。status=RESTED を付けて resolver に伝える。
 # ---------------------------------------------------------------------------
+def _don_add_status(t: str, is_rested: bool) -> Optional[str]:
+    """RAMP_DON の status。「相手は…ドン!!を追加してもよい」は追加先が相手（OP12-075）。"""
+    opp = bool(re.search(_nfc(r"相手は[^、。]*?ドン"), t)) and _nfc("自分") not in t
+    if opp:
+        return "OPPONENT_RESTED" if is_rested else "OPPONENT"
+    return "RESTED" if is_rested else None
+
+
 @rule("don_add", priority=86)
 def _don_add(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
@@ -1739,7 +1812,8 @@ def _don_add(ctx: ParseContext) -> Optional[GameAction]:
     return GameAction(
         type=ActionType.RAMP_DON,
         value=ValueSource(base=_first_int(t, 1)),
-        status="RESTED" if is_rested else None,
+        # 「相手はドン!!デッキからドン!!1枚を、アクティブで追加してもよい」は追加先が相手（OP12-075）。
+        status=_don_add_status(t, is_rested),
         raw_text=t,
     )
 
@@ -2995,10 +3069,10 @@ def _rule_processing(ctx: ParseContext) -> Optional[GameAction]:
 
 
 # ---------------------------------------------------------------------------
-# コスト節の裸の数値: 「1:このキャラをアクティブにする」のように コロン左側が単独の
-#   数値だけになるカード（OP05-032 ピーカ 等）。この数値は効果の連番表記であって
-#   コストではないため、no-op（RULE_PROCESSING）に吸収して OTHER 化を防ぐ。
-#   ドン!!コスト（【ドン!!×N】）・丸数字コスト（①）は別タグ/ルールで処理済み。
+# コスト節の裸の数値: 「1:このキャラをアクティブにする」（OP05-032 ピーカ 等）。
+#   原文は丸数字コスト「①」だが、DataCleaner（NFKC）が素の数字へ分解するため裸の数値で残る。
+#   ①＝コストエリアのドン!!を N 枚レストにする支払い（REST_DON）。従来は連番表記と見て no-op
+#   （RULE_PROCESSING）に吸収していたため、ドン!!を払わず発動できた。
 # ---------------------------------------------------------------------------
 @rule("bare_number_cost_noop", priority=93)
 def _bare_number_cost_noop(ctx: ParseContext) -> Optional[GameAction]:
@@ -3006,7 +3080,7 @@ def _bare_number_cost_noop(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if not re.fullmatch(r"\d+", ctx.text.strip()):
         return None
-    return GameAction(type=ActionType.RULE_PROCESSING, raw_text=ctx.text)
+    return GameAction(type=ActionType.REST_DON, value=ValueSource(base=int(ctx.text.strip())), raw_text=ctx.text)
 
 
 # ---------------------------------------------------------------------------

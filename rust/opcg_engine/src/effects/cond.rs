@@ -201,9 +201,15 @@ pub fn check_condition(
     Ok(match cond.ty {
         C::DonCount => {
             // 「付与されているドン!!が…」は付与中のみ数える（「同じ」を含む対象固有の比較は除く）。
+            // 「アクティブのドン!!が…」「レストのドン!!が…」「ドン!!すべてがレスト」はその状態の
+            // ドンだけを数える（従来は場のドン総数＝状態の限定が脱落していた）。
             let raw = cond.raw_text.as_str();
             let current = if raw.contains("付与") && !raw.contains("同じ") {
                 tp.don_attached.len() as i32
+            } else if raw.contains("アクティブのドン") || raw.contains("すべてがレスト") {
+                tp.don_active.len() as i32
+            } else if raw.contains("レストのドン") {
+                tp.don_rested.len() as i32
             } else {
                 don_total(target_seat)
             };
@@ -800,6 +806,27 @@ mod tests {
         )));
         // それ以外は場のドン!!総数（active 2 + attached 2 = 4）。
         assert!(f.check(&cond("DON_COUNT", json!({"value": 4, "operator": "EQ"}))));
+    }
+
+    #[test]
+    fn don_count_respects_active_and_rested_qualifiers() {
+        let f = fixture();
+        // 場のドン!!は active 2・rested 0・attached 2（総数 4）。
+        let active = |n: i32| {
+            cond("DON_COUNT", json!({"value": n, "operator": "EQ", "raw_text": "自分のアクティブのドン!!が2枚以上"}))
+        };
+        assert!(f.check(&active(2)));
+        assert!(!f.check(&active(4)));
+        let rested = |n: i32| {
+            cond("DON_COUNT", json!({"value": n, "operator": "EQ", "raw_text": "自分のレストのドン!!が6枚以上"}))
+        };
+        assert!(f.check(&rested(0)));
+        assert!(!f.check(&rested(4)));
+        // 「ドン!!すべてがレスト」（EQ 0）はアクティブが 0 枚のときだけ真。いまはアクティブ 2 枚＝偽。
+        assert!(!f.check(&cond(
+            "DON_COUNT",
+            json!({"value": 0, "operator": "EQ", "raw_text": "自分のドン!!すべてがレストの"})
+        )));
     }
 
     #[test]

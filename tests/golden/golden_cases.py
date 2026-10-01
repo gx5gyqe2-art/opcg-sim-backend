@@ -1997,7 +1997,7 @@ CASES = [
         "id": "don_return_deck_optional",
         "text": "相手は自身のアクティブのドン‼1枚をドン‼デッキに戻してもよい。",
         "expect": [
-            {"effect": {"kind": "action", "type": "RETURN_DON", "value": 1, "status": "OPPONENT"}}
+            {"effect": {"kind": "action", "type": "RETURN_DON", "value": 1, "status": "OPPONENT_ACTIVE"}}
         ],
     },
     # ----- 「任意の枚数」可変選択（is_up_to + 大きめ count で 0..N 選択） ----
