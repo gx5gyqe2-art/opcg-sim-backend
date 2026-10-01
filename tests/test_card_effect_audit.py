@@ -79,6 +79,17 @@ def test_static_checks_flag_an_unknown_heading_and_a_missing_keyword():
     assert "NO_ABILITY" not in kinds          # キーワードだけのカードは能力 0 で正しい
 
 
+def test_qualifier_gaps_flag_a_dropped_qualifier():
+    """本文の限定語（上か下・元々のパワー・以外）に対応する欄が無ければ指摘、あれば出ない。"""
+    raw = "【登場時】相手の元々のパワー5000以下のキャラ1枚までを、ライフの上か下に置く。"
+    bare = _ability("ON_PLAY", raw, [_action("MOVE_CARD", "相手のキャラ1枚までを、ライフに置く")])
+    kinds = " ".join(A.qualifier_gaps(bare))
+    assert "元々のパワー" in kinds and "上か下" in kinds
+    ok = _ability("ON_PLAY", raw, [{"node": "Choice", "options": [
+        _action("MOVE_CARD", "上", status="POWER_OVERRIDE"), _action("MOVE_CARD", "下")]}])
+    assert A.qualifier_gaps(ok) == []
+
+
 # --- 2. 台帳 -------------------------------------------------------------------
 
 def test_ledger_state_follows_the_fingerprints():

@@ -71,6 +71,7 @@ FLAG_LEVEL = {
     "ORACLE": "E",             # 効果オラクル（ターン1回／〜まで の取りこぼし・OTHER）
     "UNCOVERED_TEXT": "W",     # 本文の句が解析結果のどのノードにも対応しない
     "ACTION_NOT_FIRED": "W",   # 解析結果のアクションがプローブで一度も実行されない
+    "QUALIFIER_GAP": "W",      # 本文の限定語（元々の・上か下・できる・以外・色…）に対応する欄が解析結果に無い
     "TAG_TRIGGER_MISMATCH": "W",  # 【登場時】等の見出しに対応する能力トリガーが無い
     "TAG_CONTEXT_MISSING": "W",   # 【ターン1回】【ドン!!×N】等に対応する条件が無い
     "KEYWORD_MISSING": "E",    # 【ブロッカー】等が keywords にも付与効果にも無い（＝どこも処理しない）
@@ -392,6 +393,10 @@ def static_checks(card: dict, parser_stats: dict) -> Tuple[List[dict], List[str]
         else:
             flags.append({"flag": "UNCOVERED_TEXT", "detail": piece})
 
+    for idx, ab in enumerate(abilities):
+        for g in qualifier_gaps(ab):
+            flags.append({"flag": "QUALIFIER_GAP", "ability": idx, "detail": g})
+
     for m in heads:
         raw = m.group(1)
         key = tag_key(raw)
@@ -417,6 +422,66 @@ def static_checks(card: dict, parser_stats: dict) -> Tuple[List[dict], List[str]
         else:
             flags.append({"flag": "UNKNOWN_TAG", "detail": f"【{raw}】（既知の見出しに無い）"})
     return flags, trigger_phrases
+
+
+# --- 限定語の照合 -------------------------------------------------------------
+# 本文の限定語ごとに、解析結果のどこかに対応する欄があるか。**欄が無い＝限定が脱落している疑い**
+# （2026-10-01 の pilot レビュー 320 枚で見つかった ng の約半数がこの類型）。偽陽性はありうる
+# （限定が別の欄・別の能力で表現されている）ので W。「元々のコスト」「含む特徴」は
+# 解析結果にもエンジンにも対応する欄が無いので、本文にあれば常に出る（＝既知のエンジン欠落）。
+# 「含む特徴」は対象の raw_text をエンジン（matcher）が読むので欄が無くても欠落ではない（対象外）。
+_COLOR_RE = re.compile(r"(?<![ぁ-んァ-ヶ一-龥])[赤青緑紫黒黄]の(?:キャラ|カード|イベント|ステージ|リーダー|特徴)")
+
+
+def _walk_targets(ability: dict) -> Iterable[dict]:
+    return (n for n in walk_nodes(ability) if n.get("node") == "TargetQuery")
+
+
+def qualifier_gaps(ability: dict) -> List[str]:
+    raw = nfkc(ability.get("raw_text"))
+    raw = _PAREN_RE.sub("", raw)
+    blob = json.dumps({k: v for k, v in ability.items() if k != "raw_text"}, ensure_ascii=False)
+    targets = list(_walk_targets(ability))
+    conds = [n for n in walk_nodes(ability) if n.get("node") == "Condition"]
+    acts = [n for n in walk_nodes(ability) if n.get("node") == "GameAction"]
+    gaps: List[str] = []
+
+    def need(cond: bool, label: str) -> None:
+        if not cond:
+            gaps.append(label)
+
+    if "元々のパワー" in raw:
+        need("ORIGINAL_POWER" in blob or "POWER_OVERRIDE" in blob, "元々のパワー（ORIGINAL_POWER 無し）")
+    if "元々のコスト" in raw:
+        need("ORIGINAL_COST" in blob, "元々のコスト（対応する欄がエンジンに無い）")
+    if "元々の効果のない" in raw or "元々の効果を持たない" in raw:
+        need('"is_vanilla": true' in blob, "元々の効果のない（is_vanilla 無し）")
+    if re.search(r"[上下]か[上下]|上または下", raw):
+        need(any(n.get("node") == "Choice" and len(n.get("options") or []) >= 2
+                 for n in walk_nodes(ability)), "上か下（選択肢が無い）")
+    if re.search(r"ことができる|てもよい", raw):
+        need(bool(ability.get("cost_optional")) or any(n.get("is_optional") for n in acts), "任意（できる）が欄に無い")
+    if "以外" in raw:
+        need(any(t.get("exclude_names") or t.get("exclude_ids") for t in targets)
+             or any(f in blob for f in ("EXCLUDE_SOURCE", "EXCLUDE_SELECTED_COLOR")),
+             "以外（除外欄が無い）")
+    if _COLOR_RE.search(raw):
+        need(any(t.get("colors") for t in targets) or any(c.get("type") == "LEADER_COLOR" for c in conds),
+             "色（colors が無い）")
+    if "好きな順番" in raw:
+        need("ARRANGE" in blob or "ORDER_LIFE" in blob, "好きな順番（並び替えが無い）")
+    if re.search(r"いない場合|ない場合|いなければ", raw):
+        need(any(c.get("operator") in ("LT", "LE", "EQ") for c in conds) or '"NOT"' in blob,
+             "否定条件（いない・ない場合）が肯定のまま")
+    if "表向き" in raw:
+        need("FACE_UP" in blob or '"face_up": true' in blob or '"is_face_up": true' in blob, "表向き（欄が無い）")
+    if re.search(r"このターン中|このバトル中|次の.*まで", raw):
+        need(any(n.get("duration") not in (None, "INSTANT") for n in acts) or bool(conds)
+             or ability.get("trigger") in ("PASSIVE", "YOUR_TURN", "OPPONENT_TURN"), "期間（INSTANT のまま）")
+    if re.search(r"すべて", raw) and "すべてを見て" not in raw:
+        need(any(t.get("count") == -1 for t in targets) or any("ALL" in str(t.get("select_mode")) for t in targets),
+             "すべて（count=-1 が無い）")
+    return gaps
 
 
 def parse_stats(cards: Dict[str, dict]) -> Dict[str, dict]:
