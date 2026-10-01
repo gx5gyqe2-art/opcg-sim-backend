@@ -2571,6 +2571,11 @@ def _play_card_from_zone(ctx: ParseContext) -> Optional[GameAction]:
         tq.zone = Zone.HAND
     if _nfc("まで") in t:
         tq.is_up_to = True
+    # 「コストの合計がN以下になるように」: 合計コストの上限（resolver が貪欲に収める）。従来は欄が無く
+    # 上限なしで登場できた（OP17-118）。
+    m_sum = re.search(_nfc(r"コストの合計が([\d０-９]+)以下"), t)
+    if m_sum:
+        tq.flags.add(f"COST_SUM_MAX:{_to_int(m_sum.group(1))}")
     status = "RESTED" if re.search(_nfc(r"レストで(、)?登場"), t) else None
     # 「「A」と「B」と「C」それぞれ1枚ずつまでを、登場させる」= 名前ごとに 1 枚ずつ（最大 3 枚）。
     # 従来は 3 名の OR で合計 1 枚までになっていた（ST13-006）。

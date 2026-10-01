@@ -1153,6 +1153,43 @@ impl Resolver {
             }
         }
 
+        // 「コストの合計がN以下になるように登場させる」（COST_SUM_MAX:N・OP17-118）: 合計コストが上限に
+        // 収まるよう、コストの高いものから貪欲に取る（枚数は count まで）。選択の対話は挟まない。
+        if let Some(cap) = query
+            .flags
+            .iter()
+            .find_map(|f| f.strip_prefix("COST_SUM_MAX:").and_then(|n| n.parse::<i32>().ok()))
+        {
+            if !candidates.is_empty() {
+                let cost_of = |t: TargetRef| match t.card() {
+                    Some(c) => {
+                        let card = s.state().card(c);
+                        card.current_cost(masters.get(card.master))
+                    }
+                    None => 0,
+                };
+                let cap_n = if query.count > 0 { query.count as usize } else { candidates.len() };
+                let mut ordered = candidates.clone();
+                ordered.sort_by_key(|t| std::cmp::Reverse(cost_of(*t)));
+                let mut chosen: Vec<TargetRef> = Vec::new();
+                let mut total = 0;
+                for t in ordered {
+                    if chosen.len() >= cap_n {
+                        break;
+                    }
+                    let c = cost_of(t);
+                    if total + c <= cap {
+                        chosen.push(t);
+                        total += c;
+                    }
+                }
+                if let Some(save_id) = query.save_id.as_ref() {
+                    self.context.set_saved(save_id, chosen.clone());
+                }
+                return Ok(Some(chosen));
+            }
+        }
+
         let mut required_count = query.count;
         let mut is_up_to = query.is_up_to;
         let is_resource = query.zone == vec![ZoneRef::CostArea];

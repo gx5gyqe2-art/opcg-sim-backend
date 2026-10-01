@@ -385,6 +385,10 @@ pub fn get_target_cards(
         if query.has_flag("NO_COUNTER") && master.counter > 0 {
             continue;
         }
+        // 「カウンターを持つ」カードだけ（OP17-118 の「カウンターを持たないキャラのみ」の判定用）。
+        if query.has_flag("HAS_COUNTER") && master.counter <= 0 {
+            continue;
+        }
         // Python は `ab.trigger.name == query.lacks_trigger` の**文字列比較**＝未知の名前は
         // 「どの能力にも一致しない」だけでエラーにしない。ここも名前で比べる。
         if let Some(lacks) = query.lacks_trigger.as_deref() {
@@ -826,5 +830,94 @@ pub(crate) mod tests {
             &EffectContext::default(),
         );
         assert!(matches!(err, Err(EngineError::BadPayload(_))));
+    }
+
+    // --- カード効果監査（2026-10-01・WP A_target）で足した絞り込み -------------------------
+
+    /// 「自分のキャラか「X」」（NAME_OR_TYPE）は種類 OR 名前で、名前側ではリーダーも候補になる
+    /// （EB04-009/OP12-016/018/019 の「キャラか「シルバーズ・レイリー」」）。
+    #[test]
+    fn name_or_type_reaches_the_leader_by_name() {
+        let f = fixture();
+        assert_eq!(
+            f.run(
+                &query(r#""card_type":["CHARACTER"],"names":["リーダー"],"flags":["NAME_OR_TYPE"]"#),
+                "p1-char-a"
+            ),
+            ["p1-char-a", "p1-char-b", "p1-leader"]
+        );
+        // フラグ無し（AND）なら名前が合うキャラは無く空（従来の誤り）。
+        assert!(f
+            .run(&query(r#""card_type":["CHARACTER"],"names":["リーダー"]"#), "p1-char-a")
+            .is_empty());
+    }
+
+    /// 「特徴《A》か属性(斬)を持つ」（SELECTOR_OR）は名前・特徴・属性のいずれか。除外名は AND のまま。
+    #[test]
+    fn selector_or_accepts_any_of_trait_attribute_or_name() {
+        let f = fixture();
+        let q = r#""card_type":["CHARACTER"],"traits":["海軍"],"attributes":["斬"]"#;
+        assert!(f.run(&query(q), "p1-char-a").is_empty(), "AND なら両方持つカードは無い");
+        assert_eq!(
+            f.run(&query(&format!(r#"{q},"flags":["SELECTOR_OR"]"#)), "p1-char-a"),
+            ["p1-char-a", "p1-char-b"]
+        );
+        assert_eq!(
+            f.run(
+                &query(&format!(r#"{q},"flags":["SELECTOR_OR"],"exclude_names":["キャラA"]"#)),
+                "p1-char-a"
+            ),
+            ["p1-char-b"]
+        );
+        // 「「X」か属性(斬)」: 名前 OR 属性。
+        assert_eq!(
+            f.run(
+                &query(r#""card_type":["CHARACTER"],"names":["キャラB"],"attributes":["斬"],"flags":["SELECTOR_OR"]"#),
+                "p1-char-a"
+            ),
+            ["p1-char-a", "p1-char-b"]
+        );
+    }
+
+    /// 「《X》(を含む特徴)を持たない」（LACKS_TRAIT[_PARTIAL]）と「カウンターを持つ」（HAS_COUNTER）、
+    /// 「【ブロッカー】を持つ」（HAS_KEYWORD:）。
+    #[test]
+    fn lacks_trait_has_counter_and_has_keyword_filter() {
+        let mut f = fixture();
+        assert_eq!(
+            f.run(&query(r#""card_type":["CHARACTER"],"flags":["LACKS_TRAIT_PARTIAL:麦わら"]"#), "p1-char-a"),
+            ["p1-char-b"]
+        );
+        assert_eq!(
+            f.run(&query(r#""card_type":["CHARACTER"],"flags":["LACKS_TRAIT:海軍"]"#), "p1-char-a"),
+            ["p1-char-a"]
+        );
+        // char-a だけカウンター 1000。
+        assert_eq!(
+            f.run(&query(r#""card_type":["CHARACTER"],"flags":["HAS_COUNTER"]"#), "p1-char-a"),
+            ["p1-char-a"]
+        );
+        let b = f.find("p1-char-b") as usize;
+        f.state.cards[b].current_keywords.push("ブロッカー".to_string());
+        assert_eq!(
+            f.run(&query(r#""card_type":["CHARACTER"],"flags":["HAS_KEYWORD:ブロッカー"]"#), "p1-char-a"),
+            ["p1-char-b"]
+        );
+    }
+
+    /// 「赤のイベントかコスト3以上のキャラ」: 色は EVENT にだけ・コストは CHARACTER にだけ掛かる。
+    #[test]
+    fn type_scoped_color_and_cost_filters_make_an_or() {
+        let f = fixture();
+        // トラッシュの赤イベント（コスト 1）はコスト条件が掛からないので通る。
+        let base = r#""zone":"TRASH","card_type":["CHARACTER","EVENT"],"colors":["赤"],"cost_min":3"#;
+        assert!(f.run(&query(base), "p1-char-a").is_empty(), "AND ならコスト 1 のイベントは落ちる");
+        assert_eq!(
+            f.run(
+                &query(&format!(r#"{base},"flags":["COLORS_ONLY_EVENT","COST_ONLY_CHARACTER"]"#)),
+                "p1-char-a"
+            ),
+            ["p1-trash-a"]
+        );
     }
 }

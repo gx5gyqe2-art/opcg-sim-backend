@@ -192,6 +192,7 @@ class EffectParser:
                 ab = self.parse_ability(seg)
                 self._normalize_coreference(ab)
                 self._normalize_replacement_alternative(ab)
+                self._defer_condition_after_self_cost(ab)
                 if ab.trigger != TriggerType.UNKNOWN or ab.effect is not None:
                     abilities.append(ab)
                     # 「（このリーダー/キャラが）アタックした時かアタックされた時」は ON_ATTACK と
@@ -313,6 +314,33 @@ class EffectParser:
                     else:
                         n.target.ref_id = None
 
+    def _defer_condition_after_self_cost(self, ability) -> None:
+        """「このキャラをトラッシュに置く／手札に戻すことができる：自分のトラッシュが15枚以上ある場合、…」の
+        ように、コストで自身を場から外す能力が、そのコストで数が変わる枚数条件を持つとき、条件を
+        コスト支払い後に評価する（効果側の Branch へ移す）。
+
+        従来は条件が能力レベルでコストの前に評価され、(a) 自身をトラッシュへ送って 15 枚に届く
+        OP15-083 は 14 枚で不発、(b) 自身を戻す P-081 は戻す本人を数えていた。
+        対象は「自身を除去するコスト」×「トラッシュ／場の枚数条件（自分側）」に限る（影響範囲を絞る）。
+        """
+        cond, cost = ability.condition, ability.cost
+        if cond is None or cost is None or ability.effect is None:
+            return
+        if cond.type not in (ConditionType.TRASH_COUNT, ConditionType.FIELD_COUNT):
+            return
+        if cond.player != Player.SELF and cond.type == ConditionType.TRASH_COUNT:
+            return
+        nodes = cost.actions if isinstance(cost, Sequence) else [cost]
+        removes_self = any(
+            isinstance(a, GameAction) and a.target is not None
+            and a.type in (ActionType.TRASH, ActionType.BOUNCE, ActionType.DECK_BOTTOM)
+            and (a.target.ref_id == "self" or a.target.select_mode == "SOURCE")
+            for a in nodes)
+        if not removes_self:
+            return
+        ability.effect = Branch(condition=cond, if_true=ability.effect)
+        ability.condition = None
+
     def _normalize_replacement_alternative(self, ability) -> None:
         """『（先行効果）の代わりに（後続効果）』= 択一の整形。
 
@@ -360,6 +388,12 @@ class EffectParser:
              r'(?P<sign>[+＋\-－−‐])[ 　]*(?P<n>\d+)。?$')
     )
 
+    # 「手札のこのカードは、…、カウンター+Nを持つ」
+    _HAND_COUNTER_RE = re.compile(
+        _nfc(r'^手札のこのカードは[、,]\s*(?P<cond>.+?)[、,]\s*カウンター[ 　]*'
+             r'(?P<sign>[+＋])[ 　]*(?P<n>\d+)を持つ。?$')
+    )
+
     def _try_hand_self_cost(self, norm_text: str):
         """「手札のこのカードは、〈条件〉、コスト±N」を PASSIVE 自己コスト増減能力にする。
 
@@ -368,6 +402,11 @@ class EffectParser:
         条件が解釈不能な場合は None を返し、従来経路に委ねる（無条件の常時軽減化を防ぐ）。
         """
         m = self._HAND_COST_RE.match(norm_text)
+        status = "COST_REDUCTION"
+        if not m:
+            # 手札のこのカードのカウンター値の常在付与（OP17-118）。コストと同じ仕組みで手札の自己値を直す。
+            m = self._HAND_COUNTER_RE.match(norm_text)
+            status = "COUNTER"
         if not m:
             return None
         cond_text = m.group("cond")
@@ -388,7 +427,7 @@ class EffectParser:
             type=ActionType.BUFF,
             target=target,
             value=ValueSource(base=value),
-            status="COST_REDUCTION",
+            status=status,
             duration="INSTANT",
             raw_text=norm_text,
         )
@@ -1412,6 +1451,15 @@ class EffectParser:
 
     def _parse_condition_obj(self, text: str) -> Condition:
         norm_text = _nfc(text)
+
+        # 「自分のキャラがカウンターを持たないキャラのみ」= カウンター値を持つ自分のキャラが 0 枚
+        # （OP17-118。従来は HAND_COUNT EQ 0 に誤変換されていた）。
+        if re.search(_nfc(r'キャラが?カウンターを持たないキャラのみ'), norm_text):
+            tq_c = TargetQuery(player=Player.OPPONENT if _nfc("相手") in norm_text else Player.SELF,
+                               card_type=["CHARACTER"], count=-1, select_mode="ALL")
+            tq_c.flags.add("HAS_COUNTER")
+            return Condition(type=ConditionType.FIELD_COUNT, target=tq_c, operator=CompareOperator.LT,
+                             value=1, player=tq_c.player, raw_text=norm_text)
 
         # 置換の対象指定「（自分の）「X」がKOされる/場を離れる（場合）」: 離れるカードが名前 X か
         # （OP12-061「自分の「トラファルガー・ロー」がKOされる場合」）。離脱カードを source_card として
