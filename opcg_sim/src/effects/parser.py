@@ -1515,8 +1515,15 @@ class EffectParser:
         # 始まる句のみ対象とし、独自の主語を持つ句（OP14-086「自分の…すべてを、コスト+2」=
         # 始端が「自分の」）は巻き込まない。
         if len(parts) > 1:
-            _bare_buff_re = re.compile(_nfc(r'^(?:パワー|コスト)[ 　]*[+＋\-－−‐]\d'))
-            _subj_re = re.compile(_nfc(r'(この(?:キャラ|リーダー|カード))(?:は|の)?'))
+            # 裸の増減句は自身の「N枚につき、」を前置していてもよい（ST27-004）。
+            _bare_buff_re = re.compile(_nfc(
+                r'^(?:[^、。：:]*?[\d０-９]+枚につき、)?(?:パワー|コスト)[ 　]*[+＋\-－−‐]\d'))
+            _subj_re = re.compile(_nfc(
+                r'(この(?:キャラ|リーダー|カード)|自分のリーダー(?:「[^」]+」)?)(?:は|の)?'))
+            # 先行句の期間（このバトル中／このターン中／次の…まで）も裸の増減句へ引き継ぐ
+            # （継承しないと「…を得て、パワー+N」の後句が INSTANT に落ちる。OP04-071 等）。
+            _dur_carry_re = re.compile(_nfc(
+                r'このバトル中|このターン中|次の(?:自分の|相手の)?(?:ターン|エンドフェイズ)(?:開始|終了)時まで'))
             # 「…N枚につき、パワー+1000し、コスト+2」の「N枚につき」は後続の裸の増減句にも掛かる
             # （EB04-048: トラッシュ5枚につきコスト+2。継承しないとコスト+2 が固定値になる）。
             _per_re = re.compile(_nfc(r'([^、。：:]*?[\d０-９]+枚につき)、'))
@@ -1524,8 +1531,15 @@ class EffectParser:
             _carry_per = None
             for _pi, _p in enumerate(parts):
                 if _carry_subj and _bare_buff_re.match(_p):
-                    parts[_pi] = (_carry_subj + 'は、' + _carry_per + _p) if _carry_per \
-                        else (_carry_subj + 'の' + _p)
+                    _dm = _dur_carry_re.search(parts[_pi - 1]) if _pi > 0 else None
+                    _dur = (_dm.group(0) + '、') if (_dm and not _dur_carry_re.search(_p)) else ''
+                    _own_per = _per_re.match(_p) is not None
+                    if _carry_per and not _own_per:
+                        parts[_pi] = _carry_subj + 'は、' + _dur + _carry_per + _p
+                    elif _own_per or _dur:
+                        parts[_pi] = _carry_subj + 'は、' + _dur + _p
+                    else:
+                        parts[_pi] = _carry_subj + 'の' + _p
                 else:
                     _sm = _subj_re.search(_p)
                     if _sm:
@@ -1547,7 +1561,17 @@ class EffectParser:
                         parts[_pi] = _dm.group(0) + _nfc('、') + _p
 
         if len(parts) > 1:
-            return Sequence(actions=[self._parse_logic_block(p, is_cost) for p in parts])
+            _nodes = [self._parse_logic_block(p, is_cost) for p in parts]
+            # 「自分の手札1枚を捨て、ドン!!1枚をレストにしてもよい」: 末尾の「てもよい」は「捨て、」で
+            # 区切った前句にも掛かる（前句が強制のままだと断れない。OP11-024）。
+            if not is_cost:
+                for _ni in range(1, len(parts)):
+                    _pn = _nodes[_ni - 1]
+                    if (parts[_ni - 1].endswith(_nfc('捨て')) and isinstance(_pn, GameAction)
+                            and _pn.type == ActionType.DISCARD
+                            and re.search(_nfc(r'(してもよい|てもよい)'), parts[_ni])):
+                        _pn.is_optional = True
+            return Sequence(actions=_nodes)
         elif parts:
             return self._parse_logic_block(parts[0], is_cost)
         return None
@@ -1615,6 +1639,11 @@ class EffectParser:
         if (not is_cost and isinstance(node, GameAction)
                 and node.type not in (ActionType.REPLACE_EFFECT, ActionType.DECLARE_COST, ActionType.OTHER)
                 and re.search(_nfc(r"(してもよい|てもよい)"), norm_text)):
+            node.is_optional = True
+        # 「自分のドン!!1枚をレストにできる」（文末の「できる」）も REST_DON は任意（OP12-018）。
+        # 「できる」は他の型で多義なため REST_DON に限る。
+        if (not is_cost and isinstance(node, GameAction) and node.type == ActionType.REST_DON
+                and re.search(_nfc(r"レストにできる$"), norm_text)):
             node.is_optional = True
 
         return node
@@ -2332,11 +2361,23 @@ class EffectParser:
             # 「パワーN以上の「X」」「他の「X」」は target で絞る（OP15-080）。
             _hc_tq = None
             _pw = re.search(_nfc(r'パワー(\d+)(以上|以下)の「'), norm_text)
-            _other = re.search(_nfc(r'他の「'), norm_text)
-            if _pw or _other:
+            _other = re.search(_nfc(r'他の(?:[^「」、]*?)「'), norm_text)
+            # 「元々のコストN(以上/以下)の「X」」「コストNの「X」」もコストで絞る（OP12-102）。
+            _cs = re.search(_nfc(r'(元々の)?コスト(\d+)(以上|以下)?の(?:[^「」、]*?)「'), norm_text)
+            if _pw or _other or _cs:
                 _hc_tq = TargetQuery(player=p, raw_text=norm_text)
                 if _other:
                     _hc_tq.flags.add("EXCLUDE_SOURCE")
+                if _cs:
+                    _cv = int(_cs.group(2))
+                    if _cs.group(3) == _nfc('以上'):
+                        _hc_tq.cost_min = _cv
+                    elif _cs.group(3) == _nfc('以下'):
+                        _hc_tq.cost_max = _cv
+                    else:
+                        _hc_tq.cost_min = _hc_tq.cost_max = _cv
+                    if _cs.group(1):
+                        _hc_tq.flags.add("ORIGINAL_COST")
             if _pw and _hc_tq is not None:
                 if _pw.group(2) == _nfc('以上'):
                     _hc_tq.power_min = int(_pw.group(1))

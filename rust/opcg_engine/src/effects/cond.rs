@@ -521,10 +521,22 @@ pub fn check_condition(
                 .target
                 .as_ref()
                 .map_or((None, None), |q| (q.power_min, q.power_max));
+            // 「元々のコストN」(ORIGINAL_COST)＝master のコスト／無印＝現在コストで絞る（OP12-102）。
+            let (cost_min, cost_max, orig_cost) = cond.target.as_ref().map_or((None, None, false), |q| {
+                (q.cost_min, q.cost_max, q.has_flag("ORIGINAL_COST"))
+            });
             let don_turn = |c: CardIdx| state.card(c).owner == state.turn_player;
             let passes = |c: CardIdx| -> bool {
                 if exclude_source && source == Some(c) {
                     return false;
+                }
+                if cost_min.is_some() || cost_max.is_some() {
+                    let card = state.card(c);
+                    let m = masters.get(card.master);
+                    let cost = if orig_cost { m.cost } else { card.current_cost(m) };
+                    if cost_min.is_some_and(|v| cost < v) || cost_max.is_some_and(|v| cost > v) {
+                        return false;
+                    }
                 }
                 if pw_min.is_none() && pw_max.is_none() {
                     return true;
@@ -1023,6 +1035,26 @@ mod tests {
             "HAS_CHARACTER",
             json!({"value": ["キャラ", 2], "operator": "GE"})
         )));
+    }
+
+    /// 「元々のコストN の「X」」(ORIGINAL_COST)／コスト絞りが target で効く（OP12-102）。
+    #[test]
+    fn has_character_filters_by_cost() {
+        let f = fixture();
+        let q = |cmin: i32, cmax: i32, flags: &str| {
+            crate::effects::matcher::tests::query_json(&format!(
+                r#""zone":"FIELD","cost_min":{cmin},"cost_max":{cmax},"flags":[{flags}]"#
+            ))
+        };
+        // キャラA はコスト 3（元々のコストも 3）。
+        assert!(f.check(&cond("HAS_CHARACTER", json!({
+            "value": "キャラA", "operator": "GE", "target": q(3, 3, r#""ORIGINAL_COST""#)}))));
+        assert!(!f.check(&cond("HAS_CHARACTER", json!({
+            "value": "キャラA", "operator": "GE", "target": q(2, 2, r#""ORIGINAL_COST""#)}))));
+        assert!(f.check(&cond("HAS_CHARACTER", json!({
+            "value": "キャラA", "operator": "EQ", "target": q(2, 2, r#""ORIGINAL_COST""#)}))));
+        assert!(!f.check(&cond("HAS_CHARACTER", json!({
+            "value": "キャラA", "operator": "GE", "target": q(0, 2, "")}))));
     }
 
     #[test]

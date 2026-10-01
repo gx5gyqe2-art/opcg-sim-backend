@@ -785,6 +785,19 @@ mod tests {
         }
     }
 
+    /// 「そのキャラに付与されているドン!!N枚につき」は対象ごとの付与ドン枚数で倍率を掛ける（OP15-008）。
+    #[test]
+    fn buff_scales_by_each_targets_attached_don() {
+        let (masters, mut s, c) = board();
+        s.edit().set_card_i32(c, crate::journal::CardI32Field::AttachedDon, 3);
+        let mut a = testkit::action(ActionType::Buff, 0);
+        a.value.dynamic_source = Some("TARGET_ATTACHED_DON".to_string());
+        a.value.multiplier = -1000;
+        a.value.divisor = 1;
+        run(&mut s, &masters, &a, &[c], 0);
+        assert_eq!(s.state().card(c).power_buff, -3000);
+    }
+
     /// `PERMANENT` は Python の `dur in (...)` に含まれない＝`power_buff` へ落ちる。
     #[test]
     fn buff_power_permanent_is_not_a_continuous_effect() {

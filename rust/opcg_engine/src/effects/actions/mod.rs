@@ -481,6 +481,14 @@ fn buff(
     value: i32,
 ) -> Result<(), EngineError> {
     let _ = masters;
+    // 「そのキャラに付与されているドン!!N枚につき」: 対象ごとに付与ドン枚数で倍率を掛ける
+    // （値は対象に依存するので、対象ループの外で一括計算した value は使わない。OP15-008）。
+    let value = if action.value.dynamic_source.as_deref() == Some("TARGET_ATTACHED_DON") {
+        let n = s.state().card(target).attached_don.max(0);
+        (n / action.value.divisor.max(1)) * action.value.multiplier
+    } else {
+        value
+    };
     match action.status.as_deref() {
         Some("POWER_OVERRIDE") => {
             // PASSIVE 再計算由来は再計算レイヤへ（即時効果の上書きを消さない）。

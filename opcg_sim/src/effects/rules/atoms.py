@@ -485,11 +485,16 @@ def _per_n_value(t: str, x: int) -> Optional[ValueSource]:
     if re.search(_nfc(r"(捨てた|戻した|KOした|置いた|レストにした)"), counted):
         return ValueSource(base=0, dynamic_source="PREV_ACTION_COUNT",
                            divisor=n, multiplier=x)
-    # 「付与されているドンN枚につき」は別機構（対象固有）のため未対応＝フラット値のまま。
+    # 「付与されているドンN枚につき」は対象固有のため、上記のとおり限定して扱う。
     # 「カード名の異なるキャラN枚につき」は parse_target が is_unique_name を立てるので
     # COUNT_QUERY（重複名を除外して計数）で正しくスケールする（OP16-034 ルフィ）。
     # それ以外の「異なる」（異なる色 等）は未対応のため None。
     if re.search(_nfc(r"付与されている"), counted):
+        # 「そのキャラ／このキャラに付与されているドン!!N枚につき」は対象ごとの付与ドン数で
+        # 倍率を掛ける（エンジンの buff が対象別に計算する。OP15-008）。それ以外は未対応。
+        if re.search(_nfc(r"(?:その|この)キャラに付与されているドン"), counted):
+            return ValueSource(base=0, dynamic_source="TARGET_ATTACHED_DON",
+                               divisor=n, multiplier=x)
         return None
     if _nfc("異なる") in counted and not re.search(_nfc(r"カード名(?:の|が)異なる"), counted):
         return None
@@ -891,7 +896,9 @@ def _grant_keyword(ctx: ParseContext) -> Optional[GameAction]:
     elif subject and not re.search(_nfc(r"この(カード|キャラ|リーダー)"), subject):
         # 主語が自身でないなら主語だけから対象を作る（述語の「属性(斬)を得る」等を絞り込みに混ぜない: OP15-093）。
         tq = parse_target(subject)
-        if _nfc("すべて") in subject:
+        # 枚数の無い主語（「自分の「ブルゴリ」は【ブロッカー】を得る」OP02-074）も該当全体。
+        if _nfc("すべて") in subject or (
+                not tq.ref_id and not re.search(_nfc(r"[\d０-９]+枚|選"), subject)):
             tq.count = -1
             tq.select_mode = "ALL"
     elif re.search(_nfc(r"この(カード|キャラ|リーダー)"), t):
@@ -1681,6 +1688,15 @@ def _don_return_deck(ctx: ParseContext) -> Optional[GameAction]:
         return None
     if not re.search(_nfc(r"ドン(?:!!|‼)?デッキ"), t):
         return None
+    # 「相手の場のドン!!の枚数と同じ枚数になるように自分の場のドン!!を…戻す」＝超過分だけ戻す（OP08-074）。
+    if re.search(_nfc(r"相手の場のドン(?:!!|‼)?の枚数と同じ枚数になるように"), t):
+        return GameAction(
+            type=ActionType.RETURN_DON,
+            target=None,
+            value=ValueSource(base=0, dynamic_source="DON_TO_OPP_COUNT"),
+            status=_don_return_status(t),
+            raw_text=t,
+        )
     return GameAction(
         type=ActionType.RETURN_DON,
         target=None,

@@ -225,3 +225,75 @@ def test_battle_ko_trigger_is_on_ko():
     """「このキャラのバトルによって相手のキャラをKOした時」は起動メインではなく ON_KO（OP04-086）。"""
     ab = parse("【ドン!!×1】このキャラのバトルによって相手のキャラをKOした時、カード2枚を引き、自分の手札2枚を捨てる。")
     assert ab[0].trigger == TriggerType.ON_KO
+
+
+# --- G1_parser（2026-10-01）: 主語・期間・per 倍率の継承 -------------------------
+
+def _buffs(text):
+    out = []
+    for ab in parse(text):
+        out += [a for a in actions(ab.effect) if a.type == ActionType.BUFF]
+    return out
+
+
+def test_battle_duration_carries_to_the_power_clause():
+    """「このバトル中、【ブロッカー】を得て、パワー+1000」: 後句も THIS_BATTLE（OP04-071）。"""
+    (b,) = _buffs("【相手のアタック時】ドン!!-1:このキャラは、このバトル中、【ブロッカー】を得て、パワー+1000。")
+    assert b.duration == "THIS_BATTLE"
+    assert b.target.select_mode == "SOURCE"
+
+
+def test_until_next_turn_end_carries_to_the_power_clause():
+    (b,) = _buffs("【登場時】このキャラは、次の相手のエンドフェイズ終了時まで、【速攻】を得て、パワー+2000。")
+    assert b.duration == "UNTIL_NEXT_TURN_END"
+
+
+def test_leader_subject_carries_to_the_power_clause():
+    """「自分のリーダーは、このターン中、【ダブルアタック】を得て、パワー+3000」: 後句もリーダー・THIS_TURN（OP03-016）。"""
+    (b,) = _buffs("【メイン】自分のリーダーは、このターン中、【ダブルアタック】を得て、パワー+3000。")
+    assert b.target.card_type == ["LEADER"]
+    assert b.duration == "THIS_TURN"
+    (b,) = _buffs("【自分のターン中】自分のリーダーは【ダブルアタック】を得て、パワー+2000。")
+    assert b.target.card_type == ["LEADER"]
+
+
+def test_per_clause_with_own_subject_gets_the_source_target():
+    """「このキャラは【ブロッカー】を得て、自分のトラッシュ4枚につき、コスト+1」: コスト増の対象は自身（ST27-004）。"""
+    (b,) = _buffs("自分のリーダーが特徴《黒ひげ海賊団》を持つ場合、このキャラは【ブロッカー】を得て、自分のトラッシュ4枚につき、コスト+1。")
+    assert b.target.select_mode == "SOURCE"
+
+
+def test_attached_don_per_scales_per_target():
+    (b,) = _buffs("【起動メイン】相手のキャラすべては、そのキャラに付与されているドン!!1枚につき、このターン中、パワー-1000。")
+    assert b.value.dynamic_source == "TARGET_ATTACHED_DON"
+    assert b.value.multiplier == -1000
+
+
+def test_named_passive_keyword_grant_applies_to_all():
+    """枚数の無い主語「自分の「ブルゴリ」は【ブロッカー】を得る」は該当全体（OP02-074）。"""
+    (ab,) = parse("自分の「ブルゴリ」は【ブロッカー】を得る。")
+    (g,) = actions(ab.effect)
+    assert g.target.select_mode == "ALL" and g.target.count == -1
+
+
+def test_original_cost_qualifier_on_has_character():
+    ab = parse("【相手のターン中】自分の他の元々のコスト2の「しらほし」がいない場合、自分のキャラすべてのパワー+2000。")[0]
+    c = ab.condition
+    assert c.type == ConditionType.HAS_CHARACTER and c.target is not None
+    assert c.target.cost_min == c.target.cost_max == 2
+    assert "ORIGINAL_COST" in c.target.flags and "EXCLUDE_SOURCE" in c.target.flags
+
+
+def test_return_don_to_match_opponent():
+    ab = parse("【起動メイン】その後、このターン終了時、相手の場のドン!!の枚数と同じ枚数になるように自分の場のドン!!をドン!!デッキに戻す。")[0]
+    (a,) = [x for x in actions(ab.effect) if x.type == ActionType.RETURN_DON]
+    assert a.value.dynamic_source == "DON_TO_OPP_COUNT"
+
+
+def test_optional_rest_don_and_discard_chain():
+    ab = parse("【メイン】自分のドン!!1枚をレストにできる。")[0]
+    (a,) = actions(ab.effect)
+    assert a.type == ActionType.REST_DON and a.is_optional
+    ab = parse("このキャラが相手の効果でKOされた時、自分の手札1枚を捨て、自分のドン!!1枚をレストにしてもよい。")[0]
+    d = [x for x in actions(ab.effect) if x.type == ActionType.DISCARD]
+    assert d and d[0].is_optional
