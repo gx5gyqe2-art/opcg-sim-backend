@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import copy
 import re
 import unicodedata
 from typing import Optional
@@ -868,8 +869,29 @@ def _grant_keyword_choice(ctx: ParseContext):
                   options=[_opt(k) for k in kws])
 
 
+_ATTR_GRANT_RE = re.compile(_nfc(r"と属性[(（]([斬打射特知])[)）]を得る"))
+
+
 @rule("grant_keyword", priority=63)
-def _grant_keyword(ctx: ParseContext) -> Optional[GameAction]:
+def _grant_keyword(ctx: ParseContext):
+    """【キーワード】の付与。「【速攻:キャラ】と属性(斬)を得る」は属性の付与（status="ATTR:斬"）も続ける。"""
+    act = _grant_keyword_base(ctx)
+    am = _ATTR_GRANT_RE.search(ctx.text)
+    if act is None or am is None or not isinstance(act, GameAction):
+        return act
+    tq = act.target
+    if tq is not None and tq.select_mode not in ("SOURCE", "ALL") and not tq.ref_id:
+        # 同じ対象を 2 度選ばせない（1 度選んだものへ属性も付ける）。
+        tq.save_id = "selected_card"
+        tq2 = TargetQuery(ref_id="selected_card")
+    else:
+        tq2 = copy.deepcopy(tq)
+    attr = GameAction(type=ActionType.GRANT_KEYWORD, target=tq2, status=f"ATTR:{am.group(1)}",
+                      duration=act.duration, raw_text=ctx.text)
+    return Sequence(actions=[act, attr])
+
+
+def _grant_keyword_base(ctx: ParseContext) -> Optional[GameAction]:
     t = ctx.text
     # 連用形「【ブロッカー】を得て、コスト+4」(P-105) の「得て」も付与。
     if _nfc("得る") not in t and not re.search(_nfc(r"】を得て$"), t):

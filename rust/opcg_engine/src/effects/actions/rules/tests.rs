@@ -1365,3 +1365,71 @@ fn an_unqualified_ko_immunity_sets_both_flags() {
     assert!(crate::rules::has_flag(s.state(), v, "PREVENT_EFFECT_KO"));
     assert!(crate::rules::has_flag(s.state(), v, "PREVENT_BATTLE_KO"));
 }
+
+/// OP11-110「このキャラがKOされる場合、代わりに自分の、「魚人島」かリーダーの「しらほし」1枚を、
+/// レストにできる」: 任意の置換。断れば本来の KO、受ければ対象がレストになり KO はされない。
+/// 代わりにレストにできるカードが無ければ（リーダーが別名・既にレスト）置換は成立しない。
+#[test]
+fn an_optional_rest_replacement_can_be_declined_and_needs_a_restable_substitute() {
+    let target = json!({"node": "TargetQuery", "zone": "FIELD", "player": "SELF",
+        "card_type": ["LEADER"], "traits": [], "attributes": [], "colors": [],
+        "names": ["魚人島", "しらほし"], "cost_min": null, "cost_max": null,
+        "cost_max_dynamic": null, "power_min": null, "power_max": null, "power_sum_max": null,
+        "min_attached_don": null, "is_face_up": null, "lacks_trigger": null, "is_rest": null,
+        "count": 1, "is_up_to": false, "count_dynamic": null, "select_mode": "CHOOSE",
+        "save_id": null, "ref_id": null, "chooser": null, "flags": ["NAME_OR_TYPED_NAME"],
+        "is_vanilla": false, "is_strict_count": false, "is_unique_name": false,
+        "exclude_ids": [], "exclude_names": [], "raw_text": ""});
+    let raw = "このキャラがKOされる場合、代わりに自分の、「魚人島」かリーダーの「しらほし」1枚を、レストにできる。";
+    let repl = ability_json(
+        "PASSIVE",
+        json!({"node": "GameAction", "type": "REPLACE_EFFECT", "target": null,
+               "value": value_json(0), "duration": "INSTANT", "status": "EFFECT_KO,BATTLE_KO",
+               "destination": null, "is_rest": null, "dest_position": null, "raw_text": raw,
+               "sub_effect": {"node": "GameAction", "type": "REST", "target": target,
+                   "value": value_json(0), "duration": "INSTANT", "status": null,
+                   "destination": null, "is_rest": null, "dest_position": null, "raw_text": "",
+                   "sub_effect": null, "is_optional": true, "delay": null, "face_up": null},
+               "is_optional": false, "delay": null, "face_up": null}),
+        raw,
+    );
+    let mk = |leader_name: &str, leader_rest: bool| {
+        let mut ld = master_json("LD", "LEADER", json!([]));
+        ld["name"] = json!(leader_name);
+        let cards = json!({
+            "LD": ld,
+            "V": master_json("V", "CHARACTER", json!([])),
+            "FK": master_json("FK", "CHARACTER", json!([repl.clone()])),
+        });
+        let (masters, mut s) =
+            board(cards, json!([]), json!([card_json("FK", "p2-fk", "p2")]), json!([]));
+        if leader_rest {
+            let l = s.state().player(Seat::P2).leader.expect("leader");
+            s.edit().set_card_bool(l, crate::journal::CardBoolField::IsRest, true);
+        }
+        (masters, s)
+    };
+    for accept in [false, true] {
+        let (masters, mut s) = mk("しらほし", false);
+        let fk = find(&s, "p2-fk");
+        let leader = s.state().player(Seat::P2).leader.expect("leader");
+        assert_eq!(apply(&mut s, &masters, Seat::P1, &action("KO", ""), &[fk]), Ok(true));
+        let it = s.state().active_interaction().cloned().expect("使うかを確認する");
+        assert_eq!(it.kind, InteractionKind::ConfirmOptional);
+        assert_eq!(it.player, Seat::P2);
+        crate::effects::interact::resolve_interaction(
+            &mut s, &masters, Seat::P2, &json!({"accepted": accept}),
+        )
+        .expect("resume");
+        assert_eq!(s.state().player(Seat::P2).field.contains(&fk), accept, "accept={accept}");
+        assert_eq!(s.state().card(leader).is_rest, accept, "accept={accept}");
+    }
+    for (name, rest) in [("別のリーダー", false), ("しらほし", true)] {
+        let (masters, s) = mk(name, rest);
+        let fk = find(&s, "p2-fk");
+        assert!(
+            find_replacement(&s, &masters, fk, &["EFFECT_KO"]).unwrap().is_none(),
+            "{name} rest={rest}: 代わりにレストにできるカードが無ければ置換は成立しない"
+        );
+    }
+}

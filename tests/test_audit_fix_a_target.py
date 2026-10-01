@@ -101,8 +101,9 @@ def test_grant_to_others_and_self_keeps_both_subjects():
     assert g["target"]["count"] == -1 and "EXCLUDE_SOURCE" in g["target"]["flags"]
     assert g["target"]["colors"] == ["赤"] and g["target"]["cost_min"] == 3
     # 述語の「属性(斬)を得る」を対象の絞り込みに混ぜない。
-    g = _one(_parse("【起動メイン】自分のキャラの「モンキー・D・ルフィ」1枚までは、このターン中、【速攻:キャラ】と属性(斬)を得る。"),
-             "GRANT_KEYWORD")
+    # （属性の付与そのものは 2 つ目の GRANT_KEYWORD status=ATTR:斬・WP H2_engine）。
+    g = _actions(_parse("【起動メイン】自分のキャラの「モンキー・D・ルフィ」1枚までは、このターン中、【速攻:キャラ】と属性(斬)を得る。"),
+                 "GRANT_KEYWORD")[0]
     assert not g["target"].get("attributes")
 
 
@@ -379,3 +380,25 @@ def test_g3_name_or_typed_name():
     abs_ = _parse("このキャラがKOされる場合、代わりに自分の、「魚人島」かリーダーの「しらほし」1枚を、レストにできる。")
     tqs = [d for d in _walk(abs_) if d.get("node") == "TargetQuery" and d.get("names")]
     assert tqs and all("NAME_OR_TYPED_NAME" in t["flags"] and "NAME_OR_TYPE" not in t["flags"] for t in tqs)
+
+
+# --- 属性の付与・登場したキャラへの付与（WP H2_engine） -----------------------------------------------
+
+def test_attribute_grant_follows_the_keyword_grant_on_the_same_target():
+    abs_ = _parse("【起動メイン】このキャラをトラッシュに置くことができる:自分のトラッシュが15枚以上ある場合、"
+                  "自分のキャラの「モンキー・D・ルフィ」1枚までは、このターン中、【速攻:キャラ】と属性(斬)を得る。")
+    grants = _actions(abs_, "GRANT_KEYWORD")
+    assert [g["status"] for g in grants] == ["速攻:キャラ", "ATTR:斬"]
+    # 同じ 1 枚を 2 度選ばせない（1 つ目で選んだものへ属性も付ける）。
+    assert grants[0]["target"]["save_id"] == "selected_card"
+    assert grants[1]["target"]["ref_id"] == "selected_card"
+    assert all(g["duration"] == "THIS_TURN" for g in grants)
+
+
+def test_played_character_clause_binds_that_character_to_the_trigger_subject():
+    abs_ = _parse("自分のトラッシュから特徴《ワノ国》を持つキャラが登場した時、そのキャラは、このターン中、【速攻】を得る。")
+    g = _one(abs_, "GRANT_KEYWORD")
+    assert g["target"]["ref_id"] == "trigger_subject"
+    assert g["status"] == "速攻"
+    # 誘発句は効果本体に残らない（トラッシュ・特徴の語を対象に取り込まない）。
+    assert g["target"]["zone"] != "TRASH" and not g["target"]["traits"]

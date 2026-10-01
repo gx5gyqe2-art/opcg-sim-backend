@@ -196,6 +196,20 @@ fn grant_keyword(s: &mut Session, action: &GameAction, target: CardIdx) {
         return;
     }
     let duration = keyword_duration(action.duration);
+    // 「属性(斬)を得る」（status="ATTR:斬"）は一時の属性フラグとして載せる（OP15-093）。
+    if keyword.starts_with("ATTR:") {
+        continuous::apply(
+            s,
+            target,
+            ContinuousKind::Flag,
+            duration,
+            0,
+            &keyword,
+            "",
+            expire_turn_for(s, duration),
+        );
+        return;
+    }
     continuous::apply(
         s,
         target,
