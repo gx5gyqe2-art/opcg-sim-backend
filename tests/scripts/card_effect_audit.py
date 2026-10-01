@@ -415,7 +415,7 @@ def static_checks(card: dict, parser_stats: dict) -> Tuple[List[dict], List[str]
                               "detail": f"【{raw}】に対応するトリガー／条件 "
                                         f"{sorted(trig_ok | cond_ok)} が無い"})
         elif key in TAG_KEYWORDS:
-            name = key.split(":")[0]
+            name = key      # 【速攻:キャラ】は keywords の「速攻:キャラ」（【速攻】とは別）で表す
             if name not in (card.get("keywords") or []) and name not in granted:
                 flags.append({"flag": "KEYWORD_MISSING",
                               "detail": f"【{raw}】が keywords にも付与効果にも無い"})

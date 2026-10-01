@@ -2087,10 +2087,12 @@ def _rush_natural(ctx: ParseContext) -> Optional[GameAction]:
         return None
     # 主語が「自分の特徴《X》を持つキャラは」等の場合は対象クエリを保全する
     # （従来は SOURCE 固定で範囲付与が自身のみになっていた。OP11-001/OP11-031 等）。
+    # 「キャラへアタックできる」は【速攻:キャラ】（リーダーへは不可）。通常の【速攻】と取り違えると
+    # リーダーにも攻撃できてしまう（2026-10-01 カード効果監査・15 枚）。
     return GameAction(
         type=ActionType.GRANT_KEYWORD,
         target=_subject_target(t),
-        status="速攻",
+        status="速攻:キャラ" if _nfc("キャラへアタックできる") in t else "速攻",
         duration="PERMANENT",
         raw_text=t,
     )

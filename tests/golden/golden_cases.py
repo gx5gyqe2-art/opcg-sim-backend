@@ -754,7 +754,7 @@ CASES = [
                 "effect": {
                     "kind": "action",
                     "type": "GRANT_KEYWORD",
-                    "status": "速攻",
+                    "status": "速攻:キャラ",     # 「キャラへアタックできる」は【速攻:キャラ】（リーダー不可・2026-10-01）
                     "duration": "PERMANENT",
                 }
             }
@@ -2264,7 +2264,7 @@ CASES = [
         "id": "scoped_rush_traits",
         "text": "自分の特徴《SWORD》を持つキャラは、登場したターンにキャラへアタックできる。",
         "expect": [
-            {"effect": {"kind": "action", "type": "GRANT_KEYWORD", "status": "速攻",
+            {"effect": {"kind": "action", "type": "GRANT_KEYWORD", "status": "速攻:キャラ",
                         "target": {"traits": ["SWORD"], "select_mode": "ALL"}}}
         ],
     },
