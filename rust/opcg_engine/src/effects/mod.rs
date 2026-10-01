@@ -42,6 +42,7 @@ pub mod interact;
 pub mod loader;
 pub mod matcher;
 pub mod passives;
+pub mod probe;
 pub mod resolver;
 #[cfg(test)]
 mod tests_effects;

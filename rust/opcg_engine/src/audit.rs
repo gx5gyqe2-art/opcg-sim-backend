@@ -75,6 +75,17 @@ pub fn extra_masters() -> Value {
     ])
 }
 
+/// 効果プローブ（[`effect_probe`]）だけが使う表＝[`extra_masters`] ＋ イベント／ステージの
+/// フィラー（`FILLER-EVENT`／`FILLER-STAGE`）。監査 golden の表（[`audit_masters`]）とは別に持つ。
+fn probe_extra_masters() -> Value {
+    let mut all = extra_masters();
+    if let Some(list) = all.as_array_mut() {
+        list.push(make_master_json("FILLER-EVENT", "フィラーイベント", "EVENT", 0));
+        list.push(make_master_json("FILLER-STAGE", "フィラーステージ", "STAGE", 0));
+    }
+    all
+}
+
 // ---------------------------------------------------------------------------
 // 汎用盤面（`effect_coverage._build_test_state` ＋ `rs_audit_replay` の正規化）
 // ---------------------------------------------------------------------------
@@ -369,6 +380,16 @@ fn audit_masters(base: &'static MasterTable) -> Result<&'static MasterTable, Eng
     Ok(AUDIT_MASTERS.get_or_init(|| table))
 }
 
+static PROBE_MASTERS: OnceLock<MasterTable> = OnceLock::new();
+
+fn probe_masters(base: &'static MasterTable) -> Result<&'static MasterTable, EngineError> {
+    if let Some(table) = PROBE_MASTERS.get() {
+        return Ok(table);
+    }
+    let table = base.with_extra_masters(&probe_extra_masters())?;
+    Ok(PROBE_MASTERS.get_or_init(|| table))
+}
+
 /// 1 能力ぶんの監査を Rust だけで走らせ、各段の sha1 と要約を返す（`lib.rs::golden_audit`）。
 ///
 /// 戻り値は `{"hashes":[sha1, ...], "summary":{...}}`。`hashes[0]` は発動直後、以降は
@@ -454,6 +475,187 @@ pub fn golden_audit(
     }
     serde_json::to_string(&out)
         .map_err(|e| bad(format!("golden_audit: cannot serialize result: {e}")))
+}
+
+// ---------------------------------------------------------------------------
+// 効果プローブ（新カード監査 `tests/scripts/card_effect_audit.py` 用・golden とは無関係）
+// ---------------------------------------------------------------------------
+
+/// プローブの 1 応答（`drain_payload` の「最大限やる」版）。
+///
+/// - 対象選択: 上限まで選ぶ（上限なし＝候補を全部・下限は満たす）
+/// - 場の上限超過（`FIELD_OVERFLOW_TRASH`）: 1 枚（下限）だけ選ぶ（選ばないと同じ要求が続く）
+/// - `CHOICE`: `choice_index` 番目（選択肢の数で丸める）
+/// - それ以外（任意効果の確認・トリガー確認・並び替え等）: `index 0`＝実行する／先頭
+fn probe_payload(state: &GameState, choice_index: i64) -> Option<Value> {
+    let it = state.active_interaction()?;
+    let action_type = it.kind.action_type();
+    if action_type == "CHOICE" {
+        let n = it.options.len().max(1) as i64;
+        return Some(json!({"selected_uuids": [], "index": choice_index.clamp(0, n - 1)}));
+    }
+    let overflow = action_type == "FIELD_OVERFLOW_TRASH";
+    if action_type != "SELECT_TARGET" && action_type != "SELECT_RESOURCE" && !overflow {
+        return Some(json!({"selected_uuids": [], "index": 0}));
+    }
+    let candidates: Vec<String> = match it.selectable.as_ref() {
+        Some(list) if !list.is_empty() => {
+            list.iter().map(|t| state.target_uuid(*t).to_owned()).collect()
+        }
+        _ => it
+            .candidates
+            .iter()
+            .map(|t| state.target_uuid(*t).to_owned())
+            .collect(),
+    };
+    let (min_req, max_req) = it.constraints.unwrap_or((0, 1));
+    let n_select = if overflow {
+        (min_req.max(1) as usize).min(candidates.len())
+    } else if max_req < 0 {
+        candidates.len()
+    } else {
+        (max_req.max(min_req).max(0) as usize).min(candidates.len())
+    };
+    let selected: Vec<String> = candidates.into_iter().take(n_select).collect();
+    Some(json!({"selected_uuids": selected, "index": 0}))
+}
+
+/// プローブの盤面にだけ、イベントとステージを足す（汎用盤面はキャラのフィラーしか無いので、
+/// 「手札のイベントを捨てる」「ステージをデッキの下に置く」等のコストや対象が成立しない）。
+///
+/// - 両者の手札・トラッシュにイベント 2 枚とステージ 1 枚（「イベント2枚を公開」等）
+/// - 両者のステージ置き場が空ならステージ 1 枚（検査対象がステージならそのまま）
+/// - 両者のライフの上と下の 1 枚ずつを表向き（「ライフを裏向きにできる」コスト等。
+///   間は裏向きのまま＝「表向きにする」効果にも対象が残る）
+fn add_probe_extras(masters: &MasterTable, hidden: &mut Value) {
+    let mut n = 0u64;
+    let mut next = || {
+        n += 1;
+        format!("{n:08x}-0000-4000-9000-{n:012x}")
+    };
+    for seat in ["p1", "p2"] {
+        let player = &mut hidden["players"][seat];
+        for zone in ["hand", "trash"] {
+            if let Some(cards) = player[zone].as_array_mut() {
+                cards.push(card_record(masters, "FILLER-EVENT", next(), seat));
+                cards.push(card_record(masters, "FILLER-EVENT", next(), seat));
+                cards.push(card_record(masters, "FILLER-STAGE", next(), seat));
+            }
+        }
+        if let Some(life) = player["life"].as_array_mut() {
+            let n_life = life.len();
+            for i in [0, n_life.saturating_sub(1)] {
+                if let Some(card) = life.get_mut(i) {
+                    card["is_face_up"] = Value::Bool(true);
+                }
+            }
+        }
+        if player["stage"].is_null() {
+            player["stage"] = card_record(masters, "FILLER-STAGE", next(), seat);
+        }
+    }
+}
+
+/// 1 能力を「条件を固定し・選べるだけ選ぶ」既定で最後まで解決し、各段のイベントを返す
+/// （`lib.rs::effect_probe`）。
+///
+/// 監査 golden（[`golden_audit`]）は汎用盤面＋最小応答なので、条件付きの句や「〜まで」の句は
+/// 実行されないまま終わることが多い。プローブは本文の句が**一つずつ実行経路に乗るか**を見る:
+///
+/// - `force_condition = Some(true)`: 全 `Condition` を真として扱う（`Some(false)` は偽＝
+///   `Branch` の else 側を通すため）。`None` は通常評価。
+/// - `choice_path`: `k` 番目に立った `CHOICE` で選ぶ選択肢（尽きたら 0）。入れ子の選択肢も
+///   含めて全経路を見るには、呼び出し側が `summary.choices`（各 `CHOICE` の選択肢数）を見て回す。
+/// - `relax_targets`: 対象の絞り込みをカード種別だけにする（汎用盤面のフィラーは特徴を
+///   持たないので、緩めないと「特徴《X》を持つカードを捨てる」等の先が実行されない）。
+///
+/// 戻り値は `{"events":[[段0のイベント...], ...], "summary":{...}}`。盤面は返さない
+/// （照合は呼び出し側がイベントの `action` と効果構造で行う）。エンジンの例外は
+/// `summary.error` に入れて返す（例外もプローブの結果＝呼び出し側が分類する）。
+pub fn effect_probe(
+    base: &'static MasterTable,
+    card_id: &str,
+    trigger: &str,
+    ability_index: usize,
+    force_condition: Option<bool>,
+    choice_path: &[i64],
+    relax_targets: bool,
+) -> Result<String, EngineError> {
+    let masters = probe_masters(base)?;
+    let (mut hidden, source_uuid) = build_test_state(masters, card_id, trigger == "ON_PLAY")?;
+    add_probe_extras(masters, &mut hidden);
+    let mut session = Session::new(GameState::from_record(&hidden, masters)?);
+    let source = crate::ops::find_card_by_uuid(session.state(), &source_uuid)
+        .ok_or_else(|| bad("effect_probe: 検査対象カードが盤面に居ない".into()))?;
+
+    let _guard = crate::effects::probe::ProbeGuard::set(force_condition, relax_targets);
+    let mut stages: Vec<Value> = Vec::new();
+    let mut error: Option<String> = None;
+
+    session.reset_events();
+    let fired = if trigger == "ON_PLAY" {
+        rules::actions::play_card_action(&mut session, masters, Seat::P1, source)
+    } else {
+        crate::effects::resolver::game_resolve_ability(
+            &mut session,
+            masters,
+            Seat::P1,
+            source,
+            ability_index,
+            false,
+        )
+    };
+    stages.push(Value::Array(session.action_events().to_vec()));
+    if let Err(e) = fired {
+        error = Some(format!("fire: {e:?}"));
+    }
+
+    let mut responses = 0usize;
+    let mut interactions: Vec<Value> = Vec::new();
+    let mut choices: Vec<Value> = Vec::new();
+    while error.is_none()
+        && session.state().active_interaction().is_some()
+        && responses < DRAIN_LIMIT
+    {
+        let it = session.state().active_interaction().expect("checked above");
+        let responder = it.player;
+        interactions.push(Value::from(it.kind.action_type()));
+        let mut choice_index = 0;
+        if it.kind.action_type() == "CHOICE" {
+            choice_index = choice_path.get(choices.len()).copied().unwrap_or(0);
+            choices.push(Value::from(it.options.len()));
+        }
+        let Some(payload) = probe_payload(session.state(), choice_index) else {
+            break;
+        };
+        session.reset_events();
+        let res = rules::actions::resolve_interaction(&mut session, masters, responder, &payload);
+        stages.push(Value::Array(session.action_events().to_vec()));
+        if let Err(e) = res {
+            error = Some(format!("respond[{responses}]: {e:?}"));
+        }
+        responses += 1;
+    }
+    let still_pending = session.state().active_interaction().is_some();
+
+    let out = json!({
+        "events": stages,
+        "summary": {
+            "card_id": card_id,
+            "trigger": trigger,
+            "ability_index": ability_index,
+            "force_condition": force_condition,
+            "choice_path": choice_path,
+            "choices": choices,
+            "relax_targets": relax_targets,
+            "responses": responses,
+            "interactions": interactions,
+            "drain_limit_hit": still_pending && responses >= DRAIN_LIMIT,
+            "error": error,
+        },
+    });
+    serde_json::to_string(&out)
+        .map_err(|e| bad(format!("effect_probe: cannot serialize result: {e}")))
 }
 
 // ---------------------------------------------------------------------------

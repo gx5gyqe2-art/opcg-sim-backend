@@ -187,6 +187,8 @@ pub fn get_target_cards(
 
     let exclude_source = query.has_flag("EXCLUDE_SOURCE");
     let partial = query.has_flag("NAME_PARTIAL");
+    // 効果プローブ（`super::probe`）中だけ立つ。ループの外で 1 度だけ読む（探索の内側ループ）。
+    let relax = super::probe::relax_targets();
 
     let mut results: Vec<TargetRef> = Vec::new();
     let mut seen_names: HashSet<&str> = HashSet::new();
@@ -223,6 +225,17 @@ pub fn get_target_cards(
         };
         let card = state.card(card_idx);
         let master = masters.get(card.master);
+
+        // 効果プローブ（`super::probe`）: カード種別だけで選ぶ（汎用盤面のフィラーは
+        // 特徴も名前も持たないので、絞り込みを残すと条件付きの句が実行されない）。
+        if relax {
+            if query.card_type.is_empty()
+                || query.card_type.iter().any(|t| t == master.ty.name())
+            {
+                results.push(cand);
+            }
+            continue;
+        }
 
         // --- 種類／色／属性（OR 合成フラグの有無で分かれる）------------------------
         if query.has_flag("ATTR_OR_TYPE") || query.has_flag("NAME_OR_COLORTYPE") {

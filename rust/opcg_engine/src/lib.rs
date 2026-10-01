@@ -166,6 +166,38 @@ fn golden_audit(
     Ok(audit::golden_audit(base, card_id, trigger, ability_index, debug)?)
 }
 
+/// 効果プローブ（新カード監査 `tests/scripts/card_effect_audit.py` 用）。
+///
+/// `golden_audit` と同じ汎用盤面で能力を 1 つ発動し、**条件を固定**（`force_condition`＝
+/// True/False/None）・**選べるだけ選ぶ**・`k` 番目の `Choice` は `choice_path[k]` 番目・`relax_targets`＝
+/// 対象の絞り込みをカード種別だけにする、で最後まで解決する。
+/// 戻り値は `{"events":[[...],...],"summary":{...,"error":str|null}}`。golden には使わない。
+#[pyfunction]
+#[pyo3(signature = (card_id, trigger, ability_index, force_condition=None, choice_path=Vec::new(), relax_targets=true))]
+fn effect_probe(
+    card_id: &str,
+    trigger: &str,
+    ability_index: usize,
+    force_condition: Option<bool>,
+    choice_path: Vec<i64>,
+    relax_targets: bool,
+) -> PyResult<String> {
+    let base = state::masters().ok_or_else(|| {
+        PyValueError::new_err(
+            "effect_probe: card masters are not loaded; call opcg_engine.load_masters(path) first",
+        )
+    })?;
+    Ok(audit::effect_probe(
+        base,
+        card_id,
+        trigger,
+        ability_index,
+        force_condition,
+        &choice_path,
+        relax_targets,
+    )?)
+}
+
 /// 符号化 v13 が使う語彙（`vocab_ids`）を設定する。**プロセスで 1 度**でよい。
 ///
 /// `ids_json` はネット npz の `vocab_ids`（card_id の list を JSON にしたもの）。index は
@@ -394,6 +426,7 @@ fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(eval_queries, m)?)?;
     m.add_function(wrap_pyfunction!(replay_audit, m)?)?;
     m.add_function(wrap_pyfunction!(golden_audit, m)?)?;
+    m.add_function(wrap_pyfunction!(effect_probe, m)?)?;
     m.add_class::<py_game::Game>()?;
     m.add_function(wrap_pyfunction!(set_vocab, m)?)?;
     m.add_function(wrap_pyfunction!(encode_state, m)?)?;

@@ -140,6 +140,10 @@ pub fn check_condition(
 ) -> Result<bool, EngineError> {
     use ConditionType as C;
 
+    if let Some(forced) = super::probe::forced_condition() {
+        return Ok(forced);
+    }
+
     // 論理演算（Python は再帰・short-circuit）。
     match cond.ty {
         C::And => {
