@@ -192,6 +192,23 @@ pub fn run_target_loop(
     value: i32,
     source_card: Option<CardIdx>,
 ) -> Result<bool, EngineError> {
+    run_target_loop_with(s, masters, actor, action, node_ref, targets, value, source_card, None)
+}
+
+/// [`run_target_loop`] の `skip_guards` 版。`skip_guards` のカードは除去保護・置換の確認を
+/// 済ませた（置換を断られた）ものとして、そのまま本来の除去を行う。
+#[allow(clippy::too_many_arguments)]
+pub fn run_target_loop_with(
+    s: &mut Session,
+    masters: &MasterTable,
+    actor: Seat,
+    action: &GameAction,
+    node_ref: &NodeRef,
+    targets: &[TargetRef],
+    value: i32,
+    source_card: Option<CardIdx>,
+    skip_guards: Option<CardIdx>,
+) -> Result<bool, EngineError> {
     let handler = target_handler_for(action.ty);
     // 群 A〜E の差し口: 土台に無い種別は、担当する群があればその `apply_target` へ 1 対象ずつ渡す。
     type GroupTarget = fn(&mut Session, &MasterTable, Seat, &GameAction, CardIdx, Seat, Option<CardZone>, i32, Option<CardIdx>) -> Result<(), EngineError>;
@@ -247,6 +264,7 @@ pub fn run_target_loop(
         if LEAVE_ACTIONS.contains(&action.ty)
             && actor != owner
             && source_list == Some(CardZone::Field)
+            && skip_guards != Some(target)
         {
             let guard_statuses: &[&str] = if action.ty == ActionType::Ko {
                 &["LEAVE", "EFFECT_KO"]
@@ -255,6 +273,26 @@ pub fn run_target_loop(
             };
             if active_protection(s, masters, target, guard_statuses, Some(actor))? {
                 continue;
+            }
+            // 任意の置換（「代わりに〜できる」）は、先に被除去側へ確認してから実行する
+            // （断れば本来の除去を続行・`suspend_for_battle_ko_replacement` と同じ作り）。
+            if let Some(repl) = find_replacement(s, masters, target, guard_statuses)? {
+                if repl.sub_is_optional {
+                    let remaining = &targets[i + 1..];
+                    if !remaining.is_empty() {
+                        super::interact::defer_removal_targets(
+                            s, actor, node_ref, &cards_of(remaining), value,
+                        );
+                    }
+                    super::interact::suspend_for_removal_replacement(
+                        s, masters, actor, node_ref, action, target, owner, value, source_card,
+                    );
+                    s.edit().set_mgr_flag(
+                        crate::journal::MgrFlagField::ReplacementSuspended,
+                        true,
+                    );
+                    return Ok(success);
+                }
             }
             if active_replacement(s, masters, target, guard_statuses)? {
                 if s.state().active_interaction().is_some() {

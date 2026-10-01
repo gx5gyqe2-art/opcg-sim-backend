@@ -1073,6 +1073,22 @@ pub struct Continuation {
     pub arrange: Option<ArrangeContinuation>,
     /// `kind == "BATTLE_KO_REPLACE"` の欄（`target_owner_name`／`life_lost`）。
     pub battle_ko: Option<BattleKoContinuation>,
+    /// 任意の効果除去置換の確認（`source_card` が除去されようとしているカード）。
+    pub removal_replace: Option<RemovalReplaceContinuation>,
+}
+
+/// 任意の効果除去置換（「KOされる代わりに〜できる」）の continuation。
+#[derive(Debug, Clone, PartialEq)]
+pub struct RemovalReplaceContinuation {
+    /// 除去を行う側（効果の使い手）。
+    pub actor: Seat,
+    /// 除去アクションのノード。
+    pub action: crate::effects::NodeRef,
+    /// 除去アクション本体（ノード参照が引けなくても再開できるよう複製を持つ）。
+    pub action_body: Box<crate::effects::ast::GameAction>,
+    pub value: i32,
+    /// 除去アクションの `source_card`（効果の発生源）。
+    pub effect_source: Option<CardIdx>,
 }
 
 /// ARRANGE_DECK の continuation（Python の同名キー）。

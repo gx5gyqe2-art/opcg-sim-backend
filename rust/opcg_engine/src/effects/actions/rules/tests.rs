@@ -531,6 +531,55 @@ fn a_replacement_runs_the_sub_effect_instead_of_the_removal() {
     );
 }
 
+/// 任意の効果除去置換（「代わりに〜できる」）は先に確認する。断れば本来の KO が続行し、
+/// 受け入れれば置換が実行されて KO はスキップされる。
+#[test]
+fn an_optional_effect_removal_replacement_asks_first_and_declining_continues_the_ko() {
+    let mk = || {
+        let sub = json!({"node": "GameAction", "type": "DRAW", "target": null,
+            "value": value_json(1), "duration": "INSTANT", "status": null,
+            "destination": null, "is_rest": null, "dest_position": null, "raw_text": "",
+            "sub_effect": null, "is_optional": true, "delay": null, "face_up": null});
+        let repl = ability_json(
+            "PASSIVE",
+            json!({"node": "GameAction", "type": "REPLACE_EFFECT",
+                   "target": query_json(r#""select_mode":"SOURCE""#), "value": value_json(0),
+                   "duration": "INSTANT", "status": "LEAVE", "destination": null,
+                   "is_rest": null, "dest_position": null, "raw_text": "",
+                   "sub_effect": sub, "is_optional": false, "delay": null, "face_up": null}),
+            "",
+        );
+        let cards = json!({
+            "LD": master_json("LD", "LEADER", json!([])),
+            "V": master_json("V", "CHARACTER", json!([])),
+            "RP": master_json("RP", "CHARACTER", json!([repl])),
+        });
+        board(cards, json!([]), json!([card_json("RP", "p2-rp", "p2")]), json!([]))
+    };
+    for accept in [false, true] {
+        let (masters, mut s) = mk();
+        let rp = find(&s, "p2-rp");
+        let ko = action("KO", "");
+        assert_eq!(apply(&mut s, &masters, Seat::P1, &ko, &[rp]), Ok(true));
+        let it = s.state().active_interaction().cloned().expect("確認で止まる");
+        assert_eq!(it.kind, InteractionKind::ConfirmOptional);
+        assert_eq!(it.player, Seat::P2);
+        assert!(s.state().player(Seat::P2).field.contains(&rp), "確認中は除去されない");
+        crate::effects::interact::resolve_interaction(
+            &mut s,
+            &masters,
+            Seat::P2,
+            &json!({"accepted": accept}),
+        )
+        .expect("resume");
+        assert_eq!(
+            s.state().player(Seat::P2).field.contains(&rp),
+            accept,
+            "accept={accept}"
+        );
+    }
+}
+
 /// `sub_effect` が満たせない（引くデッキが無い）場合は置換不成立＝本来の除去が行われる
 /// （Python `_can_satisfy_node`）。
 #[test]
