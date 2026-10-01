@@ -174,6 +174,11 @@ class EffectParser:
                     and not self._KEYWORD_ONLY_RE.match(segments[i + 1])):
                 body = re.sub(_nfc(r'^【[^】]+】'), '', segments[i + 1])
                 expanded.append(seg + body)
+                # 「【ドン!!×1】【アタック時】/【ブロック時】…」の【ドン!!×N】は両方のトリガーに掛かる
+                # （ブロック時側の能力にも付ける。OP01-078）。
+                don_tag = re.search(_nfc(r'【ドン[ ]*(?:!!|‼)[ ]*[××][ ]*\d+】'), seg)
+                if don_tag and not re.search(_nfc(r'【ドン[ ]*(?:!!|‼)[ ]*[××][ ]*\d+】'), segments[i + 1]):
+                    segments[i + 1] = don_tag.group(0) + segments[i + 1]
             else:
                 expanded.append(seg)
         segments = expanded
@@ -547,6 +552,10 @@ class EffectParser:
                 # 自動誘発トリガーでは発動前に使用確認を挟むためのフラグ（resolver が参照）。
                 if _nfc("できる") in cost_text or _nfc("してもよい") in cost_text:
                     cost_optional = True
+                # 「ドン!!-N」はルール上「ドン!!をN枚戻すことができる」＝任意の支払い（括弧の注釈が
+                # 無い【トリガー】「ドン!!-1:」でも払うかを選べる＝EB01-038/OP12-075）。
+                if re.match(_nfc(r'^ドン[ 　]*(?:!!|‼)[ 　]*[-－−‐][ 　]*\d+'), cost_text.strip()):
+                    cost_optional = True
                 # ただし起動メインで「源自身を消費する」コスト（このキャラ/リーダー/ステージ/カードを
                 # rest/trash/手札に戻す/デッキ下 等）は**必須**＝「できる」は起動の任意性であってコストの
                 # 任意性ではない（2026-06-27: パーサが一律 optional 化していたため、レストを断って無制限
@@ -812,8 +821,9 @@ class EffectParser:
     # 効果文先頭の「〈イベント〉した時、」をターン内イベント条件へ写像する定義。
     # (正規表現, イベント名, 最小回数)。先頭マッチのみ採用し、本文から除去する。
     _EVENT_CLAUSE_PATTERNS = (
-        (r'^自分の場のドン[ 　]*(?:!!|‼)?が(\d+)枚以上[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED", None),
-        (r'^自分の場のドン[ 　]*(?:!!|‼)?が[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED", 1),
+        (r'^(?:自分の)?場のドン[ 　]*(?:!!|‼)?が(\d+)枚以上[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED", None),
+        (r'^(?:自分の)?場のドン[ 　]*(?:!!|‼)?が自分の効果によって[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED_OWN", 1),
+        (r'^(?:自分の)?場のドン[ 　]*(?:!!|‼)?が[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED", 1),
         (r'^[^。]*?キャラが自分の効果で場を離れた時、', "CHAR_LEFT_BY_OWN_EFFECT", 1),
         (r'^自分の特徴《海軍》を持つカードの効果で[^。]*?捨てられた時、', "NAVY_DISCARD", 1),
         (r'^自分の【トリガー】を持つキャラが登場した時、', "TRIGGER_CHAR_PLAYED", 1),
@@ -1032,6 +1042,12 @@ class EffectParser:
         if _nfc("【カウンター】") in norm_text: return TriggerType.COUNTER
         if _nfc("【トリガー】") in norm_text: return TriggerType.TRIGGER
         if _nfc("【ゲーム開始時】") in norm_text: return TriggerType.GAME_START
+
+        # 無タグ（【ターン1回】のみ）の「（自分の場の）ドン!!がドン!!デッキに戻された時、」は起動メインではなく
+        # 反応型の誘発（P-077・ST10-014）。PASSIVE にしておけば再計算では動かず、ドン!!が戻された
+        # 瞬間にエンジンの enqueue_don_returned_listeners が積む。
+        if re.search(_nfc(r'(?:自分の)?場のドン[ 　]*(?:!!|‼)?が[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、'), norm_text):
+            return TriggerType.PASSIVE
 
         # 【ドン!!×N】 または 【ターン1回】 のみ（既知トリガータグなし）。
         # 【ターン1回】（起動回数制限）を含む、または【ドン!!×N】を含まない → 起動メイン（活性化能力）。
@@ -1559,7 +1575,7 @@ class EffectParser:
         # （例「コスト8以上のキャラがいて、手札6枚以下」→ HAND_COUNT>=8 と誤読）。
         split_m = re.search(
             _nfc(r'^(?P<a>.+?(?:がい(?:て|る)|枚以上いて|枚以下いて|がいなくて|があり|がある|'
-                 r'以上でかつ|以下でかつ|以上で|以下で|以上であり|以下であり|を持ち|カード名で|多色で|[」》]で))、(?P<b>.+)$'),
+                 r'以上でかつ|以下でかつ|以上で|以下で|以上であり|以下であり|を持ち|カード名で|多色で|[」》]でかつ|[」》]で))、(?P<b>.+)$'),
             norm_text)
         if split_m:
             a_txt = split_m.group("a")
@@ -1576,6 +1592,7 @@ class EffectParser:
             a_norm = re.sub(_nfc(r'カード名で$'), _nfc('カード名'), a_norm)
             # 「リーダーが「X」で、…」「リーダーが特徴《X》で、…」連結（OP14-059 ほか6枚）。
             # 閉じ括弧直後の連結「で」を落として体言止めに戻す。
+            a_norm = re.sub(_nfc(r'([」》])でかつ$'), r'\1', a_norm)  # OP06-072「特徴《ジェルマ66》でかつ、…」
             a_norm = re.sub(_nfc(r'([」》])で$'), r'\1', a_norm)
             # 「リーダーが多色で、…」連結（EB02-061/PRB02-005）。連結「で」を落とす。
             a_norm = re.sub(_nfc(r'多色で$'), _nfc('多色'), a_norm)
@@ -1659,6 +1676,15 @@ class EffectParser:
                     or re.search(_nfc(r'ドン[ 　]*(?:!!|‼).{0,20}(?:より|以上|以下)'), norm_text)
                     and _nfc("相手") in norm_text):
                 cmp_op, offset = self._compare_op_offset(norm_text, CompareOperator.GE)
+                # 比較の主語が相手側（「相手の場のドン!!の枚数が自分の場のドン!!の枚数より多い」）なら
+                # 向きを反転する。エンジンは「自分 ⟨演算子⟩ 相手(±offset)」で評価するため、
+                # 相手 > 自分 は 自分 < 相手（GT→LT・GE→LE）に直す。
+                _i_opp, _i_self = norm_text.find(_nfc("相手")), norm_text.find(_nfc("自分"))
+                if 0 <= _i_opp < _i_self:
+                    cmp_op = {CompareOperator.GT: CompareOperator.LT,
+                              CompareOperator.LT: CompareOperator.GT,
+                              CompareOperator.GE: CompareOperator.LE,
+                              CompareOperator.LE: CompareOperator.GE}.get(cmp_op, cmp_op)
                 return Condition(type=ConditionType.DON_COUNT_COMPARE, operator=cmp_op,
                                  value=offset, player=Player.SELF, raw_text=norm_text)
             # 「（自分の）付与されているドン‼がある／ない場合」= 付与ドン（attached）の存在条件。
@@ -1828,6 +1854,13 @@ class EffectParser:
                     name_cond = Condition(type=ConditionType.LEADER_NAME, value=nval, player=p, raw_text=norm_text)
                     trait_cond = Condition(type=ConditionType.OR, player=p,
                                            args=[trait_cond, name_cond], raw_text=norm_text)
+                # 「特徴《X》か属性(Y)を持つ場合」= 特徴 OR 属性（OP13-025 コビー）。属性側が脱落していた。
+                _attr_or = re.search(_nfc(r'か属性[ 　]*[（(]([^）)]+)[）)]'), norm_text)
+                if _attr_or:
+                    attr_cond = Condition(type=ConditionType.LEADER_ATTRIBUTE, value=_attr_or.group(1),
+                                          player=p, raw_text=norm_text)
+                    trait_cond = Condition(type=ConditionType.OR, player=p,
+                                           args=[trait_cond, attr_cond], raw_text=norm_text)
                 if _leader_pow_cond is not None:
                     return Condition(type=ConditionType.AND, player=p,
                                      args=[_leader_pow_cond, trait_cond], raw_text=norm_text)

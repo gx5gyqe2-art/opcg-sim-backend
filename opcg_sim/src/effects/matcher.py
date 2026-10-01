@@ -221,6 +221,10 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 「「名前」か特徴《X》を持つ」順（か→「特徴」→《）も OR（OP15-073/101）。
     if tq.traits and tq.names and re.search(_nfc(r'か(?:を含む)?(?:特徴)?[「『《]'), tgt_text):
         tq.flags.add("TRAIT_OR_NAME")
+    # 「「名前」と特徴《X》を持つキャラすべて」= 名前 OR 特徴（和集合。OP12-073/OP02-024）。
+    # 名前を持つキャラが同時に特徴 X を持つとは限らず、AND だと誰にも掛からない。
+    if tq.traits and tq.names and re.search(_nfc(r'」と(?:特徴)?[《『]'), tgt_text):
+        tq.flags.add("TRAIT_OR_NAME")
 
     # 「「名前」か<種類>」= 名前 OR 種類（OP12-071「「サンジ」かイベント」）。従来は names と
     # card_type が AND になり、両立しない条件（サンジという名のイベントは無い）で対象が常に

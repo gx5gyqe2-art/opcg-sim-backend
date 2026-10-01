@@ -411,8 +411,12 @@ impl Resolver {
                     // 場のドン!!（アクティブ＋レスト＋付与中）の合計で判定する。
                     let cost = a.value.base;
                     let p = state.player(actor);
-                    let total =
-                        (p.don_active.len() + p.don_rested.len() + p.don_attached.len()) as i32;
+                    // 「アクティブのドン!!N枚」（status=ACTIVE）はアクティブだけで判定する。
+                    let total = if super::interact::don_active_only(a) {
+                        p.don_active.len() as i32
+                    } else {
+                        (p.don_active.len() + p.don_rested.len() + p.don_attached.len()) as i32
+                    };
                     return Ok(total >= cost);
                 }
                 let Some(query) = a.target.as_ref() else {

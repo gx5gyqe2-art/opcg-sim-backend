@@ -385,11 +385,18 @@ pub fn suspend_for_cost_declaration(
 
 /// Python `_don_pool_player`（`status == "OPPONENT"` なら相手のドン!!プール）。
 pub fn don_pool_player(actor: Seat, action: &GameAction) -> Seat {
-    if action.status.as_deref() == Some("OPPONENT") {
+    // OPPONENT／OPPONENT_ACTIVE（RETURN_DON）／OPPONENT_RESTED（RAMP_DON）。
+    if action.status.as_deref().is_some_and(|st| st.starts_with("OPPONENT")) {
         actor.other()
     } else {
         actor
     }
+}
+
+/// 「アクティブのドン!!N枚を戻す」＝戻す候補をアクティブ状態のドン!!だけに限る
+/// （`status` が `ACTIVE`／`OPPONENT_ACTIVE`。レスト・付与中のドン!!は戻せない）。
+pub fn don_active_only(action: &GameAction) -> bool {
+    matches!(action.status.as_deref(), Some("ACTIVE") | Some("OPPONENT_ACTIVE"))
 }
 
 /// Python `_suspend_for_don_selection`（SELECT_RESOURCE）。戻せるドン!!が無ければ `false`。
@@ -408,9 +415,14 @@ pub fn suspend_for_don_selection(
     let tp = don_pool_player(actor, action);
     // 候補の並び＝既定解決の優先順位: レスト → アクティブ → 付与中
     // （戻すなら一番損の少ないドン!!から）。
-    let mut field_don: Vec<DonIdx> = s.state().player(tp).don_rested.clone();
+    let mut field_don: Vec<DonIdx> = Vec::new();
+    if !don_active_only(action) {
+        field_don.extend(s.state().player(tp).don_rested.iter().copied());
+    }
     field_don.extend(s.state().player(tp).don_active.iter().copied());
-    field_don.extend(s.state().player(tp).don_attached.iter().copied());
+    if !don_active_only(action) {
+        field_don.extend(s.state().player(tp).don_attached.iter().copied());
+    }
     let n = if value > 0 { value } else { 1 };
     let to_return = n.min(field_don.len() as i32);
     if to_return <= 0 {

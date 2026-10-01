@@ -734,6 +734,59 @@ pub fn enqueue_life_decrease(
     Ok(())
 }
 
+/// 「（自分の場の）ドン!!がドン!!デッキに戻された時」リスナー（OP02-071・OP14-068・EB03-033・
+/// P-077・ST10-014）。ドン!!が戻された直後に `return_don` が呼ぶ。
+///
+/// 対象はタイミングタグ付き（YOUR_TURN／OPPONENT_TURN。手番が合うときだけ）か無タグ（PASSIVE）の
+/// 反応型能力で、本文に「ドン…デッキに戻された時」を持つもの。再計算（passives）は反応型を
+/// 飛ばすため、この経路でしか発動しない。主語は本文から読む:
+/// 「自分の場のドン!!」は持ち主＝戻されたドン!!の持ち主のときだけ、主語なし（「場のドン!!」）は
+/// どちらの場でも。「自分の効果によって」は戻した効果の発動者がそのドン!!の持ち主のときだけ。
+pub fn enqueue_don_returned_listeners(
+    s: &mut Session,
+    masters: &MasterTable,
+    don_owner: Seat,
+    by_own_effect: bool,
+) -> Result<(), EngineError> {
+    for owner in [Seat::P1, Seat::P2] {
+        let mut holders: Vec<CardIdx> = s.state().player(owner).leader.into_iter().collect();
+        holders.extend(s.state().player(owner).field.iter().copied());
+        holders.extend(s.state().player(owner).stage);
+        for holder in holders {
+            let ids = masters.get(s.state().card(holder).master).ability_ids.clone();
+            for (index, id) in ids.iter().enumerate() {
+                let ab = ability(masters, *id)?;
+                if !CHAR_PLAYED_LISTENER_TRIGGERS.contains(&ab.trigger) {
+                    continue;
+                }
+                let raw = &ab.raw_text;
+                if !raw.contains("デッキに戻された時") || !raw.contains("ドン") {
+                    continue;
+                }
+                if ab.trigger == TriggerType::YourTurn && s.state().turn_player != owner {
+                    continue;
+                }
+                if ab.trigger == TriggerType::OpponentTurn && s.state().turn_player == owner {
+                    continue;
+                }
+                if raw.contains("相手の場のドン") {
+                    if don_owner == owner {
+                        continue;
+                    }
+                } else if raw.contains("自分の場のドン") && don_owner != owner {
+                    continue;
+                }
+                if raw.contains("自分の効果によって") && !(by_own_effect && don_owner == owner) {
+                    continue;
+                }
+                let optional = raw.contains("発動できる");
+                enqueue_trigger(s, owner, holder, index, optional);
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Python `_fire_on_life_decrease`（積んで即座に消化する単発経路）。
 pub fn fire_on_life_decrease(
     s: &mut Session,
