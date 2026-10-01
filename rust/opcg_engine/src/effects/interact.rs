@@ -241,10 +241,11 @@ pub fn suspend_for_ability_cost_confirm(
 }
 
 /// Python `_suspend_for_optional_confirmation`（「〜してもよい」の発動可否）。
+/// `chooser` は確認に答える側（「相手は…してもよい」は効果の使用者でなく相手）。
 pub fn suspend_for_optional_confirmation(
     s: &mut Session,
     masters: &MasterTable,
-    actor: Seat,
+    chooser: Seat,
     node_ref: &NodeRef,
     source_card: Option<CardIdx>,
     execution_stack: &[NodeRef],
@@ -255,7 +256,7 @@ pub fn suspend_for_optional_confirmation(
     cont.node = Some(node_ref.clone());
     s.edit().set_interaction(Interaction {
         kind: InteractionKind::ConfirmOptional,
-        player: actor,
+        player: chooser,
         message: format!("「{name}」の効果を発動しますか？"),
         candidates: Vec::new(),
         selectable: None,
@@ -263,7 +264,7 @@ pub fn suspend_for_optional_confirmation(
         can_skip: true,
         // Python はこちらだけトップレベルにも uuid を置く。
         source_card,
-        owner: actor,
+        owner: chooser,
         options: Vec::new(),
         allow_position: false,
         allow_reorder: false,
@@ -712,7 +713,9 @@ pub fn resolve_interaction(
                         resolver.execution_stack.push(node.clone());
                     }
                 }
-                resolver.process_stack(s, masters, actor, Some(source_card))?;
+                // 確認に答えたのが相手（「相手は…してもよい」）でも、後続は効果の責任者視点で実行する。
+                let controller = s.state().card(source_card).owner;
+                resolver.process_stack(s, masters, controller, Some(source_card))?;
                 history = resolver.action_history;
             }
             }
@@ -790,8 +793,14 @@ pub fn resolve_interaction(
                     }
                 }
             }
-            let mut resolver = Resolver::resumed(cont.execution_stack.clone(), cont.context.clone());
-            resolver.process_stack(s, masters, actor, Some(source_card))?;
+            // 中断前に積んだ「直前の枚数」は resume で失われるので、並べた枚数で積み直す
+            // （「置いた枚数分カードを引く」）。
+            let mut ctx = cont.context.clone();
+            ctx.prev_action_count = Some(ordered.len() as i32);
+            let mut resolver = Resolver::resumed(cont.execution_stack.clone(), ctx);
+            // 並べたのが持ち主（相手）でも、後続は効果の責任者視点で実行する。
+            let controller = s.state().card(source_card).owner;
+            resolver.process_stack(s, masters, controller, Some(source_card))?;
             history = resolver.action_history;
         }
         InteractionKind::DeclareCost => {

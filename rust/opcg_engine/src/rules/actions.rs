@@ -305,6 +305,8 @@ pub fn apply_game_action(
                 c.current_cost(masters.get(c.master))
             };
             ops::pay_cost(s, seat, cost, None)?;
+            // 「次に登場させる〜のコストは N 少なくなる」（一回限り）は払い終えたので使い切る。
+            crate::effects::continuous::consume_next_play_discounts(s, card);
             play_card_action(s, masters, seat, card)?;
         }
         // `end_turn` の中で `_validate_action(gm.turn_player, "MAIN_ACTION")` を行う（Python 同）。
@@ -364,6 +366,9 @@ pub fn apply_game_action(
                 "type": "ATTACH_DON", "player": seat.name(), "card_name": name,
                 "message": format!("「{name}」にドン!!付与"),
             }));
+            // 「ドン!!が付与された時」の誘発（OP02-002）。
+            let host_owner = s.state().card(card).owner;
+            crate::effects::triggers::enqueue_don_attached_listeners(s, masters, card, host_owner)?;
         }
         "ACTIVATE_MAIN" => {
             let card = operating.ok_or_else(|| bad("効果を発動するカードが見つかりません。"))?;

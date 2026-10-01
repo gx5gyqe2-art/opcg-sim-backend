@@ -229,7 +229,13 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 「「名前」か<種類>」= 名前 OR 種類（OP12-071「「サンジ」かイベント」）。従来は names と
     # card_type が AND になり、両立しない条件（サンジという名のイベントは無い）で対象が常に
     # 空になっていた。「」か」直後に種類語が続く場合に OR とみなす。
-    if tq.names and tq.card_type and re.search(_nfc(r'」か(?:イベント|キャラクター|キャラ|リーダー|ステージ)'), tgt_text):
+    # 「「A」か<種類>の「B」」（OP11-110「「魚人島」かリーダーの「しらほし」」）は「A という名前のカード」か
+    # 「<種類>で名前が B のカード」＝種類は 2 つ目の名前にだけ掛かる（NAME_OR_TYPED_NAME）。
+    # NAME_OR_TYPE 扱いだと「リーダーなら名前不問」になり、名前の合わない任意のリーダーまで対象になる。
+    if (tq.names and len(tq.names) >= 2 and tq.card_type
+            and re.search(_nfc(r'」か(?:イベント|キャラクター|キャラ|リーダー|ステージ)の「'), tgt_text)):
+        tq.flags.add("NAME_OR_TYPED_NAME")
+    elif tq.names and tq.card_type and re.search(_nfc(r'」か(?:イベント|キャラクター|キャラ|リーダー|ステージ)'), tgt_text):
         tq.flags.add("NAME_OR_TYPE")
     # 逆順「<種類>か「名前」」（OP04-082「自分のリーダーか「コリーダコロシアム」」）も 種類 OR 名前。
     elif tq.names and tq.card_type and re.search(_nfc(r'(?:イベント|キャラクター|キャラ|リーダー|ステージ)か、?「'), tgt_text):

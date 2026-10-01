@@ -1012,6 +1012,55 @@ pub fn enqueue_don_returned_listeners(
     Ok(())
 }
 
+/// 「（このリーダー／自分のキャラ）にドン!!が付与された時」リスナー（OP02-002）。
+/// ドン!!が付与された直後に呼ぶ。反応型は再計算で動かないので、この経路でしか発動しない。
+/// 主語は本文（付与された時の手前）から読む:「このリーダー／このキャラ」＝付与先が持ち主自身、
+/// 「自分のリーダー」「自分のキャラ」＝付与先がその種類で持ち主が同じ。
+pub fn enqueue_don_attached_listeners(
+    s: &mut Session,
+    masters: &MasterTable,
+    host: CardIdx,
+    host_owner: Seat,
+) -> Result<(), EngineError> {
+    let host_ty = masters.get(s.state().card(host).master).ty;
+    for owner in [Seat::P1, Seat::P2] {
+        let mut holders: Vec<CardIdx> = s.state().player(owner).leader.into_iter().collect();
+        holders.extend(s.state().player(owner).field.iter().copied());
+        holders.extend(s.state().player(owner).stage);
+        for holder in holders {
+            let ids = masters.get(s.state().card(holder).master).ability_ids.clone();
+            for (index, id) in ids.iter().enumerate() {
+                let ab = ability(masters, *id)?;
+                if !CHAR_PLAYED_LISTENER_TRIGGERS.contains(&ab.trigger) {
+                    continue;
+                }
+                let raw = &ab.raw_text;
+                if !raw.contains("付与された時") || !raw.contains("ドン") {
+                    continue;
+                }
+                if ab.trigger == TriggerType::YourTurn && s.state().turn_player != owner {
+                    continue;
+                }
+                if ab.trigger == TriggerType::OpponentTurn && s.state().turn_player == owner {
+                    continue;
+                }
+                let pre = strip_tags(&before(raw, "付与された時"));
+                let own = host_owner == owner;
+                let subject_ok = ((pre.contains("このリーダー") || pre.contains("このキャラ"))
+                    && host == holder)
+                    || (pre.contains("自分のリーダー") && own && host_ty == CardType::Leader)
+                    || (pre.contains("自分のキャラ") && own && host_ty == CardType::Character);
+                if !subject_ok {
+                    continue;
+                }
+                let optional = raw.contains("発動できる");
+                enqueue_trigger(s, owner, holder, index, optional);
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Python `_fire_on_life_decrease`（積んで即座に消化する単発経路）。
 pub fn fire_on_life_decrease(
     s: &mut Session,
@@ -1094,7 +1143,7 @@ pub fn flush_pending_end_of_turn(
     s: &mut Session,
     masters: &MasterTable,
 ) -> Result<(), EngineError> {
-    flush_delayed(s, masters, false)
+    flush_delayed(s, masters, DelayKind::TurnEnd)
 }
 
 /// 「このバトル終了時、〜」の解決（バトルの後始末で呼ぶ）。
@@ -1102,23 +1151,46 @@ pub fn flush_pending_battle_end(
     s: &mut Session,
     masters: &MasterTable,
 ) -> Result<(), EngineError> {
-    flush_delayed(s, masters, true)
+    flush_delayed(s, masters, DelayKind::BattleEnd)
+}
+
+/// 「次の相手のメインフェイズ開始時、〜」の解決（メインフェイズへ入るとき呼ぶ）。
+/// 予約者の相手がターンプレイヤーのときだけ解決する（自分のメインフェイズでは持ち越す）。
+pub fn flush_pending_main_start(
+    s: &mut Session,
+    masters: &MasterTable,
+) -> Result<(), EngineError> {
+    flush_delayed(s, masters, DelayKind::MainStart)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DelayKind {
+    TurnEnd,
+    BattleEnd,
+    MainStart,
 }
 
 fn flush_delayed(
     s: &mut Session,
     masters: &MasterTable,
-    battle_end: bool,
+    kind: DelayKind,
 ) -> Result<(), EngineError> {
-    if s.state().pending_end_of_turn.iter().all(|d| d.battle_end != battle_end) {
+    let turn_player = s.state().turn_player;
+    let is_kind = |d: &crate::model::DelayedAction| match kind {
+        DelayKind::BattleEnd => d.battle_end,
+        DelayKind::MainStart => d.main_start && d.player != turn_player,
+        DelayKind::TurnEnd => !d.battle_end && !d.main_start,
+    };
+    if !s.state().pending_end_of_turn.iter().any(&is_kind) {
         return Ok(());
     }
+    let battle_end = kind == DelayKind::BattleEnd;
     let (pending, keep): (Vec<_>, Vec<_>) = s
         .state()
         .pending_end_of_turn
         .clone()
         .into_iter()
-        .partition(|d| d.battle_end == battle_end);
+        .partition(&is_kind);
     s.edit().set_pending_end_of_turn(keep);
     for item in pending {
         // バトル終了時の予約は、発生源が場に残っているときだけ（KO 済みなら何もしない）。

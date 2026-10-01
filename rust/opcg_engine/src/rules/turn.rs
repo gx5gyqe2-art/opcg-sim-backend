@@ -377,5 +377,7 @@ fn don_phase_leader_redirect(
 pub fn main_phase(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
     s.edit().set_phase(Phase::Main);
     let tp = s.state().turn_player;
-    apply_passive_effects(s, masters, tp)
+    apply_passive_effects(s, masters, tp)?;
+    // 「次の相手のメインフェイズ開始時、〜」の予約を解決する。
+    triggers::flush_pending_main_start(s, masters)
 }

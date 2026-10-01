@@ -412,6 +412,9 @@ pub fn check_condition(
                     "IS_RESTED" => card.is_rest,
                     "IS_ACTIVE" => !card.is_rest,
                     "ENTERED_THIS_TURN" => card.is_newly_played,
+                    // 「このターン中、このリーダー／キャラが相手のキャラとバトルしている」
+                    // （バトル宣言／ブロック時に `BATTLED_CHAR_<uuid>` を記録している）。
+                    "BATTLED_CHAR_THIS_TURN" => event_count(&format!("BATTLED_CHAR_{}", card.uuid)) > 0,
                     "IN_BATTLE" => match &state.active_battle {
                         None => false,
                         Some(ab) => {

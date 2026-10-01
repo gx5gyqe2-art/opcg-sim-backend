@@ -300,6 +300,7 @@ pub fn get_target_cards(
             if !query.card_type.is_empty()
                 && !query.card_type.iter().any(|t| t == master.ty.name())
                 && !query.has_flag("NAME_OR_TYPE")
+                && !query.has_flag("NAME_OR_TYPED_NAME")
             {
                 continue;
             }
@@ -445,6 +446,19 @@ pub fn get_target_cards(
                 continue;
             }
         } else if query.has_flag("NAME_OR_COLORTYPE") {
+            if excluded() {
+                continue;
+            }
+        } else if query.has_flag("NAME_OR_TYPED_NAME")
+            && query.names.len() >= 2
+            && !query.card_type.is_empty()
+        {
+            // 「「A」か<種類>の「B」」: A は種類不問の名前一致、B は<種類>のカードのときだけ。
+            let type_ok = query.card_type.iter().any(|t| t == master.ty.name());
+            let hit = name_in(&query.names[..1]) || (type_ok && name_in(&query.names[1..]));
+            if !hit {
+                continue;
+            }
             if excluded() {
                 continue;
             }

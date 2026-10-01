@@ -2159,11 +2159,13 @@ CASES = [
         "text": "【登場時】自分のトラッシュのコスト4以下のキャラカード1枚までとコスト2以下のキャラカード1枚までを選び、1枚を登場させ、残りをレストで登場させる。",
         "expect": [
             {"trigger": "ON_PLAY", "effect": {"kind": "seq", "actions": [
+                # 各ティアから選んだ 2 枚のうち 1 枚（プレイヤーが選ぶ）をアクティブで、残りをレストで登場
                 {"kind": "seq", "actions": [
-                    {"type": "PLAY_CARD", "target": {"zone": "TRASH", "cost_max": 4}},
-                    {"type": "PLAY_CARD", "status": "RESTED", "target": {"zone": "TRASH", "cost_max": 2}},
+                    {"type": "SELECT", "target": {"zone": "TRASH", "cost_max": 4}},
+                    {"type": "SELECT", "target": {"zone": "TRASH", "cost_max": 2}},
+                    {"type": "PLAY_CARD", "target": {"select_mode": "GROUP_FIRST", "ref_id": "_sel_a+_sel_b"}},
                 ]},
-                {"type": "PLAY_CARD", "target": {"zone": "TEMP"}},
+                {"type": "PLAY_CARD", "status": "RESTED", "target": {"zone": "TEMP", "select_mode": "REMAINING"}},
             ]}}
         ],
     },

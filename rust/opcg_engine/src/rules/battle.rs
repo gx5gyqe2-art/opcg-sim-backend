@@ -128,11 +128,23 @@ pub fn declare_attack(
         target_owner,
         counter_buff: 0,
     }));
+    record_char_battle(s, masters, attacker, target);
     // ON_ATTACK / ON_REST（アタック宣言によるレスト）/ ON_OPP_ATTACK を待ち行列へ積む。
     let queue =
         triggers::enqueue_battle_triggers(s, masters, attacker, attacker_owner, target_owner)?;
     s.edit().set_trigger_queue(TriggerQueue::Battle, queue);
     advance_battle_triggers(s, masters)
+}
+
+/// 「このターン中、相手のキャラとバトルしている」用: バトルした 2 枚のうち、相手が
+/// キャラクターである側へ `BATTLED_CHAR_<uuid>` を記録する（ターン切替で消える）。
+fn record_char_battle(s: &mut Session, masters: &MasterTable, a: CardIdx, b: CardIdx) {
+    for (me, other) in [(a, b), (b, a)] {
+        if masters.get(s.state().card(other).master).ty == crate::model::CardType::Character {
+            let name = format!("BATTLED_CHAR_{}", s.state().card(me).uuid);
+            ops::record_turn_event(s, &name, 1);
+        }
+    }
 }
 
 /// Python `_advance_battle_triggers`: 積んだトリガーを 1 つずつ解決し、
@@ -193,6 +205,7 @@ pub fn handle_block(
         let mut updated = battle.clone();
         updated.target = blocker;
         s.edit().set_active_battle(Some(updated));
+        record_char_battle(s, masters, battle.attacker, blocker);
         // 「相手が【ブロッカー】を発動した時」の誘発（消化は【ブロック時】の後）。
         triggers::enqueue_activation_listeners(
             s,
