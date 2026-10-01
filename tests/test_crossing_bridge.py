@@ -549,6 +549,8 @@ def _walk_of(ax, cards, don, blk, life, lt, play, ks, turns=None):
     hits1 = () if ax["no_attack_now"] else steps[0]["hits"]
     xf = () if ax["no_attack_now"] else (tuple(float(att1[q][1]) + 1000.0 * ks[q] for q in range(len(att1)))
                                          + tuple(hits1[len(att1):]))
+    if turns is None:
+        turns = CB.model_horizon(ax, blk, life)
     r = CB.rule_guard_plan_ex(cards, don, xf, None, blk, life, turns, lt, CB._prices_of(ax), later_seq=later_seq,
                               rest_blk=tuple(ax.get("rest_blk") or ()))
     paid = sum(ax["cand"][i][0] for i in play) + sum(ks)
@@ -2586,3 +2588,17 @@ def test_opp_clock_mirror_on_empty_records_builds_no_rows_and_default_counts_no_
     finally:
         CB.set_opp_clock_mode("mirror")
     assert rows2 == [] and stats2["mirror_rows"] == 0
+
+
+def test_the_defender_model_looks_only_as_far_as_the_walk_without_the_hand():
+    """**H-4f（地平）**: 守る側の計算の地平は T116 と同じ「手札抜きの地平 `⌈τ0⌉`」（ライフ ＋ 全てのブロッカーに、盤面の
+    素殴りと引いた 1 枚の流れで届くターン数）。手札・ライフの札・引く札で手札が増えても状態が爆発しない。
+    ライフが多いほど・ブロッカーが多いほど・盤面が遅いほど地平は長い。最低 1 ターン。"""
+    ax = _actx(3, [(0, 0.0)], [(0, 0.0)], [], a_tab=[0.01] * 4, board=0.1)
+    h0 = CB.model_horizon(ax, [], 0)
+    h3 = CB.model_horizon(ax, [], 3)
+    hb = CB.model_horizon(ax, [1000.0, 1000.0], 3)
+    slow = CB.model_horizon(_actx(3, [(0, 0.0)], [(0, 0.0)], [], a_tab=[0.01] * 4, board=0.02), [], 3)
+    assert h0 == 1 and h3 >= h0 and hb >= h3 and slow > h3
+    ax["rest_blk"] = (1000.0,)
+    assert CB.model_horizon(ax, [], 3) >= h3

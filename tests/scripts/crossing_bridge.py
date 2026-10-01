@@ -1004,6 +1004,8 @@ def _rule_hand_term(sc, tok, side, g_hand, mu=MU, turns=None, count=True):
 #      守る側の計算が覆わない段も、その段の付与の増分を数える（F1-b・付与を 0 にしない）。
 #    * **速攻は 1 回**（F3）・`RATE_RUSH_MODE` に従う。
 #    * **守る側も毎ターン 1 枚引く**（F4・完全情報で両席の引きを対称に・そのデッキの構成から）。
+#    * **地平**: 守る側の計算は T116 と同じ手札抜きの地平 `⌈τ0⌉`（ライフ ＋ 全てのブロッカーに盤面の素殴りで届くターン数）
+#      までを見る——引く札・取られたライフの札で手札が毎ターン増えるので、無制限に読むと状態が爆発する（実測 80 万状態）。
 #    * **読み手ごとの速さ**（Q1）: 時刻で読む器（線形の橋・帳簿）は `耐久 ÷ 歩きの τ`、1 ターンで読む器（速さの検算）は
 #      今のターンの損害（歩きの 1 段目）。実現の側の検算も、倒したターンはそのターン開始の耐久の残りで数える（E2）。
 #
@@ -1670,6 +1672,23 @@ def walk_crossing(sched, theta, actx):
                           j0=(1 if actx.get("no_attack_now") else 2)))
 
 
+def model_horizon(actx, blk, life, arrive=()):
+    """**H-4f（地平）**: 守る側の計算は**手札抜きの地平**までしか見ない（T116 と同じ約束: 手札が耐久に入るのは守る窓が
+    開く分だけ＝歩きが手札抜きの的〔ライフ ＋ 全てのブロッカー〕に届くまでのターン数 `⌈τ0⌉`）。引く札・取られたライフの
+    札で手札が毎ターン増えるので、無制限に読むと状態が爆発する（実測: 手札 6・ブロッカー 3 で 80 万状態）。
+    `τ0` は盤面の素殴りと引いた 1 枚の流れで歩く（付与・出す札は入れない＝計画に依らない）。"""
+    L0 = int(max(0, round(float(life))))
+    rest = tuple(actx.get("rest_blk") or ())
+    olp = float(actx.get("olp", 5000.0)); mlp = float(actx.get("mlp", 5000.0))
+    nu_b = sum(float(nu_meas_of(float(m) + olp, mlp)) for m in tuple(blk or ()) + rest + tuple(arrive or ()))
+    th0 = float(actx.get("lam", LAM)) * L0 + nu_b
+    a0 = float(actx.get("lead_bare", 0.0)) + float(actx.get("chars_bare", 0.0))
+    flow = actx.get("flow") or [0.0]
+    tau0 = tau_grow(th0, 0.0, a0, 0.0, float(flow[min(len(flow) - 1, int(actx["budget"]))]),
+                    j0=(1 if actx.get("no_attack_now") else 2))
+    return max(1, int(math.ceil(tau0 - 1e-9)))
+
+
 _RULE_DON_CACHE = {}
 
 
@@ -1707,6 +1726,8 @@ def rule_don_solve(cards_d, don_d, blk, life, actx, turns=None, life_types=(), d
     no_now = bool(actx.get("no_attack_now"))
     max_t = max([0.0] + [float(c) for c, _d, _p in (life_types or ())])
     s_cnt = sum(float(c) for c, _d in cards_d or ())
+    if turns is None:
+        turns = model_horizon(actx, blk, L0, arrive)
 
     for mask in range(1 << n_c):
         play = [i for i in range(n_c) if mask >> i & 1]
