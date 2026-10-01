@@ -158,7 +158,7 @@ python tests/scripts/card_effect_audit.py status
 - 統合時は parser.py／atoms.py／rules.rs／resolver.rs／triggers.rs／cond.rs が衝突しやすい（解消後に必ず
   `cargo test`＋パーサのテスト。表現が変わったテスト期待値は直す）。
 
-**未解決として台帳に ng で残したカード（1 枚）**: OP15-074 ――「リーダーが〜の場合、A。その後、B」の条件が
+**ng 1 枚だった OP15-074（ユーザ確認で「条件は能力全体に係る」＝現行どおり ok にした）**: 「リーダーが〜の場合、A。その後、B」の条件が
 「その後」まで能力全体を支配する扱いは、プロジェクト既定の裁定（`_lift_h_gate`・同型 約 119 能力・
 `test_structural_gate` で上限 0 のラチェット）。個別に変えると類型の裁定が割れるため、ルール裁定を決めたうえで
 類型ごと直す別作業にする（直すときは `_lift_h_gate` と構造ゲートを一緒に）。
