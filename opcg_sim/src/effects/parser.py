@@ -720,7 +720,10 @@ class EffectParser:
             raw = _nfc(getattr(node, "raw_text", "") or "")
             if (tq is not None and getattr(tq, "player", None) == Player.OPPONENT
                     and getattr(tq, "chooser", None) is None
-                    and _nfc("相手は自身の") in raw):
+                    and (_nfc("相手は自身の") in raw
+                         # 「相手の手札N枚を捨てる」も捨てるカードは相手が自分の手札から選ぶ（OP03-078/ST10-010）。
+                         or (node.type == ActionType.DISCARD and tq.zone == Zone.HAND
+                             and _nfc("相手の手札") in raw))):
                 tq.chooser = Player.OPPONENT
             self._apply_opponent_self_chooser(getattr(node, "sub_effect", None))
             return

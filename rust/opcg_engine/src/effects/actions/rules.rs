@@ -378,6 +378,17 @@ pub fn active_protection(
                     continue;
                 }
             }
+            // 発生源限定の効果 KO 耐性（「相手の元々のパワーN以下のキャラの効果でKOされない」OP14-003）:
+            // 除去を行った効果の発生源（`attacker` に渡る）が印刷パワーN以下のキャラのときだけ守る。
+            if let Some(max) = required_source_power_max(&eff.raw_text) {
+                let ok = attacker.is_some_and(|a| {
+                    let m = masters.get(s.state().card(a).master);
+                    m.ty == CardType::Character && m.power <= max
+                });
+                if !ok {
+                    continue;
+                }
+            }
             // 属性限定のバトル KO 耐性（「属性《斬》を持つカードとのバトルでKOされず」OP08-114）。
             if let Some(req) = required_battle_attribute(&eff.raw_text) {
                 let ok = attacker.is_some_and(|a| {
@@ -888,6 +899,20 @@ fn node_is_optional(node: &EffectNode) -> bool {
 ///
 /// 一致すれば要求属性（1 文字）を返す。regex クレートを足さずに済むよう、括弧の 3 種類・
 /// 任意の「カード／キャラ」・「バトル／戦闘」を素直に走査する。
+/// 「相手の元々のパワー5000以下のキャラの効果でKOされない」の上限（OP14-003）。
+/// 本文に「元々のパワーN以下のキャラの効果で」が無ければ None。
+fn required_source_power_max(text: &str) -> Option<i32> {
+    let pos = text.find("元々のパワー")?;
+    let after = &text[pos + "元々のパワー".len()..];
+    let digits: String = after
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
+    let n: i32 = digits.parse().ok()?;
+    let tail = &after[digits.len()..];
+    tail.starts_with("以下のキャラの効果で").then_some(n)
+}
+
 fn required_battle_attribute(text: &str) -> Option<&'static str> {
     const ATTRS: [&str; 5] = ["斬", "打", "射", "特", "知"];
     const OPEN: [&str; 3] = ["(", "（", "《"];

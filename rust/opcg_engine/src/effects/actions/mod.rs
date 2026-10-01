@@ -253,7 +253,8 @@ pub fn run_target_loop(
             } else {
                 &["LEAVE"]
             };
-            if active_protection(s, masters, target, guard_statuses, Some(actor))? {
+            // 除去を行った効果の発生源も渡す（「元々のパワーN以下のキャラの効果で」の判定用）。
+            if active_protection_vs(s, masters, target, guard_statuses, Some(actor), source_card)? {
                 continue;
             }
             if active_replacement(s, masters, target, guard_statuses)? {
@@ -355,6 +356,18 @@ fn rest(
             target,
             status::FLAG_CANNOT_BE_RESTED_BY_OPP,
         )
+    {
+        return Ok(());
+    }
+    // 「相手のリーダーとキャラの効果で」版: 発生源がリーダー／キャラのときだけ弾く。
+    if actor != owner
+        && crate::rules::has_timed_flag(s.state(), target, status::FLAG_CANNOT_BE_RESTED_BY_OPP_LC)
+        && source_card.is_some_and(|c| {
+            matches!(
+                masters.get(s.state().card(c).master).ty,
+                crate::model::CardType::Leader | crate::model::CardType::Character
+            )
+        })
     {
         return Ok(());
     }

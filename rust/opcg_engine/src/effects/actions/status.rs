@@ -46,6 +46,8 @@ const FLAG_CANNOT_REST: &str = "CANNOT_REST";
 /// ＝このフラグは [`super::rest`]（`actor != owner`）だけが見る。KO 耐性は従来どおり
 /// `PREVENT_LEAVE` 経路。
 pub(crate) const FLAG_CANNOT_BE_RESTED_BY_OPP: &str = "CANNOT_BE_RESTED_BY_OPP";
+/// 発生源が相手のリーダー／キャラの効果によるレストだけを弾く版（OP15-024）。
+pub(crate) const FLAG_CANNOT_BE_RESTED_BY_OPP_LC: &str = "CANNOT_BE_RESTED_BY_OPP_LC";
 /// Python `per_target.freeze` が `flags`（`timed_flags` ではない）へ直接書くフラグ。
 const FLAG_FREEZE: &str = "FREEZE";
 /// Python `per_target.negate_effect` が載せる継続フラグ（`CardInstance.is_effect_negated`）。
@@ -227,7 +229,13 @@ fn prevent_rest(
     source_card: Option<CardIdx>,
 ) {
     let flag = if source_card == Some(target) {
-        FLAG_CANNOT_BE_RESTED_BY_OPP
+        // 「相手のリーダーとキャラの効果でレストにされず」は発生源がリーダー／キャラの効果だけを弾く
+        // （相手のイベント・ステージの効果では守られない: OP15-024）。
+        if action.raw_text.contains("リーダーとキャラの効果で") {
+            FLAG_CANNOT_BE_RESTED_BY_OPP_LC
+        } else {
+            FLAG_CANNOT_BE_RESTED_BY_OPP
+        }
     } else {
         FLAG_CANNOT_REST
     };
