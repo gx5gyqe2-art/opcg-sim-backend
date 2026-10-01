@@ -265,9 +265,21 @@ class EffectParser:
             return q is not None and q.ref_id == "selected_card"
 
         if not any(is_producer(n) for n in nodes):
+            # 直前の PLAY_CARD（「登場させた場合、そのキャラは…」）が producer の代わりになる:
+            # 登場させたカードを save_id="played_card" に保存し、「そのキャラ」をそこへ結ぶ
+            # （OP12-058。従来は ref を外して自軍の任意のキャラを選ばせていた）。
+            played = None
             for n in nodes:
-                if is_consumer(n):
-                    n.target.ref_id = None
+                tq = getattr(n, "target", None)
+                if (isinstance(n, GameAction) and n.type == ActionType.PLAY_CARD
+                        and tq is not None and tq.select_mode != "SOURCE" and tq.ref_id is None):
+                    played = n
+                elif is_consumer(n):
+                    if played is not None:
+                        played.target.save_id = "played_card"
+                        n.target.ref_id = "played_card"
+                    else:
+                        n.target.ref_id = None
 
     def _normalize_replacement_alternative(self, ability) -> None:
         """『（先行効果）の代わりに（後続効果）』= 択一の整形。
