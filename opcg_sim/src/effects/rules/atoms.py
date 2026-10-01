@@ -1657,6 +1657,24 @@ def _rest_leader_or_don(ctx: ParseContext) -> Optional[EffectNode]:
                   options=[rest_leader, rest_don])
 
 
+@rule("don_rest_any_count", priority=75)
+def _don_rest_any_count(ctx: ParseContext) -> Optional[GameAction]:
+    """「（自分の）ドン!!を任意の枚数レストにできる」→ REST（COST_AREA のアクティブなドン!!を 0..N 枚選ぶ）。
+
+    枚数をプレイヤーが選ぶ（0 枚でもよい）ので REST_DON の固定枚数ではなく、既存の
+    SELECT_TARGET（is_up_to・count=50）に乗せる。後続の「レストにしたドン!!1枚につき」は
+    PREV_ACTION_COUNT（＝実際にレストにした枚数）で倍率を掛ける（OP13-001）。
+    """
+    t = ctx.text
+    if not re.search(_nfc(r"ドン(?:!!|‼)を任意の枚数レストに(?:する|できる)"), t):
+        return None
+    if _don_opponent(t):
+        return None
+    tq = TargetQuery(player=Player.SELF, zone=Zone.COST_AREA, count=50, is_up_to=True,
+                     is_rest=False, raw_text=t)
+    return GameAction(type=ActionType.REST, target=tq, raw_text=t)
+
+
 @rule("don_set_rest", priority=74)
 def _don_set_rest(ctx: ParseContext) -> Optional[GameAction]:
     """「（自分の）ドン!!N枚をレストにする/できる」→ REST_DON（アクティブ→レスト）。多くはコスト。"""
