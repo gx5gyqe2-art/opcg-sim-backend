@@ -450,7 +450,7 @@ pub fn check_condition(
                             bad("SOURCE_STATE ATTACKER_ATTRIBUTE: expected a string".into())
                         })?;
                         state.active_battle.as_ref().is_some_and(|ab| {
-                            masters.get(state.card(ab.attacker).master).attribute.value() == want
+                            state.card(ab.attacker).has_attribute(masters.get(state.card(ab.attacker).master), want)
                         })
                     }
                     (Some(key @ ("BATTLE_OPP_ATTRIBUTE" | "BATTLE_OPP_TYPE")), Some(v)) => {
@@ -468,7 +468,7 @@ pub fn check_condition(
                             };
                             let m = masters.get(state.card(opp).master);
                             if key == "BATTLE_OPP_ATTRIBUTE" {
-                                m.attribute.value() == want
+                                state.card(opp).has_attribute(m, want)
                             } else {
                                 m.ty.name() == want
                             }
@@ -620,7 +620,9 @@ pub fn check_condition(
             None => false,
             Some(m) => match cond.value.as_str() {
                 None => true, // Python: str でなければ素通り
-                Some(attr) => m.attribute.value() == attr,
+                Some(attr) => tp
+                    .leader
+                    .is_some_and(|l| state.card(l).has_attribute(m, attr)),
             },
         },
         C::RestedCount => {

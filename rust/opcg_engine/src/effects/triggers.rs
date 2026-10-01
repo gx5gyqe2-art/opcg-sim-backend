@@ -774,7 +774,8 @@ pub fn enqueue_char_played_listeners(
                     continue;
                 }
                 let optional = ab.raw_text.contains("発動できる");
-                enqueue_trigger(s, owner, holder, index, optional);
+                // 契機カード（登場したキャラ）を添える＝「そのキャラは〜」が引く（trigger_subject・OP16-079）。
+                enqueue_trigger_with_subject(s, owner, holder, index, optional, Some(played_card));
             }
         }
     }

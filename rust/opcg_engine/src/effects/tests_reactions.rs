@@ -826,3 +826,73 @@ mod g2_trigger {
         assert_eq!(turn_event(&s, "NAVY_DISCARD"), Some(2));
     }
 }
+
+/// OP16-079 型: 「自分のトラッシュから…キャラが登場した時、そのキャラは…【速攻】を得る」。
+/// 登場したカード（契機カード）が trigger_subject として渡り、付与はそのカードに載る。
+mod played_subject {
+    use super::*;
+    use crate::effects::ast::{ActionType, EffectNode};
+    use crate::effects::matcher::tests::query;
+
+    #[test]
+    fn the_played_character_is_the_subject_of_that_character_clause() {
+        let mut b = BoardBuilder::new().turn(3, Seat::P1);
+        let holder = b.put_field(Seat::P1, M_CHAR);
+        let played = b.put_field(Seat::P1, M_BIG);
+        let other = b.put_field(Seat::P1, M_BIG);
+        let (mut masters, state) = b.build();
+        let mut grant = testkit::action(ActionType::GrantKeyword, 0);
+        grant.status = Some("速攻".to_string());
+        grant.duration = crate::effects::ast::Duration::ThisTurn;
+        grant.target = Some(query(r#""player":"SELF","ref_id":"trigger_subject""#));
+        let id = masters.abilities.abilities.len() as u32;
+        masters.abilities.abilities.push(testkit::ability(
+            TriggerType::Passive,
+            EffectNode::Action(grant),
+            "自分のトラッシュから、キャラが登場した時、そのキャラは、このターン中、【速攻】を得る。",
+        ));
+        masters.masters[M_CHAR as usize].ability_ids = vec![id];
+        let mut s = Session::new(state);
+        triggers::enqueue_char_played_listeners(&mut s, &masters, played, Seat::P1, Some("TRASH")).unwrap();
+        assert_eq!(s.state().pending_triggers.len(), 1);
+        assert_eq!(s.state().pending_triggers[0].subject, Some(played));
+        triggers::advance_pending_triggers(&mut s, &masters).unwrap();
+        assert_eq!(s.state().card(played).timed_keywords, vec!["速攻".to_string()]);
+        assert!(s.state().card(other).timed_keywords.is_empty(), "他のキャラには付かない");
+        assert!(s.state().card(holder).timed_keywords.is_empty());
+        // 手札からの登場では動かない（「トラッシュから」）。
+        let mut s2 = Session::new(s.state().clone());
+        s2.edit().set_trigger_queue(crate::journal::TriggerQueue::Pending, vec![]);
+        triggers::enqueue_char_played_listeners(&mut s2, &masters, other, Seat::P1, Some("HAND")).unwrap();
+        assert!(s2.state().pending_triggers.is_empty());
+    }
+}
+
+/// OP15-093 型: 「属性(斬)を得る」は一時の属性として載り、属性の絞り込みに現れる。
+mod granted_attribute {
+    use super::*;
+    use crate::effects::ast::Duration;
+    use crate::effects::continuous;
+    use crate::model::ContinuousKind;
+
+    #[test]
+    fn a_granted_attribute_is_a_timed_flag_that_expires() {
+        let mut b = BoardBuilder::new().turn(3, Seat::P1);
+        let c = b.put_field(Seat::P1, M_CHAR);
+        let (masters, state) = b.build();
+        let mut s = Session::new(state);
+        let m = masters.get(s.state().card(c).master);
+        let base = m.attribute.value().to_string();
+        let other = if base == "斬" { "打" } else { "斬" };
+        assert!(!s.state().card(c).has_attribute(m, other));
+        continuous::apply(
+            &mut s, c, ContinuousKind::Flag, Duration::ThisTurn, 0, &format!("ATTR:{other}"), "", 3,
+        );
+        let m = masters.get(s.state().card(c).master);
+        assert!(s.state().card(c).has_attribute(m, other));
+        assert!(s.state().card(c).has_attribute(m, &base), "元の属性も残る");
+        continuous::expire(&mut s, continuous::ExpireEvent::TurnEnd, 3);
+        let m = masters.get(s.state().card(c).master);
+        assert!(!s.state().card(c).has_attribute(m, other), "ターン終了で失効");
+    }
+}

@@ -677,6 +677,7 @@ class EffectParser:
             if trigger == TriggerType.GAME_START:
                 effect_text = re.sub(_nfc(r'^ゲーム開始時、'), '', effect_text).strip()
 
+            played_subject_clause = False
             # 効果本体の解析
             # 埋め込み反応型トリガー（本文の「〜時、」）が認識された能力では、効果文先頭に残る
             # そのトリガー句を除去する。残すと parse_target が KO 条件のフィルタ（特徴/パワー/枚数）を
@@ -696,6 +697,13 @@ class EffectParser:
                     _nfc(r'^[^。：:]*?(?:カードを引いた|手札が捨てられた|バトルしたバトル終了|'
                          r'アタックされた|アタックした)時、'),
                     '', effect_text).strip()
+                # 「自分の…キャラが登場した時、そのキャラは〜」（OP16-079）: 誘発句を除き、「そのキャラ」は
+                # 登場したカード（エンジンが契機カードとして積む trigger_subject）を指す。
+                _m_played = re.match(
+                    _nfc(r'^(?![^。：:]*?このキャラが登場した時)[^。：:]*?キャラが登場した時、'), effect_text)
+                if _m_played:
+                    effect_text = effect_text[_m_played.end():].strip()
+                    played_subject_clause = True
 
             # 「〜を捨てて発動できる。X」＝手札を捨てるのは発動コスト（任意）。効果側に残すと
             # 捨てられなくても X が実行される（OP17-040）。
@@ -728,6 +736,8 @@ class EffectParser:
                 effect_text = repl_split["body"]
 
             effect_node = self._parse_to_node(effect_text)
+            if played_subject_clause:
+                self._bind_trigger_subject(effect_node)
 
             # カテゴリH: 先頭ゲート条件が「。その後、」をまたいで後続を無条件化する漏れを是正する。
             effect_node = self._lift_h_gate(effect_node, effect_text)
@@ -1012,6 +1022,18 @@ class EffectParser:
         # 「そのキャラは〜代わりに、…」の「そのキャラ」は除去されるカード（保護者ではない）。
         body = re.sub(_nfc(r'^そのキャラは(?:KOされる|場を離れる)代わりに、?'), _nfc('代わりに、そのキャラを、'), body)
         return {"status": status, "body": body, "conds": conds}
+
+    def _bind_trigger_subject(self, node) -> None:
+        """「そのキャラ」（ref_id=selected_card）を誘発の契機カード（trigger_subject）へ付け替える。"""
+        if node is None:
+            return
+        for a in getattr(node, "actions", None) or []:
+            self._bind_trigger_subject(a)
+        for k in ("if_true", "if_false", "sub_effect"):
+            self._bind_trigger_subject(getattr(node, k, None))
+        tq = getattr(node, "target", None)
+        if tq is not None and tq.ref_id == "selected_card":
+            tq.ref_id = "trigger_subject"
 
     def _fix_replacement_self_targets(self, node, other_subject: bool = False) -> None:
         """置換の本体（代わりに〜）の「このキャラを／そのキャラを」の対象を直す。

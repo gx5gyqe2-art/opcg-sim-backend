@@ -761,6 +761,13 @@ impl CardInstance {
         sorted_union(&self.current_keywords, &self.timed_keywords)
     }
 
+    /// 属性(斬)等を持つか。マスターの属性に加え、「属性(斬)を得る」で付与した一時の属性
+    /// （`timed_flags` の `ATTR:斬`・OP15-093）も含む。
+    pub fn has_attribute(&self, master: &CardMaster, attr: &str) -> bool {
+        master.attribute.value() == attr
+            || self.timed_flags.iter().any(|f| f.strip_prefix("ATTR:") == Some(attr))
+    }
+
     /// Python `to_dict` の `is_frozen`＝`'FREEZE' in self.flags`。
     pub fn is_frozen(&self) -> bool {
         self.flags.iter().any(|f| f == "FREEZE")

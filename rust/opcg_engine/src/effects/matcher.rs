@@ -284,7 +284,7 @@ pub fn get_target_cards(
                     && query.names.iter().any(|n| matches_name(master, n, false))
             } else {
                 !query.attributes.is_empty()
-                    && query.attributes.iter().any(|a| a == master.attribute.value())
+                    && query.attributes.iter().any(|a| card.has_attribute(master, a))
             };
             let type_ok = query.card_type.is_empty()
                 || query.card_type.iter().any(|t| t == master.ty.name());
@@ -316,7 +316,7 @@ pub fn get_target_cards(
             // SELECTOR_OR（名前／特徴／属性のいずれか）のときは後段でまとめて判定する。
             if !query.attributes.is_empty()
                 && !query.has_flag("SELECTOR_OR")
-                && !query.attributes.iter().any(|a| a == master.attribute.value())
+                && !query.attributes.iter().any(|a| card.has_attribute(master, a))
             {
                 continue;
             }
@@ -438,7 +438,7 @@ pub fn get_target_cards(
             // 「特徴《A》か属性(斬)を持つ」「「ペローナ」か属性(斬)を持つ」: 指定された名前・特徴・属性の
             // いずれかに当てはまればよい（他の絞り込み＝種類／コスト／除外名は AND のまま）。
             let attr_ok = !query.attributes.is_empty()
-                && query.attributes.iter().any(|a| a == master.attribute.value());
+                && query.attributes.iter().any(|a| card.has_attribute(master, a));
             if !(name_in(&query.names) || trait_in() || attr_ok) {
                 continue;
             }
