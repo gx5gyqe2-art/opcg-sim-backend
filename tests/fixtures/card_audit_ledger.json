@@ -9,8 +9,8 @@
    "verdict": "ok"
   },
   "EB01-002": {
-   "ast_sha": "472eaf1ff0d4739b",
-   "note": "全句対応を確認 [厳格レビュー]",
+   "ast_sha": "ac80cfd3209d9e02",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "4f3c7b5142d8ac41",
    "reviewed": "2026-10-01",
    "text_sha": "62b8d96623e666c6",
@@ -217,24 +217,24 @@
    "verdict": "ok"
   },
   "EB01-031": {
-   "ast_sha": "53802a0b90ab4934",
-   "note": "全句対応を確認 [厳格レビュー]",
+   "ast_sha": "0ca39fb05b93fe01",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "675ba725000c0e1d",
    "reviewed": "2026-10-01",
    "text_sha": "aa692055e7b99189",
    "verdict": "ok"
   },
   "EB01-033": {
-   "ast_sha": "ed8ffdb86db083f5",
-   "note": "全句対応を確認 [厳格レビュー]",
+   "ast_sha": "a7c6518415d66b8a",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "11b26773f559b941",
    "reviewed": "2026-10-01",
    "text_sha": "6d1bbd4d041e9a8d",
    "verdict": "ok"
   },
   "EB01-034": {
-   "ast_sha": "0adc6d6335e7bf3f",
-   "note": "全句がノード・対象・条件と一致 [厳格レビュー]",
+   "ast_sha": "fc6b2b7f4fcba321",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "26c8093983351fb6",
    "reviewed": "2026-10-01",
    "text_sha": "525c50e3fa048e68",
@@ -265,8 +265,8 @@
    "verdict": "ok"
   },
   "EB01-038": {
-   "ast_sha": "f4ed2b8fe09ee56c",
-   "note": "全句がノード・対象・条件と一致 [厳格レビュー]",
+   "ast_sha": "60514a3cbfb834af",
+   "note": "全句一致。トリガーのドン!!-1 は cost_optional=True に解消、counter 条件は効果側 Branch [厳格レビュー]",
    "probe_sha": "d9a6055dfb5deb36",
    "reviewed": "2026-10-01",
    "text_sha": "39776ab7c7dcaf1c",
@@ -497,8 +497,8 @@
    "verdict": "ok"
   },
   "EB02-010": {
-   "ast_sha": "4181b992e787ecc9",
-   "note": "全句がノード・対象・条件と一致 [厳格レビュー]",
+   "ast_sha": "57c66626cf7ea27c",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "f6f319d6818be19a",
    "reviewed": "2026-10-01",
    "text_sha": "256668fb125c52b2",
@@ -617,8 +617,8 @@
    "verdict": "ok"
   },
   "EB02-025": {
-   "ast_sha": "923aad3e9b505ab7",
-   "note": "[厳格レビュー]",
+   "ast_sha": "bcc10b5b5dce339d",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "4c575a94c6185159",
    "reviewed": "2026-10-01",
    "text_sha": "976ab617395c7557",
@@ -713,8 +713,8 @@
    "verdict": "ok"
   },
   "EB02-039": {
-   "ast_sha": "0a7f63e9efe48cbf",
-   "note": "全句がノード・対象・条件と一致 [厳格レビュー]",
+   "ast_sha": "4bbda10c87f51cb9",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "7753b2cb8d2a4452",
    "reviewed": "2026-10-01",
    "text_sha": "6069d520a6479c91",
@@ -729,8 +729,8 @@
    "verdict": "ok"
   },
   "EB02-041": {
-   "ast_sha": "949b4b26dd322af7",
-   "note": "[厳格レビュー]",
+   "ast_sha": "a63864fd39be55e4",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "6ccdde8cfc3e386e",
    "reviewed": "2026-10-01",
    "text_sha": "8724af75d9155c5f",
@@ -777,8 +777,8 @@
    "verdict": "ok"
   },
   "EB02-049": {
-   "ast_sha": "e5e9cd393239a33c",
-   "note": "[厳格レビュー]",
+   "ast_sha": "d483ecb1eee506a6",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "ceb745d4155ff9b8",
    "reviewed": "2026-10-01",
    "text_sha": "350427abe488301d",
@@ -801,8 +801,8 @@
    "verdict": "ok"
   },
   "EB02-052": {
-   "ast_sha": "818b6f2c3f10f390",
-   "note": "全句がノード・対象・条件と一致 [厳格レビュー]",
+   "ast_sha": "5b9e305dce63d268",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "d32f9cfd624aa1b2",
    "reviewed": "2026-10-01",
    "text_sha": "4d0f895ac0198d2d",
@@ -1089,24 +1089,24 @@
    "verdict": "ok"
   },
   "EB03-028": {
-   "ast_sha": "2390ef5b3d68e6a8",
-   "note": "QG能1: 起動メインのコストで決着（手札条件はコストで変動しない） [厳格レビュー]",
+   "ast_sha": "0ea1233e62615ddb",
+   "note": "全句一致。QG「できる」は起動メインのコスト（任意＝使わない選択）で決着 [厳格レビュー]",
    "probe_sha": "edfecfd5eca0374c",
    "reviewed": "2026-10-01",
    "text_sha": "ca6c56a6985b5e58",
    "verdict": "ok"
   },
   "EB03-029": {
-   "ast_sha": "9058f3a215c637b9",
-   "note": "全句対応 [厳格レビュー]",
+   "ast_sha": "9db2edd75c6185ac",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "51992455a2324de1",
    "reviewed": "2026-10-01",
    "text_sha": "5f87c3146e5f62cd",
    "verdict": "ok"
   },
   "EB03-031": {
-   "ast_sha": "d9748f0932783961",
-   "note": "全句がノード・対象・条件と一致 [厳格レビュー]",
+   "ast_sha": "45622b90688a3a97",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "cc29ac9055b3cd4c",
    "reviewed": "2026-10-01",
    "text_sha": "85c984f8ca8a9ffa",
@@ -1161,8 +1161,8 @@
    "verdict": "ok"
   },
   "EB03-038": {
-   "ast_sha": "5f2d0df9a3a27f2f",
-   "note": "全句対応 [厳格レビュー]",
+   "ast_sha": "ac576b410f4f522e",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "60870a8f5e7ceef9",
    "reviewed": "2026-10-01",
    "text_sha": "8c346f87d17e441a",
@@ -1241,8 +1241,8 @@
    "verdict": "ok"
   },
   "EB03-049": {
-   "ast_sha": "f5854442259a34a8",
-   "note": "全句がノード・対象・条件と一致 [厳格レビュー]",
+   "ast_sha": "d1d8cee97664f594",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "a53d66082de57950",
    "reviewed": "2026-10-01",
    "text_sha": "ec0b6674f49cc7cd",
@@ -1265,8 +1265,8 @@
    "verdict": "ok"
   },
   "EB03-052": {
-   "ast_sha": "6a7fd85a089de509",
-   "note": "HEAL『1枚を』（まで無し）が上に積まれ一致 [厳格レビュー・修正後再判定]",
+   "ast_sha": "dec12d2cfa8012ed",
+   "note": "全句一致。HEAL『1枚を』は上に積む修正済み。QG「できる」は起動メインのコストで決着 [厳格レビュー]",
    "probe_sha": "f698021ad6e88992",
    "reviewed": "2026-10-01",
    "text_sha": "2045790e462f3f26",
@@ -1289,8 +1289,8 @@
    "verdict": "ok"
   },
   "EB03-055": {
-   "ast_sha": "a8ee69ccf138368e",
-   "note": "全句がノード・対象・条件と一致 [厳格レビュー]",
+   "ast_sha": "e1430ca924f7603b",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "8b46f31aa51cdc82",
    "reviewed": "2026-10-01",
    "text_sha": "8f356c7529e52af7",
@@ -1465,8 +1465,8 @@
    "verdict": "ok"
   },
   "EB04-015": {
-   "ast_sha": "812fcc9c0f4539a6",
-   "note": "ブロッカー／KO時 カード1枚レスト(任意コスト)→リーダー魚人族or人魚族条件・手札から緑コスト6以下キャラ1枚まで登場。全句一致 [厳格レビュー]",
+   "ast_sha": "f132c5c18558b853",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "5c41ad92e15d542c",
    "reviewed": "2026-10-01",
    "text_sha": "d96545ab9383d1aa",
@@ -1497,8 +1497,8 @@
    "verdict": "ok"
   },
   "EB04-019": {
-   "ast_sha": "80eb4d8b293853b8",
-   "note": "メイン カード1枚レスト(任意コスト)・リーダーミンク族条件→相手キャラ1枚まで このターンコスト-3／カウンター ミンク族のリーダーかキャラ1枚まで+3000(THIS_BATTLE)。一致 [厳格レビュー]",
+   "ast_sha": "26177fbd2135805f",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "d7d09f684f1a388a",
    "reviewed": "2026-10-01",
    "text_sha": "31b2e917b3171f86",
@@ -1521,8 +1521,8 @@
    "verdict": "ok"
   },
   "EB04-022": {
-   "ast_sha": "5c22fc625f225842",
-   "note": "登場時 手札2枚捨て(任意コスト)・相手手札6枚以上条件→相手が手札2枚をARRANGEでデッキ下(chooser=OPPONENT)／ドン×1アタック時 手札1枚捨て(任意)→相手キャラ1枚までこのターン-2000。一致(条件はコスト前判定だが実害なし) [厳格レビュー]",
+   "ast_sha": "3150c2f22721eab8",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "338a656f6a3ade90",
    "reviewed": "2026-10-01",
    "text_sha": "5232823ca0c47b21",
@@ -1569,8 +1569,8 @@
    "verdict": "ok"
   },
   "EB04-028": {
-   "ast_sha": "5403ace8dd93e9ec",
-   "note": "メイン 手札1枚捨て(任意)・リーダー海軍条件→相手パワー10000以下キャラ2枚まで次の相手エンド終了時までアタック不可／トリガー コスト5以下キャラ1枚まで(ALL)持ち主手札へ。一致 [厳格レビュー]",
+   "ast_sha": "14ca1ac5f7d8222b",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "a8d40990af0c2c44",
    "reviewed": "2026-10-01",
    "text_sha": "c091838adc09fcca",
@@ -1585,8 +1585,8 @@
    "verdict": "ok"
   },
   "EB04-030": {
-   "ast_sha": "6d94ca6419391a26",
-   "note": "全句がノード・対象・条件と一致 [厳格レビュー]",
+   "ast_sha": "5b2263eeb5452a0c",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "da9936f622bd9dfd",
    "reviewed": "2026-10-01",
    "text_sha": "40a8349f87b01cca",
@@ -1601,24 +1601,24 @@
    "verdict": "ok"
   },
   "EB04-032": {
-   "ast_sha": "2641ac3b1b9d888a",
-   "note": "登場時 手札の百獣海賊団カード1枚捨て(任意)→2枚引く／起動メイン ターン1回・ドン2枚レスト(任意)・リーダー百獣海賊団条件→RAMP_DONレスト1。一致 [厳格レビュー]",
+   "ast_sha": "b9ad020fdd2d7dea",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "b1e6da8e022ed28c",
    "reviewed": "2026-10-01",
    "text_sha": "913076bdd3dfede8",
    "verdict": "ok"
   },
   "EB04-033": {
-   "ast_sha": "d09edbfcbec1241a",
-   "note": "全句がノード・対象・条件と一致 [厳格レビュー]",
+   "ast_sha": "7a651195756996c8",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "6c96793176709dc5",
    "reviewed": "2026-10-01",
    "text_sha": "7873094d94e82668",
    "verdict": "ok"
   },
   "EB04-034": {
-   "ast_sha": "23353b3b5f86981e",
-   "note": "全句がノード・対象・条件と一致 [厳格レビュー]",
+   "ast_sha": "7ac540decf1d3696",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "e41ae0d616e1493c",
    "reviewed": "2026-10-01",
    "text_sha": "a9a375423ac744f8",
@@ -1633,8 +1633,8 @@
    "verdict": "ok"
   },
   "EB04-036": {
-   "ast_sha": "9a38968fe2f1e3b0",
-   "note": "全句がノード・対象・条件と一致 [厳格レビュー]",
+   "ast_sha": "2cda883b5d20f347",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "e02d05608716cc96",
    "reviewed": "2026-10-01",
    "text_sha": "66c90eda4bd685d9",
@@ -1705,8 +1705,8 @@
    "verdict": "ok"
   },
   "EB04-045": {
-   "ast_sha": "7843d3c8a76571aa",
-   "note": "[厳格レビュー]",
+   "ast_sha": "ca1af89f113cbc9d",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "0669e3bff6fce685",
    "reviewed": "2026-10-01",
    "text_sha": "bce9457db11ce767",
@@ -1817,8 +1817,8 @@
    "verdict": "ok"
   },
   "EB04-059": {
-   "ast_sha": "a555b88fa524a3ec",
-   "note": "[厳格レビュー]",
+   "ast_sha": "3441e671070a8b6a",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "6b9b6c2502d99432",
    "reviewed": "2026-10-01",
    "text_sha": "d926514504eee42c",
@@ -1849,8 +1849,8 @@
    "verdict": "ok"
   },
   "OP01-002": {
-   "ast_sha": "5113f3b6fb4c236b",
-   "note": "[厳格レビュー]",
+   "ast_sha": "dd6992319bb1d89f",
+   "note": "戻したキャラと異なる色=EXCLUDE_SELECTED_COLOR が selected_card の色を除外、条件は効果側 Branch。FIRED_EMPTY はプローブ盤面都合 [厳格レビュー]",
    "probe_sha": "0c9ed300c468b3f9",
    "reviewed": "2026-10-01",
    "text_sha": "2f8cd01fff0dbb1f",
@@ -2129,8 +2129,8 @@
    "verdict": "ok"
   },
   "OP01-042": {
-   "ast_sha": "81a43533ec44bb6d",
-   "note": "[厳格レビュー]",
+   "ast_sha": "2696ab93a05fbf95",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "d14281b7e62dfcee",
    "reviewed": "2026-10-01",
    "text_sha": "1f3a74f085030cf3",
@@ -2481,8 +2481,8 @@
    "verdict": "ok"
   },
   "OP01-094": {
-   "ast_sha": "4518790ec0efa9af",
-   "note": "本文の各句が対応ノードと一致（誘発・対象・条件・置換とも今の状態で解消） [厳格レビュー]",
+   "ast_sha": "5d32280ce006e546",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "a0cc05d27e141cb0",
    "reviewed": "2026-10-01",
    "text_sha": "47b68b102675706a",
@@ -2793,8 +2793,8 @@
    "verdict": "ok"
   },
   "OP02-018": {
-   "ast_sha": "38629ff3888c071d",
-   "note": "本文の各句が対応ノードと一致（誘発・対象・条件・置換とも今の状態で解消） [厳格レビュー]",
+   "ast_sha": "55d5e87a1c7c2f1c",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "e4f1c12f5bc28aa7",
    "reviewed": "2026-10-01",
    "text_sha": "c07180439e4d1f61",
@@ -3105,12 +3105,12 @@
    "verdict": "ok"
   },
   "OP02-066": {
-   "ast_sha": "97569b5f1ca10622",
-   "note": "本文の各句が対応ノードと一致（誘発・対象・条件・置換とも今の状態で解消） [厳格レビュー]",
+   "ast_sha": "f091a08bf0f63242",
+   "note": "メイン『カード2枚までを引く』の「まで」に対応する欄が無く DRAW 2 が強制（DRAW に is_up_to/任意が無い）。条件のBranch化は解消済み・エンジン/パーサ",
    "probe_sha": "4ec700a2595a022f",
    "reviewed": "2026-10-01",
    "text_sha": "354409a78c466f02",
-   "verdict": "ok"
+   "verdict": "ng"
   },
   "OP02-067": {
    "ast_sha": "9a0f9973269cc40a",
@@ -3137,8 +3137,8 @@
    "verdict": "ok"
   },
   "OP02-070": {
-   "ast_sha": "f86ce7248abf46e1",
-   "note": "起動メイン ステージREST(コスト)→リーダー名エンポリオ・イワンコフ条件で1枚引く→手札1枚捨て(必須)→手札3枚まで捨てる。一致 [厳格レビュー]",
+   "ast_sha": "aad3cc9ca188c0b5",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "03534141cc84169f",
    "reviewed": "2026-10-01",
    "text_sha": "72e6f8b2e0705262",
@@ -3625,8 +3625,8 @@
    "verdict": "ok"
   },
   "OP03-020": {
-   "ast_sha": "d0a39e0ab3a1d8a3",
-   "note": "FIRED_EMPTY はプローブにイベント無しのため。コスト2ドン+レスト、条件、LOOK5→イベント1枚まで→残りデッキ下 対応 [厳格レビュー]",
+   "ast_sha": "ffedb6dbcb6466f9",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "3de4ea937b4b5536",
    "reviewed": "2026-10-01",
    "text_sha": "304296dc6a5c232d",
@@ -3929,8 +3929,8 @@
    "verdict": "ok"
   },
   "OP03-063": {
-   "ast_sha": "3038c632551c7270",
-   "note": "全句対応(句→ノード一致・QUALIFIER_GAPなし) [厳格レビュー]",
+   "ast_sha": "35716d68a70d5451",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "eb20b83bc01c9f94",
    "reviewed": "2026-10-01",
    "text_sha": "90932b2019b6c45f",
@@ -4009,8 +4009,8 @@
    "verdict": "ok"
   },
   "OP03-073": {
-   "ast_sha": "b3be301ae118a3fe",
-   "note": "全句対応(句→ノード一致・QUALIFIER_GAPなし) [厳格レビュー]",
+   "ast_sha": "2613c80970756c1e",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "6daf070bd2f4c03d",
    "reviewed": "2026-10-01",
    "text_sha": "263fda236753b3c2",
@@ -4025,8 +4025,8 @@
    "verdict": "ok"
   },
   "OP03-075": {
-   "ast_sha": "e8fb61ddd076ef58",
-   "note": "全句対応(句→ノード一致・QUALIFIER_GAPなし) [厳格レビュー]",
+   "ast_sha": "eadd2cb07a75dd86",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "c16178bb9b4b908f",
    "reviewed": "2026-10-01",
    "text_sha": "551a716ba6dedfc9",
@@ -4041,8 +4041,8 @@
    "verdict": "ok"
   },
   "OP03-077": {
-   "ast_sha": "a02999b2e1114e4d",
-   "note": "ドン×2/アタック時・REST_DON2+捨て・ライフ1以下条件・HEAL任意が一致 [厳格レビュー・修正後再判定]",
+   "ast_sha": "a6c7c73c045e6345",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "9f8f7a09adf33ec0",
    "reviewed": "2026-10-01",
    "text_sha": "d3328165b1371e2f",
@@ -4137,8 +4137,8 @@
    "verdict": "ok"
   },
   "OP03-093": {
-   "ast_sha": "059b2bc810476cc7",
-   "note": "本文の各句と解析・エンジン挙動が一致（再レビュー） [厳格レビュー]",
+   "ast_sha": "f389d91d25197cb1",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "92ed6233c8ab3aaf",
    "reviewed": "2026-10-01",
    "text_sha": "87336e22d8b33393",
@@ -4177,8 +4177,8 @@
    "verdict": "ok"
   },
   "OP03-098": {
-   "ast_sha": "ff0c9fe7cd50f7fd",
-   "note": "本文の各句と解析・エンジン挙動が一致（再レビュー） [厳格レビュー]",
+   "ast_sha": "b9c81c6f9c5e537e",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "ceb53d0fb346fba6",
    "reviewed": "2026-10-01",
    "text_sha": "9644201ec57e4ee5",
@@ -4537,8 +4537,8 @@
    "verdict": "ok"
   },
   "OP04-026": {
-   "ast_sha": "f17d38cbe4c0560c",
-   "note": "[厳格レビュー]",
+   "ast_sha": "c77228ca851d8b13",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "e0ae22cb6cc51e64",
    "reviewed": "2026-10-01",
    "text_sha": "83a0933f44333c59",
@@ -4641,8 +4641,8 @@
    "verdict": "ok"
   },
   "OP04-039": {
-   "ast_sha": "5513c6957bb5179c",
-   "note": "[厳格レビュー]",
+   "ast_sha": "c8b7d6db444477ee",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "ab7e8c7d8295bcb3",
    "reviewed": "2026-10-01",
    "text_sha": "d66993ce75e9a58c",
@@ -4793,32 +4793,32 @@
    "verdict": "ok"
   },
   "OP04-059": {
-   "ast_sha": "ced90b684a93d6e9",
-   "note": "全句対応 [厳格レビュー]",
+   "ast_sha": "938f321b8380da7a",
+   "note": "全句がノード・対象・条件と一致（効果側条件=Branch・直った内容で解消） [厳格レビュー]",
    "probe_sha": "3b94124b768886de",
    "reviewed": "2026-10-01",
    "text_sha": "3c53493a74fab2c3",
    "verdict": "ok"
   },
   "OP04-060": {
-   "ast_sha": "4af3f3503bf4d0b6",
-   "note": "本文の各句と解析・エンジン挙動が一致（再レビュー） [厳格レビュー]",
+   "ast_sha": "229d8325e946f50c",
+   "note": "能力0: コスト ドン-2→Branch(リーダー特徴B・W)内HEAL1任意。能力1: ターン1回ドン-1→DRAW1→DISCARD1。全句一致 [厳格レビュー]",
    "probe_sha": "e6c8b00099604a5c",
    "reviewed": "2026-10-01",
    "text_sha": "4ec805e50b5b5ca9",
    "verdict": "ok"
   },
   "OP04-061": {
-   "ast_sha": "150f179296163017",
-   "note": "QUALIFIER_GAP(任意)は ACTIVATE_MAIN の起動自体が任意で、then 側は本文でも強制＝決着 [厳格レビュー]",
+   "ast_sha": "cec404a770a09c42",
+   "note": "コストTRASH自身→Branch(リーダーW7)内RAMP_DON1 RESTED。一致(起動メインは任意が自明) [厳格レビュー]",
    "probe_sha": "5213e33e43fd573f",
    "reviewed": "2026-10-01",
    "text_sha": "0a0b437361f7b627",
    "verdict": "ok"
   },
   "OP04-063": {
-   "ast_sha": "a63345aba564c9ac",
-   "note": "全句対応を確認 [厳格レビュー]",
+   "ast_sha": "56dfa0734d03e8ea",
+   "note": "ターン1回見出し=能力条件、コストRETURN_DON1→Branch(W7)内BUFF+1000 THIS_BATTLE リーダーかキャラ1枚まで。一致 [厳格レビュー]",
    "probe_sha": "1cbb54eb80839a4a",
    "reviewed": "2026-10-01",
    "text_sha": "d39f7aa075976873",
@@ -5025,8 +5025,8 @@
    "verdict": "ok"
   },
   "OP04-091": {
-   "ast_sha": "3d4826e3bbb1fd87",
-   "note": "全句対応を確認 [厳格レビュー]",
+   "ast_sha": "488620ca184cd073",
+   "note": "コストREST自リーダー→Branch(ドレスローザ)内 KO(cost1以下)→TRASH_FROM_DECK2 の両方が条件下。一致 [厳格レビュー]",
    "probe_sha": "4b2d8f04da36e907",
    "reviewed": "2026-10-01",
    "text_sha": "8955c6c405fe3ae2",
@@ -5081,8 +5081,8 @@
    "verdict": "ok"
   },
   "OP04-098": {
-   "ast_sha": "303ad15aef14401e",
-   "note": "全句対応を確認 [厳格レビュー]",
+   "ast_sha": "ad140a3087280a7f",
+   "note": "コストDISCARD ワノ国2枚→Branch(ライフ1以下)内HEAL1。一致 [厳格レビュー]",
    "probe_sha": "09d1a70a85c97bae",
    "reviewed": "2026-10-01",
    "text_sha": "e9ed144a77fee2ca",
@@ -5353,16 +5353,16 @@
    "verdict": "ok"
   },
   "OP05-016": {
-   "ast_sha": "b3e2ad2dcdd76deb",
-   "note": "全句対応・QUALIFIER_GAP決着済み [厳格レビュー]",
+   "ast_sha": "842114ec033c6d9d",
+   "note": "能力0: 条件パワー7000以上(能力条件・コスト無し)→BLOCKER_DISABLE THIS_BATTLE。能力1: コストDISCARD→Branch(多色)内PLAY_CARD自身。一致 [厳格レビュー]",
    "probe_sha": "00c119820c3d3b7b",
    "reviewed": "2026-10-01",
    "text_sha": "712a8e0123d5c504",
    "verdict": "ok"
   },
   "OP05-017": {
-   "ast_sha": "83fd61ed5d0d52b0",
-   "note": "全句対応・QUALIFIER_GAP決着済み [厳格レビュー]",
+   "ast_sha": "5b988c475e510ede",
+   "note": "能力0: パワー7000以上→KO power3000以下1枚まで。能力1: 同上のトリガー。一致 [厳格レビュー]",
    "probe_sha": "fc19dfa588aea787",
    "reviewed": "2026-10-01",
    "text_sha": "23e00a272908a48b",
@@ -5689,8 +5689,8 @@
    "verdict": "ok"
   },
   "OP05-060": {
-   "ast_sha": "0dde9797803da27e",
-   "note": "cost/条件OR(EQ0,GE3)/RAMP_DON active（既定=active）全て一致 [厳格レビュー]",
+   "ast_sha": "a78cce04f530a795",
+   "note": "ターン1回見出し、コストライフ上→手札、Branch(ドン0枚OR3枚以上)内RAMP_DON1 アクティブ。一致 [厳格レビュー]",
    "probe_sha": "b221d9a3b1abc91b",
    "reviewed": "2026-10-01",
    "text_sha": "a051ea3ddc67b7ff",
@@ -5857,8 +5857,8 @@
    "verdict": "ok"
   },
   "OP05-082": {
-   "ast_sha": "060d9480049e13d5",
-   "note": "全句がノード・対象・条件と一致（再レビュー・修正後） [厳格レビュー]",
+   "ast_sha": "bc1721fc49a3a18a",
+   "note": "コストREST自身+トラッシュ2枚デッキ下(ARRANGE)→Branch(相手手札6枚以上)内 相手が手札1枚捨てる(chooser=OPP)。一致 [厳格レビュー]",
    "probe_sha": "f2cfb99b29ae0d10",
    "reviewed": "2026-10-01",
    "text_sha": "0af1aac2d1fb7776",
@@ -6577,8 +6577,8 @@
    "verdict": "ok"
   },
   "OP06-060": {
-   "ast_sha": "d42501081b7b5468",
-   "note": "起動メイン コスト RETURN_DON1+自身TRASH(できる=起動の任意性で決着)/LEADER_TRAIT ジェルマ66/手札かトラッシュのcost7 イチジ1まで登場 一致 [厳格レビュー]",
+   "ast_sha": "f58d2ecbff2b420d",
+   "note": "コスト ドン-1+自身トラッシュ→Branch(ジェルマ66)内PLAY_CARD 手札/トラッシュ cost7 名前イチジ。一致 [厳格レビュー]",
    "probe_sha": "0428a8975b040d54",
    "reviewed": "2026-10-01",
    "text_sha": "353cfd52f87c51da",
@@ -6601,16 +6601,16 @@
    "verdict": "ok"
   },
   "OP06-063": {
-   "ast_sha": "00a3a42a4dc0de73",
-   "note": "ON_PLAY コスト手札1捨て任意/DON compare LE0/トラッシュ power4000以下 ヴィンスモーク家 キャラ1まで手札 一致 [厳格レビュー]",
+   "ast_sha": "d707cd4dec61e431",
+   "note": "コストDISCARD1→Branch(自ドン<=相手ドン: DON_COUNT_COMPARE LE offset0)内MOVE_CARD トラッシュ→手札 power4000以下ヴィンスモーク家キャラ1枚まで。一致 [厳格レビュー]",
    "probe_sha": "aa2da9b0093dd0f3",
    "reviewed": "2026-10-01",
    "text_sha": "45e216873c47c7ac",
    "verdict": "ok"
   },
   "OP06-064": {
-   "ast_sha": "9ba1060944eeb55d",
-   "note": "060と同型 cost5 ニジ（できる=起動の任意性）一致 [厳格レビュー]",
+   "ast_sha": "93d117a969a3c1d0",
+   "note": "OP06-060と同型(cost5ニジ)。一致 [厳格レビュー]",
    "probe_sha": "74d570934306e3d3",
    "reviewed": "2026-10-01",
    "text_sha": "3bd3bb4bc619252c",
@@ -6625,8 +6625,8 @@
    "verdict": "ok"
   },
   "OP06-066": {
-   "ast_sha": "43b28da149def54c",
-   "note": "060と同型 cost4 ヨンジ 一致 [厳格レビュー]",
+   "ast_sha": "6560c7f64675ad2b",
+   "note": "OP06-060と同型(cost4ヨンジ)。一致 [厳格レビュー]",
    "probe_sha": "aef743d234575f05",
    "reviewed": "2026-10-01",
    "text_sha": "57eac6eebd4b05ad",
@@ -6641,8 +6641,8 @@
    "verdict": "ok"
   },
   "OP06-068": {
-   "ast_sha": "6070abe3724ba07d",
-   "note": "060と同型 cost4 レイジュ 一致 [厳格レビュー]",
+   "ast_sha": "d7ab8fcc2f96f046",
+   "note": "OP06-060と同型(cost4レイジュ)。一致 [厳格レビュー]",
    "probe_sha": "0a5506ae8060feb0",
    "reviewed": "2026-10-01",
    "text_sha": "328d3aeb89b7cbbf",
@@ -6657,8 +6657,8 @@
    "verdict": "ok"
   },
   "OP06-071": {
-   "ast_sha": "d188957e3880b613",
-   "note": "ON_PLAY コスト ドン-1 任意/LEADER_TRAIT FILM/トラッシュ FILM キャラ cost4以下2まで手札 一致 [厳格レビュー]",
+   "ast_sha": "c6cacdeb6003774c",
+   "note": "コストドン-1→Branch(FILM)内MOVE_CARD トラッシュFILMキャラcost4以下2枚まで→手札。一致 [厳格レビュー]",
    "probe_sha": "675ba725000c0e1d",
    "reviewed": "2026-10-01",
    "text_sha": "dfa72ec16e9ab676",
@@ -6865,8 +6865,8 @@
    "verdict": "ok"
   },
   "OP06-098": {
-   "ast_sha": "1591e830090bc1b3",
-   "note": "全句対応・QUALIFIER_GAPなし（条件/対象/値/期間一致） [厳格レビュー]",
+   "ast_sha": "eec84c3be8591210",
+   "note": "コスト➀REST_DON+ステージREST→Branch(スリラーバーク)内PLAY_CARD トラッシュcost2以下 RESTED。一致 [厳格レビュー]",
    "probe_sha": "187a658371e1acb1",
    "reviewed": "2026-10-01",
    "text_sha": "338d5f95b6b37248",
@@ -7377,8 +7377,8 @@
    "verdict": "ok"
   },
   "OP07-047": {
-   "ast_sha": "b6add7ad57190b5c",
-   "note": "全句対応。 [厳格レビュー]",
+   "ast_sha": "3136268d51c3ba4a",
+   "note": "コストBOUNCE自身→Branch(相手手札6枚以上)内 相手が手札1枚デッキ下(chooser=OPP)。一致 [厳格レビュー]",
    "probe_sha": "07e6c8df6ac8828e",
    "reviewed": "2026-10-01",
    "text_sha": "73ac293eea0532e2",
@@ -7465,16 +7465,16 @@
    "verdict": "ok"
   },
   "OP07-058": {
-   "ast_sha": "476f7b032f97f3ad",
-   "note": "[厳格レビュー]",
+   "ast_sha": "abb7060ae8715470",
+   "note": "コストDISCARD1+ステージREST→Branch(九蛇海賊団)内BOUNCE 自分のアマゾン・リリーor九蛇キャラ1枚まで。一致 [厳格レビュー]",
    "probe_sha": "1b2145cd059f9397",
    "reviewed": "2026-10-01",
    "text_sha": "71f52974fd745cd4",
    "verdict": "ok"
   },
   "OP07-059": {
-   "ast_sha": "f287bebb65c8505e",
-   "note": "[厳格レビュー]",
+   "ast_sha": "be01d104bdd8bf0f",
+   "note": "コストドン-3→Branch(フォクシー海賊団キャラ3枚以上)内 SELECT(相手レストのリーダー+キャラ1枚まで)→FREEZE。一致 [厳格レビュー]",
    "probe_sha": "b6ccc3ed6398a7b6",
    "reviewed": "2026-10-01",
    "text_sha": "532324ff483618e2",
@@ -7489,8 +7489,8 @@
    "verdict": "ok"
   },
   "OP07-061": {
-   "ast_sha": "2413c86ddba734ce",
-   "note": "[厳格レビュー]",
+   "ast_sha": "c56aeffde800a1a3",
+   "note": "コストドン-1→Branch(ヴィンスモーク家)内DRAW1。一致 [厳格レビュー]",
    "probe_sha": "eb20b83bc01c9f94",
    "reviewed": "2026-10-01",
    "text_sha": "f11a6ebb7d0ac464",
@@ -7505,8 +7505,8 @@
    "verdict": "ok"
   },
   "OP07-063": {
-   "ast_sha": "b9a892aa6240dc9d",
-   "note": "[厳格レビュー]",
+   "ast_sha": "1c297c7b5a340633",
+   "note": "コストドン-1→Branch(フォクシー)内ATTACK_DISABLE 相手cost6以下1枚まで UNTIL_NEXT_TURN_END。一致 [厳格レビュー]",
    "probe_sha": "cda7fb305cfc8a72",
    "reviewed": "2026-10-01",
    "text_sha": "98b731a0d34e734f",
@@ -7577,16 +7577,16 @@
    "verdict": "ok"
   },
   "OP07-073": {
-   "ast_sha": "f197e23cacb7459d",
-   "note": "[厳格レビュー]",
+   "ast_sha": "d59b0b97acdbee2f",
+   "note": "ターン1回、コストドン-3→Branch(相手キャラ3枚以上)内ACTIVE自身。一致 [厳格レビュー]",
    "probe_sha": "6f599921341af19b",
    "reviewed": "2026-10-01",
    "text_sha": "5f54f9b96ebdb8ff",
    "verdict": "ok"
   },
   "OP07-074": {
-   "ast_sha": "2897239194fcf50f",
-   "note": "全句対応・QUALIFIER_GAP決着済み [厳格レビュー]",
+   "ast_sha": "e3a1685c61eb1b1f",
+   "note": "コストTRASH自身→Branch(フォクシー)内RAMP_DON1 RESTED。一致 [厳格レビュー]",
    "probe_sha": "680254c7d73f8380",
    "reviewed": "2026-10-01",
    "text_sha": "3ae8f17b08f88091",
@@ -7849,8 +7849,8 @@
    "verdict": "ok"
   },
   "OP07-109": {
-   "ast_sha": "a3ef0512bbf58089",
-   "note": "全句対応。QG任意: 起動メイン自体が任意で支払いも任意扱い。LIFE条件が能力全体に掛かるがLIFE>2では効果が全て空なので実害なし [厳格レビュー]",
+   "ast_sha": "12ec07d7e2f5f8d1",
+   "note": "能力0: コストTRASH自身→Branch(ライフ2以下)内KO cost4以下→DRAW1(その後も条件下)。能力1: トリガーKO cost4以下。一致 [厳格レビュー]",
    "probe_sha": "545b3a86ad3cdfe1",
    "reviewed": "2026-10-01",
    "text_sha": "a9bf64c679d36642",
@@ -8041,8 +8041,8 @@
    "verdict": "ok"
   },
   "OP08-016": {
-   "ast_sha": "dc3bcb24113c8147",
-   "note": "全句対応（QUALIFIER_GAPは dest_position=CHOOSE／起動任意で決着） [厳格レビュー]",
+   "ast_sha": "0b00575d939fef8e",
+   "note": "コストREST自身→Branch(リーダー名チョッパー)内BUFF+2000 THIS_TURN チョッパー全て。一致 [厳格レビュー]",
    "probe_sha": "1d431a43bded9506",
    "reviewed": "2026-10-01",
    "text_sha": "e94ca189f743925f",
@@ -8161,8 +8161,8 @@
    "verdict": "ok"
   },
   "OP08-032": {
-   "ast_sha": "9bad7e66cdad4ecf",
-   "note": "全句対応（QUALIFIER_GAPは dest_position=CHOOSE／起動任意で決着） [厳格レビュー]",
+   "ast_sha": "e525b0cea0f50c20",
+   "note": "コストREST自身→Branch(ミンク族)内ACTIVE_DON1。一致 [厳格レビュー]",
    "probe_sha": "3086fda8fd1830da",
    "reviewed": "2026-10-01",
    "text_sha": "840d503dd5ca7c80",
@@ -8209,24 +8209,24 @@
    "verdict": "ok"
   },
   "OP08-039": {
-   "ast_sha": "b3cd9b149015b42e",
-   "note": "全句対応（QUALIFIER_GAPは dest_position=CHOOSE／起動任意で決着） [厳格レビュー]",
+   "ast_sha": "ea2dbacf04f5f929",
+   "note": "能力0: コストREST→Branch(ミンク族)内ACTIVE_DON1。能力1: ターン終了時 ミンク族キャラ1枚までACTIVE。一致 [厳格レビュー]",
    "probe_sha": "d1dc9a4d8b3f138d",
    "reviewed": "2026-10-01",
    "text_sha": "c9a373040a18f5d1",
    "verdict": "ok"
   },
   "OP08-040": {
-   "ast_sha": "f75fd00746e31c16",
-   "note": " [厳格レビュー]",
+   "ast_sha": "840de5e252e766a2",
+   "note": "コストREVEAL 白ひげ特徴手札2枚→Branch(リーダー白ひげ特徴)内BOUNCE 相手cost4以下1枚まで。一致 [厳格レビュー]",
    "probe_sha": "3cce59f021c904a6",
    "reviewed": "2026-10-01",
    "text_sha": "afd49712608477f2",
    "verdict": "ok"
   },
   "OP08-041": {
-   "ast_sha": "7e310d8d2c69335f",
-   "note": "全句対応（QUALIFIER_GAPは dest_position=CHOOSE／起動任意で決着） [厳格レビュー]",
+   "ast_sha": "4875870e125991a6",
+   "note": "コストBOUNCE自身→Branch(九蛇)内DECK_BOTTOM 相手cost1以下1枚まで。一致 [厳格レビュー]",
    "probe_sha": "3f3a79db2212b8c0",
    "reviewed": "2026-10-01",
    "text_sha": "72f40cc99a5c7212",
@@ -8361,16 +8361,16 @@
    "verdict": "ok"
   },
   "OP08-059": {
-   "ast_sha": "7a8538cb2c10d88f",
-   "note": "QG任意は起動メインのコスト全払いで表現済み(前例 OP07-003)・自身トラッシュ→手札コスト7以下キング1枚まで登場・リーダー百獣海賊団/ドン10 一致 [厳格レビュー]",
+   "ast_sha": "e358afab0e509ccf",
+   "note": "コストTRASH自身→Branch(百獣 AND ドン10枚)内PLAY_CARD 手札cost7以下キング。一致 [厳格レビュー]",
    "probe_sha": "3d0728b1f7b2af7e",
    "reviewed": "2026-10-01",
    "text_sha": "a1f5e5e36c479005",
    "verdict": "ok"
   },
   "OP08-060": {
-   "ast_sha": "ddbcd5b4a7fa40a8",
-   "note": "全句対応・QUALIFIER_GAPなし（条件/対象/値/期間一致） [厳格レビュー]",
+   "ast_sha": "8572f1e4e5188b85",
+   "note": "コストドン-1→Branch(相手ドン5枚以上)内GRANT_KEYWORD速攻 THIS_TURN 自身。括弧注釈は説明のみ。一致 [厳格レビュー]",
    "probe_sha": "5adc5cc6f56b2921",
    "reviewed": "2026-10-01",
    "text_sha": "371f9f61ff510c33",
@@ -8385,8 +8385,8 @@
    "verdict": "ok"
   },
   "OP08-062": {
-   "ast_sha": "f6eb94a0a638978f",
-   "note": "QG任意は起動メインのコスト全払いで表現済み・条件ビッグ・マム・手札カタクリ cost_min3/cost_max_dynamic=相手ドン数 1枚まで登場 一致 [厳格レビュー]",
+   "ast_sha": "065fd0074cd76de9",
+   "note": "コストTRASH自身→Branch(ビッグ・マム)内PLAY_CARD 手札カタクリ cost3以上・相手ドン数以下(動的)。一致 [厳格レビュー]",
    "probe_sha": "e1ab222c6a2711e0",
    "reviewed": "2026-10-01",
    "text_sha": "ebac00b9a05cd382",
@@ -8497,16 +8497,16 @@
    "verdict": "ok"
   },
   "OP08-077": {
-   "ast_sha": "9e5d4630c79a0358",
-   "note": "全句対応・QUALIFIER_GAPなし（条件/対象/値/期間一致） [厳格レビュー]",
+   "ast_sha": "024f143741eb7dd1",
+   "note": "コストドン-2→Branch(百獣OR BM)内KO cost6以下2枚まで。一致 [厳格レビュー]",
    "probe_sha": "0186940e8cc7dab1",
    "reviewed": "2026-10-01",
    "text_sha": "c22122f5c47178c3",
    "verdict": "ok"
   },
   "OP08-079": {
-   "ast_sha": "7097ea3889f1bf22",
-   "note": "全句対応・QUALIFIER_GAPなし（条件/対象/値/期間一致） [厳格レビュー]",
+   "ast_sha": "00cb266c96ca33dc",
+   "note": "ターン1回、コストDISCARD→Branch(登場したターン)内 TRASH相手cost7以下1枚まで→相手DISCARD1。一致 [厳格レビュー]",
    "probe_sha": "0dd101bb45feb032",
    "reviewed": "2026-10-01",
    "text_sha": "7964c689fa90064b",
@@ -8665,8 +8665,8 @@
    "verdict": "ok"
   },
   "OP08-101": {
-   "ast_sha": "0cfa050a82a98d0a",
-   "note": "HEAL『1枚を』（まで無し）が上に積まれ、ターン終了時の遅延も一致 [厳格レビュー・修正後再判定]",
+   "ast_sha": "5341acfe01eb308b",
+   "note": "ターン1回、コストライフ上→トラッシュ→Branch(BM)内 ターン終了時DEFERRED HEAL1。一致 [厳格レビュー]",
    "probe_sha": "c881f0c7bcabdb43",
    "reviewed": "2026-10-01",
    "text_sha": "d50b037db75eda3d",
@@ -8737,8 +8737,8 @@
    "verdict": "ok"
   },
   "OP08-111": {
-   "ast_sha": "61060cd8aed9dfe5",
-   "note": "ドン1・アタック時 相手BLOCKER_DISABLE THIS_BATTLE(前例OP02-061)／トリガー 手札1枚捨て任意・ライフ2以下→自身登場 一致 [厳格レビュー]",
+   "ast_sha": "d03ed4f41acf6d3e",
+   "note": "能力0: ドン×1見出し条件→BLOCKER_DISABLE。能力1: コストDISCARD→Branch(ライフ2以下)内PLAY_CARD自身。一致 [厳格レビュー]",
    "probe_sha": "98d31fdbf7cf6f88",
    "reviewed": "2026-10-01",
    "text_sha": "dcbdf93c5ff92e76",
@@ -8753,16 +8753,16 @@
    "verdict": "ok"
   },
   "OP08-113": {
-   "ast_sha": "20df0113e5d50d72",
-   "note": "トリガー 手札1枚捨て任意・ライフ2以下→自身登場→相手コスト3以下1枚までKO 一致 [厳格レビュー]",
+   "ast_sha": "315dd1d25fc58bf9",
+   "note": "コストDISCARD→Branch(ライフ2以下)内PLAY_CARD自身→KO cost3以下(両方条件下)。一致 [厳格レビュー]",
    "probe_sha": "b3c0104bb9dfe8a5",
    "reviewed": "2026-10-01",
    "text_sha": "2f2def8c85f7f8df",
    "verdict": "ok"
   },
   "OP08-114": {
-   "ast_sha": "5ca882e92e2bddb9",
-   "note": "ドン1・ライフ相手より少ない(LT)→PREVENT_LEAVE BATTLE_KO(属性(斬)はraw_textをrules.rsが読む)＋自身+2000／トリガー 一致 [厳格レビュー]",
+   "ast_sha": "f135d0bc248d1e76",
+   "note": "属性(斬)限定のバトルKO耐性はエンジンが効果の raw_text から読む（battle_opponent_filter）＝パーサの対象欄に無くても本文どおり。実対局の検証テストあり [厳格レビュー]",
    "probe_sha": "6ca3bce57e0437eb",
    "reviewed": "2026-10-01",
    "text_sha": "65f0256ac0804946",
@@ -8881,8 +8881,8 @@
    "verdict": "ok"
   },
   "OP09-011": {
-   "ast_sha": "97bd7c58706c1a1a",
-   "note": "起動メイン 自身レストコスト・リーダー赤髪海賊団条件→相手キャラ1枚までTHIS_TURN-2000 一致 [厳格レビュー]",
+   "ast_sha": "e0d213bcce7aa3e9",
+   "note": "コストREST自身→Branch(赤髪)内BUFF-2000 THIS_TURN 相手キャラ1枚まで。一致 [厳格レビュー]",
    "probe_sha": "de4f2b022fa96afa",
    "reviewed": "2026-10-01",
    "text_sha": "92d78eb49027454c",
@@ -8953,8 +8953,8 @@
    "verdict": "ok"
   },
   "OP09-021": {
-   "ast_sha": "f50375041204def2",
-   "note": "起動メイン ステージレストコスト・リーダー赤髪海賊団条件→相手キャラ1枚までTHIS_TURN-1000 一致 [厳格レビュー]",
+   "ast_sha": "fc46279b2797eb29",
+   "note": "コストREST自身→Branch(赤髪)内BUFF-1000。一致 [厳格レビュー]",
    "probe_sha": "c612cbe2893161c0",
    "reviewed": "2026-10-01",
    "text_sha": "088e2097cddcff38",
@@ -9241,8 +9241,8 @@
    "verdict": "ok"
   },
   "OP09-060": {
-   "ast_sha": "3e7e7a73d13eb079",
-   "note": "全句がノード・対象・条件と一致（再レビュー・修正後） [厳格レビュー]",
+   "ast_sha": "b633a97ac1bd017a",
+   "note": "コスト手札2枚デッキ下(ARRANGE)+ステージREST→Branch(クロスギルド)内DRAW2。一致 [厳格レビュー]",
    "probe_sha": "3ed2a01b81fe9c77",
    "reviewed": "2026-10-01",
    "text_sha": "4847e1aaaa8e06b8",
@@ -9345,8 +9345,8 @@
    "verdict": "ok"
   },
   "OP09-075": {
-   "ast_sha": "6522964977b4f891",
-   "note": "全句対応 [厳格レビュー]",
+   "ast_sha": "604d5bb235a9e685",
+   "note": "コストライフ上→手札→Branch(キッド海賊団)内RAMP_DON1 アクティブ。一致 [厳格レビュー]",
    "probe_sha": "179d59403582ed3d",
    "reviewed": "2026-10-01",
    "text_sha": "aa6017fd712954d4",
@@ -9369,8 +9369,8 @@
    "verdict": "ok"
   },
   "OP09-078": {
-   "ast_sha": "1e9b3fa6fdfe01b1",
-   "note": "全句対応 [厳格レビュー]",
+   "ast_sha": "6295263112be4f25",
+   "note": "コストドン-2+DISCARD1→Branch(麦わら)内BUFF+4000 THIS_BATTLE→DRAW2(その後も条件下)。一致 [厳格レビュー]",
    "probe_sha": "67a768117628b1b2",
    "reviewed": "2026-10-01",
    "text_sha": "80654763874210bc",
@@ -9401,8 +9401,8 @@
    "verdict": "ok"
   },
   "OP09-083": {
-   "ast_sha": "3c9834f52d057a98",
-   "note": "全句対応 [厳格レビュー]",
+   "ast_sha": "3b5a15829a501526",
+   "note": "能力0: コストREST→Branch(黒ひげ)内コスト-3 THIS_TURN。能力1: KO時DRAW1。一致 [厳格レビュー]",
    "probe_sha": "2e9d5a43e7e4f487",
    "reviewed": "2026-10-01",
    "text_sha": "f79e41b12eabeaec",
@@ -9449,16 +9449,16 @@
    "verdict": "ok"
   },
   "OP09-089": {
-   "ast_sha": "973b22aa460080be",
-   "note": "全句対応（QG任意=起動メインのコストで決着） [厳格レビュー]",
+   "ast_sha": "b5ccd71be799e41d",
+   "note": "コストDISCARD+TRASH自身→Branch(黒ひげ)内DRAW1→コスト-2 THIS_TURN 相手1枚まで。一致 [厳格レビュー]",
    "probe_sha": "d840b5bbc41ed633",
    "reviewed": "2026-10-01",
    "text_sha": "c0ac525a6ead10f0",
    "verdict": "ok"
   },
   "OP09-090": {
-   "ast_sha": "0b9223d8ee197e12",
-   "note": "全句対応 [厳格レビュー]",
+   "ast_sha": "ca910931b23842fc",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "06f013175c441061",
    "reviewed": "2026-10-01",
    "text_sha": "272c87c94df2337f",
@@ -9473,8 +9473,8 @@
    "verdict": "ok"
   },
   "OP09-092": {
-   "ast_sha": "3ca8c6391beed884",
-   "note": "全句対応 [厳格レビュー]",
+   "ast_sha": "fd184dd75351a6f6",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "f7d3fc9c811d7c30",
    "reviewed": "2026-10-01",
    "text_sha": "f41f65216a80cfaa",
@@ -9825,8 +9825,8 @@
    "verdict": "ok"
   },
   "OP10-021": {
-   "ast_sha": "0aebe66623f85067",
-   "note": "全句一致・QUALIFIER_GAP決着済み（OP10-028任意は起動メインで表現） [厳格レビュー]",
+   "ast_sha": "af70ff53a14d7d4f",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "4e88855e3ac22203",
    "reviewed": "2026-10-01",
    "text_sha": "e37b9c30afd56577",
@@ -10089,8 +10089,8 @@
    "verdict": "ok"
   },
   "OP10-057": {
-   "ast_sha": "fdd68d996bdf0f94",
-   "note": "全句対応・全QUALIFIER決着 [厳格レビュー]",
+   "ast_sha": "2a8bc4607e9ba6ac",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "05bf3b8ac400b377",
    "reviewed": "2026-10-01",
    "text_sha": "b6212ef3143d8d54",
@@ -10129,8 +10129,8 @@
    "verdict": "ok"
   },
   "OP10-062": {
-   "ast_sha": "330d29a04040908f",
-   "note": " [厳格レビュー]",
+   "ast_sha": "c957a0ad80dfd12a",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "55ae3cfef1068fe0",
    "reviewed": "2026-10-01",
    "text_sha": "71f6468c4c2093e9",
@@ -10217,16 +10217,16 @@
    "verdict": "ok"
   },
   "OP10-075": {
-   "ast_sha": "fd7c5865cbc82b5b",
-   "note": "全句対応・全QUALIFIER決着 [厳格レビュー]",
+   "ast_sha": "4d08dfd9789e4dc0",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "6079dd74af091c3c",
    "reviewed": "2026-10-01",
    "text_sha": "80e58da338577549",
    "verdict": "ok"
   },
   "OP10-076": {
-   "ast_sha": "b5e1684c70c7b666",
-   "note": "全句対応・全QUALIFIER決着 [厳格レビュー]",
+   "ast_sha": "61ba7b616af712b4",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "14050b92302a337f",
    "reviewed": "2026-10-01",
    "text_sha": "07b822023a074df4",
@@ -10305,8 +10305,8 @@
    "verdict": "ok"
   },
   "OP10-087": {
-   "ast_sha": "85f626972b8e700d",
-   "note": "全句対応。相手手札5枚以上の条件は能力全体を支配する既定仕様で一致 [厳格レビュー]",
+   "ast_sha": "554dd0e0979576a4",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "a64fd6f8921f577a",
    "reviewed": "2026-10-01",
    "text_sha": "e23a01f53fcbf624",
@@ -10489,16 +10489,16 @@
    "verdict": "ok"
   },
   "OP10-113": {
-   "ast_sha": "a99aa83c7ef33d1a",
-   "note": "全句対応・QG無し／決着済み。一致 [厳格レビュー]",
+   "ast_sha": "c3adfbf81235bc98",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "1d641db19c98c7f4",
    "reviewed": "2026-10-01",
    "text_sha": "d7570a4600cb68b7",
    "verdict": "ok"
   },
   "OP10-114": {
-   "ast_sha": "4538935dbe391640",
-   "note": "全句対応・QG無し／決着済み。一致 [厳格レビュー]",
+   "ast_sha": "cbf53ca453bc2714",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "dcfc6a9b9dc9b74d",
    "reviewed": "2026-10-01",
    "text_sha": "6a323f4755ded15a",
@@ -10529,8 +10529,8 @@
    "verdict": "ok"
   },
   "OP10-118": {
-   "ast_sha": "a2fd06c733b1f788",
-   "note": "全句がノード・対象・条件と一致（再レビュー・修正後） [厳格レビュー]",
+   "ast_sha": "1ce11b6cfb3f1efd",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "e1a55a71421aadd9",
    "reviewed": "2026-10-01",
    "text_sha": "098a1b7cf02878bb",
@@ -10585,16 +10585,16 @@
    "verdict": "ok"
   },
   "OP11-007": {
-   "ast_sha": "af734ea191325103",
-   "note": "全句対応・QG無し／決着済み。一致 [厳格レビュー]",
+   "ast_sha": "4e777cbfb364d5fc",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "37bc0c1b40563868",
    "reviewed": "2026-10-01",
    "text_sha": "b06154bf95e909a9",
    "verdict": "ok"
   },
   "OP11-008": {
-   "ast_sha": "6719c718fad9a948",
-   "note": "全句対応・QG無し／決着済み。一致 [厳格レビュー]",
+   "ast_sha": "bd5092b7a94a32ac",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "1cb044190cc77b1a",
    "reviewed": "2026-10-01",
    "text_sha": "7ea91118409aaae4",
@@ -10753,8 +10753,8 @@
    "verdict": "ok"
   },
   "OP11-034": {
-   "ast_sha": "6f8abb8bc3d6cd68",
-   "note": "起動メイン コスト自身REST／LEADER_TRAIT any-of 魚人族/人魚族→相手cost<=3キャラ1まで PREVENT_REST 次の相手ターン終了時まで。一致 [厳格レビュー]",
+   "ast_sha": "1472a55a140cb4cc",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "78f0f06e19940dfa",
    "reviewed": "2026-10-01",
    "text_sha": "1cac46200ec95248",
@@ -10953,8 +10953,8 @@
    "verdict": "ok"
   },
   "OP11-063": {
-   "ast_sha": "7e19ebed961a7b98",
-   "note": "全句対応を確認 [厳格レビュー] [厳格レビュー]",
+   "ast_sha": "cdf412e0d5a77427",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "918a94840dc1ec1b",
    "reviewed": "2026-10-01",
    "text_sha": "1c70d4b52afe00a2",
@@ -10985,8 +10985,8 @@
    "verdict": "ok"
   },
   "OP11-069": {
-   "ast_sha": "b4975f3221ef7e99",
-   "note": "全句対応を確認 [厳格レビュー] [厳格レビュー]",
+   "ast_sha": "25f9f6491a977ef6",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "179d59403582ed3d",
    "reviewed": "2026-10-01",
    "text_sha": "3062ca76cb0fdcea",
@@ -11065,8 +11065,8 @@
    "verdict": "ok"
   },
   "OP11-080": {
-   "ast_sha": "579e0c1cc4137e14",
-   "note": "全句対応を確認 [厳格レビュー] [厳格レビュー]",
+   "ast_sha": "f92dbbc7adf8ece0",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "8eb61c0d309baa0c",
    "reviewed": "2026-10-01",
    "text_sha": "3df962adb6219e61",
@@ -11081,8 +11081,8 @@
    "verdict": "ok"
   },
   "OP11-082": {
-   "ast_sha": "aeb3646741c09e2c",
-   "note": " [厳格レビュー]",
+   "ast_sha": "46eb5932cf23f069",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "e59d72b3c0ad5420",
    "reviewed": "2026-10-01",
    "text_sha": "14a3ef9e304b7ad1",
@@ -11281,8 +11281,8 @@
    "verdict": "ok"
   },
   "OP11-114": {
-   "ast_sha": "dfbdd6a495b9cab1",
-   "note": "ドン3レストコスト・ライフ合計条件・ORIGINAL_COST KO・カウンターが一致 [厳格レビュー・修正後再判定]",
+   "ast_sha": "54f2188745b7b2b8",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "ee90a52662c7bae7",
    "reviewed": "2026-10-01",
    "text_sha": "8ddd6d3a4fa6b91e",
@@ -11497,8 +11497,8 @@
    "verdict": "ok"
   },
   "OP12-028": {
-   "ast_sha": "1865f1d8bee3b20b",
-   "note": "全句対応・QG決着済み(できる=起動の任意/ARRANGE_DECK等で表現済み) [厳格レビュー]",
+   "ast_sha": "0e807e3103ba932d",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "44f7ee09ea1b9d64",
    "reviewed": "2026-10-01",
    "text_sha": "69c238e462d92b6b",
@@ -11753,8 +11753,8 @@
    "verdict": "ok"
   },
   "OP12-069": {
-   "ast_sha": "fe7cf75dab88e8d5",
-   "note": "全句一致 [厳格レビュー]",
+   "ast_sha": "820a8b1dee4ef9a3",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "1023978ee1bd3199",
    "reviewed": "2026-10-01",
    "text_sha": "97198e3d9124f2e5",
@@ -11793,8 +11793,8 @@
    "verdict": "ok"
   },
   "OP12-074": {
-   "ast_sha": "a4a1c6a912b1eacc",
-   "note": "登場時 手札からイベント1枚捨てる任意→リーダーサンジ→RAMP_DON アクティブ1枚まで。全句一致 [厳格レビュー]",
+   "ast_sha": "a94ffac9ecb5583b",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "bab48cb28cc2a23f",
    "reviewed": "2026-10-01",
    "text_sha": "e822a4e58871e7a8",
@@ -11833,8 +11833,8 @@
    "verdict": "ok"
   },
   "OP12-080": {
-   "ast_sha": "31b8d19eac1a0291",
-   "note": "起動メイン 自身デッキ下(QG任意=起動の任意)→リーダーサンジ→LOOK3→イベント1枚まで手札→残りデッキ下／トリガー 登場。一致 [厳格レビュー]",
+   "ast_sha": "ea79dc3cc4f17e3e",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "0f351795640fa3c4",
    "reviewed": "2026-10-01",
    "text_sha": "ae3eb7f48785a804",
@@ -11873,8 +11873,8 @@
    "verdict": "ok"
   },
   "OP12-087": {
-   "ast_sha": "f8009be1cd29c94e",
-   "note": "全句一致 [厳格レビュー]",
+   "ast_sha": "52835e9e3d2c49d5",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "429ba33e55c49bc9",
    "reviewed": "2026-10-01",
    "text_sha": "545fe3053f1e6c3f",
@@ -11913,8 +11913,8 @@
    "verdict": "ok"
   },
   "OP12-094": {
-   "ast_sha": "4a54ea2e6796a476",
-   "note": "全句がノード・対象・条件と一致（再レビュー・修正後） [厳格レビュー]",
+   "ast_sha": "ae25602141dba51f",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "a204ea9a51f44ce0",
    "reviewed": "2026-10-01",
    "text_sha": "bfdb3bc9af37da69",
@@ -12065,8 +12065,8 @@
    "verdict": "ok"
   },
   "OP12-117": {
-   "ast_sha": "9d0b5b29fef0cb1b",
-   "note": "全句対応 [厳格レビュー]",
+   "ast_sha": "c8330a2f2e7aa585",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "265394822e9fcfb8",
    "reviewed": "2026-10-01",
    "text_sha": "81bbb534cffeedbf",
@@ -12481,8 +12481,8 @@
    "verdict": "ok"
   },
   "OP13-057": {
-   "ast_sha": "9f48463e2538cab1",
-   "note": "ok。ライフ1枚以下条件・コスト任意・リーダーアタック時のブロッカー不可(OPP_NO_BLOCK_VS_LEADER)・カウンター+3000が一致 [厳格レビュー]",
+   "ast_sha": "b2dd640dbdc92011",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "2575b6a11b7cfdfa",
    "reviewed": "2026-10-01",
    "text_sha": "2414f16400da3e52",
@@ -12609,24 +12609,24 @@
    "verdict": "ok"
   },
   "OP13-075": {
-   "ast_sha": "9faf04aa247cccfb",
-   "note": "全句対応を確認 [厳格レビュー]",
+   "ast_sha": "f614febb28bdb4ef",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "a772ce800e14b037",
    "reviewed": "2026-10-01",
    "text_sha": "7ad2999229545677",
    "verdict": "ok"
   },
   "OP13-076": {
-   "ast_sha": "c8e742bf56471ccf",
-   "note": "全句対応を確認 [厳格レビュー]",
+   "ast_sha": "296e04b943d8844d",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "8df52d1704dad62f",
    "reviewed": "2026-10-01",
    "text_sha": "211d8fe5afc8b010",
    "verdict": "ok"
   },
   "OP13-077": {
-   "ast_sha": "3475975d35476771",
-   "note": "全句対応を確認 [厳格レビュー]",
+   "ast_sha": "a8c2a4c2ed7be797",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "0f20c388ee97d287",
    "reviewed": "2026-10-01",
    "text_sha": "0eadae8319b4fe7d",
@@ -12745,8 +12745,8 @@
    "verdict": "ok"
   },
   "OP13-095": {
-   "ast_sha": "445e6358cbdf167b",
-   "note": "捨てコスト・天竜人のみ条件・ORIGINAL_COST 2枚KO が一致 [厳格レビュー・修正後再判定]",
+   "ast_sha": "90ad3481c0c7d126",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "1dc338e61e20a28f",
    "reviewed": "2026-10-01",
    "text_sha": "f9c652b57eca9c0a",
@@ -12761,16 +12761,16 @@
    "verdict": "ok"
   },
   "OP13-097": {
-   "ast_sha": "7a9ef8eb95e5b888",
-   "note": "ドン5レスト・天竜人のみ条件・ORIGINAL_COST KO・カウンターが一致 [厳格レビュー・修正後再判定]",
+   "ast_sha": "1de3a26a29798184",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "13468775005ac437",
    "reviewed": "2026-10-01",
    "text_sha": "bf257c3a709c3204",
    "verdict": "ok"
   },
   "OP13-098": {
-   "ast_sha": "db35b59a7c15038c",
-   "note": "全句対応を確認 [厳格レビュー]",
+   "ast_sha": "cd736905b7249e0a",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "570966663a2c6838",
    "reviewed": "2026-10-01",
    "text_sha": "96f096cfa018860f",
@@ -12793,16 +12793,16 @@
    "verdict": "ok"
   },
   "OP13-102": {
-   "ast_sha": "f017f481f2fc06d9",
-   "note": "QUALIFIER_GAP 任意: 起動メインは使用者が起動を選ぶのでコスト任意と同義で欠落でない。全句対応 [厳格レビュー]",
+   "ast_sha": "91afe7cfac0a666a",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "ef862f66c6137a53",
    "reviewed": "2026-10-01",
    "text_sha": "b613cd8e333476ba",
    "verdict": "ok"
   },
   "OP13-104": {
-   "ast_sha": "b61d51f757b3fb51",
-   "note": "全句がノード・条件と一致 [厳格レビュー]",
+   "ast_sha": "40a7ca475fada058",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "2f545d5100002d42",
    "reviewed": "2026-10-01",
    "text_sha": "efca2c78a74098c6",
@@ -13057,8 +13057,8 @@
    "verdict": "ok"
   },
   "OP14-020": {
-   "ast_sha": "8080158176133fbe",
-   "note": "全句対応 [厳格レビュー]",
+   "ast_sha": "04219ec318cbac57",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "94c7bd65c2cd28a0",
    "reviewed": "2026-10-01",
    "text_sha": "ad3ddb45e2360b96",
@@ -13473,8 +13473,8 @@
    "verdict": "ok"
   },
   "OP14-076": {
-   "ast_sha": "1058332b5044ec08",
-   "note": "全句対応・QUALIFIER_GAP 決着済み [厳格レビュー]",
+   "ast_sha": "aca7888ea8ae02f7",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "b6309637e0eaccc6",
    "reviewed": "2026-10-01",
    "text_sha": "a35139ad72980538",
@@ -13489,8 +13489,8 @@
    "verdict": "ok"
   },
   "OP14-078": {
-   "ast_sha": "7907ec745e68b50b",
-   "note": "全句がノード・対象・条件と一致(そのカード参照は selected_card 既定保存) [厳格レビュー]",
+   "ast_sha": "cbfe5dc8c8085c48",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "84aba4d9fe6edda2",
    "reviewed": "2026-10-01",
    "text_sha": "6751c3fbf1db0557",
@@ -14049,8 +14049,8 @@
    "verdict": "ok"
   },
   "OP15-032": {
-   "ast_sha": "a9487c03bba5ce57",
-   "note": "登場時レスト・起動メインの元々コスト8以下ACTIVE(ORIGINAL_COST)・リーダー条件とも一致（起動コストの任意は発動自体が任意で実害なし） [厳格レビュー・修正後再判定]",
+   "ast_sha": "3bed8b30e0641f30",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "cdc364e0159830cb",
    "reviewed": "2026-10-01",
    "text_sha": "794bf50189d8db68",
@@ -14129,8 +14129,8 @@
    "verdict": "ok"
   },
   "OP15-042": {
-   "ast_sha": "30f5b3bb1f693007",
-   "note": "全句一致 [厳格レビュー]",
+   "ast_sha": "87f64c82395b571a",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "491240d8a41c21c9",
    "reviewed": "2026-10-01",
    "text_sha": "1a1517cd3e070427",
@@ -14289,8 +14289,8 @@
    "verdict": "ok"
   },
   "OP15-064": {
-   "ast_sha": "ddfb95b6a8101e6f",
-   "note": "全句一致 [厳格レビュー]",
+   "ast_sha": "470f1a3c7cc9c457",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "ff6e12b481721305",
    "reviewed": "2026-10-01",
    "text_sha": "81a4ecf9731ec613",
@@ -14353,8 +14353,8 @@
    "verdict": "ok"
   },
   "OP15-072": {
-   "ast_sha": "39c102b6b7d250f9",
-   "note": "全句一致 [厳格レビュー]",
+   "ast_sha": "02c5d2aa12f9da18",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "4619a1fc90734091",
    "reviewed": "2026-10-01",
    "text_sha": "a584063fadb39170",
@@ -14369,24 +14369,24 @@
    "verdict": "ok"
   },
   "OP15-074": {
-   "ast_sha": "1c03b37c97b6a57a",
-   "note": "「リーダーが「エネル」の場合」は能力全体（引く句＋その後の句）に係る＝既定の裁定どおり（ユーザ確認 2026-10-01） [厳格レビュー]",
+   "ast_sha": "a0fda46000b436f0",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "8b4040dda6189283",
    "reviewed": "2026-10-01",
    "text_sha": "a068d4710260eaf8",
    "verdict": "ok"
   },
   "OP15-075": {
-   "ast_sha": "9a280ebd419bf4fa",
-   "note": "再レビュー: 全句がノードと一致（反応型誘発・置換の確認先行・対象/条件の修正で解消） [厳格レビュー]",
+   "ast_sha": "c926fa3ace9e9fe1",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "0edfbb3194368aba",
    "reviewed": "2026-10-01",
    "text_sha": "8cd5943737379669",
    "verdict": "ok"
   },
   "OP15-076": {
-   "ast_sha": "d61e41f51110d197",
-   "note": "再レビュー: 全句がノードと一致（反応型誘発・置換の確認先行・対象/条件の修正で解消） [厳格レビュー]",
+   "ast_sha": "495a392edde94778",
+   "note": "全句が対応ノードと一致・コスト後条件は Branch [厳格レビュー]",
    "probe_sha": "16fc204ba2645aa3",
    "reviewed": "2026-10-01",
    "text_sha": "da3b9905a27bb2a8",
@@ -14457,8 +14457,8 @@
    "verdict": "ok"
   },
   "OP15-085": {
-   "ast_sha": "e11fd52b85b3f933",
-   "note": "登場時mill3／起動メイン 自身トラッシュ(QG任意は起動メインのコストで決着)・リーダー麦わら条件(コストの影響なし)・除外名付き麦わらキャラ1まで手札。一致 [厳格レビュー]",
+   "ast_sha": "a48865b808476899",
+   "note": "全句一致。自身トラッシュcostは起動が任意なのでできるは決着・条件はBranch [厳格レビュー]",
    "probe_sha": "28efd29d248d627e",
    "reviewed": "2026-10-01",
    "text_sha": "bd97e77055b73484",
@@ -14529,16 +14529,16 @@
    "verdict": "ok"
   },
   "OP15-095": {
-   "ast_sha": "0ef9178063d554f5",
-   "note": "全句対応・全QG決着。一致 [厳格レビュー]",
+   "ast_sha": "4a80257aa6da87af",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "0eec22c5dff64262",
    "reviewed": "2026-10-01",
    "text_sha": "37b0495c14a5b0ce",
    "verdict": "ok"
   },
   "OP15-096": {
-   "ast_sha": "96abf672deee57dc",
-   "note": "全句対応・全QG決着。一致 [厳格レビュー]",
+   "ast_sha": "7296be740aae4592",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "2d30297cba4cf15e",
    "reviewed": "2026-10-01",
    "text_sha": "929f5e735b9c4f51",
@@ -14633,8 +14633,8 @@
    "verdict": "ok"
   },
   "OP15-109": {
-   "ast_sha": "43e8682a6f731ffd",
-   "note": "ライフ→手札コスト任意・HEAL任意・コスト5以下空島登場とも一致 [厳格レビュー・修正後再判定]",
+   "ast_sha": "0f384e0eb0102546",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "e76d8805b5e25aa3",
    "reviewed": "2026-10-01",
    "text_sha": "5f7ce5f7ee6a5482",
@@ -14801,8 +14801,8 @@
    "verdict": "ok"
   },
   "OP16-012": {
-   "ast_sha": "8bba48c5316d1c19",
-   "note": "ブロッカー／登場時 ドン1レスト(任意)→条件AND(リーダー特徴赤髪海賊団,場のドン10枚)→手札「シャンクス」1まで登場。一致 [厳格レビュー]",
+   "ast_sha": "ad53e85c656ec79f",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "e11ba9e2e5a98a9c",
    "reviewed": "2026-10-01",
    "text_sha": "f338593f8f13b410",
@@ -14985,8 +14985,8 @@
    "verdict": "ok"
   },
   "OP16-038": {
-   "ast_sha": "06f1d2b0eb1798b3",
-   "note": "メイン ドン6レスト(任意コスト)・条件FIELD_COUNT GE5(名前違い・インペルダウン特徴キャラ)→リーダーとキャラ全てACTIVE(ALL)／カウンター リーダー+3000 THIS_BATTLE。一致 [厳格レビュー]",
+   "ast_sha": "fb923122cdc8ed31",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "c0555179106ceb73",
    "reviewed": "2026-10-01",
    "text_sha": "29034919b6193100",
@@ -15049,8 +15049,8 @@
    "verdict": "ok"
   },
   "OP16-047": {
-   "ast_sha": "150becf2593b700d",
-   "note": "起動メイン 自身レスト(コスト)・条件 相手手札8枚以上→相手が手札2枚を好きな順番でデッキ下(chooser=OPPONENT,ARRANGE)。一致 [厳格レビュー]",
+   "ast_sha": "923fce555c756ddc",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "97109cefa9e6ef8d",
    "reviewed": "2026-10-01",
    "text_sha": "2d3c6a54d6fc91ea",
@@ -15177,8 +15177,8 @@
    "verdict": "ok"
   },
   "OP16-065": {
-   "ast_sha": "7bf870ed5bebc735",
-   "note": "再レビュー: 全句がノードと一致（反応型誘発・置換の確認先行・対象/条件の修正で解消） [厳格レビュー]",
+   "ast_sha": "42158dce51adfb94",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "fb58237086d4595c",
    "reviewed": "2026-10-01",
    "text_sha": "767e584854e16233",
@@ -15217,8 +15217,8 @@
    "verdict": "ok"
   },
   "OP16-070": {
-   "ast_sha": "f27674e22f2d8921",
-   "note": "ブロッカー(keyword)／登場時REST_DON2(任意)・LEADER_TRAIT海軍→RAMP_DON1まで RESTED。一致 [厳格レビュー]",
+   "ast_sha": "f10cbb819b3b28ce",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "fe33106a59435a58",
    "reviewed": "2026-10-01",
    "text_sha": "31a6bd77517eb47d",
@@ -15305,8 +15305,8 @@
    "verdict": "ok"
   },
   "OP16-081": {
-   "ast_sha": "9da9a050ba5f4ad1",
-   "note": "起動メイン コストこのキャラをレスト→FIELD_COUNT(ALL・キャラcost_min8≥1)→相手キャラ1枚までTHIS_TURN-2000。一致(主語無しのALLは本文どおり) [厳格レビュー]",
+   "ast_sha": "5ea032972551a54e",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "5fae9f1b789e89a1",
    "reviewed": "2026-10-01",
    "text_sha": "0da3d49d07dd6f10",
@@ -15329,8 +15329,8 @@
    "verdict": "ok"
   },
   "OP16-084": {
-   "ast_sha": "840e8e3c211bd126",
-   "note": "再レビュー: 全句がノードと一致（反応型誘発・置換の確認先行・対象/条件の修正で解消） [厳格レビュー]",
+   "ast_sha": "49601e39d65ee1ee",
+   "note": "全句一致。コスト自身トラッシュのcost_min=20は自キャラのコスト条件として正（FIRED_EMPTYはプローブの自キャラ<20による）・条件はコスト後でBranchに残る [厳格レビュー]",
    "probe_sha": "6bb62d5011041d43",
    "reviewed": "2026-10-01",
    "text_sha": "0fe9ce57dc488743",
@@ -15345,8 +15345,8 @@
    "verdict": "ok"
   },
   "OP16-087": {
-   "ast_sha": "12ba5f1b06b7adab",
-   "note": "登場時 このキャラトラッシュ(任意cost)→LEADER_TRAITワノ国→ドロー1→「光月モモの助」1枚までTHIS_TURNコスト+20。一致 [厳格レビュー]",
+   "ast_sha": "6d75f012821a49df",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "b8c1a44eac7f2390",
    "reviewed": "2026-10-01",
    "text_sha": "1e00b31fefd8a858",
@@ -15449,8 +15449,8 @@
    "verdict": "ok"
   },
   "OP16-100": {
-   "ast_sha": "54133d7dd6f8f2cb",
-   "note": "全句対応・構造一致・QUALIFIER_GAPなし [厳格レビュー]",
+   "ast_sha": "f31e46f4ce556605",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "c944d1fd8f70eddd",
    "reviewed": "2026-10-01",
    "text_sha": "3c0438c5ea615963",
@@ -16057,8 +16057,8 @@
    "verdict": "ok"
   },
   "OP17-061": {
-   "ast_sha": "7bdf8ddc2cd2dff5",
-   "note": " [厳格レビュー]",
+   "ast_sha": "77b2a7458cbfd992",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "c9ba82c153bd5375",
    "reviewed": "2026-10-01",
    "text_sha": "8e82f7360542cf51",
@@ -16073,8 +16073,8 @@
    "verdict": "ok"
   },
   "OP17-063": {
-   "ast_sha": "9f4b652250d8402b",
-   "note": " [厳格レビュー]",
+   "ast_sha": "691e3e9e6eed9471",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "7a8f6499be845730",
    "reviewed": "2026-10-01",
    "text_sha": "f9e21ac8dba3bbdf",
@@ -16097,32 +16097,32 @@
    "verdict": "ok"
   },
   "OP17-066": {
-   "ast_sha": "fd8abed4ebd077ea",
-   "note": " [厳格レビュー]",
+   "ast_sha": "32e288386e152795",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "e761a89b207ae0a0",
    "reviewed": "2026-10-01",
    "text_sha": "50f8cfc467325a06",
    "verdict": "ok"
   },
   "OP17-067": {
-   "ast_sha": "e84b9b4a4b74fbdc",
-   "note": " [厳格レビュー]",
+   "ast_sha": "d4c0f3ac3edaaad3",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "918a94840dc1ec1b",
    "reviewed": "2026-10-01",
    "text_sha": "8b38c0b6a4418314",
    "verdict": "ok"
   },
   "OP17-068": {
-   "ast_sha": "b390d156b746b85d",
-   "note": "全句対応・QUALIFIER_GAP なし（表: tables_b50.md） [厳格レビュー]",
+   "ast_sha": "020951bcb1c631b0",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "5bdb1ba291aa3eaa",
    "reviewed": "2026-10-01",
    "text_sha": "9c2c98ea41da9f63",
    "verdict": "ok"
   },
   "OP17-069": {
-   "ast_sha": "b18c74ff3a4f1803",
-   "note": " [厳格レビュー]",
+   "ast_sha": "92162e59db8560bc",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "98cdd48dd7c4d485",
    "reviewed": "2026-10-01",
    "text_sha": "b1a8e66d1ba65b10",
@@ -16145,8 +16145,8 @@
    "verdict": "ok"
   },
   "OP17-073": {
-   "ast_sha": "dfced6dd2d12957e",
-   "note": "全句対応・QUALIFIER_GAP なし（表: tables_b50.md） [厳格レビュー]",
+   "ast_sha": "854414cdf190c982",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "14050b92302a337f",
    "reviewed": "2026-10-01",
    "text_sha": "8fe5c8307ddbf5ca",
@@ -16177,16 +16177,16 @@
    "verdict": "ok"
   },
   "OP17-077": {
-   "ast_sha": "59ffcb9196eab755",
-   "note": " [厳格レビュー]",
+   "ast_sha": "0902f5e16a8bddab",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "075ddc38ef9758fa",
    "reviewed": "2026-10-01",
    "text_sha": "8dfb8a3552f7f20b",
    "verdict": "ok"
   },
   "OP17-078": {
-   "ast_sha": "2c80d9c045ca1ad9",
-   "note": "全句対応・QUALIFIER_GAP なし（表: tables_b50.md） [厳格レビュー]",
+   "ast_sha": "054062a66fb119ae",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "fb663e08129dedff",
    "reviewed": "2026-10-01",
    "text_sha": "4f826522282e6d4d",
@@ -16337,8 +16337,8 @@
    "verdict": "ok"
   },
   "OP17-098": {
-   "ast_sha": "acc39429360d895e",
-   "note": "全句対応・QUALIFIER_GAP なし（表: tables_b50.md） [厳格レビュー]",
+   "ast_sha": "a0c9f12d8a27bf40",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "6136eb074cbc0656",
    "reviewed": "2026-10-01",
    "text_sha": "dcd89a136d2a5ede",
@@ -16377,8 +16377,8 @@
    "verdict": "ok"
   },
   "OP17-104": {
-   "ast_sha": "abd7f84a3f8691b5",
-   "note": "ドン2レストコスト任意・条件・HEAL 上・任意・トリガー一致 [厳格レビュー・修正後再判定]",
+   "ast_sha": "503d124841fdbe72",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "9b7c7cbd463d5b71",
    "reviewed": "2026-10-01",
    "text_sha": "923148e2cc60deea",
@@ -17377,8 +17377,8 @@
    "verdict": "ok"
   },
   "P-151": {
-   "ast_sha": "6442d76050af1970",
-   "note": "登場時 手札1枚捨て(任意コスト)・リーダー海軍(先頭ゲート全体支配)→RAMP_DON1 RESTED→LOOK5→海軍1枚まで手札→残り好きな順デッキ下。一致 [厳格レビュー]",
+   "ast_sha": "9e396d5d7270cb34",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "b0e9f800bee64d9a",
    "reviewed": "2026-10-01",
    "text_sha": "59646e3cb3ac9575",
@@ -17465,8 +17465,8 @@
    "verdict": "ok"
   },
   "PRB02-010": {
-   "ast_sha": "bd2b98bc995ea092",
-   "note": "ok [厳格レビュー]",
+   "ast_sha": "b636b27b1067f480",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "4271a4be2c2733ee",
    "reviewed": "2026-10-01",
    "text_sha": "e27f56cd2ced10fd",
@@ -17945,8 +17945,8 @@
    "verdict": "ok"
   },
   "ST04-017": {
-   "ast_sha": "c3fdc42c84a66ea2",
-   "note": "全句対応・QUALIFIER_GAP無し [厳格レビュー]",
+   "ast_sha": "519f0aab9551cc1e",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "f87bdf57636a7e6d",
    "reviewed": "2026-10-01",
    "text_sha": "6934cccdd828692b",
@@ -17985,8 +17985,8 @@
    "verdict": "ok"
   },
   "ST05-005": {
-   "ast_sha": "e6dfdf68b2b27538",
-   "note": "ok [厳格レビュー]",
+   "ast_sha": "97fc21a4b2133b28",
+   "note": "全句一致。DON_COUNT_COMPAREの向き(相手>自分=自分<相手)正・条件はBranch [厳格レビュー]",
    "probe_sha": "6310f5af301a21b1",
    "reviewed": "2026-10-01",
    "text_sha": "fe934b9ad77f24dd",
@@ -18153,8 +18153,8 @@
    "verdict": "ok"
   },
   "ST06-017": {
-   "ast_sha": "bd85cfe54106360a",
-   "note": "登場時 相手キャラ1まで コスト-1／起動メイン REST self cost・LEADER_TRAIT 海軍・同効果 一致 [厳格レビュー]",
+   "ast_sha": "d1618e866b7a3cf9",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "0ca921f37caa7947",
    "reviewed": "2026-10-01",
    "text_sha": "c0516e3761426b6e",
@@ -18513,8 +18513,8 @@
    "verdict": "ok"
   },
   "ST10-010": {
-   "ast_sha": "cd5c9d212dc695fb",
-   "note": "RETURN_DON cost・相手手札7枚以上・DISCARD 相手手札2 chooser=OPPONENT 一致 [厳格レビュー]",
+   "ast_sha": "8ca6bdf4f3d65ca1",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "80fefaf5a0fedb3a",
    "reviewed": "2026-10-01",
    "text_sha": "90076bfec3baae18",
@@ -18649,8 +18649,8 @@
    "verdict": "ok"
   },
   "ST12-007": {
-   "ast_sha": "bc71a48b46606854",
-   "note": "登場時 ②(REST_DON2・任意)→相手ライフ3以上→自分コスト4以下属性斬キャラ1までACTIVE。一致 [厳格レビュー]",
+   "ast_sha": "c6a24b623014ba54",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "209fc38f31d36f31",
    "reviewed": "2026-10-01",
    "text_sha": "c6796d451ea9cd11",
@@ -18737,8 +18737,8 @@
    "verdict": "ok"
   },
   "ST13-003": {
-   "ast_sha": "02fcea69ca486635",
-   "note": "表向きライフ→デッキ下の裁定はエンジンが読む(RULE_PROCESSING)・手札捨てcost・ライフ0・コスト5キャラ2枚までライフ上表向き 一致 [厳格レビュー]",
+   "ast_sha": "6370a8ae5ff5a46b",
+   "note": "全句一致。表向きライフ→デッキ下はエンジンがraw_textで処理・ライフ0条件で移動元LIFE混入は無害 [厳格レビュー]",
    "probe_sha": "44a01b0ff08215b0",
    "reviewed": "2026-10-01",
    "text_sha": "6c55d846184c0b06",
@@ -18785,8 +18785,8 @@
    "verdict": "ok"
   },
   "ST13-009": {
-   "ast_sha": "9e4115dc0f159e40",
-   "note": "FACE_UP_LIFE DOWN cost・相手手札7枚以上・相手ライフ上1まで トラッシュ 一致 [厳格レビュー]",
+   "ast_sha": "46449ebf7af13b7b",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "f6959f9fd002d6d4",
    "reviewed": "2026-10-01",
    "text_sha": "ebdd803eda06eb07",
@@ -19073,8 +19073,8 @@
    "verdict": "ok"
   },
   "ST17-002": {
-   "ast_sha": "e02177ba1291fc42",
-   "note": "コスト:自分キャラ1枚バウンス(任意)→リーダー特徴条件→コスト4以下キャラ1まで手札へ 対応(条件がコスト前評価になる点のみ差異だが実害なし) [厳格レビュー]",
+   "ast_sha": "60edc9e442d8c87a",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "86b627cf7f693fc3",
    "reviewed": "2026-10-01",
    "text_sha": "78ed5e64ab2cf777",
@@ -19153,8 +19153,8 @@
    "verdict": "ok"
   },
   "ST19-002": {
-   "ast_sha": "3772ccd9304c80b1",
-   "note": "黒海軍2枚捨て(任意)→リーダー海軍条件→3枚引く 対応 [厳格レビュー]",
+   "ast_sha": "cb6de3fd2b1fe66b",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "bfb1bfcad1f1ffc8",
    "reviewed": "2026-10-01",
    "text_sha": "d883cf2a8301e853",
@@ -19441,8 +19441,8 @@
    "verdict": "ok"
   },
   "ST23-003": {
-   "ast_sha": "e1837156380efc21",
-   "note": "全句対応・QUALIFIER_GAP は起動の任意性／raw読みで決着(tables_b60.md) [厳格レビュー]",
+   "ast_sha": "cdf0a9cb35a41a8c",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "92ed6233c8ab3aaf",
    "reviewed": "2026-10-01",
    "text_sha": "cd5a312aab7ed8d4",
@@ -19529,8 +19529,8 @@
    "verdict": "ok"
   },
   "ST25-004": {
-   "ast_sha": "0715e014175d04fb",
-   "note": "全句対応・QUALIFIER_GAP は起動の任意性／raw読みで決着(tables_b60.md) [厳格レビュー]",
+   "ast_sha": "0ba970d7cb48cd74",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "49716cc7dc254ec9",
    "reviewed": "2026-10-01",
    "text_sha": "523228b1a9b5cabb",
@@ -19577,24 +19577,24 @@
    "verdict": "ok"
   },
   "ST26-005": {
-   "ast_sha": "76200da9482252f0",
-   "note": "全句対応・QUALIFIER_GAP は起動の任意性／raw読みで決着(tables_b60.md) [厳格レビュー]",
+   "ast_sha": "a2130835feb0bf79",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "bdd217010cb061c6",
    "reviewed": "2026-10-01",
    "text_sha": "76800dbf322f96bc",
    "verdict": "ok"
   },
   "ST27-001": {
-   "ast_sha": "008b0423e03bc8cf",
-   "note": "全句対応・QUALIFIER_GAP は起動の任意性／raw読みで決着(tables_b60.md) [厳格レビュー]",
+   "ast_sha": "2d259b34e60ab75f",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "48f8dc590a26be37",
    "reviewed": "2026-10-01",
    "text_sha": "99733fe9cbf495fc",
    "verdict": "ok"
   },
   "ST27-002": {
-   "ast_sha": "881b0ce5d2ab40d7",
-   "note": "全句対応・QUALIFIER_GAP は起動の任意性／raw読みで決着(tables_b60.md) [厳格レビュー]",
+   "ast_sha": "c95712bf330293bc",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "0a64a2f7968d2431",
    "reviewed": "2026-10-01",
    "text_sha": "17f2ad6bba834da3",
@@ -19993,8 +19993,8 @@
    "verdict": "ok"
   },
   "ST33-002": {
-   "ast_sha": "4e350badcd917c5f",
-   "note": "手札1捨てcost任意・条件相手手札>=6・相手選択DISCARD1・KO時PLAY_CARD(コスト4以下/海軍/キャラ/まで)全対応 [厳格レビュー]",
+   "ast_sha": "eab7e49f90f8c82c",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "d88828df88860d5c",
    "reviewed": "2026-10-01",
    "text_sha": "76a417051b63b7e9",
@@ -20081,8 +20081,8 @@
    "verdict": "ok"
   },
   "ST35-003": {
-   "ast_sha": "f6cc5f28198f2ea8",
-   "note": "cost任意TRASH_FROM_DECK2→条件相手手札>=7→相手選択DISCARD1対応 [厳格レビュー]",
+   "ast_sha": "06fba178ad7346b9",
+   "note": "全句が対応ノードと一致（コスト後の条件は効果側Branch・修正で解消/確認） [再レビュー re8] [厳格レビュー]",
    "probe_sha": "b3adfbe77747f277",
    "reviewed": "2026-10-01",
    "text_sha": "2915f2e64e89032d",
