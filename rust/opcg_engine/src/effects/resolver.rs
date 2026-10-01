@@ -1173,7 +1173,11 @@ impl Resolver {
                             let m = masters.get(card.master);
                             let cost = card.current_cost(m);
                             let power = card.get_power(m, card.owner == s.state().turn_player);
-                            query.cost_max.map_or(true, |x| cost <= x)
+                            // 「選んだキャラのコストがそのキャラに付与されているドン!!の枚数と同じ場合」(OP15-031)。
+                            let don_eq = !query.flags.iter().any(|f| f == "REF_COST_EQ_ATTACHED_DON")
+                                || cost == card.attached_don;
+                            don_eq
+                                && query.cost_max.map_or(true, |x| cost <= x)
                                 && query.cost_min.map_or(true, |x| cost >= x)
                                 && query.power_max.map_or(true, |x| power <= x)
                                 && query.power_min.map_or(true, |x| power >= x)

@@ -585,3 +585,44 @@ fn the_test_table_travels_with_the_master_table() {
         .contains("発動できる"));
     let _ = M_LEADER;
 }
+
+/// 「Aしてもよい。そうした場合、B」: A を断ったら（行わなかったので）B も行わない。
+/// 断った後も直前の成否が「成立」のまま残ると、そうした場合の枝が走ってしまう（OP11-024）。
+#[test]
+fn declining_an_optional_action_skips_the_following_so_branch() {
+    use super::ast::{
+        ActionType, CompareOperator, CondValue, Condition, ConditionType, EffectNode, PlayerRef,
+        TriggerType,
+    };
+    for (accepted, expected) in [(true, 3), (false, 0)] {
+        let (mut masters, mut s, card) = board_with(testkit::AB_DRAW1, 10);
+        let mut opt = testkit::action(ActionType::Draw, 1);
+        opt.is_optional = true;
+        let so = EffectNode::Branch {
+            condition: Some(Condition {
+                ty: ConditionType::PrevAction,
+                target: None,
+                player: PlayerRef::SelfP,
+                operator: CompareOperator::Eq,
+                value: CondValue::Str("SUCCEEDED".to_string()),
+                args: Vec::new(),
+                raw_text: "そうした".to_string(),
+            }),
+            if_true: Some(Box::new(testkit::draw(2))),
+            if_false: None,
+        };
+        let id = masters.abilities.abilities.len() as u32;
+        masters.abilities.abilities.push(testkit::ability(
+            TriggerType::ActivateMain,
+            EffectNode::Sequence(vec![EffectNode::Action(opt), so]),
+            "カード1枚を引いてもよい。そうした場合、カード2枚を引く。",
+        ));
+        masters.masters[M_CHAR as usize].ability_ids = vec![id];
+        Resolver::new()
+            .resolve_ability(&mut s, &masters, Seat::P1, card, 0, false)
+            .expect("resolve");
+        super::interact::resolve_interaction(&mut s, &masters, Seat::P1, &json!({"accepted": accepted}))
+            .expect("resume");
+        assert_eq!(hand_len(&s), expected, "accepted={accepted}");
+    }
+}

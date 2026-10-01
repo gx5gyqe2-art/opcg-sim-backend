@@ -307,6 +307,14 @@ class EffectParser:
                 if not (isinstance(n, Branch) and cond is not None and cond.type == ConditionType.GENERIC
                         and isinstance(act, GameAction)):
                     continue
+                if re.search(_nfc(r"(?:選んだ|その)キャラのコストが(?:その|選んだ)キャラに付与されているドン[!‼]+の枚数と同じ"),
+                             cond.raw_text or ""):
+                    # 選んだキャラのコスト＝付与ドン!!枚数（OP15-031）。数値比較ではなく参照先どうしの比較。
+                    act.target = TargetQuery(ref_id="selected_card",
+                                             flags={"REF_FILTER", "REF_COST_EQ_ATTACHED_DON"})
+                    act.raw_text = f"{cond.raw_text}、{act.raw_text}" if act.raw_text else cond.raw_text
+                    n.condition = None
+                    continue
                 m = re.search(_nfc(r"そのキャラの(コスト|パワー)が(\d+)(以下|以上)"), cond.raw_text or "")
                 if not m:
                     continue
@@ -694,7 +702,7 @@ class EffectParser:
                 # 句が効果本体に残ると対象解析が句の語を拾う（OP05-053 の「ドローフェイズ以外」等）。
                 effect_text = re.sub(
                     _nfc(r'^[^。：:]*?(?:カードを引いた|手札が捨てられた|バトルしたバトル終了|'
-                         r'アタックされた|アタックした)時、'),
+                         r'アタックされた|アタックした|ドン[!！‼]*が付与された)時、'),
                     '', effect_text).strip()
 
             # 「〜を捨てて発動できる。X」＝手札を捨てるのは発動コスト（任意）。効果側に残すと
@@ -1597,6 +1605,15 @@ class EffectParser:
                             and _pn.type == ActionType.DISCARD
                             and re.search(_nfc(r'(してもよい|てもよい)'), parts[_ni])):
                         _pn.is_optional = True
+                        # 確認点は前句の 1 回だけ（捨てる前に「してもよい」を聞く）。後句まで任意のままだと
+                        # 捨てた後にだけ断れてしまう＝捨て＋レストは一体の任意（OP11-024）。断った（捨てなかった）
+                        # なら後句は行わないので、後句は「直前が成立した場合」だけ実行する分岐で包む。
+                        if isinstance(_nodes[_ni], GameAction):
+                            _nodes[_ni].is_optional = False
+                            _nodes[_ni] = Branch(
+                                condition=Condition(type=ConditionType.PREV_ACTION, value="SUCCEEDED",
+                                                    player=Player.SELF, raw_text=_nfc("そうした")),
+                                if_true=_nodes[_ni])
             return Sequence(actions=_nodes)
         elif parts:
             return self._parse_logic_block(parts[0], is_cost)
@@ -1846,6 +1863,13 @@ class EffectParser:
             tq_c.flags.add("HAS_COUNTER")
             return Condition(type=ConditionType.FIELD_COUNT, target=tq_c, operator=CompareOperator.LT,
                              value=1, player=tq_c.player, raw_text=norm_text)
+
+        # 「選んだ(そのキャラ)のコストがそのキャラに付与されているドン!!の枚数と同じ」(OP15-031): 直前に選んだ
+        # キャラ自身との比較。ドン!!枚数の場の条件（DON_COUNT）ではないので GENERIC に留め、
+        # _normalize_coreference が選んだキャラへの参照フィルタ（REF_COST_EQ_ATTACHED_DON）へ変換する。
+        if re.search(_nfc(r'(?:選んだ|その)キャラのコストが(?:その|選んだ)キャラに付与されているドン[!‼]+の枚数と同じ'),
+                     norm_text):
+            return Condition(type=ConditionType.GENERIC, raw_text=norm_text)
 
         # 「効果で自分の手札が捨てられているターン中」（ST33-004）: このターンに効果で手札が捨てられた
         # という事実の条件（手札 0 枚ではない）。エンジンが捨てるたびにターン内イベントを記録する。

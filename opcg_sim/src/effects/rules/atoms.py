@@ -2592,6 +2592,10 @@ def _deck_bottom_general(ctx: ParseContext) -> Optional[GameAction]:
         tq.player = Player.ALL
     if _nfc("まで") in t:
         tq.is_up_to = True
+    elif ctx.is_cost and isinstance(tq.count, int) and tq.count > 1:
+        # コストの「カードN枚をデッキの下に置くことができる」はちょうど N 枚。「できる」は任意性で
+        # あって枚数ではない＝N 枚未満では払えない（OP07-083: トラッシュ 4 枚）。
+        tq.is_strict_count = True
     # 「このキャラを持ち主のデッキの下に置く」は発生源自身（CHOOSE だと自分の任意のキャラになる）。
     if re.search(_nfc(r"(?:^|[、。])この(?:キャラ|カード)を"), t):
         tq = TargetQuery(select_mode="SOURCE")

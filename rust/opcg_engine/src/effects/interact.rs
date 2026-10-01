@@ -712,6 +712,10 @@ pub fn resolve_interaction(
                         resolver.context.confirm(node.clone());
                         resolver.execution_stack.push(node.clone());
                     }
+                } else {
+                    // 断った＝その動作は行われなかった（後続の「そうした場合」が成立してはならない）。
+                    resolver.context.last_action_success = false;
+                    resolver.context.last_had_targets = None;
                 }
                 // 確認に答えたのが相手（「相手は…してもよい」）でも、後続は効果の責任者視点で実行する。
                 let controller = s.state().card(source_card).owner;
