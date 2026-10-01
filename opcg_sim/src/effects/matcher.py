@@ -233,6 +233,9 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     #   （従来は「コスト3」だけを拾い cost_max=3 に縮退していた: OP10-099）。
     m_crange = None if "COST_0_OR_GE_8" in tq.flags else re.search(_nfc(ParserKeyword.COST + r'(\d+)から(\d+)'), tgt_text)
     if m_crange:
+        # 「元々のコストN〜M」は印刷コスト（master.cost）で絞る（効果で増減した現在コストではない）。
+        if _nfc("元々") in tgt_text[max(0, m_crange.start() - 4):m_crange.start()]:
+            tq.flags.add("ORIGINAL_COST")
         tq.cost_min = int(m_crange.group(1))
         tq.cost_max = int(m_crange.group(2))
     m_c = None if (m_crange or "COST_0_OR_GE_8" in tq.flags) else re.search(_nfc(ParserKeyword.COST + r'[^+＋\-－−‐\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
@@ -246,6 +249,9 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
 
         if prefix_context not in ['+', '-', '\u2212', '\u2010', '\uff0b', '\uff0d'] and not is_set_action:
             val = int(m_c.group(1))
+            # 「元々のコストN以下」は印刷コスト（master.cost）で絞る。エンジンが ORIGINAL_COST を見る。
+            if _nfc("元々") in tgt_text[max(0, start_idx - 4):start_idx]:
+                tq.flags.add("ORIGINAL_COST")
             if m_c.group(2) == _nfc(ParserKeyword.ABOVE): tq.cost_min = val
             elif m_c.group(2) == _nfc(ParserKeyword.BELOW): tq.cost_max = val
             else:
@@ -526,8 +532,9 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         # 「コスト0か8以上」= 0 または 8以上の離散2レンジ（B・W）。
         if "COST_0_OR_GE_8" in query.flags and not (card.current_cost == 0 or card.current_cost >= 8):
             continue
-        if query.cost_max is not None and card.current_cost > query.cost_max: continue
-        if query.cost_min is not None and card.current_cost < query.cost_min: continue
+        _cost = (card.master.cost or 0) if "ORIGINAL_COST" in query.flags else card.current_cost
+        if query.cost_max is not None and _cost > query.cost_max: continue
+        if query.cost_min is not None and _cost < query.cost_min: continue
 
         if dynamic_cost_max is not None and card.current_cost > dynamic_cost_max: continue
 

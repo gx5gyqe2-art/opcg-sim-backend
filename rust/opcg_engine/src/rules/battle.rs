@@ -18,7 +18,7 @@ use crate::state::EngineError;
 use super::passive::apply_passive_effects;
 use super::{
     card_type, has_flag, has_keyword, has_timed_flag, KW_ATTACK_ACTIVE, KW_BANISH, KW_BLOCKER,
-    KW_DOUBLE_ATTACK, KW_RUSH,
+    KW_DOUBLE_ATTACK, KW_RUSH, KW_RUSH_CHAR, KW_UNBLOCKABLE,
 };
 
 fn bad(msg: impl Into<String>) -> EngineError {
@@ -72,9 +72,12 @@ pub fn declare_attack(
         ));
     }
     // 召喚酔い（登場したターンのキャラ。速攻を持てば可。リーダーは is_newly_played=false）。
+    // 【速攻:キャラ】は登場したターンにキャラへだけアタックできる（リーダーへは不可）。
     if card_type(s.state(), masters, attacker) == CardType::Character
         && s.state().card(attacker).is_newly_played
         && !has_keyword(s.state(), attacker, KW_RUSH)
+        && !(has_keyword(s.state(), attacker, KW_RUSH_CHAR)
+            && card_type(s.state(), masters, target) == CardType::Character)
     {
         return Err(bad(
             "登場したターンのキャラクターは攻撃できません（速攻を除く）。",
@@ -156,7 +159,10 @@ pub fn advance_battle_triggers(
     let Some(battle) = s.state().active_battle.clone() else {
         return Ok(());
     };
-    let phase = if has_blocker(s, battle.target_owner) {
+    // 【ブロック不可】のアタッカーはブロックされない（ブロッカーを構えていてもブロックステップを飛ばす）。
+    let phase = if has_blocker(s, battle.target_owner)
+        && !has_keyword(s.state(), battle.attacker, KW_UNBLOCKABLE)
+    {
         Phase::BlockStep
     } else {
         Phase::BattleCounter

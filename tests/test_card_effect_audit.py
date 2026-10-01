@@ -90,6 +90,16 @@ def test_qualifier_gaps_flag_a_dropped_qualifier():
     assert A.qualifier_gaps(ok) == []
 
 
+def test_loader_extracts_rush_character_and_unblockable_keywords():
+    """【速攻:キャラ】（本文は全角コロン）と【ブロック不可】が keywords に入る（監査で未処理と判明・31 枚）。
+    付与側（「【ブロック不可】を得る」）は静的キーワードにしない。"""
+    from opcg_sim.src.utils.loader import _extract_static_keywords as kw
+    assert kw("【速攻：キャラ】(このカードは登場したターンにキャラへアタックできる)") == {"速攻:キャラ"}
+    assert kw("【ブロック不可】(このカードはブロックされない)") == {"ブロック不可"}
+    assert kw("【速攻】(このカードは登場したターンにアタックできる)") == {"速攻"}
+    assert kw("このキャラは、このターン中、【ブロック不可】を得る。") == set()
+
+
 # --- 2. 台帳 -------------------------------------------------------------------
 
 def test_ledger_state_follows_the_fingerprints():

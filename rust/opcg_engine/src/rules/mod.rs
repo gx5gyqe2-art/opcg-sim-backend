@@ -36,6 +36,11 @@ pub const KW_BLOCKER: &str = "ブロッカー";
 pub const KW_RUSH: &str = "速攻";
 pub const KW_DOUBLE_ATTACK: &str = "ダブルアタック";
 pub const KW_BANISH: &str = "バニッシュ";
+/// 【速攻:キャラ】（登場したターンにキャラへアタックできる。リーダーへは不可）。
+/// 本文は全角コロンの表記もあるが、ローダが NFKC で `:`（半角）へ揃える。
+pub const KW_RUSH_CHAR: &str = "速攻:キャラ";
+/// 【ブロック不可】（このカードはブロックされない）。
+pub const KW_UNBLOCKABLE: &str = "ブロック不可";
 /// 「レスト状態のキャラクターのみ攻撃可能」を外す内部キーワード（Python `has_keyword("ATTACK_ACTIVE")`）。
 pub const KW_ATTACK_ACTIVE: &str = "ATTACK_ACTIVE";
 

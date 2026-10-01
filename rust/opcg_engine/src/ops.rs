@@ -493,6 +493,22 @@ pub fn deck_to_life(s: &mut Session, seat: Seat) -> bool {
     true
 }
 
+/// デッキ上 1 枚をライフの**一番上**へ（効果の「デッキの上から1枚を、ライフの上に加える」）。
+///
+/// ライフは先頭（index 0）が「上」（ダメージで取られる側）。`deck_to_life` は Python HEAL の
+/// 逐語写し（一番下へ積む）で、初期ライフの配布（`rules/turn.rs`）など「下へ積む」意味の
+/// 呼び口が使う。カード効果の HEAL は本文が全て「ライフの上に加える」なのでこちらを使う
+/// （2026-10-01 カード効果監査で 43 枚の不一致として検出）。
+pub fn deck_to_life_top(s: &mut Session, seat: Seat) -> bool {
+    if s.state().player(seat).deck.is_empty() {
+        return false;
+    }
+    let mut e = s.edit();
+    let card = e.card_zone_remove_at(seat, CardZone::Deck, 0);
+    e.card_zone_insert(seat, CardZone::Life, 0, card);
+    true
+}
+
 /// レスト／アクティブの切替。
 pub fn set_rest(s: &mut Session, card: CardIdx, value: bool) {
     s.edit().set_card_bool(card, CardBoolField::IsRest, value);
@@ -1017,6 +1033,17 @@ mod tests {
         let (f, mut s) = setup();
         assert!(deck_to_life(&mut s, Seat::P1));
         assert_eq!(s.state().player(Seat::P1).life.last(), Some(&f.p1_deck_top));
+        assert_eq!(s.state().player(Seat::P1).deck.first(), Some(&f.p1_deck_second));
+    }
+
+    #[test]
+    fn deck_to_life_top_puts_the_deck_top_at_the_top_of_life() {
+        let (f, mut s) = setup();
+        let life_before = s.state().player(Seat::P1).life.clone();
+        assert!(deck_to_life_top(&mut s, Seat::P1));
+        let life = &s.state().player(Seat::P1).life;
+        assert_eq!(life.first(), Some(&f.p1_deck_top));
+        assert_eq!(&life[1..], &life_before[..], "既存のライフは 1 つ下がる");
         assert_eq!(s.state().player(Seat::P1).deck.first(), Some(&f.p1_deck_second));
     }
 

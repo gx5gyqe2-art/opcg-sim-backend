@@ -188,6 +188,70 @@ fn summoning_sickness_blocks_the_attack_unless_the_card_has_rush() {
     assert!(s.state().card(rush).is_rest, "宣言でレストになる");
 }
 
+/// 【速攻:キャラ】は登場したターンにキャラへだけアタックできる（リーダーへは不可）。
+/// 2026-10-01 のカード効果監査で、このキーワードが未処理（登場ターンは何にも攻撃できない）と判明。
+#[test]
+fn rush_character_lets_a_fresh_character_attack_characters_only() {
+    let mut b = BoardBuilder::new().turn(3, Seat::P1);
+    let fresh = b.put_field(Seat::P1, M_CHAR);
+    b.card_mut(fresh).is_newly_played = true;
+    b.card_mut(fresh).timed_keywords.push("速攻:キャラ".to_string());
+    let victim = b.put_field(Seat::P2, M_CHAR);
+    b.card_mut(victim).is_rest = true;
+    b.put_deck(Seat::P1, M_CHAR);
+    b.put_deck(Seat::P2, M_CHAR);
+    b.put_life(Seat::P2, M_CHAR);
+    let (masters, mut s) = session(b.build());
+    let leader = s.state().player(Seat::P2).leader.unwrap();
+
+    let err = battle::declare_attack(&mut s, &masters, fresh, leader).unwrap_err();
+    assert!(matches!(err, crate::state::EngineError::BadPayload(ref m) if m.contains("速攻")));
+    battle::declare_attack(&mut s, &masters, fresh, victim).expect("キャラへは攻撃できる");
+}
+
+/// 合法手の列挙も同じ（登場ターンの【速攻:キャラ】はリーダーを狙う手を出さない）。
+#[test]
+fn rush_character_legal_moves_exclude_the_leader() {
+    let mut b = BoardBuilder::new().turn(3, Seat::P1);
+    let fresh = b.put_field(Seat::P1, M_CHAR);
+    b.card_mut(fresh).is_newly_played = true;
+    b.card_mut(fresh).timed_keywords.push("速攻:キャラ".to_string());
+    let victim = b.put_field(Seat::P2, M_CHAR);
+    b.card_mut(victim).is_rest = true;
+    b.put_deck(Seat::P1, M_CHAR);
+    b.put_deck(Seat::P2, M_CHAR);
+    let (masters, mut s) = session(b.build());
+    let leader_uuid = s.state().card(s.state().player(Seat::P2).leader.unwrap()).uuid.clone();
+    let victim_uuid = s.state().card(victim).uuid.clone();
+    let fresh_uuid = s.state().card(fresh).uuid.clone();
+
+    let moves = legal::get_legal_actions(&mut s, &masters, Seat::P1).expect("legal");
+    let targets: Vec<&str> = moves
+        .iter()
+        .filter(|m| m["action_type"] == "ATTACK" && m["payload"]["uuid"] == json!(fresh_uuid))
+        .filter_map(|m| m["payload"]["target_ids"][0].as_str())
+        .collect();
+    assert!(targets.contains(&victim_uuid.as_str()), "キャラへは攻撃できる");
+    assert!(!targets.contains(&leader_uuid.as_str()), "リーダーへは攻撃できない");
+}
+
+/// 【ブロック不可】のアタッカーは、ブロッカーが居てもブロックステップを飛ばす。
+#[test]
+fn an_unblockable_attacker_skips_the_block_step() {
+    let mut b = BoardBuilder::new().turn(3, Seat::P1);
+    let atk = b.put_field(Seat::P1, M_BIG);
+    b.card_mut(atk).timed_keywords.push("ブロック不可".to_string());
+    b.put_field(Seat::P2, M_BLOCKER);
+    b.put_deck(Seat::P1, M_CHAR);
+    b.put_deck(Seat::P2, M_CHAR);
+    b.put_life(Seat::P2, M_CHAR);
+    let (masters, mut s) = session(b.build());
+    let target = s.state().player(Seat::P2).leader.unwrap();
+
+    battle::declare_attack(&mut s, &masters, atk, target).expect("declare");
+    assert_eq!(s.state().phase, Phase::BattleCounter, "ブロックされない");
+}
+
 /// Python `declare_attack`: 最初のターン（turn_count <= 2）はアタックできない。
 #[test]
 fn the_first_two_turns_cannot_attack() {

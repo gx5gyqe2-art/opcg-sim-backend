@@ -18,7 +18,7 @@
 
 use super::ast::{AbilityTable, PlayerRef, TargetQuery, TriggerType, ZoneRef};
 use super::{EffectContext, TargetRef};
-use crate::model::{CardIdx, CardMaster, GameState, MasterTable, Seat};
+use crate::model::{CardIdx, CardInstance, CardMaster, GameState, MasterTable, Seat};
 use crate::state::EngineError;
 use std::collections::HashSet;
 
@@ -61,6 +61,16 @@ fn is_vanilla_text(effect_text: &str) -> bool {
         return true;
     }
     matches!(effect_text.trim(), "" | "なし" | "-")
+}
+
+/// 対象の絞り込みに使うコスト。「元々のコストN以下」（`ORIGINAL_COST`）は印刷コスト、
+/// それ以外は効果で増減した現在コスト。
+fn filter_cost(query: &TargetQuery, card: &CardInstance, master: &CardMaster) -> i32 {
+    if query.has_flag("ORIGINAL_COST") {
+        master.cost
+    } else {
+        card.current_cost(master)
+    }
 }
 
 /// §11.5 の契約（戻り値だけ `TargetRef`＝ドン!!も返せる。理由は `effects/mod.rs`）。
@@ -111,7 +121,7 @@ pub fn get_target_cards(
             let p = state.player(*seat);
             for ch in &p.field {
                 let card = state.card(*ch);
-                let cost = card.current_cost(masters.get(card.master));
+                let cost = filter_cost(query, card, masters.get(card.master));
                 if query.cost_max.is_some_and(|m| cost > m) {
                     continue;
                 }
@@ -281,7 +291,7 @@ pub fn get_target_cards(
         }
 
         // --- コスト ---------------------------------------------------------------
-        let cost = card.current_cost(master);
+        let cost = filter_cost(query, card, master);
         if query.has_flag("COST_0_OR_GE_8") && !(cost == 0 || cost >= 8) {
             continue;
         }
@@ -556,6 +566,23 @@ pub(crate) mod tests {
         assert_eq!(f.run(&query(r#""cost_min":4,"card_type":["CHARACTER"]"#), "p1-char-a"), ["p1-char-b"]);
         assert_eq!(f.run(&query(r#""power_max":5000,"card_type":["CHARACTER"]"#), "p1-char-a"), ["p1-char-a"]);
         assert_eq!(f.run(&query(r#""power_min":6000,"card_type":["CHARACTER"]"#), "p1-char-a"), ["p1-char-b"]);
+    }
+
+    /// 「元々のコストN以下」（`ORIGINAL_COST`）は印刷コストで絞る（効果で増減した現在コストではない）。
+    /// 2026-10-01 のカード効果監査で、パーサが「元々の」を落としエンジンも欄を持たないと判明（62 枚）。
+    #[test]
+    fn original_cost_filters_by_the_printed_cost() {
+        let mut f = fixture();
+        let a = f.find("p1-char-a") as usize;
+        f.state.cards[a].cost_buff = -2; // 現在コスト 1・印刷コスト 3
+        assert_eq!(f.run(&query(r#""cost_max":1,"card_type":["CHARACTER"]"#), "p1-char-a"), ["p1-char-a"]);
+        assert!(f
+            .run(&query(r#""cost_max":1,"flags":["ORIGINAL_COST"],"card_type":["CHARACTER"]"#), "p1-char-a")
+            .is_empty());
+        assert_eq!(
+            f.run(&query(r#""cost_max":3,"flags":["ORIGINAL_COST"],"card_type":["CHARACTER"]"#), "p1-char-a"),
+            ["p1-char-a"]
+        );
     }
 
     #[test]

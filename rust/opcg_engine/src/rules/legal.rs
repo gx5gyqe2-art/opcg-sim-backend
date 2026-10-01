@@ -16,7 +16,7 @@ use super::pending::{
     get_pending_request, request_action, request_actor, ACT_MAIN_ACTION, ACT_MULLIGAN, ACT_PASS,
     ACT_SELECT_BLOCKER, ACT_SELECT_COUNTER,
 };
-use super::{card_type, has_flag, has_keyword, has_timed_flag, KW_RUSH};
+use super::{card_type, has_flag, has_keyword, has_timed_flag, KW_RUSH, KW_RUSH_CHAR};
 
 fn game_move(action_type: &str, payload: Value) -> Value {
     json!({"kind": "game", "action_type": action_type, "payload": payload})
@@ -130,10 +130,11 @@ fn main_actions(
             if state.card(*c).is_rest {
                 continue;
             }
-            // 召喚酔い（速攻を持てば可）。
+            // 召喚酔い（速攻を持てば可。【速攻:キャラ】はキャラへのアタックだけ可＝下の対象列挙で絞る）。
             if card_type(state, masters, *c) == CardType::Character
                 && state.card(*c).is_newly_played
                 && !has_keyword(state, *c, KW_RUSH)
+                && !has_keyword(state, *c, KW_RUSH_CHAR)
             {
                 continue;
             }
@@ -161,7 +162,14 @@ fn main_actions(
     let hand_len = p.hand.len();
     attackers.retain(|a| super::attack_tax_need(state, *a).map_or(true, |need| hand_len >= need));
     for atk in &attackers {
+        // 登場したターンの【速攻:キャラ】（【速攻】無し）はリーダーへアタックできない。
+        let char_only = card_type(state, masters, *atk) == CardType::Character
+            && state.card(*atk).is_newly_played
+            && !has_keyword(state, *atk, KW_RUSH);
         for tgt in &targets {
+            if char_only && card_type(state, masters, *tgt) == CardType::Leader {
+                continue;
+            }
             moves.push(game_move(
                 "ATTACK",
                 json!({"uuid": uuid(*atk), "target_ids": [uuid(*tgt)]}),
