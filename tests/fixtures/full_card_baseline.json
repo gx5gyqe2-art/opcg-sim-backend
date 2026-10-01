@@ -2891,6 +2891,7 @@
 "P-072|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs1,co0",
 "P-073|ACTIVATE_MAIN": "p1_hand:5→6, p1_life:5→4 | pw1000,kw0,rs0,co0",
 "P-074|ACTIVATE_MAIN": "p1_hand:5→6, p1_field:4→3 | pw0,kw0,rs0,co0",
+"P-075|ON_ATTACK": "- | pw0,kw0,rs0,co0",
 "P-075|ON_PLAY": "p1_hand:6→5, p1_field:3→4 | pw0,kw0,rs0,co0",
 "P-076|ACTIVATE_MAIN": "- | pw0,kw0,rs0,co0",
 "P-077|PASSIVE": "- | pw0,kw0,rs0,co0",

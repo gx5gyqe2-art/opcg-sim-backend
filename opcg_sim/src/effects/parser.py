@@ -142,6 +142,13 @@ class EffectParser:
         segments = re.split(r'\s*/\s*|\n', norm)
         segments = [s.strip() for s in segments if s.strip()]
 
+        # 区切り（` / `・改行）なしで次の能力が続くカード（P-075「…付与する。【アタック時】…」）は、
+        # 句点の直後に別トリガーのタグが始まる位置で能力を分ける。分けないと後半が前半の能力へ畳まれ、
+        # 【登場時】に【アタック時】の効果が走る。
+        _split_re = re.compile(_nfc(
+            r'(?<=。)(?=【(?:登場時|アタック時|KO時|ブロック時|起動メイン|相手のアタック時|自分のターン終了時|相手のターン終了時)】)'))
+        segments = [x.strip() for _seg in segments for x in _split_re.split(_seg) if x.strip()]
+
         # 「以下から…選ぶ」の選択肢項目（` / ` で別セグメントに分かれた「・」項目や
         # 条件付き項目）を、Choice を導入する親セグメントへ `\n` で再結合する。
         # 従来は別 Ability として分割→破棄され、options が空の Choice になっていた（難所）。
@@ -199,6 +206,7 @@ class EffectParser:
                 self._normalize_coreference(ab)
                 self._normalize_replacement_alternative(ab)
                 self._defer_condition_after_self_cost(ab)
+                self._link_played_reference(ab)
                 if ab.trigger != TriggerType.UNKNOWN or ab.effect is not None:
                     abilities.append(ab)
                     # 「（このリーダー/キャラが）アタックした時かアタックされた時」は ON_ATTACK と
@@ -363,6 +371,37 @@ class EffectParser:
             return
         ability.effect = Branch(condition=cond, if_true=ability.effect)
         ability.condition = None
+
+    def _link_played_reference(self, ability) -> None:
+        """「この効果で登場させたキャラ」= 直前の PLAY_CARD が実際に登場させたカードへの厳密参照。
+
+        後続ノード（速攻付与・終了時のデッキ下 等）の対象を ref_id="played_by_effect" にし、
+        直前の PLAY_CARD の対象へ save_id を付ける。付けないと「自分の任意のキャラ」を選んでしまう
+        （OP15-086・OP11-092）。"""
+        nodes = []
+
+        def walk(node):
+            if node is None:
+                return
+            nodes.append(node)
+            for f in ("if_true", "if_false"):
+                walk(getattr(node, f, None))
+            for f in ("actions", "options"):
+                for child in (getattr(node, f, None) or []):
+                    walk(child)
+
+        walk(ability.effect)
+        producer = None
+        for n in nodes:
+            if not isinstance(n, GameAction):
+                continue
+            if n.type == ActionType.PLAY_CARD and n.target is not None:
+                producer = n
+                continue
+            if producer is not None and _nfc("この効果で登場させた") in _nfc(n.raw_text or ""):
+                producer.target.save_id = "played_by_effect"
+                n.target = TargetQuery(zone=Zone.FIELD, player=Player.SELF, ref_id="played_by_effect",
+                                       card_type=["CHARACTER"], count=1)
 
     def _normalize_replacement_alternative(self, ability) -> None:
         """『（先行効果）の代わりに（後続効果）』= 択一の整形。
@@ -815,11 +854,11 @@ class EffectParser:
         except Exception as e:
             return Ability(trigger=TriggerType.UNKNOWN, effect=None, raw_text=_nfc(text))
 
-    _OPTIONAL_END_RE = re.compile(_nfc(r"ことができる$"))
+    _OPTIONAL_END_RE = re.compile(_nfc(r"(?:ことが|に)できる$"))
     _OPTIONAL_TYPES = frozenset({
         ActionType.MOVE_CARD, ActionType.DRAW, ActionType.DISCARD, ActionType.TRASH,
         ActionType.DECK_BOTTOM, ActionType.BOUNCE, ActionType.PLAY_CARD, ActionType.HEAL,
-        ActionType.RETURN_DON, ActionType.REVEAL,
+        ActionType.RETURN_DON, ActionType.REVEAL, ActionType.REST, ActionType.ACTIVE, ActionType.KO,
     })
 
     def _mark_optional_effects(self, node):
@@ -876,6 +915,11 @@ class EffectParser:
             return
         if isinstance(node, Choice):
             for o in node.options:
+                # 「相手は以下から1つを選ぶ。・カード2枚を引く」のドローは選んだ相手が引く（OP17-049）。
+                if (node.player == Player.OPPONENT and isinstance(o, GameAction)
+                        and o.type == ActionType.DRAW and o.target is None):
+                    o.target = TargetQuery(player=Player.OPPONENT, zone=Zone.DECK,
+                                           count=max(o.value.base, 1))
                 self._apply_opponent_self_chooser(o)
             return
 
@@ -1158,6 +1202,14 @@ class EffectParser:
                 raw_text=norm
             )
             head = norm[:m.start()].rstrip(' 　')
+            # 「コスト20以上のこのキャラをトラッシュに置く」(OP16-084): 修飾語はコストを払える条件
+            # （現在のコストがその範囲のときだけ払える）。resolver が ref_id="self" でも現在コストで絞る。
+            _cm = re.search(_nfc(r'コスト(\d+)(以上|以下)の$'), head)
+            if _cm:
+                if _cm.group(2) == _nfc('以上'):
+                    self_action.target.cost_min = int(_cm.group(1))
+                else:
+                    self_action.target.cost_max = int(_cm.group(1))
             # head が**区切り**（、 ， , ／ 並列の「と」）で終わっていれば別のコスト
             # （「自分のドン!!1枚とこのキャラをレストにできる」＝ドンのレスト＋自身のレスト）。
             # 終わっていなければ **同じ句の修飾語**であって別コストではない
@@ -1315,6 +1367,9 @@ class EffectParser:
             return TriggerType.PASSIVE
         return None
 
+    _TARGET_SWAP_RE = re.compile(_nfc(
+        r'^(?P<base>[^。]+?)。(?P<cond>[^。、]+?場合)、(?P<old>[^。、]+?)の代わりに(?P<new>[^。、]+?)を選ぶ。?$'))
+
     def _parse_to_node(self, text: str, is_cost: bool = False) -> EffectNode:
         norm_text = _nfc(text)
 
@@ -1327,6 +1382,19 @@ class EffectParser:
                 self._parse_to_node(_cs.group(1) + _cs.group(3) + _rest, is_cost),
                 self._parse_to_node(_cs.group(2) + _nfc('は、') + _rest, is_cost),
             ])
+        # 「<効果>。<条件>の場合、<旧対象>の代わりに<新対象>を選ぶ。」= 条件成立時は対象の絞り込みだけが
+        # 差し替わる（OP12-096: コスト8以上のキャラがいれば KO の対象がコスト6以下になる）。
+        # 条件を満たすときは新対象で、満たさないときは旧対象で、同じ効果を 1 回だけ行う。
+        swap = self._TARGET_SWAP_RE.match(norm_text)
+        if swap and swap.group('old') in swap.group('base'):
+            base = swap.group('base')
+            swapped = base.replace(swap.group('old'), swap.group('new'), 1)
+            if_true = self._parse_to_node(swapped, is_cost)
+            if isinstance(if_true, GameAction):
+                if_true.raw_text = norm_text  # 差し替えの句も本文照合で覆えるようにする
+            return Branch(condition=self._parse_condition_obj(swap.group('cond')),
+                          if_true=if_true,
+                          if_false=self._parse_to_node(base, is_cost))
 
         # 選択肢「以下から…選ぶ」: 「・」項目（または改行区切りの各文）を options として
         # Choice を生成する。後続の「。」分割より前に処理しないと選択肢構造が壊れるため、
@@ -1412,7 +1480,7 @@ class EffectParser:
         split_pattern = _nfc(
             r'。|その後、|(?<=置き)、|(?<=加え)、|(?<=引く)、|(?<=捨て)、|発動できる、|させ、'
             r'|(?<=KOし)、|(?<=レストにし)、|(?<=戻し)、|(?<=\d)し、|(?<=付与し)、|(?<=追加し)、'
-            r'|(?<=アクティブにし)、'
+            r'|(?<=アクティブにし)、|(?<=得て)、'
         )
 
         # 条件ゲート（「…場合、」「…なら、」）を含む文は、文内の連用接続（引く、捨て、…し 等）で
@@ -1449,14 +1517,21 @@ class EffectParser:
         if len(parts) > 1:
             _bare_buff_re = re.compile(_nfc(r'^(?:パワー|コスト)[ 　]*[+＋\-－−‐]\d'))
             _subj_re = re.compile(_nfc(r'(この(?:キャラ|リーダー|カード))(?:は|の)?'))
+            # 「…N枚につき、パワー+1000し、コスト+2」の「N枚につき」は後続の裸の増減句にも掛かる
+            # （EB04-048: トラッシュ5枚につきコスト+2。継承しないとコスト+2 が固定値になる）。
+            _per_re = re.compile(_nfc(r'([^、。：:]*?[\d０-９]+枚につき)、'))
             _carry_subj = None
+            _carry_per = None
             for _pi, _p in enumerate(parts):
                 if _carry_subj and _bare_buff_re.match(_p):
-                    parts[_pi] = _carry_subj + 'の' + _p
+                    parts[_pi] = (_carry_subj + 'は、' + _carry_per + _p) if _carry_per \
+                        else (_carry_subj + 'の' + _p)
                 else:
                     _sm = _subj_re.search(_p)
                     if _sm:
                         _carry_subj = _sm.group(1)
+                        _pm = _per_re.search(_p)
+                        _carry_per = (_pm.group(1) + '、') if _pm else None
 
         # 「次の相手のターン終了時まで、1枚をパワー-3000し、残りをパワー-2000」: 後続の「残りを…」
         # は期間句を持たないが、先行句の期間（このターン中／このバトル中／次の…まで）を引き継ぐ
@@ -1725,6 +1800,19 @@ class EffectParser:
                              operator=CompareOperator.GE,
                              player=(Player.OPPONENT if _nfc('相手の手札') in norm_text else Player.SELF),
                              raw_text=norm_text)
+        # ターン文脈だけの条件「相手のターン中の場合」「自分のターン中の場合」(OP17-119 の +3000 等)。
+        # 従来は GENERIC（常に真）に落ち、自分のターンにも効いていた。
+        # 「相手のライフが離れているターン中」(P-120): このターン相手のライフが離れた事実（EVENT_THIS_TURN）。
+        # 従来は LIFE_COUNT（相手のライフが 0 枚）に化けていた。
+        if re.search(_nfc(r'相手のライフが離れて(?:いる|いた)'), norm_text):
+            return Condition(type=ConditionType.EVENT_THIS_TURN, value=("OPP_LIFE_LEFT", 1),
+                             operator=CompareOperator.GE, player=Player.SELF, raw_text=norm_text)
+        turn_ctx = re.fullmatch(_nfc(r'(相手|自分)のターン中(?:の場合|の|なら)?'), norm_text.strip())
+        if turn_ctx:
+            return Condition(type=ConditionType.CONTEXT,
+                             value="OPPONENT_TURN" if turn_ctx.group(1) == _nfc("相手") else "SELF_TURN",
+                             player=Player.SELF, raw_text=norm_text)
+
         # 置換の対象指定「（自分の）「X」がKOされる/場を離れる（場合）」: 離れるカードが名前 X か
         # （OP12-061「自分の「トラファルガー・ロー」がKOされる場合」）。離脱カードを source_card として
         # 評価する SOURCE_STATE("NAME", X) にする。従来は GENERIC で名称限定が脱落していた。
@@ -1993,17 +2081,20 @@ class EffectParser:
                 if len(name_conds) == 1:
                     return name_conds[0]
                 return Condition(type=ConditionType.AND, args=name_conds, raw_text=norm_text)
-            # 「トラッシュにイベントが4枚以上ある」: 種類（イベント／キャラ／ステージ）や特徴で絞った
-            # 枚数。絞りが無ければ総枚数（target なし）。
-            _trash_tq = None
-            _tq = parse_target(norm_text)
-            if _tq.card_type or _tq.traits or _tq.colors or _tq.attributes:
-                _tq.zone = Zone.TRASH
-                _tq.player = p
-                _tq.count = value
-                _trash_tq = _tq
-            return Condition(type=ConditionType.TRASH_COUNT, operator=operator, value=value, player=p,
-                             target=_trash_tq, raw_text=norm_text)
+            # 「トラッシュに<種類>が N枚以上ある」(OP12-059/063/065/066 のイベント4枚以上 等)は
+            # トラッシュ全枚数ではなく、その種類のカードだけを数える。種類（イベント/キャラ/ステージ・
+            # 特徴・色・コスト 等）を TargetQuery（zone=TRASH）で持たせ、エンジンが一致数を数える。
+            typed_m = re.search(_nfc(r'トラッシュ(?:に|の)(?P<what>[^、。]*?)が[\d０-９]+枚'), norm_text)
+            if typed_m and typed_m.group('what').strip() not in ('', 'カード', 'あるカード'):
+                tq = parse_target(typed_m.group('what'))
+                tq.zone = Zone.TRASH
+                tq.player = p
+                tq.count = -1
+                tq.select_mode = "ALL"
+                tq.is_up_to = False
+                return Condition(type=ConditionType.TRASH_COUNT, target=tq, operator=operator,
+                                 value=value, player=p, raw_text=norm_text)
+            return Condition(type=ConditionType.TRASH_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 
         # デッキ枚数（「自分のデッキが20枚以下の場合」等）。"デッキの上から…" は除外。
         if _nfc("デッキが") in norm_text:
@@ -2434,6 +2525,13 @@ class EffectParser:
         cond_m = re.search(_nfc(r'^(.+?)(?:場合|なら)、\s*以下から'), head)
         if cond_m:
             return Branch(condition=self._parse_condition_obj(cond_m.group(1)), if_true=choice)
+        # 「カード1枚を引き、以下から1つを選ぶ」(OP17-112): 選択の前に行う動作は Choice の外に残す
+        # （従来は脱落して、ドローが実行されなかった）。
+        pre_m = re.match(_nfc(r'^(?P<pre>[^。、]+?(?:し|き|て|引き|置き|加え))、\s*以下から'), head)
+        if pre_m:
+            pre_node = self._parse_to_node(_nfc(pre_m.group('pre')), is_cost)
+            if pre_node is not None:
+                return Sequence(actions=[pre_node, choice])
         return choice
 
     def _node_has_real_action(self, node) -> bool:

@@ -41,6 +41,8 @@ const SELF_RESTRICTION_KEYS: &[&str] = &[
     "CANNOT_LIFE_TO_HAND",
     "CANNOT_ATTACK_LEADER",
     "CANNOT_ACTIVATE_DON",
+    // 「このターン中、自分のリーダーがアタックする際、相手は【ブロッカー】を発動できない」（OP13-057）。
+    "OPP_NO_BLOCK_VS_LEADER",
 ];
 
 /// Python `_auto_resolve_replacement` の打ち切り回数（`limit=16`）。
@@ -288,6 +290,19 @@ pub fn active_protection(
     actor: Option<Seat>,
     attacker: Option<CardIdx>,
 ) -> Result<bool, EngineError> {
+    active_protection_with_origin(s, masters, card, status_values, actor, attacker, None)
+}
+
+/// [`active_protection`] に除去する効果の発生源（`origin`）を渡す版（OP11-005）。
+pub fn active_protection_with_origin(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+    attacker: Option<CardIdx>,
+    origin: Option<CardIdx>,
+) -> Result<bool, EngineError> {
     if s.state().card(card).negated {
         return Ok(false);
     }
@@ -401,6 +416,16 @@ pub fn active_protection(
                 });
                 if !ok {
                     continue;
+                }
+            }
+            // 「属性(特)を持たないキャラの効果で〜されない」(OP11-005)＝除去する効果の発生源が
+            // その属性を持たないときだけ守る（発生源が不明なら守る側へ倒す）。
+            if let Some(lacked) = lacked_source_attribute(&eff.raw_text) {
+                if let Some(src) = origin {
+                    let attr = masters.get(s.state().card(src).master).attribute;
+                    if attr != crate::model::Attribute::None && attr.value() == lacked {
+                        continue;
+                    }
                 }
             }
             // 【ターン1回】保護は resolve_ability を通らないので、ここで直接 enforce する。
@@ -1065,3 +1090,22 @@ fn self_negating_name(text: &str) -> Option<&str> {
 
 #[cfg(test)]
 mod tests;
+
+/// 「属性(特)を持たないキャラの効果で」（括弧は 3 種）の属性 1 文字。
+fn lacked_source_attribute(text: &str) -> Option<&'static str> {
+    const ATTRS: [&str; 5] = ["斬", "打", "射", "特", "知"];
+    for open in ["(", "（", "《"] {
+        for attr in ATTRS {
+            for close in [")", "）", "》"] {
+                let pat = format!("属性{open}{attr}{close}を持たない");
+                if let Some(pos) = text.find(&pat) {
+                    let tail = &text[pos + pat.len()..];
+                    if tail.starts_with("キャラ") || tail.starts_with("カード") {
+                        return Some(attr);
+                    }
+                }
+            }
+        }
+    }
+    None
+}

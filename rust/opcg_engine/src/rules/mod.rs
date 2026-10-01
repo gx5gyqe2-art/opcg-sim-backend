@@ -167,6 +167,16 @@ pub fn active_restriction<'a>(
     }
 }
 
+/// 進行中のバトルが「リーダーのアタック」で、アタッカー側に「相手は【ブロッカー】を発動できない」
+/// 制限（`OPP_NO_BLOCK_VS_LEADER`・OP13-057）が有効ならブロックできない。
+pub fn blocking_suppressed(state: &GameState) -> bool {
+    let Some(b) = state.active_battle.as_ref() else {
+        return false;
+    };
+    state.player(b.attacker_owner).leader == Some(b.attacker)
+        && active_restriction(state, b.attacker_owner, "OPP_NO_BLOCK_VS_LEADER").is_some()
+}
+
 /// [`active_restriction`] の `&mut Session` 版（§11.8 #8）。期限切れのエントリは Python と同じく
 /// `restrictions` から取り除く（`player.restrictions.pop(key, None)`）。判定結果（`Some`/`None`）
 /// は [`active_restriction`] と常に同じ＝掃除は副作用のみで戻り値の意味を変えない。

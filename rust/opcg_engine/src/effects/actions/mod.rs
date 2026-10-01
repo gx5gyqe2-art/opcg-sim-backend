@@ -272,7 +272,9 @@ pub fn run_target_loop_with(
                 &["LEAVE"]
             };
             // 除去を行った効果の発生源も渡す（「元々のパワーN以下のキャラの効果で」の判定用）。
-            if active_protection_vs(s, masters, target, guard_statuses, Some(actor), source_card)? {
+            if rules::active_protection_with_origin(
+                s, masters, target, guard_statuses, Some(actor), source_card, source_card,
+            )? {
                 continue;
             }
             // 任意の置換（「代わりに〜できる」）は、先に被除去側へ確認してから実行する
@@ -610,6 +612,7 @@ pub fn move_card(
                 continuous::drop_for(s, &uuid);
             }
             ops::LeaveKind::LifeDecrease => {
+                ops::record_life_left(s, ev.owner, ev.count);
                 triggers::enqueue_life_decrease(s, masters, ev.owner, ev.count, dest_zone == Zone::Hand)?;
             }
             ops::LeaveKind::OnLeave => {
@@ -636,6 +639,18 @@ pub fn active_protection(
     actor: Option<Seat>,
 ) -> Result<bool, EngineError> {
     rules::active_protection(s, masters, card, status_values, actor, None)
+}
+
+/// [`active_protection`] に除去する効果の発生源（`source_card`）を渡す版（発生源の属性で守りが変わる OP11-005）。
+pub fn active_protection_from(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+    origin: Option<CardIdx>,
+) -> Result<bool, EngineError> {
+    rules::active_protection_with_origin(s, masters, card, status_values, actor, None, origin)
 }
 
 /// [`active_protection`] にバトル相手（Python の `attacker=`）を渡す版。

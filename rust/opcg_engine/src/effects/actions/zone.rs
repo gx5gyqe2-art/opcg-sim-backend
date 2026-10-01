@@ -161,6 +161,9 @@ fn deal_damage(
         }
     }
     // ON_LIFE_DECREASE を積み、【トリガー】と共にこの場で消化する。
+    if life_lost > 0 {
+        crate::ops::record_life_left(s, damaged, life_lost);
+    }
     if life_lost > 0 && s.state().winner.is_none() {
         triggers::enqueue_life_decrease(s, masters, damaged, life_lost, true)?;
         triggers::enqueue_damaged_listeners(s, masters, damaged, life_lost)?;

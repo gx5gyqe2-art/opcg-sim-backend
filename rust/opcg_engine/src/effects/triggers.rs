@@ -370,6 +370,25 @@ pub fn resolve_on_ko(
     ops::record_turn_event(s, &name, 1);
     // 他カードの「…キャラがKOされた時」リスナーを積む（自身の【KO時】とは独立）。
     enqueue_ko_listeners(s, masters, card, owner)?;
+    // 「このキャラのバトルによって相手のキャラをKOした時」: バトルで KO したアタッカー自身の誘発。
+    if cause == "BATTLE" {
+        if let Some(battle) = s.state().active_battle.clone() {
+            if battle.target == card && battle.attacker != card && battle.attacker_owner != owner {
+                let attacker = battle.attacker;
+                let ids = masters.get(s.state().card(attacker).master).ability_ids.clone();
+                for (index, id) in ids.iter().enumerate() {
+                    let ab = ability(masters, *id)?;
+                    if ab.trigger == TriggerType::OnKo
+                        && ab.raw_text.contains("のバトルによって")
+                        && ab.raw_text.contains("KOした時")
+                    {
+                        let optional = ab.raw_text.contains("発動できる");
+                        enqueue_trigger(s, battle.attacker_owner, attacker, index, optional);
+                    }
+                }
+            }
+        }
+    }
     let ids = masters.get(s.state().card(card).master).ability_ids.clone();
     for (index, id) in ids.iter().enumerate() {
         let ab = ability(masters, *id)?;
@@ -1078,6 +1097,7 @@ fn flush_delayed(
         }
         let mut ctx = EffectContext::new();
         ctx.flushing_delayed = true;
+        ctx.saved_targets = item.saved_targets.clone();
         if s.state().active_interaction().is_some() {
             // 中断中は直接実行できない＝deferred 継続へ退避する。
             super::interact::defer_resolver_stack(

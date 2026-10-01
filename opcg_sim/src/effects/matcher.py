@@ -360,6 +360,13 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if m_psum:
         tq.power_sum_max = int(m_psum.group(1))
 
+    # 「コストの合計がN以下になるように」(OP17-119): 選択集合の合計コスト上限。パワー版と同じ仕組みで、
+    # フラグ SUM_COST が付くと resolver が合計コストで数える。枚数の指定が無ければ上限なし（複数枚）。
+    m_csum = re.search(_nfc(r'コスト(?:の)?合計が(\d+)以下'), tgt_text)
+    if m_csum:
+        tq.power_sum_max = int(m_csum.group(1))
+        tq.flags.add("SUM_COST")
+
     m_prange = re.search(_nfc(ParserKeyword.POWER + r'(\d+)\u304b\u3089(\d+)'), tgt_text)
     if m_prange:
         if _nfc("\u5143\u3005") in tgt_text[max(0, m_prange.start() - 4):m_prange.start()]:
@@ -452,7 +459,8 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.select_mode = "ALL"
     else:
         m_cnt = re.search(r'(\d+)' + _nfc(ParserKeyword.COUNT_SUFFIX), count_text)
-        tq.count = int(m_cnt.group(1)) if m_cnt else 1
+        # 合計コスト上限だけで枚数の指定が無いとき（OP17-119）は枚数に上限なし。
+        tq.count = int(m_cnt.group(1)) if m_cnt else (-1 if "SUM_COST" in tq.flags else 1)
 
     # 「任意の枚数」: プレイヤーが 0..N 枚を任意に選べる可変選択。is_up_to=True かつ
     # 大きめの count（フィールド/手札の実上限を超える）で対象選択中断（_suspend_for_target_selection,

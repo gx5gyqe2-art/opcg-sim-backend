@@ -303,7 +303,10 @@ pub fn check_condition(
                 }
                 None => name,
             };
-            let occurred = name.map(event_count).unwrap_or(0);
+            let occurred = match name {
+                Some("OPP_LIFE_LEFT") => event_count(&format!("LIFE_LEFT_{}", opponent.name())),
+                other => other.map(event_count).unwrap_or(0),
+            };
             compare(occurred, cond.operator, threshold)
         }
         C::LifeCountCompare => compare(
@@ -877,6 +880,21 @@ mod tests {
         assert!(f.check(&cond("FIELD_COST_SUM", json!({"value": 8, "operator": "EQ"}))));
         // OPPONENT 指定は相手側を数える（p2: life 1 / hand 0）
         assert!(f.check(&cond("LIFE_COUNT", json!({"player": "OPPONENT", "value": 1, "operator": "EQ"}))));
+    }
+
+    #[test]
+    fn trash_count_with_a_target_counts_only_that_kind() {
+        let f = fixture();
+        // p1 のトラッシュは「トラッシュA（イベント）」1 枚だけ。
+        let q = |ct: &str| {
+            crate::effects::matcher::tests::query_json(&format!(
+                r#""zone":"TRASH","card_type":["{ct}"],"count":-1,"select_mode":"ALL""#
+            ))
+        };
+        assert!(f.check(&cond("TRASH_COUNT", json!({"target": q("EVENT"), "value": 1, "operator": "GE"}))));
+        assert!(!f.check(&cond("TRASH_COUNT", json!({"target": q("EVENT"), "value": 2, "operator": "GE"}))));
+        // 種類が違えば数えない（トラッシュ全枚数 1 ではなく 0 枚）。
+        assert!(!f.check(&cond("TRASH_COUNT", json!({"target": q("CHARACTER"), "value": 1, "operator": "GE"}))));
     }
 
     #[test]

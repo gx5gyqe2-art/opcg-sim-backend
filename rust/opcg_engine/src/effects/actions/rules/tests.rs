@@ -947,6 +947,18 @@ fn the_battle_opponent_filter_reads_attribute_and_kind() {
     assert!(f("属性《斬》を持つキャラをKOする").is_none());
 }
 
+/// 「属性(特)を持たないキャラの効果で」の属性（OP11-005）。
+#[test]
+fn the_lacked_source_attribute_is_read_from_the_text() {
+    assert_eq!(
+        lacked_source_attribute("このキャラは属性(特)を持たないキャラの効果でKOされない"),
+        Some("特")
+    );
+    assert_eq!(lacked_source_attribute("属性《斬》を持たないカードの効果で"), Some("斬"));
+    assert_eq!(lacked_source_attribute("属性(特)を持つキャラの効果でKOされない"), None);
+    assert_eq!(lacked_source_attribute("このキャラはKOされない"), None);
+}
+
 /// `「([^」]+)」がい[るて][^。]*?この効果は無効` と同じ判定。
 #[test]
 fn the_self_negating_pattern_matches_the_python_regex() {
