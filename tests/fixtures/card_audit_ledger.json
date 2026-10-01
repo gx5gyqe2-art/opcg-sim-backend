@@ -2690,7 +2690,7 @@
   },
   "OP02-002": {
    "ast_sha": "772b4c2047f2e62c",
-   "note": "「ドン!!が付与された時」の誘発句をエンジンが積まず、YOUR_TURN 常在の BUFF として即時適用される（パーサ/エンジン・反応型未対応）",
+   "note": "【ガープ】「ドン!!が付与された時」が誘発になっておらず trigger=YOUR_TURN の常在、対象も相手キャラのみのはずがリーダーまで含む（パーサ）",
    "probe_sha": "3ea2ca76c08a4d47",
    "reviewed": "2026-10-01",
    "text_sha": "799da82fd02fc1c7",
@@ -2841,12 +2841,12 @@
    "verdict": "ok"
   },
   "OP02-025": {
-   "ast_sha": "b659c9edbd32231b",
-   "note": "次に登場させるカード1枚への一回限り割引になっておらず、手札の条件一致キャラ全てに常時-1（既知の未対応）",
+   "ast_sha": "35c6096fc1e1101c",
+   "note": "NEXT_PLAY_ONCE の割引で句と一致 [厳格レビュー]",
    "probe_sha": "769b47c25f18bd55",
    "reviewed": "2026-10-01",
    "text_sha": "f974b0e71cec9b11",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP02-026": {
    "ast_sha": "88f04899cd1607fd",
@@ -3169,12 +3169,12 @@
    "verdict": "ok"
   },
   "OP02-074": {
-   "ast_sha": "0aed29d6b115f464",
-   "note": "「自分の「ブルゴリ」は【ブロッカー】を得る」が全員対象でなく count=1 の選択になっている（パーサ）",
-   "probe_sha": "70b862ef937f60e8",
+   "ast_sha": "e4c9ce9da7dbeef6",
+   "note": "全句一致 [厳格レビュー]",
+   "probe_sha": "683d714edbb1b0a5",
    "reviewed": "2026-10-01",
    "text_sha": "45b537ee37e9e956",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP02-075": {
    "ast_sha": "9e183b4bb0e99207",
@@ -3593,12 +3593,12 @@
    "verdict": "ok"
   },
   "OP03-016": {
-   "ast_sha": "211d9231f41d4c86",
-   "note": "「自分のリーダーは…ダブルアタックを得て、パワー+3000」の BUFF の対象がリーダーでなく SELF/FIELD 任意1枚・期間なしになっている（パーサ・主語継承）",
-   "probe_sha": "c1fbf61d20ac40ac",
+   "ast_sha": "bd441e3b317a77e2",
+   "note": "全句一致 [厳格レビュー]",
+   "probe_sha": "240a9c04ca375e31",
    "reviewed": "2026-10-01",
    "text_sha": "63171528567f3a31",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP03-017": {
    "ast_sha": "a325094ce2853917",
@@ -4649,12 +4649,12 @@
    "verdict": "ok"
   },
   "OP04-040": {
-   "ast_sha": "f097bb1a2029f1fe",
-   "note": "「引く代わりに〜できる」の置換が別枝の任意HEALになっており、断ったときに通常のドローが残らない（パーサ/構造）",
-   "probe_sha": "978934ae9e3e0d18",
+   "ast_sha": "0f8aebc4321b0884",
+   "note": "Choice の第2選択肢が断る側を担い全句一致 [厳格レビュー]",
+   "probe_sha": "3fde6f574b141f48",
    "reviewed": "2026-10-01",
    "text_sha": "43af66a57038d907",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP04-041": {
    "ast_sha": "47f3d623be4d19cf",
@@ -4881,12 +4881,12 @@
    "verdict": "ok"
   },
   "OP04-071": {
-   "ast_sha": "7be2e79baf0d6d0e",
-   "note": "「このバトル中、ブロッカーを得て、パワー+1000」の後句BUFFの期間がINSTANT（THIS_BATTLEを継承せず、ターン中残る）（パーサ）",
+   "ast_sha": "4af28cca3833a925",
+   "note": "全句一致 [厳格レビュー]",
    "probe_sha": "4e016ccb62e4606f",
    "reviewed": "2026-10-01",
    "text_sha": "172d14574f14fea8",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP04-072": {
    "ast_sha": "9822d70e95e800a4",
@@ -5841,12 +5841,12 @@
    "verdict": "ok"
   },
   "OP05-080": {
-   "ast_sha": "9f98952f59552d6e",
-   "note": "パーサ: 「このバトル中、ダブルアタックを得て、パワー+10000」の BUFF が duration=INSTANT（THIS_BATTLE が GRANT_KEYWORD にしか掛からず、パワーがバトル後も残る）",
+   "ast_sha": "bbeb94e4d56be88b",
+   "note": "全句一致（NOT_FIRED はプローブのトラッシュ不足） [厳格レビュー]",
    "probe_sha": "1eb955a601a5618f",
    "reviewed": "2026-10-01",
    "text_sha": "c77c51e0bd657abc",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP05-081": {
    "ast_sha": "4be4c4673e5b9a2a",
@@ -6777,12 +6777,12 @@
    "verdict": "ok"
   },
   "OP06-086": {
-   "ast_sha": "55e8aaf11ca3c12c",
-   "note": "未修正: 「1枚を登場させ、残りをレストで登場させる」が選んだ2枚の分配になっておらず、2枚目PLAY_CARD(REMAINING)がNOT_FIRED（パーサ/エンジン・既知の未対応）",
-   "probe_sha": "4d03bb103d979bd2",
+   "ast_sha": "6950aa395cf98ea9",
+   "note": "全句一致 [厳格レビュー]",
+   "probe_sha": "251a505cfa8a13df",
    "reviewed": "2026-10-01",
    "text_sha": "16d2e93c5673184b",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP06-087": {
    "ast_sha": "97d170e1550eee4a",
@@ -7305,12 +7305,12 @@
    "verdict": "ok"
   },
   "OP07-038": {
-   "ast_sha": "b577e180024a3c26",
-   "note": "エンジン: 条件 EVENT_THIS_TURN[CHAR_LEFT_BY_OWN_EFFECT] を記録する箇所が無く（journalのfuzzのみ）、ON_LEAVE が積まれても条件不成立で実戦では発動しない",
+   "ast_sha": "9086b99a3d973058",
+   "note": "全句一致 [厳格レビュー]",
    "probe_sha": "f00acb61420be547",
    "reviewed": "2026-10-01",
    "text_sha": "fa1a0d4eafdd067d",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP07-039": {
    "ast_sha": "4105c09fa3ae2424",
@@ -7657,8 +7657,8 @@
    "verdict": "ok"
   },
   "OP07-083": {
-   "ast_sha": "29131d4a5adc2aa5",
-   "note": "「このターン中…パワー+1000」の BUFF が期間 INSTANT に落ち(パーサ)、エンジンは power_buff を永続にするため+1000 が戻らない",
+   "ast_sha": "d14b79f6575c2116",
+   "note": "コスト「トラッシュのカード4枚」が厳密枚数でなく（is_strict_count なし）、4枚未満でも払えてしまう（パーサ）",
    "probe_sha": "f470b53b38ed592a",
    "reviewed": "2026-10-01",
    "text_sha": "4b031ede4b14db31",
@@ -7690,11 +7690,11 @@
   },
   "OP07-087": {
    "ast_sha": "2c86250d09a5b858",
-   "note": "「相手のコスト0のキャラがいる」の条件 FIELD_COUNT にコスト0の絞り(cost_max=0)が無く相手のキャラ1枚で成立する(パーサ)",
+   "note": "全句一致 [厳格レビュー]",
    "probe_sha": "76886573d0ce5a1d",
    "reviewed": "2026-10-01",
    "text_sha": "6f64ef6cc40e5a85",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP07-088": {
    "ast_sha": "eab1c6f29aa80f9a",
@@ -7714,8 +7714,8 @@
   },
   "OP07-091": {
    "ast_sha": "4a1761a61219bd03",
-   "note": "[厳格レビュー・修正後再判定]",
-   "probe_sha": "d95a192d5cd0b1bb",
+   "note": "全句一致 [厳格レビュー]",
+   "probe_sha": "e018900eadb44355",
    "reviewed": "2026-10-01",
    "text_sha": "4c352e1203c38732",
    "verdict": "ok"
@@ -8265,8 +8265,8 @@
    "verdict": "ok"
   },
   "OP08-046": {
-   "ast_sha": "53b152edc45b3c63",
-   "note": " [厳格レビュー]",
+   "ast_sha": "8b3236abd41f0553",
+   "note": "全句一致 [厳格レビュー]",
    "probe_sha": "9663815370b63df5",
    "reviewed": "2026-10-01",
    "text_sha": "65d3230cce18d52c",
@@ -8338,11 +8338,11 @@
   },
   "OP08-056": {
    "ast_sha": "48d295f4b4e270be",
-   "note": "ステージの ON_LEAVE 誘発句「自分の『白ひげ海賊団』キャラが効果で場を離れた時」: enqueue_on_leave の holders が leader+field のみでステージを走査せず誘発しない／裸の「効果で」も未検査(エンジン)",
+   "note": "全句一致 [厳格レビュー]",
    "probe_sha": "55e9be3162d00374",
    "reviewed": "2026-10-01",
    "text_sha": "c5758aec749c2112",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP08-057": {
    "ast_sha": "71b5acd5d1ae7d4e",
@@ -8473,12 +8473,12 @@
    "verdict": "ok"
   },
   "OP08-074": {
-   "ast_sha": "c4b7e4e9704d7b5d",
-   "note": "「相手の場のドン!!の枚数と同じ枚数になるように戻す」が RETURN_DON value=1 固定で動的枚数を表せていない(パーサ)",
+   "ast_sha": "e02edaed8860ca01",
+   "note": "全句一致 [厳格レビュー]",
    "probe_sha": "7586660f73181f72",
    "reviewed": "2026-10-01",
    "text_sha": "7f41e95907ddbf48",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP08-075": {
    "ast_sha": "79b8fe59d7c26ea0",
@@ -8794,8 +8794,8 @@
   },
   "OP08-118": {
    "ast_sha": "3fcba1ee3c489807",
-   "note": " [厳格レビュー]",
-   "probe_sha": "1cd382f8ac3c30bd",
+   "note": "全句一致 [厳格レビュー]",
+   "probe_sha": "fa76695da04d1be9",
    "reviewed": "2026-10-01",
    "text_sha": "ba54ef048a78951d",
    "verdict": "ok"
@@ -9386,11 +9386,11 @@
   },
   "OP09-080": {
    "ast_sha": "21cab9412bdc76f4",
-   "note": "ステージの ON_LEAVE 誘発句「自分の《麦わらの一味》キャラが相手の効果で場を離れた時」: enqueue_on_leave がステージを holders に含めず誘発しない(エンジン)",
+   "note": "全句一致 [厳格レビュー]",
    "probe_sha": "4195059479d30e99",
    "reviewed": "2026-10-01",
    "text_sha": "1407f2a12426e985",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP09-081": {
    "ast_sha": "e301d6f21c0ce4e7",
@@ -9985,12 +9985,12 @@
    "verdict": "ok"
   },
   "OP10-042": {
-   "ast_sha": "e2e2edcb4dddcd98",
-   "note": "エンジン/パーサ: 「KOされた時か相手の効果で場を離れた時」が ON_KO と ON_LEAVE の2能力に割れ、相手の効果でKOされると両方誘発し、【ターン1回】も共有されず2枚引ける",
-   "probe_sha": "278f8f224aee7a30",
+   "ast_sha": "c8592d012be9a4c9",
+   "note": "全句一致 [厳格レビュー]",
+   "probe_sha": "ad15850c486a804c",
    "reviewed": "2026-10-01",
    "text_sha": "99651a588171c066",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP10-043": {
    "ast_sha": "e7d3a951253be2bc",
@@ -10097,12 +10097,12 @@
    "verdict": "ok"
   },
   "OP10-058": {
-   "ast_sha": "ac0535474e567e7b",
-   "note": "エンジン/パーサ: 「公開したカードのうち1枚を登場／残りをレストで登場」の対象が TEMP（ref_id 無し）で公開は手札のまま＝PLAY_CARD が FIRED_EMPTY で登場しない",
-   "probe_sha": "2f8681e031a33aaf",
+   "ast_sha": "f6e057b33d596651",
+   "note": "全句一致 [厳格レビュー]",
+   "probe_sha": "89422982bf38d5ad",
    "reviewed": "2026-10-01",
    "text_sha": "6a806ac53dd1105f",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP10-059": {
    "ast_sha": "36738e1f8806454c",
@@ -10570,11 +10570,11 @@
   },
   "OP11-005": {
    "ast_sha": "30664f8861f6e342",
-   "note": "エンジン: 「属性(特)を持たないキャラの効果で」が発生源の種類を見ず、属性なしのイベント/ステージ/リーダーの効果のKOまで防ぐ",
+   "note": "全句一致 [厳格レビュー]",
    "probe_sha": "d9e241ab71181d90",
    "reviewed": "2026-10-01",
    "text_sha": "1d3c6418706b9c8c",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP11-006": {
    "ast_sha": "7d1e685b2179022b",
@@ -10697,9 +10697,9 @@
    "verdict": "ok"
   },
   "OP11-024": {
-   "ast_sha": "71c9ab71d97fb6bf",
-   "note": "パーサ: 「捨て、ドン!!をレストにしてもよい」の任意が REST_DON にだけ付き、手札を捨てる側は強制（断れない）",
-   "probe_sha": "cff5c598fc9c614c",
+   "ast_sha": "4caf4a526f272ac7",
+   "note": "「手札1枚を捨て、ドン!!1枚をレストにしてもよい」が別々の任意2つになり、捨てた後だけ断れ、「そうした場合」もレストの成否だけを見る（パーサ）",
+   "probe_sha": "10d2853ae284c253",
    "reviewed": "2026-10-01",
    "text_sha": "208bf1fca009d1b2",
    "verdict": "ng"
@@ -10914,11 +10914,11 @@
   },
   "OP11-058": {
    "ast_sha": "c0d4cad0c9c1af11",
-   "note": "エンジン: 条件付きPASSIVEの ATTACK_DISABLE（parser は duration=THIS_TURN）は再計算キーワード化が Instant のみで、手札が減ってもそのターンはアタック不可のまま",
+   "note": "全句一致 [厳格レビュー]",
    "probe_sha": "34e63a8aead6afdb",
    "reviewed": "2026-10-01",
    "text_sha": "ffe67e9bf847f806",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP11-059": {
    "ast_sha": "fb589221157d68bb",
@@ -11122,11 +11122,11 @@
   },
   "OP11-088": {
    "ast_sha": "e7678309df5c1823",
-   "note": "エンジン/パーサ: 「相手のキャラがアタックした時」の『キャラ』が効かず、相手リーダーのアタックでも誘発し、斬属性リーダーなら+5000が入る",
+   "note": "全句一致 [厳格レビュー]",
    "probe_sha": "946d749017a9df47",
    "reviewed": "2026-10-01",
    "text_sha": "338c76835d520387",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP11-090": {
    "ast_sha": "97d170e1550eee4a",
@@ -11201,12 +11201,12 @@
    "verdict": "ok"
   },
   "OP11-101": {
-   "ast_sha": "7ef78aa6b26a5c01",
-   "note": "パーサ: 置換の「ライフの上に加える」対象が SOURCE（カポネ自身）で、本来の離れる側の《超新星》キャラ(removed_card)ではない",
+   "ast_sha": "1a79a6f66b463534",
+   "note": "全句一致 [厳格レビュー]",
    "probe_sha": "1bd42a55acd607d2",
    "reviewed": "2026-10-01",
    "text_sha": "eb66a44593d2e139",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP11-102": {
    "ast_sha": "884de73e4f2f1b25",
@@ -11265,8 +11265,8 @@
    "verdict": "ok"
   },
   "OP11-110": {
-   "ast_sha": "6afc5a0ef2009b37",
-   "note": "パーサ/エンジン: 「魚人島」かリーダーの「しらほし」が NAME_OR_TYPE(LEADER)で、名前の合わない任意のリーダーまでレスト対象になる",
+   "ast_sha": "10b27fcec2efdcfd",
+   "note": "KO 置換の「代わりに…レストにできる」の断る側が未対応のまま（エンジン・報告済み）",
    "probe_sha": "e5b000cef74a51a7",
    "reviewed": "2026-10-01",
    "text_sha": "f7cb448fc4f55f97",
@@ -11433,12 +11433,12 @@
    "verdict": "ok"
   },
   "OP12-018": {
-   "ast_sha": "29b2ee0e31501cbe",
-   "note": "パーサ: 「ドン!!1枚をレストにできる」が REST_DON の is_optional 無しで強制実行（任意確認が出ない）",
-   "probe_sha": "b7a65d14f7247833",
+   "ast_sha": "45d9e3c692d58855",
+   "note": "全句一致 [厳格レビュー]",
+   "probe_sha": "3c5fa882cb4e958c",
    "reviewed": "2026-10-01",
    "text_sha": "b48ad8defe7e1ba3",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP12-019": {
    "ast_sha": "1f4d292d404a2d05",
@@ -11449,12 +11449,12 @@
    "verdict": "ok"
   },
   "OP12-020": {
-   "ast_sha": "5fa7ad5192b44a22",
-   "note": "パーサ/エンジン: 「このターン中、相手のキャラとバトルしている」が SOURCE_STATE IN_BATTLE（進行中バトル）で、起動メイン中は常に偽＝発動不能",
+   "ast_sha": "a437d53c2f6f0731",
+   "note": "全句一致 [厳格レビュー]",
    "probe_sha": "927a9d0a2d5c805a",
    "reviewed": "2026-10-01",
    "text_sha": "3b8741f8be9f25f0",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP12-021": {
    "ast_sha": "7bce979ffaac6c90",
@@ -11577,12 +11577,12 @@
    "verdict": "ok"
   },
   "OP12-040": {
-   "ast_sha": "7dffbe4669970602",
-   "note": "エンジン: 「海軍カードの効果で手札から捨てられた時」の誘発が未対応(明示の未修正項目)",
-   "probe_sha": "5419d7885c22c458",
+   "ast_sha": "38ae75bbd9c63545",
+   "note": "全句一致 [厳格レビュー]",
+   "probe_sha": "f00acb61420be547",
    "reviewed": "2026-10-01",
    "text_sha": "282a3051b978fc9b",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP12-041": {
    "ast_sha": "4215113ac7fafc5d",
@@ -11713,12 +11713,12 @@
    "verdict": "ok"
   },
   "OP12-061": {
-   "ast_sha": "cf001b3a05023940",
-   "note": "エンジン: 能力1「次に手札から登場させるコスト4以上のローのコスト-2」が一回限りでなく同ターンの該当カード全てに掛かる(OP02-025 と同型の未対応)",
+   "ast_sha": "9fa766703f671458",
+   "note": "ok: 置換の断る側は共通経路（removal_replace・テスト済み）で対応・NEXT_PLAY_ONCE 修正済み（起動後に引いたローは割引対象外の軽微な差のみ）[再レビュー re6] [厳格レビュー]",
    "probe_sha": "e9fa4f091159aa94",
    "reviewed": "2026-10-01",
    "text_sha": "3af78f7613dc4b2e",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP12-062": {
    "ast_sha": "e05825131c848cc1",
@@ -11802,11 +11802,11 @@
   },
   "OP12-075": {
    "ast_sha": "698d2d295e6576b2",
-   "note": "エンジン: 「相手は…アクティブで追加してもよい」の任意確認がカード使用者に出る(決めるのは相手のはず)。追加先は相手で一致",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "b321380e56c743b4",
    "reviewed": "2026-10-01",
    "text_sha": "b91f035c939630c9",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP12-077": {
    "ast_sha": "f2d04b2b5de403a3",
@@ -11842,11 +11842,11 @@
   },
   "OP12-081": {
    "ast_sha": "29637c5e54d949b5",
-   "note": "パーサ/エンジン: 能力0「相手のリーダーにアタックした時」が ON_ATTACK のみで攻撃先がリーダーかを見ず、キャラへのアタックでもドローする(能力1は一致)",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "debbee45e38ce121",
    "reviewed": "2026-10-01",
    "text_sha": "1de2e0e7c568c570",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP12-084": {
    "ast_sha": "9d1e73b9cf3a8d53",
@@ -11977,12 +11977,12 @@
    "verdict": "ok"
   },
   "OP12-102": {
-   "ast_sha": "9e3d561f8b0bfb39",
-   "note": "パーサ: 能力1「他の元々のコスト2のしらほしがいない場合」が HAS_CHARACTER しらほし(肯定)で否定・他の・元々コスト2が欠落し、自身がいれば真になり反転",
+   "ast_sha": "684b23d4eecf0d97",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "5bcf8fe91c672731",
    "reviewed": "2026-10-01",
    "text_sha": "473a0c84709af1c5",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP12-104": {
    "ast_sha": "dd5e8c9a8fbf2277",
@@ -12089,9 +12089,9 @@
    "verdict": "ok"
   },
   "OP13-001": {
-   "ast_sha": "45572ec2c18660c3",
-   "note": "パーサ/エンジン: 「ドン!!を任意の枚数レストにできる」が REST_DON 固定1枚・任意化なしで、1枚につきの倍率が常に1回分(最大+2000)",
-   "probe_sha": "15e98ebd639d51bd",
+   "ast_sha": "426231ba4fab012f",
+   "note": "パーサ/エンジン: 「ドン!!を任意の枚数レストにできる」が REST_DON 固定1枚で枚数を選べず、1枚につきの倍率が常に1回分（未対応）",
+   "probe_sha": "88eeaa1ffc118f12",
    "reviewed": "2026-10-01",
    "text_sha": "8a9c84f78b010b77",
    "verdict": "ng"
@@ -13873,12 +13873,12 @@
    "verdict": "ok"
   },
   "OP15-008": {
-   "ast_sha": "4b91a3fa35de5d07",
-   "note": "【起動メイン】「付与されているドン!!1枚につき-1000」の per 倍率が脱落し固定 -1000（パーサ）",
-   "probe_sha": "426157687a1400f6",
+   "ast_sha": "399ea2915357adbd",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
+   "probe_sha": "060137e369cd94d2",
    "reviewed": "2026-10-01",
    "text_sha": "f7c037a5d8bf9467",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP15-009": {
    "ast_sha": "99c7c144f0be9e18",
@@ -14042,7 +14042,7 @@
   },
   "OP15-031": {
    "ast_sha": "0cf616a50ae4cb85",
-   "note": "「選んだキャラのコストが付与ドン!!数と同じ場合KO」が DON_COUNT[EQ 0] と SELF/FIELD の KO に化け、選んだキャラとの比較・対象参照が無い（パーサ）",
+   "note": "パーサ/エンジン: 「選んだキャラのコストが付与ドン!!数と同じ場合KO」が DON_COUNT[EQ 0] と SELF/FIELD の KO のままで、選んだキャラとの比較・対象参照が無い（未対応）",
    "probe_sha": "df133b42e48dd6a0",
    "reviewed": "2026-10-01",
    "text_sha": "5b17ab873e1c637f",
@@ -14233,12 +14233,12 @@
    "verdict": "ok"
   },
   "OP15-056": {
-   "ast_sha": "4ee75b974362917d",
-   "note": "「ルーシーは…パワー+3000」の BUFF が対象限定（リーダー/名前）と期間（このターン中）を失い、自分の任意のカードを選べる（パーサ）",
-   "probe_sha": "d270326ec1cebe7b",
+   "ast_sha": "e91bf357e85d506c",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
+   "probe_sha": "2d2083d385c9da95",
    "reviewed": "2026-10-01",
    "text_sha": "a469f676e01a3e5a",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP15-057": {
    "ast_sha": "db072f3459825cac",
@@ -14258,11 +14258,11 @@
   },
   "OP15-059": {
    "ast_sha": "dc5aed4333e8f2ca",
-   "note": "「相手は…ドン!!を戻してもよい」の任意確認・ドン選択を相手でなく持ち主(actor)に問う（エンジン）",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "9aef78a462d9aa34",
    "reviewed": "2026-10-01",
    "text_sha": "b3572b8cc0cc38cc",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP15-060": {
    "ast_sha": "7299a83b3cf2e8fb",
@@ -14370,7 +14370,7 @@
   },
   "OP15-074": {
    "ast_sha": "1c03b37c97b6a57a",
-   "note": "LEADER_NAME 条件が能力全体にかかり、「その後」のコスト+2 句まで巻き込む疑い（本文の場合は引く句に係る読みが自然・パーサ条件範囲）。迷いのため ng",
+   "note": "パーサ: LEADER_NAME 条件が能力全体に掛かり「その後」のコスト+2句まで巻き込む疑い（「場合」の係り先は裁定要・未対応）",
    "probe_sha": "8b4040dda6189283",
    "reviewed": "2026-10-01",
    "text_sha": "a068d4710260eaf8",
@@ -14514,7 +14514,7 @@
   },
   "OP15-093": {
    "ast_sha": "37b5ad8b5df92497",
-   "note": "パーサ/エンジン: 「【速攻:キャラ】と属性(斬)を得る」の属性(斬)付与がノード無し（atoms.py が述語として捨て・エンジンに属性付与なし）。速攻:キャラのみ付与",
+   "note": "パーサ/エンジン: 「【速攻:キャラ】と属性(斬)を得る」の属性(斬)付与がノード無し（未対応）",
    "probe_sha": "2cbaeb23fdffebd1",
    "reviewed": "2026-10-01",
    "text_sha": "6db9328fdffcb35b",
@@ -14737,12 +14737,12 @@
    "verdict": "ok"
   },
   "OP16-003": {
-   "ast_sha": "28321435ca3170f4",
-   "note": "パーサ: 【自分のターン中】「リーダーは【ダブルアタック】を得て、パワー+2000」の後句 BUFF の対象が card_type 無しの SELF/FIELD CHOOSE で、リーダーに載らず任意の自キャラ選択になる",
-   "probe_sha": "3f35bab153cc2aab",
+   "ast_sha": "befb1ff1421c7394",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
+   "probe_sha": "328314280eef0cfe",
    "reviewed": "2026-10-01",
    "text_sha": "ef5ab0c73e64ec0f",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP16-005": {
    "ast_sha": "be0eaf3cfb20b151",
@@ -14777,12 +14777,12 @@
    "verdict": "ok"
   },
   "OP16-009": {
-   "ast_sha": "932a5fa8be8fd9b0",
-   "note": "パーサ/エンジン: 「次の相手のエンドフェイズ終了時まで、【速攻】を得て、パワー+2000」のパワー+2000 が duration=INSTANT で落ち、エンジンが恒久 power_buff に積む（期間が不一致）",
+   "ast_sha": "ea1bce16b3e11b01",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "00f45ab413c00e4a",
    "reviewed": "2026-10-01",
    "text_sha": "3cf1b65fc259f8e1",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP16-010": {
    "ast_sha": "6594b04d930ca43b",
@@ -15290,7 +15290,7 @@
   },
   "OP16-079": {
    "ast_sha": "63651df347efe0f8",
-   "note": "パーサ/エンジン: 「そのキャラは【速攻】を得る」の対象が SELF/TRASH のワノ国キャラ（ref_id 無し）で、登場したキャラ(trigger_subject)に付与されない",
+   "note": "パーサ/エンジン: 「トラッシュから登場した時」の誘発句が無く PASSIVE のまま、「そのキャラは速攻を得る」の対象が SELF/TRASH で登場したキャラに付与されない（未対応）",
    "probe_sha": "70b862ef937f60e8",
    "reviewed": "2026-10-01",
    "text_sha": "da314b962a742d68",
@@ -15665,12 +15665,12 @@
    "verdict": "ok"
   },
   "OP17-010": {
-   "ast_sha": "8e627d339803c8da",
-   "note": "このキャラ「パワー+2000」の期間（次の相手のエンドフェイズ終了時まで）が BUFF の duration=INSTANT に落ちている（ブロッカー付与側のみ UNTIL_NEXT_TURN_END）。パーサ",
+   "ast_sha": "cd628812ff4e1490",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "92d3e3f505b2487c",
    "reviewed": "2026-10-01",
    "text_sha": "4401209764048604",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP17-011": {
    "ast_sha": "02cdc2c713e2fc89",
@@ -15898,19 +15898,19 @@
   },
   "OP17-040": {
    "ast_sha": "00c1bd8d5ca5f9e5",
-   "note": "「自分のロックス海賊団特徴のリーダーがアタックした時かアタックされた時」が trigger=PASSIVE のまま（ON_ATTACK/ON_OPP_ATTACK＋リーダー特徴条件が無く誘発しない）。パーサ/エンジン",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "f61cc4fd7c42cbce",
    "reviewed": "2026-10-01",
    "text_sha": "a3241ddc3e563f6d",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP17-041": {
    "ast_sha": "99eb7d68c185cc36",
-   "note": "「持ち主が好きな順番でデッキの下」の並び替え(ARRANGE)を効果の使用者(actor)が行い、chooser=持ち主(相手)が無い。パーサ/エンジン(resolver suspend_for_arrange)",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "25aed2c677540061",
    "reviewed": "2026-10-01",
    "text_sha": "a4bb07c7b013b7e6",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "OP17-042": {
    "ast_sha": "ab6ef9ff62314d7b",
@@ -16465,8 +16465,8 @@
    "verdict": "ok"
   },
   "OP17-115": {
-   "ast_sha": "2548c8bf662e23a4",
-   "note": "ok [厳格レビュー]",
+   "ast_sha": "3a77ba279aae7d78",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "d412197a98fb7165",
    "reviewed": "2026-10-01",
    "text_sha": "2fe086d2b119ae53",
@@ -16810,11 +16810,11 @@
   },
   "P-046": {
    "ast_sha": "58648fb82bce1542",
-   "note": "エンジン: ARRANGE_DECK 中断を挟むと直前枚数（PREV_ACTION_COUNT）が失われ、『置いた枚数分カードを引く』が 0 枚ドローになる（プローブで DRAW value=0）",
-   "probe_sha": "d3393df4b24bffa0",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
+   "probe_sha": "cd5d7ea8b87e900b",
    "reviewed": "2026-10-01",
    "text_sha": "ce33a71181d14d25",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "P-047": {
    "ast_sha": "397b66c58665131e",
@@ -17425,12 +17425,12 @@
    "verdict": "ok"
   },
   "PRB02-005": {
-   "ast_sha": "be7554883cbd07ff",
-   "note": "パーサ/エンジン: 『次の相手のメインフェイズ開始時、』の遅延が欄に無く REST_DON が登場時に即時実行される（相手のリフレッシュで戻り実質無効）",
-   "probe_sha": "a1a383e7d2123db4",
+   "ast_sha": "5b969cba66ead76a",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
+   "probe_sha": "1eb955a601a5618f",
    "reviewed": "2026-10-01",
    "text_sha": "19ee1c44bcb3aa68",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "PRB02-006": {
    "ast_sha": "26051621142cb950",
@@ -18177,8 +18177,8 @@
    "verdict": "ok"
   },
   "ST07-004": {
-   "ast_sha": "7c1f756b0d939e2a",
-   "note": "HAS_DON・アタック時・ライフ上か下を手札(任意cost)→バニッシュ THIS_BATTLE＋パワー+1000 一致（+1000は期間継承なしでターン終了まで・実害なし） [厳格レビュー]",
+   "ast_sha": "1d1514e6bb4277c6",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "3821f9b27b8e8cb3",
    "reviewed": "2026-10-01",
    "text_sha": "2f43878434a2e11a",
@@ -18410,11 +18410,11 @@
   },
   "ST09-010": {
    "ast_sha": "113ae59b882e38eb",
-   "note": "エンジン: 「KOされる場合」の置換は相手効果の除去・バトルKOでしか評価されず自分の効果によるKOでは働かない（稀）。確認先行・ライフ上か下は解消",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "1bd42a55acd607d2",
    "reviewed": "2026-10-01",
    "text_sha": "1e917f52564a0008",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST09-012": {
    "ast_sha": "b06303af04fdd2d5",
@@ -18930,11 +18930,11 @@
   },
   "ST14-009": {
    "ast_sha": "388fcbe0eb4a697e",
-   "note": "エンジン: OPPONENT_TURN の「相手の効果でKOされず」PREVENT_LEAVE(INSTANT)は旗を立てず、保護走査(active_protection)は PASSIVE 能力しか見ないため保護が効かない",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "622e636df47dca21",
    "reviewed": "2026-10-01",
    "text_sha": "2eeac768f5d432b5",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST14-011": {
    "ast_sha": "47e0aa08092af385",
@@ -19194,11 +19194,11 @@
   },
   "ST20-002": {
    "ast_sha": "0117b19b06e12215",
-   "note": "エンジン: 「効果でKOされる場合」は自分の効果のKOも対象だが置換は相手効果の除去でしか評価されない（前回理由が残存）",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "1a37db7d04d0bda9",
    "reviewed": "2026-10-01",
    "text_sha": "9c031a6c257055dc",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST20-003": {
    "ast_sha": "ab87b7753f4e7c09",
@@ -19609,12 +19609,12 @@
    "verdict": "ok"
   },
   "ST27-004": {
-   "ast_sha": "aede9d4ddf23976a",
-   "note": "パーサ: 「自分のトラッシュ4枚につき、コスト+1」の BUFF 対象が SOURCE でなく SELF/FIELD CHOOSE count=4＝場のキャラ最大4枚にコスト増が付く（主語「このキャラ」の継承漏れ）。ブロッカー付与は解消",
-   "probe_sha": "e56a0f331786ac0d",
+   "ast_sha": "406a5b279061e85c",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
+   "probe_sha": "3503e00b799af0ed",
    "reviewed": "2026-10-01",
    "text_sha": "d5a54989d1d799b6",
-   "verdict": "ng"
+   "verdict": "ok"
   },
   "ST27-005": {
    "ast_sha": "65b3fce97b2d23bb",
@@ -19633,8 +19633,8 @@
    "verdict": "ok"
   },
   "ST28-002": {
-   "ast_sha": "3bb766a977dd105f",
-   "note": "ドン!!×2 ブロッカー・登場時 ワノ国リーダー THIS_TURN バニッシュ 一致 [厳格レビュー]",
+   "ast_sha": "80873d05c6474682",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "4bbd71e5b699cd16",
    "reviewed": "2026-10-01",
    "text_sha": "a68cda86bb0a9765",
@@ -19649,8 +19649,8 @@
    "verdict": "ok"
   },
   "ST28-004": {
-   "ast_sha": "22545c39df66a461",
-   "note": "自分ターン・ライフ2以下リーダー+1000・付与ドン2枚戻す(任意cost)→速攻 THIS_TURN＋パワー+1000 一致 [厳格レビュー]",
+   "ast_sha": "3adc3d257949c215",
+   "note": "ok [再レビュー re6] [厳格レビュー]",
    "probe_sha": "ccc5ebfe10e574ba",
    "reviewed": "2026-10-01",
    "text_sha": "f62d6a8f6fcaf88e",
