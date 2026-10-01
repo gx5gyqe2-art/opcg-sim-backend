@@ -381,6 +381,10 @@ def rate_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=No
     **必ずその席のターンの「最初の行」で呼ぶ**——ターン途中の行では殴り終わった体の
     `CAN_ATTACK` が落ちていて `A` がほぼ 0 になり、`τ = Θ/A` が数百ターンに飛ぶ（実測）。
     橋も `turn_start[(w, t)]` で読んでいる（`crossing_bridge.collect`）。"""
+    if plan is not None and "a_time" in plan:
+        # **H-4f（Q1）**: 帳簿の速さは時計（`Θ/A`）にしか使わない＝時刻で読む器。`rule_don` 系は
+        # **耐久 ÷ 歩きの τ**（T103 の最初のターンの 0 は τ の中にある）。
+        return float(plan["a_time"])
     if j is not None and CB.RATE_T1_MODE == "on" and int(j) == 0:
         return 0.0
     # **H-4b**: `plan`（`rule_don` 系の攻め手の計画）を渡すと速さの側も**耐久と同じ計画**を読む（T109）
@@ -460,6 +464,8 @@ def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, id
     mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
     b_me = CB.resting_blocker_term(tok, TO.SLOT_OWN_FIELD, olp, ci_row=ci_row, idx2cid=idx2cid, cards=cards)
     b_opp = CB.resting_blocker_term(tok, TO.SLOT_OPP_FIELD, mlp, ci_row=ci_row, idx2cid=idx2cid, cards=cards)
+    if (CB.THETA_HAND_MODE in CB.RULE_DON_MODES and don_plan is not None and "theta_parts" in don_plan):
+        b_opp = 0.0       # **H-4f（F1）**: 相手のレスト中のブロッカーは守る側の計算の中で戻る（`Θ_opp` に入っている）
     return st + (float(b_me), float(b_opp))
 
 

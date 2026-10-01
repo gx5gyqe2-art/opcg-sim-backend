@@ -873,6 +873,7 @@ def _g_opp_of(opp, last_main, ex, idx2cid, cards, cache, seat, deck=None):
         g = _g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards, cache, ("last", seat, opp["t"]))
         if CB.THETA_HAND_MODE in CB.RULE_DON_MODES:
             g = CB.with_life_types(g, deck)                # **H-4e（E1）**: 取られたライフの札（その席のデッキ）
+            g = CB.with_hand_blocker(g, ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)   # **H-4f（F1）**
         return g
     return _g_of_row(opp["sc"], opp["tok"], opp["ci"], idx2cid, cards, cache, (seat, opp["t"]))
 

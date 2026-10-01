@@ -304,6 +304,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                     # **H-4e（E1）**: 取られたライフの札の分布（その席のデッキ）
                     g_last_at_turn[(w, t)] = CB.with_life_types(g_last_at_turn[(w, t)],
                                                                 KV._deck_of(seat_decks, seed_g, w))
+                    g_last_at_turn[(w, t)] = CB.with_hand_blocker(g_last_at_turn[(w, t)], ex["sc"][i], ex["tok"][i],
+                                                                  ex["ci"][i], idx2cid, cards)   # **H-4f（F1）**
         if CB.THETA_HAND_MODE in CB.RULE_DON_MODES:
             # **H-4b（T109）**: 攻め手の計画は**そのターンの最初の行**で、守る席の手札（相手の直近のターンの
             # 最後の行）に対して 1 回だけ選ぶ。**速さ（`rate_at_turn`）も耐久（下の `state_of_row`）も同じ計画を読む**。
