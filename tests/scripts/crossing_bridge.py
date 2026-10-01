@@ -1006,6 +1006,8 @@ def _rule_hand_term(sc, tok, side, g_hand, mu=MU, turns=None, count=True):
 #    * **守る側も毎ターン 1 枚引く**（F4・完全情報で両席の引きを対称に・そのデッキの構成から）。
 #    * **地平**: 守る側の計算は T116 と同じ手札抜きの地平 `⌈τ0⌉`（ライフ ＋ 全てのブロッカーに盤面の素殴りで届くターン数）
 #      までを見る——引く札・取られたライフの札で手札が毎ターン増えるので、無制限に読むと状態が爆発する（実測 80 万状態）。
+#      それでも状態数が計算の予算（`EX_STATE_BUDGET`・理論の定数ではない）を超える計画は、地平を 1 ターンずつ縮めてやり直す
+#      （縮めた回数を `RULE_STATS["horizon_cut"]` に数える・報告で開示する）。
 #    * **読み手ごとの速さ**（Q1）: 時刻で読む器（線形の橋・帳簿）は `耐久 ÷ 歩きの τ`、1 ターンで読む器（速さの検算）は
 #      今のターンの損害（歩きの 1 段目）。実現の側の検算も、倒したターンはそのターン開始の耐久の残りで数える（E2）。
 #
@@ -1180,6 +1182,17 @@ _RULE_EX_MEMO = {}
 _RULE_EX_CTX = {}
 
 
+class _ModelBudget(Exception):
+    """守る側の計算の状態数が予算を超えた（`rule_don_solve` が地平を 1 つ縮めてやり直す）。"""
+
+
+#: **計算の予算（理論の定数ではない）**: 1 回の `rule_don_solve` が守る側の計算で新しく作ってよい状態の数。超えたら
+#: 地平を 1 ターン縮めてやり直す（地平 1 は必ず収まる）。縮めた回数は `RULE_STATS["horizon_cut"]` に数える。
+#: `None` なら無制限（テスト・小さい盤面）。
+EX_STATE_BUDGET = 60000
+_EX_USED = {"n": 0, "limit": None}
+
+
 def _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, life_types,
                         lam, lam_net, mu, olp, mlp, rest_blk=(), arrive_blk=(), draw_types=()):
     types = tuple((float(c), float(d), float(p)) for c, d, p in (life_types or ()) if float(p) > 0.0)
@@ -1343,6 +1356,9 @@ def _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, lif
             r = next_turn(t, hand, lf, tuple(sorted(ready + rested + pend, reverse=True)))
             out = (r[0], r[1], r[2] + 1.0, r[3], (0.0,) + tuple(r[4]))
             memo[key] = out
+            _EX_USED["n"] += 1
+            if _EX_USED["limit"] is not None and _EX_USED["n"] > _EX_USED["limit"]:
+                raise _ModelBudget()
             return out
         best_att = None
         for x in sorted(set(rem)):                            # 攻め手が次に宣言する攻撃を選ぶ
@@ -1386,6 +1402,9 @@ def _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, lif
             if best_att is None or better(best_att, best_def):
                 best_att = best_def
         memo[key] = best_att
+        _EX_USED["n"] += 1
+        if _EX_USED["limit"] is not None and _EX_USED["n"] > _EX_USED["limit"]:
+            raise _ModelBudget()
         return best_att
 
     # 今のターン: アクティブなブロッカーだけが横取りでき、レスト中のものと手札から出るものは次のターンから
@@ -1693,6 +1712,41 @@ _RULE_DON_CACHE = {}
 
 
 def rule_don_solve(cards_d, don_d, blk, life, actx, turns=None, life_types=(), draw_types=(), arrive=()):
+    """`_rule_don_solve` を地平 `⌈τ0⌉`（手札抜きの地平）から始め、守る側の計算の状態数が予算 `EX_STATE_BUDGET` を超えたら
+    地平を 1 ターンずつ縮めてやり直す（縮めた回数を数える・計画の `horizon` に使った地平を残す）。`turns` を渡されたら
+    その地平のまま（窓・テスト）。"""
+    key = (tuple(sorted((float(c), float(d)) for c, d in cards_d or ())), float(don_d),
+           tuple(sorted(float(m) for m in blk or ())), int(max(0, round(float(life)))),
+           None if turns is None else int(turns), tuple(life_types or ()), tuple(draw_types or ()),
+           tuple(sorted(float(m) for m in arrive or ())), actx["key"], "w")
+    if key in _RULE_DON_CACHE:
+        return _RULE_DON_CACHE[key]
+    if turns is not None:
+        out = _rule_don_solve(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arrive)
+    else:
+        L0 = int(max(0, round(float(life))))
+        h0 = model_horizon(actx, blk, L0, arrive)
+        out = None
+        for h in range(h0, 0, -1):
+            _EX_USED["n"] = 0
+            _EX_USED["limit"] = EX_STATE_BUDGET if h > 1 else None
+            try:
+                out = _rule_don_solve(cards_d, don_d, blk, life, actx, h, life_types, draw_types, arrive)
+            except _ModelBudget:
+                RULE_STATS["horizon_cut"] = RULE_STATS.get("horizon_cut", 0) + 1
+                continue
+            finally:
+                _EX_USED["limit"] = None
+            break
+        out[2]["horizon"] = h
+        out[2]["horizon0"] = h0
+    if len(_RULE_DON_CACHE) > 100000:
+        _RULE_DON_CACHE.clear()
+    _RULE_DON_CACHE[key] = out
+    return out
+
+
+def _rule_don_solve(cards_d, don_d, blk, life, actx, turns, life_types=(), draw_types=(), arrive=()):
     """**H-4b／H-4e／H-4f**: 攻め手の最善の計画（今のターンに出す札の組 × 付与）に対する守る側の最善の守り。
 
     **2 ターン目からは攻め手もその段のドンで財布を解き直す**（`rules_steps`・F2）——今のターンの計画が変えるのは
@@ -1726,8 +1780,6 @@ def rule_don_solve(cards_d, don_d, blk, life, actx, turns=None, life_types=(), d
     no_now = bool(actx.get("no_attack_now"))
     max_t = max([0.0] + [float(c) for c, _d, _p in (life_types or ())])
     s_cnt = sum(float(c) for c, _d in cards_d or ())
-    if turns is None:
-        turns = model_horizon(actx, blk, L0, arrive)
 
     for mask in range(1 << n_c):
         play = [i for i in range(n_c) if mask >> i & 1]

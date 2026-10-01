@@ -2602,3 +2602,31 @@ def test_the_defender_model_looks_only_as_far_as_the_walk_without_the_hand():
     assert h0 == 1 and h3 >= h0 and hb >= h3 and slow > h3
     ax["rest_blk"] = (1000.0,)
     assert CB.model_horizon(ax, [], 3) >= h3
+
+
+def test_an_oversized_defender_model_shortens_its_horizon_and_says_so():
+    """**H-4f（計算の予算）**: 守る側の計算の状態数が予算を超えたら地平を 1 ターンずつ縮めてやり直す（地平 1 は必ず収まる）。
+    縮めた回数を数え、計画に使った地平を残す。予算が十分なら縮めない（結果は予算なしと同じ）。"""
+    cards = [(1000.0, 0.0), (2000.0, 0.0), (1000.0, 0.0), (2000.0, 0.0)]
+    lt = ((1000.0, 0.0, 0.3), (2000.0, 0.0, 0.3))
+    dt = ((1000.0, 0.0, 0.3), (2000.0, 0.0, 0.3))
+    att = [(0, 0.0), (2, 1000.0), (3, 0.0)]
+    ax = _actx(6, att, att, [], kmax=2, a_tab=[0.01] * 8, board=0.05)
+    ax["ds"] = [6.0 + i for i in range(30)]
+    ax["key"] = ax["key"] + ("budget",)
+    old = CB.EX_STATE_BUDGET
+    try:
+        CB.EX_STATE_BUDGET = None
+        CB._RULE_DON_CACHE.clear()
+        _c, _s, free = CB.rule_don_solve(cards, 0.0, [], 3, ax, None, lt, dt)
+        assert free["horizon"] == free["horizon0"]
+        CB.EX_STATE_BUDGET = 50
+        ax["key"] = ax["key"] + ("tight",)
+        CB._RULE_EX_MEMO.clear(); CB._RULE_EX_CACHE.clear()          # 覚えた状態を使うと新しい状態が要らない
+        n0 = CB.RULE_STATS.get("horizon_cut", 0)
+        _c, _s, tight = CB.rule_don_solve(cards, 0.0, [], 3, ax, None, lt, dt)
+        assert tight["horizon"] < tight["horizon0"] and CB.RULE_STATS.get("horizon_cut", 0) > n0
+        assert tight["horizon"] >= 1 and tight["tau"] >= 0.0
+    finally:
+        CB.EX_STATE_BUDGET = old
+        CB._RULE_DON_CACHE.clear()
