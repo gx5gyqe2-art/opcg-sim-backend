@@ -577,6 +577,8 @@ push 前の必須ゲートは **`make test` 1 本**（2026-09-07・第 2 段 `rs
 | `cargo test --no-default-features` | Rust の単体テスト 381 本（`make test` が先に回す） |
 | `tests/test_effect_oracle_gate.py` | 静的 text↔AST 整合性 HAS_OTHER / PER_TURN_LIMIT_GAP / UP_TO_GAP = 0（**ラチェット**） |
 | `tests/test_verified_buckets.py` | §8.2 台帳「✓」弾×色がベースライン全数登録・H違反0（ドキュメント主張の機械保証） |
+| `tests/test_parser_cost_effect_gate.py` | 「コスト：〜の場合、効果」の条件は効果側（Branch）に残り能力全体へ持ち上げない（OP05-082／OP10-118／OP09-060／OP15-074・ユーザ決定 2026-10-01）。コストなし・「：」前・見出し条件は従来どおり。`test_verified_buckets.py` の `H_COST_GATE_LIFT=0` ラチェットと対 |
+| `cargo test`（`rules/tests_cost_gate.rs`） | 実カード（`tests/fixtures/cost_gate_cards.json`）で、条件偽でも起動メインが合法手に出てコストだけ払い効果が不発／真なら効果が出る |
 | `tests/test_contract_export.py` | `contract/` の再生成差分ゼロ（API 契約のラチェット） |
 | （legacy・tag で回す） | `full_card_audit.py`（EXCEPTION/CARD_LOSS/TEMP_LEAK=0）・`test_full_card_baseline.py`・`test_verified_decks.py`・`compare_parsers.py`・`test_structural_gate.py` |
 
@@ -779,7 +781,7 @@ OPCG_LOG_SILENT=1 python tests/scripts/perf_gate.py --full      # 本走（pairs
 | 持続時間の写像漏れ | 「次の相手のエンドフェイズ終了時まで」が `INSTANT` に退化し即失効 | 対象アクションの `duration` を確認（UNTIL_NEXT_TURN_END 等） |
 | スケール値の脱落 | 「カード名の異なるキャラ1枚につき+N」がフラット値に退化 | `ValueSource.dynamic_source`（COUNT_QUERY 等）と count_query を確認 |
 | 危険な常在 | `PASSIVE`+`VICTORY` 等が再計算ループで誤発火（相手ライフ0で自動勝利） | 不変条件テスト（誤って勝利/除去しないこと）を追加 |
-| **先頭条件が「。その後、」をまたいで漏れる**（カテゴリH・是正済） | 「〈条件〉の場合、A**。その後、**B」でBが条件の外に出て無条件実行（EB02-032 ドン<3でもガレーラ登場／EB03-017 超新星でなくても相手レスト不可／OP04-033・ST11-004 等・全弾~119能力） | 能力 effect の先頭要素が `branch`(if_false=None) かつ後続に実効果アクション（PLAY_CARD/KO/REST/BUFF/付与/ACTIVE_DON 等）が並ぶか。先頭条件は能力全体（その後 B 含む）をゲートすべき。TEMP/REMAINING のデッキ整理だけの後続は no-op で無害。**`EffectParser._lift_h_gate` で先頭ゲートを能力全体へ引き上げ済み**。再混入は `tests/test_structural_gate.py`（構造不変条件＝上限0）で検出する |
+| **先頭条件が「。その後、」をまたいで漏れる**（カテゴリH・是正済） | 「〈条件〉の場合、A**。その後、**B」でBが条件の外に出て無条件実行（EB02-032 ドン<3でもガレーラ登場／EB03-017 超新星でなくても相手レスト不可／OP04-033・ST11-004 等・全弾~119能力） | 能力 effect の先頭要素が `branch`(if_false=None) かつ後続に実効果アクション（PLAY_CARD/KO/REST/BUFF/付与/ACTIVE_DON 等）が並ぶか。先頭条件は能力全体（その後 B 含む）をゲートすべき。TEMP/REMAINING のデッキ整理だけの後続は no-op で無害。**`EffectParser._lift_h_gate` で先頭ゲートを能力全体へ引き上げ済み**（ただし**コスト「：」を持つ能力の効果側条件は引き上げず効果ノードに残す**＝条件偽でもコストは払え効果だけ不発。2026-10-01）。再混入は `tests/test_structural_gate.py`（構造不変条件＝上限0）で検出する |
 
 > **カテゴリH の修正（是正済み）**: パーサ `EffectParser._lift_h_gate` が「能力 effect の先頭要素が分岐
 > （if_false=None＝先頭条件）」のとき、その条件でシーケンス全体を包む（後続を if_true に取り込み

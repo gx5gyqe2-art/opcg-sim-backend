@@ -27,6 +27,8 @@ pub mod pending;
 pub mod turn;
 #[cfg(test)]
 mod tests_rules;
+#[cfg(test)]
+mod tests_cost_gate;
 
 use crate::model::{CardIdx, CardType, GameState, MasterTable, Restriction, Seat};
 

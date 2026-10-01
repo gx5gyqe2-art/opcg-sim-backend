@@ -750,6 +750,14 @@ class EffectParser:
             # カテゴリH: 先頭ゲート条件が「。その後、」をまたいで後続を無条件化する漏れを是正する。
             effect_node = self._lift_h_gate(effect_node, effect_text)
 
+            # コスト（「：」の前）を持つ能力の効果側条件は、能力全体ではなく効果ノード側に残す
+            # （ユーザ決定 2026-10-01）。公式ルールでは条件が偽でもコストは払え、効果だけが不発になる
+            # （OP05-082/OP10-118/OP12-094/OP09-060/OP15-074）。「A。その後、B」の B まで条件が係る。
+            # コストなし・条件が「：」の前（cost_gate_cond）・見出しの条件は従来どおり能力全体。
+            if effect_gate_cond is not None and cost_node is not None and effect_node is not None:
+                effect_node = Branch(condition=effect_gate_cond, if_true=effect_node, if_false=None)
+                effect_gate_cond = None
+
             # ゲーム開始時のデッキサーチはルール上シャッフルを伴う（OP13-079）。
             if (trigger == TriggerType.GAME_START and effect_node is not None
                     and _nfc("デッキから") in effect_text):
@@ -802,6 +810,7 @@ class EffectParser:
                 and self._node_moves_life(cost_node))
             if (isinstance(effect_node, Branch) and effect_node.if_false is None
                     and effect_node.condition is not None
+                    and cost_node is None
                     and not _cost_changes_life):
                 if final_condition is None:
                     final_condition = effect_node.condition
