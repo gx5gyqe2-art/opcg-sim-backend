@@ -510,7 +510,8 @@ def test_end_of_turn_frames_read_the_next_opponent_turn_leader_power():
 def test_guard_rows_read_no_frame_after_the_row():
     """守りの窓（守り手 `w` の行・攻め手 `1 − w` のターン `t` の途中）で攻め手の値段の窓を引くとき、
     **攻め手のターン末の枠**（`end_of_turn=True`）はそのターンの最後の行と次のターンの最初の行＝この行より後ろを読む（先読み）。
-    **今のターンの最初の行**（`theory_bridge` の `first_main`・T79 の相手の行と同じ）はこの行より前。実記録 2 局で全部の守りの窓を確かめる。"""
+    **今のターンの最初の行**（`theory_bridge` の `first_main`・T79 の相手の行と同じ）は普通この行より前で、後ろになる稀な窓
+    （攻め手の最初の main の行より前に守りの窓が来る）は `frame_key(at_n=)` が前の枠へ落とす。実記録 2 局で全部の守りの窓を確かめる。"""
     from opcg_sim.learned.train import plan_labels as PL
     n_guard = n_flag_old = 0
     for rows, ex, order, idx2cid, cards, own_last in _fixture_frames():
@@ -526,8 +527,10 @@ def test_guard_rows_read_no_frame_after_the_row():
             if t < 1 or PL.is_own_turn(w, t):
                 continue                                  # 守りの窓＝相手のターンの自分の行
             n_guard += 1
-            p_new = new.lookahead_pos(1 - w, t)
-            assert p_new is None or p_new <= n
+            k_new = new.frame_key(1 - w, t, at_n=n)            # 因果の選び方（この行より後ろを読む枠は飛ばす）
+            assert k_new is None or new._key_last_pos(k_new) <= n
+            k_old = old.frame_key(1 - w, t, at_n=n)            # 旧の枠の束でも、因果の選び方なら先読みしない
+            assert k_old is None or old._key_last_pos(k_old) <= n
             p_old = old.lookahead_pos(1 - w, t)
             if p_old is not None and p_old > n:
                 n_flag_old += 1

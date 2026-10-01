@@ -548,13 +548,34 @@ class CutFrames:
     def _st(self, k, v=1):
         self.stats[k] = self.stats.get(k, 0) + v
 
-    def frame_key(self, d, t):
-        """席 `d` の枠のうち自席ターンが `t` 以下で一番新しいもの（無ければ `None`）。"""
+    def frame_key(self, d, t, at_n=None):
+        """席 `d` の枠のうち自席ターンが `t` 以下で一番新しいもの（無ければ `None`）。
+        `at_n`（呼ぶ行の `order` の中の位置）を渡せば、**その行より後ろの行を読む枠は飛ばす**（因果: 窓はその行までに
+        在る行だけで作る・2026-10-01 の点検）。"""
         ts = [tt for tt in self._by_seat.get(int(d), ()) if tt <= int(t)]
-        return (int(d), ts[-1]) if ts else None
+        if at_n is None:
+            return (int(d), ts[-1]) if ts else None
+        for tt in reversed(ts):
+            key = (int(d), tt)
+            if self._key_last_pos(key) <= int(at_n):
+                return key
+            self._st("cut_causal_skip")
+        return None
 
-    def curve(self, d, t):
-        key = self.frame_key(d, t)
+    def _key_last_pos(self, key):
+        """枠 `key` が読む一番後ろの行の位置（枠の行と、ターン末の枠なら次の相手ターンの最初の行）。"""
+        if not hasattr(self, "_posmap"):
+            self._posmap = {int(i): n for n, i in enumerate(self.order)}
+        last = self._posmap.get(int(self.frame_rows[key]), -1)
+        if self.end_of_turn:
+            for n, i in enumerate(self.order):
+                if int(self.rows["who"][i]) == 1 - int(key[0]) and int(self.rows["turn"][i]) == int(key[1]) + 1:
+                    last = max(last, n)
+                    break
+        return last
+
+    def curve(self, d, t, at_n=None):
+        key = self.frame_key(d, t, at_n)
         if key is None:
             return None
         if key not in self._curves:
@@ -589,15 +610,7 @@ class CutFrames:
         key = self.frame_key(d, t)
         if key is None:
             return None
-        if not hasattr(self, "_posmap"):
-            self._posmap = {int(i): n for n, i in enumerate(self.order)}
-        last = self._posmap.get(int(self.frame_rows[key]), -1)
-        if self.end_of_turn:
-            for n, i in enumerate(self.order):
-                if int(self.rows["who"][i]) == 1 - int(key[0]) and int(self.rows["turn"][i]) == int(key[1]) + 1:
-                    last = max(last, n)
-                    break
-        return last
+        return self._key_last_pos(key)
 
     def view(self, d, t, hand_now, at_n=None):
         """席 `d` が守り手の値段の窓（今の枚数 `hand_now`）。枠が無ければ `None`（旧の値段）。
@@ -605,10 +618,10 @@ class CutFrames:
         2026-10-01 の点検: 守りの窓で攻め手の進行中のターンの末の枠を読んでいた＝先読み。器は 0 を保つ）。"""
         if at_n is not None:
             self._st("cut_lookups")
-            p = self.lookahead_pos(d, t)
-            if p is not None and p > int(at_n):
-                self._st("cut_lookahead")
-        cv = self.curve(d, t)
+            key = self.frame_key(d, t, at_n)
+            if key is not None and self._key_last_pos(key) > int(at_n):
+                self._st("cut_lookahead")                     # 因果の選び方なら常に 0（器の検算）
+        cv = self.curve(d, t, at_n)
         if cv is None:
             self._st("cut_view_flat")
             return None
