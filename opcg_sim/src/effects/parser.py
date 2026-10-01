@@ -595,6 +595,10 @@ class EffectParser:
             # 自身の置換（このキャラ）は条件が status に包含されるので ab.condition は不要。
             # 他のキャラを守る型は OPPONENT_REMOVAL 条件を保持し、_active_replacement で評価。
             repl_status = self._replacement_status(_nfc(text))
+            # 効果側の「〜することができる」（コストの「できる：」ではなく動作そのものが任意）。
+            # 置換（代わりに〜）と常在（PASSIVE）は別扱い（置換の任意は下のコメント参照）。
+            if not repl_status and trigger != TriggerType.PASSIVE:
+                self._mark_optional_effects(effect_node)
             if repl_status and effect_node is not None:
                 # 「代わりに〜できる／てもよい」は任意の置換（払うかを選べる）。**バトル KO の置換**は
                 # エンジンが sub_effect の is_optional を見て先に確認する（accept→置換・decline→KO）。
@@ -633,6 +637,35 @@ class EffectParser:
             )
         except Exception as e:
             return Ability(trigger=TriggerType.UNKNOWN, effect=None, raw_text=_nfc(text))
+
+    _OPTIONAL_END_RE = re.compile(_nfc(r"ことができる$"))
+    _OPTIONAL_TYPES = frozenset({
+        ActionType.MOVE_CARD, ActionType.DRAW, ActionType.DISCARD, ActionType.TRASH,
+        ActionType.DECK_BOTTOM, ActionType.BOUNCE, ActionType.PLAY_CARD, ActionType.HEAL,
+        ActionType.RETURN_DON, ActionType.REVEAL,
+    })
+
+    def _mark_optional_effects(self, node):
+        """効果ツリーの GameAction のうち、本文が「〜することができる」で終わるものを任意にする。
+
+        「手札に加えることができる」「カード1枚を引くことができる」は、使うかをプレイヤーが選べる
+        （従来は てもよい だけが任意で、強制実行になっていた・2026-10-01 カード効果監査）。
+        「アタックできる」「レストにできない」等の付与・制限は対象の種別で除外している。
+        """
+        if node is None:
+            return
+        if isinstance(node, GameAction):
+            if (node.type in self._OPTIONAL_TYPES and not node.is_optional
+                    and self._OPTIONAL_END_RE.search(_nfc(node.raw_text or ""))
+                    and not _nfc(node.raw_text or "").startswith(_nfc("代わりに"))):
+                node.is_optional = True
+            return
+        for child in (getattr(node, "actions", None) or []):
+            self._mark_optional_effects(child)
+        for attr in ("if_true", "if_false"):
+            self._mark_optional_effects(getattr(node, attr, None))
+        for opt in (getattr(node, "options", None) or []):
+            self._mark_optional_effects(opt)
 
     def _apply_opponent_self_chooser(self, node):
         """effect/cost ツリーを走査し、「相手は自身の〜」（相手が自分のカードを処理する）
