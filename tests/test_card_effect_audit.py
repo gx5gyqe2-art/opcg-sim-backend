@@ -184,7 +184,7 @@ def test_probe_flags_do_not_leak_into_normal_evaluation(engine_and_cards):
     with open(AUDIT_GOLDEN, encoding="utf-8") as f:
         golden = {(e["card_id"], e["ability_index"]): e for e in json.load(f)["entries"]}
     # 条件つき（リーダー特徴）・対象つき（特徴フィルタ）の能力を選ぶ。
-    picks = [("EB01-020", 0), ("OP01-031", 0), ("OP14-021", 0)]
+    picks = [("EB01-020", 0), ("OP01-031", 0), ("OP13-079", 0)]
     for cid, idx in picks:
         engine.effect_probe(cid, cards[cid]["abilities"][idx]["trigger"], idx, True, [], True)
         e = golden[(cid, idx)]

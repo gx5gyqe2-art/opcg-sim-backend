@@ -525,7 +525,10 @@ def _power_buff(ctx: ParseContext) -> Optional[GameAction]:
     # 「<数える対象>N枚につき、<対象>は…パワー±N」: 対象は「につき、」の後ろだけから作る。数える側の
     # 特徴・側（「自分の場の特徴《麦わらの一味》を持つカード1枚につき」）を対象の絞り込みに混ぜると、
     # 相手キャラが麦わら持ちに限られていた（ST31-004）。
-    tq = _buff_target(re.sub(_nfc(r"^.*?枚につき、?"), "", t, count=1) or t)
+    _after_per = re.sub(_nfc(r"^.*?枚につき、?"), "", t, count=1)
+    # 「につき」の後ろに対象（キャラ/リーダー…）があるときだけそれを使う（「このキャラは、…5枚につき、
+    # パワー+1000」のように主語が前に来る形は全文のまま）。
+    tq = _buff_target(_after_per if re.search(_nfc(r"キャラ|リーダー|カード|ステージ"), _after_per) else t)
     x = _to_int(m.group(1))
     buff = GameAction(
         type=ActionType.BUFF,

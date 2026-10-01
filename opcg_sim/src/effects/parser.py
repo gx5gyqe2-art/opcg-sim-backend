@@ -305,6 +305,8 @@ class EffectParser:
                 else:
                     tq.power_min = v
                 act.target = tq
+                # 消した条件句の本文も実行ノードの raw_text に残す（本文照合で「句が抜けた」扱いにしない）。
+                act.raw_text = f"{cond.raw_text}、{act.raw_text}" if act.raw_text else cond.raw_text
                 n.condition = None
         if not any(is_producer(n) for n in nodes):
             # 直前の PLAY_CARD（「登場させた場合、そのキャラは…」）が producer の代わりになる:
