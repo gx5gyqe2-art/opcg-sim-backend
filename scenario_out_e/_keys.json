@@ -1,0 +1,3461 @@
+{
+ "E1": {
+  "enel_t9_kaminosabaki_before_attack": {
+   "s0": false,
+   "s1": false,
+   "s2": false,
+   "s3": false,
+   "s4": false,
+   "s5": false,
+   "s6": false,
+   "s7": false
+  },
+  "enel_roger_t7_gammaknife": {
+   "s0": false,
+   "s1": false,
+   "s2": false,
+   "s3": true,
+   "s4": false,
+   "s5": false,
+   "s6": false,
+   "s7": false
+  },
+  "enel_luffy_t4_kami_ko": {
+   "s0": "no_kami",
+   "s1": "no_kami",
+   "s2": "no_kami",
+   "s3": "no_kami",
+   "s4": "no_kami",
+   "s5": "no_kami",
+   "s6": "no_kami",
+   "s7": "no_kami"
+  },
+  "detail_enel_t9_kami_vs_oom": {
+   "s0": {
+    "action_index": 7,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.907,
+    "top_by_n": {
+     "n": 164,
+     "q": 0.8636,
+     "p": 0.1385,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-061"
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0157,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 123,
+     "q": 0.9072,
+     "p": 0.0545,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s1": {
+    "action_index": 14,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.982,
+    "top_by_n": {
+     "n": 437,
+     "q": 0.9819,
+     "p": 0.2078,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0362,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 437,
+     "q": 0.9819,
+     "p": 0.2078,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s2": {
+    "action_index": 14,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.981,
+    "top_by_n": {
+     "n": 426,
+     "q": 0.9811,
+     "p": 0.2078,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0362,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 426,
+     "q": 0.9811,
+     "p": 0.2078,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s3": {
+    "action_index": 12,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.897,
+    "top_by_n": {
+     "n": 223,
+     "q": 0.8842,
+     "p": 0.181,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0243,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 222,
+     "q": 0.8972,
+     "p": 0.1384,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s4": {
+    "action_index": 14,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.984,
+    "top_by_n": {
+     "n": 445,
+     "q": 0.9842,
+     "p": 0.2078,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0362,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 445,
+     "q": 0.9842,
+     "p": 0.2078,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s5": {
+    "action_index": 14,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.943,
+    "top_by_n": {
+     "n": 376,
+     "q": 0.9426,
+     "p": 0.2078,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0362,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 376,
+     "q": 0.9426,
+     "p": 0.2078,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s6": {
+    "action_index": 6,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-061"
+    },
+    "chosen_q": 0.877,
+    "top_by_n": {
+     "n": 241,
+     "q": 0.8768,
+     "p": 0.1392,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-061"
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0162,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 106,
+     "q": 0.8621,
+     "p": 0.0886,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s7": {
+    "action_index": 14,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.924,
+    "top_by_n": {
+     "n": 415,
+     "q": 0.9238,
+     "p": 0.2078,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0362,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 415,
+     "q": 0.9238,
+     "p": 0.2078,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   }
+  },
+  "enel_t9_winner": {
+   "s0": null,
+   "s1": null,
+   "s2": null,
+   "s3": null,
+   "s4": null,
+   "s5": null,
+   "s6": null,
+   "s7": null
+  },
+  "box_vs_bare": {
+   "decisions": 258,
+   "chose_box": 80,
+   "chose_bare": 0,
+   "pairs": 0,
+   "bare_gt_box": 0,
+   "box_max_gt_bare": 0,
+   "bare_gt_box_ratio": "0/0"
+  },
+  "detail_enel_roger_t7_gamma": {
+   "s0": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-061"
+    },
+    "chosen_q": -0.361,
+    "top_by_n": {
+     "n": 56,
+     "q": -0.3073,
+     "p": 0.0413,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 5,
+      "card": "OP15-066",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 49,
+     "q": -0.3857,
+     "p": 0.0158,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s1": {
+    "action_index": 0,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-061"
+    },
+    "chosen_q": -0.211,
+    "top_by_n": {
+     "n": 93,
+     "q": -0.3611,
+     "p": 0.0286,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-058"
+     }
+    },
+    "gamma": {
+     "n": 7,
+     "q": -0.45,
+     "p": 0.0156,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s2": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-118",
+     "targets": [
+      "OP13-003"
+     ]
+    },
+    "chosen_q": -0.346,
+    "top_by_n": {
+     "n": 85,
+     "q": -0.3459,
+     "p": 0.212,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 51,
+     "q": -0.1519,
+     "p": 0.0118,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s3": {
+    "action_index": 5,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.242,
+    "top_by_n": {
+     "n": 78,
+     "q": -0.2422,
+     "p": 0.0111,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 78,
+     "q": -0.2422,
+     "p": 0.0111,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s4": {
+    "action_index": 17,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-066",
+     "targets": [
+      "OP13-003"
+     ]
+    },
+    "chosen_q": -0.554,
+    "top_by_n": {
+     "n": 152,
+     "q": -0.5706,
+     "p": 0.2146,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 52,
+     "q": -0.5271,
+     "p": 0.0441,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s5": {
+    "action_index": 5,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-061"
+    },
+    "chosen_q": -0.295,
+    "top_by_n": {
+     "n": 80,
+     "q": -0.4225,
+     "p": 0.1891,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 20,
+     "q": -0.2121,
+     "p": 0.0111,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s6": {
+    "action_index": 12,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-063"
+    },
+    "chosen_q": -0.404,
+    "top_by_n": {
+     "n": 104,
+     "q": -0.4698,
+     "p": 0.2029,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 39,
+     "q": -0.3693,
+     "p": 0.0312,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s7": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-063"
+    },
+    "chosen_q": -0.197,
+    "top_by_n": {
+     "n": 89,
+     "q": -0.1974,
+     "p": 0.0307,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-063"
+     }
+    },
+    "gamma": {
+     "n": 39,
+     "q": -0.1546,
+     "p": 0.0118,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   }
+  },
+  "setup_box_structure": {
+   "boxes": {
+    "setup": 82482,
+    "attack": 0,
+    "defense": 96406
+   },
+   "box_decisions": 80,
+   "box_below_floor": 21,
+   "n_floor": 80,
+   "box_branches_median": 2.0,
+   "box_branch_n_sum_median": 304.5
+  }
+ },
+ "E2": {
+  "enel_t9_kaminosabaki_before_attack": {
+   "s0": false,
+   "s1": false,
+   "s2": false,
+   "s3": false,
+   "s4": false,
+   "s5": false,
+   "s6": "no_oom_attack",
+   "s7": false
+  },
+  "enel_roger_t7_gammaknife": {
+   "s0": false,
+   "s1": true,
+   "s2": true,
+   "s3": true,
+   "s4": false,
+   "s5": false,
+   "s6": false,
+   "s7": false
+  },
+  "enel_luffy_t4_kami_ko": {
+   "s0": "no_kami",
+   "s1": true,
+   "s2": "no_kami",
+   "s3": true,
+   "s4": "no_kami",
+   "s5": "no_kami",
+   "s6": true,
+   "s7": "no_kami"
+  },
+  "detail_enel_t9_kami_vs_oom": {
+   "s0": {
+    "action_index": 7,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.858,
+    "top_by_n": {
+     "n": 42,
+     "q": 0.8324,
+     "p": 0.1385,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-061"
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0157,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 35,
+     "q": 0.8585,
+     "p": 0.0545,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s1": {
+    "action_index": 10,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.998,
+    "top_by_n": {
+     "n": 87,
+     "q": 0.9842,
+     "p": 0.281,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0249,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 55,
+     "q": 0.998,
+     "p": 0.1391,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s2": {
+    "action_index": 12,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP14-110"
+     ]
+    },
+    "chosen_q": 0.885,
+    "top_by_n": {
+     "n": 70,
+     "q": 0.8652,
+     "p": 0.2398,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0193,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 33,
+     "q": 0.8605,
+     "p": 0.1193,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s3": {
+    "action_index": 7,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.868,
+    "top_by_n": {
+     "n": 40,
+     "q": 0.8294,
+     "p": 0.1365,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-061"
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0155,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 37,
+     "q": 0.8684,
+     "p": 0.0537,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s4": {
+    "action_index": 10,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.796,
+    "top_by_n": {
+     "n": 49,
+     "q": 0.7688,
+     "p": 0.1485,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP12-112"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0227,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 38,
+     "q": 0.7838,
+     "p": 0.073,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP12-112"
+      ]
+     }
+    }
+   },
+   "s5": {
+    "action_index": 10,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.829,
+    "top_by_n": {
+     "n": 75,
+     "q": 0.8091,
+     "p": 0.281,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0249,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 46,
+     "q": 0.8294,
+     "p": 0.1391,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s6": {
+    "action_index": 14,
+    "turn": 9,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP12-071"
+    },
+    "chosen_q": 0.8,
+    "top_by_n": {
+     "n": 70,
+     "q": 0.6568,
+     "p": 0.1004,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0251,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 70,
+     "q": 0.6568,
+     "p": 0.1004,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s7": {
+    "action_index": 10,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.907,
+    "top_by_n": {
+     "n": 83,
+     "q": 0.8955,
+     "p": 0.281,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0249,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 52,
+     "q": 0.9068,
+     "p": 0.1391,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   }
+  },
+  "enel_t9_winner": {
+   "s0": null,
+   "s1": null,
+   "s2": null,
+   "s3": null,
+   "s4": null,
+   "s5": null,
+   "s6": null,
+   "s7": null
+  },
+  "box_vs_bare": {
+   "decisions": 291,
+   "chose_box": 105,
+   "chose_bare": 0,
+   "pairs": 0,
+   "bare_gt_box": 0,
+   "box_max_gt_bare": 0,
+   "bare_gt_box_ratio": "0/0"
+  },
+  "detail_enel_roger_t7_gamma": {
+   "s0": {
+    "action_index": 0,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-058"
+    },
+    "chosen_q": -0.188,
+    "top_by_n": {
+     "n": 35,
+     "q": -0.1884,
+     "p": 0.0286,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-058"
+     }
+    },
+    "gamma": {
+     "n": 1,
+     "q": -0.4696,
+     "p": 0.0156,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s1": {
+    "action_index": 6,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.538,
+    "top_by_n": {
+     "n": 20,
+     "q": -0.5377,
+     "p": 0.0183,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 20,
+     "q": -0.5377,
+     "p": 0.0183,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s2": {
+    "action_index": 5,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.267,
+    "top_by_n": {
+     "n": 25,
+     "q": -0.2666,
+     "p": 0.0111,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 25,
+     "q": -0.2666,
+     "p": 0.0111,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s3": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.246,
+    "top_by_n": {
+     "n": 27,
+     "q": -0.3606,
+     "p": 0.212,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 23,
+     "q": -0.2458,
+     "p": 0.0118,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s4": {
+    "action_index": 17,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-066",
+     "targets": [
+      "OP13-003"
+     ]
+    },
+    "chosen_q": -0.55,
+    "top_by_n": {
+     "n": 38,
+     "q": -0.5675,
+     "p": 0.2146,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 13,
+     "q": -0.5257,
+     "p": 0.0441,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s5": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-118",
+     "targets": [
+      "OP13-003"
+     ]
+    },
+    "chosen_q": -0.324,
+    "top_by_n": {
+     "n": 19,
+     "q": -0.3245,
+     "p": 0.212,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 13,
+     "q": -0.1102,
+     "p": 0.0118,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s6": {
+    "action_index": 8,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-061"
+    },
+    "chosen_q": -0.294,
+    "top_by_n": {
+     "n": 22,
+     "q": -0.3689,
+     "p": 0.1762,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 8,
+     "q": -0.2849,
+     "p": 0.0145,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s7": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-063"
+    },
+    "chosen_q": -0.192,
+    "top_by_n": {
+     "n": 22,
+     "q": -0.1922,
+     "p": 0.0307,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-063"
+     }
+    },
+    "gamma": {
+     "n": 16,
+     "q": -0.1144,
+     "p": 0.0118,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   }
+  },
+  "setup_box_structure": {
+   "boxes": {
+    "setup": 85139,
+    "attack": 0,
+    "defense": 108459
+   },
+   "box_decisions": 105,
+   "box_below_floor": 23,
+   "n_floor": 20,
+   "box_branches_median": 2,
+   "box_branch_n_sum_median": 63
+  }
+ },
+ "E3": {
+  "enel_t9_kaminosabaki_before_attack": {
+   "s0": false,
+   "s1": false,
+   "s2": false,
+   "s3": false,
+   "s4": false,
+   "s5": false,
+   "s6": "no_oom_attack",
+   "s7": false
+  },
+  "enel_roger_t7_gammaknife": {
+   "s0": false,
+   "s1": false,
+   "s2": true,
+   "s3": true,
+   "s4": false,
+   "s5": false,
+   "s6": false,
+   "s7": false
+  },
+  "enel_luffy_t4_kami_ko": {
+   "s0": "no_kami",
+   "s1": true,
+   "s2": "no_kami",
+   "s3": true,
+   "s4": "no_kami",
+   "s5": "no_kami",
+   "s6": true,
+   "s7": "no_kami"
+  },
+  "detail_enel_t9_kami_vs_oom": {
+   "s0": {
+    "action_index": 7,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.855,
+    "top_by_n": {
+     "n": 42,
+     "q": 0.8247,
+     "p": 0.1385,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-061"
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0157,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 35,
+     "q": 0.8551,
+     "p": 0.0545,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s1": {
+    "action_index": 10,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.998,
+    "top_by_n": {
+     "n": 87,
+     "q": 0.9836,
+     "p": 0.281,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0249,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 56,
+     "q": 0.998,
+     "p": 0.1391,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s2": {
+    "action_index": 10,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP12-112"
+     ]
+    },
+    "chosen_q": 0.882,
+    "top_by_n": {
+     "n": 67,
+     "q": 0.8517,
+     "p": 0.281,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0249,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 41,
+     "q": 0.8626,
+     "p": 0.1391,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s3": {
+    "action_index": 7,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.868,
+    "top_by_n": {
+     "n": 52,
+     "q": 0.8249,
+     "p": 0.1482,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "OP15-061"
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0155,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 40,
+     "q": 0.8679,
+     "p": 0.0537,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s4": {
+    "action_index": 10,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.796,
+    "top_by_n": {
+     "n": 49,
+     "q": 0.7687,
+     "p": 0.1485,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP12-112"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0227,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 38,
+     "q": 0.7838,
+     "p": 0.073,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP12-112"
+      ]
+     }
+    }
+   },
+   "s5": {
+    "action_index": 16,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP12-112"
+     ]
+    },
+    "chosen_q": 0.796,
+    "top_by_n": {
+     "n": 44,
+     "q": 0.7815,
+     "p": 0.1474,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0267,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 44,
+     "q": 0.7815,
+     "p": 0.1474,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s6": {
+    "action_index": 14,
+    "turn": 9,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP12-071"
+    },
+    "chosen_q": 0.8,
+    "top_by_n": {
+     "n": 70,
+     "q": 0.6581,
+     "p": 0.1004,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0251,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 70,
+     "q": 0.6581,
+     "p": 0.1004,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s7": {
+    "action_index": 10,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.885,
+    "top_by_n": {
+     "n": 74,
+     "q": 0.8664,
+     "p": 0.281,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0249,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP15-075",
+      "selected": [
+       "OP15-118"
+      ]
+     }
+    },
+    "oom_attack": {
+     "n": 53,
+     "q": 0.8854,
+     "p": 0.1391,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   }
+  },
+  "enel_t9_winner": {
+   "s0": null,
+   "s1": null,
+   "s2": null,
+   "s3": null,
+   "s4": null,
+   "s5": null,
+   "s6": null,
+   "s7": null
+  },
+  "box_vs_bare": {
+   "decisions": 296,
+   "chose_box": 96,
+   "chose_bare": 0,
+   "pairs": 0,
+   "bare_gt_box": 0,
+   "box_max_gt_bare": 0,
+   "bare_gt_box_ratio": "0/0"
+  },
+  "detail_enel_roger_t7_gamma": {
+   "s0": {
+    "action_index": 0,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-058"
+    },
+    "chosen_q": -0.188,
+    "top_by_n": {
+     "n": 35,
+     "q": -0.1884,
+     "p": 0.0286,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-058"
+     }
+    },
+    "gamma": {
+     "n": 1,
+     "q": -0.4696,
+     "p": 0.0156,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s1": {
+    "action_index": 10,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-061"
+    },
+    "chosen_q": -0.188,
+    "top_by_n": {
+     "n": 39,
+     "q": -0.188,
+     "p": 0.1381,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "OP15-061"
+     }
+    },
+    "gamma": {
+     "n": 3,
+     "q": -0.2696,
+     "p": 0.0284,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s2": {
+    "action_index": 5,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.267,
+    "top_by_n": {
+     "n": 25,
+     "q": -0.2666,
+     "p": 0.0111,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 25,
+     "q": -0.2666,
+     "p": 0.0111,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s3": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.246,
+    "top_by_n": {
+     "n": 27,
+     "q": -0.3606,
+     "p": 0.212,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 23,
+     "q": -0.2458,
+     "p": 0.0118,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s4": {
+    "action_index": 17,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-066",
+     "targets": [
+      "OP13-003"
+     ]
+    },
+    "chosen_q": -0.55,
+    "top_by_n": {
+     "n": 38,
+     "q": -0.5675,
+     "p": 0.2146,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 13,
+     "q": -0.5257,
+     "p": 0.0441,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s5": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-118",
+     "targets": [
+      "OP13-003"
+     ]
+    },
+    "chosen_q": -0.324,
+    "top_by_n": {
+     "n": 19,
+     "q": -0.3245,
+     "p": 0.212,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 13,
+     "q": -0.1102,
+     "p": 0.0118,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s6": {
+    "action_index": 8,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-061"
+    },
+    "chosen_q": -0.294,
+    "top_by_n": {
+     "n": 22,
+     "q": -0.3689,
+     "p": 0.1762,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 8,
+     "q": -0.2849,
+     "p": 0.0145,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   },
+   "s7": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-063"
+    },
+    "chosen_q": -0.192,
+    "top_by_n": {
+     "n": 22,
+     "q": -0.1922,
+     "p": 0.0307,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-063"
+     }
+    },
+    "gamma": {
+     "n": 16,
+     "q": -0.1144,
+     "p": 0.0118,
+     "move": {
+      "action_type": "SETUP_BOX",
+      "card": "OP05-077",
+      "selected": [
+       "EB04-007"
+      ]
+     }
+    }
+   }
+  },
+  "setup_box_structure": {
+   "boxes": {
+    "setup": 85396,
+    "attack": 0,
+    "defense": 0
+   },
+   "box_decisions": 96,
+   "box_below_floor": 24,
+   "n_floor": 20,
+   "box_branches_median": 2.0,
+   "box_branch_n_sum_median": 57.0
+  }
+ },
+ "E4": {
+  "enel_t9_kaminosabaki_before_attack": {
+   "s0": false,
+   "s1": false,
+   "s2": false,
+   "s3": false,
+   "s4": false,
+   "s5": true,
+   "s6": true,
+   "s7": false
+  },
+  "enel_roger_t7_gammaknife": {
+   "s0": false,
+   "s1": true,
+   "s2": true,
+   "s3": true,
+   "s4": true,
+   "s5": true,
+   "s6": true,
+   "s7": true
+  },
+  "enel_luffy_t4_kami_ko": {
+   "s0": "no_kami",
+   "s1": false,
+   "s2": "no_kami",
+   "s3": "no_kami",
+   "s4": "no_kami",
+   "s5": "no_kami",
+   "s6": "no_kami",
+   "s7": "no_kami"
+  },
+  "detail_enel_t9_kami_vs_oom": {
+   "s0": {
+    "action_index": 14,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.867,
+    "top_by_n": {
+     "n": 70,
+     "q": 0.8669,
+     "p": 0.2801,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 20,
+     "q": 0.8606,
+     "p": 0.093,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 70,
+     "q": 0.8669,
+     "p": 0.2801,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s1": {
+    "action_index": 10,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.997,
+    "top_by_n": {
+     "n": 74,
+     "q": 0.988,
+     "p": 0.3287,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 7,
+     "q": 0.9548,
+     "p": 0.0582,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 41,
+     "q": 0.9973,
+     "p": 0.1627,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s2": {
+    "action_index": 12,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP12-112"
+     ]
+    },
+    "chosen_q": 0.934,
+    "top_by_n": {
+     "n": 38,
+     "q": 0.8568,
+     "p": 0.2723,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 10,
+     "q": 0.8863,
+     "p": 0.0594,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 30,
+     "q": 0.9345,
+     "p": 0.0904,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP12-112"
+      ]
+     }
+    }
+   },
+   "s3": {
+    "action_index": 6,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-061"
+    },
+    "chosen_q": 0.879,
+    "top_by_n": {
+     "n": 39,
+     "q": 0.8702,
+     "p": 0.1536,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-061"
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0364,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 23,
+     "q": 0.8788,
+     "p": 0.096,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s4": {
+    "action_index": 7,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-061"
+    },
+    "chosen_q": 0.837,
+    "top_by_n": {
+     "n": 50,
+     "q": 0.8275,
+     "p": 0.1364,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-061"
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0311,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 33,
+     "q": 0.8374,
+     "p": 0.0672,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s5": {
+    "action_index": 9,
+    "turn": 9,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP15-075"
+    },
+    "chosen_q": 0.924,
+    "top_by_n": {
+     "n": 51,
+     "q": 0.8869,
+     "p": 0.2897,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 17,
+     "q": 0.9239,
+     "p": 0.063,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 26,
+     "q": 0.875,
+     "p": 0.1525,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s6": {
+    "action_index": 13,
+    "turn": 9,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP15-075"
+    },
+    "chosen_q": 0.869,
+    "top_by_n": {
+     "n": 57,
+     "q": 0.816,
+     "p": 0.2796,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 32,
+     "q": 0.8693,
+     "p": 0.0759,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 40,
+     "q": 0.8181,
+     "p": 0.2185,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s7": {
+    "action_index": 8,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-061"
+    },
+    "chosen_q": 0.955,
+    "top_by_n": {
+     "n": 57,
+     "q": 0.8978,
+     "p": 0.1964,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "OP15-061"
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0356,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 25,
+     "q": 0.9554,
+     "p": 0.0551,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   }
+  },
+  "enel_t9_winner": {
+   "s0": null,
+   "s1": null,
+   "s2": null,
+   "s3": null,
+   "s4": null,
+   "s5": "p1",
+   "s6": null,
+   "s7": null
+  },
+  "detail_enel_roger_t7_gamma": {
+   "s0": {
+    "action_index": 9,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP13-003"
+     ]
+    },
+    "chosen_q": -0.306,
+    "top_by_n": {
+     "n": 30,
+     "q": -0.3661,
+     "p": 0.2571,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 17,
+     "q": -0.2707,
+     "p": 0.0412,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   },
+   "s1": {
+    "action_index": 6,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.536,
+    "top_by_n": {
+     "n": 23,
+     "q": -0.536,
+     "p": 0.0308,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    },
+    "gamma": {
+     "n": 23,
+     "q": -0.536,
+     "p": 0.0308,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   },
+   "s2": {
+    "action_index": 5,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.244,
+    "top_by_n": {
+     "n": 30,
+     "q": -0.2444,
+     "p": 0.0182,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    },
+    "gamma": {
+     "n": 30,
+     "q": -0.2444,
+     "p": 0.0182,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   },
+   "s3": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.203,
+    "top_by_n": {
+     "n": 35,
+     "q": -0.2027,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    },
+    "gamma": {
+     "n": 35,
+     "q": -0.2027,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   },
+   "s4": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.165,
+    "top_by_n": {
+     "n": 24,
+     "q": -0.165,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    },
+    "gamma": {
+     "n": 24,
+     "q": -0.165,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   },
+   "s5": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.12,
+    "top_by_n": {
+     "n": 23,
+     "q": -0.1197,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    },
+    "gamma": {
+     "n": 23,
+     "q": -0.1197,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   },
+   "s6": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.165,
+    "top_by_n": {
+     "n": 25,
+     "q": -0.1646,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    },
+    "gamma": {
+     "n": 25,
+     "q": -0.1646,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   },
+   "s7": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.171,
+    "top_by_n": {
+     "n": 27,
+     "q": -0.1712,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    },
+    "gamma": {
+     "n": 27,
+     "q": -0.1712,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   }
+  },
+  "setup_box_structure": {
+   "boxes": {
+    "setup": 0,
+    "attack": 1531,
+    "defense": 120894
+   },
+   "box_decisions": 0,
+   "box_below_floor": 0,
+   "n_floor": 20,
+   "box_branches_median": null,
+   "box_branch_n_sum_median": null
+  }
+ },
+ "E5": {
+  "enel_t9_kaminosabaki_before_attack": {
+   "s0": false,
+   "s1": false,
+   "s2": false,
+   "s3": false,
+   "s4": false,
+   "s5": true,
+   "s6": false,
+   "s7": true
+  },
+  "enel_roger_t7_gammaknife": {
+   "s0": false,
+   "s1": false,
+   "s2": true,
+   "s3": true,
+   "s4": true,
+   "s5": true,
+   "s6": true,
+   "s7": true
+  },
+  "enel_luffy_t4_kami_ko": {
+   "s0": "no_kami",
+   "s1": false,
+   "s2": "no_kami",
+   "s3": "no_kami",
+   "s4": "no_kami",
+   "s5": "no_kami",
+   "s6": "no_kami",
+   "s7": "no_kami"
+  },
+  "detail_enel_t9_kami_vs_oom": {
+   "s0": {
+    "action_index": 14,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.867,
+    "top_by_n": {
+     "n": 70,
+     "q": 0.8666,
+     "p": 0.2801,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 20,
+     "q": 0.8602,
+     "p": 0.093,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 70,
+     "q": 0.8666,
+     "p": 0.2801,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s1": {
+    "action_index": 10,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.997,
+    "top_by_n": {
+     "n": 74,
+     "q": 0.988,
+     "p": 0.3287,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 7,
+     "q": 0.9548,
+     "p": 0.0582,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 41,
+     "q": 0.9973,
+     "p": 0.1627,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s2": {
+    "action_index": 12,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP12-112"
+     ]
+    },
+    "chosen_q": 0.902,
+    "top_by_n": {
+     "n": 49,
+     "q": 0.87,
+     "p": 0.2723,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 11,
+     "q": 0.8805,
+     "p": 0.0594,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 24,
+     "q": 0.8776,
+     "p": 0.1312,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s3": {
+    "action_index": 6,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-061"
+    },
+    "chosen_q": 0.879,
+    "top_by_n": {
+     "n": 39,
+     "q": 0.8701,
+     "p": 0.1536,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-061"
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0364,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 23,
+     "q": 0.8786,
+     "p": 0.096,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s4": {
+    "action_index": 7,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-061"
+    },
+    "chosen_q": 0.831,
+    "top_by_n": {
+     "n": 58,
+     "q": 0.8279,
+     "p": 0.1364,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-061"
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0311,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 33,
+     "q": 0.8315,
+     "p": 0.0672,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 1,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s5": {
+    "action_index": 9,
+    "turn": 9,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP15-075"
+    },
+    "chosen_q": 0.924,
+    "top_by_n": {
+     "n": 51,
+     "q": 0.8869,
+     "p": 0.2897,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 17,
+     "q": 0.9236,
+     "p": 0.063,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 26,
+     "q": 0.875,
+     "p": 0.1525,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s6": {
+    "action_index": 9,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.833,
+    "top_by_n": {
+     "n": 31,
+     "q": 0.7992,
+     "p": 0.1675,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 0,
+     "q": 0.0,
+     "p": 0.0447,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 26,
+     "q": 0.8331,
+     "p": 0.0986,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   },
+   "s7": {
+    "action_index": 13,
+    "turn": 9,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP11-041"
+     ]
+    },
+    "chosen_q": 0.997,
+    "top_by_n": {
+     "n": 79,
+     "q": 0.9955,
+     "p": 0.3576,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    },
+    "kami": {
+     "n": 7,
+     "q": 0.9515,
+     "p": 0.0587,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP15-075"
+     }
+    },
+    "oom_attack": {
+     "n": 45,
+     "q": 0.9973,
+     "p": 0.1987,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-061",
+      "targets": [
+       "OP11-041"
+      ]
+     }
+    }
+   }
+  },
+  "enel_t9_winner": {
+   "s0": null,
+   "s1": null,
+   "s2": null,
+   "s3": null,
+   "s4": null,
+   "s5": "p1",
+   "s6": null,
+   "s7": "p1"
+  },
+  "detail_enel_roger_t7_gamma": {
+   "s0": {
+    "action_index": 9,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACK",
+     "card": "OP15-061",
+     "targets": [
+      "OP13-003"
+     ]
+    },
+    "chosen_q": -0.306,
+    "top_by_n": {
+     "n": 30,
+     "q": -0.3661,
+     "p": 0.2571,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 0,
+      "card": "OP15-118",
+      "targets": [
+       "OP13-003"
+      ]
+     }
+    },
+    "gamma": {
+     "n": 17,
+     "q": -0.2707,
+     "p": 0.0412,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   },
+   "s1": {
+    "action_index": 10,
+    "turn": 7,
+    "chosen": {
+     "action_type": "ATTACH_DON",
+     "card": "OP15-061"
+    },
+    "chosen_q": -0.209,
+    "top_by_n": {
+     "n": 42,
+     "q": -0.2095,
+     "p": 0.1594,
+     "move": {
+      "action_type": "DON_BOX",
+      "don_k": 2,
+      "card": "OP15-061"
+     }
+    },
+    "gamma": {
+     "n": 12,
+     "q": -0.2139,
+     "p": 0.0464,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   },
+   "s2": {
+    "action_index": 5,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.244,
+    "top_by_n": {
+     "n": 30,
+     "q": -0.2444,
+     "p": 0.0182,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    },
+    "gamma": {
+     "n": 30,
+     "q": -0.2444,
+     "p": 0.0182,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   },
+   "s3": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.203,
+    "top_by_n": {
+     "n": 35,
+     "q": -0.2027,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    },
+    "gamma": {
+     "n": 35,
+     "q": -0.2027,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   },
+   "s4": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.165,
+    "top_by_n": {
+     "n": 24,
+     "q": -0.165,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    },
+    "gamma": {
+     "n": 24,
+     "q": -0.165,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   },
+   "s5": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.12,
+    "top_by_n": {
+     "n": 23,
+     "q": -0.1197,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    },
+    "gamma": {
+     "n": 23,
+     "q": -0.1197,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   },
+   "s6": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.165,
+    "top_by_n": {
+     "n": 25,
+     "q": -0.1646,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    },
+    "gamma": {
+     "n": 25,
+     "q": -0.1646,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   },
+   "s7": {
+    "action_index": 7,
+    "turn": 7,
+    "chosen": {
+     "action_type": "PLAY",
+     "card": "OP05-077"
+    },
+    "chosen_q": -0.171,
+    "top_by_n": {
+     "n": 27,
+     "q": -0.1712,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    },
+    "gamma": {
+     "n": 27,
+     "q": -0.1712,
+     "p": 0.0195,
+     "move": {
+      "action_type": "PLAY",
+      "card": "OP05-077"
+     }
+    }
+   }
+  },
+  "setup_box_structure": {
+   "boxes": {
+    "setup": 0,
+    "attack": 0,
+    "defense": 0
+   },
+   "box_decisions": 0,
+   "box_below_floor": 0,
+   "n_floor": 20,
+   "box_branches_median": null,
+   "box_branch_n_sum_median": null
+  }
+ }
+}

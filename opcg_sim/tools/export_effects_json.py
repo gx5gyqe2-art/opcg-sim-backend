@@ -41,7 +41,9 @@ import dataclasses
 import enum
 import json
 import os
+import subprocess
 import sys
+import time
 from collections import Counter
 from typing import Any, Dict, List
 
@@ -57,6 +59,9 @@ DEFAULT_OUT = os.path.join(_DATA_DIR, "opcg_effects.json")
 
 # 出力形式のバージョン（Rust 側の読み込みと対で管理する）。
 EXPORT_VERSION = 1
+#: 生成物が無いときの自動生成を**1 プロセスだけ**に絞る鍵（`ensure`）。
+LOCK_SUFFIX = ".lock"
+ENSURE_TIMEOUT = 600.0
 
 # dataclass 名 -> 出力の "node" 名。ここに無い dataclass が出てきたら型名をそのまま使い、
 # 集計時に unknown として警告する（黙って捨てない＝計画 §6「未知の種類はエラー」に備える）。
@@ -157,6 +162,66 @@ def _table(counter: Counter, total: int, top: int) -> List[str]:
     return lines
 
 
+def tmp_path(out: str) -> str:
+    """書き出し中の一時ファイル名（**プロセスごとに別名**）。
+
+    2026-09-13 に実害: アリーナのワーカープール（4 本）が起動時に同時に生成物を作りに行き、
+    全員が同じ `out + ".tmp"` を開いて互いの中身を上書き → 壊れた JSON が `os.replace` で
+    公開され、ほぼ全ワーカーが最初のシャードで落ちた。名前を分ければ `os.replace` は
+    アトミックなので、公開されるのは常に完全なファイルになる。
+    """
+    return f"{out}.tmp.{os.getpid()}"
+
+
+def ensure(out: str, timeout: float = ENSURE_TIMEOUT, poll: float = 0.5, runner=None):
+    """`out` が無ければ**1 プロセスだけ**がエクスポータを回し、他はでき上がるのを待つ。
+
+    生成物（約 8MB・git 管理外）を使う側（`loop/engine.py`／`api/engine_rs.py`）の共通入口。
+    戻り値は `"exists"`（既にあった）／`"created"`（自分が作った）／`"waited"`（他が作った）。
+    鍵が `timeout` より古ければ「作りかけのまま死んだプロセスの残骸」とみなして奪う。
+    """
+    if os.path.exists(out):
+        return "exists"
+    lock = out + LOCK_SUFFIX
+    while True:
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            break
+        except FileExistsError:
+            t0 = time.time()
+            while time.time() - t0 < timeout:
+                if os.path.exists(out):
+                    return "waited"
+                try:
+                    age = time.time() - os.stat(lock).st_mtime
+                except FileNotFoundError:
+                    break                      # 鍵が外れた＝もう一度取りに行く
+                if age > timeout:
+                    try:
+                        os.unlink(lock)        # 残骸を奪う
+                    except FileNotFoundError:
+                        pass
+                    break
+                time.sleep(poll)
+            else:
+                raise TimeoutError(
+                    f"{out} の生成を {timeout:.0f}s 待ったが現れない（鍵 {lock} を消して再実行）")
+    try:
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+        if runner is None:
+            subprocess.run([sys.executable, "-m", "opcg_sim.tools.export_effects_json",
+                            "--out", out], check=True, stdout=subprocess.DEVNULL)
+        else:
+            runner(out)
+        return "created"
+    finally:
+        try:
+            os.unlink(lock)
+        except FileNotFoundError:
+            pass
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="パース済み効果構造を JSON へ書き出す（Rust 移行 P0）")
     ap.add_argument("--out", default=DEFAULT_OUT, help=f"出力パス（既定: {DEFAULT_OUT}）")
@@ -197,7 +262,7 @@ def main(argv=None) -> int:
     size = 0
     if not args.dry_run:
         os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-        tmp = args.out + ".tmp"
+        tmp = tmp_path(args.out)
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, sort_keys=True,
                       indent=(args.indent or None),

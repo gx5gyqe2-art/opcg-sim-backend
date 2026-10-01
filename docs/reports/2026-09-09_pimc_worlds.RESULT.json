@@ -1,0 +1,40 @@
+{
+ "job": "rs-pimc-worlds",
+ "status": "done",
+ "branch": "claude/rs-pimc-worlds",
+ "base": "claude/cpu-spec-improvements-yw91jd (f8569d6)",
+ "kami_before_attack": {"w1": 0, "w2": 0, "w4": 0, "w8": 0},
+ "kami_before_attack_detail": {
+  "note": "enel_human_20260810_t9-9・seed 0〜7・sims 160・visits 規則。値は「オーム(OP15-061)の最初の ATTACK より前に神の裁き(OP15-075)を PLAY した run の本数」（分母 8）。全条件で 8/8 が false（オーム攻撃は毎回あり・no_oom_attack は 0）。",
+  "w1": {"true": 0, "false": 8, "no_oom_attack": 0},
+  "w2": {"true": 0, "false": 8, "no_oom_attack": 0},
+  "w4": {"true": 0, "false": 8, "no_oom_attack": 0},
+  "w8": {"true": 0, "false": 8, "no_oom_attack": 0},
+  "kami_vs_oom_at_the_head_to_head_decision": {
+   "note": "同じ決定での（訪問数, Q）。P は世界に依らないので不変（kami 0.0574／oom 0.4723）。世界を増やすほど「相手の手札を知っているつもり」の Q=1.000 が崩れ、kami の訪問も増えるが、visits 規則では届かない。",
+   "w1_s0": {"kami": [3, 0.925], "oom_attack": [115, 1.0]},
+   "w2_s0": {"kami": [6, 0.925], "oom_attack": [231, 1.0]},
+   "w4_s0": {"kami": [35, 0.8416], "oom_attack": [404, 0.9583]},
+   "w8_s0": {"kami": [120, 0.9195], "oom_attack": [692, 0.9036]}
+  }
+ },
+ "latency_ms": {"w1": 204.1, "w2": 259.9, "w4": 473.4, "w8": 855.2},
+ "latency_detail": {
+  "note": "tests/scripts/rs_search_a_latency.py --sims 160 --repeat 5・同じ 3 局面・単独プロセス・4 コア。latency_ms は 3 局面の中位（各局面は 5 回の中位）。",
+  "by_scenario_ms": {
+   "enel_human_20260810_t9-9": {"w1": 55.8, "w2": 56.7, "w4": 336.8, "w8": 724.0},
+   "human_enel_vs_roger_20260904_t7-8": {"w1": 204.1, "w2": 259.9, "w4": 473.4, "w8": 855.2},
+   "human_doflamingo_vs_luffy_20260904_t10-11": {"w1": 429.6, "w2": 408.2, "w4": 715.2, "w8": 1067.8}
+  },
+  "ratio_vs_w1": {"w2": 1.27, "w4": 2.32, "w8": 4.19},
+  "target": "worlds=4 が worlds=1 の 1.3 倍以内（4 コア）＝**未達**（2.32 倍）。原因は下の notes（スレッド化ではなく、世界ごとのコストが二峰で壁時計が最大値に張り付くため）。"
+ },
+ "make_test": "454 passed, 1 skipped（skip は torch 任意依存の tests/test_n_rel_train_torch.py・本 WP と無関係）。cargo test 400 passed・clippy -D warnings green。",
+ "audit_cross": {"pairs": 120, "games": 240, "void": 0, "wr": 0.5},
+ "artifacts": {
+  "scenario_out_w": "9 シナリオ × seed 0/1（18 本）を worlds=4・sims 160 で。.md の (4) に「世界ごとの最善手」行あり。",
+  "scenario_out_w/keys_worlds.json": "rs_search_a_keys.py の出力（w1/w2/w4/w8 × seed 0〜7）",
+  "scenario_out_w/latency_w{1,2,4,8}.json": "rs_search_a_latency.py の生出力"
+ },
+ "notes": "【P は世界で違ったか】違わなかった。scenario_out_w の 229 決定 × 916 世界すべてで p_differs=false（根の事前分布はネットの出力＝実盤面の符号化に依り、相手の伏せ札の引き直しに依らない）。束ねの P は仕様どおり世界 0 のものを返している。 | 【legal の並びは違ったか】違わなかった。同 916 世界すべてで unmapped=0（＝全ての手が世界 0 の legal に 1 対 1 で対応）。実装は念のため move_sig で突き合わせる経路を持ち、対応が付かない手は捨てて WorldStats.unmapped に数える（0 でなければ trace と RESULT で見える）。 | 【スレッド化で困った点】(1) 世界 0 は**呼び出し側の rng をそのまま使い、呼び出し元スレッドで**回す設計にした（スレッドは K-1 本）。こうすると worlds=1 が出目の消費順まで含めて 1 bit も変わらない（cargo test worlds_one_is_bit_identical_to_the_default が既定・worlds=1・worlds=4+search_seed なしの 3 通りで確認）。世界 i>=1 は Pcg32SearchRng::new(search_seed+i) を各スレッドで新規に作るので、スレッドの終わる順に依らず再現する。 (2) 記録した出目で回す経路（opcg_engine.decide＝オラクル）は search_seed を持たないので、worlds を渡しても 1 本に落とす（DecideOptions::effective_worlds）。複数世界で決められるのは Game.decide（生盤面版）だけ。 (3) GIL は Python::detach（pyo3 0.29 の旧 allow_threads）で放す。探索は Python を触らないので安全。effects/resolver.rs の効果イベント計数は thread_local なので世界間で混ざらない（各スレッドが自分の計数を reset して読む）。 (4) 枝予算は世界ごとに独立に張る（1 本の木から見た予算は worlds=1 と同じ）。実績（used/exhausted）だけ合算して返し、left は世界 0 のものを残す＝この後のコミット生成の見え方を変えない。 (5) PV とコミットの継続は「選んだ手の訪問が最も多い世界」から採る（trace の world_used）。複数世界では PV の 1 手目を『束ねた統計で選んだ手』に固定する（その世界の argmax とは限らないため）。コミットの継続はその世界の盤面を使い回す＝乱数を引き直さない（worlds=1 は今までどおり引き直す）。 | 【レイテンシが目標 1.3 倍に届かない理由】スレッド化の問題ではない。同じ局面で世界サンプルだけを変えて worlds=1 を 12 本測ると 1 決定のコストが二峰に割れる（enel T9: 52.8/56.1/56.6/56.9/69.7/71.3 ms と 386.1/421.9/438.2/453.7/616.7/622.6 ms）。K 本を並列に回すと壁時計は**平均ではなく最大**になるので、高い山を 1 本引く確率が K とともに上がる＝K を増やすほど壁時計が伸びる。並列化自体は効いている: 同じ 3 回測定を 1 コアに固定（taskset -c 0）すると worlds=4 は 475ms・worlds=8 は 2217ms で、4 コアではそれぞれ 337ms（1.4 倍）・742ms（3.0 倍）に縮む。CPU 時間は 1 コアでも 4 コアでも同じ（w4: 480 vs 490ms・w8: 2210 vs 2190ms）＝スレッド化による無駄な仕事の増加やアロケータ競合は無い。**壁時計を詰めるなら「世界ごとのコストの山（相手の手札次第で戦闘箱が膨らむ局面）」を削るか、世界数ぶん sims を割る（K×sims を一定にする）かのどちらか**＝どちらも本 WP の範囲外なので判定はコーディネータに委ねる。 | 【効き目の観測】scenario_out_w（worlds=4）の木の決定 229 個のうち **64 個（27.9%）で世界ごとの最善手が割れた**。PV を採った世界の分布は w0=101・w1=50・w2=35・w3=43（同点は若い世界＝w0 が多め）。エネル T9 の神の裁きは訪問数では届かなかったが、オーム攻撃の Q が 1.000 → 0.904（w8）へ落ちた＝§20.7.1 が狙った「相手の手札を知っているつもりの Q」の是正自体は起きている。select_rule=q_min_n と組み合わせると判断が変わりうる（未測定）。 | 【質問】(a) 束ねた統計に対する q_min_n の訪問下限は実効 sims（K×sims）で測るようにした（worlds=1 では今までと同じ値）。この解釈で良いか。 (b) worlds は Game.decide の opts のみに配線した（生成・アリーナ・serve の既定は 1 のまま）。アリーナで worlds=4 を使うには opcg_sim/loop 側の配線が要る（本 WP の触ってよいファイル外なので入れていない）。"
+}

@@ -45,6 +45,8 @@ pub mod passives;
 pub mod resolver;
 #[cfg(test)]
 mod tests_effects;
+#[cfg(test)]
+mod tests_rest_replace;
 pub mod triggers;
 pub mod value;
 

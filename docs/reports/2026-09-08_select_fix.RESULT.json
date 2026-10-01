@@ -1,0 +1,14 @@
+{
+  "job": "rs-select-fix",
+  "status": "done",
+  "q7": "確認: (i) カウンターBUFFは箱の盤面に正しく適用される（target.timed_powerが選択枝ごとに変わる）。(ii) 戦闘ダメージは評価前に解決されている（p1_life/p2_lifeが選択枝ごとに正しく変わる、評価はその後）。RCAの「3枝が15桁一致」は機構のバグではなく、その盤面ではBUFFが実際に戦闘結果を変えなかった（同一の結果状態→同一のネット出力）ケースだった可能性が高い。別コミットの修正は不要と判断（一時計装はコミット前にgit checkoutで完全に削除済み）。",
+  "golden": {
+    "audit_changed": 0,
+    "replay_changed": 133,
+    "unexpected": 0
+  },
+  "make_test": "cargo test 386 passed; pytest 440 passed, 1 skipped",
+  "audit_cross": {"pairs": 120, "games": 240, "void": 0, "wr": 0.5, "elo": -0.0},
+  "scenario_check": "分岐点シナリオ4本（enel_human_20260810_t3-4 seed0/1・human_enel_vs_luffy_20260904_t4-5 seed0/1、r3・sims160）全てで自分への+1000のBUFFが非空になった: 万雷『targets:[サトリ]』（seed0/1双方）・放電『targets:[サトリ]』・神の裁き『targets:[エネル]』（seed0/1双方、value1000/2000）。luffy seed0では神の裁きのKO（対象外・(b)のネット過小評価の話）もこの回はたまたま非空だったが、これは本WPの修正の効果ではない。",
+  "notes": "分類表の判断: ActionType::Buffはstatus別に6分岐（None/不明→符号則, COUNTER→符号則, POWER_OVERRIDE/BLOCKER_DISABLE→常にBenefit, COST_OVERRIDE/COST_REDUCTION→符号が逆向き=負値がBenefit）。BpBuff/SetBasePower/SwapPower/CostBuffは現行カードDBに自分側up_to選択の実例が無かったが、WP指示の符号則をそのまま実装（将来のため）。MoveToHandは『手札に戻すほど得』な自分側up_to効果がQ4代表10件・監査diffのどちらにも現れなかったためCost側に倒した（判断根拠はinteract.rsのdoc comment参照）。zone拡張は`zones_in(&[\"hand\",\"field\",\"leader\",\"stage\"])`とし、life/不明ゾーンは対象外のまま（WPが明示したのはリーダー+キャラの混在のみ）。\n\n発見1（重要・コーディネータ判断を仰ぎたい）: 監査golden（`audit.rs::golden_audit`の`drain_default`/`drain_payload`）は`effects/interact.rs::choose_selection`を一切使わない独立実装（min_req.max(1)を候補の先頭から取るだけ）で、本WPの修正を経由しない。よって監査golden 3,386件は0件変化（内訳無し）。RCA・WP双方が『監査3,386件も変わる』ことを前提にしていたが実際には変わらなかった。監査harnessの既定解決もchoose_selectionへ統一するかは別途判断が要る。\n\n発見2: `tests/fixtures/rs_goldens/audit.json`のハッシュ計算に`pending_request`全体（`request_id`除く）が含まれており、`intent`欄を追加すると（選択結果が変わらなくても）1,407件が変化してしまうノイズがあった。`rust/opcg_engine/src/audit.rs`に`strip_intent_for_hash`を追加してハッシュ対象から`intent`を除外（Python側`tests/harness/rs_golden.py::strip_request_id`と同じ判断・再生golden用に既存のrequest_id除外と同列）。この結果、監査golden差分は真に0件になった（audit.jsonは実際に無変更＝gitにも差分が出ない）。\n\n発見3（本WPと無関係な既存の陳腐化・報告のみ）: 差分レビューのため『本WPの変更を除いた現HEAD』でgolden再生成→現在コミット済みgoldenと比較したところ、audit.jsonは一致したがreplay 200局は200局とも既に不一致だった。原因はcommit 4803192（rules/legal.rsのイベントPLAY列挙修正・本WPと無関係・golden未再生成のまま2026-09-07 c4688fd以降に着地）。本WPの再生成（audit+replay）でこの陳腐化も合わせて解消済み。\n\ngolden差分の分類手法: 監査は変更前後のhashesを(card_id,trigger,ability_index)キーで突き合わせ、変更分をopcg_effects.jsonから抽出したclassify_intent相当ロジックでBenefit/Cost/Unknown再分類し『Benefit理由の変化か』を判定（0件変化のため実質未使用）。再生は『本WPを除いた現HEAD』のクリーンな回帰生成をbaseline、本WPを適用した回帰生成をpostfixとし、各局の最初にinput.steps[].moveが乖離する箇所を特定して分類（RESOLVE_EFFECT_SELECTIONでのempty→non-empty=期待どおり114局・non-empty→別のnon-empty=4局・それ以外の乖離=0局・moveは全て一致しlegalハッシュのみ異なる=15局・無変化=67局。114+4+15+67=200で全数説明でき、想定外0件）。\n\n環境: pytest/httpx/numpy/fastapi等のPython依存とmaturinをこのセッションで追加インストール（コードには含めない・環境セットアップのみ）。starlette.testclientがhttpxを要求するエラーが最初のmake test実行で出たがhttpx追加インストールで解消（本WPのコード変更とは無関係）。"
+}

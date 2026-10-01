@@ -111,6 +111,13 @@ fn resolve_trigger_over(
             if is_reactive_passive(ab) {
                 continue; // 「…された時」型はイベント誘発であり再計算で実行しない
             }
+            if super::actions::rules::is_rest_replacement(ab) {
+                // 「〜になる場合、代わりに〜」の置換（PRB02-006）は**置換であって継続効果では
+                // ない**＝再計算で実行しない（実体はレストの現場の `active_rest_replacement`）。
+                // 再計算で実行すると、条件が偽にならないまま対象選択で中断し続けて要求が
+                // 無限に往復する（§20.8.1-1 の発見 2・seed 930028 の void）。
+                continue;
+            }
             game_resolve_ability(s, masters, actor, card, index, false)?;
         }
     }

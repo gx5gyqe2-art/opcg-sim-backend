@@ -29,7 +29,9 @@ use crate::journal::{CardZone, Session};
 use crate::model::{CardIdx, CardType, ContinuousKind, MasterTable, Restriction, Seat};
 use crate::state::EngineError;
 
-use super::super::ast::{Ability, ActionType, Duration, EffectNode, GameAction, TriggerType};
+use super::super::ast::{
+    Ability, ActionType, CondValue, ConditionType, Duration, EffectNode, GameAction, TriggerType,
+};
 use super::super::resolver::{turn_limit_of, Resolver};
 use super::super::{ability, EffectContext, NodeRef, NodeRoot, TargetRef};
 
@@ -611,6 +613,189 @@ pub fn active_replacement_with(
                 s.edit().pop_interaction();
             }
         }
+        Some(it) => s.edit().set_interaction(it),
+    }
+    Ok(true)
+}
+
+// ---------------------------------------------------------------------------
+// レスト置換（パーサが `REPLACE_EFFECT` にしない置換・PRB02-006）
+// ---------------------------------------------------------------------------
+
+/// 「このキャラが相手のキャラの効果でレストになる場合、代わりに〜」（PRB02-006）の形か。
+///
+/// パーサ v2 はこの本文を `REPLACE_EFFECT` にせず、**素の誘発能力**として出す
+/// （trigger=`OPPONENT_TURN`／condition=`SOURCE_STATE == IS_RESTED`／effect=`REST`）。
+/// 常在効果の再計算（[`crate::effects::passives`] の Step 2/2'/3）はこの形を
+/// 「今そうなっている状態」と読んで**毎回**実行してしまい、
+///
+/// 1. 条件（持ち主がレスト）は効果を解決しても偽にならない、
+/// 2. 効果は対象選択で中断する（＝再計算のたびに新しい `SEARCH_AND_SELECT` が立つ）、
+/// 3. `REST` の対象クエリはレスト済みのキャラを外さない（＝盤面が動かず候補も減らない）
+///
+/// の 3 つが重なって、要求と応答が無限に往復した（seed 930028 で `max_steps=400` の void・
+/// `docs/rust_engine_plan.md` §20.8.1-1 の発見 2）。
+///
+/// **置換は再計算で実行するものではない**（[`super::super::passives::is_reactive_passive`] と
+/// 同じ理由）＝再計算は飛ばし、実体は「レストされる現場」の
+/// [`active_rest_replacement`] が回す。
+pub fn is_rest_replacement(ab: &Ability) -> bool {
+    if !matches!(
+        ab.trigger,
+        TriggerType::Passive | TriggerType::YourTurn | TriggerType::OpponentTurn
+    ) {
+        return false;
+    }
+    if !ab.raw_text.contains("代わりに") {
+        return false;
+    }
+    // `REPLACE_EFFECT` を持つ形は既存の置換機構（[`find_replacement`]）の担当。
+    if ab
+        .effect
+        .as_ref()
+        .and_then(|e| find_action_ref(e, &NodeRef::root(0, NodeRoot::Effect), ActionType::ReplaceEffect))
+        .is_some()
+    {
+        return false;
+    }
+    matches!(ab.condition.as_ref(), Some(c)
+        if c.ty == ConditionType::SourceState
+            && matches!(&c.value, CondValue::Str(v) if v == "IS_RESTED"))
+}
+
+/// [`find_rest_replacement`] の戻り。
+#[derive(Debug, Clone)]
+pub struct RestReplacement {
+    /// 置換能力のカード内 index（【ターン1回】の使用回数キー）。
+    pub ability_index: usize,
+    /// `_ability_turn_limit(ab)`。
+    pub turn_limit: Option<i32>,
+    /// 「代わりに」実行する効果（能力の effect そのもの）。
+    pub effect: NodeRef,
+}
+
+/// レストされようとしているカード自身が持つレスト置換を探す。
+///
+/// 置換の持ち主は**レストされるカード自身**だけ（本文が「このキャラが〜」）＝
+/// [`find_replacement`] のようにリーダーや他のキャラは走査しない。
+pub fn find_rest_replacement(
+    s: &Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    actor: Seat,
+    source_card: Option<CardIdx>,
+) -> Result<Option<RestReplacement>, EngineError> {
+    let owner = s.state().card(card).owner;
+    if actor == owner {
+        return Ok(None); // 「相手の…効果で」レストになる場合だけ
+    }
+    if s.state().card(card).is_rest {
+        return Ok(None); // 既にレスト＝「レストになる」場面ではない
+    }
+    if s.state().card(card).negated || crate::rules::is_effect_negated(s.state(), card) {
+        return Ok(None);
+    }
+    // 「相手の**キャラ**の効果で」＝発生源が相手のキャラであること。
+    let source_is_opp_char = source_card.is_some_and(|src| {
+        masters.get(s.state().card(src).master).ty == CardType::Character
+            && s.state().card(src).owner != owner
+    });
+    if !source_is_opp_char {
+        return Ok(None);
+    }
+    let ids = &masters.get(s.state().card(card).master).ability_ids;
+    for (index, id) in ids.iter().enumerate() {
+        let ab = ability(masters, *id)?;
+        if !is_rest_replacement(ab) {
+            continue;
+        }
+        // 【自分のターン中】【相手のターン中】のタグ（`cond.rs` の CONTEXT と同じ規約）。
+        let turn_ok = match ab.trigger {
+            TriggerType::YourTurn => s.state().turn_player == owner,
+            TriggerType::OpponentTurn => s.state().turn_player != owner,
+            _ => true,
+        };
+        if !turn_ok {
+            continue;
+        }
+        let Some(effect) = ab.effect.as_ref() else {
+            continue;
+        };
+        let effect_ref = NodeRef::root(*id, NodeRoot::Effect);
+        // 代わりの行動が取れない場合は置換不成立（＝本来のレストがそのまま起きる）。
+        if !Resolver::new().can_satisfy_node(s, masters, owner, effect, &effect_ref, Some(card))? {
+            continue;
+        }
+        let limit = ability_turn_limit(ab);
+        if let Some(limit) = limit {
+            if used_count(s, card, index as u32) as i32 >= limit {
+                continue;
+            }
+        }
+        return Ok(Some(RestReplacement {
+            ability_index: index,
+            turn_limit: limit,
+            effect: effect_ref,
+        }));
+    }
+    Ok(None)
+}
+
+/// レスト置換を起こす。`true` なら**本来のレストは呼び出し元で行わない**
+/// （中断を立てた場合は、0 枚を選んだ再開経路が本来のレストを行う）。
+pub fn active_rest_replacement(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    actor: Seat,
+    source_card: Option<CardIdx>,
+) -> Result<bool, EngineError> {
+    let Some(found) = find_rest_replacement(s, masters, card, actor, source_card)? else {
+        return Ok(false);
+    };
+    let owner = s.state().card(card).owner;
+
+    // 置換はレスト解決の最中に発生する「入れ子の中断」。外側の中断を退避してから実行する
+    // （[`active_replacement_with`] と同じ作法）。
+    let outer = s.state().active_interaction().cloned();
+    if outer.is_some() {
+        s.edit().pop_interaction();
+    }
+    Resolver::resumed(vec![found.effect.clone()], EffectContext::new())
+        .process_stack(s, masters, owner, Some(card))?;
+
+    // 発動成立 → 【ターン1回】の使用回数を消費する。
+    if found.turn_limit.is_some() {
+        let key = found.ability_index as u32;
+        let used = used_count(s, card, key);
+        set_used_count(s, card, key, used + 1);
+    }
+
+    if let Some(mut it) = s.state().active_interaction().cloned() {
+        // 対象選択で中断した＝「代わりに誰をレストするか」を訊いている。本文は「できる」＝
+        // 任意なので **0 枚（＝置換を使わない）も選べる**ようにし、0 枚だったときに本来の
+        // レストへ戻れるよう continuation へ印を付ける（消化は `interact::resolve_interaction`）。
+        let max = it.constraints.map(|c| c.1).unwrap_or(1);
+        it.constraints = Some((0, max));
+        it.can_skip = true;
+        if let Some(cont) = it.continuation.as_mut() {
+            cont.rest_replace = Some(crate::model::RestReplaceContinuation {
+                original: card,
+                actor,
+                source_card,
+            });
+        }
+        s.edit().pop_interaction();
+        s.edit().set_interaction(it);
+        // 外側（resolver）の実行スタックを退避させる合図。
+        s.edit()
+            .set_mgr_flag(crate::journal::MgrFlagField::ReplacementSuspended, true);
+        return Ok(true);
+    }
+
+    // 中断せずに解決した（候補が 1 枚＝自動確定など）＝置換成立。
+    match outer {
+        None => {}
         Some(it) => s.edit().set_interaction(it),
     }
     Ok(true)

@@ -1,0 +1,41 @@
+{
+ "src": [
+  "/root/n29_wave/w01/n_records/n29_w01"
+ ],
+ "points": 28383,
+ "cands": 310019,
+ "floor": 20.0,
+ "p_net_src": "nrel_r3.npz",
+ "n_min": 1.0,
+ "c_visit": 50.0,
+ "visits": {
+  "entropy": 1.6268530561209396,
+  "mass_below_floor": 0.042592396958292505,
+  "mass_unvisited": 0.0,
+  "max_prob": 0.3857232983373162
+ },
+ "sweep": {
+  "0.1": {
+   "entropy": 1.2787702426816816,
+   "mass_below_floor": 0.025121945330951738,
+   "mass_unvisited": 0.006878130140996335,
+   "max_prob": 0.524338015939334,
+   "kl_from_visits": 0.31249610012571355
+  },
+  "0.3": {
+   "entropy": 1.0306715449971655,
+   "mass_below_floor": 0.017687238754095436,
+   "mass_unvisited": 0.005193263370453144,
+   "max_prob": 0.614730239712035,
+   "kl_from_visits": 0.4343613382297879
+  },
+  "1": {
+   "entropy": 0.6676552275116767,
+   "mass_below_floor": 0.017377501474436827,
+   "mass_unvisited": 0.0027085426048367176,
+   "max_prob": 0.7481345351942529,
+   "kl_from_visits": 0.7274607019696144
+  }
+ },
+ "elapsed_sec": 14.9
+}

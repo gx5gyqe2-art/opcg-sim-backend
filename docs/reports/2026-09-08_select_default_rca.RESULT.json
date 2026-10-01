@@ -1,0 +1,11 @@
+{
+  "job": "rs-select-default",
+  "status": "done",
+  "report": "docs/reports/2026-09-08_select_default_rca.md",
+  "root_cause": "(a) 万雷カウンターのBUFF空選択: choose_selectionのゾーン意味論バグ(自分のリーダー+キャラ混在でNone→uuids[:0]=空)により既定解決が空を返し、それがmerged_search_actionsの重複排除で候補の先頭に来る。加えてTHIS_BATTLE持続バフは戦闘解決後に評価されるため3枝(空/サトリ/リーダー)が完全同値になり、best_branchのタイブレーク(先頭を残す)で空が機械的に勝つ。(b) 神の裁きのKO空選択は別原因: 既定解決は相手側候補を正しく非空で返すが、box-quiescingの浅い先読み(BOX_RESOLVE_DEPTH=1)における価値関数自体が「KOしない」を「KOする」より高く評価していた(分析#3の除去過小評価と同系・choose_selectionのバグではない)。",
+  "fix_included": false,
+  "golden_changed": false,
+  "make_test": "cargo test 383 passed; pytest 437 passed, 1 skipped (438 collected)",
+  "audit_cross": {"pairs": 120, "games": 240, "void": 0, "wr": 0.5042, "elo": 2.9},
+  "notes": "Q1-Q4は決定的な証拠(RsGame._decideのoutをそのまま保存する計装+OPCG_DEBUG_SELECT付きの一時ビルドで枝の値を直接ダンプ)で確定。(a)(b)を同じ欠陥として扱っていたdocs/rust_engine_plan.md §8.27の前提は一部誤りで、報告書で訂正した(修正案③=「can_skip=Falseで空を拒む」は前提から成立しない: can_skipはSelectTargetでは常にfalseの定数で、真の必須/任意はconstraints.minが持つため)。Q4はopcg_effects.jsonの走査で自分側up_to選択660件中339件(51%)が利益系・13件(2%)のみコスト系と定量化。Q5(Python版py-engine-finalでの再現)は時間の制約で未確認(理論上(a)は同じ構造の欠陥を持つはずだが探索実装の違いでタイの発生が保証されない・(b)はネット依存なので比較対象が変わる)。修正はQ6で①(効果種別を既定解決に配線し利益系はmax件にする)を推奨したが、影響が自分側up_to選択660件・golden 2種(監査3,386件・再生200局)全体に及び「局所修正」とは言えないため、このセッションではコードは変更していない。修正の実施要否・優先度・WP分割はコーディネータ判断を仰ぐ。作業前提として、環境にpytest/httpx/cffi/numpy/fastapi等のPython依存が入っておらず(pip install --break-system-packages -r opcg_sim/requirements.txt + pytest/pytest-xdist/httpx/cffi)を追加で入れた(コードには含めていない・環境セットアップのみ)。一時的なデバッグ計装(rust/opcg_engine/src/search/quiesce.rsへのOPCG_DEBUG_SELECT付きeprintln!)は証拠採取後にgit checkoutで完全に元に戻し、このブランチの差分には含めていない。"
+}

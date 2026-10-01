@@ -185,7 +185,18 @@ pub fn event_has_main_play(
     masters: &MasterTable,
     card: CardIdx,
 ) -> Result<bool, EngineError> {
-    for id in &masters.get(s.state().card(card).master).ability_ids {
+    event_has_main_play_state(s.state(), masters, card)
+}
+
+/// [`event_has_main_play`] の盤面版（合法手の列挙 `legal.rs` が使う＝`play_card_action` と
+/// 同じ判定を列挙側でも行い、「合法なのに適用できない手」と「適用できるのに列挙されない手」の
+/// 両方を防ぐ）。
+pub fn event_has_main_play_state(
+    state: &crate::model::GameState,
+    masters: &MasterTable,
+    card: CardIdx,
+) -> Result<bool, EngineError> {
+    for id in &masters.get(state.card(card).master).ability_ids {
         if matches!(
             crate::effects::ability(masters, *id)?.trigger,
             TriggerType::OnPlay | TriggerType::ActivateMain

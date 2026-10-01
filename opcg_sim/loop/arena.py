@@ -123,13 +123,20 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
 
     `cand_kw` は**候補席にだけ**渡す探索のつまみ（`{"macro_moves": True}` 等）。機構を
     グローバルで切り替えると両席に効いて A/B にならないので、席別の seam を通す。
+    **基準席は常に既定**（`sims` 以外は何も渡さない）＝比べているのは候補席の設定だけ。
+
+    `cand_kw["sims"]`（`--cand-sims`）だけは `SeatSpec` の名前付き引数と衝突するので取り出す
+    ＝候補席だけ sims を変えられる（基準席は `sims` のまま）。
     """
     E.engine()
     _G["leaders_mode"] = leaders_mode
     _G["decks"] = decks
     _G["pair_timeout"] = pair_timeout
     _G["db"] = D.load_db()
-    _G["cand"] = E.SeatSpec(cand_spec or None, sims=sims, **(cand_kw or {}))
+    kw = dict(cand_kw or {})
+    _G["cand_opts"] = dict(kw)                 # 台帳に書く候補席の設定（既定なら空）
+    cand_sims = int(kw.pop("sims", sims))
+    _G["cand"] = E.SeatSpec(cand_spec or None, sims=cand_sims, **kw)
     _G["best"] = E.SeatSpec(best_spec or None, sims=sims)
 
 
@@ -157,15 +164,29 @@ def play_pair_detail(seed: int) -> Dict[str, Any]:
         if a["winner"] is None or b["winner"] is None:
             raise DR.GameAborted(f"seed={seed} 決着せず（上限手数）")
     except (Exception, PairTimeout) as e:                    # noqa: BLE001  1 ペアで計測を止めない
-        return {"seed": seed, "score": None, "leaders": [la, lb],
-                "void": f"{type(e).__name__}: {str(e)[:120]}"}
+        return _with_cand_opts({"seed": seed, "score": None, "leaders": [la, lb],
+                                "void": f"{type(e).__name__}: {str(e)[:120]}"})
     finally:
         if _G.get("pair_timeout"):
             signal.alarm(0)
     wa = 1.0 if a["winner"] == "p1" else 0.0
     wb = 1.0 if b["winner"] == "p2" else 0.0
-    return {"seed": seed, "score": wa + wb, "leaders": [la, lb], "games": [wa, wb],
-            "cand_leaders": [la, la], "turns": [a["turns"], b["turns"]]}
+    return _with_cand_opts(
+        {"seed": seed, "score": wa + wb, "leaders": [la, lb], "games": [wa, wb],
+         "cand_leaders": [la, la], "turns": [a["turns"], b["turns"]]})
+
+
+def _with_cand_opts(row: Dict[str, Any]) -> Dict[str, Any]:
+    """台帳行へ候補席の設定を添える（**既定なら何も足さない**）。
+
+    判定は設定に紐づく（同じネットでも探索のつまみが違えば別の測定）ので、行そのものに
+    「どの設定で打ったか」を残す。既定（`--cand-*` を 1 つも付けない）実行では鍵ごと
+    現れない＝**歴代の台帳と 1 バイトも変わらない**（既存の読み手を壊さない）。
+    """
+    opts = _G.get("cand_opts")
+    if opts:
+        row["cand_opts"] = dict(opts)
+    return row
 
 
 #: `--cand-*` フラグ → 席別の探索つまみ（旧 `arena_resume` の cand_kw と同じ意味）。
@@ -199,14 +220,49 @@ def add_cand_args(ap) -> None:
                     help="候補席だけ残ドン掘り（腕 A・2026-09-02 の対照実験）")
     ap.add_argument("--cand-residual-activate", default=None, choices=("low", "high"),
                     help="候補席だけ残り起動（腕 A2）。付与対話を方針で解く")
+    # --- 探索の設定そのもの（§20.5／§20.7・WP `rs-search-arena`）--------------------
+    # ネットを固定して**設定だけ**を比べるための欄。`Game.decide` の opts と同名で、
+    # 省略＝既定＝今までの挙動（opts に鍵が現れない）。基準席には一切渡らない。
+    ap.add_argument("--cand-sims", type=int, default=None,
+                    help="候補席だけ sims（省略＝`--sims`＝両席同じ）")
+    ap.add_argument("--cand-select-rule", default=None, choices=("visits", "q_min_n"),
+                    help="候補席だけ根の選択規則（§20.5・既定 visits）")
+    ap.add_argument("--cand-q-min-frac", type=float, default=None,
+                    help="候補席だけ q_min_n の訪問下限の割合（既定 0.125＝sims/8）")
+    ap.add_argument("--cand-root-prior-temp", type=float, default=None,
+                    help="候補席だけ根の事前分布の平坦化 P^(1/t)（§20.5・既定 1.0）")
+    ap.add_argument("--cand-worlds", type=int, default=None,
+                    help="候補席だけ世界サンプルの本数 K（§20.7.1・既定 1）。K 本ぶん"
+                         "スレッドを使うので --workers を下げること")
+    ap.add_argument("--cand-setup-box", action="store_true",
+                    help="候補席だけ準備箱（§20.7.2・既定 OFF）")
+
+
+#: `--cand-<flag>` → `Game.decide` の opts の欄（値をそのまま流す欄・省略＝既定）。
+CAND_VALUE_FLAGS = {
+    "cand_sims": "sims",
+    "cand_select_rule": "select_rule",
+    "cand_q_min_frac": "q_min_frac",
+    "cand_root_prior_temp": "root_prior_temp",
+    "cand_worlds": "worlds",
+    "cand_residual_activate": "residual_activate",
+}
 
 
 def cand_kw_from_args(args) -> Optional[Dict[str, Any]]:
-    """`add_cand_args` のフラグ → `init_pool(cand_kw=...)`。何も立っていなければ None。"""
+    """`add_cand_args` のフラグ → `init_pool(cand_kw=...)`。何も立っていなければ None。
+
+    **None（省略）は載せない**＝既定の実行では `SeatSpec.opts` が今までと同じ
+    `{"net", "sims"}` だけになる（記録も歴代の台帳と同じ形になる）。
+    """
     kw: Dict[str, Any] = {}
     for flag, extra in CAND_FLAGS.items():
         if getattr(args, f"cand_{flag}", False):
             kw.update(extra)
-    if getattr(args, "cand_residual_activate", None):
-        kw["residual_activate"] = args.cand_residual_activate
+    for attr, key in CAND_VALUE_FLAGS.items():
+        value = getattr(args, attr, None)
+        if value is not None:
+            kw[key] = value
+    if getattr(args, "cand_setup_box", False):
+        kw["setup_box"] = True
     return kw or None

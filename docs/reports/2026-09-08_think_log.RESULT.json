@@ -1,0 +1,9 @@
+{
+  "job": "rs-think-log",
+  "status": "done",
+  "fields": ["pv", "legal_stats", "attribution", "kind", "commit_from"],
+  "make_test": "385 passed (cargo test) + 442 passed, 1 skipped (pytest)",
+  "golden_changed": false,
+  "outputs": "scenario_out/（9 シナリオ × seed 0/1 = 18 本・r3・sims=160。.frames.json + .md）",
+  "notes": "PIMC の木: 現在の TreeMcts::run は世界サンプルを decide 1 回につき 1 度しか引かない（複数世界を持たない）ので、PVは単一の木を辿るだけで曖昧さは無い。相手の伏せ手札など根の世界サンプルにしか無いカードのuuidは実盤面（describe_move が読む self.session の状態）で引けないことがあり、その場合 describe_move は uuid をそのまま返す（記述子化できない）——今回の9シナリオ×2seedの出力では観測されなかったが、起こり得る。PVは根の訪問数最多の子を辿るだけなので、探索が浅く終わった枝（sims不足で未訪問）に達すると n=0 のまま「その局面の先頭合法手」を機械的に示す（実際に観測: 決定#0のPV4手目でp2 PASS n=0）——これは仕様どおり（葉での停止条件は「未展開／終局／合法手0」のみで、n=0そのものは停止条件にしていない）。V の帰属の潰し方: 根の符号化（Game.encode、実盤面・decide内部の世界サンプルではない）の22枠それぞれについて、tokens（S_DIM=20列/枠）を0埋め・card_idxを0（PAD）にしてopcg_engine.net_evalで再計算。dv = v0 - v_masked（その枠を消すとvalueがどれだけ動くか）の絶対値上位5。net_evalはプロセスの既定ネット（最初にload_netしたnpz）を使うため、seat側とopp側で別ネットを使う運用ではattributionが席ごとのネット切替を追わない制約がある——本WPの9シナリオはseat=opp=r3で単一ネットのため影響なし。commit_from: RsGameが(turn,seat)キーで「箱コミットを初めて焼き込んだ決定のaction_index」を覚えておき、以降の同じ箱の消化（kind==commit）が続く限りその値を返す（多段の箱コミットで複数のcommit決定が同じcommit_fromを指すことを実際に確認）。legal_statsのn合計はmain決定で必ずsimsと厳密に一致することを実測で確認（root自身の訪問合計は箱化の影響を受けない）——test_think_log.pyでは==で検証（緩めていない）。既存tests/test_scenario_play.pyの.mdマーカー検証を新しい見出し（(3)探索が見た候補・(6)PV・(7)V の帰属）に合わせて更新した。環境: このセッションにはmaturin/pytest/pytest-xdist/fastapi/httpx/numpyが入っていなかったのでpip installした（make rust-develop・make testの前提）。"
+}

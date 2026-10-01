@@ -1,0 +1,328 @@
+{
+ "job": "rs-leaf-rollout",
+ "status": "done",
+ "branch": "claude/rs-leaf-rollout-7mlk9y",
+ "base": "claude/cpu-spec-improvements-yw91jd @ 2945169",
+ "net": "nrel_r3.npz（既定・変更なし）",
+ "keys": {
+  "F1": {
+   "kami_before_attack": 0,
+   "lethal": 0,
+   "gammaknife": 0,
+   "kami_ko": 1,
+   "kami_ko_played": 3,
+   "runs": 8
+  },
+  "F2": {
+   "kami_before_attack": 4,
+   "lethal": 2,
+   "gammaknife": 0,
+   "kami_ko": 1,
+   "kami_ko_played": 4,
+   "runs": 8
+  },
+  "F3": {
+   "kami_before_attack": 4,
+   "lethal": 4,
+   "gammaknife": 0,
+   "kami_ko": 1,
+   "kami_ko_played": 1,
+   "runs": 8
+  }
+ },
+ "keys_reference": {
+  "C_w4_r2": {
+   "kami_before_attack": 5,
+   "lethal": 4,
+   "gammaknife": 4,
+   "kami_ko": 0,
+   "kami_ko_played": 0,
+   "runs": 8,
+   "note": "分析 #6 の参照条件（worlds 4 ＋ R2・打ち切り**なし**）。scenario_out_c/C_w4_r2 を tests/scripts/rs_leaf_rollout_keys.py で数え直して分析 #6 の表と一致することを確認した（同じ物差しで比べている）。"
+  },
+  "S1_default": {
+   "kami_before_attack": 0,
+   "lethal": 0,
+   "gammaknife": 0,
+   "kami_ko": 0,
+   "note": "分析 #6 の既定（sims 160・visits・worlds 1）"
+  }
+ },
+ "condition_settings": {
+  "F1": {
+   "leaf_rollout": "turn_end",
+   "select_rule": "visits",
+   "root_prior_temp": 1.0,
+   "worlds": 1
+  },
+  "F2": {
+   "leaf_rollout": "turn_end",
+   "select_rule": "q_min_n",
+   "q_min_frac": 0.125,
+   "root_prior_temp": 2.0,
+   "worlds": 1
+  },
+  "F3": {
+   "leaf_rollout": "turn_end",
+   "select_rule": "q_min_n",
+   "q_min_frac": 0.125,
+   "root_prior_temp": 2.0,
+   "worlds": 4
+  },
+  "common": "sims 160・seed 0〜7・両席同じ設定・3 局面（enel_human_20260810_t9-9／human_enel_vs_roger_20260904_t7-8／human_enel_vs_luffy_20260904_t4-5）・ネット r3"
+ },
+ "keys_detail": {
+  "F1": {
+   "kami_before_attack": {
+    "scenario": "enel_human_20260810_t9-9",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": false,
+     "s4": false,
+     "s5": false,
+     "s6": false,
+     "s7": false
+    }
+   },
+   "gammaknife": {
+    "scenario": "human_enel_vs_roger_20260904_t7-8",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": false,
+     "s4": false,
+     "s5": false,
+     "s6": false,
+     "s7": false
+    }
+   },
+   "kami_ko": {
+    "scenario": "human_enel_vs_luffy_20260904_t4-5",
+    "per_seed": {
+     "s0": "no_kami",
+     "s1": true,
+     "s2": false,
+     "s3": false,
+     "s4": "no_kami",
+     "s5": "no_kami",
+     "s6": "no_kami",
+     "s7": "no_kami"
+    },
+    "played": 3
+   },
+   "lethal": {
+    "scenario": "enel_human_20260810_t9-9",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": false,
+     "s4": false,
+     "s5": false,
+     "s6": false,
+     "s7": false
+    }
+   }
+  },
+  "F2": {
+   "kami_before_attack": {
+    "scenario": "enel_human_20260810_t9-9",
+    "per_seed": {
+     "s0": true,
+     "s1": true,
+     "s2": false,
+     "s3": false,
+     "s4": false,
+     "s5": true,
+     "s6": false,
+     "s7": true
+    }
+   },
+   "gammaknife": {
+    "scenario": "human_enel_vs_roger_20260904_t7-8",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": false,
+     "s4": false,
+     "s5": false,
+     "s6": false,
+     "s7": false
+    }
+   },
+   "kami_ko": {
+    "scenario": "human_enel_vs_luffy_20260904_t4-5",
+    "per_seed": {
+     "s0": "no_kami",
+     "s1": false,
+     "s2": false,
+     "s3": false,
+     "s4": "no_kami",
+     "s5": "no_kami",
+     "s6": true,
+     "s7": "no_kami"
+    },
+    "played": 4
+   },
+   "lethal": {
+    "scenario": "enel_human_20260810_t9-9",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": false,
+     "s4": false,
+     "s5": true,
+     "s6": false,
+     "s7": true
+    }
+   }
+  },
+  "F3": {
+   "kami_before_attack": {
+    "scenario": "enel_human_20260810_t9-9",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": true,
+     "s4": true,
+     "s5": true,
+     "s6": false,
+     "s7": true
+    }
+   },
+   "gammaknife": {
+    "scenario": "human_enel_vs_roger_20260904_t7-8",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": false,
+     "s4": false,
+     "s5": false,
+     "s6": false,
+     "s7": false
+    }
+   },
+   "kami_ko": {
+    "scenario": "human_enel_vs_luffy_20260904_t4-5",
+    "per_seed": {
+     "s0": "no_kami",
+     "s1": "no_kami",
+     "s2": true,
+     "s3": "no_kami",
+     "s4": "no_kami",
+     "s5": "no_kami",
+     "s6": "no_kami",
+     "s7": "no_kami"
+    },
+    "played": 1
+   },
+   "lethal": {
+    "scenario": "enel_human_20260810_t9-9",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": true,
+     "s4": true,
+     "s5": true,
+     "s6": false,
+     "s7": true
+    }
+   }
+  }
+ },
+ "latency_ms": {
+  "base": 223.5,
+  "F1": 428.0,
+  "F2": 413.4,
+  "F3": 568.1
+ },
+ "latency_detail": {
+  "note": "tests/scripts/rs_search_a_latency.py --sims 160 --repeat 3・同じ 3 局面（分岐点の開始盤面）・単独プロセス・4 コア。latency_ms は 3 局面の中位（各局面は 3 回の中位）。生データは scenario_out_f/lat_{base,F1,F2,F3}.json。",
+  "by_scenario_ms": {
+   "enel_human_20260810_t9-9": {
+    "base": 58.6,
+    "F1": 70.9,
+    "F2": 85.1,
+    "F3": 480.7
+   },
+   "human_enel_vs_roger_20260904_t7-8": {
+    "base": 223.5,
+    "F1": 428.0,
+    "F2": 413.4,
+    "F3": 848.7
+   },
+   "human_enel_vs_luffy_20260904_t4-5": {
+    "base": 349.9,
+    "F1": 429.8,
+    "F2": 426.7,
+    "F3": 568.1
+   }
+  },
+  "ratio_vs_base": {
+   "F1": 1.91,
+   "F2": 1.85,
+   "F3": 2.54
+  }
+ },
+ "rollout": {
+  "mean_plies": 2.9642,
+  "capped_frac": 0.0041,
+  "note": "F1〜F3 の全 72 run・全決定の trace[\"rollout\"] を束ねた値（分母は打ち切りを試みた葉）。条件別は by_condition。worlds>1（F3）は世界 0 のぶんだけが計測に出る。",
+  "by_condition": {
+   "F1": {
+    "mean_plies": 2.8499,
+    "capped_frac": 0.0,
+    "mean_plies_when_rolled": 2.9505,
+    "rolled_frac": 0.9659,
+    "leaves": 20430,
+    "plies": 58223,
+    "capped": 0,
+    "decisions": 746
+   },
+   "F2": {
+    "mean_plies": 2.9358,
+    "capped_frac": 0.0031,
+    "mean_plies_when_rolled": 3.1605,
+    "rolled_frac": 0.9289,
+    "leaves": 27938,
+    "plies": 82019,
+    "capped": 86,
+    "decisions": 795
+   },
+   "F3": {
+    "mean_plies": 3.0943,
+    "capped_frac": 0.0088,
+    "mean_plies_when_rolled": 3.24,
+    "rolled_frac": 0.955,
+    "leaves": 24039,
+    "plies": 74385,
+    "capped": 211,
+    "decisions": 719
+   }
+  }
+ },
+ "make_test": "464 passed, 1 skipped",
+ "cargo_test": "414 passed（うち葉の打ち切り 7 本＝search/tests_leaf_rollout.rs）",
+ "clippy": "clean（--no-default-features --all-targets -D warnings）",
+ "audit_cross": {
+  "pairs": 120,
+  "games": 240,
+  "void": 0,
+  "wr": 0.5
+ },
+ "artifacts": {
+  "scenario_out_f/": "3 条件 × 3 局面 × seed 0〜7（72 run）の frames.json ＋ .md",
+  "scenario_out_f/_keys.json": "tests/scripts/rs_leaf_rollout_keys.py の生出力（鍵の per-seed ＋ rollout の実績）",
+  "scenario_out_f/lat_{base,F1,F2,F3}.json": "rs_search_a_latency.py の生出力",
+  "tests/scripts/rs_leaf_rollout_keys.py": "上の集計器（判定は書かない）"
+ },
+ "notes": "【結論の材料（判定はコーディネータ）】葉の打ち切りだけ（F1）では 4 つの鍵が全部 0/8（kami_ko だけ 1/8・打った run は 3）。R2 と組むと「神の裁き → オーム攻撃の順」が 4/8・決着 2/8（F2）、さらに worlds 4 を足すと決着 4/8（F3）。参照の C_w4_r2（打ち切り**なし**・worlds 4 ＋ R2）は 5/8・4/8 なので、**打ち切りは C_w4_r2 を上回らなかった**（同等〜わずかに下）。 | 【回帰した鍵】ガンマナイフが **F1/F2/F3 とも 0/8**（参照 C_w4_r2 は 4/8・C_box_r2/C_all は 5/8）。ロジャー T7 の頭合わせを見ると、打ち切りなしの C_w4_r2 では ガンマナイフの PLAY が N=108・Q=-0.180 で訪問数最多だったのに対し、F2 では N=8・Q=-0.632（最多は DON_BOX の N=65・Q=-0.526）、F3 では N=18・Q=-0.169（最多は DON_BOX の N=197・Q=+0.023）。**打ち切りは「除去 → 攻撃が通る」をガンマナイフ専用の得にしない**——攻撃を先にした葉も同じ様にターン終了まで打ち切られて Q が上がるので、深さ 1 で見えていた差が消える。§20.7.9 の弱点 (1)（打ち切りの質は方策の質に縛られる）が実際に出た形。 | 【打ち切りの実績】葉の 93〜97% が 1 手以上打てて、1 葉あたり平均 2.85〜3.09 ply（打てた葉に限ると 2.95〜3.24）。上限 12 ply に当たったのは F1 0%・F2 0.31%・F3 0.88%＝**上限はほぼ効いていない**（ターンは 3 手ほどで自然に終わる）。残り 3〜7% は葉が戦闘窓／対話窓の途中や相手の応手側に居てメインフェイズから始められなかったもの。 | 【レイテンシ】同じ 3 局面・sims 160・repeat 3 の中位で 既定 223.5ms → F1 428.0ms（1.9 倍）・F2 413.4ms（1.8 倍）・F3 568.1ms（2.5 倍）。§20.7.9 の見込み（2〜4 倍）の下限に収まった。1 葉あたり平均 3 ply ぶんネットを余分に呼ぶわりに 2 倍で済むのは、打ち切りが方策 1 回＋適用だけで枝評価（resolved_branch_values）を起こさないため。 | 【既定は 1 bit も変えていない】`leaf_rollout` の既定は \"none\" で、`leaf_value` の分岐に 1 度も入らない。cargo test は「既定と leaf_rollout=none の decide 出力が丸ごと同じ JSON・rollout の欄も出ない」を固定（`decide_is_bit_identical_for_none_and_wired_for_turn_end`）。make test 464 passed・make audit-cross void 0（既定のまま）。 | 【実装の判断 1・要確認】途中で開いた戦闘窓／対話窓の既定解決は `box_depth=-1` で呼んだ（今の `leaf_value` は 0）。指示の「枝予算（BOX_BRANCH_BUDGET）は打ち切りの中では引かない」を満たすため＝`box_depth>=0` だと `setup_box=true` のとき窓の中の対象選択が枝になって `resolved_branch_values`（予算を引く）が走る。`setup_box=false`（今回の F1〜F3 を含む既定）ではどちらでも 1 bit も変わらない。 | 【実装の判断 2・要確認】打ち切りの中の窓の解決は `ctx.quiesce` で切っていない（窓を解決しないと「そのターンの終わり」へ到達できないため）。`quiesce=false` かつ `leaf_rollout=turn_end` という組み合わせでだけ意味を持つ。serve 既定は `quiesce=true` なので実運用では差が無い。 | 【実装の判断 3】木の中の戦闘箱／対話箱（`box_battle`／`box_dialog`）が葉を畳んだ場合、その葉は `leaf_value` を通らないので打ち切られない（畳まれた葉は窓の中＝メインフェイズではない）。打ち切りが掛かるのは `leaf_value` を通る葉だけ＝指示書の字面どおり。 | 【計測の粒度】`trace[\"rollout\"]` は thread_local なので、`worlds>1`（F3）では**世界 0 のぶんだけ**が出る（`boxes` と同じ扱い・`decide::run_worlds` の注記）。F3 の rollout の数字は 1/4 の標本。 | 【ブランチ名】指示書は `claude/rs-leaf-rollout` だが、本セッションの指定ブランチは `claude/rs-leaf-rollout-7mlk9y`（システム側の指定）。指定に従ってそちらへ push した。 | 【質問】(a) ガンマナイフの回帰（4/8 → 0/8）は打ち切りの原理的な帰結（攻撃側の葉も同じだけ得をする）に見えるが、これを「正しい比較になった」と読むか「退行」と読むかは判定が要る。(b) 打ち切りの方策を P の argmax ではなく「Q 付きの浅い読み」にすると gammaknife は戻りうるが、レイテンシが跳ねる（本 WP の範囲外）。(c) F1 が全部 0/8 なのは、打ち切りが**訪問の配り方**を変えないため（P は変わらない）＝R2（訪問下限＋平坦化）と組んで初めて効く。単独で載せる価値は低いと読む。"
+}

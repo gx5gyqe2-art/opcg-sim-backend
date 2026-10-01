@@ -1,0 +1,52 @@
+{
+ "note": "同じ 1 局面（分岐点の開始盤面）に対する 1 decide の実測 ms・単独プロセス",
+ "seed": 0,
+ "repeat": 3,
+ "opts": {
+  "select_rule": "q_min_n",
+  "q_min_frac": 0.125,
+  "root_prior_temp": 2.0,
+  "worlds": 4
+ },
+ "by_scenario": {
+  "enel_human_20260810_t9-9": {
+   "160": {
+    "ms": 381.3,
+    "ms_all": [
+     401.2,
+     330.1,
+     381.3
+    ],
+    "legal": 28,
+    "kind": "main"
+   }
+  },
+  "human_enel_vs_roger_20260904_t7-8": {
+   "160": {
+    "ms": 452.7,
+    "ms_all": [
+     476.2,
+     452.7,
+     376.1
+    ],
+    "legal": 29,
+    "kind": "main"
+   }
+  },
+  "human_enel_vs_luffy_20260904_t4-5": {
+   "160": {
+    "ms": 390.0,
+    "ms_all": [
+     324.2,
+     390.0,
+     403.1
+    ],
+    "legal": 14,
+    "kind": "main"
+   }
+  }
+ },
+ "median_ms_by_sims": {
+  "160": 390.0
+ }
+}

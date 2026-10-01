@@ -1,0 +1,41 @@
+消化済み 0/24 ペア・残り 24
+今回 24 ペア（74s）・累計 24/24
+ARENA_RESUME_FINAL {"pairs": 24, "games": 48, "void": 0, "wins": 20.0, "wr": 0.4167, "ci95": [0.2762, 0.5571], "elo": -58.5, "promoted": false, "candidate": "/root/nrel_r4q.npz"}
+== shard 0 done (mirror seed-base 521000)
+消化済み 0/24 ペア・残り 24
+今回 24 ペア（76s）・累計 24/24
+ARENA_RESUME_FINAL {"pairs": 24, "games": 48, "void": 0, "wins": 27.0, "wr": 0.5625, "ci95": [0.4143, 0.7107], "elo": 43.7, "promoted": false, "candidate": "/root/nrel_r4q.npz"}
+== shard 1 done (mirror seed-base 522000)
+消化済み 0/24 ペア・残り 24
+今回 24 ペア（77s）・累計 24/24
+ARENA_RESUME_FINAL {"pairs": 24, "games": 48, "void": 0, "wins": 22.0, "wr": 0.4583, "ci95": [0.3148, 0.6018], "elo": -29.0, "promoted": false, "candidate": "/root/nrel_r4q.npz"}
+== shard 2 done (mirror seed-base 523000)
+消化済み 0/24 ペア・残り 24
+今回 24 ペア（79s）・累計 24/24
+ARENA_RESUME_FINAL {"pairs": 24, "games": 48, "void": 0, "wins": 24.0, "wr": 0.5, "ci95": [0.3555, 0.6445], "elo": -0.0, "promoted": false, "candidate": "/root/nrel_r4q.npz"}
+== shard 3 done (mirror seed-base 524000)
+消化済み 0/24 ペア・残り 24
+今回 24 ペア（73s）・累計 24/24
+ARENA_RESUME_FINAL {"pairs": 24, "games": 48, "void": 0, "wins": 28.0, "wr": 0.5833, "ci95": [0.4704, 0.6963], "elo": 58.5, "promoted": false, "candidate": "/root/nrel_r4q.npz"}
+== shard 4 done (mirror seed-base 525000)
+消化済み 0/24 ペア・残り 24
+今回 24 ペア（83s）・累計 24/24
+ARENA_RESUME_FINAL {"pairs": 24, "games": 48, "void": 0, "wins": 23.0, "wr": 0.4792, "ci95": [0.3411, 0.6172], "elo": -14.5, "promoted": false, "candidate": "/root/nrel_r4q.npz"}
+== shard 5 done (mirror seed-base 526000)
+消化済み 0/24 ペア・残り 24
+今回 24 ペア（80s）・累計 24/24
+ARENA_RESUME_FINAL {"pairs": 24, "games": 48, "void": 0, "wins": 25.0, "wr": 0.5208, "ci95": [0.396, 0.6457], "elo": 14.5, "promoted": false, "candidate": "/root/nrel_r4q.npz"}
+== shard 6 done (mirror seed-base 527000)
+消化済み 0/24 ペア・残り 24
+今回 24 ペア（80s）・累計 24/24
+ARENA_RESUME_FINAL {"pairs": 24, "games": 48, "void": 0, "wins": 27.0, "wr": 0.5625, "ci95": [0.44, 0.685], "elo": 43.7, "promoted": false, "candidate": "/root/nrel_r4q.npz"}
+== shard 7 done (mirror seed-base 528000)
+  shard_0.jsonl                20.0/48 = 0.4167 void 0
+  shard_1.jsonl                27.0/48 = 0.5625 void 0
+  shard_2.jsonl                22.0/48 = 0.4583 void 0
+  shard_3.jsonl                24.0/48 = 0.5000 void 0
+  shard_4.jsonl                28.0/48 = 0.5833 void 0
+  shard_5.jsonl                23.0/48 = 0.4792 void 0
+  shard_6.jsonl                25.0/48 = 0.5208 void 0
+  shard_7.jsonl                27.0/48 = 0.5625 void 0
+[mirror] ARENA_MERGE_FINAL {"pairs": 192, "games": 384, "void": 0, "wins": 196.0, "wr": 0.5104, "ci95": [0.463, 0.5579], "elo": 7.2, "elo95": [-25.8, 40.4], "promoted": false, "shards": 8, "dup_seeds": 0}

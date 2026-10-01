@@ -21,8 +21,14 @@ use crate::model::{GameState, MasterTable, Seat};
 use crate::state::EngineError;
 use std::collections::HashMap;
 
-/// `encoder.scalars_dim(13)`＝94（v12）＋29（`n_rel_feat.EXTRA_DIM`）。
-pub const D_SC: usize = 123;
+/// `encoder.scalars_dim(14)`＝94（v12）＋33（`n_rel_feat.EXTRA_DIM`）。
+///
+/// **符号化 v14**（2026-09-11・`docs/rust_engine_plan.md` §20.9）は v13 に列を**末尾へ足した**
+/// だけ（S 20→22・EXTRA 29→33）。v13 のネット（r3／a1）は新しい列の重みを 0 で埋めて読む
+/// （[`crate::net::load_npz`]）＝出力が v13 と 1 bit も変わらない。
+pub const D_SC: usize = 127;
+/// v13 の scalars（94＋29）。npz の pad の位置を決めるのに要る。
+pub const D_SC_V13: usize = 123;
 pub const MAX_FIELD: usize = 5;
 pub const MAX_HAND: usize = 10;
 /// `encoder.PER_CHAR`＝[cost, power, is_rest, attached_don]＋キーワード 4。
@@ -33,9 +39,16 @@ pub const N_CARD_IDX: usize = 24;
 pub const N_TOK: usize = 22;
 pub const N_OWN: usize = 16;
 pub const N_OPP: usize = 6;
-pub const S_DIM: usize = 20;
+pub const S_DIM: usize = 22;
+/// v13 のトークン状態 S（20 列）。npz の pad の位置を決めるのに要る。
+pub const S_DIM_V13: usize = 20;
 pub const R_DIM: usize = 5;
-pub const EXTRA_DIM: usize = 29;
+pub const EXTRA_DIM: usize = 33;
+/// v13 のグローバル追加列（29）。
+pub const EXTRA_DIM_V13: usize = 29;
+/// 符号化の世代（`n_rel.NR_ENC_VERSION`）。npz の meta `enc_version` と突き合わせる。
+pub const ENC_VERSION: u32 = 14;
+pub const ENC_VERSION_V13: u32 = 13;
 /// `n_eff.STATS_DIM`（stats 8＋印字キーワード 8）／`MAX_AB`／`ABILITY_DIM`（23＋62×2＋4＋8＋7＋1）。
 pub const STATS_DIM: usize = 16;
 pub const MAX_AB: usize = 4;

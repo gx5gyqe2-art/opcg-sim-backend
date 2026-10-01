@@ -1,0 +1,153 @@
+{
+ "job": "rs-setup-box-3",
+ "status": "partial",
+ "branch": "claude/rs-setup-box-2",
+ "base": "claude/rs-setup-box-2 (6bcd0480)",
+ "net": "nrel_r3.npz（変更なし）",
+ "conditions": {
+  "E1": "--worlds 4 --setup-box --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2 --sims 160 --seeds 8",
+  "E2": "--setup-box --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2 --sims 160 --seeds 8",
+  "E3": "--setup-box --select-branch off --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2 --sims 160 --seeds 8",
+  "E4": "--select-branch on --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2 --sims 160 --seeds 8",
+  "E5": "（指示に無い追加の対照）--select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2 --sims 160 --seeds 8＝箱も共通規則も無い R2 単独。E3／E4 を読むための worlds なしの基準線"
+ },
+ "reference": {
+  "note": "scenario_out_c/C_w4_r2（worlds 4 ＋ R2・箱なし）を同じ鍵で読んだ値。",
+  "C_w4_r2": {
+   "kami_before_attack": 5,
+   "lethal": 4,
+   "gammaknife": 4,
+   "kami_ko": 0,
+   "kami_played": 0
+  }
+ },
+ "make_test": "458 passed, 1 skipped（pytest）＋ cargo test 413 passed（cargo clippy --all-targets -D warnings も clean）",
+ "audit_cross": {
+  "pairs": 120,
+  "games": 240,
+  "void": 0
+ },
+ "keys": {
+  "E1": {
+   "kami_before_attack": 0,
+   "lethal": 0,
+   "gammaknife": 1,
+   "kami_ko": 0,
+   "kami_played": 0,
+   "chose_box": 80,
+   "chose_bare": 0,
+   "decisions_with_box": 258,
+   "box_below_floor": 21,
+   "n_floor": 80,
+   "boxes": {
+    "setup": 82482,
+    "attack": 0,
+    "defense": 96406
+   }
+  },
+  "E2": {
+   "kami_before_attack": 0,
+   "lethal": 0,
+   "gammaknife": 3,
+   "kami_ko": 3,
+   "kami_played": 3,
+   "chose_box": 105,
+   "chose_bare": 0,
+   "decisions_with_box": 291,
+   "box_below_floor": 23,
+   "n_floor": 20,
+   "boxes": {
+    "setup": 85139,
+    "attack": 0,
+    "defense": 108459
+   }
+  },
+  "E3": {
+   "kami_before_attack": 0,
+   "lethal": 0,
+   "gammaknife": 2,
+   "kami_ko": 3,
+   "kami_played": 3,
+   "chose_box": 96,
+   "chose_bare": 0,
+   "decisions_with_box": 296,
+   "box_below_floor": 24,
+   "n_floor": 20,
+   "boxes": {
+    "setup": 85396,
+    "attack": 0,
+    "defense": 0
+   }
+  },
+  "E4": {
+   "kami_before_attack": 2,
+   "lethal": 1,
+   "gammaknife": 7,
+   "kami_ko": 0,
+   "kami_played": 1,
+   "chose_box": 0,
+   "chose_bare": 0,
+   "decisions_with_box": 0,
+   "box_below_floor": 0,
+   "n_floor": 20,
+   "boxes": {
+    "setup": 0,
+    "attack": 1531,
+    "defense": 120894
+   }
+  },
+  "E5": {
+   "kami_before_attack": 2,
+   "lethal": 2,
+   "gammaknife": 6,
+   "kami_ko": 0,
+   "kami_played": 1,
+   "chose_box": 0,
+   "chose_bare": 0,
+   "decisions_with_box": 0,
+   "box_below_floor": 0,
+   "n_floor": 20,
+   "boxes": {
+    "setup": 0,
+    "attack": 0,
+    "defense": 0
+   }
+  }
+ },
+ "latency_ms": {
+  "E1": 997.5,
+  "E2": 444.1,
+  "E3": 360.3,
+  "E4": 184.7,
+  "E5": 174.5,
+  "detail": {
+   "E1": {
+    "enel_human_20260810_t9-9": 997.5,
+    "human_enel_vs_roger_20260904_t7-8": 1142.0,
+    "human_enel_vs_luffy_20260904_t4-5": 626.6
+   },
+   "E2": {
+    "enel_human_20260810_t9-9": 146.1,
+    "human_enel_vs_roger_20260904_t7-8": 444.1,
+    "human_enel_vs_luffy_20260904_t4-5": 512.0
+   },
+   "E3": {
+    "enel_human_20260810_t9-9": 110.9,
+    "human_enel_vs_roger_20260904_t7-8": 360.3,
+    "human_enel_vs_luffy_20260904_t4-5": 504.3
+   },
+   "E4": {
+    "enel_human_20260810_t9-9": 58.0,
+    "human_enel_vs_roger_20260904_t7-8": 184.7,
+    "human_enel_vs_luffy_20260904_t4-5": 326.0
+   },
+   "E5": {
+    "enel_human_20260810_t9-9": 49.6,
+    "human_enel_vs_roger_20260904_t7-8": 174.5,
+    "human_enel_vs_luffy_20260904_t4-5": 334.7
+   }
+  },
+  "note": "rs_search_a_latency.py・同じ 3 局面・単独プロセス・repeat 3 の中位（sims 160）。"
+ },
+ "notes": "指示の 1〜6 は全部入り、既定（setup_box=false・select_branch=None）は 1 bit も変えていない（cargo の setup_box_is_off_by_default／defaults_report_no_boxes_at_all／spelling_out_the_defaults_changes_nothing・pytest の test_default_is_unchanged）。status=partial の理由は E1 が参照（scenario_out_c/C_w4_r2＝神の裁き→攻撃 5/8・決着 4/8・ガンマナイフ 4/8・KO 0/8）を下回ったこと 1 点。■ 受け入れ（cargo）: 神の裁きの箱に「KO する／しない」の枝が両方ある（kami_no_sabaki_branches_on_ko_and_no_ko）／適用すると PLAY → SELECT_RESOURCE → BUFF 対象 → KO 対象 で止まり、戦闘に入らず自分のメインに戻る（applying_the_kami_box_expands_into_primitive_moves）／箱に攻撃の欄も攻撃対象も無い（setup_boxes_never_carry_a_follow_up_attack）／箱がある準備の手の素の手は候補に無い（kami_no_sabaki_branches_on_ko_and_no_ko の後段）／箱の各枝の P が「素の手の P × 対象の P」で**枝の和が素の手の P**（setup_box_priors_split_by_the_selection_policy）／束ね: 同じ card_id の枝 3 本が各々下限未満でも和が下限以上なら q_min_n がその代表を選べる・visits は不変（select_groups_bundle_branches_so_q_min_n_can_reach_the_floor）／select_branch=false ＋ setup_box=true で boxes.attack／defense が 0（select_branch_off_removes_the_attack_and_defense_branches）。実測でも E3 の boxes は attack 0・defense 0 で setup 85,396、E4 は setup 0・attack 1,531・defense 120,894＝つまみは実プレイでも効いている。■ 「対象選択の P」は実際には一様だった（重要）: 指示どおり「木が対話ノードで使うのと同じ方策」を 1 度呼んでいるが、NRel の候補行（quiesce::cand_owned）は RESOLVE_EFFECT_SELECTION の選択肢を区別する欄を持たない（主体 uuid が同じ・target_ids が空）ので、対話ノードの priors は候補数ぶんの一様分布になる（実測: scenario_out_e/E4/enel_human_20260810_t9-9/r3_s0 の T9 の対話ノードで候補 3 に対し P=0.3333 ずつ）。よって「素の手の P × 対象の P」は**素の手の P の等分**に落ちる。それでも変わったのは分母側で、§20.7.8 の 3 では**同じ準備の手の枝をネットに 1 行として見せる**ようにした（quiesce::setup_row_map）＝枝の P の和が素の手の P になる。rs-setup-box-2 では k 本の枝が各々「素の手の P」を持ち、softmax がその手を k 回数えていた（和が k×素の手の P）。枝ごとに意味のある P を出したいなら、方策側に「どの対象を選ぶか」を区別する特徴（選んだカードの card_id／枠）が要る＝符号化の話になる。■ E3／E4／E5 の答え（指示の問い「rs-setup-box（v1）のガンマナイフ 5/8 の出所がどちらか」）: **どちらでもなく、素の PLAY が候補に残っていたこと**が出所。指示に無い対照 E5（箱も共通規則も無い R2 単独・worlds なし）を足して測ったところ、ガンマナイフは E5 6/8・E4（共通規則だけ）7/8・E3（準備箱だけ）2/8・E2（両方）3/8 だった。つまり共通規則は 6→7 でほぼ中立、準備箱は 6→2 で**下げる**側。v1 の 5/8 は rs-setup-box-2 の調査どおり 10 run すべて素の PLAY 由来で、箱の寄与ではなかった。詳細（detail_enel_roger_t7_gamma）を見ると E4/E5 では素の PLAY が N 23〜35（下限 20 超え）で選ばれ、E2/E3 では枝に割れて枝の最大が N 13〜25 に落ちる。■ 束ねは効いている: 箱を選んだ決定のうち「選んだ枝の N が単独では下限を割っている」ものが E1 21/80・E2 23/105・E3 24/96（setup_box_structure.box_below_floor）。§20.7.8 の 4 が無ければ q_min_n はこれらを選べない。それでも E2 のガンマナイフが 3/8 に留まるのは、束ねた N が下限を超えても**グループの Q（代表の Q）が素の手より低い**局面が残るため（箱は対話の選択を枝で固定するので、木が対話ノードで後から読み直す自由度を失う）。■ 箱が買っているもの: 神の裁きの KO。E2/E3 は打った 3/8・そのすべてで KO（kami_played 3・kami_ko 3）に対し、箱の無い E4/E5 は打った 1/8・KO 0/8。「打つと得か」を効果の解決まで含めて評価できるのは箱だけで、ここは v1（KO 5/8）に次ぐ水準まで戻った（rs-setup-box-2 は 4/8）。■ E1（worlds 4 ＋ 箱 ＋ R2）は全鍵で最下位（ガンマナイフ 1・KO 0・決着 0）。worlds 4 は実効 sims 640＝下限が 80 に上がるので、束ねた N でも届かない箱が増える（box_branch_n_sum_median 304.5 に対し box_below_floor 21）。worlds と箱は同時に入れると噛み合わない。■ レイテンシ（sims 160・単独プロセス・repeat 3 の中位）は rs-setup-box-2 から改善: E1 997.5 ms（C_all 1578.5 ms）・E2 444.1 ms（C_box_r2 589.2 ms）。箱の生成から「続きの攻撃を方策で選ぶ」段（枝ごとに legal_actions ＋ ネット 1 回）が消え、代わりに準備の手 1 つにつきネット 1 回になったため。E3 360.3・E4 184.7・E5 174.5。■ 判定材料としての読み（コーディネータ向け）: 準備箱は「効果の解決まで読ませる」ことには成功していて（KO 3/8）、失っているのは「素の手が持っていた訪問の集中」。今の形は素の手を落として枝に割るので、束ねで N を回復しても Q が代表 1 本ぶんしか出ない。■ 質問: (Q1) 素の手を**残したまま**箱を足す（rs-setup-box v1 の形）に戻し、§20.7.8 の 4 の束ね（素の手も同じグループに入れる＝実装済み）で取り合いを解く案はどうか。今の select_groups は素の手が候補に残っていればそれも同じグループに束ねる作りにしてあるので、quiesce::Ctx::legal_actions の 1 行（素の手を落とす retain）を外すだけで試せる。(Q2) 枝の P を意味のあるものにするには方策の候補行に「選んだ対象」を載せる必要がある（今は一様）。これは符号化＝ネットの再訓練を伴うので別 WP か。(Q3) worlds と箱の併用（E1）は今回の測定では最悪だった。§20.7.1 の worlds は箱と切り離して使う、で合っているか。■ 追加した対照 E5 は指示に無い（E3／E4 を読むための worlds なしの基準線が既存データに無かったため足した）。■ 計画 §20.7.8 は docs/rust_engine_plan.md にまだ書かれていない（§20.7.6 までしかない）＝本 WP は指示書の本文を仕様として実装した。文書化はコーディネータの担当と理解している。■ 計器: 鍵は既存の tests/scripts/rs_search_a_keys.py に setup_box_structure（boxes の合計・box_below_floor・枝数の中位）を足して読んだ（新規ファイルは作っていない）。旧データ scenario_out_d/ で旧鍵が 1 つも変わらないことを確認済み。decide の戻り値の select_groups は Python の trace には載せていない（指示の「trace の stats／groups の形は変えない」を守るため）＝必要なら次の WP で 1 行足せる。■ 環境メモ: この作業セッションには maturin・pytest・pytest-xdist・httpx・opcg_sim/requirements.txt が入っていなかったので入れた（コンテナは使い捨て）。opcg_sim/data/opcg_effects.json（生成物・git 管理外）も export_effects_json で作り直した——無いと tests_setup_box.rs は何も検査せずに戻る。"
+}

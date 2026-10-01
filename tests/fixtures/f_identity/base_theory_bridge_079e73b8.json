@@ -1,0 +1,366 @@
+{
+  "stats": {
+    "games": 2,
+    "atk_rows": 125,
+    "atk_silent": 0,
+    "grd_rows": 17,
+    "grd_no_attack": 0,
+    "grd_comfortable": 10,
+    "w_mode": "curve",
+    "sigma_turn": 1.154,
+    "w_bar": 0.2238,
+    "kappa_sum": 103.50462243571226,
+    "kappa_n": 125,
+    "clock_hand": "off",
+    "harm_profile": "cross",
+    "theta_hand": "cuttable_forced",
+    "theta_body": "blockers",
+    "play_book": "next",
+    "play_deferred": 14,
+    "play_deferred_dropped": 0,
+    "attach_ledger": "in_attack",
+    "attach_zeroed": 0,
+    "guard_price": "max_attack",
+    "grd_by_attacks": {},
+    "grd_took_n": 0.0,
+    "ledger_harm": "realised",
+    "harm_rows": 113,
+    "harm_unbracketed": 12,
+    "flow_pricing": "option",
+    "ledger_pricing": "exercise",
+    "ledger_rescored": 6,
+    "guard_g": "delta",
+    "grd_by_life": {
+      "4": {
+        "n": 9,
+        "took": 5,
+        "says_take": 6,
+        "can_guard": 7,
+        "g_paid": -0.7762881816548312,
+        "g_delta": 0.0,
+        "z_win": 5,
+        "z_n": 9
+      },
+      "3": {
+        "n": 4,
+        "took": 3,
+        "says_take": 3,
+        "can_guard": 2,
+        "g_paid": -0.5893207620428962,
+        "g_delta": 0.0,
+        "z_win": 2,
+        "z_n": 4
+      },
+      "1": {
+        "n": 1,
+        "took": 1,
+        "says_take": 1,
+        "can_guard": 1,
+        "g_paid": -0.09293875549614561,
+        "g_delta": 0.0,
+        "z_win": 1,
+        "z_n": 1
+      },
+      "0": {
+        "n": 1,
+        "took": 0,
+        "says_take": 0,
+        "can_guard": 1,
+        "g_paid": -0.1274003875968992,
+        "g_delta": 0.0,
+        "z_win": 1,
+        "z_n": 1
+      },
+      "5": {
+        "n": 1,
+        "took": 1,
+        "says_take": 0,
+        "can_guard": 1,
+        "g_paid": -0.08716269000000001,
+        "g_delta": 0.0,
+        "z_win": 0,
+        "z_n": 1
+      },
+      "2": {
+        "n": 1,
+        "took": 1,
+        "says_take": 1,
+        "can_guard": 0,
+        "g_paid": -0.19407547819831064,
+        "g_delta": 0.0,
+        "z_win": 0,
+        "z_n": 1
+      }
+    },
+    "guard_afford": "rule",
+    "guard_afford_requested": "rule",
+    "guard_s_cost": "curve",
+    "search_price": "plan",
+    "search_deck_ok": 4,
+    "search_deck_bad": 0,
+    "d_bins": {
+      "<-3": 6,
+      "-3..-1": 8,
+      "-1..1": 81,
+      "1..3": 25,
+      ">3": 5
+    },
+    "d_win": {
+      "<-3": [
+        0,
+        6
+      ],
+      "-3..-1": [
+        0,
+        8
+      ],
+      "-1..1": [
+        30,
+        81
+      ],
+      "1..3": [
+        13,
+        25
+      ],
+      ">3": [
+        5,
+        5
+      ]
+    },
+    "grd_spent_rows": 17,
+    "grd_spent_sum": 0.9083966649890827,
+    "kappa_needed": {
+      "n_turns": 20,
+      "n_used": 16,
+      "g_floor": 0.005,
+      "dW_mean": -0.1017,
+      "g_abs_mean": 0.0934,
+      "fit": {
+        "n": 16,
+        "kappa_fit": 1.502,
+        "corr": 0.676,
+        "g_rms": 0.1164,
+        "dW_rms": 0.238
+      },
+      "ratio": {
+        "n": 16,
+        "median": 0.878,
+        "mean": 0.542,
+        "p25": -0.991,
+        "p75": 2.212
+      },
+      "by_d": {
+        "1<|D|<=3": null,
+        "|D|<=1": {
+          "n": 14,
+          "kappa_fit": 2.054,
+          "corr": 0.745,
+          "g_rms": 0.0912,
+          "dW_rms": 0.2437
+        }
+      },
+      "by_r_turns": {
+        "1": null,
+        "2": null,
+        "3": null,
+        "4": null,
+        "5": null
+      }
+    },
+    "kappa_needed_1turn": {
+      "n_turns": 20,
+      "n_used": 16,
+      "g_floor": 0.005,
+      "dW_mean": -0.051,
+      "g_abs_mean": 0.1579,
+      "fit": {
+        "n": 16,
+        "kappa_fit": 0.489,
+        "corr": 0.559,
+        "g_rms": 0.1875,
+        "dW_rms": 0.158
+      },
+      "ratio": {
+        "n": 16,
+        "median": 0.518,
+        "mean": 0.342,
+        "p25": -0.145,
+        "p75": 1.054
+      },
+      "by_d": {
+        "1<|D|<=3": null,
+        "|D|<=1": {
+          "n": 14,
+          "kappa_fit": 0.526,
+          "corr": 0.572,
+          "g_rms": 0.1797,
+          "dW_rms": 0.1631
+        }
+      },
+      "by_r_turns": {
+        "1": null,
+        "2": null,
+        "3": null,
+        "4": null,
+        "5": null
+      }
+    },
+    "kappa_split": {
+      "by_window": {
+        "1": {
+          "n": 16,
+          "kappa_fit": 1.391,
+          "corr": 0.628,
+          "g_rms": 0.1164,
+          "dW_rms": 0.2335
+        },
+        "2": {
+          "n": 15,
+          "kappa_fit": 1.385,
+          "corr": 0.584,
+          "g_rms": 0.128,
+          "dW_rms": 0.252
+        },
+        "3": {
+          "n": 12,
+          "kappa_fit": 1.283,
+          "corr": 0.552,
+          "g_rms": 0.1594,
+          "dW_rms": 0.2923
+        }
+      },
+      "by_family": {
+        "attach": null,
+        "attach_除いた残り": {
+          "n": 16,
+          "kappa_fit": 1.391,
+          "corr": 0.628,
+          "g_rms": 0.1164,
+          "dW_rms": 0.2335
+        },
+        "attack": {
+          "n": 16,
+          "kappa_fit": 1.391,
+          "corr": 0.628,
+          "g_rms": 0.1164,
+          "dW_rms": 0.2335
+        },
+        "attack_除いた残り": null,
+        "effect": null,
+        "effect_除いた残り": {
+          "n": 16,
+          "kappa_fit": 1.391,
+          "corr": 0.628,
+          "g_rms": 0.1164,
+          "dW_rms": 0.2335
+        },
+        "end": null,
+        "end_除いた残り": {
+          "n": 16,
+          "kappa_fit": 1.391,
+          "corr": 0.628,
+          "g_rms": 0.1164,
+          "dW_rms": 0.2335
+        },
+        "guard": null,
+        "guard_除いた残り": {
+          "n": 16,
+          "kappa_fit": 1.391,
+          "corr": 0.628,
+          "g_rms": 0.1164,
+          "dW_rms": 0.2335
+        },
+        "play": null,
+        "play_除いた残り": {
+          "n": 16,
+          "kappa_fit": 1.391,
+          "corr": 0.628,
+          "g_rms": 0.1164,
+          "dW_rms": 0.2335
+        }
+      },
+      "by_combo": {
+        "攻め＋守り": {
+          "n": 16,
+          "kappa_fit": 1.391,
+          "corr": 0.628,
+          "g_rms": 0.1164,
+          "dW_rms": 0.2335
+        },
+        "攻め＋守り＋付与": {
+          "n": 16,
+          "kappa_fit": 1.391,
+          "corr": 0.628,
+          "g_rms": 0.1164,
+          "dW_rms": 0.2335
+        },
+        "攻めだけ": {
+          "n": 16,
+          "kappa_fit": 1.391,
+          "corr": 0.628,
+          "g_rms": 0.1164,
+          "dW_rms": 0.2335
+        },
+        "出す＋効果を除いた残り": {
+          "n": 16,
+          "kappa_fit": 1.391,
+          "corr": 0.628,
+          "g_rms": 0.1164,
+          "dW_rms": 0.2335
+        }
+      },
+      "by_board_change": {
+        "場が動いた": {
+          "n": 13,
+          "kappa_fit": 1.535,
+          "corr": 0.67,
+          "g_rms": 0.1208,
+          "dW_rms": 0.255
+        },
+        "場は同じ": null
+      }
+    },
+    "last_turn": "keep",
+    "kappa_mean": 0.828,
+    "w_mean": 0.1853
+  },
+  "decision_rows": "main",
+  "provisional": {
+    "P3_theta": 1.5819,
+    "P2_silent": "zero",
+    "T28c_margin": 2000.0,
+    "w_mode": "curve",
+    "flow_pricing": "option",
+    "ledger_pricing": "exercise",
+    "surv_mode": "geo",
+    "nu_mode": "pair",
+    "cbar_mode": "strict",
+    "guard_g": "delta",
+    "take_mode": "lethal",
+    "guard_cost": "spent",
+    "search_price": "plan",
+    "guard_afford": "rule",
+    "guard_afford_requested": "rule",
+    "guard_s_cost": "curve",
+    "play_now": "hand",
+    "inflow": "on",
+    "cond_clock": "on",
+    "pricing_fixes": "draw_n,either_side,optional_block,base_power,opp_subject,revealed_src,choice_max",
+    "note": "§0.4 の暫定値。感度を付けて読む"
+  },
+  "summary": {
+    "n": 2
+  },
+  "per_band": {
+    "close": {
+      "n": 2
+    },
+    "mid": {
+      "n": 2
+    },
+    "decided": {
+      "n": 2
+    }
+  },
+  "seconds": 3.5
+}
