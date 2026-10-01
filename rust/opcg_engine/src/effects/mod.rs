@@ -46,6 +46,8 @@ pub mod probe;
 pub mod resolver;
 #[cfg(test)]
 mod tests_effects;
+#[cfg(test)]
+mod tests_reactions;
 pub mod triggers;
 pub mod value;
 

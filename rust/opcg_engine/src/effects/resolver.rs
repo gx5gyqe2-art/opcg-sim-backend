@@ -207,6 +207,33 @@ pub fn game_resolve_ability(
     Ok(())
 }
 
+/// [`game_resolve_ability`] の誘発版: 誘発の契機カード（バトルした相手など）を文脈の
+/// `trigger_subject` に載せてから解決する（対象の `ref_id: "trigger_subject"` が引く）。
+pub fn game_resolve_ability_with_subject(
+    s: &mut Session,
+    masters: &MasterTable,
+    actor: Seat,
+    source_card: CardIdx,
+    ability_index: usize,
+    subject: Option<CardIdx>,
+) -> Result<(), EngineError> {
+    if s.state().card(source_card).negated || crate::rules::is_effect_negated(s.state(), source_card)
+    {
+        return Ok(());
+    }
+    let mut resolver = Resolver::new();
+    if let Some(c) = subject {
+        resolver
+            .context
+            .set_saved("trigger_subject", vec![TargetRef::Card(c)]);
+    }
+    resolver.resolve_ability(s, masters, actor, source_card, ability_index, false)?;
+    if !s.state().in_passive_recalc {
+        resolver.flush_events(s, masters, actor, source_card);
+    }
+    Ok(())
+}
+
 /// `resolver.action_history` を `action_events` の `EFFECT` 行へ写す（Python の 3 か所が
 /// 同じ 8 行を書き写しているので、Rust では 1 か所にまとめて 3 か所から呼ぶ）。
 ///
@@ -617,12 +644,15 @@ impl Resolver {
         }
 
         // 遅延実行（「このターン終了時、〜」）
-        if action.delay.as_deref() == Some("TURN_END") && !self.context.flushing_delayed {
+        if matches!(action.delay.as_deref(), Some("TURN_END") | Some("BATTLE_END"))
+            && !self.context.flushing_delayed
+        {
             let mut pending = s.state().pending_end_of_turn.clone();
             pending.push(DelayedAction {
                 player: actor,
                 node: node_ref.clone(),
                 source_card,
+                battle_end: action.delay.as_deref() == Some("BATTLE_END"),
             });
             s.edit().set_pending_end_of_turn(pending);
             return Ok(true);

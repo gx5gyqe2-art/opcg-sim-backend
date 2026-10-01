@@ -827,11 +827,11 @@ pub fn action(ty: ActionType, base: i32) -> GameAction {
     }
 }
 
-fn draw(n: i32) -> EffectNode {
+pub fn draw(n: i32) -> EffectNode {
     EffectNode::Action(action(ActionType::Draw, n))
 }
 
-fn ability(trigger: TriggerType, effect: EffectNode, raw_text: &str) -> Ability {
+pub fn ability(trigger: TriggerType, effect: EffectNode, raw_text: &str) -> Ability {
     Ability {
         trigger,
         condition: None,

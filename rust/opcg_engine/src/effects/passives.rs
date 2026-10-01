@@ -130,7 +130,20 @@ pub fn is_reactive_passive(ab: &super::ast::Ability) -> bool {
 
 /// `(された|した|受けた|なった|離れた)時、` を含むか（Python の正規表現と同値）。
 fn reactive_re_search(text: &str) -> bool {
-    for pat in ["された時、", "した時、", "受けた時、", "なった時、", "離れた時、"] {
+    for pat in [
+        "された時、",
+        "した時、",
+        "受けた時、",
+        "なった時、",
+        "離れた時、",
+        // 反応型の誘発句（エンジンが raw_text を読んで待ち行列へ積む）。再計算では実行しない。
+        "させた時、",
+        "引いた時、",
+        "戻った時、",
+        "加わった時、",
+        "与えた時、",
+        "終了時、",
+    ] {
         if text.contains(pat) {
             return true;
         }

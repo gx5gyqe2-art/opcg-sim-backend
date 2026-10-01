@@ -255,6 +255,9 @@ pub struct Session {
     /// （`tests/harness/rs_golden.py::mask_shuffled_targets`）。journal の外＝巻き戻さない
     /// （記録は「実際に混ぜたか」を残す）。
     shuffled: Vec<Seat>,
+    /// いま対象ループで効果を実行している席（「自分の効果で」「相手の効果で」の判定用）。
+    /// journal の外の一時値＝対象 1 枚の処理の前後で立てて戻す。効果の外（バトル等）は `None`。
+    effect_actor: Option<(Seat, Option<CardIdx>)>,
 }
 
 impl Session {
@@ -265,7 +268,26 @@ impl Session {
             rng: crate::search::rng::Rng::Replay,
             action_events: Vec::new(),
             shuffled: Vec::new(),
+            effect_actor: None,
         }
+    }
+
+    /// 対象ループが処理中の効果の実行者（無ければ `None`）。
+    pub fn effect_actor(&self) -> Option<Seat> {
+        self.effect_actor.map(|(a, _)| a)
+    }
+
+    /// 対象ループが処理中の効果の発生源カード。
+    pub fn effect_source(&self) -> Option<CardIdx> {
+        self.effect_actor.and_then(|(_, c)| c)
+    }
+
+    /// 効果の実行者（と発生源）を立てる（戻り値は直前の値＝呼び出し側が戻す）。
+    pub fn set_effect_actor(
+        &mut self,
+        actor: Option<(Seat, Option<CardIdx>)>,
+    ) -> Option<(Seat, Option<CardIdx>)> {
+        std::mem::replace(&mut self.effect_actor, actor)
     }
 
     /// この要求のあいだに山札を混ぜた席（重複なし・席順）。

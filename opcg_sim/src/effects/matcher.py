@@ -400,6 +400,11 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if re.search(_nfc(r"(選んだ|その)(カード|キャラ|リーダー)"), tgt_text):
         tq.ref_id = "selected_card"
 
+    # 「バトルした相手のキャラ」＝バトル終了時の誘発の契機カード（エンジンが解決時に
+    # 文脈 `trigger_subject` へ載せる）。場全体の選択にはしない。
+    if _nfc("バトルした相手の") in tgt_text:
+        tq.ref_id = "trigger_subject"
+
     if chooser is not None:
         tq.chooser = chooser
 

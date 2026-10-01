@@ -187,6 +187,13 @@ pub fn handle_block(
         let mut updated = battle.clone();
         updated.target = blocker;
         s.edit().set_active_battle(Some(updated));
+        // 「相手が【ブロッカー】を発動した時」の誘発（消化は【ブロック時】の後）。
+        triggers::enqueue_activation_listeners(
+            s,
+            masters,
+            triggers::Activation::Blocker,
+            battle.target_owner,
+        )?;
         // 【ブロック時】効果を発動する。
         triggers::resolve_on_block(s, masters, blocker, battle.target_owner)?;
         if s.state().active_interaction().is_some() {
@@ -195,6 +202,9 @@ pub fn handle_block(
         }
     }
     s.edit().set_phase(Phase::BattleCounter);
+    if blocker.is_some() {
+        triggers::advance_pending_triggers(s, masters)?;
+    }
     Ok(())
 }
 
@@ -217,6 +227,7 @@ pub fn apply_counter(
         // `_register_granted_replacements` → トラッシュ。
         let cost = masters.get(s.state().card(counter_card).master).cost;
         ops::pay_cost(s, seat, cost, None)?;
+        triggers::enqueue_activation_listeners(s, masters, triggers::Activation::Event, seat)?;
         let ids = masters
             .get(s.state().card(counter_card).master)
             .ability_ids
@@ -241,6 +252,7 @@ pub fn apply_counter(
             seat,
             Position::Bottom,
         )?;
+        triggers::advance_pending_triggers(s, masters)?;
         return Ok(());
     }
     let value = super::current_counter(s.state(), masters, counter_card);
@@ -316,6 +328,10 @@ pub fn resolve_attack(s: &mut Session, masters: &MasterTable) -> Result<(), Engi
                     triggers::enqueue_trigger(s, target_owner, life_card, index, true);
                 }
             }
+            if life_lost > 0 {
+                triggers::enqueue_damage_dealt_listeners(s, masters, attacker, attacker_owner, life_lost)?;
+                triggers::enqueue_damaged_listeners(s, masters, target_owner, life_lost)?;
+            }
         }
     } else if attacker_pwr >= target_pwr {
         // Python: 保護 →（無ければ）置換 →（無ければ）本来の KO。保護判定は **1 回だけ**
@@ -364,6 +380,7 @@ pub fn resolve_attack(s: &mut Session, masters: &MasterTable) -> Result<(), Engi
                         Position::Bottom,
                     )?;
                     triggers::resolve_on_ko(s, masters, target, target_owner, "BATTLE", None)?;
+                    triggers::enqueue_battle_ko_listeners(s, masters, attacker, attacker_owner)?;
                 }
             }
         }
@@ -398,6 +415,8 @@ pub fn finish_attack(
     target: CardIdx,
     life_lost: i32,
 ) -> Result<(), EngineError> {
+    // バトルの当事者（終了時の誘発と、ライフ離脱の行き先＝バニッシュの判定に使う）。
+    let battle = s.state().active_battle.clone();
     ops::reset_turn_status(s, masters, target, true, false);
     s.edit().set_active_battle(None);
     s.edit().set_phase(Phase::Main);
@@ -410,7 +429,19 @@ pub fn finish_attack(
     }
     // ライフが離れた回数ぶん ON_LIFE_DECREASE を積み、【トリガー】と共に消化する。
     if life_lost > 0 && s.state().winner.is_none() {
-        triggers::enqueue_life_decrease(s, masters, life_lost)?;
+        let life_owner = s.state().card(target).owner;
+        let to_hand = battle
+            .as_ref()
+            .map(|b| !has_keyword(s.state(), b.attacker, KW_BANISH))
+            .unwrap_or(true);
+        triggers::enqueue_life_decrease(s, masters, life_owner, life_lost, to_hand)?;
+    }
+    // 「このバトル終了時、〜」の遅延アクションと「…とバトルしたバトル終了時」の誘発。
+    if s.state().winner.is_none() {
+        triggers::flush_pending_battle_end(s, masters)?;
+        if let Some(b) = battle.as_ref() {
+            triggers::enqueue_battle_end_listeners(s, masters, b.attacker, b.target)?;
+        }
     }
     triggers::advance_pending_triggers(s, masters)
 }

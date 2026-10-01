@@ -11,10 +11,11 @@
 //!     multiplier != 1 なら * multiplier
 //! ```
 //!
-//! `dynamic_source` は 5 種:
+//! `dynamic_source` は 6 種:
 //! `COUNT_REFERENCE`（自分のトラッシュ枚数）／`PREV_ACTION_COUNT`（直前アクションの枚数）／
 //! `COUNT_QUERY`（範囲クエリの該当数）／`REFERENCE_POWER`（参照カードの現在パワー）／
-//! `REFERENCE_BASE_POWER`（参照カードの印刷時パワー）。それ以外の文字列は `base` に落ちる。
+//! `REFERENCE_BASE_POWER`（参照カードの印刷時パワー）／`REVEALED_CARD_COST`（直前に公開したカードの
+//! コスト。「公開したカードのコスト1につき」）。それ以外の文字列は `base` に落ちる。
 //!
 //! Python の `targets` 引数は `get_dynamic_value` が一切見ない（受け取るだけ）。契約どおり
 //! 受け取るが、ここでも使わない。
@@ -85,6 +86,14 @@ fn dynamic_value(
                 .is_some_and(|(seat, _)| seat == state.turn_player);
             Ok(card.get_power(masters.get(card.master), is_ref_turn))
         }
+        // 「公開したカードのコスト1につき」: 直前に公開したカード（`last_revealed_card`）のコスト。
+        Some("REVEALED_CARD_COST") => Ok(ctx
+            .last_revealed_card
+            .map(|c| {
+                let card = state.card(c);
+                card.current_cost(masters.get(card.master))
+            })
+            .unwrap_or(0)),
         // 「元々のパワーと同じ」: 参照カードの基礎値（master.power）。
         Some("REFERENCE_BASE_POWER") => {
             let Some(reference) = power_reference(state, actor, value.ref_id.as_deref(), ctx) else {

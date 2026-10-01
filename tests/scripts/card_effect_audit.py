@@ -154,6 +154,9 @@ def heading_tags(text: str) -> List[re.Match]:
     out = []
     for m in _TAG_RE.finditer(text):
         before = text[:m.start()].rstrip()
+        # 「【トリガー】が発動した時」の【トリガー】は誘発句の目的語（見出しではない）。
+        if m.group(1) == "トリガー" and text[m.end():].startswith("が発動した時"):
+            continue
         if not before or before[-1] in "/】・。)":
             out.append(m)
     return out
@@ -437,9 +440,20 @@ def _walk_targets(ability: dict) -> Iterable[dict]:
     return (n for n in walk_nodes(ability) if n.get("node") == "TargetQuery")
 
 
+# 誘発句（「…時、」までの文）の限定語は、エンジンが raw_text から読んで絞る（`triggers.rs` の
+# 反応型リスナー: 元々のコスト／パワー・元々の効果のない・特徴・主語の側・ドローフェイズ以外＝
+# 効果ドローだけに反応）。解析結果に欄が無くても脱落ではないので、照合から外す。
+_ENGINE_READ_CLAUSE = re.compile(
+    r"^[^。]*?(?:KOされた|KOした|場を離れた|手札に戻った|ライフが(?:離れた|0枚になった|手札に加わった)|"
+    r"発動した|登場させた|カードを引いた|手札が捨てられた|ダメージを(?:受けた|与えた)|"
+    r"バトルしたバトル終了)時(?:か[^。、]*?時)?[、。]")
+
+
 def qualifier_gaps(ability: dict) -> List[str]:
     raw = nfkc(ability.get("raw_text"))
     raw = _PAREN_RE.sub("", raw)
+    raw = _TAG_RE.sub("", raw) if _ENGINE_READ_CLAUSE.match(_TAG_RE.sub("", raw)) else raw
+    raw = _ENGINE_READ_CLAUSE.sub("", raw)
     blob = json.dumps({k: v for k, v in ability.items() if k != "raw_text"}, ensure_ascii=False)
     targets = list(_walk_targets(ability))
     conds = [n for n in walk_nodes(ability) if n.get("node") == "Condition"]
@@ -458,7 +472,8 @@ def qualifier_gaps(ability: dict) -> List[str]:
         need('"is_vanilla": true' in blob, "元々の効果のない（is_vanilla 無し）")
     if re.search(r"[上下]か[上下]|上または下", raw):
         need(any(n.get("node") == "Choice" and len(n.get("options") or []) >= 2
-                 for n in walk_nodes(ability)), "上か下（選択肢が無い）")
+                 for n in walk_nodes(ability))
+             or any(n.get("dest_position") == "CHOOSE" for n in acts), "上か下（選択肢が無い）")
     if re.search(r"ことができる|てもよい", raw):
         need(bool(ability.get("cost_optional")) or any(n.get("is_optional") for n in acts), "任意（できる）が欄に無い")
     if "以外" in raw:

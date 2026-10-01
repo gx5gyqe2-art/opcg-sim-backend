@@ -151,6 +151,9 @@ def _ko(ctx: ParseContext) -> Optional[GameAction]:
     # （例:「相手の…をKOし、このカードを手札に加える」→ 前段「…をKOし」）。
     if not re.search(_nfc(r"KO(する|できる|してもよい)"), t) and not re.search(_nfc(r"KOし(?:[、。]|$)"), t.strip()):
         return None
+    # 「このキャラをKOする」は発生源自身（CHOOSE のままだと自分の任意のキャラを選べてしまう）。
+    if re.search(_nfc(r"(?:^|[、。])この(?:キャラ|カード)をKO"), t):
+        return GameAction(type=ActionType.KO, target=TargetQuery(select_mode="SOURCE"), raw_text=t)
     tq = parse_target(t)
     if _nfc("まで") in t or re.search(r"\d+枚まで", t):
         tq.is_up_to = True
@@ -395,6 +398,11 @@ def _per_n_value(t: str, x: int) -> Optional[ValueSource]:
     直前アクションの結果数を参照する文脈依存（「捨てたカード1枚につき」等）と
     「カード名の異なる」は未対応のため None（フラット値のまま）を返す。
     """
+    # 「公開したカードのコスト1につき」＝直前に公開したカード（last_revealed_card）のコスト÷N。
+    m_cost = re.search(_nfc(r"公開した(?:カード)?の(?:元々の)?コスト([\d０-９]+)につき"), t)
+    if m_cost:
+        return ValueSource(base=0, dynamic_source="REVEALED_CARD_COST",
+                           divisor=max(_to_int(m_cost.group(1)), 1), multiplier=x)
     m = re.search(_nfc(r"([^、。：:]*?)([\d０-９]+)枚につき"), t)
     if not m:
         return None
@@ -2197,6 +2205,9 @@ def _deck_bottom_general(ctx: ParseContext) -> Optional[GameAction]:
         tq.player = Player.ALL
     if _nfc("まで") in t:
         tq.is_up_to = True
+    # 「このキャラを持ち主のデッキの下に置く」は発生源自身（CHOOSE だと自分の任意のキャラになる）。
+    if re.search(_nfc(r"(?:^|[、。])この(?:キャラ|カード)を"), t):
+        tq = TargetQuery(select_mode="SOURCE")
     return GameAction(type=ActionType.DECK_BOTTOM, target=tq, raw_text=t)
 
 
@@ -2893,6 +2904,29 @@ def _negate_then_buff(ctx: ParseContext) -> Optional[Sequence]:
         GameAction(type=ActionType.NEGATE_EFFECT, target=tq1, duration=duration, raw_text=t),
         GameAction(type=ActionType.BUFF, target=tq2, value=ValueSource(base=value),
                    duration=duration, raw_text=t),
+    ])
+
+
+# ---------------------------------------------------------------------------
+# 効果無効＋KO の連結: 「<対象>を、このターン中、効果を無効にし、KOする」(OP17-063)
+#   同一対象に NEGATE_EFFECT → KO（KO 時効果を誘発させない）。区切らないと ko が全体を
+#   丸呑みして「効果を無効にし」が脱落する。
+# ---------------------------------------------------------------------------
+@rule("negate_then_ko", priority=72)
+def _negate_then_ko(ctx: ParseContext) -> Optional[Sequence]:
+    t = ctx.text
+    if not re.search(_nfc(r"効果を無効にし、.{0,6}?KOする"), t):
+        return None
+    head = t.split(_nfc("効果を無効にし"))[0]
+    tq1 = parse_target(head)
+    tq1.save_id = "negate_ko_char"
+    if _nfc("まで") in head:
+        tq1.is_up_to = True
+    tq2 = TargetQuery(player=tq1.player, zone=Zone.FIELD, card_type=list(tq1.card_type) or ["CHARACTER"],
+                      count=1, ref_id="negate_ko_char")
+    return Sequence(actions=[
+        GameAction(type=ActionType.NEGATE_EFFECT, target=tq1, duration="THIS_TURN", raw_text=t),
+        GameAction(type=ActionType.KO, target=tq2, raw_text=t),
     ])
 
 

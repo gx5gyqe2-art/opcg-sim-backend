@@ -155,6 +155,7 @@ make test-slow   # 重テストだけ
 | ファイル | 役割 |
 |---|---|
 | `tests/test_parser.py` | レガシーパーサ単体 |
+| `tests/test_parser_reactions.py` | **反応型の誘発句のパーサ出力**（必須/標準）: 「相手がイベント／【ブロッカー】／【トリガー】を発動した時」「…登場させた時」「手札に戻った／場を離れた時」「ライフが離れた／0枚になった／手札に加わった時」「KOした時」「バトルしたバトル終了時」「他のカードのリーダーがアタックした時」が専用/常在の反応トリガーになり、誘発句は raw_text に残ること（エンジンが読む）、`バトルした相手`＝`trigger_subject`・`このバトル終了時`＝`BATTLE_END` 遅延・「このキャラをKO／デッキの下」＝発生源・「効果を無効にし、KOする」の両半・「公開したカードのコスト1につき」＝`REVEALED_CARD_COST`・「効果で自分の手札が捨てられているターン中」＝EVENT_THIS_TURN。Rust 側は `effects/tests_reactions.rs`（主語・要因・絞り込みの読みと、バトル／カウンター／ブロック／ダメージ／離脱／捨てるの実イベントでの消化） |
 | `tests/test_golden.py` / `tests/golden/*` | ゴールデンコーパス（AST 指紋の部分一致） |
 | `tests/test_rs_golden_audit.py` | **全カード監査 golden**（Rust エンジンだけで回る・`docs/rust_engine_plan.md` §16.1）。`opcg_engine.golden_audit(card_id, trigger, ability_index)` が汎用盤面の生成から `_smart_drain` 既定応答での解決まで自前で辿り、`tests/fixtures/rs_goldens/audit.json`（3,386 能力・Python の記録から `--golden-out` で作った sha1 の列）と一致するかを見る。`test_full_card_audit.py`／`test_full_card_baseline.py`（旧・Python エンジンで全カードを回すゲート・legacy）の Rust 側置き換え |
 | `tests/test_rs_golden_replay.py` | **実対局の再生 golden**（Rust エンジンだけで回る・§16.1）。`opcg_engine.replay()` の盤面・合法手・イベントログの sha1 が `tests/fixtures/rs_goldens/replay/`（random 150 局＋L1 50 局・`--golden-out` で作成）と一致するかを見る |
