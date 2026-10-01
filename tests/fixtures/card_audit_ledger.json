@@ -64,6 +64,14 @@
    "text_sha": "d738a66124d5042b",
    "verdict": "ng"
   },
+  "OP16-059": {
+   "ast_sha": "0483fe01d53a98bd",
+   "note": "DECK_BOTTOM はプローブ盤面の場上限超過で止まっていた（盤面を修正して ARRANGE_DECK まで到達）。構造は本文どおり",
+   "probe_sha": "d723de15c0e1e977",
+   "reviewed": "2026-10-01",
+   "text_sha": "e8222dfec66985af",
+   "verdict": "ok"
+  },
   "OP16-089": {
    "ast_sha": "9f3642bccde76c51",
    "note": "【速攻:キャラ】が未処理。エンジン/ローダ",
@@ -131,7 +139,7 @@
   "ST28-004": {
    "ast_sha": "d82a06c549d5a0cf",
    "note": "NOT_FIRED はプローブ盤面に付与ドン!!が無くコスト不成立のため。構造は本文どおり",
-   "probe_sha": "ecce6338af2da640",
+   "probe_sha": "ccc5ebfe10e574ba",
    "reviewed": "2026-10-01",
    "text_sha": "f62d6a8f6fcaf88e",
    "verdict": "ok"

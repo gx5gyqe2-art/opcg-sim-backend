@@ -527,7 +527,11 @@ fn probe_payload(state: &GameState, choice_index: i64) -> Option<Value> {
 /// - 両者のステージ置き場が空ならステージ 1 枚（検査対象がステージならそのまま）
 /// - 両者のライフの上と下の 1 枚ずつを表向き（「ライフを裏向きにできる」コスト等。
 ///   間は裏向きのまま＝「表向きにする」効果にも対象が残る）
-fn add_probe_extras(masters: &MasterTable, hidden: &mut Value) {
+/// - 検査対象がイベントなら、場ではなく手札へ移す（汎用盤面は検査対象を種別によらず場に
+///   置くので、キャラのフィラー 3＋イベント 1 で 4 枚になり、2 体の登場で上限 5 を超えて
+///   途中で止まる。イベントは本来手札から使う）
+/// - P1 のリーダーにアクティブのドン!! 2 枚を付与する（「付与されているドン!!を戻す」コスト等）
+fn add_probe_extras(masters: &MasterTable, hidden: &mut Value, source_uuid: &str) {
     let mut n = 0u64;
     let mut next = || {
         n += 1;
@@ -553,6 +557,35 @@ fn add_probe_extras(masters: &MasterTable, hidden: &mut Value) {
         if player["stage"].is_null() {
             player["stage"] = card_record(masters, "FILLER-STAGE", next(), seat);
         }
+    }
+    let p1 = &mut hidden["players"]["p1"];
+    let moved = p1["field"].as_array_mut().and_then(|field| {
+        let i = field.iter().position(|c| {
+            c["uuid"] == source_uuid
+                && masters
+                    .index_of(c["card_id"].as_str().unwrap_or(""))
+                    .is_some_and(|m| masters.get(m).ty == CardType::Event)
+        })?;
+        Some(field.remove(i))
+    });
+    if let Some(card) = moved {
+        if let Some(hand) = p1["hand"].as_array_mut() {
+            hand.push(card);
+        }
+    }
+    let leader_uuid = p1["leader"]["uuid"].clone();
+    let mut attached: Vec<Value> = Vec::new();
+    if let Some(active) = p1["don"]["active"].as_array_mut() {
+        for _ in 0..2 {
+            if let Some(mut don) = active.pop() {
+                don["attached_to"] = leader_uuid.clone();
+                attached.push(don);
+            }
+        }
+    }
+    if !attached.is_empty() {
+        p1["leader"]["attached_don"] = Value::from(attached.len());
+        p1["don"]["attached"] = Value::Array(attached);
     }
 }
 
@@ -583,7 +616,7 @@ pub fn effect_probe(
 ) -> Result<String, EngineError> {
     let masters = probe_masters(base)?;
     let (mut hidden, source_uuid) = build_test_state(masters, card_id, trigger == "ON_PLAY")?;
-    add_probe_extras(masters, &mut hidden);
+    add_probe_extras(masters, &mut hidden, &source_uuid);
     let mut session = Session::new(GameState::from_record(&hidden, masters)?);
     let source = crate::ops::find_card_by_uuid(session.state(), &source_uuid)
         .ok_or_else(|| bad("effect_probe: 検査対象カードが盤面に居ない".into()))?;

@@ -139,6 +139,16 @@ def test_probe_pays_a_trait_filtered_cost_and_a_stage_cost(engine_and_cards):
     assert "NOT_FIRED" not in st.values(), st
 
 
+def test_probe_board_has_room_and_attached_don(engine_and_cards):
+    """イベントを手札に置いて場に空きを作る（OP16-059: 2 体登場→残りをデッキの下）／
+    付与ドン!!を持つリーダーが居る（ST28-004: 付与ドン!!を戻すコスト→速攻・パワー）。"""
+    engine, cards = engine_and_cards
+    st = _statuses(engine, cards, "OP16-059", 0)
+    assert st["PLAY_CARD"] == "FIRED" and st["DECK_BOTTOM"] in ("FIRED", "FIRED_VIA_INTERACTION"), st
+    st = _statuses(engine, cards, "ST28-004", 1)
+    assert set(st.values()) == {"FIRED"}, st
+
+
 def test_probe_walks_every_option_of_a_nested_choice(engine_and_cards):
     """OP05-096: 「KO／手札に戻す／ライフに置く」が二重の Choice。3 経路とも実行される。"""
     engine, cards = engine_and_cards
