@@ -2356,7 +2356,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 own_last[(w0, t0)] = i                      # `turn_last` と同じ行（同じ条件で最後の行）
             cut = CP.CutFrames(order, rows, ex, idx2cid, cards, own_last, mu,
                                decks=(cut_decks.get(seed_g) if cut_decks else None),
-                               don_rule=(THETA_DON_MODE == "rule"), stats=stats)
+                               don_rule=(THETA_DON_MODE == "rule"), stats=stats, end_of_turn=True)
         turn_start = {}       # (w, t) -> (sc, tok, ci)
         turn_last = {}        # (w, t) -> その席のそのターン最後の行（T76: 出した後の手札で 1 枚あたりの価格を測る）
         turn_seq = {0: [], 1: []}

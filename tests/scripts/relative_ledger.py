@@ -284,7 +284,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
         cut = cut_me_fr = None
         if CP.joint_on():
             cut = CP.CutFrames(list(idx), r, ex, idx2cid, cards, KV.frame_rows_of(r, idx, last=True), mu,
-                               decks=KV._deck_pair(seat_decks, seed_g), don_rule=False, stats=stats)
+                               decks=KV._deck_pair(seat_decks, seed_g), don_rule=False, stats=stats, end_of_turn=True)
             cut_me_fr = CP.CutFrames(list(idx), r, ex, idx2cid, cards, KV.frame_rows_of(r, idx), mu,
                                      decks=KV._deck_pair(seat_decks, seed_g), don_rule=False, stats=stats)
         for i in idx:

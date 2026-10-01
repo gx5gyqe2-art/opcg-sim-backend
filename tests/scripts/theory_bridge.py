@@ -1106,7 +1106,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     own_last[(w0, t0)] = i0
             _dk = (decks.get(0), decks.get(1))
             cut_opp_fr = _CP.CutFrames(list(idx), rows, ex, idx2cid, cards, own_last, mu, decks=_dk,
-                                       don_rule=True, stats=stats)
+                                       don_rule=True, stats=stats, end_of_turn=True)
             cut_me_fr = _CP.CutFrames(list(idx), rows, ex, idx2cid, cards, first_main, mu, decks=_dk,
                                       don_rule=True, stats=stats)
         pending_grd = []                  # T86: `all_attacks` のときは攻めの行を全部読んだ後に確定する

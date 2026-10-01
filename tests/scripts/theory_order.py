@@ -852,14 +852,64 @@ def saturation_x(theta=THETA):
     return float(x)
 
 
-def incoming_x(tok_row, don=0):
+#: scalars の手番フラグ（`IDX_IS_MY_TURN`）・トークンの「相手の手番の側で評価したパワー」（v14・自分の枠＝付与ドン無し）
+SC_IS_MY_TURN = 11
+S_POWER_OPP_TURN = 20
+
+
+def leader_power_opp_turn(tok_row, sc=None, ci_row=None, idx2cid=None, st=None):
+    """**自分のリーダーが次の相手ターンに持つ規則どおりのパワー**（守る側のパワー・2026-10-01・N-3 採用の残り 2b）。
+
+    自席のターンの行のトークン列 0（`power_now`）は**自分が付けたドン（自分のターンだけ +1000×枚数）**を載せている
+    （エンジン `get_power(所有者のターンか)`）。相手のターンには規則上そのドンの分は無い。読み方（規則から）:
+
+    1. **付与ドン無しのパワー**＝トークン列 20（`power_opp_turn`＝`get_power(False)`・scalars 12 と同じ値）。
+       付与ドンだけを外す（印字＋恒久＋このターンの増減＋今の手番の継続効果）。v14 より前の記録は scalars 12・
+       それも無ければ列 0（旧の読み）。
+    2. **手番で入れ替わる自分自身の継続効果**（リーダーの本文・`effect_value.continuous_self_mods`）: 自席のターンの行
+       （scalars 11）なら【自分のターン中】の上昇を外し【相手のターン中】の上昇を足す（【常時】は両方に在るので相殺）。
+       条件は行の状態で判定・【ドン!!×N】はリーダーに付いているドンの枚数で判定する（付与ドンは相手のターンにも
+       付いたまま＝持ち主のリフレッシュで戻る）。札が読めなければこの段は飛ばす。
+
+    **読めない残り**（限界・記録が和しか持たない）: このターンだけの増減（例: 相手の【相手のアタック時】の −1000）と
+    他の札が与える手番つきの継続効果。相手のターンの行は列 0 が既に規則どおり（付与ドン無し・相手の手番の継続効果）＝
+    そのまま返す。"""
+    tok = np.asarray(tok_row)
+    p = 0.0
+    if tok.ndim == 2 and tok.shape[1] > S_POWER_OPP_TURN:
+        p = float(np.round(float(tok[0, S_POWER_OPP_TURN]) * 1e4 / PWR_EPS) * PWR_EPS)
+    if p <= 0.0 and sc is not None:
+        p = float(np.round(float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 / PWR_EPS) * PWR_EPS)
+    if p <= 0.0:
+        p = slot_power(tok, 0) or 0.0
+    if sc is None or float(np.asarray(sc)[SC_IS_MY_TURN]) <= 0.5:
+        return p
+    if ci_row is None or idx2cid is None:
+        return p
+    lid = idx2cid.get(int(np.asarray(ci_row)[0]))
+    if not lid:
+        return p
+    import effect_value as EV
+    if st is None:
+        from theory_bridge import _state_of                 # 遅延（橋は本器を import する）
+        st = _state_of(np.asarray(sc), ci_row, idx2cid, tok=tok)
+    st2 = dict(st or {})
+    if tok.ndim == 2 and tok.shape[1] > S_ATTACHED_DON:
+        st2["source_don_attached"] = int(round(float(tok[0, S_ATTACHED_DON]) * 5.0))
+    m = EV.continuous_self_mods(lid, st=st2)
+    return float(p - float(m["atk"]) + float(m["def"]))
+
+
+def incoming_x(tok_row, don=0, mine=None):
     """**これから来る攻撃の超過パワー `x`**（自席の行から相手の枠を読む・高い順）。
 
     攻撃側は**相手のリーダー（枠 1）＋相手のキャラ（枠 7〜11）**、守るのは自分のリーダー（枠 0）。
     `don` を渡すと**高い攻撃から順に 1 個 +1000 ずつ**乗せる（相手が次のターンに付与する分）。
+    `mine`＝守る側のパワー（省略＝列 0 の今のパワー＝旧の読み。自席のターンの行では付与ドンが載る——
+    規則どおりにするなら `leader_power_opp_turn` を渡す）。
     """
     tok = np.asarray(tok_row)
-    mine = slot_power(tok, 0) or 0.0
+    mine = (slot_power(tok, 0) or 0.0) if mine is None else float(mine)
     pwr = [slot_power(tok, 1) or 0.0]
     for s in range(SLOT_OPP_FIELD.start, SLOT_OPP_FIELD.stop):
         if float(tok[s, S_IS_CHAR]) > 0.5:

@@ -338,11 +338,12 @@ def price_active(k, mu=MU):
 # 枠の行から曲線を作る
 # ---------------------------------------------------------------------------------------------------------------
 
-def curve_of_row(sc, tok, ci_row, idx2cid, cards, deck=None, don=None, mu=MU):
+def curve_of_row(sc, tok, ci_row, idx2cid, cards, deck=None, don=None, mu=MU, mlp=None):
     """**守り手の枠の行から値段の曲線を作る**（N-2 の読み `guard_hand_reading(values=True)`・`joint_valuer` をそのまま）。
 
     受ける損は `theta_take(その席のライフ)·μ`（N-2 の窓の受ける費用と同じ規約・`const`）。`don` はカウンター・イベントを
-    切れるかのドン（`cuttable_share` と同じ渡し方・`None` なら全部）。手札が空なら `None`。"""
+    切れるかのドン（`cuttable_share` と同じ渡し方・`None` なら全部）。手札が空なら `None`。
+    `mlp`＝守り手のリーダーが次の相手ターンに持つパワー（省略＝枠の行から規則で読む `frame_leader_power`）。"""
     import numpy as np
     import theory_bridge as TB
     sc = np.asarray(sc)
@@ -352,7 +353,12 @@ def curve_of_row(sc, tok, ci_row, idx2cid, cards, deck=None, don=None, mu=MU):
     # ドン（自分のターンだけ +1000）が乗っている＝相手のターンには規則上存在しないパワー。`HG.incoming` はそれを守る側に
     # 使うので来る攻撃が −2000 などに見え、カウンターの守りの役が全部 0 になっていた（`L(k)=0`・`ḡ≈0`）。
     # 相手のターンの規則どおりのパワー（`SC_MY_LEADER_POWER`＝付与ドンを載せない値）で読み、**予約 `N_f` と同じ攻撃の並び**を使う。
-    hand["xs_future"] = defender_incoming(sc, tok)
+    # **残り 2a（2026-10-01）**: `SC_MY_LEADER_POWER` は付与ドンを外すが、自席のターンの増減（このターンだけの −1000 など）と
+    # 手番つきの継続効果は残る＝実 w41 の枠の 18% で次の相手ターンのパワーと 1000 以上ずれた。`CutFrames` は
+    # ターン末の枠では**次の相手ターンの最初の行**の値を渡す（`next_turn_leader_power`）。渡されなければ行から規則で読む。
+    if mlp is None:
+        mlp = frame_leader_power(sc, tok, ci_row, idx2cid)
+    hand["xs_future"] = defender_incoming(sc, tok, mlp)
     slots = hand["slots"]
     if not slots:
         return None
@@ -363,35 +369,61 @@ def curve_of_row(sc, tok, ci_row, idx2cid, cards, deck=None, don=None, mu=MU):
     valuer = TB.joint_valuer(hand)
     cv = CutCurve(valuer, cand, float(sc[SC_MY_HAND]), share, mu,
                   cids=[s_.get("cid") for s_ in slots],
-                  reserve=reserve_of_row(sc, tok, share, mu))
+                  reserve=reserve_of_row(sc, tok, share, mu, mlp=mlp))
     cv.xs_future = list(hand["xs_future"])            # V が読んだ来る攻撃（テストで `N_f` の攻撃と一致を見る）
+    cv.mlp = float(mlp)
     return cv
 
 
-def defender_incoming(sc, tok):
+def frame_leader_power(sc, tok, ci_row=None, idx2cid=None):
+    """**守り手のリーダーが次の相手ターンに持つパワーを、枠の行だけから規則で読む**（`theory_order.leader_power_opp_turn`：
+    付与ドンを外し、リーダー自身の【自分のターン中】の上昇を外して【相手のターン中】の上昇を足す）。0 なら 5000（旧の床）。"""
+    return float(TO.leader_power_opp_turn(tok, sc, ci_row, idx2cid)) or 5000.0
+
+
+def next_turn_leader_power(order, rows, ex, d, t):
+    """**ターン末の枠 `(d, t)` の守り手のリーダーが、次の相手ターンに実際に持つパワー**＝攻め手 `1 − d` のターン `t + 1` の
+    最初の行の相手のリーダーのパワー（`SC_OPP_LEADER_POWER`＝付与ドンを載せない `get_power(False)`）。無ければ `None`。
+
+    **なぜ次の行か**（規則から読めない分）: 記録のパワーは「印字＋恒久の増減＋このターンだけの増減＋今の手番の継続効果」の
+    **和**しか持たない。このターンだけの増減（相手の【相手のアタック時】の −1000 など）はターン終了で消える＝規則では
+    次の相手ターンに無いが、和から分けられない（実 w41 の 707 枠: 枠の行の値は 16% でずれ、印字＋本文の継続効果は
+    ターン中に入った恒久の増減を落として 8% でずれる）。攻め手の最初の行はターン終了の失効とリフレッシュを経た直後の
+    **同じ盤面**で、その間に守り手の選択は無い。**漏れない**: この値を使うのは攻め手のターン `t + 1` の行（最初の行は
+    その行以前）だけ＝ターン末の枠でしか使わない（ターン頭の枠〔帳簿の `cut_me`〕は行から規則で読む）。"""
+    import numpy as np
+    for i in order:
+        if int(rows["who"][i]) == 1 - int(d) and int(rows["turn"][i]) == int(t) + 1:
+            v = float(np.asarray(ex["sc"][i])[TO.SC_OPP_LEADER_POWER]) * 1e4
+            return v if v > 0.0 else None
+    return None
+
+
+def defender_incoming(sc, tok, mlp=None):
     """**守り手の枠から見た、次の相手ターンに来る攻撃の超過**（高い順・通らないものは落とす）。
-    守る側は**相手のターンの**自分のリーダーのパワー（付与ドン無し＝`SC_MY_LEADER_POWER`）、攻める側は相手のリーダーと
+    守る側は**相手のターンの**自分のリーダーのパワー（`mlp`・省略は `frame_leader_power`）、攻める側は相手のリーダーと
     場のキャラ全部（相手のターンにはリフレッシュで全部殴れる・`crossing_bridge.opp_attackers_of`）＝`reserve_of_row` と同じ並び。"""
-    return sorted((float(x) for x in defender_attackers(sc, tok) if float(x) >= -TO.PWR_EPS), reverse=True)
+    return sorted((float(x) for x in defender_attackers(sc, tok, mlp) if float(x) >= -TO.PWR_EPS), reverse=True)
 
 
-def defender_attackers(sc, tok):
+def defender_attackers(sc, tok, mlp=None):
     """`reserve_of_row` と `defender_incoming` が共有する攻撃の並び（超過 `x`・通らないものも含む）。"""
     import numpy as np
     import crossing_bridge as CB
     sc = np.asarray(sc); tok = np.asarray(tok)
-    mlp = float(sc[TO.SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-    return CB.opp_attackers_of(tok, mlp)
+    if mlp is None:
+        mlp = frame_leader_power(sc, tok)
+    return CB.opp_attackers_of(tok, float(mlp))
 
 
-def reserve_of_row(sc, tok, share, mu=MU):
+def reserve_of_row(sc, tok, share, mu=MU, mlp=None):
     """**枠の時点の予約 `N_f`**＝その席の耐久の手札の項が言う「切る枚数」（`crossing_bridge.hand_cut_count`・
     `threshold_parts_side(…, "me")` と同じ入力: 相手の場の攻撃〔レフレッシュで全部殴れる〕・自分のライフ・自分のアクティブな
     ブロッカー・切れる割合 × 手札の枚数）。窓の上限（T116）は `τ` が要るので掛けない（限界）。"""
     import numpy as np
     import crossing_bridge as CB
     sc = np.asarray(sc); tok = np.asarray(tok)
-    xs = defender_attackers(sc, tok)
+    xs = defender_attackers(sc, tok, mlp)
     return float(CB.hand_cut_count(float(mu) * float(share), float(sc[SC_MY_HAND]), xs, float(sc[SC_MY_LIFE]),
                                    CB._own_active_blockers(tok), mu))
 
@@ -491,7 +523,8 @@ class CutFrames:
     `decks`＝`(席 0 のデッキ, 席 1 のデッキ)`（相方待ちの読み直し・無ければ `None`）。`don_rule`＝カウンター・イベントを
     切れるかを枠の使い残しのドンで決めるか（交点の橋の `THETA_DON_MODE=rule` と同じ）・`False` なら全部切れる。"""
 
-    def __init__(self, order, rows, ex, idx2cid, cards, frame_rows, mu=MU, decks=None, don_rule=True, stats=None):
+    def __init__(self, order, rows, ex, idx2cid, cards, frame_rows, mu=MU, decks=None, don_rule=True, stats=None,
+                 end_of_turn=False):
         self.order = list(order)
         self.rows = rows
         self.ex = ex
@@ -502,6 +535,7 @@ class CutFrames:
         self.decks = decks
         self.don_rule = bool(don_rule)
         self.stats = stats if stats is not None else {}
+        self.end_of_turn = bool(end_of_turn)       # 枠がターン末の行か（次の相手ターンの最初の行のパワーを読む・残り 2a）
         self._curves = {}
         self._corr = {}
         self._by_seat = {}
@@ -532,8 +566,12 @@ class CutFrames:
                 dk = self.decks[int(d)]
                 deck = None if dk is None else list(dk)
             don = float(sc[SC_MY_DON]) if self.don_rule else None
+            mlp = next_turn_leader_power(self.order, self.rows, self.ex, key[0], key[1]) if self.end_of_turn else None
+            self._st("cut_mlp_next" if mlp is not None else "cut_mlp_rule")
+            if mlp is None:
+                mlp = frame_leader_power(sc, self.ex["tok"][i], self.ex["ci"][i], self.idx2cid)
             cv = curve_of_row(sc, self.ex["tok"][i], self.ex["ci"][i], self.idx2cid, self.cards, deck=deck,
-                              don=don, mu=self.mu)
+                              don=don, mu=self.mu, mlp=mlp)
             self._curves[key] = cv
             self._st("cut_frames")
             if cv is not None:

@@ -405,3 +405,86 @@ def test_value_and_reserve_read_the_same_attackers_with_the_rules_power():
     assert xs == pytest.approx([1000.0, 0.0], abs=1e-3)  # トークンのまま読むと [−1000, −2000]＝全部通らない（旧の誤り）
     assert sorted(x for x in CP.defender_attackers(sc, tok)) == pytest.approx([0.0, 1000.0], abs=1e-3)
     assert sorted(HG.incoming(tok)) == []            # 旧の読み（守りの窓の行では正しい・枠の行では誤り）
+
+
+# ---- 残り 2a（2026-10-01）: 枠の守る側のパワーは次の相手ターンの規則どおりの値 ----
+
+_REC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "f_identity", "rec")
+
+
+def _vocab_maps():
+    import guard_afford as GA
+    v = GA._vocab()
+    return v, {i: c for c, i in v.items()}
+
+
+def test_leader_power_opp_turn_strips_don_and_swaps_turn_passives():
+    """自席のターンの行: 付与ドン（列 0 にだけ載る）を外し、リーダー自身の【相手のターン中】の上昇を足す。
+    ST09-001＝【ドン!!×1】【相手のターン中】自分のライフが 2 枚以下ならパワー +1000（印字 5000）。"""
+    v, idx2cid = _vocab_maps()
+    sc = np.zeros(127, dtype=np.float32)
+    sc[T.SC_MY_LEADER_POWER] = 0.5; sc[T.SC_OPP_LEADER_POWER] = 0.5; sc[T.SC_MY_LIFE] = 2.0; sc[T.SC_OPP_LIFE] = 4.0
+    sc[T.SC_IS_MY_TURN] = 1.0
+    tok = np.zeros((22, 22), dtype=np.float32)
+    tok[0, T.S_POWER] = 0.7; tok[0, T.S_POWER_OPP_TURN] = 0.5; tok[0, T.S_ATTACHED_DON] = 0.4   # 付与ドン 2 枚
+    ci = np.zeros(24, dtype=np.int16); ci[0] = v["ST09-001"]; ci[1] = v["OP09-001"]
+    assert T.leader_power_opp_turn(tok, sc, ci, idx2cid) == pytest.approx(6000.0)
+    assert T.leader_power_opp_turn(tok, sc) == pytest.approx(5000.0)            # 札が読めなければ付与ドンだけ外す
+    sc[T.SC_MY_LIFE] = 3.0
+    assert T.leader_power_opp_turn(tok, sc, ci, idx2cid) == pytest.approx(5000.0)   # 条件が偽
+    sc[T.SC_MY_LIFE] = 2.0; tok[0, T.S_ATTACHED_DON] = 0.0
+    assert T.leader_power_opp_turn(tok, sc, ci, idx2cid) == pytest.approx(5000.0)   # 【ドン!!×1】が付いていない
+    sc[T.SC_IS_MY_TURN] = 0.0; tok[0, T.S_POWER] = 0.6; tok[0, T.S_POWER_OPP_TURN] = 0.6
+    assert T.leader_power_opp_turn(tok, sc, ci, idx2cid) == pytest.approx(6000.0)   # 相手のターンの行はそのまま
+    # 旧の読み（列 0）は自席の行で付与ドンを載せる＝来る攻撃の超過が 2000 小さく見えていた
+    tok[0, T.S_POWER] = 0.7; tok[0, T.S_POWER_OPP_TURN] = 0.5; sc[T.SC_IS_MY_TURN] = 1.0
+    tok[1, T.S_POWER] = 0.6
+    assert T.incoming_x(tok) == pytest.approx([-1000.0])
+    assert T.incoming_x(tok, mine=T.leader_power_opp_turn(tok, sc)) == pytest.approx([1000.0])
+
+
+def _fixture_frames():
+    from opcg_sim.learned.train import plan_labels as PL
+    import theory_bridge as TB
+    from theory_bridge import POL_COLS, ROW_COLS, _extra
+    _v, idx2cid = _vocab_maps()
+    cards = PL.Cards()
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([_REC], row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
+        own_last = {}
+        for i in idx:
+            w, t = int(rows["who"][i]), int(rows["turn"][i])
+            if t >= 1 and PL.is_own_turn(w, t) and TB.is_decision_row(rows, pol, L, ptr, i):
+                own_last[(w, t)] = i
+        yield rows, ex, list(idx), idx2cid, cards, own_last
+
+
+def test_end_of_turn_frames_read_the_next_opponent_turn_leader_power():
+    """ターン末の枠（`end_of_turn=True`）は守る側のパワーを**次の相手ターンの最初の行**（攻め手の行の相手のリーダー＝
+    付与ドン無し・このターンだけの増減が切れた後）から読む。V の来る攻撃と予約 `N_f` は同じ値で読む。次の行が無い枠と
+    ターン頭の枠は行から規則で読む（`leader_power_opp_turn`）。実デッキの記録 2 局。"""
+    n_next = n_rule = 0
+    for rows, ex, order, idx2cid, cards, own_last in _fixture_frames():
+        stats = {}
+        cf = CP.CutFrames(order, rows, ex, idx2cid, cards, own_last, MU, don_rule=True, stats=stats, end_of_turn=True)
+        cf0 = CP.CutFrames(order, rows, ex, idx2cid, cards, own_last, MU, don_rule=True, end_of_turn=False)
+        for (d, t), i in own_last.items():
+            cv = cf.curve(d, t)
+            if cv is None:
+                continue
+            j = next((k for k in order if int(rows["who"][k]) == 1 - d and int(rows["turn"][k]) == t + 1), None)
+            sc, tok = np.asarray(ex["sc"][i]), np.asarray(ex["tok"][i])
+            rule = T.leader_power_opp_turn(tok, sc, ex["ci"][i], idx2cid)
+            if j is not None:
+                want = float(np.asarray(ex["sc"][j])[T.SC_OPP_LEADER_POWER]) * 1e4
+                n_next += 1
+            else:
+                want = rule
+                n_rule += 1
+            assert cv.mlp == pytest.approx(want)
+            assert cf0.curve(d, t).mlp == pytest.approx(rule)
+            # V の来る攻撃と予約は同じ並び（同じパワー）で読む
+            xs = sorted((float(x) for x in CB.opp_attackers_of(tok, cv.mlp) if float(x) >= -T.PWR_EPS), reverse=True)
+            assert cv.xs_future == pytest.approx(xs)
+            assert cv.reserve == pytest.approx(CP.reserve_of_row(sc, tok, cv.share, MU, mlp=cv.mlp))
+        assert stats.get("cut_mlp_next", 0) + stats.get("cut_mlp_rule", 0) == stats.get("cut_frames", 0)
+    assert n_next >= 10
