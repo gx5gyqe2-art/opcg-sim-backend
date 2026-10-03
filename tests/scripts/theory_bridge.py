@@ -1211,8 +1211,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                           _g_opp_of(opp, last_main, ex, idx2cid, cards, g_cache, 1 - w,
                                                     deck=(decks or {}).get(1 - w))),
                                    opp=opp, cut_me=cut_me, cut_opp=cut_opp,
-                                   attacker=_attacker_of(sc, tok, ex["ci"][i], idx2cid, cards,
-                                                         deck_ids=(decks or {}).get(w), t=t))
+                                   attacker=(lambda _i=i, _w=w, _t=t, _sc=sc, _tok=tok:
+                                             _attacker_of(_sc, _tok, ex["ci"][_i], idx2cid, cards,
+                                                          deck_ids=(decks or {}).get(_w), t=_t)))
                 kap = float(ck["kappa"])
                 stats["kappa_sum"] += kap; stats["kappa_n"] += 1
                 stats["d_bins"][_d_bin(ck["d"])] += 1
@@ -1371,8 +1372,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                                  _g_opp_of(opp_g, last_main, ex, idx2cid, cards, g_cache, 1 - w,
                                                            deck=(decks or {}).get(1 - w))),
                                           opp=opp_g,
-                                          attacker=_attacker_of(sc, tok, ex["ci"][i], idx2cid, cards,
-                                                                deck_ids=(decks or {}).get(w), t=t),
+                                          attacker=(lambda _i=i, _w=w, _t=t, _sc=sc, _tok=tok:
+                                                    _attacker_of(_sc, _tok, ex["ci"][_i], idx2cid, cards,
+                                                                 deck_ids=(decks or {}).get(_w), t=_t)),
                                           # **N-3**: 守りの窓の席（w）と攻め手（1 − w）の値段の窓
                                           cut_me=(None if cut_me_fr is None else
                                                   cut_me_fr.view(w, t, float(sc[SC_MY_HAND]), at_n=n)),

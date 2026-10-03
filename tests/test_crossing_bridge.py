@@ -2611,29 +2611,101 @@ def test_the_defender_model_looks_only_as_far_as_the_walk_without_the_hand():
     assert CB.model_horizon(ax, [], 3) >= h3
 
 
-def test_an_oversized_defender_model_shortens_its_horizon_and_says_so():
-    """**H-4f（計算の予算）**: 守る側の計算の状態数が予算を超えたら地平を 1 ターンずつ縮めてやり直す（地平 1 は必ず収まる）。
-    縮めた回数を数え、計画に使った地平を残す。予算が十分なら縮めない（結果は予算なしと同じ）。"""
+def test_an_oversized_defender_model_shortens_its_horizon_deterministically():
+    """**H-4f（計算の予算・B1）**: 守る側の計算の状態数が予算を超えたら地平を 1 ターンずつ縮めてやり直す（地平 1 は必ず収まる）。
+    **縮めるかどうかは問題だけの関数**——試行ごとに空の覚え書きで数えるので、共有の覚え書き・結果の覚え書き・前に解いた
+    局面があっても同じ地平・同じ計画になる（再現できる）。予算が十分なら縮めない（結果は予算なしと同じ）。"""
     cards = [(1000.0, 0.0), (2000.0, 0.0), (1000.0, 0.0), (2000.0, 0.0)]
     lt = ((1000.0, 0.0, 0.3), (2000.0, 0.0, 0.3))
     dt = ((1000.0, 0.0, 0.3), (2000.0, 0.0, 0.3))
     att = [(0, 0.0), (2, 1000.0), (3, 0.0)]
     ax = _actx(6, att, att, [], kmax=2, a_tab=[0.01] * 8, board=0.05)
     ax["ds"] = [6.0 + i for i in range(30)]
-    ax["key"] = ax["key"] + ("budget",)
     old = CB.EX_STATE_BUDGET
+
+    def solve(budget, tag):
+        CB.EX_STATE_BUDGET = budget
+        a2 = dict(ax, key=ax["key"] + (tag,))
+        return CB.rule_don_solve(cards, 0.0, [], 3, a2, None, lt, dt)[2]
     try:
-        CB.EX_STATE_BUDGET = None
-        CB._RULE_DON_CACHE.clear()
-        _c, _s, free = CB.rule_don_solve(cards, 0.0, [], 3, ax, None, lt, dt)
+        free = solve(None, "free")
         assert free["horizon"] == free["horizon0"]
-        CB.EX_STATE_BUDGET = 50
-        ax["key"] = ax["key"] + ("tight",)
-        CB._RULE_EX_MEMO.clear(); CB._RULE_EX_CACHE.clear()          # 覚えた状態を使うと新しい状態が要らない
-        n0 = CB.RULE_STATS.get("horizon_cut", 0)
-        _c, _s, tight = CB.rule_don_solve(cards, 0.0, [], 3, ax, None, lt, dt)
-        assert tight["horizon"] < tight["horizon0"] and CB.RULE_STATS.get("horizon_cut", 0) > n0
-        assert tight["horizon"] >= 1 and tight["tau"] >= 0.0
+        cold = solve(50, "tight")
+        assert cold["horizon"] < cold["horizon0"] and cold["horizon"] >= 1 and cold["tau"] >= 0.0
+        # 共有の覚え書き・結果の覚え書きを温めてからでも同じ（呼ぶ順・覚え書きの状態に依らない）
+        CB._RULE_DON_CACHE.clear()
+        solve(None, "warm")
+        warm = solve(50, "tight2")
+        assert (warm["horizon"], warm["horizon0"], warm["k"], warm["play"]) == \
+            (cold["horizon"], cold["horizon0"], cold["k"], cold["play"])
+        assert warm["tau"] == pytest.approx(cold["tau"]) and warm["theta"] == pytest.approx(cold["theta"])
+        # 予算が十分なら縮めない
+        big = solve(10 ** 9, "big")
+        assert big["horizon"] == big["horizon0"] and big["tau"] == pytest.approx(free["tau"])
     finally:
         CB.EX_STATE_BUDGET = old
         CB._RULE_DON_CACHE.clear()
+
+
+class _JointView:
+    """`cut_price.CutView`（`avg`）と同じ形の最小の窓: 切る札 1 枚 = `g`。"""
+    kind = "avg"
+
+    def __init__(self, g):
+        self.g = float(g)
+        self.curve = type("C", (), {"gbar": float(g)})()
+
+    def price(self, k, mu=None):
+        return float(k) * self.g
+
+
+def test_the_defender_model_charges_the_joint_cut_price_and_flat_mu_otherwise():
+    """**B2（T77 の対称）**: 切った札の値段は損害の側（攻撃の守る値段）と耐久の側（守る側の計算）で同じ数。`flat` は一律 `μ`・
+    `joint` は N-3 と同じ予約の 1 枚あたりの平均 `ḡ`。受ける費用も `λ − h·ḡ`（`gbar`）。耐久の手札の項は
+    切った枚数 × その値段、命中の正味は受けた回数ごと、積む損害は切らせた札ごと。`rule`／`rule_don` は joint の中でも落ちない。"""
+    import cut_price as CPm
+    X = CB.rule_guard_plan_ex
+    cards = [(2000.0, 0.0), (2000.0, 0.0)]
+    flat = X(cards, 0.0, [0.0], [0.0], [], 1, 3)
+    g = 0.2
+    old_take = T.CUT_TAKE_CARD
+    try:
+        with CPm.defending(_JointView(g)):
+            T.CUT_TAKE_CARD = g
+            assert CB.cut_card_price() == pytest.approx(g)
+            assert CB.cut_take_price() == pytest.approx(T.THETA * T.MU + T.H_LIFE_TO_HAND * (T.MU - g))
+            joint = X(cards, 0.0, [0.0], [0.0], [], 1, 3)
+            sc, tok = _rule_row(life=1.0, hand=2.0, xs=(0.0,))
+            old = CB.THETA_HAND_MODE
+            try:
+                for mode in ("rule", "rule_don"):
+                    CB.set_theta_hand_mode(mode)
+                    hand = CB.threshold_parts(sc, tok, g_hand=_read([2000.0, 2000.0]))[1]
+                    assert hand > 0.0                                      # joint の中でも落ちない
+                    if mode == "rule":
+                        flat_hand = None
+                        with CPm.defending(None):
+                            flat_hand = CB.threshold_parts(sc, tok, g_hand=_read([2000.0, 2000.0]))[1]
+                        assert hand / g == pytest.approx(flat_hand / T.MU)      # 同じ枚数・値段だけ違う
+            finally:
+                CB.set_theta_hand_mode(old)
+    finally:
+        T.CUT_TAKE_CARD = old_take
+    assert joint["cut"] == pytest.approx(flat["cut"])                       # 数は同じ
+    assert joint["theta"] - (T.LAM * 1) == pytest.approx(g * joint["cut"])   # 耐久の手札の項 = 切った枚数 × ḡ
+    assert flat["theta"] - (T.LAM * 1) == pytest.approx(T.MU * flat["cut"])
+    # 積む損害は切らせた札ごとに `ḡ`（`flat` は `μ`）・受けたとき（ここでは取る方が早く積む損害が小さい）は `λ − h·ḡ`
+    assert sorted(round(x, 9) for x in joint["harms"][1:3]) == [round(g, 9)] * 2
+    assert round(joint["harms"][0], 9) == round(T.THETA * T.MU + T.H_LIFE_TO_HAND * (T.MU - g), 9)
+    assert sorted(round(x, 9) for x in flat["harms"][:2]) == [round(T.MU, 9)] * 2
+
+
+def test_the_attackers_purse_and_the_solve_must_share_one_price_window():
+    """**B2**: 攻め手の財布（`attacker_ctx`）は作った値段の文脈を持ち、別の文脈で解こうとすると落ちる（付与の増分と
+    守る側の計算の値段が食い違ったまま黙って使わない）。"""
+    import cut_price as CPm
+    ax = _actx(2, [(0, 0.0)], [(0, 0.0)], [])
+    ax["cp"] = (("avg", 0.2), 0.2)
+    with pytest.raises(RuntimeError):
+        CB.rule_don_solve([(2000.0, 0.0)], 0.0, [], 0, ax, None)
+

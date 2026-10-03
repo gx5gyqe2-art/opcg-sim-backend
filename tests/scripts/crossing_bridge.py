@@ -910,6 +910,34 @@ def _rule_guard_plan(cards, don, xs_first, xs_later, blk_margins, life, turns=No
     return int(cut), int(stopped), int(alive)
 
 
+def cut_card_price(mu=MU):
+    """**B2（T77 の対称）**: 守る側が切る札 1 枚の値段。`CUT_PRICE_MODE=flat` なら一律 `μ`（旧）。`joint` なら
+    **N-3 と同じ予約の 1 枚あたりの平均 `ḡ`**（守り手の手札の価値の減り・`cut_price.CutView.price(1)`）——損害の側
+    （攻撃の守る値段・実現の損害）が使うのと同じ数。`rule*` の守る側の計算は切った札の枚数 × この値段で耐久を数える。
+    安い順の切れ目（`joint_slice`）は枚数ごとに値段が変わるので 1 枚の値段が定まらない＝組めない（落とす）。"""
+    cv = CP.active()
+    if cv is None:
+        return float(mu)
+    if getattr(cv, "kind", "avg") != "avg":
+        raise ValueError("rule／rule_don は cut price joint_slice と組めない（1 枚の値段が定まらない）")
+    return float(cv.price(1.0, mu))
+
+
+def cut_take_price(mu=MU):
+    """**B4（T77）**: 命中を受けたときの正味の値段 `λ − h·(手札に入る札の値段)`。`flat` は `Θ·μ`（旧）。
+    `joint`＋`gbar` は手札に入る札も `ḡ` で数える（`theory_order` の受ける費用と同じ式）。"""
+    base = float(THETA) * float(mu)
+    if CP.active() is not None and TO.CUT_TAKE_CARD is not None:
+        base += TO.H_LIFE_TO_HAND * (float(mu) - float(TO.CUT_TAKE_CARD))
+    return base
+
+
+def cut_context_key():
+    """守る側の計算の結果を覚えておくときに鍵へ入れる値段の文脈（`flat` なら `(None, None)`）。"""
+    return (TO.CUT_PRICER_KEY if CP.active() is not None else None,
+            TO.CUT_TAKE_CARD if CP.active() is not None else None)
+
+
 def _rule_hand_term(sc, tok, side, g_hand, mu=MU, turns=None, count=True):
     """**H-4**: `threshold_parts_side` の手札の項（`rule`）。読めなければ `None`（呼び側が既定の形に落とす）。"""
     if not isinstance(g_hand, HandRead):
@@ -937,7 +965,7 @@ def _rule_hand_term(sc, tok, side, g_hand, mu=MU, turns=None, count=True):
         RULE_STATS["rule_cut_sum"] += cut
         RULE_STATS["rule_stop_sum"] += stopped
         RULE_STATS["rule_hand_mismatch"] += int(g_hand.n_hand != int(round(hand_n)))
-    return float(mu) * float(cut)
+    return cut_card_price(mu) * float(cut)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1156,8 +1184,8 @@ def rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns=
     `theta`＝**この守りで耐久が数える量**＝`λ × ライフ ＋ μ × 切る札の期待値 ＋ ν × 全てのブロッカー`。
     倒れた枝では `Σ harms = theta` がちょうど成り立つ（とどめの段が残りを埋める）。"""
     pr = prices or {}
-    lam = float(pr.get("lam", LAM)); lam_net = float(pr.get("lam_net", float(THETA) * float(MU)))
-    mu = float(pr.get("mu", MU)); olp = float(pr.get("olp", 5000.0)); mlp = float(pr.get("mlp", 5000.0))
+    lam = float(pr.get("lam", LAM)); lam_net = float(pr.get("lam_net", cut_take_price()))
+    mu = float(pr.get("mu", cut_card_price())); olp = float(pr.get("olp", 5000.0)); mlp = float(pr.get("mlp", 5000.0))
     if later_seq is None:
         later_seq = (tuple(xs_later or ()),)
     seq = tuple(tuple(sorted(float(x) for x in s)) for s in later_seq) or ((),)
@@ -1168,10 +1196,13 @@ def rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns=
            round(lam, 9), round(lam_net, 9), round(mu, 9), round(olp, 3), round(mlp, 3),
            tuple(sorted(float(m) for m in rest_blk or ())), tuple(sorted(float(m) for m in arrive_blk or ())),
            tuple(draw_types or ()))
-    if key in _RULE_EX_CACHE:
+    budgeted = _EX_USED["memo"] is not None
+    if not budgeted and key in _RULE_EX_CACHE:
         return _RULE_EX_CACHE[key]
     out = _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, life_types,
                               lam, lam_net, mu, olp, mlp, rest_blk, arrive_blk, draw_types)
+    if budgeted:
+        return out                         # 予算つきの試行では結果を共有の覚え書きに入れない（問題だけの関数に保つ）
     if len(_RULE_EX_CACHE) > 200000:
         _RULE_EX_CACHE.clear()
     _RULE_EX_CACHE[key] = out
@@ -1187,11 +1218,13 @@ class _ModelBudget(Exception):
     """守る側の計算の状態数が予算を超えた（`rule_don_solve` が地平を 1 つ縮めてやり直す）。"""
 
 
-#: **計算の予算（理論の定数ではない）**: 1 回の `rule_don_solve` が守る側の計算で新しく作ってよい状態の数。超えたら
-#: 地平を 1 ターン縮めてやり直す（地平 1 は必ず収まる）。縮めた回数は `RULE_STATS["horizon_cut"]` に数える。
-#: `None` なら無制限（テスト・小さい盤面）。
+#: **計算の予算（理論の定数ではない）**: 1 回の `rule_don_solve` の 1 回の試行（ある地平）が守る側の計算で作ってよい
+#: 状態の数。超えたら地平を 1 ターン縮めてやり直す（地平 1 は必ず収まる）。**試行ごとに空の覚え書きで始める**ので、
+#: 数える状態数は**問題だけの関数**（呼ぶ順・他の試行や前の局面の覚え書きに依らない＝再現できる）。
+#: 縮めたかどうかは計画に残し（`horizon` 対 `horizon0`）、使った計画ごとに数える（`RULE_STATS["plan_cut"]`・覚えた結果を
+#: 使い回しても冷たい実行と同じ数になる）。`None` なら無制限（窓・テスト・感度の測定）。
 EX_STATE_BUDGET = 60000
-_EX_USED = {"n": 0, "limit": None}
+_EX_USED = {"memo": None, "limit": None}
 
 
 def _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, life_types,
@@ -1284,13 +1317,17 @@ def _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, lif
         set_cache[ck] = out
         return out
 
-    memo = _RULE_EX_MEMO
-    if len(memo) > 600000:
-        memo.clear()
-        set_cache.clear()
-        _RULE_EX_CTX.clear()      # 文脈の番号も振り直す（覚えた値と一緒に捨てる）
-        ctx = _RULE_EX_CTX.setdefault(ctx_t, 0)
-        kid = _RULE_EX_CTX.setdefault(("kinds", kinds_t), 1)
+    memo = _EX_USED["memo"]
+    lim = _EX_USED["limit"]
+    if memo is None:                       # 窓・テスト・感度の測定: 呼び出しをまたいで覚える（予算は無い）
+        memo = _RULE_EX_MEMO
+        lim = None
+        if len(memo) > 600000:
+            memo.clear()
+            set_cache.clear()
+            _RULE_EX_CTX.clear()      # 文脈の番号も振り直す（覚えた値と一緒に捨てる）
+            ctx = _RULE_EX_CTX.setdefault(ctx_t, 0)
+            kid = _RULE_EX_CTX.setdefault(("kinds", kinds_t), 1)
 
     def better(a, b):
         """守る側の比較（期待値・同点は誤差で）。"""
@@ -1357,8 +1394,7 @@ def _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, lif
             r = next_turn(t, hand, lf, tuple(sorted(ready + rested + pend, reverse=True)))
             out = (r[0], r[1], r[2] + 1.0, r[3], (0.0,) + tuple(r[4]))
             memo[key] = out
-            _EX_USED["n"] += 1
-            if _EX_USED["limit"] is not None and _EX_USED["n"] > _EX_USED["limit"]:
+            if lim is not None and len(memo) > lim:
                 raise _ModelBudget()
             return out
         best_att = None
@@ -1403,8 +1439,7 @@ def _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, lif
             if best_att is None or better(best_att, best_def):
                 best_att = best_def
         memo[key] = best_att
-        _EX_USED["n"] += 1
-        if _EX_USED["limit"] is not None and _EX_USED["n"] > _EX_USED["limit"]:
+        if lim is not None and len(memo) > lim:
             raise _ModelBudget()
         return best_att
 
@@ -1545,14 +1580,14 @@ def attacker_ctx(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=N
         if (cards.info(idx2cid.get(int(ci_a[s_i]))) or {}).get("blocker"):
             rest_blk.append(float(slot_power(tok, s_i) or 0.0) - olp)
     rest_blk = tuple(sorted(rest_blk, reverse=True))
-    key = (budget, tuple(att1), tuple(later), rest_blk, RATE_RUSH_MODE, SLOPE_EFFECT_MODE,
+    key = (budget, tuple(att1), tuple(later), rest_blk, RATE_RUSH_MODE, SLOPE_EFFECT_MODE, cut_context_key(),
            tuple((c, tuple(sorted(p.items())), bx, ru) for c, p, bx, ru in cand),
            tuple(tuple(round(v, 12) for v in row) for row in price),
            tuple(round(v, 12) for v in a_tab + ar_tab + e_tab), tuple(ds), round(olp, 3), round(mlp, 3),
            bool(no_attack_now), round(float(lead_b), 12), round(float(chars_b), 12))
     out = {"budget": budget, "att1": att1, "later": later, "cand": cand, "price": price, "flow": flow,
            "kmax": kmax, "key": key, "fixed": None, "olp": olp, "mlp": mlp,
-           "lam": float(LAM), "lam_net": float(THETA) * float(mu), "mu": float(mu),
+           "lam": float(LAM), "lam_net": cut_take_price(mu), "mu": cut_card_price(mu), "cp": cut_context_key(),
            "ds": ds, "a_tab": a_tab, "ar_tab": ar_tab, "e_tab": e_tab, "jmax": jmax,
            "no_attack_now": bool(no_attack_now), "lead_bare": float(lead_b), "chars_bare": float(chars_b),
            "rest_blk": rest_blk, "blk_a": blk_a, "theta_p": float(theta)}
@@ -1716,10 +1751,12 @@ def rule_don_solve(cards_d, don_d, blk, life, actx, turns=None, life_types=(), d
     """`_rule_don_solve` を地平 `⌈τ0⌉`（手札抜きの地平）から始め、守る側の計算の状態数が予算 `EX_STATE_BUDGET` を超えたら
     地平を 1 ターンずつ縮めてやり直す（縮めた回数を数える・計画の `horizon` に使った地平を残す）。`turns` を渡されたら
     その地平のまま（窓・テスト）。"""
+    if tuple(actx.get("cp", (None, None))) != cut_context_key():
+        raise RuntimeError("攻め手の財布（attacker_ctx）と守る側の計算が別の値段の文脈で作られている（同じ `CP.defending` の中で呼ぶ）")
     key = (tuple(sorted((float(c), float(d)) for c, d in cards_d or ())), float(don_d),
            tuple(sorted(float(m) for m in blk or ())), int(max(0, round(float(life)))),
            None if turns is None else int(turns), tuple(life_types or ()), tuple(draw_types or ()),
-           tuple(sorted(float(m) for m in arrive or ())), actx["key"], "w")
+           tuple(sorted(float(m) for m in arrive or ())), actx["key"], EX_STATE_BUDGET, "w")
     if key in _RULE_DON_CACHE:
         return _RULE_DON_CACHE[key]
     if turns is not None:
@@ -1729,15 +1766,16 @@ def rule_don_solve(cards_d, don_d, blk, life, actx, turns=None, life_types=(), d
         h0 = model_horizon(actx, blk, L0, arrive)
         out = None
         for h in range(h0, 0, -1):
-            _EX_USED["n"] = 0
-            _EX_USED["limit"] = EX_STATE_BUDGET if h > 1 else None
+            if EX_STATE_BUDGET is None:
+                _EX_USED["memo"], _EX_USED["limit"] = None, None
+            else:
+                _EX_USED["memo"], _EX_USED["limit"] = {}, (EX_STATE_BUDGET if h > 1 else None)
             try:
                 out = _rule_don_solve(cards_d, don_d, blk, life, actx, h, life_types, draw_types, arrive)
             except _ModelBudget:
-                RULE_STATS["horizon_cut"] = RULE_STATS.get("horizon_cut", 0) + 1
                 continue
             finally:
-                _EX_USED["limit"] = None
+                _EX_USED["memo"], _EX_USED["limit"] = None, None
             break
         out[2]["horizon"] = h
         out[2]["horizon0"] = h0
@@ -1890,6 +1928,12 @@ def _rule_don_term(sc, tok, side, g_hand, attacker, mu=MU, turns=None, plan=None
             cut, st = r["cut"], r["stopped"]
     else:
         cut, st, plan = rule_don_solve(g_hand.cards, g_hand.don, blk, life, attacker, turns, lt, dt, arr)
+        if "horizon0" in plan:
+            # **B1**: 使った計画ごとに数える（覚えた結果を使い回しても冷たい実行と同じ数になる）
+            RULE_STATS["plan_n"] = RULE_STATS.get("plan_n", 0) + 1
+            if plan["horizon"] < plan["horizon0"]:
+                RULE_STATS["plan_cut"] = RULE_STATS.get("plan_cut", 0) + 1
+                RULE_STATS["plan_cut_turns"] = RULE_STATS.get("plan_cut_turns", 0) + (plan["horizon0"] - plan["horizon"])
     if count:
         RULE_STATS["rule_n"] += 1
         RULE_STATS["rule_cut_sum"] += cut
@@ -1897,7 +1941,7 @@ def _rule_don_term(sc, tok, side, g_hand, attacker, mu=MU, turns=None, plan=None
         RULE_STATS["rule_hand_mismatch"] += int(g_hand.n_hand != int(round(hand_n)))
         RULE_STATS["rule_don_attach_sum"] = RULE_STATS.get("rule_don_attach_sum", 0.0) + float(sum(plan["k"]))
         RULE_STATS["rule_don_play_n"] = RULE_STATS.get("rule_don_play_n", 0) + int(bool(plan["play"]))
-    return float(mu) * float(cut), plan
+    return cut_card_price(mu) * float(cut), plan
 
 
 def rule_don_plan_for(sc, tok, g_hand, attacker):
@@ -1907,29 +1951,30 @@ def rule_don_plan_for(sc, tok, g_hand, attacker):
     return _rule_don_term(sc, tok, "opp", g_hand, attacker, count=False)[1]
 
 
-def hand_cut_count(g, hand_n, xs, life_opp, n_blockers_opp, mu=MU):
+def hand_cut_count(g, hand_n, xs, life_opp, n_blockers_opp, mu=MU, mode=None):
     """**N-3**: 耐久の手札の項が言う「**切る枚数**」（旧の式から値段 `μ` を外したもの）。
 
     `count`＝全部の枚数・`cuttable`＝切れる枚数・`cuttable_cx`／`cuttable_forced`／`cuttable_seq`＝
     それぞれ `hand_absorb`／`hand_absorb_forced`／`hand_absorb_seq` の `μ ×` の中身（同じ式・同じ端数の落とし方）。
     `quality`／`play`／`guard` は 1 枚あたりの値段そのものを読み替える形なので数に戻せない＝`N-3` とは組めない（落とす）。"""
     n = max(0.0, float(hand_n))
-    if THETA_HAND_MODE == "count":
+    hm = THETA_HAND_MODE if mode is None else mode
+    if hm == "count":
         return n
-    if THETA_HAND_MODE not in ("cuttable", "cuttable_cx", "cuttable_forced", "cuttable_seq"):
-        raise ValueError("N-3（cut price joint）は THETA_HAND_MODE=%r と組めない（数に戻せない）" % (THETA_HAND_MODE,))
+    if hm not in ("cuttable", "cuttable_cx", "cuttable_forced", "cuttable_seq"):
+        raise ValueError("N-3（cut price joint）は THETA_HAND_MODE=%r と組めない（数に戻せない）" % (hm,))
     n_cut = (float(g) / float(mu)) * n if mu else 0.0
-    if THETA_HAND_MODE == "cuttable":
+    if hm == "cuttable":
         return n_cut
     cs = sorted(c for c in (c_of(float(x)) for x in (xs or ())) if c > 0.0)
-    if THETA_HAND_MODE == "cuttable_cx":
+    if hm == "cuttable_cx":
         c = float(c_of(float(max(xs)) if xs else -1.0))       # `threshold_parts_side` が `hand_absorb` に渡すのと同じ
         if c <= 0.0:
             return 0.0
         return max(0.0, n_cut) if c <= 1.0 else c * math.floor(max(0.0, n_cut) / c)
     if not cs:
         return 0.0
-    if THETA_HAND_MODE == "cuttable_forced":
+    if hm == "cuttable_forced":
         gg = forced_guards(xs, life_opp, n_blockers_opp)
         use = cs[:gg] if gg > 0 else cs[:1]
         c_eff = sum(use) / len(use)
@@ -2086,13 +2131,6 @@ def threshold_parts_side(sc, tok, side, lam=LAM, mu=MU, g_hand=None, hand_blocke
         raise ValueError("side は 'opp' か 'me'（%r）" % (side,))
     g = float(mu if g_hand is None else g_hand)
     cv = CP.active()
-    if cv is not None:
-        # **N-3**: 数（切る枚数）は旧の式のまま、値段だけを守り手の手札の価値の減りで読む（`cut_price` の注）
-        hand = float(cv.price(hand_cut_count(g, hand_n, xs, life, n_blk, mu)))
-        body = float(_body_term(tok, slots, body_ref))
-        if THETA_HAND_BLOCKER_MODE == "on":
-            body += max(0.0, float(hand_blocker))
-        return (float(lam) * life, hand, body)
     hand = g * hand_n
     rule_hand = None
     if THETA_HAND_MODE in RULE_DON_MODES:
@@ -2112,7 +2150,13 @@ def threshold_parts_side(sc, tok, side, lam=LAM, mu=MU, g_hand=None, hand_blocke
         if rule_hand is None:
             RULE_STATS["rule_fallback"] += 1
     if rule_hand is not None:
-        hand = rule_hand
+        hand = rule_hand           # **B2**: 切った枚数 × 守り手の 1 枚の値段（`joint` なら `ḡ`・`flat` なら `μ`）
+    elif cv is not None:
+        # **N-3**: 数（切る枚数）は旧の式のまま、値段だけを守り手の手札の価値の減りで読む（`cut_price` の注）。
+        # `rule*` で守る席の手札が読めなかったときは既定の形（`cuttable_forced`）の数に落とす（H-4 と同じ）。
+        hand = float(cv.price(hand_cut_count(g, hand_n, xs, life, n_blk, mu,
+                                             mode=("cuttable_forced" if THETA_HAND_MODE in ("rule",) + RULE_DON_MODES
+                                                   else None))))
     elif THETA_HAND_MODE in ("cuttable_cx", "cuttable_forced", "cuttable_seq", "rule") + RULE_DON_MODES:
         # **T99／T100／T158**: 切れる枚数は `g/μ × H`（`g` は 1 枚あたりの価格＝`μ ×` 切れる割合）。
         n_cut = (g / float(mu)) * hand_n if mu else 0.0
@@ -2394,7 +2438,9 @@ def curve_d_of_row(sc, tok, j, prof, g_hand_of_opp=None, g_hand_of_me=None, cut_
     # **N-3**: `cut_opp`／`cut_me`＝その席の値段の窓（`cut_price.CutView`・`None` なら旧の `μ`）。
     # 相手の耐久は相手の手札・自分の耐久は自分の手札で読む（文脈は項ごとに入れ替える）。
     with CP.defending(cut_opp):
-        th_me = threshold(sc, tok, g_hand=g_hand_of_opp, attacker=attacker, plan=plan)   # **H-4b**: `rule_don` だけが読む
+        # **H-4b**: `rule_don` だけが読む。攻め手の財布は**この値段の窓の中で**作る（呼び出す関数で渡されたとき）
+        th_me = threshold(sc, tok, g_hand=g_hand_of_opp, attacker=(attacker() if callable(attacker) else attacker),
+                          plan=plan)
     with CP.defending(cut_me):
         th_opp = threshold_of_me(sc, tok, g_hand=g_hand_of_me)
     sh_me = sh_opp = rate_me = rate_opp = 0.0
@@ -3642,8 +3688,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     # **N-3**: 切らせた札の値段を守り手の手札で読むなら、組めない形を先に落とす（黙って旧の値段に落ちない）
     cut_decks = None
     if CP.joint_on():
-        if THETA_HAND_MODE not in ("cuttable", "cuttable_cx", "cuttable_forced", "cuttable_seq"):
+        if THETA_HAND_MODE not in ("cuttable", "cuttable_cx", "cuttable_forced", "cuttable_seq", "rule") + RULE_DON_MODES:
             raise ValueError("N-3（cut price joint）は THETA_HAND_MODE=%r と組めない" % (THETA_HAND_MODE,))
+        if THETA_HAND_MODE in ("rule",) + RULE_DON_MODES and CP.CUT_PRICE_MODE == "joint_slice":
+            raise ValueError("rule／rule_don は cut price joint_slice と組めない（1 枚の値段が定まらない）")
         if DON_PURSE_MODE == "race" or THETA_HAND_PLACE == "shield":
             raise ValueError("N-3（cut price joint）は DON_PURSE_MODE=race／THETA_HAND_PLACE=shield と組めない")
         import deck_refill as _DR
