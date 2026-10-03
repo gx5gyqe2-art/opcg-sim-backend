@@ -74,7 +74,7 @@ def _prev_count_value(t: str) -> Optional[ValueSource]:
 # ドロー: 「カードN枚を引く」
 # ---------------------------------------------------------------------------
 @rule("draw", priority=80)
-def _draw(ctx: ParseContext) -> Optional[GameAction]:
+def _draw(ctx: ParseContext) -> Optional[EffectNode]:
     t = ctx.text
     if _nfc("引く") not in t and not re.search(_nfc(r"カード\d*枚?を?引き"), t):
         return None
@@ -104,6 +104,18 @@ def _draw(ctx: ParseContext) -> Optional[GameAction]:
             value=ValueSource(base=_to_int(m_to.group(1)), dynamic_source="HAND_TO_N"),
             raw_text=t,
         )
+    # 「カードN枚までを引く」(N≥2・OP02-066): 0〜N 枚を選べる。1 枚ずつの任意ドローを並べ、2 枚目以降は
+    # 直前を引いたとき（断ったら止まる）だけ行う＝引く枚数をプレイヤーが 0〜N から選べる。
+    if (x >= 2 and tq is None and re.search(_nfc(r"カード[\d０-９]+枚までを?引"), t)
+            and not _per_n_value(t, x) and not _prev_count_value(t)):
+        nodes: list = []
+        for i in range(x):
+            one = GameAction(type=ActionType.DRAW, value=ValueSource(base=1), is_optional=True, raw_text=t)
+            nodes.append(one if i == 0 else Branch(
+                condition=Condition(type=ConditionType.PREV_ACTION, value="SUCCEEDED", player=Player.SELF,
+                                    raw_text=t),
+                if_true=one))
+        return Sequence(actions=nodes)
     return GameAction(
         type=ActionType.DRAW,
         target=tq,

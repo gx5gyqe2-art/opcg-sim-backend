@@ -183,3 +183,36 @@ def test_wangzhi_lets_the_owner_order_the_cost_1_characters_to_the_deck_bottom()
     p.resolve("P2", list(reversed(pe["selectable_uuids"])))
     assert p.action() == "MAIN_ACTION"
     assert p.ids("p2", "field") == ["OP01-076"] and VANILLA in p.ids("p1", "trash")
+
+
+# --- OP02-066 インペルダウンオールスター（カード2枚までを引く＝0〜2 枚を選ぶ）--------------------------
+
+IMPEL_ALL_STAR = "OP02-066"
+IMPEL_LEADER = "OP02-049"     # 特徴《インペルダウン》のリーダー
+
+
+def _all_star(answers):
+    s = Scenario(p1_leader=IMPEL_LEADER, turn=5)
+    s.don["p1"] = 5
+    s.put("p1", IMPEL_ALL_STAR, "hand")
+    s.put("p1", VANILLA, "hand")
+    s.put("p1", VANILLA, "hand")
+    p = s.build()
+    before = p.hand_count("p1")
+    p.play("P1", IMPEL_ALL_STAR)
+    pe = p.pending()
+    assert pe["action"] == "SEARCH_AND_SELECT"             # コスト: 手札 2 枚を捨てる
+    p.resolve("P1", [c["uuid"] for c in pe["candidates"] if c["card_id"] == VANILLA][:2])
+    for a in answers:
+        pe = p.pending()
+        assert pe and pe["action"] == "CONFIRM_OPTIONAL" and pe["player_id"] == "P1", pe
+        p.answer(accept=a)
+    return p, before
+
+
+def test_all_star_draw_up_to_two_can_stop_at_zero_one_or_two():
+    for answers, drawn in (([True, True], 2), ([True, False], 1), ([False], 0)):
+        p, before = _all_star(answers)
+        assert p.action() == "MAIN_ACTION"
+        # 手札: 発動前 − イベント 1 枚 − 捨てる 2 枚 + 引いた枚数
+        assert p.hand_count("p1") == before - 3 + drawn, (answers, before, p.hand_count("p1"))
