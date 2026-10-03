@@ -604,6 +604,8 @@ def main(argv=None):
     TO.apply_defender_power(a)                     # 2b
     out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency,
                   pre_settle=(a.pre_settle == "on"), parts=a.parts)
+    if CB.THETA_HAND_MODE in ("rule",) + CB.RULE_DON_MODES:
+        out["rule_stats"] = dict(CB.RULE_STATS)               # **H-4g**: 使った計画ごとの地平の縮み
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:

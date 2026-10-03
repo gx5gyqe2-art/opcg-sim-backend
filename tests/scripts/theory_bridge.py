@@ -1884,6 +1884,9 @@ def main(argv=None):
            "per_band": {nm: summarise(pair_by_band(per, nm), a.boot_reps, a.seed)
                         for nm in ("close", "mid", "decided")},
            "seconds": round(time.time() - t0, 1)}
+    import crossing_bridge as _CBs
+    if _CBs.THETA_HAND_MODE in ("rule",) + _CBs.RULE_DON_MODES:
+        res["rule_stats"] = dict(_CBs.RULE_STATS)             # **H-4g**: 使った計画ごとの地平の縮み（冷たい実行と同じ数）
     txt = json.dumps(res, ensure_ascii=False, indent=2)
     print(txt)
     if a.out:
