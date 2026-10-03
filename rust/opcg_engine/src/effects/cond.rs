@@ -140,6 +140,10 @@ pub fn check_condition(
 ) -> Result<bool, EngineError> {
     use ConditionType as C;
 
+    if let Some(forced) = super::probe::forced_condition() {
+        return Ok(forced);
+    }
+
     // 論理演算（Python は再帰・short-circuit）。
     match cond.ty {
         C::And => {
@@ -197,25 +201,41 @@ pub fn check_condition(
     Ok(match cond.ty {
         C::DonCount => {
             // 「付与されているドン!!が…」は付与中のみ数える（「同じ」を含む対象固有の比較は除く）。
+            // 「アクティブのドン!!が…」「レストのドン!!が…」「ドン!!すべてがレスト」はその状態の
+            // ドンだけを数える（従来は場のドン総数＝状態の限定が脱落していた）。
             let raw = cond.raw_text.as_str();
             let current = if raw.contains("付与") && !raw.contains("同じ") {
                 tp.don_attached.len() as i32
+            } else if raw.contains("アクティブのドン") || raw.contains("すべてがレスト") {
+                tp.don_active.len() as i32
+            } else if raw.contains("レストのドン") {
+                tp.don_rested.len() as i32
             } else {
                 don_total(target_seat)
             };
             compare(current, cond.operator, threshold_or_raw_text(cond, target_val))
         }
-        C::LifeCount => compare(
-            tp.life.len() as i32,
-            cond.operator,
-            threshold_or_raw_text(cond, target_val),
-        ),
-        C::HandCount => compare(tp.hand.len() as i32, cond.operator, target_val),
-        C::TrashCount => compare(
-            tp.trash.len() as i32,
-            cond.operator,
-            threshold_or_raw_text(cond, target_val),
-        ),
+        C::LifeCount => {
+            // target があれば「表向きのライフ」のように絞った枚数を数える。
+            let current = match &cond.target {
+                Some(q) => {
+                    get_target_cards(state, masters, abilities, q, actor, source, ctx)?.len() as i32
+                }
+                None => tp.life.len() as i32,
+            };
+            compare(current, cond.operator, threshold_or_raw_text(cond, target_val))
+        }
+        C::HandCount => compare(state.hand_len(tp.seat) as i32, cond.operator, target_val),
+        C::TrashCount => {
+            // target があれば「トラッシュのイベント」のように種類等で絞った枚数を数える。
+            let current = match &cond.target {
+                Some(q) => {
+                    get_target_cards(state, masters, abilities, q, actor, source, ctx)?.len() as i32
+                }
+                None => tp.trash.len() as i32,
+            };
+            compare(current, cond.operator, threshold_or_raw_text(cond, target_val))
+        }
         C::DeckCount => compare(tp.deck.len() as i32, cond.operator, target_val),
         C::FieldCount => {
             let current = match &cond.target {
@@ -243,7 +263,7 @@ pub fn check_condition(
             threshold_or_raw_text(cond, target_val),
         ),
         C::LifeHandSum => compare(
-            (tp.life.len() + tp.hand.len()) as i32,
+            (tp.life.len() + state.hand_len(tp.seat)) as i32,
             cond.operator,
             target_val,
         ),
@@ -274,7 +294,19 @@ pub fn check_condition(
                 CondValue::Str(s) => (Some(s.as_str()), 1),
                 _ => (None, 1),
             };
-            let occurred = name.map(event_count).unwrap_or(0);
+            // 名前の末尾が `_SEAT` なら、条件の対象席の記録を引く（`HAND_DISCARDED_BY_EFFECT_P1` 等）。
+            let seat_name: String;
+            let name = match name.and_then(|n| n.strip_suffix("_SEAT")) {
+                Some(base) => {
+                    seat_name = format!("{base}_{}", target_seat.name());
+                    Some(seat_name.as_str())
+                }
+                None => name,
+            };
+            let occurred = match name {
+                Some("OPP_LIFE_LEFT") => event_count(&format!("LIFE_LEFT_{}", opponent.name())),
+                other => other.map(event_count).unwrap_or(0),
+            };
             compare(occurred, cond.operator, threshold)
         }
         C::LifeCountCompare => compare(
@@ -283,9 +315,9 @@ pub fn check_condition(
             offset_threshold(state.player(opponent).life.len() as i32, cond),
         ),
         C::HandCountCompare => compare(
-            state.player(actor).hand.len() as i32,
+            state.hand_len(actor) as i32,
             cond.operator,
-            offset_threshold(state.player(opponent).hand.len() as i32, cond),
+            offset_threshold(state.hand_len(opponent) as i32, cond),
         ),
         C::CharKoedThisTurn => {
             let occurred = event_count(&format!("CHAR_KOED_{}", target_seat.name()));
@@ -321,14 +353,22 @@ pub fn check_condition(
         },
         C::LeaderTrait => match master_of(tp.leader) {
             None => false,
-            Some(m) => match &cond.value {
-                CondValue::Str(s) => m.traits.contains(s),
-                CondValue::List(items) => items
-                    .iter()
-                    .filter_map(CondValue::as_str)
-                    .any(|t| m.traits.iter().any(|x| x == t)),
-                _ => false,
-            },
+            Some(m) => {
+                // operator=HAS は「『X』を含む特徴」（部分一致。CP9／CP0 は『CP』を含む）。
+                let contains = cond.operator == CompareOperator::Has;
+                let hit = |want: &str| -> bool {
+                    if contains {
+                        m.traits.iter().any(|x| x.contains(want))
+                    } else {
+                        m.traits.iter().any(|x| x == want)
+                    }
+                };
+                match &cond.value {
+                    CondValue::Str(s) => hit(s),
+                    CondValue::List(items) => items.iter().filter_map(CondValue::as_str).any(hit),
+                    _ => false,
+                }
+            }
         },
         C::HasTrait | C::HasAttribute | C::HasUnit => {
             // condition.target が無ければ「その側の場」を数えるクエリを合成する。
@@ -372,6 +412,9 @@ pub fn check_condition(
                     "IS_RESTED" => card.is_rest,
                     "IS_ACTIVE" => !card.is_rest,
                     "ENTERED_THIS_TURN" => card.is_newly_played,
+                    // 「このターン中、このリーダー／キャラが相手のキャラとバトルしている」
+                    // （バトル宣言／ブロック時に `BATTLED_CHAR_<uuid>` を記録している）。
+                    "BATTLED_CHAR_THIS_TURN" => event_count(&format!("BATTLED_CHAR_{}", card.uuid)) > 0,
                     "IN_BATTLE" => match &state.active_battle {
                         None => false,
                         Some(ab) => {
@@ -400,6 +443,37 @@ pub fn check_condition(
                             .ok_or_else(|| bad("SOURCE_STATE COST: expected an integer".into()))?;
                         compare(masters.get(card.master).cost, cond.operator, threshold)
                     }
+                    // バトル文脈: 攻撃者の属性（「そのキャラが属性(斬)を持つ」）／
+                    // 発動元と戦っている相手の属性・種類。バトルが無ければ偽。
+                    (Some("ATTACKER_ATTRIBUTE"), Some(v)) => {
+                        let want = v.as_str().ok_or_else(|| {
+                            bad("SOURCE_STATE ATTACKER_ATTRIBUTE: expected a string".into())
+                        })?;
+                        state.active_battle.as_ref().is_some_and(|ab| {
+                            state.card(ab.attacker).has_attribute(masters.get(state.card(ab.attacker).master), want)
+                        })
+                    }
+                    (Some(key @ ("BATTLE_OPP_ATTRIBUTE" | "BATTLE_OPP_TYPE")), Some(v)) => {
+                        let want = v.as_str().ok_or_else(|| {
+                            bad(format!("SOURCE_STATE {key}: expected a string"))
+                        })?;
+                        let idx = source.expect("source is present");
+                        state.active_battle.as_ref().is_some_and(|ab| {
+                            let opp = if ab.attacker == idx {
+                                ab.target
+                            } else if ab.target == idx {
+                                ab.attacker
+                            } else {
+                                return false;
+                            };
+                            let m = masters.get(state.card(opp).master);
+                            if key == "BATTLE_OPP_ATTRIBUTE" {
+                                state.card(opp).has_attribute(m, want)
+                            } else {
+                                m.ty.name() == want
+                            }
+                        })
+                    }
                     _ => false,
                 },
                 _ => false,
@@ -420,9 +494,7 @@ pub fn check_condition(
                 .as_str()
                 .ok_or_else(|| bad("FIELD_ALL_TRAIT: the trait must be a string".into()))?;
             let contains = truthy(&items[1]);
-            if tp.field.is_empty() {
-                return Ok(false);
-            }
+            // 「のみ」は空でも成立（all の空は真）＝キャラがいなければ「麦わらの一味のみ」を満たす。
             tp.field.iter().all(|c| {
                 let traits = &masters.get(state.card(*c).master).traits;
                 if contains {
@@ -445,13 +517,48 @@ pub fn check_condition(
             } else {
                 master_of(tp.leader)
             };
+            // target の絞り込み: 「他の」(EXCLUDE_SOURCE)＝発動元自身を数えない／
+            // 「パワーN以上の」＝現在パワーで絞る（OP15-080）。
+            let exclude_source = cond.target.as_ref().is_some_and(|q| q.has_flag("EXCLUDE_SOURCE"));
+            let (pw_min, pw_max) = cond
+                .target
+                .as_ref()
+                .map_or((None, None), |q| (q.power_min, q.power_max));
+            // 「元々のコストN」(ORIGINAL_COST)＝master のコスト／無印＝現在コストで絞る（OP12-102）。
+            let (cost_min, cost_max, orig_cost) = cond.target.as_ref().map_or((None, None, false), |q| {
+                (q.cost_min, q.cost_max, q.has_flag("ORIGINAL_COST"))
+            });
+            let don_turn = |c: CardIdx| state.card(c).owner == state.turn_player;
+            let passes = |c: CardIdx| -> bool {
+                if exclude_source && source == Some(c) {
+                    return false;
+                }
+                if cost_min.is_some() || cost_max.is_some() {
+                    let card = state.card(c);
+                    let m = masters.get(card.master);
+                    let cost = if orig_cost { m.cost } else { card.current_cost(m) };
+                    if cost_min.is_some_and(|v| cost < v) || cost_max.is_some_and(|v| cost > v) {
+                        return false;
+                    }
+                }
+                if pw_min.is_none() && pw_max.is_none() {
+                    return true;
+                }
+                let card = state.card(c);
+                let power = card.get_power(masters.get(card.master), don_turn(c));
+                pw_min.map_or(true, |m| power >= m) && pw_max.map_or(true, |m| power <= m)
+            };
             let count_named = |name: &str| -> i32 {
                 let mut n = pool
                     .iter()
-                    .filter(|c| matches_name(masters.get(state.card(**c).master), name, true))
+                    .filter(|c| {
+                        passes(**c) && matches_name(masters.get(state.card(**c).master), name, true)
+                    })
                     .count() as i32;
-                if leader_master.is_some_and(|m| matches_name(m, name, true)) {
-                    n += 1;
+                if let (Some(leader), Some(m)) = (tp.leader, leader_master) {
+                    if passes(leader) && matches_name(m, name, true) {
+                        n += 1;
+                    }
                 }
                 n
             };
@@ -472,11 +579,12 @@ pub fn check_condition(
                                 .iter()
                                 .copied()
                                 .filter(|c| {
-                                    matches_name(masters.get(state.card(*c).master), name, true)
+                                    passes(*c)
+                                        && matches_name(masters.get(state.card(*c).master), name, true)
                                 })
                                 .collect();
                             if let (Some(leader), Some(m)) = (tp.leader, leader_master) {
-                                if matches_name(m, name, true) {
+                                if passes(leader) && matches_name(m, name, true) {
                                     candidates.push(leader);
                                 }
                             }
@@ -512,7 +620,9 @@ pub fn check_condition(
             None => false,
             Some(m) => match cond.value.as_str() {
                 None => true, // Python: str でなければ素通り
-                Some(attr) => m.attribute.value() == attr,
+                Some(attr) => tp
+                    .leader
+                    .is_some_and(|l| state.card(l).has_attribute(m, attr)),
             },
         },
         C::RestedCount => {
@@ -573,6 +683,15 @@ pub fn check_condition(
             let Some(m) = master_of(source) else {
                 return Ok(false);
             };
+            // 除去されるカードの絞り込み（TargetQuery）。保護者（host）を発生源として照合する
+            // ＝「このキャラ以外」（EXCLUDE_SOURCE）は保護者自身を除く。
+            if let Some(q) = cond.target.as_ref() {
+                let removed = source.expect("master_of(source) が Some");
+                let pool = get_target_cards(state, masters, abilities, q, actor, host.or(source), ctx)?;
+                if !pool.contains(&crate::model::TargetRef::Card(removed)) {
+                    return Ok(false);
+                }
+            }
             let Some(_) = cond.value.as_dict() else {
                 return Ok(true); // Python: dict でなければ素通り
             };
@@ -598,7 +717,13 @@ pub fn check_condition(
                 let want = t
                     .as_str()
                     .ok_or_else(|| bad("OPPONENT_REMOVAL.trait: expected a string".into()))?;
-                if !m.traits.iter().any(|x| x == want) {
+                let contains = cond.value.dict_get("trait_contains").is_some_and(truthy);
+                let ok = if contains {
+                    m.traits.iter().any(|x| x.contains(want))
+                } else {
+                    m.traits.iter().any(|x| x == want)
+                };
+                if !ok {
                     return Ok(false);
                 }
             }
@@ -775,6 +900,21 @@ mod tests {
     }
 
     #[test]
+    fn trash_count_with_a_target_counts_only_that_kind() {
+        let f = fixture();
+        // p1 のトラッシュは「トラッシュA（イベント）」1 枚だけ。
+        let q = |ct: &str| {
+            crate::effects::matcher::tests::query_json(&format!(
+                r#""zone":"TRASH","card_type":["{ct}"],"count":-1,"select_mode":"ALL""#
+            ))
+        };
+        assert!(f.check(&cond("TRASH_COUNT", json!({"target": q("EVENT"), "value": 1, "operator": "GE"}))));
+        assert!(!f.check(&cond("TRASH_COUNT", json!({"target": q("EVENT"), "value": 2, "operator": "GE"}))));
+        // 種類が違えば数えない（トラッシュ全枚数 1 ではなく 0 枚）。
+        assert!(!f.check(&cond("TRASH_COUNT", json!({"target": q("CHARACTER"), "value": 1, "operator": "GE"}))));
+    }
+
+    #[test]
     fn relative_comparisons_use_the_offset_threshold() {
         let f = fixture();
         // 自分のライフ 2・相手 1 → 「相手より 1 枚以上多い」= 2 >= 1+1
@@ -796,6 +936,27 @@ mod tests {
         )));
         // それ以外は場のドン!!総数（active 2 + attached 2 = 4）。
         assert!(f.check(&cond("DON_COUNT", json!({"value": 4, "operator": "EQ"}))));
+    }
+
+    #[test]
+    fn don_count_respects_active_and_rested_qualifiers() {
+        let f = fixture();
+        // 場のドン!!は active 2・rested 0・attached 2（総数 4）。
+        let active = |n: i32| {
+            cond("DON_COUNT", json!({"value": n, "operator": "EQ", "raw_text": "自分のアクティブのドン!!が2枚以上"}))
+        };
+        assert!(f.check(&active(2)));
+        assert!(!f.check(&active(4)));
+        let rested = |n: i32| {
+            cond("DON_COUNT", json!({"value": n, "operator": "EQ", "raw_text": "自分のレストのドン!!が6枚以上"}))
+        };
+        assert!(f.check(&rested(0)));
+        assert!(!f.check(&rested(4)));
+        // 「ドン!!すべてがレスト」（EQ 0）はアクティブが 0 枚のときだけ真。いまはアクティブ 2 枚＝偽。
+        assert!(!f.check(&cond(
+            "DON_COUNT",
+            json!({"value": 0, "operator": "EQ", "raw_text": "自分のドン!!すべてがレストの"})
+        )));
     }
 
     #[test]
@@ -879,6 +1040,26 @@ mod tests {
             "HAS_CHARACTER",
             json!({"value": ["キャラ", 2], "operator": "GE"})
         )));
+    }
+
+    /// 「元々のコストN の「X」」(ORIGINAL_COST)／コスト絞りが target で効く（OP12-102）。
+    #[test]
+    fn has_character_filters_by_cost() {
+        let f = fixture();
+        let q = |cmin: i32, cmax: i32, flags: &str| {
+            crate::effects::matcher::tests::query_json(&format!(
+                r#""zone":"FIELD","cost_min":{cmin},"cost_max":{cmax},"flags":[{flags}]"#
+            ))
+        };
+        // キャラA はコスト 3（元々のコストも 3）。
+        assert!(f.check(&cond("HAS_CHARACTER", json!({
+            "value": "キャラA", "operator": "GE", "target": q(3, 3, r#""ORIGINAL_COST""#)}))));
+        assert!(!f.check(&cond("HAS_CHARACTER", json!({
+            "value": "キャラA", "operator": "GE", "target": q(2, 2, r#""ORIGINAL_COST""#)}))));
+        assert!(f.check(&cond("HAS_CHARACTER", json!({
+            "value": "キャラA", "operator": "EQ", "target": q(2, 2, r#""ORIGINAL_COST""#)}))));
+        assert!(!f.check(&cond("HAS_CHARACTER", json!({
+            "value": "キャラA", "operator": "GE", "target": q(0, 2, "")}))));
     }
 
     #[test]

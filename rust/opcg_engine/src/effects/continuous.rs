@@ -101,6 +101,38 @@ pub fn remove_from_card(s: &mut Session, card: CardIdx, eff: &ContinuousEffect) 
     }
 }
 
+/// 「次に登場させる〜のコストは N 少なくなる」（一回限り）の継続コスト効果の印（`flag` の前置き）。
+pub const NEXT_PLAY_FLAG: &str = "NEXT_PLAY:";
+
+/// 手札から登場させた（コストを払った）`played` が、一回限りの軽減の対象だったなら、その軽減を
+/// 掛けていた全ての手札（登場させた 1 枚の分も含む）から外して使い切りにする。
+/// 軽減を受けないカードを先に登場させても消費されない（「次に登場させる＜条件に合う＞カード」）。
+pub fn consume_next_play_discounts(s: &mut Session, played: CardIdx) {
+    let uuid = s.state().card(played).uuid.clone();
+    let groups: Vec<String> = s
+        .state()
+        .continuous
+        .iter()
+        .filter(|e| e.kind == ContinuousKind::Cost && e.flag.starts_with(NEXT_PLAY_FLAG) && e.target_uuid == uuid)
+        .map(|e| e.flag.clone())
+        .collect();
+    if groups.is_empty() {
+        return;
+    }
+    let effects = s.state().continuous.clone();
+    let mut kept: Vec<ContinuousEffect> = Vec::with_capacity(effects.len());
+    for eff in effects {
+        if eff.kind == ContinuousKind::Cost && groups.contains(&eff.flag) {
+            if let Some(card) = ops::find_card_by_uuid(s.state(), &eff.target_uuid) {
+                remove_from_card(s, card, &eff);
+            }
+        } else {
+            kept.push(eff);
+        }
+    }
+    s.edit().set_continuous(kept);
+}
+
 /// Python `_is_expired`。
 pub fn is_expired(eff: &ContinuousEffect, event: ExpireEvent, turn_count: i32) -> bool {
     match event {

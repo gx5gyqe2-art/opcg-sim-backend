@@ -155,10 +155,22 @@ make test-slow   # 重テストだけ
 | ファイル | 役割 |
 |---|---|
 | `tests/test_parser.py` | レガシーパーサ単体 |
+| `tests/test_parser_reactions.py` | **反応型の誘発句のパーサ出力**（必須/標準）: 「相手がイベント／【ブロッカー】／【トリガー】を発動した時」「…登場させた時」「手札に戻った／場を離れた時」「ライフが離れた／0枚になった／手札に加わった時」「KOした時」「バトルしたバトル終了時」「他のカードのリーダーがアタックした時」が専用/常在の反応トリガーになり、誘発句は raw_text に残ること（エンジンが読む）、`バトルした相手`＝`trigger_subject`・`このバトル終了時`＝`BATTLE_END` 遅延・「このキャラをKO／デッキの下」＝発生源・「効果を無効にし、KOする」の両半・「公開したカードのコスト1につき」＝`REVEALED_CARD_COST`・「効果で自分の手札が捨てられているターン中」＝EVENT_THIS_TURN。Rust 側は `effects/tests_reactions.rs`（主語・要因・絞り込みの読みと、バトル／カウンター／ブロック／ダメージ／離脱／捨てるの実イベントでの消化） |
 | `tests/test_golden.py` / `tests/golden/*` | ゴールデンコーパス（AST 指紋の部分一致） |
 | `tests/test_rs_golden_audit.py` | **全カード監査 golden**（Rust エンジンだけで回る・`docs/rust_engine_plan.md` §16.1）。`opcg_engine.golden_audit(card_id, trigger, ability_index)` が汎用盤面の生成から `_smart_drain` 既定応答での解決まで自前で辿り、`tests/fixtures/rs_goldens/audit.json`（3,386 能力・Python の記録から `--golden-out` で作った sha1 の列）と一致するかを見る。`test_full_card_audit.py`／`test_full_card_baseline.py`（旧・Python エンジンで全カードを回すゲート・legacy）の Rust 側置き換え |
 | `tests/test_rs_golden_replay.py` | **実対局の再生 golden**（Rust エンジンだけで回る・§16.1）。`opcg_engine.replay()` の盤面・合法手・イベントログの sha1 が `tests/fixtures/rs_goldens/replay/`（random 150 局＋L1 50 局・`--golden-out` で作成）と一致するかを見る |
+| `tests/test_card_effect_audit.py` | **カード効果監査（skill `card-effect-audit`）の健全性**: 本文照合が「解析結果に無い句」を拾い見出し・注釈・文中の【】参照では騒がないこと、台帳の状態（未確認／本文変更／実装変更／確認済み）、入れ子の選択肢の経路計算、Rust の効果プローブ（`opcg_engine.effect_probe`＝条件固定・対象緩和・盤面追加）が条件付き／コスト付き／三択の句を実行経路に乗せること、そして**プローブの旗が通常の評価へ漏れない**（プローブ後の `golden_audit` が監査 golden と一致する）ことを見る |
+| `tests/test_replacement_parse.py` | **置換効果と「KOされない」保護のパーサ出力**（2026-10-01 カード効果監査）: 置換の限定句（元々のコスト／パワー・色・特徴・属性・名前・「このキャラ以外」・前置の「自分のリーダーが〜」）が除去されるカードの TargetQuery（OPPONENT_REMOVAL.target）になること、「代わりに〜できる／てもよい」が任意（エンジンが確認先行）であること、除去種別（EFFECT_KO／BATTLE_KO／LEAVE のカンマ区切り）、「そのキャラ／このキャラ」の対象、修飾なし「KOされない」が効果KO・バトルKOの両方を防ぐこと、「Aの代わりにB」の条件・対象差し替え、場を離れた時・レストになった時の誘発、「このキャラカードをトラッシュから登場」が自分自身であること |
+| `tests/test_parser_h1_fixes.py` | **パーサ H1 群の是正**（2026-10-01 カード効果監査・再修正）: 「ドン!!が付与された時」の誘発句が効果対象に混入しないこと（OP02-002）、コスト「カードN枚をデッキの下に置くことができる」が厳密枚数であること（OP07-083）、「捨て、…してもよい」が一体の任意（確認 1 回・後句は前句成立時のみ。OP11-024）、「選んだキャラのコストが付与ドン!!数と同じ場合」が選んだキャラへの参照フィルタ（REF_COST_EQ_ATTACHED_DON。OP15-031） |
+| `tests/test_don_any_count_rest.py` | **「ドン!!を任意の枚数レストにできる」のパーサ出力**（2026-10-01 カード効果監査 H3_count・OP13-001）: REST_DON 固定 1 枚ではなく COST_AREA・is_up_to の選択（0..N 枚）になること、「1枚につき」が PREV_ACTION_COUNT×2000 になること |
+| `tests/test_parser_misc_fixes.py` | **カード効果監査 F_misc（2026-10-01）で直したパーサ類型の回帰**（必須/標準）: 「アクティブのキャラにもアタックできる」の付与先、「トラッシュにイベントが N 枚以上」の種類別計数、「戻した／置いた／捨てた／引いた枚数分」の直前枚数参照、「キャラ N 枚までとリーダー」「このキャラと自分のリーダー」の両方適用、「N 枚につき」のコスト句への継承、二段登場のレスト誤付与・「コスト4以下と1の」、「「A」と「B」それぞれ」の名前別登場、「この効果で登場させたキャラ」参照、「レストにできる」の任意、好きな順番の 2 ティア配置、「上か下」、「代わりに…を選ぶ」の Branch、リーダーのアタック時だけのブロック封じ、相手が選んで引く Choice、選択前の動作の保持、合計コスト上限 KO、ターン文脈条件、区切り無しの別能力、「得て、」連用、相手ライフ離脱条件、自己コスト修飾、バトル KO 誘発 |
 | `tests/test_counter_event_offer.py` | **カウンターステップで【カウンター】イベントが選べる**（必須・実プレイの退行・2026-09-08 ユーザ報告）: API と同じ `RsGame` を実際に駆動（p1 先攻・両者 1 ターン目は攻撃不可・p1 の 2 ターン目までドン!! 3 枚を残して p2 がリーダーで攻撃）し、`pending.selectable_uuids` と `get_legal_actions` の両方に **コストを払える【カウンター】イベント**（カウンター値 0）が載ること・`SELECT_COUNTER` で実際に発動できてコストを払いトラッシュへ行くことを見る。対照としてドン!!を全部付与した盤面では候補に載らない（Python 版 `interaction.get_pending_request` の BATTLE_COUNTER 分岐 (b) と同じ判定）。golden の random 帯は防御側のドン!!が尽きた盤面ばかりでこの経路を一度も通らない（150 局・976 カウンター歩で候補 0）ため、golden だけでは守れない |
+| `tests/test_play_flow_replacement.py` | **KO の置換・保護を実対局の流れで**（必須/標準・2026-10-01 実対局検証）: `tests/harness/rs_scenario.py`（実カード ID で盤面を組み `RsGame` を 1 手ずつ進める土台）で、OP11-110（魚人島／しらほし）・ST29-008（相手の効果のみ）・ST09-010（バトル KO）・ST20-002（自分の効果の KO）の確認→断れば KO・受ければ代わりの処理、OP10-118「ターンに1回」。**盤面の再計算が常在の置換・保護の【ターン1回】を消費しない**（以前は最初の再計算で使い切られ、実対局では置換が出なかった）ことを固定 |
+| `tests/test_play_flow_cost_discount.py` | **一回限りの割引を実対局で**（必須/標準）: OP02-025・OP12-061 の起動後、対象外（コスト・特徴・名前違い）を先に出しても消費されず、最初の対象で軽減が効いて残りの軽減が消える |
+| `tests/test_play_flow_reactions.py` | **反応型の誘発を実戦闘・KO・ドン!!付与・登場で**（必須/標準）: OP08-056／OP09-080（ステージ）・OP07-038（自分の効果で離れた時）・OP12-081／OP11-088（攻撃先・アタッカー種別・属性）・OP02-002（ドン!!付与）・OP10-042（KOされた時と相手の効果で離れた時の二重誘発が無い）の有無・回数・要因の絞り込み |
+| `tests/test_event_resolving_hand.py` | **発動中のイベントは手札の候補・枚数・条件に入らない**（必須/標準）: OP02-066（捨てる候補）・OP14-059（手札N枚以下）・P-002（戻した枚数分）・EB04-029（【カウンター】経路） |
+| `tests/test_play_flow_optional_confirm.py` | **任意・確認・選択枚数を実対局で**（必須/標準）: OP11-024（断れば「そうした場合」が走らない）・OP13-001（0〜N 枚のドン!!と倍率）・OP12-075／OP15-059（確認が**相手に**出る）・OP17-041（並び替えを持ち主が行う）・OP02-066（「カード2枚までを引く」＝0〜2 枚を選べる） |
+| `tests/test_play_flow_distribution.py` | **登場の分配と付与を実対局で**（必須/標準）: OP06-086／OP10-058（1 枚アクティブ・残りレスト）・OP16-079（トラッシュから登場したワノ国だけ速攻）・OP15-093（速攻:キャラ・属性(斬)） |
 | `tests/test_full_card_audit.py` | **legacy**（Python エンジン直叩き）。全カード構造不変条件ゲート（EXCEPTION/CARD_LOSS/TEMP_LEAK=0）。退避後は tag `py-engine-final` でのみ実行 |
 | `tests/test_full_card_baseline.py` | **legacy**。全カード挙動ベースライン回帰（`full_card_baseline.json` と一致）。退避後は tag `py-engine-final` でのみ実行 |
 | `tests/test_verified_decks.py` | **手動検証済みデッキの効果回帰**（§8）。ベースラインが捕捉できない常在ルール（RULE_PROCESSING）・ON_LEAVE 誘発・勝利条件・ドンデッキ枚数・カード名別名・持続時間等を意味的に固定 |
@@ -366,6 +378,7 @@ make test-slow   # 重テストだけ
 | ファイル | 役割 |
 |---|---|
 | `tests/test_effect_oracle_gate.py` | 静的 text↔AST 整合性 HAS_OTHER/PER_TURN_LIMIT_GAP/UP_TO_GAP = 0 のラチェット（§5） |
+| `tests/test_audit_fix_a_target.py` | カード効果監査の欠陥（自身を指す句・公開/登場カードの参照・攻撃先制限・ブロック不可付与・択一の共有対象・OR/除外/種別スコープ・条件の否定/他の/コスト後評価ほか）の解析構造を実文で固定（必須/標準・WP A_target） |
 | `tests/test_effect_event_dest.py` | **EFFECT イベントの行き先（dest）記録**: 移動系（MOVE_CARD 等）の eventLog に dest（"LIFE" 等）が additive に載る／非移動系（LOOK）には載せない。実カード OP16-119 のライフ追加で固定（フロントの効果表示の根拠） |
 | `tests/test_structural_gate.py` | 構造不変条件4スキャン＋条件偽パスのラチェット（カテゴリH 再発防止。§5/§8.5） |
 | `tests/test_interaction_stack.py` | 中断スタック（`active_interaction` 互換プロパティ／`push_interaction`）のセマンティクス |
@@ -413,6 +426,7 @@ make test-slow   # 重テストだけ
 | `opcg_sim/loop/arena_shard.py` | **再開可能アリーナ**（旧 `arena_resume.py`）: 帯設計・席入替 CRN・void・ペア水準 95% CI の規約は不変。`--candidate`／`--baseline`／`--leaders`／`--decks`／`--cand-*`（席別の探索つまみ） |
 | `opcg_sim/loop/arena_merge.py` | **台帳の合算と判定**（旧 `tests/scripts/arena_merge.py`・純関数は同一）: seed 衝突を黙って畳まない |
 | `opcg_sim/loop/gate.py` | **昇格ゲート**（旧 `promotion_gate.py`＋`arena_gate.py`＋`n1_gate.py smoke`）: `promote`（stage1/stage2＋アンカー）／`band`（一次スクリーン＋帯層別の本判定）／`smoke`（1 局完走） |
+| `tests/scripts/card_effect_audit.py` | **カード効果監査**（2026-10-01・skill `.claude/skills/card-effect-audit/`・`make card-audit`）: カード DB の差し替え後・既存カードの点検で、全カードを「Rust が読めるか（未知の効果種別＝エンジン未実装）／パーサの未実装句／本文の句が解析結果のどのノードにも無いか（`raw_text` 照合）／【】見出しとトリガー・条件・キーワードの対応（未知の見出し＝新しい仕組み）／効果プローブで各アクションが実行されるか」で洗い出す（全 2,800 枚で約 10 秒）。`show` でレビュー資料、`record`／`status` で確認済み台帳 `tests/fixtures/card_audit_ledger.json`（本文・解析結果・プローブの指紋つき＝変われば再確認へ戻る）。意味の判定は Claude が §8.3／§8.4 の観点で行う |
 | `tests/scripts/compare_parsers.py` | レガシー vs V2 の全カード差分（退行検知） |
 | `tests/harness/full_card_audit.py` | 全カード構造不変条件検証＋挙動ベースライン生成（`--regen` で更新） |
 | `tests/harness/game_driver.py` | **共通対局ドライバ**（設計⑥ `docs/refactoring_harness_driver.md`）: 統一対局ループ `run_game`（決定論契約＝global random の消費順保存・`first_player` 再現）＋席生成 `make_seat`（random/ai/arena/**learned**・engine 注入で net-vs-net）＋観測専用 observer。全 CPU 検証ハーネスの土台（新計器の追加＝observer 1 個） |
@@ -569,6 +583,8 @@ push 前の必須ゲートは **`make test` 1 本**（2026-09-07・第 2 段 `rs
 | `cargo test --no-default-features` | Rust の単体テスト 381 本（`make test` が先に回す） |
 | `tests/test_effect_oracle_gate.py` | 静的 text↔AST 整合性 HAS_OTHER / PER_TURN_LIMIT_GAP / UP_TO_GAP = 0（**ラチェット**） |
 | `tests/test_verified_buckets.py` | §8.2 台帳「✓」弾×色がベースライン全数登録・H違反0（ドキュメント主張の機械保証） |
+| `tests/test_parser_cost_effect_gate.py` | 「コスト：〜の場合、効果」の条件は効果側（Branch）に残り能力全体へ持ち上げない（OP05-082／OP10-118／OP09-060／OP15-074・ユーザ決定 2026-10-01）。コストなし・「：」前・見出し条件は従来どおり。`test_verified_buckets.py` の `H_COST_GATE_LIFT=0` ラチェットと対 |
+| `cargo test`（`rules/tests_cost_gate.rs`） | 実カード（`tests/fixtures/cost_gate_cards.json`）で、条件偽でも起動メインが合法手に出てコストだけ払い効果が不発／真なら効果が出る |
 | `tests/test_contract_export.py` | `contract/` の再生成差分ゼロ（API 契約のラチェット） |
 | （legacy・tag で回す） | `full_card_audit.py`（EXCEPTION/CARD_LOSS/TEMP_LEAK=0）・`test_full_card_baseline.py`・`test_verified_decks.py`・`compare_parsers.py`・`test_structural_gate.py` |
 
@@ -771,7 +787,7 @@ OPCG_LOG_SILENT=1 python tests/scripts/perf_gate.py --full      # 本走（pairs
 | 持続時間の写像漏れ | 「次の相手のエンドフェイズ終了時まで」が `INSTANT` に退化し即失効 | 対象アクションの `duration` を確認（UNTIL_NEXT_TURN_END 等） |
 | スケール値の脱落 | 「カード名の異なるキャラ1枚につき+N」がフラット値に退化 | `ValueSource.dynamic_source`（COUNT_QUERY 等）と count_query を確認 |
 | 危険な常在 | `PASSIVE`+`VICTORY` 等が再計算ループで誤発火（相手ライフ0で自動勝利） | 不変条件テスト（誤って勝利/除去しないこと）を追加 |
-| **先頭条件が「。その後、」をまたいで漏れる**（カテゴリH・是正済） | 「〈条件〉の場合、A**。その後、**B」でBが条件の外に出て無条件実行（EB02-032 ドン<3でもガレーラ登場／EB03-017 超新星でなくても相手レスト不可／OP04-033・ST11-004 等・全弾~119能力） | 能力 effect の先頭要素が `branch`(if_false=None) かつ後続に実効果アクション（PLAY_CARD/KO/REST/BUFF/付与/ACTIVE_DON 等）が並ぶか。先頭条件は能力全体（その後 B 含む）をゲートすべき。TEMP/REMAINING のデッキ整理だけの後続は no-op で無害。**`EffectParser._lift_h_gate` で先頭ゲートを能力全体へ引き上げ済み**。再混入は `tests/test_structural_gate.py`（構造不変条件＝上限0）で検出する |
+| **先頭条件が「。その後、」をまたいで漏れる**（カテゴリH・是正済） | 「〈条件〉の場合、A**。その後、**B」でBが条件の外に出て無条件実行（EB02-032 ドン<3でもガレーラ登場／EB03-017 超新星でなくても相手レスト不可／OP04-033・ST11-004 等・全弾~119能力） | 能力 effect の先頭要素が `branch`(if_false=None) かつ後続に実効果アクション（PLAY_CARD/KO/REST/BUFF/付与/ACTIVE_DON 等）が並ぶか。先頭条件は能力全体（その後 B 含む）をゲートすべき。TEMP/REMAINING のデッキ整理だけの後続は no-op で無害。**`EffectParser._lift_h_gate` で先頭ゲートを能力全体へ引き上げ済み**（ただし**コスト「：」を持つ能力の効果側条件は引き上げず効果ノードに残す**＝条件偽でもコストは払え効果だけ不発。2026-10-01）。再混入は `tests/test_structural_gate.py`（構造不変条件＝上限0）で検出する |
 
 > **カテゴリH の修正（是正済み）**: パーサ `EffectParser._lift_h_gate` が「能力 effect の先頭要素が分岐
 > （if_false=None＝先頭条件）」のとき、その条件でシーケンス全体を包む（後続を if_true に取り込み

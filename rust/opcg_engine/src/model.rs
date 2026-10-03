@@ -761,6 +761,13 @@ impl CardInstance {
         sorted_union(&self.current_keywords, &self.timed_keywords)
     }
 
+    /// 属性(斬)等を持つか。マスターの属性に加え、「属性(斬)を得る」で付与した一時の属性
+    /// （`timed_flags` の `ATTR:斬`・OP15-093）も含む。
+    pub fn has_attribute(&self, master: &CardMaster, attr: &str) -> bool {
+        master.attribute.value() == attr
+            || self.timed_flags.iter().any(|f| f.strip_prefix("ATTR:") == Some(attr))
+    }
+
     /// Python `to_dict` の `is_frozen`＝`'FREEZE' in self.flags`。
     pub fn is_frozen(&self) -> bool {
         self.flags.iter().any(|f| f == "FREEZE")
@@ -1073,6 +1080,22 @@ pub struct Continuation {
     pub arrange: Option<ArrangeContinuation>,
     /// `kind == "BATTLE_KO_REPLACE"` の欄（`target_owner_name`／`life_lost`）。
     pub battle_ko: Option<BattleKoContinuation>,
+    /// 任意の効果除去置換の確認（`source_card` が除去されようとしているカード）。
+    pub removal_replace: Option<RemovalReplaceContinuation>,
+}
+
+/// 任意の効果除去置換（「KOされる代わりに〜できる」）の continuation。
+#[derive(Debug, Clone, PartialEq)]
+pub struct RemovalReplaceContinuation {
+    /// 除去を行う側（効果の使い手）。
+    pub actor: Seat,
+    /// 除去アクションのノード。
+    pub action: crate::effects::NodeRef,
+    /// 除去アクション本体（ノード参照が引けなくても再開できるよう複製を持つ）。
+    pub action_body: Box<crate::effects::ast::GameAction>,
+    pub value: i32,
+    /// 除去アクションの `source_card`（効果の発生源）。
+    pub effect_source: Option<CardIdx>,
 }
 
 /// ARRANGE_DECK の continuation（Python の同名キー）。
@@ -1220,6 +1243,12 @@ pub struct DelayedAction {
     pub player: Seat,
     pub node: crate::effects::NodeRef,
     pub source_card: Option<CardIdx>,
+    /// 「このバトル終了時、〜」の予約（バトルの終わりに解決する。ターン終了では解決しない）。
+    pub battle_end: bool,
+    /// 「次の相手のメインフェイズ開始時、〜」の予約（予約者の相手のメインフェイズが始まるときに解決する）。
+    pub main_start: bool,
+    /// 予約時点の保存済み対象（「この効果で登場させたキャラ」等の参照をターン終了時にも解くため）。
+    pub saved_targets: Vec<(String, Vec<TargetRef>)>,
 }
 
 /// 誘発待ち行列の 1 件（Python `_pending_triggers`／`_battle_triggers`）。
@@ -1235,6 +1264,8 @@ pub struct PendingTrigger {
     pub ability: u32,
     pub optional: bool,
     pub confirmed: bool,
+    /// 誘発の契機になったカード（バトルした相手など）。解決時に文脈の `trigger_subject` へ載せる。
+    pub subject: Option<CardIdx>,
 }
 
 /// 盤面全体（Python `GameManager`＋両 `Player`）。
@@ -1284,9 +1315,36 @@ pub struct GameState {
     pub return_don_selection: Option<Vec<String>>,
     /// Python `_last_resource_count`（ドン!!の増減で実際に処理した枚数＝§7-5 の分母）。
     pub last_resource_count: Option<i32>,
+    /// いま解決中のイベント（発動した【メイン】／【カウンター】／「発動する」効果）。
+    ///
+    /// 実ルールでは発動したイベントは手札を離れて解決される。エンジンは Python 版の移植で
+    /// 解決後にトラッシュへ送る（手札に置いたまま解決する）ため、**手札の候補・枚数・条件には
+    /// このカードを含めない**（[`GameState::hand_cards`]／[`GameState::hand_len`]）。
+    /// 解決の同期区間（`play_card_action` ほか）の間だけ `Some`＝盤面の記録・符号化には出ない。
+    pub resolving_event: Option<CardIdx>,
 }
 
 impl GameState {
+    /// 手札のカード（解決中のイベント自身は除く）。
+    pub fn hand_cards(&self, seat: Seat) -> Vec<CardIdx> {
+        let skip = self.resolving_event;
+        self.player(seat)
+            .hand
+            .iter()
+            .copied()
+            .filter(|c| Some(*c) != skip)
+            .collect()
+    }
+
+    /// 手札の枚数（解決中のイベント自身は数えない）。
+    pub fn hand_len(&self, seat: Seat) -> usize {
+        let p = self.player(seat);
+        match self.resolving_event {
+            Some(c) if p.hand.contains(&c) => p.hand.len() - 1,
+            _ => p.hand.len(),
+        }
+    }
+
     /// いま UI へ提示すべき中断（Python `active_interaction`＝スタック先頭）。
     pub fn active_interaction(&self) -> Option<&Interaction> {
         self.interaction_stack.last()
@@ -1651,6 +1709,7 @@ impl GameState {
             in_passive_recalc: false,
             replacement_suspended: false,
             return_don_selection: None,
+            resolving_event: None,
             last_resource_count: None,
         })
     }

@@ -22,7 +22,7 @@
 # **tag `py-engine-final` を checkout して回す**（手順は docs/TEST_SPEC.md）。
 # lint は任意（CI 無し・必須ゲートではない）。
 
-.PHONY: test test-fast test-slow audit-cross lint golden-audit golden-replay
+.PHONY: test test-fast test-slow audit-cross lint golden-audit golden-replay card-audit
 
 # push 前の必須ゲート。cargo test（Rust 単体テスト）＋ Rust 裏付けの pytest 集合。
 test: rust-test
@@ -62,6 +62,14 @@ audit-cross:
 
 lint:
 	ruff check opcg_sim/
+
+# カード効果の監査（skill `card-effect-audit`・`.claude/skills/card-effect-audit/SKILL.md`）。
+# カード DB を差し替えたら回す。既定は確認済み台帳（tests/fixtures/card_audit_ledger.json）で
+# 未確認／本文変更／実装変更のカードだけ。全走査は `make card-audit CARD_AUDIT_ARGS=--all`。
+# 結果は /tmp/card_effect_audit/（summary.md・report.json）。要 `make rust-develop`。
+CARD_AUDIT_ARGS ?=
+card-audit:
+	OPCG_LOG_SILENT=1 python tests/scripts/card_effect_audit.py scan $(CARD_AUDIT_ARGS)
 
 # --- Rust エンジン（rust/opcg_engine・docs/rust_engine_plan.md） ---------------
 # Rust 側の品質ゲート。`make test` が `rust-test` を先に回す。

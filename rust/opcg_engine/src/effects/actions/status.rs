@@ -46,6 +46,8 @@ const FLAG_CANNOT_REST: &str = "CANNOT_REST";
 /// ＝このフラグは [`super::rest`]（`actor != owner`）だけが見る。KO 耐性は従来どおり
 /// `PREVENT_LEAVE` 経路。
 pub(crate) const FLAG_CANNOT_BE_RESTED_BY_OPP: &str = "CANNOT_BE_RESTED_BY_OPP";
+/// 発生源が相手のリーダー／キャラの効果によるレストだけを弾く版（OP15-024）。
+pub(crate) const FLAG_CANNOT_BE_RESTED_BY_OPP_LC: &str = "CANNOT_BE_RESTED_BY_OPP_LC";
 /// Python `per_target.freeze` が `flags`（`timed_flags` ではない）へ直接書くフラグ。
 const FLAG_FREEZE: &str = "FREEZE";
 /// Python `per_target.negate_effect` が載せる継続フラグ（`CardInstance.is_effect_negated`）。
@@ -73,7 +75,7 @@ pub fn game_handler(
         // `mod.rs::apply_action` が「全群 `None` なら対象ループへ落ちる」に直ったので、
         // ここで自前に `run_target_loop` を呼ぶ回避策は不要になった（Python の `when=` 偽と
         // 同じフォールスルーが `apply_action` 側で成立する）。
-        ActionType::SwapPower => Some(Ok(swap_power(s, masters, targets))),
+        ActionType::SwapPower => Some(Ok(swap_power(s, masters, action, targets))),
         _ => None,
     }
 }
@@ -147,11 +149,19 @@ fn disable_opp_onplay(s: &mut Session, actor: Seat, action: &GameAction) -> bool
 /// 2 体の元々パワー（`master.power`）を相互に `base_power_override` へ上書きする
 /// （絶対値の base 上書き＝`reset_turn_status` で失効＝このターン中）。
 /// 対象が 2 枚未満なら何もしない（Python も同じ。`targets` に `None` は入らない）。
-fn swap_power(s: &mut Session, masters: &MasterTable, targets: &[CardIdx]) -> bool {
+fn swap_power(s: &mut Session, masters: &MasterTable, action: &GameAction, targets: &[CardIdx]) -> bool {
     if targets.len() >= 2 {
         let (a, b) = (targets[0], targets[1]);
         let pa = masters.get(s.state().card(a).master).power;
         let pb = masters.get(s.state().card(b).master).power;
+        // 「このバトル中、元々のパワーを入れ替える」（OP14-009）は期限付き。base_power_override に
+        // 書くとバトル後もターン終了まで残るので、差分の継続効果（バトル終了で失効）にする。
+        if action.duration == Duration::ThisBattle {
+            let expire = expire_turn_for(s, action.duration);
+            continuous::apply(s, a, ContinuousKind::Power, action.duration, pb - pa, "", "", expire);
+            continuous::apply(s, b, ContinuousKind::Power, action.duration, pa - pb, "", "", expire);
+            return true;
+        }
         let mut e = s.edit();
         e.set_card_opt_i32(a, CardOptI32Field::BasePowerOverride, Some(pb));
         e.set_card_opt_i32(b, CardOptI32Field::BasePowerOverride, Some(pa));
@@ -178,7 +188,28 @@ fn grant_keyword(s: &mut Session, action: &GameAction, target: CardIdx) {
             None => return, // Python: `if keyword:` が偽＝何もしない
         },
     };
+    // 常在効果の再計算中の期間なし付与（「…の場合、このキャラは【ブロッカー】を得る」）は、再計算の
+    // たびにリセットされる `current_keywords` へ載せる。継続効果（Permanent）へ載せると条件が
+    // 偽に戻っても外れない（OP12-089/OP12-100 等）。
+    if s.state().in_passive_recalc && action.duration == Duration::Instant {
+        add_recalc_keyword(s, target, &keyword);
+        return;
+    }
     let duration = keyword_duration(action.duration);
+    // 「属性(斬)を得る」（status="ATTR:斬"）は一時の属性フラグとして載せる（OP15-093）。
+    if keyword.starts_with("ATTR:") {
+        continuous::apply(
+            s,
+            target,
+            ContinuousKind::Flag,
+            duration,
+            0,
+            &keyword,
+            "",
+            expire_turn_for(s, duration),
+        );
+        return;
+    }
     continuous::apply(
         s,
         target,
@@ -191,6 +222,16 @@ fn grant_keyword(s: &mut Session, action: &GameAction, target: CardIdx) {
     );
 }
 
+/// 再計算でリセットされる `current_keywords` へキーワード（や ATTACK_DISABLE の印）を足す。
+fn add_recalc_keyword(s: &mut Session, target: CardIdx, keyword: &str) {
+    let mut kws = s.state().card(target).current_keywords.clone();
+    if !kws.iter().any(|k| k == keyword) {
+        kws.push(keyword.to_owned());
+        kws.sort();
+        s.edit().set_card_strs(target, crate::journal::CardStrsField::CurrentKeywords, kws);
+    }
+}
+
 /// Python `per_target.attack_disable`（`ATTACK_DISABLE` 側。`RESTRICTION` は群 E）。
 ///
 /// 「（このターン中／次の相手のターン終了時まで）アタックできない」。アタック税
@@ -199,8 +240,21 @@ fn grant_keyword(s: &mut Session, action: &GameAction, target: CardIdx) {
 fn attack_disable(s: &mut Session, action: &GameAction, target: CardIdx) {
     let flag = match action.status.as_deref() {
         Some(st) if st.starts_with(ATTACK_TAX_PREFIX) => st.to_owned(),
+        // 「リーダーにアタックできない」「相手の元々のコストN以下のキャラへアタックできない」＝
+        // 攻撃先を縛るフラグ（`rules::attack_target_banned` が見る）。全アタック禁止ではない。
+        Some(st) if st.starts_with("ATTACK_BAN_") => st.to_owned(),
         _ => FLAG_ATTACK_DISABLE.to_owned(),
     };
+    // 常在効果の再計算中（期間句の無い PASSIVE「手札が5枚以上ある場合、このキャラはアタックできない」）は
+    // 再計算のたびにリセットされる `current_keywords` へ載せる。`timed_flags`（THIS_TURN）へ載せると
+    // 条件が偽に戻っても外れない（OP11-058）。判定は `rules::has_flag` が両方を見る。
+    if flag == FLAG_ATTACK_DISABLE
+        && s.state().in_passive_recalc
+        && action.duration != Duration::UntilNextTurnEnd
+    {
+        add_recalc_keyword(s, target, &flag);
+        return;
+    }
     timed_flag(s, target, action.duration, &flag);
 }
 
@@ -224,7 +278,13 @@ fn prevent_rest(
     source_card: Option<CardIdx>,
 ) {
     let flag = if source_card == Some(target) {
-        FLAG_CANNOT_BE_RESTED_BY_OPP
+        // 「相手のリーダーとキャラの効果でレストにされず」は発生源がリーダー／キャラの効果だけを弾く
+        // （相手のイベント・ステージの効果では守られない: OP15-024）。
+        if action.raw_text.contains("リーダーとキャラの効果で") {
+            FLAG_CANNOT_BE_RESTED_BY_OPP_LC
+        } else {
+            FLAG_CANNOT_BE_RESTED_BY_OPP
+        }
     } else {
         FLAG_CANNOT_REST
     };
@@ -445,6 +505,34 @@ mod tests {
         }
     }
 
+    /// 常在効果の再計算中の ATTACK_DISABLE は timed_flags ではなく再計算でリセットされる
+    /// current_keywords に載る（条件が偽に戻ったら外れる。OP11-058）。
+    #[test]
+    fn passive_attack_disable_is_reset_by_the_recalc() {
+        let (masters, mut s, c) = board();
+        s.edit().set_mgr_flag(crate::journal::MgrFlagField::InPassiveRecalc, true);
+        let mut a = testkit::action(ActionType::AttackDisable, 0);
+        a.duration = Duration::Instant;
+        run(&mut s, &masters, &a, &[c], 0);
+        assert!(s.state().card(c).timed_flags.is_empty());
+        assert!(crate::rules::has_flag(s.state(), c, "ATTACK_DISABLE"));
+        let kws = masters.get(s.state().card(c).master).keywords.clone();
+        s.edit().set_card_strs(c, crate::journal::CardStrsField::CurrentKeywords, kws);
+        assert!(!crate::rules::has_flag(s.state(), c, "ATTACK_DISABLE"));
+    }
+
+    /// 条件付き常在の ATTACK_DISABLE は期間が THIS_TURN と読まれていても再計算で外れる（OP11-058）。
+    #[test]
+    fn passive_attack_disable_with_this_turn_duration_is_also_recalculated() {
+        let (masters, mut s, c) = board();
+        s.edit().set_mgr_flag(crate::journal::MgrFlagField::InPassiveRecalc, true);
+        let mut a = testkit::action(ActionType::AttackDisable, 0);
+        a.duration = Duration::ThisTurn;
+        run(&mut s, &masters, &a, &[c], 0);
+        assert!(s.state().card(c).timed_flags.is_empty());
+        assert!(crate::rules::has_flag(s.state(), c, "ATTACK_DISABLE"));
+    }
+
     /// `UNTIL_NEXT_TURN_END` だけが期限つきで残る。
     #[test]
     fn attack_disable_until_next_turn_end() {
@@ -656,6 +744,25 @@ mod tests {
         assert_eq!(s.state().card(big).base_power_override, Some(3000));
     }
 
+    /// 「このバトル中」の入れ替えは base_power_override ではなく期限付きの差分（OP14-009）。
+    #[test]
+    fn swap_power_this_battle_is_a_timed_delta() {
+        let mut b = BoardBuilder::new().turn(3, Seat::P1);
+        let small = b.put_field(Seat::P1, M_CHAR); // power 3000
+        let big = b.put_field(Seat::P2, M_BIG); // power 9000
+        let (masters, state) = b.build();
+        let mut s = Session::new(state);
+
+        let mut a = testkit::action(ActionType::SwapPower, 0);
+        a.duration = Duration::ThisBattle;
+        assert!(run(&mut s, &masters, &a, &[small, big], 0));
+
+        assert_eq!(s.state().card(small).base_power_override, None);
+        assert_eq!(s.state().card(small).timed_power, 6000);
+        assert_eq!(s.state().card(big).timed_power, -6000);
+        assert!(effects(&s).iter().all(|e| e.duration == Duration::ThisBattle));
+    }
+
     /// 対象が 1 枚以下なら何もしない（`valid` が 2 未満）。
     #[test]
     fn swap_power_needs_two_targets() {
@@ -705,6 +812,19 @@ mod tests {
             assert_eq!(e.duration, duration);
             assert_eq!(e.expire_turn, expire);
         }
+    }
+
+    /// 「そのキャラに付与されているドン!!N枚につき」は対象ごとの付与ドン枚数で倍率を掛ける（OP15-008）。
+    #[test]
+    fn buff_scales_by_each_targets_attached_don() {
+        let (masters, mut s, c) = board();
+        s.edit().set_card_i32(c, crate::journal::CardI32Field::AttachedDon, 3);
+        let mut a = testkit::action(ActionType::Buff, 0);
+        a.value.dynamic_source = Some("TARGET_ATTACHED_DON".to_string());
+        a.value.multiplier = -1000;
+        a.value.divisor = 1;
+        run(&mut s, &masters, &a, &[c], 0);
+        assert_eq!(s.state().card(c).power_buff, -3000);
     }
 
     /// `PERMANENT` は Python の `dur in (...)` に含まれない＝`power_buff` へ落ちる。

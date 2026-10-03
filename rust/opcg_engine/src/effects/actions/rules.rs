@@ -41,6 +41,8 @@ const SELF_RESTRICTION_KEYS: &[&str] = &[
     "CANNOT_LIFE_TO_HAND",
     "CANNOT_ATTACK_LEADER",
     "CANNOT_ACTIVATE_DON",
+    // 「このターン中、自分のリーダーがアタックする際、相手は【ブロッカー】を発動できない」（OP13-057）。
+    "OPP_NO_BLOCK_VS_LEADER",
 ];
 
 /// Python `_auto_resolve_replacement` の打ち切り回数（`limit=16`）。
@@ -128,6 +130,27 @@ pub fn apply_target(
 /// ガード（`status in SELF_RESTRICTION_KEYS`）が偽なら Python は対象ループへ落ち、そこは no-op。
 /// どちらも success=true なので、ここでは `false` を返さない（モジュール docstring 参照）。
 fn rule_processing_self_restriction(s: &mut Session, actor: Seat, action: &GameAction) -> bool {
+    // 「相手はキャラの「X」以外にアタックできない」（常在）: 相手側の攻撃先制限として登録する
+    // （`rules::attack_target_banned` が強制。常在の再計算ごとに作り直す＝`passives` が毎回消す）。
+    if let Some(st) = action
+        .status
+        .as_deref()
+        .filter(|st| st.starts_with(crate::rules::ATTACK_CHAR_ONLY_PREFIX))
+    {
+        let opp = actor.other();
+        let mut recs = s.state().player(opp).restrictions.clone();
+        let rec = Restriction {
+            key: st.to_owned(),
+            expire: s.state().turn_count,
+            min_cost: None,
+        };
+        match recs.iter_mut().find(|r| r.key == st) {
+            Some(slot) => *slot = rec,
+            None => recs.push(rec),
+        }
+        s.edit().set_restrictions(opp, recs);
+        return true;
+    }
     let Some(status) = action
         .status
         .as_deref()
@@ -202,22 +225,24 @@ fn prevent_leave(s: &mut Session, action: &GameAction, target: CardIdx) {
     ) {
         return;
     }
-    let flag = format!("PREVENT_{}", action.status.as_deref().unwrap_or("LEAVE"));
+    // status はカンマ区切りで複数持てる（修飾なしの「KOされない」＝EFFECT_KO,BATTLE_KO）。
     let expire_turn = if action.duration == Duration::UntilNextTurnEnd {
         s.state().turn_count + 1
     } else {
         0
     };
-    super::continuous::apply(
-        s,
-        target,
-        ContinuousKind::Flag,
-        action.duration,
-        0,
-        &flag,
-        "",
-        expire_turn,
-    );
+    for st in action.status.as_deref().unwrap_or("LEAVE").split(',') {
+        super::continuous::apply(
+            s,
+            target,
+            ContinuousKind::Flag,
+            action.duration,
+            0,
+            &format!("PREVENT_{st}"),
+            "",
+            expire_turn,
+        );
+    }
 }
 
 /// Python `per_target.attack_disable`（`ATTACK_DISABLE` と `RESTRICTION` の共通ハンドラ）。
@@ -265,15 +290,32 @@ pub fn active_protection(
     actor: Option<Seat>,
     attacker: Option<CardIdx>,
 ) -> Result<bool, EngineError> {
+    active_protection_with_origin(s, masters, card, status_values, actor, attacker, None)
+}
+
+/// [`active_protection`] に除去する効果の発生源（`origin`）を渡す版（OP11-005）。
+pub fn active_protection_with_origin(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+    attacker: Option<CardIdx>,
+    origin: Option<CardIdx>,
+) -> Result<bool, EngineError> {
     if s.state().card(card).negated {
         return Ok(false);
     }
     let owner = s.state().card(card).owner;
 
     // トリガー効果が継続効果として付与した期間付き保護（`flags | timed_flags`）。
-    for st in status_values {
-        if crate::rules::has_flag(s.state(), card, &format!("PREVENT_{st}")) {
-            return Ok(true);
+    // 期間付きの保護フラグは「相手の効果で」か「効果で」かを持たないので、従来どおり相手の効果にだけ効く
+    // （自分の効果の KO までは止めない）。
+    if actor != Some(owner) {
+        for st in status_values {
+            if crate::rules::has_flag(s.state(), card, &format!("PREVENT_{st}")) {
+                return Ok(true);
+            }
         }
     }
 
@@ -296,7 +338,16 @@ pub fn active_protection(
         let ids = masters.get(s.state().card(protector).master).ability_ids.clone();
         for (index, id) in ids.iter().enumerate() {
             let ab = ability(masters, *id)?;
-            if ab.trigger != TriggerType::Passive {
+            // 常在に加え、手番限定の常在（【相手のターン中】＝OPPONENT_TURN・【自分のターン中】＝YOUR_TURN）も
+            // 持ち主から見た手番が合うときだけ守る（ST14-009）。
+            let turn_player = s.state().turn_player;
+            let trigger_ok = match ab.trigger {
+                TriggerType::Passive => true,
+                TriggerType::OpponentTurn => turn_player != s.state().card(protector).owner,
+                TriggerType::YourTurn => turn_player == s.state().card(protector).owner,
+                _ => false,
+            };
+            if !trigger_ok {
                 continue;
             }
             let Some(effect) = ab.effect.as_ref() else {
@@ -306,11 +357,16 @@ pub fn active_protection(
             else {
                 continue;
             };
+            // status はカンマ区切りで複数持てる（「KOされる場合」＝EFFECT_KO,BATTLE_KO 等）。
             if !eff
                 .status
                 .as_deref()
-                .is_some_and(|st| status_values.contains(&st))
+                .is_some_and(|st| st.split(',').any(|one| status_values.contains(&one)))
             {
+                continue;
+            }
+            // 自分の効果による除去（actor＝持ち主）には「相手の効果で」の保護は働かない。
+            if actor == Some(owner) && opp_only_removal(&eff.raw_text) {
                 continue;
             }
             // 保護対象クエリ: `SOURCE`（既定）は protector 自身だけを守る。範囲クエリは
@@ -357,14 +413,41 @@ pub fn active_protection(
                     continue;
                 }
             }
-            // 属性限定のバトル KO 耐性（「属性《斬》を持つカードとのバトルでKOされず」OP08-114）。
-            if let Some(req) = required_battle_attribute(&eff.raw_text) {
+            // 発生源限定の効果 KO 耐性（「相手の元々のパワーN以下のキャラの効果でKOされない」OP14-003）:
+            // 除去を行った効果の発生源（`attacker` に渡る）が印刷パワーN以下のキャラのときだけ守る。
+            if let Some(max) = required_source_power_max(&eff.raw_text) {
                 let ok = attacker.is_some_and(|a| {
-                    let attr = masters.get(s.state().card(a).master).attribute;
-                    attr != crate::model::Attribute::None && attr.value() == req
+                    let m = masters.get(s.state().card(a).master);
+                    m.ty == CardType::Character && m.power <= max
                 });
                 if !ok {
                     continue;
+                }
+            }
+            // 相手を限定したバトル KO 耐性（「属性《斬》を持つカードとのバトルでKOされず」OP08-114・
+            // 「リーダーとのバトルでKOされない」ST08-002・「属性(特)を持たないキャラとの…」P-025）。
+            if let Some(filter) = battle_opponent_filter(&eff.raw_text) {
+                let ok = attacker.is_some_and(|a| {
+                    let m = masters.get(s.state().card(a).master);
+                    filter.matches(m.attribute, m.ty)
+                });
+                if !ok {
+                    continue;
+                }
+            }
+            // 「属性(特)を持たないキャラの効果で〜されない」(OP11-005)＝除去する効果の発生源が
+            // その属性を持たないときだけ守る（発生源が不明なら守る側へ倒す）。
+            if let Some(lacked) = lacked_source_attribute(&eff.raw_text) {
+                if let Some(src) = origin {
+                    let sm = masters.get(s.state().card(src).master);
+                    // 「…キャラの効果で」＝発生源がキャラのときだけ（イベント／ステージ／リーダーの効果は
+                    // 属性が無くても「属性を持たないキャラ」ではないので守らない）。
+                    if sm.ty != CardType::Character && eff.raw_text.contains("を持たないキャラの効果") {
+                        continue;
+                    }
+                    if sm.attribute != crate::model::Attribute::None && sm.attribute.value() == lacked {
+                        continue;
+                    }
                 }
             }
             // 【ターン1回】保護は resolve_ability を通らないので、ここで直接 enforce する。
@@ -402,12 +485,68 @@ pub struct Replacement {
     pub sub_is_optional: bool,
 }
 
+/// 置換の本文から読む適用範囲:
+///
+/// - 主語が「このキャラ」「このリーダー」（自己置換）なら、保護者＝除去されるカード自身のときだけ成立する
+///   （従来は保護者が場の誰でも、持ち主のどのカードの除去でも成立していた）。
+/// - 【相手のターン中】は相手の手番のとき、【自分のターン中】は持ち主の手番のときだけ成立する。
+fn replacement_scope_matches(
+    raw: &str,
+    protector: CardIdx,
+    removed: CardIdx,
+    owner: Seat,
+    turn_player: Seat,
+) -> bool {
+    if raw.contains("【相手のターン中】") && turn_player == owner {
+        return false;
+    }
+    if raw.contains("【自分のターン中】") && turn_player != owner {
+        return false;
+    }
+    let mut body = raw.trim_start();
+    while let Some(rest) = body.strip_prefix('【') {
+        match rest.find('】') {
+            Some(i) => body = rest[i + '】'.len_utf8()..].trim_start(),
+            None => break,
+        }
+    }
+    let self_subject = (body.starts_with("このキャラ") && !body.starts_with("このキャラ以外"))
+        || body.starts_with("このリーダー");
+    !self_subject || protector == removed
+}
+
 /// Python `guards._find_replacement`。
 pub fn find_replacement(
     s: &Session,
     masters: &MasterTable,
     card: CardIdx,
     status_values: &[&str],
+) -> Result<Option<Replacement>, EngineError> {
+    find_replacement_by(s, masters, card, status_values, None)
+}
+
+/// 「相手の効果で…される場合」のように相手の効果だけを対象にする句か。
+///
+/// 除去を述べる句（「KOされ」「場を離れ」「されない」等の手前まで）に「相手の」を含むものを
+/// 相手専用とみなす（【相手のターン中】の手番タグは除く）。置換の代わりの行動に出る「相手の
+/// キャラ」等を拾わないよう、除去の述語より前だけを見る。
+fn opp_only_removal(raw: &str) -> bool {
+    let cut = ["KOされ", "場を離れ", "離れる", "離れない", "離れず"]
+        .iter()
+        .filter_map(|m| raw.find(m))
+        .min()
+        .unwrap_or(raw.len());
+    raw[..cut].replace("【相手のターン中】", "").contains("相手の")
+}
+
+/// [`find_replacement`] に除去を行った効果の実行者（`actor`）を渡す版。持ち主自身の効果による
+/// 除去（`actor == owner`）には「相手の効果で」の置換を適用しない（OP11-101）。`None` は従来どおり。
+pub fn find_replacement_by(
+    s: &Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
 ) -> Result<Option<Replacement>, EngineError> {
     if s.state().card(card).negated {
         return Ok(None);
@@ -450,11 +589,20 @@ pub fn find_replacement(
             ) else {
                 continue;
             };
+            // status はカンマ区切りで複数持てる（「KOされる場合」＝EFFECT_KO,BATTLE_KO 等）。
             if !eff
                 .status
                 .as_deref()
-                .is_some_and(|st| status_values.contains(&st))
+                .is_some_and(|st| st.split(',').any(|one| status_values.contains(&one)))
             {
+                continue;
+            }
+            // 適用範囲（本文の主語・ターン限定）。パーサは置換の本文を `raw_text` に丸ごと残すだけで
+            // 主語や【相手のターン中】を条件にしないので、ここで読む（2026-10-01 カード効果監査・約 50 枚）。
+            if !replacement_scope_matches(&eff.raw_text, protector, card, owner, s.state().turn_player) {
+                continue;
+            }
+            if actor == Some(owner) && opp_only_removal(&eff.raw_text) {
                 continue;
             }
             // 自己無効化（「キャラの「X」がいる場合、この効果は無効になる」OP05-100）。
@@ -498,7 +646,7 @@ pub fn find_replacement(
                 owner,
                 sub,
                 &sub_ref,
-                Some(card),
+                Some(protector),
             )? {
                 continue;
             }
@@ -562,8 +710,19 @@ pub fn active_replacement(
     card: CardIdx,
     status_values: &[&str],
 ) -> Result<bool, EngineError> {
+    active_replacement_by(s, masters, card, status_values, None)
+}
+
+/// [`active_replacement`] に除去を行った効果の実行者を渡す版（[`find_replacement_by`]）。
+pub fn active_replacement_by(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+) -> Result<bool, EngineError> {
     let can_suspend = !status_values.contains(&"BATTLE_KO");
-    active_replacement_with(s, masters, card, status_values, can_suspend)
+    active_replacement_inner(s, masters, card, status_values, can_suspend, actor)
 }
 
 /// [`active_replacement`] の `can_suspend` を明示する版（バトル KO 経路は `false`）。
@@ -574,7 +733,18 @@ pub fn active_replacement_with(
     status_values: &[&str],
     can_suspend: bool,
 ) -> Result<bool, EngineError> {
-    let Some(found) = find_replacement(s, masters, card, status_values)? else {
+    active_replacement_inner(s, masters, card, status_values, can_suspend, None)
+}
+
+fn active_replacement_inner(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    can_suspend: bool,
+    actor: Option<Seat>,
+) -> Result<bool, EngineError> {
+    let Some(found) = find_replacement_by(s, masters, card, status_values, actor)? else {
         return Ok(false);
     };
     let owner = s.state().card(card).owner;
@@ -584,8 +754,17 @@ pub fn active_replacement_with(
     if outer.is_some() {
         s.edit().pop_interaction(); // Python `gm.active_interaction = None`
     }
-    Resolver::resumed(vec![found.sub.clone()], EffectContext::new())
-        .process_stack(s, masters, owner, Some(card))?;
+    // 任意の置換（「代わりに〜できる」）は成立前に確認済み＝sub の任意確認を二重に聞かない。
+    let mut sub_ctx = EffectContext::new();
+    if found.sub_is_optional {
+        sub_ctx.confirm(found.sub.clone());
+        sub_ctx.confirm(found.sub.child(0));
+    }
+    // 「そのキャラ」（除去されるカード）は ref_id=removed_card で参照する。「このキャラ」は
+    // 置換能力の持ち主（他のキャラを守る型では除去されるカードと別）なので発生源は持ち主にする。
+    sub_ctx.set_saved("removed_card", vec![crate::model::TargetRef::Card(card)]);
+    Resolver::resumed(vec![found.sub.clone()], sub_ctx)
+        .process_stack(s, masters, owner, Some(found.protector))?;
     let suspended = s.state().active_interaction().is_some();
 
     // 発動成立 → 【ターン1回】の使用回数を消費する。
@@ -712,6 +891,50 @@ pub fn register_granted_replacements(
     Ok(())
 }
 
+/// 持ち主のリーダー／場の有効な PASSIVE のうち、本文（raw_text）に `needle` を含むものがあるか
+/// （「ルール上、〜」の規則書き換え能力を本文で見分ける）。
+fn has_rule_passive(
+    s: &Session,
+    masters: &MasterTable,
+    seat: Seat,
+    needle: &str,
+) -> Result<bool, EngineError> {
+    let mut units: Vec<CardIdx> = Vec::new();
+    units.extend(s.state().player(seat).leader);
+    units.extend(s.state().player(seat).field.iter().copied());
+    for card in units {
+        if s.state().card(card).negated || crate::rules::is_effect_negated(s.state(), card) {
+            continue;
+        }
+        for id in &masters.get(s.state().card(card).master).ability_ids {
+            let ab = ability(masters, *id)?;
+            if ab.trigger == TriggerType::Passive && ab.raw_text.contains(needle) {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+/// 「ルール上、自分はデッキが0枚でも敗北せず、…ターン終了時に敗北する」（OP15-022）の PASSIVE を持つか。
+pub fn has_deckout_delay(
+    s: &Session,
+    masters: &MasterTable,
+    seat: Seat,
+) -> Result<bool, EngineError> {
+    has_rule_passive(s, masters, seat, "デッキが0枚でも敗北せず")
+}
+
+/// 「ルール上、自分の表向きのライフは手札に加わる代わりにデッキの下に置かれる」（ST13-003）の
+/// PASSIVE を持つか。
+pub fn has_face_up_life_to_deck_rule(
+    s: &Session,
+    masters: &MasterTable,
+    seat: Seat,
+) -> Result<bool, EngineError> {
+    has_rule_passive(s, masters, seat, "表向きのライフは手札に加わる代わりにデッキの下に置かれる")
+}
+
 /// Python `battle._has_deckout_win_replace`（デッキアウト敗北→勝利の置換 PASSIVE を持つか）。
 pub fn has_deckout_win_replace(
     s: &Session,
@@ -825,59 +1048,88 @@ fn set_used_count(s: &mut Session, card: CardIdx, key: u32, n: u32) {
 
 /// `getattr(sub, "is_optional", False)`（`GameAction` 以外のノードは属性を持たない＝False）。
 fn node_is_optional(node: &EffectNode) -> bool {
-    matches!(node, EffectNode::Action(a) if a.is_optional)
+    match node {
+        EffectNode::Action(a) => a.is_optional,
+        // 「〜をレストにし、手札1枚を捨てることができる」＝全体が任意（先頭の動作が確認点）。
+        EffectNode::Sequence(v) => v.first().is_some_and(node_is_optional),
+        _ => false,
+    }
 }
 
-/// Python の正規表現
-/// `属性[(（《]([斬打射特知])[)）》]を持つ(?:カード|キャラ)?との(?:バトル|戦闘)` を手で解く。
-///
-/// 一致すれば要求属性（1 文字）を返す。regex クレートを足さずに済むよう、括弧の 3 種類・
-/// 任意の「カード／キャラ」・「バトル／戦闘」を素直に走査する。
-fn required_battle_attribute(text: &str) -> Option<&'static str> {
-    const ATTRS: [&str; 5] = ["斬", "打", "射", "特", "知"];
-    const OPEN: [&str; 3] = ["(", "（", "《"];
-    const CLOSE: [&str; 3] = [")", "）", "》"];
-    let mut rest = text;
-    while let Some(pos) = rest.find("属性") {
-        let after = &rest[pos + "属性".len()..];
-        let mut matched = None;
-        for (i, open) in OPEN.iter().enumerate() {
-            let Some(body) = after.strip_prefix(*open) else {
-                continue;
-            };
-            for attr in ATTRS {
-                let Some(tail) = body.strip_prefix(attr) else {
-                    continue;
-                };
-                let Some(tail) = tail.strip_prefix(CLOSE[i]) else {
-                    continue;
-                };
-                let Some(tail) = tail.strip_prefix("を持つ") else {
-                    continue;
-                };
-                // `(?:カード|キャラ)?` は任意。
-                let tail = tail
-                    .strip_prefix("カード")
-                    .or_else(|| tail.strip_prefix("キャラ"))
-                    .unwrap_or(tail);
-                let Some(tail) = tail.strip_prefix("との") else {
-                    continue;
-                };
-                if tail.starts_with("バトル") || tail.starts_with("戦闘") {
-                    matched = Some(attr);
-                }
-                break;
-            }
-            if matched.is_some() {
-                break;
+/// 「相手の元々のパワー5000以下のキャラの効果でKOされない」の上限（OP14-003）。
+/// 本文に「元々のパワーN以下のキャラの効果で」が無ければ None。
+fn required_source_power_max(text: &str) -> Option<i32> {
+    let pos = text.find("元々のパワー")?;
+    let after = &text[pos + "元々のパワー".len()..];
+    let digits: String = after
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
+    let n: i32 = digits.parse().ok()?;
+    let tail = &after[digits.len()..];
+    tail.starts_with("以下のキャラの効果で").then_some(n)
+}
+
+/// 「〜とのバトルでKOされない」の「〜」（バトル相手の限定）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BattleOpponentFilter {
+    /// 要求属性（1 文字）と、否定（「を持たない」）か。
+    attr: Option<(&'static str, bool)>,
+    /// 相手の種類の限定（リーダーのみ／キャラのみ）。両方書かれていれば `None`。
+    kind: Option<CardType>,
+}
+
+impl BattleOpponentFilter {
+    fn matches(&self, attribute: crate::model::Attribute, ty: CardType) -> bool {
+        if self.kind.is_some_and(|k| k != ty) {
+            return false;
+        }
+        match self.attr {
+            None => true,
+            Some((want, negated)) => {
+                let has = attribute != crate::model::Attribute::None && attribute.value() == want;
+                has != negated
             }
         }
-        if matched.is_some() {
-            return matched;
-        }
-        rest = after;
     }
-    None
+}
+
+/// 本文の「…とのバトル（戦闘）」の直前の句から、バトル相手の限定（属性・リーダー/キャラ）を読む。
+/// 限定が無ければ `None`（無条件のバトル KO 耐性）。属性の括弧前の空白・「持つ／持たない」・
+/// 「リーダーとキャラ」（＝種類は限定しない）に対応する。
+fn battle_opponent_filter(text: &str) -> Option<BattleOpponentFilter> {
+    const ATTRS: [&str; 5] = ["斬", "打", "射", "特", "知"];
+    const OPEN: [char; 3] = ['(', '（', '《'];
+    let end = ["とのバトル", "との戦闘"].iter().filter_map(|k| text.find(k)).min()?;
+    let head = &text[..end];
+    let start = head
+        .rfind(['。', '、', '」', '】'])
+        .map(|i| i + head[i..].chars().next().map_or(1, char::len_utf8))
+        .unwrap_or(0);
+    let clause = &head[start..];
+    let mut attr = None;
+    if let Some(pos) = clause.find("属性") {
+        let after = clause[pos + "属性".len()..].trim_start_matches([' ', '\u{3000}']);
+        let mut chars = after.chars();
+        if chars.next().is_some_and(|c| OPEN.contains(&c)) {
+            let body = chars.as_str();
+            attr = ATTRS.iter().copied().find(|a| body.starts_with(a)).map(|a| {
+                let negated = body.contains("を持たない") || body.contains("以外");
+                (a, negated)
+            });
+        }
+    }
+    let leader = clause.contains("リーダー");
+    let chara = clause.contains("キャラ");
+    let kind = match (leader, chara) {
+        (true, false) => Some(CardType::Leader),
+        (false, true) => Some(CardType::Character),
+        _ => None,
+    };
+    if attr.is_none() && kind.is_none() {
+        return None;
+    }
+    Some(BattleOpponentFilter { attr, kind })
 }
 
 /// Python の正規表現 `「([^」]+)」がい[るて][^。]*?この効果は無効` を手で解く。
@@ -911,3 +1163,22 @@ fn self_negating_name(text: &str) -> Option<&str> {
 
 #[cfg(test)]
 mod tests;
+
+/// 「属性(特)を持たないキャラの効果で」（括弧は 3 種）の属性 1 文字。
+fn lacked_source_attribute(text: &str) -> Option<&'static str> {
+    const ATTRS: [&str; 5] = ["斬", "打", "射", "特", "知"];
+    for open in ["(", "（", "《"] {
+        for attr in ATTRS {
+            for close in [")", "）", "》"] {
+                let pat = format!("属性{open}{attr}{close}を持たない");
+                if let Some(pos) = text.find(&pat) {
+                    let tail = &text[pos + pat.len()..];
+                    if tail.starts_with("キャラ") || tail.starts_with("カード") {
+                        return Some(attr);
+                    }
+                }
+            }
+        }
+    }
+    None
+}

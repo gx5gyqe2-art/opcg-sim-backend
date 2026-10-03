@@ -27,7 +27,7 @@
 //! （§11.7 の「resolver に `_expand_main_effect` 相当が既にあればそれを呼ぶ」）。
 //!
 //! **PLAY_CARD は `rules/actions.rs::play_card_action` と別物**（同じ「登場」でも手順が違う）:
-//! 効果による登場は `attached_don` を 0 に戻さず・`TRIGGER_CHAR_PLAYED` を記録せず・
+//! 効果による登場は `attached_don` を 0 に戻さず・（`TRIGGER_CHAR_PLAYED` は手札登場と同じく記録し・）
 //! 「相手の登場時効果は無効」(OPP_ONPLAY) を見ず・登場後の 2 度目の場上限確認をしない。
 //! そのため `triggers::resolve_on_play`（OPP_ONPLAY を見る）ではなく [`resolve_effect_on_play`]
 //! を使う。共通で使えるのは `mod.rs::move_card`／`rules::actions::enforce_field_limit`／
@@ -140,8 +140,11 @@ fn execute_event(
 ) -> Result<bool, EngineError> {
     for ev in targets {
         record_event_played(s, masters, *ev);
+        triggers::enqueue_activation_listeners(s, masters, triggers::Activation::Event, actor)?;
         if let Some(index) = main_event_ability(s, masters, *ev)? {
-            crate::effects::resolver::game_resolve_ability(s, masters, actor, *ev, index, false)?;
+            s.with_resolving_event(*ev, |s| {
+                crate::effects::resolver::game_resolve_ability(s, masters, actor, *ev, index, false)
+            })?;
         }
         move_card(s, masters, *ev, Zone::Trash, actor, Position::Bottom)?;
     }
@@ -219,6 +222,11 @@ fn play_card(
     move_card(s, masters, target, Zone::Field, owner, Position::Bottom)?;
     s.edit()
         .set_card_bool(target, CardBoolField::IsNewlyPlayed, true);
+    // 【トリガー】を持つキャラの登場はターン内イベントとして記録する（OP13-100「【トリガー】を持つ
+    // キャラが登場した時」は登場方法を問わない。効果による登場でも記録する）。
+    if crate::rules::actions::has_trigger_icon(s, masters, target)? {
+        crate::ops::record_turn_event(s, "TRIGGER_CHAR_PLAYED", 1);
+    }
     // 「レストで登場させる」: 効果の明示 RESTED、または owner の RESTED_PLAY の PASSIVE。
     if action.status.as_deref() == Some("RESTED") || has_rested_play(s, masters, owner)? {
         s.edit().set_card_bool(target, CardBoolField::IsRest, true);
@@ -251,7 +259,9 @@ fn resolve_effect_on_play(
     card: CardIdx,
     owner: Seat,
 ) -> Result<(), EngineError> {
-    if crate::rules::is_effect_negated(s.state(), card) {
+    if crate::rules::is_effect_negated(s.state(), card)
+        || triggers::own_onplay_negated(s, masters, owner)
+    {
         return Ok(());
     }
     let ids = masters.get(s.state().card(card).master).ability_ids.clone();

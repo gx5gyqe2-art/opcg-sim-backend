@@ -46,7 +46,7 @@ use crate::ops;
 use crate::state::EngineError;
 
 use super::ast::{
-    ActionType, Condition, ConditionType, EffectNode, GameAction, PlayerRef, TargetQuery,
+    Ability, ActionType, Condition, ConditionType, EffectNode, GameAction, PlayerRef, TargetQuery,
     TriggerType, ZoneRef,
 };
 use super::{ability_of, EffectContext, NodeRef, NodeRoot};
@@ -127,6 +127,15 @@ pub fn ability_key(index: usize) -> u32 {
     index as u32
 }
 
+/// 置換（`REPLACE_EFFECT`）・保護（`PREVENT_LEAVE`）の常在か（先頭の動作で判定）。
+fn is_removal_guard(ability: &Ability) -> bool {
+    ability
+        .effect
+        .as_ref()
+        .and_then(super::passives::find_first_action)
+        .is_some_and(|a| matches!(a.ty, ActionType::ReplaceEffect | ActionType::PreventLeave))
+}
+
 /// Python `CardInstance.ability_used_this_turn.get(key, 0)`。
 fn used_count(s: &Session, card: CardIdx, key: u32) -> u32 {
     s.state()
@@ -201,6 +210,33 @@ pub fn game_resolve_ability(
     resolver.resolve_ability(s, masters, actor, source_card, ability_index, cost_confirmed)?;
     // Python `gamestate.resolve_ability` の末尾: 継続効果の再計算（`_apply_passive_effects`）中は
     // イベントを発行しない（同じバフを載せ直す内部処理で eventLog が膨張するため・§15.1）。
+    if !s.state().in_passive_recalc {
+        resolver.flush_events(s, masters, actor, source_card);
+    }
+    Ok(())
+}
+
+/// [`game_resolve_ability`] の誘発版: 誘発の契機カード（バトルした相手など）を文脈の
+/// `trigger_subject` に載せてから解決する（対象の `ref_id: "trigger_subject"` が引く）。
+pub fn game_resolve_ability_with_subject(
+    s: &mut Session,
+    masters: &MasterTable,
+    actor: Seat,
+    source_card: CardIdx,
+    ability_index: usize,
+    subject: Option<CardIdx>,
+) -> Result<(), EngineError> {
+    if s.state().card(source_card).negated || crate::rules::is_effect_negated(s.state(), source_card)
+    {
+        return Ok(());
+    }
+    let mut resolver = Resolver::new();
+    if let Some(c) = subject {
+        resolver
+            .context
+            .set_saved("trigger_subject", vec![TargetRef::Card(c)]);
+    }
+    resolver.resolve_ability(s, masters, actor, source_card, ability_index, false)?;
     if !s.state().in_passive_recalc {
         resolver.flush_events(s, masters, actor, source_card);
     }
@@ -358,7 +394,11 @@ impl Resolver {
         }
 
         // 発動成立 → 使用回数を消費する。
-        if turn_limit.is_some() {
+        // 例外: 継続効果の再計算が「実行」する置換・保護の常在（【ターン1回】…KOされる場合、代わりに／
+        // KOされない）。これらの効果は本体では何もせず（実際の発動は除去の瞬間に `rules::active_*` が
+        // 判定し、そこで回数を消費する）、再計算のたびに消費すると、盤面が 1 度動いただけで
+        // 「ターン1回」が使い切られて、肝心の KO の場面で働かなくなる（2026-10-01 実対局検証）。
+        if turn_limit.is_some() && !(s.state().in_passive_recalc && is_removal_guard(ability)) {
             set_used_count(s, source_card, limit_key, used + 1);
         }
 
@@ -411,8 +451,12 @@ impl Resolver {
                     // 場のドン!!（アクティブ＋レスト＋付与中）の合計で判定する。
                     let cost = a.value.base;
                     let p = state.player(actor);
-                    let total =
-                        (p.don_active.len() + p.don_rested.len() + p.don_attached.len()) as i32;
+                    // 「アクティブのドン!!N枚」（status=ACTIVE）はアクティブだけで判定する。
+                    let total = if super::interact::don_active_only(a) {
+                        p.don_active.len() as i32
+                    } else {
+                        (p.don_active.len() + p.don_rested.len() + p.don_attached.len()) as i32
+                    };
                     return Ok(total >= cost);
                 }
                 let Some(query) = a.target.as_ref() else {
@@ -617,12 +661,20 @@ impl Resolver {
         }
 
         // 遅延実行（「このターン終了時、〜」）
-        if action.delay.as_deref() == Some("TURN_END") && !self.context.flushing_delayed {
+        if matches!(
+            action.delay.as_deref(),
+            Some("TURN_END") | Some("BATTLE_END") | Some("OPP_MAIN_START")
+        )
+            && !self.context.flushing_delayed
+        {
             let mut pending = s.state().pending_end_of_turn.clone();
             pending.push(DelayedAction {
                 player: actor,
                 node: node_ref.clone(),
                 source_card,
+                battle_end: action.delay.as_deref() == Some("BATTLE_END"),
+                main_start: action.delay.as_deref() == Some("OPP_MAIN_START"),
+                saved_targets: self.context.saved_targets.clone(),
             });
             s.edit().set_pending_end_of_turn(pending);
             return Ok(true);
@@ -630,10 +682,17 @@ impl Resolver {
 
         // 任意効果（「〜してもよい」）
         if action.is_optional && !self.context.is_confirmed(node_ref) {
+            // 「相手は…ドン!!を…してもよい」（RAMP_DON／RETURN_DON の status=OPPONENT*）は
+            // 任意の可否を決めるのが相手（ドン!!プールの持ち主）。
+            let confirmer = if matches!(action.ty, ActionType::RampDon | ActionType::ReturnDon) {
+                super::interact::don_pool_player(actor, action)
+            } else {
+                actor
+            };
             super::interact::suspend_for_optional_confirmation(
                 s,
                 masters,
-                actor,
+                confirmer,
                 node_ref,
                 source_card,
                 &self.execution_stack,
@@ -755,7 +814,10 @@ impl Resolver {
         node_ref: &NodeRef,
         source_card: Option<CardIdx>,
     ) -> Result<bool, EngineError> {
-        let targets = match action.target.as_ref() {
+        // DEAL_DAMAGE の target はダメージを受ける側（player）を表すだけで、カードを選ぶ対象ではない
+        // （FIELD の既定のままだと相手キャラの選択が出る／相手キャラ不在で不発になる）。
+        let action_target = if action.ty == ActionType::DealDamage { None } else { action.target.as_ref() };
+        let targets = match action_target {
             None => Vec::new(),
             Some(query) => {
                 match self.resolve_targets(s, masters, actor, query, source_card, Some((action, node_ref)))? {
@@ -765,14 +827,20 @@ impl Resolver {
             }
         };
 
+        // 対象を取る行動が 0 枚だった（「2枚まで捨てる」で 0 枚等）なら、直前の枚数は 0 に更新する
+        // （古い枚数が残ると「捨てた枚数と同じ枚数」が前の行動の枚数で動いてしまう）。
+        if action_target.is_some() && targets.is_empty() && action.ty != ActionType::Select {
+            self.context.prev_action_count = Some(0);
+        }
+
         // PREV_ACTION 条件評価用: ターゲットの有無を記録
-        self.context.last_had_targets = if action.target.is_some() {
+        self.context.last_had_targets = if action_target.is_some() {
             Some(!targets.is_empty())
         } else {
             None
         };
 
-        if let Some(query) = action.target.as_ref() {
+        if let Some(query) = action_target {
             if targets.is_empty() && !query.is_up_to {
                 // Python の失敗履歴（`{"action":..,"success":False,"reason":"No targets found"}`）。
                 self.action_history.push(serde_json::json!({
@@ -830,6 +898,12 @@ impl Resolver {
         // 除去置換の内側中断を検知するためのフラグ（Python `_replacement_suspended`）。
         s.edit()
             .set_mgr_flag(crate::journal::MgrFlagField::ReplacementSuspended, false);
+        // 「引いた枚数分」のために、ドローは実際に手札へ増えた枚数を数える（DRAW は対象を持たない）。
+        let drawer = match action.target.as_ref() {
+            Some(q) if q.player == PlayerRef::Opponent => actor.other(),
+            _ => actor,
+        };
+        let hand_before = s.state().player(drawer).hand.len() as i32;
         let success = super::actions::apply_action(
             s,
             masters,
@@ -840,6 +914,7 @@ impl Resolver {
             value,
             source_card,
         )?;
+        let drawn = s.state().player(drawer).hand.len() as i32 - hand_before;
         if s.state().replacement_suspended && !self.execution_stack.is_empty() {
             super::interact::defer_resolver_stack(
                 s,
@@ -890,8 +965,13 @@ impl Resolver {
         }
 
         // 文脈依存スケーリング（§7-5「捨てたカード1枚につき」等）
-        if success && action.ty != ActionType::Select {
+        // SHUFFLE は枚数を持たない帳簿上の動作（「戻し、シャッフルする。戻した枚数分引く」で
+        // 直前の枚数を 0 に潰さない）ので記録しない。
+        if success && action.ty != ActionType::Select && action.ty != ActionType::Shuffle {
             let mut cnt = targets.len() as i32;
+            if action.ty == ActionType::Draw {
+                cnt = drawn.max(0);
+            }
             if matches!(
                 action.ty,
                 ActionType::RestDon | ActionType::ActiveDon | ActionType::ReturnDon
@@ -978,6 +1058,14 @@ impl Resolver {
             if let Some(save_id) = query.save_id.as_ref() {
                 self.context.set_saved(save_id, resumed.clone());
             }
+            // 選択グループから選んだ分は消費済みにする（残りは「残りを〜」が拾う）。
+            if query.select_mode == "GROUP_FIRST" && query.ref_id.is_some() {
+                let uuids: Vec<String> = resumed
+                    .iter()
+                    .map(|t| s.state().target_uuid(*t).to_owned())
+                    .collect();
+                self.context.consume(SEL_GROUP_ID, uuids);
+            }
             // 「そのキャラ/そのカード」の coreference 用の既定キー。
             if query.select_mode == "CHOOSE"
                 && query.ref_id.is_none()
@@ -994,32 +1082,123 @@ impl Resolver {
             }
         }
 
-        // 選択グループ分配（§7-1）: 先頭 M 枚を取り、消費済みとして記録する。
+        // 「引いた／戻した枚数分〜を捨てる」: 直前アクションの枚数を count に読み替える（0 枚なら対象なし）。
+        if query.count_dynamic.as_deref() == Some("PREV_ACTION_COUNT") {
+            let n = self.context.prev_action_count.unwrap_or(0);
+            if n <= 0 {
+                return Ok(Some(Vec::new()));
+            }
+            let mut q = query.clone();
+            q.count = n;
+            q.count_dynamic = None;
+            return self.resolve_targets(s, masters, actor, &q, source_card, action);
+        }
+
+        // 選択グループ分配（§7-1）: M 枚を取り、消費済みとして記録する。
+        // グループは保存済みの選択（`a+b` で複数をまとめられる）。`_sel_group` 以外から作った
+        // グループは `_sel_group` へ写し、後続の「残りを〜」がその残余を参照できるようにする。
+        // 候補が M 枚より多いときは選ぶのはプレイヤー（SELECT_TARGET）。
         if query.select_mode == "GROUP_FIRST" {
             if let Some(ref_id) = query.ref_id.as_ref() {
-                let group = self.context.saved(ref_id).cloned().unwrap_or_default();
-                let consumed: Vec<String> = self.context.consumed(ref_id).to_vec();
+                if ref_id != SEL_GROUP_ID && self.context.saved(SEL_GROUP_ID).is_none() {
+                    let mut merged: Vec<TargetRef> = Vec::new();
+                    for key in ref_id.split('+') {
+                        for t in self.context.saved(key).cloned().unwrap_or_default() {
+                            if !merged.contains(&t) {
+                                merged.push(t);
+                            }
+                        }
+                    }
+                    self.context.set_saved(SEL_GROUP_ID, merged);
+                }
+                let group = self.context.saved(SEL_GROUP_ID).cloned().unwrap_or_default();
+                let consumed: Vec<String> = self.context.consumed(SEL_GROUP_ID).to_vec();
                 let avail: Vec<TargetRef> = group
                     .into_iter()
                     .filter(|t| !consumed.contains(&s.state().target_uuid(*t).to_owned()))
                     .collect();
                 let n = if query.count > 0 { query.count as usize } else { 1 };
+                if avail.len() > n && !s.state().in_passive_recalc {
+                    super::interact::suspend_for_target_selection(
+                        s,
+                        masters,
+                        actor,
+                        &avail,
+                        query,
+                        source_card,
+                        action.map(|(_, r)| r),
+                        &self.execution_stack,
+                        &self.context,
+                    )?;
+                    return Ok(None);
+                }
                 let picked: Vec<TargetRef> = avail.into_iter().take(n).collect();
                 let uuids: Vec<String> = picked
                     .iter()
                     .map(|t| s.state().target_uuid(*t).to_owned())
                     .collect();
-                self.context.consume(ref_id, uuids);
+                self.context.consume(SEL_GROUP_ID, uuids);
                 return Ok(Some(picked));
             }
         }
 
         if let Some(ref_id) = query.ref_id.as_ref() {
             if ref_id == "self" {
-                return Ok(Some(source_card.into_iter().map(TargetRef::Card).collect()));
+                // 「コストN以上のこのキャラを…」(OP16-084)の修飾語＝現在のコストが範囲外なら対象にならない。
+                let in_range = |c: CardIdx| {
+                    let card = s.state().card(c);
+                    let cost = card.current_cost(masters.get(card.master));
+                    query.cost_min.map_or(true, |m| cost >= m) && query.cost_max.map_or(true, |m| cost <= m)
+                };
+                return Ok(Some(
+                    source_card.into_iter().filter(|c| in_range(*c)).map(TargetRef::Card).collect(),
+                ));
+            }
+            // 「a+b」＝保存済みの複数の選択をまとめた参照（重複は 1 枚にする）。
+            if ref_id.contains('+') {
+                let mut merged: Vec<TargetRef> = Vec::new();
+                for key in ref_id.split('+') {
+                    for t in self.context.saved(key).cloned().unwrap_or_default() {
+                        if !merged.contains(&t) {
+                            merged.push(t);
+                        }
+                    }
+                }
+                return Ok(Some(merged));
             }
             if let Some(saved) = self.context.saved(ref_id) {
-                return Ok(Some(saved.clone()));
+                let mut out = saved.clone();
+                // 「この効果で登場させたキャラ」は今も場にいるものだけ（KO・バウンス済みは対象外）。
+                if ref_id == "played_by_effect" {
+                    out.retain(|t| match t.card() {
+                        Some(c) => {
+                            let owner = s.state().card(c).owner;
+                            s.state().player(owner).field.contains(&c)
+                        }
+                        None => false,
+                    });
+                }
+                // 「そのキャラのコスト／パワーがN以下の場合」: 参照先をコスト／パワーで絞る。
+                if query.flags.iter().any(|f| f == "REF_FILTER") {
+                    out.retain(|t| match t.card() {
+                        Some(c) => {
+                            let card = s.state().card(c);
+                            let m = masters.get(card.master);
+                            let cost = card.current_cost(m);
+                            let power = card.get_power(m, card.owner == s.state().turn_player);
+                            // 「選んだキャラのコストがそのキャラに付与されているドン!!の枚数と同じ場合」(OP15-031)。
+                            let don_eq = !query.flags.iter().any(|f| f == "REF_COST_EQ_ATTACHED_DON")
+                                || cost == card.attached_don;
+                            don_eq
+                                && query.cost_max.map_or(true, |x| cost <= x)
+                                && query.cost_min.map_or(true, |x| cost >= x)
+                                && query.power_max.map_or(true, |x| power <= x)
+                                && query.power_min.map_or(true, |x| power >= x)
+                        }
+                        None => true,
+                    });
+                }
+                return Ok(Some(out));
             }
             // ref_id 指定なのに保存対象が無い＝対象なし（場全体クエリへ落とさない）。
             return Ok(Some(Vec::new()));
@@ -1031,10 +1210,20 @@ impl Resolver {
                 if !group.is_empty() {
                     let group = group.clone();
                     let consumed: Vec<String> = self.context.consumed(SEL_GROUP_ID).to_vec();
+                    // 「残りがコストN以下なら」: 残余をコストで絞る（条件を満たさない残りは何もしない）。
                     return Ok(Some(
                         group
                             .into_iter()
                             .filter(|t| !consumed.contains(&s.state().target_uuid(*t).to_owned()))
+                            .filter(|t| match t.card() {
+                                Some(c) => {
+                                    let card = s.state().card(c);
+                                    let cost = card.current_cost(masters.get(card.master));
+                                    query.cost_max.map_or(true, |x| cost <= x)
+                                        && query.cost_min.map_or(true, |x| cost >= x)
+                                }
+                                None => true,
+                            })
                             .collect(),
                     ));
                 }
@@ -1059,6 +1248,32 @@ impl Resolver {
             source_card,
             &self.context,
         )?;
+
+        // 「すでに選んだカードを除く」（EXCLUDE_SAVED:<save_id>）: 別の選択で選んだカードは選べない。
+        for f in &query.flags {
+            if let Some(save_id) = f.strip_prefix("EXCLUDE_SAVED:") {
+                let taken = self.context.saved(save_id).cloned().unwrap_or_default();
+                candidates.retain(|t| !taken.contains(t));
+            }
+        }
+
+        // 「捨てたカードと同じカード名を持つ」（SAME_NAME_AS:<save_id>・EB02-039）: 保存済みのカードと
+        // 同名のものだけを候補に残す（保存が無ければ誰も同名でない＝対象なし）。
+        for f in &query.flags {
+            if let Some(save_id) = f.strip_prefix("SAME_NAME_AS:") {
+                let names: Vec<String> = self
+                    .context
+                    .saved_cards(save_id)
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|c| masters.get(s.state().card(*c).master).name.clone())
+                    .collect();
+                candidates.retain(|t| match t.card() {
+                    Some(c) => names.contains(&masters.get(s.state().card(c).master).name),
+                    None => false,
+                });
+            }
+        }
 
         // コストで「状態を変える」対象は、まだその状態でないカードに限る。
         if let Some((node, node_ref)) = action {
@@ -1106,7 +1321,13 @@ impl Resolver {
         // 組み合わせは無い）。
         if let Some(psum_max) = query.power_sum_max {
             if !candidates.is_empty() {
+                // フラグ SUM_COST（「コストの合計がN以下」）のときは現在のコストで数える。
+                let by_cost = query.flags.iter().any(|f| f == "SUM_COST");
                 let power_of = |t: TargetRef| match t.card() {
+                    Some(c) if by_cost => {
+                        let card = s.state().card(c);
+                        card.current_cost(masters.get(card.master))
+                    }
                     Some(c) => masters.get(s.state().card(c).master).power,
                     None => 0,
                 };
@@ -1127,6 +1348,43 @@ impl Resolver {
                     if total + p <= psum_max {
                         chosen.push(t);
                         total += p;
+                    }
+                }
+                if let Some(save_id) = query.save_id.as_ref() {
+                    self.context.set_saved(save_id, chosen.clone());
+                }
+                return Ok(Some(chosen));
+            }
+        }
+
+        // 「コストの合計がN以下になるように登場させる」（COST_SUM_MAX:N・OP17-118）: 合計コストが上限に
+        // 収まるよう、コストの高いものから貪欲に取る（枚数は count まで）。選択の対話は挟まない。
+        if let Some(cap) = query
+            .flags
+            .iter()
+            .find_map(|f| f.strip_prefix("COST_SUM_MAX:").and_then(|n| n.parse::<i32>().ok()))
+        {
+            if !candidates.is_empty() {
+                let cost_of = |t: TargetRef| match t.card() {
+                    Some(c) => {
+                        let card = s.state().card(c);
+                        card.current_cost(masters.get(card.master))
+                    }
+                    None => 0,
+                };
+                let cap_n = if query.count > 0 { query.count as usize } else { candidates.len() };
+                let mut ordered = candidates.clone();
+                ordered.sort_by_key(|t| std::cmp::Reverse(cost_of(*t)));
+                let mut chosen: Vec<TargetRef> = Vec::new();
+                let mut total = 0;
+                for t in ordered {
+                    if chosen.len() >= cap_n {
+                        break;
+                    }
+                    let c = cost_of(t);
+                    if total + c <= cap {
+                        chosen.push(t);
+                        total += c;
                     }
                 }
                 if let Some(save_id) = query.save_id.as_ref() {
@@ -1373,10 +1631,15 @@ impl Resolver {
             } else {
                 Position::Bottom
             };
+            // 「持ち主が好きな順番で」: 相手の場のカードを並べるのはその持ち主（相手）。
+            let arranger = match action.target.as_ref() {
+                Some(q) if q.player == PlayerRef::Opponent && needs_reorder => actor.other(),
+                _ => actor,
+            };
             super::interact::suspend_for_arrange(
                 s,
                 masters,
-                actor,
+                arranger,
                 source_card,
                 targets.to_vec(),
                 crate::model::ArrangeDest::Deck,

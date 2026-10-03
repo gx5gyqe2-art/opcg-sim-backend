@@ -65,6 +65,18 @@ pub fn apply_passive_effects(
         }
     }
 
+    // 常在の「相手は…以外にアタックできない」制限は再計算のたびに作り直す（条件が崩れたら消える）。
+    for seat in [player, opponent] {
+        let recs = s.state().player(seat).restrictions.clone();
+        if recs.iter().any(|r| r.key.starts_with(crate::rules::ATTACK_CHAR_ONLY_PREFIX)) {
+            let kept: Vec<_> = recs
+                .into_iter()
+                .filter(|r| !r.key.starts_with(crate::rules::ATTACK_CHAR_ONLY_PREFIX))
+                .collect();
+            s.edit().set_restrictions(seat, kept);
+        }
+    }
+
     // Step 2/3 で適用される INSTANT パワーバフは passive_power（再計算レイヤ）へ載せる。
     s.edit().set_mgr_flag(MgrFlagField::InPassiveRecalc, true);
     let result = recalc_steps(s, masters, player, opponent);
@@ -130,7 +142,21 @@ pub fn is_reactive_passive(ab: &super::ast::Ability) -> bool {
 
 /// `(された|した|受けた|なった|離れた)時、` を含むか（Python の正規表現と同値）。
 fn reactive_re_search(text: &str) -> bool {
-    for pat in ["された時、", "した時、", "受けた時、", "なった時、", "離れた時、"] {
+    for pat in [
+        "された時、",
+        "した時、",
+        "受けた時、",
+        "なった時、",
+        "離れた時、",
+        // 反応型の誘発句（エンジンが raw_text を読んで待ち行列へ積む）。再計算では実行しない。
+        "させた時、",
+        "引いた時、",
+        "戻った時、",
+        "加わった時、",
+        "与えた時、",
+        "終了時、",
+        "捨てられた時、",
+    ] {
         if text.contains(pat) {
             return true;
         }
@@ -171,7 +197,9 @@ pub fn apply_hand_self_cost(
                 let Some(EffectNode::Action(eff)) = ab.effect.as_ref() else {
                     continue;
                 };
-                if eff.status.as_deref() != Some("COST_REDUCTION") {
+                // 手札の自己値: コスト増減（COST_REDUCTION）と、カウンター値の付与（COUNTER・OP17-118）。
+                let is_counter = eff.status.as_deref() == Some("COUNTER");
+                if eff.status.as_deref() != Some("COST_REDUCTION") && !is_counter {
                     continue;
                 }
                 let Some(tq) = eff.target.as_ref() else {
@@ -194,6 +222,11 @@ pub fn apply_hand_self_cost(
                     )? {
                         continue;
                     }
+                }
+                if is_counter {
+                    let v = s.state().card(card).passive_counter + eff.value.base;
+                    s.edit().set_card_i32(card, CardI32Field::PassiveCounter, v);
+                    continue;
                 }
                 let v = s.state().card(card).cost_buff + eff.value.base;
                 s.edit().set_card_i32(card, CardI32Field::CostBuff, v);
@@ -220,6 +253,7 @@ mod tests {
     fn reactive_regex_matches_the_python_alternation() {
         assert!(reactive_re_search("相手のキャラが登場した時、ドローする"));
         assert!(reactive_re_search("ライフが離れた時、"));
+        assert!(reactive_re_search("カードの効果で自分の手札からカードが捨てられた時、カードを引く。"));
         assert!(reactive_re_search("ダメージを受けた時、"));
         assert!(reactive_re_search("レストになった時、"));
         // 「時、」が続かない（＝常在の記述）ものは反応型ではない。

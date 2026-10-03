@@ -18,7 +18,7 @@
 
 use super::ast::{AbilityTable, PlayerRef, TargetQuery, TriggerType, ZoneRef};
 use super::{EffectContext, TargetRef};
-use crate::model::{CardIdx, CardMaster, GameState, MasterTable, Seat};
+use crate::model::{CardIdx, CardInstance, CardMaster, CardType, GameState, MasterTable, Seat};
 use crate::state::EngineError;
 use std::collections::HashSet;
 
@@ -56,11 +56,36 @@ fn has_trigger(master: &CardMaster, abilities: &AbilityTable) -> bool {
 }
 
 /// Python `if txt and txt.strip() not in ["", "なし", "-"]`（＝バニラなら通す）。
-fn is_vanilla_text(effect_text: &str) -> bool {
+pub(super) fn is_vanilla_text(effect_text: &str) -> bool {
     if effect_text.is_empty() {
         return true;
     }
     matches!(effect_text.trim(), "" | "なし" | "-")
+}
+
+/// 対象の絞り込みに使うコスト。「元々のコストN以下」（`ORIGINAL_COST`）は印刷コスト、
+/// それ以外は効果で増減した現在コスト。
+fn filter_cost(query: &TargetQuery, card: &CardInstance, master: &CardMaster) -> i32 {
+    if query.has_flag("ORIGINAL_COST") {
+        master.cost
+    } else {
+        card.current_cost(master)
+    }
+}
+
+/// 「<色>の<種類A>か<コスト>の<種類B>」（OP12-017）のように、絞り込みが特定の種類にだけ掛かる
+/// 場合の判定。`<prefix><種類名>` のフラグが 1 つも無ければ常に掛かる（通常の AND）。
+fn scope_applies(query: &TargetQuery, prefix: &str, ty_name: &str) -> bool {
+    let mut any = false;
+    for f in &query.flags {
+        if let Some(t) = f.strip_prefix(prefix) {
+            any = true;
+            if t == ty_name {
+                return true;
+            }
+        }
+    }
+    !any
 }
 
 /// §11.5 の契約（戻り値だけ `TargetRef`＝ドン!!も返せる。理由は `effects/mod.rs`）。
@@ -111,7 +136,7 @@ pub fn get_target_cards(
             let p = state.player(*seat);
             for ch in &p.field {
                 let card = state.card(*ch);
-                let cost = card.current_cost(masters.get(card.master));
+                let cost = filter_cost(query, card, masters.get(card.master));
                 if query.cost_max.is_some_and(|m| cost > m) {
                     continue;
                 }
@@ -141,8 +166,11 @@ pub fn get_target_cards(
             match z {
                 ZoneRef::Field => {
                     candidates.extend(p.field.iter().map(|c| TargetRef::Card(*c)));
+                    // 「自分のキャラか「X」」（NAME_OR_TYPE）は名前側でリーダーも拾う
+                    // （リーダーの「シルバーズ・レイリー」。種類に LEADER が無くても候補に入れる）。
                     if query.card_type.is_empty()
                         || query.card_type.iter().any(|t| t == "LEADER")
+                        || (query.has_flag("NAME_OR_TYPE") && !query.names.is_empty())
                     {
                         if let Some(leader) = p.leader {
                             candidates.push(TargetRef::Card(leader));
@@ -152,9 +180,21 @@ pub fn get_target_cards(
                         candidates.push(TargetRef::Card(stage));
                     }
                 }
-                ZoneRef::Hand => candidates.extend(p.hand.iter().map(|c| TargetRef::Card(*c))),
+                ZoneRef::Hand => candidates.extend(
+                    state.hand_cards(p.seat).into_iter().map(TargetRef::Card),
+                ),
                 ZoneRef::Trash => candidates.extend(p.trash.iter().map(|c| TargetRef::Card(*c))),
-                ZoneRef::Life => candidates.extend(p.life.iter().map(|c| TargetRef::Card(*c))),
+                ZoneRef::Life => {
+                    // 「ライフの上か下から1枚」: 先頭（上）と末尾（下）の 2 枚だけが候補。
+                    if query.has_flag("LIFE_TOP_OR_BOTTOM") {
+                        candidates.extend(p.life.first().map(|c| TargetRef::Card(*c)));
+                        if p.life.len() > 1 {
+                            candidates.extend(p.life.last().map(|c| TargetRef::Card(*c)));
+                        }
+                    } else {
+                        candidates.extend(p.life.iter().map(|c| TargetRef::Card(*c)));
+                    }
+                }
                 ZoneRef::Temp => {
                     candidates.extend(p.temp_zone.iter().map(|c| TargetRef::Card(*c)))
                 }
@@ -187,6 +227,8 @@ pub fn get_target_cards(
 
     let exclude_source = query.has_flag("EXCLUDE_SOURCE");
     let partial = query.has_flag("NAME_PARTIAL");
+    // 効果プローブ（`super::probe`）中だけ立つ。ループの外で 1 度だけ読む（探索の内側ループ）。
+    let relax = super::probe::relax_targets();
 
     let mut results: Vec<TargetRef> = Vec::new();
     let mut seen_names: HashSet<&str> = HashSet::new();
@@ -224,6 +266,17 @@ pub fn get_target_cards(
         let card = state.card(card_idx);
         let master = masters.get(card.master);
 
+        // 効果プローブ（`super::probe`）: カード種別だけで選ぶ（汎用盤面のフィラーは
+        // 特徴も名前も持たないので、絞り込みを残すと条件付きの句が実行されない）。
+        if relax {
+            if query.card_type.is_empty()
+                || query.card_type.iter().any(|t| t == master.ty.name())
+            {
+                results.push(cand);
+            }
+            continue;
+        }
+
         // --- 種類／色／属性（OR 合成フラグの有無で分かれる）------------------------
         if query.has_flag("ATTR_OR_TYPE") || query.has_flag("NAME_OR_COLORTYPE") {
             let first_ok = if query.has_flag("NAME_OR_COLORTYPE") {
@@ -233,7 +286,7 @@ pub fn get_target_cards(
                     && query.names.iter().any(|n| matches_name(master, n, false))
             } else {
                 !query.attributes.is_empty()
-                    && query.attributes.iter().any(|a| a == master.attribute.value())
+                    && query.attributes.iter().any(|a| card.has_attribute(master, a))
             };
             let type_ok = query.card_type.is_empty()
                 || query.card_type.iter().any(|t| t == master.ty.name());
@@ -249,10 +302,12 @@ pub fn get_target_cards(
             if !query.card_type.is_empty()
                 && !query.card_type.iter().any(|t| t == master.ty.name())
                 && !query.has_flag("NAME_OR_TYPE")
+                && !query.has_flag("NAME_OR_TYPED_NAME")
             {
                 continue;
             }
             if !query.colors.is_empty()
+                && scope_applies(query, "COLORS_ONLY_", master.ty.name())
                 && !query
                     .colors
                     .iter()
@@ -260,25 +315,53 @@ pub fn get_target_cards(
             {
                 continue;
             }
+            // SELECTOR_OR（名前／特徴／属性のいずれか）のときは後段でまとめて判定する。
             if !query.attributes.is_empty()
-                && !query.attributes.iter().any(|a| a == master.attribute.value())
+                && !query.has_flag("SELECTOR_OR")
+                && !query.attributes.iter().any(|a| card.has_attribute(master, a))
             {
                 continue;
             }
         }
 
+        // 「【ブロッカー】を持つ」等: 現在そのキーワードを持つカードに限る（効果無効なら持たない）。
+        if query.flags.iter().any(|f| {
+            f.strip_prefix("HAS_KEYWORD:")
+                .is_some_and(|kw| !crate::rules::has_keyword(state, card_idx, kw))
+        }) {
+            continue;
+        }
+        // 「《X》(を含む特徴)を持たない」: その特徴を持たないカードに限る。
+        if query.flags.iter().any(|f| {
+            if let Some(t) = f.strip_prefix("LACKS_TRAIT_PARTIAL:") {
+                master.traits.iter().any(|x| x.contains(t))
+            } else if let Some(t) = f.strip_prefix("LACKS_TRAIT:") {
+                master.traits.iter().any(|x| x == t)
+            } else {
+                false
+            }
+        }) {
+            continue;
+        }
+        // 「単色の」: 色を 1 色だけ持つカード。
+        if query.has_flag("SINGLE_COLOR") && master.colors.len() != 1 {
+            continue;
+        }
+
         // --- コスト ---------------------------------------------------------------
-        let cost = card.current_cost(master);
-        if query.has_flag("COST_0_OR_GE_8") && !(cost == 0 || cost >= 8) {
+        let cost = filter_cost(query, card, master);
+        // 「赤のイベントかコスト3以上のキャラ」: コスト条件は COST_ONLY_<種類> の種類にだけ掛かる。
+        let cost_scoped = scope_applies(query, "COST_ONLY_", master.ty.name());
+        if cost_scoped && query.has_flag("COST_0_OR_GE_8") && !(cost == 0 || cost >= 8) {
             continue;
         }
-        if query.cost_max.is_some_and(|m| cost > m) {
+        if cost_scoped && query.cost_max.is_some_and(|m| cost > m) {
             continue;
         }
-        if query.cost_min.is_some_and(|m| cost < m) {
+        if cost_scoped && query.cost_min.is_some_and(|m| cost < m) {
             continue;
         }
-        if dynamic_cost_max.is_some_and(|m| cost > m) {
+        if cost_scoped && dynamic_cost_max.is_some_and(|m| cost > m) {
             continue;
         }
 
@@ -305,6 +388,10 @@ pub fn get_target_cards(
         if query.has_flag("NO_COUNTER") && master.counter > 0 {
             continue;
         }
+        // 「カウンターを持つ」カードだけ（OP17-118 の「カウンターを持たないキャラのみ」の判定用）。
+        if query.has_flag("HAS_COUNTER") && master.counter <= 0 {
+            continue;
+        }
         // Python は `ab.trigger.name == query.lacks_trigger` の**文字列比較**＝未知の名前は
         // 「どの能力にも一致しない」だけでエラーにしない。ここも名前で比べる。
         if let Some(lacks) = query.lacks_trigger.as_deref() {
@@ -326,19 +413,54 @@ pub fn get_target_cards(
             !names.is_empty() && names.iter().any(|n| matches_name(master, n, partial))
         };
         // Python `_excluded()`: 除外名は**常に部分一致なし**（partial を渡さない）。
+        // REST_LEADER_ONLY（「レストのリーダーか、「X」以外のキャラ」）: 「X以外」は後ろのキャラ
+        // だけに掛かり、リーダーは除外名の対象外。
         let excluded = || -> bool {
             !query.exclude_names.is_empty()
+                && !(query.has_flag("REST_LEADER_ONLY") && master.ty == CardType::Leader)
                 && query
                     .exclude_names
                     .iter()
                     .any(|en| matches_name(master, en, false))
         };
+        // 「『X』を含む特徴」（TRAIT_PARTIAL）は特徴名の部分一致（「元ロックス海賊団」等も該当）。
+        let trait_partial = query.has_flag("TRAIT_PARTIAL");
         let trait_in = || -> bool {
             !query.traits.is_empty()
-                && query.traits.iter().any(|t| master.traits.contains(t))
+                && query.traits.iter().any(|t| {
+                    if trait_partial {
+                        master.traits.iter().any(|x| x.contains(t.as_str()))
+                    } else {
+                        master.traits.contains(t)
+                    }
+                })
         };
 
-        if query.has_flag("NAME_OR_COLORTYPE") {
+        if query.has_flag("SELECTOR_OR") {
+            // 「特徴《A》か属性(斬)を持つ」「「ペローナ」か属性(斬)を持つ」: 指定された名前・特徴・属性の
+            // いずれかに当てはまればよい（他の絞り込み＝種類／コスト／除外名は AND のまま）。
+            let attr_ok = !query.attributes.is_empty()
+                && query.attributes.iter().any(|a| card.has_attribute(master, a));
+            if !(name_in(&query.names) || trait_in() || attr_ok) {
+                continue;
+            }
+            if excluded() {
+                continue;
+            }
+        } else if query.has_flag("NAME_OR_COLORTYPE") {
+            if excluded() {
+                continue;
+            }
+        } else if query.has_flag("NAME_OR_TYPED_NAME")
+            && query.names.len() >= 2
+            && !query.card_type.is_empty()
+        {
+            // 「「A」か<種類>の「B」」: A は種類不問の名前一致、B は<種類>のカードのときだけ。
+            let type_ok = query.card_type.iter().any(|t| t == master.ty.name());
+            let hit = name_in(&query.names[..1]) || (type_ok && name_in(&query.names[1..]));
+            if !hit {
+                continue;
+            }
             if excluded() {
                 continue;
             }
@@ -380,7 +502,10 @@ pub fn get_target_cards(
             }
         }
 
-        if query.is_rest.is_some_and(|r| card.is_rest != r) {
+        // REST_LEADER_ONLY（「レストのリーダーか、…のキャラ」）: 状態の絞りはリーダーだけに掛かる。
+        if query.is_rest.is_some_and(|r| card.is_rest != r)
+            && !(query.has_flag("REST_LEADER_ONLY") && master.ty != CardType::Leader)
+        {
             continue;
         }
 
@@ -545,6 +670,35 @@ pub(crate) mod tests {
         assert_eq!(f.run(&query(r#""power_min":6000,"card_type":["CHARACTER"]"#), "p1-char-a"), ["p1-char-b"]);
     }
 
+    /// 「元々のコストN以下」（`ORIGINAL_COST`）は印刷コストで絞る（効果で増減した現在コストではない）。
+    /// 2026-10-01 のカード効果監査で、パーサが「元々の」を落としエンジンも欄を持たないと判明（62 枚）。
+    #[test]
+    fn original_cost_filters_by_the_printed_cost() {
+        let mut f = fixture();
+        let a = f.find("p1-char-a") as usize;
+        f.state.cards[a].cost_buff = -2; // 現在コスト 1・印刷コスト 3
+        assert_eq!(f.run(&query(r#""cost_max":1,"card_type":["CHARACTER"]"#), "p1-char-a"), ["p1-char-a"]);
+        assert!(f
+            .run(&query(r#""cost_max":1,"flags":["ORIGINAL_COST"],"card_type":["CHARACTER"]"#), "p1-char-a")
+            .is_empty());
+        assert_eq!(
+            f.run(&query(r#""cost_max":3,"flags":["ORIGINAL_COST"],"card_type":["CHARACTER"]"#), "p1-char-a"),
+            ["p1-char-a"]
+        );
+    }
+
+    /// 「ライフの上か下から1枚」（`LIFE_TOP_OR_BOTTOM`）は先頭と末尾の 2 枚だけが候補になる。
+    #[test]
+    fn life_top_or_bottom_limits_the_candidates_to_the_two_ends() {
+        let f = fixture();
+        let all = f.run(&query(r#""zone":"LIFE","count":-1"#), "p1-char-a");
+        let ends = f.run(&query(r#""zone":"LIFE","count":-1,"flags":["LIFE_TOP_OR_BOTTOM"]"#), "p1-char-a");
+        assert!(ends.len() <= 2, "{ends:?}");
+        if all.len() > 2 {
+            assert_eq!(ends, vec![all[0].clone(), all[all.len() - 1].clone()]);
+        }
+    }
+
     #[test]
     fn traits_colors_attributes_and_names_filter() {
         let f = fixture();
@@ -596,6 +750,19 @@ pub(crate) mod tests {
             f.run(&query(r#""zone":"HAND","is_unique_name":true"#), "p1-char-a"),
             ["p1-hand-a", "p1-hand-c"]
         );
+    }
+
+    /// 解決中のイベント（発動したカード）は手札の候補・枚数に入らない。
+    #[test]
+    fn the_resolving_event_is_not_a_hand_candidate() {
+        let mut f = fixture();
+        let ev = f.find("p1-hand-b");
+        f.state.resolving_event = Some(ev);
+        assert_eq!(f.run(&query(r#""zone":"HAND""#), "p1-char-a"), ["p1-hand-a", "p1-hand-c"]);
+        assert_eq!(f.state.hand_len(Seat::P1), f.state.player(Seat::P1).hand.len() - 1);
+        assert!(!f.state.hand_cards(Seat::P1).contains(&ev));
+        // 相手の手札は影響を受けない。
+        assert_eq!(f.state.hand_len(Seat::P2), f.state.player(Seat::P2).hand.len());
     }
 
     #[test]
@@ -706,5 +873,94 @@ pub(crate) mod tests {
             &EffectContext::default(),
         );
         assert!(matches!(err, Err(EngineError::BadPayload(_))));
+    }
+
+    // --- カード効果監査（2026-10-01・WP A_target）で足した絞り込み -------------------------
+
+    /// 「自分のキャラか「X」」（NAME_OR_TYPE）は種類 OR 名前で、名前側ではリーダーも候補になる
+    /// （EB04-009/OP12-016/018/019 の「キャラか「シルバーズ・レイリー」」）。
+    #[test]
+    fn name_or_type_reaches_the_leader_by_name() {
+        let f = fixture();
+        assert_eq!(
+            f.run(
+                &query(r#""card_type":["CHARACTER"],"names":["リーダー"],"flags":["NAME_OR_TYPE"]"#),
+                "p1-char-a"
+            ),
+            ["p1-char-a", "p1-char-b", "p1-leader"]
+        );
+        // フラグ無し（AND）なら名前が合うキャラは無く空（従来の誤り）。
+        assert!(f
+            .run(&query(r#""card_type":["CHARACTER"],"names":["リーダー"]"#), "p1-char-a")
+            .is_empty());
+    }
+
+    /// 「特徴《A》か属性(斬)を持つ」（SELECTOR_OR）は名前・特徴・属性のいずれか。除外名は AND のまま。
+    #[test]
+    fn selector_or_accepts_any_of_trait_attribute_or_name() {
+        let f = fixture();
+        let q = r#""card_type":["CHARACTER"],"traits":["海軍"],"attributes":["斬"]"#;
+        assert!(f.run(&query(q), "p1-char-a").is_empty(), "AND なら両方持つカードは無い");
+        assert_eq!(
+            f.run(&query(&format!(r#"{q},"flags":["SELECTOR_OR"]"#)), "p1-char-a"),
+            ["p1-char-a", "p1-char-b"]
+        );
+        assert_eq!(
+            f.run(
+                &query(&format!(r#"{q},"flags":["SELECTOR_OR"],"exclude_names":["キャラA"]"#)),
+                "p1-char-a"
+            ),
+            ["p1-char-b"]
+        );
+        // 「「X」か属性(斬)」: 名前 OR 属性。
+        assert_eq!(
+            f.run(
+                &query(r#""card_type":["CHARACTER"],"names":["キャラB"],"attributes":["斬"],"flags":["SELECTOR_OR"]"#),
+                "p1-char-a"
+            ),
+            ["p1-char-a", "p1-char-b"]
+        );
+    }
+
+    /// 「《X》(を含む特徴)を持たない」（LACKS_TRAIT[_PARTIAL]）と「カウンターを持つ」（HAS_COUNTER）、
+    /// 「【ブロッカー】を持つ」（HAS_KEYWORD:）。
+    #[test]
+    fn lacks_trait_has_counter_and_has_keyword_filter() {
+        let mut f = fixture();
+        assert_eq!(
+            f.run(&query(r#""card_type":["CHARACTER"],"flags":["LACKS_TRAIT_PARTIAL:麦わら"]"#), "p1-char-a"),
+            ["p1-char-b"]
+        );
+        assert_eq!(
+            f.run(&query(r#""card_type":["CHARACTER"],"flags":["LACKS_TRAIT:海軍"]"#), "p1-char-a"),
+            ["p1-char-a"]
+        );
+        // char-a だけカウンター 1000。
+        assert_eq!(
+            f.run(&query(r#""card_type":["CHARACTER"],"flags":["HAS_COUNTER"]"#), "p1-char-a"),
+            ["p1-char-a"]
+        );
+        let b = f.find("p1-char-b") as usize;
+        f.state.cards[b].current_keywords.push("ブロッカー".to_string());
+        assert_eq!(
+            f.run(&query(r#""card_type":["CHARACTER"],"flags":["HAS_KEYWORD:ブロッカー"]"#), "p1-char-a"),
+            ["p1-char-b"]
+        );
+    }
+
+    /// 「赤のイベントかコスト3以上のキャラ」: 色は EVENT にだけ・コストは CHARACTER にだけ掛かる。
+    #[test]
+    fn type_scoped_color_and_cost_filters_make_an_or() {
+        let f = fixture();
+        // トラッシュの赤イベント（コスト 1）はコスト条件が掛からないので通る。
+        let base = r#""zone":"TRASH","card_type":["CHARACTER","EVENT"],"colors":["赤"],"cost_min":3"#;
+        assert!(f.run(&query(base), "p1-char-a").is_empty(), "AND ならコスト 1 のイベントは落ちる");
+        assert_eq!(
+            f.run(
+                &query(&format!(r#"{base},"flags":["COLORS_ONLY_EVENT","COST_ONLY_CHARACTER"]"#)),
+                "p1-char-a"
+            ),
+            ["p1-trash-a"]
+        );
     }
 }
