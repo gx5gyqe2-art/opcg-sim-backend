@@ -836,8 +836,31 @@ def opp_pools(opp_ci, my_ci, idx2cid, opp_deck):
     return out
 
 
+#: **鏡（H-4g）**: 線形の橋（curve）で自分の耐久も同じ守る側の計算で読むか。`rule_don` 系のときだけ効く（他は何も変わらない）。
+MIRROR_ME = True
+
+
+def _mirror_of(sc, tok, ci, opp, last_main, ex, idx2cid, cards, decks, w, t, g_me):
+    """**鏡（H-4g）**: 自分の耐久も相手の耐久と**同じ守る側の計算**で読むための材料（`rule_don` 系・curve のときだけ）。
+    今の行を相手の席から見た行（`mirror_view`・相手の手札は相手の直近の自席ターンの最後の行）にして、相手の財布
+    （次の相手のターン）と自分の手札の読み（デッキの構成と手札のブロッカー込み）を返す。作れなければ `None`。"""
+    import crossing_bridge as CB
+    if CB.THETA_HAND_MODE not in CB.RULE_DON_MODES or _TO_W_MODE() != "curve" or opp is None:
+        return None
+    i_h = last_main.get((1 - w, opp["t"]))
+    if i_h is None or not isinstance(g_me, CB.HandRead):
+        return None
+    sc_m, tok_m, ci_m = CB.mirror_view(sc, tok, ci, tok_hand=ex["tok"][i_h], ci_hand=ex["ci"][i_h],
+                                       cards=cards, idx2cid=idx2cid)
+    g = CB.with_life_types(g_me, (decks or {}).get(w))
+    g = CB.with_hand_blocker(g, sc, tok, ci, idx2cid, cards)
+    return {"sc": sc_m, "tok": tok_m, "g_me": g,
+            "attacker": (lambda: _attacker_of(sc_m, tok_m, ci_m, idx2cid, cards,
+                                              deck_ids=(decks or {}).get(1 - w), t=t + 1))}
+
+
 def _kappa_of_row(sc, tok, t, prof=None, g_me=None, g_opp=None, opp=None, cut_me=None, cut_opp=None,
-                  attacker=None):
+                  attacker=None, mirror=None):
     """行の局面の傾き `κ` と時計の差 `d`。`W_MODE=curve`（T75）なら交点の橋の `D`（`crossing_bridge.curve_d_of_row`）、
     それ以外は盤面の時計（`clock_of_row`・`flat` なら `κ = 1`）。
     `g_me`／`g_opp`（T76・**T79 で両側**）は手札 1 枚あたりの価格。`opp`（T79）は相手の直近の行＝時計の相手側もそこから読む。"""
@@ -845,7 +868,7 @@ def _kappa_of_row(sc, tok, t, prof=None, g_me=None, g_opp=None, opp=None, cut_me
         import crossing_bridge as CB
         cd = CB.curve_d_of_row(sc, tok, CB.own_turn_index(t), prof, g_hand_of_opp=g_opp, g_hand_of_me=g_me,
                                cut_opp=cut_opp, cut_me=cut_me,                     # **N-3**（`None` なら旧）
-                               attacker=attacker)                     # **H-4b**（`rule_don` だけが読む）
+                               attacker=attacker, mirror=mirror)      # **H-4b**／**H-4g の鏡**（`rule_don` だけが読む）
         return {"d": cd["d"], "kappa": _TOM.state_factor(cd["d"], "curve"), "tau_me": cd["tau_me"], "tau_opp": cd["tau_opp"]}
     return clock_of_row(sc, tok, opp_sc=(None if opp is None else opp["sc"]),
                         opp_tok=(None if opp is None else opp["tok"]))
@@ -1205,8 +1228,12 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 if cut_opp_fr is not None:                                # **N-3**: 両席の値段の窓（今の枚数で）
                     cut_me = cut_me_fr.view(w, t, float(sc[SC_MY_HAND]), at_n=n)
                     cut_opp = cut_opp_fr.view(1 - w, t, float(sc[SC_OPP_HAND]), at_n=n)
+                _gme1 = _g_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t))
                 ck = _kappa_of_row(sc, tok, t, prof,
-                                   g_me=_g_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t)),
+                                   g_me=_gme1,
+                                   mirror=(lambda _i=i, _opp=opp, _sc=sc, _tok=tok, _w=w, _t=t, _g=_gme1:
+                                           _mirror_of(_sc, _tok, ex["ci"][_i], _opp, last_main, ex, idx2cid, cards,
+                                                      decks, _w, _t, _g)) if MIRROR_ME else None,
                                    g_opp=(None if opp is None else
                                           _g_opp_of(opp, last_main, ex, idx2cid, cards, g_cache, 1 - w,
                                                     deck=(decks or {}).get(1 - w))),
@@ -1365,9 +1392,12 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                     got["g_delta"] if GUARD_G_MODE == "delta" else got["g_paid"])
                 bnd = band_of(abs(float(rows["pol_v0"][i])))
                 opp_g = _opp_view(first_main, opp_turns, ex, w, t)    # T79: 相手の直近の行（完全情報）
+                _gme2 = _g_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t))
                 kap = float(_kappa_of_row(sc, tok, t, prof,           # T49（守りの窓も同じ傾き）・T75（curve）
-                                          g_me=_g_of_row(sc, tok, ex["ci"][i], idx2cid, cards,
-                                                         g_cache, (w, t)),
+                                          g_me=_gme2,
+                                          mirror=(lambda _i=i, _opp=opp_g, _sc=sc, _tok=tok, _w=w, _t=t, _g=_gme2:
+                                                  _mirror_of(_sc, _tok, ex["ci"][_i], _opp, last_main, ex, idx2cid,
+                                                             cards, decks, _w, _t, _g)) if MIRROR_ME else None,
                                           g_opp=(None if opp_g is None else
                                                  _g_opp_of(opp_g, last_main, ex, idx2cid, cards, g_cache, 1 - w,
                                                            deck=(decks or {}).get(1 - w))),

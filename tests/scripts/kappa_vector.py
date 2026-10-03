@@ -460,7 +460,7 @@ def rate_terms_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_
 
 
 def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, idx2cid=None, cards=None,
-                 cut_me=None, cut_opp=None, don_plan=None):
+                 cut_me=None, cut_opp=None, don_plan=None, mirror=None):
     """行から **(Θ_me, Θ_opp, A_me, A_opp, j)** を組む（両席・完全情報・§0.05）。
 
     `Θ` は**その行**から両席分読める（`threshold` と `threshold_of_me` が対の式）。
@@ -477,7 +477,13 @@ def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, id
     # **H-4b**: `rule_don` 系は**速さ（`a_me`）を作ったのと同じ計画**（`don_plan`）を耐久にも渡す（T109）。
     # 計画が無ければ攻め手の財布を渡さない＝付与 0 の `rule` に落ちる（速さの側も計画なし＝両側で付与 0）。
     with CP.defending(cut_me):
-        th_me = float(CB.threshold_of_me(sc, tok, g_hand=g_me))
+        m = mirror() if (mirror is not None and CB.THETA_HAND_MODE in CB.RULE_DON_MODES) else None
+        if m is not None:
+            # **鏡（H-4g）**: 自分の耐久も相手の耐久と同じ守る側の計算で読む（`crossing_bridge.curve_d_of_row` と同じ）
+            th_me = float(CB.threshold(m["sc"], m["tok"], g_hand=m["g_me"],
+                                       attacker=(m["attacker"]() if callable(m["attacker"]) else m["attacker"])))
+        else:
+            th_me = float(CB.threshold_of_me(sc, tok, g_hand=g_me))
     with CP.defending(cut_opp):
         th_opp = float(CB.threshold(sc, tok, g_hand=g_opp,
                                     plan=(don_plan if CB.THETA_HAND_MODE in CB.RULE_DON_MODES else None)))

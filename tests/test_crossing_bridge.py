@@ -2709,3 +2709,26 @@ def test_the_attackers_purse_and_the_solve_must_share_one_price_window():
     with pytest.raises(RuntimeError):
         CB.rule_don_solve([(2000.0, 0.0)], 0.0, [], 0, ax, None)
 
+
+def test_the_mirror_reads_my_endurance_with_the_same_defender_model():
+    """**H-4g（鏡）**: 線形の橋（curve）の自分の耐久は旧の `threshold_of_me`（別の式）ではなく、相手の席から見た行に
+    相手の財布を渡して**相手の耐久と同じ守る側の計算**で読む。鏡を渡さなければ（または `rule_don` 以外なら）旧のまま。"""
+    sc, tok = _rule_row(life=1.0, hand=2.0, xs=(0.0,))
+    sc_m, tok_m = _rule_row(life=2.0, hand=3.0, xs=(1000.0, 0.0))
+    g_me = _read([2000.0, 2000.0])
+    prof = [0.1] * 12
+    old = CB.THETA_HAND_MODE
+    try:
+        CB.set_theta_hand_mode("rule_don")
+        legacy = CB.curve_d_of_row(sc, tok, 3, prof, g_hand_of_opp=_read([1000.0]), g_hand_of_me=g_me)
+        same = CB.curve_d_of_row(sc, tok, 3, prof, g_hand_of_opp=_read([1000.0]), g_hand_of_me=g_me, mirror=None)
+        assert same["theta_opp"] == pytest.approx(legacy["theta_opp"])
+        m = {"sc": sc_m, "tok": tok_m, "g_me": g_me, "attacker": None}
+        mir = CB.curve_d_of_row(sc, tok, 3, prof, g_hand_of_opp=_read([1000.0]), g_hand_of_me=g_me, mirror=lambda: m)
+        assert mir["theta_opp"] == pytest.approx(CB.threshold(sc_m, tok_m, g_hand=g_me))
+        assert mir["theta_me"] == pytest.approx(legacy["theta_me"])               # 相手の耐久は変わらない
+        CB.set_theta_hand_mode("cuttable_forced")
+        off = CB.curve_d_of_row(sc, tok, 3, prof, g_hand_of_opp=_read([1000.0]), g_hand_of_me=g_me, mirror=lambda: m)
+        assert off["theta_opp"] == pytest.approx(CB.threshold_of_me(sc, tok, g_hand=g_me))   # rule_don 以外は旧のまま
+    finally:
+        CB.set_theta_hand_mode(old)

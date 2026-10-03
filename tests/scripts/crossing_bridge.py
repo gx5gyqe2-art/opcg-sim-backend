@@ -2430,7 +2430,7 @@ def profile_th_for(dirs, name="cross", path=None):
 
 
 def curve_d_of_row(sc, tok, j, prof, g_hand_of_opp=None, g_hand_of_me=None, cut_opp=None, cut_me=None,
-                   attacker=None, plan=None):
+                   attacker=None, plan=None, mirror=None):
     """**交点の近さ `D`**（T75）＝両席の到達ターンの差 `τ_opp − τ_me`（正なら自分が先に届く）。
     `τ_me` は自分が相手の耐久 `Θ_me` に、`τ_opp` は相手が自分の耐久 `Θ_opp` に、同じ輪郭で積んで届くターン数（相手も同じ自席ターン番号 `j` と置く）。
     `g_hand_of_opp`／`g_hand_of_me` は**その席の手札**の 1 枚あたりの価格（T76・`None` なら `μ`）。1 行からは自分の手札しか読めないので、
@@ -2442,7 +2442,14 @@ def curve_d_of_row(sc, tok, j, prof, g_hand_of_opp=None, g_hand_of_me=None, cut_
         th_me = threshold(sc, tok, g_hand=g_hand_of_opp, attacker=(attacker() if callable(attacker) else attacker),
                           plan=plan)
     with CP.defending(cut_me):
-        th_opp = threshold_of_me(sc, tok, g_hand=g_hand_of_me)
+        m = mirror() if (mirror is not None and THETA_HAND_MODE in RULE_DON_MODES) else None
+        if m is not None:
+            # **鏡（H-4g）**: 自分の耐久も**同じ守る側の計算**で読む——相手の席から見た行（`mirror_view`）に相手の財布を渡して
+            # 「相手が殴る側・自分が守る側」の `threshold` を解く（旧の `threshold_of_me` は別の式だった）。
+            th_opp = float(threshold(m["sc"], m["tok"], g_hand=m["g_me"],
+                                     attacker=(m["attacker"]() if callable(m["attacker"]) else m["attacker"])))
+        else:
+            th_opp = threshold_of_me(sc, tok, g_hand=g_hand_of_me)
     sh_me = sh_opp = rate_me = rate_opp = 0.0
     if THETA_HAND_PLACE == "shield" and (cut_opp is not None or cut_me is not None):
         raise ValueError("N-3（cut price joint）は THETA_HAND_PLACE=shield と組めない")

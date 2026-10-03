@@ -80,6 +80,7 @@ import guard_afford as GA  # noqa: E402
 import kappa_vector as KV  # noqa: E402
 import cut_price as CP  # noqa: E402  （N-3）
 import theory_order as TO  # noqa: E402
+import theory_bridge as _TBm  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
 from theory_order import (MU, SC_MY_DON, SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER,  # noqa: E402
                           SC_OPP_LIFE, THETA, opp_bodies_of, own_attackers_of, score_candidate,
@@ -279,6 +280,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
         rate_at_turn, g_at_turn = {}, {}
         g_last_at_turn = {}                                   # **H-4**（`rule` のときだけ埋まる）
         first_i = {}                                          # **H-4b**: (席, ターン) → その席のターンの最初の行
+        last_i_at_turn = {}                                   # **H-4g**: (席, ターン) → その席のターンの最後の行（鏡の手札）
         plan_at_turn = {}                                     # **H-4b**: (席, ターン) → 攻め手の計画（`rule_don` 系）
         shape_at = {}
         seed_g = int(r["seed"][idx[0]]) if len(idx) else -1
@@ -311,6 +313,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                 # **H-4**: `rule` は守る席の**実際の札**を読むので、相手の手札は**その席のターンの最後の行**
                 # （出した後＝相手のターンに持っている手札・使い残したドン）から読む。値は上書きで最後の行が残る。
                 g_last_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
+                last_i_at_turn[(w, t)] = i
                 if CB.THETA_HAND_MODE in CB.RULE_DON_MODES:
                     # **H-4e（E1）**: 取られたライフの札の分布（その席のデッキ）
                     g_last_at_turn[(w, t)] = CB.with_life_types(g_last_at_turn[(w, t)],
@@ -345,6 +348,25 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
         last_turn_of = {}
         for (w, t) in rate_at_turn:
             last_turn_of[w] = max(t, last_turn_of.get(w, -1))
+
+        def _mirror_for(w, t, sc, tok, ci):
+            """**鏡（H-4g）**: 自分の耐久を相手の耐久と同じ守る側の計算で読む材料（`rule_don` 系・curve のときだけ）。"""
+            if not (_TBm.MIRROR_ME and CB.THETA_HAND_MODE in CB.RULE_DON_MODES and KV.D_MODE in ("curve", "curve_scaled")):
+                return None
+            ts_o = [tt for (ww, tt) in last_i_at_turn if ww == 1 - w and tt < t]
+            if not ts_o or (w, t) not in g_at_turn:
+                return None
+            i_h = last_i_at_turn[(1 - w, max(ts_o))]
+            g_me = g_at_turn[(w, t)]
+            if not isinstance(g_me, CB.HandRead):
+                return None
+            sc_m, tok_m, ci_m = CB.mirror_view(sc, tok, ci, tok_hand=ex["tok"][i_h], ci_hand=ex["ci"][i_h],
+                                               cards=cards, idx2cid=idx2cid)
+            g = CB.with_hand_blocker(CB.with_life_types(g_me, KV._deck_of(seat_decks, seed_g, w)), sc, tok, ci,
+                                     idx2cid, cards)
+            dk_o = KV._deck_of(seat_decks, seed_g, 1 - w)
+            return {"sc": sc_m, "tok": tok_m, "g_me": g,
+                    "attacker": (lambda: CB.attacker_ctx(sc_m, tok_m, ci_m, idx2cid, cards, theta, mu, deck_ids=dk_o))}
 
         def _opp_at(w, t):
             ts = [tt for (ww, tt) in rate_at_turn if ww == 1 - w and tt < t]
@@ -386,7 +408,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                 cut_opp = cut.view(1 - w, t, float(np.asarray(sc)[TO.SC_OPP_HAND]))
             st0 = KV.state_of_row(sc, tok, rate_at_turn[(w, t)], ao, CB.own_turn_index(t),
                                   g_me=g_at_turn[(w, t)], g_opp=g_opp, ci_row=ci, idx2cid=idx2cid, cards=cards,
-                                  cut_me=cut_me, cut_opp=cut_opp, don_plan=plan_at_turn.get((w, t)))
+                                  cut_me=cut_me, cut_opp=cut_opp, don_plan=plan_at_turn.get((w, t)),
+                                  mirror=_mirror_for(w, t, sc, tok, ci))
             # **P5**: 通貨の付け替え＝耐久も価格も同じ c 倍（速さはそのまま＝時計は c 倍される）
             st0 = ((st0[0] * scale_currency, st0[1] * scale_currency, st0[2], st0[3], st0[4])
                    + tuple(x * scale_currency for x in st0[5:]))     # 戻る分も同じ通貨（C-5c）
