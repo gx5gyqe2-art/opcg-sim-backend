@@ -477,7 +477,8 @@ def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, id
     # **H-4b**: `rule_don` 系は**速さ（`a_me`）を作ったのと同じ計画**（`don_plan`）を耐久にも渡す（T109）。
     # 計画が無ければ攻め手の財布を渡さない＝付与 0 の `rule` に落ちる（速さの側も計画なし＝両側で付与 0）。
     with CP.defending(cut_me):
-        m = mirror() if (mirror is not None and CB.THETA_HAND_MODE in CB.RULE_DON_MODES) else None
+        m = ((mirror() if callable(mirror) else mirror)
+             if (mirror is not None and CB.THETA_HAND_MODE in CB.RULE_DON_MODES) else None)
         if m is not None:
             # **鏡（H-4g）**: 自分の耐久も相手の耐久と同じ守る側の計算で読む（`crossing_bridge.curve_d_of_row` と同じ）
             th_me = float(CB.threshold(m["sc"], m["tok"], g_hand=m["g_me"],

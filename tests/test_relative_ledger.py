@@ -409,3 +409,23 @@ def test_theory_d_mode_fills_the_rate_shape_in_the_default_hand_mode(monkeypatch
         RL.collect(["x"], 0)
     assert RL.CB.THETA_HAND_MODE == "cuttable_forced"
     assert seen == [(("shape",), ("shape",))]
+
+
+def test_state_of_row_takes_the_mirror_as_a_dict_or_a_thunk(monkeypatch):
+    """H-4g（実測で見つかった落ち）: 帳簿は鏡を**辞書**で渡す——呼び出し可能だけを受けると `rule_don` で落ちる。"""
+    CB = KV.CB
+    monkeypatch.setattr(CB, "THETA_HAND_MODE", "rule_don")
+    monkeypatch.setattr(CB, "THETA_RETURN_MODE", "off")
+    seen = {}
+
+    def _thr(sc, tok, g_hand=None, attacker=None, plan=None):
+        if attacker is not None:
+            seen["attacker"] = attacker
+        return 7.0
+    monkeypatch.setattr(CB, "threshold", _thr)
+    monkeypatch.setattr(CB, "threshold_of_me", lambda *a, **k: 3.0)
+    sc, tok = np.zeros(64), np.zeros((4, 4))
+    m = {"sc": sc, "tok": tok, "g_me": None, "attacker": (lambda: "ctx")}
+    for mirror in (m, (lambda: m)):
+        st = KV.state_of_row(sc, tok, 0.2, 0.2, 1, mirror=mirror)
+        assert st[0] == 7.0 and seen["attacker"] == "ctx"
