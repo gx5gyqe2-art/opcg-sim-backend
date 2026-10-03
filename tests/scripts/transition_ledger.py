@@ -53,6 +53,7 @@ if _HERE not in sys.path:
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 import attack_response as AR  # noqa: E402
 import crossing_bridge as CB  # noqa: E402
+import cut_price as CP  # noqa: E402  （N-3）
 import guard_afford as GA  # noqa: E402
 import kappa_vector as KV  # noqa: E402
 import relative_ledger as RL  # noqa: E402
@@ -303,27 +304,39 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
         rate_at, g_at, sched_at = {}, {}, {}
         shape_at = {}
         seed_g = int(r["seed"][idx[0]]) if len(idx) else -1
+        # **N-3**: 値段の枠。守り手（相手）の枠は**その席の直近の自席ターンの最後の行**（こちらのターンの間の手札そのもの）・
+        # 自分の枠は**今の自席ターンの最初の行**（`g_at` と同じ行）。カウンター・イベントは `g_at` と同じく全部切れる。
+        cut = cut_me_fr = None
+        if CP.joint_on():
+            cut = CP.CutFrames(list(idx), r, ex, idx2cid, cards, KV.frame_rows_of(r, idx, last=True), mu,
+                               decks=KV._deck_pair(seat_decks, seed_g), don_rule=False, stats=stats, end_of_turn=True)
+            cut_me_fr = CP.CutFrames(list(idx), r, ex, idx2cid, cards, KV.frame_rows_of(r, idx), mu,
+                                     decks=KV._deck_pair(seat_decks, seed_g), don_rule=False, stats=stats)
         for i in idx:
             if int(r["kind"][i]) != 0:
                 continue
             w, t = int(r["who"][i]), int(r["turn"][i])
             if PL.is_own_turn(w, t) and (w, t) not in rate_at:
                 dk = KV._deck_of(seat_decks, seed_g, w)            # **T128**
-                rate_at[(w, t)] = KV.rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
-                                                 idx2cid, cards, theta, mu, deck_ids=dk,
-                                                 j=CB.own_turn_index(t))
+                _cv = (None if cut is None else
+                       cut.view(1 - w, t, float(np.asarray(ex["sc"][i])[TO.SC_OPP_HAND])))
+                with CP.defending(_cv):                            # **N-3**: 速さは守り手＝相手の値段で
+                    rate_at[(w, t)] = KV.rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
+                                                     idx2cid, cards, theta, mu, deck_ids=dk,
+                                                     j=CB.own_turn_index(t))
+                    shape_at[(w, t)] = (KV.rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
+                                                           idx2cid, cards, theta, mu, deck_ids=dk)
+                                           if KV.D_MODE == "theory" else None)
                 g_at[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
-                shape_at[(w, t)] = (KV.rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
-                                                       idx2cid, cards, theta, mu, deck_ids=dk)
-                                       if KV.D_MODE == "theory" else None)
                 sched_at[(w, t)] = None
                 if BOUNDARY_MODE in ("rules", "don") and CB.RATE_DON_MODE != "off":
                     _sc, _tok, _ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
                     _olp = float(np.asarray(_sc)[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-                    sched_at[(w, t)] = CB.seat_slope_sched(_sc, _tok, _ci, idx2cid, cards, _olp,
-                                                          theta, mu, deck_ids=dk,
-                                                          jmax=int(CB.RACE_CAP),
-                                                          j0=CB.own_turn_index(t) + 1)   # **T152**
+                    with CP.defending(_cv):
+                        sched_at[(w, t)] = CB.seat_slope_sched(_sc, _tok, _ci, idx2cid, cards, _olp,
+                                                              theta, mu, deck_ids=dk,
+                                                              jmax=int(CB.RACE_CAP),
+                                                              j0=CB.own_turn_index(t) + 1)   # **T152**
 
         def _latest(w, t):
             ts = [tt for (ww, tt) in rate_at if ww == w and tt <= t]
@@ -349,8 +362,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
                 KV.set_rate_shape(shape_at.get((w, t)),
                              shape_at.get((1 - w, max(_ts))) if _ts else None)
             sc, tok, ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
+            cut_me = cut_opp = None
+            if cut is not None:                          # **N-3**: 両席の値段の窓（今の枚数で）
+                cut_me = cut_me_fr.view(w, t, float(np.asarray(sc)[TO.SC_MY_HAND]))
+                cut_opp = cut.view(1 - w, t, float(np.asarray(sc)[TO.SC_OPP_HAND]))
             st = KV.state_of_row(sc, tok, me[0], op[0], CB.own_turn_index(t),
-                                 g_me=me[1], g_opp=op[1], ci_row=ci, idx2cid=idx2cid, cards=cards)
+                                 g_me=me[1], g_opp=op[1], ci_row=ci, idx2cid=idx2cid, cards=cards,
+                                 cut_me=cut_me, cut_opp=cut_opp)
             stats["rows"] += 1
             # その行で選ばれた手の `Δx`（無ければ空＝値段の付かない行）
             dx = {}; fam = "none"; mv = None
@@ -370,17 +388,20 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
                        "st": _state_of(sc, ci, idx2cid),
                        "opp_bodies": opp_bodies_of(tok, mlp, rt, th, mu, ci_row=ci, idx2cid=idx2cid)}
                 tl = sig[2] if len(sig) > 2 else None
-                v = score_candidate(sig, str(pol["pol_cid"][b]) or None,
-                                    (str(pol["pol_tcid"][b]) or None) if tl else None, ctx, cards,
-                                    src_power=slot_power(tok, int(pol["pol_si"][b])),
-                                    tgt_power=slot_power(tok, int(pol["pol_ti"][b])),
-                                    don_k=int(pol["pol_k"][b]))
+                with CP.defending(cut_opp):              # **N-3**: 攻め手の手の値段は守り手＝相手の値段で
+                    v = score_candidate(sig, str(pol["pol_cid"][b]) or None,
+                                        (str(pol["pol_tcid"][b]) or None) if tl else None, ctx, cards,
+                                        src_power=slot_power(tok, int(pol["pol_si"][b])),
+                                        tgt_power=slot_power(tok, int(pol["pol_ti"][b])),
+                                        don_k=int(pol["pol_k"][b]),
+                                        src_don=TO.slot_don(tok, int(pol["pol_si"][b])))   # F-2（切替 on のときだけ使う）
                 mv = {"si": int(pol["pol_si"][b]), "ti": int(pol["pol_ti"][b]),
                       "cid": str(pol["pol_cid"][b]) or None, "don_k": int(pol["pol_k"][b]),
                       "v": (float(v) if v is not None else None)}
                 if v is not None:
-                    dx = KV.axis_of_move(fam, float(v), sig, str(pol["pol_cid"][b]) or None, cards,
-                                         sc, tok, olp, rt, don_k=int(pol["pol_k"][b]))
+                    with CP.defending(cut_opp):
+                        dx = KV.axis_of_move(fam, float(v), sig, str(pol["pol_cid"][b]) or None, cards,
+                                             sc, tok, olp, rt, don_k=int(pol["pol_k"][b]))
             if w == 1:
                 st, dx = _swap_state(st), _swap_dx(dx)
             seq.append((st, dx, t, fam,
@@ -491,6 +512,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
            "cross_share": {c: {a: round(acc["cross_abs"][c][a]
                                         / max(1e-12, sum(acc["cross_abs"][c].values())), 4)
                                for a in AXES5} for c in CAUSES}}
+    if CP.joint_on():                     # **N-3**（`flat` では欄を足さない＝出力は旧と同じ）
+        out["cut_price"] = {"mode": CP.CUT_PRICE_MODE,
+                            **{k: v for k, v in stats.items() if str(k).startswith("cut_")}}
     return out
 
 
@@ -505,8 +529,19 @@ def main(argv=None):
                     help="攻撃した体のレスト費用をΘ_meへ足すか（既定 `return`・C-5c／`body`＝C-2／`off`＝旧）")
     ap.add_argument("--theta-return", dest="theta_return", choices=CB.THETA_RETURN_MODES, default=None,
                     help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 untap）")
+    TO.add_attack_ability_arg(ap)
+    TO.add_passive_body_arg(ap)
+    import effect_value as _EV
+    _EV.add_f_pricing_fixes_arg(ap)
+    CP.add_cut_price_arg(ap)                       # **N-3**
+    TO.add_defender_power_arg(ap)                  # 2b
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
+    CP.apply_cut_price(a)
+    TO.apply_defender_power(a)                     # 2b
+    TO.apply_attack_ability(a)
+    TO.apply_passive_body(a)
+    _EV.apply_f_pricing_fixes(a)
     if a.d_mode:
         KV.set_d_mode(a.d_mode)
     if a.boundary:

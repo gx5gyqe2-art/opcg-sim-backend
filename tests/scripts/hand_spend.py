@@ -84,19 +84,20 @@ def use_value(cid, info, opp_leader_power, r_turns, cards=None, st=None):
     return max(0.0, float(v) - float(info.get("cost") or 0.0) * DELTA)
 
 
-def free_value(cid, info, opp_leader_power, r_turns, cards=None, st=None):
+def free_value(cid, info, opp_leader_power, r_turns, cards=None, st=None, opp_bodies=None):
     """**コストを払わずに使えたときの価値（`μ` を除く）**＝体 `ν` ＋ 登場時効果（イベントは効果・ステージは能力 1 つ）。
     「手札から出す」効果（T70）で相方をただで出したときの取り分。読めなければ `None`。"""
     if not info:
         return None
     if info.get("event"):
-        v, _u = EV.card_value(cid, EV.ON_PLAY_TRIGGERS, cards=cards, st=st)
+        v, _u = EV.card_value(cid, EV.ON_PLAY_TRIGGERS, cards=cards, st=st, opp_bodies=opp_bodies)
         return None if v is None else float(v)
     if info.get("stage"):
         return float(EV.ABILITY_UNKNOWN)
     power = float(info.get("power") or 0.0)
     body = TO.nu_of(power, float(opp_leader_power), float(r_turns), is_blocker=bool(info.get("blocker")))
-    onplay, unp = EV.card_value(cid, EV.CHAR_ON_PLAY_TRIGGERS, no_ability=0.0, cards=cards, st=st)
+    onplay, unp = EV.card_value(cid, EV.CHAR_ON_PLAY_TRIGGERS, no_ability=0.0, cards=cards, st=st,
+                                opp_bodies=opp_bodies)
     if onplay is None:
         if unp and unp[0][0] == "<no_card>":
             onplay = 0.0                                   # 効果 JSON に無い札＝素の体として読む

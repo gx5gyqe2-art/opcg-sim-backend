@@ -1611,7 +1611,9 @@ def test_the_walk_obeys_the_first_turn_rule():
         # `off` なら `j0` は無視される（旧と完全に同じ）
         assert _ra(1, 0.05, 0.05, 0.1, 0.02, j0=1) == pytest.approx(0.1)
     finally:
-        CB.set_rate_t1_mode("on")           # 既定へ戻す（戻さないと同じプロセスの後のテストへ漏れる）
+        # **既定へ戻す**（2026-09-26）——戻さないと同じワーカーで後に走る `test_kappa_vector` の
+        # `rate_of_row(j=0)` が `off` を読んで落ちる（xdist の割り振り次第で出るテスト間の漏れ）
+        CB.set_rate_t1_mode("on")
 
 
 def test_rush_bodies_attack_the_turn_they_arrive():
@@ -1743,6 +1745,7 @@ def test_the_hand_blocker_is_read_from_the_rules_not_the_play():
                     "BIG": {"power": 9000, "blocker": True},
                     "BODY": {"power": 7000}})
     tok = np.zeros((22, 24), dtype=np.float32)
+    _orig_hp = sys.modules.get("hand_plan")
     sys.modules["hand_plan"] = _HP
     try:
         assert CB.THETA_DON_MODE == "rule"       # **2026-09-19 から既定**（ユーザ指示「それは直しましょうか」）
@@ -1770,7 +1773,11 @@ def test_the_hand_blocker_is_read_from_the_rules_not_the_play():
         assert CB.hand_blocker_nu(sc, None, None, None, None, 5000.0) == pytest.approx(0.0)
     finally:
         CB.set_theta_don_mode("rule")
-        del sys.modules["hand_plan"]
+        # 元のモジュールを戻す（消すと後のテストの遅延 import が別の `hand_plan` を作り、monkeypatch が効かなくなる）
+        if _orig_hp is not None:
+            sys.modules["hand_plan"] = _orig_hp
+        else:
+            del sys.modules["hand_plan"]
 
 
 def test_the_rate_check_can_drop_the_killing_turn():

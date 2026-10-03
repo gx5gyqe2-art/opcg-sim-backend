@@ -119,6 +119,15 @@ def don_stock(sc, tok, side="me"):
     return float(sc[a]) + float(sc[r]) + float(sc[ld]) * 5.0 + attached
 
 
+def don_attached(sc, tok, side="me"):
+    """**付与中のドン**＝リーダー付与＋キャラ付与（`don_stock` の付与の部分）。"""
+    _a, _r, ld = SC_DON[side]
+    slots = SLOT_OWN_FIELD if side == "me" else SLOT_OPP_FIELD
+    attached = sum(float(tok[s, S_ATTACHED_DON]) * 5.0 for s in range(slots.start, slots.stop)
+                   if float(tok[s, S_IS_CHAR]) > 0.5)
+    return float(sc[ld]) * 5.0 + attached
+
+
 def state_meas(sc, tok):
     """**実測の価格で評価した盤面**（自席から見た差）。"""
     mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
@@ -162,7 +171,29 @@ def quality_correction(gains, mu=MU):
     return float(sum(float(g) - float(mu) for g in gains))
 
 
+#: **F-4（レビュー 3 の 6）**: 物差しを固める——実現の側の手札の質（`hand_quality_delta`）を、F の値付けの直しと
+#: 2 つの切替を**切った**値付けで読む（価格の側だけが動く比較にする）。既定 `False`＝従来どおり今の値付けで読む。
+FREEZE_YARDSTICK = False
+
+
+class _frozen_pricing:
+    def __enter__(self):
+        self._b = (EV.F_PRICING_FIX, _TO.ATTACK_ABILITY_MODE, _TO.PASSIVE_BODY_MODE)
+        if FREEZE_YARDSTICK:
+            EV.set_f_pricing_fixes("none"); _TO.set_attack_ability_mode("off"); _TO.set_passive_body_mode("off")
+
+    def __exit__(self, *_e):
+        if FREEZE_YARDSTICK:
+            EV.set_f_pricing_fixes(self._b[0]); _TO.set_attack_ability_mode(self._b[1]); _TO.set_passive_body_mode(self._b[2])
+        return False
+
+
 def hand_quality_delta(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, mu=MU, deck=None):
+    with _frozen_pricing():
+        return _hand_quality_delta(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, mu, deck)
+
+
+def _hand_quality_delta(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, mu=MU, deck=None):
     """**T69**: 窓の中で手札に入った札の補正 `(Σ(gain − μ), [gain, …])`。`count` なら `(0, [])`。`deck` は T70 の相方待ちに使う。"""
     if HAND_MEAS_MODE != "quality":
         return 0.0, []
@@ -175,6 +206,33 @@ def hand_quality_delta(sc_after, tok_after, ci_before, ci_after, idx2cid, cards,
 DON_COST = 0.66 * MU
 #: **後で効く効果**（T53）——次の判断点には出ず、同じターンの後の行（攻撃）に実現が出る動作の型
 FLOW_ACTS = frozenset({"ACTIVE_DON", "ATTACH_DON", "GRANT_KEYWORD", "BUFF", "BP_BUFF", "REST"})
+
+
+#: **F-4**: 攻撃の行を「攻め手が【アタック時】能力を持つか」で層別した表を出すか（既定 `False`＝出力は従来のまま）
+ATTACK_SPLIT = False
+
+
+def passive_class(cid, info, ctx, theta, mu):
+    """**F-4**: 登場の行の継続効果の値が物差しに見えるか（`none`＝足す値が無い／`visible`＝殴る側のパワーの上昇だけ
+    ＝次の判断点の体の帯に現れる／`invisible`＝生存・ブロッカー・守る側・キーワード等を含む）。切替に依らず同じ行を分ける。"""
+    if not info or info.get("event") or info.get("stage") or info.get("leader"):
+        return "none"
+    try:
+        parts = _TO.passive_parts(cid, info, ctx, theta, mu)
+    except Exception:
+        return "none"
+    if abs(parts["total"]) <= 1e-12 and not parts["bad"]:
+        return "none"
+    if abs(parts["total"] - parts["visible"]) <= 1e-12:
+        return "visible"
+    return "invisible"
+
+
+def has_on_attack(cid):
+    """攻め手のカードが【アタック時】能力を持つか（F-4 の層別）。"""
+    c = EV._all_cards().get(cid) if cid else None
+    return bool(c) and any((ab.get("trigger") or ab.get("timing")) in EV.ON_ATTACK_TRIGGERS
+                           for ab in (c.get("abilities") or []))
 
 
 def primary_action(cid, triggers=EV.ACTIVATE_TRIGGERS):
@@ -251,8 +309,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
             if t >= 1 and PL.is_own_turn(w, t) and TB_is_decision_row(rows, pol, L, ptr, i):
                 turn_end_row[(w, t)] = i                                        # 後の行で上書き＝最後が残る
+        last_ci = {}                                                            # D3: 席ごとの直近の行（相手の手札）
         for n, i in enumerate(order):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
+            prev_opp_ci = last_ci.get(1 - w)
+            last_ci[w] = ex["ci"][i]
             if t < 1:
                 continue
             z = float(rows["z"][i])
@@ -280,6 +341,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     stats["no_next"] += 1      # ターン最後の行＝相手のターンが挟まる
                     continue
                 ctx = row_ctx(sc, tok, ex["ci"][i], idx2cid, cards, decks.get(w), theta, mu, theta_mode)
+                if EV.F_PRICING_FIX and ctx.get("st") is not None:
+                    from theory_bridge import opp_pools
+                    ctx["st"].update(opp_pools(prev_opp_ci, ex["ci"][i], idx2cid, decks.get(1 - w)))
                 th = ctx["theta"]
                 b = int(ptr[i]) + ch
                 sig = json.loads(pol["pol_sig"][b])
@@ -288,7 +352,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                     (str(pol["pol_tcid"][b]) or None) if tl else None, ctx, cards,
                                     src_power=slot_power(tok, pol["pol_si"][b]),
                                     tgt_power=slot_power(tok, pol["pol_ti"][b]),
-                                    don_k=pol["pol_k"][b])
+                                    don_k=pol["pol_k"][b],
+                                    src_don=_TO.slot_don(tok, pol["pol_si"][b]))      # F-2（切替 on のときだけ使う）
                 fam = move_family(sig)
                 if v is None:
                     stats["silent"] += 1
@@ -327,7 +392,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             rec["price"][fam] += float(v); rec["real"][fam] += float(real); rec["n"][fam] += 1
             rec["rows"].append({"fam": fam, "price": float(v), "real": float(real), "real_te": float(real_te),
                                 "gross": float(gross), "act": act, "cid": cid, "turn": t, "play_parts": play_parts,
-                                "hand_gains": list(gains)})                                 # T69: 窓で手札に入った札の gain
+                                "hand_gains": list(gains),                                  # T69: 窓で手札に入った札の gain
+                                "on_attack": has_on_attack(cid) if fam == "attack" else None,   # F-4: 層別用（出力には出ない）
+                                "pas_class": (passive_class(cid, info, ctx, th, mu)
+                                              if (ATTACK_SPLIT and fam == "play") else None)})
             # **ターン単位の恒等式**——価格の和 対 「最初の自分の行 → 最後の自分の行」の実現
             tk = rec["turns"].setdefault(t, {"price": 0.0, "first": None, "last": None, "acts": set()})
             tk["price"] += float(v)
@@ -392,6 +460,15 @@ def summarise(per, reps=200, seed=0):
         if len(rs) < 10:
             continue
         out["by_family"][f] = block(rs)
+    if ATTACK_SPLIT:
+        # **F-4**: 登場の行を継続効果の値の見え方で層別する（`passive_class`）
+        out["play_by_passive_class"] = {k: block(rs) for k, rs in (
+            (k, [r for r in allrows if r["fam"] == "play" and r.get("pas_class") == k])
+            for k in ("none", "visible", "invisible")) if len(rs) >= 10}
+        # **F-4**: 攻撃の行を攻め手の【アタック時】能力の有無で層別する
+        out["attack_by_on_attack"] = {k: block(rs) for k, rs in (
+            ("with", [r for r in allrows if r["fam"] == "attack" and r.get("on_attack")]),
+            ("without", [r for r in allrows if r["fam"] == "attack" and not r.get("on_attack")])) if len(rs) >= 10}
     # 効果の型の内訳（最初の動作の型ごと）
     eff = [r for r in allrows if r["fam"] == "effect"]
     acts = {}
@@ -492,9 +569,25 @@ def main(argv=None):
     import hand_plan as _HP
     _HP.add_inflow_arg(ap)
     _HP.add_cond_clock_arg(ap)
+    _TO.add_attack_ability_arg(ap)
+    _TO.add_defender_power_arg(ap)                 # 2b
+    _TO.add_passive_body_arg(ap)
+    EV.add_f_pricing_fixes_arg(ap)
+    ap.add_argument("--freeze-yardstick", action="store_true",
+                    help="**F-4** 実現の側の手札の質を、F の直しと切替を切った値付けで読む（物差しを固める）")
+    ap.add_argument("--attack-split", action="store_true",
+                    help="**F-4** 攻撃の行を攻め手の【アタック時】能力の有無で層別した表も出す")
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_decision_row(a)
+    _TO.apply_attack_ability(a)
+    _TO.apply_defender_power(a)                    # 2b
+    _TO.apply_passive_body(a)
+    EV.apply_f_pricing_fixes(a)
+    _TO.reset_wiring_stats()
+    global ATTACK_SPLIT, FREEZE_YARDSTICK
+    ATTACK_SPLIT = bool(a.attack_split)
+    FREEZE_YARDSTICK = bool(a.freeze_yardstick)
     apply_nu_mode(a)
     _TO.apply_surv_mode(a)
     _TO.apply_cbar_mode(a)
@@ -512,6 +605,12 @@ def main(argv=None):
     EV.reset_cond_stats()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
     stats["cond"] = dict(EV.COND_STATS)                     # T72: 条件の判定（真／偽／判らない）の数
+    if EV.F_PRICING_FIX:
+        stats["f_pricing_fixes"] = EV.apply_f_pricing_fixes(a)          # 空でないときだけ刻む（`none`＝旧の値付けの出力は 079e73b8 と同じ）
+    if _TO.ATTACK_ABILITY_MODE != "off" or _TO.PASSIVE_BODY_MODE != "off":
+        # F-2/F-3a: 切替 on のときだけ刻む（off の出力は従来と同じ）
+        stats["wiring"] = {"attack_ability": _TO.ATTACK_ABILITY_MODE, "passive_body": _TO.PASSIVE_BODY_MODE,
+                           **{k: (round(v, 5) if isinstance(v, float) else v) for k, v in _TO.WIRING_STATS.items()}}
     res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "flow_pricing": EV.FLOW_PRICING,
            "search_price": EV.SEARCH_PRICE_MODE, "hand_meas": HAND_MEAS_MODE,
            "play_now": EV.PLAY_NOW_MODE, "cost_afford": EV.COST_AFFORD_MODE, "pricing_fixes": pricing_fixes,

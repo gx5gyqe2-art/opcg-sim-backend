@@ -90,8 +90,9 @@ import guard_afford as GA  # noqa: E402
 from order_acc import band_of  # noqa: E402
 import effect_value as EV  # noqa: E402
 import theory_order as _TOM  # noqa: E402
+import cut_price as _CP  # noqa: E402  （N-3: 切らせた札の値段を守り手の手札で読む）
 from theory_order import (own_attackers_of, MU, PWR_EPS, POL_COLS, SC_MY_DON, SC_MY_LEADER_POWER,  # noqa: E402
-                          SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE, THETA,
+                          SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE, THETA, SC_MY_HAND, SC_OPP_HAND,
                           c_of, clock_of_row, incoming_x, opp_bodies_of, opp_chars_of, score_candidate,
                           slot_power,
                           theta_of)
@@ -470,7 +471,7 @@ def guard_hand_reading(tok, sc, ci_row, idx2cid, cards, take, mu=MU, deck=None, 
         total = don_stock(sc, tok, "me")
         nxt = float(total) + float(HP.DON_PER_TURN)              # 次の自席ターン: 全部アクティブ ＋ ドン!!フェイズの 2 枚（上限 10）
         out["caps"] = HP.caps_of(min(float(HP.DON_CAP), nxt), nxt, r_turns=r_opp)
-        out["xs_future"] = HG.incoming(tok)                      # T67 と同じ「今の相手の場が毎ターン来る」
+        out["xs_future"] = HP.incoming_of_row(sc, tok, ci, idx2cid)   # T67 と同じ「今の相手の場が毎ターン来る」（2b: 規則どおりの守る側）
         out["inflow"] = {"deck": deck, "cards": cards, "olp": olp, "r": r_opp,
                          "field": HP.own_field_ids(ci, idx2cid),
                          "st_base": HP.state_of_row(sc, tok, ci, idx2cid, cards)}
@@ -593,6 +594,7 @@ def joint_valuer(hand):
     ctx = hand.get("inflow")
     mu = float(hand["mu"])
     reread = ctx is not None and any(_inflow_sensitive(s_.get("item"), ctx) for s_ in slots)
+    memo = {} if _TOM.SPEED_MEMO else None                      # この手札の読みの間だけの覚え書き（2026-10-01・値は同じ）
 
     def plan_items_of(keep):
         idx = sorted(keep)
@@ -600,7 +602,7 @@ def joint_valuer(hand):
         if reread and known:
             import hand_plan as HP
             known = HP.apply_inflow(known, ctx["deck"], hand["xs_future"], hand["take"], ctx["cards"], ctx["olp"], ctx["r"],
-                                    field=ctx["field"], st_base=ctx["st_base"])
+                                    field=ctx["field"], st_base=ctx["st_base"], memo=memo)
         rest = [slots[i] for i in idx if slots[i].get("item") is None]
         return [(float(it["cost"]), (mu if it["v"] is None else it["v"])) for it in list(known) + rest]
 
@@ -814,19 +816,35 @@ def _state_of(sc, ci, idx2cid, tok=None, cards=None):
         import price_realised as PR                       # 遅延（`price_realised` は本器を import する）
         st["my_don_total"] = PR.don_stock(sc, tok, "me")
         st["opp_don_total"] = PR.don_stock(sc, tok, "opp")
+        # 付与中のドン（リーダー ＋ キャラ・`attached_don_cond` だけが読む）
+        st["my_don_attached"] = PR.don_attached(sc, tok, "me")
+        st["opp_don_attached"] = PR.don_attached(sc, tok, "opp")
     st["source_rested"] = False                             # 登場時の値付け＝出た札はアクティブ
     if cards is not None:
         st["cards"] = cards
     return st
 
 
-def _kappa_of_row(sc, tok, t, prof=None, g_me=None, g_opp=None, opp=None, attacker=None):
+def opp_pools(opp_ci, my_ci, idx2cid, opp_deck):
+    """**レビュー 4 の D3**（完全情報）: 相手の手札（相手の直近の行の手札の枠）と相手の残りの山
+    （相手のデッキの構成 − 相手の手札 − 相手の場）。公開した札の確率を相手の札の池で出すのに使う。"""
+    import search_price as SP
+    hand = [] if opp_ci is None else _TOM.hand_ids_of(opp_ci, idx2cid)
+    field = [c for c in (idx2cid.get(int(x)) for x in np.asarray(my_ci)[_TOM.SLOT_OPP_FIELD]) if c]
+    out = {"opp_hand_ids": hand if opp_ci is not None else None}
+    out["opp_deck_remaining"] = SP.remaining_deck(opp_deck, hand, field) if opp_deck else None
+    return out
+
+
+def _kappa_of_row(sc, tok, t, prof=None, g_me=None, g_opp=None, opp=None, cut_me=None, cut_opp=None,
+                  attacker=None):
     """行の局面の傾き `κ` と時計の差 `d`。`W_MODE=curve`（T75）なら交点の橋の `D`（`crossing_bridge.curve_d_of_row`）、
     それ以外は盤面の時計（`clock_of_row`・`flat` なら `κ = 1`）。
     `g_me`／`g_opp`（T76・**T79 で両側**）は手札 1 枚あたりの価格。`opp`（T79）は相手の直近の行＝時計の相手側もそこから読む。"""
     if _TO_W_MODE() == "curve" and prof is not None:
         import crossing_bridge as CB
         cd = CB.curve_d_of_row(sc, tok, CB.own_turn_index(t), prof, g_hand_of_opp=g_opp, g_hand_of_me=g_me,
+                               cut_opp=cut_opp, cut_me=cut_me,                     # **N-3**（`None` なら旧）
                                attacker=attacker)                     # **H-4b**（`rule_don` だけが読む）
         return {"d": cd["d"], "kappa": _TOM.state_factor(cd["d"], "curve"), "tau_me": cd["tau_me"], "tau_opp": cd["tau_opp"]}
     return clock_of_row(sc, tok, opp_sc=(None if opp is None else opp["sc"]),
@@ -1112,6 +1130,20 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
             for _w0, ns in by_seat.items():
                 for a0, b0 in zip(ns, ns[1:]):
                     nxt_same_seat[a0] = b0
+        # **N-3**: 値段の枠。相手（守り手）の枠は**その席の直近の自席ターンの最後の行**（攻め手のターンの間の守り手の手札そのもの・
+        # 実現の直しの出発点と同じ＝損害と耐久が同じ枠）・自分の枠は**今の自席ターンの最初の行**（`first_main`・`g_me` と同じ行）。
+        cut_opp_fr = cut_me_fr = None
+        if _CP.joint_on():
+            own_last = {}
+            for i0 in idx:
+                w0, t0 = int(rows["who"][i0]), int(rows["turn"][i0])
+                if t0 >= 1 and PL.is_own_turn(w0, t0) and is_decision_row(rows, pol, L, ptr, i0):
+                    own_last[(w0, t0)] = i0
+            _dk = (decks.get(0), decks.get(1))
+            cut_opp_fr = _CP.CutFrames(list(idx), rows, ex, idx2cid, cards, own_last, mu, decks=_dk,
+                                       don_rule=True, stats=stats, end_of_turn=True)
+            cut_me_fr = _CP.CutFrames(list(idx), rows, ex, idx2cid, cards, first_main, mu, decks=_dk,
+                                      don_rule=True, stats=stats)
         pending_grd = []                  # T86: `all_attacks` のときは攻めの行を全部読んだ後に確定する
         for n, i in enumerate(idx):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
@@ -1167,13 +1199,20 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     ctx["opp_chars"] = opp_chars_of(tok)
                 # **T49**: 局面の傾き。価格（平均の傾きで書いた時計の差分）に掛けて `ΔG` に足す
                 opp = _opp_view(first_main, opp_turns, ex, w, t)          # T79: 相手の直近の行（完全情報）
+                if EV.F_PRICING_FIX and ctx.get("st") is not None:
+                    ctx["st"].update(opp_pools(None if opp is None else opp["ci"], ex["ci"][i], idx2cid, decks.get(1 - w)))
+                cut_me = cut_opp = None
+                if cut_opp_fr is not None:                                # **N-3**: 両席の値段の窓（今の枚数で）
+                    cut_me = cut_me_fr.view(w, t, float(sc[SC_MY_HAND]), at_n=n)
+                    cut_opp = cut_opp_fr.view(1 - w, t, float(sc[SC_OPP_HAND]), at_n=n)
                 ck = _kappa_of_row(sc, tok, t, prof,
                                    g_me=_g_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t)),
                                    g_opp=(None if opp is None else
                                           _g_opp_of(opp, last_main, ex, idx2cid, cards, g_cache, 1 - w,
                                                     deck=(decks or {}).get(1 - w))),
-                                   opp=opp, attacker=_attacker_of(sc, tok, ex["ci"][i], idx2cid, cards,
-                                                                  deck_ids=(decks or {}).get(w), t=t))
+                                   opp=opp, cut_me=cut_me, cut_opp=cut_opp,
+                                   attacker=_attacker_of(sc, tok, ex["ci"][i], idx2cid, cards,
+                                                         deck_ids=(decks or {}).get(w), t=t))
                 kap = float(ck["kappa"])
                 stats["kappa_sum"] += kap; stats["kappa_n"] += 1
                 stats["d_bins"][_d_bin(ck["d"])] += 1
@@ -1182,15 +1221,17 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     stats["d_win"][_d_bin(ck["d"])][1] += 1
                 b = int(ptr[i])
 
-                def _score(j, _ctx=ctx, _tok=tok):
+                def _score(j, _ctx=ctx, _tok=tok, _cv=cut_opp):
                     sig = json.loads(pol["pol_sig"][j])
                     tl = sig[2] if len(sig) > 2 else None
-                    return score_candidate(sig, str(pol["pol_cid"][j]) or None,
-                                           (str(pol["pol_tcid"][j]) or None) if tl else None,
-                                           _ctx, cards,
-                                           src_power=slot_power(_tok, pol["pol_si"][j]),
-                                           tgt_power=slot_power(_tok, pol["pol_ti"][j]),
-                                           don_k=pol["pol_k"][j])
+                    with _CP.defending(_cv):                               # **N-3**: 守り手＝相手の値段で
+                        return score_candidate(sig, str(pol["pol_cid"][j]) or None,
+                                               (str(pol["pol_tcid"][j]) or None) if tl else None,
+                                               _ctx, cards,
+                                               src_power=slot_power(_tok, pol["pol_si"][j]),
+                                               tgt_power=slot_power(_tok, pol["pol_ti"][j]),
+                                               don_k=pol["pol_k"][j],
+                                               src_don=_TOM.slot_don(_tok, pol["pol_si"][j]))   # F-2（on のときだけ使う）
                 vals = [_score(j) for j in range(b, b + k)]
                 scored = [v for v in vals if v is not None]
                 played_v = vals[ch]
@@ -1215,6 +1256,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     i2 = idx[j2] if j2 is not None else None
                     if i2 is not None and int(rows["turn"][i2]) == t:
                         g_v = realised_harm(sc, tok, ex["sc"][i2], ex["tok"][i2])
+                        if cut_opp_fr is not None:
+                            # **N-3**: 括りの中の応答で守り手の手札から出ていった札の値段の直し（交点の橋の `F` と同じ関数）
+                            g_v += cut_opp_fr.bracket_corr(w, t, n, j2)
                         stats["harm_rows"] += 1
                     else:
                         g_v = 0.0
@@ -1328,7 +1372,16 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                                            deck=(decks or {}).get(1 - w))),
                                           opp=opp_g,
                                           attacker=_attacker_of(sc, tok, ex["ci"][i], idx2cid, cards,
-                                                                deck_ids=(decks or {}).get(w), t=t))["kappa"])
+                                                                deck_ids=(decks or {}).get(w), t=t),
+                                          # **N-3**: 守りの窓の席（w）と攻め手（1 − w）の値段の窓
+                                          cut_me=(None if cut_me_fr is None else
+                                                  cut_me_fr.view(w, t, float(sc[SC_MY_HAND]), at_n=n)),
+                                          # **2026-10-01 の点検（先読みの修正）**: 守りの窓は攻め手（1 − w）のターン t の
+                                          # 途中＝攻め手のターン末の枠（`cut_opp_fr`）はこの行より後ろ（とその次のターン）を読む。
+                                          # 攻め手の値段はこの行までに在る攻め手の直近の行＝**今のターンの最初の行**
+                                          # （`cut_me_fr` の枠・`opp_g`〔T79〕・κ の相手の時計と同じ行・パワーは行から規則で読む）。
+                                          cut_opp=(None if cut_me_fr is None else
+                                                   cut_me_fr.view(1 - w, t, float(sc[SC_OPP_HAND]), at_n=n)))["kappa"])
                 if LEDGER_HARM_MODE == "realised":
                     # **T87**: 移転は攻め手の行に 1 回だけ入っている＝守りの窓は帳簿に何も足さない（`s` 専任）
                     got = dict(got, g=0.0, g_delta=0.0)
@@ -1715,11 +1768,22 @@ def main(argv=None):
                     help="**T80 の診断** `drop` なら局の最後のターンの行を落とす（とどめの一撃とその応答を外す）")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
+    _TOM.add_attack_ability_arg(ap)
+    _TOM.add_passive_body_arg(ap)
+    EV.add_f_pricing_fixes_arg(ap)
+    _CP.add_cut_price_arg(ap)                                  # **N-3**
+    _TOM.add_defender_power_arg(ap)                            # 2b
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_decision_row(a)
+    _CP.apply_cut_price(a)                                     # **N-3**
+    _TOM.apply_defender_power(a)                               # 2b
     apply_guard_afford(a)                                      # G-2
     apply_guard_s_cost(a)                                      # G-2
+    _TOM.apply_attack_ability(a)
+    _TOM.apply_passive_body(a)
+    EV.apply_f_pricing_fixes(a)
+    _TOM.reset_wiring_stats()
     EV.apply_search_price(a)
     EV.apply_play_now(a)
     EV.apply_cost_afford(a)
@@ -1763,6 +1827,12 @@ def main(argv=None):
     # **T49 の検算**: `κ` の平均（`w` の平均が `w̄` に戻れば 1）
     stats["kappa_mean"] = (round(stats["kappa_sum"] / stats["kappa_n"], 4) if stats["kappa_n"] else None)
     stats["w_mean"] = (round(stats["kappa_mean"] * _TO.W_BAR, 4) if stats["kappa_mean"] is not None else None)
+    if EV.F_PRICING_FIX:
+        stats["f_pricing_fixes"] = EV.apply_f_pricing_fixes(a)          # 空でないときだけ刻む（`none` の出力は 079e73b8 と同じ）
+    if _TOM.ATTACK_ABILITY_MODE != "off" or _TOM.PASSIVE_BODY_MODE != "off":
+        # F-2/F-3a: 切替 on のときだけ刻む（off の出力は従来と同じ）
+        stats["wiring"] = {"attack_ability": _TOM.ATTACK_ABILITY_MODE, "passive_body": _TOM.PASSIVE_BODY_MODE,
+                           **{k: (round(v, 5) if isinstance(v, float) else v) for k, v in _TOM.WIRING_STATS.items()}}
     pairs = pair_games(per, a.silent)
     res = {"stats": stats, "decision_rows": DECISION_ROW_MODE,
            "provisional": {"P3_theta": a.theta, "P2_silent": a.silent,
@@ -1775,7 +1845,8 @@ def main(argv=None):
                            "guard_s_cost": GUARD_S_COST_MODE,
                            "play_now": EV.PLAY_NOW_MODE, "inflow": _HP.INFLOW_MODE, "cond_clock": _HP.COND_CLOCK_MODE,
                            "pricing_fixes": pricing_fixes,                                              # L
-                           "note": "§0.4 の暫定値。感度を付けて読む"},
+                           "note": "§0.4 の暫定値。感度を付けて読む",
+                           **({"cut_price": _CP.CUT_PRICE_MODE} if _CP.joint_on() else {})},   # **N-3**
            "summary": summarise(pairs, a.boot_reps, a.seed),
            # **T28-b: 行ごとに帯で切ってから足した版**（判定の主はこちら）
            "per_band": {nm: summarise(pair_by_band(per, nm), a.boot_reps, a.seed)

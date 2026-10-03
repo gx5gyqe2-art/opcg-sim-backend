@@ -151,12 +151,12 @@ def enabler_target(cid, cards_json=None):
     return out
 
 
-def eligible_hand_cards(target, items, cards, skip_cid=None):
+def eligible_hand_cards(target, items, cards, skip_cid=None, st=None):
     """手札（`hand_items`）のうち絞り込みに合う札（`skip_cid` は 1 枚だけ除く＝出す札そのもの）。"""
     cids = [it["cid"] for it in items]
     if skip_cid and skip_cid in cids:
         cids.remove(skip_cid)
-    return eligible_deck_cards(target, cids, cards)
+    return eligible_deck_cards(target, cids, cards, st=st)
 
 
 def _card_body(cid, cards):
@@ -167,9 +167,13 @@ def _card_body(cid, cards):
             "counter": float(info.get("counter") or 0.0), "card_type": kind, **ident}
 
 
-def eligible_deck_cards(target, deck_cids, cards):
-    """絞り込みに合うデッキの札（card_id の並び・同じ札は枚数ぶん）。読めない絞り込みは無視（上限として読む）。"""
+def eligible_deck_cards(target, deck_cids, cards, st=None):
+    """絞り込みに合うデッキの札（card_id の並び・同じ札は枚数ぶん）。読めない絞り込みは無視（上限として読む）。
+
+    `st` を渡すと（`effect_value` の F の直し `state_filters` のときだけ呼び側が渡す）、動的なコスト上限
+    （「自分の場のドン!!の枚数以下のコスト」等・`effect_value.dynamic_cost_cap`）を状態から読んで絞る。"""
     t = target or {}
+    dyn_cap = EV.dynamic_cost_cap(t, st) if st is not None else None
     types = [str(x).upper() for x in (t.get("card_type") or [])]
     names = list(t.get("names") or [])
     name_or_type = "NAME_OR_TYPE" in [str(f) for f in (t.get("flags") or [])]
@@ -189,6 +193,8 @@ def eligible_deck_cards(target, deck_cids, cards):
         if not EV._matches_identity(rest, b):
             continue
         if t.get("cost_max") is not None and b["cost"] > float(t["cost_max"]):
+            continue
+        if dyn_cap is not None and b["cost"] > dyn_cap:
             continue
         if t.get("cost_min") is not None and b["cost"] < float(t["cost_min"]):
             continue
@@ -224,8 +230,10 @@ def _ctx_key(ctx):
 
 def card_gain(cid, ctx, cards):
     """デッキの札 1 枚を今の手札に加えたときの `max(ΔH_play, ΔG_guard)`（同じ手札・同じ札は使い回す）。"""
-    key = (_ctx_key(ctx), str(cid))
-    if key in _GAIN:
+    import theory_order as _TO
+    key = ((_ctx_key(ctx), str(cid)) + ((_TO.CUT_PRICER_KEY, _TO.CUT_TAKE_CARD is not None) if _TO.CUT_PRICER is not None else ())
+           if _TO._cut_cache_ok() else None)                   # **N-3**: 値段の文脈は鍵に入れる
+    if key is not None and key in _GAIN:
         return _GAIN[key]
     b = _card_body(cid, cards)
     info = cards.info(cid) or {}
@@ -235,6 +243,8 @@ def card_gain(cid, ctx, cards):
         card = HP.inflow_item(card, ctx["hand_items"], ctx.get("deck") or [], ctx["xs"], ctx["take"], cards, ctx["olp"], ctx["r"],
                               field=ctx.get("field") or (), st_base=ctx.get("st_base"))
     d = HP.card_deltas(ctx["hand_items"], card, ctx["caps"], ctx["xs"], ctx["take"])
+    if key is None:
+        return float(d["dtotal"])
     _GAIN[key] = float(d["dtotal"])
     return _GAIN[key]
 

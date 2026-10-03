@@ -233,3 +233,30 @@ def test_a_conditional_card_gets_a_per_turn_value_from_the_projected_state(monke
         assert HP.inflow_item(k, [], [], [], 0.087, _Cards(), 5000.0, 4.0, turns=4, st_base=st) is k
     finally:
         HP.set_cond_clock_mode("on")
+
+
+def test_search_context_reads_incoming_attacks_at_the_rules_power_of_the_defender():
+    """**2026-10-01（残り 2b）**: 自席のターンの行のトークン列 0 は自分が付けたドン（自分のターンだけ）を載せる——
+    探す値の状態の来る攻撃（`search_context["xs"]`）は相手のターンの規則どおりのパワー（列 20＝付与ドン無し）で読む。
+    `token`（旧）は列 0 の読み＝`hand_guard.incoming` と同じ。相手のターンの行は両方同じ。"""
+    import numpy as np
+    import theory_order as TO
+    sc = np.zeros(127, dtype=np.float32)
+    sc[TO.SC_MY_LEADER_POWER] = 0.5; sc[TO.SC_OPP_LEADER_POWER] = 0.5; sc[TO.SC_MY_LIFE] = 3.0; sc[TO.SC_OPP_LIFE] = 4.0
+    sc[TO.SC_IS_MY_TURN] = 1.0
+    tok = np.zeros((22, 22), dtype=np.float32)
+    tok[0, TO.S_POWER] = 0.7; tok[0, TO.S_POWER_OPP_TURN] = 0.5      # 5000 ＋ 付与ドン 2 枚（自分のターンだけ）
+    tok[1, TO.S_POWER] = 0.6                                         # 相手のリーダー 6000
+    tok[7, TO.S_IS_CHAR] = 1.0; tok[7, TO.S_POWER] = 0.5             # 相手のキャラ 5000
+    before = TO.DEFENDER_POWER_MODE
+    try:
+        assert TO.DEFENDER_POWER_MODE == "rule"                     # 出荷の既定
+        assert HP.incoming_of_row(sc, tok) == pytest.approx([1000.0, 0.0])
+        TO.set_defender_power_mode("token")
+        assert HP.incoming_of_row(sc, tok) == HP.HG.incoming(tok) == []
+        TO.set_defender_power_mode("rule")
+        sc[TO.SC_IS_MY_TURN] = 0.0; tok[0, TO.S_POWER] = 0.5         # 相手のターンの行（列 0 に付与ドンは載らない）
+        assert HP.incoming_of_row(sc, tok) == pytest.approx(HP.HG.incoming(tok))
+        assert HP.incoming_of_row(sc, tok) == pytest.approx([1000.0, 0.0])
+    finally:
+        TO.set_defender_power_mode(before)

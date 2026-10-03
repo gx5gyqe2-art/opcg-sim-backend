@@ -386,7 +386,7 @@ def test_theory_d_mode_fills_the_rate_shape_in_the_default_hand_mode(monkeypatch
     rows = {"kind": np.zeros(3, np.int64), "who": np.array([0, 1, 0]), "turn": np.array([1, 2, 3]),
             "z": np.zeros(3), "pol_chosen": np.zeros(3, np.int64), "seed": np.zeros(3, np.int64)}
     ex = {"sc": np.zeros((3, 70), np.float32), "tok": np.zeros((3, 22, 24), np.float32),
-          "ci": np.zeros((3, 22), np.int64)}
+          "ci": np.zeros((3, 24), np.int64)}
     game = (rows, {"pol_sig": ["[]"]}, ex, np.ones(3, np.int64), np.zeros(3, np.int64), [0, 1, 2])
     monkeypatch.setattr(RL.PL, "iter_games", lambda *a, **k: iter([game]))
     monkeypatch.setattr(RL.CB, "profile_for", lambda dirs: [0.2] * 12)
