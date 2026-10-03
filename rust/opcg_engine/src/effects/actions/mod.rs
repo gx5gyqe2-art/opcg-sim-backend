@@ -192,6 +192,23 @@ pub fn run_target_loop(
     value: i32,
     source_card: Option<CardIdx>,
 ) -> Result<bool, EngineError> {
+    run_target_loop_with(s, masters, actor, action, node_ref, targets, value, source_card, None)
+}
+
+/// [`run_target_loop`] の `skip_guards` 版。`skip_guards` のカードは除去保護・置換の確認を
+/// 済ませた（置換を断られた）ものとして、そのまま本来の除去を行う。
+#[allow(clippy::too_many_arguments)]
+pub fn run_target_loop_with(
+    s: &mut Session,
+    masters: &MasterTable,
+    actor: Seat,
+    action: &GameAction,
+    node_ref: &NodeRef,
+    targets: &[TargetRef],
+    value: i32,
+    source_card: Option<CardIdx>,
+    skip_guards: Option<CardIdx>,
+) -> Result<bool, EngineError> {
     let handler = target_handler_for(action.ty);
     // 群 A〜E の差し口: 土台に無い種別は、担当する群があればその `apply_target` へ 1 対象ずつ渡す。
     type GroupTarget = fn(&mut Session, &MasterTable, Seat, &GameAction, CardIdx, Seat, Option<CardZone>, i32, Option<CardIdx>) -> Result<(), EngineError>;
@@ -243,20 +260,45 @@ pub fn run_target_loop(
         let Some((owner, source_list)) = ops::find_card_location(s.state(), target) else {
             continue;
         };
-        // 相手の効果で場のカードを除去する場合、保護／置換を確認する。
+        // 相手の効果で場のカードを除去する場合、保護／置換を確認する。自分の効果の KO も
+        // 「効果でKOされない／KOされる場合」の句は受ける（「相手の効果で」の句は各判定が弾く）。
         if LEAVE_ACTIONS.contains(&action.ty)
-            && actor != owner
+            && (actor != owner || action.ty == ActionType::Ko)
             && source_list == Some(CardZone::Field)
+            && skip_guards != Some(target)
         {
             let guard_statuses: &[&str] = if action.ty == ActionType::Ko {
                 &["LEAVE", "EFFECT_KO"]
             } else {
                 &["LEAVE"]
             };
-            if active_protection(s, masters, target, guard_statuses, Some(actor))? {
+            // 除去を行った効果の発生源も渡す（「元々のパワーN以下のキャラの効果で」の判定用）。
+            if rules::active_protection_with_origin(
+                s, masters, target, guard_statuses, Some(actor), source_card, source_card,
+            )? {
                 continue;
             }
-            if active_replacement(s, masters, target, guard_statuses)? {
+            // 任意の置換（「代わりに〜できる」）は、先に被除去側へ確認してから実行する
+            // （断れば本来の除去を続行・`suspend_for_battle_ko_replacement` と同じ作り）。
+            if let Some(repl) = find_replacement_by(s, masters, target, guard_statuses, Some(actor))? {
+                if repl.sub_is_optional {
+                    let remaining = &targets[i + 1..];
+                    if !remaining.is_empty() {
+                        super::interact::defer_removal_targets(
+                            s, actor, node_ref, &cards_of(remaining), value,
+                        );
+                    }
+                    super::interact::suspend_for_removal_replacement(
+                        s, masters, actor, node_ref, action, target, owner, value, source_card,
+                    );
+                    s.edit().set_mgr_flag(
+                        crate::journal::MgrFlagField::ReplacementSuspended,
+                        true,
+                    );
+                    return Ok(success);
+                }
+            }
+            if active_replacement_by(s, masters, target, guard_statuses, Some(actor))? {
                 if s.state().active_interaction().is_some() {
                     let remaining = &targets[i + 1..];
                     if !remaining.is_empty() {
@@ -269,16 +311,28 @@ pub fn run_target_loop(
                 continue;
             }
         }
-        match handler.as_ref() {
-            Some(TargetHandler::Ko) => ko(s, masters, actor, target, owner, source_card)?,
-            Some(TargetHandler::Discard) => discard(s, masters, target, owner)?,
-            Some(TargetHandler::Rest) => rest(s, masters, actor, target, source_card)?,
-            Some(TargetHandler::Active) => active(s, target, owner),
-            Some(TargetHandler::Buff) => buff(s, masters, action, target, value)?,
-            None => group.expect("checked above")(
-                s, masters, actor, action, target, owner, source_list, value, source_card,
-            )?,
-        }
+        let prev_actor = s.set_effect_actor(Some((actor, source_card)));
+        let applied = (|| -> Result<(), EngineError> {
+            match handler.as_ref() {
+                Some(TargetHandler::Ko) => ko(s, masters, actor, target, owner, source_card)?,
+                Some(TargetHandler::Discard) => {
+                    discard(s, masters, target, owner)?;
+                    // 手札から効果で捨てられた（コスト含む）＝「効果で自分の手札が捨てられた時」。
+                    if source_list == Some(CardZone::Hand) {
+                        triggers::on_hand_discarded_by_effect(s, masters, owner)?;
+                    }
+                }
+                Some(TargetHandler::Rest) => rest(s, masters, actor, target, source_card)?,
+                Some(TargetHandler::Active) => active(s, target, owner),
+                Some(TargetHandler::Buff) => buff(s, masters, action, target, value, source_card)?,
+                None => group.expect("checked above")(
+                    s, masters, actor, action, target, owner, source_list, value, source_card,
+                )?,
+            }
+            Ok(())
+        })();
+        s.set_effect_actor(prev_actor);
+        applied?;
     }
     Ok(success)
 }
@@ -306,6 +360,9 @@ fn draw(
         return Ok(true);
     }
     crate::rules::turn::draw_card(s, masters, target_player, value.max(0) as u32)?;
+    if value > 0 {
+        triggers::on_card_drawn_by_effect(s, masters, target_player)?;
+    }
     Ok(true)
 }
 
@@ -355,6 +412,18 @@ fn rest(
             target,
             status::FLAG_CANNOT_BE_RESTED_BY_OPP,
         )
+    {
+        return Ok(());
+    }
+    // 「相手のリーダーとキャラの効果で」版: 発生源がリーダー／キャラのときだけ弾く。
+    if actor != owner
+        && crate::rules::has_timed_flag(s.state(), target, status::FLAG_CANNOT_BE_RESTED_BY_OPP_LC)
+        && source_card.is_some_and(|c| {
+            matches!(
+                masters.get(s.state().card(c).master).ty,
+                crate::model::CardType::Leader | crate::model::CardType::Character
+            )
+        })
     {
         return Ok(());
     }
@@ -411,8 +480,17 @@ fn buff(
     action: &GameAction,
     target: CardIdx,
     value: i32,
+    source_card: Option<CardIdx>,
 ) -> Result<(), EngineError> {
     let _ = masters;
+    // 「そのキャラに付与されているドン!!N枚につき」: 対象ごとに付与ドン枚数で倍率を掛ける
+    // （値は対象に依存するので、対象ループの外で一括計算した value は使わない。OP15-008）。
+    let value = if action.value.dynamic_source.as_deref() == Some("TARGET_ATTACHED_DON") {
+        let n = s.state().card(target).attached_don.max(0);
+        (n / action.value.divisor.max(1)) * action.value.multiplier
+    } else {
+        value
+    };
     match action.status.as_deref() {
         Some("POWER_OVERRIDE") => {
             // PASSIVE 再計算由来は再計算レイヤへ（即時効果の上書きを消さない）。
@@ -432,13 +510,27 @@ fn buff(
         }
         Some("COST_REDUCTION") => {
             if is_timed(action.duration) {
+                // 「次に登場させる〜のコストは N 少なくなる」: 一回限り＝発生源ごとの印を付ける
+                // （1 枚を登場させたら `consume_next_play_discounts` が残りを外す）。
+                let once = action
+                    .target
+                    .as_ref()
+                    .is_some_and(|q| q.flags.iter().any(|f| f == "NEXT_PLAY_ONCE"));
+                let flag = if once {
+                    let src = source_card
+                        .map(|c| s.state().card(c).uuid.clone())
+                        .unwrap_or_default();
+                    format!("{}{src}", continuous::NEXT_PLAY_FLAG)
+                } else {
+                    String::new()
+                };
                 continuous::apply(
                     s,
                     target,
                     ContinuousKind::Cost,
                     action.duration,
                     value,
-                    "",
+                    &flag,
                     "",
                     expire_turn_for(s, action.duration),
                 );
@@ -525,6 +617,17 @@ pub fn move_card(
     dest_player: Seat,
     dest_position: Position,
 ) -> Result<(), EngineError> {
+    // 「表向きのライフは手札に加わる代わりにデッキの下に置かれる」（ST13-003）: 効果でライフから
+    // 手札へ加わる場合も同じ（バトルのダメージは battle.rs が同じ判定をする）。
+    let (dest_zone, dest_position) = if dest_zone == Zone::Hand
+        && s.state().card(card).is_face_up
+        && ops::find_card_location(s.state(), card).is_some_and(|(_, z)| z == Some(CardZone::Life))
+        && rules::has_face_up_life_to_deck_rule(s, masters, s.state().card(card).owner)?
+    {
+        (Zone::Deck, Position::Bottom)
+    } else {
+        (dest_zone, dest_position)
+    };
     let events = ops::move_card(s, masters, card, dest_zone, dest_player, dest_position)?;
     for ev in events {
         match ev.kind {
@@ -533,10 +636,11 @@ pub fn move_card(
                 continuous::drop_for(s, &uuid);
             }
             ops::LeaveKind::LifeDecrease => {
-                triggers::enqueue_life_decrease(s, masters, ev.count)?;
+                ops::record_life_left(s, ev.owner, ev.count);
+                triggers::enqueue_life_decrease(s, masters, ev.owner, ev.count, dest_zone == Zone::Hand)?;
             }
             ops::LeaveKind::OnLeave => {
-                triggers::enqueue_on_leave(s, masters, ev.card, ev.owner)?;
+                triggers::enqueue_on_leave(s, masters, ev.card, ev.owner, dest_zone == Zone::Hand)?;
             }
         }
     }
@@ -561,6 +665,18 @@ pub fn active_protection(
     rules::active_protection(s, masters, card, status_values, actor, None)
 }
 
+/// [`active_protection`] に除去する効果の発生源（`source_card`）を渡す版（発生源の属性で守りが変わる OP11-005）。
+pub fn active_protection_from(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+    origin: Option<CardIdx>,
+) -> Result<bool, EngineError> {
+    rules::active_protection_with_origin(s, masters, card, status_values, actor, None, origin)
+}
+
 /// [`active_protection`] にバトル相手（Python の `attacker=`）を渡す版。
 pub fn active_protection_vs(
     s: &mut Session,
@@ -581,6 +697,28 @@ pub fn find_replacement(
     status_values: &[&str],
 ) -> Result<Option<rules::Replacement>, EngineError> {
     rules::find_replacement(s, masters, card, status_values)
+}
+
+/// [`find_replacement`] に除去を行った効果の実行者を渡す版（自分の効果の KO にも置換を適用する）。
+pub fn find_replacement_by(
+    s: &Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+) -> Result<Option<rules::Replacement>, EngineError> {
+    rules::find_replacement_by(s, masters, card, status_values, actor)
+}
+
+/// [`active_replacement`] に除去を行った効果の実行者を渡す版。
+pub fn active_replacement_by(
+    s: &mut Session,
+    masters: &MasterTable,
+    card: CardIdx,
+    status_values: &[&str],
+    actor: Option<Seat>,
+) -> Result<bool, EngineError> {
+    rules::active_replacement_by(s, masters, card, status_values, actor)
 }
 
 /// Python `guards._active_replacement`（本体は群 E＝[`rules::active_replacement`]）。

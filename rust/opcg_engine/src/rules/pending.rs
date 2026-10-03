@@ -65,6 +65,9 @@ pub fn pending_actor_action(s: &mut Session) -> Option<(Seat, &'static str)> {
 /// ブロッカー候補（Python `get_pending_request` の BLOCK_STEP 分岐。`has_blocker` と
 /// 条件が **1 つずれている**: こちらは `BLOCKER_DISABLED` を見ない＝Python のまま移す）。
 pub fn blocker_candidates(state: &crate::model::GameState, seat: Seat) -> Vec<CardIdx> {
+    if crate::rules::blocking_suppressed(state) {
+        return Vec::new();
+    }
     state
         .player(seat)
         .field

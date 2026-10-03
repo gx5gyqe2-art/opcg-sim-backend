@@ -169,6 +169,14 @@ pub fn end_turn(s: &mut Session, masters: &MasterTable) -> Result<(), EngineErro
     triggers::flush_pending_end_of_turn(s, masters)?;
     let turn_count = s.state().turn_count;
     continuous::expire(s, ExpireEvent::TurnEnd, turn_count);
+    // デッキが0枚になったターンの終了時に敗北する（OP15-022 の持ち越し）。
+    for seat in [Seat::P1, Seat::P2] {
+        let name = super::battle::deckout_delay_event(seat);
+        let hit = s.state().turn_events.iter().any(|(k, n)| *k == name && *n > 0);
+        if hit && s.state().winner.is_none() {
+            s.edit().set_winner(Some(seat.other()));
+        }
+    }
     switch_turn(s, masters)
 }
 
@@ -298,20 +306,78 @@ pub fn draw_phase(s: &mut Session, masters: &MasterTable) -> Result<(), EngineEr
 pub fn don_phase(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
     let n = if s.state().turn_count == 1 { 1 } else { 2 };
     let seat = s.state().turn_player;
+    // 「（条件）の場合、自分のドン!!フェイズに置かれるドン!!1枚は、自分のリーダーに付与される」
+    // （OP13-003）。置く前の盤面で条件を判定し、置いた 1 枚目をリーダーへ付与する。
+    let redirect_to_leader = don_phase_leader_redirect(s, masters, seat)?;
+    let mut redirected = false;
     for _ in 0..n {
         if s.state().player(seat).don_deck.is_empty() {
             continue;
         }
-        let mut e = s.edit();
-        let don = e.don_zone_remove_at(seat, DonZone::Deck, 0);
-        e.don_zone_push(seat, DonZone::Active, don);
+        {
+            let mut e = s.edit();
+            let don = e.don_zone_remove_at(seat, DonZone::Deck, 0);
+            e.don_zone_push(seat, DonZone::Active, don);
+        }
+        if redirect_to_leader && !redirected {
+            if let Some(leader) = s.state().player(seat).leader {
+                ops::attach_don(s, seat, leader, false);
+                redirected = true;
+            }
+        }
     }
     main_phase(s, masters)
+}
+
+/// リーダーの常在能力に「ドン!!フェイズに置かれるドン!!…は、…リーダーに付与される」があり、
+/// その条件が今成り立つか。
+fn don_phase_leader_redirect(
+    s: &Session,
+    masters: &MasterTable,
+    seat: Seat,
+) -> Result<bool, EngineError> {
+    use crate::effects::ast::{ActionType, EffectNode, TriggerType};
+    let Some(leader) = s.state().player(seat).leader else {
+        return Ok(false);
+    };
+    let ids = masters.get(s.state().card(leader).master).ability_ids.clone();
+    for id in ids {
+        let ab = crate::effects::ability(masters, id)?;
+        if ab.trigger != TriggerType::Passive
+            || !ab.raw_text.contains("フェイズに置かれる")
+            || !ab.raw_text.contains("付与される")
+        {
+            continue;
+        }
+        let is_rule = matches!(&ab.effect, Some(EffectNode::Action(a)) if a.ty == ActionType::RuleProcessing);
+        if !is_rule {
+            continue;
+        }
+        let ok = match &ab.condition {
+            Some(c) => crate::effects::check_condition(
+                s.state(),
+                masters,
+                &masters.abilities,
+                c,
+                seat,
+                Some(leader),
+                None,
+                &crate::effects::EffectContext::default(),
+            )?,
+            None => true,
+        };
+        if ok {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Python `main_phase`。
 pub fn main_phase(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
     s.edit().set_phase(Phase::Main);
     let tp = s.state().turn_player;
-    apply_passive_effects(s, masters, tp)
+    apply_passive_effects(s, masters, tp)?;
+    // 「次の相手のメインフェイズ開始時、〜」の予約を解決する。
+    triggers::flush_pending_main_start(s, masters)
 }

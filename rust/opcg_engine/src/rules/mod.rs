@@ -27,6 +27,8 @@ pub mod pending;
 pub mod turn;
 #[cfg(test)]
 mod tests_rules;
+#[cfg(test)]
+mod tests_cost_gate;
 
 use crate::model::{CardIdx, CardType, GameState, MasterTable, Restriction, Seat};
 
@@ -36,6 +38,11 @@ pub const KW_BLOCKER: &str = "ブロッカー";
 pub const KW_RUSH: &str = "速攻";
 pub const KW_DOUBLE_ATTACK: &str = "ダブルアタック";
 pub const KW_BANISH: &str = "バニッシュ";
+/// 【速攻:キャラ】（登場したターンにキャラへアタックできる。リーダーへは不可）。
+/// 本文は全角コロンの表記もあるが、ローダが NFKC で `:`（半角）へ揃える。
+pub const KW_RUSH_CHAR: &str = "速攻:キャラ";
+/// 【ブロック不可】（このカードはブロックされない）。
+pub const KW_UNBLOCKABLE: &str = "ブロック不可";
 /// 「レスト状態のキャラクターのみ攻撃可能」を外す内部キーワード（Python `has_keyword("ATTACK_ACTIVE")`）。
 pub const KW_ATTACK_ACTIVE: &str = "ATTACK_ACTIVE";
 
@@ -77,6 +84,50 @@ pub fn attack_tax_need(state: &GameState, card: CardIdx) -> Option<usize> {
         .max()
 }
 
+/// 「相手はキャラの「X」以外にアタックできない」の制限キー接頭辞（`ATTACK_CHAR_ONLY:<名前>`）。
+/// 相手側 `restrictions` に常在の再計算ごとに登録される（`effects::passives` が毎回消す）。
+pub const ATTACK_CHAR_ONLY_PREFIX: &str = "ATTACK_CHAR_ONLY:";
+
+/// `attacker` が `target` へアタックできない（攻撃先の制限に当たる）か。
+///
+/// - 攻撃側カードの `ATTACK_BAN_LEADER`（リーダーへ不可）／`ATTACK_BAN_CHAR_OCOST_LE_<n>`
+///   （元々のコストが n 以下のキャラへ不可）フラグ。
+/// - 攻撃側プレイヤーに掛かる `ATTACK_CHAR_ONLY:<名前>`（キャラへは該当名のカードにしかアタックできない。
+///   リーダーへは制限なし）。
+pub fn attack_target_banned(
+    state: &GameState,
+    masters: &MasterTable,
+    attacker: CardIdx,
+    target: CardIdx,
+) -> bool {
+    let a = state.card(attacker);
+    let t = state.card(target);
+    let tm = masters.get(t.master);
+    for f in a.flags.iter().chain(a.timed_flags.iter()) {
+        if f == "ATTACK_BAN_LEADER" && tm.ty == CardType::Leader {
+            return true;
+        }
+        if let Some(n) = f.strip_prefix("ATTACK_BAN_CHAR_OCOST_LE_") {
+            if tm.ty == CardType::Character && n.parse::<i32>().is_ok_and(|n| tm.cost <= n) {
+                return true;
+            }
+        }
+    }
+    if tm.ty == CardType::Character {
+        for r in &state.player(a.owner).restrictions {
+            if state.turn_count > r.expire {
+                continue;
+            }
+            if let Some(name) = r.key.strip_prefix(ATTACK_CHAR_ONLY_PREFIX) {
+                if !crate::effects::matcher::matches_name(tm, name, false) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 pub fn card_type(state: &GameState, masters: &MasterTable, card: CardIdx) -> CardType {
     masters.get(state.card(card).master).ty
 }
@@ -84,7 +135,10 @@ pub fn card_type(state: &GameState, masters: &MasterTable, card: CardIdx) -> Car
 /// `flags` と `timed_flags` の和に含まれるか（Python `f in card.flags or f in card.timed_flags`）。
 pub fn has_flag(state: &GameState, card: CardIdx, flag: &str) -> bool {
     let c = state.card(card);
-    c.flags.iter().any(|f| f == flag) || c.timed_flags.iter().any(|f| f == flag)
+    // 常在効果由来の ATTACK_DISABLE は再計算でリセットされる current_keywords に載る（status.rs）。
+    c.flags.iter().any(|f| f == flag)
+        || c.timed_flags.iter().any(|f| f == flag)
+        || (flag == "ATTACK_DISABLE" && c.current_keywords.iter().any(|f| f == flag))
 }
 
 pub fn has_timed_flag(state: &GameState, card: CardIdx, flag: &str) -> bool {
@@ -113,6 +167,16 @@ pub fn active_restriction<'a>(
     } else {
         None
     }
+}
+
+/// 進行中のバトルが「リーダーのアタック」で、アタッカー側に「相手は【ブロッカー】を発動できない」
+/// 制限（`OPP_NO_BLOCK_VS_LEADER`・OP13-057）が有効ならブロックできない。
+pub fn blocking_suppressed(state: &GameState) -> bool {
+    let Some(b) = state.active_battle.as_ref() else {
+        return false;
+    };
+    state.player(b.attacker_owner).leader == Some(b.attacker)
+        && active_restriction(state, b.attacker_owner, "OPP_NO_BLOCK_VS_LEADER").is_some()
 }
 
 /// [`active_restriction`] の `&mut Session` 版（§11.8 #8）。期限切れのエントリは Python と同じく

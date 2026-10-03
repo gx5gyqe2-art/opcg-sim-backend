@@ -140,13 +140,25 @@ pub fn play_card_action(
             ));
         }
         record_event_played(s, masters, card);
+        crate::effects::triggers::enqueue_activation_listeners(
+            s,
+            masters,
+            crate::effects::triggers::Activation::Event,
+            seat,
+        )?;
         let ids = masters.get(s.state().card(card).master).ability_ids.clone();
-        for (index, id) in ids.iter().enumerate() {
-            let trigger = crate::effects::ability(masters, *id)?.trigger;
-            if matches!(trigger, TriggerType::OnPlay | TriggerType::ActivateMain) {
-                crate::effects::resolver::game_resolve_ability(s, masters, seat, card, index, false)?;
+        // 解決中のイベント自身は手札の候補・枚数に含めない（実ルールでは手札を離れている）。
+        s.with_resolving_event(card, |s| -> Result<(), EngineError> {
+            for (index, id) in ids.iter().enumerate() {
+                let trigger = crate::effects::ability(masters, *id)?.trigger;
+                if matches!(trigger, TriggerType::OnPlay | TriggerType::ActivateMain) {
+                    crate::effects::resolver::game_resolve_ability(
+                        s, masters, seat, card, index, false,
+                    )?;
+                }
             }
-        }
+            Ok(())
+        })?;
         crate::effects::actions::move_card(s, masters, card, Zone::Trash, seat, Position::Bottom)?;
         return Ok(());
     }
@@ -206,7 +218,7 @@ fn record_event_played(s: &mut Session, masters: &MasterTable, card: CardIdx) {
 }
 
 /// Python `play_card_action` の【トリガー】判定（`trigger_text` 非空 or TRIGGER 能力）。
-fn has_trigger_icon(
+pub(crate) fn has_trigger_icon(
     s: &Session,
     masters: &MasterTable,
     card: CardIdx,
@@ -299,6 +311,8 @@ pub fn apply_game_action(
                 c.current_cost(masters.get(c.master))
             };
             ops::pay_cost(s, seat, cost, None)?;
+            // 「次に登場させる〜のコストは N 少なくなる」（一回限り）は払い終えたので使い切る。
+            crate::effects::continuous::consume_next_play_discounts(s, card);
             play_card_action(s, masters, seat, card)?;
         }
         // `end_turn` の中で `_validate_action(gm.turn_player, "MAIN_ACTION")` を行う（Python 同）。
@@ -358,6 +372,9 @@ pub fn apply_game_action(
                 "type": "ATTACH_DON", "player": seat.name(), "card_name": name,
                 "message": format!("「{name}」にドン!!付与"),
             }));
+            // 「ドン!!が付与された時」の誘発（OP02-002）。
+            let host_owner = s.state().card(card).owner;
+            crate::effects::triggers::enqueue_don_attached_listeners(s, masters, card, host_owner)?;
         }
         "ACTIVATE_MAIN" => {
             let card = operating.ok_or_else(|| bad("効果を発動するカードが見つかりません。"))?;

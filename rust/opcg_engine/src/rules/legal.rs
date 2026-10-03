@@ -16,7 +16,7 @@ use super::pending::{
     get_pending_request, request_action, request_actor, ACT_MAIN_ACTION, ACT_MULLIGAN, ACT_PASS,
     ACT_SELECT_BLOCKER, ACT_SELECT_COUNTER,
 };
-use super::{card_type, has_flag, has_keyword, has_timed_flag, KW_RUSH};
+use super::{card_type, has_flag, has_keyword, has_timed_flag, KW_RUSH, KW_RUSH_CHAR};
 
 fn game_move(action_type: &str, payload: Value) -> Value {
     json!({"kind": "game", "action_type": action_type, "payload": payload})
@@ -96,7 +96,9 @@ fn main_actions(
 
     // --- 登場（コストを active ドン!! で払える手札。イベントは【メイン】効果が要る）------
     let cannot_play_hand = super::active_restriction(state, seat, "CANNOT_PLAY_FROM_HAND").is_some();
-    let char_restricted = super::active_restriction(state, seat, "CANNOT_PLAY_CHARACTER").is_some();
+    // 「元々のコストN以上のキャラを登場できない」は min_cost 以上だけを禁じる（無指定なら全キャラ）。
+    // `play_card_action` の検証と同じ規則（元々のコスト＝master.cost）。
+    let char_restriction = super::active_restriction(state, seat, "CANNOT_PLAY_CHARACTER");
     for c in &p.hand {
         let card = state.card(*c);
         if card.current_cost(masters.get(card.master)) > don_active {
@@ -109,8 +111,13 @@ fn main_actions(
         if card_type(state, masters, *c) == CardType::Event {
             continue;
         }
-        if card_type(state, masters, *c) == CardType::Character && char_restricted {
-            continue;
+        if card_type(state, masters, *c) == CardType::Character {
+            if let Some(rec) = char_restriction {
+                let base_cost = masters.get(card.master).cost;
+                if rec.min_cost.is_none() || base_cost >= rec.min_cost.unwrap_or(0) {
+                    continue;
+                }
+            }
         }
         moves.push(game_move("PLAY", json!({"uuid": uuid(*c)})));
     }
@@ -130,10 +137,11 @@ fn main_actions(
             if state.card(*c).is_rest {
                 continue;
             }
-            // 召喚酔い（速攻を持てば可）。
+            // 召喚酔い（速攻を持てば可。【速攻:キャラ】はキャラへのアタックだけ可＝下の対象列挙で絞る）。
             if card_type(state, masters, *c) == CardType::Character
                 && state.card(*c).is_newly_played
                 && !has_keyword(state, *c, KW_RUSH)
+                && !has_keyword(state, *c, KW_RUSH_CHAR)
             {
                 continue;
             }
@@ -161,7 +169,17 @@ fn main_actions(
     let hand_len = p.hand.len();
     attackers.retain(|a| super::attack_tax_need(state, *a).map_or(true, |need| hand_len >= need));
     for atk in &attackers {
+        // 登場したターンの【速攻:キャラ】（【速攻】無し）はリーダーへアタックできない。
+        let char_only = card_type(state, masters, *atk) == CardType::Character
+            && state.card(*atk).is_newly_played
+            && !has_keyword(state, *atk, KW_RUSH);
         for tgt in &targets {
+            if char_only && card_type(state, masters, *tgt) == CardType::Leader {
+                continue;
+            }
+            if super::attack_target_banned(state, masters, *atk, *tgt) {
+                continue;
+            }
             moves.push(game_move(
                 "ATTACK",
                 json!({"uuid": uuid(*atk), "target_ids": [uuid(*tgt)]}),
@@ -249,7 +267,9 @@ fn has_activatable_main(
                 continue;
             }
         }
-        if ability_effect_is_inert(state, seat, ab.effect.as_ref()) {
+        // 「キャラの効果でドン!!をアクティブにできない」は発生源がキャラのときだけ効く。
+        let from_character = masters.get(state.card(card).master).ty == CardType::Character;
+        if ability_effect_is_inert(state, seat, ab.effect.as_ref(), from_character) {
             continue;
         }
         return Ok(true);
@@ -263,6 +283,7 @@ fn ability_effect_is_inert(
     state: &GameState,
     seat: Seat,
     node: Option<&crate::effects::ast::EffectNode>,
+    from_character: bool,
 ) -> bool {
     use crate::effects::ast::{ActionType, EffectNode};
     let Some(node) = node else {
@@ -271,10 +292,10 @@ fn ability_effect_is_inert(
     match node {
         EffectNode::Sequence(items) => items
             .iter()
-            .all(|n| ability_effect_is_inert(state, seat, Some(n))),
+            .all(|n| ability_effect_is_inert(state, seat, Some(n), from_character)),
         EffectNode::Choice { options, .. } => options
             .iter()
-            .all(|n| ability_effect_is_inert(state, seat, Some(n))),
+            .all(|n| ability_effect_is_inert(state, seat, Some(n), from_character)),
         // Python は `actions`／`options` を持たない非 GameAction（Branch）を False にする。
         EffectNode::Branch { .. } => false,
         EffectNode::Action(a) => match a.ty {
@@ -286,7 +307,7 @@ fn ability_effect_is_inert(
                 }
             },
             ActionType::ActiveDon if a.target.is_none() => {
-                if super::active_restriction(state, seat, "CANNOT_ACTIVATE_DON").is_some() {
+                if from_character && super::active_restriction(state, seat, "CANNOT_ACTIVATE_DON").is_some() {
                     return true;
                 }
                 state.player(seat).don_rested.is_empty()

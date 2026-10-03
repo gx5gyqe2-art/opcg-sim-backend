@@ -27,7 +27,7 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 対象側ではない（「自分の手札から…相手の場のドン‼の枚数以下のコストを持つ『X』」で
     # player を OPPONENT に誤判定し相手手札を見てしまう: OP08-062 カタクリ）。
     player_text = re.sub(
-        _nfc(r'(?:相手の|自分の|お互いの)?場のドン(?:!!|‼)?の枚数(?:分)?以下のコストを持つ'),
+        _nfc(r'(?:相手の|自分の|お互いの)?場のドン(?:!!|‼)?の枚数(?:分)?以下のコストを持(?:つ|ち)'),
         '', player_text)
     # 期間/タイミング句の「相手の」は対象側ではないため除去する
     # （「自分のリーダーを、次の相手のターン終了時まで、パワー+2000」で OPPONENT 誤判定を防ぐ）。
@@ -133,7 +133,11 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 名前は複数併記され得る（「「X」と「Y」すべて」ST30-001 /「「X」か「Y」」）。findall で全て拾い、
     # matcher は names を OR（いずれかの名前）として扱う。
     for _nm in re.findall(r'「([^」]+)」', tgt_text):
-        if (f'「{_nm}」' + _nfc(ParserKeyword.EXCEPT)) not in tgt_text:
+        # 本文の「ケイミ―」(U+2015 水平線) はカード名の長音符「ー」(U+30FC) の表記ゆれ（OP06-025）。
+        _raw_nm = _nm
+        _nm = _nm.replace("\u2015", "\u30fc")
+        # 「「X」以外で、…」「「X」以外の…」のどちらも除外名（従来は「以外の」だけ＝ST12-003 の「以外で」は包含になった）。
+        if (f'「{_raw_nm}」' + _nfc(ParserKeyword.EXCEPT)) not in tgt_text and (f'「{_raw_nm}」以外') not in tgt_text:
             tq.names.append(_nm)
         else:
             # 「「◯◯」以外のキャラ」: その名前を除外対象にする（従来は無視され、
@@ -142,17 +146,35 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     
     if _nfc("含む") in tgt_text:
         tq.flags.add("NAME_PARTIAL")
+    # 「『X』を含む特徴を持つ」は特徴名の部分一致（「元ロックス海賊団」等も該当）。
+    if re.search(_nfc(r'[』」]を含む特徴'), tgt_text):
+        tq.flags.add("TRAIT_PARTIAL")
 
     # 「（このキャラ）他の」「このキャラ以外」: ソース自身を候補から除外する。
     # 例: EB02-018「自分のキャラの他の『バギー』がいない場合」（自分自身を数えない）、
     # OP04-111「このキャラ以外の自分の特徴《ホーミーズ》を持つキャラ」（自身をコストに使わない）。
-    if _nfc("他の") in tgt_text or _nfc("このキャラ以外") in tgt_text or _nfc("以外の自分") in tgt_text:
+    if (_nfc("他の") in tgt_text or _nfc("このキャラ以外") in tgt_text or _nfc("このカード以外") in tgt_text
+            or _nfc("以外の自分") in tgt_text):
         tq.flags.add("EXCLUDE_SOURCE")
 
     # 「カード名の異なる…N枚」: 選ぶカードはすべて名前が異なる（distinct）。matcher が名前重複を
     # 除外して候補化することで、同名を複数選べないようにする（OP16-060/OP16-034/038 等）。
     if _nfc("カード名の異なる") in tgt_text or _nfc("カード名が異なる") in tgt_text:
         tq.is_unique_name = True
+
+    # 「捨てたカードと同じカード名を持つ」: コストで捨てたカードと同名に限る（EB02-039）。
+    #   コスト側の捨て札対象を save_id=discarded_card に保存し、resolver が名前で絞る。
+    if _nfc("捨てたカードと同じカード名") in tgt_text:
+        tq.flags.add("SAME_NAME_AS:discarded_card")
+
+    # 「【ブロッカー】を持つ（キャラ）」等のキーワード所持の絞り込み（ST01-016/ST30-012）。
+    #   従来は欄が無く任意の相手キャラを選べた。【トリガー】は別機構（HAS_TRIGGER）。
+    for _kw in re.findall(_nfc(r'【(ブロッカー|速攻|ダブルアタック|バニッシュ|ブロック不可)】を持つ'), tgt_text):
+        tq.flags.add("HAS_KEYWORD:" + _kw)
+
+    # 「単色の（リーダー/キャラ）」: 色を 1 色だけ持つカード（OP17-005）。matcher が色数で絞る。
+    if _nfc("単色の") in tgt_text:
+        tq.flags.add("SINGLE_COLOR")
 
     # 「【X】効果を持たないキャラ」: 指定トリガー種別を持たないカードに限定（EB03-001/PRB01-001）。
     _lacks = re.search(_nfc(r'【(登場時|アタック時|ブロック時|KO時|トリガー)】効果を持たない'), tgt_text)
@@ -186,16 +208,45 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
             
     tq.traits.extend(final_traits)
 
+    # 「《X》(を含む特徴)を持たない」= その特徴を持たないカードに限る（OP13-064）。包含の traits には
+    # 入れず LACKS_TRAIT[_PARTIAL]:X として matcher に渡す。
+    for _lt in re.finditer(_nfc(r'[《<『]([^》>』]+)[》>』](を含む特徴)?を持たない'), tgt_text):
+        if _lt.group(1) in tq.traits:
+            tq.traits.remove(_lt.group(1))
+        tq.flags.add(("LACKS_TRAIT_PARTIAL:" if _lt.group(2) else "LACKS_TRAIT:") + _lt.group(1))
+        tq.flags.discard("NAME_PARTIAL")
+
     # 「《特徴》（を持つキャラカード）か「名前」」= 特徴 OR 名前。「か」が名前/特徴の開き括弧へ
     # かかる場合に OR とみなす（OP11-022「《海王類》を持つキャラカードか「メガロ」」）。
     # 「「名前」か特徴《X》を持つ」順（か→「特徴」→《）も OR（OP15-073/101）。
     if tq.traits and tq.names and re.search(_nfc(r'か(?:を含む)?(?:特徴)?[「『《]'), tgt_text):
         tq.flags.add("TRAIT_OR_NAME")
+    # 「「名前」と特徴《X》を持つキャラすべて」= 名前 OR 特徴（和集合。OP12-073/OP02-024）。
+    # 名前を持つキャラが同時に特徴 X を持つとは限らず、AND だと誰にも掛からない。
+    if tq.traits and tq.names and re.search(_nfc(r'」と(?:特徴)?[《『]'), tgt_text):
+        tq.flags.add("TRAIT_OR_NAME")
 
     # 「「名前」か<種類>」= 名前 OR 種類（OP12-071「「サンジ」かイベント」）。従来は names と
     # card_type が AND になり、両立しない条件（サンジという名のイベントは無い）で対象が常に
     # 空になっていた。「」か」直後に種類語が続く場合に OR とみなす。
-    if tq.names and tq.card_type and re.search(_nfc(r'」か(?:イベント|キャラクター|キャラ|リーダー|ステージ)'), tgt_text):
+    # 「「A」か<種類>の「B」」（OP11-110「「魚人島」かリーダーの「しらほし」」）は「A という名前のカード」か
+    # 「<種類>で名前が B のカード」＝種類は 2 つ目の名前にだけ掛かる（NAME_OR_TYPED_NAME）。
+    # NAME_OR_TYPE 扱いだと「リーダーなら名前不問」になり、名前の合わない任意のリーダーまで対象になる。
+    if (tq.names and len(tq.names) >= 2 and tq.card_type
+            and re.search(_nfc(r'」か(?:イベント|キャラクター|キャラ|リーダー|ステージ)の「'), tgt_text)):
+        tq.flags.add("NAME_OR_TYPED_NAME")
+    elif tq.names and tq.card_type and re.search(_nfc(r'」か(?:イベント|キャラクター|キャラ|リーダー|ステージ)'), tgt_text):
+        tq.flags.add("NAME_OR_TYPE")
+    # 逆順「<種類>か「名前」」（OP04-082「自分のリーダーか「コリーダコロシアム」」）も 種類 OR 名前。
+    elif tq.names and tq.card_type and re.search(_nfc(r'(?:イベント|キャラクター|キャラ|リーダー|ステージ)か、?「'), tgt_text):
+        tq.flags.add("NAME_OR_TYPE")
+
+    # 「自分の<種類>か「名前」」= 種類 OR 名前（逆順。EB04-009/OP12-016/018/019「自分のキャラか
+    # 「シルバーズ・レイリー」1枚まで」）。従来は card_type∧names の AND になりリーダーのレイリーも
+    # 他のキャラも選べなかった。種類語が「自分の/相手の」直後に来る単純形に限る（特徴/色/コストで
+    # 修飾された「…キャラカードか「サンジ」」は別の OR 合成＝TRAIT_OR_NAME が担当）。
+    if tq.names and tq.card_type and re.search(
+            _nfc(r'(?:自分の|相手の)(?:イベント|キャラクター|キャラ|リーダー|ステージ)か、?「'), tgt_text):
         tq.flags.add("NAME_OR_TYPE")
 
     # 「「名前」か<色>の<種類>」= 名前 OR (色∧種類)（OP12-006/014「「モンキー・D・ルフィ」か
@@ -209,6 +260,24 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
 
     for c in [_nfc("赤"), _nfc("緑"), _nfc("青"), _nfc("紫"), _nfc("黒"), _nfc("黄")]:
         if f"{c}の" in tgt_text: tq.colors.append(c)
+
+    # 「特徴《A》か属性(斬)を持つ」「「名前」か属性(斬)を持つ」= 名前・特徴・属性のいずれか（OR）。
+    #   従来は特徴∧属性（両方持つ）の AND になっていた（ST12-003/ST32-003）。
+    if tq.attributes and (tq.names or tq.traits) and re.search(
+            _nfc(r'(?:」|》|』)か、?属性[((]'), tgt_text):
+        tq.flags.add("SELECTOR_OR")
+
+    # 「<色>の<種類A>か<コスト条件>の<種類B>」（OP12-017「赤のイベントかコスト3以上のキャラカード」）
+    #   = (色∧種類A) OR (コスト∧種類B)。色は種類A にだけ・コストは種類B にだけ掛かる
+    #   （単純 AND では赤でもコスト3以上でもあるカードしか選べなかった）。
+    m_scoped = re.search(_nfc(
+        r'(?:赤|青|緑|黄|黒|紫)の(イベント|キャラクター|キャラ|ステージ)か'
+        r'(?:コスト\d+以[上下])の(イベント|キャラクター|キャラ|ステージ)'), tgt_text)
+    if m_scoped:
+        _tn = {_nfc("イベント"): "EVENT", _nfc("キャラクター"): "CHARACTER",
+               _nfc("キャラ"): "CHARACTER", _nfc("ステージ"): "STAGE"}
+        tq.flags.add("COLORS_ONLY_" + _tn[m_scoped.group(1)])
+        tq.flags.add("COST_ONLY_" + _tn[m_scoped.group(2)])
 
     # 「属性《X》を持つカードか<種類/色>」= 属性 OR (種類∧色)（OP12-034 ペローナ
     # 「属性(斬)を持つカードか緑のイベント」）。従来は属性・種類・色がすべて AND になり、
@@ -231,8 +300,12 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.flags.add("COST_0_OR_GE_8")
     # コスト範囲「コストNからM」（N以上M以下）。範囲表記は単一しきい値より先に判定する
     #   （従来は「コスト3」だけを拾い cost_max=3 に縮退していた: OP10-099）。
-    m_crange = None if "COST_0_OR_GE_8" in tq.flags else re.search(_nfc(ParserKeyword.COST + r'(\d+)から(\d+)'), tgt_text)
+    # 連続する 2 値の並記「コスト3と4の」（P-084）も範囲（3 以上 4 以下）として扱う。
+    m_crange = None if "COST_0_OR_GE_8" in tq.flags else re.search(_nfc(ParserKeyword.COST + r'(\d+)(?:から|と)(\d+)'), tgt_text)
     if m_crange:
+        # 「元々のコストN〜M」は印刷コスト（master.cost）で絞る（効果で増減した現在コストではない）。
+        if _nfc("元々") in tgt_text[max(0, m_crange.start() - 4):m_crange.start()]:
+            tq.flags.add("ORIGINAL_COST")
         tq.cost_min = int(m_crange.group(1))
         tq.cost_max = int(m_crange.group(2))
     m_c = None if (m_crange or "COST_0_OR_GE_8" in tq.flags) else re.search(_nfc(ParserKeyword.COST + r'[^+＋\-－−‐\d]?(\d+)(' + ParserKeyword.BELOW + r'|' + ParserKeyword.ABOVE + r')?'), tgt_text)
@@ -246,6 +319,9 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
 
         if prefix_context not in ['+', '-', '\u2212', '\u2010', '\uff0b', '\uff0d'] and not is_set_action:
             val = int(m_c.group(1))
+            # 「元々のコストN以下」は印刷コスト（master.cost）で絞る。エンジンが ORIGINAL_COST を見る。
+            if _nfc("元々") in tgt_text[max(0, start_idx - 4):start_idx]:
+                tq.flags.add("ORIGINAL_COST")
             if m_c.group(2) == _nfc(ParserKeyword.ABOVE): tq.cost_min = val
             elif m_c.group(2) == _nfc(ParserKeyword.BELOW): tq.cost_max = val
             else:
@@ -290,6 +366,13 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if m_psum:
         tq.power_sum_max = int(m_psum.group(1))
 
+    # 「コストの合計がN以下になるように」(OP17-119): 選択集合の合計コスト上限。パワー版と同じ仕組みで、
+    # フラグ SUM_COST が付くと resolver が合計コストで数える。枚数の指定が無ければ上限なし（複数枚）。
+    m_csum = re.search(_nfc(r'コスト(?:の)?合計が(\d+)以下'), tgt_text)
+    if m_csum:
+        tq.power_sum_max = int(m_csum.group(1))
+        tq.flags.add("SUM_COST")
+
     m_prange = re.search(_nfc(ParserKeyword.POWER + r'(\d+)\u304b\u3089(\d+)'), tgt_text)
     if m_prange:
         if _nfc("\u5143\u3005") in tgt_text[max(0, m_prange.start() - 4):m_prange.start()]:
@@ -330,9 +413,15 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     # 「ならない/にする/にし/にできる」を含むと丸ごと抑制され、OP15-077 雷龍
     # 「相手のレストの…キャラ…アクティブにならない」でレスト対象制限が脱落し、
     # アクティブなキャラも対象にできていた。
-    rest_mod = re.search(_nfc(r'(レスト|アクティブ)の[^。、]*?(?:キャラ|カード|リーダー)'), tgt_text)
+    rest_mod = re.search(_nfc(r'(レスト|アクティブ)の、?[^。、]*?(?:キャラ|カード|リーダー|ステージ)'), tgt_text)
     if rest_mod:
         tq.is_rest = (rest_mod.group(1) == _nfc("レスト"))
+        # 「レストのリーダーか、…のキャラ」(PRB02-017): 状態修飾は直後のリーダーだけに掛かり、
+        # 並記されたキャラには掛からない（レストでないキャラも対象）。
+        if (rest_mod.group(0).endswith(_nfc("リーダー"))
+                and "LEADER" in tq.card_type and "CHARACTER" in tq.card_type
+                and re.match(_nfc(r'か'), tgt_text[rest_mod.end():])):
+            tq.flags.add("REST_LEADER_ONLY")
     elif (_nfc("にする") not in tgt_text and _nfc("にし") not in tgt_text
             and _nfc("ならない") not in tgt_text and _nfc("にでき") not in tgt_text
             and _nfc("にされ") not in tgt_text
@@ -376,7 +465,8 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
         tq.select_mode = "ALL"
     else:
         m_cnt = re.search(r'(\d+)' + _nfc(ParserKeyword.COUNT_SUFFIX), count_text)
-        tq.count = int(m_cnt.group(1)) if m_cnt else 1
+        # 合計コスト上限だけで枚数の指定が無いとき（OP17-119）は枚数に上限なし。
+        tq.count = int(m_cnt.group(1)) if m_cnt else (-1 if "SUM_COST" in tq.flags else 1)
 
     # 「任意の枚数」: プレイヤーが 0..N 枚を任意に選べる可変選択。is_up_to=True かつ
     # 大きめの count（フィールド/手札の実上限を超える）で対象選択中断（_suspend_for_target_selection,
@@ -394,8 +484,18 @@ def parse_target(tgt_text: str, default_player: Player = Player.SELF) -> TargetQ
     if re.search(_nfc(r"(選んだ|その)(カード|キャラ|リーダー)"), tgt_text):
         tq.ref_id = "selected_card"
 
+    # 「バトルした相手のキャラ」＝バトル終了時の誘発の契機カード（エンジンが解決時に
+    # 文脈 `trigger_subject` へ載せる）。場全体の選択にはしない。
+    if _nfc("バトルした相手の") in tgt_text:
+        tq.ref_id = "trigger_subject"
+
     if chooser is not None:
         tq.chooser = chooser
+
+    # 「ライフの上か下から1枚を〜」: 選べるのはライフの一番上か一番下の 1 枚だけ（任意のライフではない）。
+    #   エンジンの matcher が LIFE ゾーンの候補を先頭と末尾に絞る（2026-10-01 カード効果監査・43 枚）。
+    if tq.zone == Zone.LIFE and re.search(_nfc(r"ライフの上か下から"), tgt_text):
+        tq.flags.add("LIFE_TOP_OR_BOTTOM")
 
     return tq
 
@@ -526,8 +626,9 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         # 「コスト0か8以上」= 0 または 8以上の離散2レンジ（B・W）。
         if "COST_0_OR_GE_8" in query.flags and not (card.current_cost == 0 or card.current_cost >= 8):
             continue
-        if query.cost_max is not None and card.current_cost > query.cost_max: continue
-        if query.cost_min is not None and card.current_cost < query.cost_min: continue
+        _cost = (card.master.cost or 0) if "ORIGINAL_COST" in query.flags else card.current_cost
+        if query.cost_max is not None and _cost > query.cost_max: continue
+        if query.cost_min is not None and _cost < query.cost_min: continue
 
         if dynamic_cost_max is not None and card.current_cost > dynamic_cost_max: continue
 
@@ -569,7 +670,13 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
         _partial = "NAME_PARTIAL" in query.flags
         def _name_in(names):  # noqa: E306
             return bool(names) and any(card.master.matches_name(n, partial=_partial) for n in names)
+        def _trait_hit():  # noqa: E306
+            if "TRAIT_PARTIAL" in query.flags:
+                return any(x in c for x in query.traits for c in card.master.traits)
+            return any(t in card.master.traits for t in query.traits)
         def _excluded():  # noqa: E306
+            if "REST_LEADER_ONLY" in query.flags and card.master.type.name == "LEADER":
+                return False
             return query.exclude_names and any(card.master.matches_name(en) for en in query.exclude_names)
         if "NAME_OR_COLORTYPE" in query.flags:
             # 上の合成OR（名前 OR 色∧種類）で判定済み。除外名のみここで適用。
@@ -581,7 +688,7 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
             if _excluded(): continue
         elif "TRAIT_OR_NAME" in query.flags and (query.names or query.traits):
             name_ok = _name_in(query.names)
-            trait_ok = bool(query.traits) and any(t in card.master.traits for t in query.traits)
+            trait_ok = bool(query.traits) and _trait_hit()
             if not (name_ok or trait_ok): continue
             if _excluded(): continue
         else:
@@ -590,7 +697,7 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
 
             if _excluded(): continue
 
-            if query.traits and not any(t in card.master.traits for t in query.traits):
+            if query.traits and not _trait_hit():
                 # 「《特徴》か【トリガー】を持つ」は特徴 OR トリガー所持。特徴不一致でも
                 # トリガー所持なら通す（OP05-002）。それ以外は従来どおり除外。
                 if "TRAIT_OR_TRIGGER" not in query.flags:
@@ -599,7 +706,8 @@ def get_target_cards(game_manager, query: TargetQuery, source_card) -> list:
                     ab.trigger == TriggerType.TRIGGER for ab in getattr(card.master, "abilities", ()))
                 if not _trig:
                     continue
-        if query.is_rest is not None and card.is_rest != query.is_rest: continue
+        if (query.is_rest is not None and card.is_rest != query.is_rest
+                and not ("REST_LEADER_ONLY" in query.flags and card.master.type.name != "LEADER")): continue
 
         # 「【トリガー】を持つカード」フィルタ: トリガー能力（master.trigger_text 非空、または
         # TriggerType.TRIGGER 能力）を持つカードのみに限定する（OP16-080 等）。

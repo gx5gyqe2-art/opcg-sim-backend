@@ -161,8 +161,12 @@ fn deal_damage(
         }
     }
     // ON_LIFE_DECREASE を積み、【トリガー】と共にこの場で消化する。
+    if life_lost > 0 {
+        crate::ops::record_life_left(s, damaged, life_lost);
+    }
     if life_lost > 0 && s.state().winner.is_none() {
-        triggers::enqueue_life_decrease(s, masters, life_lost)?;
+        triggers::enqueue_life_decrease(s, masters, damaged, life_lost, true)?;
+        triggers::enqueue_damaged_listeners(s, masters, damaged, life_lost)?;
     }
     triggers::advance_pending_triggers(s, masters)?;
     Ok(true)
@@ -218,11 +222,14 @@ pub fn shuffle_deck(s: &mut Session, seat: Seat) {
     }
 }
 
-/// Python `player_level.heal`（`HEAL`／`LIFE_RECOVER`）。デッキ上 1 枚をライフの**一番下**へ。
+/// `HEAL`／`LIFE_RECOVER`。デッキ上 1 枚をライフの**一番上**へ（本文は全て「ライフの上に加える」）。
+///
+/// Python `player_level.heal` は `life.append(...)`＝一番下へ積んでいた（本文と逆）。2026-10-01 の
+/// カード効果監査で 43 枚の不一致として検出し、エンジンの正本（ここ）は本文どおり上へ直した。
 fn heal(s: &mut Session, actor: Seat, value: i32) -> Result<bool, EngineError> {
     for _ in 0..value.max(0) {
         // Python は `if player.deck:` で空を素通りする（break はしない）＝同じ。
-        crate::ops::deck_to_life(s, actor);
+        crate::ops::deck_to_life_top(s, actor);
     }
     Ok(true)
 }

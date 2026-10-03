@@ -159,10 +159,10 @@ fn shuffle_succeeds_without_touching_the_deck_order() {
 // HEAL / LIFE_RECOVER（`player_level.heal`）
 // ---------------------------------------------------------------------------
 
-/// Python: `for _ in range(value): if player.deck: player.life.append(player.deck.pop(0))`
-/// ＝デッキの**上**から取り、ライフの**一番下**へ足す。
+/// デッキの**上**から 1 枚ずつ取り、ライフの**一番上**へ足す（本文は「ライフの上に加える」）。
+/// Python は `life.append(...)`＝一番下だった（2026-10-01 のカード効果監査で本文と逆と判明）。
 #[test]
-fn heal_moves_the_top_of_the_deck_under_the_life() {
+fn heal_moves_the_top_of_the_deck_onto_the_top_of_the_life() {
     let mut b = BoardBuilder::new();
     let life0 = b.put_life(Seat::P1, M_CHAR);
     let d0 = b.put_deck(Seat::P1, M_CHAR);
@@ -173,7 +173,7 @@ fn heal_moves_the_top_of_the_deck_under_the_life() {
 
     apply(&mut s, &masters, Seat::P1, &act(ActionType::Heal), &[], 2);
 
-    assert_eq!(s.state().player(Seat::P1).life, vec![life0, d0, d1], "下へ順に足す");
+    assert_eq!(s.state().player(Seat::P1).life, vec![d1, d0, life0], "上へ順に足す（後から足した方が最上）");
     assert_eq!(s.state().player(Seat::P1).deck, vec![d2]);
 }
 

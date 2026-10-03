@@ -65,3 +65,12 @@ def test_verified_buckets_have_no_category_h():
     h = [(cid, trig) for cid, trig, _ in findings.get("H_LEADING_GATE_LEAK", [])
          if VERIFIED_SET_RE.match(cid)]
     assert not h, "検証済み弾の H 残: " + ", ".join(f"{c}/{t}" for c, t in h[:15])
+
+
+def test_no_cost_ability_lifts_effect_side_condition():
+    """コストあり能力の「：」後ろの条件が能力全体へ持ち上がっていない（全カード・上限0）。
+    条件偽でもコストは払え、効果だけが不発になる（ユーザ決定 2026-10-01）。"""
+    db = CardLoader(DATA)
+    db.load()
+    lifted = si.scan(db).get("H_COST_GATE_LIFT", [])
+    assert not lifted, "効果側条件の持ち上げ: " + ", ".join(f"{c}/{t}" for c, t, _ in lifted[:15])

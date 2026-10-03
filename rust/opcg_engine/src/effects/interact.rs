@@ -166,6 +166,7 @@ pub fn suspend_for_choice(
     let super::ast::EffectNode::Choice {
         message,
         option_labels,
+        player: choice_player,
         ..
     } = node
     else {
@@ -181,16 +182,22 @@ pub fn suspend_for_choice(
     let name = card_name(s, masters, source_card);
     let mut cont = continuation(execution_stack, context, source_card);
     cont.node = Some(node_ref.clone());
+    // 「相手は以下から1つを選ぶ」（OP17-049）: 選ぶのは相手（効果の責任者は変わらない）。
+    let chooser = if choice_player == super::ast::PlayerRef::Opponent {
+        actor.other()
+    } else {
+        actor
+    };
     s.edit().set_interaction(Interaction {
         kind: InteractionKind::Choice,
-        player: actor,
+        player: chooser,
         message: format!("「{name}」の効果: {base_msg}"),
         candidates: Vec::new(),
         selectable: None,
         constraints: None,
         can_skip: false,
         source_card: None,
-        owner: actor,
+        owner: chooser,
         options: option_labels,
         allow_position: false,
         allow_reorder: false,
@@ -234,10 +241,11 @@ pub fn suspend_for_ability_cost_confirm(
 }
 
 /// Python `_suspend_for_optional_confirmation`（「〜してもよい」の発動可否）。
+/// `chooser` は確認に答える側（「相手は…してもよい」は効果の使用者でなく相手）。
 pub fn suspend_for_optional_confirmation(
     s: &mut Session,
     masters: &MasterTable,
-    actor: Seat,
+    chooser: Seat,
     node_ref: &NodeRef,
     source_card: Option<CardIdx>,
     execution_stack: &[NodeRef],
@@ -248,7 +256,7 @@ pub fn suspend_for_optional_confirmation(
     cont.node = Some(node_ref.clone());
     s.edit().set_interaction(Interaction {
         kind: InteractionKind::ConfirmOptional,
-        player: actor,
+        player: chooser,
         message: format!("「{name}」の効果を発動しますか？"),
         candidates: Vec::new(),
         selectable: None,
@@ -256,7 +264,7 @@ pub fn suspend_for_optional_confirmation(
         can_skip: true,
         // Python はこちらだけトップレベルにも uuid を置く。
         source_card,
-        owner: actor,
+        owner: chooser,
         options: Vec::new(),
         allow_position: false,
         allow_reorder: false,
@@ -286,6 +294,49 @@ pub fn suspend_for_battle_ko_replacement(
         kind: InteractionKind::ConfirmOptional,
         player: target_owner,
         message: format!("「{name}」がバトルでKOされます。代わりの効果を使用しますか？"),
+        candidates: Vec::new(),
+        selectable: None,
+        constraints: None,
+        can_skip: true,
+        source_card: Some(target),
+        owner: target_owner,
+        options: Vec::new(),
+        allow_position: false,
+        allow_reorder: false,
+        continuation: Some(cont),
+    });
+}
+
+/// 任意の効果除去置換の確認（バトル KO 版の `suspend_for_battle_ko_replacement` の効果除去版）。
+/// 受け入れれば置換を実行して除去をスキップ・断れば本来の除去を続行する。
+#[allow(clippy::too_many_arguments)]
+pub fn suspend_for_removal_replacement(
+    s: &mut Session,
+    masters: &MasterTable,
+    actor: Seat,
+    action: &NodeRef,
+    action_body: &super::ast::GameAction,
+    target: CardIdx,
+    target_owner: Seat,
+    value: i32,
+    effect_source: Option<CardIdx>,
+) {
+    let name = card_name(s, masters, Some(target));
+    let cont = Box::new(Continuation {
+        source_card: Some(target),
+        removal_replace: Some(crate::model::RemovalReplaceContinuation {
+            actor,
+            action: action.clone(),
+            action_body: Box::new(action_body.clone()),
+            value,
+            effect_source,
+        }),
+        ..Default::default()
+    });
+    s.edit().set_interaction(Interaction {
+        kind: InteractionKind::ConfirmOptional,
+        player: target_owner,
+        message: format!("「{name}」が効果で場を離れます。代わりの効果を使用しますか？"),
         candidates: Vec::new(),
         selectable: None,
         constraints: None,
@@ -385,11 +436,18 @@ pub fn suspend_for_cost_declaration(
 
 /// Python `_don_pool_player`（`status == "OPPONENT"` なら相手のドン!!プール）。
 pub fn don_pool_player(actor: Seat, action: &GameAction) -> Seat {
-    if action.status.as_deref() == Some("OPPONENT") {
+    // OPPONENT／OPPONENT_ACTIVE（RETURN_DON）／OPPONENT_RESTED（RAMP_DON）。
+    if action.status.as_deref().is_some_and(|st| st.starts_with("OPPONENT")) {
         actor.other()
     } else {
         actor
     }
+}
+
+/// 「アクティブのドン!!N枚を戻す」＝戻す候補をアクティブ状態のドン!!だけに限る
+/// （`status` が `ACTIVE`／`OPPONENT_ACTIVE`。レスト・付与中のドン!!は戻せない）。
+pub fn don_active_only(action: &GameAction) -> bool {
+    matches!(action.status.as_deref(), Some("ACTIVE") | Some("OPPONENT_ACTIVE"))
 }
 
 /// Python `_suspend_for_don_selection`（SELECT_RESOURCE）。戻せるドン!!が無ければ `false`。
@@ -408,9 +466,14 @@ pub fn suspend_for_don_selection(
     let tp = don_pool_player(actor, action);
     // 候補の並び＝既定解決の優先順位: レスト → アクティブ → 付与中
     // （戻すなら一番損の少ないドン!!から）。
-    let mut field_don: Vec<DonIdx> = s.state().player(tp).don_rested.clone();
+    let mut field_don: Vec<DonIdx> = Vec::new();
+    if !don_active_only(action) {
+        field_don.extend(s.state().player(tp).don_rested.iter().copied());
+    }
     field_don.extend(s.state().player(tp).don_active.iter().copied());
-    field_don.extend(s.state().player(tp).don_attached.iter().copied());
+    if !don_active_only(action) {
+        field_don.extend(s.state().player(tp).don_attached.iter().copied());
+    }
     let n = if value > 0 { value } else { 1 };
     let to_return = n.min(field_don.len() as i32);
     if to_return <= 0 {
@@ -568,7 +631,9 @@ pub fn resolve_interaction(
                 }
             }
             s.edit().pop_interaction();
-            resolver.process_stack(s, masters, actor, Some(source_card))?;
+            // 選んだ側（相手が選ぶ Choice）ではなく効果の責任者として選ばれた枝を実行する。
+            let controller = s.state().card(source_card).owner;
+            resolver.process_stack(s, masters, controller, Some(source_card))?;
             history = resolver.action_history;
         }
         InteractionKind::ConfirmOptional => {
@@ -598,6 +663,34 @@ pub fn resolve_interaction(
                 crate::rules::battle::finish_attack(s, masters, target, bk.life_lost)?;
                 return Ok(());
             }
+            if let Some(rr) = cont.removal_replace.clone() {
+                s.edit().pop_interaction();
+                let target = source_card;
+                {
+                    let a = &*rr.action_body;
+                    let guard: &[&str] = if a.ty == super::ast::ActionType::Ko {
+                        &["LEAVE", "EFFECT_KO"]
+                    } else {
+                        &["LEAVE"]
+                    };
+                    let replaced = accepted
+                        && super::actions::active_replacement_by(s, masters, target, guard, Some(rr.actor))?;
+                    if !replaced {
+                        // 断った（または置換不成立）＝本来の除去を続行（保護・置換は確認済み）。
+                        super::actions::run_target_loop_with(
+                            s,
+                            masters,
+                            rr.actor,
+                            a,
+                            &rr.action,
+                            &[TargetRef::Card(target)],
+                            rr.value,
+                            rr.effect_source,
+                            Some(target),
+                        )?;
+                    }
+                }
+            } else {
             s.edit().pop_interaction();
             if let Some(ability_id) = cont.confirm_ability {
                 if accepted {
@@ -619,9 +712,16 @@ pub fn resolve_interaction(
                         resolver.context.confirm(node.clone());
                         resolver.execution_stack.push(node.clone());
                     }
+                } else {
+                    // 断った＝その動作は行われなかった（後続の「そうした場合」が成立してはならない）。
+                    resolver.context.last_action_success = false;
+                    resolver.context.last_had_targets = None;
                 }
-                resolver.process_stack(s, masters, actor, Some(source_card))?;
+                // 確認に答えたのが相手（「相手は…してもよい」）でも、後続は効果の責任者視点で実行する。
+                let controller = s.state().card(source_card).owner;
+                resolver.process_stack(s, masters, controller, Some(source_card))?;
                 history = resolver.action_history;
+            }
             }
         }
         InteractionKind::ArrangeDeck => {
@@ -697,8 +797,14 @@ pub fn resolve_interaction(
                     }
                 }
             }
-            let mut resolver = Resolver::resumed(cont.execution_stack.clone(), cont.context.clone());
-            resolver.process_stack(s, masters, actor, Some(source_card))?;
+            // 中断前に積んだ「直前の枚数」は resume で失われるので、並べた枚数で積み直す
+            // （「置いた枚数分カードを引く」）。
+            let mut ctx = cont.context.clone();
+            ctx.prev_action_count = Some(ordered.len() as i32);
+            let mut resolver = Resolver::resumed(cont.execution_stack.clone(), ctx);
+            // 並べたのが持ち主（相手）でも、後続は効果の責任者視点で実行する。
+            let controller = s.state().card(source_card).owner;
+            resolver.process_stack(s, masters, controller, Some(source_card))?;
             history = resolver.action_history;
         }
         InteractionKind::DeclareCost => {
