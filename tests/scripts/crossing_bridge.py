@@ -1223,7 +1223,7 @@ class _ModelBudget(Exception):
 #: 数える状態数は**問題だけの関数**（呼ぶ順・他の試行や前の局面の覚え書きに依らない＝再現できる）。
 #: 縮めたかどうかは計画に残し（`horizon` 対 `horizon0`）、使った計画ごとに数える（`RULE_STATS["plan_cut"]`・覚えた結果を
 #: 使い回しても冷たい実行と同じ数になる）。`None` なら無制限（窓・テスト・感度の測定）。
-EX_STATE_BUDGET = 60000
+EX_STATE_BUDGET = 300000
 _EX_USED = {"memo": None, "limit": None}
 
 
