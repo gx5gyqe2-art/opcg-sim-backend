@@ -225,7 +225,7 @@ pub fn check_condition(
             };
             compare(current, cond.operator, threshold_or_raw_text(cond, target_val))
         }
-        C::HandCount => compare(tp.hand.len() as i32, cond.operator, target_val),
+        C::HandCount => compare(state.hand_len(tp.seat) as i32, cond.operator, target_val),
         C::TrashCount => {
             // target があれば「トラッシュのイベント」のように種類等で絞った枚数を数える。
             let current = match &cond.target {
@@ -263,7 +263,7 @@ pub fn check_condition(
             threshold_or_raw_text(cond, target_val),
         ),
         C::LifeHandSum => compare(
-            (tp.life.len() + tp.hand.len()) as i32,
+            (tp.life.len() + state.hand_len(tp.seat)) as i32,
             cond.operator,
             target_val,
         ),
@@ -315,9 +315,9 @@ pub fn check_condition(
             offset_threshold(state.player(opponent).life.len() as i32, cond),
         ),
         C::HandCountCompare => compare(
-            state.player(actor).hand.len() as i32,
+            state.hand_len(actor) as i32,
             cond.operator,
-            offset_threshold(state.player(opponent).hand.len() as i32, cond),
+            offset_threshold(state.hand_len(opponent) as i32, cond),
         ),
         C::CharKoedThisTurn => {
             let occurred = event_count(&format!("CHAR_KOED_{}", target_seat.name()));

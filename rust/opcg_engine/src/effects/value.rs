@@ -74,7 +74,7 @@ fn dynamic_value(
         }
         // 「手札がN枚になるようにカードを引く」: 不足分（N − 現在の手札枚数・下限 0）だけ引く。
         // `base` が目標の手札枚数。
-        Some("HAND_TO_N") => Ok((value.base - state.player(actor).hand.len() as i32).max(0)),
+        Some("HAND_TO_N") => Ok((value.base - state.hand_len(actor) as i32).max(0)),
         // 文脈依存「直前アクションで捨てた/戻した/KO した…カードN枚につき」（§7-5）。
         // §11.6: 未設定（`None`）は Python の `context.get("_last_action_count", 0)` と同じ 0。
         Some("PREV_ACTION_COUNT") => Ok(ctx.prev_action_count.unwrap_or(0)),

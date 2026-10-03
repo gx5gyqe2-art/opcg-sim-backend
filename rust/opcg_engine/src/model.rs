@@ -1315,9 +1315,36 @@ pub struct GameState {
     pub return_don_selection: Option<Vec<String>>,
     /// Python `_last_resource_count`（ドン!!の増減で実際に処理した枚数＝§7-5 の分母）。
     pub last_resource_count: Option<i32>,
+    /// いま解決中のイベント（発動した【メイン】／【カウンター】／「発動する」効果）。
+    ///
+    /// 実ルールでは発動したイベントは手札を離れて解決される。エンジンは Python 版の移植で
+    /// 解決後にトラッシュへ送る（手札に置いたまま解決する）ため、**手札の候補・枚数・条件には
+    /// このカードを含めない**（[`GameState::hand_cards`]／[`GameState::hand_len`]）。
+    /// 解決の同期区間（`play_card_action` ほか）の間だけ `Some`＝盤面の記録・符号化には出ない。
+    pub resolving_event: Option<CardIdx>,
 }
 
 impl GameState {
+    /// 手札のカード（解決中のイベント自身は除く）。
+    pub fn hand_cards(&self, seat: Seat) -> Vec<CardIdx> {
+        let skip = self.resolving_event;
+        self.player(seat)
+            .hand
+            .iter()
+            .copied()
+            .filter(|c| Some(*c) != skip)
+            .collect()
+    }
+
+    /// 手札の枚数（解決中のイベント自身は数えない）。
+    pub fn hand_len(&self, seat: Seat) -> usize {
+        let p = self.player(seat);
+        match self.resolving_event {
+            Some(c) if p.hand.contains(&c) => p.hand.len() - 1,
+            _ => p.hand.len(),
+        }
+    }
+
     /// いま UI へ提示すべき中断（Python `active_interaction`＝スタック先頭）。
     pub fn active_interaction(&self) -> Option<&Interaction> {
         self.interaction_stack.last()
@@ -1682,6 +1709,7 @@ impl GameState {
             in_passive_recalc: false,
             replacement_suspended: false,
             return_don_selection: None,
+            resolving_event: None,
             last_resource_count: None,
         })
     }

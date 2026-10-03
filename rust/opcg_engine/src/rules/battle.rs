@@ -251,15 +251,18 @@ pub fn apply_counter(
             .get(s.state().card(counter_card).master)
             .ability_ids
             .clone();
-        for (index, id) in ids.iter().enumerate() {
-            if crate::effects::ability(masters, *id)?.trigger
-                == crate::effects::ast::TriggerType::Counter
-            {
-                crate::effects::resolver::game_resolve_ability(
-                    s, masters, seat, counter_card, index, false,
-                )?;
+        s.with_resolving_event(counter_card, |s| -> Result<(), EngineError> {
+            for (index, id) in ids.iter().enumerate() {
+                if crate::effects::ability(masters, *id)?.trigger
+                    == crate::effects::ast::TriggerType::Counter
+                {
+                    crate::effects::resolver::game_resolve_ability(
+                        s, masters, seat, counter_card, index, false,
+                    )?;
+                }
             }
-        }
+            Ok(())
+        })?;
         crate::effects::actions::rules::register_granted_replacements(
             s, masters, seat, counter_card,
         )?;

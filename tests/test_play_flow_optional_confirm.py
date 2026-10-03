@@ -195,13 +195,14 @@ def _all_star(answers):
     s = Scenario(p1_leader=IMPEL_LEADER, turn=5)
     s.don["p1"] = 5
     s.put("p1", IMPEL_ALL_STAR, "hand")
-    s.put("p1", VANILLA, "hand")
-    s.put("p1", VANILLA, "hand")
+    for _ in range(3):      # 発動したイベント自身は候補に入らない＝選ぶには自分以外が 3 枚要る
+        s.put("p1", VANILLA, "hand")
     p = s.build()
     before = p.hand_count("p1")
     p.play("P1", IMPEL_ALL_STAR)
     pe = p.pending()
     assert pe["action"] == "SEARCH_AND_SELECT"             # コスト: 手札 2 枚を捨てる
+    assert all(c["card_id"] == VANILLA for c in pe["candidates"]), "イベント自身は候補に出ない"
     p.resolve("P1", [c["uuid"] for c in pe["candidates"] if c["card_id"] == VANILLA][:2])
     for a in answers:
         pe = p.pending()

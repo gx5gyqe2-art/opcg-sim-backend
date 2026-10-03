@@ -147,12 +147,18 @@ pub fn play_card_action(
             seat,
         )?;
         let ids = masters.get(s.state().card(card).master).ability_ids.clone();
-        for (index, id) in ids.iter().enumerate() {
-            let trigger = crate::effects::ability(masters, *id)?.trigger;
-            if matches!(trigger, TriggerType::OnPlay | TriggerType::ActivateMain) {
-                crate::effects::resolver::game_resolve_ability(s, masters, seat, card, index, false)?;
+        // 解決中のイベント自身は手札の候補・枚数に含めない（実ルールでは手札を離れている）。
+        s.with_resolving_event(card, |s| -> Result<(), EngineError> {
+            for (index, id) in ids.iter().enumerate() {
+                let trigger = crate::effects::ability(masters, *id)?.trigger;
+                if matches!(trigger, TriggerType::OnPlay | TriggerType::ActivateMain) {
+                    crate::effects::resolver::game_resolve_ability(
+                        s, masters, seat, card, index, false,
+                    )?;
+                }
             }
-        }
+            Ok(())
+        })?;
         crate::effects::actions::move_card(s, masters, card, Zone::Trash, seat, Position::Bottom)?;
         return Ok(());
     }

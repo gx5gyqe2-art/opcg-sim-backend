@@ -358,6 +358,7 @@ pub fn fixture() -> Fixture {
         in_passive_recalc: false,
         replacement_suspended: false,
         return_don_selection: None,
+        resolving_event: None,
         last_resource_count: None,
     };
 
@@ -549,6 +550,7 @@ impl BoardBuilder {
             in_passive_recalc: false,
             replacement_suspended: false,
             return_don_selection: None,
+            resolving_event: None,
             last_resource_count: None,
         };
         (self.masters, state)

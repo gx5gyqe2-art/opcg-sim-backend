@@ -142,7 +142,9 @@ fn execute_event(
         record_event_played(s, masters, *ev);
         triggers::enqueue_activation_listeners(s, masters, triggers::Activation::Event, actor)?;
         if let Some(index) = main_event_ability(s, masters, *ev)? {
-            crate::effects::resolver::game_resolve_ability(s, masters, actor, *ev, index, false)?;
+            s.with_resolving_event(*ev, |s| {
+                crate::effects::resolver::game_resolve_ability(s, masters, actor, *ev, index, false)
+            })?;
         }
         move_card(s, masters, *ev, Zone::Trash, actor, Position::Bottom)?;
     }

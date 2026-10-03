@@ -180,7 +180,9 @@ pub fn get_target_cards(
                         candidates.push(TargetRef::Card(stage));
                     }
                 }
-                ZoneRef::Hand => candidates.extend(p.hand.iter().map(|c| TargetRef::Card(*c))),
+                ZoneRef::Hand => candidates.extend(
+                    state.hand_cards(p.seat).into_iter().map(TargetRef::Card),
+                ),
                 ZoneRef::Trash => candidates.extend(p.trash.iter().map(|c| TargetRef::Card(*c))),
                 ZoneRef::Life => {
                     // 「ライフの上か下から1枚」: 先頭（上）と末尾（下）の 2 枚だけが候補。
@@ -748,6 +750,19 @@ pub(crate) mod tests {
             f.run(&query(r#""zone":"HAND","is_unique_name":true"#), "p1-char-a"),
             ["p1-hand-a", "p1-hand-c"]
         );
+    }
+
+    /// 解決中のイベント（発動したカード）は手札の候補・枚数に入らない。
+    #[test]
+    fn the_resolving_event_is_not_a_hand_candidate() {
+        let mut f = fixture();
+        let ev = f.find("p1-hand-b");
+        f.state.resolving_event = Some(ev);
+        assert_eq!(f.run(&query(r#""zone":"HAND""#), "p1-char-a"), ["p1-hand-a", "p1-hand-c"]);
+        assert_eq!(f.state.hand_len(Seat::P1), f.state.player(Seat::P1).hand.len() - 1);
+        assert!(!f.state.hand_cards(Seat::P1).contains(&ev));
+        // 相手の手札は影響を受けない。
+        assert_eq!(f.state.hand_len(Seat::P2), f.state.player(Seat::P2).hand.len());
     }
 
     #[test]

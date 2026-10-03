@@ -185,6 +185,7 @@ pub enum Undo {
     ReturnDonSelection(Option<Vec<String>>),
     /// `last_resource_count` の旧値。
     LastResourceCount(Option<i32>),
+    ResolvingEvent(Option<CardIdx>),
     /// 中断（対話）を丸ごと差し替えた（Python の `active_interaction = {...}`＝先頭置換）。
     InteractionReplace(Box<Interaction>),
 }
@@ -334,6 +335,19 @@ impl Session {
 
     pub fn journal(&self) -> &Journal {
         &self.journal
+    }
+
+    /// `card`（発動したイベント）を「解決中」として `f` を走らせる（手札の候補・枚数・条件から
+    /// 外す。[`GameState::resolving_event`]）。エラーでも必ず元へ戻す。
+    pub fn with_resolving_event<R>(
+        &mut self,
+        card: CardIdx,
+        f: impl FnOnce(&mut Session) -> R,
+    ) -> R {
+        let prev = self.edit().set_resolving_event(Some(card));
+        let r = f(self);
+        self.edit().set_resolving_event(prev);
+        r
     }
 
     /// 記録つきの書き換え口（`ops.rs` が使う唯一の経路）。
@@ -779,6 +793,16 @@ impl StateMut<'_> {
         self.rec(Undo::ReturnDonSelection(old));
     }
 
+    /// 解決中のイベントを設定する（旧値を返す＝呼び出し側が入れ子で復元できる）。
+    pub fn set_resolving_event(&mut self, value: Option<CardIdx>) -> Option<CardIdx> {
+        if self.state.resolving_event == value {
+            return value;
+        }
+        let old = std::mem::replace(&mut self.state.resolving_event, value);
+        self.rec(Undo::ResolvingEvent(old));
+        old
+    }
+
     pub fn set_last_resource_count(&mut self, value: Option<i32>) {
         if self.state.last_resource_count == value {
             return;
@@ -882,6 +906,7 @@ fn apply_undo(state: &mut GameState, entry: Undo) {
         },
         Undo::ReturnDonSelection(old) => state.return_don_selection = old,
         Undo::LastResourceCount(old) => state.last_resource_count = old,
+        Undo::ResolvingEvent(old) => state.resolving_event = old,
     }
 }
 
