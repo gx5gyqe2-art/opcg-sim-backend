@@ -14,3 +14,7 @@ done cb_syn_base.json 17:40:24
 run wc_syn_base.json 17:40:24
 done wc_syn_base.json 17:43:47
 run rl_syn_base.json 17:43:47
+done rl_syn_base.json 18:22:30
+run rl_real_kappa.json 18:22:30
+done rl_real_kappa.json 18:23:58
+run rl_syn_kappa.json 18:23:58
