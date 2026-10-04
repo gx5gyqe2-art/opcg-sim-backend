@@ -2332,11 +2332,15 @@ def add_search_price_arg(ap):
     ap.add_argument("--search-price", default=None, choices=SEARCH_PRICE_MODES,
                     help="**T68** 探す能力の価格: `plan`（既定・取れる札の `max(ΔH, ΔG)` の期待値・デッキから数える）"
                          "／`sel`（旧・`μ + sel(k)`）。**2026-09-17 より前の数字と比べるときは `sel` を明示する**")
+    import search_price as SP                                    # 遅延（`search_price` は本器を import する）
+    SP.add_search_value_args(ap)                                 # **N-4**: `--search-value`・`--deck-counter`
 
 
 def apply_search_price(a):
     if getattr(a, "search_price", None) is not None:
         set_search_price_mode(a.search_price)
+    import search_price as SP
+    SP.apply_search_value_args(a)                                # **N-4**
     return SEARCH_PRICE_MODE
 
 

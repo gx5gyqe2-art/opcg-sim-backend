@@ -41,6 +41,87 @@ HAND_DEST = "HAND"
 _DECKS = {}
 _GAIN = {}
 
+#: **N-4（2026-10-04）: 足した札の値の読み方**——探す能力の価格（本器の `card_gain`）と物差しの入った札
+#: （`hand_plan.added_card_gains`・T69）の**両方**を 1 つの切替で動かす（同じ札に同じ値を付ける＝価格と実現を
+#: 同じ物差しで比べるため・片側だけ替えると型ごとの価格／実現の比が式の違いだけで 1 から外れる）。
+#:
+#: * `legacy`（既定）＝T67 の札ごとの価値 `max(ΔH_play, ΔG_guard)`（`hand_plan.card_deltas` の `dtotal`・
+#:   `ΔG` は切る札の `v` を差し引いた純額で貪欲）。
+#: * `joint`＝N-1 の 1 枚 1 役の手札の価値の増え `V(手札 ∪ 札) − V(手札)`（`hand_joint`・同じ枠・同じ来る攻撃・
+#:   同じ受ける損・同じ地平と割引〔守る備えは今の行の次の相手ターンから `s^0`〕＝替わるのは値の関数だけ）。
+#:   入った札が複数なら順に足した差（望遠鏡・和は `V(後) − V(後 − 入った札)`）。**新定数ゼロ**。
+SEARCH_VALUE_MODES = ("legacy", "joint")
+SEARCH_VALUE_MODE = "legacy"
+
+#: **N-4: デッキの札のカウンター値**（探す能力で取れる札の守る側の値に使う）。
+#: * `printed`（既定・旧）＝印字カウンターだけ（`plan_labels.Cards.info` の `counter`）＝**【カウンター】イベントは 0**。
+#: * `rules`＝手札の符号化（`n_rel_feat` の手札トークンの欄 7）と同じ規則: イベントは `max(印字, 【カウンター】の上げ幅)`・
+#:   上限 5000（`min(値/2000, 2.5)`）＝**同じ札がデッキに在るときと手札に入ったときで同じカウンター値**
+#:   （`deck_refill.is_cuttable`・`lethal_rule.avg_counter(rules)` と同じ定義）。新定数ゼロ。
+DECK_COUNTER_MODES = ("printed", "rules")
+DECK_COUNTER_MODE = "printed"
+
+
+def set_search_value_mode(mode):
+    global SEARCH_VALUE_MODE
+    if mode not in SEARCH_VALUE_MODES:
+        raise ValueError("search value mode は %s のどれか" % (SEARCH_VALUE_MODES,))
+    SEARCH_VALUE_MODE = mode
+    return SEARCH_VALUE_MODE
+
+
+def set_deck_counter_mode(mode):
+    global DECK_COUNTER_MODE
+    if mode not in DECK_COUNTER_MODES:
+        raise ValueError("deck counter mode は %s のどれか" % (DECK_COUNTER_MODES,))
+    DECK_COUNTER_MODE = mode
+    return DECK_COUNTER_MODE
+
+
+def add_search_value_args(ap):
+    ap.add_argument("--search-value", default=None, choices=SEARCH_VALUE_MODES,
+                    help="**N-4** 足した札の値（探す能力の価格と物差しの入った札の両方）: `legacy`（既定・`max(ΔH, ΔG)`）"
+                         "／`joint`（1 枚 1 役の手札の価値の増え）")
+    ap.add_argument("--deck-counter", default=None, choices=DECK_COUNTER_MODES,
+                    help="**N-4** デッキの札のカウンター値: `printed`（既定・印字だけ＝カウンター・イベントは 0）"
+                         "／`rules`（手札の符号化と同じ・イベントの上げ幅を数える）")
+
+
+def apply_search_value_args(a):
+    if getattr(a, "search_value", None) is not None:
+        set_search_value_mode(a.search_value)
+    if getattr(a, "deck_counter", None) is not None:
+        set_deck_counter_mode(a.deck_counter)
+    return SEARCH_VALUE_MODE, DECK_COUNTER_MODE
+
+
+_CEV = {}
+
+
+def counter_event_of(cid):
+    """その札の【カウンター】でパワーを上げる量（`n_rel_feat.profile` の `counter_event`・読めなければ 0）。"""
+    cid = str(cid or "")
+    if cid not in _CEV:
+        try:
+            import deck_refill as DR
+            from opcg_sim.learned import n_rel_feat as NF
+            m = DR.db().get_card(cid)
+            _CEV[cid] = 0.0 if m is None else float(NF.profile(m).get("counter_event") or 0.0)
+        except Exception:
+            _CEV[cid] = 0.0
+    return _CEV[cid]
+
+
+def deck_counter(cid, info):
+    """**デッキの札のカウンター値**（`DECK_COUNTER_MODE`）。`info` は `cards.info(cid)`。"""
+    printed = float((info or {}).get("counter") or 0.0)
+    if DECK_COUNTER_MODE != "rules":
+        return printed
+    cv = printed
+    if (info or {}).get("event"):
+        cv = max(cv, float(counter_event_of(cid)))
+    return min(cv, 5000.0)                                   # 手札トークンの上限（`min(値/2000, 2.5)`）
+
 
 def record_decks(dirs):
     """記録ディレクトリ → {seed: (decks モード, [リーダー p1, p2])}。無ければ空。"""
@@ -229,23 +310,29 @@ def _ctx_key(ctx):
 
 
 def card_gain(cid, ctx, cards):
-    """デッキの札 1 枚を今の手札に加えたときの `max(ΔH_play, ΔG_guard)`（同じ手札・同じ札は使い回す）。"""
+    """デッキの札 1 枚を今の手札に加えたときの `max(ΔH_play, ΔG_guard)`（同じ手札・同じ札は使い回す）。
+    **N-4**: `SEARCH_VALUE_MODE=joint` なら 1 枚 1 役の手札の価値の増え・`DECK_COUNTER_MODE=rules` ならカウンター値は規則どおり。"""
     import theory_order as _TO
     key = ((_ctx_key(ctx), str(cid)) + ((_TO.CUT_PRICER_KEY, _TO.CUT_TAKE_CARD is not None) if _TO.CUT_PRICER is not None else ())
-           if _TO._cut_cache_ok() else None)                   # **N-3**: 値段の文脈は鍵に入れる
+           + ((SEARCH_VALUE_MODE, DECK_COUNTER_MODE) if (SEARCH_VALUE_MODE, DECK_COUNTER_MODE) != ("legacy", "printed") else ())
+           if _TO._cut_cache_ok() else None)                   # **N-3**: 値段の文脈は鍵に入れる（**N-4**: 切替も）
     if key is not None and key in _GAIN:
         return _GAIN[key]
     b = _card_body(cid, cards)
     info = cards.info(cid) or {}
     card = {"cid": str(cid), "cost": b["cost"], "v": use_value(cid, info, ctx["olp"], ctx["r"]),
-            "counter": b["counter"], "event": bool(info.get("event"))}
+            "counter": (b["counter"] if DECK_COUNTER_MODE == "printed" else deck_counter(cid, info)),   # N-4
+            "event": bool(info.get("event"))}
     if HP.INFLOW_MODE == "on":                                   # T70: 取れる札が相方待ちの札なら v をターンごとの並びに
         card = HP.inflow_item(card, ctx["hand_items"], ctx.get("deck") or [], ctx["xs"], ctx["take"], cards, ctx["olp"], ctx["r"],
                               field=ctx.get("field") or (), st_base=ctx.get("st_base"))
-    d = HP.card_deltas(ctx["hand_items"], card, ctx["caps"], ctx["xs"], ctx["take"])
+    if SEARCH_VALUE_MODE == "joint":                             # **N-4**: 1 枚 1 役の手札の価値の増え
+        g = HP.joint_gain(ctx["hand_items"], card, ctx["caps"], ctx["xs"], ctx["take"])
+    else:
+        g = float(HP.card_deltas(ctx["hand_items"], card, ctx["caps"], ctx["xs"], ctx["take"])["dtotal"])
     if key is None:
-        return float(d["dtotal"])
-    _GAIN[key] = float(d["dtotal"])
+        return float(g)
+    _GAIN[key] = float(g)
     return _GAIN[key]
 
 

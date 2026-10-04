@@ -531,9 +531,41 @@ def card_deltas(rest, card, caps, xs, take_cost):
             "counter_card": bool(card["counter"] >= 2000.0 - TO.PWR_EPS or (card["event"] and card["counter"] > 0.0))}
 
 
+def _joint_items(items):
+    return [(float(it["cost"]), it["v"], float(it["counter"])) for it in items]
+
+
+def joint_gain(rest, card, caps, xs, take_cost):
+    """**N-4: 札 1 枚を足したときの 1 枚 1 役の手札の価値の増え** `V(rest ∪ 札) − V(rest)`（`hand_joint`・≥ 0）。
+    枠（`caps`）・来る攻撃（`xs`）・受ける損・地平・割引は `card_deltas` と同じ（守る備えは `s^0` から＝`start=0`）。
+    札の `v`（数かターンごとの並び）は渡されたまま読む（読み直さない＝単調・絞ってよい）。"""
+    import hand_joint as HJ
+    items = _joint_items(list(rest) + [card])
+    return float(HJ.valuer_of(items, caps, xs, take_cost).loss((len(items) - 1,)))
+
+
+def joint_gains_seq(items, added_idx, caps, xs, take_cost):
+    """**N-4: 入った札の組を順に足した差**（望遠鏡）——`added_idx` の順に
+    `g_i = V(残り ∪ a_1..a_i) − V(残り ∪ a_1..a_{i−1})`。和は `V(全部) − V(全部 − 入った札)`（順に依らない）。"""
+    import hand_joint as HJ
+    jv = HJ.valuer_of(_joint_items(items), caps, xs, take_cost)
+    full = frozenset(range(len(items)))
+    base = full - frozenset(added_idx)
+    out, cur = [], base
+    prev = jv.value(cur)[0]
+    for k_ in added_idx:
+        cur = cur | {k_}
+        v = jv.value(cur)[0]
+        out.append(max(0.0, v - prev))
+        prev = v
+    return out
+
+
 def added_card_gains(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, deck=None):
     """**窓の中で手札に入った札の `max(ΔH_play, ΔG_guard)`**（T69・物差しに手札の質を入れる）。
-    入った先の手札（`ci_after`・他の入った札も含む）で読む。同じ札が 2 枚入れば別の枠を当てる。戻り値は `[(cid, gain), …]`。"""
+    入った先の手札（`ci_after`・他の入った札も含む）で読む。同じ札が 2 枚入れば別の枠を当てる。戻り値は `[(cid, gain), …]`。
+    **N-4**（`search_price.SEARCH_VALUE_MODE=joint`）: 入った札の組を順に足した 1 枚 1 役の手札の価値の増え
+    （`joint_gains_seq`・入った札の和は `V(後) − V(後 − 入った札)`）。探す能力の価格と同じ値の関数（1 つの切替）。"""
     before = hand_ids(ci_before, idx2cid)
     after = hand_ids(ci_after, idx2cid)
     added = spent_cards(after, before)                      # after − before（多重集合）
@@ -547,17 +579,33 @@ def added_card_gains(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, d
     items = apply_inflow(hand_items(tok_after, ci_after, idx2cid, cards, olp, r), deck, xs, take, cards, olp, r,
                          field=own_field_ids(ci_after, idx2cid),
                          st_base=state_of_row(sc_after, tok_after, ci_after, idx2cid, cards))   # T70／T72
+    import search_price as SP
     used = set()
     out = []
+    pos = []
     for cid in added:
         k_ = next((q for q, it in enumerate(items) if it["cid"] == cid and q not in used), None)
         if k_ is None:
             continue
         used.add(k_)
+        pos.append((cid, k_))
+        if SP.SEARCH_VALUE_MODE == "joint":
+            continue
         card = items[k_]
         rest = items[:k_] + items[k_ + 1:]
         out.append((cid, float(card_deltas(rest, card, caps, xs, take)["dtotal"])))
+    if SP.SEARCH_VALUE_MODE == "joint" and pos:                 # **N-4**
+        gs = joint_gains_seq(items, [k_ for _c, k_ in pos], caps, xs, take)
+        out = [(cid, float(g)) for (cid, _k), g in zip(pos, gs)]
     return out
+
+
+def gain_of(rest, card, caps, xs, take_cost):
+    """**足した札の値**（`search_price.SEARCH_VALUE_MODE` に従う）: `legacy`＝`max(ΔH, ΔG)`・`joint`＝`joint_gain`。"""
+    import search_price as SP
+    if SP.SEARCH_VALUE_MODE == "joint":
+        return joint_gain(rest, card, caps, xs, take_cost)
+    return float(card_deltas(rest, card, caps, xs, take_cost)["dtotal"])
 
 
 def collect(dirs, limit_games=0):
@@ -614,6 +662,8 @@ def collect(dirs, limit_games=0):
                             items = [(it["cost"], it["v"]) for it in rest]
                             d = card_deltas(rest, card, caps, xs, take)
                             draws.append({"cid": cid, "v": v_scalar(card["v"]), "dh": d["dh"], "dg": d["dg"], "dtotal": d["dtotal"],
+                                          "dj": joint_gain(rest, card, caps, xs, take),                     # N-4
+                                          "counter": float(card["counter"]),
                                           "counter_card": d["counter_card"], "turn": t, "hand_n": len(hand),
                                           "playable_next_before": playable_next(items, caps)})
                         stats["draw_rows"] += 1
@@ -650,6 +700,7 @@ def collect(dirs, limit_games=0):
                 items = [(it["cost"], it["v"]) for it in rest]
                 d = card_deltas(rest, card, caps2, xs2, take2)
                 got.append({"cid": c2, "v": v_scalar(card["v"]), "dh": d["dh"], "dg": d["dg"], "dtotal": d["dtotal"],
+                            "dj": joint_gain(rest, card, caps2, xs2, take2),                                 # N-4
                             "counter_card": d["counter_card"], "playable_next_before": playable_next(items, caps2)})
             searches.append({"cid": cid, "k": look_k(cid), "turn": t, "found": len(added), "got": got})
     return searches, draws, stats
@@ -660,7 +711,7 @@ def _mean(xs):
     return float(np.mean(xs)) if xs else None
 
 
-def block(ss, draw_dh, draw_v, draw_dg=None, draw_dt=None):
+def block(ss, draw_dh, draw_v, draw_dg=None, draw_dt=None, draw_dj=None):
     n = len(ss)
     if n == 0:
         return {"n": 0}
@@ -668,6 +719,7 @@ def block(ss, draw_dh, draw_v, draw_dg=None, draw_dt=None):
     dh = [g["dh"] for g in got]
     dg = [g["dg"] for g in got]
     dt = [g["dtotal"] for g in got]
+    dj = [g["dj"] for g in got if g.get("dj") is not None]
     vs = [g["v"] for g in got if g["v"] is not None]
     return {"n": n, "found": float(np.mean([s["found"] >= 1 for s in ss])), "k_mean": _mean([s["k"] for s in ss]),
             "dh_searched": _mean(dh), "dh_draw": draw_dh,
@@ -675,6 +727,9 @@ def block(ss, draw_dh, draw_v, draw_dg=None, draw_dt=None):
             "dg_searched": _mean(dg), "dg_draw": draw_dg, "premium_dg": (None if not dg or draw_dg is None else float(np.mean(dg) - draw_dg)),
             "dtotal_searched": _mean(dt), "dtotal_draw": draw_dt,
             "premium_total": (None if not dt or draw_dt is None else float(np.mean(dt) - draw_dt)),
+            # **N-4**: 1 枚 1 役の手札の価値の増え（探した札・引いた札・差）
+            "dj_searched": _mean(dj), "dj_draw": draw_dj,
+            "premium_joint": (None if not dj or draw_dj is None else float(np.mean(dj) - draw_dj)),
             "counter_card_share": (float(np.mean([g["counter_card"] for g in got])) if got else None),
             "guard_motivated_share": (float(np.mean([g["dg"] > g["dh"] + 1e-12 for g in got])) if got else None),
             # **計画の増分で見た選択の利得**（探した札 − 引いた札）対 静的 v の差
@@ -690,19 +745,24 @@ def block(ss, draw_dh, draw_v, draw_dg=None, draw_dt=None):
 def summarise(searches, draws, min_card=8):
     draw_dh = _mean([d["dh"] for d in draws]); draw_v = _mean([d["v"] for d in draws])
     draw_dg = _mean([d["dg"] for d in draws]); draw_dt = _mean([d["dtotal"] for d in draws])
+    draw_dj = _mean([d.get("dj") for d in draws])
     out = {"draws": {"n": len(draws), "dh_mean": draw_dh, "dg_mean": draw_dg, "dtotal_mean": draw_dt, "v_mean": draw_v, "mu": MU,
+                     "dj_mean": draw_dj, "dtotal_over_mu": (None if draw_dt is None else draw_dt / MU),
+                     "dj_over_mu": (None if draw_dj is None else draw_dj / MU),
+                     "dj_ge_dtotal_share": (float(np.mean([d["dj"] >= d["dtotal"] - 1e-12 for d in draws if d.get("dj") is not None]))
+                                            if any(d.get("dj") is not None for d in draws) else None),
                      "dh_zero_share": (float(np.mean([d["dh"] <= 1e-9 for d in draws])) if draws else None),
                      "counter_card_share": (float(np.mean([d["counter_card"] for d in draws])) if draws else None),
                      "hole_before": _mean([None if d["playable_next_before"] is None else float(not d["playable_next_before"]) for d in draws])},
-           "all": block(searches, draw_dh, draw_v, draw_dg, draw_dt)}
+           "all": block(searches, draw_dh, draw_v, draw_dg, draw_dt, draw_dj)}
     for k in (3, 4, 5):
         ss = [s for s in searches if int(s["k"]) == k]
         if ss:
-            out["k=%d" % k] = block(ss, draw_dh, draw_v, draw_dg, draw_dt)
+            out["k=%d" % k] = block(ss, draw_dh, draw_v, draw_dg, draw_dt, draw_dj)
     by = collections.defaultdict(list)
     for s in searches:
         by[s["cid"]].append(s)
-    out["by_card"] = {c: block(ss, draw_dh, draw_v, draw_dg, draw_dt) for c, ss in sorted(by.items(), key=lambda kv: -len(kv[1])) if len(ss) >= min_card}
+    out["by_card"] = {c: block(ss, draw_dh, draw_v, draw_dg, draw_dt, draw_dj) for c, ss in sorted(by.items(), key=lambda kv: -len(kv[1])) if len(ss) >= min_card}
     return out
 
 
