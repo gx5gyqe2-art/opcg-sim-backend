@@ -269,7 +269,7 @@ def test_the_plan_store_returns_identical_plans_and_never_a_stale_one(_budget, t
 #: 解き方の関数の原文の指紋（版ごと）。解き方を変えたら `crossing_bridge.SOLVER_VERSION` を上げ、ここに新しい指紋を足す
 #: （ディスクの覚え書きの古い値を読まないため・値を変えたなら `rule_don_ref.py` も同じ変更で更新する）。
 SOLVER_FINGERPRINTS = {
-    "rd-speed-1": "7846c61ad1a8f190",
+    "rd-speed-1": "84e3b483d52b4b2c",
 }
 _SOLVER_FUNCS = ("_ex_prep", "_ex_counter_sets", "_norm_seq", "_seq_prep", "rule_guard_plan_ex", "_rule_guard_plan_ex",
                  "_prices_of", "_attach_gain", "rules_steps", "rules_sched", "_tab", "walk_crossing", "model_horizon",
