@@ -1,0 +1,5 @@
+{"job":"h4-syn","role":"measure","status":"done",
+"inputs":{"base":"claude/h4-rule-don-wip@66fe9224","jobs":[2,3,7]},
+"outputs":{"files":["h4_wip/results/tb_syn_cuttable_forced.json","h4_wip/results/tb_syn_rule_don.json","h4_wip/results/tb_syn_rule_don_nomirror.json"]},
+"command":"bash h4_wip/run_jobs.sh 2,3,7",
+"notes":"No code changed. Env setup needed: pip install maturin (for make rust-develop) and numpy; generated opcg_sim/data/opcg_effects.json via python -m opcg_sim.tools.export_effects_json (gitignored, absent on branch). First two launches failed instantly (missing numpy / effects json) with empty outputs; relaunched after fixing. Durations: job2 ~1min, job3 ~29min, job7 ~1min (plan cache warm). Results not interpreted."}
