@@ -23,6 +23,12 @@ class CardSchema(BaseModel):
     is_face_up: bool = Field(True, alias=CONST.get('CARD_PROPERTIES', {}).get('IS_FACE_UP', 'is_face_up'))
     attached_don: int = Field(0, alias=CONST.get('CARD_PROPERTIES', {}).get('ATTACHED_DON', 'attached_don'))
     owner_id: str = Field(..., alias=CONST.get('CARD_PROPERTIES', {}).get('OWNER_ID', 'owner_id'))
+    # ▼ 継続中の状態（場のカードだけ・`presenters.merge_statuses`）。code は
+    #   FREEZE／ATTACK_DISABLE／EFFECTS_DISABLED／PREVENT_*／KW:<キーワード> 等、duration は
+    #   THIS_TURN／THIS_BATTLE／UNTIL_NEXT_TURN_END（expire_turn 付き）／PERMANENT／PASSIVE／NEXT_REFRESH。
+    statuses: List[Dict[str, Any]] = Field(default_factory=list)
+    power_mod: int = 0  # 効果によるパワー増減（付与ドン!!は含めない）
+    cost_mod: int = 0   # 効果によるコスト増減
 
     @field_validator('type', mode='before')
     @classmethod
@@ -52,6 +58,7 @@ class PlayerSchema(BaseModel):
     don_deck_count: int = Field(10, alias=CONST.get('PLAYER_PROPERTIES', {}).get('DON_DECK_COUNT', 'don_deck_count'))
     don_active: List[Any] = Field(default_factory=list)
     don_rested: List[Any] = Field(default_factory=list)
+    don_frozen: int = 0  # レストのうち次のリフレッシュでアクティブにならないドン!!の枚数
     leader: Optional[CardSchema] = None
     zones: ZoneSchema
 

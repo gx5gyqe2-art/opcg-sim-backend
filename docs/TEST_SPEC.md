@@ -586,6 +586,7 @@ push 前の必須ゲートは **`make test` 1 本**（2026-09-07・第 2 段 `rs
 | `tests/test_parser_cost_effect_gate.py` | 「コスト：〜の場合、効果」の条件は効果側（Branch）に残り能力全体へ持ち上げない（OP05-082／OP10-118／OP09-060／OP15-074・ユーザ決定 2026-10-01）。コストなし・「：」前・見出し条件は従来どおり。`test_verified_buckets.py` の `H_COST_GATE_LIFT=0` ラチェットと対 |
 | `cargo test`（`rules/tests_cost_gate.rs`） | 実カード（`tests/fixtures/cost_gate_cards.json`）で、条件偽でも起動メインが合法手に出てコストだけ払い効果が不発／真なら効果が出る |
 | `tests/test_contract_export.py` | `contract/` の再生成差分ゼロ（API 契約のラチェット） |
+| `tests/test_status_view_api.py`＋`cargo test`（`status_view.rs`） | 継続中の状態（凍結・アタック不可・効果無効・KO 耐性・付与キーワード・パワー/コスト増減・凍結ドン!!）を期間つきで出し、API 応答の場のカード／プレイヤーへ合流する（盤面 dict＝golden とは別出力） |
 | （legacy・tag で回す） | `full_card_audit.py`（EXCEPTION/CARD_LOSS/TEMP_LEAK=0）・`test_full_card_baseline.py`・`test_verified_decks.py`・`compare_parsers.py`・`test_structural_gate.py` |
 
 **golden（`tests/fixtures/rs_goldens/`）は挙動を意図的に変えたときだけ作り直す**
