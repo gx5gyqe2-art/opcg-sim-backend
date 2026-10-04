@@ -760,6 +760,9 @@ T.set_defender_power_mode("token")
 # 2026-10-01 で切らせた札の値段の既定が `joint`＋`gbar` になった＝079e73b8 当時の `flat`＋`mu` を明示する。
 import cut_price as CP
 CP.set_cut_price_mode("flat"); CP.set_cut_take_mode("mu")
+# 2026-10-04（H-4）で手札の項の既定が `rule_don` になった＝079e73b8 当時の `cuttable_forced` を明示する。
+import crossing_bridge as _CB
+_CB.set_theta_hand_mode("cuttable_forced")
 rec, out, which = sys.argv[1], sys.argv[2], sys.argv[3]
 if which == "price_realised":
     rc = PR.main(["--in", rec, "--boot-reps", "10", "--out", out])

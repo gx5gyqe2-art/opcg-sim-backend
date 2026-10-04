@@ -94,14 +94,16 @@ SLOPE_FLOOR = 1e-3
 #: （本数・ライフ・ブロッカー・`c_of` だけ）。
 THETA_HAND_MODES = ("count", "quality", "play", "guard", "cuttable", "cuttable_cx", "cuttable_forced", "cuttable_seq",
                     "rule", "rule_don", "rule_don_purse")
-#: **出荷既定は `cuttable_forced`**（2026-09-20・ユーザ決定「3 本すべて」・T100 の形を T116 の窓の上限と対で採った）。
+#: **出荷既定は `rule_don`**（2026-10-04・H-4・ユーザ決定「推奨を採用」・`2026-10-04_h4_rule_don.md`）。
+#: **旧の既定は `cuttable_forced`**（2026-09-20・ユーザ決定「3 本すべて」・T100 の形を T116 の窓の上限と対で採った）
+#: ——**`--theta-hand cuttable_forced` で再現できる**（N-3 の数字・74a51363 と同じ）。
 #: **既定は `cuttable`**（2026-09-17・ユーザ決定「1は変えましょうか」・T77）。以前の数字と比べるときは `--theta-hand count`。
 #: **`cuttable_seq`（T158）は切替として追加**——既定はまだ `cuttable_forced`（H-2 の計測待ち）。
 #: **`rule`（H-4・2026-09-26・ユーザ決定「4は正しい形で」）は切替として追加**——**守る席の実際のカウンター値・
 #: イベントのドン・ブロッカー・ライフ**から、最善の守りで倒れるまでに切る札を DP で解く（導出は `HandRead` の上）。
 #: **`rule_don`（H-4b・ユーザ決定「推奨の方法でお願いします」）**＝`rule` に**攻め手の付与**を入れた形（財布は 1 つ・
 #: 攻め手の最善応答・速さの側も同じ計画を読む・導出は `attacker_ctx` の上）。
-THETA_HAND_MODE = "cuttable_forced"
+THETA_HAND_MODE = "rule_don"
 
 
 #: **1 枚あたりの価格の出どころ**（`hand_price_mean` の `part`）。`count` は `None`（＝`μ`）。
@@ -4837,8 +4839,9 @@ def main(argv=None):
                          "`shield`（**的の側の有限の盾**＝毎ターン規則が許すぶんだけ＝**使う時間が要る**）")
     ap.add_argument("--theta-hand", default=THETA_HAND_MODE, choices=THETA_HAND_MODES,
                     help="**T76** 耐久の手札項: `count`（`μ × 枚数`）／`quality`（札ごとの `max(ΔH, ΔG)` の平均を掛ける）／"
-                         "`cuttable_forced`（既定・T100）／`cuttable_seq`（**T158**・攻撃ごとに安い順へ `c(x_i)` 枚を割り当てる）／"
-                         "`rule`（**H-4**・守る席の実際のカウンター値・イベントのドン・ブロッカー・ライフから最善の守りで切る札を解く）")
+                         "`cuttable_forced`（旧の既定・T100・N-3 までの数字はこれ）／`cuttable_seq`（**T158**・攻撃ごとに安い順へ `c(x_i)` 枚を割り当てる）／"
+                         "`rule`（**H-4**・守る席の実際のカウンター値・イベントのドン・ブロッカー・ライフから最善の守りで切る札を解く）／"
+                         "`rule_don`（**既定・2026-10-04**・`rule` に攻め手の付与を入れた形）／`rule_don_purse`")
     ap.add_argument("--rate-don", default=RATE_DON_MODE, choices=RATE_DON_MODES,
                     help="**T114** 歩きの成長を規則のドンの列から作るか: `off`（旧・`flow·(j−1)`）／"
                          "`flow`（流入だけ `d_i` で絞る）／`purse`（財布ごと `d_i` で解き直す）")

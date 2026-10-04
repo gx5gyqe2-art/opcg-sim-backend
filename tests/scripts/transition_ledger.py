@@ -527,6 +527,10 @@ def main(argv=None):
                     help="**T124**: ターンの境目を規則から値付けするか（既定 `off`）")
     ap.add_argument("--attack-rest", dest="attack_rest", choices=KV.ATTACK_REST_MODES, default=None,
                     help="攻撃した体のレスト費用をΘ_meへ足すか（既定 `return`・C-5c／`body`＝C-2／`off`＝旧）")
+    ap.add_argument("--theta-hand", dest="theta_hand", choices=CB.THETA_HAND_MODES, default=None,
+                    help="**H-4** 耐久の手札項（既定 `rule_don`・2026-10-04／旧の既定は `cuttable_forced`）")
+    ap.add_argument("--mirror", choices=("on", "off"), default=None,
+                    help="**H-4g** 自分の耐久も相手と同じ守る側の計算で読む（既定 on・`rule_don` 系のときだけ効く）")
     ap.add_argument("--theta-return", dest="theta_return", choices=CB.THETA_RETURN_MODES, default=None,
                     help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 untap）")
     TO.add_attack_ability_arg(ap)
@@ -546,6 +550,10 @@ def main(argv=None):
         KV.set_d_mode(a.d_mode)
     if a.boundary:
         set_boundary_mode(a.boundary)
+    if a.theta_hand:
+        CB.set_theta_hand_mode(a.theta_hand)           # **H-4**
+    if a.mirror:
+        RL._TBm.MIRROR_ME = (a.mirror == "on")        # **H-4g**
     if a.theta_return:
         CB.set_theta_return_mode(a.theta_return)
     if a.attack_rest:

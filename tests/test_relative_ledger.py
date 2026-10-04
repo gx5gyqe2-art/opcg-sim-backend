@@ -403,6 +403,7 @@ def test_theory_d_mode_fills_the_rate_shape_in_the_default_hand_mode(monkeypatch
     def _record(me, opp):
         seen.append((me, opp))
         raise _Stop()
+    monkeypatch.setattr(RL.CB, "THETA_HAND_MODE", "cuttable_forced")   # 2026-10-04: 既定は rule_don になった＝旧の既定を明示
     monkeypatch.setattr(RL.KV, "set_rate_shape", _record)
     monkeypatch.setattr(RL.KV, "D_MODE", "theory")
     with pytest.raises(_Stop):
@@ -429,3 +430,14 @@ def test_state_of_row_takes_the_mirror_as_a_dict_or_a_thunk(monkeypatch):
     for mirror in (m, (lambda: m)):
         st = KV.state_of_row(sc, tok, 0.2, 0.2, 1, mirror=mirror)
         assert st[0] == 7.0 and seen["attacker"] == "ctx"
+
+
+def test_the_shipped_defaults_are_rule_don_with_the_mirror_on_under_joint_gbar():
+    """H-4（2026-10-04・ユーザ決定）: 手札の項の既定は `rule_don`・鏡は既定で入る・切らせた札の値段は `joint`＋`gbar`。
+    旧の既定は `--theta-hand cuttable_forced`・鏡なしは `MIRROR=0`／`MIRROR_ME=False`・一律の値段は `--cut-price flat --cut-take mu`。"""
+    import theory_bridge as TB
+    import cut_price as CP
+    assert RL.CB.THETA_HAND_MODE == "rule_don"
+    assert TB.MIRROR_ME is True
+    assert CP.CUT_PRICE_MODE == "joint" and CP.CUT_TAKE_MODE == "gbar"
+    assert "cuttable_forced" in RL.CB.THETA_HAND_MODES

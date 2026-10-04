@@ -56,7 +56,7 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
     `THETA_HAND_BLOCKER_MODE=on`（T103／T106＝**規則として正しい形**）。
     **黙って既定が変わると 2 つの橋の数字が比較不能になる**ので、ここで固定する。"""
     assert _SHIPPED == {
-        "THETA_HAND_MODE": "cuttable_forced",   # T77／T100・2026-09-20（T116 と対で採用）
+        "THETA_HAND_MODE": "rule_don",          # H-4・2026-10-04（ユーザ決定・旧 cuttable_forced は --theta-hand で再現）
         "THETA_HAND_PLACE": "stock",            # T102（切替として残す）
         "THETA_BODY_MODE": "blockers",           # T97
         "THETA_HAND_BLOCKER_MODE": "on",         # T106・2026-09-19
@@ -881,7 +881,7 @@ def test_rule_don_without_the_attackers_purse_falls_back_to_rule_and_counts_it()
         assert CB.THETA_HAND_PART["rule_don"] == "rule"
     finally:
         CB.set_theta_hand_mode(old)
-    assert CB.THETA_HAND_MODE == "cuttable_forced"
+    assert CB.THETA_HAND_MODE == old
 
 
 def test_the_ledger_state_reads_the_same_plan_as_the_ledger_rate():
@@ -932,7 +932,7 @@ def test_selecting_rule_leaves_the_other_modes_and_falls_back_loudly_when_the_ha
         assert CB.THETA_HAND_PART["rule"] == "rule"
     finally:
         CB.set_theta_hand_mode(old)
-    assert CB.THETA_HAND_MODE == "cuttable_forced"
+    assert CB.THETA_HAND_MODE == old
 
 
 def test_the_threshold_splits_into_life_hand_and_bodies():
@@ -2256,14 +2256,18 @@ def test_the_two_seats_endurance_must_agree_once_guards_are_forced():
     # **体が小さいと `CBAR_MODE=loose`（テスト環境）では `c_of(1000) = 1.0` になって差が消える**
     # （2026-09-20 に踏んだ: 盤面の選び方が環境の設定に依存していた）。
     sc, tok = _mirror_row(life=1.0, hand=5.0, n_char=3, pw=1.0)
-    assert CB.THETA_HAND_MODE == "cuttable_forced"             # 既定（食い違いの所在）
     assert CB.THETA_SIDE_MODE == "legacy"                      # 既定は据え置き
-    legacy_gap = abs(CB.threshold(sc, tok) - CB.threshold_of_me(sc, tok))
+    old_hm = CB.THETA_HAND_MODE
+    CB.set_theta_hand_mode("cuttable_forced")                  # **旧の既定を明示**（食い違いの所在・H-4 で既定は rule_don になった）
     try:
-        CB.set_theta_side_mode("symmetric")
-        sym_gap = abs(CB.threshold(sc, tok) - CB.threshold_of_me(sc, tok))
+        legacy_gap = abs(CB.threshold(sc, tok) - CB.threshold_of_me(sc, tok))
+        try:
+            CB.set_theta_side_mode("symmetric")
+            sym_gap = abs(CB.threshold(sc, tok) - CB.threshold_of_me(sc, tok))
+        finally:
+            CB.set_theta_side_mode("legacy")
     finally:
-        CB.set_theta_side_mode("legacy")
+        CB.set_theta_hand_mode(old_hm)
     assert legacy_gap > 1e-9          # **従来は破れる**（同じ盤面なのに席で違う）
     assert sym_gap == pytest.approx(0.0, abs=1e-9)             # **鏡にすると一致する**
     with pytest.raises(ValueError):

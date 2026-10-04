@@ -1723,6 +1723,7 @@ def summarise(pairs, reps=200, seed=0):
 
 
 def main(argv=None):
+    global MIRROR_ME
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     add_decision_row_arg(ap)
     add_guard_afford_arg(ap)                                   # G-2
@@ -1776,8 +1777,11 @@ def main(argv=None):
     ap.add_argument("--theta-hand-place", default=_CB.THETA_HAND_PLACE, choices=_CB.THETA_HAND_PLACES,
                     help="**T102** 耐久の手札項の置き場所: `stock`（旧・`Θ` に一括）／"
                          "`shield`（的の側の有限の盾＝毎ターン規則が許すぶんだけ）")
+    ap.add_argument("--mirror", default=("on" if MIRROR_ME else "off"), choices=("on", "off"),
+                    help="**H-4g** 自分の耐久も相手と同じ守る側の計算で読む（`rule_don` 系のときだけ効く・既定 on・"
+                         "`off`＝旧式〔自分は `threshold_of_me`〕。環境変数 `MIRROR=0` と同じ）")
     ap.add_argument("--theta-hand", default=_CB.THETA_HAND_MODE, choices=_CB.THETA_HAND_MODES,
-                    help="**T76** 耐久の手札項（`--w-mode curve` の `D` に効く）: `count`（既定・`μ × 枚数`）／"
+                    help="**T76** 耐久の手札項（`--w-mode curve` の `D` に効く）: `count`（`μ × 枚数`）／`rule_don`（既定・H-4・2026-10-04）／`cuttable_forced`（旧の既定）／"
                          "`quality`（自分の手札の札ごとの `max(ΔH, ΔG)` の平均。1 行から読めるのは自分の手札だけ＝相手側は `μ` のまま）")
     ap.add_argument("--clock-hand", default=_TOM.CLOCK_HAND_MODE, choices=_TOM.CLOCK_HAND_MODES,
                     help="**T78** `--w-mode clock` の時計に手札の 2 つの価値を入れるか（`on`＝耐久は切れる札だけ・速さは今出せる体を足す・自席側のみ）")
@@ -1807,6 +1811,7 @@ def main(argv=None):
     _TOM.add_defender_power_arg(ap)                            # 2b
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
+    MIRROR_ME = (a.mirror == "on")                             # **H-4g**
     apply_decision_row(a)
     _CP.apply_cut_price(a)                                     # **N-3**
     _TOM.apply_defender_power(a)                               # 2b
