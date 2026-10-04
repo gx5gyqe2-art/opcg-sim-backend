@@ -1,0 +1,4 @@
+*.sqlite*
+*.err
+run.log
+store/
