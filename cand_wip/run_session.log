@@ -6,3 +6,5 @@ run cb_real_base.json 15:24:19
 run cb_real_base.json 15:45:33
 done cb_real_base.json 16:11:52
 run wc_real_base.json 16:11:52
+done wc_real_base.json 16:16:10
+run rl_real_base.json 16:16:10
