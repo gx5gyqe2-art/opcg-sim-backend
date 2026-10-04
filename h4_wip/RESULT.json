@@ -1,0 +1,22 @@
+{
+ "job": "h4-misc",
+ "role": "measure",
+ "status": "done",
+ "inputs": {
+  "base": "claude/h4-rule-don-wip@66fe922",
+  "jobs": [
+   4,
+   5,
+   30
+  ]
+ },
+ "outputs": {
+  "files": [
+   "h4_wip/results/tl_real_cuttable_forced.json",
+   "h4_wip/results/tl_real_rule_don.json",
+   "h4_wip/results/cb_flatreal_rule_don.json"
+  ]
+ },
+ "command": "bash h4_wip/run_jobs.sh 4,5,30",
+ "notes": "Jobs 4,5 (transition ledger real: cuttable_forced / rule_don) done ~1 min each; job 30 (flat price, cut-take mu, real w41) done 05:28-08:46 UTC. Job 30 'theory' slope vs H-4f reference (hit .725/bias -.01/sigma_T 1.42/within1 .672/MAE .91): bias .073, sigma_T 1.464, within1 .6724, MAE .93 -- within1 matches, others close but not exact (bias differs by ~.08); overall hit not read directly (per-turn hit .61-1.0). Env fixes only, no code changes: pip installed maturin and numpy; generated opcg_sim/data/opcg_effects.json via opcg_sim.tools.export_effects_json (gitignored, not committed); first two launches failed instantly on these and left no outputs."
+}
