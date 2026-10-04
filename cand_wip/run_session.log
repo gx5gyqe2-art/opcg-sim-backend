@@ -10,3 +10,7 @@ done wc_real_base.json 16:16:10
 run rl_real_base.json 16:16:10
 done rl_real_base.json 17:10:45
 run cb_syn_base.json 17:10:45
+done cb_syn_base.json 17:40:24
+run wc_syn_base.json 17:40:24
+done wc_syn_base.json 17:43:47
+run rl_syn_base.json 17:43:47
