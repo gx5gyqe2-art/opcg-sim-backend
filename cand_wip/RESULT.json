@@ -1,0 +1,4 @@
+{"job":"cand-block","role":"measure","status":"done","inputs":{"base":"claude/cand-wip@b2ba3f47"},
+"outputs":{"files":["cand_wip/results/cb_real_block.json","cand_wip/results/wc_real_block.json","cand_wip/results/rl_real_block.json","cand_wip/results/cb_syn_block.json","cand_wip/results/wc_syn_block.json","cand_wip/results/rl_syn_block.json"]},
+"command":"CAND=slope_block=on bash cand_wip/run_cand.sh block",
+"notes":"No code/fixtures changed. Container was reclaimed while idle twice (13:43 and 14:55 runs lost; resumed from scratch each time, results unaffected). Stayed active afterwards so the run completed. Final run 15:27-17:00 UTC. No FAILED steps. Smoke check passed."}
