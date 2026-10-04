@@ -1821,7 +1821,12 @@ def model_horizon(actx, blk, life, arrive=()):
     return max(1, int(math.ceil(tau0 - 1e-9)))
 
 
-PLAN_STORE = None          # **RD-speed**: 計画のディスクの覚え書き（`plan_store.py`・既定は無し）
+#: **RD-speed**: 計画のディスクの覚え書き（`plan_store.py`・環境変数 `OPCG_PLAN_STORE` で開く・既定は無し）
+PLAN_STORE = None
+#: **解き方の版**——`rule_don_solve` の値を変える変更（守る側の計算・計画の列挙・歩き）をしたら上げる。ディスクの
+#: 覚え書きの鍵に入る（`tests/scripts` の原文のハッシュも入るので、上げ忘れても古い値は返らない＝二重の守り）。
+#: `test_rd_speed.py` が解き方の関数の原文の指紋を見張り、変わったのに上げていなければ落ちる。
+SOLVER_VERSION = "rd-speed-1"
 _RULE_DON_CACHE = {}
 
 #: **RD-speed**: 地平を縮めるかの決め方の数え方（`_ex_count_layers`）を使うか。`False` なら旧の「1 ターンずつ縮めて
@@ -5056,6 +5061,10 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
                 o["win_by_D"][name] = {"n": int(m.sum()), "win_rate": round(float(z[m].mean()), 4)}
         out["by_slope"][sv] = o
     return out
+
+
+import plan_store as _PS  # noqa: E402  （**RD-speed**: `OPCG_PLAN_STORE` が有ればディスクの覚え書きを開く）
+_PS.open_from_env(sys.modules[__name__])
 
 
 def main(argv=None):
