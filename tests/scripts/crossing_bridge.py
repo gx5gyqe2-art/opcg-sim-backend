@@ -1764,20 +1764,30 @@ def rules_sched(harms, steps, actx, paid1):
     ds = actx["ds"]
     a_tab, ar_tab, e_tab = actx.get("a_tab") or [0.0], actx.get("ar_tab") or [0.0], actx.get("e_tab") or [0.0]
     n = len(steps)
+    if n == 0:
+        return []
+    nl = len(a_tab) - 1
 
-    def left(i):
+    def left_of(i, paid):
         d = float(ds[min(i, len(ds)) - 1])
-        paid = paid1 if i == 1 else steps[i - 1]["paid"]
         l_ = int(round(max(0.0, d - paid) if RATE_DON_PAY else d))
-        return max(0, min(l_, len(a_tab) - 1))
-    lefts = [left(i) for i in range(1, n + 1)]
-    # **速さのためだけ（RD-speed）**: 段 `i` の項（速攻の分・素の体の分・効果）を 1 回だけ表から引き、段 `j` ごとに
-    # **同じ順の同じ足し算**を繰り返す（`v += ar_1; v += pos_1; …; v += ar_j`）——浮動小数の結果は 1 ビットも変わらない。
-    ar_l = [_tab(ar_tab, li) for li in lefts]
-    pos_l = [max(0.0, _tab(a_tab, li) - _tab(ar_tab, li)) for li in lefts]
-    seq_l = []
-    for q in range(n):
-        seq_l.append(ar_l[q]); seq_l.append(pos_l[q])
+        return max(0, min(l_, nl))
+
+    def terms(li, st):
+        # 段の項: (速攻の分, 素の体の分, 効果〔引いた札の効果 ＋ その段に出した札の効果〕)
+        return (_tab(ar_tab, li), max(0.0, _tab(a_tab, li) - _tab(ar_tab, li)), _tab(e_tab, li) + float(st["eff"]))
+    # **速さのためだけ（RD-speed）**: 段 `i ≥ 2` の項は計画の 1 段目の支払いに依らない＝出す札の組（`steps`）ごとに
+    # 1 回だけ表から引いて覚える。段 `j` ごとに**同じ順の同じ足し算**（`v += ar_1; v += pos_1; …; v += ar_j`）を
+    # 繰り返す——浮動小数の結果は 1 ビットも変わらない（旧は段ごとに表を引き直していた）。
+    ck = ("_rules_sched_tail", bool(RATE_DON_PAY), id(actx))
+    tail = steps[0].get(ck)
+    if tail is None:
+        tail = [terms(left_of(i, steps[i - 1]["paid"]), steps[i - 1]) for i in range(2, n + 1)]
+        steps[0][ck] = tail
+    t1 = terms(left_of(1, paid1), steps[0])
+    seq_l = [t1[0], t1[1]]
+    for ar_, pos_, _e in tail:
+        seq_l.append(ar_); seq_l.append(pos_)
     nh = len(harms)
     skip1 = bool(actx.get("no_attack_now")) and RATE_T1_MODE == "on"
     out = []
@@ -1786,10 +1796,11 @@ def rules_sched(harms, steps, actx, paid1):
             out.append(0.0)
             continue
         v = float(harms[j - 1]) if j <= nh else float(steps[j - 1]["fb"])
-        for x in seq_l[:2 * j - 2]:
-            v += x
-        v += ar_l[j - 1]
-        v += _tab(e_tab, lefts[j - 1]) + float(steps[j - 1]["eff"])
+        for q in range(2 * j - 2):
+            v += seq_l[q]
+        tj = t1 if j == 1 else tail[j - 2]
+        v += tj[0]
+        v += tj[2]
         out.append(float(v))
     return out
 
@@ -2139,23 +2150,32 @@ def _rule_don_solve(cards_d, don_d, blk, life, actx, turns, life_types=(), draw_
         play, cost, b, steps, later_seq, hits1 = m["play"], m["cost"], m["b"], m["steps"], m["later_seq"], m["hits1"]
         p_atk, p_eff, p_rush, caps = m["p_atk"], m["p_eff"], m["p_rush"], m["caps"]
 
-        def solve(ks):
-            xf = () if no_now else (tuple(float(att1[q][1]) + 1000.0 * ks[q] for q in range(len(att1)))
-                                    + tuple(hits1[len(att1):]))
-            return xf, rule_guard_plan_ex(cards_d, don_d, xf, None, blk, life, turns, life_types, prices,
-                                          later_seq=later_seq, rest_blk=rest, arrive_blk=arrive,
-                                          draw_types=draw_types)
-        r0 = solve([0] * len(att1))[1]
+        def first_of(ks):
+            return () if no_now else (tuple(float(att1[q][1]) + 1000.0 * ks[q] for q in range(len(att1)))
+                                      + tuple(hits1[len(att1):]))
+
+        def solve(xf):
+            return rule_guard_plan_ex(cards_d, don_d, xf, None, blk, life, turns, life_types, prices,
+                                      later_seq=later_seq, rest_blk=rest, arrive_blk=arrive, draw_types=draw_types)
+        r0 = solve(first_of([0] * len(att1)))
         h1_bare = r0["harms"][0] if r0["harms"] else 0.0
         ks = [0] * len(att1)
+        seen = set()
 
         def visit(i, left):
             nonlocal best
             if i == len(att1):
                 if fixed is not None and sum(ks) != fixed[1]:
                     return
-                xf, res = solve(ks)
+                xf = first_of(ks)
                 paid = cost + sum(ks)
+                # **RD-speed**: 同じ攻撃の組（並べ替え）と同じ支払いの計画は、守る側の計算（攻撃の並びを並べ替えて読む）も
+                # 歩きも点数も同じ＝点数が等しいので先に来た方が残る（`<` で比べる）。後から来た同じ計画は解かずに飛ばす。
+                sig = (tuple(sorted(xf)), paid)
+                if sig in seen:
+                    return
+                seen.add(sig)
+                res = solve(xf)
                 h = res["harms"]
                 incr = (h[0] if h else 0.0) - h1_bare
                 val = p_atk + p_eff + incr + float(flow[max(0, budget - paid)])
