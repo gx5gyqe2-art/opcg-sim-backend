@@ -1,0 +1,22 @@
+{
+ "job": "cand-base",
+ "role": "measure",
+ "status": "done",
+ "inputs": {
+  "base": "claude/cand-wip@b2ba3f4"
+ },
+ "outputs": {
+  "files": [
+   "cand_wip/results/cb_real_base.json",
+   "cand_wip/results/wc_real_base.json",
+   "cand_wip/results/rl_real_base.json",
+   "cand_wip/results/cb_syn_base.json",
+   "cand_wip/results/wc_syn_base.json",
+   "cand_wip/results/rl_syn_base.json",
+   "cand_wip/results/rl_real_kappa.json",
+   "cand_wip/results/rl_syn_kappa.json"
+  ]
+ },
+ "command": "bash cand_wip/run_cand.sh base",
+ "notes": "Control (base), 100 games crossing_bridge/win_calib, 60 games relative_ledger; no step failed. Crossing bridge (theory slope) real: sign_acc 0.749, bias +0.02, sigma_T 1.33, within1 0.675, MAE 0.89; synthetic: sign_acc 0.661, bias +0.19, sigma_T 1.85, within1 0.663, MAE 1.02. | win_calib abs AUC/ECE real 0.846/0.042, synthetic 0.716/0.155 (synthetic abs logloss 0.846 is worse than the constant 0.693; rel logloss 0.637 beats it). | relative_ledger rel_K AUC real 0.902, synthetic 0.734; kappa_sigma=match changes only the abs_kappa arm (AUC real 0.778->0.840, synthetic 0.658->0.674); rel_K unchanged. Operational: container restarted 3 times while idle (~every 20-40 min, coinciding with scheduled wake-ups) killing the runner and losing in-progress steps; it finished after relaunch once the session was kept active with foreground waits. cb steps took ~26-30 min, rl_real ~55 min."
+}
