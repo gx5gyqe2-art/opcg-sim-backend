@@ -763,6 +763,9 @@ CP.set_cut_price_mode("flat"); CP.set_cut_take_mode("mu")
 # 2026-10-04（H-4）で手札の項の既定が `rule_don` になった＝079e73b8 当時の `cuttable_forced` を明示する。
 import crossing_bridge as _CB
 _CB.set_theta_hand_mode("cuttable_forced")
+# 2026-10-04（N-4）でデッキの【カウンター】イベントの数え方の既定が `rules` になった＝079e73b8 当時の `printed`（印字だけ）を明示する。
+import search_price as _SP
+_SP.set_deck_counter_mode("printed")
 rec, out, which = sys.argv[1], sys.argv[2], sys.argv[3]
 if which == "price_realised":
     rc = PR.main(["--in", rec, "--boot-reps", "10", "--out", out])
