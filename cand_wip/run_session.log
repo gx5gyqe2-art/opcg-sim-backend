@@ -2,3 +2,7 @@ run cb_real_base.json 13:43:53
 run cb_real_base.json 14:52:02
 --- container restart detected 15:24:19; relaunching
 run cb_real_base.json 15:24:19
+--- container restart detected 15:45:33 (idle reclaim suspected); relaunching, will keep session active
+run cb_real_base.json 15:45:33
+done cb_real_base.json 16:11:52
+run wc_real_base.json 16:11:52
