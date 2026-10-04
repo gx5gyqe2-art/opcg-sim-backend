@@ -1357,6 +1357,7 @@ def _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, lif
     if len(set_cache) > 400000:
         set_cache.clear()
     eps = PWR_EPS
+    tprob = tuple(tp[2] for tp in types)
 
     memo = _EX_USED["memo"]
     lim = _EX_USED["limit"]
@@ -1449,6 +1450,7 @@ def _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, lif
             return out
         best_att = None
         prev_x = None
+        kill_def = None
         if lf > 0:
             hs = recv_of.get(hand)
             if hs is None:
@@ -1464,20 +1466,42 @@ def _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, lif
             rest_rem = rem[:i] + rem[i + 1:]
             # 受ける
             if lf <= 0:
-                kill = (lam - lam_net) * float(L0) + sum(nu(m) for m in ready + rested + pend)
-                best_def = (0.0, 0.0, 0.0, 0.0, (kill,))
+                if kill_def is None:
+                    kill = (lam - lam_net) * float(L0) + sum(nu(m) for m in ready + rested + pend)
+                    kill_def = (0.0, 0.0, 0.0, 0.0, (kill,))
+                best_def = kill_def
             else:
-                parts = []
+                # 確率つきの和（`comb` と同じ足し算を同じ順で・その場で）
+                prev = cut = alive = st = 0.0
+                hh = []
                 lf1 = lf - 1
                 for ti in range(NT):
                     k = (ctx, t, rest_rem, hs[ti], ready, rested, pend, dl, lf1)
-                    parts.append((types[ti][2], memo_get(k) or within(k)))
+                    r = memo_get(k) or within(k)
+                    p = tprob[ti]
+                    prev += p * r[0]; cut += p * r[1]; alive += p * r[2]; st += p * r[3]
+                    r4 = r[4]
+                    n4 = len(r4)
+                    if n4 > len(hh):
+                        hh.extend([0.0] * (n4 - len(hh)))
+                    for j in range(n4):
+                        hh[j] += p * r4[j]
                 if p_none > 0.0:
                     k = (ctx, t, rest_rem, hand, ready, rested, pend, dl, lf1)
-                    parts.append((p_none, memo_get(k) or within(k)))
-                r = comb(parts)
-                h4 = r[4]
-                best_def = (r[0], r[1], r[2], r[3], ((h4[0] + lam_net,) + h4[1:]) if h4 else (0.0 + lam_net,))
+                    r = memo_get(k) or within(k)
+                    p = p_none
+                    prev += p * r[0]; cut += p * r[1]; alive += p * r[2]; st += p * r[3]
+                    r4 = r[4]
+                    n4 = len(r4)
+                    if n4 > len(hh):
+                        hh.extend([0.0] * (n4 - len(hh)))
+                    for j in range(n4):
+                        hh[j] += p * r4[j]
+                if hh:
+                    hh[0] = hh[0] + lam_net
+                    best_def = (prev, cut, alive, st, tuple(hh))
+                else:
+                    best_def = (prev, cut, alive, st, (0.0 + lam_net,))
             # 横取りする
             for bi, m in enumerate(ready):
                 if bi > 0 and ready[bi - 1] == m:
@@ -1493,7 +1517,8 @@ def _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, lif
                     k = (ctx, t, rest_rem, hand, nr, tuple(sorted(rested + (m,), reverse=True)), pend, dl, lf)
                     r = memo_get(k) or within(k)
                     cand = (r[0] + 1.0, r[1], r[2], r[3], r[4])
-                if better(cand, best_def):
+                d = cand[0] - best_def[0]
+                if d > FEQ or (not d < -FEQ and better(cand, best_def)):
                     best_def = cand
             # カウンターを切る
             for nh, dl2, nc in _ex_counter_sets(kid, kvals, kdons, x, hand, dl):
@@ -1502,7 +1527,8 @@ def _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, lif
                 h4 = r[4]
                 v = mu * nc
                 cand = (r[0] + 1.0, r[1] + nc, r[2], r[3] + 1.0, ((h4[0] + v,) + h4[1:]) if h4 else (0.0 + v,))
-                if better(cand, best_def):
+                d = cand[0] - best_def[0]
+                if d > FEQ or (not d < -FEQ and better(cand, best_def)):
                     best_def = cand
             # 攻め手は守る側の値を最小にする順番
             if best_att is None or better(best_att, best_def):
