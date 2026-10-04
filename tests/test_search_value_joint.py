@@ -43,8 +43,14 @@ def _modes():
     SP._GAIN.clear()
 
 
-def test_defaults_are_the_old_reading_and_unknown_names_fail():
-    assert SP.SEARCH_VALUE_MODE == "legacy" and SP.DECK_COUNTER_MODE == "printed"
+#: 読み込み時点の既定（ラチェット）
+_DEFAULTS = (SP.SEARCH_VALUE_MODE, SP.DECK_COUNTER_MODE)
+
+
+def test_defaults_and_unknown_names_fail():
+    """**既定のラチェット**（ユーザ決定 2026-10-04）: 足した札の値は旧の `legacy` のまま（1 枚 1 役は出ていく側と対で N-5）・
+    デッキのカウンター・イベントは規則どおり `rules` が既定（旧 `printed` は切替で再現）。"""
+    assert _DEFAULTS == ("legacy", "rules")
     with pytest.raises(ValueError):
         SP.set_search_value_mode("max")
     with pytest.raises(ValueError):
@@ -126,6 +132,7 @@ def test_deck_counter_events_are_zero_when_printed_and_read_by_rule(monkeypatch)
     monkeypatch.setattr(SP, "card_identity", lambda cid: {"names": [cid], "traits": [], "colors": []})
     monkeypatch.setattr(SP, "use_value", lambda cid, info, olp, r: 0.0)
     cards = _Cards(_TABLE)
+    SP.set_deck_counter_mode("printed")
     assert SP.deck_counter("CEV", _TABLE["CEV"]) == 0.0
     SP.set_deck_counter_mode("rules")
     assert SP.deck_counter("CEV", _TABLE["CEV"]) == 2000.0
@@ -153,6 +160,7 @@ def test_the_cache_keeps_the_modes_apart(monkeypatch):
     cards = _Cards(_TABLE)
     ctx = {"hand_items": [], "caps": [0, 0, 0, 0], "xs": [1000.0], "take": 0.0872,
            "deck": ["CEV"], "olp": 5000.0, "r": 4.0, "field": []}
+    SP.set_deck_counter_mode("printed")
     a = SP.card_gain("CEV", ctx, cards)
     SP.set_deck_counter_mode("rules")
     b = SP.card_gain("CEV", ctx, cards)
