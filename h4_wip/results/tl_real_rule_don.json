@@ -1,0 +1,112 @@
+{
+  "games": 60,
+  "rows": 4286,
+  "gaps": 4226,
+  "d_mode": "curve",
+  "boundary_mode": "off",
+  "sigma_rel": 0.4481,
+  "attack_rest_mode": "return",
+  "identity_max_abs_error": 0.0,
+  "w_first_mean": 0.4705,
+  "w_last_mean": 0.5483,
+  "z_mean": 0.55,
+  "terminal_mean": 0.0017,
+  "terminal_abs_mean": 0.0398,
+  "priced_share": 0.3076,
+  "resid_share": 0.988,
+  "priced_mean": -0.001139,
+  "resid_mean": 0.002243,
+  "by_axis_share": {
+    "th_me": 0.4631,
+    "th_opp": 0.5211,
+    "a_me": 0.0,
+    "a_opp": 0.0,
+    "j": 0.0157
+  },
+  "by_axis_mean": {
+    "th_me": 0.004315,
+    "th_opp": -0.001828,
+    "a_me": 0.0,
+    "a_opp": 0.0,
+    "j": -0.000244
+  },
+  "by_cause_share": {
+    "turn_boundary": 0.3843,
+    "same_turn": 0.6157
+  },
+  "by_cause_mean": {
+    "turn_boundary": 0.001244,
+    "same_turn": 0.000999
+  },
+  "by_cause_gaps": {
+    "turn_boundary": 647,
+    "same_turn": 3579
+  },
+  "resid_abs_per_gap": {
+    "turn_boundary": 0.154996,
+    "same_turn": 0.044895
+  },
+  "by_family": {
+    "attack": {
+      "gaps": 1517,
+      "resid_per_gap": 0.060396,
+      "priced_per_gap": 0.053554,
+      "resid_over_priced": 1.128
+    },
+    "attach": {
+      "gaps": 754,
+      "resid_per_gap": 0.027344,
+      "priced_per_gap": 0.0,
+      "resid_over_priced": null
+    },
+    "play": {
+      "gaps": 721,
+      "resid_per_gap": 0.051776,
+      "priced_per_gap": 0.0,
+      "resid_over_priced": null
+    },
+    "other": {
+      "gaps": 326,
+      "resid_per_gap": 0.026927,
+      "priced_per_gap": 0.0,
+      "resid_over_priced": null
+    },
+    "effect": {
+      "gaps": 261,
+      "resid_per_gap": 0.008942,
+      "priced_per_gap": 0.0,
+      "resid_over_priced": null
+    }
+  },
+  "resid_priority": {
+    "attack_rows": 0.3511,
+    "nonattack_rows": 0.2646,
+    "turn_boundary": 0.3843
+  },
+  "cross_share": {
+    "turn_boundary": {
+      "th_me": 0.4434,
+      "th_opp": 0.5188,
+      "a_me": 0.0,
+      "a_opp": 0.0,
+      "j": 0.0378
+    },
+    "same_turn": {
+      "th_me": 0.4772,
+      "th_opp": 0.5228,
+      "a_me": 0.0,
+      "a_opp": 0.0,
+      "j": 0.0
+    }
+  },
+  "cut_price": {
+    "mode": "joint",
+    "cut_view_flat": 83,
+    "cut_mlp_next": 707,
+    "cut_frames": 1414,
+    "cut_cand_sum": 5059,
+    "cut_L1_n": 1382,
+    "cut_L1_sum": 68.40017461190199,
+    "cut_mlp_rule": 707
+  }
+}
