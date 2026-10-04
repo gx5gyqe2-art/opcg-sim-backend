@@ -4822,7 +4822,7 @@ def main(argv=None):
                          "`hand`（`on` ＋ **在庫（手札）が今出せる分**を一度きり・T108）")
     ap.add_argument("--don-purse", default=DON_PURSE_MODE, choices=DON_PURSE_MODES,
                     help="**T109** 体を出すドンと効果を撃つドンを 1 つの財布にするか: "
-                         "`off`（旧・`stock` と `e₁` が別々に同じアクティブを使える＝自席ターンの 22% で使いすぎ）／"
+                         "`off`（旧・`stock` と `e₁` が別々に同じアクティブを使える＝自席ターンの 22%% で使いすぎ）／"
                          "`one`（**規則どおり**＝手札を 1 つのナップサックに入れ、1 枚 1 回だけ払う）")
     ap.add_argument("--theta-don", default=THETA_DON_MODE, choices=THETA_DON_MODES,
                     help="**T110** 耐久 `Θ` の側もドンを規則どおり払うか: `off`（旧）／"
