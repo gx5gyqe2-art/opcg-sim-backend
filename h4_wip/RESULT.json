@@ -1,0 +1,5 @@
+{"job":"h4-real","role":"measure","status":"done",
+"inputs":{"base":"claude/h4-rule-don-wip@66fe9224","jobs":[0,1,6]},
+"outputs":{"files":["h4_wip/results/rl_real_rule_don.json","h4_wip/results/tb_real_rule_don.json","h4_wip/results/tb_real_rule_don_nomirror.json"]},
+"command":"bash h4_wip/run_jobs.sh 0,1,6",
+"notes":"No code changed. Env setup needed beyond 'make rust-develop': pip install maturin, numpy and opcg_sim/requirements.txt; generated opcg_sim/data/opcg_effects.json via python -m opcg_sim.tools.export_effects_json. Earlier launches failed instantly on those missing deps (stale .err removed, rerun from scratch; no partial outputs reused except pre-existing plan caches). Wall time: job0 05:30-06:16, job1 06:16-06:29, job6 06:29-06:31 UTC. Job 6 (nomirror) ran in ~2 min thanks to the plan cache warmed by earlier jobs."}
