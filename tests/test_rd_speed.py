@@ -266,6 +266,28 @@ def test_the_plan_store_returns_identical_plans_and_never_a_stale_one(_budget, t
     assert st.key_of(cards, don, blk, life, ax, None, lt, dt, arr) == k0
 
 
+def test_the_plan_store_key_is_shared_across_tools_and_module_names(_budget, tmp_path, monkeypatch):
+    """器をまたいで共有できる鍵: 解き方が読まない切替（`PRE_SETTLE_MODE`・器ごとに既定が違う）では変わらず、
+    `crossing_bridge` が `__main__` として走っても（別の名前で読み込んだ 2 つ目の写し）同じ鍵。解き方が読む切替は入る。"""
+    import importlib.util
+    p = _PROBLEMS[5]
+    cards, don, blk, life, ax, _t, lt, dt, arr = p
+    st = PS.PlanStore(str(tmp_path / "ps"), CB)
+    names = {n for _lab, n, _src in st.reads}
+    assert {"RATE_T1_MODE", "RATE_DON_PAY", "EX_STATE_BUDGET", "CUT_PRICER_KEY", "NU_MEAS"} <= names
+    assert "PRE_SETTLE_MODE" not in names and "OPP_CLOCK_MODE" not in names
+    k0 = st.key_of(cards, don, blk, life, ax, None, lt, dt, arr)
+    monkeypatch.setattr(CB, "PRE_SETTLE_MODE", "on" if CB.PRE_SETTLE_MODE == "off" else "off")
+    assert st.key_of(cards, don, blk, life, ax, None, lt, dt, arr) == k0
+    monkeypatch.undo()
+    spec = importlib.util.spec_from_file_location("cb_as_main_copy", CB.__file__)
+    cb2 = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, "cb_as_main_copy", cb2)
+    spec.loader.exec_module(cb2)
+    st2 = PS.PlanStore(str(tmp_path / "ps2"), cb2)
+    assert st2.key_of(cards, don, blk, life, ax, None, lt, dt, arr) == k0
+
+
 #: 解き方の関数の原文の指紋（版ごと）。解き方を変えたら `crossing_bridge.SOLVER_VERSION` を上げ、ここに新しい指紋を足す
 #: （ディスクの覚え書きの古い値を読まないため・値を変えたなら `rule_don_ref.py` も同じ変更で更新する）。
 SOLVER_FINGERPRINTS = {

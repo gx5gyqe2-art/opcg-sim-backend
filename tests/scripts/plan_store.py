@@ -9,14 +9,16 @@
 * 値段の文脈（`cut_context_key`・守り手の窓が有るか）と計算の予算 `EX_STATE_BUDGET`。
 * **解き方の版** `crossing_bridge.SOLVER_VERSION`（解き方を変えたら上げる・テストが解き方の関数の原文の指紋で見張る）
   と **`tests/scripts/*.py` 全部の原文のハッシュ**（どれか 1 文字でも変われば別の鍵＝古い値は返らない）。
-* 解き方が読む 3 つのモジュール（`crossing_bridge`・`theory_order`・`price_realised`）の**大文字の大域の値**
-  （切替・定数）の全部——どの器から呼んでも、切替が違えば別の鍵。
+* 解き方が**読みうる大文字の大域**（切替・定数）の今の値——`rule_don_solve` から呼ばれうる関数をモジュールをまたいで
+  たどって集める（`solver_reads`・多めに拾う側）。解き方が読まない切替（`PRE_SETTLE_MODE` 等）は入れない＝器ごとに
+  違う切替を立てても同じ問題は同じ鍵（器をまたいで共有できる）。`__main__` として走っても import されても同じ鍵。
 
 使い方: 環境変数 `OPCG_PLAN_STORE=<ディレクトリ>` を付けて器を走らせる（`crossing_bridge` が import 時に開く）。
 既定は無し（何も書かない）。中身は SQLite 1 ファイル（`plans.sqlite`・値は zlib＋pickle）。消せば冷たい実行に戻る。
 """
 import glob
 import hashlib
+import inspect
 import os
 import pickle
 import sqlite3
@@ -45,22 +47,54 @@ def source_digest(root=None):
     return h.hexdigest()
 
 
-def globals_snapshot(mods):
-    """モジュールの大文字の大域（スカラー・スカラーの組・`NU_MEAS` のような数の辞書）の `repr`。"""
-    out = []
-    for m in mods:
-        for k in sorted(vars(m)):
-            if not (k[:1].isupper() and k.upper() == k):
-                continue
-            v = vars(m)[k]
-            if k in _VOLATILE:
-                continue
-            if _scalar_like(v):
-                out.append((m.__name__, k, repr(v)))
-            elif isinstance(v, dict) and len(v) <= 64 and all(
-                    _scalar_like(a) and _scalar_like(b) for a, b in v.items()):
-                out.append((m.__name__, k, repr(sorted(v.items(), key=repr))))
-    return repr(out)
+def _code_names(code):
+    out = set(code.co_names)
+    for c in code.co_consts:
+        if inspect.iscode(c):
+            out |= _code_names(c)
+    return out
+
+
+def _label(g):
+    return os.path.basename(g.get("__file__") or "") or str(g.get("__name__"))
+
+
+def solver_reads(fn):
+    """`fn` から呼ばれうる関数を（モジュールをまたいで）たどり、読まれうる**大文字の大域**の一覧
+    `[(ファイル名, 名前, その大域の辞書)]`。関数の原文に出てくる名前（`co_names`・入れ子の関数も）を、その関数の
+    大域と、そこで参照されるモジュールの属性の両方で引く（多めに拾う側に倒す）。"""
+    seen, out, stack = set(), {}, [fn]
+    while stack:
+        f = stack.pop()
+        if f in seen:
+            continue
+        seen.add(f)
+        g = f.__globals__
+        names = _code_names(f.__code__)
+        srcs = [g] + [vars(g[n]) for n in names if n in g and inspect.ismodule(g[n])]
+        for n in names:
+            for src in srcs:
+                if n not in src:
+                    continue
+                v = src[n]
+                if inspect.isfunction(v):
+                    stack.append(v)
+                elif n[:1].isupper() and n.upper() == n and not inspect.ismodule(v) and n not in _VOLATILE:
+                    out[(_label(src), n)] = src
+    return sorted((lab, n, src) for (lab, n), src in out.items())
+
+
+def _val(v):
+    if _scalar_like(v):
+        return repr(v)
+    if isinstance(v, dict) and len(v) <= 64 and all(_scalar_like(a) and _scalar_like(b) for a, b in v.items()):
+        return repr(sorted(v.items(), key=repr))
+    return "<%s>" % type(v).__name__                         # 関数・オブジェクト: 有るか（型）だけ（中身は入力の側で鍵に入る）
+
+
+def globals_snapshot(reads):
+    """`solver_reads` の大域の今の値（ファイル名・名前つき）。モジュールの名前（`__main__` か否か）に依らない。"""
+    return repr([(lab, n, _val(src.get(n))) for lab, n, src in reads])
 
 
 #: 実行中に数が増えるだけの数え先と、この覚え書き自身（値に入らない）——鍵に入れると毎回別の鍵になって覚え書きが効かない
@@ -78,19 +112,16 @@ class PlanStore:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("CREATE TABLE IF NOT EXISTS plans (k TEXT PRIMARY KEY, v BLOB)")
         self.src = source_digest()
+        self.reads = solver_reads(cb.rule_don_solve)
         self.hits = self.misses = self.puts = 0
         self._glob_cache = None
 
-    def _mods(self):
-        import theory_order as TO
-        import price_realised as PR
-        return (self.cb, TO, PR)
 
     def key_of(self, cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arrive):
         cb = self.cb
         ax = sorted((k, v) for k, v in actx.items() if k != "_gain")
         import cut_price as CP
-        body = repr((cb.SOLVER_VERSION, self.src, globals_snapshot(self._mods()),
+        body = repr((cb.SOLVER_VERSION, self.src, globals_snapshot(self.reads),
                      list(cards_d or ()), don_d, list(blk or ()), life, turns, tuple(life_types or ()),
                      tuple(draw_types or ()), tuple(arrive or ()), ax, cb.cut_context_key(),
                      CP.active() is not None, cb.EX_STATE_BUDGET))
@@ -121,5 +152,5 @@ def open_from_env(cb):
     st = PlanStore(path, cb)
     cb.PLAN_STORE = st
     import atexit
-    atexit.register(lambda: print("plan_store: %r" % (st.report(),), file=sys.stderr))
+    atexit.register(lambda: (st.hits or st.misses) and print("plan_store: %r" % (st.report(),), file=sys.stderr))
     return st
