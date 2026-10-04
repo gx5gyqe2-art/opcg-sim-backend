@@ -22,6 +22,7 @@ mod py_game;
 mod rules;
 mod search;
 mod state;
+mod status_view;
 #[cfg(test)]
 mod testkit;
 

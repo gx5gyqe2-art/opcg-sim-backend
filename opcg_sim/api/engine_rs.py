@@ -179,6 +179,11 @@ class RsGame:
         """完全な内部状態（記録 v5 の `hidden`）。"""
         return json.loads(self._game.hidden_json())
 
+    def statuses(self) -> Dict[str, Any]:
+        """画面表示用の継続中の状態（`cards`: uuid→{statuses, power_mod, cost_mod}／
+        `players`: 席→{don_frozen}）。盤面 dict とは別出力（Rust `status_view.rs`）。"""
+        return json.loads(self._game.status_json())
+
     def get_pending_request(self, with_request_id: bool = True) -> Optional[Dict[str, Any]]:
         """現在の要求（`request_id` はここで付ける）。"""
         pending = json.loads(self._game.pending_json())
