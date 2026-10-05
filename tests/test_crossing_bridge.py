@@ -31,7 +31,7 @@ import theory_order as T  # noqa: E402
 _SHIPPED = {n: getattr(CB, n) for n in (
     "THETA_HAND_MODE", "THETA_HAND_PLACE", "THETA_BODY_MODE", "THETA_HAND_BLOCKER_MODE",
     "THETA_RETURN_MODE", "SLOPE_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE", "SLOPE_EFFECT_MODE",
-    "RATE_WALK_MODE", "RATE_DECAY_MODE", "RATE_RUSH_MODE", "RACE_MODE", "SLOPE_TAKE_MODE",
+    "RATE_WALK_MODE", "RATE_DECAY_MODE", "RACE_MODE", "SLOPE_TAKE_MODE",
     "DON_PURSE_MODE", "THETA_DON_MODE", "THETA_HAND_WINDOW", "RATE_DON_MODE")}
 
 
@@ -52,7 +52,7 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
     **代金は ±1 当たりと `curve` の的中、そして線形の橋**（`dG` の AUC 0.696 → 0.660／0.720 → 0.692）。
 
     **同日のユーザ決定**（「1は規定、2は正しいものに直してください」）で 4 つ動いた:
-    `SLOPE_EFFECT_MODE=hand`（T108）・最初の自席ターンは打てない規則（T103・2026-10-05 に切替は削除）・`RATE_RUSH_MODE=on`・
+    `SLOPE_EFFECT_MODE=hand`（T108）・最初の自席ターンは打てない規則（T103・2026-10-05 に切替は削除）・速攻は出したターンから（T103・2026-10-05 に切替は削除）・
     `THETA_HAND_BLOCKER_MODE=on`（T103／T106＝**規則として正しい形**）。
     **黙って既定が変わると 2 つの橋の数字が比較不能になる**ので、ここで固定する。"""
     assert _SHIPPED == {
@@ -68,7 +68,6 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "SLOPE_EFFECT_MODE": "hand",             # T105／T108・2026-09-19
         "RATE_WALK_MODE": "grow",                # T94
         "RATE_DECAY_MODE": "off",                # T95（切替として残す）
-        "RATE_RUSH_MODE": "on",                  # T103・2026-09-19
         "RACE_MODE": "static",                   # T90／T91／T104（切替として残す）
         "DON_PURSE_MODE": "all",                 # T109・2026-09-19
         "THETA_DON_MODE": "rule",                # T110・2026-09-19
@@ -780,20 +779,12 @@ def test_the_attackers_purse_is_resolved_every_turn_with_the_growing_don():
 
 def test_rush_counts_once_and_follows_the_rush_mode():
     """**H-4f（F3）**: 速攻の体は出したターンから**1 回だけ**数える（攻撃の価格は内訳の `atk` の中・`rush` は内訳の名前）。
-    `RATE_RUSH_MODE=off` なら出したターンには殴らない。"""
+    出したターンに殴る（旧の「殴らない」形 `RATE_RUSH_MODE=off` は 2026-10-05 に削除）。"""
     body = (1, {"atk": 0.04, "eff": 0.0, "rush": 0.04}, 0.0, True)
     ax = _actx(1, [(0, 0.0)], [(0, 0.0)], [body], board=0.01)
     on = CB.rules_steps(ax, (0,), 3)
     assert on[0]["fb"] == pytest.approx(0.05) and len(on[0]["hits"]) == 2
     assert on[1]["fb"] >= 0.05 and on[1]["fb"] < 0.05 + 0.04 + 1.0   # 2 段目: 体は場の 1 体として 1 回
-    old = CB.RATE_RUSH_MODE
-    try:
-        CB.set_rate_rush_mode("off")
-        off = CB.rules_steps(ax, (0,), 3)
-    finally:
-        CB.set_rate_rush_mode(old)
-    assert off[0]["fb"] == pytest.approx(0.01) and len(off[0]["hits"]) == 1
-    assert len(off[1]["hits"]) == 2
 
 
 def test_the_defender_draws_a_card_every_turn_like_the_attacker():
@@ -1217,7 +1208,7 @@ def test_the_rate_terms_are_separate_quantities():
     board, stock, flow, lead, s_rush, f_rush, eff, eff1 = CB.seat_slope_terms(
         sc, tok, None, None, None, 5000.0, deck_ids=[body])
     assert eff1 == 0.0                                # 既定は `SLOPE_EFFECT_MODE=off`（T108）
-    assert s_rush == 0.0 and f_rush == 0.0            # 既定は `RATE_RUSH_MODE=off`（T103）
+    assert s_rush == 0.0 and f_rush == 0.0            # 速攻の札が無いデッキ（T103）
     assert eff == 0.0                                 # 既定は `SLOPE_EFFECT_MODE=off`（T105）
     assert board == pytest.approx(CB.theory_slope(tok, 5000.0))
     assert stock == 0.0                                              # `cards` が無ければ在庫は数えられない
@@ -1624,7 +1615,6 @@ def test_the_walk_obeys_the_first_turn_rule():
 def test_rush_bodies_attack_the_turn_they_arrive():
     """**T103**: **速攻は出したターン・引いたターンからもう殴れる**（規則）。
     帳簿側は T84 の `play_starts_next_turn` が既に例外にしていて、**歩きだけが持っていなかった**。"""
-    assert CB.RATE_RUSH_MODE == "on"      # **2026-09-19 から既定**（規則どおり・量は小さい）
     # 在庫 0.1 が全部速攻なら 1 ターン目から乗る（旧は 2 ターン目から）
     assert _ra(1, 0.05, 0.0, 0.1, 0.0) == pytest.approx(0.05)
     assert _ra(1, 0.05, 0.0, 0.1, 0.0, stock_rush=0.1) == pytest.approx(0.15)
@@ -1636,12 +1626,6 @@ def test_rush_bodies_attack_the_turn_they_arrive():
     assert _ra(3, 0.0, 0.0, 0.0, 0.02, flow_rush=0.02) == pytest.approx(0.06)
     # 上限を超えて渡しても総額で抑える
     assert _ra(1, 0.0, 0.0, 0.05, 0.0, stock_rush=99.0) == pytest.approx(0.05)
-    try:
-        assert CB.set_rate_rush_mode("off") == "off"
-        with pytest.raises(ValueError):
-            CB.set_rate_rush_mode("なにか")
-    finally:
-        CB.set_rate_rush_mode("on")
 
 
 def test_the_rush_share_comes_out_of_the_same_knapsack():

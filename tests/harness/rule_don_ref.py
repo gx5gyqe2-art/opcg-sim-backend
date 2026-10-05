@@ -319,7 +319,7 @@ def rules_sched(harms, steps, actx, paid1):
     段 `j` ＝ (守る側の計算が覆う段なら) その段の損害の期待値 `harms[j]`／(先は) その段の財布の `fb`
     ＋ **計算の外**: 引いた 1 枚（段 `i` に引いた札は速攻なら `i` から・素の体は `i+1` から・その段の残ったドン
     `d_i − paid_i` で払える札だけ・素殴り＝E6）＋ 引いた札の効果 ＋ その段に出した札の効果。
-    **速攻は 1 回だけ**（出した速攻の体は `hits`／`fb` の中・F3）・`RATE_RUSH_MODE` に従う。局の最初の自席ターンは 0（T103）。"""
+    **速攻は 1 回だけ**（出した速攻の体は `hits`／`fb` の中・F3）。局の最初の自席ターンは 0（T103）。"""
     ds = actx["ds"]
     a_tab, ar_tab, e_tab = actx.get("a_tab") or [0.0], actx.get("ar_tab") or [0.0], actx.get("e_tab") or [0.0]
     n = len(steps)

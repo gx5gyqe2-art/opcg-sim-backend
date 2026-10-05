@@ -1032,7 +1032,7 @@ def _rule_hand_term(sc, tok, side, g_hand, mu=MU, turns=None, count=True):
 #    * **攻め手の財布は段ごと**（F2）: 付けたドンはそのターンで戻り、毎ターンのドン `d_i` で出す・付けるを解き直す
 #      （2 段目からは速さの側の財布と同じナップサック・`rules_steps`）。今は払えない札は払える段で出る。
 #      守る側の計算が覆わない段も、その段の付与の増分を数える（F1-b・付与を 0 にしない）。
-#    * **速攻は 1 回**（F3）・`RATE_RUSH_MODE` に従う。
+#    * **速攻は 1 回**（F3）。
 #    * **守る側も毎ターン 1 枚引く**（F4・完全情報で両席の引きを対称に・そのデッキの構成から）。
 #    * **地平**: 守る側の計算は T116 と同じ手札抜きの地平 `⌈τ0⌉`（ライフ ＋ 全てのブロッカーに盤面の素殴りで届くターン数）
 #      までを見る——引く札・取られたライフの札で手札が毎ターン増えるので、無制限に読むと状態が爆発する（実測 80 万状態）。
@@ -1628,8 +1628,7 @@ def attacker_ctx(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=N
         import deck_refill as DR
         for l_ in range(lmax + 1):
             a_tab[l_] = float(DR.a_of(deck_ids, olp, float(l_), theta, mu, with_don=False))
-            if RATE_RUSH_MODE == "on":
-                ar_tab[l_] = float(DR.a_of(deck_ids, olp, float(l_), theta, mu, rush_only=True, with_don=False))
+            ar_tab[l_] = float(DR.a_of(deck_ids, olp, float(l_), theta, mu, rush_only=True, with_don=False))
             if SLOPE_EFFECT_MODE in ("on", "hand"):
                 e_tab[l_] = float(DR.e_of(deck_ids, mlp, r, float(l_)))
     flow = [a_tab[l_] + e_tab[l_] for l_ in range(budget + 1)]
@@ -1645,7 +1644,7 @@ def attacker_ctx(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=N
         if (cards.info(idx2cid.get(int(ci_a[s_i]))) or {}).get("blocker"):
             rest_blk.append(float(slot_power(tok, s_i) or 0.0) - olp)
     rest_blk = tuple(sorted(rest_blk, reverse=True))
-    key = (budget, tuple(att1), tuple(later), rest_blk, RATE_RUSH_MODE, SLOPE_EFFECT_MODE, cut_context_key(),
+    key = (budget, tuple(att1), tuple(later), rest_blk, SLOPE_EFFECT_MODE, cut_context_key(),
            tuple((c, tuple(sorted(p.items())), bx, ru) for c, p, bx, ru in cand),
            tuple(tuple(round(v, 12) for v in row) for row in price),
            tuple(round(v, 12) for v in a_tab + ar_tab + e_tab), tuple(ds), round(olp, 3), round(mlp, 3),
@@ -1691,7 +1690,6 @@ def rules_steps(actx, play1, nsteps):
     計算が覆わない段の速さ（盤面の素殴り ＋ 場に居る出した体 ＋ 付与の増分）, "eff": その段に出した札の効果}`。
     1 段目の `hits`／`paid`／`fb` は付与 0 の値（呼ぶ側が足す）。"""
     cand = actx["cand"]; ds = actx["ds"]; kmax = int(actx["kmax"]); delta = float(DELTA)
-    rush_on = RATE_RUSH_MODE == "on"
     board_x = [float(x) for _s, x in actx["later"]]          # 2 段目から殴る場の体（リーダー＋全キャラ）
     att1_x = [float(x) for _s, x in actx["att1"]]
     base = float(actx.get("lead_bare", 0.0)) + float(actx.get("chars_bare", 0.0))
@@ -1702,7 +1700,7 @@ def rules_steps(actx, play1, nsteps):
     for i in play1:
         if cand[i][2] is not None:
             bodies.append((float(cand[i][2]), bool(cand[i][3]), 1, float(cand[i][1].get("atk", 0.0))))
-    rush1 = [b for b in bodies if b[1] and rush_on]
+    rush1 = [b for b in bodies if b[1]]
     out.append({"hits": tuple(att1_x) + tuple(b[0] for b in rush1),
                 "paid": float(sum(cand[i][0] for i in play1)),
                 "fb": base + sum(b[3] for b in rush1),
@@ -1735,7 +1733,7 @@ def rules_steps(actx, play1, nsteps):
             remaining.remove(ci_)
             if cand[ci_][2] is not None:
                 bodies.append((float(cand[ci_][2]), bool(cand[ci_][3]), step, float(cand[ci_][1].get("atk", 0.0))))
-        rush_now = [b for b in bodies if b[2] == step and b[1] and rush_on]
+        rush_now = [b for b in bodies if b[2] == step and b[1]]
         hits = tuple(x + 1000.0 * k for x, k in zip(on_board, ks)) + tuple(b[0] for b in rush_now)
         paid = float(sum(cand[c][0] for c in plays) + sum(ks))
         fb = base + on_val + sum(b[3] for b in rush_now) + sum(_attach_gain(actx, x, k) for x, k in zip(on_board, ks))
@@ -1750,7 +1748,7 @@ def rules_sched(harms, steps, actx, paid1):
     段 `j` ＝ (守る側の計算が覆う段なら) その段の損害の期待値 `harms[j]`／(先は) その段の財布の `fb`
     ＋ **計算の外**: 引いた 1 枚（段 `i` に引いた札は速攻なら `i` から・素の体は `i+1` から・その段の残ったドン
     `d_i − paid_i` で払える札だけ・素殴り＝E6）＋ 引いた札の効果 ＋ その段に出した札の効果。
-    **速攻は 1 回だけ**（出した速攻の体は `hits`／`fb` の中・F3）・`RATE_RUSH_MODE` に従う。局の最初の自席ターンは 0（T103）。"""
+    **速攻は 1 回だけ**（出した速攻の体は `hits`／`fb` の中・F3）。局の最初の自席ターンは 0（T103）。"""
     ds = actx["ds"]
     a_tab, ar_tab, e_tab = actx.get("a_tab") or [0.0], actx.get("ar_tab") or [0.0], actx.get("e_tab") or [0.0]
     n = len(steps)
@@ -2993,7 +2991,7 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
 
     戻り値は `(盤面, 在庫, 流入, 盤面のうちリーダー, 在庫の速攻ぶん, 流入の速攻ぶん, 効果の損害, 在庫の効果)`
     ——**リーダーは KO されない**ので減衰（T95）が掛からない。
-    **T103**: 末尾 2 つは**速攻の内訳**（`RATE_RUSH_MODE=on` のときだけ歩きに渡す）。**速攻は出したターン・
+    **T103**: 末尾 2 つは**速攻の内訳**（歩きに渡す）。**速攻は出したターン・
     引いたターンからもう殴れる**ので 1 ターン早く積む（規則）。`off` のときは 0 を返す。
     **T105**: 末尾は**引いた 1 枚が出す効果の損害**（`deck_refill.e_of`・`SLOPE_EFFECT_MODE=on` のときだけ）。
     `want_stock=False`（既定）なら在庫は計算しない（`hand_plan` のナップサックは重い）。
@@ -3057,15 +3055,12 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
         don = float(sc_a[SC_MY_DON])
         _wd = THETA_HAND_MODE != "rule_don"      # **H-4e（E6）**: 財布を 1 つにする形は引いた札に無料で付けない
         flow = float(DR.a_of(deck_ids, olp, don, theta, mu, with_don=_wd))
-        if RATE_RUSH_MODE == "on":
-            flow_rush = float(DR.a_of(deck_ids, olp, don, theta, mu, rush_only=True, with_don=_wd))
+        flow_rush = float(DR.a_of(deck_ids, olp, don, theta, mu, rush_only=True, with_don=_wd))
         if SLOPE_EFFECT_MODE in ("on", "hand"):
             # **T105**: 効果は**相手の体**から奪うので、自分のリーダーのパワーと
             # 相手の残りライフ（盤面の分布の条件）で読む。
             mlp = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
             eff = float(DR.e_of(deck_ids, mlp, max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE]))), don))
-    if RATE_RUSH_MODE != "on":
-        stock_rush = flow_rush = 0.0
     return base, stock, flow, lead, stock_rush, flow_rush, eff, eff_once
 
 
@@ -3184,9 +3179,9 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
         # （`i` 段で入った体は `j` では `j − i` ターン場に居た＝`rate_at` と同じ数え方）
         for i in range(1, j + 1):
             dr = max(0.0, rush[i] - rush[i - 1])
-            val += dr * (q ** (j - i)) if RATE_RUSH_MODE == "on" else 0.0
+            val += dr * (q ** (j - i))
             if i <= j - 1:
-                da = max(0.0, (atk[i] - atk[i - 1]) - (dr if RATE_RUSH_MODE == "on" else 0.0))
+                da = max(0.0, (atk[i] - atk[i - 1]) - dr)
                 val += da * (q ** (j - i - 1))
         if plan is not None and "harm_steps" in plan and j <= len(plan["harm_steps"]):
             # **H-4e（E3）**: 計画の道筋が覆う段は、盤面・出した体・付与の損害を**守る側の最善応答での実際の損害**
@@ -3202,8 +3197,7 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
                 continue
             _wd = THETA_HAND_MODE != "rule_don"  # **H-4e（E6）**
             f = float(DR.a_of(deck_ids, olp, don_i, theta, mu, with_don=_wd))
-            fr = (float(DR.a_of(deck_ids, olp, don_i, theta, mu, rush_only=True, with_don=_wd))
-                  if RATE_RUSH_MODE == "on" else 0.0)
+            fr = float(DR.a_of(deck_ids, olp, don_i, theta, mu, rush_only=True, with_don=_wd))
             val += fr * (q ** (j - i)) if i <= j else 0.0
             if i <= j - 1:
                 val += max(0.0, f - fr) * (q ** (j - i - 1))
@@ -3341,11 +3335,10 @@ def set_rate_decay_mode(mode):
 #: **なぜ効くか**: `grow` の `R_1` は盤面だけ（≒ `r` = 0.040）なので、**補充を歩きに入れると
 #: 序盤の数ターンが実質ゼロ進行になる**（T102 で偏りが +2.53 → +6.37 に開いた）。
 #: 速攻を 1 ターン目に入れると `R_1` が上がるので、**補充と釣り合わせられる**。
-RATE_RUSH_MODES = ("off", "on")
-#: **既定は `on`**（2026-09-19・ユーザ決定「2は正しいものに直してください」）。**実質不動**
+#: **常に `on`**（2026-09-19・ユーザ決定「2は正しいものに直してください」）。**実質不動**
 #: （速攻はデッキの 1.55%／0.33% しか無い）が、**帳簿側が既に持っている例外を歩きも持つ**のが正しい。
-#: **以前の数字と比べるときは `--rate-rush off`**。
-RATE_RUSH_MODE = "on"
+#: 旧の `off` 形（切替 `RATE_RUSH_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
+#: 出力 JSON の `rate_rush` キーは定数 `"on"` のまま残す（バイト一致のため）。
 
 
 #: **T103**: **どちらの席も「自分の最初のターン」はアタックできない**（規則・`rules/battle.rs::declare_attack`
@@ -3707,14 +3700,6 @@ def hand_purse(items, cards, don, olp, theta=THETA, mu=MU, mlp=5000.0, r_turns=3
     return float(p["atk"]), float(p["rush"]), float(p["eff"]), float(p["paid"])
 
 
-def set_rate_rush_mode(name):
-    global RATE_RUSH_MODE
-    if name not in RATE_RUSH_MODES:
-        raise ValueError("unknown rate rush mode: %r" % (name,))
-    RATE_RUSH_MODE = name
-    return RATE_RUSH_MODE
-
-
 def rate_at(j, board_lead, board_chars, stock, flow, ko_p=0.0, stock_rush=0.0, flow_rush=0.0,
             j0=1, eff=0.0, eff_once=0.0, sched=None):
     """**`j` 自席ターン目の速さ** `R_j`（T94・T95）。**リーダーは減衰しない**（KO されない）。
@@ -3997,7 +3982,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "r_deck_n": 0, "r_deck_sum": 0.0, "r_deck_missing": 0,
              "slope_hand": SLOPE_HAND_MODE, "a_flow_n": 0, "a_flow_sum": 0.0, "a_flow_missing": 0,
              "rate_walk": RATE_WALK_MODE, "rate_decay": RATE_DECAY_MODE, "stock_n": 0, "stock_sum": 0.0,
-             "rate_rush": RATE_RUSH_MODE, "stock_rush_sum": 0.0, "flow_rush_sum": 0.0,
+             "rate_rush": "on", "stock_rush_sum": 0.0, "flow_rush_sum": 0.0,
              "rate_t1": "on", "tau_capped": 0, "tau_rows": 0,
              "slope_effect": SLOPE_EFFECT_MODE, "eff_sum": 0.0, "eff_n": 0, "eff1_sum": 0.0,
              "don_purse": DON_PURSE_MODE,
@@ -5113,9 +5098,6 @@ def main(argv=None):
                     help="**T110** 耐久 `Θ` の側もドンを規則どおり払うか: `off`（旧）／"
                          "`blocker`（手札のブロッカーの予算を**規則の次ターンのアクティブ**にする）／"
                          "`rule`（それ ＋ **カウンター・イベントは使い残しのドンで払う**）")
-    ap.add_argument("--rate-rush", default=RATE_RUSH_MODE, choices=RATE_RUSH_MODES,
-                    help="**T103** 歩きの 1 ターン目に速攻の体を入れるか: `off`（旧・全部 1 ターン待つ）／"
-                         "`on`（**規則どおり**＝速攻は出したターン・引いたターンから殴れる）")
     ap.add_argument("--theta-hand-place", default=THETA_HAND_PLACE, choices=THETA_HAND_PLACES,
                     help="**T102** 耐久の手札項の置き場所: `stock`（旧・`Θ` に一括）／"
                          "`shield`（**的の側の有限の盾**＝毎ターン規則が許すぶんだけ＝**使う時間が要る**）")
@@ -5164,7 +5146,6 @@ def main(argv=None):
     set_theta_hand_place(a.theta_hand_place)
     set_theta_hand_window(a.theta_hand_window)
     set_rate_don_mode(a.rate_don, pay=(a.rate_don_pay == "on"), ramp=a.rate_ramp)
-    set_rate_rush_mode(a.rate_rush)
     set_slope_effect_mode(a.slope_effect)
     set_don_purse_mode(a.don_purse)
     set_theta_don_mode(a.theta_don)
