@@ -369,10 +369,10 @@ def rate_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=No
     """その席の **A**（1 自席ターンに積む損害）。**橋の `slope_theory` と同じ式**（T128）。
 
     ```
-    A = 盤面 ＋ 手札の項（`SLOPE_HAND_MODE`）＋ 効果の流入 ＋ 在庫の効果
+    A = 盤面 ＋ 手札の項（流入・T93）＋ 効果の流入 ＋ 在庫の効果
     ```
 
-    **`deck_ids` を必ず渡す**（T128）——既定の `SLOPE_HAND_MODE=flow`（効果の項も常に入る）
+    **`deck_ids` を必ず渡す**（T128）——手札の項は流入（T93・効果の項も常に入る）
     では**流入と効果の項がデッキの中身から出る**ので、渡さないと `A` が**盤面だけ**になる。
     2026-09-20 に実測: 渡さないと `A` は `j` によらずほぼ一定（0.055）で、
     橋の実測（`j=5` で 0.204）に対し**伸びが丸ごと消える**。
@@ -391,7 +391,7 @@ def rate_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=No
     # **H-4b**: `plan`（`rule_don` 系の攻め手の計画）を渡すと速さの側も**耐久と同じ計画**を読む（T109）
     lead, chars, stock, flow, _sr, _fr, eff, eff1 = rate_terms_of_row(
         sc, tok, ci_row, idx2cid, cards, theta, mu, deck_ids=deck_ids, plan=plan)
-    hand = stock if CB.SLOPE_HAND_MODE == "stock" else flow
+    hand = flow
     return float(lead + chars + hand + eff + eff1)
 
 
@@ -619,7 +619,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
         if sr is None:
             raise ValueError("W_ERR_MODE=rel なのに σ_rel が引けない＝黙って abs に落とさない")
         TO.set_sigma_rel(sr)
-    # **T128**: `A` の流入・効果の項は**デッキの中身から出る**（`SLOPE_HAND_MODE=flow`／
+    # **T128**: `A` の流入・効果の項は**デッキの中身から出る**（手札の項の流入・T93／
     # 効果の項）。渡さないと `A` が**盤面だけ**になり、伸びが丸ごと消える。
     seat_decks = _seat_decks(dirs)
     arms = {k: [] for k in ("flat", "scalar", "vector", "exact", "exactw",

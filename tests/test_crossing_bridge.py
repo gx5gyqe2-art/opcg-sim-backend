@@ -30,7 +30,7 @@ import theory_order as T  # noqa: E402
 #: まだ走っていない時点の値）＝**ファイルの既定そのもの**をラチェットするための控え。
 _SHIPPED = {n: getattr(CB, n) for n in (
     "THETA_HAND_MODE", "THETA_BODY_MODE",
-    "THETA_RETURN_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE",
+    "THETA_RETURN_MODE", "SLOPE_BLOCK_MODE",
     "RATE_WALK_MODE", "RATE_DECAY_MODE", "RACE_MODE", "SLOPE_TAKE_MODE")}
 
 
@@ -58,7 +58,6 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "THETA_HAND_MODE": "rule_don",          # H-4・2026-10-04（ユーザ決定・旧 cuttable_forced は --theta-hand で再現）
         "THETA_BODY_MODE": "blockers",           # T97
         "THETA_RETURN_MODE": "untap",            # T96・**C-5c で既定に採用**（2026-09-25）
-        "SLOPE_HAND_MODE": "flow",               # T93
         "SLOPE_BLOCK_MODE": "on",                # T92・2026-10-05 既定に採用（ユーザ決定・旧 off は --slope-block off）
         "SLOPE_TAKE_MODE": "life",               # T134・2026-10-05 既定に採用（ユーザ決定・旧 const は --slope-take const）
         "RATE_WALK_MODE": "grow",                # T94
@@ -1029,7 +1028,6 @@ def test_the_hand_term_of_the_rate_is_a_flow():
     """**T93**（2026-09-18・ユーザ決定「それは規定にしましょうか」で既定）: 速さの手札の項は**在庫ではなく流入**。
     `flow` は**そのデッキの平均**（`deck_refill.a_of`）だけを見る＝**手札の中身も打ち方も読まない**。"""
     import deck_refill as DR
-    assert CB.SLOPE_HAND_MODE == "flow"                      # 既定（以前の数字と比べるときだけ `stock`）
     tok = np.zeros((22, 24), np.float32)
     tok[0, T.S_POWER], tok[1, T.S_POWER] = 0.5, 0.5
     sc = _sc(3, 4)
@@ -1041,12 +1039,6 @@ def test_the_hand_term_of_the_rate_is_a_flow():
     assert hand == pytest.approx(DR.a_of([body], 5000.0, 10.0))
     assert hand > 0.0
     assert CB.seat_slope_parts(sc, tok, None, None, None, 5000.0)[1] == 0.0  # デッキが無ければ流入は数えない
-    with pytest.raises(ValueError):
-        CB.set_slope_hand_mode("なにか")
-    try:                                                     # 旧い形（在庫）も残す＝過去の数字と比べるため
-        assert CB.set_slope_hand_mode("stock") == "stock"
-    finally:
-        CB.set_slope_hand_mode("flow")
 
 
 def test_the_walk_lets_the_rate_accumulate():

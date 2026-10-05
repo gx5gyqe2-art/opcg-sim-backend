@@ -2795,11 +2795,11 @@ def theory_slope(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None, life_
 #: **T76 が `μ` について確かめたのと同じ取り違え**（「`μ` は**流入**の値であって**在庫**の平均ではない」）が速さの側で起きている。
 #: **在庫は速さではなく「一度きりの上積み」**で、交点まで歩く形（`tau_net`・T90）が**既に 2 ターン目から 1 回だけ**足している。
 #: **新定数ゼロ**（攻撃の価格は `attack_value_don`・残りはデッキの中身・**打ち方は入らない**）。
-SLOPE_HAND_MODES = ("stock", "flow")
-#: **既定は `flow`**（2026-09-18・ユーザ決定「それは規定にしましょうか」・T93）——`stock` は**貯金を毎月の収入として
+#: **`flow` が既定**（2026-09-18・ユーザ決定「それは規定にしましょうか」・T93）——`stock` は**貯金を毎月の収入として
 #: 数える**形（1 回しか出せない札を毎ターン出せることにしている）。`flow` にすると **`A`／実測が 1.262 → 1.010／
 #: 1.198 → 0.938**（**当てはめずに 1 に載った**）。`curve`（時刻を読む既定の形）と `F_end/Θ_start` は完全に不変、
-#: 線形の橋（帳簿・`κ`）は `A` を通らないので無関係。**以前の数字と比べるときは `--slope-hand stock`**。
+#: 線形の橋（帳簿・`κ`）は `A` を通らないので無関係。旧の `stock`（切替 `SLOPE_HAND_MODE`）は
+#: 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。出力 JSON の `slope_hand` キーは定数 `"flow"` のまま残す。
 #:
 #: **役割分担が確定した**: **`A` は「どれだけ強いか」（水準）・時刻は損害の輪郭（`curve`）**——
 #: 輪郭は加速する（0.001 → 0.25/ターン）ので、**一定の速さでは到着時刻を原理的に当てられない**。
@@ -2807,15 +2807,6 @@ SLOPE_HAND_MODES = ("stock", "flow")
 #: **既定にした時点で開いている穴**: **手札の在庫がどこにも入らない**。在庫は速さではないが
 #: **出せば盤面の速さを恒久的に押し上げる**（＝一度きりの放出ではなく**設備投資**・召喚酔いで翌ターンから）。
 #: 交点まで歩く形（`tau_net` の `a_hand`）に**在庫を段差として**渡すのが次の手当て。
-SLOPE_HAND_MODE = "flow"
-
-
-def set_slope_hand_mode(mode):
-    global SLOPE_HAND_MODE
-    if mode not in SLOPE_HAND_MODES:
-        raise ValueError("slope hand mode は %s のどれか" % (SLOPE_HAND_MODES,))
-    SLOPE_HAND_MODE = mode
-    return SLOPE_HAND_MODE
 
 
 def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None,
@@ -3028,11 +3019,11 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
 def seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None,
                      through=None):
     """速さを **2 つに分けて**返す（T90）: `(盤面の攻撃手, 手札の項)`。
-    手札の項は `SLOPE_HAND_MODE` が決める（`stock`＝今出せる体の総額／**`flow`＝毎ターン入ってくるぶん**・T93）。"""
+    手札の項は**毎ターン入ってくるぶん**（`flow`・T93）。"""
     base, stock, flow, _lead, _sr, _fr, _ef, _e1 = seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards,
                                                                     olp, theta, mu, deck_ids,
                                                                     through=through)
-    return base, (stock if SLOPE_HAND_MODE == "stock" else flow)
+    return base, flow
 
 
 def seat_slope(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU):
@@ -3551,9 +3542,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     import deck_refill as DR
     refill = DR.shares_by_seed(dirs)
     # **T93**: `flow` なら手札の項はそのデッキの平均から（同じく seed で作り直す）。
-    seat_decks = {}
-    if SLOPE_HAND_MODE == "flow" or THETA_HAND_MODE == "rule_don":   # H-4e: ライフの札の分布もデッキから
-        seat_decks = DR.decks_by_seed(dirs)
+    seat_decks = DR.decks_by_seed(dirs)                 # H-4e: ライフの札の分布もデッキから
     # **N-3**: 切らせた札の値段を守り手の手札で読むなら、組めない形を先に落とす（黙って旧の値段に落ちない）
     cut_decks = None
     if CP.joint_on():
@@ -3574,7 +3563,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "through_missing": 0,
              "race": RACE_MODE,
              "r_deck_n": 0, "r_deck_sum": 0.0, "r_deck_missing": 0,
-             "slope_hand": SLOPE_HAND_MODE, "a_flow_n": 0, "a_flow_sum": 0.0, "a_flow_missing": 0,
+             "slope_hand": "flow", "a_flow_n": 0, "a_flow_sum": 0.0, "a_flow_missing": 0,
              "rate_walk": RATE_WALK_MODE, "rate_decay": RATE_DECAY_MODE, "stock_n": 0, "stock_sum": 0.0,
              "rate_rush": "on", "stock_rush_sum": 0.0, "flow_rush_sum": 0.0,
              "rate_t1": "on", "tau_capped": 0, "tau_rows": 0,
@@ -3924,14 +3913,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 th_back = 0.0     # **H-4f（F1）**: レスト中のブロッカーは守る側の計算の中で戻る（的にもう入っている）
             slope_hist = (f_real / j) if j > 0 else None
             dk = (seat_decks.get(seed_g) or (None, None))[w] if seat_decks else None
-            if SLOPE_HAND_MODE == "flow" and not dk:
+            if not dk:
                 stats["a_flow_missing"] += 1
             (s_board, s_stock, s_flow, s_lead, s_srush, s_frush, s_eff,
              s_eff1) = seat_slope_terms(
                 sc, tok, _ci, idx2cid, cards, olp, theta, mu, deck_ids=dk,
                 want_stock=True,                                       # T77／T90／T93／T94／T95
                 plan=don_plan)                                          # **H-4b**（`rule_don` 以外は None）
-            s_hand = s_stock if SLOPE_HAND_MODE == "stock" else s_flow
+            s_hand = s_flow
             # **T114**: 規則のドンの列から `R_j` を作る
             sched = seat_slope_sched(sc, tok, _ci, idx2cid, cards, olp, theta, mu,
                                      deck_ids=dk, jmax=int(RACE_CAP),
@@ -3939,8 +3928,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                      plan=don_plan)                      # **H-4b**
             stats["sched_n"] += 1
             stats["sched_j1_sum"] += float(sched[0]); stats["sched_j5_sum"] += float(sched[4])
-            if SLOPE_HAND_MODE == "flow":
-                stats["a_flow_n"] += 1; stats["a_flow_sum"] += float(s_hand)
+            stats["a_flow_n"] += 1; stats["a_flow_sum"] += float(s_hand)
             if RATE_WALK_MODE == "grow":
                 stats["stock_n"] += 1; stats["stock_sum"] += float(s_stock)
                 stats["stock_rush_sum"] += float(s_srush); stats["flow_rush_sum"] += float(s_frush)
@@ -4584,9 +4572,6 @@ def main(argv=None):
     ap.add_argument("--rate-walk", default=RATE_WALK_MODE, choices=RATE_WALK_MODES,
                     help="**T94** 交点までの速さ: `flat`（旧・一定）／"
                          "`grow`（規則どおり積み上がる＝盤面 ＋ 在庫·[j≥2] ＋ 流入·(j−1)）")
-    ap.add_argument("--slope-hand", default=SLOPE_HAND_MODE, choices=SLOPE_HAND_MODES,
-                    help="**T93** 速さの手札の項: `stock`（旧・今のドンで出せる体の総額＝在庫）／"
-                         "**`flow`（既定**・毎ターン入ってくるぶん＝そのデッキの平均・`deck_refill.a_of`）")
     ap.add_argument("--slope-take", default=SLOPE_TAKE_MODE, choices=SLOPE_TAKE_MODES,
                     help="**T134** 攻撃の価格の「受けられたとき」を守る側のライフで読むか: "
                          "`const`（旧・定数 `Θ`）／**`life`（既定**・2026-10-05）（`theta_take(ライフ)`＝**他の 4 つの器が既に使っている式**・"
@@ -4635,7 +4620,6 @@ def main(argv=None):
     set_slope_block_mode(a.slope_block)
     set_theta_side_mode(a.theta_side)              # **T133**
     set_slope_take_mode(a.slope_take)              # **T134**
-    set_slope_hand_mode(a.slope_hand)
     set_rate_walk_mode(a.rate_walk)
     set_rate_decay_mode(a.rate_decay)
     set_theta_return_mode(a.theta_return)
