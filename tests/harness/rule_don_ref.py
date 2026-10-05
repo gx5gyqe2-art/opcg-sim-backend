@@ -4,6 +4,11 @@
 ここは直さない——解き方の値を意図して変えたときは、この写しも同じ変更で更新する（さもなくばテストが落ちる）。
 関数の外の名前（`rules_steps`・`walk_crossing`・`model_horizon`・`nu_meas_of`・切替の値…）は呼ぶたびに
 `crossing_bridge` から写す（`_sync`）＝切替を変えたテストでも同じ値を読む。覚え書きはこのモジュール専用。
+
+**Rust 化・第 3 段（2026-10-05）**: 速くした Python の解き方を消したので、ここが**唯一の Python の解き方**（`OPCG_RD_KERNEL=ref`／
+`both` の比べる相手）。消した関数のうちここが借りていたもの（`_tab`）は**原文のまま**ここへ写した（検算する相手と一緒に
+答えが変わらないように・設計 §9）。まだ借りているもの（`rules_steps`・`walk_crossing`→`tau_grow`・`model_horizon`・
+`_prices_of`・`nu_meas_of`・切替の値）は `crossing_bridge` に残っている（第 2b 段で消すときに同じく写す）。
 """
 import math  # noqa: F401
 
@@ -11,7 +16,7 @@ import crossing_bridge as CB
 
 _OWN = {"rule_guard_plan_ex", "_rule_guard_plan_ex", "rules_sched", "rule_don_solve", "_rule_don_solve",
         "_RULE_EX_CACHE", "_RULE_EX_SETS", "_RULE_EX_MEMO", "_RULE_EX_CTX", "_RULE_DON_CACHE", "_EX_USED",
-        "_ModelBudget", "_sync", "clear", "solve", "CB", "math"}
+        "_ModelBudget", "_sync", "clear", "solve", "CB", "math", "_tab"}
 _RULE_EX_CACHE = {}
 _RULE_EX_SETS = {}
 _RULE_EX_MEMO = {}
@@ -344,6 +349,10 @@ def rules_sched(harms, steps, actx, paid1):
         v += _tab(e_tab, lefts[j - 1]) + float(steps[j - 1]["eff"])
         out.append(float(v))
     return out
+
+
+def _tab(t, i):
+    return float(t[max(0, min(int(i), len(t) - 1))]) if t else 0.0
 
 
 def rule_don_solve(cards_d, don_d, blk, life, actx, turns=None, life_types=(), draw_types=(), arrive=()):
