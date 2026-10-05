@@ -173,6 +173,6 @@ def test_cli_reaches_collect(monkeypatch):
 def test_cli_passes_lethal_rule_switches_through(monkeypatch):
     """**missed_lethal の margin=-1 が `econ`（T130）でどう動くかを検算する**ための通り道。"""
     monkeypatch.setattr(SS, "collect", lambda *a, **k: {"lethal_rule": {}, "false_declared": {}, "missed_lethal": {}})
-    SS.main(["--in", "x", "--hand", "share", "--stop", "econ", "--life", "off"])
-    assert (LR.LETHAL_HAND_MODE, LR.LETHAL_STOP_MODE, LR.LETHAL_LIFE_MODE) == ("share", "econ", "off")
-    LR.set_lethal_hand_mode("actual"); LR.set_lethal_stop_mode("max"); LR.set_lethal_life_mode("draw")
+    SS.main(["--in", "x", "--stop", "econ", "--life", "off"])
+    assert (LR.LETHAL_STOP_MODE, LR.LETHAL_LIFE_MODE) == ("econ", "off")
+    LR.set_lethal_stop_mode("max"); LR.set_lethal_life_mode("draw")

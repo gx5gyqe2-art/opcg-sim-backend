@@ -7,7 +7,7 @@
 1. **守り手は切れるだけ切る**（`max`）——1 本ごとに使うカウンター値が最小の組を選び、安い攻撃から止める＝止まる本数が最大。
 2. **ブロッカーは安い攻撃から横取りする**・**通らない攻撃（相手リーダー未満）は数えない**。
 3. **ドンは安い攻撃から 1 体 4 枚まで**（規則）——付ければ止めるのに要るカウンターが増える。
-4. **`actual` は守り手の手札が渡らなければ落ちる**（黙って `share` に落とさない）。
+4. **守り手の手札が渡らなければ落ちる**（黙って旧の数え方に落とさない・`share` は 2026-10-05 に削除）。
 5. **6 指標の算術**（宣言した勝者の精度・そのターンに終わった精度・終局での再現率・局の再現率・先読み・誤宣言）。
 6. **受けたライフの札は全部手札に入る**（規則）——ライフ L なら L 枚がカウンターになりうる。
 
@@ -33,12 +33,10 @@ from theory_order import (S_CAN_ATTACK, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, S_PO
 
 @pytest.fixture(autouse=True)
 def _defaults():
-    LR.set_lethal_hand_mode("actual")
     LR.set_lethal_stop_mode("max")
     LR.set_lethal_life_mode("off")          # 既定は `draw` だが、規則 1〜5 のテストはライフの札なしで読む
     LR.set_avg_counter_mode("rules")
     yield
-    LR.set_lethal_hand_mode("actual")
     LR.set_lethal_stop_mode("max")
     LR.set_lethal_life_mode("draw")
     LR.set_avg_counter_mode("rules")
@@ -159,21 +157,12 @@ def test_life_zero_is_alive_and_one_hit_decides():
     assert not ok_neg
 
 
-# ---- 4. 落ちるべきところで落ちる / share の再現 --------------------------------------------------
+# ---- 4. 落ちるべきところで落ちる --------------------------------------------------
 
 def test_actual_mode_refuses_to_run_without_the_defenders_hand():
     sc, tok = _row()
     with pytest.raises(ValueError):
         LR.lethal_of_row(sc, tok, with_don=False, defender_counters=None)
-
-
-def test_share_mode_reads_the_count_times_the_deck_share():
-    LR.set_lethal_hand_mode("share")
-    sc, tok = _row(opp_life=0.0, opp_hand=4)
-    ok_pess, d = LR.lethal_of_row(sc, tok, with_don=False, cut_share=None)   # 割合が無ければ 1.0（悲観側）
-    assert (not ok_pess) and d["hand_read"] == 4.0
-    ok_zero, _ = LR.lethal_of_row(sc, tok, with_don=False, cut_share=0.0)
-    assert ok_zero
 
 
 def test_econ_mode_needs_items_and_take_cost():
@@ -211,9 +200,9 @@ def test_metrics_are_empty_safe():
 
 def test_cli_exposes_all_switches_and_they_reach_the_module(monkeypatch):
     monkeypatch.setattr(LR, "collect", lambda *a, **k: {})
-    LR.main(["--in", "x", "--hand", "share", "--stop", "econ", "--life", "off", "--avg-counter", "rules"])
-    assert (LR.LETHAL_HAND_MODE, LR.LETHAL_STOP_MODE, LR.LETHAL_LIFE_MODE, LR.AVG_COUNTER_MODE) == \
-        ("share", "econ", "off", "rules")
+    LR.main(["--in", "x", "--stop", "econ", "--life", "off", "--avg-counter", "rules"])
+    assert (LR.LETHAL_STOP_MODE, LR.LETHAL_LIFE_MODE, LR.AVG_COUNTER_MODE) == \
+        ("econ", "off", "rules")
 
 
 # ---- 6. 受けたライフの札は手札に入る（規則・`rules/battle.rs`） -----------------------------------

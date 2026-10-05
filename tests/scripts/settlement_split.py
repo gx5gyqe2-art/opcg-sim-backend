@@ -125,8 +125,6 @@ def build_parser():
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--don", default="on", choices=("on", "off"))
-    ap.add_argument("--hand", default=None, choices=LR.LETHAL_HAND_MODES,
-                    help="lethal_rule の --hand をそのまま通す（既定 actual）")
     ap.add_argument("--stop", default=None, choices=LR.LETHAL_STOP_MODES,
                     help="lethal_rule の --stop をそのまま通す（既定 max・missed_lethal の "
                          "margin=-1 が `econ`〔T130 の受けるより安いときだけ切る〕でどう動くかの検算に使う）")
@@ -140,8 +138,6 @@ def build_parser():
 
 def main(argv=None):
     a = build_parser().parse_args(argv)
-    if a.hand:
-        LR.set_lethal_hand_mode(a.hand)
     if a.stop:
         LR.set_lethal_stop_mode(a.stop)
     if a.life:
