@@ -35,7 +35,7 @@
   * 試行ごとの状態の数（予算超えは予算＋1）が Python の `len(memo)` と同じ。
   * 予算なしの覚え書きの共有・計画のディスクの覚え書き（冷たい／温かい）が Python と同じ振る舞い。`rs` は Python の `_rule_don_solve`・`rules_sched`・`walk_crossing` を呼ばない。`both` が全ての計画を比べ、τ を 1e-15 ずらすと例外。
 * 第 1 段の `tests/test_rd_kernel.py`（23 本）は `rs` の `rule_don_solve` がこの段の経路を通るようになった上でそのまま通る（記録 152 解 × 予算 2 を rs で解き直してビット一致を含む）。
-* 原文との 3 者照合（記録 152 解 × 予算 2）: `rust2a/ref_golden.py` の結果は下の「記録 152 解の原文照合」に書く。
+* 原文との 3 者照合（記録 152 解 × 予算 2）: 下の「記録 152 解の原文照合」（全 304 解一致）。
 
 ### L5（器まるごと・ユーザ決定で縮小）
 `crossing_bridge.py` を `OPCG_PLAN_STORE` なしで `OPCG_RD_KERNEL=py` と `=rs` で回し、JSON から最上位の `"seconds"` だけを除いて**バイト列で比較**（`rust2a/compare_l5.py`）:
@@ -87,11 +87,11 @@ cProfile（rs・第 2a 段・5 局・計測のぶん遅い）の内訳: 実＝�
 
 ## 記録 152 解の原文照合
 
-（`rust2a/ref_golden.py` の結果をここに書く）
+記録した 152 解（実 76・合成 76）× 予算 300000／150＝**304 解**を rs（第 2a 段）と速くする前の原文（`rule_don_ref`）で解き、`repr`（rs＝原文）と記録のビット（rs＝記録）の**3 者が全部一致**（不一致 0・197 秒・`rust2a/ref_golden.json`）。
 
 ## 品質ゲート
 
-（`make rust-develop` のあと `make test` の結果をここに書く）
+最終のツリー（コードの最後の変更の後）で `make rust-develop` → `make test` を 1 回: **cargo 441 passed**（うち `theory` 13 本）／**pytest 2073 passed・12 skipped**（skip は torch 等の任意依存・盤面に依る既存のもの）・4 分 16 秒・終了コード 0。その後に足したのは `rust2a/ref_golden.py` とこの報告だけ（テストは読まない）。
 
 ## skipped・食い違い
 

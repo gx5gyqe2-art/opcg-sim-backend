@@ -1,0 +1,4 @@
+real py 48.4
+real rs 8.8
+syn py 44.9
+syn rs 11.3
