@@ -31,7 +31,7 @@ import theory_order as T  # noqa: E402
 _SHIPPED = {n: getattr(CB, n) for n in (
     "THETA_HAND_MODE", "THETA_BODY_MODE",
     "THETA_RETURN_MODE", "SLOPE_BLOCK_MODE",
-    "RATE_WALK_MODE", "RATE_DECAY_MODE", "SLOPE_TAKE_MODE")}
+    "RATE_DECAY_MODE", "SLOPE_TAKE_MODE")}
 
 
 def test_the_shipped_defaults_are_the_ones_we_decided():
@@ -60,7 +60,6 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "THETA_RETURN_MODE": "untap",            # T96・**C-5c で既定に採用**（2026-09-25）
         "SLOPE_BLOCK_MODE": "on",                # T92・2026-10-05 既定に採用（ユーザ決定・旧 off は --slope-block off）
         "SLOPE_TAKE_MODE": "life",               # T134・2026-10-05 既定に採用（ユーザ決定・旧 const は --slope-take const）
-        "RATE_WALK_MODE": "grow",                # T94
         "RATE_DECAY_MODE": "off",                # T95（切替として残す）
     }
 
@@ -1043,7 +1042,6 @@ def test_the_hand_term_of_the_rate_is_a_flow():
 def test_the_walk_lets_the_rate_accumulate():
     """**T94**（2026-09-18・ユーザ決定「規定にして」で既定）: 交点までの速さを**規則どおり積み上げる**。
     盤面は毎ターン・**在庫は 2 ターン目からの段差**（召喚酔い）・**流入は進むほど積み上がる**（j で引いた札は j+1 から殴る）。"""
-    assert CB.RATE_WALK_MODE == "grow"                               # 既定（以前の数字と比べるときだけ `flat`）
     # 在庫も流入も無ければ一定の速さと同じ（リーダー 0.25・キャラ 0）
     assert _tg(1.0, 0.25, 0.0, 0.0, 0.0) == pytest.approx(4.0)
     # 在庫 0.1 は 2 ターン目から: 0.25 + 0.35 + 0.35 = 0.95、残り 0.05 を 4 ターン目の 0.35 で
@@ -1056,12 +1054,6 @@ def test_the_walk_lets_the_rate_accumulate():
     assert _tg(1.0, 0.0, 0.0, 0.0, 0.0) == pytest.approx(CB.RACE_CAP)   # 届かなければ打ち切り
     # 動く的と組める（的が下がるぶん遅くなる）
     assert _tg(1.0, 0.25, 0.0, 0.1, 0.1, 0.05) > _tg(1.0, 0.25, 0.0, 0.1, 0.1)
-    try:                                                             # 旧い形も残す＝過去の数字と比べるため
-        assert CB.set_rate_walk_mode("flat") == "flat"
-        with pytest.raises(ValueError):
-            CB.set_rate_walk_mode("なにか")
-    finally:
-        CB.set_rate_walk_mode("grow")
 
 
 def test_the_board_can_decay_but_the_leader_never_does():
@@ -1462,7 +1454,7 @@ def test_the_two_places_that_solve_for_tau_use_the_same_branch():
     """**T101**: 行の予測（`SLOPES` のループ）と `theta_check` の τ は**同じ式**でなければ、
     「τ が当たった行」の選び方が予測と食い違う。`collect` の中で 1 本に束ねたことを、
     式そのもの（`tau_grow`／`tau_net`／`Θ/A`）が既定の切替に従うことで確かめる。"""
-    assert CB.RATE_WALK_MODE == "grow"                               # 現在の既定（的は動かない）
+    # 橋は積み上がる歩き（`grow`）・的は動かない（`static`）——どちらも 2026-10-05 から固定（切替は削除）
     # `grow` の既定では `r = 0`（`static` なので的は動かない）＝`tau_grow` の素の形
     assert _tg(1.0, 0.1, 0.1, 0.0, 0.0, 0.0) == pytest.approx(5.0)
     # `static` ＋ `flat` なら `Θ / A`（`predict` と同じ）

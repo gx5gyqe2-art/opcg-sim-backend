@@ -3063,8 +3063,7 @@ def tau_net(theta, a_board, a_hand, r, cap=RACE_CAP):
     return float(cap)
 
 
-#: **交点までの速さを「積み上がる」形で歩くか**（T94・2026-09-18・ユーザ指示「1で進めてください」）。
-#: `flat`＝旧（`τ = Θ / A`＝**速さは一定**）／`grow`＝**規則どおり積み上がる**:
+#: **交点までの速さは「積み上がる」形で歩く**（T94・2026-09-18・ユーザ指示「1で進めてください」）＝**規則どおり積み上がる**:
 #:
 #: ```
 #: j 自席ターン目の速さ  R_j = 盤面 ＋ 在庫·[j ≥ 2] ＋ 流入·(j − 1)
@@ -3075,20 +3074,12 @@ def tau_net(theta, a_board, a_hand, r, cap=RACE_CAP):
 #:
 #: **新定数ゼロ**（3 つの項はどれも既に在る量）。**一定の速さでは時刻が当たらない**（T93 で確定）——
 #: 損害の輪郭は 0.001 → 0.25/ターンと加速するので、平均の速さで到着時刻を言えば必ず遅く言う。
-#: **本モードはその加速を規則から作る**（輪郭という実測の借り物を使わずに）。
-RATE_WALK_MODES = ("flat", "grow")
-#: **既定は `grow`**（2026-09-18・ユーザ決定「規定にして2で進めてください」・T94）——**両記録・両指標で改善**
+#: **この形はその加速を規則から作る**（輪郭という実測の借り物を使わずに）。
+#: **`grow` を既定に**（2026-09-18・ユーザ決定「規定にして2で進めてください」・T94）——**両記録・両指標で改善**
 #: （勝者の的中 0.6208 → 0.6400〔実・歴代最良〕／0.6335 → 0.6378・偏り +4.98 → +2.93／+5.19 → +2.92・MAE −37%／−41%）。
-#: **`curve`・`curve_scaled`・`F_end/Θ_start`・線形の橋は完全に不変**。**以前の数字と比べるときは `--rate-walk flat`**。
-RATE_WALK_MODE = "grow"
-
-
-def set_rate_walk_mode(mode):
-    global RATE_WALK_MODE
-    if mode not in RATE_WALK_MODES:
-        raise ValueError("rate walk mode は %s のどれか" % (RATE_WALK_MODES,))
-    RATE_WALK_MODE = mode
-    return RATE_WALK_MODE
+#: **`curve`・`curve_scaled`・`F_end/Θ_start`・線形の橋は完全に不変**。旧の `flat`（`τ = Θ / A`＝**速さは一定**・
+#: 切替 `RATE_WALK_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
+#: 出力 JSON の `rate_walk` キーは定数 `"grow"` のまま残す（バイト一致のため）。
 
 
 #: **盤面が減ることを歩きに入れるか**（T95・2026-09-18・ユーザ指示「2で進めてください」）。
@@ -3547,7 +3538,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "race": "static",
              "r_deck_n": 0, "r_deck_sum": 0.0, "r_deck_missing": 0,
              "slope_hand": "flow", "a_flow_n": 0, "a_flow_sum": 0.0, "a_flow_missing": 0,
-             "rate_walk": RATE_WALK_MODE, "rate_decay": RATE_DECAY_MODE, "stock_n": 0, "stock_sum": 0.0,
+             "rate_walk": "grow", "rate_decay": RATE_DECAY_MODE, "stock_n": 0, "stock_sum": 0.0,
              "rate_rush": "on", "stock_rush_sum": 0.0, "flow_rush_sum": 0.0,
              "rate_t1": "on", "tau_capped": 0, "tau_rows": 0,
              "slope_effect": "hand", "eff_sum": 0.0, "eff_n": 0, "eff1_sum": 0.0,
@@ -3824,17 +3815,15 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
 
             **T101**: `theta_check` で「τ が当たった行」を選ぶために要る。行ごとの予測
             （下の `SLOPES` のループ）と**同じ枝**を通るよう、ここに 1 本だけ書いて両方から呼ぶ。"""
-            if RATE_WALK_MODE == "grow":
-                return tau_grow(d["theta"], d["slope_lead"], d["slope_board"] - d["slope_lead"],
-                                d["slope_stock"], d["slope_flow"], 0.0, step=d.get("th_back") or 0.0,
-                                shield=d.get("shield") or 0.0, shield_rate=d.get("shield_rate") or 0.0,
-                                stock_rush=d.get("slope_stock_rush") or 0.0,
-                                flow_rush=d.get("slope_flow_rush") or 0.0,
-                                j0=int(d.get("j") or 0) + 1, refill=0.0,
-                                eff=d.get("slope_eff") or 0.0,
-                                eff_once=d.get("slope_eff_once") or 0.0,
-                                sched=d.get("sched"))       # **T114**（`off` なら None＝旧の式）
-            return d["theta"] / max(SLOPE_FLOOR, d["slope_theory"])
+            return tau_grow(d["theta"], d["slope_lead"], d["slope_board"] - d["slope_lead"],
+                            d["slope_stock"], d["slope_flow"], 0.0, step=d.get("th_back") or 0.0,
+                            shield=d.get("shield") or 0.0, shield_rate=d.get("shield_rate") or 0.0,
+                            stock_rush=d.get("slope_stock_rush") or 0.0,
+                            flow_rush=d.get("slope_flow_rush") or 0.0,
+                            j0=int(d.get("j") or 0) + 1, refill=0.0,
+                            eff=d.get("slope_eff") or 0.0,
+                            eff_once=d.get("slope_eff_once") or 0.0,
+                            sched=d.get("sched"))       # **T114**
 
         def seat_row(w, t, j, sc, tok, _ci, f_real, t_left, stats):
             """**N-3**: 守り手 `1 − w` の値段の文脈の中で `_seat_row` を読む（`flat` なら文脈に入らない＝旧のまま）。"""
@@ -3897,9 +3886,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             stats["sched_n"] += 1
             stats["sched_j1_sum"] += float(sched[0]); stats["sched_j5_sum"] += float(sched[4])
             stats["a_flow_n"] += 1; stats["a_flow_sum"] += float(s_hand)
-            if RATE_WALK_MODE == "grow":
-                stats["stock_n"] += 1; stats["stock_sum"] += float(s_stock)
-                stats["stock_rush_sum"] += float(s_srush); stats["flow_rush_sum"] += float(s_frush)
+            stats["stock_n"] += 1; stats["stock_sum"] += float(s_stock)
+            stats["stock_rush_sum"] += float(s_srush); stats["flow_rush_sum"] += float(s_frush)
             stats["eff_n"] += 1; stats["eff_sum"] += float(s_eff)
             stats["eff1_sum"] += float(s_eff1)
             slope_theory = s_board + s_hand + s_eff + s_eff1   # **T105／T108**: 効果の項（既定は 0）
@@ -4130,7 +4118,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 for sv in SLOPES:
                     s_me = me["slope_" + sv] if me["slope_" + sv] is not None else me["slope_theory"]
                     s_op = op["slope_" + sv] if op["slope_" + sv] is not None else op["slope_theory"]
-                    if sv == "theory" and RATE_WALK_MODE == "grow":
+                    if sv == "theory":
                         # **T94**（積み上がる歩き）。**式は `tau_theory_of` に 1 本だけ置き、
                         # `theta_check` と同じ枝を通す**（T101）。
                         tau_me = tau_theory_of(me); tau_opp = tau_theory_of(op)
@@ -4525,9 +4513,6 @@ def main(argv=None):
     ap.add_argument("--rate-decay", default=RATE_DECAY_MODE, choices=RATE_DECAY_MODES,
                     help="**T95** 盤面が減ることを歩きに入れるか: `off`（旧・死なない前提）／"
                          "`ko`（毎自席ターン `ko_p`＝0.289 で失われる・T60 の生存の重みと同じ量）")
-    ap.add_argument("--rate-walk", default=RATE_WALK_MODE, choices=RATE_WALK_MODES,
-                    help="**T94** 交点までの速さ: `flat`（旧・一定）／"
-                         "`grow`（規則どおり積み上がる＝盤面 ＋ 在庫·[j≥2] ＋ 流入·(j−1)）")
     ap.add_argument("--slope-take", default=SLOPE_TAKE_MODE, choices=SLOPE_TAKE_MODES,
                     help="**T134** 攻撃の価格の「受けられたとき」を守る側のライフで読むか: "
                          "`const`（旧・定数 `Θ`）／**`life`（既定**・2026-10-05）（`theta_take(ライフ)`＝**他の 4 つの器が既に使っている式**・"
@@ -4573,7 +4558,6 @@ def main(argv=None):
     set_slope_block_mode(a.slope_block)
     set_theta_side_mode(a.theta_side)              # **T133**
     set_slope_take_mode(a.slope_take)              # **T134**
-    set_rate_walk_mode(a.rate_walk)
     set_rate_decay_mode(a.rate_decay)
     set_theta_return_mode(a.theta_return)
     set_theta_body_mode(a.theta_body)
