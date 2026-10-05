@@ -37,8 +37,8 @@
    "syn": 1.724
   },
   "blockers": {
-   "real": 0.994,
-   "syn": 1.154
+   "real": 1.242,
+   "syn": 2.133
   },
   "all": {
    "real": 1.546,
@@ -64,12 +64,12 @@
  "sigma_rel": {
   "blockers": {
    "theory": {
-    "real": 0.3078,
-    "syn": 0.3301
+    "real": 0.2383,
+    "syn": 0.2737
    },
    "curve": {
-    "real": 0.2456,
-    "syn": 0.2693
+    "real": 0.2262,
+    "syn": 0.2567
    }
   }
  },
@@ -90,12 +90,12 @@
  "sigma_rel_whole": {
   "blockers": {
    "theory": {
-    "real": 0.4146,
-    "syn": 0.4068
+    "real": 0.387,
+    "syn": 0.3875
    },
    "curve": {
-    "real": 0.4282,
-    "syn": 0.4481
+    "real": 0.3874,
+    "syn": 0.4427
    }
   }
  },
