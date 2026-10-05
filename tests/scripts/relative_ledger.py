@@ -334,7 +334,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                                   cut.view(1 - w, t, float(np.asarray(ex["sc"][i0])[TO.SC_OPP_HAND]))):
                     actx = CB.attacker_ctx(ex["sc"][i0], ex["tok"][i0], ex["ci"][i0], idx2cid, cards, theta, mu,
                                            deck_ids=dk,
-                                           no_attack_now=(CB.RATE_T1_MODE == "on" and CB.own_turn_index(t) == 0))
+                                           no_attack_now=(CB.own_turn_index(t) == 0))
                     plan = CB.rule_don_plan_for(ex["sc"][i0], ex["tok"][i0], g_def, actx)
                     if plan is None:
                         continue

@@ -31,7 +31,7 @@ import theory_order as T  # noqa: E402
 _SHIPPED = {n: getattr(CB, n) for n in (
     "THETA_HAND_MODE", "THETA_HAND_PLACE", "THETA_BODY_MODE", "THETA_HAND_BLOCKER_MODE",
     "THETA_RETURN_MODE", "SLOPE_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE", "SLOPE_EFFECT_MODE",
-    "RATE_WALK_MODE", "RATE_DECAY_MODE", "RATE_T1_MODE", "RATE_RUSH_MODE", "RACE_MODE", "SLOPE_TAKE_MODE",
+    "RATE_WALK_MODE", "RATE_DECAY_MODE", "RATE_RUSH_MODE", "RACE_MODE", "SLOPE_TAKE_MODE",
     "DON_PURSE_MODE", "THETA_DON_MODE", "THETA_HAND_WINDOW", "RATE_DON_MODE")}
 
 
@@ -52,7 +52,7 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
     **代金は ±1 当たりと `curve` の的中、そして線形の橋**（`dG` の AUC 0.696 → 0.660／0.720 → 0.692）。
 
     **同日のユーザ決定**（「1は規定、2は正しいものに直してください」）で 4 つ動いた:
-    `SLOPE_EFFECT_MODE=hand`（T108）・`RATE_T1_MODE=on`・`RATE_RUSH_MODE=on`・
+    `SLOPE_EFFECT_MODE=hand`（T108）・最初の自席ターンは打てない規則（T103・2026-10-05 に切替は削除）・`RATE_RUSH_MODE=on`・
     `THETA_HAND_BLOCKER_MODE=on`（T103／T106＝**規則として正しい形**）。
     **黙って既定が変わると 2 つの橋の数字が比較不能になる**ので、ここで固定する。"""
     assert _SHIPPED == {
@@ -68,7 +68,6 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "SLOPE_EFFECT_MODE": "hand",             # T105／T108・2026-09-19
         "RATE_WALK_MODE": "grow",                # T94
         "RATE_DECAY_MODE": "off",                # T95（切替として残す）
-        "RATE_T1_MODE": "on",                    # T103・2026-09-19
         "RATE_RUSH_MODE": "on",                  # T103・2026-09-19
         "RACE_MODE": "static",                   # T90／T91／T104（切替として残す）
         "DON_PURSE_MODE": "all",                 # T109・2026-09-19
@@ -150,7 +149,7 @@ def test_the_2026_10_05_defaults_are_take_life_block_on():
 def _tg(*a, **k):
     """**歩きの代数は「局の途中の行」で確かめる**（`j0=2`）。
 
-    `RATE_T1_MODE=on`（2026-09-19 から既定）は**局の 1 自席ターン目だけ**速さを 0 にする規則
+    最初の自席ターンは打てない規則（T103・2026-09-19 から）は**局の 1 自席ターン目だけ**速さを 0 にする規則
     （`turn_count <= 2`）なので、**閉じた代数を固定するテストには掛けない**——
     規則そのものは `test_the_walk_obeys_the_first_turn_rule` が `j0` を明示して固定する。"""
     k.setdefault("j0", 2)
@@ -846,12 +845,7 @@ def test_the_walk_reads_the_dp_harm_for_the_steps_it_covers_then_the_base():
     avg = (0.05 + 0.09) / 2.0
     plan = {"atk": 0.0, "rush": 0.0, "eff": 0.0, "attach": avg - (bare[0] + bare[1]), "attach_lead": 0.0, "paid": 1.0,
             "harm_steps": (0.05, 0.09)}
-    old_t1 = CB.RATE_T1_MODE
-    try:
-        CB.set_rate_t1_mode("off")
-        sched = CB.seat_slope_sched(sc, tok, ci, {}, _NoCards(), olp, jmax=3, plan=plan)
-    finally:
-        CB.set_rate_t1_mode(old_t1)
+    sched = CB.seat_slope_sched(sc, tok, ci, {}, _NoCards(), olp, jmax=3, plan=plan, j0=2)   # 局の途中の行（1 ターン目の 0 を避ける）
     assert sched[0] == pytest.approx(0.05) and sched[1] == pytest.approx(0.09)
     assert sched[2] == pytest.approx(bare[0] + bare[1])
     base, _st, _f, lead, *_ = CB.seat_slope_terms(sc, tok, ci, {}, _NoCards(), olp, want_stock=True, plan=plan)
@@ -1617,27 +1611,14 @@ def test_the_opponents_attacks_are_read_from_the_board_not_the_turn_flag():
 def test_the_walk_obeys_the_first_turn_rule():
     """**T103**: **どちらの席も「自分の最初のターン」はアタックできない**
     （規則・`rules/battle.rs::declare_attack` の `turn_count <= 2`）。歩きはこれを知らなかった。"""
-    assert CB.RATE_T1_MODE == "on"        # **2026-09-19 から既定**（ユーザ決定「2は正しいものに直してください」）
-    try:
-        # 局の 1 自席ターン目（`j0 = 1`）から歩くと、1 段目は 0
-        assert CB.rate_at(1, 0.05, 0.05, 0.1, 0.02, j0=1) == pytest.approx(0.0)
-        assert CB.rate_at(2, 0.05, 0.05, 0.1, 0.02, j0=1) > 0.0
-        # 途中の行（`j0 ≥ 2`）から歩くなら 1 段目から打てる
-        assert CB.rate_at(1, 0.05, 0.05, 0.1, 0.02, j0=2) > 0.0
-        # 的に届くまでのターン数は 1 つ増える側に動く（1 段ぶん進めないので）
-        assert CB.tau_grow(0.3, 0.1, 0.0, 0.0, 0.0, j0=1) > CB.tau_grow(
-            0.3, 0.1, 0.0, 0.0, 0.0, j0=2)
-        with pytest.raises(ValueError):
-            CB.set_rate_t1_mode("なにか")
-    finally:
-        CB.set_rate_t1_mode("off")
-    try:
-        # `off` なら `j0` は無視される（旧と完全に同じ）
-        assert _ra(1, 0.05, 0.05, 0.1, 0.02, j0=1) == pytest.approx(0.1)
-    finally:
-        # **既定へ戻す**（2026-09-26）——戻さないと同じワーカーで後に走る `test_kappa_vector` の
-        # `rate_of_row(j=0)` が `off` を読んで落ちる（xdist の割り振り次第で出るテスト間の漏れ）
-        CB.set_rate_t1_mode("on")
+    # 局の 1 自席ターン目（`j0 = 1`）から歩くと、1 段目は 0（2026-09-19 から既定・切替は 2026-10-05 に削除）
+    assert CB.rate_at(1, 0.05, 0.05, 0.1, 0.02, j0=1) == pytest.approx(0.0)
+    assert CB.rate_at(2, 0.05, 0.05, 0.1, 0.02, j0=1) > 0.0
+    # 途中の行（`j0 ≥ 2`）から歩くなら 1 段目から打てる
+    assert CB.rate_at(1, 0.05, 0.05, 0.1, 0.02, j0=2) > 0.0
+    # 的に届くまでのターン数は 1 つ増える側に動く（1 段ぶん進めないので）
+    assert CB.tau_grow(0.3, 0.1, 0.0, 0.0, 0.0, j0=1) > CB.tau_grow(
+        0.3, 0.1, 0.0, 0.0, 0.0, j0=2)
 
 
 def test_rush_bodies_attack_the_turn_they_arrive():

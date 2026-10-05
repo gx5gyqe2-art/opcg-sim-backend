@@ -1779,7 +1779,7 @@ def rules_sched(harms, steps, actx, paid1):
     for ar_, pos_, _e in tail:
         seq_l.append(ar_); seq_l.append(pos_)
     nh = len(harms)
-    skip1 = bool(actx.get("no_attack_now")) and RATE_T1_MODE == "on"
+    skip1 = bool(actx.get("no_attack_now"))
     out = []
     for j in range(1, n + 1):
         if skip1 and j == 1:
@@ -3175,7 +3175,7 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     for j in range(1, jmax + 1):
         # **T152**: `walk`＝旧（列の第 1 段は無条件に 0）／`game`＝`rate_at` と同じ規則（局の最初の自席ターンだけ 0）
         first_zero = (j <= 1) if SCHED_T1_MODE == "walk" else (int(j0) + j - 1 <= 1)
-        if RATE_T1_MODE == "on" and first_zero:
+        if first_zero:
             out.append(0.0)
             continue
         lead = lead0 + attl[j]
@@ -3349,17 +3349,11 @@ RATE_RUSH_MODE = "on"
 
 
 #: **T103**: **どちらの席も「自分の最初のターン」はアタックできない**（規則・`rules/battle.rs::declare_attack`
-#: の `turn_count <= 2`）。歩きはこれを知らず、**局の 1 自席ターン目にも `A` を積んでいた**。
-#: `off`＝旧／**`on`＝規則どおり**（絶対の自席ターン番号が 1 の段は速さ 0）。**新定数ゼロ**。
-#:
-#: **実測が裏づけている**（下の `harm_profile`）: **1 自席ターン目の実際の損害は 0.001／0.000** なのに
-#: 理論は 0.055／0.054 を言っていた（**78 倍／136 倍**）。2 ターン目以降の比は 0.72〜1.72 なので、
-#: **1 ターン目だけが桁で外れている**＝規則の欠落。
-RATE_T1_MODES = ("off", "on")
-#: **既定は `on`**（2026-09-19・ユーザ決定「2は正しいものに直してください」）。**実測が桁で裏づけている**
-#: （1 自席ターン目の実際の損害は 0.001／0.000 なのに理論は 0.055／0.054＝**79 倍／134 倍**）。
-#: **偏りは +0.12 悪くなる**（`A` を減らす向きで、偏りは既に正）。**以前の数字と比べるときは `--rate-t1 off`**。
-RATE_T1_MODE = "on"
+#: の `turn_count <= 2`）。歩きは局の 1 自席ターン目にも `A` を積んでいた——**規則どおり**（絶対の自席ターン番号が 1 の段は
+#: 速さ 0）にした（2026-09-19・ユーザ決定「2は正しいものに直してください」）。**新定数ゼロ**。
+#: **実測が桁で裏づけている**（1 自席ターン目の実際の損害は 0.001／0.000 なのに理論は 0.055／0.054＝**79 倍／134 倍**）。
+#: 旧の `off` 形（切替 `RATE_T1_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
+#: 出力 JSON の `rate_t1` キーは定数 `"on"` のまま残す（バイト一致のため）。
 
 
 #: **T105**: **速さ `A` に「効果が出す損害」の項を入れるか**（2026-09-18・T103 §8 の 1）。
@@ -3713,14 +3707,6 @@ def hand_purse(items, cards, don, olp, theta=THETA, mu=MU, mlp=5000.0, r_turns=3
     return float(p["atk"]), float(p["rush"]), float(p["eff"]), float(p["paid"])
 
 
-def set_rate_t1_mode(name):
-    global RATE_T1_MODE
-    if name not in RATE_T1_MODES:
-        raise ValueError("unknown rate t1 mode: %r" % (name,))
-    RATE_T1_MODE = name
-    return RATE_T1_MODE
-
-
 def set_rate_rush_mode(name):
     global RATE_RUSH_MODE
     if name not in RATE_RUSH_MODES:
@@ -3738,11 +3724,11 @@ def rate_at(j, board_lead, board_chars, stock, flow, ko_p=0.0, stock_rush=0.0, f
     ——在庫の速攻は `j ≥ 1` から（出したターンに殴れる）・流入の速攻は**引いたターンから**（`Σ_{k=0}^{j−1} q^k`）。
     どちらも総額の内側なので、残り（`stock − stock_rush`・`flow − flow_rush`）が旧どおりの遅い側。
 
-    **T103**: `j0` は**この歩きの出発点の絶対の自席ターン番号**（1 始まり）。`RATE_T1_MODE=on` なら
+    **T103**: `j0` は**この歩きの出発点の絶対の自席ターン番号**（1 始まり）。
     **絶対の自席ターン 1 の段は 0**（どちらの席も最初のターンはアタックできない・`turn_count <= 2`）。
     **T105**: `eff` は**効果が出す損害**＝**毎ターン一定**（1 枚は 1 回しか使えないので積み上がらない）。
     **T108**: `eff_once` は**今の手札が出せる分**＝**1 ターン目に 1 回だけ**（在庫なので繰り返さない）。"""
-    if RATE_T1_MODE == "on" and int(j0) + int(j) - 1 <= 1:
+    if int(j0) + int(j) - 1 <= 1:
         return 0.0                                    # **T103**: 自分の最初のターンはアタックできない（規則）
     if sched:
         # **T114**: 規則のドンの列から作った `R_j`（`seat_slope_sched`）。**列が一定なら下の式と恒等**。
@@ -4012,7 +3998,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "slope_hand": SLOPE_HAND_MODE, "a_flow_n": 0, "a_flow_sum": 0.0, "a_flow_missing": 0,
              "rate_walk": RATE_WALK_MODE, "rate_decay": RATE_DECAY_MODE, "stock_n": 0, "stock_sum": 0.0,
              "rate_rush": RATE_RUSH_MODE, "stock_rush_sum": 0.0, "flow_rush_sum": 0.0,
-             "rate_t1": RATE_T1_MODE, "tau_capped": 0, "tau_rows": 0,
+             "rate_t1": "on", "tau_capped": 0, "tau_rows": 0,
              "slope_effect": SLOPE_EFFECT_MODE, "eff_sum": 0.0, "eff_n": 0, "eff1_sum": 0.0,
              "don_purse": DON_PURSE_MODE,
              # **T114**: 規則のドンの列から作った `R_j`（`off` なら 0 件）
@@ -4373,7 +4359,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             if THETA_HAND_MODE == "rule_don":
                 _dk0 = (seat_decks.get(seed_g) or (None, None))[w] if seat_decks else None
                 actx = attacker_ctx(sc, tok, _ci, idx2cid, cards, theta, mu, deck_ids=_dk0,
-                                    no_attack_now=(RATE_T1_MODE == "on" and int(j) == 0))   # T103
+                                    no_attack_now=(int(j) == 0))   # T103
                 don_plan = rule_don_plan_for(sc, tok, _g_def, actx)
             th_life, th_hand, th_body = threshold_parts(sc, tok, g_hand=_g_def,
                                                        hand_blocker=hb_for(1 - w, t), attacker=actx,
@@ -4448,7 +4434,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             stats["eff_n"] += 1; stats["eff_sum"] += float(s_eff)
             stats["eff1_sum"] += float(s_eff1)
             slope_theory = s_board + s_hand + s_eff + s_eff1   # **T105／T108**: 効果の項（既定は 0）
-            if RATE_T1_MODE == "on" and j == 0 and not model_theta:
+            if j == 0 and not model_theta:
                 slope_theory = 0.0            # **T103**: 最初の自席ターンは 1 本も打てない（規則）
             # **H-4f（Q1）**: 1 ターンで読む器（速さの検算）には**今のターンの損害**。時刻で読む器（`slope_theory`・
             # 線形の橋）には `耐久 ÷ 歩きの τ`（T103 の 0 は τ の中にある）。既定の形は同じ値のまま。
@@ -5127,9 +5113,6 @@ def main(argv=None):
                     help="**T110** 耐久 `Θ` の側もドンを規則どおり払うか: `off`（旧）／"
                          "`blocker`（手札のブロッカーの予算を**規則の次ターンのアクティブ**にする）／"
                          "`rule`（それ ＋ **カウンター・イベントは使い残しのドンで払う**）")
-    ap.add_argument("--rate-t1", default=RATE_T1_MODE, choices=RATE_T1_MODES,
-                    help="**T103** 最初の自席ターンはアタックできない規則（`turn_count <= 2`）を歩きに入れるか: "
-                         "`off`（旧）／`on`（**規則どおり**＝絶対の自席ターン 1 の速さは 0）")
     ap.add_argument("--rate-rush", default=RATE_RUSH_MODE, choices=RATE_RUSH_MODES,
                     help="**T103** 歩きの 1 ターン目に速攻の体を入れるか: `off`（旧・全部 1 ターン待つ）／"
                          "`on`（**規則どおり**＝速攻は出したターン・引いたターンから殴れる）")
@@ -5182,7 +5165,6 @@ def main(argv=None):
     set_theta_hand_window(a.theta_hand_window)
     set_rate_don_mode(a.rate_don, pay=(a.rate_don_pay == "on"), ramp=a.rate_ramp)
     set_rate_rush_mode(a.rate_rush)
-    set_rate_t1_mode(a.rate_t1)
     set_slope_effect_mode(a.slope_effect)
     set_don_purse_mode(a.don_purse)
     set_theta_don_mode(a.theta_don)

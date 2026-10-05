@@ -443,4 +443,4 @@ def test_the_plan_store_key_separates_the_kernel_and_keeps_python_keys_stable(tm
     assert "RD_KERNEL_TAG" in vars(CB)
     # 包んだ関数でも、解き方が読む大域の一覧（鍵に入る切替）が欠けない
     names = {n for _lab, n, _src in st.reads}
-    assert {"RATE_T1_MODE", "RATE_DON_PAY", "EX_STATE_BUDGET", "CUT_PRICER_KEY", "NU_MEAS"} <= names
+    assert {"RATE_DECAY_MODE", "EX_STATE_BUDGET", "CUT_PRICER_KEY", "NU_MEAS"} <= names

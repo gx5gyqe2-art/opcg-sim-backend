@@ -332,7 +332,7 @@ def rules_sched(harms, steps, actx, paid1):
     lefts = [left(i) for i in range(1, n + 1)]
     out = []
     for j in range(1, n + 1):
-        if actx.get("no_attack_now") and j == 1 and RATE_T1_MODE == "on":
+        if actx.get("no_attack_now") and j == 1:
             out.append(0.0)
             continue
         v = float(harms[j - 1]) if j <= len(harms) else float(steps[j - 1]["fb"])

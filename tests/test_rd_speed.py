@@ -252,7 +252,7 @@ def test_the_plan_store_returns_identical_plans_and_never_a_stale_one(_budget, t
     assert repr(a) == repr(b) and st.hits == 1 and st.puts == 1
     cards, don, blk, life, ax, _t, lt, dt, arr = p
     k0 = st.key_of(cards, don, blk, life, ax, None, lt, dt, arr)
-    monkeypatch.setattr(CB, "RATE_T1_MODE", "off" if CB.RATE_T1_MODE == "on" else "on")
+    monkeypatch.setattr(CB, "RATE_DECAY_MODE", "off" if CB.RATE_DECAY_MODE == "ko" else "ko")
     k1 = st.key_of(cards, don, blk, life, ax, None, lt, dt, arr)
     monkeypatch.undo()
     monkeypatch.setattr(CB, "SOLVER_VERSION", CB.SOLVER_VERSION + "-x")
@@ -274,7 +274,7 @@ def test_the_plan_store_key_is_shared_across_tools_and_module_names(_budget, tmp
     cards, don, blk, life, ax, _t, lt, dt, arr = p
     st = PS.PlanStore(str(tmp_path / "ps"), CB)
     names = {n for _lab, n, _src in st.reads}
-    assert {"RATE_T1_MODE", "RATE_DON_PAY", "EX_STATE_BUDGET", "CUT_PRICER_KEY", "NU_MEAS"} <= names
+    assert {"RATE_DECAY_MODE", "EX_STATE_BUDGET", "CUT_PRICER_KEY", "NU_MEAS"} <= names
     assert "PRE_SETTLE_MODE" not in names and "OPP_CLOCK_MODE" not in names
     k0 = st.key_of(cards, don, blk, life, ax, None, lt, dt, arr)
     monkeypatch.setattr(CB, "PRE_SETTLE_MODE", "on" if CB.PRE_SETTLE_MODE == "off" else "off")

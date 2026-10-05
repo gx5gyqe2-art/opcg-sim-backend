@@ -901,7 +901,7 @@ def _attacker_of(sc, tok, ci_row, idx2cid, cards, deck_ids=None, t=None):
     if CB.THETA_HAND_MODE != "rule_don" or _TO_W_MODE() != "curve":
         return None
     return CB.attacker_ctx(sc, tok, ci_row, idx2cid, cards, deck_ids=deck_ids,
-                           no_attack_now=(t is not None and CB.RATE_T1_MODE == "on" and CB.own_turn_index(t) == 0))
+                           no_attack_now=(t is not None and CB.own_turn_index(t) == 0))
 
 
 def _g_opp_of(opp, last_main, ex, idx2cid, cards, cache, seat, deck=None):

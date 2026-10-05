@@ -178,7 +178,7 @@ def profile_scale(rate, j, prof_th=None):
     **これが入ると輪郭の読みが尺度不変になる**——輪郭は比 `prof/prof_th`（無次元）としてしか入らず、
     **単位は `A` が持つ**ので、通貨を c 倍すれば 1 ターンの損害も `Θ` も同じだけ c 倍になる
     （T122 の P5 が `curve` で 96.2% 破れていた患部）。
-    **`prof_th[0] = 0` を分母にしてはいけない**（T126 で踏んだ）——`RATE_T1_MODE=on` は
+    **`prof_th[0] = 0` を分母にしてはいけない**（T126 で踏んだ）——最初の自席ターンは打てない規則（T103）は
     「最初の自席ターンは 1 本も打てない」という**規則**なので、そこに典型の速さは**存在しない**。
     床 `SLOPE_FLOOR` で割ると倍率が 55 倍まで飛び、**5.0% の行が打ち切りに貼り付いた**（実測）。
     **規則どおりに「速さが定義される最初のターン」まで進めて割る**（新定数ゼロ）。"""
@@ -386,7 +386,7 @@ def rate_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=No
         # **H-4f（Q1）**: 帳簿の速さは時計（`Θ/A`）にしか使わない＝時刻で読む器。`rule_don` 系は
         # **耐久 ÷ 歩きの τ**（T103 の最初のターンの 0 は τ の中にある）。
         return float(plan["a_time"])
-    if j is not None and CB.RATE_T1_MODE == "on" and int(j) == 0:
+    if j is not None and int(j) == 0:
         return 0.0
     # **H-4b**: `plan`（`rule_don` 系の攻め手の計画）を渡すと速さの側も**耐久と同じ計画**を読む（T109）
     lead, chars, stock, flow, _sr, _fr, eff, eff1 = rate_terms_of_row(

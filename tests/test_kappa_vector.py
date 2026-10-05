@@ -505,7 +505,7 @@ def test_profile_scale_is_the_rate_over_the_typical_rate(_prof_th):
 
 
 def test_profile_scale_skips_the_first_turn_where_no_rate_exists(_prof_th):
-    """**`prof_th[0] = 0` を分母にしない**（`RATE_T1_MODE=on`＝最初の自席ターンは打てない規則）。
+    """**`prof_th[0] = 0` を分母にしない**（最初の自席ターンは打てない規則）。
 
     床で割ると倍率が 55 倍に飛び、**5.0% の行が打ち切りに貼り付いた**（T126 で踏んだ）。
     **速さが定義される最初のターンまで進めて割る**。"""
