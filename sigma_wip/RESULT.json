@@ -1,0 +1,18 @@
+{
+ "job": "sigma-syn",
+ "role": "measure",
+ "status": "done",
+ "inputs": {
+  "base": "claude/sigma-wip@18131d56"
+ },
+ "outputs": {
+  "files": [
+   "sigma_wip/results/cb_syn.json",
+   "sigma_wip/results/tb_syn.json",
+   "sigma_wip/results/wc_syn.json",
+   "sigma_wip/results/pa_syn.json"
+  ]
+ },
+ "command": "bash sigma_wip/run_sigma.sh syn",
+ "notes": "再起動: コンテナ再起動 3 回（cb は 12:38→14:41→15:13 で 2 回失い、15:13 から完走。tb は 22:49 に 1 回失い 4.4h 分を再実行）。\n1) wc_syn（勝率の較正・pre-settle on）: 絶対版 対数損失 0.8579（コイン 0.6927 を下回れず・ECE 0.127・AUC 0.7193）／相対版 0.6223（コイン未満・ECE 0.051・AUC 0.7258）。AUC は絶対 0.7193→相対 0.7258 でほぼ不動、幅だけ縮んだ。\n2) pa_syn（有利側・不利側の差）: n=9367 行、有利側比率 0.489、有利側の平均ずれ +0.058／不利側 −0.044。有利側の対数損失 0.6448（有利側のコイン 0.6486 をわずかに下回る・AUC 0.6273）。\n3) cb_syn（損害の歩み方）: 10186 行。理論の読み: 符号正答率 0.662・bias 0.396・σ_T 1.995・within1 0.665／hist の読み: 符号正答率 0.602・bias 12.32・σ_T 10.297。凍結定数 lambda=0.1362 mu=0.0551 theta=1.5819。tb_syn は dG の AUC 0.681・gain_verdict=bridge_holds。\n所見: 判断基準の「相対版がコイン投げ下回る」は合成で成立、絶対版は不成立。損害の歩み方の輪郭が値段の読みで動かないかは、hist と theory で bias・σ_T が大きく違うため未検証（実側との比較が必要）。解釈・表への書き込みは作業担当に委ねる。"
+}
