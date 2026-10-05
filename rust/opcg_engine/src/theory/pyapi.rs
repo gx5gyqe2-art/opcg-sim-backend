@@ -10,7 +10,7 @@ use super::defender::{DpErr, Defender, Input};
 use super::layers::{count_layers, fit_horizon, LayerIn};
 use super::numeric;
 use super::plans::{self, Mask, SolveIn};
-use super::sched::{StepIn, Tables};
+use super::sched::{self, StepIn, Tables};
 
 type Out = (f64, f64, f64, f64, Vec<f64>, f64, f64);
 
@@ -252,11 +252,39 @@ fn rd_solve(
     }
 }
 
+/// 歩きの段ごとの速さと届く時刻（`rules_sched` → `walk_crossing`・テスト用）。`steps` は `(paid, eff, fb)`。
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn rd_sched(
+    harms: Vec<f64>,
+    steps: Vec<(f64, f64, f64)>,
+    ds: Vec<f64>,
+    a_tab: Vec<f64>,
+    ar_tab: Vec<f64>,
+    e_tab: Vec<f64>,
+    no_now: bool,
+    paid1: f64,
+    theta: f64,
+    slope_floor: f64,
+    race_cap: f64,
+) -> PyResult<(Vec<f64>, f64)> {
+    if ds.is_empty() || a_tab.is_empty() || steps.is_empty() {
+        return Err(PyValueError::new_err("rd_sched: empty ds, a_tab or steps"));
+    }
+    let tb = Tables { ds: &ds, a_tab: &a_tab, ar_tab: &ar_tab, e_tab: &e_tab, no_now, slope_floor, race_cap };
+    let steps: Vec<StepIn> = steps.into_iter().map(|(paid, eff, fb)| StepIn { paid, eff, fb }).collect();
+    let tail = sched::tail_of(&tb, &steps);
+    let sc = sched::rules_sched(&tb, &harms, &steps, &tail, paid1);
+    let tau = sched::walk_crossing(&tb, &sc, theta);
+    Ok((sc, tau))
+}
+
 /// 拡張モジュールへの登録。
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDefender>()?;
     m.add_function(wrap_pyfunction!(rd_count_layers, m)?)?;
     m.add_function(wrap_pyfunction!(rd_solve, m)?)?;
+    m.add_function(wrap_pyfunction!(rd_sched, m)?)?;
     m.add_function(wrap_pyfunction!(rd_fit_horizon, m)?)?;
     m.add_function(wrap_pyfunction!(rd_kernel_version, m)?)?;
     m.add_function(wrap_pyfunction!(rd_py_round, m)?)?;
