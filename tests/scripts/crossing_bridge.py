@@ -3391,8 +3391,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 slope_theory = d["slope_theory"]; shield = d["shield"]; sh_rate = d["shield_rate"]
                 th_body = d["th_body"]; th_hand = d["th_hand"]; th_w = d["theta"]
                 # **T112**: `g`（局の序数）と `who`（席）は 3 つの出口（`turn_harm`／`theta_check`／
-                # `rows_out`）を**同じ鍵で突き合わせる**ために置く（`bias_budget.py` が偏りを
-                # 「A の軌跡」と「的と要の差」へ分けるとき、どちらの母数でも同じ行を指せる）。
+                # `rows_out`）を**同じ鍵で突き合わせる**ために置く（偏りを「A の軌跡」と「的と要の差」へ
+                # 分けるとき、どちらの母数でも同じ行を指せる。分解の器 `bias_budget.py` は波C で削除・
+                # 凍結ブランチ `claude/theory-switches-final` で再現）。
                 _kill = bool(z_of.get(w, 0.0) > 0.5 and t == ts[-1])
                 turn_harm.append({"g": games, "who": w,
                                   "j": j, "harm": harm.get((w, t), 0.0),
