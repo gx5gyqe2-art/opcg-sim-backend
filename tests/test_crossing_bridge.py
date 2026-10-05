@@ -32,20 +32,20 @@ _SHIPPED = {n: getattr(CB, n) for n in (
     "THETA_HAND_MODE", "THETA_HAND_PLACE", "THETA_BODY_MODE", "THETA_HAND_BLOCKER_MODE",
     "THETA_RETURN_MODE", "SLOPE_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE",
     "RATE_WALK_MODE", "RATE_DECAY_MODE", "RACE_MODE", "SLOPE_TAKE_MODE",
-    "DON_PURSE_MODE", "THETA_DON_MODE", "THETA_HAND_WINDOW", "RATE_DON_MODE")}
+    "THETA_DON_MODE", "THETA_HAND_WINDOW")}
 
 
 def test_the_shipped_defaults_are_the_ones_we_decided():
     """**既定の一覧をラチェットする**（`docs/cpu_theory_gap.md` §9.2 の表と 1 対 1）。
 
     **2026-09-19 のユーザ指示**（「使用できるドンと使ったドンの整合が取れるように最後まで進めてください」）で
-    `DON_PURSE_MODE=all`（T109）が入った——**財布が 1 つになって初めて帳尻が合う**
+    財布 1 つ（T109・旧 `DON_PURSE_MODE=all`・2026-10-05 に切替は削除）が入った——**財布が 1 つになって初めて帳尻が合う**
     （理論の使いすぎ 22.0% → 0.0%）。**続く「それは直しましょうか」で `THETA_DON_MODE=rule`（T110）**
     ——**耐久の側もドンを規則どおり払う**（手札のブロッカーの予算＝次ターンのアクティブ・
     カウンター・イベントは使い残しで払う）。
 
     **2026-09-20 のユーザ決定**（「効果があったものの規定はオンにしないの？」→「3 本すべて」）で 3 本動いた:
-    `RATE_DON_MODE=flow`（T114・歩きの成長を規則のドンから）・`THETA_HAND_MODE=cuttable_forced` ＋
+    歩きの成長を規則のドンから（T114・旧 `RATE_DON_MODE=flow`・同上）・`THETA_HAND_MODE=cuttable_forced` ＋
     `THETA_HAND_WINDOW=horizon`（T116・手札は守る窓が開く分だけ的に入る）・
     `theory_order.W_ERR_MODE=rel`（T118・勝率を比で読む）。**T114 と T116 は対で採る**
     ——単独では合成が動かないが、**組むと両記録で 5 軸が改善する**（偏り・的中・σ_T・`curve` の偏り・`Θ`/要）。
@@ -68,10 +68,8 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "RATE_WALK_MODE": "grow",                # T94
         "RATE_DECAY_MODE": "off",                # T95（切替として残す）
         "RACE_MODE": "static",                   # T90／T91／T104（切替として残す）
-        "DON_PURSE_MODE": "all",                 # T109・2026-09-19
         "THETA_DON_MODE": "rule",                # T110・2026-09-19
         "THETA_HAND_WINDOW": "horizon",          # T116・2026-09-20
-        "RATE_DON_MODE": "flow",                 # T114・2026-09-20
     }
 
 
@@ -1110,7 +1108,7 @@ def test_the_board_can_decay_but_the_leader_never_does():
 def test_the_decay_also_bites_on_the_scheduled_path():
     """**T128**（2026-09-20）: **列を作る道でも減衰が効く**。
 
-    `rate_at` は `sched` が在ると**先頭で返す**ので、**`RATE_DON_MODE != "off"`（既定）の下では
+    `rate_at` は `sched` が在ると**先頭で返す**ので、**規則のドンの列（既定）の下では
     `RATE_DECAY_MODE=ko` が 1 ビットも効いていなかった**（`--rate-decay ko` の出力が既定とバイト一致）。
     **切替が名乗ったことをするか**をここで固定する（既定は `off` なので出荷の値は動かない）。
     """
@@ -1811,7 +1809,8 @@ def test_the_hand_can_fire_its_effect_once():
 def test_one_purse_pays_for_each_card_once(monkeypatch):
     """**T109**（ユーザ指示「使用できるドンと使ったドンの整合が取れるように」）: **支払いも付与も
     同じアクティブから出る**のが規則なのに、`stock`（T77・体）と `e₁`（T108・効果）は**別々に同じドンを
-    使えた**。`DON_PURSE_MODE=one` は**手札を 1 つのナップサックに入れ、1 枚 1 回だけ払う**。"""
+    使えた**。財布は**手札を 1 つのナップサックに入れ、1 枚 1 回だけ払う**（旧 `DON_PURSE_MODE=one`／`all` の核・
+    旧 `off` は 2026-10-05 に削除）。"""
     import deck_refill as DR
 
     class _Cards:
@@ -1821,16 +1820,19 @@ def test_one_purse_pays_for_each_card_once(monkeypatch):
     cards = _Cards({"A": {"power": 6000, "cost": 4}, "B": {"power": 0, "cost": 4, "event": True}})
     monkeypatch.setattr(DR, "card_effect_harm", lambda cid, *a, **k: 0.05 if cid == "B" else 0.0)
     items = [{"cid": "A", "cost": 4}, {"cid": "B", "cost": 4}]
+    def hand_purse(don):
+        p = CB.purse_plan(CB.hand_groups(items, cards, 5000.0, with_don=False), don)
+        return float(p["atk"]), float(p["rush"]), float(p["eff"]), float(p["paid"])
     # ドン 4 なら**どちらか 1 枚だけ**——旧 `off` は両方（体も効果も）数えられた
-    atk, rush, eff, paid = CB.hand_purse(items, cards, 4, 5000.0)
+    atk, rush, eff, paid = hand_purse(4)
     assert paid == pytest.approx(4.0)                     # 払ったのは 1 枚ぶん
     assert (atk > 0.0) != (eff > 0.0)                     # 体か効果のどちらか片方しか立たない
     # ドン 8 なら両方買える＝両方立つ（払いは 8）
-    atk2, _r2, eff2, paid2 = CB.hand_purse(items, cards, 8, 5000.0)
+    atk2, _r2, eff2, paid2 = hand_purse(8)
     assert paid2 == pytest.approx(8.0) and atk2 > 0.0 and eff2 == pytest.approx(0.05)
     # **払いは絶対に財布を超えない**（不変量）
     for don in range(0, 11):
-        assert CB.hand_purse(items, cards, don, 5000.0)[3] <= don + 1e-9
+        assert hand_purse(don)[3] <= don + 1e-9
 
 
 def test_the_purse_keeps_bodyless_removal_that_the_old_form_dropped(monkeypatch):
@@ -1846,7 +1848,8 @@ def test_the_purse_keeps_bodyless_removal_that_the_old_form_dropped(monkeypatch)
     monkeypatch.setattr(DR, "card_effect_harm", lambda cid, *a, **k: 0.07)
     items = [{"cid": "E", "cost": 2}]
     assert CB.playable_attack_price(items, cards, 5, 5000.0) == pytest.approx(0.0)   # 旧: 0
-    atk, _r, eff, paid = CB.hand_purse(items, cards, 5, 5000.0)
+    p = CB.purse_plan(CB.hand_groups(items, cards, 5000.0, with_don=False), 5)
+    atk, eff, paid = float(p["atk"]), float(p["eff"]), float(p["paid"])
     assert atk == pytest.approx(0.0) and eff == pytest.approx(0.07) and paid == pytest.approx(2.0)
 
 
@@ -1914,13 +1917,6 @@ def test_the_attach_comes_out_of_the_same_purse():
     lead_don, chars_don = CB.theory_slope_parts(tok, olp)
     lead_raw, chars_raw = CB.theory_slope_parts(tok, olp, with_don=False)
     assert chars_don > chars_raw and lead_don == pytest.approx(lead_raw)
-    try:
-        assert CB.set_don_purse_mode("all") == "all"
-        assert CB.set_don_purse_mode("one") == "one"
-        with pytest.raises(ValueError):
-            CB.set_don_purse_mode("なにか")
-    finally:
-        CB.set_don_purse_mode("all")
 
 
 def test_the_next_turns_don_is_what_the_rules_give_back():
@@ -1980,79 +1976,6 @@ def test_a_counter_event_has_to_be_paid_for():
     assert CB.cuttable_share([], 5.0) == 0.0
     # **印字カウンターはドンが 0 でも数える**（規則どおり無料）
     assert CB.cuttable_share([printed], 0.0) == pytest.approx(1.0)
-
-
-def test_the_purse_frontier_needs_no_exchange_rate():
-    """**T111**（ユーザの問い「1本にまとめた定数はどんな意味を持つ？」）: 財布を 1 本にするには
-    `価値 = A の分 + ρ × Θ の分` の `ρ` が要るが、**`ρ` は定数ではない**——
-
-    * **次元が [1/ターン]**（`A` は価格/ターン・`Θ` は価格）＝**率**。`ρ = 1` は「耐久は 1 ターンで効く」
-      と宣言するのと同じで、**時間の単位を変えると値が変わる**。
-    * レースから出る値は `ρ = (∂D/∂Θ_me)/(∂D/∂A_me) = A_me²/(A_opp·Θ_opp) = (1/τ_me)·(A_me/A_opp)`
-      ＝**局面の量**（どちらが速い側か）。**定数に固めると打ち筋を式に入れる**ことになる。
-
-    **だから `ρ` を置かない**——`D` は両軸で単調増なので**最適点はパレート境界上に在り**、
-    **境界の各点で `D` を直に測れば交換レートは現れない**。"""
-    g = [[(0, {}), (3, {"atk": 0.10, "rush": 0.10})], [(0, {}), (3, {"theta_body": 0.08})]]
-    # 予算 3 = どちらか片方しか買えない＝本物のトレードオフ
-    front = CB.purse_pareto(g, 3)
-    assert [(round(a, 3), round(t, 3)) for a, t, _p in front] == [(0.1, 0.0), (0.0, 0.08)]
-    # **予算が足りれば両方**＝境界は 1 点に潰れる（取り合いが無い）
-    assert len(CB.purse_pareto(g, 6)) == 1
-    # **内訳（witness）も運ぶ**——歩きは `atk`（段差）と `eff`（一度きり）で扱いが違うので潰せない
-    assert front[0][2]["rush"] == pytest.approx(0.10) and front[0][2]["paid"] == 3.0
-    # **自分が速いほど耐久を買う**（`τ = Θ/A` が凸なので追加の速さの効きが落ちる）
-    fast = CB.choose_by_race(front, 0.30, 0.60, 0.10, 0.60)
-    assert fast[1] == pytest.approx(0.08) and fast[0] == pytest.approx(0.0)
-    # **相手が速いほど速さを買う**（耐久 1 単位が買うターンが短い＝レースするしかない）
-    slow = CB.choose_by_race(front, 0.10, 0.60, 0.30, 0.60)
-    assert slow[0] == pytest.approx(0.10) and slow[1] == pytest.approx(0.0)
-    # `D` の値そのものも 2 つの時計の差（`τ_opp − τ_me`）
-    assert CB.race_margin(0.2, 0.6, 0.2, 0.6) == pytest.approx(0.0)
-    assert CB.race_margin(0.4, 0.6, 0.2, 0.6) > 0.0          # 自分が速い＝margin は正
-    assert CB.race_margin(0.0, 0.6, 0.2, 0.6) < 0.0          # 速さ 0 は床で割る（落ちない）
-
-
-def test_the_endurance_options_are_the_two_the_rules_allow():
-    """**T111**: 耐久に行ける選択肢は**規則が許す 2 つだけ**——
-    **出せるブロッカー**（`theta_body = ν_meas`・ブロックに召喚酔いは無い）と
-    **構えるカウンター・イベント**（`theta_hand = μ`・`apply_counter` が `pay_cost` を要求する）。
-    **印字カウンターの札は無料**なので財布には入らない（`cuttable_share` が別に数える）。"""
-    class _Cards:
-        def __init__(self, tbl): self.tbl = tbl
-        def info(self, cid): return self.tbl.get(cid)
-    cards = _Cards({"B": {"power": 6000, "blocker": True, "cost": 4},
-                    "E": {"power": 0, "event": True, "cost": 2},
-                    "P": {"power": 5000, "cost": 3},
-                    "N": {"power": 3000, "cost": 1}})
-    # `event` は**枠のほうにも載る**（`hand_plan.hand_items` が付ける）——`cuttable_share` は枠を見る
-    items = [{"cid": "B", "cost": 4, "counter": 0, "event": False},
-             {"cid": "E", "cost": 2, "counter": 1000, "event": True},
-             {"cid": "P", "cost": 3, "counter": 1000, "event": False},
-             {"cid": "N", "cost": 1, "counter": 0, "event": False}]
-    g = CB.theta_groups(items, cards, 5000.0)
-    kinds = sorted({k for opts in g for _c, parts in opts for k in parts})
-    assert kinds == ["theta_body", "theta_hand"]
-    assert len(g) == 2                       # ブロッカー B とカウンター・イベント E だけ
-    # 印字カウンターの非イベント（P）は**無料**なので財布の外
-    assert CB.theta_groups([items[2]], cards, 5000.0) == []
-    # `don_left` を渡すと払えないイベントは落ちる（`theta_body` は残る）
-    g0 = CB.theta_groups(items, cards, 5000.0, don_left=0.0)
-    assert sorted({k for opts in g0 for _c, parts in opts for k in parts}) == ["theta_body"]
-    # 無料で切れる札の 1 枚あたり＝印字カウンターの非イベントだけ（4 枚中 1 枚）
-    assert CB.free_cuttable_g(items) == pytest.approx(T.MU * 1 / 4)
-
-
-def test_the_opponents_board_speed_is_readable_from_my_row():
-    """**T111**: `A_opp` は**その席の行から読める**（相手の盤面の攻め手＝枠 1 と 7〜11・`opp_attackers_of`）。
-    **`A_opp` が要るのは配分を決めるため**で、これが読めなければレースで割れない。"""
-    tok = np.zeros((22, 24), np.float32)
-    assert CB.opp_board_slope(tok, 5000.0) == pytest.approx(0.0)      # 誰も居なければ 0
-    tok[1, T.S_POWER] = 0.5                                           # 相手のリーダー 5000
-    one = CB.opp_board_slope(tok, 5000.0)
-    assert one > 0.0
-    tok[7, T.S_POWER], tok[7, T.S_IS_CHAR] = 0.6, 1.0                 # 相手の体 6000
-    assert CB.opp_board_slope(tok, 5000.0) > one                      # 攻め手が増えれば速くなる
 
 
 def test_the_body_term_can_move_to_the_rate_side():

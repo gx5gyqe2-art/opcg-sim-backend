@@ -132,16 +132,12 @@ def flows_between(a, b):
 
 
 def theory_spend(sc, tok, ci_row, idx2cid, cards, olp, theta=None, mu=None):
-    """**理論が「使う」ことにしているドン**を 3 つに分けて数える（T109 の問い）。
+    """**理論が「使う」ことにしているドン**（T109 の問い）＝財布 1 つのナップサックが払った額（付与も同じ財布）。
 
-    * `stock`＝`playable_attack_price` が詰めた札のコストの和（T77・体を出す）
-    * `eff`＝`hand_effect_harm` が選んだ札のコスト（T108・効果を撃つ）
-    * `attach`＝`attack_value_don` が場の攻め手に**暗黙に付けている**ドン（T45）
-
-    **3 つは同じアクティブから出る**のが規則なので、**合計が `active` を超えていれば二重使用**。
+    体を出す・効果を撃つ・付与するは**同じアクティブから出る**のが規則なので、財布 1 つで買えば合計は `active` を超えない。
+    旧の 3 分け（`stock`／`eff`／`attach` を別々に数える形）は 2026-10-05 に削除——`claude/theory-switches-final`。
     """
     import crossing_bridge as CB
-    import deck_refill as DR
     import hand_plan as HP
     sc_a = np.asarray(sc)
     theta = TO.THETA if theta is None else theta
@@ -150,36 +146,12 @@ def theory_spend(sc, tok, ci_row, idx2cid, cards, olp, theta=None, mu=None):
     r = max(1.0, min(5.0, float(sc_a[TO.SC_OPP_LIFE])))
     mlp = float(sc_a[TO.SC_MY_LEADER_POWER]) * 1e4 or 5000.0
     items = HP.hand_items(tok, ci_row, idx2cid, cards, float(olp), r) or []
-    if CB.DON_PURSE_MODE == "all":
-        # **財布 1 つ・付与も同じ財布**（T109）＝ナップサックが払った額そのもの
-        g = CB.hand_groups(items, cards, float(olp), theta, mu, mlp, r, with_don=False)
-        g = g + CB.attach_groups(tok, float(olp), theta, mu)
-        paid = float(CB.purse_plan(g, avail)["paid"])
-        return {"available": avail, "stock": paid, "eff": 0.0, "attach": 0.0, "asked": paid}
-    if CB.DON_PURSE_MODE == "one":
-        paid = float(CB.hand_purse(items, cards, avail, float(olp), theta, mu, mlp, r)[3])
-        attach = sum(float(don_for_attacker(float(p), float(olp), theta, mu))
-                     for p in TO.own_attackers_of(tok, float(olp)))
-        return {"available": avail, "stock": paid, "eff": 0.0, "attach": float(attach),
-                "asked": paid + float(attach)}
-    _val, _rush, cost_stock = CB.playable_attack_price(items, cards, avail, float(olp), theta, mu,
-                                                       want_rush=True, want_cost=True)
-    # 効果の側（T108）が使うコスト＝選ばれた 1 枚のコスト
-    cost_eff, best = 0.0, 0.0
-    cap = int(round(avail))
-    for it in items:
-        c = int(round(float(it.get("cost") or 0.0)))
-        if c > cap:
-            continue
-        h = DR.card_effect_harm(it["cid"], mlp, r)
-        if h > best:
-            best, cost_eff = h, float(c)
-    # 場の攻め手に暗黙に付いているドン
-    attach = 0.0
-    for p in TO.own_attackers_of(tok, float(olp)):
-        attach += float(don_for_attacker(float(p), float(olp), theta, mu))
-    return {"available": avail, "stock": float(cost_stock), "eff": float(cost_eff),
-            "attach": float(attach), "asked": float(cost_stock) + float(cost_eff) + float(attach)}
+    # **財布 1 つ・付与も同じ財布**（T109）＝ナップサックが払った額そのもの
+    # （旧の `off`／`one` の 3 分け〔体・効果・暗黙の付与〕は 2026-10-05 に削除——`claude/theory-switches-final`）
+    g = CB.hand_groups(items, cards, float(olp), theta, mu, mlp, r, with_don=False)
+    g = g + CB.attach_groups(tok, float(olp), theta, mu)
+    paid = float(CB.purse_plan(g, avail)["paid"])
+    return {"available": avail, "stock": paid, "eff": 0.0, "attach": 0.0, "asked": paid}
 
 
 def don_for_attacker(power, target_power, theta=None, mu=None, max_don=None, delta=None):
@@ -281,14 +253,10 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="ドンの帳尻（4 ゾーンの不変量・使い道・理論の使いすぎ）")
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
-    ap.add_argument("--don-purse", default="", help="理論側の財布の形（`off`／`one`／`all`）を指定して測る")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
-    if a.don_purse:
-        import crossing_bridge as CB
-        CB.set_don_purse_mode(a.don_purse)
     out = collect(a.src, a.games)
-    out["don_purse"] = a.don_purse or "off"
+    out["don_purse"] = "off"                      # 出力のバイト一致のため定数で残す（`--don-purse` は 2026-10-05 に削除）
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:

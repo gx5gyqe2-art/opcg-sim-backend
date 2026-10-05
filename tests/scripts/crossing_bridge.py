@@ -265,44 +265,15 @@ def purse_series(sc, tok, jmax=10):
     return out
 
 
-#: **T114（2026-09-19）**: **歩きの成長を規則のドンから作る**か。既定は `off`（今の挙動）。
-#: **患部**: `rate_at` は成長を `flow·(j−1)` と書いていて**ドンの列を 1 度も読まない**のに、
-#: 規則はドンを毎ターン +2・席の総量で止める。実測でも**観測 ΔA は flow の 2.14 倍／2.04 倍**で
-#: **形が逆**（ドンは j=4 で止まるのに flow は伸び続ける）。
-#: * `flow` … **流入だけ**を `d_i` で絞り直す（在庫・付与は今のまま）
-#: * `purse` … **財布ごと** `d_i` で解き直す（在庫・付与・流入の全部）
-#:
-#: **既定にしない**（2026-09-19・反証の結果）——**「成長が要る」は確認できたが「その成長が規則の財布から来る」は
-#: 示せていない**。2 つの理由:
-#: 1. **引いた札のドンを払うかで符号が反転する**（払わせない＝設計版は `rate` −0.49、払わせると +0.45）。
-#:    自席ターン開始ではレスト・付与が厳密 0 なので `d_i = active + min(2j, deck)` ＝**上限付きの一次ランプ**で、
-#:    デッキの飽和は実測で不活性＝**規則の中身がほとんど効いていない**。
-#: 2. **中身ゼロの 1 定数のランプ** `R_j + g·(j−1)`（両記録同じ `g`）が**両記録でこれを上回る**
-#:    （±1 ターン当たり 0.6898／0.7038 対 `purse` の 0.6688／0.6991）。
-#: **水準だけのプラセボ（`flow` を一律 c 倍）は失敗する**（当たり 0.4086／0.4276 < 今の 0.5085／0.5255）＝
-#: **患部の読み（成長が要る）は正しい**。判定の場は T18（出口）。
-RATE_DON_MODES = ("off", "flow", "purse")
-#: **出荷既定は `flow`**（2026-09-20・ユーザ決定「3 本すべて」）。**T116 と対で採った**——
-#: 単独では合成が +0.005 しか動かないが、**T116 と組むと両記録で 5 軸が改善する**
-#: （偏り 2.563 → **1.608**／2.601 → **1.744**・的中 0.6631 → **0.7164**／0.6340 → **0.6428**・
-#: σ_T 4.19 → **1.59**／4.16 → **1.48**・`curve` の偏り 0.239 → 0.088／0.455 → 0.286・
-#: `Θ`/要 1.816 → 1.383／1.999 → 1.611）。**理論の読みで退行する軸は無い**。
-#: 代金は **±1 当たり**（0.454 → 0.342／0.441 → 0.286＝残る偏りが系統誤差になり σ が締まった結果）と
-#: **`curve` の的中 −0.01〜0.02**。`purse` は切替として残す（財布ごと解き直す形）。
-RATE_DON_MODE = "flow"
+#: **T114（2026-09-19）**: **歩きの成長を規則のドンから作る**（流入だけを各段のドン `d_i` で絞り直す＝旧 `flow`・
+#: 2026-09-20 からユーザ決定で常に採用）。**患部**: 旧の `rate_at` は成長を `flow·(j−1)` と書いていて**ドンの列を 1 度も読まない**
+#: のに、規則はドンを毎ターン +2・席の総量で止める。**T116 と対で採った**——単独では合成が +0.005 しか動かないが、
+#: T116 と組むと両記録で 5 軸が改善する（偏り 2.563 → 1.608／2.601 → 1.744 ほか）。
+#: 旧の `off`（`flow·(j−1)`）と `purse`（財布ごと解き直す形）は 2026-10-05 に削除（切替 `RATE_DON_MODE`）
+#: ——`claude/theory-switches-final` で再現できる。出力 JSON の `rate_don` キーは定数 `"flow"` のまま残す（バイト一致のため）。
 #: 引いた 1 枚のドンは**常に財布から払わせる**（残ったドンで絞る・T114 の反証が要求した修正）。旧の「払わせない」形
-#: （`RATE_DON_PAY=False`）と、**プラセボ専用**の一次ランプ（`RATE_RAMP`）は 2026-10-05 に削除
-#: ——`claude/theory-switches-final` で再現できる。出力 JSON の `rate_don_pay`／`rate_ramp` キーは定数のまま残す（バイト一致のため）。
-
-
-def set_rate_don_mode(name):
-    global RATE_DON_MODE
-    if name not in RATE_DON_MODES:
-        raise ValueError("rate don mode は %s のどれか" % (RATE_DON_MODES,))
-    if name != "off" and DON_PURSE_MODE == "race":
-        raise ValueError("`--don-purse race` は 1 行で解いた配分なので j の列を持てない（併用不可）")
-    RATE_DON_MODE = name
-    return RATE_DON_MODE
+#: （`RATE_DON_PAY=False`）と、**プラセボ専用**の一次ランプ（`RATE_RAMP`）も 2026-10-05 に削除。出力 JSON の
+#: `rate_don_pay`／`rate_ramp` キーは定数のまま残す。
 
 
 def opp_don_next(sc, tok):
@@ -973,7 +944,7 @@ def _rule_hand_term(sc, tok, side, g_hand, mu=MU, turns=None, count=True):
 # **導出（規則から・新定数ゼロ）**:
 # 1. **財布は 1 つ**（T109・`ops.rs::attach_don`＝アクティブ → 付与・出すのも同じアクティブから払う）。
 #    1 自席ターンに使えるのは**速さの側がその段で使う額と同じ**＝`DON_PURSE_MODE=all` の `purse_plan` に渡す
-#    `sc[SC_MY_DON]`（`RATE_DON_MODE=flow`／`off` ではどの段も同じ額・T114）。
+#    `sc[SC_MY_DON]`（どの段も同じ額・T114）。
 # 2. **攻め手の選べるもの＝速さの側の選べるものと同じ**（`hand_groups`＝手札の 1 枚を出す／出さない・
 #    今攻撃できる体に付与 `k` 枚）。出した体は次のターンから（速攻は今から）殴り、付与は +1000 ずつ
 #    （止めるのに要るカウンターが 1 枚ぶんにつき**ちょうど 1000** 増える・ブロッカーを倒しやすくなる）。
@@ -1043,8 +1014,7 @@ def _rule_hand_term(sc, tok, side, g_hand, mu=MU, turns=None, count=True):
 # `rule_don`＝**分け方（出す／付ける）も上の目的で選ぶ**。速さの側もその計画を読む。
 # （分け方を速さの側の財布の計画に固定する旧の形 `rule_don_purse` は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。）
 #
-# **限界**: 計画は**毎ターン同じ**——ターンごとに付け替える攻め手はもっと強い。`RATE_DON_MODE=purse`・
-# `DON_PURSE_MODE≠all`・自分の耐久（`THETA_SIDE_MODE=symmetric` の `me` 側）では攻め手の手札を読まないので
+# **限界**: 計画は**毎ターン同じ**——ターンごとに付け替える攻め手はもっと強い。自分の耐久（`THETA_SIDE_MODE=symmetric` の `me` 側）では攻め手の手札を読まないので
 # 付与 0（H-4 の `rule`）に落ちる（数える）。計画は窓（T116）の前の地平で選び、窓はその計画のまま DP を打ち切る。
 # 帳簿の途中の行（ターンの途中）は**そのターンの最初の行で選んだ計画**を耐久・速さの両方が読む
 # （もう殴った体も 1 ターン目の並びに残る＝ターン途中の耐久は少し厳しめ）。
@@ -1575,8 +1545,6 @@ def attacker_ctx(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=N
     `deck_refill.a_of ＋ e_of`・デッキが読めなければ 0）。読めない・財布の形が違うときは `None`。"""
     if cards is None or ci_row is None or idx2cid is None:
         return None
-    if DON_PURSE_MODE != "all" or RATE_DON_MODE == "purse":
-        return None                                     # 速さの側が段ごとに解き直す形とは同じ計画を共有できない
     import hand_plan as HP
     sc = np.asarray(sc); tok = np.asarray(tok)
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
@@ -1676,7 +1644,7 @@ def rules_steps(actx, play1, nsteps):
     規則: 毎ターンのドンは `d_i`（`purse_series`）で、出すのと付けるのは同じ財布（T109）。付けたドンはそのターンの
     終わりに戻る（次のターンの付与は次のターンのドンで払う）。手札に残った札は払えるターンに出せる。
     2 段目からの選び方は**速さの側の財布と同じナップサック**（`purse_plan`・付与の値段は `attach_groups` と同じ
-    `増分 − k·δ`）を、その段のドン・その段の攻め手・残った手札で解き直す（`RATE_DON_MODE=purse` と同じ規則）。
+    `増分 − k·δ`）を、その段のドン・その段の攻め手・残った手札で解き直す（旧の `purse` 形と同じ規則）。
 
     返すのは段 `i = 1..nsteps` ごとの `{"hits": その段の攻撃の超過（付与込み・2 段目から）, "paid", "fb": 守る側の
     計算が覆わない段の速さ（盤面の素殴り ＋ 場に居る出した体 ＋ 付与の増分）, "eff": その段に出した札の効果}`。
@@ -2970,7 +2938,7 @@ def set_slope_hand_mode(mode):
 
 
 def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None,
-                     want_stock=False, alloc=None, through=None, plan=None):
+                     want_stock=False, through=None, plan=None):
     """速さを **3 つに分けて**返す（T94）: `(盤面, 在庫, 流入)`。**規則から出る 3 つの別の量**:
 
     * **盤面** … 今場に居る攻撃手。**毎ターン殴る**。
@@ -2997,9 +2965,9 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     if SLOPE_BLOCK_MODE == "on":
         blk = opp_blockers_of(tok_row, my_leader_power=float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
                               theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)
-    # **T109**: `all` なら盤面は**素殴り**で数え、付与は財布のナップサックの中で買う（二重に数えない）。
+    # **T109**: 盤面は**素殴り**で数え、付与は財布のナップサックの中で買う（二重に数えない）。
     lead, chars = theory_slope_parts(tok_row, olp, theta, mu, blockers=blk,
-                                     with_don=(DON_PURSE_MODE not in ("all", "race")),
+                                     with_don=False,
                                      through=through,                      # **T131**
                                      life_opp=float(sc_a[SC_OPP_LIFE]))    # **T134**
     base = lead + chars
@@ -3011,30 +2979,15 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
         r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
         items = HP.hand_items(tok_row, ci_row, idx2cid, cards, olp, r)
         mlp_h = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-        if DON_PURSE_MODE == "race" and alloc is not None:
-            # **T111**: 配分はレース（`D`）が決めた——ここでは**受け取るだけ**（交換レートは無い）。
-            stock, stock_rush, eff_once = alloc["atk"], alloc["rush"], alloc["eff"]
-            lead += float(alloc.get("attach_lead") or 0.0)
-            base += float(alloc.get("attach_lead") or 0.0) + float(alloc.get("attach") or 0.0)
-        elif DON_PURSE_MODE in ("one", "all"):
-            # **T109**: 財布は 1 つ——**体と効果を同じナップサックで買う**（1 枚 1 回だけ払う）。
-            g = hand_groups(items, cards, olp, theta, mu, mlp_h, r,
-                            with_don=(DON_PURSE_MODE != "all"))
-            if DON_PURSE_MODE == "all":
-                # **付与も同じ財布から**（`attack_value_don` が無料で付けていたドン）
-                g = g + attach_groups(tok_row, olp, theta, mu, blockers=blk)
-            # **H-4b**: `plan` を渡されたら**耐久の側と同じ計画**（攻め手の最善応答）をそのまま読む（財布は 1 つ）
-            pl = plan if plan is not None else purse_plan(g, float(sc_a[SC_MY_DON]))
-            stock, stock_rush, eff_once = pl["atk"], pl["rush"], pl["eff"]
-            lead += pl["attach_lead"]
-            base += pl["attach_lead"] + pl["attach"]
-        else:
-            stock, stock_rush = playable_attack_price(items, cards, float(sc_a[SC_MY_DON]), olp, theta, mu,
-                                                      want_rush=True)
-            # **T108**: 在庫（手札）が今このターン出せる効果の損害（一度きり）
-            import deck_refill as DR
-            eff_once = float(DR.hand_effect_harm([it["cid"] for it in (items or ())], mlp_h, r,
-                                                 float(sc_a[SC_MY_DON])))
+        # **T109**: 財布は 1 つ——**体と効果を同じナップサックで買う**（1 枚 1 回だけ払う）。
+        g = hand_groups(items, cards, olp, theta, mu, mlp_h, r, with_don=False)
+        # **付与も同じ財布から**（`attack_value_don` が無料で付けていたドン）
+        g = g + attach_groups(tok_row, olp, theta, mu, blockers=blk)
+        # **H-4b**: `plan` を渡されたら**耐久の側と同じ計画**（攻め手の最善応答）をそのまま読む（財布は 1 つ）
+        pl = plan if plan is not None else purse_plan(g, float(sc_a[SC_MY_DON]))
+        stock, stock_rush, eff_once = pl["atk"], pl["rush"], pl["eff"]
+        lead += pl["attach_lead"]
+        base += pl["attach_lead"] + pl["attach"]
     flow = flow_rush = eff = 0.0
     if deck_ids:
         import deck_refill as DR
@@ -3053,7 +3006,7 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
 #:
 #: **欠陥**: `seat_slope_sched` は列の先頭 `R_1` を**無条件に** 0 にしていた（`j <= 1`）。`rate_at` の規則は
 #: `j0 + j − 1 <= 1`（**局の最初の自席ターンだけ**殴れない・T103）だが、`rate_at` は `sched` が在ると
-#: その規則を通らず `sched[0]` を返す＝既定（`RATE_DON_MODE=flow`）では**全ての歩きの第 1 段が 0**
+#: その規則を通らず `sched[0]` を返す＝既定では**全ての歩きの第 1 段が 0**
 #: （実 5 局 65 本の歩きで `sched_j1_sum = 0.0`・`rate_at(j=1, j0=3, sched) = 0`）。**両席に対称**なので
 #: T151 の反対称の結論には効かないが、**全ての τ を約 1 ターン膨らませる**（T146b の「τ の偏り +1.6」・
 #: T118／T151 の最上位分位の相手の τ の残差 ≈7／≈4.5 の候補）。
@@ -3085,17 +3038,17 @@ def set_sched_t1_mode(mode):
 
 def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None,
                      jmax=10, blockers=None, through=None, j0=1, plan=None):
-    """**`j` ごとの速さの列 `R_1..R_jmax`**（T114・`RATE_DON_MODE != "off"` のときだけ使う）。
+    """**`j` ごとの速さの列 `R_1..R_jmax`**（T114）。
 
     規則のドンの列 `d_i`（`purse_series`）で**その i で買えるもの**を解き直す:
 
-    * 在庫（体・付与・手札の効果）… `purse_plan(groups, d_i)`（`purse` のときだけ i で解き直す）
+    * 在庫（体・付与・手札の効果）… `purse_plan(groups, ds[0])`（どの段も同じ額）
     * 流入（引いた 1 枚）… `a_of(deck, olp, don_i, …)`。`don_i = d_i − 払った額`
       （**同じドンを 2 回使わない**＝反証が要求した修正）
     * 召喚酔い・速攻・1 ターン目の規則は既存のまま（T84／T103）＝**新しい規則を足していない**
 
-    `d_i` が一定なら**今の `rate_at` と恒等**（Σ が `[j≥2]·在庫 + 流入·(j−1)` に畳まれる）＝
-    `off` が今の挙動、という設計。返すのは長さ `jmax` のリスト（`rate_at(..., sched=)` に渡す）。
+    `d_i` が一定なら**`rate_at` の式と恒等**（Σ が `[j≥2]·在庫 + 流入·(j−1)` に畳まれる）。
+    返すのは長さ `jmax` のリスト（`rate_at(..., sched=)` に渡す）。
 
     **H-4f**: `rule_don` 系の計画（`sched` を持つ）を渡されたら、その計画を選んだときの歩きの列そのもの
     （守る側の計算の段ごとの損害 ＋ 段ごとの財布・`rules_sched`）を返す＝計画の選び方と橋の歩きが同じ列を読む。"""
@@ -3115,7 +3068,7 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
                                    my_leader_power=float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
                                    theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)
     lead0, chars0 = theory_slope_parts(tok_row, olp, theta, mu, blockers=blockers,
-                                       with_don=(DON_PURSE_MODE not in ("all", "race")),
+                                       with_don=False,
                                        through=through,                    # **T131**
                                        life_opp=float(sc_a[SC_OPP_LIFE]))  # **T134**
     ds = purse_series(sc, tok_row, jmax)
@@ -3125,17 +3078,15 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     items = HP.hand_items(tok_row, ci_row, idx2cid, cards, olp, r) if cards is not None else []
     groups = []
     if items:
-        groups = hand_groups(items, cards, olp, theta, mu, mlp, r,
-                            with_don=(DON_PURSE_MODE != "all"))
-        if DON_PURSE_MODE == "all":
-            groups = groups + attach_groups(tok_row, olp, theta, mu, blockers=blockers)
+        groups = hand_groups(items, cards, olp, theta, mu, mlp, r, with_don=False)
+        groups = groups + attach_groups(tok_row, olp, theta, mu, blockers=blockers)
     import deck_refill as DR
-    # 各 i の「その時点の在庫の総額」（`purse` は i ごと・`flow` は i=1 のまま）
+    # 各 i の「その時点の在庫の総額」（どの段も i=1 のまま）
     atk = [0.0] * (jmax + 1); rush = [0.0] * (jmax + 1); paid = [0.0] * (jmax + 1)
     att = [0.0] * (jmax + 1); attl = [0.0] * (jmax + 1); e1 = [0.0] * (jmax + 1)
     for i in range(1, jmax + 1):
         d_i = ds[min(i, len(ds)) - 1]
-        pl = purse_plan(groups, d_i if RATE_DON_MODE == "purse" else ds[0]) if groups else None
+        pl = purse_plan(groups, ds[0]) if groups else None
         if plan is not None:
             pl = plan                                     # **H-4b**: 耐久の側と同じ計画（`flow` はどの段も同じ額）
         if pl:
@@ -3146,7 +3097,7 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
             paid[i] = float(pl.get("paid") or 0.0)
             e1[i] = float(pl["eff"])
     # **T128**: 盤面が `ko_p` で失われる（T95）。**列を作る道でも効くようにした**——
-    # `rate_at` は `sched` が在ると**先頭で返す**ので、`RATE_DON_MODE != "off"`（2026-09-19 から既定）の
+    # `rate_at` は `sched` が在ると**先頭で返す**ので、規則のドンの列（2026-09-19 から既定）の
     # 下では **`RATE_DECAY_MODE=ko` が 1 ビットも効いていなかった**（2026-09-20 に実測で確認・
     # `--rate-decay ko` の出力が既定とバイト一致）。**既定は `off` のままなので値は動かない**。
     # **リーダーは KO されないので減衰しない**（T95）・**効果は体ではないので減衰しない**（`rate_at` と同じ）。
@@ -3365,25 +3316,12 @@ def set_rate_decay_mode(mode):
 #: `all` までは**速さの財布**だけだったが、`race` は**耐久の選択肢（出せるブロッカー・構えるカウンター・イベント）も
 #: 同じ財布に入れ**、`(A の分, Θ の分)` のパレート境界の各点で `D = τ_opp − τ_me` を測って最大の点を採る。
 #: **`A_opp`・`Θ_opp` はその席の行から読める分**（相手の盤面の攻め手・ライフ・手札・体）＝**1 パス近似**。
-DON_PURSE_MODES = ("off", "one", "all", "race")
-#: **既定は `all`**（2026-09-19・ユーザ指示「使用できるドンと使ったドンの整合が取れるように最後まで進めてください」）。
-#: **帳尻が合うのはこの形だけ**——理論が在るドンより多くを要求する自席ターンの割合は
-#: **`off` 22.0% → `one` 4.4% → `all` 0.0%**（`don_ledger` 実測・実 40 局）。
-#: 数字は**実で単調に良くなり**（勝者の的中 0.6628 → 0.6642 → **0.6654**）**合成はわずかに下がる**
-#: （0.6421 → 0.6376 → 0.6381）。**帳簿（線形の橋）と `curve` は小数 4 桁まで不変＝費用ゼロ**。
-#: **以前の数字と比べるときは `--don-purse off`**。
-DON_PURSE_MODE = "all"
+#: **常に `all`**（2026-09-19・ユーザ指示「使用できるドンと使ったドンの整合が取れるように最後まで進めてください」）。
+#: 帳尻が合うのはこの形だけ——理論が在るドンより多くを要求する自席ターンの割合は **`off` 22.0% → `one` 4.4% → `all` 0.0%**
+#: （`don_ledger` 実測・実 40 局）。旧の `off`／`one`／`race`（切替 `DON_PURSE_MODE`）は 2026-10-05 に削除
+#: ——`claude/theory-switches-final` で再現できる。出力 JSON の `don_purse` キーは定数 `"all"` のまま残す（バイト一致のため）。
 
 
-def set_don_purse_mode(name):
-    global DON_PURSE_MODE
-    if name not in DON_PURSE_MODES:
-        raise ValueError("unknown don purse mode: %r" % (name,))
-    DON_PURSE_MODE = name
-    return DON_PURSE_MODE
-
-
-#: 財布の内訳の名前（**1 つの詰め方の中の内訳**なので、足し合わせても二重にならない）
 PURSE_PARTS = ("atk", "rush", "eff", "attach", "attach_lead")
 
 
@@ -3477,193 +3415,6 @@ def attach_groups(tok, olp, theta=THETA, mu=MU, blockers=None, max_don=None, del
         if len(opts) > 1:
             out.append(opts)
     return out
-
-
-#: **財布の 2 つの軸**（T111）: 速さに行くぶん（`A`）と耐久に行くぶん（`Θ`）。
-#: **1 つの数（交換レート）に潰さない**——潰すには `ρ = A_me²/(A_opp·Θ_opp) = (1/τ_me)·(A_me/A_opp)` が要り、
-#: これは**局面の量**（どちらが速い側か）なので**定数として置くと打ち筋を式に入れる**ことになる。
-#: 代わりに**境界の各点で `D = τ_opp − τ_me` を直に測って最大の点を採る**＝**交換レートは現れない**。
-PURSE_AXES = {"a": ("atk", "eff", "attach", "attach_lead"), "th": ("theta_body", "theta_hand")}
-
-
-#: 財布の内訳の全 channel（`purse_pareto` が運ぶ・**歩きで扱いが違う**ので潰さない）
-PURSE_CHANNELS = ("atk", "eff", "attach", "attach_lead", "rush", "theta_body", "theta_hand", "paid")
-
-
-def _pareto(points, cap=0):
-    """`(A, Θ, 内訳)` の点列からパレート境界だけ残す（`A` 降順・`Θ` は狭義単調増）。
-
-    **内訳（witness）も一緒に運ぶ**——歩き（`rate_at`）は `atk`（段差・`j ≥ 2`）と
-    `eff`（一度きり・`j = 1`）と `attach`（盤面・今すぐ）で**扱いが違う**ので、
-    合計に潰したら戻せない。"""
-    best = {}
-    for a, t, parts in points:
-        key = (round(float(a), 12), round(float(t), 12))
-        if key not in best:
-            best[key] = parts
-    pts = sorted(best.items(), key=lambda x: (-x[0][0], -x[0][1]))
-    out = []
-    best_th = float("-inf")
-    for (a, t), parts in pts:
-        if t > best_th + 1e-12:
-            out.append((a, t, parts))
-            best_th = t
-    if cap and len(out) > cap:                     # 端を残して間引く（起きたら `stats` に出る）
-        step = len(out) / float(cap)
-        out = [out[int(i * step)] for i in range(cap)]
-    return out
-
-
-def purse_pareto(groups, budget, cap=512):
-    """**組ごとに 1 つ選ぶ**選択が作る `(A の分, Θ の分)` の**パレート境界**（T111）。
-
-    `groups` は `purse_plan` と同じ形（`[[(費用, {内訳}), ...], ...]`）で、内訳は
-    **速さの channel**（`atk`／`eff`／`attach`／`attach_lead`）と**耐久の channel**
-    （`theta_body`＝出せるブロッカーの `ν`／`theta_hand`＝構えるカウンター・イベントの `μ`）を持つ。
-
-    **`D` は両軸で単調増**なので、**最適点は必ず境界上に在る**＝境界を出せば交換レートは要らない。
-    **ドンを使い残すのも選択肢**（`(0, 0)` が常に境界に残る）。"""
-    zero = {k2: 0.0 for k2 in PURSE_CHANNELS}
-    cur = {0: [(0.0, 0.0, zero)]}
-    n = int(max(0, round(float(budget))))
-    for g in groups:
-        nxt = {}
-        for spend, pts in cur.items():
-            for cost, parts in g:
-                c = int(max(0, round(float(cost))))
-                s2 = spend + c
-                if s2 > n:
-                    continue
-                da = sum(float(parts.get(k2, 0.0)) for k2 in PURSE_AXES["a"])
-                dt = sum(float(parts.get(k2, 0.0)) for k2 in PURSE_AXES["th"])
-                lst = nxt.setdefault(s2, [])
-                for a, t, acc in pts:
-                    nw = dict(acc)
-                    for k2 in PURSE_CHANNELS:
-                        nw[k2] += float(parts.get(k2, 0.0))
-                    nw["paid"] = acc["paid"] + c
-                    lst.append((a + da, t + dt, nw))
-        cur = {sp: _pareto(v, cap) for sp, v in nxt.items()} or {0: [(0.0, 0.0, zero)]}
-    return _pareto([q for v in cur.values() for q in v], cap)
-
-
-def race_margin(a_me, th_me, a_opp, th_opp):
-    """`D = τ_opp − τ_me = Θ_me/A_opp − Θ_opp/A_me`（T90 の 2 つの時計・T111 の目的関数）。"""
-    return (float(th_me) / max(SLOPE_FLOOR, float(a_opp))
-            - float(th_opp) / max(SLOPE_FLOOR, float(a_me)))
-
-
-def choose_by_race(points, base_a, base_th, a_opp, th_opp):
-    """**境界の各点で `D` を測って最大の点を返す**（T111）＝`(A の分, Θ の分, D)`。
-
-    戻り値は `(A の分, Θ の分, 内訳, D)`。**交換レートを 1 つ置かない**のが要点——`ρ` は
-    `(1/τ_me)·(A_me/A_opp)` という**局面の量**で、しかも**微分＝線形近似**なので離散な財布の選択に合わない。
-    **`D` を直に測れば両方が要らない**。"""
-    zero = {k2: 0.0 for k2 in PURSE_CHANNELS}
-    best = None
-    for a, t, parts in (points or [(0.0, 0.0, zero)]):
-        d = race_margin(float(base_a) + a, float(base_th) + t, a_opp, th_opp)
-        if best is None or d > best[3] + 1e-15:
-            best = (a, t, parts, d)
-    return best if best is not None else (0.0, 0.0, zero, 0.0)
-
-
-def opp_board_slope(tok, my_leader_power, theta=THETA, mu=MU):
-    """**相手の盤面の速さ**（その席の行から読める分・枠 1 と 7〜11・T111）。
-    `opp_attackers_of`（T102）＋ 自分側と同じ `attack_value`（素殴り）。"""
-    mlp = float(my_leader_power)
-    return float(sum(attack_value(mlp + float(x), mlp, True, theta, mu)
-                     for x in opp_attackers_of(tok, mlp)))
-
-
-def race_alloc(sc, tok, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU,
-               deck_me=None, deck_opp=None):
-    """**1 行ぶんの財布の配分**（T111・`DON_PURSE_MODE=race`）＝`(内訳, D, 境界の点数)`。
-
-    土台（配分では動かない分）は**素殴りの盤面 ＋ 流入 ＋ 引いた 1 枚の効果**、
-    耐久の土台は**自分のライフ・無料で切れる札・自分の体**（`threshold_of_me`）。
-    選択肢は**手札の札（出す／構える）＋ 場の攻め手への付与**。"""
-    sc_a = np.asarray(sc)
-    mlp = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-    r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
-    don = float(sc_a[SC_MY_DON])
-    items = HP_hand_items(tok, ci_row, idx2cid, cards, olp, r)
-    lead, chars = theory_slope_parts(tok, olp, theta, mu, with_don=False,
-                                     life_opp=float(sc_a[SC_OPP_LIFE]))   # **T134**
-    base_a = lead + chars
-    if deck_me:
-        import deck_refill as DR
-        base_a += float(DR.a_of(deck_me, olp, don, theta, mu))
-        base_a += float(DR.e_of(deck_me, mlp, r, don))
-    base_th = float(threshold_of_me(sc, tok, g_hand=free_cuttable_g(items, mu)))
-    tl, th, tb = threshold_parts(sc, tok, g_hand=mu, hand_blocker=0.0)
-    th_opp = float(tl + th + tb)
-    a_opp = opp_board_slope(tok, mlp, theta, mu)
-    if deck_opp:
-        import deck_refill as DR
-        # **T120**: 相手が引いた 1 枚を出せるかは**相手のドン**で判定する（席の取り違えの修正）
-        a_opp += float(DR.a_of(deck_opp, mlp, opp_don_next(sc, tok), theta, mu))
-    groups = hand_groups(items, cards, olp, theta, mu, mlp, r, with_don=False)
-    groups += attach_groups(tok, olp, theta, mu)
-    groups += theta_groups(items, cards, olp, mu, don_left=None)
-    front = purse_pareto(groups, don)
-    _a, _t, parts, d = choose_by_race(front, base_a, base_th, a_opp, th_opp)
-    return parts, d, len(front)
-
-
-def HP_hand_items(tok_row, ci_row, idx2cid, cards, olp, r):
-    """`hand_plan.hand_items` の薄い包み（import を 1 か所にまとめる）。引けなければ空。"""
-    if cards is None or ci_row is None or idx2cid is None:
-        return []
-    import hand_plan as HP
-    return HP.hand_items(tok_row, ci_row, idx2cid, cards, float(olp), float(r)) or []
-
-
-def free_cuttable_g(items, mu=MU):
-    """**ドン無しで切れる札**だけの 1 枚あたりの価格（印字カウンター・EVENT でない・T111）。
-    **カウンター・イベントは財布の選択肢**（`theta_groups`）なのでここから外す。"""
-    if not items:
-        return float(mu)
-    return float(mu) * cuttable_share(items, 0.0)
-
-
-def theta_groups(items, cards, olp, mu=MU, don_left=None):
-    """**耐久に行く選択肢**（T111）＝手札の枠ごとの組。
-
-    * **出せるブロッカー** … `theta_body = ν_meas(そのパワー, 相手のリーダー)`（T106 と同じ値付け）。
-      **ブロックに召喚酔いは無い**ので出した次の相手のターンから避けて通れない体になる。
-    * **構えるカウンター・イベント** … `theta_hand = μ`（T110・`apply_counter` は EVENT に `pay_cost`）。
-      **払うドンは相手のターンに在るドン**なので、`don_left` を渡すとその枠だけに絞る。
-
-    **印字カウンターの札は無料**なので**ここには入らない**（`cuttable_share` が別に数える）。"""
-    out = []
-    for it in items or ():
-        info = (cards.info(it["cid"]) or {}) if cards is not None else {}
-        cost = max(0, int(round(float(it.get("cost") or 0.0))))
-        opts = []
-        if info.get("blocker") and not info.get("event"):
-            nu = float(nu_meas_of(float(info.get("power") or 0.0), float(olp)))
-            if nu > 0.0:
-                opts.append((cost, {"theta_body": nu}))
-        if info.get("event") and float(it.get("counter") or 0.0) > 0.0:
-            if don_left is None or cost <= float(don_left) + 1e-9:
-                opts.append((cost, {"theta_hand": float(mu)}))
-        if opts:
-            out.append([(0, {})] + opts)
-    return out
-
-
-def hand_purse(items, cards, don, olp, theta=THETA, mu=MU, mlp=5000.0, r_turns=3):
-    """**財布 1 つのナップサック**（T109）＝`(体の攻撃, そのうち速攻, 効果の損害, 使ったドン)`。
-
-    **1 枚 1 回だけ払う**——`playable_attack_price`（体）と `hand_effect_harm`（効果）は
-    **同じアクティブを別々に使えた**。ここでは**同じ詰め方**から両方の内訳を返す。
-
-    値は `体の攻撃 + その札の効果の損害` の和を最大化する（**規則と原本だけ**・打ち筋は入らない）。
-    体を持たない札は攻撃 0・除去を持たない札は効果 0 で、**どちらか在れば候補に残る**。"""
-    g = hand_groups(items, cards, olp, theta, mu, mlp, r_turns, with_don=True)
-    p = purse_plan(g, don)
-    return float(p["atk"]), float(p["rush"]), float(p["eff"]), float(p["paid"])
 
 
 def rate_at(j, board_lead, board_chars, stock, flow, ko_p=0.0, stock_rush=0.0, flow_rush=0.0,
@@ -3931,8 +3682,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             raise ValueError("N-3（cut price joint）は THETA_HAND_MODE=%r と組めない" % (THETA_HAND_MODE,))
         if THETA_HAND_MODE in ("rule", "rule_don") and CP.CUT_PRICE_MODE == "joint_slice":
             raise ValueError("rule／rule_don は cut price joint_slice と組めない（1 枚の値段が定まらない）")
-        if DON_PURSE_MODE == "race" or THETA_HAND_PLACE == "shield":
-            raise ValueError("N-3（cut price joint）は DON_PURSE_MODE=race／THETA_HAND_PLACE=shield と組めない")
+        if THETA_HAND_PLACE == "shield":
+            raise ValueError("N-3（cut price joint）は THETA_HAND_PLACE=shield と組めない")
         import deck_refill as _DR
         cut_decks = _DR.decks_by_seed(dirs)
     rows_out = []
@@ -3951,9 +3702,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "rate_rush": "on", "stock_rush_sum": 0.0, "flow_rush_sum": 0.0,
              "rate_t1": "on", "tau_capped": 0, "tau_rows": 0,
              "slope_effect": "hand", "eff_sum": 0.0, "eff_n": 0, "eff1_sum": 0.0,
-             "don_purse": DON_PURSE_MODE,
+             "don_purse": "all",
              # **T114**: 規則のドンの列から作った `R_j`（`off` なら 0 件）
-             "rate_don": RATE_DON_MODE, "rate_don_pay": True, "rate_ramp": 0.0,
+             "rate_don": "flow", "rate_don_pay": True, "rate_ramp": 0.0,
              "sched_n": 0, "sched_j1_sum": 0.0, "sched_j5_sum": 0.0,
              # **T113**: そのターンの最後の行で閉じて足した額（旧値＝新値 − `last_close_sum`）
              "last_close_n": 0, "last_close_sum": 0.0, "last_close_open": 0,
@@ -4094,10 +3845,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     sc, tok, ci = turn_last.get((w, t), turn_start[(w, t)])   # 出した後の手札（ターン最後の行）
                     # **T110**: `rule` なら**カウンター・イベントはドンを払う**。切るドンは
                     # **相手のターンに在るドン**＝自席ターンで使い残したアクティブ（この行の `sc[2]`）。
-                    # **T111**: `race` ならカウンター・イベントは**財布の選択肢**なので、
-                    # ここは**無料で切れる札だけ**（`don=0`）＝二重に数えない。
-                    don_left = (0.0 if DON_PURSE_MODE == "race"
-                                else (float(np.asarray(sc)[SC_MY_DON]) if THETA_DON_MODE == "rule" else None))
+                    don_left = float(np.asarray(sc)[SC_MY_DON]) if THETA_DON_MODE == "rule" else None
                     g_self[(w, t)] = hand_price_mean(sc, tok, ci, idx2cid, cards, mu, part, don_left)
                     if THETA_HAND_MODE == "rule_don" and seat_decks:
                         # **H-4e（E1）**: 取られたライフの札（その席のデッキの構成・手札に入る割合は `h`）・
@@ -4106,34 +3854,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     if THETA_HAND_MODE == "rule_don":
                         # **H-4f（F1）**: 手札から出すブロッカー（耐久の体の項・守る側の計算の盤面）
                         g_self[(w, t)] = with_hand_blocker(g_self[(w, t)], sc, tok, ci, idx2cid, cards)
-        # **T111**: 席ごとの**財布の配分**（レース `D` が決める・交換レートは置かない）。
-        # **耐久の 2 項（出せるブロッカー・構えるカウンター）もここから出る**ので、
-        # `hb_for`／`g_for` より先に作る。
-        alloc_self = {}
-        if DON_PURSE_MODE == "race":
-            for w in (0, 1):
-                dk_w = (seat_decks.get(seed_g) or (None, None))[w] if seat_decks else None
-                dk_o = (seat_decks.get(seed_g) or (None, None))[1 - w] if seat_decks else None
-                for t in turn_seq[w]:
-                    sc, tok, ci = turn_start[(w, t)]
-                    olp_w = float(np.asarray(sc)[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-                    pa, pd, pn = race_alloc(sc, tok, ci, idx2cid, cards, olp_w, theta, mu,
-                                            deck_me=dk_w, deck_opp=dk_o)
-                    alloc_self[(w, t)] = pa
-                    stats["race_n"] += 1
-                    stats["race_front_sum"] += pn
-                    stats["race_th_sum"] += float(pa.get("theta_body") or 0.0) + float(pa.get("theta_hand") or 0.0)
-                    stats["race_a_sum"] += sum(float(pa.get(k2) or 0.0) for k2 in PURSE_AXES["a"])
-                    stats["race_paid_sum"] += float(pa.get("paid") or 0.0)
-
-        def alloc_for(seat, t):
-            """その席の**直近の自席ターン開始**で決まった配分（無ければ空）。"""
-            prev = [tt for tt in turn_seq[seat] if tt <= t]
-            return alloc_self.get((seat, prev[-1])) if prev else None
-
         # **T106**: 席ごとの「手札から出せるブロッカー 1 体の `ν`」（同じく自席の行からしか読めない）
         hb_self = {}
-        if THETA_HAND_BLOCKER_MODE == "on" and DON_PURSE_MODE != "race":
+        if THETA_HAND_BLOCKER_MODE == "on":
             for w in (0, 1):
                 for t in turn_seq[w]:
                     sc, tok, ci = turn_last.get((w, t), turn_start[(w, t)])
@@ -4141,12 +3864,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                     hb_self[(w, t)] = hand_blocker_nu(sc, tok, ci, idx2cid, cards, olp_w)
 
         def hb_for(defender, t):
-            """守る席の直近の自席ターン開始までに持っていた「出せるブロッカー」（無ければ 0）。
-
-            **T111**: `race` なら**財布の配分が決めた分**（守る席が実際にそこへドンを回すと決めた分）。"""
-            if DON_PURSE_MODE == "race":
-                a = alloc_for(defender, t)
-                return float((a or {}).get("theta_body") or 0.0)
+            """守る席の直近の自席ターン開始までに持っていた「出せるブロッカー」（無ければ 0）。"""
             if THETA_HAND_BLOCKER_MODE != "on":
                 return 0.0
             prev = [tt for tt in turn_seq[defender] if tt <= t]
@@ -4318,10 +4036,6 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             # **T143**: 体の項のうち**手札のブロッカー**（T106）の分——`threshold_parts_side` が
             # 体に足した額そのもの（値は動かさない・内訳として持つだけ）
             th_hb = max(0.0, float(hb_for(1 - w, t))) if THETA_HAND_BLOCKER_MODE == "on" else 0.0
-            if DON_PURSE_MODE == "race":
-                # **T111**: 守る席が**構えると決めたカウンター・イベント**（`μ` の絶対量・
-                # `g_hand` は無料の札だけを数えているので二重にならない）
-                th_hand += float((alloc_for(1 - w, t) or {}).get("theta_hand") or 0.0)
             # **T102**: `shield` なら手札は**しきい値から外し、的の側の有限の盾**にする
             # （毎ターン `shield_rate` までしか出てこない＝**使う時間が要る**）。
             if THETA_HAND_PLACE == "shield":
@@ -4365,18 +4079,16 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              s_eff1) = seat_slope_terms(
                 sc, tok, _ci, idx2cid, cards, olp, theta, mu, deck_ids=dk,
                 want_stock=True,
-                alloc=alloc_self.get((w, t)), through=thr,             # T77／T90／T93／T94／T95／T131
+                through=thr,                                           # T77／T90／T93／T94／T95／T131
                 plan=don_plan)                                          # **H-4b**（`rule_don` 以外は None）
             s_hand = s_stock if SLOPE_HAND_MODE == "stock" else s_flow
-            sched = None
-            if RATE_DON_MODE != "off":
-                # **T114**: 規則のドンの列から `R_j` を作る（`off` なら作らない＝旧の式）
-                sched = seat_slope_sched(sc, tok, _ci, idx2cid, cards, olp, theta, mu,
-                                         deck_ids=dk, jmax=int(RACE_CAP), through=thr,
-                                         j0=int(j) + 1,                  # **T152**: この歩きの出発点（絶対の自席ターン・1 始まり）
-                                         plan=don_plan)                  # **H-4b**
-                stats["sched_n"] += 1
-                stats["sched_j1_sum"] += float(sched[0]); stats["sched_j5_sum"] += float(sched[4])
+            # **T114**: 規則のドンの列から `R_j` を作る
+            sched = seat_slope_sched(sc, tok, _ci, idx2cid, cards, olp, theta, mu,
+                                     deck_ids=dk, jmax=int(RACE_CAP), through=thr,
+                                     j0=int(j) + 1,                      # **T152**: この歩きの出発点（絶対の自席ターン・1 始まり）
+                                     plan=don_plan)                      # **H-4b**
+            stats["sched_n"] += 1
+            stats["sched_j1_sum"] += float(sched[0]); stats["sched_j5_sum"] += float(sched[4])
             if SLOPE_HAND_MODE == "flow":
                 stats["a_flow_n"] += 1; stats["a_flow_sum"] += float(s_hand)
             if RATE_WALK_MODE == "grow":
@@ -5052,10 +4764,6 @@ def main(argv=None):
                     choices=THETA_HAND_BLOCKER_MODES,
                     help="**T106** 相手の**手札のブロッカー**を耐久に入れるか（ブロックに召喚酔いは無い）: "
                          "`off`（旧・どこにも入らない）／`on`（**規則どおり**＝出せる 1 体の `ν`）")
-    ap.add_argument("--don-purse", default=DON_PURSE_MODE, choices=DON_PURSE_MODES,
-                    help="**T109** 体を出すドンと効果を撃つドンを 1 つの財布にするか: "
-                         "`off`（旧・`stock` と `e₁` が別々に同じアクティブを使える＝自席ターンの 22%% で使いすぎ）／"
-                         "`one`（**規則どおり**＝手札を 1 つのナップサックに入れ、1 枚 1 回だけ払う）")
     ap.add_argument("--theta-don", default=THETA_DON_MODE, choices=THETA_DON_MODES,
                     help="**T110** 耐久 `Θ` の側もドンを規則どおり払うか: `off`（旧）／"
                          "`blocker`（手札のブロッカーの予算を**規則の次ターンのアクティブ**にする）／"
@@ -5068,9 +4776,6 @@ def main(argv=None):
                          "`cuttable_forced`（旧の既定・T100・N-3 までの数字はこれ）／`cuttable_seq`（**T158**・攻撃ごとに安い順へ `c(x_i)` 枚を割り当てる）／"
                          "`rule`（**H-4**・守る席の実際のカウンター値・イベントのドン・ブロッカー・ライフから最善の守りで切る札を解く）／"
                          "`rule_don`（**既定・2026-10-04**・`rule` に攻め手の付与を入れた形）")
-    ap.add_argument("--rate-don", default=RATE_DON_MODE, choices=RATE_DON_MODES,
-                    help="**T114** 歩きの成長を規則のドンの列から作るか: `off`（旧・`flow·(j−1)`）／"
-                         "`flow`（流入だけ `d_i` で絞る）／`purse`（財布ごと `d_i` で解き直す）")
     ap.add_argument("--theta-hand-window", default=THETA_HAND_WINDOW, choices=THETA_HAND_WINDOWS,
                     help="**T116** 手札のうち**守る窓が開く分だけ**を的に入れるか（`min(手札, SR·τ)`）: "
                          "`off`（旧・全部入る）／`horizon`（手札抜きの `τ0` で 1 回切る）／"
@@ -5103,8 +4808,6 @@ def main(argv=None):
     set_theta_hand_mode(a.theta_hand)
     set_theta_hand_place(a.theta_hand_place)
     set_theta_hand_window(a.theta_hand_window)
-    set_rate_don_mode(a.rate_don)
-    set_don_purse_mode(a.don_purse)
     set_theta_don_mode(a.theta_don)
     set_theta_hand_blocker_mode(a.theta_hand_blocker)
     set_slope_mode(a.slope_mode)

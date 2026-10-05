@@ -78,19 +78,6 @@ def test_the_schedule_is_read_at_the_walks_own_turn_number():
     assert CB.rate_at(9, 0, 0, 0, 0, j0=2, sched=sched) == pytest.approx(0.3)
 
 
-def test_the_don_walk_refuses_to_share_a_row_with_the_race_purse():
-    """**`--don-purse race` は 1 行で解いた配分**なので `j` の列を持てない（黙って混ぜない）。"""
-    old_p, old_d = CB.DON_PURSE_MODE, CB.RATE_DON_MODE
-    try:
-        CB.set_don_purse_mode("race")
-        with pytest.raises(ValueError):
-            CB.set_rate_don_mode("purse")
-        assert CB.set_rate_don_mode("off") == "off"        # off は併用できる
-    finally:
-        CB.set_don_purse_mode(old_p)
-        CB.set_rate_don_mode(old_d)
-
-
 # ---------------------------------------------------------------- T116 窓の上限
 
 def test_the_window_cap_is_the_rate_times_the_turns_that_remain():

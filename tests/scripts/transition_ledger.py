@@ -116,7 +116,7 @@ def boundary_dx(tok, ci_row, idx2cid, cards, mlp, g_next, sched, j_next, next_is
       **手札の項は `cuttable_forced` では枚数に線形でない**（守りの強制で上限が付く）ので、
       これは**一次の近似**である——そう書いておく（上限に当たっている行では過大になる）。
     * **アンタップ** … レストのブロッカーが的に戻る（`resting_blocker_term`）。
-    * **ドン +2 ＋ 召喚酔いの解除** … 規則のドンの列の段差。`sched` が無ければ 0（`RATE_DON_MODE=off`）。
+    * **ドン +2 ＋ 召喚酔いの解除** … 規則のドンの列の段差。`sched` が無ければ 0。
     """
     use_draw = BOUNDARY_MODE in ("rules", "draw_untap", "draw")
     use_untap = BOUNDARY_MODE in ("rules", "draw_untap", "untap")
@@ -329,7 +329,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
                                            if KV.D_MODE == "theory" else None)
                 g_at[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
                 sched_at[(w, t)] = None
-                if BOUNDARY_MODE in ("rules", "don") and CB.RATE_DON_MODE != "off":
+                if BOUNDARY_MODE in ("rules", "don"):
                     _sc, _tok, _ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
                     _olp = float(np.asarray(_sc)[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
                     with CP.defending(_cv):
