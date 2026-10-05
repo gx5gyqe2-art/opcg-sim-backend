@@ -27,6 +27,11 @@
 
 ## 0. 式の全体系（地図・2026-09-16 時点）
 
+> **切替名の読み方（2026-10-05）**: 以下に出てくる `RATE_T1_MODE`・`RATE_RUSH_MODE`・`SLOPE_EFFECT_MODE`・`DON_PURSE_MODE`・
+> `RATE_DON_MODE`・`RATE_DON_PAY`・`RATE_RAMP`・`THETA_HAND_MODE=rule_don_purse` の**既定以外の値は削除済**（現行コードは既定の形だけ。
+> 「以前の数字と比べるときは `--X`」の指示は無効）。旧い形は凍結ブランチ `claude/theory-switches-final`（79c7fb14）で再現する。
+> 履歴の文章は書き換えない。
+
 ユーザ指示「理論式全体を体系整理できる？」→「既存のドキュメントに反映」で置いた。**層で並べる**——上の層ほど定義に近く、
 下の層ほど実測の写し。各行の右に導出の場所を書く。**式の実装の正本は `tests/scripts/theory_order.py`／`effect_value.py`**
 （`cpu_theory_gap.md` §9）で、本節はその読み下し。**定数は全部が実測の写しで、当てはめた定数は 1 つも無い**。
