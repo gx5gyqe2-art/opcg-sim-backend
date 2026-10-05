@@ -483,7 +483,6 @@ def main(argv=None):
                     help="**T54** 後で効く効果を付与の行で数える（`option`・既定）か、使った行で数える（`exercise`＝付与の行は 0）か")
     EV.add_search_price_arg(ap)
     EV.add_cost_afford_arg(ap)
-    EV.add_pricing_fixes_arg(ap)
     import hand_plan as _HP
     _TO.add_attack_ability_arg(ap)
     _TO.add_defender_power_arg(ap)                 # 2b
@@ -503,7 +502,7 @@ def main(argv=None):
         EV.set_flow_pricing(a.flow_pricing)
     EV.apply_search_price(a)
     EV.apply_cost_afford(a)
-    pricing_fixes = EV.apply_pricing_fixes(a)
+    pricing_fixes = EV.pricing_fixes_label()
     t0 = time.time()
     EV.reset_cond_stats()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)

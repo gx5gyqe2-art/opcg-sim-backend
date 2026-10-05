@@ -623,9 +623,9 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
     at = str(effect.get("type") or "")
     target = effect.get("target") or {}
     side = _side(target)
-    if not effect.get("target") and _fix("opp_subject") and opp_subject(effect.get("raw_text")):
+    if not effect.get("target") and opp_subject(effect.get("raw_text")):
         side = "OPPONENT"                     # L(e): 対象欄の無い「相手の〜」「相手は〜」は相手の資源が動く
-    if side == "ALL" and _fix("either_side") and not _own_specific(effect):
+    if side == "ALL" and not _own_specific(effect):
         # L(b): 「持ち主の〜」等＝どちらの側の体も取れる → 発動した側が得な方を選ぶ
         return _either_side_value(effect, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st)
     opp = (side == "OPPONENT")
@@ -649,7 +649,7 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         stock, turns, gain = TEMPO[at]
         per = {"nu": nu, "don": delta, "attack": theta * mu * R_TURNS}[stock]
         turns = DURATION_TURNS.get(str(effect.get("duration") or ""), turns)
-        if stock == "don" and not effect.get("target") and _fix("draw_n"):
+        if stock == "don" and not effect.get("target"):
             m = _value_count(effect)
             if m is not None:
                 n = min(m, ZONE_CAPACITY["DON"])      # L(d): 「ドン!!N枚(まで)をレストにする」の N も値の欄に入る
@@ -759,7 +759,7 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
         return amt if not opp else -amt
     if kind == "hand_gain":
         cnt = n
-        if _fix("draw_n") and at == "DRAW":
+        if at == "DRAW":
             # L(d): 「カードを N 枚引く」の N は対象欄ではなく値（`value.base`）に入る（対象欄は空＝既定 1 枚）
             m = _value_count(effect)
             if m is not None:
@@ -818,18 +818,14 @@ def action_value(effect, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA,
             return amt if good else -amt
         return amt if not opp else -amt
     if kind == "power":
-        if _fix("base_power") and _is_set_power(effect):
+        if _is_set_power(effect):
             # L(c): 「元々のパワーを X にする」＝対象の今のパワーから X への差。X も今のパワーも盤面から読む（読めなければ `None`）
             return _set_power_value(effect, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st)
         mag = _magnitude(effect)
         if (FLOW_PRICING == "exercise" and not opp and mag > 0
                 and str(effect.get("duration") or "") in ("THIS_TURN", "INSTANT", "")):
             return 0.0                        # そのターンのパワー上昇は攻撃の行で数える
-        # **「パワーを X にする」は +X ではなく「X − 今のパワー」**（T54・2026-09-16）——パーサは `BUFF +X` で出す
-        # （エンジンにも `SET_BASE_POWER` のハンドラが無い）ので、**価格の側で裁定する**: 自分の体なら印刷のパワーとの差。
-        # 相手の体（「パワー 0 にする」）は今のパワーが判らないので従来どおり（上限で打ち切られる）。
-        if _is_set_power(effect) and not opp and card is not None and card.get("power") is not None:
-            mag = mag - float(card.get("power") or 0.0)
+        # （「パワーを X にする」は上の L(c) が読む。T54 の「X − 印刷のパワー」は L で置き換わり、波C で削除。）
         if (_OPAQUE_UPPER[0] and opp and mag < 0 and opp_bodies is not None and (st or {}).get("attack_ctx")
                 and str(effect.get("status") or "") != "COST_REDUCTION"):
             # **レビュー 4 の D6**: 攻撃の行の「相手のキャラ 1 枚まで −N」（攻撃の対象以外に使う読み）は、**このターンの
@@ -901,9 +897,10 @@ def _is_set_power(effect):
 # L: 規則どおりの値付けの直し（2026-09-26・ユーザ決定「3はa」＝新しい切替を測る前に既定の数字の誤りを先に直す）
 # ---------------------------------------------------------------------------
 
-#: **規則どおりの値付けの直し**（L・2026-09-26）。レビューで見つかった既定の価格の誤り 6 つを、
-#: **1 つずつ切り替えられる名前つきの直し**として持つ。**既定は全部入り**、`legacy`（空集合）は直す前と
-#: **1 ビットも変わらない**（`test_effect_value.py` が全能力で縛る）。**新しい定数は足さない**（既存の価格の組み替えだけ）。
+#: **規則どおりの値付けの直し**（L・2026-09-26）。レビューで見つかった既定の価格の誤り 7 つの直し——**常に全部入り**。
+#: 切替（`--pricing-fixes`: `legacy`＝直す前・名前の部分集合・`-名前`）は波C（2026-10-05）で削除し、直す前の値付けは
+#: 凍結ブランチ `claude/theory-switches-final` で再現する。出力 JSON の `pricing_fixes` キーは定数（7 つの名前の
+#: カンマ区切り）のまま。**新しい定数は足さない**（既存の価格の組み替えだけ）。
 #:
 #: | 名前 | 誤り（直す前） | 直した読み |
 #: |---|---|---|
@@ -915,11 +912,6 @@ def _is_set_power(effect):
 #: | `revealed_src` | 見た・公開した札を動かす動作（パーサが「場」と読む）を場の体を失うと数えた | 出どころは見た札（`TEMP`・通貨を持たない） |
 #: | `choice_max` | 「以下から 1 つを選ぶ」「A するか、B する」（`Choice` の選択肢）を全部足した（全部起きる扱い） | 選ぶ側が自分なら選択肢の最大・相手なら最小。**一般の規則の変更**なので別の名前で持つ（`either_side` は自分を含む選択肢だけに同じ規則を当てる） |
 PRICING_FIXES = ("draw_n", "either_side", "optional_block", "base_power", "opp_subject", "revealed_src", "choice_max")
-PRICING_FIX = frozenset(PRICING_FIXES)
-
-
-def _fix(name):
-    return name in PRICING_FIX
 
 
 def _value_count(effect):
@@ -930,44 +922,12 @@ def _value_count(effect):
     return None
 
 
-def parse_pricing_fixes(spec):
-    """`all`（既定＝全部）／`legacy`（直す前）／名前のカンマ区切り（その直しだけ）／`-名前` を含めば「全部からそれを抜く」。"""
-    s = str(spec).strip()
-    if s == "all":
-        return frozenset(PRICING_FIXES)
-    if s in ("legacy", "none"):
-        return frozenset()
-    names = [x.strip() for x in s.split(",") if x.strip()]
-    drop = [x[1:] for x in names if x.startswith("-")]
-    keep = [x for x in names if not x.startswith("-")]
-    bad = [x for x in drop + keep if x not in PRICING_FIXES]
-    if bad or (drop and keep):
-        raise ValueError("pricing fixes は all／legacy／%s のカンマ区切り（または -名前 のカンマ区切り）: %s" % (PRICING_FIXES, bad))
-    if drop:
-        return frozenset(PRICING_FIXES) - frozenset(drop)
-    return frozenset(keep)
-
-
-def set_pricing_fixes(spec):
-    """直しの集合を替える（`spec` は `parse_pricing_fixes` の書式か集合）。選択の分布（`selection_dist`）の覚えを捨てる。"""
-    global PRICING_FIX
-    new = parse_pricing_fixes(spec) if isinstance(spec, str) else frozenset(spec)
-    bad = [x for x in new if x not in PRICING_FIXES]
-    if bad:
-        raise ValueError("知らない直し: %s" % bad)
-    if new != PRICING_FIX:
-        _stash_sel()
-        PRICING_FIX = new
-        _restore_sel()
-    return tuple(x for x in PRICING_FIXES if x in PRICING_FIX)
-
-
 def _sel_key():
-    return ("sel", PRICING_FIX, globals().get("F_PRICING_FIX", frozenset()))
+    return ("sel", globals().get("F_PRICING_FIX", frozenset()))
 
 
 def _stash_sel():
-    """選択の分布の覚えを、今の直しの集合の鍵で退避する（集合を替えるたびに作り直すと遅い・値は同じ）。"""
+    """選択の分布の覚えを、今の直しの集合（F）の鍵で退避する（集合を替えるたびに作り直すと遅い・値は同じ）。"""
     if "sel" in _CACHE:
         _CACHE[_sel_key()] = _CACHE.pop("sel")
 
@@ -978,32 +938,9 @@ def _restore_sel():
         _CACHE["sel"] = v
 
 
-class pricing_fixes:
-    """`with pricing_fixes("legacy"):` の間だけ直しの集合を替え、抜けるときに必ず戻す（例外でも）。"""
-
-    def __init__(self, spec):
-        self.spec = spec
-        self._before = None
-
-    def __enter__(self):
-        self._before = PRICING_FIX
-        return set_pricing_fixes(self.spec)
-
-    def __exit__(self, *_exc):
-        set_pricing_fixes(self._before)
-        return False
-
-
-def add_pricing_fixes_arg(ap):
-    ap.add_argument("--pricing-fixes", default=None,
-                    help="**L** 規則どおりの値付けの直し: `all`（既定）／`legacy`（直す前と同じ数字）／"
-                         "%s のカンマ区切り（その直しだけ）／`-名前` のカンマ区切り（全部からそれを抜く）" % ",".join(PRICING_FIXES))
-
-
-def apply_pricing_fixes(a):
-    if getattr(a, "pricing_fixes", None) is not None:
-        set_pricing_fixes(a.pricing_fixes)
-    return ",".join(x for x in PRICING_FIXES if x in PRICING_FIX) or "legacy"
+def pricing_fixes_label():
+    """出力 JSON の `pricing_fixes` キーの値（L の直しは常に全部入り＝定数・波C で切替は削除）。"""
+    return ",".join(PRICING_FIXES)
 
 
 #: **F の値付けの直し**（2026-09-26・F-4 の独立レビュー 2 回目）。**既定は全部入り**（F-5・ユーザ決定 2026-09-30・
@@ -1337,7 +1274,7 @@ def _set_power_value(effect, mu, lam, delta, nu, theta, ko_p, card, depth, opp_b
 def _unpriced_family(e):
     """値付けできなかった動作の類。**L(c) の「元々のパワーを X にする」は盤面が要る類**（`SET_BASE_POWER` と同じ）として数える。"""
     at = str(e.get("type") or "")
-    if _fix("base_power") and at in ("BUFF", "BP_BUFF") and _is_set_power(e):
+    if at in ("BUFF", "BP_BUFF") and _is_set_power(e):
         return "board"
     return family_of(at)
 
@@ -1711,21 +1648,15 @@ def _block_value(e, deps, did, didnt, args, st, orig=None):
 
 
 def qualified_choices(effect):
-    """**L（`choice_max`／`either_side`）**: 最大（相手が選ぶなら最小）を取る選択肢の節の `id` の集合。
-
-    `choice_max` なら全部の `Choice`。`either_side` だけなら**どちらの側でも取れる動作を含む** `Choice` だけ
-    （「KO するか、持ち主の手札に戻す」を 2 つの除去として足さない）。どちらも無効なら空。
+    """**L（`choice_max`）**: 最大（相手が選ぶなら最小）を取る選択肢の節の `id` の集合＝全部の `Choice`。
+    （波C まで: `either_side` だけを入れたときは**どちらの側でも取れる動作を含む** `Choice` だけだった・削除。）
     """
-    if not (_fix("choice_max") or _fix("either_side")):
-        return set()
     out = set()
 
     def rec(o):
         if isinstance(o, dict):
             if o.get("node") == "Choice" and isinstance(o.get("options"), list):
-                if _fix("choice_max") or any(
-                        _side(a.get("target") or {}) == "ALL" and not _own_specific(a) for a in walk_actions(o)):
-                    out.add(id(o))
+                out.add(id(o))
             for v in o.values():
                 rec(v)
         elif isinstance(o, list):
@@ -2562,7 +2493,7 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
     # `E[max_{取れる札} max(ΔH, ΔG)]`（デッキから数える）で値付けし、`sel(k)` と手札 1 枚の μ は足さない
     found = _search_plan(acts, card, st)
     # **L(f)**: 見た・公開した札の移動は出どころを見た札に置き換える／**L(a)**: 任意の動作と後続は塊で値付けする
-    repl = revealed_moves(acts) if _fix("revealed_src") else {}
+    repl = revealed_moves(acts)
     if _ffix("look_return"):
         for k_, v_ in look_returns(acts).items():
             repl.setdefault(k_, v_)
@@ -2575,14 +2506,13 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
     blocks = []
     in_block = set()
     vals = {}                                              # id(元の動作) → 値（選択肢を最大で読むときに使う）
-    if _fix("optional_block"):
-        skip = {id(u) for u, e in zip(use, acts) if found is not None and e is found[2]}
-        # 後続の枝は元の効果木の中で探す（置き換えた動作は同一性が変わるので元の動作で探す）
-        pos = {id(e): i for i, e in enumerate(acts)}
-        for b in optional_blocks(ab.get("effect"), acts, skip):
-            e0, deps0, did, didnt = b
-            blocks.append((use[pos[id(e0)]], [use[pos[id(d)]] for d in deps0], did, didnt, e0))
-            in_block.update(id(x) for x in [e0] + deps0)
+    skip = {id(u) for u, e in zip(use, acts) if found is not None and e is found[2]}
+    # 後続の枝は元の効果木の中で探す（置き換えた動作は同一性が変わるので元の動作で探す）
+    pos = {id(e): i for i, e in enumerate(acts)}
+    for b in optional_blocks(ab.get("effect"), acts, skip):
+        e0, deps0, did, didnt = b
+        blocks.append((use[pos[id(e0)]], [use[pos[id(d)]] for d in deps0], did, didnt, e0))
+        in_block.update(id(x) for x in [e0] + deps0)
     for e, u in zip(acts, use):
         if found is not None and e is found[2]:
             total += found[0]
@@ -2628,14 +2558,14 @@ def ability_value(ab, mu=MU, lam=LAM, delta=DELTA, nu=NU_AVG, theta=THETA, ko_p=
     cost_acts = walk_actions(cost)
     if cost_acts and not offered and _cost_unpayable(cost_acts, card, st):
         return 0.0, []                                     # T70: 払える札が場・手札に無い＝効果は起きない（登場時）
-    if (cost_acts and not offered and _fix("either_side")
+    if (cost_acts and not offered
             and any(either_side_unpayable(e, st, opp_bodies) for e in cost_acts)):
         return 0.0, []                                     # L(b): どちらの側にも払える体が無い＝払えない＝効果は起きない
     for e in cost_acts:
         v = action_value(e, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st=st)
         if v is None:
             unpriced.append((str(e.get("type") or "?"), _unpriced_family(e)))
-        elif (_fix("either_side") and _side(e.get("target") or {}) == "ALL"
+        elif (_side(e.get("target") or {}) == "ALL"
               and not _own_specific(e)):
             total += v               # **L(b)**: 「キャラ 1 枚を持ち主のデッキの下に置く」コストは相手の体でも払える＝得にもなる
         else:
@@ -2806,9 +2736,8 @@ def main(argv=None):
     ap.add_argument("--effects", default="", help="`opcg_effects.json`（既定は同梱のもの）")
     ap.add_argument("--census", action="store_true", help="エンジンの全動作の表も出す")
     ap.add_argument("--out", default="")
-    add_pricing_fixes_arg(ap)
     a = ap.parse_args(argv)
-    fixes = apply_pricing_fixes(a)
+    fixes = pricing_fixes_label()
 
     t0 = time.time()
     cards = load_cards(a.effects or None)

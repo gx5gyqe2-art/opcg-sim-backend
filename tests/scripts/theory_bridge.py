@@ -1499,7 +1499,6 @@ def main(argv=None):
                          "**2026-09-16 より前の `ΔG` と比べるときは `option` を明示する**")
     EV.add_search_price_arg(ap)
     EV.add_cost_afford_arg(ap)
-    EV.add_pricing_fixes_arg(ap)
     import hand_plan as _HP
     ap.add_argument("--harm-profile", default="cross", choices=("cross", "real", "syn"),
                     help="**T75** `--w-mode curve` の輪郭: `cross`（既定・測る記録と別のセット）／`real`／`syn`（`tests/fixtures/harm_profile.json`）")
@@ -1530,7 +1529,7 @@ def main(argv=None):
     _TOM.reset_wiring_stats()
     EV.apply_search_price(a)
     EV.apply_cost_afford(a)
-    pricing_fixes = EV.apply_pricing_fixes(a)                  # L
+    pricing_fixes = EV.pricing_fixes_label()                  # L
     _CB.set_theta_hand_mode(a.theta_hand)
     _TOM.set_clock_hand_mode(a.clock_hand)
 
