@@ -59,7 +59,6 @@ import kappa_vector as KV  # noqa: E402
 import relative_ledger as RL  # noqa: E402
 import theory_order as TO  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
-from theory_order import SLOT_OPP_FIELD as TO_SLOT_OPP_FIELD  # noqa: E402
 from theory_order import (MU, SC_MY_DON, SC_MY_HAND, SC_MY_LEADER_POWER, SC_MY_LIFE,  # noqa: E402
                           SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE, THETA, opp_bodies_of,
                           own_attackers_of, score_candidate, slot_power, theta_of)
@@ -69,71 +68,10 @@ AXES5 = ("th_me", "th_opp", "a_me", "a_opp", "j")
 #: `residual` を規則の出どころで分ける区分
 CAUSES = ("turn_boundary", "same_turn")
 
-#: **ターンの境目に値段を付けるか**（T124・残差の 1/3・密度は最悪）。
-#:
-#: **境目で起きることは全部規則である**（誰も手を打っていないのに時計が動く）:
-#:
-#: | 規則 | 動く軸 | 既にある量 |
-#: |---|---|---|
-#: | **引き 1 枚** | 引いた席の `Θ`（手札の項） | `g`＝切れる札 1 枚あたりの価格（T76／T99） |
-#: | **アンタップ** | 起きる席の `Θ`（体の項・レストのブロッカーが的に戻る） | `resting_blocker_term`（T96） |
-#: | **ドン +2 ＋ 召喚酔いの解除** | 起きる席の `A` | 規則のドンの列の段差 `sched[j+1] − sched[j]`（T114） |
-#:
-#: **新定数ゼロ**——3 つとも既に測って在る量で、新しい係数は 1 つも置かない。
-#: `off`＝境目を値付けしない（T123 の測り方）／`rules`＝上の 3 つを当てる。
-#: `rules`＝3 つ全部／**`draw_untap`＝推薦形**（`don` を外す）／`draw`・`untap`・`don`＝内訳。
-#:
-#: **`don` は外す**（T124 → **T125 で理由を訂正**）。`clock` の読みで悪化する
-#: （境目の残差 0.2286 → 0.2651・`priced_search` ではなく `priced_share` が 1 を超える＝行き過ぎ）。
-#:
-#: **「二重計上」は誤った診断だった**（T125・`2026-09-20_boundary_don_retraction.md`）——実測すると
-#: **列の段差は実際の `ΔA` の 0.35 倍しかなく、相関は `−0.27`・符号一致は 30.8%**。
-#: **足しすぎではなく、別の量を足していた**。ドン +2 が起きるのは**ターンが渡ってきた席の開始時**で
-#: **タイミングの方は正しい**（ユーザ指摘 2026-09-20）。
-#: **患部は反対側**——`sched` は**積み上がる歩きの率 `R_j`**（盤面 ＋ 在庫·[j≥2] ＋ 流入·(j−1)）で、
-#: 状態の `A`（`seat_slope`＝盤面 ＋ 流入）とは**別の対象**なので、一方の段差が他方の跳びを予測しない。
-#: **代わりの量も 2 つ測って両方落ちた**（総額 2.61 倍・相関 +0.60／召喚酔い 3.13 倍・相関 +0.32）＝
-#: **境目に速さの項は当てられていない**。`curve` では `A` が時計に入らないので `rules` と `draw_untap` は同じ値になる。
-BOUNDARY_MODES = ("off", "rules", "draw_untap", "draw", "untap", "don")
-BOUNDARY_MODE = "off"
-
-
-def set_boundary_mode(name):
-    global BOUNDARY_MODE
-    if name not in BOUNDARY_MODES:
-        raise ValueError("BOUNDARY_MODE は %s のどれか（%r）" % (BOUNDARY_MODES, name))
-    BOUNDARY_MODE = name
-    return BOUNDARY_MODE
-
-
-def boundary_dx(tok, ci_row, idx2cid, cards, mlp, g_next, sched, j_next, next_is_seat0):
-    """**ターンの境目で規則が動かす分**（席 0 の視点の `Δx`・新定数ゼロ）。
-
-    `tok`／`ci_row` は**境目の直前の行**（前のターンの最後の行）で、**次に動く席はその行の相手**。
-    だから起きる側の枠は `SLOT_OPP_FIELD`・リーダーのパワーは `mlp`（T96 と同じ渡し方）。
-
-    * **引き 1 枚** … 引いた席の `Θ` に `g`（切れる札 1 枚あたりの価格）。
-      **手札の項は `cuttable_forced` では枚数に線形でない**（守りの強制で上限が付く）ので、
-      これは**一次の近似**である——そう書いておく（上限に当たっている行では過大になる）。
-    * **アンタップ** … レストのブロッカーが的に戻る（`resting_blocker_term`）。
-    * **ドン +2 ＋ 召喚酔いの解除** … 規則のドンの列の段差。`sched` が無ければ 0。
-    """
-    use_draw = BOUNDARY_MODE in ("rules", "draw_untap", "draw")
-    use_untap = BOUNDARY_MODE in ("rules", "draw_untap", "untap")
-    use_don = BOUNDARY_MODE in ("rules", "don")
-    d_th = (float(g_next or 0.0) if use_draw else 0.0)
-    if use_untap:
-        d_th += float(CB.resting_blocker_term(tok, TO_SLOT_OPP_FIELD, mlp, ci_row=ci_row,
-                                              idx2cid=idx2cid, cards=cards))
-    d_a = 0.0
-    if sched and use_don:
-        j = max(0, int(j_next))
-        lo = sched[min(max(0, j - 1), len(sched) - 1)]
-        hi = sched[min(j, len(sched) - 1)]
-        d_a = float(hi) - float(lo)
-    if next_is_seat0:
-        return {"th_me": d_th, "a_me": d_a}
-    return {"th_opp": d_th, "a_opp": d_a}
+#: **ターンの境目に値段を付けるか**（T124／T125）——引き 1 枚・アンタップ・ドン +2 ＋ 召喚酔いの解除を規則から値付けする
+#: 切替 `BOUNDARY_MODE`（`rules`／`draw_untap`／`draw`／`untap`／`don`）は「境目に速さの項は当てられていない」
+#: （T125・`2026-09-20_boundary_don_retraction.md`）で引っ込め、2026-10-05 に削除——`claude/theory-switches-final` で
+#: 再現できる。境目は値付けしない（`off`・T123 の測り方）。出力の `boundary_mode` は定数 `"off"`。
 
 
 def _swap_state(st):
@@ -301,7 +239,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
             break
         stats["games"] += 1
         # 席ごとの速さ（その席の自席ターンの**最初の行**から・`crossing_bridge` の `turn_start` と同じ規約）
-        rate_at, g_at, sched_at = {}, {}, {}
+        rate_at, g_at = {}, {}
         shape_at = {}
         seed_g = int(r["seed"][idx[0]]) if len(idx) else -1
         # **N-3**: 値段の枠。守り手（相手）の枠は**その席の直近の自席ターンの最後の行**（こちらのターンの間の手札そのもの）・
@@ -328,15 +266,6 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
                                                            idx2cid, cards, theta, mu, deck_ids=dk)
                                            if KV.D_MODE == "theory" else None)
                 g_at[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
-                sched_at[(w, t)] = None
-                if BOUNDARY_MODE in ("rules", "don"):
-                    _sc, _tok, _ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
-                    _olp = float(np.asarray(_sc)[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-                    with CP.defending(_cv):
-                        sched_at[(w, t)] = CB.seat_slope_sched(_sc, _tok, _ci, idx2cid, cards, _olp,
-                                                              theta, mu, deck_ids=dk,
-                                                              jmax=int(CB.RACE_CAP),
-                                                              j0=CB.own_turn_index(t) + 1)   # **T152**
 
         def _latest(w, t):
             ts = [tt for (ww, tt) in rate_at if ww == w and tt <= t]
@@ -422,19 +351,6 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
             gap = w1 - w0
             run += gap
             dx_use = dict(dx0)
-            if BOUNDARY_MODE != "off" and t1 != t0:
-                # **境目は「打ち手のいない手」として同じ行に相乗りさせる**（規則の 3 つ）
-                tok0, ci0, mlp0, w_row = bi0[0], bi0[1], bi0[2], bi0[3]
-                w_next = 1 - w_row                       # 次に動く席＝この行の相手
-                ts = [tt for (ww, tt) in rate_at if ww == w_next and tt > t0]
-                key_prev = [tt for (ww, tt) in rate_at if ww == w_next and tt <= t0]
-                sched = sched_at.get((w_next, max(key_prev))) if key_prev else None
-                j_next = CB.own_turn_index(min(ts)) if ts else CB.own_turn_index(t0) + 1
-                g_next = g_at.get((w_next, min(ts))) if ts else None
-                bdx = boundary_dx(tok0, ci0, idx2cid, cards, mlp0, g_next, sched, j_next,
-                                  next_is_seat0=(w_next == 0))
-                for kk3, vv3 in bdx.items():
-                    dx_use[kk3] = dx_use.get(kk3, 0.0) + vv3
             priced = (RL.w_of(*RL.clocks_of(KV.apply_dx(st0, dx_use), prof), sigma_rel=sr) - w0) if dx_use else 0.0
             resid = gap - priced
             stats["gaps"] += 1
@@ -469,7 +385,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
     n = max(1, stats["gaps"]); ng = max(1, stats["games"])
     tot_abs = max(1e-12, acc["gap_abs"])
     out = {"games": stats["games"], "rows": stats["rows"], "gaps": stats["gaps"],
-           "d_mode": KV.D_MODE, "boundary_mode": BOUNDARY_MODE, "sigma_rel": round(sr, 4),
+           "d_mode": KV.D_MODE, "boundary_mode": "off", "sigma_rel": round(sr, 4),
            "attack_rest_mode": KV.ATTACK_REST_MODE,
            # **恒等式の検算**（配分の和が差に一致すること・telescoping が閉じること）
            "identity_max_abs_error": round(stats["identity_max_err"], 12),
@@ -523,8 +439,6 @@ def main(argv=None):
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--d-mode", dest="d_mode", choices=KV.D_MODES, default=None)
-    ap.add_argument("--boundary", choices=BOUNDARY_MODES, default=None,
-                    help="**T124**: ターンの境目を規則から値付けするか（既定 `off`）")
     ap.add_argument("--attack-rest", dest="attack_rest", choices=KV.ATTACK_REST_MODES, default=None,
                     help="攻撃した体のレスト費用をΘ_meへ足すか（既定 `return`・C-5c／`body`＝C-2／`off`＝旧）")
     ap.add_argument("--theta-hand", dest="theta_hand", choices=CB.THETA_HAND_MODES, default=None,
@@ -548,8 +462,6 @@ def main(argv=None):
     _EV.apply_f_pricing_fixes(a)
     if a.d_mode:
         KV.set_d_mode(a.d_mode)
-    if a.boundary:
-        set_boundary_mode(a.boundary)
     if a.theta_hand:
         CB.set_theta_hand_mode(a.theta_hand)           # **H-4**
     if a.mirror:
