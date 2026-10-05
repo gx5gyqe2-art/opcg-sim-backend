@@ -137,7 +137,7 @@ impl Counter<'_> {
                     let ix = prep.type_ix[ti];
                     cur.hand[ix] += 1;
                     let r = self.visit(t, cur);
-                    cur.hand[ix] -= 1;
+                    cur.hand[ix] = cur.hand[ix].wrapping_sub(1);
                     r?;
                 }
                 if prep.p_none > 0.0 {
@@ -170,10 +170,7 @@ impl Counter<'_> {
             for cs in sets.iter() {
                 cur.hand.copy_from_slice(&cs.nh);
                 cur.dl = cs.dl2;
-                let r = self.visit(t, cur);
-                if r.is_err() {
-                    return r;
-                }
+                self.visit(t, cur)?;
             }
             cur.hand.copy_from_slice(&saved_hand);
             cur.dl = saved_dl;

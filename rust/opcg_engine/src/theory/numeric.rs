@@ -51,9 +51,9 @@ mod tests {
         // Python 3.11 の round(x, 9) の値（ビットで比べる）。
         let v9: &[(f64, f64)] = &[
             (0.1234567895, 0.123456789),
-            (0.1234567885, 0.123456789),
+            (0.1234567885, 0.123456788),
             (2.5e-10, 0.0),
-            (5e-10, 0.0),
+            (5e-10, 1e-9),
             (7.5e-10, 1e-9),
             (-1e-12, -0.0),
             (0.5, 0.5),
@@ -66,7 +66,7 @@ mod tests {
             assert_eq!(got.to_bits(), want.to_bits(), "round({x}, 9) = {got} want {want}");
         }
         assert_eq!(py_round(2.675, 2).to_bits(), 2.67f64.to_bits());
-        assert_eq!(py_round(0.0005, 3).to_bits(), 0.0f64.to_bits());
+        assert_eq!(py_round(0.0005, 3).to_bits(), 0.001f64.to_bits());
         assert_eq!(py_round(0.0015, 3).to_bits(), 0.002f64.to_bits());
     }
 

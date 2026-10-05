@@ -31,6 +31,11 @@ import rd_kernel as RK  # noqa: E402
 import rule_don_ref as REF  # noqa: E402
 import test_rd_speed as TS  # noqa: E402  （問題の作り方・枠の読み込みを共有する）
 
+import theory_order as T  # noqa: E402
+
+#: 器の既定（import 時＝`conftest` の固定の前）。記録した解は器の既定で解いたもの
+_TOOL_DEFAULTS = (T.OPTION_MODE, T.W_MODE, T.SURV_MODE, T.CBAR_MODE, T.CLOCK_HAND_MODE)
+
 GOLDEN = os.path.join(_HERE, "fixtures", "rd_kernel_golden.jsonl.gz")
 
 
@@ -175,8 +180,9 @@ def test_dp_memo_is_shared_across_roots_of_one_attempt():
         base["turns"] = rng.choice((2, 3, 4))
         memo = {}
         d = E.RdDefender(None)
-        for xs in ([0.0], [1000.0, 2000.0], [0.0, 0.0, 1000.0], [2000.0]):
-            p = dict(base, xs_first=xs)
+        for xs, bk in (([0.0], base["blk"]), ([1000.0, 2000.0], [1000.0]), ([0.0, 0.0, 1000.0], []),
+                       ([2000.0], base["blk"]), ([1000.0, 2000.0], [1000.0, 0.0])):
+            p = dict(base, xs_first=xs, blk=bk)
             CB._EX_USED["memo"], CB._EX_USED["limit"] = memo, None
             try:
                 orig = RK._ORIG[id(vars(CB))]["_rule_guard_plan_ex"]
@@ -385,6 +391,18 @@ def _golden():
 
 
 def test_golden_solves_replay_bit_identically_with_the_kernel():
+    cur = (T.OPTION_MODE, T.W_MODE, T.SURV_MODE, T.CBAR_MODE, T.CLOCK_HAND_MODE)
+    setters = (T.set_option_mode, T.set_w_mode, T.set_surv_mode, T.set_cbar_mode, T.set_clock_hand_mode)
+    for f, v in zip(setters, _TOOL_DEFAULTS):
+        f(v)
+    try:
+        _golden_body()
+    finally:
+        for f, v in zip(setters, cur):
+            f(v)
+
+
+def _golden_body():
     recs = _golden()
     srcs = {r["src"].split("#")[0] for r in recs}
     n_real = sum(r["src"].startswith("real") for r in recs)
@@ -396,15 +414,16 @@ def test_golden_solves_replay_bit_identically_with_the_kernel():
         ax = dict(ax)
         for k in ("key", "cp", "rest_blk"):
             ax[k] = TS._tup(ax[k])
-        CB.EX_STATE_BUDGET = r["budget"]
-        TS._clear_new()
-        RK.reset_global()
-        RK.set_mode("rs")
-        with CP.defending(TS._view_of(ax)):
-            out = CB.rule_don_solve(cards, don, blk, life, dict(ax), turns, lt, dt, arr)
-        assert RK.enc(out) == r["expect"], r["src"]
-        cuts += int(out[2]["horizon"] < out[2]["horizon0"])
-    assert cuts >= 0
+        for budget, expect in [(r["budget"], r["expect"])] + [(e["budget"], e["expect"]) for e in r["extra"]]:
+            CB.EX_STATE_BUDGET = budget
+            TS._clear_new()
+            RK.reset_global()
+            RK.set_mode("rs")
+            with CP.defending(TS._view_of(ax)):
+                out = CB.rule_don_solve(cards, don, blk, life, dict(ax), turns, lt, dt, arr)
+            assert RK.enc(out) == expect, (r["src"], budget)
+            cuts += int(out[2]["horizon"] < out[2]["horizon0"])
+    assert cuts >= 5, "小さな予算で地平の縮めを通っている"
 
 
 # ---------------------------------------------------------------------------------------------

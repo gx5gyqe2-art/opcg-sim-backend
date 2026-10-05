@@ -259,6 +259,7 @@ impl SetCache {
         SetCache { idx: KeyTable::new(), vals: Vec::new(), kb: Vec::new() }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn get(&mut self, kid: u32, kvals: &[f64], kdons: &[f64], eps: f64, x: f64, hand: &[u16], dl: f64) -> Rc<Vec<CSet>> {
         self.kb.clear();
         self.kb.push(kid as u64);
@@ -573,13 +574,9 @@ impl Defender {
             }
         }
         ck.extend([canon_bits(don), l0 as u64, cap as u64]);
-        for x in [inp.lam, inp.lam_net, inp.mu, inp.olp, inp.mlp, inp.eps, inp.feq] {
+        // Python の文脈の鍵（`ctx_t`）と同じ中身だけ（ν・誤差・EPS は鍵に入れない＝値段が同じなら同じ文脈）
+        for x in [inp.lam, inp.lam_net, inp.mu, inp.olp, inp.mlp] {
             ck.push(canon_bits(x));
-        }
-        ck.push(inp.nu.len() as u64);
-        for &(m, v) in inp.nu {
-            ck.push(canon_bits(m));
-            ck.push(v.to_bits());
         }
         let next_kid = self.kid_ids.len() as u32;
         let kid = *self.kid_ids.entry(kk).or_insert(next_kid);
@@ -708,7 +705,7 @@ impl Defender {
             let ix = p.prep.dtype_ix[di];
             cur.hand[ix] += 1;
             let r = self.turn(p, cur);
-            cur.hand[ix] -= 1;
+            cur.hand[ix] = cur.hand[ix].wrapping_sub(1); // 失敗で戻る道では値は使わない（巻き戻しの不足で落とさない）
             acc.add(p.dprob[di], &r?, &self.harms);
         }
         if p.prep.pd_none > 0.0 {
@@ -719,7 +716,8 @@ impl Defender {
         Ok(acc.into_cand())
     }
 
-    /// 覚え書きに無い状態を解く（`within`）。
+    /// 覚え書きに無い状態を解く（`within`）。Python の `not d < -FEQ` をそのまま写す（NaN は来ない）。
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
     fn within(&mut self, p: &Prob, cur: &mut Cur) -> R<Res> {
         if cur.rem.is_empty() {
             return self.within_end(p, cur);
@@ -758,7 +756,7 @@ impl Defender {
                     let ix = p.prep.type_ix[ti];
                     cur.hand[ix] += 1;
                     let r = self.lookup(p, cur);
-                    cur.hand[ix] -= 1;
+                    cur.hand[ix] = cur.hand[ix].wrapping_sub(1); // 失敗で戻る道では値は使わない（巻き戻しの不足で落とさない）
                     acc.add(p.tprob[ti], &Cand::from_res(&r?), &self.harms);
                 }
                 if p.prep.p_none > 0.0 {
@@ -782,22 +780,17 @@ impl Defender {
                     continue;
                 }
                 let mr = cur.ready.remove(bi);
-                let cand;
-                if x >= m - p.eps {
-                    let r = self.lookup(p, cur);
-                    let r = match r {
-                        Ok(r) => r,
-                        Err(e) => return Err(e),
-                    };
-                    cand = Cand { v: [r.v[0] + 1.0, r.v[1], r.v[2], r.v[3]], src: Src::Arena(r.off, r.len), bump: Some(p.nu_of(m)) };
+                let cand = if x >= m - p.eps {
+                    let r = self.lookup(p, cur)?;
+                    Cand { v: [r.v[0] + 1.0, r.v[1], r.v[2], r.v[3]], src: Src::Arena(r.off, r.len), bump: Some(p.nu_of(m)) }
                 } else {
                     let pos = cur.rested.iter().position(|&y| y < m).unwrap_or(cur.rested.len());
                     cur.rested.insert(pos, m);
                     let r = self.lookup(p, cur);
                     cur.rested.remove(pos);
                     let r = r?;
-                    cand = Cand { v: [r.v[0] + 1.0, r.v[1], r.v[2], r.v[3]], src: Src::Arena(r.off, r.len), bump: None };
-                }
+                    Cand { v: [r.v[0] + 1.0, r.v[1], r.v[2], r.v[3]], src: Src::Arena(r.off, r.len), bump: None }
+                };
                 cur.ready.insert(bi, mr);
                 let d = cand.v[0] - best_def.v[0];
                 if d > p.feq || (!(d < -p.feq) && better(&self.harms, &cand, &best_def, p.feq)) {

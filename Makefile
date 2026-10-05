@@ -22,7 +22,7 @@
 # **tag `py-engine-final` を checkout して回す**（手順は docs/TEST_SPEC.md）。
 # lint は任意（CI 無し・必須ゲートではない）。
 
-.PHONY: test test-fast test-slow audit-cross lint golden-audit golden-replay
+.PHONY: test test-fast test-slow audit-cross lint golden-audit golden-replay rd-golden
 
 # push 前の必須ゲート。cargo test（Rust 単体テスト）＋ Rust 裏付けの pytest 集合。
 test: rust-test
@@ -47,6 +47,12 @@ golden-replay:
 	  --policy random --games 150 --seed-base 5000000
 	OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_golden_make.py replay \
 	  --policy a1 --games 50 --seed-base 5000150
+
+# 理論の器の Rust の核（`rd_kernel`）の golden（実・合成の記録の解のビット）の作り直し
+# （**解き方のモデルを意図して変えたときだけ**・差分は必ずレビューする）。入力は golden 自身が持つ。
+# 独立した検算には `--ref`（速くする前の原文で解き直す・遅い）。
+rd-golden:
+	OPCG_LOG_SILENT=1 python tests/scripts/rd_kernel_golden.py remake
 
 # 交差対面の実プレイ監査（エンジン/パーサを変更したときに push 前へ追加する）。
 # ミラー（同一リーダー同士）では一度も通らない経路を実プレイに乗せる＝ここでしか出ない欠陥がある
