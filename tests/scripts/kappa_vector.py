@@ -559,9 +559,15 @@ def axis_of_move(fam, v, sig, cid, cards, sc, tok, olp, r_turns, don_k=0):
 
 
 def _perm_axes(d, shift=1):
-    """**プラセボ A**: 大きさはそのまま・**軸だけ決定的に回す**（意味を壊す対照）。"""
+    """**プラセボ A**: 大きさはそのまま・**軸だけ決定的に回す**（意味を壊す対照）。
+
+    回すのは**勾配の 4 軸**（`AXES`）だけ。**戻る分（`th_*_back`・C-5c）は勾配を持たない成分**
+    （`grad_of` は `AXES` しか返さず `dot` では 0）なので**そのまま通す**——`transition_ledger._swap_dx`
+    の `m.get(k, k)` と同じ扱い。既定 `ATTACK_REST_MODE=return` で攻撃が `th_me_back` を出すと、
+    以前はここで `ValueError` で落ちていた。"""
     keys = list(AXES)
-    return {keys[(keys.index(k) + shift) % len(keys)]: val for k, val in d.items()}
+    n = len(keys)
+    return {(keys[(keys.index(k) + shift) % n] if k in keys else k): val for k, val in d.items()}
 
 
 def dot(grad, dx):

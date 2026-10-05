@@ -391,6 +391,35 @@ def test_placebo_a_returns_to_the_original_after_four_rotations():
     assert cur == d
 
 
+def test_placebo_a_passes_the_return_component_through_unrotated():
+    """**C-5c の戻る分（`th_me_back`）は勾配を持たない成分**なので回さずにそのまま通す
+    （以前は `ValueError: 'th_me_back' is not in list` で既定の実行が最後に落ちていた）。
+    `dot` は戻る分を 0 と読むので、通しても回しても `plac_axis` の値は変わらない。"""
+    dx = {"th_opp": -0.37, "th_me": -0.2, "th_me_back": 0.2}
+    p = KV._perm_axes(dx)
+    assert p == {"a_me": -0.37, "th_opp": -0.2, "th_me_back": 0.2}
+    g = KV.grad_clock(6.0, 5.0, 1.2, 0.9)
+    no_back = {k: v for k, v in p.items() if k in KV.AXES}
+    assert KV.dot(g, p) == pytest.approx(KV.dot(g, no_back))
+
+
+_REC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "f_identity", "rec")
+
+
+def test_default_run_completes_with_the_return_component(tmp_path, capsys):
+    """**退行**: 既定（`ATTACK_REST_MODE=return`）の CLI が最後まで走る（4ec745f 以前は `_perm_axes` で落ちていた）。
+    小さい記録（2 局）でもブロッカーの攻撃が `th_me_back` を出すことまで確かめる＝落ちた経路を本当に通っている。"""
+    assert KV.ATTACK_REST_MODE == "return"
+    out_path = tmp_path / "kv.json"
+    assert KV.main(["--in", _REC, "--json", str(out_path)]) == 0
+    import json
+    out = json.loads(out_path.read_text(encoding="utf-8"))
+    assert out["attack_rest_mode"] == "return"
+    assert out["by_axis"].get("th_me_back", 0) > 0
+    assert out["by_axis"]["th_me_back"] == out["by_axis"]["th_me"]
+    assert "plac_axis" in out["arms"]
+
+
 def test_dot_ignores_axes_the_move_does_not_touch():
     g = KV.grad_clock(6.0, 5.0, 1.2, 0.9)
     assert KV.dot(g, {"th_opp": -1.0}) == pytest.approx(-g["th_opp"])
