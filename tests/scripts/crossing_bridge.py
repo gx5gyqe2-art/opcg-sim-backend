@@ -1480,7 +1480,7 @@ def _rd_solve_args(cards_d, don_d, blk, life, actx, turns, life_types, draw_type
 
 def _rd_run(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arrive, masks, h0):
     """Rust の核で試行のループから先を解く。`((cut, stopped, plan), 使った地平 or None, 開示)`。
-    `plan` は速くした Python の `_rule_don_solve` と同じ辞書（同じキーの順）で、`horizon`／`horizon0` はまだ付けない。"""
+    `plan` は速くした Python の解き方（第 3 段で削除）と同じ辞書（同じキーの順）で、`horizon`／`horizon0` はまだ付けない。"""
     prices = _prices_of(actx)
     rest = tuple(actx.get("rest_blk") or ())
     att1 = actx["att1"]
@@ -1517,7 +1517,7 @@ def _rd_run(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arri
 
 def _rule_don_masks(cards_d, blk, life, actx, life_types):
     """**RD-speed**: 攻め手の今のターンの計画の候補（出す札の組ごと）——地平に依らない部分を 1 回だけ作る
-    （`_rule_don_solve` の列挙と同じ順・同じ値。旧は地平の試行ごとに作り直していた）。"""
+    （計画の列挙と同じ順・同じ値。列挙は Rust の核〔`plans.rs`〕が回す・第 2b 段まで出す札の組は Python が作る）。"""
     L0 = int(max(0, round(float(life))))
     att1, cand = actx["att1"], actx["cand"]
     budget, kmax = actx["budget"], actx["kmax"]
@@ -2341,7 +2341,7 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     返すのは長さ `jmax` のリスト（`rate_at(..., sched=)` に渡す）。
 
     **H-4f**: `rule_don` 系の計画（`sched` を持つ）を渡されたら、その計画を選んだときの歩きの列そのもの
-    （守る側の計算の段ごとの損害 ＋ 段ごとの財布・`rules_sched`）を返す＝計画の選び方と橋の歩きが同じ列を読む。"""
+    （守る側の計算の段ごとの損害 ＋ 段ごとの財布・Rust の核の `sched.rs`）を返す＝計画の選び方と橋の歩きが同じ列を読む。"""
     if plan is not None and "sched" in plan:
         sch = [float(v) for v in plan["sched"]][:int(jmax)]
         return sch + [sch[-1] if sch else 0.0] * max(0, int(jmax) - len(sch))
