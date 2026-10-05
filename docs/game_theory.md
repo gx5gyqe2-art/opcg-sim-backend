@@ -31,6 +31,8 @@
 > `RATE_DON_MODE`・`RATE_DON_PAY`・`RATE_RAMP`・`THETA_HAND_MODE=rule_don_purse` の**既定以外の値は削除済**（現行コードは既定の形だけ。
 > 「以前の数字と比べるときは `--X`」の指示は無効）。旧い形は凍結ブランチ `claude/theory-switches-final`（79c7fb14）で再現する。
 > 履歴の文章は書き換えない。
+> **switch cleanup B（同日）で次の値も削除済**: `SLOPE_MODE=board`・`THETA_HAND_BLOCKER_MODE=off`・`THETA_DON_MODE=off/blocker`・`THETA_HAND_PLACE=shield`・`THETA_HAND_WINDOW=off/fixpoint`・`RATE_THROUGH_MODE=cut/cut_block`・`SLOPE_HAND_MODE=stock`・`SCHED_T1_MODE=walk`・`RACE_MODE=net/deck/deck_shield`・`RATE_WALK_MODE=flat`・`OPP_CLOCK_MODE=prev_start`・`CUT_PRICE_MODE=joint_slice/joint_theta/joint_floor`（`flat` は残る）・`SEARCH_PRICE_MODE=sel`・`PLAY_NOW_MODE=full`・`INFLOW_MODE=off`・`COND_CLOCK_MODE=off`・`LETHAL_HAND_MODE=share`・`LETHAL_STOP_MODE=econ`・`LETHAL_LIFE_MODE=off`・`HAND_MEAS_MODE=count`・`FREEZE_YARDSTICK=True`・`ATTACK_SPLIT=True`・`LEDGER_HARM_MODE=price`・`GUARD_G_MODE=paid/zero`・`GUARD_COST_MODE=formula/spent_all`・`GUARD_PRICE_MODE=all_attacks`・`ATTACH_LEDGER_MODE=increment`・`PLAY_BOOK_MODE=now`・`LAST_TURN_MODE=drop`・`GUARD_AFFORD_MODE=lenient`・`GUARD_S_COST_MODE=hand`（`curve` は残る）・`DECISION_ROW_MODE=any`・`SIGMA_FROM_CURVE=False`・`--silent exclude`・`TAKE_MODE=const/by_life`・`W_MOVER_MODE=off`・`ACTIVATE_USES_STATE=False`・`PLAY_COST_MODE=flat`・`ATTACK_DON_MODE=bare`・`BOUNDARY_MODE=rules/draw_untap/draw/untap/don`・`ATTACK_REST_MODE=body`。
+> 同じく旧い形は `claude/theory-switches-final` で再現する（`W_ERR_MODE=abs` と `NU_MODE=base` は使われているので残した）。
 
 ユーザ指示「理論式全体を体系整理できる？」→「既存のドキュメントに反映」で置いた。**層で並べる**——上の層ほど定義に近く、
 下の層ほど実測の写し。各行の右に導出の場所を書く。**式の実装の正本は `tests/scripts/theory_order.py`／`effect_value.py`**
