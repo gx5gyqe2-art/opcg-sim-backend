@@ -166,31 +166,8 @@ DON_COST = 0.66 * MU
 FLOW_ACTS = frozenset({"ACTIVE_DON", "ATTACH_DON", "GRANT_KEYWORD", "BUFF", "BP_BUFF", "REST"})
 
 
-#: **F-4**: 攻撃の行を「攻め手が【アタック時】能力を持つか」で層別した表を出すか（既定 `False`＝出力は従来のまま）
-ATTACK_SPLIT = False
-
-
-def passive_class(cid, info, ctx, theta, mu):
-    """**F-4**: 登場の行の継続効果の値が物差しに見えるか（`none`＝足す値が無い／`visible`＝殴る側のパワーの上昇だけ
-    ＝次の判断点の体の帯に現れる／`invisible`＝生存・ブロッカー・守る側・キーワード等を含む）。切替に依らず同じ行を分ける。"""
-    if not info or info.get("event") or info.get("stage") or info.get("leader"):
-        return "none"
-    try:
-        parts = _TO.passive_parts(cid, info, ctx, theta, mu)
-    except Exception:
-        return "none"
-    if abs(parts["total"]) <= 1e-12 and not parts["bad"]:
-        return "none"
-    if abs(parts["total"] - parts["visible"]) <= 1e-12:
-        return "visible"
-    return "invisible"
-
-
-def has_on_attack(cid):
-    """攻め手のカードが【アタック時】能力を持つか（F-4 の層別）。"""
-    c = EV._all_cards().get(cid) if cid else None
-    return bool(c) and any((ab.get("trigger") or ab.get("timing")) in EV.ON_ATTACK_TRIGGERS
-                           for ab in (c.get("abilities") or []))
+#: **F-4** の層別の表（`--attack-split`＝登場の行を継続効果の見え方で・攻撃の行を【アタック時】能力の有無で）は
+#: 2026-10-05 に削除——`claude/theory-switches-final` で再現できる（`passive_class`／`has_on_attack` も同時に削除）。
 
 
 def primary_action(cid, triggers=EV.ACTIVATE_TRIGGERS):
@@ -350,10 +327,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             rec["price"][fam] += float(v); rec["real"][fam] += float(real); rec["n"][fam] += 1
             rec["rows"].append({"fam": fam, "price": float(v), "real": float(real), "real_te": float(real_te),
                                 "gross": float(gross), "act": act, "cid": cid, "turn": t, "play_parts": play_parts,
-                                "hand_gains": list(gains),                                  # T69: 窓で手札に入った札の gain
-                                "on_attack": has_on_attack(cid) if fam == "attack" else None,   # F-4: 層別用（出力には出ない）
-                                "pas_class": (passive_class(cid, info, ctx, th, mu)
-                                              if (ATTACK_SPLIT and fam == "play") else None)})
+                                "hand_gains": list(gains)})                                 # T69: 窓で手札に入った札の gain
             # **ターン単位の恒等式**——価格の和 対 「最初の自分の行 → 最後の自分の行」の実現
             tk = rec["turns"].setdefault(t, {"price": 0.0, "first": None, "last": None, "acts": set()})
             tk["price"] += float(v)
@@ -418,15 +392,6 @@ def summarise(per, reps=200, seed=0):
         if len(rs) < 10:
             continue
         out["by_family"][f] = block(rs)
-    if ATTACK_SPLIT:
-        # **F-4**: 登場の行を継続効果の値の見え方で層別する（`passive_class`）
-        out["play_by_passive_class"] = {k: block(rs) for k, rs in (
-            (k, [r for r in allrows if r["fam"] == "play" and r.get("pas_class") == k])
-            for k in ("none", "visible", "invisible")) if len(rs) >= 10}
-        # **F-4**: 攻撃の行を攻め手の【アタック時】能力の有無で層別する
-        out["attack_by_on_attack"] = {k: block(rs) for k, rs in (
-            ("with", [r for r in allrows if r["fam"] == "attack" and r.get("on_attack")]),
-            ("without", [r for r in allrows if r["fam"] == "attack" and not r.get("on_attack")])) if len(rs) >= 10}
     # 効果の型の内訳（最初の動作の型ごと）
     eff = [r for r in allrows if r["fam"] == "effect"]
     acts = {}
@@ -527,8 +492,6 @@ def main(argv=None):
     _TO.add_defender_power_arg(ap)                 # 2b
     _TO.add_passive_body_arg(ap)
     EV.add_f_pricing_fixes_arg(ap)
-    ap.add_argument("--attack-split", action="store_true",
-                    help="**F-4** 攻撃の行を攻め手の【アタック時】能力の有無で層別した表も出す")
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_decision_row(a)
@@ -537,8 +500,6 @@ def main(argv=None):
     _TO.apply_passive_body(a)
     EV.apply_f_pricing_fixes(a)
     _TO.reset_wiring_stats()
-    global ATTACK_SPLIT
-    ATTACK_SPLIT = bool(a.attack_split)
     apply_nu_mode(a)
     _TO.apply_surv_mode(a)
     _TO.apply_cbar_mode(a)
