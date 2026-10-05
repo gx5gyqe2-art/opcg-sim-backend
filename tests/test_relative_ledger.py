@@ -419,7 +419,6 @@ def test_state_of_row_takes_the_mirror_as_a_dict_or_a_thunk(monkeypatch):
     """H-4g（実測で見つかった落ち）: 帳簿は鏡を**辞書**で渡す——呼び出し可能だけを受けると `rule_don` で落ちる。"""
     CB = KV.CB
     monkeypatch.setattr(CB, "THETA_HAND_MODE", "rule_don")
-    monkeypatch.setattr(CB, "THETA_RETURN_MODE", "off")
     seen = {}
 
     def _thr(sc, tok, g_hand=None, attacker=None, plan=None):

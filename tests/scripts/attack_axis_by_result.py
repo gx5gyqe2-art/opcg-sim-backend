@@ -53,11 +53,9 @@ def by_result(dump):
     return out
 
 
-def collect(dirs, limit_games=0, d_mode=None, attack_rest=None):
+def collect(dirs, limit_games=0, d_mode=None):
     if d_mode:
         KV.set_d_mode(d_mode)
-    if attack_rest:
-        KV.set_attack_rest_mode(attack_rest)
     dump = []
     out = TL.collect(dirs, limit_games, dump=dump)
     return {"games": out["games"], "d_mode": KV.D_MODE, "attack_rest_mode": KV.ATTACK_REST_MODE,
@@ -70,19 +68,13 @@ def build_parser():
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--d-mode", default=None, choices=KV.D_MODES)
-    ap.add_argument("--attack-rest", dest="attack_rest", default=None, choices=KV.ATTACK_REST_MODES,
-                    help="**C-2**: 攻撃した体のレスト費用をΘ_meへ足すか（既定 `return`・C-5c／`off`＝旧・C-2 の `body` は 2026-10-05 に削除）")
-    ap.add_argument("--theta-return", dest="theta_return", default=None, choices=KV.CB.THETA_RETURN_MODES,
-                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 `untap`）")
     ap.add_argument("--json", default="")
     return ap
 
 
 def main(argv=None):
     a = build_parser().parse_args(argv)
-    if a.theta_return:
-        KV.CB.set_theta_return_mode(a.theta_return)
-    out = collect(a.src, a.games, a.d_mode, a.attack_rest)
+    out = collect(a.src, a.games, a.d_mode)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:

@@ -42,14 +42,6 @@ def _restore_d_mode():
     KV.set_d_mode(old)
 
 
-@pytest.fixture(autouse=True)
-def _restore_attack_rest_mode():
-    """`ATTACK_REST_MODE` もモジュール変数（C-2）——既定 `off` へ戻す。"""
-    old = KV.ATTACK_REST_MODE
-    yield
-    KV.set_attack_rest_mode(old)
-
-
 #: 損害の輪郭のダミー（**一定 0.2／ターン**）。一定なら `τ = Θ/0.2` と手で解けるので検算に使える。
 _FLAT_PROF = [0.2] * 14
 #: 段のある輪郭（序盤が遅い＝実測の形）。`τ` の位置で勾配が変わることを見るため。
@@ -297,20 +289,10 @@ def test_the_rate_moving_families_are_exactly_the_ones_curve_cannot_price():
 
 # --------------------------------------------------------------------------- 4b. C-2: 攻撃した体のレスト費用
 def test_attack_rest_mode_defaults_to_return():
-    """**C-5c で既定に採用**（2026-09-25・ユーザ決定）——攻めたブロッカーは消さずに戻る側へ移す。"""
+    """**C-5c で既定に採用**（2026-09-25・ユーザ決定）——攻めたブロッカーは消さずに戻る側へ移す。
+    波C で旧 `off` を削除＝定数（切替は無い）。"""
+    assert not hasattr(KV, "set_attack_rest_mode")
     assert KV.ATTACK_REST_MODE == "return"
-
-
-def test_attack_rest_off_never_touches_theta_me():
-    """**`off`（旧）**——ブロッカーで攻めても `th_me` は動かない。"""
-    KV.set_attack_rest_mode("off")
-    class _C:
-        def info(self, cid):
-            return {"power": 5000.0, "blocker": True}
-
-    sc, tok = _ctx()
-    dx = KV.axis_of_move("attack", 0.37, ["ATTACK", None, "L"], "X", _C(), sc, tok, 5000.0, 4.0)
-    assert dx == {"th_opp": -0.37}
 
 
 def test_attack_rest_return_moves_a_blocker_going_rest():
@@ -321,7 +303,6 @@ def test_attack_rest_return_moves_a_blocker_going_rest():
         def info(self, cid):
             return {"power": 5000.0, "blocker": True}
 
-    KV.set_attack_rest_mode("return")
     sc, tok = _ctx()
     dx = KV.axis_of_move("attack", 0.37, ["ATTACK", None, "L"], "X", _C(), sc, tok, 5000.0, 4.0)
     assert dx["th_opp"] == pytest.approx(-0.37)
@@ -336,7 +317,6 @@ def test_attack_rest_return_ignores_non_blocker_attackers():
         def info(self, cid):
             return {"power": 5000.0, "blocker": False}
 
-    KV.set_attack_rest_mode("return")
     sc, tok = _ctx()
     dx = KV.axis_of_move("attack", 0.37, ["ATTACK", None, "L"], "X", _C(), sc, tok, 5000.0, 4.0)
     assert dx == {"th_opp": -0.37}
@@ -348,7 +328,6 @@ def test_attack_rest_return_ignores_event_cards():
         def info(self, cid):
             return {"power": 5000.0, "blocker": True, "event": True}
 
-    KV.set_attack_rest_mode("return")
     sc, tok = _ctx()
     dx = KV.axis_of_move("attack", 0.37, ["ATTACK", None, "L"], "X", _C(), sc, tok, 5000.0, 4.0)
     assert dx == {"th_opp": -0.37}
@@ -356,15 +335,9 @@ def test_attack_rest_return_ignores_event_cards():
 
 def test_attack_rest_return_is_safe_without_a_card_id_or_card_db():
     """**`cid`／`cards` が無い行でも落ちない**（黙って `th_opp` だけになる）。"""
-    KV.set_attack_rest_mode("return")
     sc, tok = _ctx()
     dx = KV.axis_of_move("attack", 0.37, ["ATTACK", None, "L"], None, None, sc, tok, 5000.0, 4.0)
     assert dx == {"th_opp": -0.37}
-
-
-def test_set_attack_rest_mode_rejects_unknown_modes():
-    with pytest.raises(ValueError):
-        KV.set_attack_rest_mode("all")
 
 
 # --------------------------------------------------------------------------- 5. プラセボと台帳

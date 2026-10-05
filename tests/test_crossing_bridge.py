@@ -850,24 +850,19 @@ def test_a_rested_blocker_is_not_endurance_now_but_comes_back():
     ci = np.zeros(22, np.int32); ci[7] = 1
     idx2cid, cards = {1: "B"}, _Cards()
     sc = _sc(3, 4)
-    assert CB.THETA_RETURN_MODE == "untap"                       # **C-5c で既定に採用**（2026-09-25・ユーザ決定）
+    assert CB.THETA_RETURN_MODE == "untap"                       # **C-5c で既定に採用**（2026-09-25・ユーザ決定・波C で定数）
     # **トークンだけでは分からない**（札を渡さなければ 0）
     assert CB.resting_blocker_term(tok, T.SLOT_OPP_FIELD, 5000.0) == 0.0
     back = CB.resting_blocker_term(tok, T.SLOT_OPP_FIELD, 5000.0, ci_row=ci, idx2cid=idx2cid, cards=cards)
     assert back > 0.0
     # **既定（`blockers`）では耐久に入らない**——今は横取りできないから（規則どおり）
     assert CB.threshold(sc, tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
-    try:
-        CB.set_theta_return_mode("untap")
-        # 段差は `j ≥ 2` からしか効かない＝1 ターン目で届くなら τ は変わらない
-        assert _tg(0.2, 0.25, 0.0, 0.0, 0.0, step=back) == pytest.approx(
-            _tg(0.2, 0.25, 0.0, 0.0, 0.0))
-        # 2 ターン目までかかるなら、その分だけ遠のく
-        assert _tg(0.4, 0.25, 0.0, 0.0, 0.0, step=back) > _tg(0.4, 0.25, 0.0, 0.0, 0.0)
-        with pytest.raises(ValueError):
-            CB.set_theta_return_mode("なにか")
-    finally:
-        CB.set_theta_return_mode("untap")
+    # 段差は `j ≥ 2` からしか効かない＝1 ターン目で届くなら τ は変わらない
+    assert _tg(0.2, 0.25, 0.0, 0.0, 0.0, step=back) == pytest.approx(
+        _tg(0.2, 0.25, 0.0, 0.0, 0.0))
+    # 2 ターン目までかかるなら、その分だけ遠のく
+    assert _tg(0.4, 0.25, 0.0, 0.0, 0.0, step=back) > _tg(0.4, 0.25, 0.0, 0.0, 0.0)
+    assert not hasattr(CB, "set_theta_return_mode")              # 波C: 旧 `off` は削除＝定数
 
 
 def test_the_theory_slope_is_the_priced_attack_flow_of_the_board():

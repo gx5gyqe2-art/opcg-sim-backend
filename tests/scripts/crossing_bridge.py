@@ -345,11 +345,8 @@ def _body_absorbs(tok, s):
         return False
     rest = float(tok[s, S_IS_REST]) > 0.5
     blocker = float(tok[s, S_IS_BLOCKER]) > 0.5
-    if THETA_RETURN_MODE == "untap" and rest and blocker:
-        # **T96**: レストのブロッカーは今は吸えない（補充の段差へ回す）。
-        # **ただしトークンだけでは届かない**——6 列目は `is_blocker_active` なので `rest and blocker` は
-        # 記録上ほぼ成立しない。実際の除外は `THETA_BODY_MODE=blockers`（アクティブなブロッカーだけ）で起きる。
-        return False
+    # **T96**: レストのブロッカーは今は吸えない（補充の段差へ回す・`THETA_RETURN_MODE=untap`）。
+    # トークンの 6 列目は `is_blocker_active` なので `rest and blocker` は記録上ほぼ成立しない。
     return bool(blocker and not rest)
 
 
@@ -369,7 +366,7 @@ def threshold(sc, tok, lam=LAM, mu=MU, g_hand=None, attacker=None, plan=None):
 
 
 #: **レストのブロッカーの扱い**（T96・2026-09-18・ユーザ指摘「レストのブロッカーの意味も考えてみてください」）。
-#: `off`＝旧（`THETA_BODY_MODE` に任せる）／`untap`＝**今の `Θ` からは外し、補充の側へ「段差」として渡す**。
+#: `untap`＝**今の `Θ` からは外し、補充の側へ「段差」として渡す**（定数・下の注）。
 #:
 #: **規則**（`rust/opcg_engine/src/rules/battle.rs`）:
 #:   * `has_blocker` は **`!is_rest`** を要求する＝**レストのブロッカーは横取りできない**（レストがブロックの費用）。
@@ -379,18 +376,11 @@ def threshold(sc, tok, lam=LAM, mu=MU, g_hand=None, attacker=None, plan=None):
 #:
 #: **速さの側と鏡像**（T94）: 攻めは**召喚酔い**で在庫が `j ≥ 2` から効き、守りは**アンタップ**で
 #: レストのブロッカーが `j ≥ 2` から効く。**どちらも 1 ターン遅れて効き始める同じ形**。
-THETA_RETURN_MODES = ("off", "untap")
-#: **既定は `untap`**（2026-09-25・C-5c・ユーザ決定「aでお願いします」・`2026-09-25_c5c_theta_return.md`）——
-#: 帳簿の状態（7 つ組）・両方の歩き（輪郭・積み上がり）に通した形で採用。以前の数字と比べるときは `--theta-return off`。
+#: **`untap`**（2026-09-25・C-5c・ユーザ決定「aでお願いします」・`2026-09-25_c5c_theta_return.md`）——
+#: 帳簿の状態（7 つ組）・両方の歩き（輪郭・積み上がり）に通した形で採用。**定数**——旧 `off`（`THETA_BODY_MODE` に
+#: 任せる・帳簿の状態は 5 つ組）は波C（2026-10-05）で削除し、凍結ブランチ `claude/theory-switches-final` で再現する。
+#: 出力 JSON の `theta_return` キーは定数 `"untap"` のまま。
 THETA_RETURN_MODE = "untap"
-
-
-def set_theta_return_mode(mode):
-    global THETA_RETURN_MODE
-    if mode not in THETA_RETURN_MODES:
-        raise ValueError("theta return mode は %s のどれか" % (THETA_RETURN_MODES,))
-    THETA_RETURN_MODE = mode
-    return THETA_RETURN_MODE
 
 
 def resting_blocker_term(tok, slots, opp_leader_power, ci_row=None, idx2cid=None, cards=None):
@@ -3137,11 +3127,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             _hb = hb_for(1 - w, t)
             stats["hb_n"] += 1; stats["hb_sum"] += _hb; stats["hb_hit"] += int(_hb > 0.0)
             th_w = th_life + th_hand + th_body
-            # **T96**: 次の自席ターンに戻ってくるレストのブロッカー（`untap` のときだけ段差として使う）
-            th_back = (resting_blocker_term(tok, SLOT_OPP_FIELD,
-                                            float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
-                                            ci_row=_ci, idx2cid=idx2cid, cards=cards)
-                       if THETA_RETURN_MODE == "untap" else 0.0)
+            # **T96**: 次の自席ターンに戻ってくるレストのブロッカー（`untap`＝段差として使う）
+            th_back = resting_blocker_term(tok, SLOT_OPP_FIELD,
+                                           float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
+                                           ci_row=_ci, idx2cid=idx2cid, cards=cards)
             model_theta = don_plan is not None and "theta_parts" in don_plan
             if model_theta:
                 th_back = 0.0     # **H-4f（F1）**: レスト中のブロッカーは守る側の計算の中で戻る（的にもう入っている）
@@ -3777,9 +3766,6 @@ def main(argv=None):
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA)
     ap.add_argument("--theta-mode", default="const", choices=("const", "board", "max"))
-    ap.add_argument("--theta-return", default=THETA_RETURN_MODE, choices=THETA_RETURN_MODES,
-                    help="**T96** レストのブロッカー: `off`（旧）／"
-                         "`untap`（今の `Θ` から外し、`j ≥ 2` の段差として補充の側へ＝規則どおり）")
     ap.add_argument("--rate-decay", default=RATE_DECAY_MODE, choices=RATE_DECAY_MODES,
                     help="**T95** 盤面が減ることを歩きに入れるか: `off`（旧・死なない前提）／"
                          "`ko`（毎自席ターン `ko_p`＝0.289 で失われる・T60 の生存の重みと同じ量）")
@@ -3816,7 +3802,6 @@ def main(argv=None):
     set_theta_side_mode(a.theta_side)              # **T133**
     set_slope_take_mode(a.slope_take)              # **T134**
     set_rate_decay_mode(a.rate_decay)
-    set_theta_return_mode(a.theta_return)
     rows_out, ledger, stats, turn_harm, theta_check = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
     if stats.get("g_n"):
         stats["g_mean"] = round(stats["g_sum"] / stats["g_n"], 4)

@@ -568,14 +568,10 @@ def build_parser():
                     help="**T134**: `A` の「受ける費用」を自分のライフで決めるか（既定 `life`・2026-10-05／旧は `const`）")
     ap.add_argument("--slope-block", dest="slope_block", choices=CB.SLOPE_BLOCK_MODES, default=None,
                     help="**T92**: `A` に相手のブロッカーを入れるか（既定 `on`・2026-10-05／旧は `off`）")
-    ap.add_argument("--attack-rest", dest="attack_rest", choices=KV.ATTACK_REST_MODES, default=None,
-                    help="**C-2**: 攻撃した体のレスト費用をΘ_meへ足すか（既定 `return`・C-5c／`off`＝旧・C-2 の `body` は 2026-10-05 に削除）")
     ap.add_argument("--theta-hand", dest="theta_hand", choices=CB.THETA_HAND_MODES, default=None,
                     help="**H-4** 耐久の手札項（既定 `rule_don`・2026-10-04／旧の既定は `cuttable_forced`）")
     ap.add_argument("--mirror", choices=("on", "off"), default=None,
                     help="**H-4g** 自分の耐久も相手と同じ守る側の計算で読む（既定 on・`rule_don` 系のときだけ効く）")
-    ap.add_argument("--theta-return", dest="theta_return", choices=CB.THETA_RETURN_MODES, default=None,
-                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 `untap`）")
     ap.add_argument("--scale-a", type=float, default=1.0, help="**P7**: 両席の A に共通の掛け算誤差")
     ap.add_argument("--scale-currency", type=float, default=1.0, help="**P5**: 耐久と価格を同時に c 倍")
     ap.add_argument("--scale-clamp", dest="clamp", default="",
@@ -602,14 +598,10 @@ def main(argv=None):
         CB.set_slope_block_mode(a.slope_block)
     if a.slope_take:
         CB.set_slope_take_mode(a.slope_take)          # **T134**
-    if a.attack_rest:
-        KV.set_attack_rest_mode(a.attack_rest)        # **C-2**
     if a.theta_hand:
         CB.set_theta_hand_mode(a.theta_hand)           # **H-4**
     if a.mirror:
         _TBm.MIRROR_ME = (a.mirror == "on")        # **H-4g**
-    if a.theta_return:
-        CB.set_theta_return_mode(a.theta_return)      # **C-5c**
     if a.clamp:
         KV.set_scale_clamp([float(x) for x in a.clamp.split(",")])
     CP.apply_cut_price(a)                          # **N-3**

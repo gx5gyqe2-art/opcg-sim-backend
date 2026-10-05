@@ -122,22 +122,21 @@ TAU_CAP = CB.RACE_CAP
 AXES = ("th_me", "th_opp", "a_me", "a_opp")
 
 #: **攻撃した体のレスト費用**（C-2・2026-09-25・`2026-09-25_c1_attack_axis_by_result.md` の候補(a)）。
-#: `off`＝旧（攻撃は`Θ_opp`しか動かさない）／C-2 の `body`（**攻めた体がブロッカーなら、攻撃でレストになり
-#: 次の自席ターンまで`Θ_me`の体の項から抜ける分を永久の損失として足す**近似）は 2026-10-05 に削除——
+#: 旧 `off`（攻撃は`Θ_opp`しか動かさない・波C で削除）／C-2 の `body`（**攻めた体がブロッカーなら、攻撃でレストになり
+#: 次の自席ターンまで`Θ_me`の体の項から抜ける分を永久の損失として足す**近似・波B で削除）——
 #: `claude/theory-switches-final` で再現できる。
 #: 規則: `has_blocker`は`!is_rest`を要求（`rust/opcg_engine/src/rules/battle.rs`）。値は`_body_term`と
 #: 同じ単位（`crossing_bridge.nu_meas_of`）。**新定数ゼロ**（既存の式の再利用）。
 #: **`return`（C-5c・正しい形）**: 攻めたブロッカーの `ν_meas` を**消さずに「戻る側」へ移す**
 #: （`th_me` −ν・`th_me_back` +ν・総量は不変）——状態が `THETA_RETURN_MODE=untap` の 7 つ組
 #: （戻る分を持つ）であることが前提（5 つ組に `*_back` を足すと `apply_dx` が落ちる＝黙って捨てない）。
-ATTACK_REST_MODES = ("off", "return")
-#: **既定は `return`**（2026-09-25・C-5c・ユーザ決定）。
+#: **`return`**（2026-09-25・C-5c・ユーザ決定）。**定数**——出力 JSON の `attack_rest_mode` キーは `"return"` のまま。
 ATTACK_REST_MODE = "return"
 
 
 def split_state(st):
     """状態を **7 つ**に揃えて返す `(Θ_me, Θ_opp, A_me, A_opp, j, 戻る_me, 戻る_opp)`（C-5c）。
-    5 つ組（既定・`THETA_RETURN_MODE=off`）は戻る分 0 として読む。"""
+    5 つ組（`state5_of_row` の器・旧 `THETA_RETURN_MODE=off`）は戻る分 0 として読む。"""
     st = tuple(st)
     if len(st) == 5:
         return st + (0.0, 0.0)
@@ -145,13 +144,6 @@ def split_state(st):
         return st
     raise ValueError("状態は 5 つ組か 7 つ組（%d）" % len(st))
 
-
-def set_attack_rest_mode(mode):
-    global ATTACK_REST_MODE
-    if mode not in ATTACK_REST_MODES:
-        raise ValueError("attack rest mode は %s のどれか" % (ATTACK_REST_MODES,))
-    ATTACK_REST_MODE = mode
-    return ATTACK_REST_MODE
 
 #: **`D` の読み方**（上の表）。`curve`＝**帳簿の正本**（輪郭・軸は 2 本）／`clock`＝2 本の時計（軸は 4 本）。
 D_MODES = ("curve", "curve_scaled", "clock", "theory")
@@ -466,7 +458,7 @@ def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, id
     ——`scalar` の腕を**帳簿の `κ` そのもの**にするために要る（`μ` で代用すると別物になる）。
     `A` は**両席ぶんをターンの最初の行から**渡してもらう（`rate_of_row` の注意書き）。
 
-    **C-5c**: `CB.THETA_RETURN_MODE=untap` なら **7 つ組**——末尾に**レスト中のブロッカー**
+    **C-5c**: **7 つ組**（`CB.THETA_RETURN_MODE=untap`）——末尾に**レスト中のブロッカー**
     `(戻る_me, 戻る_opp)`（`resting_blocker_term`・札の原本から読む＝`ci_row`／`idx2cid`／`cards` が要る）。
     歩きはこれを**2 段目から**的に足す（持ち主の次のリフレッシュで戻る・T96）。`Θ` 本体はアクティブな
     ブロッカーだけのまま（既定と同じ数字）。"""
@@ -487,8 +479,6 @@ def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, id
         th_opp = float(CB.threshold(sc, tok, g_hand=g_opp,
                                     plan=(don_plan if CB.THETA_HAND_MODE == "rule_don" else None)))
     st = (th_me, th_opp, float(a_me), float(a_opp), int(j))
-    if CB.THETA_RETURN_MODE != "untap":
-        return st
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
     b_me = CB.resting_blocker_term(tok, TO.SLOT_OWN_FIELD, olp, ci_row=ci_row, idx2cid=idx2cid, cards=cards)
@@ -513,14 +503,14 @@ def axis_of_move(fam, v, sig, cid, cards, sc, tok, olp, r_turns, don_k=0):
     v = float(v)
     if fam == "attack":
         out["th_opp"] = -v                      # 相手の耐久を削る（価格の単位のまま）
-        if ATTACK_REST_MODE == "return":
-            info = cards.info(cid) if (cards is not None and cid) else None
-            if info and info.get("blocker") and not info.get("event"):
-                p = float(info.get("power") or 0.0)
-                nu = float(CB.nu_meas_of(p, olp))
-                if nu > 0.0:
-                    out["th_me"] = -nu           # 攻めてレストになる分、自分の耐久の体の項から抜ける（C-2）
-                    out["th_me_back"] = nu       # **C-5c**: 消さずに「次の自席ターンから戻る側」へ移す
+        # **C-5c**（`ATTACK_REST_MODE=return`）: 攻めたブロッカーは消さずに戻る側へ移す
+        info = cards.info(cid) if (cards is not None and cid) else None
+        if info and info.get("blocker") and not info.get("event"):
+            p = float(info.get("power") or 0.0)
+            nu = float(CB.nu_meas_of(p, olp))
+            if nu > 0.0:
+                out["th_me"] = -nu               # 攻めてレストになる分、自分の耐久の体の項から抜ける（C-2）
+                out["th_me_back"] = nu           # **C-5c**: 消さずに「次の自席ターンから戻る側」へ移す
     elif fam == "play":
         info = cards.info(cid) if (cards is not None and cid) else None
         p = float((info or {}).get("power") or 0.0)
@@ -774,18 +764,10 @@ def main(argv=None):
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--d-mode", dest="d_mode", choices=D_MODES, default=None)
-    ap.add_argument("--attack-rest", dest="attack_rest", choices=ATTACK_REST_MODES, default=None,
-                    help="攻撃した体のレスト費用（既定 `return`＝戻る側へ移す・C-5c／`body`＝C-2 の近似／`off`＝旧）")
-    ap.add_argument("--theta-return", dest="theta_return", choices=CB.THETA_RETURN_MODES, default=None,
-                    help="**C-5c**: レスト中のブロッカーを次の自席ターンから戻る耐久として持つか（既定 untap）")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
     if a.d_mode:
         set_d_mode(a.d_mode)
-    if a.theta_return:
-        CB.set_theta_return_mode(a.theta_return)
-    if a.attack_rest:
-        set_attack_rest_mode(a.attack_rest)
     out = collect(a.src, a.games)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:

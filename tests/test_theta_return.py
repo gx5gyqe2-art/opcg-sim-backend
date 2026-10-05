@@ -8,12 +8,13 @@
    1 段目で届くなら `step` は一切効かない。
 2. **7 つ組の代数**: `split_state` は 5 つ組を戻る分 0 として読む／`apply_dx` は `th_*_back` を 7 つ組にだけ足し、
    5 つ組に足そうとすると落ちる（黙って捨てない）。
-3. **状態の組み立て**: `untap` なら `state_of_row` が末尾に戻る分を持ち、`Θ` 本体（アクティブなブロッカーだけ）は
-   既定と同じ数字のまま。`off` なら 5 つ組（既定はビット一致）。
+3. **状態の組み立て**: `state_of_row` は末尾に戻る分を持ち（7 つ組）、`Θ` 本体（アクティブなブロッカーだけ）は
+   戻る分を読まない器（`state5_of_row`）と同じ数字のまま。
 4. **攻撃の価格**: `return` はブロッカーで攻めた `ν` を **`th_me` から `th_me_back` へ移す**（総量は不変）。
 5. **席の入れ替えと混ぜ方**: `_swap_state` は戻る分も入れ替え、`_mix` は耐久の軸と戻る分を一緒に動かし、
    シャープレイ配分の和は 7 つ組でも厳密に `W(st1) − W(st0)`。
-6. **器の CLI に切替が在る**（帳簿・攻撃の残差の 2 器・耐久の内訳の器）。
+（波C・2026-10-05: 旧 `THETA_RETURN_MODE=off`／`ATTACK_REST_MODE=off` は削除＝どちらも定数。
+6 つ目だった「器の CLI に切替が在る」は切替と一緒に外した。）
 
 **基盤健全性ではない**——式の形（規則）そのものを固める。
 """
@@ -30,8 +31,6 @@ _SCRIPTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts")
 if _SCRIPTS not in sys.path:
     sys.path.insert(0, _SCRIPTS)
 
-import attack_axis_by_result as AX  # noqa: E402
-import attack_theta_parts as AP  # noqa: E402
 import crossing_bridge as CB  # noqa: E402
 import kappa_vector as KV  # noqa: E402
 import relative_ledger as RL  # noqa: E402
@@ -43,9 +42,9 @@ _FLAT = [0.2] * 14
 
 @pytest.fixture(autouse=True)
 def _restore():
-    old = (CB.THETA_RETURN_MODE, KV.ATTACK_REST_MODE, KV.D_MODE)
+    old = KV.D_MODE
     yield
-    CB.set_theta_return_mode(old[0]); KV.set_attack_rest_mode(old[1]); KV.set_d_mode(old[2])
+    KV.set_d_mode(old)
 
 
 # --- 1. 歩きの規約 -----------------------------------------------------------------------------
@@ -126,13 +125,10 @@ def _board_with_a_rested_blocker():
 
 def test_state_of_row_carries_the_rested_blocker_as_returning_stock_under_untap():
     sc, tok, ci, idx2cid, cards = _board_with_a_rested_blocker()
-    CB.set_theta_return_mode("off")
-    st_off = KV.state_of_row(sc, tok, 0.1, 0.1, 2, ci_row=ci, idx2cid=idx2cid, cards=cards)
-    assert len(st_off) == 5
-    CB.set_theta_return_mode("untap")
+    st_off = (float(CB.threshold_of_me(sc, tok)), float(CB.threshold(sc, tok)), 0.1, 0.1, 2)   # 戻る分を持たない形
     st = KV.state_of_row(sc, tok, 0.1, 0.1, 2, ci_row=ci, idx2cid=idx2cid, cards=cards)
     assert len(st) == 7
-    assert st[:5] == st_off                                         # Θ 本体は既定と同じ数字
+    assert st[:5] == st_off                                         # Θ 本体はアクティブなブロッカーだけの数字
     assert st[5] == pytest.approx(CB.nu_meas_of(5000.0, 5000.0))    # 私の戻る分
     assert st[6] == pytest.approx(0.0)
     assert KV.state5_of_row(sc, tok, 0.1, 0.1, 2, ci_row=ci, idx2cid=idx2cid, cards=cards) == st_off
@@ -140,7 +136,6 @@ def test_state_of_row_carries_the_rested_blocker_as_returning_stock_under_untap(
 
 def test_state_of_row_needs_the_card_db_to_see_the_returning_stock():
     sc, tok, ci, idx2cid, cards = _board_with_a_rested_blocker()
-    CB.set_theta_return_mode("untap")
     st = KV.state_of_row(sc, tok, 0.1, 0.1, 2)                       # 札の原本が無ければ 0（落ちない）
     assert len(st) == 7 and st[5] == 0.0 and st[6] == 0.0
 
@@ -152,7 +147,6 @@ def test_return_mode_moves_the_blocker_from_active_to_returning():
         def info(self, cid):
             return {"power": 5000.0, "blocker": True}
 
-    KV.set_attack_rest_mode("return")
     sc = np.zeros(70, float); sc[12] = sc[13] = 0.5
     tok = np.zeros((22, 24), float); tok[0, 0] = 0.5
     dx = KV.axis_of_move("attack", 0.37, ["ATTACK", None, "L"], "X", _C(), sc, tok, 5000.0, 4.0)
@@ -160,12 +154,6 @@ def test_return_mode_moves_the_blocker_from_active_to_returning():
     assert dx == pytest.approx({"th_opp": -0.37, "th_me": -nu, "th_me_back": nu})
     st = KV.apply_dx((1.0, 0.8, 0.3, 0.2, 3, 0.0, 0.0), dx)
     assert st[0] + st[5] == pytest.approx(1.0)                      # 総量は不変（移すだけ）
-
-
-def test_attack_rest_modes_include_return():
-    assert "return" in KV.ATTACK_REST_MODES
-    KV.set_attack_rest_mode("return")
-    assert KV.ATTACK_REST_MODE == "return"
 
 
 # --- 5. 席の入れ替えと混ぜ方 ---------------------------------------------------------------------
@@ -203,8 +191,3 @@ def test_shapley_split_still_sums_to_the_difference_on_seven_tuples():
 
 
 # --- 6. 器の CLI -----------------------------------------------------------------------------------
-
-def test_the_instruments_expose_the_switch():
-    for build in (RL.build_parser, AX.build_parser, AP.build_parser):
-        a = build().parse_args(["--in", "x", "--theta-return", "untap", "--attack-rest", "return"])
-        assert a.theta_return == "untap" and a.attack_rest == "return"
