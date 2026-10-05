@@ -1092,8 +1092,9 @@ def test_the_curve_w_mode_uses_the_same_density_as_the_clock_mode():
 
 
 def test_the_clock_can_take_the_hands_two_values_from_the_row(monkeypatch):
-    """**T78**（T77 の横展開）: 2 本の時計にも手札の 2 つの価値を入れられる——**耐久は切れる札だけ**（カウンター値 > 0）・
-    **速さは盤面 ＋ 今のドンで出せる通る体**。どちらも**行のトークンだけ**から読める（手札の枠にパワー・費用・カウンター値が在る）。"""
+    """**T78**（T77 の横展開）: 手札の 2 つの価値——**耐久は切れる札だけ**（カウンター値 > 0）・
+    **速さは盤面 ＋ 今のドンで出せる通る体**。どちらも**行のトークンだけ**から読める（手札の枠にパワー・費用・カウンター値が在る）。
+    （時計へ入れる切替 `CLOCK_HAND_MODE=on` は波C で削除・2 つの数え方は `clock_calib` が読むので残る。）"""
     tok = np.zeros((22, 24), np.float32)
     for j, (pw, cost, cnt) in enumerate([(6000, 4, 0), (5000, 2, 1000), (2000, 1, 2000), (7000, 3, 0)]):
         s = T.SLOT_HAND.start + j
@@ -1105,38 +1106,8 @@ def test_the_clock_can_take_the_hands_two_values_from_the_row(monkeypatch):
     assert T.hand_attackers(tok, 5000, 5) == 2
     assert T.hand_attackers(tok, 5000, 9) == 3
     assert T.hand_attackers(tok, 9000, 10) == 0                        # 越える体が無ければ 0
-    # 切替: `on` なら自席側の耐久が縮み（切れる札だけ）・自席側の速さが増える
-    sc = np.zeros(16, np.float32)
-    sc[T.SC_MY_LIFE], sc[T.SC_OPP_LIFE] = 3, 3
-    sc[T.SC_MY_HAND], sc[T.SC_OPP_HAND] = 4, 4
-    sc[T.SC_MY_DON] = 5
-    sc[T.SC_MY_LEADER_POWER], sc[T.SC_OPP_LEADER_POWER] = 0.5, 0.5
-    tok[0, T.S_POWER] = 0.5                                            # 自分のリーダー 5000（相手リーダーを越える）
-    tok[1, T.S_POWER] = 0.5
-    off = T.clock_of_row(sc, tok)
-    T.set_clock_hand_mode("on")
-    try:
-        on = T.clock_of_row(sc, tok)
-    finally:
-        T.set_clock_hand_mode("off")
-    assert on["a_me"] == off["a_me"] + 2                               # ドン 5 で 2 体足せる
-    assert on["t_opp"] < off["t_opp"]                                  # 自分の耐久が縮む＝相手は早く殺せる
-    assert on["t_me"] < off["t_me"]                                    # 自分の速さが上がる＝自分も早く殺せる
-    # **T79（完全情報・§0.05）**: 相手の行を渡せば**相手側も同じ形で読む**（記録には両席の行が在る）
-    opp_tok = np.zeros((22, 24), np.float32)
-    for j, (pw, cost, cnt) in enumerate([(6000, 3, 0), (5000, 1, 2000)]):
-        s2 = T.SLOT_HAND.start + j
-        opp_tok[s2, T.S_POWER] = pw / 1e4; opp_tok[s2, T.S_COST] = cost / 10.0; opp_tok[s2, T.S_COUNTER] = cnt / 2000.0
-    opp_sc = np.zeros(16, np.float32); opp_sc[T.SC_MY_DON] = 4
-    T.set_clock_hand_mode("on")
-    try:
-        both = T.clock_of_row(sc, tok, opp_sc=opp_sc, opp_tok=opp_tok)
-    finally:
-        T.set_clock_hand_mode("off")
-    assert both["a_opp"] == on["a_opp"] + 2                            # 相手もドン 4 で 2 体（費用 1 と 3）
-    assert both["t_me"] < on["t_me"]                                   # 相手の手札 4 枚 → 切れるのは 1 枚＝耐久が縮む
-    assert both["t_opp"] < on["t_opp"]                                 # 相手の速さが上がる＝自分は早く死ぬ
-    assert T.CLOCK_HAND_MODE == "off"                                  # 既定は旧のまま
+    # 時計の切替（T78 の `CLOCK_HAND_MODE=on`・この 2 つで耐久と速さを置き換える）は波C で削除——数え方は `clock_calib` が読む
+    assert T.CLOCK_HAND_MODE == "off" and not hasattr(T, "set_clock_hand_mode")   # 定数（波C）
 
 
 def test_the_win_probability_is_the_integral_of_the_same_density():

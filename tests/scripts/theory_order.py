@@ -324,20 +324,11 @@ def set_w_mode(mode):
 #: **手札の枠にはパワー・費用・カウンター値が入っている**ので、手札の 2 つの価値は**行のトークンだけで読める**（T78 で実測して確認）。
 SLOT_HAND = slice(12, 22)
 S_COUNTER = 7
-#: **手札の 2 つの価値を時計に入れるか**（T78・2026-09-17・T77 の横展開）。`off`＝旧（手札は枚数 `H`・速さは盤面だけ）／
-#: `on`＝**耐久は切れる札だけ**（カウンター値 > 0）・**速さは盤面 ＋ 今のドンで出せる通る体**。T77 が交点の橋で測った 2 つの
-#: 置き換えを、同じ量の別表現である**2 本の時計**（`T = (L + H/c̄ + B)/A`）にも当てる。**新定数ゼロ**。
-#: **1 行からは自分の手札しか読めない**ので、`clock_of_row` では自席側だけが直る（相手側は推定器待ち＝非対称）。
-CLOCK_HAND_MODES = ("off", "on")
+#: **時計の手札は枚数 `H`・速さは盤面だけ**（`clock_of_row`）。T78 の `CLOCK_HAND_MODE=on`（耐久は切れる札だけ・
+#: 速さに今のドンで出せる通る体を足す）は回帰したまま推定器待ちで、その前提（1 行からは自分の手札しか読めない）は
+#: §0.05（完全情報）で消えた——波C（2026-10-05）で削除し、凍結ブランチ `claude/theory-switches-final` で再現する。
+#: 出力 JSON の `clock_hand` キーは定数 `"off"` のまま。`hand_cuttable`／`hand_attackers` は `clock_calib` が読む。
 CLOCK_HAND_MODE = "off"
-
-
-def set_clock_hand_mode(mode):
-    global CLOCK_HAND_MODE
-    if mode not in CLOCK_HAND_MODES:
-        raise ValueError("clock hand mode は %s のどれか" % (CLOCK_HAND_MODES,))
-    CLOCK_HAND_MODE = mode
-    return CLOCK_HAND_MODE
 
 
 def hand_cuttable(tok_row):
@@ -685,7 +676,7 @@ def state_factor(d, mode=None, t_me=None, t_opp=None, scale_mode="hyp"):
     return float(w_of_d(d, sd) / W_BAR)
 
 
-def clock_of_row(sc, tok_row, mode=None, opp_sc=None, opp_tok=None, ci_row=None, idx2cid=None):
+def clock_of_row(sc, tok_row, mode=None, ci_row=None, idx2cid=None):
     """判断点の行（`scalars`・トークン）から時計と `κ` を出す。
 
     `A_me`＝自分のリーダー＋場のキャラのうち**相手リーダーを越える**もの（レスト中も次のターンは殴れる
@@ -701,16 +692,7 @@ def clock_of_row(sc, tok_row, mode=None, opp_sc=None, opp_tok=None, ci_row=None,
             a_me += 1
     a_opp = sum(1 for x in incoming_x(tok, mine=defender_power(tok, sc, ci_row, idx2cid)) if x >= -PWR_EPS)
     b_opp = sum(1 for _p, blk in opp_chars_of(tok) if blk)
-    # **T78**（T77 の横展開）: 手札の 2 つの価値を時計へ。**T79（完全情報・§0.05）**: 相手の行（`opp_sc`／`opp_tok`）を
-    # 渡せば相手側も同じ形で読む（記録には両席の行が在る）。渡さなければ自席側だけ直る（片側＝T78 の形）。
     h_me, h_opp = float(sc[SC_MY_HAND]), float(sc[SC_OPP_HAND])
-    if CLOCK_HAND_MODE == "on":
-        h_me = float(hand_cuttable(tok))
-        a_me += hand_attackers(tok, olp, float(sc[SC_MY_DON]))
-        if opp_tok is not None:
-            mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-            h_opp = float(hand_cuttable(opp_tok))
-            a_opp += hand_attackers(opp_tok, mlp, 0.0 if opp_sc is None else float(np.asarray(opp_sc)[SC_MY_DON]))
     t_me, t_opp = clocks(sc[SC_MY_LIFE], sc[SC_OPP_LIFE], h_me, h_opp,
                          a_me, a_opp, count_blockers(tok), b_opp)
     d = t_opp - t_me

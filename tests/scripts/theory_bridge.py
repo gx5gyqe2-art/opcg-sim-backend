@@ -665,8 +665,7 @@ def _kappa_of_row(sc, tok, t, prof=None, g_me=None, g_opp=None, opp=None, cut_me
                                cut_opp=cut_opp, cut_me=cut_me,                     # **N-3**（`None` なら旧）
                                attacker=attacker, mirror=mirror)      # **H-4b**／**H-4g の鏡**（`rule_don` だけが読む）
         return {"d": cd["d"], "kappa": _TOM.state_factor(cd["d"], "curve"), "tau_me": cd["tau_me"], "tau_opp": cd["tau_opp"]}
-    return clock_of_row(sc, tok, opp_sc=(None if opp is None else opp["sc"]),
-                        opp_tok=(None if opp is None else opp["tok"]))
+    return clock_of_row(sc, tok)
 
 
 #: 耐久の手札項の数え方 → `crossing_bridge.hand_price_mean` の `part`（正本は `crossing_bridge.THETA_HAND_PART`）。
@@ -1507,8 +1506,6 @@ def main(argv=None):
                          "`off`＝旧式〔自分は `threshold_of_me`〕。環境変数 `MIRROR=0` と同じ）")
     ap.add_argument("--theta-hand", default=_CB.THETA_HAND_MODE, choices=_CB.THETA_HAND_MODES,
                     help="**T76** 耐久の手札項（`--w-mode curve` の `D` に効く）: `rule_don`（既定・H-4・2026-10-04）／`cuttable_forced`（旧の既定）")
-    ap.add_argument("--clock-hand", default=_TOM.CLOCK_HAND_MODE, choices=_TOM.CLOCK_HAND_MODES,
-                    help="**T78** `--w-mode clock` の時計に手札の 2 つの価値を入れるか（`on`＝耐久は切れる札だけ・速さは今出せる体を足す・自席側のみ）")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     _TOM.add_attack_ability_arg(ap)
@@ -1529,7 +1526,6 @@ def main(argv=None):
     EV.apply_search_price(a)
     pricing_fixes = EV.pricing_fixes_label()                  # L
     _CB.set_theta_hand_mode(a.theta_hand)
-    _TOM.set_clock_hand_mode(a.clock_hand)
 
     try:
         import condition_value as CV

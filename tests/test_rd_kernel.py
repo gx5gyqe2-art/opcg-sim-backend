@@ -36,7 +36,7 @@ import test_rd_speed as TS  # noqa: E402  （問題の作り方・枠の読み�
 import theory_order as T  # noqa: E402
 
 #: 器の既定（import 時＝`conftest` の固定の前）。記録した解は器の既定で解いたもの
-_TOOL_DEFAULTS = (T.OPTION_MODE, T.W_MODE, T.SURV_MODE, T.CBAR_MODE, T.CLOCK_HAND_MODE)
+_TOOL_DEFAULTS = (T.OPTION_MODE, T.W_MODE, T.SURV_MODE, T.CBAR_MODE)
 
 GOLDEN = os.path.join(_HERE, "fixtures", "rd_kernel_golden.jsonl.gz")
 
@@ -424,8 +424,8 @@ def _golden():
 
 
 def test_golden_solves_replay_bit_identically_with_the_kernel():
-    cur = (T.OPTION_MODE, T.W_MODE, T.SURV_MODE, T.CBAR_MODE, T.CLOCK_HAND_MODE)
-    setters = (T.set_option_mode, T.set_w_mode, T.set_surv_mode, T.set_cbar_mode, T.set_clock_hand_mode)
+    cur = (T.OPTION_MODE, T.W_MODE, T.SURV_MODE, T.CBAR_MODE)
+    setters = (T.set_option_mode, T.set_w_mode, T.set_surv_mode, T.set_cbar_mode)
     for f, v in zip(setters, _TOOL_DEFAULTS):
         f(v)
     try:
