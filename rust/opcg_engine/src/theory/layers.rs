@@ -8,6 +8,7 @@
 use std::collections::HashMap;
 
 use super::defender::{norm_seq, seq_prep, sort_asc, sort_desc, write_key, Cur, Prep, SetCache};
+use super::succ::{self, TurnStart};
 use super::numeric::{bankers_round, canon_bits, py_round};
 use super::table::KeyTable;
 
@@ -58,13 +59,7 @@ struct Counter<'a> {
 struct Over;
 
 impl Counter<'_> {
-    fn push_next(&mut self, c: Cur) {
-        write_key(&mut self.kb, 0, &c);
-        if self.next_seen.insert_if_absent(&self.kb, ()) {
-            self.next_front.push(c);
-        }
-    }
-
+    /// 状態 `cur`（段 `t`）を数え、子を辿る。子の作り方は守る側の動的計画と同じ [`succ`]。
     fn visit(&mut self, t: usize, cur: &mut Cur) -> Result<(), Over> {
         write_key(&mut self.kb, 0, cur);
         if !self.seen.insert_if_absent(&self.kb, ()) {
@@ -75,106 +70,63 @@ impl Counter<'_> {
         if self.total > self.lim {
             return Err(Over);
         }
+        let prep = self.prep;
         if cur.rem.is_empty() {
-            if (t as i64) + 1 >= self.cap {
-                return Ok(()); // 地平の終わり
-            }
-            let tn = t + 1;
-            if !(self.repeat || (tn as i64 - 1) <= self.last_hit) {
-                return Ok(()); // 以後ずっと命中が無い（状態を作らない）
-            }
-            let mut blk: Vec<f64> = Vec::with_capacity(cur.ready.len() + cur.rested.len() + cur.pend.len());
-            blk.extend_from_slice(&cur.ready);
-            blk.extend_from_slice(&cur.rested);
-            blk.extend_from_slice(&cur.pend);
-            sort_desc(&mut blk);
-            let hits = self.seq[(tn - 1).min(self.seq.len() - 1)].clone();
-            let (lf_now, don_now) = (cur.lf, self.don);
-            let mk = |hand: Vec<u16>| Cur {
-                t: tn as u32,
-                lf: lf_now,
-                dl: don_now,
-                rem: hits.clone(),
-                hand,
-                ready: blk.clone(),
-                rested: Vec::new(),
-                pend: Vec::new(),
+            // 段の終わり: 次の段の始まりの状態（引く札ごと）は次の段の数えに回す
+            let tn = t as i64 + 1;
+            let hits = match succ::turn_start(tn, self.cap, &[], &self.seq, self.last_hit, self.repeat) {
+                TurnStart::Hits(h) => h.to_vec(),
+                _ => return Ok(()), // 地平の終わり／以後ずっと命中が無い（状態を作らない）
             };
-            let prep = self.prep;
-            if prep.dtypes.is_empty() {
-                let c = mk(cur.hand.clone());
-                self.push_next(c);
-                return Ok(());
+            let e = succ::end_turn(cur, self.don);
+            let (t0, rem0) = (cur.t, std::mem::replace(&mut cur.rem, hits));
+            cur.t = tn as u32;
+            for mv in succ::draw_moves(prep) {
+                succ::draw(cur, prep, mv);
+                write_key(&mut self.kb, 0, cur);
+                if self.next_seen.insert_if_absent(&self.kb, ()) {
+                    self.next_front.push(cur.clone());
+                }
+                succ::undo_draw(cur, prep, mv);
             }
-            let mut news = Vec::new();
-            for di in 0..prep.dtypes.len() {
-                let mut nh = cur.hand.clone();
-                nh[prep.dtype_ix[di]] += 1;
-                news.push(mk(nh));
-            }
-            if prep.pd_none > 0.0 {
-                news.push(mk(cur.hand.clone()));
-            }
-            for c in news {
-                self.push_next(c);
-            }
+            cur.t = t0;
+            cur.rem = rem0;
+            succ::undo_end_turn(cur, e);
             return Ok(());
         }
-        let prep = self.prep;
         let nrem = cur.rem.len();
-        let mut prev_x: Option<f64> = None;
         for i in 0..nrem {
-            let x = cur.rem[i];
-            if i > 0 && prev_x == Some(x) {
+            if succ::is_repeat(&cur.rem, i) {
                 continue;
             }
-            prev_x = Some(x);
-            let removed = cur.rem.remove(i);
+            let x = cur.rem.remove(i);
             if cur.lf > 0 {
-                let lf0 = cur.lf;
-                cur.lf = lf0 - 1;
-                for ti in 0..prep.types.len() {
-                    let ix = prep.type_ix[ti];
-                    cur.hand[ix] += 1;
+                for mv in succ::recv_moves(prep) {
+                    succ::recv(cur, prep, mv);
                     let r = self.visit(t, cur);
-                    cur.hand[ix] = cur.hand[ix].wrapping_sub(1);
+                    succ::undo_recv(cur, prep, mv);
                     r?;
                 }
-                if prep.p_none > 0.0 {
-                    self.visit(t, cur)?;
-                }
-                cur.lf = lf0;
             }
             let nready = cur.ready.len();
             for bi in 0..nready {
-                let m = cur.ready[bi];
-                if bi > 0 && cur.ready[bi - 1] == m {
+                if !succ::can_block(cur, bi) {
                     continue;
                 }
-                let mr = cur.ready.remove(bi);
-                if x >= m - self.eps {
-                    let r = self.visit(t, cur);
-                    cur.ready.insert(bi, mr);
-                    r?;
-                } else {
-                    let pos = cur.rested.iter().position(|&y| y < m).unwrap_or(cur.rested.len());
-                    cur.rested.insert(pos, m);
-                    let r = self.visit(t, cur);
-                    cur.rested.remove(pos);
-                    cur.ready.insert(bi, mr);
-                    r?;
-                }
+                let b = succ::block(cur, bi, x, self.eps);
+                let r = self.visit(t, cur);
+                succ::undo_block(cur, &b);
+                r?;
             }
             let sets = self.sets.get(0, &prep.kvals, &prep.kdons, self.eps, x, &cur.hand, cur.dl);
             let (saved_hand, saved_dl) = (cur.hand.clone(), cur.dl);
             for cs in sets.iter() {
-                cur.hand.copy_from_slice(&cs.nh);
-                cur.dl = cs.dl2;
+                succ::counter(cur, cs);
                 self.visit(t, cur)?;
             }
             cur.hand.copy_from_slice(&saved_hand);
             cur.dl = saved_dl;
-            cur.rem.insert(i, removed);
+            cur.rem.insert(i, x);
         }
         Ok(())
     }

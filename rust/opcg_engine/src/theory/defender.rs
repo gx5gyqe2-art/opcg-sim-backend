@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::numeric::{bankers_round, canon_bits, naive_sum, py_round};
+use super::succ::{self, TurnStart};
 use super::table::KeyTable;
 
 /// 動的計画の失敗。
@@ -296,6 +297,7 @@ fn pack_hand(kb: &mut Vec<u64>, hand: &[u16]) {
 // 状態
 
 /// 作業用の状態（1 つを書き換えて戻す）。
+#[derive(Clone)]
 pub struct Cur {
     pub t: u32,
     pub lf: i32,
@@ -670,24 +672,21 @@ impl Defender {
     /// t 段目の始まり（`turn`）。`cur.t` は新しい段・`cur.rem` は空・`cur.ready` に戻ったブロッカー。
     fn turn(&mut self, p: &Prob, cur: &mut Cur) -> R<Cand> {
         let t = cur.t as i64;
-        if t >= p.cap {
-            return Ok(Cand::zero());
+        match succ::turn_start(t, p.cap, &p.hits_f, &p.seq, p.last_hit, p.repeat_hits) {
+            TurnStart::Horizon => Ok(Cand::zero()),
+            TurnStart::Dry => {
+                let mut c = Cand::zero();
+                c.v[2] = (p.cap - t) as f64; // 以後ずっと命中が無い
+                Ok(c)
+            }
+            TurnStart::Hits(hits) => {
+                cur.rem.clear();
+                cur.rem.extend_from_slice(hits);
+                let r = self.lookup(p, cur)?;
+                cur.rem.clear();
+                Ok(Cand::from_res(&r))
+            }
         }
-        if t >= 1 && !(p.repeat_hits || (t - 1) <= p.last_hit) {
-            let mut c = Cand::zero();
-            c.v[2] = (p.cap - t) as f64; // 以後ずっと命中が無い
-            return Ok(c);
-        }
-        cur.rem.clear();
-        if t == 0 {
-            cur.rem.extend_from_slice(&p.hits_f);
-        } else {
-            let ix = ((t - 1) as usize).min(p.seq.len() - 1);
-            cur.rem.extend_from_slice(&p.seq[ix]);
-        }
-        let r = self.lookup(p, cur)?;
-        cur.rem.clear();
-        Ok(Cand::from_res(&r))
     }
 
     /// 守る側のターン（1 枚引く）を挟んで次の段へ（`next_turn`）。
@@ -701,39 +700,36 @@ impl Defender {
         }
         let mut acc = Acc::new();
         cur.t += 1;
-        for di in 0..p.prep.dtypes.len() {
-            let ix = p.prep.dtype_ix[di];
-            cur.hand[ix] += 1;
+        for mv in succ::draw_moves(&p.prep) {
+            succ::draw(cur, &p.prep, mv);
             let r = self.turn(p, cur);
-            cur.hand[ix] = cur.hand[ix].wrapping_sub(1); // 失敗で戻る道では値は使わない（巻き戻しの不足で落とさない）
-            acc.add(p.dprob[di], &r?, &self.harms);
-        }
-        if p.prep.pd_none > 0.0 {
-            let r = self.turn(p, cur)?;
-            acc.add(p.prep.pd_none, &r, &self.harms);
+            succ::undo_draw(cur, &p.prep, mv); // 失敗で戻る道では値は使わない（巻き戻しの不足で落とさない）
+            let prob = match mv {
+                Some(di) => p.dprob[di],
+                None => p.prep.pd_none,
+            };
+            acc.add(prob, &r?, &self.harms);
         }
         cur.t -= 1;
         Ok(acc.into_cand())
     }
 
     /// 覚え書きに無い状態を解く（`within`）。Python の `not d < -FEQ` をそのまま写す（NaN は来ない）。
+    /// 子の作り方は [`succ`]（段ごとの数え方と同じ遷移）。
     #[allow(clippy::neg_cmp_op_on_partial_ord)]
     fn within(&mut self, p: &Prob, cur: &mut Cur) -> R<Res> {
         if cur.rem.is_empty() {
             return self.within_end(p, cur);
         }
-        let nt = p.prep.types.len();
         let mut best_att: Option<Cand> = None;
-        let mut prev_x: Option<f64> = None;
         let mut kill_def: Option<f64> = None;
         let nrem = cur.rem.len();
         for i in 0..nrem {
-            let x = cur.rem[i];
-            if i > 0 && prev_x == Some(x) {
+            if succ::is_repeat(&cur.rem, i) {
                 continue;
             }
-            prev_x = Some(x);
             let removed = cur.rem.remove(i);
+            let x = removed;
             // 受ける
             let mut best_def: Cand;
             if cur.lf <= 0 {
@@ -749,21 +745,17 @@ impl Defender {
                 });
                 best_def = Cand { v: [0.0; 4], src: Src::Own(vec![kill]), bump: None };
             } else {
-                let saved_lf = cur.lf;
-                cur.lf = saved_lf - 1;
                 let mut acc = Acc::new();
-                for ti in 0..nt {
-                    let ix = p.prep.type_ix[ti];
-                    cur.hand[ix] += 1;
+                for mv in succ::recv_moves(&p.prep) {
+                    succ::recv(cur, &p.prep, mv);
                     let r = self.lookup(p, cur);
-                    cur.hand[ix] = cur.hand[ix].wrapping_sub(1); // 失敗で戻る道では値は使わない（巻き戻しの不足で落とさない）
-                    acc.add(p.tprob[ti], &Cand::from_res(&r?), &self.harms);
+                    succ::undo_recv(cur, &p.prep, mv); // 失敗で戻る道では値は使わない（巻き戻しの不足で落とさない）
+                    let prob = match mv {
+                        Some(ti) => p.tprob[ti],
+                        None => p.prep.p_none,
+                    };
+                    acc.add(prob, &Cand::from_res(&r?), &self.harms);
                 }
-                if p.prep.p_none > 0.0 {
-                    let r = self.lookup(p, cur)?;
-                    acc.add(p.prep.p_none, &Cand::from_res(&r), &self.harms);
-                }
-                cur.lf = saved_lf;
                 let mut hh = acc.hh;
                 if hh.is_empty() {
                     hh.push(0.0 + p.lam_net);
@@ -775,23 +767,15 @@ impl Defender {
             // 横取りする
             let nready = cur.ready.len();
             for bi in 0..nready {
-                let m = cur.ready[bi];
-                if bi > 0 && cur.ready[bi - 1] == m {
+                if !succ::can_block(cur, bi) {
                     continue;
                 }
-                let mr = cur.ready.remove(bi);
-                let cand = if x >= m - p.eps {
-                    let r = self.lookup(p, cur)?;
-                    Cand { v: [r.v[0] + 1.0, r.v[1], r.v[2], r.v[3]], src: Src::Arena(r.off, r.len), bump: Some(p.nu_of(m)) }
-                } else {
-                    let pos = cur.rested.iter().position(|&y| y < m).unwrap_or(cur.rested.len());
-                    cur.rested.insert(pos, m);
-                    let r = self.lookup(p, cur);
-                    cur.rested.remove(pos);
-                    let r = r?;
-                    Cand { v: [r.v[0] + 1.0, r.v[1], r.v[2], r.v[3]], src: Src::Arena(r.off, r.len), bump: None }
-                };
-                cur.ready.insert(bi, mr);
+                let b = succ::block(cur, bi, x, p.eps);
+                let r = self.lookup(p, cur);
+                succ::undo_block(cur, &b);
+                let r = r?;
+                let bump = if b.killed { Some(p.nu_of(b.m)) } else { None };
+                let cand = Cand { v: [r.v[0] + 1.0, r.v[1], r.v[2], r.v[3]], src: Src::Arena(r.off, r.len), bump };
                 let d = cand.v[0] - best_def.v[0];
                 if d > p.feq || (!(d < -p.feq) && better(&self.harms, &cand, &best_def, p.feq)) {
                     best_def = cand;
@@ -801,8 +785,7 @@ impl Defender {
             let sets = self.sets.get(p.kid, &p.prep.kvals, &p.prep.kdons, p.eps, x, &cur.hand, cur.dl);
             let (saved_hand, saved_dl) = (cur.hand.clone(), cur.dl);
             for cs in sets.iter() {
-                cur.hand.copy_from_slice(&cs.nh);
-                cur.dl = cs.dl2;
+                succ::counter(cur, cs);
                 let r = self.lookup(p, cur)?;
                 let nc = cs.nc as f64;
                 let cand = Cand {
@@ -833,21 +816,9 @@ impl Defender {
 
     /// 残りの攻撃が無い状態（段の終わり）: ブロッカーが戻り、1 枚引いて次の段へ。
     fn within_end(&mut self, p: &Prob, cur: &mut Cur) -> R<Res> {
-        let mut blk: Vec<f64> = Vec::with_capacity(cur.ready.len() + cur.rested.len() + cur.pend.len());
-        blk.extend_from_slice(&cur.ready);
-        blk.extend_from_slice(&cur.rested);
-        blk.extend_from_slice(&cur.pend);
-        sort_desc(&mut blk);
-        let sv_ready = std::mem::replace(&mut cur.ready, blk);
-        let sv_rested = std::mem::take(&mut cur.rested);
-        let sv_pend = std::mem::take(&mut cur.pend);
-        let sv_dl = cur.dl;
-        cur.dl = p.don;
+        let e = succ::end_turn(cur, p.don);
         let r = self.next_turn(p, cur);
-        cur.ready = sv_ready;
-        cur.rested = sv_rested;
-        cur.pend = sv_pend;
-        cur.dl = sv_dl;
+        succ::undo_end_turn(cur, e);
         let r = r?;
         let n = r.hlen();
         let mut hv = Vec::with_capacity(n + 1);

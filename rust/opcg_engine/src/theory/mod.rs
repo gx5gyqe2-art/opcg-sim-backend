@@ -13,12 +13,15 @@
 pub mod defender;
 pub mod layers;
 pub mod numeric;
+pub mod plans;
 pub mod pyapi;
+pub mod sched;
+pub mod succ;
 pub mod table;
 #[cfg(test)]
 mod tests;
 
 /// 入口の版（Python 側 `rd_kernel.RD_KERNEL_API` と一致させる。入口の形を変えたら上げる）。
-pub const API: u32 = 1;
+pub const API: u32 = 2;
 /// `src/theory/**` の原文のハッシュ（`build.rs` が作る）。古い wheel の取り違え検出と、計画の覚え書きの鍵に使う。
 pub const SRC_HASH: &str = env!("RD_KERNEL_SRC_HASH");
