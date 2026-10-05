@@ -372,7 +372,7 @@ def rate_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=No
     A = 盤面 ＋ 手札の項（`SLOPE_HAND_MODE`）＋ 効果の流入 ＋ 在庫の効果
     ```
 
-    **`deck_ids` を必ず渡す**（T128）——既定の `SLOPE_HAND_MODE=flow`／`SLOPE_EFFECT_MODE=hand`
+    **`deck_ids` を必ず渡す**（T128）——既定の `SLOPE_HAND_MODE=flow`（効果の項も常に入る）
     では**流入と効果の項がデッキの中身から出る**ので、渡さないと `A` が**盤面だけ**になる。
     2026-09-20 に実測: 渡さないと `A` は `j` によらずほぼ一定（0.055）で、
     橋の実測（`j=5` で 0.204）に対し**伸びが丸ごと消える**。
@@ -620,7 +620,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
             raise ValueError("W_ERR_MODE=rel なのに σ_rel が引けない＝黙って abs に落とさない")
         TO.set_sigma_rel(sr)
     # **T128**: `A` の流入・効果の項は**デッキの中身から出る**（`SLOPE_HAND_MODE=flow`／
-    # `SLOPE_EFFECT_MODE=hand`）。渡さないと `A` が**盤面だけ**になり、伸びが丸ごと消える。
+    # 効果の項）。渡さないと `A` が**盤面だけ**になり、伸びが丸ごと消える。
     seat_decks = _seat_decks(dirs)
     arms = {k: [] for k in ("flat", "scalar", "vector", "exact", "exactw",
                             "plac_axis", "plac_mag")}

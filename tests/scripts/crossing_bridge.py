@@ -1629,8 +1629,7 @@ def attacker_ctx(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=N
         for l_ in range(lmax + 1):
             a_tab[l_] = float(DR.a_of(deck_ids, olp, float(l_), theta, mu, with_don=False))
             ar_tab[l_] = float(DR.a_of(deck_ids, olp, float(l_), theta, mu, rush_only=True, with_don=False))
-            if SLOPE_EFFECT_MODE in ("on", "hand"):
-                e_tab[l_] = float(DR.e_of(deck_ids, mlp, r, float(l_)))
+            e_tab[l_] = float(DR.e_of(deck_ids, mlp, r, float(l_)))
     flow = [a_tab[l_] + e_tab[l_] for l_ in range(budget + 1)]
     # 盤面の素殴り（`seat_slope_terms` が `DON_PURSE_MODE=all` で数えるのと同じ式）
     lead_b, chars_b = theory_slope_parts(tok, olp, theta, mu, blockers=blk_a, with_don=False,
@@ -1644,7 +1643,7 @@ def attacker_ctx(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=N
         if (cards.info(idx2cid.get(int(ci_a[s_i]))) or {}).get("blocker"):
             rest_blk.append(float(slot_power(tok, s_i) or 0.0) - olp)
     rest_blk = tuple(sorted(rest_blk, reverse=True))
-    key = (budget, tuple(att1), tuple(later), rest_blk, SLOPE_EFFECT_MODE, cut_context_key(),
+    key = (budget, tuple(att1), tuple(later), rest_blk, cut_context_key(),
            tuple((c, tuple(sorted(p.items())), bx, ru) for c, p, bx, ru in cand),
            tuple(tuple(round(v, 12) for v in row) for row in price),
            tuple(round(v, 12) for v in a_tab + ar_tab + e_tab), tuple(ds), round(olp, 3), round(mlp, 3),
@@ -1693,7 +1692,6 @@ def rules_steps(actx, play1, nsteps):
     board_x = [float(x) for _s, x in actx["later"]]          # 2 段目から殴る場の体（リーダー＋全キャラ）
     att1_x = [float(x) for _s, x in actx["att1"]]
     base = float(actx.get("lead_bare", 0.0)) + float(actx.get("chars_bare", 0.0))
-    eff_on = SLOPE_EFFECT_MODE == "hand"
     bodies = []                                               # (超過, 速攻, 出した段, 攻撃の価格)
     remaining = [i for i in range(len(cand)) if i not in set(play1)]
     out = []
@@ -1704,7 +1702,7 @@ def rules_steps(actx, play1, nsteps):
     out.append({"hits": tuple(att1_x) + tuple(b[0] for b in rush1),
                 "paid": float(sum(cand[i][0] for i in play1)),
                 "fb": base + sum(b[3] for b in rush1),
-                "eff": sum(float(cand[i][1].get("eff", 0.0)) for i in play1) if eff_on else 0.0})
+                "eff": sum(float(cand[i][1].get("eff", 0.0)) for i in play1)})
     for step in range(2, int(nsteps) + 1):
         d = float(ds[min(step, len(ds)) - 1])
         on_board = board_x + [b[0] for b in bodies if b[2] < step]
@@ -1738,7 +1736,7 @@ def rules_steps(actx, play1, nsteps):
         paid = float(sum(cand[c][0] for c in plays) + sum(ks))
         fb = base + on_val + sum(b[3] for b in rush_now) + sum(_attach_gain(actx, x, k) for x, k in zip(on_board, ks))
         out.append({"hits": hits, "paid": paid, "fb": fb,
-                    "eff": sum(float(cand[c][1].get("eff", 0.0)) for c in plays) if eff_on else 0.0})
+                    "eff": sum(float(cand[c][1].get("eff", 0.0)) for c in plays)})
     return out
 
 
@@ -2992,8 +2990,8 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     戻り値は `(盤面, 在庫, 流入, 盤面のうちリーダー, 在庫の速攻ぶん, 流入の速攻ぶん, 効果の損害, 在庫の効果)`
     ——**リーダーは KO されない**ので減衰（T95）が掛からない。
     **T103**: 末尾 2 つは**速攻の内訳**（歩きに渡す）。**速攻は出したターン・
-    引いたターンからもう殴れる**ので 1 ターン早く積む（規則）。`off` のときは 0 を返す。
-    **T105**: 末尾は**引いた 1 枚が出す効果の損害**（`deck_refill.e_of`・`SLOPE_EFFECT_MODE=on` のときだけ）。
+    引いたターンからもう殴れる**ので 1 ターン早く積む（規則）。
+    **T105**: 末尾は**引いた 1 枚が出す効果の損害**（`deck_refill.e_of`）。
     `want_stock=False`（既定）なら在庫は計算しない（`hand_plan` のナップサックは重い）。
 
     **H-4f（Q1）**: `rule_don` 系の計画（`a_time` を持つ）を渡されたら、**1 本の速さで時刻を読む器**のための速さ
@@ -3015,7 +3013,7 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     if SLOPE_MODE != "hand":
         return base, 0.0, 0.0, lead, 0.0, 0.0, 0.0, 0.0
     stock = stock_rush = eff_once = 0.0
-    if (want_stock or SLOPE_HAND_MODE == "stock" or SLOPE_EFFECT_MODE == "hand") and cards is not None:
+    if cards is not None:                    # 在庫の効果（T108）を常に読むので `want_stock` は不問
         import hand_plan as HP
         r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
         items = HP.hand_items(tok_row, ci_row, idx2cid, cards, olp, r)
@@ -3025,8 +3023,6 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
             stock, stock_rush, eff_once = alloc["atk"], alloc["rush"], alloc["eff"]
             lead += float(alloc.get("attach_lead") or 0.0)
             base += float(alloc.get("attach_lead") or 0.0) + float(alloc.get("attach") or 0.0)
-            if SLOPE_EFFECT_MODE != "hand":
-                eff_once = 0.0
         elif DON_PURSE_MODE in ("one", "all"):
             # **T109**: 財布は 1 つ——**体と効果を同じナップサックで買う**（1 枚 1 回だけ払う）。
             g = hand_groups(items, cards, olp, theta, mu, mlp_h, r,
@@ -3039,16 +3035,13 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
             stock, stock_rush, eff_once = pl["atk"], pl["rush"], pl["eff"]
             lead += pl["attach_lead"]
             base += pl["attach_lead"] + pl["attach"]
-            if SLOPE_EFFECT_MODE != "hand":
-                eff_once = 0.0
         else:
             stock, stock_rush = playable_attack_price(items, cards, float(sc_a[SC_MY_DON]), olp, theta, mu,
                                                       want_rush=True)
-            if SLOPE_EFFECT_MODE == "hand":
-                # **T108**: 在庫（手札）が今このターン出せる効果の損害（一度きり）
-                import deck_refill as DR
-                eff_once = float(DR.hand_effect_harm([it["cid"] for it in (items or ())], mlp_h, r,
-                                                     float(sc_a[SC_MY_DON])))
+            # **T108**: 在庫（手札）が今このターン出せる効果の損害（一度きり）
+            import deck_refill as DR
+            eff_once = float(DR.hand_effect_harm([it["cid"] for it in (items or ())], mlp_h, r,
+                                                 float(sc_a[SC_MY_DON])))
     flow = flow_rush = eff = 0.0
     if deck_ids:
         import deck_refill as DR
@@ -3056,11 +3049,10 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
         _wd = THETA_HAND_MODE != "rule_don"      # **H-4e（E6）**: 財布を 1 つにする形は引いた札に無料で付けない
         flow = float(DR.a_of(deck_ids, olp, don, theta, mu, with_don=_wd))
         flow_rush = float(DR.a_of(deck_ids, olp, don, theta, mu, rush_only=True, with_don=_wd))
-        if SLOPE_EFFECT_MODE in ("on", "hand"):
-            # **T105**: 効果は**相手の体**から奪うので、自分のリーダーのパワーと
-            # 相手の残りライフ（盤面の分布の条件）で読む。
-            mlp = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-            eff = float(DR.e_of(deck_ids, mlp, max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE]))), don))
+        # **T105**: 効果は**相手の体**から奪うので、自分のリーダーのパワーと
+        # 相手の残りライフ（盤面の分布の条件）で読む。
+        mlp = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
+        eff = float(DR.e_of(deck_ids, mlp, max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE]))), don))
     return base, stock, flow, lead, stock_rush, flow_rush, eff, eff_once
 
 
@@ -3159,7 +3151,7 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
             if plan is not None and "harm_steps" in plan:
                 att[i] = attl[i] = 0.0                    # **H-4e（E3）**: 付与の効き目は下の `harm_steps` の中にある
             paid[i] = float(pl.get("paid") or 0.0)
-            e1[i] = float(pl["eff"]) if SLOPE_EFFECT_MODE == "hand" else 0.0
+            e1[i] = float(pl["eff"])
     # **T128**: 盤面が `ko_p` で失われる（T95）。**列を作る道でも効くようにした**——
     # `rate_at` は `sched` が在ると**先頭で返す**ので、`RATE_DON_MODE != "off"`（2026-09-19 から既定）の
     # 下では **`RATE_DECAY_MODE=ko` が 1 ビットも効いていなかった**（2026-09-20 に実測で確認・
@@ -3201,7 +3193,7 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
             val += fr * (q ** (j - i)) if i <= j else 0.0
             if i <= j - 1:
                 val += max(0.0, f - fr) * (q ** (j - i - 1))
-        if deck_ids and SLOPE_EFFECT_MODE in ("on", "hand"):
+        if deck_ids:
             d_j = ds[min(j, len(ds)) - 1]
             val += float(DR.e_of(deck_ids, mlp, r, max(0.0, d_j - paid[j]) if RATE_DON_PAY else d_j))
         if j <= 1:
@@ -3349,31 +3341,12 @@ def set_rate_decay_mode(mode):
 #: 出力 JSON の `rate_t1` キーは定数 `"on"` のまま残す（バイト一致のため）。
 
 
-#: **T105**: **速さ `A` に「効果が出す損害」の項を入れるか**（2026-09-18・T103 §8 の 1）。
-#: `off`＝旧（`A` は攻撃しか数えない）／**`on`＝引いた 1 枚が出す除去の損害をデッキ平均で足す**
-#: （`deck_refill.e_of`）。**新定数ゼロ**（除去のしきい値は原本・損害は `ν_meas`・盤面は T46 と同じ分布）。
-#:
-#: **根拠は T103 の速さの検算**: **実際に打った攻撃は 1 ターンの損害の 79〜92% しか説明しない**。
-#: 残り 8〜21% は**効果が出した損害**で、**速さの式に 1 項も入っていなかった**。
-#: しかも **`A` は「実際に打った攻撃」とはよく合う**（2〜4 ターン目で 0.83〜1.01）＝
-#: **攻撃の値付けは正しく、欠けているのは効果だけ**。
-#:
-#: **形は「流量」**——**1 枚は 1 回しか使えない**ので、毎ターン引く 1 枚ぶんが**毎ターン `e` ずつ**入る
-#: （体の攻撃 `a_of` が**毎ターン殴り続けて積み上がる**のとは役割が違う）。
-#: **T108**: `hand` は `on` に**在庫（手札）の効果**を足す——**一度きり**なので
-#: 歩きでは **1 ターン目に 1 回だけ**乗り、行ごとの `A` には**そのターン撃てる分**として入る。
-SLOPE_EFFECT_MODES = ("off", "on", "hand")
-#: **既定は `hand`**（2026-09-19・ユーザ決定「1は規定」）——**`off` → `on`（T105）→ `hand`（T108）と単調に良くなり**、
-#: **両記録・的中と偏りの両方で改善・帳簿は構造上不変（費用ゼロ）**。**以前の数字と比べるときは `--slope-effect off`**。
-SLOPE_EFFECT_MODE = "hand"
-
-
-def set_slope_effect_mode(name):
-    global SLOPE_EFFECT_MODE
-    if name not in SLOPE_EFFECT_MODES:
-        raise ValueError("unknown slope effect mode: %r" % (name,))
-    SLOPE_EFFECT_MODE = name
-    return SLOPE_EFFECT_MODE
+#: **T105／T108**: **速さ `A` に「効果が出す損害」の項を入れる**（常に・2026-09-19 ユーザ決定「1は規定」）。
+#: 引いた 1 枚が出す除去の損害をデッキ平均で毎ターン足し（`deck_refill.e_of`・T105）、**在庫（手札）の効果**は
+#: **一度きり**なので歩きでは **1 ターン目に 1 回だけ**乗り、行ごとの `A` には**そのターン撃てる分**として入る（T108）。
+#: **新定数ゼロ**（除去のしきい値は原本・損害は `ν_meas`・盤面は T46 と同じ分布）。
+#: 旧の `off`／`on` 形（切替 `SLOPE_EFFECT_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
+#: 出力 JSON の `slope_effect` キーは定数 `"hand"` のまま残す（バイト一致のため）。
 
 
 #: **財布は 1 つ**（T109・ユーザ指示 2026-09-19「使用できるドンと使ったドンの整合が取れるように」）。
@@ -3984,7 +3957,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "rate_walk": RATE_WALK_MODE, "rate_decay": RATE_DECAY_MODE, "stock_n": 0, "stock_sum": 0.0,
              "rate_rush": "on", "stock_rush_sum": 0.0, "flow_rush_sum": 0.0,
              "rate_t1": "on", "tau_capped": 0, "tau_rows": 0,
-             "slope_effect": SLOPE_EFFECT_MODE, "eff_sum": 0.0, "eff_n": 0, "eff1_sum": 0.0,
+             "slope_effect": "hand", "eff_sum": 0.0, "eff_n": 0, "eff1_sum": 0.0,
              "don_purse": DON_PURSE_MODE,
              # **T114**: 規則のドンの列から作った `R_j`（`off` なら 0 件）
              "rate_don": RATE_DON_MODE, "rate_don_pay": RATE_DON_PAY, "rate_ramp": RATE_RAMP,
@@ -4398,7 +4371,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             (s_board, s_stock, s_flow, s_lead, s_srush, s_frush, s_eff,
              s_eff1) = seat_slope_terms(
                 sc, tok, _ci, idx2cid, cards, olp, theta, mu, deck_ids=dk,
-                want_stock=(RATE_WALK_MODE == "grow" or SLOPE_EFFECT_MODE == "hand"),
+                want_stock=True,
                 alloc=alloc_self.get((w, t)), through=thr,             # T77／T90／T93／T94／T95／T131
                 plan=don_plan)                                          # **H-4b**（`rule_don` 以外は None）
             s_hand = s_stock if SLOPE_HAND_MODE == "stock" else s_flow
@@ -5086,10 +5059,6 @@ def main(argv=None):
                     choices=THETA_HAND_BLOCKER_MODES,
                     help="**T106** 相手の**手札のブロッカー**を耐久に入れるか（ブロックに召喚酔いは無い）: "
                          "`off`（旧・どこにも入らない）／`on`（**規則どおり**＝出せる 1 体の `ν`）")
-    ap.add_argument("--slope-effect", default=SLOPE_EFFECT_MODE, choices=SLOPE_EFFECT_MODES,
-                    help="**T105** 速さ `A` に効果が出す損害を入れるか: `off`（旧・攻撃だけ）／"
-                         "`on`（**引いた 1 枚が出す除去の損害**をデッキ平均で毎ターン足す・`deck_refill.e_of`）／"
-                         "`hand`（`on` ＋ **在庫（手札）が今出せる分**を一度きり・T108）")
     ap.add_argument("--don-purse", default=DON_PURSE_MODE, choices=DON_PURSE_MODES,
                     help="**T109** 体を出すドンと効果を撃つドンを 1 つの財布にするか: "
                          "`off`（旧・`stock` と `e₁` が別々に同じアクティブを使える＝自席ターンの 22%% で使いすぎ）／"
@@ -5146,7 +5115,6 @@ def main(argv=None):
     set_theta_hand_place(a.theta_hand_place)
     set_theta_hand_window(a.theta_hand_window)
     set_rate_don_mode(a.rate_don, pay=(a.rate_don_pay == "on"), ramp=a.rate_ramp)
-    set_slope_effect_mode(a.slope_effect)
     set_don_purse_mode(a.don_purse)
     set_theta_don_mode(a.theta_don)
     set_theta_hand_blocker_mode(a.theta_hand_blocker)

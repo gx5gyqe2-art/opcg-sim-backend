@@ -30,7 +30,7 @@ import theory_order as T  # noqa: E402
 #: まだ走っていない時点の値）＝**ファイルの既定そのもの**をラチェットするための控え。
 _SHIPPED = {n: getattr(CB, n) for n in (
     "THETA_HAND_MODE", "THETA_HAND_PLACE", "THETA_BODY_MODE", "THETA_HAND_BLOCKER_MODE",
-    "THETA_RETURN_MODE", "SLOPE_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE", "SLOPE_EFFECT_MODE",
+    "THETA_RETURN_MODE", "SLOPE_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE",
     "RATE_WALK_MODE", "RATE_DECAY_MODE", "RACE_MODE", "SLOPE_TAKE_MODE",
     "DON_PURSE_MODE", "THETA_DON_MODE", "THETA_HAND_WINDOW", "RATE_DON_MODE")}
 
@@ -52,7 +52,7 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
     **代金は ±1 当たりと `curve` の的中、そして線形の橋**（`dG` の AUC 0.696 → 0.660／0.720 → 0.692）。
 
     **同日のユーザ決定**（「1は規定、2は正しいものに直してください」）で 4 つ動いた:
-    `SLOPE_EFFECT_MODE=hand`（T108）・最初の自席ターンは打てない規則（T103・2026-10-05 に切替は削除）・速攻は出したターンから（T103・2026-10-05 に切替は削除）・
+    効果の項（T105／T108・2026-10-05 に切替は削除）・最初の自席ターンは打てない規則（T103・2026-10-05 に切替は削除）・速攻は出したターンから（T103・2026-10-05 に切替は削除）・
     `THETA_HAND_BLOCKER_MODE=on`（T103／T106＝**規則として正しい形**）。
     **黙って既定が変わると 2 つの橋の数字が比較不能になる**ので、ここで固定する。"""
     assert _SHIPPED == {
@@ -65,7 +65,6 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "SLOPE_HAND_MODE": "flow",               # T93
         "SLOPE_BLOCK_MODE": "on",                # T92・2026-10-05 既定に採用（ユーザ決定・旧 off は --slope-block off）
         "SLOPE_TAKE_MODE": "life",               # T134・2026-10-05 既定に採用（ユーザ決定・旧 const は --slope-take const）
-        "SLOPE_EFFECT_MODE": "hand",             # T105／T108・2026-09-19
         "RATE_WALK_MODE": "grow",                # T94
         "RATE_DECAY_MODE": "off",                # T95（切替として残す）
         "RACE_MODE": "static",                   # T90／T91／T104（切替として残す）
@@ -1207,9 +1206,9 @@ def test_the_rate_terms_are_separate_quantities():
     body = next(c for c in db.raw_db if DR.body_of(db.get_card(c)) and float(db.get_card(c).power) >= 6000)
     board, stock, flow, lead, s_rush, f_rush, eff, eff1 = CB.seat_slope_terms(
         sc, tok, None, None, None, 5000.0, deck_ids=[body])
-    assert eff1 == 0.0                                # 既定は `SLOPE_EFFECT_MODE=off`（T108）
+    assert eff1 == 0.0                                # 効果の項は cards=None では 0（T108）
     assert s_rush == 0.0 and f_rush == 0.0            # 速攻の札が無いデッキ（T103）
-    assert eff == 0.0                                 # 既定は `SLOPE_EFFECT_MODE=off`（T105）
+    assert eff == 0.0                                 # 同上（T105）
     assert board == pytest.approx(CB.theory_slope(tok, 5000.0))
     assert stock == 0.0                                              # `cards` が無ければ在庫は数えられない
     assert flow == pytest.approx(DR.a_of([body], 5000.0, 10.0))
@@ -1797,7 +1796,6 @@ def test_the_hand_can_fire_its_effect_once():
     """**T108**（T107 が指した先）: T105 は**毎ターン引く 1 枚**（流量）の効果だけを数えていた。
     **手札に溜まっている札の効果**は**一度きり**に使えるもので、速さの式に 1 項も無かった。
     歩きでは **1 ターン目に 1 回だけ**乗る（在庫なので繰り返さない）。"""
-    assert CB.SLOPE_EFFECT_MODE == "hand"   # **2026-09-19 から既定**（ユーザ決定「1は規定」）
     # 流量（`eff`）は毎ターン・在庫（`eff_once`）は 1 ターン目だけ
     assert _ra(1, 0.1, 0.0, 0.0, 0.0, eff=0.01) == pytest.approx(0.11)
     assert _ra(3, 0.1, 0.0, 0.0, 0.0, eff=0.01) == pytest.approx(0.11)
@@ -1808,13 +1806,6 @@ def test_the_hand_can_fire_its_effect_once():
     assert _ra(1, 0.1, 0.0, 0.0, 0.0, eff_once=-1.0) == pytest.approx(0.10)
     # 的に届くのは早くなる（1 ターン目に 1 回ぶん進む）
     assert _tg(0.5, 0.1, 0.0, 0.0, 0.0, eff_once=0.03) < _tg(0.5, 0.1, 0.0, 0.0, 0.0)
-    try:
-        assert CB.set_slope_effect_mode("off") == "off"
-        assert CB.set_slope_effect_mode("on") == "on"
-        with pytest.raises(ValueError):
-            CB.set_slope_effect_mode("なにか")
-    finally:
-        CB.set_slope_effect_mode("hand")
 
 
 def test_one_purse_pays_for_each_card_once(monkeypatch):
