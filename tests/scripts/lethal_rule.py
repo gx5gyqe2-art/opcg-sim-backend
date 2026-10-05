@@ -30,10 +30,11 @@ T117（「今このターンで殺せるか」・2026-09-19）を**決着の定�
   （`sc[SC_OPP_DON_ACTIVE]`）の範囲まで。**イベントの費用の和がそれを超える組は選べない**。
 * **守り手の手札の読みは正確**——「最後の判断行で出した札が残っているのでは」と疑って落とす処理を入れて数えたが
   **0 回**（ターン最後の判断行の選択は `TURN_END` で、その行の手札は出した後のもの）。処理は外した。
-* **`LETHAL_LIFE_MODE`** … `draw`（既定）＝**受けたライフの札は手札に入る**（規則・`rules/battle.rs` の `dest = Zone::Hand`）ので、
+* **受けたライフの札** … `draw`＝**受けたライフの札は手札に入る**（規則・`rules/battle.rs` の `dest = Zone::Hand`）ので、
   守り手は**残りライフの枚数**（全部が手札に入ってから、次の損害で負ける）を**デッキの平均カウンター値**の札として追加で持つ
   （**完全情報でもライフの中身の順は読めない**のでデッキ平均＝T91 と同じ規約・新定数ゼロ）。**先に全部持たせる**のは
-  守り手に有利な上限＝**宣言は健全側**（取りこぼしは増えうる）。`off`＝旧（T117 と同じ・ライフの札を数えない）。
+  守り手に有利な上限＝**宣言は健全側**（取りこぼしは増えうる）。旧の `off`（T117 と同じ・ライフの札を数えない・
+  切替 `LETHAL_LIFE_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
 
 ## 測るもの（真値は「その局を誰が勝ったか」と「いつ終わったか」）
 
@@ -90,9 +91,7 @@ from theory_order import (MU, PWR_EPS, SC_MY_DON, SC_MY_LIFE, SC_OPP_HAND, SC_OP
 
 #: **守り手の手札の読み方**は `actual`（§0.05 完全情報＝相手席の行から実際の値）。`share`（T117 の旧規約）は 2026-10-05 に削除。
 #: **守り手は切れるだけ切る**（`max`＝詰みの判定）。`econ`（受けるより安いときだけ・T130 の規則）は 2026-10-05 に削除。
-#: **受けたライフの札を守り手のカウンターに数えるか**——`draw`（既定・規則）／`off`（T117 の旧規約）
-LETHAL_LIFE_MODES = ("draw", "off")
-LETHAL_LIFE_MODE = "draw"
+#: **受けたライフの札は守り手のカウンターに数える**（`draw`・規則）。`off`（T117 の旧規約）は 2026-10-05 に削除。
 #: **ライフ札の平均カウンター値の数え方**（P8-7(b) 候補(c)・2026-09-25・2026-09-25 に既定採用）——
 #: `rules`（既定）は `deck_refill.is_cuttable`／`hand_guard.counter_of` と同じ定義（印字カウンターと
 #: 【カウンター】イベントの上げ幅の大きい方）に揃える。`printed`（旧来）は印字カウンターだけを数える。
@@ -102,14 +101,6 @@ AVG_COUNTER_MODE = "rules"
 DON_PER_BODY = 4
 #: 状態スカラーの **相手のアクティブなドン**（`encoder.py` の並び: 0 自ライフ・1 相手ライフ・2 自アクティブ・3 自レスト・4 相手アクティブ）
 SC_OPP_DON_ACTIVE = 4
-
-
-def set_lethal_life_mode(mode):
-    global LETHAL_LIFE_MODE
-    if mode not in LETHAL_LIFE_MODES:
-        raise ValueError("lethal life mode は %s のどれか" % (LETHAL_LIFE_MODES,))
-    LETHAL_LIFE_MODE = mode
-    return LETHAL_LIFE_MODE
 
 
 def set_avg_counter_mode(mode):
@@ -217,7 +208,7 @@ def lethal_of_row(sc, tok, with_don=True, defender_counters=None, life_counter=N
     """1 行の判定 `(決着か, 内訳)`。**新定数ゼロ・打ち筋を仮定しない**。
 
     `defender_counters` … 守り手の実際の手札のカウンター値の列（**相手席の行から**）。
-    `life_counter` … 守り手のデッキの平均カウンター値（`LETHAL_LIFE_MODE=draw`・`actual` のときに要る）。
+    `life_counter` … 守り手のデッキの平均カウンター値（受けたライフの札・必須・カウンターの無いデッキなら 0）。
     `defender_costs` … 守り手の各札の**イベントの費用**（非イベントは 0・無ければ費用ゼロ扱い）。
     予算は `sc[SC_OPP_DON_ACTIVE]`（相手がこのターン開始時に残しているアクティブなドン）。"""
     sc = np.asarray(sc); tok = np.asarray(tok)
@@ -234,10 +225,9 @@ def lethal_of_row(sc, tok, with_don=True, defender_counters=None, life_counter=N
     if defender_counters is None:
         raise ValueError("守り手の手札が渡されていない（相手席の行から読む・黙って旧の数え方に落とさない）")
     pool = list(defender_counters)
-    if LETHAL_LIFE_MODE == "draw":
-        if life_counter is None:
-            raise ValueError("LETHAL_LIFE_MODE='draw' なのにデッキの平均カウンター値が渡されていない")
-        pool += life_cards_as_counters(life, life_counter)
+    if life_counter is None:
+        raise ValueError("デッキの平均カウンター値が渡されていない（受けたライフの札は手札に入る・規則）")
+    pool += life_cards_as_counters(life, life_counter)
     costs = (list(defender_costs) if defender_costs is not None else [0.0] * len(defender_counters))
     costs += [0.0] * (len(pool) - len(defender_counters))          # ライフの札はキャラ扱い（費用 0）
     stops = max_stops(pool, xs_through, costs, float(sc[SC_OPP_DON_ACTIVE]))
@@ -309,9 +299,9 @@ def _iter_declared_games(dirs, limit_games=0, with_don=True):
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     import deck_refill as DR
-    decks = DR.decks_by_seed(dirs) if LETHAL_LIFE_MODE == "draw" else {}
-    if LETHAL_LIFE_MODE == "draw" and not decks:
-        raise ValueError("LETHAL_LIFE_MODE='draw' なのにデッキが引けない（%s）" % (dirs,))
+    decks = DR.decks_by_seed(dirs)
+    if not decks:
+        raise ValueError("デッキが引けない（受けたライフの札の平均カウンター値が読めない・%s）" % (dirs,))
     avg_cache = {}
     games = 0
     for r, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS,
@@ -357,14 +347,12 @@ def _iter_declared_games(dirs, limit_games=0, with_don=True):
                     # 相手がまだ 1 度も打っていない（先手の 1 ターン目）＝手札は初手 5 枚のまま読めない → 宣言しない
                     rows_out.append((w, t, False, False, {}, True, None))
                     continue
-                lc = None
-                if LETHAL_LIFE_MODE == "draw":
-                    key = (seed_g, d)
-                    if key not in avg_cache:
-                        if dk is None or dk[d] is None:
-                            raise ValueError("seed %d 席 %d のデッキが引けない" % (seed_g, d))
-                        avg_cache[key] = avg_counter(dk[d], cards)
-                    lc = avg_cache[key]
+                key = (seed_g, d)
+                if key not in avg_cache:
+                    if dk is None or dk[d] is None:
+                        raise ValueError("seed %d 席 %d のデッキが引けない" % (seed_g, d))
+                    avg_cache[key] = avg_counter(dk[d], cards)
+                lc = avg_cache[key]
                 declared, dd = lethal_of_row(sc, tok, with_don, counters, life_counter=lc,
                                              defender_costs=costs)
                 killed_now = bool(winner == w and t == t_end)
@@ -407,7 +395,7 @@ def collect(dirs, limit_games=0, with_don=True, dump=None):
     `dump` に list を渡すと**宣言した行と勝者の最後のターンの全内訳**を積む（診断用・取りこぼしも読める）。"""
     games_out = []
     stats = {"games": 0, "rows": 0, "hand_missing": 0, "with_don": with_don,
-             "hand_mode": "actual", "stop_mode": "max", "life_mode": LETHAL_LIFE_MODE,
+             "hand_mode": "actual", "stop_mode": "max", "life_mode": "draw",
              "by_life": {},                           # 相手ライフ別: 宣言数・勝者の宣言数
              "false_rows": []}                        # 敗者の席で宣言した行の内訳（先頭 200 件）
     for seed_g, winner, t_end, rows in _iter_declared_games(dirs, limit_games, with_don):
@@ -442,8 +430,6 @@ def build_parser():
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--don", default="on", choices=("on", "off"))
-    ap.add_argument("--life", default=None, choices=LETHAL_LIFE_MODES,
-                    help="受けたライフの札を守り手のカウンターに数えるか（既定 `draw`＝規則・`off`＝T117 の旧規約）")
     ap.add_argument("--avg-counter", default=None, choices=AVG_COUNTER_MODES,
                     help="ライフ札の平均カウンター値の数え方（既定 `rules`＝印字とカウンターイベントの大きい方・`printed`＝旧来）")
     ap.add_argument("--json", default="")
@@ -453,8 +439,6 @@ def build_parser():
 
 def main(argv=None):
     a = build_parser().parse_args(argv)
-    if a.life:
-        set_lethal_life_mode(a.life)
     if a.avg_counter:
         set_avg_counter_mode(a.avg_counter)
     dump = [] if a.dump else None

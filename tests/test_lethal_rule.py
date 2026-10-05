@@ -33,11 +33,16 @@ from theory_order import (S_CAN_ATTACK, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, S_PO
 
 @pytest.fixture(autouse=True)
 def _defaults():
-    LR.set_lethal_life_mode("off")          # 既定は `draw` だが、規則 1〜5 のテストはライフの札なしで読む
     LR.set_avg_counter_mode("rules")
     yield
-    LR.set_lethal_life_mode("draw")
     LR.set_avg_counter_mode("rules")
+
+
+def _lor(*a, **k):
+    """規則 1〜5 のテストは**ライフの札なし**で読む＝デッキの平均カウンター値 0（`life_cards_as_counters` が空を返す・
+    旧の `LETHAL_LIFE_MODE=off` と同じ判定。切替は 2026-10-05 に削除）。"""
+    k.setdefault("life_counter", 0.0)
+    return LR.lethal_of_row(*a, **k)
 
 
 # ---- 1. 切れるだけ切る ---------------------------------------------------------------------------
@@ -93,42 +98,42 @@ def _row(my_life=3.0, opp_life=1.0, opp_hand=0, don=0.0, leader_power=5000.0, ol
 
 def test_leader_alone_declares_at_life_zero_with_an_empty_hand():
     sc, tok = _row(opp_life=0.0)
-    ok, d = LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[])
+    ok, d = _lor(sc, tok, with_don=False, defender_counters=[])
     assert ok and d["through"] == 1 and d["stops"] == 0 and d["hits"] == 1
 
 
 def test_one_hit_at_life_one_is_not_lethal_by_the_rules():
     # 規則: 最後のライフ札を取られても負けではない（ライフ 0 で損害を受けたら負け）＝ライフ 1 には 2 本要る
     sc, tok = _row(opp_life=1.0)
-    ok, d = LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[])
+    ok, d = _lor(sc, tok, with_don=False, defender_counters=[])
     assert (not ok) and d["hits"] == 1
     sc2, tok2 = _row(opp_life=1.0, own=[(5000.0, 0, 0, 1)])
-    ok2, d2 = LR.lethal_of_row(sc2, tok2, with_don=False, defender_counters=[])
+    ok2, d2 = _lor(sc2, tok2, with_don=False, defender_counters=[])
     assert ok2 and d2["hits"] == 2
 
 
 def test_one_counter_card_stops_the_leader():
     sc, tok = _row(opp_life=0.0)
-    ok, d = LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[1000.0])
+    ok, d = _lor(sc, tok, with_don=False, defender_counters=[1000.0])
     assert not ok and d["stops"] == 1
 
 
 def test_active_blocker_takes_the_cheapest_attack():
     # リーダー 5000 ＋ 体 7000・相手ライフ 0・アクティブなブロッカー 1: 安い方（リーダー）が横取りされ 7000 が通る
     sc, tok = _row(opp_life=0.0, own=[(7000.0, 0, 0, 1)], opp=[(3000.0, 1, 0, 0)])
-    ok, d = LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[])
+    ok, d = _lor(sc, tok, with_don=False, defender_counters=[])
     assert ok and d["blockers"] == 1 and d["through"] == 1
 
 
 def test_rested_blocker_does_not_count():
     sc, tok = _row(opp_life=1.0, own=[(7000.0, 0, 0, 1)], opp=[(3000.0, 1, 1, 0)])
-    ok, d = LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[])
+    ok, d = _lor(sc, tok, with_don=False, defender_counters=[])
     assert ok and d["blockers"] == 0 and d["through"] == 2
 
 
 def test_attacks_below_the_leader_do_not_reach():
     sc, tok = _row(opp_life=0.0, leader_power=3000.0, olp=5000.0)
-    ok, d = LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[])
+    ok, d = _lor(sc, tok, with_don=False, defender_counters=[])
     assert not ok and d["through"] == 0
 
 
@@ -140,18 +145,18 @@ def test_don_goes_to_the_cheapest_attack_four_per_body():
 def test_don_raises_the_counter_the_defender_needs():
     # リーダー超過 0 は 1000 で止まる。ドン 1 枚で超過 1000 → 2000 要る → 1000 の札では止まらない
     sc, tok = _row(opp_life=0.0, don=1.0)
-    off, _ = LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[1000.0])
-    on, d = LR.lethal_of_row(sc, tok, with_don=True, defender_counters=[1000.0])
+    off, _ = _lor(sc, tok, with_don=False, defender_counters=[1000.0])
+    on, d = _lor(sc, tok, with_don=True, defender_counters=[1000.0])
     assert (not off) and on and d["stops"] == 0
 
 
 def test_life_zero_is_alive_and_one_hit_decides():
     # ライフ 0 は生きている（T134 で 84 行実在）＝1 本通れば決着。ライフが負なら（記録の不整合）宣言しない
     sc, tok = _row(opp_life=0.0)
-    ok, _ = LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[])
+    ok, _ = _lor(sc, tok, with_don=False, defender_counters=[])
     assert ok
     sc[SC_OPP_LIFE] = -1.0
-    ok_neg, _ = LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[])
+    ok_neg, _ = _lor(sc, tok, with_don=False, defender_counters=[])
     assert not ok_neg
 
 
@@ -160,7 +165,7 @@ def test_life_zero_is_alive_and_one_hit_decides():
 def test_actual_mode_refuses_to_run_without_the_defenders_hand():
     sc, tok = _row()
     with pytest.raises(ValueError):
-        LR.lethal_of_row(sc, tok, with_don=False, defender_counters=None)
+        _lor(sc, tok, with_don=False, defender_counters=None)
 
 
 # ---- 5. 6 指標の算術 ---------------------------------------------------------------------------
@@ -191,8 +196,8 @@ def test_metrics_are_empty_safe():
 
 def test_cli_exposes_all_switches_and_they_reach_the_module(monkeypatch):
     monkeypatch.setattr(LR, "collect", lambda *a, **k: {})
-    LR.main(["--in", "x", "--life", "off", "--avg-counter", "rules"])
-    assert (LR.LETHAL_LIFE_MODE, LR.AVG_COUNTER_MODE) == ("off", "rules")
+    LR.main(["--in", "x", "--avg-counter", "rules"])
+    assert LR.AVG_COUNTER_MODE == "rules"
 
 
 # ---- 6. 受けたライフの札は手札に入る（規則・`rules/battle.rs`） -----------------------------------
@@ -204,36 +209,31 @@ def test_all_life_cards_become_counters():
 
 
 def test_life_cards_raise_the_bar_at_high_life_but_not_at_life_zero():
-    LR.set_lethal_life_mode("draw")
     # リーダー ＋ 体 4（全部超過 0）・相手ライフ 4（5 本要る）・手札なし: ライフの札 4 枚（各 1000）で 4 本止まる → 1 本
     sc, tok = _row(opp_life=4.0, own=[(5000.0, 0, 0, 1)] * 4)
-    ok_draw, d = LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[], life_counter=1000.0)
-    LR.set_lethal_life_mode("off")
-    ok_off, _ = LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[], life_counter=1000.0)
+    ok_draw, d = _lor(sc, tok, with_don=False, defender_counters=[], life_counter=1000.0)
+    ok_off, _ = _lor(sc, tok, with_don=False, defender_counters=[], life_counter=0.0)   # ライフの札なし（旧 `off` と同じ）
     assert (not ok_draw) and d["stops"] == 4 and ok_off
     # ライフ 0 では何も変わらない
-    LR.set_lethal_life_mode("draw")
     sc1, tok1 = _row(opp_life=0.0)
-    ok1, d1 = LR.lethal_of_row(sc1, tok1, with_don=False, defender_counters=[], life_counter=1000.0)
+    ok1, d1 = _lor(sc1, tok1, with_don=False, defender_counters=[], life_counter=1000.0)
     assert ok1 and d1["stops"] == 0
 
 
 def test_draw_mode_refuses_to_run_without_the_deck_average():
-    LR.set_lethal_life_mode("draw")
     sc, tok = _row(opp_life=2.0)
     with pytest.raises(ValueError):
-        LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[], life_counter=None)
+        _lor(sc, tok, with_don=False, defender_counters=[], life_counter=None)
 
 
 def test_the_plus_one_is_exact_at_every_life():
     # ライフ L には L+1 本要る（手札なし・ライフの札なし）
-    LR.set_lethal_life_mode("off")
     for L in range(0, 5):
         sc_a, tok_a = _row(opp_life=float(L), own=[(5000.0, 0, 0, 1)] * L)          # L+1 本（リーダー込み）
-        assert LR.lethal_of_row(sc_a, tok_a, with_don=False, defender_counters=[])[0]
+        assert _lor(sc_a, tok_a, with_don=False, defender_counters=[])[0]
         if L >= 1:                                                                  # L 本（ライフ 0 では作れない）
             sc_b, tok_b = _row(opp_life=float(L), own=[(5000.0, 0, 0, 1)] * (L - 1))
-            assert not LR.lethal_of_row(sc_b, tok_b, with_don=False, defender_counters=[])[0]
+            assert not _lor(sc_b, tok_b, with_don=False, defender_counters=[])[0]
 
 
 # ---- 7. カウンターのイベントはドンを払う（規則） ---------------------------------------------------
@@ -251,9 +251,9 @@ def test_event_counter_needs_the_defenders_active_don():
 def test_row_uses_the_opponents_active_don_as_the_event_budget():
     sc, tok = _row(opp_life=0.0)
     sc[LR.SC_OPP_DON_ACTIVE] = 0.0
-    ok0, d0 = LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[4000.0], defender_costs=[1.0])
+    ok0, d0 = _lor(sc, tok, with_don=False, defender_counters=[4000.0], defender_costs=[1.0])
     sc[LR.SC_OPP_DON_ACTIVE] = 1.0
-    ok1, d1 = LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[4000.0], defender_costs=[1.0])
+    ok1, d1 = _lor(sc, tok, with_don=False, defender_counters=[4000.0], defender_costs=[1.0])
     assert ok0 and d0["stops"] == 0 and (not ok1) and d1["stops"] == 1
 
 

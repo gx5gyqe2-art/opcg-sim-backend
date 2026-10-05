@@ -168,11 +168,3 @@ def test_cli_reaches_collect(monkeypatch):
     monkeypatch.setattr(SS, "collect", fake_collect)
     SS.main(["--in", "x", "y", "--games", "10", "--don", "off"])
     assert called["args"] == (["x", "y"], 10, False)
-
-
-def test_cli_passes_lethal_rule_switches_through(monkeypatch):
-    """lethal_rule の切替をそのまま通す（`--life`）。"""
-    monkeypatch.setattr(SS, "collect", lambda *a, **k: {"lethal_rule": {}, "false_declared": {}, "missed_lethal": {}})
-    SS.main(["--in", "x", "--life", "off"])
-    assert LR.LETHAL_LIFE_MODE == "off"
-    LR.set_lethal_life_mode("draw")
