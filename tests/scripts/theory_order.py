@@ -380,7 +380,7 @@ def hand_cuttable(tok_row):
 
 def hand_attackers(tok_row, opp_leader_power, don):
     """**今のドンで手札から出せる「通る体」の枚数**（T78）＝パワーが相手リーダー以上の体を、費用の合計が `don` を超えない
-    範囲で**最大枚数**（安い順）。速さ `A` に足す（T77 の `SLOPE_MODE=hand` の時計版）。"""
+    範囲で**最大枚数**（安い順）。速さ `A` に足す（T77 の速さの手札の項の時計版）。"""
     tok = np.asarray(tok_row)
     costs = []
     for s in range(SLOT_HAND.start, SLOT_HAND.stop):

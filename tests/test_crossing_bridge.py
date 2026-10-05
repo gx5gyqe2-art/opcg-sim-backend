@@ -30,7 +30,7 @@ import theory_order as T  # noqa: E402
 #: まだ走っていない時点の値）＝**ファイルの既定そのもの**をラチェットするための控え。
 _SHIPPED = {n: getattr(CB, n) for n in (
     "THETA_HAND_MODE", "THETA_HAND_PLACE", "THETA_BODY_MODE", "THETA_HAND_BLOCKER_MODE",
-    "THETA_RETURN_MODE", "SLOPE_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE",
+    "THETA_RETURN_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE",
     "RATE_WALK_MODE", "RATE_DECAY_MODE", "RACE_MODE", "SLOPE_TAKE_MODE",
     "THETA_DON_MODE", "THETA_HAND_WINDOW")}
 
@@ -61,7 +61,6 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "THETA_BODY_MODE": "blockers",           # T97
         "THETA_HAND_BLOCKER_MODE": "on",         # T106・2026-09-19
         "THETA_RETURN_MODE": "untap",            # T96・**C-5c で既定に採用**（2026-09-25）
-        "SLOPE_MODE": "hand",                    # T77
         "SLOPE_HAND_MODE": "flow",               # T93
         "SLOPE_BLOCK_MODE": "on",                # T92・2026-10-05 既定に採用（ユーザ決定・旧 off は --slope-block off）
         "SLOPE_TAKE_MODE": "life",               # T134・2026-10-05 既定に採用（ユーザ決定・旧 const は --slope-take const）
@@ -1377,9 +1376,7 @@ def test_the_hand_carries_two_values_cuttable_for_the_threshold_and_playable_for
     assert CB.playable_attack_price(hand, cards, 2, olp) == pytest.approx(one)            # ドン 2 なら安い方だけ
     assert CB.playable_attack_price(hand, cards, 0, olp) == pytest.approx(0.0)
     assert CB.playable_attack_price([{"cid": "EV", "cost": 1, "counter": 0.0}], cards, 4, olp) == pytest.approx(0.0)
-    with pytest.raises(ValueError):
-        CB.set_slope_mode("nope")
-    assert CB.SLOPE_MODE == "hand" and CB.THETA_HAND_MODE == "cuttable"   # **既定は T77 の 2 値化**（ユーザ決定 2026-09-17）
+    assert CB.THETA_HAND_MODE == "cuttable"   # **T77 の 2 値化**（速さの手札の項は 2026-10-05 から常に入る・切替は削除）
 
 
 def test_the_endurance_counts_bodies_the_same_way_the_harm_side_does():

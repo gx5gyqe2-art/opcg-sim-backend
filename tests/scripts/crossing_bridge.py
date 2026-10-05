@@ -65,7 +65,7 @@ SLOPE_FLOOR = 1e-3
 #: `cuttable`＝**T77（ユーザ提案「手札に 2 つの価値を持たせる」）の守る側**: **切れる札だけが `μ` を持つ**（カウンター値 > 0）・切れない札は 0。
 #: 根拠は**損害 `F` と耐久 `Θ` は同じものに同じ値段を付けなければならない**こと——`F` は切らせた札 1 枚を `μ` で数える（`attack_response.parts`）ので、
 #: `Θ` の手札項も切られる札 1 枚 `μ`。**切られない札（カウンター値 0）は一生 `F` に入らない**＝耐久ではない。T76 で「札の機会費用」を入れて失敗したのは、
-#: `F` が `μ` で数えている物に別の値段を付けたため。出す価値は耐久ではなく**速さ**へ（`SLOPE_MODE`）。
+#: `F` が `μ` で数えている物に別の値段を付けたため。出す価値は耐久ではなく**速さ**へ（T77）。
 #: `cuttable_cx`＝**T99（2026-09-18・ユーザ指示「1から進めてください」）**: `cuttable` の**端数を落とす**形。
 #: **1 枚で 1 回止まるとは限らない**——規則は「攻撃側のパワー ≥ 対象のパワー」で命中するので、
 #: **超過 `x` の攻撃を止めるには `c(x)` 枚要る**（`c_of`）。よって切れる札は **`c(x)` 枚ひと組でしか働かず、
@@ -122,18 +122,10 @@ def set_theta_hand_mode(mode):
     THETA_HAND_MODE = mode
 
 
-#: **速さ（1 自席ターンに積む損害）の数え方**（T77）: `board`＝旧（今の盤面の攻撃手だけ）／`hand`＝**手札から今出せる体の攻撃の価格も足す**
+#: **速さ（1 自席ターンに積む損害）は手札から今出せる体の攻撃の価格も足す**（T77・2026-09-17・ユーザ決定「1は変えましょうか」）
 #: （出す価値 `v_play` の側＝場に出れば次のターンから殴る。ドンの枠で選ぶ）。**新定数ゼロ**（攻撃の価格は `attack_value_don`・枠は規則）。
-SLOPE_MODES = ("board", "hand")
-#: **既定は `hand`**（2026-09-17・ユーザ決定「1は変えましょうか」・T77）。以前の数字と比べるときは `--slope-mode board`。
-SLOPE_MODE = "hand"
-
-
-def set_slope_mode(mode):
-    global SLOPE_MODE
-    if mode not in SLOPE_MODES:
-        raise ValueError("slope mode は %s のどれか" % (SLOPE_MODES,))
-    SLOPE_MODE = mode
+#: 旧の `board`（今の盤面の攻撃手だけ・切替 `SLOPE_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
+#: 出力 JSON の `slope_mode` キーは定数 `"hand"` のまま残す（バイト一致のため）。
 
 
 def playable_attack_price(items, cards, don, olp, theta=THETA, mu=MU, want_rush=False,
@@ -2971,8 +2963,6 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
                                      through=through,                      # **T131**
                                      life_opp=float(sc_a[SC_OPP_LIFE]))    # **T134**
     base = lead + chars
-    if SLOPE_MODE != "hand":
-        return base, 0.0, 0.0, lead, 0.0, 0.0, 0.0, 0.0
     stock = stock_rush = eff_once = 0.0
     if cards is not None:                    # 在庫の効果（T108）を常に読むので `want_stock` は不問
         import hand_plan as HP
@@ -3157,7 +3147,7 @@ def seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
 
 
 def seat_slope(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU):
-    """その席が **1 自席ターンに積む損害**（理論）。`SLOPE_MODE=hand`（T77）なら手札の項も足す。"""
+    """その席が **1 自席ターンに積む損害**（理論）。手札の項も足す（T77）。"""
     a, b = seat_slope_parts(sc, tok_row, ci_row, idx2cid, cards, olp, theta, mu)
     return a + b
 
@@ -3691,7 +3681,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     ledger = []            # (d) 単位の検算: 勝った席の F_end 対 Θ_start
     theta_check = []       # **T96**: 行ごとの `Θ` 対「そこから終局までに実際に要った損害」
     turn_harm = []         # 自席ターン番号 j ごとの損害（損害の輪郭＝加速を測る材料）
-    stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "mirror_rows": 0, "theta_hand": THETA_HAND_MODE, "slope_mode": SLOPE_MODE, "theta_body": THETA_BODY_MODE, "slope_block": SLOPE_BLOCK_MODE,
+    stats = {"games": 0, "turns": 0, "rows_bracketed": 0, "mirror_rows": 0, "theta_hand": THETA_HAND_MODE, "slope_mode": "hand", "theta_body": THETA_BODY_MODE, "slope_block": SLOPE_BLOCK_MODE,
              # **T131**: 通った割合の開示（平均と、手札が読めず割り引けなかった行の数）
              "rate_through": RATE_THROUGH_MODE, "through_n": 0, "through_sum": 0.0,
              "through_missing": 0,
@@ -4724,8 +4714,6 @@ def main(argv=None):
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA)
     ap.add_argument("--theta-mode", default="const", choices=("const", "board", "max"))
-    ap.add_argument("--slope-mode", default=SLOPE_MODE, choices=SLOPE_MODES,
-                    help="**T77** 速さ: `board`（既定・今の盤面の攻撃手）／`hand`（手札から今出せる体の攻撃の価格も足す）")
     ap.add_argument("--race", default=RACE_MODE, choices=RACE_MODES,
                     help="**T90** 交点の解き方: `static`（旧・`τ = Θ/A`＝的は動かない）／"
                          "`net`（動く的＝1 ターン目は盤面だけ・的は毎ターン相手の補充 `r` だけ下がる・`r` は帳簿の `g`）／"
@@ -4810,7 +4798,6 @@ def main(argv=None):
     set_theta_hand_window(a.theta_hand_window)
     set_theta_don_mode(a.theta_don)
     set_theta_hand_blocker_mode(a.theta_hand_blocker)
-    set_slope_mode(a.slope_mode)
     set_slope_block_mode(a.slope_block)
     set_rate_through_mode(a.rate_through)          # **T131**
     set_theta_side_mode(a.theta_side)              # **T133**
