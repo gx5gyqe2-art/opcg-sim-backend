@@ -133,6 +133,9 @@ def kernel_tag():
 def ref_module(g=None):
     """`rule_don_ref`（速くする前の原文）を、**今動いている** `crossing_bridge` の切替で読めるようにして返す
     （`crossing_bridge` が `__main__` として走っていても、REF が import した別の写しではなくこちらの大域を写す）。"""
+    harness = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "harness")
+    if harness not in sys.path:                              # 器を直接走らせたとき（tests/harness が道に無い）
+        sys.path.append(harness)
     import rule_don_ref as REF                               # 遅延（crossing_bridge を import し終えてから）
     g = g or _G
     mod = sys.modules.get(g.get("__name__")) if g else None
