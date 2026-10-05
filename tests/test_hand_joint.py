@@ -209,7 +209,7 @@ def test_joint_is_the_shipped_default():
     """出荷時の既定は `joint`（2026-09-26・ユーザ決定「判断1の続き→(a)」）——収集時に写した値で見る
     （他のテストが切替を触っても、戻し忘れがここを黙って通さない）。旧の `curve` は切替で残る。"""
     assert _SHIPPED_S_COST == "joint"
-    assert B.GUARD_S_COST_MODES == ("curve", "hand", "joint")
+    assert B.GUARD_S_COST_MODES == ("curve", "joint")
     old = B.GUARD_S_COST_MODE
     try:
         B.set_guard_s_cost_mode("curve")
@@ -232,7 +232,6 @@ def test_the_joint_cost_on_the_reviewers_example_and_the_ledger_is_unchanged():
     h = _hand([_slot(2000.0, 0.03, cost=2)])
     got = B.guard_joint_cost(h, 1000.0, 5)
     assert got["cost"] == pytest.approx(max(0.03, S_DISC * TAKE)) and got["set"] == (0,)
-    assert B.guard_hand_cost(_hand([_slot(2000.0, 0.03, cost=2)]), 1000.0, 5)["cost"] == pytest.approx(0.03 + S_DISC * (TAKE - 0.03))
     for played in ("take", "guard"):
         j = B.guard_step(_tok(opp_lead=6000), _sc(don=5), played, 2000.0, [], s_cost="joint",
                          hand=_hand([_slot(2000.0, 0.03, cost=2)]))

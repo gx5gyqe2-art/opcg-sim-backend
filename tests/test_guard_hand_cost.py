@@ -3,7 +3,8 @@
 1. **守れたかを規則どおりに判定する**——同じパワーは命中するので、超過 `x` を止めるには
    カウンター合計が `x + 1000` 以上要る。旧 `lenient`（合計 ≥ `x`・超過 0 ならカウンター 0 枚でも「守れた」）の切替は
    2026-10-05 に削除（下の `_old_guard_step` は比較の基準としてだけ残す）。
-2. **守る費用をこの手札で実際に失う価値で測る切替**（`GUARD_S_COST_MODE`・`curve`＝従来の `c(x)·μ`・`hand` が新形。
+2. **守る費用をこの手札で実際に失う価値で測る切替**（`GUARD_S_COST_MODE`・`curve`＝従来の `c(x)·μ`・`hand` が G-2 の形
+   〔2026-10-05 に削除・本ファイルの `hand` の代数のテストも同時に削除〕。
    **既定は 2026-09-26 から N-2 の `joint`**＝`test_hand_joint.py`。本ファイルの代数は `curve` を明示して固定する）——
    止める札の組 `S` のうち `V(手札) − V(手札 − S)` が一番小さい組の減り。`V` は出す計画（T66）＋ **これから来る**
    相手ターンの守る備え（T67 と同じ目的を**厳密な最大**で解いたもの・今の窓から **1 ラウンド割り引く**）を次の自席ターンの時点で読んだもの。
@@ -129,7 +130,7 @@ def _grid():
 
 def test_the_defaults_are_the_rule_and_the_old_cost():
     assert _SHIPPED_S_COST == "joint"             # 判断の守る費用は N-2 の 1 枚 1 役（ユーザ決定 2026-09-26「判断1の続き→(a)」）
-    assert B.GUARD_S_COST_MODES == ("curve", "hand", "joint")
+    assert B.GUARD_S_COST_MODES == ("curve", "joint")
 
 
 def test_unknown_modes_are_refused_everywhere():
@@ -147,8 +148,8 @@ def test_the_cli_flags_reach_the_modes():
     try:
         a = ap.parse_args([])
         assert B.apply_guard_s_cost(a) == "curve"                         # 省略時は不動（固定した `curve` のまま）
-        a = ap.parse_args(["--guard-s-cost", "hand"])
-        assert B.apply_guard_s_cost(a) == "hand" and B.GUARD_S_COST_MODE == "hand"
+        a = ap.parse_args(["--guard-s-cost", "joint"])
+        assert B.apply_guard_s_cost(a) == "joint" and B.GUARD_S_COST_MODE == "joint"
         with pytest.raises(SystemExit):
             ap.parse_args(["--guard-s-cost", "strict"])                   # 知らない値は argparse が弾く
     finally:
@@ -233,198 +234,7 @@ def test_curve_mode_with_a_hand_reading_changes_no_old_field():
         assert a["n_hand_cards"] is None and a["cost_guard_hand"] is None
 
 
-# ---- 3. 手札で測る守る費用（`hand`） ----
-
-def test_one_cheap_counter_costs_less_than_two_big_characters():
-    """2000 カウンター 1 枚で止まる手札は、1000 カウンターの大型を 2 枚切る手札より安い（一律の `c(x)·μ` は同じ値を付ける）。"""
-    one = B.guard_hand_cost(_hand([_slot(2000.0, 0.0), _slot(0.0, 0.12, cost=8)]), 1000.0, 5)
-    two = B.guard_hand_cost(_hand([_slot(1000.0, 0.12, cost=8), _slot(1000.0, 0.10, cost=7)]), 1000.0, 5)
-    assert one["set"] == (0,) and two["set"] == (0, 1)
-    assert one["cost"] < two["cost"]
-    assert two["cost"] > TAKE                                  # 大型 2 枚は受けるより高い＝受けるのが正しい
-    tok, sc = _tok(opp_lead=6000), _sc(don=5)
-    got = B.guard_step(tok, sc, "guard", 2000.0, [], s_cost="hand",
-                       hand=_hand([_slot(1000.0, 0.12, cost=8), _slot(1000.0, 0.10, cost=7)]))
-    assert got["theory_says"] == "take" and got["s"] == pytest.approx(-(two["cost"] - TAKE))
-
-
-def test_a_counter_only_card_is_not_free():
-    """出す価値 0 のカウンター専用札も**次の相手ターンの備えを失う**のでタダではない。
-    `hand_guard.guard_cost_min_v`（使ったときの価値だけ）はこの札を 0 と読む——そこが直した点。"""
-    h = _hand([_slot(2000.0, 0.0)], xs_future=(1000.0,))
-    got = B.guard_hand_cost(h, 1000.0, 5)
-    assert HG.guard_cost_min_v([(2000.0, 0.0)], 1000.0)[0] == 0.0
-    assert got["cost"] == pytest.approx(S_DISC * TAKE)          # 次の相手ターン（1 ラウンド後）に同じ攻撃を受けることになる
-    assert got["cost"] > 0.0
-
-
-def test_a_spare_counter_is_cheaper_than_the_last_one():
-    """最初に来る相手ターンは今の窓の 1 ラウンド後（`s = 1 − ko_p`）・2 枚目はその次（`s²`）にしか要らない＝安い。"""
-    one = B.guard_hand_cost(_hand([_slot(2000.0, 0.0)]), 1000.0, 5)["cost"]
-    two = B.guard_hand_cost(_hand([_slot(2000.0, 0.0), _slot(2000.0, 0.0)]), 1000.0, 5)["cost"]
-    three = B.guard_hand_cost(_hand([_slot(2000.0, 0.0)] * 3), 1000.0, 5)["cost"]
-    assert one == pytest.approx(S_DISC * TAKE)
-    assert two == pytest.approx(S_DISC ** 2 * TAKE)
-    assert three == pytest.approx(0.0)                          # 地平（相手ターン 2 回）の外＝要らない札
-    # 判断: 止める札が 1 枚しか無くても守るのが最善（**同点にならない**）——受けた行は (1 − s)·Θμ だけ罰する
-    tok, sc = _tok(opp_lead=6000), _sc(don=5)
-    g1t = B.guard_step(tok, sc, "take", 2000.0, [], s_cost="hand", hand=_hand([_slot(2000.0, 0.0)]))
-    g1g = B.guard_step(tok, sc, "guard", 2000.0, [], s_cost="hand", hand=_hand([_slot(2000.0, 0.0)]))
-    assert g1t["theory_says"] == "guard" and g1t["cost_guard_s"] < g1t["cost_take"]
-    assert g1t["s"] == pytest.approx(-(1.0 - S_DISC) * TAKE) and g1t["s"] < 0.0
-    assert g1g["s"] == pytest.approx(0.0)
-    g2t = B.guard_step(tok, sc, "take", 4000.0, [], s_cost="hand", hand=_hand([_slot(2000.0, 0.0)] * 2))
-    g2g = B.guard_step(tok, sc, "guard", 4000.0, [], s_cost="hand", hand=_hand([_slot(2000.0, 0.0)] * 2))
-    assert g2t["theory_says"] == "guard" and g2t["s"] == pytest.approx(-(1.0 - S_DISC ** 2) * TAKE)
-    assert g2g["s"] == pytest.approx(0.0)
-
-
-def test_the_only_stopper_is_used_against_a_lethal_attack_at_life_0():
-    """**D2 の再現**: ライフ 0 で超過 1000 の攻撃（受ければ負け）を、それを止める 2000 カウンターを持ったまま受けた。
-    割り引く前は守る費用 = 受ける損ちょうどの同点で「受けろ」・罰点 0 になっていた。今は守れと言い、受けた行を罰する。"""
-    tok, sc = _tok(opp_lead=6000), _sc(don=5)
-    th0 = T.theta_take(0.0)
-    h = _hand([_slot(2000.0, 0.0)], xs_future=(1000.0,), take=LIFE0_TAKE)
-    took = B.guard_step(tok, sc, "take", 2000.0, [], theta=th0, s_cost="hand", hand=h)
-    assert took["cost_take"] == pytest.approx(LIFE0_TAKE)
-    assert took["cost_guard_s"] == pytest.approx(S_DISC * LIFE0_TAKE)
-    assert took["theory_says"] == "guard"
-    assert took["s"] == pytest.approx(-(1.0 - S_DISC) * LIFE0_TAKE) and took["s"] < -0.1
-    guarded = B.guard_step(tok, sc, "guard", 2000.0, [], theta=th0, s_cost="hand", hand=h)
-    assert guarded["s"] == pytest.approx(0.0)
-
-
-def test_the_current_attack_is_not_counted_inside_its_own_cost():
-    """**循環を切る**: V はこれから来る相手ターンだけを数える。今の窓の攻撃 `x` は V に入らない。
-    (a) 次に来る攻撃が無ければ、カウンター専用札で今の攻撃を止める費用は 0（今の攻撃を止められることが費用に入れば `Θ·μ`）。
-    (b) 次に来る攻撃をこの札では止められないなら、費用は今の `x` に依らず出す価値だけ。"""
-    assert B.guard_hand_cost(_hand([_slot(2000.0, 0.0)], xs_future=()), 1000.0, 5)["cost"] == pytest.approx(0.0)
-    assert B.guard_hand_cost(_hand([_slot(2000.0, 0.0)], xs_future=(1000.0,)), 1000.0, 5)["cost"] == pytest.approx(S_DISC * TAKE)
-    h = _hand([_slot(2000.0, 0.01, cost=1)], xs_future=(3000.0,))            # 次の攻撃は 4000 要る＝この札では止まらない
-    for x in (0.0, 1000.0):
-        assert B.guard_hand_cost(h, x, 5)["cost"] == pytest.approx(0.01)
-    # 判断の側でも: 次の攻撃が無い手札なら受けた行は `Θ·μ` まるごと罰される
-    tok, sc = _tok(opp_lead=6000), _sc(don=5)
-    got = B.guard_step(tok, sc, "take", 2000.0, [], s_cost="hand", hand=_hand([_slot(2000.0, 0.0)], xs_future=()))
-    assert got["cost_guard_hand"] == pytest.approx(0.0) and got["s"] == pytest.approx(-TAKE)
-
-
-def test_an_unreadable_card_counts_at_the_market_price():
-    """値の読めない札は `μ`（`spent` の分岐と同じ規約）——使ったときの価値がちょうど `μ` の札と区別がつかない。"""
-    for xs in ((), (1000.0,), (3000.0,)):
-        u = B.guard_hand_cost(_hand([_slot(2000.0, None, cost=2), _slot(1000.0, 0.02, cost=1)], xs_future=xs), 1000.0, 5)
-        r = B.guard_hand_cost(_hand([_slot(2000.0, MU, cost=2), _slot(1000.0, 0.02, cost=1)], xs_future=xs), 1000.0, 5)
-        assert u == r
-    lone = B.guard_hand_cost(_hand([_slot(2000.0, None, cost=2)], xs_future=()), 1000.0, 5)
-    assert lone["cost"] == pytest.approx(MU)                    # 次のターンに出せる＝ちょうど μ を失う
-
-
-def _mixed():
-    return _hand([_slot(1000.0, 0.02, cost=2), _slot(1000.0, 0.03, cost=3), _slot(2000.0, 0.05, cost=4),
-                  _slot(0.0, 0.10, cost=5), _slot(2000.0, 0.0, cost=1, event=True, paid=(1, 2000.0))])
-
-
-def test_spending_more_cards_than_needed_is_never_cheaper():
-    """余計な札を足した組は、足りている組より安くならない（V は札が多いほど下がらない）。
-    選ばれた組は過不足が無い（どの 1 枚を抜いても足りない）。来る攻撃が 1 本の手札と、何本も来る手札（D1 の形）の両方で。"""
-    for xs in ((1000.0,), (2000.0, 0.0), (1000.0, 2000.0, 3000.0, 0.0, 0.0, 0.0), (0.0, 0.0, 1000.0)):
-        _check_supersets_and_minimality(dict(_mixed(), xs_future=list(xs)))
-
-
-def _check_supersets_and_minimality(h):
-    cache = {}
-    n = len(h["slots"])
-    for r in range(1, n):
-        for S in itertools.combinations(range(n), r):
-            base = B.guard_set_loss(h, S, cache)
-            assert base >= 0.0
-            for j in range(n):
-                if j not in S:
-                    assert B.guard_set_loss(h, S + (j,), cache) >= base - 1e-12, (S, j)
-    for x in (0.0, 1000.0, 2000.0, 3000.0):
-        got = B.guard_hand_cost(h, x, 1)
-        need = B.afford_need(x)
-        tot = lambda S: sum(h["slots"][i]["free"] for i in S) + GA.knapsack(
-            [h["slots"][i]["paid"] for i in S if h["slots"][i]["paid"]], 1)
-        assert tot(got["set"]) >= need
-        for k in got["set"]:
-            assert tot(tuple(i for i in got["set"] if i != k)) < need      # 1 枚でも抜けば足りない
-        # 最小性: 足りる組はどれも選ばれた組より安くない
-        for r in range(1, n + 1):
-            for S in itertools.combinations(range(n), r):
-                if tot(S) >= need:
-                    assert B.guard_set_loss(h, S, cache) >= got["cost"] - 1e-12
-
-
-def test_a_bigger_attack_never_costs_less_to_stop():
-    for xs in ((1000.0,), (2000.0, 0.0), (1000.0, 2000.0, 3000.0, 0.0, 0.0, 0.0)):
-        _check_bigger_attack(dict(_mixed(), xs_future=list(xs)))
-
-
-def _check_bigger_attack(h):
-    costs = [B.guard_hand_cost(h, x, 1)["cost"] for x in (0.0, 1000.0, 2000.0, 3000.0, 4000.0, 5000.0)]
-    finite = [c for c in costs if c is not None]
-    assert finite == sorted(finite) and len(finite) >= 4
-    assert costs[-1] is None or costs[-1] >= finite[-1]
-
-
-def test_an_event_counter_is_usable_only_if_its_don_is_payable():
-    h = _hand([_slot(2000.0, 0.0, cost=2, event=True, paid=(2, 2000.0))])
-    assert B.guard_hand_cost(h, 1000.0, 1)["cost"] is None
-    assert B.guard_hand_cost(h, 1000.0, 2)["cost"] is not None
-    tok = _tok(opp_lead=6000)
-    poor = B.guard_step(tok, _sc(don=1), "take", 0.0, [(2, 2000.0)], s_cost="hand", hand=h)
-    rich = B.guard_step(tok, _sc(don=2), "take", 0.0, [(2, 2000.0)], s_cost="hand", hand=h)
-    assert poor["can_guard"] is False and poor["s"] == 0.0 and poor["n_counter_cards"] == 0
-    assert rich["can_guard"] is True and rich["n_counter_cards"] == 1
-
-
-def test_blocker_rows_keep_the_old_price_and_the_ledger_never_moves():
-    """限界の固定: ブロッカーが居る行は従来の `c(x)·μ` で判断する。`hand` は判断だけの切替＝帳簿の欄は `curve` と同じ。"""
-    tok, sc = _tok(opp_lead=8000, blocker=True), _sc(don=5)
-    h = _hand([_slot(2000.0, 0.0), _slot(2000.0, 0.0)], xs_future=())
-    for played in ("take", "guard"):
-        hb = B.guard_step(tok, sc, played, 4000.0, [], s_cost="hand", hand=h)
-        cb = B.guard_step(tok, sc, played, 4000.0, [])
-        assert hb["cost_guard_source"] == "blocker" and hb["cost_guard_hand"] is not None
-        assert hb["s"] == cb["s"] and hb["theory_says"] == cb["theory_says"]
-    tok2 = _tok(opp_lead=8000)                                   # ブロッカー無し
-    for played in ("take", "guard"):
-        for gg in ("paid", "delta", "zero"):
-            hh = B.guard_step(tok2, sc, played, 4000.0, [], s_cost="hand", hand=h)
-            cc = B.guard_step(tok2, sc, played, 4000.0, [])
-            assert hh["cost_guard_source"] == "hand"
-            for k in ("g", "g_paid", "g_delta", "price", "margin", "x", "can_guard"):
-                assert hh[k] == cc[k], k
-
-
-def test_hand_mode_without_a_hand_reading_refuses_to_guess():
-    with pytest.raises(ValueError):
-        B.guard_step(_tok(6000), _sc(), "take", 9000.0, [], s_cost="hand")
-    with pytest.raises(ValueError):
-        B.guard_step(_tok(6000), _sc(), "take", 9000.0, [], s_cost="hand",
-                     hand={"slots": [], "caps": None, "xs_future": None, "take": TAKE, "mu": MU, "inflow": None})
-
-
-def test_the_audit_fields_reach_the_window_bookkeeping():
-    """監査の欄は `_finish_guard`（G-1 が行ごとの記録に monkeypatch した経路）まで届き、`hand` の行だけ集計される。"""
-    tok, sc = _tok(opp_lead=6000), _sc(don=5)
-    got = B.guard_step(tok, sc, "take", 4000.0, [], s_cost="hand", hand=_hand([_slot(2000.0, 0.0)] * 2))
-    for k in ("cost_guard_curve", "cost_guard_hand", "n_hand_cards", "n_counter_cards", "cost_guard_source"):
-        assert k in got
-    seen = []
-    stats = {"grd_rows": 0, "grd_by_life": {}, "grd_comfortable": 0}
-    B._finish_guard(dict(got, g=0.0, g_delta=0.0), "take", 3.0, 1.0, "close", 1.0, 0, 4, {}, {}, stats,
-                    lambda *a, **k: seen.append(a))
-    assert stats["grd_hand_rows"] == 1 and stats["grd_hand_priced"] == 1
-    assert stats["grd_hand_cost_sum"] == pytest.approx(got["cost_guard_hand"])
-    assert stats["grd_hand_curve_sum"] == pytest.approx(got["cost_guard_curve"])
-    assert seen and seen[0][2] == pytest.approx(got["s"])            # 帯に入る `s` は手札で測った判断のもの
-    stats2 = {"grd_rows": 0, "grd_by_life": {}, "grd_comfortable": 0}
-    B._finish_guard(B.guard_step(tok, sc, "take", 4000.0, []), "take", 3.0, 1.0, "close", 1.0, 0, 4, {}, {}, stats2,
-                    lambda *a, **k: None)
-    assert "grd_hand_rows" not in stats2                            # `curve` の行は集計しない
-
+# ---- 3. 手札で測る守る費用（`hand`）——2026-10-05 に切替ごと削除（`joint` は `test_hand_joint.py`） ----
 
 # ---- 4. 記録の行からの読み（本物の札） ----
 
@@ -488,8 +298,8 @@ def test_the_reading_values_come_from_hand_plan_on_the_next_turn():
     lite = B.guard_hand_reading(tok, sc, ci, idx2cid, cards, take=TAKE, values=False)
     assert lite["caps"] is None and all(s["v"] is None and s["item"] is None for s in lite["slots"])
     free, paid, _n = GA.hand_counters(tok, ci, idx2cid, cards)
-    got = B.guard_step(tok, sc, "take", free, paid, s_cost="hand", hand=rd)
-    assert got["cost_guard_source"] == "hand" and got["cost_guard_hand"] is not None
+    got = B.guard_step(tok, sc, "take", free, paid, s_cost="joint", hand=rd)
+    assert got["cost_guard_source"] == "joint" and got["cost_guard_hand"] is not None
     assert got["cost_guard_hand"] >= 0.0 and got["hand_set_n"] >= 1
     assert got["n_hand_cards"] == 6 and got["n_counter_cards"] == 5                   # イベントはドン 1 で払える
 
@@ -541,48 +351,6 @@ def test_the_exact_guard_readiness_is_the_true_maximum_and_never_below_the_greed
     assert HG.guard_value_exact(items, [0.0, 1000.0], TAKE) == pytest.approx(_brute_guard(items, [0.0, 1000.0], TAKE))
 
 
-def test_the_value_of_a_hand_never_drops_when_a_card_is_added():
-    """**D1 の単調性**: 相方待ちを読み直さない手札では `V(手札) ≥ V(手札 − 1 枚)`（出す計画は DP の最大・守る備えは厳密な最大）。
-    過不足の無い組に絞ってよい根拠。何本も攻撃が来る形で乱択 200 手札。"""
-    rng = np.random.default_rng(5)
-    for _ in range(200):
-        n = int(rng.integers(1, 6))
-        slots = [_slot(float(rng.choice([0.0, 1000.0, 2000.0])), float(rng.choice([0.0, 0.02, 0.05, 0.1])),
-                       cost=int(rng.integers(0, 8))) for _k in range(n)]
-        xs = [float(x) for x in rng.choice([0.0, 1000.0, 2000.0, 3000.0], size=int(rng.integers(0, 4)))]
-        h = _hand(slots, xs_future=xs)
-        assert B.hand_value_monotone(h)
-        cache = {}
-        v_all = B._hand_v(h, range(n), cache)
-        for j in range(n):
-            assert v_all >= B._hand_v(h, [i for i in range(n) if i != j], cache) - 1e-12, (slots, xs, j)
-
-
-def test_several_future_attacks_are_priced_by_the_best_assignment():
-    """**D1 のレビューの再現**（貪欲では損が 0 に潰れた 2 例）。
-    (a) 1000 と 2000 のカウンター専用札・来る攻撃が超過 2000 と 0: 貪欲は 2 枚とも 2000 の攻撃に当てるので 1 枚の損が 0 に見えた。
-        最善は 0 の攻撃に 1 枚ずつ（1 ラウンド後と 2 ラウンド後）＝V = (s + s²)Θμ。今 1 枚切ると残りは s·Θμ ＝ 損 s²·Θμ。
-    (b) 1000 カウンター 5 枚（v = 0.01〜0.05）・来る攻撃 3000, 2000, 1000, 0, 0, 0: 貪欲では 1 枚目を抜くと V が上がり、損 0 だった。"""
-    h = _hand([_slot(1000.0, 0.0), _slot(2000.0, 0.0)], xs_future=(2000.0, 0.0))
-    assert HG.guard_value([(1000.0, 0.0), (2000.0, 0.0)], [2000.0, 0.0], TAKE) == pytest.approx(TAKE)   # 貪欲の読み
-    got = B.guard_hand_cost(h, 0.0, 5)
-    assert got["cost"] == pytest.approx(S_DISC ** 2 * TAKE) and got["cost"] > 0.0
-    five = [(1000.0, 0.01 * (i + 1)) for i in range(5)]
-    xs = (1000.0, 2000.0, 3000.0, 0.0, 0.0, 0.0)
-    h5 = _hand([_slot(c, v, cost=i + 1) for i, (c, v) in enumerate(five)], xs_future=xs)
-    cache = {}
-    v_all = B._hand_v(h5, range(5), cache)
-    for j in range(5):
-        rest = [it for i, it in enumerate(five) if i != j]
-        assert B._hand_v(h5, [i for i in range(5) if i != j], cache) <= v_all
-        # V の守る備えは独立の総当たりと一致（1 ラウンド後から数える）
-        assert HG.guard_value_exact(rest, list(xs), TAKE, start=1) == pytest.approx(_brute_guard(rest, list(xs), TAKE, start=1))
-    c5 = B.guard_hand_cost(h5, 0.0, 5)
-    assert c5["cost"] > 0.01 and c5["set"] == (0,)
-    loss0 = v_all - B._hand_v(h5, [1, 2, 3, 4], cache)
-    assert c5["cost"] == pytest.approx(loss0)
-
-
 def test_the_value_lost_is_not_t67s_per_card_value():
     """**D3**: 手札の差で読む失う価値は T67 の札ごとの価値 `max(ΔH, ΔG)` とは**違う量**。
     2000 カウンター（v = 0.03・コスト 2）1 枚・次の攻撃 1000: 割引前の差は `ΔH + ΔG`＝`max(v, Θμ)`＝0.0872、
@@ -598,39 +366,5 @@ def test_the_value_lost_is_not_t67s_per_card_value():
     assert v0 == pytest.approx(0.0872, abs=1e-4) and v0 == pytest.approx(TAKE)
     assert v0 == pytest.approx(d["dh"] + d["dg"])
     assert v0 == pytest.approx(d["dtotal"] + min(d["dh"], d["dg"]))
-    got = B.guard_hand_cost(_hand([_slot(2000.0, 0.03, cost=2)], xs_future=(1000.0,)), 1000.0, 5)
-    assert got["cost"] == pytest.approx(d["dh"] + S_DISC * d["dg"])          # 判断が使う値（1 ラウンド割り引く）
 
 
-def test_cutting_a_partner_lowers_the_partner_waiting_card(monkeypatch):
-    """**D5**: 相方を切ると、手札に残った相方待ちの札の価値も落ちる（`apply_inflow` を残した手札で読み直す）。
-    その手札では V の単調性が保証できないので、足りる組を全部調べる。"""
-    import hand_plan as HP
-    import search_price as SP
-
-    class _Cards:
-        def info(self, cid):
-            return {"E": {"cost": 4}, "P": {"cost": 2}, "Z": {"cost": 5}}.get(cid)
-    monkeypatch.setattr(SP, "enabler_target", lambda cid, cards_json=None: {"cost_max": 2} if cid == "E" else None)
-    monkeypatch.setattr(SP, "eligible_hand_cards",
-                        lambda target, items, cards, skip_cid=None: [it["cid"] for it in items if it["cid"] == "P"])
-    monkeypatch.setattr(SP, "eligible_deck_cards", lambda target, deck, cards: [c for c in deck if c == "P"])
-    monkeypatch.setattr(HP, "_base_value", lambda cid, info, cards, olp, r, field=(), st_base=None: 0.10)
-    monkeypatch.setattr(HP, "_value_with_partner",
-                        lambda cid, info, cards, olp, r, partner, field=(), st_base=None: 0.10 + 0.12)
-    monkeypatch.setattr(HP, "inflow_per_turn", lambda items, xs, take, deck, cards: 1.0)
-    e = {"cid": "E", "cost": 4.0, "v": 0.10, "counter": 0.0, "event": False}
-    p = {"cid": "P", "cost": 2.0, "v": 0.02, "counter": 1000.0, "event": False}
-    slots = [dict(_slot(0.0, 0.10, cost=4), cid="E", item=e), dict(_slot(1000.0, 0.02, cost=2), cid="P", item=p)]
-    h = dict(_hand(slots, xs_future=()), inflow={"deck": ["Z", "Z"], "cards": _Cards(), "olp": 5000.0, "r": 3.0,
-                                                 "field": [], "st_base": None})
-    assert not B.hand_value_monotone(h)
-    got = B.guard_hand_cost(h, 0.0, 5)                          # 今の攻撃（超過 0）を止められるのは P だけ
-    assert got["set"] == (1,)
-    # 読み直し無し（E は 0.10 のまま）なら損は P 自身の 0.02 だけ。読み直すと E の相方の取り分 0.12 も失う
-    static = B.guard_hand_cost(dict(h, inflow=None), 0.0, 5)
-    assert static["cost"] == pytest.approx(0.02)
-    assert got["cost"] == pytest.approx(0.02 + 0.12)
-    # 相方の居ない山（["Z", "Z"]）では E は base のまま＝V(手札 − P) は E = 0.10
-    assert B._hand_v(h, [0], {}) == pytest.approx(0.10)
-    assert B.hand_value_monotone(dict(h, inflow=None))          # 読み直さない手札なら単調＝過不足の無い組に絞る
