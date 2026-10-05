@@ -577,7 +577,7 @@ def _inflow_sensitive(item, ctx):
         return False
     if SP.enabler_target(item["cid"]) is not None:
         return True
-    return bool(ctx.get("st_base")) and HP.COND_CLOCK_MODE == "on" and HP.has_on_play_condition(item["cid"])
+    return bool(ctx.get("st_base")) and HP.has_on_play_condition(item["cid"])
 
 
 def joint_valuer(hand):
@@ -1765,7 +1765,6 @@ def main(argv=None):
     EV.add_cost_afford_arg(ap)
     EV.add_pricing_fixes_arg(ap)
     import hand_plan as _HP
-    _HP.add_cond_clock_arg(ap)
     ap.add_argument("--harm-profile", default="cross", choices=("cross", "real", "syn"),
                     help="**T75** `--w-mode curve` の輪郭: `cross`（既定・測る記録と別のセット）／`real`／`syn`（`tests/fixtures/harm_profile.json`）")
     import crossing_bridge as _CB
@@ -1816,7 +1815,6 @@ def main(argv=None):
     EV.apply_search_price(a)
     EV.apply_cost_afford(a)
     pricing_fixes = EV.apply_pricing_fixes(a)                  # L
-    _HP.apply_cond_clock_mode(a)
     _CB.set_theta_hand_mode(a.theta_hand)
     set_last_turn_mode(a.last_turn)
     set_play_book_mode(a.play_book)
@@ -1869,7 +1867,7 @@ def main(argv=None):
                            "guard_cost": GUARD_COST_MODE, "search_price": "plan",
                            "guard_afford": effective_guard_afford(), "guard_afford_requested": GUARD_AFFORD_MODE,   # G-2
                            "guard_s_cost": GUARD_S_COST_MODE,
-                           "play_now": "hand", "inflow": "on", "cond_clock": _HP.COND_CLOCK_MODE,
+                           "play_now": "hand", "inflow": "on", "cond_clock": "on",
                            "pricing_fixes": pricing_fixes,                                              # L
                            "note": "§0.4 の暫定値。感度を付けて読む",
                            **({"cut_price": _CP.CUT_PRICE_MODE} if _CP.joint_on() else {})},   # **N-3**

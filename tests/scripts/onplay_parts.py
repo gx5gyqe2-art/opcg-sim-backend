@@ -134,7 +134,6 @@ def main(argv=None):
     EV.add_search_price_arg(ap)
     PR.add_hand_meas_arg(ap)
     import hand_plan as _HP
-    _HP.add_cond_clock_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     TO.apply_nu_mode(a)
@@ -142,11 +141,10 @@ def main(argv=None):
     TO.apply_cbar_mode(a)
     EV.apply_search_price(a)
     PR.apply_hand_meas(a)
-    _HP.apply_cond_clock_mode(a)
     t0 = time.time()
     rows, stats = collect(a.src, a.limit_games)
     res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "search_price": "plan",
-           "hand_meas": PR.HAND_MEAS_MODE, "play_now": "hand", "inflow": "on", "cond_clock": _HP.COND_CLOCK_MODE, "stats": stats,
+           "hand_meas": PR.HAND_MEAS_MODE, "play_now": "hand", "inflow": "on", "cond_clock": "on", "stats": stats,
            "summary": summarise(rows, a.min_card_rows),
            "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)

@@ -174,7 +174,7 @@ def test_inflow_item_turns_an_enabler_into_a_per_turn_value(monkeypatch):
 
 def test_project_state_advances_the_clocks_from_rules_and_the_theory(monkeypatch):
     """**T73**: ドンは +2/ターン（上限 10・ターン開始は全部アクティブ）・自分のライフは受ける本数・相手のライフは受ける規則が受けろと言う本数・
-    トラッシュはカウンター＋KO＋イベント・ターンは +2t。`t = 0` と `off` はそのまま。"""
+    トラッシュはカウンター＋KO＋イベント・ターンは +2t。`t = 0` はそのまま。"""
     st = {"my_don_total": 7.0, "my_don": 7, "my_don_active": 3, "opp_don_total": 9.0, "opp_don": 9, "opp_don_active": 9,
           "my_life": 4, "opp_life": 3, "my_trash": 2, "turn": 5, "my_field_ids": ["A", "B"],
           "my_attack_xs": [3000.0, -1000.0, 0.0]}
@@ -194,13 +194,6 @@ def test_project_state_advances_the_clocks_from_rules_and_the_theory(monkeypatch
     out2 = HP.project_state(st, 2, items, xs, take)
     assert out2["my_don_total"] == 10.0 and out2["my_life"] == pytest.approx(2.0) and out2["turn"] == 9
     assert HP.counters_cut(items, xs, take) == 1.0 and HP.opp_life_loss_per_turn(st) == 1.0
-    HP.set_cond_clock_mode("off")
-    try:
-        assert HP.project_state(st, 2, items, xs, take) is st
-    finally:
-        HP.set_cond_clock_mode("on")
-    with pytest.raises(ValueError):
-        HP.set_cond_clock_mode("guess")
 
 
 def test_a_conditional_card_gets_a_per_turn_value_from_the_projected_state(monkeypatch):
@@ -221,11 +214,6 @@ def test_a_conditional_card_gets_a_per_turn_value_from_the_projected_state(monke
     assert got["v"] == pytest.approx([0.05, 0.05, 0.2, 0.2]) and got["v_static"] == 0.05      # 6 → 8 → 10 で条件が立つ
     z = {"cid": "Z", "cost": 5.0, "v": 0.05, "counter": 0.0, "event": False}
     assert HP.inflow_item(z, [], [], [], 0.087, _Cards(), 5000.0, 4.0, turns=4, st_base=st) is z   # 条件も相方も無ければそのまま
-    HP.set_cond_clock_mode("off")
-    try:
-        assert HP.inflow_item(k, [], [], [], 0.087, _Cards(), 5000.0, 4.0, turns=4, st_base=st) is k
-    finally:
-        HP.set_cond_clock_mode("on")
 
 
 def test_search_context_reads_incoming_attacks_at_the_rules_power_of_the_defender():

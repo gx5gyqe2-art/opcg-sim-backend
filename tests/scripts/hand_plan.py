@@ -280,28 +280,8 @@ def state_of_row(sc, tok_row, ci_row, idx2cid, cards):
 #:   ドン: 自分のターンごとに +2（上限 10・ターン開始は全部アクティブ）  相手のドンも +2
 #:   自分のライフ: 受ける本数（守る規則で止めない攻撃）× t        相手のライフ: 自分の攻撃のうち受ける規則（c(x) > Θ）が受けろと言う本数 × t
 #:   トラッシュ: カウンターで切る枚数 ＋ KO される体（ko_p × 場の数）＋ 使うイベント（手札の使えるイベント ÷ 計画の長さ）  × t
-#:   ターン: +2t。場の数・手札枚数はそのまま（限界）。`off` なら今の状態で全 t を読む（T72 まで）。
-COND_CLOCK_MODES = ("off", "on")
-COND_CLOCK_MODE = "on"
-
-
-def set_cond_clock_mode(mode):
-    global COND_CLOCK_MODE
-    if mode not in COND_CLOCK_MODES:
-        raise ValueError("cond clock mode は %s のどれか" % (COND_CLOCK_MODES,))
-    COND_CLOCK_MODE = mode
-    return COND_CLOCK_MODE
-
-
-def add_cond_clock_arg(ap):
-    ap.add_argument("--cond-clock", default=None, choices=COND_CLOCK_MODES,
-                    help="**T73** 条件付きの札の v を t ターン後の状態（ドン +2・ライフ・トラッシュ・ターンの時計）で読む（`on`・既定）か今の状態（`off`）か")
-
-
-def apply_cond_clock_mode(a):
-    if getattr(a, "cond_clock", None) is not None:
-        set_cond_clock_mode(a.cond_clock)
-    return COND_CLOCK_MODE
+#:   ターン: +2t。場の数・手札枚数はそのまま（限界）。旧の `off`（今の状態で全 t を読む・T72 まで・切替 `COND_CLOCK_MODE`）は
+#:   2026-10-05 に削除——`claude/theory-switches-final` で再現できる。出力 JSON の `cond_clock` キーは定数 `"on"` のまま残す。
 
 
 _HAS_COND = {}
@@ -379,9 +359,9 @@ def _hand_stats(items, xs, take_cost, deck=None, cards=None, memo=None, search=F
 
 
 def project_state(st, t, items, xs, take_cost, turns=PLAN_TURNS, pre=None):
-    """判断点の状態を t ターン後へ進める（`t = 0` はそのまま・`COND_CLOCK_MODE=off` もそのまま）。
+    """判断点の状態を t ターン後へ進める（`t = 0` はそのまま）。
     `pre`（`_hand_stats` の戻り値）を渡せば残りの手札の量を読み直さない（同じ式・同じ値）。"""
-    if not st or int(t) <= 0 or COND_CLOCK_MODE != "on":
+    if not st or int(t) <= 0:
         return st
     t = int(t)
     out = dict(st)
@@ -446,7 +426,7 @@ def inflow_item(item, others, deck, xs, take_cost, cards, olp, r, turns=PLAN_TUR
     `memo`（2026-10-01）＝1 つの手札の読みの間だけ生きる覚え書き（`_uv_memo`・値は同じ）。"""
     import search_price as SP
     target = SP.enabler_target(item["cid"])
-    cond = bool(st_base) and COND_CLOCK_MODE == "on" and has_on_play_condition(item["cid"])
+    cond = bool(st_base) and has_on_play_condition(item["cid"])
     if target is None and not cond:
         return item
     info = cards.info(item["cid"]) or {}
@@ -754,17 +734,15 @@ def main(argv=None):
     TO.add_nu_mode_arg(ap)
     TO.add_surv_mode_arg(ap)
     TO.add_cbar_mode_arg(ap)
-    add_cond_clock_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     apply_decision_row(a)
     TO.apply_nu_mode(a)
     TO.apply_surv_mode(a)
     TO.apply_cbar_mode(a)
-    apply_cond_clock_mode(a)
     t0 = time.time()
     searches, draws, stats = collect(a.src, a.limit_games)
-    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "cbar_mode": a.cbar_mode, "inflow": "on", "cond_clock": COND_CLOCK_MODE,
+    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "cbar_mode": a.cbar_mode, "inflow": "on", "cond_clock": "on",
            "plan_turns": PLAN_TURNS,
            "stats": stats, "summary": summarise(searches, draws, a.min_card), "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)
