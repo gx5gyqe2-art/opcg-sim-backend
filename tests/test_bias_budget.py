@@ -196,10 +196,9 @@ def test_the_decomposition_only_claims_to_be_exact_on_a_static_target():
 
 def test_every_mode_that_moves_the_target_is_named():
     """**的を動かす 4 つの切替**が条件に全部入っている（1 つ足したら落ちる）。"""
-    base = {n: getattr(CB, n) for n in ("RACE_MODE", "THETA_HAND_PLACE", "THETA_RETURN_MODE", "RATE_DECAY_MODE")}
+    base = {n: getattr(CB, n) for n in ("RACE_MODE", "THETA_RETURN_MODE", "RATE_DECAY_MODE")}
     CB.THETA_RETURN_MODE = "off"                 # 他の 3 つを測るために的を止めておく（既定は untap）
     for name, off, on in (("RACE_MODE", "static", "net"),
-                          ("THETA_HAND_PLACE", "stock", "shield"),
                           ("THETA_RETURN_MODE", "off", "untap"),
                           ("RATE_DECAY_MODE", "off", "ko")):
         old = getattr(CB, name)

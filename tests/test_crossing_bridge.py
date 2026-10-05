@@ -29,7 +29,7 @@ import theory_order as T  # noqa: E402
 #: **出荷時の既定**を import の瞬間に写し取る（`conftest` の autouse も各テストの try/finally も
 #: まだ走っていない時点の値）＝**ファイルの既定そのもの**をラチェットするための控え。
 _SHIPPED = {n: getattr(CB, n) for n in (
-    "THETA_HAND_MODE", "THETA_HAND_PLACE", "THETA_BODY_MODE",
+    "THETA_HAND_MODE", "THETA_BODY_MODE",
     "THETA_RETURN_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE",
     "RATE_WALK_MODE", "RATE_DECAY_MODE", "RACE_MODE", "SLOPE_TAKE_MODE",
     "THETA_HAND_WINDOW",)}
@@ -57,7 +57,6 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
     **黙って既定が変わると 2 つの橋の数字が比較不能になる**ので、ここで固定する。"""
     assert _SHIPPED == {
         "THETA_HAND_MODE": "rule_don",          # H-4・2026-10-04（ユーザ決定・旧 cuttable_forced は --theta-hand で再現）
-        "THETA_HAND_PLACE": "stock",            # T102（切替として残す）
         "THETA_BODY_MODE": "blockers",           # T97
         "THETA_RETURN_MODE": "untap",            # T96・**C-5c で既定に採用**（2026-09-25）
         "SLOPE_HAND_MODE": "flow",               # T93
@@ -1524,7 +1523,7 @@ def test_the_hand_is_a_shield_that_takes_time_to_spend():
     """**T102**（T101 が指した先）: **手札は「使う時間」が要る**——`Θ` に一括で足すと
     **とどめのターンで倍に見え**（T101: τ を揃えても 1.95／2.01）、**長い局では足りない**（0.58）。
     同じ `μ × 切れる枚数` を**しきい値から的の側の有限の盾へ移す**（新しい量はゼロ）。"""
-    assert CB.THETA_HAND_PLACE == "stock"                         # 既定は据え置き（採否はユーザ判定）
+    # 橋の置き場所は `Θ` に一括（`stock`）のまま——`shield` の切替は 2026-10-05 に削除。歩きの盾の算術だけ残す
     # 盾が無ければ従来どおり: 速さ 0.1／ターンで的 0.5 → 5 ターン
     assert _tg(0.5, 0.1, 0.0, 0.0, 0.0) == pytest.approx(5.0)
     # 盾 0.5 を 1 ターンで全部使えるなら、的は 1.0 になる（＝旧 `stock` と同じ）
@@ -1542,12 +1541,6 @@ def test_the_hand_is_a_shield_that_takes_time_to_spend():
     assert CB.tau_from_profile(0.5, 0, prof) == pytest.approx(5.0)
     assert CB.tau_from_profile(0.5, 0, prof, 1.0, 0.0, 0.5) == pytest.approx(10.0)
     assert 5.0 < CB.tau_from_profile(0.5, 0, prof, 1.0, 0.0, 0.5, 0.02) < 10.0
-    try:
-        assert CB.set_theta_hand_place("shield") == "shield"
-        with pytest.raises(ValueError):
-            CB.set_theta_hand_place("なにか")
-    finally:
-        CB.set_theta_hand_place("stock")
 
 
 def test_the_shield_can_only_be_spent_on_attacks_that_exist():

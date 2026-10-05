@@ -2217,15 +2217,16 @@ def shield_count_of(xs, n_blockers_opp, theta=THETA):
     return float(sum(c for c in cs if c <= float(theta)))
 
 
-#: **T102**: 耐久の手札項を**どこに置くか**。
-#: `stock`（旧・`Θ` に一括で足す）／**`shield`**（**的の側の有限の盾**＝毎ターン「規則が許すぶんだけ」減る）。
+#: **T102**: 耐久の手札項を**どこに置くか**——`Θ` に一括で足す（`stock`）。比べた `shield`（**的の側の有限の盾**＝
+#: 毎ターン「規則が許すぶんだけ」減る・切替 `THETA_HAND_PLACE`）は T116 の窓（`horizon`）に置き換わり、2026-10-05 に削除——
+#: `claude/theory-switches-final` で再現できる。出力 JSON の `theta_hand_place` キーは定数 `"stock"` のまま残す。
+#: 歩き（`tau_grow`／`tau_from_profile`）の `shield`／`shield_rate` の引数は残る（橋からは常に 0 が渡る）。
+#: 当時の根拠:
 #: **根拠**: `Θ` は在庫だが**手札は「使う時間」が要る**——`T101` で、`Θ`/要は τ の当たった行に絞っても
 #: **残り 1 ターンで 1.95／2.01 のまま**（τ の偏りでは説明できない）で、**超過はちょうど手札の項の大きさ**
 #: （実: `Θ` 0.3208 = ライフ 0.1357 ＋ 手札 0.1702 ＋ 体 0.0148 に対し**要った損害は 0.1643 ≒ ライフだけ**）。
 #: 逆に**残り 6+ では手札の項が無いと足りない**（0.652/1.123 = 0.58）＝**手札は長い局でだけ耐久になる**。
 #: **新しい量はゼロ**——同じ `μ × 切れる枚数` を、**しきい値から的の動き方へ移すだけ**。
-THETA_HAND_PLACES = ("stock", "shield")
-THETA_HAND_PLACE = "stock"
 
 #: **T116**（2026-09-19）: **手札のうち「守る窓が存在する分」だけを的に入れる**（新定数ゼロ）。
 #: **規則**: 守り手はカウンターを**宣言された攻撃にしか切れない**（`shield_rate_of`＝1 守備ターンの上限 `SR`）。
@@ -2249,14 +2250,6 @@ def set_theta_hand_window(name):
         raise ValueError("unknown theta hand window: %r" % (name,))
     THETA_HAND_WINDOW = name
     return THETA_HAND_WINDOW
-
-
-def set_theta_hand_place(name):
-    global THETA_HAND_PLACE
-    if name not in THETA_HAND_PLACES:
-        raise ValueError("unknown theta hand place: %r" % (name,))
-    THETA_HAND_PLACE = name
-    return THETA_HAND_PLACE
 
 
 def opp_attackers_of(tok, my_leader_power):
@@ -2670,22 +2663,8 @@ def curve_d_of_row(sc, tok, j, prof, g_hand_of_opp=None, g_hand_of_me=None, cut_
                                      attacker=(m["attacker"]() if callable(m["attacker"]) else m["attacker"])))
         else:
             th_opp = threshold_of_me(sc, tok, g_hand=g_hand_of_me)
-    sh_me = sh_opp = rate_me = rate_opp = 0.0
-    if THETA_HAND_PLACE == "shield" and (cut_opp is not None or cut_me is not None):
-        raise ValueError("N-3（cut price joint）は THETA_HAND_PLACE=shield と組めない")
-    if THETA_HAND_PLACE == "shield":
-        # **T102**: 手札は**しきい値から外し、両席とも有限の盾**にする（対称に読む・§0.05）。
-        sc_a = np.asarray(sc); tok_a = np.asarray(tok)
-        mlp = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-        olp = float(sc_a[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-        g_o = float(MU if g_hand_of_opp is None else g_hand_of_opp)
-        g_m = float(MU if g_hand_of_me is None else g_hand_of_me)
-        sh_me = g_o * float(sc_a[SC_OPP_HAND]); th_me -= sh_me
-        sh_opp = g_m * float(sc_a[SC_MY_HAND]); th_opp -= sh_opp
-        rate_me = shield_rate_of(own_attackers_of(tok_a, olp), _opp_active_blockers(tok_a))
-        rate_opp = shield_rate_of(opp_attackers_of(tok_a, mlp), _own_active_blockers(tok_a))
-    tau_me = tau_from_profile(th_me, int(j), prof, 1.0, 0.0, sh_me, rate_me)
-    tau_opp = tau_from_profile(th_opp, int(j), prof, 1.0, 0.0, sh_opp, rate_opp)
+    tau_me = tau_from_profile(th_me, int(j), prof, 1.0, 0.0, 0.0, 0.0)
+    tau_opp = tau_from_profile(th_opp, int(j), prof, 1.0, 0.0, 0.0, 0.0)
     return {"d": float(tau_opp - tau_me), "tau_me": tau_me, "tau_opp": tau_opp, "theta_me": th_me, "theta_opp": th_opp}
 
 
@@ -3648,8 +3627,6 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             raise ValueError("N-3（cut price joint）は THETA_HAND_MODE=%r と組めない" % (THETA_HAND_MODE,))
         if THETA_HAND_MODE in ("rule", "rule_don") and CP.CUT_PRICE_MODE == "joint_slice":
             raise ValueError("rule／rule_don は cut price joint_slice と組めない（1 枚の値段が定まらない）")
-        if THETA_HAND_PLACE == "shield":
-            raise ValueError("N-3（cut price joint）は THETA_HAND_PLACE=shield と組めない")
         import deck_refill as _DR
         cut_decks = _DR.decks_by_seed(dirs)
     rows_out = []
@@ -3678,7 +3655,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "race_n": 0, "race_front_sum": 0.0, "race_th_sum": 0.0, "race_a_sum": 0.0,
              "race_paid_sum": 0.0,
              "theta_hand_blocker": "on", "hb_sum": 0.0, "hb_n": 0, "hb_hit": 0,
-             "theta_return": THETA_RETURN_MODE, "theta_hand_place": THETA_HAND_PLACE,
+             "theta_return": THETA_RETURN_MODE, "theta_hand_place": "stock",
              # **T116**: 窓の上限で切った額（`thw_cut_sum`）と、切った行の数
              "theta_hand_window": THETA_HAND_WINDOW, "thw_n": 0, "thw_cut_sum": 0.0,
              "thw_hit": 0, "thw_tau_sum": 0.0,
@@ -3999,15 +3976,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             # **T143**: 体の項のうち**手札のブロッカー**（T106）の分——`threshold_parts_side` が
             # 体に足した額そのもの（値は動かさない・内訳として持つだけ）
             th_hb = max(0.0, float(hb_for(1 - w, t)))
-            # **T102**: `shield` なら手札は**しきい値から外し、的の側の有限の盾**にする
-            # （毎ターン `shield_rate` までしか出てこない＝**使う時間が要る**）。
-            if THETA_HAND_PLACE == "shield":
-                shield = float(th_hand)
-                sh_rate = shield_rate_of(own_attackers_of(tok, olp), _opp_active_blockers(tok), theta, mu)
-                th_hand = 0.0
-                stats["shield_n"] += 1; stats["shield_sum"] += shield; stats["shield_rate_sum"] += sh_rate
-            else:
-                shield = sh_rate = 0.0
+            shield = sh_rate = 0.0          # **T102** の盾（`shield`）は削除済＝手札は `Θ` に一括（盾の欄は 0 のまま残す）
             _hb = hb_for(1 - w, t)
             stats["hb_n"] += 1; stats["hb_sum"] += _hb; stats["hb_hit"] += int(_hb > 0.0)
             th_w = th_life + th_hand + th_body
@@ -4720,9 +4689,6 @@ def main(argv=None):
                     help="耐久の体の項: `blockers`（旧・アクティブなブロッカーだけ）／`all`（全キャラ・T82）／"
                          "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）／"
                          "`none`（**体を `Θ` から外して速さの側へ移す**・T129・`--slope-block on` と対で使う）")
-    ap.add_argument("--theta-hand-place", default=THETA_HAND_PLACE, choices=THETA_HAND_PLACES,
-                    help="**T102** 耐久の手札項の置き場所: `stock`（旧・`Θ` に一括）／"
-                         "`shield`（**的の側の有限の盾**＝毎ターン規則が許すぶんだけ＝**使う時間が要る**）")
     ap.add_argument("--theta-hand", default=THETA_HAND_MODE, choices=THETA_HAND_MODES,
                     help="**T76** 耐久の手札項: `count`（`μ × 枚数`）／`quality`（札ごとの `max(ΔH, ΔG)` の平均を掛ける）／"
                          "`cuttable_forced`（旧の既定・T100・N-3 までの数字はこれ）／`cuttable_seq`（**T158**・攻撃ごとに安い順へ `c(x_i)` 枚を割り当てる）／"
@@ -4758,7 +4724,6 @@ def main(argv=None):
     TO.set_w_mover_mode(a.w_mover)                  # **T151-2**
     set_sched_t1_mode(a.sched_t1)                   # **T152**
     set_theta_hand_mode(a.theta_hand)
-    set_theta_hand_place(a.theta_hand_place)
     set_theta_hand_window(a.theta_hand_window)
     set_slope_block_mode(a.slope_block)
     set_rate_through_mode(a.rate_through)          # **T131**

@@ -72,7 +72,7 @@ CAP = CB.RACE_CAP
 def static_target():
     """**的が定数か**（分解が恒等式になる条件）。**C-5c（2026-09-25）以降の既定では偽**
     （`THETA_RETURN_MODE=untap` で的が 2 段目から動く）——恒等式として読むなら `--theta-return off` で回す。"""
-    return (CB.RACE_MODE == "static" and CB.THETA_HAND_PLACE == "stock"
+    return (CB.RACE_MODE == "static"                     # 手札の置き場所は常に `stock`（`THETA_HAND_PLACE` は削除済）
             and CB.THETA_RETURN_MODE == "off" and CB.RATE_DECAY_MODE == "off")
 
 
@@ -266,7 +266,7 @@ def collect_budget(dirs, limit_games=0, theta=None, mu=None, require_static=True
         raise SystemExit(
             "的が動く構成では分解が恒等式にならない（RACE_MODE=%s THETA_HAND_PLACE=%s "
             "THETA_RETURN_MODE=%s RATE_DECAY_MODE=%s）。--no-require-static で強行できる。"
-            % (CB.RACE_MODE, CB.THETA_HAND_PLACE, CB.THETA_RETURN_MODE, CB.RATE_DECAY_MODE))
+            % (CB.RACE_MODE, "stock", CB.THETA_RETURN_MODE, CB.RATE_DECAY_MODE))
     theta = THETA if theta is None else theta
     mu = MU if mu is None else mu
     rows_out, _ledger, stats, turn_harm, theta_check = CB.collect(dirs, limit_games, theta, mu, "const")
@@ -279,7 +279,7 @@ def collect_budget(dirs, limit_games=0, theta=None, mu=None, require_static=True
     out = {"turns": summarise_budget(by_turn), "rows": summarise_budget(by_row),
            "ledger_bias": led_bias, "ledger_sigma_T": ((led.get("by_slope") or {}).get("theory") or {}).get("sigma_T"),
            "static_target": static_target(),
-           "modes": {"race": CB.RACE_MODE, "theta_hand_place": CB.THETA_HAND_PLACE,
+           "modes": {"race": CB.RACE_MODE, "theta_hand_place": "stock",
                      "theta_return": CB.THETA_RETURN_MODE, "rate_decay": CB.RATE_DECAY_MODE,
                      "rate_walk": CB.RATE_WALK_MODE, "don_purse": "all",
                      "theta_don": "rule", "theta_hand": CB.THETA_HAND_MODE,
