@@ -17,7 +17,7 @@ CPU が決めなかったかのどちらかだが、**記録からは分けら�
 
 そのターンに**実際に選んだ**攻撃の本数 `attacks_made` を数える——候補の署名（`pol_sig`）が
 `theory_bridge.move_family` で `"attack"`（`ATTACK` または対象付き `DON_BOX`）と分類される選択の数
-（`theory_bridge.py` の T86 `atk_turn_n` と**同じ数え方**）。これを、ターン開始時点で攻撃できた体の数
+（`theory_bridge.py` の T86 `atk_turn_n`〔2026-10-05 に `all_attacks` と一緒に削除〕と**同じ数え方**）。これを、ターン開始時点で攻撃できた体の数
 `xs`（`lethal_rule.lethal_of_row` が返す内訳の `xs`＝`own_attackers_of` の長さ）と比べる:
 
 * **`attacks_made >= xs`（全力で殴った）** … 攻め手は取れる手を尽くした。それでも理論の計算（通る本数・
@@ -59,7 +59,7 @@ from theory_bridge import POL_COLS, ROW_COLS, _extra, move_family  # noqa: E402
 
 def attacks_made_by_turn(dirs, limit_games=0):
     """局×席×ターン → **実際に選んだ**攻撃の本数（`move_family(選んだ候補) == "attack"` の行数）。
-    **`theory_bridge` の T86 `atk_turn_n` と同じ数え方**（`kind==0`・自席ターン・候補が選ばれている行）。
+    **`theory_bridge` の T86 `atk_turn_n`（2026-10-05 に削除）と同じ数え方**（`kind==0`・自席ターン・候補が選ばれている行）。
     `k>=1`（1 候補しか無い強制手も数える——`theory_bridge` の `k>=2`〔スコアリング用の制約〕は要らない）。"""
     out = {}
     games = 0

@@ -83,7 +83,7 @@ def _hand(slots, xs_future=(1000.0,), caps=(7, 9, 10, 10), take=TAKE):
             "mu": MU, "inflow": None}
 
 
-def _old_guard_step(tok, sc, played, free, paid, theta=T.THETA, mu=T.MU, margin_comfort=None, guard_g=None):
+def _old_guard_step(tok, sc, played, free, paid, theta=T.THETA, mu=T.MU, margin_comfort=None):
     """**G-2 より前の `guard_step` の写し**（HEAD f86e7d30 のまま）——`lenient` が旧を 1 ビットも違わず再現するかの基準。"""
     xs = [x for x in B.incoming_x(tok) if x >= -B.PWR_EPS]
     if not xs:
@@ -100,8 +100,7 @@ def _old_guard_step(tok, sc, played, free, paid, theta=T.THETA, mu=T.MU, margin_
     g_paid = -float(actual)
     price = min(cost_take, cost_guard)
     g_delta = float(price) - float(actual)
-    _gm = B.GUARD_G_MODE if guard_g is None else guard_g
-    g = 0.0 if _gm == "zero" else (g_delta if _gm == "delta" else g_paid)
+    g = g_delta                                           # `GUARD_G_MODE=delta`（他の値は 2026-10-05 に削除）
     if played == "guard" and not can_guard:
         actual = best
     margin = (float("inf") if blocker else float(afford_pw) - float(x))
@@ -122,8 +121,7 @@ def _grid():
                     for blocker in (False, True):
                         for played in ("take", "guard"):
                             for theta in (T.THETA, 1.15, 8.18):
-                                for gg in (None, "paid", "zero"):
-                                    yield opp, free, paid, don, blocker, played, theta, gg
+                                yield opp, free, paid, don, blocker, played, theta
 
 
 # ---- 1. 既定と切替 ----
@@ -213,18 +211,18 @@ def test_paid_event_counters_still_need_the_don_under_the_rule():
 
 
 def test_lenient_reproduces_the_old_step_bit_for_bit():
-    """`lenient` ＋ `curve` は旧の `guard_step` と**全部の欄が完全に一致**（手で組んだ 20,412 行・攻撃の無い行は両方 `None`）。"""
+    """`lenient` ＋ `curve` は旧の `guard_step` と**全部の欄が完全に一致**（手で組んだ 6,804 行・攻撃の無い行は両方 `None`）。"""
     n = 0
-    for opp, free, paid, don, blocker, played, theta, gg in _grid():
+    for opp, free, paid, don, blocker, played, theta in _grid():
         tok, sc = _tok(opp_lead=opp, blocker=blocker), _sc(don=don)
-        old = _old_guard_step(tok, sc, played, free, paid, theta=theta, guard_g=gg)
-        new = B.guard_step(tok, sc, played, free, paid, theta=theta, guard_g=gg, afford="lenient")
+        old = _old_guard_step(tok, sc, played, free, paid, theta=theta)
+        new = B.guard_step(tok, sc, played, free, paid, theta=theta, afford="lenient")
         if old is None:
             assert new is None
             continue
-        assert {k: new[k] for k in old} == old, (opp, free, paid, don, blocker, played, theta, gg)
+        assert {k: new[k] for k in old} == old, (opp, free, paid, don, blocker, played, theta)
         n += 1
-    assert n > 10000
+    assert n > 3000
 
 
 def test_under_the_rule_only_the_rows_between_x_and_x_plus_1000_change():
@@ -232,10 +230,10 @@ def test_under_the_rule_only_the_rows_between_x_and_x_plus_1000_change():
     （帳簿の欄・余裕・価格は 1 ビットも動かない）。向きは必ず「守れた → 守れない」。"""
     derived = {"can_guard", "s", "theory_says", "comfortable"}
     changed = 0
-    for opp, free, paid, don, blocker, played, theta, gg in _grid():
+    for opp, free, paid, don, blocker, played, theta in _grid():
         tok, sc = _tok(opp_lead=opp, blocker=blocker), _sc(don=don)
-        old = _old_guard_step(tok, sc, played, free, paid, theta=theta, guard_g=gg)
-        new = B.guard_step(tok, sc, played, free, paid, theta=theta, guard_g=gg)
+        old = _old_guard_step(tok, sc, played, free, paid, theta=theta)
+        new = B.guard_step(tok, sc, played, free, paid, theta=theta)
         if old is None:
             continue
         diff = {k for k in old if new[k] != old[k]}
@@ -255,14 +253,14 @@ def test_curve_mode_with_a_hand_reading_changes_no_old_field():
     """既定の `curve` で手札の読み（枚数の監査）を渡しても従来の欄は同じ——足すのは監査の欄だけ。"""
     rd = {"slots": [_slot(2000.0, None), _slot(0.0, None, cost=3), _slot(2000.0, None, cost=1, event=True, paid=(1, 2000.0))],
           "caps": None, "xs_future": None, "take": TAKE, "mu": MU, "inflow": None}
-    for opp, free, paid, don, blocker, played, theta, gg in itertools.islice(_grid(), 0, None, 7):
+    for opp, free, paid, don, blocker, played, theta in itertools.islice(_grid(), 0, None, 7):
         tok, sc = _tok(opp_lead=opp, blocker=blocker), _sc(don=don)
-        a = B.guard_step(tok, sc, played, free, paid, theta=theta, guard_g=gg)
-        b = B.guard_step(tok, sc, played, free, paid, theta=theta, guard_g=gg, hand=rd)
+        a = B.guard_step(tok, sc, played, free, paid, theta=theta)
+        b = B.guard_step(tok, sc, played, free, paid, theta=theta, hand=rd)
         if a is None:
             assert b is None
             continue
-        old_keys = set(_old_guard_step(tok, sc, played, free, paid, theta=theta, guard_g=gg))
+        old_keys = set(_old_guard_step(tok, sc, played, free, paid, theta=theta))
         assert {k: a[k] for k in old_keys} == {k: b[k] for k in old_keys}
         assert b["cost_guard_hand"] is None and b["cost_guard_source"] == "curve" and b["s_cost_mode"] == "curve"
         assert b["cost_guard_curve"] == pytest.approx(B.c_of(b["x"]) * MU) and b["cost_guard_s"] == b["cost_guard_curve"]
@@ -454,8 +452,8 @@ def test_blocker_rows_keep_the_old_price_and_the_ledger_never_moves():
     tok2 = _tok(opp_lead=8000)                                   # ブロッカー無し
     for played in ("take", "guard"):
         for gg in ("paid", "delta", "zero"):
-            hh = B.guard_step(tok2, sc, played, 4000.0, [], s_cost="hand", hand=h, guard_g=gg)
-            cc = B.guard_step(tok2, sc, played, 4000.0, [], guard_g=gg)
+            hh = B.guard_step(tok2, sc, played, 4000.0, [], s_cost="hand", hand=h)
+            cc = B.guard_step(tok2, sc, played, 4000.0, [])
             assert hh["cost_guard_source"] == "hand"
             for k in ("g", "g_paid", "g_delta", "price", "margin", "x", "can_guard"):
                 assert hh[k] == cc[k], k

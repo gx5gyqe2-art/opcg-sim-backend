@@ -238,41 +238,32 @@ def test_the_gain_of_a_guard_row_is_minus_what_was_actually_paid():
     """`g` は**実際に払った費用の符号**——`s` と違って誰の責任かを問わない。"""
     tok, sc = _tok(), _sc(don=5)
     x = 2000.0
-    got_g = B.guard_step(tok, sc, "guard", free=x + 1000.0, paid=[], theta=1.15, mu=0.0551, guard_g="paid")
-    got_t = B.guard_step(tok, sc, "take", free=x + 1000.0, paid=[], theta=1.15, mu=0.0551, guard_g="paid")
-    assert got_g["g"] == pytest.approx(-B.c_of(got_g["x"]) * 0.0551)
-    assert got_t["g"] == pytest.approx(-1.15 * 0.0551)
+    got_g = B.guard_step(tok, sc, "guard", free=x + 1000.0, paid=[], theta=1.15, mu=0.0551)
+    got_t = B.guard_step(tok, sc, "take", free=x + 1000.0, paid=[], theta=1.15, mu=0.0551)
+    assert got_g["g_paid"] == pytest.approx(-B.c_of(got_g["x"]) * 0.0551)
+    assert got_t["g_paid"] == pytest.approx(-1.15 * 0.0551)
     # 払えなかった行: `s` は 0（誤りでない）だが `g` は受けた損をそのまま持つ
     # （G-2 より前の `lenient` では `x = 0` は 0 パワーでも守れた扱いだったので、守れない行は相手リーダーを大きくして作る）
-    poor = B.guard_step(_tok(opp_lead=8000), sc, "take", free=0.0, paid=[], theta=1.15, mu=0.0551, guard_g="paid")
+    poor = B.guard_step(_tok(opp_lead=8000), sc, "take", free=0.0, paid=[], theta=1.15, mu=0.0551)
     assert poor["can_guard"] is False
-    assert poor["s"] == 0.0 and poor["g"] == pytest.approx(-1.15 * 0.0551)
+    assert poor["s"] == 0.0 and poor["g_paid"] == pytest.approx(-1.15 * 0.0551)
 
 
 def test_under_delta_the_guard_window_counts_only_the_gap_to_the_attackers_price():
     """**T62**: `g = 攻め手の価格 − 払った額`（価格＝`min(Θ·μ, c(x)·μ)`）。最安の応答なら 0・高い方を選べば差分が負・
-    払えずに受けた行も差分（攻め手には払えるかが見えない）。`paid` と `delta` の両方を返し、既定はモジュール定数。"""
+    払えずに受けた行も差分（攻め手には払えるかが見えない）。`paid` と `delta` の両方を返し、`g` は `delta`（旧 `paid` の切替は 2026-10-05 に削除）。"""
     x = 2000.0                                              # loose: c(2000) = 1.28 > Θ 1.15 → 受けるのが最安
     tok, sc = _tok(opp_lead=5000 + x), _sc(don=5)            # 来る攻撃の超過 x は相手リーダーと自リーダーの差
     th, mu = 1.15, 0.0551
-    g = B.guard_step(tok, sc, "guard", free=x + 1000.0, paid=[], theta=th, mu=mu, guard_g="delta")
-    t = B.guard_step(tok, sc, "take", free=x + 1000.0, paid=[], theta=th, mu=mu, guard_g="delta")
+    g = B.guard_step(tok, sc, "guard", free=x + 1000.0, paid=[], theta=th, mu=mu)
+    t = B.guard_step(tok, sc, "take", free=x + 1000.0, paid=[], theta=th, mu=mu)
     assert t["g"] == pytest.approx(0.0, abs=1e-9)                                  # 最安どおり
     assert g["g"] == pytest.approx((th - B.c_of(x)) * mu, abs=1e-9) and g["g"] < 0  # 高い方を選んだ分だけ負
     assert g["g_paid"] == pytest.approx(-B.c_of(x) * mu) and g["g_delta"] == g["g"]
     assert t["price"] == pytest.approx(th * mu)
-    poor = B.guard_step(_tok(opp_lead=8000), sc, "take", free=0.0, paid=[], theta=th, mu=mu, guard_g="delta")
+    poor = B.guard_step(_tok(opp_lead=8000), sc, "take", free=0.0, paid=[], theta=th, mu=mu)
     assert poor["can_guard"] is False and poor["s"] == 0.0
     assert poor["g"] == pytest.approx(min(th * mu, B.c_of(poor["x"]) * mu) - th * mu)   # 守れないが差分は載る
-    before = B.GUARD_G_MODE
-    try:
-        assert B.set_guard_g_mode("paid") == "paid"
-        assert B.guard_step(tok, sc, "guard", free=x + 1000.0, paid=[], theta=th, mu=mu)["g"] == pytest.approx(-B.c_of(x) * mu)
-        with pytest.raises(ValueError):
-            B.set_guard_g_mode("なにか")
-    finally:
-        B.set_guard_g_mode(before)
-    assert B.GUARD_G_MODE == before
 
 
 def test_gain_is_accumulated_beside_the_deviation_not_instead_of_it():
@@ -381,7 +372,7 @@ def test_the_ledger_convention_is_a_module_constant_with_a_switch():
 
 
 def test_a_played_body_is_booked_when_it_starts_working():
-    """**T84**（ユーザ決定 2026-09-18）: 出した体の価格の計上時点（`PLAY_BOOK_MODE`）。
+    """**T84**（ユーザ決定 2026-09-18）: 出した体の価格の計上時点（`next`・旧 `now` の切替は 2026-10-05 に削除）。
     規則から**次の自席ターンに繰り延べるのは「登場したターンには何もできない体」だけ**——
     召喚酔いで殴れず（`battle.rs::declare_attack`）・アクティブなので殴られず（`attackable`）・
     ブロッカーでないのでブロックもできない体。**速攻**（今から殴れる）・**ブロッカー**（相手の次のターンから守れる）・
@@ -403,47 +394,19 @@ def test_a_played_body_is_booked_when_it_starts_working():
     assert B.play_starts_next_turn("missing", cards) is False      # 知らない札は繰り延べない
     assert B.play_starts_next_turn(None, cards) is False
     assert B.play_starts_next_turn("plain", None) is False         # カード表が無ければ繰り延べない
-    before = B.PLAY_BOOK_MODE
-    assert before == "next"                                        # **既定は規則どおりの計上時点**（ユーザ決定 2026-09-18）
-    try:
-        assert B.set_play_book_mode("now") == "now"                # 旧の計上時点にも戻せる（以前の数字と比べるとき）
-        with pytest.raises(ValueError):
-            B.set_play_book_mode("なにか")
-        assert B.PLAY_BOOK_MODE == "now"
-    finally:
-        B.set_play_book_mode(before)
-    assert B.PLAY_BOOK_MODE == "next"
 
 
 def test_the_attach_is_counted_once_in_the_ledger():
     """**T85**: ドン付与の増分は**殴る行の価格に既に入っている**（記録の `slot_power` は自席のターンに付与ドンを
     載せる）ので、帳簿（`g`・`ΔG`）では**付与の行を 0** にして同じ移転を 1 回だけ数える（T62 と同じ型の直し）。
-    **決める価格 `s` は増分のまま**（T58 の分離）。切替の既定は旧（`increment`）。"""
-    assert B.ATTACH_LEDGER_MODE == "in_attack"      # **既定は 1 回だけ数える**（ユーザ決定 2026-09-18）
+    **決める価格 `s` は増分のまま**（T58 の分離）。旧の `increment` の切替は 2026-10-05 に削除。"""
     assert B.move_family(["DON_BOX", "cid", [], [], None]) == "attach"      # 対象なし＝純粋な付与
     assert B.move_family(["DON_BOX", "cid", ["t"], [], None]) == "attack"   # 対象あり＝殴る手（こちらは 0 にしない）
-    try:
-        assert B.set_attach_ledger_mode("increment") == "increment"        # 旧の規約にも戻せる
-        with pytest.raises(ValueError):
-            B.set_attach_ledger_mode("なにか")
-        assert B.ATTACH_LEDGER_MODE == "increment"
-    finally:
-        B.set_attach_ledger_mode("in_attack")
-    assert B.ATTACH_LEDGER_MODE == "in_attack"
 
 
-def test_the_guard_window_can_be_priced_against_every_attack_of_the_turn():
-    """**T86**: 守りの窓の「攻め手の価格」は `max_attack`（旧・そのターン最大の攻撃 1 本）か
-    **`all_attacks`**（そのターンに相手が打った攻撃の価格の和＝帳簿の攻めの行と同じ数）。
-    旧は `actual`（`spent`＝窓の間に消えた札の総額＝**全部の攻撃への支払い**）と釣り合っておらず、
-    **攻め手の行が既に数えた移転を守り側でもう一度数えていた**（記録: 攻撃のあったターンの 73%／67% が 2 本以上）。"""
-    assert B.GUARD_PRICE_MODE == "max_attack"          # 既定は旧のまま（採否はユーザ判定）
-    try:
-        assert B.set_guard_price_mode("all_attacks") == "all_attacks"
-        with pytest.raises(ValueError):
-            B.set_guard_price_mode("なにか")
-    finally:
-        B.set_guard_price_mode("max_attack")
+def test_the_guard_window_is_finished_in_one_place():
+    """**T86**: 守りの窓の確定処理（`_finish_guard`）。`all_attacks`（そのターンに相手が打った攻撃の価格の和）の
+    切替は 2026-10-05 に削除——確定処理の算術だけを固める。"""
     # 切り出した確定処理（T86）: `g` は `price − actual`・帯と型に同じ値が入る
     kn, stats, rec = {}, {"grd_rows": 0, "grd_by_life": {}, "grd_comfortable": 0}, {}
     seen = []
@@ -461,7 +424,7 @@ def test_the_guard_window_can_be_priced_against_every_attack_of_the_turn():
 
 
 def test_the_ledger_can_be_written_in_what_was_actually_lost():
-    """**T87**（T86 の結論）: 帳簿を**実際に失われた額**で書く切替。`realised_harm` は
+    """**T87**（T86 の結論）: 帳簿を**実際に失われた額**で書く（旧 `price` の切替は 2026-10-05 に削除）。`realised_harm` は
     `attack_response.parts` の相手ライフ・相手手札・相手の体の和＝**交点の橋が `F` を積むのに使う式と同じ**
     （`crossing_bridge.harm_of`）。ライフ 1 枚 ＋ 手札 1 枚なら `λ + μ` ちょうど。"""
     import numpy as np
@@ -475,13 +438,6 @@ def test_the_ledger_can_be_written_in_what_was_actually_lost():
     import crossing_bridge as CB
     from attack_response import parts
     assert B.realised_harm(sc, tok, sc2, tok2) == pytest.approx(CB.harm_of(parts(sc, tok, sc2, tok2)))
-    assert B.LEDGER_HARM_MODE == "realised"     # **既定は実現**（ユーザ決定 2026-09-18・`exercise` の規約どおり）
-    try:
-        assert B.set_ledger_harm_mode("price") == "price"                   # 旧の規約にも戻せる（比較用）
-        with pytest.raises(ValueError):
-            B.set_ledger_harm_mode("なにか")
-    finally:
-        B.set_ledger_harm_mode("realised")
 
 def test_the_sigma_of_the_clock_is_taken_from_the_measurement(monkeypatch):
     """**T97**（ユーザ指示「理論的に正しいものにしたい」）: `W_MODE=curve` のとき、`σ_T` は

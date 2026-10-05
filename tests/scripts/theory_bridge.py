@@ -130,26 +130,15 @@ MARGIN_COMFORT = 2000.0
 #: `paid`＝従来＝**−実際に払った額**（守れば `c(x)·μ`・受ければ `Θ·μ`）／`delta`＝**攻め手の価格 − 実際に払った額**
 #: （攻め手の価格＝`min(c(x)·μ, Θ·μ)`＝相手が最安の応答をしたときに失う額）。零和なので同じ移転は攻め手の行で 1 回だけ数え、
 #: 受け手の行には見積もりとの差分だけを載せる（`paid` は同じ移転を両席で二重に数え、払える席ほど損に見えた＝守り側の `ΔG` が反対向き）。
-#: **T87**: `zero`＝**守りの窓は帳簿に何も足さない**（移転は攻め手の行に 1 回・窓は `s` 専任）。
-#: `realised`（帳簿ぜんたいを実現で書く）と違い、**攻めの側は理論の価格のまま**＝
-#: 「二重計上だけを止めたら何が起きるか」を分けて測るための第 3 の形（T86 で守り側が主犯と分かったので）。
-GUARD_G_MODES = ("paid", "delta", "zero")
-GUARD_G_MODE = "delta"
+#: **`delta` を採用**（2026-09-16）。`paid`（旧）と `zero`（T87 の第 3 の形）の切替 `GUARD_G_MODE` は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
+#: `guard_step` は `g_paid`／`g_delta` の両方を返し、`g` は `g_delta`（帳簿は T87 の実現の書き方で守りの窓を 0 にする）。
 #: **守りの窓で「払った額」をどう読むか**（T64・2026-09-16）。`formula`＝式の費用（守れば `c(x)·μ`・受ければ `Θ·μ`）／
 #: `spent`＝**実際に手札から消えた札の価値の和**（`hand_spend.use_value`・切った札の機会費用）＋ 受けたなら `Θ·μ`。
 #: 手札の中身は記録の枠 12〜21 に在る（P8 を待たずに読める）。`v` が読めない札は `μ` で数える。
 #: **既定は `spent`**（T64・2026-09-16・`2026-09-16_hand_spend.md`）: 守り側の `ΔG` が 0.276 → 0.602／0.429 → 0.574・接戦帯 0.33 → 0.64。
-#: 帳簿の「払った額」を式の近似から記録の実額に戻しただけ（定数は増えない）。以前の数字と比べるときは `--guard-cost formula`。
-#: **T86（2026-09-18）**: `spent_all`＝`spent` に**受けた回数**を入れる——`spent` は消えた札を**窓の全部の攻撃**について
-#: 数えるのに、受ける費用 `Θ·μ` を**1 回しか**足していなかった（2 本以上受けたターンは 73%／67%）。
-#: 受けた回数は**窓の間に減ったライフ**（次の自席ターン開始との差）で読める＝**記録の拡張（P8）は要らない**。
-GUARD_COST_MODES = ("formula", "spent", "spent_all")
-GUARD_COST_MODE = "spent"
-#: **最後のターンを落とすか**（T80 の診断・2026-09-17）。`keep`＝従来／`drop`＝**局の最後のターンの行を全部落とす**
-#: （とどめの一撃とその応答）。決着帯で `flat` が `curve` に勝っているのが「とどめを満額で数えているから」なのかを分ける
-#: ——落とした瞬間に差が消えるなら、決着帯の当たりは**勝敗の言い換え**であって価格の正しさの証拠ではない。
-LAST_TURN_MODES = ("keep", "drop")
-LAST_TURN_MODE = "keep"
+#: 帳簿の「払った額」を式の近似から記録の実額に戻しただけ（定数は増えない）。旧の `formula` と、受けた回数ぶん `Θ·μ` を
+#: 足す T86 の `spent_all`（切替 `GUARD_COST_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
+#: **T80 の診断**（局の最後のターンの行を落とす `LAST_TURN_MODE=drop`）も 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。出力の `last_turn` は定数 `"keep"`。
 #: **出した体の価格をいつ計上するか**（T84・2026-09-18・ユーザ決定「その2つでお願いします」）。
 #: `now`＝従来（出したターンに満額）／`next`＝**効き始める自席ターン（t + 2）に計上する**。
 #: **根拠は規則**（`rust/opcg_engine/src/rules/`）——登場したターンのキャラは
@@ -172,8 +161,8 @@ LAST_TURN_MODE = "keep"
 #: **決める価格 `s` は増分のまま**（T58 の分離: 決めるのは `option`・数えるのは `exercise`）——
 #: 付与は打つ価値のある手で、`s` を 0 にすると理論が「ドンを付けるな」と言い出す。
 #: 体が殴らずに終われば（ドンはターン終了で戻る）**損害は実現していない**ので 0 が正しい。
-#: **帳簿を「理論の価格」で書くか「実際に失われた額」で書くか**（T87・2026-09-18・T86 の結論）。
-#: `price`＝従来（攻めの行は `score_candidate` の価格・守りの窓は `price − 支払い`）／
+#: **帳簿を「実際に失われた額」で書く**（T87・2026-09-18・T86 の結論）。
+#: 旧の `price`（攻めの行は `score_candidate` の価格・守りの窓は `price − 支払い`・切替 `LEDGER_HARM_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
 #: **`realised`＝攻めの行は「その手で相手が実際に失った額」**（`attack_response.parts` の相手ライフ・相手手札・相手の体＝
 #: `crossing_bridge.harm_of` と**同じ関数**）・**守りの窓の `g` は 0**（移転は攻め手の行に 1 回だけ）。
 #: **根拠**（T86）: 守りの `g` を「理論の価格 − 実際の支払い」で作る形は**2 つの別の物差しの差**なので、
@@ -182,22 +171,12 @@ LAST_TURN_MODE = "keep"
 #: **帳簿は `price_realised` の `F`（交点の橋が積む損害）と同じ物**になり、2 つの橋が同じ量を数える（§0.1 の整合）。
 #: **決める価格 `s` は理論の価格のまま**（T58 の分離・`s` は「その局面で最善だったか」を測るので実現では書けない）。
 #: **新定数ゼロ**（`λ`・`μ`・`ν_meas` の写しで実現を数えるだけ）。
-LEDGER_HARM_MODES = ("price", "realised")
-#: **既定は `realised`**（2026-09-18・ユーザ決定「規定は正しいものにしてください」・T87）——**理論的に正しいのはこれ**:
+#: **`realised` を採用**（2026-09-18・ユーザ決定「規定は正しいものにしてください」・T87）——**理論的に正しいのはこれ**:
 #:   * **T58 の規約**（ユーザ決定）「決めるのは `option`・**数えるのは `exercise`**」＝帳簿は**起きたことを数える**。
 #:   * **§0.1 の整合**: 帳簿が交点の橋の `F` と**同じ式**になる（同じものに同じ値段）。
 #:   * **零和**: 実現の損害は**相手が実際に失った額そのもの**なので零和が定義から成り立つ（価格では成り立たない）。
 #: **数字は一長一短**（恒等式は改善・順序付けは悪化）だが、**T82 → T83 と同じ判断**——規則・規約から出る形を採り、
-#: 見かけの良い数字で選ばない。以前の数字と比べるときは `--ledger-harm price`。
-LEDGER_HARM_MODE = "realised"
-
-
-def set_ledger_harm_mode(mode):
-    global LEDGER_HARM_MODE
-    if mode not in LEDGER_HARM_MODES:
-        raise ValueError("ledger harm mode は %s のどれか" % (LEDGER_HARM_MODES,))
-    LEDGER_HARM_MODE = mode
-    return LEDGER_HARM_MODE
+#: 見かけの良い数字で選ばない。
 
 
 def realised_harm(sc, tok, sc2, tok2):
@@ -215,51 +194,23 @@ def realised_harm(sc, tok, sc2, tok2):
 #: `price` は**1 本ぶん**しか数えていなかった＝`g = price − actual` が構造的に負に振れ、
 #: **攻め手の行が既に数えた移転を守り側でもう一度数えている**（T85 と同じ型の二重計上）。
 #: `all_attacks` は**攻め手の行の価格の和**をそのまま `price` に使う＝零和で同じ移転を 1 回だけ数える。**新定数ゼロ**。
-GUARD_PRICE_MODES = ("max_attack", "all_attacks")
-GUARD_PRICE_MODE = "max_attack"
+#: 保留のまま T87 の実現の書き方（守りの窓の `g` は 0）で意味を失い、切替 `GUARD_PRICE_MODE` は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
+#: 守りの窓の `price` は `max_attack`（出力の `guard_price` は定数）。
 
 
-def set_guard_price_mode(mode):
-    global GUARD_PRICE_MODE
-    if mode not in GUARD_PRICE_MODES:
-        raise ValueError("guard price mode は %s のどれか" % (GUARD_PRICE_MODES,))
-    GUARD_PRICE_MODE = mode
-    return GUARD_PRICE_MODE
-
-
-ATTACH_LEDGER_MODES = ("increment", "in_attack")
-#: **既定は `in_attack`**（2026-09-18・ユーザ決定「正しく直した上で」・T85）——二重計上は記録で確認した**事実**なので、
+#: **`in_attack` を採用**（2026-09-18・ユーザ決定「正しく直した上で」・T85）——二重計上は記録で確認した**事実**なので、
 #: 数字の得が小さくても（必要な `κ` 0.502 → 0.509・`g` の実効値 −1.1%）旧を既定に残す理由が無い。
-#: 以前の数字と比べるときは `--attach-ledger increment`。
-ATTACH_LEDGER_MODE = "in_attack"
+#: 旧の `increment`（付与の行で増分を計上・切替 `ATTACH_LEDGER_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
 
 
-def set_attach_ledger_mode(mode):
-    global ATTACH_LEDGER_MODE
-    if mode not in ATTACH_LEDGER_MODES:
-        raise ValueError("attach ledger mode は %s のどれか" % (ATTACH_LEDGER_MODES,))
-    ATTACH_LEDGER_MODE = mode
-    return ATTACH_LEDGER_MODE
-
-
-PLAY_BOOK_MODES = ("now", "next")
-#: **既定は `next`**（2026-09-18・ユーザ決定「規定にして」・T84）——規則が「登場したターンの体は何もできない」と言うので、
+#: **`next` を採用**（2026-09-18・ユーザ決定「規定にして」・T84）——規則が「登場したターンの体は何もできない」と言うので、
 #: 出したターンに計上するのは**帳簿の付け間違い**。局所の恒等式の相関が 0.388 → 0.535（実）／0.432 → 0.554（合成）・
 #: 出す手 0.081 → 0.427／0.029 → 0.344・攻撃の `κ = 1.05／1.12` は不変。**価格そのものは変えていない**（計上時点だけ）ので
-#: `ΔG`・`ΔS`・交点の橋は動かない。以前の数字と比べるときは `--play-book now`。
-PLAY_BOOK_MODE = "next"
-
-
-def set_play_book_mode(mode):
-    global PLAY_BOOK_MODE
-    if mode not in PLAY_BOOK_MODES:
-        raise ValueError("play book mode は %s のどれか" % (PLAY_BOOK_MODES,))
-    PLAY_BOOK_MODE = mode
-    return PLAY_BOOK_MODE
+#: `ΔG`・`ΔS`・交点の橋は動かない。旧の `now`（出したターンに満額・切替 `PLAY_BOOK_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
 
 
 def play_starts_next_turn(cid, cards):
-    """**その手で出した体は次の自席ターンから効くか**（T84・規則から・`PLAY_BOOK_MODE=next` のときだけ使う）。
+    """**その手で出した体は次の自席ターンから効くか**（T84・規則から）。
     体を持たない札（イベント・ステージ）は `False`（その場で解決）・**速攻**は `False`（今から殴れる）・
     **ブロッカー**は `False`（相手の次のターンから守れる＝1 ラウンドの窓の中で効く）。それ以外のキャラは `True`。"""
     info = (cards.info(cid) or {}) if (cards is not None and cid) else None
@@ -268,30 +219,6 @@ def play_starts_next_turn(cid, cards):
     if float(info.get("power") or 0.0) <= 0.0:
         return False
     return not (info.get("rush") or info.get("blocker"))
-
-
-def set_last_turn_mode(mode):
-    global LAST_TURN_MODE
-    if mode not in LAST_TURN_MODES:
-        raise ValueError("last turn mode は %s のどれか" % (LAST_TURN_MODES,))
-    LAST_TURN_MODE = mode
-    return LAST_TURN_MODE
-
-
-def set_guard_cost_mode(mode):
-    global GUARD_COST_MODE
-    if mode not in GUARD_COST_MODES:
-        raise ValueError("guard cost mode は %s のどれか" % (GUARD_COST_MODES,))
-    GUARD_COST_MODE = mode
-    return GUARD_COST_MODE
-
-
-def set_guard_g_mode(mode):
-    global GUARD_G_MODE
-    if mode not in GUARD_G_MODES:
-        raise ValueError("guard g mode は %s のどれか" % (GUARD_G_MODES,))
-    GUARD_G_MODE = mode
-    return GUARD_G_MODE
 
 
 def _extra(dd, n):
@@ -381,10 +308,10 @@ def afford_need(x, mode=None):
 #:   （`hand_plan.apply_inflow`）を読み直さない手札（`inflow` が無い）では、出す計画（DP の最大）も
 #:   守る備え（厳密な最大）も札を足して下がらないので、余計な札を足した組が安くなることは無い。相方待ちを読み直す手札では
 #:   札の `v` が残りの手札で変わる（相方を切れば落ち、守る備えの差し引きは軽くなる）ので単調性は保証できない＝**足りる組を全部**調べる。
-#: * 値の読めない札は `μ`（`GUARD_COST_MODE=spent` の分岐と同じ規約）。**新定数ゼロ**（`μ`・`KO_P`・既存の関数だけ）。
+#: * 値の読めない札は `μ`（守りの窓の払った額〔T64 の `spent`〕と同じ規約）。**新定数ゼロ**（`μ`・`KO_P`・既存の関数だけ）。
 #: * **ブロッカーが居る行は従来どおり `c(x)·μ`**（限界: ブロッカーで止めた行の値段はまだ手札で測らない）。
 #: * **帳簿（`g`・`g_paid`・`g_delta`・`price`）は変えない**＝この切替は判断（`s`・`theory_says`）だけに効く。
-#:   帳簿の「払った額」の切替は `GUARD_COST_MODE`（名前が似ているが別物）。
+#:   帳簿の「払った額」（T64 の `spent`）とは別物。
 #:
 #: **`joint`（N-2・2026-09-26・ユーザ決定 判断6(a)・判断7(a)）**＝手札の価値を**1 枚 1 役の最適な割り当て**
 #: （`hand_joint.JointValuer`・各札を 出す／カウンター／持つ のどれか 1 つに割り当てた最大）で読み、守る費用＝
@@ -639,13 +566,12 @@ def guard_joint_cost(hand, x, budget):
     return {"cost": float(best[0]), "set": tuple(sorted(best[1])), "n_sets": len(found)}
 
 
-def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=None, guard_g=None,
+def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=None,
                afford=None, s_cost=None, hand=None):
     """**守りの窓 1 つ**の取りこぼし（`≤ 0`）と、判定に使った内訳。
 
     **払えなかった行は誤りと数えない**——`measurement.md` §1。
-    `guard_g`（省略時 `GUARD_G_MODE`）: `g` を `paid`（−払った額）か `delta`（攻め手の価格 − 払った額・T62）で返す。
-    両方 `g_paid`／`g_delta` としても返す。
+    `g` は `delta`（攻め手の価格 − 払った額・T62）。`g_paid`（−払った額）／`g_delta` としても返す。
 
     **G-2**: `afford`（省略時 `GUARD_AFFORD_MODE`）＝守れたかの閾値（`rule`＝合計 ≥ 超過 + 1000・`lenient`＝旧）。
     `s_cost`（省略時 `GUARD_S_COST_MODE`）＝判断の守る費用（`curve`＝`c(x)·μ`・`hand`＝`guard_hand_cost`・`joint`＝`guard_joint_cost`〔N-2〕）。
@@ -691,8 +617,7 @@ def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=N
     # **T62**: 攻め手の価格＝相手が最安の応答をしたときに失う額（払えるかは攻め手には見えない＝`min` そのもの）
     price = min(cost_take, cost_guard)
     g_delta = float(price) - float(actual)
-    _gm = GUARD_G_MODE if guard_g is None else guard_g
-    g = 0.0 if _gm == "zero" else (g_delta if _gm == "delta" else g_paid)
+    g = g_delta
     if played == "guard" and not can_guard:
         # 守れないはずの行で守っている＝予算の見積りが渋い。**誤りにしない**
         actual_s = best
@@ -995,8 +920,7 @@ def ledger_value(score, played_v, mode=None):
 
 
 def _finish_guard(got, played, my_life, z, bnd, kap, w, t, rec, kn, stats, _add):
-    """**守りの窓 1 つを帳簿に入れる**（T86 で切り出した・中身は従来のまま）。
-    `all_attacks` のときだけ呼ぶ時点が遅い（攻めの行を全部読んだ後）が、和なので順序は結果を変えない。"""
+    """**守りの窓 1 つを帳簿に入れる**（T86 で切り出した・中身は従来のまま）。"""
     stats["grd_rows"] += 1
     gl = stats["grd_by_life"].setdefault(str(int(round(float(my_life)))),
                                          {"n": 0, "took": 0, "says_take": 0, "can_guard": 0,
@@ -1091,17 +1015,17 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
              "theta_hand": __import__("crossing_bridge").THETA_HAND_MODE,
              "theta_body": __import__("crossing_bridge").THETA_BODY_MODE,
              # **T84**: 出した体の価格を効き始めるターンに計上するか
-             "play_book": PLAY_BOOK_MODE, "play_deferred": 0, "play_deferred_dropped": 0,
+             "play_book": "next", "play_deferred": 0, "play_deferred_dropped": 0,
              # **T85**: 付与の帳簿価格の規約と、0 にした行の数
-             "attach_ledger": ATTACH_LEDGER_MODE, "attach_zeroed": 0,
+             "attach_ledger": "in_attack", "attach_zeroed": 0,
              # **T86**: 守りの窓の攻め手の価格の取り方と、そのターンの攻撃の本数ごとの内訳
-             "guard_price": GUARD_PRICE_MODE, "grd_by_attacks": {}, "grd_took_n": 0.0,
+             "guard_price": "max_attack", "grd_by_attacks": {}, "grd_took_n": 0.0,
              # **T87**: 帳簿を実現で書くか・実現で書けた行／書けなかった行（次の行が同じターンに無い＝ターン末）
-             "ledger_harm": LEDGER_HARM_MODE, "harm_rows": 0, "harm_unbracketed": 0,
+             "ledger_harm": "realised", "harm_rows": 0, "harm_unbracketed": 0,
              # **T58**: 決める価格（`s`）と数える価格（`g`）の規約・読み直した行の数
              "flow_pricing": EV.FLOW_PRICING, "ledger_pricing": ledger_pricing, "ledger_rescored": 0,
              # **T62**: 守りの窓の定義と、自ライフごとの内訳（受けた率・理論が受けろと言う率・`g` の平均）
-             "guard_g": GUARD_G_MODE, "grd_by_life": {},
+             "guard_g": "delta", "grd_by_life": {},
              # **G-2**: 守れたかの閾値と、判断の守る費用の測り方
              # `guard_afford` は**実際に効いた**閾値（`hand` は常に規則どおり）・指定された値は `guard_afford_requested`
              "guard_afford": effective_guard_afford(), "guard_afford_requested": GUARD_AFFORD_MODE,
@@ -1137,19 +1061,16 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 last_main[(w0, t0)] = i        # **H-4**: その席のターンの最後の main 行（`rule` の相手の手札）
         opp_turns = {0: sorted(t0 for (w0, t0) in first_main if w0 == 0),
                      1: sorted(t0 for (w0, t0) in first_main if w0 == 1)}
-        last_turn = max([int(rows["turn"][i]) for i in idx] or [0])        # T80: とどめのターン
         kn = {}          # T80: ターンごとの `{d0（席 0 視点）, g0（生の価格・席 0 − 席 1）, r_turns}`
-        atk_turn, atk_turn_n = {}, {}     # T86: (席, ターン) → 打った攻撃の価格の和・本数
         # **T87**: 行 → **同じ席の次の行**（実現の損害を読む区間・`crossing_bridge` の `nxt` と同じ作り）
         nxt_same_seat = {}
-        if LEDGER_HARM_MODE == "realised":
-            by_seat = {}
-            for n0, i0 in enumerate(idx):
-                if is_decision_row(rows, pol, L, ptr, i0):                     # D-5
-                    by_seat.setdefault(int(rows["who"][i0]), []).append(n0)
-            for _w0, ns in by_seat.items():
-                for a0, b0 in zip(ns, ns[1:]):
-                    nxt_same_seat[a0] = b0
+        by_seat = {}
+        for n0, i0 in enumerate(idx):
+            if is_decision_row(rows, pol, L, ptr, i0):                     # D-5
+                by_seat.setdefault(int(rows["who"][i0]), []).append(n0)
+        for _w0, ns in by_seat.items():
+            for a0, b0 in zip(ns, ns[1:]):
+                nxt_same_seat[a0] = b0
         # **N-3**: 値段の枠。相手（守り手）の枠は**その席の直近の自席ターンの最後の行**（攻め手のターンの間の守り手の手札そのもの・
         # 実現の直しの出発点と同じ＝損害と耐久が同じ枠）・自分の枠は**今の自席ターンの最初の行**（`first_main`・`g_me` と同じ行）。
         cut_opp_fr = cut_me_fr = None
@@ -1164,7 +1085,6 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                        don_rule=True, stats=stats, end_of_turn=True)
             cut_me_fr = _CP.CutFrames(list(idx), rows, ex, idx2cid, cards, first_main, mu, decks=_dk,
                                       don_rule=True, stats=stats)
-        pending_grd = []                  # T86: `all_attacks` のときは攻めの行を全部読んだ後に確定する
         for n, i in enumerate(idx):
             w, t = int(rows["who"][i]), int(rows["turn"][i])
             if t < 1:
@@ -1180,9 +1100,6 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                        "band": {}})
             if z != 0.0:
                 rec["z"] = 1.0 if z > 0 else 0.0
-            if LAST_TURN_MODE == "drop" and t >= last_turn:               # T80 の診断
-                stats["last_turn_dropped"] = stats.get("last_turn_dropped", 0) + 1
-                continue
             sc, tok = ex["sc"][i], ex["tok"][i]
             if PL.is_own_turn(w, t):
                 if not is_decision_row(rows, pol, L, ptr, i):
@@ -1276,28 +1193,22 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                     stats["ledger_rescored"] += 1          # 規約で値が動いた行（付与・流れの行）だけ数える
                 # **T87**: 帳簿を実現で書く——その手で相手が実際に失った額（次の同席の行までの差）。
                 # 次の行が同じターンに無い（＝ターン末で区間が閉じない）行は 0 にし、数だけ残す。
-                if LEDGER_HARM_MODE == "realised":
-                    j2 = nxt_same_seat.get(n)
-                    i2 = idx[j2] if j2 is not None else None
-                    if i2 is not None and int(rows["turn"][i2]) == t:
-                        g_v = realised_harm(sc, tok, ex["sc"][i2], ex["tok"][i2])
-                        if cut_opp_fr is not None:
-                            # **N-3**: 括りの中の応答で守り手の手札から出ていった札の値段の直し（交点の橋の `F` と同じ関数）
-                            g_v += cut_opp_fr.bracket_corr(w, t, n, j2)
-                        stats["harm_rows"] += 1
-                    else:
-                        g_v = 0.0
-                        stats["harm_unbracketed"] += 1
+                j2 = nxt_same_seat.get(n)
+                i2 = idx[j2] if j2 is not None else None
+                if i2 is not None and int(rows["turn"][i2]) == t:
+                    g_v = realised_harm(sc, tok, ex["sc"][i2], ex["tok"][i2])
+                    if cut_opp_fr is not None:
+                        # **N-3**: 括りの中の応答で守り手の手札から出ていった札の値段の直し（交点の橋の `F` と同じ関数）
+                        g_v += cut_opp_fr.bracket_corr(w, t, n, j2)
+                    stats["harm_rows"] += 1
+                else:
+                    g_v = 0.0
+                    stats["harm_unbracketed"] += 1
                 # **T85**: 付与の増分は殴る行の価格に入っているので、帳簿では付与の行を 0 にする（移転は 1 回）
-                if ATTACH_LEDGER_MODE == "in_attack" \
-                        and move_family(json.loads(pol["pol_sig"][b + ch])) == "attach":
+                if move_family(json.loads(pol["pol_sig"][b + ch])) == "attach":
                     if abs(float(g_v)) > 0.0:
                         stats["attach_zeroed"] = stats.get("attach_zeroed", 0) + 1
                     g_v = 0.0
-                if move_family(json.loads(pol["pol_sig"][b + ch])) == "attack":
-                    # **T86**: そのターンに自席が実際に打った攻撃の価格の和（守りの窓の `price` に使う）
-                    atk_turn[(w, t)] = atk_turn.get((w, t), 0.0) + float(g_v)
-                    atk_turn_n[(w, t)] = atk_turn_n.get((w, t), 0) + 1
                 g_row = float(g_v) * kap
                 s_row = (float(played_v) - max(scored)) * kap
                 # **T80**: 区間の恒等式のために**生の価格**（`κ` を掛けない）と `D` を席 0 の視点で積む
@@ -1306,8 +1217,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 fam0 = move_family(json.loads(pol["pol_sig"][b + ch]))                     # T81: 型ごとに割る
                 # **T84**: 出した体が効き始めるのが次の自席ターンなら、価格もそのターンに計上する（規則・新定数ゼロ）
                 book = e
-                if PLAY_BOOK_MODE == "next" and fam0 == "play" \
-                        and play_starts_next_turn(str(pol["pol_cid"][b + ch]) or None, cards):
+                if fam0 == "play" and play_starts_next_turn(str(pol["pol_cid"][b + ch]) or None, cards):
                     stats["play_deferred"] = stats.get("play_deferred", 0) + 1
                     book = kn.setdefault(t + 2, {"d0": None, "t_me0": None, "t_opp0": None, "g0": 0.0, "r_turns": None, "g_fam": {}, "chars": None})
                 book["g0"] += float(g_v) * sgn
@@ -1360,33 +1270,24 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 if got is None:
                     stats["grd_no_attack"] += 1
                     continue
-                if GUARD_COST_MODE in ("spent", "spent_all"):
-                    # **T64**: 払った額＝実際に消えた札の価値の和（＋受けたなら `Θ·μ`）。次の自席ターンが無ければ式の費用のまま
-                    j = first_main.get((w, t + 1))
-                    if j is not None:
-                        import hand_spend as HS
-                        before = HS.hand_ids(ex["ci"][i], idx2cid)
-                        after = HS.hand_ids(ex["ci"][j], idx2cid)
-                        olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-                        r_opp = max(1.0, min(5.0, float(sc[SC_OPP_LIFE])))
-                        paid_v = 0.0
-                        for cid in HS.spent_cards(before, after):
-                            v = HS.use_value(cid, cards.info(cid), olp, r_opp)
-                            paid_v += float(mu) if v is None else float(v)
-                        if GUARD_COST_MODE == "spent_all":
-                            # **T86**: 受けた回数＝窓の間に減ったライフ（リーダーへの攻撃 1 本 = ライフ 1 枚）。
-                            # 効果で減ったライフも混ざる（限界）。1 本も受けていなければ 0。
-                            took_n = max(0.0, float(sc[SC_MY_LIFE]) - float(ex["sc"][j][SC_MY_LIFE]))
-                            actual = paid_v + float(th_g) * float(mu) * took_n
-                            stats["grd_took_n"] = stats.get("grd_took_n", 0.0) + took_n
-                        else:
-                            actual = paid_v + (float(th_g) * float(mu) if played == "take" else 0.0)
-                        stats["grd_spent_rows"] = stats.get("grd_spent_rows", 0) + 1
-                        stats["grd_spent_sum"] = stats.get("grd_spent_sum", 0.0) + paid_v
-                        got["g_paid"] = -actual
-                        got["g_delta"] = got["price"] - actual
-                        got["g"] = (0.0 if GUARD_G_MODE == "zero" else
-                                    got["g_delta"] if GUARD_G_MODE == "delta" else got["g_paid"])
+                # **T64**: 払った額＝実際に消えた札の価値の和（＋受けたなら `Θ·μ`）。次の自席ターンが無ければ式の費用のまま
+                j = first_main.get((w, t + 1))
+                if j is not None:
+                    import hand_spend as HS
+                    before = HS.hand_ids(ex["ci"][i], idx2cid)
+                    after = HS.hand_ids(ex["ci"][j], idx2cid)
+                    olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+                    r_opp = max(1.0, min(5.0, float(sc[SC_OPP_LIFE])))
+                    paid_v = 0.0
+                    for cid in HS.spent_cards(before, after):
+                        v = HS.use_value(cid, cards.info(cid), olp, r_opp)
+                        paid_v += float(mu) if v is None else float(v)
+                    actual = paid_v + (float(th_g) * float(mu) if played == "take" else 0.0)
+                    stats["grd_spent_rows"] = stats.get("grd_spent_rows", 0) + 1
+                    stats["grd_spent_sum"] = stats.get("grd_spent_sum", 0.0) + paid_v
+                    got["g_paid"] = -actual
+                    got["g_delta"] = got["price"] - actual
+                    got["g"] = got["g_delta"]
                 bnd = band_of(abs(float(rows["pol_v0"][i])))
                 opp_g = _opp_view(first_main, opp_turns, ex, w, t)    # T79: 相手の直近の行（完全情報）
                 _gme2 = _g_of_row(sc, tok, ex["ci"][i], idx2cid, cards, g_cache, (w, t))
@@ -1411,27 +1312,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                                           # （`cut_me_fr` の枠・`opp_g`〔T79〕・κ の相手の時計と同じ行・パワーは行から規則で読む）。
                                           cut_opp=(None if cut_me_fr is None else
                                                    cut_me_fr.view(1 - w, t, float(sc[SC_OPP_HAND]), at_n=n)))["kappa"])
-                if LEDGER_HARM_MODE == "realised":
-                    # **T87**: 移転は攻め手の行に 1 回だけ入っている＝守りの窓は帳簿に何も足さない（`s` 専任）
-                    got = dict(got, g=0.0, g_delta=0.0)
-                # **T86**: `all_attacks` なら攻めの行を全部読み終えてから確定する（そのターンの攻撃の価格の和が要る）
-                if GUARD_PRICE_MODE == "all_attacks" and LEDGER_HARM_MODE != "realised":
-                    pending_grd.append((got, played, float(sc[SC_MY_LIFE]), z, bnd, kap, w, t, rec))
-                else:
-                    _finish_guard(got, played, float(sc[SC_MY_LIFE]), z, bnd, kap, w, t, rec, kn, stats, _add)
-        # **T86**: 守りの窓を確定する——攻め手の価格は**そのターンに相手が打った攻撃の価格の和**
-        for (got, played, my_life, z, bnd, kap, w, t, rec_g) in pending_grd:
-            price_all = float(atk_turn.get((1 - w, t), 0.0))
-            n_atk = int(atk_turn_n.get((1 - w, t), 0))
-            got = dict(got, price=price_all)
-            actual = -float(got["g_paid"])                       # 実際に払った額（`spent` 込み）
-            got["g_delta"] = price_all - actual
-            got["g"] = (0.0 if GUARD_G_MODE == "zero" else
-                        got["g_delta"] if GUARD_G_MODE == "delta" else got["g_paid"])
-            ga = stats["grd_by_attacks"].setdefault(str(min(n_atk, 5)),
-                                                    {"n": 0, "price": 0.0, "actual": 0.0, "g_delta": 0.0})
-            ga["n"] += 1; ga["price"] += price_all; ga["actual"] += actual; ga["g_delta"] += got["g_delta"]
-            _finish_guard(got, played, my_life, z, bnd, kap, w, t, rec_g, kn, stats, _add)
+                # **T87**: 移転は攻め手の行に 1 回だけ入っている＝守りの窓は帳簿に何も足さない（`s` 専任）
+                got = dict(got, g=0.0, g_delta=0.0)
+                _finish_guard(got, played, float(sc[SC_MY_LIFE]), z, bnd, kap, w, t, rec, kn, stats, _add)
         # **T80**: ターンの前後で動いた勝率 `ΔW = W(D の次) − W(D の今)` を、そのターンの**生の価格**と並べる
         ts_kn = sorted(t0 for t0, e in kn.items() if e.get("d0") is not None)   # 席 0 視点の `D` が読めたターン
         # **T84**: 局が終わって存在しないターンへ繰り延べた価格は落ちる（数だけ残す＝母数が減ったことを隠さない）
@@ -1452,7 +1335,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
     stats["kappa_needed"] = KN.summarise(kn_turns)
     stats["kappa_needed_1turn"] = KN.summarise([dict(t, g0=t["g0_turn"], dW=t["dW_turn"]) for t in kn_turns])
     stats["kappa_split"] = KN.summarise_games(kn_games)        # T81: 相関の中身（窓・型・場の動き）
-    stats["last_turn"] = LAST_TURN_MODE
+    stats["last_turn"] = "keep"
     return per, stats
 
 
@@ -1748,13 +1631,6 @@ def main(argv=None):
     _TOM.add_surv_mode_arg(ap)
     _TOM.add_cbar_mode_arg(ap)
     _TOM.add_take_mode_arg(ap)
-    ap.add_argument("--guard-cost", default=None, choices=GUARD_COST_MODES,
-                    help="**守りの窓の払った額**（T64）。`spent`＝実際に消えた札の価値の和（＋受けたなら Θ·μ・2026-09-16 から既定）／"
-                         "`spent_all`＝**受けた回数ぶん** Θ·μ を足す（T86・回数は窓の間に減ったライフ）／"
-                         "`formula`＝式の費用（以前の数字と比べるとき）")
-    ap.add_argument("--guard-g", default=None, choices=GUARD_G_MODES,
-                    help="**守りの窓の `g`**（T62）。省略時は `GUARD_G_MODE`（2026-09-16 から `delta`＝攻め手の価格 − 払った額）。"
-                         "以前の数字と比べるときは `paid` を明示する")
     ap.add_argument("--flow-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
                     help="**決める価格**（`s`・`ΔS`）の規約。省略時は `effect_value.FLOW_PRICING`（`option`）")
     ap.add_argument("--ledger-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
@@ -1779,20 +1655,6 @@ def main(argv=None):
     ap.add_argument("--theta-body", default=_CB.THETA_BODY_MODE, choices=_CB.THETA_BODY_MODES,
                     help="耐久の体の項（`--w-mode curve` の `D` に効く）: `blockers`（既定）／`all`（全キャラ・T82）／"
                          "`attackable`（レストの体 ＋ アクティブなブロッカー＝規則から出る形・T83）")
-    ap.add_argument("--ledger-harm", default=LEDGER_HARM_MODE, choices=LEDGER_HARM_MODES,
-                    help="**T87** 帳簿の書き方: `realised`（既定・攻めの行は実際に相手が失った額・守りの窓の `g` は 0＝移転は 1 回。"
-                         "`s` は価格のまま）／`price`（旧・理論の価格）")
-    ap.add_argument("--guard-price", default=GUARD_PRICE_MODE, choices=GUARD_PRICE_MODES,
-                    help="**T86** 守りの窓の攻め手の価格: `max_attack`（旧・そのターン最大の攻撃 1 本）／"
-                         "`all_attacks`（そのターンに相手が打った攻撃の価格の和＝攻めの行と同じ数）")
-    ap.add_argument("--attach-ledger", default=ATTACH_LEDGER_MODE, choices=ATTACH_LEDGER_MODES,
-                    help="**T85** ドン付与の帳簿価格: `in_attack`（既定・付与の行は 0＝増分は殴る行の価格に入っている。"
-                         "決める価格 `s` は増分のまま）／`increment`（旧・付与の行で増分を計上）")
-    ap.add_argument("--play-book", default=PLAY_BOOK_MODE, choices=PLAY_BOOK_MODES,
-                    help="**T84** 出した体の価格の計上時点: `next`（既定・効き始める次の自席ターン＝召喚酔い。"
-                         "速攻・ブロッカー・イベント／ステージは据え置き）／`now`（旧・出したターンに満額）")
-    ap.add_argument("--last-turn", default=LAST_TURN_MODE, choices=LAST_TURN_MODES,
-                    help="**T80 の診断** `drop` なら局の最後のターンの行を落とす（とどめの一撃とその応答を外す）")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     _TOM.add_attack_ability_arg(ap)
@@ -1816,11 +1678,6 @@ def main(argv=None):
     EV.apply_cost_afford(a)
     pricing_fixes = EV.apply_pricing_fixes(a)                  # L
     _CB.set_theta_hand_mode(a.theta_hand)
-    set_last_turn_mode(a.last_turn)
-    set_play_book_mode(a.play_book)
-    set_attach_ledger_mode(a.attach_ledger)
-    set_guard_price_mode(a.guard_price)
-    set_ledger_harm_mode(a.ledger_harm)
     _CB.set_theta_body_mode(a.theta_body)
     _TOM.set_clock_hand_mode(a.clock_hand)
 
@@ -1841,10 +1698,6 @@ def main(argv=None):
     _TOM.apply_surv_mode(a)
     _TOM.apply_cbar_mode(a)
     _TOM.apply_take_mode(a)
-    if a.guard_g is not None:
-        set_guard_g_mode(a.guard_g)
-    if a.guard_cost is not None:
-        set_guard_cost_mode(a.guard_cost)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.nu_targets,
                          a.silent, a.margin_comfort, ledger_pricing=a.ledger_pricing, harm_profile=a.harm_profile)
@@ -1863,8 +1716,8 @@ def main(argv=None):
                            "T28c_margin": a.margin_comfort, "w_mode": _TO.W_MODE,
                            "flow_pricing": stats["flow_pricing"], "ledger_pricing": stats["ledger_pricing"],
                            "surv_mode": _TO.SURV_MODE, "nu_mode": _TO.NU_MODE,
-                           "cbar_mode": _TO.CBAR_MODE, "guard_g": GUARD_G_MODE, "take_mode": _TO.TAKE_MODE,
-                           "guard_cost": GUARD_COST_MODE, "search_price": "plan",
+                           "cbar_mode": _TO.CBAR_MODE, "guard_g": "delta", "take_mode": _TO.TAKE_MODE,
+                           "guard_cost": "spent", "search_price": "plan",
                            "guard_afford": effective_guard_afford(), "guard_afford_requested": GUARD_AFFORD_MODE,   # G-2
                            "guard_s_cost": GUARD_S_COST_MODE,
                            "play_now": "hand", "inflow": "on", "cond_clock": "on",

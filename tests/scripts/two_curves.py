@@ -88,9 +88,9 @@ def _price_row(sc, tok, ci, cards, idx2cid, sig, cid, tcid, si, ti, k, theta, mu
     if played_v is None:
         return None
     g_v = TB.ledger_value(_score, played_v)
-    # **T85**: 付与の増分は殴る行の価格に既に入っている（`ATTACH_LEDGER_MODE=in_attack`）ので、
+    # **T85**: 付与の増分は殴る行の価格に既に入っている（`in_attack`）ので、
     # 付与の行そのものは帳簿では 0 にする（移転は 1 回だけ数える）。
-    if TB.ATTACH_LEDGER_MODE == "in_attack" and move_family(sig) == "attach":
+    if move_family(sig) == "attach":
         g_v = 0.0
     return float(g_v)
 

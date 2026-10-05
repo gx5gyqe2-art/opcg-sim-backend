@@ -7,7 +7,7 @@
 
 1. **`harm_of`** は `crossing_bridge.harm_of` と同じ式（独立に書いた・値が一致するのを固定）。
 2. **`_price_row`** は `score_candidate` をそのまま呼び、**帳簿の規約（T58・T85）で読み直す**——
-   `ATTACK` は素の値のまま・**`attach` 系の族は既定 `ATTACH_LEDGER_MODE=in_attack` でゼロになる**。
+   `ATTACK` は素の値のまま・**`attach` 系の族は `in_attack`（T85）でゼロになる**。
 3. **`two_curves_for_game` の累積の束ね方**（`_price_row`／`AR.parts`／`AR.parts_mirror` を差し替えて、
    `g`／`r` が正しい順序・正しい席に積まれるか）。
 4. **`collect` の集計**（席ごとの終点・勝った席の `R` 終点の平均）と
@@ -76,8 +76,7 @@ def test_price_row_attack_on_leader_matches_attack_value():
 
 
 def test_price_row_zeroes_attach_family_rows_under_the_shipped_ledger_mode():
-    """**T85**: `ATTACH_LEDGER_MODE=in_attack`（既定）では付与の行は帳簿で 0 になる。"""
-    assert TB.ATTACH_LEDGER_MODE == "in_attack"
+    """**T85**: `in_attack`（2026-09-18 から・切替は 2026-10-05 に削除）では付与の行は帳簿で 0 になる。"""
     sc, tok, ci = _minimal_row()
     idx2cid = {}
     cards = _Cards()
