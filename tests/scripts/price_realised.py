@@ -142,28 +142,8 @@ def state_meas(sc, tok):
 #: **物差しの手札の項**（T69・2026-09-17・ユーザ決定「物差し側にも質は入れた方が良さそう」）:
 #: `quality`（既定）＝窓の中で**手札に入った札**を μ ではなくその札の `max(ΔH_play, ΔG_guard)`（入った先の手札で・
 #: `hand_plan.added_card_gains`）で数える。手札から出た札は μ のまま（出す価格の `−μ` と揃える）。
-#: `count`＝旧（μ × 枚数の差）。**2026-09-17 より前の数字と比べるときは `count` を明示する**。
-HAND_MEAS_MODES = ("count", "quality")
-HAND_MEAS_MODE = "quality"
-
-
-def set_hand_meas_mode(mode):
-    global HAND_MEAS_MODE
-    if mode not in HAND_MEAS_MODES:
-        raise ValueError("hand meas mode は %s のどれか" % (HAND_MEAS_MODES,))
-    HAND_MEAS_MODE = mode
-    return HAND_MEAS_MODE
-
-
-def add_hand_meas_arg(ap):
-    ap.add_argument("--hand-meas", default=None, choices=HAND_MEAS_MODES,
-                    help="**T69** 物差しの手札の項: `quality`（既定・入った札を `max(ΔH, ΔG)` で数える）／`count`（旧・μ × 枚数）")
-
-
-def apply_hand_meas(a):
-    if getattr(a, "hand_meas", None) is not None:
-        set_hand_meas_mode(a.hand_meas)
-    return HAND_MEAS_MODE
+#: 旧の `count`（μ × 枚数の差・切替 `HAND_MEAS_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
+#: 出力 JSON の `hand_meas` キーは定数 `"quality"` のまま残す（バイト一致のため）。
 
 
 def quality_correction(gains, mu=MU):
@@ -194,9 +174,7 @@ def hand_quality_delta(sc_after, tok_after, ci_before, ci_after, idx2cid, cards,
 
 
 def _hand_quality_delta(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, mu=MU, deck=None):
-    """**T69**: 窓の中で手札に入った札の補正 `(Σ(gain − μ), [gain, …])`。`count` なら `(0, [])`。`deck` は T70 の相方待ちに使う。"""
-    if HAND_MEAS_MODE != "quality":
-        return 0.0, []
+    """**T69**: 窓の中で手札に入った札の補正 `(Σ(gain − μ), [gain, …])`。`deck` は T70 の相方待ちに使う。"""
     import hand_plan as HP                     # 遅延 import（hand_plan は本器を import する）
     gains = [g for _cid, g in HP.added_card_gains(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, deck=deck)]
     return quality_correction(gains, mu), gains
@@ -278,7 +256,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     stats = {"games": 0, "own_rows": 0, "scored": 0, "no_next": 0, "silent": 0,
              "search_price": "plan", "search_deck_ok": 0, "search_deck_bad": 0,
              # **T69**: 物差しの手札の項の規約・入った札の数・補正の和（Σ(gain − μ)）・入った札の gain の平均
-             "hand_meas": HAND_MEAS_MODE, "hand_added": 0, "hand_quality_sum": 0.0, "hand_gain_sum": 0.0}
+             "hand_meas": "quality", "hand_added": 0, "hand_quality_sum": 0.0, "hand_gain_sum": 0.0}
     games = 0
     for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS,
                                                     pol_cols=POL_COLS, extra_fn=_extra):
@@ -562,7 +540,6 @@ def main(argv=None):
     ap.add_argument("--flow-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
                     help="**T54** 後で効く効果を付与の行で数える（`option`・既定）か、使った行で数える（`exercise`＝付与の行は 0）か")
     EV.add_search_price_arg(ap)
-    add_hand_meas_arg(ap)
     EV.add_cost_afford_arg(ap)
     EV.add_pricing_fixes_arg(ap)
     import hand_plan as _HP
@@ -592,7 +569,6 @@ def main(argv=None):
     if a.flow_pricing is not None:
         EV.set_flow_pricing(a.flow_pricing)
     EV.apply_search_price(a)
-    apply_hand_meas(a)
     EV.apply_cost_afford(a)
     pricing_fixes = EV.apply_pricing_fixes(a)
     t0 = time.time()
@@ -606,7 +582,7 @@ def main(argv=None):
         stats["wiring"] = {"attack_ability": _TO.ATTACK_ABILITY_MODE, "passive_body": _TO.PASSIVE_BODY_MODE,
                            **{k: (round(v, 5) if isinstance(v, float) else v) for k, v in _TO.WIRING_STATS.items()}}
     res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "flow_pricing": EV.FLOW_PRICING,
-           "search_price": "plan", "hand_meas": HAND_MEAS_MODE,
+           "search_price": "plan", "hand_meas": "quality",
            "play_now": "hand", "cost_afford": EV.COST_AFFORD_MODE, "pricing_fixes": pricing_fixes,
            "decision_rows": apply_decision_row(a),
            "inflow": "on", "cond_clock": "on", "stats": stats,

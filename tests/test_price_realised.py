@@ -143,15 +143,6 @@ def test_the_turn_end_column_and_the_flow_split_do_not_touch_the_family_sums():
 
 
 def test_the_hand_quality_yardstick_counts_cards_that_enter_the_hand_at_their_gain():
-    """**T69**: 物差しは入った札を μ ではなく `max(ΔH, ΔG)` で数える＝補正は Σ(gain − μ)・`count` なら 0・不正な mode は弾く。"""
-    before = PR.HAND_MEAS_MODE
-    try:
-        assert PR.quality_correction([0.08, 0.0], mu=0.05) == pytest.approx(0.08 - 0.05 + 0.0 - 0.05)
-        assert PR.quality_correction([], mu=0.05) == 0.0
-        PR.set_hand_meas_mode("count")
-        assert PR.hand_quality_delta(None, None, None, None, None, None) == (0.0, [])      # 旧規約は何も読まない
-        with pytest.raises(ValueError):
-            PR.set_hand_meas_mode("guess")
-        assert PR.set_hand_meas_mode("quality") == "quality"
-    finally:
-        PR.set_hand_meas_mode(before)
+    """**T69**: 物差しは入った札を μ ではなく `max(ΔH, ΔG)` で数える＝補正は Σ(gain − μ)（旧の `count` は 2026-10-05 に削除）。"""
+    assert PR.quality_correction([0.08, 0.0], mu=0.05) == pytest.approx(0.08 - 0.05 + 0.0 - 0.05)
+    assert PR.quality_correction([], mu=0.05) == 0.0
