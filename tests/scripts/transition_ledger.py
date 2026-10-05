@@ -440,7 +440,7 @@ def main(argv=None):
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--d-mode", dest="d_mode", choices=KV.D_MODES, default=None)
     ap.add_argument("--attack-rest", dest="attack_rest", choices=KV.ATTACK_REST_MODES, default=None,
-                    help="攻撃した体のレスト費用をΘ_meへ足すか（既定 `return`・C-5c／`body`＝C-2／`off`＝旧）")
+                    help="攻撃した体のレスト費用をΘ_meへ足すか（既定 `return`・C-5c／`off`＝旧・C-2 の `body` は 2026-10-05 に削除）")
     ap.add_argument("--theta-hand", dest="theta_hand", choices=CB.THETA_HAND_MODES, default=None,
                     help="**H-4** 耐久の手札項（既定 `rule_don`・2026-10-04／旧の既定は `cuttable_forced`）")
     ap.add_argument("--mirror", choices=("on", "off"), default=None,

@@ -106,9 +106,9 @@ def test_collect_passes_attack_rest_through_to_kappa_vector(monkeypatch):
     monkeypatch.setattr(AX.TL, "collect", fake_tl_collect)
     old = KV.ATTACK_REST_MODE
     try:
-        out = AX.collect(["dummy"], attack_rest="body")
-        assert seen["mode_at_call"] == "body"
-        assert out["attack_rest_mode"] == "body"
+        out = AX.collect(["dummy"], attack_rest="off")
+        assert seen["mode_at_call"] == "off"
+        assert out["attack_rest_mode"] == "off"
     finally:
         KV.set_attack_rest_mode(old)
 
@@ -123,9 +123,9 @@ def test_collect_does_not_touch_attack_rest_mode_when_omitted(monkeypatch):
 
     monkeypatch.setattr(AX.TL, "collect", fake_tl_collect)
     old = KV.ATTACK_REST_MODE
-    KV.set_attack_rest_mode("body")
+    KV.set_attack_rest_mode("off")
     try:
         AX.collect(["dummy"])
-        assert seen["mode_at_call"] == "body"             # 渡さなければ既定(現状の値)のまま
+        assert seen["mode_at_call"] == "off"             # 渡さなければ既定(現状の値)のまま
     finally:
         KV.set_attack_rest_mode(old)

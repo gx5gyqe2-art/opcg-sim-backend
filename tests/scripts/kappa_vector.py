@@ -51,7 +51,7 @@
 
 | 型 | 動かす軸 | Δx の単位 |
 |---|---|---|
-| 攻撃 | **`Θ_opp` を削る**（＋`ATTACK_REST_MODE=body`なら**ブロッカーが攻めてレストになる分`Θ_me`も削る**・C-2） | 価格（そのまま） |
+| 攻撃 | **`Θ_opp` を削る**（＋`ATTACK_REST_MODE=return`なら**ブロッカーが攻めてレストになる分を`Θ_me`から戻る側へ移す**・C-5c） | 価格（そのまま） |
 | 出す | **`A_me` を上げる** | **1 ターンあたり**（`attack_value`＝体の毎ターンの攻撃の価値） |
 | 付与 | **`A_me` を上げる** | 1 ターンあたり（`attack_value(p+1000k) − attack_value(p)`） |
 | 効果・除去 | **`Θ_opp` を削る ＋ `A_opp` を下げる** | 価格 ＋ 1 ターンあたり |
@@ -122,15 +122,16 @@ TAU_CAP = CB.RACE_CAP
 AXES = ("th_me", "th_opp", "a_me", "a_opp")
 
 #: **攻撃した体のレスト費用**（C-2・2026-09-25・`2026-09-25_c1_attack_axis_by_result.md` の候補(a)）。
-#: `off`＝旧（攻撃は`Θ_opp`しか動かさない）／`body`＝**攻めた体がブロッカーなら、攻撃でレストになり
-#: 次の自席ターンまで`Θ_me`の体の項（`THETA_BODY_MODE=blockers`）から抜ける分を価格にも足す**。
+#: `off`＝旧（攻撃は`Θ_opp`しか動かさない）／C-2 の `body`（**攻めた体がブロッカーなら、攻撃でレストになり
+#: 次の自席ターンまで`Θ_me`の体の項から抜ける分を永久の損失として足す**近似）は 2026-10-05 に削除——
+#: `claude/theory-switches-final` で再現できる。
 #: 規則: `has_blocker`は`!is_rest`を要求（`rust/opcg_engine/src/rules/battle.rs`）。値は`_body_term`と
 #: 同じ単位（`crossing_bridge.nu_meas_of`）。**新定数ゼロ**（既存の式の再利用）。
 #: **`return`（C-5c・正しい形）**: 攻めたブロッカーの `ν_meas` を**消さずに「戻る側」へ移す**
 #: （`th_me` −ν・`th_me_back` +ν・総量は不変）——状態が `THETA_RETURN_MODE=untap` の 7 つ組
 #: （戻る分を持つ）であることが前提（5 つ組に `*_back` を足すと `apply_dx` が落ちる＝黙って捨てない）。
-ATTACK_REST_MODES = ("off", "body", "return")
-#: **既定は `return`**（2026-09-25・C-5c・ユーザ決定）。`body`（C-2・永久の損失の近似）は不採用・切替として残す。
+ATTACK_REST_MODES = ("off", "return")
+#: **既定は `return`**（2026-09-25・C-5c・ユーザ決定）。
 ATTACK_REST_MODE = "return"
 
 
@@ -515,15 +516,14 @@ def axis_of_move(fam, v, sig, cid, cards, sc, tok, olp, r_turns, don_k=0):
     v = float(v)
     if fam == "attack":
         out["th_opp"] = -v                      # 相手の耐久を削る（価格の単位のまま）
-        if ATTACK_REST_MODE in ("body", "return"):
+        if ATTACK_REST_MODE == "return":
             info = cards.info(cid) if (cards is not None and cid) else None
             if info and info.get("blocker") and not info.get("event"):
                 p = float(info.get("power") or 0.0)
                 nu = float(CB.nu_meas_of(p, olp))
                 if nu > 0.0:
                     out["th_me"] = -nu           # 攻めてレストになる分、自分の耐久の体の項から抜ける（C-2）
-                    if ATTACK_REST_MODE == "return":
-                        out["th_me_back"] = nu   # **C-5c**: 消さずに「次の自席ターンから戻る側」へ移す
+                    out["th_me_back"] = nu       # **C-5c**: 消さずに「次の自席ターンから戻る側」へ移す
     elif fam == "play":
         info = cards.info(cid) if (cards is not None and cid) else None
         p = float((info or {}).get("power") or 0.0)

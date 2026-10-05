@@ -313,49 +313,50 @@ def test_attack_rest_off_never_touches_theta_me():
     assert dx == {"th_opp": -0.37}
 
 
-def test_attack_rest_body_prices_a_blocker_going_rest():
-    """**`body` モードはブロッカーが攻めてレストになる分だけ `th_me` を削る**（C-2）。
+def test_attack_rest_return_moves_a_blocker_going_rest():
+    """**`return` はブロッカーが攻めてレストになる分を `th_me` から削り、同じ額を戻る側（`th_me_back`）へ移す**
+    （C-2 の量・C-5c の移し方。C-2 の `body`＝移さず削るだけの切替は 2026-10-05 に削除）。
     値は `_body_term` と同じ単位（`crossing_bridge.nu_meas_of`）。"""
     class _C:
         def info(self, cid):
             return {"power": 5000.0, "blocker": True}
 
-    KV.set_attack_rest_mode("body")
+    KV.set_attack_rest_mode("return")
     sc, tok = _ctx()
     dx = KV.axis_of_move("attack", 0.37, ["ATTACK", None, "L"], "X", _C(), sc, tok, 5000.0, 4.0)
     assert dx["th_opp"] == pytest.approx(-0.37)
     assert dx["th_me"] == pytest.approx(-CB.nu_meas_of(5000.0, 5000.0))
-    assert dx["th_me"] < 0.0
+    assert dx["th_me"] < 0.0 and dx["th_me_back"] == pytest.approx(-dx["th_me"])
 
 
-def test_attack_rest_body_ignores_non_blocker_attackers():
+def test_attack_rest_return_ignores_non_blocker_attackers():
     """**ブロッカーでない体は元々 `Θ_me` の体の項に入っていない**（`THETA_BODY_MODE=blockers`）
     ので、レストになっても削るものが無い——`th_me` は付かない。"""
     class _C:
         def info(self, cid):
             return {"power": 5000.0, "blocker": False}
 
-    KV.set_attack_rest_mode("body")
+    KV.set_attack_rest_mode("return")
     sc, tok = _ctx()
     dx = KV.axis_of_move("attack", 0.37, ["ATTACK", None, "L"], "X", _C(), sc, tok, 5000.0, 4.0)
     assert dx == {"th_opp": -0.37}
 
 
-def test_attack_rest_body_ignores_event_cards():
+def test_attack_rest_return_ignores_event_cards():
     """**イベントは体を持たない**（`blocker` フラグが立っていても除く）。"""
     class _C:
         def info(self, cid):
             return {"power": 5000.0, "blocker": True, "event": True}
 
-    KV.set_attack_rest_mode("body")
+    KV.set_attack_rest_mode("return")
     sc, tok = _ctx()
     dx = KV.axis_of_move("attack", 0.37, ["ATTACK", None, "L"], "X", _C(), sc, tok, 5000.0, 4.0)
     assert dx == {"th_opp": -0.37}
 
 
-def test_attack_rest_body_is_safe_without_a_card_id_or_card_db():
+def test_attack_rest_return_is_safe_without_a_card_id_or_card_db():
     """**`cid`／`cards` が無い行でも落ちない**（黙って `th_opp` だけになる）。"""
-    KV.set_attack_rest_mode("body")
+    KV.set_attack_rest_mode("return")
     sc, tok = _ctx()
     dx = KV.axis_of_move("attack", 0.37, ["ATTACK", None, "L"], None, None, sc, tok, 5000.0, 4.0)
     assert dx == {"th_opp": -0.37}
