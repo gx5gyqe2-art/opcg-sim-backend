@@ -19,9 +19,10 @@ T117（「今このターンで殺せるか」・2026-09-19）を**決着の定�
 * **通る本数** … 攻撃手（リーダー＋このターン攻撃できる体・`own_attackers_of`）のうち、
   相手の**アクティブなブロッカー**に横取りされない本数（ブロッカーは安い攻撃から止める＝守り手の最良）。
 * **止められる本数** … **守り手の実際の手札**（§0.05・**相手席の直近の自席ターンの最後の行**から読む＝T130 と同じ規約）で、
-  カウンター値が足りる組を作れる本数。**`LETHAL_STOP_MODE=max`（既定）は「切れるだけ切る」**＝詰みの判定
+  カウンター値が足りる組を作れる本数。**守り手は「切れるだけ切る」**（`max`）＝詰みの判定
   （守り手はライフ 0 なら経済を捨てて守る・規則）。**安い攻撃から止め、1 本ごとに使うカウンター値が最小の組を選ぶ**
-  （本数を最大にする貪欲）。`econ` は T130 の `attacks_stopped`（受けるより安いときだけ切る）＝比較用。
+  （本数を最大にする貪欲）。比較用の `econ`（T130 の `attacks_stopped`＝受けるより安いときだけ切る・切替
+  `LETHAL_STOP_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
 * **守り手の手札** … 実際の手札（`actual`）。T117 の旧規約（`share`＝`相手の手札枚数 × デッキの切れる割合`・
   T117 の 0.23 を再現するための切替 `LETHAL_HAND_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
 * **ドン付与** … `--don on`（既定）で**アクティブなドンを安い攻撃から 1 体 4 枚まで**（規則）配って `x` を上げる。
@@ -88,9 +89,7 @@ from theory_order import (MU, PWR_EPS, SC_MY_DON, SC_MY_LIFE, SC_OPP_HAND, SC_OP
                           SC_OPP_LIFE, THETA, c_of, own_attackers_of)
 
 #: **守り手の手札の読み方**は `actual`（§0.05 完全情報＝相手席の行から実際の値）。`share`（T117 の旧規約）は 2026-10-05 に削除。
-#: **守り手がどこまで切るか**——`max`（既定・切れるだけ切る＝詰みの判定）／`econ`（受けるより安いときだけ・T130 の規則）
-LETHAL_STOP_MODES = ("max", "econ")
-LETHAL_STOP_MODE = "max"
+#: **守り手は切れるだけ切る**（`max`＝詰みの判定）。`econ`（受けるより安いときだけ・T130 の規則）は 2026-10-05 に削除。
 #: **受けたライフの札を守り手のカウンターに数えるか**——`draw`（既定・規則）／`off`（T117 の旧規約）
 LETHAL_LIFE_MODES = ("draw", "off")
 LETHAL_LIFE_MODE = "draw"
@@ -103,14 +102,6 @@ AVG_COUNTER_MODE = "rules"
 DON_PER_BODY = 4
 #: 状態スカラーの **相手のアクティブなドン**（`encoder.py` の並び: 0 自ライフ・1 相手ライフ・2 自アクティブ・3 自レスト・4 相手アクティブ）
 SC_OPP_DON_ACTIVE = 4
-
-
-def set_lethal_stop_mode(mode):
-    global LETHAL_STOP_MODE
-    if mode not in LETHAL_STOP_MODES:
-        raise ValueError("lethal stop mode は %s のどれか" % (LETHAL_STOP_MODES,))
-    LETHAL_STOP_MODE = mode
-    return LETHAL_STOP_MODE
 
 
 def set_lethal_life_mode(mode):
@@ -222,12 +213,10 @@ def attach_don(xs, don):
     return xs
 
 
-def lethal_of_row(sc, tok, with_don=True, defender_counters=None, take_cost=None,
-                  defender_items=None, life_counter=None, defender_costs=None):
+def lethal_of_row(sc, tok, with_don=True, defender_counters=None, life_counter=None, defender_costs=None):
     """1 行の判定 `(決着か, 内訳)`。**新定数ゼロ・打ち筋を仮定しない**。
 
     `defender_counters` … 守り手の実際の手札のカウンター値の列（**相手席の行から**）。
-    `defender_items`／`take_cost` … `LETHAL_STOP_MODE=econ` のときだけ（T130 の `attacks_stopped`）。
     `life_counter` … 守り手のデッキの平均カウンター値（`LETHAL_LIFE_MODE=draw`・`actual` のときに要る）。
     `defender_costs` … 守り手の各札の**イベントの費用**（非イベントは 0・無ければ費用ゼロ扱い）。
     予算は `sc[SC_OPP_DON_ACTIVE]`（相手がこのターン開始時に残しているアクティブなドン）。"""
@@ -249,15 +238,9 @@ def lethal_of_row(sc, tok, with_don=True, defender_counters=None, take_cost=None
         if life_counter is None:
             raise ValueError("LETHAL_LIFE_MODE='draw' なのにデッキの平均カウンター値が渡されていない")
         pool += life_cards_as_counters(life, life_counter)
-    if LETHAL_STOP_MODE == "econ":
-        if defender_items is None or take_cost is None:
-            raise ValueError("LETHAL_STOP_MODE='econ' には守り手の items と受ける費用が要る")
-        extra = [{"counter": c, "v": None, "cid": "", "cost": 0.0, "event": False} for c in pool[len(defender_counters):]]
-        stops = int(HP.attacks_stopped(list(defender_items) + extra, xs_through, take_cost))
-    else:
-        costs = (list(defender_costs) if defender_costs is not None else [0.0] * len(defender_counters))
-        costs += [0.0] * (len(pool) - len(defender_counters))          # ライフの札はキャラ扱い（費用 0）
-        stops = max_stops(pool, xs_through, costs, float(sc[SC_OPP_DON_ACTIVE]))
+    costs = (list(defender_costs) if defender_costs is not None else [0.0] * len(defender_counters))
+    costs += [0.0] * (len(pool) - len(defender_counters))          # ライフの札はキャラ扱い（費用 0）
+    stops = max_stops(pool, xs_through, costs, float(sc[SC_OPP_DON_ACTIVE]))
     hand_read = len(defender_counters)
     hits = max(0, through - stops)
     # **規則**: ライフ 0 で損害を受けたら負け＝通る本数が「残りライフ ＋ 1」以上で決着（ライフ 0 なら 1 本）
@@ -363,7 +346,6 @@ def _iter_declared_games(dirs, limit_games=0, with_don=True):
                 d = 1 - w
                 prev = [tt for tt in turn_seq[d] if tt < t]
                 counters = items = costs = None
-                take = None
                 if prev:
                     sc_d, tok_d, ci_d = turn_last.get((d, prev[-1]), turn_start[(d, prev[-1])])
                     items = HP.hand_items(tok_d, ci_d, idx2cid, cards,
@@ -371,7 +353,6 @@ def _iter_declared_games(dirs, limit_games=0, with_don=True):
                                           max(1.0, min(5.0, float(np.asarray(sc_d)[SC_OPP_LIFE]))))
                     counters = [float(it["counter"]) for it in items]
                     costs = [float(it["cost"]) if it.get("event") else 0.0 for it in items]
-                    take = HG.take_cost_of(float(np.asarray(sc_d)[SC_MY_LIFE]), MU)
                 else:
                     # 相手がまだ 1 度も打っていない（先手の 1 ターン目）＝手札は初手 5 枚のまま読めない → 宣言しない
                     rows_out.append((w, t, False, False, {}, True, None))
@@ -384,7 +365,7 @@ def _iter_declared_games(dirs, limit_games=0, with_don=True):
                             raise ValueError("seed %d 席 %d のデッキが引けない" % (seed_g, d))
                         avg_cache[key] = avg_counter(dk[d], cards)
                     lc = avg_cache[key]
-                declared, dd = lethal_of_row(sc, tok, with_don, counters, take, items, life_counter=lc,
+                declared, dd = lethal_of_row(sc, tok, with_don, counters, life_counter=lc,
                                              defender_costs=costs)
                 killed_now = bool(winner == w and t == t_end)
                 rows_out.append((w, t, declared, killed_now, dd, False, lc))
@@ -426,7 +407,7 @@ def collect(dirs, limit_games=0, with_don=True, dump=None):
     `dump` に list を渡すと**宣言した行と勝者の最後のターンの全内訳**を積む（診断用・取りこぼしも読める）。"""
     games_out = []
     stats = {"games": 0, "rows": 0, "hand_missing": 0, "with_don": with_don,
-             "hand_mode": "actual", "stop_mode": LETHAL_STOP_MODE, "life_mode": LETHAL_LIFE_MODE,
+             "hand_mode": "actual", "stop_mode": "max", "life_mode": LETHAL_LIFE_MODE,
              "by_life": {},                           # 相手ライフ別: 宣言数・勝者の宣言数
              "false_rows": []}                        # 敗者の席で宣言した行の内訳（先頭 200 件）
     for seed_g, winner, t_end, rows in _iter_declared_games(dirs, limit_games, with_don):
@@ -461,8 +442,6 @@ def build_parser():
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--don", default="on", choices=("on", "off"))
-    ap.add_argument("--stop", default=None, choices=LETHAL_STOP_MODES,
-                    help="守り手がどこまで切るか（既定 `max`＝切れるだけ・`econ`＝受けるより安いときだけ）")
     ap.add_argument("--life", default=None, choices=LETHAL_LIFE_MODES,
                     help="受けたライフの札を守り手のカウンターに数えるか（既定 `draw`＝規則・`off`＝T117 の旧規約）")
     ap.add_argument("--avg-counter", default=None, choices=AVG_COUNTER_MODES,
@@ -474,8 +453,6 @@ def build_parser():
 
 def main(argv=None):
     a = build_parser().parse_args(argv)
-    if a.stop:
-        set_lethal_stop_mode(a.stop)
     if a.life:
         set_lethal_life_mode(a.life)
     if a.avg_counter:

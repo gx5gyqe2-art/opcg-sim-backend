@@ -125,9 +125,6 @@ def build_parser():
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--don", default="on", choices=("on", "off"))
-    ap.add_argument("--stop", default=None, choices=LR.LETHAL_STOP_MODES,
-                    help="lethal_rule の --stop をそのまま通す（既定 max・missed_lethal の "
-                         "margin=-1 が `econ`〔T130 の受けるより安いときだけ切る〕でどう動くかの検算に使う）")
     ap.add_argument("--life", default=None, choices=LR.LETHAL_LIFE_MODES,
                     help="lethal_rule の --life をそのまま通す（既定 draw）")
     ap.add_argument("--avg-counter", default=None, choices=LR.AVG_COUNTER_MODES,
@@ -138,8 +135,6 @@ def build_parser():
 
 def main(argv=None):
     a = build_parser().parse_args(argv)
-    if a.stop:
-        LR.set_lethal_stop_mode(a.stop)
     if a.life:
         LR.set_lethal_life_mode(a.life)
     if a.avg_counter:

@@ -33,11 +33,9 @@ from theory_order import (S_CAN_ATTACK, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, S_PO
 
 @pytest.fixture(autouse=True)
 def _defaults():
-    LR.set_lethal_stop_mode("max")
     LR.set_lethal_life_mode("off")          # 既定は `draw` だが、規則 1〜5 のテストはライフの札なしで読む
     LR.set_avg_counter_mode("rules")
     yield
-    LR.set_lethal_stop_mode("max")
     LR.set_lethal_life_mode("draw")
     LR.set_avg_counter_mode("rules")
 
@@ -165,13 +163,6 @@ def test_actual_mode_refuses_to_run_without_the_defenders_hand():
         LR.lethal_of_row(sc, tok, with_don=False, defender_counters=None)
 
 
-def test_econ_mode_needs_items_and_take_cost():
-    LR.set_lethal_stop_mode("econ")
-    sc, tok = _row()
-    with pytest.raises(ValueError):
-        LR.lethal_of_row(sc, tok, with_don=False, defender_counters=[1000.0])
-
-
 # ---- 5. 6 指標の算術 ---------------------------------------------------------------------------
 
 def test_metrics_on_a_hand_built_ledger():
@@ -200,9 +191,8 @@ def test_metrics_are_empty_safe():
 
 def test_cli_exposes_all_switches_and_they_reach_the_module(monkeypatch):
     monkeypatch.setattr(LR, "collect", lambda *a, **k: {})
-    LR.main(["--in", "x", "--stop", "econ", "--life", "off", "--avg-counter", "rules"])
-    assert (LR.LETHAL_STOP_MODE, LR.LETHAL_LIFE_MODE, LR.AVG_COUNTER_MODE) == \
-        ("econ", "off", "rules")
+    LR.main(["--in", "x", "--life", "off", "--avg-counter", "rules"])
+    assert (LR.LETHAL_LIFE_MODE, LR.AVG_COUNTER_MODE) == ("off", "rules")
 
 
 # ---- 6. 受けたライフの札は手札に入る（規則・`rules/battle.rs`） -----------------------------------
