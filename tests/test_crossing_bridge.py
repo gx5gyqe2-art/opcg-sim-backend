@@ -32,7 +32,7 @@ _SHIPPED = {n: getattr(CB, n) for n in (
     "THETA_HAND_MODE", "THETA_HAND_PLACE", "THETA_BODY_MODE",
     "THETA_RETURN_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE",
     "RATE_WALK_MODE", "RATE_DECAY_MODE", "RACE_MODE", "SLOPE_TAKE_MODE",
-    "THETA_DON_MODE", "THETA_HAND_WINDOW")}
+    "THETA_HAND_WINDOW",)}
 
 
 def test_the_shipped_defaults_are_the_ones_we_decided():
@@ -40,7 +40,7 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
 
     **2026-09-19 のユーザ指示**（「使用できるドンと使ったドンの整合が取れるように最後まで進めてください」）で
     財布 1 つ（T109・旧 `DON_PURSE_MODE=all`・2026-10-05 に切替は削除）が入った——**財布が 1 つになって初めて帳尻が合う**
-    （理論の使いすぎ 22.0% → 0.0%）。**続く「それは直しましょうか」で `THETA_DON_MODE=rule`（T110）**
+    （理論の使いすぎ 22.0% → 0.0%）。**続く「それは直しましょうか」で耐久の側のドンも規則どおり（T110・2026-10-05 に切替は削除）**
     ——**耐久の側もドンを規則どおり払う**（手札のブロッカーの予算＝次ターンのアクティブ・
     カウンター・イベントは使い残しで払う）。
 
@@ -66,7 +66,6 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "RATE_WALK_MODE": "grow",                # T94
         "RATE_DECAY_MODE": "off",                # T95（切替として残す）
         "RACE_MODE": "static",                   # T90／T91／T104（切替として残す）
-        "THETA_DON_MODE": "rule",                # T110・2026-09-19
         "THETA_HAND_WINDOW": "horizon",          # T116・2026-09-20
     }
 
@@ -1720,7 +1719,6 @@ def test_the_hand_blocker_is_read_from_the_rules_not_the_play():
     _orig_hp = sys.modules.get("hand_plan")
     sys.modules["hand_plan"] = _HP
     try:
-        assert CB.THETA_DON_MODE == "rule"       # **2026-09-19 から既定**（ユーザ指示「それは直しましょうか」）
         sc = _sc(3, 4)
         # 使い残し 1・レスト 3・デッキ 6 → 次のターンは 1 + 3 + 0 + 2 = 6 ドン
         sc[DL.SC_MY_ACTIVE], sc[DL.SC_MY_RESTED] = 1.0, 3.0
@@ -1736,15 +1734,9 @@ def test_the_hand_blocker_is_read_from_the_rules_not_the_play():
         sc[DL.SC_MY_ACTIVE] = sc[DL.SC_MY_RESTED] = 0.0
         sc[DL.SC_MY_LEADER_DON] = sc[DL.SC_MY_DON_DECK] = 0.0
         assert CB.hand_blocker_nu(sc, tok, [0] * 22, {}, cards, 5000.0) == pytest.approx(0.0)
-        # **旧 `off` は使い残しだけを見るので、同じ行でも桁が違う**（3 ドン＝どちらも出せない）
-        CB.set_theta_don_mode("off")
-        sc[DL.SC_MY_ACTIVE], sc[DL.SC_MY_RESTED] = 1.0, 3.0
-        sc[DL.SC_MY_DON_DECK] = 6 / DL.DECK_SCALE
-        assert CB.hand_blocker_nu(sc, tok, [0] * 22, {}, cards, 5000.0) == pytest.approx(0.0)
         # 原本が引けなければ 0（落ちない）
         assert CB.hand_blocker_nu(sc, None, None, None, None, 5000.0) == pytest.approx(0.0)
     finally:
-        CB.set_theta_don_mode("rule")
         # 元のモジュールを戻す（消すと後のテストの遅延 import が別の `hand_plan` を作り、monkeypatch が効かなくなる）
         if _orig_hp is not None:
             sys.modules["hand_plan"] = _orig_hp
@@ -1933,15 +1925,6 @@ def test_the_next_turns_don_is_what_the_rules_give_back():
     sc2 = np.zeros(70, np.float32)
     sc2[DL.SC_MY_ACTIVE], sc2[DL.SC_MY_DON_DECK] = 4, 2 / DL.DECK_SCALE
     assert CB.next_turn_don(sc2, np.zeros((22, 24), np.float32)) == pytest.approx(6.0)
-    # 旧式は自席ターン終わり（使い残しが少ない）で測るので大幅に過小
-    try:
-        assert CB.set_theta_don_mode("off") == "off"
-        assert CB.set_theta_don_mode("blocker") == "blocker"
-        assert CB.set_theta_don_mode("rule") == "rule"
-        with pytest.raises(ValueError):
-            CB.set_theta_don_mode("なにか")
-    finally:
-        CB.set_theta_don_mode(_SHIPPED["THETA_DON_MODE"])
 
 
 def test_a_counter_event_has_to_be_paid_for():

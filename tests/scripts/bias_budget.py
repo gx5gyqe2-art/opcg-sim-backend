@@ -282,7 +282,7 @@ def collect_budget(dirs, limit_games=0, theta=None, mu=None, require_static=True
            "modes": {"race": CB.RACE_MODE, "theta_hand_place": CB.THETA_HAND_PLACE,
                      "theta_return": CB.THETA_RETURN_MODE, "rate_decay": CB.RATE_DECAY_MODE,
                      "rate_walk": CB.RATE_WALK_MODE, "don_purse": "all",
-                     "theta_don": CB.THETA_DON_MODE, "theta_hand": CB.THETA_HAND_MODE,
+                     "theta_don": "rule", "theta_hand": CB.THETA_HAND_MODE,
                      "theta_hand_window": CB.THETA_HAND_WINDOW, "rate_don": "flow",
                      "rate_don_pay": True, "rate_ramp": 0.0},
            "games": stats.get("games"), "rows_out": len(rows_out), "blocks": len(blocks)}

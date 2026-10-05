@@ -191,23 +191,13 @@ def playable_attack_price(items, cards, don, olp, theta=THETA, mu=MU, want_rush=
 #:    印字カウンターの札はそのまま足せる＝無料。**イベントを切るドンは相手のターンに在るドン**＝
 #:    **自席ターンで使い残したぶんだけ**（実測 0.53 枚）。
 #:
-#: `off`＝旧（両方そのまま）／`blocker`＝1 だけ／**`rule`＝両方**（規則どおり）。**新定数ゼロ**。
-THETA_DON_MODES = ("off", "blocker", "rule")
-#: **既定は `rule`**（2026-09-19・ユーザ指示「それは直しましょうか」）——**どちらも規則がそう言っている**。
+#: **両方を規則どおりに払う**（**新定数ゼロ**）——2026-09-19・ユーザ指示「それは直しましょうか」・**どちらも規則がそう言っている**。
 #: **効き方は大きい**: 手札のブロッカーが立つ行が **3.4% → 44.0%（実）／10.9% → 29.3%（合成）**、
 #: 項の大きさが **0.0038 → 0.0550／0.0079 → 0.0304**（14 倍／3.9 倍）＝**旧の予算は桁で間違っていた**。
 #: `curve` の的中は上がり（0.5839 → **0.5983**／0.5996 → 0.6004）**`theory` の的中はわずかに下がる**
 #: （0.6654 → 0.6631／0.6381 → 0.6340）。**`Θ` が変わるので `σ_T` と `w̄` は測り直した**（T97／T98 の規約）。
-#: **以前の数字と比べるときは `--theta-don off`**。
-THETA_DON_MODE = "rule"
-
-
-def set_theta_don_mode(name):
-    global THETA_DON_MODE
-    if name not in THETA_DON_MODES:
-        raise ValueError("unknown theta don mode: %r" % (name,))
-    THETA_DON_MODE = name
-    return THETA_DON_MODE
+#: 旧の `off`（両方そのまま）／`blocker`（1 だけ）（切替 `THETA_DON_MODE`）は 2026-10-05 に削除——
+#: `claude/theory-switches-final` で再現できる。出力 JSON の `theta_don` キーは定数 `"rule"` のまま残す（バイト一致のため）。
 
 
 def next_turn_don(sc, tok):
@@ -311,8 +301,7 @@ def hand_blocker_nu(sc, tok_row, ci_row, idx2cid, cards, opp_leader_power):
     import hand_plan as HP
     sc_a = np.asarray(sc)
     # **T110**: 規則どおりの予算（リフレッシュで全部戻る ＋ ドンデッキから min(2, 残り)）。
-    don = (next_turn_don(sc, tok_row) if THETA_DON_MODE in ("blocker", "rule")
-           else min(10.0, float(sc_a[SC_MY_DON]) + 2.0))
+    don = next_turn_don(sc, tok_row)
     r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
     best = 0.0
     for it in (HP.hand_items(tok_row, ci_row, idx2cid, cards, float(opp_leader_power), r) or ()):
@@ -649,8 +638,7 @@ def with_hand_blocker(hr, sc, tok_row, ci_row, idx2cid, cards):
     sc_a = np.asarray(sc)
     own_lp = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
     opp_lp = float(sc_a[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-    don = (next_turn_don(sc, tok_row) if THETA_DON_MODE in ("blocker", "rule")
-           else min(10.0, float(sc_a[SC_MY_DON]) + 2.0))
+    don = next_turn_don(sc, tok_row)
     r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
     best, best_it = 0.0, None
     for it in (HP.hand_items(tok_row, ci_row, idx2cid, cards, opp_lp, r) or ()):
@@ -3686,7 +3674,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "sched_n": 0, "sched_j1_sum": 0.0, "sched_j5_sum": 0.0,
              # **T113**: そのターンの最後の行で閉じて足した額（旧値＝新値 − `last_close_sum`）
              "last_close_n": 0, "last_close_sum": 0.0, "last_close_open": 0,
-             "theta_don": THETA_DON_MODE, "hb_don_sum": 0.0, "cut_share_sum": 0.0, "cut_n": 0,
+             "theta_don": "rule", "hb_don_sum": 0.0, "cut_share_sum": 0.0, "cut_n": 0,
              "race_n": 0, "race_front_sum": 0.0, "race_th_sum": 0.0, "race_a_sum": 0.0,
              "race_paid_sum": 0.0,
              "theta_hand_blocker": "on", "hb_sum": 0.0, "hb_n": 0, "hb_hit": 0,
@@ -3737,7 +3725,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 own_last[(w0, t0)] = i                      # `turn_last` と同じ行（同じ条件で最後の行）
             cut = CP.CutFrames(order, rows, ex, idx2cid, cards, own_last, mu,
                                decks=(cut_decks.get(seed_g) if cut_decks else None),
-                               don_rule=(THETA_DON_MODE == "rule"), stats=stats, end_of_turn=True)
+                               don_rule=True, stats=stats, end_of_turn=True)
         turn_start = {}       # (w, t) -> (sc, tok, ci)
         turn_last = {}        # (w, t) -> その席のそのターン最後の行（T76: 出した後の手札で 1 枚あたりの価格を測る）
         turn_seq = {0: [], 1: []}
@@ -3821,9 +3809,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             for w in (0, 1):
                 for t in turn_seq[w]:
                     sc, tok, ci = turn_last.get((w, t), turn_start[(w, t)])   # 出した後の手札（ターン最後の行）
-                    # **T110**: `rule` なら**カウンター・イベントはドンを払う**。切るドンは
+                    # **T110**: **カウンター・イベントはドンを払う**。切るドンは
                     # **相手のターンに在るドン**＝自席ターンで使い残したアクティブ（この行の `sc[2]`）。
-                    don_left = float(np.asarray(sc)[SC_MY_DON]) if THETA_DON_MODE == "rule" else None
+                    don_left = float(np.asarray(sc)[SC_MY_DON])
                     g_self[(w, t)] = hand_price_mean(sc, tok, ci, idx2cid, cards, mu, part, don_left)
                     if THETA_HAND_MODE == "rule_don" and seat_decks:
                         # **H-4e（E1）**: 取られたライフの札（その席のデッキの構成・手札に入る割合は `h`）・
@@ -4732,10 +4720,6 @@ def main(argv=None):
                     help="耐久の体の項: `blockers`（旧・アクティブなブロッカーだけ）／`all`（全キャラ・T82）／"
                          "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）／"
                          "`none`（**体を `Θ` から外して速さの側へ移す**・T129・`--slope-block on` と対で使う）")
-    ap.add_argument("--theta-don", default=THETA_DON_MODE, choices=THETA_DON_MODES,
-                    help="**T110** 耐久 `Θ` の側もドンを規則どおり払うか: `off`（旧）／"
-                         "`blocker`（手札のブロッカーの予算を**規則の次ターンのアクティブ**にする）／"
-                         "`rule`（それ ＋ **カウンター・イベントは使い残しのドンで払う**）")
     ap.add_argument("--theta-hand-place", default=THETA_HAND_PLACE, choices=THETA_HAND_PLACES,
                     help="**T102** 耐久の手札項の置き場所: `stock`（旧・`Θ` に一括）／"
                          "`shield`（**的の側の有限の盾**＝毎ターン規則が許すぶんだけ＝**使う時間が要る**）")
@@ -4776,7 +4760,6 @@ def main(argv=None):
     set_theta_hand_mode(a.theta_hand)
     set_theta_hand_place(a.theta_hand_place)
     set_theta_hand_window(a.theta_hand_window)
-    set_theta_don_mode(a.theta_don)
     set_slope_block_mode(a.slope_block)
     set_rate_through_mode(a.rate_through)          # **T131**
     set_theta_side_mode(a.theta_side)              # **T133**

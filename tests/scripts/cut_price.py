@@ -525,7 +525,7 @@ class CutFrames:
     `frame_rows`＝`{(席, 自席ターン): その枠の行}`（器が自分の規約で選ぶ——交点の橋は `turn_last`〔その席の直近の自席
     ターンの最後の行〕・帳簿は `rate_at`〔自席ターンの最初の行〕）。`order` は局の行の並び（位置 `n` は記録の順）。
     `decks`＝`(席 0 のデッキ, 席 1 のデッキ)`（相方待ちの読み直し・無ければ `None`）。`don_rule`＝カウンター・イベントを
-    切れるかを枠の使い残しのドンで決めるか（交点の橋の `THETA_DON_MODE=rule` と同じ）・`False` なら全部切れる。"""
+    切れるかを枠の使い残しのドンで決めるか（交点の橋の T110 と同じ）・`False` なら全部切れる。"""
 
     def __init__(self, order, rows, ex, idx2cid, cards, frame_rows, mu=MU, decks=None, don_rule=True, stats=None,
                  end_of_turn=False):
