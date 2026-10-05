@@ -2881,7 +2881,7 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
 #: T151 の反対称の結論には効かないが、**全ての τ を約 1 ターン膨らませる**（T146b の「τ の偏り +1.6」・
 #: T118／T151 の最上位分位の相手の τ の残差 ≈7／≈4.5 の候補）。
 #:
-#: `walk`＝旧（既定・出荷の値を動かさない）／`game`＝**規則どおり**（`j0` を受け取り、`j0 + j − 1 <= 1` のときだけ 0）。
+#: `walk`＝旧／`game`＝**規則どおり**（`j0` を受け取り、`j0 + j − 1 <= 1` のときだけ 0）。
 #: **新定数ゼロ・新しい量ゼロ**（`rate_at` の既存の規則を列にも通すだけ）。
 #:
 #: **予告（測る前に書く・`2026-09-24_walk_first_step.md`）**:
@@ -2892,18 +2892,9 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
 #: P4 最上位分位の相手の τ の残差（6.87／4.42）が **約 1 縮む**（殺す基準: 0.5 未満＝その帯は別の欠陥）／
 #: P5 較正の観察（予告ではない）: 尺度 `s = √(τ_me²+τ_opp²)` が縮むぶん p は極端になる＝優勢／劣勢の
 #:    |gap| は**両側とも同じ向きに**動く（反対称は保たれる）。幅の作り直し（σ）は次の T。
-#: **既定は `game`（2026-09-24 採用・ユーザ決定「1は規定で」）**。`walk` は T152 以前の数字との対照。
+#: **`game` を採用（2026-09-24・ユーザ決定「1は規定で」）**。対照の `walk`（切替 `SCHED_T1_MODE`）は 2026-10-05 に削除——
+#: `claude/theory-switches-final` で再現できる。
 #: 較正（σ_rel の固定表）は次の T で新しい既定の上で作り直す（それまで対数損失は借り物の σ で読まれる）。
-SCHED_T1_MODES = ("walk", "game")
-SCHED_T1_MODE = "game"
-
-
-def set_sched_t1_mode(mode):
-    global SCHED_T1_MODE
-    if mode not in SCHED_T1_MODES:
-        raise ValueError("sched t1 mode は %s のどれか" % (SCHED_T1_MODES,))
-    SCHED_T1_MODE = mode
-    return SCHED_T1_MODE
 
 
 def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU, deck_ids=None,
@@ -2974,8 +2965,8 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     q = 1.0 - max(0.0, min(1.0, float(KO_P))) if RATE_DECAY_MODE == "ko" else 1.0
     out = []
     for j in range(1, jmax + 1):
-        # **T152**: `walk`＝旧（列の第 1 段は無条件に 0）／`game`＝`rate_at` と同じ規則（局の最初の自席ターンだけ 0）
-        first_zero = (j <= 1) if SCHED_T1_MODE == "walk" else (int(j0) + j - 1 <= 1)
+        # **T152**: `rate_at` と同じ規則（局の最初の自席ターンだけ 0）
+        first_zero = (int(j0) + j - 1 <= 1)
         if first_zero:
             out.append(0.0)
             continue
@@ -4600,8 +4591,6 @@ def main(argv=None):
                          "`mirror`（同じ瞬間＝自席ターンの最後の行を相手の席から見た鏡・相手側はリフレッシュ後）")
     ap.add_argument("--w-mover", default=TO.W_MOVER_MODE, choices=TO.W_MOVER_MODES,
                     help="**T151-2** 手番の半ターン: `off`（旧）／`half`（`W(D + 1/2)`・規則から）")
-    ap.add_argument("--sched-t1", default=SCHED_T1_MODE, choices=SCHED_T1_MODES,
-                    help="**T152** 列の第 1 段: `walk`（旧・全ての歩きの第 1 段が 0）／`game`（規則・局の最初の自席ターンだけ 0）")
     add_nu_mode_arg(ap)
     CP.add_cut_price_arg(ap)                        # **N-3**
     TO.add_defender_power_arg(ap)                   # 2b
@@ -4615,7 +4604,6 @@ def main(argv=None):
     set_pre_settle_mode(a.pre_settle)               # **T138b**
     set_opp_clock_mode(a.opp_clock)                 # **T151-2**
     TO.set_w_mover_mode(a.w_mover)                  # **T151-2**
-    set_sched_t1_mode(a.sched_t1)                   # **T152**
     set_theta_hand_mode(a.theta_hand)
     set_slope_block_mode(a.slope_block)
     set_theta_side_mode(a.theta_side)              # **T133**

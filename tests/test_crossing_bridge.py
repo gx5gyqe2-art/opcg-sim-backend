@@ -1117,11 +1117,12 @@ def test_the_decay_also_bites_on_the_scheduled_path():
     assert CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6) == base
 
 
-# ---- T152: 列の第 1 段に T103 の規則を当てる（SCHED_T1_MODE） --------------------------------------
+# ---- T152: 列の第 1 段に T103 の規則を当てる --------------------------------------
 #
 # 旧（`walk`）は列の先頭を**無条件に** 0 にしていた（`j <= 1`）。`rate_at` の規則は `j0 + j − 1 <= 1`
 # （局の最初の自席ターンだけ）で、`sched` が在ると `rate_at` はその規則を通らず `sched[0]` を返す
-# ＝全ての歩きの第 1 段が 0 だった。`game` は `j0` を受け取って同じ規則を列にも通す。
+# ＝全ての歩きの第 1 段が 0 だった。`game` は `j0` を受け取って同じ規則を列にも通す
+# （2026-09-24 採用・旧 `walk` の切替は 2026-10-05 に削除）。
 
 def _sched_fixture():
     tok = np.zeros((22, 24), np.float32)
@@ -1131,44 +1132,15 @@ def _sched_fixture():
     return _sc(3, 4), tok
 
 
-def test_sched_t1_mode_defaults_to_game_and_rejects_unknown():
-    """**既定は `game`**（2026-09-24 採用・ユーザ決定「1は規定で」）。`walk` は T152 以前の数字との対照。"""
-    assert CB.SCHED_T1_MODE == "game"
-    try:
-        assert CB.set_sched_t1_mode("walk") == "walk"
-    finally:
-        CB.set_sched_t1_mode("game")
-    with pytest.raises(ValueError):
-        CB.set_sched_t1_mode("なにか")
-    assert CB.SCHED_T1_MODE == "game"
-
-
-def test_sched_t1_walk_ignores_j0_and_zeroes_every_walks_first_step():
-    sc, tok = _sched_fixture()
-    try:
-        CB.set_sched_t1_mode("walk")
-        base = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6)
-        j5 = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6, j0=5)
-    finally:
-        CB.set_sched_t1_mode("game")
-    assert base[0] == 0.0 and base[1] > 0.0
-    assert j5 == base                                                              # 旧は j0 を見ない
-
-
 def test_sched_t1_game_zeroes_only_the_games_first_own_turn():
     sc, tok = _sched_fixture()
-    try:
-        CB.set_sched_t1_mode("walk")
-        base = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6)      # 旧（対照）
-    finally:
-        CB.set_sched_t1_mode("game")
-    g1 = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6, j0=1)     # 既定 game
+    g1 = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6, j0=1)
     g2 = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6, j0=2)
     g5 = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6, j0=5)
     assert CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6) == g1   # j0 の既定は 1（局の最初）
-    assert g1[0] == 0.0 and g1[1:] == base[1:]            # 局の最初の自席ターンから出る歩きは旧と同じ
-    assert g2[0] > 0.0 and g2[0] == pytest.approx(base[1])  # 2 ターン目から出る歩きの第 1 段＝盤面がそのまま殴る
-    assert g2[1:] == base[1:] and g5 == g2                  # 2 段目以降は不変・j0 ≥ 2 はどれも同じ
+    assert g1[0] == 0.0 and g1[1] > 0.0                   # 局の最初の自席ターンから出る歩きだけ第 1 段が 0
+    assert g2[0] > 0.0 and g2[0] == pytest.approx(g1[1])    # 2 ターン目から出る歩きの第 1 段＝盤面がそのまま殴る
+    assert g2[1:] == g1[1:] and g5 == g2                    # 2 段目以降は不変・j0 ≥ 2 はどれも同じ
 
 
 def test_rate_at_reads_the_nonzero_first_step_from_the_game_sched():
