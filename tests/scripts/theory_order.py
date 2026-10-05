@@ -1721,23 +1721,20 @@ def _attack_bound(is_leader, theta, mu, nu_target, blockers):
 #: ドン 1 個の価格（実測・`game_theory.md` §18・`effect_value.DELTA` と同じ）——**ドンの代替価値**
 #: （登場・他の体への付与を平均したもの）として「ドンを付けて殴る」の使用コストに使う（T45）
 DELTA = 0.0277
-#: 「ドンを付けて殴る」を `ν` の攻撃項に入れるか（T45・2026-09-16・ユーザ提案）。
-#: `don`＝毎ターン **max_k [ 圧力(k) − k·δ ]**（付けた後の攻撃 1 回の価値からドンの代替価値を引き、
-#: 一番得な枚数で殴る・k = 0 を含む）／`bare`＝従来＝素殴りだけ（リーダー未満は 0）。**新定数なし**
-ATTACK_DON_MODES = ("bare", "don")
-ATTACK_DON_MODE = "don"
+#: 「ドンを付けて殴る」を `ν` の攻撃項に入れる（T45・2026-09-16・ユーザ提案）＝`don`: 毎ターン **max_k [ 圧力(k) − k·δ ]**
+#: （付けた後の攻撃 1 回の価値からドンの代替価値を引き、一番得な枚数で殴る・k = 0 を含む）。**新定数なし**。
+#: 旧の `bare`（素殴りだけ・リーダー未満は 0・切替 `ATTACK_DON_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
 #: 1 体に付けられるドンの上限（規則の 10 枚）
 ATTACK_DON_MAX = 10
 
 
 def attack_value_don(power, target_power, is_leader, theta=THETA, mu=MU, nu_target=None,
-                     delta=DELTA, max_don=ATTACK_DON_MAX, mode=None, blockers=None):
+                     delta=DELTA, max_don=ATTACK_DON_MAX, blockers=None):
     """**ドンを付けて殴る**攻撃 1 回の価値＝`max_k [ attack_value(P + 1000k) − k·δ ]`（T45）。
 
     リーダーより 1000 低い体は 1 枚付けて通す（`c(0)·μ − δ`）、2000 低い体は 2 枚で
     `c(0)·μ − 2δ ≈ 0`＝今までどおり 0。リーダー以上の体は素殴りが最善のまま（`Θ·μ` で頭打ち）。
     """
-    mode = ATTACK_DON_MODE if mode is None else mode
     # **覚え書き**（2026-10-01・N-3 採用の 3: 値を変えない高速化）——純関数（引数＋値段の文脈＋費用曲線の切替）。
     # 1 つの値段の文脈の中で同じ引数が平均 25 回呼ばれる（実 10 局で 110 万回・異なる引数 4.4 万）。
     # 鍵は `option_value` の覚え書きと同じ値段の文脈（`CUT_PRICER_KEY`・`CUT_TAKE_CARD`）。1 枚あたり一定でない窓
@@ -1745,7 +1742,7 @@ def attack_value_don(power, target_power, is_leader, theta=THETA, mu=MU, nu_targ
     key = None
     if SPEED_MEMO and _cut_cache_ok():
         key = (float(power), float(target_power), bool(is_leader), float(theta), float(mu),
-               None if nu_target is None else float(nu_target), float(delta), int(max_don), mode,
+               None if nu_target is None else float(nu_target), float(delta), int(max_don),
                tuple((float(pb), float(nb)) for pb, nb in (blockers or ())),
                CUT_PRICER_KEY if CUT_PRICER is not None else None,
                CUT_TAKE_CARD if CUT_PRICER is not None else None,
@@ -1754,20 +1751,19 @@ def attack_value_don(power, target_power, is_leader, theta=THETA, mu=MU, nu_targ
         if got is not None:
             return got
     best = attack_value(power, target_power, is_leader, theta, mu, nu_target, blockers)
-    if mode == "don":
-        # **打ち切り**（2026-10-01・値は同じ）: `attack_value` は常に `上限 = min(受ける値, 各ブロッカーの ν)` 以下。
-        # k 枚で上限に届いたら、k' > k の値は `上限 − k'δ < 上限 − kδ ≤ best`＝最大を変えない（δ > 0 のときだけ）。
-        bound = _attack_bound(is_leader, theta, mu, nu_target, blockers) \
-            if (SPEED_MEMO and float(delta) > 0.0 and attack_value is _ATTACK_VALUE_ORIG) else None
-        if bound is None or best < bound:
-            for k in range(1, int(max_don) + 1):
-                raw = attack_value(float(power) + 1000.0 * k, target_power, is_leader, theta, mu, nu_target,
-                                   blockers)
-                v = raw - k * float(delta)
-                if v > best:
-                    best = v
-                if bound is not None and raw >= bound:
-                    break
+    # **打ち切り**（2026-10-01・値は同じ）: `attack_value` は常に `上限 = min(受ける値, 各ブロッカーの ν)` 以下。
+    # k 枚で上限に届いたら、k' > k の値は `上限 − k'δ < 上限 − kδ ≤ best`＝最大を変えない（δ > 0 のときだけ）。
+    bound = _attack_bound(is_leader, theta, mu, nu_target, blockers) \
+        if (SPEED_MEMO and float(delta) > 0.0 and attack_value is _ATTACK_VALUE_ORIG) else None
+    if bound is None or best < bound:
+        for k in range(1, int(max_don) + 1):
+            raw = attack_value(float(power) + 1000.0 * k, target_power, is_leader, theta, mu, nu_target,
+                               blockers)
+            v = raw - k * float(delta)
+            if v > best:
+                best = v
+            if bound is not None and raw >= bound:
+                break
     best = float(best)
     if key is not None:
         if len(_AVD_MEMO) >= 400000:
@@ -1866,14 +1862,6 @@ def option_value(power, opp_leader_power, r_turns, theta=THETA, mu=MU, my_leader
     if key is not None:
         _OPTION_CACHE[key] = val
     return val
-
-
-def set_attack_don_mode(mode):
-    global ATTACK_DON_MODE
-    if mode not in ATTACK_DON_MODES:
-        raise ValueError("attack don mode は %s のどれか" % (ATTACK_DON_MODES,))
-    ATTACK_DON_MODE = mode
-    return ATTACK_DON_MODE
 
 
 def attack_stream(power, opp_leader_power, r_turns, theta=THETA, mu=MU, opp_chars=None,
@@ -2136,7 +2124,7 @@ def _nu_of_other_side(*args, **kwargs):
 def _nu_globals_key():
     """`nu_of`（盤面なし・旧の値段）が読む切替・表・関数の全部（覚え書きの鍵・2026-10-01）。
     関数や表の差し替え（テストの monkeypatch）も `id` で鍵に入る。"""
-    return (NU_MODE, SURV_MODE, OPTION_MODE, ATTACK_DON_MODE, CBAR_MODE, CBAR_SLOPE, id(CBAR_CURVE),
+    return (NU_MODE, SURV_MODE, OPTION_MODE, CBAR_MODE, CBAR_SLOPE, id(CBAR_CURVE),
             BLOCK_P_BLOCKER, id(KO_P_CURVE), id(SHIELD_TERM), SAT_OVER_PWR, KO_P, DELTA, ATTACK_DON_MAX,
             H_LIFE_TO_HAND, id(_OPP_BOARDS), id(load_opp_boards),
             id(nu_of), id(attack_stream), id(option_value), id(attack_value_don), id(attack_value), id(c_of),

@@ -161,8 +161,6 @@ def don_for_attacker(power, target_power, theta=None, mu=None, max_don=None, del
     mu = TO.MU if mu is None else mu
     delta = TO.DELTA if delta is None else delta
     max_don = TO.ATTACK_DON_MAX if max_don is None else max_don
-    if TO.ATTACK_DON_MODE != "don":
-        return 0
     best, arg = TO.attack_value(float(power), float(target_power), True, theta, mu), 0
     for k in range(1, int(max_don) + 1):
         v = TO.attack_value(float(power) + 1000.0 * k, float(target_power), True, theta, mu) - k * float(delta)

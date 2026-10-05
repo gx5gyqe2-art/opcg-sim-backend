@@ -124,8 +124,3 @@ def test_the_attach_the_attack_price_hides_is_countable():
     assert DL.don_for_attacker(5000.0, olp) == 0        # リーダー以上は素殴りが最善
     assert DL.don_for_attacker(4000.0, olp) >= 1       # 1000 低い体は 1 枚付けて通す（T45）
     assert DL.don_for_attacker(1000.0, olp) == 0       # 届かない体には付けない
-    try:
-        TO.ATTACK_DON_MODE = "off"
-        assert DL.don_for_attacker(4000.0, olp) == 0   # 付与を使わない構成では 0
-    finally:
-        TO.ATTACK_DON_MODE = "don"
