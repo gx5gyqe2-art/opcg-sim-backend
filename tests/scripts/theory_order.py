@@ -614,31 +614,23 @@ def w_of_d(d, sigma=None, mover=False):
 #: **出荷の `W`（`prob_of_d`）は T118 以降 `σ_rel · s(τ_me, τ_opp)` を使っている**（例で 2.7569）。
 #: **T118 以降、`κ` は `W` の微分になっていない**——`σ` が約 2 倍小さい＝**接戦帯を本来より鋭く重み付け**していた。
 #:
-#: `abs`＝旧（以前の数字と比べるとき）／`match`＝**`W` と同じ物差しを使う（既定・2026-10-05）**
-#: （2 本の時計が渡されたときだけ。渡されなければ `abs` と同じ）。**新定数ゼロ**（`σ_rel` は既測）。
-KAPPA_SIGMA_MODES = ("abs", "match")
-KAPPA_SIGMA_MODE = "match"   # **2026-10-05 既定に採用**（ユーザ決定・旧 `abs` は --kappa-sigma abs で再現）
-
-
-def set_kappa_sigma_mode(name):
-    global KAPPA_SIGMA_MODE
-    if name not in KAPPA_SIGMA_MODES:
-        raise ValueError("KAPPA_SIGMA_MODE は %s のどれか（%r）" % (KAPPA_SIGMA_MODES, name))
-    KAPPA_SIGMA_MODE = name
-    return KAPPA_SIGMA_MODE
+#: `match`＝**`W` と同じ物差しを使う（2026-10-05 既定に採用・ユーザ決定）**（2 本の時計が渡されたときだけ。
+#: 渡されなければ `σ_D`）。**新定数ゼロ**（`σ_rel` は既測）。**定数**——旧 `abs`（いつも `σ_D`）は同日の決定
+#: 「波Cで消す」で削除し、凍結ブランチ `claude/theory-switches-final` で再現する。出力 JSON の `kappa_sigma_mode` は `"match"`。
+KAPPA_SIGMA_MODE = "match"
 
 
 def state_factor(d, mode=None, t_me=None, t_opp=None, scale_mode="hyp"):
     """`κ(状態) = w(D)/w̄`——平均の傾きで書いた価格を局面の傾きに戻す係数。`flat` なら 1。
 
-    **T122**: `KAPPA_SIGMA_MODE == "match"` かつ 2 本の時計が渡されたときは、`w` の物差しを
+    **T122**（`KAPPA_SIGMA_MODE=match`）: 2 本の時計が渡されたときは、`w` の物差しを
     `prob_of_d` と同じ `σ_rel · s` にする（＝`κ` を本当に `W` の微分にする）。`w̄` は分母なので
     そのまま（尺度に依らない量〔AUC・相関〕は `w̄` で動かない）。"""
     mode = W_MODE if mode is None else mode
     if mode not in ("clock", "curve"):
         return 1.0
     sd = None
-    if (KAPPA_SIGMA_MODE == "match" and SIGMA_REL is not None
+    if (SIGMA_REL is not None
             and t_me is not None and t_opp is not None):
         s = clock_scale(t_me, t_opp, scale_mode)
         if s > 0.0:

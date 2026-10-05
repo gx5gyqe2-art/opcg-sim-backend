@@ -44,9 +44,9 @@ _RAMP_PROF = [0.05, 0.1, 0.2, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
 
 @pytest.fixture(autouse=True)
 def _restore_modes():
-    d, k, s, shape = KV.D_MODE, TO.KAPPA_SIGMA_MODE, TO.SIGMA_REL, dict(KV.RATE_SHAPE)
+    d, s, shape = KV.D_MODE, TO.SIGMA_REL, dict(KV.RATE_SHAPE)
     yield
-    KV.set_d_mode(d); TO.set_kappa_sigma_mode(k); TO.set_sigma_rel(s)
+    KV.set_d_mode(d); TO.set_sigma_rel(s)
     KV.RATE_SHAPE.update(shape)
 
 
@@ -257,12 +257,10 @@ def test_calibration_is_none_without_both_labels():
 
 
 def test_kappa_sigma_mode_defaults_to_match():
-    """**既定は `match`**（2026-10-05・ユーザ決定「全て正しい方式にしてください」・§17.9.6-1）。
-    旧 `abs` は `--kappa-sigma abs` で再現できる。"""
+    """**`match`**（2026-10-05・ユーザ決定「全て正しい方式にしてください」・§17.9.6-1）。旧 `abs` は同日の決定
+    「波Cで消す」で削除＝定数（凍結ブランチ `claude/theory-switches-final` で再現）。"""
     assert TO.KAPPA_SIGMA_MODE == "match"
-    assert TO.set_kappa_sigma_mode("abs") == "abs"
-    with pytest.raises(ValueError):
-        TO.set_kappa_sigma_mode("rel")
+    assert not hasattr(TO, "set_kappa_sigma_mode") and not hasattr(TO, "KAPPA_SIGMA_MODES")
 
 
 def test_kappa_sigma_match_uses_the_same_yardstick_as_the_win_probability():
@@ -271,11 +269,9 @@ def test_kappa_sigma_match_uses_the_same_yardstick_as_the_win_probability():
     a, b = 7.0, 9.0
     d = b - a
     sd = SIG * TO.clock_scale(a, b)
-    TO.set_kappa_sigma_mode("abs")
-    k_abs = TO.state_factor(d, "curve", t_me=a, t_opp=b)
-    TO.set_kappa_sigma_mode("match")
+    k_abs = TO.w_of_d(d) / TO.W_BAR                 # 旧 `abs`（いつも `σ_D`）の値＝時計を渡さないときと同じ
     k_match = TO.state_factor(d, "curve", t_me=a, t_opp=b)
-    assert k_abs == pytest.approx(TO.w_of_d(d) / TO.W_BAR)
+    assert TO.state_factor(d, "curve") == pytest.approx(k_abs)
     assert k_match == pytest.approx(TO.w_of_d(d, sd) / TO.W_BAR)
     assert sd > TO.SIGMA_D                     # 出荷の物差しの方が広い（κ が鋭すぎた）
     assert k_match != pytest.approx(k_abs)
@@ -284,12 +280,10 @@ def test_kappa_sigma_match_uses_the_same_yardstick_as_the_win_probability():
 def test_kappa_sigma_match_falls_back_when_the_clocks_are_missing():
     """時計が渡されなければ `match` でも `abs` と同じ（黙って別の値にしない）。"""
     TO.set_sigma_rel(SIG)
-    TO.set_kappa_sigma_mode("match")
     assert TO.state_factor(1.0, "curve") == pytest.approx(TO.w_of_d(1.0) / TO.W_BAR)
 
 
 def test_flat_mode_is_still_exactly_one():
-    TO.set_kappa_sigma_mode("match")
     assert TO.state_factor(1.0, "flat", t_me=3.0, t_opp=9.0) == 1.0
 
 
@@ -297,17 +291,15 @@ def test_the_ledger_exposes_both_seat_switches_and_they_reach_the_module(monkeyp
     """**T134**: **切替が器の側に無いと「動かなかった」を誤って読む**——本 T で実際に踏んだ
     （`--theta-side` だけ渡した測定を「①＋③」と名付けていた）。**帳簿にも両方在ることを固定する。**"""
     import crossing_bridge as CB                       # noqa: PLC0415
-    old_take = CB.SLOPE_TAKE_MODE
-    a = RL.build_parser().parse_args(["--in", "x", "--theta-side", "symmetric",
-                                      "--slope-take", "life"])
-    assert (a.theta_side, a.slope_take) == ("symmetric", "life")
+    # （`--slope-take` は 2026-10-05 の決定「波Cで消す」で削除——受ける費用は守る側のライフで読む定数 `life`）
+    a = RL.build_parser().parse_args(["--in", "x", "--theta-side", "symmetric"])
+    assert a.theta_side == "symmetric"
     monkeypatch.setattr(RL, "collect", lambda *args, **kw: {})
     try:
-        RL.main(["--in", "x", "--theta-side", "symmetric", "--slope-take", "life"])
+        RL.main(["--in", "x", "--theta-side", "symmetric"])
         assert (CB.THETA_SIDE_MODE, CB.SLOPE_TAKE_MODE) == ("symmetric", "life")
     finally:
         CB.set_theta_side_mode("legacy")
-        CB.set_slope_take_mode(old_take)
 
 
 def test_pre_settle_defaults_to_off_and_the_cli_flag_reaches_collect(monkeypatch):

@@ -58,8 +58,8 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "THETA_HAND_MODE": "rule_don",          # H-4・2026-10-04（ユーザ決定・旧 cuttable_forced は --theta-hand で再現）
         "THETA_BODY_MODE": "blockers",           # T97
         "THETA_RETURN_MODE": "untap",            # T96・**C-5c で既定に採用**（2026-09-25）
-        "SLOPE_BLOCK_MODE": "on",                # T92・2026-10-05 既定に採用（ユーザ決定・旧 off は --slope-block off）
-        "SLOPE_TAKE_MODE": "life",               # T134・2026-10-05 既定に採用（ユーザ決定・旧 const は --slope-take const）
+        "SLOPE_BLOCK_MODE": "on",                # T92・2026-10-05 既定に採用（ユーザ決定・旧 off は波C で削除＝定数）
+        "SLOPE_TAKE_MODE": "life",               # T134・2026-10-05 既定に採用（ユーザ決定・旧 const は波C で削除＝定数）
         "RATE_DECAY_MODE": "off",                # T95（切替として残す）
     }
 
@@ -95,44 +95,23 @@ def _plain_hand(request):
         CB.set_theta_hand_mode(old)
 
 
-#: **2026-10-05**: `SLOPE_TAKE_MODE=life`／`SLOPE_BLOCK_MODE=on` が既定になった（ユーザ決定）。
-#: **以下のテストは旧い数字（定数 `Θ`・ブロッカー無し）の算術を固定している**ので、自分で旧い形を
-#: 明示して回す＝**テストの意味を変えずに既定の変更だけを吸収する**。既定そのものは
-#: `test_the_shipped_defaults_are_the_ones_we_decided` と下の新既定のラチェットが固定する。
-_NEW_DEFAULT_TESTS = (
-    "test_the_shipped_defaults_are_the_ones_we_decided",
-    "test_the_2026_10_05_defaults_are_take_life_block_on",
-)
-
-
-@pytest.fixture(autouse=True)
-def _old_slope_forms(request):
-    if request.node.name.split("[")[0] in _NEW_DEFAULT_TESTS:
-        yield
-        return
-    old_t, old_b = CB.SLOPE_TAKE_MODE, CB.SLOPE_BLOCK_MODE
-    CB.set_slope_take_mode("const")
-    CB.set_slope_block_mode("off")
-    try:
-        yield
-    finally:
-        CB.set_slope_take_mode(old_t)
-        CB.set_slope_block_mode(old_b)
+#: **2026-10-05**: `SLOPE_TAKE_MODE=life`／`SLOPE_BLOCK_MODE=on` が既定になった（ユーザ決定）。当初は旧い数字
+#: （定数 `Θ`・ブロッカー無し）の算術を固定するテストを旧い形で回す autouse を置いていたが、同日の決定「波Cで消す」で
+#: 旧い形は削除した（定数）＝**全テストが新しい形の算術で回る**。
 
 
 def test_the_2026_10_05_defaults_are_take_life_block_on():
     """**3 本の既定採用のラチェット**（ユーザ決定 2026-10-05「全て正しい方式にしてください」）。
     橋の 2 本（受ける費用を守る側のライフで・ブロッカーを速さに入れる）と、帳簿の `κ` の物差し。
-    旧い値は切替として選べる（掃除の波で死んだ切替を消すまで残す）。
-    CLI の既定も module の既定と同じ（引数の既定が定数を指している）。"""
+    **旧い値は同日の決定「波Cで消す」で削除**——3 つとも定数になり、切替も CLI の引数も無い。"""
     import relative_ledger as RL                       # noqa: PLC0415
     assert CB.SLOPE_TAKE_MODE == "life" and CB.SLOPE_BLOCK_MODE == "on"
     assert T.KAPPA_SIGMA_MODE == "match"
-    for old, new in (("const", "life"), ("off", "on")):
-        assert old in CB.SLOPE_TAKE_MODES + CB.SLOPE_BLOCK_MODES and new in CB.SLOPE_TAKE_MODES + CB.SLOPE_BLOCK_MODES
-    assert "abs" in T.KAPPA_SIGMA_MODES
+    for mod, gone in ((CB, "set_slope_take_mode"), (CB, "set_slope_block_mode"), (CB, "SLOPE_TAKE_MODES"),
+                      (CB, "SLOPE_BLOCK_MODES"), (T, "set_kappa_sigma_mode"), (T, "KAPPA_SIGMA_MODES")):
+        assert not hasattr(mod, gone), gone
     a = RL.build_parser().parse_args(["--in", "x"])
-    assert (a.slope_take, a.slope_block, a.kappa_sigma) == (None, None, None)   # None＝module の既定に任せる
+    assert not any(hasattr(a, k) for k in ("slope_take", "slope_block", "kappa_sigma"))
 
 
 def _tg(*a, **k):
@@ -868,10 +847,10 @@ def test_a_rested_blocker_is_not_endurance_now_but_comes_back():
 def test_the_theory_slope_is_the_priced_attack_flow_of_the_board():
     tok = np.zeros((22, 24), np.float32)
     tok[0, T.S_POWER], tok[1, T.S_POWER] = 0.5, 0.5
-    lead_only = CB.theory_slope(tok, 5000.0)
+    lead_only = CB.theory_slope(tok, 5000.0, life_opp=3.0)  # 守る側のライフ（ライフが残れば受ける費用は定数 `Θ`・T134）
     assert lead_only == pytest.approx(T.attack_value_don(5000.0, 5000.0, True))
     tok[2, T.S_POWER], tok[2, T.S_IS_CHAR], tok[2, T.S_CAN_ATTACK] = 0.8, 1.0, 1.0
-    assert CB.theory_slope(tok, 5000.0) == pytest.approx(lead_only + T.attack_value_don(8000.0, 5000.0, True))
+    assert CB.theory_slope(tok, 5000.0, life_opp=3.0) == pytest.approx(lead_only + T.attack_value_don(8000.0, 5000.0, True))
 
 
 def test_the_rate_can_count_the_opponents_blockers():
@@ -881,18 +860,11 @@ def test_the_rate_can_count_the_opponents_blockers():
     tok = np.zeros((22, 24), np.float32)
     tok[0, T.S_POWER], tok[1, T.S_POWER] = 0.5, 0.5
     blk = ((6000.0, 0.05),)                                   # 殴る体より大きいブロッカー（ν = 0.05）
-    assert CB.SLOPE_BLOCK_MODE == "off"                       # 既定は据え置き（採否はユーザ判定）
-    assert CB.theory_slope(tok, 5000.0, blockers=blk) == pytest.approx(CB.theory_slope(tok, 5000.0))  # off では無視
-    try:
-        assert CB.set_slope_block_mode("on") == "on"
-        with_blk = CB.theory_slope(tok, 5000.0, blockers=blk)
-        assert with_blk == pytest.approx(T.attack_value_don(5000.0, 5000.0, True, blockers=blk))
-        assert with_blk < CB.theory_slope(tok, 5000.0)        # 応答が 1 つ増えるので `min` は下がる
-        assert CB.theory_slope(tok, 5000.0, blockers=()) == pytest.approx(CB.theory_slope(tok, 5000.0))
-        with pytest.raises(ValueError):
-            CB.set_slope_block_mode("なにか")
-    finally:
-        CB.set_slope_block_mode("off")
+    assert CB.SLOPE_BLOCK_MODE == "on"                        # 2026-10-05 既定に採用・波C で旧 `off` を削除＝定数
+    with_blk = CB.theory_slope(tok, 5000.0, blockers=blk, life_opp=3.0)
+    assert with_blk == pytest.approx(T.attack_value_don(5000.0, 5000.0, True, blockers=blk))
+    assert with_blk < CB.theory_slope(tok, 5000.0, life_opp=3.0)   # 応答が 1 つ増えるので `min` は下がる
+    assert CB.theory_slope(tok, 5000.0, blockers=(), life_opp=3.0) == pytest.approx(CB.theory_slope(tok, 5000.0, life_opp=3.0))
 
 
 def test_the_hand_term_of_the_rate_is_a_flow():
@@ -906,7 +878,7 @@ def test_the_hand_term_of_the_rate_is_a_flow():
     db = DR.db()
     body = next(c for c in db.raw_db if DR.body_of(db.get_card(c)) and float(db.get_card(c).power) >= 6000)
     board, hand = CB.seat_slope_parts(sc, tok, None, None, None, 5000.0, deck_ids=[body])
-    assert board == pytest.approx(CB.theory_slope(tok, 5000.0))              # 盤面の項は動かない
+    assert board == pytest.approx(CB.theory_slope(tok, 5000.0, life_opp=3.0))   # 盤面の項は動かない（`_sc(3, 4)` のライフ 3）
     assert hand == pytest.approx(DR.a_of([body], 5000.0, 10.0))
     assert hand > 0.0
     assert CB.seat_slope_parts(sc, tok, None, None, None, 5000.0)[1] == 0.0  # デッキが無ければ流入は数えない
@@ -1029,7 +1001,7 @@ def test_the_rate_terms_are_separate_quantities():
     assert eff1 == 0.0                                # 効果の項は cards=None では 0（T108）
     assert s_rush == 0.0 and f_rush == 0.0            # 速攻の札が無いデッキ（T103）
     assert eff == 0.0                                 # 同上（T105）
-    assert board == pytest.approx(CB.theory_slope(tok, 5000.0))
+    assert board == pytest.approx(CB.theory_slope(tok, 5000.0, life_opp=3.0))   # `_sc(3, 4)` のライフ 3
     assert stock == 0.0                                              # `cards` が無ければ在庫は数えられない
     assert flow == pytest.approx(DR.a_of([body], 5000.0, 10.0))
     assert lead == pytest.approx(board)                              # 場が空ならリーダーが全部
@@ -1656,8 +1628,8 @@ def test_the_attach_comes_out_of_the_same_purse():
     # 財布が 0 なら 1 枚も付けられない
     assert CB.purse_plan(g, 0)["paid"] == 0.0
     # 盤面の項は `with_don` で素殴りに戻る（付与を財布で買うので二重に数えない）
-    lead_don, chars_don = CB.theory_slope_parts(tok, olp)
-    lead_raw, chars_raw = CB.theory_slope_parts(tok, olp, with_don=False)
+    lead_don, chars_don = CB.theory_slope_parts(tok, olp, life_opp=3.0)
+    lead_raw, chars_raw = CB.theory_slope_parts(tok, olp, with_don=False, life_opp=3.0)
     assert chars_don > chars_raw and lead_don == pytest.approx(lead_raw)
 
 
@@ -1717,7 +1689,8 @@ def test_the_blockers_also_bite_on_the_scheduled_path():
     `rate_at` を通る道では `seat_slope_terms` が自分でブロッカーを引いていたのに、**列の道は
     呼び出し側に任せていて橋は渡していなかった**＝`SLOPE_BLOCK_MODE=on` が**歩きに効いていなかった**
     （行ごとの `slope_theory` だけが動く）。**T128 の減衰と同じ型の取りこぼし。**
-    **渡されなければ規則どおり自分で引く**ことをここで固定する（既定は `off` なので出荷の値は不動）。
+    **渡されなければ規則どおり自分で引く**ことをここで固定する（2026-10-05 から既定・波C で旧 `off` は削除——
+    比べる相手は「ブロッカーを空で渡した列」）。
     """
     tok = np.zeros((22, 24), np.float32)
     tok[0, T.S_POWER] = 0.5                                   # 自リーダー 5000
@@ -1726,16 +1699,11 @@ def test_the_blockers_also_bite_on_the_scheduled_path():
     b0 = T.SLOT_OPP_FIELD.start                               # 相手のアクティブなブロッカー
     tok[b0, T.S_POWER], tok[b0, T.S_IS_CHAR], tok[b0, T.S_IS_BLOCKER] = 0.6, 1.0, 1.0
     sc = _sc(3, 4)
-    base = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6)
-    try:
-        CB.set_slope_block_mode("on")
-        blk = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6)
-    finally:
-        CB.set_slope_block_mode("off")
+    base = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6, blockers=())   # ブロッカーを空で渡す
+    blk = CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6)                 # 渡さなければ自分で引く
     assert blk[1] < base[1]                                   # 横取りされる分だけ速さが落ちる
     assert all(x <= y + 1e-12 for x, y in zip(blk, base))      # どの段でも増えない
-    assert CB.seat_slope_sched(sc, tok, None, None, None, 5000.0, jmax=6) == base   # 既定は不動
-    assert CB.SLOPE_BLOCK_MODE == "off"
+    assert CB.SLOPE_BLOCK_MODE == "on"
 
 
 def test_a_body_mode_without_a_yardstick_entry_is_not_silently_borrowed():
@@ -1752,9 +1720,9 @@ def test_the_through_share_scales_both_the_leader_and_the_characters():
     tok[0, T.S_POWER] = 0.5
     s0 = T.SLOT_OWN_FIELD.start
     tok[s0, T.S_POWER], tok[s0, T.S_IS_CHAR], tok[s0, T.S_CAN_ATTACK] = 0.7, 1.0, 1.0
-    lead, chars = CB.theory_slope_parts(tok, 5000.0)
+    lead, chars = CB.theory_slope_parts(tok, 5000.0, life_opp=3.0)
     assert lead > 0.0 and chars > 0.0
-    l2, c2 = CB.theory_slope_parts(tok, 5000.0, through=0.5)
+    l2, c2 = CB.theory_slope_parts(tok, 5000.0, through=0.5, life_opp=3.0)
     assert l2 == pytest.approx(lead * 0.5) and c2 == pytest.approx(chars * 0.5)
 
 
@@ -1899,34 +1867,22 @@ def test_the_take_branch_reads_the_defenders_life():
     """
     tok = np.zeros((22, 24), np.float32)
     tok[0, T.S_POWER] = 0.5                                    # リーダーだけ（超過 0）
-    assert CB.SLOPE_TAKE_MODE == "const"                       # 既定は据え置き
-    base = CB.theory_slope(tok, 5000.0)
-    assert CB.theory_slope(tok, 5000.0, life_opp=0.0) == pytest.approx(base)   # `const` なら無視
-    try:
-        CB.set_slope_take_mode("life")
-        # **ライフが残っているうちは `theta_take` が定数を返す**（`lethal` の規則・T63）
-        assert CB.theory_slope(tok, 5000.0, life_opp=3.0) == pytest.approx(base)
-        # **ライフ 0＝この 1 本が通れば勝ち**——価格が変わる
-        lethal = CB.theory_slope(tok, 5000.0, life_opp=0.0)
-        assert lethal != pytest.approx(base)
-    finally:
-        CB.set_slope_take_mode("const")
-    with pytest.raises(ValueError):
-        CB.set_slope_take_mode("なにか")
+    assert CB.SLOPE_TAKE_MODE == "life"                        # 2026-10-05 既定に採用・波C で旧 `const` を削除＝定数
+    # **ライフが残っているうちは `theta_take` が定数を返す**（`lethal` の規則・T63）＝旧 `const` と同じ値
+    base = CB.theory_slope(tok, 5000.0, life_opp=3.0)
+    assert base == pytest.approx(T.attack_value_don(5000.0, 5000.0, True))
+    # **ライフ 0＝この 1 本が通れば勝ち**——価格が変わる
+    lethal = CB.theory_slope(tok, 5000.0, life_opp=0.0)
+    assert lethal != pytest.approx(base)
 
 
 def test_a_missing_defender_life_is_loud_not_silently_constant():
-    """**T131 で決めた規約**——切替を入れたのに渡し忘れたら**黙って旧の値にならず落ちる**。"""
+    """**T131 で決めた規約**——渡し忘れたら**黙って旧の値にならず落ちる**。"""
     tok = np.zeros((22, 24), np.float32)
     tok[0, T.S_POWER] = 0.5
-    CB.theory_slope_parts(tok, 5000.0)                         # `const` なら渡さなくてよい
-    try:
-        CB.set_slope_take_mode("life")
-        with pytest.raises(ValueError):
-            CB.theory_slope_parts(tok, 5000.0)                 # 渡し忘れ＝落ちる
-        CB.theory_slope_parts(tok, 5000.0, life_opp=2.0)       # 渡せば通る
-    finally:
-        CB.set_slope_take_mode("const")
+    with pytest.raises(ValueError):
+        CB.theory_slope_parts(tok, 5000.0)                     # 渡し忘れ＝落ちる
+    CB.theory_slope_parts(tok, 5000.0, life_opp=2.0)           # 渡せば通る
 
 
 def test_the_take_branch_only_binds_when_it_is_the_cheaper_response():
@@ -1937,12 +1893,8 @@ def test_the_take_branch_only_binds_when_it_is_the_cheaper_response():
     s0 = T.SLOT_OWN_FIELD.start
     # **超過 0 の体**＝`c(0) = 1 枚`で止まるので守る方が安い（受ける費用が動いても `min` は変わらない）
     tok[s0, T.S_POWER], tok[s0, T.S_IS_CHAR], tok[s0, T.S_CAN_ATTACK] = 0.5, 1.0, 1.0
-    _lead, chars_const = CB.theory_slope_parts(tok, 5000.0, with_don=False)
-    try:
-        CB.set_slope_take_mode("life")
-        _l2, chars_life = CB.theory_slope_parts(tok, 5000.0, with_don=False, life_opp=0.0)
-    finally:
-        CB.set_slope_take_mode("const")
+    _lead, chars_const = CB.theory_slope_parts(tok, 5000.0, with_don=False, life_opp=3.0)   # ライフが残る＝定数 `Θ`
+    _l2, chars_life = CB.theory_slope_parts(tok, 5000.0, with_don=False, life_opp=0.0)
     assert chars_life == pytest.approx(chars_const)             # 守る方が安い枝は動かない
 
 
@@ -1957,13 +1909,10 @@ def test_at_lethal_the_higher_take_cost_makes_don_worth_attaching():
     tok[0, T.S_POWER] = 0.5
     s0 = T.SLOT_OWN_FIELD.start
     tok[s0, T.S_POWER], tok[s0, T.S_IS_CHAR], tok[s0, T.S_CAN_ATTACK] = 0.5, 1.0, 1.0
-    _lead, chars_const = CB.theory_slope_parts(tok, 5000.0)     # ドン込み（既定）
-    try:
-        CB.set_slope_take_mode("life")
-        _l2, chars_lethal = CB.theory_slope_parts(tok, 5000.0, life_opp=0.0)
-        _l3, chars_safe = CB.theory_slope_parts(tok, 5000.0, life_opp=3.0)
-    finally:
-        CB.set_slope_take_mode("const")
+    # ドン込み（既定）・旧 `const`（定数 `Θ`）の値＝`theta_take` の定数 `Θ` をそのまま渡した形
+    chars_const = T.attack_value_don(5000.0, 5000.0, True, T.THETA, T.MU)
+    _l2, chars_lethal = CB.theory_slope_parts(tok, 5000.0, life_opp=0.0)
+    _l3, chars_safe = CB.theory_slope_parts(tok, 5000.0, life_opp=3.0)
     assert chars_lethal > chars_const                           # とどめでは跳ねる
     assert chars_safe == pytest.approx(chars_const)             # ライフが残っていれば不動
 

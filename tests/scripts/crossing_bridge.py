@@ -1075,9 +1075,8 @@ def attacker_ctx(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=N
     olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
     r = max(1.0, min(5.0, float(sc[SC_OPP_LIFE])))
-    blk_a = None
-    if SLOPE_BLOCK_MODE == "on":                        # `seat_slope_terms` と同じ引き方
-        blk_a = opp_blockers_of(tok, my_leader_power=mlp, theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)
+    # `seat_slope_terms` と同じ引き方（T92・`SLOPE_BLOCK_MODE=on`）
+    blk_a = opp_blockers_of(tok, my_leader_power=mlp, theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)
     items = HP.hand_items(tok, ci_row, idx2cid, cards, olp, r) or []
     cand = []
     for it in items:
@@ -1942,7 +1941,9 @@ def own_turn_index(t):
 
 
 #: **速さ `A` の盤面の項にブロッカーを入れるか**（T92・2026-09-18・ユーザ指示「1で進めてください」）。
-#: `off`＝旧（`attack_value` に `blockers` を渡さない）／`on`＝**規則どおり**渡す。
+#: **規則どおり渡す**（`on`・2026-10-05 既定に採用・ユーザ決定「全て正しい方式にしてください」）。**定数**——旧 `off`
+#: （`attack_value` に `blockers` を渡さない）は同日の決定「波Cで消す」で削除し、凍結ブランチ `claude/theory-switches-final`
+#: で再現する。出力 JSON の `slope_block` キーは定数 `"on"` のまま。
 #:
 #: **これは欠落であって新しい式ではない**——`attack_value(..., blockers=…)` は T47 から在り、
 #: `ν` の攻撃項も `score_candidate` も渡している。**`A` だけが渡していなかった**。
@@ -1951,16 +1952,7 @@ def own_turn_index(t):
 #:
 #: **効き方は状態で決まる**（実測 2026-09-18）: 平均では `A` の盤面の項が 3.6%／5.0% 下がるだけだが、
 #: **ブロッカーの居るターン（12.1%／12.4%）では 28.6%／34.1% 下がる**。
-SLOPE_BLOCK_MODES = ("off", "on")
-SLOPE_BLOCK_MODE = "on"             # **2026-10-05 既定に採用**（ユーザ決定・旧 `off` は --slope-block off で再現）
-
-
-def set_slope_block_mode(mode):
-    global SLOPE_BLOCK_MODE
-    if mode not in SLOPE_BLOCK_MODES:
-        raise ValueError("slope block mode は %s のどれか" % (SLOPE_BLOCK_MODES,))
-    SLOPE_BLOCK_MODE = mode
-    return SLOPE_BLOCK_MODE
+SLOPE_BLOCK_MODE = "on"
 
 
 def opp_blockers_of(tok, my_leader_power=None, r_turns=R_TURNS, theta=THETA, mu=MU,
@@ -2021,16 +2013,9 @@ def _budget_gap(pairs, xs, take_cost):
 #:
 #: **新定数ゼロ**（`theta_take` は既にある式・`LAM_BY_LIFE` は実測）。
 #: **渡し忘れは落とす**（T131 で決めた規約——黙って定数に落ちない）。
-SLOPE_TAKE_MODES = ("const", "life")
-SLOPE_TAKE_MODE = "life"            # **2026-10-05 既定に採用**（ユーザ決定・旧 `const` は --slope-take const で再現）
-
-
-def set_slope_take_mode(mode):
-    global SLOPE_TAKE_MODE
-    if mode not in SLOPE_TAKE_MODES:
-        raise ValueError("slope take mode は %s のどれか" % (SLOPE_TAKE_MODES,))
-    SLOPE_TAKE_MODE = mode
-    return SLOPE_TAKE_MODE
+#: **`life`**（2026-10-05 既定に採用・ユーザ決定）。**定数**——旧 `const`（定数 `Θ`）は同日の決定「波Cで消す」で削除し、
+#: 凍結ブランチ `claude/theory-switches-final` で再現する。
+SLOPE_TAKE_MODE = "life"
 
 
 def theory_slope_parts(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None, with_don=True,
@@ -2044,12 +2029,11 @@ def theory_slope_parts(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None,
     減衰（KO されない）とは別で、**どちらも同じ割合で割り引く**（渡さなければ 1.0）。"""
     thr = 1.0 if through is None else max(0.0, min(1.0, float(through)))
     # **T134**: 「受けられたとき」を**守る側のライフ**で読む（`min` の 2 本目の枝）。
-    if SLOPE_TAKE_MODE == "life" and life_opp is None:
+    if life_opp is None:
         raise ValueError("SLOPE_TAKE_MODE='life' なのに守る側のライフが渡されていない"
                          "＝黙って定数に落とさない（`sc[SC_OPP_LIFE]` を渡す）")
-    th_atk = float(theta) if life_opp is None or SLOPE_TAKE_MODE != "life" else \
-        float(theta_take(float(life_opp), theta=theta, mu=mu))
-    blk = blockers if (SLOPE_BLOCK_MODE == "on" and blockers) else None
+    th_atk = float(theta_take(float(life_opp), theta=theta, mu=mu))
+    blk = blockers if blockers else None
     xs = own_attackers_of(tok, opp_leader_power)
     fn = attack_value_don if with_don else attack_value
     vals = [fn(float(opp_leader_power) + x, opp_leader_power, True, th_atk, mu, blockers=blk) for x in xs]
@@ -2058,7 +2042,7 @@ def theory_slope_parts(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None,
 
 def theory_slope(tok, opp_leader_power, theta=THETA, mu=MU, blockers=None, life_opp=None):
     """今の盤面の攻撃手（リーダー＋殴れる体）がリーダーを殴る価格の和＝理論の「1 ターンに積む損害」。
-    `SLOPE_BLOCK_MODE=on` なら**相手のアクティブなブロッカー**も応答に入れる（T92）。
+    **相手のアクティブなブロッカー**も応答に入れる（T92・`SLOPE_BLOCK_MODE=on`）。
     **T134**: `life_opp` を渡すと「受けられたとき」を守る側のライフで読む。"""
     lead, chars = theory_slope_parts(tok, opp_leader_power, theta, mu, blockers, life_opp=life_opp)
     return lead + chars
@@ -2112,10 +2096,8 @@ def seat_slope_terms(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
         a = float(plan["a_time"])
         return a, 0.0, 0.0, a, 0.0, 0.0, 0.0, 0.0
     sc_a = np.asarray(sc)
-    blk = None
-    if SLOPE_BLOCK_MODE == "on":
-        blk = opp_blockers_of(tok_row, my_leader_power=float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
-                              theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)
+    blk = opp_blockers_of(tok_row, my_leader_power=float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
+                          theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)          # T92（`SLOPE_BLOCK_MODE=on`）
     # **T109**: 盤面は**素殴り**で数え、付与は財布のナップサックの中で買う（二重に数えない）。
     lead, chars = theory_slope_parts(tok_row, olp, theta, mu, blockers=blk,
                                      with_don=False,
@@ -2203,7 +2185,7 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     # 的中・偏り・σ_T・within1 がバイト一致・行ごとの `slope_theory` だけが動いていた）。
     # **T128 の減衰と同じ型の取りこぼし**（T114 で既定になったとき規則を 2 つ引き継がなかった）。
     # **渡されたらそれを使い、渡されなければ規則どおり自分で引く**＝呼び出し側の渡し忘れが起きない形。
-    if blockers is None and SLOPE_BLOCK_MODE == "on":
+    if blockers is None:
         blockers = opp_blockers_of(tok_row,
                                    my_leader_power=float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
                                    theta=theta, mu=mu, ci_row=ci_row, idx2cid=idx2cid)
@@ -3761,16 +3743,9 @@ def main(argv=None):
     ap.add_argument("--rate-decay", default=RATE_DECAY_MODE, choices=RATE_DECAY_MODES,
                     help="**T95** 盤面が減ることを歩きに入れるか: `off`（旧・死なない前提）／"
                          "`ko`（毎自席ターン `ko_p`＝0.289 で失われる・T60 の生存の重みと同じ量）")
-    ap.add_argument("--slope-take", default=SLOPE_TAKE_MODE, choices=SLOPE_TAKE_MODES,
-                    help="**T134** 攻撃の価格の「受けられたとき」を守る側のライフで読むか: "
-                         "`const`（旧・定数 `Θ`）／**`life`（既定**・2026-10-05）（`theta_take(ライフ)`＝**他の 4 つの器が既に使っている式**・"
-                         "受ける費用の `lethal`（T63）ではライフ 0 のときだけ変わる＝**とどめが見えるようになる**）")
     ap.add_argument("--theta-side", default=THETA_SIDE_MODE, choices=THETA_SIDE_MODES,
                     help="**T133** `Θ` を両席で同じ式にするか: `legacy`（従来・自分の耐久だけ `g × 枚数`）／"
                          "**`symmetric`**（`threshold_parts` と同じ式を鏡に当てる）")
-    ap.add_argument("--slope-block", default=SLOPE_BLOCK_MODE, choices=SLOPE_BLOCK_MODES,
-                    help="**T92** 速さ `A` の盤面の項に相手のアクティブなブロッカーを入れるか: "
-                         "`off`（旧・渡さない）／**`on`（既定**・2026-10-05・規則どおり `attack_value` に渡す＝新定数ゼロ）")
     ap.add_argument("--theta-hand", default=THETA_HAND_MODE, choices=THETA_HAND_MODES,
                     help="**T76** 耐久の手札項: `cuttable_forced`（旧の既定・T100・N-3 までの数字はこれ）／"
                          "`rule_don`（**既定・2026-10-04**・守る席の実際のカウンター値・イベントのドン・ブロッカー・ライフから"
@@ -3790,9 +3765,7 @@ def main(argv=None):
     t0 = time.time()
     set_pre_settle_mode(a.pre_settle)               # **T138b**
     set_theta_hand_mode(a.theta_hand)
-    set_slope_block_mode(a.slope_block)
     set_theta_side_mode(a.theta_side)              # **T133**
-    set_slope_take_mode(a.slope_take)              # **T134**
     set_rate_decay_mode(a.rate_decay)
     rows_out, ledger, stats, turn_harm, theta_check = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
     if stats.get("g_n"):

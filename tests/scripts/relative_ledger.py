@@ -546,14 +546,8 @@ def build_parser():
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--d-mode", dest="d_mode", choices=KV.D_MODES, default=None)
-    ap.add_argument("--kappa-sigma", dest="kappa_sigma", choices=TO.KAPPA_SIGMA_MODES, default=None,
-                    help="**T122/§17.9.6-1**: κ の物差しを W に合わせるか（既定 `match`・2026-10-05／旧は `abs`）")
     ap.add_argument("--theta-side", dest="theta_side", choices=CB.THETA_SIDE_MODES, default=None,
                     help="**T133**: `Θ` を両席で同じ式にするか（既定は現状の `legacy`）")
-    ap.add_argument("--slope-take", dest="slope_take", choices=CB.SLOPE_TAKE_MODES, default=None,
-                    help="**T134**: `A` の「受ける費用」を自分のライフで決めるか（既定 `life`・2026-10-05／旧は `const`）")
-    ap.add_argument("--slope-block", dest="slope_block", choices=CB.SLOPE_BLOCK_MODES, default=None,
-                    help="**T92**: `A` に相手のブロッカーを入れるか（既定 `on`・2026-10-05／旧は `off`）")
     ap.add_argument("--theta-hand", dest="theta_hand", choices=CB.THETA_HAND_MODES, default=None,
                     help="**H-4** 耐久の手札項（既定 `rule_don`・2026-10-04／旧の既定は `cuttable_forced`）")
     ap.add_argument("--mirror", choices=("on", "off"), default=None,
@@ -574,14 +568,8 @@ def main(argv=None):
     a = build_parser().parse_args(argv)
     if a.d_mode:
         KV.set_d_mode(a.d_mode)
-    if a.kappa_sigma:
-        TO.set_kappa_sigma_mode(a.kappa_sigma)
     if a.theta_side:
         CB.set_theta_side_mode(a.theta_side)          # **T133**
-    if a.slope_block:
-        CB.set_slope_block_mode(a.slope_block)
-    if a.slope_take:
-        CB.set_slope_take_mode(a.slope_take)          # **T134**
     if a.theta_hand:
         CB.set_theta_hand_mode(a.theta_hand)           # **H-4**
     if a.mirror:
