@@ -275,7 +275,7 @@ def test_the_plan_store_key_is_shared_across_tools_and_module_names(_budget, tmp
     st = PS.PlanStore(str(tmp_path / "ps"), CB)
     names = {n for _lab, n, _src in st.reads}
     assert {"RATE_DECAY_MODE", "EX_STATE_BUDGET", "CUT_PRICER_KEY", "NU_MEAS"} <= names
-    assert "PRE_SETTLE_MODE" not in names and "OPP_CLOCK_MODE" not in names
+    assert "PRE_SETTLE_MODE" not in names
     k0 = st.key_of(cards, don, blk, life, ax, None, lt, dt, arr)
     monkeypatch.setattr(CB, "PRE_SETTLE_MODE", "on" if CB.PRE_SETTLE_MODE == "off" else "off")
     assert st.key_of(cards, don, blk, life, ax, None, lt, dt, arr) == k0

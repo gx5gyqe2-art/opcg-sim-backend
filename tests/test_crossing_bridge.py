@@ -2249,23 +2249,11 @@ def test_pre_settle_game_reads_the_settled_map_once_and_derives_the_first_turn(m
     assert "game" in CB.PRE_SETTLE_MODES
 
 
-# ---- T151-2: 相手の時計を同じ瞬間から読む（opp_clock=mirror・mirror_view） ----------------------------
+# ---- T151-2: 相手の時計を同じ瞬間から読む（mirror・mirror_view） ----------------------------
 #
-# 既定 `prev_start` は従来どおり（`op = per_seat[(1-w, 相手の前ターン)]`）。`mirror` は w のターン t の最後の行を
+# 旧 `prev_start`（`op = per_seat[(1-w, 相手の前ターン)]`・2026-10-05 に切替は削除）。`mirror` は w のターン t の最後の行を
 # 相手の席から見た鏡（`mirror_view`）にして同じ `seat_row` で読む。**既定の道は 1 ビットも動かない**
 # （2026-09-24・実 20 局で rows_out／ledger／stats／theta_check／turn_harm のハッシュが HEAD と一致）。
-
-def test_set_opp_clock_mode_defaults_to_mirror_and_rejects_unknown():
-    """**既定は `mirror`**（2026-09-24 採用・ユーザ決定）。`prev_start` は旧の数字との対照。"""
-    assert CB.OPP_CLOCK_MODE == "mirror"
-    try:
-        assert CB.set_opp_clock_mode("prev_start") == "prev_start"
-    finally:
-        CB.set_opp_clock_mode("mirror")
-    with pytest.raises(ValueError):
-        CB.set_opp_clock_mode("なにか")
-    assert CB.OPP_CLOCK_MODE == "mirror"
-
 
 def _mirror_fixture():
     """自分＝席 A の行。A のリーダー 0・場 2..6・手札 12..21／相手＝リーダー 1・場 7..11。"""
@@ -2362,12 +2350,6 @@ def test_opp_clock_mirror_on_empty_records_builds_no_rows_and_default_counts_no_
     monkeypatch.setattr(CB.PL, "iter_games", lambda *a, **k: iter([]))
     rows, _l, stats, _t, _c = CB.collect(["x"])                  # 既定（mirror）
     assert rows == [] and stats["mirror_rows"] == 0
-    try:
-        CB.set_opp_clock_mode("prev_start")
-        rows2, _l2, stats2, _t2, _c2 = CB.collect(["x"])
-    finally:
-        CB.set_opp_clock_mode("mirror")
-    assert rows2 == [] and stats2["mirror_rows"] == 0
 
 
 def test_the_defender_model_looks_only_as_far_as_the_walk_without_the_hand():

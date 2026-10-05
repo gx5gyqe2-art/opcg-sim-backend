@@ -128,7 +128,7 @@ def tau_resid_by_bin(rows_out, p, nbin=10, cap=None):
     """**T151-4（P4）**: `p` の等頻度 `nbin` 箱ごとの **τ の残差**（理論 − 実際）を 2 本の時計で分けて出す。
     `resid_opp = min(τ_opp, cap) − t_opp_act`（相手が実際にあと何自席ターン打ったか）・
     `resid_me = min(τ_me, cap) − t_me_act`。T118 が最上位帯で見つけた「相手の τ の残差 +10.7 対 自分の +1.4」を
-    切替（`--opp-clock`）の前後で同じ物差しで測るための器。`won`／`lost` の全体も出す（`summarise` の `bias` と同じ
+    切替（T151-2 の相手の時計・2026-10-05 に削除）の前後で同じ物差しで測るための器。`won`／`lost` の全体も出す（`summarise` の `bias` と同じ
     ——勝った行は `resid_me`・負けた行は `resid_opp`）。`calib_bins` と同じ切り方（`argsort` の等頻度）。"""
     cap = CB.RACE_CAP if cap is None else float(cap)
     p = np.asarray(p, float)

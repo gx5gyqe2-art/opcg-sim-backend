@@ -133,27 +133,26 @@ def pair_table(pairs, unpaired=0):
 
 
 def collect(dirs, limit_games=0, pre_settle="on", slope="theory", sigma_rel=None, w_err="rel",
-            opp_clock=None, w_mover=None):
+            w_mover=None):
     """記録を 1 度読み、行に `p` を付け、対の表を返す。`pre_settle` は `crossing_bridge.PRE_SETTLE_MODES`・
-    `opp_clock`／`w_mover` は T151-2 の 2 つの切替（`None` なら今の値のまま）。"""
+    `w_mover` は T151-2 の切替（`None` なら今の値のまま）。相手の時計は常に同じ瞬間（`mirror`・
+    `opp_clock` の切替は 2026-10-05 に削除・出力の欄は定数）。"""
     import theory_order as TO
-    old = CB.PRE_SETTLE_MODE; old_oc = CB.OPP_CLOCK_MODE; old_wm = TO.W_MOVER_MODE
+    old = CB.PRE_SETTLE_MODE; old_wm = TO.W_MOVER_MODE
     try:
         CB.set_pre_settle_mode(pre_settle)
-        if opp_clock is not None:
-            CB.set_opp_clock_mode(opp_clock)
         if w_mover is not None:
             TO.set_w_mover_mode(w_mover)
         rows_out, _ledger, stats, _th, _tc = CB.collect(dirs, limit_games, THETA, MU, "const")
         if sigma_rel is None:
             sigma_rel = CB.sigma_rel_for(dirs)
         rows = PA.rows_with_p(rows_out, slope, sigma_rel, w_err)
-        oc_used, wm_used = CB.OPP_CLOCK_MODE, TO.W_MOVER_MODE
+        wm_used = TO.W_MOVER_MODE
     finally:
-        CB.set_pre_settle_mode(old); CB.set_opp_clock_mode(old_oc); TO.set_w_mover_mode(old_wm)
+        CB.set_pre_settle_mode(old); TO.set_w_mover_mode(old_wm)
     pairs, unpaired = pair_rows(rows)
     return {"games": stats.get("games"), "n_rows": len(rows), "pre_settle": pre_settle, "sigma_rel": sigma_rel,
-            "opp_clock": oc_used, "w_mover": wm_used,
+            "opp_clock": "mirror", "w_mover": wm_used,
             "overall": {"mean_p": float(np.mean([r["p"] for r in rows])) if rows else None,
                         "mean_z": float(np.mean([r["z"] for r in rows])) if rows else None,
                         "favorite_share": (sum(1 for r in rows if r["p"] > 0.5) / len(rows)) if rows else None},
@@ -168,11 +167,10 @@ def main(argv=None):
     ap.add_argument("--slope", default="theory")
     ap.add_argument("--sigma-rel", type=float, default=None)
     ap.add_argument("--w-err", default="rel", choices=("abs", "rel"))
-    ap.add_argument("--opp-clock", default=None, choices=CB.OPP_CLOCK_MODES)
     ap.add_argument("--w-mover", default=None, choices=("off", "half"))
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
-    out = collect(a.src, a.games, a.pre_settle, a.slope, a.sigma_rel, a.w_err, a.opp_clock, a.w_mover)
+    out = collect(a.src, a.games, a.pre_settle, a.slope, a.sigma_rel, a.w_err, a.w_mover)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:

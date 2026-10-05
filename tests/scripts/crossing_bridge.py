@@ -3385,7 +3385,7 @@ def pre_settle_skip(mode, settled, first_turn, seed_g, w, t):
 
 #: **相手の時計をどの瞬間から読むか**（T151-2・2026-09-24・ユーザ決定「それでお願いします」）。
 #:
-#: `prev_start`＝従来（既定）: 行 `(w, t)` の相手の役は `per_seat[(1-w, 相手の前ターン)]`＝**相手のターン開始の値**
+#: `prev_start`＝旧: 行 `(w, t)` の相手の役は `per_seat[(1-w, 相手の前ターン)]`＝**相手のターン開始の値**
 #: ——私の耐久 `Θ_w` は相手の前ターンの攻撃で削られる**前**・相手の速さ `A_{1-w}` はそのターンに出した体を
 #: 含まない（T120 が `race_alloc` で「次ターンに殴る体を 0.8／0.7 体落とす」と見つけたのと同じ古さ）＝
 #: **両方とも `τ_opp` を膨らませ、手番の席に甘い**（実測: 両席の行の mean p 0.568／0.594・対の和 −1 が +0.168／+0.211）。
@@ -3399,18 +3399,9 @@ def pre_settle_skip(mode, settled, first_turn, seed_g, w, t):
 #: 残る非対称（開示）: 相手の体のパワーは w の行の列 0＝**相手の手番でないときの値**（`YOUR_TURN` の
 #: パッシブが載らない・`OPPONENT_TURN` のパッシブが載る）——エンジンは手番側のパッシブしか計算しないので
 #: w の行からは読めない。`mirror_view` の docstring に列ごとの扱いを書いた。
-#: **既定は `mirror`（2026-09-24 採用・ユーザ決定「推薦の通りでいきましょう」・`2026-09-24_opp_clock_freshness.md`）**。
-#: `prev_start` は旧の数字と比べるときの対照（T151 以前の報告の数字はこちら）。
-OPP_CLOCK_MODES = ("prev_start", "mirror")
-OPP_CLOCK_MODE = "mirror"
-
-
-def set_opp_clock_mode(mode):
-    global OPP_CLOCK_MODE
-    if mode not in OPP_CLOCK_MODES:
-        raise ValueError("opp clock mode は %s のどれか" % (OPP_CLOCK_MODES,))
-    OPP_CLOCK_MODE = mode
-    return OPP_CLOCK_MODE
+#: **`mirror` を採用（2026-09-24・ユーザ決定「推薦の通りでいきましょう」・`2026-09-24_opp_clock_freshness.md`）**。
+#: 対照の `prev_start`（T151 以前の報告の数字・切替 `OPP_CLOCK_MODE`）は 2026-10-05 に削除——
+#: `claude/theory-switches-final` で再現できる。`pre_settle_asymmetry`／`seat_pair_symmetry` の出力の `opp_clock` は定数 `"mirror"`。
 
 
 #: トークンの列（`rust/opcg_engine/src/encode/tokens.rs`）: 2＝付与ドン/5・4＝召喚酔い・20＝**視点の相手が手番のとき**のパワー
@@ -4065,23 +4056,22 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         # `w := 1 − w` として読む。`j`＝相手の次の自席ターンの序数（`len(prev_o)`）。`stats` は捨てる
         # （`g_for` の g_* カウンタだけは閉包で共有＝`mirror` のときだけ両役ぶん数える・開示）。
         op_mirror = {}
-        if OPP_CLOCK_MODE == "mirror":
-            import collections
-            sink = collections.defaultdict(float)
-            for w in (0, 1):
-                ts = turn_seq[w]; ts_o = turn_seq[1 - w]
-                for j, t in enumerate(ts):
-                    prev_o = [tt for tt in ts_o if tt < t]
-                    if not prev_o:
-                        continue
-                    sc_l, tok_l, ci_l = turn_last.get((w, t), turn_start[(w, t)])
-                    sc_b, tok_b, ci_b = turn_last.get((1 - w, prev_o[-1]), turn_start[(1 - w, prev_o[-1])])
-                    sc_m, tok_m, ci_m = mirror_view(sc_l, tok_l, ci_l, tok_hand=tok_b, ci_hand=ci_b,
-                                                    cards=cards, idx2cid=idx2cid)
-                    f_o = float(per_seat[(1 - w, prev_o[-1])]["f_real"]) + harm.get((1 - w, prev_o[-1]), 0.0)
-                    op_mirror[(w, t)] = seat_row(1 - w, t, len(prev_o), sc_m, tok_m, ci_m, f_o,
-                                                 sum(1 for tt in ts_o if tt > t), sink)
-                    stats["mirror_rows"] += 1
+        import collections
+        sink = collections.defaultdict(float)
+        for w in (0, 1):
+            ts = turn_seq[w]; ts_o = turn_seq[1 - w]
+            for j, t in enumerate(ts):
+                prev_o = [tt for tt in ts_o if tt < t]
+                if not prev_o:
+                    continue
+                sc_l, tok_l, ci_l = turn_last.get((w, t), turn_start[(w, t)])
+                sc_b, tok_b, ci_b = turn_last.get((1 - w, prev_o[-1]), turn_start[(1 - w, prev_o[-1])])
+                sc_m, tok_m, ci_m = mirror_view(sc_l, tok_l, ci_l, tok_hand=tok_b, ci_hand=ci_b,
+                                                cards=cards, idx2cid=idx2cid)
+                f_o = float(per_seat[(1 - w, prev_o[-1])]["f_real"]) + harm.get((1 - w, prev_o[-1]), 0.0)
+                op_mirror[(w, t)] = seat_row(1 - w, t, len(prev_o), sc_m, tok_m, ci_m, f_o,
+                                             sum(1 for tt in ts_o if tt > t), sink)
+                stats["mirror_rows"] += 1
         for w in (0, 1):
             ts = turn_seq[w]; ts_o = turn_seq[1 - w]
             won = z_of[w] > 0.5
@@ -4092,7 +4082,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 prev_o = [tt for tt in ts_o if tt < t]
                 if not prev_o:
                     continue                                   # 相手がまだ 1 ターンも打っていない
-                op = op_mirror[(w, t)] if OPP_CLOCK_MODE == "mirror" else per_seat[(1 - w, prev_o[-1])]
+                op = op_mirror[(w, t)]
                 t_opp_act = sum(1 for tt in ts_o if tt > t)
                 rec = {"g": games, "who": w, "won": won,
                        # **T145**: 決着の旗（`lethal_rule.settled_map` の `(seed, w, t)`）と同じ鍵——
@@ -4536,9 +4526,6 @@ def main(argv=None):
                     help="**T138b** `W(D)` の較正が読む行から決着後（`lethal_rule.settled_map`）を除くか: "
                          "`off`（旧・全行）／`on`（宣言した席の行だけ除く）／"
                          "`game`（**T151-3** どちらかの席の最初の宣言ターン以降を両席とも除く）")
-    ap.add_argument("--opp-clock", default=OPP_CLOCK_MODE, choices=OPP_CLOCK_MODES,
-                    help="**T151-2** 相手の時計をどの瞬間から読むか: `prev_start`（旧・相手の前ターン開始）／"
-                         "`mirror`（同じ瞬間＝自席ターンの最後の行を相手の席から見た鏡・相手側はリフレッシュ後）")
     ap.add_argument("--w-mover", default=TO.W_MOVER_MODE, choices=TO.W_MOVER_MODES,
                     help="**T151-2** 手番の半ターン: `off`（旧）／`half`（`W(D + 1/2)`・規則から）")
     add_nu_mode_arg(ap)
@@ -4552,7 +4539,6 @@ def main(argv=None):
     TO.apply_defender_power(a)                      # 2b
     t0 = time.time()
     set_pre_settle_mode(a.pre_settle)               # **T138b**
-    set_opp_clock_mode(a.opp_clock)                 # **T151-2**
     TO.set_w_mover_mode(a.w_mover)                  # **T151-2**
     set_theta_hand_mode(a.theta_hand)
     set_slope_block_mode(a.slope_block)
