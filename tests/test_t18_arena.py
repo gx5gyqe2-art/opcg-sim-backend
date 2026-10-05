@@ -447,8 +447,8 @@ def test_cli_seq_flag_reaches_shadow_forbid(monkeypatch):
     monkeypatch.setattr(TA.SF, "set_seq_mode", lambda m: seen.append(m))
     monkeypatch.setattr(TA, "dry_run", lambda seeds, decks_mode, sims=64, **kw: [])
     TA.main(["--games", "1", "--seed-base", "60000"])
-    TA.main(["--games", "1", "--seed-base", "60000", "--seq", "attack_le"])
-    assert seen == ["off", "attack_le"]
+    TA.main(["--games", "1", "--seed-base", "60000", "--seq", "attack_any"])
+    assert seen == ["off", "attack_any"]
 
 
 # ---- 5. T18: 読み替えられない付与も対象にする（attach_static）／プラセボの腕 ---------------------

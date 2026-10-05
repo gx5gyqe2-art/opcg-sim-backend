@@ -60,7 +60,7 @@ T141 の申し送りどおり `attach` は対象から除く）なら、**その
 3. **置き換えた箱はほぼ最後まで打たれる**（`box_broken` は `box_completed` より十分小さい）——
    壊れるのは途中で盤面が変わって同じ `sig` の合法手が消えたときだけ。
 
-**T144 の切替（`--seq`）**: `shadow_forbid.SEQ_MODE` を `attack`／`attack_le` にすると、純付与は
+**T144 の切替（`--seq`）**: `shadow_forbid.SEQ_MODE` を `attack_any` にすると（途中の `attack`／`attack_le` は波C で削除）、純付与は
 「それが準備する攻撃の価格」で読まれる。読み替えられた付与の行は `played_reread` が立ち、`attach` でも
 対象外にしない（読み替えられない付与は今までどおり対象外）。既定は `off`＝T142b のまま。
 

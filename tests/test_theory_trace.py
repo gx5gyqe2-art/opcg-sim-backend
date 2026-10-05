@@ -174,12 +174,12 @@ def test_cli_builds_seed_range_sets_seq_mode_and_writes_json(monkeypatch, tmp_pa
     monkeypatch.setattr(TT, "collect", fake_collect)
     out = tmp_path / "trace.json"
     rc = TT.main(["--games", "2", "--seed-base", "1300000", "--decks", "synth_roles", "--sims", "8",
-                  "--seq", "attack_le", "--json", str(out)])
+                  "--seq", "off", "--json", str(out)])
     SF.set_seq_mode("off")
     assert rc == 0
     assert captured == {"seeds": [1300000, 1300001], "decks": "synth_roles", "sims": 8}
     saved = json.loads(out.read_text(encoding="utf-8"))
-    assert saved["meta"]["seq"] == "attack_le" and saved["meta"]["summary"]["n_games"] == 2
+    assert saved["meta"]["seq"] == "off" and saved["meta"]["summary"]["n_games"] == 2
     assert saved["meta"]["mu"] == pytest.approx(TT.MU)
     assert [g["seed"] for g in saved["games"]] == [1300000, 1300001]
 

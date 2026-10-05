@@ -256,13 +256,15 @@ def _c(sig, k):
 
 
 def test_seq_prices_rereads_a_pure_attach_as_the_attack_it_prepares():
+    """（波C: 読みは `attack_any` だけ——同じ X の攻撃候補の最大を枚数を問わず取る。同じ枚数だけを見た
+    T144 の `attack` は削除。）"""
     cands = [_c(["DON_BOX", "X", [], [], None], 2),           # 純付与 X・2 枚
              _c(["DON_BOX", "X", ["L"], [], None], 2),        # X が 2 枚乗せて殴る
              _c(["DON_BOX", "X", ["C"], [], None], 2),        # 同・別の対象
-             _c(["DON_BOX", "X", ["L"], [], None], 0)]        # 枚数が違う攻撃は数えない
+             _c(["DON_BOX", "X", ["L"], [], None], 0)]        # 枚数が違う攻撃も数える（attack_any）
     priced = [{"price": 0.03}, {"price": 0.30}, {"price": 0.25}, {"price": 0.50}]
     out, n_re, n_attach = SF.seq_prices(cands, priced)
-    assert out[0]["price"] == pytest.approx(0.30)           # 同じ X・同じ k の攻撃の最大
+    assert out[0]["price"] == pytest.approx(0.50)           # 同じ X の攻撃の最大（枚数を問わず）
     assert [p["price"] for p in out[1:]] == [0.30, 0.25, 0.50]
     assert (n_re, n_attach) == (1, 1)
 
@@ -291,72 +293,16 @@ def test_shadow_row_in_seq_mode_no_longer_forbids_an_attach_that_prepares_the_be
     out = {"sig": sigs[0], "k": 2}
     monkeypatch.setattr(SF, "SEQ_MODE", "off")
     assert SF.shadow_row(_SC, _TOK, _CI, None, None, cands, out, move={})["forbidden"] is True
-    monkeypatch.setattr(SF, "SEQ_MODE", "attack")
+    monkeypatch.setattr(SF, "SEQ_MODE", "attack_any")
     row = SF.shadow_row(_SC, _TOK, _CI, None, None, cands, out, move={})
     assert row["forbidden"] is False and row["played_reread"] is True
 
 
 def test_set_seq_mode_rejects_unknown_values():
-    with pytest.raises(ValueError):
-        SF.set_seq_mode("both")
-
-
-def test_seq_prices_le_mode_reads_the_best_attack_with_no_more_don():
-    """**T144 §4（`attack_le`）**: 箱の生成器はしきい値を越える枚数しか攻撃候補を出さない——
-    k=0 の攻撃しか無い体への 1 枚の付与は、`attack` では読み替わらず、`attack_le` では k≤1 の攻撃の最大で読む。
-    枚数が多い攻撃（k=3）は数えない。"""
-    cands = [_c(["DON_BOX", "X", [], [], None], 1),
-             _c(["DON_BOX", "X", ["L"], [], None], 0),
-             _c(["DON_BOX", "X", ["C"], [], None], 3)]
-    priced = [{"price": 0.03}, {"price": 0.20}, {"price": 0.40}]
-    out, n_re, _ = SF.seq_prices(cands, priced, mode="attack")
-    assert out[0]["price"] == pytest.approx(0.03) and n_re == 0
-    out, n_re, _ = SF.seq_prices(cands, priced, mode="attack_le")
-    assert out[0]["price"] == pytest.approx(0.20) and n_re == 1
-    assert SF._reread_index(cands, 0, priced, mode="attack_le") is True
-    assert SF._reread_index(cands, 0, priced, mode="attack") is False
-
-
-def test_seq_prices_delta_mode_subtracts_the_attach_move_s_own_k_times_delta():
-    """**T147a**: `attack_le_delta` は `attack_le` と同じ候補（k' ≤ k）から最大を取り、**この付与
-    候補自身の `k`**（借りた攻撃候補の `k'` ではない）に δ を掛けて引く。"""
-    cands = [_c(["DON_BOX", "X", [], [], None], 3),           # 純付与 X・3 枚
-             _c(["DON_BOX", "X", ["L"], [], None], 1)]        # X が 1 枚で殴る（k'=1 ≤ k=3）
-    priced = [{"price": 0.03}, {"price": 0.50}]
-    out, n_re, n_attach = SF.seq_prices(cands, priced, mode="attack_le_delta", delta=0.02)
-    assert out[0]["price"] == pytest.approx(0.50 - 3 * 0.02)   # k=3（付与自身）で割り引く・k'=1 ではない
-    assert (n_re, n_attach) == (1, 1)
-
-
-def test_seq_prices_delta_mode_matches_attack_le_s_candidate_selection():
-    """**T147a**: 読み替えの対象になる候補の集合は `attack_le` と同一（δ の有無だけが違う）——
-    `attack_le` で読み替えられない付与（枚数が全部より多い）は `attack_le_delta` でも読み替えられない。"""
-    cands = [_c(["DON_BOX", "X", [], [], None], 1), _c(["DON_BOX", "X", ["L"], [], None], 5)]
-    priced = [{"price": 0.03}, {"price": 0.90}]
-    out_le, n_re_le, _ = SF.seq_prices(cands, priced, mode="attack_le")
-    out_d, n_re_d, _ = SF.seq_prices(cands, priced, mode="attack_le_delta", delta=0.02)
-    assert n_re_le == 0 and n_re_d == 0
-    assert out_le[0]["price"] == out_d[0]["price"] == pytest.approx(0.03)
-
-
-def test_seq_prices_delta_defaults_to_theory_order_delta():
-    cands = [_c(["DON_BOX", "X", [], [], None], 2), _c(["DON_BOX", "X", ["L"], [], None], 2)]
-    priced = [{"price": 0.03}, {"price": 0.40}]
-    out, _n_re, _n_attach = SF.seq_prices(cands, priced, mode="attack_le_delta")
-    assert out[0]["price"] == pytest.approx(0.40 - 2 * SF.DELTA)
-
-
-def test_reread_index_treats_attack_le_delta_like_attack_le():
-    cands = [_c(["DON_BOX", "X", [], [], None], 3), _c(["DON_BOX", "X", ["L"], [], None], 1)]
-    priced = [{"price": 0.03}, {"price": 0.50}]
-    assert SF._reread_index(cands, 0, priced, mode="attack_le_delta") is True
-    assert SF._reread_index(cands, 0, priced, mode="attack") is False   # k' != k なので厳密一致は不成立
-
-
-def test_set_seq_mode_accepts_attack_le_delta():
-    SF.set_seq_mode("attack_le_delta")
-    assert SF.SEQ_MODE == "attack_le_delta"
-    SF.set_seq_mode("off")
+    for bad in ("both", "attack", "attack_le", "attack_le_delta"):     # 途中の読みは波C で削除
+        with pytest.raises(ValueError):
+            SF.set_seq_mode(bad)
+    assert SF.SEQ_MODES == ("off", "attack_any")
 
 
 # ---- 7. T155: 同じターンの続き（turn_followups／followup_table／sequence_columns）------------
@@ -507,20 +453,19 @@ def test_seq_prices_any_mode_reads_the_best_attack_of_the_same_card_whatever_the
              _c(["DON_BOX", "X", ["L"], [], None], 3),        # 3 枚乗せて殴る（k を超える）
              _c(["DON_BOX", "Y", ["L"], [], None], 1)]        # 別のカード
     priced = [{"price": 0.03}, {"price": 0.20}, {"price": 0.45}, {"price": 0.90}]
-    out_le, n_le, _ = SF.seq_prices(cands, priced, mode="attack_le")
-    out_any, n_any, _ = SF.seq_prices(cands, priced, mode="attack_any")
-    assert out_le[0]["price"] == pytest.approx(0.20) and out_any[0]["price"] == pytest.approx(0.45)
-    assert n_le == n_any == 1
+    out_any, n_any, _ = SF.seq_prices(cands, priced)
+    assert out_any[0]["price"] == pytest.approx(0.45)        # 枚数が同じか少ない攻撃だけなら 0.20 だった
+    assert n_any == 1
     assert [p["price"] for p in out_any[1:]] == [0.20, 0.45, 0.90]
-    assert SF._reread_index(cands, 0, priced, mode="attack_any") is True
+    assert SF._reread_index(cands, 0, priced) is True
 
 
 def test_seq_prices_any_mode_still_keeps_the_static_price_when_the_card_has_no_attack_at_all():
     cands = [_c(["DON_BOX", "X", [], [], None], 1), _c(["DON_BOX", "Y", ["L"], [], None], 4)]
     priced = [{"price": 0.03}, {"price": 0.30}]
-    out, n_re, _ = SF.seq_prices(cands, priced, mode="attack_any")
+    out, n_re, _ = SF.seq_prices(cands, priced)
     assert out[0]["price"] == pytest.approx(0.03) and n_re == 0
-    assert SF._reread_index(cands, 0, priced, mode="attack_any") is False
+    assert SF._reread_index(cands, 0, priced) is False
 
 
 def test_set_seq_mode_accepts_attack_any():
@@ -550,14 +495,14 @@ def test_seq_prices_any_mode_records_the_source_regardless_of_don_count():
              _c(["DON_BOX", "X", ["L"], [], None], 0),        # 0 枚で殴る（index 1）
              _c(["DON_BOX", "X", ["L"], [], None], 3)]        # 3 枚乗せて殴る（index 2・価格最大）
     priced = [{"price": 0.03}, {"price": 0.20}, {"price": 0.45}]
-    out, _n_re, _n_attach = SF.seq_prices(cands, priced, mode="attack_any")
+    out, _n_re, _n_attach = SF.seq_prices(cands, priced)
     assert out[0]["price"] == pytest.approx(0.45) and out[0]["src_index"] == 2  # k を超えた攻撃を指す
 
 
 def test_seq_prices_no_source_when_the_card_has_no_matching_attack():
     cands = [_c(["DON_BOX", "X", [], [], None], 1), _c(["DON_BOX", "Y", ["L"], [], None], 4)]
     priced = [{"price": 0.03}, {"price": 0.30}]
-    out, n_re, _ = SF.seq_prices(cands, priced, mode="attack_any")
+    out, n_re, _ = SF.seq_prices(cands, priced)
     assert "src_index" not in out[0] and n_re == 0                              # 読み替えられない＝手がかりも無い
 
 
@@ -572,7 +517,7 @@ def test_shadow_row_exposes_reread_src_parallel_to_cands(monkeypatch):
     monkeypatch.setattr(SF, "SEQ_MODE", "off")
     row_off = SF.shadow_row(_SC, _TOK, _CI, None, None, cands, out, move={})
     assert row_off["reread_src"] == [None, None, None]      # 読み替えていなければ全て None
-    monkeypatch.setattr(SF, "SEQ_MODE", "attack")
+    monkeypatch.setattr(SF, "SEQ_MODE", "attack_any")
     row = SF.shadow_row(_SC, _TOK, _CI, None, None, cands, out, move={})
     assert row["reread_src"] == [1, None, None]              # 純付与(0) は攻撃(1) から価格を借りた
     assert row["forbidden"] is False and row["played_reread"] is True         # T144 の既存の判定は不変
