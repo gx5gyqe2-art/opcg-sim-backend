@@ -95,3 +95,7 @@
 * テスト: `tests/test_crossing_bridge.py`（出荷の既定の一覧に 2 つを更新・追加、新しい既定の杭〔`test_the_2026_10_05_defaults_are_take_life_block_on`〕、旧い算術を固定している既存テストは旧い値を自分で明示して回す autouse）、`tests/test_relative_ledger.py`（`κ` の既定の杭を `match` に）。
 * 文書: `docs/cpu_theory_gap.md`（台帳・切替の表）、`docs/TEST_SPEC.md`（行の追記）。§0.6 の数字は動かさない（交点の橋の的中は実で 0.749 のまま・合成で 0.001 の差）。
 * 触らなかったもの: 旧い値の切替そのもの（掃除の波で消す）。
+
+## Rust 第 1 段のあとに載せたときの確認（2026-10-05）
+
+Rust 第 1 段（a15ef270）の上にこの 3 つの切替を載せ直した。`make test` は緑（golden〔`rd_kernel_golden.jsonl.gz`・`rd_dp_golden.jsonl`〕は解の入力と出力そのものを記録しているので、切替は無関係で作り直していない）。`OPCG_RD_KERNEL=both` で新しい既定のまま交点の橋を実 3 局・合成 3 局に通し、Rust と Python が全 36,136 回の解でビットまで一致した（これが新しい既定での Rust 対 Python の初めての確認）。
