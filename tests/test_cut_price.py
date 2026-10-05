@@ -9,7 +9,7 @@
 * **望遠鏡の不変量**: 切った組の値段を順に足すと `V(枠) − V(残り)`・最安の組を順に切れば**耐久の予約と損害が厳密に一致**。
 * 単調（`L` は減らない・値段は 0 以上・窓の値段は足し算で閉じる）。
 * 差し替え口は文脈の中だけ（外では `c(x)·μ` そのもの・相手の体の `ν` は旧の値段のまま）。
-* `hand_cut_count × μ` は旧の `hand_absorb*` と一致（数を変えていない）・`cuttable_indices` は `cuttable_share` と一致。
+* `hand_cut_count × μ` は旧の `hand_absorb_forced` と一致（数を変えていない）・`cuttable_indices` は `cuttable_share` と一致。
 
 **基盤健全性**（`cpu_infra`）。
 """
@@ -132,11 +132,12 @@ def test_flat_view_leaves_attack_prices_unchanged():
 
 
 def test_theta_hand_count_is_unchanged():
-    """`hand_cut_count × μ` は旧の手札の項（`hand_absorb*`）と一致＝N-3 は数を変えず値段だけを変える。"""
+    """`hand_cut_count × μ` は旧の手札の項（`hand_absorb_forced`）と一致＝N-3 は数を変えず値段だけを変える。
+    （波C: 数え方は `cuttable_forced` の 1 つだけ——`cuttable`／`cuttable_cx`／`cuttable_seq` は削除。）"""
     rng = np.random.default_rng(3)
     old = CB.THETA_HAND_MODE
     try:
-        for mode in ("cuttable", "cuttable_cx", "cuttable_forced", "cuttable_seq"):
+        for mode in ("cuttable_forced", "rule_don"):           # どちらの手札の形でも数は `cuttable_forced`
             CB.set_theta_hand_mode(mode)
             for _ in range(200):
                 hand_n = float(rng.integers(0, 9))
@@ -144,10 +145,7 @@ def test_theta_hand_count_is_unchanged():
                 xs = [float(x) for x in rng.choice([-1000.0, 0.0, 1000.0, 2000.0, 4000.0], size=int(rng.integers(0, 5)))]
                 life = float(rng.integers(0, 5)); blk = int(rng.integers(0, 3))
                 n_cut = (g / MU) * hand_n
-                want = {"cuttable": g * hand_n,
-                        "cuttable_cx": CB.hand_absorb(n_cut, max(xs) if xs else -1.0, MU),
-                        "cuttable_forced": CB.hand_absorb_forced(n_cut, xs, life, blk, MU),
-                        "cuttable_seq": CB.hand_absorb_seq(n_cut, xs, MU)}[mode]
+                want = CB.hand_absorb_forced(n_cut, xs, life, blk, MU)
                 got = CB.hand_cut_count(g, hand_n, xs, life, blk, MU) * MU
                 assert got == pytest.approx(want, abs=1e-12)
         xs = [0.0, 1000.0, 2000.0, 5000.0]

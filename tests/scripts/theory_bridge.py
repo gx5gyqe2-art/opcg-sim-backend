@@ -675,10 +675,10 @@ def _kappa_of_row(sc, tok, t, prof=None, g_me=None, g_opp=None, opp=None, cut_me
 
 def _g_of_row(sc, tok, ci_row, idx2cid, cards, cache, key):
     """**T76／T79**: **その行の席の**手札 1 枚あたりの価格（`crossing_bridge.hand_price_mean`）。
-    `W_MODE=curve` のときだけ計算し、`key`（席とターン）で使い回す。`THETA_HAND_MODE=count` なら `None`（＝`μ`）。"""
+    `W_MODE=curve` のときだけ計算し、`key`（席とターン）で使い回す。"""
     import crossing_bridge as CB
     part = CB.THETA_HAND_PART[CB.THETA_HAND_MODE]
-    if _TO_W_MODE() != "curve" or part is None:
+    if _TO_W_MODE() != "curve":
         return None
     if key not in cache:
         cache[key] = CB.hand_price_mean(sc, tok, ci_row, idx2cid, cards, part=part)
@@ -700,11 +700,11 @@ def _attacker_of(sc, tok, ci_row, idx2cid, cards, deck_ids=None, t=None):
 
 
 def _g_opp_of(opp, last_main, ex, idx2cid, cards, cache, seat, deck=None):
-    """**相手の手札 1 枚あたりの価格**（T79）。**H-4**: `THETA_HAND_MODE=rule` だけは守る席の**実際の札**を読むので、
+    """**相手の手札 1 枚あたりの価格**（T79）。**H-4**: `THETA_HAND_MODE=rule_don` だけは守る席の**実際の札**を読むので、
     相手の**直近の自席ターンの最後の main 行**（出した後の手札・使い残したドン）から読む（鍵も別）。
     他のモードは従来どおり**最初の行**（`opp`）から（1 ビットも変えない）。"""
     import crossing_bridge as CB
-    if CB.THETA_HAND_MODE in ("rule", "rule_don") and (seat, opp["t"]) in last_main:
+    if CB.THETA_HAND_MODE == "rule_don" and (seat, opp["t"]) in last_main:
         i = last_main[(seat, opp["t"])]
         g = _g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards, cache, ("last", seat, opp["t"]))
         if CB.THETA_HAND_MODE == "rule_don":
@@ -1508,8 +1508,7 @@ def main(argv=None):
                     help="**H-4g** 自分の耐久も相手と同じ守る側の計算で読む（`rule_don` 系のときだけ効く・既定 on・"
                          "`off`＝旧式〔自分は `threshold_of_me`〕。環境変数 `MIRROR=0` と同じ）")
     ap.add_argument("--theta-hand", default=_CB.THETA_HAND_MODE, choices=_CB.THETA_HAND_MODES,
-                    help="**T76** 耐久の手札項（`--w-mode curve` の `D` に効く）: `count`（`μ × 枚数`）／`rule_don`（既定・H-4・2026-10-04）／`cuttable_forced`（旧の既定）／"
-                         "`quality`（自分の手札の札ごとの `max(ΔH, ΔG)` の平均。1 行から読めるのは自分の手札だけ＝相手側は `μ` のまま）")
+                    help="**T76** 耐久の手札項（`--w-mode curve` の `D` に効く）: `rule_don`（既定・H-4・2026-10-04）／`cuttable_forced`（旧の既定）")
     ap.add_argument("--clock-hand", default=_TOM.CLOCK_HAND_MODE, choices=_TOM.CLOCK_HAND_MODES,
                     help="**T78** `--w-mode clock` の時計に手札の 2 つの価値を入れるか（`on`＝耐久は切れる札だけ・速さは今出せる体を足す・自席側のみ）")
     ap.add_argument("--theta-body", default=_CB.THETA_BODY_MODE, choices=_CB.THETA_BODY_MODES,
@@ -1587,7 +1586,7 @@ def main(argv=None):
                         for nm in ("close", "mid", "decided")},
            "seconds": round(time.time() - t0, 1)}
     import crossing_bridge as _CBs
-    if _CBs.THETA_HAND_MODE in ("rule", "rule_don"):
+    if _CBs.THETA_HAND_MODE == "rule_don":
         res["rule_stats"] = dict(_CBs.RULE_STATS)             # **H-4g**: 使った計画ごとの地平の縮み（冷たい実行と同じ数）
     txt = json.dumps(res, ensure_ascii=False, indent=2)
     print(txt)

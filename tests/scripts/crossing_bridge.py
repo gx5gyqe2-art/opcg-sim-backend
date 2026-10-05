@@ -56,31 +56,10 @@ SLOPES = ("hist", "theory")
 SLOPE_FLOOR = 1e-3
 
 
-#: **耐久の手札項の数え方**（T76・2026-09-17・§0.6 の残り 2）: `count`＝旧（`μ × 枚数`）／`quality`＝**札 1 枚あたりの実価格**
-#: （その席の手札の札ごとの `max(ΔH_play, ΔG_guard)`＝T67 の値の平均）を `μ` の代わりに掛ける。**新定数ゼロ**（T64〜T67 の器の写し）。
-#: **手札の中身はその席の行にしか無い**（記録に相手の手札は無い）ので、`quality` は守る席の直近の自席ターン開始の行から作る
-#: ＝**攻める席が持たない情報を使う**（「本当の耐久なら当たるのか」を先に確かめる段・推定器は次の T）。
-#: `play`＝**出す側だけ**（`ΔH_play`）／`guard`＝**守る側だけ**（`ΔG_guard`＝切って止められる分）＝どちらの半分が耐久なのかの切り分け（T76）。
-#: `cuttable`＝**T77（ユーザ提案「手札に 2 つの価値を持たせる」）の守る側**: **切れる札だけが `μ` を持つ**（カウンター値 > 0）・切れない札は 0。
-#: 根拠は**損害 `F` と耐久 `Θ` は同じものに同じ値段を付けなければならない**こと——`F` は切らせた札 1 枚を `μ` で数える（`attack_response.parts`）ので、
-#: `Θ` の手札項も切られる札 1 枚 `μ`。**切られない札（カウンター値 0）は一生 `F` に入らない**＝耐久ではない。T76 で「札の機会費用」を入れて失敗したのは、
-#: `F` が `μ` で数えている物に別の値段を付けたため。出す価値は耐久ではなく**速さ**へ（T77）。
-#: `cuttable_cx`＝**T99（2026-09-18・ユーザ指示「1から進めてください」）**: `cuttable` の**端数を落とす**形。
-#: **1 枚で 1 回止まるとは限らない**——規則は「攻撃側のパワー ≥ 対象のパワー」で命中するので、
-#: **超過 `x` の攻撃を止めるには `c(x)` 枚要る**（`c_of`）。よって切れる札は **`c(x)` 枚ひと組でしか働かず、
-#: 1 回分に足りない端数は一生 `F` に入らない＝耐久ではない**:
+#: **耐久の手札項の数え方**（T76 から H-4b まで）。残る値は 2 つ:
 #:
-#: ```
-#: Θ_hand = μ × c(x_max) × floor(切れる枚数 / c(x_max))       # c = 1 なら `cuttable` と同じ
-#: ```
-#:
-#: `x_max` は**その席が打てる最大の攻撃の超過**（`own_attackers_of` の最大＝相手が止めねばならない一番重い攻撃）。
-#: **新定数ゼロ**（`c_of` は T61 で測ってある費用曲線）。
-#: **根拠は実測**（T96）: `Θ` は**とどめのターンで実際に要った損害の 1.98 倍**で、残る膨らみは**手札の項**
-#: （0.181 対 要った損害 0.169 とほぼ同額）＝**切れる札が「必ず `μ` ずつ吸う」前提が終盤で破れている**。
-#: `cuttable_forced`＝**T100**: `cuttable_cx` の**粗さの是正**。T99 は `c(x_max)`（一番重い攻撃）1 本で
-#: 全部の札を割ったので**端数を捨てすぎた**。守り手は**攻撃ごとに止めるかを選ぶ**ので、
-#: **規則が決める「必ず守る回数」**（`board_theta` と同じ式・§7）で 1 回あたりの費用を出す:
+#: `cuttable_forced`＝**T100**: 切れる札の枚数を、**規則が決める「必ず守る回数」**（`board_theta` と同じ式・§7）の
+#: 1 回あたりの費用で組にする:
 #:
 #: ```
 #: G     = max(0, 攻撃の本数 − 相手のライフ − 相手のブロッカー)     必ず守る回数
@@ -90,27 +69,27 @@ SLOPE_FLOOR = 1e-3
 #:
 #: **G = 0**（全部受けても死なない）なら守る義務は無いので、**一番安い攻撃の `c`** に落とす
 #: （経済的な理由でなら守る＝`theta_of` の `max` と同じ考え方）。**新定数ゼロ**・**打ち筋に依らない**
-#: （本数・ライフ・ブロッカー・`c_of` だけ）。
-THETA_HAND_MODES = ("count", "quality", "play", "guard", "cuttable", "cuttable_cx", "cuttable_forced", "cuttable_seq",
-                    "rule", "rule_don")
+#: （本数・ライフ・ブロッカー・`c_of` だけ）。切れる札＝カウンター値 > 0（T77: `F` が切らせた札を `μ` で数えるので、
+#: `Θ` の手札項も切られる札 1 枚 `μ`）。
+#:
+#: `rule_don`＝**H-4b**（既定）: **守る席の実際のカウンター値・イベントのドン・ブロッカー・ライフ**から、
+#: 最善の守りで倒れるまでに切る札を DP で解き（H-4・導出は `HandRead` の上）、**攻め手の付与**を入れる
+#: （財布は 1 つ・攻め手の最善応答・速さの側も同じ計画を読む・導出は `attacker_ctx` の上）。攻め手が読めない席は
+#: 付与 0 の H-4 の形（`_rule_hand_term`）に落ちる。
+#:
+#: **波C（2026-10-05）で削除した値**: `count`／`quality`／`play`／`guard`（T76）・`cuttable`（T77・2026-09-17〜09-20 の既定）・
+#: `cuttable_cx`（T99）・`cuttable_seq`（T158）・`rule`（H-4・攻め手の付与なし）——凍結ブランチ
+#: `claude/theory-switches-final` で再現する。
+THETA_HAND_MODES = ("cuttable_forced", "rule_don")
 #: **出荷既定は `rule_don`**（2026-10-04・H-4・ユーザ決定「推奨を採用」・`2026-10-04_h4_rule_don.md`）。
 #: **旧の既定は `cuttable_forced`**（2026-09-20・ユーザ決定「3 本すべて」・T100 の形を T116 の窓の上限と対で採った）
 #: ——**`--theta-hand cuttable_forced` で再現できる**（N-3 の数字・74a51363 と同じ）。
-#: **既定は `cuttable`**（2026-09-17・ユーザ決定「1は変えましょうか」・T77）。以前の数字と比べるときは `--theta-hand count`。
-#: **`cuttable_seq`（T158）は切替として追加**——既定はまだ `cuttable_forced`（H-2 の計測待ち）。
-#: **`rule`（H-4・2026-09-26・ユーザ決定「4は正しい形で」）は切替として追加**——**守る席の実際のカウンター値・
-#: イベントのドン・ブロッカー・ライフ**から、最善の守りで倒れるまでに切る札を DP で解く（導出は `HandRead` の上）。
-#: **`rule_don`（H-4b・ユーザ決定「推奨の方法でお願いします」）**＝`rule` に**攻め手の付与**を入れた形（財布は 1 つ・
-#: 攻め手の最善応答・速さの側も同じ計画を読む・導出は `attacker_ctx` の上）。
 THETA_HAND_MODE = "rule_don"
 
 
-#: **1 枚あたりの価格の出どころ**（`hand_price_mean` の `part`）。`count` は `None`（＝`μ`）。
-#: **`cuttable_cx` は 1 枚あたりの価格そのものは `cuttable` と同じ**（`c(x)` のひと組み化は `threshold_parts` の側でやる）。
+#: **1 枚あたりの価格の出どころ**（`hand_price_mean` の `part`）。
 #: **知らない名前は `KeyError` で落とす**——黙って別の値で走らないため（T99 でこの穴を踏んだ）。
-THETA_HAND_PART = {"count": None, "quality": "dtotal", "play": "dh", "guard": "dg",
-                   "cuttable": "cuttable", "cuttable_cx": "cuttable", "cuttable_forced": "cuttable",
-                   "cuttable_seq": "cuttable", "rule": "rule", "rule_don": "rule"}
+THETA_HAND_PART = {"cuttable_forced": "cuttable", "rule_don": "rule"}
 
 
 
@@ -313,10 +292,13 @@ def hand_blocker_nu(sc, tok_row, ci_row, idx2cid, cards, opp_leader_power):
     return best
 
 
-def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="dtotal", don=None):
-    """**その席の手札 1 枚あたりの価格**（T76）＝自分の手札の札ごとの `max(ΔH_play, ΔG_guard)`（T67）の平均。
-    `part="dh"` なら出す側だけ（守る備えを外した切り分け）。手札が空なら `μ`（旧の数え方）。
-    来る攻撃・受ける損・ドンの枠はその席の行から採る（`hand_plan.search_context`）。"""
+def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="cuttable", don=None):
+    """**その席の手札 1 枚あたりの価格**（T76）。`part="cuttable"`＝`μ × 切れる札の割合`（T77）／
+    `part="rule"`＝それに手札の中身とドンを持たせた `HandRead`（H-4）。手札が空なら `μ`（`rule` は読めた上で 0）。
+    手札はその席の行から採る（`hand_plan.search_context`）。**波C**: 札ごとの `max(ΔH_play, ΔG_guard)` の平均
+    （`dtotal`／`dh`／`dg`・T76 の `quality`／`play`／`guard`）は削除——凍結ブランチ `claude/theory-switches-final` で再現。"""
+    if part not in ("cuttable", "rule"):
+        raise ValueError("hand_price_mean の part は 'cuttable' か 'rule'（%r）" % (part,))
     import hand_plan as HP
     ctx = HP.search_context(sc, tok_row, ci_row, idx2cid, cards, None)
     items = ctx["hand_items"]
@@ -329,12 +311,9 @@ def hand_price_mean(sc, tok_row, ci_row, idx2cid, cards, mu=MU, part="dtotal", d
         # 値（1 枚あたり）は渡されたドンで `cuttable` と同じに作る＝他の経路の数は `cuttable` と一致する。
         d_rule = float(np.asarray(sc)[SC_MY_DON]) if don is None else float(don)
         return hand_read_of_items(items, d_rule, mu, share_don=don)
-    if part == "cuttable":                       # T77: 切れる札だけが μ を持つ（1 枚あたりの平均にすると μ × 切れる枚数 / 枚数）
-        # **T110**: `don` を渡すと**カウンター・イベントはドンを払う**（`apply_counter` の規則）
-        return float(mu) * cuttable_share(items, don)
-    vals = [float(HP.card_deltas(items[:k] + items[k + 1:], it, ctx["caps"], ctx["xs"], ctx["take"])[part])
-            for k, it in enumerate(items)]
-    return float(np.mean(vals))
+    # T77: 切れる札だけが μ を持つ（1 枚あたりの平均にすると μ × 切れる枚数 / 枚数）
+    # **T110**: `don` を渡すと**カウンター・イベントはドンを払う**（`apply_counter` の規則）
+    return float(mu) * cuttable_share(items, don)
 
 
 #: **耐久の体の項の数え方**。`blockers`＝旧（**アクティブなブロッカーだけ**）／`all`＝**場の全キャラ**
@@ -476,20 +455,6 @@ def resting_blocker_term(tok, slots, opp_leader_power, ci_row=None, idx2cid=None
     return float(tot)
 
 
-def hand_absorb(n_cut, x_max, mu=MU):
-    """**手札が実際に吸える額**（T99）＝`μ × c(x_max) × floor(n_cut / c(x_max))`。
-
-    **1 回分に足りない端数は耐久ではない**——`c(x)` 枚そろわないと攻撃は止まらず、その札は一生 `F` に入らない。
-    `c(x_max) ≤ 1` なら従来どおり（1 枚 = 1 回）。`x_max` が負（通らない攻撃しかない）なら止める必要が無いので 0。"""
-    n = max(0.0, float(n_cut))
-    c = float(c_of(float(x_max)))
-    if c <= 0.0:
-        return 0.0                                   # 通らない攻撃＝守る必要が無い
-    if c <= 1.0:
-        return float(mu) * n
-    return float(mu) * c * math.floor(n / c)
-
-
 def forced_guards(xs, life_opp, n_blockers_opp):
     """**相手が必ず守る回数 `G`**（T100・`board_theta` と同じ式・§7）＝`max(0, 本数 − ライフ − ブロッカー)`。
     **打ち筋に依らない**——本数・ライフ・ブロッカーはすべて規則と盤面から出る。"""
@@ -511,30 +476,6 @@ def hand_absorb_forced(n_cut, xs, life_opp, n_blockers_opp, mu=MU):
     if c_eff <= 1.0:
         return float(mu) * n
     return float(mu) * c_eff * math.floor(n / c_eff)
-
-
-def hand_absorb_seq(n_cut, xs, mu=MU):
-    """**手札が実際に吸える額**（T158）＝**攻撃ごとに安い順へ `c(x_i)` 枚をそのまま割り当てる**貪欲法。
-
-    `hand_absorb`（T99）は**一番重い攻撃 1 本**の `c(x_max)` で全札を割り、
-    `hand_absorb_forced`（T100）は**必ず守る `G` 回の平均費用**で割る——どちらも
-    「同じ大きさの組」で割る粗さが残る（T99 が指した先）。**実際の守り手は攻撃ごとに
-    止めるかを選ぶ**（安く止まるものから止める・T64「一番安い札から切る」と同じ規則）ので、
-    **その席が受ける攻撃を `c(x)` の安い順に並べ、手札が尽きるまで攻撃ごとにその `c(x_i)`
-    枚をそのまま割り当てる**。**端数は一生 `F` に入らない**——足りなくなった攻撃で打ち切り、
-    それ以降の攻撃も止められない。通る攻撃が無ければ 0。"""
-    cs = sorted(c for c in (c_of(float(x)) for x in (xs or ())) if c > 0.0)
-    if not cs:
-        return 0.0                                   # 通らない攻撃しかない＝守る必要が無い
-    remaining = max(0.0, float(n_cut))
-    absorbed = 0.0
-    for c in cs:
-        if remaining >= c:
-            absorbed += c
-            remaining -= c
-        else:
-            break                                     # 端数は次以降の攻撃も止められない（一生 F に入らない）
-    return float(mu) * absorbed
 
 
 # ---------------------------------------------------------------------------------------------
@@ -599,7 +540,7 @@ def hand_absorb_seq(n_cut, xs, mu=MU):
 
 
 class HandRead(float):
-    """**H-4**: 守る席の手札の読み（`THETA_HAND_MODE=rule` のときだけ作る）。
+    """**H-4**: 守る席の手札の読み（`THETA_HAND_MODE=rule_don` のときだけ作る・`hand_price_mean(part="rule")`）。
 
     **`float` の値は `cuttable` と同じ**（`μ ×` 切れる割合）——補充・統計・`threshold_of_me`（`legacy`）など
     `g` を 1 枚あたりの価格として使う他の経路は、これまでどおり数として読む（形を変えない）。
@@ -672,7 +613,7 @@ def hand_read_of_items(items, don, mu=MU, share_don=None):
     return HandRead(val, cards, max(0.0, float(don)), len(items or ()))
 
 
-#: `rule` の読みの開示（`collect` が `rule` のときだけ `stats` に写す＝既定の出力は 1 バイトも変えない）
+#: `rule_don` の読みの開示（`collect` が `rule_don` のときだけ `stats` に写す）
 RULE_STATS = {}
 
 
@@ -1601,42 +1542,20 @@ def rule_don_plan_for(sc, tok, g_hand, attacker):
     return _rule_don_term(sc, tok, "opp", g_hand, attacker, count=False)[1]
 
 
-def hand_cut_count(g, hand_n, xs, life_opp, n_blockers_opp, mu=MU, mode=None):
-    """**N-3**: 耐久の手札の項が言う「**切る枚数**」（旧の式から値段 `μ` を外したもの）。
-
-    `count`＝全部の枚数・`cuttable`＝切れる枚数・`cuttable_cx`／`cuttable_forced`／`cuttable_seq`＝
-    それぞれ `hand_absorb`／`hand_absorb_forced`／`hand_absorb_seq` の `μ ×` の中身（同じ式・同じ端数の落とし方）。
-    `quality`／`play`／`guard` は 1 枚あたりの値段そのものを読み替える形なので数に戻せない＝`N-3` とは組めない（落とす）。"""
+def hand_cut_count(g, hand_n, xs, life_opp, n_blockers_opp, mu=MU):
+    """**N-3**: 耐久の手札の項が言う「**切る枚数**」（旧の式から値段 `μ` を外したもの）＝
+    `hand_absorb_forced` の `μ ×` の中身（`cuttable_forced`・同じ式・同じ端数の落とし方）。`rule_don` で守る席の
+    手札が読めなかったときもこの数に落ちる。**波C**: 他の数え方（`count`／`cuttable`／`cuttable_cx`／`cuttable_seq`）は
+    削除——凍結ブランチ `claude/theory-switches-final` で再現。"""
     n = max(0.0, float(hand_n))
-    hm = THETA_HAND_MODE if mode is None else mode
-    if hm == "count":
-        return n
-    if hm not in ("cuttable", "cuttable_cx", "cuttable_forced", "cuttable_seq"):
-        raise ValueError("N-3（cut price joint）は THETA_HAND_MODE=%r と組めない（数に戻せない）" % (hm,))
     n_cut = (float(g) / float(mu)) * n if mu else 0.0
-    if hm == "cuttable":
-        return n_cut
     cs = sorted(c for c in (c_of(float(x)) for x in (xs or ())) if c > 0.0)
-    if hm == "cuttable_cx":
-        c = float(c_of(float(max(xs)) if xs else -1.0))       # `threshold_parts_side` が `hand_absorb` に渡すのと同じ
-        if c <= 0.0:
-            return 0.0
-        return max(0.0, n_cut) if c <= 1.0 else c * math.floor(max(0.0, n_cut) / c)
     if not cs:
         return 0.0
-    if hm == "cuttable_forced":
-        gg = forced_guards(xs, life_opp, n_blockers_opp)
-        use = cs[:gg] if gg > 0 else cs[:1]
-        c_eff = sum(use) / len(use)
-        return max(0.0, n_cut) if c_eff <= 1.0 else c_eff * math.floor(max(0.0, n_cut) / c_eff)
-    remaining, absorbed = max(0.0, n_cut), 0.0
-    for c in cs:
-        if remaining >= c:
-            absorbed += c
-            remaining -= c
-        else:
-            break
-    return absorbed
+    gg = forced_guards(xs, life_opp, n_blockers_opp)
+    use = cs[:gg] if gg > 0 else cs[:1]
+    c_eff = sum(use) / len(use)
+    return max(0.0, n_cut) if c_eff <= 1.0 else c_eff * math.floor(max(0.0, n_cut) / c_eff)
 
 
 def shield_count_of(xs, n_blockers_opp, theta=THETA):
@@ -1775,29 +1694,16 @@ def threshold_parts_side(sc, tok, side, lam=LAM, mu=MU, g_hand=None, hand_blocke
             # 出すものも〕）＝歩きの的と同じもの。手札のブロッカーは計算の盤面に入っているので足し直さない。
             lp, hp, bp = _plan["theta_parts"]
             return (float(lp), float(hp), float(bp))
-    elif THETA_HAND_MODE == "rule":
-        # **H-4**: 守る席の実際の札から最善の守りを解く。読めない（`g_hand` が `HandRead` でない）ときは
-        # **既定の形（`cuttable_forced`）に落とし、数を開示する**（`RULE_STATS["rule_fallback"]`）。
-        rule_hand = _rule_hand_term(sc, tok, side, g_hand, mu)
-        if rule_hand is None:
-            RULE_STATS["rule_fallback"] += 1
     if rule_hand is not None:
         hand = rule_hand           # **B2**: 切った枚数 × 守り手の 1 枚の値段（`joint` なら `ḡ`・`flat` なら `μ`）
     elif cv is not None:
         # **N-3**: 数（切る枚数）は旧の式のまま、値段だけを守り手の手札の価値の減りで読む（`cut_price` の注）。
-        # `rule*` で守る席の手札が読めなかったときは既定の形（`cuttable_forced`）の数に落とす（H-4 と同じ）。
-        hand = float(cv.price(hand_cut_count(g, hand_n, xs, life, n_blk, mu,
-                                             mode=("cuttable_forced" if THETA_HAND_MODE in ("rule", "rule_don")
-                                                   else None))))
-    elif THETA_HAND_MODE in ("cuttable_cx", "cuttable_forced", "cuttable_seq", "rule", "rule_don"):
-        # **T99／T100／T158**: 切れる枚数は `g/μ × H`（`g` は 1 枚あたりの価格＝`μ ×` 切れる割合）。
+        # `rule_don` で守る席の手札が読めなかったときは `cuttable_forced` の数に落とす（H-4 と同じ）。
+        hand = float(cv.price(hand_cut_count(g, hand_n, xs, life, n_blk, mu)))
+    else:
+        # **T100**: 切れる枚数は `g/μ × H`（`g` は 1 枚あたりの価格＝`μ ×` 切れる割合）。
         n_cut = (g / float(mu)) * hand_n if mu else 0.0
-        if THETA_HAND_MODE in ("cuttable_forced", "rule", "rule_don"):
-            hand = hand_absorb_forced(n_cut, xs, life, n_blk, mu)
-        elif THETA_HAND_MODE == "cuttable_seq":
-            hand = hand_absorb_seq(n_cut, xs, mu)          # **T158**: 攻撃ごとに安い順へ割り当てる
-        else:
-            hand = hand_absorb(n_cut, max(xs) if xs else -1.0, mu)
+        hand = hand_absorb_forced(n_cut, xs, life, n_blk, mu)
     body = float(_body_term(tok, slots, body_ref))
     body += max(0.0, float(hand_blocker))           # **T106**: 手札から出せるブロッカー（召喚酔い無し）
     return (float(lam) * life, hand, body)
@@ -2940,12 +2846,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     # **N-3**: 切らせた札の値段を守り手の手札で読むなら、組めない形を先に落とす（黙って旧の値段に落ちない）
     cut_decks = None
     if CP.joint_on():
-        if THETA_HAND_MODE not in ("cuttable", "cuttable_cx", "cuttable_forced", "cuttable_seq", "rule", "rule_don"):
-            raise ValueError("N-3（cut price joint）は THETA_HAND_MODE=%r と組めない" % (THETA_HAND_MODE,))
         import deck_refill as _DR
         cut_decks = _DR.decks_by_seed(dirs)
     rows_out = []
-    _rule_stats_reset()    # **H-4**: `rule` の読みの開示（`rule` のときだけ下で `stats` に写す）
+    _rule_stats_reset()    # **H-4**: `rule_don` の読みの開示（`rule_don` のときだけ下で `stats` に写す）
     ledger = []            # (d) 単位の検算: 勝った席の F_end 対 Θ_start
     theta_check = []       # **T96**: 行ごとの `Θ` 対「そこから終局までに実際に要った損害」
     turn_harm = []         # 自席ターン番号 j ごとの損害（損害の輪郭＝加速を測る材料）
@@ -3096,22 +3000,21 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             continue
         # **T76**: 席ごとの手札 1 枚あたりの価格（自席の行からしか読めない）。守る席の直近の自席ターン開始の値を耐久に使う。
         g_self = {}
-        if THETA_HAND_MODE != "count":
-            part = THETA_HAND_PART[THETA_HAND_MODE]
-            for w in (0, 1):
-                for t in turn_seq[w]:
-                    sc, tok, ci = turn_last.get((w, t), turn_start[(w, t)])   # 出した後の手札（ターン最後の行）
-                    # **T110**: **カウンター・イベントはドンを払う**。切るドンは
-                    # **相手のターンに在るドン**＝自席ターンで使い残したアクティブ（この行の `sc[2]`）。
-                    don_left = float(np.asarray(sc)[SC_MY_DON])
-                    g_self[(w, t)] = hand_price_mean(sc, tok, ci, idx2cid, cards, mu, part, don_left)
-                    if THETA_HAND_MODE == "rule_don" and seat_decks:
-                        # **H-4e（E1）**: 取られたライフの札（その席のデッキの構成・手札に入る割合は `h`）・
-                        # **H-4f（F4）**: 毎ターン引く札
-                        g_self[(w, t)] = with_life_types(g_self[(w, t)], (seat_decks.get(seed_g) or (None, None))[w])
-                    if THETA_HAND_MODE == "rule_don":
-                        # **H-4f（F1）**: 手札から出すブロッカー（耐久の体の項・守る側の計算の盤面）
-                        g_self[(w, t)] = with_hand_blocker(g_self[(w, t)], sc, tok, ci, idx2cid, cards)
+        part = THETA_HAND_PART[THETA_HAND_MODE]
+        for w in (0, 1):
+            for t in turn_seq[w]:
+                sc, tok, ci = turn_last.get((w, t), turn_start[(w, t)])   # 出した後の手札（ターン最後の行）
+                # **T110**: **カウンター・イベントはドンを払う**。切るドンは
+                # **相手のターンに在るドン**＝自席ターンで使い残したアクティブ（この行の `sc[2]`）。
+                don_left = float(np.asarray(sc)[SC_MY_DON])
+                g_self[(w, t)] = hand_price_mean(sc, tok, ci, idx2cid, cards, mu, part, don_left)
+                if THETA_HAND_MODE == "rule_don" and seat_decks:
+                    # **H-4e（E1）**: 取られたライフの札（その席のデッキの構成・手札に入る割合は `h`）・
+                    # **H-4f（F4）**: 毎ターン引く札
+                    g_self[(w, t)] = with_life_types(g_self[(w, t)], (seat_decks.get(seed_g) or (None, None))[w])
+                if THETA_HAND_MODE == "rule_don":
+                    # **H-4f（F1）**: 手札から出すブロッカー（耐久の体の項・守る側の計算の盤面）
+                    g_self[(w, t)] = with_hand_blocker(g_self[(w, t)], sc, tok, ci, idx2cid, cards)
         # **T106**: 席ごとの「手札から出せるブロッカー 1 体の `ν`」（同じく自席の行からしか読めない）
         hb_self = {}
         for w in (0, 1):
@@ -3201,8 +3104,6 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         def g_for(defender, t):
             """守る席の手札 1 枚あたりの価格（その席の直近の自席ターン開始・無ければ `None`＝`μ`）。
             **勝った席と負けた席で分けて集計する**（T76 の切り分け: 勝つ席ほど手札を場に出していて 1 枚あたりが安い、を確かめる）。"""
-            if THETA_HAND_MODE == "count":
-                return None
             prev = [tt for tt in turn_seq[defender] if tt <= t]
             g = g_self.get((defender, prev[-1])) if prev else None
             if g is None:
@@ -3345,25 +3246,19 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 sr = shield_rate_of(own_attackers_of(tok, olp), _opp_active_blockers(tok), theta, mu)
                 bare = th_life + th_body
                 tau_h = tau_theory_of(dict(d0, theta=bare))          # 手札抜きの地平 τ0
-                # **H-4**: `g_for` は数を数える（`g_n` 等）ので `rule` のときだけ呼ぶ（既定の出力を変えない）
-                # `rule` は H-4 のまま（数え方も変えない）・`rule_don` 系は上で 1 回読んだ `_g_def` を使う
-                g_def = (g_for(1 - w, t) if THETA_HAND_MODE == "rule"
-                         else (_g_def if THETA_HAND_MODE == "rule_don" else None))
+                # `rule_don` は上で 1 回読んだ `_g_def` を使う（`g_for` は数を数えるので呼ばない）
+                g_def = _g_def if THETA_HAND_MODE == "rule_don" else None
                 rule_win = isinstance(g_def, HandRead)
                 _cv = CP.active()
                 _src = (shield_count_of(own_attackers_of(tok, olp), _opp_active_blockers(tok), theta)
                         if _cv is not None else 0.0)
 
                 def _cap(tau):
-                    if rule_win and THETA_HAND_MODE == "rule_don":
+                    if rule_win:
                         # **H-4b**: 窓は**選んだ計画のまま** DP だけ `⌈τ⌉` で打ち切る（計画は窓の前に 1 回だけ選ぶ）
                         n_t = int(math.ceil(max(0.0, float(tau)) - 1e-9))
                         h_w, _p = _rule_don_term(sc, tok, "opp", g_def, actx, mu, turns=n_t, plan=don_plan, count=False)
                         return min(th_hand, h_w)
-                    if rule_win:
-                        # **H-4**: 窓は**丸ごとの守備ターン `⌈τ⌉`** で開く＝同じ DP を地平で打ち切る（`SR·τ` の平均形は使わない）
-                        n_t = int(math.ceil(max(0.0, float(tau)) - 1e-9))
-                        return min(th_hand, _rule_hand_term(sc, tok, "opp", g_def, mu, turns=n_t, count=False))
                     if _cv is not None:
                         # **N-3**: 上限も「切れる枚数 × τ」の数のまま、値段だけ守り手の手札で読む
                         return min(th_hand, _cv.price(_src * max(0.0, tau)))
@@ -3549,7 +3444,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                         stats["tau_capped"] += int(tau_me >= RACE_CAP) + int(tau_opp >= RACE_CAP)
                         stats["tau_rows"] += 2
                 rows_out.append(rec)
-    if THETA_HAND_MODE in ("rule", "rule_don"):
+    if THETA_HAND_MODE == "rule_don":
         stats.update(RULE_STATS)                          # **H-4**（既定の出力は変えない）
     return rows_out, ledger, stats, turn_harm, theta_check
 
@@ -3945,10 +3840,9 @@ def main(argv=None):
                          "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）／"
                          "`none`（**体を `Θ` から外して速さの側へ移す**・T129・`--slope-block on` と対で使う）")
     ap.add_argument("--theta-hand", default=THETA_HAND_MODE, choices=THETA_HAND_MODES,
-                    help="**T76** 耐久の手札項: `count`（`μ × 枚数`）／`quality`（札ごとの `max(ΔH, ΔG)` の平均を掛ける）／"
-                         "`cuttable_forced`（旧の既定・T100・N-3 までの数字はこれ）／`cuttable_seq`（**T158**・攻撃ごとに安い順へ `c(x_i)` 枚を割り当てる）／"
-                         "`rule`（**H-4**・守る席の実際のカウンター値・イベントのドン・ブロッカー・ライフから最善の守りで切る札を解く）／"
-                         "`rule_don`（**既定・2026-10-04**・`rule` に攻め手の付与を入れた形）")
+                    help="**T76** 耐久の手札項: `cuttable_forced`（旧の既定・T100・N-3 までの数字はこれ）／"
+                         "`rule_don`（**既定・2026-10-04**・守る席の実際のカウンター値・イベントのドン・ブロッカー・ライフから"
+                         "最善の守りで切る札を解き、攻め手の付与を入れた形）。他の値は波C で削除（`claude/theory-switches-final`）")
     ap.add_argument("--pre-settle", default=PRE_SETTLE_MODE, choices=PRE_SETTLE_MODES,
                     help="**T138b** `W(D)` の較正が読む行から決着後（`lethal_rule.settled_map`）を除くか: "
                          "`off`（旧・全行）／`on`（宣言した席の行だけ除く）／"

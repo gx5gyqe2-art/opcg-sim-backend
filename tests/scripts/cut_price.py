@@ -424,11 +424,10 @@ def reserve_of_row(sc, tok, share, mu=MU, mlp=None):
     import crossing_bridge as CB
     sc = np.asarray(sc); tok = np.asarray(tok)
     xs = defender_attackers(sc, tok, mlp)
-    # **H-4g**: `rule`／`rule_don` の守る側の計算は札の枚数を自分で解く（予約はその結果に依る＝循環する）ので、`ḡ` を決める予約は
-    # 既定の形（`cuttable_forced`）の枚数で作る＝**どの手札の形でも同じ `ḡ`**（N-3 の既定と同じ値段で比べられる）。
-    mode = "cuttable_forced" if CB.THETA_HAND_MODE in ("rule", "rule_don") else None
+    # **H-4g**: `rule_don` の守る側の計算は札の枚数を自分で解く（予約はその結果に依る＝循環する）ので、`ḡ` を決める予約は
+    # `cuttable_forced` の枚数で作る＝**どの手札の形でも同じ `ḡ`**（N-3 の既定と同じ値段で比べられる）。
     return float(CB.hand_cut_count(float(mu) * float(share), float(sc[SC_MY_HAND]), xs, float(sc[SC_MY_LIFE]),
-                                   CB._own_active_blockers(tok), mu, mode=mode))
+                                   CB._own_active_blockers(tok), mu))
 
 
 # ---------------------------------------------------------------------------------------------------------------

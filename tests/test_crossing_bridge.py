@@ -66,6 +66,9 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
 
 #: **2026-09-20**: 既定が `THETA_HAND_MODE=cuttable_forced`（T116 と対で採用）になったので、
 #: **しきい値の算術を固定するテストは自分で形を明示する**（`μ × 枚数` の素の形を測っているもの）。
+#: **波C（2026-10-05）**: 素の形（`cuttable`＝`g × 枚数`）は削除したので、これらのテストは `cuttable_forced` で回し、
+#: 盤面に**超過 0 の攻撃を 1 本**（自分のリーダー＝相手リーダーと同じパワー・`_plain_tok`）置く——`c(0) = 1`・
+#: 守る義務 `G = 0` なので `cuttable_forced` は `g × 枚数` そのものになる（同じ算術を新しい形の上で固定する）。
 #: **既定そのものは上の `test_the_shipped_defaults_are_the_ones_we_decided` がラチェットする**ので、
 #: ここで形を固定するのは「算術の検算」と「既定の検算」を分けるためであって既定を隠すためではない。
 _PLAIN_HAND_TESTS = (
@@ -81,12 +84,12 @@ _PLAIN_HAND_TESTS = (
 
 @pytest.fixture(autouse=True)
 def _plain_hand(request):
-    """上の一覧のテストだけ **`THETA_HAND_MODE=cuttable`**（`g` をそのまま掛ける素の形）で回す。"""
+    """上の一覧のテストだけ **`THETA_HAND_MODE=cuttable_forced`**（盤面は `_plain_tok`＝`g` をそのまま掛ける形に落ちる）で回す。"""
     if request.node.name.split("[")[0] not in _PLAIN_HAND_TESTS:
         yield
         return
     old = CB.THETA_HAND_MODE
-    CB.set_theta_hand_mode("cuttable")
+    CB.set_theta_hand_mode("cuttable_forced")
     try:
         yield
     finally:
@@ -148,6 +151,14 @@ def _ra(*a, **k):
     k.setdefault("j0", 2)
     return CB.rate_at(*a, **k)
 
+def _plain_tok():
+    """**波C**: 自分のリーダーを相手リーダーと同じパワー（5000）にした空の盤面＝超過 0 の攻撃 1 本（`c(0) = 1`）。
+    `cuttable_forced` の手札の項が `g × 枚数` に落ちる（`_PLAIN_HAND_TESTS` が使う）。"""
+    tok = np.zeros((22, 24), np.float32)
+    tok[0, T.S_POWER] = 0.5
+    return tok
+
+
 def _sc(opp_life=3, opp_hand=4):
     sc = np.zeros(70, np.float32)
     sc[T.SC_OPP_LIFE], sc[T.SC_OPP_HAND] = opp_life, opp_hand
@@ -158,7 +169,7 @@ def _sc(opp_life=3, opp_hand=4):
 def test_the_threshold_is_the_opponents_endurance_in_price_units():
     """しきい値の形（`λL + gH + Σν_meas(吸える体)`）。**体の集合は `THETA_BODY_MODE` が決める**ので、
     旧 `blockers`（アクティブなブロッカーだけ・レストは数えない）を明示して算術を固定する（既定は T83 の `attackable`）。"""
-    tok = np.zeros((22, 24), np.float32)
+    tok = _plain_tok()                       # 波C: `cuttable_forced` が `g × 枚数` に落ちる盤面
     try:
         CB.set_theta_body_mode("blockers")                                           # 既定（T97）
         assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
@@ -231,10 +242,6 @@ def test_the_hand_pays_for_the_guards_the_rules_force():
         # **中盤以降（G = 0）**: 一番安い攻撃の `c` に落ちる＝**削らない**（T99 の削りすぎを避ける）
         assert CB.hand_absorb_forced(3, xs, 3, 0) == pytest.approx(3 * mu)
         assert CB.hand_absorb_forced(3, xs, 1, 2) == pytest.approx(3 * mu)
-        # **T99 との違いは中盤以降**——`c(x_max)` は**守る義務が無いターンでも削る**が、
-        # `forced` は `G = 0` なら削らない。そこが T99 の「削りすぎ」の正体。
-        assert CB.hand_absorb(3, max(xs)) < 3 * mu                       # T99 は中盤でも削る
-        assert CB.hand_absorb_forced(3, xs, 3, 0) == pytest.approx(3 * mu)   # T100 は削らない
     finally:
         T.set_cbar_mode(before)
     # 通る攻撃が無ければ 0
@@ -249,91 +256,16 @@ def test_every_hand_mode_has_a_price_source():
     import theory_bridge as TB  # noqa: F401  （同じ表を使うことの確認）
     for m in CB.THETA_HAND_MODES:
         assert m in CB.THETA_HAND_PART
-    assert CB.THETA_HAND_PART["count"] is None                       # `count` は `μ`
-    assert CB.THETA_HAND_PART["cuttable_cx"] == "cuttable"           # 1 枚あたりの価格は同じ
+    assert CB.THETA_HAND_PART == {"cuttable_forced": "cuttable", "rule_don": "rule"}   # 波C で 2 つだけ残る
+    with pytest.raises(ValueError):
+        CB.hand_price_mean(None, None, None, {}, None, part="dtotal")    # 削除した出どころは拒む
     with pytest.raises(KeyError):
         CB.THETA_HAND_PART["なにか"]
 
 
-def test_the_hand_absorbs_in_whole_guards():
-    """**T99**（ユーザ指示「1から進めてください」）: 切れる札は **`c(x)` 枚ひと組**でしか働かない。
-    規則は「攻撃側のパワー ≥ 対象のパワー」で命中するので、超過 `x` を止めるには `c(x)` 枚要る（`c_of`）＝
-    **1 回分に足りない端数は一生 `F` に入らない＝耐久ではない**。"""
-    mu = T.MU
-    # `c(x) ≤ 1`（超過 0）なら従来どおり 1 枚 = 1 回
-    assert T.c_of(0.0) == pytest.approx(1.0)
-    assert CB.hand_absorb(3, 0.0) == pytest.approx(3 * mu)
-    # 通らない攻撃しか無ければ守る必要が無い＝0
-    assert CB.hand_absorb(3, -1000.0) == 0.0
-    # `c(3000) = 2.78` → 3 枚では 1 回ぶんしか止まらない（端数 0.22 枚は捨てる）
-    c = T.c_of(3000.0)
-    assert c > 2.0
-    assert CB.hand_absorb(3, 3000.0) == pytest.approx(mu * c * 1.0)
-    assert CB.hand_absorb(3, 3000.0) < 3 * mu                       # 端数のぶん小さい
-    # **1 回分に足りなければ 0**（重い攻撃 ＋ 薄い手札＝終盤の形）
-    assert CB.hand_absorb(2, 3000.0) == 0.0
-    assert CB.hand_absorb(0, 0.0) == 0.0
-
-
-def test_the_hand_absorbs_by_price_order_per_attack():
-    """**T158**（T99 が指した先）: `hand_absorb` は一番重い攻撃 1 本の `c(x_max)` で全札を割り、
-    `hand_absorb_forced` は必ず守る `G` 回の**平均費用**で割る——どちらも「同じ大きさの組」で割る
-    粗さが残る。**実際の守り手は攻撃ごとに止めるかを選ぶ**ので、`cuttable_seq`（`hand_absorb_seq`）は
-    **その席が受ける攻撃を安い順に並べ、手札が尽きるまで攻撃ごとにその `c(x_i)` 枚をそのまま割り当てる**。"""
-    mu = T.MU
-    before = T.CBAR_MODE
-    try:
-        T.set_cbar_mode("strict")
-        xs = [0.0, 1000.0, 3000.0]                         # c = 1.00 / 1.28 / 2.78（安い順）
-        cs = sorted(T.c_of(x) for x in xs)
-        assert cs[0] < cs[1] < cs[2]
-        # 手札 3.5 枚: 1 本目・2 本目は丸ごと止まり、3 本目は端数が足りず打ち切り
-        n_cut = cs[0] + cs[1] + 1.5
-        got = CB.hand_absorb_seq(n_cut, xs, mu)
-        assert got == pytest.approx(mu * (cs[0] + cs[1]))
-        assert got < n_cut * mu                            # 端数のぶん小さい（一生 F に入らない）
-        # `hand_absorb`（x_max 1 本）とも `hand_absorb_forced`（G 本の平均費用）とも異なる値になる
-        # （`forced` は `G=2` の平均費用 `c_eff=(cs[0]+cs[1])/2` で `floor(n_cut/c_eff)=3` 回ぶん吸う）
-        assert got != pytest.approx(CB.hand_absorb(n_cut, max(xs), mu))
-        assert got != pytest.approx(CB.hand_absorb_forced(n_cut, xs, 1, 0, mu))
-        # 通らない攻撃しか無ければ守る必要が無い＝0
-        assert CB.hand_absorb_seq(3, [-1000.0], mu) == 0.0
-        assert CB.hand_absorb_seq(3, [], mu) == 0.0
-        # **1 回分に足りなければ 0**（一番安い攻撃の 1 回分にも届かない薄い手札）
-        assert CB.hand_absorb_seq(cs[0] - 0.5, xs, mu) == 0.0
-    finally:
-        T.set_cbar_mode(before)
-
-
-def test_the_hand_absorbed_by_price_order_does_not_carry_the_remainder_forward():
-    """**T158**: ちょうど 2 本ぶん割り切ったところで止めると、**余りは 0 で次の攻撃には回らない**
-    （3 本目の費用に満たない余りを 3 本目に一部だけ充てることはしない）。"""
-    mu = T.MU
-    before = T.CBAR_MODE
-    try:
-        T.set_cbar_mode("strict")
-        xs = [0.0, 1000.0, 3000.0]
-        cs = sorted(T.c_of(x) for x in xs)
-        # 手札はちょうど 1 本目 ＋ 2 本目の費用の和＝2 本ぶん止めて余りは正確に 0
-        n_cut = cs[0] + cs[1]
-        got = CB.hand_absorb_seq(n_cut, xs, mu)
-        assert got == pytest.approx(mu * (cs[0] + cs[1]))
-        # 3 本目に余りが回っていれば `got` はこれより大きくなるはずだが、そうならない
-        assert got < mu * (cs[0] + cs[1] + cs[2])
-        # 手札を少し増やしても（3 本目の費用 `cs[2]` ≥ 2 には届かない量）絵柄は変わらない
-        assert cs[2] > 1.0                             # 増分 0.5 が 3 本目には遠く届かないことの前提
-        got_more = CB.hand_absorb_seq(n_cut + 0.5, xs, mu)
-        assert got_more == pytest.approx(mu * (cs[0] + cs[1]))   # 3 本目は依然として 0 本ぶん
-    finally:
-        T.set_cbar_mode(before)
-
-
-def test_selecting_cuttable_seq_leaves_the_older_hand_modes_byte_for_byte():
-    """**「off は旧のまま」の作法**——`cuttable_seq`（T158）を `THETA_HAND_MODES` に足しても、
-    既存のモード（`count`／`cuttable`／`cuttable_forced`）を選んでいるときの `threshold_parts` の
-    出力は`threshold_parts_side` に元からある分岐（`cuttable_cx`＝`hand_absorb`／
-    `cuttable_forced`＝`hand_absorb_forced`／`count`＝素の `g × 枚数`）そのままで、
-    1 バイトも変わらない（`cuttable`（`_cx` 無し）は `g` の出どころが違うだけでこの分岐自体を通らない）。"""
+def test_cuttable_forced_threshold_hand_is_hand_absorb_forced_and_unknown_modes_are_rejected():
+    """`THETA_HAND_MODE=cuttable_forced` の `threshold_parts` の手札の項は `hand_absorb_forced` そのもの。
+    **知らない名前（波C で削除した値も）は `set_theta_hand_mode` で `ValueError`**（T99 で踏んだ「黙って別の値で走る」穴）。"""
     sc, tok = _mirror_row(life=1.0, hand=5.0, n_char=3, pw=1.0)
     olp = float(np.asarray(sc)[T.SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     xs = CB.own_attackers_of(tok, olp)
@@ -343,43 +275,15 @@ def test_selecting_cuttable_seq_leaves_the_older_hand_modes_byte_for_byte():
     mu = T.MU
     old = CB.THETA_HAND_MODE
     try:
-        CB.set_theta_hand_mode("count")
-        _, hand, _ = CB.threshold_parts(sc, tok)
-        assert hand == pytest.approx(mu * hand_n)
-        CB.set_theta_hand_mode("cuttable_cx")
-        _, hand, _ = CB.threshold_parts(sc, tok)
-        assert hand == pytest.approx(CB.hand_absorb(hand_n, max(xs) if xs else -1.0, mu))
         CB.set_theta_hand_mode("cuttable_forced")
         _, hand, _ = CB.threshold_parts(sc, tok)
         assert hand == pytest.approx(CB.hand_absorb_forced(hand_n, xs, life, n_blk, mu))
     finally:
         CB.set_theta_hand_mode(old)
-
-
-def test_cuttable_seq_is_wired_into_threshold_parts_and_rejects_unknown_modes():
-    """**T158**: `THETA_HAND_MODE=cuttable_seq` を選ぶと `threshold_parts` の手札の項が
-    `hand_absorb_seq` そのものになる。**知らない名前は `set_theta_hand_mode` で `ValueError`**
-    （T99 で踏んだ「黙って別の値で走る」穴を避ける）。"""
-    sc, tok = _mirror_row(life=1.0, hand=5.0, n_char=3, pw=1.0)
-    olp = float(np.asarray(sc)[T.SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-    xs = CB.own_attackers_of(tok, olp)
-    hand_n = float(np.asarray(sc)[T.SC_OPP_HAND])
-    mu = T.MU
-    old = CB.THETA_HAND_MODE
-    try:
-        CB.set_theta_hand_mode("cuttable_seq")
-        assert CB.THETA_HAND_MODE == "cuttable_seq"
-        _, hand, _ = CB.threshold_parts(sc, tok)
-        assert hand == pytest.approx(CB.hand_absorb_seq(hand_n, xs, mu))
-    finally:
-        CB.set_theta_hand_mode(old)
-    with pytest.raises(ValueError):
-        CB.set_theta_hand_mode("cuttable_seqq")
+    for gone in ("count", "quality", "play", "guard", "cuttable", "cuttable_cx", "cuttable_seq", "rule"):
+        with pytest.raises(ValueError):
+            CB.set_theta_hand_mode(gone)
     assert CB.THETA_HAND_MODE == old                                    # 失敗した切替は既定を汚さない
-
-
-# ---- H-4: 規則から導いた手札の項（`THETA_HAND_MODE=rule`） ---------------------------------------
-
 
 def _rule_row(life=0.0, hand=3.0, xs=(1000.0, 2000.0), blockers=()):
     """攻め手の行: 相手（守る側）のリーダー 5000・攻撃の超過 `xs`（リーダー＋キャラ）・相手のアクティブなブロッカー。"""
@@ -439,12 +343,7 @@ def test_the_rule_hand_beats_the_greedy_allocation_on_a_hand_built_case():
     assert _greedy_cheapest_first(cards, [1000.0, 2000.0], 0) == (0, 0)
     assert CB.rule_guard_plan([(c, 0.0) for c in cards], 0.0, [1000.0, 2000.0], [1000.0, 2000.0], [], 0, 1) == (3, 2)
     sc, tok = _rule_row(life=0.0, hand=3.0, xs=(1000.0, 2000.0))
-    old = CB.THETA_HAND_MODE
-    try:
-        CB.set_theta_hand_mode("rule")
-        _, hand, _ = CB.threshold_parts(sc, tok, g_hand=_read(cards))
-    finally:
-        CB.set_theta_hand_mode(old)
+    hand = CB._rule_hand_term(sc, tok, "opp", _read(cards), T.MU, count=False)   # `rule_don` の付与 0 の形（H-4）
     # 地平は「倒れるまで」: 1 ターン目で全部使い切り、2 ターン目は止められず倒れる＝切るのは 3 枚
     assert hand == pytest.approx(3 * T.MU)
     # 最適な割り当ては貪欲より多く止める（同じ札・同じ攻撃）
@@ -462,7 +361,6 @@ def test_the_rule_hand_reads_the_actual_counter_values():
         CB.set_theta_hand_mode("cuttable_forced")
         f_small = CB.threshold_parts(sc, tok, g_hand=float(_read([1000.0, 1000.0])))[1]
         f_big = CB.threshold_parts(sc, tok, g_hand=float(_read([2000.0, 2000.0])))[1]
-        CB.set_theta_hand_mode("rule")
         r_small = CB._rule_hand_term(sc, tok, "opp", _read([1000.0, 1000.0]), T.MU, turns=1, count=False)
         r_big = CB._rule_hand_term(sc, tok, "opp", _read([2000.0, 2000.0]), T.MU, turns=1, count=False)
     finally:
@@ -865,13 +763,13 @@ def test_the_purse_witness_reproduces_purse_plan_exactly():
 
 
 def test_rule_don_without_the_attackers_purse_falls_back_to_rule_and_counts_it():
-    """**H-4b**: 攻め手の財布が読めない（`attacker=None`・計画も無い）ときは付与 0 の `rule` と同じ値に落ち、数を残す。"""
+    """**H-4b**: 攻め手の財布が読めない（`attacker=None`・計画も無い）ときは付与 0 の H-4 の形（`_rule_hand_term`）と
+    同じ値に落ち、数を残す（切替の値 `rule` は波C で削除・関数は `rule_don` の落ち先として残る）。"""
     sc, tok = _rule_row(life=0.0, hand=3.0, xs=(1000.0, 2000.0))
     cards = [1000.0, 3000.0, 1000.0]
     old = CB.THETA_HAND_MODE
     try:
-        CB.set_theta_hand_mode("rule")
-        r = CB.threshold_parts(sc, tok, g_hand=_read(cards))[1]
+        r = CB._rule_hand_term(sc, tok, "opp", _read(cards), T.MU, count=False)
         CB.set_theta_hand_mode("rule_don")
         CB._rule_stats_reset()
         rd = CB.threshold_parts(sc, tok, g_hand=_read(cards))[1]
@@ -885,7 +783,7 @@ def test_rule_don_without_the_attackers_purse_falls_back_to_rule_and_counts_it()
 
 def test_the_ledger_state_reads_the_same_plan_as_the_ledger_rate():
     """**H-4b（T109・レビュー指摘 3）**: 帳簿（`kappa_vector.state_of_row`）の耐久は**速さ（`rate_of_row(plan=)`）と同じ計画**を読む。
-    計画を渡すとその並びで守りを解き、渡さなければ付与 0 の `rule` に落ちる（両側で付与 0＝食い違わない）。"""
+    計画を渡すとその並びで守りを解き、渡さなければ付与 0 の H-4 の形に落ちる（両側で付与 0＝食い違わない）。"""
     import kappa_vector as KV
     sc, tok = _rule_row(life=0.0, hand=1.0, xs=(1000.0,))
     old = CB.THETA_HAND_MODE
@@ -895,18 +793,18 @@ def test_the_ledger_state_reads_the_same_plan_as_the_ledger_rate():
         plan = {"xs_first": (2000.0,), "xs_later": (2000.0,), "k": (1,), "play": ()}
         st_plan = KV.state5_of_row(sc, tok, 0.1, 0.1, 1, g_opp=g, don_plan=plan)
         st_none = KV.state5_of_row(sc, tok, 0.1, 0.1, 1, g_opp=g)
-        CB.set_theta_hand_mode("rule")
-        st_rule = KV.state5_of_row(sc, tok, 0.1, 0.1, 1, g_opp=g)
     finally:
         CB.set_theta_hand_mode(old)
-    assert st_none[1] == pytest.approx(st_rule[1])                    # 計画なし＝付与 0
-    assert st_plan[1] == pytest.approx(st_rule[1] - T.MU)             # 付与 1 枚で 2000 では止まらない＝切る札 1 → 0
+    # 計画なし＝付与 0（H-4 の形の手札の項＝切る札 1 枚）
+    assert CB._rule_hand_term(sc, tok, "opp", g, T.MU, count=False) == pytest.approx(T.MU)
+    assert st_plan[1] == pytest.approx(st_none[1] - T.MU)             # 付与 1 枚で 2000 では止まらない＝切る札 1 → 0
 
 
 def test_selecting_rule_leaves_the_other_modes_and_falls_back_loudly_when_the_hand_is_unread():
-    """**H-4「off は旧のまま」**: `rule` を足しても既定（`cuttable_forced`）の手札の項は `hand_absorb_forced`
-    そのまま。`rule` でも**守る席の手札が読めない**（`g_hand` が `HandRead` でない＝`None` か数）ときは
-    **既定の形に落ち、その回数を `RULE_STATS` に残す**（黙って別の値にしない）。"""
+    """**H-4「off は旧のまま」**: `rule_don` を足しても旧の既定（`cuttable_forced`）の手札の項は `hand_absorb_forced`
+    そのまま。`rule_don` でも**守る席の手札が読めない**（`g_hand` が `HandRead` でない＝`None` か数）ときは
+    **`cuttable_forced` の形に落ち、その回数を `RULE_STATS` に残す**（黙って別の値にしない）。
+    （波C までは切替の値 `rule` で同じことを確かめていた——`rule` は削除、落ち方は `rule_don` と同じ。）"""
     sc, tok = _mirror_row(life=1.0, hand=5.0, n_char=3, pw=1.0)
     olp = float(np.asarray(sc)[T.SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
     xs = CB.own_attackers_of(tok, olp)
@@ -919,7 +817,7 @@ def test_selecting_rule_leaves_the_other_modes_and_falls_back_loudly_when_the_ha
         CB.set_theta_hand_mode("cuttable_forced")
         base = CB.threshold_parts(sc, tok)
         assert base[1] == pytest.approx(CB.hand_absorb_forced(hand_n, xs, life, n_blk, mu))
-        CB.set_theta_hand_mode("rule")
+        CB.set_theta_hand_mode("rule_don")
         CB._rule_stats_reset()
         assert CB.threshold_parts(sc, tok) == base                 # g_hand=None → 既定の形
         assert CB.threshold_parts(sc, tok, g_hand=0.7 * mu)[1] == pytest.approx(
@@ -927,8 +825,8 @@ def test_selecting_rule_leaves_the_other_modes_and_falls_back_loudly_when_the_ha
         assert CB.RULE_STATS["rule_fallback"] == 2 and CB.RULE_STATS["rule_n"] == 0
         CB.threshold_parts(sc, tok, g_hand=_read([1000.0] * 5))
         assert CB.RULE_STATS["rule_n"] == 1
-        # `THETA_HAND_PART` に `rule` が在る（`KeyError` で落ちない）・知らない名前は拒む
-        assert CB.THETA_HAND_PART["rule"] == "rule"
+        # `THETA_HAND_PART` の `rule_don` は `rule` の読み（`KeyError` で落ちない）
+        assert CB.THETA_HAND_PART["rule_don"] == "rule"
     finally:
         CB.set_theta_hand_mode(old)
     assert CB.THETA_HAND_MODE == old
@@ -937,7 +835,7 @@ def test_selecting_rule_leaves_the_other_modes_and_falls_back_loudly_when_the_ha
 def test_the_threshold_splits_into_life_hand_and_bodies():
     """**T96**（ユーザ指示「Θの方で進めてください」）: `threshold_parts` は `Θ` を **3 つの項**に割り、和は `threshold` と一致する。
     **どの項が終盤に縮まないか**を見るための切り分け。"""
-    tok = np.zeros((22, 24), np.float32)
+    tok = _plain_tok()                       # 波C: `cuttable_forced` が `g × 枚数` に落ちる盤面
     tok[7, T.S_POWER], tok[7, T.S_IS_CHAR], tok[7, T.S_IS_BLOCKER] = 0.6, 1.0, 1.0   # アクティブなブロッカー（既定で入る）
     sc = _sc(3, 4)
     life, hand, body = CB.threshold_parts(sc, tok)
@@ -963,7 +861,7 @@ def test_a_rested_blocker_is_not_endurance_now_but_comes_back():
         def info(self, cid):
             return {"blocker": True} if cid == "B" else {}
 
-    tok = np.zeros((22, 24), np.float32)
+    tok = _plain_tok()                       # 波C: `cuttable_forced` が `g × 枚数` に落ちる盤面
     tok[7, T.S_POWER], tok[7, T.S_IS_CHAR] = 0.6, 1.0
     tok[7, T.S_IS_REST] = 1.0                                    # レストのブロッカー（列 6 は 0 のまま＝符号化どおり）
     ci = np.zeros(22, np.int32); ci[7] = 1
@@ -1270,10 +1168,10 @@ def test_my_endurance_mirrors_the_threshold_and_the_curve_d_is_the_tau_differenc
 
 
 def test_theta_hand_mode_prices_the_hand_by_quality_instead_of_the_count(monkeypatch):
-    """**T76**: 耐久の手札項は `μ × 枚数`（`count`・旧）か **札 1 枚あたりの実価格 × 枚数**（`quality`）。
-    1 枚あたりの価格はその席の手札の札ごとの `max(ΔH_play, ΔG_guard)` の平均で、手札が空なら `μ` に落ちる。"""
+    """**T76**: 耐久の手札項は **札 1 枚あたりの価格 `g` × 枚数**。手札が空なら `μ` に落ちる。
+    （波C: 札ごとの `max(ΔH_play, ΔG_guard)` の平均＝`quality` は削除。`g` を受ける算術だけを固定する。）"""
     sc = _sc(3, 4); sc[T.SC_MY_LIFE], sc[T.SC_MY_HAND] = 5, 2
-    tok = np.zeros((22, 24), np.float32)
+    tok = _plain_tok()
     # 手札項だけが `g` で置き換わる（ライフ・体はそのまま）
     assert CB.threshold(sc, tok, g_hand=0.2) == pytest.approx(3 * T.LAM + 4 * 0.2)
     assert CB.threshold_of_me(sc, tok, g_hand=0.2) == pytest.approx(5 * T.LAM + 2 * 0.2)
@@ -1283,25 +1181,21 @@ def test_theta_hand_mode_prices_the_hand_by_quality_instead_of_the_count(monkeyp
     got = CB.curve_d_of_row(sc, tok, 0, prof, g_hand_of_me=0.2)
     assert got["theta_opp"] == pytest.approx(CB.threshold_of_me(sc, tok, g_hand=0.2))
     assert got["theta_me"] == pytest.approx(CB.threshold(sc, tok))                 # 相手側は μ のまま
-    # 1 枚あたりの価格＝札ごとの `dtotal` の平均（器は差し替えて算術だけ見る）
+    # 手札が空なら `μ`（器は差し替えて算術だけ見る）
     import hand_plan as HP
-    monkeypatch.setattr(HP, "search_context",
-                        lambda *a, **k: {"hand_items": [{"cid": "A"}, {"cid": "B"}], "caps": (1,), "xs": [], "take": 0.0})
-    monkeypatch.setattr(HP, "card_deltas", lambda rest, card, caps, xs, take: {"dtotal": {"A": 0.1, "B": 0.3}[card["cid"]]})
-    assert CB.hand_price_mean(sc, tok, np.zeros(24, np.int32), {}, None) == pytest.approx(0.2)
     monkeypatch.setattr(HP, "search_context", lambda *a, **k: {"hand_items": [], "caps": (1,), "xs": [], "take": 0.0})
     assert CB.hand_price_mean(sc, tok, np.zeros(24, np.int32), {}, None) == pytest.approx(T.MU)
     # 切替の検査
     with pytest.raises(ValueError):
         CB.set_theta_hand_mode("nope")
-    assert CB.THETA_HAND_MODE == "cuttable"          # **既定は T77 で `cuttable` になった**（ユーザ決定 2026-09-17）
+    assert CB.THETA_HAND_MODE == "cuttable_forced"   # `_PLAIN_HAND_TESTS` の形（既定は `rule_don`）
 
 
 def test_the_hand_carries_two_values_cuttable_for_the_threshold_and_playable_for_the_rate(monkeypatch):
     """**T77**（ユーザ提案「手札に 2 つの価値を持たせる」）: **守る価値は耐久へ**（切れる札だけが `μ`＝`F` が切らせた札を `μ` で数えるから）・
     **出す価値は速さへ**（今のドンで出せる体の攻撃の価格を 1 ターンの損害に足す）。"""
     sc = _sc(3, 4); sc[T.SC_MY_LIFE], sc[T.SC_MY_HAND], sc[T.SC_MY_DON] = 5, 2, 4
-    tok = np.zeros((22, 24), np.float32)
+    tok = _plain_tok()
     import hand_plan as HP
     # 耐久側: 4 枚中 2 枚がカウンターを持つ → 1 枚あたりは μ の半分（＝μ × 切れる枚数）
     items = [{"cid": "A", "counter": 2000.0}, {"cid": "B", "counter": 0.0},
@@ -1328,7 +1222,7 @@ def test_the_hand_carries_two_values_cuttable_for_the_threshold_and_playable_for
     assert CB.playable_attack_price(hand, cards, 2, olp) == pytest.approx(one)            # ドン 2 なら安い方だけ
     assert CB.playable_attack_price(hand, cards, 0, olp) == pytest.approx(0.0)
     assert CB.playable_attack_price([{"cid": "EV", "cost": 1, "counter": 0.0}], cards, 4, olp) == pytest.approx(0.0)
-    assert CB.THETA_HAND_MODE == "cuttable"   # **T77 の 2 値化**（速さの手札の項は 2026-10-05 から常に入る・切替は削除）
+    assert CB.THETA_HAND_MODE == "cuttable_forced"   # **T77 の 2 値化**（速さの手札の項は 2026-10-05 から常に入る・切替は削除）
 
 
 def test_the_endurance_counts_bodies_the_same_way_the_harm_side_does():
@@ -1337,7 +1231,7 @@ def test_the_endurance_counts_bodies_the_same_way_the_harm_side_does():
     `Θ` の体の項も**同じ関数の値**になる。`blockers`（旧）はアクティブなブロッカーだけ。"""
     sc = _sc(3, 4)
     sc[T.SC_MY_LEADER_POWER] = 0.5
-    tok = np.zeros((22, 24), np.float32)
+    tok = _plain_tok()                       # 波C: `cuttable_forced` が `g × 枚数` に落ちる盤面
     tok[7, T.S_POWER], tok[7, T.S_IS_CHAR] = 0.6, 1.0                                  # ブロッカーでないキャラ
     tok[8, T.S_POWER], tok[8, T.S_IS_CHAR], tok[8, T.S_IS_BLOCKER] = 0.5, 1.0, 1.0     # アクティブなブロッカー
     tok[9, T.S_POWER], tok[9, T.S_IS_CHAR], tok[9, T.S_IS_BLOCKER] = 0.5, 1.0, 1.0
@@ -1366,7 +1260,7 @@ def test_the_endurance_counts_only_what_cannot_be_walked_past():
     とどめのターンで 4.07 倍の過大）。**避けて通れないのはアクティブなブロッカーだけ**＝既定は `blockers`（T97）。"""
     sc = _sc(3, 4)
     sc[T.SC_MY_LEADER_POWER] = 0.5
-    tok = np.zeros((22, 24), np.float32)
+    tok = _plain_tok()                       # 波C: `cuttable_forced` が `g × 枚数` に落ちる盤面
     tok[7, T.S_POWER], tok[7, T.S_IS_CHAR] = 0.5, 1.0                                  # アクティブな非ブロッカー＝吸えない
     tok[8, T.S_POWER], tok[8, T.S_IS_CHAR], tok[8, T.S_IS_REST] = 0.5, 1.0, 1.0        # レストの体＝**避けて通れる**
     tok[9, T.S_POWER], tok[9, T.S_IS_CHAR], tok[9, T.S_IS_BLOCKER] = 0.5, 1.0, 1.0     # アクティブなブロッカー＝横取りできる
@@ -2056,15 +1950,16 @@ def test_the_side_wrapper_reproduces_the_opponent_formula_exactly():
 
 
 def test_the_asymmetry_is_exactly_the_cuttable_branch():
-    """**食い違いは手札の項だけ**——`count`（`g × 枚数`）なら両モードで一致する。"""
+    """**食い違いは手札の項だけ**——ライフと体の項は両モードで一致する（波C までは `count`＝`g × 枚数` で
+    合計の一致を見ていた・`count` は削除したので項ごとに見る）。"""
     sc, tok = _mirror_row()
     old = CB.THETA_HAND_MODE
     try:
-        CB.set_theta_hand_mode("count")
-        a = CB.threshold_of_me(sc, tok)
+        CB.set_theta_hand_mode("cuttable_forced")
+        a = CB.threshold_of_me_parts(sc, tok)
         CB.set_theta_side_mode("symmetric")
-        b = CB.threshold_of_me(sc, tok)
-        assert a == pytest.approx(b)                           # 手札の項が同じ式なら差は出ない
+        b = CB.threshold_of_me_parts(sc, tok)
+        assert a[0] == pytest.approx(b[0]) and a[2] == pytest.approx(b[2])   # 手札以外は同じ式
     finally:
         CB.set_theta_side_mode("legacy")
         CB.set_theta_hand_mode(old)
@@ -2419,7 +2314,8 @@ class _JointView:
 def test_the_defender_model_charges_the_joint_cut_price_and_flat_mu_otherwise():
     """**B2（T77 の対称）**: 切った札の値段は損害の側（攻撃の守る値段）と耐久の側（守る側の計算）で同じ数。`flat` は一律 `μ`・
     `joint` は N-3 と同じ予約の 1 枚あたりの平均 `ḡ`。受ける費用も `λ − h·ḡ`（`gbar`）。耐久の手札の項は
-    切った枚数 × その値段、命中の正味は受けた回数ごと、積む損害は切らせた札ごと。`rule`／`rule_don` は joint の中でも落ちない。"""
+    切った枚数 × その値段、命中の正味は受けた回数ごと、積む損害は切らせた札ごと。`rule_don` は joint の中でも落ちない
+    （攻め手の財布が無いので付与 0 の H-4 の形に落ちる・波C で切替の値 `rule` は削除）。"""
     import cut_price as CPm
     X = CB.rule_guard_plan_ex
     cards = [(2000.0, 0.0), (2000.0, 0.0)]
@@ -2435,15 +2331,12 @@ def test_the_defender_model_charges_the_joint_cut_price_and_flat_mu_otherwise():
             sc, tok = _rule_row(life=1.0, hand=2.0, xs=(0.0,))
             old = CB.THETA_HAND_MODE
             try:
-                for mode in ("rule", "rule_don"):
-                    CB.set_theta_hand_mode(mode)
-                    hand = CB.threshold_parts(sc, tok, g_hand=_read([2000.0, 2000.0]))[1]
-                    assert hand > 0.0                                      # joint の中でも落ちない
-                    if mode == "rule":
-                        flat_hand = None
-                        with CPm.defending(None):
-                            flat_hand = CB.threshold_parts(sc, tok, g_hand=_read([2000.0, 2000.0]))[1]
-                        assert hand / g == pytest.approx(flat_hand / T.MU)      # 同じ枚数・値段だけ違う
+                CB.set_theta_hand_mode("rule_don")
+                hand = CB.threshold_parts(sc, tok, g_hand=_read([2000.0, 2000.0]))[1]
+                assert hand > 0.0                                      # joint の中でも落ちない
+                with CPm.defending(None):
+                    flat_hand = CB.threshold_parts(sc, tok, g_hand=_read([2000.0, 2000.0]))[1]
+                assert hand / g == pytest.approx(flat_hand / T.MU)      # 同じ枚数・値段だけ違う
             finally:
                 CB.set_theta_hand_mode(old)
     finally:

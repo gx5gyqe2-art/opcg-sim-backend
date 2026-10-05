@@ -309,8 +309,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                                                            idx2cid, cards, theta, mu, deck_ids=dk)
                                            if KV.D_MODE == "theory" else None)
                 g_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
-            if CB.THETA_HAND_MODE in ("rule", "rule_don") and PL.is_own_turn(w, t):
-                # **H-4**: `rule` は守る席の**実際の札**を読むので、相手の手札は**その席のターンの最後の行**
+            if CB.THETA_HAND_MODE == "rule_don" and PL.is_own_turn(w, t):
+                # **H-4**: `rule_don` は守る席の**実際の札**を読むので、相手の手札は**その席のターンの最後の行**
                 # （出した後＝相手のターンに持っている手札・使い残したドン）から読む。値は上書きで最後の行が残る。
                 g_last_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
                 last_i_at_turn[(w, t)] = i
@@ -616,7 +616,7 @@ def main(argv=None):
     TO.apply_defender_power(a)                     # 2b
     out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency,
                   pre_settle=(a.pre_settle == "on"), parts=a.parts)
-    if CB.THETA_HAND_MODE in ("rule", "rule_don"):
+    if CB.THETA_HAND_MODE == "rule_don":
         out["rule_stats"] = dict(CB.RULE_STATS)               # **H-4g**: 使った計画ごとの地平の縮み
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:

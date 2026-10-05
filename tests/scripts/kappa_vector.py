@@ -436,11 +436,8 @@ def frame_rows_of(r, idx, last=False):
 
 
 def g_of_row(sc, tok, ci_row, idx2cid, cards):
-    """**その席の手札 1 枚あたりの価格**（T76／T79・帳簿の `_g_of_row` と同じ式）。
-    `THETA_HAND_MODE` が `count` なら `None`（＝`μ`）。"""
+    """**その席の手札 1 枚あたりの価格**（T76／T79・帳簿の `_g_of_row` と同じ式）。"""
     part = CB.THETA_HAND_PART[CB.THETA_HAND_MODE]
-    if part is None:
-        return None
     return CB.hand_price_mean(sc, tok, ci_row, idx2cid, cards, part=part)
 
 
