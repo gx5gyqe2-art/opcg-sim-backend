@@ -762,35 +762,22 @@ def test_the_opportunity_cost_is_what_the_don_would_have_earned_on_attacks():
     assert T.don_opportunity([0.0, 0.0], 4, 2) <= T.don_opportunity([0.0, 0.0], 4, 4)
 
 
-def test_play_cost_falls_back_to_the_flat_charge_without_a_board_and_under_flat_mode():
+def test_play_cost_falls_back_to_the_flat_charge_without_a_board():
     ctx = {"attackers": [0.0], "don_active": 10}
-    before = T.PLAY_COST_MODE
-    try:
-        T.PLAY_COST_MODE = "state"
-        assert T.play_cost_term(ctx, 3, T.MU) == pytest.approx(0.0)          # ドンが余る＝0
-        assert T.play_cost_term({}, 3, T.MU) == pytest.approx(3 * 0.66 * T.MU)  # 盤面なし＝定額
-        T.PLAY_COST_MODE = "flat"
-        assert T.play_cost_term(ctx, 3, T.MU) == pytest.approx(3 * 0.66 * T.MU)
-    finally:
-        T.PLAY_COST_MODE = before
+    assert T.play_cost_term(ctx, 3, T.MU) == pytest.approx(0.0)              # ドンが余る＝0
+    assert T.play_cost_term({}, 3, T.MU) == pytest.approx(3 * 0.66 * T.MU)   # 盤面なし＝定額
 
 
 def test_a_play_with_slack_don_is_priced_higher_than_under_the_flat_charge():
-    """ドンが余る局面の登場は、定額の費用を引いた従来より高い（＝出す理屈が出る）。"""
+    """ドンが余る局面の登場は、定額の費用を引いた従来より高い（＝出す理屈が出る・旧 `flat` の切替は 2026-10-05 に削除）。"""
     from opcg_sim.learned.train import plan_labels as PL
     cards = PL.Cards()
     cid = _vanilla_cid()
     base = {"theta": T.THETA, "mu": T.MU, "opp_leader_power": 5000.0, "my_leader_power": 5000.0,
             "r_turns": 4.0, "don_k": 1}
     slack = dict(base, attackers=[0.0], don_active=10.0)
-    before = T.PLAY_COST_MODE
-    try:
-        T.PLAY_COST_MODE = "state"
-        v_state = T.score_candidate(["PLAY"], cid, None, slack, cards)
-        T.PLAY_COST_MODE = "flat"
-        v_flat = T.score_candidate(["PLAY"], cid, None, slack, cards)
-    finally:
-        T.PLAY_COST_MODE = before
+    v_state = T.score_candidate(["PLAY"], cid, None, slack, cards)
+    v_flat = T.score_candidate(["PLAY"], cid, None, base, cards)        # 盤面なし＝従来の定額（旧 `flat` と同じ式）
     info = cards.info(cid)
     assert v_state - v_flat == pytest.approx(float(info.get("cost") or 0) * 0.66 * T.MU)
 

@@ -962,12 +962,10 @@ S_COST, S_IS_REST = 1, 3
 S_ATTACHED_DON = 2
 #: 「今攻撃できるか」の旗（`n_rel_feat.S_COLS_V13` の 5 番目）
 S_CAN_ATTACK = 5
-#: 登場・イベントの費用（ドン）の引き方（T43・2026-09-16）。
-#: `flat`＝従来＝`コスト × 0.66μ` を無条件に引く。**`state`＝機会費用**＝「そのドンを攻撃に付けていれば
+#: 登場・イベントの費用（ドン）の引き方（T43・2026-09-16）＝**`state`＝機会費用**＝「そのドンを攻撃に付けていれば
 #: 得られたはずの価値」だけを引く——攻撃手が居ない・ドンが余る局面では 0。**新定数なし**
-#: （付与 1 枚の価値は攻撃の価格 `attack_value` の増分＝理論の既存の規則）。
-PLAY_COST_MODES = ("flat", "state")
-PLAY_COST_MODE = "state"
+#: （付与 1 枚の価値は攻撃の価格 `attack_value` の増分＝理論の既存の規則）。盤面が渡らなければ従来の定額
+#: （`コスト × 0.66μ`）。無条件に定額を引く旧の `flat`（切替 `PLAY_COST_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
 
 
 def own_attackers_of(tok_row, opp_leader_power):
@@ -1068,8 +1066,8 @@ def don_misalloc(attackers_x, don_active, pin_idx, pin_k, theta=THETA, mu=MU):
 
 
 def play_cost_term(ctx, cost, mu, theta=THETA):
-    """登場・イベントの価格から引く費用。`state` で盤面が渡っていれば機会費用、無ければ従来の定額。"""
-    if PLAY_COST_MODE == "state" and ctx.get("attackers") is not None and ctx.get("don_active") is not None:
+    """登場・イベントの価格から引く費用。盤面が渡っていれば機会費用、無ければ従来の定額。"""
+    if ctx.get("attackers") is not None and ctx.get("don_active") is not None:
         return don_opportunity(ctx["attackers"], ctx["don_active"], cost, theta, mu)
     return float(cost) * 0.66 * mu
 
