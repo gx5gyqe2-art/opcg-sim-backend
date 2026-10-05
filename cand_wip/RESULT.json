@@ -1,0 +1,5 @@
+{"job":"cand-take","role":"measure","status":"done",
+ "inputs":{"base":"claude/cand-wip@b2ba3f47"},
+ "outputs":{"files":["cand_wip/results/cb_real_take.json","cand_wip/results/wc_real_take.json","cand_wip/results/rl_real_take.json","cand_wip/results/cb_syn_take.json","cand_wip/results/wc_syn_take.json","cand_wip/results/rl_syn_take.json"]},
+ "command":"CAND=slope_take=life bash cand_wip/run_cand.sh take",
+ "notes":"All 6 steps completed, no FAILED lines. The container restarted ~4 times during the first step (cb_real) when the session was idle between turns; the runner is resumable and was relaunched each time (plan store persisted on disk). Later steps ran uninterrupted while the session stayed in the foreground. No code or fixtures were changed. Results are raw jsons; no adoption judgement made here."}

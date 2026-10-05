@@ -11,3 +11,7 @@ done rl_real_take.json 01:57:25
 run cb_syn_take.json 01:57:25
 done cb_syn_take.json 02:24:18
 run wc_syn_take.json 02:24:18
+done wc_syn_take.json 02:27:23
+run rl_syn_take.json 02:27:23
+done rl_syn_take.json 03:02:17
+SESSION_DONE
