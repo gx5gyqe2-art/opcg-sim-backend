@@ -31,8 +31,7 @@ import theory_order as T  # noqa: E402
 _SHIPPED = {n: getattr(CB, n) for n in (
     "THETA_HAND_MODE", "THETA_BODY_MODE",
     "THETA_RETURN_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE",
-    "RATE_WALK_MODE", "RATE_DECAY_MODE", "RACE_MODE", "SLOPE_TAKE_MODE",
-    "THETA_HAND_WINDOW",)}
+    "RATE_WALK_MODE", "RATE_DECAY_MODE", "RACE_MODE", "SLOPE_TAKE_MODE")}
 
 
 def test_the_shipped_defaults_are_the_ones_we_decided():
@@ -46,7 +45,7 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
 
     **2026-09-20 のユーザ決定**（「効果があったものの規定はオンにしないの？」→「3 本すべて」）で 3 本動いた:
     歩きの成長を規則のドンから（T114・旧 `RATE_DON_MODE=flow`・同上）・`THETA_HAND_MODE=cuttable_forced` ＋
-    `THETA_HAND_WINDOW=horizon`（T116・手札は守る窓が開く分だけ的に入る）・
+    手札は守る窓が開く分だけ的に入る（T116・`horizon`・2026-10-05 に切替は削除）・
     `theory_order.W_ERR_MODE=rel`（T118・勝率を比で読む）。**T114 と T116 は対で採る**
     ——単独では合成が動かないが、**組むと両記録で 5 軸が改善する**（偏り・的中・σ_T・`curve` の偏り・`Θ`/要）。
     **代金は ±1 当たりと `curve` の的中、そして線形の橋**（`dG` の AUC 0.696 → 0.660／0.720 → 0.692）。
@@ -65,7 +64,6 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "RATE_WALK_MODE": "grow",                # T94
         "RATE_DECAY_MODE": "off",                # T95（切替として残す）
         "RACE_MODE": "static",                   # T90／T91／T104（切替として残す）
-        "THETA_HAND_WINDOW": "horizon",          # T116・2026-09-20
     }
 
 

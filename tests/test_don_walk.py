@@ -89,15 +89,6 @@ def test_the_window_cap_is_the_rate_times_the_turns_that_remain():
     assert min(10 * CB.MU, sr * 3.0) == pytest.approx(min(10 * CB.MU, 3.0 * sr))
 
 
-def test_the_window_modes_are_the_two_the_walk_can_produce():
-    """切替は `off`／`horizon`（手札抜きの地平で 1 回）／`fixpoint`（反復）の 3 つだけ。
-    **既定は `horizon`**（2026-09-20・ユーザ決定「3 本すべて」）。"""
-    assert CB.THETA_HAND_WINDOWS == ("off", "horizon", "fixpoint")
-    assert CB.THETA_HAND_WINDOW == "horizon"
-    with pytest.raises(ValueError):
-        CB.set_theta_hand_window("なにか")
-
-
 # ---------------------------------------------------------------- T120 相手のドン
 
 def test_the_opponents_budget_is_read_from_the_opponents_zones():

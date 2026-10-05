@@ -572,7 +572,7 @@ def hand_absorb_seq(n_cut, xs, mu=MU):
 #    ように、手札を攻撃に割り当てる（貪欲ではなく全部の割り当ての最大）。同じ本数なら**札の少ない方**
 #    （残った札は一生 `F` に入らない＝耐久ではない・T99 の原理）。1 ターンの中では**止めるのは安い攻撃から**
 #    （必要な合計が小さい攻撃を先に止めても本数は減らない＝交換の議論）。ターンをまたぐ使い方は DP で解く。
-# 7. **地平**: 守る席が倒れるまで（攻撃の並びは上の 1. で固定）。窓の上限（T116・`THETA_HAND_WINDOW`）が
+# 7. **地平**: 守る席が倒れるまで（攻撃の並びは上の 1. で固定）。窓の上限（T116）が
 #    効くときは、**手札抜きの歩きが届くまでのターン数 `⌈τ0⌉`** で打ち切る（攻撃は丸ごとのターンで来る）。
 #
 # **`Θ` の単位（T77 を守る）**: `Θ_hand = μ × 切る枚数`。**救ったライフの枚数 `k` は `λ` で数えない**——
@@ -2231,25 +2231,14 @@ def shield_count_of(xs, n_blockers_opp, theta=THETA):
 #: **T116**（2026-09-19）: **手札のうち「守る窓が存在する分」だけを的に入れる**（新定数ゼロ）。
 #: **規則**: 守り手はカウンターを**宣言された攻撃にしか切れない**（`shield_rate_of`＝1 守備ターンの上限 `SR`）。
 #: 残り `τ` ターンで開く窓は `SR × τ` までなので、**`min(手札の額, SR·τ)` が的に入る上限**。
-#: `τ` は歩き自身が出す（記録も打ち筋も見ない）:
-#: * `horizon`＝**手札抜きの地平** `τ0 = tau_grow(λL + Σν, …)` で 1 回だけ切る
-#: * `fixpoint`＝切った的で `τ` を引き直して 3 回反復（`τ` と的の不動点）
+#: `τ` は歩き自身が出す（記録も打ち筋も見ない）＝**手札抜きの地平** `τ0 = tau_grow(λL + Σν, …)` で 1 回だけ切る（`horizon`）。
 #: **T101 の規約どおり `τ` の式は `tau_theory_of` 1 本を通す**（別の式を書かない）。
 #: **実測（`2026-09-19_theta_window.md`）**: `cuttable_forced` と組むと残り 1 ターンの的の項が
 #: **1.3485 → 0.6309（実）／1.2601 → 0.4950（合成）**・平均 0.2433 → 0.0442／0.2961 → 0.0582。
 #: **6+ 帯の不足は動かない**——そこの不足は**体の項**（不足の 99.2%）で手札ではない（反証で判明）。
-THETA_HAND_WINDOWS = ("off", "horizon", "fixpoint")
-#: **出荷既定は `horizon`**（2026-09-20・ユーザ決定「3 本すべて」・`THETA_HAND_MODE=cuttable_forced` と対）。
-#: `fixpoint` は反復で `τ` が伸びるので切る額が減る＝**`horizon` の方が効く**（実測）。
-THETA_HAND_WINDOW = "horizon"
-
-
-def set_theta_hand_window(name):
-    global THETA_HAND_WINDOW
-    if name not in THETA_HAND_WINDOWS:
-        raise ValueError("unknown theta hand window: %r" % (name,))
-    THETA_HAND_WINDOW = name
-    return THETA_HAND_WINDOW
+#: **2026-09-20 から既定**（ユーザ決定「3 本すべて」）。旧の `off`（全部入る）と `fixpoint`（切った的で `τ` を引き直して
+#: 3 回反復・実測で `horizon` より効かない）（切替 `THETA_HAND_WINDOW`）は 2026-10-05 に削除——
+#: `claude/theory-switches-final` で再現できる。出力 JSON の `theta_hand_window` キーは定数 `"horizon"` のまま残す。
 
 
 def opp_attackers_of(tok, my_leader_power):
@@ -3657,7 +3646,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "theta_hand_blocker": "on", "hb_sum": 0.0, "hb_n": 0, "hb_hit": 0,
              "theta_return": THETA_RETURN_MODE, "theta_hand_place": "stock",
              # **T116**: 窓の上限で切った額（`thw_cut_sum`）と、切った行の数
-             "theta_hand_window": THETA_HAND_WINDOW, "thw_n": 0, "thw_cut_sum": 0.0,
+             "theta_hand_window": "horizon", "thw_n": 0, "thw_cut_sum": 0.0,
              "thw_hit": 0, "thw_tau_sum": 0.0,
              "shield_n": 0, "shield_sum": 0.0, "shield_rate_sum": 0.0,
              "g_sum": 0.0, "g_n": 0, "g_fallback": 0,
@@ -4056,7 +4045,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                 "r_deck": r_deck_of(1 - w),
                                 "f_real": f_real, "t_left": len(ts) - j, "j": j,
                                 "sched": sched}          # **T114**（`off` なら None）
-            if THETA_HAND_WINDOW != "off" and th_hand > 0.0 and not model_theta:
+            if th_hand > 0.0 and not model_theta:
                 # （**H-4f**: `rule_don` 系の計算は倒れるまでに実際に切る札だけを数える＝窓は計算の中にある）
                 # **T116**: 手札は**守る窓が開く分しか的に入らない**（`SR × τ`）。
                 # `τ` は**歩き自身**が出す（`tau_theory_of` の 1 本を通す＝T101 の規約）。
@@ -4088,9 +4077,6 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                         return min(th_hand, _cv.price(_src * max(0.0, tau)))
                     return min(th_hand, sr * max(0.0, tau))
                 cap = _cap(tau_h)
-                for _ in range(3 if THETA_HAND_WINDOW == "fixpoint" else 0):
-                    tau_h = tau_theory_of(dict(d0, theta=bare + cap))
-                    cap = _cap(tau_h)
                 stats["thw_n"] += 1; stats["thw_cut_sum"] += float(th_hand - cap)
                 stats["thw_hit"] += int(cap < th_hand - 1e-12); stats["thw_tau_sum"] += float(tau_h)
                 th_hand = cap
@@ -4694,10 +4680,6 @@ def main(argv=None):
                          "`cuttable_forced`（旧の既定・T100・N-3 までの数字はこれ）／`cuttable_seq`（**T158**・攻撃ごとに安い順へ `c(x_i)` 枚を割り当てる）／"
                          "`rule`（**H-4**・守る席の実際のカウンター値・イベントのドン・ブロッカー・ライフから最善の守りで切る札を解く）／"
                          "`rule_don`（**既定・2026-10-04**・`rule` に攻め手の付与を入れた形）")
-    ap.add_argument("--theta-hand-window", default=THETA_HAND_WINDOW, choices=THETA_HAND_WINDOWS,
-                    help="**T116** 手札のうち**守る窓が開く分だけ**を的に入れるか（`min(手札, SR·τ)`）: "
-                         "`off`（旧・全部入る）／`horizon`（手札抜きの `τ0` で 1 回切る）／"
-                         "`fixpoint`（切った的で `τ` を引き直して 3 回反復）")
     ap.add_argument("--pre-settle", default=PRE_SETTLE_MODE, choices=PRE_SETTLE_MODES,
                     help="**T138b** `W(D)` の較正が読む行から決着後（`lethal_rule.settled_map`）を除くか: "
                          "`off`（旧・全行）／`on`（宣言した席の行だけ除く）／"
@@ -4724,7 +4706,6 @@ def main(argv=None):
     TO.set_w_mover_mode(a.w_mover)                  # **T151-2**
     set_sched_t1_mode(a.sched_t1)                   # **T152**
     set_theta_hand_mode(a.theta_hand)
-    set_theta_hand_window(a.theta_hand_window)
     set_slope_block_mode(a.slope_block)
     set_rate_through_mode(a.rate_through)          # **T131**
     set_theta_side_mode(a.theta_side)              # **T133**

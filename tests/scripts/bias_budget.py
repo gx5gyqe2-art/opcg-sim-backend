@@ -283,7 +283,7 @@ def collect_budget(dirs, limit_games=0, theta=None, mu=None, require_static=True
                      "theta_return": CB.THETA_RETURN_MODE, "rate_decay": CB.RATE_DECAY_MODE,
                      "rate_walk": CB.RATE_WALK_MODE, "don_purse": "all",
                      "theta_don": "rule", "theta_hand": CB.THETA_HAND_MODE,
-                     "theta_hand_window": CB.THETA_HAND_WINDOW, "rate_don": "flow",
+                     "theta_hand_window": "horizon", "rate_don": "flow",
                      "rate_don_pay": True, "rate_ramp": 0.0},
            "games": stats.get("games"), "rows_out": len(rows_out), "blocks": len(blocks)}
     return out, {"turns": by_turn, "rows": by_row}
@@ -298,13 +298,11 @@ def main(argv=None):
                     help="的が動く構成でも強行する（分解は恒等式でなくなる）")
     # **T114／T116**: 切替ごとに分解を測り直せるようにする（**報告の数を再現する唯一の道**）
     ap.add_argument("--theta-hand", default=CB.THETA_HAND_MODE, choices=CB.THETA_HAND_MODES)
-    ap.add_argument("--theta-hand-window", default=CB.THETA_HAND_WINDOW, choices=CB.THETA_HAND_WINDOWS)
     ap.add_argument("--theta-return", default=CB.THETA_RETURN_MODE, choices=CB.THETA_RETURN_MODES,
                     help="**C-5c**: 既定 `untap` では的が動く＝恒等式として読むなら `off`")
     a = ap.parse_args(argv)
     CB.set_theta_return_mode(a.theta_return)
     CB.set_theta_hand_mode(a.theta_hand)
-    CB.set_theta_hand_window(a.theta_hand_window)
     out, _rows = collect_budget(a.src, a.games, require_static=a.require_static)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:

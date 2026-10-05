@@ -19,7 +19,7 @@ T137d は**開始からの累積** `R(t_declare)` を**その瞬間の残りの�
 
 * **1 行の器**（`kappa_vector.state_of_row`＝`crossing_bridge.threshold`・T137c／T137d と線形の帳簿が使う）
 * **交点の橋**（`crossing_bridge.collect` の `per_seat`＝`theta_check`）——1 行の器に無い**補正が 3 つ**掛かる:
-  ① **手札の窓**（T116・`THETA_HAND_WINDOW=horizon`＝`min(手札の項, SR·τ0)`）
+  ① **手札の窓**（T116・`min(手札の項, SR·τ0)`）
   ② **手札のブロッカー**（T106・体の項に足す）
   ③ **手札 1 枚あたりの価格 `g` の読み方**（橋はターン最後の行・使い残しのドンでイベントも切れる〔T110〕／
      1 行の器はターン最初の行・ドン無し）
