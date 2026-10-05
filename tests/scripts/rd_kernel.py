@@ -388,11 +388,9 @@ def _res_dict(r, any_blk):
             "nu_all": nu_all}
 
 
-def run_rs(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arrive, masks, h0, g=None):
-    """Rust の核で試行のループから先を解く。`(計画の組 (cut, stopped, plan), 使った地平 or None, 開示)`。
-    `plan` は `_rule_don_solve` と同じ辞書（同じキーの順）で、`horizon`／`horizon0` はまだ付けない。"""
+def solve_args(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arrive, masks, h0, g=None):
+    """`opcg_engine.rd_solve` に渡す引数の組（最後の覚え書きの引数を除く・記録した解の金型もこれを使う）。"""
     g = g or _G
-    E = engine()
     prices = g["_prices_of"](actx)
     pr = tuple(float(prices[k]) for k in ("lam", "lam_net", "mu", "olp", "mlp"))
     rest = tuple(actx.get("rest_blk") or ())
@@ -404,20 +402,31 @@ def run_rs(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arriv
             nu[m] = float(nu_fn(m + pr[3], pr[4]))
     budget = actx["budget"]
     flow = actx.get("flow") or [0.0] * (budget + 1)
-    att1 = actx["att1"]
     mk = [(m["cost"], m["b"], m["later_seq"], m["hits1"], m["p_atk"], m["p_eff"], m["caps"],
            [(s["paid"], s["eff"], s["fb"]) for s in m["steps"]]) for m in masks]
     lim = g["EX_STATE_BUDGET"]
+    return ([(float(c), float(d)) for c, d in cards_d or ()], float(don_d), _fl(blk), float(life),
+            None if turns is None else int(turns),
+            [(float(c), float(d), float(p)) for c, d, p in life_types or ()],
+            [(float(c), float(d), float(p)) for c, d, p in draw_types or ()], _fl(arrive), _fl(rest),
+            [float(x) for _s, x in actx["att1"]], int(budget), flow, bool(actx.get("no_attack_now")), pr,
+            list(nu.items()), float(g["PWR_EPS"]), float(g["_FEQ"]), actx["ds"], actx.get("a_tab") or [0.0],
+            actx.get("ar_tab") or [0.0], actx.get("e_tab") or [0.0], float(g["SLOPE_FLOOR"]), _race_cap(g), mk,
+            int(h0 or 0), None if lim is None else int(lim), bool(g["EX_LAYER_COUNT"]))
+
+
+def run_rs(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arrive, masks, h0, g=None):
+    """Rust の核で試行のループから先を解く。`(計画の組 (cut, stopped, plan), 使った地平 or None, 開示)`。
+    `plan` は `_rule_don_solve` と同じ辞書（同じキーの順）で、`horizon`／`horizon0` はまだ付けない。"""
+    g = g or _G
+    E = engine()
+    prices = g["_prices_of"](actx)
+    rest = tuple(actx.get("rest_blk") or ())
+    att1 = actx["att1"]
     no_now = bool(actx.get("no_attack_now"))
     h, mi, ks, paid, incr, val, tau, sched, r, st = E.rd_solve(
-        [(float(c), float(d)) for c, d in cards_d or ()], float(don_d), _fl(blk), float(life),
-        None if turns is None else int(turns),
-        [(float(c), float(d), float(p)) for c, d, p in life_types or ()],
-        [(float(c), float(d), float(p)) for c, d, p in draw_types or ()], _fl(arrive), _fl(rest),
-        [float(x) for _s, x in att1], int(budget), flow, no_now, pr, list(nu.items()),
-        float(g["PWR_EPS"]), float(g["_FEQ"]), actx["ds"], actx.get("a_tab") or [0.0], actx.get("ar_tab") or [0.0],
-        actx.get("e_tab") or [0.0], float(g["SLOPE_FLOOR"]), _race_cap(g), mk, int(h0 or 0),
-        None if lim is None else int(lim), bool(g["EX_LAYER_COUNT"]), _glob_defender())
+        *solve_args(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arrive, masks, h0, g),
+        _glob_defender())
     m = masks[mi]
     res = _res_dict(r, blk or rest or arrive)
     n = len(att1)

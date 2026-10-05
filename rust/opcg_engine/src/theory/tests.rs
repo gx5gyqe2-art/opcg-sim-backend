@@ -447,3 +447,200 @@ fn recorded_real_and_synthetic_dp_calls_replay_bit_identically() {
     assert!(n_real >= 60 && n_syn >= 60, "real={n_real} syn={n_syn}");
     assert!(n_cut > 0);
 }
+
+// ---------------------------------------------------------------------------------------------
+// 第 2a 段: `rd_solve` の記録の再生（計画の列挙・歩き・試行のループまで・Python 無し）
+
+/// gzip（Python の `gzip.open` が書く形・FNAME つき）をほどく。
+fn gunzip(raw: &[u8]) -> Vec<u8> {
+    assert!(raw.len() > 18 && raw[0] == 0x1f && raw[1] == 0x8b && raw[2] == 8, "gzip でない");
+    let flg = raw[3];
+    let mut i = 10;
+    if flg & 4 != 0 {
+        let xlen = raw[i] as usize | (raw[i + 1] as usize) << 8;
+        i += 2 + xlen;
+    }
+    for bit in [8u8, 16u8] {
+        if flg & bit != 0 {
+            while raw[i] != 0 {
+                i += 1;
+            }
+            i += 1;
+        }
+    }
+    if flg & 2 != 0 {
+        i += 2;
+    }
+    miniz_oxide::inflate::decompress_to_vec(&raw[i..raw.len() - 8]).expect("deflate")
+}
+
+fn hx(v: &serde_json::Value) -> f64 {
+    f64::from_bits(u64::from_str_radix(v.as_str().expect("hex"), 16).unwrap())
+}
+
+fn hxs(v: &serde_json::Value) -> Vec<f64> {
+    v.as_array().expect("list").iter().map(hx).collect()
+}
+
+fn hx_pairs(v: &serde_json::Value) -> Vec<(f64, f64)> {
+    v.as_array().unwrap().iter().map(|x| (hx(&x[0]), hx(&x[1]))).collect()
+}
+
+fn hx_triples(v: &serde_json::Value) -> Vec<(f64, f64, f64)> {
+    v.as_array().unwrap().iter().map(|x| (hx(&x[0]), hx(&x[1]), hx(&x[2]))).collect()
+}
+
+fn ints(v: &serde_json::Value) -> Vec<i64> {
+    v.as_array().unwrap().iter().map(|x| x.as_i64().unwrap()).collect()
+}
+
+#[test]
+fn recorded_rule_don_solves_replay_bit_identically() {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/rd_solve_golden.jsonl.gz");
+    let raw = std::fs::read(path).expect("記録した解（rd_solve_golden.jsonl.gz）が無い");
+    let text = String::from_utf8(gunzip(&raw)).unwrap();
+    let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
+    // 記録ごとに独立（4 本の糸に分ける・`make test` の時間を抑える）
+    let chunks: Vec<Vec<&str>> =
+        (0..4).map(|k| lines.iter().skip(k).step_by(4).copied().collect()).collect();
+    let parts: Vec<[usize; 5]> = std::thread::scope(|sc| {
+        let hs: Vec<_> = chunks.iter().map(|c| sc.spawn(move || replay_solves(c))).collect();
+        hs.into_iter().map(|h| h.join().unwrap()).collect()
+    });
+    let mut tot = [0usize; 5];
+    for p in parts {
+        for q in 0..5 {
+            tot[q] += p[q];
+        }
+    }
+    let [n_real, n_syn, n_frame, n_runs, n_cut] = tot;
+    assert!(n_real >= 60 && n_syn >= 60 && n_frame >= 8, "{n_real} {n_syn} {n_frame}");
+    assert!(n_runs >= 300 && n_cut >= 5, "{n_runs} {n_cut}");
+}
+
+/// 記録した解の行を再生する。`[実, 合成, 局面, 解いた数, 縮めた数]`。
+fn replay_solves(lines: &[&str]) -> [usize; 5] {
+    use super::plans::{run, Mask, SolveIn};
+    use super::sched::{StepIn, Tables};
+    let (mut n_real, mut n_syn, mut n_frame, mut n_runs, mut n_cut) = (0, 0, 0, 0, 0);
+    for line in lines {
+        let rec: serde_json::Value = serde_json::from_str(line).unwrap();
+        let src = rec["src"].as_str().unwrap().to_string();
+        let a = &rec["in"];
+        let masks: Vec<Mask> = a["masks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|m| Mask {
+                cost: m[0].as_i64().unwrap(),
+                b: m[1].as_i64().unwrap(),
+                later_seq: m[2].as_array().unwrap().iter().map(hxs).collect(),
+                hits1: hxs(&m[3]),
+                p_atk: hx(&m[4]),
+                p_eff: hx(&m[5]),
+                caps: ints(&m[6]),
+                steps: m[7]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|s| StepIn { paid: hx(&s[0]), eff: hx(&s[1]), fb: hx(&s[2]) })
+                    .collect(),
+            })
+            .collect();
+        let pr = hxs(&a["prices"]);
+        let (cards, blk, lt, dt, arrive, rest) = (
+            hx_pairs(&a["cards"]),
+            hxs(&a["blk"]),
+            hx_triples(&a["lt"]),
+            hx_triples(&a["dt"]),
+            hxs(&a["arrive"]),
+            hxs(&a["rest"]),
+        );
+        let (att1_x, flow, nu, ds, a_tab, ar_tab, e_tab) = (
+            hxs(&a["att1_x"]),
+            hxs(&a["flow"]),
+            hx_pairs(&a["nu"]),
+            hxs(&a["ds"]),
+            hxs(&a["a_tab"]),
+            hxs(&a["ar_tab"]),
+            hxs(&a["e_tab"]),
+        );
+        for run_rec in rec["runs"].as_array().unwrap() {
+            let no_now = a["no_now"].as_bool().unwrap();
+            let inp = SolveIn {
+                cards: &cards,
+                don: hx(&a["don"]),
+                blk: &blk,
+                life: hx(&a["life"]),
+                turns: run_rec["turns"].as_i64(),
+                life_types: &lt,
+                draw_types: &dt,
+                arrive: &arrive,
+                rest: &rest,
+                att1_x: &att1_x,
+                budget: a["budget"].as_i64().unwrap(),
+                flow: &flow,
+                no_now,
+                prices: (pr[0], pr[1], pr[2], pr[3], pr[4]),
+                nu: &nu,
+                eps: hx(&a["eps"]),
+                feq: hx(&a["feq"]),
+                tables: Tables {
+                    ds: &ds,
+                    a_tab: &a_tab,
+                    ar_tab: &ar_tab,
+                    e_tab: &e_tab,
+                    no_now,
+                    slope_floor: hx(&a["slope_floor"]),
+                    race_cap: hx(&a["race_cap"]),
+                },
+                masks: &masks,
+                h0: run_rec["h0"].as_i64().unwrap(),
+                limit: run_rec["limit"].as_u64().map(|x| x as usize),
+                layer_count: a["layer_count"].as_bool().unwrap(),
+            };
+            let o = run(&inp, None).unwrap_or_else(|e| panic!("{src}: {e:?}"));
+            let e = &run_rec["expect"];
+            let b = &o.best;
+            assert_eq!(o.h, e["h"].as_i64(), "{src} h");
+            assert_eq!(b.mask as u64, e["mask"].as_u64().unwrap(), "{src} mask");
+            assert_eq!(b.ks, ints(&e["ks"]), "{src} ks");
+            assert_eq!(b.paid, e["paid"].as_i64().unwrap(), "{src} paid");
+            for (name, got) in [("incr", b.incr), ("val", b.val), ("tau", b.tau)] {
+                assert!(bits_eq(got, hx(&e[name])), "{src} {name}: {got} vs {}", hx(&e[name]));
+            }
+            let es = hxs(&e["sched"]);
+            assert_eq!(b.sched.len(), es.len(), "{src} sched の長さ");
+            assert!(b.sched.iter().zip(&es).all(|(x, y)| bits_eq(*x, *y)), "{src} sched");
+            let r = &e["res"];
+            let rr = &b.res;
+            for (q, got) in [(0, rr.cut), (1, rr.stopped), (2, rr.alive), (3, rr.prevented), (5, rr.theta), (6, rr.nu_all)] {
+                assert!(bits_eq(got, hx(&r[q])), "{src} res[{q}]: {got} vs {}", hx(&r[q]));
+            }
+            let eh = hxs(&r[4]);
+            assert_eq!(rr.harms.len(), eh.len(), "{src} harms の長さ");
+            assert!(rr.harms.iter().zip(&eh).all(|(x, y)| bits_eq(*x, *y)), "{src} harms");
+            let st = ints(&e["stats"]);
+            let s = &o.stats;
+            assert_eq!(
+                vec![s.attempt_fail as i64, s.attempt_skipped as i64, s.count_calls as i64, s.count_fallback as i64],
+                st,
+                "{src} 試行の開示"
+            );
+            if let (Some(h), Some(h0)) = (o.h, run_rec["h0"].as_i64()) {
+                if run_rec["turns"].is_null() && h < h0 {
+                    n_cut += 1;
+                }
+            }
+            n_runs += 1;
+        }
+        if src.starts_with("real") {
+            n_real += 1;
+        } else if src.starts_with("syn") {
+            n_syn += 1;
+        } else {
+            n_frame += 1;
+        }
+    }
+    [n_real, n_syn, n_frame, n_runs, n_cut]
+}

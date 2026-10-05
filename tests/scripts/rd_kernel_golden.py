@@ -8,6 +8,11 @@
   （地平の縮めの道を通すため）。
 * `rust/opcg_engine/tests/fixtures/rd_dp_golden.jsonl` — 1 行 = 同じ解の中の守る側の動的計画の 1 呼び出し
   （採った計画の守り）。`cargo test` が Python 無しで Rust 単体で再生する。
+* **第 2a 段** `rust/opcg_engine/tests/fixtures/rd_solve_golden.jsonl.gz` — 1 行 = 1 つの `rule_don_solve` の
+  `opcg_engine.rd_solve` への入力の全部（Python の `_rule_don_masks`＝`rules_steps` の出力・`model_horizon` の地平・
+  ν の表を含む）と、予算／地平ごとの**Python の解き方の答え**（採った組・付与・支払い・値打ち・τ・歩きの列・守る側の
+  結果・試行の開示）。浮動小数は 16 桁の 16 進。`cargo test` が Python 無しで計画の列挙・歩き・試行のループまで再生する。
+  `python tests/scripts/rd_kernel_golden.py solve-golden` で作る（記録の 152 解 × 予算 2 と 8 局面 × 予算 2 ＋地平 2）。
 
 使い方:
 
@@ -42,6 +47,8 @@ import rd_kernel as RK  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(_HERE))
 GOLDEN = os.path.join(ROOT, "tests", "fixtures", "rd_kernel_golden.jsonl.gz")
 DP_GOLDEN = os.path.join(ROOT, "rust", "opcg_engine", "tests", "fixtures", "rd_dp_golden.jsonl")
+SOLVE_GOLDEN = os.path.join(ROOT, "rust", "opcg_engine", "tests", "fixtures", "rd_solve_golden.jsonl.gz")
+FRAMES = os.path.join(ROOT, "tests", "fixtures", "rd_speed_frames.json")
 #: 小さな予算（地平の縮めを通す）
 EXTRA_BUDGETS = (150,)
 
@@ -174,6 +181,106 @@ def cmd_remake(ref):
     write(recs)
 
 
+# ----------------------------------------------------------------------------------------------
+# 第 2a 段: `rd_solve` の金型（Rust 単体の再生用）
+
+_SPEED_KEYS = ("attempt_fail", "attempt_skipped", "count_calls", "count_fallback")
+
+
+def _hx(v):
+    import struct
+    return "%016x" % struct.unpack("<Q", struct.pack("<d", float(v)))[0]
+
+
+def _hxs(seq):
+    return [_hx(x) for x in seq]
+
+
+def _enc_solve_args(a):
+    (cards, don, blk, life, _turns, lt, dt, arr, rest, att1_x, budget, flow, no_now, pr, nu, eps, feq, ds, a_tab,
+     ar_tab, e_tab, floor, cap, masks, h0, _lim, layer_count) = a
+    return {"cards": [_hxs(c) for c in cards], "don": _hx(don), "blk": _hxs(blk), "life": _hx(life),
+            "lt": [_hxs(t) for t in lt], "dt": [_hxs(t) for t in dt], "arrive": _hxs(arr), "rest": _hxs(rest),
+            "att1_x": _hxs(att1_x), "budget": int(budget), "flow": _hxs(flow), "no_now": bool(no_now),
+            "prices": _hxs(pr), "nu": [_hxs(kv) for kv in nu], "eps": _hx(eps), "feq": _hx(feq), "ds": _hxs(ds),
+            "a_tab": _hxs(a_tab), "ar_tab": _hxs(ar_tab), "e_tab": _hxs(e_tab), "slope_floor": _hx(floor),
+            "race_cap": _hx(cap), "h0": int(h0), "layer_count": bool(layer_count),
+            "masks": [[int(c), int(b), [_hxs(x) for x in ls], _hxs(h1), _hx(pa), _hx(pe), [int(k) for k in caps],
+                       [_hxs(st) for st in steps]] for c, b, ls, h1, pa, pe, caps, steps in masks]}
+
+
+def _solve_case(p, budget, turns):
+    """Python の解き方（`py`）で 1 つ解き、`rd_solve` の入力と、Rust の答えの形にした期待値を返す。"""
+    cards, don, blk, life, ax, _t, lt, dt, arr = p
+    ax = dict(ax)
+    view = _AvgView(ax["cp"][1]) if ax["cp"][0] is not None else None
+    old = CB.EX_STATE_BUDGET
+    CB.EX_STATE_BUDGET = budget
+    for d in (CB._RULE_DON_CACHE, CB._RULE_EX_CACHE, CB._RULE_EX_MEMO, CB._RULE_EX_SETS, CB._RULE_EX_CTX):
+        d.clear()
+    RK.set_mode("py")
+    try:
+        with CP.defending(view):
+            before = [CB.EX_SPEED_STATS[k] for k in _SPEED_KEYS]
+            cut, st, plan = CB.rule_don_solve(cards, don, blk, life, ax, turns, lt, dt, arr)
+            stats = [CB.EX_SPEED_STATS[k] - b for k, b in zip(_SPEED_KEYS, before)]
+            masks = CB._rule_don_masks(cards, blk, life, ax, lt)
+            h0 = None if turns is not None else CB.model_horizon(ax, blk, int(max(0, round(float(life)))), arr)
+            args = RK.solve_args(cards, don, blk, life, ax, turns, lt, dt, arr, masks, h0, vars(CB))
+            h = plan.get("horizon", turns)
+            res = CB.rule_guard_plan_ex(cards, don, plan["xs_first"], None, blk, life, h, lt, CB._prices_of(ax),
+                                        later_seq=plan["later_seq"], rest_blk=tuple(ax.get("rest_blk") or ()),
+                                        arrive_blk=arr, draw_types=dt)
+    finally:
+        CB.EX_STATE_BUDGET = old
+    assert tuple(res["harms"]) == plan["harm_steps"] and res["theta"] == plan["theta"] and res["cut"] == cut
+    mi = [i for i, m in enumerate(masks) if tuple(m["play"]) == plan["play"]]
+    assert len(mi) == 1
+    exp = {"h": None if turns is not None else int(h), "mask": mi[0], "ks": [int(k) for k in plan["k"]],
+           "paid": int(plan["paid"]), "incr": _hx(plan["incr"]), "val": _hx(plan["value"]), "tau": _hx(plan["tau"]),
+           "sched": _hxs(plan["sched"]),
+           "res": [_hx(cut), _hx(st), _hx(res["alive"]), _hx(res["prevented"]), _hxs(res["harms"]),
+                   _hx(res["theta"]), _hx(res["nu_all"])],
+           "stats": stats if turns is None else [0, 0, 0, 0]}
+    return args, exp
+
+
+def _frame_problems():
+    with open(FRAMES, encoding="utf-8") as fh:
+        raw = json.load(fh)
+    out = []
+    for f in raw:
+        ax = dict(f["actx"])
+        for k in ("key", "cp", "rest_blk"):
+            ax[k] = _tup(ax[k])
+        out.append((f["src"], (f["cards"], f["don"], f["blk"], f["life"], ax, None, _tup(f["life_types"]),
+                               _tup(f["draw_types"]), _tup(f["arrive"]))))
+    return out
+
+
+def cmd_solve_golden():
+    with gzip.open(GOLDEN, "rt", encoding="utf-8") as fh:
+        recs = [json.loads(line) for line in fh if line.strip()]
+    cases = [(r["src"], args_of(r), [(r["budget"], None)] + [(e["budget"], None) for e in r["extra"]]) for r in recs]
+    cases += [("frame:" + src, p, [(300000, None), (150, None), (300000, 2)]) for src, p in _frame_problems()]
+    lines = []
+    for src, p, runs in cases:
+        enc_in, out_runs = None, []
+        for budget, turns in runs:
+            args, exp = _solve_case(p, budget, turns)
+            e_in = _enc_solve_args(args)
+            h0 = e_in.pop("h0")
+            if enc_in is None:
+                enc_in = e_in
+            assert e_in == enc_in, src                         # 入力は予算・地平に依らない
+            out_runs.append({"limit": budget, "turns": turns, "h0": h0, "expect": exp})
+        lines.append(json.dumps({"src": src, "in": enc_in, "runs": out_runs}, separators=(",", ":")))
+    with gzip.open(SOLVE_GOLDEN, "wt", encoding="utf-8", compresslevel=9) as fh:
+        for ln in lines:
+            fh.write(ln + "\n")
+    print("wrote %s (%d records, %d bytes)" % (SOLVE_GOLDEN, len(lines), os.path.getsize(SOLVE_GOLDEN)))
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -181,8 +288,11 @@ def main(argv=None):
     b.add_argument("paths", nargs="+")
     m = sub.add_parser("remake")
     m.add_argument("--ref", action="store_true")
+    sub.add_parser("solve-golden")
     a = ap.parse_args(argv)
-    if a.cmd == "build":
+    if a.cmd == "solve-golden":
+        cmd_solve_golden()
+    elif a.cmd == "build":
         cmd_build(a.paths)
     else:
         cmd_remake(a.ref)
