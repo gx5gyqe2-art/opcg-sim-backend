@@ -49,7 +49,7 @@ from theory_order import (DELTA, KO_P, LAM, MU, PWR_EPS, R_TURNS, S_IS_BLOCKER, 
                           attack_value_don, c_of, theta_take,
                           hand_ids_of, opp_bodies_of, own_attackers_of, score_candidate, slot_power, theta_of)
 
-import theory_order as TO  # noqa: E402  （T151-2: `--w-mover` の切替を渡す）
+import theory_order as TO  # noqa: E402
 import cut_price as CP  # noqa: E402  （N-3: 切らせた札の値段を守り手の手札で読む）
 
 SLOPES = ("hist", "theory")
@@ -4522,8 +4522,6 @@ def main(argv=None):
                     help="**T138b** `W(D)` の較正が読む行から決着後（`lethal_rule.settled_map`）を除くか: "
                          "`off`（旧・全行）／`on`（宣言した席の行だけ除く）／"
                          "`game`（**T151-3** どちらかの席の最初の宣言ターン以降を両席とも除く）")
-    ap.add_argument("--w-mover", default=TO.W_MOVER_MODE, choices=TO.W_MOVER_MODES,
-                    help="**T151-2** 手番の半ターン: `off`（旧）／`half`（`W(D + 1/2)`・規則から）")
     add_nu_mode_arg(ap)
     CP.add_cut_price_arg(ap)                        # **N-3**
     TO.add_defender_power_arg(ap)                   # 2b
@@ -4534,7 +4532,6 @@ def main(argv=None):
     TO.apply_defender_power(a)                      # 2b
     t0 = time.time()
     set_pre_settle_mode(a.pre_settle)               # **T138b**
-    TO.set_w_mover_mode(a.w_mover)                  # **T151-2**
     set_theta_hand_mode(a.theta_hand)
     set_slope_block_mode(a.slope_block)
     set_theta_side_mode(a.theta_side)              # **T133**

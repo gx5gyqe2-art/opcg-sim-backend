@@ -417,15 +417,15 @@ def streak_by_volatility_table(rows, n_q=STREAK_QUANTILES):
 
 
 def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel", pre_settle="on",
-            w_mover=None, settle_cond=None, sigma_floor=None):
+            settle_cond=None, sigma_floor=None):
     """記録を 1 度読み（決着前だけ）、優勢／劣勢・序盤〜終盤で割った較正を返す。
 
     **T151-3**: `pre_settle` は `crossing_bridge.PRE_SETTLE_MODES` のどれか（既定 `on`＝従来・`game`＝どちらかの
     席の最初の宣言ターン以降を両席とも落とす・`off`＝全行）。
-    **T151-2**: `w_mover`（`theory_order.W_MOVER_MODES`・手番の半ターン）。`None` なら今の値のまま。
-    相手の時計は常に同じ瞬間（`mirror`）から読む（`opp_clock` の切替は 2026-10-05 に削除・出力の欄は定数）。
+    **T151-2**: 相手の時計は常に同じ瞬間（`mirror`）から読み、手番の半ターン（`half`）を入れる（`opp_clock`／`w_mover`
+    の切替は 2026-10-05 に削除・出力の欄は定数）。
     **K-1／K-2**: `settle_cond`（`theory_order.SETTLE_COND_MODES`）・`sigma_floor`（`SIGMA_FLOOR_MODES`）。`None` なら今の値。"""
-    old = CB.PRE_SETTLE_MODE; old_wm = TO.W_MOVER_MODE
+    old = CB.PRE_SETTLE_MODE
     old_sc = TO.SETTLE_COND_MODE; old_sf = TO.SIGMA_FLOOR_MODE
     try:
         CB.set_pre_settle_mode(pre_settle)
@@ -433,21 +433,18 @@ def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel", pr
             TO.set_settle_cond_mode(settle_cond)
         if sigma_floor is not None:
             TO.set_sigma_floor_mode(sigma_floor)
-        if w_mover is not None:
-            TO.set_w_mover_mode(w_mover)
         rows_out, _ledger, stats, _th, _tc = CB.collect(dirs, limit_games, THETA, MU, "const")
         if sigma_rel is None:
             sigma_rel = CB.sigma_rel_for(dirs)
         rows = rows_with_p(rows_out, slope, sigma_rel, w_err)     # `p` は `w_mover` の下で出す
-        w_mover_used = TO.W_MOVER_MODE
     finally:
-        CB.set_pre_settle_mode(old); TO.set_w_mover_mode(old_wm)
+        CB.set_pre_settle_mode(old)
         TO.set_settle_cond_mode(old_sc); TO.set_sigma_floor_mode(old_sf)
     rows = add_volatility(rows, dirs)          # **T149g-1**: 各行に劣勢側デッキの v_opp を足す
     fs = favorite_split(rows)
     ss = stage_split(rows)
     return {"games": stats.get("games"), "n": len(rows), "sigma_rel": sigma_rel, "w_err": w_err,
-           "pre_settle": pre_settle, "opp_clock": "mirror", "w_mover": w_mover_used,
+           "pre_settle": pre_settle, "opp_clock": "mirror", "w_mover": "half",
            # **T151**: 両席の行をまとめた mean p／mean z（完全情報で対称なら mean p ≈ 0.5）と優勢側の行の比率
            "overall": {"mean_p": float(np.mean([r["p"] for r in rows])) if rows else None,
                        "mean_z": float(np.mean([r["z"] for r in rows])) if rows else None,
@@ -482,15 +479,13 @@ def main(argv=None):
     ap.add_argument("--w-err", default="rel", choices=("abs", "rel"))
     ap.add_argument("--pre-settle", default="on", choices=CB.PRE_SETTLE_MODES,
                     help="**T151-3** `on`（従来・宣言した席の行だけ除く）／`game`（両席とも除く）／`off`")
-    ap.add_argument("--w-mover", default=None, choices=TO.W_MOVER_MODES,
-                    help="**T151-2** 手番の半ターン: `off`（従来）／`half`（`W(D + 1/2)`）")
     ap.add_argument("--settle-cond", default=None, choices=TO.SETTLE_COND_MODES,
                     help="**K-1** 決着前の行で持ち主の今のターンを決着の段から外す（`on`）／対照（`whole`）")
     ap.add_argument("--sigma-floor", default=None, choices=TO.SIGMA_FLOOR_MODES,
                     help="**K-2** 幅に整数ターンの床 1/12 を足し、床を入れて測り直した σ_rel を引く")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
-    out = collect(a.src, a.games, a.slope, a.sigma_rel, a.w_err, a.pre_settle, a.w_mover,
+    out = collect(a.src, a.games, a.slope, a.sigma_rel, a.w_err, a.pre_settle,
                   a.settle_cond, a.sigma_floor)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:

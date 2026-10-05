@@ -436,30 +436,20 @@ def clock_scale(t_me, t_opp, mode="hyp"):
 #: `predict` の同点の扱い（`τ_me <= τ_opp` で勝ち）はこれと整合しているが、`Φ(D/σ)` は `D=0` で 0.5 を
 #: 返していた＝**手番の半ターンを落としていた**。従来の読み方（相手の時計を相手の前ターン開始から読む・
 #: T151-2 の `prev_start`・2026-10-05 に削除）では相手の時計が約 1 段古いぶん `D` が約 +1 されていたので、実質の中心は
-#: `−1`（半ターン**行き過ぎ**＝自席びいき）だった。`off`＝従来／`half`＝`W(D + 1/2)`。
+#: `−1`（半ターン**行き過ぎ**＝自席びいき）だった。`half`＝`W(D + 1/2)`（旧の `off` の切替 `W_MOVER_MODE` は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる）。
 #:
-#: **既定は `half`（2026-09-24 採用・ユーザ決定「推薦の通りでいきましょう」）。掛かる先は交点の橋の行の p だけ**
+#: **`half` を採用（2026-09-24・ユーザ決定「推薦の通りでいきましょう」）。掛かる先は交点の橋の行の p だけ**
 #: （`win_calib.probs_of` が `mover=True` で呼ぶ・行は**ターン開始**の 2 本の時計＝半ターンが正確な瞬間）。
 #: **1 行の器（線形の橋の κ・`relative_ledger`・`kappa_vector`・`kappa_needed`）には掛けない**（`mover=False` が既定）
 #: ——それらは**ターンの途中の行**で、手番の有利はターンの最初の手で +1/2・最後の手で −1/2 と行ごとに違うので、
 #: 一律 +1/2 は最初の手以外で行き過ぎる（T151 で `dG` が両記録で悪化した機構）。正しい形は「ターン内の進み具合で
 #: ずらす」＝T153 候補。それまでは掛けない（ターン全体で平均すればほぼ 0＝一律 +1/2 より誤差が小さい）。
-W_MOVER_MODES = ("off", "half")
-W_MOVER_MODE = "half"
-
-
-def set_w_mover_mode(mode):
-    global W_MOVER_MODE
-    if mode not in W_MOVER_MODES:
-        raise ValueError("w mover mode は %s のどれか" % (W_MOVER_MODES,))
-    W_MOVER_MODE = mode
-    return W_MOVER_MODE
 
 
 def mover_shift(mover=True):
-    """`W`／`w` に足す手番の半ターン（`half` かつ `mover` なら 0.5・それ以外は 0）。
+    """`W`／`w` に足す手番の半ターン（`mover` なら 0.5・それ以外は 0）。
     `mover`＝**ターン開始の 2 本の時計の行か**（交点の橋の `rows_out`＝`win_calib.probs_of`）。1 行の器は `False`。"""
-    return 0.5 if (mover and W_MOVER_MODE == "half") else 0.0
+    return 0.5 if mover else 0.0
 
 
 #: **K-2: 整数ターンの床**（2026-09-26・規則から・**当てはめた定数ではない**）。
@@ -515,7 +505,7 @@ def set_sigma_floor_mode(mode):
 #:
 #: `on`＝決着前の行（行に `settled_me=False`）で上の式・詰みのある行（`settled_me=True`・決着前フィルタ `off` の
 #: 参照測定で残る行）は `k ≥ 1` の同じ式。`whole`＝**対照**: 条件を掛けず（`k ≥ 1`）同じ整数ターンの式だけ使う
-#: （条件の効果と、割合を平均で置かない効果を分けて読むため）。`on`／`whole` は `W_MOVER_MODE=half`・
+#: （条件の効果と、割合を平均で置かない効果を分けて読むため）。`on`／`whole` は手番の半ターン（`mover`）・
 #: `W_ERR_MODE=rel`・`mover=True`・2 本の時計が在るときだけ掛かり、それ以外は従来の式。整数ターンを正確に数える
 #: ので `SIGMA_FLOOR_MODE`（床）はこの式には足さない（二重に数えない）——`on` の床は `σ_rel` の表（床を抜いた
 #: 連続の誤差）を選ぶことにだけ効く。既定は `off`（従来と 1 ビットも変わらない）。
@@ -601,14 +591,14 @@ def prob_of_d(d, sigma_d=None, t_me=None, t_opp=None, scale_mode="hyp", mover=Fa
 
     **T118**: `W_ERR_MODE == "rel"` かつ 2 本の時計が渡されたときは、物差しを
     `σ_rel × s(τ_me, τ_opp)` にする（`s` は 1 次同次＝比で読む）。`σ_rel` が無ければ `abs` に落ちる。
-    **T151-2**: `mover=True`（ターン開始の 2 本の時計の行）かつ `W_MOVER_MODE=half` なら `D + 1/2`（手番の半ターン）。
+    **T151-2**: `mover=True`（ターン開始の 2 本の時計の行）なら `D + 1/2`（手番の半ターン）。
     1 行の器（ターン途中の行）は `mover=False` のまま＝ずらさない（採用時のユーザ決定 2026-09-24・上の注）。
     **K-1**: `SETTLE_COND_MODE` が `on`／`whole` で、交点の橋の行（`mover=True`・`half`・`rel`・2 本の時計が在る）なら
     整数ターンの競争（`whole_turn_race_prob`）で読む。`first_open`＝**持ち主の今のターンが決着の段でありうるか**
     （決着前の行は `False`＝`on` なら `k_me ≥ 2` の条件）。
     **K-5**: `whole` の時計 1 本の幅は `σ_rel · max(1, τ)`（`whole_clock_scale`・`σ_rel` は `sigma_rel_whole` の表）。
     **K-2**: `SIGMA_FLOOR_MODE=on` かつ `mover=True` なら幅に整数ターンの床 1/12 を二乗和で足す。"""
-    if (SETTLE_COND_MODE != "off" and mover and W_MOVER_MODE == "half" and W_ERR_MODE == "rel"
+    if (SETTLE_COND_MODE != "off" and mover and W_ERR_MODE == "rel"
             and sigma_d is None and SIGMA_REL is not None and t_me is not None and t_opp is not None
             and scale_mode == "hyp"):                     # 2 本への分け方は `hyp`（`s² = τ_me² + τ_opp²`）だけが整合
         k0 = 2 if (SETTLE_COND_MODE == "on" and not first_open) else 1

@@ -43,11 +43,11 @@ def test_whole_is_the_shipped_default():
 
 @pytest.fixture(autouse=True)
 def _restore_modes():
-    old = (T.SETTLE_COND_MODE, T.SIGMA_FLOOR_MODE, T.W_ERR_MODE, T.SIGMA_REL, T.W_MOVER_MODE, CB.PRE_SETTLE_MODE)
+    old = (T.SETTLE_COND_MODE, T.SIGMA_FLOOR_MODE, T.W_ERR_MODE, T.SIGMA_REL, CB.PRE_SETTLE_MODE)
     T.set_settle_cond_mode("off")      # 以下の代数は旧の Φ の形（off）を基準に書いてある
     yield
     T.set_settle_cond_mode(old[0]); T.set_sigma_floor_mode(old[1]); T.set_w_err_mode(old[2])
-    T.set_sigma_rel(old[3]); T.set_w_mover_mode(old[4]); CB.set_pre_settle_mode(old[5])
+    T.set_sigma_rel(old[3]); CB.set_pre_settle_mode(old[4])
 
 
 def _phi(x):
@@ -73,7 +73,7 @@ def test_both_switches_default_off_and_reject_unknown_names():
 
 def test_off_is_bit_identical_to_the_t154_formula_and_ignores_first_open():
     """`off`／`off` は `Φ((D + 1/2)/(σ_rel·s))` そのもの（T151／T154 の式）で、`first_open` を見ない。"""
-    T.set_w_err_mode("rel"); T.set_sigma_rel(0.3078); T.set_w_mover_mode("half")
+    T.set_w_err_mode("rel"); T.set_sigma_rel(0.3078)
     for d, tm, to in _GRID:
         s = math.sqrt(tm * tm + to * to)
         want = 0.5 if s == 0 else 0.5 * (1.0 + math.erf((float(d) + 0.5) / ((0.3078 * s) * math.sqrt(2.0))))
@@ -199,7 +199,7 @@ def test_whole_turn_race_tends_to_the_floor_formula_when_the_clocks_are_wide():
 
 
 def test_settle_cond_routes_prob_of_d_through_the_race_only_on_turn_start_rows():
-    T.set_w_err_mode("rel"); T.set_sigma_rel(0.3); T.set_w_mover_mode("half")
+    T.set_w_err_mode("rel"); T.set_sigma_rel(0.3)
     tm, to = 0.8, 1.6
     T.set_settle_cond_mode("on")
     p_closed = T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=True, first_open=False)
@@ -213,8 +213,8 @@ def test_settle_cond_routes_prob_of_d_through_the_race_only_on_turn_start_rows()
     tm = 1.4                                                                      # τ ≥ 1 なら幅は `on` と同じ σ·τ
     assert T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=True, first_open=False) == pytest.approx(
         T.whole_turn_race_prob(tm, to, 0.3 * tm, 0.3 * to, 1))
-    T.set_settle_cond_mode("on"); T.set_w_mover_mode("off")                       # 半ターンを使わない構成には掛けない
-    assert T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=True, first_open=False) == pytest.approx(
+    T.set_settle_cond_mode("on")                                                 # 半ターンを使わない行（1 行の器）には掛けない
+    assert T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=False, first_open=False) == pytest.approx(
         _phi((to - tm) / (0.3 * math.hypot(tm, to))))
 
 
@@ -223,7 +223,7 @@ def test_settle_cond_routes_prob_of_d_through_the_race_only_on_turn_start_rows()
 def test_whole_width_is_the_number_of_turns_still_to_play():
     """時計 1 本の幅の尺度は `max(1, τ)`＝今のターンは τ がいくら小さくても丸ごと 1 ターン打たれる。"""
     assert [T.whole_clock_scale(x) for x in (0.0, 1e-9, 0.4, 1.0, 3.2)] == [1.0, 1.0, 1.0, 1.0, 3.2]
-    T.set_w_err_mode("rel"); T.set_sigma_rel(0.4); T.set_w_mover_mode("half"); T.set_settle_cond_mode("whole")
+    T.set_w_err_mode("rel"); T.set_sigma_rel(0.4); T.set_settle_cond_mode("whole")
     for d, tm, to in _GRID:
         want = T.whole_turn_race_prob(tm, to, 0.4 * max(1.0, tm), 0.4 * max(1.0, to), 1)
         assert T.prob_of_d(d, t_me=tm, t_opp=to, mover=True) == want
@@ -241,7 +241,7 @@ def test_whole_with_the_turn_width_matches_a_simulation_of_the_rule(tm, to):
 def test_whole_never_says_exactly_0_or_1_at_tiny_clocks():
     """従来の幅 `σ·τ` は `τ = 0` で幅 0＝「いま届く」を確率 1 と言っていた（p がちょうど 1／相手なら 0）。"""
     assert T.whole_turn_race_prob(0.0, 2.0, 0.0, 0.4 * 2.0, 1) == 1.0                # 弱点（従来の幅）
-    T.set_w_err_mode("rel"); T.set_sigma_rel(0.4); T.set_w_mover_mode("half"); T.set_settle_cond_mode("whole")
+    T.set_w_err_mode("rel"); T.set_sigma_rel(0.4); T.set_settle_cond_mode("whole")
     tiny = (0.0, 1e-9, 0.01, 0.3, 0.9)
     for tm in tiny:
         for to in tiny + (1.5, 3.0):
@@ -360,7 +360,7 @@ def test_the_fixture_carries_the_whole_table():
 
 
 def test_off_stays_bit_identical_after_whole_was_used():
-    T.set_w_err_mode("rel"); T.set_sigma_rel(0.3078); T.set_w_mover_mode("half")
+    T.set_w_err_mode("rel"); T.set_sigma_rel(0.3078)
     base = [T.prob_of_d(d, t_me=tm, t_opp=to, mover=True) for d, tm, to in _GRID]
     T.set_settle_cond_mode("whole")
     [T.prob_of_d(d, t_me=tm, t_opp=to, mover=True) for d, tm, to in _GRID]
