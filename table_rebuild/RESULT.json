@@ -1,0 +1,73 @@
+{
+ "job": "table-rebuild",
+ "role": "measure",
+ "status": "partial",
+ "inputs": {
+  "base": "claude/cpu-spec-improvements-yw91jd@4ec745f",
+  "records": "claude/sigma-wip@18131d5"
+ },
+ "outputs": {
+  "branch": "claude/table-rebuild",
+  "head": "0f71b52 (the RESULT.json commit follows it)",
+  "files": [
+   "docs/reports/2026-10-05_table_rebuild_rust.md",
+   "table_rebuild/.gitignore",
+   "table_rebuild/proposed_test_fix.patch",
+   "table_rebuild/results/after_cb_real.json",
+   "table_rebuild/results/after_cb_syn.json",
+   "table_rebuild/results/after_pa_real.json",
+   "table_rebuild/results/after_pa_syn.json",
+   "table_rebuild/results/after_rl_real.json",
+   "table_rebuild/results/after_rl_syn.json",
+   "table_rebuild/results/after_wc_real.json",
+   "table_rebuild/results/after_wc_syn.json",
+   "table_rebuild/results/before_cb_real.json",
+   "table_rebuild/results/before_cb_syn.json",
+   "table_rebuild/results/before_pa_real.json",
+   "table_rebuild/results/before_pa_syn.json",
+   "table_rebuild/results/before_rl_real.json",
+   "table_rebuild/results/before_rl_syn.json",
+   "table_rebuild/results/before_wc_real.json",
+   "table_rebuild/results/before_wc_syn.json",
+   "table_rebuild/results/s2_cb_real.json",
+   "table_rebuild/results/s2_cb_syn.json",
+   "table_rebuild/results/s3_tb_real.json",
+   "table_rebuild/results/s3_tb_syn.json",
+   "table_rebuild/run.sh",
+   "table_rebuild/write_table.py",
+   "tests/fixtures/f_identity/base_theory_bridge_079e73b8.json",
+   "tests/fixtures/f_identity/base_transition_ledger_079e73b8.json",
+   "tests/fixtures/harm_profile.json",
+   "tests/test_kappa_vector.py",
+   "table_rebuild/RESULT.json"
+  ]
+ },
+ "table": {
+  "real (contour)": "[0.0007,0.0783,0.1059,0.1799,0.2554,0.2666,0.2164,0.1955...] -> [0.0007,0.0775,0.1073,0.186,0.2597,0.2809,0.2277,0.226...]",
+  "syn (contour)": "[0.0004,0.0682,0.1121,0.2,0.2468,0.2155,0.1884,0.1531,0.1426,0.1001...] -> [0.0004,0.0601,0.1035,0.1965,0.248,0.2283,0.2022,0.1708,0.1558,0.0971...]",
+  "theory_slope.real": "[0,0.0773,0.1196,0.1949,0.2444,0.3,0.3114,0.336...] -> [0,0.0953,0.1036,0.1875,0.2678,0.3401,0.3108,0.3728...]",
+  "theory_slope.syn": "[0,0.0815,0.1231,0.186,0.2277,0.2453,0.2526,0.2438,0.2225,0.2162...] -> [0,0.0947,0.1227,0.1913,0.274,0.298,0.2964,0.2951,0.3223,0.2315...]",
+  "sigma_t.blockers.real": "0.994 -> 1.242",
+  "sigma_t.blockers.syn": "1.154 -> 2.133",
+  "sigma_rel.blockers.theory.real": "0.3078 -> 0.2383",
+  "sigma_rel.blockers.theory.syn": "0.3301 -> 0.2737",
+  "sigma_rel.blockers.curve.real": "0.2456 -> 0.2262",
+  "sigma_rel.blockers.curve.syn": "0.2693 -> 0.2567",
+  "sigma_rel_whole.blockers.theory.real": "0.4146 -> 0.387",
+  "sigma_rel_whole.blockers.theory.syn": "0.4068 -> 0.3875",
+  "sigma_rel_whole.blockers.curve.real": "0.4282 -> 0.3874",
+  "sigma_rel_whole.blockers.curve.syn": "0.4481 -> 0.4427",
+  "w_bar.blockers.real": "0.1894 -> 0.0948",
+  "w_bar.blockers.syn": "0.2238 -> 0.1589",
+  "n_scale0": "theory real 0 / syn 18; curve real 2 / syn 20"
+ },
+ "predictions": {
+  "P1": "hit: win_calib rel AUC real 0.8076->0.8076, syn 0.7241->0.7241",
+  "P2": "hit: after logloss real 0.5266 (<0.692), syn 0.6314 (<0.693); syn worsened vs before 0.6252, real improved vs 0.5273",
+  "P3": "miss: abs_kappa bias real -0.180 -> -0.1835 (not toward -0.09); sep real 0.561->0.5905, syn bias -0.127->-0.117, sep 0.360->0.414 (small, predicted direction). relative_ledger does not read the table w_bar (kappa denominator is theory_order.W_BAR=0.5/R_TURNS; only theory_bridge calls set_w_bar), so the hypothesis cannot be tested by rewriting the table",
+  "P4": "hit (trivially): crossing_bridge theory sign_accuracy 0.7048/0.6602 before and after; crossing_bridge default output reads no table value",
+  "P5": "hit: measured theory sigma_rel 0.2383 / 0.2737 vs table 0.3078 / 0.3301 (both down)"
+ },
+ "make_test": "cargo 441 passed / pytest 2032 passed, 2 failed, 12 skipped (red)",
+ "notes": "Status partial only because make test is red on 2 inequality tests in tests/test_crossing_bridge.py (sigma_t: blockers < attackable fails for syn 2.133 vs untouched 1.724; w_bar: blockers > attackable fails for real 0.0948 vs 0.127, and real > 0.5/R=0.121 fails). These compare against the untouched attackable keys / a code constant, not pinned values, so not edited; proposed patch at table_rebuild/proposed_test_fix.patch (makes test_crossing_bridge.py 111 passed; full make test with patch not run). Expectations updated: test_kappa_vector profile_th_for real[1] 0.0773->0.0953, syn[1] 0.0815->0.0947; f_identity/base_theory_bridge_079e73b8.json and base_transition_ledger_079e73b8.json regenerated after verifying the old table reproduces them bit-for-bit (diff is table-only). Contour converged in one pass: crossing_bridge output before vs s2 identical in all 647 fields (it never reads the fixture), so steps 1-2 were not repeated. Under the default SETTLE_COND_MODE=whole, win_calib / pre_settle_asymmetry / relative_ledger read sigma_rel_whole, not sigma_rel. Container restarted twice during step 0 (detached setsid jobs died with it); rerun as harness-tracked jobs, no data lost. Timings with Rust + plan store: crossing_bridge real 6 min / syn ~18 min, theory_bridge real 20 min / syn 65 min. Report: docs/reports/2026-10-05_table_rebuild_rust.md."
+}
