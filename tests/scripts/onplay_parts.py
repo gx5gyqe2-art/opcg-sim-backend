@@ -133,7 +133,6 @@ def main(argv=None):
     TO.add_cbar_mode_arg(ap)
     EV.add_search_price_arg(ap)
     PR.add_hand_meas_arg(ap)
-    EV.add_play_now_arg(ap)
     import hand_plan as _HP
     _HP.add_inflow_arg(ap)
     _HP.add_cond_clock_arg(ap)
@@ -144,13 +143,12 @@ def main(argv=None):
     TO.apply_cbar_mode(a)
     EV.apply_search_price(a)
     PR.apply_hand_meas(a)
-    EV.apply_play_now(a)
     _HP.apply_inflow_mode(a)
     _HP.apply_cond_clock_mode(a)
     t0 = time.time()
     rows, stats = collect(a.src, a.limit_games)
     res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "search_price": "plan",
-           "hand_meas": PR.HAND_MEAS_MODE, "play_now": EV.PLAY_NOW_MODE, "inflow": _HP.INFLOW_MODE, "cond_clock": _HP.COND_CLOCK_MODE, "stats": stats,
+           "hand_meas": PR.HAND_MEAS_MODE, "play_now": "hand", "inflow": _HP.INFLOW_MODE, "cond_clock": _HP.COND_CLOCK_MODE, "stats": stats,
            "summary": summarise(rows, a.min_card_rows),
            "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)

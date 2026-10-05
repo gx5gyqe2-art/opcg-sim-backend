@@ -2331,31 +2331,11 @@ def apply_search_price(a):
     return "plan"
 
 
-#: **「手札から出す」効果（`PLAY_CARD`・zone HAND）の価格の規約**（T70・2026-09-17・ユーザ決定「着手してください」）:
-#: `hand`＝**今の手札に絞り込みに合う札が在ればその札の値（体 `ν` ＋ 登場時効果 − μ）・無ければ 0**（出す札そのものは除く）／
-#: `full`＝旧（合う札が在るものとして満額 `ν̄ − μ`）。状態（`st["search_ctx"]`）が無い行は `hand` でも `full` に落ちる。
+#: **「手札から出す」効果（`PLAY_CARD`・zone HAND）の価格の規約**（T70・2026-09-17・ユーザ決定「着手してください」）＝`hand`:
+#: **今の手札に絞り込みに合う札が在ればその札の値（体 `ν` ＋ 登場時効果 − μ）・無ければ 0**（出す札そのものは除く）。
+#: 状態（`st["search_ctx"]`）が無い行は旧（合う札が在るものとして満額 `ν̄ − μ`）に落ちる。状態が在っても満額で読む切替
+#: `PLAY_NOW_MODE=full` は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。出力 JSON の `play_now` キーは定数 `"hand"`。
 #: 「相方が後で来る」期待は価格ではなく手札の計画 `H`（`hand_plan.apply_inflow`）に入る。
-PLAY_NOW_MODES = ("full", "hand")
-PLAY_NOW_MODE = "hand"
-
-
-def set_play_now_mode(mode):
-    global PLAY_NOW_MODE
-    if mode not in PLAY_NOW_MODES:
-        raise ValueError("play now mode は %s のどれか" % (PLAY_NOW_MODES,))
-    PLAY_NOW_MODE = mode
-    return PLAY_NOW_MODE
-
-
-def add_play_now_arg(ap):
-    ap.add_argument("--play-now", default=None, choices=PLAY_NOW_MODES,
-                    help="**T70** 「手札から出す」効果の価格: `hand`（既定・今の手札に合う札が在ればその値・無ければ 0）／`full`（旧・満額）")
-
-
-def apply_play_now(a):
-    if getattr(a, "play_now", None) is not None:
-        set_play_now_mode(a.play_now)
-    return PLAY_NOW_MODE
 
 
 #: 攻撃の行・継続効果の値付けだけが積む状態の鍵（相方の登場時効果を読むときは落とす）
@@ -2364,8 +2344,8 @@ _ROW_ONLY_KEYS = ("attack_ctx", "source_paid", "source_don_attached", "source_re
 
 def _play_from_hand_now(target, st, card, n, mu, opp_bodies=None):
     """**今の手札から出せる札の値**（T70）＝合う札のうち値（`free_value` − μ）の大きい `n` 枚の和。合う札が無ければ 0。
-    `hand` でなければ／状態が無ければ `None`（旧価格に落ちる）。"""
-    if PLAY_NOW_MODE != "hand" or not st or not st.get("search_ctx"):
+    状態が無ければ `None`（旧価格に落ちる）。"""
+    if not st or not st.get("search_ctx"):
         return None
     ctx = st["search_ctx"]
     cards = ctx.get("cards")

@@ -1765,7 +1765,6 @@ def main(argv=None):
                          "（`exercise`＝使った行で 1 回・ユーザ決定 2026-09-16）。"
                          "**2026-09-16 より前の `ΔG` と比べるときは `option` を明示する**")
     EV.add_search_price_arg(ap)
-    EV.add_play_now_arg(ap)
     EV.add_cost_afford_arg(ap)
     EV.add_pricing_fixes_arg(ap)
     import hand_plan as _HP
@@ -1819,7 +1818,6 @@ def main(argv=None):
     EV.apply_f_pricing_fixes(a)
     _TOM.reset_wiring_stats()
     EV.apply_search_price(a)
-    EV.apply_play_now(a)
     EV.apply_cost_afford(a)
     pricing_fixes = EV.apply_pricing_fixes(a)                  # L
     _HP.apply_inflow_mode(a)
@@ -1876,7 +1874,7 @@ def main(argv=None):
                            "guard_cost": GUARD_COST_MODE, "search_price": "plan",
                            "guard_afford": effective_guard_afford(), "guard_afford_requested": GUARD_AFFORD_MODE,   # G-2
                            "guard_s_cost": GUARD_S_COST_MODE,
-                           "play_now": EV.PLAY_NOW_MODE, "inflow": _HP.INFLOW_MODE, "cond_clock": _HP.COND_CLOCK_MODE,
+                           "play_now": "hand", "inflow": _HP.INFLOW_MODE, "cond_clock": _HP.COND_CLOCK_MODE,
                            "pricing_fixes": pricing_fixes,                                              # L
                            "note": "§0.4 の暫定値。感度を付けて読む",
                            **({"cut_price": _CP.CUT_PRICE_MODE} if _CP.joint_on() else {})},   # **N-3**
