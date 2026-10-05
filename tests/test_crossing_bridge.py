@@ -31,7 +31,7 @@ import theory_order as T  # noqa: E402
 _SHIPPED = {n: getattr(CB, n) for n in (
     "THETA_HAND_MODE", "THETA_HAND_PLACE", "THETA_BODY_MODE", "THETA_HAND_BLOCKER_MODE",
     "THETA_RETURN_MODE", "SLOPE_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE", "SLOPE_EFFECT_MODE",
-    "RATE_WALK_MODE", "RATE_DECAY_MODE", "RATE_T1_MODE", "RATE_RUSH_MODE", "RACE_MODE",
+    "RATE_WALK_MODE", "RATE_DECAY_MODE", "RATE_T1_MODE", "RATE_RUSH_MODE", "RACE_MODE", "SLOPE_TAKE_MODE",
     "DON_PURSE_MODE", "THETA_DON_MODE", "THETA_HAND_WINDOW", "RATE_DON_MODE")}
 
 
@@ -63,7 +63,8 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "THETA_RETURN_MODE": "untap",            # T96・**C-5c で既定に採用**（2026-09-25）
         "SLOPE_MODE": "hand",                    # T77
         "SLOPE_HAND_MODE": "flow",               # T93
-        "SLOPE_BLOCK_MODE": "off",               # T92（切替として残す）
+        "SLOPE_BLOCK_MODE": "on",                # T92・2026-10-05 既定に採用（ユーザ決定・旧 off は --slope-block off）
+        "SLOPE_TAKE_MODE": "life",               # T134・2026-10-05 既定に採用（ユーザ決定・旧 const は --slope-take const）
         "SLOPE_EFFECT_MODE": "hand",             # T105／T108・2026-09-19
         "RATE_WALK_MODE": "grow",                # T94
         "RATE_DECAY_MODE": "off",                # T95（切替として残す）
@@ -104,6 +105,46 @@ def _plain_hand(request):
         yield
     finally:
         CB.set_theta_hand_mode(old)
+
+
+#: **2026-10-05**: `SLOPE_TAKE_MODE=life`／`SLOPE_BLOCK_MODE=on` が既定になった（ユーザ決定）。
+#: **以下のテストは旧い数字（定数 `Θ`・ブロッカー無し）の算術を固定している**ので、自分で旧い形を
+#: 明示して回す＝**テストの意味を変えずに既定の変更だけを吸収する**。既定そのものは
+#: `test_the_shipped_defaults_are_the_ones_we_decided` と下の新既定のラチェットが固定する。
+_NEW_DEFAULT_TESTS = (
+    "test_the_shipped_defaults_are_the_ones_we_decided",
+    "test_the_2026_10_05_defaults_are_take_life_block_on",
+)
+
+
+@pytest.fixture(autouse=True)
+def _old_slope_forms(request):
+    if request.node.name.split("[")[0] in _NEW_DEFAULT_TESTS:
+        yield
+        return
+    old_t, old_b = CB.SLOPE_TAKE_MODE, CB.SLOPE_BLOCK_MODE
+    CB.set_slope_take_mode("const")
+    CB.set_slope_block_mode("off")
+    try:
+        yield
+    finally:
+        CB.set_slope_take_mode(old_t)
+        CB.set_slope_block_mode(old_b)
+
+
+def test_the_2026_10_05_defaults_are_take_life_block_on():
+    """**3 本の既定採用のラチェット**（ユーザ決定 2026-10-05「全て正しい方式にしてください」）。
+    橋の 2 本（受ける費用を守る側のライフで・ブロッカーを速さに入れる）と、帳簿の `κ` の物差し。
+    旧い値は切替として選べる（掃除の波で死んだ切替を消すまで残す）。
+    CLI の既定も module の既定と同じ（引数の既定が定数を指している）。"""
+    import relative_ledger as RL                       # noqa: PLC0415
+    assert CB.SLOPE_TAKE_MODE == "life" and CB.SLOPE_BLOCK_MODE == "on"
+    assert T.KAPPA_SIGMA_MODE == "match"
+    for old, new in (("const", "life"), ("off", "on")):
+        assert old in CB.SLOPE_TAKE_MODES + CB.SLOPE_BLOCK_MODES and new in CB.SLOPE_TAKE_MODES + CB.SLOPE_BLOCK_MODES
+    assert "abs" in T.KAPPA_SIGMA_MODES
+    a = RL.build_parser().parse_args(["--in", "x"])
+    assert (a.slope_take, a.slope_block, a.kappa_sigma) == (None, None, None)   # None＝module の既定に任せる
 
 
 def _tg(*a, **k):

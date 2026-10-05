@@ -2827,7 +2827,7 @@ def own_turn_index(t):
 #: **効き方は状態で決まる**（実測 2026-09-18）: 平均では `A` の盤面の項が 3.6%／5.0% 下がるだけだが、
 #: **ブロッカーの居るターン（12.1%／12.4%）では 28.6%／34.1% 下がる**。
 SLOPE_BLOCK_MODES = ("off", "on")
-SLOPE_BLOCK_MODE = "off"
+SLOPE_BLOCK_MODE = "on"             # **2026-10-05 既定に採用**（ユーザ決定・旧 `off` は --slope-block off で再現）
 
 
 def set_slope_block_mode(mode):
@@ -2947,7 +2947,7 @@ def _budget_gap(pairs, xs, take_cost):
 #: **新定数ゼロ**（`theta_take` は既にある式・`LAM_BY_LIFE` は実測）。
 #: **渡し忘れは落とす**（T131 で決めた規約——黙って定数に落ちない）。
 SLOPE_TAKE_MODES = ("const", "life")
-SLOPE_TAKE_MODE = "const"
+SLOPE_TAKE_MODE = "life"            # **2026-10-05 既定に採用**（ユーザ決定・旧 `const` は --slope-take const で再現）
 
 
 def set_slope_take_mode(mode):
@@ -5142,7 +5142,7 @@ def main(argv=None):
                          "**`flow`（既定**・毎ターン入ってくるぶん＝そのデッキの平均・`deck_refill.a_of`）")
     ap.add_argument("--slope-take", default=SLOPE_TAKE_MODE, choices=SLOPE_TAKE_MODES,
                     help="**T134** 攻撃の価格の「受けられたとき」を守る側のライフで読むか: "
-                         "`const`（従来・定数 `Θ`）／**`life`**（`theta_take(ライフ)`＝**他の 4 つの器が既に使っている式**・"
+                         "`const`（旧・定数 `Θ`）／**`life`（既定**・2026-10-05）（`theta_take(ライフ)`＝**他の 4 つの器が既に使っている式**・"
                          "既定の `TAKE_MODE=lethal` ではライフ 0 のときだけ変わる＝**とどめが見えるようになる**）")
     ap.add_argument("--theta-side", default=THETA_SIDE_MODE, choices=THETA_SIDE_MODES,
                     help="**T133** `Θ` を両席で同じ式にするか: `legacy`（従来・自分の耐久だけ `g × 枚数`）／"
@@ -5153,7 +5153,7 @@ def main(argv=None):
                          "`cut_block`（ブロッカーも引く・**`--theta-body none` と対でだけ**）")
     ap.add_argument("--slope-block", default=SLOPE_BLOCK_MODE, choices=SLOPE_BLOCK_MODES,
                     help="**T92** 速さ `A` の盤面の項に相手のアクティブなブロッカーを入れるか: "
-                         "`off`（旧・渡さない）／`on`（規則どおり `attack_value` に渡す＝新定数ゼロ）")
+                         "`off`（旧・渡さない）／**`on`（既定**・2026-10-05・規則どおり `attack_value` に渡す＝新定数ゼロ）")
     ap.add_argument("--theta-body", default=THETA_BODY_MODE, choices=THETA_BODY_MODES,
                     help="耐久の体の項: `blockers`（旧・アクティブなブロッカーだけ）／`all`（全キャラ・T82）／"
                          "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）／"

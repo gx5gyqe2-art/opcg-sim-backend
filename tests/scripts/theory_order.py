@@ -691,10 +691,10 @@ def w_of_d(d, sigma=None, mover=False):
 #: **出荷の `W`（`prob_of_d`）は T118 以降 `σ_rel · s(τ_me, τ_opp)` を使っている**（例で 2.7569）。
 #: **T118 以降、`κ` は `W` の微分になっていない**——`σ` が約 2 倍小さい＝**接戦帯を本来より鋭く重み付け**していた。
 #:
-#: `abs`＝**現状のまま**（既定・以前の数字と比べられる）／`match`＝**`W` と同じ物差しを使う**
+#: `abs`＝旧（以前の数字と比べるとき）／`match`＝**`W` と同じ物差しを使う（既定・2026-10-05）**
 #: （2 本の時計が渡されたときだけ。渡されなければ `abs` と同じ）。**新定数ゼロ**（`σ_rel` は既測）。
 KAPPA_SIGMA_MODES = ("abs", "match")
-KAPPA_SIGMA_MODE = "abs"
+KAPPA_SIGMA_MODE = "match"   # **2026-10-05 既定に採用**（ユーザ決定・旧 `abs` は --kappa-sigma abs で再現）
 
 
 def set_kappa_sigma_mode(name):

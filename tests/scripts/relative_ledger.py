@@ -561,11 +561,13 @@ def build_parser():
     ap.add_argument("--games", type=int, default=0)
     ap.add_argument("--d-mode", dest="d_mode", choices=KV.D_MODES, default=None)
     ap.add_argument("--kappa-sigma", dest="kappa_sigma", choices=TO.KAPPA_SIGMA_MODES, default=None,
-                    help="**T122/§17.9.6-1**: κ の物差しを W に合わせるか（既定は現状の `abs`）")
+                    help="**T122/§17.9.6-1**: κ の物差しを W に合わせるか（既定 `match`・2026-10-05／旧は `abs`）")
     ap.add_argument("--theta-side", dest="theta_side", choices=CB.THETA_SIDE_MODES, default=None,
                     help="**T133**: `Θ` を両席で同じ式にするか（既定は現状の `legacy`）")
     ap.add_argument("--slope-take", dest="slope_take", choices=CB.SLOPE_TAKE_MODES, default=None,
-                    help="**T134**: `A` の「受ける費用」を自分のライフで決めるか（既定は現状の `const`）")
+                    help="**T134**: `A` の「受ける費用」を自分のライフで決めるか（既定 `life`・2026-10-05／旧は `const`）")
+    ap.add_argument("--slope-block", dest="slope_block", choices=CB.SLOPE_BLOCK_MODES, default=None,
+                    help="**T92**: `A` に相手のブロッカーを入れるか（既定 `on`・2026-10-05／旧は `off`）")
     ap.add_argument("--attack-rest", dest="attack_rest", choices=KV.ATTACK_REST_MODES, default=None,
                     help="**C-2**: 攻撃した体のレスト費用をΘ_meへ足すか（既定 `return`・C-5c／`body`＝C-2／`off`＝旧）")
     ap.add_argument("--theta-hand", dest="theta_hand", choices=CB.THETA_HAND_MODES, default=None,
@@ -596,6 +598,8 @@ def main(argv=None):
         TO.set_kappa_sigma_mode(a.kappa_sigma)
     if a.theta_side:
         CB.set_theta_side_mode(a.theta_side)          # **T133**
+    if a.slope_block:
+        CB.set_slope_block_mode(a.slope_block)
     if a.slope_take:
         CB.set_slope_take_mode(a.slope_take)          # **T134**
     if a.attack_rest:

@@ -15,7 +15,7 @@
 6. **当てはめゼロの較正**（`sep`＝勝ち負けの平均差・理想 1.0／`bias`＝理想 0）が定義どおり動く。
 
 **`κ` の物差しの齟齬**（§17.9.6-1・`w_of_d` は `σ_D`・`prob_of_d` は `σ_rel·s`）を切り替える
-`KAPPA_SIGMA_MODE` も、**既定は現状のまま**であることを含めてここでラチェットする。
+`KAPPA_SIGMA_MODE` も、**既定が `match`（2026-10-05 採用）**であることを含めてここでラチェットする。
 """
 import math
 import os
@@ -246,9 +246,11 @@ def test_calibration_is_none_without_both_labels():
     assert RL.calib_of([1.0, 2.0], [1.0, 1.0], [0.5, 0.5])["sep"] is None
 
 
-def test_kappa_sigma_mode_defaults_to_the_shipped_behaviour():
-    """**既定は動かさない**（`abs`）——直すかどうかはユーザ判断（§17.9.6-1）。"""
-    assert TO.KAPPA_SIGMA_MODE == "abs"
+def test_kappa_sigma_mode_defaults_to_match():
+    """**既定は `match`**（2026-10-05・ユーザ決定「全て正しい方式にしてください」・§17.9.6-1）。
+    旧 `abs` は `--kappa-sigma abs` で再現できる。"""
+    assert TO.KAPPA_SIGMA_MODE == "match"
+    assert TO.set_kappa_sigma_mode("abs") == "abs"
     with pytest.raises(ValueError):
         TO.set_kappa_sigma_mode("rel")
 
@@ -285,6 +287,7 @@ def test_the_ledger_exposes_both_seat_switches_and_they_reach_the_module(monkeyp
     """**T134**: **切替が器の側に無いと「動かなかった」を誤って読む**——本 T で実際に踏んだ
     （`--theta-side` だけ渡した測定を「①＋③」と名付けていた）。**帳簿にも両方在ることを固定する。**"""
     import crossing_bridge as CB                       # noqa: PLC0415
+    old_take = CB.SLOPE_TAKE_MODE
     a = RL.build_parser().parse_args(["--in", "x", "--theta-side", "symmetric",
                                       "--slope-take", "life"])
     assert (a.theta_side, a.slope_take) == ("symmetric", "life")
@@ -294,7 +297,7 @@ def test_the_ledger_exposes_both_seat_switches_and_they_reach_the_module(monkeyp
         assert (CB.THETA_SIDE_MODE, CB.SLOPE_TAKE_MODE) == ("symmetric", "life")
     finally:
         CB.set_theta_side_mode("legacy")
-        CB.set_slope_take_mode("const")
+        CB.set_slope_take_mode(old_take)
 
 
 def test_pre_settle_defaults_to_off_and_the_cli_flag_reaches_collect(monkeypatch):
