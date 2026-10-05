@@ -65,23 +65,15 @@ def rows_of(rows_out, slope="theory", cap=None):
     return out
 
 
-def first_open_of(rows_out):
-    """**K-1**: 行ごとに「持ち主の今のターンが決着の段でありうるか」（`settled_me` が無い行は `True`＝条件を掛けない）。
-    `crossing_bridge.collect` は `SETTLE_COND_MODE=on` のときだけ `settled_me` を置く（決着前の行は常に `False`）。"""
-    return [bool(r.get("settled_me", True)) for r in rows_out]
-
-
-def probs_of(rs, sigma_rel=None, scale_mode="hyp", first_open=None):
-    """行ごとの予測勝率。`W_ERR_MODE` は呼ぶ側が立てる（`sigma_rel` は `rel` のときだけ使う）。
-    `first_open`（K-1）は `first_open_of(rows_out)` の並び（省略時は全行 `True`＝従来）。"""
+def probs_of(rs, sigma_rel=None, scale_mode="hyp"):
+    """行ごとの予測勝率。`W_ERR_MODE` は呼ぶ側が立てる（`sigma_rel` は `rel` のときだけ使う）。"""
     old = TO.SIGMA_REL
-    fo = first_open if first_open is not None else [True] * len(rs)
     try:
         if sigma_rel is not None:
             TO.set_sigma_rel(sigma_rel)
         # **T151-2**: `rows_out` は**ターン開始の 2 本の時計**の行＝手番の半ターンが正確に掛かる瞬間（`mover=True`）。
-        return [TO.prob_of_d(d, t_me=tm, t_opp=to, scale_mode=scale_mode, mover=True, first_open=f)
-                for (d, tm, to, _z), f in zip(rs, fo)]
+        return [TO.prob_of_d(d, t_me=tm, t_opp=to, scale_mode=scale_mode, mover=True)
+                for (d, tm, to, _z) in rs]
     finally:
         TO.set_sigma_rel(old)
 
@@ -202,25 +194,23 @@ def collect_calib(dirs, limit_games=0, slope="theory", sigma_rel=None, scale_mod
     """記録を 1 度読んで **`abs` と `rel` を並べる**（`sigma_rel` が無ければ `rel` は出さない）。"""
     rows_out, ledger, stats, turn_harm, theta_check = CB.collect(dirs, limit_games, THETA, MU, "const")
     rs = rows_of(rows_out, slope)
-    fo = first_open_of(rows_out)
     z = [r[3] for r in rs]
     old = TO.W_ERR_MODE
     out = {"slope": slope, "games": stats.get("games"), "rows": len(rs),
            "pre_settle": CB.PRE_SETTLE_MODE,
            "sigma_d": round(float(TO.SIGMA_D), 4), "scale_mode": scale_mode,
            "stretch": stretch(rs)}
-    if TO.SETTLE_COND_MODE != "off" or TO.SIGMA_FLOOR_MODE != "off":
-        # **K-1／K-2**: 切替を使ったときだけ書く（既定の出力は従来と 1 バイトも変わらない）
-        out["settle_cond"] = TO.SETTLE_COND_MODE; out["sigma_floor"] = TO.SIGMA_FLOOR_MODE
+    # **K-1／K-2**: 時計の読みの欄（波C で切替は削除＝定数 `whole`／`off`・欄は従来どおり書く）
+    out["settle_cond"] = TO.SETTLE_COND_MODE; out["sigma_floor"] = TO.SIGMA_FLOOR_MODE
     try:
         TO.set_w_err_mode("abs")
-        out["abs"] = score(probs_of(rs, first_open=fo), z, nbin)
+        out["abs"] = score(probs_of(rs), z, nbin)
         if sigma_rel is not None:
             TO.set_w_err_mode("rel")
-            out["rel"] = score(probs_of(rs, sigma_rel, scale_mode, fo), z, nbin)
+            out["rel"] = score(probs_of(rs, sigma_rel, scale_mode), z, nbin)
             out["sigma_rel"] = round(float(sigma_rel), 4)
             # **1 次同次な尺度はどれでも識別力が同じ**ことの検算（AUC が一致する）
-            out["scale_auc"] = {m: score(probs_of(rs, sigma_rel, m, fo), z, nbin)["auc"]
+            out["scale_auc"] = {m: score(probs_of(rs, sigma_rel, m), z, nbin)["auc"]
                                 for m in ("hyp", "sum", "mean", "max", "geo")}
     finally:
         TO.set_w_err_mode(old)
@@ -238,15 +228,9 @@ def main(argv=None):
     ap.add_argument("--bins", type=int, default=10)
     ap.add_argument("--pre-settle", default=CB.PRE_SETTLE_MODE, choices=CB.PRE_SETTLE_MODES,
                     help="**T138b** 決着後（`lethal_rule.settled_map`）の行を除いて較正を測るか")
-    ap.add_argument("--settle-cond", default=TO.SETTLE_COND_MODE, choices=TO.SETTLE_COND_MODES,
-                    help="**K-1** 決着前の行で持ち主の今のターンを決着の段から外す（`on`）／対照（`whole`）")
-    ap.add_argument("--sigma-floor", default=TO.SIGMA_FLOOR_MODE, choices=TO.SIGMA_FLOOR_MODES,
-                    help="**K-2** 幅に整数ターンの床 1/12 を足し、床を入れて測り直した σ_rel を引く")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
     CB.set_pre_settle_mode(a.pre_settle)            # **T138b**
-    TO.set_settle_cond_mode(a.settle_cond)          # **K-1**
-    TO.set_sigma_floor_mode(a.sigma_floor)          # **K-2**（`sigma_rel_for` が引く表も切り替わる）
     sr = a.sigma_rel if a.sigma_rel is not None else CB.sigma_rel_for(a.src)
     out = collect_calib(a.src, a.games, a.slope, sr, a.scale, a.bins)
     if CB.THETA_HAND_MODE == "rule_don":

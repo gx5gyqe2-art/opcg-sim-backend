@@ -1436,21 +1436,21 @@ def test_w_mover_mode_defaults_to_half_and_only_the_two_clock_rows_get_the_shift
 def test_w_mover_half_recentres_w_at_minus_half_and_makes_the_pair_antisymmetric():
     """`p(d) + p(−1 − d) == 1`——鏡の対（`d_a + d_b = −1`・T151 の対の恒等式）が `half` で反対称になる
     （`mover=True` の行だけ）。`mover=False` では `p(0) = 0.5`（手番の半ターンを落としている）。"""
-    old_err, old_sig, old_sc = T.W_ERR_MODE, T.SIGMA_REL, T.SETTLE_COND_MODE
+    old_err, old_sig = T.W_ERR_MODE, T.SIGMA_REL
     try:
-        T.set_settle_cond_mode("off")                                 # Φ の形の代数（整数ターンの式は別に試す）
+        # Φ の形の代数（整数ターンの式は別に試す）——`hyp` の 2 本の時計の行は整数ターンの式に入るので、
+        # 尺度を `sum` にして同じ代数を見る（波C で旧 `SETTLE_COND_MODE=off` を削除）
         T.set_w_err_mode("rel"); T.set_sigma_rel(0.17)
         assert T.prob_of_d(0.0, t_me=5, t_opp=5, mover=False) == pytest.approx(0.5)
         assert T.prob_of_d(-0.5, t_me=5, t_opp=5, mover=False) < 0.5
         assert T.prob_of_d(0.0, t_me=5, t_opp=5) == pytest.approx(0.5)               # 1 行の器（mover 省略）はずらさない
-        assert T.prob_of_d(-0.5, t_me=5, t_opp=5, mover=True) == pytest.approx(0.5)  # 中心が −1/2 へ
-        assert T.prob_of_d(0.0, t_me=5, t_opp=5, mover=True) > 0.5
+        assert T.prob_of_d(-0.5, t_me=5, t_opp=5, scale_mode="sum", mover=True) == pytest.approx(0.5)  # 中心が −1/2 へ
+        assert T.prob_of_d(0.0, t_me=5, t_opp=5, scale_mode="sum", mover=True) > 0.5
         for d in (-3.0, -1.0, -0.5, 0.0, 0.7, 2.0):
-            assert (T.prob_of_d(d, t_me=5, t_opp=5, mover=True)
-                    + T.prob_of_d(-1.0 - d, t_me=5, t_opp=5, mover=True)) == pytest.approx(1.0)
+            assert (T.prob_of_d(d, t_me=5, t_opp=5, scale_mode="sum", mover=True)
+                    + T.prob_of_d(-1.0 - d, t_me=5, t_opp=5, scale_mode="sum", mover=True)) == pytest.approx(1.0)
         # 密度も同じだけずれる（`W` の微分であり続ける）——`mover=True` のときだけ
         assert T.w_of_d(-0.5, mover=True) == pytest.approx(T.w_of_d(0.0))            # `half` の山（−1/2）＝ずらさない山（0）
         assert T.w_of_d(0.0, mover=False) == pytest.approx(T.w_of_d(0.0))
     finally:
         T.set_w_err_mode(old_err); T.set_sigma_rel(old_sig)
-        T.set_settle_cond_mode(old_sc)

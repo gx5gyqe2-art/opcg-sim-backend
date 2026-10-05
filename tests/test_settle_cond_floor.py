@@ -7,7 +7,9 @@
   床を入れて測り直す（`crossing_bridge.sigma_rel_mle`・床 0 なら従来の `std(r/s)` そのもの）。
 * 報告のみ: 整数ターンの残差 `max(1, ⌈τ⌉) − t_act`（`τ − t_act` は完璧な予測でも平均 ≈ −0.5）。
 
-既定はどちらも `off`＝従来と 1 ビットも変わらない（ここで固める）。
+既定は `whole`（K-4・K-5）・床なし。**波C（2026-10-05）**: `SETTLE_COND_MODE` の `off`／`on` と `SIGMA_FLOOR_MODE=on` は
+削除し、どちらも定数になった（凍結ブランチ `claude/theory-switches-final` で再現）。従来の `Φ` の形は `mover=False`（1 行の器）
+と尺度 `hyp` 以外の行でだけ生きる。
 
 **基盤健全性**（`cpu_infra`）——交点の橋の較正の器（`tests/scripts/`）の算術と配線だけを見る。
 """
@@ -28,7 +30,6 @@ if _SCRIPTS not in sys.path:
     sys.path.insert(0, _SCRIPTS)
 
 import crossing_bridge as CB  # noqa: E402
-import pre_settle_asymmetry as PSA  # noqa: E402
 import theory_order as T  # noqa: E402
 import win_calib as WC  # noqa: E402
 
@@ -43,11 +44,9 @@ def test_whole_is_the_shipped_default():
 
 @pytest.fixture(autouse=True)
 def _restore_modes():
-    old = (T.SETTLE_COND_MODE, T.SIGMA_FLOOR_MODE, T.W_ERR_MODE, T.SIGMA_REL, CB.PRE_SETTLE_MODE)
-    T.set_settle_cond_mode("off")      # 以下の代数は旧の Φ の形（off）を基準に書いてある
+    old = (T.W_ERR_MODE, T.SIGMA_REL, CB.PRE_SETTLE_MODE)
     yield
-    T.set_settle_cond_mode(old[0]); T.set_sigma_floor_mode(old[1]); T.set_w_err_mode(old[2])
-    T.set_sigma_rel(old[3]); CB.set_pre_settle_mode(old[4])
+    T.set_w_err_mode(old[0]); T.set_sigma_rel(old[1]); CB.set_pre_settle_mode(old[2])
 
 
 def _phi(x):
@@ -60,61 +59,35 @@ _GRID = [(d, tm, to) for tm in (0.0, 0.4, 1.0, 1.7, 3.2, 9.0) for to in (0.0, 0.
 
 # ---- 既定・切替 ---------------------------------------------------------------------------------
 
-def test_both_switches_default_off_and_reject_unknown_names():
-    assert T.SETTLE_COND_MODE == "off" and T.SIGMA_FLOOR_MODE == "off"
-    assert T.SETTLE_COND_MODES == ("off", "on", "whole") and T.SIGMA_FLOOR_MODES == ("off", "on")
-    with pytest.raises(ValueError):
-        T.set_settle_cond_mode("なにか")
-    with pytest.raises(ValueError):
-        T.set_sigma_floor_mode("なにか")
-    assert T.SETTLE_COND_MODE == "off" and T.SIGMA_FLOOR_MODE == "off"
+def test_both_switches_are_constants_now():
+    """波C: `whole`・床なしの定数（出力の欄 `settle_cond`／`sigma_floor` のため名前は残る）。"""
+    assert T.SETTLE_COND_MODE == "whole" and T.SIGMA_FLOOR_MODE == "off"
+    for gone in ("set_settle_cond_mode", "set_sigma_floor_mode", "SETTLE_COND_MODES", "SIGMA_FLOOR_MODES"):
+        assert not hasattr(T, gone), gone
     assert T.TURN_ROUND_VAR == pytest.approx(1.0 / 12.0)
 
 
-def test_off_is_bit_identical_to_the_t154_formula_and_ignores_first_open():
-    """`off`／`off` は `Φ((D + 1/2)/(σ_rel·s))` そのもの（T151／T154 の式）で、`first_open` を見ない。"""
+def test_non_hyp_scales_keep_the_t154_formula_bit_for_bit():
+    """尺度が `hyp` 以外（`win_calib` の `scale_auc`）の行は `Φ((D + 1/2)/(σ_rel·s))` そのもの（T151／T154 の式）。
+    （波C までは旧 `off` で `hyp` の行もこの式だった・`off` は削除。）"""
     T.set_w_err_mode("rel"); T.set_sigma_rel(0.3078)
     for d, tm, to in _GRID:
-        s = math.sqrt(tm * tm + to * to)
+        s = T.clock_scale(tm, to, "sum")
         want = 0.5 if s == 0 else 0.5 * (1.0 + math.erf((float(d) + 0.5) / ((0.3078 * s) * math.sqrt(2.0))))
-        got = T.prob_of_d(d, t_me=tm, t_opp=to, mover=True)
+        got = T.prob_of_d(d, t_me=tm, t_opp=to, scale_mode="sum", mover=True)
         assert got == want                                                         # ビット一致
-        assert T.prob_of_d(d, t_me=tm, t_opp=to, mover=True, first_open=False) == want
 
 
 def test_switches_do_not_touch_the_one_row_instruments():
-    """1 行の器（`mover=False`）には K-1／K-2 とも掛からない（手番の半ターンと同じ範囲）。"""
+    """1 行の器（`mover=False`）には整数ターンの式は掛からない（手番の半ターンと同じ範囲）＝`Φ(D/(σ_rel·s))`。"""
     T.set_w_err_mode("rel"); T.set_sigma_rel(0.3)
-    base = [T.prob_of_d(d, t_me=tm, t_opp=to) for d, tm, to in _GRID]
-    T.set_settle_cond_mode("on"); T.set_sigma_floor_mode("on")
-    assert [T.prob_of_d(d, t_me=tm, t_opp=to, first_open=False) for d, tm, to in _GRID] == base
+    for d, tm, to in _GRID:
+        s = math.sqrt(tm * tm + to * to)
+        want = 0.5 if s == 0 else 0.5 * (1.0 + math.erf(float(d) / ((0.3 * s) * math.sqrt(2.0))))
+        assert T.prob_of_d(d, t_me=tm, t_opp=to) == want
 
 
 # ---- K-2: 整数ターンの床 -----------------------------------------------------------------------
-
-def test_floor_adds_one_twelfth_in_quadrature_and_keeps_the_pair_antisymmetric():
-    T.set_w_err_mode("rel"); T.set_sigma_rel(0.3); T.set_sigma_floor_mode("on")
-    for d, tm, to in _GRID:
-        s = math.sqrt(tm * tm + to * to)
-        want = _phi((d + 0.5) / math.sqrt((0.3 * s) ** 2 + 1.0 / 12.0))
-        assert T.prob_of_d(d, t_me=tm, t_opp=to, mover=True) == pytest.approx(want, abs=1e-15)
-    # 尺度 0 の行も定義できる（従来は 0.5 に落としていた）
-    assert T.prob_of_d(0.0, t_me=0.0, t_opp=0.0, mover=True) == pytest.approx(_phi(0.5 * math.sqrt(12.0)))
-    for d in (-3.0, -1.0, -0.5, 0.0, 0.7, 2.0):                                  # 鏡の対は反対称のまま
-        assert (T.prob_of_d(d, t_me=1.0, t_opp=1.0, mover=True)
-                + T.prob_of_d(-1.0 - d, t_me=1.0, t_opp=1.0, mover=True)) == pytest.approx(1.0)
-
-
-def test_floor_widens_most_where_the_clocks_are_short():
-    T.set_w_err_mode("rel"); T.set_sigma_rel(0.3)
-    near_off = T.prob_of_d(0.0, t_me=1.0, t_opp=1.0, mover=True)
-    far_off = T.prob_of_d(0.0, t_me=10.0, t_opp=10.0, mover=True)
-    T.set_sigma_floor_mode("on")
-    near_on = T.prob_of_d(0.0, t_me=1.0, t_opp=1.0, mover=True)
-    far_on = T.prob_of_d(0.0, t_me=10.0, t_opp=10.0, mover=True)
-    assert near_on < near_off and far_on < far_off
-    assert (near_off - near_on) > 10 * (far_off - far_on)
-
 
 def test_sigma_rel_mle_without_floor_is_the_old_std_and_recovers_sigma_with_the_floor():
     rng = np.random.default_rng(7)
@@ -130,25 +103,6 @@ def test_sigma_rel_mle_without_floor_is_the_old_std_and_recovers_sigma_with_the_
     assert CB.sigma_rel_mle([1.0], [0.0], 1.0 / 12.0) is None
     tiny = rng.uniform(-0.01, 0.01, 50)
     assert CB.sigma_rel_mle(tiny, np.full(50, 2.0), 1.0 / 12.0) == 0.0
-
-
-def test_sigma_rel_for_reads_the_floor_table_only_when_the_floor_is_on(monkeypatch, tmp_path):
-    prof = {"sigma_rel": {"blockers": {"theory": {"real": 0.31, "syn": 0.33}}},
-            "sigma_rel_floor": {"blockers": {"theory": {"real": 0.21, "syn": 0.23}}}}
-    monkeypatch.setattr(CB, "load_harm_profiles", lambda path=None: prof)
-    d_real = tmp_path / "w_real"; d_real.mkdir()
-    (d_real / "meta_n_record.json").write_text('{"decks": "user"}', encoding="utf-8")
-    assert CB.sigma_rel_for([str(d_real)]) == pytest.approx(0.33)                 # 別のセット（cross）
-    T.set_sigma_floor_mode("on")
-    assert CB.sigma_rel_for([str(d_real)]) == pytest.approx(0.23)
-    assert CB.sigma_rel_for([str(d_real)], "real") == pytest.approx(0.21)
-
-
-def test_the_fixture_carries_the_floor_table_next_to_the_old_one():
-    prof = CB.load_harm_profiles()
-    old = prof["sigma_rel"]["blockers"]["theory"]
-    new = prof["sigma_rel_floor"]["blockers"]["theory"]
-    assert set(new) == {"real", "syn"} and all(0.0 < new[k] < old[k] for k in ("real", "syn"))
 
 
 # ---- K-1: 整数ターンの競争・決着前の条件 ------------------------------------------------------------
@@ -201,20 +155,14 @@ def test_whole_turn_race_tends_to_the_floor_formula_when_the_clocks_are_wide():
 def test_settle_cond_routes_prob_of_d_through_the_race_only_on_turn_start_rows():
     T.set_w_err_mode("rel"); T.set_sigma_rel(0.3)
     tm, to = 0.8, 1.6
-    T.set_settle_cond_mode("on")
-    p_closed = T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=True, first_open=False)
-    p_open = T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=True, first_open=True)
-    assert p_closed == pytest.approx(T.whole_turn_race_prob(tm, to, 0.3 * tm, 0.3 * to, 2))
-    assert p_open == pytest.approx(T.whole_turn_race_prob(tm, to, 0.3 * tm, 0.3 * to, 1))
-    assert p_closed < p_open
-    T.set_settle_cond_mode("whole")                                              # 条件を掛けない・幅はまだ打つターン数（K-5）
-    assert T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=True, first_open=False) == pytest.approx(
+    # 条件を掛けない・幅はまだ打つターン数（K-5）
+    assert T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=True) == pytest.approx(
         T.whole_turn_race_prob(tm, to, 0.3 * 1.0, 0.3 * to, 1))
-    tm = 1.4                                                                      # τ ≥ 1 なら幅は `on` と同じ σ·τ
-    assert T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=True, first_open=False) == pytest.approx(
+    tm = 1.4                                                                      # τ ≥ 1 なら幅は σ·τ
+    assert T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=True) == pytest.approx(
         T.whole_turn_race_prob(tm, to, 0.3 * tm, 0.3 * to, 1))
-    T.set_settle_cond_mode("on")                                                 # 半ターンを使わない行（1 行の器）には掛けない
-    assert T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=False, first_open=False) == pytest.approx(
+    # 半ターンを使わない行（1 行の器）には掛けない
+    assert T.prob_of_d(to - tm, t_me=tm, t_opp=to, mover=False) == pytest.approx(
         _phi((to - tm) / (0.3 * math.hypot(tm, to))))
 
 
@@ -223,11 +171,10 @@ def test_settle_cond_routes_prob_of_d_through_the_race_only_on_turn_start_rows()
 def test_whole_width_is_the_number_of_turns_still_to_play():
     """時計 1 本の幅の尺度は `max(1, τ)`＝今のターンは τ がいくら小さくても丸ごと 1 ターン打たれる。"""
     assert [T.whole_clock_scale(x) for x in (0.0, 1e-9, 0.4, 1.0, 3.2)] == [1.0, 1.0, 1.0, 1.0, 3.2]
-    T.set_w_err_mode("rel"); T.set_sigma_rel(0.4); T.set_settle_cond_mode("whole")
+    T.set_w_err_mode("rel"); T.set_sigma_rel(0.4)
     for d, tm, to in _GRID:
         want = T.whole_turn_race_prob(tm, to, 0.4 * max(1.0, tm), 0.4 * max(1.0, to), 1)
         assert T.prob_of_d(d, t_me=tm, t_opp=to, mover=True) == want
-        assert T.prob_of_d(d, t_me=tm, t_opp=to, mover=True, first_open=False) == want   # 条件は掛けない
 
 
 @pytest.mark.parametrize("tm,to", [(0.0, 0.0), (0.0, 1.3), (0.3, 2.5), (2.2, 0.0), (0.9, 0.2)])
@@ -241,7 +188,7 @@ def test_whole_with_the_turn_width_matches_a_simulation_of_the_rule(tm, to):
 def test_whole_never_says_exactly_0_or_1_at_tiny_clocks():
     """従来の幅 `σ·τ` は `τ = 0` で幅 0＝「いま届く」を確率 1 と言っていた（p がちょうど 1／相手なら 0）。"""
     assert T.whole_turn_race_prob(0.0, 2.0, 0.0, 0.4 * 2.0, 1) == 1.0                # 弱点（従来の幅）
-    T.set_w_err_mode("rel"); T.set_sigma_rel(0.4); T.set_settle_cond_mode("whole")
+    T.set_w_err_mode("rel"); T.set_sigma_rel(0.4)
     tiny = (0.0, 1e-9, 0.01, 0.3, 0.9)
     for tm in tiny:
         for to in tiny + (1.5, 3.0):
@@ -334,20 +281,15 @@ def test_sigma_rel_whole_mle_edges():
 
 
 def test_sigma_rel_for_reads_the_whole_table_when_whole_is_on(monkeypatch, tmp_path):
+    """`sigma_rel_for` は `whole` の表だけを引く（従来の表・床の表を引く切替は波C で削除）。"""
     prof = {"sigma_rel": {"blockers": {"theory": {"real": 0.31, "syn": 0.33}}},
             "sigma_rel_floor": {"blockers": {"theory": {"real": 0.21, "syn": 0.23}}},
             "sigma_rel_whole": {"blockers": {"theory": {"real": 0.41, "syn": 0.43}}}}
     monkeypatch.setattr(CB, "load_harm_profiles", lambda path=None: prof)
     d_real = tmp_path / "w_real"; d_real.mkdir()
     (d_real / "meta_n_record.json").write_text('{"decks": "user"}', encoding="utf-8")
-    T.set_settle_cond_mode("whole")
     assert CB.sigma_rel_for([str(d_real)]) == pytest.approx(0.43)                 # 別のセット（cross）
-    T.set_sigma_floor_mode("on")                                                  # `whole` は床を足さない＝表も `whole`
-    assert CB.sigma_rel_for([str(d_real)]) == pytest.approx(0.43)
-    T.set_settle_cond_mode("on")                                                  # `on` は従来の表のまま
-    assert CB.sigma_rel_for([str(d_real)]) == pytest.approx(0.23)
-    T.set_settle_cond_mode("off"); T.set_sigma_floor_mode("off")
-    assert CB.sigma_rel_for([str(d_real)]) == pytest.approx(0.33)
+    assert CB.sigma_rel_for([str(d_real)], "real") == pytest.approx(0.41)
 
 
 def test_the_fixture_carries_the_whole_table():
@@ -355,71 +297,20 @@ def test_the_fixture_carries_the_whole_table():
     tbl = prof["sigma_rel_whole"]["blockers"]
     for slope in ("theory", "curve"):
         assert set(tbl[slope]) == {"real", "syn"} and all(0.0 < v < 1.0 for v in tbl[slope].values())
-    old = prof["sigma_rel"]["blockers"]["theory"]
-    assert all(tbl["theory"][k] > old[k] for k in ("real", "syn"))              # 従来の手順は幅を小さく測っていた
-
-
-def test_off_stays_bit_identical_after_whole_was_used():
-    T.set_w_err_mode("rel"); T.set_sigma_rel(0.3078)
-    base = [T.prob_of_d(d, t_me=tm, t_opp=to, mover=True) for d, tm, to in _GRID]
-    T.set_settle_cond_mode("whole")
-    [T.prob_of_d(d, t_me=tm, t_opp=to, mover=True) for d, tm, to in _GRID]
-    T.set_settle_cond_mode("off")
-    assert [T.prob_of_d(d, t_me=tm, t_opp=to, mover=True) for d, tm, to in _GRID] == base
 
 
 # ---- 配線（win_calib／pre_settle_asymmetry／crossing_bridge） ----------------------------------------
 
-def test_first_open_of_reads_the_settled_flag_and_defaults_to_open():
-    rows = [{"settled_me": False}, {"settled_me": True}, {}]
-    assert WC.first_open_of(rows) == [False, True, True]
-
-
-def test_probs_of_passes_first_open_per_row():
-    T.set_w_err_mode("rel"); T.set_settle_cond_mode("on")
-    rs = [(0.8, 0.8, 1.6, 1.0)] * 2
-    p = WC.probs_of(rs, 0.3, first_open=[False, True])
-    assert p[0] < p[1]
-    T.set_settle_cond_mode("off")
-    q = WC.probs_of(rs, 0.3, first_open=[False, True])
-    assert q[0] == q[1] == WC.probs_of(rs, 0.3)[0]
-
-
-def test_win_calib_cli_flags_reach_the_modules(monkeypatch):
-    monkeypatch.setattr(WC, "collect_calib", lambda *a, **k: {"x": 1})
-    monkeypatch.setattr(CB, "sigma_rel_for", lambda dirs: 1.0)
-    WC.main(["--in", "x", "--settle-cond", "on", "--sigma-floor", "on"])
-    assert T.SETTLE_COND_MODE == "on" and T.SIGMA_FLOOR_MODE == "on"
-    with pytest.raises(SystemExit):
-        WC.main(["--in", "x", "--settle-cond", "なにか"])
-    with pytest.raises(SystemExit):
-        WC.main(["--in", "x", "--sigma-floor", "なにか"])
-
-
-def test_pre_settle_asymmetry_cli_flags_are_scoped_to_the_call(monkeypatch):
-    seen = {}
-
-    def fake_collect(dirs, limit, *a, **k):
-        seen["modes"] = (T.SETTLE_COND_MODE, T.SIGMA_FLOOR_MODE)
-        return [], [], {"games": 0}, [], []
-    monkeypatch.setattr(CB, "collect", fake_collect)
-    monkeypatch.setattr(CB, "sigma_rel_for", lambda dirs: 0.3)
-    monkeypatch.setattr(PSA, "add_volatility", lambda rows, dirs: rows)
-    PSA.collect(["x"], settle_cond="on", sigma_floor="on")
-    assert seen["modes"] == ("on", "on")
-    assert T.SETTLE_COND_MODE == "off" and T.SIGMA_FLOOR_MODE == "off"             # 呼び出しの外へ漏れない
-
-
-def test_collect_reads_the_settled_map_when_settle_cond_is_on_even_without_pre_settle(monkeypatch):
+def test_collect_reads_the_settled_map_only_for_the_pre_settle_filter(monkeypatch):
     import lethal_rule as LR
     calls = []
     monkeypatch.setattr(LR, "settled_map", lambda dirs, limit_games: calls.append(1) or {})
     monkeypatch.setattr(CB.PL, "iter_games", lambda *a, **k: iter([]))
     CB.collect(["x"])
-    assert calls == []                                                            # 既定（off）は読まない
-    T.set_settle_cond_mode("on")
+    assert calls == []                                                            # 決着前フィルタが `off` なら読まない
+    CB.set_pre_settle_mode("on")
     CB.collect(["x"])
-    assert calls == [1]
+    assert calls == [1]                                                           # `on`／`game` だけが読む
 
 
 # ---- 報告のみ: 整数ターンの残差 --------------------------------------------------------------------

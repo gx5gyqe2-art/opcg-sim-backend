@@ -126,8 +126,7 @@ def rows_with_p(rows_out, slope="theory", sigma_rel=None, w_err="rel"):
     old = TO.W_ERR_MODE
     try:
         TO.set_w_err_mode(w_err)
-        p = WC.probs_of(rs, sigma_rel if w_err == "rel" else None,
-                        first_open=WC.first_open_of(rows_out))        # **K-1**（`settled_me` が無ければ従来）
+        p = WC.probs_of(rs, sigma_rel if w_err == "rel" else None)
     finally:
         TO.set_w_err_mode(old)
     out = []
@@ -416,30 +415,23 @@ def streak_by_volatility_table(rows, n_q=STREAK_QUANTILES):
     return {"n": len(late_fav), "median_v_opp": med, "bands": bands}
 
 
-def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel", pre_settle="on",
-            settle_cond=None, sigma_floor=None):
+def collect(dirs, limit_games=0, slope="theory", sigma_rel=None, w_err="rel", pre_settle="on"):
     """記録を 1 度読み（決着前だけ）、優勢／劣勢・序盤〜終盤で割った較正を返す。
 
     **T151-3**: `pre_settle` は `crossing_bridge.PRE_SETTLE_MODES` のどれか（既定 `on`＝従来・`game`＝どちらかの
     席の最初の宣言ターン以降を両席とも落とす・`off`＝全行）。
     **T151-2**: 相手の時計は常に同じ瞬間（`mirror`）から読み、手番の半ターン（`half`）を入れる（`opp_clock`／`w_mover`
     の切替は 2026-10-05 に削除・出力の欄は定数）。
-    **K-1／K-2**: `settle_cond`（`theory_order.SETTLE_COND_MODES`）・`sigma_floor`（`SIGMA_FLOOR_MODES`）。`None` なら今の値。"""
+    （K-1／K-2 の `settle_cond`／`sigma_floor` の引数は波C で削除——時計の読みは `whole`・床なしの定数。）"""
     old = CB.PRE_SETTLE_MODE
-    old_sc = TO.SETTLE_COND_MODE; old_sf = TO.SIGMA_FLOOR_MODE
     try:
         CB.set_pre_settle_mode(pre_settle)
-        if settle_cond is not None:
-            TO.set_settle_cond_mode(settle_cond)
-        if sigma_floor is not None:
-            TO.set_sigma_floor_mode(sigma_floor)
         rows_out, _ledger, stats, _th, _tc = CB.collect(dirs, limit_games, THETA, MU, "const")
         if sigma_rel is None:
             sigma_rel = CB.sigma_rel_for(dirs)
         rows = rows_with_p(rows_out, slope, sigma_rel, w_err)     # `p` は `w_mover` の下で出す
     finally:
         CB.set_pre_settle_mode(old)
-        TO.set_settle_cond_mode(old_sc); TO.set_sigma_floor_mode(old_sf)
     rows = add_volatility(rows, dirs)          # **T149g-1**: 各行に劣勢側デッキの v_opp を足す
     fs = favorite_split(rows)
     ss = stage_split(rows)
@@ -479,14 +471,9 @@ def main(argv=None):
     ap.add_argument("--w-err", default="rel", choices=("abs", "rel"))
     ap.add_argument("--pre-settle", default="on", choices=CB.PRE_SETTLE_MODES,
                     help="**T151-3** `on`（従来・宣言した席の行だけ除く）／`game`（両席とも除く）／`off`")
-    ap.add_argument("--settle-cond", default=None, choices=TO.SETTLE_COND_MODES,
-                    help="**K-1** 決着前の行で持ち主の今のターンを決着の段から外す（`on`）／対照（`whole`）")
-    ap.add_argument("--sigma-floor", default=None, choices=TO.SIGMA_FLOOR_MODES,
-                    help="**K-2** 幅に整数ターンの床 1/12 を足し、床を入れて測り直した σ_rel を引く")
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
-    out = collect(a.src, a.games, a.slope, a.sigma_rel, a.w_err, a.pre_settle,
-                  a.settle_cond, a.sigma_floor)
+    out = collect(a.src, a.games, a.slope, a.sigma_rel, a.w_err, a.pre_settle)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:

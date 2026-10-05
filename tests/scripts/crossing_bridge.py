@@ -1768,16 +1768,11 @@ def sigma_rel_for(dirs, name="cross", body_mode=None, slope="theory"):
     ——**耐久の形ごと**・**測る記録と別のセット**（§0.1 条件 1）。引けなければ `None`（`abs` に落ちる）。
     **読みごとに分けて持つ**（`theory` の τ と `curve` の τ は別の器なので同じ `σ` を使ってはいけない
     ——T97 の「借り物の σ」と同じ誤りを繰り返さないため）。値の出所は `summarise` の `by_slope[*].sigma_rel`。
-    **K-2**: `theory_order.SIGMA_FLOOR_MODE=on` なら**床を入れた形で測り直した表**（`sigma_rel_floor`・出所は
-    `summarise` の `by_slope[*].sigma_rel_floor`＝`sigma_rel_mle` に床 1/12 を入れたもの）を同じ規約で引く。
-    **K-5**: `theory_order.SETTLE_COND_MODE=whole` なら **`whole` の形と揃えて測った表**（`sigma_rel_whole`・出所は
+    **K-5**: `theory_order.SETTLE_COND_MODE=whole`（定数）なので **`whole` の形と揃えて測った表**（`sigma_rel_whole`・出所は
     `summarise` の `by_slope[*].sigma_rel_whole`＝`sigma_rel_whole_mle`）を同じ規約で引く（床の切替より先に見る
     ——`whole` は整数ターンを式の中で数えるので床を足さない）。"""
-    if TO.SETTLE_COND_MODE == "whole":
-        key = "sigma_rel_whole"
-    else:
-        key = "sigma_rel_floor" if TO.SIGMA_FLOOR_MODE == "on" else "sigma_rel"
-    tbl = (load_harm_profiles() or {}).get(key) or {}
+    # 波C: 従来の表（`sigma_rel`）と床の表（`sigma_rel_floor`）を引く切替は削除（`whole` の表だけ）
+    tbl = (load_harm_profiles() or {}).get("sigma_rel_whole") or {}
     by = (tbl.get(body_mode or THETA_BODY_MODE) or {}).get(slope) or {}
     if not by:
         return None
@@ -2779,8 +2774,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     # **記録をもう 1 度読む**（`lethal_rule` は独立の下請け・`settled_map` の判定式は 1 か所にしか無い）。
     settled = None
     settled_first = None
-    # **K-1**: `SETTLE_COND_MODE=on` なら決着前フィルタが `off` でも行ごとの決着の旗が要る（`settled_me`）
-    if PRE_SETTLE_MODE in ("on", "game") or TO.SETTLE_COND_MODE == "on":
+    if PRE_SETTLE_MODE in ("on", "game"):
         import lethal_rule as LR
         settled = LR.settled_map(dirs, limit_games)
         if PRE_SETTLE_MODE == "game":
@@ -3373,9 +3367,6 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                        # **T102**: 有限の盾（`curve` の読みでも同じ形で使う）
                        "shield_me": me.get("shield"), "shield_opp": op.get("shield"),
                        "shield_rate_me": me.get("shield_rate"), "shield_rate_opp": op.get("shield_rate")}
-                if TO.SETTLE_COND_MODE == "on":
-                    # **K-1**: 行の持ち主がいま規則上の詰みを持つか（`lethal_rule.settled_map`・決着前の行は常に False）
-                    rec["settled_me"] = bool(settled.get((seed_g, w, t))) if settled is not None else True
                 for sv in SLOPES:
                     s_me = me["slope_" + sv] if me["slope_" + sv] is not None else me["slope_theory"]
                     s_op = op["slope_" + sv] if op["slope_" + sv] is not None else op["slope_theory"]
@@ -3720,7 +3711,7 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
              "tau_me_median": round(float(np.median([min(r["tau_me_" + sv], 30.0) for r in rows_out])), 3),
              "win_by_D": {}}
         # **K-2（2026-09-26・報告のみ・既存の欄は不変）**: 床（整数ターンの丸め 1/12）を入れた形で最尤に測った
-        # `σ_rel`（`sigma_rel_mle`）。`SIGMA_FLOOR_MODE=on` の表（`sigma_rel_floor`）の出所。
+        # `σ_rel`（`sigma_rel_mle`）。旧 `SIGMA_FLOOR_MODE=on` の表（`sigma_rel_floor`）の出所（切替は波C で削除・欄は残す）。
         o["sigma_rel_floor"] = (round(float(sigma_rel_mle(res, scale, TO.TURN_ROUND_VAR, TO.TURN_ROUND_MEAN)), 4)
                                 if has_scale.any() else None)
         # **K-5（2026-09-26・報告のみ・既存の欄は不変）**: `whole` の形と揃えた幅（勝った席が届いた段を区間で観測・
