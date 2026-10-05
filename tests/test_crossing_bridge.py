@@ -1999,29 +1999,7 @@ def test_a_body_mode_without_a_yardstick_entry_is_not_silently_borrowed():
     assert CB.sigma_t_for(None, "real", body_mode="none") is None      # T129 の新しい形は表に無い
 
 
-# --------------------------------------------------------------------------- T131: 通った割合で割り引く
-def test_the_through_share_is_a_dimensionless_ratio_of_the_rules():
-    """**T131**（ユーザ決定 2026-09-20「入れてみてください」）: `通った本数 / 本数`。
-
-    **既定は割り引かない**（1.0）。**`cut` はブロッカーを引かない**——既定ではブロッカーは
-    **耐久 `Θ` の体の項に在る**ので、ここでも引くと**同じ規則を 2 か所で数える**（T97／T129 の型）。
-    """
-    assert CB.RATE_THROUGH_MODE == "off"
-    assert CB.through_scale(3, 2, 1) == 1.0                   # `off` は素通し
-    try:
-        CB.set_rate_through_mode("cut")
-        assert CB.through_scale(4, 1, 2) == pytest.approx(0.75)   # ブロッカーは引かない
-        assert CB.through_scale(3, 0, 0) == 1.0                   # 切られなければ満額
-        assert CB.through_scale(2, 5, 0) == 0.0                   # 全部止められたら 0（負にしない）
-        assert CB.through_scale(0, 0, 0) == 1.0                   # 本数 0 は割り引くものが無い
-        CB.set_rate_through_mode("cut_block")
-        assert CB.through_scale(4, 1, 2) == pytest.approx(0.25)   # こちらは引く（`--theta-body none` と対）
-    finally:
-        CB.set_rate_through_mode("off")
-    with pytest.raises(ValueError):
-        CB.set_rate_through_mode("なにか")
-
-
+# --------------------------------------------------------------------------- T131: 通った割合で割り引く（切替は 2026-10-05 に削除・`through` の口だけ）
 def test_the_through_share_scales_both_the_leader_and_the_characters():
     """**リーダーの攻撃も答えられる**ので、減衰（KO されない）とは違い**両方に同じ割合が掛かる**。"""
     tok = np.zeros((22, 24), np.float32)
@@ -2032,21 +2010,6 @@ def test_the_through_share_scales_both_the_leader_and_the_characters():
     assert lead > 0.0 and chars > 0.0
     l2, c2 = CB.theory_slope_parts(tok, 5000.0, through=0.5)
     assert l2 == pytest.approx(lead * 0.5) and c2 == pytest.approx(chars * 0.5)
-
-
-def test_a_missing_through_share_is_loud_not_silently_one():
-    """**今日 2 度踏んだ事故**（T128 の減衰・T129 のブロッカー）——**渡し忘れが黙って旧の値になる**。
-    守る席の手札は**攻める席の行からは読めない**ので渡すしかない＝**渡されなければ落とす**。"""
-    tok = np.zeros((22, 24), np.float32)
-    tok[0, T.S_POWER] = 0.5
-    CB.theory_slope_parts(tok, 5000.0)                        # `off` なら渡さなくてよい
-    try:
-        CB.set_rate_through_mode("cut")
-        with pytest.raises(ValueError):
-            CB.theory_slope_parts(tok, 5000.0)                # 渡し忘れ＝落ちる
-        CB.theory_slope_parts(tok, 5000.0, through=1.0)       # 渡せば通る
-    finally:
-        CB.set_rate_through_mode("off")
 
 
 def test_the_budget_gap_is_zero_for_one_attack_and_positive_when_cards_are_reused():
