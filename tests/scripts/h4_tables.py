@@ -60,7 +60,7 @@ def cb_row(j):
             st.get("plan_cut"), st.get("plan_n")]
 
 
-def table_cb(sides=("real", "syn"), modes=("cuttable_forced", "rule_don", "rule", "rule_don_purse", "noplan", "spdavg")):
+def table_cb(sides=("real", "syn"), modes=("cuttable_forced", "rule_don", "rule", "rule_don_purse")):
     print("== 交点の橋  [的中 バイアス σ_T within1 MAE | 打ち切り | 守る側の計算が地平を縮めた計画／解いた計画]")
     for s in sides:
         for m in modes:
