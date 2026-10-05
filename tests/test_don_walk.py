@@ -78,20 +78,6 @@ def test_the_schedule_is_read_at_the_walks_own_turn_number():
     assert CB.rate_at(9, 0, 0, 0, 0, j0=2, sched=sched) == pytest.approx(0.3)
 
 
-def test_the_placebo_ramp_is_off_by_default_and_additive_when_on():
-    """**プラセボの一次ランプは既定 0**（当てはめた定数なので既定に置かない）。"""
-    assert CB.RATE_RAMP == 0.0
-    base = CB.rate_at(4, 0.1, 0.0, 0.0, 0.0, j0=2)
-    try:
-        CB.set_rate_don_mode("off", ramp=0.02)
-        assert CB.rate_at(4, 0.1, 0.0, 0.0, 0.0, j0=2) == pytest.approx(base + 0.02 * 3)
-        # 列を渡しても同じだけ足される（対照の条件を揃える）
-        assert CB.rate_at(4, 0, 0, 0, 0, j0=2, sched=[0.5] * 8) == pytest.approx(0.5 + 0.02 * 3)
-    finally:
-        CB.set_rate_don_mode("off", ramp=0.0)
-    assert CB.RATE_RAMP == 0.0
-
-
 def test_the_don_walk_refuses_to_share_a_row_with_the_race_purse():
     """**`--don-purse race` は 1 行で解いた配分**なので `j` の列を持てない（黙って混ぜない）。"""
     old_p, old_d = CB.DON_PURSE_MODE, CB.RATE_DON_MODE

@@ -327,7 +327,7 @@ def rules_sched(harms, steps, actx, paid1):
     def left(i):
         d = float(ds[min(i, len(ds)) - 1])
         paid = paid1 if i == 1 else steps[i - 1]["paid"]
-        l_ = int(round(max(0.0, d - paid) if RATE_DON_PAY else d))
+        l_ = int(round(max(0.0, d - paid)))
         return max(0, min(l_, len(a_tab) - 1))
     lefts = [left(i) for i in range(1, n + 1)]
     out = []

@@ -290,25 +290,18 @@ RATE_DON_MODES = ("off", "flow", "purse")
 #: 代金は **±1 当たり**（0.454 → 0.342／0.441 → 0.286＝残る偏りが系統誤差になり σ が締まった結果）と
 #: **`curve` の的中 −0.01〜0.02**。`purse` は切替として残す（財布ごと解き直す形）。
 RATE_DON_MODE = "flow"
-#: `purse`／`flow` のとき、**引いた 1 枚のドンを財布から払わせる**か（T114 の反証が要求した修正）。
-#: `True`（既定）＝残ったドンで絞る（悲観側の下限）／`False`＝設計の初版（払わせない＝上端）。
-RATE_DON_PAY = True
-#: **プラセボ専用**の一次ランプ `R_j + RATE_RAMP·(j−1)`。**当てはめた定数なので既定は 0**
-#: （対照として回すときだけ CLI で入れる。報告では必ず `purse` と並べる）。
-RATE_RAMP = 0.0
+#: 引いた 1 枚のドンは**常に財布から払わせる**（残ったドンで絞る・T114 の反証が要求した修正）。旧の「払わせない」形
+#: （`RATE_DON_PAY=False`）と、**プラセボ専用**の一次ランプ（`RATE_RAMP`）は 2026-10-05 に削除
+#: ——`claude/theory-switches-final` で再現できる。出力 JSON の `rate_don_pay`／`rate_ramp` キーは定数のまま残す（バイト一致のため）。
 
 
-def set_rate_don_mode(name, pay=None, ramp=None):
-    global RATE_DON_MODE, RATE_DON_PAY, RATE_RAMP
+def set_rate_don_mode(name):
+    global RATE_DON_MODE
     if name not in RATE_DON_MODES:
         raise ValueError("rate don mode は %s のどれか" % (RATE_DON_MODES,))
     if name != "off" and DON_PURSE_MODE == "race":
         raise ValueError("`--don-purse race` は 1 行で解いた配分なので j の列を持てない（併用不可）")
     RATE_DON_MODE = name
-    if pay is not None:
-        RATE_DON_PAY = bool(pay)
-    if ramp is not None:
-        RATE_RAMP = float(ramp)
     return RATE_DON_MODE
 
 
@@ -1756,7 +1749,7 @@ def rules_sched(harms, steps, actx, paid1):
 
     def left_of(i, paid):
         d = float(ds[min(i, len(ds)) - 1])
-        l_ = int(round(max(0.0, d - paid) if RATE_DON_PAY else d))
+        l_ = int(round(max(0.0, d - paid)))
         return max(0, min(l_, nl))
 
     def terms(li, st):
@@ -1765,7 +1758,7 @@ def rules_sched(harms, steps, actx, paid1):
     # **速さのためだけ（RD-speed）**: 段 `i ≥ 2` の項は計画の 1 段目の支払いに依らない＝出す札の組（`steps`）ごとに
     # 1 回だけ表から引いて覚える。段 `j` ごとに**同じ順の同じ足し算**（`v += ar_1; v += pos_1; …; v += ar_j`）を
     # 繰り返す——浮動小数の結果は 1 ビットも変わらない（旧は段ごとに表を引き直していた）。
-    ck = ("_rules_sched_tail", bool(RATE_DON_PAY), id(actx))
+    ck = ("_rules_sched_tail", id(actx))
     tail = steps[0].get(ck)
     if tail is None:
         tail = [terms(left_of(i, steps[i - 1]["paid"]), steps[i - 1]) for i in range(2, n + 1)]
@@ -3097,7 +3090,7 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
     規則のドンの列 `d_i`（`purse_series`）で**その i で買えるもの**を解き直す:
 
     * 在庫（体・付与・手札の効果）… `purse_plan(groups, d_i)`（`purse` のときだけ i で解き直す）
-    * 流入（引いた 1 枚）… `a_of(deck, olp, don_i, …)`。`RATE_DON_PAY` なら `don_i = d_i − 払った額`
+    * 流入（引いた 1 枚）… `a_of(deck, olp, don_i, …)`。`don_i = d_i − 払った額`
       （**同じドンを 2 回使わない**＝反証が要求した修正）
     * 召喚酔い・速攻・1 ターン目の規則は既存のまま（T84／T103）＝**新しい規則を足していない**
 
@@ -3184,7 +3177,7 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
         # 流入: 引いた 1 枚を**その時点のドン**で読む（払わせるなら残ったドンで絞る）
         for i in range(1, j + 1):
             d_i = ds[min(i, len(ds)) - 1]
-            don_i = max(0.0, d_i - paid[i]) if RATE_DON_PAY else d_i
+            don_i = max(0.0, d_i - paid[i])
             if not deck_ids:
                 continue
             _wd = THETA_HAND_MODE != "rule_don"  # **H-4e（E6）**
@@ -3195,7 +3188,7 @@ def seat_slope_sched(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=M
                 val += max(0.0, f - fr) * (q ** (j - i - 1))
         if deck_ids:
             d_j = ds[min(j, len(ds)) - 1]
-            val += float(DR.e_of(deck_ids, mlp, r, max(0.0, d_j - paid[j]) if RATE_DON_PAY else d_j))
+            val += float(DR.e_of(deck_ids, mlp, r, max(0.0, d_j - paid[j])))
         if j <= 1:
             val += e1[1]                                  # **T108**: 在庫の効果は 1 回だけ
         out.append(float(val))
@@ -3690,7 +3683,7 @@ def rate_at(j, board_lead, board_chars, stock, flow, ko_p=0.0, stock_rush=0.0, f
         return 0.0                                    # **T103**: 自分の最初のターンはアタックできない（規則）
     if sched:
         # **T114**: 規則のドンの列から作った `R_j`（`seat_slope_sched`）。**列が一定なら下の式と恒等**。
-        return float(sched[min(max(1, int(j)), len(sched)) - 1]) + RATE_RAMP * (int(j) - 1)
+        return float(sched[min(max(1, int(j)), len(sched)) - 1])
     q = 1.0 - max(0.0, min(1.0, float(ko_p)))
     n = max(0, int(j) - 1)
     out = float(board_lead) + float(board_chars) * (q ** n)
@@ -3712,7 +3705,7 @@ def rate_at(j, board_lead, board_chars, stock, flow, ko_p=0.0, stock_rush=0.0, f
     out += max(0.0, float(eff))                      # **T105**: 効果は毎ターン 1 枚ぶん（積み上がらない）
     if int(j) <= 1:
         out += max(0.0, float(eff_once))             # **T108**: 在庫の効果は 1 回だけ
-    return float(out) + RATE_RAMP * (int(j) - 1)     # **プラセボ専用**の一次ランプ（既定 0）
+    return float(out)
 
 
 def tau_grow(theta, board_lead, board_chars, stock, flow, r=0.0, cap=RACE_CAP, ko_p=None, step=0.0,
@@ -3960,7 +3953,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "slope_effect": "hand", "eff_sum": 0.0, "eff_n": 0, "eff1_sum": 0.0,
              "don_purse": DON_PURSE_MODE,
              # **T114**: 規則のドンの列から作った `R_j`（`off` なら 0 件）
-             "rate_don": RATE_DON_MODE, "rate_don_pay": RATE_DON_PAY, "rate_ramp": RATE_RAMP,
+             "rate_don": RATE_DON_MODE, "rate_don_pay": True, "rate_ramp": 0.0,
              "sched_n": 0, "sched_j1_sum": 0.0, "sched_j5_sum": 0.0,
              # **T113**: そのターンの最後の行で閉じて足した額（旧値＝新値 − `last_close_sum`）
              "last_close_n": 0, "last_close_sum": 0.0, "last_close_open": 0,
@@ -5078,10 +5071,6 @@ def main(argv=None):
     ap.add_argument("--rate-don", default=RATE_DON_MODE, choices=RATE_DON_MODES,
                     help="**T114** 歩きの成長を規則のドンの列から作るか: `off`（旧・`flow·(j−1)`）／"
                          "`flow`（流入だけ `d_i` で絞る）／`purse`（財布ごと `d_i` で解き直す）")
-    ap.add_argument("--rate-don-pay", default="on", choices=("on", "off"),
-                    help="**T114** 引いた 1 枚のドンを財布から払わせるか（`on`＝残ったドンで絞る・既定）")
-    ap.add_argument("--rate-ramp", type=float, default=RATE_RAMP,
-                    help="**プラセボ専用**の一次ランプ `R_j + g·(j−1)`（当てはめた定数・既定 0）")
     ap.add_argument("--theta-hand-window", default=THETA_HAND_WINDOW, choices=THETA_HAND_WINDOWS,
                     help="**T116** 手札のうち**守る窓が開く分だけ**を的に入れるか（`min(手札, SR·τ)`）: "
                          "`off`（旧・全部入る）／`horizon`（手札抜きの `τ0` で 1 回切る）／"
@@ -5114,7 +5103,7 @@ def main(argv=None):
     set_theta_hand_mode(a.theta_hand)
     set_theta_hand_place(a.theta_hand_place)
     set_theta_hand_window(a.theta_hand_window)
-    set_rate_don_mode(a.rate_don, pay=(a.rate_don_pay == "on"), ramp=a.rate_ramp)
+    set_rate_don_mode(a.rate_don)
     set_don_purse_mode(a.don_purse)
     set_theta_don_mode(a.theta_don)
     set_theta_hand_blocker_mode(a.theta_hand_blocker)
