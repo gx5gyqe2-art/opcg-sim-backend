@@ -581,7 +581,9 @@ def _walk_of(ax, cards, don, blk, life, lt, play, ks, turns=None):
     r = CB.rule_guard_plan_ex(cards, don, xf, None, blk, life, turns, lt, CB._prices_of(ax), later_seq=later_seq,
                               rest_blk=tuple(ax.get("rest_blk") or ()))
     paid = sum(ax["cand"][i][0] for i in play) + sum(ks)
-    sched = CB.rules_sched(r["harms"], steps, ax, float(paid))
+    # 歩きの段ごとの速さは原文（`rule_don_ref.rules_sched`）で——速くした Python の写しは Rust 化・第 3 段で消した
+    import rd_kernel as RK
+    sched = RK.ref_module(vars(CB)).rules_sched(r["harms"], steps, ax, float(paid))
     return r, sched, CB.walk_crossing(sched, r["theta"], ax), paid
 
 

@@ -4,6 +4,9 @@
 （浮動小数の最後の桁まで）・地平の縮め（計算の予算）も同じ地平を選ぶ・冷たい／温まった／順を入れ替えた実行で同じ・
 ディスクの覚え書き（`plan_store.py`）から読んでも同じ、を確かめる。問題は乱数で作ったものと、実の記録（w41）と
 合成の記録（w39/w42）から取った小さな局面（`tests/fixtures/rd_speed_frames.json`）。
+
+**Rust 化・第 3 段（2026-10-05）**: 速くした Python の解き方は消した＝ここで比べる「新」は Rust の核（`OPCG_RD_KERNEL=rs`・
+既定）。原文と比べる約束はそのまま。
 """
 import hashlib
 import inspect
@@ -27,6 +30,7 @@ for _p in (os.path.join(_HERE, "scripts"), os.path.join(_HERE, "harness")):
 import crossing_bridge as CB  # noqa: E402
 import cut_price as CP  # noqa: E402
 import plan_store as PS  # noqa: E402
+import rd_kernel as RK  # noqa: E402
 import rule_don_ref as REF  # noqa: E402
 import theory_order as T  # noqa: E402
 
@@ -98,8 +102,8 @@ def _rand_problem(rng, i):
 
 
 def _clear_new():
-    for d in (CB._RULE_DON_CACHE, CB._RULE_EX_CACHE, CB._RULE_EX_MEMO, CB._RULE_EX_SETS, CB._RULE_EX_CTX):
-        d.clear()
+    CB._RULE_DON_CACHE.clear()
+    RK.reset_global()
 
 
 def _view_of(ax):
@@ -168,26 +172,60 @@ def test_explicit_horizons_solve_bit_identically(_budget):
             assert repr(_solve_new(p, h)) == repr(_solve_ref(p, h))
 
 
+def _mask_firsts(m, actx):
+    """1 つの出す札の組で守る側の計算に渡る今のターンの攻撃の並びの全部（付与 0 の 1 本 ＋ 列挙する付与の全部）。
+    （第 3 段で消した `crossing_bridge._mask_firsts` の写し・状態の数を比べるためだけ。）"""
+    att1 = actx["att1"]
+    no_now = bool(actx.get("no_attack_now"))
+    hits1, caps, b = m["hits1"], m["caps"], m["b"]
+    n = len(att1)
+
+    def xf_of(ks):
+        return () if no_now else (tuple(float(att1[q][1]) + 1000.0 * ks[q] for q in range(n)) + tuple(hits1[n:]))
+    out = {xf_of([0] * n)}
+    ks = [0] * n
+
+    def visit(i, left):
+        if i == n:
+            out.add(xf_of(ks))
+            return
+        for k in range(0, min(caps[i], left) + 1):
+            ks[i] = k
+            visit(i + 1, left - k)
+        ks[i] = 0
+    visit(0, b)
+    return out
+
+
+def _ref_states(cards, don, blk, life, ax, lt, dt, arr, roots, h):
+    """原文の守る側の計算が地平 `h` の 1 回の試行（全ての計画の根・覚え書きを共有）で作る状態の数。"""
+    R = RK.ref_module()
+    pr = CB._prices_of(ax)
+    R._EX_USED["memo"], R._EX_USED["limit"] = {}, None
+    try:
+        for xf, ls in roots:
+            R.rule_guard_plan_ex(cards, don, xf, None, blk, life, h, lt, pr, later_seq=ls,
+                                 rest_blk=tuple(ax.get("rest_blk") or ()), arrive_blk=arr, draw_types=dt)
+        return len(R._EX_USED["memo"])
+    finally:
+        R._EX_USED["memo"], R._EX_USED["limit"] = None, None
+
+
 def test_layer_count_equals_the_states_each_horizon_actually_creates(_budget):
-    """**数え方**（`_ex_count_layers`）の段 `0..h−1` の和は、地平 `h` の試行が本当に作る状態の数（覚え書きの大きさ）と
-    ちょうど同じ——だから「超える地平を解いて捨てる」代わりに数えて選んでも、選ぶ地平は 1 つも変わらない。"""
+    """**数え方**（Rust の `rd_count_layers`）の段 `0..h−1` の和は、地平 `h` の試行が本当に作る状態の数（原文の守る側の
+    計算の覚え書きの大きさ）とちょうど同じ——だから「超える地平を解いて捨てる」代わりに数えて選んでも、選ぶ地平は 1 つも
+    変わらない（第 3 段: 比べる相手を速くした Python の数え方から原文の動的計画に替えた）。"""
     checked = 0
     for p in _PROBLEMS[:25] + [p for _s, p in _frames()]:
         cards, don, blk, life, ax, _t, lt, dt, arr = p
         ax = dict(ax)
         with CP.defending(_view_of(ax)):
             masks = CB._rule_don_masks(cards, blk, life, ax, lt)
-            roots = [(xf, m["later_seq"]) for m in masks for xf in CB._mask_firsts(m, ax)]
-            sizes = CB._ex_count_layers(cards, don, blk, life, lt, tuple(ax.get("rest_blk") or ()), arr, dt,
-                                        roots, 4, 10 ** 12)
+            roots = [(xf, m["later_seq"]) for m in masks for xf in _mask_firsts(m, ax)]
+            sizes = RK.count_layers(cards, don, blk, life, lt, tuple(ax.get("rest_blk") or ()), arr, dt,
+                                    roots, 4, 10 ** 12)
             for h in range(1, 5):
-                CB._EX_USED["memo"], CB._EX_USED["limit"] = {}, None
-                try:
-                    CB._rule_don_solve(cards, don, blk, life, ax, h, lt, dt, arr, masks=masks)
-                    real = len(CB._EX_USED["memo"])
-                finally:
-                    CB._EX_USED["memo"], CB._EX_USED["limit"] = None, None
-                assert sum(sizes[:h]) == real
+                assert sum(sizes[:h]) == _ref_states(cards, don, blk, life, ax, lt, dt, arr, roots, h)
                 checked += 1
     assert checked >= 100
 
@@ -290,26 +328,32 @@ def test_the_plan_store_key_is_shared_across_tools_and_module_names(_budget, tmp
 
 #: 解き方の関数の原文の指紋（版ごと）。解き方を変えたら `crossing_bridge.SOLVER_VERSION` を上げ、ここに新しい指紋を足す
 #: （ディスクの覚え書きの古い値を読まないため・値を変えたなら `rule_don_ref.py` も同じ変更で更新する）。
+#: **rd-speed-3（Rust 化・第 3 段）から Rust の核の原文のハッシュ（`rd_kernel.source_hash()`）も指紋に入る**——
+#: `src/theory` を直して版を上げ忘れると落ちる（設計 §6.4）。
 SOLVER_FINGERPRINTS = {
     "rd-speed-1": "84e3b483d52b4b2c",
     "rd-speed-2": "45dc6aba0ff5c6b2",     # switch cleanup A（2026-10-05）: 死んだ切替の枝を削除（値は不変）
+    "rd-speed-3": "@FP3@",     # Rust 化・第 3 段（2026-10-05）: 速くした Python の解き方を消した（値は不変）
 }
-_SOLVER_FUNCS = ("_ex_prep", "_ex_counter_sets", "_norm_seq", "_seq_prep", "rule_guard_plan_ex", "_rule_guard_plan_ex",
-                 "_prices_of", "_attach_gain", "rules_steps", "rules_sched", "_tab", "walk_crossing", "model_horizon",
-                 "tau_grow", "rule_don_solve", "_rule_don_masks", "_mask_firsts", "_ex_fit_horizon",
-                 "_ex_count_layers", "_rule_don_solve")
+_SOLVER_FUNCS = ("rule_guard_plan_ex", "_prices_of", "_attach_gain", "rules_steps", "walk_crossing", "model_horizon",
+                 "tau_grow", "rule_don_solve", "_rd_solve_args", "_rd_run", "_rule_don_masks")
+#: Rust の核の継ぎ目（`rd_kernel`）のうち値に触れる関数
+_KERNEL_FUNCS = ("guard_rs", "res_dict", "race_cap", "rd_solve")
 
 
 def solver_fingerprint():
     h = hashlib.sha256()
     for name in _SOLVER_FUNCS:
         h.update(inspect.getsource(getattr(CB, name)).encode())
+    for name in _KERNEL_FUNCS:
+        h.update(inspect.getsource(getattr(RK, name)).encode())
+    h.update((RK.source_hash() or "").encode())
     return h.hexdigest()[:16]
 
 
 def test_the_solver_version_is_bumped_when_the_solver_changes():
-    """解き方の関数の原文が変わったのに `SOLVER_VERSION` を上げていなければ落ちる（ディスクの覚え書きの鍵にも
-    `tests/scripts` 全部の原文のハッシュが入るので古い値は返らないが、版で変更を明示する約束）。"""
+    """解き方の関数の原文（と Rust の核の原文）が変わったのに `SOLVER_VERSION` を上げていなければ落ちる（ディスクの
+    覚え書きの鍵にも `tests/scripts` 全部の原文のハッシュと核の版が入るので古い値は返らないが、版で変更を明示する約束）。"""
     assert CB.SOLVER_VERSION in SOLVER_FINGERPRINTS, "新しい SOLVER_VERSION の指紋を SOLVER_FINGERPRINTS に足す"
     assert SOLVER_FINGERPRINTS[CB.SOLVER_VERSION] == solver_fingerprint(), \
         "解き方が変わった: crossing_bridge.SOLVER_VERSION を上げて指紋 %s を足す" % solver_fingerprint()

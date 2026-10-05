@@ -7,8 +7,9 @@
 * 問題の入力の全部（守る側の札・ドン・ブロッカー・ライフ・地平・ライフの札／引く札の分布・手札から出るブロッカー・
   攻め手の財布 `actx` の全項目〔覚え書きの `_gain` だけ除く〕）を `repr`（浮動小数は最短の厳密な表記）で。
 * 値段の文脈（`cut_context_key`・守り手の窓が有るか）と計算の予算 `EX_STATE_BUDGET`。
-* **解き方の版** `crossing_bridge.SOLVER_VERSION`（解き方を変えたら上げる・テストが解き方の関数の原文の指紋で見張る）
-  と **`tests/scripts/*.py` 全部の原文のハッシュ**（どれか 1 文字でも変われば別の鍵＝古い値は返らない）。
+* **解き方の版** `crossing_bridge.SOLVER_VERSION`（解き方を変えたら上げる・テストが解き方の関数の原文と Rust の核の
+  原文の指紋で見張る）と **`tests/scripts/*.py` 全部の原文のハッシュ**（どれか 1 文字でも変われば別の鍵＝古い値は返らない）と
+  **Rust の核の版**（`rd_kernel.kernel_tag()`＝入口の版と `src/theory` の原文のハッシュ・第 3 段から必ず入る）。
 * 解き方が**読みうる大文字の大域**（切替・定数）の今の値——`rule_don_solve` から呼ばれうる関数をモジュールをまたいで
   たどって集める（`solver_reads`・多めに拾う側）。解き方が読まない切替（`PRE_SETTLE_MODE` 等）は入れない＝器ごとに
   違う切替を立てても同じ問題は同じ鍵（器をまたいで共有できる）。`__main__` として走っても import されても同じ鍵。
@@ -98,7 +99,8 @@ def globals_snapshot(reads):
 
 
 #: 実行中に数が増えるだけの数え先と、この覚え書き自身（値に入らない）——鍵に入れると毎回別の鍵になって覚え書きが効かない
-_VOLATILE = {"RULE_STATS", "EX_SPEED_STATS", "PLAN_STORE"}
+#: （`STATS` は `rd_kernel` の呼び出しの数え先＝解き方が `rd_kernel` の関数を呼ぶので、たどると拾われる）
+_VOLATILE = {"RULE_STATS", "EX_SPEED_STATS", "PLAN_STORE", "STATS"}
 
 
 class PlanStore:
@@ -121,13 +123,14 @@ class PlanStore:
         cb = self.cb
         ax = sorted((k, v) for k, v in actx.items() if k != "_gain")
         import cut_price as CP
-        # Rust の核で解く試行は別の鍵（核の誤りが Python の覚え書きを汚さない・核を直せば別の鍵）。`py` は従来と同じ鍵
+        # **Rust 化・第 3 段**: 解くのは Rust の核だけ——核の版（入口の版と `src/theory` の原文のハッシュ）を鍵に入れる
+        # （核を直せば別の鍵＝古い値は返らない）
         tag = getattr(cb, "RD_KERNEL_TAG", None)
-        tag = tag() if tag is not None else "py"
+        tag = tag() if tag is not None else "rs:none"
         body = repr((cb.SOLVER_VERSION, self.src, globals_snapshot(self.reads),
                      list(cards_d or ()), don_d, list(blk or ()), life, turns, tuple(life_types or ()),
                      tuple(draw_types or ()), tuple(arrive or ()), ax, cb.cut_context_key(),
-                     CP.active() is not None, cb.EX_STATE_BUDGET) + (() if tag == "py" else (tag,)))
+                     CP.active() is not None, cb.EX_STATE_BUDGET, tag))
         return hashlib.sha256(body.encode()).hexdigest()
 
     def get(self, key):
