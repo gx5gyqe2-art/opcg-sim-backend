@@ -710,24 +710,17 @@ def test_the_shared_nu_mode_flag_follows_the_module_default_and_writes_back():
 
 def test_activated_ability_pricing_uses_the_state_to_cap_up_to_n_don():
     """**「N 枚まで」は上限であって期待値ではない**（T41）——起動メインの値付けに判断点の状態を渡し、
-    ドンデッキが空なら `RAMP_DON` は 0 になる。`ACTIVATE_USES_STATE` は感度の切替（切ると N を上限として読む）。
+    ドンデッキが空なら `RAMP_DON` は 0 になる（N を上限として読む感度の切替は 2026-10-05 に削除）。
     """
     from opcg_sim.learned.train import plan_labels as PL
     cards = PL.Cards()
     ctx_full = {"theta": T.THETA, "mu": T.MU, "opp_leader_power": 5000.0, "my_leader_power": 5000.0,
                 "r_turns": 4.0, "don_k": 1, "st": {"my_don_deck": 10, "my_don": 10, "my_don_rested": 10}}
     ctx_empty = dict(ctx_full, st={"my_don_deck": 0, "my_don": 0, "my_don_rested": 0})
-    before = T.ACTIVATE_USES_STATE
-    try:
-        T.ACTIVATE_USES_STATE = True
-        full = T.score_candidate(["ACTIVATE_MAIN"], "OP15-058", None, ctx_full, cards)     # エネル
-        empty = T.score_candidate(["ACTIVATE_MAIN"], "OP15-058", None, ctx_empty, cards)
-        assert full is not None and empty is not None
-        assert empty < full                                   # 追加できるドンが無ければ安い
-        T.ACTIVATE_USES_STATE = False
-        assert T.score_candidate(["ACTIVATE_MAIN"], "OP15-058", None, ctx_empty, cards) == pytest.approx(full)
-    finally:
-        T.ACTIVATE_USES_STATE = before
+    full = T.score_candidate(["ACTIVATE_MAIN"], "OP15-058", None, ctx_full, cards)     # エネル
+    empty = T.score_candidate(["ACTIVATE_MAIN"], "OP15-058", None, ctx_empty, cards)
+    assert full is not None and empty is not None
+    assert empty < full                                       # 追加できるドンが無ければ安い
 
 
 # ---- T43: 登場の機会費用を状態で決める（2026-09-16） ----
