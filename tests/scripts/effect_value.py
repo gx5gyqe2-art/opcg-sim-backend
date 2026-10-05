@@ -2328,7 +2328,8 @@ def _play_from_hand_now(target, st, card, n, mu, opp_bodies=None):
 #: （個々の札の素性を追う記録が無いため・絞り込み〔特徴・名前〕は上限として読む＝ファイルの他の場所と
 #: 同じ「読めないものは払えるとして読む」規約）。**既定 `check`**（ユーザ決定 2026-09-25・D-5 の物差しの上で値段と実現を
 #: 両記録で近づけた・`2026-09-25_d5_decision_rows.md`）。状態が無い行は `check` でも「払える」に落ちる＝上限。
-#: `off`＝旧（常に払えるとして読む）。
+#: 旧 `off`（常に払えるとして読む）は波C（2026-10-05）で削除——凍結ブランチ `claude/theory-switches-final` で再現する。
+#: 出力 JSON の `cost_afford` キーは定数 `"check"` のまま。
 #:
 #: **実装時のレビュー（ワークフロー・独立3観点×検証）で2件の実害を確認・その場で直した**:
 #: リーダー対象は上の3.の直しだけだと`card_type`に`"LEADER"`が在れば絞り込み（特徴・名前等）を無視して
@@ -2347,42 +2348,19 @@ def _play_from_hand_now(target, st, card, n, mu, opp_bodies=None):
 #: ドンで判定する（エンジンは出す札のコストをアクティブなドンのレストで先に払ってから登場時・【メイン】
 #: を解決する）。状態を渡して呼ぶ経路は全部「手札から出す」文脈（登場時・イベント・手札の計画価格）で、
 #: 効果でただで出す相方（T70）は状態を渡さないのでこの判定に来ない。
-COST_AFFORD_MODES = ("off", "check")
 COST_AFFORD_MODE = "check"
 
 
-def set_cost_afford_mode(mode):
-    global COST_AFFORD_MODE
-    if mode not in COST_AFFORD_MODES:
-        raise ValueError("cost afford mode は %s のどれか" % (COST_AFFORD_MODES,))
-    COST_AFFORD_MODE = mode
-    return COST_AFFORD_MODE
-
-
-def add_cost_afford_arg(ap):
-    ap.add_argument("--cost-afford", default=None, choices=COST_AFFORD_MODES,
-                    help="**D-4** コストの支払い可否: `check`（ドン‼️・場／手札の自分自身・リーダー・枚数・"
-                         "ライフ／トラッシュの枚数を見る・既定）／`off`（旧・常に払えるとして読む）")
-
-
-def apply_cost_afford(a):
-    if getattr(a, "cost_afford", None) is not None:
-        set_cost_afford_mode(a.cost_afford)
-    return COST_AFFORD_MODE
-
-
 def _cost_unpayable(cost_acts, card, st):
-    """**コストを払える札が無いか**（T70／D-2/D-4）。**`off` は D-2 以前と 1 バイトも変わらない**（既定は `check`・2026-09-25）——
-    自分自身・リーダー・枚数・ライフ／トラッシュの扱いは全部 `COST_AFFORD_MODE=="check"` の中だけで効く。
-    `check`: **ドン‼️−N**（`RETURN_DON`）は場のドンの合計 `st["my_don_total"]` と、**ドンをレストにする
+    """**コストを払える札が無いか**（T70／D-2/D-4・`COST_AFFORD_MODE=check`）。
+    **ドン‼️−N**（`RETURN_DON`）は場のドンの合計 `st["my_don_total"]` と、**ドンをレストにする
     コスト**（`REST_DON`・自分のアクティブなドンを付与する`ATTACH_DON`）は出す札のコストを払った後の
     アクティブなドン `st["my_don_active"] − cost` と比べる（`search_ctx` が無い行でも効く・読めなければ上限）。**場・手札・ライフ・トラッシュから札を要るコスト**（`target` が在る）は、
     自分自身（`ref_id=="self"`・判定時点で必ず場に在る）を素通りし、リーダー（`card_type` に`"LEADER"`）は
     素性（`st["my_leader"]`）が絞り込みに合えば払える札として数えたうえで、絞り込みに合う札の数が
     `target.count`（枚数）以上あるかを見る。ライフ・トラッシュは枚数のみ（個々の札の素性を追う記録が無い）。
     状態が無ければ `False`（払えるとして読む＝上限）。"""
-    check = COST_AFFORD_MODE == "check"
-    if check and st:
+    if st:
         have = st.get("my_don_active")
         total = st.get("my_don_total")
         # 登場時・イベントの値付けは「手札から出した後」に解決する——エンジンは出す札のコストを
@@ -2422,28 +2400,25 @@ def _cost_unpayable(cost_acts, card, st):
         t = e.get("target") or {}
         if not t or _side(t) != "SELF":
             continue
-        if check and t.get("ref_id") == "self":
+        if t.get("ref_id") == "self":
             continue                                                  # D-4: 自分自身は常に在る
         zones = _zone(t)
         leader_ok = 0
-        if check and "LEADER" in [str(x).upper() for x in (t.get("card_type") or [])]:
+        if "LEADER" in [str(x).upper() for x in (t.get("card_type") or [])]:
             my_leader = st.get("my_leader")
             # 素性（特徴・色・属性・名前）が読めなければ払えるとして読む（上限）。読めれば絞り込みに
             # 実際に合うかを見る——「特徴《ドレスローザ》のリーダー」等、素性を問う対象があるため。
             leader_ok = 1 if (my_leader is None or _matches_identity(t, my_leader)) else 0
-        if check:
-            n = t.get("count")
-            need_n = None if (n is not None and float(n) < 0) else (1.0 if n is None else float(n))  # -1(全部) は床なし
-        else:
-            need_n = 1.0                                              # 旧＝枚数は見ない（1 枚在るかだけ）
+        n = t.get("count")
+        need_n = None if (n is not None and float(n) < 0) else (1.0 if n is None else float(n))  # -1(全部) は床なし
         matched = None
         if zones == ["FIELD"] and ctx.get("field") is not None:
             matched = len(SP.eligible_deck_cards(t, list(ctx["field"]), cards)) + leader_ok
         elif zones == ["HAND"] and ctx.get("hand_items") is not None:
             matched = len(SP.eligible_hand_cards(t, ctx["hand_items"], cards, skip_cid=cid))
-        elif check and zones == ["LIFE"]:
+        elif zones == ["LIFE"]:
             matched = st.get("my_life")
-        elif check and zones == ["TRASH"]:
+        elif zones == ["TRASH"]:
             matched = st.get("my_trash")
         if matched is not None and need_n is not None and matched < need_n:
             return True
