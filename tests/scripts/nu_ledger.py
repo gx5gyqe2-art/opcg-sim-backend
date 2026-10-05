@@ -34,7 +34,6 @@ import guard_afford as GA  # noqa: E402
 from price_realised import NU_MEAS, SAT_OVER_PWR, state_meas  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
 from theory_bridge import is_decision_row as TB_is_decision_row  # noqa: E402  (D-5)
-from theory_bridge import add_decision_row_arg, apply_decision_row  # noqa: E402  (D-5)
 from theory_order import (KO_P, MU, PWR_EPS, S_CAN_ATTACK, S_IS_BLOCKER, S_IS_CHAR, S_POWER,  # noqa: E402
                           SC_MY_DON, SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE,
                           SLOT_OWN_FIELD, THETA, add_nu_mode_arg, apply_nu_mode, ko_p_of, nu_of,
@@ -194,7 +193,6 @@ def summarise(atk, body):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    add_decision_row_arg(ap)
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA)
@@ -202,7 +200,6 @@ def main(argv=None):
     add_nu_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
-    apply_decision_row(a)
     apply_nu_mode(a)
     t0 = time.time()
     atk, body, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)

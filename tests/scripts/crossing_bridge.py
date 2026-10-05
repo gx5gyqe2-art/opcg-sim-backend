@@ -42,7 +42,6 @@ from clock_calib import D_BINS, d_bin  # noqa: E402
 from price_realised import nu_meas_of, side_nu_meas  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
 from theory_bridge import is_decision_row as TB_is_decision_row  # noqa: E402  (D-5)
-from theory_bridge import add_decision_row_arg, apply_decision_row  # noqa: E402  (D-5)
 from theory_order import (DELTA, KO_P, LAM, MU, PWR_EPS, R_TURNS, S_IS_BLOCKER, S_IS_CHAR, S_IS_REST, SC_MY_DON, SC_MY_HAND, SLOT_OWN_FIELD, clock_scale,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE, S_POWER,
                           S_CAN_ATTACK, SLOT_HAND,                                       # T151-2（mirror_view）
@@ -4490,7 +4489,6 @@ _RDK.install(globals())
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    add_decision_row_arg(ap)
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA)
@@ -4531,7 +4529,6 @@ def main(argv=None):
     TO.add_defender_power_arg(ap)                   # 2b
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
-    apply_decision_row(a)
     apply_nu_mode(a)
     CP.apply_cut_price(a)                           # **N-3**
     TO.apply_defender_power(a)                      # 2b

@@ -66,7 +66,6 @@ import effect_value as EV  # noqa: E402
 from theory_bridge import (MOVE_FAMILIES, POL_COLS, ROW_COLS, _extra, _state_of,  # noqa: E402
                            move_family)
 from theory_bridge import is_decision_row as TB_is_decision_row  # noqa: E402  (D-5)
-from theory_bridge import add_decision_row_arg, apply_decision_row  # noqa: E402  (D-5)
 import theory_order as _TO  # noqa: E402
 from theory_order import (own_attackers_of, play_value, LAM, MU, PWR_EPS, S_IS_CHAR, S_POWER, SC_MY_DON, SC_MY_HAND,  # noqa: E402
                           SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE,
@@ -471,7 +470,6 @@ def summarise(per, reps=200, seed=0):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    add_decision_row_arg(ap)
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA)
@@ -494,7 +492,6 @@ def main(argv=None):
     EV.add_f_pricing_fixes_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
-    apply_decision_row(a)
     _TO.apply_attack_ability(a)
     _TO.apply_defender_power(a)                    # 2b
     _TO.apply_passive_body(a)
@@ -522,7 +519,7 @@ def main(argv=None):
     res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "flow_pricing": EV.FLOW_PRICING,
            "search_price": "plan", "hand_meas": "quality",
            "play_now": "hand", "cost_afford": EV.COST_AFFORD_MODE, "pricing_fixes": pricing_fixes,
-           "decision_rows": apply_decision_row(a),
+           "decision_rows": "main",
            "inflow": "on", "cond_clock": "on", "stats": stats,
            "frozen": {"lambda": LAM, "mu": MU, "delta": DELTA, "nu_meas": NU_MEAS, "theta": a.theta},
            "summary": summarise(per, a.boot_reps, a.seed), "seconds": round(time.time() - t0, 1)}

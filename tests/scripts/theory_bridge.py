@@ -564,29 +564,9 @@ def move_family(sig):
 #: （実記録の登場の 45%・`2026-09-25_d4_review.md`）。`main` は問いの行を判断点から外す＝窓は問いの答えの
 #: 後の本当の判断点まで伸び、問いの行自体も窓の始まりにならない（T47 が kind 1/2 に当てた直しと同じ）。
 #: 問いの行の候補に通常の手が混ざる行は実・合成とも 0（全部か無しか）なので先頭の候補だけで判定できる。
-#: **既定 `main`**（ユーザ決定 2026-09-25・`2026-09-25_d5_decision_rows.md`）。`any` は旧の数字を再現するときだけ。
-DECISION_ROW_MODES = ("any", "main")
-DECISION_ROW_MODE = "main"
+#: **`main` を採用**（ユーザ決定 2026-09-25・`2026-09-25_d5_decision_rows.md`）。旧の `any`（切替 `DECISION_ROW_MODE`・
+#: `--decision-rows`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。出力の `decision_rows` は定数 `"main"` のまま残す。
 SELECTION_ACTION = "RESOLVE_EFFECT_SELECTION"
-
-
-def set_decision_row_mode(mode):
-    global DECISION_ROW_MODE
-    if mode not in DECISION_ROW_MODES:
-        raise ValueError("decision row mode は %s のどれか" % (DECISION_ROW_MODES,))
-    DECISION_ROW_MODE = mode
-    return DECISION_ROW_MODE
-
-
-def add_decision_row_arg(ap):
-    ap.add_argument("--decision-rows", default=None, choices=DECISION_ROW_MODES,
-                    help="**D-5** 次の判断点: `main`（既定・効果の途中の選択の問いの行を外す）／`any`（旧）")
-
-
-def apply_decision_row(a):
-    if getattr(a, "decision_rows", None) is not None:
-        set_decision_row_mode(a.decision_rows)
-    return DECISION_ROW_MODE
 
 
 def is_selection_row(pol, L, ptr, i):
@@ -601,7 +581,7 @@ def is_decision_row(rows, pol, L, ptr, i):
     """「次の判断点」の並びに入れる行か（kind 0・`main` なら選択の問いの行を除く）。"""
     if int(rows["kind"][i]) != 0:
         return False
-    return DECISION_ROW_MODE == "any" or not is_selection_row(pol, L, ptr, i)
+    return not is_selection_row(pol, L, ptr, i)
 
 
 def _state_of(sc, ci, idx2cid, tok=None, cards=None):
@@ -1498,7 +1478,6 @@ def summarise(pairs, reps=200, seed=0):
 def main(argv=None):
     global MIRROR_ME
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    add_decision_row_arg(ap)
     add_guard_s_cost_arg(ap)                                   # G-2
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
@@ -1557,7 +1536,6 @@ def main(argv=None):
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     MIRROR_ME = (a.mirror == "on")                             # **H-4g**
-    apply_decision_row(a)
     _CP.apply_cut_price(a)                                     # **N-3**
     _TOM.apply_defender_power(a)                               # 2b
     apply_guard_s_cost(a)                                      # G-2
@@ -1602,7 +1580,7 @@ def main(argv=None):
         stats["wiring"] = {"attack_ability": _TOM.ATTACK_ABILITY_MODE, "passive_body": _TOM.PASSIVE_BODY_MODE,
                            **{k: (round(v, 5) if isinstance(v, float) else v) for k, v in _TOM.WIRING_STATS.items()}}
     pairs = pair_games(per, a.silent)
-    res = {"stats": stats, "decision_rows": DECISION_ROW_MODE,
+    res = {"stats": stats, "decision_rows": "main",
            "provisional": {"P3_theta": a.theta, "P2_silent": a.silent,
                            "T28c_margin": a.margin_comfort, "w_mode": _TO.W_MODE,
                            "flow_pricing": stats["flow_pricing"], "ledger_pricing": stats["ledger_pricing"],

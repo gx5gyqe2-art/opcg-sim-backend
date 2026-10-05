@@ -39,7 +39,6 @@ from nu_ledger import BANDS, band_of  # noqa: E402
 from price_realised import NU_MEAS, state_meas  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
 from theory_bridge import is_decision_row as TB_is_decision_row  # noqa: E402  (D-5)
-from theory_bridge import add_decision_row_arg, apply_decision_row  # noqa: E402  (D-5)
 from theory_order import (MU, S_IS_BLOCKER, S_IS_CHAR, S_POWER, SC_MY_DON, SC_MY_LEADER_POWER,  # noqa: E402
                           SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE, SLOT_OWN_FIELD, THETA,
                           add_nu_mode_arg, apply_nu_mode, attack_value_don, ko_p_of, option_value,
@@ -208,7 +207,6 @@ def summarise(bodies, r_by_life):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    add_decision_row_arg(ap)
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA)
@@ -218,7 +216,6 @@ def main(argv=None):
     TO.add_cbar_mode_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
-    apply_decision_row(a)
     apply_nu_mode(a)
     TO.apply_surv_mode(a)
     TO.apply_cbar_mode(a)
