@@ -31,7 +31,7 @@ import theory_order as T  # noqa: E402
 _SHIPPED = {n: getattr(CB, n) for n in (
     "THETA_HAND_MODE", "THETA_BODY_MODE",
     "THETA_RETURN_MODE", "SLOPE_BLOCK_MODE",
-    "RATE_WALK_MODE", "RATE_DECAY_MODE", "RACE_MODE", "SLOPE_TAKE_MODE")}
+    "RATE_WALK_MODE", "RATE_DECAY_MODE", "SLOPE_TAKE_MODE")}
 
 
 def test_the_shipped_defaults_are_the_ones_we_decided():
@@ -62,7 +62,6 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
         "SLOPE_TAKE_MODE": "life",               # T134・2026-10-05 既定に採用（ユーザ決定・旧 const は --slope-take const）
         "RATE_WALK_MODE": "grow",                # T94
         "RATE_DECAY_MODE": "off",                # T95（切替として残す）
-        "RACE_MODE": "static",                   # T90／T91／T104（切替として残す）
     }
 
 
@@ -1404,7 +1403,7 @@ def test_the_race_can_run_against_a_moving_threshold():
     """**T90**（ユーザとの整理 2026-09-18「その形で進めてください」）: 交点を**動く的との競争**で解く。
     **時間軸は流れの側に 1 本だけ**——`Θ` は在庫のまま・`A`（1 ターン目は盤面だけ＝召喚酔い）と
     相手の補充 `r`（引き 1 枚＝`Θ` の手札項と同じ 1 枚あたりの価格）が時間を持つ。"""
-    assert CB.RACE_MODE == "static"                                  # 既定は旧（採否はユーザ判定）
+    # 橋の的は動かない（`static`）——`net`／`deck`／`deck_shield` の切替は 2026-10-05 に削除。`tau_net` の算術だけ残す
     assert CB.tau_net(1.0, 0.25, 0.0, 0.0) == pytest.approx(4.0)     # 的が動かなければ Θ/A
     assert CB.tau_net(1.0, 0.25, 0.0, 0.05) == pytest.approx(5.0)    # 補充ありなら Θ/(A − r)
     # **手札の体は 2 ターン目から**（召喚酔い）: 1 ターン目 0.2・以後 0.3 → 0.2+0.3+0.3 = 0.8、残り 0.2 を 4 ターン目の途中で
@@ -1416,12 +1415,6 @@ def test_the_race_can_run_against_a_moving_threshold():
     assert CB.tau_from_profile(0.5, 0, prof) == pytest.approx(4.0)                 # 的が動かない
     assert CB.tau_from_profile(0.5, 0, prof, 1.0, 0.03) > 4.0                      # 動けば伸びる
     assert CB.tau_from_profile(0.5, 0, prof, 1.0, 0.0) == pytest.approx(4.0)       # r = 0 は従来と同じ
-    try:
-        assert CB.set_race_mode("net") == "net"
-        with pytest.raises(ValueError):
-            CB.set_race_mode("なにか")
-    finally:
-        CB.set_race_mode("static")
 
 
 def test_the_refill_can_come_from_the_rules_instead_of_the_play():
@@ -1429,12 +1422,7 @@ def test_the_refill_can_come_from_the_rules_instead_of_the_play():
     動く的の下がる速さ `r` を**帳簿の `g`**（打ち筋が入る）ではなく**デッキの中身**から出す形。
     的の解き方（`tau_net`／`tau_from_profile`）は `net` と同一で、**変わるのは `r` の出どころだけ**。"""
     import deck_refill as DR
-    assert "deck" in CB.RACE_MODES
-    assert CB.RACE_MODE == "static"                                  # 既定は据え置き（採否はユーザ判定）
-    try:
-        assert CB.set_race_mode("deck") == "deck"
-    finally:
-        CB.set_race_mode("static")
+    # （`RACE_MODE=deck` の切替は 2026-10-05 に削除・`r` の算術だけ残す）
     # `r` は `μ ×（切れる札の割合）`＝記録も打ち回しも読まない
     assert DR.r_of(0.5) == pytest.approx(T.MU * 0.5)
     prof = [0.05, 0.10, 0.15, 0.20, 0.25, 0.25]
@@ -1474,7 +1462,7 @@ def test_the_two_places_that_solve_for_tau_use_the_same_branch():
     """**T101**: 行の予測（`SLOPES` のループ）と `theta_check` の τ は**同じ式**でなければ、
     「τ が当たった行」の選び方が予測と食い違う。`collect` の中で 1 本に束ねたことを、
     式そのもの（`tau_grow`／`tau_net`／`Θ/A`）が既定の切替に従うことで確かめる。"""
-    assert CB.RATE_WALK_MODE == "grow" and CB.RACE_MODE == "static"   # 現在の既定
+    assert CB.RATE_WALK_MODE == "grow"                               # 現在の既定（的は動かない）
     # `grow` の既定では `r = 0`（`static` なので的は動かない）＝`tau_grow` の素の形
     assert _tg(1.0, 0.1, 0.1, 0.0, 0.0, 0.0) == pytest.approx(5.0)
     # `static` ＋ `flat` なら `Θ / A`（`predict` と同じ）
@@ -1612,7 +1600,6 @@ def test_the_refill_lands_in_the_shield_not_on_the_target():
     """**T104**（T102・T103 が指した先）: **補充も「使う時間」が要る**——引いた札は手札に入るだけで、
     **出せる速さは `shield_rate`（宣言された攻撃の本数）が決める**。
     `Θ + r·j` と直に足すと**上限なしに吸える**ことになり、交点が遠のきすぎる（T102 で偏り +6.37）。"""
-    assert "deck_shield" in CB.RACE_MODES and CB.RACE_MODE == "static"
     # 盾も補充も無ければ従来どおり
     assert _tg(0.5, 0.1, 0.0, 0.0, 0.0) == pytest.approx(5.0)
     # 的に直に足す旧い形（`r`）は上限が無いので、補充が速さに近いと一気に遠のく

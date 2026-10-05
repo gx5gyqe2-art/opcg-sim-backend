@@ -181,25 +181,24 @@ def test_the_decomposition_only_claims_to_be_exact_on_a_static_target():
     **C-5c（2026-09-25）以降、出荷既定は的が動く**（`THETA_RETURN_MODE=untap`＝レスト中のブロッカーが
     2 段目から戻る）ので、既定のままでは降りる。恒等式として読むなら `--theta-return off` で回す。"""
     assert BB.static_target() is False       # 出荷既定（untap）
-    old, old_ret = CB.RACE_MODE, CB.THETA_RETURN_MODE
+    old, old_ret = CB.RATE_DECAY_MODE, CB.THETA_RETURN_MODE
     try:
         CB.set_theta_return_mode("off")
         assert BB.static_target() is True
-        CB.set_race_mode("net")
+        CB.set_rate_decay_mode("ko")
         assert BB.static_target() is False
         with pytest.raises(SystemExit):
             BB.collect_budget(["/nonexistent"], 1)
     finally:
-        CB.set_race_mode(old)
+        CB.set_rate_decay_mode(old)
         CB.set_theta_return_mode(old_ret)
 
 
 def test_every_mode_that_moves_the_target_is_named():
-    """**的を動かす 4 つの切替**が条件に全部入っている（1 つ足したら落ちる）。"""
-    base = {n: getattr(CB, n) for n in ("RACE_MODE", "THETA_RETURN_MODE", "RATE_DECAY_MODE")}
+    """**的を動かす切替**が条件に全部入っている（1 つ足したら落ちる・`RACE_MODE`／`THETA_HAND_PLACE` は 2026-10-05 に削除）。"""
+    base = {n: getattr(CB, n) for n in ("THETA_RETURN_MODE", "RATE_DECAY_MODE")}
     CB.THETA_RETURN_MODE = "off"                 # 他の 3 つを測るために的を止めておく（既定は untap）
-    for name, off, on in (("RACE_MODE", "static", "net"),
-                          ("THETA_RETURN_MODE", "off", "untap"),
+    for name, off, on in (("THETA_RETURN_MODE", "off", "untap"),
                           ("RATE_DECAY_MODE", "off", "ko")):
         old = getattr(CB, name)
         try:

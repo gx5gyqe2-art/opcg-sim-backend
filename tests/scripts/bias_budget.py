@@ -30,10 +30,10 @@
 
 ## 成り立つ条件（既定で成り立つ・破れたら器が黙らずに落ちる）
 
-`RACE_MODE=static`・`THETA_HAND_PLACE=stock`・`THETA_RETURN_MODE=off`（**C-5c 以降は既定でない**）・`RATE_DECAY_MODE=off` では
+的の解き方 `static`・手札の置き場所 `stock`（どちらも 2026-10-05 から固定＝切替は削除）・`THETA_RETURN_MODE=off`（**C-5c 以降は既定でない**）・`RATE_DECAY_MODE=off` では
 `tau_grow` の的は**定数 `Θ`**（`need = theta + r·j + 盾 + 段差` の後ろ 3 項が 0）。
 このとき**速さの列だけを差し替えた歩き**が作れる＝分解が恒等式になる。
-的が動く構成（`race`／`shield`／`untap`／`decay`）では第 2 項の意味が変わるので、
+的が動く構成（`untap`／`decay`）では第 2 項の意味が変わるので、
 `--require-static` を既定で有効にし、**既定以外の構成では明示的に降りる**。
 
 ## 3 つの出口を突き合わせる鍵（T112 で `collect` に足した `g`/`who`）
@@ -72,8 +72,8 @@ CAP = CB.RACE_CAP
 def static_target():
     """**的が定数か**（分解が恒等式になる条件）。**C-5c（2026-09-25）以降の既定では偽**
     （`THETA_RETURN_MODE=untap` で的が 2 段目から動く）——恒等式として読むなら `--theta-return off` で回す。"""
-    return (CB.RACE_MODE == "static"                     # 手札の置き場所は常に `stock`（`THETA_HAND_PLACE` は削除済）
-            and CB.THETA_RETURN_MODE == "off" and CB.RATE_DECAY_MODE == "off")
+    # 的の解き方は常に `static`・手札の置き場所は常に `stock`（`RACE_MODE`／`THETA_HAND_PLACE` は 2026-10-05 に削除）
+    return (CB.THETA_RETURN_MODE == "off" and CB.RATE_DECAY_MODE == "off")
 
 
 def tau_of_sequence(theta, adds, tail, cap=CAP):
@@ -266,7 +266,7 @@ def collect_budget(dirs, limit_games=0, theta=None, mu=None, require_static=True
         raise SystemExit(
             "的が動く構成では分解が恒等式にならない（RACE_MODE=%s THETA_HAND_PLACE=%s "
             "THETA_RETURN_MODE=%s RATE_DECAY_MODE=%s）。--no-require-static で強行できる。"
-            % (CB.RACE_MODE, "stock", CB.THETA_RETURN_MODE, CB.RATE_DECAY_MODE))
+            % ("static", "stock", CB.THETA_RETURN_MODE, CB.RATE_DECAY_MODE))
     theta = THETA if theta is None else theta
     mu = MU if mu is None else mu
     rows_out, _ledger, stats, turn_harm, theta_check = CB.collect(dirs, limit_games, theta, mu, "const")
@@ -279,7 +279,7 @@ def collect_budget(dirs, limit_games=0, theta=None, mu=None, require_static=True
     out = {"turns": summarise_budget(by_turn), "rows": summarise_budget(by_row),
            "ledger_bias": led_bias, "ledger_sigma_T": ((led.get("by_slope") or {}).get("theory") or {}).get("sigma_T"),
            "static_target": static_target(),
-           "modes": {"race": CB.RACE_MODE, "theta_hand_place": "stock",
+           "modes": {"race": "static", "theta_hand_place": "stock",
                      "theta_return": CB.THETA_RETURN_MODE, "rate_decay": CB.RATE_DECAY_MODE,
                      "rate_walk": CB.RATE_WALK_MODE, "don_purse": "all",
                      "theta_don": "rule", "theta_hand": CB.THETA_HAND_MODE,

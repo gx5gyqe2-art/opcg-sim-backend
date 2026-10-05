@@ -3023,8 +3023,10 @@ def seat_slope(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU):
     return a + b
 
 
-#: **交点の解き方**（T90・2026-09-18・ユーザ決定「その形で進めてください」）。
-#: `static`＝従来（`τ = Θ / A`＝**的が動かない**前提）／**`net`＝動く的との競争**:
+#: **交点の解き方**（T90・2026-09-18・ユーザ決定「その形で進めてください」）＝**的が動かない**（`static`）。
+#: 比べた `net`／`deck`（T91）／`deck_shield`（T104）（切替 `RACE_MODE`）は `deck` が両記録で反証され、
+#: 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。出力 JSON の `race` キーは定数 `"static"`、
+#: `r_deck_*` の数は 0 のまま残す。`tau_net`（局の開始の `tau_net_start` の欄）は残る。当時の `net`＝**動く的との競争**:
 #:
 #: ```
 #: F(t) = Σ_{i≤t} A_i   が   Θ_now + r·t   に届く時刻       （同じ式を `τ = Θ/(A − r)` とも書ける）
@@ -3043,17 +3045,7 @@ def seat_slope(sc, tok_row, ci_row, idx2cid, cards, olp, theta=THETA, mu=MU):
 #: `deck` は `r` を**規則とデッキの中身だけ**から出す（`deck_refill`・`r = μ ×（そのデッキの切れる札の割合）`）。
 #: 引くのは毎ターン 1 枚（規則）・その 1 枚が `Θ` の手札項に載るのは切れる札のときだけ（T77）。
 #: **手札に残すか出すかは `Θ` の中の引っ越し**（手札の項 ↔ 体の項）で `Θ` の増減ではない＝`r` には入らない。
-RACE_MODES = ("static", "net", "deck", "deck_shield")
-RACE_MODE = "static"
 RACE_CAP = 30.0          # 届かないときの打ち切り（ターン）
-
-
-def set_race_mode(mode):
-    global RACE_MODE
-    if mode not in RACE_MODES:
-        raise ValueError("race mode は %s のどれか" % (RACE_MODES,))
-    RACE_MODE = mode
-    return RACE_MODE
 
 
 def tau_net(theta, a_board, a_hand, r, cap=RACE_CAP):
@@ -3552,7 +3544,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              # **T131**: 通った割合の開示（平均と、手札が読めず割り引けなかった行の数）
              "rate_through": "off", "through_n": 0, "through_sum": 0.0,
              "through_missing": 0,
-             "race": RACE_MODE,
+             "race": "static",
              "r_deck_n": 0, "r_deck_sum": 0.0, "r_deck_missing": 0,
              "slope_hand": "flow", "a_flow_n": 0, "a_flow_sum": 0.0, "a_flow_missing": 0,
              "rate_walk": RATE_WALK_MODE, "rate_decay": RATE_DECAY_MODE, "stock_n": 0, "stock_sum": 0.0,
@@ -3813,23 +3805,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             return g
 
         def r_opp_of(defender, t):
-            """**守る席の補充**（1 守備ターンあたり `Θ` がどれだけ戻るか）。
-
-            `deck`（T91・規則）＝`μ ×（その席のデッキの切れる札の割合）`——**記録も打ち方も見ない**。
-            `net`（T90・旧）＝帳簿の `g`（その席の手札 1 枚あたりの価格）＝**打ち筋が入る**。
-            デッキを引けなかったときだけ `g` に落とす（数は `r_deck_missing` に残す）。"""
-            if RACE_MODE in ("deck", "deck_shield"):
-                sh = refill.get(seed_g)
-                if sh is not None:
-                    r = float(mu) * float(sh[int(defender)])
-                    stats["r_deck_n"] += 1; stats["r_deck_sum"] += r
-                    return r
-                stats["r_deck_missing"] += 1
+            """**守る席の補充**（1 守備ターンあたり `Θ` がどれだけ戻るか・行の `r_opp` 欄）＝帳簿の `g`
+            （その席の手札 1 枚あたりの価格・T90）。的は動かない（`static`）ので歩きには入らない。"""
             g = g_for(defender, t)
             return float(g if g is not None else mu)
 
         def r_deck_of(defender):
-            """**T102**: **デッキだけから出る補充**（`RACE_MODE` に依らない）。
+            """**T102**: **デッキだけから出る補充**。
 
             `theta_check` は `Θ`（在庫）と `要`（総量）を比べるので、**間の守備ターンで戻るぶん**を
             足さないと単位が揃わない。ここは**検算の側**なので、既定が `static` でも
@@ -3843,20 +3825,15 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
             **T101**: `theta_check` で「τ が当たった行」を選ぶために要る。行ごとの予測
             （下の `SLOPES` のループ）と**同じ枝**を通るよう、ここに 1 本だけ書いて両方から呼ぶ。"""
             if RATE_WALK_MODE == "grow":
-                # **T104**: `deck_shield` は補充を**的**ではなく**盾の在庫**に積む（`refill=`）。
-                r = d["r_opp"] if RACE_MODE in ("net", "deck") else 0.0
-                rf = d["r_opp"] if RACE_MODE == "deck_shield" else 0.0
                 return tau_grow(d["theta"], d["slope_lead"], d["slope_board"] - d["slope_lead"],
-                                d["slope_stock"], d["slope_flow"], r, step=d.get("th_back") or 0.0,
+                                d["slope_stock"], d["slope_flow"], 0.0, step=d.get("th_back") or 0.0,
                                 shield=d.get("shield") or 0.0, shield_rate=d.get("shield_rate") or 0.0,
                                 stock_rush=d.get("slope_stock_rush") or 0.0,
                                 flow_rush=d.get("slope_flow_rush") or 0.0,
-                                j0=int(d.get("j") or 0) + 1, refill=rf,
+                                j0=int(d.get("j") or 0) + 1, refill=0.0,
                                 eff=d.get("slope_eff") or 0.0,
                                 eff_once=d.get("slope_eff_once") or 0.0,
                                 sched=d.get("sched"))       # **T114**（`off` なら None＝旧の式）
-            if RACE_MODE in ("net", "deck"):
-                return tau_net(d["theta"], d["slope_board"], d["slope_hand"], d["r_opp"])
             return d["theta"] / max(SLOPE_FLOOR, d["slope_theory"])
 
         def seat_row(w, t, j, sc, tok, _ci, f_real, t_left, stats):
@@ -4153,9 +4130,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 for sv in SLOPES:
                     s_me = me["slope_" + sv] if me["slope_" + sv] is not None else me["slope_theory"]
                     s_op = op["slope_" + sv] if op["slope_" + sv] is not None else op["slope_theory"]
-                    if sv == "theory" and (RATE_WALK_MODE == "grow"
-                                           or RACE_MODE in ("net", "deck", "deck_shield")):
-                        # **T94**（積み上がる歩き）／**T90**（動く的）。**式は `tau_theory_of` に 1 本だけ置き、
+                    if sv == "theory" and RATE_WALK_MODE == "grow":
+                        # **T94**（積み上がる歩き）。**式は `tau_theory_of` に 1 本だけ置き、
                         # `theta_check` と同じ枝を通す**（T101）。
                         tau_me = tau_theory_of(me); tau_opp = tau_theory_of(op)
                         pred = tau_me <= tau_opp
@@ -4341,19 +4317,12 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
                     ("curve_scaled",
                      r["slope_theory_me"] / max(SLOPE_FLOOR, prof_th[min(r["j_me"], len(prof_th) - 1)]),
                      r["slope_theory_opp"] / max(SLOPE_FLOOR, prof_th[min(r["j_opp"], len(prof_th) - 1)]))):
-                # **T90**: `net` なら的が毎ターン相手の補充ぶん下がる（`r_opp_*` は行に載せてある）
-                moving = RACE_MODE in ("net", "deck")
-                rr_me = float(r.get("r_opp_me") or 0.0) if moving else 0.0
-                rr_op = float(r.get("r_opp_opp") or 0.0) if moving else 0.0
-                # **T104**: `deck_shield` は補充を盾の在庫へ（出せる速さの上限を受ける）
-                fill = RACE_MODE == "deck_shield"
-                rf_me = float(r.get("r_opp_me") or 0.0) if fill else 0.0
-                rf_op = float(r.get("r_opp_opp") or 0.0) if fill else 0.0
-                tm = tau_from_profile(r["theta_me"], r["j_me"], prof, scale_me, rr_me,
-                                      r.get("shield_me") or 0.0, r.get("shield_rate_me") or 0.0, rf_me,
+                # 的は動かない（`static`・T90 の `net`／T104 の `deck_shield` は 2026-10-05 に削除）
+                tm = tau_from_profile(r["theta_me"], r["j_me"], prof, scale_me, 0.0,
+                                      r.get("shield_me") or 0.0, r.get("shield_rate_me") or 0.0, 0.0,
                                       step=r.get("th_back_me") or 0.0)
-                to = tau_from_profile(r["theta_opp"], r["j_opp"], prof, scale_op, rr_op,
-                                      r.get("shield_opp") or 0.0, r.get("shield_rate_opp") or 0.0, rf_op,
+                to = tau_from_profile(r["theta_opp"], r["j_opp"], prof, scale_op, 0.0,
+                                      r.get("shield_opp") or 0.0, r.get("shield_rate_opp") or 0.0, 0.0,
                                       step=r.get("th_back_opp") or 0.0)
                 r["tau_me_" + sv] = tm; r["tau_opp_" + sv] = to; r["pred_" + sv] = (tm <= to)
     if theta_check:
@@ -4550,10 +4519,6 @@ def main(argv=None):
     ap.add_argument("--limit-games", type=int, default=0)
     ap.add_argument("--theta", type=float, default=THETA)
     ap.add_argument("--theta-mode", default="const", choices=("const", "board", "max"))
-    ap.add_argument("--race", default=RACE_MODE, choices=RACE_MODES,
-                    help="**T90** 交点の解き方: `static`（旧・`τ = Θ/A`＝的は動かない）／"
-                         "`net`（動く的＝1 ターン目は盤面だけ・的は毎ターン相手の補充 `r` だけ下がる・`r` は帳簿の `g`）／"
-                         "`deck`（**T91** 同じ動く的で `r` を**規則とデッキの中身だけ**から出す＝`μ ×`切れる札の割合）")
     ap.add_argument("--theta-return", default=THETA_RETURN_MODE, choices=THETA_RETURN_MODES,
                     help="**T96** レストのブロッカー: `off`（旧）／"
                          "`untap`（今の `Θ` から外し、`j ≥ 2` の段差として補充の側へ＝規則どおり）")
@@ -4612,7 +4577,6 @@ def main(argv=None):
     set_rate_decay_mode(a.rate_decay)
     set_theta_return_mode(a.theta_return)
     set_theta_body_mode(a.theta_body)
-    set_race_mode(a.race)
     rows_out, ledger, stats, turn_harm, theta_check = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
     if stats.get("g_n"):
         stats["g_mean"] = round(stats["g_sum"] / stats["g_n"], 4)
