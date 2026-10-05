@@ -77,7 +77,6 @@ _PLAIN_HAND_TESTS = (
     "test_a_rested_blocker_is_not_endurance_now_but_comes_back",
     "test_theta_hand_mode_prices_the_hand_by_quality_instead_of_the_count",
     "test_the_hand_carries_two_values_cuttable_for_the_threshold_and_playable_for_the_rate",
-    "test_the_endurance_counts_bodies_the_same_way_the_harm_side_does",
     "test_the_endurance_counts_only_what_cannot_be_walked_past",
 )
 
@@ -167,33 +166,23 @@ def _sc(opp_life=3, opp_hand=4):
 
 
 def test_the_threshold_is_the_opponents_endurance_in_price_units():
-    """しきい値の形（`λL + gH + Σν_meas(吸える体)`）。**体の集合は `THETA_BODY_MODE` が決める**ので、
-    旧 `blockers`（アクティブなブロッカーだけ・レストは数えない）を明示して算術を固定する（既定は T83 の `attackable`）。"""
+    """しきい値の形（`λL + gH + Σν_meas(吸える体)`）。体の集合は `blockers`（アクティブなブロッカーだけ・
+    レストは数えない・T97・波C で切替は削除＝定数）。"""
     tok = _plain_tok()                       # 波C: `cuttable_forced` が `g × 枚数` に落ちる盤面
-    try:
-        CB.set_theta_body_mode("blockers")                                           # 既定（T97）
-        assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
-        tok[7, T.S_POWER], tok[7, T.S_IS_CHAR], tok[7, T.S_IS_BLOCKER] = 0.6, 1.0, 1.0  # アクティブなブロッカー 6000
-        assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU + PR.NU_MEAS["leader_to_sat"])
-        tok[7, T.S_IS_REST] = 1.0                                                        # `blockers` ではレスト中は数えない
-        assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
-    finally:
-        CB.set_theta_body_mode("blockers")
+    assert CB.THETA_BODY_MODE == "blockers"
+    assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
+    tok[7, T.S_POWER], tok[7, T.S_IS_CHAR], tok[7, T.S_IS_BLOCKER] = 0.6, 1.0, 1.0  # アクティブなブロッカー 6000
+    assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU + PR.NU_MEAS["leader_to_sat"])
+    tok[7, T.S_IS_REST] = 1.0                                                        # `blockers` ではレスト中は数えない
+    assert CB.threshold(_sc(3, 4), tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
 
 
 def test_sigma_t_comes_from_the_measurement_and_follows_the_body_set():
     """**T97**（ユーザ指示「理論的に正しいものにしたい」）: `σ_D = √2 × σ_T` の `σ_T` は
     **借り物の 1.0 ではなく交点の橋の実測**（輪郭の表の `sigma_t`）から採る。
-    **耐久の体の集合ごとに違う**（`blockers` は `attackable` より小さい）ので追随し、
-    **測る記録と別のセット**の値を使う（輪郭と同じ規約）。"""
-    b_real, b_syn = CB.sigma_t_for(None, "real"), CB.sigma_t_for(None, "syn")     # 既定 `blockers`
+    **耐久の体の集合（`blockers`）の行**を引き、**測る記録と別のセット**の値を使う（輪郭と同じ規約）。"""
+    b_real, b_syn = CB.sigma_t_for(None, "real"), CB.sigma_t_for(None, "syn")     # `blockers`
     assert b_real and b_syn and b_real > 0.0 and b_syn > 0.0
-    try:
-        CB.set_theta_body_mode("attackable")
-        a_real, a_syn = CB.sigma_t_for(None, "real"), CB.sigma_t_for(None, "syn")
-    finally:
-        CB.set_theta_body_mode("blockers")
-    assert b_real > 0.0 and a_real > 0.0             # `attackable` は 2026-09-18 の旧い既定のまま（波C で消す）＝大小は比べない
     assert CB.sigma_t_for(None, "real", body_mode="blockers") == b_real
     assert CB.sigma_t_for(None, "なにか") is None or True   # 知らない名前は cross 扱い
     assert CB.sigma_t_for([], "cross") is None      # 記録の種類が判らなければ引かない
@@ -204,14 +193,8 @@ def test_w_bar_comes_from_the_measurement_too():
     `0.5/R` は閉じた形の代用で、`σ_T` を実測にし耐久の形を変えたら一致しなくなった
     （`blockers` で `κ` の平均 1.505／1.737）ので、**同じ器の実測**を使う。規約は `σ_T` と同じ。"""
     import theory_order as TO
-    b_real, b_syn = CB.w_bar_for(None, "real"), CB.w_bar_for(None, "syn")     # 既定 `blockers`
+    b_real, b_syn = CB.w_bar_for(None, "real"), CB.w_bar_for(None, "syn")     # `blockers`
     assert b_real and b_syn and b_real > 0.0 and b_syn > 0.0
-    try:
-        CB.set_theta_body_mode("attackable")
-        a_real, a_syn = CB.w_bar_for(None, "real"), CB.w_bar_for(None, "syn")
-    finally:
-        CB.set_theta_body_mode("blockers")
-    assert a_real > 0.0 and a_syn > 0.0           # `attackable` は 2026-09-18 の旧い既定のまま（波C で消す）＝大小は比べない
     # 2026-10-05 の作り直し（Rust 版）で `blockers` の `w̄` は 0.0948／0.1589 になり `0.5/R`（0.121）の両側に分かれた
     assert CB.w_bar_for([], "cross") is None      # 記録の種類が判らなければ引かない
 
@@ -874,11 +857,6 @@ def test_a_rested_blocker_is_not_endurance_now_but_comes_back():
     assert back > 0.0
     # **既定（`blockers`）では耐久に入らない**——今は横取りできないから（規則どおり）
     assert CB.threshold(sc, tok) == pytest.approx(3 * T.LAM + 4 * T.MU)
-    try:                                                         # 旧 `attackable` は**レストの体として**数えていた
-        CB.set_theta_body_mode("attackable")
-        assert CB.threshold(sc, tok) > 3 * T.LAM + 4 * T.MU
-    finally:
-        CB.set_theta_body_mode("blockers")
     try:
         CB.set_theta_return_mode("untap")
         # 段差は `j ≥ 2` からしか効かない＝1 ターン目で届くなら τ は変わらない
@@ -1225,31 +1203,6 @@ def test_the_hand_carries_two_values_cuttable_for_the_threshold_and_playable_for
     assert CB.THETA_HAND_MODE == "cuttable_forced"   # **T77 の 2 値化**（速さの手札の項は 2026-10-05 から常に入る・切替は削除）
 
 
-def test_the_endurance_counts_bodies_the_same_way_the_harm_side_does():
-    """**T82**（T81 の結論）: **`F` と `Θ` は同じものに同じ値段を付ける**。`F` の体の項は `price_realised.side_nu_meas`
-    で**場の全キャラ**を数える（レストもブロッカー以外も・付与ドンを外した素のパワーで）ので、`THETA_BODY_MODE=all` なら
-    `Θ` の体の項も**同じ関数の値**になる。`blockers`（旧）はアクティブなブロッカーだけ。"""
-    sc = _sc(3, 4)
-    sc[T.SC_MY_LEADER_POWER] = 0.5
-    tok = _plain_tok()                       # 波C: `cuttable_forced` が `g × 枚数` に落ちる盤面
-    tok[7, T.S_POWER], tok[7, T.S_IS_CHAR] = 0.6, 1.0                                  # ブロッカーでないキャラ
-    tok[8, T.S_POWER], tok[8, T.S_IS_CHAR], tok[8, T.S_IS_BLOCKER] = 0.5, 1.0, 1.0     # アクティブなブロッカー
-    tok[9, T.S_POWER], tok[9, T.S_IS_CHAR], tok[9, T.S_IS_BLOCKER] = 0.5, 1.0, 1.0
-    tok[9, T.S_IS_REST] = 1.0                                                          # レスト中のブロッカー
-    base = 3 * T.LAM + 4 * T.MU
-    try:
-        CB.set_theta_body_mode("blockers")
-        assert CB.threshold(sc, tok) == pytest.approx(base + PR.NU_MEAS["leader_to_sat"])   # アクティブなブロッカー 1 体だけ
-        assert CB.set_theta_body_mode("all") == "all"
-        # **`F` が使う関数そのもの**と一致する（3 体ぜんぶ）
-        assert CB.threshold(sc, tok) == pytest.approx(base + PR.side_nu_meas(tok, T.SLOT_OPP_FIELD, 5000.0))
-        assert CB.threshold(sc, tok) > base + PR.NU_MEAS["leader_to_sat"]              # 体を出すほど耐久が増える
-        with pytest.raises(ValueError):
-            CB.set_theta_body_mode("なにか")
-    finally:
-        CB.set_theta_body_mode("blockers")
-
-
 def test_the_endurance_counts_only_what_cannot_be_walked_past():
     """**T83 → T97**: 耐久は「**避けて通れないもの**」だけを数える。
 
@@ -1266,25 +1219,11 @@ def test_the_endurance_counts_only_what_cannot_be_walked_past():
     tok[9, T.S_POWER], tok[9, T.S_IS_CHAR], tok[9, T.S_IS_BLOCKER] = 0.5, 1.0, 1.0     # アクティブなブロッカー＝横取りできる
     base = 3 * T.LAM + 4 * T.MU
     one = PR.NU_MEAS["leader_to_sat"]
-    assert CB.THETA_BODY_MODE == "blockers"            # **既定は規則から出る形**（T97）
-    # 既定: アクティブなブロッカーだけ（レストの体もアクティブな非ブロッカーも入らない）
+    assert CB.THETA_BODY_MODE == "blockers"            # **規則から出る形**（T97・波C で切替は削除＝定数）
+    # アクティブなブロッカーだけ（レストの体もアクティブな非ブロッカーも入らない）
     assert CB.threshold(sc, tok) == pytest.approx(base + one)
     assert not CB._body_absorbs(tok, 7) and not CB._body_absorbs(tok, 8) and CB._body_absorbs(tok, 9)
-    try:
-        assert CB.set_theta_body_mode("attackable") == "attackable"
-        assert CB.threshold(sc, tok) == pytest.approx(base + 2 * one)                   # 旧: レスト 1 ＋ ブロッカー 1
-        assert not CB._body_absorbs(tok, 7) and CB._body_absorbs(tok, 8) and CB._body_absorbs(tok, 9)
-        # 3 つの数え方は順序で挟まる: 規則どおり ≤ 旧（殴れるか） ≤ 全キャラ
-        CB.set_theta_body_mode("blockers")
-        low = CB.threshold(sc, tok)
-        CB.set_theta_body_mode("attackable")
-        mid = CB.threshold(sc, tok)
-        CB.set_theta_body_mode("all")
-        high = CB.threshold(sc, tok)
-        assert low < mid < high
-        assert CB.threshold_of_me(sc, tok) == pytest.approx(0.0)                        # 自分のライフ・手札・場が空なら 0（どのモードでも）
-    finally:
-        CB.set_theta_body_mode("blockers")
+    assert CB.threshold_of_me(sc, tok) == pytest.approx(0.0)                            # 自分のライフ・手札・場が空なら 0
 
 
 def test_the_race_can_run_against_a_moving_threshold():
@@ -1775,33 +1714,6 @@ def test_a_counter_event_has_to_be_paid_for():
     assert CB.cuttable_share([], 5.0) == 0.0
     # **印字カウンターはドンが 0 でも数える**（規則どおり無料）
     assert CB.cuttable_share([printed], 0.0) == pytest.approx(1.0)
-
-
-def test_the_body_term_can_move_to_the_rate_side():
-    """**T129**（ユーザ決定 2026-09-20「相手の守りは入れましょう」）: **足すのではなく移す**。
-
-    ブロッカーは既定で `Θ`（的の遠さ）に在る。規則としては「リーダーへの攻撃を**横取りする**」＝
-    **そのターン届く量が減る**話なので速さ `A` の側。**両方に入れると同じ規則を 2 か所で数える**
-    （T97 の実害）ので、移すには `Θ` 側を空にする必要がある＝`THETA_BODY_MODE=none`。
-    """
-    tok = np.zeros((22, 24), np.float32)
-    s0 = T.SLOT_OPP_FIELD.start
-    tok[s0, T.S_POWER], tok[s0, T.S_IS_CHAR], tok[s0, T.S_IS_BLOCKER] = 0.6, 1.0, 1.0
-    sc = _sc(3, 4)
-    with_body = CB.threshold(sc, tok)
-    try:
-        assert CB.set_theta_body_mode("none") == "none"
-        without = CB.threshold(sc, tok)
-        # 体の項だけが消える（ライフと手札はそのまま）
-        life, hand, body = CB.threshold_parts(sc, tok)
-        assert body == 0.0
-        assert without == pytest.approx(life + hand)
-    finally:
-        CB.set_theta_body_mode("blockers")
-    assert with_body > without                       # 既定では体の項が在る
-    assert CB.THETA_BODY_MODE == "blockers"          # 既定は据え置き（採否はユーザ判定）
-    with pytest.raises(ValueError):
-        CB.set_theta_body_mode("なにか")
 
 
 def test_the_blockers_also_bite_on_the_scheduled_path():

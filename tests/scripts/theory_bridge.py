@@ -848,11 +848,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
         if prof is None:
             raise ValueError("harm profile が無い（%s・%s）" % (harm_profile, CB.HARM_PROFILE_PATH))
         # **T97**: `σ_D = √2 × σ_T` の `σ_T` を**同じ器の実測**から採る（T75 以来の借り物 1.0 を外す）。
-        # **耐久の体の集合ごとに違う**ので `THETA_BODY_MODE` に合わせ、**別のセットの値**を使う（輪郭と同じ規約）。
+        # **耐久の体の集合ごとに違う**ので `THETA_BODY_MODE`（定数 `blockers`）の行の、**別のセットの値**を使う（輪郭と同じ規約）。
         st = CB.sigma_t_for(dirs, harm_profile)
         if st is None:
             # **T129**（2026-09-20）: **黙って前の σ を使い回さない**。`σ_T` は**耐久の体の集合ごと**に
-            # 表から引くので、**表に無い形（例: `--theta-body none`）では引けない**——そのまま走ると
+            # 表から引くので、**表に無い形では引けない**（`--theta-body none` は波C で削除）——そのまま走ると
             # 「**どの物差しで測ったか分からない数字**」が出る。すぐ下の `σ_rel` は最初からこう書いてある。
             raise ValueError("σ_T が引けない（体の形 %r・%s・%s）＝黙って前の値を使い回さない"
                              % (CB.THETA_BODY_MODE, harm_profile, CB.HARM_PROFILE_PATH))
@@ -1511,9 +1511,6 @@ def main(argv=None):
                     help="**T76** 耐久の手札項（`--w-mode curve` の `D` に効く）: `rule_don`（既定・H-4・2026-10-04）／`cuttable_forced`（旧の既定）")
     ap.add_argument("--clock-hand", default=_TOM.CLOCK_HAND_MODE, choices=_TOM.CLOCK_HAND_MODES,
                     help="**T78** `--w-mode clock` の時計に手札の 2 つの価値を入れるか（`on`＝耐久は切れる札だけ・速さは今出せる体を足す・自席側のみ）")
-    ap.add_argument("--theta-body", default=_CB.THETA_BODY_MODE, choices=_CB.THETA_BODY_MODES,
-                    help="耐久の体の項（`--w-mode curve` の `D` に効く）: `blockers`（既定）／`all`（全キャラ・T82）／"
-                         "`attackable`（レストの体 ＋ アクティブなブロッカー＝規則から出る形・T83）")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     _TOM.add_attack_ability_arg(ap)
@@ -1535,7 +1532,6 @@ def main(argv=None):
     EV.apply_cost_afford(a)
     pricing_fixes = EV.apply_pricing_fixes(a)                  # L
     _CB.set_theta_hand_mode(a.theta_hand)
-    _CB.set_theta_body_mode(a.theta_body)
     _TOM.set_clock_hand_mode(a.clock_hand)
 
     try:
