@@ -19,7 +19,7 @@
 
 ## 2. 現在地（標準のブランチ `claude/cpu-spec-improvements-yw91jd`）
 
-先端は本書を書いた時点で `79c7fb14`（以降、本書のコミットが載る）。取り込み済みの主な作業:
+先端は `004d3729`（波 A の切替削除まで取り込み済み。その前は `79c7fb14`）。取り込み済みの主な作業:
 
 | 作業 | 要点 |
 |---|---|
@@ -42,7 +42,7 @@
 
 | 名前 | 場所 | 状態 |
 |---|---|---|
-| 切替の削除 波 A（Rust 化に関わる 12 通り） | 作業場所 `cleanup-a`（ローカルのサブエージェント） | **実行中**。凍結の出力を基準に、消した後で 1 バイト一致を確認する指示 |
+| 切替の削除 波 A（Rust 化に関わる 6 グループ） | 標準に取り込み済み（`004d3729`） | **完了**。5 計器の既定出力が実・合成とも前後で1バイト一致（秒数欄のみ差）、`make test` green（cargo 440・pytest 2084）。削除量 −1075/+238 行。出力のキーは定数で残してある（`bias_budget.py`・`don_ledger.py` に波A の余波あり＝波B/C で整理）。作業場所 `cleanup-a` は消してよい |
 | 表（`tests/fixtures/harm_profile.json`）の取り直し | ブランチ `sigma2`（先端 `0417c75f`・ローカル作業場所） | **下書きで保留**。新しい幅×古い輪郭の不整合のため**取り込まない**。Rust 化の後に「輪郭 → ばらつき → 勝率の幅 → 平均の傾き」の順で一度に作り直す（ユーザ決定 2026-10-05） |
 | 平均の傾き（分母）の測り直し | 上の作り直しに含める | `KAPPA_SIGMA_MODE=match` で、分母が旧い幅の平均のまま → 帳簿の較正が悪化（偏り 実 −0.092→−0.189）。分母を match の幅で測り直すと戻る、という**仮説**（未検証。予測は `sigma2` の報告書 §6.1 に記載） |
 
@@ -62,8 +62,8 @@
 
 ## 5. 次の課題の順番
 
-1. 切替の削除 波 A を取り込む → **波 B（きれいに消せる 57 通り）・波 C（依存のある 29 通り）**。棚卸しは `/tmp/.../rustprep_out/switch_inventory.md`（失われた場合は `docs/` に無いので、必要なら再作成。要点は §7 の波分け）。
-2. **Rust 化 段 2a**（計画の列挙と採点・`rules_sched`・`walk_crossing` の sched 部。守る側の計算を計画列挙の内側から呼ぶ形に）。設計は `rustprep_out/rust_design.md`（失われた場合は `docs/reports/2026-10-05_rust_kernel_stage1.md` に要点）。
+1. 切替の削除 波 A は済み → **波 B（きれいに消せる 57 通り）・波 C（依存のある 29 通り）**。棚卸しは `docs/reports/2026-10-05_switch_inventory.md`（波Bの内訳はここで**必ず確かめてから**作業を出す）。波Aの作業者の申し送り: 波Bに `SLOPE_MODE=board`・`THETA_HAND_PLACE=shield`・`RACE_MODE=net/deck/deck_shield`・`ATTACK_REST_MODE=body` ほか、`h4_tables.py` の旧い腕ラベルの整理、`CLAUDE.md` 221 行目の `--seq attack_le` 例の差し替え。波Cに `THETA_HAND_MODE=rule` と旧 `cuttable*/count/quality/play/guard`（`THETA_HAND_PART` 含む）・`THETA_RETURN_MODE=off`・表に縛られるもの、`bias_budget.py`＋`test_bias_budget.py` の削除。波Uは `ATTACK_DON_COST_MODE` 系（「残す」決定と食い違うので要確認）、`EX_LAYER_COUNT=False` は移植後に削除。
+2. **Rust 化 段 2a**（計画の列挙と採点・`rules_sched`・`walk_crossing` の sched 部。守る側の計算を計画列挙の内側から呼ぶ形に）。設計は `docs/reports/2026-10-05_rust_design.md`（段1の結果は `2026-10-05_rust_kernel_stage1.md`）。
 3. 表の作り直し（Rust 版で）→ 平均の傾きの測り直し → 較正が戻るかの確認。
 4. Rust 版を標準に（`OPCG_RD_KERNEL=auto`）→ 速くした Python 版を消す。
 5. 並行して進められる課題: **N-5**（引く札・手札の枚数・出ていく札を「1 枚 1 役」にそろえ、引いた札の価値の検算が実・合成で 0.9〜1.1 に入ったら `SEARCH_VALUE_MODE=joint` をまとめて標準に）、**N-6**（決着の予測・帳簿の道具に探す効果の値段を渡す配線）。
