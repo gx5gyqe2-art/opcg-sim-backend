@@ -40,8 +40,8 @@ s_t     = −( 実際に払った費用 − min(2 つのうち払えた方) )
 > **`guard_afford` の予算計算（無料カウンター＋ナップサック）をそのまま使う**。
 > ブロッカーが居れば無料で守れる。
 >
-> **G-2（2026-09-25）**: 「払えた」は**規則どおり合計 ≥ 超過 + 1000**（同値は命中・`GUARD_AFFORD_MODE=rule`・旧は
-> 合計 ≥ 超過＝`lenient`）。守る費用を**この手札で実際に失う価値**で測る切替 `GUARD_S_COST_MODE=hand`（既定は
+> **G-2（2026-09-25）**: 「払えた」は**規則どおり合計 ≥ 超過 + 1000**（同値は命中・旧の合計 ≥ 超過＝`lenient` の
+> 切替は 2026-10-05 に削除）。守る費用を**この手札で実際に失う価値**で測る切替 `GUARD_S_COST_MODE=hand`（既定は
 > 従来の `c(x)·μ`＝`curve`）。**G-2 の修正（2026-09-26）**: `hand` の守る備えは厳密な最大（`guard_value_exact`）を
 > 1 ラウンド割り引いて読む。失う価値は T67 の札ごとの価値 `max(ΔH, ΔG)` とは違う量（`GUARD_S_COST_MODES` の注記）。
 > **N-2（2026-09-26）**: `GUARD_S_COST_MODE=joint`＝手札の価値を 1 枚 1 役の最適な割り当て（`hand_joint.py`）で読む切替。
@@ -232,46 +232,13 @@ def _extra(dd, n):
 #: カウンターの合計が **`x + 1000` 以上**要る（`c(x)` の `strict`＝T61、`hand_guard.guard_cost_min_v` と同じ閾値）。
 #: 旧 `lenient` は「合計 ≥ `x`」で判定していた＝**超過 0 の攻撃ならカウンター 0 枚でも「守れた」**になり、
 #: ちょうど `x` の合計でも「守れた」になる＝**本当は守れなかった行に「受けた」罰点が付いていた**（G-1 の申し送りの調査で実行して確認）。
-#: **既定は `rule`**。`lenient` は旧の数字を再現するときだけ。**ブロッカーの判定は変えない**（無料で 1 回止める）。
-#: `GUARD_S_COST_MODE=hand` のときは、この切替に依らず規則どおり（止める組が無ければ守る費用が定義できないため）。
-GUARD_AFFORD_MODES = ("rule", "lenient")
-GUARD_AFFORD_MODE = "rule"
+#: **ブロッカーの判定は変えない**（無料で 1 回止める）。旧 `lenient`（切替 `GUARD_AFFORD_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
+#: 出力の `guard_afford`／`guard_afford_requested`／行の `afford_mode` は定数 `"rule"` のまま残す（バイト一致のため）。
 
 
-def set_guard_afford_mode(mode):
-    global GUARD_AFFORD_MODE
-    if mode not in GUARD_AFFORD_MODES:
-        raise ValueError("guard afford mode は %s のどれか" % (GUARD_AFFORD_MODES,))
-    GUARD_AFFORD_MODE = mode
-    return GUARD_AFFORD_MODE
-
-
-def add_guard_afford_arg(ap):
-    ap.add_argument("--guard-afford", default=None, choices=GUARD_AFFORD_MODES,
-                    help="**G-2** 守れたかの判定: `rule`（既定・カウンター合計 ≥ 超過 + 1000＝同値は命中）／"
-                         "`lenient`（旧・合計 ≥ 超過）")
-
-
-def apply_guard_afford(a):
-    if getattr(a, "guard_afford", None) is not None:
-        set_guard_afford_mode(a.guard_afford)
-    return GUARD_AFFORD_MODE
-
-
-def effective_guard_afford(afford=None, s_cost=None):
-    """**実際に効く**守れたかの閾値——`GUARD_S_COST_MODE=hand` では指定に依らず `rule`（`guard_step` の `afford_mode` 欄と同じ規約）。
-    実行全体の記録（`stats`・`provisional`）の `guard_afford` はこれ・指定された値は `guard_afford_requested` に別に刻む。"""
-    am = GUARD_AFFORD_MODE if afford is None else afford
-    sm = GUARD_S_COST_MODE if s_cost is None else s_cost
-    return "rule" if sm in ("hand", "joint") else am
-
-
-def afford_need(x, mode=None):
-    """超過 `x` の攻撃を止めるのに要るカウンターの合計（`rule`＝`x + 1000`〔`PWR_EPS` の許容つき〕・`lenient`＝`x`）。"""
-    mode = GUARD_AFFORD_MODE if mode is None else mode
-    if mode not in GUARD_AFFORD_MODES:
-        raise ValueError("guard afford mode は %s のどれか" % (GUARD_AFFORD_MODES,))
-    return float(x) + 1000.0 - PWR_EPS if mode == "rule" else float(x)
+def afford_need(x):
+    """超過 `x` の攻撃を止めるのに要るカウンターの合計（規則＝`x + 1000`〔`PWR_EPS` の許容つき〕）。"""
+    return float(x) + 1000.0 - PWR_EPS
 
 
 #: **G-2: 守りの判断（`s`）の「守る費用」を何で測るか**（2026-09-25・ユーザ決定「これで行きましょう」）。
@@ -472,7 +439,7 @@ def guard_hand_cost(hand, x, budget):
     x = float(x)
     if x < -PWR_EPS:
         return {"cost": 0.0, "set": (), "n_sets": 0}
-    need = afford_need(x, "rule")
+    need = afford_need(x)
     cand = [i for i, s in enumerate(slots) if _payable(s, budget)]
     prune = hand_value_monotone(hand)
     found = []
@@ -543,7 +510,7 @@ def guard_joint_cost(hand, x, budget):
     x = float(x)
     if x < -PWR_EPS:
         return {"cost": 0.0, "set": (), "n_sets": 0}
-    need = afford_need(x, "rule")
+    need = afford_need(x)
     cand = [i for i, s_ in enumerate(slots) if _payable(s_, budget)]
     found = []
     for r_ in range(1, len(cand) + 1):
@@ -567,13 +534,13 @@ def guard_joint_cost(hand, x, budget):
 
 
 def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=None,
-               afford=None, s_cost=None, hand=None):
+               s_cost=None, hand=None):
     """**守りの窓 1 つ**の取りこぼし（`≤ 0`）と、判定に使った内訳。
 
     **払えなかった行は誤りと数えない**——`measurement.md` §1。
     `g` は `delta`（攻め手の価格 − 払った額・T62）。`g_paid`（−払った額）／`g_delta` としても返す。
 
-    **G-2**: `afford`（省略時 `GUARD_AFFORD_MODE`）＝守れたかの閾値（`rule`＝合計 ≥ 超過 + 1000・`lenient`＝旧）。
+    **G-2**: 守れたかは規則どおり（合計 ≥ 超過 + 1000・`afford_need`）。
     `s_cost`（省略時 `GUARD_S_COST_MODE`）＝判断の守る費用（`curve`＝`c(x)·μ`・`hand`＝`guard_hand_cost`・`joint`＝`guard_joint_cost`〔N-2〕）。
     `hand`＝`guard_hand_reading` の戻り値（`hand`／`joint` のとき必須・`curve` では枚数の監査にだけ使う）。
     `curve` では従来の欄は 1 ビットも変えない（新しい欄を足すだけ）。`hand` では**守れたかは規則どおり**
@@ -582,9 +549,6 @@ def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=N
     xs = [x for x in incoming_x(tok) if x >= -PWR_EPS]
     if not xs:
         return None
-    _am = GUARD_AFFORD_MODE if afford is None else afford
-    if _am not in GUARD_AFFORD_MODES:
-        raise ValueError("guard afford mode は %s のどれか" % (GUARD_AFFORD_MODES,))
     _sm = GUARD_S_COST_MODE if s_cost is None else s_cost
     if _sm not in GUARD_S_COST_MODES:
         raise ValueError("guard s cost mode は %s のどれか" % (GUARD_S_COST_MODES,))
@@ -592,7 +556,7 @@ def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=N
     blocker = bool((np.asarray(tok)[GA.SLOT_OWN_FIELD][:, GA.S_BLOCKER] > 0.5).any())
     budget = int(round(float(sc[SC_MY_DON])))
     afford_pw = free + GA.knapsack(paid, budget)
-    can_guard = bool(blocker or afford_pw >= afford_need(x, _am))      # **G-2**: 既定は規則どおり（x + 1000）
+    can_guard = bool(blocker or afford_pw >= afford_need(x))           # **G-2**: 規則どおり（x + 1000）
     cost_take = float(theta) * float(mu)
     cost_guard = float(c_of(x)) * float(mu)
     # **G-2**: 判断に使う守る費用（`curve` なら `cost_guard` と同じもの＝従来と 1 ビットも違わない）
@@ -601,7 +565,7 @@ def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=N
         if hand is None or hand.get("caps") is None:
             raise ValueError("GUARD_S_COST_MODE=%s には手札の読み（guard_hand_reading(values=True)）が要る" % _sm)
         hc = (guard_hand_cost if _sm == "hand" else guard_joint_cost)(hand, x, budget)
-        # 守れたかは**規則どおり**（`GUARD_AFFORD_MODE` に依らない）: 止める組が在るのは `Σ無料 + knapsack ≥ x + 1000` と同値
+        # 守れたかは**規則どおり**: 止める組が在るのは `Σ無料 + knapsack ≥ x + 1000` と同値
         can_guard = bool(blocker or hc["cost"] is not None)
         if blocker:
             source = "blocker"                    # 限界: ブロッカーの行は従来の値段のまま
@@ -635,7 +599,7 @@ def guard_step(tok, sc, played, free, paid, theta=THETA, mu=MU, margin_comfort=N
     out.update({"cost_take": cost_take, "cost_guard_curve": cost_guard,
                 "cost_guard_hand": (None if hc is None else hc["cost"]),
                 "cost_guard_s": cost_guard_s, "cost_guard_source": source,
-                "afford_mode": effective_guard_afford(_am, _sm), "s_cost_mode": _sm,
+                "afford_mode": "rule", "s_cost_mode": _sm,
                 "n_hand_cards": (None if slots is None else len(slots)),
                 "n_counter_cards": (None if slots is None else sum(1 for s_ in slots if _payable(s_, budget))),
                 "hand_set_n": (None if hc is None or hc["set"] is None else len(hc["set"]))})
@@ -1027,8 +991,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
              # **T62**: 守りの窓の定義と、自ライフごとの内訳（受けた率・理論が受けろと言う率・`g` の平均）
              "guard_g": "delta", "grd_by_life": {},
              # **G-2**: 守れたかの閾値と、判断の守る費用の測り方
-             # `guard_afford` は**実際に効いた**閾値（`hand` は常に規則どおり）・指定された値は `guard_afford_requested`
-             "guard_afford": effective_guard_afford(), "guard_afford_requested": GUARD_AFFORD_MODE,
+             # `guard_afford` は実際に効いた閾値（2026-10-05 から常に規則どおり）
+             "guard_afford": "rule", "guard_afford_requested": "rule",
              "guard_s_cost": GUARD_S_COST_MODE,
              # **T68**: 探す能力の価格の規約と、デッキを復元できた席／できなかった席の数
              "search_price": "plan", "search_deck_ok": 0, "search_deck_bad": 0,
@@ -1606,7 +1570,6 @@ def main(argv=None):
     global MIRROR_ME
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     add_decision_row_arg(ap)
-    add_guard_afford_arg(ap)                                   # G-2
     add_guard_s_cost_arg(ap)                                   # G-2
     ap.add_argument("--in", dest="src", nargs="+", required=True, help="n_records のディレクトリ")
     ap.add_argument("--limit-games", type=int, default=0)
@@ -1668,7 +1631,6 @@ def main(argv=None):
     apply_decision_row(a)
     _CP.apply_cut_price(a)                                     # **N-3**
     _TOM.apply_defender_power(a)                               # 2b
-    apply_guard_afford(a)                                      # G-2
     apply_guard_s_cost(a)                                      # G-2
     _TOM.apply_attack_ability(a)
     _TOM.apply_passive_body(a)
@@ -1718,7 +1680,7 @@ def main(argv=None):
                            "surv_mode": _TO.SURV_MODE, "nu_mode": _TO.NU_MODE,
                            "cbar_mode": _TO.CBAR_MODE, "guard_g": "delta", "take_mode": _TO.TAKE_MODE,
                            "guard_cost": "spent", "search_price": "plan",
-                           "guard_afford": effective_guard_afford(), "guard_afford_requested": GUARD_AFFORD_MODE,   # G-2
+                           "guard_afford": "rule", "guard_afford_requested": "rule",   # G-2
                            "guard_s_cost": GUARD_S_COST_MODE,
                            "play_now": "hand", "inflow": "on", "cond_clock": "on",
                            "pricing_fixes": pricing_fixes,                                              # L

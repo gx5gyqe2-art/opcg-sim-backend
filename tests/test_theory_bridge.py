@@ -216,8 +216,7 @@ def test_the_margin_is_how_much_the_guard_overshoots_the_attack():
     tight = B.guard_step(tok, sc, "take", free=4500.0, paid=[])
     assert tight["can_guard"] is True and tight["comfortable"] is False
     assert tight["margin"] == pytest.approx(1500.0)
-    assert B.guard_step(tok, sc, "take", free=3500.0, paid=[])["can_guard"] is False    # 旧（lenient）では守れた扱い
-    assert B.guard_step(tok, sc, "take", free=3500.0, paid=[], afford="lenient")["can_guard"] is True
+    assert B.guard_step(tok, sc, "take", free=3500.0, paid=[])["can_guard"] is False    # 旧（lenient・削除済）では守れた扱い
 
 
 def test_the_comfort_threshold_is_a_provisional_value_you_can_sweep():

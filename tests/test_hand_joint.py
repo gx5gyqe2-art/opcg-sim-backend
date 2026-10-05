@@ -210,7 +210,6 @@ def test_joint_is_the_shipped_default():
     （他のテストが切替を触っても、戻し忘れがここを黙って通さない）。旧の `curve` は切替で残る。"""
     assert _SHIPPED_S_COST == "joint"
     assert B.GUARD_S_COST_MODES == ("curve", "hand", "joint")
-    assert B.effective_guard_afford("lenient", "joint") == "rule"
     old = B.GUARD_S_COST_MODE
     try:
         B.set_guard_s_cost_mode("curve")
@@ -256,7 +255,7 @@ def test_the_joint_cost_uses_only_just_sufficient_sets_and_is_the_minimum_loss()
     n = len(h["slots"])
     for x in (0.0, 1000.0, 2000.0, 3000.0):
         got = B.guard_joint_cost(h, x, 1)
-        need = B.afford_need(x, "rule")
+        need = B.afford_need(x)
         tot = lambda S: sum(h["slots"][i]["free"] for i in S) + B.GA.knapsack(
             [h["slots"][i]["paid"] for i in S if h["slots"][i]["paid"]], 1)
         assert tot(got["set"]) >= need

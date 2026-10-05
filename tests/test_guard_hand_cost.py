@@ -1,7 +1,8 @@
 """**G-2（2026-09-25・ユーザ決定「これで行きましょう」）**: 守りの判断（`theory_bridge.guard_step`）の 2 つの直し。
 
-1. **守れたかを規則どおりに判定する**（`GUARD_AFFORD_MODE`・既定 `rule`）——同じパワーは命中するので、超過 `x` を止めるには
-   カウンター合計が `x + 1000` 以上要る。旧 `lenient`（合計 ≥ `x`）は超過 0 ならカウンター 0 枚でも「守れた」にしていた。
+1. **守れたかを規則どおりに判定する**——同じパワーは命中するので、超過 `x` を止めるには
+   カウンター合計が `x + 1000` 以上要る。旧 `lenient`（合計 ≥ `x`・超過 0 ならカウンター 0 枚でも「守れた」）の切替は
+   2026-10-05 に削除（下の `_old_guard_step` は比較の基準としてだけ残す）。
 2. **守る費用をこの手札で実際に失う価値で測る切替**（`GUARD_S_COST_MODE`・`curve`＝従来の `c(x)·μ`・`hand` が新形。
    **既定は 2026-09-26 から N-2 の `joint`**＝`test_hand_joint.py`。本ファイルの代数は `curve` を明示して固定する）——
    止める札の組 `S` のうち `V(手札) − V(手札 − S)` が一番小さい組の減り。`V` は出す計画（T66）＋ **これから来る**
@@ -84,7 +85,7 @@ def _hand(slots, xs_future=(1000.0,), caps=(7, 9, 10, 10), take=TAKE):
 
 
 def _old_guard_step(tok, sc, played, free, paid, theta=T.THETA, mu=T.MU, margin_comfort=None):
-    """**G-2 より前の `guard_step` の写し**（HEAD f86e7d30 のまま）——`lenient` が旧を 1 ビットも違わず再現するかの基準。"""
+    """**G-2 より前の `guard_step` の写し**（HEAD f86e7d30 のまま）——規則どおりの判定で変わる行だけが変わることの基準。"""
     xs = [x for x in B.incoming_x(tok) if x >= -B.PWR_EPS]
     if not xs:
         return None
@@ -127,57 +128,36 @@ def _grid():
 # ---- 1. 既定と切替 ----
 
 def test_the_defaults_are_the_rule_and_the_old_cost():
-    assert B.GUARD_AFFORD_MODE == "rule"          # 既定は規則どおり（ユーザ決定 2026-09-25）
     assert _SHIPPED_S_COST == "joint"             # 判断の守る費用は N-2 の 1 枚 1 役（ユーザ決定 2026-09-26「判断1の続き→(a)」）
-    assert B.GUARD_AFFORD_MODES == ("rule", "lenient") and B.GUARD_S_COST_MODES == ("curve", "hand", "joint")
+    assert B.GUARD_S_COST_MODES == ("curve", "hand", "joint")
 
 
 def test_unknown_modes_are_refused_everywhere():
     for bad in ("", "strict", "なにか"):
         with pytest.raises(ValueError):
-            B.set_guard_afford_mode(bad)
-        with pytest.raises(ValueError):
             B.set_guard_s_cost_mode(bad)
         with pytest.raises(ValueError):
-            B.afford_need(0.0, bad)
-        with pytest.raises(ValueError):
-            B.guard_step(_tok(6000), _sc(), "take", 9000.0, [], afford=bad)
-        with pytest.raises(ValueError):
             B.guard_step(_tok(6000), _sc(), "take", 9000.0, [], s_cost=bad)
-    assert B.GUARD_AFFORD_MODE == "rule" and B.GUARD_S_COST_MODE == "curve"      # 弾かれた指定は今の値（ここでは固定した `curve`）を変えない
+    assert B.GUARD_S_COST_MODE == "curve"      # 弾かれた指定は今の値（ここでは固定した `curve`）を変えない
 
 
 def test_the_cli_flags_reach_the_modes():
     ap = argparse.ArgumentParser()
-    B.add_guard_afford_arg(ap)
     B.add_guard_s_cost_arg(ap)
     try:
         a = ap.parse_args([])
-        assert B.apply_guard_afford(a) == "rule" and B.apply_guard_s_cost(a) == "curve"      # 省略時は不動（固定した `curve` のまま）
-        a = ap.parse_args(["--guard-afford", "lenient", "--guard-s-cost", "hand"])
-        assert B.apply_guard_afford(a) == "lenient" and B.GUARD_AFFORD_MODE == "lenient"
+        assert B.apply_guard_s_cost(a) == "curve"                         # 省略時は不動（固定した `curve` のまま）
+        a = ap.parse_args(["--guard-s-cost", "hand"])
         assert B.apply_guard_s_cost(a) == "hand" and B.GUARD_S_COST_MODE == "hand"
         with pytest.raises(SystemExit):
-            ap.parse_args(["--guard-afford", "strict"])                   # 知らない値は argparse が弾く
+            ap.parse_args(["--guard-s-cost", "strict"])                   # 知らない値は argparse が弾く
     finally:
-        B.set_guard_afford_mode("rule")
         B.set_guard_s_cost_mode("curve")
     # 器の `main` が両方を組み込み、実行前に反映していること（片方だけ付け忘れると CLI の値が黙って捨てられる）
     src = inspect.getsource(B.main)
-    for piece in ("add_guard_afford_arg(ap)", "add_guard_s_cost_arg(ap)", "apply_guard_afford(a)", "apply_guard_s_cost(a)"):
+    for piece in ("add_guard_s_cost_arg(ap)", "apply_guard_s_cost(a)"):
         assert piece in src, piece
     assert src.index("apply_guard_s_cost(a)") < src.index("collect(a.src")
-
-
-def test_the_module_switch_is_what_the_step_reads_when_no_override_is_given():
-    tok, sc = _tok(opp_lead=5000), _sc(don=0)                  # 超過 0・カウンター 0 枚
-    try:
-        B.set_guard_afford_mode("lenient")
-        assert B.guard_step(tok, sc, "take", 0.0, [])["can_guard"] is True
-        B.set_guard_afford_mode("rule")
-        assert B.guard_step(tok, sc, "take", 0.0, [])["can_guard"] is False
-    finally:
-        B.set_guard_afford_mode("rule")
 
 
 # ---- 2. 規則どおりの「守れたか」 ----
@@ -185,8 +165,8 @@ def test_the_module_switch_is_what_the_step_reads_when_no_override_is_given():
 def test_an_equal_power_attack_is_not_stopped_by_no_counters():
     """超過 0（同じパワー）は命中する＝カウンター 0 枚では止まらない。旧は「守れた」にして受けた行を罰していた。"""
     tok, sc = _tok(opp_lead=5000), _sc(don=0)
-    rule = B.guard_step(tok, sc, "take", 0.0, [], afford="rule")
-    old = B.guard_step(tok, sc, "take", 0.0, [], afford="lenient")
+    rule = B.guard_step(tok, sc, "take", 0.0, [])
+    old = _old_guard_step(tok, sc, "take", 0.0, [])
     assert rule["x"] == pytest.approx(0.0)
     assert rule["can_guard"] is False and rule["s"] == 0.0            # 守れない＝受けても誤りでない
     assert old["can_guard"] is True and old["s"] < 0.0                # 旧は受けたことを罰していた
@@ -194,12 +174,11 @@ def test_an_equal_power_attack_is_not_stopped_by_no_counters():
 
 def test_a_counter_total_of_exactly_the_excess_still_loses_the_battle():
     tok, sc = _tok(opp_lead=7000), _sc(don=0)                   # 超過 2000
-    assert B.guard_step(tok, sc, "take", 2000.0, [], afford="rule")["can_guard"] is False
-    assert B.guard_step(tok, sc, "take", 2000.0, [], afford="lenient")["can_guard"] is True
-    assert B.guard_step(tok, sc, "take", 2500.0, [], afford="rule")["can_guard"] is False    # 許容は PWR_EPS（丸め）だけ
-    assert B.guard_step(tok, sc, "take", 3000.0, [], afford="rule")["can_guard"] is True     # x + 1000 ちょうどで勝つ
-    assert B.afford_need(2000.0, "rule") == pytest.approx(3000.0 - T.PWR_EPS)
-    assert B.afford_need(2000.0, "lenient") == pytest.approx(2000.0)
+    assert B.guard_step(tok, sc, "take", 2000.0, [])["can_guard"] is False
+    assert _old_guard_step(tok, sc, "take", 2000.0, [])["can_guard"] is True                 # 旧（lenient）は守れた扱い
+    assert B.guard_step(tok, sc, "take", 2500.0, [])["can_guard"] is False    # 許容は PWR_EPS（丸め）だけ
+    assert B.guard_step(tok, sc, "take", 3000.0, [])["can_guard"] is True     # x + 1000 ちょうどで勝つ
+    assert B.afford_need(2000.0) == pytest.approx(3000.0 - T.PWR_EPS)
 
 
 def test_paid_event_counters_still_need_the_don_under_the_rule():
@@ -208,21 +187,6 @@ def test_paid_event_counters_still_need_the_don_under_the_rule():
     assert B.guard_step(tok, _sc(don=0), "take", 0.0, [(1, 2000.0)])["can_guard"] is False
     assert B.guard_step(tok, _sc(don=1), "take", 0.0, [(1, 1000.0)])["can_guard"] is False   # 払えても 1000 では足りない
     assert B.guard_step(_tok(opp_lead=9000, blocker=True), _sc(don=0), "take", 0.0, [])["can_guard"] is True   # ブロッカーは不変
-
-
-def test_lenient_reproduces_the_old_step_bit_for_bit():
-    """`lenient` ＋ `curve` は旧の `guard_step` と**全部の欄が完全に一致**（手で組んだ 6,804 行・攻撃の無い行は両方 `None`）。"""
-    n = 0
-    for opp, free, paid, don, blocker, played, theta in _grid():
-        tok, sc = _tok(opp_lead=opp, blocker=blocker), _sc(don=don)
-        old = _old_guard_step(tok, sc, played, free, paid, theta=theta)
-        new = B.guard_step(tok, sc, played, free, paid, theta=theta, afford="lenient")
-        if old is None:
-            assert new is None
-            continue
-        assert {k: new[k] for k in old} == old, (opp, free, paid, don, blocker, played, theta)
-        n += 1
-    assert n > 3000
 
 
 def test_under_the_rule_only_the_rows_between_x_and_x_plus_1000_change():
@@ -379,7 +343,7 @@ def _check_supersets_and_minimality(h):
                     assert B.guard_set_loss(h, S + (j,), cache) >= base - 1e-12, (S, j)
     for x in (0.0, 1000.0, 2000.0, 3000.0):
         got = B.guard_hand_cost(h, x, 1)
-        need = B.afford_need(x, "rule")
+        need = B.afford_need(x)
         tot = lambda S: sum(h["slots"][i]["free"] for i in S) + GA.knapsack(
             [h["slots"][i]["paid"] for i in S if h["slots"][i]["paid"]], 1)
         assert tot(got["set"]) >= need
@@ -413,31 +377,6 @@ def test_an_event_counter_is_usable_only_if_its_don_is_payable():
     rich = B.guard_step(tok, _sc(don=2), "take", 0.0, [(2, 2000.0)], s_cost="hand", hand=h)
     assert poor["can_guard"] is False and poor["s"] == 0.0 and poor["n_counter_cards"] == 0
     assert rich["can_guard"] is True and rich["n_counter_cards"] == 1
-
-
-def test_hand_mode_uses_the_rule_whatever_the_afford_switch_says():
-    """`hand` は止める組が在るかで判定する＝`Σ無料 + knapsack(有料, ドン) ≥ x + 1000` と同値（手で組んだ全組で一致）。
-    `lenient` を指定しても規則どおり（止める組が無ければ守る費用が定義できない）。"""
-    rng = np.random.default_rng(7)
-    for _ in range(300):
-        slots = []
-        for _k in range(int(rng.integers(0, 6))):
-            if rng.random() < 0.3:
-                c = int(rng.integers(0, 4))
-                slots.append(_slot(float(rng.choice([1000.0, 2000.0, 3000.0])), 0.01, cost=c, event=True,
-                                   paid=(c, float(rng.choice([1000.0, 2000.0, 3000.0])))))
-            else:
-                slots.append(_slot(float(rng.choice([0.0, 1000.0, 2000.0])), float(rng.random() * 0.1), cost=int(rng.integers(0, 8))))
-        don = int(rng.integers(0, 4))
-        opp = int(rng.choice([5000, 6000, 7000, 8000, 9000]))
-        free = sum(s["free"] for s in slots)
-        paid = [s["paid"] for s in slots if s["paid"]]
-        tok, sc = _tok(opp_lead=opp), _sc(don=don)
-        got = B.guard_step(tok, sc, "take", free, paid, s_cost="hand", afford="lenient", hand=_hand(slots))
-        rule = B.guard_step(tok, sc, "take", free, paid, afford="rule")
-        assert got["can_guard"] == rule["can_guard"]
-        assert got["afford_mode"] == "rule"
-        assert (got["cost_guard_hand"] is not None) == rule["can_guard"]
 
 
 def test_blocker_rows_keep_the_old_price_and_the_ledger_never_moves():
@@ -661,26 +600,6 @@ def test_the_value_lost_is_not_t67s_per_card_value():
     assert v0 == pytest.approx(d["dtotal"] + min(d["dh"], d["dg"]))
     got = B.guard_hand_cost(_hand([_slot(2000.0, 0.03, cost=2)], xs_future=(1000.0,)), 1000.0, 5)
     assert got["cost"] == pytest.approx(d["dh"] + S_DISC * d["dg"])          # 判断が使う値（1 ラウンド割り引く）
-
-
-def test_the_run_records_the_afford_threshold_that_was_actually_used():
-    """**D4**: `--guard-afford lenient --guard-s-cost hand` でも行ごとの判定は規則どおり。実行全体の記録の `guard_afford` は
-    実際に効いた `rule`、指定された値は `guard_afford_requested` に別に刻む。"""
-    assert B.effective_guard_afford("lenient", "hand") == "rule"
-    assert B.effective_guard_afford("lenient", "curve") == "lenient"
-    assert B.effective_guard_afford("rule", "curve") == "rule"
-    try:
-        B.set_guard_afford_mode("lenient")
-        B.set_guard_s_cost_mode("hand")
-        assert B.effective_guard_afford() == "rule"
-        got = B.guard_step(_tok(opp_lead=6000), _sc(don=5), "take", 2000.0, [], hand=_hand([_slot(2000.0, 0.0)]))
-        assert got["afford_mode"] == B.effective_guard_afford()
-    finally:
-        B.set_guard_afford_mode("rule")
-        B.set_guard_s_cost_mode("curve")
-    for src in (inspect.getsource(B.collect), inspect.getsource(B.main)):
-        assert '"guard_afford": effective_guard_afford()' in src
-        assert '"guard_afford_requested": GUARD_AFFORD_MODE' in src
 
 
 def test_cutting_a_partner_lowers_the_partner_waiting_card(monkeypatch):
