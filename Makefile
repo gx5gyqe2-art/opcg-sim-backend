@@ -50,7 +50,7 @@ golden-replay:
 
 # 理論の器の Rust の核（`rd_kernel`）の golden（実・合成の記録の解のビット）の作り直し
 # （**解き方のモデルを意図して変えたときだけ**・差分は必ずレビューする）。入力は golden 自身が持つ。
-# 独立した検算には `--ref`（速くする前の原文で解き直す・遅い）。
+# 答えは速くする前の原文（`rule_don_ref`）で解く（遅い・Rust 化・第 3 段から既定）。Rust の核で解くなら `remake --rs`。
 rd-golden:
 	OPCG_LOG_SILENT=1 python tests/scripts/rd_kernel_golden.py remake
 

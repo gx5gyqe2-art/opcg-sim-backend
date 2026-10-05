@@ -10,22 +10,26 @@
   （採った計画の守り）。`cargo test` が Python 無しで Rust 単体で再生する。
 * **第 2a 段** `rust/opcg_engine/tests/fixtures/rd_solve_golden.jsonl.gz` — 1 行 = 1 つの `rule_don_solve` の
   `opcg_engine.rd_solve` への入力の全部（Python の `_rule_don_masks`＝`rules_steps` の出力・`model_horizon` の地平・
-  ν の表を含む）と、予算／地平ごとの**Python の解き方の答え**（採った組・付与・支払い・値打ち・τ・歩きの列・守る側の
+  ν の表を含む）と、予算／地平ごとの**答え**（採った組・付与・支払い・値打ち・τ・歩きの列・守る側の
   結果・試行の開示）。浮動小数は 16 桁の 16 進。`cargo test` が Python 無しで計画の列挙・歩き・試行のループまで再生する。
   `python tests/scripts/rd_kernel_golden.py solve-golden` で作る（記録の 152 解 × 予算 2 と 8 局面 × 予算 2 ＋地平 2）。
+  第 2a 段で作ったときの答えは速くした Python の解き方のもの。
+
+**第 3 段（2026-10-05）**: 速くした Python の解き方を消したので、作り直しの答えは**原文（`rule_don_ref`）**で解く
+（`remake` の既定・Rust で Rust を検算しない）。`remake --rs` は Rust の核で解く（速い・独立した検算ではない）。
+`solve-golden` は Rust の核で解き（試行の開示は Rust にしか無い）、採った計画を原文と `repr` で突き合わせてから書く。
 
 使い方:
 
     # 1) 記録から取り込む（実 w41・合成 w39+w42。測定の通しの途中で `OPCG_RD_CAPTURE` を付ける）
     OPCG_RD_CAPTURE=cap/real.jsonl OPCG_RD_CAPTURE_SRC=real OPCG_RD_CAPTURE_EVERY=4 \\
         python tests/scripts/crossing_bridge.py --in <w41> --limit-games 12
-    # 2) golden にまとめる（解は Python の解き方で検算してから書く）
+    # 2) golden にまとめる（解は原文で検算してから書く）
     python tests/scripts/rd_kernel_golden.py build cap/real.jsonl cap/syn.jsonl
-    # 3) 挙動を意図して変えたときだけ作り直す（**差分は必ずレビューする**）
-    python tests/scripts/rd_kernel_golden.py remake [--ref]
+    # 3) 挙動を意図して変えたときだけ作り直す（**差分は必ずレビューする**・既定は原文で解く）
+    python tests/scripts/rd_kernel_golden.py remake [--rs]
 
-golden は「その時点の Python の出力」であって、正しさの独立した証拠ではない（CLAUDE.md の golden の作法と同じ）。
-`--ref` は速くする前の原文（`rule_don_ref`）で解き直す（遅い・独立した検算）。
+golden は「その時点の原文の出力」であって、正しさの独立した証拠ではない（CLAUDE.md の golden の作法と同じ）。
 """
 import argparse
 import gzip
@@ -77,37 +81,41 @@ def args_of(rec):
     return cards, don, blk, life, ax, turns, lt, dt, arr
 
 
-def solve(rec, budget, ref=False):
+def _clear():
+    CB._RULE_DON_CACHE.clear()
+    RK.reset_global()
+
+
+def solve(rec, budget, ref=True):
+    """記録した 1 問を予算 `budget` で冷たく解く（`ref`＝原文〔既定〕・偽なら Rust の核）。"""
     cards, don, blk, life, ax, turns, lt, dt, arr = args_of(rec)
     view = _AvgView(ax["cp"][1]) if ax["cp"][0] is not None else None
     old = CB.EX_STATE_BUDGET
     CB.EX_STATE_BUDGET = budget
-    for d in (CB._RULE_DON_CACHE, CB._RULE_EX_CACHE, CB._RULE_EX_MEMO, CB._RULE_EX_SETS, CB._RULE_EX_CTX):
-        d.clear()
+    _clear()
     try:
         with CP.defending(view):
             if ref:
-                import rule_don_ref as REF
+                REF = RK.ref_module(vars(CB))
                 REF.clear()
                 return REF.solve(cards, don, blk, life, dict(ax), turns, lt, dt, arr)
-            RK.set_mode("py")
+            RK.set_mode("rs")
             return CB.rule_don_solve(cards, don, blk, life, dict(ax), turns, lt, dt, arr)
     finally:
         CB.EX_STATE_BUDGET = old
 
 
 def dp_expect(rec):
-    """動的計画の 1 呼び出し（採った計画の守り）を Python の解き方で解き直した辞書（符号化済み）。"""
+    """動的計画の 1 呼び出し（採った計画の守り）を原文で解き直した辞書（符号化済み）。"""
     dp = rec["dp"]
     cards = [tuple(c) for c in RK.dec(dp["cards"])]
     pr = dict(zip(("lam", "lam_net", "mu", "olp", "mlp"), RK.dec(dp["prices"])))
     ax = args_of(rec)[4]
     view = _AvgView(ax["cp"][1]) if ax["cp"][0] is not None else None
-    RK.set_mode("py")
-    for d in (CB._RULE_EX_CACHE, CB._RULE_EX_MEMO, CB._RULE_EX_SETS, CB._RULE_EX_CTX):
-        d.clear()
+    REF = RK.ref_module(vars(CB))
+    REF.clear()
     with CP.defending(view):
-        res = CB.rule_guard_plan_ex(cards, RK.dec(dp["don"]), RK.dec(dp["xs_first"]), None, RK.dec(dp["blk"]),
+        res = REF.rule_guard_plan_ex(cards, RK.dec(dp["don"]), RK.dec(dp["xs_first"]), None, RK.dec(dp["blk"]),
                                     RK.dec(dp["life"]), dp["turns"], _tup(RK.dec(dp["life_types"])), pr,
                                     later_seq=_tup(RK.dec(dp["seq"])), rest_blk=_tup(RK.dec(dp["rest"])),
                                     arrive_blk=_tup(RK.dec(dp["arrive"])), draw_types=_tup(RK.dec(dp["draw_types"])))
@@ -141,9 +149,9 @@ def cmd_build(paths):
             continue
         got = solve(r, r["budget"])
         if RK.enc(got) != r["expect"]:
-            raise SystemExit("取り込んだ解が Python の解き直しと違う: " + r["src"])
+            raise SystemExit("取り込んだ解が原文の解き直しと違う: " + r["src"])
         if dp_expect(r) != r["dp"]["expect"]:
-            raise SystemExit("取り込んだ動的計画の呼び出しが Python の解き直しと違う: " + r["src"])
+            raise SystemExit("取り込んだ動的計画の呼び出しが原文の解き直しと違う: " + r["src"])
         extra = [{"budget": b, "expect": RK.enc(solve(r, b))} for b in EXTRA_BUDGETS]
         r["extra"] = extra
         out.append(r)
@@ -153,7 +161,7 @@ def cmd_build(paths):
     write(out)
 
 
-def cmd_remake(ref):
+def cmd_remake(ref=True):
     with gzip.open(GOLDEN, "rt", encoding="utf-8") as fh:
         recs = [json.loads(line) for line in fh if line.strip()]
     dps = {}
@@ -210,23 +218,29 @@ def _enc_solve_args(a):
 
 
 def _solve_case(p, budget, turns):
-    """Python の解き方（`py`）で 1 つ解き、`rd_solve` の入力と、Rust の答えの形にした期待値を返す。"""
+    """Rust の核で 1 つ解き（採った計画は原文と `repr` で突き合わせる）、`rd_solve` の入力と、Rust の答えの形にした
+    期待値を返す（第 3 段まで: 速くした Python の解き方で解いていた）。"""
     cards, don, blk, life, ax, _t, lt, dt, arr = p
     ax = dict(ax)
     view = _AvgView(ax["cp"][1]) if ax["cp"][0] is not None else None
     old = CB.EX_STATE_BUDGET
     CB.EX_STATE_BUDGET = budget
-    for d in (CB._RULE_DON_CACHE, CB._RULE_EX_CACHE, CB._RULE_EX_MEMO, CB._RULE_EX_SETS, CB._RULE_EX_CTX):
-        d.clear()
-    RK.set_mode("py")
+    _clear()
+    RK.set_mode("rs")
     try:
         with CP.defending(view):
             before = [CB.EX_SPEED_STATS[k] for k in _SPEED_KEYS]
-            cut, st, plan = CB.rule_don_solve(cards, don, blk, life, ax, turns, lt, dt, arr)
+            out = CB.rule_don_solve(cards, don, blk, life, ax, turns, lt, dt, arr)
+            cut, st, plan = out
             stats = [CB.EX_SPEED_STATS[k] - b for k, b in zip(_SPEED_KEYS, before)]
+            REF = RK.ref_module(vars(CB))
+            REF.clear()
+            ref = REF.solve(cards, don, blk, life, dict(ax), turns, lt, dt, arr)
+            if repr(ref) != repr(out):
+                raise SystemExit("Rust の核と原文の計画が違う（記録を書かない）")
             masks = CB._rule_don_masks(cards, blk, life, ax, lt)
             h0 = None if turns is not None else CB.model_horizon(ax, blk, int(max(0, round(float(life)))), arr)
-            args = RK.solve_args(cards, don, blk, life, ax, turns, lt, dt, arr, masks, h0, vars(CB))
+            args = CB._rd_solve_args(cards, don, blk, life, ax, turns, lt, dt, arr, masks, h0)
             h = plan.get("horizon", turns)
             res = CB.rule_guard_plan_ex(cards, don, plan["xs_first"], None, blk, life, h, lt, CB._prices_of(ax),
                                         later_seq=plan["later_seq"], rest_blk=tuple(ax.get("rest_blk") or ()),
@@ -287,7 +301,7 @@ def main(argv=None):
     b = sub.add_parser("build")
     b.add_argument("paths", nargs="+")
     m = sub.add_parser("remake")
-    m.add_argument("--ref", action="store_true")
+    m.add_argument("--rs", action="store_true", help="原文の代わりに Rust の核で解く（速い・独立した検算ではない）")
     sub.add_parser("solve-golden")
     a = ap.parse_args(argv)
     if a.cmd == "solve-golden":
@@ -295,7 +309,7 @@ def main(argv=None):
     elif a.cmd == "build":
         cmd_build(a.paths)
     else:
-        cmd_remake(a.ref)
+        cmd_remake(not a.rs)
     return 0
 
 
