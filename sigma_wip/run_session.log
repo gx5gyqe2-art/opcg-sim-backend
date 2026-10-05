@@ -1,0 +1,8 @@
+skip /home/user/opcg-sim-backend/sigma_wip/results/cb_syn.json
+run tb_syn.json 22:49:12
+done tb_syn.json 03:35:39
+run wc_syn.json 03:35:39
+done wc_syn.json 03:45:40
+run pa_syn.json 03:45:40
+done pa_syn.json 03:51:21
+SESSION_DONE
