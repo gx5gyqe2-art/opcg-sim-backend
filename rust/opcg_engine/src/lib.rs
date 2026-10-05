@@ -22,6 +22,7 @@ mod py_game;
 mod rules;
 mod search;
 mod state;
+mod theory;
 #[cfg(test)]
 mod testkit;
 
@@ -409,5 +410,6 @@ fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(search_determinize, m)?)?;
     m.add_function(wrap_pyfunction!(search_apply, m)?)?;
     m.add_function(wrap_pyfunction!(decide, m)?)?;
+    theory::pyapi::register(m)?;
     Ok(())
 }

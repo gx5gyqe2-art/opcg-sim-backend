@@ -5111,6 +5111,8 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
 
 import plan_store as _PS  # noqa: E402  （**RD-speed**: `OPCG_PLAN_STORE` が有ればディスクの覚え書きを開く）
 _PS.open_from_env(sys.modules[__name__])
+import rd_kernel as _RDK  # noqa: E402  （**Rust 化・第 1 段**: `OPCG_RD_KERNEL` で守る側の計算を Rust の核へ。既定 `py`＝何も変わらない）
+_RDK.install(globals())
 
 
 def main(argv=None):

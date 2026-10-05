@@ -65,7 +65,7 @@ def solver_reads(fn):
     大域と、そこで参照されるモジュールの属性の両方で引く（多めに拾う側に倒す）。"""
     seen, out, stack = set(), {}, [fn]
     while stack:
-        f = stack.pop()
+        f = inspect.unwrap(stack.pop())                      # Rust 化の継ぎ目（`rd_kernel`）の包みは元の関数に戻して読む
         if f in seen:
             continue
         seen.add(f)
@@ -121,10 +121,13 @@ class PlanStore:
         cb = self.cb
         ax = sorted((k, v) for k, v in actx.items() if k != "_gain")
         import cut_price as CP
+        # Rust の核で解く試行は別の鍵（核の誤りが Python の覚え書きを汚さない・核を直せば別の鍵）。`py` は従来と同じ鍵
+        tag = getattr(cb, "RD_KERNEL_TAG", None)
+        tag = tag() if tag is not None else "py"
         body = repr((cb.SOLVER_VERSION, self.src, globals_snapshot(self.reads),
                      list(cards_d or ()), don_d, list(blk or ()), life, turns, tuple(life_types or ()),
                      tuple(draw_types or ()), tuple(arrive or ()), ax, cb.cut_context_key(),
-                     CP.active() is not None, cb.EX_STATE_BUDGET))
+                     CP.active() is not None, cb.EX_STATE_BUDGET) + (() if tag == "py" else (tag,)))
         return hashlib.sha256(body.encode()).hexdigest()
 
     def get(self, key):
