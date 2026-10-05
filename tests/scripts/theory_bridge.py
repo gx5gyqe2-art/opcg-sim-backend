@@ -845,7 +845,7 @@ def _mirror_of(sc, tok, ci, opp, last_main, ex, idx2cid, cards, decks, w, t, g_m
     今の行を相手の席から見た行（`mirror_view`・相手の手札は相手の直近の自席ターンの最後の行）にして、相手の財布
     （次の相手のターン）と自分の手札の読み（デッキの構成と手札のブロッカー込み）を返す。作れなければ `None`。"""
     import crossing_bridge as CB
-    if CB.THETA_HAND_MODE not in CB.RULE_DON_MODES or _TO_W_MODE() != "curve" or opp is None:
+    if CB.THETA_HAND_MODE != "rule_don" or _TO_W_MODE() != "curve" or opp is None:
         return None
     i_h = last_main.get((1 - w, opp["t"]))
     if i_h is None or not isinstance(g_me, CB.HandRead):
@@ -898,7 +898,7 @@ def _attacker_of(sc, tok, ci_row, idx2cid, cards, deck_ids=None, t=None):
     攻め手の計画は耐久の側だけが読む（同じドンを 2 回使う相手が居ない）。引いた 1 枚の値打ちは
     その席のデッキ（`deck_ids`）から読む（交点の橋と同じ計画を選ぶため）。"""
     import crossing_bridge as CB
-    if CB.THETA_HAND_MODE not in CB.RULE_DON_MODES or _TO_W_MODE() != "curve":
+    if CB.THETA_HAND_MODE != "rule_don" or _TO_W_MODE() != "curve":
         return None
     return CB.attacker_ctx(sc, tok, ci_row, idx2cid, cards, deck_ids=deck_ids,
                            no_attack_now=(t is not None and CB.RATE_T1_MODE == "on" and CB.own_turn_index(t) == 0))
@@ -909,10 +909,10 @@ def _g_opp_of(opp, last_main, ex, idx2cid, cards, cache, seat, deck=None):
     相手の**直近の自席ターンの最後の main 行**（出した後の手札・使い残したドン）から読む（鍵も別）。
     他のモードは従来どおり**最初の行**（`opp`）から（1 ビットも変えない）。"""
     import crossing_bridge as CB
-    if CB.THETA_HAND_MODE in ("rule",) + CB.RULE_DON_MODES and (seat, opp["t"]) in last_main:
+    if CB.THETA_HAND_MODE in ("rule", "rule_don") and (seat, opp["t"]) in last_main:
         i = last_main[(seat, opp["t"])]
         g = _g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards, cache, ("last", seat, opp["t"]))
-        if CB.THETA_HAND_MODE in CB.RULE_DON_MODES:
+        if CB.THETA_HAND_MODE == "rule_don":
             g = CB.with_life_types(g, deck)                # **H-4e（E1）**: 取られたライフの札（その席のデッキ）
             g = CB.with_hand_blocker(g, ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)   # **H-4f（F1）**
         return g
@@ -1890,7 +1890,7 @@ def main(argv=None):
                         for nm in ("close", "mid", "decided")},
            "seconds": round(time.time() - t0, 1)}
     import crossing_bridge as _CBs
-    if _CBs.THETA_HAND_MODE in ("rule",) + _CBs.RULE_DON_MODES:
+    if _CBs.THETA_HAND_MODE in ("rule", "rule_don"):
         res["rule_stats"] = dict(_CBs.RULE_STATS)             # **H-4g**: 使った計画ごとの地平の縮み（冷たい実行と同じ数）
     txt = json.dumps(res, ensure_ascii=False, indent=2)
     print(txt)

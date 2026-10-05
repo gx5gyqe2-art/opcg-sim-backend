@@ -77,7 +77,7 @@ def _rand_problem(rng, i):
     a_tab = [round(rng.random() * 0.02, 4) for _ in range(budget + 2)]
     e_tab = [round(rng.random() * 0.01, 4) for _ in range(budget + 2)]
     ax = {"budget": budget, "att1": att1, "later": later, "cand": cand, "price": [[0.0] * (kmax + 1) for _ in att1],
-          "flow": [a + e for a, e in zip(a_tab, e_tab)], "kmax": kmax, "fixed": None, "olp": 5000.0, "mlp": 5000.0,
+          "flow": [a + e for a, e in zip(a_tab, e_tab)], "kmax": kmax, "olp": 5000.0, "mlp": 5000.0,
           "lam": T.LAM, "lam_net": T.THETA * T.MU, "mu": T.MU, "cp": (None, None),
           "ds": [float(budget + (q % 2)) for q in range(30)], "a_tab": a_tab, "ar_tab": [0.0] * len(a_tab),
           "e_tab": e_tab, "jmax": 30, "no_attack_now": rng.random() < 0.15, "lead_bare": round(rng.random() * 0.1, 3),
@@ -86,7 +86,7 @@ def _rand_problem(rng, i):
     if rng.random() < 0.15 and cand:
         play = (0,) if cand[0][0] <= budget else ()
         left = budget - (cand[0][0] if play else 0)
-        ax["fixed"] = (play, rng.randint(0, min(1, left)))       # `rule_don_purse` の形（払える計画）
+        rng.randint(0, min(1, left))        # 乱数の列を変えないための空引き（旧 `rule_don_purse` の `fixed` の枚数・2026-10-05 に形は削除）
     ax["key"] = ("rd-test", i, repr(sorted((k, v) for k, v in ax.items())))
     kinds = ((1000.0, 0.0), (2000.0, 0.0), (1000.0, 1.0))
     cards = [rng.choice(kinds) for _ in range(rng.randint(0, 3))]

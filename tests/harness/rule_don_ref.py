@@ -414,7 +414,6 @@ def _rule_don_solve(cards_d, don_d, blk, life, actx, turns, life_types=(), draw_
     nsteps = int(actx.get("jmax") or RACE_CAP)
     best = None
     n_c = len(cand)
-    fixed = actx.get("fixed")
     no_now = bool(actx.get("no_attack_now"))
     max_t = max([0.0] + [float(c) for c, _d, _p in (life_types or ())])
     s_cnt = sum(float(c) for c, _d in cards_d or ())
@@ -424,8 +423,6 @@ def _rule_don_solve(cards_d, don_d, blk, life, actx, turns, life_types=(), draw_
         cost = sum(cand[i][0] for i in play)
         if cost > budget:
             continue
-        if fixed is not None and tuple(play) != tuple(fixed[0]):
-            continue                                        # `rule_don_purse`: 出す札は速さの側の計画そのまま
         b = budget - cost
         steps = rules_steps(actx, play, nsteps)
         later_seq = tuple(st["hits"] for st in steps[1:]) or ((),)
@@ -449,15 +446,11 @@ def _rule_don_solve(cards_d, don_d, blk, life, actx, turns, life_types=(), draw_
         caps = [min(kmax, b, max(0, int(math.ceil((cap_x - float(x)) / 1000.0 - 1e-9)))) for _s, x in att1]
         if no_now:
             caps = [0] * len(att1)                          # 局の最初の自席ターンは攻撃できない＝付けても効かない
-        if fixed is not None:
-            caps = [min(kmax, fixed[1]) for _s, _x in att1]
         ks = [0] * len(att1)
 
         def visit(i, left):
             nonlocal best
             if i == len(att1):
-                if fixed is not None and sum(ks) != fixed[1]:
-                    return
                 xf, res = solve(ks)
                 paid = cost + sum(ks)
                 h = res["harms"]

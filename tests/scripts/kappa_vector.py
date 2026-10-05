@@ -478,7 +478,7 @@ def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, id
     # 計画が無ければ攻め手の財布を渡さない＝付与 0 の `rule` に落ちる（速さの側も計画なし＝両側で付与 0）。
     with CP.defending(cut_me):
         m = ((mirror() if callable(mirror) else mirror)
-             if (mirror is not None and CB.THETA_HAND_MODE in CB.RULE_DON_MODES) else None)
+             if (mirror is not None and CB.THETA_HAND_MODE == "rule_don") else None)
         if m is not None:
             # **鏡（H-4g）**: 自分の耐久も相手の耐久と同じ守る側の計算で読む（`crossing_bridge.curve_d_of_row` と同じ）
             th_me = float(CB.threshold(m["sc"], m["tok"], g_hand=m["g_me"],
@@ -487,7 +487,7 @@ def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, id
             th_me = float(CB.threshold_of_me(sc, tok, g_hand=g_me))
     with CP.defending(cut_opp):
         th_opp = float(CB.threshold(sc, tok, g_hand=g_opp,
-                                    plan=(don_plan if CB.THETA_HAND_MODE in CB.RULE_DON_MODES else None)))
+                                    plan=(don_plan if CB.THETA_HAND_MODE == "rule_don" else None)))
     st = (th_me, th_opp, float(a_me), float(a_opp), int(j))
     if CB.THETA_RETURN_MODE != "untap":
         return st
@@ -495,7 +495,7 @@ def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, id
     mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
     b_me = CB.resting_blocker_term(tok, TO.SLOT_OWN_FIELD, olp, ci_row=ci_row, idx2cid=idx2cid, cards=cards)
     b_opp = CB.resting_blocker_term(tok, TO.SLOT_OPP_FIELD, mlp, ci_row=ci_row, idx2cid=idx2cid, cards=cards)
-    if (CB.THETA_HAND_MODE in CB.RULE_DON_MODES and don_plan is not None and "theta_parts" in don_plan):
+    if (CB.THETA_HAND_MODE == "rule_don" and don_plan is not None and "theta_parts" in don_plan):
         b_opp = 0.0       # **H-4f（F1）**: 相手のレスト中のブロッカーは守る側の計算の中で戻る（`Θ_opp` に入っている）
     return st + (float(b_me), float(b_opp))
 

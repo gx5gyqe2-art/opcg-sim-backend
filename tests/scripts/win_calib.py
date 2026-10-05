@@ -249,7 +249,7 @@ def main(argv=None):
     TO.set_sigma_floor_mode(a.sigma_floor)          # **K-2**（`sigma_rel_for` が引く表も切り替わる）
     sr = a.sigma_rel if a.sigma_rel is not None else CB.sigma_rel_for(a.src)
     out = collect_calib(a.src, a.games, a.slope, sr, a.scale, a.bins)
-    if CB.THETA_HAND_MODE in ("rule",) + CB.RULE_DON_MODES:
+    if CB.THETA_HAND_MODE in ("rule", "rule_don"):
         out["rule_stats"] = dict(CB.RULE_STATS)               # **H-4g**: 使った計画ごとの地平の縮み
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:

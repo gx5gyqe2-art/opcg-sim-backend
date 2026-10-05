@@ -309,18 +309,18 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
                                                            idx2cid, cards, theta, mu, deck_ids=dk)
                                            if KV.D_MODE == "theory" else None)
                 g_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
-            if CB.THETA_HAND_MODE in ("rule",) + CB.RULE_DON_MODES and PL.is_own_turn(w, t):
+            if CB.THETA_HAND_MODE in ("rule", "rule_don") and PL.is_own_turn(w, t):
                 # **H-4**: `rule` は守る席の**実際の札**を読むので、相手の手札は**その席のターンの最後の行**
                 # （出した後＝相手のターンに持っている手札・使い残したドン）から読む。値は上書きで最後の行が残る。
                 g_last_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
                 last_i_at_turn[(w, t)] = i
-                if CB.THETA_HAND_MODE in CB.RULE_DON_MODES:
+                if CB.THETA_HAND_MODE == "rule_don":
                     # **H-4e（E1）**: 取られたライフの札の分布（その席のデッキ）
                     g_last_at_turn[(w, t)] = CB.with_life_types(g_last_at_turn[(w, t)],
                                                                 KV._deck_of(seat_decks, seed_g, w))
                     g_last_at_turn[(w, t)] = CB.with_hand_blocker(g_last_at_turn[(w, t)], ex["sc"][i], ex["tok"][i],
                                                                   ex["ci"][i], idx2cid, cards)   # **H-4f（F1）**
-        if CB.THETA_HAND_MODE in CB.RULE_DON_MODES:
+        if CB.THETA_HAND_MODE == "rule_don":
             # **H-4b（T109）**: 攻め手の計画は**そのターンの最初の行**で、守る席の手札（相手の直近のターンの
             # 最後の行）に対して 1 回だけ選ぶ。**速さ（`rate_at_turn`）も耐久（下の `state_of_row`）も同じ計画を読む**。
             for (w, t), i0 in first_i.items():
@@ -351,7 +351,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
 
         def _mirror_for(w, t, sc, tok, ci):
             """**鏡（H-4g）**: 自分の耐久を相手の耐久と同じ守る側の計算で読む材料（`rule_don` 系・curve のときだけ）。"""
-            if not (_TBm.MIRROR_ME and CB.THETA_HAND_MODE in CB.RULE_DON_MODES and KV.D_MODE in ("curve", "curve_scaled")):
+            if not (_TBm.MIRROR_ME and CB.THETA_HAND_MODE == "rule_don" and KV.D_MODE in ("curve", "curve_scaled")):
                 return None
             ts_o = [tt for (ww, tt) in last_i_at_turn if ww == 1 - w and tt < t]
             if not ts_o or (w, t) not in g_at_turn:
@@ -616,7 +616,7 @@ def main(argv=None):
     TO.apply_defender_power(a)                     # 2b
     out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency,
                   pre_settle=(a.pre_settle == "on"), parts=a.parts)
-    if CB.THETA_HAND_MODE in ("rule",) + CB.RULE_DON_MODES:
+    if CB.THETA_HAND_MODE in ("rule", "rule_don"):
         out["rule_stats"] = dict(CB.RULE_STATS)               # **H-4g**: 使った計画ごとの地平の縮み
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:

@@ -547,7 +547,7 @@ def _actx(budget, att1, later, cand, kmax=10, flow=None, price=None, a_tab=None,
     key = ("test", budget, tuple(att1), tuple(later), tuple((c, tuple(sorted(p.items())), bx, ru) for c, p, bx, ru in cand),
            tuple(flow), tuple(a_tab), tuple(e_tab), tuple(tuple(r) for r in price), kmax, board)
     return {"budget": budget, "att1": att1, "later": later, "cand": cand, "price": price, "flow": flow,
-            "kmax": kmax, "key": key, "fixed": None, "olp": 5000.0, "mlp": 5000.0, "lam": T.LAM,
+            "kmax": kmax, "key": key, "olp": 5000.0, "mlp": 5000.0, "lam": T.LAM,
             "lam_net": T.THETA * T.MU, "mu": T.MU, "ds": [float(budget)] * 30, "a_tab": a_tab,
             "ar_tab": [0.0] * len(a_tab), "e_tab": e_tab, "jmax": 30, "no_attack_now": False,
             "lead_bare": float(board), "chars_bare": 0.0, "rest_blk": (), "blk_a": None, "theta_p": T.THETA}
@@ -870,7 +870,7 @@ def test_the_drawn_card_is_bare_under_the_one_purse_forms_and_default_unchanged(
 
 
 def test_the_purse_witness_reproduces_purse_plan_exactly():
-    """**H-4b（`rule_don_purse`）**: 速さの側の計画の中身を読む `purse_plan_witness` は `purse_plan` と**同じ選び方**。"""
+    """**H-4b**: 計画の中身を読む `purse_plan_witness` は `purse_plan` と**同じ選び方**。"""
     groups = [[(0, {}), (2, {"atk": 0.05, "eff": 0.0})], [(0, {}), (1, {"atk": 0.0, "eff": 0.03})],
               [(0, {}), (1, {"attach_lead": 0.02}), (2, {"attach_lead": 0.035})],
               [(0, {}), (1, {"attach": 0.015})]]
@@ -887,23 +887,6 @@ def test_the_purse_witness_reproduces_purse_plan_exactly():
         for k in CB.PURSE_PARTS:
             assert tot[k] == pytest.approx(pl[k])
         assert paid == pytest.approx(pl["paid"]) and paid <= budget
-
-
-def test_rule_don_purse_keeps_the_speed_sides_split_and_only_moves_the_attachments():
-    """**H-4b（`rule_don_purse`・T109）**: 出す札と付与の**枚数**は速さの側の財布の計画そのままで、決めるのは**付け先**だけ。
-    守る側 2000 が 2 枚・ライフ 0。リーダー（超過 0）とキャラ（超過 1000）・財布 1。速さの側（値段）はリーダーに 1 枚
-    （2 枚で両方止まり守る側は生き延びる）。**キャラに付け替える**と要る合計 1000 と 3000 → 両方は止まらず倒れる。"""
-    price = [[0.0, 0.02] + [-1.0] * 9, [0.0, 0.01] + [-1.0] * 9]
-    ax = _actx(1, [(0, 0.0), (2, 1000.0)], [(0, 0.0), (2, 1000.0)], [], price=price)
-    play, ks, _g = CB.speed_plan_of(ax)
-    assert play == () and ks == (1, 0)
-    cards = [(2000.0, 0.0), (2000.0, 0.0)]
-    speed_alive = CB.rule_guard_plan_ex(cards, 0.0, [1000.0, 1000.0], [1000.0, 1000.0], [], 0, None)["alive"]
-    ax["fixed"] = (play, int(sum(ks)))
-    ax["key"] = ax["key"] + (("fixed",) + ax["fixed"],)
-    _cut, _st, plan = CB.rule_don_solve(cards, 0.0, [], 0, ax, None)
-    assert sum(plan["k"]) == 1 and plan["paid"] == 1.0 and plan["play"] == ()
-    assert plan["k"] == (0, 1) and plan["alive"] == 0.0 < speed_alive
 
 
 def test_rule_don_without_the_attackers_purse_falls_back_to_rule_and_counts_it():
