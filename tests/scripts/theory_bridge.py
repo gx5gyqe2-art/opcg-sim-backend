@@ -951,7 +951,7 @@ def _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats=None):
 
 def _search_ctx(sc, tok, ci_row, idx2cid, cards, deck):
     """**T68**: 探す能力の計画価格の状態（`hand_plan.search_context` ＋ `cards`）。デッキが無ければ `None`。"""
-    if deck is None or EV.SEARCH_PRICE_MODE != "plan":
+    if deck is None:
         return None
     import hand_plan as HP
     ctx = HP.search_context(sc, tok, ci_row, idx2cid, cards, deck)
@@ -1046,7 +1046,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
     idx2cid = {i: c for c, i in GA._vocab().items()}
     # **T68**: 探す能力の計画価格に要るデッキ（seed から復元・席ごとに手札で検算）
     import search_price as SP
-    rec_decks = SP.record_decks(dirs) if EV.SEARCH_PRICE_MODE == "plan" else {}
+    rec_decks = SP.record_decks(dirs)
     # **T75**: `W_MODE=curve` なら交点の橋の `D`（損害の輪郭に沿った到達ターンの差）で `κ` を出す。輪郭は別のセットのもの（`cross`）
     prof = None
     if _TO_W_MODE() == "curve":
@@ -1110,7 +1110,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
              "guard_afford": effective_guard_afford(), "guard_afford_requested": GUARD_AFFORD_MODE,
              "guard_s_cost": GUARD_S_COST_MODE,
              # **T68**: 探す能力の価格の規約と、デッキを復元できた席／できなかった席の数
-             "search_price": EV.SEARCH_PRICE_MODE, "search_deck_ok": 0, "search_deck_bad": 0,
+             "search_price": "plan", "search_deck_ok": 0, "search_deck_bad": 0,
              "d_bins": {"<-3": 0, "-3..-1": 0, "-1..1": 0, "1..3": 0, ">3": 0},
              # **`D` の帯ごとの実勝率**（当てはめない）——時計の推定 `D` が勝敗を順序付けるか・
              # 実測の `W(D)` の傾きが置いた `σ_D` と合うかの検算
@@ -1873,7 +1873,7 @@ def main(argv=None):
                            "flow_pricing": stats["flow_pricing"], "ledger_pricing": stats["ledger_pricing"],
                            "surv_mode": _TO.SURV_MODE, "nu_mode": _TO.NU_MODE,
                            "cbar_mode": _TO.CBAR_MODE, "guard_g": GUARD_G_MODE, "take_mode": _TO.TAKE_MODE,
-                           "guard_cost": GUARD_COST_MODE, "search_price": EV.SEARCH_PRICE_MODE,
+                           "guard_cost": GUARD_COST_MODE, "search_price": "plan",
                            "guard_afford": effective_guard_afford(), "guard_afford_requested": GUARD_AFFORD_MODE,   # G-2
                            "guard_s_cost": GUARD_S_COST_MODE,
                            "play_now": EV.PLAY_NOW_MODE, "inflow": _HP.INFLOW_MODE, "cond_clock": _HP.COND_CLOCK_MODE,

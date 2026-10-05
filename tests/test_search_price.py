@@ -74,9 +74,7 @@ def _stub(monkeypatch):
     monkeypatch.setattr(SP, "card_identity", lambda cid: _IDENT.get(cid))
     monkeypatch.setattr(SP, "use_value", lambda cid, info, olp, r: (0.0 if (info or {}).get("event") else 0.02 * float((info or {}).get("cost") or 0)))
     SP._GAIN.clear()
-    before = EV.SEARCH_PRICE_MODE
     yield
-    EV.set_search_price_mode(before)
 
 
 def _item(cid, v=None):
@@ -167,10 +165,9 @@ def _search_ability():
 
 
 def test_effect_value_uses_the_plan_price_only_when_the_state_carries_a_search_context():
-    """`plan` は `st["search_ctx"]` が在るときだけ・無ければ `sel(k)`（旧）に落ちる・`sel` なら常に旧。"""
+    """`plan` は `st["search_ctx"]` が在るときだけ・無ければ `sel(k)`（旧）に落ちる（常に旧で読む切替は 2026-10-05 に削除）。"""
     ab = _search_ability()
     old = MU + EV._sel_premium(5)
-    EV.set_search_price_mode("plan")
     v, unp = EV.ability_value(ab, st=None)
     assert unp == [] and v == pytest.approx(old)
     v, unp = EV.ability_value(ab, st={"my_life": 4})
@@ -182,11 +179,6 @@ def test_effect_value_uses_the_plan_price_only_when_the_state_carries_a_search_c
     assert unp == []
     want = SP.search_value(ctx, 5, ab["effect"]["sub_effect"][0]["target"], cards, played_cid="EVT", played_cost=1)
     assert v == pytest.approx(want) and v != pytest.approx(old)                              # `sel(k)` も μ も足さない
-    EV.set_search_price_mode("sel")
-    v, _ = EV.ability_value(ab, st={"search_ctx": ctx}, card={"card_id": "EVT", "cost": 1})
-    assert v == pytest.approx(old)
-    with pytest.raises(ValueError):
-        EV.set_search_price_mode("guess")
 
 
 def test_the_gain_cache_and_the_draw_baseline():

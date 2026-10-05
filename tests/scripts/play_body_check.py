@@ -178,7 +178,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     cards = PL.Cards()
     vocab = GA._vocab()
     idx2cid = {i: c for c, i in vocab.items()}
-    rec_decks = SP.record_decks(dirs) if EV.SEARCH_PRICE_MODE == "plan" else {}
+    rec_decks = SP.record_decks(dirs)
     out = []
     stats = {"games": 0, "play_rows": 0, "no_slot": 0, "no_hand": 0, "silent": 0, "search_deck_ok": 0,
              "search_deck_bad": 0, "no_aux_def": 0}

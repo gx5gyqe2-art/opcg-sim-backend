@@ -273,10 +273,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     import search_price as SP
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
-    rec_decks = SP.record_decks(dirs) if EV.SEARCH_PRICE_MODE == "plan" else {}
+    rec_decks = SP.record_decks(dirs)
     per = {}
     stats = {"games": 0, "own_rows": 0, "scored": 0, "no_next": 0, "silent": 0,
-             "search_price": EV.SEARCH_PRICE_MODE, "search_deck_ok": 0, "search_deck_bad": 0,
+             "search_price": "plan", "search_deck_ok": 0, "search_deck_bad": 0,
              # **T69**: 物差しの手札の項の規約・入った札の数・補正の和（Σ(gain − μ)）・入った札の gain の平均
              "hand_meas": HAND_MEAS_MODE, "hand_added": 0, "hand_quality_sum": 0.0, "hand_gain_sum": 0.0}
     games = 0
@@ -612,7 +612,7 @@ def main(argv=None):
         stats["wiring"] = {"attack_ability": _TO.ATTACK_ABILITY_MODE, "passive_body": _TO.PASSIVE_BODY_MODE,
                            **{k: (round(v, 5) if isinstance(v, float) else v) for k, v in _TO.WIRING_STATS.items()}}
     res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "flow_pricing": EV.FLOW_PRICING,
-           "search_price": EV.SEARCH_PRICE_MODE, "hand_meas": HAND_MEAS_MODE,
+           "search_price": "plan", "hand_meas": HAND_MEAS_MODE,
            "play_now": EV.PLAY_NOW_MODE, "cost_afford": EV.COST_AFFORD_MODE, "pricing_fixes": pricing_fixes,
            "decision_rows": apply_decision_row(a),
            "inflow": _HP.INFLOW_MODE, "cond_clock": _HP.COND_CLOCK_MODE, "stats": stats,

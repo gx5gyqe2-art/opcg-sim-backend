@@ -11,7 +11,7 @@
 
 デッキは記録の seed から復元する（`decks.build_pair`・`meta_n_record.json` の `decks` と `meta_games.json` のリーダー）。
 残りの山は「デッキの並び − 見えている自分の札（手札・場）」で近似する（ライフ・トラッシュは記録に無い）。
-切替は `effect_value.SEARCH_PRICE_MODE`（`plan`＝既定／`sel`＝旧）。状態（`search_ctx`）が無い行は `sel` に落ちる。
+状態（`search_ctx`）が無い行は旧の `sel` に落ちる（状態が在っても旧で読む切替 `SEARCH_PRICE_MODE` は 2026-10-05 に削除）。
 """
 import collections
 import json

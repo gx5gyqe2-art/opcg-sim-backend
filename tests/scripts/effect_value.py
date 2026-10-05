@@ -2312,36 +2312,23 @@ def reset_cond_stats():
         COND_STATS[k] = 0
 
 
-#: **探す能力の価格の規約**（T68・2026-09-17・ユーザ決定「置き換えましょう」）:
-#: `plan`＝`E[max_{取れる札 ∈ k 枚} max(ΔH_play, ΔG_guard)]`（自分のデッキの絞り込みに合う札・今の手札とドンと
-#: 来る攻撃で読む・`search_price.py`）／`sel`＝旧 `μ + sel(k)`（山札全体の静的な価値 `W` の最大）。
-#: **状態（`st["search_ctx"]`）が無い行は `plan` でも `sel` に落ちる**（上限として読む・閉じた代数のテストは動かない）。
-SEARCH_PRICE_MODES = ("sel", "plan")
-SEARCH_PRICE_MODE = "plan"
-
-
-def set_search_price_mode(mode):
-    global SEARCH_PRICE_MODE
-    if mode not in SEARCH_PRICE_MODES:
-        raise ValueError("search price mode は %s のどれか" % (SEARCH_PRICE_MODES,))
-    SEARCH_PRICE_MODE = mode
-    return SEARCH_PRICE_MODE
+#: **探す能力の価格の規約**（T68・2026-09-17・ユーザ決定「置き換えましょう」）＝`plan`:
+#: `E[max_{取れる札 ∈ k 枚} max(ΔH_play, ΔG_guard)]`（自分のデッキの絞り込みに合う札・今の手札とドンと
+#: 来る攻撃で読む・`search_price.py`）。**状態（`st["search_ctx"]`）が無い行は旧 `μ + sel(k)`（山札全体の静的な価値 `W` の
+#: 最大）に落ちる**（上限として読む・閉じた代数のテストは動かない）。状態が在っても旧の形で読む切替 `SEARCH_PRICE_MODE=sel`
+#: は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。出力 JSON の `search_price` キーは定数 `"plan"`。
 
 
 def add_search_price_arg(ap):
-    ap.add_argument("--search-price", default=None, choices=SEARCH_PRICE_MODES,
-                    help="**T68** 探す能力の価格: `plan`（既定・取れる札の `max(ΔH, ΔG)` の期待値・デッキから数える）"
-                         "／`sel`（旧・`μ + sel(k)`）。**2026-09-17 より前の数字と比べるときは `sel` を明示する**")
+    """探す能力の価格の CLI（**N-4** の `--search-value`・`--deck-counter`。T68 の `--search-price` は 2026-10-05 に削除）。"""
     import search_price as SP                                    # 遅延（`search_price` は本器を import する）
     SP.add_search_value_args(ap)                                 # **N-4**: `--search-value`・`--deck-counter`
 
 
 def apply_search_price(a):
-    if getattr(a, "search_price", None) is not None:
-        set_search_price_mode(a.search_price)
     import search_price as SP
     SP.apply_search_value_args(a)                                # **N-4**
-    return SEARCH_PRICE_MODE
+    return "plan"
 
 
 #: **「手札から出す」効果（`PLAY_CARD`・zone HAND）の価格の規約**（T70・2026-09-17・ユーザ決定「着手してください」）:
@@ -2553,8 +2540,8 @@ def _cost_unpayable(cost_acts, card, st):
 
 
 def _search_plan(acts, card, st):
-    """**探す能力の計画価格**（T68）＝`(値, k, 手札に加える動作)`。`plan` でなければ／状態が無ければ／探す能力でなければ `None`。"""
-    if SEARCH_PRICE_MODE != "plan" or not st or not st.get("search_ctx"):
+    """**探す能力の計画価格**（T68）＝`(値, k, 手札に加える動作)`。状態が無ければ／探す能力でなければ `None`。"""
+    if not st or not st.get("search_ctx"):
         return None
     try:
         import search_price as SP

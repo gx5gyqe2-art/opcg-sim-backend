@@ -149,7 +149,7 @@ def main(argv=None):
     _HP.apply_cond_clock_mode(a)
     t0 = time.time()
     rows, stats = collect(a.src, a.limit_games)
-    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "search_price": EV.SEARCH_PRICE_MODE,
+    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "search_price": "plan",
            "hand_meas": PR.HAND_MEAS_MODE, "play_now": EV.PLAY_NOW_MODE, "inflow": _HP.INFLOW_MODE, "cond_clock": _HP.COND_CLOCK_MODE, "stats": stats,
            "summary": summarise(rows, a.min_card_rows),
            "seconds": round(time.time() - t0, 1)}
