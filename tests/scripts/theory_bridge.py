@@ -51,7 +51,7 @@ s_t     = −( 実際に払った費用 − min(2 つのうち払えた方) )
 
 | | 穴 | この器での扱い |
 |---|---|---|
-| **P2** | イベント・効果の値付けが無い | `--silent {zero,exclude}` ——**両方出して挟む** |
+| **P2** | イベント・効果の値付けが無い | 無言の行を取りこぼし 0 として母数に入れる（`zero`・感度の `exclude` は 2026-10-05 に削除） |
 | **P3** | `Θ` が 2 経路で食い違う | `--theta` ——1.15／1.325／1.88 で回す |
 | **P1** | `w(状態)` の式が無い | **帯ごとに傾きを出す**（揃えば実害なし） |
 
@@ -120,8 +120,8 @@ ROW_COLS = ("who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen",
             "sig")   # `sig` は `PL.label_game`（守り側の take/guard の判定）が要る
 #: **P3** の感度（§0.4）——盤面経路 1.325・恒等式 1.88・出荷既定 1.15
 THETA_SWEEP = (1.15, 1.325, 1.88)
-#: **P2** の扱い（理論が値を付けられなかった行）
-SILENT_MODES = ("zero", "exclude")
+#: **P2** の扱い（理論が値を付けられなかった行）は `zero`（取りこぼし 0 として母数に入れる）。感度の `exclude`
+#: （`--silent`・2026-09-14）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。出力の `P2_silent` は定数 `"zero"`。
 #: **T28-c**——「払えた」の判定が粗いせいで反転しているのではないかを分ける閾値。
 #: 守る力が来る攻撃をこれだけ上回っていれば**余裕で払えた**と見なす（暫定値・感度を取る）。
 #: **ブロッカーが居る行は無条件で余裕**（レストするだけでドンを使わない）。
@@ -828,7 +828,7 @@ def _finish_guard(got, played, my_life, z, bnd, kap, w, t, rec, kn, stats, _add)
 
 
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targets="leader",
-            silent="zero", margin_comfort=None, ledger_pricing=None, harm_profile="cross"):
+            margin_comfort=None, ledger_pricing=None, harm_profile="cross"):
     """(局, 席) ごとに攻め側と守り側の取りこぼしを足す。
 
     `s`（決める＝行内の最善からの逸脱）は `FLOW_PRICING`、`g`（数える＝`ΔG`）は `ledger_pricing`
@@ -1052,10 +1052,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
                 if played_v is None or len(scored) < 2:
                     stats["atk_silent"] += 1
                     rec["n_silent"] += 1
-                    if silent == "zero":
-                        # **無言の行を「取りこぼし 0」として母数に入れる**
-                        _add(rec, bnd, 0.0, "atk")
-                    continue                     # `exclude` は母数にも入れない
+                    # **無言の行を「取りこぼし 0」として母数に入れる**
+                    _add(rec, bnd, 0.0, "atk")
+                    continue
                 # `s`＝最善からの逸脱（≤ 0）・`g`＝選んだ手の理論値そのもの（T40）
                 # `κ` は同じ行の全候補に共通なので順位（最善）は動かず、和の重みだけが局面で変わる
                 # **T58**: `g` は帳簿の規約（`exercise`）で読み直す——`s`（決める側）は `option` のまま
@@ -1246,7 +1245,7 @@ def pair_by_band(per, band):
     return out
 
 
-def pair_games(per, silent="zero"):
+def pair_games(per):
     """(局) ごとに 2 席を突き合わせて `ΔS` を作る（全帯まとめ・T28 の形）。"""
     by = {}
     for (seed, w), r in per.items():
@@ -1258,10 +1257,6 @@ def pair_games(per, silent="zero"):
         a, b = seats.get(0), seats.get(1)
         if a is None or b is None or a["z"] is None or b["z"] is None:
             continue
-        if silent == "exclude" and (a["n_silent"] or b["n_silent"]):
-            # **無言の行があった局を丸ごと外す**のは厳しすぎるので、
-            # `exclude` は「無言の行を母数から外す」＝既に加算していない＝ここでは何もしない。
-            pass
         na, nb = a["n_atk"] + a["n_grd"], b["n_atk"] + b["n_grd"]
         if na < 1 or nb < 1:
             continue
@@ -1482,9 +1477,6 @@ def main(argv=None):
     ap.add_argument("--theta", type=float, default=THETA, help="**P3** の暫定値（§0.4）")
     ap.add_argument("--theta-mode", default="const", choices=("const", "board", "max"))
     ap.add_argument("--nu-targets", default="leader", choices=("leader", "board"))
-    ap.add_argument("--silent", default="zero", choices=SILENT_MODES,
-                    help="**P2** の暫定値——`zero` は無言の行を取りこぼし 0 として母数に入れる／"
-                         "`exclude` は母数にも入れない")
     ap.add_argument("--margin-comfort", type=float, default=MARGIN_COMFORT,
                     help="**T28-c** の暫定値——守る力が来る攻撃をこれだけ上回れば「余裕で払えた」")
     ap.add_argument("--nu-mode", default=None, choices=("base", "pair"),
@@ -1567,7 +1559,7 @@ def main(argv=None):
     _TOM.apply_take_mode(a)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.nu_targets,
-                         a.silent, a.margin_comfort, ledger_pricing=a.ledger_pricing, harm_profile=a.harm_profile)
+                         a.margin_comfort, ledger_pricing=a.ledger_pricing, harm_profile=a.harm_profile)
     # **T49 の検算**: `κ` の平均（`w` の平均が `w̄` に戻れば 1）
     stats["kappa_mean"] = (round(stats["kappa_sum"] / stats["kappa_n"], 4) if stats["kappa_n"] else None)
     stats["w_mean"] = (round(stats["kappa_mean"] * _TO.W_BAR, 4) if stats["kappa_mean"] is not None else None)
@@ -1577,9 +1569,9 @@ def main(argv=None):
         # F-2/F-3a: 切替 on のときだけ刻む（off の出力は従来と同じ）
         stats["wiring"] = {"attack_ability": _TOM.ATTACK_ABILITY_MODE, "passive_body": _TOM.PASSIVE_BODY_MODE,
                            **{k: (round(v, 5) if isinstance(v, float) else v) for k, v in _TOM.WIRING_STATS.items()}}
-    pairs = pair_games(per, a.silent)
+    pairs = pair_games(per)
     res = {"stats": stats, "decision_rows": "main",
-           "provisional": {"P3_theta": a.theta, "P2_silent": a.silent,
+           "provisional": {"P3_theta": a.theta, "P2_silent": "zero",
                            "T28c_margin": a.margin_comfort, "w_mode": _TO.W_MODE,
                            "flow_pricing": stats["flow_pricing"], "ledger_pricing": stats["ledger_pricing"],
                            "surv_mode": _TO.SURV_MODE, "nu_mode": _TO.NU_MODE,
