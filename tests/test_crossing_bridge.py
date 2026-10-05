@@ -2090,7 +2090,7 @@ def test_the_take_branch_reads_the_defenders_life():
     攻撃 1 回の価格は `min(c(x)·μ〔守られる〕, Θ·μ〔受けられる〕, ブロック)`。
     **「受けられる」側に定数を渡していた**——`theta_take(ライフ)` は既に在り、
     **守りの規則・線形の橋・実現の帳簿の 4 つでは使われている**のに**交点の橋の `A` だけが渡していなかった**。
-    **既定の `TAKE_MODE=lethal` ではライフ 0 のときだけ値が変わる**＝
+    **受ける費用の `lethal`（T63）ではライフ 0 のときだけ値が変わる**＝
     **`A` は「この攻撃が通れば勝ち」を一度も見ていなかった**（T117 と同じ患部）。
     """
     tok = np.zeros((22, 24), np.float32)
@@ -2100,7 +2100,7 @@ def test_the_take_branch_reads_the_defenders_life():
     assert CB.theory_slope(tok, 5000.0, life_opp=0.0) == pytest.approx(base)   # `const` なら無視
     try:
         CB.set_slope_take_mode("life")
-        # **ライフが残っているうちは `theta_take` が定数を返す**（`TAKE_MODE=lethal` の規則）
+        # **ライフが残っているうちは `theta_take` が定数を返す**（`lethal` の規則・T63）
         assert CB.theory_slope(tok, 5000.0, life_opp=3.0) == pytest.approx(base)
         # **ライフ 0＝この 1 本が通れば勝ち**——価格が変わる
         lethal = CB.theory_slope(tok, 5000.0, life_opp=0.0)

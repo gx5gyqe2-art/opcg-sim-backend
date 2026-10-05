@@ -95,51 +95,19 @@ THETA = round((LAM - H_LIFE_TO_HAND * MU) / MU, 4)
 #: 表の形（2〜3 で高く 4 で低い）は雑音を含む。`L = 0` は受ければ負け＝勝利の価値 0.5（恒等式の値・`effect_value` の勝利と同じ）。
 #: **新定数ゼロ**（実測と恒等式の写し）。**既定は `lethal`**（ユーザ決定 2026-09-16「3 だけ採用」・`2026-09-16_take_by_life.md`）＝
 #: ライフ 0 で受ければ負け（0.5）だけを規則として入れ、他は定数。`by_life` は表の雑音（L=4 の谷）が規則と価格を壊すので不採用。
-#: **橋の総合値は決め手の一撃の分だけ膨らむので、以後は帯（接戦・中盤）で読む**。以前の数字と比べるときは `--take-mode const`。
-TAKE_MODES = ("const", "by_life", "lethal")
-TAKE_MODE = "lethal"
+#: **橋の総合値は決め手の一撃の分だけ膨らむので、以後は帯（接戦・中盤）で読む**。旧の `const` と不採用の `by_life`
+#: （切替 `TAKE_MODE`・`--take-mode`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。出力の `take_mode` は定数 `"lethal"`。
+#: `λ(L)` の表（T19 の写し）は `L = 0`（勝利の価値 0.5）だけが規則として使われる。
 LAM_BY_LIFE = {0: 0.5, 1: 0.113, 2: 0.218, 3: 0.190, 4: 0.078, 5: 0.119}
 
 
-def set_take_mode(mode):
-    global TAKE_MODE
-    if mode not in TAKE_MODES:
-        raise ValueError("take mode は %s のどれか" % (TAKE_MODES,))
-    TAKE_MODE = mode
-    _OPTION_CACHE.clear()
-    return TAKE_MODE
-
-
-def add_take_mode_arg(ap):
-    ap.add_argument("--take-mode", default=None, choices=TAKE_MODES,
-                    help="受ける費用（T63）。省略時は `theory_order.TAKE_MODE`（2026-09-16 から `lethal`＝ライフ 0 だけ勝利の価値 0.5）。"
-                         "`const`＝`Θ·μ`（以前の数字と比べるとき）・`by_life`＝`λ(L) − h·μ`（T19 の写し・不採用）")
-
-
-def apply_take_mode(a):
-    if getattr(a, "take_mode", None) is not None:
-        set_take_mode(a.take_mode)
-    a.take_mode = TAKE_MODE
-    return TAKE_MODE
-
-
-def lam_of_life(life):
-    """受け手のライフ `L` での `λ(L)`（T19 の写し・`L ≥ 5` は 5 の値・`L ≤ 0` は勝利の価値 0.5）。"""
-    lv = int(round(float(life)))
-    if lv <= 0:
-        return float(LAM_BY_LIFE[0])
-    return float(LAM_BY_LIFE.get(lv, LAM_BY_LIFE[5]))
-
-
-def theta_take(life, mode=None, theta=THETA, mu=MU, h=H_LIFE_TO_HAND):
-    """**受ける費用（枚）**＝`const` なら `Θ`・`by_life` なら `max(0, λ(L) − h·μ) / μ`。攻撃の価格には相手のライフ・守りの規則には自分のライフを渡す。"""
-    mode = TAKE_MODE if mode is None else mode
-    if mode == "const" or life is None:
+def theta_take(life, theta=THETA, mu=MU, h=H_LIFE_TO_HAND):
+    """**受ける費用（枚）**（T63 の `lethal`）＝ライフが残っていれば `Θ`・受ければ負け（ライフ 0）のときだけ勝利の価値 0.5 の
+    `max(0, 0.5 − h·μ) / μ`。攻撃の価格には相手のライフ・守りの規則には自分のライフを渡す。`None` は `Θ`。"""
+    if life is None:
         return float(theta)
-    if mode == "lethal":
-        # **規則だけ**: 受ければ負け（ライフ 0）のときだけ勝利の価値 0.5・それ以外は定数（T19 の表を使わない）
-        return float(theta) if int(round(float(life))) > 0 else float(max(0.0, LAM_BY_LIFE[0] - float(h) * float(mu)) / float(mu))
-    return float(max(0.0, lam_of_life(life) - float(h) * float(mu)) / float(mu))
+    # **規則だけ**: 受ければ負け（ライフ 0）のときだけ勝利の価値 0.5・それ以外は定数（T19 の表を使わない）
+    return float(theta) if int(round(float(life))) > 0 else float(max(0.0, LAM_BY_LIFE[0] - float(h) * float(mu)) / float(mu))
 #: **`Θ` には 2 つの経路が在り、帯レベルで食い違う**（2026-09-14 に判明・未解決）:
 #:
 #: | 経路 | 定義 | ライフ別 (ℓ=1..4) |

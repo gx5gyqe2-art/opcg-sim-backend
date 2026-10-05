@@ -1099,23 +1099,12 @@ def test_under_strict_the_attack_at_one_step_over_costs_the_two_thousand_counter
 # ---- T63（2026-09-16・ユーザ指示「着手してください」）: 受ける費用のライフ依存 `λ(L) − h·μ` ----
 
 def test_the_take_cost_by_life_is_the_measured_lambda_minus_the_hand_share():
-    """`const` は `Θ`・`by_life` は `max(0, λ(L) − h·μ)/μ`（L=0 は勝利の価値 0.5・L≥5 は 5 の値・None は Θ）。既定は `const`。"""
-    assert T.theta_take(3, mode="const") == T.THETA and T.theta_take(None, mode="by_life") == T.THETA
+    """`lethal`（T63・2026-09-16 から）: ライフが残っていれば `Θ`・ライフ 0 は勝利の価値 0.5 の `max(0, 0.5 − h·μ)/μ`・None は Θ。
+    旧の `const`／不採用の `by_life` の切替は 2026-10-05 に削除。"""
+    assert T.theta_take(None) == T.THETA
     for L in (1, 2, 3, 4, 5, 7):
-        lam = T.LAM_BY_LIFE[min(L, 5)]
-        assert T.theta_take(L, mode="by_life") == pytest.approx(max(0.0, lam - T.H_LIFE_TO_HAND * T.MU) / T.MU, abs=1e-9)
-    assert T.theta_take(0, mode="by_life") == pytest.approx((0.5 - T.H_LIFE_TO_HAND * T.MU) / T.MU, abs=1e-9)   # 受ければ負け
-    assert T.theta_take(2, mode="by_life") > T.theta_take(4, mode="by_life")     # T19 の形（2 で高く 4 で低い）
-    assert T.theta_take(3, mode="lethal") == T.THETA and T.theta_take(0, mode="lethal") == T.theta_take(0, mode="by_life")   # 規則だけ
-    before = T.TAKE_MODE
-    try:
-        assert T.set_take_mode("by_life") == "by_life"
-        assert T.theta_take(4) == pytest.approx(max(0.0, 0.078 - T.H_LIFE_TO_HAND * T.MU) / T.MU, abs=1e-9)
-        with pytest.raises(ValueError):
-            T.set_take_mode("なにか")
-    finally:
-        T.set_take_mode(before)
-    assert T.TAKE_MODE == before
+        assert T.theta_take(L) == T.THETA
+    assert T.theta_take(0) == pytest.approx((0.5 - T.H_LIFE_TO_HAND * T.MU) / T.MU, abs=1e-9)   # 受ければ負け
 
 
 def test_the_curve_w_mode_uses_the_same_density_as_the_clock_mode():

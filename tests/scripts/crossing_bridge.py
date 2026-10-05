@@ -2732,7 +2732,7 @@ def _budget_gap(pairs, xs, take_cost):
 #: の 4 つでは使われている**のに、**交点の橋の `A` だけが渡していなかった**。
 #: **同じ「ライフ」という要素に、器ごとに違う扱い**。
 #:
-#: **既定の `TAKE_MODE=lethal` では「ライフ 0 のときだけ」値が変わる**ので、
+#: **受ける費用の `lethal`（T63）では「ライフ 0 のときだけ」値が変わる**ので、
 #: **`A` は「この攻撃が通れば勝ち」を一度も見ていなかった**——**T117（とどめの規則の的中 0.23）と同じ患部**。
 #:
 #: **二重計上ではない**——`Θ` の `λ·L` は「全部でどれだけ要るか」（在庫）、
@@ -4502,7 +4502,7 @@ def main(argv=None):
     ap.add_argument("--slope-take", default=SLOPE_TAKE_MODE, choices=SLOPE_TAKE_MODES,
                     help="**T134** 攻撃の価格の「受けられたとき」を守る側のライフで読むか: "
                          "`const`（旧・定数 `Θ`）／**`life`（既定**・2026-10-05）（`theta_take(ライフ)`＝**他の 4 つの器が既に使っている式**・"
-                         "既定の `TAKE_MODE=lethal` ではライフ 0 のときだけ変わる＝**とどめが見えるようになる**）")
+                         "受ける費用の `lethal`（T63）ではライフ 0 のときだけ変わる＝**とどめが見えるようになる**）")
     ap.add_argument("--theta-side", default=THETA_SIDE_MODE, choices=THETA_SIDE_MODES,
                     help="**T133** `Θ` を両席で同じ式にするか: `legacy`（従来・自分の耐久だけ `g × 枚数`）／"
                          "**`symmetric`**（`threshold_parts` と同じ式を鏡に当てる）")
