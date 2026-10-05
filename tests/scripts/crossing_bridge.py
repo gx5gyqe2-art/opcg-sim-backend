@@ -1049,7 +1049,6 @@ def block_assignments(hits, blk):
     return out
 
 
-_RULE_EX_CACHE = {}
 _FEQ = 1e-9
 
 
@@ -1112,367 +1111,36 @@ def rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns=
     損害の期待値**（`F` と同じ値段: 命中 `λ − h·μ`・切らせた札 `μ`・倒したブロッカー `ν`・**とどめの段は耐久の残り全部**
     ＝`(λ − (λ − h·μ)) × 最初のライフ ＋ ν × 残っている全てのブロッカー`・E2）。
     `theta`＝**この守りで耐久が数える量**＝`λ × ライフ ＋ μ × 切る札の期待値 ＋ ν × 全てのブロッカー`。
-    倒れた枝では `Σ harms = theta` がちょうど成り立つ（とどめの段が残りを埋める）。"""
+    倒れた枝では `Σ harms = theta` がちょうど成り立つ（とどめの段が残りを埋める）。
+
+    **Rust 化・第 3 段（2026-10-05）**: 解くのは Rust の核（`rd_kernel.guard_rs`・速くした Python の写しは消した）。
+    `OPCG_RD_KERNEL=ref` なら速くする前の原文（`rule_don_ref`）・`both` なら両方で解いて `repr` を比べる。"""
+    if _RDK.MODE == "ref":
+        return _RDK.ref_module(globals()).rule_guard_plan_ex(cards, don, xs_first, xs_later, blk_margins, life, turns,
+                                                             life_types, prices, later_seq, rest_blk, arrive_blk,
+                                                             draw_types)
     pr = prices or {}
     lam = float(pr.get("lam", LAM)); lam_net = float(pr.get("lam_net", cut_take_price()))
     mu = float(pr.get("mu", cut_card_price())); olp = float(pr.get("olp", 5000.0)); mlp = float(pr.get("mlp", 5000.0))
     if later_seq is None:
         later_seq = (tuple(xs_later or ()),)
-    seq = _norm_seq(later_seq)
-    budgeted = _EX_USED["memo"] is not None
-    if budgeted:
-        # 予算つきの試行では結果を共有の覚え書きに入れない（問題だけの関数に保つ）——鍵も作らない（速さのためだけ）
-        return _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, life_types,
-                                   lam, lam_net, mu, olp, mlp, rest_blk, arrive_blk, draw_types)
-    key = (tuple(sorted((float(c), float(d)) for c, d in cards or ())), float(don),
-           tuple(sorted(float(x) for x in xs_first or ())), seq,
-           tuple(sorted(float(m) for m in blk_margins or ())), int(max(0, round(float(life)))),
-           None if turns is None else int(turns), tuple(life_types or ()),
-           round(lam, 9), round(lam_net, 9), round(mu, 9), round(olp, 3), round(mlp, 3),
-           tuple(sorted(float(m) for m in rest_blk or ())), tuple(sorted(float(m) for m in arrive_blk or ())),
-           tuple(draw_types or ()))
-    if key in _RULE_EX_CACHE:
-        return _RULE_EX_CACHE[key]
-    out = _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, life_types,
-                              lam, lam_net, mu, olp, mlp, rest_blk, arrive_blk, draw_types)
-    if len(_RULE_EX_CACHE) > 200000:
-        _RULE_EX_CACHE.clear()
-    _RULE_EX_CACHE[key] = out
+    seq = tuple(tuple(sorted(float(x) for x in s)) for s in later_seq) or ((),)
+    out = _RDK.guard_rs(cards, don, xs_first, seq, blk_margins, life, turns, life_types, lam, lam_net, mu, olp, mlp,
+                        rest_blk, arrive_blk, draw_types, g=globals())
+    if _RDK.MODE == "both":
+        _RDK.check("rule_guard_plan_ex", out, _RDK.ref_module(globals()).rule_guard_plan_ex(
+            cards, don, xs_first, xs_later, blk_margins, life, turns, life_types, prices, later_seq, rest_blk,
+            arrive_blk, draw_types))
     return out
-
-
-_RULE_EX_SETS = {}
-_RULE_EX_MEMO = {}
-_RULE_EX_CTX = {}
-
-
-class _ModelBudget(Exception):
-    """守る側の計算の状態数が予算を超えた（`rule_don_solve` が地平を 1 つ縮めてやり直す）。"""
 
 
 #: **計算の予算（理論の定数ではない）**: 1 回の `rule_don_solve` の 1 回の試行（ある地平）が守る側の計算で作ってよい
-#: 状態の数。超えたら地平を 1 ターン縮めてやり直す（地平 1 は必ず収まる）。**試行ごとに空の覚え書きで始める**ので、
-#: 数える状態数は**問題だけの関数**（呼ぶ順・他の試行や前の局面の覚え書きに依らない＝再現できる）。
-#: 縮めたかどうかは計画に残し（`horizon` 対 `horizon0`）、使った計画ごとに数える（`RULE_STATS["plan_cut"]`・覚えた結果を
-#: 使い回しても冷たい実行と同じ数になる）。`None` なら無制限（窓・テスト・感度の測定）。
+#: 状態の数。超えたら地平を縮めてやり直す（地平 1 は必ず収まる・段ごとの状態の数から収まる一番長い地平を選ぶ）。
+#: **試行ごとに空の覚え書きで始める**ので、数える状態数は**問題だけの関数**（呼ぶ順・他の試行や前の局面の覚え書きに
+#: 依らない＝再現できる）。縮めたかどうかは計画に残し（`horizon` 対 `horizon0`）、使った計画ごとに数える
+#: （`RULE_STATS["plan_cut"]`・覚えた結果を使い回しても冷たい実行と同じ数になる）。`None` なら無制限（窓・テスト・感度の測定）。
+#: 試行のループは Rust の核（`rd_solve`）が回す（第 2a 段・第 3 段で Python の写しを消した）。
 EX_STATE_BUDGET = 300000
-_EX_USED = {"memo": None, "limit": None}
-
-
-_SEQ_NORM = {}
-_SEQ_PREP = {}
-
-
-def _norm_seq(later_seq):
-    """`rule_guard_plan_ex` の攻撃の並びの正規化（段ごとに昇順）——同じ並びは計画の列挙で何百回も来るので覚える
-    （**速さのためだけ**・値は `tuple(tuple(sorted(float(x) for x in s)) for s in later_seq) or ((),)` と同じ）。"""
-    try:
-        return _SEQ_NORM[later_seq]
-    except (KeyError, TypeError):
-        pass
-    seq = tuple(tuple(sorted(float(x) for x in s)) for s in later_seq) or ((),)
-    try:
-        if len(_SEQ_NORM) > 200000:
-            _SEQ_NORM.clear()
-        _SEQ_NORM[later_seq] = seq
-    except TypeError:                          # 鍵にできない並び（リスト等）はそのまま毎回作る
-        pass
-    return seq
-
-
-def _seq_prep(seq):
-    """守る側の計算が読む攻撃の並び（命中するものだけ）・攻撃が尽きる段・最後の段を繰り返すか（覚えるだけ）。"""
-    r = _SEQ_PREP.get(seq)
-    if r is None:
-        fs = tuple(tuple(x for x in s if x >= -PWR_EPS) for s in seq)
-        r = (fs, max([i for i, s in enumerate(fs) if s] + [-1]), bool(fs[-1]))
-        if len(_SEQ_PREP) > 200000:
-            _SEQ_PREP.clear()
-        _SEQ_PREP[seq] = r
-    return r
-
-
-def _ex_prep(cards, life_types, draw_types):
-    """守る側の計算の手札の形（`_rule_guard_plan_ex` と状態の数え方 `_ex_count_layers` が同じものを読む）。
-    返すのは `(types, p_none, dtypes, pd_none, kinds, kvals, kdons, type_ix, dtype_ix, cnt0)`。"""
-    types = tuple((float(c), float(d), float(p)) for c, d, p in (life_types or ()) if float(p) > 0.0)
-    p_none = max(0.0, 1.0 - sum(p for _c, _d, p in types))
-    dtypes = tuple((float(c), float(d), float(p)) for c, d, p in (draw_types or ()) if float(p) > 0.0)
-    pd_none = max(0.0, 1.0 - sum(p for _c, _d, p in dtypes))
-    # 手札の状態は**札の種類（カウンター値, 払うドン）ごとの枚数**——同じ種類の札は入れ替えても同じ（厳密）。
-    # 読めた手札の札・取られたライフから入った札・引いた札は同じ種類なら区別しない。
-    kinds = sorted({(float(c), float(d)) for c, d in cards or () if float(c) > 0.0}
-                   | {(c, d) for c, d, _p in types} | {(c, d) for c, d, _p in dtypes}, reverse=True)
-    kind_ix = {kd: i for i, kd in enumerate(kinds)}
-    cnt0 = [0] * len(kinds)
-    for c, d in cards or ():
-        if float(c) > 0.0:
-            cnt0[kind_ix[(float(c), float(d))]] += 1
-    kinds_t = tuple(kinds)
-    return (types, p_none, dtypes, pd_none, kinds_t, tuple(kd[0] for kd in kinds_t), tuple(kd[1] for kd in kinds_t),
-            tuple(kind_ix[(c, d)] for c, d, _p in types), tuple(kind_ix[(c, d)] for c, d, _p in dtypes), tuple(cnt0))
-
-
-def _ex_counter_sets(kid, kvals, kdons, x, hand, dl):
-    """超過 `x` を止める**過不足の無い**札の組（種類ごとの枚数）→ `(新しい手札, 払ったドンの残り, 枚数)` の列。
-    過不足が無い＝どの 1 枚を外しても足りない（切る枚数の最小を探す守る側は、余る組を選ぶ理由が無い）。
-    `kid` は札の種類の並びの番号（`_RULE_EX_CTX`）・結果は `_RULE_EX_SETS` に覚える（問題だけの関数）。"""
-    ck = (kid, x, hand, dl)
-    out = _RULE_EX_SETS.get(ck)
-    if out is not None:
-        return out
-    need = float(x) + 1000.0 - PWR_EPS
-    NK = len(kvals)
-    res = {}
-    use = [0] * NK
-
-    def rec(i, s, dc):
-        if dc > dl + 1e-9:
-            return
-        if i == NK:
-            if s < need:
-                return
-            if any(use[q] > 0 and s - kvals[q] >= need for q in range(NK)):
-                return
-            nh = tuple(hand[q] - use[q] for q in range(NK))
-            kk = (nh, round(dl - dc, 9))
-            if kk not in res:
-                res[kk] = sum(use)
-            return
-        for n_ in range(hand[i] + 1):
-            use[i] = n_
-            rec(i + 1, s + n_ * kvals[i], dc + n_ * kdons[i])
-        use[i] = 0
-    rec(0, 0.0, 0.0)
-    out = [(nh, dl2, nc) for (nh, dl2), nc in res.items()]
-    _RULE_EX_SETS[ck] = out
-    return out
-
-
-def _rule_guard_plan_ex(cards, don, xs_first, seq, blk_margins, life, turns, life_types,
-                        lam, lam_net, mu, olp, mlp, rest_blk=(), arrive_blk=(), draw_types=()):
-    (types, p_none, dtypes, pd_none, kinds_t, kvals, kdons, type_ix, dtype_ix,
-     cnt0) = _ex_prep(cards, life_types, draw_types)
-    L0 = int(max(0, round(float(life))))
-    cap = (sum(cnt0) + 2 * L0 + 2) if turns is None else int(max(0, turns))
-    blk0 = tuple(sorted((float(m) for m in blk_margins or ()), reverse=True))
-    rest0 = tuple(sorted((float(m) for m in rest_blk or ()), reverse=True))
-    arr0 = tuple(sorted((float(m) for m in arrive_blk or ()), reverse=True))
-    nu_of = {}
-
-    def nu(m):
-        if m not in nu_of:
-            nu_of[m] = float(nu_meas_of(float(m) + olp, mlp))
-        return nu_of[m]
-    nu_all = sum(nu(m) for m in blk0 + rest0 + arr0)
-    zero = {"cut": 0.0, "stopped": 0.0, "alive": 0.0, "prevented": 0.0, "harms": (), "theta": lam * L0 + nu_all,
-            "nu_all": nu_all}
-    if cap <= 0:
-        return zero
-    hits_f = tuple(sorted(float(x) for x in xs_first or () if float(x) >= -PWR_EPS))
-    # これより先の段に攻撃は無い（尽きたら最後を繰り返す）
-    seq, last_hit, repeat_hits = _seq_prep(seq)
-    nseq = len(seq)
-
-    don = round(float(don), 9)
-    NT = len(types)
-    # 計画の列挙（`rule_don_solve`）は同じ守る側に対して何百回も呼ぶ——結果は下の文脈と状態だけで決まるので、
-    # 呼び出しをまたいで覚える（値は 1 つも変わらない・速さのためだけ）。
-    ctx_t = (kinds_t, types, dtypes, seq, don, L0, cap, lam, lam_net, mu, olp, mlp)
-    ctx = _RULE_EX_CTX.setdefault(ctx_t, len(_RULE_EX_CTX))
-    kid = _RULE_EX_CTX.setdefault(("kinds", kinds_t), len(_RULE_EX_CTX))
-    set_cache = _RULE_EX_SETS
-    if len(set_cache) > 400000:
-        set_cache.clear()
-    eps = PWR_EPS
-    tprob = tuple(tp[2] for tp in types)
-
-    memo = _EX_USED["memo"]
-    lim = _EX_USED["limit"]
-    if memo is None:                       # 窓・テスト・感度の測定: 呼び出しをまたいで覚える（予算は無い）
-        memo = _RULE_EX_MEMO
-        lim = None
-        if len(memo) > 600000:
-            memo.clear()
-            set_cache.clear()
-            _RULE_EX_CTX.clear()      # 文脈の番号も振り直す（覚えた値と一緒に捨てる）
-            ctx = _RULE_EX_CTX.setdefault(ctx_t, 0)
-            kid = _RULE_EX_CTX.setdefault(("kinds", kinds_t), 1)
-    memo_get = memo.get
-    FEQ = _FEQ
-
-    def better(a, b):
-        """守る側の比較（期待値・同点は誤差で）。`b` は None でない。"""
-        d = a[0] - b[0]
-        if d > FEQ or d < -FEQ:
-            return a[0] > b[0]
-        d = a[1] - b[1]
-        if d > FEQ or d < -FEQ:
-            return a[1] < b[1]
-        d = a[2] - b[2]
-        if d > FEQ or d < -FEQ:
-            return a[2] > b[2]
-        # 同じなら**損害を遅らせる方**（早い段の損害が小さい方・段の順に比べる）——守る側は歩きが耐久に届く時刻を
-        # 遅らせたい（攻め手の目的 E4 の裏返し）。切る札の総数は同じなので耐久は変わらず、時刻だけが変わる。
-        ha, hb = a[4], b[4]
-        la, lb = len(ha), len(hb)
-        for q in range(la if la > lb else lb):
-            u = ha[q] if q < la else 0.0
-            v = hb[q] if q < lb else 0.0
-            d = u - v
-            if d > FEQ or d < -FEQ:
-                return u < v
-        return False
-
-    def comb(parts):
-        """確率つきの結果の和（足す順は旧と同じ＝値は 1 ビットも変わらない）。"""
-        prev = cut = alive = st = 0.0
-        hh = []
-        for p, r in parts:
-            prev += p * r[0]; cut += p * r[1]; alive += p * r[2]; st += p * r[3]
-            r4 = r[4]
-            n4 = len(r4)
-            if n4 > len(hh):
-                hh.extend([0.0] * (n4 - len(hh)))
-            for j in range(n4):
-                hh[j] += p * r4[j]
-        return (prev, cut, alive, st, tuple(hh))
-
-    recv_of = {}                                             # 手札 → 受けてライフの札が入った手札の列（覚えるだけ）
-    draw_of = {}                                             # 手札 → 1 枚引いた手札の列（覚えるだけ）
-
-    def turn(t, hand, lf, blk):
-        """t 段目の始まり（ブロッカーは全部戻っている・ドンは満タン）。"""
-        if t >= cap:
-            return (0.0, 0.0, 0.0, 0.0, ())
-        if t >= 1 and not (repeat_hits or (t - 1) <= last_hit):
-            return (0.0, 0.0, float(cap - t), 0.0, ())       # 以後ずっと命中が無い
-        k = (ctx, t, hits_f if t == 0 else seq[min(t - 1, nseq - 1)], hand, blk, (), (), don, lf)
-        return memo_get(k) or within(k)
-
-    def next_turn(t, hand, lf, blk):
-        """守る側のターン（**1 枚引く**・H-4f）を挟んで t+1 段目へ。"""
-        if t + 1 >= cap or not dtypes:
-            return turn(t + 1, hand, lf, blk)
-        hs = draw_of.get(hand)
-        if hs is None:
-            hs = []
-            for di in range(len(dtypes)):
-                nh = list(hand); nh[dtype_ix[di]] += 1
-                hs.append(tuple(nh))
-            draw_of[hand] = hs
-        parts = [(dtypes[di][2], turn(t + 1, hs[di], lf, blk)) for di in range(len(dtypes))]
-        if pd_none > 0.0:
-            parts.append((pd_none, turn(t + 1, hand, lf, blk)))
-        return comb(parts)
-
-    def within(key):
-        """覚え書きに無い状態だけを解く（呼ぶ側が先に覚え書きを引く・**速さのためだけ**）。`dl` は丸め済み。"""
-        _c, t, rem, hand, ready, rested, pend, dl, lf = key
-        if not rem:
-            r = next_turn(t, hand, lf, tuple(sorted(ready + rested + pend, reverse=True)))
-            out = (r[0], r[1], r[2] + 1.0, r[3], (0.0,) + tuple(r[4]))
-            memo[key] = out
-            if lim is not None and len(memo) > lim:
-                raise _ModelBudget()
-            return out
-        best_att = None
-        prev_x = None
-        kill_def = None
-        if lf > 0:
-            hs = recv_of.get(hand)
-            if hs is None:
-                hs = []
-                for ti in range(NT):
-                    nh = list(hand); nh[type_ix[ti]] += 1
-                    hs.append(tuple(nh))
-                recv_of[hand] = hs
-        for i, x in enumerate(rem):                           # 攻め手が次に宣言する攻撃を選ぶ（`rem` は昇順）
-            if i and x == prev_x:
-                continue
-            prev_x = x
-            rest_rem = rem[:i] + rem[i + 1:]
-            # 受ける
-            if lf <= 0:
-                if kill_def is None:
-                    kill = (lam - lam_net) * float(L0) + sum(nu(m) for m in ready + rested + pend)
-                    kill_def = (0.0, 0.0, 0.0, 0.0, (kill,))
-                best_def = kill_def
-            else:
-                # 確率つきの和（`comb` と同じ足し算を同じ順で・その場で）
-                prev = cut = alive = st = 0.0
-                hh = []
-                lf1 = lf - 1
-                for ti in range(NT):
-                    k = (ctx, t, rest_rem, hs[ti], ready, rested, pend, dl, lf1)
-                    r = memo_get(k) or within(k)
-                    p = tprob[ti]
-                    prev += p * r[0]; cut += p * r[1]; alive += p * r[2]; st += p * r[3]
-                    r4 = r[4]
-                    n4 = len(r4)
-                    if n4 > len(hh):
-                        hh.extend([0.0] * (n4 - len(hh)))
-                    for j in range(n4):
-                        hh[j] += p * r4[j]
-                if p_none > 0.0:
-                    k = (ctx, t, rest_rem, hand, ready, rested, pend, dl, lf1)
-                    r = memo_get(k) or within(k)
-                    p = p_none
-                    prev += p * r[0]; cut += p * r[1]; alive += p * r[2]; st += p * r[3]
-                    r4 = r[4]
-                    n4 = len(r4)
-                    if n4 > len(hh):
-                        hh.extend([0.0] * (n4 - len(hh)))
-                    for j in range(n4):
-                        hh[j] += p * r4[j]
-                if hh:
-                    hh[0] = hh[0] + lam_net
-                    best_def = (prev, cut, alive, st, tuple(hh))
-                else:
-                    best_def = (prev, cut, alive, st, (0.0 + lam_net,))
-            # 横取りする
-            for bi, m in enumerate(ready):
-                if bi > 0 and ready[bi - 1] == m:
-                    continue
-                nr = ready[:bi] + ready[bi + 1:]
-                if x >= m - eps:
-                    k = (ctx, t, rest_rem, hand, nr, rested, pend, dl, lf)
-                    r = memo_get(k) or within(k)
-                    h4 = r[4]
-                    v = nu(m)
-                    cand = (r[0] + 1.0, r[1], r[2], r[3], ((h4[0] + v,) + h4[1:]) if h4 else (0.0 + v,))
-                else:
-                    k = (ctx, t, rest_rem, hand, nr, tuple(sorted(rested + (m,), reverse=True)), pend, dl, lf)
-                    r = memo_get(k) or within(k)
-                    cand = (r[0] + 1.0, r[1], r[2], r[3], r[4])
-                d = cand[0] - best_def[0]
-                if d > FEQ or (not d < -FEQ and better(cand, best_def)):
-                    best_def = cand
-            # カウンターを切る
-            for nh, dl2, nc in _ex_counter_sets(kid, kvals, kdons, x, hand, dl):
-                k = (ctx, t, rest_rem, nh, ready, rested, pend, dl2, lf)
-                r = memo_get(k) or within(k)
-                h4 = r[4]
-                v = mu * nc
-                cand = (r[0] + 1.0, r[1] + nc, r[2], r[3] + 1.0, ((h4[0] + v,) + h4[1:]) if h4 else (0.0 + v,))
-                d = cand[0] - best_def[0]
-                if d > FEQ or (not d < -FEQ and better(cand, best_def)):
-                    best_def = cand
-            # 攻め手は守る側の値を最小にする順番
-            if best_att is None or better(best_att, best_def):
-                best_att = best_def
-        memo[key] = best_att
-        if lim is not None and len(memo) > lim:
-            raise _ModelBudget()
-        return best_att
-
-    # 今のターン: アクティブなブロッカーだけが横取りでき、レスト中のものと手札から出るものは次のターンから
-    k = (ctx, 0, hits_f, cnt0, blk0, rest0, arr0, don, L0)
-    r = memo_get(k) or within(k)
-    prev, cut, alive, st, harms = r
-    harms = tuple(harms)                                     # 道筋が覆う段の数だけ（倒れた段・地平まで）
-    return {"cut": cut, "stopped": st, "alive": alive, "prevented": prev, "harms": harms,
-            "theta": lam * L0 + mu * cut + nu_all, "nu_all": nu_all}
 
 
 def rule_guard_plan_bo(cards, don, xs_first, xs_later, blk_margins, life, turns=None, life_types=(), prices=None):
@@ -1669,61 +1337,6 @@ def rules_steps(actx, play1, nsteps):
     return out
 
 
-def rules_sched(harms, steps, actx, paid1):
-    """**H-4f**: 歩きの段ごとの速さ（`seat_slope_sched` の代わり・`rule_don` 系）。
-
-    段 `j` ＝ (守る側の計算が覆う段なら) その段の損害の期待値 `harms[j]`／(先は) その段の財布の `fb`
-    ＋ **計算の外**: 引いた 1 枚（段 `i` に引いた札は速攻なら `i` から・素の体は `i+1` から・その段の残ったドン
-    `d_i − paid_i` で払える札だけ・素殴り＝E6）＋ 引いた札の効果 ＋ その段に出した札の効果。
-    **速攻は 1 回だけ**（出した速攻の体は `hits`／`fb` の中・F3）。局の最初の自席ターンは 0（T103）。"""
-    ds = actx["ds"]
-    a_tab, ar_tab, e_tab = actx.get("a_tab") or [0.0], actx.get("ar_tab") or [0.0], actx.get("e_tab") or [0.0]
-    n = len(steps)
-    if n == 0:
-        return []
-    nl = len(a_tab) - 1
-
-    def left_of(i, paid):
-        d = float(ds[min(i, len(ds)) - 1])
-        l_ = int(round(max(0.0, d - paid)))
-        return max(0, min(l_, nl))
-
-    def terms(li, st):
-        # 段の項: (速攻の分, 素の体の分, 効果〔引いた札の効果 ＋ その段に出した札の効果〕)
-        return (_tab(ar_tab, li), max(0.0, _tab(a_tab, li) - _tab(ar_tab, li)), _tab(e_tab, li) + float(st["eff"]))
-    # **速さのためだけ（RD-speed）**: 段 `i ≥ 2` の項は計画の 1 段目の支払いに依らない＝出す札の組（`steps`）ごとに
-    # 1 回だけ表から引いて覚える。段 `j` ごとに**同じ順の同じ足し算**（`v += ar_1; v += pos_1; …; v += ar_j`）を
-    # 繰り返す——浮動小数の結果は 1 ビットも変わらない（旧は段ごとに表を引き直していた）。
-    ck = ("_rules_sched_tail", id(actx))
-    tail = steps[0].get(ck)
-    if tail is None:
-        tail = [terms(left_of(i, steps[i - 1]["paid"]), steps[i - 1]) for i in range(2, n + 1)]
-        steps[0][ck] = tail
-    t1 = terms(left_of(1, paid1), steps[0])
-    seq_l = [t1[0], t1[1]]
-    for ar_, pos_, _e in tail:
-        seq_l.append(ar_); seq_l.append(pos_)
-    nh = len(harms)
-    skip1 = bool(actx.get("no_attack_now"))
-    out = []
-    for j in range(1, n + 1):
-        if skip1 and j == 1:
-            out.append(0.0)
-            continue
-        v = float(harms[j - 1]) if j <= nh else float(steps[j - 1]["fb"])
-        for q in range(2 * j - 2):
-            v += seq_l[q]
-        tj = t1 if j == 1 else tail[j - 2]
-        v += tj[0]
-        v += tj[2]
-        out.append(float(v))
-    return out
-
-
-def _tab(t, i):
-    return float(t[max(0, min(int(i), len(t) - 1))]) if t else 0.0
-
-
 def walk_crossing(sched, theta, actx):
     """**H-4f**: 歩きが耐久に届く時刻＝**橋の歩き（`tau_grow`）そのもの**に同じ列と同じ的を渡す（式を 2 本書かない）。"""
     return float(tau_grow(float(theta), 0.0, 0.0, 0.0, 0.0, sched=list(sched),
@@ -1750,33 +1363,57 @@ def model_horizon(actx, blk, life, arrive=()):
 #: **RD-speed**: 計画のディスクの覚え書き（`plan_store.py`・環境変数 `OPCG_PLAN_STORE` で開く・既定は無し）
 PLAN_STORE = None
 #: **解き方の版**——`rule_don_solve` の値を変える変更（守る側の計算・計画の列挙・歩き）をしたら上げる。ディスクの
-#: 覚え書きの鍵に入る（`tests/scripts` の原文のハッシュも入るので、上げ忘れても古い値は返らない＝二重の守り）。
-#: `test_rd_speed.py` が解き方の関数の原文の指紋を見張り、変わったのに上げていなければ落ちる。
-SOLVER_VERSION = "rd-speed-2"
+#: 覚え書きの鍵に入る（`tests/scripts` の原文のハッシュと Rust の核の原文のハッシュも入るので、上げ忘れても古い値は
+#: 返らない＝二重の守り）。`test_rd_speed.py` が解き方の関数の原文と Rust の核の原文の指紋を見張り、変わったのに
+#: 上げていなければ落ちる。**rd-speed-3**（Rust 化・第 3 段）: 速くした Python の解き方を消して Rust の核だけにした（値は不変）。
+SOLVER_VERSION = "rd-speed-3"
 _RULE_DON_CACHE = {}
 
-#: **RD-speed**: 地平を縮めるかの決め方の数え方（`_ex_count_layers`）を使うか。`False` なら旧の「1 ターンずつ縮めて
-#: やり直す」だけ（同じ地平を選ぶ・テストが両方を比べる）。
-EX_LAYER_COUNT = True
 #: 開示: 予算を超えた試行の数・数え方で飛ばした試行の数（`rule_don_solve` の呼び出しごと・値には入らない）
 EX_SPEED_STATS = {"attempt_fail": 0, "attempt_skipped": 0, "count_calls": 0, "count_fallback": 0}
+_EX_SPEED_KEYS = ("attempt_fail", "attempt_skipped", "count_calls", "count_fallback")
+
+
+def _rd_put(key, out):
+    if len(_RULE_DON_CACHE) > 100000:
+        _RULE_DON_CACHE.clear()
+    _RULE_DON_CACHE[key] = out
 
 
 def rule_don_solve(cards_d, don_d, blk, life, actx, turns=None, life_types=(), draw_types=(), arrive=()):
-    """`_rule_don_solve` を地平 `⌈τ0⌉`（手札抜きの地平）から始め、守る側の計算の状態数が予算 `EX_STATE_BUDGET` を超えたら
-    地平を 1 ターンずつ縮めてやり直す（縮めた回数を数える・計画の `horizon` に使った地平を残す）。`turns` を渡されたら
-    その地平のまま（窓・テスト）。
+    """**H-4b／H-4e／H-4f**: 攻め手の最善の計画（今のターンに出す札の組 × 付与）に対する守る側の最善の守り。
 
-    **RD-speed（速さのためだけ・値は 1 ビットも変わらない）**: 地平 `h` の試行が予算を超えるのは「その試行が作る状態の数
-    （全ての計画の和集合）＞ 予算」のときちょうど（状態は問題だけで決まる・`h` より手前の段の状態は地平に依らない）。
-    最初の試行 `⌈τ0⌉` が超えたら、段ごとの状態の数を 1 回だけ数えて（`_ex_count_layers`・値は計算しない）収まる一番長い
-    地平を直接選ぶ——旧は超える地平を 1 つずつ全部解いてから捨てていた。選んだ地平もいつもどおり予算つきで解く。"""
+    **2 ターン目からは攻め手もその段のドンで財布を解き直す**（`rules_steps`・F2）——今のターンの計画が変えるのは
+    今のターンの攻撃と、残る手札（＝先の段で出せる札）だけ。**付けたドンはそのターンで戻る**。
+    守る側は**レスト中のブロッカーが次のターンに戻り**（`actx["rest_blk"]`）、**手札のブロッカー**（`arrive`）も
+    次のターンから居り、**毎ターン 1 枚引く**（`draw_types`・F4）＝歩きの的と守る側の計算の耐久が同じもの（F1）。
+
+    攻め手の目的は (**歩きが耐久に届くターン**〔整数・端数は切り上げ〕 最小, 守る側が生き延びるターン数 最小,
+    速さの値打ち 最大, 使うドン 最小)（E4）。
+
+    返すのは `(切る枚数, 止める本数, 計画)`。計画は `play`・`k`・`paid`・`xs_first`・`later_seq`・`harm_steps`・
+    `sched`（歩きの段ごとの速さ）・`theta`（守る側の計算の耐久＝歩きの的）・`theta_parts`＝(ライフ, 手札, 体)・
+    `tau`（歩きが届く時刻）・**`a_time`＝耐久 ÷ 届く時刻**（時刻で読む器〔線形の橋・帳簿〕が受け取る速さ）・
+    **`a_turn`＝今のターンの損害**（1 ターンで読む器〔速さの検算〕が受け取る速さ）・`alive`・`value`・
+    （地平を渡さなければ）`horizon`（使った地平）・`horizon0`（手札抜きの地平 `⌈τ0⌉`）。
+
+    地平を渡さなければ `⌈τ0⌉`（`model_horizon`）から始め、守る側の計算の状態数が予算 `EX_STATE_BUDGET` を超えたら
+    段ごとの状態の数から収まる一番長い地平を選んで解き直す。`turns` を渡されたらその地平のまま（窓・テスト）。
+
+    **Rust 化・第 3 段（2026-10-05）**: 計画の列挙と採点・歩き・試行のループ・守る側の計算は Rust の核
+    （`opcg_engine.rd_solve`）が解く。ここに残るのは覚え書き・計画のディスクの覚え書き・出す札の組（`_rule_don_masks`
+    ＝`rules_steps`・第 2b 段まで Python）・最初の地平・ν の表・計画の辞書の組み立て。予算なしの試行（地平を渡された・
+    予算が無い）の答えは地平つきの鍵でも覚え、地平を渡した解と渡さない解が同じ辞書を指す（後から地平の欄が足される・
+    速くした Python と同じ振る舞い）。`OPCG_RD_KERNEL=ref` なら速くする前の原文（`rule_don_ref`）・`both` なら冷たく
+    解いた答えを原文と `repr` で比べる（違えば例外）。"""
+    if _RDK.MODE == "ref":
+        return _RDK.ref_module(globals()).solve(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arrive)
     if tuple(actx.get("cp", (None, None))) != cut_context_key():
         raise RuntimeError("攻め手の財布（attacker_ctx）と守る側の計算が別の値段の文脈で作られている（同じ `CP.defending` の中で呼ぶ）")
-    key = (tuple(sorted((float(c), float(d)) for c, d in cards_d or ())), float(don_d),
-           tuple(sorted(float(m) for m in blk or ())), int(max(0, round(float(life)))),
-           None if turns is None else int(turns), tuple(life_types or ()), tuple(draw_types or ()),
-           tuple(sorted(float(m) for m in arrive or ())), actx["key"], EX_STATE_BUDGET, "w")
+    head = (tuple(sorted((float(c), float(d)) for c, d in cards_d or ())), float(don_d),
+            tuple(sorted(float(m) for m in blk or ())), int(max(0, round(float(life)))))
+    tail = (tuple(life_types or ()), tuple(draw_types or ()), tuple(sorted(float(m) for m in arrive or ())), actx["key"])
+    key = head + (None if turns is None else int(turns),) + tail + (EX_STATE_BUDGET, "w")
     if key in _RULE_DON_CACHE:
         return _RULE_DON_CACHE[key]
     dkey = None
@@ -1784,54 +1421,98 @@ def rule_don_solve(cards_d, don_d, blk, life, actx, turns=None, life_types=(), d
         dkey = PLAN_STORE.key_of(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arrive)
         hit = PLAN_STORE.get(dkey)
         if hit is not None:
-            if len(_RULE_DON_CACHE) > 100000:
-                _RULE_DON_CACHE.clear()
-            _RULE_DON_CACHE[key] = hit
+            _rd_put(key, hit)
             return hit
     masks = _rule_don_masks(cards_d, blk, life, actx, life_types)
-    if turns is not None:
-        out = _rule_don_solve(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arrive, masks=masks)
+    h0 = None
+    if turns is None:
+        h0 = model_horizon(actx, blk, int(max(0, round(float(life)))), arrive)
+    # 予算なしの試行（地平を渡された・予算が無い）は地平つきの鍵でも覚える（同じ辞書を共有する）
+    unb = turns if turns is not None else (h0 if EX_STATE_BUDGET is None else None)
+    ukey = None if unb is None else head + (int(unb),) + tail
+    out = _RULE_DON_CACHE.get(ukey) if ukey is not None else None
+    if out is None:
+        out, h, st = _rd_run(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arrive, masks, h0)
+        if ukey is not None:
+            _rd_put(ukey, out)
+        for k, v in zip(_EX_SPEED_KEYS, st[:4]):
+            EX_SPEED_STATS[k] += v
     else:
-        L0 = int(max(0, round(float(life))))
-        h0 = model_horizon(actx, blk, L0, arrive)
-        out = None
-        h = h0
-        tried_count = False
-        while h >= 1:
-            if EX_STATE_BUDGET is None:
-                _EX_USED["memo"], _EX_USED["limit"] = None, None
-            else:
-                _EX_USED["memo"], _EX_USED["limit"] = {}, (EX_STATE_BUDGET if h > 1 else None)
-            try:
-                out = _rule_don_solve(cards_d, don_d, blk, life, actx, h, life_types, draw_types, arrive, masks=masks)
-            except _ModelBudget:
-                EX_SPEED_STATS["attempt_fail"] += 1
-                nxt = h - 1
-                if EX_LAYER_COUNT and not tried_count and nxt > 1:
-                    # 地平 h が超えた: 段ごとの数から「収まる一番長い地平」を直接出す（数え方が予算内と言った地平も
-                    # 予算つきで解くので、万一数え違えて超えたら旧と同じ 1 つずつの縮め方に戻る）
-                    tried_count = True
-                    EX_SPEED_STATS["count_calls"] += 1
-                    fit = _ex_fit_horizon(cards_d, don_d, blk, life, actx, life_types, draw_types, arrive, masks,
-                                          h, EX_STATE_BUDGET)
-                    if fit is None or fit >= h:
-                        EX_SPEED_STATS["count_fallback"] += 1
-                    else:
-                        EX_SPEED_STATS["attempt_skipped"] += nxt - fit
-                        nxt = fit
-                h = nxt
-                continue
-            finally:
-                _EX_USED["memo"], _EX_USED["limit"] = None, None
-            break
+        h = unb
+    if turns is None:
         out[2]["horizon"] = h
         out[2]["horizon0"] = h0
-    if len(_RULE_DON_CACHE) > 100000:
-        _RULE_DON_CACHE.clear()
-    _RULE_DON_CACHE[key] = out
+    if _RDK.MODE == "both":
+        ref = _RDK.ref_module(globals())
+        ref.clear()                        # 原文は冷たく解く（原文の覚え書きは予算つきの試行でも読む・B1 の前）
+        _RDK.check("rule_don_solve", out, ref.solve(cards_d, don_d, blk, life, actx, turns, life_types, draw_types,
+                                                    arrive))
+    _rd_put(key, out)
     if dkey is not None:
         PLAN_STORE.put(dkey, out)
     return out
+
+
+def _rd_solve_args(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arrive, masks, h0):
+    """`opcg_engine.rd_solve` に渡す引数の組（最後の覚え書きの引数を除く・記録した解の金型もこれを使う）。"""
+    prices = _prices_of(actx)
+    pr = tuple(float(prices[k]) for k in ("lam", "lam_net", "mu", "olp", "mlp"))
+    rest = tuple(actx.get("rest_blk") or ())
+    nu = {}
+    for m in list(blk or ()) + list(rest) + list(arrive or ()):
+        m = float(m)
+        if m not in nu:
+            nu[m] = float(nu_meas_of(m + pr[3], pr[4]))
+    budget = actx["budget"]
+    flow = actx.get("flow") or [0.0] * (budget + 1)
+    mk = [(m["cost"], m["b"], m["later_seq"], m["hits1"], m["p_atk"], m["p_eff"], m["caps"],
+           [(s["paid"], s["eff"], s["fb"]) for s in m["steps"]]) for m in masks]
+    lim = EX_STATE_BUDGET
+    return ([(float(c), float(d)) for c, d in cards_d or ()], float(don_d), [float(x) for x in blk or ()],
+            float(life), None if turns is None else int(turns),
+            [(float(c), float(d), float(p)) for c, d, p in life_types or ()],
+            [(float(c), float(d), float(p)) for c, d, p in draw_types or ()], [float(x) for x in arrive or ()],
+            [float(x) for x in rest], [float(x) for _s, x in actx["att1"]], int(budget), flow,
+            bool(actx.get("no_attack_now")), pr, list(nu.items()), float(PWR_EPS), float(_FEQ), actx["ds"],
+            actx.get("a_tab") or [0.0], actx.get("ar_tab") or [0.0], actx.get("e_tab") or [0.0], float(SLOPE_FLOOR),
+            _RDK.race_cap(tau_grow), mk, int(h0 or 0), None if lim is None else int(lim), True)
+
+
+def _rd_run(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arrive, masks, h0):
+    """Rust の核で試行のループから先を解く。`((cut, stopped, plan), 使った地平 or None, 開示)`。
+    `plan` は速くした Python の `_rule_don_solve` と同じ辞書（同じキーの順）で、`horizon`／`horizon0` はまだ付けない。"""
+    prices = _prices_of(actx)
+    rest = tuple(actx.get("rest_blk") or ())
+    att1 = actx["att1"]
+    no_now = bool(actx.get("no_attack_now"))
+    h, mi, ks, paid, incr, val, tau, sched, r, st = _RDK.rd_solve(
+        _rd_solve_args(cards_d, don_d, blk, life, actx, turns, life_types, draw_types, arrive, masks, h0))
+    m = masks[mi]
+    res = _RDK.res_dict(r, blk or rest or arrive)
+    n = len(att1)
+    hits1 = m["hits1"]
+    xf = () if no_now else (tuple(float(att1[q][1]) + 1000.0 * ks[q] for q in range(n)) + tuple(hits1[n:]))
+    hh = res["harms"]
+    plan = {"atk": m["p_atk"], "rush": m["p_rush"], "eff": m["p_eff"], "incr": incr,
+            "paid": float(paid), "play": tuple(m["play"]), "k": tuple(ks),
+            "xs_first": tuple(xf), "later_seq": m["later_seq"],
+            "alive": res["alive"], "value": val, "tau": tau,
+            "harm_steps": tuple(hh), "sched": tuple(sched), "theta": res["theta"],
+            "cut": res["cut"], "stopped": res["stopped"]}
+    L0 = int(max(0, round(float(life))))
+    lam = float(prices["lam"]); mu = float(prices["mu"])
+    plan["theta_parts"] = (lam * L0, mu * float(res["cut"]), float(res["nu_all"]))
+    tau = float(plan["tau"]); th = float(plan["theta"])
+    sched = plan["sched"]
+    # **Q1**: 時刻で読む器は「耐久 ÷ 届く時刻」（Θ/A がちょうど歩きの τ）、1 ターンで読む器は今のターンの損害
+    plan["a_time"] = (th / tau) if tau > 1e-12 else max(float(sched[0]) if sched else 0.0, SLOPE_FLOOR)
+    plan["a_turn"] = float(sched[0]) if sched else 0.0
+    plan["attach_lead"] = 0.0
+    plan["attach"] = 0.0
+    plan["rest"] = rest
+    plan["arrive"] = tuple(arrive or ())
+    plan["draw_types"] = tuple(draw_types or ())
+    return (res["cut"], res["stopped"], plan), h, st
 
 
 def _rule_don_masks(cards_d, blk, life, actx, life_types):
@@ -1867,257 +1548,6 @@ def _rule_don_masks(cards_d, blk, life, actx, life_types):
             caps = [0] * len(att1)                          # 局の最初の自席ターンは攻撃できない＝付けても効かない
         out.append({"play": play, "cost": cost, "b": b, "steps": steps, "later_seq": later_seq, "hits1": hits1,
                     "p_atk": p_atk, "p_eff": p_eff, "p_rush": p_rush, "caps": caps})
-    return out
-
-
-def _mask_firsts(m, actx):
-    """1 つの出す札の組で守る側の計算に渡る**今のターンの攻撃の並び**の全部（`_rule_don_solve` の `solve` と同じ値・
-    付与 0 の 1 本 ＋ 列挙する付与の全部）。状態の数え方だけが使う（順は要らない）。"""
-    att1 = actx["att1"]
-    no_now = bool(actx.get("no_attack_now"))
-    hits1, caps, b = m["hits1"], m["caps"], m["b"]
-    n = len(att1)
-
-    def xf_of(ks):
-        return () if no_now else (tuple(float(att1[q][1]) + 1000.0 * ks[q] for q in range(n)) + tuple(hits1[n:]))
-    out = {xf_of([0] * n)}
-    ks = [0] * n
-
-    def visit(i, left):
-        if i == n:
-            out.add(xf_of(ks))
-            return
-        for k in range(0, min(caps[i], left) + 1):
-            ks[i] = k
-            visit(i + 1, left - k)
-        ks[i] = 0
-    visit(0, b)
-    return out
-
-
-def _ex_fit_horizon(cards_d, don_d, blk, life, actx, life_types, draw_types, arrive, masks, h_fail, lim):
-    """地平 `h_fail` が予算を超えたとき、**予算に収まる一番長い地平**（`< h_fail`・最低 1）。数えられなければ `None`。"""
-    roots = []
-    for m in masks:
-        for xf in _mask_firsts(m, actx):
-            roots.append((xf, m["later_seq"]))
-    sizes = _ex_count_layers(cards_d, don_d, blk, life, life_types, tuple(actx.get("rest_blk") or ()), arrive,
-                             draw_types, roots, h_fail, lim)
-    tot = 0
-    fit = 1
-    for t, n in enumerate(sizes):
-        tot += n
-        if tot > lim:
-            break
-        fit = t + 1                                         # 段 0..t が全部入る＝地平 t+1 の状態の数 ≤ 予算
-    return max(1, min(fit, h_fail))
-
-
-def _ex_count_layers(cards, don, blk_margins, life, life_types, rest_blk, arrive_blk, draw_types, roots, cap, lim):
-    """**RD-speed**: 守る側の計算（`_rule_guard_plan_ex` の `within`）が地平 `cap` の 1 回の試行で作る状態を**段ごとに**数える
-    （値は計算しない）。`roots`＝`[(今のターンの攻撃, 2 ターン目からの攻撃の並び)]`（計画の全部）。状態は `within` の
-    覚え書きの鍵と同じもの（文脈＝並びごとに別・段・残りの攻撃・手札・ブロッカー・ドン・ライフ）で、遷移も `within` と
-    同じ——`h < cap` の地平の試行の状態は、この数えの段 `0..h−1` とちょうど同じ（段 `t` の状態は `t` より先の地平に依らない）。
-    合計が `lim` を超えたらそこで打ち切る（最後の段は途中まで）。返すのは段ごとの数の列。"""
-    (types, p_none, dtypes, pd_none, kinds_t, kvals, kdons, type_ix, dtype_ix,
-     cnt0) = _ex_prep(cards, life_types, draw_types)
-    L0 = int(max(0, round(float(life))))
-    blk0 = tuple(sorted((float(m) for m in blk_margins or ()), reverse=True))
-    rest0 = tuple(sorted((float(m) for m in rest_blk or ()), reverse=True))
-    arr0 = tuple(sorted((float(m) for m in arrive_blk or ()), reverse=True))
-    don = round(float(don), 9)
-    kid = _RULE_EX_CTX.setdefault(("kinds", kinds_t), len(_RULE_EX_CTX))
-    if len(_RULE_EX_SETS) > 400000:
-        _RULE_EX_SETS.clear()
-    eps = PWR_EPS
-    NT = len(types)
-    groups = {}                                             # 文脈（並び）→ (並び, 尽きる段, 繰り返すか, 段ごとの根)
-    for xf, later_seq in roots:
-        seq, last_hit, repeat_hits = _seq_prep(_norm_seq(later_seq))
-        g = groups.get(seq)
-        if g is None:
-            g = groups[seq] = (seq, last_hit, repeat_hits, [set() for _ in range(max(1, cap))])
-        hits_f = tuple(sorted(float(x) for x in xf or () if float(x) >= -PWR_EPS))
-        g[3][0].add((0, hits_f, cnt0, blk0, rest0, arr0, don, L0))
-    sizes = [0] * max(1, cap)
-    total = 0
-    recv_of = {}
-    draw_of = {}
-    for t in range(cap):
-        for seq, last_hit, repeat_hits, fronts in groups.values():
-            nseq = len(seq)
-            seen = set()
-            stack = list(fronts[t])
-            nxt = fronts[t + 1] if t + 1 < cap else None
-            while stack:
-                s = stack.pop()
-                if s in seen:
-                    continue
-                seen.add(s)
-                sizes[t] += 1
-                total += 1
-                if total > lim:
-                    return sizes[:t + 1]
-                _t, rem, hand, ready, rested, pend, dl, lf = s
-                if not rem:
-                    if nxt is None:
-                        continue                            # 地平の終わり
-                    tn = t + 1
-                    if not (repeat_hits or (tn - 1) <= last_hit):
-                        continue                            # 以後ずっと命中が無い（状態を作らない）
-                    blk = tuple(sorted(ready + rested + pend, reverse=True))
-                    hits = seq[min(tn - 1, nseq - 1)]
-                    if not dtypes:
-                        nxt.add((tn, hits, hand, blk, (), (), don, lf))
-                        continue
-                    hs = draw_of.get(hand)
-                    if hs is None:
-                        hs = []
-                        for di in range(len(dtypes)):
-                            nh = list(hand); nh[dtype_ix[di]] += 1
-                            hs.append(tuple(nh))
-                        draw_of[hand] = hs
-                    for nh in hs:
-                        nxt.add((tn, hits, nh, blk, (), (), don, lf))
-                    if pd_none > 0.0:
-                        nxt.add((tn, hits, hand, blk, (), (), don, lf))
-                    continue
-                if lf > 0:
-                    hs = recv_of.get(hand)
-                    if hs is None:
-                        hs = []
-                        for ti in range(NT):
-                            nh = list(hand); nh[type_ix[ti]] += 1
-                            hs.append(tuple(nh))
-                        recv_of[hand] = hs
-                prev_x = None
-                for i, x in enumerate(rem):
-                    if i and x == prev_x:
-                        continue
-                    prev_x = x
-                    rest_rem = rem[:i] + rem[i + 1:]
-                    if lf > 0:
-                        for nh in hs:
-                            stack.append((t, rest_rem, nh, ready, rested, pend, dl, lf - 1))
-                        if p_none > 0.0:
-                            stack.append((t, rest_rem, hand, ready, rested, pend, dl, lf - 1))
-                    for bi, m in enumerate(ready):
-                        if bi > 0 and ready[bi - 1] == m:
-                            continue
-                        nr = ready[:bi] + ready[bi + 1:]
-                        if x >= m - eps:
-                            stack.append((t, rest_rem, hand, nr, rested, pend, dl, lf))
-                        else:
-                            stack.append((t, rest_rem, hand, nr, tuple(sorted(rested + (m,), reverse=True)), pend, dl, lf))
-                    for nh, dl2, _nc in _ex_counter_sets(kid, kvals, kdons, x, hand, dl):
-                        stack.append((t, rest_rem, nh, ready, rested, pend, dl2, lf))
-    return sizes
-
-
-def _rule_don_solve(cards_d, don_d, blk, life, actx, turns, life_types=(), draw_types=(), arrive=(), masks=None):
-    """**H-4b／H-4e／H-4f**: 攻め手の最善の計画（今のターンに出す札の組 × 付与）に対する守る側の最善の守り。
-
-    **2 ターン目からは攻め手もその段のドンで財布を解き直す**（`rules_steps`・F2）——今のターンの計画が変えるのは
-    今のターンの攻撃と、残る手札（＝先の段で出せる札）だけ。**付けたドンはそのターンで戻る**。
-    守る側は**レスト中のブロッカーが次のターンに戻り**（`actx["rest_blk"]`）、**手札のブロッカー**（`arrive`）も
-    次のターンから居り、**毎ターン 1 枚引く**（`draw_types`・F4）＝歩きの的と守る側の計算の耐久が同じもの（F1）。
-
-    攻め手の目的は (**歩きが耐久に届くターン**〔整数・端数は切り上げ〕 最小, 守る側が生き延びるターン数 最小,
-    速さの値打ち 最大, 使うドン 最小)（E4）。
-
-    返すのは `(切る枚数, 止める本数, 計画)`。計画は `play`・`k`・`paid`・`xs_first`・`later_seq`・`harm_steps`・
-    `sched`（歩きの段ごとの速さ）・`theta`（守る側の計算の耐久＝歩きの的）・`theta_parts`＝(ライフ, 手札, 体)・
-    `tau`（歩きが届く時刻）・**`a_time`＝耐久 ÷ 届く時刻**（時刻で読む器〔線形の橋・帳簿〕が受け取る速さ）・
-    **`a_turn`＝今のターンの損害**（1 ターンで読む器〔速さの検算〕が受け取る速さ）・`alive`・`value`。
-
-    **予算つきの試行**（`rule_don_solve` の地平の縮め）では結果の覚え書きを読まない・書かない——覚えた結果を返すと
-    その試行の状態を数えずに済んでしまい、縮めるかどうかが前に解いた局面に依る（B1 と同じ約束・RD-speed で塞いだ）。"""
-    budgeted = _EX_USED["memo"] is not None
-    key = None
-    if not budgeted:
-        key = (tuple(sorted((float(c), float(d)) for c, d in cards_d or ())), float(don_d),
-               tuple(sorted(float(m) for m in blk or ())), int(max(0, round(float(life)))),
-               None if turns is None else int(turns), tuple(life_types or ()), tuple(draw_types or ()),
-               tuple(sorted(float(m) for m in arrive or ())), actx["key"])
-        if key in _RULE_DON_CACHE:
-            return _RULE_DON_CACHE[key]
-    if masks is None:
-        masks = _rule_don_masks(cards_d, blk, life, actx, life_types)
-    prices = _prices_of(actx)
-    L0 = int(max(0, round(float(life))))
-    rest = tuple(actx.get("rest_blk") or ())
-    att1 = actx["att1"]
-    budget = actx["budget"]
-    flow = actx.get("flow") or [0.0] * (budget + 1)
-    best = None
-    no_now = bool(actx.get("no_attack_now"))
-
-    for m in masks:
-        play, cost, b, steps, later_seq, hits1 = m["play"], m["cost"], m["b"], m["steps"], m["later_seq"], m["hits1"]
-        p_atk, p_eff, p_rush, caps = m["p_atk"], m["p_eff"], m["p_rush"], m["caps"]
-
-        def first_of(ks):
-            return () if no_now else (tuple(float(att1[q][1]) + 1000.0 * ks[q] for q in range(len(att1)))
-                                      + tuple(hits1[len(att1):]))
-
-        def solve(xf):
-            return rule_guard_plan_ex(cards_d, don_d, xf, None, blk, life, turns, life_types, prices,
-                                      later_seq=later_seq, rest_blk=rest, arrive_blk=arrive, draw_types=draw_types)
-        r0 = solve(first_of([0] * len(att1)))
-        h1_bare = r0["harms"][0] if r0["harms"] else 0.0
-        ks = [0] * len(att1)
-        seen = set()
-
-        def visit(i, left):
-            nonlocal best
-            if i == len(att1):
-                xf = first_of(ks)
-                paid = cost + sum(ks)
-                # **RD-speed**: 同じ攻撃の組（並べ替え）と同じ支払いの計画は、守る側の計算（攻撃の並びを並べ替えて読む）も
-                # 歩きも点数も同じ＝点数が等しいので先に来た方が残る（`<` で比べる）。後から来た同じ計画は解かずに飛ばす。
-                sig = (tuple(sorted(xf)), paid)
-                if sig in seen:
-                    return
-                seen.add(sig)
-                res = solve(xf)
-                h = res["harms"]
-                incr = (h[0] if h else 0.0) - h1_bare
-                val = p_atk + p_eff + incr + float(flow[max(0, budget - paid)])
-                sched = rules_sched(h, steps, actx, float(paid))
-                tau = walk_crossing(sched, res["theta"], actx)
-                score = (int(math.ceil(round(tau, 9) - 1e-9)), round(float(res["alive"]), 9), -round(val, 12), paid)
-                if best is None or score < best[0]:
-                    best = (score, res, {"atk": p_atk, "rush": p_rush, "eff": p_eff, "incr": incr,
-                                         "paid": float(paid), "play": tuple(play), "k": tuple(ks),
-                                         "xs_first": tuple(xf), "later_seq": later_seq,
-                                         "alive": res["alive"], "value": val, "tau": tau,
-                                         "harm_steps": tuple(h), "sched": tuple(sched), "theta": res["theta"],
-                                         "cut": res["cut"], "stopped": res["stopped"]})
-                return
-            for k in range(0, min(caps[i], left) + 1):
-                ks[i] = k
-                visit(i + 1, left - k)
-            ks[i] = 0
-
-        visit(0, b)
-    res, plan = best[1], dict(best[2])
-    lam = float(prices["lam"]); mu = float(prices["mu"])
-    plan["theta_parts"] = (lam * L0, mu * float(res["cut"]), float(res["nu_all"]))
-    tau = float(plan["tau"]); th = float(plan["theta"])
-    sched = plan["sched"]
-    # **Q1**: 時刻で読む器は「耐久 ÷ 届く時刻」（Θ/A がちょうど歩きの τ）、1 ターンで読む器は今のターンの損害
-    plan["a_time"] = (th / tau) if tau > 1e-12 else max(float(sched[0]) if sched else 0.0, SLOPE_FLOOR)
-    plan["a_turn"] = float(sched[0]) if sched else 0.0
-    plan["attach_lead"] = 0.0
-    plan["attach"] = 0.0
-    plan["rest"] = rest
-    plan["arrive"] = tuple(arrive or ())
-    plan["draw_types"] = tuple(draw_types or ())
-    out = (res["cut"], res["stopped"], plan)
-    if key is not None:
-        if len(_RULE_DON_CACHE) > 100000:
-            _RULE_DON_CACHE.clear()
-        _RULE_DON_CACHE[key] = out
     return out
 
 
@@ -4483,7 +3913,7 @@ def summarise(rows_out, ledger, turn_harm=None, theta_check=None):
 
 import plan_store as _PS  # noqa: E402  （**RD-speed**: `OPCG_PLAN_STORE` が有ればディスクの覚え書きを開く）
 _PS.open_from_env(sys.modules[__name__])
-import rd_kernel as _RDK  # noqa: E402  （**Rust 化・第 1 段**: `OPCG_RD_KERNEL` で守る側の計算を Rust の核へ。既定 `py`＝何も変わらない）
+import rd_kernel as _RDK  # noqa: E402  （**Rust 化**: 守る側の計算・計画の列挙・試行のループは Rust の核。`OPCG_RD_KERNEL`＝rs（既定）／ref／both）
 _RDK.install(globals())
 
 
