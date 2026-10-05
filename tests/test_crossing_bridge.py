@@ -163,6 +163,7 @@ def test_sigma_t_comes_from_the_measurement_and_follows_the_body_set():
     b_real, b_syn = CB.sigma_t_for(None, "real"), CB.sigma_t_for(None, "syn")     # `blockers`
     assert b_real and b_syn and b_real > 0.0 and b_syn > 0.0
     assert CB.sigma_t_for(None, "real", body_mode="blockers") == b_real
+    assert CB.sigma_t_for(None, "real", body_mode="attackable") is None    # 波C で表から外した行は引けない
     assert CB.sigma_t_for(None, "なにか") is None or True   # 知らない名前は cross 扱い
     assert CB.sigma_t_for([], "cross") is None      # 記録の種類が判らなければ引かない
 
@@ -174,6 +175,7 @@ def test_w_bar_comes_from_the_measurement_too():
     import theory_order as TO
     b_real, b_syn = CB.w_bar_for(None, "real"), CB.w_bar_for(None, "syn")     # `blockers`
     assert b_real and b_syn and b_real > 0.0 and b_syn > 0.0
+    assert CB.w_bar_for(None, "real", body_mode="attackable") is None      # 波C で表から外した行は引けない
     # 2026-10-05 の作り直し（Rust 版）で `blockers` の `w̄` は 0.0948／0.1589 になり `0.5/R`（0.121）の両側に分かれた
     assert CB.w_bar_for([], "cross") is None      # 記録の種類が判らなければ引かない
 

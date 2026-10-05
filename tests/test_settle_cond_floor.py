@@ -297,6 +297,7 @@ def test_the_fixture_carries_the_whole_table():
     tbl = prof["sigma_rel_whole"]["blockers"]
     for slope in ("theory", "curve"):
         assert set(tbl[slope]) == {"real", "syn"} and all(0.0 < v < 1.0 for v in tbl[slope].values())
+    assert "sigma_rel" not in prof and "sigma_rel_floor" not in prof            # 波C: 消した切替だけが読んでいた表
 
 
 # ---- 配線（win_calib／pre_settle_asymmetry／crossing_bridge） ----------------------------------------
