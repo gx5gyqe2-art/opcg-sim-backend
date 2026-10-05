@@ -30,7 +30,9 @@ N_f         = 枠の時点で耐久の式が言う「切る枚数」（予約・
 **理論の側は枠の中で線形のまま `μ` を `ḡ` に替える**——速さ（`A`）は攻撃を 1 本ずつ独立に値付けし、予約の何枚目を
 どの攻撃が切らせるかを持たないので、予約の値段を攻撃の本数で配るには平均しか無い。これで**予約の `N_f` 枚ぶんの攻撃の値段の和
 ＝耐久の手札の項＝守り手が予約の組 `T*` を順に切ったときの実現の損害の和＝`L(N_f)`**（3 つが厳密に同じ額）。
-安い順の切れ目で配る形（`joint_slice`）は診断として残す（`CutView` の注）。
+安い順の切れ目で配る窓（`CutView` の `kind="slice"`）は曲線の読み口として残す（`CutView` の注）。
+その窓で器を回す切替（`joint_slice`）と、切り分けの腕 `joint_theta`／`joint_floor` は 2026-10-05 に削除——
+`claude/theory-switches-final` で再現できる。
 
 **数は変えず、1 枚あたりの値段だけを変える**——`c(x)`・`N*`・実際に減った枚数はどれも旧の式のまま。
 全部の札が一律 `μ` の札なら `L(k) = kμ`・`ḡ = μ` で旧の値に厳密に戻る（テスト）。数の側を規則から作り直す線（H-4 の
@@ -65,12 +67,11 @@ if _HERE not in sys.path:
 import theory_order as TO  # noqa: E402
 from theory_order import MU, SC_MY_HAND, SC_MY_LIFE  # noqa: E402
 
-#: **切替**: `flat`＝旧（1 枚一律 `μ`・2026-10-01 までの既定）／`joint`＝N-3（**既定**・1 枚 1 役の価値の減り・損害と耐久の両側を同時に・
-#: 予約の平均の値段 `ḡ = L(N_f)/N_f` で理論の側を線形に読む）／`joint_slice`＝同じ曲線を**安い順の切れ目**で読む診断の腕
-#: （攻撃 1 本ごとに一番安い札から数える＝速さが攻撃を独立に数えるので安い札を何度も使い回す・下の注）。
-#: 切り分けの腕（レビュー 2026-09-30）: `joint_theta`＝**耐久の側だけ**（`Θ` の手札の項と窓の上限は `ḡ`・攻撃の値段・
-#: 速さ・実現の損害は旧の `μ`＝T77 を破る対照）／`joint_floor`＝`ḡ` を `μ` で床打ちした `joint`（安すぎる枠の影響の切り分け）。
-CUT_PRICE_MODES = ("flat", "joint", "joint_slice", "joint_theta", "joint_floor")
+#: **切替**: `flat`＝旧（1 枚一律 `μ`・2026-10-01 までの既定・再現用に残す）／`joint`＝N-3（**既定**・1 枚 1 役の価値の減り・
+#: 損害と耐久の両側を同時に・予約の平均の値段 `ḡ = L(N_f)/N_f` で理論の側を線形に読む）。
+#: 診断と切り分けの腕（`joint_slice`＝安い順の切れ目・`joint_theta`＝耐久の側だけ・`joint_floor`＝`ḡ` を `μ` で床打ち・
+#: レビュー 2026-09-30）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
+CUT_PRICE_MODES = ("flat", "joint")
 CUT_PRICE_MODE = "joint"
 #: **B4（T77）**: 受けたとき手札に入るライフの札の値段。`mu`＝旧（受ける費用 `λ − h·μ`・実現の `−μ`）／
 #: `gbar`＝守る側と同じ `ḡ`（**既定**・2026-10-01・受ける費用 `λ − h·ḡ`・実現の損害でも攻め手のターンの間に入った札を `ḡ` で数える）。
@@ -99,8 +100,7 @@ def set_cut_price_mode(mode):
 def add_cut_price_arg(ap):
     ap.add_argument("--cut-price", default=None, choices=CUT_PRICE_MODES,
                     help="**N-3** 切らせた札の値段: `flat`（旧・1 枚一律 μ）／"
-                         "`joint`（既定・1 枚 1 役の手札の価値の減り・損害の側と耐久の側を同時に）／"
-                         "`joint_slice`（安い順の切れ目・診断）／`joint_theta`（耐久の側だけ・対照）／`joint_floor`（ḡ を μ で床打ち）")
+                         "`joint`（既定・1 枚 1 役の手札の価値の減り・損害の側と耐久の側を同時に）")
     ap.add_argument("--cut-take", default=None, choices=CUT_TAKE_MODES,
                     help="**N-3 B4** 受けたとき手札に入るライフの札の値段: `gbar`（既定・守る側と同じ ḡ）／`mu`（旧）")
 
@@ -118,8 +118,8 @@ def joint_on():
 
 
 def harm_side_on():
-    """損害の側（攻撃の値段・速さ・実現の損害）も新しい値段で読むか（`joint_theta` だけが耐久の側に限る）。"""
-    return joint_on() and CUT_PRICE_MODE != "joint_theta"
+    """損害の側（攻撃の値段・速さ・実現の損害）も新しい値段で読むか（`joint` なら常に読む）。"""
+    return joint_on()
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -180,7 +180,6 @@ class CutCurve:
             g = self.mu
         else:
             g = float(self.Lx(n) / n)
-            g = max(g, self.mu) if CUT_PRICE_MODE == "joint_floor" else g
         self._gbar_memo = (key, g)
         return g
 
@@ -234,9 +233,9 @@ class CutCurve:
         return max(0.0, self.share * (self.h0 - float(hand_now)))
 
     def view(self, hand_now=None, kind=None):
-        """今の枚数（省略＝枠のまま）での値段の窓。`kind` は `avg`（`joint`）／`slice`（`joint_slice`）・省略は切替から。"""
+        """今の枚数（省略＝枠のまま）での値段の窓。`kind` は `avg`（`joint`・省略時）／`slice`（安い順の切れ目・曲線の読み口）。"""
         if kind is None:
-            kind = "slice" if CUT_PRICE_MODE == "joint_slice" else "avg"
+            kind = "avg"
         return CutView(self, 0.0 if hand_now is None else self.m_of(hand_now), kind)
 
     # --- 実際に切った組 ---
@@ -261,7 +260,7 @@ class CutView:
     * `avg`（`joint`・既定）: `price(k) = k · ḡ`——**枠の中では 1 枚あたり一定**（予約の平均）。理論の側（攻撃の守る値段・
       `Θ` の手札の項・窓の上限）は枚数に線形のまま `μ` を `ḡ` に替えるだけ＝予約の `N_f` 枚ぶんの攻撃の値段の和も、
       `Θ` の手札の項も、守り手が予約の組を順に切ったときの実現の損害の和も**同じ `L(N_f)`**。
-    * `slice`（`joint_slice`・診断）: `price(k) = Lx(m + k) − Lx(m)`（`m` はこれまでに減った切れる枚数）——安い順の切れ目。
+    * `slice`（曲線の読み口・器の切替としては 2026-10-05 に削除）: `price(k) = Lx(m + k) − Lx(m)`（`m` はこれまでに減った切れる枚数）——安い順の切れ目。
       速さ（`A`）は攻撃を 1 本ずつ独立に値付けする（`m` を積まない）ので、凸な曲線では**一番安い札を攻撃の本数だけ
       使い回す**＝攻撃の値段が系統的に安く出る（40 局の予備測定で理論の速さ −30%・終局の偏り +1.0 ターン）。"""
 
@@ -311,10 +310,10 @@ def active():
 def defending(view):
     """**この中で呼んだ旧の式は、守り手 `view` の値段で読む**。`view=None` なら旧の値段（何もしない）。
     `theory_order.CUT_PRICER`（攻撃の値段）・`CUT_PRICER_KEY`（覚えておく値の鍵）・`CUT_TAKE_CARD`（B4）を差し替え、
-    出るときに必ず戻す（入れ子可）。`joint_theta` では攻撃の値段は差し替えない（耐久の側だけ）。"""
+    出るときに必ず戻す（入れ子可）。"""
     prev = (TO.CUT_PRICER, TO.CUT_PRICER_KEY, TO.CUT_TAKE_CARD)
     _STACK.append(view)
-    if view is None or CUT_PRICE_MODE == "joint_theta":
+    if view is None:
         TO.CUT_PRICER, TO.CUT_PRICER_KEY, TO.CUT_TAKE_CARD = None, None, None
     else:
         TO.CUT_PRICER = (lambda c, mu, _v=view: _v.price(c, mu))
@@ -666,5 +665,5 @@ class CutFrames:
     def bracket_corr(self, w, t, n_lo, n_hi):
         """括り（攻め手の行の位置 `n_lo` から閉じる行の位置 `n_hi`）の中の応答の直しの和。"""
         if n_hi is None or not harm_side_on():
-            return 0.0                                  # `joint_theta`（耐久の側だけ）は実現の損害を旧のまま
+            return 0.0                                  # `flat` は実現の損害を旧のまま
         return sum_in(self.corrections(w, t), n_lo, n_hi)

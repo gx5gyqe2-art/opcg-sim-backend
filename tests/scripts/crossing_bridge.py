@@ -848,12 +848,12 @@ def cut_card_price(mu=MU):
     """**B2（T77 の対称）**: 守る側が切る札 1 枚の値段。`CUT_PRICE_MODE=flat` なら一律 `μ`（旧）。`joint` なら
     **N-3 と同じ予約の 1 枚あたりの平均 `ḡ`**（守り手の手札の価値の減り・`cut_price.CutView.price(1)`）——損害の側
     （攻撃の守る値段・実現の損害）が使うのと同じ数。`rule*` の守る側の計算は切った札の枚数 × この値段で耐久を数える。
-    安い順の切れ目（`joint_slice`）は枚数ごとに値段が変わるので 1 枚の値段が定まらない＝組めない（落とす）。"""
+    安い順の切れ目の窓（`kind="slice"`）は枚数ごとに値段が変わるので 1 枚の値段が定まらない＝組めない（落とす）。"""
     cv = CP.active()
     if cv is None:
         return float(mu)
     if getattr(cv, "kind", "avg") != "avg":
-        raise ValueError("rule／rule_don は cut price joint_slice と組めない（1 枚の値段が定まらない）")
+        raise ValueError("rule／rule_don は安い順の切れ目の窓（slice）と組めない（1 枚の値段が定まらない）")
     return float(cv.price(1.0, mu))
 
 
@@ -3513,8 +3513,6 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     if CP.joint_on():
         if THETA_HAND_MODE not in ("cuttable", "cuttable_cx", "cuttable_forced", "cuttable_seq", "rule", "rule_don"):
             raise ValueError("N-3（cut price joint）は THETA_HAND_MODE=%r と組めない" % (THETA_HAND_MODE,))
-        if THETA_HAND_MODE in ("rule", "rule_don") and CP.CUT_PRICE_MODE == "joint_slice":
-            raise ValueError("rule／rule_don は cut price joint_slice と組めない（1 枚の値段が定まらない）")
         import deck_refill as _DR
         cut_decks = _DR.decks_by_seed(dirs)
     rows_out = []
