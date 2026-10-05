@@ -170,13 +170,6 @@ def test_inflow_item_turns_an_enabler_into_a_per_turn_value(monkeypatch):
     # 相方待ちでない札はそのまま・デッキに合う札が無ければ base だけ
     assert HP.inflow_item(z, [e], deck, [], 0.087, cards, 5000.0, 4.0) is z
     assert HP.inflow_item(e, [z], ["Z", "Z"], [], 0.087, cards, 5000.0, 4.0)["v"] == [0.10] * 4
-    HP.set_inflow_mode("off")
-    try:
-        assert HP.apply_inflow([e], deck, [], 0.087, cards, 5000.0, 4.0) == [e]
-    finally:
-        HP.set_inflow_mode("on")
-    with pytest.raises(ValueError):
-        HP.set_inflow_mode("guess")
 
 
 def test_project_state_advances_the_clocks_from_rules_and_the_theory(monkeypatch):

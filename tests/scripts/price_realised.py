@@ -566,7 +566,6 @@ def main(argv=None):
     EV.add_cost_afford_arg(ap)
     EV.add_pricing_fixes_arg(ap)
     import hand_plan as _HP
-    _HP.add_inflow_arg(ap)
     _HP.add_cond_clock_arg(ap)
     _TO.add_attack_ability_arg(ap)
     _TO.add_defender_power_arg(ap)                 # 2b
@@ -597,7 +596,6 @@ def main(argv=None):
     apply_hand_meas(a)
     EV.apply_cost_afford(a)
     pricing_fixes = EV.apply_pricing_fixes(a)
-    _HP.apply_inflow_mode(a)
     _HP.apply_cond_clock_mode(a)
     t0 = time.time()
     EV.reset_cond_stats()
@@ -613,7 +611,7 @@ def main(argv=None):
            "search_price": "plan", "hand_meas": HAND_MEAS_MODE,
            "play_now": "hand", "cost_afford": EV.COST_AFFORD_MODE, "pricing_fixes": pricing_fixes,
            "decision_rows": apply_decision_row(a),
-           "inflow": _HP.INFLOW_MODE, "cond_clock": _HP.COND_CLOCK_MODE, "stats": stats,
+           "inflow": "on", "cond_clock": _HP.COND_CLOCK_MODE, "stats": stats,
            "frozen": {"lambda": LAM, "mu": MU, "delta": DELTA, "nu_meas": NU_MEAS, "theta": a.theta},
            "summary": summarise(per, a.boot_reps, a.seed), "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)

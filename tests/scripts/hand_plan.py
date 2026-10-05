@@ -182,30 +182,11 @@ def hand_items(tok_row, ci_row, idx2cid, cards, olp, r):
 #: **相方が後で来る期待**（T70・2026-09-17・ユーザ提案「ドロー＋サーチ＋相手の攻撃によるライフで出せる札が確保できる期待値も加味」）:
 #: `on`（既定）＝「手札から出す」効果を持つ札（相方待ちの札）の `v` を **ターンごとの並び** `v_t = base + P(t までに相方が来る) × E[相方の値]` に
 #: する（`P = 1 − (1 − p)^N(t)`・`p` = 残りの山の合う札の割合・`N(t)` = t ターンで手札に入る枚数＝ドロー 1 ＋ 受けるライフ ＋ サーチの当たり）。
-#: 相方が今の手札に在れば `P = 1`。`off`＝旧（静的 `v`・効果は満額）。**新定数ゼロ**（率は全部デッキと来る攻撃から出る）。
-INFLOW_MODES = ("off", "on")
-INFLOW_MODE = "on"
+#: 相方が今の手札に在れば `P = 1`。**新定数ゼロ**（率は全部デッキと来る攻撃から出る）。
+#: 旧の `off`（静的 `v`・効果は満額・切替 `INFLOW_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
+#: 出力 JSON の `inflow` キーは定数 `"on"` のまま残す（バイト一致のため）。
 #: 自分のターンに引く枚数（規則）
 DRAWS_PER_TURN = 1.0
-
-
-def set_inflow_mode(mode):
-    global INFLOW_MODE
-    if mode not in INFLOW_MODES:
-        raise ValueError("inflow mode は %s のどれか" % (INFLOW_MODES,))
-    INFLOW_MODE = mode
-    return INFLOW_MODE
-
-
-def add_inflow_arg(ap):
-    ap.add_argument("--inflow", default=None, choices=INFLOW_MODES,
-                    help="**T70** 相方待ちの札の v をターンごと（相方が来る確率つき）にする（`on`・既定）か旧の静的 v（`off`）か")
-
-
-def apply_inflow_mode(a):
-    if getattr(a, "inflow", None) is not None:
-        set_inflow_mode(a.inflow)
-    return INFLOW_MODE
 
 
 def arrival_prob(p, n):
@@ -512,10 +493,8 @@ def inflow_item(item, others, deck, xs, take_cost, cards, olp, r, turns=PLAN_TUR
 
 
 def apply_inflow(items, deck, xs, take_cost, cards, olp, r, turns=PLAN_TURNS, field=(), st_base=None, memo=None):
-    """手札の全部の札に `inflow_item` を当てる（`off` ならそのまま）。`field` は自分の場の札 id（コストを払えるかの判定）・
+    """手札の全部の札に `inflow_item` を当てる。`field` は自分の場の札 id（コストを払えるかの判定）・
     `st_base` は判断点の状態（条件の判定・T72）。`memo` は `inflow_item` の覚え書き（同じ手札の読みの間だけ）。"""
-    if INFLOW_MODE != "on":
-        return list(items)
     items = list(items)
     return [inflow_item(it, items[:k] + items[k + 1:], deck, xs, take_cost, cards, olp, r, turns, field, st_base, memo=memo)
             for k, it in enumerate(items)]
@@ -613,9 +592,9 @@ def collect(dirs, limit_games=0):
     idx2cid = {i: c for c, i in GA._vocab().items()}
     from theory_bridge import _seat_decks                    # 遅延（橋は本器を import しない）
     import search_price as SP
-    rec_decks = SP.record_decks(dirs) if INFLOW_MODE == "on" else {}
+    rec_decks = SP.record_decks(dirs)
     searches, draws = [], []
-    stats = {"games": 0, "search_rows": 0, "draw_rows": 0, "no_next": 0, "inflow": INFLOW_MODE, "search_deck_ok": 0, "search_deck_bad": 0}
+    stats = {"games": 0, "search_rows": 0, "draw_rows": 0, "no_next": 0, "inflow": "on", "search_deck_ok": 0, "search_deck_bad": 0}
     games = 0
     for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
         games += 1
@@ -775,7 +754,6 @@ def main(argv=None):
     TO.add_nu_mode_arg(ap)
     TO.add_surv_mode_arg(ap)
     TO.add_cbar_mode_arg(ap)
-    add_inflow_arg(ap)
     add_cond_clock_arg(ap)
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
@@ -783,11 +761,10 @@ def main(argv=None):
     TO.apply_nu_mode(a)
     TO.apply_surv_mode(a)
     TO.apply_cbar_mode(a)
-    apply_inflow_mode(a)
     apply_cond_clock_mode(a)
     t0 = time.time()
     searches, draws, stats = collect(a.src, a.limit_games)
-    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "cbar_mode": a.cbar_mode, "inflow": INFLOW_MODE, "cond_clock": COND_CLOCK_MODE,
+    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "cbar_mode": a.cbar_mode, "inflow": "on", "cond_clock": COND_CLOCK_MODE,
            "plan_turns": PLAN_TURNS,
            "stats": stats, "summary": summarise(searches, draws, a.min_card), "seconds": round(time.time() - t0, 1)}
     txt = json.dumps(res, ensure_ascii=False, indent=2)

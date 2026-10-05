@@ -702,7 +702,6 @@ def test_cutting_a_partner_lowers_the_partner_waiting_card(monkeypatch):
     monkeypatch.setattr(HP, "_value_with_partner",
                         lambda cid, info, cards, olp, r, partner, field=(), st_base=None: 0.10 + 0.12)
     monkeypatch.setattr(HP, "inflow_per_turn", lambda items, xs, take, deck, cards: 1.0)
-    monkeypatch.setattr(HP, "INFLOW_MODE", "on")
     e = {"cid": "E", "cost": 4.0, "v": 0.10, "counter": 0.0, "event": False}
     p = {"cid": "P", "cost": 2.0, "v": 0.02, "counter": 1000.0, "event": False}
     slots = [dict(_slot(0.0, 0.10, cost=4), cid="E", item=e), dict(_slot(1000.0, 0.02, cost=2), cid="P", item=p)]
@@ -717,5 +716,4 @@ def test_cutting_a_partner_lowers_the_partner_waiting_card(monkeypatch):
     assert got["cost"] == pytest.approx(0.02 + 0.12)
     # 相方の居ない山（["Z", "Z"]）では E は base のまま＝V(手札 − P) は E = 0.10
     assert B._hand_v(h, [0], {}) == pytest.approx(0.10)
-    monkeypatch.setattr(HP, "INFLOW_MODE", "off")               # 読み直さない切替なら単調＝過不足の無い組に絞る
-    assert B.hand_value_monotone(h)
+    assert B.hand_value_monotone(dict(h, inflow=None))          # 読み直さない手札なら単調＝過不足の無い組に絞る

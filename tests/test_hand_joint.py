@@ -285,7 +285,6 @@ def test_cutting_a_partner_is_read_on_the_remaining_hand(monkeypatch):
     monkeypatch.setattr(HP, "_value_with_partner",
                         lambda cid, info, cards, olp, r, partner, field=(), st_base=None: 0.10 + 0.12)
     monkeypatch.setattr(HP, "inflow_per_turn", lambda items, xs, take, deck, cards: 1.0)
-    monkeypatch.setattr(HP, "INFLOW_MODE", "on")
     e = {"cid": "E", "cost": 4.0, "v": 0.10, "counter": 0.0, "event": False}
     p = {"cid": "P", "cost": 2.0, "v": 0.02, "counter": 1000.0, "event": False}
     slots = [dict(_slot(0.0, 0.10, cost=4), cid="E", item=e), dict(_slot(1000.0, 0.02, cost=2), cid="P", item=p)]

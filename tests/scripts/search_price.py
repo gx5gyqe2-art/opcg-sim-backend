@@ -323,9 +323,9 @@ def card_gain(cid, ctx, cards):
     card = {"cid": str(cid), "cost": b["cost"], "v": use_value(cid, info, ctx["olp"], ctx["r"]),
             "counter": deck_counter(cid, info, printed=b["counter"]),     # N-4（`printed` なら印字のまま）
             "event": bool(info.get("event"))}
-    if HP.INFLOW_MODE == "on":                                   # T70: 取れる札が相方待ちの札なら v をターンごとの並びに
-        card = HP.inflow_item(card, ctx["hand_items"], ctx.get("deck") or [], ctx["xs"], ctx["take"], cards, ctx["olp"], ctx["r"],
-                              field=ctx.get("field") or (), st_base=ctx.get("st_base"))
+    # T70: 取れる札が相方待ちの札なら v をターンごとの並びに
+    card = HP.inflow_item(card, ctx["hand_items"], ctx.get("deck") or [], ctx["xs"], ctx["take"], cards, ctx["olp"], ctx["r"],
+                          field=ctx.get("field") or (), st_base=ctx.get("st_base"))
     if SEARCH_VALUE_MODE == "joint":                             # **N-4**: 1 枚 1 役の手札の価値の増え
         g = HP.joint_gain(ctx["hand_items"], card, ctx["caps"], ctx["xs"], ctx["take"])
     else:

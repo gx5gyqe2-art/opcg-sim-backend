@@ -378,7 +378,7 @@ def afford_need(x, mode=None):
 #:   （ライフ 0 で致死の攻撃を、止める札を持ったまま受けても罰点 0 になった）。出す計画（次の自席ターン＝半ラウンド後）は割り引かない
 #:   （T67 の t=0 の規約のまま）。
 #: * **調べる組**: V が手札について単調（札を足して下がらない）と**証明できるときだけ**過不足の無い組に絞る——相方待ち／条件の時計
-#:   （`hand_plan.apply_inflow`）を読み直さない手札（`inflow` が無い・`INFLOW_MODE=off`）では、出す計画（DP の最大）も
+#:   （`hand_plan.apply_inflow`）を読み直さない手札（`inflow` が無い）では、出す計画（DP の最大）も
 #:   守る備え（厳密な最大）も札を足して下がらないので、余計な札を足した組が安くなることは無い。相方待ちを読み直す手札では
 #:   札の `v` が残りの手札で変わる（相方を切れば落ち、守る備えの差し引きは軽くなる）ので単調性は保証できない＝**足りる組を全部**調べる。
 #: * 値の読めない札は `μ`（`GUARD_COST_MODE=spent` の分岐と同じ規約）。**新定数ゼロ**（`μ`・`KO_P`・既存の関数だけ）。
@@ -500,12 +500,9 @@ def hand_value_next(items, caps, xs_future, take, mu=MU, guard_start=1):
 
 
 def hand_value_monotone(hand):
-    """V が手札について単調だと**証明できる**か——札の `v` を残りの手札で読み直さない（`inflow` が無いか `INFLOW_MODE=off`）とき。
+    """V が手札について単調だと**証明できる**か——札の `v` を残りの手札で読み直さない（`inflow` が無い）とき。
     そのとき出す計画（DP の最大）も守る備え（厳密な最大）も、札を足して選べる手が増えるだけなので下がらない。"""
-    if hand.get("inflow") is None:
-        return True
-    import hand_plan as HP
-    return HP.INFLOW_MODE != "on"
+    return hand.get("inflow") is None
 
 
 def _hand_v(hand, keep, cache):
@@ -576,7 +573,7 @@ def _inflow_sensitive(item, ctx):
     """その札の `v` を残りの手札で読み直すか（`hand_plan.inflow_item` がそのまま返さない札＝相方待ち・条件の時計）。"""
     import hand_plan as HP
     import search_price as SP
-    if HP.INFLOW_MODE != "on" or item is None:
+    if item is None:
         return False
     if SP.enabler_target(item["cid"]) is not None:
         return True
@@ -1768,7 +1765,6 @@ def main(argv=None):
     EV.add_cost_afford_arg(ap)
     EV.add_pricing_fixes_arg(ap)
     import hand_plan as _HP
-    _HP.add_inflow_arg(ap)
     _HP.add_cond_clock_arg(ap)
     ap.add_argument("--harm-profile", default="cross", choices=("cross", "real", "syn"),
                     help="**T75** `--w-mode curve` の輪郭: `cross`（既定・測る記録と別のセット）／`real`／`syn`（`tests/fixtures/harm_profile.json`）")
@@ -1820,7 +1816,6 @@ def main(argv=None):
     EV.apply_search_price(a)
     EV.apply_cost_afford(a)
     pricing_fixes = EV.apply_pricing_fixes(a)                  # L
-    _HP.apply_inflow_mode(a)
     _HP.apply_cond_clock_mode(a)
     _CB.set_theta_hand_mode(a.theta_hand)
     set_last_turn_mode(a.last_turn)
@@ -1874,7 +1869,7 @@ def main(argv=None):
                            "guard_cost": GUARD_COST_MODE, "search_price": "plan",
                            "guard_afford": effective_guard_afford(), "guard_afford_requested": GUARD_AFFORD_MODE,   # G-2
                            "guard_s_cost": GUARD_S_COST_MODE,
-                           "play_now": "hand", "inflow": _HP.INFLOW_MODE, "cond_clock": _HP.COND_CLOCK_MODE,
+                           "play_now": "hand", "inflow": "on", "cond_clock": _HP.COND_CLOCK_MODE,
                            "pricing_fixes": pricing_fixes,                                              # L
                            "note": "§0.4 の暫定値。感度を付けて読む",
                            **({"cut_price": _CP.CUT_PRICE_MODE} if _CP.joint_on() else {})},   # **N-3**
