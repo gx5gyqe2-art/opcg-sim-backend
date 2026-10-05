@@ -44,9 +44,18 @@ _RAMP_PROF = [0.05, 0.1, 0.2, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
 
 @pytest.fixture(autouse=True)
 def _restore_modes():
-    d, k, s = KV.D_MODE, TO.KAPPA_SIGMA_MODE, TO.SIGMA_REL
+    d, k, s, shape = KV.D_MODE, TO.KAPPA_SIGMA_MODE, TO.SIGMA_REL, dict(KV.RATE_SHAPE)
     yield
     KV.set_d_mode(d); TO.set_kappa_sigma_mode(k); TO.set_sigma_rel(s)
+    KV.RATE_SHAPE.update(shape)
+
+
+def _clock_like():
+    """**波C**: 旧 `D_MODE=clock`（`τ = min(CAP, Θ/A)`）は削除。**`theory` の一定の形**（全部が盤面）は
+    `tau_grow` が `Θ/A` に退化する（`test_kappa_vector::test_a_constant_shape_degenerates_to_the_clock_reading`）
+    ので、局の途中の行（`j ≥ 1`）の閉じた代数はこの読みで同じに固定できる。"""
+    KV.set_d_mode("theory")
+    KV.set_rate_shape(KV.FLAT_SHAPE, KV.FLAT_SHAPE)
 
 
 # --------------------------------------------------------------------------- 1. 0 次同次
@@ -119,7 +128,7 @@ def _st(th_me=0.9, th_opp=0.6, a_me=0.12, a_opp=0.10, j=2):
 
 def test_p5_currency_rescale_leaves_the_relative_reading_untouched():
     """**P5**: 耐久と価格を同時に c 倍しても、時計は c 倍されるだけなので**比は動かない**。"""
-    KV.set_d_mode("clock")
+    _clock_like()
     st0 = _st(); dx = {"th_opp": -0.05}
     base = RL.dlog_of(st0, KV.apply_dx(st0, dx))
     for c in (0.5, 3.0):
@@ -140,7 +149,7 @@ def test_p7_a_common_multiplicative_error_in_both_rates_cancels():
 
     T112 は「偏りの 74.7%／73.7% は `A` の軌跡の誤り」と示した＝**両席にほぼ共通**なので、
     比で読む形はその誤りに強いはず、という予告の代数側。"""
-    KV.set_d_mode("clock")
+    _clock_like()
     st0 = _st(); dx = {"th_opp": -0.05}
     base = RL.dlog_of(st0, KV.apply_dx(st0, dx))
     a0, b0 = RL.clocks_of(st0)
@@ -152,7 +161,7 @@ def test_p7_a_common_multiplicative_error_in_both_rates_cancels():
 
 def test_p7_a_one_sided_rate_error_does_not_cancel():
     """**打ち消えるのは「共通の掛け算」だけ**——片側だけずれたら当然動く（過大な主張をしない）。"""
-    KV.set_d_mode("clock")
+    _clock_like()
     st0 = _st()
     one = (st0[0], st0[1], st0[2] * 1.3, st0[3], st0[4])
     assert RL.k_of(*RL.clocks_of(one), sigma_rel=SIG) != pytest.approx(
@@ -170,7 +179,8 @@ def test_curve_reading_gives_zero_log_change_for_rate_moves():
 
 
 def test_clock_reading_does_price_rate_moves():
-    KV.set_d_mode("clock")
+    """速さが時計に入る読み（旧 `clock`・今は一定の形の `theory`）は速さを動かす手に値段を付ける。"""
+    _clock_like()
     st0 = _st()
     assert RL.dlog_of(st0, KV.apply_dx(st0, {"a_me": 0.05})) > 0.0
     assert RL.dlog_of(st0, KV.apply_dx(st0, {"a_opp": -0.02})) > 0.0
@@ -180,7 +190,7 @@ def test_clocks_of_agrees_with_the_bridge_reading_of_d():
     """**`D = T_opp − T_me` は `kappa_vector.d_of` と同じ値**（同じ関数を呼んでいる＝読みが 1 本）。"""
     st0 = _st()
     for mode, prof in (("clock", None), ("curve", _FLAT_PROF)):
-        KV.set_d_mode(mode)
+        _clock_like() if mode == "clock" else KV.set_d_mode(mode)
         a, b = RL.clocks_of(st0, prof)
         assert (b - a) == pytest.approx(KV.d_of(st0, prof))
 
@@ -188,7 +198,7 @@ def test_clocks_of_agrees_with_the_bridge_reading_of_d():
 def test_an_attack_always_moves_the_log_ratio_the_right_way():
     """相手の耐久を削れば `T_me` が縮む＝`log(T_opp/T_me)` は**増える**（自分に有利）。"""
     for mode, prof in (("clock", None), ("curve", _FLAT_PROF)):
-        KV.set_d_mode(mode)
+        _clock_like() if mode == "clock" else KV.set_d_mode(mode)
         st0 = _st()
         assert RL.dlog_of(st0, KV.apply_dx(st0, {"th_opp": -0.05}), prof) > 0.0
         assert RL.dlog_of(st0, KV.apply_dx(st0, {"th_me": +0.05}), prof) > 0.0
@@ -197,7 +207,7 @@ def test_an_attack_always_moves_the_log_ratio_the_right_way():
 def test_the_killing_blow_diverges_in_the_log_reading():
     """**§17.9.4**: `Δlog Θ_opp = log(Θ_opp/(Θ_opp − p))` は `p → Θ_opp` で発散する
     ＝**絶対額の帳簿はとどめの一撃を原理的に軽く見る**（T80／T119 の予言）。"""
-    KV.set_d_mode("clock")
+    _clock_like()
     st0 = _st(th_opp=0.60)
     prev = 0.0
     for p in (0.30, 0.55, 0.59, 0.5999):

@@ -35,7 +35,10 @@
 | 読み | `τ` の出し方 | 生きている軸 |
 |---|---|---|
 | **`curve`（帳簿の正本・T75）** | **実測の損害の輪郭**（`tests/fixtures/harm_profile.json`）を `Θ` に届くまで積む | **`Θ_me` と `Θ_opp` の 2 本だけ** |
-| `clock`（交点の橋の静的な形・T90） | `τ = min(CAP, Θ/A)` | **4 本**（`Θ` 2 本 ＋ `A` 2 本） |
+| `theory`（積み上がる歩き・T127） | 状態から出す加速で `Θ` に届くまで歩く（表を使わない） | **4 本**（`Θ` 2 本 ＋ `A` 2 本） |
+
+（波C・2026-10-05: `clock`〔`τ = min(CAP, Θ/A)`・T90〕と `curve_scaled`〔輪郭をその席の `A` で伸縮・T126〕は削除——
+凍結ブランチ `claude/theory-switches-final` で再現する。）
 
 **これが本器の一番大事な観測**——**帳簿の `D` には速さの軸が存在しない**。輪郭は
 **両席共通の固定の表**なので、体を出しても付与しても `τ` は 1 ターンも動かない。
@@ -86,7 +89,7 @@
 
 使い方:
 
-    python tests/scripts/kappa_vector.py --in <records_dir> [--games N] [--d-mode curve|clock] [--json out.json]
+    python tests/scripts/kappa_vector.py --in <records_dir> [--games N] [--d-mode curve|theory] [--json out.json]
 """
 
 import argparse
@@ -145,60 +148,11 @@ def split_state(st):
     raise ValueError("状態は 5 つ組か 7 つ組（%d）" % len(st))
 
 
-#: **`D` の読み方**（上の表）。`curve`＝**帳簿の正本**（輪郭・軸は 2 本）／`clock`＝2 本の時計（軸は 4 本）。
-D_MODES = ("curve", "curve_scaled", "clock", "theory")
+#: **`D` の読み方**（上の表）。`curve`＝**帳簿の正本**（輪郭・軸は 2 本）／`theory`＝積み上がる歩き（軸は 4 本）。
+D_MODES = ("curve", "theory")
 D_MODE = "curve"
 #: 読みごとに**生きている軸**。`curve` に速さの軸は**存在しない**（輪郭は固定の表）。
-#: **`curve_scaled` は 4 本とも生きている**——輪郭をその席の `A` で伸縮するので速さが時計に入る。
-LIVE_AXES = {"curve": ("th_me", "th_opp"), "curve_scaled": AXES, "clock": AXES,
-             "theory": AXES}
-
-#: **`curve_scaled` の分母**（`crossing_bridge.profile_th_for` が返す理論の速さの輪郭）。
-#: 読む側が `set_profile_th` で入れる。**入っていないのに `curve_scaled` を頼んだら落ちる**
-#: （黙って `curve` に落ちない＝T118 の規約と同じ）。
-PROFILE_TH = None
-
-
-def set_profile_th(prof_th):
-    global PROFILE_TH
-    PROFILE_TH = list(prof_th) if prof_th else None
-    return PROFILE_TH
-
-
-def profile_scale(rate, j, prof_th=None):
-    """**輪郭をその席の速さで伸縮する倍率**＝`A / prof_th[j]`（橋の `curve_scaled` と同じ式・T126）。
-
-    **これが入ると輪郭の読みが尺度不変になる**——輪郭は比 `prof/prof_th`（無次元）としてしか入らず、
-    **単位は `A` が持つ**ので、通貨を c 倍すれば 1 ターンの損害も `Θ` も同じだけ c 倍になる
-    （T122 の P5 が `curve` で 96.2% 破れていた患部）。
-    **`prof_th[0] = 0` を分母にしてはいけない**（T126 で踏んだ）——最初の自席ターンは打てない規則（T103）は
-    「最初の自席ターンは 1 本も打てない」という**規則**なので、そこに典型の速さは**存在しない**。
-    床 `SLOPE_FLOOR` で割ると倍率が 55 倍まで飛び、**5.0% の行が打ち切りに貼り付いた**（実測）。
-    **規則どおりに「速さが定義される最初のターン」まで進めて割る**（新定数ゼロ）。"""
-    th = prof_th if prof_th is not None else PROFILE_TH
-    if not th:
-        raise ValueError("curve_scaled には理論の速さの輪郭が要る（profile_th_for）")
-    i = min(max(0, int(j)), len(th) - 1)
-    while i < len(th) - 1 and float(th[i]) <= CB.SLOPE_FLOOR:
-        i += 1                                  # 速さが定義される最初のターンまで進める
-    sc = float(rate) / max(CB.SLOPE_FLOOR, float(th[i]))
-    if SCALE_CLAMP:
-        sc = min(max(sc, SCALE_CLAMP[0]), SCALE_CLAMP[1])   # 診断用（上の注記）
-    return sc
-
-
-#: **診断用の倍率の締め**（T126 の追試・**モデルの提案ではない**）。
-#: `curve_scaled` が判別を失う原因が**倍率の尾**（中央 0.676 に対し 99% 点 55.1・打ち切りに貼り付く行 5.0%）
-#: なのかを切り分けるためだけの締め。**定数を 2 つ置くので理論には入れられない**——
-#: 「A を時計に入れるのが正しいか」と「今の A の推定が使えるか」を分けるために測る。
-SCALE_CLAMP = None
-
-
-def set_scale_clamp(lo_hi):
-    global SCALE_CLAMP
-    SCALE_CLAMP = tuple(float(x) for x in lo_hi) if lo_hi else None
-    return SCALE_CLAMP
-
+LIVE_AXES = {"curve": ("th_me", "th_opp"), "theory": AXES}
 
 #: **`theory`（積み上がる歩き・T94）の速さの形**＝席ごとの
 #: `(リーダー, 盤面のキャラ, 在庫, 流入, 在庫の速攻, 流入の速攻, 効果, 在庫の効果)` を
@@ -267,7 +221,7 @@ def set_d_mode(name):
 
 
 def tau_of(theta, rate, step=0.0):
-    """**片側の時計** `τ = min(CAP, Θ/A)`（`clock` の読み・T90 の `static`）。
+    """**片側の時計** `τ = min(CAP, Θ/A)`（T90 の `static`・統計の `tau_*_sum` が使う。旧 `clock` の読みの時計）。
     `step > 0`（C-5c）なら 1 段目に届かなければ的が `step` 遠のく＝`(Θ + step)/A`。"""
     a = max(A_FLOOR, float(rate))
     th = float(theta); step = max(0.0, float(step))
@@ -282,21 +236,14 @@ def d_of(st, prof=None):
     `st` は `(Θ_me, Θ_opp, A_me, A_opp, j)`。`j` は自席ターン番号（輪郭の読み出し位置）。
     `curve` は `crossing_bridge.tau_from_profile`（**帳簿が使っているのと同じ関数**）。"""
     th_me, th_opp, a_me, a_opp, j, b_me, b_opp = split_state(st)
-    if D_MODE in ("curve", "curve_scaled"):
+    if D_MODE == "curve":
         if prof is None:
             raise ValueError("D_MODE=%s には損害の輪郭が要る（profile_for）" % D_MODE)
-        # **T126**: `curve_scaled` は**その席の速さ**で輪郭を伸縮する（相手の時計は相手の `A` で）
-        s_me = s_opp = 1.0
-        if D_MODE == "curve_scaled":
-            s_me = profile_scale(a_opp, j)      # 自分が死ぬまで＝**相手**が削る速さ
-            s_opp = profile_scale(a_me, j)      # 相手が死ぬまで＝**自分**が削る速さ
-        return float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof, s_me, step=b_me)
-                     - CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof, s_opp, step=b_opp))
-    if D_MODE == "theory":
-        # **T127**: 加速を**状態から**出す（表を使わない）。削る側の速さでそれぞれ歩く。
-        return (tau_theory(th_me, a_opp, RATE_SHAPE["opp"], j, step=b_me)
-                - tau_theory(th_opp, a_me, RATE_SHAPE["me"], j, step=b_opp))
-    return tau_of(th_me, a_opp, step=b_me) - tau_of(th_opp, a_me, step=b_opp)
+        return float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof, 1.0, step=b_me)
+                     - CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof, 1.0, step=b_opp))
+    # **T127**（`theory`）: 加速を**状態から**出す（表を使わない）。削る側の速さでそれぞれ歩く。
+    return (tau_theory(th_me, a_opp, RATE_SHAPE["opp"], j, step=b_me)
+            - tau_theory(th_opp, a_me, RATE_SHAPE["me"], j, step=b_opp))
 
 
 def apply_dx(st, dx):
@@ -317,34 +264,12 @@ def apply_dx(st, dx):
     return out
 
 
-def grad_clock(th_me, th_opp, a_me, a_opp):
-    """**`clock` の読みの勾配**（4 成分・解析・新定数ゼロ）。`D = Θ_me/A_opp − Θ_opp/A_me` の偏微分そのまま。
-
-        ∂D/∂Θ_me  = +1/A_opp          自分の耐久を 1 守る
-        ∂D/∂Θ_opp = −1/A_me           相手の耐久を 1 削る（削る＝ Δ<0 なので寄与は +）
-        ∂D/∂A_me  = +Θ_opp/A_me²      自分の速さを 1 上げる
-        ∂D/∂A_opp = −Θ_me/A_opp²      相手の速さを 1 下げる
-
-    **符号は「その軸の量が増えたとき `D` がどう動くか」**なので、使う側は「削る」なら
-    `Δx < 0` を渡す（符号を 2 回付けない）。**打ち切りに当たっている側は 0**（`τ` がもう動かない）。"""
-    am = max(A_FLOOR, float(a_me)); ao = max(A_FLOOR, float(a_opp))
-    live_me = float(th_me) / ao < float(TAU_CAP)
-    live_opp = float(th_opp) / am < float(TAU_CAP)
-    return {"th_me": (1.0 / ao) if live_me else 0.0,
-            "th_opp": (-1.0 / am) if live_opp else 0.0,
-            "a_me": (float(th_opp) / (am * am)) if live_opp else 0.0,
-            "a_opp": (-float(th_me) / (ao * ao)) if live_me else 0.0}
-
-
 def grad_of(st, prof=None):
-    """**`D` の勾配**（読みに応じて）。`clock` は解析（`grad_clock`）、`curve` は**中心差分**。
+    """**`D` の勾配**（読みに応じて・**中心差分**）。
 
     `curve` の `τ` は輪郭に沿った区分線形なので、中心差分は**その `τ` における輪郭の高さの逆数**
     `1/prof[j+τ]` をそのまま返す（解析と同じ値・刻みは数値の都合で式の定数ではない）。
     **生きていない軸は 0**（`curve` に速さの軸は存在しない）。"""
-    th_me, th_opp, a_me, a_opp, j = split_state(st)[:5]
-    if D_MODE == "clock":
-        return grad_clock(th_me, th_opp, a_me, a_opp)
     g = {k: 0.0 for k in AXES}
     axes = (("th_me", 0), ("th_opp", 1)) if D_MODE == "curve" else (
         ("th_me", 0), ("th_opp", 1), ("a_me", 2), ("a_opp", 3))
@@ -597,14 +522,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     prof = CB.profile_for(dirs)
-    if D_MODE in ("curve", "curve_scaled") and not prof:
+    if D_MODE == "curve" and not prof:
         raise ValueError("D_MODE=D_MODE なのに損害の輪郭が引けない（%s）" % (dirs,))
-    if D_MODE == "curve_scaled":
-        # **T126**: 輪郭をその席の `A` で伸縮する読み＝分母が要る（引けなければ落ちる）
-        _th = CB.profile_th_for(dirs)
-        if not _th:
-            raise ValueError("curve_scaled なのに理論の速さの輪郭が引けない（%s）" % (dirs,))
-        set_profile_th(_th)
     # **物差し（T118）**: `W_ERR_MODE=rel` なら `σ_rel × s(τ_me, τ_opp)`。**別のセットの値を使う**（§0.1 条件 1）。
     sr = None
     if TO.W_ERR_MODE == "rel":

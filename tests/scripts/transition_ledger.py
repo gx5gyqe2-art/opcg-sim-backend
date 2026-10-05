@@ -31,7 +31,7 @@
 
 使い方:
 
-    python tests/scripts/transition_ledger.py --in <records_dir> [--games N] [--d-mode curve|clock] [--json out.json]
+    python tests/scripts/transition_ledger.py --in <records_dir> [--games N] [--d-mode curve|theory] [--json out.json]
 """
 
 import argparse
@@ -187,7 +187,7 @@ def _priority(acc):
     """**残差を 3 つに割る**（全部 `|·|` の割合・手当てが別々なので分ける）。
 
     同じターンの中の残差を**攻撃の行**と**攻撃でない行**に分け、そこへ**ターンの境目**を並べる。3 つで 1 になる。
-    **`curve` の読みでは「攻撃でない行」の価格は厳密に 0**（速さの軸が無い）だが、`clock` では価格が付く
+    **`curve` の読みでは「攻撃でない行」の価格は厳密に 0**（速さの軸が無い）だが、`theory` では価格が付く
     ——だから名前は「値段が付いていない」ではなく「攻撃でない」にしてある（読みによって意味が変わる欄にしない）。"""
     tot = max(1e-12, acc["resid_abs"])
     st_attack = acc["fam_abs"].get("attack", 0.0)
@@ -204,14 +204,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
     cards = PL.Cards()
     idx2cid = {i: c for c, i in GA._vocab().items()}
     prof = CB.profile_for(dirs)
-    if KV.D_MODE in ("curve", "curve_scaled") and not prof:
+    if KV.D_MODE == "curve" and not prof:
         raise ValueError("D_MODE=KV.D_MODE なのに損害の輪郭が引けない（%s）" % (dirs,))
-    if KV.D_MODE == "curve_scaled":
-        # **T126**: 輪郭をその席の `A` で伸縮する読み＝分母が要る（引けなければ落ちる）
-        _th = CB.profile_th_for(dirs)
-        if not _th:
-            raise ValueError("curve_scaled なのに理論の速さの輪郭が引けない（%s）" % (dirs,))
-        KV.set_profile_th(_th)
     sr = CB.sigma_rel_for(dirs, slope="curve")
     if sr is None:
         raise ValueError("σ_rel が引けない＝黙って別の物差しに落とさない（T118 の規約）")
@@ -421,7 +415,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
            # **残差の優先順位**（3 つに割る・各々に別の手当てが要る）:
            # `attack_rows`＝攻撃の行の説明できない分（**相手の窓の答え**と**価格の誤り**が混ざる＝P8 待ち）／
            # `nonattack_rows`＝**攻撃でない行**（体を出す・付与・`TURN_END`・効果）
-           #   ——**`curve` の読みではここの価格が厳密に 0**（速さの軸が無いので）。`clock` では価格が付く／
+           #   ——**`curve` の読みではここの価格が厳密に 0**（速さの軸が無いので）。`theory` では価格が付く／
            # `turn_boundary`＝**誰も手を打っていない遷移**（ドン +2・アンタップ・召喚酔いの解除・引き）。
            "resid_priority": _priority(acc),
            # **原因 × 軸**（各原因の中での軸の割合）

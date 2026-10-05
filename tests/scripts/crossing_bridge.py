@@ -1901,9 +1901,10 @@ def profile_for(dirs, name="cross", path=None):
 
 
 def profile_th_for(dirs, name="cross", path=None):
-    """**理論の速さの輪郭**（T126）＝`curve_scaled` の分母。規約は `profile_for` と同じ（`cross`＝別のセット）。
+    """**理論の速さの輪郭**（T126）＝帳簿の `D_MODE=curve_scaled`（波C で削除）の分母だった表・今は `rate_tracking` が読む。
+    規約は `profile_for` と同じ（`cross`＝別のセット）。
 
-    **無ければ `None`**（`curve_scaled` を頼んだのに引けなければ呼ぶ側が落ちる＝黙って `curve` に落ちない）。"""
+    **無ければ `None`**（引けなければ呼ぶ側が落ちる＝黙って別の値に落ちない）。"""
     tbl = (load_harm_profiles(path) or {}).get("theory_slope") or {}
     if name == "cross":
         kind = record_kind(dirs)

@@ -56,7 +56,7 @@
 
 使い方:
 
-    python tests/scripts/relative_ledger.py --in <records_dir> [--games N] [--d-mode curve|clock] [--json out.json]
+    python tests/scripts/relative_ledger.py --in <records_dir> [--games N] [--d-mode curve|theory] [--json out.json]
 """
 
 import argparse
@@ -97,28 +97,20 @@ def clocks_of(st, prof=None):
 
     **`T_me` は「自分が相手を倒しきるまで」**＝相手の耐久 `Θ_opp` を自分の速さで削る時間、
     **`T_opp` は「相手が自分を倒しきるまで」**。`KV.D_MODE` が読み方を決める
-    （`curve`＝輪郭を歩く〔帳簿の正本〕／**`curve_scaled`＝輪郭をその席の `A` で伸縮**〔T126〕／`clock`＝`min(CAP, Θ/A)`）。
+    （`curve`＝輪郭を歩く〔帳簿の正本〕／`theory`＝積み上がる歩き〔T127〕。`curve_scaled`・`clock` は波C で削除）。
 
     **`D = T_opp − T_me`** は `KV.d_of` と同じ値になる（同じ関数を呼んでいる）。"""
     # **C-5c**: 7 つ組なら末尾の**戻る分**（レスト中のブロッカー）が各歩きの的に 2 段目から足される
     th_me, th_opp, a_me, a_opp, j, b_me, b_opp = KV.split_state(st)
-    if KV.D_MODE in ("curve", "curve_scaled"):
+    if KV.D_MODE == "curve":
         if prof is None:
             raise ValueError("D_MODE=%s には損害の輪郭が要る（profile_for）" % KV.D_MODE)
-        # **T126**: `curve_scaled` は**削る側の速さ**で輪郭を伸縮する（`kappa_vector.d_of` と同じ式）
-        s_me = s_opp = 1.0
-        if KV.D_MODE == "curve_scaled":
-            s_me = KV.profile_scale(a_me, j)      # 自分が相手を倒すまで＝**自分**の速さ
-            s_opp = KV.profile_scale(a_opp, j)    # 相手が自分を倒すまで＝**相手**の速さ
-        t_me = float(CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof, s_me, step=b_opp))
-        t_opp = float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof, s_opp, step=b_me))
-    elif KV.D_MODE == "theory":
-        # **T127**: 加速を状態から出す（表を使わない）。削る側の速さでそれぞれ歩く。
+        t_me = float(CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof, 1.0, step=b_opp))
+        t_opp = float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof, 1.0, step=b_me))
+    else:
+        # **T127**（`theory`）: 加速を状態から出す（表を使わない）。削る側の速さでそれぞれ歩く。
         t_me = KV.tau_theory(th_opp, a_me, KV.RATE_SHAPE["me"], j, step=b_opp)
         t_opp = KV.tau_theory(th_me, a_opp, KV.RATE_SHAPE["opp"], j, step=b_me)
-    else:
-        t_me = KV.tau_of(th_opp, a_me, step=b_opp)
-        t_opp = KV.tau_of(th_me, a_opp, step=b_me)
     return max(T_FLOOR, t_me), max(T_FLOOR, t_opp)
 
 
@@ -186,7 +178,7 @@ def _invariance(inv, st0, dx, prof, sigma_rel, dl, kk, capped):
     for tag, st0b, dxb in (
             # **P5 は通貨の付け替え**なので **`A` も同じだけ倍にする**（`A` は「損害/ターン」）。
             # **T127 で直した**——`curve` の読みでは `A` が時計に入らないので無害だったが、
-            # `A` が時計に入る読み（`curve_scaled`／`theory`）では**耐久だけ 3 倍にするのは
+            # `A` が時計に入る読み（`theory`）では**耐久だけ 3 倍にするのは
             # 単位の変更ではなく物理の変更**（同じ速さで 3 倍の耐久＝3 倍の時間）になっていた。
             # **T122／T126 の P5 の数字はこの誤った定義で測ったもの**（`curve` については結論は変わらない）。
             # **C-5c**: 7 つ組なら**戻る分も同じ通貨**（P5 では c 倍・P7 ではそのまま）
@@ -236,14 +228,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
             settled = flags
     part_rows = []                        # **T145**: 局ごとの `rel_K` の内訳（席 0 視点）
     prof = CB.profile_for(dirs)
-    if KV.D_MODE in ("curve", "curve_scaled") and not prof:
+    if KV.D_MODE == "curve" and not prof:
         raise ValueError("D_MODE=KV.D_MODE なのに損害の輪郭が引けない（%s）" % (dirs,))
-    if KV.D_MODE == "curve_scaled":
-        # **T126**: 輪郭をその席の `A` で伸縮する読み＝分母が要る（引けなければ落ちる）
-        _th = CB.profile_th_for(dirs)
-        if not _th:
-            raise ValueError("curve_scaled なのに理論の速さの輪郭が引けない（%s）" % (dirs,))
-        KV.set_profile_th(_th)
     sr = CB.sigma_rel_for(dirs, slope="curve")
     if sr is None:
         raise ValueError("σ_rel が引けない＝黙って別の物差しに落とさない（T118 の規約）")
@@ -351,7 +337,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
 
         def _mirror_for(w, t, sc, tok, ci):
             """**鏡（H-4g）**: 自分の耐久を相手の耐久と同じ守る側の計算で読む材料（`rule_don` 系・curve のときだけ）。"""
-            if not (_TBm.MIRROR_ME and CB.THETA_HAND_MODE == "rule_don" and KV.D_MODE in ("curve", "curve_scaled")):
+            if not (_TBm.MIRROR_ME and CB.THETA_HAND_MODE == "rule_don" and KV.D_MODE == "curve"):
                 return None
             ts_o = [tt for (ww, tt) in last_i_at_turn if ww == 1 - w and tt < t]
             if not ts_o or (w, t) not in g_at_turn:
@@ -574,8 +560,6 @@ def build_parser():
                     help="**H-4g** 自分の耐久も相手と同じ守る側の計算で読む（既定 on・`rule_don` 系のときだけ効く）")
     ap.add_argument("--scale-a", type=float, default=1.0, help="**P7**: 両席の A に共通の掛け算誤差")
     ap.add_argument("--scale-currency", type=float, default=1.0, help="**P5**: 耐久と価格を同時に c 倍")
-    ap.add_argument("--scale-clamp", dest="clamp", default="",
-                    help="**診断用**（例 0.5,2）: `curve_scaled` の倍率を締める。モデルの提案ではない")
     ap.add_argument("--pre-settle", dest="pre_settle", default="off", choices=("off", "on"),
                     help="**T138b** 決着後（`lethal_rule.settled_map`）の行を除いて測るか")
     ap.add_argument("--parts", action="store_true",
@@ -602,8 +586,6 @@ def main(argv=None):
         CB.set_theta_hand_mode(a.theta_hand)           # **H-4**
     if a.mirror:
         _TBm.MIRROR_ME = (a.mirror == "on")        # **H-4g**
-    if a.clamp:
-        KV.set_scale_clamp([float(x) for x in a.clamp.split(",")])
     CP.apply_cut_price(a)                          # **N-3**
     TO.apply_defender_power(a)                     # 2b
     out = collect(a.src, a.games, scale_a=a.scale_a, scale_currency=a.scale_currency,

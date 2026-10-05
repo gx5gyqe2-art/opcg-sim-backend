@@ -86,10 +86,10 @@ def test_collect_does_not_touch_d_mode_when_omitted(monkeypatch):
 
     monkeypatch.setattr(AX.TL, "collect", fake_tl_collect)
     old = KV.D_MODE
-    KV.set_d_mode("clock")
+    KV.set_d_mode("theory")
     try:
         AX.collect(["dummy"])
-        assert seen["d_mode_at_call"] == "clock"          # 渡さなければ既定(現状の値)のまま
+        assert seen["d_mode_at_call"] == "theory"         # 渡さなければ既定(現状の値)のまま
     finally:
         KV.set_d_mode(old)
 
