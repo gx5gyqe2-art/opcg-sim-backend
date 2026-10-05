@@ -292,6 +292,7 @@ def test_the_plan_store_key_is_shared_across_tools_and_module_names(_budget, tmp
 #: （ディスクの覚え書きの古い値を読まないため・値を変えたなら `rule_don_ref.py` も同じ変更で更新する）。
 SOLVER_FINGERPRINTS = {
     "rd-speed-1": "84e3b483d52b4b2c",
+    "rd-speed-2": "45dc6aba0ff5c6b2",     # switch cleanup A（2026-10-05）: 死んだ切替の枝を削除（値は不変）
 }
 _SOLVER_FUNCS = ("_ex_prep", "_ex_counter_sets", "_norm_seq", "_seq_prep", "rule_guard_plan_ex", "_rule_guard_plan_ex",
                  "_prices_of", "_attach_gain", "rules_steps", "rules_sched", "_tab", "walk_crossing", "model_horizon",

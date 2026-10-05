@@ -1784,7 +1784,7 @@ PLAN_STORE = None
 #: **解き方の版**——`rule_don_solve` の値を変える変更（守る側の計算・計画の列挙・歩き）をしたら上げる。ディスクの
 #: 覚え書きの鍵に入る（`tests/scripts` の原文のハッシュも入るので、上げ忘れても古い値は返らない＝二重の守り）。
 #: `test_rd_speed.py` が解き方の関数の原文の指紋を見張り、変わったのに上げていなければ落ちる。
-SOLVER_VERSION = "rd-speed-1"
+SOLVER_VERSION = "rd-speed-2"
 _RULE_DON_CACHE = {}
 
 #: **RD-speed**: 地平を縮めるかの決め方の数え方（`_ex_count_layers`）を使うか。`False` なら旧の「1 ターンずつ縮めて
