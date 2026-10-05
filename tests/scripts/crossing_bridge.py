@@ -162,8 +162,7 @@ def playable_attack_price(items, cards, don, olp, theta=THETA, mu=MU, want_rush=
     return (float(best[budget]), float(rush[budget])) if want_rush else float(best[budget])
 
 
-#: **T106**: **相手の手札のブロッカーを耐久に入れるか**（2026-09-18・T96 以来の宿題）。
-#: `off`＝旧（手札のブロッカーは `Θ` のどこにも入らない）／**`on`＝規則どおり**。
+#: **T106**: **相手の手札のブロッカーを耐久に入れる**（2026-09-18・T96 以来の宿題・規則どおり）。
 #:
 #: **規則**: **ブロックに召喚酔いは無い**（ユーザ指摘 2026-09-18）——`rules/battle.rs` の `has_blocker` は
 #: `!is_rest && KW_BLOCKER && !BLOCKER_DISABLED` だけを見る（登場ターンかどうかを見ない）＝
@@ -172,19 +171,9 @@ def playable_attack_price(items, cards, don, olp, theta=THETA, mu=MU, want_rush=
 #: **今はどこにも数えられていない**（盤面の体でも切れる札でもない）＝**欠落**。
 #:
 #: **完全情報で読む**（§0.05）——守る席の手札はその席の行に在るので、`g_for` と同じ経路で引く。
-THETA_HAND_BLOCKER_MODES = ("off", "on")
-#: **既定は `on`**（2026-09-19・ユーザ決定「2は正しいものに直してください」）——**規則がそう言っている**ので採る。
-#: **数字はわずかに下がる**（的中 0.6541 → 0.6552〔実〕／0.6449 → 0.6406〔合成〕・偏り +2.53 → +2.59／+2.56 → +2.62）。
-#: **以前の数字と比べるときは `--theta-hand-blocker off`**。
-THETA_HAND_BLOCKER_MODE = "on"
-
-
-def set_theta_hand_blocker_mode(name):
-    global THETA_HAND_BLOCKER_MODE
-    if name not in THETA_HAND_BLOCKER_MODES:
-        raise ValueError("unknown theta hand blocker mode: %r" % (name,))
-    THETA_HAND_BLOCKER_MODE = name
-    return THETA_HAND_BLOCKER_MODE
+#: 2026-09-19・ユーザ決定「2は正しいものに直してください」で既定に（**規則がそう言っている**ので採る）。
+#: 旧の `off`（どこにも数えない・切替 `THETA_HAND_BLOCKER_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
+#: 出力 JSON の `theta_hand_blocker` キーは定数 `"on"` のまま残す（バイト一致のため）。
 
 
 #: **耐久の側もドンを払う**（T110・ユーザ指示 2026-09-19「それは直しましょうか」＝T109 §10 の 1）。
@@ -652,8 +641,8 @@ def with_life_types(hr, deck_ids):
 def with_hand_blocker(hr, sc, tok_row, ci_row, idx2cid, cards):
     """**H-4f（F1）**: 守る席が**手札から出すブロッカー**（`hand_blocker_nu` と同じ選び方: 次の自分のターンのドンで
     払える札の中で `ν` が一番大きい 1 体）を、守る側の計算の盤面に**次のターンから居るブロッカー**として渡す。
-    その札は出すので手札（カウンター）からは外す。`THETA_HAND_BLOCKER_MODE=off` なら何もしない。"""
-    if (not isinstance(hr, HandRead) or THETA_HAND_BLOCKER_MODE != "on" or cards is None or ci_row is None
+    その札は出すので手札（カウンター）からは外す。"""
+    if (not isinstance(hr, HandRead) or cards is None or ci_row is None
             or idx2cid is None):
         return hr
     import hand_plan as HP
@@ -2411,8 +2400,7 @@ def threshold_parts_side(sc, tok, side, lam=LAM, mu=MU, g_hand=None, hand_blocke
         else:
             hand = hand_absorb(n_cut, max(xs) if xs else -1.0, mu)
     body = float(_body_term(tok, slots, body_ref))
-    if THETA_HAND_BLOCKER_MODE == "on":
-        body += max(0.0, float(hand_blocker))       # **T106**: 手札から出せるブロッカー（召喚酔い無し）
+    body += max(0.0, float(hand_blocker))           # **T106**: 手札から出せるブロッカー（召喚酔い無し）
     return (float(lam) * life, hand, body)
 
 
@@ -3701,7 +3689,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
              "theta_don": THETA_DON_MODE, "hb_don_sum": 0.0, "cut_share_sum": 0.0, "cut_n": 0,
              "race_n": 0, "race_front_sum": 0.0, "race_th_sum": 0.0, "race_a_sum": 0.0,
              "race_paid_sum": 0.0,
-             "theta_hand_blocker": THETA_HAND_BLOCKER_MODE, "hb_sum": 0.0, "hb_n": 0, "hb_hit": 0,
+             "theta_hand_blocker": "on", "hb_sum": 0.0, "hb_n": 0, "hb_hit": 0,
              "theta_return": THETA_RETURN_MODE, "theta_hand_place": THETA_HAND_PLACE,
              # **T116**: 窓の上限で切った額（`thw_cut_sum`）と、切った行の数
              "theta_hand_window": THETA_HAND_WINDOW, "thw_n": 0, "thw_cut_sum": 0.0,
@@ -3846,17 +3834,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                         g_self[(w, t)] = with_hand_blocker(g_self[(w, t)], sc, tok, ci, idx2cid, cards)
         # **T106**: 席ごとの「手札から出せるブロッカー 1 体の `ν`」（同じく自席の行からしか読めない）
         hb_self = {}
-        if THETA_HAND_BLOCKER_MODE == "on":
-            for w in (0, 1):
-                for t in turn_seq[w]:
-                    sc, tok, ci = turn_last.get((w, t), turn_start[(w, t)])
-                    olp_w = float(np.asarray(sc)[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-                    hb_self[(w, t)] = hand_blocker_nu(sc, tok, ci, idx2cid, cards, olp_w)
+        for w in (0, 1):
+            for t in turn_seq[w]:
+                sc, tok, ci = turn_last.get((w, t), turn_start[(w, t)])
+                olp_w = float(np.asarray(sc)[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
+                hb_self[(w, t)] = hand_blocker_nu(sc, tok, ci, idx2cid, cards, olp_w)
 
         def hb_for(defender, t):
             """守る席の直近の自席ターン開始までに持っていた「出せるブロッカー」（無ければ 0）。"""
-            if THETA_HAND_BLOCKER_MODE != "on":
-                return 0.0
             prev = [tt for tt in turn_seq[defender] if tt <= t]
             return float(hb_self.get((defender, prev[-1]), 0.0)) if prev else 0.0
 
@@ -4025,7 +4010,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                                                        plan=don_plan)
             # **T143**: 体の項のうち**手札のブロッカー**（T106）の分——`threshold_parts_side` が
             # 体に足した額そのもの（値は動かさない・内訳として持つだけ）
-            th_hb = max(0.0, float(hb_for(1 - w, t))) if THETA_HAND_BLOCKER_MODE == "on" else 0.0
+            th_hb = max(0.0, float(hb_for(1 - w, t)))
             # **T102**: `shield` なら手札は**しきい値から外し、的の側の有限の盾**にする
             # （毎ターン `shield_rate` までしか出てこない＝**使う時間が要る**）。
             if THETA_HAND_PLACE == "shield":
@@ -4035,9 +4020,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
                 stats["shield_n"] += 1; stats["shield_sum"] += shield; stats["shield_rate_sum"] += sh_rate
             else:
                 shield = sh_rate = 0.0
-            if THETA_HAND_BLOCKER_MODE == "on":
-                _hb = hb_for(1 - w, t)
-                stats["hb_n"] += 1; stats["hb_sum"] += _hb; stats["hb_hit"] += int(_hb > 0.0)
+            _hb = hb_for(1 - w, t)
+            stats["hb_n"] += 1; stats["hb_sum"] += _hb; stats["hb_hit"] += int(_hb > 0.0)
             th_w = th_life + th_hand + th_body
             # **T96**: 次の自席ターンに戻ってくるレストのブロッカー（`untap` のときだけ段差として使う）
             th_back = (resting_blocker_term(tok, SLOT_OPP_FIELD,
@@ -4748,10 +4732,6 @@ def main(argv=None):
                     help="耐久の体の項: `blockers`（旧・アクティブなブロッカーだけ）／`all`（全キャラ・T82）／"
                          "`attackable`（**規則から出る形**・レストの体 ＋ アクティブなブロッカー・T83）／"
                          "`none`（**体を `Θ` から外して速さの側へ移す**・T129・`--slope-block on` と対で使う）")
-    ap.add_argument("--theta-hand-blocker", default=THETA_HAND_BLOCKER_MODE,
-                    choices=THETA_HAND_BLOCKER_MODES,
-                    help="**T106** 相手の**手札のブロッカー**を耐久に入れるか（ブロックに召喚酔いは無い）: "
-                         "`off`（旧・どこにも入らない）／`on`（**規則どおり**＝出せる 1 体の `ν`）")
     ap.add_argument("--theta-don", default=THETA_DON_MODE, choices=THETA_DON_MODES,
                     help="**T110** 耐久 `Θ` の側もドンを規則どおり払うか: `off`（旧）／"
                          "`blocker`（手札のブロッカーの予算を**規則の次ターンのアクティブ**にする）／"
@@ -4797,7 +4777,6 @@ def main(argv=None):
     set_theta_hand_place(a.theta_hand_place)
     set_theta_hand_window(a.theta_hand_window)
     set_theta_don_mode(a.theta_don)
-    set_theta_hand_blocker_mode(a.theta_hand_blocker)
     set_slope_block_mode(a.slope_block)
     set_rate_through_mode(a.rate_through)          # **T131**
     set_theta_side_mode(a.theta_side)              # **T133**

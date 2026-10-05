@@ -29,7 +29,7 @@ import theory_order as T  # noqa: E402
 #: **出荷時の既定**を import の瞬間に写し取る（`conftest` の autouse も各テストの try/finally も
 #: まだ走っていない時点の値）＝**ファイルの既定そのもの**をラチェットするための控え。
 _SHIPPED = {n: getattr(CB, n) for n in (
-    "THETA_HAND_MODE", "THETA_HAND_PLACE", "THETA_BODY_MODE", "THETA_HAND_BLOCKER_MODE",
+    "THETA_HAND_MODE", "THETA_HAND_PLACE", "THETA_BODY_MODE",
     "THETA_RETURN_MODE", "SLOPE_HAND_MODE", "SLOPE_BLOCK_MODE",
     "RATE_WALK_MODE", "RATE_DECAY_MODE", "RACE_MODE", "SLOPE_TAKE_MODE",
     "THETA_DON_MODE", "THETA_HAND_WINDOW")}
@@ -53,13 +53,12 @@ def test_the_shipped_defaults_are_the_ones_we_decided():
 
     **同日のユーザ決定**（「1は規定、2は正しいものに直してください」）で 4 つ動いた:
     効果の項（T105／T108・2026-10-05 に切替は削除）・最初の自席ターンは打てない規則（T103・2026-10-05 に切替は削除）・速攻は出したターンから（T103・2026-10-05 に切替は削除）・
-    `THETA_HAND_BLOCKER_MODE=on`（T103／T106＝**規則として正しい形**）。
+    手札のブロッカーを耐久に入れる（T103／T106＝**規則として正しい形**・2026-10-05 に切替は削除）。
     **黙って既定が変わると 2 つの橋の数字が比較不能になる**ので、ここで固定する。"""
     assert _SHIPPED == {
         "THETA_HAND_MODE": "rule_don",          # H-4・2026-10-04（ユーザ決定・旧 cuttable_forced は --theta-hand で再現）
         "THETA_HAND_PLACE": "stock",            # T102（切替として残す）
         "THETA_BODY_MODE": "blockers",           # T97
-        "THETA_HAND_BLOCKER_MODE": "on",         # T106・2026-09-19
         "THETA_RETURN_MODE": "untap",            # T96・**C-5c で既定に採用**（2026-09-25）
         "SLOPE_HAND_MODE": "flow",               # T93
         "SLOPE_BLOCK_MODE": "on",                # T92・2026-10-05 既定に採用（ユーザ決定・旧 off は --slope-block off）
@@ -1685,25 +1684,15 @@ def test_a_blocker_in_hand_is_endurance_too():
     **ブロックに召喚酔いは無い**（`has_blocker` は登場ターンかどうかを見ない）ので、
     **手札から出せるブロッカーは「避けて通れない体」の予備**＝`Θ` の体の項と同じ意味。
     **今はどこにも数えられていなかった**（盤面の体でも切れる札でもない）。"""
-    assert CB.THETA_HAND_BLOCKER_MODE == "on"   # **2026-09-19 から既定**（規則がそう言っている）
     sc = _sc(3, 4)
     tok = np.zeros((22, 24), dtype=np.float32)
     base = CB.threshold(sc, tok)
-    try:
-        # `off`（旧）なら手札のブロッカーを渡しても動かない
-        CB.set_theta_hand_blocker_mode("off")
-        life, hand, body = CB.threshold_parts(sc, tok, hand_blocker=0.5)
-        assert life + hand + body == pytest.approx(base)
-        CB.set_theta_hand_blocker_mode("on")
-        life2, hand2, body2 = CB.threshold_parts(sc, tok, hand_blocker=0.5)
-        assert body2 == pytest.approx(body + 0.5)               # 体の項に載る
-        assert life2 == pytest.approx(life) and hand2 == pytest.approx(hand)
-        assert CB.threshold_parts(sc, tok, hand_blocker=0.0)[2] == pytest.approx(body)
-        assert CB.threshold_parts(sc, tok, hand_blocker=-1.0)[2] == pytest.approx(body)   # 負は 0 に倒す
-        with pytest.raises(ValueError):
-            CB.set_theta_hand_blocker_mode("なにか")
-    finally:
-        CB.set_theta_hand_blocker_mode("on")
+    life, hand, body = CB.threshold_parts(sc, tok, hand_blocker=0.0)
+    assert life + hand + body == pytest.approx(base)            # 渡さなければ（0）動かない
+    life2, hand2, body2 = CB.threshold_parts(sc, tok, hand_blocker=0.5)
+    assert body2 == pytest.approx(body + 0.5)                   # 体の項に載る（2026-09-19 から・切替は 2026-10-05 に削除）
+    assert life2 == pytest.approx(life) and hand2 == pytest.approx(hand)
+    assert CB.threshold_parts(sc, tok, hand_blocker=-1.0)[2] == pytest.approx(body)   # 負は 0 に倒す
 
 
 def test_the_hand_blocker_is_read_from_the_rules_not_the_play():
