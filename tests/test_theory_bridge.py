@@ -444,7 +444,6 @@ def test_the_sigma_of_the_clock_is_taken_from_the_measurement(monkeypatch):
     ここでは差し替えが**確かに起きること**だけを押さえる（値そのものは fixture が正本）。"""
     import crossing_bridge as CB
     import theory_order as TO
-    assert B.SIGMA_FROM_CURVE is True                       # 既定で実測を使う
     got = []
     monkeypatch.setattr(TO, "set_sigma_turn", lambda v: got.append(float(v)) or v)
     st = CB.sigma_t_for(None, "syn")                         # 実を測るときは合成の値（cross）

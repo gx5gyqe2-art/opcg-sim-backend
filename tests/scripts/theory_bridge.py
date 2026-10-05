@@ -819,13 +819,12 @@ def _finish_guard(got, played, my_life, z, bnd, kap, w, t, rec, kn, stats, _add)
 
 
 #: **`σ_T` を実測から採るか**（T97・2026-09-18・ユーザ指示「理論的に正しいものにしたい」）。
-#: `True`＝**交点の橋の `curve` の終局時刻の残差 σ**（`tests/fixtures/harm_profile.json` の `sigma_t`・
-#: **耐久の体の集合ごと**・**測る記録と別のセット**）を `σ_T` に使う／`False`＝旧（借り物の 1.0）。
+#: **交点の橋の `curve` の終局時刻の残差 σ**（`tests/fixtures/harm_profile.json` の `sigma_t`・
+#: **耐久の体の集合ごと**・**測る記録と別のセット**）を `σ_T` に使う。旧（借り物の 1.0・`SIGMA_FROM_CURVE=False`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
 #: **新定数ゼロ**——`σ_D = √2 × σ_T` の形は変えず、**中身を借り物から実測に差し替える**だけ。
 #: T75 の注記「`σ` の出所である時間軸ヘッドの `T` 予測で `D` を作るのが筋」への回答でもある。
 #: **借り物の 1.0 は「時計 1 本のぶれ」の当てずっぽう**で、実測は `attackable` 1.55／1.72・`blockers` 1.09／1.25
 #: ＝**耐久の形を変えると `D` の広がりが変わるのに `σ` が固定だった**のが T96 で比較を壊していた交絡。
-SIGMA_FROM_CURVE = True
 
 
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targets="leader",
@@ -850,15 +849,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", nu_targ
             raise ValueError("harm profile が無い（%s・%s）" % (harm_profile, CB.HARM_PROFILE_PATH))
         # **T97**: `σ_D = √2 × σ_T` の `σ_T` を**同じ器の実測**から採る（T75 以来の借り物 1.0 を外す）。
         # **耐久の体の集合ごとに違う**ので `THETA_BODY_MODE` に合わせ、**別のセットの値**を使う（輪郭と同じ規約）。
-        if SIGMA_FROM_CURVE:
-            st = CB.sigma_t_for(dirs, harm_profile)
-            if st is None:
-                # **T129**（2026-09-20）: **黙って前の σ を使い回さない**。`σ_T` は**耐久の体の集合ごと**に
-                # 表から引くので、**表に無い形（例: `--theta-body none`）では引けない**——そのまま走ると
-                # 「**どの物差しで測ったか分からない数字**」が出る。すぐ下の `σ_rel` は最初からこう書いてある。
-                raise ValueError("σ_T が引けない（体の形 %r・%s・%s）＝黙って前の値を使い回さない"
-                                 % (CB.THETA_BODY_MODE, harm_profile, CB.HARM_PROFILE_PATH))
-            _TOM.set_sigma_turn(st)
+        st = CB.sigma_t_for(dirs, harm_profile)
+        if st is None:
+            # **T129**（2026-09-20）: **黙って前の σ を使い回さない**。`σ_T` は**耐久の体の集合ごと**に
+            # 表から引くので、**表に無い形（例: `--theta-body none`）では引けない**——そのまま走ると
+            # 「**どの物差しで測ったか分からない数字**」が出る。すぐ下の `σ_rel` は最初からこう書いてある。
+            raise ValueError("σ_T が引けない（体の形 %r・%s・%s）＝黙って前の値を使い回さない"
+                             % (CB.THETA_BODY_MODE, harm_profile, CB.HARM_PROFILE_PATH))
+        _TOM.set_sigma_turn(st)
         # **T118**: `W_ERR_MODE=rel` なら物差しは `σ_rel × s(τ_me, τ_opp)`。**`σ_rel` は `curve` の読みのもの**
         # （`d0` は `curve_d_of_row` が出すので）。**引けなければ落ちる**——黙って `abs` で走ると
         # 「どの物差しで測ったか分からない数字」が出てしまう（T97 の借り物 σ と同じ型の事故）。
