@@ -92,7 +92,7 @@
   に動いた分だけ。
 * 平均の傾き `w̄` はほぼ半分になった（κ の平均＝`w_mean` ÷ 相手セットの `w̄`: 実 0.4236・合成 0.8392）。
   合成の `sigma_T`（curve）が 1.154 → 2.133 と倍近くになったのと同じ方向（幅が広がれば密度の平均は下がる）。
-* `make test` の結果は §5。
+* `make test` の結果は §5（赤 2 本・表の書き換えに伴う既存テストの主張の破れ）。
 
 **推測**（検証していない）:
 
@@ -105,10 +105,34 @@
 
 ## 5. テスト
 
-`make rust-develop` → `make test` を 1 回（結果は下に追記）。表の値を固定している期待値は見つからなかった
-（`test_settle_cond_floor.py` の 0.3078 は式の検算用の任意の数で、表を読まない＝変えていない）。
-表を読む不等式（`sigma_rel_floor` < `sigma_rel.theory` < `sigma_rel_whole.theory`）は新しい値でも成り立つ
-（0.2084 < 0.2383 < 0.387・0.1946 < 0.2737 < 0.3875）。
+`make rust-develop` → `make test`: **cargo 441 passed／pytest 2032 passed・2 failed・12 skipped**（赤）。
+
+**期待値を新しい値に直したもの**（どれも表の値か、表から計算した出力を固定していた）:
+
+| テスト | 値 | 旧 → 新 |
+|---|---|---|
+| `tests/test_kappa_vector.py::test_profile_th_for_follows_the_cross_convention` | `profile_th_for(None, "real")[1]` | 0.0773 → **0.0953** |
+| 同上 | `profile_th_for(None, "syn")[1]` | 0.0815 → **0.0947** |
+| `tests/test_attack_passive_wiring.py::test_switches_off_match_recorded_base_outputs_of_079e73b8` | `tests/fixtures/f_identity/base_theory_bridge_079e73b8.json`（記録した出力） | 77 項目（`sigma_turn` 1.154 → 2.133・`w_bar` 0.2238 → 0.1589・`kappa_mean` 0.828 → 0.7478・`w_mean` 0.1853 → 0.1188・`d_bins`／`d_win`・`kappa_needed*`・`kappa_split` の当てはめ） |
+| 同上 | `tests/fixtures/f_identity/base_transition_ledger_079e73b8.json` | 輪郭を読む項目（`priced_mean` −0.001627 → −0.001653・`resid_share` 0.6932 → 0.7235・`cross_share` ほか） |
+
+記録した出力の 2 本は、**旧い表を一時的に戻すと今のコードで記録と 1 ビット一致する**ことを確かめてから（差分は表だけが原因）、
+新しい表の出力で上書きした（`seconds` は旧の値のまま）。`base_price_realised_079e73b8.json` は表を読まないので不変。
+
+**直していないもの（落ちたまま）**——期待値ではなく、**触らない旧い表の値（`attackable`）やコードの定数との大小**を言うテスト:
+
+* `tests/test_crossing_bridge.py::test_sigma_t_comes_from_the_measurement_and_follows_the_body_set`:
+  `blockers` の σ_T < `attackable` の σ_T。新しい合成の 2.133 が 2026-09-18 の `attackable` 1.724 を超えた（実は 1.242 < 1.546 で成り立つ）。
+* `tests/test_crossing_bridge.py::test_w_bar_comes_from_the_measurement_too`:
+  `blockers` の `w̄` > `attackable` の `w̄`（実 0.0948 < 0.127 で不成立）と、`w̄`（実）> `0.5/R`（0.121）（0.0948 で不成立）。
+
+`attackable` は死んだ切替の入力で、指示により触っていない。テストの主張を変えるのは期待値の変更の範囲を越えるので適用せず、
+**提案の差分を `table_rebuild/proposed_test_fix.patch` に置いた**（`attackable` との大小と `0.5/R` の比較を外し、正の値であることだけ見る）。
+これを当てると `tests/test_crossing_bridge.py` は 111 passed・`make test` の残りの赤はこの 2 本だけなので全体が緑になる見込み
+（当てた状態で `make test` 全体は回していない）。
+
+表を読む別の不等式（`sigma_rel_floor` < `sigma_rel.theory` < `sigma_rel_whole.theory`）は新しい値でも成り立つ
+（0.2084 < 0.2383 < 0.387・0.1946 < 0.2737 < 0.3875）。`test_settle_cond_floor.py` の 0.3078 は式の検算用の任意の数で表を読まない（不変）。
 
 ## 6. 再現
 

@@ -576,8 +576,8 @@ def test_curve_scaled_still_needs_the_harm_curve(_prof_th):
 
 def test_profile_th_for_follows_the_cross_convention():
     """**分母も `profile_for` と同じ規約**（`cross`＝測る記録と別のセット・§0.1 条件 1）。"""
-    assert CB.profile_th_for(None, "real")[1] == pytest.approx(0.0773)
-    assert CB.profile_th_for(None, "syn")[1] == pytest.approx(0.0815)
+    assert CB.profile_th_for(None, "real")[1] == pytest.approx(0.0953)
+    assert CB.profile_th_for(None, "syn")[1] == pytest.approx(0.0947)
     assert CB.profile_th_for(None, "real")[0] == 0.0          # 最初の自席ターンは打てない規則
 
 
