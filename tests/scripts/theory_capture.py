@@ -320,7 +320,15 @@ def _a_of_hit(a):
     if key is None:
         return False
     if key in DR._FLOW:
-        _stat("dr.a_of", "memo_hit_same_value_inputs" if _A_OF_FIRST.get(key) == exact else "memo_hit_RISKY")
+        first = _A_OF_FIRST.get(key)
+        if first == exact:
+            _stat("dr.a_of", "memo_hit_same_value_inputs")
+        else:
+            _stat("dr.a_of", "memo_hit_RISKY")
+            parts = ("deck", "olp", "cap", "rush", "with_don", "theta", "mu", "cut_key", "cut_take_card")
+            for i, nm in enumerate(parts):
+                if first is None or first[i] != exact[i]:
+                    _stat("dr.a_of", "memo_hit_RISKY_" + nm)
         return True
     _A_OF_FIRST[key] = exact
     return False
@@ -378,7 +386,9 @@ SPECS = [
     Spec("dr.removal_harm", "deck_refill", "removal_harm", xform=_boards_xform),
     Spec("dr.card_effect_harm", "deck_refill", "card_effect_harm", xform=_boards_xform),
     Spec("dr.e_of", "deck_refill", "e_of", xform=_boards_xform),
-    Spec("dr.a_of", "deck_refill", "a_of", subs=("to.attack_value_don", "to.attack_value"), probe=_a_of_hit),
+    Spec("dr.a_of", "deck_refill", "a_of", subs=("to.attack_value_don", "to.attack_value"), probe=_a_of_hit,
+         glob=[("CUT_PRICER_KEY", _g(TO_, "CUT_PRICER_KEY")), ("CUT_TAKE_CARD", _g(TO_, "CUT_TAKE_CARD")),
+               ("CUT_PRICER", _cut_pricer_on)]),           # 値段の文脈（核の答えを変える・入力の鍵に入れる）
     Spec("lr.avg_counter", "lethal_rule", "avg_counter", glob=[("AVG_COUNTER_MODE", _g("lethal_rule", "AVG_COUNTER_MODE"))]),
     Spec("lr.life_cards_as_counters", "lethal_rule", "life_cards_as_counters"),
     Spec("lr.stop_min_counter", "lethal_rule", "stop_min_counter"),
