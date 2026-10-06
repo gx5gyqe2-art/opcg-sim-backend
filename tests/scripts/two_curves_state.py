@@ -51,9 +51,32 @@ from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 import crossing_bridge as CB  # noqa: E402
 import guard_afford as GA  # noqa: E402
 import kappa_vector as KV  # noqa: E402
-from rate_tracking import corr, demean_by  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra  # noqa: E402
 from theory_order import MU, SC_MY_HAND, SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LIFE, THETA  # noqa: E402
+
+
+# `corr`・`demean_by` は T128 の計器 `rate_tracking.py` から写した（その器は移植の段 0〔2026-10-06〕で退役）。
+def corr(a, b):
+    """相関（どちらかが定数なら `None`）。"""
+    a = np.asarray(a, float); b = np.asarray(b, float)
+    if a.size < 2 or a.std() < 1e-12 or b.std() < 1e-12:
+        return None
+    return float(np.corrcoef(a, b)[0, 1])
+
+
+def demean_by(xs, js):
+    """`j`（自席ターン番号）ごとの平均を引く＝**ターン番号の影を抜く**。
+
+    **これをやらないと「守りが効いた」と「ターンが進んだ」を取り違える**——
+    ライフも手札もブロッカーも `j` とともに動くので、生の相関は `j` の傾向をそのまま拾う
+    （2026-09-20 の実測: `d_life` の生の相関は実 +0.164・合成 −0.021 と**符号が割れた**）。"""
+    xs = np.asarray(xs, float); js = np.asarray(js, int)
+    out = xs.astype(float).copy()
+    for j in np.unique(js):
+        m = js == j
+        out[m] = xs[m] - xs[m].mean()
+    return out
+
 
 #: 状態量の名前（順序は表の並びに使う）
 STATE_KEYS = ("th_me", "th_opp", "a_me", "a_opp", "life_me", "life_opp", "hand_me", "hand_opp")

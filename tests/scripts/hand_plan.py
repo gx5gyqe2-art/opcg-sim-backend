@@ -43,8 +43,20 @@ from theory_bridge import ROW_COLS, _extra, move_family  # noqa: E402
 from theory_bridge import is_decision_row as TB_is_decision_row  # noqa: E402  (D-5)
 from hand_spend import hand_ids, spent_cards, use_value  # noqa: E402
 import hand_guard as HG  # noqa: E402
-from onplay_parts import look_k  # noqa: E402
 from price_realised import don_stock, primary_action  # noqa: E402
+
+
+def look_k(cid, cards=None):
+    """登場時能力が**何枚から選べるか**（`selection_k`・能力ごとの最大）。登場時能力が無ければ 0。
+
+    （T59 の計器 `onplay_parts.py` から移した——その器は移植の段 0〔2026-10-06〕で退役。）"""
+    c = (cards or EV._all_cards()).get(str(cid) or "")
+    if not c:
+        return 0.0
+    ks = [EV.selection_k(EV.walk_actions(ab.get("effect")))
+          for ab in (c.get("abilities") or []) if ab.get("trigger") in EV.CHAR_ON_PLAY_TRIGGERS]
+    return max(ks) if ks else 0.0
+
 
 #: 計画の長さ＝今・次・その次の 3 ターン＋「それより後」の 1 枠（上限 10・割引 s^3）。ユーザ提案「ゲームを通じて必要な札」
 #: ＝3 ターン先より後に出す札（フィニッシャー）も計画に入れるため。厳密 DP は 11^4 状態。
