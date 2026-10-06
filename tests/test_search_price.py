@@ -195,8 +195,10 @@ def test_play_from_hand_is_priced_by_the_matching_card_in_hand_now():
     assert fv > MU
     assert EV.action_value(act, st=st) == pytest.approx(fv - MU)                        # 4 コストの体が在る → その値
     assert EV.action_value(act, st={"search_ctx": {**ctx, "hand_items": [_item("BIG")]}}) == 0.0   # 合う札が無い → 0
-    # 体が μ に届かない小物（3000）は出しても損＝「1 枚まで」なので 0
-    assert EV.action_value(act, st={"search_ctx": {**ctx, "hand_items": [_item("SMALL")]}}) == 0.0
+    # 小物（3000）も同じ式＝`max(0, 体の値 − μ)`（既定の ν では μ をわずかに超える）
+    fv_small = hand_spend.free_value("SMALL", _TABLE["SMALL"], 5000.0, 4.0)
+    assert EV.action_value(act, st={"search_ctx": {**ctx, "hand_items": [_item("SMALL")]}}) == \
+        pytest.approx(max(0.0, fv_small - MU))
     # 出す札そのもの（MID を出してその効果で MID を出す）は除く
     assert EV.action_value(act, st=st, card={"card_id": "MID", "cost": 4}) == 0.0
     assert SP.eligible_hand_cards({"cost_max": 4}, ctx["hand_items"], cards, skip_cid="MID") == []

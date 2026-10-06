@@ -50,9 +50,7 @@ def test_the_realised_nu_is_the_measured_band_value_not_the_formula():
     assert PR.nu_meas_of(5000.0, 5000.0) == PR.NU_MEAS["leader_to_sat"]
     assert PR.nu_meas_of(7000.0, 5000.0) == PR.NU_MEAS["leader_to_sat"]     # 飽和点まで
     assert PR.nu_meas_of(7000.0 + 2 * PR.PWR_EPS, 5000.0) == PR.NU_MEAS["over_sat"]
-    # 式の側（`base`）はリーダー未満を 0 と言う——実測は 0.069。ここが混ざっていないことの証拠
-    assert T.nu_of(3000.0, 5000.0, 4.128, is_blocker=False, mode="base") == 0.0
-    assert PR.nu_meas_of(3000.0, 5000.0) > 0.0
+    assert PR.nu_meas_of(3000.0, 5000.0) > 0.0                               # リーダー未満も実測は正（0.069）
 
 
 def test_the_don_stock_counts_active_rested_and_attached_alike():

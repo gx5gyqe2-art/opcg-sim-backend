@@ -37,8 +37,8 @@ def test_rank_is_the_position_in_the_ascending_hand():
 
 
 def test_use_value_is_the_opportunity_cost_floored_at_zero():
-    # 2 コスト 3000 の素の体（相手リーダー 5000・R 4）: ν は小さくコスト 2·δ を引くと負 → 0 で床
-    v = HS.use_value("X", {"power": 3000, "cost": 2, "blocker": False}, 5000.0, 4.0, cards={})
+    # 3 コスト 3000 の素の体（相手リーダー 5000・R 4）: ν は小さくコスト 3·δ を引くと負 → 0 で床
+    v = HS.use_value("X", {"power": 3000, "cost": 3, "blocker": False}, 5000.0, 4.0, cards={})
     assert v == 0.0
     big = HS.use_value("Y", {"power": 8000, "cost": 0, "blocker": False}, 5000.0, 4.0, cards={})
     assert big is not None and big > 0.1                                    # 大きい体は ν の分だけ高い

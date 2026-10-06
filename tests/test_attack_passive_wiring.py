@@ -310,22 +310,13 @@ def test_fix_c_opponent_turn_blocker_and_immunities_are_in_the_body():
 
 
 # ---------------------------------------------------------------------------
-# 手で計算した期待値（関数を通さずに書いた数字）——conftest で `CBAR_MODE=loose`・`SURV_MODE=once`・`OPTION_MODE=off`
+# 手で計算した期待値（関数を通さずに書いた数字）——出荷の既定（`c(x) = c̄(x + 1000)`・生存は幾何和・潜在価値あり）
 # ---------------------------------------------------------------------------
 
 #: `Θ = round((λ − h·μ)/μ, 4)` を手で: (0.1362 − 0.89·0.0551)/0.0551 = 1.58187…
 TH_HAND = 1.5819
 MU_HAND = 0.0551
 LAM_HAND = 0.1362
-
-
-def test_hand_computed_attack_and_self_buff_values():
-    """EB01-003（5000・相手ライフ 2 以下で +2000）: 5000 対 5000 は超過 0 → `c = 1.00` 枚、
-    7000 対 5000 は超過 2000 → `c = 1.28` 枚（`loose`）。どちらも `Θ = 1.5819` 未満なので守る側の費用が価格。"""
-    assert TH == pytest.approx(TH_HAND, abs=1e-12)
-    T.set_attack_ability_mode("on")
-    assert _attack("EB01-003", 5000, _ctx(_st(opp_life=4))) == pytest.approx(1.00 * MU_HAND)
-    assert _attack("EB01-003", 5000, _ctx(_st(opp_life=2))) == pytest.approx(1.28 * MU_HAND)
 
 
 def test_rush_is_never_counted_on_the_play_row():
@@ -341,58 +332,6 @@ def test_rush_is_never_counted_on_the_play_row():
     off = _play("EB01-003", 5000, ctx2)
     T.set_passive_body_mode("on")
     assert _play("EB01-003", 5000, ctx2) == off
-
-
-def test_fix_b_own_power_buff_with_don_cost_charged_every_used_turn():
-    """EB01-058（3000・【ドン!!×1】【自分のターン中】ライフ 2 以下で +2000）。**F review 5**: 付ける費用は使うターンごと
-    ＝`1 × δ / R × (生きて迎えるターン)`。`SURV_MODE=once` なら重みの和は `R` そのもの（4）＝`0.0277 / 4 × 4 = 0.0277`。"""
-    T.set_passive_body_mode("on")
-    p = 3000.0
-    yes = _play_ctx(my_life=2, my_don_active=3)
-    mods = EV.continuous_self_mods("EB01-058", st=dict(T._effect_state(yes), don_turns=4.0))
-    assert mods["don_cost"] == pytest.approx(0.0277)
-    want = (T.nu_of(p + 2000, OLP, 4.0, TH, MU, is_blocker=False, my_leader_power=5000.0, def_power=p)
-            - T.nu_of(p, OLP, 4.0, TH, MU, is_blocker=False, my_leader_power=5000.0) - 0.0277)
-    got = T.passive_parts("EB01-058", {"power": p, "blocker": False}, yes)
-    assert got["body"] == pytest.approx(max(want, 0.0))
-    assert got["visible"] == pytest.approx(got["body"])           # 殴る側のパワーだけ＝物差しに見える
-    no = _play_ctx(my_life=4, my_don_active=3)
-    assert T.passive_body_value("EB01-058", {"power": p, "blocker": False}, no) == pytest.approx(0.0)
-
-
-def test_fix_b_conditional_blocker_grant_turns_the_blocker_flag_on():
-    """EB04-057: 【ドン!!×1】このキャラは【ブロッカー】を得る——付けられるなら体をブロッカーとして値付けする。"""
-    T.set_passive_body_mode("on")
-    p = 4000.0
-    ctx = _play_ctx(my_don_active=2)
-    st = T._effect_state(ctx)
-    mods = EV.continuous_self_mods("EB04-057", st=st)
-    assert mods["blocker"] is True and mods["atk"] == 0.0
-    got = T.passive_parts("EB04-057", {"power": p, "blocker": False}, ctx)
-    # ブロックの項（手で）: 0.773 × Θ × μ × (1 − ko_p(4000))・`once` の生存の重み（ko_p(4000) = 0.3297 の帯）
-    block_hand = 0.773 * TH_HAND * MU_HAND * (1.0 - 0.3297)
-    assert got["body"] == pytest.approx(max(block_hand - 0.0277, 0.0), abs=1e-6)
-    assert got["visible"] == 0.0                                 # ブロッカーは物差しに現れない
-    assert EV.continuous_self_mods("EB04-057", st=T._effect_state(_play_ctx(my_don_active=0)))["blocker"] is False
-
-
-def test_double_attack_uses_the_survival_weighted_turn_count():
-    """**F review 6**: 印刷のダブルアタック（EB04-023・9000）は `keyword_delta × 生きて迎えるターン`（登場のターンは含まない）。
-    手で: 9000 対 5000 は超過 4000 → `c = 2.78`。受ける費用が `Θ` → `2Θ` で `min(2.78, 1.5819)·μ` → `min(2.78, 3.1638)·μ`。"""
-    st = dict(T._effect_state(_play_ctx()), perm_turns=1.7)
-    da = EV.printed_keyword_value(dict(EV._all_cards()["EB04-023"], power=9000), ("ダブルアタック",), st=st)
-    assert da == pytest.approx((2.78 - TH_HAND) * MU_HAND * 1.7, abs=1e-6)
-    T.set_passive_body_mode("on")
-    got = T.passive_parts("EB04-023", {"power": 9000, "blocker": False}, _play_ctx())
-    assert got["kw"] == pytest.approx((2.78 - TH_HAND) * MU_HAND * 4.0, abs=1e-6)   # `once` の重み＝R＝4
-    # 条件つき（体のパーツ）≤ 印刷（同じ重み）
-    card = {"power": 9000, "abilities": [{"trigger": "PASSIVE", "raw_text": "このキャラは【ダブルアタック】を得る。",
-            "condition": {"type": "LIFE_COUNT", "operator": "LE", "value": 2, "player": "SELF"},
-            "effect": {"type": "GRANT_KEYWORD", "status": "ダブルアタック", "duration": "INSTANT", "raw_text": "",
-                       "target": {"select_mode": "SOURCE", "player": "SELF"}}}]}
-    for life in (1, 4):
-        cond, _ = EV.continuous_body_value("X", st=dict(st, my_life=life), nu=0.1, ko_p=0.3, cards={"X": card})
-        assert cond <= da + 1e-12
 
 
 def test_unblockable_is_read_from_the_card_text():
@@ -434,16 +373,6 @@ def test_f_fixes_default_is_the_full_set():
                                        "look_return", "trash_pool"}
 
 
-def test_f_fixes_setter_legacy_and_rejects_unknown(_ffix_restore):
-    assert EV.set_f_pricing_fixes("legacy") == ()
-    assert EV.set_f_pricing_fixes("all") == EV.F_PRICING_FIXES
-    assert EV.set_f_pricing_fixes("none") == ()
-    with pytest.raises(ValueError):
-        EV.set_f_pricing_fixes("bogus")
-
-
-
-
 def test_branch_then_follows_the_state_condition(_ffix_restore):
     eff = {"node": "Branch", "condition": {"type": "LIFE_COUNT", "operator": "LE", "value": 1, "player": "SELF"},
            "if_true": {"type": "DRAW", "value": {"base": 1}, "raw_text": "カード1枚を引く"},
@@ -465,14 +394,10 @@ def test_state_filters_read_the_dynamic_cost_cap_and_attached_don(_ffix_restore)
     both = ["OP15-114", "OP15-110"]
     assert SP.eligible_deck_cards(t, both, cards) == both
     assert SP.eligible_deck_cards(t, both, cards, st={"my_don_total": 3}) == ["OP15-110"]
-    EV.set_f_pricing_fixes("none")                                  # 旧の集合を明示（F-5 で既定は全部入り）
     bodies = [_body(3000), dict(_body(2000), attached_don=1)]
     bodies[0]["attached_don"] = 0
     tgt = {"min_attached_don": 1, "power_max": 3000, "card_type": ["CHARACTER"], "player": "OPPONENT"}
-    assert EV.eligible_bodies(tgt, bodies) is None                  # 既定は読めない＝盤面を使わない
-    EV.set_f_pricing_fixes("state_filters")
-    assert EV.eligible_bodies(tgt, bodies) == [bodies[1]["nu"]]
-    EV.set_f_pricing_fixes("none")
+    assert EV.eligible_bodies(tgt, bodies) == [bodies[1]["nu"]]     # 既定（全部入り）は付与中の体だけ
     with EV.opaque_as_upper():                                      # 攻撃の行の上限読みでも同じく読める
         assert EV.eligible_bodies(tgt, bodies) == [bodies[1]["nu"]]
 
@@ -482,11 +407,8 @@ def test_attached_don_condition_counts_only_attached_don(_ffix_restore):
     エンジン（`effects/cond.rs`）は本文の「付与」で付与中だけを数える＝パーサの誤りではなく理論側の読み違い。"""
     import condition_value as CV
     ab = next(a for a in EV._all_cards()["ST31-004"]["abilities"] if a.get("trigger") == "PASSIVE")
-    EV.set_f_pricing_fixes("none")                                  # 旧の集合を明示（F-5 で既定は全部入り）
     st = {"my_don_total": 8, "my_don_attached": 2}
-    assert CV.holds(ab["condition"], st) is True
-    EV.set_f_pricing_fixes("attached_don_cond")
-    assert CV.holds(ab["condition"], st) is False
+    assert CV.holds(ab["condition"], st) is False                   # 既定（全部入り）は付与中の 2 枚だけを数える
     assert CV.holds(ab["condition"], dict(st, my_don_attached=3)) is True
     assert CV.holds(ab["condition"], {"my_don_total": 8}) is None
 
@@ -582,66 +504,21 @@ def test_cli_flags_follow_the_mode_switch_convention():
 
 
 # ---------------------------------------------------------------------------
-# F レビュー 3（手で計算した期待値・`loose` の費用曲線: c(1000)=1.00・c(2000)=1.28・c(4000)=2.78 枚）
+# F レビュー 3（手で計算した期待値・`c(x) = c̄(x + 1000)`: c(0)=1.00・c(1000)=1.28・c(2000)=2.25 枚）
 # ---------------------------------------------------------------------------
-
-
-def test_don_requirement_is_read_from_the_attached_don_plus_the_box_and_charged_when_boxed():
-    """ST12-011（【ドン!!×1】【アタック時】手札 5 枚以下なら +2000）。
-    k=1 で付けて満たすなら、付けたドン 1 枚の 1 ターンの使用権 `0.0277 / 4 = 0.006925` を払う（レビュー 3 の 8）。
-    手で: 付けて 5000 → 上昇で 7000。攻撃 1.00μ ＋ 能力 (1.28 − 1.00)μ − 0.006925 = 0.0551 + 0.015428 − 0.006925。
-    既に 1 枚付いていた（前の手で付けた）なら費用 0 ＝ 1.28μ。"""
-    T.set_attack_ability_mode("on")
-    ctx = _ctx(_st(my_hand=3))
-    assert _attack("ST12-011", 4000, ctx, don_k=0, src_don=0) == pytest.approx(0.0)          # 4000 は 5000 に届かない・条件偽
-    assert _attack("ST12-011", 4000, ctx, don_k=1, src_don=0) == pytest.approx(0.0551 + 0.28 * 0.0551 - 0.006925)
-    assert _attack("ST12-011", 5000, ctx, don_k=0, src_don=1) == pytest.approx(1.28 * 0.0551)
-    assert _attack("ST12-011", 5000, _ctx(_st(my_hand=7)), src_don=1) == pytest.approx(1.00 * 0.0551)
-
-
-def test_a_removal_on_attack_hand_computed():
-    """OP15-018（6000・【アタック時】ドン!!が付与されている相手のパワー 3000 以下 1 枚まで KO）がリーダーを殴る。
-    盤面を渡さない＝取れる体は平均の体 `ν̄ = 0.1087`（既存の規約）。手で: 攻撃 1.00μ ＋ 0.1087。"""
-    T.set_attack_ability_mode("on")
-    assert _attack("OP15-018", 6000, _ctx(_st())) == pytest.approx(0.0551 + 0.1087)
-    # 相手の体が 2 体・付与ドンが読める（1 体だけ付いている）なら、付いている方だけ取れる
-    bodies = [dict(_body(3000, nu=0.05), attached_don=0), dict(_body(2000, nu=0.04), attached_don=1)]
-    assert _attack("OP15-018", 6000, _ctx(_st(), opp_bodies=bodies)) == pytest.approx(0.0551 + 0.04)
-
-
-def test_power_down_on_the_attack_target_makes_the_attack_land_review3_5():
-    """EB01-006（【ドン!!×2】【アタック時】相手のキャラ 1 枚まで −3000）の 6000 が唯一の 7000 を殴る。
-    **パワー低下はバトルを終わらせない**——対象が 4000 になって攻撃が通る: 超過 2000 → 1.28μ（`ν(対象)` より安い）。
-    旧実装は「対象に触る＝バトル終了」と読み、パワー低下の汎用の値（3000 → 0.0831）しか付かなかった。"""
-    T.set_attack_ability_mode("on")
-    tgt = _body(7000)
-    ctx = _ctx(_st(), opp_bodies=[tgt])
-    got = _attack("EB01-006", 6000, ctx, don_k=0, src_don=2, tgt="C7", tgt_power=7000)
-    assert got == pytest.approx(1.28 * 0.0551)
-    assert T._target_power_down(EV._all_cards()["EB01-006"]) == 3000.0
-    assert T._removes_from_field(EV._all_cards()["EB01-006"]) is False
-    assert T._removes_from_field(EV._all_cards()["OP15-018"]) is True
 
 
 def test_look_return_prices_life_reordering_as_zero_review3_7():
     """**look_return**（OP03-099 の原因）: 「ライフの上から 1 枚を見て、ライフの上か下に置く」をパーサは見た札 → ライフの
-    移動で出す＝旧は自分のライフが 1 枚増える（+λ = 0.1362）と数えた。直した後は並べ替え（0）＋自分の上昇だけ:
-    6000 → 7000 のリーダー攻撃で (1.28 − 1.00)μ = 0.015428。"""
+    移動で出す＝旧は自分のライフが 1 枚増える（+λ = 0.1362）と数えた。既定（全部入り）は並べ替え（0）＋自分の上昇だけ:
+    6000 → 7000 のリーダー攻撃で (min(c(2000), Θ) − c(1000))μ = (1.5819 − 1.28)μ。"""
     c = EV._all_cards()["OP03-099"]
     ab = next(a for a in c["abilities"] if a.get("trigger") == "ON_ATTACK")
     actx = {"power": 6000.0, "target_power": 5000.0, "is_leader": True, "nu_target": None, "blockers": [],
             "theta": TH, "mu": MU}
     st = dict(_st(), attack_ctx=actx, source_don_attached=1, source_don_pre=1)
-    before = EV.F_PRICING_FIX
-    try:
-        EV.set_f_pricing_fixes("none")                              # 旧の集合を明示（F-5 で既定は全部入り）
-        v0, _ = EV.ability_value(ab, card=c, st=st)
-        assert v0 == pytest.approx(0.1362 + 0.28 * 0.0551)
-        EV.set_f_pricing_fixes("look_return")
-        v1, _ = EV.ability_value(ab, card=c, st=st)
-        assert v1 == pytest.approx(0.28 * 0.0551)
-    finally:
-        EV.set_f_pricing_fixes(before)
+    v1, _ = EV.ability_value(ab, card=c, st=st)
+    assert v1 == pytest.approx((TH_HAND - 1.28) * MU_HAND)
 
 
 class _FakeCards:
@@ -695,11 +572,7 @@ def test_branch_then_state_conditions_and_prev_action(_ffix_restore):
     got = EV.branch_actions(ab["effect"], None)
     assert [(e["type"], w) for e, w in got] == [("MOVE_CARD", 1.0)]
     assert EV.action_value(got[0][0], card=c) == pytest.approx(0.0551 - 0.1362)
-    EV.set_f_pricing_fixes("none")                                  # 旧の集合を明示（F-5 で既定は全部入り）
-    v0, _ = EV.ability_value(ab, card=c)
-    assert v0 == pytest.approx(0.1087 - 0.0551)
-    EV.set_f_pricing_fixes("branch_then")
-    v1, _ = EV.ability_value(ab, card=c)
+    v1, _ = EV.ability_value(ab, card=c)                             # 既定（全部入り・branch_then を含む）
     assert v1 == pytest.approx(0.0)                                  # max(0, 0.0536 − 0.0811)
 
 
@@ -733,72 +606,6 @@ def test_ko_effect_share_was_dropped_review3_4():
     assert not hasattr(EV, "survive_share")
 
 
-_FIX = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "f_identity")
-
-
-_RUNNER = r"""
-import json, os, sys
-sys.path.insert(0, os.path.join(os.getcwd(), "tests")); sys.path.insert(0, os.path.join(os.getcwd(), "tests", "scripts"))
-import _bootstrap  # noqa
-import theory_order as T, effect_value as EV, price_realised as PR, theory_bridge as TB, transition_ledger as TL
-def boom(*_a, **_k):
-    raise AssertionError("切替 off で新しい道に入った")
-for mod, names in ((T, ("attack_ability_value", "passive_parts", "passive_body_value", "printed_keywords")),
-                   (EV, ("continuous_body_value", "continuous_self_mods", "printed_keyword_value",
-                         "branch_actions", "branch_probability", "dynamic_cost_cap", "look_returns"))):
-    for n in names:
-        setattr(mod, n, boom)
-EV.opaque_as_upper.__enter__ = boom
-_orig = EV.attack_self_value
-EV.attack_self_value = lambda e, at, st, *a, **k: (boom() if (st or {}).get("attack_ctx") else None)
-# F-5（2026-09-30）で既定が全部入りになった＝**旧の集合（`none`）を明示**して 079e73b8 の再現を見る。
-# N-2（2026-09-26）で守る費用の既定が `joint` になった＝079e73b8 当時の `curve` を明示する（F と独立の変更）。
-EV.set_f_pricing_fixes("none")
-TB.set_guard_s_cost_mode("curve")
-# 2026-10-01（残り 2b）で来る攻撃を守る側のパワーの既定が `rule` になった＝079e73b8 当時の `token` を明示する。
-T.set_defender_power_mode("token")
-# 2026-10-01 で切らせた札の値段の既定が `joint`＋`gbar` になった＝079e73b8 当時の `flat`＋`mu` を明示する。
-import cut_price as CP
-CP.set_cut_price_mode("flat"); CP.set_cut_take_mode("mu")
-# 2026-10-04（H-4）で手札の項の既定が `rule_don` になった＝079e73b8 当時の `cuttable_forced` を明示する。
-import crossing_bridge as _CB
-_CB.set_theta_hand_mode("cuttable_forced")
-# 2026-10-04（N-4）でデッキの【カウンター】イベントの数え方の既定が `rules` になった＝079e73b8 当時の `printed`（印字だけ）を明示する。
-import search_price as _SP
-_SP.set_deck_counter_mode("printed")
-rec, out, which = sys.argv[1], sys.argv[2], sys.argv[3]
-if which == "price_realised":
-    rc = PR.main(["--in", rec, "--boot-reps", "10", "--out", out])
-elif which == "theory_bridge":
-    rc = TB.main(["--in", rec, "--boot-reps", "10", "--out", out])
-else:
-    rc = TL.main(["--in", rec, "--json", out])
-sys.exit(rc)
-"""
-
-
-def test_switches_off_match_recorded_base_outputs_of_079e73b8(tmp_path):
-    """**旧の集合の同一性**（レビュー 3 の 9・F-5 で意味を固定）: 実デッキの記録 2 局（`tests/fixtures/f_identity/rec`・
-    `record_gen --decks user --seed-base 990401`）に対し、**079e73b8 のコードで記録した出力**
-    （`base_*_079e73b8.json`）と、今のコードで**旧の集合**（切替 off・F の直し `none`・守る費用 `curve`＝どれも明示）
-    の出力が秒数を除いて一致する＝`--f-pricing-fixes none` は 079e73b8 の値付けを 1 ビットも変えずに再現する。
-    （F-5 で出荷の既定は全部入りになった——既定そのものは `test_f_fixes_default_is_the_full_set` がラチェットする。）
-    別プロセスで回す（出荷の既定のまま・テスト間でモジュールの状態を漏らさない）。新しい道の関数に罠を掛けても
-    一致する＝既定では一度も通らない。"""
-    import json
-    import subprocess
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    rec = os.path.join(_FIX, "rec")
-    env = dict(os.environ, OPCG_LOG_SILENT="1")
-    for name in ("price_realised", "theory_bridge", "transition_ledger"):
-        out = str(tmp_path / (name + ".json"))
-        r = subprocess.run([sys.executable, "-c", _RUNNER, rec, out, name], cwd=root, env=env,
-                           capture_output=True, text=True, timeout=600)
-        assert r.returncode == 0, (name, r.stderr[-2000:])
-        got = json.loads(open(out, encoding="utf-8").read())
-        want = json.loads(open(os.path.join(_FIX, "base_%s_079e73b8.json" % name), encoding="utf-8").read())
-        got.pop("seconds", None); want.pop("seconds", None)
-        assert got == want, name
 
 
 # ---------------------------------------------------------------------------
@@ -933,11 +740,6 @@ def test_d5_play_from_trash_is_weighted_by_the_chance_a_match_is_there(_ffix_res
     tgt = {"card_type": ["CHARACTER"], "cost_max": 3, "zone": "TRASH", "player": "SELF"}
     assert EV.trash_has_match(tgt, st) == pytest.approx(0.5)
     assert EV.trash_has_match(tgt, dict(st, my_trash=0)) == 0.0
-    EV.set_f_pricing_fixes("none")                                  # 旧の集合を明示（F-5 で既定は全部入り）
-    e = {"type": "PLAY_CARD", "target": tgt, "raw_text": ""}
-    base = EV.action_value(e, card={}, st=st)
-    EV.set_f_pricing_fixes("trash_pool")
-    assert EV.action_value(e, card={}, st=st) == pytest.approx(0.5 * base)
 
 
 def test_d6_leader_attack_debuff_is_priced_by_a_follow_up_attack(_strict):

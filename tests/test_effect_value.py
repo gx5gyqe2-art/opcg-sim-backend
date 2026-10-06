@@ -731,7 +731,9 @@ def test_double_attack_and_banish_are_the_difference_in_the_attack_price():
     assert E.keyword_delta("バニッシュ", 9000.0, olp) == pytest.approx(
         T.attack_value_don(9000.0, olp, True, T.LAM / T.MU) - base9)
     assert E.keyword_delta("ダブルアタック", 9000.0, olp) > 0
-    assert E.keyword_delta("ダブルアタック", 5000.0, olp) == pytest.approx(0.0)           # 守られる帯では効かない
+    # 超過 0 の体: 素殴りは c(0)=1.00 枚（Θ 未満）。受ける費用が 2Θ になると 3 枚付けて c(3000)=2.78 枚まで払わせる方が得
+    # （1 枚 1.28μ−δ・2 枚 2.25μ−2δ・3 枚 2.78μ−3δ・4 枚 min(3.63, 2Θ)μ−4δ の最大）
+    assert E.keyword_delta("ダブルアタック", 5000.0, olp) == pytest.approx(2.78 * T.MU - 3 * T.DELTA - 1.00 * T.MU)
     assert E.keyword_delta("速攻", 9000.0, olp) is None
     st = {"opp_leader_power": olp, "r_turns": 3.0}
     src = _act("GRANT_KEYWORD", "SELF", status="ダブルアタック", duration="THIS_TURN"); src["target"]["select_mode"] = "SOURCE"

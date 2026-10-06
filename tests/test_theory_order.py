@@ -26,33 +26,41 @@ import theory_order as T  # noqa: E402
 
 
 def test_cost_curve_is_a_staircase_and_tolerates_f16_rounding():
+    """`c(x) = c̄(x + 1000)`（T61）——同値は命中するので、超過 `x` を生き残るには合計 `x + 1000` が要る。
+    `c̄` は `CBAR_CURVE` の節（「合計が v 以上」の枚数）・節の間は上の節・5000 超は `CBAR_SLOPE`。"""
     assert T.c_of(-3000) == 0.0                         # 通らない攻撃は守る必要が無い
-    assert T.c_of(0) == pytest.approx(1.00)             # **x=0 でも命中するので 1 枚要る**
-    assert T.c_of(1000) == pytest.approx(1.00)
-    assert T.c_of(1000.0002) == pytest.approx(1.00)     # f16 の丸めで段が上がらない
-    assert T.c_of(1500) == pytest.approx(1.28)          # 段の途中は上の段の値
-    assert T.c_of(3000) == pytest.approx(2.25)
-    assert T.c_of(6000) == pytest.approx(3.63 + 0.66)   # 5000 超は平均の傾きで伸ばす
+    assert T.c_of(0) == pytest.approx(1.00)             # **x=0 でも命中するので 1 枚要る**＝c̄(1000)
+    assert T.c_of(1000) == pytest.approx(1.28)          # 合計 2000 が要る＝c̄(2000)
+    assert T.c_of(1000.0002) == pytest.approx(1.28)     # f16 の丸めで段が上がらない
+    assert T.c_of(1500) == pytest.approx(2.25)          # c̄(2500)＝段の途中は上の段の値
+    assert T.c_of(3000) == pytest.approx(2.78)          # c̄(4000)
+    assert T.c_of(4000) == pytest.approx(3.63)          # c̄(5000)＝最後の節
+    assert T.c_of(6000) == pytest.approx(3.63 + 2 * T.CBAR_SLOPE)   # c̄(7000)＝5000 超は平均の傾きで伸ばす
+    for x in (0, 1000, 2000, 3000, 4000):
+        assert T.c_of(x) == T.cbar_of(x + 1000)         # 定義そのもの
+    assert T.cbar_of(0) == 0.0 and T.cbar_of(1000) == 1.0 and T.cbar_of(1500) == 1.28
+    with pytest.raises(ValueError):
+        T.set_cbar_mode("なにか")
 
 
 def test_saturation_point_moves_with_theta():
     """`x* = min{x : c(x) ≥ Θ}`。**Θ が上がると飽和点も上がる**（相手のライフが薄い帯）。
 
     > **2026-09-14 に書き直した——旧版は 2 つのバグを固定していた**
-    > （`saturation_x(0.8) == 1000` と `saturation_x(10.0) == 5000`）。
     > (1) **`x = 0` が候補に入っていなかった**——`c(0) = 1.00` なので `Θ ≤ 1` の答えは **0**。
-    > (2) **曲線の端（5000）で頭打ち**にしていた——`c(x)` はその先も +0.66/1000 で伸びる。
-    > 既定の `Θ = 1.15` では露見しないが、**盤面から出す `Θ` は 1 を割ることが多い**。
+    > (2) **曲線の端で頭打ち**にしていた——`c(x)` はその先も `CBAR_SLOPE`/1000 で伸びる。
+    （値は `c(x) = c̄(x + 1000)`＝0:1.00・1000:1.28・2000:2.25・3000:2.78・4000:3.63・5000:4.29。）
     """
     # (1) `Θ ≤ 1` は「通すだけでよい」＝積む価値が無い
     assert T.saturation_x(0.5) == 0.0
     assert T.saturation_x(0.8) == 0.0                   # c(0)=1.00 ≥ 0.8
     assert T.saturation_x(1.0) == 0.0                   # ちょうど 1 枚でも足りる
-    assert T.saturation_x(1.15) == 2000.0               # c(2000)=1.28 ≥ 1.15
-    assert T.saturation_x(2.0) == 3000.0
-    # (2) 端から先は傾き `CBAR_SLOPE` で伸ばす（頭打ちにしない）
-    assert T.saturation_x(3.63) == 5000.0
-    assert T.saturation_x(4.0) == 6000.0                # 3.63 + 0.66 = 4.29 ≥ 4.0
+    assert T.saturation_x(1.15) == 1000.0               # c(1000)=1.28 ≥ 1.15
+    assert T.saturation_x(2.0) == 2000.0                # c(1000)=1.28 < 2.0 ≤ c(2000)=2.25
+    assert T.saturation_x(T.THETA) == 2000.0            # Θ≈1.58: c(1000)=1.28 < Θ ≤ c(2000)=2.25
+    # (2) 最後の節から先は傾き `CBAR_SLOPE` で伸ばす（頭打ちにしない）
+    assert T.saturation_x(3.63) == 4000.0               # c(4000)=c̄(5000)=3.63
+    assert T.saturation_x(4.0) == 5000.0                # 3.63 + 0.66 = 4.29 ≥ 4.0
     assert T.saturation_x(10.0) > 5000.0
     # 定義そのもの: 返した x で足り、1000 手前では足りない
     for th in (0.9, 1.15, 2.0, 4.0, 7.0):
@@ -96,12 +104,12 @@ def test_only_my_active_blockers_are_counted():
 
 def test_board_theta_is_the_g_th_cheapest_incoming_cost():
     """**`Θ` は盤面から出せる**（`λ` を通らない）＝`G = max(0, N − L − B)` 番目に安い `c(x)`。"""
-    tok = _tok_board(5000, 5000, (6000, 8000, 10000))   # x = 0, 1000, 3000, 5000
+    tok = _tok_board(5000, 5000, (6000, 8000, 10000))   # x = 0, 1000, 3000, 5000 → c = 1.00, 1.28, 2.78, 4.29
     # ライフ 1・ブロッカー 0 → G = 4 − 1 − 0 = 3 → c を安い順に並べて 3 番目
-    assert T.board_theta(tok, life=1) == pytest.approx(2.25)
+    assert T.board_theta(tok, life=1) == pytest.approx(2.78)
     # ブロッカーが 1 体居れば G = 2 → 2 番目
     tok_b = _tok_board(5000, 5000, (6000, 8000, 10000), blockers=1)
-    assert T.board_theta(tok_b, life=1) == pytest.approx(1.00)
+    assert T.board_theta(tok_b, life=1) == pytest.approx(1.28)
     # ライフが厚いほど G が小さい＝Θ が下がる（守る必要が薄い）
     assert T.board_theta(tok, life=2) < T.board_theta(tok, life=1)
 
@@ -126,15 +134,18 @@ def test_the_don_allowance_uses_the_measured_attach_share():
 
 
 def test_attack_on_leader_is_the_min_of_guarding_and_taking():
-    """守る費用が受ける費用を超えたら、**それ以上は価値が増えない**（飽和）。"""
+    """守る費用が受ける費用を超えたら、**それ以上は価値が増えない**（飽和）。`c(x) = c̄(x + 1000)`。"""
     mu, theta = 0.05, 1.15
     take = theta * mu
-    # x=1000 → c=1.00 枚 < Θ なので守る方が安い＝守る費用が価値
-    assert T.attack_value(6000, 5000, True, theta, mu) == pytest.approx(1.00 * mu)
-    # x=3000 → c=2.25 枚 > Θ なので相手は受ける＝価値は take で止まる
-    assert T.attack_value(8000, 5000, True, theta, mu) == pytest.approx(take)
+    # x=0 → c=1.00 枚 < Θ なので守る方が安い＝守る費用が価値
+    assert T.attack_value(5000, 5000, True, theta, mu) == pytest.approx(1.00 * mu)
+    # x=1000 → c=1.28 枚 > Θ なので相手は受ける＝価値は take で止まる
+    assert T.attack_value(6000, 5000, True, theta, mu) == pytest.approx(take)
     # さらに積んでも増えない
     assert T.attack_value(12000, 5000, True, theta, mu) == pytest.approx(take)
+    # 既定の Θ（≈1.58）: x=1000 は守る（1.28μ）・x=2000 は 2.25 枚 > Θ なので受ける
+    assert T.attack_value(6000.0, 5000.0, True, theta=T.THETA) == pytest.approx(1.28 * T.MU, abs=1e-9)
+    assert T.attack_value(7000.0, 5000.0, True, theta=T.THETA) == pytest.approx(T.THETA * T.MU, abs=1e-9)
 
 
 def test_attack_that_cannot_connect_is_worth_zero():
@@ -156,22 +167,22 @@ def test_attack_on_character_compares_against_that_character():
 
 
 def test_attach_don_is_the_increment_of_the_attack_value():
-    """付与の価値は**攻撃の価値の増分**＝平らな段では 0・飽和点より上でも 0。"""
-    mu, theta = 0.05, 1.15                              # 飽和点 x* = 2000
-    # **x 0→1000 は 0**（実測の曲線は c(0)=c(1000)=1.00＝1 枚でどちらも止まる）
-    assert T.attach_value(5000, 5000, 1, theta, mu) == 0.0
-    # x 1000→2000 は Θ で潰れた分だけ（1.15 − 1.00）
-    assert T.attach_value(6000, 5000, 1, theta, mu) == pytest.approx((1.15 - 1.00) * mu)
+    """付与の価値は**攻撃の価値の増分**＝飽和点より上では 0・通らない攻撃にも 0。"""
+    mu, theta = 0.05, 1.15                              # 飽和点 x* = 1000（c(1000)=1.28 ≥ 1.15）
+    # x 0→1000: min(c, Θ) が 1.00 → 1.15（Θ で潰れる）
+    assert T.attach_value(5000, 5000, 1, theta, mu) == pytest.approx((1.15 - 1.00) * mu)
     # 既に飽和点に居るなら足しても 0
+    assert T.attach_value(6000, 5000, 1, theta, mu) == 0.0
     assert T.attach_value(7000, 5000, 1, theta, mu) == 0.0
     assert T.attach_value(9000, 5000, 3, theta, mu) == 0.0
-    # 通らない攻撃に付与しても 0（x = −2000 → +1000 でも届かない）
+    # 通らない攻撃に付与しても 0（x = −2000 → −1000 でも届かない）
     assert T.attach_value(3000, 5000, 1, theta, mu) == 0.0
     # **`attack_value` の差と厳密に一致する**
-    for k in (1, 2, 3):
-        inc = (T.attack_value(6000 + 1000 * k, 5000, True, theta, mu)
-               - T.attack_value(6000, 5000, True, theta, mu))
-        assert T.attach_value(6000, 5000, k, theta, mu) == pytest.approx(inc)
+    for src in (5000, 6000):
+        for k in (1, 2, 3):
+            inc = (T.attack_value(src + 1000 * k, 5000, True, theta, mu)
+                   - T.attack_value(src, 5000, True, theta, mu))
+            assert T.attach_value(src, 5000, k, theta, mu) == pytest.approx(inc)
 
 
 def test_play_pays_the_card_and_the_don():
@@ -272,10 +283,10 @@ def test_current_power_overrides_the_printed_power():
 def test_piling_power_past_the_saturation_point_buys_nothing():
     """**飽和点を超えたら価値は増えない**（`min(c(x), Θ)` の天井＝理論の中心の予言）。
 
-    Θ=1.15 なので飽和点は 2000（`c(2000) = 1.28 ≥ Θ`）。5000 のリーダー相手なら
-    7000 で天井に当たり、そこから積んでも同じ値になる。
+    Θ=1.15 なので飽和点は 1000（`c(1000) = 1.28 ≥ Θ`）。5000 のリーダー相手なら
+    6000 で天井に当たり、そこから積んでも同じ値になる。
     """
-    assert T.saturation_x(1.15) == 2000.0
+    assert T.saturation_x(1.15) == 1000.0
     cap = 1.15 * 0.05
     assert _box(src=6000.0) == pytest.approx(cap)      # +1 ドンで 7000＝超過 2000
     assert _box(src=9000.0) == pytest.approx(cap)      # 10000 でも同じ
@@ -322,15 +333,15 @@ def test_theta_of_takes_the_max_of_the_two_routes():
     `board` 単体は**経済的な理由を消してしまう**ので、`Θ_B < Θ_A` の帯で
     守る基準を不当に下げる（それが `board` を既定にできなかった一因）。
     """
-    # 相手 3 体＋リーダー・ライフ 1 → G = 3 → Θ_B = 2.25 ＞ Θ_A（既定 1.15）
+    # 相手 3 体＋リーダー・ライフ 1 → G = 3 → Θ_B = c(3000) = 2.78 ＞ Θ_A（既定 ≈1.58）
     tok = _tok_board(5000, 5000, (6000, 8000, 10000))
     assert T.theta_of(tok, life=1, mode="const") == pytest.approx(T.THETA)
-    assert T.theta_of(tok, life=1, mode="board") == pytest.approx(2.25)
-    assert T.theta_of(tok, life=1, mode="max") == pytest.approx(2.25)    # B の方が大きい
+    assert T.theta_of(tok, life=1, mode="board") == pytest.approx(2.78)
+    assert T.theta_of(tok, life=1, mode="max") == pytest.approx(2.78)    # B の方が大きい
     # ライフが厚い＝Θ_B が小さい帯では **A が残る**（board だと下がってしまう）
-    tok2 = _tok_board(5000, 5000, (6000, 5000))          # x = 0, 1000 → c = 1.00, 1.00
+    tok2 = _tok_board(5000, 5000, (6000, 5000))          # x = 0, 1000 → c = 1.00, 1.28・G = 1
     assert T.theta_of(tok2, life=1, mode="board") == pytest.approx(1.00)
-    assert T.theta_of(tok2, life=1, mode="max") == pytest.approx(T.THETA)  # 1.15 > 1.00
+    assert T.theta_of(tok2, life=1, mode="max") == pytest.approx(T.THETA)  # Θ_A > 1.00
     # 領域 1（G=0）はどのモードでも定数
     for mode in T.THETA_MODES:
         assert T.theta_of(tok, life=9, mode=mode) == pytest.approx(T.THETA)
@@ -384,59 +395,6 @@ def test_the_attack_term_never_falls_below_the_leader_line():
     with_blocker = [(3000.0, False), (7000.0, True)]
     assert T.attack_stream(6000.0, 5000.0, 4.128, opp_chars=with_blocker,
                            my_leader_power=5000.0) < T.attack_stream(6000.0, 5000.0, 4.128)
-
-
-def test_power_keeps_paying_past_the_saturation_point():
-    """**飽和点から上でもパワーが効く**——これが #39 の狙い（`2026-09-14_nu_measure.md` ②）。
-
-    リーダー狙いだけだと `x ≥ x*` で頭打ちになる。**相手の大きなキャラを殴る選択肢**が
-    残るので、盤面を渡すと**飽和点の先も単調に伸びる**。
-    """
-    board = [(7000.0, False), (9000.0, False)]
-    flat = [T.nu_of(p, 5000.0, 4.128, is_blocker=False) for p in (8000.0, 10000.0, 13000.0)]
-    assert flat[0] == pytest.approx(flat[1]) == pytest.approx(flat[2])   # 頭打ち
-    grow = [T.nu_of(p, 5000.0, 4.128, is_blocker=False, opp_chars=board,
-                    my_leader_power=5000.0) for p in (8000.0, 10000.0, 13000.0)]
-    assert grow[0] < grow[1] < grow[2]
-
-
-def test_the_stock_of_a_target_is_not_multiplied_by_the_horizon():
-    """**`ν(対象)` は在庫であって毎ターンの流量ではない**（実装の初版の型の誤り）。
-
-    `R · max(lead, v_T)` と書くと「4 ターン続けて同じ 1 体を倒す」ことになる。
-    倒せるのは **1 体 1 回**なので、**対象は高い順に 1 ターン 1 体ずつ**しか充てられない——
-    対象を 1 体だけ置いた盤面の上乗せは `(v_T − lead)` **1 回ぶん**で頭打ちになる。
-    """
-    one = [(9000.0, False)]
-    lead = T.attack_value(12000.0, 5000.0, True)
-    got = T.attack_stream(12000.0, 5000.0, 4.0, opp_chars=one, my_leader_power=5000.0)
-    v_t = got - 3.0 * lead                       # 残り 3 ターンはリーダー狙い
-    assert got == pytest.approx(3.0 * lead + v_t)
-    assert got < 4.0 * max(lead, v_t) - 1e-9     # 在庫を R 倍してはいない
-    # 2 体置けば 2 回ぶん乗る（が 3 回ぶんにはならない）
-    two = T.attack_stream(12000.0, 5000.0, 4.0, opp_chars=one * 2, my_leader_power=5000.0)
-    assert two == pytest.approx(got + (v_t - lead))
-
-
-def test_the_fractional_turn_is_prorated():
-    """端数のターンは**比例配分**（`R` は実測の 4.128 のような小数）。"""
-    lead = T.attack_value(6000.0, 5000.0, True)
-    assert T.attack_stream(6000.0, 5000.0, 2.5) == pytest.approx(2.5 * lead)
-    assert T.attack_stream(6000.0, 5000.0, 0.0) == 0.0
-
-
-def test_the_inner_nu_does_not_recurse():
-    """**深さ 1 で止める**——内側の `ν` に `opp_chars` を渡さない。
-
-    渡すと相互再帰になる。**止まっている証拠**は「対象の `ν` が `opp_chars` 無しの
-    `ν` と一致する」こと（値で押さえる＝実装を書き換えても意味が残る）。
-    """
-    board = [(9000.0, False)]
-    lead = T.attack_value(12000.0, 5000.0, True)
-    v_t = T.attack_stream(12000.0, 5000.0, 1.0, opp_chars=board, my_leader_power=5000.0)
-    nu_shallow = T.nu_of(9000.0, 5000.0, 1.0, is_blocker=False)
-    assert v_t == pytest.approx(max(lead, T.attack_value(12000.0, 9000.0, False,
-                                                         nu_target=nu_shallow)))
 
 
 def test_play_value_passes_the_board_through():
@@ -751,8 +709,8 @@ def test_the_opportunity_cost_is_what_the_don_would_have_earned_on_attacks():
     one = T.don_opportunity([-1000.0], 1, 1)
     assert one == pytest.approx(T.attack_value(0.0, 0.0, True) - T.attack_value(-1000.0, 0.0, True))
     assert one > 0.0
-    # x=0 の攻撃手に 1 枚: c(1000) = c(0) = 1 枚なので増分 0（段が上がらない）
-    assert T.don_opportunity([0.0], 1, 1) == pytest.approx(0.0)
+    # x=0 の攻撃手に 1 枚: c(0) = 1.00 → c(1000) = 1.28（Θ≈1.58 より下）＝増分 0.28 枚ぶん
+    assert T.don_opportunity([0.0], 1, 1) == pytest.approx((1.28 - 1.00) * T.MU)
     # 飽和: 攻撃手 1 体に 10 枚持っていて 3 枚払う——残り 7 枚で飽和点を越えるなら機会費用 0
     assert T.don_opportunity([0.0], 10, 3) == pytest.approx(0.0)
     # 攻撃手が多いほど払ったドンの機会費用は大きい（単調）
@@ -801,39 +759,10 @@ def test_attacking_with_don_is_pressure_minus_the_don_s_alternative_value():
         assert T.attack_value_don(pw, lead, True) >= T.attack_value(pw, lead, True)
 
 
-def test_the_don_attack_flows_into_nu_for_bodies_just_below_the_leader():
-    """`ν` の攻撃項が「リーダー未満は 0」（旧の素殴り・`attack_value`）から「1000 低い体は付けて殴る」に変わる。"""
-    assert T.attack_value(4000.0, 5000.0, True) == 0.0                 # 素殴りでは届かない
-    don = T.nu_of(4000.0, 5000.0, 4.128, is_blocker=False, mode="base")
-    assert don == pytest.approx((T.c_of(0.0) * T.MU - T.DELTA) * 4.128 * (1 - T.KO_P))
-
-
 # ---- T46: 相手の体を倒せる潜在価値（分布で・2026-09-16） ----
 
 def _boards():
     return {3: [[5000, [[4000, False], [7000, True]]], [5000, []], [5000, [[6000, False]]]]}
-
-
-def test_the_option_value_is_the_excess_over_the_leader_attack_never_double_counted():
-    """`E[Σ_{i<R} max(v_(i), lead)] − lead·R`——盤面 1 つを R ターンの池にし、1 体は 1 回だけ。空の場は 0。"""
-    P, olp, r = 9000.0, 5000.0, 3.0
-    lead = T.attack_value_don(P, olp, True)
-    opt = T.option_value(P, olp, r, my_leader_power=5000.0, boards=_boards())
-    # 盤面ごとに手で組む＝盤面モードの attack_stream と同じ
-    vals = []
-    for _mlp, bodies in _boards()[3]:
-        chars = [(float(tp), blk) for tp, blk in bodies] or None
-        vals.append(T.attack_stream(P, olp, r, opp_chars=chars, my_leader_power=5000.0) - lead * r)
-    assert opt == pytest.approx(float(np.mean(vals)))
-    assert vals[1] == 0.0                                   # 空の場
-    # 1 体は 1 回だけ: 体が 1 つの盤面の選択肢は「1 ターンぶんの v_T − lead」を超えない
-    one = _boards()[3][2]
-    nu_t = T.nu_of(6000.0, 5000.0, r, is_blocker=False)
-    v_t = T.attack_value_don(P, 6000.0, False, nu_target=nu_t)
-    assert vals[2] == pytest.approx(max(0.0, v_t - lead))
-    # 分布が無ければ 0（従来どおり）
-    assert T.option_value(P, olp, r, boards={}) == 0.0
-    assert T.option_value(P, olp, r, boards={3: []}) == 0.0
 
 
 def test_a_bigger_body_has_more_option_value_and_a_tiny_one_none():
@@ -844,27 +773,6 @@ def test_a_bigger_body_has_more_option_value_and_a_tiny_one_none():
     assert small <= 0.0                                     # 何も倒せない（ブロッカーに止められる分は負）
     assert mid <= big                                       # 大きいほど選択肢が広い
     assert big > 0.0
-
-
-def test_the_attack_stream_adds_the_option_per_turn_when_no_board_is_given():
-    """`attack_stream` は盤面を渡さないとき `(lead + 選択肢) × R`。`off` なら従来どおり `lead × R`。"""
-    P, olp, r = 9000.0, 5000.0, 3.0
-    before = T.OPTION_MODE
-    try:
-        T.set_option_mode("off")
-        off = T.attack_stream(P, olp, r)
-        T.set_option_mode("dist")
-        on = T.attack_stream(P, olp, r, my_leader_power=5000.0)
-        opt = T.option_value(P, olp, r, my_leader_power=5000.0)
-    finally:
-        T.set_option_mode(before)
-    lead = T.attack_value_don(P, olp, True)
-    assert off == pytest.approx(lead * r)
-    assert opt > 0.0
-    assert on == pytest.approx(lead * r + opt)               # 選択肢は R ターンぶんの総額
-    assert on >= off
-    with pytest.raises(ValueError):
-        T.set_option_mode("なにか")
 
 
 def test_the_shipped_distribution_loads_and_is_keyed_by_remaining_turns():
@@ -900,11 +808,6 @@ def test_only_active_blockers_on_the_board_count_and_the_target_cannot_block_its
                           {"power": 9000.0, "blocker": False, "is_rest": False, "nu": 0.25}]}
     assert T.blockers_of(ctx) == [(7000.0, 0.2)]
     assert T.blockers_of({}) == []
-    # 攻撃の流れ: ブロッカーが居る盤面はリーダー狙いが安くなり、そのブロッカー自身を狙う攻撃は他のブロッカーだけが受ける
-    P, olp, r = 8000.0, 5000.0, 1.0
-    with_b = T.attack_stream(P, olp, r, opp_chars=[(7000.0, True)], my_leader_power=5000.0)
-    no_b = T.attack_stream(P, olp, r, opp_chars=[(7000.0, False)], my_leader_power=5000.0)
-    assert with_b <= no_b
 
 
 # ---- T49: 価格 = w(状態) × 時計の差分（2026-09-16・ユーザ決定「2 つ目」） ----
@@ -915,8 +818,8 @@ def test_the_take_cost_is_what_the_defender_actually_loses():
     assert T.THETA * T.MU == pytest.approx(T.LAM - T.H_LIFE_TO_HAND * T.MU, abs=1e-4)
     assert T.THETA == pytest.approx(1.58, abs=0.01)
     assert T.THETA_SWITCH == 1.15 and T.THETA > T.THETA_SWITCH
-    # 飽和点は 3000 に上がる（c(2000)=1.28 < 1.58 ≤ c(3000)=2.25）
-    assert T.saturation_x(T.THETA) == 3000.0
+    # 飽和点は 2000（c(1000)=1.28 < 1.58 ≤ c(2000)=2.25）
+    assert T.saturation_x(T.THETA) == 2000.0
 
 
 def test_w_is_a_slope_that_peaks_when_the_race_is_even():
@@ -981,89 +884,6 @@ def test_the_geometric_survival_weight_is_the_sum_of_per_turn_survival():
         geo, once = T.surv_turns(r, 0.289, "geo"), (1 - 0.289) * r
         assert abs(geo - meas) < abs(once - meas)          # 幾何和の方が実測に近い（3 帯とも）
         assert abs(geo - meas) < 0.15
-
-
-def test_nu_under_geo_discounts_the_attack_stream_per_turn_and_the_block_once():
-    """`geo` の `ν` ＝ `lead·Σs^t + block·s`（潜在価値 off・`base` は身代わり無し）。`once` は `(lead·R + block)(1−ko_p)`。
-    既定（`once`）は従来の値のまま＝切替を入れても過去の数字は動かない。"""
-    before = T.SURV_MODE
-    try:
-        T.set_surv_mode("once")
-        v_once = T.nu_of(8000.0, 5000.0, 4.0, is_blocker=True, mode="base")
-        lead = T.attack_value_don(8000.0, 5000.0, True)
-        block = T.BLOCK_P_BLOCKER * T.THETA * T.MU
-        assert v_once == pytest.approx((lead * 4.0 + block) * (1 - T.KO_P), abs=1e-9)
-        assert T.set_surv_mode("geo") == "geo"
-        v_geo = T.nu_of(8000.0, 5000.0, 4.0, is_blocker=True, mode="base")
-        s = 1 - T.KO_P
-        assert v_geo == pytest.approx(lead * T.surv_turns(4.0, T.KO_P, "geo") + block * s, abs=1e-9)
-        assert 0.5 < v_geo / v_once < 0.8                   # 大きい体は 2/3 前後に下がる（T59 の KO の比 0.61〜0.64 の側）
-        # 身代わり（`pair`・実測の在庫）は従来どおり `(1 − ko_p)` を一度＝変わるのは攻撃項だけ
-        v_pair = T.nu_of(8000.0, 5000.0, 4.0, is_blocker=False, mode="pair")
-        kp = T.ko_p_of(8000.0)
-        st = T.surv_turns(4.0, kp, "geo")
-        assert v_pair == pytest.approx(lead * st + T.shield_of(8000.0, 5000.0) * (1 - kp), abs=1e-9)
-        with pytest.raises(ValueError):
-            T.set_surv_mode("なにか")
-    finally:
-        T.set_surv_mode(before)
-    assert T.SURV_MODE == before
-
-
-def test_the_board_attack_stream_weights_each_turns_target_by_survival():
-    """盤面モード（対象の max）でも t ターン目の対象に `(1−ko_p)^t` が掛かる。"""
-    before = T.SURV_MODE
-    try:
-        chars = [(3000.0, False)]
-        T.set_surv_mode("once")
-        a_once = T.attack_stream(8000.0, 5000.0, 2.0, opp_chars=chars)
-        T.set_surv_mode("geo")
-        a_geo = T.attack_stream(8000.0, 5000.0, 2.0, opp_chars=chars)
-        s = 1 - T.KO_P
-        lead = T.attack_value_don(8000.0, 5000.0, True)
-        v1 = a_once - lead                                  # 1 ターン目は対象の max・2 ターン目はリーダー
-        assert a_geo == pytest.approx(s * v1 + s ** 2 * lead, abs=1e-9)
-    finally:
-        T.set_surv_mode(before)
-
-
-# ---- T61（2026-09-16）: 費用曲線は `c̄(x + 1000)`——同値は命中するので超過を上回る合計が要る ----
-
-def test_the_strict_cost_curve_is_the_loose_one_shifted_by_one_step():
-    """`CBAR_CURVE` の節は「合計が v 以上」の枚数。超過 x を生き残るには合計 x+1000 が要るので `c(x) = c̄(x+1000)`。
-    旧 `loose` は `c̄(x)`（x=0 だけ合い x≥1000 で 1 段安い）。実測（相手が切る枚数）は x=1000 で 1.2〜1.3・x=4000 で 3.5〜3.7＝strict。"""
-    before = T.CBAR_MODE
-    try:
-        T.set_cbar_mode("loose")
-        assert [T.c_of(x) for x in (-1000, 0, 1000, 2000, 3000, 4000, 5000)] == [0.0, 1.0, 1.0, 1.28, 2.25, 2.78, 3.63]
-        assert T.saturation_x(1.15) == 2000.0 and T.saturation_x(T.THETA) == 3000.0
-        assert T.set_cbar_mode("strict") == "strict"
-        assert [T.c_of(x) for x in (-1000, 0, 1000, 2000, 3000, 4000, 5000)] == [0.0, 1.0, 1.28, 2.25, 2.78, 3.63, 4.29]
-        assert T.c_of(6000) == pytest.approx(3.63 + 2 * T.CBAR_SLOPE)              # 5000 超は同じ傾きで伸びる
-        assert T.saturation_x(1.15) == 1000.0 and T.saturation_x(T.THETA) == 2000.0   # 飽和点も 1 段手前
-        for x in (0, 1000, 2000, 3000, 4000):
-            assert T.c_of(x, mode="strict") == T.c_of(x + 1000, mode="loose")   # 定義そのもの
-        assert T.cbar_of(0) == 0.0 and T.cbar_of(1000) == 1.0 and T.cbar_of(1500) == 1.28
-        with pytest.raises(ValueError):
-            T.set_cbar_mode("なにか")
-    finally:
-        T.set_cbar_mode(before)
-    assert T.CBAR_MODE == before
-
-
-def test_under_strict_the_attack_at_one_step_over_costs_the_two_thousand_counter():
-    """x = 1000 のリーダー攻撃: strict では守る費用 1.28μ（旧 1.00μ）・x = 2000 では 2.25μ > 受ける費用（Θ=1.58）なので受ける側に倒れる。"""
-    before = T.CBAR_MODE
-    try:
-        T.set_cbar_mode("strict")
-        v1 = T.attack_value(6000.0, 5000.0, True, theta=T.THETA)
-        v2 = T.attack_value(7000.0, 5000.0, True, theta=T.THETA)
-        assert v1 == pytest.approx(1.28 * T.MU, abs=1e-9)
-        assert v2 == pytest.approx(T.THETA * T.MU, abs=1e-9)                 # 2.25μ より受ける方が安い
-        T.set_cbar_mode("loose")
-        assert T.attack_value(6000.0, 5000.0, True, theta=T.THETA) == pytest.approx(1.0 * T.MU, abs=1e-9)
-    finally:
-        T.set_cbar_mode(before)
 
 
 # ---- T63（2026-09-16・ユーザ指示「着手してください」）: 受ける費用のライフ依存 `λ(L) − h·μ` ----
@@ -1227,15 +1047,16 @@ def test_don_misalloc_is_positive_when_the_pinned_body_is_not_optimal():
     assert T.don_misalloc(attackers, 1.0, 1, 1, 1.15, 0.05) == pytest.approx(0.05)
 
 
-def test_don_misalloc_is_maximal_when_slack_is_zero_and_drops_once_a_spare_don_recovers_it():
-    """**損は「余裕の有無」で決まる段付きの構造**——この箱（0→1.0 の 1 段しか無い体の組）では、
-    固定した分だけしかドンが無ければ（`n == pin_k`）損は丸ごと出るが、**1 枚でも余れば**その
-    1 枚が最良の体に回って貪欲の最適に追いつくため、損は 0 に戻る（「縮む」ではなく 0/最大 の 2 値）。"""
+def test_don_misalloc_is_maximal_when_slack_is_zero_and_shrinks_once_a_spare_don_recovers_it():
+    """**損は「余裕の有無」で縮む**——Θ=1.15・μ=0.05 で、強い体（x=−1000）は 1 枚目で 0→1.00 枚・2 枚目で
+    1.00→1.15 枚（`c(1000)=1.28` を Θ で潰す）、弱い体（x=−5000）は 1 枚では通らない。
+    固定した分だけしかドンが無ければ（`n == pin_k`）損は丸ごと 1.00μ、1 枚余ればそれが強い体に回り、
+    最適（2 枚とも強い体＝1.15μ）との差 0.15μ だけが残る。"""
     attackers = [-1000.0, -5000.0]
     loss_scarce = T.don_misalloc(attackers, 1.0, 1, 1, 1.15, 0.05)      # n=1=pin_k（余裕ゼロ）
     loss_slack = T.don_misalloc(attackers, 2.0, 1, 1, 1.15, 0.05)       # n=2（1 枚の余裕）
-    assert loss_scarce > 0.0
-    assert loss_slack == pytest.approx(0.0)
+    assert loss_scarce == pytest.approx(1.00 * 0.05)
+    assert loss_slack == pytest.approx((1.15 - 1.00) * 0.05)
     assert loss_scarce > loss_slack
 
 

@@ -393,7 +393,7 @@ def test_other_side_turns_off_both_the_price_hook_and_the_hand_term_context():
             assert CP.active() is not None and T.CUT_PRICER is not None
     finally:
         T.nu_of = orig
-    assert seen == [(None, None, None, None)]
+    assert seen and all(x == (None, None, None, None) for x in seen)     # 潜在価値（既定）の中の `nu_of` も全部
     # 攻撃の流れの中の相手の体の `ν`・`opp_bodies_of` も逆の席として旧の値段
     tok = np.zeros((24, 40), dtype=np.float32)
     tok[7, T.S_IS_CHAR] = 1.0; tok[7, T.S_POWER] = 0.6
