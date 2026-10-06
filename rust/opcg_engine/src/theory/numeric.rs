@@ -118,6 +118,7 @@ pub fn py_floordiv(a: i64, b: i64) -> i64 {
     }
 }
 
+#[allow(dead_code)]
 /// Python の整数の `%`（除数の符号・**E34**）。
 pub fn py_mod(a: i64, b: i64) -> i64 {
     let r = a % b;
@@ -164,12 +165,14 @@ pub fn exp(x: f64) -> f64 {
     unsafe { libm_ffi::exp(x) }
 }
 
+#[allow(dead_code)]
 /// `math.log`（1 引数）。
 #[inline(never)]
 pub fn log(x: f64) -> f64 {
     unsafe { libm_ffi::log(x) }
 }
 
+#[allow(dead_code)]
 /// `math.log1p`。
 #[inline(never)]
 pub fn log1p(x: f64) -> f64 {

@@ -226,9 +226,12 @@ impl CardTable {
 }
 
 /// 相手の場の分布（`theory_order.load_opp_boards`）＝`R` → `[(自リーダーのパワー, [(パワー, ブロッカーか), …]), …]`。
+/// 盤面 1 つ＝`(記録の自リーダーのパワー, [(パワー, ブロッカーか), …])`。
+pub type Board = (f64, Vec<(f64, bool)>);
+
 #[derive(Clone, Debug, Default)]
 pub struct OppBoards {
-    pub by_r: Vec<(i64, Vec<(f64, Vec<(f64, bool)>)>)>,
+    pub by_r: Vec<(i64, Vec<Board>)>,
 }
 
 impl OppBoards {
@@ -268,7 +271,7 @@ impl OppBoards {
     }
 
     /// `boards.get(rb) or []`
-    pub fn get(&self, r: i64) -> &[(f64, Vec<(f64, bool)>)] {
+    pub fn get(&self, r: i64) -> &[Board] {
         self.by_r.iter().find(|(k, _)| *k == r).map(|(_, v)| v.as_slice()).unwrap_or(&[])
     }
 
@@ -329,6 +332,7 @@ impl Frame {
         c.3.chunks_exact(4).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect()
     }
 
+    #[allow(dead_code)]
     pub fn ints(&self, name: &str) -> Vec<i64> {
         let c = self.col(name).unwrap_or_else(|| panic!("列 {name} が無い"));
         pyval::nd_ints(&c.1, &c.3)
@@ -365,6 +369,7 @@ pub fn set_opp_boards(b: OppBoards) {
     STORE.write().unwrap().opp_boards = Some(Arc::new(b));
 }
 
+#[allow(dead_code)]
 pub fn opp_boards() -> Arc<OppBoards> {
     STORE.read().unwrap().opp_boards.clone().expect("相手の場の分布が読まれていない（theory_load_opp_boards）")
 }

@@ -215,13 +215,13 @@ pub fn holds(cx: &CondCtx, cond: &PyVal, st: &PyVal) -> Option<bool> {
         let args = cond.getv("args");
         let subs: Vec<Option<bool>> = if args.truthy() { args.items().iter().map(|c| holds(cx, c, st)).collect() } else { vec![] };
         if kind == "AND" {
-            if subs.iter().any(|s| *s == Some(false)) {
+            if subs.contains(&Some(false)) {
                 return Some(false);
             }
             return if subs.iter().any(|s| s.is_none()) { None } else { Some(true) };
         }
         if kind == "OR" {
-            if subs.iter().any(|s| *s == Some(true)) {
+            if subs.contains(&Some(true)) {
                 return Some(true);
             }
             return if subs.iter().any(|s| s.is_none()) { None } else { Some(false) };
@@ -301,10 +301,9 @@ fn holds_board(cx: &CondCtx, kind: &str, cond: &PyVal, st: &PyVal) -> Option<boo
                 return n.map(|n| py_int(sda) >= n);
             }
             let a = st.getv(&format!("{p}don_active"));
-            if n.is_none() || a.is_none() {
-                None
-            } else {
-                Some(py_int(a) >= n.unwrap())
+            match n {
+                Some(n) if !a.is_none() => Some(py_int(a) >= n),
+                _ => None,
             }
         }
         "HAS_CHARACTER" => {

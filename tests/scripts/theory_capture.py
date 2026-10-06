@@ -538,6 +538,10 @@ def stats():
 
 
 def _finish():
+    sp = os.environ.get("OPCG_THEORY_STATS")
+    if sp:
+        with open(sp, "w", encoding="utf-8") as fh:
+            json.dump({"both": _CFG.get("both"), "stats": stats()}, fh, ensure_ascii=False, indent=1)
     for fh in _FH.values():
         fh.close()
     _FH.clear()

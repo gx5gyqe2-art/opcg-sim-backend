@@ -1,0 +1,69 @@
+"""**理論の Rust 全移植・段 1／2 の一致の番人**（2026-10-06・`docs/reports/2026-10-06_port_stage1_2.md`）。
+
+移植の間だけの番人（CLAUDE.md の「値を変えない移植の間の一致の見張り」）——**段 7 で Python の理論を消すときに一緒に消す**。
+古い wheel は skip ではなく fail（`make rust-develop`）。
+
+1. 受け渡し（段 1）: カード表（2803 枚・語彙）・効果の木・fixture 2 本が Rust の写しと**型・値（浮動小数はビット）ごとに**一致し、
+   `tests/fixtures/f_identity/rec` の 2 局の枠（`scalars`／`tokens` は float32）が往復で恒等。
+2. 両方で解いて比べる（段 2）: 本物の通し（交点の橋と較正〔`--pre-settle on`〕を `rec` で）の中で、移した葉の全部の呼び出しを
+   Python と Rust の両方で解き、1 つでも違えば落ちる（`OPCG_THEORY_BOTH=1`・`theory_capture.py`）。出力の JSON は普段の
+   起動と 1 バイト同じ。記録したビットの再生は `cargo test`（`theory::tests_leaves`）。
+"""
+import json
+import os
+import subprocess
+import sys
+
+import pytest
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(_HERE)
+_SCRIPTS = os.path.join(_HERE, "scripts")
+sys.path.insert(0, _SCRIPTS)
+
+import theory_rs as RS  # noqa: E402
+
+pytestmark = pytest.mark.cpu_infra
+
+REC = os.path.join(_HERE, "fixtures", "f_identity", "rec")
+
+
+def test_inputs_round_trip_bit_exactly():
+    assert RS.check_cards() > 2000
+    assert RS.check_effects() > 2000
+    assert RS.check_fixtures() > 0
+    games, rows = RS.check_dirs([REC])
+    assert games == 2 and rows > 100
+
+
+def _run(tool, extra, both, tmp_path):
+    out = os.path.join(str(tmp_path), "%s_%d.json" % (tool, both))
+    st = os.path.join(str(tmp_path), "%s_stats.json" % tool)
+    env = dict(os.environ, OPCG_LOG_SILENT="1", OPCG_THEORY_BOTH=str(both), OPCG_THEORY_CAPTURE="", OPCG_THEORY_STATS=st)
+    env.pop("OPCG_PLAN_STORE", None)
+    cmd = [sys.executable]
+    if both:
+        cmd.append(os.path.join(_SCRIPTS, "theory_capture_run.py"))
+    of = "--json" if tool == "win_calib" else "--out"
+    cmd += [os.path.join(_SCRIPTS, tool + ".py"), "--in", REC, of, out] + extra
+    p = subprocess.run(cmd, cwd=_ROOT, env=env, capture_output=True, text=True)
+    assert p.returncode == 0, p.stderr[-3000:]
+    with open(out, encoding="utf-8") as fh:
+        d = json.load(fh)
+    for k in ("seconds", "rule_stats"):
+        d.pop(k, None)
+    checked = 0
+    if both:
+        with open(st, encoding="utf-8") as fh:
+            stats = json.load(fh)["stats"]
+        assert not any(v.get("both_mismatch") for v in stats.values())
+        checked = sum(v.get("both_checked", 0) for v in stats.values())
+    return d, checked
+
+
+@pytest.mark.parametrize("tool,extra", [("crossing_bridge", []), ("win_calib", ["--pre-settle", "on"])])
+def test_both_mode_in_a_real_run_matches_and_keeps_the_output(tool, extra, tmp_path):
+    plain, _ = _run(tool, extra, 0, tmp_path)
+    both, checked = _run(tool, extra, 1, tmp_path)
+    assert checked > 500, checked
+    assert json.dumps(plain, sort_keys=True) == json.dumps(both, sort_keys=True)

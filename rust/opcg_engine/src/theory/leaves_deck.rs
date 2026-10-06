@@ -20,6 +20,7 @@ pub trait Oracle {
 }
 
 /// 核を引かない葉のための口（呼ばれたら誤り）。
+#[allow(dead_code)]
 pub struct NoOracle;
 
 impl Oracle for NoOracle {
@@ -92,7 +93,7 @@ pub fn removal_harm(m: &TCard, mlp: f64, boards: &Boards) -> f64 {
 
 /// `int(max(1, min(5, round(float(r_turns)))))`
 pub fn r_band(r_turns: f64) -> i64 {
-    py_round_int(r_turns).min(5).max(1)
+    py_round_int(r_turns).clamp(1, 5)
 }
 
 /// `card_effect_harm(cid, my_leader_power, r_turns, boards)`（`boards` は `R` で引いた後の並び）。

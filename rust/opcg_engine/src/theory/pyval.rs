@@ -167,6 +167,7 @@ impl PyVal {
         }
     }
 
+    #[allow(dead_code)]
     pub fn nd_dtype(&self) -> &str {
         match self {
             PyVal::Nd { dtype, .. } => dtype,
@@ -594,6 +595,7 @@ pub fn capture_string(v: &PyVal) -> String {
 }
 
 /// gzip（Python の `gzip.open` が書く形）をほどく。
+#[allow(dead_code)]
 pub fn gunzip(raw: &[u8]) -> Vec<u8> {
     assert!(raw.len() > 18 && raw[0] == 0x1f && raw[1] == 0x8b && raw[2] == 8, "gzip でない");
     let flg = raw[3];

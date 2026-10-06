@@ -108,7 +108,7 @@ fn tuple_idx(v: &[usize]) -> PyVal {
 }
 
 /// 盤面の分布（`{"obj": "opp_boards:R"}`＝大域の表の `R` の並び・`None`＝大域の表を使う）。
-fn boards_r<'a>(bd: &'a OppBoards, v: &PyVal) -> Result<&'a [(f64, Vec<(f64, bool)>)], String> {
+fn boards_r<'a>(bd: &'a OppBoards, v: &PyVal) -> Result<&'a [super::input::Board], String> {
     match v {
         PyVal::Obj(n) if n.starts_with("opp_boards:") => Ok(bd.get(n[11..].parse::<i64>().map_err(|e| e.to_string())?)),
         _ => Err(format!("盤面の分布は大域の表だけを受ける: {v:?}")),

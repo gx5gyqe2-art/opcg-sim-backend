@@ -2,7 +2,10 @@
 //!
 //! **値付けの核（`nu_of`・`attack_value(_don)`・`attack_stream`・`option_value`・`block_cost`）は段 3**（33 関数の輪）。
 //! ここは輪に入らない関数だけ。各関数の注に元の名前を書く。大域の切替（`SURV_MODE` など）は**明示の引数**（E37）。
+//! 段 3 以降が使う定数（`KO_P`・`DELTA`・`SC_*` ほか）も置く（`dead_code` を許す）。
 //! 浮動小数の演算の順は Python と同じ（`a*b+c` を融合しない・`**` は libm の `pow`・`math.erf`/`erfc`/`exp` は libm）。
+
+#![allow(dead_code)]
 
 use super::numeric::{erf, erfc, exp, np_rint, pow, py_max, py_min, py_round, py_round_int, sqrt};
 
@@ -380,15 +383,15 @@ pub struct ClockCfg {
 
 /// `prob_of_d(d, sigma_d, t_me, t_opp, scale_mode, mover)`
 pub fn prob_of_d(cfg: &ClockCfg, d: f64, sigma_d: Option<f64>, t_me: Option<f64>, t_opp: Option<f64>, scale_mode: &str, mover: bool) -> f64 {
-    if mover && cfg.w_err_rel && sigma_d.is_none() && cfg.sigma_rel.is_some() && t_me.is_some() && t_opp.is_some() && scale_mode == "hyp" {
-        let sr = cfg.sigma_rel.unwrap();
-        let (a, b) = (t_me.unwrap(), t_opp.unwrap());
-        return whole_turn_race_prob(a, b, sr * whole_clock_scale(a), sr * whole_clock_scale(b), 1);
+    let rel = if cfg.w_err_rel && sigma_d.is_none() { cfg.sigma_rel.zip(t_me).zip(t_opp) } else { None };
+    if let Some(((sr, a), b)) = rel {
+        if mover && scale_mode == "hyp" {
+            return whole_turn_race_prob(a, b, sr * whole_clock_scale(a), sr * whole_clock_scale(b), 1);
+        }
     }
     let d = d + mover_shift(mover);
-    if cfg.w_err_rel && sigma_d.is_none() && cfg.sigma_rel.is_some() && t_me.is_some() && t_opp.is_some() {
-        let s = clock_scale(t_me.unwrap(), t_opp.unwrap(), scale_mode);
-        let sd = cfg.sigma_rel.unwrap() * s;
+    if let Some(((sr, a), b)) = rel {
+        let sd = sr * clock_scale(a, b, scale_mode);
         if sd <= 0.0 {
             return 0.5;
         }
