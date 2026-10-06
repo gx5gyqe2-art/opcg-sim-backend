@@ -42,9 +42,180 @@ pub fn naive_sum<I: IntoIterator<Item = f64>>(it: I) -> f64 {
     s
 }
 
+// ---------------------------------------------------------------------------------------------
+// 移植の段 1（2026-10-06）: numpy と libm の数の癖（計画 §5.1 の E25・E27・E34・E35）
+
+/// numpy の対ごとの足し算（`np.add.reduce` の浮動小数・numpy 2.x の `pairwise_sum`）。
+/// 8 本未満は 0 から左へ・128 本以下は 8 本の部分和を展開して `((r0+r1)+(r2+r3))+((r4+r5)+(r6+r7))` の後に端を左から・
+/// それより長いと 8 の倍数で 2 つに割る（**E25**・Python の `sum` とも左からの足し算とも違う）。
+pub fn np_pairwise_sum(a: &[f64]) -> f64 {
+    let n = a.len();
+    if n < 8 {
+        let mut r = 0.0;
+        for &x in a {
+            r += x;
+        }
+        r
+    } else if n <= 128 {
+        let mut r = [a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]];
+        let mut i = 8;
+        while i < n - (n % 8) {
+            for j in 0..8 {
+                r[j] += a[i + j];
+            }
+            i += 8;
+        }
+        let mut res = ((r[0] + r[1]) + (r[2] + r[3])) + ((r[4] + r[5]) + (r[6] + r[7]));
+        while i < n {
+            res += a[i];
+            i += 1;
+        }
+        res
+    } else {
+        let mut n2 = n / 2;
+        n2 -= n2 % 8;
+        np_pairwise_sum(&a[..n2]) + np_pairwise_sum(&a[n2..])
+    }
+}
+
+/// `np.mean(list_of_floats)`（空なら呼ばない＝Python 側は空で別の値を返す）。
+pub fn np_mean(a: &[f64]) -> f64 {
+    np_pairwise_sum(a) / a.len() as f64
+}
+
+/// `np.round(x)`（桁なし＝`rint`・偶数への丸め）。
+pub fn np_rint(x: f64) -> f64 {
+    bankers_round(x)
+}
+
+/// Python の `max(a, b)`（`b > a` のときだけ `b`・同点と NaN は左＝**E35**）。
+#[inline]
+pub fn py_max(a: f64, b: f64) -> f64 {
+    if b > a {
+        b
+    } else {
+        a
+    }
+}
+
+/// Python の `min(a, b)`（`b < a` のときだけ `b`）。
+#[inline]
+pub fn py_min(a: f64, b: f64) -> f64 {
+    if b < a {
+        b
+    } else {
+        a
+    }
+}
+
+/// Python の整数の `//`（床・**E34**）。
+pub fn py_floordiv(a: i64, b: i64) -> i64 {
+    let q = a / b;
+    if (a % b != 0) && ((a < 0) != (b < 0)) {
+        q - 1
+    } else {
+        q
+    }
+}
+
+/// Python の整数の `%`（除数の符号・**E34**）。
+pub fn py_mod(a: i64, b: i64) -> i64 {
+    let r = a % b;
+    if r != 0 && ((r < 0) != (b < 0)) {
+        r + b
+    } else {
+        r
+    }
+}
+
+/// `int(round(x))`（Python・偶数への丸め）。
+#[inline]
+pub fn py_round_int(x: f64) -> i64 {
+    bankers_round(x) as i64
+}
+
+mod libm_ffi {
+    extern "C" {
+        pub fn erf(x: f64) -> f64;
+        pub fn erfc(x: f64) -> f64;
+        pub fn exp(x: f64) -> f64;
+        pub fn log(x: f64) -> f64;
+        pub fn log1p(x: f64) -> f64;
+        pub fn sqrt(x: f64) -> f64;
+        pub fn pow(x: f64, y: f64) -> f64;
+    }
+}
+
+/// `math.erf`（CPython 3.11 は libm の `erf`＝同じ関数を呼ぶ・**E27**・定数畳み込みを避けるため外部関数で）。
+#[inline(never)]
+pub fn erf(x: f64) -> f64 {
+    unsafe { libm_ffi::erf(x) }
+}
+
+/// `math.erfc`。
+#[inline(never)]
+pub fn erfc(x: f64) -> f64 {
+    unsafe { libm_ffi::erfc(x) }
+}
+
+/// `math.exp`。
+#[inline(never)]
+pub fn exp(x: f64) -> f64 {
+    unsafe { libm_ffi::exp(x) }
+}
+
+/// `math.log`（1 引数）。
+#[inline(never)]
+pub fn log(x: f64) -> f64 {
+    unsafe { libm_ffi::log(x) }
+}
+
+/// `math.log1p`。
+#[inline(never)]
+pub fn log1p(x: f64) -> f64 {
+    unsafe { libm_ffi::log1p(x) }
+}
+
+/// `math.sqrt`（IEEE の正しい丸め＝`f64::sqrt` と同じだが、出所を 1 つにする）。
+#[inline(never)]
+pub fn sqrt(x: f64) -> f64 {
+    unsafe { libm_ffi::sqrt(x) }
+}
+
+/// `x ** y`（Python の浮動小数の冪＝libm の `pow`・`f64::powi` は値が違いうる）。特別な値（0 乗・1 の冪）は
+/// CPython の `float_pow` と同じ先の分岐で返す。
+#[inline(never)]
+pub fn pow(x: f64, y: f64) -> f64 {
+    if y == 0.0 {
+        return 1.0;
+    }
+    if x == 1.0 {
+        return 1.0;
+    }
+    unsafe { libm_ffi::pow(x, y) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn floordiv_and_mod_follow_python() {
+        for (a, b, q, r) in [(7, 2, 3, 1), (-7, 2, -4, 1), (7, -2, -4, -1), (-7, -2, 3, -1), (6, 3, 2, 0), (-6, 3, -2, 0)] {
+            assert_eq!(py_floordiv(a, b), q, "{a}//{b}");
+            assert_eq!(py_mod(a, b), r, "{a}%{b}");
+        }
+    }
+
+    #[test]
+    fn pairwise_sum_differs_from_left_fold_and_matches_numpy_vectors() {
+        // numpy 2.4.6 の `np.sum` の値（ビット）: 0.1 を n 個（n = 7, 9, 130, 300）。
+        let cases: &[(usize, u64)] = &[(7, 0x3fe6666666666666), (9, 0x3feccccccccccccd), (130, 0x4029ffffffffffff), (300, 0x403dffffffffffff)];
+        for &(n, bits) in cases {
+            let v = vec![0.1f64; n];
+            assert_eq!(np_pairwise_sum(&v).to_bits(), bits, "n={n}");
+        }
+    }
 
     #[test]
     fn round_matches_python_vectors() {

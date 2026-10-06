@@ -10,11 +10,17 @@
 //! `defender`＝守る側の動的計画（状態の覚え書き・予算・過不足の無い札の組）／`layers`＝段ごとの状態の数え方と
 //! 地平の選び方／`pyapi`＝PyO3 の入口（核は PyO3 の型を名指さない＝`cargo test --no-default-features` で回る）。
 
+pub mod cond;
 pub mod defender;
+pub mod dispatch;
+pub mod input;
+pub mod leaves_deck;
+pub mod leaves_to;
 pub mod layers;
 pub mod numeric;
 pub mod plans;
 pub mod pyapi;
+pub mod pyval;
 pub mod sched;
 pub mod succ;
 pub mod table;
