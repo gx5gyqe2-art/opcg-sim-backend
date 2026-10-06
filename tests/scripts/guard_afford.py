@@ -57,9 +57,8 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from plan_value_map import _pad  # noqa: E402
-from race_state import _extra as _race_extra, _incoming  # noqa: E402
 from opcg_sim.learned import n_rel as NL  # noqa: E402
+from opcg_sim.learned import n_rel_feat as NR  # noqa: E402
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from opcg_sim.learned.train import time_labels as TL  # noqa: E402
 
@@ -71,6 +70,47 @@ SLOT_OWN_FIELD, SLOT_HAND = slice(2, 7), slice(12, 22)
 COUNTER_SCALE = 2000.0          # `counter_value` は `min(counter/2000, 2.5)`
 CLOCK_BANDS = ("t<=2", "t3-4", "t5+")
 C_TLEFT = 0                     # `time_labels.TIME_COLS` の先頭
+
+
+# ---- 下の 3 つ（`_pad`・`_race_extra`・`_incoming`）と列の定数は、CPU の診断の計器 `plan_value_map.py`（`_pad`）と
+# `race_state.py`（`_extra`・`_incoming`）から写した。その 2 本は移植の段 0（2026-10-06）で退役した。
+# tokens の列（n_rel_feat.S_COLS）・枠（0 自L・1 相L・2〜6 自場・7〜11 相場）
+_C_PWR, _C_REST, _C_CAN, _C_BLK, _C_CHAR = 0, 3, 5, 6, 18
+_TOK_COLS = (_C_PWR, _C_REST, _C_CAN, _C_BLK, _C_CHAR)
+_T_PWR, _T_REST, _T_CAN, _T_BLK, _T_CHAR = range(len(_TOK_COLS))
+_SLOT_OPP = slice(7, 12)
+#: `power_now` の目盛り（`n_rel_feat` は 10000 で割って入れる）
+_PWR_SCALE = 10000.0
+
+
+def _pad(sc, tok):
+    """v13 の行（scalars 123・tokens 22×20）を現行の形へ 0 埋め（`dump_io.target_form` と同じ）。"""
+    if sc.shape[1] < NL.D_SC:
+        sc = np.concatenate([sc, np.zeros((sc.shape[0], NL.D_SC - sc.shape[1]), np.float32)], 1)
+    if tok.shape[2] < NR.S_DIM:
+        tok = np.concatenate([tok, np.zeros(tok.shape[:2] + (NR.S_DIM - tok.shape[2],), np.float32)], 2)
+    return sc, tok
+
+
+def _race_extra(dd, n):
+    """scalars の先頭 14（ライフ・ドン・手札・場・ターン・リーダーパワー）と tokens の 12 枠 × 5 列。"""
+    sc = np.asarray(dd["scalars"])[:n, :14].astype(np.float32)
+    tk = np.asarray(dd["tokens"])[:n, :12][:, :, list(_TOK_COLS)].astype(np.float32)
+    return sc, tk
+
+
+def _incoming(tk):
+    """相手ターン中の自分の行 → 飛んでくる攻撃の超過パワー（最大の攻撃側 − 自リーダー）。攻撃側が居なければ None。"""
+    opp = tk[_SLOT_OPP]
+    cand = [float(tk[1, _T_PWR])]                      # 相手リーダー
+    ch = opp[:, _T_CHAR] > 0.5
+    if ch.any():
+        cand.append(float(opp[ch, _T_PWR].max()))
+    top = max(cand) * _PWR_SCALE
+    mine = float(tk[0, _T_PWR]) * _PWR_SCALE
+    if top <= 0.0:
+        return None
+    return top - mine
 
 
 def clock_band(t):
