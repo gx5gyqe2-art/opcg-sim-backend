@@ -27,6 +27,8 @@ pub mod succ;
 pub mod table;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_leaves;
 
 /// 入口の版（Python 側 `rd_kernel.RD_KERNEL_API` と一致させる。入口の形を変えたら上げる）。
 pub const API: u32 = 2;

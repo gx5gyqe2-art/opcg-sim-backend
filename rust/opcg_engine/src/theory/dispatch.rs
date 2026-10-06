@@ -9,7 +9,7 @@ use super::cond::{self, CondCtx};
 use super::input::{CardTable, OppBoards};
 use super::leaves_deck::{self as ld, CutItem, Oracle};
 use super::leaves_to::{self as lt, ClockCfg, Tok};
-use super::pyval::{py_str, PyVal};
+use super::pyval::{from_capture, py_str, Json, PyVal};
 
 type R = Result<PyVal, String>;
 
@@ -599,4 +599,14 @@ pub fn call_payload(name: &str, payload: &PyVal, t: &CardTable, bd: &OppBoards) 
         return Err(format!("核の記録を使い残した（{}/{}）", o.pos, o.subs.len()));
     }
     Ok(r)
+}
+
+/// 記録の 1 行（素の JSON の object・各欄は記録の形）→ `{"a", "g", "s"}` の dict。
+pub fn payload_of(j: &Json) -> PyVal {
+    let field = |k: &str| j.get(k).map(from_capture).unwrap_or(PyVal::None);
+    PyVal::Dict(vec![
+        (PyVal::Str("a".into()), field("a")),
+        (PyVal::Str("g".into()), field("g")),
+        (PyVal::Str("s".into()), field("s")),
+    ])
 }
