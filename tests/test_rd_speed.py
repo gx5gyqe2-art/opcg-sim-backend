@@ -248,6 +248,7 @@ SOLVER_FINGERPRINTS = {
     "rd-speed-1": "84e3b483d52b4b2c",
     "rd-speed-2": "45dc6aba0ff5c6b2",     # switch cleanup A（2026-10-05）: 死んだ切替の枝を削除（値は不変）
     "rd-speed-3": "9e21fec15160dcda",     # Rust 化・第 3 段（2026-10-05）: 速くした Python の解き方を消した（値は不変）
+    "rd-speed-4": "1b96139ac93cffad",     # 全移植・段 1／2（2026-10-06）: `src/theory` に葉を足した（解き方の値は不変）
 }
 _SOLVER_FUNCS = ("rule_guard_plan_ex", "_prices_of", "_attach_gain", "rules_steps", "walk_crossing", "model_horizon",
                  "tau_grow", "rule_don_solve", "_rd_solve_args", "_rd_run", "_rule_don_masks")

@@ -1254,7 +1254,8 @@ PLAN_STORE = None
 #: 覚え書きの鍵に入る（`tests/scripts` の原文のハッシュと Rust の核の原文のハッシュも入るので、上げ忘れても古い値は
 #: 返らない＝二重の守り）。`test_rd_speed.py` が解き方の関数の原文と Rust の核の原文の指紋を見張り、変わったのに
 #: 上げていなければ落ちる。**rd-speed-3**（Rust 化・第 3 段）: 速くした Python の解き方を消して Rust の核だけにした（値は不変）。
-SOLVER_VERSION = "rd-speed-3"
+#: **rd-speed-4**（全移植・段 1／2・2026-10-06）: `src/theory` に葉と受け渡しを足した＝原文のハッシュが変わった（解き方の値は不変）。
+SOLVER_VERSION = "rd-speed-4"
 _RULE_DON_CACHE = {}
 
 #: 開示: 予算を超えた試行の数・数え方で飛ばした試行の数（`rule_don_solve` の呼び出しごと・値には入らない）
