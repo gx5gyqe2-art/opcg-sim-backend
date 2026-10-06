@@ -301,6 +301,7 @@ def _boards_xform(a):
     return a
 
 
+_A_OF_ORIG = [None]  # 差し替える前の `a_of`（覚え書きの検算の解き直し用）
 _A_OF_FIRST = {}     # 覚え書きの鍵 → 値を決める正確な入力（最初に本体が走った呼び出しの）
 
 
@@ -329,6 +330,18 @@ def _a_of_hit(a):
             for i, nm in enumerate(parts):
                 if first is None or first[i] != exact[i]:
                     _stat("dr.a_of", "memo_hit_RISKY_" + nm)
+            # 覚え書きを外して正確な入力で解き直し、覚え書きの値と比べる（覚え書きは元へ戻す＝器の出力は変わらない）
+            held = DR._FLOW.pop(key)
+            try:
+                fresh = _A_OF_ORIG[0](a["deck_ids"], a["opp_leader_power"], a["don"], a["theta"], a["mu"],
+                                      a["rush_only"], a["with_don"])
+            finally:
+                DR._FLOW[key] = held
+            if fresh != held or (fresh == 0.0 and str(fresh) != str(held)):
+                _stat("dr.a_of", "memo_hit_RISKY_value_differs")
+                d = abs(float(fresh) - float(held))
+                s_ = _STATS["dr.a_of"]
+                s_["memo_hit_RISKY_max_abs_diff"] = max(s_.get("memo_hit_RISKY_max_abs_diff", 0.0), d)
         return True
     _A_OF_FIRST[key] = exact
     return False
@@ -534,6 +547,8 @@ def install(capture_dir=None, both=None):
         if spec.kind == "func":
             orig = getattr(m, spec.attr)
             orig = getattr(orig, "__theory_capture_orig__", orig)
+            if spec.name == "dr.a_of":
+                _A_OF_ORIG[0] = orig
             _patch_everywhere(orig, _func_wrapper(spec, orig))
         else:
             cls_name, attr = spec.attr.split(".")

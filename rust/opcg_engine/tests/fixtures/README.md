@@ -42,3 +42,14 @@ OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_audit_replay.py \
 （`counts` も数え直す）を `audit_masters_v4.json` へ書く（どちらも
 `json.dump(..., ensure_ascii=False, sort_keys=True, separators=(",",":"))`）。
 **期待値は Python の出力**で、Rust の出力から作り直してはいけない。
+
+## 理論の全移植・段 1／2（2026-10-06）
+
+| ファイル | 中身 |
+|---|---|
+| `theory_leaves_golden.jsonl.gz` | 移した葉（`src/theory/leaves_*.rs`・`cond.rs`）の**記録した呼び出し** 20,859 行（Python が本物の通し〔8 器 × `f_identity/rec`・実 w41・合成 w39 の各 5 局〕の中で実際に解いた入力・大域・核の答え・出力・浮動小数は 16 進のビット）。`theory::tests_leaves` が Python 無しで解き直してビットで比べる。間引きの規則と作り直し方は `tests/scripts/theory_leaves_golden.py`（記録は `tests/scripts/theory_capture.py`）。約 1 MB |
+| `theory_cards.json.gz` | 葉が引くカード表と語彙（`tests/scripts/theory_rs.py::card_table_json`・2803 枚）。約 80 KB |
+
+作り直し（挙動を意図して変えたときだけ・差分は必ずレビューする・期待値は Python の出力）: `make rust-develop` の後、
+8 器を `tests/scripts/theory_capture_run.py <器>.py …`（`OPCG_THEORY_CAPTURE=<dir>`・`OPCG_THEORY_CAPTURE_SRC`・`OPCG_THEORY_CAPTURE_TOOL`）で回し、
+`python tests/scripts/theory_leaves_golden.py <dir>`。
