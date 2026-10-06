@@ -35,6 +35,7 @@ r = μ × （そのデッキの切れる札の割合）            # 新定数�
   OPCG_LOG_SILENT=1 python tests/scripts/deck_refill.py --in ~/w41 --out ~/deck_refill.json
 """
 import argparse
+import collections.abc
 import json
 import os
 import sys
@@ -299,27 +300,81 @@ def hand_effect_harm(cids, my_leader_power=5000.0, r_turns=3, don=None, boards=N
     return float(best)
 
 
+class _SeedMap(collections.abc.Mapping):
+    """`{seed: fn(seed, mode, leaders)}` を**引かれた seed の分だけ**作る読み取り専用の対応表（2026-10-06・移植の段 0）。
+
+    以前は `meta_games.json` の全局（合成の記録では 300 組）のデッキを先に作り直していた——`--limit-games 5` でも
+    数秒かかる固定費。値は前と 1 ビットも変わらない: ある seed の値は「その seed が現れるディレクトリを順に見て
+    `fn` が最初に成功したもの」（前の dict の作り方と同じ）、真偽は「どれか 1 局でも成功したか」、反復・`len` は
+    前と同じ挿入順の dict を丸ごと作ってから返す。"""
+
+    def __init__(self, dirs, fn):
+        self._fn = fn
+        self._occ = []                      # (seed, mode, leaders)・ディレクトリ順・局順
+        self._by = {}                       # seed -> [(mode, leaders), ...]
+        for d in dirs:
+            p = os.path.join(d, "meta_games.json")
+            if not os.path.exists(p):
+                continue
+            with open(p, encoding="utf-8") as fh:
+                meta = json.load(fh)
+            mode = str(meta.get("decks") or "singleton")
+            for g in meta.get("games", ()):
+                s = int(g.get("seed"))
+                lead = tuple(g.get("leaders") or (None, None))
+                self._occ.append((s, mode, lead))
+                self._by.setdefault(s, []).append((mode, lead))
+        self._got = {}
+        self._full = None
+
+    def _value(self, s):
+        if s not in self._got:
+            res = (False, None, -1)
+            for k, (mode, lead) in enumerate(self._by.get(s, ())):
+                try:
+                    res = (True, self._fn(s, mode, lead), k)
+                    break
+                except Exception:                            # noqa: BLE001
+                    continue
+            self._got[s] = res
+        return self._got[s]
+
+    def __getitem__(self, s):
+        ok, v, _k = self._value(s)
+        if not ok:
+            raise KeyError(s)
+        return v
+
+    def _all(self):
+        if self._full is None:
+            out, seen = {}, {}
+            for s, _mode, _lead in self._occ:        # 前の dict と同じ挿入順＝その seed が最初に成功した出現の位置
+                k = seen.get(s, 0)
+                seen[s] = k + 1
+                if s in out:
+                    continue
+                ok, v, k_ok = self._value(s)
+                if ok and k == k_ok:
+                    out[s] = v
+            self._full = out
+        return self._full
+
+    def __iter__(self):
+        return iter(self._all())
+
+    def __len__(self):
+        return len(self._all())
+
+    def __bool__(self):
+        return any(self._value(s)[0] for s in self._by)
+
+
 def _by_seed(dirs, fn):
     """記録のディレクトリ群 → `{seed: fn(seed, mode, leaders)}`（`meta_games.json` を読んで作り直す）。
 
-    `who=0`＝p1・`who=1`＝p2（記録の規約）。同じ seed が複数のディレクトリに在れば先勝ち。"""
-    out = {}
-    for d in dirs:
-        p = os.path.join(d, "meta_games.json")
-        if not os.path.exists(p):
-            continue
-        with open(p, encoding="utf-8") as fh:
-            meta = json.load(fh)
-        mode = str(meta.get("decks") or "singleton")
-        for g in meta.get("games", ()):
-            s = int(g.get("seed"))
-            if s in out:
-                continue
-            try:
-                out[s] = fn(s, mode, tuple(g.get("leaders") or (None, None)))
-            except Exception:                                # noqa: BLE001
-                continue
-    return out
+    `who=0`＝p1・`who=1`＝p2（記録の規約）。同じ seed が複数のディレクトリに在れば先勝ち。
+    **引かれた seed の分だけ作る**（`_SeedMap`）——値は全部を先に作っていたときと同じ。"""
+    return _SeedMap(dirs, fn)
 
 
 def shares_by_seed(dirs):
