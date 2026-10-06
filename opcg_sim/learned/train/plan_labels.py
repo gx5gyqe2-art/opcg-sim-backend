@@ -19,7 +19,7 @@
                ターン 0（マリガン）・次の自席ターンが無くライフの増減が測れない相手ターン
 攻撃の対象（リーダー／キャラ）は候補列（`pol_sig`×`pol_cid`/`pol_tcid`）から uuid→カード ID を
 引いて判別する。ライフは `scalars[0]`（自席ターンの最初の main 行＝そのターン開始時の値）。
-分類の正本はここ（`tests/scripts/plan_drift.py`／`race_state.py` の計器も同じ関数を使う）。
+分類の正本はここ（同じ関数を使っていた計器 `plan_drift.py`／`race_state.py` は 2026-10-06 に退役）。
 
 CLI（sidecar を書く・冪等・既にあれば飛ばす）:
   OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.plan_labels --in ~/n32_wave/w*/n_records [--force]
