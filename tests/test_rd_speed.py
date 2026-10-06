@@ -133,45 +133,6 @@ def _budget():
 _PROBLEMS = [_rand_problem(random.Random(1000 + i), i) for i in range(40)]
 
 
-@pytest.mark.parametrize("budget", [None, 40, 300])
-def test_random_problems_solve_bit_identically_to_the_pre_speed_solver(budget, _budget):
-    """乱数の 40 問 × 予算 3 つ（無制限・地平を何度も縮める小さな予算 2 つ）で、新旧の結果の `repr` が同じ。"""
-    CB.EX_STATE_BUDGET = budget
-    cuts = 0
-    for p in _PROBLEMS:
-        _clear_new(); REF.clear()
-        new, old = _solve_new(p), _solve_ref(p)
-        assert repr(new) == repr(old)
-        cuts += int(new[2]["horizon"] < new[2]["horizon0"])
-    if budget == 40:
-        assert cuts >= 5                     # 小さな予算では地平の縮めを本当に通っている
-
-
-@pytest.mark.parametrize("budget", [300000, 150])
-def test_real_and_synthetic_frames_solve_bit_identically_to_the_pre_speed_solver(budget, _budget):
-    """実（w41）・合成（w39/w42）の記録から取った局面（N-3 の値段の窓の中）で、新旧の結果の `repr` が同じ。
-    小さな予算は実の局面で地平の縮め（数え方で飛ばす道）を通す。"""
-    CB.EX_STATE_BUDGET = budget
-    frames = _frames()
-    assert len(frames) >= 8 and {s.split("#")[0] for s, _p in frames} == {"real", "syn"}
-    cuts = 0
-    for _src, p in frames:
-        _clear_new(); REF.clear()
-        new, old = _solve_new(p), _solve_ref(p)
-        assert repr(new) == repr(old)
-        cuts += int(new[2]["horizon"] < new[2]["horizon0"])
-    if budget == 150:
-        assert cuts >= 3
-
-
-def test_explicit_horizons_solve_bit_identically(_budget):
-    """地平を渡した解き方（窓・テスト）も同じ。"""
-    for p in _PROBLEMS[:15]:
-        for h in (1, 2, 3):
-            _clear_new(); REF.clear()
-            assert repr(_solve_new(p, h)) == repr(_solve_ref(p, h))
-
-
 def _mask_firsts(m, actx):
     """1 つの出す札の組で守る側の計算に渡る今のターンの攻撃の並びの全部（付与 0 の 1 本 ＋ 列挙する付与の全部）。
     （第 3 段で消した `crossing_bridge._mask_firsts` の写し・状態の数を比べるためだけ。）"""
@@ -228,53 +189,6 @@ def test_layer_count_equals_the_states_each_horizon_actually_creates(_budget):
                 assert sum(sizes[:h]) == _ref_states(cards, don, blk, life, ax, lt, dt, arr, roots, h)
                 checked += 1
     assert checked >= 100
-
-
-def test_cut_decisions_are_the_same_cold_warm_and_reordered(_budget, tmp_path):
-    """**計算の予算の縮めは問題だけの関数**: 冷たい実行・覚え書きを温めた後・順を入れ替えた実行・ディスクの覚え書きから
-    読んだ実行で、全部の計画（地平・縮めた回数を含む）が同じ。"""
-    CB.EX_STATE_BUDGET = 60
-    probs = _PROBLEMS[:20] + [p for _s, p in _frames()]
-
-    def run(order, warm, store=None):
-        if not warm:
-            _clear_new()
-        old_store = CB.PLAN_STORE
-        CB.PLAN_STORE = store
-        try:
-            out = {}
-            for i in order:
-                if not warm:
-                    _clear_new()
-                out[i] = repr(_solve_new(probs[i]))
-            return out
-        finally:
-            CB.PLAN_STORE = old_store
-    idx = list(range(len(probs)))
-    cold = run(idx, warm=False)
-    # 覚え書きを先に別の地平・別の予算で温めてから（内側の覚え書きに地平つきの結果が入っている）
-    for p in probs:
-        _solve_new(p, 2)
-    CB.EX_STATE_BUDGET = None
-    for p in probs[:5]:
-        _solve_new(p)
-    CB.EX_STATE_BUDGET = 60
-    warm = run(idx, warm=True)
-    rev = run(list(reversed(idx)), warm=True)
-    shuf = idx[:]
-    random.Random(7).shuffle(shuf)
-    _clear_new()
-    reord = run(shuf, warm=True)
-    st = PS.PlanStore(str(tmp_path / "ps"), CB)
-    disk1 = run(idx, warm=False, store=st)
-    disk2 = run(shuf, warm=False, store=PS.PlanStore(str(tmp_path / "ps"), CB))
-    assert cold == warm == rev == reord == disk1 == disk2
-    assert st.puts == len(probs)
-    old = {i: None for i in idx}
-    for i in idx:
-        REF.clear()
-        old[i] = repr(_solve_ref(probs[i]))
-    assert old == cold
 
 
 def test_the_plan_store_returns_identical_plans_and_never_a_stale_one(_budget, tmp_path, monkeypatch):

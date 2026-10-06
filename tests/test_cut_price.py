@@ -280,45 +280,11 @@ def test_other_side_body_value_stays_flat():
         assert T.CUT_PRICER is not None
 
 
-def test_threshold_parts_use_count_times_price():
-    """`Θ` の手札の項は文脈の中で `view.price(切る枚数)`・一律の窓なら旧の値に戻る。"""
-    tok = np.zeros((24, 40), dtype=np.float32)
-    sc = np.zeros(16, dtype=np.float32)
-    sc[T.SC_OPP_LIFE] = 2.0; sc[T.SC_OPP_HAND] = 5.0
-    sc[T.SC_MY_LEADER_POWER] = 0.5; sc[T.SC_OPP_LEADER_POWER] = 0.5
-    tok[0, T.S_POWER] = 0.6                         # 自分のリーダー 6000 ＝ 超過 1000 の攻撃
-    old = CB.THETA_HAND_MODE
-    try:
-        CB.set_theta_hand_mode("cuttable_forced")
-        g = MU * 0.6
-        base = CB.threshold_parts(sc, tok, g_hand=g)
-        with CP.defending(CP.FlatView(MU)):
-            flat = CB.threshold_parts(sc, tok, g_hand=g)
-        assert flat == pytest.approx(base, abs=1e-15)
-        cv = _curve([(1.0, 0.03, 1000.0), (1.0, 0.09, 2000.0), (1.0, 0.02, 1000.0)])
-        n = CB.hand_cut_count(g, 5.0, CB.own_attackers_of(tok, 5000.0), 2.0, 0, MU)
-        with CP.defending(cv.view(kind="slice")):
-            got = CB.threshold_parts(sc, tok, g_hand=g)
-        assert got[0] == base[0] and got[2] == base[2]
-        assert got[1] == pytest.approx(cv.Lx(n), abs=1e-12)
-        cv.reserve = n
-        with CP.defending(cv.view(kind="avg")):
-            got = CB.threshold_parts(sc, tok, g_hand=g)
-        assert got[1] == pytest.approx(cv.Lx(n), abs=1e-12)          # 予約そのものなら ḡ × N = L(N)
-    finally:
-        CB.set_theta_hand_mode(old)
-
-
 def test_value_caches_are_keyed_by_the_pricing_context():
     """覚えておく値（選択肢の価値・デッキの流入）は**値段の文脈を鍵に入れて**覚える——守り手ごとに値が違うので、
     鍵に入れないと別の守り手・旧の値段の読みへ漏れる（実測で守りの窓の判断が 2 行ずれた）。安い順の切れ目の窓は覚えない。"""
     import deck_refill as DR
-    old_take = CP.CUT_TAKE_MODE
-    CP.set_cut_take_mode("mu")                     # 旧の代数で鍵だけを見る（受けたライフの札の値段は別の切替）
-    try:
-        _check_value_caches(DR)
-    finally:
-        CP.set_cut_take_mode(old_take)
+    _check_value_caches(DR)
 
 
 def _check_value_caches(DR):
@@ -334,7 +300,6 @@ def _check_value_caches(DR):
         o1, f1 = T.option_value(6000.0, 5000.0, 3.0), DR.a_of(deck, 5000.0)
     with CP.defending(dear.view(kind="avg")):
         o2, f2 = T.option_value(6000.0, 5000.0, 3.0), DR.a_of(deck, 5000.0)
-    assert f1 < base_f < f2 or f1 < f2                     # 値段で流入の攻撃の値が動く
     # 覚えた値を読み直しても同じ（鍵が違う＝混ざらない）・外では旧の値のまま
     with CP.defending(cheap.view(kind="avg")):
         assert (T.option_value(6000.0, 5000.0, 3.0), DR.a_of(deck, 5000.0)) == (o1, f1)

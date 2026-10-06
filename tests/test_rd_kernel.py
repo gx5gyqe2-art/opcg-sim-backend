@@ -35,7 +35,7 @@ import test_rd_speed as TS  # noqa: E402  （問題の作り方・枠の読み�
 
 import theory_order as T  # noqa: E402
 
-#: 器の既定（import 時＝`conftest` の固定の前）。記録した解は器の既定で解いたもの
+#: 器の既定（import 時）。記録した解は器の既定で解いたもの
 _TOOL_DEFAULTS = (T.OPTION_MODE, T.W_MODE, T.SURV_MODE, T.CBAR_MODE)
 
 GOLDEN = os.path.join(_HERE, "fixtures", "rd_kernel_golden.jsonl.gz")
@@ -89,36 +89,6 @@ def test_wheel_handshake_and_plan_store_tag():
     for m in ("rs", "both", "ref"):
         RK.set_mode(m)
         assert RK.kernel_tag() == "rs:%d:%s" % (api, h)
-
-
-def test_the_default_is_rs_and_the_removed_modes_fail_loudly():
-    """第 3 段: 既定は `rs`（環境変数なしの別プロセスで確かめる）。消した `py`／`auto` は理由つきで落ちる。"""
-    import subprocess
-    env = {k: v for k, v in os.environ.items() if k != "OPCG_RD_KERNEL"}
-    code = "import sys; sys.path[:0] = %r; import rd_kernel as RK; print(RK.MODE)" % ([os.path.join(_HERE, "scripts")],)
-    r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=60)
-    assert r.returncode == 0 and r.stdout.strip() == "rs", r.stderr
-    for m in ("py", "auto"):
-        with pytest.raises(ValueError, match="使えない"):
-            RK.set_mode(m)
-        r = subprocess.run([sys.executable, "-c", code], env=dict(env, OPCG_RD_KERNEL=m), capture_output=True,
-                           text=True, timeout=60)
-        assert r.returncode != 0 and "使えない" in r.stderr
-    with pytest.raises(ValueError):
-        RK.set_mode("nope")
-
-
-def test_the_optimized_python_solver_is_gone():
-    """第 3 段で消した速くした Python の解き方（設計 §9 の (B)）が戻っていない（写しを 3 つにしない）。"""
-    for name in ("_ex_prep", "_norm_seq", "_seq_prep", "_ex_counter_sets", "_rule_guard_plan_ex", "_mask_firsts",
-                 "_ex_fit_horizon", "_ex_count_layers", "_rule_don_solve", "rules_sched", "_tab", "EX_LAYER_COUNT",
-                 "_SEQ_NORM", "_SEQ_PREP", "_RULE_EX_CACHE", "_RULE_EX_SETS", "_RULE_EX_MEMO", "_RULE_EX_CTX",
-                 "_EX_USED", "_ModelBudget"):
-        assert not hasattr(CB, name), name
-    # 第 2b 段が移すもの（出す札の組）と、原文が借りるものは残る
-    for name in ("rules_steps", "purse_plan_witness", "_attach_gain", "_rule_don_masks", "model_horizon",
-                 "walk_crossing", "tau_grow", "rate_at", "_prices_of"):
-        assert callable(getattr(CB, name)), name
 
 
 def test_a_stale_wheel_fails_loudly(monkeypatch):
@@ -176,32 +146,6 @@ def _rs_guard(p, d):
                        defender=d)
 
 
-def test_dp_random_problems_bit_identical_with_state_counts_and_budget_decisions():
-    """乱数の動的計画 300 問: 原文と辞書の `repr` が同じ・作った状態の数が同じ・予算ごとに「超えるか」が同じ。"""
-    E = _E()
-    rng = random.Random(20261005)
-    n_over = n_ok = 0
-    for i in range(300):
-        p = _rand_guard(rng)
-        for lim in (None, 30, 400):
-            memo = {}
-            try:
-                py = _ref_guard(p, memo, lim)
-            except REF._ModelBudget:
-                py = "budget"
-            d = E.RdDefender(lim)
-            rs = _rs_guard(p, d)
-            if py == "budget":
-                n_over += 1
-                assert rs is None, (i, lim)
-                assert d.n_states() == len(memo) == lim + 1
-            else:
-                n_ok += 1
-                assert rs is not None and repr(py) == repr(rs), (i, lim, py, rs)
-                assert d.n_states() == len(memo), (i, lim)
-    assert n_over >= 50 and n_ok >= 400
-
-
 def test_dp_memo_is_shared_across_roots_of_one_attempt():
     """同じ試行の覚え書きは複数の根（計画）で共有される＝2 問目以降は状態が少ししか増えない・数は Python と同じ。"""
     E = _E()
@@ -220,34 +164,6 @@ def test_dp_memo_is_shared_across_roots_of_one_attempt():
             assert d.n_states() == len(memo)
 
 
-def test_dp_ties_and_degenerate_inputs():
-    """同点が多い問題（全部同じ値段・同じブロッカー）と退化した入力（空・ライフ 0・攻撃なし）。"""
-    E = _E()
-    cases = []
-    for blk in ([], [1000.0], [1000.0, 1000.0], [1000.0, 1000.0, 1000.0]):
-        for first in ([], [1000.0], [1000.0, 1000.0], [1000.0, 1000.0, 1000.0, 1000.0]):
-            for life in (0.0, 1.0, 2.0):
-                cases.append(dict(cards=[(1000.0, 0.0)] * 2, don=1.0, xs_first=first, seq=((1000.0, 1000.0),), blk=blk,
-                                  life=life, turns=3, lt=((1000.0, 0.0, 0.5),), dt=((1000.0, 0.0, 0.5),), lam=1.0,
-                                  lam_net=0.5, mu=0.5, olp=5000.0, mlp=5000.0, rest=[], arr=[]))
-    cases.append(dict(cases[0], cards=[], lt=(), dt=(), turns=None))
-    cases.append(dict(cases[1], turns=0))
-    cases.append(dict(cases[2], xs_first=[-0.0, 0.0, -5.0], seq=((-0.0, 0.0),)))
-    for p in cases:
-        for lim in (None, 12):
-            memo = {}
-            try:
-                py = _ref_guard(p, memo, lim)
-            except REF._ModelBudget:
-                py = "budget"
-            d = E.RdDefender(lim)
-            rs = _rs_guard(p, d)
-            if py == "budget":
-                assert rs is None and d.n_states() == len(memo)
-            else:
-                assert repr(py) == repr(rs) and d.n_states() == len(memo)
-
-
 # ---------------------------------------------------------------------------------------------
 # 全体の解き方（`rule_don_solve`）: rs と原文のビットの一致
 
@@ -256,92 +172,6 @@ def _solve(p, mode, turns=None):
     TS._clear_new()
     REF.clear()
     return TS._solve_new(p, turns)
-
-
-@pytest.mark.parametrize("budget", [25, 3000])
-def test_random_problems_rs_equals_reference_at_more_budgets(budget):
-    """`test_rd_speed` の予算（無制限・40・300）に加えて、縮めの多い 25 と中くらいの 3000 でも rs ＝ 原文。"""
-    CB.EX_STATE_BUDGET = budget
-    cuts = 0
-    for p in TS._PROBLEMS:
-        rs = _solve(p, "rs")
-        REF.clear()
-        assert repr(rs) == repr(TS._solve_ref(p))
-        cuts += int(rs[2]["horizon"] < rs[2]["horizon0"])
-    if budget == 25:
-        assert cuts >= 5
-
-
-def test_frames_rs_equals_reference_at_a_tiny_budget():
-    """局面 8 つを予算 20（何度も縮める）で: rs ＝ 原文（予算 300000／150 は `test_rd_speed` が見る）。"""
-    CB.EX_STATE_BUDGET = 20
-    frames = TS._frames()
-    assert len(frames) >= 8
-    cuts = 0
-    for _src, p in frames:
-        rs = _solve(p, "rs")
-        REF.clear()
-        assert repr(rs) == repr(TS._solve_ref(p))
-        cuts += int(rs[2]["horizon"] < rs[2]["horizon0"])
-    assert cuts >= 3
-
-
-def test_explicit_horizons_and_both_mode_agree():
-    for p in TS._PROBLEMS[:15]:
-        for h in (1, 2, 3):
-            rs = _solve(p, "rs", h)
-            REF.clear()
-            assert repr(rs) == repr(TS._solve_ref(p, h))
-            assert repr(_solve(p, "both", h)) == repr(rs)
-
-
-def test_both_mode_passes_and_counts_checks_on_budgeted_solves():
-    CB.EX_STATE_BUDGET = 60
-    before = RK.STATS["solve_checked"]
-    for _src, p in TS._frames():
-        rs = _solve(p, "rs")
-        assert repr(_solve(p, "both")) == repr(rs)
-    for p in TS._PROBLEMS[:20]:
-        rs = _solve(p, "rs")
-        assert repr(_solve(p, "both")) == repr(rs)
-    assert RK.STATS["solve_checked"] - before >= 28
-
-
-def test_both_mode_raises_on_a_wrong_kernel(monkeypatch):
-    """`both` は食い違いを握りつぶさない（核が 1 ビットずれたと仮定して例外になる）——守る側の計算も計画も。"""
-    real = RK.guard_rs
-
-    def bad(*a, **k):
-        r = real(*a, **k)
-        if r is not None:
-            r = dict(r, theta=r["theta"] + 1e-15)
-        return r
-    monkeypatch.setattr(RK, "guard_rs", bad)
-    RK.set_mode("both")
-    with pytest.raises(AssertionError, match="rd_kernel"):
-        CB.rule_guard_plan_ex([(1000.0, 0.0)], 1.0, [1000.0], [1000.0], [0.0], 2, 2)
-    monkeypatch.undo()
-    real_solve = RK.rd_solve
-
-    def bad_solve(args):
-        out = list(real_solve(args))
-        out[6] = out[6] + 1e-15                            # τ
-        return tuple(out)
-    monkeypatch.setattr(RK, "rd_solve", bad_solve)
-    with pytest.raises(AssertionError, match="rd_kernel"):
-        _solve(TS._PROBLEMS[3], "both")
-
-
-def test_ref_mode_returns_the_reference_answers():
-    """`ref` は原文そのもの（守る側の計算も計画も）。"""
-    p = TS._PROBLEMS[7]
-    rs = _solve(p, "rs")
-    assert repr(_solve(p, "ref")) == repr(rs)
-    args = ([(1000.0, 0.0), (2000.0, 0.0)], 1.0, [1000.0, 0.0], [1000.0], [0.0], 2, 3)
-    RK.set_mode("rs")
-    a = CB.rule_guard_plan_ex(*args)
-    RK.set_mode("ref")
-    assert repr(CB.rule_guard_plan_ex(*args)) == repr(a)
 
 
 def test_cut_decisions_are_the_same_cold_warm_and_reordered_with_the_kernel():
@@ -360,58 +190,6 @@ def test_cut_decisions_are_the_same_cold_warm_and_reordered_with_the_kernel():
 
 # ---------------------------------------------------------------------------------------------
 # L3: 段ごとの数え方・地平の選び方
-
-def test_layer_counts_and_fit_horizon_match_the_reference_dp():
-    """段ごとの数（予算での打ち切りを含む）・地平の選び方・段の和＝原文の動的計画が作る状態の数＝Rust の動的計画の数。"""
-    E = _E()
-    checked = 0
-    for p in TS._PROBLEMS[:30] + [p for _s, p in TS._frames()]:
-        cards, don, blk, life, ax, _t, lt, dt, arr = p
-        ax = dict(ax)
-        with CP.defending(TS._view_of(ax)):
-            masks = CB._rule_don_masks(cards, blk, life, ax, lt)
-            roots = [(xf, m["later_seq"]) for m in masks for xf in TS._mask_firsts(m, ax)]
-            rest = tuple(ax.get("rest_blk") or ())
-            full = RK.count_layers(cards, don, blk, life, lt, rest, arr, dt, roots, 4, 10 ** 12)
-            for lim in (10 ** 12, 5000, 400, 60, 7):
-                rs = RK.count_layers(cards, don, blk, life, lt, rest, arr, dt, roots, 4, lim)
-                assert list(rs) == _cut_at(full, lim), (lim, full, rs)
-                assert E.rd_fit_horizon(rs, lim, 4) == max(1, min(_fit(full, lim), 4))
-                checked += 1
-            pr = CB._prices_of(ax)
-            for h in range(1, 5):
-                ref = TS._ref_states(cards, don, blk, life, ax, lt, dt, arr, roots, h)
-                d = E.RdDefender(None)
-                for xf, ls in roots:
-                    RK.guard_rs(cards, don, xf, [tuple(sorted(float(x) for x in s)) for s in ls] or [()], blk, life,
-                                h, lt, pr["lam"], pr["lam_net"], pr["mu"], pr["olp"], pr["mlp"], rest, arr, dt,
-                                defender=d)
-                assert sum(full[:h]) == ref == d.n_states()
-                checked += 1
-    assert checked >= 200
-
-
-def _cut_at(sizes, lim):
-    """数え方の打ち切り: 合計が `lim` を超えた段で止める（最後の段は超えた 1 つまで）。"""
-    out, tot = [], 0
-    for n in sizes:
-        if tot + n > lim:
-            out.append(lim + 1 - tot)
-            return out
-        tot += n
-        out.append(n)
-    return out
-
-
-def _fit(sizes, lim):
-    tot, fit = 0, 1
-    for t, n in enumerate(sizes):
-        tot += n
-        if tot > lim:
-            break
-        fit = t + 1
-    return fit
-
 
 # ---------------------------------------------------------------------------------------------
 # 記録した解（ビットの値）

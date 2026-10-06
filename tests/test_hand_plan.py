@@ -219,7 +219,7 @@ def test_a_conditional_card_gets_a_per_turn_value_from_the_projected_state(monke
 def test_search_context_reads_incoming_attacks_at_the_rules_power_of_the_defender():
     """**2026-10-01（残り 2b）**: 自席のターンの行のトークン列 0 は自分が付けたドン（自分のターンだけ）を載せる——
     探す値の状態の来る攻撃（`search_context["xs"]`）は相手のターンの規則どおりのパワー（列 20＝付与ドン無し）で読む。
-    `token`（旧）は列 0 の読み＝`hand_guard.incoming` と同じ。相手のターンの行は両方同じ。"""
+    相手のターンの行は列 0 の読み（`hand_guard.incoming`）と同じ。"""
     import numpy as np
     import theory_order as TO
     sc = np.zeros(127, dtype=np.float32)
@@ -233,9 +233,7 @@ def test_search_context_reads_incoming_attacks_at_the_rules_power_of_the_defende
     try:
         assert TO.DEFENDER_POWER_MODE == "rule"                     # 出荷の既定
         assert HP.incoming_of_row(sc, tok) == pytest.approx([1000.0, 0.0])
-        TO.set_defender_power_mode("token")
-        assert HP.incoming_of_row(sc, tok) == HP.HG.incoming(tok) == []
-        TO.set_defender_power_mode("rule")
+        assert HP.HG.incoming(tok) == []                             # 列 0（付与ドン込み 7000）で読むと届かない
         sc[TO.SC_IS_MY_TURN] = 0.0; tok[0, TO.S_POWER] = 0.5         # 相手のターンの行（列 0 に付与ドンは載らない）
         assert HP.incoming_of_row(sc, tok) == pytest.approx(HP.HG.incoming(tok))
         assert HP.incoming_of_row(sc, tok) == pytest.approx([1000.0, 0.0])

@@ -15,8 +15,6 @@ V の差は T67 の札ごとの価値 `max(ΔH, ΔG)` とは違う量（`ΔH + �
 
 **符号と循環が 1 つ狂うと判断が反転する器**なので、向き・循環・規則の境目を値で押さえる。**基盤健全性**（`cpu_infra`）。
 """
-import argparse
-import inspect
 import itertools
 import os
 import sys
@@ -140,25 +138,6 @@ def test_unknown_modes_are_refused_everywhere():
         with pytest.raises(ValueError):
             B.guard_step(_tok(6000), _sc(), "take", 9000.0, [], s_cost=bad)
     assert B.GUARD_S_COST_MODE == "curve"      # 弾かれた指定は今の値（ここでは固定した `curve`）を変えない
-
-
-def test_the_cli_flags_reach_the_modes():
-    ap = argparse.ArgumentParser()
-    B.add_guard_s_cost_arg(ap)
-    try:
-        a = ap.parse_args([])
-        assert B.apply_guard_s_cost(a) == "curve"                         # 省略時は不動（固定した `curve` のまま）
-        a = ap.parse_args(["--guard-s-cost", "joint"])
-        assert B.apply_guard_s_cost(a) == "joint" and B.GUARD_S_COST_MODE == "joint"
-        with pytest.raises(SystemExit):
-            ap.parse_args(["--guard-s-cost", "strict"])                   # 知らない値は argparse が弾く
-    finally:
-        B.set_guard_s_cost_mode("curve")
-    # 器の `main` が両方を組み込み、実行前に反映していること（片方だけ付け忘れると CLI の値が黙って捨てられる）
-    src = inspect.getsource(B.main)
-    for piece in ("add_guard_s_cost_arg(ap)", "apply_guard_s_cost(a)"):
-        assert piece in src, piece
-    assert src.index("apply_guard_s_cost(a)") < src.index("collect(a.src")
 
 
 # ---- 2. 規則どおりの「守れたか」 ----

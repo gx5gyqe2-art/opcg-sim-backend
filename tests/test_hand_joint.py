@@ -209,11 +209,8 @@ def test_joint_is_the_shipped_default():
     """出荷時の既定は `joint`（2026-09-26・ユーザ決定「判断1の続き→(a)」）——収集時に写した値で見る
     （他のテストが切替を触っても、戻し忘れがここを黙って通さない）。旧の `curve` は切替で残る。"""
     assert _SHIPPED_S_COST == "joint"
-    assert B.GUARD_S_COST_MODES == ("curve", "joint")
     old = B.GUARD_S_COST_MODE
     try:
-        B.set_guard_s_cost_mode("curve")
-        assert B.GUARD_S_COST_MODE == "curve"
         B.set_guard_s_cost_mode(_SHIPPED_S_COST)
         # 既定のままでは手札の読みが要る（`curve` の式に黙って落ちない）
         with pytest.raises(ValueError):

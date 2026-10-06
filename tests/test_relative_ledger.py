@@ -444,4 +444,3 @@ def test_the_shipped_defaults_are_rule_don_with_the_mirror_on_under_joint_gbar()
     assert RL.CB.THETA_HAND_MODE == "rule_don"
     assert TB.MIRROR_ME is True
     assert CP.CUT_PRICE_MODE == "joint" and CP.CUT_TAKE_MODE == "gbar"
-    assert "cuttable_forced" in RL.CB.THETA_HAND_MODES

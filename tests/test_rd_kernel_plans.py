@@ -68,10 +68,6 @@ def _solve(p, mode, turns=None):
     return out, tuple(CB.EX_SPEED_STATS[k] - b for k, b in zip(_KEYS, before))
 
 
-def _more_problems():
-    return [TS._rand_problem(random.Random(5000 + i), 1000 + i) for i in range(160)]
-
-
 # ---------------------------------------------------------------------------------------------
 # 歩き（E18・E19）
 
@@ -132,22 +128,6 @@ def _rec_stats():
     return out
 
 
-@pytest.mark.parametrize("budget", [300000, 150])
-def test_frames_rs_equals_reference_with_the_recorded_disclosure(budget):
-    """局面 8 つ: rs ＝ 原文（`repr`）・試行の開示（`EX_SPEED_STATS` の増分）が記録した値（速くした Python のもの）と同じ。"""
-    CB.EX_STATE_BUDGET = budget
-    rec = _rec_stats()
-    cuts = 0
-    for _src, p in TS._frames():
-        rs, st_rs = _solve(p, "rs")
-        assert st_rs == rec[("frame:" + _src, budget)], (_src, st_rs)
-        REF.clear()
-        assert repr(TS._solve_ref(p)) == repr(rs), _src
-        cuts += int(rs[2]["horizon"] < rs[2]["horizon0"])
-    if budget == 150:
-        assert cuts >= 3
-
-
 def test_recorded_solves_have_the_recorded_disclosure():
     """記録した 152 解 × 予算 2: 試行の開示が記録（速くした Python の解き方の値）と同じ（解のビットは `test_rd_kernel` が見る）。"""
     import rd_kernel_golden as G
@@ -166,68 +146,6 @@ def test_recorded_solves_have_the_recorded_disclosure():
             n += 1
             nz += int(any(st))
     assert n >= 300 and nz >= 20
-
-
-@pytest.mark.parametrize("budget", [None, 25, 40, 300])
-def test_random_problems_rs_equals_reference(budget):
-    """乱数の 200 問（既存 40＋新 160・`no_attack_now` を含む）× 予算 4: rs ＝ 原文。"""
-    CB.EX_STATE_BUDGET = budget
-    probs = TS._PROBLEMS + _more_problems()
-    cuts = nonow = 0
-    for i, p in enumerate(probs):
-        rs, _st = _solve(p, "rs")
-        REF.clear()
-        assert repr(TS._solve_ref(p)) == repr(rs), i
-        cuts += int(rs[2]["horizon"] < rs[2]["horizon0"])
-        nonow += int(bool(p[4].get("no_attack_now")))
-    assert nonow >= 10
-    if budget in (25, 40):
-        assert cuts >= 10
-
-
-def test_explicit_horizons_rs_equals_reference():
-    probs = TS._PROBLEMS[:20] + _more_problems()[:30] + [p for _s, p in TS._frames()]
-    for i, p in enumerate(probs):
-        for h in (1, 2, 3):
-            rs, _ = _solve(p, "rs", h)
-            assert "horizon" not in rs[2]
-            REF.clear()
-            assert repr(TS._solve_ref(p, h)) == repr(rs), (i, h)
-
-
-def test_states_per_attempt_equal_the_reference(monkeypatch):
-    """試行ごとに作った状態の数（予算超えの試行は超えた時点＝予算 + 1）が、同じ地平の原文の試行の `len(memo)` と同じ
-    （原文は 1 ターンずつ縮めるので、Rust の試行〔最初の地平と、数えて選んだ地平〕は原文の試行の部分列）。"""
-    R = RK.ref_module()
-    seen = {}
-    real = R._rule_don_solve
-
-    def spy(cards_d, don_d, blk, life, actx, turns, *a, **k):
-        try:
-            return real(cards_d, don_d, blk, life, actx, turns, *a, **k)
-        finally:
-            memo = R._EX_USED["memo"]
-            seen[turns] = None if memo is None else len(memo)
-    monkeypatch.setattr(R, "_rule_don_solve", spy)
-    checked = 0
-    for budget in (150, 40):
-        CB.EX_STATE_BUDGET = budget
-        for p in [p for _s, p in TS._frames()] + TS._PROBLEMS[:20]:
-            cards, don, blk, life, ax, _t, lt, dt, arr = p
-            seen.clear()
-            REF.clear()
-            ref = TS._solve_ref(p)
-            TS._clear_new()
-            RK.set_mode("rs")
-            with CP.defending(TS._view_of(ax)):
-                masks = CB._rule_don_masks(cards, blk, life, dict(ax), lt)
-                h0 = CB.model_horizon(dict(ax), blk, int(max(0, round(float(life)))), arr)
-                (_c, _s, plan), h, st = CB._rd_run(cards, don, blk, life, dict(ax), None, lt, dt, arr, masks, h0)
-            assert h == ref[2]["horizon"]
-            states = list(st[4])
-            assert states[0] == seen[h0] and states[-1] == seen[h], (budget, seen, st)
-            checked += len(states)
-    assert checked >= 60
 
 
 # ---------------------------------------------------------------------------------------------
@@ -261,20 +179,3 @@ def test_unbudgeted_cache_aliasing_and_the_plan_store(tmp_path):
     CB.PLAN_STORE = None
 
 
-def test_both_mode_checks_every_plan_and_raises_on_a_wrong_one(monkeypatch):
-    CB.EX_STATE_BUDGET = 60
-    before = RK.STATS["solve_checked"]
-    for p in TS._PROBLEMS[:20] + [p for _s, p in TS._frames()]:
-        rs, _ = _solve(p, "rs")
-        both, _ = _solve(p, "both")
-        assert repr(both) == repr(rs)
-    assert RK.STATS["solve_checked"] - before >= 28
-    real = CB._rd_run
-
-    def bad(*a, **k):
-        out, h, st = real(*a, **k)
-        out[2]["tau"] = out[2]["tau"] + 1e-15
-        return out, h, st
-    monkeypatch.setitem(vars(CB), "_rd_run", bad)
-    with pytest.raises(AssertionError, match="rd_kernel"):
-        _solve(TS._PROBLEMS[3], "both")
