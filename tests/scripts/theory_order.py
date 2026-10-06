@@ -226,7 +226,7 @@ def add_surv_mode_arg(ap):
 #: **値を変えない高速化の切替**（2026-10-01・N-3 採用の 3）: `True`（既定）＝純関数の覚え書きと厳密な打ち切りを使う
 #: （`attack_value_don` の覚え書きと上限での打ち切り・`option_value` の同じ盤面・`attack_stream` の相手の体の `ν`・
 #: `turn_weights`・手札の読み直しの `use_value`）。`False`＝旧の計算そのもの。**どちらでも値は 1 ビットも変わらない**
-#: （`tests/test_speed_memo.py` が実記録と乱数の標本で確かめる）。
+#: （`tests/test_speed_memo.py` が実記録と乱数の標本で確かめていた——2026-10-06 の移植の段 0 で退役・Python の覚え書き専用の番人）。
 SPEED_MEMO = True
 
 
