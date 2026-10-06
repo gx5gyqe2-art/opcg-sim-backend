@@ -289,5 +289,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rd_kernel_version, m)?)?;
     m.add_function(wrap_pyfunction!(rd_py_round, m)?)?;
     m.add_function(wrap_pyfunction!(rd_bankers_round, m)?)?;
+    super::pyapi_port::register(m)?;
     Ok(())
 }

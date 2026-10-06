@@ -533,3 +533,70 @@ pub fn call(name: &str, a: &PyVal, g: &PyVal, t: &CardTable, bd: &OppBoards, o: 
         _ => return Err(format!("未知の葉 {name}")),
     })
 }
+
+/// 記録した核の答えを、Python が呼んだ順に返す口（引数が 1 つでも違えば誤り＝呼ぶ順と入力まで突き合わせる）。
+pub struct ReplayOracle {
+    /// `(名前, 引数の dict, 戻り)`
+    pub subs: Vec<(String, PyVal, PyVal)>,
+    pub pos: usize,
+    pub err: Option<String>,
+}
+
+impl ReplayOracle {
+    pub fn new(s: &PyVal) -> ReplayOracle {
+        let subs = s
+            .items()
+            .iter()
+            .map(|e| {
+                let it = e.items();
+                (py_str(&it[0]), it[1].clone(), it[2].clone())
+            })
+            .collect();
+        ReplayOracle { subs, pos: 0, err: None }
+    }
+
+    /// 全部使い切ったか。
+    pub fn done(&self) -> bool {
+        self.pos == self.subs.len()
+    }
+}
+
+impl Oracle for ReplayOracle {
+    fn call(&mut self, name: &str, args: Vec<(&str, PyVal)>) -> PyVal {
+        let Some((n, a, r)) = self.subs.get(self.pos) else {
+            let pos = self.pos;
+            self.err.get_or_insert_with(|| format!("核 {name} の記録が足りない（{pos} 件目）"));
+            return PyVal::Float(f64::NAN);
+        };
+        self.pos += 1;
+        if n != name {
+            let n = n.clone();
+            self.err.get_or_insert_with(|| format!("核の呼び出し順が違う: 記録 {n}・Rust {name}"));
+        }
+        for (k, v) in &args {
+            match a.get(k) {
+                Some(rv) if rv.same(v) => {}
+                other => {
+                    let msg = format!("核 {name} の引数 {k} が違う: 記録 {other:?}・Rust {v:?}");
+                    self.err.get_or_insert(msg);
+                }
+            }
+        }
+        r.clone()
+    }
+}
+
+/// 記録 1 行（`a`・`g`・`s`）を解き、戻り（Python の戻りと同じ型）を返す。核の記録を使い残したら誤り。
+pub fn call_payload(name: &str, payload: &PyVal, t: &CardTable, bd: &OppBoards) -> Result<PyVal, String> {
+    let a = payload.getv("a");
+    let g = payload.getv("g");
+    let mut o = ReplayOracle::new(payload.getv("s"));
+    let r = call(name, a, g, t, bd, &mut o)?;
+    if let Some(e) = o.err {
+        return Err(e);
+    }
+    if !o.done() {
+        return Err(format!("核の記録を使い残した（{}/{}）", o.pos, o.subs.len()));
+    }
+    Ok(r)
+}

@@ -20,6 +20,7 @@ pub mod layers;
 pub mod numeric;
 pub mod plans;
 pub mod pyapi;
+pub mod pyapi_port;
 pub mod pyval;
 pub mod sched;
 pub mod succ;
