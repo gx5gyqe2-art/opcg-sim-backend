@@ -64,10 +64,20 @@ fn theory_read_fixture(path: &str) -> PyResult<String> {
     Ok(capture_string(&input::load_fixture(path).map_err(verr)?))
 }
 
+/// 記録の 1 行（素の JSON の object・各欄は記録の形）→ `{"a", "g", "s"}` の dict。
+pub fn payload_of(j: &super::pyval::Json) -> PyVal {
+    let field = |k: &str| j.get(k).map(from_capture).unwrap_or(PyVal::None);
+    PyVal::Dict(vec![
+        (PyVal::Str("a".into()), field("a")),
+        (PyVal::Str("g".into()), field("g")),
+        (PyVal::Str("s".into()), field("s")),
+    ])
+}
+
 /// 葉を 1 つ呼ぶ（`payload`＝記録の形の `{"a": 引数, "g": 大域, "s": 核の答え}`）。戻り＝記録の形の戻り。
 #[pyfunction]
 fn theory_leaf_call(name: &str, payload: &str) -> PyResult<String> {
-    let p = from_capture(&parse_json(payload).map_err(verr)?);
+    let p = payload_of(&parse_json(payload).map_err(verr)?);
     let t = input::cards();
     let bd = input::STORE.read().unwrap().opp_boards.clone().unwrap_or_default();
     let r = dispatch::call_payload(name, &p, &t, &bd).map_err(verr)?;
