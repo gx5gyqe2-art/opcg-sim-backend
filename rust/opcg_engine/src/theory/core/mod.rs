@@ -1,0 +1,22 @@
+//! 理論の Rust 全移植・段 3（2026-10-07）: **値付けの核**（`theory_order`・`effect_value`・`hand_plan`・`hand_spend`・
+//! `search_price`・`hand_joint`・`theory_bridge.joint_valuer` にまたがる 1 つの相互再帰）。
+//!
+//! 計画 `docs/reports/2026-10-06_full_port_plan.md` §4.2 段 3・報告 `docs/reports/2026-10-07_port_stage3.md`。
+//! 既定の枝と、残す候補 2 つ（ドンの配分ずれの値段 `ATTACK_DON_COST_MODE`・探す効果の 1 枚 1 役 `SEARCH_VALUE_MODE=joint`）だけ。
+//! 移していない枝を求められたら誤りを返す（`entry::apply_g`）。
+//!
+//! 構成: `obj`＝参照の意味つきの Python の値／`state`＝文脈・覚え書き・計数／`to`・`ev`・`hp`・`sp`・`hj`＝各モジュールの写し／
+//! `pyrand`＝`random.Random`／`entry`＝名前 → 関数（PyO3 と `cargo test` が同じ道）。
+//! このフォルダは守る側の計算（`rd_solve`）の指紋に入らない（`build.rs`）。
+
+pub mod entry;
+pub mod ev;
+pub mod hj;
+pub mod hp;
+pub mod obj;
+pub mod pyrand;
+pub mod sp;
+pub mod state;
+pub mod to;
+#[cfg(test)]
+mod tests_core;

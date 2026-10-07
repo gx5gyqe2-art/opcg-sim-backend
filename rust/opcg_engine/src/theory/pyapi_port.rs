@@ -20,6 +20,7 @@ fn theory_load_cards(text: &str) -> PyResult<usize> {
     let t = CardTable::from_json(text).map_err(verr)?;
     let n = t.cards.len();
     input::set_cards(t);
+    super::core::state::drop_core();
     Ok(n)
 }
 
@@ -38,6 +39,7 @@ fn theory_load_effects(text: &str) -> PyResult<usize> {
         _ => 0,
     };
     input::set_effects(v);
+    super::core::state::drop_core();
     Ok(n)
 }
 
@@ -55,6 +57,7 @@ fn theory_load_opp_boards(path: &str) -> PyResult<String> {
     let b = OppBoards::from_json(&text).map_err(verr)?;
     let out = capture_string(&b.to_pyval());
     input::set_opp_boards(b);
+    super::core::state::drop_core();
     Ok(out)
 }
 
@@ -71,6 +74,35 @@ fn theory_leaf_call(name: &str, payload: &str) -> PyResult<String> {
     let t = input::cards();
     let bd = input::STORE.read().unwrap().opp_boards.clone().unwrap_or_default();
     let r = dispatch::call_payload(name, &p, &t, &bd).map_err(verr)?;
+    Ok(capture_string(&r))
+}
+
+/// **段 3**: 値付けの核の入口を 1 つ呼ぶ（`payload`＝記録の形の `{"a", "g", "pre"}`）。`replay=True` なら丸めた鍵の
+/// 覚え書きを空にして `pre` を入れてから解く（記録の再生）・偽なら覚え書きは呼び出しをまたいで生きる（器の通し）。
+/// 戻り＝記録の形の `{"r": 戻り, "cs": 条件の計数の差分 [真, 偽, 判らない]}`。
+#[pyfunction]
+#[pyo3(signature = (name, payload, replay=false))]
+fn theory_core_call(name: &str, payload: &str, replay: bool) -> PyResult<String> {
+    use super::core::obj::{from_pyval, to_pyval, V};
+    let p = from_pyval(&super::pyval::from_capture(&parse_json(payload).map_err(verr)?));
+    let (r, cs) = super::core::state::with_core(|c| super::core::entry::call(c, name, &p, replay)).map_err(verr)?;
+    let out = V::dict(vec![(V::s("r"), r), (V::s("cs"), V::list(cs.iter().map(|&x| V::Int(x)).collect()))]);
+    Ok(capture_string(&to_pyval(&out)))
+}
+
+/// **段 3**: 核の覚え書きを全部捨てる（`which="history"` なら丸めた鍵の覚え書きだけ）。
+#[pyfunction]
+#[pyo3(signature = (which="all"))]
+fn theory_core_reset(which: &str) -> PyResult<()> {
+    super::core::state::with_core(|c| if which == "history" { c.reset_history() } else { c.reset_all() });
+    Ok(())
+}
+
+/// **段 3**: 段 2 の葉を、核に頼る部分（`Oracle`）を Rust の核で答えて解く（記録の核の答えは使わない）。
+#[pyfunction]
+fn theory_leaf_call_core(name: &str, payload: &str) -> PyResult<String> {
+    let p = dispatch::payload_of(&parse_json(payload).map_err(verr)?);
+    let r = super::core::state::with_core(|c| super::core::entry::leaf_with_core(c, name, &p)).map_err(verr)?;
     Ok(capture_string(&r))
 }
 
@@ -153,5 +185,8 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(theory_load_opp_boards, m)?)?;
     m.add_function(wrap_pyfunction!(theory_read_fixture, m)?)?;
     m.add_function(wrap_pyfunction!(theory_leaf_call, m)?)?;
+    m.add_function(wrap_pyfunction!(theory_core_call, m)?)?;
+    m.add_function(wrap_pyfunction!(theory_core_reset, m)?)?;
+    m.add_function(wrap_pyfunction!(theory_leaf_call_core, m)?)?;
     Ok(())
 }

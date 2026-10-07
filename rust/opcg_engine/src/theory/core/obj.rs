@@ -34,7 +34,10 @@ pub enum V {
     Obj(Rc<str>),
 }
 
-pub static VNONE: V = V::None;
+pub struct SyncNone(pub V);
+// `V::None` は `Rc` を持たない＝thread をまたいで共有してよい
+unsafe impl Sync for SyncNone {}
+pub static VNONE_S: SyncNone = SyncNone(V::None);
 
 impl V {
     pub fn s(x: &str) -> V {
@@ -112,7 +115,7 @@ impl V {
                 }
             }
         }
-        &VNONE
+        &VNONE_S.0
     }
     /// `k in d`
     pub fn has(&self, k: &str) -> bool {

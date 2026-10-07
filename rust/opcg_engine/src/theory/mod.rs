@@ -11,6 +11,7 @@
 //! 地平の選び方／`pyapi`＝PyO3 の入口（核は PyO3 の型を名指さない＝`cargo test --no-default-features` で回る）。
 
 pub mod cond;
+pub mod core;
 pub mod defender;
 pub mod dispatch;
 pub mod input;
