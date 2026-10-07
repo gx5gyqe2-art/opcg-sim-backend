@@ -9,6 +9,19 @@
 //! `pyrand`＝`random.Random`／`entry`＝名前 → 関数（PyO3 と `cargo test` が同じ道）。
 //! このフォルダは守る側の計算（`rd_solve`）の指紋に入らない（`build.rs`）。
 
+// Python の形を 1 行ずつ写すため（`!(a > b)`・`min(..).max(..)`・引数の多い関数など）に一部の lint を外す。
+#![allow(
+    dead_code,
+    clippy::type_complexity,
+    clippy::too_many_arguments,
+    clippy::collapsible_if,
+    clippy::neg_cmp_op_on_partial_ord,
+    clippy::needless_option_as_deref,
+    clippy::manual_map,
+    clippy::map_entry,
+    clippy::manual_clamp
+)]
+
 pub mod entry;
 pub mod ev;
 pub mod hj;

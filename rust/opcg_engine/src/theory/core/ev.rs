@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use super::super::leaves_to::{H_LIFE_TO_HAND, KO_P, LAM, MU, PWR_EPS};
+use super::super::leaves_to::{KO_P, LAM, MU};
 use super::super::numeric::{py_max, py_min, py_round_int};
 use super::obj::{dpop_mut, dset, dset_mut, dwithout, id_of, IdMap, V, VNONE_S};
 use super::state::Core;
