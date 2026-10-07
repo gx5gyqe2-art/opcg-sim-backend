@@ -71,20 +71,27 @@ fn replay_one(c: &mut Core, name: &str, payload: &V, want: &PyVal, cs_want: &[i6
             v => return (false, format!("jv の参照でない: {v:?}")),
         };
         let Some(hand) = hands.get(&id).cloned() else { return (false, format!("{id} の手札の行が無い")) };
-        // 手札から作り直す（覚え書きは完全な鍵だけ＝作り直しても同じ値）
         if let Err(e) = entry::apply_g(c, payload.get("g")) {
             return (false, format!("誤り: {e}"));
         }
-        let jv = c.joint_valuer_of(&hand);
-        let rid = c.next_valuer;
-        c.next_valuer += 1;
-        c.valuers.insert(rid, jv);
+        // 手札の読み 1 つの物は記録の順に生かし続ける: Python の `JointValuer` の覚え書き（`_val`・`_plan`）は鍵が残った札だけで
+        // 値段の文脈を持たない＝最初に解いた文脈の値を後の呼び出しが使う（E52）。同じ読みの行を順に解けば同じ状態が育つ。
+        let key = format!("__rid:{id}");
+        let rid = match hands.get(&key) {
+            Some(V::Int(r)) => *r as u64,
+            _ => {
+                let jv = c.joint_valuer_of(&hand);
+                let rid = c.next_valuer;
+                c.next_valuer += 1;
+                c.valuers.insert(rid, jv);
+                hands.insert(key, V::Int(rid as i64));
+                rid
+            }
+        };
         let a2 = super::obj::dset(&a, "jv", V::Obj(format!("jv:{rid}").into()));
         payload = super::obj::dset(&payload, "a", a2);
         let out = entry::call(c, name, &payload, true);
-        c.valuers.remove(&rid);
-        // 条件の計数は見ない: Python の手札の読みは覚え書き（`_plan`・`_uv_memo`）を持ち越すので、同じ読みの 2 回目以降の
-        // 呼び出しは条件を数え直さない＝作り直した物では数が履歴に依る（値は覚え書きの鍵が完全なので同じ）。
+        // 条件の計数は見ない: 記録は同じ入力の行を 1 度しか書かない（覚え書きに当たった 2 回目は数えない）ので、数は履歴に依る。
         return judge(out, want, &[]);
     }
     judge(entry::call(c, name, &payload, true), want, cs_want)
