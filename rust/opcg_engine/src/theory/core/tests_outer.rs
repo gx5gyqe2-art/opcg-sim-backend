@@ -20,15 +20,15 @@ fn fixture(name: &str) -> Vec<u8> {
     std::fs::read(&p).unwrap_or_else(|e| panic!("{p}: {e}"))
 }
 
-struct Line {
-    name: String,
-    payload: V,
-    want: PyVal,
-    cs: Vec<i64>,
-    ev: Option<PyVal>,
+pub(super) struct Line {
+    pub name: String,
+    pub payload: V,
+    pub want: PyVal,
+    pub cs: Vec<i64>,
+    pub ev: Option<PyVal>,
 }
 
-fn parse_line(line: &str) -> Line {
+pub(super) fn parse_line(line: &str) -> Line {
     let j = parse_json(line).expect("記録の行");
     let name = j.get("fn").and_then(|v| v.as_str()).unwrap().to_string();
     let field = |k: &str| j.get(k).map(from_capture).unwrap_or(PyVal::None);
@@ -45,26 +45,52 @@ fn parse_line(line: &str) -> Line {
     Line { name, payload, want: field("r"), cs, ev }
 }
 
-fn ev_pv(ev: &[(String, V)]) -> PyVal {
+pub(super) fn ev_pv(ev: &[(String, V)]) -> PyVal {
     PyVal::List(ev.iter().map(|(k, v)| PyVal::List(vec![PyVal::Str(k.clone()), to_pyval(v)])).collect())
 }
 
 /// 1 行を解き直す。`curves`＝記録の `cv:<n>` → Rust の曲線の番地。
 fn replay_one(c: &mut Core, l: &Line, curves: &mut HashMap<String, String>) -> (bool, String) {
+    let (g, cs, ev) = match run_one(c, l, curves) {
+        Ok(x) => x,
+        Err(e) => return (false, e),
+    };
+    let want = match (l.name.as_str(), &l.want) {
+        ("cp.curve_of_row", PyVal::Dict(kv)) => kv.iter().find(|(k, _)| k.as_str() == Some("s")).map(|(_, v)| v.clone()).unwrap(),
+        _ => l.want.clone(),
+    };
+    let mut ok = g.same(&want);
+    let mut why = if ok { String::new() } else { format!("Rust {g:?} ≠ Python {want:?}") };
+    if cs.to_vec() != l.cs {
+        ok = false;
+        why.push_str(&format!(" cs: Rust {cs:?} ≠ Python {:?}", l.cs));
+    }
+    if let Some(w) = &l.ev {
+        let e = ev_pv(&ev);
+        if !e.same(w) {
+            ok = false;
+            why.push_str(&format!(" ev: Rust {e:?} ≠ Python {w:?}"));
+        }
+    }
+    (ok, why)
+}
+
+/// 1 行を解く → (比べる部分〔財布は dict・曲線は要約〕, 条件の計数, 計数の増分)。golden の作り直し（`tests_regen`）も同じ道を通る。
+pub(super) fn run_one(c: &mut Core, l: &Line, curves: &mut HashMap<String, String>) -> Result<(PyVal, [i64; 3], Vec<(String, V)>), String> {
     let mut payload = l.payload.clone();
     if l.name.starts_with("cv.") {
         let a = payload.get("a").clone();
         let id = match a.get("cv") {
             V::Obj(n) => n.to_string(),
-            v => return (false, format!("cv の参照でない: {v:?}")),
+            v => return Err(format!("cv の参照でない: {v:?}")),
         };
-        let Some(rid) = curves.get(&id).cloned() else { return (false, format!("{id} の曲線の行が無い")) };
+        let Some(rid) = curves.get(&id).cloned() else { return Err(format!("{id} の曲線の行が無い")) };
         payload = dset(&payload, "a", dset(&a, "cv", V::Obj(rid.into())));
     }
     let out = entry::call_ev(c, &l.name, &payload, true);
     let (got, cs, ev) = match out {
         Ok(x) => x,
-        Err(e) => return (false, format!("誤り: {e}")),
+        Err(e) => return Err(format!("誤り: {e}")),
     };
     // 戻りの比べる部分（財布は dict・曲線は要約と番地の対応）
     let cmp = match l.name.as_str() {
@@ -80,25 +106,7 @@ fn replay_one(c: &mut Core, l: &Line, curves: &mut HashMap<String, String>) -> (
         }
         _ => got.clone(),
     };
-    let want = match (l.name.as_str(), &l.want) {
-        ("cp.curve_of_row", PyVal::Dict(kv)) => kv.iter().find(|(k, _)| k.as_str() == Some("s")).map(|(_, v)| v.clone()).unwrap(),
-        _ => l.want.clone(),
-    };
-    let g = to_pyval(&cmp);
-    let mut ok = g.same(&want);
-    let mut why = if ok { String::new() } else { format!("Rust {g:?} ≠ Python {want:?}") };
-    if cs.to_vec() != l.cs {
-        ok = false;
-        why.push_str(&format!(" cs: Rust {cs:?} ≠ Python {:?}", l.cs));
-    }
-    if let Some(w) = &l.ev {
-        let e = ev_pv(&ev);
-        if !e.same(w) {
-            ok = false;
-            why.push_str(&format!(" ev: Rust {e:?} ≠ Python {w:?}"));
-        }
-    }
-    (ok, why)
+    Ok((to_pyval(&cmp), cs, ev))
 }
 
 type Per = Vec<(String, usize, usize)>;

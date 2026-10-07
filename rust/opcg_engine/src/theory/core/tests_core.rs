@@ -36,7 +36,7 @@ pub(super) fn load_tables() {
 }
 
 /// 記録の 1 行（素の JSON）→ (名前, payload, 戻り, cs)
-fn parse_line(line: &str) -> (String, V, PyVal, Vec<i64>) {
+pub(super) fn parse_line(line: &str) -> (String, V, PyVal, Vec<i64>) {
     let j = parse_json(line).expect("記録の行");
     let name = j.get("fn").and_then(|v| v.as_str()).unwrap().to_string();
     let field = |k: &str| j.get(k).map(from_capture).unwrap_or(PyVal::None);
@@ -54,25 +54,34 @@ fn parse_line(line: &str) -> (String, V, PyVal, Vec<i64>) {
 
 /// 1 行を解き直す。`hands`＝記録の `jv:<n>` → 手札。戻り＝(一致か, 説明)。
 fn replay_one(c: &mut Core, name: &str, payload: &V, want: &PyVal, cs_want: &[i64], hands: &mut HashMap<String, V>) -> (bool, String) {
+    match run_one(c, name, payload, want, hands) {
+        None => (true, String::new()),
+        // 条件の計数は見ない（`jv.value`）: 記録は同じ入力の行を 1 度しか書かない（覚え書きに当たった 2 回目は数えない）ので、数は履歴に依る。
+        Some(out) if name == "jv.value" => judge(out, want, &[]),
+        Some(out) => judge(out, want, cs_want),
+    }
+}
+
+/// 1 行を解く（`tb.joint_valuer` の行は手札を覚えるだけで `None`）。golden の作り直し（`tests_regen`）も同じ道を通る。
+pub(super) fn run_one(c: &mut Core, name: &str, payload: &V, want: &PyVal, hands: &mut HashMap<String, V>) -> Option<Result<(V, [i64; 3]), String>> {
     if name == "tb.joint_valuer" {
         if let PyVal::Obj(id) = want {
             hands.insert(id.clone(), payload.get("a").get("hand").clone());
         }
-        return (true, String::new());
+        return None;
     }
     let mut payload = payload.clone();
     if name == "jv.value" {
         let a = payload.get("a").clone();
         let id = match a.get("jv") {
             V::Obj(n) => n.to_string(),
-            v => return (false, format!("jv の参照でない: {v:?}")),
+            v => return Some(Err(format!("jv の参照でない: {v:?}"))),
         };
-        let Some(hand) = hands.get(&id).cloned() else { return (false, format!("{id} の手札の行が無い")) };
+        let Some(hand) = hands.get(&id).cloned() else { return Some(Err(format!("{id} の手札の行が無い"))) };
         if let Err(e) = entry::apply_g(c, payload.get("g")) {
-            return (false, format!("誤り: {e}"));
+            return Some(Err(e));
         }
-        // 手札の読み 1 つの物は記録の順に生かし続ける: Python の `JointValuer` の覚え書き（`_val`・`_plan`）は鍵が残った札だけで
-        // 値段の文脈を持たない＝最初に解いた文脈の値を後の呼び出しが使う（E52）。同じ読みの行を順に解けば同じ状態が育つ。
+        // 手札の読み 1 つの物は記録の順に生かし続ける（記録と同じ物の寿命・覚え書きは正確な鍵なので値は順に依らない）。
         let key = format!("__rid:{id}");
         let rid = match hands.get(&key) {
             Some(V::Int(r)) => *r as u64,
@@ -87,11 +96,9 @@ fn replay_one(c: &mut Core, name: &str, payload: &V, want: &PyVal, cs_want: &[i6
         };
         let a2 = super::obj::dset(&a, "jv", V::Obj(format!("jv:{rid}").into()));
         payload = super::obj::dset(&payload, "a", a2);
-        let out = entry::call(c, name, &payload, true);
-        // 条件の計数は見ない: 記録は同じ入力の行を 1 度しか書かない（覚え書きに当たった 2 回目は数えない）ので、数は履歴に依る。
-        return judge(out, want, &[]);
+        return Some(entry::call(c, name, &payload, true));
     }
-    judge(entry::call(c, name, &payload, true), want, cs_want)
+    Some(entry::call(c, name, &payload, true))
 }
 
 fn judge(out: Result<(V, [i64; 3]), String>, want: &PyVal, cs_want: &[i64]) -> (bool, String) {

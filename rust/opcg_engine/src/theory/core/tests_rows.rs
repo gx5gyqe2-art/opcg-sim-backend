@@ -22,6 +22,23 @@ fn fixture(name: &str) -> Vec<u8> {
 
 /// 1 行を解き直す → (器, 合っているか, 違いの説明)
 fn replay_one(c: &mut Core, line: &str, frames: &HashMap<i64, PyVal>) -> (String, bool, String) {
+    let (tool, out, want) = run_one(c, line, frames);
+    match out {
+        Ok(got) => {
+            if got.same(&want) {
+                (tool, true, String::new())
+            } else {
+                let (a, b) = (format!("{got:?}"), format!("{want:?}"));
+                let k = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count().saturating_sub(200);
+                (tool, false, format!("Rust …{} ≠ Python …{}", &a[k..a.len().min(k + 900)], &b[k..b.len().min(k + 900)]))
+            }
+        }
+        Err(e) => (tool, false, e),
+    }
+}
+
+/// 1 行を解く → (器, 戻り, 記録の戻り)。golden の作り直し（`tests_regen`）も同じ道を通る。
+pub(super) fn run_one(c: &mut Core, line: &str, frames: &HashMap<i64, PyVal>) -> (String, Result<PyVal, String>, PyVal) {
     let j = parse_json(line).expect("記録の行");
     let tool = j.get("tool").and_then(|v| v.as_str()).unwrap().to_string();
     let payload = from_pyval(&from_capture(j.get("payload").expect("payload")));
@@ -35,29 +52,17 @@ fn replay_one(c: &mut Core, line: &str, frames: &HashMap<i64, PyVal>) -> (String
         Some(fv) => {
             let fr = match frame_of_pyval(&fv) {
                 Ok(f) => f,
-                Err(e) => return (tool, false, format!("枠が読めない: {e}")),
+                Err(e) => return (tool, Err(format!("枠が読めない: {e}")), want),
             };
             let g = match Game::of(&fr) {
                 Ok(g) => g,
-                Err(e) => return (tool, false, format!("局が読めない: {e}")),
+                Err(e) => return (tool, Err(format!("局が読めない: {e}")), want),
             };
             drive::run(c, &g, &payload)
         }
         None => drive::rows_call(c, &payload),
     };
-    match out {
-        Ok(v) => {
-            let got = to_pyval(&v);
-            if got.same(&want) {
-                (tool, true, String::new())
-            } else {
-                let (a, b) = (format!("{got:?}"), format!("{want:?}"));
-                let k = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count().saturating_sub(200);
-                (tool, false, format!("Rust …{} ≠ Python …{}", &a[k..a.len().min(k + 900)], &b[k..b.len().min(k + 900)]))
-            }
-        }
-        Err(e) => (tool, false, format!("誤り: {e}")),
-    }
+    (tool, out.map(|v| to_pyval(&v)).map_err(|e| format!("誤り: {e}")), want)
 }
 
 type Per = Vec<(String, usize, usize)>;

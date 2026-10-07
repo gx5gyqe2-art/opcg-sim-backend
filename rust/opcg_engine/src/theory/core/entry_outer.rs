@@ -72,9 +72,31 @@ fn with_actx<T>(c: &mut Core, v: &V, f: impl FnOnce(&mut Core, Option<&mut Actx>
     }
     if v.is_dict() {
         let mut ax = Actx::from_v(v)?;
+        legacy_cp(c, &mut ax);
         return f(c, Some(&mut ax));
     }
     Err(format!("attacker が財布でない: {v:?}"))
+}
+
+/// 記録の財布（Python が作った dict）の値段の文脈 `cp` が旧い形（`("avg", round(ḡ, 12))`）で、今の窓の `ḡ` を 12 桁に丸めた値と
+/// 同じなら、今の正確な形（`ḡ` のビット）に直す（2026-10-07 に `cut_context_key` を正確にした・golden の入力の財布のため）。
+fn legacy_cp(c: &Core, ax: &mut Actx) {
+    let cp = ax.d.get("cp").clone();
+    let now = c.cut_context_key();
+    if cp.eq(&now) || !c.cut_active() {
+        return;
+    }
+    let it = cp.items();
+    if it.len() != 2 {
+        return;
+    }
+    let pk = it[0].items();
+    let g = c.ctx.pricer.unwrap();
+    let same_round = pk.len() == 2 && pk[1].as_f64().map(|x| x.to_bits() == super::super::numeric::py_round(g, 12).to_bits()).unwrap_or(false);
+    if same_round && it[1].eq(&V::optf(c.ctx.take_card)) {
+        let kv: Vec<(V, V)> = ax.d.kv().iter().map(|(k, x)| if k.as_str() == Some("cp") { (k.clone(), now.clone()) } else { (k.clone(), x.clone()) }).collect();
+        ax.d = V::dict(kv);
+    }
 }
 
 fn tup3(t: (f64, f64, f64)) -> V {
