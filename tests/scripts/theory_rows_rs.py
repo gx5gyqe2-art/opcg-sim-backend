@@ -433,8 +433,78 @@ class PrDriver(_Driver):
         check(self.tool, "per", new, _per_in(res["per"]))
 
 
+class CbDriver(_Driver):
+    tool = "crossing_bridge"
+    LISTS = ("rows_out", "ledger", "turn_harm", "theta_check")
+
+    def solve(self, game, n, stats):
+        loc = self.loc
+        cb = _cb_mod()
+        seed = _seed_of(game)
+        sh = loc["refill"].get(seed)
+        sd = loc["seat_decks"]
+        has_sd = bool(sd)
+        dp = (sd.get(seed) or (None, None)) if has_sd else (None, None)
+        cd = loc["cut_decks"]
+        cdp = cd.get(seed) if cd else None
+        sf = loc["settled_first"]
+        pin = {"g": int(n), "refill": None if sh is None else [float(x) for x in sh], "has_seat_decks": has_sd,
+               "decks": [None if d is None else list(d) for d in dp],
+               "cut_decks": None if cdp is None else [None if d is None else list(d) for d in cdp],
+               "settled": _settled_in(loc["settled"], seed),
+               "settled_first": None if sf is None else sf.get(seed)}
+        cfg = dict(_cfg(loc), PRE_SETTLE_MODE=cb.PRE_SETTLE_MODE)
+        return call(self.tool, game, {"cfg": cfg, "in": pin, "stats": stats, "carry": {}})
+
+    def apply(self, res):
+        for nm in self.LISTS:
+            self.loc[nm].extend(res[nm])
+
+    def snap(self):
+        s = super().snap()
+        s["n"] = {nm: len(self.loc[nm]) for nm in self.LISTS}
+        return s
+
+    def compare(self, snap, res):
+        loc = self.loc
+        check(self.tool, "stats", loc["stats"], res["stats"])
+        for nm in self.LISTS:
+            check(self.tool, nm, loc[nm][snap["n"][nm]:], res[nm])
+
+
+def _settled_rs(dirs, limit_games=0, with_don=True):
+    """`lethal_rule.settled_map` の Rust 版（局ごとに `lethal_rule` の局の駆動）。"""
+    import deck_refill as DR
+    import theory_bridge as TB
+    decks = DR.decks_by_seed(dirs)
+    if not decks:
+        raise ValueError("デッキが引けない（受けたライフの札の平均カウンター値が読めない・%s）" % (dirs,))
+    out = {}
+    games = 0
+    for game in _REAL["iter_games"](dirs, row_cols=TB.ROW_COLS, pol_cols=TB.POL_COLS, extra_fn=TB._extra):
+        games += 1
+        if limit_games and games > limit_games:
+            break
+        seed = _seed_of(game)
+        dk = decks.get(seed) if decks else None
+        pin = {"decks": None if dk is None else [None if d is None else list(d) for d in dk]}
+        res = call("lethal_rule", game, {"cfg": dict(_cfg({}), with_don=bool(with_don)), "in": pin, "stats": {}, "carry": {}})
+        for w, t, dec in res["rows"]:
+            out[(seed, w, t)] = bool(dec)
+    return out
+
+
+def _settled_map_proxy(dirs, limit_games=0, with_don=True):
+    if _CFG["mode"] == "rs":
+        return _settled_rs(dirs, limit_games, with_don)
+    py = _REAL["settled_map"](dirs, limit_games, with_don)
+    rs = _settled_rs(dirs, limit_games, with_don)
+    check("lethal_rule", "settled_map", py, rs)
+    return py
+
+
 #: `(ファイル名, 関数名)` → 局の駆動
-DRIVERS = {("price_realised.py", "collect"): PrDriver, ("relative_ledger.py", "collect"): RlDriver, ("kappa_vector.py", "collect"): KvDriver, ("transition_ledger.py", "collect"): TlDriver}
+DRIVERS = {("crossing_bridge.py", "collect"): CbDriver, ("price_realised.py", "collect"): PrDriver, ("relative_ledger.py", "collect"): RlDriver, ("kappa_vector.py", "collect"): KvDriver, ("transition_ledger.py", "collect"): TlDriver}
 
 
 def _iter_games_proxy(*args, **kwargs):
@@ -465,6 +535,9 @@ def install(mode_=None):
     from opcg_sim.learned.train import plan_labels as PL
     _REAL["iter_games"] = PL.iter_games
     PL.iter_games = _iter_games_proxy
+    import lethal_rule as LR
+    _REAL["settled_map"] = LR.settled_map
+    LR.settled_map = _settled_map_proxy
     if os.environ.get("OPCG_PLAN_STORE") and m == "rs":
         import theory_outer_rs as TOR
         TOR._rs_call_ev("store.open", {"d": [["path", os.environ["OPCG_PLAN_STORE"]]]}, {})
