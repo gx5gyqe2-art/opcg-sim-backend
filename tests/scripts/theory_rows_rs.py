@@ -206,6 +206,42 @@ def _seed_of(game):
     return int(rows["seed"][idx[0]]) if len(idx) else -1
 
 
+def _mod(name):
+    """切替を読む器の写し（器が `name` 自身なら `__main__`）。"""
+    m = sys.modules.get("__main__")
+    if m is not None and os.path.basename(getattr(m, "__file__", "") or "") == name + ".py":
+        return m
+    import importlib
+    return importlib.import_module(name)
+
+
+#: 局の駆動が読む行の切替の既定の枝（核と外側の切替は Rust の `apply_g` が見る）——**ほかの値では落ちる**（黙って既定で解かない）
+GUARDS = {
+    "_all": [("theory_order", "W_MODE", ("curve",)), ("theory_order", "CLOCK_HAND_MODE", ("off",)),
+             ("theory_order", "SIGMA_FLOOR_MODE", ("off",)), ("theory_order", "SETTLE_COND_MODE", ("whole",)),
+             ("theory_order", "KAPPA_SIGMA_MODE", ("match",)), ("theory_order", "W_ERR_MODE", ("abs", "rel")),
+             ("crossing_bridge", "THETA_RETURN_MODE", ("untap",)), ("crossing_bridge", "SLOPE_BLOCK_MODE", ("on",)),
+             ("crossing_bridge", "PRE_SETTLE_MODE", ("off", "on")),
+             ("kappa_vector", "D_MODE", ("curve",)), ("kappa_vector", "ATTACK_REST_MODE", ("return",)),
+             ("lethal_rule", "AVG_COUNTER_MODE", ("rules",)),
+             ("theory_bridge", "GUARD_S_COST_MODE", ("joint",))],
+}
+#: 器の `collect` の引数の既定の枝（`None`＝既定値だけ）
+LOC_GUARDS = {"transition_ledger": [("dump", (None,))], "relative_ledger": [("parts", (False,))],
+              "theory_bridge": [("nu_targets", ("leader",)), ("ledger_pricing", ("exercise",))]}
+
+
+def guard(tool, loc=None):
+    for mod, name, ok in GUARDS["_all"]:
+        v = getattr(_mod(mod), name)
+        if v not in ok:
+            raise RuntimeError("theory rows: 移していない枝 %s.%s=%r（%s を rs／both で解けない・既定 %r）" % (mod, name, v, tool, ok))
+    for name, ok in LOC_GUARDS.get(tool, []):
+        v = (loc or {}).get(name)
+        if v not in ok and not (v is not None and ok == (False,) and not v):
+            raise RuntimeError("theory rows: 移していない枝 %s(%s=%r)（rs／both で解けない・既定 %r）" % (tool, name, v, ok))
+
+
 class _Driver:
     """器ごとの局の駆動の型。`prep`（入力の側・Python）・`payload`・`apply`（`rs`）・`snap`／`compare`（`both`）を持つ。"""
     tool = None
@@ -214,6 +250,7 @@ class _Driver:
         self.fr = frame
         self.loc = frame.f_locals
         self.carry = {}
+        guard(self.tool, self.loc)
 
     def refresh(self):
         self.loc = self.fr.f_locals
@@ -539,6 +576,7 @@ def _settled_rs(dirs, limit_games=0, with_don=True):
     """`lethal_rule.settled_map` の Rust 版（局ごとに `lethal_rule` の局の駆動）。"""
     import deck_refill as DR
     import theory_bridge as TB
+    guard("lethal_rule")
     decks = DR.decks_by_seed(dirs)
     if not decks:
         raise ValueError("デッキが引けない（受けたライフの札の平均カウンター値が読めない・%s）" % (dirs,))

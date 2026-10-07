@@ -14,6 +14,9 @@
 4. 守る側の外側と耐久（段 4・2026-10-07・`docs/reports/2026-10-07_port_stage4.md`）: 交点の橋を `rec` で、外側の入口を両方で解いて
    比べる（`OPCG_THEORY_OUTER=both`・核も `both`）と、外側も核も Rust だけで解く（`rs`）。どちらも出力の JSON は普段の起動と
    1 バイト同じ（`rule_stats` も）。記録したビットの再生は `cargo test`（`theory::core::tests_outer`）。
+5. 行の読みと局の駆動（段 5／6・2026-10-07・`docs/reports/2026-10-07_port_stage5_6.md`）: 8 本の器を `rec` で、`collect` の
+   1 局ぶんを Python と Rust の両方で解いて比べる（`OPCG_THEORY_ROWS=both`・核と外側は Python）と、Rust だけで解く（`rs`）。
+   どちらも出力の JSON は普段の起動と 1 バイト同じ（`rule_stats` も）。記録したビットの再生は `cargo test`（`theory::core::tests_rows`）。
 """
 import json
 import os
@@ -119,5 +122,50 @@ def test_outer_both_and_rs_modes_keep_the_output(tmp_path):
     outer = ("cb.", "cp.", "cv.", "hp.hand_items", "hp.search_context", "tb.guard_hand_reading")
     assert sum(v.get("both_checked", 0) for k, v in st_b.items() if k.startswith(outer)) > 300
     assert st_r["cb.threshold_parts_side"]["rs_calls"] > 20 and st_r["cp.curve_of_row"]["rs_calls"] > 10
+    assert json.dumps(plain, sort_keys=True) == json.dumps(both, sort_keys=True)
+    assert json.dumps(plain, sort_keys=True) == json.dumps(rs, sort_keys=True)
+
+
+#: 段 5／6 の器と引数（`win_calib` は決着の旗〔`lethal_rule.settled_map`〕と `probs_of` も通す）
+ROWS_TOOLS = [("crossing_bridge", []), ("theory_bridge", []), ("relative_ledger", []), ("transition_ledger", []),
+              ("price_realised", []), ("win_calib", ["--pre-settle", "on"]), ("pre_settle_asymmetry", []), ("kappa_vector", [])]
+
+
+def _run_rows(tool, extra, mode, tmp_path):
+    out = os.path.join(str(tmp_path), "%s_rows_%s.json" % (tool, mode))
+    st = os.path.join(str(tmp_path), "%s_rows_%s_stats.json" % (tool, mode))
+    env = dict(os.environ, OPCG_LOG_SILENT="1", OPCG_THEORY_ROWS=mode, OPCG_THEORY_ROWS_STATS=st)
+    for k in ("OPCG_PLAN_STORE", "OPCG_THEORY_BOTH", "OPCG_THEORY_CAPTURE", "OPCG_THEORY_CORE", "OPCG_THEORY_OUTER",
+              "OPCG_THEORY_CORE_CAPTURE", "OPCG_THEORY_ROWS_CAPTURE", "OPCG_THEORY_SET"):
+        env.pop(k, None)
+    f = os.path.join(_SCRIPTS, tool + ".py")
+    with open(f, encoding="utf-8") as fh:
+        of = "--json" if 'add_argument("--json"' in fh.read() else "--out"
+    cmd = [sys.executable]
+    if mode != "py":
+        cmd.append(os.path.join(_SCRIPTS, "theory_capture_run.py"))
+    cmd += [f, "--in", REC, of, out] + extra
+    p = subprocess.run(cmd, cwd=_ROOT, env=env, capture_output=True, text=True)
+    assert p.returncode == 0, p.stderr[-3000:]
+    with open(out, encoding="utf-8") as fh:
+        d = json.load(fh)
+    for k in ("seconds", "elapsed"):
+        d.pop(k, None)
+    checks = None
+    if mode != "py":
+        with open(st, encoding="utf-8") as fh:
+            checks = json.load(fh)["games_checked"]
+    return d, checks
+
+
+@pytest.mark.parametrize("tool,extra", ROWS_TOOLS)
+def test_rows_both_and_rs_modes_keep_the_output(tool, extra, tmp_path):
+    """段 5／6: 器の `collect` の 1 局ぶんを両方で解いても（行の表・`stats`・計数の増分の不一致 0）・Rust だけで解いても、
+    出力は普段の起動と 1 バイト同じ（`rule_stats` も）。"""
+    plain, _ = _run_rows(tool, extra, "py", tmp_path)
+    both, n_b = _run_rows(tool, extra, "both", tmp_path)
+    rs, n_r = _run_rows(tool, extra, "rs", tmp_path)
+    if tool != "pre_settle_asymmetry":           # 段 5 の器のうち `rows_with_p` だけの器は局の駆動を通らない
+        assert n_b >= 2 and n_r >= 2, (n_b, n_r)
     assert json.dumps(plain, sort_keys=True) == json.dumps(both, sort_keys=True)
     assert json.dumps(plain, sort_keys=True) == json.dumps(rs, sort_keys=True)

@@ -3,13 +3,15 @@
 //! （段 7 で Python の理論を消した後も残る答え合わせ・`docs/reports/2026-10-07_port_stage5_6.md`）。
 //!
 //! * `tests/fixtures/theory_rows_golden.jsonl.gz` — 1 行 = 本物の通し（器 × `f_identity/rec`・実 w41・合成 w39）の中の 1 呼び出し。
-//!   `{"seq": <列の名前>, "tool", "game", "frame"?, "payload", "result"}`。**列ごとに新しい核で頭から記録の順に解く**——
+//!   `{"seq": <列の名前>, "tool", "game", "fref"?, "payload", "result"}`（局の枠は `{"frame_def": <番号>, "frame"}` の行で 1 度だけ）。**列ごとに新しい核で頭から記録の順に解く**——
 //!   覚え書き（`option`・`gain`・`flow`・計画の表…）は局をまたいで育つ＝1 局だけ抜くと値が変わりうる（列の頭から
 //!   切った前半は正しい）。間引きの規則は `tests/scripts/theory_rows_golden.py`。
-//! * `OPCG_THEORY_ROWS_REPLAY=<記録のディレクトリ>` を付けると、間引く前の全部の記録（`<dir>/<源>/<器>.rows.jsonl.gz`・
+//! * `OPCG_THEORY_ROWS_REPLAY=<記録のディレクトリ>` を付けると、間引く前の全部の記録（`<dir>` の下の `*.rows.jsonl.gz`・
 //!   1 ファイル＝1 列）も解き直す（手で回す）。
 
-use super::super::pyval::{from_capture, gunzip, parse_json};
+use std::collections::HashMap;
+
+use super::super::pyval::{from_capture, gunzip, parse_json, PyVal};
 use super::drive;
 use super::game::{frame_of_pyval, Game};
 use super::obj::{from_pyval, to_pyval};
@@ -21,14 +23,19 @@ fn fixture(name: &str) -> Vec<u8> {
 }
 
 /// 1 行を解き直す → (器, 合っているか, 違いの説明)
-fn replay_one(c: &mut Core, line: &str) -> (String, bool, String) {
+fn replay_one(c: &mut Core, line: &str, frames: &HashMap<i64, PyVal>) -> (String, bool, String) {
     let j = parse_json(line).expect("記録の行");
     let tool = j.get("tool").and_then(|v| v.as_str()).unwrap().to_string();
     let payload = from_pyval(&from_capture(j.get("payload").expect("payload")));
     let want = from_capture(j.get("result").expect("result"));
-    let out = match j.get("frame") {
-        Some(fj) => {
-            let fr = match frame_of_pyval(&from_capture(fj)) {
+    let fpv = match (j.get("frame"), j.get("fref").and_then(|v| v.as_i64())) {
+        (Some(fj), _) => Some(from_capture(fj)),
+        (None, Some(i)) => Some(frames.get(&i).cloned().unwrap_or_else(|| panic!("局の枠 {i} が無い"))),
+        _ => None,
+    };
+    let out = match fpv {
+        Some(fv) => {
+            let fr = match frame_of_pyval(&fv) {
                 Ok(f) => f,
                 Err(e) => return (tool, false, format!("枠が読めない: {e}")),
             };
@@ -58,14 +65,14 @@ fn replay_one(c: &mut Core, line: &str) -> (String, bool, String) {
 type Per = Vec<(String, usize, usize)>;
 
 /// 列（1 プロセスの記録）を新しい核で頭から解く
-fn replay_seq<'a>(lines: impl Iterator<Item = &'a str>, per: &mut Per, bad: &mut Vec<String>, label: &str) {
+fn replay_seq<'a>(lines: impl Iterator<Item = &'a str>, frames: &HashMap<i64, PyVal>, per: &mut Per, bad: &mut Vec<String>, label: &str) {
     with_core(|c| {
         *c = Core::new();
         for line in lines {
             if line.trim().is_empty() {
                 continue;
             }
-            let (tool, ok, why) = replay_one(c, line);
+            let (tool, ok, why) = replay_one(c, line, frames);
             let e = match per.iter_mut().find(|e| e.0 == tool) {
                 Some(e) => e,
                 None => {
@@ -103,8 +110,13 @@ fn recorded_game_drivers_replay_bit_identically() {
     let text = String::from_utf8(gunzip(&fixture("theory_rows_golden.jsonl.gz"))).unwrap();
     // 列ごとにまとめる（記録の順を保つ）
     let mut seqs: Vec<(String, Vec<&str>)> = Vec::new();
+    let mut frames = HashMap::new();
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
         let j = parse_json(line).expect("記録の行");
+        if let Some(i) = j.get("frame_def").and_then(|v| v.as_i64()) {
+            frames.insert(i, from_capture(j.get("frame").unwrap()));
+            continue;
+        }
         let s = j.get("seq").and_then(|v| v.as_str()).unwrap().to_string();
         match seqs.iter_mut().find(|e| e.0 == s) {
             Some(e) => e.1.push(line),
@@ -113,7 +125,7 @@ fn recorded_game_drivers_replay_bit_identically() {
     }
     let (mut per, mut bad) = (Vec::new(), Vec::new());
     for (s, ls) in &seqs {
-        replay_seq(ls.iter().cloned(), &mut per, &mut bad, s);
+        replay_seq(ls.iter().cloned(), &frames, &mut per, &mut bad, s);
     }
     let total: usize = per.iter().map(|e| e.1).sum();
     eprintln!("局の駆動の golden: {} 列・{total} 行・{per:?}", seqs.len());
@@ -123,19 +135,20 @@ fn recorded_game_drivers_replay_bit_identically() {
     }
 }
 
-/// 手で回す: 間引く前の全部の記録（`OPCG_THEORY_ROWS_REPLAY=<dir>`・`<dir>/<源>/<器>.rows.jsonl.gz`）。
+/// 手で回す: 間引く前の全部の記録（`OPCG_THEORY_ROWS_REPLAY=<dir>`・`<dir>` の下の `*.rows.jsonl.gz`）。
 #[test]
 fn full_rows_capture_replays_bit_identically_when_given() {
     let Ok(root) = std::env::var("OPCG_THEORY_ROWS_REPLAY") else { return };
     super::tests_core::load_tables();
+    // `<dir>` の下の `*.rows.jsonl.gz` を全部（深さは問わない・名前の順）
     let mut files = Vec::new();
-    for src in std::fs::read_dir(&root).unwrap().flatten() {
-        if !src.path().is_dir() {
-            continue;
-        }
-        for f in std::fs::read_dir(src.path()).unwrap().flatten() {
+    let mut stack = vec![std::path::PathBuf::from(&root)];
+    while let Some(d) = stack.pop() {
+        for f in std::fs::read_dir(&d).unwrap().flatten() {
             let p = f.path();
-            if p.to_string_lossy().ends_with(".rows.jsonl.gz") {
+            if p.is_dir() {
+                stack.push(p);
+            } else if p.to_string_lossy().ends_with(".rows.jsonl.gz") {
                 files.push(p);
             }
         }
@@ -144,7 +157,7 @@ fn full_rows_capture_replays_bit_identically_when_given() {
     let (mut per, mut bad) = (Vec::new(), Vec::new());
     for p in &files {
         let text = String::from_utf8(gunzip(&std::fs::read(p).unwrap())).unwrap();
-        replay_seq(text.lines(), &mut per, &mut bad, &p.to_string_lossy());
+        replay_seq(text.lines(), &HashMap::new(), &mut per, &mut bad, &p.to_string_lossy());
     }
     let total: usize = per.iter().map(|e| e.1).sum();
     let mism: usize = per.iter().map(|e| e.2).sum();
