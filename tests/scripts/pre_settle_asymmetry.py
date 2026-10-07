@@ -97,11 +97,11 @@ if _HERE not in sys.path:
 
 import crossing_bridge as CB  # noqa: E402
 import kappa_vector as KV  # noqa: E402
-import theory_order as TO  # noqa: E402
+import theory_rs as TR  # noqa: E402
 import win_calib as WC  # noqa: E402
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from opcg_sim.loop import deck_roles as DR  # noqa: E402
-from theory_order import MU, THETA  # noqa: E402
+from theory_rs import MU, THETA  # noqa: E402
 
 #: 序盤／中盤／終盤の境目（自席ターン番号 `j_me`・0 始まり）。**新しい閾値ではなく境目を宣言するだけ**
 #: ——`j_me <= J_EARLY_MAX` を序盤・`> J_LATE_MIN` を終盤・その間を中盤とする（T146c）。
@@ -123,14 +123,15 @@ def rows_with_p(rows_out, slope="theory", sigma_rel=None, w_err="rel"):
     """`rows_out`（`crossing_bridge.collect` の行）に予測確率 `p` を付けて返す
     （`win_calib.rows_of`／`probs_of` をそのまま呼ぶ・新しい式は書かない）。"""
     rs = WC.rows_of(rows_out, slope)
-    old = TO.W_ERR_MODE
+    old = TR.CLOCK["W_ERR_MODE"]
     try:
-        TO.set_w_err_mode(w_err)
+        TR.set_w_err_mode(w_err)
         p = WC.probs_of(rs, sigma_rel if w_err == "rel" else None)
     finally:
-        TO.set_w_err_mode(old)
+        TR.set_w_err_mode(old)
+    sv = TR.clock_scale([(tm, to) for (_d, tm, to, _z) in rs])
     out = []
-    for r, (d, tm, to, z), pi in zip(rows_out, rs, p):
+    for r, (d, tm, to, z), pi, si in zip(rows_out, rs, p, sv):
         out.append({"p": float(pi), "z": float(z), "d": float(d), "won": bool(r["won"]),
                     "j_me": int(r["j_me"]), "stage": stage_of(r["j_me"]),
                     "seed": r.get("seed"), "who": r.get("who"),
@@ -138,7 +139,7 @@ def rows_with_p(rows_out, slope="theory", sigma_rel=None, w_err="rel"):
                     # 相手の次の行と組にして恒等式 `d_w(t)+d_{1−w}(t+1) = τ_opp(w,t) − τ_me(1−w,t+1)` を検算する）
                     "t": r.get("t"), "j_opp": r.get("j_opp"), "tau_me": float(tm), "tau_opp": float(to),
                     # **T149b**: `s`＝`theory_order.clock_scale`（`W(D)` の物差しがそのまま使う残り時間の尺度）
-                    "s": float(TO.clock_scale(tm, to))})
+                    "s": float(si)})
     return out
 
 

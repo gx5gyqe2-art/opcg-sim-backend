@@ -1,45 +1,20 @@
-"""**毎ターン引く 1 枚がもたらすもの**——デッキの中身と規則だけから出す「流入」。T91／T93・2026-09-18・読み取り専用。
+"""**理論の器の入力の準備**——記録の seed から両席のデッキを作り直し、補充の材料（切れる札の割合）を数える。
+T91／T93・2026-09-18／段 7（2026-10-07）: 流入・効果の損害・除去の害の**式は Rust**（`rust/opcg_engine/src/theory/leaves_deck.rs`）
+に移り、ここには記録とデッキ表から入力を作る部分だけが残る（ユーザ決定 2026-10-06／07: 合成デッキの作り直しは Python に残し
+1 局ずつ Rust へ渡す）。
 
-2 つ在る（どちらも**記録も打ち方も読まない**）:
-
-* **`r`（T91・守る側）**＝耐久 `Θ` の補充＝`μ ×（切れる札の割合）`
-* **`a`（T93・攻める側）**＝速さ `A` の流入＝`E_デッキ[出せる体 1 枚の攻撃の価格]`
-
-**問い**（ユーザ指摘 2026-09-18「穴の大きさを測るのは CPU の打ち方によるんじゃない？」）:
-T90 は動く的の下がる速さ `r` に**帳簿の `g`**（＝相手が**実際にどう打ったか**の記録から出た 1 枚あたりの価格）を
-使っていた。これは**打ち筋を式に入れている**＝記録を取り直せば別の値になる。**式に入れてよいのは規則とデッキの中身だけ**。
-
-**分け方**:
-
-| | 誰が決めるか | `r` に入れてよいか |
-|---|---|---|
-| 毎ターン 1 枚引く・ドンが 1 枚増える | **規則** | ○ |
-| 引いた 1 枚が**切れる札**である確率 | **デッキの中身**（デッキ表から数えられる） | ○ |
-| その札を手札に残すか出すか | **打ち方** | **×** |
-
-3 番目は `Θ` の**中の引っ越し**（手札の項 `μ` ↔ 体の項 `ν`）であって `Θ` の増減ではない＝`r` には入らない。
-`Θ` の手札項は既定 `cuttable`（T77・**切れる札だけが `μ` を持つ**）なので:
-
-```
-r = μ × （そのデッキの切れる札の割合）            # 新定数ゼロ・記録も打ち方も見ない
-```
-
-**デッキは seed から決定論で作れる**（`decks.build_pair`・`deck_profile` と同じ経路）ので、記録の
-`meta_games.json`（`decks` のモードと各局の `leaders`・`seed`）だけで席ごとの `r` が引ける。
-
-**切れる札の定義は符号化に合わせる**——`Θ` の手札項が読んでいるのは `hand_guard.counter_of`
-＝**印字カウンター ＋ カウンターイベントの上げ幅**なので、デッキ側も
-「印字カウンター > 0 **または** 【カウンター】能力を持つイベント」を切れる札として数える。
-
-実行例:
-  OPCG_LOG_SILENT=1 python tests/scripts/deck_refill.py --in ~/w41 --out ~/deck_refill.json
+* **補充の割合**（`shares_by_seed`）＝席ごとの**切れる札の割合**（`r = μ × 割合` の材料・交点の橋の `refill`）。
+  **切れる札の定義は符号化に合わせる**——印字カウンター > 0 **または**【カウンター】でパワーを上げるイベント
+  （`n_rel_feat` の `counter_value` 欄と同じ式）。
+* **両席のデッキ**（`decks_by_seed`）＝`meta_games.json` の `decks` のモードと各局の `leaders`・`seed` から
+  `decks.build_pair` で決定論に作り直す（引かれた seed の分だけ・`_SeedMap`）。
+* **探す能力の価格の席ごとのデッキ**（`record_decks`／`deck_for_seat`・T68・旧 `search_price`）＝最初の自席ターンの手札で検算する。
 """
-import argparse
+import collections
 import collections.abc
 import json
 import os
 import sys
-import time
 
 import numpy as np
 
@@ -52,16 +27,14 @@ if _HERE not in sys.path:
 
 from opcg_sim.learned import n_rel_feat as NF  # noqa: E402
 from opcg_sim.loop import decks as D  # noqa: E402
-import theory_order as TO  # noqa: E402
-from price_realised import nu_meas_of  # noqa: E402
-from theory_order import MU, THETA, attack_value, attack_value_don  # noqa: E402
 
 _DB = {}
 _SHARE = {}          # (leader_id, tuple(deck_ids)) は重いので id 列の署名でキャッシュ
 _PAIR = {}           # (decks_mode, seed, la, lb) -> (share_p1, share_p2)
 _DECKS = {}          # (decks_mode, seed, la, lb) -> (deck_ids_p1, deck_ids_p2)
-_FLOW = {}           # (deck_ids, 相手リーダー, ドンの枠) -> 流入する速さ `a`
-_EFF = {}            # (deck_ids, R, 自リーダー, ドンの枠) -> 効果が出す損害 `e`（T105）
+_SEAT_DECKS = {}     # (seed, decks_mode) -> (deck_ids_p1, deck_ids_p2) または None（`deck_of`・旧 `search_price._DECKS`）
+#: 手札の枠（`n_rel_feat` の枠の並び）
+SLOT_HAND = slice(12, 22)
 
 
 def db():
@@ -118,186 +91,6 @@ def pair_shares(seed, decks_mode, leaders=(None, None)):
     out = (cut_share(d1), cut_share(d2))
     _PAIR[key] = out
     return out
-
-
-def r_of(share, mu=MU):
-    """**補充**＝`μ ×（切れる札の割合）`（1 守備ターンあたり・引き 1 枚ぶん）。"""
-    return float(mu) * float(share)
-
-
-def body_of(m):
-    """その札は**場に出て殴れる体**か（キャラでパワー > 0）。イベント・ステージ・リーダーは違う。"""
-    if getattr(getattr(m, "type", None), "name", "") != "CHARACTER":
-        return False
-    return float(getattr(m, "power", 0) or 0) > 0.0
-
-
-def a_of(deck_ids, opp_leader_power, don=None, theta=THETA, mu=MU, rush_only=False, with_don=True):
-    """**流入する速さ `a`**（T93）＝**引いた 1 枚がもたらす攻撃の価格の期待値**（デッキ平均）。
-
-    ```
-    a = (1/N) Σ_{札 ∈ デッキ}  attack_value_don(パワー, 相手リーダー, リーダー狙い)
-    ```
-
-    体でない札（イベント・ステージ）は 0。`don` を渡すと**そのドンで出せない札**（コスト > ドン）も 0
-    ＝規則の枠（ドンは毎ターン +1・上限 10）で絞る。**新定数ゼロ**（攻撃の価格は `attack_value_don`・
-    残りはデッキの中身）。**打ち方は入らない**——どの札を選ぶかではなく**山の平均**を取る。
-
-    **T103**: `rush_only=True` なら**速攻の札だけ**を数える。速攻は**引いたターンからもう殴れる**ので、
-    歩き（`rate_at`）では 1 ターン早く積む（規則・`play_starts_next_turn` が帳簿側で既に使っている例外）。
-    """
-    olp = float(opp_leader_power)
-    cap = None if don is None else int(round(float(don)))
-    import theory_order as _TO
-    key = (tuple(deck_ids), round(olp, 1), cap, bool(rush_only)) + (() if with_don else ("bare",))
-    if _TO.CUT_PRICER is not None:
-        # **N-3**: 守り手の値段の文脈は鍵に入れる（1 枚あたり一定の窓だけ・それ以外は覚えない）
-        key = (key + (_TO.CUT_PRICER_KEY, _TO.CUT_TAKE_CARD is not None)) if _TO._cut_cache_ok() else None
-    if key is not None and key in _FLOW:
-        return _FLOW[key]
-    d = db()
-    n = 0
-    tot = 0.0
-    for cid in deck_ids:
-        m = d.get_card(cid)
-        if m is None:
-            continue
-        n += 1
-        if not body_of(m):
-            continue
-        if cap is not None and int(getattr(m, "cost", 0) or 0) > cap:
-            continue
-        # **T103**: `rush_only` なら**速攻の札だけ**（引いたターンからもう殴れる＝1 ターン早い）。
-        if rush_only and "速攻" not in (getattr(m, "keywords", ()) or ()):
-            continue
-        # **H-4e（E6）**: `with_don=False` なら**素殴り**——`attack_value_don` は付与のドンを**財布の外で無料で**付けている
-        # （T109 の財布の漏れ）。財布を 1 つにする形（`rule_don` 系）はこちらを使う（付けるなら財布の中で払う）。
-        pw = float(getattr(m, "power", 0) or 0)
-        tot += float(attack_value_don(pw, olp, True, theta, mu) if with_don else attack_value(pw, olp, True, theta, mu))
-    out = (tot / n) if n else 0.0
-    if key is not None:
-        _FLOW[key] = out
-    return out
-
-
-def e_of(deck_ids, my_leader_power=5000.0, r_turns=3, don=None, boards=None):
-    """**引いた 1 枚が出す「効果の損害」の期待値**（T105・デッキ平均）。
-
-    **問い**（T103 の速さの検算）: **実際に打った攻撃は 1 ターンの損害の 79〜92% しか説明しない**。
-    残り 8〜21% は**効果が出した損害**（KO・除去）で、速さ `A` には 1 項も入っていなかった。
-
-    ```
-    e = (1/N) Σ_{札 ∈ デッキ}  max_{その札の除去能力}  E_盤面[ max ν(倒せる体) ]
-    ```
-
-    * **除去能力としきい値は原本から読む**（`n_rel_feat.profile` の `thr`＝相手を対象にした
-      KO／バウンス／レスト系と `power_max`）。**パーサの出力であって打ち方ではない**。
-    * **倒せる体の損害は `ν_meas`**（`price_realised`・`Θ` の体の項と同じ式）。
-    * **盤面は測った分布**（`theory_order.load_opp_boards`・T46 の `OPTION_MODE=dist` と同じ資産）。
-      **ここだけが記録由来**で、他は全部デッキ表と規則。
-    * **1 枚は 1 回しか使えない**ので、これは**流量**（毎ターン 1 枚引く ＝ 毎ターン `e` ずつ）であって
-      積み上がらない——体の攻撃（`a_of`）が**毎ターン殴り続ける**のと役割が違う。
-
-    `don` を渡すとそのドンで出せない札は 0（`a_of` と同じ規則の枠）。
-    """
-    rb = int(max(1, min(5, round(float(r_turns)))))
-    bs = (TO.load_opp_boards() if boards is None else boards).get(rb) or []
-    if not bs:
-        return 0.0
-    mlp = float(my_leader_power)
-    cap = None if don is None else int(round(float(don)))
-    key = (tuple(deck_ids), rb, round(mlp, 1), cap)
-    if boards is None and key in _EFF:
-        return _EFF[key]
-    d = db()
-    n = 0
-    tot = 0.0
-    for cid in deck_ids:
-        m = d.get_card(cid)
-        if m is None:
-            continue
-        n += 1
-        if cap is not None and int(getattr(m, "cost", 0) or 0) > cap:
-            continue
-        tot += removal_harm(m, mlp, bs)
-    out = (tot / n) if n else 0.0
-    if boards is None:
-        _EFF[key] = out
-    return out
-
-
-def removal_harm(m, my_leader_power, boards):
-    """その札 1 枚が**相手から奪える体の損害**（`ν_meas`）の期待値。除去能力が無ければ 0。
-
-    しきい値（`power_max`）に合う体だけが対象。**1 枚で 1 体**（複数体を取る能力も 1 体ぶんで数える＝
-    過小側に倒す）。**コストのしきい値（`cost_max`）は盤面の分布がコストを持たないので見ない**（限界）。"""
-    thr = [t for t in (NF.profile(m).get("thr") or ()) if len(t) >= 4 and t[3] == "removal"]
-    if not thr:
-        return 0.0
-    mlp = float(my_leader_power)
-    best = 0.0
-    for t in thr:
-        pmax = t[0]
-        tot = 0.0
-        for _rec_mlp, bodies in boards:
-            v = 0.0
-            for tp, _blk in bodies:
-                if pmax is not None and float(tp) > float(pmax) + 1e-6:
-                    continue
-                v = max(v, float(nu_meas_of(float(tp), mlp)))
-            tot += v
-        best = max(best, tot / len(boards))
-    return float(best)
-
-
-_CEFF = {}           # (cid, R, 自リーダー) -> その札 1 枚の効果の損害（T109・財布のナップサックが枚ごとに引く）
-
-
-def card_effect_harm(cid, my_leader_power=5000.0, r_turns=3, boards=None):
-    """**その札 1 枚**の効果の損害（`removal_harm` の 1 枚版・キャッシュあり）。
-
-    **T109**（財布を 1 つにする）で要る——`hand_effect_harm` は「手札のうち一番大きいもの」を返すが、
-    **1 つのナップサックに手札を入れる**には**札ごとの値**が必要になる。中身は `removal_harm` そのままで、
-    **体を持たない札（イベント・ステージ）も除去なら値を持つ**（規則どおり・`playable_attack_price` は
-    体だけ見ていたので、そこだけでは落ちていた）。"""
-    rb = int(max(1, min(5, round(float(r_turns)))))
-    mlp = float(my_leader_power)
-    key = (str(cid), rb, round(mlp, 1))
-    if boards is None and key in _CEFF:
-        return _CEFF[key]
-    bs = (TO.load_opp_boards() if boards is None else boards).get(rb) or []
-    m = db().get_card(cid) if cid else None
-    out = 0.0 if (not bs or m is None) else float(removal_harm(m, mlp, bs))
-    if boards is None:
-        _CEFF[key] = out
-    return out
-
-
-def hand_effect_harm(cids, my_leader_power=5000.0, r_turns=3, don=None, boards=None):
-    """**今の手札が今このターン出せる「効果の損害」**（T108・在庫の側・一度きり）。
-
-    T105 の `e_of` は**毎ターン引く 1 枚**（流量）だけを数えていた。**手札に溜まっている札の効果**は
-    **一度きり**に使えるもので、**速さの式にまだ 1 項も入っていない**。
-
-    **1 枚だけ数える**——複数撃つぶんのドンは体にも使えるので**過小側に倒す**（`removal_harm` と同じ規約）。
-    `don` を渡すとそのドンで出せない札は 0（規則の枠）。**打ち筋は入らない**——
-    **どれを使うかではなく「使えるもののうち一番大きいもの」**を規則と原本から決める。
-    """
-    rb = int(max(1, min(5, round(float(r_turns)))))
-    bs = (TO.load_opp_boards() if boards is None else boards).get(rb) or []
-    if not bs or not cids:
-        return 0.0
-    d = db()
-    cap = None if don is None else int(round(float(don)))
-    best = 0.0
-    for cid in cids:
-        m = d.get_card(cid)
-        if m is None:
-            continue
-        if cap is not None and int(getattr(m, "cost", 0) or 0) > cap:
-            continue
-        best = max(best, removal_harm(m, float(my_leader_power), bs))
-    return float(best)
 
 
 class _SeedMap(collections.abc.Mapping):
@@ -387,32 +180,63 @@ def decks_by_seed(dirs):
     return _by_seed(dirs, pair_decks)
 
 
-def main(argv=None):
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--in", dest="inp", nargs="+", required=True, help="記録のディレクトリ（複数可）")
-    ap.add_argument("--out", default="")
-    a = ap.parse_args(argv)
-    t0 = time.time()
-    sh = shares_by_seed(a.inp)
-    vals = np.array([v for pair in sh.values() for v in pair], float)
-    out = {"dirs": list(a.inp), "games": len(sh), "seats": int(vals.size),
-           "cut_share": {"mean": round(float(vals.mean()), 4) if vals.size else None,
-                         "p10": round(float(np.percentile(vals, 10)), 4) if vals.size else None,
-                         "p50": round(float(np.percentile(vals, 50)), 4) if vals.size else None,
-                         "p90": round(float(np.percentile(vals, 90)), 4) if vals.size else None},
-           "r": {"mu": MU,
-                 "mean": round(float(r_of(vals.mean())), 5) if vals.size else None,
-                 "p10": round(float(r_of(np.percentile(vals, 10))), 5) if vals.size else None,
-                 "p90": round(float(r_of(np.percentile(vals, 90))), 5) if vals.size else None},
-           "seconds": round(time.time() - t0, 1)}
-    txt = json.dumps(out, ensure_ascii=False, indent=1)
-    if a.out:
-        with open(a.out, "w", encoding="utf-8") as fh:
-            fh.write(txt + "\n")
-    print(txt)
-    return 0
+def record_decks(dirs):
+    """記録ディレクトリ → {seed: (decks モード, [リーダー p1, p2])}。無ければ空。"""
+    out = {}
+    for d in dirs:
+        d = os.path.expanduser(d)
+        mode = None
+        try:
+            with open(os.path.join(d, "meta_n_record.json"), encoding="utf-8") as fh:
+                mode = json.load(fh).get("decks")
+        except (OSError, ValueError):
+            pass
+        try:
+            with open(os.path.join(d, "meta_games.json"), encoding="utf-8") as fh:
+                m = json.load(fh)
+            mode = mode or m.get("decks")
+            for g in m.get("games") or []:
+                out[int(g["seed"])] = (mode, list(g.get("leaders") or [None, None]))
+        except (OSError, ValueError):
+            pass
+    return out
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+def deck_of(seed, mode, leaders):
+    """seed からその局の両席のデッキ（card_id の並び）を復元する。復元できなければ `None`。"""
+    key = (int(seed), str(mode))
+    if key in _SEAT_DECKS:
+        return _SEAT_DECKS[key]
+    try:
+        db_ = D.load_db()
+        la, lb = (list(leaders) + [None, None])[:2]
+        (l1, d1), (l2, d2) = D.build_pair(db_, la, lb, int(seed), str(mode))[:2]
+        _SEAT_DECKS[key] = (list(d1), list(d2))
+    except Exception:
+        _SEAT_DECKS[key] = None
+    return _SEAT_DECKS[key]
+
+
+def deck_for_seat(seed, mode, leaders, who, hand_cids):
+    """席 `who`（0/1）のデッキ。**復元が記録と合うか**を手札で検算する（手札の札がデッキの並びに全部在るか）。
+    合わなければ `None`＝その局の探す能力の価格は従来の `sel(k)` に落ちる。"""
+    d = deck_of(seed, mode, leaders)
+    if d is None or who not in (0, 1):
+        return None
+    deck = d[int(who)]
+    cnt = collections.Counter(deck)
+    for c in hand_cids:
+        if cnt[c] <= 0:
+            return None
+        cnt[c] -= 1
+    return list(deck)
+
+
+def hand_ids(ci_row, idx2cid):
+    """行の主の手札の card_id の並び（空の枠は落とす）。"""
+    out = []
+    for v in np.asarray(ci_row)[SLOT_HAND]:
+        cid = idx2cid.get(int(v))
+        if cid:
+            out.append(str(cid))
+    return out

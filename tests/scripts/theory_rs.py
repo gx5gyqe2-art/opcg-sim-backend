@@ -73,6 +73,9 @@ SETTLE_COND_MODE = "whole"
 SIGMA_FLOOR_MODE = "off"
 CLOCK_HAND_MODE = "off"
 LEDGER_FLOW_PRICING = "exercise"
+#: 値付けの直し（`F_PRICING_FIX=all`・定数）の出力の欄（旧 `effect_value.pricing_fixes_label()`／`apply_f_pricing_fixes`）
+PRICING_FIXES_LABEL = "draw_n,either_side,optional_block,base_power,opp_subject,revealed_src,choice_max"
+F_PRICING_FIXES_LABEL = "hand_board,state_filters,branch_then,attached_don_cond,look_return,trash_pool"
 FLOW_PRICING_MODES = ("option", "exercise")
 
 # ---------------------------------------------------------------------------------------------------------------

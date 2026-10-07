@@ -42,6 +42,10 @@ S_meas = λ·(自ライフ − 相手ライフ) + μ·(自手札 − 相手手�
 **限界**: 実現は「次の自分の行まで」の変化なので、**その手が将来に残す価値**（体の残りの仕事・
 サーチの選択の利得）は `ν_meas`・手札の枚数を通してしか入らない。付与（DON）の実現は攻撃に混ざる。
 
+
+**段 7（2026-10-07）**: 価格（`score_candidate`）・実現（`S_meas`・入った札の質）・1 局ぶんの行の読みは Rust の局の駆動
+（`rust/opcg_engine/src/theory/core/drv_pr.rs`）。Python に残るのは記録の読み・デッキの作り直し・集計と JSON。
+
 実行例:
   OPCG_LOG_SILENT=1 python tests/scripts/price_realised.py --in ~/w41 --out ~/pr_w41.json
 """
@@ -61,283 +65,52 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
-import guard_afford as GA  # noqa: E402
-import effect_value as EV  # noqa: E402
-from theory_bridge import (MOVE_FAMILIES, POL_COLS, ROW_COLS, _extra, _state_of,  # noqa: E402
-                           move_family)
-from theory_bridge import is_decision_row as TB_is_decision_row  # noqa: E402  (D-5)
-import theory_order as _TO  # noqa: E402
-from theory_order import (own_attackers_of, play_value, LAM, MU, PWR_EPS, S_IS_CHAR, S_POWER, SC_MY_DON, SC_MY_HAND,  # noqa: E402
-                          SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER, SC_OPP_LIFE,
-                          SLOT_OPP_FIELD, SLOT_OWN_FIELD, THETA, add_nu_mode_arg, apply_nu_mode,
-                          opp_bodies_of, play_cost_term, score_candidate, slot_power, theta_of)
+import theory_rs as TR  # noqa: E402
+from theory_bridge import MOVE_FAMILIES, POL_COLS, ROW_COLS, _extra  # noqa: E402
+from theory_rs import LAM, MU, THETA  # noqa: E402
 
 #: 実測の価格（`game_theory.md` §18）——**式ではなく実測**。`δ` は `theory_gate` と同じ値
 DELTA = 0.0277
-SC_OPP_HAND = 7
-#: ドンの列（`encode/scalars.rs`: 2/3 自アクティブ/レスト・4/5 相手・14/15 リーダー付与÷5）と
-#: トークンの付与ドン列（`n_rel_feat.S_COLS_V13` の 2 番目・÷5）
-SC_DON = {"me": (2, 3, 14), "opp": (4, 5, 15)}
-S_ATTACHED_DON = 2
 #: **帯ごとの実測 `ν`**（Phase 1a・`2026-09-13_nu_measure` 系・§18）。式 `nu_of` は通さない
 NU_MEAS = {"lt_leader": 0.0690, "leader_to_sat": 0.1503, "over_sat": 0.2112}
-SAT_OVER_PWR = 2000.0
-
-
-def nu_meas_of(power, opp_leader_power):
-    """帯ごとの実測 `ν`（パワー対相手リーダー）。"""
-    x = float(power) - float(opp_leader_power)
-    if x < -PWR_EPS:
-        return NU_MEAS["lt_leader"]
-    if x <= SAT_OVER_PWR + PWR_EPS:
-        return NU_MEAS["leader_to_sat"]
-    return NU_MEAS["over_sat"]
-
-
-def side_nu_meas(tok, slots, opp_leader_power):
-    """自分／相手の体の `ν_meas` の和。**帯は付与ドンを外した素のパワーで決める**（2026-09-16 訂正・
-    ユーザ指摘）——`power_now` は所有者のターンに付与ドンを載せるので、`DON_BOX` で付けた 1000·k が
-    次の判断点まで残り、帯が上がって**付けたドンが実現に暗黙に加算**されていた。"""
-    tot = 0.0
-    for s in range(slots.start, slots.stop):
-        if float(tok[s, S_IS_CHAR]) <= 0.5:
-            continue
-        pw = float(tok[s, S_POWER]) * 1e4 - float(tok[s, S_ATTACHED_DON]) * 5.0 * 1000.0
-        if pw < -PWR_EPS:
-            continue
-        tot += nu_meas_of(pw, opp_leader_power)
-    return tot
-
-
-def don_stock(sc, tok, side="me"):
-    """**ドンの総在庫**＝アクティブ＋レスト＋リーダー付与＋キャラ付与（付与しても動かない）。"""
-    a, r, ld = SC_DON[side]
-    slots = SLOT_OWN_FIELD if side == "me" else SLOT_OPP_FIELD
-    attached = sum(float(tok[s, S_ATTACHED_DON]) * 5.0 for s in range(slots.start, slots.stop)
-                   if float(tok[s, S_IS_CHAR]) > 0.5)
-    return float(sc[a]) + float(sc[r]) + float(sc[ld]) * 5.0 + attached
-
-
-def don_attached(sc, tok, side="me"):
-    """**付与中のドン**＝リーダー付与＋キャラ付与（`don_stock` の付与の部分）。"""
-    _a, _r, ld = SC_DON[side]
-    slots = SLOT_OWN_FIELD if side == "me" else SLOT_OPP_FIELD
-    attached = sum(float(tok[s, S_ATTACHED_DON]) * 5.0 for s in range(slots.start, slots.stop)
-                   if float(tok[s, S_IS_CHAR]) > 0.5)
-    return float(sc[ld]) * 5.0 + attached
-
-
-def state_meas(sc, tok):
-    """**実測の価格で評価した盤面**（自席から見た差）。"""
-    mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-    olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-    return (LAM * (float(sc[SC_MY_LIFE]) - float(sc[SC_OPP_LIFE]))
-            + MU * (float(sc[SC_MY_HAND]) - float(sc[SC_OPP_HAND]))
-            + DELTA * (don_stock(sc, tok, "me") - don_stock(sc, tok, "opp"))
-            + side_nu_meas(tok, SLOT_OWN_FIELD, olp)      # 自分の体は相手のリーダーに対して
-            - side_nu_meas(tok, SLOT_OPP_FIELD, mlp))     # 相手の体は自分のリーダーに対して
-
-
-#: **物差しの手札の項**（T69・2026-09-17・ユーザ決定「物差し側にも質は入れた方が良さそう」）:
-#: `quality`（既定）＝窓の中で**手札に入った札**を μ ではなくその札の `max(ΔH_play, ΔG_guard)`（入った先の手札で・
-#: `hand_plan.added_card_gains`）で数える。手札から出た札は μ のまま（出す価格の `−μ` と揃える）。
-#: 旧の `count`（μ × 枚数の差・切替 `HAND_MEAS_MODE`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
-#: 出力 JSON の `hand_meas` キーは定数 `"quality"` のまま残す（バイト一致のため）。
-
-
-def quality_correction(gains, mu=MU):
-    """入った札の分の補正＝Σ (`max(ΔH, ΔG)` − μ)（物差しは既に μ × 枚数を数えているので差だけ足す）。"""
-    return float(sum(float(g) - float(mu) for g in gains))
-
-
-#: **F-4（レビュー 3 の 6）** の「物差しを固める」測定の腕（`--freeze-yardstick`＝実現の側の手札の質を F の直しと
-#: 2 つの切替を切った値付けで読む）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。
-def hand_quality_delta(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, mu=MU, deck=None):
-    """**T69**: 窓の中で手札に入った札の補正 `(Σ(gain − μ), [gain, …])`。`deck` は T70 の相方待ちに使う。"""
-    import hand_plan as HP                     # 遅延 import（hand_plan は本器を import する）
-    gains = [g for _cid, g in HP.added_card_gains(sc_after, tok_after, ci_before, ci_after, idx2cid, cards, deck=deck)]
-    return quality_correction(gains, mu), gains
-
-
-#: 登場・イベントの価格が引くドンの機会費用（`theory_order.play_value`／`score_candidate` と同じ `0.66·μ`）
-DON_COST = 0.66 * MU
 #: **後で効く効果**（T53）——次の判断点には出ず、同じターンの後の行（攻撃）に実現が出る動作の型
 FLOW_ACTS = frozenset({"ACTIVE_DON", "ATTACH_DON", "GRANT_KEYWORD", "BUFF", "BP_BUFF", "REST"})
 
 
-#: **F-4** の層別の表（`--attack-split`＝登場の行を継続効果の見え方で・攻撃の行を【アタック時】能力の有無で）は
-#: 2026-10-05 に削除——`claude/theory-switches-final` で再現できる（`passive_class`／`has_on_attack` も同時に削除）。
-
-
-def primary_action(cid, triggers=EV.ACTIVATE_TRIGGERS):
-    """その契機の最初の能力の最初の動作の型（効果の型の内訳用）。読めなければ `"?"`。"""
-    c = EV._all_cards().get(cid) if cid else None
-    if not c:
-        return "?"
-    for ab in (c.get("abilities") or []):
-        if (ab.get("trigger") or ab.get("timing")) in triggers:
-            acts = EV.walk_actions(ab.get("effect"))
-            return str(acts[0].get("type")) if acts else "?"
-    return "?"
-
-
-def row_ctx(sc, tok, ci_row, idx2cid, cards, deck, theta=THETA, mu=MU, theta_mode="const"):
-    """自席の判断点 1 行の価格の文脈（`score_candidate` に渡す `ctx`・本器と `play_body_check` が共有する）。"""
-    from theory_bridge import _search_ctx      # 遅延 import（橋は本器を import しない）
-    th = theta_of(tok, float(sc[SC_MY_LIFE]), float(sc[SC_MY_DON]),
-                  mode=theta_mode, theta=_TO.theta_take(float(sc[SC_OPP_LIFE]), theta=theta))   # T63
-    return {"theta": th, "mu": mu,
-            "opp_leader_power": float(sc[SC_OPP_LEADER_POWER]) * 1e4,
-            "my_leader_power": float(sc[SC_MY_LEADER_POWER]) * 1e4,
-            "r_turns": max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), "don_k": 1,
-            "attackers": own_attackers_of(tok, float(sc[SC_OPP_LEADER_POWER]) * 1e4),
-            "don_active": float(sc[SC_MY_DON]),   # 登場の機会費用（T43）
-            "st": _state_of(sc, ci_row, idx2cid, tok=tok, cards=cards),   # T72: 場の札 id・総在庫も
-            "search_ctx": _search_ctx(sc, tok, ci_row, idx2cid, cards, deck),   # T68
-            "opp_bodies": opp_bodies_of(
-                tok, float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0,
-                max(1.0, min(5.0, float(sc[SC_OPP_LIFE]))), th, mu,
-                ci_row=ci_row, idx2cid=idx2cid)}
-
-
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
-    """(局, 席) ごとに、手の型ごとの価格と実現を足す。"""
-    from attack_response import parts          # 遅延 import（attack_response は本器を import する）
-    from theory_bridge import _seat_decks   # T68（遅延 import・橋は本器を import しない）
-    import search_price as SP
-    cards = PL.Cards()
-    idx2cid = {i: c for c, i in GA._vocab().items()}
-    rec_decks = SP.record_decks(dirs)
+    """(局, 席) ごとに、手の型ごとの価格と実現を足す（1 局ぶんは Rust の局の駆動 `price_realised`）。"""
+    from theory_bridge import _seat_decks   # T68
+    import deck_refill as DR
+    idx2cid = TR.idx2cid()
+    rec_decks = DR.record_decks(dirs)
     per = {}
     stats = {"games": 0, "own_rows": 0, "scored": 0, "no_next": 0, "silent": 0,
              "search_price": "plan", "search_deck_ok": 0, "search_deck_bad": 0,
              # **T69**: 物差しの手札の項の規約・入った札の数・補正の和（Σ(gain − μ)）・入った札の gain の平均
              "hand_meas": "quality", "hand_added": 0, "hand_quality_sum": 0.0, "hand_gain_sum": 0.0}
     games = 0
-    for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS,
-                                                    pol_cols=POL_COLS, extra_fn=_extra):
+    for game in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
         games += 1
         if limit_games and games > limit_games:
             break
-        stats["games"] += 1
+        rows, _pol, ex, _L, _ptr, idx = game
+        stats["games"] += 1                                       # `_seat_decks` が `stats` に数える前
         seed = int(rows["seed"][idx[0]])
-        order = list(idx)
         decks = _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats)   # T68
-        # 席ごとの **main 行**（kind 0）の並び——「次の自分の行」は**次の判断点**でなければならない。
-        # 攻撃の直後に自分の選択の行（kind 1/2＝アタック時効果の対象・トリガー等）が挟まると、
-        # そこで挟むと解決前の盤面を読んでしまい**攻撃の実現が半分消える**（2026-09-16 に実測:
-        # リーダー攻撃の実現 0.038 → 0.074・T47）。
-        by_seat = {}
-        for n, i in enumerate(order):
-            if TB_is_decision_row(rows, pol, L, ptr, i):
-                by_seat.setdefault(int(rows["who"][i]), []).append(n)
-        nxt = {}
-        for w, ns in by_seat.items():
-            for a, b in zip(ns, ns[1:]):
-                nxt[a] = b
-        # **ターン末の盤面**（T53）＝そのターンの最後の判断点（`TURN_END` の行）。「後で効く」効果
-        # （`ACTIVE_DON`・`GRANT_KEYWORD`・`BUFF`・`REST`）の実現は次の判断点には出ず同じターンの攻撃に出るので、
-        # 行 → ターン末の差分 `real_te` も持つ（後の行の実現と重なるので**型の和には使わない**・ターン単位の恒等式で読む）
-        turn_end_row = {}
-        for n, i in enumerate(order):
-            w, t = int(rows["who"][i]), int(rows["turn"][i])
-            if t >= 1 and PL.is_own_turn(w, t) and TB_is_decision_row(rows, pol, L, ptr, i):
-                turn_end_row[(w, t)] = i                                        # 後の行で上書き＝最後が残る
-        last_ci = {}                                                            # D3: 席ごとの直近の行（相手の手札）
-        for n, i in enumerate(order):
-            w, t = int(rows["who"][i]), int(rows["turn"][i])
-            prev_opp_ci = last_ci.get(1 - w)
-            last_ci[w] = ex["ci"][i]
-            if t < 1:
-                continue
-            z = float(rows["z"][i])
-            rec = per.setdefault((seed, w), {"seed": seed, "who": w, "z": None,
-                                             "price": {f: 0.0 for f in MOVE_FAMILIES},
-                                             "real": {f: 0.0 for f in MOVE_FAMILIES},
-                                             "n": {f: 0 for f in MOVE_FAMILIES},
-                                             "rows": [], "turns": {}})
-            if z != 0.0:
-                rec["z"] = 1.0 if z > 0 else 0.0
-            sc, tok = ex["sc"][i], ex["tok"][i]
-            j = nxt.get(n)
-            if j is None:
-                stats["no_next"] += 1
-                continue
-            i2 = order[j]
-            if PL.is_own_turn(w, t):
-                if not TB_is_decision_row(rows, pol, L, ptr, i):
-                    continue
-                k = int(L[i]); ch = int(rows["pol_chosen"][i])
-                if k < 1 or ch < 0 or ch >= k:
-                    continue
-                stats["own_rows"] += 1
-                if int(rows["turn"][i2]) != t:
-                    stats["no_next"] += 1      # ターン最後の行＝相手のターンが挟まる
-                    continue
-                ctx = row_ctx(sc, tok, ex["ci"][i], idx2cid, cards, decks.get(w), theta, mu, theta_mode)
-                if EV.F_PRICING_FIX and ctx.get("st") is not None:
-                    from theory_bridge import opp_pools
-                    ctx["st"].update(opp_pools(prev_opp_ci, ex["ci"][i], idx2cid, decks.get(1 - w)))
-                th = ctx["theta"]
-                b = int(ptr[i]) + ch
-                sig = json.loads(pol["pol_sig"][b])
-                tl = sig[2] if len(sig) > 2 else None
-                v = score_candidate(sig, str(pol["pol_cid"][b]) or None,
-                                    (str(pol["pol_tcid"][b]) or None) if tl else None, ctx, cards,
-                                    src_power=slot_power(tok, pol["pol_si"][b]),
-                                    tgt_power=slot_power(tok, pol["pol_ti"][b]),
-                                    don_k=pol["pol_k"][b],
-                                    src_don=_TO.slot_don(tok, pol["pol_si"][b]))      # F-2（切替 on のときだけ使う）
-                fam = move_family(sig)
-                if v is None:
-                    stats["silent"] += 1
-                    continue
-                stats["scored"] += 1
-                real = state_meas(ex["sc"][i2], ex["tok"][i2]) - state_meas(sc, tok)
-                # **T69**: 窓の中で手札に入った札は μ ではなく `max(ΔH, ΔG)` で数える（`quality`）
-                hq, gains = hand_quality_delta(ex["sc"][i2], ex["tok"][i2], ex["ci"][i], ex["ci"][i2], idx2cid, cards, mu, deck=decks.get(w))
-                real += hq
-                stats["hand_added"] += len(gains); stats["hand_quality_sum"] += hq; stats["hand_gain_sum"] += sum(gains)
-                cid = str(pol["pol_cid"][b]) or None
-                # **総額**＝価格にドンの機会費用を足し戻したもの（在庫の差分と同じ土俵にする）
-                info = cards.info(cid) if cid else None
-                cost = float((info or {}).get("cost") or 0) if fam == "play" else 0.0
-                # 実際に引かれた費用（`state` なら機会費用・`flat` なら定額）を足し戻す（T43）
-                gross = float(v) + (play_cost_term(ctx, cost, mu, th) if fam == "play" else 0.0)
-                act = (primary_action(cid) if fam == "effect"
-                       else primary_action(cid, EV.CHAR_ON_PLAY_TRIGGERS) if fam == "play" else None)
-                ite = turn_end_row.get((w, t), i2)
-                real_te = state_meas(ex["sc"][ite], ex["tok"][ite]) - state_meas(sc, tok)
-                real_te += hand_quality_delta(ex["sc"][ite], ex["tok"][ite], ex["ci"][i], ex["ci"][ite], idx2cid, cards, mu, deck=decks.get(w))[0]   # T69
-                # **登場の内訳**（T53）: 価格を「体（ν − μ）」「登場時効果」「機会費用」に、実現を部品に割る
-                play_parts = None
-                if fam == "play" and info is not None and not (info.get("event") or info.get("stage")):
-                    nu_part = play_value(float(info["power"]), 0, ctx["opp_leader_power"], ctx["r_turns"], th, mu,
-                                         is_blocker=info.get("blocker"), my_leader_power=ctx["my_leader_power"])
-                    cost_part = play_cost_term(ctx, cost, mu, th)
-                    play_parts = {"nu_minus_mu": float(nu_part), "effect": float(v) - float(nu_part) + float(cost_part),
-                                  "opportunity": float(cost_part), **parts(sc, tok, ex["sc"][i2], ex["tok"][i2])}
-                    # **T69**: 手札の部品にも質の補正を載せる。枚数だけの旧値は `my_hand_count` に残す（「見つけたか」はこちらで読む）
-                    play_parts["my_hand_count"] = play_parts["my_hand"]
-                    play_parts["my_hand"] = play_parts["my_hand"] + hq
-                    play_parts["hand_quality"] = float(hq)             # 補正だけ（入った札の gain の並びは行の `hand_gains`）
-            else:
-                continue                       # 守りの窓は比べない（docstring）
-            rec["price"][fam] += float(v); rec["real"][fam] += float(real); rec["n"][fam] += 1
-            rec["rows"].append({"fam": fam, "price": float(v), "real": float(real), "real_te": float(real_te),
-                                "gross": float(gross), "act": act, "cid": cid, "turn": t, "play_parts": play_parts,
-                                "hand_gains": list(gains)})                                 # T69: 窓で手札に入った札の gain
-            # **ターン単位の恒等式**——価格の和 対 「最初の自分の行 → 最後の自分の行」の実現
-            tk = rec["turns"].setdefault(t, {"price": 0.0, "first": None, "last": None, "acts": set()})
-            tk["price"] += float(v)
-            if act:
-                tk["acts"].add(act)
-            if tk["first"] is None:
-                tk["first"] = state_meas(sc, tok)
-                tk["ci_first"] = ex["ci"][i]
-            tk["last"] = state_meas(ex["sc"][i2], ex["tok"][i2])
-            # **T69**: ターン単位の恒等式の実現にも入った札の質を載せる（最初の行の手札 → この判断点の手札）
-            tk["last"] += hand_quality_delta(ex["sc"][i2], ex["tok"][i2], tk["ci_first"], ex["ci"][i2], idx2cid, cards, mu, deck=decks.get(w))[0]
+        pin = {"decks": [None if decks.get(w) is None else list(decks.get(w)) for w in (0, 1)]}
+        c = TR.cfg(theta, mu, theta_mode, F_PRICING_FIX=True)
+        res = TR.game_call("price_realised", game, {"cfg": c, "in": pin, "stats": stats, "carry": {}})
+        for key, rec in res["per"]:
+            for tk in (rec.get("turns") or {}).values():
+                if "acts" in tk:
+                    tk["acts"] = set(tk["acts"])
+            key = tuple(key)
+            if key in per:
+                raise RuntimeError("price_realised: per の鍵 %r が 2 局に出た" % (key,))
+            per[key] = rec
+        new = res["stats"]
+        stats.clear()
+        stats.update(new)
     return per, stats
 
 
@@ -347,6 +120,8 @@ def _slope(x, y):
         return None
     xd = x - x.mean()
     return float((xd * (y - y.mean())).sum() / (xd * xd).sum())
+
+
 
 
 def _auc(scores, labels):
@@ -476,44 +251,24 @@ def main(argv=None):
     ap.add_argument("--theta-mode", default="const", choices=("const", "board", "max"))
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
-    add_nu_mode_arg(ap)
-    _TO.add_surv_mode_arg(ap)
-    _TO.add_cbar_mode_arg(ap)
-    ap.add_argument("--flow-pricing", default=None, choices=EV.FLOW_PRICING_MODES,
+    ap.add_argument("--flow-pricing", default=None, choices=TR.FLOW_PRICING_MODES,
                     help="**T54** 後で効く効果を付与の行で数える（`option`・既定）か、使った行で数える（`exercise`＝付与の行は 0）か")
-    EV.add_search_price_arg(ap)
-    import hand_plan as _HP
-    _TO.add_attack_ability_arg(ap)
-    _TO.add_defender_power_arg(ap)                 # 2b
-    _TO.add_passive_body_arg(ap)
-    EV.add_f_pricing_fixes_arg(ap)
+    ap.add_argument("--search-value", default=None, choices=TR.SWITCH_VALUES["SEARCH_VALUE_MODE"],
+                    help="**N-4** 足した札の値: `legacy`（既定・`max(ΔH, ΔG)`）／`joint`（1 枚 1 役の手札の価値の増え・残す候補）")
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
-    _TO.apply_attack_ability(a)
-    _TO.apply_defender_power(a)                    # 2b
-    _TO.apply_passive_body(a)
-    EV.apply_f_pricing_fixes(a)
-    _TO.reset_wiring_stats()
-    apply_nu_mode(a)
-    _TO.apply_surv_mode(a)
-    _TO.apply_cbar_mode(a)
     if a.flow_pricing is not None:
-        EV.set_flow_pricing(a.flow_pricing)
-    EV.apply_search_price(a)
-    pricing_fixes = EV.pricing_fixes_label()
+        TR.set_switch("FLOW_PRICING", a.flow_pricing)
+    if a.search_value is not None:
+        TR.set_switch("SEARCH_VALUE_MODE", a.search_value)
     t0 = time.time()
-    EV.reset_cond_stats()
+    TR.reset_cond_stats()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode)
-    stats["cond"] = dict(EV.COND_STATS)                     # T72: 条件の判定（真／偽／判らない）の数
-    if EV.F_PRICING_FIX:
-        stats["f_pricing_fixes"] = EV.apply_f_pricing_fixes(a)          # 空でないときだけ刻む（`none`＝旧の値付けの出力は 079e73b8 と同じ）
-    if _TO.ATTACK_ABILITY_MODE != "off" or _TO.PASSIVE_BODY_MODE != "off":
-        # F-2/F-3a: 切替 on のときだけ刻む（off の出力は従来と同じ）
-        stats["wiring"] = {"attack_ability": _TO.ATTACK_ABILITY_MODE, "passive_body": _TO.PASSIVE_BODY_MODE,
-                           **{k: (round(v, 5) if isinstance(v, float) else v) for k, v in _TO.WIRING_STATS.items()}}
-    res = {"nu_mode": a.nu_mode, "surv_mode": a.surv_mode, "flow_pricing": EV.FLOW_PRICING,
+    stats["cond"] = dict(TR.COND_STATS)                     # T72: 条件の判定（真／偽／判らない）の数
+    stats["f_pricing_fixes"] = TR.F_PRICING_FIXES_LABEL     # 値付けの直し（`all`・定数）
+    res = {"nu_mode": TR.SW["NU_MODE"], "surv_mode": TR.SW["SURV_MODE"], "flow_pricing": TR.RUN["FLOW_PRICING"],
            "search_price": "plan", "hand_meas": "quality",
-           "play_now": "hand", "cost_afford": EV.COST_AFFORD_MODE, "pricing_fixes": pricing_fixes,
+           "play_now": "hand", "cost_afford": TR.SW["COST_AFFORD_MODE"], "pricing_fixes": TR.PRICING_FIXES_LABEL,
            "decision_rows": "main",
            "inflow": "on", "cond_clock": "on", "stats": stats,
            "frozen": {"lambda": LAM, "mu": MU, "delta": DELTA, "nu_meas": NU_MEAS, "theta": a.theta},

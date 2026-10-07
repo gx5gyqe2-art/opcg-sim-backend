@@ -47,8 +47,8 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 import crossing_bridge as CB  # noqa: E402
-import theory_order as TO  # noqa: E402
-from theory_order import MU, THETA  # noqa: E402
+import theory_rs as TR  # noqa: E402
+from theory_rs import MU, THETA  # noqa: E402
 
 #: 対数損失を潰さないための刻み（**確率 0/1 を返す読みは存在しない**が、`erf` の飽和で 0 になりうる）
 EPS = 1e-6
@@ -66,16 +66,16 @@ def rows_of(rows_out, slope="theory", cap=None):
 
 
 def probs_of(rs, sigma_rel=None, scale_mode="hyp"):
-    """行ごとの予測勝率。`W_ERR_MODE` は呼ぶ側が立てる（`sigma_rel` は `rel` のときだけ使う）。"""
-    old = TO.SIGMA_REL
+    """行ごとの予測勝率（式は Rust の `prob_of_d`）。`W_ERR_MODE` は呼ぶ側が立てる（`sigma_rel` は `rel` のときだけ使う）。"""
+    old = TR.CLOCK["SIGMA_REL"]
     try:
         if sigma_rel is not None:
-            TO.set_sigma_rel(sigma_rel)
+            TR.set_sigma_rel(sigma_rel)
         # **T151-2**: `rows_out` は**ターン開始の 2 本の時計**の行＝手番の半ターンが正確に掛かる瞬間（`mover=True`）。
-        return [TO.prob_of_d(d, t_me=tm, t_opp=to, scale_mode=scale_mode, mover=True)
-                for (d, tm, to, _z) in rs]
+        return TR.rows_call("wc.probs_of", [[float(d), float(tm), float(to)] for (d, tm, to, _z) in rs],
+                            scale_mode=str(scale_mode))
     finally:
-        TO.set_sigma_rel(old)
+        TR.set_sigma_rel(old)
 
 
 def auc_of(p, z):
@@ -175,7 +175,7 @@ def stretch(rs, nq=5):
     d = np.array([r[0] for r in rs], float)
     tm = np.array([r[1] for r in rs], float)
     to = np.array([r[2] for r in rs], float)
-    s = np.array([TO.clock_scale(a, b) for a, b in zip(tm, to)], float)
+    s = np.array(TR.clock_scale(list(zip(tm, to))), float)
     q = np.quantile(s, np.linspace(0, 1, nq + 1))
     out = []
     for i in range(nq):
@@ -195,25 +195,25 @@ def collect_calib(dirs, limit_games=0, slope="theory", sigma_rel=None, scale_mod
     rows_out, ledger, stats, turn_harm, theta_check = CB.collect(dirs, limit_games, THETA, MU, "const")
     rs = rows_of(rows_out, slope)
     z = [r[3] for r in rs]
-    old = TO.W_ERR_MODE
+    old = TR.CLOCK["W_ERR_MODE"]
     out = {"slope": slope, "games": stats.get("games"), "rows": len(rs),
            "pre_settle": CB.PRE_SETTLE_MODE,
-           "sigma_d": round(float(TO.SIGMA_D), 4), "scale_mode": scale_mode,
+           "sigma_d": round(float(TR.CLOCK["SIGMA_D"]), 4), "scale_mode": scale_mode,
            "stretch": stretch(rs)}
     # **K-1／K-2**: 時計の読みの欄（波C で切替は削除＝定数 `whole`／`off`・欄は従来どおり書く）
-    out["settle_cond"] = TO.SETTLE_COND_MODE; out["sigma_floor"] = TO.SIGMA_FLOOR_MODE
+    out["settle_cond"] = TR.SETTLE_COND_MODE; out["sigma_floor"] = TR.SIGMA_FLOOR_MODE
     try:
-        TO.set_w_err_mode("abs")
+        TR.set_w_err_mode("abs")
         out["abs"] = score(probs_of(rs), z, nbin)
         if sigma_rel is not None:
-            TO.set_w_err_mode("rel")
+            TR.set_w_err_mode("rel")
             out["rel"] = score(probs_of(rs, sigma_rel, scale_mode), z, nbin)
             out["sigma_rel"] = round(float(sigma_rel), 4)
             # **1 次同次な尺度はどれでも識別力が同じ**ことの検算（AUC が一致する）
             out["scale_auc"] = {m: score(probs_of(rs, sigma_rel, m), z, nbin)["auc"]
                                 for m in ("hyp", "sum", "mean", "max", "geo")}
     finally:
-        TO.set_w_err_mode(old)
+        TR.set_w_err_mode(old)
     return out
 
 
@@ -233,8 +233,7 @@ def main(argv=None):
     CB.set_pre_settle_mode(a.pre_settle)            # **T138b**
     sr = a.sigma_rel if a.sigma_rel is not None else CB.sigma_rel_for(a.src)
     out = collect_calib(a.src, a.games, a.slope, sr, a.scale, a.bins)
-    if CB.THETA_HAND_MODE == "rule_don":
-        out["rule_stats"] = dict(CB.RULE_STATS)               # **H-4g**: 使った計画ごとの地平の縮み
+    out["rule_stats"] = dict(CB.RULE_STATS)               # **H-4g**: 使った計画ごとの地平の縮み
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:
         with open(a.json, "w", encoding="utf-8") as f:

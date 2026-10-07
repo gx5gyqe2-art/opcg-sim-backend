@@ -7,7 +7,7 @@
    **ターンの前後で勝率がどれだけ動いたか**と**そのターンの価格の和**を並べるのが本来の形:
 
    ```
-   W(t)      = Φ(D(t)/σ_D)                     その時点の勝率（席 0 から見る・`theory_order.prob_of_d`）
+   W(t)      = Φ(D(t)/σ_D)                     その時点の勝率（席 0 から見る・Rust の `prob_of_d`）
    ΔW(t)     = W(t+1) − W(t)                   そのターンで動いた勝率（実測の側）
    g(t)      = Σ(席 0 の手の価格) − Σ(席 1 の手の価格)   そのターンの帳簿（**κ を掛けない生の価格**）
    κ_必要(t) = ΔW(t) / g(t)                     この局面で価格 1 単位が勝率いくらに当たるべきか
@@ -38,10 +38,12 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-def _PROB(d):
-    """`W(D) = Φ(D/σ_D)`（`theory_order.prob_of_d`）。"""
-    import theory_order as TO
-    return TO.prob_of_d(d)
+import theory_rs as TR  # noqa: E402
+
+
+def _probs(ds):
+    """`W(D) = Φ(D/σ_D)`（Rust の `prob_of_d`・`D` の列 → 列）。"""
+    return TR.prob_of_d([(d, None, None) for d in ds])
 
 
 #: `κ_必要 = ΔW/g` が発散しないための下限（価格の単位・`μ` の 1/10 程度）
@@ -84,6 +86,7 @@ def windows(series, rounds=1):
     """
     n = 2 * int(rounds)
     out = []
+    ps = _probs([x for i in range(len(series) - n) for x in (series[i + n]["d0"], series[i]["d0"])])
     for i in range(len(series) - n):
         a, b = series[i], series[i + n]
         fam = {}
@@ -92,7 +95,7 @@ def windows(series, rounds=1):
                 fam[f] = fam.get(f, 0.0) + float(v)
         out.append({"d0": a["d0"], "r_turns": a.get("r_turns"),
                     "g0": float(sum(series[k]["g0"] for k in range(i, i + n))),
-                    "dW": _PROB(b["d0"]) - _PROB(a["d0"]),
+                    "dW": ps[2 * i] - ps[2 * i + 1],
                     "g_fam": fam,
                     "dchars": (None if a.get("chars") is None or b.get("chars") is None
                                else int(b["chars"]) - int(a["chars"]))})
