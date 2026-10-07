@@ -92,6 +92,10 @@ pub struct Core {
     pub cond_stats: [i64; 3],
     pub valuers: HashMap<u64, super::hj::JointValuer>,
     pub next_valuer: u64,
+    /// 段 4: 守る側の外側の覚え書き・攻め手の財布・曲線・計数の増分
+    pub outer: super::outer::OuterState,
+    /// 入口の `g` の `modes`（Rust の計画のディスクの覚え書きの鍵に入る）
+    pub modes: V,
 }
 
 impl Core {
@@ -135,11 +139,14 @@ impl Core {
             cond_stats: [0; 3],
             valuers: HashMap::new(),
             next_valuer: 1,
+            outer: Default::default(),
+            modes: V::None,
         }
     }
 
     /// 履歴に依る覚え書き（丸めた鍵）を捨てる（記録の再生で 1 行ごとに）。
     pub fn reset_history(&mut self) {
+        self.outer.rdc.clear();
         self.option.clear();
         self.gain.clear();
         self.flow.clear();
@@ -152,6 +159,9 @@ impl Core {
         self.bodies.clear();
         self.valuers.clear();
         self.conv.clear();
+        let store = self.outer.store.take();
+        self.outer = Default::default();
+        self.outer.store = store;
     }
 
     /// `cards.info(cid)`（`PL.Cards.info` の 9 項目の dict・無い札は `None`）。

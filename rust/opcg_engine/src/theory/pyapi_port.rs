@@ -85,8 +85,12 @@ fn theory_leaf_call(name: &str, payload: &str) -> PyResult<String> {
 fn theory_core_call(name: &str, payload: &str, replay: bool) -> PyResult<String> {
     use super::core::obj::{from_pyval, to_pyval, V};
     let p = from_pyval(&super::pyval::from_capture(&parse_json(payload).map_err(verr)?));
-    let (r, cs) = super::core::state::with_core(|c| super::core::entry::call(c, name, &p, replay)).map_err(verr)?;
-    let out = V::dict(vec![(V::s("r"), r), (V::s("cs"), V::list(cs.iter().map(|&x| V::Int(x)).collect()))]);
+    let (r, cs, ev) = super::core::state::with_core(|c| super::core::entry::call_ev(c, name, &p, replay)).map_err(verr)?;
+    let mut kv = vec![(V::s("r"), r), (V::s("cs"), V::list(cs.iter().map(|&x| V::Int(x)).collect()))];
+    if !ev.is_empty() {
+        kv.push((V::s("ev"), V::list(ev.into_iter().map(|(k, v)| V::list(vec![V::s(&k), v])).collect())));
+    }
+    let out = V::dict(kv);
     Ok(capture_string(&to_pyval(&out)))
 }
 

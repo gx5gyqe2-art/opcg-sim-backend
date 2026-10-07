@@ -22,14 +22,18 @@
     clippy::manual_clamp
 )]
 
+pub mod curve;
 pub mod entry;
+pub mod entry_outer;
 pub mod ev;
 pub mod hj;
 pub mod hp;
 pub mod obj;
+pub mod outer;
 pub mod pyrand;
 pub mod sp;
 pub mod state;
+pub mod store;
 pub mod to;
 #[cfg(test)]
 mod tests_core;

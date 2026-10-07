@@ -46,6 +46,27 @@ fn main() {
         feed(&[0]);
     }
     println!("cargo:rustc-env=RD_KERNEL_SRC_HASH={:016x}", h);
+    // **全移植・段 4（2026-10-07）**: Rust の計画のディスクの覚え書き（`core/store.rs`）の鍵に入る**解き方の原文の全部**のハッシュ
+    // （`src/theory/**` の `.rs` のうち試験〔`tests*.rs`〕でないもの全部・相対パス順・FNV-1a 64 を 2 本）——`rule_don_solve` の外側が
+    // Rust に移ったので、どのファイルを直しても古い計画は返らない（版の上げ忘れは `test_rd_speed` の指紋が見張る）。
+    let mut all = Vec::new();
+    collect(root, &mut all);
+    let mut keyed: Vec<(String, PathBuf)> = all
+        .into_iter()
+        .map(|p| (p.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/"), p))
+        .filter(|(rel, _)| !rel.rsplit('/').next().unwrap_or("").starts_with("tests"))
+        .collect();
+    keyed.sort();
+    let (mut h1, mut h2): (u64, u64) = (0xcbf2_9ce4_8422_2325, 0x8422_2325_cbf2_9ce4);
+    for (rel, p) in &keyed {
+        let body = fs::read(p).unwrap_or_default();
+        for &b in rel.as_bytes().iter().chain([0u8].iter()).chain(body.iter()).chain([0u8].iter()) {
+            h1 ^= b as u64;
+            h1 = h1.wrapping_mul(0x0000_0100_0000_01b3);
+            h2 = (h2 ^ b as u64).wrapping_mul(0x0000_0100_0000_01b3).rotate_left(5);
+        }
+    }
+    println!("cargo:rustc-env=RD_SOLVER_SRC_HASH={:016x}{:016x}", h1, h2);
     println!("cargo:rerun-if-changed=src/theory");
     println!("cargo:rerun-if-changed=build.rs");
 }

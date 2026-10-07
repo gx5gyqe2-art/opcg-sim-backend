@@ -121,6 +121,15 @@ pub fn apply_g(c: &mut Core, g: &V) -> R<()> {
     if !m.get("UNKNOWN_FACTOR").is_none() {
         c.unknown_factor = m.get("UNKNOWN_FACTOR").f();
     }
+    // 段 4（守る側の外側）の切替: 既定の枝だけ
+    want("THETA_HAND_MODE", &["rule_don"])?;
+    want("THETA_SIDE_MODE", &["legacy", "symmetric"])?;
+    want("RD_KERNEL", &["rs"])?;
+    want("RATE_DECAY_MODE", &["off", "ko"])?;
+    want("EX_STATE_BUDGET", &["300000"])?;
+    want("THETA_BODY_MODE", &["blockers"])?;
+    want("SLOPE_TAKE_MODE", &["life"])?;
+    c.modes = m.clone();
     Ok(())
 }
 
@@ -129,7 +138,7 @@ pub fn preload(c: &mut Core, pre: &V) -> R<()> {
     for e in pre.items() {
         let it = e.items();
         let k = key_of(&it[1]);
-        let v = it[2].f();
+        let v = if it[0].as_str() == Some("rdc") { 0.0 } else { it[2].f() };
         match it[0].as_str() {
             Some("option") => {
                 c.option.insert(k, v);
@@ -139,6 +148,10 @@ pub fn preload(c: &mut Core, pre: &V) -> R<()> {
             }
             Some("flow") => {
                 c.flow.insert(k, v);
+            }
+            Some("rdc") => {
+                c.outer.rdc.insert(k, it[2].clone());
+                continue;
             }
             other => return Err(format!("覚え書き {other:?}")),
         }
@@ -490,13 +503,25 @@ pub fn call_inner(c: &mut Core, name: &str, a: &V) -> R<V> {
         }
         _ => {
             let _ = (th(), MU);
-            return Err(format!("未知の核の入口 {name}"));
+            return super::entry_outer::call_outer(c, name, a);
         }
     })
 }
 
 /// 記録 1 行を解く: 文脈を入れ、（再生なら）丸めた鍵の覚え書きを空にして前もって入れ、呼び、条件の計数の差分も返す。
 pub fn call(c: &mut Core, name: &str, payload: &V, replay: bool) -> R<(V, [i64; 3])> {
+    call_ev(c, name, payload, replay).map(|(v, cs, _ev)| (v, cs))
+}
+
+/// `call` ＋ 段 4 の計数（`RULE_STATS`／`EX_SPEED_STATS`）の増分（順に）。
+pub fn call_ev(c: &mut Core, name: &str, payload: &V, replay: bool) -> R<(V, [i64; 3], Vec<(String, V)>)> {
+    c.outer.events.clear();
+    let r = call_body(c, name, payload, replay);
+    let ev = std::mem::take(&mut c.outer.events);
+    r.map(|(v, cs)| (v, cs, ev))
+}
+
+fn call_body(c: &mut Core, name: &str, payload: &V, replay: bool) -> R<(V, [i64; 3])> {
     apply_g(c, payload.get("g"))?;
     if replay {
         c.reset_history();
