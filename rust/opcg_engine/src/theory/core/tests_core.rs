@@ -27,7 +27,7 @@ fn fixture(name: &str) -> Vec<u8> {
 
 static LOAD: Once = Once::new();
 
-fn load_tables() {
+pub(super) fn load_tables() {
     LOAD.call_once(|| {
         let cards = String::from_utf8(gunzip(&fixture("theory_cards.json.gz"))).unwrap();
         input::set_cards(CardTable::from_json(&cards).expect("カード表"));

@@ -37,3 +37,5 @@ pub mod store;
 pub mod to;
 #[cfg(test)]
 mod tests_core;
+#[cfg(test)]
+mod tests_outer;
