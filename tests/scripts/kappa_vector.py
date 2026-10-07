@@ -89,12 +89,12 @@
 
 使い方:
 
-    python tests/scripts/kappa_vector.py --in <records_dir> [--games N] [--d-mode curve|theory] [--json out.json]
+    python tests/scripts/kappa_vector.py --in <records_dir> [--games N] [--json out.json]
 """
+
 
 import argparse
 import json
-import math
 import os
 import sys
 
@@ -109,208 +109,17 @@ if _HERE not in sys.path:
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 import crossing_bridge as CB  # noqa: E402
-import cut_price as CP  # noqa: E402  （N-3）
-import guard_afford as GA  # noqa: E402
-import theory_order as TO  # noqa: E402
-from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
-from theory_order import (MU, SC_MY_DON, SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER,  # noqa: E402
-                          SC_OPP_LIFE, THETA, opp_bodies_of, own_attackers_of, score_candidate,
-                          slot_power, theta_of)
+import theory_rs as TR  # noqa: E402
+from theory_bridge import POL_COLS, ROW_COLS, _extra  # noqa: E402
+from theory_rs import MU, THETA  # noqa: E402
 
-#: 速さの床（`crossing_bridge.SLOPE_FLOOR` と同じ意味・0 割りを避ける）
-A_FLOOR = CB.SLOPE_FLOOR
-#: **歩きの打ち切り**（`crossing_bridge.RACE_CAP`・既存の定数）。`A → 0` の行で `τ` が数百ターンに飛ぶのを止める。
-TAU_CAP = CB.RACE_CAP
-#: 軸の名前（順序は固定・プラセボの置換もこの順で回す）
 AXES = ("th_me", "th_opp", "a_me", "a_opp")
-
-#: **攻撃した体のレスト費用**（C-2・2026-09-25・`2026-09-25_c1_attack_axis_by_result.md` の候補(a)）。
-#: 旧 `off`（攻撃は`Θ_opp`しか動かさない・波C で削除）／C-2 の `body`（**攻めた体がブロッカーなら、攻撃でレストになり
-#: 次の自席ターンまで`Θ_me`の体の項から抜ける分を永久の損失として足す**近似・波B で削除）——
-#: `claude/theory-switches-final` で再現できる。
-#: 規則: `has_blocker`は`!is_rest`を要求（`rust/opcg_engine/src/rules/battle.rs`）。値は`_body_term`と
-#: 同じ単位（`crossing_bridge.nu_meas_of`）。**新定数ゼロ**（既存の式の再利用）。
-#: **`return`（C-5c・正しい形）**: 攻めたブロッカーの `ν_meas` を**消さずに「戻る側」へ移す**
-#: （`th_me` −ν・`th_me_back` +ν・総量は不変）——状態が `THETA_RETURN_MODE=untap` の 7 つ組
-#: （戻る分を持つ）であることが前提（5 つ組に `*_back` を足すと `apply_dx` が落ちる＝黙って捨てない）。
-#: **`return`**（2026-09-25・C-5c・ユーザ決定）。**定数**——出力 JSON の `attack_rest_mode` キーは `"return"` のまま。
+#: **C-5c**: 攻めたブロッカーは消さずに戻る側へ移す（定数・Rust の `core::drv_kv`）
 ATTACK_REST_MODE = "return"
-
-
-def split_state(st):
-    """状態を **7 つ**に揃えて返す `(Θ_me, Θ_opp, A_me, A_opp, j, 戻る_me, 戻る_opp)`（C-5c）。
-    5 つ組（`state5_of_row` の器・旧 `THETA_RETURN_MODE=off`）は戻る分 0 として読む。"""
-    st = tuple(st)
-    if len(st) == 5:
-        return st + (0.0, 0.0)
-    if len(st) == 7:
-        return st
-    raise ValueError("状態は 5 つ組か 7 つ組（%d）" % len(st))
-
-
-#: **`D` の読み方**（上の表）。`curve`＝**帳簿の正本**（輪郭・軸は 2 本）／`theory`＝積み上がる歩き（軸は 4 本）。
-D_MODES = ("curve", "theory")
+#: `D` の読み（`curve`＝帳簿の正本・損害の輪郭）。`theory`（積み上がる歩き・T127）は Rust に移していない
+#: （段 7・凍結ブランチ `claude/theory-switches-final` で再現する）
 D_MODE = "curve"
-#: 読みごとに**生きている軸**。`curve` に速さの軸は**存在しない**（輪郭は固定の表）。
-LIVE_AXES = {"curve": ("th_me", "th_opp"), "theory": AXES}
-
-#: **`theory`（積み上がる歩き・T94）の速さの形**＝席ごとの
-#: `(リーダー, 盤面のキャラ, 在庫, 流入, 在庫の速攻, 流入の速攻, 効果, 在庫の効果)` を
-#: **和が 1 になるよう正規化した割合**。歩きの各項はこの割合 × その席の `A` で作る。
-#: **速攻の 2 つは在庫・流入の内側**なので、和を取る分母には入れない（`_norm_shape`）。
-#:
-#: **なぜ割合で持つか**: 状態は `A` をスカラーで持っている（軸は 4 本のまま）。`ΔA` を割合で配れば
-#: **歩きは `Θ` と `A` を同じだけ倍にしても不変**（＝**P5・通貨の付け替え**が設計から出る）
-#: ——輪郭と違い**絶対のターン番号の表を一切使わない**ので、単位は `A` だけが持つ。
-#:
-#: **ただし P7（両席の `A` を c 倍しても `D` が 1/c になる）は満たさない**（T127 で踏んだ）。
-#: `R_k = A·f(k)` で `f` が増えるなら `Σ_{k≤τ} f` が `1/c` になる `τ` は `τ/c` より大きい
-#: ——**加速する時計は原理的に `A` について 1 次同次になれない**。**加速と P7 は両立しない**ので、
-#: **P7 は要求として過剰だった**（`curve` で「0 行の破れ」だったのは満たしていたからではなく
-#: `A` が時計に入っていなかったから・T126）。**単位の不変量は P5 の方**であり、そちらは厳密に通る。
-#: （代わりに「出した体は `stock` へ」という T84 の遅れは**この形では表現していない**＝一次の近似・報告で明示する。）
-#: 既定は `(0, 1, 0, 0, 0, 0, 0, 0)`＝全部が盤面＝**一定の速さ**（`tau_grow` が `Θ/A` に退化する）。
-SHAPE_N = 8
-FLAT_SHAPE = (0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-#: 和の分母に入る枠（速攻の 2 つ＝添字 4・5 は在庫・流入の内側なので二重に数えない）
-SHAPE_TOTAL_IX = (0, 1, 2, 3, 6, 7)
-RATE_SHAPE = {"me": FLAT_SHAPE, "opp": FLAT_SHAPE}
-
-
-def _norm_shape(terms):
-    """8 つの項を**和が 1 になるよう**正規化（全部 0 なら全部盤面に倒す）。
-
-    項は `(リーダー, 盤面, 在庫, 流入, 在庫の速攻, 流入の速攻, 効果, 在庫の効果)`
-    ——**速攻の 2 つは在庫・流入の内側**（`seat_slope_terms` の規約）なので**分母に入れない**。
-    短い列を渡したら残りは 0 とみなす（旧 4 項の呼び出しをそのまま受ける）。"""
-    v = [max(0.0, float(x)) for x in terms] + [0.0] * SHAPE_N
-    v = v[:SHAPE_N]
-    tot = sum(v[i] for i in SHAPE_TOTAL_IX)
-    return tuple(x / tot for x in v) if tot > 0.0 else FLAT_SHAPE
-
-
-def set_rate_shape(me_terms=None, opp_terms=None):
-    """席ごとの速さの形を入れる（`theory` の読みだけが使う）。`None` は据え置き。"""
-    if me_terms is not None:
-        RATE_SHAPE["me"] = _norm_shape(me_terms)
-    if opp_terms is not None:
-        RATE_SHAPE["opp"] = _norm_shape(opp_terms)
-    return RATE_SHAPE
-
-
-def tau_theory(theta, rate, shape, j, step=0.0):
-    """**積み上がる歩き**（T94）で `Θ` に届くまでのターン数。**表を一切使わない**（加速は状態から出る）。
-
-    `R_k = リーダー ＋ 盤面·(1−ko_p)^{k−1} ＋ 在庫·[k≥2] ＋ 流入·(k−1) ＋ 効果 ＋ 在庫の効果·[k≤1]`
-    （`crossing_bridge.rate_at`・速攻は 1 ターン早く積む）を `shape × rate` で作って歩く。
-    **`A` について 1 次同次**なので、通貨の付け替えにも両席共通の速さの誤差にも構造的に強い。
-    `step`＝**2 段目から的に戻るレスト中のブロッカー**（C-5c・`tau_grow` の `step`）。"""
-    sh = list(shape) + [0.0] * SHAPE_N
-    lead, chars, stock, flow, s_rush, f_rush, eff, eff1 = (
-        float(x) * max(0.0, float(rate)) for x in sh[:SHAPE_N])
-    return float(CB.tau_grow(max(0.0, float(theta)), lead, chars, stock, flow,
-                             stock_rush=s_rush, flow_rush=f_rush, eff=eff, eff_once=eff1,
-                             j0=int(j) + 1, step=max(0.0, float(step))))
-
-
-def set_d_mode(name):
-    global D_MODE
-    if name not in D_MODES:
-        raise ValueError("D_MODE は %s のいずれか（%r）" % (D_MODES, name))
-    D_MODE = name
-
-
-def tau_of(theta, rate, step=0.0):
-    """**片側の時計** `τ = min(CAP, Θ/A)`（T90 の `static`・統計の `tau_*_sum` が使う。旧 `clock` の読みの時計）。
-    `step > 0`（C-5c）なら 1 段目に届かなければ的が `step` 遠のく＝`(Θ + step)/A`。"""
-    a = max(A_FLOOR, float(rate))
-    th = float(theta); step = max(0.0, float(step))
-    if step > 0.0 and th > a:
-        th += step
-    return min(float(TAU_CAP), th / a)
-
-
-def d_of(st, prof=None):
-    """**2 つの到達時刻の差** `D = τ(私が死ぬまで) − τ(相手が死ぬまで)`（正なら自分が先に届く）。
-
-    `st` は `(Θ_me, Θ_opp, A_me, A_opp, j)`。`j` は自席ターン番号（輪郭の読み出し位置）。
-    `curve` は `crossing_bridge.tau_from_profile`（**帳簿が使っているのと同じ関数**）。"""
-    th_me, th_opp, a_me, a_opp, j, b_me, b_opp = split_state(st)
-    if D_MODE == "curve":
-        if prof is None:
-            raise ValueError("D_MODE=%s には損害の輪郭が要る（profile_for）" % D_MODE)
-        return float(CB.tau_from_profile(max(0.0, float(th_me)), int(j), prof, 1.0, step=b_me)
-                     - CB.tau_from_profile(max(0.0, float(th_opp)), int(j), prof, 1.0, step=b_opp))
-    # **T127**（`theory`）: 加速を**状態から**出す（表を使わない）。削る側の速さでそれぞれ歩く。
-    return (tau_theory(th_me, a_opp, RATE_SHAPE["opp"], j, step=b_me)
-            - tau_theory(th_opp, a_me, RATE_SHAPE["me"], j, step=b_opp))
-
-
-def apply_dx(st, dx):
-    """`(Θ_me, Θ_opp, A_me, A_opp, j[, 戻る_me, 戻る_opp])` に `Δx` を足す（**耐久は 0 未満に、速さは床未満に
-    しない**＝規則）。5 つ組に `th_*_back` を足すことはできない（戻る分を持たない状態＝落とす）。"""
-    st = tuple(st)
-    has_back = ("th_me_back" in dx) or ("th_opp_back" in dx)
-    if len(st) == 5 and has_back:
-        raise ValueError("戻る分（th_*_back）は THETA_RETURN_MODE=untap の 7 つ組にしか足せない")
-    th_me, th_opp, a_me, a_opp, j, b_me, b_opp = split_state(st)
-    out = (max(0.0, float(th_me) + float(dx.get("th_me", 0.0))),
-           max(0.0, float(th_opp) + float(dx.get("th_opp", 0.0))),
-           max(A_FLOOR, float(a_me) + float(dx.get("a_me", 0.0))),
-           max(A_FLOOR, float(a_opp) + float(dx.get("a_opp", 0.0))), j)
-    if len(st) == 7:
-        out += (max(0.0, float(b_me) + float(dx.get("th_me_back", 0.0))),
-                max(0.0, float(b_opp) + float(dx.get("th_opp_back", 0.0))))
-    return out
-
-
-def grad_of(st, prof=None):
-    """**`D` の勾配**（読みに応じて・**中心差分**）。
-
-    `curve` の `τ` は輪郭に沿った区分線形なので、中心差分は**その `τ` における輪郭の高さの逆数**
-    `1/prof[j+τ]` をそのまま返す（解析と同じ値・刻みは数値の都合で式の定数ではない）。
-    **生きていない軸は 0**（`curve` に速さの軸は存在しない）。"""
-    g = {k: 0.0 for k in AXES}
-    axes = (("th_me", 0), ("th_opp", 1)) if D_MODE == "curve" else (
-        ("th_me", 0), ("th_opp", 1), ("a_me", 2), ("a_opp", 3))
-    # `theory` は表を使わないので輪郭は要らない（`d_of` が無視する）
-    for k, i in axes:
-        x = float(st[i])
-        h = max(1e-6, 1e-4 * max(1.0, abs(x)))
-        up = list(st); up[i] = x + h
-        dn = list(st); dn[i] = max(0.0, x - h)
-        g[k] = (d_of(tuple(up), prof) - d_of(tuple(dn), prof)) / (up[i] - dn[i])
-    return g
-
-
-def rate_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=None, j=None, plan=None):
-    """その席の **A**（1 自席ターンに積む損害）。**橋の `slope_theory` と同じ式**（T128）。
-
-    ```
-    A = 盤面 ＋ 手札の項（流入・T93）＋ 効果の流入 ＋ 在庫の効果
-    ```
-
-    **`deck_ids` を必ず渡す**（T128）——手札の項は流入（T93・効果の項も常に入る）
-    では**流入と効果の項がデッキの中身から出る**ので、渡さないと `A` が**盤面だけ**になる。
-    2026-09-20 に実測: 渡さないと `A` は `j` によらずほぼ一定（0.055）で、
-    橋の実測（`j=5` で 0.204）に対し**伸びが丸ごと消える**。
-    `j`（自席ターン番号・0 始まり）を渡すと **T103 の規則**（最初の自席ターンは 1 本も打てない）も
-    橋と同じく適用する。
-
-    **必ずその席のターンの「最初の行」で呼ぶ**——ターン途中の行では殴り終わった体の
-    `CAN_ATTACK` が落ちていて `A` がほぼ 0 になり、`τ = Θ/A` が数百ターンに飛ぶ（実測）。
-    橋も `turn_start[(w, t)]` で読んでいる（`crossing_bridge.collect`）。"""
-    if plan is not None and "a_time" in plan:
-        # **H-4f（Q1）**: 帳簿の速さは時計（`Θ/A`）にしか使わない＝時刻で読む器。`rule_don` 系は
-        # **耐久 ÷ 歩きの τ**（T103 の最初のターンの 0 は τ の中にある）。
-        return float(plan["a_time"])
-    if j is not None and int(j) == 0:
-        return 0.0
-    # **H-4b**: `plan`（`rule_don` 系の攻め手の計画）を渡すと速さの側も**耐久と同じ計画**を読む（T109）
-    lead, chars, stock, flow, _sr, _fr, eff, eff1 = rate_terms_of_row(
-        sc, tok, ci_row, idx2cid, cards, theta, mu, deck_ids=deck_ids, plan=plan)
-    hand = flow
-    return float(lead + chars + hand + eff + eff1)
+LIVE_AXES = {"curve": ("th_me", "th_opp")}
 
 
 def _seat_decks(dirs):
@@ -333,157 +142,10 @@ def _deck_of(seat_decks, seed, w):
 
 
 def _deck_pair(seat_decks, seed):
-    """**N-3**: `(席 0 のデッキ, 席 1 のデッキ)`（無ければ `None`）——`cut_price.CutFrames` に渡す。"""
+    """**N-3**: `(席 0 のデッキ, 席 1 のデッキ)`（無ければ `None`）。"""
     if not seat_decks:
         return None
     return (_deck_of(seat_decks, seed, 0), _deck_of(seat_decks, seed, 1))
-
-
-def frame_rows_of(r, idx, last=False):
-    """**N-3**: 各席の**自席ターンの最初の行**（`kind == 0`）＝帳簿が `rate_at`／`g_at` を読む行と同じ行。
-    `last=True` なら**最後の行**＝次の相手ターンの間の手札そのもの（守り手の枠・`crossing_bridge` の `turn_last` と同じ考え方）。"""
-    out = {}
-    for i in idx:
-        if int(r["kind"][i]) != 0:
-            continue
-        w, t = int(r["who"][i]), int(r["turn"][i])
-        if PL.is_own_turn(w, t) and (last or (w, t) not in out):
-            out[(w, t)] = i
-    return out
-
-
-def g_of_row(sc, tok, ci_row, idx2cid, cards):
-    """**その席の手札 1 枚あたりの価格**（T76／T79・帳簿の `_g_of_row` と同じ式）。"""
-    part = CB.THETA_HAND_PART[CB.THETA_HAND_MODE]
-    return CB.hand_price_mean(sc, tok, ci_row, idx2cid, cards, part=part)
-
-
-def rate_terms_of_row(sc, tok, ci_row, idx2cid, cards, theta=THETA, mu=MU, deck_ids=None, plan=None):
-    """その席の**速さの内訳** 8 項
-    `(リーダー, 盤面のキャラ, 在庫, 流入, 在庫の速攻, 流入の速攻, 効果, 在庫の効果)`
-    （T94／T103／T105／T108・`seat_slope_terms` の並べ替え）。
-
-    **`deck_ids` を必ず渡す**（T128・`rate_of_row` の注記と同じ）——流入・効果はデッキの中身から出る。
-    **`rate_of_row` と同じ行（その席のターンの最初の行）で呼ぶ。** 返すのは生の額で、
-    使う側は `set_rate_shape` で割合に正規化する（**速攻の 2 つは在庫・流入の内側**）。"""
-    sc = np.asarray(sc); tok = np.asarray(tok)
-    olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-    base, stock, flow, lead, s_rush, f_rush, eff, eff1 = CB.seat_slope_terms(
-        sc, tok, ci_row, idx2cid, cards, olp, theta, mu, deck_ids=deck_ids, want_stock=True, plan=plan)
-    return (float(lead), max(0.0, float(base) - float(lead)), float(stock), float(flow),
-            float(s_rush), float(f_rush), float(eff), float(eff1))
-
-
-def state_of_row(sc, tok, a_me, a_opp, j, g_me=None, g_opp=None, ci_row=None, idx2cid=None, cards=None,
-                 cut_me=None, cut_opp=None, don_plan=None, mirror=None):
-    """行から **(Θ_me, Θ_opp, A_me, A_opp, j)** を組む（両席・完全情報・§0.05）。
-
-    `Θ` は**その行**から両席分読める（`threshold` と `threshold_of_me` が対の式）。
-    **手札 1 枚あたりの価格は両席それぞれの手札から**（T79・`curve_d_of_row` と同じ渡し方）
-    ——`scalar` の腕を**帳簿の `κ` そのもの**にするために要る（`μ` で代用すると別物になる）。
-    `A` は**両席ぶんをターンの最初の行から**渡してもらう（`rate_of_row` の注意書き）。
-
-    **C-5c**: **7 つ組**（`CB.THETA_RETURN_MODE=untap`）——末尾に**レスト中のブロッカー**
-    `(戻る_me, 戻る_opp)`（`resting_blocker_term`・札の原本から読む＝`ci_row`／`idx2cid`／`cards` が要る）。
-    歩きはこれを**2 段目から**的に足す（持ち主の次のリフレッシュで戻る・T96）。`Θ` 本体はアクティブな
-    ブロッカーだけのまま（既定と同じ数字）。"""
-    sc = np.asarray(sc); tok = np.asarray(tok)
-    # **N-3**: `cut_me`／`cut_opp`＝その席の値段の窓（`cut_price.CutView`・`None` なら旧の `μ`）。
-    # **H-4b**: `rule_don` 系は**速さ（`a_me`）を作ったのと同じ計画**（`don_plan`）を耐久にも渡す（T109）。
-    # 計画が無ければ攻め手の財布を渡さない＝付与 0 の `rule` に落ちる（速さの側も計画なし＝両側で付与 0）。
-    with CP.defending(cut_me):
-        m = ((mirror() if callable(mirror) else mirror)
-             if (mirror is not None and CB.THETA_HAND_MODE == "rule_don") else None)
-        if m is not None:
-            # **鏡（H-4g）**: 自分の耐久も相手の耐久と同じ守る側の計算で読む（`crossing_bridge.curve_d_of_row` と同じ）
-            th_me = float(CB.threshold(m["sc"], m["tok"], g_hand=m["g_me"],
-                                       attacker=(m["attacker"]() if callable(m["attacker"]) else m["attacker"])))
-        else:
-            th_me = float(CB.threshold_of_me(sc, tok, g_hand=g_me))
-    with CP.defending(cut_opp):
-        th_opp = float(CB.threshold(sc, tok, g_hand=g_opp,
-                                    plan=(don_plan if CB.THETA_HAND_MODE == "rule_don" else None)))
-    st = (th_me, th_opp, float(a_me), float(a_opp), int(j))
-    olp = float(sc[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-    mlp = float(sc[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-    b_me = CB.resting_blocker_term(tok, TO.SLOT_OWN_FIELD, olp, ci_row=ci_row, idx2cid=idx2cid, cards=cards)
-    b_opp = CB.resting_blocker_term(tok, TO.SLOT_OPP_FIELD, mlp, ci_row=ci_row, idx2cid=idx2cid, cards=cards)
-    if (CB.THETA_HAND_MODE == "rule_don" and don_plan is not None and "theta_parts" in don_plan):
-        b_opp = 0.0       # **H-4f（F1）**: 相手のレスト中のブロッカーは守る側の計算の中で戻る（`Θ_opp` に入っている）
-    return st + (float(b_me), float(b_opp))
-
-
-def state5_of_row(*args, **kwargs):
-    """`state_of_row` の**最初の 5 つだけ**（戻る分を読まない器の互換用・C-5c）。"""
-    return tuple(state_of_row(*args, **kwargs))[:5]
-
-
-def axis_of_move(fam, v, sig, cid, cards, sc, tok, olp, r_turns, don_k=0):
-    """**その手が動かす軸と量**を返す（`{軸: Δx}`・規則と型から）。
-
-    **単位に注意**——`th_*` は価格そのまま、`a_*` は**1 ターンあたり**。
-    価格 `v` は「速さの軸の量」を一定率で価格へ換算済みなので、`a_*` の軸では**換算前の量を作り直す**
-    （`attack_value`＝毎ターンの攻撃の価値）。"""
-    out = {}
-    v = float(v)
-    if fam == "attack":
-        out["th_opp"] = -v                      # 相手の耐久を削る（価格の単位のまま）
-        # **C-5c**（`ATTACK_REST_MODE=return`）: 攻めたブロッカーは消さずに戻る側へ移す
-        info = cards.info(cid) if (cards is not None and cid) else None
-        if info and info.get("blocker") and not info.get("event"):
-            p = float(info.get("power") or 0.0)
-            nu = float(CB.nu_meas_of(p, olp))
-            if nu > 0.0:
-                out["th_me"] = -nu               # 攻めてレストになる分、自分の耐久の体の項から抜ける（C-2）
-                out["th_me_back"] = nu           # **C-5c**: 消さずに「次の自席ターンから戻る側」へ移す
-    elif fam == "play":
-        info = cards.info(cid) if (cards is not None and cid) else None
-        p = float((info or {}).get("power") or 0.0)
-        if p > 0.0:
-            # 出した体が**毎ターン**出す攻撃の価値（＝`theory_slope_parts` がこの体に足す分）
-            out["a_me"] = float(TO.attack_value(p, olp, True, THETA, MU))
-        else:
-            out["a_me"] = v / max(1.0, float(r_turns))     # 体でない札は残りターンで割る（過小側）
-    elif fam == "attach":
-        # 付与 k 枚＝一番強い攻め手のパワーが +1000k（規則）
-        xs = own_attackers_of(tok, olp)
-        p = (max(xs) + olp) if xs else olp
-        k = max(0, int(don_k))
-        out["a_me"] = float(TO.attack_value(p + 1000.0 * k, olp, True, THETA, MU)
-                            - TO.attack_value(p, olp, True, THETA, MU))
-    elif fam == "effect":
-        import deck_refill as DR
-        mlp = float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-        harm = float(DR.card_effect_harm(cid, mlp, r_turns) or 0.0) if cid else 0.0
-        if harm > 0.0:
-            out["th_opp"] = -harm               # 除去は相手の耐久を削り
-            out["a_opp"] = -harm / max(1.0, float(r_turns))   # 相手の速さも下げる（体が減る）
-        else:
-            out["a_me"] = v / max(1.0, float(r_turns))        # 引く・探す・付与は自分の速さ
-    elif fam == "guard":
-        # 自分の耐久を守る（`g` は既に正味）。**本器の母数からは来ない**——`move_family` は `guard` を
-        # 返さない（守りは相手ターンの窓で、記録に「実際の攻撃」が無い＝P8 待ち）。表を完成させて
-        # 置き、テストが直接呼んで軸を固定する。
-        out["th_me"] = v
-    else:
-        out["th_opp"] = -v                      # 型が読めない手は耐久の軸へ（従来と同じ扱い）
-    return out
-
-
-def _perm_axes(d, shift=1):
-    """**プラセボ A**: 大きさはそのまま・**軸だけ決定的に回す**（意味を壊す対照）。
-
-    回すのは**勾配の 4 軸**（`AXES`）だけ。**戻る分（`th_*_back`・C-5c）は勾配を持たない成分**
-    （`grad_of` は `AXES` しか返さず `dot` では 0）なので**そのまま通す**——`transition_ledger._swap_dx`
-    の `m.get(k, k)` と同じ扱い。既定 `ATTACK_REST_MODE=return` で攻撃が `th_me_back` を出すと、
-    以前はここで `ValueError` で落ちていた。"""
-    keys = list(AXES)
-    n = len(keys)
-    return {(keys[(keys.index(k) + shift) % n] if k in keys else k): val for k, val in d.items()}
-
-
-def dot(grad, dx):
-    return float(sum(float(grad.get(k, 0.0)) * float(v) for k, v in dx.items()))
 
 
 def auc_of(scores, labels):
@@ -518,21 +180,18 @@ def _score(xs, zs):
 
 
 def collect(dirs, limit_games=0, theta=THETA, mu=MU):
-    """記録を 1 度読んで **5 つの腕 ＋ 2 つのプラセボ**を並べる（席×局ごとに積む）。"""
-    cards = PL.Cards()
-    idx2cid = {i: c for c, i in GA._vocab().items()}
+    """記録を 1 度読んで **5 つの腕 ＋ 2 つのプラセボ**を並べる（席×局ごとに積む）。
+    1 局ぶんの計算（`A`・`Θ`・勾配・腕の積み上げ）は Rust の局の駆動（`core::drv_kv`）。"""
     prof = CB.profile_for(dirs)
-    if D_MODE == "curve" and not prof:
+    if not prof:
         raise ValueError("D_MODE=D_MODE なのに損害の輪郭が引けない（%s）" % (dirs,))
     # **物差し（T118）**: `W_ERR_MODE=rel` なら `σ_rel × s(τ_me, τ_opp)`。**別のセットの値を使う**（§0.1 条件 1）。
     sr = None
-    if TO.W_ERR_MODE == "rel":
+    if TR.CLOCK["W_ERR_MODE"] == "rel":
         sr = CB.sigma_rel_for(dirs, slope="curve")
         if sr is None:
             raise ValueError("W_ERR_MODE=rel なのに σ_rel が引けない＝黙って abs に落とさない")
-        TO.set_sigma_rel(sr)
-    # **T128**: `A` の流入・効果の項は**デッキの中身から出る**（手札の項の流入・T93／
-    # 効果の項）。渡さないと `A` が**盤面だけ**になり、伸びが丸ごと消える。
+        TR.set_sigma_rel(sr)
     seat_decks = _seat_decks(dirs)
     arms = {k: [] for k in ("flat", "scalar", "vector", "exact", "exactw",
                             "plac_axis", "plac_mag")}
@@ -541,125 +200,22 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
              "tau_me_sum": 0.0, "tau_opp_sum": 0.0, "g_me_sum": 0.0, "g_opp_sum": 0.0,
              "by_family": {}, "by_axis": {}}
     games = 0
-    for r, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS,
-                                                 extra_fn=_extra):
+    for game in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
         games += 1
         if limit_games and games > limit_games:
             break
-        stats["games"] += 1
-        acc = {k: 0.0 for k in arms}
-        z_of = {}
-        # **1 周目**: 席ごとに「その自席ターンの**最初の**決定行」から `A` を作る（橋と同じ `turn_start`）。
-        rate_at_turn, g_at_turn = {}, {}
-        shape_at = {}
-        seed_g = int(r["seed"][idx[0]]) if len(idx) else -1
-        for i in idx:
-            if int(r["kind"][i]) != 0:
-                continue
-            w, t = int(r["who"][i]), int(r["turn"][i])
-            if PL.is_own_turn(w, t) and (w, t) not in rate_at_turn:
-                dk = _deck_of(seat_decks, seed_g, w)             # **T128**
-                rate_at_turn[(w, t)] = rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
-                                                   idx2cid, cards, theta, mu, deck_ids=dk,
-                                                   j=CB.own_turn_index(t))
-                g_at_turn[(w, t)] = g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
-                shape_at[(w, t)] = (rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
-                                                       idx2cid, cards, theta, mu, deck_ids=dk)
-                                       if D_MODE == "theory" else None)
-
-        def _opp_at(w, t):
-            """相手の **(A, g)**＝相手の**直近の自席ターンの最初の行**から読んだもの。無ければ `None`。"""
-            ts = [tt for (ww, tt) in rate_at_turn if ww == 1 - w and tt < t]
-            if not ts:
-                return None
-            key = (1 - w, max(ts))
-            return rate_at_turn[key], g_at_turn[key]
-        for i in idx:
-            z = float(r["z"][i])
-            if z != 0.0:
-                z_of[int(r["who"][i])] = 1.0 if z > 0 else 0.0
-            if int(r["kind"][i]) != 0:
-                continue
-            w, t = int(r["who"][i]), int(r["turn"][i])
-            if not PL.is_own_turn(w, t):
-                continue
-            k = int(L[i]); ch = int(r["pol_chosen"][i])
-            if k < 1 or ch < 0 or ch >= k:
-                continue
-            stats["rows"] += 1
-            pair = _opp_at(w, t)
-            if pair is None:
-                continue
-            if D_MODE == "theory":
-                # **T127**: 席ごとの速さの形（相手は直近の自席ターンの形）を行ごとに入れる
-                _ts = [tt for (ww, tt) in rate_at_turn if ww == 1 - w and tt < t]
-                set_rate_shape(shape_at.get((w, t)),
-                             shape_at.get((1 - w, max(_ts))) if _ts else None)                       # 相手がまだ 1 ターンも打っていない（橋と同じ扱い）
-            ao, g_opp = pair
-            sc, tok, ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
-            b = int(ptr[i]) + ch
-            sig = json.loads(pol["pol_sig"][b])
-            fam = move_family(sig)
-            st0 = state_of_row(sc, tok, rate_at_turn[(w, t)], ao, CB.own_turn_index(t),
-                               g_me=g_at_turn[(w, t)], g_opp=g_opp, ci_row=ci, idx2cid=idx2cid, cards=cards)
-            rt = max(1.0, min(5.0, float(np.asarray(sc)[SC_OPP_LIFE])))
-            th = theta_of(tok, float(np.asarray(sc)[SC_MY_LIFE]), float(np.asarray(sc)[SC_MY_DON]),
-                          mode="const", theta=theta)
-            olp = float(np.asarray(sc)[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-            mlp = float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-            ctx = {"theta": th, "mu": mu, "opp_leader_power": olp, "my_leader_power": mlp,
-                   "r_turns": rt, "don_k": 1, "attackers": own_attackers_of(tok, olp),
-                   "don_active": float(np.asarray(sc)[SC_MY_DON]),
-                   "st": _state_of(sc, ci, idx2cid),
-                   "opp_bodies": opp_bodies_of(tok, mlp, rt, th, mu, ci_row=ci, idx2cid=idx2cid)}
-            tl = sig[2] if len(sig) > 2 else None
-            v = score_candidate(sig, str(pol["pol_cid"][b]) or None,
-                                (str(pol["pol_tcid"][b]) or None) if tl else None, ctx, cards,
-                                src_power=slot_power(tok, int(pol["pol_si"][b])),
-                                tgt_power=slot_power(tok, int(pol["pol_ti"][b])),
-                                don_k=int(pol["pol_k"][b]))
-            if v is None:
-                continue
-            stats["priced"] += 1
-            stats["by_family"][fam] = stats["by_family"].get(fam, 0) + 1
-            d = d_of(st0, prof)
-            wd = TO.w_of_d(d)
-            grad = grad_of(st0, prof)
-            dx = axis_of_move(fam, v, sig, str(pol["pol_cid"][b]) or None, cards, sc, tok, olp, rt,
-                              don_k=int(pol["pol_k"][b]))
-            live = LIVE_AXES[D_MODE]
-            if not any(ax in live for ax in dx):
-                # **その読みに軸が無い手**＝帳簿が原理的に値付けできない手（数えて報告する）
-                stats["dead"] += 1
-                stats["dead_v"] += abs(float(v))
-            else:
-                stats["live_v"] += abs(float(v))
-            for ax in dx:
-                stats["by_axis"][ax] = stats["by_axis"].get(ax, 0) + 1
-            stats["tau_me_sum"] += tau_of(st0[0], st0[3])
-            stats["tau_opp_sum"] += tau_of(st0[1], st0[2])
-            stats["g_me_sum"] += abs(grad["th_me"]); stats["g_opp_sum"] += abs(grad["th_opp"])
-            sgn = 1.0 if w == 0 else -1.0                    # 席 0 の視点で積む（帳簿と同じ）
-            acc["flat"] += float(v) * sgn
-            acc["scalar"] += float(v) * sgn * float(TO.state_factor(d, "curve"))
-            acc["vector"] += wd * dot(grad, dx) * sgn
-            # **線形化をやめた 2 本**（同じ式・近似の深さだけが違う）
-            st1 = apply_dx(st0, dx)
-            d1 = d_of(st1, prof)
-            acc["exact"] += wd * (d1 - d) * sgn
-            t0 = (tau_of(st0[0], st0[3]), tau_of(st0[1], st0[2]))
-            t1 = (tau_of(st1[0], st1[3]), tau_of(st1[1], st1[2]))
-            acc["exactw"] += (TO.prob_of_d(d1, t_me=t1[0], t_opp=t1[1])
-                              - TO.prob_of_d(d, t_me=t0[0], t_opp=t0[1])) * sgn
-            acc["plac_axis"] += wd * dot(grad, _perm_axes(dx)) * sgn
-            # プラセボ B: 勾配の成分を**平均で置き換える**（＝スカラーと同じ形・正規化だけ違う）
-            gbar = sum(abs(x) for x in grad.values()) / max(1, len(grad))
-            acc["plac_mag"] += wd * gbar * sum(abs(x) for x in dx.values()) * sgn
-        if len(z_of) < 2:
+        pin = {"decks": TR.deck_list(_deck_pair(seat_decks, TR.seed_of(game)))}
+        res = TR.game_call("kappa_vector", game, {"cfg": TR.cfg(theta, mu, prof=prof), "in": pin, "stats": stats,
+                                                  "carry": {}})
+        new = res["stats"]
+        stats.clear()
+        stats.update(new)
+        out = res["out"]
+        if out is None:
             continue
-        zs.append(z_of.get(0, 0.0))
-        for kk in arms:
-            arms[kk].append(acc[kk])
+        zs.append(out["z0"])
+        for k, v in zip(arms, out["acc"]):
+            arms[k].append(v)
     n = max(1, stats["priced"])
     out = {"games": stats["games"], "rows": stats["rows"], "priced": stats["priced"],
            "d_mode": D_MODE, "live_axes": list(LIVE_AXES[D_MODE]), "attack_rest_mode": ATTACK_REST_MODE,
@@ -672,7 +228,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
            "tau_me_mean": round(stats["tau_me_sum"] / n, 4),
            "tau_opp_mean": round(stats["tau_opp_sum"] / n, 4),
            "sigma_rel": (round(sr, 4) if sr is not None else None),
-           "w_err_mode": TO.W_ERR_MODE,
+           "w_err_mode": TR.CLOCK["W_ERR_MODE"],
            "by_family": stats["by_family"], "by_axis": stats["by_axis"],
            "arms": {kk: _score(arms[kk], zs) for kk in arms}}
     return out
@@ -682,11 +238,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="κ をベクトル（勾配）にする（T121）")
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
-    ap.add_argument("--d-mode", dest="d_mode", choices=D_MODES, default=None)
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
-    if a.d_mode:
-        set_d_mode(a.d_mode)
     out = collect(a.src, a.games)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:

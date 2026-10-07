@@ -31,6 +31,7 @@ pub mod drv_lr;
 pub mod drv_pr;
 pub mod drv_rl;
 pub mod drv_tb;
+pub mod drv_t18;
 pub mod drv_tl;
 pub mod game;
 pub mod pd;

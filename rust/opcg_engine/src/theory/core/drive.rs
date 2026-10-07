@@ -50,6 +50,7 @@ pub fn run(c: &mut Core, g: &Game, p: &V) -> R<V> {
         "crossing_bridge" => super::drv_cb::game(c, g, &cfg, p),
         "lethal_rule" => super::drv_lr::game(c, g, &cfg, p),
         "theory_bridge" => super::drv_tb::game(c, g, &cfg, p),
+        "two_curves" | "two_curves_state" | "price_cands" | "live_turn" => super::drv_t18::game(c, g, &cfg, p, &tool),
         o => Err(format!("局の駆動が無い器: {o}")),
     };
     c.ctx = super::state::Ctx::default();
@@ -83,7 +84,45 @@ pub fn rows_call(c: &mut Core, p: &V) -> R<V> {
             Ok(V::list(out))
         }
         "to.clock_scale" => {
-            let out: Vec<V> = p.get("rs").items().iter().map(|r| V::Float(lt::clock_scale(r.items()[0].f(), r.items()[1].f(), "hyp"))).collect();
+            // 段 7: `mode`（省略時 `hyp`）
+            let m = if p.get("mode").is_none() { "hyp".to_string() } else { p.get("mode").pystr() };
+            let out: Vec<V> = p.get("rs").items().iter().map(|r| V::Float(lt::clock_scale(r.items()[0].f(), r.items()[1].f(), &m))).collect();
+            Ok(V::list(out))
+        }
+        // 段 7（2026-10-07）: 器の集計が読む理論の式（Python の写しを消したので Rust で）
+        "to.prob_of_d" => {
+            // `[TO.prob_of_d(d, sigma_d=sigma_d, t_me=tm, t_opp=to, scale_mode=scale_mode, mover=mover) for (d, tm, to) in rs]`
+            let sm = if p.get("scale_mode").is_none() { "hyp".to_string() } else { p.get("scale_mode").pystr() };
+            let mover = p.get("mover").truthy();
+            let sd = if p.get("sigma_d").is_none() { None } else { Some(p.get("sigma_d").f()) };
+            let of = |x: &V| if x.is_none() { None } else { Some(x.f()) };
+            let out: Vec<V> = p
+                .get("rs")
+                .items()
+                .iter()
+                .map(|r| {
+                    let it = r.items();
+                    V::Float(lt::prob_of_d(&cfg.clock, it[0].f(), sd, of(&it[1]), of(&it[2]), &sm, mover))
+                })
+                .collect();
+            Ok(V::list(out))
+        }
+        "to.whole_clock_scale" => {
+            let out: Vec<V> = p.get("rs").items().iter().map(|x| V::Float(lt::whole_clock_scale(x.f()))).collect();
+            Ok(V::list(out))
+        }
+        "cb.tau_from_profile" => {
+            // `[CB.tau_from_profile(theta, j, prof, scale, r, shield, shield_rate, refill, step) for … in rs]`
+            let prof: Vec<f64> = p.get("prof").items().iter().map(|x| x.f()).collect();
+            let out: Vec<V> = p
+                .get("rs")
+                .items()
+                .iter()
+                .map(|r| {
+                    let a = r.items();
+                    V::Float(super::rows::tau_from_profile(a[0].f(), a[1].int(), &prof, a[2].f(), a[3].f(), a[4].f(), a[5].f(), a[6].f(), a[7].f()))
+                })
+                .collect();
             Ok(V::list(out))
         }
         o => Err(format!("行の関数が無い: {o}")),

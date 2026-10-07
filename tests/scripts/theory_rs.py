@@ -1,21 +1,31 @@
-"""**理論の器の Rust 全移植・段 1（2026-10-06）**: Python → Rust の入力の受け渡し（`docs/reports/2026-10-06_port_stage1_2.md`）。
+"""**理論の計算は Rust だけ**（全移植の段 7・2026-10-07・`docs/reports/2026-10-07_port_stage7.md`）——理論の器が Rust を呼ぶ口。
 
-境界（計画 §4.1・ユーザ決定 2026-10-06）: 記録の読み込み・合成デッキの作り直し・カード DB（パーサ）・集計と JSON の書き出しは
-Python に残る。Rust へ渡すのは:
+理論の式（値付けの核・耐久 Θ・速さ・守る側の計算・行の読み・局ごとの `collect` の中身）は全部
+`rust/opcg_engine/src/theory/` にあり、Python に写しは無い。Python に残るのは（ユーザ決定 2026-10-06／07）:
+CLI・記録の読み込みと入力の準備（`label_game`・合成デッキの作り直し・決着の旗の表・損害の輪郭と σ の表）・
+カード DB（パーサ）からカード表と効果の木を Rust へ渡すこと・集計（ブートストラップ・AUC・較正）と JSON の書き出し。
 
-* **カード表と語彙**（1 度だけ・`load_cards()`）——`PL.Cards.info` の 9 項目と、理論が原本（`load_db().get_card`）から読む
-  項目（種別・パワー・コスト・印字カウンター・キーワード・特徴・色・名前・属性）と `n_rel_feat.profile` の
-  `counter_event`／`thr`。`check_cards()` が Rust の写しと項目ごとに突き合わせる。
-* **効果の木**（1 度だけ・`load_effects()`・`opcg_sim/data/opcg_effects.json` の文字列そのまま）。`check_effects()`。
-* **fixture**（`harm_profile.json`・`opp_boards.json`）——Rust が自分で読む。`check_fixtures()` が全部の値をビットで比べる。
-* **局の枠**（`frame_of(...)`・行の `scalars`／`tokens` は器が見る float32 のまま・候補・uuid→card・デッキ）。
-  `check_frame()` が往復の恒等を確かめる。
+この模块が持つもの:
+
+* **受け渡し**: カード表と語彙（`load_cards`）・効果の木（`load_effects`・`opcg_sim/data/opcg_effects.json`）・
+  盤面の分布の fixture（`load_opp_boards`）・1 局の枠（`frame_of`）・記録の形の符号化（`enc`／`dec`）。
+* **切替の置き場**（`SW`）: Rust へ渡す文脈 `g` の切替の値。**既定の枝と、残す候補 2 つ**（ドンの付け違いの費用の 3 つの形
+  `ATTACK_DON_COST_MODE`・探す効果の 1 枚 1 役 `SEARCH_VALUE_MODE=joint`）だけを選べる。ほかの値は `set_switch` が誤りにする
+  （Rust の `entry::apply_g` も誤りを返す）。候補は環境変数 `OPCG_THEORY_SWITCHES="名前=値,…"` でも選べる。
+  旧い既定・保留の値の再現は凍結ブランチ `claude/theory-switches-final`。
+* **器の集計が読む定数**（`MU`・`THETA`・時計の `SIGMA_D` ほか）と時計の設定（`set_w_err_mode`・`set_sigma_rel`・
+  `set_sigma_turn`・`set_w_bar`）。
+* **呼び出し**: `game_call`（1 局ぶんの局の駆動・`theory_game_call`）・`rows_call`（局をまたがない行の関数・`theory_rows_call`）。
+  局の駆動が返す計数の増分は `RULE_STATS`／`EX_SPEED_STATS`／`COND_STATS` に足す。
+* **計画のディスクの覚え書き**: `OPCG_PLAN_STORE=<dir>` なら Rust の覚え書き（`core::store`）を開く。
 
 記録の形（`enc`／`dec`）: 浮動小数は 16 桁の 16 進（ビット）・組は `{"t": …}`・dict は `{"d": [[k, v], …]}`・numpy の配列は
-`{"nd": dtype, "s": 形, "h": 生のバイト}`・numpy のスカラーは `{"npf"|"npi": …}`・大域の物（カード表・語彙・盤面の分布）は
-`{"obj": 名前}`。`theory_capture.py`（呼び出しの記録）と Rust の `theory::pyval` が同じ形を読み書きする。
+`{"nd": dtype, "s": 形, "h": 生のバイト}`・numpy のスカラーは `{"npf"|"npi": …}`・大域の物は `{"obj": 名前}`
+（Rust の `theory::pyval` が同じ形を読み書きする）。
 """
+import atexit
 import json
+import math
 import os
 import struct
 import sys
@@ -30,29 +40,289 @@ for _p in (_ROOT, _HERE):
 
 EFFECTS_PATH = os.path.join(_ROOT, "opcg_sim", "data", "opcg_effects.json")
 OPP_BOARDS_PATH = os.path.join(_ROOT, "tests", "fixtures", "opp_boards.json")
-HARM_PROFILE_PATH = os.path.join(_ROOT, "tests", "fixtures", "harm_profile.json")
 
 _ENGINE = {}
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# 器の集計と出力が読む定数（値は Rust の `theory::leaves_to`・`core::to` と同じ・実測の写し）
+
+MU = 0.0551
+LAM = 0.1362
+H_LIFE_TO_HAND = 0.89
+THETA = round((LAM - H_LIFE_TO_HAND * MU) / MU, 4)
+R_TURNS = 4.128
+CBAR = 1.514
+DELTA = 0.0277
+PWR_EPS = 10.0
+#: scalars の列（`rust/opcg_engine/src/encode/scalars.rs`）
+SC_MY_LIFE, SC_OPP_LIFE = 0, 1
+SC_MY_DON = 2
+SC_MY_HAND, SC_OPP_HAND = 6, 7
+SC_TURN = 10
+SC_MY_LEADER_POWER, SC_OPP_LEADER_POWER = 12, 13
+#: 枠
+SLOT_OWN_FIELD = slice(2, 7)
+SLOT_OPP_FIELD = slice(7, 12)
+#: 整数ターンの床（`crossing_bridge.sigma_rel_mle`）
+TURN_ROUND_VAR = 1.0 / 12.0
+TURN_ROUND_MEAN = -0.5
+#: 出力の欄に書く定数（波C／段 7 で切替は消えた）
+W_MODE = "curve"
+SETTLE_COND_MODE = "whole"
+SIGMA_FLOOR_MODE = "off"
+CLOCK_HAND_MODE = "off"
+LEDGER_FLOW_PRICING = "exercise"
+FLOW_PRICING_MODES = ("option", "exercise")
+
+# ---------------------------------------------------------------------------------------------------------------
+# 時計（`theory_order` の写しだった大域の設定・Rust へは `clock()` で渡す）
+
+W_ERR_MODES = ("abs", "rel")
+CLOCK = {"W_ERR_MODE": "rel", "SIGMA_REL": None, "SIGMA_TURN": 1.0, "SIGMA_D": math.sqrt(2.0) * 1.0,
+         "W_BAR": 0.5 / R_TURNS}
+
+
+def set_w_err_mode(mode):
+    if mode not in W_ERR_MODES:
+        raise ValueError("w err mode は %s のどれか" % (W_ERR_MODES,))
+    CLOCK["W_ERR_MODE"] = mode
+    return mode
+
+
+def set_sigma_rel(value):
+    CLOCK["SIGMA_REL"] = None if value is None else float(value)
+    return CLOCK["SIGMA_REL"]
+
+
+def set_sigma_turn(turns):
+    CLOCK["SIGMA_TURN"] = float(turns)
+    CLOCK["SIGMA_D"] = math.sqrt(2.0) * CLOCK["SIGMA_TURN"]
+    return CLOCK["SIGMA_D"]
+
+
+def set_w_bar(value):
+    CLOCK["W_BAR"] = float(value)
+    return CLOCK["W_BAR"]
+
+
+def clock():
+    return {"W_ERR_MODE": CLOCK["W_ERR_MODE"], "SIGMA_REL": (None if CLOCK["SIGMA_REL"] is None else float(CLOCK["SIGMA_REL"])),
+            "SIGMA_D": float(CLOCK["SIGMA_D"]), "W_MODE": W_MODE, "W_BAR": float(CLOCK["W_BAR"])}
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# 切替（Rust の `entry::apply_g` が受ける値だけ）
+
+#: `g["modes"]`（並びは Rust の計画の覚え書きの鍵に入る＝変えない）
+SW = {"NU_MODE": "pair", "SURV_MODE": "geo", "OPTION_MODE": "dist", "CBAR_MODE": "strict", "SPEED_MEMO": "True",
+      "ATTACK_ABILITY_MODE": "off", "PASSIVE_BODY_MODE": "off", "DEFENDER_POWER_MODE": "rule",
+      "ATTACK_DON_COST_MODE": "off", "COST_AFFORD_MODE": "check", "F_PRICING_FIX": "all",
+      "CUT_PRICE_MODE": "joint", "CUT_TAKE_MODE": "gbar", "SEARCH_VALUE_MODE": "legacy", "DECK_COUNTER_MODE": "rules",
+      "UNKNOWN_FACTOR": 1.0, "THETA_HAND_MODE": "rule_don", "THETA_SIDE_MODE": "legacy", "RD_KERNEL": "rs",
+      "RATE_DECAY_MODE": "off", "EX_STATE_BUDGET": "300000", "THETA_BODY_MODE": "blockers", "SLOPE_TAKE_MODE": "life",
+      "ATTACK_DON_MAX": "10"}
+#: 選べる値（ここに無い名前は固定）。`UNKNOWN_FACTOR` は数（判らない条件の係数・感度）
+SWITCH_VALUES = {"ATTACK_DON_COST_MODE": ("off", "opportunity", "misalloc", "misalloc_play"),
+                 "SEARCH_VALUE_MODE": ("legacy", "joint"),
+                 "THETA_SIDE_MODE": ("legacy", "symmetric"),
+                 "RATE_DECAY_MODE": ("off", "ko")}
+#: 局の駆動の設定（`g` の外）
+RUN = {"FLOW_PRICING": "option", "PRE_SETTLE_MODE": "off", "MIRROR_ME": True}
+RUN_VALUES = {"FLOW_PRICING": FLOW_PRICING_MODES, "PRE_SETTLE_MODE": ("off", "on"), "MIRROR_ME": (True, False)}
+
+
+def set_switch(name, value):
+    """切替を 1 つ立てる。Rust に移していない値は `ValueError`（黙って既定で解かない）。"""
+    if name == "UNKNOWN_FACTOR":
+        SW[name] = float(value)
+        return SW[name]
+    if name in RUN_VALUES:
+        if value not in RUN_VALUES[name]:
+            raise ValueError("%s=%r は Rust に無い（%r）" % (name, value, RUN_VALUES[name]))
+        RUN[name] = value
+        return value
+    ok = SWITCH_VALUES.get(name)
+    if name not in SW:
+        raise ValueError("切替 %r は無い" % (name,))
+    if ok is None:
+        if value != SW[name]:
+            raise ValueError("%s は %r だけ（%r は移していない・凍結ブランチ claude/theory-switches-final で再現）"
+                             % (name, SW[name], value))
+        return value
+    if value not in ok:
+        raise ValueError("%s=%r は Rust に無い（%r・旧い値は凍結ブランチ claude/theory-switches-final で再現）" % (name, value, ok))
+    SW[name] = value
+    return value
+
+
+def _switches_from_env():
+    txt = os.environ.get("OPCG_THEORY_SWITCHES", "")
+    for part in [p for p in txt.split(",") if p.strip()]:
+        k, _, v = part.partition("=")
+        set_switch(k.strip(), v.strip())
+
+
+_switches_from_env()
+
+
+def g():
+    """Rust の局の駆動へ渡す文脈（段 3／4 の `g`・既定の文脈＝値段の窓なし）。"""
+    modes = dict(SW)
+    modes["UNKNOWN_FACTOR"] = float(modes["UNKNOWN_FACTOR"])
+    return {"CUT_PRICER": None, "CUT_PRICER_KEY": None, "CUT_TAKE_CARD": None, "CUT_OTHER_SIDE": 0, "OPTION_DEPTH": 0,
+            "FLOW_PRICING": RUN["FLOW_PRICING"], "OPAQUE_UPPER": False, "modes": modes}
+
+
+def cfg(theta=THETA, mu=MU, theta_mode="const", prof=None, **extra):
+    """局の駆動の設定（`core::drive::cfg_of`）。`extra` は器ごとの値（並びは呼び手の順）。"""
+    out = {"theta": float(theta), "mu": float(mu), "theta_mode": str(theta_mode), "clock": clock(),
+           "THETA_SIDE_MODE": SW["THETA_SIDE_MODE"], "RATE_DECAY_MODE": SW["RATE_DECAY_MODE"],
+           "prof": (None if prof is None else [float(x) for x in prof])}
+    out.update(extra)
+    return out
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Rust の口
+
 def engine():
     if "m" not in _ENGINE:
         import opcg_engine
-        if not hasattr(opcg_engine, "theory_leaf_call"):
-            raise RuntimeError("opcg_engine の wheel が古い（theory_leaf_call が無い）——`make rust-develop` で作り直す")
+        if not hasattr(opcg_engine, "theory_game_call"):
+            raise RuntimeError("opcg_engine の wheel が古い（theory_game_call が無い）——`make rust-develop` で作り直す")
         _ENGINE["m"] = opcg_engine
     return _ENGINE["m"]
+
+
+def ready():
+    """カード表・盤面の分布・効果の木を Rust へ（1 度だけ）・計画の覚え書きを開く。"""
+    if "ready" in _ENGINE:
+        return engine()
+    load_cards()
+    load_opp_boards()
+    load_effects()
+    _ENGINE["ready"] = True
+    path = os.environ.get("OPCG_PLAN_STORE")
+    if path:
+        core_call("store.open", {"path": path})
+        atexit.register(_store_report)
+    return engine()
+
+
+def core_call(name, args):
+    """段 3／4 の核の入口を 1 つ（計画の覚え書きの `store.*` だけが使う）。"""
+    payload = json.dumps({"d": [["a", enc(args)], ["g", enc({})], ["pre", []]]}, ensure_ascii=False, separators=(",", ":"))
+    out = json.loads(engine().theory_core_call(name, payload, False))
+    return dec({k: x for k, x in out["d"]}.get("r"))
+
+
+def _store_report():
+    try:
+        r = core_call("store.report", {})
+        if r is not None:
+            print("plan_store_rs: %r" % (r,), file=sys.stderr)
+    except Exception:                                   # noqa: BLE001
+        pass
+
+
+RULE_STATS = {}
+EX_SPEED_STATS = {"attempt_fail": 0, "attempt_skipped": 0, "count_calls": 0, "count_fallback": 0}
+COND_STATS = {"true": 0, "false": 0, "unknown": 0}
+
+
+def reset_cond_stats():
+    for k in COND_STATS:
+        COND_STATS[k] = 0
+
+
+def apply_ev(res):
+    """局の駆動が返した `RULE_STATS`／`EX_SPEED_STATS` の増分（`ex:` は後者）を順に足し、条件の計数の差分を足す。"""
+    for k, v in res.get("ev") or []:
+        if k.startswith("ex:"):
+            k = k[3:]
+            EX_SPEED_STATS[k] = EX_SPEED_STATS.get(k, 0) + v
+        else:
+            RULE_STATS[k] = RULE_STATS.get(k, 0) + v
+    cs = res.get("cs") or [0, 0, 0]
+    for k, n in zip(("true", "false", "unknown"), cs):
+        COND_STATS[k] = COND_STATS.get(k, 0) + n
+
+
+def game_call(tool, game, payload, counters=True, raw=False):
+    """1 局（`plan_labels.iter_games` の 1 つ、または `frame_of` の枠）を Rust の局の駆動で解く。戻り＝ほどいた dict
+    （`raw` なら JSON を読んだだけの記録の形）。`counters` なら計数の増分を足す。"""
+    ready()
+    fr = game if hasattr(game, "names") else frame_of(*game)
+    pl = dict(payload, tool=tool, g=g())
+    try:
+        out = engine().theory_game_call(fr, dumps(pl))
+    except Exception as e:                               # noqa: BLE001
+        raise RuntimeError("theory: %s の局を Rust が解けない: %s" % (tool, e))
+    j = json.loads(out)
+    res = dec(j)
+    if counters:
+        apply_ev(res)
+    return (res, j) if raw else res
+
+
+def seed_of(game):
+    """1 局（`iter_games` の 1 つ）の seed（行が無ければ −1）"""
+    rows, _pol, _ex, _L, _ptr, idx = game
+    return int(rows["seed"][idx[0]]) if len(idx) else -1
+
+
+def deck_list(p):
+    """`(席 0 のデッキ, 席 1 のデッキ)`（無ければ `None`）→ 受け渡しの形（list の list）"""
+    return None if p is None else [None if d is None else list(d) for d in p]
+
+
+def settled_in(settled, seed):
+    """この局の宣言した行 `[[w, t], …]`（`settled` が無ければ `None`）"""
+    if settled is None:
+        return None
+    return [[w, t] for (sd, w, t), v in settled.items() if sd == seed and v]
+
+
+def rows_call(fn, rs, **kw):
+    """局をまたがない行の関数（`core::drive::rows_call`）。`rs`＝行の数の組の列。"""
+    ready()
+    pl = dict(kw, fn=fn, cfg=cfg(), rs=rs)
+    try:
+        out = engine().theory_rows_call(dumps(pl))
+    except Exception as e:                               # noqa: BLE001
+        raise RuntimeError("theory: %s を Rust が解けない: %s" % (fn, e))
+    return dec(json.loads(out))
+
+
+def prob_of_d(rs, sigma_d=None, scale_mode="hyp", mover=False):
+    """`W`（時計の差 `D` から勝率・`[(D, τ_me|None, τ_opp|None), …]`）。式は Rust の `leaves_to::prob_of_d`。"""
+    rows = [[float(d), None if a is None else float(a), None if b is None else float(b)] for d, a, b in rs]
+    return rows_call("to.prob_of_d", rows, sigma_d=(None if sigma_d is None else float(sigma_d)),
+                     scale_mode=str(scale_mode), mover=bool(mover))
+
+
+def clock_scale(pairs, mode="hyp"):
+    """1 次同次な局面の尺度 `s`（`[(τ_me, τ_opp), …]`）。"""
+    return rows_call("to.clock_scale", [[float(a), float(b)] for a, b in pairs], mode=str(mode))
+
+
+def whole_clock_scale(ts):
+    """`whole` の時計 1 本の幅の尺度 `max(1, τ)`（`[τ, …]`）。"""
+    return rows_call("to.whole_clock_scale", [float(t) for t in ts])
+
+
+def tau_from_profile(rows, prof):
+    """輪郭に沿って `Θ` に届くまでのターン数（`[(Θ, j, scale, r, shield, shield_rate, refill, step), …]`）。"""
+    rs = [[float(a[0]), int(a[1])] + [float(x) for x in a[2:]] for a in rows]
+    return rows_call("cb.tau_from_profile", rs, prof=[float(x) for x in prof])
 
 
 # ---------------------------------------------------------------------------------------------------------------
 # 記録の形
 
-#: 大域の物の識別（`id` → 名前）。`register_obj` で足す。
+#: 大域の物の識別（`id` → 名前）
 _OBJS = {}
-
-
-def register_obj(obj, name):
-    _OBJS[id(obj)] = (obj, name)
 
 
 def _vocab_rev():
@@ -62,11 +332,9 @@ def _vocab_rev():
     return _ENGINE["rev"]
 
 
-def _obj_name(v):
-    hit = _OBJS.get(id(v))
-    if hit is not None and hit[0] is v:
-        return hit[1]
-    return None
+def idx2cid():
+    """語彙の index → card_id（`plan_labels` の語彙と同じ）。"""
+    return dict(_vocab_rev())
 
 
 class Unencodable(TypeError):
@@ -81,17 +349,14 @@ def enc(v):
         return v
     if isinstance(v, float):
         return {"f": "%016x" % struct.unpack("<Q", struct.pack("<d", v))[0]}
-    nm = _obj_name(v)
-    if nm is not None:
-        return {"obj": nm}
+    hit = _OBJS.get(id(v))
+    if hit is not None and hit[0] is v:
+        return {"obj": hit[1]}
     if isinstance(v, tuple):
         return {"t": [enc(x) for x in v]}
     if isinstance(v, list):
         return [enc(x) for x in v]
     if isinstance(v, dict):
-        if len(v) > 1000 and v == _vocab_rev():
-            register_obj(v, "idx2cid")
-            return {"obj": "idx2cid"}
         return {"d": [[enc(k), enc(x)] for k, x in v.items()]}
     if isinstance(v, np.ndarray):
         a = np.ascontiguousarray(v)
@@ -103,13 +368,8 @@ def enc(v):
         return {"npf": v.dtype.str.lstrip("<|="), "h": "%016x" % struct.unpack("<Q", struct.pack("<d", float(v)))[0]}
     if isinstance(v, (np.integer, np.bool_)):
         return {"npi": v.dtype.str.lstrip("<|="), "v": int(v)}
-    if isinstance(v, slice):
-        return {"t": ["slice", v.start, v.stop]}
     if isinstance(v, (set, frozenset)):
         return sorted(enc(x) for x in v)
-    cid = getattr(v, "card_id", None)
-    if cid is not None and hasattr(v, "abilities"):
-        return {"obj": "card:%s" % cid}
     raise Unencodable("enc: %r" % (type(v),))
 
 
@@ -150,7 +410,7 @@ def _sv(x):
 
 
 def card_record(m):
-    """1 枚の札 → Rust の `TCard` の JSON（Python の器が読む値をそのまま・型変換も同じ式）。"""
+    """1 枚の札 → Rust の `TCard` の JSON（理論が原本から読む項目と `Cards.info` の 9 項目）。"""
     from opcg_sim.learned import n_rel_feat as NF
     cid = m.card_id
     info = _cards().info(cid)
@@ -193,14 +453,11 @@ def card_table():
     return {"cards": cards, "vocab": vocab}
 
 
-def card_table_json():
-    return json.dumps(card_table(), ensure_ascii=False, separators=(",", ":"))
-
-
 def load_cards():
     """カード表と語彙を Rust へ（1 度だけ）。戻り＝札の数。"""
     if "cards_loaded" not in _ENGINE:
-        _ENGINE["cards_loaded"] = engine().theory_load_cards(card_table_json())
+        txt = json.dumps(card_table(), ensure_ascii=False, separators=(",", ":"))
+        _ENGINE["cards_loaded"] = engine().theory_load_cards(txt)
     return _ENGINE["cards_loaded"]
 
 
@@ -215,79 +472,6 @@ def load_opp_boards(path=OPP_BOARDS_PATH):
     if "boards_loaded" not in _ENGINE:
         _ENGINE["boards_loaded"] = engine().theory_load_opp_boards(path)
     return _ENGINE["boards_loaded"]
-
-
-def load_all():
-    load_cards()
-    load_opp_boards()
-    return engine()
-
-
-def _same(a, b):
-    """記録の形のまま（＝浮動小数はビットで）等しいか。"""
-    return json.dumps(a, sort_keys=False) == json.dumps(b, sort_keys=False)
-
-
-def check_cards():
-    """Rust の写しが Python の表と項目ごとに一致するか。戻り＝札の数（違えば例外）。"""
-    tab = card_table()
-    load_cards()
-    got = dec(json.loads(engine().theory_dump_cards()))
-    want_cards = [{**c, "thr": [list(map(lambda x: float(x) if isinstance(x, (int, float)) and not isinstance(x, bool) else x, r))
-                                for r in c["thr"]]} for c in tab["cards"]]
-    if len(got["cards"]) != len(want_cards):
-        raise AssertionError("札の数が違う")
-    for a, b in zip(got["cards"], want_cards):
-        if _same(enc(a), enc(b)):
-            continue
-        raise AssertionError("札 %s が違う: %r != %r" % (b["id"], a, b))
-    if [list(x) for x in got["vocab"]] != tab["vocab"]:
-        raise AssertionError("語彙が違う")
-    return len(want_cards)
-
-
-def check_effects(path=EFFECTS_PATH):
-    """効果の木の写しが `json.load` の結果と型・値ごとに一致するか（浮動小数はビット）。"""
-    load_effects(path)
-    with open(path, encoding="utf-8") as fh:
-        want = json.load(fh)["cards"]
-    got = engine().theory_dump_effects()
-    if got != json.dumps(enc(want), ensure_ascii=False, separators=(",", ":")):
-        raise AssertionError("効果の木の写しが違う")
-    return len(want)
-
-
-def _floats_of(v, out):
-    if isinstance(v, float):
-        out.append(v)
-    elif isinstance(v, dict):
-        for k, x in v.items():
-            _floats_of(x, out)
-    elif isinstance(v, list):
-        for x in v:
-            _floats_of(x, out)
-    return out
-
-
-def check_fixtures():
-    """fixture を Rust が読んだ値が Python の `json.load` と全部の値でビット一致するか。戻り＝比べた浮動小数の数。"""
-    n = 0
-    for p in (HARM_PROFILE_PATH, OPP_BOARDS_PATH):
-        with open(p, encoding="utf-8") as fh:
-            want = json.load(fh)
-        got = engine().theory_read_fixture(p)
-        if got != json.dumps(enc(want), ensure_ascii=False, separators=(",", ":")):
-            raise AssertionError("fixture %s の読みが違う" % p)
-        n += len(_floats_of(want, []))
-    # 盤面の分布の型つきの表（`load_opp_boards` と同じ形）
-    with open(OPP_BOARDS_PATH, encoding="utf-8") as fh:
-        raw = json.load(fh)
-    want = {int(k): [[float(m), [[float(p), bool(b)] for p, b in bodies]] for m, bodies in v]
-            for k, v in (raw.get("by_r") or {}).items()}
-    got = dec(json.loads(load_opp_boards()))
-    if json.dumps(enc(got)) != json.dumps(enc(want)):
-        raise AssertionError("盤面の分布の表が違う")
-    return n
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -329,55 +513,19 @@ def frame_of(rows, pol, ex, L, ptr, idx, u2c=None, decks=None):
     return engine().TheoryFrame(cols, strs, [(str(a), str(b)) for a, b in u2c.items()], deck_t)
 
 
-def check_frame(fr, rows, pol, ex, L, ptr, idx):
-    """枠の往復が恒等か（全部の列のバイト・文字列・uuid→card）。"""
-    from opcg_sim.learned.train import plan_labels as PL
-    idx = np.asarray(idx, np.int64)
-    for k, v in list((ex or {}).items()) + [(k, rows[k]) for k in ROW_NUM_COLS if k in rows]:
-        a = np.ascontiguousarray(np.asarray(v)[idx])
-        dt, sh, raw = fr.col(k)
-        if dt != a.dtype.str.lstrip("<|=") or list(sh) != list(a.shape) or bytes(raw) != a.tobytes():
-            raise AssertionError("列 %s の往復が違う" % k)
-    for k in ("sc", "tok"):
-        if k in (ex or {}):
-            a = np.asarray(ex[k])[idx]
-            for j in range(len(idx)):
-                if fr.f32_row(k, j) != [float(x) for x in a[j].ravel()]:
-                    raise AssertionError("%s の行 %d の float32 → float が違う" % (k, j))
-    u2c = PL.uuid_map(pol, L, ptr, idx)
-    if fr.u2c() != [(str(a), str(b)) for a, b in u2c.items()]:
-        raise AssertionError("uuid→card の往復が違う")
-    return True
-
-
-def check_dirs(dirs, limit_games=0):
-    """記録の局ごとに枠を作って往復を確かめる（器と同じ `iter_games`・`theory_bridge._extra` の float32）。戻り＝(局, 行)。"""
-    from opcg_sim.learned.train import plan_labels as PL
-    import theory_bridge as TB
-    g = n = 0
-    for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=TB.ROW_COLS, pol_cols=TB.POL_COLS, extra_fn=TB._extra):
-        g += 1
-        if limit_games and g > limit_games:
-            break
-        fr = frame_of(rows, pol, ex, L, ptr, idx)
-        check_frame(fr, rows, pol, ex, L, ptr, idx)
-        n += len(idx)
-    return g if not limit_games else min(g, limit_games), n
-
-
-def main(argv=None):
-    import argparse
-    ap = argparse.ArgumentParser(description="段 1 の受け渡しの恒等の確認（カード表・効果の木・fixture・局の枠）")
-    ap.add_argument("--in", dest="inp", nargs="*", default=[])
-    ap.add_argument("--limit-games", type=int, default=0)
-    a = ap.parse_args(argv)
-    print("cards", check_cards())
-    print("effects", check_effects())
-    print("fixture_floats", check_fixtures())
-    if a.inp:
-        print("frames(games, rows)", check_dirs(a.inp, a.limit_games))
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+def row_frame(sc, tok, ci, cands=(), who=0, turn=1):
+    """生の 1 行（`sc`／`tok` は float32・`ci` は int64）と候補の記述子（`sig`・`cid`・`tcid`・`si`・`ti`・`k`）→ 1 行の枠
+    （T18 の器が生の局面を Rust に読ませる・`live_theory.raw_row` の形）。"""
+    n = len(cands)
+    rows = {"who": np.array([who], np.int64), "turn": np.array([turn], np.int64), "seed": np.array([0], np.int64),
+            "z": np.array([0.0], np.float32), "kind": np.array([0], np.int64), "pol_len": np.array([n], np.int64),
+            "pol_chosen": np.array([-1], np.int64), "pol_v0": np.array([0.0], np.float32)}
+    pol = {"pol_sig": np.array([json.dumps(c["sig"]) for c in cands] or [""], object)[:n],
+           "pol_cid": np.array([c["cid"] or "" for c in cands] or [""], object)[:n],
+           "pol_tcid": np.array([c["tcid"] or "" for c in cands] or [""], object)[:n],
+           "pol_si": np.array([int(c["si"]) for c in cands], np.int64),
+           "pol_ti": np.array([int(c["ti"]) for c in cands], np.int64),
+           "pol_k": np.array([int(c["k"]) for c in cands], np.int64)}
+    ex = {"sc": np.asarray(sc, np.float32)[None], "tok": np.asarray(tok, np.float32)[None],
+          "ci": np.asarray(ci, np.int64)[None]}
+    return frame_of(rows, pol, ex, np.array([n]), np.array([0]), np.array([0]), u2c={})
