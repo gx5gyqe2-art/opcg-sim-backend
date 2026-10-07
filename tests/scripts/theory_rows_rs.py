@@ -291,8 +291,42 @@ class KvDriver(_Driver):
         check(self.tool, "acc", [loc["arms"][k][n:] for k in loc["arms"]], [[v] for v in out["acc"]])
 
 
+class TlDriver(_Driver):
+    tool = "transition_ledger"
+
+    def solve(self, game, n, stats, acc=None):
+        loc = self.loc
+        pin = {"decks": _decks_pair(loc["seat_decks"], _seed_of(game))}
+        cfg = dict(_cfg(loc, loc["prof"]), sr=float(loc["sr"]))
+        return call(self.tool, game, {"cfg": cfg, "in": pin, "stats": stats,
+                                      "carry": {"acc": loc["acc"] if acc is None else acc}})
+
+    def step_rs(self, game, n):
+        super().step_rs(game, n)
+
+    def apply(self, res):
+        acc = self.loc["acc"]
+        new = res["carry"]["acc"]
+        acc.clear()
+        acc.update(new)
+
+    def snap(self):
+        s = super().snap()
+        s["acc"] = copy.deepcopy(self.loc["acc"])
+        return s
+
+    def run(self, real):
+        # `both`: Rust は前の `acc` の写しから解く
+        self._acc_snap = None
+        return super().run(real)
+
+    def compare(self, snap, res):
+        check(self.tool, "stats", self.loc["stats"], res["stats"])
+        check(self.tool, "acc", self.loc["acc"], res["carry"]["acc"])
+
+
 #: `(ファイル名, 関数名)` → 局の駆動
-DRIVERS = {("kappa_vector.py", "collect"): KvDriver}
+DRIVERS = {("kappa_vector.py", "collect"): KvDriver, ("transition_ledger.py", "collect"): TlDriver}
 
 
 def _iter_games_proxy(*args, **kwargs):

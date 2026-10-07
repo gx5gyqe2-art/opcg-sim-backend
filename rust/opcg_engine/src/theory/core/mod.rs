@@ -23,6 +23,7 @@
 )]
 
 pub mod curve;
+pub mod cutframes;
 pub mod drive;
 pub mod drv_cb;
 pub mod drv_kv;
