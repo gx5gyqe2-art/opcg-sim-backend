@@ -306,17 +306,20 @@ _CAP_IDS = [0]
 
 def _record4(name, a_enc, g, pre, r_enc, cs, ev):
     """`TCR._record` ＋ 計数の増分 `ev`（`both` の通しでは Rust の増分＝Python と同じと確かめた物・`py` の記録では `None`）。"""
-    key = _dumps([a_enc, RS.enc(g), pre])
-    seen = TCR._SEEN.setdefault(name, set())
+    curve = name == "cp.curve_of_row" or name.startswith("cv.")
     TCR._stat(name, "calls")
-    if key in seen:
-        return
-    seen.add(key)
+    if not curve:
+        # 曲線の行は重複を除かない（曲線ごとに記録の順に解き直す・1 つの曲線の中の覚え書きが履歴に依る＝E52）
+        key = _dumps([a_enc, RS.enc(g), pre])
+        seen = TCR._SEEN.setdefault(name, set())
+        if key in seen:
+            return
+        seen.add(key)
     TCR._stat(name, "recorded")
     rec = {"fn": name, "a": a_enc, "g": RS.enc(g), "pre": pre, "r": r_enc, "cs": cs}
     if ev is not None:
         rec["ev"] = [[k, RS.enc(v)] for k, v in ev]
-    TCR._write(name, rec)
+    TCR._write("cp.curve" if curve else name, rec)
 
 
 class _RdcLog(TCR.LogDict):
@@ -538,7 +541,7 @@ def install(mode):
         if only == "outer":
             # 段 4 の行だけを書く（段 3 の核の行は段 3 の記録で確かめ済み・ディスクを食う）
             w0 = TCR._write
-            keep = tuple(n for n, _m, _a in OUTER) + ("cb.rule_don_solve", "cv.")
+            keep = tuple(n for n, _m, _a in OUTER) + ("cb.rule_don_solve", "cv.", "cp.curve")
 
             def _w(name, rec, _w0=w0):
                 if name.startswith(keep):
