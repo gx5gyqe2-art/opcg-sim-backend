@@ -62,6 +62,10 @@ THETA_RETURN_MODE = "untap"
 SLOPE_BLOCK_MODE = "on"
 RACE_CAP = 30.0          # 届かないときの打ち切り（ターン）
 
+#: **M-2 の計器**（`m2_probe.py`・`OPCG_M2_PROBE` のときだけ Rust が局ごとに `m2` を返す・`rows_out` と同じ並び）。
+#: 既定では空のまま（Rust が `m2` を返さない）＝既定の出力は変わらない。
+M2_ROWS = []
+
 #: 局の駆動が返す計数（`theory_rs` が持つ・器をまたいで 1 つ）
 RULE_STATS = TR.RULE_STATS
 EX_SPEED_STATS = TR.EX_SPEED_STATS
@@ -329,6 +333,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
     seat_decks = DR.decks_by_seed(dirs)                 # H-4e: ライフの札の分布もデッキから
     cut_decks = DR.decks_by_seed(dirs)                  # **N-3**: 切らせた札の値段を守り手の手札で読む
     rows_out = []
+    del M2_ROWS[:]
     _rule_stats_reset()    # **H-4**: `rule_don` の読みの開示（`rule_don` のときだけ下で `stats` に写す）
     ledger = []            # (d) 単位の検算: 勝った席の F_end 対 Θ_start
     theta_check = []       # **T96**: 行ごとの `Θ` 対「そこから終局までに実際に要った損害」
@@ -382,6 +387,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
         ledger.extend(res["ledger"])
         turn_harm.extend(res["turn_harm"])
         theta_check.extend(res["theta_check"])
+        M2_ROWS.extend(res.get("m2") or ())
         new = res["stats"]
         stats.clear()
         stats.update(new)

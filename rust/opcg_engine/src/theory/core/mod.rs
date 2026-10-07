@@ -41,6 +41,7 @@ pub mod entry_outer;
 pub mod ev;
 pub mod hj;
 pub mod hp;
+pub mod m2probe;
 pub mod memock;
 pub mod obj;
 pub mod outer;

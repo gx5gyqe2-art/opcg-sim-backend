@@ -1515,7 +1515,7 @@ impl Core {
         let th = r.theta;
         let a_time = if tau > 1e-12 { th / tau } else { py_max(if b.sched.is_empty() { 0.0 } else { b.sched[0] }, SLOPE_FLOOR) };
         let a_turn = if b.sched.is_empty() { 0.0 } else { b.sched[0] };
-        let plan = V::dict(vec![
+        let mut pkv = vec![
             (V::s("atk"), m.p_atk.clone()),
             (V::s("rush"), m.p_rush.clone()),
             (V::s("eff"), m.p_eff.clone()),
@@ -1541,7 +1541,20 @@ impl Core {
             (V::s("rest"), tfl(&rest)),
             (V::s("arrive"), tfl(p.arrive)),
             (V::s("draw_types"), vtrip(p.draw_types)),
-        ]);
+        ];
+        // **M-2 の計器**（`OPCG_M2_PROBE` のときだけ・診断の欄を足すだけで上の値は変えない・`m2probe.rs`）
+        if super::m2probe::on() {
+            let th_take = lt::theta_take(Some(p.life), ax.theta_p, lt::MU, lt::H_LIFE_TO_HAND);
+            let mut take_price = th_take * lt::MU;
+            if self.ctx.pricer.is_some() {
+                if let Some(tc) = self.ctx.take_card {
+                    take_price += lt::H_LIFE_TO_HAND * (lt::MU - tc);
+                }
+            }
+            let hits: Vec<Vec<f64>> = m.steps.iter().map(|s| s.hits.clone()).collect();
+            pkv.extend(super::m2probe::plan_fields(&inp, &mk[b.mask], &hits, &b.ks, b.paid, &r, o.h, take_price));
+        }
+        let plan = V::dict(pkv);
         let s = o.stats;
         Ok((
             V::tuple(vec![V::Float(r.cut), V::Float(r.stopped), plan]),

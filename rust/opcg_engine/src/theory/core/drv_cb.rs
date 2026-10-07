@@ -394,7 +394,117 @@ fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row:
         d.set("shield_rate", if srv.truthy() { srv } else { V::Float(0.0) });
     }
     let _ = th_w;
+    // **M-2 の計器**（`OPCG_M2_PROBE` のときだけ・値は変えず診断の欄を足す・`m2probe.rs`）
+    if super::m2probe::on() {
+        let why = if model_theta {
+            "plan"
+        } else if !rw::is_hr(&g_def) {
+            "no_hand_read"
+        } else if actx.is_none() {
+            "no_attacker"
+        } else {
+            "other"
+        };
+        let mut kv = vec![(V::s("why"), V::s(why))];
+        if model_theta {
+            for (k, v) in don_plan.kv() {
+                let ks = k.pystr();
+                if ks.starts_with("m2_") || ks == "horizon" || ks == "horizon0" {
+                    kv.push((k.clone(), v.clone()));
+                }
+            }
+        }
+        d.kv.push(("m2", V::dict(kv)));
+    }
     Ok(d)
+}
+
+/// **M-2 の計器**: 1 本の時計の交点と、交点までに積んだ損害の出どころ（`OPCG_M2_PROBE` のときだけ）
+fn m2_clock(d: &SeatD, rd: bool) -> V {
+    use super::m2probe::walk;
+    let tau = tau_theory_of(d, rd);
+    let theta = d.f("theta");
+    let sv = d.get("sched");
+    let sched: Vec<f64> = if sv.truthy() { sv.items().iter().map(|x| x.f()).collect() } else { Vec::new() };
+    let j0 = (if d.get("j").truthy() { d.get("j").int() } else { 0 }) + 1;
+    let tb = d.get("th_back");
+    let step = if tb.truthy() { tb.f() } else { 0.0 };
+    let floor = ou::SLOPE_FLOOR;
+    let (tw, jx, frac, adds) = walk(theta, &sched, j0, step, RACE_CAP, floor);
+    let m2 = d.get("m2");
+    let why = m2.get("why").pystr();
+    let mut kv = vec![
+        (V::s("tau"), V::Float(tau)),
+        (V::s("tau_walk"), V::Float(tw)),
+        (V::s("J"), V::Int(jx)),
+        (V::s("frac"), V::Float(frac)),
+        (V::s("theta"), V::Float(theta)),
+        (V::s("j"), V::Int(j0 - 1)),
+        (V::s("why"), V::s(&why)),
+        (V::s("acc"), V::Float(adds.iter().sum())),
+    ];
+    if why != "plan" {
+        kv.push((V::s("acc_fallback"), V::Float(adds.iter().sum())));
+        return V::dict(kv);
+    }
+    let gl = |k: &str| -> Vec<f64> { m2.get(k).items().iter().map(|x| x.f()).collect() };
+    let (base, flow, eff, take) = (gl("m2_base"), gl("m2_flow"), gl("m2_eff"), gl("m2_take"));
+    let dp: Vec<bool> = m2.get("m2_dp").items().iter().map(|x| x.truthy()).collect();
+    let n = base.len().min(sched.len());
+    let at = |j: usize| -> usize { j.min(n) - 1 };
+    let (mut a_dp, mut a_fb, mut a_flow, mut a_eff) = (0.0, 0.0, 0.0, 0.0);
+    for (q, &add) in adds.iter().enumerate() {
+        let i = at(q + 1);
+        let tot = base[i] + flow[i] + eff[i];
+        if add == 0.0 || tot <= 0.0 {
+            continue;
+        }
+        let sc = add / tot;
+        if dp[i] {
+            a_dp += base[i] * sc;
+        } else {
+            a_fb += base[i] * sc;
+        }
+        a_flow += flow[i] * sc;
+        a_eff += eff[i] * sc;
+    }
+    let nh = m2.get("m2_nh").int();
+    // 地平の内側の段ごとの（守る側の計算の損害, その段の `fb`）——同じ段を両方の値段で読んだ組
+    let fbl = gl("m2_fb");
+    let fbdp: Vec<V> = (0..(nh.max(0) as usize).min(n).min(fbl.len()))
+        .filter(|&i| !(i == 0 && j0 <= 1))
+        .map(|i| V::list(vec![V::Float(base[i]), V::Float(fbl[i])]))
+        .collect();
+    kv.push((V::s("fbdp"), V::list(fbdp)));
+    kv.extend(vec![
+        (V::s("acc_dp"), V::Float(a_dp)),
+        (V::s("acc_fb"), V::Float(a_fb)),
+        (V::s("acc_flow"), V::Float(a_flow)),
+        (V::s("acc_eff"), V::Float(a_eff)),
+        (V::s("nh"), V::Int(nh)),
+        (V::s("horizon"), m2.get("horizon").clone()),
+        (V::s("horizon0"), m2.get("horizon0").clone()),
+        (V::s("tau_full_plan"), m2.get("m2_tau_full").clone()),
+        (V::s("theta_plan"), m2.get("m2_theta_full").clone()),
+        (V::s("alive"), m2.get("m2_alive").clone()),
+        (V::s("resolve_same"), m2.get("m2_resolve_same").clone()),
+        (V::s("short"), m2.get("m2_short").clone()),
+    ]);
+    // 診断の別の歩き（同じ耐久・式の提案ではない）
+    let mk = |f: &dyn Fn(usize) -> f64| -> f64 {
+        let s2: Vec<f64> = (0..sched.len()).map(|q| f(at(q + 1))).collect();
+        walk(theta, &s2, j0, step, RACE_CAP, floor).0
+    };
+    let core = |i: usize| if dp[i] { base[i] } else { take[i] };
+    kv.extend(vec![
+        (V::s("tau_parts"), V::Float(mk(&|i| base[i] + flow[i] + eff[i]))),
+        (V::s("tau_noflow"), V::Float(mk(&|i| base[i] + eff[i]))),
+        (V::s("tau_noeff"), V::Float(mk(&|i| base[i] + flow[i]))),
+        (V::s("tau_core"), V::Float(mk(&|i| base[i]))),
+        (V::s("tau_take"), V::Float(mk(&|i| core(i) + flow[i] + eff[i]))),
+        (V::s("tau_take_core"), V::Float(mk(&|i| core(i)))),
+    ]);
+    V::dict(kv)
 }
 
 fn d2v(d: &SeatD) -> V {
@@ -736,6 +846,7 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         }
     }
     let mut rows_out = Vec::new();
+    let mut m2rows: Vec<V> = Vec::new();
     for w in 0..2i64 {
         let ts = turn_seq[w as usize].clone();
         let ts_o = turn_seq[(1 - w) as usize].clone();
@@ -816,14 +927,21 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
                 }
             }
             rows_out.push(V::dict(kv));
+            if super::m2probe::on() {
+                m2rows.push(V::dict(vec![(V::s("me"), m2_clock(&me, rd)), (V::s("opp"), m2_clock(&op, rd))]));
+            }
         }
     }
     let _ = (d2v, MU);
-    Ok(V::dict(vec![
+    let mut outv = vec![
         (V::s("stats"), stats.to_v()),
         (V::s("rows_out"), V::list(rows_out)),
         (V::s("ledger"), V::list(ledger)),
         (V::s("turn_harm"), V::list(turn_harm)),
         (V::s("theta_check"), V::list(theta_check)),
-    ]))
+    ];
+    if super::m2probe::on() {
+        outv.push((V::s("m2"), V::list(m2rows)));
+    }
+    Ok(V::dict(outv))
 }
