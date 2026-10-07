@@ -45,12 +45,12 @@ if _HERE not in sys.path:
 from opcg_sim.loop import decks as D  # noqa: E402
 from opcg_sim.loop import driver as DR  # noqa: E402
 from opcg_sim.loop import engine as E  # noqa: E402
-import guard_afford as GA  # noqa: E402
+import theory_rs as TR  # noqa: E402
 import live_theory as LT  # noqa: E402
 import shadow_forbid as SF  # noqa: E402
 import t18_arena as TA  # noqa: E402
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
-from theory_order import MU, THETA  # noqa: E402
+from theory_rs import MU, THETA  # noqa: E402
 
 
 # ---- 盤面 -----------------------------------------------------------------------------------------
@@ -247,7 +247,7 @@ def collect(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns
     介入は `t18_arena.make_swap`（T18・T156(a) の折り返し込み）をそのまま使う——理論が禁じた手を
     理論の最善に差し替える。`arm`／`attach_static` の意味も T18 と同じ。"""
     cards = PL.Cards()
-    idx2cid = {i: c for c, i in GA._vocab().items()}
+    idx2cid = TR.idx2cid()
     E.engine()
     search = {"worlds": int(worlds)} if worlds else {}
     spec = E.SeatSpec(net, sims=sims, dirichlet_eps=dirichlet_eps, temp_turns=temp_turns,

@@ -87,11 +87,11 @@ from opcg_sim.loop import decks as D  # noqa: E402
 from opcg_sim.loop import driver as DR  # noqa: E402
 from opcg_sim.loop import engine as E  # noqa: E402
 from opcg_sim.loop import record_gen as RG  # noqa: E402
-import guard_afford as GA  # noqa: E402
+import theory_rs as TR  # noqa: E402
 import live_theory as LT  # noqa: E402
 import shadow_forbid as SF  # noqa: E402
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
-from theory_order import MU, THETA  # noqa: E402
+from theory_rs import MU, THETA  # noqa: E402
 
 #: 「禁じる」対象から除く型（T141 の申し送り——系列の価値を見ない `s` の守備範囲の外）。
 EXEMPT_FAMILIES = ("attach",)
@@ -333,7 +333,7 @@ def dry_run(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns
 
     **T148**: `seats`（省略可）を `make_swap` にそのまま渡す（`None`＝両席・後方互換）。"""
     cards = PL.Cards()
-    idx2cid = {i: c for c, i in GA._vocab().items()}
+    idx2cid = TR.idx2cid()
     E.engine()
     search = {"worlds": int(worlds)} if worlds else {}
     spec = E.SeatSpec(net, sims=sims, dirichlet_eps=dirichlet_eps, temp_turns=temp_turns,
@@ -376,7 +376,7 @@ def t18_pairs(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_tur
     **両席に同じ規則で介入すると効果が相殺する**（`make_swap` の docstring）ので、**片席だけへの介入**が
     T18 の勝率判定に要る唯一の形。返り値は局ごとの記録（`dry_run` と同じ形＋`intervened`＝介入された席）。"""
     cards = PL.Cards()
-    idx2cid = {i: c for c, i in GA._vocab().items()}
+    idx2cid = TR.idx2cid()
     E.engine()
     search = {"worlds": int(worlds)} if worlds else {}
     spec = E.SeatSpec(net, sims=sims, dirichlet_eps=dirichlet_eps, temp_turns=temp_turns,

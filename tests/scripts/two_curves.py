@@ -29,6 +29,11 @@
 ——**勝った席の `R(最終自席ターン)` の平均**が `crossing_bridge.collect()` の `ledger.F_end_mean`
 と一致すれば、2 つの別々に書いた実装が同じ答えに収束したことになる（`--verify` で自動実行）。
 
+
+**段 7（2026-10-07）**: 1 局ぶんの `G(t)`／`R(t)`（`_price_row`＝`score_candidate` を帳簿の規約で読み直したもの・
+`attack_response.parts`／`parts_mirror` の損害・T113 のブラケット）は Rust の局の駆動
+（`rust/opcg_engine/src/theory/core/drv_t18.rs` の `two_curves`）。`--verify` の相手（`crossing_bridge.collect`）も Rust で、
+2 つは Rust の中で別々の経路（`drv_t18` の `ar_parts` の和 対 `drv_cb` の `F`）を通る。
 使い方:
 
     python tests/scripts/two_curves.py --in <records_dir> [--games N] [--verify] [--dump rows.json] [--json out.json]
@@ -49,154 +54,32 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
-import attack_response as AR  # noqa: E402
-import guard_afford as GA  # noqa: E402
-import theory_bridge as TB  # noqa: E402
-from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
-from theory_bridge import is_decision_row as TB_is_decision_row  # noqa: E402  (D-5)
-from theory_order import (MU, SC_MY_DON, SC_MY_LEADER_POWER, SC_MY_LIFE, SC_OPP_LEADER_POWER,  # noqa: E402
-                          SC_OPP_LIFE, THETA, hand_ids_of, opp_bodies_of, own_attackers_of, score_candidate,
-                          slot_power, theta_of)
+import theory_rs as TR  # noqa: E402
+from theory_bridge import POL_COLS, ROW_COLS, _extra  # noqa: E402
+from theory_rs import MU, THETA  # noqa: E402
 
 
-def harm_of(p):
-    """**`crossing_bridge.harm_of` と同じ式**（独立に書く——配線の検算の意味が無くなるので import しない）。"""
-    return float(p["opp_life"] + p["opp_hand"] + p["opp_body"])
-
-
-def _price_row(sc, tok, ci, cards, idx2cid, sig, cid, tcid, si, ti, k, theta, mu, theta_mode="const"):
-    """1 決定行の理論値（帳簿の規約＝T58 `exercise` ＋ T85 付与ゼロ化）。`TURN_END` は 0・値付けできなければ `None`。
-    **`theory_bridge.collect` の `g_row` と同じパイプライン**を、`search_ctx` を渡さずに簡略化して呼ぶ（docstring 参照）。"""
-    sc_a, tok_a = np.asarray(sc), np.asarray(tok)
-    olp = float(sc_a[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-    mlp = float(sc_a[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-    th = theta_of(tok_a, float(sc_a[SC_MY_LIFE]), float(sc_a[SC_MY_DON]), mode=theta_mode, theta=theta)
-    r = max(1.0, min(5.0, float(sc_a[SC_OPP_LIFE])))
-    ctx = {"theta": th, "mu": mu, "opp_leader_power": olp, "my_leader_power": mlp, "r_turns": r, "don_k": 1,
-           "attackers": own_attackers_of(tok_a, olp), "don_active": float(sc_a[SC_MY_DON]),
-           "st": _state_of(sc, ci, idx2cid, tok=tok, cards=cards),
-           # **T150f-2**: 見送った登場の価値（`misalloc_play`）に要る手札の card_id 列
-           "hand": hand_ids_of(ci, idx2cid),
-           "opp_bodies": opp_bodies_of(tok_a, mlp, r, th, mu, ci_row=ci, idx2cid=idx2cid)}
-
-    def _score():
-        return score_candidate(sig, cid, tcid, ctx, cards,
-                                src_power=slot_power(tok_a, si), tgt_power=slot_power(tok_a, ti), don_k=k)
-
-    played_v = _score()
-    if played_v is None:
-        return None
-    g_v = TB.ledger_value(_score, played_v)
-    # **T85**: 付与の増分は殴る行の価格に既に入っている（`in_attack`）ので、
-    # 付与の行そのものは帳簿では 0 にする（移転は 1 回だけ数える）。
-    if move_family(sig) == "attach":
-        g_v = 0.0
-    return float(g_v)
-
-
-def two_curves_for_game(rows, pol, ex, L, ptr, idx, cards, idx2cid, theta=THETA, mu=MU):
-    """1 局ぶんの `G(t)`／`R(t)`（局×席の累積系列）。戻り値: `{(w): {"turns": [...], "g": [...], "r": [...]}}`
-    ＋ `winner`（0/1/None）。`turns` はその席の自席ターン番号の並び（昇順）。
-
-    **T143**: `r_life`／`r_hand`／`r_body` は `R(t)` を `harm_of` の 3 項（相手のライフ・手札・体）に
-    分けた累積——**足すと `r` に戻る**（新しい量ではなく、同じ差分を足す前に分けて持つだけ）。"""
-    order = list(idx)
-    by_seat = {}
-    for n, i in enumerate(order):
-        if TB_is_decision_row(rows, pol, L, ptr, i):
-            by_seat.setdefault(int(rows["who"][i]), []).append(n)
-    nxt = {}
-    for _w, ns in by_seat.items():
-        for a, b in zip(ns, ns[1:]):
-            nxt[a] = b
-    # **T113**: そのターンに残っている最後の行（席を問わない）——閉じる相手が同席に無い決定行のため
-    last_of_turn = {}
-    for n, i in enumerate(order):
-        last_of_turn[int(rows["turn"][i])] = n
-
-    turn_seq = {0: [], 1: []}
-    g_turn = {}            # (w, t) -> 理論値の和
-    r_turn = {}             # (w, t) -> 実現の損害の和
-    g_fam_turn = {}        # (w, t) -> {型: 理論値の和}（T137b・g_turn の分割・和は g_turn と一致する）
-    # (w, t) -> 実現の損害の 3 部品（T143・`harm_of` の 3 項をそのまま分けて積む＝和は r_turn と一致する）
-    r_part_turn = {}
-    z_of = {}
-    for n, i in enumerate(order):
-        w, t = int(rows["who"][i]), int(rows["turn"][i])
-        z = float(rows["z"][i])
-        if z != 0.0:
-            z_of[w] = 1.0 if z > 0 else 0.0
-        if t < 1 or not PL.is_own_turn(w, t) or not TB_is_decision_row(rows, pol, L, ptr, i):
-            continue
-        k = int(L[i]); ch = int(rows["pol_chosen"][i])
-        if k < 1 or ch < 0 or ch >= k:
-            continue
-        sc, tok, ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
-        if (w, t) not in g_turn:
-            g_turn[(w, t)] = 0.0; r_turn[(w, t)] = 0.0; g_fam_turn[(w, t)] = {}
-            r_part_turn[(w, t)] = {"life": 0.0, "hand": 0.0, "body": 0.0}
-            turn_seq[w].append(t)
-        # ---- R(t): T113 のブラケット（次の行 → 実現の損害） ----
-        j = nxt.get(n)
-        mirror = False
-        if j is not None and int(rows["turn"][order[j]]) == t:
-            i2 = order[j]
-        else:
-            m = last_of_turn.get(t)
-            i2 = order[m] if (m is not None and m > n) else None
-            mirror = i2 is not None and int(rows["who"][i2]) != w
-        if i2 is not None:
-            p = (AR.parts_mirror if mirror else AR.parts)(sc, tok, ex["sc"][i2], ex["tok"][i2])
-            r_turn[(w, t)] += harm_of(p)
-            rp = r_part_turn[(w, t)]
-            rp["life"] += float(p["opp_life"]); rp["hand"] += float(p["opp_hand"]); rp["body"] += float(p["opp_body"])
-        # ---- G(t): 選んだ候補の理論値（帳簿の規約） ----
-        b = int(ptr[i]) + ch
-        sig = json.loads(pol["pol_sig"][b])
-        tl = sig[2] if len(sig) > 2 else None
-        g_v = _price_row(sc, tok, ci, cards, idx2cid, sig,
-                         str(pol["pol_cid"][b]) or None, (str(pol["pol_tcid"][b]) or None) if tl else None,
-                         int(pol["pol_si"][b]), int(pol["pol_ti"][b]), int(pol["pol_k"][b]), theta, mu)
-        if g_v is not None:
-            g_turn[(w, t)] += g_v
-            fam = move_family(sig)
-            g_fam_turn[(w, t)][fam] = g_fam_turn[(w, t)].get(fam, 0.0) + g_v
-    winner = None
-    for w, zz in z_of.items():
-        if zz > 0.5:
-            winner = w
-    out = {}
-    for w in (0, 1):
-        ts = turn_seq[w]
-        g_cum, r_cum, g_fam = [], [], []
-        r_life, r_hand, r_body = [], [], []
-        gs = rs = 0.0
-        ls = hs = bs = 0.0
-        for t in ts:
-            gs += g_turn.get((w, t), 0.0); rs += r_turn.get((w, t), 0.0)
-            g_cum.append(gs); r_cum.append(rs)
-            g_fam.append(g_fam_turn.get((w, t), {}))     # **その 1 ターンの**（累積ではない）型別内訳
-            rp = r_part_turn.get((w, t)) or {"life": 0.0, "hand": 0.0, "body": 0.0}
-            ls += rp["life"]; hs += rp["hand"]; bs += rp["body"]
-            r_life.append(ls); r_hand.append(hs); r_body.append(bs)
-        out[w] = {"turns": ts, "g": g_cum, "r": r_cum, "g_fam": g_fam,
-                  "r_life": r_life, "r_hand": r_hand, "r_body": r_body}
-    return out, winner
+def two_curves_for_game(game, theta=THETA, mu=MU):
+    """1 局ぶんの `G(t)`／`R(t)`（局×席の累積系列・Rust の局の駆動 `two_curves`）。戻り値:
+    `{w: {"turns": [...], "g": [...], "r": [...], "g_fam": [...], "r_life": [...], "r_hand": [...], "r_body": [...]}}`
+    ＋ `winner`（0/1/None）。`turns` はその席の自席ターン番号の並び（昇順）。**T143**: `r_life`／`r_hand`／`r_body` は
+    `R(t)` を 3 項（相手のライフ・手札・体）に分けた累積——**足すと `r` に戻る**。"""
+    res = TR.game_call("two_curves", game, {"cfg": TR.cfg(theta, mu), "in": {}, "stats": {}, "carry": {}})
+    curves = res["curves"]
+    return {0: curves[0], 1: curves[1]}, res["winner"]
 
 
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
-    cards = PL.Cards()
-    idx2cid = {i: c for c, i in GA._vocab().items()}
     games = 0
     winner_final_r = []          # 勝った席の R(最終自席ターン)（配線の検算に使う）
     end_g, end_r = [], []        # 各局・各席の終点（G, R）
     n_games = n_seats = 0
-    for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
+    for game in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
         games += 1
         if limit_games and games > limit_games:
             break
-        seed_g = int(rows["seed"][idx[0]]) if len(idx) else -1
-        curves, winner = two_curves_for_game(rows, pol, ex, L, ptr, idx, cards, idx2cid, theta, mu)
+        seed_g = TR.seed_of(game)
+        curves, winner = two_curves_for_game(game, theta, mu)
         n_games += 1
         for w in (0, 1):
             c = curves[w]

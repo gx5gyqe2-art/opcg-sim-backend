@@ -84,11 +84,11 @@ from opcg_sim.loop import decks as D  # noqa: E402
 from opcg_sim.loop import driver as DR  # noqa: E402
 from opcg_sim.loop import engine as E  # noqa: E402
 from opcg_sim.loop import record_gen as RG  # noqa: E402
-import guard_afford as GA  # noqa: E402
+import theory_rs as TR  # noqa: E402
 import live_theory as LT  # noqa: E402
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 from theory_bridge import move_family  # noqa: E402
-from theory_order import MU, THETA  # noqa: E402
+from theory_rs import MU, THETA  # noqa: E402
 
 #: `s < -TOL` を「理論が禁じる」と呼ぶ（浮動小数の丸め誤差を吸収するだけ・新しい判断基準ではない）。
 TOL = 1e-9
@@ -267,7 +267,7 @@ def collect(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns
            theta=THETA, mu=MU):
     """`seeds` を今ここに打ちながら影の判定を集め、局ごとの行を返す（打ち回しには介入しない）。"""
     cards = PL.Cards()
-    idx2cid = {i: c for c, i in GA._vocab().items()}
+    idx2cid = TR.idx2cid()
     E.engine()
     search = {"worlds": int(worlds)} if worlds else {}
     spec = E.SeatSpec(net, sims=sims, dirichlet_eps=dirichlet_eps, temp_turns=temp_turns,

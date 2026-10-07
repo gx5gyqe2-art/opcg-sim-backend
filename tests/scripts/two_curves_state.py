@@ -48,11 +48,10 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
-import crossing_bridge as CB  # noqa: E402
-import guard_afford as GA  # noqa: E402
 import kappa_vector as KV  # noqa: E402
+import theory_rs as TR  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra  # noqa: E402
-from theory_order import MU, SC_MY_HAND, SC_MY_LIFE, SC_OPP_HAND, SC_OPP_LIFE, THETA  # noqa: E402
+from theory_rs import MU, THETA  # noqa: E402
 
 
 # `corr`・`demean_by` は T128 の計器 `rate_tracking.py` から写した（その器は移植の段 0〔2026-10-06〕で退役）。
@@ -82,72 +81,35 @@ def demean_by(xs, js):
 STATE_KEYS = ("th_me", "th_opp", "a_me", "a_opp", "life_me", "life_opp", "hand_me", "hand_opp")
 
 
-def state_by_turn(rows, ex, idx, cards, idx2cid, seat_decks, seed_g, theta=THETA, mu=MU, with_parts=False):
+def state_by_turn(game, seat_decks, seed_g, theta=THETA, mu=MU, with_parts=False):
     """局 1 本ぶんの `(w, t)`（自席ターン・その最初の `kind=0` 行）→ 状態 dict（8 量）。
 
     **`kappa_vector.collect` の一次通過と同じ規約**——`A` はその席のターンの最初の行から
     （`rate_of_row` の注記どおり）・相手の `A`／手札価格は**相手の直近の自席ターン**から読む
     （`_opp_at` と同じ形）。相手がまだ 1 ターンも打っていない席は state が無い（`None` を返さず省く）。
+    計算は Rust の局の駆動（`two_curves_state`・`core::drv_t18`）。
 
-    **T143**: `with_parts=True` なら `th_opp` を**同じ引数の `crossing_bridge.threshold_parts`**
-    で 3 項（`th_opp_life`／`th_opp_hand`／`th_opp_body`）にも割って添える
-    （`threshold` は `threshold_parts` の和なので**足すと `th_opp` に戻る**）。"""
-    rate_at_turn, g_at_turn, first_row = {}, {}, {}
-    for i in idx:
-        if int(rows["kind"][i]) != 0:
-            continue
-        w, t = int(rows["who"][i]), int(rows["turn"][i])
-        if PL.is_own_turn(w, t) and (w, t) not in rate_at_turn:
-            dk = KV._deck_of(seat_decks, seed_g, w)
-            j = CB.own_turn_index(t)
-            rate_at_turn[(w, t)] = KV.rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid,
-                                                  cards, theta, mu, deck_ids=dk, j=j)
-            g_at_turn[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
-            first_row[(w, t)] = i
-
-    def opp_at(w, t):
-        ts = [tt for (ww, tt) in rate_at_turn if ww == 1 - w and tt < t]
-        if not ts:
-            return None
-        key = (1 - w, max(ts))
-        return rate_at_turn[key], g_at_turn[key]
-
-    out = {}
-    for (w, t), a_me in rate_at_turn.items():
-        pair = opp_at(w, t)
-        if pair is None:
-            continue
-        a_opp, g_opp = pair
-        sc, tok = ex["sc"][first_row[(w, t)]], ex["tok"][first_row[(w, t)]]
-        th_me, th_opp, a_me2, a_opp2, _j = KV.state5_of_row(
-            sc, tok, a_me, a_opp, CB.own_turn_index(t), g_me=g_at_turn[(w, t)], g_opp=g_opp)
-        sc_a = np.asarray(sc)
-        out[(w, t)] = {"th_me": th_me, "th_opp": th_opp, "a_me": a_me2, "a_opp": a_opp2,
-                       "life_me": float(sc_a[SC_MY_LIFE]), "life_opp": float(sc_a[SC_OPP_LIFE]),
-                       "hand_me": float(sc_a[SC_MY_HAND]), "hand_opp": float(sc_a[SC_OPP_HAND])}
-        if with_parts:
-            p_life, p_hand, p_body = CB.threshold_parts(sc, tok, g_hand=g_opp)
-            out[(w, t)].update({"th_opp_life": float(p_life), "th_opp_hand": float(p_hand),
-                                "th_opp_body": float(p_body)})
-    return out
+    **T143**: `with_parts=True` なら `th_opp` を**同じ引数の `threshold_parts`** で 3 項
+    （`th_opp_life`／`th_opp_hand`／`th_opp_body`）にも割って添える（**足すと `th_opp` に戻る**）。"""
+    pin = {"decks": TR.deck_list(KV._deck_pair(seat_decks, seed_g)), "with_parts": bool(with_parts)}
+    res = TR.game_call("two_curves_state", game, {"cfg": TR.cfg(theta, mu), "in": pin, "stats": {}, "carry": {}})
+    return {(int(w), int(t)): st for w, t, st in res["states"]}
 
 
 def collect(dump, dirs, limit_games=0, theta=THETA, mu=MU):
     """`dump`（`two_curves.py --dump` の中身）× `dirs`（同じ記録）から残差×状態量の表を作る。"""
-    cards = PL.Cards()
-    idx2cid = {i: c for c, i in GA._vocab().items()}
     seat_decks = KV._seat_decks(dirs)
     by_seed_w = {(int(row["seed"]), int(row["w"])): row for row in dump}
 
     residuals, js = [], []
     state_lists = {k: [] for k in STATE_KEYS}
     games = 0
-    for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
+    for game in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
         games += 1
         if limit_games and games > limit_games:
             break
-        seed_g = int(rows["seed"][idx[0]]) if len(idx) else -1
-        st_by_turn = state_by_turn(rows, ex, idx, cards, idx2cid, seat_decks, seed_g, theta, mu)
+        seed_g = TR.seed_of(game)
+        st_by_turn = state_by_turn(game, seat_decks, seed_g, theta, mu)
         for w in (0, 1):
             d = by_seed_w.get((seed_g, w))
             if not d:

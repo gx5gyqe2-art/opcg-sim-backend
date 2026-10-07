@@ -72,12 +72,11 @@ from opcg_sim.loop import decks as D  # noqa: E402
 from opcg_sim.loop import driver as DR  # noqa: E402
 from opcg_sim.loop import engine as E  # noqa: E402
 from opcg_sim.loop import record_gen as RG  # noqa: E402
-import guard_afford as GA  # noqa: E402
 import kappa_vector as KV  # noqa: E402
-import two_curves as TC  # noqa: E402
+import theory_rs as TR  # noqa: E402
 from crossing_bridge import own_turn_index  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra  # noqa: E402
-from theory_order import MU, THETA  # noqa: E402
+from theory_rs import MU, THETA  # noqa: E402
 
 #: 記録と同じ形（`record_gen.py` の規約——`MAX_CI`／`TOKENS_SHAPE`／`DT_V3` はそこから借りる）。
 TOKENS_SHAPE = RG.TOKENS_SHAPE
@@ -133,14 +132,15 @@ def raw_candidates(game, name, out):
 
 
 def price_candidates(sc, tok, ci, cards, idx2cid, cands, theta=THETA, mu=MU):
-    """候補ごとの理論値（`two_curves._price_row` の再利用——T137a の帳簿の規約のまま）。
-    値付けできない候補は `None`（`TURN_END` 等）。"""
-    out = []
-    for c in cands:
-        v = TC._price_row(sc, tok, ci, cards, idx2cid, c["sig"], c["cid"], c["tcid"],
-                          c["si"], c["ti"], c["k"], theta, mu)
-        out.append(dict(c, price=v))
-    return out
+    """候補ごとの理論値（`two_curves` の `_price_row`——T137a の帳簿の規約のまま・Rust の局の駆動 `price_cands`）。
+    値付けできない候補は `None`（`TURN_END` 等）。`cards`／`idx2cid` は呼び手の互換のため（Rust はカード表を持つ）。"""
+    if not cands:
+        return []
+    fr = TR.row_frame(sc, tok, ci, cands)
+    res = TR.game_call("price_cands", fr, {"cfg": TR.cfg(theta, mu), "in": {"rows": [0], "gate": False},
+                                          "stats": {}, "carry": {}})
+    prices = res["prices"][0][1]
+    return [dict(c, price=v) for c, v in zip(cands, prices)]
 
 
 class _LiveState:
@@ -154,19 +154,26 @@ class _LiveState:
 
     def on_turn_start(self, w, t, sc, tok, ci):
         """その自席ターンの最初の行で呼ぶ——`A`／`g` を記録し、両席ぶん読めれば `state_of_row` を返す
-        （読めなければ `None`＝先手の最初のターンと同じ扱い）。"""
+        （読めなければ `None`＝先手の最初のターンと同じ扱い）。計算は Rust の局の駆動（`live_turn`）。
+        `g`（手札の読み）は Rust の値のまま記録の形の文字列で持ち、相手の行を読むときに渡し返す。"""
         dk = self.decks[w]
         j = own_turn_index(t)
-        self.rate_at_turn[(w, t)] = KV.rate_of_row(sc, tok, ci, self.idx2cid, self.cards,
-                                                   self.theta, self.mu, deck_ids=dk, j=j)
-        self.g_at_turn[(w, t)] = KV.g_of_row(sc, tok, ci, self.idx2cid, self.cards)
         ts = [tt for (ww, tt) in self.rate_at_turn if ww == 1 - w and tt < t]
-        if not ts:
+        opp = None
+        if ts:
+            key = (1 - w, max(ts))
+            opp = {"a": float(self.rate_at_turn[key]), "g_txt": self.g_at_turn[key]}
+        decks = [None, None]
+        decks[w] = None if dk is None else list(dk)
+        res, raw = TR.game_call("live_turn", TR.row_frame(sc, tok, ci),
+                                {"cfg": TR.cfg(self.theta, self.mu), "in": {"w": int(w), "j": int(j), "opp": opp,
+                                                                            "decks": decks},
+                                 "stats": {}, "carry": {}}, raw=True)
+        self.rate_at_turn[(w, t)] = res["a"]
+        self.g_at_turn[(w, t)] = json.dumps(dict(raw["d"])["g"], separators=(",", ":"))
+        if res["state"] is None:
             return None
-        key = (1 - w, max(ts))
-        a_opp, g_opp = self.rate_at_turn[key], self.g_at_turn[key]
-        th_me, th_opp, a_me2, a_opp2, _j = KV.state5_of_row(
-            sc, tok, self.rate_at_turn[(w, t)], a_opp, j, g_me=self.g_at_turn[(w, t)], g_opp=g_opp)
+        th_me, th_opp, a_me2, a_opp2 = res["state"]
         return {"th_me": th_me, "th_opp": th_opp, "a_me": a_me2, "a_opp": a_opp2}
 
 
@@ -214,7 +221,7 @@ def replay_and_compare(dirs, seed, decks_mode, sims=64, net=None, dirichlet_eps=
 
     `dirs` の中に `seed` を含む記録が無ければ `ValueError`。"""
     cards = PL.Cards()
-    idx2cid = {i: c for c, i in GA._vocab().items()}
+    idx2cid = TR.idx2cid()
     rec = _load_record_rows(dirs, seed)
     if rec is None:
         raise ValueError("記録に seed=%d が無い（%s）" % (seed, dirs))
@@ -322,17 +329,21 @@ def replay_and_compare(dirs, seed, decks_mode, sims=64, net=None, dirichlet_eps=
 
 def _load_record_rows(dirs, seed):
     """`dirs` から `seed` の main 行だけを step 順に読み、`(sc,tok,ci)`・`theta` 状態・候補の値付けを
-    オフライン（ダンプ経由）で作る（`replay_and_compare` の突き合わせの相手側）。"""
-    cards = PL.Cards()
-    idx2cid = {i: c for c, i in GA._vocab().items()}
-    for rows, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
-        seed_g = int(rows["seed"][idx[0]]) if len(idx) else -1
+    オフライン（ダンプ経由）で作る（`replay_and_compare` の突き合わせの相手側）。状態と値付けは Rust
+    （`two_curves_state`・`price_cands` の局の駆動）。"""
+    import two_curves_state as TS
+    for game in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
+        rows, pol, ex, L, ptr, idx = game
+        seed_g = TR.seed_of(game)
         if seed_g != seed:
             continue
         order = list(idx)
         out = {"who": [], "turn": [], "kind": [], "sc": [], "tok": [], "ci": [], "theta": {}, "cands": {}}
         seat_decks = KV._seat_decks(dirs)
-        st_by_turn = TS_state_by_turn_cache(rows, ex, idx, cards, idx2cid, seat_decks, seed_g)
+        st_by_turn = TS.state_by_turn(game, seat_decks, seed_g)
+        res = TR.game_call("price_cands", game, {"cfg": TR.cfg(THETA, MU), "in": {"rows": None, "gate": True},
+                                                 "stats": {}, "carry": {}})
+        prices = {int(n): ps for n, ps in res["prices"]}
         for n, i in enumerate(order):
             w, t, kind = int(rows["who"][i]), int(rows["turn"][i]), int(rows["kind"][i])
             out["who"].append(w); out["turn"].append(t); out["kind"].append(kind)
@@ -342,27 +353,10 @@ def _load_record_rows(dirs, seed):
                 if st is not None:
                     out["theta"][n] = {"th_me": st["th_me"], "th_opp": st["th_opp"],
                                        "a_me": st["a_me"], "a_opp": st["a_opp"]}
-                k = int(L[i])
-                if k > 0:
-                    b = int(ptr[i])
-                    cands = []
-                    for j in range(b, b + k):
-                        sig = json.loads(pol["pol_sig"][j])
-                        tl = sig[2] if len(sig) > 2 else None
-                        cid, tcid = str(pol["pol_cid"][j]) or None, (str(pol["pol_tcid"][j]) or None) if tl else None
-                        price = TC._price_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], cards, idx2cid,
-                                              sig, cid, tcid, int(pol["pol_si"][j]), int(pol["pol_ti"][j]),
-                                              int(pol["pol_k"][j]), THETA, MU)
-                        cands.append({"price": price})
-                    out["cands"][n] = cands
+                if int(L[i]) > 0:
+                    out["cands"][n] = [{"price": p} for p in prices[n]]
         return out
     return None
-
-
-def TS_state_by_turn_cache(rows, ex, idx, cards, idx2cid, seat_decks, seed_g):
-    """`two_curves_state.state_by_turn` を呼ぶだけの薄い包み（循環 import を避けるため遅延 import）。"""
-    import two_curves_state as TS
-    return TS.state_by_turn(rows, ex, idx, cards, idx2cid, seat_decks, seed_g)
 
 
 def build_parser():
