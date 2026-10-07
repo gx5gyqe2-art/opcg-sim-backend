@@ -251,11 +251,24 @@ SOLVER_FINGERPRINTS = {
     "rd-speed-3": "9e21fec15160dcda",     # Rust 化・第 3 段（2026-10-05）: 速くした Python の解き方を消した（値は不変）
     "rd-speed-4": "1b96139ac93cffad",     # 全移植・段 1／2（2026-10-06）: `src/theory` に葉を足した（解き方の値は不変）
     "rd-speed-5": "92b35884614a0123",     # 全移植・段 3（2026-10-07）: 原文のハッシュを守る側の 8 ファイルだけに（値は不変）
+    "rd-speed-6": "bd93a863e1c99d9d",                # 全移植・段 4（2026-10-07）: 外側を Rust にも写した（Rust の外側の原文が指紋に入る・値は不変）
 }
 _SOLVER_FUNCS = ("rule_guard_plan_ex", "_prices_of", "_attach_gain", "rules_steps", "walk_crossing", "model_horizon",
                  "tau_grow", "rule_don_solve", "_rd_solve_args", "_rd_run", "_rule_don_masks")
 #: Rust の核の継ぎ目（`rd_kernel`）のうち値に触れる関数
 _KERNEL_FUNCS = ("guard_rs", "res_dict", "race_cap", "rd_solve")
+#: **rd-speed-6（全移植・段 4）**: Rust に写した外側（`rule_don_solve` の外側・攻め手の財布・段ごとの財布・計画のディスクの覚え書き）
+#: の原文——ここを直して版を上げ忘れても落ちる（Rust の計画の覚え書きの鍵は Rust の原文の全部のハッシュなので古い値は返らない）
+_OUTER_RS = ("core/outer.rs", "core/store.rs")
+
+
+def _outer_rs_hash():
+    base = os.path.join(_HERE, "..", "rust", "opcg_engine", "src", "theory")
+    h = hashlib.sha256()
+    for rel in _OUTER_RS:
+        with open(os.path.join(base, rel), "rb") as fh:
+            h.update(rel.encode() + b"\0" + fh.read())
+    return h.hexdigest()
 
 
 def solver_fingerprint():
@@ -265,7 +278,15 @@ def solver_fingerprint():
     for name in _KERNEL_FUNCS:
         h.update(inspect.getsource(getattr(RK, name)).encode())
     h.update((RK.source_hash() or "").encode())
+    h.update(_outer_rs_hash().encode())
     return h.hexdigest()[:16]
+
+
+def test_the_rust_outer_carries_the_same_solver_version():
+    """Rust の外側（`outer::SOLVER_VERSION`・Rust の計画のディスクの覚え書きの鍵に入る）と Python の版が同じ（上げ忘れの見張り）。"""
+    import opcg_engine
+    ver, _h = opcg_engine.theory_outer_version()
+    assert ver == CB.SOLVER_VERSION
 
 
 def test_the_solver_version_is_bumped_when_the_solver_changes():

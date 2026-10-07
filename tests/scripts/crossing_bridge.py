@@ -1257,7 +1257,11 @@ PLAN_STORE = None
 #: **rd-speed-4**（全移植・段 1／2・2026-10-06）: `src/theory` に葉と受け渡しを足した＝原文のハッシュが変わった（解き方の値は不変）。
 #: **rd-speed-5**（全移植・段 3・2026-10-07）: 原文のハッシュを守る側の計算の 8 ファイル（`rd_kernel.KERNEL_FILES`）だけに絞った
 #: ＝理論の移植のファイルを足しても版を上げずに済む（ハッシュの値が変わっただけ・解き方の値は不変）。
-SOLVER_VERSION = "rd-speed-5"
+#: **rd-speed-6**（全移植・段 4・2026-10-07）: `rule_don_solve` の外側（`attacker_ctx`・`rules_steps`・覚え書き・計画の辞書）を
+#: Rust にも写した（`rust/opcg_engine/src/theory/core/outer.rs`・`OPCG_THEORY_OUTER=rs` で使う）。Rust の計画のディスクの覚え書き
+#: （`core/store.rs`）の鍵は Rust の原文の全部のハッシュと入力だけ（Python の原文は入らない）——その版がこれと同じ
+#: （`outer::SOLVER_VERSION`・`test_rd_speed` が一致を見る）。解き方の値は不変。
+SOLVER_VERSION = "rd-speed-6"
 _RULE_DON_CACHE = {}
 
 #: 開示: 予算を超えた試行の数・数え方で飛ばした試行の数（`rule_don_solve` の呼び出しごと・値には入らない）

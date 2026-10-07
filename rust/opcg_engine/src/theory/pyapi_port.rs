@@ -94,6 +94,12 @@ fn theory_core_call(name: &str, payload: &str, replay: bool) -> PyResult<String>
     Ok(capture_string(&to_pyval(&out)))
 }
 
+/// **段 4**: Rust の外側の解き方の版（`outer::SOLVER_VERSION`）と、Rust の計画のディスクの覚え書きの鍵に入る原文のハッシュ。
+#[pyfunction]
+fn theory_outer_version() -> (&'static str, &'static str) {
+    (super::core::outer::SOLVER_VERSION, super::core::store::SOLVER_SRC_HASH)
+}
+
 /// **段 3**: 核の覚え書きを全部捨てる（`which="history"` なら丸めた鍵の覚え書きだけ）。
 #[pyfunction]
 #[pyo3(signature = (which="all"))]
@@ -191,6 +197,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(theory_leaf_call, m)?)?;
     m.add_function(wrap_pyfunction!(theory_core_call, m)?)?;
     m.add_function(wrap_pyfunction!(theory_core_reset, m)?)?;
+    m.add_function(wrap_pyfunction!(theory_outer_version, m)?)?;
     m.add_function(wrap_pyfunction!(theory_leaf_call_core, m)?)?;
     Ok(())
 }

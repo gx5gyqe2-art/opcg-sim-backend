@@ -239,8 +239,8 @@ def _call_outer(name, orig, bind, args, kw, gl):
         TCR._pop_frame(fr)
     cs = [x - y for x, y in zip(TCR._cond_stats(), cs0)]
     r_enc = _res_enc(name, r)
-    if cap:
-        TCR._record(name, a_cap, g, TCR._frame_pre(fr), r_enc, cs)
+    pre = TCR._frame_pre(fr) if cap else None
+    ev = None
     if mode == "both":
         r_rs, cs_rs, ev = _rs_call_ev(name, a_rs, g)
         TCR._stat(name, "both_checked")
@@ -252,6 +252,13 @@ def _call_outer(name, orig, bind, args, kw, gl):
         _ev_check(name, gl, st0, ev)
         _gain_check(argd)
         r = _wrap_both_result(name, r, r_rs)
+    if cap:
+        r_cap = r_enc
+        if name == "cp.curve_of_row" and r is not None:
+            _CAP_IDS[0] += 1
+            r.__dict__["_cap"] = "cv:%d" % _CAP_IDS[0]
+            r_cap = {"d": [["id", {"obj": r._cap}], ["s", r_enc]]}
+        _record4(name, a_cap, g, pre, r_cap, cs, ev)
     return r
 
 
@@ -288,10 +295,28 @@ def _rds_wrapper(orig):
         finally:
             TCR._pop_frame(fr)
         cs = [x - y for x, y in zip(TCR._cond_stats(), cs0)]
-        TCR._record("cb.rule_don_solve", a_cap, g, TCR._frame_pre(fr), RS.enc(r), cs)
+        _record4("cb.rule_don_solve", a_cap, g, TCR._frame_pre(fr), RS.enc(r), cs, None)
         return r
     w.__theory_core_orig__ = orig
     return w
+
+
+_CAP_IDS = [0]
+
+
+def _record4(name, a_enc, g, pre, r_enc, cs, ev):
+    """`TCR._record` ＋ 計数の増分 `ev`（`both` の通しでは Rust の増分＝Python と同じと確かめた物・`py` の記録では `None`）。"""
+    key = _dumps([a_enc, RS.enc(g), pre])
+    seen = TCR._SEEN.setdefault(name, set())
+    TCR._stat(name, "calls")
+    if key in seen:
+        return
+    seen.add(key)
+    TCR._stat(name, "recorded")
+    rec = {"fn": name, "a": a_enc, "g": RS.enc(g), "pre": pre, "r": r_enc, "cs": cs}
+    if ev is not None:
+        rec["ev"] = [[k, RS.enc(v)] for k, v in ev]
+    TCR._write(name, rec)
 
 
 class _RdcLog(TCR.LogDict):
@@ -330,14 +355,14 @@ OUTER = [
 # ---------------------------------------------------------------------------------------------------------------
 # 曲線の代理
 
-def _cv_call(rid, name, extra=()):
+def _g_cv(name):
+    """曲線の呼び出しの文脈。`defending` は窓の `CUT_PRICER` を入れてから `ḡ` を読む＝その `ḡ` はまだ無い。Python も `L` を
+    覚えた後の `ḡ` しか読めない（読めば再帰する）ので、`ḡ` だけは文脈なしで渡し、Rust は `L` が未定なら誤りにする（`nested`）。"""
     try:
-        g = TCR._g()
+        return TCR._g(), []
     except RuntimeError:
         if name != "cv.gbar":
             raise
-        # `defending` は窓の `CUT_PRICER` を入れてから `ḡ` を読む＝その `ḡ` はまだ無い。Python も `L` を覚えた後の `ḡ` しか
-        # 読めない（読めば再帰する）ので、文脈なしで渡し、Rust は `L` が未定なら誤りにする（`nested`）。
         import theory_order as TO
         saved = (TO.CUT_PRICER, TO.CUT_PRICER_KEY, TO.CUT_TAKE_CARD)
         TO.CUT_PRICER, TO.CUT_PRICER_KEY, TO.CUT_TAKE_CARD = None, None, None
@@ -345,8 +370,12 @@ def _cv_call(rid, name, extra=()):
             g = TCR._g()
         finally:
             TO.CUT_PRICER, TO.CUT_PRICER_KEY, TO.CUT_TAKE_CARD = saved
-        extra = list(extra) + [("nested", True)]
-    a = {"d": [["cv", {"obj": rid}]] + [[k, RS.enc(v)] for k, v in extra]}
+        return g, [("nested", True)]
+
+
+def _cv_call(rid, name, extra=()):
+    g, more = _g_cv(name)
+    a = {"d": [["cv", {"obj": rid}]] + [[k, RS.enc(v)] for k, v in list(extra) + more]}
     r, _cs, _ev = _rs_call_ev(name, a, g)
     return TCR._dec(r)
 
@@ -439,38 +468,49 @@ def _mk_curve_classes():
             finally:
                 TCR._DEPTH[0] -= 1
 
+        def _run(self, what, fn, args, extra, rs):
+            """Python で解き（深さ +1・記録の枠つき）、Rust と比べ、記録する。"""
+            cap = bool(TCR._CFG["dir"]) and "_cap" in self.__dict__
+            g, more = _g_cv("cv." + what)
+            extra = list(extra) + more
+            fr = {"start": TCR._SEQ[0] + 1, "pre": [], "seen": set()}
+            TCR._FRAMES.append(fr)
+            cs0 = TCR._cond_stats()
+            TCR._DEPTH[0] += 1
+            try:
+                v = fn(*args)
+            finally:
+                TCR._DEPTH[0] -= 1
+                TCR._pop_frame(fr)
+            cs = [x - y for x, y in zip(TCR._cond_stats(), cs0)]
+            self._chk(what, v, rs())
+            if cap:
+                a = {"d": [["cv", {"obj": self._cap}]] + [[k, RS.enc(x)] for k, x in extra]}
+                _record4("cv." + what, a, g, TCR._frame_pre(fr), RS.enc(v), cs, None)
+            return v
+
         @property
         def gbar(self):
-            if TCR._DEPTH[0] > 0:
+            if TCR._DEPTH[0] > 0 or self.__dict__.get("_gbar_memo") is not None:
                 return base.gbar.fget(self)
-            fresh = self.__dict__.get("_gbar_memo") is None
-            g = self._py(base.gbar.fget, self)
-            if fresh:
-                self._chk("gbar", g, self._rs_gbar())
-            return g
+            return self._run("gbar", base.gbar.fget, (self,), [], self._rs_gbar)
 
         def L(self):
-            if TCR._DEPTH[0] > 0:
+            if TCR._DEPTH[0] > 0 or self._L is not None:
                 return base.L(self)
-            fresh = self._L is None
-            L = self._py(base.L, self)
-            if fresh:
-                self._chk("L", list(L), self._rs_L())
-            return L
+            return self._run("L", base.L, (self,), [], self._rs_L)
 
         def Lx(self, x):
             if TCR._DEPTH[0] > 0:
                 return base.Lx(self, x)
-            v = self._py(base.Lx, self, x)
-            self._chk("Lx", v, self._rs_Lx(x))
-            return v
+            return self._run("Lx", base.Lx, (self, x), [("x", float(x))], lambda: self._rs_Lx(x))
 
         def set_loss(self, keep, S):
             if TCR._DEPTH[0] > 0:
                 return base.set_loss(self, keep, S)
-            v = self._py(base.set_loss, self, keep, S)
-            self._chk("set_loss", v, self._rs_set_loss(frozenset(keep), frozenset(S) & frozenset(keep)))
-            return v
+            kk, ss = sorted(int(i) for i in keep), sorted(int(i) for i in frozenset(S) & frozenset(keep))
+            return self._run("set_loss", base.set_loss, (self, keep, S), [("keep", kk), ("S", ss)],
+                             lambda: self._rs_set_loss(frozenset(keep), frozenset(S) & frozenset(keep)))
 
     _CLS["rs"], _CLS["both"] = RsCurve, BothCurve
 
@@ -494,6 +534,16 @@ def install(mode):
     TCR._patch_everywhere(cb.rule_don_solve, _rds_wrapper(cb.rule_don_solve))
     if TCR._CFG["dir"]:
         _install_rdc(vars(cb))
+        only = os.environ.get("OPCG_THEORY_CAPTURE_ONLY")
+        if only == "outer":
+            # 段 4 の行だけを書く（段 3 の核の行は段 3 の記録で確かめ済み・ディスクを食う）
+            w0 = TCR._write
+            keep = tuple(n for n, _m, _a in OUTER) + ("cb.rule_don_solve", "cv.")
+
+            def _w(name, rec, _w0=w0):
+                if name.startswith(keep):
+                    _w0(name, rec)
+            TCR._write = _w
     if mode == "rs" and os.environ.get("OPCG_PLAN_STORE"):
         _rs_call_ev("store.open", {"d": [["path", os.environ["OPCG_PLAN_STORE"]]]}, {})
         atexit.register(_store_report)
