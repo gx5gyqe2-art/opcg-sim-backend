@@ -627,7 +627,26 @@ pub fn py_str(v: &PyVal) -> String {
         PyVal::Bool(b) => (if *b { "True" } else { "False" }).to_string(),
         PyVal::None => "None".to_string(),
         PyVal::Float(f) | PyVal::NpFloat { v: f, .. } => py_float_repr(*f),
+        // list／tuple は Python の `str(list)`＝要素の `repr` の並び（条件の値が札の素性の並びのとき・`str(want) in traits` は偽になる）。
+        // 2026-10-07 に合成の全記録（w39＋w42）の通しで落ちていたのを直した（`docs/reports/2026-10-07_memo_exact.md`）。
+        PyVal::List(xs) | PyVal::Tuple(xs) => {
+            let parts: Vec<String> = xs.iter().map(py_repr).collect();
+            match v {
+                PyVal::Tuple(_) if parts.len() == 1 => format!("({},)", parts[0]),
+                PyVal::Tuple(_) => format!("({})", parts.join(", ")),
+                _ => format!("[{}]", parts.join(", ")),
+            }
+        }
         _ => panic!("py_str: 未対応の型 {v:?}"),
+    }
+}
+
+/// Python の `repr(x)`（文字列は引用符つき・他は `str`）。
+fn py_repr(v: &PyVal) -> String {
+    match v {
+        PyVal::Str(s) if s.contains('\'') && !s.contains('"') => format!("\"{}\"", s.replace('\\', "\\\\")),
+        PyVal::Str(s) => format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'")),
+        _ => py_str(v),
     }
 }
 

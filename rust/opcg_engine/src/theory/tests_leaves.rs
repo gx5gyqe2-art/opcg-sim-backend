@@ -133,3 +133,13 @@ fn json_numbers_parse_like_python_float() {
     let v = from_capture(&parse_json(r#"{"t":[{"f":"3ff0000000000000"},1,"a",null]}"#).unwrap());
     assert!(v.same(&PyVal::Tuple(vec![PyVal::Float(1.0), PyVal::Int(1), PyVal::Str("a".into()), PyVal::None])));
 }
+
+/// `py_str` の list は Python の `str(list)`（2026-10-07・合成の全記録で条件の値が素性の並びのとき落ちていた）
+#[test]
+fn py_str_of_a_list_is_python_str() {
+    use super::pyval::py_str;
+    // python3 -c "print(str(['魚人族', '人魚族']), str(('a',)), str([1, \"it's\"]))"
+    assert_eq!(py_str(&PyVal::List(vec![PyVal::Str("魚人族".into()), PyVal::Str("人魚族".into())])), "['魚人族', '人魚族']");
+    assert_eq!(py_str(&PyVal::Tuple(vec![PyVal::Str("a".into())])), "('a',)");
+    assert_eq!(py_str(&PyVal::List(vec![PyVal::Int(1), PyVal::Str("it's".into())])), "[1, \"it's\"]");
+}
