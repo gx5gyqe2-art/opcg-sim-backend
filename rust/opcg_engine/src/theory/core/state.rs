@@ -164,6 +164,16 @@ impl Core {
         self.outer.store = store;
     }
 
+    /// 検算（`memock`）の解き直しの前の計数（条件の計数・`RULE_STATS` の増分の長さ）
+    pub fn ck_save(&self) -> ([i64; 3], usize) {
+        (self.cond_stats, self.outer.events.len())
+    }
+    /// 検算の解き直しの副作用（計数）を戻す
+    pub fn ck_restore(&mut self, s: ([i64; 3], usize)) {
+        self.cond_stats = s.0;
+        self.outer.events.truncate(s.1);
+    }
+
     /// `cards.info(cid)`（`PL.Cards.info` の 9 項目の dict・無い札は `None`）。
     pub fn info(&mut self, cid: &str) -> V {
         if let Some(v) = self.info.get(cid) {

@@ -1791,32 +1791,36 @@ impl Core {
         }
         let k = (py_min(k, 10.0)).trunc() as i64;
         if let Some(&v) = self.sel_prem.get(&k) {
+            if super::memock::on() {
+                super::memock::f("sel_prem", v, sel_premium_of(&d, k));
+            }
             return Ok(v);
         }
-        let n = d.len() as u128;
-        let mut mean = 0.0;
-        for x in d.iter() {
-            mean += x;
-        }
-        mean /= d.len() as f64;
-        let den = n.pow(k as u32);
-        let mut emax = 0.0;
-        for (i, x) in d.iter().enumerate() {
-            let i = i as u128;
-            let num = (i + 1).pow(k as u32) - i.pow(k as u32);
-            // `d[i] * ((i+1)**k - i**k) / (n**k)`＝左から: float × int（int を正しく丸めて float に）÷ int
-            emax += x * (num as f64) / (den as f64);
-        }
-        let v = py_max(0.0, emax - mean);
+        let v = sel_premium_of(&d, k);
         self.sel_prem.insert(k, v);
         Ok(v)
     }
 
     /// `selection_dist()`
     pub fn selection_dist(&mut self) -> R<Rc<Vec<f64>>> {
-        if let Some(s) = &self.sel {
-            return Ok(s.clone());
+        if let Some(s) = self.sel.clone() {
+            if super::memock::on() {
+                let sv = self.ck_save();
+                let fresh = self.selection_dist_body();
+                self.ck_restore(sv);
+                let fresh = fresh?;
+                let same = fresh.len() == s.len() && fresh.iter().zip(s.iter()).all(|(a, b)| a.to_bits() == b.to_bits());
+                super::memock::tally("sel", same, || format!("memo n={} fresh n={}", s.len(), fresh.len()));
+            }
+            return Ok(s);
         }
+        let r = Rc::new(self.selection_dist_body()?);
+        self.sel = Some(r.clone());
+        Ok(r)
+    }
+
+    /// `selection_dist` の本体（覚え書きの外）
+    fn selection_dist_body(&mut self) -> R<Vec<f64>> {
         let mut out = Vec::new();
         for cid in self.effects_order.clone() {
             let i = self.info(&cid);
@@ -1829,9 +1833,7 @@ impl Core {
             out.push(body + v - i.get("cost").f_or0() * DELTA);
         }
         out.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let r = Rc::new(out);
-        self.sel = Some(r.clone());
-        Ok(r)
+        Ok(out)
     }
 
     /// `action_value(effect, mu, lam, delta, nu, theta, ko_p, card, depth, opp_bodies, st)`
@@ -2691,4 +2693,23 @@ fn unpriced_family(e: &V) -> String {
 #[allow(dead_code)]
 fn _unused(kv: &mut Vec<(V, V)>) {
     dpop_mut(kv, "x");
+}
+
+/// `_sel_premium(k)` の算術（分布 `d`・`k` は 2〜10 の整数）
+fn sel_premium_of(d: &[f64], k: i64) -> f64 {
+        let n = d.len() as u128;
+        let mut mean = 0.0;
+        for x in d.iter() {
+            mean += x;
+        }
+        mean /= d.len() as f64;
+        let den = n.pow(k as u32);
+        let mut emax = 0.0;
+        for (i, x) in d.iter().enumerate() {
+            let i = i as u128;
+            let num = (i + 1).pow(k as u32) - i.pow(k as u32);
+            // `d[i] * ((i+1)**k - i**k) / (n**k)`＝左から: float × int（int を正しく丸めて float に）÷ int
+            emax += x * (num as f64) / (den as f64);
+        }
+        py_max(0.0, emax - mean)
 }

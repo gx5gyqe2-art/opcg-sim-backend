@@ -179,23 +179,46 @@ impl JointValuer {
 
     fn plan_of(&mut self, core: &mut Core, keep: u64) -> R<f64> {
         if let Some(&v) = self.plan.get(&keep) {
+            if super::memock::on() {
+                let s = core.ck_save();
+                let fresh = self.plan_body(core, keep);
+                core.ck_restore(s);
+                super::memock::f("jv_plan", v, fresh?);
+            }
             return Ok(v);
         }
-        let v = if keep == 0 {
-            0.0
-        } else {
-            let items = self.plan_items_of(core, keep)?;
-            plan_value(&items, &self.caps, self.s)
-        };
+        let v = self.plan_body(core, keep)?;
         self.plan.insert(keep, v);
         Ok(v)
     }
 
+    fn plan_body(&mut self, core: &mut Core, keep: u64) -> R<f64> {
+        Ok(if keep == 0 {
+            0.0
+        } else {
+            let items = self.plan_items_of(core, keep)?;
+            plan_value(&items, &self.caps, self.s)
+        })
+    }
+
     /// `value(keep)` → (V, カウンターに回す札)
     pub fn value(&mut self, core: &mut Core, keep: u64) -> R<(f64, Vec<usize>)> {
-        if let Some(v) = self.val.get(&keep) {
-            return Ok(v.clone());
+        if let Some(v) = self.val.get(&keep).cloned() {
+            if super::memock::on() {
+                let s = core.ck_save();
+                let fresh = self.value_body(core, keep);
+                core.ck_restore(s);
+                let fresh = fresh?;
+                super::memock::tally("jv_val", fresh.0.to_bits() == v.0.to_bits() && fresh.1 == v.1, || format!("memo {v:?} fresh {fresh:?}"));
+            }
+            return Ok(v);
         }
+        let best = self.value_body(core, keep)?;
+        self.val.insert(keep, best.clone());
+        Ok(best)
+    }
+
+    fn value_body(&mut self, core: &mut Core, keep: u64) -> R<(f64, Vec<usize>)> {
         let pos: Vec<usize> = self.pos.iter().copied().filter(|&i| keep >> i & 1 == 1).collect();
         let mut masks = Vec::with_capacity(1 << pos.len());
         for m in 0u64..(1u64 << pos.len()) {
@@ -244,7 +267,6 @@ impl JointValuer {
                 }
             }
         }
-        self.val.insert(keep, best.clone());
         Ok(best)
     }
 

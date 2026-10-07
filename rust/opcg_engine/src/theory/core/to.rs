@@ -114,9 +114,39 @@ impl Core {
         };
         if let Some(k) = &key {
             if let Some(&v) = self.avd.get(k) {
+                if super::memock::on() {
+                    let s = self.ck_save();
+                    let fresh = self.avd_body(power, target_power, is_leader, theta, mu, nu_target, delta, max_don, blockers);
+                    self.ck_restore(s);
+                    super::memock::f("avd", v, fresh);
+                }
                 return v;
             }
         }
+        let best = self.avd_body(power, target_power, is_leader, theta, mu, nu_target, delta, max_don, blockers);
+        if let Some(k) = key {
+            if self.avd.len() >= 400000 {
+                self.avd.clear();
+            }
+            self.avd.insert(k, best);
+        }
+        best
+    }
+
+    /// `attack_value_don` の本体（覚え書きの外）
+    #[allow(clippy::too_many_arguments)]
+    fn avd_body(
+        &mut self,
+        power: f64,
+        target_power: f64,
+        is_leader: bool,
+        theta: f64,
+        mu: f64,
+        nu_target: Option<f64>,
+        delta: f64,
+        max_don: i64,
+        blockers: &[(f64, f64)],
+    ) -> f64 {
         let mut best = self.attack_value(power, target_power, is_leader, theta, mu, nu_target, blockers);
         let bound = if delta > 0.0 { Some(self.attack_bound(is_leader, theta, mu, nu_target, blockers)) } else { None };
         if bound.is_none() || best < bound.unwrap() {
@@ -132,12 +162,6 @@ impl Core {
                     }
                 }
             }
-        }
-        if let Some(k) = key {
-            if self.avd.len() >= 400000 {
-                self.avd.clear();
-            }
-            self.avd.insert(k, best);
         }
         best
     }
@@ -171,15 +195,28 @@ impl Core {
         };
         if let Some(k) = &key {
             if let Some(&v) = self.option.get(k) {
+                if super::memock::on() {
+                    let s = self.ck_save();
+                    let fresh = self.option_body(power, olp, r, rb, theta, mu, mlp, ko_p);
+                    self.ck_restore(s);
+                    super::memock::f("option", v, fresh);
+                }
                 return v;
             }
         }
+        let val = self.option_body(power, olp, r, rb, theta, mu, mlp, ko_p);
+        if let Some(k) = key {
+            self.option.insert(k, val);
+        }
+        val
+    }
+
+    /// `option_value` の本体（覚え書きの外・`r`＝`max(0, r_turns)`・`rb`＝帯）
+    #[allow(clippy::too_many_arguments)]
+    fn option_body(&mut self, power: f64, olp: f64, r: f64, rb: i64, theta: f64, mu: f64, mlp: f64, ko_p: f64) -> f64 {
         let bd = self.bd.clone();
         let bs = bd.get(rb);
         if bs.is_empty() {
-            if let Some(k) = key {
-                self.option.insert(k, 0.0);
-            }
             return 0.0;
         }
         let lead = self.avd_lead(power, olp, theta, mu, &[]);
@@ -207,11 +244,7 @@ impl Core {
             tot += got;
         }
         self.ctx.option_depth -= 1;
-        let val = tot / bs.len() as f64;
-        if let Some(k) = key {
-            self.option.insert(k, val);
-        }
-        val
+        tot / bs.len() as f64
     }
 
     /// `attack_stream(power, opp_leader_power, r_turns, theta, mu, opp_chars, my_leader_power, ko_p)`。
@@ -247,8 +280,22 @@ impl Core {
             knum(ko_p),
             knum((self.ctx.option_depth > 0) as i64 as f64),
         ]);
-        let bodies = match self.bodies.get(&bkey) {
-            Some(b) => b.clone(),
+        let bodies = match self.bodies.get(&bkey).cloned() {
+            Some(b) => {
+                if super::memock::on() {
+                    let s = self.ck_save();
+                    let mut fresh = Vec::new();
+                    for &(tp, blk) in chars {
+                        let nu = self.nu_of_other_side(tp, mlp, r_turns, theta, mu, None, ko_p, blk, None, None, None);
+                        fresh.push((tp, blk.unwrap_or(false), nu));
+                    }
+                    self.ck_restore(s);
+                    let same = fresh.len() == b.len()
+                        && fresh.iter().zip(b.iter()).all(|(x, y)| x.0.to_bits() == y.0.to_bits() && x.1 == y.1 && x.2.to_bits() == y.2.to_bits());
+                    super::memock::tally("bodies", same, || format!("memo {b:?} fresh {fresh:?}"));
+                }
+                b
+            }
             None => {
                 let mut b = Vec::new();
                 for &(tp, blk) in chars {

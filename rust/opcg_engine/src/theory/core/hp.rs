@@ -264,14 +264,24 @@ impl Core {
             knum(take),
             knum(search as i64 as f64),
         ]);
-        if let Some(s) = memo.stats.get(&key) {
-            return *s;
+        if let Some(s) = memo.stats.get(&key).copied() {
+            if super::memock::on() {
+                let f = self.hand_stats_body(items, xs, take, deck, search);
+                let same = [s.taken, s.cut, s.ev, s.hits].iter().zip([f.taken, f.cut, f.ev, f.hits].iter()).all(|(a, b)| a.to_bits() == b.to_bits());
+                super::memock::tally("hand_stats", same, || format!("memo {s:?} fresh {f:?}"));
+            }
+            return s;
         }
+        let out = self.hand_stats_body(items, xs, take, deck, search);
+        memo.stats.insert(key, out);
+        out
+    }
+
+    fn hand_stats_body(&mut self, items: &[V], xs: &[f64], take: f64, deck: Option<&[String]>, search: bool) -> Stats {
         let mut out = Stats { taken: expected_taken(items, xs, take), cut: counters_cut(items, xs, take), ev: n_events(items), hits: 0.0 };
         if search {
             out.hits = self.expected_search_hits(items, deck);
         }
-        memo.stats.insert(key, out);
         out
     }
 
@@ -400,17 +410,35 @@ impl Core {
             None
         };
         if let (Some(m), Some(k)) = (&memo, &key) {
-            if let Some(v) = m.uv.get(k) {
-                return Ok(*v);
+            if let Some(v) = m.uv.get(k).copied() {
+                if super::memock::on() {
+                    let s = self.ck_save();
+                    let fresh = self.uv_body(cid, info, olp, r, partner, field, state);
+                    self.ck_restore(s);
+                    let fresh = fresh?;
+                    let same = match (v, fresh) {
+                        (None, None) => true,
+                        (Some(a), Some(b)) => a.to_bits() == b.to_bits(),
+                        _ => false,
+                    };
+                    super::memock::tally("uv", same, || format!("memo {v:?} fresh {fresh:?}"));
+                }
+                return Ok(v);
             }
         }
-        let hand: Vec<String> = partner.map(|p| vec![p.to_string()]).unwrap_or_default();
-        let st = self.ctx_with_hand(&hand, olp, r, field, state);
-        let v = self.use_value(cid, info, olp, r, &st)?;
+        let v = self.uv_body(cid, info, olp, r, partner, field, state)?;
         if let (Some(m), Some(k)) = (memo, key) {
             m.uv.insert(k, v);
         }
         Ok(v)
+    }
+
+    /// `_uv_memo` の本体（覚え書きの外）
+    #[allow(clippy::too_many_arguments)]
+    fn uv_body(&mut self, cid: &str, info: &V, olp: f64, r: f64, partner: Option<&str>, field: &[String], state: &V) -> R<Option<f64>> {
+        let hand: Vec<String> = partner.map(|p| vec![p.to_string()]).unwrap_or_default();
+        let st = self.ctx_with_hand(&hand, olp, r, field, state);
+        self.use_value(cid, info, olp, r, &st)
     }
 
     /// `inflow_item(item, others, deck, xs, take_cost, cards, olp, r, turns, field, st_base, memo)`

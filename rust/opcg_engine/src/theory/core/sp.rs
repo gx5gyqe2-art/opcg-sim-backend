@@ -231,9 +231,24 @@ impl Core {
         };
         if let Some(k) = &key {
             if let Some(&v) = self.gain.get(k) {
+                if super::memock::on() {
+                    let s = self.ck_save();
+                    let fresh = self.card_gain_body(cid, ctx);
+                    self.ck_restore(s);
+                    super::memock::f("gain", v, fresh?);
+                }
                 return Ok(v);
             }
         }
+        let g = self.card_gain_body(cid, ctx)?;
+        if let Some(k) = key {
+            self.gain.insert(k, g);
+        }
+        Ok(g)
+    }
+
+    /// `card_gain` の本体（覚え書きの外）
+    fn card_gain_body(&mut self, cid: &str, ctx: &V) -> R<f64> {
         let info = self.info(cid);
         let b_cost = info.get("cost").f_or0();
         let b_counter = info.get("counter").f_or0();
@@ -266,9 +281,6 @@ impl Core {
         } else {
             self.card_deltas_total(ctx.get("hand_items").items(), &card, &caps, &floats(ctx.get("xs")), ctx.get("take").f())
         };
-        if let Some(k) = key {
-            self.gain.insert(k, g);
-        }
         Ok(g)
     }
 

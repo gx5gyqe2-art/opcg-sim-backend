@@ -322,7 +322,14 @@ impl Tb<'_> {
 /// `_g_of_row(sc, tok, ci, idx2cid, cards, cache, key)`（`W_MODE=curve`・覚え書きつき）
 fn g_of_row(c: &mut Core, tb: &mut Tb, r: &GRow, key: K) -> R<V> {
     if let Some((_, v)) = tb.g_cache.iter().find(|(k, _)| *k == key) {
-        return Ok(v.clone());
+        let v = v.clone();
+        if super::memock::on() {
+            let s = c.ck_save();
+            let fresh = c.hand_price_mean(&r.row(), MU, true, None);
+            c.ck_restore(s);
+            super::memock::v("tb_g_cache", &v, &fresh?);
+        }
+        return Ok(v);
     }
     let v = c.hand_price_mean(&r.row(), MU, true, None)?;
     tb.g_cache.push((key, v.clone()));

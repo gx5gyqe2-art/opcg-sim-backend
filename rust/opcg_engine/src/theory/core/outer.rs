@@ -1109,15 +1109,24 @@ impl Core {
         let rx = py_round(x, 3);
         let key = K::Tup(vec![knum(rx), knum(k as f64)]);
         if let Some(&v) = ax.gain.get(&key) {
+            if super::memock::on() {
+                let fresh = self.attach_gain_body(ax, x, k);
+                super::memock::f("attach_gain", v, fresh);
+            }
             return v;
         }
-        let p = ax.olp + x;
-        let a = self.attack_value(p + 1000.0 * k as f64, ax.olp, true, ax.theta_p, ax.mu, None, &ax.blk_a);
-        let b = self.attack_value(p, ax.olp, true, ax.theta_p, ax.mu, None, &ax.blk_a);
-        let v = a - b;
+        let v = self.attach_gain_body(ax, x, k);
         ax.gain.insert(key.clone(), v);
         ax.gain_order.push((rx, k, key));
         v
+    }
+
+    /// `_attach_gain` の本体（覚え書きの外）
+    fn attach_gain_body(&mut self, ax: &Actx, x: f64, k: i64) -> f64 {
+        let p = ax.olp + x;
+        let a = self.attack_value(p + 1000.0 * k as f64, ax.olp, true, ax.theta_p, ax.mu, None, &ax.blk_a);
+        let b = self.attack_value(p, ax.olp, true, ax.theta_p, ax.mu, None, &ax.blk_a);
+        a - b
     }
 
     /// `rules_steps(actx, play1, nsteps)`
@@ -1324,13 +1333,19 @@ impl Core {
         key.push(knum(EX_STATE_BUDGET as f64));
         key.push(super::obj::kstr("w"));
         let key = K::Tup(key);
-        if let Some(v) = self.outer.rdc.get(&key) {
-            return Ok(v.clone());
+        if let Some(v) = self.outer.rdc.get(&key).cloned() {
+            if super::memock::on() {
+                self.rd_check("rdc", p, ax, &v)?;
+            }
+            return Ok(v);
         }
         let mut skey = None;
         if self.outer.store.is_some() {
             let sk = super::store::key_of(self, p, ax);
             if let Some(hit) = self.outer.store.as_mut().unwrap().get(&sk) {
+                if super::memock::on() {
+                    self.rd_check("plan_store", p, ax, &hit)?;
+                }
                 self.rd_put(key, hit.clone());
                 return Ok(hit);
             }
@@ -1346,6 +1361,9 @@ impl Core {
             K::Tup(k)
         });
         let got = ukey.as_ref().and_then(|k| self.outer.rdc.get(k).cloned());
+        if let (Some(o), true) = (&got, super::memock::on()) {
+            self.rd_check("rdc_unbudgeted", p, ax, o)?;
+        }
         let (out, h) = match got {
             Some(o) => (o, p.turns),
             None => {
@@ -1374,6 +1392,33 @@ impl Core {
             self.outer.store.as_mut().unwrap().put(&sk, &out);
         }
         Ok(out)
+    }
+
+    /// 検算: 覚え書きを通さずに `rule_don_solve` を解き直して比べる（財布の `_gain` は写しの上で育てる・計数は戻す）
+    fn rd_check(&mut self, name: &'static str, p: &DefIn, ax: &Actx, memo: &V) -> R<()> {
+        let s = self.ck_save();
+        let mut ax2 = ax.clone();
+        let fresh = self.rd_fresh(p, &mut ax2);
+        self.ck_restore(s);
+        super::memock::v(name, memo, &fresh?);
+        Ok(())
+    }
+
+    /// `rule_don_solve` の本体（覚え書きと計画のディスクの外）
+    fn rd_fresh(&mut self, p: &DefIn, ax: &mut Actx) -> R<V> {
+        let l0 = nonneg_round(p.life);
+        let masks = self.rule_don_masks(p.cards, p.blk, p.life, ax, p.life_types);
+        let h0 = if p.turns.is_none() { Some(self.model_horizon(ax, p.blk, l0 as f64, p.arrive)) } else { None };
+        let (out, h, _st) = self.rd_run(p, ax, &masks, h0)?;
+        Ok(if p.turns.is_none() {
+            let it = out.items().to_vec();
+            let mut pk = it[2].kv().to_vec();
+            dset_mut(&mut pk, "horizon", h.map(V::Int).unwrap_or(V::None));
+            dset_mut(&mut pk, "horizon0", h0.map(V::Int).unwrap_or(V::None));
+            V::tuple(vec![it[0].clone(), it[1].clone(), V::dict(pk)])
+        } else {
+            out
+        })
     }
 
     fn rd_put(&mut self, key: K, out: V) {
@@ -1540,6 +1585,10 @@ impl Core {
             turns.map(|t| knum(t as f64)).unwrap_or(K::None),
         ]);
         if let Some(&v) = self.outer.rpc.get(&key) {
+            if super::memock::on() {
+                let f = rule_guard_plan_raw(cards, don, xs_first, xs_later, blk, life, turns);
+                super::memock::tally("rpc", f == v, || format!("memo {v:?} fresh {f:?}"));
+            }
             return v;
         }
         if self.outer.rpc.len() > 200000 {

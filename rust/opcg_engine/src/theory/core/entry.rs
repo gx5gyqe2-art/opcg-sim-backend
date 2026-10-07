@@ -256,18 +256,31 @@ impl Core {
         let key = a_of_key(self, deck, olp, cap, rush, with_don);
         if let Some(k) = &key {
             if let Some(&v) = self.flow.get(k) {
+                if super::memock::on() {
+                    let s = self.ck_save();
+                    let fresh = self.a_of_body(deck, olp, don, theta, mu, rush, with_don);
+                    self.ck_restore(s);
+                    super::memock::f("flow", v, fresh?);
+                }
                 return Ok(v);
             }
         }
+        let v = self.a_of_body(deck, olp, don, theta, mu, rush, with_don)?;
+        if let Some(k) = key {
+            self.flow.insert(k, v);
+        }
+        Ok(v)
+    }
+
+    /// `a_of` の本体（覚え書きの外）
+    #[allow(clippy::too_many_arguments)]
+    fn a_of_body(&mut self, deck: &[String], olp: f64, don: Option<f64>, theta: &V, mu: &V, rush: bool, with_don: bool) -> R<f64> {
         let t = self.t.clone();
         let (pt, pm) = (to_pyval(theta), to_pyval(mu));
         let mut o = CoreOracle { c: self, err: None };
         let v = ld::a_of(&t, deck, olp, don, &pt, &pm, rush, with_don, &mut o);
         if let Some(e) = o.err {
             return Err(e);
-        }
-        if let Some(k) = key {
-            self.flow.insert(k, v);
         }
         Ok(v)
     }

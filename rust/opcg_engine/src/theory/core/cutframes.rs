@@ -94,7 +94,34 @@ impl CutFrames {
     /// `curve(d, t, at_n)` → 曲線の鍵（`None`＝枠が無い／手札が空）
     pub fn curve(&mut self, c: &mut Core, g: &Game, st: &mut D, d: i64, t: i64, at_n: Option<i64>) -> R<Option<Key>> {
         let Some(key) = self.frame_key(g, st, d, t, at_n) else { return Ok(None) };
+        if let (Some(ix), true) = (self.has_curve(key), super::memock::on()) {
+            let s = c.ck_save();
+            let fresh = self.build_curve(c, g, &mut D::new(), key);
+            c.ck_restore(s);
+            let fresh = fresh?;
+            let memo = &mut self.curves[ix].1;
+            let a = match memo.as_mut() {
+                None => V::None,
+                Some(cv) => V::list(vec![cv.summary(), V::fl(&cv.l(c)?), V::Float(cv.gbar(c)?)]),
+            };
+            let b = match fresh {
+                None => V::None,
+                Some(mut cv) => V::list(vec![cv.summary(), V::fl(&cv.l(c)?), V::Float(cv.gbar(c)?)]),
+            };
+            super::memock::v("cut_curves", &a, &b);
+        }
         if self.has_curve(key).is_none() {
+            let cv = self.build_curve(c, g, st, key)?;
+            self.curves.push((key, cv));
+        }
+        let ix = self.has_curve(key).unwrap();
+        Ok(if self.curves[ix].1.is_some() { Some(key) } else { None })
+    }
+
+    /// 枠 `key` の曲線を作る（`curve` の本体・計数は `st` に）
+    fn build_curve(&mut self, c: &mut Core, g: &Game, st: &mut D, key: Key) -> R<Option<Curve>> {
+        let d = key.0;
+        {
             let i = self.fr(key);
             let r = &g.rows[i];
             let deck = match &self.decks {
@@ -121,10 +148,8 @@ impl CutFrames {
                     st.addf("cut_L1_sum", l[1]);
                 }
             }
-            self.curves.push((key, cv));
+            Ok(cv)
         }
-        let ix = self.has_curve(key).unwrap();
-        Ok(if self.curves[ix].1.is_some() { Some(key) } else { None })
     }
 
     /// 曲線の `ḡ`（`defending(view)` が読む）
@@ -163,8 +188,23 @@ impl CutFrames {
     pub fn corrections(&mut self, c: &mut Core, g: &Game, st: &mut D, w: i64, t: i64) -> R<Vec<(Option<i64>, f64)>> {
         let key = (w, t);
         if let Some((_, v)) = self.corr.iter().find(|(k, _)| *k == key) {
-            return Ok(v.clone());
+            let v = v.clone();
+            if super::memock::on() {
+                let s = c.ck_save();
+                let fresh = self.corrections_body(c, g, &mut D::new(), w, t);
+                c.ck_restore(s);
+                let fresh = fresh?;
+                let same = fresh.len() == v.len() && fresh.iter().zip(v.iter()).all(|(a, b)| a.0 == b.0 && a.1.to_bits() == b.1.to_bits());
+                super::memock::tally("cut_corr", same, || format!("memo {v:?} fresh {fresh:?}"));
+            }
+            return Ok(v);
         }
+        let out = self.corrections_body(c, g, st, w, t)?;
+        self.corr.push((key, out.clone()));
+        Ok(out)
+    }
+
+    fn corrections_body(&mut self, c: &mut Core, g: &Game, st: &mut D, w: i64, t: i64) -> R<Vec<(Option<i64>, f64)>> {
         let d = 1 - w;
         let fk = self.frame_key(g, st, d, t, None);
         let mut out = Vec::new();
@@ -200,7 +240,6 @@ impl CutFrames {
                 st.addf("cut_corr_sum", s);
             }
         }
-        self.corr.push((key, out.clone()));
         Ok(out)
     }
 

@@ -99,16 +99,29 @@ impl Curve {
 
     /// `L()`
     pub fn l(&mut self, c: &mut Core) -> R<Vec<f64>> {
-        if let Some(l) = &self.l {
-            return Ok(l.clone());
+        if let Some(l) = self.l.clone() {
+            if super::memock::on() {
+                let s = c.ck_save();
+                let fresh = self.l_body(c);
+                c.ck_restore(s);
+                let fresh = fresh?;
+                let same = fresh.len() == l.len() && fresh.iter().zip(l.iter()).all(|(a, b)| a.to_bits() == b.to_bits());
+                super::memock::tally("curve_L", same, || format!("memo {l:?} fresh {fresh:?}"));
+            }
+            return Ok(l);
         }
+        let l = self.l_body(c)?;
+        self.l = Some(l.clone());
+        Ok(l)
+    }
+
+    fn l_body(&mut self, c: &mut Core) -> R<Vec<f64>> {
         let mut o = JvOracle { c, jv: &mut self.jv, err: None };
         let n = o.jv.n;
         let l = ld::cut_l(n, &self.cand, &mut o);
         if let Some(e) = o.err {
             return Err(e);
         }
-        self.l = Some(l.clone());
         Ok(l)
     }
 
@@ -124,15 +137,25 @@ impl Curve {
     /// `gbar`（曲線ごとに 1 回・鍵は `(reserve, CUT_PRICE_MODE)`＝既定は `joint` だけ）
     pub fn gbar(&mut self, c: &mut Core) -> R<f64> {
         if let Some(g) = self.gbar {
+            if super::memock::on() {
+                let s = c.ck_save();
+                let fresh = self.gbar_body(c);
+                c.ck_restore(s);
+                super::memock::f("curve_gbar", g, fresh?);
+            }
             return Ok(g);
         }
+        let g = self.gbar_body(c)?;
+        self.gbar = Some(g);
+        Ok(g)
+    }
+
+    fn gbar_body(&mut self, c: &mut Core) -> R<f64> {
         let n = match self.reserve {
             Some(r) if r > 1e-9 => r,
             _ => self.n0() as f64,
         };
-        let g = if n <= 1e-9 { self.mu } else { self.lx(c, n)? / n };
-        self.gbar = Some(g);
-        Ok(g)
+        Ok(if n <= 1e-9 { self.mu } else { self.lx(c, n)? / n })
     }
 
     /// `set_loss(keep, S)`

@@ -41,6 +41,7 @@ pub mod entry_outer;
 pub mod ev;
 pub mod hj;
 pub mod hp;
+pub mod memock;
 pub mod obj;
 pub mod outer;
 pub mod pyrand;
