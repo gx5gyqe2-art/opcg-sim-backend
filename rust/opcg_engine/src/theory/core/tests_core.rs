@@ -2,13 +2,10 @@
 //! 答え合わせ・`docs/reports/2026-10-07_port_stage3.md`）。
 //!
 //! * `tests/fixtures/theory_core_golden.jsonl.gz` — 1 行 = 本物の通し（8 器 × 実 w41・合成 w39 の各 5 局と
-//!   `tests/fixtures/f_identity/rec`・残す候補 2 つ）の中の核の 1 呼び出し（`tests/scripts/theory_core_rs.py` の形）。
-//!   間引きの規則は `tests/scripts/theory_core_golden.py`。行ごとに丸めた鍵の覚え書きを空にして `pre` を入れてから解く
+//!   `tests/fixtures/f_identity/rec`・残す候補 2 つ）の中の核の 1 呼び出し（記録の器と間引きの道具〔旧 `tests/scripts/theory_*_golden.py`・`theory_capture*.py`〕は段 7 で Python の理論と一緒に消した＝golden は固定の正本）。行ごとに丸めた鍵の覚え書きを空にして `pre` を入れてから解く
 //!   （順に依らない）。`jv.value` の行は、それより前の `tb.joint_valuer` の行の手札から作り直した物で解く。
 //! * `tests/fixtures/theory_effects.json.gz` — 効果の木（`opcg_effects.json`・記録を取ったときのもの）。
 //! * カード表は段 2 と同じ `theory_cards.json.gz`・盤面の分布はリポジトリの `opp_boards.json`。
-//!
-//! `OPCG_THEORY_CORE_REPLAY=<記録のディレクトリ>` を付けると、間引く前の全部の記録も解き直す（手で回す・数を出す）。
 
 use std::collections::HashMap;
 use std::sync::Once;
@@ -158,43 +155,6 @@ fn recorded_core_calls_replay_bit_identically() {
     assert!(total > 1000, "記録が少なすぎる: {total}");
 }
 
-/// 手で回す: 間引く前の全部の記録（`OPCG_THEORY_CORE_REPLAY=<dir>`・`<dir>/<src>/<器>/<名前>.jsonl`）。
-#[test]
-fn full_core_capture_replays_bit_identically_when_given() {
-    let Ok(root) = std::env::var("OPCG_THEORY_CORE_REPLAY") else { return };
-    load_tables();
-    let mut dirs = Vec::new();
-    for src in std::fs::read_dir(&root).unwrap().flatten() {
-        if !src.path().is_dir() {
-            continue;
-        }
-        for tool in std::fs::read_dir(src.path()).unwrap().flatten() {
-            if tool.path().is_dir() {
-                dirs.push(tool.path());
-            }
-        }
-    }
-    dirs.sort();
-    let (mut per, mut bad) = (Vec::new(), Vec::new());
-    for d in &dirs {
-        // 手札の行（tb_joint_valuer）を先に
-        let mut files: Vec<_> = std::fs::read_dir(d).unwrap().flatten().map(|f| f.path()).filter(|p| p.extension().map(|x| x == "jsonl").unwrap_or(false)).collect();
-        files.sort_by_key(|p| (!p.to_string_lossy().contains("tb_joint_valuer"), p.clone()));
-        let mut text = String::new();
-        for p in &files {
-            text.push_str(&std::fs::read_to_string(p).unwrap());
-        }
-        replay_text(&text, &mut per, &mut bad);
-    }
-    let total: usize = per.iter().map(|e| e.1).sum();
-    let mism: usize = per.iter().map(|e| e.2).sum();
-    eprintln!("全部の記録の再生: {} ファイル群・{total} 行・不一致 {mism}", dirs.len());
-    for e in &per {
-        eprintln!("  {}: {} 行・不一致 {}", e.0, e.1, e.2);
-    }
-    assert!(bad.is_empty(), "記録と違う核の呼び出し（先頭 20）:\n{}", bad.join("\n"));
-}
-
 /// 段 2 の葉のうち核に頼るもの（`a_of`・`leader_power_opp_turn`・`defender_power`）を、記録の核の答えではなく
 /// **Rust の核で**答えて解き直す（段 2 の `Oracle` を本物に替えた検算）。
 #[test]
@@ -202,27 +162,6 @@ fn stage2_leaves_with_the_rust_core_replay_bit_identically() {
     load_tables();
     let text = String::from_utf8(gunzip(&fixture("theory_leaves_golden.jsonl.gz"))).unwrap();
     stage2_with_core(&text, 100);
-}
-
-/// 手で回す: 段 2 の間引く前の全部の記録（`OPCG_THEORY_CAPTURE_REPLAY_CORE=<dir>`）の核に頼る葉を Rust の核で。
-#[test]
-fn stage2_full_capture_with_the_rust_core_when_given() {
-    let Ok(root) = std::env::var("OPCG_THEORY_CAPTURE_REPLAY_CORE") else { return };
-    load_tables();
-    let mut text = String::new();
-    for src in std::fs::read_dir(&root).unwrap().flatten() {
-        if !src.path().is_dir() {
-            continue;
-        }
-        for tool in std::fs::read_dir(src.path()).unwrap().flatten() {
-            for leaf in ["dr.a_of.jsonl", "to.leader_power_opp_turn.jsonl", "to.defender_power.jsonl"] {
-                if let Ok(t) = std::fs::read_to_string(tool.path().join(leaf)) {
-                    text.push_str(&t);
-                }
-            }
-        }
-    }
-    stage2_with_core(&text, 1);
 }
 
 fn stage2_with_core(text: &str, min_n: usize) {

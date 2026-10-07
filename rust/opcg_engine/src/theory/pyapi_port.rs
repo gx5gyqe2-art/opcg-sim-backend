@@ -1,4 +1,4 @@
-//! 移植の段 1・2 の PyO3 の入口（`tests/harness/theory_rs.py` が呼ぶ）。
+//! 理論の器の PyO3 の入口（`tests/scripts/theory_rs.py` が呼ぶ・段 7 で器が使わない口〔写しの確認・葉の 1 呼び出し・核の覚え書きの消去〕は消した）。
 //!
 //! 受け渡しは JSON の文字列（記録の形 `enc`・浮動小数は 16 進のビット）か numpy の生のバイト＝往復で 1 ビットも変えない。
 
@@ -6,7 +6,6 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
-use super::dispatch;
 use super::input::{self, CardTable, Frame, OppBoards};
 use super::pyval::{capture_string, parse_json, PyVal};
 
@@ -24,12 +23,6 @@ fn theory_load_cards(text: &str) -> PyResult<usize> {
     Ok(n)
 }
 
-/// 渡したカード表の写し（記録の形）。恒等の確認用。
-#[pyfunction]
-fn theory_dump_cards() -> PyResult<String> {
-    Ok(capture_string(&input::cards().to_pyval()))
-}
-
 /// 効果の木（`opcg_effects.json` の文字列）を渡す。戻り＝札の数。
 #[pyfunction]
 fn theory_load_effects(text: &str) -> PyResult<usize> {
@@ -43,13 +36,6 @@ fn theory_load_effects(text: &str) -> PyResult<usize> {
     Ok(n)
 }
 
-/// 渡した効果の木の写し（記録の形）。
-#[pyfunction]
-fn theory_dump_effects() -> PyResult<String> {
-    let e = input::effects().ok_or_else(|| PyValueError::new_err("効果の木が渡されていない"))?;
-    Ok(capture_string(&e))
-}
-
 /// 相手の場の分布を Rust が自分で読む（`tests/fixtures/opp_boards.json`）。戻り＝読んだ表の写し（記録の形）。
 #[pyfunction]
 fn theory_load_opp_boards(path: &str) -> PyResult<String> {
@@ -59,22 +45,6 @@ fn theory_load_opp_boards(path: &str) -> PyResult<String> {
     input::set_opp_boards(b);
     super::core::state::drop_core();
     Ok(out)
-}
-
-/// fixture の JSON を Rust が読み、記録の形で返す（全部の値のビットを Python と比べる）。
-#[pyfunction]
-fn theory_read_fixture(path: &str) -> PyResult<String> {
-    Ok(capture_string(&input::load_fixture(path).map_err(verr)?))
-}
-
-/// 葉を 1 つ呼ぶ（`payload`＝記録の形の `{"a": 引数, "g": 大域, "s": 核の答え}`）。戻り＝記録の形の戻り。
-#[pyfunction]
-fn theory_leaf_call(name: &str, payload: &str) -> PyResult<String> {
-    let p = dispatch::payload_of(&parse_json(payload).map_err(verr)?);
-    let t = input::cards();
-    let bd = input::STORE.read().unwrap().opp_boards.clone().unwrap_or_default();
-    let r = dispatch::call_payload(name, &p, &t, &bd).map_err(verr)?;
-    Ok(capture_string(&r))
 }
 
 /// **段 3**: 値付けの核の入口を 1 つ呼ぶ（`payload`＝記録の形の `{"a", "g", "pre"}`）。`replay=True` なら丸めた鍵の
@@ -92,28 +62,6 @@ fn theory_core_call(name: &str, payload: &str, replay: bool) -> PyResult<String>
     }
     let out = V::dict(kv);
     Ok(capture_string(&to_pyval(&out)))
-}
-
-/// **段 4**: Rust の外側の解き方の版（`outer::SOLVER_VERSION`）と、Rust の計画のディスクの覚え書きの鍵に入る原文のハッシュ。
-#[pyfunction]
-fn theory_outer_version() -> (&'static str, &'static str) {
-    (super::core::outer::SOLVER_VERSION, super::core::store::SOLVER_SRC_HASH)
-}
-
-/// **段 3**: 核の覚え書きを全部捨てる（`which="history"` なら丸めた鍵の覚え書きだけ）。
-#[pyfunction]
-#[pyo3(signature = (which="all"))]
-fn theory_core_reset(which: &str) -> PyResult<()> {
-    super::core::state::with_core(|c| if which == "history" { c.reset_history() } else { c.reset_all() });
-    Ok(())
-}
-
-/// **段 3**: 段 2 の葉を、核に頼る部分（`Oracle`）を Rust の核で答えて解く（記録の核の答えは使わない）。
-#[pyfunction]
-fn theory_leaf_call_core(name: &str, payload: &str) -> PyResult<String> {
-    let p = dispatch::payload_of(&parse_json(payload).map_err(verr)?);
-    let r = super::core::state::with_core(|c| super::core::entry::leaf_with_core(c, name, &p)).map_err(verr)?;
-    Ok(capture_string(&r))
 }
 
 /// **段 6**: 1 局ぶんの局の駆動（`payload`＝記録の形の `{"tool", "g", "cfg", "in", "stats", "carry"}`）。
@@ -209,16 +157,9 @@ impl PyFrame {
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFrame>()?;
     m.add_function(wrap_pyfunction!(theory_load_cards, m)?)?;
-    m.add_function(wrap_pyfunction!(theory_dump_cards, m)?)?;
     m.add_function(wrap_pyfunction!(theory_load_effects, m)?)?;
-    m.add_function(wrap_pyfunction!(theory_dump_effects, m)?)?;
     m.add_function(wrap_pyfunction!(theory_load_opp_boards, m)?)?;
-    m.add_function(wrap_pyfunction!(theory_read_fixture, m)?)?;
-    m.add_function(wrap_pyfunction!(theory_leaf_call, m)?)?;
     m.add_function(wrap_pyfunction!(theory_core_call, m)?)?;
-    m.add_function(wrap_pyfunction!(theory_core_reset, m)?)?;
-    m.add_function(wrap_pyfunction!(theory_outer_version, m)?)?;
-    m.add_function(wrap_pyfunction!(theory_leaf_call_core, m)?)?;
     m.add_function(wrap_pyfunction!(theory_game_call, m)?)?;
     m.add_function(wrap_pyfunction!(theory_rows_call, m)?)?;
     Ok(())

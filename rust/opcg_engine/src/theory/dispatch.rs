@@ -9,7 +9,9 @@ use super::cond::{self, CondCtx};
 use super::input::{CardTable, OppBoards};
 use super::leaves_deck::{self as ld, CutItem, Oracle};
 use super::leaves_to::{self as lt, ClockCfg, Tok};
-use super::pyval::{from_capture, py_str, Json, PyVal};
+use super::pyval::{py_str, PyVal};
+#[cfg(test)]
+use super::pyval::{from_capture, Json};
 
 type R = Result<PyVal, String>;
 
@@ -534,6 +536,7 @@ pub fn call(name: &str, a: &PyVal, g: &PyVal, t: &CardTable, bd: &OppBoards, o: 
     })
 }
 
+#[cfg(test)]
 /// 記録した核の答えを、Python が呼んだ順に返す口（引数が 1 つでも違えば誤り＝呼ぶ順と入力まで突き合わせる）。
 pub struct ReplayOracle {
     /// `(名前, 引数の dict, 戻り)`
@@ -542,6 +545,7 @@ pub struct ReplayOracle {
     pub err: Option<String>,
 }
 
+#[cfg(test)]
 impl ReplayOracle {
     pub fn new(s: &PyVal) -> ReplayOracle {
         let subs = s
@@ -561,6 +565,7 @@ impl ReplayOracle {
     }
 }
 
+#[cfg(test)]
 impl Oracle for ReplayOracle {
     fn call(&mut self, name: &str, args: Vec<(&str, PyVal)>) -> PyVal {
         let Some((n, a, r)) = self.subs.get(self.pos) else {
@@ -586,6 +591,7 @@ impl Oracle for ReplayOracle {
     }
 }
 
+#[cfg(test)]
 /// 記録 1 行（`a`・`g`・`s`）を解き、戻り（Python の戻りと同じ型）を返す。核の記録を使い残したら誤り。
 pub fn call_payload(name: &str, payload: &PyVal, t: &CardTable, bd: &OppBoards) -> Result<PyVal, String> {
     let a = payload.getv("a");
@@ -601,6 +607,7 @@ pub fn call_payload(name: &str, payload: &PyVal, t: &CardTable, bd: &OppBoards) 
     Ok(r)
 }
 
+#[cfg(test)]
 /// 記録の 1 行（素の JSON の object・各欄は記録の形）→ `{"a", "g", "s"}` の dict。
 pub fn payload_of(j: &Json) -> PyVal {
     let field = |k: &str| j.get(k).map(from_capture).unwrap_or(PyVal::None);

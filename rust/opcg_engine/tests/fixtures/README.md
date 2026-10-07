@@ -43,13 +43,19 @@ OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_audit_replay.py \
 `json.dump(..., ensure_ascii=False, sort_keys=True, separators=(",",":"))`）。
 **期待値は Python の出力**で、Rust の出力から作り直してはいけない。
 
-## 理論の全移植・段 1／2（2026-10-06）
+## 理論の全移植の golden（段 1〜6・2026-10-06／07）
 
 | ファイル | 中身 |
 |---|---|
-| `theory_leaves_golden.jsonl.gz` | 移した葉（`src/theory/leaves_*.rs`・`cond.rs`）の**記録した呼び出し** 20,859 行（Python が本物の通し〔8 器 × `f_identity/rec`・実 w41・合成 w39 の各 5 局〕の中で実際に解いた入力・大域・核の答え・出力・浮動小数は 16 進のビット）。`theory::tests_leaves` が Python 無しで解き直してビットで比べる。間引きの規則と作り直し方は `tests/scripts/theory_leaves_golden.py`（記録は `tests/scripts/theory_capture.py`）。約 1 MB |
-| `theory_cards.json.gz` | 葉が引くカード表と語彙（`tests/scripts/theory_rs.py::card_table_json`・2803 枚）。約 80 KB |
+| `theory_leaves_golden.jsonl.gz` | 葉（`src/theory/leaves_*.rs`・`cond.rs`）の**記録した呼び出し** 20,859 行（Python が本物の通し〔8 器 × `f_identity/rec`・実 w41・合成 w39 の各 5 局〕の中で実際に解いた入力・大域・核の答え・出力・浮動小数は 16 進のビット）。`theory::tests_leaves` が解き直してビットで比べる。約 1 MB |
+| `theory_core_golden.jsonl.gz` | 値付けの核（段 3）の記録した呼び出し。`theory::core::tests_core` |
+| `theory_outer_golden.jsonl.gz` | 守る側の外側と耐久（段 4）の記録した呼び出し。`theory::core::tests_outer` |
+| `theory_rows_golden.jsonl.gz` | 局の駆動と行の関数（段 5／6）の記録した呼び出し（局の枠つき）。`theory::core::tests_rows` |
+| `rd_dp_golden.jsonl`・`rd_solve_golden.jsonl.gz` | 守る側の計算（第 1〜3 段）の記録した解。`theory::tests` |
+| `theory_cards.json.gz`・`theory_effects.json.gz` | 記録を取ったときのカード表と語彙（2803 枚）・効果の木 |
 
-作り直し（挙動を意図して変えたときだけ・差分は必ずレビューする・期待値は Python の出力）: `make rust-develop` の後、
-8 器を `tests/scripts/theory_capture_run.py <器>.py …`（`OPCG_THEORY_CAPTURE=<dir>`・`OPCG_THEORY_CAPTURE_SRC`・`OPCG_THEORY_CAPTURE_TOOL`）で回し、
-`python tests/scripts/theory_leaves_golden.py <dir>`。
+**段 7（2026-10-07）で Python の理論（記録を取った側）と、記録の器・間引きの道具（旧 `tests/scripts/theory_capture*.py`・
+`theory_*_golden.py`・`rd_kernel_golden.py`・答え合わせの原文 `tests/harness/rule_don_ref.py`）を消した**——これらの golden は
+**固定の正本**（Python の最後の出力の写し）で、Python 無しで `cargo test` が解き直す。**式を意図して変えたら**記録を取り直す道具は
+もう無いので、変えた Rust の出力で作り直し（golden は「その時点の Rust の出力」になる＝正しさの独立した証拠ではない）、
+差分を必ずレビューする。旧い Python は凍結ブランチ `claude/theory-switches-final` と履歴で辿れる。

@@ -139,32 +139,6 @@ def move_family(sig):
     return "other"
 
 
-#: **D-5（2026-09-25）物差しの窓の「次の判断点」**。エンジンは効果の途中の選択（ドン‼️−N で戻すドン・
-#: サーチで取る札など）で中断し、その答えを**自分の kind 0 の行**（候補が全部 `RESOLVE_EFFECT_SELECTION`）
-#: として記録する。`any`（旧）はこの問いの行も判断点に数えるので、手の窓が**効果の解決前で閉じる**
-#: （実記録の登場の 45%・`2026-09-25_d4_review.md`）。`main` は問いの行を判断点から外す＝窓は問いの答えの
-#: 後の本当の判断点まで伸び、問いの行自体も窓の始まりにならない（T47 が kind 1/2 に当てた直しと同じ）。
-#: 問いの行の候補に通常の手が混ざる行は実・合成とも 0（全部か無しか）なので先頭の候補だけで判定できる。
-#: **`main` を採用**（ユーザ決定 2026-09-25・`2026-09-25_d5_decision_rows.md`）。旧の `any`（切替 `DECISION_ROW_MODE`・
-#: `--decision-rows`）は 2026-10-05 に削除——`claude/theory-switches-final` で再現できる。出力の `decision_rows` は定数 `"main"` のまま残す。
-SELECTION_ACTION = "RESOLVE_EFFECT_SELECTION"
-
-
-def is_selection_row(pol, L, ptr, i):
-    """その行が効果の途中の選択の問い（候補が `RESOLVE_EFFECT_SELECTION`）か。"""
-    if int(L[i]) < 1:
-        return False
-    sig = json.loads(pol["pol_sig"][int(ptr[i])])
-    return bool(sig) and sig[0] == SELECTION_ACTION
-
-
-def is_decision_row(rows, pol, L, ptr, i):
-    """「次の判断点」の並びに入れる行か（kind 0・`main` なら選択の問いの行を除く）。"""
-    if int(rows["kind"][i]) != 0:
-        return False
-    return not is_selection_row(pol, L, ptr, i)
-
-
 def _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats=None):
     """**T68**: その局の席ごとのデッキ `{who: [card_id]}`（seed から復元・最初の自席ターンの手札で検算。合わなければ席を落とす）。"""
     if not rec_decks or int(seed) not in rec_decks:

@@ -113,7 +113,6 @@ import theory_rs as TR  # noqa: E402
 from theory_bridge import POL_COLS, ROW_COLS, _extra  # noqa: E402
 from theory_rs import MU, THETA  # noqa: E402
 
-AXES = ("th_me", "th_opp", "a_me", "a_opp")
 #: **C-5c**: 攻めたブロッカーは消さずに戻る側へ移す（定数・Rust の `core::drv_kv`）
 ATTACK_REST_MODE = "return"
 #: `D` の読み（`curve`＝帳簿の正本・損害の輪郭）。`theory`（積み上がる歩き・T127）は Rust に移していない

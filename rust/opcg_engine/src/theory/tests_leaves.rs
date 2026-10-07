@@ -2,12 +2,10 @@
 //! 答え合わせ・`docs/reports/2026-10-06_port_stage1_2.md`）。
 //!
 //! * `tests/fixtures/theory_leaves_golden.jsonl.gz` — 1 行 = 本物の通し（8 器 × 実 w41・合成 w39 の各 5 局と
-//!   `tests/fixtures/f_identity/rec`）の中の葉の 1 呼び出し（`tests/scripts/theory_capture.py` の形）。間引きの規則は
-//!   `tests/scripts/theory_leaves_golden.py`。
+//!   `tests/fixtures/f_identity/rec`）の中の葉の 1 呼び出し（記録の器と間引きの道具〔旧 `tests/scripts/theory_capture.py`・`theory_leaves_golden.py`〕は段 7 で消した＝golden は固定の正本）。
 //! * `tests/fixtures/theory_cards.json.gz` — カード表と語彙（`theory_rs.card_table_json`）。
 //! * 盤面の分布はリポジトリの `tests/fixtures/opp_boards.json` を Rust が読む。
 //!
-//! `OPCG_THEORY_CAPTURE_REPLAY=<記録のディレクトリ>` を付けると、間引く前の全部の記録も解き直す（手で回す・数を出す）。
 
 use super::dispatch;
 use super::input::{CardTable, OppBoards};
@@ -69,7 +67,7 @@ fn replay_lines<'a>(lines: impl Iterator<Item = &'a str>, t: &CardTable, bd: &Op
     (per, bad)
 }
 
-/// 葉の全部（`theory_capture.SPECS` の名前）。記録に 1 行も無い葉が在れば落ちる（番人が空振りしない）。
+/// 葉の全部（旧 `theory_capture.SPECS` の名前）。記録に 1 行も無い葉が在れば落ちる（番人が空振りしない）。
 const LEAVES: &[&str] = &[
     "to.theta_take", "to.turn_weights", "to.surv_turns", "to.cbar_of", "to.c_of", "to.slot_power", "to.incoming_x",
     "to.own_attackers_of", "to.hand_ids_of", "to.card_identity", "to.ko_p_of", "to.power_band_of", "to.shield_of",
@@ -95,48 +93,6 @@ fn recorded_leaf_calls_replay_bit_identically() {
         assert!(per.iter().any(|e| e.0 == *leaf && e.1 > 0), "葉 {leaf} の記録が無い");
     }
     assert!(total > 1000, "記録が少なすぎる: {total}");
-}
-
-/// 手で回す: 間引く前の全部の記録（`OPCG_THEORY_CAPTURE_REPLAY=<dir>`・`<dir>/<src>/<器>/<葉>.jsonl`）。
-#[test]
-fn full_capture_replays_bit_identically_when_given() {
-    let Ok(root) = std::env::var("OPCG_THEORY_CAPTURE_REPLAY") else { return };
-    let (t, bd) = tables();
-    let mut files = Vec::new();
-    for src in std::fs::read_dir(&root).unwrap().flatten() {
-        for tool in std::fs::read_dir(src.path()).unwrap().flatten() {
-            for f in std::fs::read_dir(tool.path()).unwrap().flatten() {
-                if f.path().extension().map(|x| x == "jsonl").unwrap_or(false) {
-                    files.push(f.path());
-                }
-            }
-        }
-    }
-    files.sort();
-    let mut agg: Vec<(String, usize, usize)> = Vec::new();
-    let mut bad_all = Vec::new();
-    for p in &files {
-        let text = std::fs::read_to_string(p).unwrap();
-        let (per, bad) = replay_lines(text.lines(), &t, &bd);
-        for (n, c, b) in per {
-            match agg.iter_mut().find(|e| e.0 == n) {
-                Some(e) => {
-                    e.1 += c;
-                    e.2 += b;
-                }
-                None => agg.push((n, c, b)),
-            }
-        }
-        bad_all.extend(bad.into_iter().take(5));
-    }
-    agg.sort();
-    let total: usize = agg.iter().map(|e| e.1).sum();
-    let mism: usize = agg.iter().map(|e| e.2).sum();
-    for (n, c, b) in &agg {
-        println!("REPLAY {n} {c} mismatches={b}");
-    }
-    println!("REPLAY_TOTAL files={} calls={total} mismatches={mism}", files.len());
-    assert_eq!(mism, 0, "{}", bad_all.join("\n"));
 }
 
 #[test]

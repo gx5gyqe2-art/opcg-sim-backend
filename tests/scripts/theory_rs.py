@@ -52,18 +52,11 @@ LAM = 0.1362
 H_LIFE_TO_HAND = 0.89
 THETA = round((LAM - H_LIFE_TO_HAND * MU) / MU, 4)
 R_TURNS = 4.128
-CBAR = 1.514
 DELTA = 0.0277
-PWR_EPS = 10.0
 #: scalars の列（`rust/opcg_engine/src/encode/scalars.rs`）
 SC_MY_LIFE, SC_OPP_LIFE = 0, 1
-SC_MY_DON = 2
 SC_MY_HAND, SC_OPP_HAND = 6, 7
-SC_TURN = 10
 SC_MY_LEADER_POWER, SC_OPP_LEADER_POWER = 12, 13
-#: 枠
-SLOT_OWN_FIELD = slice(2, 7)
-SLOT_OPP_FIELD = slice(7, 12)
 #: 整数ターンの床（`crossing_bridge.sigma_rel_mle`）
 TURN_ROUND_VAR = 1.0 / 12.0
 TURN_ROUND_MEAN = -0.5
@@ -213,11 +206,23 @@ def ready():
     return engine()
 
 
-def core_call(name, args):
-    """段 3／4 の核の入口を 1 つ（計画の覚え書きの `store.*` だけが使う）。"""
-    payload = json.dumps({"d": [["a", enc(args)], ["g", enc({})], ["pre", []]]}, ensure_ascii=False, separators=(",", ":"))
+def core_call(name, args, ctx=None):
+    """核の入口を 1 つ（`core::entry`）。`args` は名前つきの全部の引数（既定値も渡す）・`ctx` は文脈 `g`
+    （省略時は空＝計画の覚え書きの `store.*` の形）。"""
+    payload = json.dumps({"d": [["a", enc(args)], ["g", enc({} if ctx is None else ctx)], ["pre", []]]},
+                         ensure_ascii=False, separators=(",", ":"))
     out = json.loads(engine().theory_core_call(name, payload, False))
     return dec({k: x for k, x in out["d"]}.get("r"))
+
+
+def attack_value(power, target_power, is_leader, theta=None, mu=None, nu_target=None, blockers=None):
+    """攻撃 1 回の価値（`min(守る費用, 受ける費用, …)`・Rust の `to::attack_value`）——手計算の試験が呼ぶ入口。"""
+    ready()
+    a = {"power": float(power), "target_power": float(target_power), "is_leader": bool(is_leader),
+         "theta": float(THETA if theta is None else theta), "mu": float(MU if mu is None else mu),
+         "nu_target": None if nu_target is None else float(nu_target),
+         "blockers": None if blockers is None else [[float(p), float(q)] for p, q in blockers]}
+    return core_call("to.attack_value", a, g())
 
 
 def _store_report():

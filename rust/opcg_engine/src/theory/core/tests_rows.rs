@@ -1,13 +1,11 @@
-//! 移植の段 5／6 の番人: 記録した**局の駆動と行の関数**の呼び出し（`tests/scripts/theory_rows_rs.py`・`OPCG_THEORY_ROWS_CAPTURE`）を
+//! 移植の段 5／6 の番人: 記録した**局の駆動と行の関数**の呼び出しを
 //! Python 無しで解き直し、戻り（行の表・`stats`・計数の増分 `ev`／`cs`）を**ビットで**比べる
 //! （段 7 で Python の理論を消した後も残る答え合わせ・`docs/reports/2026-10-07_port_stage5_6.md`）。
 //!
 //! * `tests/fixtures/theory_rows_golden.jsonl.gz` — 1 行 = 本物の通し（器 × `f_identity/rec`・実 w41・合成 w39）の中の 1 呼び出し。
 //!   `{"seq": <列の名前>, "tool", "game", "fref"?, "payload", "result"}`（局の枠は `{"frame_def": <番号>, "frame"}` の行で 1 度だけ）。**列ごとに新しい核で頭から記録の順に解く**——
 //!   覚え書き（`option`・`gain`・`flow`・計画の表…）は局をまたいで育つ＝1 局だけ抜くと値が変わりうる（列の頭から
-//!   切った前半は正しい）。間引きの規則は `tests/scripts/theory_rows_golden.py`。
-//! * `OPCG_THEORY_ROWS_REPLAY=<記録のディレクトリ>` を付けると、間引く前の全部の記録（`<dir>` の下の `*.rows.jsonl.gz`・
-//!   1 ファイル＝1 列）も解き直す（手で回す）。
+//!   切った前半は正しい）（記録の器と間引きの道具〔旧 `tests/scripts/theory_*_golden.py`・`theory_capture*.py`〕は段 7 で Python の理論と一緒に消した＝golden は固定の正本）。
 
 use std::collections::HashMap;
 
@@ -74,11 +72,7 @@ fn replay_seq<'a>(lines: impl Iterator<Item = &'a str>, frames: &HashMap<i64, Py
             if line.trim().is_empty() {
                 continue;
             }
-            let t1 = std::time::Instant::now();
             let (tool, ok, why) = replay_one(c, line, frames);
-            if std::env::var("OPCG_THEORY_ROWS_TIMES").is_ok() {
-                eprintln!("    {label} #{n} {tool} {:.3} 秒", t1.elapsed().as_secs_f64());
-            }
             let e = match per.iter_mut().find(|e| e.0 == tool) {
                 Some(e) => e,
                 None => {
@@ -165,36 +159,3 @@ fn recorded_candidates_replay_bit_identically() {
     golden_part(|s| s.starts_with("cand_"), &["kappa_vector", "transition_ledger", "price_realised"]);
 }
 
-/// 手で回す: 間引く前の全部の記録（`OPCG_THEORY_ROWS_REPLAY=<dir>`・`<dir>` の下の `*.rows.jsonl.gz`）。
-#[test]
-fn full_rows_capture_replays_bit_identically_when_given() {
-    let Ok(root) = std::env::var("OPCG_THEORY_ROWS_REPLAY") else { return };
-    super::tests_core::load_tables();
-    // `<dir>` の下の `*.rows.jsonl.gz` を全部（深さは問わない・名前の順）
-    let mut files = Vec::new();
-    let mut stack = vec![std::path::PathBuf::from(&root)];
-    while let Some(d) = stack.pop() {
-        for f in std::fs::read_dir(&d).unwrap().flatten() {
-            let p = f.path();
-            if p.is_dir() {
-                stack.push(p);
-            } else if p.to_string_lossy().ends_with(".rows.jsonl.gz") {
-                files.push(p);
-            }
-        }
-    }
-    files.sort();
-    let (mut per, mut bad) = (Vec::new(), Vec::new());
-    for p in &files {
-        let text = String::from_utf8(gunzip(&std::fs::read(p).unwrap())).unwrap();
-        replay_seq(text.lines(), &HashMap::new(), &mut per, &mut bad, &p.to_string_lossy());
-    }
-    let total: usize = per.iter().map(|e| e.1).sum();
-    let mism: usize = per.iter().map(|e| e.2).sum();
-    eprintln!("全部の局の駆動の記録の再生: {} 列・{total} 行・不一致 {mism}", files.len());
-    for e in &per {
-        eprintln!("  {}: {} 行・不一致 {}", e.0, e.1, e.2);
-    }
-    assert!(bad.is_empty(), "記録と違う局の駆動（先頭 10）:\n{}", bad.join("\n"));
-    assert!(total > 0, "記録が無い: {root}");
-}

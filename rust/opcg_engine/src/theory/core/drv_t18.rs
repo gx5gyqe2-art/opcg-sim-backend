@@ -83,6 +83,7 @@ fn opt_f(x: Option<f64>) -> V {
 }
 
 /// `two_curves.two_curves_for_game`
+#[allow(clippy::needless_range_loop)] // Python の `for n, i in enumerate(order)` の形のまま
 fn two_curves(c: &mut Core, g: &Game, cfg: &Cfg) -> R<V> {
     let n = g.n();
     let mut by_seat: Vec<(i64, Vec<usize>)> = Vec::new();

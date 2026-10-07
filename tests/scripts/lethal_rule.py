@@ -57,10 +57,6 @@ if _HERE not in sys.path:
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
 import theory_rs as TR  # noqa: E402
 
-#: 受けたライフの札の平均カウンター値の読み（規則どおり・定数・Rust の `leaves_deck::avg_counter`）
-AVG_COUNTER_MODE = "rules"
-
-
 def settled_map(dirs, limit_games=0, with_don=True):
     """**T138a**: 局×席×ターンの決着フラグ `{(seed, w, t): declared(bool)}`。**判定は `lethal_of_row` そのもの**
     （Rust の局の駆動 `lethal_rule`）——他の器（`win_calib`・`relative_ledger`・`crossing_bridge`）が

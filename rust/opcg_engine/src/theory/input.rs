@@ -15,6 +15,7 @@ use super::pyval::{self, from_plain, parse_json, Json, PyVal};
 
 /// `n_rel_feat.profile(m)["thr"]` の 1 行 `(power_max, cost_max, needs_rest, kind, allow_leader)`。
 #[derive(Clone, Debug)]
+#[allow(dead_code)] // 段 7: 写しの確認（`theory_dump_cards`）を消したので読まない項目がある
 pub struct Thr {
     pub power_max: Option<f64>,
     pub cost_max: Option<f64>,
@@ -159,70 +160,6 @@ impl CardTable {
         Ok(t)
     }
 
-    /// 項目ごとの写し（Python 側で `card_table_json` の入力と突き合わせる・恒等の確認）。
-    pub fn to_pyval(&self) -> PyVal {
-        let s = |x: &str| PyVal::Str(x.to_string());
-        let ls = |v: &[String]| PyVal::List(v.iter().map(|x| s(x)).collect());
-        let opt = |x: Option<f64>| x.map(PyVal::Float).unwrap_or(PyVal::None);
-        let cards = self
-            .cards
-            .iter()
-            .map(|c| {
-                let info = match &c.info {
-                    None => PyVal::None,
-                    Some(i) => PyVal::Dict(vec![
-                        (s("leader"), PyVal::Bool(i.leader)),
-                        (s("removal"), PyVal::Bool(i.removal)),
-                        (s("blocker"), PyVal::Bool(i.blocker)),
-                        (s("rush"), PyVal::Bool(i.rush)),
-                        (s("counter"), PyVal::Int(i.counter)),
-                        (s("event"), PyVal::Bool(i.event)),
-                        (s("stage"), PyVal::Bool(i.stage)),
-                        (s("cost"), PyVal::Int(i.cost)),
-                        (s("power"), PyVal::Int(i.power)),
-                    ]),
-                };
-                PyVal::Dict(vec![
-                    (s("id"), s(&c.id)),
-                    (s("info"), info),
-                    (s("type"), s(&c.type_name)),
-                    (s("power"), PyVal::Float(c.power)),
-                    (s("cost"), PyVal::Int(c.cost)),
-                    (s("counter"), PyVal::Float(c.counter)),
-                    (s("keywords"), ls(&c.keywords)),
-                    (s("traits"), ls(&c.traits)),
-                    (s("colors"), ls(&c.colors)),
-                    (s("names"), ls(&c.names)),
-                    (s("attribute"), s(&c.attribute)),
-                    (s("counter_event"), PyVal::Float(c.counter_event)),
-                    (
-                        s("thr"),
-                        PyVal::List(
-                            c.thr
-                                .iter()
-                                .map(|t| {
-                                    PyVal::List(vec![
-                                        opt(t.power_max),
-                                        opt(t.cost_max),
-                                        PyVal::Bool(t.needs_rest),
-                                        s(&t.kind),
-                                        PyVal::Bool(t.allow_leader),
-                                    ])
-                                })
-                                .collect(),
-                        ),
-                    ),
-                ])
-            })
-            .collect();
-        let vocab = self
-            .vocab
-            .iter()
-            .enumerate()
-            .filter_map(|(i, c)| c.as_ref().map(|c| PyVal::List(vec![PyVal::Int(i as i64), s(c)])))
-            .collect();
-        PyVal::Dict(vec![(s("cards"), PyVal::List(cards)), (s("vocab"), PyVal::List(vocab))])
-    }
 }
 
 /// 相手の場の分布（`theory_order.load_opp_boards`）＝`R` → `[(自リーダーのパワー, [(パワー, ブロッカーか), …]), …]`。
@@ -299,12 +236,6 @@ impl OppBoards {
                 .collect(),
         )
     }
-}
-
-/// fixture の JSON を素の `PyVal` として読む（`json.load` と同じ型）。
-pub fn load_fixture(path: &str) -> Result<PyVal, String> {
-    let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
-    Ok(from_plain(&parse_json(&text)?))
 }
 
 /// 1 局の枠（記録の列を生のまま・`scalars`／`tokens` は Python が `float32` にした値）。

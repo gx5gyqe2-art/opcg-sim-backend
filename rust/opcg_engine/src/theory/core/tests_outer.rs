@@ -1,14 +1,12 @@
-//! 移植の段 4 の番人: 記録した**守る側の外側と耐久**の呼び出し（`tests/scripts/theory_outer_rs.py`）を Python 無しで解き直し、
+//! 移植の段 4 の番人: 記録した**守る側の外側と耐久**の呼び出しを Python 無しで解き直し、
 //! **ビットで**比べる（段 7 で Python の理論を消した後も残る答え合わせ・`docs/reports/2026-10-07_port_stage4.md`）。
 //!
 //! * `tests/fixtures/theory_outer_golden.jsonl.gz` — 1 行 = 本物の通し（8 器 × 実 w41・合成 w39 の各 5 局と
-//!   `tests/fixtures/f_identity/rec`）の中の外側の 1 呼び出し。間引きの規則は `tests/scripts/theory_outer_golden.py`。
+//!   `tests/fixtures/f_identity/rec`）の中の外側の 1 呼び出し（記録の器と間引きの道具〔旧 `tests/scripts/theory_*_golden.py`・`theory_capture*.py`〕は段 7 で Python の理論と一緒に消した＝golden は固定の正本）。
 //!   行ごとに丸めた鍵の覚え書き（`option`・`gain`・`flow`・`_RULE_DON_CACHE`＝`rdc`）を空にして `pre` を入れてから解く
 //!   （順に依らない）。攻め手の財布は `_gain` 込みの dict で渡る。**曲線の行**（`cp.curve_of_row` と `cv.*`）は曲線ごとに
 //!   記録の順に解く（曲線の中の `JointValuer` の覚え書きが履歴に依る・E52）。
 //! * 計数の増分（`ev`＝`RULE_STATS`／`EX_SPEED_STATS`）と条件の計数（`cs`）も比べる。
-//!
-//! `OPCG_THEORY_OUTER_REPLAY=<記録のディレクトリ>` を付けると、間引く前の全部の記録も解き直す（手で回す）。
 
 use std::collections::HashMap;
 
@@ -172,38 +170,3 @@ fn recorded_outer_calls_replay_bit_identically() {
     assert!(total > 1000, "記録が少なすぎる: {total}");
 }
 
-/// 手で回す: 間引く前の全部の記録（`OPCG_THEORY_OUTER_REPLAY=<dir>`・`<dir>/<src>/<器>/<名前>.jsonl`）。
-#[test]
-fn full_outer_capture_replays_bit_identically_when_given() {
-    let Ok(root) = std::env::var("OPCG_THEORY_OUTER_REPLAY") else { return };
-    super::tests_core::load_tables();
-    let mut dirs = Vec::new();
-    for src in std::fs::read_dir(&root).unwrap().flatten() {
-        if !src.path().is_dir() {
-            continue;
-        }
-        for tool in std::fs::read_dir(src.path()).unwrap().flatten() {
-            if tool.path().is_dir() {
-                dirs.push(tool.path());
-            }
-        }
-    }
-    dirs.sort();
-    let (mut per, mut bad) = (Vec::new(), Vec::new());
-    for d in &dirs {
-        let mut files: Vec<_> =
-            std::fs::read_dir(d).unwrap().flatten().map(|f| f.path()).filter(|p| p.extension().map(|x| x == "jsonl").unwrap_or(false)).collect();
-        files.sort();
-        for p in &files {
-            let text = std::fs::read_to_string(p).unwrap();
-            replay_text(&text, &mut per, &mut bad);
-        }
-    }
-    let total: usize = per.iter().map(|e| e.1).sum();
-    let mism: usize = per.iter().map(|e| e.2).sum();
-    eprintln!("全部の外側の記録の再生: {} ファイル群・{total} 行・不一致 {mism}", dirs.len());
-    for e in &per {
-        eprintln!("  {}: {} 行・不一致 {}", e.0, e.1, e.2);
-    }
-    assert!(bad.is_empty(), "記録と違う外側の呼び出し（先頭 20）:\n{}", bad.join("\n"));
-}

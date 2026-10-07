@@ -108,7 +108,6 @@ def __getattr__(name):
 #: **損害の輪郭の正本**（T75）: `tests/fixtures/harm_profile.json`＝`{"real": [...], "syn": [...]}`（自席ターン番号 j ごとの損害の平均・
 #: `harm_profile` の出力・実測の表）。`cross`＝測る記録と別のセットの輪郭を使う（実デッキの記録には合成の輪郭・逆も）。
 HARM_PROFILE_PATH = os.path.join(_ROOT, "tests", "fixtures", "harm_profile.json")
-HARM_PROFILE_NAMES = ("cross", "real", "syn")
 _PROFILES = {}
 
 
@@ -314,11 +313,6 @@ def profile_for(dirs, name="cross", path=None):
 def own_turn_index(t):
     """記録のターン番号 `t`（両席で数える・1 始まり）→ 自席ターン番号 `j`（0 始まり）。"""
     return max(0, (int(t) - 1) // 2)
-
-
-def harm_of(p):
-    """実現の部品（`attack_response.parts`）のうち**相手に与えた損害**だけ（相手ライフ・相手手札・相手の体）。"""
-    return float(p["opp_life"] + p["opp_hand"] + p["opp_body"])
 
 
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const"):
