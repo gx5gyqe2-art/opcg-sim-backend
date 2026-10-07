@@ -247,6 +247,7 @@ def _call_outer(name, orig, bind, args, kw, gl):
         a, b = _dumps(r_enc), _dumps(_rs_cmp(name, r_rs))
         if a != b or cs_rs != cs:
             TCR._stat(name, "both_mismatch")
+            _dump_mismatch(name, a_rs, a, b, cs, cs_rs)
             raise AssertionError("theory outer both: %s が違う\n  a=%s\n  py=%s cs=%s\n  rs=%s cs=%s"
                                  % (name, _dumps(a_rs)[:2000], a[:1500], cs, b[:1500], cs_rs))
         _ev_check(name, gl, st0, ev)
@@ -260,6 +261,14 @@ def _call_outer(name, orig, bind, args, kw, gl):
             r_cap = {"d": [["id", {"obj": r._cap}], ["s", r_enc]]}
         _record4(name, a_cap, g, pre, r_cap, cs, ev)
     return r
+
+
+def _dump_mismatch(name, a_rs, py, rs, cs, cs_rs):
+    """`OPCG_THEORY_OUTER_DUMP=<file>` なら不一致の全文を書く（調べる用）。"""
+    p = os.environ.get("OPCG_THEORY_OUTER_DUMP")
+    if p:
+        with open(p, "a", encoding="utf-8") as fh:
+            fh.write(_dumps({"fn": name, "a": a_rs, "py": py, "rs": rs, "cs": cs, "cs_rs": cs_rs}) + chr(10))
 
 
 def _outer_wrapper(name, orig):
@@ -460,6 +469,7 @@ def _mk_curve_classes():
         def _chk(self, what, a, b):
             if _dumps(RS.enc(a)) != _dumps(RS.enc(b)):
                 TCR._stat("cv." + what, "both_mismatch")
+                _dump_mismatch("cv." + what, None, _dumps(RS.enc(a)), _dumps(RS.enc(b)), None, None)
                 raise AssertionError("theory outer both: 曲線の %s が違う py=%r rs=%r" % (what, a, b))
             TCR._stat("cv." + what, "both_checked")
 

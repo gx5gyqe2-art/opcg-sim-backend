@@ -12,7 +12,7 @@
    比べる（`OPCG_THEORY_CORE=both`）と Rust だけで解く（`OPCG_THEORY_CORE=rs`）。どちらも出力の JSON は普段の起動と 1 バイト同じ。
    記録したビットの再生は `cargo test`（`theory::core::tests_core`）。
 4. 守る側の外側と耐久（段 4・2026-10-07・`docs/reports/2026-10-07_port_stage4.md`）: 交点の橋を `rec` で、外側の入口を両方で解いて
-   比べる（`OPCG_THEORY_OUTER=both`・核は Python）と、外側も核も Rust だけで解く（`rs`）。どちらも出力の JSON は普段の起動と
+   比べる（`OPCG_THEORY_OUTER=both`・核も `both`）と、外側も核も Rust だけで解く（`rs`）。どちらも出力の JSON は普段の起動と
    1 バイト同じ（`rule_stats` も）。記録したビットの再生は `cargo test`（`theory::core::tests_outer`）。
 """
 import json
@@ -112,7 +112,9 @@ def test_outer_both_and_rs_modes_keep_the_output(tmp_path):
     """段 4: 守る側の外側と耐久の入口を両方で解いても（不一致 0・計数と財布の覚え書きも）・外側も核も Rust だけで解いても、
     交点の橋の出力は普段の起動と 1 バイト同じ。"""
     plain, _ = _run("crossing_bridge", [], 0, tmp_path)
-    both, st_b = _run_core("crossing_bridge", [], "py", tmp_path, outer="both")
+    # 核も `both`: 外側だけ `both`（核は Python）だと、段 5 の Python が直に呼ぶ核の呼び出しを Rust の核が見ない＝丸めた鍵の
+    # 先勝ちの覚え書き（E39・E52・`_OPTION_CACHE`）の育ち方が両側で分かれる（段 4 の報告 E69）
+    both, st_b = _run_core("crossing_bridge", [], "both", tmp_path, outer="both")
     rs, st_r = _run_core("crossing_bridge", [], "rs", tmp_path, outer="rs")
     outer = ("cb.", "cp.", "cv.", "hp.hand_items", "hp.search_context", "tb.guard_hand_reading")
     assert sum(v.get("both_checked", 0) for k, v in st_b.items() if k.startswith(outer)) > 300
