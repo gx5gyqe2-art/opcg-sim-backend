@@ -4,7 +4,8 @@
     python tests/scripts/theory_capture_run.py tests/scripts/<器>.py <器の引数…>
 
 環境変数: `OPCG_THEORY_SET`＝器の前に実行する Python の文（残す候補の切替）。段 2 の葉の記録・両方で解く運転は `theory_capture.install`（`OPCG_THEORY_CAPTURE`・`OPCG_THEORY_BOTH`）、
-段 3 の核の切替と記録は `theory_core_rs.install`（`OPCG_THEORY_CORE=py|rs|both`・`OPCG_THEORY_CORE_CAPTURE`）。
+段 3 の核の切替と記録は `theory_core_rs.install`（`OPCG_THEORY_CORE=py|rs|both`・`OPCG_THEORY_CORE_CAPTURE`）、
+段 4 の守る側の外側と耐久は `theory_outer_rs`（`OPCG_THEORY_OUTER`・省略時は `OPCG_THEORY_CORE` と同じ）。
 核を差し替えるときは、器の原文を「`if __name__ == "__main__":` の塊」とそれ以外に分けて、前を実行 → 器自身の写しの入口を
 差し替え → 塊を実行する（器自身が持つ入口〔`theory_bridge.joint_valuer`〕も同じ道を通す）。移植の間だけの道具（段 7 で消す）。
 """
@@ -56,7 +57,8 @@ def main():
     if os.environ.get("OPCG_THEORY_CAPTURE") or os.environ.get("OPCG_THEORY_BOTH", "0") not in ("", "0"):
         import theory_capture as TC
         TC.install()
-    core = os.environ.get("OPCG_THEORY_CORE", "py") != "py" or bool(os.environ.get("OPCG_THEORY_CORE_CAPTURE"))
+    core = (os.environ.get("OPCG_THEORY_CORE", "py") != "py" or os.environ.get("OPCG_THEORY_OUTER", "py") not in ("", "py")
+            or bool(os.environ.get("OPCG_THEORY_CORE_CAPTURE")))
     tool_dir = os.path.dirname(tool)
     if tool_dir not in sys.path:
         sys.path.insert(0, tool_dir)

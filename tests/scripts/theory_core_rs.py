@@ -519,11 +519,14 @@ def install(mode=None, capture_dir=None):
     mode = mode if mode is not None else os.environ.get("OPCG_THEORY_CORE", "py")
     if mode not in ("py", "rs", "both"):
         raise ValueError("OPCG_THEORY_CORE は py／rs／both")
+    outer = os.environ.get("OPCG_THEORY_OUTER") or mode
+    if outer not in ("py", "rs", "both"):
+        raise ValueError("OPCG_THEORY_OUTER は py／rs／both")
     cap = capture_dir if capture_dir is not None else os.environ.get("OPCG_THEORY_CORE_CAPTURE", "")
     if cap:
         cap = os.path.join(cap, os.environ.get("OPCG_THEORY_CAPTURE_SRC", "cap"), os.environ.get("OPCG_THEORY_CAPTURE_TOOL", "run"))
     _CFG.update(mode=mode, dir=cap)
-    if mode == "py" and not cap:
+    if mode == "py" and outer == "py" and not cap:
         _CFG["installed"] = True
         return
     import importlib
@@ -532,7 +535,7 @@ def install(mode=None, capture_dir=None):
         importlib.import_module(m)
     _hooks()
     _install_logdicts()
-    if mode in ("rs", "both"):
+    if mode in ("rs", "both") or outer in ("rs", "both"):
         RS.load_all()
         RS.load_effects()
     fns = {}
@@ -543,15 +546,19 @@ def install(mode=None, capture_dir=None):
     fns[("theory_bridge", "joint_valuer")] = sys.modules["theory_bridge"].joint_valuer
     for key, w in make_wrappers(fns).items():
         _patch_everywhere(fns[key], w)
+    import theory_outer_rs as TOR                       # 段 4（守る側の外側と耐久）
+    TOR.install(outer)
     _CFG["installed"] = True
     atexit.register(_finish)
 
 
 def patch_main(ns, tool_path):
     """器を `__main__` として走らせるとき、器自身の写し（`ns`）が持つ入口を差し替える（`theory_capture_run.py`）。"""
-    if not _CFG["installed"] or (_CFG["mode"] == "py" and not _CFG["dir"]):
+    import theory_outer_rs as TOR
+    if not _CFG["installed"] or (_CFG["mode"] == "py" and TOR._OUTER["mode"] == "py" and not _CFG["dir"]):
         return 0
     mod = os.path.splitext(os.path.basename(tool_path))[0]
+    n0 = TOR.patch_main(ns, mod)
     fns = {}
     for _n, m, a, _b in ROUTED:
         if m == mod and a in ns:
@@ -561,7 +568,7 @@ def patch_main(ns, tool_path):
             fns[(m, a)] = ns[a]
     if mod == "theory_bridge" and "joint_valuer" in ns:
         fns[("theory_bridge", "joint_valuer")] = ns["joint_valuer"]
-    n = 0
+    n = n0
     for key, w in make_wrappers(fns).items():
         orig = fns[key]
         for k, v in list(ns.items()):

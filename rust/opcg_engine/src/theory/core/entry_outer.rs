@@ -281,7 +281,13 @@ pub fn call_outer(c: &mut Core, name: &str, a: &V) -> R<V> {
             };
             let r = match name {
                 "cv.L" => cv.l(c).map(|l| V::list(l.into_iter().map(V::Float).collect())),
-                "cv.gbar" => cv.gbar(c).map(V::Float),
+                "cv.gbar" => {
+                    if a.get("nested").truthy() && cv.l.is_none() && cv.gbar.is_none() {
+                        Err("ḡ: 窓の文脈の中で L が未定の曲線の ḡ を読んだ（Python は再帰する）".into())
+                    } else {
+                        cv.gbar(c).map(V::Float)
+                    }
+                }
                 "cv.Lx" => f(a, "x").and_then(|x| cv.lx(c, x)).map(V::Float),
                 _ => match (arg(a, "keep"), arg(a, "S")) {
                     (Ok(k), Ok(s)) => cv.set_loss(c, mask(k), mask(s)).map(V::Float),
