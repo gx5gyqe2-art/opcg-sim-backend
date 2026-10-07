@@ -31,17 +31,14 @@
 
 使い方:
 
-    python tests/scripts/transition_ledger.py --in <records_dir> [--games N] [--d-mode curve|theory] [--json out.json]
+    python tests/scripts/transition_ledger.py --in <records_dir> [--games N] [--json out.json]
 """
 
+
 import argparse
-import itertools
 import json
-import math
 import os
 import sys
-
-import numpy as np
 
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _ROOT not in sys.path:
@@ -51,17 +48,11 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from opcg_sim.learned.train import plan_labels as PL  # noqa: E402
-import attack_response as AR  # noqa: E402
 import crossing_bridge as CB  # noqa: E402
-import cut_price as CP  # noqa: E402  （N-3）
-import guard_afford as GA  # noqa: E402
 import kappa_vector as KV  # noqa: E402
-import relative_ledger as RL  # noqa: E402
-import theory_order as TO  # noqa: E402
-from theory_bridge import POL_COLS, ROW_COLS, _extra, _state_of, move_family  # noqa: E402
-from theory_order import (MU, SC_MY_DON, SC_MY_HAND, SC_MY_LEADER_POWER, SC_MY_LIFE,  # noqa: E402
-                          SC_OPP_HAND, SC_OPP_LEADER_POWER, SC_OPP_LIFE, THETA, opp_bodies_of,
-                          own_attackers_of, score_candidate, slot_power, theta_of)
+import theory_rs as TR  # noqa: E402
+from theory_bridge import POL_COLS, ROW_COLS, _extra  # noqa: E402
+from theory_rs import MU, THETA  # noqa: E402
 
 #: 配分する軸（`j` も軸に入れる——輪郭の読み出し位置が進むのは**誰の手でもない遷移**）
 AXES5 = ("th_me", "th_opp", "a_me", "a_opp", "j")
@@ -72,115 +63,6 @@ CAUSES = ("turn_boundary", "same_turn")
 #: 切替 `BOUNDARY_MODE`（`rules`／`draw_untap`／`draw`／`untap`／`don`）は「境目に速さの項は当てられていない」
 #: （T125・`2026-09-20_boundary_don_retraction.md`）で引っ込め、2026-10-05 に削除——`claude/theory-switches-final` で
 #: 再現できる。境目は値付けしない（`off`・T123 の測り方）。出力の `boundary_mode` は定数 `"off"`。
-
-
-def _swap_state(st):
-    """席 1 の視点の状態を**席 0 の視点**に写す（`Θ` と `A` を入れ替え・`j` は共通）。"""
-    st = tuple(st)
-    th_me, th_opp, a_me, a_opp, j = st[:5]
-    out = (th_opp, th_me, a_opp, a_me, j)
-    if len(st) == 7:                       # **C-5c**: 戻る分も入れ替える
-        out += (st[6], st[5])
-    return out
-
-
-def _swap_dx(dx):
-    """席 1 の視点の `Δx` を**席 0 の視点**に写す（軸の名前を入れ替えるだけ・符号は変えない）。"""
-    m = {"th_me": "th_opp", "th_opp": "th_me", "a_me": "a_opp", "a_opp": "a_me",
-         "th_me_back": "th_opp_back", "th_opp_back": "th_me_back"}      # **C-5c**: 戻る分も入れ替える
-    return {m.get(k, k): v for k, v in dx.items()}
-
-
-def _mix(st0, st1, keys):
-    """`keys` の軸だけ `st1` の値にした中間状態（シャープレイの部分集合の評価に使う）。
-    **C-5c**: 7 つ組では耐久の軸は戻る分も一緒に動く（`th_me`＝添字 0 と 5・`th_opp`＝添字 1 と 6）。"""
-    st0 = tuple(st0); st1 = tuple(st1)
-    out = list(st0)
-    idx = {"th_me": (0, 5), "th_opp": (1, 6), "a_me": (2,), "a_opp": (3,), "j": (4,)}
-    for k in keys:
-        for i in idx[k]:
-            if i < len(out):
-                out[i] = st1[i]
-    return tuple(out)
-
-
-def shapley(st0, st1, prof, sigma_rel):
-    """**`W(st1) − W(st0)` を 5 つの軸へシャープレイ値で配る**（順序に依らず・和は厳密に差）。
-
-    部分集合 32 通りの `W` を 1 度だけ作って再利用する（`5! = 120` 通りの順序を全部数えるのと同値）。
-    **これは配分であって説明ではない**——「どの軸が動いたか」を言うだけで、係数は 1 つも当てはめていない。"""
-    names = AXES5
-    vals = {}
-    for r in range(len(names) + 1):
-        for comb in itertools.combinations(names, r):
-            key = frozenset(comb)
-            vals[key] = RL.w_of(*RL.clocks_of(_mix(st0, st1, key), prof), sigma_rel=sigma_rel)
-    out = {n: 0.0 for n in names}
-    n = len(names)
-    fact = [math.factorial(k) for k in range(n + 1)]
-    for r in range(n):
-        for comb in itertools.combinations(names, r):
-            key = frozenset(comb)
-            # そのサイズの部分集合が順序の数え上げで持つ重み（標準のシャープレイの係数）
-            wgt = fact[r] * fact[n - r - 1] / fact[n]
-            for name in names:
-                if name in key:
-                    continue
-                out[name] += wgt * (vals[key | {name}] - vals[key])
-    return out
-
-
-def _row_basics(sc, tok):
-    """**C-5**: 1 行の基本量（攻め手＝その行の席の視点・規則が動かす量だけ）。"""
-    sc = np.asarray(sc); tok = np.asarray(tok)
-    def _n(slots, pred):
-        return sum(1 for s in range(slots.start, slots.stop) if pred(s))
-    is_chr = lambda s: float(tok[s, TO.S_IS_CHAR]) > 0.5
-    is_blk = lambda s: is_chr(s) and float(tok[s, TO.S_IS_BLOCKER]) > 0.5 and float(tok[s, TO.S_IS_REST]) <= 0.5
-    is_rest = lambda s: is_chr(s) and float(tok[s, TO.S_IS_REST]) > 0.5
-    return {"my_life": float(sc[SC_MY_LIFE]), "my_hand": float(sc[TO.SC_MY_HAND]),
-            "my_don": float(sc[SC_MY_DON]),
-            "opp_life": float(sc[SC_OPP_LIFE]), "opp_hand": float(sc[TO.SC_OPP_HAND]),
-            "n_me_chr": _n(TO.SLOT_OWN_FIELD, is_chr), "n_me_blk": _n(TO.SLOT_OWN_FIELD, is_blk),
-            "n_me_rest": _n(TO.SLOT_OWN_FIELD, is_rest),
-            "n_opp_chr": _n(TO.SLOT_OPP_FIELD, is_chr), "n_opp_blk": _n(TO.SLOT_OPP_FIELD, is_blk)}
-
-
-def attack_detail(bi0, bi1, sh, cards):
-    """**C-5**: 攻撃の遷移に**攻め手視点**の内訳を添える（診断用・既定の集計には触れない）。
-
-    * `sh_att` … シャープレイ配分を**攻め手視点**へ写したもの。`sh` は席 0 視点（`_swap_state`）なので、
-      席 1 の行は**軸を入れ替え・符号を反転**する（席 1 の勝率の差 ＝ −席 0 の勝率の差）。
-    * `me0`/`me1`・`opp0`/`opp1` … 両席の耐久の 3 項 `(ライフ, 手札, 体)`（同じターンなので `g` は行 0 のもの）。
-    * `mv` … 打った攻撃（攻め手の枠 `si`・的 `ti`・札 id・ブロッカーか・リーダーか・パワー・付けたドン・価格）。
-    * `row0`/`row1` … 基本量（`_row_basics`）。"""
-    tok0, _ci0, _mlp0, w, sc0, mv, g_me0, g_opp0 = bi0
-    tok1, _ci1, _mlp1, _w1, sc1, _mv1, _g_me1, _g_opp1 = bi1
-    if int(w) == 1:
-        sh_att = {"th_me": -sh["th_opp"], "th_opp": -sh["th_me"], "a_me": -sh["a_opp"],
-                  "a_opp": -sh["a_me"], "j": -sh["j"]}
-    else:
-        sh_att = dict(sh)
-    me0 = CB.threshold_of_me_parts(sc0, tok0, g_hand=g_me0)
-    me1 = CB.threshold_of_me_parts(sc1, tok1, g_hand=g_me0)
-    opp0 = CB.threshold_parts(sc0, tok0, g_hand=g_opp0)
-    opp1 = CB.threshold_parts(sc1, tok1, g_hand=g_opp0)
-    mv = dict(mv or {})
-    si = mv.get("si")
-    info = (cards.info(mv.get("cid")) or {}) if (cards is not None and mv.get("cid")) else {}
-    tok0a, tok1a = np.asarray(tok0), np.asarray(tok1)
-    mv.update({"leader": (si == 0),
-               "blocker": bool(info.get("blocker")) and not info.get("event"),
-               "printed_power": float(info.get("power") or 0.0),
-               "src_power": TO.slot_power(tok0a, si),
-               "target_leader": (mv.get("ti") == 1),
-               "src_rest1": (float(tok1a[int(si), TO.S_IS_REST]) > 0.5) if si is not None and 0 <= int(si) < tok1a.shape[0] else None,
-               "src_blk0": (float(tok0a[int(si), TO.S_IS_BLOCKER]) > 0.5) if si is not None and 0 <= int(si) < tok0a.shape[0] else None,
-               "src_blk1": (float(tok1a[int(si), TO.S_IS_BLOCKER]) > 0.5) if si is not None and 0 <= int(si) < tok1a.shape[0] else None})
-    return {"sh_att": {a: float(v) for a, v in sh_att.items()},
-            "me0": [float(x) for x in me0], "me1": [float(x) for x in me1],
-            "opp0": [float(x) for x in opp0], "opp1": [float(x) for x in opp1],
-            "mv": mv, "row0": _row_basics(sc0, tok0), "row1": _row_basics(sc1, tok1)}
 
 
 def _priority(acc):
@@ -197,19 +79,17 @@ def _priority(acc):
             "turn_boundary": round(acc["by_cause_abs"]["turn_boundary"] / tot, 4)}
 
 
-def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
+
+def collect(dirs, limit_games=0, theta=THETA, mu=MU):
     """記録を 1 度読んで **`W` の差を `priced` と `residual` に割り、`residual` を軸と区分へ配る**。
-    `dump` に list を渡すと**攻撃の行（`same_turn`・`fam0=="attack"`）の残差を局×席×ターンごとに積む**
-    （P8-7(c)・診断用・既定の集計には触らない）。"""
-    cards = PL.Cards()
-    idx2cid = {i: c for c, i in GA._vocab().items()}
+    1 局ぶんの計算（`W` の差・シャープレイ値・区分）は Rust の局の駆動（`core::drv_tl`・`acc` は局をまたいで渡す）。"""
     prof = CB.profile_for(dirs)
-    if KV.D_MODE == "curve" and not prof:
+    if not prof:
         raise ValueError("D_MODE=KV.D_MODE なのに損害の輪郭が引けない（%s）" % (dirs,))
     sr = CB.sigma_rel_for(dirs, slope="curve")
     if sr is None:
         raise ValueError("σ_rel が引けない＝黙って別の物差しに落とさない（T118 の規約）")
-    TO.set_sigma_rel(sr)
+    TR.set_sigma_rel(sr)
     seat_decks = KV._seat_decks(dirs)     # **T128**: `A` の流入・効果はデッキの中身から出る
     acc = {"gap": 0.0, "gap_abs": 0.0, "priced": 0.0, "priced_abs": 0.0,
            "resid": 0.0, "resid_abs": 0.0,
@@ -226,156 +106,19 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
              "w_first_sum": 0.0, "w_last_sum": 0.0, "z_sum": 0.0, "terminal_sum": 0.0,
              "terminal_abs_sum": 0.0}
     games = 0
-    for r, pol, ex, L, ptr, idx in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS,
-                                                 extra_fn=_extra):
+    for game in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
         games += 1
         if limit_games and games > limit_games:
             break
-        stats["games"] += 1
-        # 席ごとの速さ（その席の自席ターンの**最初の行**から・`crossing_bridge` の `turn_start` と同じ規約）
-        rate_at, g_at = {}, {}
-        shape_at = {}
-        seed_g = int(r["seed"][idx[0]]) if len(idx) else -1
-        # **N-3**: 値段の枠。守り手（相手）の枠は**その席の直近の自席ターンの最後の行**（こちらのターンの間の手札そのもの）・
-        # 自分の枠は**今の自席ターンの最初の行**（`g_at` と同じ行）。カウンター・イベントは `g_at` と同じく全部切れる。
-        cut = cut_me_fr = None
-        if CP.joint_on():
-            cut = CP.CutFrames(list(idx), r, ex, idx2cid, cards, KV.frame_rows_of(r, idx, last=True), mu,
-                               decks=KV._deck_pair(seat_decks, seed_g), don_rule=False, stats=stats, end_of_turn=True)
-            cut_me_fr = CP.CutFrames(list(idx), r, ex, idx2cid, cards, KV.frame_rows_of(r, idx), mu,
-                                     decks=KV._deck_pair(seat_decks, seed_g), don_rule=False, stats=stats)
-        for i in idx:
-            if int(r["kind"][i]) != 0:
-                continue
-            w, t = int(r["who"][i]), int(r["turn"][i])
-            if PL.is_own_turn(w, t) and (w, t) not in rate_at:
-                dk = KV._deck_of(seat_decks, seed_g, w)            # **T128**
-                _cv = (None if cut is None else
-                       cut.view(1 - w, t, float(np.asarray(ex["sc"][i])[TO.SC_OPP_HAND])))
-                with CP.defending(_cv):                            # **N-3**: 速さは守り手＝相手の値段で
-                    rate_at[(w, t)] = KV.rate_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
-                                                     idx2cid, cards, theta, mu, deck_ids=dk,
-                                                     j=CB.own_turn_index(t))
-                    shape_at[(w, t)] = (KV.rate_terms_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i],
-                                                           idx2cid, cards, theta, mu, deck_ids=dk)
-                                           if KV.D_MODE == "theory" else None)
-                g_at[(w, t)] = KV.g_of_row(ex["sc"][i], ex["tok"][i], ex["ci"][i], idx2cid, cards)
-
-        def _latest(w, t):
-            ts = [tt for (ww, tt) in rate_at if ww == w and tt <= t]
-            return (rate_at[(w, max(ts))], g_at[(w, max(ts))]) if ts else None
-
-        seq = []            # (席 0 視点の状態, 手の Δx〔席 0 視点〕, ターン番号, 手の型, 境目の材料)
-        z_of = {}
-        for i in idx:
-            z = float(r["z"][i])
-            if z != 0.0:
-                z_of[int(r["who"][i])] = 1.0 if z > 0 else 0.0
-            if int(r["kind"][i]) != 0:
-                continue
-            w, t = int(r["who"][i]), int(r["turn"][i])
-            if not PL.is_own_turn(w, t):
-                continue
-            me, op = _latest(w, t), _latest(1 - w, t)
-            if me is None or op is None:
-                continue
-            if KV.D_MODE == "theory":
-                # **T127**: 席ごとの速さの形（相手は直近の自席ターンの形）を行ごとに入れる
-                _ts = [tt for (ww, tt) in rate_at if ww == 1 - w and tt < t]
-                KV.set_rate_shape(shape_at.get((w, t)),
-                             shape_at.get((1 - w, max(_ts))) if _ts else None)
-            sc, tok, ci = ex["sc"][i], ex["tok"][i], ex["ci"][i]
-            cut_me = cut_opp = None
-            if cut is not None:                          # **N-3**: 両席の値段の窓（今の枚数で）
-                cut_me = cut_me_fr.view(w, t, float(np.asarray(sc)[TO.SC_MY_HAND]))
-                cut_opp = cut.view(1 - w, t, float(np.asarray(sc)[TO.SC_OPP_HAND]))
-            st = KV.state_of_row(sc, tok, me[0], op[0], CB.own_turn_index(t),
-                                 g_me=me[1], g_opp=op[1], ci_row=ci, idx2cid=idx2cid, cards=cards,
-                                 cut_me=cut_me, cut_opp=cut_opp)
-            stats["rows"] += 1
-            # その行で選ばれた手の `Δx`（無ければ空＝値段の付かない行）
-            dx = {}; fam = "none"; mv = None
-            k = int(L[i]); ch = int(r["pol_chosen"][i])
-            if k >= 1 and 0 <= ch < k:
-                b = int(ptr[i]) + ch
-                sig = json.loads(pol["pol_sig"][b])
-                fam = move_family(sig)
-                rt = max(1.0, min(5.0, float(np.asarray(sc)[SC_OPP_LIFE])))
-                th = theta_of(tok, float(np.asarray(sc)[SC_MY_LIFE]),
-                              float(np.asarray(sc)[SC_MY_DON]), mode="const", theta=theta)
-                olp = float(np.asarray(sc)[SC_OPP_LEADER_POWER]) * 1e4 or 5000.0
-                mlp = float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0
-                ctx = {"theta": th, "mu": mu, "opp_leader_power": olp, "my_leader_power": mlp,
-                       "r_turns": rt, "don_k": 1, "attackers": own_attackers_of(tok, olp),
-                       "don_active": float(np.asarray(sc)[SC_MY_DON]),
-                       "st": _state_of(sc, ci, idx2cid),
-                       "opp_bodies": opp_bodies_of(tok, mlp, rt, th, mu, ci_row=ci, idx2cid=idx2cid)}
-                tl = sig[2] if len(sig) > 2 else None
-                with CP.defending(cut_opp):              # **N-3**: 攻め手の手の値段は守り手＝相手の値段で
-                    v = score_candidate(sig, str(pol["pol_cid"][b]) or None,
-                                        (str(pol["pol_tcid"][b]) or None) if tl else None, ctx, cards,
-                                        src_power=slot_power(tok, int(pol["pol_si"][b])),
-                                        tgt_power=slot_power(tok, int(pol["pol_ti"][b])),
-                                        don_k=int(pol["pol_k"][b]),
-                                        src_don=TO.slot_don(tok, int(pol["pol_si"][b])))   # F-2（切替 on のときだけ使う）
-                mv = {"si": int(pol["pol_si"][b]), "ti": int(pol["pol_ti"][b]),
-                      "cid": str(pol["pol_cid"][b]) or None, "don_k": int(pol["pol_k"][b]),
-                      "v": (float(v) if v is not None else None)}
-                if v is not None:
-                    with CP.defending(cut_opp):
-                        dx = KV.axis_of_move(fam, float(v), sig, str(pol["pol_cid"][b]) or None, cards,
-                                             sc, tok, olp, rt, don_k=int(pol["pol_k"][b]))
-            if w == 1:
-                st, dx = _swap_state(st), _swap_dx(dx)
-            seq.append((st, dx, t, fam,
-                        (tok, ci, float(np.asarray(sc)[SC_MY_LEADER_POWER]) * 1e4 or 5000.0, w, sc,
-                         mv, me[1], op[1])))
-        if len(seq) < 2 or len(z_of) < 2:
-            continue
-        w_first = RL.w_of(*RL.clocks_of(seq[0][0], prof), sigma_rel=sr)
-        w_last = RL.w_of(*RL.clocks_of(seq[-1][0], prof), sigma_rel=sr)
-        stats["w_first_sum"] += w_first; stats["w_last_sum"] += w_last
-        stats["z_sum"] += z_of.get(0, 0.0)
-        stats["terminal_sum"] += z_of.get(0, 0.0) - w_last
-        stats["terminal_abs_sum"] += abs(z_of.get(0, 0.0) - w_last)
-        run = 0.0
-        for (st0, dx0, t0, fam0, bi0), (st1, _dx1, t1, _f1, bi1) in zip(seq, seq[1:]):
-            w0 = RL.w_of(*RL.clocks_of(st0, prof), sigma_rel=sr)
-            w1 = RL.w_of(*RL.clocks_of(st1, prof), sigma_rel=sr)
-            gap = w1 - w0
-            run += gap
-            dx_use = dict(dx0)
-            priced = (RL.w_of(*RL.clocks_of(KV.apply_dx(st0, dx_use), prof), sigma_rel=sr) - w0) if dx_use else 0.0
-            resid = gap - priced
-            stats["gaps"] += 1
-            acc["gap"] += gap; acc["gap_abs"] += abs(gap)
-            acc["priced"] += priced; acc["priced_abs"] += abs(priced)
-            acc["resid"] += resid; acc["resid_abs"] += abs(resid)
-            cause = "turn_boundary" if t1 != t0 else "same_turn"
-            acc["by_cause"][cause] += resid; acc["by_cause_abs"][cause] += abs(resid)
-            if cause == "same_turn":       # 境目を跨ぐ差は「手の型」の話ではないので混ぜない
-                acc["fam_abs"][fam0] = acc["fam_abs"].get(fam0, 0.0) + abs(resid)
-                acc["fam_priced_abs"][fam0] = acc["fam_priced_abs"].get(fam0, 0.0) + abs(priced)
-                acc["fam_n"][fam0] = acc["fam_n"].get(fam0, 0) + 1
-            # **残りを 5 つの軸へ配る**（`priced` が説明した分を引いた状態から `st1` まで）
-            base = KV.apply_dx(st0, dx_use) if dx_use else st0
-            w_base = RL.w_of(*RL.clocks_of(base, prof), sigma_rel=sr)
-            sh = shapley(base, st1, prof, sr)
-            acc["cross_n"][cause] += 1
-            for a, val in sh.items():
-                acc["by_axis"][a] += val; acc["by_axis_abs"][a] += abs(val)
-                acc["cross_abs"][cause][a] += abs(val)
-            if dump is not None and cause == "same_turn" and fam0 == "attack":
-                # **C-1**: 攻撃の型の遷移に、結果の分類（`attack_response.classify`）と軸の配分を添える
-                resp = AR.classify(bi0[4], bi0[0], bi1[4], bi1[0])
-                row_d = {"seed": seed_g, "w": int(bi0[3]), "t": int(t0), "resid_abs": abs(resid),
-                         "resp": resp, "sh": {a: float(v) for a, v in sh.items()}}
-                row_d.update(attack_detail(bi0, bi1, sh, cards))      # **C-5**
-                dump.append(row_d)
-            # **配分の恒等式**: シャープレイ値の和は厳密に `W(st1) − W(base)` に一致する
-            stats["identity_max_err"] = max(stats["identity_max_err"],
-                                            abs(sum(sh.values()) - (w1 - w_base)))
-        stats["identity_max_err"] = max(stats["identity_max_err"], abs(run - (w_last - w_first)))
+        pin = {"decks": TR.deck_list(KV._deck_pair(seat_decks, TR.seed_of(game)))}
+        res = TR.game_call("transition_ledger", game, {"cfg": TR.cfg(theta, mu, prof=prof, sr=float(sr)), "in": pin,
+                                                       "stats": stats, "carry": {"acc": acc}})
+        new_acc = res["carry"]["acc"]
+        acc.clear()
+        acc.update(new_acc)
+        new = res["stats"]
+        stats.clear()
+        stats.update(new)
     n = max(1, stats["gaps"]); ng = max(1, stats["games"])
     tot_abs = max(1e-12, acc["gap_abs"])
     out = {"games": stats["games"], "rows": stats["rows"], "gaps": stats["gaps"],
@@ -422,9 +165,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
            "cross_share": {c: {a: round(acc["cross_abs"][c][a]
                                         / max(1e-12, sum(acc["cross_abs"][c].values())), 4)
                                for a in AXES5} for c in CAUSES}}
-    if CP.joint_on():                     # **N-3**（`flat` では欄を足さない＝出力は旧と同じ）
-        out["cut_price"] = {"mode": CP.CUT_PRICE_MODE,
-                            **{k: v for k, v in stats.items() if str(k).startswith("cut_")}}
+    # **N-3**（値段の窓は `joint` だけ）
+    out["cut_price"] = {"mode": TR.SW["CUT_PRICE_MODE"],
+                        **{k: v for k, v in stats.items() if str(k).startswith("cut_")}}
     return out
 
 
@@ -432,30 +175,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="値段の付いていない遷移を数える（T123・H）")
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--games", type=int, default=0)
-    ap.add_argument("--d-mode", dest="d_mode", choices=KV.D_MODES, default=None)
-    ap.add_argument("--theta-hand", dest="theta_hand", choices=CB.THETA_HAND_MODES, default=None,
-                    help="**H-4** 耐久の手札項（既定 `rule_don`・2026-10-04／旧の既定は `cuttable_forced`）")
-    ap.add_argument("--mirror", choices=("on", "off"), default=None,
-                    help="**H-4g** 自分の耐久も相手と同じ守る側の計算で読む（既定 on・`rule_don` 系のときだけ効く）")
-    TO.add_attack_ability_arg(ap)
-    TO.add_passive_body_arg(ap)
-    import effect_value as _EV
-    _EV.add_f_pricing_fixes_arg(ap)
-    CP.add_cut_price_arg(ap)                       # **N-3**
-    TO.add_defender_power_arg(ap)                  # 2b
     ap.add_argument("--json", default="")
     a = ap.parse_args(argv)
-    CP.apply_cut_price(a)
-    TO.apply_defender_power(a)                     # 2b
-    TO.apply_attack_ability(a)
-    TO.apply_passive_body(a)
-    _EV.apply_f_pricing_fixes(a)
-    if a.d_mode:
-        KV.set_d_mode(a.d_mode)
-    if a.theta_hand:
-        CB.set_theta_hand_mode(a.theta_hand)           # **H-4**
-    if a.mirror:
-        RL._TBm.MIRROR_ME = (a.mirror == "on")        # **H-4g**
     out = collect(a.src, a.games)
     print(json.dumps(out, ensure_ascii=False, indent=2))
     if a.json:
