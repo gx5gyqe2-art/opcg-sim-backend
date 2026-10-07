@@ -5,7 +5,7 @@
 //!
 //! 計画 `docs/reports/2026-10-06_full_port_plan.md` §4.2 段 4・報告 `docs/reports/2026-10-07_port_stage4.md`。
 //! **値は 1 ビットも変えない**（M-2 は段 7 の後）。既定の枝だけ（`THETA_HAND_MODE=rule_don`・`THETA_SIDE_MODE=legacy`／`symmetric`・
-//! `OPCG_RD_KERNEL=rs`）。浮動小数の演算の順・`sum` の int の 0 から始まる足し方・`max`／`min` の同点は Python と同じ。
+//! 守る側の計算は Rust の核）。浮動小数の演算の順・`sum` の int の 0 から始まる足し方・`max`／`min` の同点は Python と同じ。
 //!
 //! **履歴に依る覚え書き（癖ごと写した）**: 攻め手の財布ごとの `_gain`（鍵 `(round(x, 3), k)`・先に書いた方が勝つ）・
 //! `_RULE_DON_CACHE`（鍵に `actx["key"]`＝12 桁に丸めた値の表・10 万で全部捨てる）・`_RULE_PLAN_CACHE`（鍵は正確・20 万で捨てる）。
