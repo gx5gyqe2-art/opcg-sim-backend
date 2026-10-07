@@ -133,6 +133,17 @@ def _seat_decks(dirs):
     return sd
 
 
+def use_table_w_bar(dirs):
+    """**`κ = w(D)/w̄` の分母を表の実測にする**（2026-10-08・ユーザ決定 10-05／06／08）。
+
+    `κ` は「この局面の傾き ÷ **平均の**傾き」なので、分母は定義上 `E[w(D)]`＝表の `w_bar`。
+    **`theory_bridge` と同じ規約**（`crossing_bridge.w_bar_for`＝耐久の形ごと・測る記録と別のセット）で引いて
+    `theory_rs.set_w_bar` する。引けなければ（記録の種類が判らない・表に無い）閉じた形 `0.5/R` に戻す
+    ——**前の器が入れた値を黙って使い回さない**。返り値は使った分母。"""
+    wb = CB.w_bar_for(dirs)
+    return TR.set_w_bar(wb if wb is not None else 0.5 / TR.R_TURNS)
+
+
 def _deck_of(seat_decks, seed, w):
     """`(seed, 席)` → その席のデッキの card id 列（無ければ `None`）。"""
     if not seat_decks:
@@ -191,6 +202,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
         if sr is None:
             raise ValueError("W_ERR_MODE=rel なのに σ_rel が引けない＝黙って abs に落とさない")
         TR.set_sigma_rel(sr)
+    w_bar = use_table_w_bar(dirs)        # `scalar` の腕の `κ` の分母（表の実測・別のセット）
     seat_decks = _seat_decks(dirs)
     arms = {k: [] for k in ("flat", "scalar", "vector", "exact", "exactw",
                             "plac_axis", "plac_mag")}
@@ -228,6 +240,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
            "tau_opp_mean": round(stats["tau_opp_sum"] / n, 4),
            "sigma_rel": (round(sr, 4) if sr is not None else None),
            "w_err_mode": TR.CLOCK["W_ERR_MODE"],
+           # `κ` の分母と、`κ` の行の平均（定義上の値は 1）
+           "w_bar": round(w_bar, 4),
+           "kappa_mean": round(stats.get("kappa_sum", 0.0) / n, 4),
            "by_family": stats["by_family"], "by_axis": stats["by_axis"],
            "arms": {kk: _score(arms[kk], zs) for kk in arms}}
     return out

@@ -51,3 +51,21 @@ def test_calibration_sep_scales_with_the_ledger():
 
 def test_calibration_is_none_without_both_labels():
     assert RL.calib_of([1.0, 2.0], [1.0, 1.0], [0.5, 0.5])["sep"] is None
+
+
+def test_kappa_denominator_is_the_tables_cross_set_w_bar():
+    """**`κ = w(D)/w̄` の分母は表の実測 `w_bar`**（2026-10-08）——実の記録には合成のセットの値
+    （`theory_bridge` と同じ別のセットの規約）。既定の式の検算（値は表から読む・数を固定しない）。"""
+    import crossing_bridge as CB
+    import json as _json
+    import theory_rs as TR
+    rec = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "f_identity", "rec")
+    with open(CB.HARM_PROFILE_PATH, encoding="utf-8") as fh:
+        want = float(_json.load(fh)["w_bar"][CB.THETA_BODY_MODE]["syn"])     # 実の記録 → 合成の値
+    old = TR.CLOCK["W_BAR"]
+    try:
+        assert CB.record_kind([rec]) == "real"
+        assert RL.KV.use_table_w_bar([rec]) == pytest.approx(want)
+        assert TR.CLOCK["W_BAR"] == pytest.approx(want)
+    finally:
+        TR.set_w_bar(old)

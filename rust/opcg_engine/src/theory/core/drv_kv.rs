@@ -241,7 +241,10 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         stats.addf("g_opp_sum", grad[1].abs());
         let sgn = if w == 0 { 1.0 } else { -1.0 };
         acc[0] += v * sgn;
-        acc[1] += v * sgn * lt::state_factor(&cfg.clock, d, true, None, None, "hyp");
+        // `scalar` の腕の `κ = w(D)/w̄`（分母は Python が表の実測を `clock.W_BAR` に入れる）——平均の検算に積む
+        let kap = lt::state_factor(&cfg.clock, d, true, None, None, "hyp");
+        stats.addf("kappa_sum", kap);
+        acc[1] += v * sgn * kap;
         acc[2] += wd * rw::dot(&grad, &dx) * sgn;
         let st1 = rw::apply_dx(&st0, &dx);
         let d1 = rw::d_of(&st1, &prof);

@@ -20,7 +20,7 @@
 | **絶対額の価格** | `abs_flat`（T121 の勝者） | `plac_K`（法則の重みだけ・相対化しない） |
 | **相対変化** | `rel_flat`（相対化だけ） | **`rel_K`（法則そのもの）** |
 
-* `abs_kappa` … **出荷の帳簿**（`κ = w(D)/w̄`）
+* `abs_kappa` … **出荷の帳簿**（`κ = w(D)/w̄`・分母 `w̄` は表の実測〔`kappa_vector.use_table_w_bar`・2026-10-08〕）
 * `rel_exact` … **一次近似をやめる**（`Φ(z') − Φ(z)` を直に引く・P3）
 * `plac_shift` … **プラセボ**: `K` を**前の局の同じ行番号**から取る（重みと局面の結びつきだけ壊す）
 
@@ -130,6 +130,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
     if sr is None:
         raise ValueError("σ_rel が引けない＝黙って別の物差しに落とさない（T118 の規約）")
     TR.set_sigma_rel(sr)
+    w_bar = KV.use_table_w_bar(dirs)      # `abs_kappa` の `κ` の分母（表の実測・別のセット・`theory_bridge` と同じ規約）
     seat_decks = KV._seat_decks(dirs)     # **T128**: `A` の流入・効果はデッキの中身から出る
     arms = {k: [] for k in ARMS}
     # **決着帯を外した帯**（最後の自席ターンを落とす）＝勝敗がまだ決まっていない所での判別
@@ -180,6 +181,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
            "last_turn_rows": stats["last_turn_rows"],
            "capped_share": round(stats["capped"] / n, 4),
            "K_mean": round(stats["k_sum"] / n, 4),
+           # `abs_kappa` の `κ = w(D)/w̄` の分母と、`κ` の行の平均（定義上の値は 1）
+           "w_bar": round(w_bar, 4),
+           "kappa_mean": round(stats.get("kappa_sum", 0.0) / n, 4),
            # `r` は片側の時計が 0 に行く行で発散するので**中央値**で読む（平均は尾に支配される）
            "r_median": round(float(np.median(rs)) if rs else 0.0, 4),
            "dlog_abs_mean": round(stats["dlog_abs_sum"] / n, 5),
