@@ -251,7 +251,7 @@ SOLVER_FINGERPRINTS = {
     "rd-speed-3": "9e21fec15160dcda",     # Rust 化・第 3 段（2026-10-05）: 速くした Python の解き方を消した（値は不変）
     "rd-speed-4": "1b96139ac93cffad",     # 全移植・段 1／2（2026-10-06）: `src/theory` に葉を足した（解き方の値は不変）
     "rd-speed-5": "92b35884614a0123",     # 全移植・段 3（2026-10-07）: 原文のハッシュを守る側の 8 ファイルだけに（値は不変）
-    "rd-speed-6": "bd93a863e1c99d9d",                # 全移植・段 4（2026-10-07）: 外側を Rust にも写した（Rust の外側の原文が指紋に入る・値は不変）
+    "rd-speed-6": "283ac8199f1925bd",                # 全移植・段 4（2026-10-07）: 外側を Rust にも写した（Rust の外側の原文が指紋に入る・値は不変）
 }
 _SOLVER_FUNCS = ("rule_guard_plan_ex", "_prices_of", "_attach_gain", "rules_steps", "walk_crossing", "model_horizon",
                  "tau_grow", "rule_don_solve", "_rd_solve_args", "_rd_run", "_rule_don_masks")
