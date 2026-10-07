@@ -194,6 +194,31 @@ fn full_core_capture_replays_bit_identically_when_given() {
 fn stage2_leaves_with_the_rust_core_replay_bit_identically() {
     load_tables();
     let text = String::from_utf8(gunzip(&fixture("theory_leaves_golden.jsonl.gz"))).unwrap();
+    stage2_with_core(&text, 100);
+}
+
+/// 手で回す: 段 2 の間引く前の全部の記録（`OPCG_THEORY_CAPTURE_REPLAY_CORE=<dir>`）の核に頼る葉を Rust の核で。
+#[test]
+fn stage2_full_capture_with_the_rust_core_when_given() {
+    let Ok(root) = std::env::var("OPCG_THEORY_CAPTURE_REPLAY_CORE") else { return };
+    load_tables();
+    let mut text = String::new();
+    for src in std::fs::read_dir(&root).unwrap().flatten() {
+        if !src.path().is_dir() {
+            continue;
+        }
+        for tool in std::fs::read_dir(src.path()).unwrap().flatten() {
+            for leaf in ["dr.a_of.jsonl", "to.leader_power_opp_turn.jsonl", "to.defender_power.jsonl"] {
+                if let Ok(t) = std::fs::read_to_string(tool.path().join(leaf)) {
+                    text.push_str(&t);
+                }
+            }
+        }
+    }
+    stage2_with_core(&text, 1);
+}
+
+fn stage2_with_core(text: &str, min_n: usize) {
     let mut n = 0;
     let mut bad = Vec::new();
     with_core(|c| {
@@ -214,8 +239,9 @@ fn stage2_leaves_with_the_rust_core_replay_bit_identically() {
             }
         }
     });
+    eprintln!("段 2 の核に頼る葉を Rust の核で: {n} 行・不一致 {}", bad.len());
     assert!(bad.is_empty(), "{} / {n}:\n{}", bad.len(), bad[..bad.len().min(10)].join("\n"));
-    assert!(n > 100, "核に頼る葉の記録が少なすぎる: {n}");
+    assert!(n > min_n, "核に頼る葉の記録が少なすぎる: {n}");
 }
 
 #[test]
