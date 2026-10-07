@@ -5,18 +5,27 @@
 `<記録の根>/<組>/<源>/<器>.rows.jsonl.gz`（組＝`main`〔既定の枝〕・`cand_opp`・`cand_mis`・`cand_misp`・`cand_joint`〔残す候補・`rec`〕、
 源＝`rec`・`w41`・`w39`）。1 ファイル＝1 プロセス＝**1 列**（`<組>/<源>/<器>`）。
 
-**間引きの規則**（固定）: 列は**丸ごと**入れる（覚え書きが局をまたいで育つ＝列の途中の 1 局だけを抜くと値が変わりうる・
-1 局目から切った前半なら正しい）。列の数が予算（`BUDGET` バイト・gzip 後の見積もり）を超えるなら、組 `main` の列を全部、
-残りは列の名前の CRC32 の小さい順に予算まで。局の枠（列の型とバイト）は字句ごとに 1 度だけ `{"frame_def": <番号>, "frame": …}` で
-書き、呼び出しの行は `"fref": <番号>` で指す（同じ局を何本もの器が読むので）。移植の間だけの道具（段 7 で消す）。
+**間引きの規則**（固定）: 覚え書きは局をまたいで育つので、列は**頭から**切る（局の駆動の行は先頭の `N` 本・`N` は下の表・
+表に無い列は入れない）。行の関数（`fn:*`＝`probs_of`・`clock_scale`）は核の状態を読みも書きもしない＝列のどこに在っても全部入れる。
+`cargo test` は debug で回るので、重い局の駆動（交点の橋・`theory_bridge`・`relative_ledger`）は `main/rec` の 1 局目だけ、
+軽いもの（`kappa_vector`・`transition_ledger`・`price_realised`・決着の旗〔`win_calib` の列の `lethal_rule`〕）は全部。
+局の枠（列の型とバイト）は字句ごとに 1 度だけ `{"frame_def": <番号>, "frame": …}` で書き、呼び出しの行は `"fref": <番号>` で指す
+（同じ局を何本もの器が読むので）。全部の記録の再生は `OPCG_THEORY_ROWS_REPLAY`（手で回す）。移植の間だけの道具（段 7 で消す）。
 """
 import gzip
 import json
 import os
 import sys
-import zlib
 
-BUDGET = 9_000_000
+ALL = 10 ** 9
+CHEAP = {"kappa_vector": ALL, "transition_ledger": ALL, "price_realised": ALL}
+#: `(組, 源)` → `{器: 局の駆動の行の本数}`（`win_calib`・`pre_settle_asymmetry` の列は決着の旗の行が先に並ぶ）
+PREFIX = {
+    ("main", "rec"): dict(CHEAP, theory_bridge=1, relative_ledger=1, crossing_bridge=1, win_calib=2, pre_settle_asymmetry=2),
+    ("main", "w41"): dict(CHEAP, win_calib=5),
+    ("main", "w39"): dict(CHEAP, win_calib=5),
+    ("cand_opp", "rec"): CHEAP, ("cand_mis", "rec"): CHEAP, ("cand_misp", "rec"): CHEAP, ("cand_joint", "rec"): CHEAP,
+}
 
 
 def _dumps(v):
@@ -35,7 +44,7 @@ def seqs_of(root):
                 continue
             for f in sorted(os.listdir(sd)):
                 if f.endswith(".rows.jsonl.gz"):
-                    out.append(("%s/%s/%s" % (grp, src, f[: -len(".rows.jsonl.gz")]), os.path.join(sd, f)))
+                    out.append((grp, src, f[: -len(".rows.jsonl.gz")], os.path.join(sd, f)))
     return out
 
 
@@ -44,52 +53,43 @@ def build(root, dst):
     if not seqs:
         raise SystemExit("記録が無い: %s" % root)
     frames = {}
-    blocks = []
-    for name, path in seqs:
-        lines = []
-        with gzip.open(path, "rt", encoding="utf-8") as fh:
-            for ln in fh:
-                if ln.strip():
-                    lines.append(json.loads(ln))
-        body = []
-        for rec in lines:
-            out = {"seq": name, "tool": rec["tool"], "game": rec["game"]}
-            if "frame" in rec:
-                key = _dumps(rec["frame"])
-                if key not in frames:
-                    frames[key] = len(frames)
-                out["fref"] = frames[key]
-            out["payload"] = rec["payload"]
-            out["result"] = rec["result"]
-            body.append(_dumps(out))
-        txt = "\n".join(body) + "\n"
-        blocks.append((name, txt, len(zlib.compress(txt.encode("utf-8"), 6))))
-    # 予算: `main` を全部 → 残りは CRC32 の順
-    main = [b for b in blocks if b[0].startswith("main/")]
-    rest = sorted((b for b in blocks if not b[0].startswith("main/")), key=lambda b: zlib.crc32(b[0].encode("utf-8")))
-    chosen, used = [], 0
-    fsz = sum(len(zlib.compress(k.encode("utf-8"), 6)) for k in frames)
-    used = fsz
-    for b in main + rest:
-        if b in rest and used + b[2] > BUDGET:
-            continue
-        chosen.append(b)
-        used += b[2]
-    need = set()
-    for _n, txt, _s in chosen:
-        for ln in txt.splitlines():
-            j = json.loads(ln)
-            if "fref" in j:
-                need.add(j["fref"])
+    out_lines = []
+    report = []
+    for grp, src, tool, path in seqs:
+        n_max = PREFIX.get((grp, src), {}).get(tool, 0)
+        name = "%s/%s/%s" % (grp, src, tool)
+        kept = drv = 0
+        if n_max:
+            with gzip.open(path, "rt", encoding="utf-8") as fh:
+                for ln in fh:
+                    if not ln.strip():
+                        continue
+                    rec = json.loads(ln)
+                    is_fn = "frame" not in rec
+                    if not is_fn:
+                        if drv >= n_max:
+                            continue
+                        drv += 1
+                    o = {"seq": name, "tool": rec["tool"], "game": rec["game"]}
+                    if not is_fn:
+                        key = _dumps(rec["frame"])
+                        if key not in frames:
+                            frames[key] = len(frames)
+                        o["fref"] = frames[key]
+                    o["payload"] = rec["payload"]
+                    o["result"] = rec["result"]
+                    out_lines.append(_dumps(o))
+                    kept += 1
+        report.append((name, kept))
     with gzip.open(dst, "wt", encoding="utf-8", compresslevel=9) as fh:
         for key, i in frames.items():
-            if i in need:
-                fh.write(_dumps({"frame_def": i, "frame": json.loads(key)}) + "\n")
-        for _n, txt, _s in sorted(chosen, key=lambda b: b[0]):
-            fh.write(txt)
-    print("列 %d／%d・局の枠 %d・%s %d バイト" % (len(chosen), len(blocks), len(need), dst, os.path.getsize(dst)))
-    for n, _t, s in sorted(blocks):
-        print("  %s %s %d" % ("+" if any(c[0] == n for c in chosen) else "-", n, s))
+            fh.write(_dumps({"frame_def": i, "frame": json.loads(key)}) + "\n")
+        for ln in out_lines:
+            fh.write(ln + "\n")
+    print("列 %d／%d・行 %d・局の枠 %d・%s %d バイト" % (sum(1 for _n, k in report if k), len(report), len(out_lines), len(frames),
+                                                  dst, os.path.getsize(dst)))
+    for n, k in report:
+        print("  %s %s %d" % ("+" if k else "-", n, k))
 
 
 if __name__ == "__main__":

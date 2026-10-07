@@ -66,13 +66,19 @@ type Per = Vec<(String, usize, usize)>;
 
 /// 列（1 プロセスの記録）を新しい核で頭から解く
 fn replay_seq<'a>(lines: impl Iterator<Item = &'a str>, frames: &HashMap<i64, PyVal>, per: &mut Per, bad: &mut Vec<String>, label: &str) {
+    let t0 = std::time::Instant::now();
+    let mut n = 0usize;
     with_core(|c| {
         *c = Core::new();
         for line in lines {
             if line.trim().is_empty() {
                 continue;
             }
+            let t1 = std::time::Instant::now();
             let (tool, ok, why) = replay_one(c, line, frames);
+            if std::env::var("OPCG_THEORY_ROWS_TIMES").is_ok() {
+                eprintln!("    {label} #{n} {tool} {:.3} 秒", t1.elapsed().as_secs_f64());
+            }
             let e = match per.iter_mut().find(|e| e.0 == tool) {
                 Some(e) => e,
                 None => {
@@ -81,6 +87,7 @@ fn replay_seq<'a>(lines: impl Iterator<Item = &'a str>, frames: &HashMap<i64, Py
                 }
             };
             e.1 += 1;
+            n += 1;
             if !ok {
                 e.2 += 1;
                 if bad.len() < 10 {
@@ -89,23 +96,12 @@ fn replay_seq<'a>(lines: impl Iterator<Item = &'a str>, frames: &HashMap<i64, Py
             }
         }
     });
+    eprintln!("  列 {label}: {n} 行・{:.2} 秒", t0.elapsed().as_secs_f64());
 }
 
-/// 記録に 1 行も無ければ落ちる呼び手
-const TOOLS: &[&str] = &[
-    "kappa_vector",
-    "transition_ledger",
-    "relative_ledger",
-    "price_realised",
-    "crossing_bridge",
-    "lethal_rule",
-    "theory_bridge",
-    "fn:wc.probs_of",
-    "fn:to.clock_scale",
-];
-
-#[test]
-fn recorded_game_drivers_replay_bit_identically() {
+/// golden の列を `want(列の名前)` で選んで解き直す。`tools`＝1 行も無ければ落ちる呼び手。
+/// 列の組ごとに別の試験にする（`cargo test` は debug で回る＝試験ごとに別の糸で並ぶ）。
+fn golden_part(want: impl Fn(&str) -> bool, tools: &[&str]) {
     super::tests_core::load_tables();
     let text = String::from_utf8(gunzip(&fixture("theory_rows_golden.jsonl.gz"))).unwrap();
     // 列ごとにまとめる（記録の順を保つ）
@@ -118,6 +114,9 @@ fn recorded_game_drivers_replay_bit_identically() {
             continue;
         }
         let s = j.get("seq").and_then(|v| v.as_str()).unwrap().to_string();
+        if !want(&s) {
+            continue;
+        }
         match seqs.iter_mut().find(|e| e.0 == s) {
             Some(e) => e.1.push(line),
             None => seqs.push((s, vec![line])),
@@ -130,9 +129,40 @@ fn recorded_game_drivers_replay_bit_identically() {
     let total: usize = per.iter().map(|e| e.1).sum();
     eprintln!("局の駆動の golden: {} 列・{total} 行・{per:?}", seqs.len());
     assert!(bad.is_empty(), "記録と違う局の駆動（先頭 10）:\n{}", bad.join("\n"));
-    for t in TOOLS {
+    for t in tools {
         assert!(per.iter().any(|x| x.0 == *t && x.1 > 0), "{t} の記録が無い");
     }
+}
+
+fn heavy(s: &str) -> bool {
+    s.ends_with("/theory_bridge") || s.ends_with("/relative_ledger") || s.ends_with("/crossing_bridge")
+}
+
+/// `theory_bridge` の局の駆動（`main/rec` の 1 局目）
+#[test]
+fn recorded_theory_bridge_replays_bit_identically() {
+    golden_part(|s| s.ends_with("/theory_bridge"), &["theory_bridge"]);
+}
+
+/// 交点の橋と `relative_ledger` の局の駆動（`main/rec` の 1 局目）
+#[test]
+fn recorded_crossing_and_relative_replay_bit_identically() {
+    golden_part(|s| s.ends_with("/relative_ledger") || s.ends_with("/crossing_bridge"), &["relative_ledger", "crossing_bridge"]);
+}
+
+/// 既定の枝の軽い局の駆動（`kappa_vector`・`transition_ledger`・`price_realised`・決着の旗）と行の関数（3 入力）
+#[test]
+fn recorded_light_drivers_and_row_fns_replay_bit_identically() {
+    golden_part(
+        |s| s.starts_with("main/") && !heavy(s),
+        &["kappa_vector", "transition_ledger", "price_realised", "lethal_rule", "fn:wc.probs_of", "fn:to.clock_scale"],
+    );
+}
+
+/// 残す候補 4 つ（ドンの付け違いの費用 3 つ・`SEARCH_VALUE_MODE=joint`）の軽い局の駆動（`rec`）
+#[test]
+fn recorded_candidates_replay_bit_identically() {
+    golden_part(|s| s.starts_with("cand_"), &["kappa_vector", "transition_ledger", "price_realised"]);
 }
 
 /// 手で回す: 間引く前の全部の記録（`OPCG_THEORY_ROWS_REPLAY=<dir>`・`<dir>` の下の `*.rows.jsonl.gz`）。

@@ -15,8 +15,8 @@
    比べる（`OPCG_THEORY_OUTER=both`・核も `both`）と、外側も核も Rust だけで解く（`rs`）。どちらも出力の JSON は普段の起動と
    1 バイト同じ（`rule_stats` も）。記録したビットの再生は `cargo test`（`theory::core::tests_outer`）。
 5. 行の読みと局の駆動（段 5／6・2026-10-07・`docs/reports/2026-10-07_port_stage5_6.md`）: 8 本の器を `rec` で、`collect` の
-   1 局ぶんを Python と Rust の両方で解いて比べる（`OPCG_THEORY_ROWS=both`・核と外側は Python）と、Rust だけで解く（`rs`）。
-   どちらも出力の JSON は普段の起動と 1 バイト同じ（`rule_stats` も）。記録したビットの再生は `cargo test`（`theory::core::tests_rows`）。
+   1 局ぶんを Rust だけで解く（`OPCG_THEORY_ROWS=rs`）。出力の JSON は普段の起動と 1 バイト同じ（`rule_stats` も）。
+   記録したビットの再生は `cargo test`（`theory::core::tests_rows`）。
 """
 import json
 import os
@@ -159,13 +159,11 @@ def _run_rows(tool, extra, mode, tmp_path):
 
 
 @pytest.mark.parametrize("tool,extra", ROWS_TOOLS)
-def test_rows_both_and_rs_modes_keep_the_output(tool, extra, tmp_path):
-    """段 5／6: 器の `collect` の 1 局ぶんを両方で解いても（行の表・`stats`・計数の増分の不一致 0）・Rust だけで解いても、
-    出力は普段の起動と 1 バイト同じ（`rule_stats` も）。"""
+def test_rows_rs_mode_keeps_the_output(tool, extra, tmp_path):
+    """段 5／6: 器の `collect` の 1 局ぶんを Rust だけで解いても（`OPCG_THEORY_ROWS=rs`）、出力は普段の起動と 1 バイト同じ
+    （`rule_stats` も）。両方で解いて比べる運転（`both`）は 8 器 × 3 入力と残す候補 4 つで報告に記録し、記録したビットの再生は
+    `cargo test`（`theory::core::tests_rows`）が見る——ここは差し替えの配線（器ごとの局の駆動）の番人。"""
     plain, _ = _run_rows(tool, extra, "py", tmp_path)
-    both, n_b = _run_rows(tool, extra, "both", tmp_path)
     rs, n_r = _run_rows(tool, extra, "rs", tmp_path)
-    if tool != "pre_settle_asymmetry":           # 段 5 の器のうち `rows_with_p` だけの器は局の駆動を通らない
-        assert n_b >= 2 and n_r >= 2, (n_b, n_r)
-    assert json.dumps(plain, sort_keys=True) == json.dumps(both, sort_keys=True)
+    assert n_r >= 2, n_r
     assert json.dumps(plain, sort_keys=True) == json.dumps(rs, sort_keys=True)
