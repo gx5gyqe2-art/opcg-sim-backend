@@ -23,6 +23,17 @@
 )]
 
 pub mod curve;
+pub mod drive;
+pub mod drv_cb;
+pub mod drv_kv;
+pub mod drv_lr;
+pub mod drv_pr;
+pub mod drv_rl;
+pub mod drv_tb;
+pub mod drv_tl;
+pub mod game;
+pub mod pd;
+pub mod rows;
 pub mod entry;
 pub mod entry_outer;
 pub mod ev;

@@ -116,6 +116,26 @@ fn theory_leaf_call_core(name: &str, payload: &str) -> PyResult<String> {
     Ok(capture_string(&r))
 }
 
+/// **段 6**: 1 局ぶんの局の駆動（`payload`＝記録の形の `{"tool", "g", "cfg", "in", "stats", "carry"}`）。
+/// 戻り＝記録の形の `{"stats", "out", "carry"?, "ev"?, "cs"}`（`core::drive`）。覚え書きは局をまたいで生きる。
+#[pyfunction]
+fn theory_game_call(frame: PyRef<'_, PyFrame>, payload: &str) -> PyResult<String> {
+    use super::core::obj::{from_pyval, to_pyval};
+    let p = from_pyval(&super::pyval::from_capture(&parse_json(payload).map_err(verr)?));
+    let g = super::core::game::Game::of(&frame.inner).map_err(verr)?;
+    let out = super::core::state::with_core(|c| super::core::drive::run(c, &g, &p)).map_err(verr)?;
+    Ok(capture_string(&to_pyval(&out)))
+}
+
+/// **段 5**: 局をまたがない行の関数（`win_calib.probs_of` ほか・`payload`＝`{"fn", "cfg", …}`）。
+#[pyfunction]
+fn theory_rows_call(payload: &str) -> PyResult<String> {
+    use super::core::obj::{from_pyval, to_pyval};
+    let p = from_pyval(&super::pyval::from_capture(&parse_json(payload).map_err(verr)?));
+    let out = super::core::state::with_core(|c| super::core::drive::rows_call(c, &p)).map_err(verr)?;
+    Ok(capture_string(&to_pyval(&out)))
+}
+
 /// 1 局の枠（記録の列を生のバイトのまま持つ）。段 6 で局の駆動がこれを読む。
 #[pyclass(unsendable, name = "TheoryFrame")]
 pub struct PyFrame {
@@ -199,5 +219,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(theory_core_reset, m)?)?;
     m.add_function(wrap_pyfunction!(theory_outer_version, m)?)?;
     m.add_function(wrap_pyfunction!(theory_leaf_call_core, m)?)?;
+    m.add_function(wrap_pyfunction!(theory_game_call, m)?)?;
+    m.add_function(wrap_pyfunction!(theory_rows_call, m)?)?;
     Ok(())
 }

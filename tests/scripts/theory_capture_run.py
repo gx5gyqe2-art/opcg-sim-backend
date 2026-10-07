@@ -5,7 +5,9 @@
 
 環境変数: `OPCG_THEORY_SET`＝器の前に実行する Python の文（残す候補の切替）。段 2 の葉の記録・両方で解く運転は `theory_capture.install`（`OPCG_THEORY_CAPTURE`・`OPCG_THEORY_BOTH`）、
 段 3 の核の切替と記録は `theory_core_rs.install`（`OPCG_THEORY_CORE=py|rs|both`・`OPCG_THEORY_CORE_CAPTURE`）、
-段 4 の守る側の外側と耐久は `theory_outer_rs`（`OPCG_THEORY_OUTER`・省略時は `OPCG_THEORY_CORE` と同じ）。
+段 4 の守る側の外側と耐久は `theory_outer_rs`（`OPCG_THEORY_OUTER`・省略時は `OPCG_THEORY_CORE` と同じ）、
+段 5／6 の行の読みと局の駆動は `theory_rows_rs`（`OPCG_THEORY_ROWS=py|rs|both`・既定 `py`・`rs`／`both` のとき Python の側の
+核と外側は Python のまま＝`OPCG_THEORY_CORE`／`OPCG_THEORY_OUTER` は `py` に限る）。
 核を差し替えるときは、器の原文を「`if __name__ == "__main__":` の塊」とそれ以外に分けて、前を実行 → 器自身の写しの入口を
 差し替え → 塊を実行する（器自身が持つ入口〔`theory_bridge.joint_valuer`〕も同じ道を通す）。移植の間だけの道具（段 7 で消す）。
 """
@@ -65,6 +67,12 @@ def main():
     setp = os.environ.get("OPCG_THEORY_SET")
     if setp:
         exec(setp, {})                    # 残す候補の切替（例 `import theory_order as T; T.set_attack_don_cost_mode("misalloc")`）
+    rows = os.environ.get("OPCG_THEORY_ROWS") or "py"
+    if rows != "py":
+        if core:
+            raise SystemExit("OPCG_THEORY_ROWS=%s は OPCG_THEORY_CORE／OPCG_THEORY_OUTER=py（と記録なし）とだけ組む" % rows)
+        import theory_rows_rs as TRR
+        TRR.install(rows)
     if core:
         import theory_core_rs as TCR
         TCR.install()
