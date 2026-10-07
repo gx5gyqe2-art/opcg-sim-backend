@@ -93,7 +93,7 @@ fn join_top(kv: &[(String, String)]) -> String {
 }
 
 /// 欄 `k` を `v` に（無ければ足さない）・`pre` は外す。変えたか。
-fn set_field(kv: &mut Vec<(String, String)>, k: &str, v: &PyVal) -> bool {
+fn set_field(kv: &mut [(String, String)], k: &str, v: &PyVal) -> bool {
     let Some(e) = kv.iter_mut().find(|(a, _)| a == k) else { return false };
     let old = from_capture(&parse_json(&e.1).expect("欄の JSON"));
     if old.same(v) {
@@ -261,7 +261,7 @@ fn regen_rows() {
                 let got = out.unwrap_or_else(|e| panic!("{s} {tool}: {e}"));
                 let mut kv = split_top(line);
                 let ch = set_field(&mut kv, "result", &got);
-                bump(&mut per, &format!("{s}"), ch);
+                bump(&mut per, s, ch);
                 if ch {
                     new_line.insert(n, join_top(&kv));
                 }
