@@ -54,6 +54,8 @@ mod tests_core;
 #[cfg(test)]
 mod tests_outer;
 #[cfg(test)]
+mod tests_memo;
+#[cfg(test)]
 mod tests_regen;
 #[cfg(test)]
 mod tests_rows;

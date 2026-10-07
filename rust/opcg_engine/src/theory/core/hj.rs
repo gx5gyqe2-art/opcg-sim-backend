@@ -294,6 +294,11 @@ impl JointValuer {
         Ok(super::super::numeric::py_max(0.0, a - b))
     }
 
+    /// 手札を読み直す物か（値が核の文脈に依る）
+    pub fn rereads(&self) -> bool {
+        matches!(&self.src, PlanSrc::Hand { reread: true, .. })
+    }
+
     pub fn counters(&self) -> &[f64] {
         &self.counters
     }

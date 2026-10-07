@@ -59,3 +59,19 @@ OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_audit_replay.py \
 **固定の正本**（Python の最後の出力の写し）で、Python 無しで `cargo test` が解き直す。**式を意図して変えたら**記録を取り直す道具は
 もう無いので、変えた Rust の出力で作り直し（golden は「その時点の Rust の出力」になる＝正しさの独立した証拠ではない）、
 差分を必ずレビューする。旧い Python は凍結ブランチ `claude/theory-switches-final` と履歴で辿れる。
+
+### 覚え書きの鍵を正確にした作り直し（2026-10-07・`docs/reports/2026-10-07_memo_exact.md`）
+
+値付けの核・外側・局の駆動の覚え書きの鍵を全部正確にした（丸めた鍵・文脈の抜け・先勝ちの共有をやめた）ので、
+`theory_core_golden`・`theory_outer_golden`・`theory_rows_golden` の**戻りの欄**（`r`・`cs`・`ev`／`result`）を Rust の出力で作り直した
+（入力の欄は 1 文字も変えていない・記録の再生で前もって入れる覚え書き `pre` は読まなくなったので全部の行から外した）。
+`theory_leaves_golden`・`rd_*_golden` は覚え書きを通らないので変わらない。作り直しの器は Rust だけで回る:
+
+```bash
+cd rust/opcg_engine
+OPCG_THEORY_GOLDEN_WRITE=1 cargo test --no-default-features tests_regen -- --include-ignored --nocapture
+```
+
+（`OPCG_THEORY_GOLDEN_WRITE` が無ければ書き換える行を数えるだけ。各行を試験と同じ道〔`tests_core`／`tests_outer`／`tests_rows` の
+`run_one`〕で解き、戻りが違う行だけ書き換える。**golden は「その時点の Rust の出力」**＝作り直したら差分を必ずレビューする。）
+
