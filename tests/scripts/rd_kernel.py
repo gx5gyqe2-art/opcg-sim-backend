@@ -58,15 +58,21 @@ _GLOB = {"d": None}
 # ----------------------------------------------------------------------------------------------
 # wheel の確認
 
+#: 守る側の計算の原文（`build.rs` の `KERNEL_FILES` と同じ・全移植の段 3〔2026-10-07〕から理論の移植のファイルは入れない）
+KERNEL_FILES = ("defender.rs", "layers.rs", "numeric.rs", "plans.rs", "pyapi.rs", "sched.rs", "succ.rs", "table.rs")
+
+
 def source_hash(root=None):
-    """`rust/opcg_engine/src/theory/**/*.rs` の原文のハッシュ（`build.rs` と同じ式: FNV-1a 64・相対パス順）。木が無ければ None。"""
+    """`rust/opcg_engine/src/theory/` の守る側の計算の原文（`KERNEL_FILES`）のハッシュ（`build.rs` と同じ式: FNV-1a 64・
+    相対パス順）。木が無ければ None。"""
     base = root or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "rust", "opcg_engine",
                                 "src", "theory")
     base = os.path.abspath(base)
     if not os.path.isdir(base):
         return None
     files = sorted(os.path.relpath(p, base).replace(os.sep, "/")
-                   for p in glob.glob(os.path.join(base, "**", "*.rs"), recursive=True))
+                   for p in glob.glob(os.path.join(base, "**", "*.rs"), recursive=True)
+                   if os.path.relpath(p, base).replace(os.sep, "/") in KERNEL_FILES)
     h = 0xcbf29ce484222325
     for rel in files:
         with open(os.path.join(base, rel), "rb") as fh:
