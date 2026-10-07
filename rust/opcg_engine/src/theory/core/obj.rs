@@ -372,6 +372,26 @@ pub fn key_of(v: &V) -> K {
     }
 }
 
+/// `V` → **正確な**鍵（dict・numpy の配列も中身ごと・2026-10-07）。数は `key_of` と同じ（型をまたいで値で・`-0.0 == 0.0`）。
+/// dict は挿入順の (鍵, 値) の並び（同じ中身でも順が違えば別の鍵＝当たりが減るだけで値は変わらない）。
+pub fn key_deep(v: &V) -> K {
+    match v {
+        V::Dict(kv) => K::Tup(vec![K::Obj(Rc::from("{}")), K::Tup(kv.iter().map(|(k, x)| K::Tup(vec![key_deep(k), key_deep(x)])).collect())]),
+        V::List(x) | V::Tuple(x) => K::Tup(x.iter().map(key_deep).collect()),
+        V::Nd(p) => match &**p {
+            PyVal::Nd { dtype, shape, raw } => {
+                let mut s = format!("nd:{dtype}:{shape:?}:");
+                for b in raw {
+                    s.push_str(&format!("{b:02x}"));
+                }
+                K::Str(Rc::from(s.as_str()))
+            }
+            o => K::Str(Rc::from(format!("{o:?}").as_str())),
+        },
+        _ => key_of(v),
+    }
+}
+
 /// 番地で比べる鍵（`id(x)`）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Id(pub usize);

@@ -3,8 +3,8 @@
 //! `CutCurve`〔`L`・`Lx`・`gbar`・`set_loss`〕・`reserve_of_row`・`defender_attackers`／`defender_incoming`）——`ḡ` を Rust の中で
 //! 1 枚 1 役の価値（段 3 の `JointValuer`）から作る。
 //!
-//! **癖（写した）**: 曲線の `ḡ`・`L` は曲線ごとに 1 回だけ（`_gbar_memo`・`_L`）。中の `JointValuer` の覚え書きは残った札だけを
-//! 鍵に持つ（E52）＝`L` を最初に解いたときの値段の文脈の値が残る。
+//! 曲線の `ḡ`・`L`（`_gbar_memo`・`_L`）は曲線ごとに覚える。**2026-10-07**: 中の `JointValuer` が手札を読み直す物なら値が核の文脈に
+//! 依るので、`L`／`ḡ` も文脈ごとに覚える（旧: 曲線ごとに 1 回＝最初に解いた文脈の値を全部で使う・E52 の癖）。
 
 use super::super::leaves_deck::{self as ld, CutItem};
 use super::super::leaves_to::{self as lt, Tok, MU, PWR_EPS};
@@ -13,7 +13,7 @@ use super::super::pyval::PyVal;
 use super::entry::CoreOracle;
 use super::ev::R;
 use super::hj::JointValuer;
-use super::obj::{dset, dset_mut, to_pyval, V};
+use super::obj::{dset, dset_mut, to_pyval, V, K};
 use super::outer::{lp_or, r_clip, Row};
 use super::state::Core;
 
@@ -48,8 +48,10 @@ pub struct Curve {
     pub mu: f64,
     pub cids: Vec<Option<String>>,
     pub reserve: Option<f64>,
-    pub l: Option<Vec<f64>>,
-    pub gbar: Option<f64>,
+    /// `L`（文脈ごと・`JointValuer::ctx_part`）
+    pub l: Vec<(K, Vec<f64>)>,
+    /// `ḡ`（文脈ごと）
+    pub gbar: Vec<(K, f64)>,
     pub xs_future: Vec<f64>,
     pub mlp: f64,
 }
@@ -98,8 +100,15 @@ impl Curve {
     }
 
     /// `L()`
+    /// 今の文脈の `L` か `ḡ` がもう在るか
+    pub fn has_l_or_gbar(&self, c: &Core) -> bool {
+        let ck = self.jv.ctx_part(c);
+        self.l.iter().any(|(k, _)| *k == ck) || self.gbar.iter().any(|(k, _)| *k == ck)
+    }
+
     pub fn l(&mut self, c: &mut Core) -> R<Vec<f64>> {
-        if let Some(l) = self.l.clone() {
+        let ck = self.jv.ctx_part(c);
+        if let Some(l) = self.l.iter().find(|(k, _)| *k == ck).map(|e| e.1.clone()).filter(|_| !super::memock::off()) {
             if super::memock::on() {
                 let s = c.ck_save();
                 let fresh = self.l_body(c);
@@ -111,7 +120,8 @@ impl Curve {
             return Ok(l);
         }
         let l = self.l_body(c)?;
-        self.l = Some(l.clone());
+        self.l.retain(|(k, _)| *k != ck);
+        self.l.push((ck, l.clone()));
         Ok(l)
     }
 
@@ -136,7 +146,8 @@ impl Curve {
 
     /// `gbar`（曲線ごとに 1 回・鍵は `(reserve, CUT_PRICE_MODE)`＝既定は `joint` だけ）
     pub fn gbar(&mut self, c: &mut Core) -> R<f64> {
-        if let Some(g) = self.gbar {
+        let ck = self.jv.ctx_part(c);
+        if let Some(g) = self.gbar.iter().find(|(k, _)| *k == ck).map(|e| e.1).filter(|_| !super::memock::off()) {
             if super::memock::on() {
                 let s = c.ck_save();
                 let fresh = self.gbar_body(c);
@@ -146,7 +157,8 @@ impl Curve {
             return Ok(g);
         }
         let g = self.gbar_body(c)?;
-        self.gbar = Some(g);
+        self.gbar.retain(|(k, _)| *k != ck);
+        self.gbar.push((ck, g));
         Ok(g)
     }
 
@@ -408,8 +420,8 @@ impl Core {
             mu,
             cids,
             reserve: Some(reserve),
-            l: None,
-            gbar: None,
+            l: Vec::new(),
+            gbar: Vec::new(),
             xs_future: inc,
             mlp,
         }))

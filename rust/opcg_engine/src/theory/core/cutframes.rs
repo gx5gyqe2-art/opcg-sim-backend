@@ -1,7 +1,8 @@
 //! 段 5: `cut_price.CutFrames`（1 局ぶんの守り手の枠と値段の曲線）・`next_turn_leader_power`・`realised_corrections`。
 //!
 //! 枠の行は局の中の位置 `n`（Python の行の番号 `i` の代わり・`_posmap` は恒等）。曲線は段 4 の `Curve`（`ḡ`・`L`・`set_loss` は
-//! 中の `JointValuer` で解く）。**計数の順も Python と同じ**（`view` は `frame_key` を 2 度呼ぶ＝`cut_causal_skip` を 2 度数える）。
+//! 中の `JointValuer` で解く）。**2026-10-07**: 曲線と補正の覚え書きは（枠, 核の文脈と切替）ごと（曲線の手札の値は作ったときの文脈で
+//! 決まる）・`view` は枠を 1 度だけ引く（旧: `frame_key` を 2 度呼んで `cut_causal_skip` を 2 度数えた・E76）。
 
 use super::super::leaves_deck as ld;
 use super::super::leaves_to::{self as lt};
@@ -9,7 +10,7 @@ use super::super::numeric::py_max;
 use super::curve::Curve;
 use super::ev::R;
 use super::game::Game;
-use super::obj::V;
+use super::obj::{V, K};
 use super::pd::D;
 use super::state::Core;
 
@@ -23,8 +24,10 @@ pub struct CutFrames {
     pub decks: Option<[Option<Vec<String>>; 2]>,
     pub don_rule: bool,
     pub end_of_turn: bool,
-    pub curves: Vec<(Key, Option<Curve>)>,
-    pub corr: Vec<(Key, Vec<(Option<i64>, f64)>)>,
+    /// 曲線（(枠, 核の文脈) ごと）
+    pub curves: Vec<((Key, K), Option<Curve>)>,
+    /// 補正（((席, ターン), 核の文脈) ごと）
+    pub corr: Vec<((Key, K), Vec<(Option<i64>, f64)>)>,
     pub by_seat: [Vec<i64>; 2],
 }
 
@@ -87,34 +90,43 @@ impl CutFrames {
         }
     }
 
-    fn has_curve(&self, k: Key) -> Option<usize> {
-        self.curves.iter().position(|(a, _)| *a == k)
+    fn has_curve(&self, k: Key, ck: &K) -> Option<usize> {
+        self.curves.iter().position(|(a, _)| a.0 == k && a.1 == *ck)
     }
 
     /// `curve(d, t, at_n)` → 曲線の鍵（`None`＝枠が無い／手札が空）
     pub fn curve(&mut self, c: &mut Core, g: &Game, st: &mut D, d: i64, t: i64, at_n: Option<i64>) -> R<Option<Key>> {
         let Some(key) = self.frame_key(g, st, d, t, at_n) else { return Ok(None) };
-        if let (Some(ix), true) = (self.has_curve(key), super::memock::on()) {
+        self.curve_at(c, g, st, key)
+    }
+
+    /// 枠 `key` の曲線（今の核の文脈の・無ければ作る）
+    fn curve_at(&mut self, c: &mut Core, g: &Game, st: &mut D, key: Key) -> R<Option<Key>> {
+        let ck = c.ctx_k();
+        if let (Some(ix), true) = (self.has_curve(key, &ck), super::memock::on()) {
             let s = c.ck_save();
-            let fresh = self.build_curve(c, g, &mut D::new(), key);
+            let r = (|| -> R<(V, V)> {
+                let fresh = self.build_curve(c, g, &mut D::new(), key)?;
+                let b = match fresh {
+                    None => V::None,
+                    Some(mut cv) => V::list(vec![cv.summary(), V::fl(&cv.l(c)?), V::Float(cv.gbar(c)?)]),
+                };
+                let a = match self.curves[ix].1.as_mut() {
+                    None => V::None,
+                    Some(cv) => V::list(vec![cv.summary(), V::fl(&cv.l(c)?), V::Float(cv.gbar(c)?)]),
+                };
+                Ok((a, b))
+            })();
             c.ck_restore(s);
-            let fresh = fresh?;
-            let memo = &mut self.curves[ix].1;
-            let a = match memo.as_mut() {
-                None => V::None,
-                Some(cv) => V::list(vec![cv.summary(), V::fl(&cv.l(c)?), V::Float(cv.gbar(c)?)]),
-            };
-            let b = match fresh {
-                None => V::None,
-                Some(mut cv) => V::list(vec![cv.summary(), V::fl(&cv.l(c)?), V::Float(cv.gbar(c)?)]),
-            };
+            let (a, b) = r?;
             super::memock::v("cut_curves", &a, &b);
         }
-        if self.has_curve(key).is_none() {
+        if self.has_curve(key, &ck).is_none() || super::memock::off() {
             let cv = self.build_curve(c, g, st, key)?;
-            self.curves.push((key, cv));
+            self.curves.retain(|(a, _)| !(a.0 == key && a.1 == ck));
+            self.curves.push(((key, ck.clone()), cv));
         }
-        let ix = self.has_curve(key).unwrap();
+        let ix = self.has_curve(key, &ck).unwrap();
         Ok(if self.curves[ix].1.is_some() { Some(key) } else { None })
     }
 
@@ -154,22 +166,35 @@ impl CutFrames {
 
     /// 曲線の `ḡ`（`defending(view)` が読む）
     pub fn gbar(&mut self, c: &mut Core, key: Key) -> R<f64> {
-        let ix = self.has_curve(key).ok_or("曲線が無い")?;
+        let ix = self.has_curve(key, &c.ctx_k()).ok_or("曲線が無い")?;
         self.curves[ix].1.as_mut().ok_or("曲線が None")?.gbar(c)
     }
 
     /// `view(d, t, hand_now, at_n)` → 窓の曲線の鍵（`None`＝旧の値段）
     pub fn view(&mut self, c: &mut Core, g: &Game, st: &mut D, d: i64, t: i64, at_n: Option<i64>) -> R<Option<Key>> {
+        self.view_split(c, g, st, None, d, t, at_n)
+    }
+
+    /// `view` の計数を分ける形: 引きの計数（`cut_lookups`・`cut_causal_skip`・`cut_view_flat` ほか）は `st`、枠を作った計数
+    /// （`cut_frames` ほか）は `st_make`（無ければ `st`）。
+    pub fn view_split(&mut self, c: &mut Core, g: &Game, st: &mut D, st_make: Option<&mut D>, d: i64, t: i64, at_n: Option<i64>) -> R<Option<Key>> {
+        // 枠は 1 度だけ引く（`frame_key` は飛ばした枠を `cut_causal_skip` に数える）
+        let key = self.frame_key(g, st, d, t, at_n);
         if let Some(at) = at_n {
             st.addi("cut_lookups", 1);
-            let key = self.frame_key(g, st, d, t, at_n);
             if let Some(k) = key {
                 if self.key_last_pos(g, k) > at {
                     st.addi("cut_lookahead", 1);
                 }
             }
         }
-        let cv = self.curve(c, g, st, d, t, at_n)?;
+        let cv = match key {
+            None => None,
+            Some(k) => match st_make {
+                Some(sm) => self.curve_at(c, g, sm, k)?,
+                None => self.curve_at(c, g, st, k)?,
+            },
+        };
         if cv.is_none() {
             st.addi("cut_view_flat", 1);
         }
@@ -184,10 +209,19 @@ impl CutFrames {
         }
     }
 
+    /// `view_gbar` の計数を分ける形（`view_split`）
+    #[allow(clippy::too_many_arguments)]
+    pub fn view_gbar_split(&mut self, c: &mut Core, g: &Game, st: &mut D, st_make: Option<&mut D>, d: i64, t: i64, at_n: Option<i64>) -> R<Option<f64>> {
+        match self.view_split(c, g, st, st_make, d, t, at_n)? {
+            None => Ok(None),
+            Some(k) => Ok(Some(self.gbar(c, k)?)),
+        }
+    }
+
     /// `corrections(w, t)`
     pub fn corrections(&mut self, c: &mut Core, g: &Game, st: &mut D, w: i64, t: i64) -> R<Vec<(Option<i64>, f64)>> {
-        let key = (w, t);
-        if let Some((_, v)) = self.corr.iter().find(|(k, _)| *k == key) {
+        let key = ((w, t), c.ctx_k());
+        if let Some((_, v)) = self.corr.iter().find(|(k, _)| *k == key).filter(|_| !super::memock::off()) {
             let v = v.clone();
             if super::memock::on() {
                 let s = c.ck_save();
@@ -200,6 +234,7 @@ impl CutFrames {
             return Ok(v);
         }
         let out = self.corrections_body(c, g, st, w, t)?;
+        self.corr.retain(|(k, _)| *k != key);
         self.corr.push((key, out.clone()));
         Ok(out)
     }
@@ -208,7 +243,10 @@ impl CutFrames {
         let d = 1 - w;
         let fk = self.frame_key(g, st, d, t, None);
         let mut out = Vec::new();
-        let cv = if fk.is_some() { self.curve(c, g, st, d, t, None)? } else { None };
+        let cv = match fk {
+            Some(k) => self.curve_at(c, g, st, k)?,
+            None => None,
+        };
         match cv {
             None => st.addi("cut_corr_noframe", 1),
             Some(ck) => {
@@ -226,7 +264,7 @@ impl CutFrames {
                 if fin.is_none() {
                     st.addi("cut_corr_nofinal", 1);
                 }
-                let ix = self.has_curve(ck).unwrap();
+                let ix = self.has_curve(ck, &c.ctx_k()).unwrap();
                 let mu = self.mu;
                 let cvv = self.curves[ix].1.as_mut().unwrap();
                 let add = cvv.gbar(c)?;

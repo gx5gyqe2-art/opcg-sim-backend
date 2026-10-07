@@ -5,9 +5,9 @@
 //! 値は順に依らない（`gain` は札ごとの dict・`card_gain` の覚え書きの鍵は札を含む）ので、Rust は最初に出た順で回す（E47）。
 //! `card_gain` の覚え書き（`_GAIN`）は鍵が丸めた手札の読み（`_ctx_key`）＝**先に書いた方が勝つ**癖ごと写す。
 
-use super::super::numeric::{py_round, py_round_int};
+use super::super::numeric::py_round_int;
 use super::ev::{count, family_of, move_default_dest, magnitude, walk_actions, MOVE_KINDS, R};
-use super::obj::{dset, key_of, knum, kstr, V, K};
+use super::obj::{dset, kstr, V, K};
 use super::pyrand::PyRandom;
 use super::state::Core;
 
@@ -196,41 +196,16 @@ impl Core {
         dset(&out, "caps", V::list(caps))
     }
 
-    /// `_ctx_key(ctx)`
-    fn ctx_key(&self, ctx: &V) -> K {
-        let mut hs: Vec<(String, f64)> = ctx
-            .get("hand_items")
-            .items()
-            .iter()
-            .map(|it| (it.get("cid").pystr(), py_round(super::hp::v_scalar(it.get("v")), 6)))
-            .collect();
-        hs.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.partial_cmp(&b.1).unwrap()));
-        K::Tup(vec![
-            K::Tup(hs.into_iter().map(|(c, v)| K::Tup(vec![kstr(&c), knum(v)])).collect()),
-            K::Tup(ctx.get("caps").items().iter().map(key_of).collect()),
-            K::Tup(ctx.get("xs").items().iter().map(|x| knum(py_round(x.f(), 1))).collect()),
-            knum(py_round(ctx.get("take").f(), 6)),
-            knum(py_round(ctx.get("olp").f(), 1)),
-            knum(py_round(ctx.get("r").f(), 3)),
-        ])
-    }
-
     /// `card_gain(cid, ctx, cards)`
     pub fn card_gain(&mut self, cid: &str, ctx: &V) -> R<f64> {
-        let key = if self.ctx.cut_cache_ok() {
-            let mut k = vec![self.ctx_key(ctx), kstr(cid)];
-            if self.ctx.pricer.is_some() {
-                k.push(key_of(&self.ctx.pricer_key));
-                k.push(knum(self.ctx.take_card.is_some() as i64 as f64));
-            }
-            k.push(kstr(if self.search_joint { "joint" } else { "legacy" }));
-            k.push(kstr("rules"));
+        // 鍵は手札の読み `ctx` の中身の全部・札・核の文脈と切替の全部（2026-10-07 に丸めた `_ctx_key` から替えた）
+        let key = {
+            let mut k = vec![super::obj::key_deep(ctx), kstr(cid)];
+            self.ctx_key(&mut k);
             Some(K::Tup(k))
-        } else {
-            None
         };
         if let Some(k) = &key {
-            if let Some(&v) = self.gain.get(k) {
+            if let Some(&v) = self.gain.get(k).filter(|_| !super::memock::off()) {
                 if super::memock::on() {
                     let s = self.ck_save();
                     let fresh = self.card_gain_body(cid, ctx);

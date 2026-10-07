@@ -7,8 +7,9 @@
 //! **値は 1 ビットも変えない**（M-2 は段 7 の後）。既定の枝だけ（`THETA_HAND_MODE=rule_don`・`THETA_SIDE_MODE=legacy`／`symmetric`・
 //! 守る側の計算は Rust の核）。浮動小数の演算の順・`sum` の int の 0 から始まる足し方・`max`／`min` の同点は Python と同じ。
 //!
-//! **履歴に依る覚え書き（癖ごと写した）**: 攻め手の財布ごとの `_gain`（鍵 `(round(x, 3), k)`・先に書いた方が勝つ）・
-//! `_RULE_DON_CACHE`（鍵に `actx["key"]`＝12 桁に丸めた値の表・10 万で全部捨てる）・`_RULE_PLAN_CACHE`（鍵は正確・20 万で捨てる）。
+//! **覚え書き（2026-10-07 から全部正確な鍵）**: 攻め手の財布ごとの `_gain`（鍵＝`x` と `k` のビットと値段の文脈・旧 `(round(x, 3), k)`＝E60）・
+//! `_RULE_DON_CACHE`（鍵＝守る側の入力の全部〔並べ替えず・ライフも丸めず〕・財布の dict の中身の全部・値段の文脈のビット・10 万で全部捨てる・
+//! 旧は `actx["key"]`＝12 桁に丸めた値の表＝E61）・`_RULE_PLAN_CACHE`（鍵は正確・20 万で捨てる）。値段の文脈の鍵 `cut_context_key` も `ḡ` のビット。
 
 use std::collections::{HashMap, HashSet};
 
@@ -20,7 +21,7 @@ use super::super::plans::{self, Mask, SolveIn};
 use super::super::pyval::PyVal;
 use super::super::sched::{StepIn, Tables};
 use super::ev::R;
-use super::obj::{dset_mut, key_of, knum, V, K};
+use super::obj::{dset_mut, knum, V, K};
 use super::state::Core;
 use super::to::{theta, DELTA, ATTACK_DON_MAX};
 
@@ -207,15 +208,9 @@ impl Actx {
                 }
             })
             .collect();
-        let mut gain = HashMap::new();
-        let mut gain_order = Vec::new();
-        for (k, val) in v.get("_gain").kv() {
-            let it = k.items();
-            let (x, kk) = (it[0].f(), it[1].int());
-            let key = key_of(k);
-            gain.insert(key.clone(), val.f());
-            gain_order.push((x, kk, key));
-        }
+        // `_gain`（Python の財布の覚え書き）は読まない: 覚え書きは正確な鍵で Rust が育てる（前もって入れる値は要らない・2026-10-07）
+        let gain = HashMap::new();
+        let gain_order = Vec::new();
         let d = V::dict(v.kv().iter().filter(|(k, _)| k.as_str() != Some("_gain")).cloned().collect());
         if !d.has("key") {
             return Err("actx に key が無い".into());
@@ -250,18 +245,9 @@ impl Actx {
         })
     }
 
-    /// `_gain` 込みの dict（Python の actx と同じ形）。
+    /// 財布の dict（`_gain` は出さない＝覚え書きは鍵に値段の文脈を持つので `(x, k)` の表にならない・2026-10-07）。
     pub fn to_v(&self) -> V {
-        let mut kv = self.d.kv().to_vec();
-        if !self.gain_order.is_empty() {
-            let g: Vec<(V, V)> = self
-                .gain_order
-                .iter()
-                .map(|(x, k, key)| (V::tuple(vec![V::Float(*x), V::Int(*k)]), V::Float(self.gain[key])))
-                .collect();
-            kv.push((V::s("_gain"), V::dict(g)));
-        }
-        V::dict(kv)
+        self.d.clone()
     }
 }
 
@@ -775,9 +761,10 @@ impl Core {
         base
     }
     /// `cut_context_key()`
+    /// （2026-10-07 から `ḡ` のビット・旧は丸めた `CUT_PRICER_KEY`）
     pub fn cut_context_key(&self) -> V {
         if self.cut_active() {
-            V::tuple(vec![self.ctx.pricer_key.clone(), V::optf(self.ctx.take_card)])
+            V::tuple(vec![V::tuple(vec![V::s("avg"), V::optf(self.ctx.pricer)]), V::optf(self.ctx.take_card)])
         } else {
             V::tuple(vec![V::None, V::None])
         }
@@ -1101,14 +1088,16 @@ impl Core {
         Ok(Some(Actx::from_v(&d)?))
     }
 
-    /// `_attach_gain(actx, x, k)`（財布ごとの覚え書き・鍵 `(round(x, 3), k)`・先に書いた方が勝つ）
+    /// `_attach_gain(actx, x, k)`（財布ごとの覚え書き・鍵は `x`・`k` のビットと値段の文脈＝2026-10-07 に `(round(x, 3), k)` から替えた）
     pub fn attach_gain(&mut self, ax: &mut Actx, x: f64, k: i64) -> f64 {
         if k <= 0 {
             return 0.0;
         }
-        let rx = py_round(x, 3);
-        let key = K::Tup(vec![knum(rx), knum(k as f64)]);
-        if let Some(&v) = ax.gain.get(&key) {
+        let rx = x;
+        let mut kv = vec![knum(x), knum(k as f64)];
+        self.ctx.price_key(&mut kv);
+        let key = K::Tup(kv);
+        if let Some(&v) = ax.gain.get(&key).filter(|_| !super::memock::off()) {
             if super::memock::on() {
                 let fresh = self.attach_gain_body(ax, x, k);
                 super::memock::f("attach_gain", v, fresh);
@@ -1325,15 +1314,28 @@ impl Core {
             return Err("攻め手の財布（attacker_ctx）と守る側の計算が別の値段の文脈で作られている（同じ `CP.defending` の中で呼ぶ）".into());
         }
         let l0 = nonneg_round(p.life);
-        let head = vec![ksorted_pairs(p.cards), knum(p.don), ksorted(p.blk), knum(l0 as f64)];
-        let tail = [ktrip(p.life_types), ktrip(p.draw_types), ksorted(p.arrive), key_of(ax.d.get("key"))];
+        // 鍵は入力の全部をそのまま（並べ替えない・ライフも丸めない）＋財布の dict の中身の全部＋値段の文脈のビット（2026-10-07・E61）
+        let mut head = vec![
+            K::Tup(p.cards.iter().map(|&(a, b)| K::Tup(vec![knum(a), knum(b)])).collect()),
+            knum(p.don),
+            K::Tup(p.blk.iter().map(|&x| knum(x)).collect()),
+            knum(p.life),
+        ];
+        self.ctx.price_key(&mut head);
+        head.push(knum((self.ctx.other_side > 0) as i64 as f64));
+        let tail = [
+            ktrip(p.life_types),
+            ktrip(p.draw_types),
+            K::Tup(p.arrive.iter().map(|&x| knum(x)).collect()),
+            super::obj::key_deep(&ax.d),
+        ];
         let mut key = head.clone();
         key.push(p.turns.map(|t| knum(t as f64)).unwrap_or(K::None));
         key.extend(tail.iter().cloned());
         key.push(knum(EX_STATE_BUDGET as f64));
         key.push(super::obj::kstr("w"));
         let key = K::Tup(key);
-        if let Some(v) = self.outer.rdc.get(&key).cloned() {
+        if let Some(v) = self.outer.rdc.get(&key).cloned().filter(|_| !super::memock::off()) {
             if super::memock::on() {
                 self.rd_check("rdc", p, ax, &v)?;
             }
@@ -1360,7 +1362,7 @@ impl Core {
             k.extend(tail.iter().cloned());
             K::Tup(k)
         });
-        let got = ukey.as_ref().and_then(|k| self.outer.rdc.get(k).cloned());
+        let got = ukey.as_ref().and_then(|k| self.outer.rdc.get(k).cloned()).filter(|_| !super::memock::off());
         if let (Some(o), true) = (&got, super::memock::on()) {
             self.rd_check("rdc_unbudgeted", p, ax, o)?;
         }
@@ -1584,7 +1586,7 @@ impl Core {
             knum(nonneg_round(life) as f64),
             turns.map(|t| knum(t as f64)).unwrap_or(K::None),
         ]);
-        if let Some(&v) = self.outer.rpc.get(&key) {
+        if let Some(&v) = self.outer.rpc.get(&key).filter(|_| !super::memock::off()) {
             if super::memock::on() {
                 let f = rule_guard_plan_raw(cards, don, xs_first, xs_later, blk, life, turns);
                 super::memock::tally("rpc", f == v, || format!("memo {v:?} fresh {f:?}"));

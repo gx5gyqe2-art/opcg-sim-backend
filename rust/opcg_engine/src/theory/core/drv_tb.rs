@@ -4,7 +4,8 @@
 //! `realised_harm`・`guard_hand_reading`・`guard_step`（`guard_joint_cost`・`JointValuer.loss`）・`_finish_guard`・`_add`・
 //! `play_starts_next_turn`・`_W_of`（`prob_of_d`）。`stats["games"]`・`label_game`・`_seat_decks` は Python が先に。
 //!
-//! **写した癖**: `g_cache` の鍵は `(席, ターン)`（相手の読みの落ち先 `(seat, opp["t"])` と同じ鍵の空間・先勝ち）。
+//! **2026-10-07**: `g_cache` の鍵は**行**（局の中の位置）と核の文脈（旧: `(席, ターン)`＝同じターンの後の行が最初の行の手札の値を受け取り、
+//! 相手の読みの落ち先 `(seat, opp["t"])` と同じ鍵の空間を先勝ちで共有していた・E77）。
 //! 戻り＝`{"stats", "per": [[[seed, w], rec], …], "kn_turns": […], "kn_game": […]}`。
 
 use super::super::leaves_deck as ld;
@@ -319,9 +320,11 @@ impl Tb<'_> {
     }
 }
 
-/// `_g_of_row(sc, tok, ci, idx2cid, cards, cache, key)`（`W_MODE=curve`・覚え書きつき）
-fn g_of_row(c: &mut Core, tb: &mut Tb, r: &GRow, key: K) -> R<V> {
-    if let Some((_, v)) = tb.g_cache.iter().find(|(k, _)| *k == key) {
+/// `_g_of_row(sc, tok, ci, idx2cid, cards, cache, key)`（`W_MODE=curve`・覚え書きつき・鍵は行 `i` と核の文脈）
+fn g_of_row(c: &mut Core, tb: &mut Tb, i: usize) -> R<V> {
+    let r = &tb.g.rows[i];
+    let key = K::Tup(vec![super::obj::knum(i as f64), c.ctx_k()]);
+    if let Some((_, v)) = tb.g_cache.iter().find(|(k, _)| *k == key).filter(|_| !super::memock::off()) {
         let v = v.clone();
         if super::memock::on() {
             let s = c.ck_save();
@@ -332,6 +335,7 @@ fn g_of_row(c: &mut Core, tb: &mut Tb, r: &GRow, key: K) -> R<V> {
         return Ok(v);
     }
     let v = c.hand_price_mean(&r.row(), MU, true, None)?;
+    tb.g_cache.retain(|(k, _)| *k != key);
     tb.g_cache.push((key, v.clone()));
     Ok(v)
 }
@@ -346,12 +350,11 @@ fn g_opp_of(c: &mut Core, tb: &mut Tb, opp: (usize, i64), seat: i64) -> R<V> {
     let deck = deck_of(tb.p, seat);
     if let Some(i) = getk(&tb.last_main, (seat, ot)) {
         let r = &tb.g.rows[i];
-        let gv = g_of_row(c, tb, r, kk(&[V::s("last"), V::Int(seat), V::Int(ot)]))?;
+        let gv = g_of_row(c, tb, i)?;
         let gv = c.with_life_types(&gv, deck.as_deref());
         return c.with_hand_blocker(&gv, &r.row());
     }
-    let r = &tb.g.rows[i_opp];
-    g_of_row(c, tb, r, kk(&[V::Int(seat), V::Int(ot)]))
+    g_of_row(c, tb, i_opp)
 }
 
 pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
@@ -504,7 +507,7 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
             }
             let cut_me = cut_me_fr.view_gbar(c, g, &mut stats, w, t, Some(k as i64))?;
             let cut_opp = cut_opp_fr.view_gbar(c, g, &mut stats, 1 - w, t, Some(k as i64))?;
-            let gme1 = g_of_row(c, &mut tb, r, kk(&[V::Int(w), V::Int(t)]))?;
+            let gme1 = g_of_row(c, &mut tb, k)?;
             let g_opp = match opp {
                 None => V::None,
                 Some(o) => g_opp_of(c, &mut tb, o, 1 - w)?,
@@ -678,7 +681,7 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
             }
             let bnd = band_of(r.v0.abs());
             let opp_g = tb.opp_view(w, t);
-            let gme2 = g_of_row(c, &mut tb, r, kk(&[V::Int(w), V::Int(t)]))?;
+            let gme2 = g_of_row(c, &mut tb, k)?;
             let g_opp = match opp_g {
                 None => V::None,
                 Some(o) => g_opp_of(c, &mut tb, o, 1 - w)?,

@@ -9,8 +9,8 @@
 use std::rc::Rc;
 
 use super::super::leaves_to::{c_of, ko_p_of, shield_of, surv_turns, theta_const, turn_weights, H_LIFE_TO_HAND, PWR_EPS};
-use super::super::numeric::{py_max, py_min, py_round, py_round_int};
-use super::obj::{dset_mut, key_of, knum, kopt, kstr, V, K};
+use super::super::numeric::{py_max, py_min, py_round_int};
+use super::obj::{dset_mut, knum, kopt, V, K};
 use super::state::{price_avg, Core, DonCost};
 
 pub const DELTA: f64 = 0.0277;
@@ -94,9 +94,9 @@ impl Core {
         max_don: i64,
         blockers: &[(f64, f64)],
     ) -> f64 {
-        let key = if self.ctx.cut_cache_ok() {
-            let pr = self.ctx.pricer.is_some();
-            Some(K::Tup(vec![
+        // 鍵は値が読む入力の全部（値段の文脈は `ḡ` と `CUT_TAKE_CARD` のビット・2026-10-07 に丸めた `CUT_PRICER_KEY` から替えた）
+        let key = {
+            let mut kv = vec![
                 knum(power),
                 knum(target_power),
                 knum(is_leader as i64 as f64),
@@ -106,14 +106,12 @@ impl Core {
                 knum(delta),
                 knum(max_don as f64),
                 K::Tup(blockers.iter().map(|&(a, b)| K::Tup(vec![knum(a), knum(b)])).collect()),
-                if pr { key_of(&self.ctx.pricer_key) } else { K::None },
-                if pr { kopt(self.ctx.take_card) } else { K::None },
-            ]))
-        } else {
-            None
+            ];
+            self.ctx.price_key(&mut kv);
+            Some(K::Tup(kv))
         };
         if let Some(k) = &key {
-            if let Some(&v) = self.avd.get(k) {
+            if let Some(&v) = self.avd.get(k).filter(|_| !super::memock::off()) {
                 if super::memock::on() {
                     let s = self.ck_save();
                     let fresh = self.avd_body(power, target_power, is_leader, theta, mu, nu_target, delta, max_don, blockers);
@@ -177,24 +175,15 @@ impl Core {
         let r = py_max(0.0, r_turns);
         let rb = py_round_int(r).min(5).max(1);
         let mlp = mlp.unwrap_or(olp);
-        let key = if self.ctx.cut_cache_ok() {
-            Some(K::Tup(vec![
-                knum(py_round_int(power / 100.0) as f64),
-                knum(rb as f64),
-                knum(py_round_int(olp / 100.0) as f64),
-                knum(py_round_int(mlp / 100.0) as f64),
-                knum(py_round(theta, 4)),
-                knum(py_round(mu, 5)),
-                knum(py_round(ko_p, 4)),
-                kstr("geo"),
-                key_of(&self.ctx.pricer_key),
-                knum(self.ctx.take_card.is_some() as i64 as f64),
-            ]))
-        } else {
-            None
+        // 鍵は値が読む入力の全部（2026-10-07 に丸めた鍵〔パワー・リーダーのパワーは 100 単位・`R` は帯・θ／μ／ko_p は桁を落とす・
+        // `CUT_TAKE_CARD` は有るかだけ〕から替えた）
+        let key = {
+            let mut kv = vec![knum(power), knum(r), knum(olp), knum(mlp), knum(theta), knum(mu), knum(ko_p)];
+            self.ctx.price_key(&mut kv);
+            Some(K::Tup(kv))
         };
         if let Some(k) = &key {
-            if let Some(&v) = self.option.get(k) {
+            if let Some(&v) = self.option.get(k).filter(|_| !super::memock::off()) {
                 if super::memock::on() {
                     let s = self.ck_save();
                     let fresh = self.option_body(power, olp, r, rb, theta, mu, mlp, ko_p);
@@ -280,7 +269,7 @@ impl Core {
             knum(ko_p),
             knum((self.ctx.option_depth > 0) as i64 as f64),
         ]);
-        let bodies = match self.bodies.get(&bkey).cloned() {
+        let bodies = match self.bodies.get(&bkey).cloned().filter(|_| !super::memock::off()) {
             Some(b) => {
                 if super::memock::on() {
                     let s = self.ck_save();

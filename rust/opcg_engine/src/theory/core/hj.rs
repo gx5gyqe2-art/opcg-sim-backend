@@ -2,7 +2,9 @@
 //!
 //! `JointValuer` は Python では「残った札 → 出す計画の札」の関数（`plan_items_of`）を持つ物。ここでは 2 つの形:
 //! 静的な札の並び（`valuer_of`）と、手札の読み（`joint_valuer(hand)`・相方待ち／条件の時計の札を残りの手札で読み直す）。
-//! 覚え書き（`_plan`・`_val`・読み直しの `memo`）は物ごと（Python と同じ寿命）。
+//! 覚え書き（`_plan`・`_val`・読み直しの `memo`）は物ごと（Python と同じ寿命）。**2026-10-07**: 手札を読み直す物（`reread`）の
+//! `_plan`／`_val` は鍵に核の文脈と切替を足した（E52: 残った札だけの鍵では、最初に解いた値段の文脈の値を別の窓でも返していた）。
+//! 読み直さない物は値が文脈に依らない（札の値は作ったときに決まっている）ので鍵は残った札だけのまま。
 
 use std::collections::HashMap;
 
@@ -10,7 +12,7 @@ use super::super::leaves_to::{KO_P, PWR_EPS};
 use super::super::numeric::pow;
 use super::ev::R;
 use super::hp::{plan_value, HMemo};
-use super::obj::V;
+use super::obj::{V, K};
 use super::state::Core;
 
 const EPS: f64 = 1e-12;
@@ -122,8 +124,8 @@ pub struct JointValuer {
     s: f64,
     monotone: bool,
     g: GuardTable,
-    plan: HashMap<u64, f64>,
-    val: HashMap<u64, (f64, Vec<usize>)>,
+    plan: HashMap<(u64, K), f64>,
+    val: HashMap<(u64, K), (f64, Vec<usize>)>,
     pos: Vec<usize>,
     src: PlanSrc,
 }
@@ -177,8 +179,17 @@ impl JointValuer {
         }
     }
 
+    /// 覚え書きの鍵の文脈の部分（読み直す物だけ核の文脈と切替・他は空）
+    pub fn ctx_part(&self, core: &Core) -> K {
+        match &self.src {
+            PlanSrc::Hand { reread: true, .. } => core.ctx_k(),
+            _ => K::None,
+        }
+    }
+
     fn plan_of(&mut self, core: &mut Core, keep: u64) -> R<f64> {
-        if let Some(&v) = self.plan.get(&keep) {
+        let mk = (keep, self.ctx_part(core));
+        if let Some(&v) = self.plan.get(&mk).filter(|_| !super::memock::off()) {
             if super::memock::on() {
                 let s = core.ck_save();
                 let fresh = self.plan_body(core, keep);
@@ -188,7 +199,7 @@ impl JointValuer {
             return Ok(v);
         }
         let v = self.plan_body(core, keep)?;
-        self.plan.insert(keep, v);
+        self.plan.insert(mk, v);
         Ok(v)
     }
 
@@ -203,7 +214,8 @@ impl JointValuer {
 
     /// `value(keep)` → (V, カウンターに回す札)
     pub fn value(&mut self, core: &mut Core, keep: u64) -> R<(f64, Vec<usize>)> {
-        if let Some(v) = self.val.get(&keep).cloned() {
+        let mk = (keep, self.ctx_part(core));
+        if let Some(v) = self.val.get(&mk).cloned().filter(|_| !super::memock::off()) {
             if super::memock::on() {
                 let s = core.ck_save();
                 let fresh = self.value_body(core, keep);
@@ -214,7 +226,7 @@ impl JointValuer {
             return Ok(v);
         }
         let best = self.value_body(core, keep)?;
-        self.val.insert(keep, best.clone());
+        self.val.insert(mk, best.clone());
         Ok(best)
     }
 

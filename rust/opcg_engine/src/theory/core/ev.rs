@@ -1790,20 +1790,22 @@ impl Core {
             return Ok(0.0);
         }
         let k = (py_min(k, 10.0)).trunc() as i64;
-        if let Some(&v) = self.sel_prem.get(&k) {
+        let pk = (self.ctx_k(), k);
+        if let Some(&v) = self.sel_prem.get(&pk).filter(|_| !super::memock::off()) {
             if super::memock::on() {
                 super::memock::f("sel_prem", v, sel_premium_of(&d, k));
             }
             return Ok(v);
         }
         let v = sel_premium_of(&d, k);
-        self.sel_prem.insert(k, v);
+        self.sel_prem.insert(pk, v);
         Ok(v)
     }
 
     /// `selection_dist()`
     pub fn selection_dist(&mut self) -> R<Rc<Vec<f64>>> {
-        if let Some(s) = self.sel.clone() {
+        let sk = self.ctx_k();
+        if let Some(s) = self.sel.get(&sk).cloned().filter(|_| !super::memock::off()) {
             if super::memock::on() {
                 let sv = self.ck_save();
                 let fresh = self.selection_dist_body();
@@ -1815,7 +1817,7 @@ impl Core {
             return Ok(s);
         }
         let r = Rc::new(self.selection_dist_body()?);
-        self.sel = Some(r.clone());
+        self.sel.insert(sk, r.clone());
         Ok(r)
     }
 

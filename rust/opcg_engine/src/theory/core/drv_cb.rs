@@ -4,9 +4,11 @@
 //! `hand_blocker_nu`・`guard_read_for`（`counters_cut`・`attacks_stopped`・`guard_value`・`_budget_gap`）・`through_for`・`g_for`・
 //! `tau_theory_of`・`mirror_view`・`predict`・`tau_net`・`pre_settle_skip`・`attack_response.parts`／`parts_mirror`。
 //!
-//! **写した癖**: `_seat_row` の `t_left` は閉包の `ts`（呼んだループの `turn_seq[w]`）で数える——鏡の行（`w := 1 − w`）でも
-//! 外のループの席の `ts`（引数の `t_left` は使わない）。鏡の行の `stats` は捨てる（`sink`）が、`g_for` の `g_*`・値段の枠の
-//! `cut_*`・`RULE_STATS` は本物に数える。
+//! **計数（2026-10-07 に直した・`docs/reports/2026-10-07_memo_exact.md`）**: 鏡の行（相手の役を同じ瞬間から読む行）の**行ごとの**計数は
+//! 全部捨てる（`sink`・旧は `g_for` の `g_*`・値段の枠の引きの `cut_view_flat`・`RULE_STATS` の行の読みの計数だけ本物に数えていた＝E75）。
+//! **解いた回数**の計数（値段の枠を作った回数 `cut_frames` ほか・守る側の計算の `ex:*`）は、どの行が最初に引いたかに依らず本物に 1 度。
+//! `g_for` は行ごとに 1 度だけ呼ぶ（旧は `r_opp` のために 2 度呼んで `g_*` を 2 度数えた）。鏡の行の `t_left` は鏡の席の残りの自席ターン
+//! （呼ぶ側が渡す値・旧は外のループの席の `ts` で数えた＝E74・出力には出ない欄）。
 //!
 //! 戻り＝`{"stats", "rows_out", "ledger", "turn_harm", "theta_check"}`（この局で足した行）。
 
@@ -238,28 +240,42 @@ fn through_for(c: &mut Core, gs: &Gs, tok: &Tok, olp: f64, d: i64, t: i64) -> R<
 
 /// `seat_row(w, t, j, sc, tok, _ci, f_real, t_left, stats)`（`ts_len`＝閉包の `len(ts)`・`sink`＝鏡の行は計数を捨てる）
 #[allow(clippy::too_many_arguments)]
-fn seat_row(c: &mut Core, gs: &Gs, cut: &mut Option<CutFrames>, st: &mut D, w: i64, t: i64, j: i64, row: &Row, f_real: f64, ts_len: i64, sink: bool) -> R<SeatD> {
+fn seat_row(c: &mut Core, gs: &Gs, cut: &mut Option<CutFrames>, st: &mut D, w: i64, t: i64, j: i64, row: &Row, f_real: f64, t_left: i64, sink: bool) -> R<SeatD> {
+    // 鏡の行の引きの計数は捨て、枠を作った計数は本物に（`view_gbar_split`）
+    let mut snk = D::new();
     let gb = match cut.as_mut() {
         None => None,
-        Some(cf) => cf.view_gbar(c, gs.g, st, 1 - w, t, None)?,
+        Some(cf) => {
+            if sink {
+                cf.view_gbar_split(c, gs.g, &mut snk, Some(&mut *st), 1 - w, t, None)?
+            } else {
+                cf.view_gbar(c, gs.g, st, 1 - w, t, None)?
+            }
+        }
     };
     let has_cut = cut.is_some();
+    let n_ev = c.outer.events.len();
     let s = if has_cut { Some(c.enter(gb)) } else { None };
-    let r = seat_row_body(c, gs, st, w, t, j, row, f_real, ts_len, sink);
+    let r = seat_row_body(c, gs, st, w, t, j, row, f_real, t_left, sink);
     if let Some(s) = s {
         c.leave(s);
+    }
+    if sink {
+        // `RULE_STATS` の行の読みの計数（`rule_*`・`plan_*`）は捨て、解いた回数（`ex:*`）は残す
+        let tail: Vec<(String, V)> = c.outer.events.split_off(n_ev);
+        c.outer.events.extend(tail.into_iter().filter(|(k, _)| k.starts_with("ex:")));
     }
     r
 }
 
 #[allow(clippy::too_many_arguments)]
-fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row: &Row, f_real: f64, ts_len: i64, sink: bool) -> R<SeatD> {
+fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row: &Row, f_real: f64, t_left: i64, sink: bool) -> R<SeatD> {
     let mut snk = D::new();
     let (theta, mu) = (gs.cfg.theta, gs.cfg.mu);
     let sc = &row.sc;
     let tok = &row.tok;
     let olp = lp_or(sc[lt::SC_OPP_LEADER_POWER]);
-    let g_def = gs.g_for(st, 1 - w, t);
+    let g_def = gs.g_for(if sink { &mut snk } else { &mut *st }, 1 - w, t);
     let dk0 = gs.seat_deck(w);
     let mut actx: Option<Actx> = c.attacker_ctx(row, theta, mu, dk0.as_deref(), j == 0, None)?;
     let don_plan = c.rule_don_plan_for(row, &g_def, actx.as_mut())?;
@@ -310,14 +326,7 @@ fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row:
         slope_theory = 0.0;
     }
     let slope_turn = if model_theta { don_plan.get("a_turn").f() } else { slope_theory };
-    let r_opp = {
-        let g = gs.g_for(st, 1 - w, t);
-        if g.is_none() {
-            mu
-        } else {
-            rw::gf(&g)
-        }
-    };
+    let r_opp = if g_def.is_none() { mu } else { rw::gf(&g_def) };
     let r_deck = match gs.p.get("in").get("refill") {
         V::None => V::None,
         sh => V::Float(mu * sh.items()[(1 - w) as usize].f()),
@@ -348,7 +357,7 @@ fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row:
             ("r_opp", V::Float(r_opp)),
             ("r_deck", r_deck),
             ("f_real", V::Float(f_real)),
-            ("t_left", V::Int(ts_len - j)),
+            ("t_left", V::Int(t_left)),
             ("j", V::Int(j)),
             ("sched", V::list(sched.iter().map(|&x| V::Float(x)).collect())),
         ],
@@ -613,7 +622,7 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
             let sc = &r.sc;
             let tok = &r.tok;
             let olp = lp_or(sc[lt::SC_OPP_LEADER_POWER]);
-            let d = seat_row(c, &gs, &mut cut, &mut stats, w, t, j, &row, f_real, ts_len, false)?;
+            let d = seat_row(c, &gs, &mut cut, &mut stats, w, t, j, &row, f_real, ts_len - j, false)?;
             let slope_theory = d.f("slope_theory");
             let (shield, sh_rate) = (d.f("shield"), d.f("shield_rate"));
             let (th_body, th_hand, th_w) = (d.f("th_body"), d.f("th_hand"), d.f("theta"));
@@ -713,7 +722,6 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
     for w in 0..2i64 {
         let ts = turn_seq[w as usize].clone();
         let ts_o = turn_seq[(1 - w) as usize].clone();
-        let ts_len = ts.len() as i64;
         for &t in ts.iter() {
             let prev_o: Vec<i64> = ts_o.iter().cloned().filter(|&tt| tt < t).collect();
             let Some(&po) = prev_o.last() else { continue };
@@ -721,7 +729,8 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
             let rb = &g.rows[gs.last_or_start((1 - w, po))];
             let mrow = c.mirror_view(&rl.row(), Some(&rb.tok), Some(&rb.ci));
             let f_o = getk(&per_seat, (1 - w, po)).unwrap().f("f_real") + getk(&harm, (1 - w, po)).unwrap_or(0.0);
-            let d = seat_row(c, &gs, &mut cut, &mut stats, 1 - w, t, prev_o.len() as i64, &mrow, f_o, ts_len, true)?;
+            let t_left_o = ts_o.iter().filter(|&&tt| tt > t).count() as i64;
+            let d = seat_row(c, &gs, &mut cut, &mut stats, 1 - w, t, prev_o.len() as i64, &mrow, f_o, t_left_o, true)?;
             op_mirror.push(((w, t), d));
             stats.addi("mirror_rows", 1);
         }

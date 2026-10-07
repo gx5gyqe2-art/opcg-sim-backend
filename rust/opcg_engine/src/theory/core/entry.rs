@@ -1,15 +1,15 @@
 //! 移植の段 3: 核の入口（名前 → Rust の関数）。PyO3（`theory_core_call`）と `cargo test` の記録の再生が同じ道を通る。
 //!
-//! 1 回の呼び出し＝`{"a": 引数（名前つき・既定値込み）, "g": 文脈と切替, "pre": 覚え書きの前もっての中身}`（記録の形）。
+//! 1 回の呼び出し＝`{"a": 引数（名前つき・既定値込み）, "g": 文脈と切替}`（記録の形）。
 //! `g` の切替が移していない枝（旧い既定・保留の候補）なら**誤りを返す**（黙って既定で解かない）。
-//! `pre`＝丸めた鍵の覚え書き（`option`・`gain`・`flow`）のうち、Python がこの呼び出しで**前から在った値を読んだ**もの
-//! （記録の再生で 1 行ずつ覚え書きを空にしてから入れる＝順に依らない再生）。
+//! **2026-10-07**: 覚え書きは全部正確な鍵になった（当たりの値＝解き直しの値）ので、記録の再生で覚え書きを前もって入れる `pre` は
+//! 読まない（旧: 丸めた鍵の覚え書き〔`option`・`gain`・`flow`・`rdc`〕のうち Python が前から在った値を読んだものを入れていた）。
 
 use super::super::leaves_deck::{self as ld, Oracle};
 use super::super::leaves_to::{self as lt, Tok, MU};
 use super::super::pyval::PyVal;
 use super::ev::{Px, R};
-use super::obj::{from_pyval, key_of, to_pyval, V, K};
+use super::obj::{from_pyval, to_pyval, V, K};
 use super::state::{Core, DonCost};
 
 fn arg<'a>(a: &'a V, k: &str) -> R<&'a V> {
@@ -133,51 +133,20 @@ pub fn apply_g(c: &mut Core, g: &V) -> R<()> {
     Ok(())
 }
 
-/// 覚え書きを前もって入れる（`pre`＝[[名前, 鍵, 値], …]）。
-pub fn preload(c: &mut Core, pre: &V) -> R<()> {
-    for e in pre.items() {
-        let it = e.items();
-        let k = key_of(&it[1]);
-        let v = if it[0].as_str() == Some("rdc") { 0.0 } else { it[2].f() };
-        match it[0].as_str() {
-            Some("option") => {
-                c.option.insert(k, v);
-            }
-            Some("gain") => {
-                c.gain.insert(k, v);
-            }
-            Some("flow") => {
-                c.flow.insert(k, v);
-            }
-            Some("rdc") => {
-                c.outer.rdc.insert(k, it[2].clone());
-                continue;
-            }
-            other => return Err(format!("覚え書き {other:?}")),
-        }
-    }
-    Ok(())
-}
-
-/// `deck_refill.a_of` の覚え書きの鍵（Python と同じ式＝E39 の癖ごと: `round(olp, 1)`・`CUT_TAKE_CARD is not None`・θ と μ は入らない）
-fn a_of_key(c: &Core, deck: &[String], olp: f64, cap: Option<i64>, rush: bool, with_don: bool) -> Option<K> {
-    use super::obj::{knum, kstr};
+/// `deck_refill.a_of` の覚え書きの鍵——値が読む入力の全部（デッキ・相手リーダーのパワー・ドンの上限・速攻だけか・付与つきか・θ・μ・
+/// 値段の文脈のビット）。2026-10-07 に E39 の丸めた鍵（`round(olp, 1)`・`CUT_TAKE_CARD` は有るかだけ・θ／μ なし）から替えた。
+fn a_of_key(c: &Core, deck: &[String], olp: f64, cap: Option<i64>, rush: bool, with_don: bool, theta: &V, mu: &V) -> Option<K> {
+    use super::obj::{key_deep, knum, kstr};
     let mut k = vec![
         K::Tup(deck.iter().map(|s| kstr(s)).collect()),
-        knum(super::super::numeric::py_round(olp, 1)),
+        knum(olp),
         cap.map(|x| knum(x as f64)).unwrap_or(K::None),
         knum(rush as i64 as f64),
+        knum(with_don as i64 as f64),
+        key_deep(theta),
+        key_deep(mu),
     ];
-    if !with_don {
-        k.push(kstr("bare"));
-    }
-    if c.ctx.pricer.is_some() {
-        if !c.ctx.cut_cache_ok() {
-            return None;
-        }
-        k.push(key_of(&c.ctx.pricer_key));
-        k.push(knum(c.ctx.take_card.is_some() as i64 as f64));
-    }
+    c.ctx.price_key(&mut k);
     Some(K::Tup(k))
 }
 
@@ -253,9 +222,9 @@ impl Core {
     #[allow(clippy::too_many_arguments)]
     pub fn a_of(&mut self, deck: &[String], olp: f64, don: Option<f64>, theta: &V, mu: &V, rush: bool, with_don: bool) -> R<f64> {
         let cap = don.map(super::super::numeric::py_round_int);
-        let key = a_of_key(self, deck, olp, cap, rush, with_don);
+        let key = a_of_key(self, deck, olp, cap, rush, with_don, theta, mu);
         if let Some(k) = &key {
-            if let Some(&v) = self.flow.get(k) {
+            if let Some(&v) = self.flow.get(k).filter(|_| !super::memock::off()) {
                 if super::memock::on() {
                     let s = self.ck_save();
                     let fresh = self.a_of_body(deck, olp, don, theta, mu, rush, with_don);
@@ -521,7 +490,7 @@ pub fn call_inner(c: &mut Core, name: &str, a: &V) -> R<V> {
     })
 }
 
-/// 記録 1 行を解く: 文脈を入れ、（再生なら）丸めた鍵の覚え書きを空にして前もって入れ、呼び、条件の計数の差分も返す。
+/// 記録 1 行を解く: 文脈を入れ、（再生なら）文脈をまたぐ覚え書きを空にし、呼び、条件の計数の差分も返す。
 pub fn call(c: &mut Core, name: &str, payload: &V, replay: bool) -> R<(V, [i64; 3])> {
     call_ev(c, name, payload, replay).map(|(v, cs, _ev)| (v, cs))
 }
@@ -538,7 +507,6 @@ fn call_body(c: &mut Core, name: &str, payload: &V, replay: bool) -> R<(V, [i64;
     apply_g(c, payload.get("g"))?;
     if replay {
         c.reset_history();
-        preload(c, payload.get("pre"))?;
     }
     let cs0 = c.cond_stats;
     let r = call_inner(c, name, payload.get("a"));

@@ -264,7 +264,7 @@ impl Core {
             knum(take),
             knum(search as i64 as f64),
         ]);
-        if let Some(s) = memo.stats.get(&key).copied() {
+        if let Some(s) = memo.stats.get(&key).copied().filter(|_| !super::memock::off()) {
             if super::memock::on() {
                 let f = self.hand_stats_body(items, xs, take, deck, search);
                 let same = [s.taken, s.cut, s.ev, s.hits].iter().zip([f.taken, f.cut, f.ev, f.hits].iter()).all(|(a, b)| a.to_bits() == b.to_bits());
@@ -393,24 +393,25 @@ impl Core {
         field: &[String],
         state: &V,
     ) -> R<Option<f64>> {
-        let use_memo = memo.is_some() && !(self.ctx.pricer.is_some() && self.ctx.pricer_key.is_none());
-        let key = if use_memo {
-            let sig = if !state.truthy() { K::None } else { K::Tup(PROJ_KEYS.iter().map(|k| key_of(state.get(k))).collect()) };
-            Some(K::Tup(vec![
+        // 鍵は値が読む入力の全部（札・相方・相手リーダーのパワー・`R`・場・状態の中身・核の文脈と切替）。2026-10-07 に
+        // 「時計を進めた欄だけ・丸めた値段の文脈」の鍵から替えた（状態の残りの欄と `olp`／`r`／場は 1 つの読みの中で同じだったが、鍵に入れて確かめる）。
+        let key = if memo.is_some() {
+            let mut kv = vec![
                 kstr(kind),
                 kstr(cid),
                 partner.map(kstr).unwrap_or(K::None),
-                sig,
-                knum(self.ctx.pricer.is_none() as i64 as f64),
-                key_of(&self.ctx.pricer_key),
-                super::obj::kopt(self.ctx.take_card),
-                knum((self.ctx.other_side > 0) as i64 as f64),
-            ]))
+                knum(olp),
+                knum(r),
+                K::Tup(field.iter().map(|s| kstr(s)).collect()),
+                super::obj::key_deep(state),
+            ];
+            self.ctx_key(&mut kv);
+            Some(K::Tup(kv))
         } else {
             None
         };
         if let (Some(m), Some(k)) = (&memo, &key) {
-            if let Some(v) = m.uv.get(k).copied() {
+            if let Some(v) = m.uv.get(k).copied().filter(|_| !super::memock::off()) {
                 if super::memock::on() {
                     let s = self.ck_save();
                     let fresh = self.uv_body(cid, info, olp, r, partner, field, state);
