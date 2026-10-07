@@ -8,6 +8,9 @@
 2. 両方で解いて比べる（段 2）: 本物の通し（交点の橋と較正〔`--pre-settle on`〕を `rec` で）の中で、移した葉の全部の呼び出しを
    Python と Rust の両方で解き、1 つでも違えば落ちる（`OPCG_THEORY_BOTH=1`・`theory_capture.py`）。出力の JSON は普段の
    起動と 1 バイト同じ。記録したビットの再生は `cargo test`（`theory::tests_leaves`）。
+3. 値付けの核（段 3・2026-10-07・`docs/reports/2026-10-07_port_stage3.md`）: 交点の橋を `rec` で、核の入口を両方で解いて
+   比べる（`OPCG_THEORY_CORE=both`）と Rust だけで解く（`OPCG_THEORY_CORE=rs`）。どちらも出力の JSON は普段の起動と 1 バイト同じ。
+   記録したビットの再生は `cargo test`（`theory::core::tests_core`）。
 """
 import json
 import os
@@ -67,3 +70,35 @@ def test_both_mode_in_a_real_run_matches_and_keeps_the_output(tool, extra, tmp_p
     both, checked = _run(tool, extra, 1, tmp_path)
     assert checked > 500, checked
     assert json.dumps(plain, sort_keys=True) == json.dumps(both, sort_keys=True)
+
+
+def _run_core(tool, extra, mode, tmp_path):
+    out = os.path.join(str(tmp_path), "%s_core_%s.json" % (tool, mode))
+    st = os.path.join(str(tmp_path), "%s_core_%s_stats.json" % (tool, mode))
+    env = dict(os.environ, OPCG_LOG_SILENT="1", OPCG_THEORY_CORE=mode, OPCG_THEORY_CORE_CAPTURE="", OPCG_THEORY_CORE_STATS=st)
+    for k in ("OPCG_PLAN_STORE", "OPCG_THEORY_BOTH", "OPCG_THEORY_CAPTURE"):
+        env.pop(k, None)
+    of = "--json" if tool == "win_calib" else "--out"
+    cmd = [sys.executable, os.path.join(_SCRIPTS, "theory_capture_run.py"), os.path.join(_SCRIPTS, tool + ".py"),
+           "--in", REC, of, out] + extra
+    p = subprocess.run(cmd, cwd=_ROOT, env=env, capture_output=True, text=True)
+    assert p.returncode == 0, p.stderr[-3000:]
+    with open(out, encoding="utf-8") as fh:
+        d = json.load(fh)
+    for k in ("seconds", "rule_stats"):
+        d.pop(k, None)
+    with open(st, encoding="utf-8") as fh:
+        stats = json.load(fh)["stats"]
+    assert not any(v.get("both_mismatch") for v in stats.values())
+    return d, stats
+
+
+def test_core_both_and_rs_modes_keep_the_output(tmp_path):
+    """段 3: 核の入口を両方で解いても（不一致 0）・Rust だけで解いても、交点の橋の出力は普段の起動と 1 バイト同じ。"""
+    plain, _ = _run("crossing_bridge", [], 0, tmp_path)
+    both, st_b = _run_core("crossing_bridge", [], "both", tmp_path)
+    rs, st_r = _run_core("crossing_bridge", [], "rs", tmp_path)
+    assert sum(v.get("both_checked", 0) for v in st_b.values()) > 5000
+    assert sum(v.get("rs_calls", 0) for v in st_r.values()) > 5000
+    assert json.dumps(plain, sort_keys=True) == json.dumps(both, sort_keys=True)
+    assert json.dumps(plain, sort_keys=True) == json.dumps(rs, sort_keys=True)
