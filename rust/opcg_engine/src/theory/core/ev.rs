@@ -1791,7 +1791,7 @@ impl Core {
         }
         let k = (py_min(k, 10.0)).trunc() as i64;
         let pk = (self.ctx_k(), k);
-        if let Some(&v) = self.sel_prem.get(&pk).filter(|_| !super::memock::off()) {
+        if let Some(&v) = self.sel_prem.get(&pk) {
             if super::memock::on() {
                 super::memock::f("sel_prem", v, sel_premium_of(&d, k));
             }
@@ -1805,7 +1805,7 @@ impl Core {
     /// `selection_dist()`
     pub fn selection_dist(&mut self) -> R<Rc<Vec<f64>>> {
         let sk = self.ctx_k();
-        if let Some(s) = self.sel.get(&sk).cloned().filter(|_| !super::memock::off()) {
+        if let Some(s) = self.sel.get(&sk).cloned() {
             if super::memock::on() {
                 let sv = self.ck_save();
                 let fresh = self.selection_dist_body();

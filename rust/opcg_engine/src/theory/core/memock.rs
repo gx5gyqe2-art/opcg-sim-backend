@@ -60,7 +60,8 @@ pub fn on() -> bool {
 
 /// `OPCG_MEMO_OFF` があると、検算の対象の覚え書き（核の・外側の・局の駆動の）を**全部引かない**（書くだけ）＝覚え書きの無い解き方。
 /// 出力が覚え書きつきと同じなら（解いた回数の計数を除く）、覚え書きが値を変えていないことの通しの証拠（2026-10-07）。
-/// 守る側の動的計画の中の状態の覚え書き（`defender`・`GuardTable`・`GuardPlan`）と札の表の写し（`info` ほか）は対象外。
+/// 守る側の動的計画の中の状態の覚え書き（`defender`・`GuardTable`・`GuardPlan`）・札の表の写し（`info` ほか）・選択の分布（`sel`・
+/// 全部の札の効果の値を解く＝引かないと 1 呼び出しごとに 2,803 枚を解き直して通しが終わらない・検算 `memock` と `tests_memo` が見る）は対象外。
 #[inline]
 pub fn off() -> bool {
     OFF_INIT.call_once(|| OFF.store(std::env::var_os("OPCG_MEMO_OFF").is_some(), Ordering::Relaxed));
