@@ -234,6 +234,14 @@ def _binder(fn):
     return bind
 
 
+def _pop_frame(fr):
+    """記録中の枠を同一性で外す（`list.remove` は `==` で比べる＝中身の同じ外側の枠を外してしまう）。"""
+    for i in range(len(_FRAMES) - 1, -1, -1):
+        if _FRAMES[i] is fr:
+            del _FRAMES[i]
+            return
+
+
 def _frame_pre(fr):
     return [[n, RS.enc(k), RS.enc(v)] for n, k, v in fr["pre"]]
 
@@ -266,7 +274,7 @@ def _call_routed(name, orig, bind, args, kw, transform=None):
         r = orig(*args, **kw)
     finally:
         _DEPTH[0] -= 1
-        _FRAMES.remove(fr)
+        _pop_frame(fr)
     cs = [x - y for x, y in zip(_cond_stats(), cs0)]
     r_enc = _enc(r)
     if cap:
@@ -296,7 +304,7 @@ def _call_internal(name, orig, bind, args, kw):
     try:
         r = orig(*args, **kw)
     finally:
-        _FRAMES.remove(fr)
+        _pop_frame(fr)
     cs = [x - y for x, y in zip(_cond_stats(), cs0)]
     try:
         _record(name, a_enc, g, _frame_pre(fr), _enc(r), cs)
@@ -376,7 +384,7 @@ class _BothJV:
             r = self._py.value(k)
         finally:
             _DEPTH[0] -= 1
-            _FRAMES.remove(fr)
+            _pop_frame(fr)
         cs = [x - y for x, y in zip(_cond_stats(), cs0)]
         r_enc = _enc(r)
         if _CFG["dir"]:
