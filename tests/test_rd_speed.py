@@ -243,12 +243,14 @@ def test_the_plan_store_key_is_shared_across_tools_and_module_names(_budget, tmp
 #: 解き方の関数の原文の指紋（版ごと）。解き方を変えたら `crossing_bridge.SOLVER_VERSION` を上げ、ここに新しい指紋を足す
 #: （ディスクの覚え書きの古い値を読まないため・値を変えたなら `rule_don_ref.py` も同じ変更で更新する）。
 #: **rd-speed-3（Rust 化・第 3 段）から Rust の核の原文のハッシュ（`rd_kernel.source_hash()`）も指紋に入る**——
-#: `src/theory` を直して版を上げ忘れると落ちる（設計 §6.4）。
+#: 守る側の計算のファイル（rd-speed-5 から `rd_kernel.KERNEL_FILES` の 8 つだけ・理論の移植のファイルは入らない）を直して
+#: 版を上げ忘れると落ちる（設計 §6.4）。
 SOLVER_FINGERPRINTS = {
     "rd-speed-1": "84e3b483d52b4b2c",
     "rd-speed-2": "45dc6aba0ff5c6b2",     # switch cleanup A（2026-10-05）: 死んだ切替の枝を削除（値は不変）
     "rd-speed-3": "9e21fec15160dcda",     # Rust 化・第 3 段（2026-10-05）: 速くした Python の解き方を消した（値は不変）
     "rd-speed-4": "1b96139ac93cffad",     # 全移植・段 1／2（2026-10-06）: `src/theory` に葉を足した（解き方の値は不変）
+    "rd-speed-5": "92b35884614a0123",     # 全移植・段 3（2026-10-07）: 原文のハッシュを守る側の 8 ファイルだけに（値は不変）
 }
 _SOLVER_FUNCS = ("rule_guard_plan_ex", "_prices_of", "_attach_gain", "rules_steps", "walk_crossing", "model_horizon",
                  "tau_grow", "rule_don_solve", "_rd_solve_args", "_rd_run", "_rule_don_masks")
