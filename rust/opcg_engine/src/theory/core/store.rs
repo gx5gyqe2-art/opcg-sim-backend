@@ -94,7 +94,7 @@ fn fl(v: &[f64]) -> V {
 /// 鍵（16 進 32 字）
 pub fn key_of(c: &Core, p: &DefIn, ax: &Actx) -> String {
     let mut items: Vec<(V, V)> = ax.d.kv().to_vec();
-    items.sort_by(|a, b| a.0.pystr().cmp(&b.0.pystr()));
+    items.sort_by_key(|a| a.0.pystr());
     let body = V::list(vec![
         V::s(SOLVER_VERSION),
         V::s(SOLVER_SRC_HASH),

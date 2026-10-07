@@ -20,7 +20,7 @@ use super::super::plans::{self, Mask, SolveIn};
 use super::super::pyval::PyVal;
 use super::super::sched::{StepIn, Tables};
 use super::ev::R;
-use super::obj::{dset_mut, key_of, knum, to_pyval, V, K};
+use super::obj::{dset_mut, key_of, knum, V, K};
 use super::state::Core;
 use super::to::{theta, DELTA, ATTACK_DON_MAX};
 
@@ -1034,7 +1034,7 @@ impl Core {
             .iter()
             .map(|c| {
                 let mut ps: Vec<(V, V)> = c.parts.kv().to_vec();
-                ps.sort_by(|a, b| a.0.pystr().cmp(&b.0.pystr()));
+                ps.sort_by_key(|a| a.0.pystr());
                 V::tuple(vec![
                     V::Int(c.cost),
                     V::tuple(ps.into_iter().map(|(k, v)| V::tuple(vec![k, v])).collect()),
@@ -1317,7 +1317,7 @@ impl Core {
         }
         let l0 = nonneg_round(p.life);
         let head = vec![ksorted_pairs(p.cards), knum(p.don), ksorted(p.blk), knum(l0 as f64)];
-        let tail = vec![ktrip(p.life_types), ktrip(p.draw_types), ksorted(p.arrive), key_of(ax.d.get("key"))];
+        let tail = [ktrip(p.life_types), ktrip(p.draw_types), ksorted(p.arrive), key_of(ax.d.get("key"))];
         let mut key = head.clone();
         key.push(p.turns.map(|t| knum(t as f64)).unwrap_or(K::None));
         key.extend(tail.iter().cloned());
@@ -1667,9 +1667,4 @@ impl Core {
         }
         (lam * sc[lt::SC_MY_LIFE], g * sc[lt::SC_MY_HAND], body)
     }
-}
-
-/// `_rule_board` の外から呼ばれる形に合わせた小さな道具（PyVal へ）
-pub fn pv(v: &V) -> PyVal {
-    to_pyval(v)
 }

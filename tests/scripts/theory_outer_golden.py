@@ -17,10 +17,10 @@ import os
 import sys
 import zlib
 
-CAP = {"cb.rule_don_solve": 40, "cb.threshold_parts_side": 60, "cb.rule_don_plan_for": 60, "cb.attacker_ctx": 60,
-       "hp.search_context": 40, "tb.guard_hand_reading": 40}
-DEFAULT_CAP = 100
-CURVES = 6
+CAP = {"cb.rule_don_solve": 80, "cb.threshold_parts_side": 120, "cb.rule_don_plan_for": 120, "cb.attacker_ctx": 120,
+       "hp.search_context": 80, "tb.guard_hand_reading": 80}
+DEFAULT_CAP = 200
+CURVES = 12
 
 
 def _dumps(v):
@@ -80,6 +80,7 @@ def main(argv=None):
     heaps = {}
     curves = {}       # src -> 最大ヒープ [(-crc, 字句, 曲線)]
     seen = set()
+    seq = [0]
     n_in = 0
     for src, tag, td in _dirs(root):
         for fn in sorted(f for f in os.listdir(td) if f.endswith(".jsonl")):
@@ -89,7 +90,8 @@ def main(argv=None):
                     k = _dumps(ent[0]["a"])
                     crc = zlib.crc32(k.encode())
                     hp = curves.setdefault(src, [])
-                    item = (-crc, _Rev(k), ent)
+                    seq[0] += 1
+                    item = (-crc, _Rev(k), -seq[0], ent)
                     if len(hp) < CURVES:
                         heapq.heappush(hp, item)
                     elif (-crc, _Rev(k)) > (hp[0][0], hp[0][1]):
@@ -106,18 +108,19 @@ def main(argv=None):
                     crc = zlib.crc32(k.encode())
                     hp = heaps.setdefault((rec["fn"], src), [])
                     n = CAP.get(rec["fn"], DEFAULT_CAP)
-                    item = (-crc, _Rev(k), rec)
+                    seq[0] += 1
+                    item = (-crc, _Rev(k), -seq[0], rec)
                     if len(hp) < n:
                         heapq.heappush(hp, item)
                     elif (-crc, _Rev(k)) > (hp[0][0], hp[0][1]):
                         heapq.heapreplace(hp, item)
     lines = []
     for src in sorted(curves):
-        for _c, _k, (crec, cvs) in sorted(curves[src], key=lambda x: (-x[0], str(x[1]))):
+        for _c, _k, _s, (crec, cvs) in sorted(curves[src], key=lambda x: (-x[0], str(x[1]), -x[2])):
             lines.append(_dumps(crec))
             lines.extend(_dumps(r) for r in cvs)
     for (fn, src) in sorted(heaps):
-        for _c, _k, rec in sorted(heaps[(fn, src)], key=lambda x: (-x[0], str(x[1]))):
+        for _c, _k, _s, rec in sorted(heaps[(fn, src)], key=lambda x: (-x[0], str(x[1]), -x[2])):
             lines.append(_dumps(rec))
     with gzip.open(out, "wt", encoding="utf-8", compresslevel=9) as fh:
         for ln in lines:
