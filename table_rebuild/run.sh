@@ -5,7 +5,7 @@
 set -u
 ROOT=$(cd "$(dirname "$0")/.." && pwd); OUT=$ROOT/table_rebuild/results; mkdir -p "$OUT"; cd "$ROOT"
 D=${TR_DATA:-/home/user/tr/sigma_wip/data}
-export OPCG_LOG_SILENT=1 OPCG_RD_KERNEL=rs OPCG_PLAN_STORE=${TR_STORE:-/home/user/tr/store}
+export OPCG_LOG_SILENT=1 OPCG_PLAN_STORE=${TR_STORE:-/home/user/tr/store}
 REAL="$D/w41"; SYN="$D/w39 $D/w42"
 P=$1
 step() { out=$1; shift; if [ -s "$out" ]; then echo "skip $(basename $out)"; return; fi

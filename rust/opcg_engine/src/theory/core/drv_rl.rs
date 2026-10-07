@@ -1,7 +1,7 @@
-//! 段 6: `relative_ledger.collect` の 1 局ぶん（`D_MODE=curve`・`THETA_HAND_MODE=rule_don`・`parts=False`）。
+//! 段 6: `relative_ledger.collect` の 1 局ぶん（`D_MODE=curve`・`THETA_HAND_MODE=rule_don`・`parts`＝T145 の内訳は段 7 から）。
 //! 行の読み: `rate_of_row`（計画つき）・`g_of_row`・`with_life_types`・`with_hand_blocker`・`attacker_ctx`・`rule_don_plan_for`・
 //! `_mirror_for`（`mirror_view`）・`state_of_row`・`clocks_of`・`k_of`・`dlog_of`・`w_of`・`_invariance`・`axis_of_move`。
-//! 局をまたぐのは `prev_ks`（プラセボ）だけ＝`carry`。戻り＝`{"stats", "out": None か {"z0", "w0", "acc", "before", "last"}, "rs", "carry"}`。
+//! 局をまたぐのは `prev_ks`（プラセボ）だけ＝`carry`。戻り＝`{"stats", "out": None か {"z0", "w0", "acc", "before", "last"〔, "part"＝`parts` のとき〕}, "rs", "carry"}`。
 
 use super::super::leaves_to as lt;
 use super::super::numeric::py_max;
@@ -65,10 +65,10 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
     let scale_a = pc.get("scale_a").f();
     let scale_cur = pc.get("scale_currency").f();
     let mirror_me = pc.get("MIRROR_ME").truthy();
-    if pc.get("parts").truthy() {
-        return Err("移していない枝: relative_ledger --parts".into());
-    }
+    // 段 7: `parts`（T145・`--pre-settle on` のとき旗だけ読む）＝`rel_K` を (席, 最後の自席ターンか, 宣言した行か) で割る
+    let parts = pc.get("parts").truthy();
     let settled = settled_of(p);
+    let mut acc_part: Vec<((i64, bool, bool), f64)> = Vec::new();
     let prev_ks: Vec<f64> = p.get("carry").get("prev_ks").items().iter().map(|x| x.f()).collect();
     let (theta, mu) = (cfg.theta, cfg.mu);
     stats.addi("games", 1);
@@ -281,6 +281,14 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         let lt_of = last_turn_of.iter().find(|(a, _)| *a == w).map(|e| e.1);
         let is_last = Some(t) == lt_of;
         stats.addi("last_turn_rows", is_last as i64);
+        if parts {
+            let dec = settled.as_ref().map(|v| v.contains(&(w, t))).unwrap_or(false);
+            let pk = (w, is_last, dec);
+            match acc_part.iter_mut().find(|e| e.0 == pk) {
+                Some(e) => e.1 += one[3],
+                None => acc_part.push((pk, 0.0 + one[3])),
+            }
+        }
         for i in 0..7 {
             acc[i] += one[i];
             if is_last {
@@ -295,13 +303,19 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         V::None
     } else {
         let z0 = z_of.iter().find(|(w, _)| *w == 0).map(|e| e.1).unwrap_or(0.0);
-        V::dict(vec![
+        let mut o = vec![
             (V::s("z0"), V::Float(z0)),
             (V::s("w0"), V::Float(w0.unwrap_or(0.5))),
             (V::s("acc"), fl(&acc)),
             (V::s("before"), fl(&acc_before)),
             (V::s("last"), fl(&acc_last)),
-        ])
+        ];
+        // `part` は `parts` のときだけ（段 6 の記録の再生の戻りの形を変えない）
+        if parts {
+            let pl = acc_part.iter().map(|((w, l, d), v)| V::list(vec![V::Int(*w), V::Bool(*l), V::Bool(*d), V::Float(*v)]));
+            o.push((V::s("part"), V::list(pl.collect())));
+        }
+        V::dict(o)
     };
     Ok(V::dict(vec![
         (V::s("stats"), stats.to_v()),

@@ -143,6 +143,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
              # **P5／P7 を行ごとに厳密に検算する**（AUC の比較ではなく一致の検算）
              "inv": {"p5_n": 0, "p5_bad": 0, "p5_max": 0.0, "p5_bad_offcap": 0,
                      "p7_n": 0, "p7_bad": 0, "p7_max": 0.0, "p7_bad_offcap": 0}}
+    part_rows = []                        # **T145**: 局ごとの `rel_K` の内訳
     prev_ks = []                          # プラセボ用: **前の局**の同じ行番号の `K`
     games = 0
     for game in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
@@ -152,7 +153,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
         seed = TR.seed_of(game)
         pin = {"decks": TR.deck_list(KV._deck_pair(seat_decks, seed)), "settled": TR.settled_in(settled, seed)}
         c = TR.cfg(theta, mu, prof=prof, sr=float(sr), scale_a=float(scale_a), scale_currency=float(scale_currency),
-                   MIRROR_ME=bool(TR.RUN["MIRROR_ME"]), parts=False)
+                   MIRROR_ME=bool(TR.RUN["MIRROR_ME"]), parts=bool(pre_settle))
         res = TR.game_call("relative_ledger", game, {"cfg": c, "in": pin, "stats": stats, "carry": {"prev_ks": prev_ks}})
         prev_ks = res["carry"]["prev_ks"]
         rs.extend(res["rs"])
@@ -163,6 +164,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
             for nm, vals in ((arms, o["acc"]), (before, o["before"]), (last, o["last"])):
                 for k, v in zip(nm, vals):
                     nm[k].append(v)
+            if pre_settle:                # **T145**: `rel_K` の内訳（席 0 視点・宣言した行の旗だけ読む）
+                part_rows.append((o["z0"], o["acc"][ARMS.index("rel_K")],
+                                  {(int(w), bool(lt), bool(d)): v for w, lt, d, v in o["part"]}))
         new = res["stats"]
         stats.clear()
         stats.update(new)
@@ -190,10 +194,48 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
            "before": {kk: KV._score(before[kk], zs) for kk in ARMS},
            # **P3**: とどめの帯だけ（厳密形が効くならここだけで効くはず）
            "last_turn": {kk: KV._score(last[kk], zs) for kk in ARMS}}
+    if pre_settle:
+        out["parts"] = parts_of(part_rows)
     # **N-3**（値段の窓は `joint` だけ）
     out["cut_price"] = {"mode": TR.SW["CUT_PRICE_MODE"],
                         **{k: v for k, v in stats.items() if str(k).startswith("cut_")}}
     return out
+
+
+def parts_of(part_rows):
+    """**T145**: `rel_K` の局ごとの和を割った表。`part_rows` は `(z0, 全体の和, {(席, 最後か, 宣言か): 和})`。
+
+    * `mean_winner_view` … 各部分の和を**勝者の視点**に直した平均（勝者の最後のターン・敗者の最後のターン・
+      宣言した行〔勝者／敗者〕・それ以外）。**正なら勝者の側に積んでいる**。
+    * `auc` … 全体の和から部分を引いた「腕」の AUC（`z` は席 0 の勝敗）:
+      `all`（全行）／`minus_declared`（宣言した行を引く＝T138b の `--pre-settle on` と同じ行）／
+      `minus_both_last`（両席の最後の自席ターンを引く＝`before` と同じ行）／
+      `minus_winner_last`・`minus_loser_last`（片方の席の最後のターンだけ引く）。"""
+    names = ("winner_last", "loser_last", "winner_declared", "loser_declared", "rest")
+    sums = {k: [] for k in names}
+    arms = {k: [] for k in ("all", "minus_declared", "minus_both_last", "minus_winner_last",
+                            "minus_loser_last")}
+    zs = []
+    for z0, tot, part in part_rows:
+        win = 0 if z0 > 0.5 else 1
+        sg = 1.0 if win == 0 else -1.0                   # 席 0 視点 → 勝者視点
+        wl = sum(v for (w, lt, _d), v in part.items() if w == win and lt)
+        ll = sum(v for (w, lt, _d), v in part.items() if w != win and lt)
+        wd = sum(v for (w, _lt, d), v in part.items() if w == win and d)
+        ld = sum(v for (w, _lt, d), v in part.items() if w != win and d)
+        rest = sum(v for (_w, lt, d), v in part.items() if not lt and not d)
+        for k, v in zip(names, (wl, ll, wd, ld, rest)):
+            sums[k].append(v * sg)
+        zs.append(z0)
+        arms["all"].append(tot)
+        arms["minus_declared"].append(tot - wd - ld)
+        arms["minus_both_last"].append(tot - wl - ll)
+        arms["minus_winner_last"].append(tot - wl)
+        arms["minus_loser_last"].append(tot - ll)
+    return {"games": len(zs),
+            "mean_winner_view": {k: round(float(np.mean(v)) if v else 0.0, 5) for k, v in sums.items()},
+            "auc": {k: KV._score(v, zs).get("auc") for k, v in arms.items()}}
+
 
 
 def build_parser():
