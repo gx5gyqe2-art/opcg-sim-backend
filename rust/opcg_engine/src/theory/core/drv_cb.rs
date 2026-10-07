@@ -147,7 +147,7 @@ impl Gs<'_> {
         getk(&self.turn_last, k).or_else(|| getk(&self.turn_start, k)).unwrap()
     }
     fn prev(&self, d: i64, t: i64) -> Option<i64> {
-        self.turn_seq[d as usize].iter().cloned().filter(|&tt| tt <= t).last()
+        self.turn_seq[d as usize].iter().cloned().rfind(|&tt| tt <= t)
     }
     fn zof(&self, w: i64) -> f64 {
         self.z_of.iter().find(|(a, _)| *a == w).map(|e| e.1).unwrap_or(0.0)
@@ -264,7 +264,7 @@ fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row:
     let mut actx: Option<Actx> = c.attacker_ctx(row, theta, mu, dk0.as_deref(), j == 0, None)?;
     let don_plan = c.rule_don_plan_for(row, &g_def, actx.as_mut())?;
     let hb = gs.hb_for(1 - w, t);
-    let (th_life, mut th_hand, th_body) = c.threshold_parts(row, &g_def, hb, actx.as_mut(), &don_plan)?;
+    let (th_life, th_hand, th_body) = c.threshold_parts(row, &g_def, hb, actx.as_mut(), &don_plan)?;
     let th_hb = py_max(0.0, hb);
     let (shield, sh_rate) = (0.0, 0.0);
     let hb2 = gs.hb_for(1 - w, t);
@@ -378,7 +378,6 @@ fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row:
         sd.addf("thw_cut_sum", th_hand - cap);
         sd.addi("thw_hit", (cap < th_hand - 1e-12) as i64);
         sd.addf("thw_tau_sum", tau_h);
-        th_hand = cap;
         th_w = bare + cap;
         d.set("theta", V::Float(th_w));
         d.set("th_hand", V::Float(cap));
@@ -459,6 +458,7 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
     let mut harm: Vec<(K2, f64)> = Vec::new();
     let mut priced: Vec<(K2, f64)> = Vec::new();
     let mut z_of: Vec<(i64, f64)> = Vec::new();
+    #[allow(clippy::needless_range_loop)]
     for k in 0..n {
         let r = &g.rows[k];
         let (w, t) = (r.who, r.turn);

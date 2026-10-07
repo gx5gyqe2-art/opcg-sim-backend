@@ -73,6 +73,8 @@ def main():
             raise SystemExit("OPCG_THEORY_ROWS=%s は OPCG_THEORY_CORE／OPCG_THEORY_OUTER=py（と記録なし）とだけ組む" % rows)
         import theory_rows_rs as TRR
         TRR.install(rows)
+        _run_split(tool, TRR.patch_main)
+        return
     if core:
         import theory_core_rs as TCR
         TCR.install()

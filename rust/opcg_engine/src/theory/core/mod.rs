@@ -51,3 +51,5 @@ pub mod to;
 mod tests_core;
 #[cfg(test)]
 mod tests_outer;
+#[cfg(test)]
+mod tests_rows;

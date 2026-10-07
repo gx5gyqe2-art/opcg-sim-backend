@@ -660,7 +660,7 @@ impl Core {
         let blk = self.opp_blockers_of(tok, Some(lp_or(sc[lt::SC_MY_LEADER_POWER])), lt::R_TURNS, theta, mu);
         let (mut lead, chars) = self.theory_slope_parts(tok, olp, theta, mu, &blk, false, sc[lt::SC_OPP_LIFE]);
         let mut base = lead + chars;
-        let (mut stock, mut stock_rush, mut eff_once) = (0.0, 0.0, 0.0);
+        let (stock, stock_rush, eff_once);
         {
             let r = r_clip(sc[lt::SC_OPP_LIFE]);
             let ci = row.ci.clone().ok_or("seat_slope_terms: ci_row が無い")?;
@@ -761,7 +761,7 @@ impl Core {
             for i in 1..=j {
                 let dr = py_max(0.0, rush[i] - rush[i - 1]);
                 val += dr * qp((j - i) as i64);
-                if i + 1 <= j {
+                if i < j {
                     let da = py_max(0.0, (atk[i] - atk[i - 1]) - dr);
                     val += da * qp(j as i64 - i as i64 - 1);
                 }
@@ -776,7 +776,7 @@ impl Core {
                 let f = self.a_of(dk, olp, Some(don_i), &vt, &vm, false, false)?;
                 let fr = self.a_of(dk, olp, Some(don_i), &vt, &vm, true, false)?;
                 val += if i <= j { fr * qp((j - i) as i64) } else { 0.0 };
-                if i + 1 <= j {
+                if i < j {
                     val += py_max(0.0, f - fr) * qp(j as i64 - i as i64 - 1);
                 }
             }

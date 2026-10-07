@@ -320,6 +320,7 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
     }
     let mut last_ci: [Option<usize>; 2] = [None, None];
     let mut recs: Vec<Rec> = Vec::new();
+    #[allow(clippy::needless_range_loop)]
     for k in 0..n {
         let r = &g.rows[k];
         let (w, t) = (r.who, r.turn);

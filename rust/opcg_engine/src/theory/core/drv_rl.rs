@@ -122,6 +122,7 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
             put(&mut g_last, (w, t), gl);
         }
     }
+    #[allow(clippy::needless_range_loop)]
     for k in 0..first_i.len() {
         let ((w, t), i0) = first_i[k];
         let mut tso: Option<i64> = None;

@@ -77,7 +77,7 @@ impl Core {
     }
 
     /// `state_of_row` の `th_me`（`cut_me` の窓の中）
-    fn state_th_me(&mut self, row: &Row, g_me: &V, mirror: MirrorArg, symmetric: bool) -> R<f64> {
+    pub fn state_th_me(&mut self, row: &Row, g_me: &V, mirror: MirrorArg, symmetric: bool) -> R<f64> {
         let m = match mirror {
             MirrorArg::None => None,
             MirrorArg::Eager(m) => m,
@@ -144,6 +144,7 @@ pub struct Mirror {
 }
 
 /// `state_of_row` の `mirror` の引数
+#[allow(clippy::large_enum_variant)]
 pub enum MirrorArg<'a> {
     None,
     Eager(Option<Mirror>),

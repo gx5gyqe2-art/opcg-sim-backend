@@ -136,6 +136,8 @@ def _counters_check(tool, before, res):
 
 
 def _capture(tool, fr, payload_txt, out_txt):
+    """1 回の呼び出しを記録の順に書く（1 プロセス＝1 ファイル＝`cargo test` が新しい核で頭から解き直す単位）。
+    局の駆動は `frame` 付き・行の関数（`fn`）は `frame` 無し。"""
     if _CFG["fh"] is None:
         src = os.environ.get("OPCG_THEORY_CAPTURE_SRC", "cap")
         d = os.path.join(_CFG["cap"], src)
@@ -144,9 +146,12 @@ def _capture(tool, fr, payload_txt, out_txt):
         _CFG["fh"] = gzip.open(os.path.join(d, name + ".rows.jsonl.gz"), "wt", encoding="utf-8")
     n = _CFG["games"].get(tool, 0)
     _CFG["games"][tool] = n + 1
-    line = json.dumps({"tool": tool, "game": n, "frame": frame_enc(fr), "payload": json.loads(payload_txt),
-                       "result": json.loads(out_txt)}, ensure_ascii=False, separators=(",", ":"))
-    _CFG["fh"].write(line + "\n")
+    rec = {"tool": tool, "game": n}
+    if fr is not None:
+        rec["frame"] = frame_enc(fr)
+    rec["payload"] = json.loads(payload_txt)
+    rec["result"] = json.loads(out_txt)
+    _CFG["fh"].write(json.dumps(rec, ensure_ascii=False, separators=(",", ":")) + "\n")
 
 
 def _close():
@@ -472,6 +477,64 @@ class CbDriver(_Driver):
             check(self.tool, nm, loc[nm][snap["n"][nm]:], res[nm])
 
 
+def _tb_mod():
+    """切替を読む `theory_bridge`（器が `theory_bridge` 自身なら `__main__` の写し）。"""
+    m = sys.modules.get("__main__")
+    if m is not None and os.path.basename(getattr(m, "__file__", "") or "") == "theory_bridge.py":
+        return m
+    import theory_bridge
+    return theory_bridge
+
+
+class TbDriver(_Driver):
+    tool = "theory_bridge"
+
+    def solve(self, game, n, stats):
+        import effect_value as EV
+        from opcg_sim.learned.train import plan_labels as PL
+        tb = _tb_mod()
+        loc = self.loc
+        rows, pol, ex, L, ptr, idx = game
+        stats["games"] += 1                                       # 器と同じ順（`_seat_decks` が `stats` に数える前）
+        seed = int(rows["seed"][idx[0]])
+        labels, _unk = PL.label_game(rows, pol, ex["sc"][:, 0], L, ptr, idx, loc["cards"])
+        decks = tb._seat_decks(loc["rec_decks"], seed, rows, ex, idx, loc["idx2cid"], stats)
+        pin = {"decks": [None if decks.get(w) is None else list(decks.get(w)) for w in (0, 1)],
+               "labels": [int(x) for x in labels]}
+        mc = loc["margin_comfort"]
+        cfg = dict(_cfg(loc, loc["prof"]), nu_targets=str(loc["nu_targets"]), GUARD_S_COST_MODE=tb.GUARD_S_COST_MODE,
+                   ledger_pricing=str(loc["ledger_pricing"]), MIRROR_ME=bool(tb.MIRROR_ME),
+                   F_PRICING_FIX=bool(EV.F_PRICING_FIX),
+                   margin_comfort=float(tb.MARGIN_COMFORT if mc is None else mc),
+                   PLAN_CLASSES=[str(c) for c in PL.PLAN_CLASSES])
+        return call(self.tool, game, {"cfg": cfg, "in": pin, "stats": stats, "carry": {}})
+
+    def apply(self, res):
+        per = self.loc["per"]
+        for key, rec in res["per"]:
+            key = tuple(key)
+            if key in per:
+                raise RuntimeError("theory rows: theory_bridge の per の鍵 %r が 2 局に出た（移していない）" % (key,))
+            per[key] = rec
+        self.loc["kn_turns"].extend(res["kn_turns"])
+        self.loc["kn_games"].append(res["kn_game"])
+
+    def snap(self):
+        s = super().snap()
+        s["keys"] = set(self.loc["per"])
+        s["nt"] = len(self.loc["kn_turns"])
+        s["ng"] = len(self.loc["kn_games"])
+        return s
+
+    def compare(self, snap, res):
+        loc = self.loc
+        check(self.tool, "stats", loc["stats"], res["stats"])
+        new = [(k, v) for k, v in loc["per"].items() if k not in snap["keys"]]
+        check(self.tool, "per", new, [(tuple(k), v) for k, v in res["per"]])
+        check(self.tool, "kn_turns", loc["kn_turns"][snap["nt"]:], res["kn_turns"])
+        check(self.tool, "kn_games", loc["kn_games"][snap["ng"]:], [res["kn_game"]])
+
+
 def _settled_rs(dirs, limit_games=0, with_don=True):
     """`lethal_rule.settled_map` の Rust 版（局ごとに `lethal_rule` の局の駆動）。"""
     import deck_refill as DR
@@ -503,8 +566,87 @@ def _settled_map_proxy(dirs, limit_games=0, with_don=True):
     return py
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# 行ごとの関数（局をまたがない）: `win_calib.probs_of`・`pre_settle_asymmetry.rows_with_p` の `p`／`s`
+
+def _rows_fn(fn, rs, **kw):
+    pl = dict(kw, fn=fn, cfg=dict(_cfg({}), clock=_clock()), rs=[[float(x) for x in r] for r in rs])
+    txt = RS.dumps(pl)
+    try:
+        out = _engine().theory_rows_call(txt)
+    except Exception as e:                               # noqa: BLE001
+        raise RuntimeError("theory rows: %s を Rust が解けない: %s" % (fn, e))
+    if _CFG["cap"]:
+        _capture("fn:" + fn, None, txt, out)
+    return RS.dec(json.loads(out))
+
+
+def _probs_rs(rs, sigma_rel=None, scale_mode="hyp"):
+    import theory_order as TO
+    old = TO.SIGMA_REL
+    try:
+        if sigma_rel is not None:
+            TO.set_sigma_rel(sigma_rel)
+        return _rows_fn("wc.probs_of", [(d, tm, to) for (d, tm, to, _z) in rs], scale_mode=str(scale_mode))
+    finally:
+        TO.set_sigma_rel(old)
+
+
+def _probs_proxy(real):
+    def probs_of(rs, sigma_rel=None, scale_mode="hyp"):
+        if _CFG["mode"] == "rs":
+            return _probs_rs(rs, sigma_rel, scale_mode)
+        py = real(rs, sigma_rel, scale_mode)
+        check("win_calib", "probs_of", py, _probs_rs(rs, sigma_rel, scale_mode))
+        _CFG["rows"] += len(py)
+        return py
+    probs_of.__doc__ = real.__doc__
+    return probs_of
+
+
+def _rows_with_p_proxy(real, ns):
+    """`pre_settle_asymmetry.rows_with_p` の `p`（`probs_of`）と `s`（`clock_scale`）を Rust で読む。
+    行の dict の形は Python が作る（器の原文と同じ並び）。"""
+    def rows_with_p(rows_out, slope="theory", sigma_rel=None, w_err="rel"):
+        import theory_order as TO
+        WC = ns["WC"]
+        rs = WC.rows_of(rows_out, slope)
+        old = TO.W_ERR_MODE
+        try:
+            TO.set_w_err_mode(w_err)
+            p = _probs_rs(rs, sigma_rel if w_err == "rel" else None)
+        finally:
+            TO.set_w_err_mode(old)
+        sv = _rows_fn("to.clock_scale", [(tm, to) for (_d, tm, to, _z) in rs])
+        stage_of = ns["stage_of"]
+        out = []
+        for r, (d, tm, to, z), pi, si in zip(rows_out, rs, p, sv):
+            out.append({"p": float(pi), "z": float(z), "d": float(d), "won": bool(r["won"]),
+                        "j_me": int(r["j_me"]), "stage": stage_of(r["j_me"]),
+                        "seed": r.get("seed"), "who": r.get("who"),
+                        "t": r.get("t"), "j_opp": r.get("j_opp"), "tau_me": float(tm), "tau_opp": float(to),
+                        "s": float(si)})
+        if _CFG["mode"] == "both":
+            check("pre_settle_asymmetry", "rows_with_p", real(rows_out, slope, sigma_rel, w_err), out)
+            _CFG["rows"] += len(out)
+        return out
+    rows_with_p.__doc__ = real.__doc__
+    return rows_with_p
+
+
+def patch_main(ns, tool):
+    """器を `__main__` で走らせるとき、器自身が持つ行の関数を差し替える（`theory_capture_run._run_split` から）。"""
+    if _CFG["mode"] == "py":
+        return
+    base = os.path.basename(tool)
+    if base == "win_calib.py":
+        ns["probs_of"] = _probs_proxy(ns["probs_of"])
+    elif base == "pre_settle_asymmetry.py":
+        ns["rows_with_p"] = _rows_with_p_proxy(ns["rows_with_p"], ns)
+
+
 #: `(ファイル名, 関数名)` → 局の駆動
-DRIVERS = {("crossing_bridge.py", "collect"): CbDriver, ("price_realised.py", "collect"): PrDriver, ("relative_ledger.py", "collect"): RlDriver, ("kappa_vector.py", "collect"): KvDriver, ("transition_ledger.py", "collect"): TlDriver}
+DRIVERS = {("theory_bridge.py", "collect"): TbDriver, ("crossing_bridge.py", "collect"): CbDriver, ("price_realised.py", "collect"): PrDriver, ("relative_ledger.py", "collect"): RlDriver, ("kappa_vector.py", "collect"): KvDriver, ("transition_ledger.py", "collect"): TlDriver}
 
 
 def _iter_games_proxy(*args, **kwargs):
@@ -535,6 +677,10 @@ def install(mode_=None):
     from opcg_sim.learned.train import plan_labels as PL
     _REAL["iter_games"] = PL.iter_games
     PL.iter_games = _iter_games_proxy
+    import win_calib as WC
+    WC.probs_of = _probs_proxy(WC.probs_of)
+    import pre_settle_asymmetry as PSA
+    PSA.rows_with_p = _rows_with_p_proxy(PSA.rows_with_p, vars(PSA))
     import lethal_rule as LR
     _REAL["settled_map"] = LR.settled_map
     LR.settled_map = _settled_map_proxy
