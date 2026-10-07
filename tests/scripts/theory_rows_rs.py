@@ -388,8 +388,53 @@ class RlDriver(_Driver):
             check(self.tool, nm, [loc[nm][k][n:] for k in loc[nm]], [[v] for v in vals])
 
 
+def _per_in(res_per):
+    """Rust の `per` の並び → `[(鍵, 記録)]`（`acts` は `set` に戻す）"""
+    out = []
+    for key, rec in res_per:
+        for tk in (rec.get("turns") or {}).values():
+            if "acts" in tk:
+                tk["acts"] = set(tk["acts"])
+        out.append((tuple(key), rec))
+    return out
+
+
+class PrDriver(_Driver):
+    tool = "price_realised"
+
+    def solve(self, game, n, stats):
+        import effect_value as EV
+        import theory_bridge as TB
+        loc = self.loc
+        rows, _pol, ex, _L, _ptr, idx = game
+        stats["games"] += 1                                       # 器と同じ順（`_seat_decks` が `stats` に数える前）
+        seed = int(rows["seed"][idx[0]])
+        decks = TB._seat_decks(loc["rec_decks"], seed, rows, ex, idx, loc["idx2cid"], stats)
+        pin = {"decks": [None if decks.get(w) is None else list(decks.get(w)) for w in (0, 1)]}
+        cfg = dict(_cfg(loc), F_PRICING_FIX=bool(EV.F_PRICING_FIX))
+        return call(self.tool, game, {"cfg": cfg, "in": pin, "stats": stats, "carry": {}})
+
+    def apply(self, res):
+        per = self.loc["per"]
+        for key, rec in _per_in(res["per"]):
+            if key in per:
+                raise RuntimeError("theory rows: price_realised の per の鍵 %r が 2 局に出た（移していない）" % (key,))
+            per[key] = rec
+
+    def snap(self):
+        s = super().snap()
+        s["keys"] = set(self.loc["per"])
+        return s
+
+    def compare(self, snap, res):
+        loc = self.loc
+        check(self.tool, "stats", loc["stats"], res["stats"])
+        new = [(k, v) for k, v in loc["per"].items() if k not in snap["keys"]]
+        check(self.tool, "per", new, _per_in(res["per"]))
+
+
 #: `(ファイル名, 関数名)` → 局の駆動
-DRIVERS = {("relative_ledger.py", "collect"): RlDriver, ("kappa_vector.py", "collect"): KvDriver, ("transition_ledger.py", "collect"): TlDriver}
+DRIVERS = {("price_realised.py", "collect"): PrDriver, ("relative_ledger.py", "collect"): RlDriver, ("kappa_vector.py", "collect"): KvDriver, ("transition_ledger.py", "collect"): TlDriver}
 
 
 def _iter_games_proxy(*args, **kwargs):
