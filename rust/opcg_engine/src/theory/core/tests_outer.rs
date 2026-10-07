@@ -105,6 +105,8 @@ fn replay_one(c: &mut Core, l: &Line, curves: &mut HashMap<String, String>) -> (
 
 type Per = Vec<(String, usize, usize)>;
 
+static TIMES: std::sync::Mutex<std::collections::BTreeMap<String, f64>> = std::sync::Mutex::new(std::collections::BTreeMap::new());
+
 fn replay_text(text: &str, per: &mut Per, bad: &mut Vec<String>) {
     let mut curves = HashMap::new();
     with_core(|c| {
@@ -113,7 +115,9 @@ fn replay_text(text: &str, per: &mut Per, bad: &mut Vec<String>) {
                 continue;
             }
             let l = parse_line(line);
+            let t0 = std::time::Instant::now();
             let (ok, why) = replay_one(c, &l, &mut curves);
+            *TIMES.lock().unwrap().entry(l.name.clone()).or_insert(0.0) += t0.elapsed().as_secs_f64();
             let e = match per.iter_mut().find(|e| e.0 == l.name) {
                 Some(e) => e,
                 None => {
@@ -160,6 +164,7 @@ fn recorded_outer_calls_replay_bit_identically() {
     let (mut per, mut bad) = (Vec::new(), Vec::new());
     replay_text(&text, &mut per, &mut bad);
     let total: usize = per.iter().map(|e| e.1).sum();
+    eprintln!("外側の golden: {total} 行・秒 {:?}", TIMES.lock().unwrap());
     assert!(bad.is_empty(), "記録と違う外側の呼び出し（先頭 20）:\n{}", bad.join("\n"));
     for e in ENTRIES {
         assert!(per.iter().any(|x| x.0 == *e && x.1 > 0), "入口 {e} の記録が無い");
