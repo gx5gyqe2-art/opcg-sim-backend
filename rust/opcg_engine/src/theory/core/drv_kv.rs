@@ -53,26 +53,11 @@ impl Core {
     }
 
     /// `KV.state_of_row(sc, tok, a_me, a_opp, j, g_me, g_opp, ci_row, idx2cid, cards, cut_me, cut_opp, don_plan, mirror)`
-    /// （`cut_*`＝窓の `ḡ`・`None` は `defending(None)`・`mirror`＝鏡の材料〔`sc`・`tok`・`g_me`・攻め手の行〕）
+    /// （`cut_*`＝窓の `ḡ`・`None` は `defending(None)`・`mirror`＝鏡の材料〔`Eager`＝呼ぶ前に作った dict・`Lazy`＝`cut_me` の窓の中で作る〕）
     #[allow(clippy::too_many_arguments)]
-    pub fn kv_state_of_row(&mut self, row: &Row, a_me: f64, a_opp: f64, j: i64, g_me: &V, g_opp: &V, cut_me: Option<f64>, cut_opp: Option<f64>, don_plan: &V, mirror: Option<&mut dyn FnMut(&mut Core) -> R<Option<Mirror>>>, symmetric: bool) -> R<St> {
+    pub fn kv_state_of_row(&mut self, row: &Row, a_me: f64, a_opp: f64, j: i64, g_me: &V, g_opp: &V, cut_me: Option<f64>, cut_opp: Option<f64>, don_plan: &V, mirror: MirrorArg, symmetric: bool) -> R<St> {
         let s = self.enter(cut_me);
-        let th_me = (|| -> R<f64> {
-            let m = match mirror {
-                Some(f) => f(self)?,
-                None => None,
-            };
-            match m {
-                Some(mut m) => {
-                    let ax = m.attacker.take();
-                    match ax {
-                        Some(mut a) => self.threshold(&m.row, &m.g_me, Some(&mut a), &V::None),
-                        None => self.threshold(&m.row, &m.g_me, None, &V::None),
-                    }
-                }
-                None => self.threshold_of_me(row, g_me, symmetric),
-            }
-        })();
+        let th_me = self.state_th_me(row, g_me, mirror, symmetric);
         self.leave(s);
         let th_me = th_me?;
         let s = self.enter(cut_opp);
@@ -89,6 +74,28 @@ impl Core {
             b_opp = 0.0;
         }
         Ok([th_me, th_opp, a_me, a_opp, j as f64, b_me, b_opp])
+    }
+
+    /// `state_of_row` の `th_me`（`cut_me` の窓の中）
+    fn state_th_me(&mut self, row: &Row, g_me: &V, mirror: MirrorArg, symmetric: bool) -> R<f64> {
+        let m = match mirror {
+            MirrorArg::None => None,
+            MirrorArg::Eager(m) => m,
+            MirrorArg::Lazy(f) => f(self)?,
+        };
+        match m {
+            Some(m) => {
+                let ax = match &m.att {
+                    None => None,
+                    Some((r, dk, no_now)) => self.attacker_ctx(r, super::to::theta(), lt::MU, dk.as_deref(), *no_now, None)?,
+                };
+                match ax {
+                    Some(mut a) => self.threshold(&m.row, &m.g_me, Some(&mut a), &V::None),
+                    None => self.threshold(&m.row, &m.g_me, None, &V::None),
+                }
+            }
+            None => self.threshold_of_me(row, g_me, symmetric),
+        }
     }
 
     /// 自席の判断点 1 行の価格の文脈（`kappa_vector`・`relative_ledger`・`transition_ledger` の形: `st` は `_state_of(sc, ci, idx2cid)`）
@@ -129,11 +136,18 @@ impl Core {
     }
 }
 
-/// 鏡の材料（`_mirror_for`／`_mirror_of` の戻り）
+/// 鏡の材料（`_mirror_for`／`_mirror_of` の戻り）。`att`＝攻め手の財布を作る行・デッキ・`no_attack_now`（`None`＝渡さない）
 pub struct Mirror {
     pub row: Row,
     pub g_me: V,
-    pub attacker: Option<super::outer::Actx>,
+    pub att: Option<(Row, Option<Vec<String>>, bool)>,
+}
+
+/// `state_of_row` の `mirror` の引数
+pub enum MirrorArg<'a> {
+    None,
+    Eager(Option<Mirror>),
+    Lazy(Box<dyn FnOnce(&mut Core) -> R<Option<Mirror>> + 'a>),
 }
 
 pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
@@ -198,7 +212,7 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         let row = r.row();
         let a_me = rate_at.iter().find(|(kk, _)| *kk == (w, t)).unwrap().1;
         let g_me = g_at.iter().find(|(kk, _)| *kk == (w, t)).unwrap().1.clone();
-        let st0 = c.kv_state_of_row(&row, a_me, ao, rw::own_turn_index(t), &g_me, &g_opp, None, None, &V::None, None, cfg.side_symmetric)?;
+        let st0 = c.kv_state_of_row(&row, a_me, ao, rw::own_turn_index(t), &g_me, &g_opp, None, None, &V::None, MirrorArg::None, cfg.side_symmetric)?;
         let sc = &r.sc;
         let rt = r_clip(sc[lt::SC_OPP_LIFE]);
         let olp = lp_or(sc[lt::SC_OPP_LEADER_POWER]);

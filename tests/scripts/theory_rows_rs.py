@@ -325,8 +325,71 @@ class TlDriver(_Driver):
         check(self.tool, "acc", self.loc["acc"], res["carry"]["acc"])
 
 
+def _settled_in(settled, seed):
+    """この局の宣言した行 `[[w, t], …]`（`settled` が無ければ `None`）"""
+    if settled is None:
+        return None
+    return [[w, t] for (sd, w, t), v in settled.items() if sd == seed and v]
+
+
+def _mirror_me():
+    import theory_bridge as TB
+    m = sys.modules.get("__main__")
+    if m is not None and os.path.basename(getattr(m, "__file__", "") or "") == "theory_bridge.py":
+        return bool(m.MIRROR_ME)
+    return bool(TB.MIRROR_ME)
+
+
+class RlDriver(_Driver):
+    tool = "relative_ledger"
+
+    def solve(self, game, n, stats):
+        loc = self.loc
+        seed = _seed_of(game)
+        pin = {"decks": _decks_pair(loc["seat_decks"], seed), "settled": _settled_in(loc["settled"], seed)}
+        cfg = dict(_cfg(loc, loc["prof"]), sr=float(loc["sr"]), scale_a=float(loc["scale_a"]),
+                   scale_currency=float(loc["scale_currency"]), MIRROR_ME=_mirror_me(), parts=bool(loc["flags"] is not None))
+        res = call(self.tool, game, {"cfg": cfg, "in": pin, "stats": stats,
+                                     "carry": {"prev_ks": self.carry.get("prev_ks", [])}})
+        self.carry["prev_ks"] = res["carry"]["prev_ks"]
+        return res
+
+    def apply(self, res):
+        loc = self.loc
+        loc["rs"].extend(res["rs"])
+        out = res["out"]
+        if out is None:
+            return
+        loc["zs"].append(out["z0"])
+        loc["w0s"].append(out["w0"])
+        for nm, vals in (("arms", out["acc"]), ("before", out["before"]), ("last", out["last"])):
+            d = loc[nm]
+            for k, v in zip(d, vals):
+                d[k].append(v)
+
+    def snap(self):
+        s = super().snap()
+        s["n"] = len(self.loc["zs"])
+        s["nr"] = len(self.loc["rs"])
+        return s
+
+    def compare(self, snap, res):
+        loc = self.loc
+        check(self.tool, "stats", loc["stats"], res["stats"])
+        check(self.tool, "rs", loc["rs"][snap["nr"]:], res["rs"])
+        check(self.tool, "prev_ks", loc["prev_ks"], res["carry"]["prev_ks"])
+        out = res["out"]
+        n = snap["n"]
+        if out is None:
+            check(self.tool, "appended", len(loc["zs"]) - n, 0)
+            return
+        check(self.tool, "z0/w0", [loc["zs"][n:], loc["w0s"][n:]], [[out["z0"]], [out["w0"]]])
+        for nm, vals in (("arms", out["acc"]), ("before", out["before"]), ("last", out["last"])):
+            check(self.tool, nm, [loc[nm][k][n:] for k in loc[nm]], [[v] for v in vals])
+
+
 #: `(ファイル名, 関数名)` → 局の駆動
-DRIVERS = {("kappa_vector.py", "collect"): KvDriver, ("transition_ledger.py", "collect"): TlDriver}
+DRIVERS = {("relative_ledger.py", "collect"): RlDriver, ("kappa_vector.py", "collect"): KvDriver, ("transition_ledger.py", "collect"): TlDriver}
 
 
 def _iter_games_proxy(*args, **kwargs):

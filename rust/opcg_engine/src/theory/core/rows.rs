@@ -1080,3 +1080,138 @@ pub fn dlog_of(st0: &St, st1: &St, prof: &[f64]) -> f64 {
 pub fn dx_contains(dx: &Dx, k: &str) -> bool {
     dx_has(dx, k)
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// 鏡（`crossing_bridge.mirror_view`・T151-2）
+
+/// f64 の値から盤面の引数を作る（`np.asarray(x, dtype=float)` の行・`ci` は元の dtype）
+pub fn row_of_f64(sc: Vec<f64>, tok: Tok, ci: Vec<i64>, ci_dtype: &str) -> Row {
+    use super::super::pyval::PyVal;
+    use std::rc::Rc;
+    let f8 = |xs: &[f64]| -> Vec<u8> { xs.iter().flat_map(|x| x.to_le_bytes()).collect() };
+    let ci_raw: Vec<u8> = match ci_dtype {
+        "i1" => ci.iter().map(|&x| x as i8 as u8).collect(),
+        "i2" => ci.iter().flat_map(|&x| (x as i16).to_le_bytes()).collect(),
+        "i4" => ci.iter().flat_map(|&x| (x as i32).to_le_bytes()).collect(),
+        _ => ci.iter().flat_map(|&x| x.to_le_bytes()).collect(),
+    };
+    let sc_v = V::Nd(Rc::new(PyVal::Nd { dtype: "f8".into(), shape: vec![sc.len()], raw: f8(&sc) }));
+    let tok_v = V::Nd(Rc::new(PyVal::Nd { dtype: "f8".into(), shape: vec![tok.rows, tok.cols], raw: f8(&tok.v) }));
+    let ci_v = V::Nd(Rc::new(PyVal::Nd { dtype: ci_dtype.into(), shape: vec![ci.len()], raw: ci_raw }));
+    Row { sc_v, tok_v, ci_v, sc, tok, ci: Some(ci) }
+}
+
+/// `ci` の dtype（`V::Nd` から）
+pub fn ci_dtype(row: &Row) -> String {
+    match &row.ci_v {
+        V::Nd(p) => p.nd_dtype().to_string(),
+        _ => "i8".into(),
+    }
+}
+
+impl Core {
+    /// `mirror_view(sc, tok, ci, tok_hand, ci_hand, cards, idx2cid)` → 相手の席から見た行
+    pub fn mirror_view(&mut self, row: &Row, tok_hand: Option<&Tok>, ci_hand: Option<&[i64]>) -> Row {
+        const ATT: usize = 2;
+        const SICK: usize = 4;
+        const POW_OTHER: usize = 20;
+        let sc = &row.sc;
+        let tok = &row.tok;
+        let ci = row.ci.as_ref().expect("mirror_view: ci");
+        let mut s = sc.clone();
+        let mut t = tok.clone();
+        let mut cc = ci.clone();
+        let own: Vec<usize> = lt::OWN_FIELD.collect();
+        let opp: Vec<usize> = lt::OPP_FIELD.collect();
+        let mut pairs: Vec<(usize, usize)> = vec![(0, 1)];
+        pairs.extend(own.iter().cloned().zip(opp.iter().cloned()));
+        for (new_i, old_i) in pairs {
+            let mut r: Vec<f64> = tok.row(old_i).to_vec();
+            let p0 = tok.at(old_i, lt::S_POWER);
+            r[lt::S_POWER] = p0;
+            r[POW_OTHER] = p0;
+            r[ATT] = 0.0;
+            r[lt::S_IS_REST] = 0.0;
+            r[SICK] = 0.0;
+            let is_char = tok.at(old_i, lt::S_IS_CHAR) > 0.5;
+            r[lt::S_CAN_ATTACK] = if new_i == 0 || is_char { 1.0 } else { 0.0 };
+            if new_i != 0 {
+                if !is_char {
+                    r[lt::S_IS_BLOCKER] = 0.0;
+                } else {
+                    let cid = self.t.cid_of(ci[old_i]).map(|x| x.to_string());
+                    let info = match cid {
+                        Some(c) if !c.is_empty() => self.info(&c),
+                        _ => V::None,
+                    };
+                    r[lt::S_IS_BLOCKER] = if info.get("blocker").truthy() { 1.0 } else { 0.0 };
+                }
+            }
+            t.v[new_i * t.cols..(new_i + 1) * t.cols].copy_from_slice(&r);
+        }
+        let mut pairs2: Vec<(usize, usize)> = vec![(1, 0)];
+        pairs2.extend(opp.iter().cloned().zip(own.iter().cloned()));
+        for (new_i, old_i) in pairs2 {
+            let mut r: Vec<f64> = tok.row(old_i).to_vec();
+            r[lt::S_POWER] = tok.at(old_i, POW_OTHER);
+            r[POW_OTHER] = tok.at(old_i, lt::S_POWER);
+            r[lt::S_CAN_ATTACK] = 0.0;
+            t.v[new_i * t.cols..(new_i + 1) * t.cols].copy_from_slice(&r);
+        }
+        for sl in lt::HAND {
+            for col in 0..t.cols {
+                t.v[sl * t.cols + col] = match tok_hand {
+                    Some(th) => th.at(sl, col),
+                    None => 0.0,
+                };
+            }
+        }
+        cc[0] = ci[1];
+        cc[1] = ci[0];
+        for (n, o) in own.iter().zip(opp.iter()) {
+            cc[*n] = ci[*o];
+        }
+        for (n, o) in opp.iter().zip(own.iter()) {
+            cc[*n] = ci[*o];
+        }
+        for sl in lt::HAND {
+            cc[sl] = match ci_hand {
+                Some(ch) => ch[sl],
+                None => 0,
+            };
+        }
+        if ci.len() >= lt::HAND.end + 2 {
+            cc[lt::HAND.end] = ci[lt::HAND.end + 1];
+            cc[lt::HAND.end + 1] = ci[lt::HAND.end];
+        }
+        for (a, b) in [(0usize, 1usize), (6, 7), (8, 9), (12, 13)] {
+            s[a] = sc[b];
+            s[b] = sc[a];
+        }
+        let (zact, zrest, zatt, zdeck) = zones(sc, tok, false);
+        let plus = py_min(2.0, zdeck);
+        s[2] = zact + zrest + zatt + plus;
+        s[3] = 0.0;
+        s[14] = 0.0;
+        s[66] = (zdeck - plus) / 10.0;
+        s[4] = sc[2];
+        s[5] = sc[3];
+        s[15] = sc[14];
+        s[67] = sc[66];
+        s[11] = 1.0;
+        let dt = ci_dtype(row);
+        row_of_f64(s, t, cc, &dt)
+    }
+}
+
+impl Core {
+    /// `rule_don_plan_for(sc, tok, g_hand, attacker)`（数えない・`mu` は既定の `MU`）
+    pub fn rule_don_plan_for(&mut self, row: &Row, g_hand: &V, attacker: Option<&mut Actx>) -> R<V> {
+        if !is_hr(g_hand) {
+            return Ok(V::None);
+        }
+        let Some(ax) = attacker else { return Ok(V::None) };
+        let (_h, plan) = self.rule_don_term(&row.sc, &row.tok, true, g_hand, Some(ax), MU, None, &V::None, false)?;
+        Ok(plan)
+    }
+}

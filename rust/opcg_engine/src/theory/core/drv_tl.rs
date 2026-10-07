@@ -185,7 +185,7 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         let cut_me = cut_me_fr.view_gbar(c, g, &mut stats, w, t, None)?;
         let cut_opp = cut.view_gbar(c, g, &mut stats, 1 - w, t, None)?;
         let row = r.row();
-        let mut st = c.kv_state_of_row(&row, me.0, op.0, rw::own_turn_index(t), &me.1, &op.1, cut_me, cut_opp, &V::None, None, cfg.side_symmetric)?;
+        let mut st = c.kv_state_of_row(&row, me.0, op.0, rw::own_turn_index(t), &me.1, &op.1, cut_me, cut_opp, &V::None, super::drv_kv::MirrorArg::None, cfg.side_symmetric)?;
         stats.addi("rows", 1);
         let mut dx: Dx = Vec::new();
         let mut fam = "none";
