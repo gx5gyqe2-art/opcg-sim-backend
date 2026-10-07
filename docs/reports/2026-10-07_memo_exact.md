@@ -291,7 +291,7 @@ pytest 621 passed・12 skipped・失敗 0**。この報告（`docs/` だけ）�
 `git log --oneline a4a5755ab..memofix`:
 
 ```
-REPORT_COMMIT 報告
+ad802a0d9 報告（このファイル）
 37d4176ba OPCG_MEMO_OFF は選択の分布を対象外に
 b13e85f5d tests_regen の clippy・TEST_SPEC に tests_memo／tests_regen の行
 67a611cf7 golden の戻りを作り直す（core 413・outer 355・rows 9 行・pre を外す）
