@@ -102,7 +102,7 @@ impl SeatD {
     }
 }
 
-/// `tau_theory_of(d)`
+/// `tau_theory_of(d)`（計画のある行は `min(歩き, 倒れる時刻の真ん中)`・`outer::clock_tau`・2026-10-08）
 fn tau_theory_of(d: &SeatD, decay_ko: bool) -> f64 {
     let or0 = |k: &str| -> f64 {
         let v = d.get(k);
@@ -126,7 +126,9 @@ fn tau_theory_of(d: &SeatD, decay_ko: bool) -> f64 {
         eff_once: or0("slope_eff_once"),
         sched: if sv.truthy() { sv.items().iter().map(|x| x.f()).collect() } else { Vec::new() },
     };
-    ou::tau_grow(d.f("theta"), &w, 0.0, RACE_CAP, or0("th_back"), or0("shield"), or0("shield_rate"), 0.0)
+    let tm = d.get("tau_med");
+    let tau_med = if tm.is_none() { None } else { Some(tm.f()) };
+    ou::clock_tau(ou::tau_grow(d.f("theta"), &w, 0.0, RACE_CAP, or0("th_back"), or0("shield"), or0("shield_rate"), 0.0), tau_med)
 }
 
 /// 局の中の状態（`collect` の閉包が読む局所変数）
@@ -360,6 +362,8 @@ fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row:
             ("t_left", V::Int(t_left)),
             ("j", V::Int(j)),
             ("sched", V::list(sched.iter().map(|&x| V::Float(x)).collect())),
+            // 倒れる時刻の真ん中（計画の辞書から・`tau_theory_of` が `outer::clock_tau` で歩きと小さい方を取る）
+            ("tau_med", don_plan.get("tau_med").clone()),
         ],
     };
     if th_hand > 0.0 && !model_theta {
@@ -436,6 +440,7 @@ fn m2_clock(d: &SeatD, rd: bool) -> V {
     let mut kv = vec![
         (V::s("tau"), V::Float(tau)),
         (V::s("tau_walk"), V::Float(tw)),
+        (V::s("tau_med"), d.get("tau_med").clone()),
         (V::s("J"), V::Int(jx)),
         (V::s("frac"), V::Float(frac)),
         (V::s("theta"), V::Float(theta)),

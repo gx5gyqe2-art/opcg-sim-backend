@@ -178,3 +178,20 @@ fn recorded_outer_calls_replay_bit_identically() {
     assert!(total > 1000, "記録が少なすぎる: {total}");
 }
 
+
+/// 倒れる時刻の真ん中と時計の読み（`docs/reports/2026-10-08_death_median.md` §1・手で導ける値）
+#[test]
+fn death_median_reads_the_half_point_of_the_death_steps() {
+    use super::outer::{clock_tau, death_median};
+    // 段 1 で 0.2・段 2 で 0.6 → 1/2 は段 2 の中: 1 + (0.5 − 0.2) / 0.6 = 1.5
+    assert_eq!(death_median(&[0.2, 0.6, 0.2]), Some(1.5));
+    // 段 1 で 0.992（① 報告 §3 の例の形）→ 0 + 0.5 / 0.992
+    assert_eq!(death_median(&[0.992, 0.008]), Some(0.5 / 0.992));
+    // 地平の内で半分に届かない（半分以上が地平を生き延びる）→ 無し
+    assert_eq!(death_median(&[0.1, 0.2, 0.1]), None);
+    assert_eq!(death_median(&[]), None);
+    // 時計は歩きと真ん中の小さい方・真ん中が無ければ歩きのまま（遅くはしない）
+    assert_eq!(clock_tau(2.0, Some(1.5)), 1.5);
+    assert_eq!(clock_tau(1.2, Some(1.5)), 1.2);
+    assert_eq!(clock_tau(4.25, None), 4.25);
+}

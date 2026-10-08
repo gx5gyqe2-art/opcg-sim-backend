@@ -13,7 +13,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use super::super::defender::{DpErr, Defender};
+use super::super::defender::{DpErr, Defender, Input};
 use super::super::leaves_deck as ld;
 use super::super::leaves_to::{self as lt, Tok, LAM, MU, PWR_EPS};
 use super::super::numeric::{bankers_round, py_max, py_min, py_round, py_round_int};
@@ -29,8 +29,10 @@ pub const RACE_CAP: f64 = 30.0;
 pub const SLOPE_FLOOR: f64 = 1e-3;
 pub const EX_STATE_BUDGET: usize = 300000;
 pub const FEQ: f64 = 1e-9;
-/// `crossing_bridge.SOLVER_VERSION`（Rust の計画のディスクの覚え書きの鍵に入る・Python と同じ値を保つ）
-pub const SOLVER_VERSION: &str = "rd-speed-6";
+/// `crossing_bridge.SOLVER_VERSION`（Rust の計画のディスクの覚え書きの鍵に入る・Python と同じ値を保つ）。
+/// `rd-speed-8`（2026-10-08）: 計画の辞書に倒れる時刻の真ん中 `tau_med` が入り、`tau`／`a_time` がそれを読む
+/// （`rd-speed-7` は不採用の 2 段の値付けが使った版なので飛ばした）。
+pub const SOLVER_VERSION: &str = "rd-speed-8";
 
 // ---------------------------------------------------------------------------------------------------------------
 // 引数の読み
@@ -397,6 +399,66 @@ pub fn rate_at(j: i64, w: &Walk) -> f64 {
         out += py_max(0.0, w.eff_once);
     }
     out
+}
+
+/// **倒れる時刻の真ん中**（2026-10-08・`docs/reports/2026-10-08_death_median.md` §1）。`p[t − 1]`＝段 `t` で守り手が倒れる確率
+/// （地平の内）。累積 `F` が最初に 1/2 に届く段 `t` で `(t − 1) + (1/2 − F_{t−1}) / p_t`（段 t で倒れる ↔ 時計の (t − 1, t]）。
+/// 地平の内で 1/2 に届かない（半分以上が地平を生き延びる）なら `None`。1/2 は「真ん中」の定義（新定数ではない）。
+pub fn death_median(p: &[f64]) -> Option<f64> {
+    let mut f = 0.0;
+    for (i, &pt) in p.iter().enumerate() {
+        if pt > 0.0 && f + pt >= 0.5 {
+            return Some(i as f64 + (0.5 - f) / pt);
+        }
+        f += pt;
+    }
+    None
+}
+
+/// **計画の時計の読み**（1 か所）: `τ = min(τ_歩き, τ_med)`。計画の辞書の `tau`（→ `a_time`）と `crossing_bridge` の行の
+/// `tau_theory_of` の両方がここを通る。`τ_med` が無い（半分以上が地平を生き延びる・ライフ 0・計画なし）なら歩きのまま。
+pub fn clock_tau(tau_walk: f64, tau_med: Option<f64>) -> f64 {
+    match tau_med {
+        Some(m) if m < tau_walk => m,
+        _ => tau_walk,
+    }
+}
+
+/// 採った計画のまま、守る側の計算を「倒れた段にだけ 1 を置く」値段で解き直し、段ごとに倒れる確率を返す
+/// （`λ_net = μ = ν = 0`・`(λ − λ_net)·L0 = 1`＝受けた 1 本・切った札・ブロッカーの値は 0、とどめの段にだけ 1）。
+/// 守り手の選び方（防いだ本数→切る枚数→生き延びるターン）は値段に依らないので同じ守り。ライフ 0 は `L0 = 0` で測れない＝`None`。
+/// `KERNEL_FILES` の解き方をそのまま呼ぶだけ（原文には触らない）。
+fn death_steps(inp: &SolveIn, m: &Mask, xs_first: &[f64], h: i64) -> Option<Vec<f64>> {
+    let l0 = bankers_round(inp.life);
+    if l0 < 1.0 {
+        return None;
+    }
+    let (_lam, _lam_net, _mu, olp, mlp) = inp.prices;
+    let nu0: Vec<(f64, f64)> = inp.nu.iter().map(|&(k, _)| (k, 0.0)).collect();
+    let mut d = Defender::new(None);
+    d.solve(&Input {
+        cards: inp.cards,
+        don: inp.don,
+        xs_first,
+        seq: &m.later_seq,
+        blk: inp.blk,
+        life: inp.life,
+        turns: Some(h),
+        life_types: inp.life_types,
+        draw_types: inp.draw_types,
+        lam: 1.0 / l0,
+        lam_net: 0.0,
+        mu: 0.0,
+        olp,
+        mlp,
+        rest: inp.rest,
+        arrive: inp.arrive,
+        nu: &nu0,
+        eps: inp.eps,
+        feq: inp.feq,
+    })
+    .ok()
+    .map(|o| o.harms)
 }
 
 /// `tau_grow(theta, ..., r, cap, ko_p, step, shield, shield_rate, ..., refill, ...)`（`ko_p` は呼ぶ側が決めた値）
@@ -1511,7 +1573,10 @@ impl Core {
         };
         let l0 = nonneg_round(p.life);
         let theta_parts = V::tuple(vec![V::Float(pr.0 * l0 as f64), V::Float(pr.2 * r.cut), V::Float(nu_all.f())]);
-        let tau = b.tau;
+        // 倒れる時刻の真ん中（採った計画・同じ地平）→ 時計は `min(歩き, 真ん中)`（計画の選び方は変えない）
+        let h_used = o.h.or(p.turns).unwrap_or(r.harms.len() as i64);
+        let tau_med = death_steps(&inp, &mk[b.mask], &xf, h_used).and_then(|pd| death_median(&pd));
+        let tau = clock_tau(b.tau, tau_med);
         let th = r.theta;
         let a_time = if tau > 1e-12 { th / tau } else { py_max(if b.sched.is_empty() { 0.0 } else { b.sched[0] }, SLOPE_FLOOR) };
         let a_turn = if b.sched.is_empty() { 0.0 } else { b.sched[0] };
@@ -1528,6 +1593,7 @@ impl Core {
             (V::s("alive"), V::Float(r.alive)),
             (V::s("value"), V::Float(b.val)),
             (V::s("tau"), V::Float(tau)),
+            (V::s("tau_med"), tau_med.map(V::Float).unwrap_or(V::None)),
             (V::s("harm_steps"), tfl(&r.harms)),
             (V::s("sched"), tfl(&b.sched)),
             (V::s("theta"), V::Float(r.theta)),
