@@ -1,6 +1,6 @@
 {
   "branch": "claude/diag-syn-sigma",
-  "commit": "SEE_GIT_LOG",
+  "commit": "257734f51 (report); RESULT.json is in the next commit",
   "report": "docs/reports/2026-10-08_syn_sigma.md",
   "summary": [
     "合成の σ_T の超過分散 2.025（4.018 対 1.993）の 70% は課題②の勝ち席の打ち切り 21 行（9 局）。除くと σ_T 2.004 → 1.611。課題①（地平の外の勝ち時計）は約 10%。",
