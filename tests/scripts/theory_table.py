@@ -6,7 +6,7 @@
 `w̄`（`κ = w(D)/w̄` の分母）は**それらを入れた** `theory_bridge` の `E[w(D)]`。だから順を守って 1 度に作り直す:
 
 1. `sigma` … `crossing_bridge` を実・合成で回し、輪郭（`real`／`syn`）・理論の速さ（`theory_slope`）・
-   `sigma_t`／`sigma_rel`／`sigma_rel_whole`（`blockers`）を書く（`table_rebuild/write_table.py` と同じ写し方）。
+   `sigma_t`／`sigma_rel_whole`（`blockers`・従来の `sigma_rel` の表は在るときだけ）を書く（`table_rebuild/write_table.py` と同じ写し方）。
 2. `w_bar` … 書いた表で `theory_bridge --measure-w-bar` を実・合成で回し、`w_bar.blockers` と
    **その出所 `w_bar_provenance.blockers`**（測った時に効いていた `σ_T`・`σ_rel`・輪郭〔`crossing_bridge.w_bar_inputs`〕と
    `Σκ`・`n`・記録・コミット）を書く。
@@ -88,7 +88,7 @@ def _check_kinds(dirs_by):
 
 
 def stage_sigma(dirs_by, work, sets):
-    """手順 1: `crossing_bridge` → 輪郭・`theory_slope`・`sigma_t`／`sigma_rel`／`sigma_rel_whole`。"""
+    """手順 1: `crossing_bridge` → 輪郭・`theory_slope`・`sigma_t`／`sigma_rel_whole`。"""
     for s in sets:
         _run("crossing_bridge", dirs_by[s], os.path.join(work, "cb_%s.json" % s))
     if set(sets) != set(SETS):
@@ -102,8 +102,9 @@ def stage_sigma(dirs_by, work, sets):
         d["theory_slope"][s] = hp["theory_slope_by_turn"]
         d["sigma_t"][BODY][s] = by["curve"]["sigma_T"]
         for sv in ("theory", "curve"):
-            d["sigma_rel"][BODY][sv][s] = by[sv]["sigma_rel"]
             d["sigma_rel_whole"][BODY][sv][s] = by[sv]["sigma_rel_whole"]
+            if "sigma_rel" in d:          # 従来の `sigma_rel` の表（波C で既定から外れた）は在るときだけ
+                d["sigma_rel"][BODY][sv][s] = by[sv]["sigma_rel"]
     _dump(d)
     print("wrote sigma", json.dumps({s: d["sigma_t"][BODY][s] for s in SETS}), flush=True)
     return True
