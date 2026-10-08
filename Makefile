@@ -53,6 +53,7 @@ golden-replay:
 
 # 損害の輪郭の表（`tests/fixtures/harm_profile.json`）の作り直し（2026-10-08・**1 本の手順**・`tests/scripts/theory_table.py`）。
 # 順を守る: `crossing_bridge` → 輪郭・σ_T・σ_rel → それを入れた `theory_bridge` → `w_bar` と**その出所**（`w_bar_provenance`）。
+# `w_bar[X]` は X の記録で、**その w̄ を使う行（もう一方のセット）の分子と同じ σ_T・σ_rel** で測る（2026-10-08 決定 B・`--w-bar-sigma consumer`）。
 # `κ = w(D)/w̄` を使う器は出所が今の表と違えば落ちる（σ だけ測り直して w̄ を測り直さない表では動かない）。
 # 例: make theory-table REAL=<data>/w41 SYN="<data>/w39 <data>/w42" WORK=<scratch>/theory_table
 #     （所要の目安: crossing_bridge 実 7 分・合成 23 分、theory_bridge 実 20 分・合成 65 分。出力があれば続きから）
