@@ -24,13 +24,14 @@ use super::ev::R;
 use super::obj::{dset_mut, knum, V, K};
 use super::state::Core;
 use super::to::{theta, DELTA, ATTACK_DON_MAX};
+use super::two_tier::{next_cap, Guard};
 
 pub const RACE_CAP: f64 = 30.0;
 pub const SLOPE_FLOOR: f64 = 1e-3;
 pub const EX_STATE_BUDGET: usize = 300000;
 pub const FEQ: f64 = 1e-9;
 /// `crossing_bridge.SOLVER_VERSION`（Rust の計画のディスクの覚え書きの鍵に入る・Python と同じ値を保つ）
-pub const SOLVER_VERSION: &str = "rd-speed-6";
+pub const SOLVER_VERSION: &str = "rd-speed-7";
 
 // ---------------------------------------------------------------------------------------------------------------
 // 引数の読み
@@ -157,6 +158,13 @@ pub struct Actx {
     pub rest_blk: Vec<f64>,
     pub blk_a: Vec<(f64, f64)>,
     pub theta_p: f64,
+    /// 山の体（守り手のリーダーへの超過・費用・速攻）と山の札の数（流入 `a_tab` の 2 段の作り直し・2026-10-08）
+    pub flow_bodies: Vec<(f64, i64, bool)>,
+    pub flow_n: i64,
+    /// 守り手が止められる量（`rule_don_solve` が守る側の入力から付ける・`two_tier.rs`）
+    pub guard: Option<Guard>,
+    /// `TV(xs, K)` の覚え書き（鍵は並びと量のビット・財布の写しの間だけ）
+    pub tv: HashMap<(Vec<u64>, u64), (f64, f64)>,
 }
 
 #[derive(Clone, Debug)]
@@ -239,6 +247,15 @@ impl Actx {
             rest_blk: floats_of(v.get("rest_blk")),
             blk_a: v.get("blk_a").items().iter().map(|p| (p.items()[0].f(), p.items()[1].f())).collect(),
             theta_p: if v.has("theta_p") { v.get("theta_p").f() } else { theta() },
+            flow_bodies: v
+                .get("flow_bodies")
+                .items()
+                .iter()
+                .map(|t| (t.items()[0].f(), t.items()[1].int(), t.items()[2].truthy()))
+                .collect(),
+            flow_n: if v.has("flow_n") { v.get("flow_n").int() } else { 0 },
+            guard: None,
+            tv: HashMap::new(),
             d,
             gain,
             gain_order,
@@ -988,7 +1005,16 @@ impl Core {
         }
         let ln = (lmax + 1).max(0) as usize;
         let (mut a_tab, mut ar_tab, mut e_tab) = (vec![0.0; ln], vec![0.0; ln], vec![0.0; ln]);
+        let mut flow_bodies: Vec<(f64, i64, bool)> = Vec::new();
+        let mut flow_n = 0i64;
         if let Some(d) = deck.filter(|d| !d.is_empty()) {
+            for cid in d {
+                let Some(m) = self.t.get(cid) else { continue };
+                flow_n += 1;
+                if ld::body_of(m) {
+                    flow_bodies.push((m.power - olp, m.cost, m.keywords.iter().any(|k| k == "速攻")));
+                }
+            }
             let (tv, mv) = (V::Float(theta_), V::Float(mu));
             let t = self.t.clone();
             let bs = self.bd.clone();
@@ -1084,6 +1110,11 @@ impl Core {
             (V::s("rest_blk"), tfl(&rest_blk)),
             (V::s("blk_a"), V::list(blk_a.iter().map(|&(a, b)| V::tuple(vec![V::Float(a), V::Float(b)])).collect())),
             (V::s("theta_p"), V::Float(theta_)),
+            (
+                V::s("flow_bodies"),
+                V::list(flow_bodies.iter().map(|&(x, c, r)| V::tuple(vec![V::Float(x), V::Int(c), V::Bool(r)])).collect()),
+            ),
+            (V::s("flow_n"), V::Int(flow_n)),
         ]);
         Ok(Some(Actx::from_v(&d)?))
     }
@@ -1118,39 +1149,49 @@ impl Core {
         a - b
     }
 
-    /// `rules_steps(actx, play1, nsteps)`
+    /// `TV(xs, K)` の覚え書きつきの口（`two_tier.rs`）
+    fn tv(&mut self, ax: &mut Actx, g: &Guard, xs: &[f64], k: f64) -> (f64, f64) {
+        let key = (xs.iter().map(|&x| (x + 0.0).to_bits()).collect::<Vec<u64>>(), (k + 0.0).to_bits());
+        if let Some(&v) = ax.tv.get(&key) {
+            return v;
+        }
+        let v = self.turn_value(ax, g, xs, k);
+        ax.tv.insert(key, v);
+        v
+    }
+
+    /// `rules_steps(actx, play1, nsteps)`——段ごとの候補の値打ちと `fb` は 2 段の値段 `TV`（守り手が止められる量 `K_j` まで `ḡ`・
+    /// 越えた分は `λ_net`・2026-10-08）。`K_j` は段ごとに止めに使った量を引き、引く札 1 枚の分を足す。
     pub fn rules_steps(&mut self, ax: &mut Actx, play1: &[i64], nsteps: i64) -> Vec<Step> {
+        let g = ax.guard.clone().expect("rules_steps: 2 段の値段が付いていない（rule_don_solve の中で arm_two_tier した財布で呼ぶ）");
         let cand = ax.cand.clone();
         let ds = ax.ds.clone();
         let kmax = ax.kmax;
         let delta = DELTA;
         let board_x: Vec<f64> = ax.later.iter().map(|&(_s, x)| x).collect();
         let att1_x: Vec<f64> = ax.att1.iter().map(|&(_s, x)| x).collect();
-        let base = ax.lead_bare + ax.chars_bare;
-        // (超過, 速攻, 出した段, 攻撃の価格)
-        let mut bodies: Vec<(f64, bool, i64, f64)> = Vec::new();
+        // (超過, 速攻, 出した段)
+        let mut bodies: Vec<(f64, bool, i64)> = Vec::new();
         let mut remaining: Vec<i64> = (0..cand.len() as i64).filter(|i| !play1.contains(i)).collect();
         let mut out = Vec::new();
         for &i in play1 {
             let c = &cand[i as usize];
             if let Some(bx) = c.bx {
-                bodies.push((bx, c.rush, 1, c.atk));
+                bodies.push((bx, c.rush, 1));
             }
         }
-        let rush1: Vec<(f64, bool, i64, f64)> = bodies.iter().copied().filter(|b| b.1).collect();
         let mut hits = att1_x.clone();
-        hits.extend(rush1.iter().map(|b| b.0));
+        hits.extend(bodies.iter().filter(|b| b.1).map(|b| b.0));
         let paid: i64 = play1.iter().map(|&i| cand[i as usize].cost).sum();
-        let rs: Vec<f64> = rush1.iter().map(|b| b.3).collect();
-        let fb = base + psum(&rs).f();
+        let (fb, used) = self.tv(ax, &g, &hits, g.k0);
         let effs: Vec<f64> = play1.iter().map(|&i| cand[i as usize].eff).collect();
         out.push(Step { hits, paid: paid as f64, fb, eff: psum(&effs) });
+        let mut cap = next_cap(&g, g.k0, if ax.no_now { 0.0 } else { used });
         for step in 2..=nsteps {
             let d = ds[(step as usize).min(ds.len()) - 1];
             let mut on_board = board_x.clone();
             on_board.extend(bodies.iter().filter(|b| b.2 < step).map(|b| b.0));
-            let ov: Vec<f64> = bodies.iter().filter(|b| b.2 < step).map(|b| b.3).collect();
-            let on_val = psum(&ov).f();
+            let (v0, _) = self.tv(ax, &g, &on_board, cap);
             let mut groups: Vec<Vec<(i64, f64)>> = Vec::new();
             // owners: (play, ci) or (attach, ai, opts k-list)
             enum Own {
@@ -1159,17 +1200,27 @@ impl Core {
             }
             let mut owners: Vec<Own> = Vec::new();
             for &ci_ in &remaining {
-                let c = &cand[ci_ as usize];
-                groups.push(vec![(0, 0.0), (c.cost, witness_val(c.atk, c.eff, 0.0))]);
+                let c = cand[ci_ as usize].clone();
+                let atk = match c.bx {
+                    Some(bx) => {
+                        let mut ys = on_board.clone();
+                        ys.push(bx);
+                        self.tv(ax, &g, &ys, cap).0 - v0
+                    }
+                    None => c.atk,
+                };
+                groups.push(vec![(0, 0.0), (c.cost, witness_val(atk, c.eff, 0.0))]);
                 owners.push(Own::Play(ci_));
             }
-            for (ai, &x) in on_board.iter().enumerate() {
+            for ai in 0..on_board.len() {
                 let mut opts: Vec<(i64, f64)> = vec![(0, 0.0)];
                 let mut ks = vec![0i64];
                 for k in 1..=kmax {
-                    let g = self.attach_gain(ax, x, k) - k as f64 * delta;
-                    if g > 0.0 {
-                        opts.push((k, witness_val(0.0, 0.0, g)));
+                    let mut ys = on_board.clone();
+                    ys[ai] += 1000.0 * k as f64;
+                    let gk = self.tv(ax, &g, &ys, cap).0 - v0 - k as f64 * delta;
+                    if gk > 0.0 {
+                        opts.push((k, witness_val(0.0, 0.0, gk)));
                         ks.push(k);
                     }
                 }
@@ -1194,37 +1245,43 @@ impl Core {
                 }
                 let c = &cand[ci_ as usize];
                 if let Some(bx) = c.bx {
-                    bodies.push((bx, c.rush, step, c.atk));
+                    bodies.push((bx, c.rush, step));
                 }
             }
-            let rush_now: Vec<(f64, bool, i64, f64)> = bodies.iter().copied().filter(|b| b.2 == step && b.1).collect();
             let mut hits: Vec<f64> = on_board.iter().zip(ks.iter()).map(|(&x, &k)| x + 1000.0 * k as f64).collect();
-            hits.extend(rush_now.iter().map(|b| b.0));
+            hits.extend(bodies.iter().filter(|b| b.2 == step && b.1).map(|b| b.0));
             let paid: i64 = plays.iter().map(|&c| cand[c as usize].cost).sum::<i64>() + ks.iter().sum::<i64>();
-            let rn: Vec<f64> = rush_now.iter().map(|b| b.3).collect();
-            let mut gains = Vec::with_capacity(on_board.len());
-            for (&x, &k) in on_board.iter().zip(ks.iter()) {
-                gains.push(self.attach_gain(ax, x, k));
-            }
-            let fb = base + on_val + psum(&rn).f() + psum(&gains).f();
+            let (fb, used) = self.tv(ax, &g, &hits, cap);
+            cap = next_cap(&g, cap, used);
             let effs: Vec<f64> = plays.iter().map(|&c| cand[c as usize].eff).collect();
             out.push(Step { hits, paid: paid as f64, fb, eff: psum(&effs) });
         }
         out
     }
 
-    /// `model_horizon(actx, blk, life, arrive)`
-    pub fn model_horizon(&mut self, ax: &Actx, blk: &[f64], life: f64, arrive: &[f64]) -> i64 {
+    /// `model_horizon(actx, blk, life, arrive)`——素の速さは段ごとに盤面の並び（`att1`）の 2 段の値段 `TV(att1, K_j)`
+    /// （`K_j` は同じ並びで減らす）＋流入 × (j − 1)（2026-10-08）。
+    pub fn model_horizon(&mut self, ax: &mut Actx, blk: &[f64], life: f64, arrive: &[f64]) -> i64 {
+        let g = ax.guard.clone().expect("model_horizon: 2 段の値段が付いていない");
         let l0 = nonneg_round(life);
         let mut nb: Vec<f64> = Vec::new();
         for &m in blk.iter().chain(ax.rest_blk.iter()).chain(arrive.iter()) {
             nb.push(lt::nu_meas_of(m + ax.olp, ax.mlp));
         }
         let th0 = ax.lam * l0 as f64 + psum(&nb).f();
-        let a0 = ax.lead_bare + ax.chars_bare;
         let flow = if ax.flow.is_empty() { vec![0.0] } else { ax.flow.clone() };
         let fl = flow[(flow.len() - 1).min(ax.budget.max(0) as usize)];
-        let w = Walk { board_chars: a0, flow: fl, j0: if ax.no_now { 1 } else { 2 }, ..Walk::default() };
+        let att1: Vec<f64> = ax.att1.iter().map(|&(_s, x)| x).collect();
+        let n = RACE_CAP as usize;
+        let mut sched = Vec::with_capacity(n);
+        let mut cap = g.k0;
+        for j in 1..=n {
+            let (v, used) = self.tv(ax, &g, &att1, cap);
+            let attacks = !(ax.no_now && j == 1);
+            sched.push(v + fl * (j - 1) as f64);
+            cap = next_cap(&g, cap, if attacks { used } else { 0.0 });
+        }
+        let w = Walk { j0: if ax.no_now { 1 } else { 2 }, sched, ..Walk::default() };
         let tau0 = tau_grow(th0, &w, 0.0, RACE_CAP, 0.0, 0.0, 0.0, 0.0);
         ((tau0 - 1e-9).ceil() as i64).max(1)
     }
@@ -1353,6 +1410,10 @@ impl Core {
             }
             skey = Some(sk);
         }
+        // 2 段の値段は守る側の入力（手札・ドン・引く札）で決まる＝財布の写しに付けて使う（呼び手の財布は変えない・鍵は上の入力の全部）
+        let mut axt = ax.clone();
+        self.arm_two_tier(&mut axt, p.cards, p.don, p.draw_types);
+        let ax = &mut axt;
         let masks = self.rule_don_masks(p.cards, p.blk, p.life, ax, p.life_types);
         let h0 = if p.turns.is_none() { Some(self.model_horizon(ax, p.blk, l0 as f64, p.arrive)) } else { None };
         // 予算なしの試行（地平を渡された）は地平つきの鍵でも覚える（`EX_STATE_BUDGET` は在る＝`turns` を渡したときだけ）
@@ -1409,6 +1470,7 @@ impl Core {
     /// `rule_don_solve` の本体（覚え書きと計画のディスクの外）
     fn rd_fresh(&mut self, p: &DefIn, ax: &mut Actx) -> R<V> {
         let l0 = nonneg_round(p.life);
+        self.arm_two_tier(ax, p.cards, p.don, p.draw_types);
         let masks = self.rule_don_masks(p.cards, p.blk, p.life, ax, p.life_types);
         let h0 = if p.turns.is_none() { Some(self.model_horizon(ax, p.blk, l0 as f64, p.arrive)) } else { None };
         let (out, h, _st) = self.rd_run(p, ax, &masks, h0)?;
