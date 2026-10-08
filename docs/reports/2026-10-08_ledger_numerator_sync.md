@@ -208,4 +208,4 @@
 
 ## 11. テスト
 
-（司令塔へ渡す前に 1 回だけ回した結果を書く）
+`make rust-develop` → `make test`（`29cda7286`・1 回）: **green**——cargo 473 passed・1 ignored／pytest 622 passed・12 skipped。
