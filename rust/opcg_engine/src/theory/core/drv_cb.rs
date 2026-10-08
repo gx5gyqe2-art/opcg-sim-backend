@@ -448,6 +448,18 @@ fn m2_clock(d: &SeatD, rd: bool) -> V {
         return V::dict(kv);
     }
     let dl = super::m2probe::detail();
+    if dl > 0 {
+        // 全部の時計に小さな欄（守り手の 1 枚の値段 ḡ・守り手のリーダーのパワー・攻め手のリーダーの超過・2 段目の支払い）
+        let st = m2.get("m2d_steps");
+        let s2p = if st.truthy() && st.items().len() > 1 { st.items()[1].items()[1].clone() } else { V::None };
+        let lx = m2.get("m2d_later");
+        kv.push((V::s("d_pricer"), m2.get("m2d_pricer").clone()));
+        kv.push((V::s("d_olp"), m2.get("m2d_olp").clone()));
+        kv.push((V::s("d_lead_x"), if lx.truthy() && !lx.items().is_empty() { lx.items()[0].clone() } else { V::None }));
+        kv.push((V::s("d_s2paid"), s2p));
+        kv.push((V::s("d_a0"), m2.get("m2d_h0_a0").clone()));
+        kv.push((V::s("d_alive"), m2.get("m2_alive").clone()));
+    }
     if dl == 2 || (dl == 1 && tau >= RACE_CAP) {
         // 打ち切りの調査（`OPCG_M2_DETAIL`）: 行の読みの全部（`m2` の中身ごと）と、歩きで段ごとに足した量
         let mut dd: Vec<(V, V)> = d.kv.iter().filter(|(k, _)| *k != "m2").map(|(k, v)| (V::s(k), v.clone())).collect();

@@ -1158,16 +1158,29 @@ impl Core {
                 Attach(usize, Vec<i64>),
             }
             let mut owners: Vec<Own> = Vec::new();
+            let cmu = super::m2probe::cand_mu();
+            let saved = if cmu { Some(self.enter(None)) } else { None };
             for &ci_ in &remaining {
                 let c = &cand[ci_ as usize];
-                groups.push(vec![(0, 0.0), (c.cost, witness_val(c.atk, c.eff, 0.0))]);
+                let atk_c = match (cmu, c.bx) {
+                    (true, Some(bx)) => self.attack_value(ax.olp + bx, ax.olp, true, ax.theta_p, MU, None, &ax.blk_a),
+                    _ => c.atk,
+                };
+                groups.push(vec![(0, 0.0), (c.cost, witness_val(atk_c, c.eff, 0.0))]);
                 owners.push(Own::Play(ci_));
             }
             for (ai, &x) in on_board.iter().enumerate() {
                 let mut opts: Vec<(i64, f64)> = vec![(0, 0.0)];
                 let mut ks = vec![0i64];
                 for k in 1..=kmax {
-                    let g = self.attach_gain(ax, x, k) - k as f64 * delta;
+                    let gk = if cmu {
+                        let p0 = ax.olp + x;
+                        self.attack_value(p0 + 1000.0 * k as f64, ax.olp, true, ax.theta_p, MU, None, &ax.blk_a)
+                            - self.attack_value(p0, ax.olp, true, ax.theta_p, MU, None, &ax.blk_a)
+                    } else {
+                        self.attach_gain(ax, x, k)
+                    };
+                    let g = gk - k as f64 * delta;
                     if g > 0.0 {
                         opts.push((k, witness_val(0.0, 0.0, g)));
                         ks.push(k);
@@ -1179,6 +1192,9 @@ impl Core {
                 }
             }
             let pick = if groups.is_empty() { Vec::new() } else { purse_plan_witness(&groups, d) };
+            if let Some(sv) = saved {
+                self.leave(sv);
+            }
             let mut plays: Vec<i64> = Vec::new();
             let mut ks = vec![0i64; on_board.len()];
             for (g_i, &oi) in pick.iter().enumerate() {

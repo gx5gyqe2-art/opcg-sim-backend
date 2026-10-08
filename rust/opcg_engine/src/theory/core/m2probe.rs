@@ -72,6 +72,19 @@ pub fn h0_fields(th0: f64, a0: f64, flow_b: f64, lead_bare: f64, chars_bare: f64
     ]
 }
 
+static CINIT: Once = Once::new();
+static CMU: AtomicBool = AtomicBool::new(false);
+
+/// 診断の別の計画の作り方（`OPCG_DIAG_CAND_MU`・1 度だけ読む）: 2 段目から先の「出す札・付与」の候補の値を 1 枚 `μ`（費用 `δ` と
+/// 同じ単位）で作る。採点（守る側の計算・歩き）は既定のまま `ḡ`。**既定では動かない**（`docs/reports/2026-10-08_syn_truncation.md`）。
+pub fn cand_mu() -> bool {
+    CINIT.call_once(|| {
+        let v = std::env::var("OPCG_DIAG_CAND_MU").unwrap_or_default();
+        CMU.store(!v.is_empty() && v != "0", Ordering::SeqCst);
+    });
+    CMU.load(Ordering::SeqCst)
+}
+
 fn fl(xs: &[f64]) -> V {
     V::list(xs.iter().map(|&x| V::Float(x)).collect())
 }
