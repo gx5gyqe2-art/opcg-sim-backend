@@ -167,6 +167,124 @@ def w_bar_for(dirs, name="cross", body_mode=None):
     return float(by["syn"]) if kind == "real" else float(by["real"])
 
 
+#: **表を作り直す 1 本の手順**（輪郭・σ → `w̄` の順・`w̄` の出所も書く・`tests/scripts/theory_table.py`）
+KAPPA_TABLE_REMEASURE = "make theory-table REAL=<実の記録> SYN='<合成の記録…>'（tests/scripts/theory_table.py all）"
+#: `w̄` の出所の欄（`harm_profile.json` の `w_bar_provenance`）が覚える、`w̄` を測ったときに効いていた表の入力
+W_BAR_INPUT_KEYS = ("sigma_t", "sigma_rel_whole_curve", "profile")
+#: **`w̄` の測り方**（2026-10-08 ユーザ決定 B）。`consumer`＝**その `w̄` を使う行の分子と同じ `σ`** で測る（既定・器が受け付ける唯一の形）:
+#: `w_bar[k]` は `k` のセットの記録で測る（別のセットから借りる規約＝§0.1 条件 1 は守る）が、`σ_T`・`σ_rel` は
+#: `w_bar[k]` を**使う**行（別のセット `_other(k)` の記録・`cross` で鍵 `k` を引く）の分子と同じ `sigma_t[k]`・`sigma_rel_whole[k]`、
+#: 輪郭は測る記録の `cross`（`_other(k)` の行）。`run`＝旧（10-08 まで）: 測る実行の `cross` の `σ`（`_other(k)`）——使う行の分子の `σ` と入れ替わる。
+W_BAR_SCHEMES = ("consumer", "run")
+W_BAR_SCHEME = "consumer"
+
+
+def _other(key):
+    return {"real": "syn", "syn": "real"}[key]
+
+
+def table_key(dirs, name="cross"):
+    """`name`（`cross`／`real`／`syn`）と記録の種類 → 引く表の鍵（`real`／`syn`）。判らなければ `None`。"""
+    if name in ("real", "syn"):
+        return name
+    kind = record_kind(dirs)
+    return None if kind is None else _other(kind)
+
+
+def w_bar_sigma_key(key, scheme=None):
+    """`w_bar[key]` を測る実行（`key` のセットの記録）で `σ_T`・`σ_rel` を引く表の鍵。"""
+    scheme = scheme or W_BAR_SCHEME
+    if scheme not in W_BAR_SCHEMES:
+        raise ValueError("w̄ の測り方は %s のどれか（%r）" % (W_BAR_SCHEMES, scheme))
+    return key if scheme == "consumer" else _other(key)
+
+
+def w_bar_inputs(key, body_mode=None, tbl=None, scheme=None):
+    """**`w_bar[key]` を測った時に効いていた表の入力**（2026-10-08）。
+
+    `w_bar[key]` は `theory_bridge`（`--harm-profile cross`）が `key` のセットの記録で測った `E[w(D)]`。輪郭（`D` を作る）は
+    測る記録の `cross`＝別のセットの行。`σ_T`（`σ_D = √2·σ_T`）・`σ_rel`（`curve` の `sigma_rel_whole`・`w(D)` の幅
+    `max(σ_rel·s, σ_D)`）は測り方 `scheme` による: `consumer`（既定）は **`w_bar[key]` を使う行の分子と同じ鍵 `key`**、`run` は別のセット。"""
+    tbl = load_harm_profiles() if tbl is None else tbl
+    body = body_mode or THETA_BODY_MODE
+    sk = w_bar_sigma_key(key, scheme)
+    st = ((tbl.get("sigma_t") or {}).get(body) or {}).get(sk)
+    sr = (((tbl.get("sigma_rel_whole") or {}).get(body) or {}).get("curve") or {}).get(sk)
+    pr = tbl.get(_other(key))
+    return {"sigma_t": (None if st is None else float(st)), "sigma_rel_whole_curve": (None if sr is None else float(sr)),
+            "profile": (None if pr is None else [float(x) for x in pr])}
+
+
+def check_w_bar_provenance(tbl=None, body_mode=None):
+    """**`w̄` の出所の検算**（2026-10-08・ユーザ決定「後で実測値が変わった場合にずれないような仕組み」・決定 B）。
+
+    表の `w_bar_provenance[体][鍵]` が (1) 測り方 `consumer`（**使う行の分子と同じ `σ` で測った**）で、(2) 覚えている入力
+    （`w_bar_inputs`）と `w̄` の値が**今の表と 1 ビット一致**しなければ落ちる——`σ_T`（など）を測り直したのに `w̄` を測り直して
+    いない表、別の `σ` で測った `w̄` で、`κ` の分子と分母が黙ってずれるのを止める。両方の鍵を見る。"""
+    tbl = load_harm_profiles() if tbl is None else tbl
+    body = body_mode or THETA_BODY_MODE
+    prov_all = ((tbl.get("w_bar_provenance") or {}).get(body) or {})
+    for key in ("real", "syn"):
+        wb = ((tbl.get("w_bar") or {}).get(body) or {}).get(key)
+        if wb is None:
+            raise ValueError("w_bar[%s][%s] が表に無い（%s）＝測り直す: %s" % (body, key, HARM_PROFILE_PATH, KAPPA_TABLE_REMEASURE))
+        prov = prov_all.get(key)
+        if not prov:
+            raise ValueError("w_bar[%s][%s]=%r の出所（w_bar_provenance）が表に無い＝どの σ_T で測ったか判らない。測り直す: %s"
+                             % (body, key, wb, KAPPA_TABLE_REMEASURE))
+        if prov.get("scheme") != W_BAR_SCHEME:
+            raise ValueError("w_bar[%s][%s]=%r の測り方は %r（%r でない）＝使う行の分子と違う σ で測った値。w_bar を測り直す: %s"
+                             % (body, key, wb, prov.get("scheme"), W_BAR_SCHEME, KAPPA_TABLE_REMEASURE))
+        now = w_bar_inputs(key, body, tbl)
+        was = {k: prov.get("inputs", {}).get(k) for k in W_BAR_INPUT_KEYS}
+        bad = [k for k in W_BAR_INPUT_KEYS if was[k] != now[k]]
+        if bad or float(prov.get("w_bar", float("nan"))) != float(wb):
+            raise ValueError("w_bar[%s][%s]=%r は %s で測った値だが、表は今 %s（w_bar の出所の値 %r）＝分子と分母がずれる。"
+                             "w_bar を測り直す: %s"
+                             % (body, key, wb, {k: was[k] for k in (bad or W_BAR_INPUT_KEYS[:1])},
+                                {k: now[k] for k in (bad or W_BAR_INPUT_KEYS[:1])}, prov.get("w_bar"), KAPPA_TABLE_REMEASURE))
+    return True
+
+
+def kappa_clock(dirs, name="cross", body_mode=None, measure=False, sigma_key=None):
+    """**`κ = w(D)/w̄` を使う全ての器が使う 1 つの読み込み**（2026-10-08・`theory_bridge`・`relative_ledger`・`kappa_vector`）。
+
+    分子 `w(D) = φ(D; max(σ_rel·s(τ_me, τ_opp), √2·σ_T))`（勝率の幅・決定 A）の `σ_T`・`σ_rel`（`curve` の `sigma_rel_whole`）と
+    分母 `w̄` を**表からだけ**、同じ鍵（耐久の形ごと・`cross`＝測る記録と別のセット）で引いて `theory_rs` の時計に入れる。
+    `w̄[鍵]` は**この鍵の `σ` で**（決定 B・`W_BAR_SCHEME`）別のセットの記録で測った値＝分子と分母の `σ` が字義どおり同じ。
+    引けなければ（記録の種類が判らない・表に無い）**落ちる**——借り物の `√2·1.0`・閉じた形 `0.5/R` に黙って戻さない。
+    `w̄` の出所（`check_w_bar_provenance`）が今の表と合わなければ落ちる。
+
+    `measure=True` は **`w̄` を測る実行だけ**（`theory_table.py` が `theory_bridge --measure-w-bar` で使う）: 出所を検算せず、
+    分母は表の今の値（無ければ 1.0）を入れる——測る量 `E[w(D)] = Σκ/n × w̄` は分母の値に依らない。`sigma_key` は
+    `σ_T`・`σ_rel` を引く鍵の差し替え（測る実行だけ・`w_bar_sigma_key`）。"""
+    import theory_rs as _TR
+    key = table_key(dirs, name)
+    if key is None:
+        raise ValueError("記録の種類が判らない（%s・meta_n_record.json の decks）＝κ の表の行を引けない。"
+                         "黙って借り物の σ_T・0.5/R に戻さない" % (list(dirs or ()),))
+    if sigma_key is not None and not measure:
+        raise ValueError("σ の鍵の差し替えは w̄ を測る実行だけ（measure=True）")
+    sk = sigma_key or key
+    tbl = load_harm_profiles()
+    body = body_mode or THETA_BODY_MODE
+    st = ((tbl.get("sigma_t") or {}).get(body) or {}).get(sk)
+    if st is None:
+        raise ValueError("σ_T が引けない（体の形 %r・%s・%s）＝黙って前の値を使い回さない" % (body, sk, HARM_PROFILE_PATH))
+    sr = (((tbl.get("sigma_rel_whole") or {}).get(body) or {}).get("curve") or {}).get(sk)
+    if sr is None:
+        raise ValueError("σ_rel が引けない（体の形 %r・curve・%s・%s）＝黙って別の物差しに落とさない" % (body, sk, HARM_PROFILE_PATH))
+    wb = ((tbl.get("w_bar") or {}).get(body) or {}).get(key)
+    if not measure:
+        check_w_bar_provenance(tbl, body)
+    elif wb is None:
+        wb = 1.0
+    _TR.set_sigma_turn(float(st))
+    _TR.set_sigma_rel(float(sr))
+    _TR.set_w_bar(float(wb))
+    return {"key": key, "sigma_key": sk, "sigma_t": float(st), "sigma_rel": float(sr), "w_bar": float(wb)}
+
+
 def record_kind(dirs):
     """記録のセットの種類（`meta_n_record.json` の `decks`: `user` → `real`・それ以外 → `syn`）。判らなければ `None`。"""
     kinds = set()

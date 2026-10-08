@@ -185,12 +185,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
     if not prof:
         raise ValueError("D_MODE=D_MODE なのに損害の輪郭が引けない（%s）" % (dirs,))
     # **物差し（T118）**: `W_ERR_MODE=rel` なら `σ_rel × s(τ_me, τ_opp)`。**別のセットの値を使う**（§0.1 条件 1）。
-    sr = None
-    if TR.CLOCK["W_ERR_MODE"] == "rel":
-        sr = CB.sigma_rel_for(dirs, slope="curve")
-        if sr is None:
-            raise ValueError("W_ERR_MODE=rel なのに σ_rel が引けない＝黙って abs に落とさない")
-        TR.set_sigma_rel(sr)
+    # **`κ = w(D)/w̄` の分子 `φ(D; max(σ_rel·s, √2·σ_T))`（勝率の幅・2026-10-08 決定 A）の `σ_T`・`σ_rel` と分母 `w̄`**
+    # （`scalar` の腕・`w(D)` を使う `vector`／`exact`／`plac_*` の腕も同じ 1 つの `w(D)`・`exactw` の勝率も同じ `σ`）を
+    # `theory_bridge`（`w̄` を測った器）と同じ 1 つの読み込みで表から引く（2026-10-08・引けない／出所が合わなければ落ちる）。
+    # `W_ERR_MODE=rel` でなければ勝率も `w(D)` も `σ_D` だけ（Rust が時計を渡さない）。
+    kc = CB.kappa_clock(dirs)
+    sr = kc["sigma_rel"] if TR.CLOCK["W_ERR_MODE"] == "rel" else None
+    w_bar = kc["w_bar"]
     seat_decks = _seat_decks(dirs)
     arms = {k: [] for k in ("flat", "scalar", "vector", "exact", "exactw",
                             "plac_axis", "plac_mag")}
@@ -204,7 +205,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
         if limit_games and games > limit_games:
             break
         pin = {"decks": TR.deck_list(_deck_pair(seat_decks, TR.seed_of(game)))}
-        res = TR.game_call("kappa_vector", game, {"cfg": TR.cfg(theta, mu, prof=prof), "in": pin, "stats": stats,
+        res = TR.game_call("kappa_vector", game, {"cfg": TR.cfg(theta, mu, prof=prof, kappa_stats=True), "in": pin, "stats": stats,
                                                   "carry": {}})
         new = res["stats"]
         stats.clear()
@@ -228,6 +229,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
            "tau_opp_mean": round(stats["tau_opp_sum"] / n, 4),
            "sigma_rel": (round(sr, 4) if sr is not None else None),
            "w_err_mode": TR.CLOCK["W_ERR_MODE"],
+           # `κ` の分母と、`κ` の行の平均（定義上の値は 1）
+           "w_bar": round(w_bar, 4), "sigma_t": round(kc["sigma_t"], 4),
+           "kappa_mean": round(stats.get("kappa_sum", 0.0) / n, 4),
            "by_family": stats["by_family"], "by_axis": stats["by_axis"],
            "arms": {kk: _score(arms[kk], zs) for kk in arms}}
     return out

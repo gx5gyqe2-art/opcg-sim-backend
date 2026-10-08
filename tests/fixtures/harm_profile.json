@@ -37,11 +37,11 @@
    "syn": 2.133
   }
  },
- "_note_w_bar": "w̄（T98）＝**`w(D)` の実測の平均**。`κ = w(D)/w̄` は「この局面の傾き ÷ 平均の傾き」なので、**分母は定義上 `E[w(D)]`**。従来の `0.5/R`（R = 平均の自席ターン数 4.128）は**閉じた形の代用**で、`D` の分布が「R ターンで勝率が 0.5 動く」形に一致するときだけ等しい。**σ_T を実測にし耐久の形を変えたら一致しなくなった**——`blockers` では `κ` の平均が 1.505／1.737（1 であるべき）。そこで**同じ器の実測**を使う＝新定数ゼロ。**耐久の体の集合ごと**に持ち、**測る記録と別のセット**の値を使う（σ_T・輪郭と同じ規約）。2026-09-18 実測（`theory_bridge` の `stats.w_mean`・σ_T は実測値を入れた条件）。。**2026-09-20 に 3 本の既定採用に合わせて取り直した**（旧 {'real': 0.1776, 'syn': 0.2043} → 新 {'real': 0.1782, 'syn': 0.2098}）。。**2026-09-24（T154）に新しい既定（mirror＋half＋game）と取り直した σ_T の上で `blockers` を取り直した**（旧 {'real': 0.1782, 'syn': 0.2098} → 新 {'real': 0.1894, 'syn': 0.2238}・`theory_bridge` の `stats.w_mean`・2 段目＝σ_T を書き換えた後に測る）。cross 規約の構造上 κ の平均は 1 に載らない（実 0.846／合成 1.182＝w_mean を相手セットの w̄ で割った値・2026-09-20 と同じ）。。**2026-10-05 に 4ec745f の既定・Rust 版（`OPCG_RD_KERNEL=rs`）で取り直した**（`docs/reports/2026-10-05_table_rebuild_rust.md`・輪郭 → ばらつき → 勝率の幅 → 平均の傾きの順・cross 規約）：`blockers` 旧 {'real': 0.1894, 'syn': 0.2238} → 新 {'real': 0.0948, 'syn': 0.1589}（`theory_bridge` の `stats.w_mean`・2 段目＝σ を書き換えた後に測った・κ の平均 実 0.4236／合成 0.8392）。。**2026-10-07 に覚え書きを全部正確にした後（`docs/reports/2026-10-07_memo_exact.md`）の全記録で取り直した**：`blockers` 旧 {'real': 0.0948, 'syn': 0.1589} → 新 {'real': 0.0961, 'syn': 0.1603}（同じ器・同じ記録・式は不変、ユーザ決定 2026-10-07「書き換える」）。",
+ "_note_w_bar": "w̄（T98）＝**`w(D)` の実測の平均**。`κ = w(D)/w̄` は「この局面の傾き ÷ 平均の傾き」なので、**分母は定義上 `E[w(D)]`**。従来の `0.5/R`（R = 平均の自席ターン数 4.128）は**閉じた形の代用**で、`D` の分布が「R ターンで勝率が 0.5 動く」形に一致するときだけ等しい。**σ_T を実測にし耐久の形を変えたら一致しなくなった**——`blockers` では `κ` の平均が 1.505／1.737（1 であるべき）。そこで**同じ器の実測**を使う＝新定数ゼロ。**耐久の体の集合ごと**に持ち、**測る記録と別のセット**の値を使う（σ_T・輪郭と同じ規約）。2026-09-18 実測（`theory_bridge` の `stats.w_mean`・σ_T は実測値を入れた条件）。。**2026-09-20 に 3 本の既定採用に合わせて取り直した**（旧 {'real': 0.1776, 'syn': 0.2043} → 新 {'real': 0.1782, 'syn': 0.2098}）。。**2026-09-24（T154）に新しい既定（mirror＋half＋game）と取り直した σ_T の上で `blockers` を取り直した**（旧 {'real': 0.1782, 'syn': 0.2098} → 新 {'real': 0.1894, 'syn': 0.2238}・`theory_bridge` の `stats.w_mean`・2 段目＝σ_T を書き換えた後に測る）。cross 規約の構造上 κ の平均は 1 に載らない（実 0.846／合成 1.182＝w_mean を相手セットの w̄ で割った値・2026-09-20 と同じ）。。**2026-10-05 に 4ec745f の既定・Rust 版（`OPCG_RD_KERNEL=rs`）で取り直した**（`docs/reports/2026-10-05_table_rebuild_rust.md`・輪郭 → ばらつき → 勝率の幅 → 平均の傾きの順・cross 規約）：`blockers` 旧 {'real': 0.1894, 'syn': 0.2238} → 新 {'real': 0.0948, 'syn': 0.1589}（`theory_bridge` の `stats.w_mean`・2 段目＝σ を書き換えた後に測った・κ の平均 実 0.4236／合成 0.8392）。。**2026-10-07 に覚え書きを全部正確にした後（`docs/reports/2026-10-07_memo_exact.md`）の全記録で取り直した**：`blockers` 旧 {'real': 0.0948, 'syn': 0.1589} → 新 {'real': 0.0961, 'syn': 0.1603}（同じ器・同じ記録・式は不変、ユーザ決定 2026-10-07「書き換える」）。。。**2026-10-08（`docs/reports/2026-10-08_ledger_numerator_sync.md`）に表を作り直す 1 本の手順（`make theory-table`＝`tests/scripts/theory_table.py`）で全記録から取り直した**：同じ値 {'real': 0.0961, 'syn': 0.1603}（輪郭・σ_T・sigma_rel_whole も 1 ビット同じ）。**出所 `w_bar_provenance` を足した**。κ を使う器（theory_bridge・relative_ledger・kappa_vector）は `crossing_bridge.kappa_clock` だけで σ_T と w̄ を読み、w̄ の出所が今の表と違えば落ちる。。**2026-10-08（`docs/reports/2026-10-08_kappa_width_and_crossset.md`・ユーザ決定 A・B）に定義を変えて取り直した**：w(D) の幅を勝率の幅 `max(σ_rel·s(τ_me, τ_opp), √2·σ_T)`（10-05 の `match`）にし（3 器とも）、`w_bar[X]` は X の記録で、**その w̄ を使う行（もう一方のセット）の分子と同じ σ_T・σ_rel**（表の `sigma_t[X]`・`sigma_rel_whole[X]`）で測る（輪郭は cross）。`blockers` 旧 {'real': 0.0961, 'syn': 0.1603} → 新 {'real': 0.1057, 'syn': 0.109}",
  "w_bar": {
   "blockers": {
-   "real": 0.0961,
-   "syn": 0.1603
+   "real": 0.1057,
+   "syn": 0.109
   }
  },
  "_note_sigma_rel_whole": "K-5（2026-09-26・ユーザ決定「2はb」）: `SETTLE_COND_MODE=whole` の `σ_rel`（時計 1 本の幅 `σ·max(1, τ)` の σ）。**`whole` の式と同じ形の尤度**で測った値——勝った席が実際に届いた段 `a`（今のターンを 1 と数える自席ターン数）を `k = max(1, ⌈X⌉)`・`X ~ N(τ, (σ·max(1, τ))²)` の実現とみて `P(a − 1 < X ≤ a)`（`a = 1` は `P(X ≤ 1)`）に、**負けた席はそれまでに届かなかった**打ち切りの因子（手番の私が段 `a` で勝った行は相手の `P(X > a − 1)`、相手が段 `a` で勝った行は私の `P(X > a)`・`whole_turn_race_prob` と同じ段の数え方）を掛けた積を σ について最大にする（`crossing_bridge.sigma_rel_whole_mle`・精度 1/σ について凹＝最大は 1 つ・新定数ゼロ）。**同じ行（全行・30 の打ち切り）・同じ cross 規約**。出所は `summarise` の `by_slope[*].sigma_rel_whole`（既定の構成・`crossing_bridge.py --in w41`／`--in w39 w42`）。同じ実行で従来の `sigma_rel`（theory）は実 0.3067／合成 0.3292——従来の手順は勝った席 1 本の残差を 2 本分の尺度 `√(τ_me²+τ_opp²)` で割り、整数の丸めを連続の誤差に混ぜるので幅を小さく測っていた。（K-5 の修正・2026-09-26: 初版は勝った席の因子だけで theory 実 0.4020／合成 0.3914・curve 実 0.3396／合成 0.3799。式は 2 本の時計の競争なので負けた側の打ち切りを入れて同じ事象の尤度にした。）。**2026-10-05 に 4ec745f の既定・Rust 版（`OPCG_RD_KERNEL=rs`）で取り直した**（`docs/reports/2026-10-05_table_rebuild_rust.md`・輪郭 → ばらつき → 勝率の幅 → 平均の傾きの順・cross 規約）：`blockers` 旧 theory 実 0.4146／合成 0.4068・curve 実 0.4282／合成 0.4481 → 新 theory 実 0.387／合成 0.3875・curve 実 0.3874／合成 0.4427。",
@@ -89,5 +89,85 @@
    0.2315,
    0.2315
   ]
+ },
+ "_note_w_bar_provenance": "w̄ の出所（2026-10-08・ユーザ決定「後で実測値が変わった場合にずれないような仕組みにしてください」・同日の決定 B）＝`w_bar[鍵]` の測り方 `scheme`（`consumer`＝**その w̄ を使う行の分子と同じ σ** で測った・器が受け付ける唯一の形）と、測った時に効いていた表の入力（`inputs`: `theory_bridge --harm-profile cross --measure-w-bar --sigma-key 鍵` が `鍵` のセットの記録に入れた `σ_T`＝`sigma_t[鍵]`・`sigma_rel_whole.curve[鍵]`〔＝使う側の記録が cross で引く値〕・輪郭＝別のセットの行＝`crossing_bridge.w_bar_inputs`）と、測った実行の `Σκ`（`kappa_sum`）・`n`（`kappa_n`）・その実行の分母（`w_bar_in_run`）・`E[w(D)]`（`w_mean`＝`Σκ/n × w_bar_in_run`・`w_bar` はその 4 桁の丸め）・その実行の σ（`sigma_turn_in_run`・`sigma_rel_in_run`）。`crossing_bridge.check_w_bar_provenance` が `scheme` と `inputs` と `w_bar` を今の表と 1 ビットで照らし、違えば κ を使う器は落ちる（σ_T などだけ測り直して w̄ を測り直さない表・別の σ で測った w̄ は使えない）。**作り直しは必ず `make theory-table REAL=<w41> SYN=\"<w39> <w42>\" WORK=<dir>`**（`crossing_bridge` → 輪郭・σ → それを入れた `theory_bridge --measure-w-bar --sigma-key` → w̄ と出所の順）。検算だけは `make theory-table-check`。手で σ_T・w̄ を書き換えない",
+ "w_bar_provenance": {
+  "blockers": {
+   "real": {
+    "w_bar": 0.1057,
+    "scheme": "consumer",
+    "inputs": {
+     "sigma_t": 1.242,
+     "sigma_rel_whole_curve": 0.3874,
+     "profile": [
+      0.0004,
+      0.0601,
+      0.1035,
+      0.1965,
+      0.248,
+      0.2283,
+      0.2022,
+      0.1708,
+      0.1558,
+      0.0971,
+      0.0971,
+      0.0971,
+      0.0971
+     ]
+    },
+    "inputs_from": "real の記録で測った（使うのは syn の記録）・輪郭は syn の行（cross）・σ_T／σ_rel は real の行＝使う syn の記録の分子と同じ σ",
+    "kappa_sum": 12010.465100847157,
+    "kappa_n": 18207,
+    "w_bar_in_run": 0.1603,
+    "w_mean": 0.10574381038423679,
+    "sigma_turn_in_run": 1.242,
+    "sigma_rel_in_run": 0.3874,
+    "games": 300,
+    "records": [
+     "w41"
+    ],
+    "tool": "theory_bridge --harm-profile cross --measure-w-bar --sigma-key real",
+    "commit": "ac7ae5fd6",
+    "date": "2026-10-08"
+   },
+   "syn": {
+    "w_bar": 0.109,
+    "scheme": "consumer",
+    "inputs": {
+     "sigma_t": 2.133,
+     "sigma_rel_whole_curve": 0.4427,
+     "profile": [
+      0.0007,
+      0.0775,
+      0.1073,
+      0.186,
+      0.2597,
+      0.2809,
+      0.2277,
+      0.226,
+      0.226,
+      0.226,
+      0.226,
+      0.226,
+      0.226
+     ]
+    },
+    "inputs_from": "syn の記録で測った（使うのは real の記録）・輪郭は real の行（cross）・σ_T／σ_rel は syn の行＝使う real の記録の分子と同じ σ",
+    "kappa_sum": 53144.981534142804,
+    "kappa_n": 46841,
+    "w_bar_in_run": 0.0961,
+    "w_mean": 0.10903338369016724,
+    "sigma_turn_in_run": 2.133,
+    "sigma_rel_in_run": 0.4427,
+    "games": 900,
+    "records": [
+     "w39",
+     "w42"
+    ],
+    "tool": "theory_bridge --harm-profile cross --measure-w-bar --sigma-key syn",
+    "commit": "ac7ae5fd6",
+    "date": "2026-10-08"
+   }
+  }
  }
 }

@@ -20,7 +20,7 @@
 | **絶対額の価格** | `abs_flat`（T121 の勝者） | `plac_K`（法則の重みだけ・相対化しない） |
 | **相対変化** | `rel_flat`（相対化だけ） | **`rel_K`（法則そのもの）** |
 
-* `abs_kappa` … **出荷の帳簿**（`κ = w(D)/w̄`）
+* `abs_kappa` … **出荷の帳簿**（`κ = w(D)/w̄`・分子は勝率の幅・その `σ_T`／`σ_rel` と分母 `w̄` は表の実測〔`crossing_bridge.kappa_clock`・2026-10-08〕）
 * `rel_exact` … **一次近似をやめる**（`Φ(z') − Φ(z)` を直に引く・P3）
 * `plac_shift` … **プラセボ**: `K` を**前の局の同じ行番号**から取る（重みと局面の結びつきだけ壊す）
 
@@ -82,7 +82,9 @@ from theory_rs import MU, THETA  # noqa: E402
 
 #: 腕の名前（出力の順序もこれ）
 ARMS = ("abs_flat", "abs_kappa", "rel_flat", "rel_K", "rel_exact", "plac_K", "plac_shift")
-#: `σ` の合わせ方（定数・Rust の `core::drv_rl`）
+#: `abs_kappa` の `κ = w(D)/w̄` の `w(D)` の幅（定数・Rust の `core::drv_rl`）。**勝率の幅**（2026-10-08 ユーザ決定 A・10-05 の `match`）
+#: ＝`max(σ_rel·s(τ_me, τ_opp), σ_D)`・`σ_D = √2·σ_T`（表の実測・`crossing_bridge.kappa_clock`）。`theory_bridge`（`w̄` を測る器）・
+#: `kappa_vector` も同じ定義（10-08 の一時期は 3 器とも `σ_D` だけだった）
 KAPPA_SIGMA_MODE = "match"
 
 
@@ -126,10 +128,11 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
     prof = CB.profile_for(dirs)
     if not prof:
         raise ValueError("D_MODE=KV.D_MODE なのに損害の輪郭が引けない（%s）" % (dirs,))
-    sr = CB.sigma_rel_for(dirs, slope="curve")
-    if sr is None:
-        raise ValueError("σ_rel が引けない＝黙って別の物差しに落とさない（T118 の規約）")
-    TR.set_sigma_rel(sr)
+    # 勝率の物差し `σ_rel`（T118）と、`abs_kappa` の `κ` の分子の `σ_T`・`σ_rel` と分母 `w̄`（表の実測・別のセット・
+    # `theory_bridge` と同じ 1 つの読み込み・2026-10-08。引けなければ落ちる＝黙って別の物差しに落とさない）
+    kc = CB.kappa_clock(dirs)
+    sr = kc["sigma_rel"]
+    w_bar = kc["w_bar"]
     seat_decks = KV._seat_decks(dirs)     # **T128**: `A` の流入・効果はデッキの中身から出る
     arms = {k: [] for k in ARMS}
     # **決着帯を外した帯**（最後の自席ターンを落とす）＝勝敗がまだ決まっていない所での判別
@@ -153,7 +156,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
         seed = TR.seed_of(game)
         pin = {"decks": TR.deck_list(KV._deck_pair(seat_decks, seed)), "settled": TR.settled_in(settled, seed)}
         c = TR.cfg(theta, mu, prof=prof, sr=float(sr), scale_a=float(scale_a), scale_currency=float(scale_currency),
-                   MIRROR_ME=bool(TR.RUN["MIRROR_ME"]), parts=bool(pre_settle))
+                   MIRROR_ME=bool(TR.RUN["MIRROR_ME"]), parts=bool(pre_settle), kappa_stats=True)
         res = TR.game_call("relative_ledger", game, {"cfg": c, "in": pin, "stats": stats, "carry": {"prev_ks": prev_ks}})
         prev_ks = res["carry"]["prev_ks"]
         rs.extend(res["rs"])
@@ -180,6 +183,9 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
            "last_turn_rows": stats["last_turn_rows"],
            "capped_share": round(stats["capped"] / n, 4),
            "K_mean": round(stats["k_sum"] / n, 4),
+           # `abs_kappa` の `κ = w(D)/w̄` の分母と、`κ` の行の平均（定義上の値は 1）
+           "w_bar": round(w_bar, 4), "sigma_t": round(kc["sigma_t"], 4),
+           "kappa_mean": round(stats.get("kappa_sum", 0.0) / n, 4),
            # `r` は片側の時計が 0 に行く行で発散するので**中央値**で読む（平均は尾に支配される）
            "r_median": round(float(np.median(rs)) if rs else 0.0, 4),
            "dlog_abs_mean": round(stats["dlog_abs_sum"] / n, 5),

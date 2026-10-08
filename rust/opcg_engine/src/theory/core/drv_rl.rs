@@ -67,6 +67,8 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
     let mirror_me = pc.get("MIRROR_ME").truthy();
     // 段 7: `parts`（T145・`--pre-settle on` のとき旗だけ読む）＝`rel_K` を (席, 最後の自席ターンか, 宣言した行か) で割る
     let parts = pc.get("parts").truthy();
+    // 2026-10-08: `kappa_stats` の旗があるときだけ `κ` の和を積む（旗の無い呼び＝記録の golden の出力は不変）
+    let kappa_stats = pc.get("kappa_stats").truthy();
     let settled = settled_of(p);
     let mut acc_part: Vec<((i64, bool, bool), f64)> = Vec::new();
     let prev_ks: Vec<f64> = p.get("carry").get("prev_ks").items().iter().map(|x| x.f()).collect();
@@ -269,9 +271,17 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         let ex_w = rw::w_of(a1, b1, sr) - rw::w_of(t_me, t_opp, sr);
         let plac_k = if cur_ks.len() < prev_ks.len() { prev_ks[cur_ks.len()] } else { kk };
         cur_ks.push(kk);
+        // `abs_kappa` の `κ = w(D)/w̄`（分母は Python が表の実測を `clock.W_BAR` に入れる）——平均の検算に積む。
+        // **分子は勝率の幅**（2026-10-08 ユーザ決定 A・10-05 の `match`）: `w(D) = φ(D; max(σ_rel·s(τ_me, τ_opp), σ_D))`、
+        // `σ_D = √2·σ_T`。`σ_rel`・`σ_T` は表（`crossing_bridge.kappa_clock`）・時計はこの行の勝率の読み（`rw::w_of`）と同じ
+        // ＝`theory_bridge`（`w̄` を測る器）・`kappa_vector` と同じ定義
+        let kap = lt::state_factor(&cfg.clock, d, true, Some(t_me), Some(t_opp), "hyp");
+        if kappa_stats {
+            stats.addf("kappa_sum", kap);
+        }
         let one = [
             v * sgn,
-            v * sgn * lt::state_factor(&cfg.clock, d, true, Some(t_me), Some(t_opp), "hyp"),
+            v * sgn * kap,
             dl * sgn,
             kk * dl * sgn,
             ex_w * sgn,
