@@ -198,4 +198,4 @@ S3 の中身【導出】: w̄ は記録ごとの定数なので AUC（順位）�
 
 ## 10. テスト
 
-@MAKETEST@
+`make rust-develop` → `make test`（`34a13273f`・1 回）: **green**——cargo 473 passed・1 ignored／pytest 622 passed・12 skipped。
