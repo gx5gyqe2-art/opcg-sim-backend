@@ -135,6 +135,43 @@ fn resolve(inp: &SolveIn, m: &Mask, ks: &[i64], h: i64, d: &mut Defender) -> Res
     })
 }
 
+/// 同じ計画・同じ地平で、守る側の計算を「倒れた段にだけ 1 を置く」値段で解き直す（診断だけ）。
+/// 値段を `λ_net = μ = ν = 0`・`(λ − λ_net)·L0 = 1` にすると、段の損害は**その段で倒れる確率**になる
+/// （受けた 1 本・切った札・ブロッカーの値は 0、とどめの段にだけ 1）。守り手の選び方（防いだ本数・切る枚数・生き延びるターン）は
+/// 値段に依らないので同じ（同点の割り切りだけが損害の並びで決まる）。ライフ 0 では `(λ − λ_net)·0 = 0` で測れない＝`None`。
+fn resolve_death(inp: &SolveIn, m: &Mask, ks: &[i64], h: i64) -> Option<Output> {
+    let l0f = bankers_round(inp.life);
+    if l0f < 1.0 {
+        return None;
+    }
+    let (_lam, _lam_net, _mu, olp, mlp) = inp.prices;
+    let nu0: Vec<(f64, f64)> = inp.nu.iter().map(|&(k, _)| (k, 0.0)).collect();
+    let xf = first_of(inp, m, ks);
+    let mut d = Defender::new(None);
+    d.solve(&Input {
+        cards: inp.cards,
+        don: inp.don,
+        xs_first: &xf,
+        seq: &m.later_seq,
+        blk: inp.blk,
+        life: inp.life,
+        turns: Some(h),
+        life_types: inp.life_types,
+        draw_types: inp.draw_types,
+        lam: 1.0 / l0f,
+        lam_net: 0.0,
+        mu: 0.0,
+        olp,
+        mlp,
+        rest: inp.rest,
+        arrive: inp.arrive,
+        nu: &nu0,
+        eps: inp.eps,
+        feq: inp.feq,
+    })
+    .ok()
+}
+
 /// 計画の辞書に足す診断の欄（`OPCG_M2_PROBE` のときだけ `rd_run` が呼ぶ）。
 /// `take`＝地平の先の段の攻撃を 1 本ずつ「受ける」の値段で数えた粗い芯（段の攻撃のうち効く本数 × 受ける値段）。
 #[allow(clippy::too_many_arguments)]
@@ -194,9 +231,20 @@ pub fn plan_fields(inp: &SolveIn, m: &Mask, step_hits: &[Vec<f64>], ks: &[i64], 
             (V::s("harms_b"), fl(&r2.harms)),
         ]));
     }
+    // 倒れる段の分布（同じ計画・同じ地平）——交点の時計が「倒れる時刻の真ん中」ではなく「最後の分岐が倒れる時刻」を
+    // 言っているかを見る（`docs/reports/2026-10-08_late_winner.md`）
+    match resolve_death(inp, m, ks, h) {
+        Some(rd) => {
+            out.push((V::s("m2_pdeath"), fl(&rd.harms)));
+            out.push((V::s("m2_alive_death"), V::Float(rd.alive)));
+            out.push((V::s("m2_cut_death"), V::Float(rd.cut)));
+        }
+        None => out.push((V::s("m2_pdeath"), V::None)),
+    }
     out.push((V::s("m2_tau_full"), V::Float(tau_full)));
     out.push((V::s("m2_theta_full"), V::Float(res.theta)));
     out.push((V::s("m2_alive"), V::Float(res.alive)));
+    out.push((V::s("m2_cut"), V::Float(res.cut)));
     out.push((V::s("m2_resolve_same"), V::Bool(same)));
     out.push((V::s("m2_short"), V::list(shorts)));
     out
