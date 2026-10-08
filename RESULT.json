@@ -1,6 +1,6 @@
 {
   "branch": "claude/diag-syn-truncation",
-  "commit": "(see git log; filled below)",
+  "commit": "2de11ca4 (report + instruments; the following commit only fills this field)",
   "report": "docs/reports/2026-10-08_syn_truncation.md",
   "summary": [
     "合成の打ち切り70本は3類: A(45本・勝った席17・実の9本も全部)=攻め手の2段目以降の候補・流入・fb・地平の見積もりが守り手の1枚の値段ḡで値付けされ、ḡ<k·δ(リーダーが届くのに要るドンk枚)で先の攻撃が空になり守る側の計算が2段目でDry(45/45・9/9でḡ<kδ)。M-2報告の『地平1段』は実は地平30段で段の損害の列が1つ",
