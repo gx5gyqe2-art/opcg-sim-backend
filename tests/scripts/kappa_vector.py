@@ -185,15 +185,12 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
     if not prof:
         raise ValueError("D_MODE=D_MODE なのに損害の輪郭が引けない（%s）" % (dirs,))
     # **物差し（T118）**: `W_ERR_MODE=rel` なら `σ_rel × s(τ_me, τ_opp)`。**別のセットの値を使う**（§0.1 条件 1）。
-    sr = None
-    if TR.CLOCK["W_ERR_MODE"] == "rel":
-        sr = CB.sigma_rel_for(dirs, slope="curve")
-        if sr is None:
-            raise ValueError("W_ERR_MODE=rel なのに σ_rel が引けない＝黙って abs に落とさない")
-        TR.set_sigma_rel(sr)
-    # **`κ = w(D)/w̄` の分子の `σ_T` と分母 `w̄`**（`scalar` の腕・`w(D)` を使う `vector`／`exact`／`exactw` の腕も同じ `σ_T`）を
-    # `theory_bridge`（`w̄` を測った器）と同じ 1 つの読み込みで表から引く（2026-10-08・引けない／出所が合わなければ落ちる）
+    # **`κ = w(D)/w̄` の分子 `φ(D; max(σ_rel·s, √2·σ_T))`（勝率の幅・2026-10-08 決定 A）の `σ_T`・`σ_rel` と分母 `w̄`**
+    # （`scalar` の腕・`w(D)` を使う `vector`／`exact`／`plac_*` の腕も同じ 1 つの `w(D)`・`exactw` の勝率も同じ `σ`）を
+    # `theory_bridge`（`w̄` を測った器）と同じ 1 つの読み込みで表から引く（2026-10-08・引けない／出所が合わなければ落ちる）。
+    # `W_ERR_MODE=rel` でなければ勝率も `w(D)` も `σ_D` だけ（Rust が時計を渡さない）。
     kc = CB.kappa_clock(dirs)
+    sr = kc["sigma_rel"] if TR.CLOCK["W_ERR_MODE"] == "rel" else None
     w_bar = kc["w_bar"]
     seat_decks = _seat_decks(dirs)
     arms = {k: [] for k in ("flat", "scalar", "vector", "exact", "exactw",

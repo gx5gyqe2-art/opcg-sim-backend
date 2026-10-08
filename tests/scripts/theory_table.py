@@ -8,8 +8,13 @@
 1. `sigma` … `crossing_bridge` を実・合成で回し、輪郭（`real`／`syn`）・理論の速さ（`theory_slope`）・
    `sigma_t`／`sigma_rel_whole`（`blockers`・従来の `sigma_rel` の表は在るときだけ）を書く（`table_rebuild/write_table.py` と同じ写し方）。
 2. `w_bar` … 書いた表で `theory_bridge --measure-w-bar` を実・合成で回し、`w_bar.blockers` と
-   **その出所 `w_bar_provenance.blockers`**（測った時に効いていた `σ_T`・`σ_rel`・輪郭〔`crossing_bridge.w_bar_inputs`〕と
+   **その出所 `w_bar_provenance.blockers`**（測り方 `scheme`・測った時に効いていた `σ_T`・`σ_rel`・輪郭〔`crossing_bridge.w_bar_inputs`〕と
    `Σκ`・`n`・記録・コミット）を書く。
+   **測り方（2026-10-08 ユーザ決定 B・`--w-bar-sigma`）**: 既定 `consumer`＝`w_bar[X]` は X のセットの記録で測る（別のセットから
+   借りる規約・§0.1 条件 1）が、`σ_T`・`σ_rel` は **その `w̄` を使う行（もう一方のセット Y の記録）の分子と同じ値**
+   ＝表の `sigma_t[X]`・`sigma_rel_whole[X]`（Y の記録は `cross` で鍵 X を引く）。輪郭は測る記録の `cross`（Y の行）。
+   ＝**分子と分母の `σ` が字義どおり同じで、どの記録も自分の単位を測らない**。`run` は旧（10-08 まで）の測り方
+   （測る実行の `cross` の `σ`＝使う行の分子と入れ替わる）で、器はこの形の表を受け付けない（比較の再現用）。
 
 `κ` を使う器（`theory_bridge`・`relative_ledger`・`kappa_vector`）は `crossing_bridge.kappa_clock` で表を読み、
 **出所が今の表と 1 ビットでも違えば落ちる**——`σ_T` などを測り直して `w̄` を測り直していない表では動かない。
@@ -21,7 +26,7 @@
 
     python tests/scripts/theory_table.py --real <w41> --syn <w39> <w42> --work <dir> all
     python tests/scripts/theory_table.py ... sigma        # 手順 1 だけ
-    python tests/scripts/theory_table.py ... w_bar        # 手順 2 だけ
+    python tests/scripts/theory_table.py ... w_bar        # 手順 2 だけ（`--w-bar-sigma consumer` が既定）
     python tests/scripts/theory_table.py ... --sets real w_bar   # 片方の実行だけ（書き込みは両方そろってから）
     python tests/scripts/theory_table.py check            # 出所の検算だけ
 """
@@ -110,16 +115,21 @@ def stage_sigma(dirs_by, work, sets):
     return True
 
 
-def stage_w_bar(dirs_by, work, sets):
-    """手順 2: 今の表で `theory_bridge --measure-w-bar` → `w_bar` と出所。"""
+def stage_w_bar(dirs_by, work, sets, scheme=None):
+    """手順 2: 今の表で `theory_bridge --measure-w-bar` → `w_bar` と出所。
+
+    `scheme`（`--w-bar-sigma`・既定 `CB.W_BAR_SCHEME`＝`consumer`）: `w_bar[s]` を測る実行で `σ_T`・`σ_rel` を引く鍵
+    （`CB.w_bar_sigma_key`）——`consumer` は `s`（その `w̄` を使う、もう一方のセットの行の分子と同じ値）。"""
+    scheme = scheme or CB.W_BAR_SCHEME
     for s in sets:
         out = os.path.join(work, "tb_%s.json" % s)
         side = out[:-5] + ".inputs.json"
-        now = CB.w_bar_inputs(s, BODY, _load())
+        now = CB.w_bar_inputs(s, BODY, _load(), scheme)
         if not (os.path.exists(out) and os.path.getsize(out) > 0):
             with open(side, "w", encoding="utf-8") as fh:
-                json.dump(now, fh)
-        _run("theory_bridge", dirs_by[s], out, extra=("--harm-profile", "cross", "--measure-w-bar"))
+                json.dump(dict(now, scheme=scheme), fh)
+        _run("theory_bridge", dirs_by[s], out,
+             extra=("--harm-profile", "cross", "--measure-w-bar", "--sigma-key", CB.w_bar_sigma_key(s, scheme)))
     if set(sets) != set(SETS):
         return False
     d = _load()
@@ -128,32 +138,39 @@ def stage_w_bar(dirs_by, work, sets):
         out = os.path.join(work, "tb_%s.json" % s)
         with open(out[:-5] + ".inputs.json", encoding="utf-8") as fh:
             was = json.load(fh)
-        now = CB.w_bar_inputs(s, BODY, d)
-        if was != now:
-            raise SystemExit("tb_%s.json は今と違う表の入力で回した（%s）＝消して回し直す" % (s, out))
+        now = CB.w_bar_inputs(s, BODY, d, scheme)
+        if was != dict(now, scheme=scheme):
+            raise SystemExit("tb_%s.json は今と違う表の入力・測り方で回した（%s）＝消して回し直す" % (s, out))
         with open(out, encoding="utf-8") as fh:
             st = json.load(fh)["stats"]
+        if st["sigma_turn"] != now["sigma_t"] or st.get("sigma_rel") != now["sigma_rel_whole_curve"]:
+            raise SystemExit("tb_%s の σ_T・σ_rel（%r・%r）が表の入力（%r・%r）と違う"
+                             % (s, st["sigma_turn"], st.get("sigma_rel"), now["sigma_t"], now["sigma_rel_whole_curve"]))
         # `E[w(D)] = Σκ/n × (その実行の分母)`——分母の値に依らない（`--measure-w-bar` は出所を検算しない）
         w_mean = st["kappa_sum"] / st["kappa_n"] * st["w_bar"]
         wb = round(w_mean, 4)
         d["w_bar"][BODY][s] = wb
         d["w_bar_provenance"][BODY][s] = {
-            "w_bar": wb, "inputs": now, "inputs_from": _other_note(s),
+            "w_bar": wb, "scheme": scheme, "inputs": now, "inputs_from": _other_note(s, scheme),
             "kappa_sum": st["kappa_sum"], "kappa_n": st["kappa_n"], "w_bar_in_run": st["w_bar"],
-            "w_mean": w_mean, "sigma_turn_in_run": st["sigma_turn"], "games": st["games"],
+            "w_mean": w_mean, "sigma_turn_in_run": st["sigma_turn"], "sigma_rel_in_run": st.get("sigma_rel"),
+            "games": st["games"],
             "records": [os.path.basename(os.path.normpath(x)) for x in dirs_by[s]],
-            "tool": "theory_bridge --harm-profile cross --measure-w-bar", "commit": _commit(),
-            "date": datetime.date.today().isoformat()}
-        if abs(st["sigma_turn"] - now["sigma_t"]) > 0:
-            raise SystemExit("tb_%s の σ_T（%r）が表の入力（%r）と違う" % (s, st["sigma_turn"], now["sigma_t"]))
+            "tool": "theory_bridge --harm-profile cross --measure-w-bar --sigma-key %s" % CB.w_bar_sigma_key(s, scheme),
+            "commit": _commit(), "date": datetime.date.today().isoformat()}
     _dump(d)
-    CB.check_w_bar_provenance(_load())
-    print("wrote w_bar", json.dumps({s: d["w_bar"][BODY][s] for s in SETS}), flush=True)
+    if scheme == CB.W_BAR_SCHEME:
+        CB.check_w_bar_provenance(_load())
+    print("wrote w_bar", scheme, json.dumps({s: d["w_bar"][BODY][s] for s in SETS}), flush=True)
     return True
 
 
-def _other_note(s):
-    return "%s の記録で測った・効いていたのは別のセット（%s）の行（cross）" % (s, CB._other(s))
+def _other_note(s, scheme):
+    o = CB._other(s)
+    if scheme == "consumer":
+        return ("%s の記録で測った（使うのは %s の記録）・輪郭は %s の行（cross）・σ_T／σ_rel は %s の行"
+                "＝使う %s の記録の分子と同じ σ" % (s, o, o, s, o))
+    return "%s の記録で測った・効いていたのは別のセット（%s）の行（cross）" % (s, o)
 
 
 def main(argv=None):
@@ -163,6 +180,9 @@ def main(argv=None):
     ap.add_argument("--syn", nargs="+", default=[])
     ap.add_argument("--work", default="")
     ap.add_argument("--sets", nargs="+", choices=SETS, default=list(SETS), help="回す記録（書き込みは両方そろってから）")
+    ap.add_argument("--w-bar-sigma", default=CB.W_BAR_SCHEME, choices=CB.W_BAR_SCHEMES,
+                    help="手順 2 の測り方（2026-10-08 決定 B）: `consumer`（既定）＝`w̄` を使う行の分子と同じ σ で測る／"
+                         "`run`＝旧（測る実行の cross の σ・器はこの表を受け付けない）")
     a = ap.parse_args(argv)
     if a.stage == "check":
         CB.check_w_bar_provenance(_load())
@@ -178,7 +198,7 @@ def main(argv=None):
         if a.stage == "all" and not done:
             return 0
     if a.stage in ("w_bar", "all"):
-        stage_w_bar(dirs_by, a.work, a.sets)
+        stage_w_bar(dirs_by, a.work, a.sets, a.w_bar_sigma)
     return 0
 
 

@@ -513,7 +513,11 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
                 Some(o) => g_opp_of(c, &mut tb, o, 1 - w)?,
             };
             let (d, tau_me, tau_opp) = kappa_of_row(c, &tb, mirror_me, r, &row, w, t, opp, &gme1, &g_opp, cut_me, cut_opp, &prof, cfg)?;
-            let kap = lt::state_factor(&cfg.clock, d, true, None, None, "hyp");
+            // **`κ = w(D)/w̄` の分子は勝率の幅**（2026-10-08 ユーザ決定 A）: `φ(D; max(σ_rel·s(τ_me, τ_opp), σ_D))`。
+            // 時計はこの行の勝率の読み（`_W_of`＝`prob_of_d(d0, t_me0, t_opp0)`）と同じ `kappa_of_row` の `τ`、
+            // 勝率が相対の幅で読む（`W_ERR_MODE=rel`）ときだけ渡す（`abs` なら勝率も `σ_D` だけ）
+            let (cm, co) = if cfg.clock.w_err_rel { (Some(tau_me), Some(tau_opp)) } else { (None, None) };
+            let kap = lt::state_factor(&cfg.clock, d, true, cm, co, "hyp");
             stats.addf("kappa_sum", kap);
             stats.addi("kappa_n", 1);
             stats.sub_mut("d_bins", |db| db.addi(d_bin(d), 1));
@@ -688,8 +692,10 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
             };
             let cut_me = cut_me_fr.view_gbar(c, g, &mut stats, w, t, Some(k as i64))?;
             let cut_opp = cut_me_fr.view_gbar(c, g, &mut stats, 1 - w, t, Some(k as i64))?;
-            let (d, _tm, _to) = kappa_of_row(c, &tb, mirror_me, r, &row, w, t, opp_g, &gme2, &g_opp, cut_me, cut_opp, &prof, cfg)?;
-            let kap = lt::state_factor(&cfg.clock, d, true, None, None, "hyp");
+            let (d, tm, to) = kappa_of_row(c, &tb, mirror_me, r, &row, w, t, opp_g, &gme2, &g_opp, cut_me, cut_opp, &prof, cfg)?;
+            // 攻めの行と同じ: 勝率の幅（時計は `kappa_of_row` の `τ`・`W_ERR_MODE=rel` のときだけ）
+            let (cm, co) = if cfg.clock.w_err_rel { (Some(tm), Some(to)) } else { (None, None) };
+            let kap = lt::state_factor(&cfg.clock, d, true, cm, co, "hyp");
             got.set("g", V::Float(0.0));
             got.set("g_delta", V::Float(0.0));
             // `_finish_guard(got, played, my_life, z, bnd, kap, w, t, rec, kn, stats, _add)`

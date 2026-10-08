@@ -413,6 +413,12 @@ pub fn state_factor(cfg: &ClockCfg, d: f64, slope: bool, t_me: Option<f64>, t_op
     if !slope {
         return 1.0;
     }
+    local_slope(cfg, d, t_me, t_opp, scale_mode) / cfg.w_bar
+}
+
+/// 局面の傾き `w(D)`（`state_factor` の分子）: 時計が渡れば幅は `max(σ_rel·s(τ_me, τ_opp), σ_D)`（勝率の幅・10-05 の `match`）、
+/// 渡らなければ `σ_D`。
+pub fn local_slope(cfg: &ClockCfg, d: f64, t_me: Option<f64>, t_opp: Option<f64>, scale_mode: &str) -> f64 {
     let mut sd = None;
     if let (Some(sr), Some(a), Some(b)) = (cfg.sigma_rel, t_me, t_opp) {
         let s = clock_scale(a, b, scale_mode);
@@ -420,7 +426,7 @@ pub fn state_factor(cfg: &ClockCfg, d: f64, slope: bool, t_me: Option<f64>, t_op
             sd = Some(py_max(sr * s, cfg.sigma_d));
         }
     }
-    w_of_d(cfg, d, sd, false) / cfg.w_bar
+    w_of_d(cfg, d, sd, false)
 }
 
 /// `board_theta(tok_row, life, my_don, don_share, fallback)`

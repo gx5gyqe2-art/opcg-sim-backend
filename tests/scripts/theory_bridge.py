@@ -159,7 +159,7 @@ def _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats=None):
 
 
 def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_comfort=None, harm_profile="cross",
-            measure_w_bar=False):
+            measure_w_bar=False, sigma_key=None):
     """(局, 席) ごとに攻め側と守り側の取りこぼしを足す（1 局ぶんは Rust の局の駆動 `theory_bridge`）。
 
     `s`（決める＝行内の最善からの逸脱）は `FLOW_PRICING`、`g`（数える＝`ΔG`）は `exercise`（T58）で読む。
@@ -175,17 +175,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_
     prof = CB.profile_for(dirs, harm_profile)
     if prof is None:
         raise ValueError("harm profile が無い（%s・%s）" % (harm_profile, CB.HARM_PROFILE_PATH))
-    # **T97／T98**: `κ = w(D)/w̄` の分子の `σ_D = √2 × σ_T` と分母 `w̄` を表の実測から採る（耐久の体の集合ごと・別のセットの値）。
+    # **T97／T98／T118**: `κ = w(D)/w̄` の分子 `φ(D; max(σ_rel·s(τ_me, τ_opp), √2·σ_T))`（勝率の幅・2026-10-08 決定 A）の
+    # `σ_T`・`σ_rel` と分母 `w̄` を表の実測から採る（耐久の体の集合ごと・別のセットの値）。
     # **κ を使う全ての器で 1 つの読み込み**（`crossing_bridge.kappa_clock`・2026-10-08）: 引けない・`w̄` の出所が今の表と
-    # 合わない（`σ_T` などを測り直したのに `w̄` を測り直していない）なら落ちる。`measure_w_bar` は `w̄` を測る実行だけ。
-    CB.kappa_clock(dirs, harm_profile, measure=measure_w_bar)
-    # **T118**: `W_ERR_MODE=rel` なら物差しは `σ_rel × s(τ_me, τ_opp)`（`curve` の読みのもの）。引けなければ落ちる。
-    if TR.CLOCK["W_ERR_MODE"] == "rel":
-        sr = CB.sigma_rel_for(dirs, harm_profile, slope="curve")
-        if sr is None:
-            raise ValueError("W_ERR_MODE=rel なのに σ_rel が引けない（%s・%s）＝黙って abs に落とさない"
-                             % (harm_profile, CB.HARM_PROFILE_PATH))
-        TR.set_sigma_rel(sr)
+    # 合わない（`σ_T` などを測り直したのに `w̄` を測り直していない）なら落ちる。`measure_w_bar` は `w̄` を測る実行だけ、
+    # `sigma_key` はその実行で `σ` を引く鍵（決定 B: 測った `w̄` を使う行の分子と同じ `σ`・`theory_table.py` が渡す）。
+    # `W_ERR_MODE=rel` なら勝率の物差しも同じ `σ_rel × s(τ_me, τ_opp)`（`curve` の読みのもの）。
+    CB.kappa_clock(dirs, harm_profile, measure=measure_w_bar, sigma_key=sigma_key)
     per = {}
     kn_turns = []        # T80: ターンごとの（`D`・生の価格・`ΔW`）＝必要な `κ` を測る材料
     kn_games = []        # T81: 局ごとのターンの並び（窓の広さ・手の型・場の動きで相関を割る）
@@ -194,6 +190,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_
              "grd_comfortable": 0,
              # **T49**: 局面の傾き `κ = w(D)/w̄`（攻めの行）——平均が 1 に戻るかが `w(状態)` の検算
              "w_mode": TR.W_MODE, "sigma_turn": TR.CLOCK["SIGMA_TURN"], "w_bar": TR.CLOCK["W_BAR"],
+             "sigma_rel": TR.CLOCK["SIGMA_REL"],
              "kappa_sum": 0.0, "kappa_n": 0,
              "clock_hand": TR.CLOCK_HAND_MODE,
              "harm_profile": (harm_profile if TR.W_MODE == "curve" else None),
@@ -533,6 +530,9 @@ def main(argv=None):
                     help="**H-4g** 自分の耐久も相手と同じ守る側の計算で読む（既定 on・`off`＝自分は `threshold_of_me`）")
     ap.add_argument("--measure-w-bar", action="store_true",
                     help="**`w̄` を測る実行**（`theory_table.py` が使う）: `w̄` の出所を検算しない（測る量 `stats.w_mean` は分母に依らない）")
+    ap.add_argument("--sigma-key", default=None, choices=("real", "syn"),
+                    help="`--measure-w-bar` の実行で `σ_T`・`σ_rel` を引く表の鍵（2026-10-08 決定 B・`theory_table.py` が "
+                         "`crossing_bridge.w_bar_sigma_key` で渡す。無ければ輪郭と同じ鍵）")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
@@ -545,7 +545,7 @@ def main(argv=None):
         TR.set_switch("FLOW_PRICING", a.flow_pricing)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.margin_comfort,
-                         harm_profile=a.harm_profile, measure_w_bar=a.measure_w_bar)
+                         harm_profile=a.harm_profile, measure_w_bar=a.measure_w_bar, sigma_key=a.sigma_key)
     # **T49 の検算**: `κ` の平均（`w` の平均が `w̄` に戻れば 1）
     stats["kappa_mean"] = (round(stats["kappa_sum"] / stats["kappa_n"], 4) if stats["kappa_n"] else None)
     stats["w_mean"] = (round(stats["kappa_mean"] * TR.CLOCK["W_BAR"], 4) if stats["kappa_mean"] is not None else None)

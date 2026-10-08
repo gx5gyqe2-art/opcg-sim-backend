@@ -224,7 +224,14 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         stats.addi("priced", 1);
         stats.sub_mut("by_family", |d| d.addi(fam, 1));
         let d = rw::d_of(&st0, &prof);
-        let wd = lt::w_of_d(&cfg.clock, d, None, false);
+        let t0 = (rw::tau_of(st0[0], st0[3]), rw::tau_of(st0[1], st0[2]));
+        // **局面の傾き `w(D)` は勝率の幅**（2026-10-08 ユーザ決定 A・`theory_bridge`・`relative_ledger` と同じ定義）:
+        // `φ(D; max(σ_rel·s(τ_me, τ_opp), σ_D))`。時計は `exactw` の腕の勝率の読み（`prob_of_d(d, t0)`）と同じ、
+        // 勝率が相対の幅で読む（`W_ERR_MODE=rel`）ときだけ時計を渡す（`abs` なら勝率も `σ_D` だけ）。
+        // `w(D)` を使う腕（`scalar`・`vector`・`exact`・`plac_*`）は全部この 1 つ（器の中に 2 つの `w(D)` を置かない）
+        let (cm, co) = if cfg.clock.w_err_rel { (Some(t0.0), Some(t0.1)) } else { (None, None) };
+        let wd = lt::local_slope(&cfg.clock, d, cm, co, "hyp");
+        let kap = wd / cfg.clock.w_bar;
         let grad = rw::grad_of(&st0, &prof);
         let cd = &g.cands[b];
         let dx = c.axis_of_move(fam, v, opt_str(&cd.cid), sc, &r.tok, olp, rt, cd.k);
@@ -244,7 +251,6 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         let sgn = if w == 0 { 1.0 } else { -1.0 };
         acc[0] += v * sgn;
         // `scalar` の腕の `κ = w(D)/w̄`（分母は Python が表の実測を `clock.W_BAR` に入れる）——平均の検算に積む
-        let kap = lt::state_factor(&cfg.clock, d, true, None, None, "hyp");
         if kappa_stats {
             stats.addf("kappa_sum", kap);
         }
@@ -253,7 +259,6 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         let st1 = rw::apply_dx(&st0, &dx);
         let d1 = rw::d_of(&st1, &prof);
         acc[3] += wd * (d1 - d) * sgn;
-        let t0 = (rw::tau_of(st0[0], st0[3]), rw::tau_of(st0[1], st0[2]));
         let t1 = (rw::tau_of(st1[0], st1[3]), rw::tau_of(st1[1], st1[2]));
         acc[4] += (lt::prob_of_d(&cfg.clock, d1, None, Some(t1.0), Some(t1.1), "hyp", false) - lt::prob_of_d(&cfg.clock, d, None, Some(t0.0), Some(t0.1), "hyp", false)) * sgn;
         acc[5] += wd * rw::dot(&grad, &rw::perm_axes(&dx)) * sgn;

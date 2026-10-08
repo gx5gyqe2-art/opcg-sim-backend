@@ -20,7 +20,7 @@
 | **絶対額の価格** | `abs_flat`（T121 の勝者） | `plac_K`（法則の重みだけ・相対化しない） |
 | **相対変化** | `rel_flat`（相対化だけ） | **`rel_K`（法則そのもの）** |
 
-* `abs_kappa` … **出荷の帳簿**（`κ = w(D)/w̄`・分子の `σ_T` と分母 `w̄` は表の実測〔`crossing_bridge.kappa_clock`・2026-10-08〕）
+* `abs_kappa` … **出荷の帳簿**（`κ = w(D)/w̄`・分子は勝率の幅・その `σ_T`／`σ_rel` と分母 `w̄` は表の実測〔`crossing_bridge.kappa_clock`・2026-10-08〕）
 * `rel_exact` … **一次近似をやめる**（`Φ(z') − Φ(z)` を直に引く・P3）
 * `plac_shift` … **プラセボ**: `K` を**前の局の同じ行番号**から取る（重みと局面の結びつきだけ壊す）
 
@@ -82,9 +82,10 @@ from theory_rs import MU, THETA  # noqa: E402
 
 #: 腕の名前（出力の順序もこれ）
 ARMS = ("abs_flat", "abs_kappa", "rel_flat", "rel_K", "rel_exact", "plac_K", "plac_shift")
-#: `abs_kappa` の `κ = w(D)/w̄` の `w(D)` の幅（定数・Rust の `core::drv_rl`）。**`theory_bridge`（`w̄` を測った器）と同じ定義**
-#: ＝`σ_D = √2·σ_T`（表の実測・`crossing_bridge.kappa_clock`）だけ（2026-10-08。旧 `match`＝`max(σ_rel·s, σ_D)`・`σ_D` は借り物の `√2·1.0`）
-KAPPA_SIGMA_MODE = "sigma_d"
+#: `abs_kappa` の `κ = w(D)/w̄` の `w(D)` の幅（定数・Rust の `core::drv_rl`）。**勝率の幅**（2026-10-08 ユーザ決定 A・10-05 の `match`）
+#: ＝`max(σ_rel·s(τ_me, τ_opp), σ_D)`・`σ_D = √2·σ_T`（表の実測・`crossing_bridge.kappa_clock`）。`theory_bridge`（`w̄` を測る器）・
+#: `kappa_vector` も同じ定義（10-08 の一時期は 3 器とも `σ_D` だけだった）
+KAPPA_SIGMA_MODE = "match"
 
 
 def calib_of(xs, zs, w0s):
@@ -127,12 +128,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
     prof = CB.profile_for(dirs)
     if not prof:
         raise ValueError("D_MODE=KV.D_MODE なのに損害の輪郭が引けない（%s）" % (dirs,))
-    sr = CB.sigma_rel_for(dirs, slope="curve")
-    if sr is None:
-        raise ValueError("σ_rel が引けない＝黙って別の物差しに落とさない（T118 の規約）")
-    TR.set_sigma_rel(sr)
-    # `abs_kappa` の `κ` の分子の `σ_T` と分母 `w̄`（表の実測・別のセット・`theory_bridge` と同じ 1 つの読み込み・2026-10-08）
+    # 勝率の物差し `σ_rel`（T118）と、`abs_kappa` の `κ` の分子の `σ_T`・`σ_rel` と分母 `w̄`（表の実測・別のセット・
+    # `theory_bridge` と同じ 1 つの読み込み・2026-10-08。引けなければ落ちる＝黙って別の物差しに落とさない）
     kc = CB.kappa_clock(dirs)
+    sr = kc["sigma_rel"]
     w_bar = kc["w_bar"]
     seat_decks = KV._seat_decks(dirs)     # **T128**: `A` の流入・効果はデッキの中身から出る
     arms = {k: [] for k in ARMS}
