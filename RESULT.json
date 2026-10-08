@@ -1,6 +1,6 @@
 {
  "branch": "claude/diag-survival-split",
- "commit": "(see git log; this file is in the commit after the report)",
+ "commit": "1e76c5523",
  "report": "docs/reports/2026-10-08_survival_split.md",
  "summary": [
   "1c（勝った席の偏り）≈0: 打ち切りつきでも S≥1/2 で予測 3.0%/2.9% 対 観測 26%/30%。言い落としは段 2 以降だけ（段 1 は逆向き）で、実際に来た盤面と実際の攻撃で解けば観測の 92%/84%＝今のターンの読みではなく先の盤面の読みの誤り。",
