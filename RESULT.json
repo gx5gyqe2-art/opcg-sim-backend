@@ -1,0 +1,19 @@
+{
+  "branch": "claude/fix-two-tier-price",
+  "commit": "5c8c881a (code tip; the report and RESULT.json commit sits on top)",
+  "report": "docs/reports/2026-10-08_two_tier_price.md",
+  "summary": [
+    "Two-tier attacker-side price (stop up to the defender's capacity at gbar per card, excess at one life lambda_net) implemented with zero new constants; KERNEL_FILES untouched; plus a rule-based floor at 0 (attacks are optional).",
+    "Crossing bridge regressed on both record sets: truncations real 9->33 (24 with floor), syn 70->197 (189); sigma_T real 1.412->1.644 (1.608), syn 2.004->2.592 (2.460). Class A fell 45->33 but class B rose 25->162: later-step attacks lengthen the defender horizon and endurance, and the expected-value walk reaches theta only when the last branch falls (same mechanism as issue 1).",
+    "Outside truncations it is slightly better (syn in-horizon winner bias +0.218->+0.171, non-truncated sd 1.611->1.578); issue-1 lateness unchanged. Recommendation: do not adopt; retest after fixing the class-B walk readout together with issue 1."
+  ],
+  "gate": {"cargo_test": "473 passed, 1 ignored", "pytest": "622 passed, 12 skipped, 0 failed", "theory_table_check": "pass (table not rebuilt)"},
+  "forecast": {
+    "1_truncations": "miss", "2_syn_bias_sigma": "miss", "3_gbar_band": "not measurable (proxy worse)",
+    "4_real_bias_kill": "direction miss; kill criterion not hit (+0.058); real sigma miss",
+    "5_in_horizon_tau_stability": "hit", "6_issue1_lateness_share": "miss (unchanged)",
+    "7_issue3_ratio": "miss (hit after excluding truncations)", "8_other_bridges": "not measured", "9_table": "not rebuilt"
+  },
+  "not_done": ["theory_bridge / relative_ledger / kappa_vector / win_calib before-after", "make theory-table rebuild"],
+  "decisions_for_coordinator": ["adopt two-tier? (recommend no)", "clamp kernel input lambda_net at 0 for class C?", "run remaining instruments + table rebuild only if adopted"]
+}
