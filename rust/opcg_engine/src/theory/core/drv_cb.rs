@@ -492,6 +492,7 @@ fn m2_clock(d: &SeatD, rd: bool) -> V {
         (V::s("pdeath"), m2.get("m2_pdeath").clone()),
         (V::s("alive_death"), m2.get("m2_alive_death").clone()),
         (V::s("cut_death"), m2.get("m2_cut_death").clone()),
+        (V::s("din"), m2.get("m2_in").clone()),
         (V::s("cut"), m2.get("m2_cut").clone()),
         (V::s("base"), V::list(base.iter().map(|&x| V::Float(x)).collect())),
         (V::s("flow"), V::list(flow.iter().map(|&x| V::Float(x)).collect())),
