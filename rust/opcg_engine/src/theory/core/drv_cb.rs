@@ -409,7 +409,7 @@ fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row:
         if model_theta {
             for (k, v) in don_plan.kv() {
                 let ks = k.pystr();
-                if ks.starts_with("m2_") || ks == "horizon" || ks == "horizon0" || (super::m2probe::detail() > 0 && !ks.starts_with("m2")) {
+                if ks.starts_with("m2_") || ks == "horizon" || ks == "horizon0" || (super::m2probe::detail() > 0 && (ks.starts_with("m2d_") || !ks.starts_with("m2"))) {
                     kv.push((k.clone(), v.clone()));
                 }
             }
