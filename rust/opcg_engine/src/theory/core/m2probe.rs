@@ -36,6 +36,42 @@ pub fn on() -> bool {
     ON.load(Ordering::SeqCst)
 }
 
+static DINIT: Once = Once::new();
+static DLVL: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+/// 打ち切りの調査の詳しい書き出し（`OPCG_M2_DETAIL`・1 度だけ読む・`OPCG_M2_PROBE` と一緒のときだけ意味がある）。
+/// 0＝無し・1＝打ち切りの時計だけ・2（`all`）＝全部の時計。`docs/reports/2026-10-08_syn_truncation.md` の診断だけ。
+pub fn detail() -> u8 {
+    DINIT.call_once(|| {
+        let v = std::env::var("OPCG_M2_DETAIL").unwrap_or_default();
+        let l = if v.is_empty() || v == "0" { 0 } else if v == "all" { 2 } else { 1 };
+        DLVL.store(l, Ordering::SeqCst);
+    });
+    DLVL.load(Ordering::SeqCst)
+}
+
+/// 地平の決め方（`model_horizon`）の中身と、攻め手の財布の表（`OPCG_M2_DETAIL` のときだけ `rd_run` が足す）
+pub fn h0_fields(th0: f64, a0: f64, flow_b: f64, lead_bare: f64, chars_bare: f64, budget: i64, ds: &[f64], a_tab: &[f64], ar_tab: &[f64], e_tab: &[f64], att1: &[f64], later: &[f64], cards: &[(f64, f64)], blk: &[f64], life: f64, steps: &[(Vec<f64>, f64, f64, f64)]) -> Vec<(V, V)> {
+    vec![
+        (V::s("m2d_h0_th0"), V::Float(th0)),
+        (V::s("m2d_h0_a0"), V::Float(a0)),
+        (V::s("m2d_h0_flow"), V::Float(flow_b)),
+        (V::s("m2d_lead_bare"), V::Float(lead_bare)),
+        (V::s("m2d_chars_bare"), V::Float(chars_bare)),
+        (V::s("m2d_budget"), V::Int(budget)),
+        (V::s("m2d_ds"), fl(ds)),
+        (V::s("m2d_a_tab"), fl(a_tab)),
+        (V::s("m2d_ar_tab"), fl(ar_tab)),
+        (V::s("m2d_e_tab"), fl(e_tab)),
+        (V::s("m2d_att1"), fl(att1)),
+        (V::s("m2d_later"), fl(later)),
+        (V::s("m2d_cards"), V::list(cards.iter().map(|&(a, b)| fl(&[a, b])).collect())),
+        (V::s("m2d_blk"), fl(blk)),
+        (V::s("m2d_life"), V::Float(life)),
+        (V::s("m2d_steps"), V::list(steps.iter().map(|(h, p, f, e)| V::list(vec![fl(h), V::Float(*p), V::Float(*f), V::Float(*e)])).collect())),
+    ]
+}
+
 fn fl(xs: &[f64]) -> V {
     V::list(xs.iter().map(|&x| V::Float(x)).collect())
 }

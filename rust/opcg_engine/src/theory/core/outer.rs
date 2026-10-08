@@ -1553,6 +1553,18 @@ impl Core {
             }
             let hits: Vec<Vec<f64>> = m.steps.iter().map(|s| s.hits.clone()).collect();
             pkv.extend(super::m2probe::plan_fields(&inp, &mk[b.mask], &hits, &b.ks, b.paid, &r, o.h, take_price));
+            if super::m2probe::detail() > 0 {
+                let l0h = nonneg_round(p.life);
+                let mut nb: Vec<f64> = Vec::new();
+                for &mm in p.blk.iter().chain(ax.rest_blk.iter()).chain(p.arrive.iter()) {
+                    nb.push(lt::nu_meas_of(mm + ax.olp, ax.mlp));
+                }
+                let th0 = ax.lam * l0h as f64 + psum(&nb).f();
+                let fl_b = flow[(flow.len() - 1).min(ax.budget.max(0) as usize)];
+                let later: Vec<f64> = ax.later.iter().map(|&(_s, x)| x).collect();
+                let st: Vec<(Vec<f64>, f64, f64, f64)> = m.steps.iter().map(|s| (s.hits.clone(), s.paid, s.fb, s.eff.f())).collect();
+                pkv.extend(super::m2probe::h0_fields(th0, ax.lead_bare + ax.chars_bare, fl_b, ax.lead_bare, ax.chars_bare, budget, &ax.ds, &ax.a_tab, &ax.ar_tab, &ax.e_tab, &att1_x, &later, p.cards, p.blk, p.life, &st));
+            }
         }
         let plan = V::dict(pkv);
         let s = o.stats;

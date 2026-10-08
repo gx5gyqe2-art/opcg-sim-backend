@@ -409,7 +409,7 @@ fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row:
         if model_theta {
             for (k, v) in don_plan.kv() {
                 let ks = k.pystr();
-                if ks.starts_with("m2_") || ks == "horizon" || ks == "horizon0" {
+                if ks.starts_with("m2_") || ks == "horizon" || ks == "horizon0" || (super::m2probe::detail() > 0 && !ks.starts_with("m2")) {
                     kv.push((k.clone(), v.clone()));
                 }
             }
@@ -446,6 +446,14 @@ fn m2_clock(d: &SeatD, rd: bool) -> V {
     if why != "plan" {
         kv.push((V::s("acc_fallback"), V::Float(adds.iter().sum())));
         return V::dict(kv);
+    }
+    let dl = super::m2probe::detail();
+    if dl == 2 || (dl == 1 && tau >= RACE_CAP) {
+        // 打ち切りの調査（`OPCG_M2_DETAIL`）: 行の読みの全部（`m2` の中身ごと）と、歩きで段ごとに足した量
+        let mut dd: Vec<(V, V)> = d.kv.iter().filter(|(k, _)| *k != "m2").map(|(k, v)| (V::s(k), v.clone())).collect();
+        dd.push((V::s("m2"), m2.clone()));
+        dd.push((V::s("adds"), V::list(adds.iter().map(|&x| V::Float(x)).collect())));
+        kv.push((V::s("detail"), V::dict(dd)));
     }
     let gl = |k: &str| -> Vec<f64> { m2.get(k).items().iter().map(|x| x.f()).collect() };
     let (base, flow, eff, take) = (gl("m2_base"), gl("m2_flow"), gl("m2_eff"), gl("m2_take"));
