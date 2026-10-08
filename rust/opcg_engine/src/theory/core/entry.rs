@@ -483,6 +483,8 @@ pub fn call_inner(c: &mut Core, name: &str, a: &V) -> R<V> {
             }
             V::None
         }
+        // 診断だけ（`OPCG_M2_PROBE` のときだけ通す・`m2probe::resolve_call`）
+        "m2.resolve" if super::m2probe::on() => super::m2probe::resolve_call(a)?,
         _ => {
             let _ = (th(), MU);
             return super::entry_outer::call_outer(c, name, a);

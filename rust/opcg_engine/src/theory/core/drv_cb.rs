@@ -494,6 +494,16 @@ fn m2_clock(d: &SeatD, rd: bool) -> V {
         (V::s("alive"), m2.get("m2_alive").clone()),
         (V::s("resolve_same"), m2.get("m2_resolve_same").clone()),
         (V::s("short"), m2.get("m2_short").clone()),
+        (V::s("pdeath"), m2.get("m2_pdeath").clone()),
+        (V::s("alive_death"), m2.get("m2_alive_death").clone()),
+        (V::s("cut_death"), m2.get("m2_cut_death").clone()),
+        (V::s("din"), m2.get("m2_in").clone()),
+        (V::s("cut"), m2.get("m2_cut").clone()),
+        (V::s("base"), V::list(base.iter().map(|&x| V::Float(x)).collect())),
+        (V::s("flow"), V::list(flow.iter().map(|&x| V::Float(x)).collect())),
+        (V::s("effs"), V::list(eff.iter().map(|&x| V::Float(x)).collect())),
+        (V::s("sched"), V::list(sched.iter().map(|&x| V::Float(x)).collect())),
+        (V::s("adds"), V::list(adds.iter().map(|&x| V::Float(x)).collect())),
     ]);
     // 診断の別の歩き（同じ耐久・式の提案ではない）
     let mk = |f: &dyn Fn(usize) -> f64| -> f64 {
