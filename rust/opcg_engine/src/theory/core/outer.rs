@@ -1563,6 +1563,20 @@ impl Core {
                 let fl_b = flow[(flow.len() - 1).min(ax.budget.max(0) as usize)];
                 let later: Vec<f64> = ax.later.iter().map(|&(_s, x)| x).collect();
                 let st: Vec<(Vec<f64>, f64, f64, f64)> = m.steps.iter().map(|s| (s.hits.clone(), s.paid, s.fb, s.eff.f())).collect();
+                let mut gains: Vec<V> = Vec::new();
+                for &(_s, x) in ax.later.iter() {
+                    let mut row_g = vec![V::Float(x)];
+                    for kk in 1..=3i64 {
+                        row_g.push(V::Float(self.attach_gain_body(ax, x, kk)));
+                    }
+                    gains.push(V::list(row_g));
+                }
+                pkv.push((V::s("m2d_gains"), V::list(gains)));
+                pkv.push((V::s("m2d_theta_p"), V::Float(ax.theta_p)));
+                pkv.push((V::s("m2d_mu"), V::Float(ax.mu)));
+                pkv.push((V::s("m2d_pricer"), self.ctx.pricer.map(V::Float).unwrap_or(V::None)));
+                pkv.push((V::s("m2d_blk_a"), V::list(ax.blk_a.iter().map(|&(a, b)| V::list(vec![V::Float(a), V::Float(b)])).collect())));
+                pkv.push((V::s("m2d_olp"), V::Float(ax.olp)));
                 pkv.extend(super::m2probe::h0_fields(th0, ax.lead_bare + ax.chars_bare, fl_b, ax.lead_bare, ax.chars_bare, budget, &ax.ds, &ax.a_tab, &ax.ar_tab, &ax.e_tab, &att1_x, &later, p.cards, p.blk, p.life, &st));
             }
         }
