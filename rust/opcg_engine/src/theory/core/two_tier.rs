@@ -109,9 +109,10 @@ impl Core {
                 used += need;
             }
         }
+        // 攻撃の宣言は任意（攻め手は自分に損な攻撃をしない）＝攻め手側の 1 本の値段は 0 を下回らない（`λ_net` < 0 の盤面・類 C）
         let mut v = 0.0;
         for p in price {
-            v += p;
+            v += if p > 0.0 { p } else { 0.0 };
         }
         (v, used)
     }
