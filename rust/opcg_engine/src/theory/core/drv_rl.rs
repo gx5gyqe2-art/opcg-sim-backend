@@ -67,6 +67,8 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
     let mirror_me = pc.get("MIRROR_ME").truthy();
     // 段 7: `parts`（T145・`--pre-settle on` のとき旗だけ読む）＝`rel_K` を (席, 最後の自席ターンか, 宣言した行か) で割る
     let parts = pc.get("parts").truthy();
+    // 2026-10-08: `kappa_stats` の旗があるときだけ `κ` の和を積む（旗の無い呼び＝記録の golden の出力は不変）
+    let kappa_stats = pc.get("kappa_stats").truthy();
     let settled = settled_of(p);
     let mut acc_part: Vec<((i64, bool, bool), f64)> = Vec::new();
     let prev_ks: Vec<f64> = p.get("carry").get("prev_ks").items().iter().map(|x| x.f()).collect();
@@ -271,7 +273,9 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         cur_ks.push(kk);
         // `abs_kappa` の `κ = w(D)/w̄`（分母は Python が表の実測を `clock.W_BAR` に入れる）——平均の検算に積む
         let kap = lt::state_factor(&cfg.clock, d, true, Some(t_me), Some(t_opp), "hyp");
-        stats.addf("kappa_sum", kap);
+        if kappa_stats {
+            stats.addf("kappa_sum", kap);
+        }
         let one = [
             v * sgn,
             v * sgn * kap,

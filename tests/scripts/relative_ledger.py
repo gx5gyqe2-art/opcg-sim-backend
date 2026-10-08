@@ -154,7 +154,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, scale_a=1.0, scale_currency
         seed = TR.seed_of(game)
         pin = {"decks": TR.deck_list(KV._deck_pair(seat_decks, seed)), "settled": TR.settled_in(settled, seed)}
         c = TR.cfg(theta, mu, prof=prof, sr=float(sr), scale_a=float(scale_a), scale_currency=float(scale_currency),
-                   MIRROR_ME=bool(TR.RUN["MIRROR_ME"]), parts=bool(pre_settle))
+                   MIRROR_ME=bool(TR.RUN["MIRROR_ME"]), parts=bool(pre_settle), kappa_stats=True)
         res = TR.game_call("relative_ledger", game, {"cfg": c, "in": pin, "stats": stats, "carry": {"prev_ks": prev_ks}})
         prev_ks = res["carry"]["prev_ks"]
         rs.extend(res["rs"])

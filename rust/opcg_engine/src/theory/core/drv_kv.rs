@@ -155,6 +155,8 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
     let mut stats = D::of(p.get("stats"));
     let prof = cfg.prof.clone().ok_or("kappa_vector: 輪郭が無い")?;
     let (theta, mu) = (cfg.theta, cfg.mu);
+    // 2026-10-08: `kappa_stats` の旗があるときだけ `κ` の和を積む（旗の無い呼び＝記録の golden の出力は不変）
+    let kappa_stats = p.get("cfg").get("kappa_stats").truthy();
     stats.addi("games", 1);
     let mut acc = [0.0f64; 7];
     let mut z_of: Vec<(i64, f64)> = Vec::new();
@@ -243,7 +245,9 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         acc[0] += v * sgn;
         // `scalar` の腕の `κ = w(D)/w̄`（分母は Python が表の実測を `clock.W_BAR` に入れる）——平均の検算に積む
         let kap = lt::state_factor(&cfg.clock, d, true, None, None, "hyp");
-        stats.addf("kappa_sum", kap);
+        if kappa_stats {
+            stats.addf("kappa_sum", kap);
+        }
         acc[1] += v * sgn * kap;
         acc[2] += wd * rw::dot(&grad, &dx) * sgn;
         let st1 = rw::apply_dx(&st0, &dx);

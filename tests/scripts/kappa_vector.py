@@ -216,7 +216,7 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU):
         if limit_games and games > limit_games:
             break
         pin = {"decks": TR.deck_list(_deck_pair(seat_decks, TR.seed_of(game)))}
-        res = TR.game_call("kappa_vector", game, {"cfg": TR.cfg(theta, mu, prof=prof), "in": pin, "stats": stats,
+        res = TR.game_call("kappa_vector", game, {"cfg": TR.cfg(theta, mu, prof=prof, kappa_stats=True), "in": pin, "stats": stats,
                                                   "carry": {}})
         new = res["stats"]
         stats.clear()
