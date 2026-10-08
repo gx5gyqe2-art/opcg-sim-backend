@@ -271,8 +271,10 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         let ex_w = rw::w_of(a1, b1, sr) - rw::w_of(t_me, t_opp, sr);
         let plac_k = if cur_ks.len() < prev_ks.len() { prev_ks[cur_ks.len()] } else { kk };
         cur_ks.push(kk);
-        // `abs_kappa` の `κ = w(D)/w̄`（分母は Python が表の実測を `clock.W_BAR` に入れる）——平均の検算に積む
-        let kap = lt::state_factor(&cfg.clock, d, true, Some(t_me), Some(t_opp), "hyp");
+        // `abs_kappa` の `κ = w(D)/w̄`（分母は Python が表の実測を `clock.W_BAR` に入れる）——平均の検算に積む。
+        // **分子は `theory_bridge`（`w̄` を測った器）と同じ定義**（2026-10-08）: `σ = σ_D = √2·σ_T`（表の実測）だけで読み、
+        // 時計の幅 `σ_rel·s` に合わせない（旧 `match` の `max(σ_rel·s, σ_D)` は `w̄` を測った定義と違っていた）
+        let kap = lt::state_factor(&cfg.clock, d, true, None, None, "hyp");
         if kappa_stats {
             stats.addf("kappa_sum", kap);
         }

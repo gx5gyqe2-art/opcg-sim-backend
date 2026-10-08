@@ -158,7 +158,8 @@ def _seat_decks(rec_decks, seed, rows, ex, idx, idx2cid, stats=None):
     return out
 
 
-def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_comfort=None, harm_profile="cross"):
+def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_comfort=None, harm_profile="cross",
+            measure_w_bar=False):
     """(局, 席) ごとに攻め側と守り側の取りこぼしを足す（1 局ぶんは Rust の局の駆動 `theory_bridge`）。
 
     `s`（決める＝行内の最善からの逸脱）は `FLOW_PRICING`、`g`（数える＝`ΔG`）は `exercise`（T58）で読む。
@@ -174,12 +175,10 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_
     prof = CB.profile_for(dirs, harm_profile)
     if prof is None:
         raise ValueError("harm profile が無い（%s・%s）" % (harm_profile, CB.HARM_PROFILE_PATH))
-    # **T97**: `σ_D = √2 × σ_T` の `σ_T` を**同じ器の実測**から採る（耐久の体の集合ごと・別のセットの値）。
-    st = CB.sigma_t_for(dirs, harm_profile)
-    if st is None:
-        raise ValueError("σ_T が引けない（体の形 %r・%s・%s）＝黙って前の値を使い回さない"
-                         % (CB.THETA_BODY_MODE, harm_profile, CB.HARM_PROFILE_PATH))
-    TR.set_sigma_turn(st)
+    # **T97／T98**: `κ = w(D)/w̄` の分子の `σ_D = √2 × σ_T` と分母 `w̄` を表の実測から採る（耐久の体の集合ごと・別のセットの値）。
+    # **κ を使う全ての器で 1 つの読み込み**（`crossing_bridge.kappa_clock`・2026-10-08）: 引けない・`w̄` の出所が今の表と
+    # 合わない（`σ_T` などを測り直したのに `w̄` を測り直していない）なら落ちる。`measure_w_bar` は `w̄` を測る実行だけ。
+    CB.kappa_clock(dirs, harm_profile, measure=measure_w_bar)
     # **T118**: `W_ERR_MODE=rel` なら物差しは `σ_rel × s(τ_me, τ_opp)`（`curve` の読みのもの）。引けなければ落ちる。
     if TR.CLOCK["W_ERR_MODE"] == "rel":
         sr = CB.sigma_rel_for(dirs, harm_profile, slope="curve")
@@ -187,10 +186,6 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_
             raise ValueError("W_ERR_MODE=rel なのに σ_rel が引けない（%s・%s）＝黙って abs に落とさない"
                              % (harm_profile, CB.HARM_PROFILE_PATH))
         TR.set_sigma_rel(sr)
-        # **T98**: `κ = w(D)/w̄` の分母も**同じ器の実測**（`E[w(D)]`）にする。
-        wb = CB.w_bar_for(dirs, harm_profile)
-        if wb is not None:
-            TR.set_w_bar(wb)
     per = {}
     kn_turns = []        # T80: ターンごとの（`D`・生の価格・`ΔW`）＝必要な `κ` を測る材料
     kn_games = []        # T81: 局ごとのターンの並び（窓の広さ・手の型・場の動きで相関を割る）
@@ -536,6 +531,8 @@ def main(argv=None):
                     help="**T75** 輪郭: `cross`（既定・測る記録と別のセット）／`real`／`syn`（`tests/fixtures/harm_profile.json`）")
     ap.add_argument("--mirror", default=("on" if TR.RUN["MIRROR_ME"] else "off"), choices=("on", "off"),
                     help="**H-4g** 自分の耐久も相手と同じ守る側の計算で読む（既定 on・`off`＝自分は `threshold_of_me`）")
+    ap.add_argument("--measure-w-bar", action="store_true",
+                    help="**`w̄` を測る実行**（`theory_table.py` が使う）: `w̄` の出所を検算しない（測る量 `stats.w_mean` は分母に依らない）")
     ap.add_argument("--boot-reps", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="")
@@ -548,7 +545,7 @@ def main(argv=None):
         TR.set_switch("FLOW_PRICING", a.flow_pricing)
     t0 = time.time()
     per, stats = collect(a.src, a.limit_games, a.theta, MU, a.theta_mode, a.margin_comfort,
-                         harm_profile=a.harm_profile)
+                         harm_profile=a.harm_profile, measure_w_bar=a.measure_w_bar)
     # **T49 の検算**: `κ` の平均（`w` の平均が `w̄` に戻れば 1）
     stats["kappa_mean"] = (round(stats["kappa_sum"] / stats["kappa_n"], 4) if stats["kappa_n"] else None)
     stats["w_mean"] = (round(stats["kappa_mean"] * TR.CLOCK["W_BAR"], 4) if stats["kappa_mean"] is not None else None)

@@ -22,7 +22,7 @@
 # **tag `py-engine-final` を checkout して回す**（手順は docs/TEST_SPEC.md）。
 # lint は任意（CI 無し・必須ゲートではない）。
 
-.PHONY: test test-fast test-slow audit-cross lint golden-audit golden-replay
+.PHONY: test test-fast test-slow audit-cross lint golden-audit golden-replay theory-table theory-table-check
 
 # push 前の必須ゲート。cargo test（Rust 単体テスト）＋ Rust 裏付けの pytest 集合。
 test: rust-test
@@ -50,6 +50,20 @@ golden-replay:
 
 # 理論の器の golden（`rust/opcg_engine/tests/fixtures/theory_*_golden*`・`rd_*_golden*`）は段 7（2026-10-07）から
 # 固定の正本（作り直しの道具は Python の理論と一緒に消した・同ディレクトリの README）。
+
+# 損害の輪郭の表（`tests/fixtures/harm_profile.json`）の作り直し（2026-10-08・**1 本の手順**・`tests/scripts/theory_table.py`）。
+# 順を守る: `crossing_bridge` → 輪郭・σ_T・σ_rel → それを入れた `theory_bridge` → `w_bar` と**その出所**（`w_bar_provenance`）。
+# `κ = w(D)/w̄` を使う器は出所が今の表と違えば落ちる（σ だけ測り直して w̄ を測り直さない表では動かない）。
+# 例: make theory-table REAL=<data>/w41 SYN="<data>/w39 <data>/w42" WORK=<scratch>/theory_table
+#     （所要の目安: crossing_bridge 実 7 分・合成 23 分、theory_bridge 実 20 分・合成 65 分。出力があれば続きから）
+REAL ?=
+SYN ?=
+WORK ?= /tmp/theory_table
+theory-table:
+	OPCG_LOG_SILENT=1 python tests/scripts/theory_table.py all --real $(REAL) --syn $(SYN) --work $(WORK)
+
+theory-table-check:
+	python tests/scripts/theory_table.py check
 
 # 交差対面の実プレイ監査（エンジン/パーサを変更したときに push 前へ追加する）。
 # ミラー（同一リーダー同士）では一度も通らない経路を実プレイに乗せる＝ここでしか出ない欠陥がある
