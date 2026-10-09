@@ -1,6 +1,6 @@
 {
   "branch": "claude/cand-drawn-attackers",
-  "commit": "TBD",
+  "commit": "afa0cac01 (RESULT.json の commit 欄はこの 1 つ前の内容を指す: 本文の数字と式は afa0cac01 と同じ)",
   "report": "docs/reports/2026-10-09_drawn_attackers.md",
   "summary": [
     "引いた体を守る側の計算の偶然の分岐に入れる候補（OPCG_DRAWN_ATTACKERS・新定数ゼロ・選び方ゼロ・既定はビット不変）を実装し、全記録で並べた。",
