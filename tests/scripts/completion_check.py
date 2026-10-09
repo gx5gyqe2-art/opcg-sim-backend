@@ -135,7 +135,7 @@ def build(clocks_path, recs_path, src):
         lam, mu = float(din["lam"]), float(din["mu"])
         act = int(r["act"])
         row = {"key": k, "act": act, "H": r["H"], "S": r["S"], "in_h": act <= r["H"],
-               "tau_med": float(c["tau"]), "tau_walk": float(c["tau_walk"]), "lam": lam, "mu": mu, "theta": float(c["theta"])}
+               "tau_med": float(c["tau"]), "tau_walk": float(c["tau_walk"]), "where": c.get("where"), "lam": lam, "mu": mu, "theta": float(c["theta"])}
         # (i)
         if r.get("hitsW_obs") is not None and r.get("hitsW_A") is not None:
             row["i_dh"] = r["hitsW_obs"] - r["hitsW_A"]
@@ -195,6 +195,10 @@ def summarise(rows, src_kind, e_kind, s_kind, reading, need_complete=False):
     res = {"all": agg(sel), "bands": {}}
     bands = {"S>=1/2": lambda r: r["S"] >= 0.5, "S<1/2": lambda r: r["S"] < 0.5,
              "in_h": lambda r: r["in_h"], "out_h": lambda r: not r["in_h"]}
+    # 測った後に足した帯（報告 §3 の注）: 歩きが耐久に届く段が守る側の計算の地平の内か外か（`m2_probe` の `where`・死の真ん中の報告と同じ分け方）
+    bands["cross_in"] = lambda r: r["where"] == "in"
+    bands["cross_past"] = lambda r: r["where"] in ("past", "capped")
+    bands["S>=1/2&cross_past"] = lambda r: r["S"] >= 0.5 and r["where"] in ("past", "capped")
     for b in ("1", "2", "3", "4-5", "6+"):
         bands["act=" + b] = (lambda bb: (lambda r: _band_act(r["act"]) == bb))(b)
     for name, f in bands.items():
@@ -208,6 +212,8 @@ def verdict(primary):
     c2 = abs(a["r_int_after"]) <= 0.1
     bad = []
     for name, b in primary["bands"].items():
+        if name.startswith(("cross", "S>=1/2&")):      # 測った後に足した帯は判定に入れない
+            continue
         if b is None or b["n"] < 30:
             continue
         if abs(b["r_int"]) < 0.1:
