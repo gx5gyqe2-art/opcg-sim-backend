@@ -178,3 +178,19 @@ fn recorded_outer_calls_replay_bit_identically() {
     assert!(total > 1000, "記録が少なすぎる: {total}");
 }
 
+
+/// 候補 `OPCG_LEFTOVER_DON` の配り方を手で導ける値と比べる（`docs/reports/2026-10-09_leftover_don.md` §1.5）:
+/// 超過 0 と 2000 の 2 体（付与なし）に、残り 1 枚なら `c̄` の増え 0.28 対 0.53 で 2000 の体へ、残り 2 枚なら
+/// 2000 の体へ 2 枚（1.38）が 0 の体へ 2 枚（1.25）・1 枚ずつ（0.81）に勝つ。届かない体は届くまでで 0 から 1 枚に上がる。
+#[test]
+fn leftover_attach_by_cbar() {
+    use super::outer::leftover_attach;
+    assert_eq!(leftover_attach(&[0.0, 2000.0], &[0, 0], 1, 10), vec![0, 1]);
+    assert_eq!(leftover_attach(&[0.0, 2000.0], &[0, 0], 2, 10), vec![0, 2]);
+    assert_eq!(leftover_attach(&[0.0, 2000.0], &[0, 0], 0, 10), vec![0, 0]);
+    // 付与の上限: 2000 の体が既に 9 枚なら 1 枚しか付かない＝0 の体へ 2 枚（1.25）が 1 枚ずつ（0.28 + 0.66 = 0.94）に勝つ
+    assert_eq!(leftover_attach(&[0.0, 2000.0], &[0, 9], 2, 10), vec![2, 0]);
+    assert_eq!(leftover_attach(&[0.0, 2000.0], &[0, 9], 1, 10), vec![0, 1]);
+    // 届かない体（超過 −1000）: 1 枚で届く（c̄ 0 → 1.00）が 0 の体の 1 枚（0.28）に勝つ
+    assert_eq!(leftover_attach(&[-1000.0, 0.0], &[0, 0], 1, 10), vec![1, 0]);
+}
