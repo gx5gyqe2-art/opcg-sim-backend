@@ -1,6 +1,6 @@
 {
   "branch": "claude/diag-completion-check",
-  "commit": "SEE_GIT_LOG",
+  "commit": "b24a5c461 (report commit; RESULT.json updated in the next commit)",
   "report": "docs/reports/2026-10-09_completion_check.md",
   "summary": [
     "終わりの検算は不合格（実・合成とも）: 主の組で 残る遅れ（整数）+0.208／+0.565・説明される遅れ +0.334／+0.495・比 1.60／0.88・差し引いた後 −0.079／+0.131・帯の向きの外れ 3／1 帯。本線（歩き）の読みでも不合格。",
