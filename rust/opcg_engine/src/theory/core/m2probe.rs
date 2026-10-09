@@ -135,6 +135,142 @@ fn resolve(inp: &SolveIn, m: &Mask, ks: &[i64], h: i64, d: &mut Defender) -> Res
     })
 }
 
+/// 同じ計画・同じ地平で、守る側の計算を「倒れた段にだけ 1 を置く」値段で解き直す（診断だけ）。
+/// 値段を `λ_net = μ = ν = 0`・`(λ − λ_net)·L0 = 1` にすると、段の損害は**その段で倒れる確率**になる
+/// （受けた 1 本・切った札・ブロッカーの値は 0、とどめの段にだけ 1）。守り手の選び方（防いだ本数・切る枚数・生き延びるターン）は
+/// 値段に依らないので同じ（同点の割り切りだけが損害の並びで決まる）。ライフ 0 では `(λ − λ_net)·0 = 0` で測れない＝`None`。
+fn resolve_death(inp: &SolveIn, m: &Mask, ks: &[i64], h: i64) -> Option<Output> {
+    let l0f = bankers_round(inp.life);
+    if l0f < 1.0 {
+        return None;
+    }
+    let (_lam, _lam_net, _mu, olp, mlp) = inp.prices;
+    let nu0: Vec<(f64, f64)> = inp.nu.iter().map(|&(k, _)| (k, 0.0)).collect();
+    let xf = first_of(inp, m, ks);
+    let mut d = Defender::new(None);
+    d.solve(&Input {
+        cards: inp.cards,
+        don: inp.don,
+        xs_first: &xf,
+        seq: &m.later_seq,
+        blk: inp.blk,
+        life: inp.life,
+        turns: Some(h),
+        life_types: inp.life_types,
+        draw_types: inp.draw_types,
+        lam: 1.0 / l0f,
+        lam_net: 0.0,
+        mu: 0.0,
+        olp,
+        mlp,
+        rest: inp.rest,
+        arrive: inp.arrive,
+        nu: &nu0,
+        eps: inp.eps,
+        feq: inp.feq,
+    })
+    .ok()
+}
+
+/// 守る側の計算の入力（採った計画・地平 `h`）を辞書に書く（`docs/reports/2026-10-08_survival_split.md`・診断だけ）。
+/// Python の器が手を加えて `m2.resolve` で解き直す（実際の攻撃の並び・実際の守り手の手札を写す）。
+fn input_v(inp: &SolveIn, m: &Mask, ks: &[i64], h: i64) -> V {
+    let (lam, lam_net, mu, olp, mlp) = inp.prices;
+    let pairs = |xs: &[(f64, f64)]| V::list(xs.iter().map(|&(a, b)| fl(&[a, b])).collect());
+    let trips = |xs: &[(f64, f64, f64)]| V::list(xs.iter().map(|&(a, b, c)| fl(&[a, b, c])).collect());
+    V::dict(vec![
+        (V::s("cards"), pairs(inp.cards)),
+        (V::s("don"), V::Float(inp.don)),
+        (V::s("xs_first"), fl(&first_of(inp, m, ks))),
+        (V::s("seq"), V::list(m.later_seq.iter().map(|s| fl(s)).collect())),
+        (V::s("blk"), fl(inp.blk)),
+        (V::s("life"), V::Float(inp.life)),
+        (V::s("turns"), V::Int(h)),
+        (V::s("life_types"), trips(inp.life_types)),
+        (V::s("draw_types"), trips(inp.draw_types)),
+        (V::s("lam"), V::Float(lam)),
+        (V::s("lam_net"), V::Float(lam_net)),
+        (V::s("mu"), V::Float(mu)),
+        (V::s("olp"), V::Float(olp)),
+        (V::s("mlp"), V::Float(mlp)),
+        (V::s("rest"), fl(inp.rest)),
+        (V::s("arrive"), fl(inp.arrive)),
+        (V::s("nu"), pairs(inp.nu)),
+        (V::s("eps"), V::Float(inp.eps)),
+        (V::s("feq"), V::Float(inp.feq)),
+        (V::s("no_now"), V::Bool(inp.no_now)),
+    ])
+}
+
+/// **`m2.resolve`**（`OPCG_M2_PROBE` のときだけ `entry` が通す・診断だけ）: `input_v` の形の辞書で守る側の計算を 1 回解く。
+/// `death` が真なら値段を「倒れた段にだけ 1」（`resolve_death` と同じ）に置き換える＝段の損害が倒れる確率。
+pub fn resolve_call(a: &V) -> Result<V, String> {
+    let fv = |k: &str| -> Vec<f64> { a.get(k).items().iter().map(|x| x.f()).collect() };
+    let pv = |k: &str| -> Vec<(f64, f64)> { a.get(k).items().iter().map(|e| (e.items()[0].f(), e.items()[1].f())).collect() };
+    let tv = |k: &str| -> Vec<(f64, f64, f64)> {
+        a.get(k).items().iter().map(|e| (e.items()[0].f(), e.items()[1].f(), e.items()[2].f())).collect()
+    };
+    let cards = pv("cards");
+    let seq: Vec<Vec<f64>> = a.get("seq").items().iter().map(|s| s.items().iter().map(|x| x.f()).collect()).collect();
+    let (xf, blk, rest, arrive) = (fv("xs_first"), fv("blk"), fv("rest"), fv("arrive"));
+    let (lt_, dt_) = (tv("life_types"), tv("draw_types"));
+    let mut nu = pv("nu");
+    let life = a.get("life").f();
+    let death = a.has("death") && a.get("death").truthy();
+    let (mut lam, mut lam_net, mut mu) = (a.get("lam").f(), a.get("lam_net").f(), a.get("mu").f());
+    if death {
+        let l0f = bankers_round(life);
+        if l0f < 1.0 {
+            return Ok(V::None);
+        }
+        lam = 1.0 / l0f;
+        lam_net = 0.0;
+        mu = 0.0;
+        for e in nu.iter_mut() {
+            e.1 = 0.0;
+        }
+    }
+    // 先読み `k` の守り手（`fore` ≥ 1・`foresight.rs`・`docs/reports/2026-10-09_defender_foresight.md`）。無ければ今の守り手
+    let fore = if a.has("fore") { a.get("fore").int() } else { 0 };
+    let mut d = Defender::new(None);
+    let inp = Input {
+            cards: &cards,
+            don: a.get("don").f(),
+            xs_first: &xf,
+            seq: &seq,
+            blk: &blk,
+            life,
+            turns: Some(a.get("turns").int()),
+            life_types: &lt_,
+            draw_types: &dt_,
+            lam,
+            lam_net,
+            mu,
+            olp: a.get("olp").f(),
+            mlp: a.get("mlp").f(),
+            rest: &rest,
+            arrive: &arrive,
+            nu: &nu,
+            eps: a.get("eps").f(),
+            feq: a.get("feq").f(),
+    };
+    let r = if fore >= 1 { super::foresight::solve(&inp, fore) } else { d.solve(&inp) };
+    let r = match r {
+        Ok(r) => r,
+        // 先読みの守り手が状態の上限を超えたら解かない（診断だけ）
+        Err(DpErr::Budget) if fore >= 1 => return Ok(V::None),
+        Err(e) => return Err(format!("m2.resolve: {e:?}")),
+    };
+    Ok(V::dict(vec![
+        (V::s("harms"), fl(&r.harms)),
+        (V::s("alive"), V::Float(r.alive)),
+        (V::s("cut"), V::Float(r.cut)),
+        (V::s("prevented"), V::Float(r.prevented)),
+        (V::s("stopped"), V::Float(r.stopped)),
+        (V::s("theta"), V::Float(r.theta)),
+    ]))
+}
+
 /// 計画の辞書に足す診断の欄（`OPCG_M2_PROBE` のときだけ `rd_run` が呼ぶ）。
 /// `take`＝地平の先の段の攻撃を 1 本ずつ「受ける」の値段で数えた粗い芯（段の攻撃のうち効く本数 × 受ける値段）。
 #[allow(clippy::too_many_arguments)]
@@ -194,9 +330,21 @@ pub fn plan_fields(inp: &SolveIn, m: &Mask, step_hits: &[Vec<f64>], ks: &[i64], 
             (V::s("harms_b"), fl(&r2.harms)),
         ]));
     }
+    // 倒れる段の分布（同じ計画・同じ地平）——交点の時計が「倒れる時刻の真ん中」ではなく「最後の分岐が倒れる時刻」を
+    // 言っているかを見る（`docs/reports/2026-10-08_late_winner.md`）
+    match resolve_death(inp, m, ks, h) {
+        Some(rd) => {
+            out.push((V::s("m2_pdeath"), fl(&rd.harms)));
+            out.push((V::s("m2_alive_death"), V::Float(rd.alive)));
+            out.push((V::s("m2_cut_death"), V::Float(rd.cut)));
+        }
+        None => out.push((V::s("m2_pdeath"), V::None)),
+    }
+    out.push((V::s("m2_in"), input_v(inp, m, ks, h)));
     out.push((V::s("m2_tau_full"), V::Float(tau_full)));
     out.push((V::s("m2_theta_full"), V::Float(res.theta)));
     out.push((V::s("m2_alive"), V::Float(res.alive)));
+    out.push((V::s("m2_cut"), V::Float(res.cut)));
     out.push((V::s("m2_resolve_same"), V::Bool(same)));
     out.push((V::s("m2_short"), V::list(shorts)));
     out
