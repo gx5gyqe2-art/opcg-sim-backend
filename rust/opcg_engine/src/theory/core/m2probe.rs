@@ -230,9 +230,10 @@ pub fn resolve_call(a: &V) -> Result<V, String> {
             e.1 = 0.0;
         }
     }
+    // 先読み `k` の守り手（`fore` ≥ 1・`foresight.rs`・`docs/reports/2026-10-09_defender_foresight.md`）。無ければ今の守り手
+    let fore = if a.has("fore") { a.get("fore").int() } else { 0 };
     let mut d = Defender::new(None);
-    let r = d
-        .solve(&Input {
+    let inp = Input {
             cards: &cards,
             don: a.get("don").f(),
             xs_first: &xf,
@@ -252,8 +253,14 @@ pub fn resolve_call(a: &V) -> Result<V, String> {
             nu: &nu,
             eps: a.get("eps").f(),
             feq: a.get("feq").f(),
-        })
-        .map_err(|e| format!("m2.resolve: {e:?}"))?;
+    };
+    let r = if fore >= 1 { super::foresight::solve(&inp, fore) } else { d.solve(&inp) };
+    let r = match r {
+        Ok(r) => r,
+        // 先読みの守り手が状態の上限を超えたら解かない（診断だけ）
+        Err(DpErr::Budget) if fore >= 1 => return Ok(V::None),
+        Err(e) => return Err(format!("m2.resolve: {e:?}")),
+    };
     Ok(V::dict(vec![
         (V::s("harms"), fl(&r.harms)),
         (V::s("alive"), V::Float(r.alive)),
