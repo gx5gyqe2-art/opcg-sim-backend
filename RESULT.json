@@ -1,6 +1,6 @@
 {
  "branch": "claude/diag-ceiling-redo",
- "commit": "(この RESULT.json を含むコミットの親: 下の report と ceiling_redo.py を含む木)",
+ "commit": "f8691295",
  "report": "docs/reports/2026-10-09_ceiling_redo.md",
  "summary": [
   "群れの勝った席の時計だけを直す天井（後知恵）で、的中の上がりは実 +0.023・合成 +0.036、決着前の予測力（相対の腕の AUC）の上がりは実 +0.027・合成 +0.053（(a) ずらし・(b) 置き換えの大きい方。ずらしだけでも実 +0.018／+0.020・合成 +0.030／+0.044）。",
