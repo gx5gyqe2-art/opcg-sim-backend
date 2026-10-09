@@ -8,5 +8,5 @@
   "既定の値は前の報告を再現（的中 .7051／.6602・AUC .7991／.7182）。既定・表・golden・KERNEL_FILES は不変。"
  ],
  "verdict": "理論の較正は既知の限界つきで完成（両方の記録で的中・決着前 AUC の上がりとも 0.01 未満〔すべて負〕）",
- "gate": "make test green at b47d088f (cargo 473 passed/1 ignored; pytest 622 passed/12 skipped); later commits docs only (gate skipped)"
+ "gate": "make test green on final tree 19c0c11a5 (cargo 473 passed/1 ignored; pytest 622 passed/12 skipped)"
 }

@@ -195,5 +195,5 @@
 - `OPCG_LOG_SILENT=1 OPCG_PLAN_STORE=<空> python tests/scripts/m2_probe.py --in <dir>... --out <json> --clocks-out <clocks.jsonl>` →
   `python tests/scripts/residual_value.py --in <dir>... --clocks <clocks.jsonl> --out <json>`（同じ計画のディスク）。
 - テスト: 集計を足した木（`b47d088f`）で `make rust-develop` の後 `make test` green（`cargo test` 473 passed・1 ignored、pytest 622 passed・12 skipped・0 failed）。
-  その後は文書だけの変更（ゲート省略）。テストは足していない（理論の道具の運用）。
+  最終の木（RESULT.json を含む）でも `make test` green（同じ数）。テストは足していない（理論の道具の運用）。
 - 既定・表・golden・`KERNEL_FILES` は変えていない。既存の報告と台帳は触っていない。
