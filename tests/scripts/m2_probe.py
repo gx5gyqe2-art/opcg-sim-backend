@@ -72,6 +72,9 @@ def clocks(rows_out, m2rows):
             c["act"] = (r["t_me_act"] if side == "me" else r["t_opp_act"]) if c["winner"] else None
             c["band"] = _band(act_w)
             c["tau_row"] = r["tau_me_theory" if side == "me" else "tau_opp_theory"]
+            # 局と行の鍵・攻め手の残りの自席ターン（負けた席では打ち切りの長さ）——`survival_split.py` が記録と突き合わせる
+            c["seed"], c["t"], c["who"] = r["seed"], r["t"], r["who"]
+            c["own_left"] = r["t_me_act"] if side == "me" else r["t_opp_act"]
             c["plan"] = c["why"] == "plan"
             if c["plan"]:
                 c["where"] = "capped" if c["J"] == 0 else ("in" if c["J"] <= c["nh"] else "past")
