@@ -539,6 +539,7 @@ make test-slow   # 重テストだけ
 | `tests/scripts/survival_split.py`・`survival_split_sum.py`・`late_winner_probe.py` | **守り手の生き残りの言い過ぎの切り分け**（2026-10-08・`docs/reports/2026-10-08_survival_split.md`・診断だけ・`claude/diag-survival-split` から器だけ取り込み）: `m2_probe.py --clocks-out` の時計の行（`din` つき）と記録を突き合わせ、守る側の計算を `m2.resolve`（`OPCG_M2_PROBE` のときだけ通る診断の入口）で入力を差し替えて解き直す。テストは足していない。 |
 | `tests/scripts/completion_check.py` | **終わりの検算**（2026-10-09・`docs/reports/2026-10-09_completion_check.md`・診断だけ）: 勝ちの時計に残る遅れを、実際の守り手が最善より余分に受けた損害で説明できるかを集計する。テストは足していない。 |
 | `tests/scripts/defender_foresight.py`（＋ `rust/.../core/foresight.rs`） | **守り手の先読みの浅さ**（2026-10-09・`docs/reports/2026-10-09_defender_foresight.md`・診断だけ）: 守る側の計算を「判断のたびに `k` 段だけ読む守り手」で解く写し（`m2.resolve` の `fore`・`k ≥ H` で今の守り手とビットで同じ）で、ターンごとの打ち方（受けた本数・切った札）と先読みを変えた時計の残る遅れを、今の守り手と並べる。既定の値・`KERNEL_FILES` は不変。テストは足していない（理論の道具の運用）。 |
+| `tests/scripts/residual_value.py` | **残りの芯の値打ち**（2026-10-09・`docs/reports/2026-10-09_residual_value.md`・診断だけ・後知恵の上限）: `m2_probe.py --clocks-out` の時計の行で「地平を生き延びると言い、歩きが地平の外で交わる」時計（群れ・予測の側の特徴だけで決める）を選び、その遅れを直したと仮定した時計で交点の橋の的中と決着前の較正の AUC を測り直す。既定の値・表は不変。テストは足していない（理論の道具の運用）。 |
 
 ### 3.1 効果検証ハーネス（CPU 対 CPU 自己対戦）
 
