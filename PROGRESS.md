@@ -4,8 +4,8 @@
 - [x] 式（報告 §1）をコミット
 - [x] 実装（OPCG_DRAWN_ATTACKERS・既定はビット不変: cargo 473 green・10 局の時計の行が 1 バイト一致）
 - [x] 10 局の切り出しで全器（輪を閉じた予告）→ §2 をコミット
-- [ ] 全記録（実 w41・合成 w39+w42）で候補あり／なし
-- [ ] 報告・RESULT.json・make test・push
+- [x] 全記録（実 w41・合成 w39+w42）で候補あり／なし（合成の tb/rl/kv は未測定）
+- [x] 報告・RESULT.json・make test（green）・push
 
 ## 計測の進み（scratchpad/full/*/progress.txt）
 - 実 off → 実 on（背景で連続）→ 合成 off → 合成 on（別々に）

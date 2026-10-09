@@ -282,4 +282,4 @@
   （実は加えて `theory_bridge.py`・`relative_ledger.py`・`kappa_vector.py`）。候補ありは `OPCG_DRAWN_ATTACKERS=1`。合成は `w39`・`w42` で `m2_probe`／`survival_split` を分けて回し、
   時計の行と測りの行をつないで集計（`crossing_bridge` 以降は 2 つを一緒に・温めた計画のディスク）。
 - §4.2 の同じ時計の比べと地平の短縮の検算は作業用のスクリプト（1 回きり・リポジトリに入れていない）。
-- テスト: §10 の `make test`。
+- テスト: 最終の木で `make rust-develop` の後 `make test` green（`cargo test` 475 passed・1 ignored〔候補の試験 2 本を含む〕、pytest 622 passed・12 skipped・0 failed）。
