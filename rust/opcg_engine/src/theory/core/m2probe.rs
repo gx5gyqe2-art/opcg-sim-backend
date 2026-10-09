@@ -20,7 +20,7 @@ use std::sync::Once;
 use super::super::defender::{Defender, DpErr, Input, Output};
 use super::super::leaves_to as lt;
 use super::super::numeric::bankers_round;
-use super::super::plans::{Mask, SolveIn};
+use super::super::plans::{adraw_of, Mask, SolveIn};
 use super::super::sched::{self, tab, StepIn, Tables};
 use super::obj::V;
 
@@ -84,6 +84,12 @@ pub fn sched_parts(tb: &Tables, harms: &[f64], steps: &[StepIn], paid1: f64) -> 
         }
         base.push(if j <= nh { harms[j - 1] } else { steps[j - 1].fb });
         dp.push(j <= nh);
+        if !tb.d_tab.is_empty() && j <= nh {
+            // 候補（`OPCG_DRAWN_ATTACKERS`）: 地平の内の流入は守る側の計算の損害に入っている（`rules_sched` と同じ）
+            flow.push(0.0);
+            eff.push(tm[j - 1].2);
+            continue;
+        }
         let mut f = 0.0;
         for t in tm.iter().take(j - 1) {
             f += t.0 + t.1;
@@ -112,6 +118,7 @@ fn first_of(inp: &SolveIn, m: &Mask, ks: &[i64]) -> Vec<f64> {
 fn resolve(inp: &SolveIn, m: &Mask, ks: &[i64], h: i64, d: &mut Defender) -> Result<Output, DpErr> {
     let (lam, lam_net, mu, olp, mlp) = inp.prices;
     let xf = first_of(inp, m, ks);
+    let ad = adraw_of(inp, m, m.cost + ks.iter().sum::<i64>(), h);
     d.solve(&Input {
         cards: inp.cards,
         don: inp.don,
@@ -132,6 +139,7 @@ fn resolve(inp: &SolveIn, m: &Mask, ks: &[i64], h: i64, d: &mut Defender) -> Res
         nu: inp.nu,
         eps: inp.eps,
         feq: inp.feq,
+        adraw: &ad,
     })
 }
 
@@ -147,6 +155,7 @@ fn resolve_death(inp: &SolveIn, m: &Mask, ks: &[i64], h: i64) -> Option<Output> 
     let (_lam, _lam_net, _mu, olp, mlp) = inp.prices;
     let nu0: Vec<(f64, f64)> = inp.nu.iter().map(|&(k, _)| (k, 0.0)).collect();
     let xf = first_of(inp, m, ks);
+    let ad = adraw_of(inp, m, m.cost + ks.iter().sum::<i64>(), h);
     let mut d = Defender::new(None);
     d.solve(&Input {
         cards: inp.cards,
@@ -168,6 +177,7 @@ fn resolve_death(inp: &SolveIn, m: &Mask, ks: &[i64], h: i64) -> Option<Output> 
         nu: &nu0,
         eps: inp.eps,
         feq: inp.feq,
+        adraw: &ad,
     })
     .ok()
 }
@@ -178,7 +188,7 @@ fn input_v(inp: &SolveIn, m: &Mask, ks: &[i64], h: i64) -> V {
     let (lam, lam_net, mu, olp, mlp) = inp.prices;
     let pairs = |xs: &[(f64, f64)]| V::list(xs.iter().map(|&(a, b)| fl(&[a, b])).collect());
     let trips = |xs: &[(f64, f64, f64)]| V::list(xs.iter().map(|&(a, b, c)| fl(&[a, b, c])).collect());
-    V::dict(vec![
+    let mut kv = vec![
         (V::s("cards"), pairs(inp.cards)),
         (V::s("don"), V::Float(inp.don)),
         (V::s("xs_first"), fl(&first_of(inp, m, ks))),
@@ -199,7 +209,16 @@ fn input_v(inp: &SolveIn, m: &Mask, ks: &[i64], h: i64) -> V {
         (V::s("eps"), V::Float(inp.eps)),
         (V::s("feq"), V::Float(inp.feq)),
         (V::s("no_now"), V::Bool(inp.no_now)),
-    ])
+    ];
+    // 候補（`OPCG_DRAWN_ATTACKERS`）の引く札の型（無ければ欄を作らない＝既定の出力は不変）
+    let ad = adraw_of(inp, m, m.cost + ks.iter().sum::<i64>(), h);
+    if !ad.is_empty() {
+        kv.push((
+            V::s("adraw"),
+            V::list(ad.iter().map(|st| V::list(st.iter().map(|&(x, r, p)| fl(&[x, if r { 1.0 } else { 0.0 }, p])).collect())).collect()),
+        ));
+    }
+    V::dict(kv)
 }
 
 /// **`m2.resolve`**（`OPCG_M2_PROBE` のときだけ `entry` が通す・診断だけ）: `input_v` の形の辞書で守る側の計算を 1 回解く。
@@ -230,6 +249,16 @@ pub fn resolve_call(a: &V) -> Result<V, String> {
             e.1 = 0.0;
         }
     }
+    // 候補（`OPCG_DRAWN_ATTACKERS`）の引く札の型（無ければ空＝今のまま）
+    let ad: Vec<Vec<(f64, bool, f64)>> = if a.has("adraw") {
+        a.get("adraw")
+            .items()
+            .iter()
+            .map(|st| st.items().iter().map(|e| (e.items()[0].f(), e.items()[1].f() > 0.5, e.items()[2].f())).collect())
+            .collect()
+    } else {
+        Vec::new()
+    };
     let mut d = Defender::new(None);
     let r = d
         .solve(&Input {
@@ -252,6 +281,7 @@ pub fn resolve_call(a: &V) -> Result<V, String> {
             nu: &nu,
             eps: a.get("eps").f(),
             feq: a.get("feq").f(),
+            adraw: &ad,
         })
         .map_err(|e| format!("m2.resolve: {e:?}"))?;
     Ok(V::dict(vec![

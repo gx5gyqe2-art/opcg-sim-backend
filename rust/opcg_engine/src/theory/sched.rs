@@ -29,6 +29,9 @@ pub struct Tables<'a> {
     pub slope_floor: f64,
     /// `tau_grow` の `cap`（既定 `RACE_CAP`）。
     pub race_cap: f64,
+    /// **候補**（`OPCG_DRAWN_ATTACKERS`）: 残ったドン `l` ごとの、攻め手が 1 枚引いた札の型 `(超過, 速攻, 確率)`（`a_tab` と同じ並び）。
+    /// 空なら今のまま。在れば守る側の計算が引いた体の攻撃を覆うので、地平の内の段の値に流入を足さない。
+    pub d_tab: &'a [Vec<(f64, bool, f64)>],
 }
 
 /// Python の `max(0.0, v)`（`v > 0.0` のときだけ `v`）。
@@ -52,7 +55,7 @@ pub fn tab(t: &[f64], i: i64) -> f64 {
 }
 
 /// 段 `i`（1 始まり）の残ったドン `l`（表の範囲に収める）。
-fn left_of(tb: &Tables, i: usize, paid: f64) -> i64 {
+pub fn left_of(tb: &Tables, i: usize, paid: f64) -> i64 {
     let d = tb.ds[i.min(tb.ds.len()) - 1];
     let l = bankers_round(max0(d - paid)) as i64;
     let nl = tb.a_tab.len() as i64 - 1;
@@ -91,11 +94,18 @@ pub fn rules_sched(tb: &Tables, harms: &[f64], steps: &[StepIn], tail: &[(f64, f
             out.push(0.0);
             continue;
         }
+        let tj = if j == 1 { t1 } else { tail[j - 2] };
+        if !tb.d_tab.is_empty() && j <= nh {
+            // 候補: 引いた体の攻撃は守る側の計算の段の損害に入っている（流入を二重に足さない・効果だけ足す）
+            let mut v = harms[j - 1];
+            v += tj.2;
+            out.push(v);
+            continue;
+        }
         let mut v = if j <= nh { harms[j - 1] } else { steps[j - 1].fb };
         for &s in &seq_l[..2 * j - 2] {
             v += s;
         }
-        let tj = if j == 1 { t1 } else { tail[j - 2] };
         v += tj.0;
         v += tj.2;
         out.push(v);

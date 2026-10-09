@@ -30,7 +30,17 @@ pub const SLOPE_FLOOR: f64 = 1e-3;
 pub const EX_STATE_BUDGET: usize = 300000;
 pub const FEQ: f64 = 1e-9;
 /// `crossing_bridge.SOLVER_VERSION`（Rust の計画のディスクの覚え書きの鍵に入る・Python と同じ値を保つ）
-pub const SOLVER_VERSION: &str = "rd-speed-6";
+pub const SOLVER_VERSION: &str = "rd-speed-7";
+
+/// **候補**（`OPCG_DRAWN_ATTACKERS`・空でも `0` でもない値で入る・1 度だけ読む）: 攻め手が引いた札から出る新しい攻め手を
+/// 守る側の計算の中の分岐に入れる（`docs/reports/2026-10-09_drawn_attackers.md`）。既定（変数なし）は今のまま。
+pub fn drawn_attackers_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| {
+        let v = std::env::var("OPCG_DRAWN_ATTACKERS").unwrap_or_default();
+        !v.is_empty() && v != "0"
+    })
+}
 
 // ---------------------------------------------------------------------------------------------------------------
 // 引数の読み
@@ -157,6 +167,8 @@ pub struct Actx {
     pub rest_blk: Vec<f64>,
     pub blk_a: Vec<(f64, f64)>,
     pub theta_p: f64,
+    /// 候補: 残ったドンごとの引く札の型（`a_tab` と同じ並び・候補が無ければ空＝dict にも入らない）
+    pub d_tab: Vec<Vec<(f64, bool, f64)>>,
 }
 
 #[derive(Clone, Debug)]
@@ -239,6 +251,12 @@ impl Actx {
             rest_blk: floats_of(v.get("rest_blk")),
             blk_a: v.get("blk_a").items().iter().map(|p| (p.items()[0].f(), p.items()[1].f())).collect(),
             theta_p: if v.has("theta_p") { v.get("theta_p").f() } else { theta() },
+            d_tab: v
+                .get("d_tab")
+                .items()
+                .iter()
+                .map(|row| row.items().iter().map(|e| (e.items()[0].f(), e.items()[1].truthy(), e.items()[2].f())).collect())
+                .collect(),
             d,
             gain,
             gain_order,
@@ -999,6 +1017,15 @@ impl Core {
             }
         }
         let flow: Vec<f64> = (0..(budget + 1) as usize).map(|l| a_tab[l] + e_tab[l]).collect();
+        // 候補: 残ったドンごとの引く札の型（デッキの中身から・`a_tab` と同じ `l`）
+        let mut d_tab: Vec<Vec<(f64, bool, f64)>> = Vec::new();
+        if drawn_attackers_on() {
+            if let Some(d) = deck.filter(|d| !d.is_empty()) {
+                for l in 0..ln {
+                    d_tab.push(ld::draw_body_types(&self.t, d, olp, Some(l as f64), PWR_EPS));
+                }
+            }
+        }
         let (lead_b, chars_b) = self.theory_slope_parts(tok, olp, theta_, mu, &blk_a, false, sc[lt::SC_OPP_LIFE]);
         let mut rest_blk = Vec::new();
         for s in lt::OPP_FIELD {
@@ -1085,6 +1112,22 @@ impl Core {
             (V::s("blk_a"), V::list(blk_a.iter().map(|&(a, b)| V::tuple(vec![V::Float(a), V::Float(b)])).collect())),
             (V::s("theta_p"), V::Float(theta_)),
         ]);
+        let d = if d_tab.is_empty() {
+            d
+        } else {
+            // 候補だけ: 引く札の型を財布の dict に入れる（守る側の計算の覚え書き・計画のディスクの鍵に入る）
+            let mut kv = d.kv().to_vec();
+            kv.push((
+                V::s("d_tab"),
+                V::list(
+                    d_tab
+                        .iter()
+                        .map(|row| V::list(row.iter().map(|&(x, r, p)| V::tuple(vec![V::Float(x), V::Bool(r), V::Float(p)])).collect()))
+                        .collect(),
+                ),
+            ));
+            V::dict(kv)
+        };
         Ok(Some(Actx::from_v(&d)?))
     }
 
@@ -1481,7 +1524,7 @@ impl Core {
             nu: &nu,
             eps: PWR_EPS,
             feq: FEQ,
-            tables: Tables { ds: &ax.ds, a_tab, ar_tab, e_tab, no_now: ax.no_now, slope_floor: SLOPE_FLOOR, race_cap: RACE_CAP },
+            tables: Tables { ds: &ax.ds, a_tab, ar_tab, e_tab, no_now: ax.no_now, slope_floor: SLOPE_FLOOR, race_cap: RACE_CAP, d_tab: &ax.d_tab },
             masks: &mk,
             h0: h0.unwrap_or(0),
             limit: Some(EX_STATE_BUDGET),

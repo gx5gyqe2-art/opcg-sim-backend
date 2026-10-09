@@ -6,7 +6,7 @@
 //! （子ごとに配列を作らない）。**子を試す順は Python と同じ**（設計書 E10・E11: 宣言は残りの攻撃の昇順・
 //! 受ける〔ライフの札の種類の順 → 使えない札〕→ 横取り〔使えるブロッカーの降順・同じ値は 1 回〕→ カウンター〔札の組の順〕）。
 
-use super::defender::{sort_desc, CSet, Cur, Prep};
+use super::defender::{sort_asc, sort_desc, CSet, Cur, Prep};
 
 /// 宣言できる攻撃か（残りの攻撃は昇順・同じ値は最初の 1 回だけ宣言する＝`prev_x` の飛ばし）。
 #[inline]
@@ -157,5 +157,37 @@ pub fn turn_start<'a>(t: i64, cap: i64, first: &'a [f64], seq: &'a [Vec<f64>], l
         TurnStart::Hits(first)
     } else {
         TurnStart::Hits(&seq[((t - 1) as usize).min(seq.len() - 1)])
+    }
+}
+
+/// 候補（`OPCG_DRAWN_ATTACKERS`）: 攻め手が引く札の子の並び（型の番号 → 最後に「何も出ない」）。
+pub fn adraw_moves(types: &[(f64, bool, f64)], p_none: f64) -> impl Iterator<Item = Option<usize>> + '_ {
+    (0..types.len()).map(Some).chain(if p_none > 0.0 { Some(None) } else { None })
+}
+
+/// 候補: 段の始まりの攻撃（`base` ∪ 引いた体の並び ∪ 速攻なら引いた体・昇順）を `cur.rem` に作り、引いた体を並びに入れる。
+/// 戻り＝並びに入れた位置（[`undo_adraw_start`] で戻す）。`cur.rem` は空で呼ぶ。
+pub fn adraw_start(cur: &mut Cur, base: &[f64], drawn: Option<(f64, bool)>) -> Option<usize> {
+    cur.rem.clear();
+    cur.rem.extend_from_slice(base);
+    cur.rem.extend_from_slice(&cur.pool);
+    let mut pos = None;
+    if let Some((x, rush)) = drawn {
+        if rush {
+            cur.rem.push(x);
+        }
+        let q = cur.pool.iter().position(|&y| y > x).unwrap_or(cur.pool.len());
+        cur.pool.insert(q, x);
+        pos = Some(q);
+    }
+    sort_asc(&mut cur.rem);
+    pos
+}
+
+/// [`adraw_start`] を戻す（`cur.rem` を空に・引いた体を並びから抜く）。
+pub fn undo_adraw_start(cur: &mut Cur, pos: Option<usize>) {
+    cur.rem.clear();
+    if let Some(q) = pos {
+        cur.pool.remove(q);
     }
 }

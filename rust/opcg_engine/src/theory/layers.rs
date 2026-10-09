@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use super::defender::{norm_seq, seq_prep, sort_asc, sort_desc, write_key, Cur, Prep, SetCache};
+use super::defender::{DrawTypes, norm_seq, seq_prep, sort_asc, sort_desc, write_key, Cur, Prep, SetCache};
 use super::succ::{self, TurnStart};
 use super::numeric::{bankers_round, canon_bits, py_round};
 use super::table::KeyTable;
@@ -24,6 +24,8 @@ pub struct LayerIn<'a> {
     pub draw_types: &'a [(f64, f64, f64)],
     /// `(今のターンの攻撃, 2 ターン目からの攻撃の並び)` の全部。
     pub roots: &'a [(Vec<f64>, Vec<Vec<f64>>)],
+    /// 候補（`OPCG_DRAWN_ATTACKERS`）: 根ごとの攻め手が引く札の型（`roots` と同じ並び・段ごと）。空なら今のまま。
+    pub root_adraw: &'a [Vec<DrawTypes>],
     pub cap: i64,
     pub lim: usize,
     pub eps: f64,
@@ -33,6 +35,8 @@ struct Group {
     seq: Vec<Vec<f64>>,
     last_hit: i64,
     repeat: bool,
+    ad: Vec<Vec<(f64, bool, f64)>>,
+    ad_none: Vec<f64>,
     front: Vec<Cur>,
     front_seen: KeyTable<()>,
 }
@@ -52,6 +56,8 @@ struct Counter<'a> {
     seq: Vec<Vec<f64>>,
     last_hit: i64,
     repeat: bool,
+    ad: Vec<Vec<(f64, bool, f64)>>,
+    ad_none: Vec<f64>,
     next_front: Vec<Cur>,
     next_seen: KeyTable<()>,
 }
@@ -74,10 +80,37 @@ impl Counter<'_> {
         if cur.rem.is_empty() {
             // 段の終わり: 次の段の始まりの状態（引く札ごと）は次の段の数えに回す
             let tn = t as i64 + 1;
+            let ad_on = !self.ad.is_empty();
             let hits = match succ::turn_start(tn, self.cap, &[], &self.seq, self.last_hit, self.repeat) {
                 TurnStart::Hits(h) => h.to_vec(),
+                // 候補: 計画の並びが尽きても段を続ける（守る側の動的計画と同じ）
+                TurnStart::Dry if ad_on => Vec::new(),
                 _ => return Ok(()), // 地平の終わり／以後ずっと命中が無い（状態を作らない）
             };
+            if ad_on {
+                let e = succ::end_turn(cur, self.don);
+                let (t0, rem0) = (cur.t, std::mem::take(&mut cur.rem));
+                cur.t = tn as u32;
+                let i = (tn as usize).min(self.ad.len() - 1);
+                let types = self.ad[i].clone();
+                let pn = self.ad_none[i];
+                for mv in succ::draw_moves(prep) {
+                    succ::draw(cur, prep, mv);
+                    for am in succ::adraw_moves(&types, pn) {
+                        let pos = succ::adraw_start(cur, &hits, am.map(|k| (types[k].0, types[k].1)));
+                        write_key(&mut self.kb, 0, cur);
+                        if self.next_seen.insert_if_absent(&self.kb, ()) {
+                            self.next_front.push(cur.clone());
+                        }
+                        succ::undo_adraw_start(cur, pos);
+                    }
+                    succ::undo_draw(cur, prep, mv);
+                }
+                cur.t = t0;
+                cur.rem = rem0;
+                succ::undo_end_turn(cur, e);
+                return Ok(());
+            }
             let e = succ::end_turn(cur, self.don);
             let (t0, rem0) = (cur.t, std::mem::replace(&mut cur.rem, hits));
             cur.t = tn as u32;
@@ -148,7 +181,7 @@ pub fn count_layers(inp: &LayerIn) -> Vec<usize> {
     let mut groups: Vec<Group> = Vec::new();
     let mut gix: HashMap<Vec<u64>, usize> = HashMap::new();
     let mut kb: Vec<u64> = Vec::new();
-    for (xf, later) in inp.roots {
+    for (ri, (xf, later)) in inp.roots.iter().enumerate() {
         let seq_n = norm_seq(later);
         let (fs, last_hit, repeat) = seq_prep(&seq_n, inp.eps);
         let mut gk: Vec<u64> = vec![fs.len() as u64];
@@ -156,8 +189,26 @@ pub fn count_layers(inp: &LayerIn) -> Vec<usize> {
             gk.push(s.len() as u64);
             gk.extend(s.iter().map(|&x| canon_bits(x)));
         }
+        // 候補: 攻め手が引く札の型（確率 0 を除く）も群の鍵に（守る側の動的計画の文脈の鍵と同じ）
+        let (mut ad, mut ad_none): (Vec<DrawTypes>, Vec<f64>) = (Vec::new(), Vec::new());
+        if let Some(ra) = inp.root_adraw.get(ri).filter(|_| !inp.root_adraw.is_empty()) {
+            gk.push(u64::MAX);
+            gk.push(ra.len() as u64);
+            for st in ra {
+                let ts: Vec<(f64, bool, f64)> = st.iter().copied().filter(|t| t.2 > 0.0).collect();
+                gk.push(ts.len() as u64);
+                for t in &ts {
+                    gk.extend([canon_bits(t.0), t.1 as u64, canon_bits(t.2)]);
+                }
+                let pn = 1.0 - super::numeric::naive_sum(ts.iter().map(|t| t.2));
+                ad_none.push(if pn > 0.0 { pn } else { 0.0 });
+                ad.push(ts);
+            }
+        }
+        let ad_g = ad.clone();
+        let adn_g = ad_none.clone();
         let gi = *gix.entry(gk).or_insert_with(|| {
-            groups.push(Group { seq: fs, last_hit, repeat, front: Vec::new(), front_seen: KeyTable::new() });
+            groups.push(Group { seq: fs, last_hit, repeat, ad: ad_g, ad_none: adn_g, front: Vec::new(), front_seen: KeyTable::new() });
             groups.len() - 1
         });
         let mut hits_f: Vec<f64> = xf.iter().copied().filter(|&x| x >= -inp.eps).collect();
@@ -171,11 +222,26 @@ pub fn count_layers(inp: &LayerIn) -> Vec<usize> {
             ready: blk0.clone(),
             rested: rest0.clone(),
             pend: arr0.clone(),
+            pool: Vec::new(),
         };
-        write_key(&mut kb, 0, &c);
         let g = &mut groups[gi];
-        if g.front_seen.insert_if_absent(&kb, ()) {
-            g.front.push(c);
+        if ad.is_empty() {
+            write_key(&mut kb, 0, &c);
+            if g.front_seen.insert_if_absent(&kb, ()) {
+                g.front.push(c);
+            }
+        } else {
+            // 候補: 段 0 の始まりの攻め手の 1 枚（守る側の動的計画の根と同じ）
+            let mut c = c;
+            let base = std::mem::take(&mut c.rem);
+            for am in succ::adraw_moves(&ad[0], ad_none[0]) {
+                let pos = succ::adraw_start(&mut c, &base, am.map(|k| (ad[0][k].0, ad[0][k].1)));
+                write_key(&mut kb, 0, &c);
+                if g.front_seen.insert_if_absent(&kb, ()) {
+                    g.front.push(c.clone());
+                }
+                succ::undo_adraw_start(&mut c, pos);
+            }
         }
     }
     let ncap = cap.max(1) as usize;
@@ -193,6 +259,8 @@ pub fn count_layers(inp: &LayerIn) -> Vec<usize> {
         seq: Vec::new(),
         last_hit: -1,
         repeat: false,
+        ad: Vec::new(),
+        ad_none: Vec::new(),
         next_front: Vec::new(),
         next_seen: KeyTable::new(),
     };
@@ -201,6 +269,8 @@ pub fn count_layers(inp: &LayerIn) -> Vec<usize> {
             counter.seq = std::mem::take(&mut g.seq);
             counter.last_hit = g.last_hit;
             counter.repeat = g.repeat;
+            counter.ad = g.ad.clone();
+            counter.ad_none = g.ad_none.clone();
             counter.seen = KeyTable::new();
             counter.next_front = Vec::new();
             counter.next_seen = KeyTable::new();

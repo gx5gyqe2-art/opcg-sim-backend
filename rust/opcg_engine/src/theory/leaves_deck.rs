@@ -180,6 +180,40 @@ pub fn a_of(
     }
 }
 
+/// **候補**（`OPCG_DRAWN_ATTACKERS`・`docs/reports/2026-10-09_drawn_attackers.md`）: 攻め手が 1 枚引いた札の型
+/// `(超過 x = power − olp, 速攻, 確率)`。分母は [`a_of`] と同じ（札の表に在る枚数）、数えるのは体でコスト ≤ `don` のうち
+/// リーダーのパワーに届くもの（`x ≥ −eps`・届かない体は守る側の計算でも当たらない）。同じ `(x, 速攻)` はまとめる（初出の順）。
+pub fn draw_body_types(t: &CardTable, deck: &[String], olp: f64, don: Option<f64>, eps: f64) -> Vec<(f64, bool, f64)> {
+    let cap = don.map(py_round_int);
+    let mut n = 0i64;
+    let mut cnt: Vec<(f64, bool, i64)> = Vec::new();
+    for cid in deck {
+        let Some(m) = t.get(cid) else { continue };
+        n += 1;
+        if !body_of(m) {
+            continue;
+        }
+        if let Some(cap) = cap {
+            if m.cost > cap {
+                continue;
+            }
+        }
+        let x = m.power - olp;
+        if x < -eps {
+            continue;
+        }
+        let rush = m.keywords.iter().any(|k| k == "速攻");
+        match cnt.iter_mut().find(|e| e.0 == x && e.1 == rush) {
+            Some(e) => e.2 += 1,
+            None => cnt.push((x, rush, 1)),
+        }
+    }
+    if n == 0 {
+        return Vec::new();
+    }
+    cnt.into_iter().map(|(x, r, c)| (x, r, c as f64 / n as f64)).collect()
+}
+
 // --- lethal_rule -------------------------------------------------------------------------------
 
 /// `avg_counter(deck_ids, cards)`（`AVG_COUNTER_MODE`: `rules`＝`max(印字, 【カウンター】の上げ幅)`／`printed`＝`info.counter`）。

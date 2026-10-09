@@ -28,6 +28,9 @@ pub enum DpErr {
     Bad(String),
 }
 
+/// 候補（`OPCG_DRAWN_ATTACKERS`）: 1 段ぶんの攻め手が引く札の型 `(超過, 速攻, 確率)`。
+pub type DrawTypes = Vec<(f64, bool, f64)>;
+
 /// 1 回の問題の入力（Python の `_rule_guard_plan_ex` の引数）。
 pub struct Input<'a> {
     pub cards: &'a [(f64, f64)],
@@ -51,6 +54,9 @@ pub struct Input<'a> {
     pub nu: &'a [(f64, f64)],
     pub eps: f64,
     pub feq: f64,
+    /// **候補**（`OPCG_DRAWN_ATTACKERS`・`docs/reports/2026-10-09_drawn_attackers.md`）: 攻め手が段 `t` の始まりに 1 枚引く札の型
+    /// `(超過 x, 速攻, 確率)`（段ごと・尽きたら最後を繰り返す）。空なら今のまま（1 ビットも変えない）。
+    pub adraw: &'a [Vec<(f64, bool, f64)>],
 }
 
 /// 守る側の最善の守り（Python が返す辞書と同じ欄）。
@@ -307,6 +313,8 @@ pub struct Cur {
     pub ready: Vec<f64>,
     pub rested: Vec<f64>,
     pub pend: Vec<f64>,
+    /// 候補: 攻め手が引いた体の超過（昇順・次の段から毎段殴る）。候補が無ければ常に空。
+    pub pool: Vec<f64>,
 }
 
 /// 状態の鍵（`ctx` は文脈の番号・数え方では 0）。
@@ -326,6 +334,13 @@ pub fn write_key(kb: &mut Vec<u64>, ctx: u32, c: &Cur) {
         }
     }
     pack_hand(kb, &c.hand);
+    if !c.pool.is_empty() {
+        // 候補だけ（空なら鍵は今と同じ）
+        kb.push(u64::MAX - c.pool.len() as u64);
+        for &x in c.pool.iter() {
+            kb.push(canon_bits(x));
+        }
+    }
 }
 
 /// 覚え書きの値（調和 `harms` は `Defender::harms` の中の `[off, off+len)`）。
@@ -463,9 +478,19 @@ struct Prob {
     feq: f64,
     nu: Vec<(f64, f64)>,
     hits_f: Vec<f64>,
+    /// 候補: 攻め手が引く札の型（段ごと・確率 0 を除いた）と「何も出ない」の確率。`ad_on` が偽なら空。
+    ad: Vec<Vec<(f64, bool, f64)>>,
+    ad_none: Vec<f64>,
+    ad_on: bool,
 }
 
 impl Prob {
+    /// 候補: 段 `t` の引く札の型（尽きたら最後を繰り返す）。
+    fn ad_stage(&self, t: usize) -> (&[(f64, bool, f64)], f64) {
+        let i = t.min(self.ad.len() - 1);
+        (&self.ad[i], self.ad_none[i])
+    }
+
     fn nu_of(&self, m: f64) -> f64 {
         for &(k, v) in &self.nu {
             if k == m {
@@ -576,6 +601,24 @@ impl Defender {
             }
         }
         ck.extend([canon_bits(don), l0 as u64, cap as u64]);
+        // 候補だけ（攻め手が引く札の型・無ければ鍵は今と同じ）
+        let ad_on = !inp.adraw.is_empty();
+        let mut ad: Vec<Vec<(f64, bool, f64)>> = Vec::new();
+        let mut ad_none: Vec<f64> = Vec::new();
+        if ad_on {
+            ck.push(u64::MAX);
+            ck.push(inp.adraw.len() as u64);
+            for st in inp.adraw {
+                let ts: Vec<(f64, bool, f64)> = st.iter().copied().filter(|t| t.2 > 0.0).collect();
+                ck.push(ts.len() as u64);
+                for t in &ts {
+                    ck.extend([canon_bits(t.0), t.1 as u64, canon_bits(t.2)]);
+                }
+                let pn = 1.0 - naive_sum(ts.iter().map(|t| t.2));
+                ad_none.push(if pn > 0.0 { pn } else { 0.0 });
+                ad.push(ts);
+            }
+        }
         // Python の文脈の鍵（`ctx_t`）と同じ中身だけ（ν・誤差・EPS は鍵に入れない＝値段が同じなら同じ文脈）
         for x in [inp.lam, inp.lam_net, inp.mu, inp.olp, inp.mlp] {
             ck.push(canon_bits(x));
@@ -605,6 +648,9 @@ impl Defender {
             nu: inp.nu.to_vec(),
             hits_f: hits_f.clone(),
             prep,
+            ad,
+            ad_none,
+            ad_on,
         };
         let mut cur = Cur {
             t: 0,
@@ -615,16 +661,25 @@ impl Defender {
             ready: blk0,
             rested: rest0,
             pend: arr0,
+            pool: Vec::new(),
         };
-        let r = self.lookup(&p, &mut cur)?;
-        let harms = self.harms[r.off as usize..(r.off + r.len) as usize].to_vec();
+        let (v, harms) = if p.ad_on {
+            // 候補: 段 0 の始まりにも攻め手が 1 枚引く（偶然の分岐の期待＝根は状態ではない）
+            let base = std::mem::take(&mut cur.rem);
+            let c = self.ad_branch(&p, &mut cur, 0, &base)?;
+            let hh: Vec<f64> = (0..c.hlen()).map(|q| c.h(&self.harms, q)).collect();
+            (c.v, hh)
+        } else {
+            let r = self.lookup(&p, &mut cur)?;
+            (r.v, self.harms[r.off as usize..(r.off + r.len) as usize].to_vec())
+        };
         Ok(Output {
-            cut: r.v[1],
-            stopped: r.v[3],
-            alive: r.v[2],
-            prevented: r.v[0],
+            cut: v[1],
+            stopped: v[3],
+            alive: v[2],
+            prevented: v[0],
             harms,
-            theta: inp.lam * l0_f + inp.mu * r.v[1] + nu_all,
+            theta: inp.lam * l0_f + inp.mu * v[1] + nu_all,
             nu_all,
         })
     }
@@ -674,6 +729,9 @@ impl Defender {
         let t = cur.t as i64;
         match succ::turn_start(t, p.cap, &p.hits_f, &p.seq, p.last_hit, p.repeat_hits) {
             TurnStart::Horizon => Ok(Cand::zero()),
+            // 候補: 計画の並びが尽きても引いた体が殴りうるので段を続ける
+            TurnStart::Dry if p.ad_on => self.ad_branch(p, cur, t as usize, &[]),
+            TurnStart::Hits(hits) if p.ad_on => self.ad_branch(p, cur, t as usize, hits),
             TurnStart::Dry => {
                 let mut c = Cand::zero();
                 c.v[2] = (p.cap - t) as f64; // 以後ずっと命中が無い
@@ -687,6 +745,25 @@ impl Defender {
                 Ok(Cand::from_res(&r))
             }
         }
+    }
+
+    /// 候補: 段 `t` の始まりに攻め手が 1 枚引く偶然の分岐（`cur.rem` は空で呼ぶ・戻るときも空）。
+    /// その段の攻撃＝計画の並び `base` ∪ 引いた体の並び ∪（速攻なら引いた体）、引いた体は並びに入って次の段から毎段殴る。
+    fn ad_branch(&mut self, p: &Prob, cur: &mut Cur, t: usize, base: &[f64]) -> R<Cand> {
+        let (types, pn) = p.ad_stage(t);
+        let mut acc = Acc::new();
+        for mv in succ::adraw_moves(types, pn) {
+            let drawn = mv.map(|i| (types[i].0, types[i].1));
+            let pos = succ::adraw_start(cur, base, drawn);
+            let r = self.lookup(p, cur);
+            succ::undo_adraw_start(cur, pos);
+            let prob = match mv {
+                Some(i) => types[i].2,
+                None => pn,
+            };
+            acc.add(prob, &Cand::from_res(&r?), &self.harms);
+        }
+        Ok(acc.into_cand())
     }
 
     /// 守る側のターン（1 枚引く）を挟んで次の段へ（`next_turn`）。

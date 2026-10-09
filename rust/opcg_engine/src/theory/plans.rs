@@ -153,6 +153,30 @@ fn each_ks<F: FnMut(&[i64]) -> Result<(), DpErr>>(caps: &[i64], b: i64, f: &mut 
     rec(caps, &mut ks, 0, b, f)
 }
 
+/// **候補**（`OPCG_DRAWN_ATTACKERS`）: 計画（出す札の組 `m`・今のターンの支払い `paid1`）の段ごとの、攻め手が引く札の型。
+/// 段 `i`（1 始まり）の残ったドンは歩きの流入と同じ `left_of(i, paid_i)`。今のターンに攻撃できない計画の段 1 では速攻も殴らない。
+/// 表（`d_tab`）が空なら空（今のまま）。
+pub fn adraw_of(inp: &SolveIn, m: &Mask, paid1: i64, turns: i64) -> Vec<Vec<(f64, bool, f64)>> {
+    let tb = &inp.tables;
+    if tb.d_tab.is_empty() || m.steps.is_empty() {
+        return Vec::new();
+    }
+    let n = (turns.max(1) as usize).min(m.steps.len());
+    let mut out = Vec::with_capacity(n);
+    for i in 1..=n {
+        let paid = if i == 1 { paid1 as f64 } else { m.steps[i - 1].paid };
+        let l = sched::left_of(tb, i, paid) as usize;
+        let mut ts = tb.d_tab[l.min(tb.d_tab.len() - 1)].clone();
+        if i == 1 && inp.no_now {
+            for t in ts.iter_mut() {
+                t.1 = false;
+            }
+        }
+        out.push(ts);
+    }
+    out
+}
+
 /// 1 つの地平の試行（`_rule_don_solve`）。守る側の覚え書き `d` は呼ぶ側が試行ごとに用意する。
 pub fn attempt(inp: &SolveIn, turns: i64, d: &mut Defender) -> Result<Best, DpErr> {
     let (lam, lam_net, mu, olp, mlp) = inp.prices;
@@ -162,7 +186,8 @@ pub fn attempt(inp: &SolveIn, turns: i64, d: &mut Defender) -> Result<Best, DpEr
             return Err(DpErr::Bad("a play set without steps".to_string()));
         }
         let tail = sched::tail_of(&inp.tables, &m.steps);
-        let solve = |d: &mut Defender, xf: &[f64]| -> Result<Output, DpErr> {
+        let solve = |d: &mut Defender, xf: &[f64], paid1: i64| -> Result<Output, DpErr> {
+            let ad = adraw_of(inp, m, paid1, turns);
             d.solve(&Input {
                 cards: inp.cards,
                 don: inp.don,
@@ -183,10 +208,11 @@ pub fn attempt(inp: &SolveIn, turns: i64, d: &mut Defender) -> Result<Best, DpEr
                 nu: inp.nu,
                 eps: inp.eps,
                 feq: inp.feq,
+                adraw: &ad,
             })
         };
         let zeros = vec![0i64; inp.att1_x.len()];
-        let r0 = solve(d, &first_of(inp, m, &zeros))?;
+        let r0 = solve(d, &first_of(inp, m, &zeros), m.cost)?;
         let h1_bare = r0.harms.first().copied().unwrap_or(0.0);
         let mut seen: HashSet<(Vec<u64>, i64)> = HashSet::new();
         each_ks(&m.caps, m.b, &mut |ks: &[i64]| {
@@ -202,7 +228,7 @@ pub fn attempt(inp: &SolveIn, turns: i64, d: &mut Defender) -> Result<Best, DpEr
             if !seen.insert(sig) {
                 return Ok(());
             }
-            let res = solve(d, &xf)?;
+            let res = solve(d, &xf, paid)?;
             let incr = res.harms.first().copied().unwrap_or(0.0) - h1_bare;
             let fi = (inp.budget - paid).max(0) as usize;
             let fl = *inp.flow.get(fi).ok_or_else(|| DpErr::Bad("flow index out of range".to_string()))?;
@@ -241,12 +267,39 @@ pub fn mask_firsts(inp: &SolveIn, m: &Mask) -> Vec<Vec<f64>> {
     out
 }
 
+/// 候補: [`mask_firsts`] の支払いつき（同じ攻撃の並び・同じ支払いは 1 回）。
+fn mask_firsts_paid(inp: &SolveIn, m: &Mask) -> Vec<(Vec<f64>, i64)> {
+    let mut seen: HashSet<(Vec<u64>, i64)> = HashSet::new();
+    let mut out = Vec::new();
+    let mut push = |xf: Vec<f64>, paid: i64| {
+        if seen.insert((xf.iter().map(|&x| canon_bits(x)).collect(), paid)) {
+            out.push((xf, paid));
+        }
+    };
+    let zeros = vec![0i64; inp.att1_x.len()];
+    push(first_of(inp, m, &zeros), m.cost);
+    let _ = each_ks(&m.caps, m.b, &mut |ks: &[i64]| {
+        push(first_of(inp, m, ks), m.cost + ks.iter().sum::<i64>());
+        Ok(())
+    });
+    out
+}
+
 /// 地平 `h_fail` が予算を超えたとき、予算に収まる一番長い地平（`_ex_fit_horizon`・同じ遷移で数える）。
 pub fn fit(inp: &SolveIn, h_fail: i64, lim: usize) -> i64 {
     let mut roots: Vec<(Vec<f64>, Vec<Vec<f64>>)> = Vec::new();
+    let mut root_adraw: Vec<Vec<Vec<(f64, bool, f64)>>> = Vec::new();
     for m in inp.masks {
-        for xf in mask_firsts(inp, m) {
-            roots.push((xf, m.later_seq.clone()));
+        if inp.tables.d_tab.is_empty() {
+            for xf in mask_firsts(inp, m) {
+                roots.push((xf, m.later_seq.clone()));
+            }
+        } else {
+            // 候補: 根ごとに今のターンの支払い（付与の枚数）が違えば段 1 の引く札の型が違う
+            for (xf, paid) in mask_firsts_paid(inp, m) {
+                roots.push((xf, m.later_seq.clone()));
+                root_adraw.push(adraw_of(inp, m, paid, h_fail));
+            }
         }
     }
     let sizes = count_layers(&LayerIn {
@@ -259,6 +312,7 @@ pub fn fit(inp: &SolveIn, h_fail: i64, lim: usize) -> i64 {
         arrive: inp.arrive,
         draw_types: inp.draw_types,
         roots: &roots,
+        root_adraw: &root_adraw,
         cap: h_fail,
         lim,
         eps: inp.eps,

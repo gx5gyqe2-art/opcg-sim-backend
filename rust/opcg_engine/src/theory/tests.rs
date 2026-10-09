@@ -40,6 +40,7 @@ struct P {
     lam: f64,
     lam_net: f64,
     mu: f64,
+    ad: Vec<Vec<(f64, bool, f64)>>,
 }
 
 impl P {
@@ -59,6 +60,7 @@ impl P {
             lam: 1.0,
             lam_net: 0.5,
             mu: 0.5,
+            ad: vec![],
         }
     }
     fn solve(&self, d: &mut Defender) -> Result<Output, DpErr> {
@@ -88,6 +90,7 @@ impl P {
             nu: &nu,
             eps: EPS,
             feq: FEQ,
+            adraw: &self.ad,
         })
     }
 }
@@ -290,6 +293,7 @@ fn layer_sums_equal_the_states_each_horizon_creates() {
             arrive: &p.arr,
             draw_types: &p.dt,
             roots: &roots,
+            root_adraw: &[],
             cap: 4,
             lim: usize::MAX / 2,
             eps: EPS,
@@ -334,6 +338,7 @@ fn count_layers_stops_once_the_limit_is_passed_and_fit_horizon_picks_the_longest
             arrive: &[],
             draw_types: &[],
             roots: &roots,
+            root_adraw: &[],
             cap: 4,
             lim,
             eps: EPS,
@@ -417,6 +422,7 @@ fn recorded_real_and_synthetic_dp_calls_replay_bit_identically() {
             nu: &nu,
             eps: dec_f(&dp["eps"]),
             feq: dec_f(&dp["feq"]),
+            adraw: &[],
         };
         let o = Defender::new(None).solve(&inp).unwrap();
         // 期待: 辞書 {"d": [[key, value], ...]} の値（cut, stopped, alive, prevented, harms, theta, nu_all）
@@ -593,6 +599,7 @@ fn replay_solves(lines: &[&str]) -> [usize; 5] {
                     no_now,
                     slope_floor: hx(&a["slope_floor"]),
                     race_cap: hx(&a["race_cap"]),
+                    d_tab: &[],
                 },
                 masks: &masks,
                 h0: run_rec["h0"].as_i64().unwrap(),
@@ -643,4 +650,91 @@ fn replay_solves(lines: &[&str]) -> [usize; 5] {
         }
     }
     [n_real, n_syn, n_frame, n_runs, n_cut]
+}
+
+// ---------------------------------------------------------------------------------------------
+// 候補（`OPCG_DRAWN_ATTACKERS`・`docs/reports/2026-10-09_drawn_attackers.md`）: 攻め手が引く札の偶然の分岐
+
+#[test]
+fn drawn_attackers_branch_matches_the_hand_derived_expectation() {
+    // ライフ 1・止める札なし・計画の攻撃なし。攻め手は毎段 1/2 で超過 0 の体（速攻なし）を引く。
+    // 段 1 の攻撃＝段 0 に引いた体: 1/2 で当たり 0.5（λ_net）。段 2 の攻撃＝段 0・1 に引いた体:
+    // 段 0 に引いていれば（1/2）ライフ 0 で当たり＝とどめ (λ − λ_net)·1 = 0.5、引いていなければ段 1 に引いた（1/4）とき 0.5。
+    // 損害＝[0, 0.25, 0.25 + 0.125]。
+    let mut p = P::base();
+    p.turns = Some(3);
+    p.ad = vec![vec![(0.0, false, 0.5)]];
+    let o = p.solve(&mut Defender::new(None)).unwrap();
+    let want = [0.0, 0.25, 0.375];
+    assert_eq!(o.harms.len(), 3, "{:?}", o.harms);
+    for (a, b) in o.harms.iter().zip(want.iter()) {
+        assert!((a - b).abs() < 1e-12, "{:?}", o.harms);
+    }
+    // 速攻なら引いた段で殴る: 地平 1 で 1 本当たる
+    let mut q = P::base();
+    q.turns = Some(1);
+    q.ad = vec![vec![(0.0, true, 1.0)]];
+    let o = q.solve(&mut Defender::new(None)).unwrap();
+    assert!((o.harms[0] - 0.5).abs() < 1e-12, "{:?}", o.harms);
+    // 型が無い（何も出ない確率 1）なら今の答えと値が同じ（計画の並びが尽きた先も段を続けるので、損害の尾に 0 が並び・
+    // 生き延びるターンが確率つきの和で積もる分の丸めだけ違う）
+    let mut r0 = Rng(7);
+    for _ in 0..60 {
+        let mut a = rand_problem(&mut r0);
+        let b0 = a.solve(&mut Defender::new(None));
+        a.ad = vec![vec![]];
+        let b1 = a.solve(&mut Defender::new(None));
+        match (b0, b1) {
+            (Ok(x), Ok(y)) => {
+                let close = |u: f64, v: f64| (u - v).abs() < 1e-9;
+                assert!(close(x.cut, y.cut) && close(x.alive, y.alive) && close(x.theta, y.theta), "{x:?} {y:?}");
+                for q in 0..x.harms.len().max(y.harms.len()) {
+                    let u = x.harms.get(q).copied().unwrap_or(0.0);
+                    let v = y.harms.get(q).copied().unwrap_or(0.0);
+                    assert!(close(u, v), "{x:?} {y:?}");
+                }
+            }
+            (Err(_), Err(_)) => {}
+            _ => panic!("one side failed"),
+        }
+    }
+}
+
+#[test]
+fn drawn_attackers_layer_sums_equal_the_states_each_horizon_creates() {
+    let mut r = Rng(1234);
+    let ad = vec![vec![(0.0, false, 0.3), (1000.0, true, 0.2)], vec![(2000.0, false, 0.25)]];
+    for _ in 0..60 {
+        let p = rand_problem(&mut r);
+        let roots: Vec<(Vec<f64>, Vec<Vec<f64>>)> = vec![(p.xs.clone(), p.seq.clone()), (vec![1000.0], p.seq.clone())];
+        let root_adraw = vec![ad.clone(), ad.clone()];
+        let sizes = count_layers(&LayerIn {
+            cards: &p.cards,
+            don: p.don,
+            blk: &p.blk,
+            life: p.life,
+            life_types: &p.lt,
+            rest: &p.rest,
+            arrive: &p.arr,
+            draw_types: &p.dt,
+            roots: &roots,
+            root_adraw: &root_adraw,
+            cap: 3,
+            lim: usize::MAX / 2,
+            eps: EPS,
+        });
+        for h in 1..=3usize {
+            let mut d = Defender::new(None);
+            for (xf, seq) in &roots {
+                let mut q = p.clone();
+                q.xs = xf.clone();
+                q.seq = seq.clone();
+                q.turns = Some(h as i64);
+                q.ad = ad.clone();
+                q.solve(&mut d).unwrap();
+            }
+            let want: usize = sizes[..h].iter().sum();
+            assert_eq!(d.n_states(), want, "h={h} sizes={sizes:?}");
+        }
+    }
 }

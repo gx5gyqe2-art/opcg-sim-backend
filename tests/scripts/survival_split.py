@@ -179,6 +179,10 @@ def resolve(din, **ov):
     a = dict(din)
     a.update(ov)
     a = {k: v for k, v in a.items() if k != "no_now"}
+    # 候補（`OPCG_DRAWN_ATTACKERS`）の引く札の型は計画の攻撃の読みの一部。実際の攻撃を入れて解くとき（`xs_first`／`seq` を差し替える）は
+    # 引いた体は実際の攻撃に入っているので外す（二重に数えない）
+    if "xs_first" in ov or "seq" in ov:
+        a.pop("adraw", None)
     for k in ("cards", "nu"):
         a[k] = [[float(p), float(q)] for p, q in a[k]]
     for k in ("life_types", "draw_types"):
