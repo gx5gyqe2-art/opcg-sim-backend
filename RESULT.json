@@ -1,6 +1,6 @@
 {
  "branch": "claude/diag-residual-value",
- "commit": "",
+ "commit": "43781cb6b",
  "report": "docs/reports/2026-10-09_residual_value.md",
  "summary": [
   "地平を生き延びると言い地平の外で交わる時計（群れ）の遅れを直したと仮定した主の上限で、的中 実 .7051→.7009（−0.004）・合成 .6602→.6471（−0.013）。",
