@@ -1,0 +1,12 @@
+{
+ "branch": "claude/diag-residual-value",
+ "commit": "",
+ "report": "docs/reports/2026-10-09_residual_value.md",
+ "summary": [
+  "地平を生き延びると言い地平の外で交わる時計（群れ）の遅れを直したと仮定した主の上限で、的中 実 .7051→.7009（−0.004）・合成 .6602→.6471（−0.013）。",
+  "決着前の予測力（AUC・表は不変）実 .7991→.7863（−0.013）・合成 .7182→.7004（−0.018）。群れの時計の 7 割／6 割は負けた席で、直すと予測が悪くなる。勝った席を完璧に当てる甘い天井でも上がりは 0.01 未満。",
+  "既定の値は前の報告を再現（的中 .7051／.6602・AUC .7991／.7182）。既定・表・golden・KERNEL_FILES は不変。"
+ ],
+ "verdict": "理論の較正は既知の限界つきで完成（両方の記録で的中・決着前 AUC の上がりとも 0.01 未満〔すべて負〕）",
+ "gate": "make test green at b47d088f (cargo 473 passed/1 ignored; pytest 622 passed/12 skipped); later commits docs only (gate skipped)"
+}
