@@ -1,0 +1,22 @@
+{
+  "branch": "claude/diag-defender-foresight",
+  "commit": "TBD",
+  "report": "docs/reports/2026-10-09_defender_foresight.md",
+  "criteria_commit": "e97acfb2",
+  "summary": [
+    "守り手を目先だけの最善（地平 1）に置き換えても、地平を生き延びると言う時計の差し引いた後の遅れは実 +0.937→+0.793（15%）・合成 +1.110→+0.957（14%）しか消えない（基準 5 割）。",
+    "実際の守り手は今の理論と目先だけの守り手の間に居る（1 ターンの札 実際 1.21/1.14・A 0.75/0.62・B 1.42/1.40／受けた本数 実際 0.97/1.02・A 1.07/1.08・B 0.74/0.72）。1 ターンずつではどちらにも寄らない。",
+    "遅れの芯（歩きが地平の外で交わる S≥1/2 の時計・実 105・合成 462 本）は守り手の打ち筋を変えてもほぼ動かない（+1.14→+1.05／+1.26→+1.14）＝先読みの浅さは芯ではなく、残りは地平の先の段の値付けの側【推測】。"
+  ],
+  "pass": false,
+  "verdict": {
+    "real": {"pass1": false, "pass2": false, "phi": 0.1534},
+    "synthetic": {"pass1": false, "pass1_detail": "cuts closer to B, hits closer to A", "pass2": false, "phi": 0.1376}
+  },
+  "theory_complete": false,
+  "gate": "make test green (cargo 473 passed / 1 ignored, pytest 622 passed / 12 skipped)",
+  "notes": [
+    "合成の A の組の差し引いた後は +1.110（前の報告 +1.192）。本数・残る遅れは再現。比べは同じ器の中。",
+    "e97acfb2 に maturin の wheel を誤って含めた（次のコミットで削除・履歴は書き換えていない）。"
+  ]
+}
