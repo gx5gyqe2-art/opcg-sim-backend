@@ -1,0 +1,29 @@
+{
+  "branch": "claude/cand-attack-count",
+  "base": "claude/cpu-spec-improvements-yw91jd@b753217b3",
+  "report": "docs/reports/2026-10-10_attack_count.md",
+  "candidate": {"switch": "OPCG_ATTACK_COUNT", "combined_with": "OPCG_LEFTOVER_DON", "default_changed": false,
+                "formula_commit": "12132bf6", "impl_commit": "c44cd76a",
+                "prediction_commit": "1259f1b7", "new_constants": 0},
+  "recommendation": "reject",
+  "kill_criteria": {
+    "real":  {"a_capped": [9, 0], "b_S_lt_half_obs_over_pred": [0.927, 0.989], "c_rel_auc": [0.8076, 0.7990], "d_hit": [0.7051, 0.7009], "hit": ["c", "d"]},
+    "synthetic": {"a_capped": [70, 3], "b_S_lt_half_obs_over_pred": [1.102, 1.183], "c_rel_auc": [0.7241, 0.7144], "d_hit": [0.6602, 0.6492], "hit": ["b", "c", "d"]}
+  },
+  "arms": {
+    "real":      {"default": {"hit": 0.7051, "rel_auc": 0.8076, "sigma_T": 1.412, "capped": 9},
+                  "leftover_don": {"hit": 0.6964, "rel_auc": 0.7969, "sigma_T": 1.089, "capped": 0},
+                  "attack_count_plus_leftover": {"hit": 0.7009, "rel_auc": 0.7990, "sigma_T": 1.151, "capped": 0}},
+    "synthetic": {"default": {"hit": 0.6602, "rel_auc": 0.7241, "sigma_T": 2.004, "capped": 70},
+                  "leftover_don": {"hit": 0.6493, "rel_auc": 0.7186, "sigma_T": 1.109, "capped": 3},
+                  "attack_count_plus_leftover": {"hit": 0.6492, "rel_auc": 0.7144, "sigma_T": 1.154, "capped": 3}}
+  },
+  "diagnostics": {
+    "later_step_excess_sum_plan_over_actual_S_lt_half": {"real": [1.03, 1.42, 1.33], "synthetic": [0.85, 1.60, 1.51], "order": ["default", "leftover_don", "attack_count_plus_leftover"], "target": [0.8, 1.2]},
+    "later_step_attack_count_plan_over_actual_S_lt_half": {"real": [1.68, 1.63, 1.42], "synthetic": [1.58, 1.52, 1.30]},
+    "delay_slope_on_horizon_same_clocks": {"real": [0.60, 0.24, 0.25], "synthetic": [0.31, 0.13, 0.13]}
+  },
+  "kappa_vector_bit_identical": true,
+  "reductions": "synthetic default/leftover arms: theory_bridge and relative_ledger reused from 2026-10-09_leftover_don.md (real arms reproduced that report exactly); synthetic theory_bridge on w39 (300 games) only",
+  "gate": {"make_test": "green", "cargo": "475 passed, 1 ignored", "pytest": "622 passed, 12 skipped"}
+}
