@@ -64,6 +64,43 @@ pub fn leftover_attach(xs: &[f64], ks: &[i64], left: i64, kmax: i64) -> Vec<i64>
     e
 }
 
+/// **候補**（`OPCG_ATTACK_COUNT`・空でも `0` でもない値で入る・1 度だけ読む）: 攻め手の後の段（2 段目以降）の攻撃の並びを、体が相手のターンに
+/// 倒される分（体の値段と同じ `ko_p_of`・レストで相手のターンを迎えた回数だけ）を期待本数で読み直す（`docs/reports/2026-10-10_attack_count.md`）。
+/// 既定（変数なし）は今のまま。
+pub fn attack_count_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| {
+        let v = std::env::var("OPCG_ATTACK_COUNT").unwrap_or_default();
+        !v.is_empty() && v != "0"
+    })
+}
+
+/// 候補 `OPCG_ATTACK_COUNT` の並べ方: 体 `i`（超過 `xs[i]`・最初に攻撃できる段 `first[i]`）の段 `step` の生き残る確率
+/// `s_i = (1 − ko_p_of(x_i + olp))^{max(0, step − first_i)}`、期待本数 `nonneg_round(Σ s_i)` 体を `s_i` の大きい順（同点は並びの順）に残す。
+/// `first[i] = None` はリーダー（倒れない・毎段並ぶ・期待本数に数えない）。返すのは並べるかどうか。
+pub fn attack_keep(xs: &[f64], first: &[Option<i64>], step: i64, olp: f64) -> Vec<bool> {
+    use super::super::numeric::pow;
+    let mut keep = vec![false; xs.len()];
+    let mut sv: Vec<(usize, f64)> = Vec::new();
+    for (i, (&x, f)) in xs.iter().zip(first.iter()).enumerate() {
+        match f {
+            None => keep[i] = true,
+            Some(f0) => {
+                let e = (step - f0).max(0);
+                let q = 1.0 - lt::ko_p_of(Some(x + olp), lt::KO_P);
+                sv.push((i, pow(q, e as f64)));
+            }
+        }
+    }
+    let n = nonneg_round(sv.iter().map(|a| a.1).sum::<f64>()) as usize;
+    // 大きい順・同点は並びの順（安定な並べ替え）
+    sv.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    for &(i, _) in sv.iter().take(n) {
+        keep[i] = true;
+    }
+    keep
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // 引数の読み
 
@@ -1121,6 +1158,9 @@ impl Core {
         if leftover_don_on() {
             dkv.push((V::s("leftover_don"), V::Bool(true)));
         }
+        if attack_count_on() {
+            dkv.push((V::s("attack_count"), V::Bool(true)));
+        }
         let d = V::dict(dkv);
         Ok(Some(Actx::from_v(&d)?))
     }
@@ -1237,13 +1277,28 @@ impl Core {
             let rush_now: Vec<(f64, bool, i64, f64)> = bodies.iter().copied().filter(|b| b.2 == step && b.1).collect();
             // 候補: 残りのドンを攻撃の並びにだけ足す（払い・`fb` は今の `ks` のまま＝流入と地平の外の段は触らない）
             let paid0: i64 = plays.iter().map(|&c| cand[c as usize].cost).sum::<i64>() + ks.iter().sum::<i64>();
-            let hk: Vec<i64> = if leftover_don_on() {
-                let ex = leftover_attach(&on_board, &ks, nonneg_round(d) - paid0, kmax);
-                ks.iter().zip(ex.iter()).map(|(&a, &b)| a + b).collect()
+            // 候補 `OPCG_ATTACK_COUNT`: 並べる体を期待本数で読み直す（並べない体の付与は手元に戻る・払いは今のまま）
+            let keep: Vec<bool> = if attack_count_on() {
+                let mut first: Vec<Option<i64>> = vec![None];
+                for &(sl, _x) in ax.later.iter().skip(1) {
+                    let now = !ax.no_now && ax.att1.iter().any(|&(s1, _)| s1 == sl);
+                    first.push(Some(if now { 1 } else { 2 }));
+                }
+                first.extend(bodies.iter().filter(|b| b.2 < step).map(|b| Some(if b.1 { b.2 } else { b.2 + 1 })));
+                attack_keep(&on_board, &first, step, ax.olp)
             } else {
-                ks.clone()
+                vec![true; on_board.len()]
             };
-            let mut hits: Vec<f64> = on_board.iter().zip(hk.iter()).map(|(&x, &k)| x + 1000.0 * k as f64).collect();
+            let ob: Vec<f64> = on_board.iter().zip(keep.iter()).filter(|a| *a.1).map(|a| *a.0).collect();
+            let kk: Vec<i64> = ks.iter().zip(keep.iter()).filter(|a| *a.1).map(|a| *a.0).collect();
+            let hk: Vec<i64> = if leftover_don_on() {
+                let paid_k: i64 = plays.iter().map(|&c| cand[c as usize].cost).sum::<i64>() + kk.iter().sum::<i64>();
+                let ex = leftover_attach(&ob, &kk, nonneg_round(d) - paid_k, kmax);
+                kk.iter().zip(ex.iter()).map(|(&a, &b)| a + b).collect()
+            } else {
+                kk.clone()
+            };
+            let mut hits: Vec<f64> = ob.iter().zip(hk.iter()).map(|(&x, &k)| x + 1000.0 * k as f64).collect();
             hits.extend(rush_now.iter().map(|b| b.0));
             let paid: i64 = paid0;
             let rn: Vec<f64> = rush_now.iter().map(|b| b.3).collect();

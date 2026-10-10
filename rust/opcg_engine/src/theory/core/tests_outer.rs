@@ -194,3 +194,21 @@ fn leftover_attach_by_cbar() {
     // 届かない体（超過 −1000）: 1 枚で届く（c̄ 0 → 1.00）が 0 の体の 1 枚（0.28）に勝つ
     assert_eq!(leftover_attach(&[-1000.0, 0.0], &[0, 0], 1, 10), vec![1, 0]);
 }
+
+/// 候補 `OPCG_ATTACK_COUNT` の並べ方を手で導ける値と比べる（`docs/reports/2026-10-10_attack_count.md` §1.5）:
+/// パワー 3,000（`ko_p` 0.2782）の体 2 体・相手リーダー 5,000（超過 −2,000）・段 1 に攻撃する体（最初の段 1）。
+/// 期待本数 1.44 → 1・1.04 → 1・0.75 → 1・0.54 → 1・0.39 → 0。リーダー（`None`）は毎段並ぶ。段 1 に攻撃できない体は 1 段遅れて減る。
+#[test]
+fn attack_keep_by_ko_survival() {
+    use super::outer::attack_keep;
+    let xs = [0.0, -2000.0, -2000.0];
+    let f1 = [None, Some(1), Some(1)];
+    assert_eq!(attack_keep(&xs, &f1, 2, 5000.0), vec![true, true, false]);
+    assert_eq!(attack_keep(&xs, &f1, 3, 5000.0), vec![true, true, false]);
+    assert_eq!(attack_keep(&xs, &f1, 5, 5000.0), vec![true, true, false]);
+    assert_eq!(attack_keep(&xs, &f1, 6, 5000.0), vec![true, false, false]);
+    // 段 1 に攻撃できない体（最初の段 2）は段 2 で 1.0 のまま＝先に並ぶ（同点でないので並びの順より前）
+    let f2 = [None, Some(1), Some(2)];
+    assert_eq!(attack_keep(&xs, &f2, 2, 5000.0), vec![true, true, true]);
+    assert_eq!(attack_keep(&xs, &f2, 3, 5000.0), vec![true, false, true]);
+}
