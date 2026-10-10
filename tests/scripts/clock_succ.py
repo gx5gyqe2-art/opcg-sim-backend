@@ -94,7 +94,7 @@ def _cast(game, name):
 
 
 def successor(game, name, turn, mv, opts):
-    """1 候補の後続（状態, 自分の側の行, 相手の側の行, 窓の手数）。"""
+    """1 候補の後続（状態, 自分の側の行, 相手の側の行, 窓の手数）。`game` は複製の元（`--shuffle` なら並べ直した複製）。"""
     opp = "p2" if name == "p1" else "p1"
     f = game.fork()
     try:
@@ -115,7 +115,7 @@ def successor(game, name, turn, mv, opts):
     return ST_MAIN, _cast(f, name), _cast(f, opp), r["plies"]
 
 
-def replay_game(d, seed, meta, rec_rows):
+def replay_game(d, seed, meta, rec_rows, shuffle=False):
     """1 局を打ち直して表を作る。戻り＝npz に書く dict。"""
     E.engine()
     search = {"worlds": int(meta["search"]["worlds"])} if (meta.get("search") or {}).get("worlds") else {}
@@ -152,12 +152,15 @@ def replay_game(d, seed, meta, rec_rows):
         rows["n"].append(len(groups)); rows["ptr"].append(len(cand["st"]))
         rows["osc"].append(o[0]); rows["otok"].append(o[1]); rows["oci"].append(o[2])
         opts = spec.decide_opts(seed, int(turn), name, None)
+        # **`--shuffle`**（報告 §2.5・司令塔の点検）: 両席のライフと山札を混ぜ直した複製を元に後続を作る（並びを知らない形）。
+        # 並べ直しは行ごとに 1 回（同じ行の候補は同じ並びで比べる）・種は (seed, step) から決まる。
+        base = game.fork_shuffled(int(seed) * 100003 + int(step)) if shuffle else game
         for g in groups:
             mv = legal[g["rep"]]
             if mv.get("action_type") == "TURN_END":
                 st, me, op, plies = ST_END, end_of_turn(mine), o, 0
             else:
-                st, me, op, plies = successor(game, name, turn, mv, opts)
+                st, me, op, plies = successor(base, name, turn, mv, opts)
             cand["st"].append(st); cand["plies"].append(plies)
             me = me or (zsc, ztok, zci)
             op = op or (zsc, ztok, zci)
@@ -180,6 +183,7 @@ def main(argv=None):
     ap.add_argument("--in", dest="src", required=True, help="記録のディレクトリ（1 つ）")
     ap.add_argument("--out", required=True)
     ap.add_argument("--games", type=int, default=0, help="先頭から何局（0＝全部）")
+    ap.add_argument("--shuffle", action="store_true", help="両席のライフと山札を混ぜ直した複製から後続を作る（並びを知らない形）")
     a = ap.parse_args(argv)
     os.makedirs(a.out, exist_ok=True)
     meta = _meta(a.src)
@@ -193,7 +197,7 @@ def main(argv=None):
         if os.path.exists(path):
             continue
         t1 = time.time()
-        out = replay_game(a.src, s, meta, rec[s])
+        out = replay_game(a.src, s, meta, rec[s], shuffle=a.shuffle)
         tmp = path + ".tmp.npz"
         np.savez_compressed(tmp, **out)
         os.replace(tmp, path)

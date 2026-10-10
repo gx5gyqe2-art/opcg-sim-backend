@@ -570,6 +570,38 @@ impl Game {
         }
     }
 
+    /// **並びを知らない複製**（司令塔の点検・`docs/reports/2026-10-10_clock_value.md` §2.5）: `fork` と同じだが、両席とも
+    /// ライフと山札を 1 つに混ぜて並べ直す（ライフの枚数・山札の枚数・手札・場はそのまま）。理論の約束（手札とデッキの中身は見えるが並びは見えない）に
+    /// 合わせた後続を作るためだけの口。並びは `seed` の PCG32（Fisher–Yates）。
+    fn fork_shuffled(&self, seed: u64) -> Game {
+        use crate::journal::CardZone;
+        let mut s = Session::new(self.session.state().clone());
+        let mut g = Pcg32::new(seed);
+        {
+            let mut e = s.edit();
+            for seat in [Seat::P1, Seat::P2] {
+                let n_life = e.card_zone(seat, CardZone::Life).len();
+                let mut pool = Vec::new();
+                for zone in [CardZone::Life, CardZone::Deck] {
+                    let len = e.card_zone(seat, zone).len();
+                    for _ in 0..len {
+                        pool.push(e.card_zone(seat, zone)[0]);
+                        e.card_zone_remove_at(seat, zone, 0);
+                    }
+                }
+                for i in (1..pool.len()).rev() {
+                    let j = (g.next_u32() as usize) % (i + 1);
+                    pool.swap(i, j);
+                }
+                for (i, card) in pool.into_iter().enumerate() {
+                    let zone = if i < n_life { CardZone::Life } else { CardZone::Deck };
+                    e.card_zone_push(seat, zone, card);
+                }
+            }
+        }
+        Game { session: Session::new(s.into_state()), names: self.names.clone() }
+    }
+
     /// 探索が木の中で使う適用（`search::apply::apply_move_inplace`・`DON_BOX` は付与 k 回＋攻撃に展開・
     /// 分岐する自分の選択は残す）で 1 手進める。`fork` した対局にだけ使う（§1.2 の 3）。
     fn apply_search_move(&mut self, player_id: &str, move_json: &str) -> PyResult<()> {
