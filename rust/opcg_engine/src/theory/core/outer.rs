@@ -32,6 +32,38 @@ pub const FEQ: f64 = 1e-9;
 /// `crossing_bridge.SOLVER_VERSION`（Rust の計画のディスクの覚え書きの鍵に入る・Python と同じ値を保つ）
 pub const SOLVER_VERSION: &str = "rd-speed-6";
 
+/// **候補**（`OPCG_LEFTOVER_DON`・空でも `0` でもない値で入る・1 度だけ読む）: 攻め手の後の段（2 段目以降）で、出す札と値打ちで決めた付与に
+/// 払った後の残りのドンを攻撃に付ける（規則: ドンは持ち越せない・`docs/reports/2026-10-09_leftover_don.md`）。既定（変数なし）は今のまま。
+pub fn leftover_don_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| {
+        let v = std::env::var("OPCG_LEFTOVER_DON").unwrap_or_default();
+        !v.is_empty() && v != "0"
+    })
+}
+
+/// 候補 `OPCG_LEFTOVER_DON` の配り方: 残り `left` 枚を、付与の上限 `kmax` の内で `Σ c̄(x_i + 1000·(k_i + e_i))` が最大になるように配る
+/// （`c̄` は止める値段の芯 `to::cof`・解き方と同点の割り切りは今の財布）。返すのは足す枚数 `e_i`。
+pub fn leftover_attach(xs: &[f64], ks: &[i64], left: i64, kmax: i64) -> Vec<i64> {
+    let mut e = vec![0i64; xs.len()];
+    if left <= 0 || xs.is_empty() {
+        return e;
+    }
+    let groups: Vec<Vec<(i64, f64)>> = xs
+        .iter()
+        .zip(ks.iter())
+        .map(|(&x, &k)| {
+            let x0 = x + 1000.0 * k as f64;
+            let c0 = super::to::cof(x0);
+            (0..=(kmax - k).max(0).min(left)).map(|j| (j, super::to::cof(x0 + 1000.0 * j as f64) - c0)).collect()
+        })
+        .collect();
+    for (i, &oi) in purse_plan_witness(&groups, left as f64).iter().enumerate() {
+        e[i] = groups[i][oi].0;
+    }
+    e
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // 引数の読み
 
@@ -1058,7 +1090,7 @@ impl Core {
                 .map(|c| V::tuple(vec![V::Int(c.cost), c.parts.clone(), V::optf(c.bx), V::Bool(c.rush)]))
                 .collect(),
         );
-        let d = V::dict(vec![
+        let mut dkv = vec![
             (V::s("budget"), V::Int(budget)),
             (V::s("att1"), pairs_l(&att1)),
             (V::s("later"), pairs_l(&later)),
@@ -1084,7 +1116,12 @@ impl Core {
             (V::s("rest_blk"), tfl(&rest_blk)),
             (V::s("blk_a"), V::list(blk_a.iter().map(|&(a, b)| V::tuple(vec![V::Float(a), V::Float(b)])).collect())),
             (V::s("theta_p"), V::Float(theta_)),
-        ]);
+        ];
+        // 候補 `OPCG_LEFTOVER_DON` の印（守る側の計算の覚え書き・計画のディスクの鍵に入る・既定では足さない）
+        if leftover_don_on() {
+            dkv.push((V::s("leftover_don"), V::Bool(true)));
+        }
+        let d = V::dict(dkv);
         Ok(Some(Actx::from_v(&d)?))
     }
 
@@ -1198,9 +1235,17 @@ impl Core {
                 }
             }
             let rush_now: Vec<(f64, bool, i64, f64)> = bodies.iter().copied().filter(|b| b.2 == step && b.1).collect();
-            let mut hits: Vec<f64> = on_board.iter().zip(ks.iter()).map(|(&x, &k)| x + 1000.0 * k as f64).collect();
+            // 候補: 残りのドンを攻撃の並びにだけ足す（払い・`fb` は今の `ks` のまま＝流入と地平の外の段は触らない）
+            let paid0: i64 = plays.iter().map(|&c| cand[c as usize].cost).sum::<i64>() + ks.iter().sum::<i64>();
+            let hk: Vec<i64> = if leftover_don_on() {
+                let ex = leftover_attach(&on_board, &ks, nonneg_round(d) - paid0, kmax);
+                ks.iter().zip(ex.iter()).map(|(&a, &b)| a + b).collect()
+            } else {
+                ks.clone()
+            };
+            let mut hits: Vec<f64> = on_board.iter().zip(hk.iter()).map(|(&x, &k)| x + 1000.0 * k as f64).collect();
             hits.extend(rush_now.iter().map(|b| b.0));
-            let paid: i64 = plays.iter().map(|&c| cand[c as usize].cost).sum::<i64>() + ks.iter().sum::<i64>();
+            let paid: i64 = paid0;
             let rn: Vec<f64> = rush_now.iter().map(|b| b.3).collect();
             let mut gains = Vec::with_capacity(on_board.len());
             for (&x, &k) in on_board.iter().zip(ks.iter()) {
