@@ -75,6 +75,43 @@ pub fn attack_count_on() -> bool {
     })
 }
 
+/// **候補**（`OPCG_DON_ONCE`・空でも `0` でもない値で入る・1 度だけ読む）: `OPCG_LEFTOVER_DON` の残りから、その段の流入（引いた札から出す体・効果）の
+/// 払い `pay[l_j]` を先に引く（引く → 出す → 残りを付ける・ドンは 1 回だけ使う・`docs/reports/2026-10-10_don_once.md`）。既定（変数なし）は今のまま。
+pub fn don_once_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| {
+        let v = std::env::var("OPCG_DON_ONCE").unwrap_or_default();
+        !v.is_empty() && v != "0"
+    })
+}
+
+/// 候補 `OPCG_DON_ONCE` の流入の払い: 残り `l` 枚で引いた札 1 枚に払う費用の期待値
+/// `(1/n) Σ_{cost ≤ l, (体 か 除去の値 > 0)} cost`（`a_of`・`e_of` が出すとして数える札と同じ定義・`n` はデッキの表に在る札の数）。
+pub fn flow_pay_of(t: &super::super::input::CardTable, deck: &[String], mlp: f64, don: f64, bs: &ld::Boards) -> f64 {
+    let cap = super::super::numeric::py_round_int(don);
+    let (mut n, mut tot) = (0i64, 0.0);
+    for cid in deck {
+        let Some(m) = t.get(cid) else { continue };
+        n += 1;
+        if m.cost > cap {
+            continue;
+        }
+        if ld::body_of(m) || (!bs.is_empty() && ld::removal_harm(m, mlp, bs) > 0.0) {
+            tot += m.cost as f64;
+        }
+    }
+    if n > 0 {
+        tot / n as f64
+    } else {
+        0.0
+    }
+}
+
+/// 候補 `OPCG_DON_ONCE` の残り: `nonneg_round(round(d) − 払った札と付与 − 流入の払い)`
+pub fn don_once_left(rd: i64, paid_k: i64, pay: f64) -> i64 {
+    nonneg_round(rd as f64 - paid_k as f64 - pay)
+}
+
 /// 候補 `OPCG_ATTACK_COUNT` の並べ方: 体 `i`（超過 `xs[i]`・最初に攻撃できる段 `first[i]`）の段 `step` の生き残る確率
 /// `s_i = (1 − ko_p_of(x_i + olp))^{max(0, step − first_i)}`、期待本数 `nonneg_round(Σ s_i)` 体を `s_i` の大きい順（同点は並びの順）に残す。
 /// `first[i] = None` はリーダー（倒れない・毎段並ぶ・期待本数に数えない）。返すのは並べるかどうか。
@@ -219,6 +256,8 @@ pub struct Actx {
     pub ar_tab: Vec<f64>,
     pub e_tab: Vec<f64>,
     pub flow: Vec<f64>,
+    /// 候補 `OPCG_DON_ONCE` の流入の払いの表（入れたときだけ dict に在る・既定は空）
+    pub flow_pay: Vec<f64>,
     pub jmax: Option<i64>,
     pub no_now: bool,
     pub lead_bare: f64,
@@ -301,6 +340,7 @@ impl Actx {
             ar_tab: floats_of(v.get("ar_tab")),
             e_tab: floats_of(v.get("e_tab")),
             flow: floats_of(v.get("flow")),
+            flow_pay: floats_of(v.get("flow_pay")),
             jmax: if jm.truthy() { Some(jm.int()) } else { None },
             no_now: v.get("no_attack_now").truthy(),
             lead_bare: if v.has("lead_bare") { v.get("lead_bare").f() } else { 0.0 },
@@ -1057,6 +1097,7 @@ impl Core {
         }
         let ln = (lmax + 1).max(0) as usize;
         let (mut a_tab, mut ar_tab, mut e_tab) = (vec![0.0; ln], vec![0.0; ln], vec![0.0; ln]);
+        let mut pay_tab = vec![0.0; ln];
         if let Some(d) = deck.filter(|d| !d.is_empty()) {
             let (tv, mv) = (V::Float(theta_), V::Float(mu));
             let t = self.t.clone();
@@ -1065,6 +1106,9 @@ impl Core {
                 a_tab[l] = self.a_of(d, olp, Some(l as f64), &tv, &mv, false, false)?;
                 ar_tab[l] = self.a_of(d, olp, Some(l as f64), &tv, &mv, true, false)?;
                 e_tab[l] = ld::e_of(&t, d, mlp, Some(l as f64), bs.get(ld::r_band(r)));
+                if don_once_on() {
+                    pay_tab[l] = flow_pay_of(&t, d, mlp, l as f64, bs.get(ld::r_band(r)));
+                }
             }
         }
         let flow: Vec<f64> = (0..(budget + 1) as usize).map(|l| a_tab[l] + e_tab[l]).collect();
@@ -1160,6 +1204,10 @@ impl Core {
         }
         if attack_count_on() {
             dkv.push((V::s("attack_count"), V::Bool(true)));
+        }
+        if don_once_on() {
+            dkv.push((V::s("flow_pay"), ffl(&pay_tab)));
+            dkv.push((V::s("don_once"), V::Bool(true)));
         }
         let d = V::dict(dkv);
         Ok(Some(Actx::from_v(&d)?))
@@ -1293,7 +1341,16 @@ impl Core {
             let kk: Vec<i64> = ks.iter().zip(keep.iter()).filter(|a| *a.1).map(|a| *a.0).collect();
             let hk: Vec<i64> = if leftover_don_on() {
                 let paid_k: i64 = plays.iter().map(|&c| cand[c as usize].cost).sum::<i64>() + kk.iter().sum::<i64>();
-                let ex = leftover_attach(&ob, &kk, nonneg_round(d) - paid_k, kmax);
+                // 候補 `OPCG_DON_ONCE`: 流入が使う残り `l_j = left_of(j, paid0)` での払い `pay[l_j]` を先に引く（流入の読みは今のまま）
+                let left = if don_once_on() {
+                    let nl = ax.flow_pay.len() as i64 - 1;
+                    let lj = bankers_round(py_max(0.0, d - paid0 as f64)) as i64;
+                    let pay = if nl >= 0 { ax.flow_pay[lj.min(nl).max(0) as usize] } else { 0.0 };
+                    don_once_left(nonneg_round(d), paid_k, pay)
+                } else {
+                    nonneg_round(d) - paid_k
+                };
+                let ex = leftover_attach(&ob, &kk, left, kmax);
                 kk.iter().zip(ex.iter()).map(|(&a, &b)| a + b).collect()
             } else {
                 kk.clone()

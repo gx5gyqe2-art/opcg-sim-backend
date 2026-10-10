@@ -212,3 +212,52 @@ fn attack_keep_by_ko_survival() {
     assert_eq!(attack_keep(&xs, &f2, 2, 5000.0), vec![true, true, true]);
     assert_eq!(attack_keep(&xs, &f2, 3, 5000.0), vec![true, false, true]);
 }
+
+/// 候補 `OPCG_DON_ONCE` の流入の払いと残りを手で導ける値と比べる（`docs/reports/2026-10-10_don_once.md` §1.5）:
+/// デッキ 4 枚（体 cost 2・体 cost 5・除去の値が正のイベント cost 1・除去の値 0 のイベント cost 3）→ `pay[0] = 0`・`pay[1] = 1/4`・
+/// `pay[2] = 3/4`・`pay[4] = 3/4`・`pay[5] = 8/4`。残り: `round(d) = 6`・払った札と付与 3・`pay = 1.75` → `nonneg_round(1.25) = 1`。
+#[test]
+fn don_once_flow_pay() {
+    use super::super::input::{CardTable, TCard, Thr};
+    use super::outer::{don_once_left, flow_pay_of};
+    let card = |id: &str, ty: &str, power: f64, cost: i64, removal: bool| TCard {
+        id: id.into(),
+        info: None,
+        type_name: ty.into(),
+        power,
+        cost,
+        counter: 0.0,
+        keywords: vec![],
+        traits: vec![],
+        colors: vec![],
+        names: vec![id.into()],
+        attribute: String::new(),
+        counter_event: 0.0,
+        thr: if removal {
+            vec![Thr { power_max: None, cost_max: None, needs_rest: false, kind: "removal".into(), allow_leader: false }]
+        } else {
+            vec![]
+        },
+    };
+    let mut t = CardTable::default();
+    for (i, c) in [
+        card("b2", "CHARACTER", 3000.0, 2, false),
+        card("b5", "CHARACTER", 6000.0, 5, false),
+        card("r1", "EVENT", 0.0, 1, true),
+        card("z3", "EVENT", 0.0, 3, false),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        t.by_id.insert(c.id.clone(), i);
+        t.cards.push(c);
+    }
+    let deck: Vec<String> = ["b2", "b5", "r1", "z3"].iter().map(|s| s.to_string()).collect();
+    let bs = vec![(0.0, vec![(4000.0, false)])];
+    let pay: Vec<f64> = (0..=5).map(|l| flow_pay_of(&t, &deck, 5000.0, l as f64, &bs)).collect();
+    assert_eq!(pay, vec![0.0, 0.25, 0.75, 0.75, 0.75, 2.0]);
+    // 盤面が空なら除去の値は 0＝体だけ払う
+    assert_eq!(flow_pay_of(&t, &deck, 5000.0, 5.0, &[]), 1.75);
+    assert_eq!(don_once_left(6, 3, 1.75), 1);
+    assert_eq!(don_once_left(2, 2, 0.75), 0);
+}
