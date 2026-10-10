@@ -1,0 +1,258 @@
+{
+ "main": {
+  "theory": {
+   "n_games": 600,
+   "n_pairs": 300,
+   "n_void_pairs": 0,
+   "void_games": 0,
+   "void_rate_games": 0.0,
+   "ci": {
+    "win_rate": 0.44333333333333336,
+    "lo": 0.4102627425279513,
+    "hi": 0.4764039241387154,
+    "elo": -39.54593207219901,
+    "elo_lo": -63.03859477125393,
+    "elo_hi": -16.408421168968268
+   },
+   "n_seen": 15851,
+   "n_intervened": 2400,
+   "intervene_rate": 0.1514,
+   "filter_row_rate": 0.793,
+   "removed_per_row": 4.72,
+   "intervened_per_game": 4.0,
+   "win_as_p1": 0.49,
+   "win_as_p2": 0.3967,
+   "turns_mean": 12.54,
+   "top_swaps": [
+    [
+     "attack->attach",
+     389
+    ],
+    [
+     "play->attach",
+     383
+    ],
+    [
+     "play->attack",
+     336
+    ],
+    [
+     "play->play",
+     267
+    ],
+    [
+     "attack->play",
+     212
+    ],
+    [
+     "attack->attack",
+     203
+    ],
+    [
+     "effect->attack",
+     174
+    ],
+    [
+     "effect->end",
+     86
+    ]
+   ]
+  },
+  "placebo": {
+   "n_games": 600,
+   "n_pairs": 300,
+   "n_void_pairs": 0,
+   "void_games": 0,
+   "void_rate_games": 0.0,
+   "ci": {
+    "win_rate": 0.17833333333333334,
+    "lo": 0.14928013285864603,
+    "hi": 0.20738653380802066,
+    "elo": -265.38525663680815,
+    "elo_lo": -302.3138248890917,
+    "elo_hi": -232.91235741986176
+   },
+   "n_seen": 17003,
+   "n_intervened": 6725,
+   "intervene_rate": 0.3955,
+   "filter_row_rate": 0.8374,
+   "removed_per_row": 5.225,
+   "intervened_per_game": 11.21,
+   "win_as_p1": 0.2133,
+   "win_as_p2": 0.1433,
+   "turns_mean": 12.88,
+   "top_swaps": [
+    [
+     "attack->attach",
+     1381
+    ],
+    [
+     "play->attach",
+     1355
+    ],
+    [
+     "attack->attack",
+     1324
+    ],
+    [
+     "play->play",
+     598
+    ],
+    [
+     "play->attack",
+     593
+    ],
+    [
+     "attack->end",
+     358
+    ],
+    [
+     "attack->play",
+     266
+    ],
+    [
+     "attack->effect",
+     169
+    ]
+   ]
+  },
+  "diff": {
+   "n": 300,
+   "mean": 0.265,
+   "lo": 0.22125498378442152,
+   "hi": 0.30874501621557854,
+   "theory_better": 161,
+   "tie": 112,
+   "placebo_better": 27
+  },
+  "verdict": "不合格"
+ },
+ "sub": {
+  "theory": {
+   "n_games": 600,
+   "n_pairs": 300,
+   "n_void_pairs": 0,
+   "void_games": 0,
+   "void_rate_games": 0.0,
+   "ci": {
+    "win_rate": 0.435,
+    "lo": 0.40295154657743765,
+    "hi": 0.46704845342256235,
+    "elo": -45.423676345920455,
+    "elo_lo": -68.30270028357994,
+    "elo_hi": -22.93031541150565
+   },
+   "n_seen": 11663,
+   "n_intervened": 1329,
+   "intervene_rate": 0.114,
+   "filter_row_rate": 0.8118,
+   "removed_per_row": 4.059,
+   "intervened_per_game": 2.21,
+   "win_as_p1": 0.41,
+   "win_as_p2": 0.46,
+   "turns_mean": 11.49,
+   "top_swaps": [
+    [
+     "play->attack",
+     218
+    ],
+    [
+     "play->attach",
+     204
+    ],
+    [
+     "attack->attach",
+     196
+    ],
+    [
+     "attack->attack",
+     160
+    ],
+    [
+     "attack->play",
+     152
+    ],
+    [
+     "play->play",
+     135
+    ],
+    [
+     "effect->attack",
+     56
+    ],
+    [
+     "end->attach",
+     52
+    ]
+   ]
+  },
+  "placebo": {
+   "n_games": 600,
+   "n_pairs": 300,
+   "n_void_pairs": 0,
+   "void_games": 0,
+   "void_rate_games": 0.0,
+   "ci": {
+    "win_rate": 0.15333333333333332,
+    "lo": 0.12522605463954264,
+    "hi": 0.181440612027124,
+    "elo": -296.8303539753456,
+    "elo_lo": -337.68045655639867,
+    "elo_hi": -261.72627663535764
+   },
+   "n_seen": 12226,
+   "n_intervened": 4694,
+   "intervene_rate": 0.3839,
+   "filter_row_rate": 0.8254,
+   "removed_per_row": 4.582,
+   "intervened_per_game": 7.82,
+   "win_as_p1": 0.17,
+   "win_as_p2": 0.1367,
+   "turns_mean": 11.49,
+   "top_swaps": [
+    [
+     "attack->attack",
+     1019
+    ],
+    [
+     "play->attach",
+     940
+    ],
+    [
+     "attack->attach",
+     851
+    ],
+    [
+     "play->attack",
+     608
+    ],
+    [
+     "play->play",
+     530
+    ],
+    [
+     "attack->end",
+     311
+    ],
+    [
+     "attack->play",
+     191
+    ],
+    [
+     "play->end",
+     76
+    ]
+   ]
+  },
+  "diff": {
+   "n": 300,
+   "mean": 0.2816666666666667,
+   "lo": 0.24135219509184025,
+   "hi": 0.3219811382414931,
+   "theory_better": 176,
+   "tie": 101,
+   "placebo_better": 23
+  },
+  "verdict": "不合格"
+ }
+}
