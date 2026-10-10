@@ -1,0 +1,40 @@
+{
+ "branch": "claude/t18-forbid",
+ "commit": "667944f",
+ "report": "docs/reports/2026-10-10_t18_forbid.md",
+ "summary": [
+  "禁止だけ・線=手札1枚の価値の1倍（本番前に固定・試し10局で介入15.0%・本番 主15.1%／副11.4%）",
+  "主条件: 理論の腕 0.443 [0.410, 0.476]・無作為の腕 0.178・差 +0.265 [+0.221, +0.309]（各300組）",
+  "副条件（固定ミラー）: 理論 0.435 [0.403, 0.467]・無作為 0.153・差 +0.282 [+0.241, +0.322]＝同じ向き"
+ ],
+ "verdict": "不合格（主条件・理論の腕の95%区間上端 0.476 < 0.5）",
+ "void": {
+  "main": {
+   "theory": 0,
+   "placebo": 0
+  },
+  "sub": {
+   "theory": 0,
+   "placebo": 0
+  },
+  "games_per_arm": 600
+ },
+ "gate": "make test green（Rust 473 passed・pytest 622 passed 12 skipped）",
+ "line_mu": 1.0,
+ "seed_bands": {
+  "trial": [
+   7100000,
+   7100009
+  ],
+  "main": [
+   7200000,
+   7200299
+  ],
+  "sub": [
+   7300000,
+   7300299
+  ]
+ },
+ "elapsed_hours": 7.5,
+ "data": "logs/t18_forbid/summary.json"
+}
