@@ -461,7 +461,8 @@ pub fn body_term(tok: &Tok, slots: std::ops::Range<usize>, olp: f64) -> f64 {
         let rest = tok.at(s, lt::S_IS_REST) > 0.5;
         let blocker = tok.at(s, lt::S_IS_BLOCKER) > 0.5;
         if blocker && !rest {
-            tot += lt::nu_meas_of(lt::or0(lt::slot_power(tok, s as i64)), olp);
+            let off = if lt::OWN_FIELD.contains(&s) { lt::later_don_off(tok, s) } else { 0.0 };
+            tot += lt::nu_meas_of(lt::or0(lt::slot_power(tok, s as i64)) - off, olp);
         }
     }
     tot
@@ -953,7 +954,7 @@ impl Core {
                 rush: info.get("rush").truthy(),
             });
         }
-        let mut slots1 = vec![0i64];
+        let mut slots1 = if lt::leader_attacks_now(tok) { vec![0i64] } else { Vec::new() };
         for s in lt::OWN_FIELD {
             if tok.at(s, lt::S_IS_CHAR) > 0.5 && tok.at(s, lt::S_CAN_ATTACK) > 0.5 {
                 slots1.push(s as i64);
@@ -961,10 +962,10 @@ impl Core {
         }
         let xs1 = lt::own_attackers_of(tok, olp);
         let att1: Vec<(i64, f64)> = slots1.iter().copied().zip(xs1.iter().copied()).collect();
-        let mut later = vec![(0i64, tok.at(0, lt::S_POWER) * 1e4 - olp)];
+        let mut later = vec![(0i64, tok.at(0, lt::S_POWER) * 1e4 - lt::later_don_off(tok, 0) - olp)];
         for s in lt::OWN_FIELD {
             if tok.at(s, lt::S_IS_CHAR) > 0.5 {
-                later.push((s as i64, tok.at(s, lt::S_POWER) * 1e4 - olp));
+                later.push((s as i64, tok.at(s, lt::S_POWER) * 1e4 - lt::later_don_off(tok, s) - olp));
             }
         }
         let kmax = ATTACK_DON_MAX;
@@ -1568,10 +1569,10 @@ impl Core {
         let mlp = lp_or(sc[lt::SC_MY_LEADER_POWER]);
         let olp = lp_or(sc[lt::SC_OPP_LEADER_POWER]);
         let (life, hand_n, dlp, xs_first, xs_later, bslots) = if side_opp {
-            let mut later = vec![tok.at(0, lt::S_POWER) * 1e4 - olp];
+            let mut later = vec![tok.at(0, lt::S_POWER) * 1e4 - lt::later_don_off(tok, 0) - olp];
             for s in lt::OWN_FIELD {
                 if tok.at(s, lt::S_IS_CHAR) > 0.5 {
-                    later.push(tok.at(s, lt::S_POWER) * 1e4 - olp);
+                    later.push(tok.at(s, lt::S_POWER) * 1e4 - lt::later_don_off(tok, s) - olp);
                 }
             }
             (sc[lt::SC_OPP_LIFE], sc[lt::SC_OPP_HAND], olp, lt::own_attackers_of(tok, olp), later, lt::OPP_FIELD)
@@ -1582,7 +1583,9 @@ impl Core {
         let mut blk = Vec::new();
         for s in bslots {
             if tok.at(s, lt::S_IS_CHAR) > 0.5 && tok.at(s, lt::S_IS_BLOCKER) > 0.5 && tok.at(s, lt::S_IS_REST) <= 0.5 {
-                blk.push(lt::or0(lt::slot_power(tok, s as i64)) - dlp);
+                // 自分の体は相手のターンに守る（このターンに付けたドンは戻る・§1.3 の 2）
+                let off = if lt::OWN_FIELD.contains(&s) { lt::later_don_off(tok, s) } else { 0.0 };
+                blk.push(lt::or0(lt::slot_power(tok, s as i64)) - off - dlp);
             }
         }
         (life, hand_n, dlp, xs_first, xs_later, blk)

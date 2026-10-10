@@ -143,3 +143,28 @@ fn py_str_of_a_list_is_python_str() {
     assert_eq!(py_str(&PyVal::Tuple(vec![PyVal::Str("a".into())])), "('a',)");
     assert_eq!(py_str(&PyVal::List(vec![PyVal::Int(1), PyVal::Str("it's".into())])), "[1, \"it's\"]");
 }
+
+/// 候補 `OPCG_CLOCK_VALUE` の「ターンの途中を規則どおりに読む」（`docs/reports/2026-10-10_clock_value.md` §1.3）: 既定では何も変えず、
+/// 入れたときだけ攻撃済みのリーダーを今のターンの攻め手から外し、付けたドンを後のターンのパワーから外す（手で導ける値）。
+#[test]
+fn mid_turn_rules_read_the_rested_leader_and_attached_don() {
+    use super::leaves_to::{later_don_off, own_attackers_of, set_mid_turn_rules, Tok};
+    let mut v = vec![0.0; 22 * 22];
+    // リーダー: パワー 7000（付けたドン 1 枚込み）・攻撃済み（`can_attack_now` 0）
+    v[0] = 0.7;
+    v[2] = 0.2;
+    // 自分の場の 1 体（枠 2）: パワー 5000（ドン 1 枚込み）・攻撃できる
+    v[2 * 22] = 0.5;
+    v[2 * 22 + 2] = 0.2;
+    v[2 * 22 + 5] = 1.0;
+    v[2 * 22 + 18] = 1.0;
+    let tok = Tok::new(v, 22, 22);
+    let prev = set_mid_turn_rules(false);
+    assert_eq!(own_attackers_of(&tok, 5000.0), vec![2000.0, 0.0]);
+    assert_eq!(later_don_off(&tok, 2), 0.0);
+    set_mid_turn_rules(true);
+    assert_eq!(own_attackers_of(&tok, 5000.0), vec![0.0]);
+    assert!((later_don_off(&tok, 0) - 1000.0).abs() < 1e-9);
+    assert!((later_don_off(&tok, 2) - 1000.0).abs() < 1e-9);
+    set_mid_turn_rules(prev);
+}

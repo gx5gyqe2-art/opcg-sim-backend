@@ -624,6 +624,7 @@ impl Core {
     pub fn attach_groups(&mut self, tok: &Tok, olp: f64, theta: f64, mu: f64, blockers: &[(f64, f64)]) -> Vec<Vec<(i64, Parts)>> {
         let max_don = ATTACK_DON_MAX;
         let mut out = Vec::new();
+        let lead0 = lt::leader_attacks_now(tok);
         for (i, x) in lt::own_attackers_of(tok, olp).into_iter().enumerate() {
             let p = olp + x;
             let base = self.attack_value(p, olp, true, theta, mu, None, blockers);
@@ -633,7 +634,7 @@ impl Core {
                 if gain - k as f64 * DELTA > 0.0 {
                     let v = gain - k as f64 * DELTA;
                     let mut pp = Parts::default();
-                    if i == 0 {
+                    if i == 0 && lead0 {
                         pp.attach_lead = v;
                     } else {
                         pp.attach = v;

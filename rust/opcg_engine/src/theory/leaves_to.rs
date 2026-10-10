@@ -214,9 +214,39 @@ pub fn opp_chars_of(tok: &Tok) -> Vec<(f64, bool)> {
         .collect()
 }
 
+thread_local! {
+    /// 候補 `OPCG_CLOCK_VALUE` の「ターンの途中の局面を規則どおりに読む」（`docs/reports/2026-10-10_clock_value.md` §1.3）。
+    /// 既定は偽＝どの式も 1 ビットも変わらない。値段の前後の読みのあいだだけ真にする（`drv_tb` の別の核で）。
+    static MID_TURN_RULES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// 規則どおりの読みが入っているか（§1.3）。
+pub fn mid_turn_rules() -> bool {
+    MID_TURN_RULES.with(|c| c.get())
+}
+
+/// 規則どおりの読みを入れ切りする（戻り＝前の値）。
+pub fn set_mid_turn_rules(on: bool) -> bool {
+    MID_TURN_RULES.with(|c| c.replace(on))
+}
+
+/// §1.3 の 1: リーダーを今のターンの攻め手に数えるか（既定はいつも数える・規則どおりの読みでは `can_attack_now` で読む）。
+pub fn leader_attacks_now(tok: &Tok) -> bool {
+    !mid_turn_rules() || tok.at(0, S_CAN_ATTACK) > 0.5
+}
+
+/// §1.3 の 2: 段 2 以降・相手のターンのパワーから外す、このターンに付けたドンの分（既定は 0）。
+pub fn later_don_off(tok: &Tok, s: usize) -> f64 {
+    if mid_turn_rules() {
+        tok.at(s, S_ATTACHED_DON) * 5.0 * 1000.0
+    } else {
+        0.0
+    }
+}
+
 /// `own_attackers_of(tok_row, opp_leader_power)`（リーダー＋このターン攻撃できるキャラの `x`）。
 pub fn own_attackers_of(tok: &Tok, olp: f64) -> Vec<f64> {
-    let mut xs = vec![tok.at(0, S_POWER) * 1e4 - olp];
+    let mut xs = if leader_attacks_now(tok) { vec![tok.at(0, S_POWER) * 1e4 - olp] } else { Vec::new() };
     for s in OWN_FIELD {
         if tok.at(s, S_IS_CHAR) > 0.5 && tok.at(s, S_CAN_ATTACK) > 0.5 {
             xs.push(tok.at(s, S_POWER) * 1e4 - olp);

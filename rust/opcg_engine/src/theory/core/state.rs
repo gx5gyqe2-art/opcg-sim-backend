@@ -176,6 +176,10 @@ impl Core {
         out.push(knum((self.ctx.other_side > 0) as i64 as f64));
         out.push(knum((self.ctx.option_depth > 0) as i64 as f64));
         out.push(knum(self.ctx.flow_exercise as i64 as f64));
+        if super::super::leaves_to::mid_turn_rules() {
+            // 候補 `OPCG_CLOCK_VALUE` の規則どおりの読み（§1.3）。既定では鍵に何も足さない＝既定の鍵は 1 ビットも変わらない
+            out.push(K::Str(std::rc::Rc::from("mid_turn")));
+        }
         out.push(knum(self.don_cost as i64 as f64));
         out.push(knum(self.search_joint as i64 as f64));
         out.push(knum(self.unknown_factor));
@@ -275,7 +279,24 @@ pub fn with_core<R>(f: impl FnOnce(&mut Core) -> R) -> R {
     })
 }
 
+thread_local! {
+    /// 候補 `OPCG_CLOCK_VALUE` の値段の読み専用の核（`drv_tb`・覚え書きを既定の読みと混ぜない・§1.5）。
+    static CORE2: std::cell::RefCell<Option<Core>> = const { std::cell::RefCell::new(None) };
+}
+
+/// 値段の読み専用の核（初めての呼び出しで表から作る）。
+pub fn with_core2<R>(f: impl FnOnce(&mut Core) -> R) -> R {
+    CORE2.with(|c| {
+        let mut b = c.borrow_mut();
+        if b.is_none() {
+            *b = Some(Core::new());
+        }
+        f(b.as_mut().unwrap())
+    })
+}
+
 /// 核を捨てる（表を入れ替えたとき・テスト）。
 pub fn drop_core() {
     CORE.with(|c| *c.borrow_mut() = None);
+    CORE2.with(|c| *c.borrow_mut() = None);
 }

@@ -446,6 +446,14 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         d.set("band", V::dict(vec![]));
         d
     };
+    // 候補 `OPCG_CLOCK_VALUE`（§1.5）: 行の位置ごとの後続局面の表（無ければ既定のまま 1 ビットも変わらない）
+    let succ: Vec<(usize, V)> = p.get("in").get("succ").items().iter().map(|e| (e.items()[0].int() as usize, e.items()[1].clone())).collect();
+    let succ_literal = p.get("in").get("succ_literal").truthy();
+    let dump_rows = p.get("in").get("dump_rows").truthy();
+    let mut row_dump: Vec<V> = Vec::new();
+    if !succ.is_empty() {
+        super::state::with_core2(|c2| super::entry::apply_g(c2, p.get("g")))?;
+    }
     for k in 0..n {
         let r = &g.rows[k];
         let (w, t) = (r.who, r.turn);
@@ -537,9 +545,42 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
                 c.leave(s);
                 vals.push(v?);
             }
+            if let Some((_, sv)) = succ.iter().find(|(kk, _)| *kk == k) {
+                let cx = ClockCx { t, prof: &prof, cfg, cut_me, cut_opp, mirror_me, dk_me: deck_of(p, w), dk_opp: deck_of(p, 1 - w), literal: succ_literal };
+                let ps = super::state::with_core2(|c2| clock_prices(c2, &row, sv, &cx, &mut stats))?;
+                if ps.len() == kq as usize {
+                    vals = ps;
+                    stats.addi("clock_rows", 1);
+                } else {
+                    stats.addi("clock_len_mismatch", 1);
+                }
+            }
             let scored: Vec<f64> = vals.iter().flatten().cloned().collect();
             let played_v = vals[ch as usize];
             let bnd = band_of(r.v0.abs());
+            if dump_rows {
+                // 行ごとの値段の写し（逸脱の分布・禁止率の器が読む・§1.5）: [t, w, 打った手, 最善, κ, 打った手の型, 最善の型, 値段の付いた候補の数, 候補ごとの [型, 値段]]
+                let mut bi: Option<usize> = None;
+                for (i, v) in vals.iter().enumerate() {
+                    if let Some(x) = v {
+                        if bi.map(|j| *x > vals[j].unwrap()).unwrap_or(true) {
+                            bi = Some(i);
+                        }
+                    }
+                }
+                row_dump.push(V::list(vec![
+                    V::Int(t),
+                    V::Int(w),
+                    played_v.map(V::Float).unwrap_or(V::None),
+                    bi.map(|j| V::Float(vals[j].unwrap())).unwrap_or(V::None),
+                    V::Float(kap),
+                    V::s(move_family(&g.cands[b + ch as usize].sig)),
+                    bi.map(|j| V::s(move_family(&g.cands[b + j].sig))).unwrap_or(V::None),
+                    V::Int(scored.len() as i64),
+                    // 候補ごとの [型, 値段]（型ごとの値段の水準の診断）
+                    V::list((0..kq as usize).map(|i| V::list(vec![V::s(move_family(&g.cands[b + i].sig)), vals[i].map(V::Float).unwrap_or(V::None)])).collect()),
+                ]));
+            }
             let (Some(played_v), true) = (played_v, scored.len() >= 2) else {
                 stats.addi("atk_silent", 1);
                 recs[ri].1.addi("n_silent", 1);
@@ -779,12 +820,101 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         ]));
     }
     let per = V::list(recs.iter().map(|(w, d)| V::list(vec![V::tuple(vec![V::Int(seed), V::Int(*w)]), d.to_v()])).collect());
-    Ok(V::dict(vec![
+    let mut out = vec![
         (V::s("stats"), stats.to_v()),
         (V::s("per"), per),
         (V::s("kn_turns"), V::list(kn_turns)),
         (V::s("kn_game"), kn_game),
-    ]))
+    ];
+    if dump_rows {
+        out.push((V::s("row_dump"), V::list(row_dump)));
+    }
+    Ok(V::dict(out))
+}
+
+/// 候補 `OPCG_CLOCK_VALUE` の読みの文脈（行のもの）
+struct ClockCx<'a> {
+    t: i64,
+    prof: &'a [f64],
+    cfg: &'a Cfg,
+    cut_me: Option<f64>,
+    cut_opp: Option<f64>,
+    mirror_me: bool,
+    dk_me: Option<Vec<String>>,
+    dk_opp: Option<Vec<String>>,
+    literal: bool,
+}
+
+/// 表の 1 行（`[sc, tok（22×22 を平らに）, ci]`）→ 行（`ci` の型は記録の行に合わせる）
+fn row_of_triplet(v: &V, dt: &str) -> Row {
+    let it = v.items();
+    let sc: Vec<f64> = it[0].items().iter().map(|x| x.f()).collect();
+    let tv: Vec<f64> = it[1].items().iter().map(|x| x.f()).collect();
+    let n = tv.len();
+    let cols = 22usize;
+    let tok = lt::Tok::new(tv, n / cols, cols);
+    let ci: Vec<i64> = it[2].items().iter().map(|x| x.int()).collect();
+    rw::row_of_f64(sc, tok, ci, dt)
+}
+
+/// 1 つの局面の勝率と局面の傾き（§1.3）: `theory_bridge` の行の読み（`kappa_of_row`）と同じ関数を、相手の手札と鏡の手札を
+/// `opp`（同じ局面を相手の側から符号化した行）から取って呼ぶ。戻り＝`(W, κ)`。
+fn clock_read(c2: &mut Core, me: &Row, opp: &Row, cx: &ClockCx) -> R<(f64, f64)> {
+    let g_me = c2.hand_price_mean(me, MU, true, None)?;
+    let go = c2.hand_price_mean(opp, MU, true, None)?;
+    let go = c2.with_life_types(&go, cx.dk_opp.as_deref());
+    let g_opp = c2.with_hand_blocker(&go, opp)?;
+    let att = Some((cx.dk_me.clone(), rw::own_turn_index(cx.t) == 0));
+    let mirror = if !cx.mirror_me {
+        MirrorArg::None
+    } else if rw::is_hr(&g_me) {
+        let mrow = c2.mirror_view(me, Some(&opp.tok), opp.ci.as_deref());
+        let gm = c2.with_life_types(&g_me, cx.dk_me.as_deref());
+        let gm = c2.with_hand_blocker(&gm, me)?;
+        let arow = rw::row_of_f64(mrow.sc.clone(), mrow.tok.clone(), mrow.ci.clone().unwrap(), &rw::ci_dtype(&mrow));
+        MirrorArg::Eager(Some(Mirror { row: mrow, g_me: gm, att: Some((arow, cx.dk_opp.clone(), rw::own_turn_index(cx.t + 1) == 0)) }))
+    } else {
+        MirrorArg::Eager(None)
+    };
+    let (d, tm, to) = c2.curve_d_of_row(me, rw::own_turn_index(cx.t), cx.prof, &g_opp, &g_me, cx.cut_opp, cx.cut_me, att, mirror, cx.cfg.side_symmetric)?;
+    let wv = lt::prob_of_d(&cx.cfg.clock, d, None, Some(tm), Some(to), "hyp", false);
+    let (cm, co) = if cx.cfg.clock.w_err_rel { (Some(tm), Some(to)) } else { (None, None) };
+    let kap = lt::state_factor(&cx.cfg.clock, d, true, cm, co, "hyp");
+    Ok((wv, kap))
+}
+
+/// 行の候補ごとの値段 `p(a) = (W(s′_a) − W(s)) / κ(s)`（§1.3）。表の状態: 0／6（`TURN_END`）＝読む・1＝勝ち（W=1）・2＝負け（W=0）・他＝値段なし。
+fn clock_prices(c2: &mut Core, row: &Row, sv: &V, cx: &ClockCx, stats: &mut D) -> R<Vec<Option<f64>>> {
+    let dt = rw::ci_dtype(row);
+    let prev = lt::set_mid_turn_rules(!cx.literal);
+    let out = (|| -> R<Vec<Option<f64>>> {
+        let opp0 = row_of_triplet(sv.get("o"), &dt);
+        let (w0, k0) = clock_read(c2, row, &opp0, cx)?;
+        stats.addf("clock_kappa_sum", k0);
+        let mut ps = Vec::new();
+        for e in sv.get("c").items() {
+            let it = e.items();
+            let st = it[0].int();
+            stats.sub_mut("clock_status", |d| d.addi(&st.to_string(), 1));
+            let w1 = match st {
+                0 | 6 => {
+                    let me1 = row_of_triplet(&it[1], &dt);
+                    let op1 = row_of_triplet(&it[2], &dt);
+                    Some(clock_read(c2, &me1, &op1, cx)?.0)
+                }
+                1 => Some(1.0),
+                2 => Some(0.0),
+                _ => None,
+            };
+            ps.push(match w1 {
+                Some(x) if k0 > 0.0 => Some((x - w0) / k0),
+                _ => None,
+            });
+        }
+        Ok(ps)
+    })();
+    lt::set_mid_turn_rules(prev);
+    out
 }
 
 /// `_kappa_of_row(sc, tok, t, prof, g_me, g_opp, opp, cut_me, cut_opp, attacker, mirror)`（`curve`）→ (d, tau_me, tau_opp)

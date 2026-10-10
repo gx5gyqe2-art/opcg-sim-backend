@@ -220,6 +220,14 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_
              # 実測の `W(D)` の傾きが置いた `σ_D` と合うかの検算
              "d_win": {"<-3": [0, 0], "-3..-1": [0, 0], "-1..1": [0, 0], "1..3": [0, 0], ">3": [0, 0]}}
     mc = MARGIN_COMFORT if margin_comfort is None else margin_comfort
+    # **候補 `OPCG_CLOCK_VALUE`**（2026-10-10・`docs/reports/2026-10-10_clock_value.md` §1.5）: 後続局面の表のディレクトリ
+    # （`clock_succ.py` の出力の親・`<親>/<記録名>/<seed>.npz`）。無ければ既定のまま 1 ビットも変わらない。
+    succ_index = clock_succ_index(os.environ.get("OPCG_CLOCK_VALUE"))
+    succ_literal = bool(os.environ.get("OPCG_CLOCK_VALUE_LITERAL"))
+    dump_path = os.environ.get("OPCG_PRICE_DUMP")            # 行ごとの値段の写し（jsonl・逸脱の分布と禁止率の器が読む）
+    dump_f = open(dump_path, "w", encoding="utf-8") if dump_path else None
+    if succ_index is not None:
+        stats.update({"clock_games": 0, "clock_games_missing": 0, "clock_games_mismatch": 0})
     games = 0
     for game in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
         games += 1
@@ -235,7 +243,23 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_
         c = TR.cfg(theta, mu, theta_mode, prof=prof, nu_targets="leader", GUARD_S_COST_MODE=GUARD_S_COST_MODE,
                    ledger_pricing=str(ledger_pricing), MIRROR_ME=bool(TR.RUN["MIRROR_ME"]), F_PRICING_FIX=True,
                    margin_comfort=float(mc), PLAN_CLASSES=[str(x) for x in PL.PLAN_CLASSES])
+        if succ_index is not None:
+            sp = succ_index.get(seed)
+            succ = clock_succ_payload(sp, rows, idx) if sp else None
+            if sp is None:
+                stats["clock_games_missing"] += 1
+            elif succ is None:
+                stats["clock_games_mismatch"] += 1
+            else:
+                stats["clock_games"] += 1
+                pin["succ"] = succ
+                pin["succ_literal"] = succ_literal
+        if dump_f is not None:
+            pin["dump_rows"] = True
         res = TR.game_call("theory_bridge", game, {"cfg": c, "in": pin, "stats": stats, "carry": {}})
+        if dump_f is not None:
+            zz = {str(k[1]): r.get("z") for k, r in res["per"]}
+            dump_f.write(json.dumps({"seed": seed, "z": zz, "rows": res.get("row_dump") or []}) + "\n")
         for key, rec in res["per"]:
             key = tuple(key)
             if key in per:
@@ -246,12 +270,59 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_
         new = res["stats"]
         stats.clear()
         stats.update(new)
+    if dump_f is not None:
+        dump_f.close()
     import kappa_needed as KN
     stats["kappa_needed"] = KN.summarise(kn_turns)
     stats["kappa_needed_1turn"] = KN.summarise([dict(t, g0=t["g0_turn"], dW=t["dW_turn"]) for t in kn_turns])
     stats["kappa_split"] = KN.summarise_games(kn_games)        # T81: 相関の中身（窓・型・場の動き）
     stats["last_turn"] = "keep"
     return per, stats
+
+
+def clock_succ_index(root):
+    """`OPCG_CLOCK_VALUE` の表のディレクトリ → `{seed: npz のパス}`（`None` なら切替なし）。"""
+    if not root:
+        return None
+    out = {}
+    for sub in sorted(os.listdir(root)):
+        d = os.path.join(root, sub)
+        if not os.path.isdir(d):
+            continue
+        for f in os.listdir(d):
+            if f.endswith(".npz") and not f.endswith(".tmp.npz"):
+                out[int(f[:-4])] = os.path.join(d, f)
+    return out
+
+
+def _trip(sc, tok, ci):
+    return [np.asarray(sc, np.float64).tolist(), np.asarray(tok, np.float64).ravel().tolist(),
+            np.asarray(ci, np.int64).tolist()]
+
+
+def clock_succ_payload(path, rows, idx):
+    """1 局の表 → Rust に渡す `[[行の位置, {"o": 打つ前の相手の側の行, "c": [[状態, 自分の側, 相手の側], …]}], …]`。
+    打ち直しが記録とビットで一致しなかった局は `None`（使わない）。"""
+    d = np.load(path)
+    if int(d["match"]) != 1:
+        return None
+    pos = {int(rows["step"][i]): n for n, i in enumerate(idx)}
+    out = []
+    for j in range(len(d["r_step"])):
+        n = pos.get(int(d["r_step"][j]))
+        if n is None:
+            return None
+        p0, m = int(d["r_ptr"][j]), int(d["r_n"][j])
+        cs = []
+        for q in range(p0, p0 + m):
+            st = int(d["c_st"][q])
+            if st in (0, 6):
+                cs.append([st, _trip(d["c_msc"][q], d["c_mtok"][q], d["c_mci"][q]),
+                           _trip(d["c_osc"][q], d["c_otok"][q], d["c_oci"][q])])
+            else:
+                cs.append([st, None, None])
+        out.append([n, {"o": _trip(d["r_osc"][j], d["r_otok"][j], d["r_oci"][j]), "c": cs}])
+    return out
 
 
 def pair_by_band(per, band):
