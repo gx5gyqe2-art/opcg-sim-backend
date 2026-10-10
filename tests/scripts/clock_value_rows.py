@@ -10,6 +10,7 @@
   T18 の器は今の既定で測れない純付与（`attach`）を外さなかったので、付与を除いた率も並べる。
 * 2 つの写しを渡すと（同じ記録・同じ行の並び）、行ごとに「理論の最善の型」が一致する割合と、両方で禁止される行の数。
 * 局ごとの攻め側の逸脱の和の AUC（全部・最後のターンを落とす・攻撃の候補を外す）と、攻撃の値段の上乗せの診断（報告 §2.2）。
+* **判定の比べ**（報告 §2.5・`fixed_reading`）: (i) 上乗せを差し引いた比べ・(ii) 同じ型どうしの比べ。
 
 使い方:
 
@@ -74,6 +75,59 @@ def game_auc(rows, zs, drop_last=False, no_attack=False):
         ys.append(float(z["0"]))
     a = auc(xs, ys) if len(xs) >= 2 else None
     return {"games": len(xs), "auc": None if a is None else round(float(a), 4)}
+
+
+def premium_of(rows):
+    """攻撃の上乗せ `P`（× κ）: 判定できる行の全部の候補で、攻撃の候補の値段の平均 − 攻撃以外の候補の値段の平均（報告 §2.5 の (i)）。"""
+    atk, oth = [], []
+    for r in rows:
+        if not judged(r) or len(r) < 10:
+            continue
+        for f, v in r[9]:
+            if v is not None:
+                (atk if f == "attack" else oth).append(v * r[5])
+    return float(np.mean(atk) - np.mean(oth)) if atk and oth else 0.0
+
+
+def game_auc_fixed(rows, zs, mode, drop_last=False):
+    """判定の比べ（報告 §2.5）: `minus_premium`＝(i) 攻撃の候補の値段（× κ）から上乗せ `P` を引いて最善と打った手の差を作り直す／
+    `same_type`＝(ii) 打った手と同じ型の候補だけで最善を取る（同じ型の値段の付いた候補が 2 本以上の行だけ）。局ごとの攻め側の逸脱の和の AUC。"""
+    from theory_bridge import auc
+    prem = premium_of(rows) if mode == "minus_premium" else 0.0
+    by = {}
+    for r in rows:
+        by.setdefault(r[0], []).append(r)
+    xs, ys, nrows = [], [], 0
+    for seed, rs in by.items():
+        z = (zs or {}).get(seed) or {}
+        if z.get("0") is None:
+            continue
+        tmax = max(r[1] for r in rs)
+        ds = 0.0
+        for r in rs:
+            if not judged(r) or len(r) < 10 or (drop_last and r[1] == tmax):
+                continue
+            if mode == "minus_premium":
+                vk = [v * r[5] - (prem if f == "attack" else 0.0) for f, v in r[9] if v is not None]
+                pk = r[3] * r[5] - (prem if r[6] == "attack" else 0.0)
+                s_row = pk - max(vk)
+            else:
+                vs = [v for f, v in r[9] if v is not None and f == r[6]]
+                if len(vs) < 2:
+                    continue
+                s_row = (r[3] - max(vs)) * r[5]
+            nrows += 1
+            ds += s_row * (1.0 if r[2] == 0 else -1.0)
+        xs.append(ds)
+        ys.append(float(z["0"]))
+    a = auc(xs, ys) if len(xs) >= 2 else None
+    return {"games": len(xs), "rows": nrows, "premium_kappa": round(prem, 5) if mode == "minus_premium" else None,
+            "auc": None if a is None else round(float(a), 4)}
+
+
+def fixed_reading(rows, zs):
+    return {m: {"all": game_auc_fixed(rows, zs, m), "drop_last": game_auc_fixed(rows, zs, m, True)}
+            for m in ("minus_premium", "same_type")}
 
 
 def attack_premium(rows, zs):
@@ -207,6 +261,7 @@ def main(argv=None):
                             "no_attack": game_auc(ra, za, no_attack=True)}
     out["a"]["family_levels"] = family_levels(ra)
     out["a"]["attack_premium"] = attack_premium(ra, za)
+    out["a"]["fixed_reading"] = fixed_reading(ra, za)
     if a.dump2:
         rb, zb = load(a.dump2, with_z=True)
         out["b"] = summarise(rb)
@@ -214,6 +269,7 @@ def main(argv=None):
                                 "no_attack": game_auc(rb, zb, no_attack=True)}
         out["b"]["family_levels"] = family_levels(rb)
         out["b"]["attack_premium"] = attack_premium(rb, zb)
+        out["b"]["fixed_reading"] = fixed_reading(rb, zb)
         out["compare"] = compare(ra, rb)
     print(json.dumps(out, ensure_ascii=False, indent=1))
     if a.json:
