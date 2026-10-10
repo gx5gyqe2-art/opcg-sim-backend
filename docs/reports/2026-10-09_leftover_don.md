@@ -329,3 +329,5 @@ golden は既定が変わらないので動いていない。
   `late_winner_probe.py` → `crossing_bridge.py` → `win_calib.py --pre-settle on` → `theory_bridge.py`（合成は w39 だけ）→ `relative_ledger.py` → `kappa_vector.py`。候補ありは `OPCG_LEFTOVER_DON=1`。
 - 合成の `survival_split` は w39・w42 で分けて回し行をつないだ（900 局を一度に回すとコンテナが再起動した・2 回）。`m2_probe` 以降の器は 2 つを一緒に。
 - §4.2 の同じ時計の比べと診断の印は作業用のスクリプト（1 回きり・リポジトリに入れていない）。
+- テスト: 最終の木で `make rust-develop` の後 `make test` green（`cargo test` 474 passed・1 ignored〔候補の試験 1 本を含む〕、pytest 622 passed・12 skipped・0 failed）。
+  コンテナの再起動で pytest と API の依存が消えていたので入れ直し、pytest の半分は入れ直した後に同じコマンドで回し直した（`cargo test` の半分は同じ木で済）。

@@ -5,7 +5,7 @@
 - [x] 実装（OPCG_LEFTOVER_DON・既定はビット不変: 10 局の時計の行が 1 バイト一致）
 - [x] 10 局の切り出しで全器（輪を閉じた予告）→ §2 をコミット
 - [x] 全記録（実 w41・合成 w39+w42）で候補あり／なし（合成の線形の橋は w39 の 300 局）
-- [ ] 報告・RESULT.json・make test・push
+- [x] 報告・RESULT.json・make test（green）・push
 
 ## 計測の進み（scratchpad/full/*/progress.txt）
 - **予告の時刻**: 輪を閉じた予告（報告 §2）は全記録の結果を見る前にコミットした——`d3a8546f`（2026-10-09 18:31:32 UTC）。全記録の最初の走り（実 off の `m2_probe`）はその後に始めた。
@@ -16,3 +16,4 @@
 - 合成 off/on の m2〜wc 済: on は 的中 .6602→.6493・相対 AUC .7241→.7186（殺す基準 (c)(d)）・S<1/2 1.102→0.969・打ち切り 70→3・σ_T 2.004→1.109・絶対の腕の対数損失 .864→.655。次: 合成の段ごとの 2×2（off/on）→ rl/kv → tb（w39）。
 - 04:10 UTC: 合成の段ごとの 2×2（off/on）済。いま合成の rl/kv（off→on・約 1.5 時間）→ 合成の線形の橋は w39 の 300 局だけ（off/on・各約 70 分）。残り約 3.5 時間 → 報告・RESULT.json・make test・最後の push。
 - 全記録 済。報告・RESULT.json 済。最終の木で make rust-develop → make test を実行中。
+- make test green（cargo 474・pytest 622 passed）。最後の push。

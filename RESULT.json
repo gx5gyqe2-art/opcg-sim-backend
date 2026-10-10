@@ -1,13 +1,13 @@
 {
   "branch": "claude/cand-leftover-don",
-  "commit": "(最後の push のコミット・git log -1 で確認)",
+  "commit": "RESULT.json を含む最後のコミット（git log -1）。本文の数字と式はその 1 つ前と同じ",
   "report": "docs/reports/2026-10-09_leftover_don.md",
   "summary": [
     "後の段で出す札に払った後の余りのドンを攻撃に付ける候補（OPCG_LEFTOVER_DON・止めるのに要る札の枚数 c̄ を最大にするよう今の財布で配る・新定数ゼロ・既定はビット不変・KERNEL_FILES 外）を実装し、全記録で並べた。",
     "殺す基準に両方の記録で当たった: 実 的中 .7051→.6964・相対 AUC .8076→.7969・S<1/2 の観測÷予測 0.927→0.830／合成 的中 .6602→.6493・相対 AUC .7241→.7186。打ち切りは 9→0・70→3 に減り、合成の σ_T 2.004→1.109・絶対の腕の対数損失 .864→.655（コインに勝つ）と較正は大きく良くなった。",
     "芯への当たり: 生き延びると言う時計の差し引いた後の遅れは同じ時計で実 +0.937→+0.339・合成 +1.192→−0.145、遅れの地平の段数への傾きは 4 割寝た（地平の予算の副作用ではない）。ただし計画の後の段の攻撃は実際の半分から 1.2〜1.6 倍へ越えた（計画が毎段全部の体で攻撃する本数の多さと掛け算）。"
   ],
-  "gate": "PENDING",
+  "gate": "make test green on the final tree (cargo 474 passed・1 ignored, pytest 622 passed・12 skipped・0 failed; pytest rerun after reinstalling deps lost in a container restart)",
   "prediction": {
     "committed_before_full_records": "d3a8546f",
     "hits": [
