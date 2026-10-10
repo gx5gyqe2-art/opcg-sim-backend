@@ -169,7 +169,7 @@ def redirect_reread(row, bi):
 
 
 def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMILIES, seats=None,
-              attach_static=False, arm="theory", rng=None, cutoff=None, restrict=None):
+              attach_static=False, arm="theory", rng=None, cutoff=None, restrict=None, mode="replace"):
     """`driver.run_game(swap=…)` に渡す関数を作る。`stats`（省略可）に介入の実績を積む。
 
     **盤面には触れない**——`out`（探索の結果・候補・π はそのまま）を読むだけで、返す `move` だけが
@@ -199,7 +199,17 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
       を測るときは `restrict={("attach","play")}`。
 
     **T156(a)（2026-09-24）**: 置き換え先が読み替えられた純付与なら、`redirect_reread` で価格を
-    借りた攻撃候補に差し替える（下記 `swap`）。`stats["n_redirected"]` に件数を積む。"""
+    借りた攻撃候補に差し替える（下記 `swap`）。`stats["n_redirected"]` に件数を積む。
+
+    **T18-禁止だけ（2026-10-10・ユーザが測る前に決めた形）**: `mode="forbid"`——理論が損と言う候補
+    （理論値が行の最善より `cutoff` を超えて低い候補・値付けできない候補と対象外の型は外さない）を**全部**
+    候補から外し、探索が選んだ手が外れたときだけ、**残った候補のうち探索の訪問数が最も多いもの**を打つ
+    （同数なら平均価値・次に index）。理論の最善へは置き換えない（T156 の形とは別）。プラセボ
+    （`arm="placebo"`）は**同じ行**（理論が 1 本以上外す行）で、理論が外せる候補の中から**同じ本数**を
+    一様に外す。`stats["n_removed"]`（外した候補の延べ本数）・`stats["n_filter_rows"]`（外した行）を積む。
+    既定 `"replace"`＝今までどおり（1 ビットも変えない）。"""
+    if mode not in ("replace", "forbid"):
+        raise ValueError("mode は replace か forbid（%r）" % (mode,))
     if arm not in ("theory", "placebo"):
         raise ValueError("arm は theory か placebo（%r）" % (arm,))
     rng = rng or random.Random(0)
@@ -216,6 +226,47 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
     stats.setdefault("n_intervened", 0)
     stats.setdefault("n_no_replacement", 0)
     stats.setdefault("interventions", [])
+    stats.setdefault("n_removed", 0)
+    stats.setdefault("n_filter_rows", 0)
+    tol = SF.TOL if cutoff is None else float(cutoff)
+
+    def forbid_pick(row, cands, groups, legal):
+        """`mode="forbid"` の 1 行ぶん。介入しないなら `(None, 0)`、介入するなら `(打つ候補の index, 外した本数)`。"""
+        prices = row.get("prices") or []
+        src = row.get("reread_src") or [None] * len(cands)
+        known = [v for v in prices if v is not None]
+        if not known:
+            return None, 0
+        best_v = max(known)
+
+        def removable(i):
+            if i >= len(prices) or prices[i] is None:
+                return False
+            fam = SF.move_family(cands[i]["sig"])
+            if fam in exempt and src[i] is None and not attach_static:
+                return False
+            return restrict is None or (fam, row["best_family"]) in restrict
+
+        elig = [i for i in range(len(cands)) if removable(i)]
+        bad = [i for i in elig if prices[i] < best_v - tol]
+        k = len(bad)
+        if not k:
+            return None, 0
+        stats["n_filter_rows"] += 1
+        stats["n_removed"] += k
+        removed = set(rng.sample(elig, k)) if arm == "placebo" else set(bad)
+        if row.get("chosen_index") not in removed:
+            return None, k
+        stats["n_forbidden"] += 1
+        rest = [i for i in range(min(len(groups), len(cands))) if i not in removed]
+        rest.sort(key=lambda i: (-cands[i]["n"], -cands[i]["q"], i))
+        for i in rest:
+            r = groups[i].get("rep")
+            if r is not None and r < len(legal) and legal[r] is not None \
+                    and expand_replacement(legal[r])[0] is not None:
+                return i, k
+        stats["n_no_replacement"] += 1
+        return None, k
 
     def swap(game, name, turn, step, out, move):
         if seats is not None and name not in seats:            # **T148**: 介入しない席はそのまま打つ
@@ -230,29 +281,22 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
         if row is None:
             return move
         stats["n_seen"] += 1
-        if not row["forbidden"]:
-            return move
-        stats["n_forbidden"] += 1
-        # **T144**: 付与が攻撃の価格に読み替えられた行（`shadow_forbid.SEQ_MODE` が `off` 以外）は、
-        # もう「系列の価値を測れない型」ではないので対象外にしない。読み替えられない付与は今までどおり外す。
-        if row["played_family"] in exempt and not row.get("played_reread") and not attach_static:
-            stats["n_exempt"] += 1
-            return move
-        if restrict is not None and (row["played_family"], row["best_family"]) not in restrict:
-            stats["n_exempt"] += 1
-            return move
         groups = out.get("groups") or []
         legal = (out.get("stats") or {}).get("legal") or []
-        bi = row["best_index"]
-        if arm == "placebo":                                    # **T18**: 同じ行で、選んだ手以外を一様に引く
-            others = [i for i in range(len(groups)) if i != row["chosen_index"]]
-            bi = rng.choice(others) if others else None
-        bi_drawn = bi                                            # **T156(a)**: 読み替え前（記録用）
-        if bi is not None:
-            bi = redirect_reread(row, bi)
-        # **T156(a)**: 読み替え後に「選んだ手そのもの」へ折り返した（プラセボの無作為な引きだけで
-        # 起こりうる稀な一致・理論の腕では forbidden の前提〔played < best〕と両立しない）なら、
-        # 置き換えても打ち回しが変わらないので「置き換え無し」として数える。
+        n_removed = None
+        if mode == "forbid":
+            bi, n_removed = forbid_pick(row, cands, groups, legal)
+            if bi is None:
+                return move
+            bi_drawn = bi
+        else:
+            bi, bi_drawn = None, None
+        if mode == "replace" and not row["forbidden"]:
+            return move
+        if mode == "replace":
+            bi, bi_drawn = replace_pick(row, groups)
+            if bi is False:
+                return move
         if bi is None or bi >= len(groups) or bi == row.get("chosen_index"):
             stats["n_no_replacement"] += 1
             return move
@@ -266,6 +310,32 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
         if new_move is None:
             stats["n_no_replacement"] += 1
             return move
+        return finish(name, turn, step, row, cands, legal, out, bi, bi_drawn, rep, new_move, commit, n_removed)
+
+    def replace_pick(row, groups):
+        """`mode="replace"`（T142〜T156 の形）の置き換え先。介入しないなら `(False, None)`。"""
+        stats["n_forbidden"] += 1
+        # **T144**: 付与が攻撃の価格に読み替えられた行（`shadow_forbid.SEQ_MODE` が `off` 以外）は、
+        # もう「系列の価値を測れない型」ではないので対象外にしない。読み替えられない付与は今までどおり外す。
+        if row["played_family"] in exempt and not row.get("played_reread") and not attach_static:
+            stats["n_exempt"] += 1
+            return False, None
+        if restrict is not None and (row["played_family"], row["best_family"]) not in restrict:
+            stats["n_exempt"] += 1
+            return False, None
+        bi = row["best_index"]
+        if arm == "placebo":                                    # **T18**: 同じ行で、選んだ手以外を一様に引く
+            others = [i for i in range(len(groups)) if i != row["chosen_index"]]
+            bi = rng.choice(others) if others else None
+        bi_drawn = bi                                            # **T156(a)**: 読み替え前（記録用）
+        if bi is not None:
+            bi = redirect_reread(row, bi)
+        # **T156(a)**: 読み替え後に「選んだ手そのもの」へ折り返した（プラセボの無作為な引きだけで
+        # 起こりうる稀な一致・理論の腕では forbidden の前提〔played < best〕と両立しない）なら、
+        # 置き換えても打ち回しが変わらないので「置き換え無し」として数える（呼び手の共通の後段で判定）。
+        return bi, bi_drawn
+
+    def finish(name, turn, step, row, cands, legal, out, bi, bi_drawn, rep, new_move, commit, n_removed):
         # **探索が元の手のために積んだ残り手順を捨て、置き換え先の残り手順に差し替える**
         # （driver は `swap` の後に `out["commit"]` を持ち越す＝ここで書き換えれば次の decide に届く）。
         # 捨て忘れると、次の decide が**元の箱の続き**（元のカードへのドン付与など）を機械実行する。
@@ -292,7 +362,9 @@ def make_swap(cards, idx2cid, theta=THETA, mu=MU, stats=None, exempt=EXEMPT_FAMI
                                        # **棋譜ビューアー（2026-09-24）**: 実際に打たせた候補の index（折り返し後）
                                        "rep_index": bi,
                                        # **T156(a)**: 置き換え先が読み替えられた純付与から攻撃候補へ折り返されたか
-                                       "redirected": bool(bi != bi_drawn)})
+                                       "redirected": bool(bi != bi_drawn),
+                                       # **T18-禁止だけ**: その行で外した候補の本数（`mode="replace"` では `None`）
+                                       "n_removed": n_removed, "mode": mode})
         return new_move
 
     return swap
@@ -370,11 +442,14 @@ _OTHER_SEAT = {"p1": "p2", "p2": "p1"}
 
 def t18_pairs(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns=4, worlds=4,
              theta=THETA, mu=MU, exempt=EXEMPT_FAMILIES, attach_static=False, arm="theory",
-             cutoff=None, restrict=None):
+             cutoff=None, restrict=None, mode="replace", leaders="random"):
     """**T148**: 1 つの seed につき **2 局**——理論の介入を **p1 だけ**に入れた局と **p2 だけ**に入れた局
     （`opcg_sim.loop.arena` と同じ「同 seed・席を入れ替えたペア」規約・リーダー対は入れ替わらない）。
     **両席に同じ規則で介入すると効果が相殺する**（`make_swap` の docstring）ので、**片席だけへの介入**が
-    T18 の勝率判定に要る唯一の形。返り値は局ごとの記録（`dry_run` と同じ形＋`intervened`＝介入された席）。"""
+    T18 の勝率判定に要る唯一の形。返り値は局ごとの記録（`dry_run` と同じ形＋`intervened`＝介入された席）。
+
+    **T18-禁止だけ**: `leaders`（`decks.leader_pair` の mode・既定 `"random"`＝今まで）。`"fixed"` と
+    `decks_mode="singleton"` で副条件の固定ミラー（`opcg_sim.loop.arena` の既定と同じ対面）。"""
     cards = PL.Cards()
     idx2cid = TR.idx2cid()
     E.engine()
@@ -384,14 +459,15 @@ def t18_pairs(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_tur
     db = D.load_db()
     games = []
     for seed in seeds:
-        la, lb = D.leader_pair(db, seed, "random")
+        la, lb = D.leader_pair(db, seed, leaders)
         for intervened in ("p1", "p2"):
             p1, p2 = D.build_pair(db, la, lb, seed, decks_mode)
             stats = {}
             # **T18**: プラセボの乱数は (seed, 席) で決まる＝再現できる・主腕と同じ局面列を歩く（CRN）
             rng = random.Random(int(seed) * 2 + (0 if intervened == "p1" else 1))
             swap = make_swap(cards, idx2cid, theta, mu, stats, exempt, seats={intervened},
-                             attach_static=attach_static, arm=arm, rng=rng, cutoff=cutoff, restrict=restrict)
+                             attach_static=attach_static, arm=arm, rng=rng, cutoff=cutoff, restrict=restrict,
+                             mode=mode)
             aborted = None
             try:
                 res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, swap=swap,
@@ -412,6 +488,8 @@ def t18_pairs(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_tur
                          "n_intervened": stats["n_intervened"],
                          "n_no_replacement": stats["n_no_replacement"],
                          "n_redirected": stats["n_redirected"],       # **T156(a)**
+                         "n_removed": stats["n_removed"],             # **T18-禁止だけ**
+                         "n_filter_rows": stats["n_filter_rows"],
                          "interventions": stats["interventions"]})   # T18 の分析用（1 件ごとの記録）
     return games
 
@@ -445,7 +523,10 @@ def summarise_pairs(games):
            "n_redirected": n_redirected,
            "redirect_rate": round(n_redirected / n_intervened, 4) if n_intervened else None,
            "intervene_rate": round(n_intervened / n_seen, 4) if n_seen else None,
-           "forbid_rate": round(n_forbidden / n_seen, 4) if n_seen else None}
+           "forbid_rate": round(n_forbidden / n_seen, 4) if n_seen else None,
+           # **T18-禁止だけ**: 外した候補の延べ本数・1 本以上外した行（`mode="replace"` では 0）
+           "n_removed": sum(g.get("n_removed", 0) for g in games),
+           "n_filter_rows": sum(g.get("n_filter_rows", 0) for g in games)}
     if pair_scores:
         out["ci"] = AR.pair_level_ci(pair_scores)
     else:
@@ -494,6 +575,8 @@ def build_parser():
                     help="既存の記録の seed 帯と重ならない値にする（新しい局を打つ）")
     ap.add_argument("--decks", default="synth", choices=("singleton", "synth", "synth_dig",
                                                           "synth_roles", "user"))
+    ap.add_argument("--leaders", default="random", choices=("random", "fixed"),
+                    help="**T18-禁止だけ**: 片席介入（`--pairs`）のリーダー対。fixed＋`--decks singleton`＝固定ミラー")
     ap.add_argument("--sims", type=int, default=64)
     ap.add_argument("--seq", default="off", choices=SF.SEQ_MODES,
                     help="**T144** 付与を攻撃の価格に読み替えるか（`off` 以外なら、読み替えた付与は対象外にしない）")
@@ -505,6 +588,9 @@ def build_parser():
                     help="**T18-b（案 b）**: 逸脱の大きさの線（手札 1 枚の価値＝μ の倍数）。0＝既定（丸め誤差だけ）")
     ap.add_argument("--restrict", default="", choices=("", "attach:play"),
                     help="**T18-c（案 c）**: 型の組に絞る（`attach:play`＝付けて殴る vs 手札を出す・T155 の本物の対立）")
+    ap.add_argument("--mode", default="replace", choices=("replace", "forbid"),
+                    help="**T18-禁止だけ**: replace＝理論の最善（プラセボは無作為な 1 本）に置き換える（既定・T142〜T156）"
+                         "／forbid＝理論が損と言う候補を外し、探索の訪問数が最多の残りを打つ（プラセボは同じ本数を無作為に外す）")
     ap.add_argument("--json", default="")
     ap.add_argument("--result", default="",
                     help="**T148**（`n_loop_ops.md` の規約）: `RESULT.json`（機械可読の納品物）を書くパス")
@@ -522,13 +608,14 @@ def main(argv=None):
     if a.pairs:
         seeds = [a.seed_base + i for i in range(a.pairs)]
         games = t18_pairs(seeds, a.decks, sims=a.sims, attach_static=(a.attach_static == "on"), arm=a.arm,
-                          cutoff=cutoff, restrict=restrict)
+                          cutoff=cutoff, restrict=restrict, mode=a.mode, leaders=a.leaders)
         summary = summarise_pairs(games)
         out = {"games": games, "summary": summary}
         status = "done" if summary.get("ci") is not None else "no_data"
         result = {"status": status, "task": "T18", "seed_base": a.seed_base, "pairs": a.pairs,
                   "decks": a.decks, "seq": a.seq, "attach_static": a.attach_static, "arm": a.arm,
-                  "cutoff_mu": a.cutoff_mu, "restrict": a.restrict, "summary": summary}
+                  "cutoff_mu": a.cutoff_mu, "restrict": a.restrict, "mode": a.mode, "leaders": a.leaders,
+                  "summary": summary}
     else:
         seeds = [a.seed_base + i for i in range(a.games)]
         games = dry_run(seeds, a.decks, sims=a.sims)

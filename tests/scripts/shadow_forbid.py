@@ -260,7 +260,10 @@ def shadow_row(sc, tok, ci, cards, idx2cid, cands, out, move, theta=THETA, mu=MU
            "n_cands": len(scored),
            # **T156(a)**: `cands` と同じ長さのリスト。`reread_src[i]` は `cands[i]` が読み替えられた
            # 純付与なら価格を借りた攻撃候補の index、そうでなければ `None`。
-           "reread_src": reread_src}
+           "reread_src": reread_src,
+           # **T18-禁止だけ（2026-10-10）**: `cands` と同じ長さの理論値（値付けできない候補は `None`）。
+           # `t18_arena.make_swap(mode="forbid")` が「損な候補」を全部外すのに使う（判定・式は変えない）。
+           "prices": [p.get("price") for p in priced]}
 
 
 def collect(seeds, decks_mode, sims=64, net=None, dirichlet_eps=0.25, temp_turns=4, worlds=4,

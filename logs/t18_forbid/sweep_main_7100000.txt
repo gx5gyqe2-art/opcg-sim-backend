@@ -1,0 +1,10 @@
+MU 0.0551 judged rows 548 games 10
+    0xMU  intervene 0.305 (167)  filter-rows 0.956  removed/row 7.01  {'play': 53, 'end': 10, 'attack': 89, 'effect': 15}
+ 0.25xMU  intervene 0.265 (145)  filter-rows 0.934  removed/row 6.57  {'play': 50, 'end': 8, 'attack': 72, 'effect': 15}
+  0.5xMU  intervene 0.214 (117)  filter-rows 0.912  removed/row 5.76  {'play': 44, 'end': 8, 'attack': 54, 'effect': 11}
+ 0.75xMU  intervene 0.137 (75)  filter-rows 0.892  removed/row 4.69  {'play': 37, 'end': 7, 'attack': 23, 'effect': 8}
+    1xMU  intervene 0.106 (58)  filter-rows 0.823  removed/row 4.05  {'play': 30, 'end': 5, 'attack': 16, 'effect': 7}
+  1.5xMU  intervene 0.075 (41)  filter-rows 0.759  removed/row 3.12  {'play': 22, 'attack': 10, 'effect': 5, 'end': 4}
+    2xMU  intervene 0.047 (26)  filter-rows 0.476  removed/row 1.61  {'effect': 2, 'play': 14, 'attack': 6, 'end': 4}
+    3xMU  intervene 0.015 (8)  filter-rows 0.182  removed/row 0.46  {'play': 4, 'end': 4}
+    4xMU  intervene 0.002 (1)  filter-rows 0.035  removed/row 0.12  {'play': 1}
