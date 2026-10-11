@@ -16,7 +16,22 @@
       "rows_with_clock": 17291,
       "json": "logs/theory_map/real_w41.json"
     },
-    "syn_w39": "pending from claude/theory-map-syn (logs/theory_map/syn_w39.json)"
+    "syn_w39": {
+      "source": "claude/theory-map-syn @ 9cd883a3 logs/theory_map/syn_w39.json",
+      "status": "PARTIAL: 260/300 games had the theory_bridge price dump at 22:30 UTC (game_missing=40 skipped by the tool's alignment); clocks.json covers all 300. Full 300-game run in progress and will replace this file.",
+      "rows": 13160,
+      "games": 260,
+      "q3_all": {
+        "diff": -0.0216,
+        "ci": [
+          -0.0423,
+          -0.0013
+        ]
+      },
+      "q3_clear_misses": [
+        "互角|4-6"
+      ]
+    }
   },
   "min_games": 30,
   "bootstrap": "games resampled, 2000 reps, 95% percentile, seed 0",
@@ -40,13 +55,25 @@
     "q5": "small-loss plays of lock/reduction/draw/blocker and leader activations lose 5-11% vs theory W; big-body plays and attacks when behind win more than W"
   },
   "next_fix_priority": [
-    "play/effect prices too high vs outcomes (known: effect pricing coarseness, comparison asymmetry)",
-    "attack overpriced vs attach when far behind / vs play mid-game even (known: attack premium)",
-    "big bodies underpriced (new)",
-    "late even-race mover underestimated (pre-settle calibration)",
-    "early life read with wrong sign"
+    "attack overpriced vs attach/play mid-game & behind (synth clear miss 互角|4-6 -0.103; real hint)",
+    "play/effect overpriced (blocker in both)",
+    "big bodies underpriced (both)",
+    "late even-race mover (real only)",
+    "early life sign (real only)"
   ],
   "gate": "make test green before push (cargo 474 passed 1 ignored / pytest 622 passed 12 skipped)",
   "new_constants": 0,
-  "theory_code_changed": false
+  "theory_code_changed": false,
+  "same_direction_both": [
+    "play:blocker small-loss plays lose vs W",
+    "play:big wins vs W",
+    "attack when far behind wins vs W",
+    "CPU attacks less / attaches more than theory"
+  ],
+  "real_only": [
+    "q3 follow>other overall (synth reversed)",
+    "lock/draw/reduction/leader-activation overpriced",
+    "late even-race mover underestimated",
+    "early life sign reversed"
+  ]
 }

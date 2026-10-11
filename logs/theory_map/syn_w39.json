@@ -1,0 +1,8755 @@
+{
+ "status": "PARTIAL: 260/300 games had the theory_bridge price dump at 22:30 UTC (game_missing=40 skipped by the tool's alignment); clocks.json covers all 300. Full 300-game run in progress and will replace this file.",
+ "games_with_dump": 260,
+ "record": "/tmp/claude-0/-home-user-opcg-sim-backend/ddd28cd7-f60e-52c6-ab75-a44ab4cf19b8/scratchpad/data/sigma_wip/data/w39",
+ "align": {
+  "rows": 13724,
+  "game_missing": 40
+ },
+ "rows_all": 13724,
+ "rows": 13160,
+ "games": 260,
+ "mu": 0.0551,
+ "q1": {
+  "by_color_band": {
+   "赤|1-3": {
+    "units": 145,
+    "best": {
+     "attack": 0.29,
+     "attach": 0.029,
+     "play": 0.339,
+     "effect": 0.187,
+     "end": 0.155
+    },
+    "played": {
+     "attack": 0.165,
+     "attach": 0.082,
+     "play": 0.331,
+     "effect": 0.122,
+     "end": 0.3
+    }
+   },
+   "赤|4-6": {
+    "units": 159,
+    "best": {
+     "attack": 0.757,
+     "attach": 0.039,
+     "play": 0.038,
+     "effect": 0.059,
+     "end": 0.107
+    },
+    "played": {
+     "attack": 0.421,
+     "attach": 0.125,
+     "play": 0.285,
+     "effect": 0.053,
+     "end": 0.114
+    }
+   },
+   "赤|7+": {
+    "units": 159,
+    "best": {
+     "attack": 0.759,
+     "attach": 0.065,
+     "play": 0.066,
+     "effect": 0.061,
+     "end": 0.05
+    },
+    "played": {
+     "attack": 0.483,
+     "attach": 0.291,
+     "play": 0.123,
+     "effect": 0.05,
+     "end": 0.052
+    }
+   },
+   "緑|1-3": {
+    "units": 94,
+    "best": {
+     "attack": 0.393,
+     "attach": 0.007,
+     "play": 0.242,
+     "effect": 0.191,
+     "end": 0.167
+    },
+    "played": {
+     "attack": 0.228,
+     "attach": 0.105,
+     "play": 0.321,
+     "effect": 0.126,
+     "end": 0.22
+    }
+   },
+   "緑|4-6": {
+    "units": 105,
+    "best": {
+     "attack": 0.745,
+     "attach": 0.035,
+     "play": 0.059,
+     "effect": 0.065,
+     "end": 0.096
+    },
+    "played": {
+     "attack": 0.416,
+     "attach": 0.098,
+     "play": 0.296,
+     "effect": 0.073,
+     "end": 0.117
+    }
+   },
+   "緑|7+": {
+    "units": 105,
+    "best": {
+     "attack": 0.778,
+     "attach": 0.086,
+     "play": 0.041,
+     "effect": 0.048,
+     "end": 0.047
+    },
+    "played": {
+     "attack": 0.477,
+     "attach": 0.297,
+     "play": 0.12,
+     "effect": 0.047,
+     "end": 0.058
+    }
+   },
+   "青|1-3": {
+    "units": 133,
+    "best": {
+     "attack": 0.323,
+     "attach": 0.03,
+     "play": 0.364,
+     "effect": 0.1,
+     "end": 0.183
+    },
+    "played": {
+     "attack": 0.228,
+     "attach": 0.071,
+     "play": 0.324,
+     "effect": 0.064,
+     "end": 0.312
+    }
+   },
+   "青|4-6": {
+    "units": 147,
+    "best": {
+     "attack": 0.698,
+     "attach": 0.062,
+     "play": 0.068,
+     "effect": 0.051,
+     "end": 0.121
+    },
+    "played": {
+     "attack": 0.441,
+     "attach": 0.113,
+     "play": 0.291,
+     "effect": 0.042,
+     "end": 0.112
+    }
+   },
+   "青|7+": {
+    "units": 147,
+    "best": {
+     "attack": 0.75,
+     "attach": 0.089,
+     "play": 0.082,
+     "effect": 0.035,
+     "end": 0.044
+    },
+    "played": {
+     "attack": 0.469,
+     "attach": 0.314,
+     "play": 0.132,
+     "effect": 0.039,
+     "end": 0.047
+    }
+   },
+   "紫|1-3": {
+    "units": 110,
+    "best": {
+     "attack": 0.277,
+     "attach": 0.052,
+     "play": 0.404,
+     "effect": 0.068,
+     "end": 0.2
+    },
+    "played": {
+     "attack": 0.192,
+     "attach": 0.066,
+     "play": 0.381,
+     "effect": 0.082,
+     "end": 0.279
+    }
+   },
+   "紫|4-6": {
+    "units": 115,
+    "best": {
+     "attack": 0.681,
+     "attach": 0.063,
+     "play": 0.041,
+     "effect": 0.065,
+     "end": 0.151
+    },
+    "played": {
+     "attack": 0.439,
+     "attach": 0.116,
+     "play": 0.243,
+     "effect": 0.049,
+     "end": 0.154
+    }
+   },
+   "紫|7+": {
+    "units": 115,
+    "best": {
+     "attack": 0.725,
+     "attach": 0.063,
+     "play": 0.078,
+     "effect": 0.073,
+     "end": 0.059
+    },
+    "played": {
+     "attack": 0.462,
+     "attach": 0.284,
+     "play": 0.128,
+     "effect": 0.06,
+     "end": 0.066
+    }
+   },
+   "黒|1-3": {
+    "units": 110,
+    "best": {
+     "attack": 0.226,
+     "attach": 0.012,
+     "play": 0.472,
+     "effect": 0.138,
+     "end": 0.152
+    },
+    "played": {
+     "attack": 0.128,
+     "attach": 0.056,
+     "play": 0.36,
+     "effect": 0.101,
+     "end": 0.356
+    }
+   },
+   "黒|4-6": {
+    "units": 110,
+    "best": {
+     "attack": 0.665,
+     "attach": 0.083,
+     "play": 0.07,
+     "effect": 0.06,
+     "end": 0.124
+    },
+    "played": {
+     "attack": 0.397,
+     "attach": 0.116,
+     "play": 0.281,
+     "effect": 0.053,
+     "end": 0.153
+    }
+   },
+   "黒|7+": {
+    "units": 110,
+    "best": {
+     "attack": 0.8,
+     "attach": 0.049,
+     "play": 0.053,
+     "effect": 0.04,
+     "end": 0.058
+    },
+    "played": {
+     "attack": 0.482,
+     "attach": 0.27,
+     "play": 0.147,
+     "effect": 0.043,
+     "end": 0.058
+    }
+   },
+   "黄|1-3": {
+    "units": 115,
+    "best": {
+     "attack": 0.34,
+     "attach": 0.023,
+     "play": 0.349,
+     "effect": 0.115,
+     "end": 0.172
+    },
+    "played": {
+     "attack": 0.194,
+     "attach": 0.111,
+     "play": 0.301,
+     "effect": 0.099,
+     "end": 0.294
+    }
+   },
+   "黄|4-6": {
+    "units": 129,
+    "best": {
+     "attack": 0.721,
+     "attach": 0.045,
+     "play": 0.051,
+     "effect": 0.087,
+     "end": 0.097
+    },
+    "played": {
+     "attack": 0.41,
+     "attach": 0.134,
+     "play": 0.261,
+     "effect": 0.066,
+     "end": 0.129
+    }
+   },
+   "黄|7+": {
+    "units": 129,
+    "best": {
+     "attack": 0.788,
+     "attach": 0.08,
+     "play": 0.046,
+     "effect": 0.047,
+     "end": 0.04
+    },
+    "played": {
+     "attack": 0.477,
+     "attach": 0.305,
+     "play": 0.128,
+     "effect": 0.043,
+     "end": 0.047
+    }
+   }
+  },
+  "by_band": {
+   "1-3": {
+    "units": 477,
+    "best": {
+     "attack": 0.298,
+     "attach": 0.029,
+     "play": 0.373,
+     "effect": 0.129,
+     "end": 0.17
+    },
+    "played": {
+     "attack": 0.184,
+     "attach": 0.08,
+     "play": 0.339,
+     "effect": 0.096,
+     "end": 0.3
+    }
+   },
+   "4-6": {
+    "units": 520,
+    "best": {
+     "attack": 0.714,
+     "attach": 0.051,
+     "play": 0.055,
+     "effect": 0.063,
+     "end": 0.117
+    },
+    "played": {
+     "attack": 0.421,
+     "attach": 0.117,
+     "play": 0.278,
+     "effect": 0.056,
+     "end": 0.127
+    }
+   },
+   "7+": {
+    "units": 520,
+    "best": {
+     "attack": 0.765,
+     "attach": 0.075,
+     "play": 0.061,
+     "effect": 0.051,
+     "end": 0.049
+    },
+    "played": {
+     "attack": 0.473,
+     "attach": 0.298,
+     "play": 0.128,
+     "effect": 0.048,
+     "end": 0.053
+    }
+   }
+  },
+  "by_leader": {
+   "leaders": 137,
+   "max_units": 9,
+   "leaders_with_30": 0,
+   "verdict": "全リーダー局数不足"
+  }
+ },
+ "q2": {
+  "all": {
+   "rows": 3439,
+   "units": 600,
+   "D": {
+    "auc": 0.7521,
+    "mean": -0.3431,
+    "mean_won": 0.6908,
+    "mean_lost": -1.4759
+   },
+   "logratio": {
+    "auc": 0.7507,
+    "mean": -0.2348,
+    "mean_won": 0.2786,
+    "mean_lost": -0.7972
+   },
+   "lr_theta": {
+    "auc": 0.6479,
+    "mean": -0.2058,
+    "mean_won": 0.1666,
+    "mean_lost": -0.6138
+   },
+   "lr_speed": {
+    "auc": 0.6101,
+    "mean": 0.0024,
+    "mean_won": 0.0862,
+    "mean_lost": -0.0895
+   },
+   "d_theta": {
+    "auc": 0.643,
+    "mean": -0.0579,
+    "mean_won": 0.0461,
+    "mean_lost": -0.1719
+   },
+   "d_speed": {
+    "auc": 0.6103,
+    "mean": -0.0106,
+    "mean_won": 0.0134,
+    "mean_lost": -0.037
+   },
+   "d_board": {
+    "auc": 0.6103,
+    "mean": -0.0106,
+    "mean_won": 0.0134,
+    "mean_lost": -0.037
+   },
+   "d_stock": {
+    "auc": 0.5,
+    "mean": 0.0,
+    "mean_won": 0.0,
+    "mean_lost": 0.0
+   },
+   "d_flow": {
+    "auc": 0.5,
+    "mean": 0.0,
+    "mean_won": 0.0,
+    "mean_lost": 0.0
+   },
+   "d_shield": {
+    "auc": 0.5,
+    "mean": 0.0,
+    "mean_won": 0.0,
+    "mean_lost": 0.0
+   },
+   "d_life_part": {
+    "auc": 0.6144,
+    "mean": 0.0459,
+    "mean_won": 0.0862,
+    "mean_lost": 0.0019
+   },
+   "d_hand_part": {
+    "auc": 0.5822,
+    "mean": 0.0395,
+    "mean_won": 0.0799,
+    "mean_lost": -0.0047
+   },
+   "d_body_part": {
+    "auc": 0.5391,
+    "mean": -0.0041,
+    "mean_won": 0.007,
+    "mean_lost": -0.0162
+   },
+   "d_life_raw": {
+    "auc": 0.6137,
+    "mean": 0.3374,
+    "mean_won": 0.6325,
+    "mean_lost": 0.014
+   },
+   "d_hand_raw": {
+    "auc": 0.5519,
+    "mean": 0.0424,
+    "mean_won": 0.2633,
+    "mean_lost": -0.1996
+   },
+   "abs_share_theta": 0.614,
+   "corr_logratio_static": 0.988
+  },
+  "by_band": {
+   "1-3": {
+    "rows": 600,
+    "units": 600,
+    "D": {
+     "auc": 0.6622,
+     "mean": -0.4248,
+     "mean_won": 0.3375,
+     "mean_lost": -1.187
+    },
+    "logratio": {
+     "auc": 0.6631,
+     "mean": -0.0751,
+     "mean_won": 0.0241,
+     "mean_lost": -0.1742
+    },
+    "lr_theta": {
+     "auc": 0.5497,
+     "mean": -0.006,
+     "mean_won": 0.0275,
+     "mean_lost": -0.0396
+    },
+    "lr_speed": {
+     "auc": 0.6021,
+     "mean": -0.0691,
+     "mean_won": -0.0035,
+     "mean_lost": -0.1347
+    },
+    "d_theta": {
+     "auc": 0.5454,
+     "mean": 0.0034,
+     "mean_won": 0.0455,
+     "mean_lost": -0.0387
+    },
+    "d_speed": {
+     "auc": 0.6028,
+     "mean": -0.013,
+     "mean_won": -0.0043,
+     "mean_lost": -0.0217
+    },
+    "d_board": {
+     "auc": 0.6028,
+     "mean": -0.013,
+     "mean_won": -0.0043,
+     "mean_lost": -0.0217
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.5875,
+     "mean": -0.0114,
+     "mean_won": 0.0095,
+     "mean_lost": -0.0304
+    },
+    "d_hand_part": {
+     "auc": 0.5142,
+     "mean": -0.0195,
+     "mean_won": 0.0004,
+     "mean_lost": -0.0377
+    },
+    "d_body_part": {
+     "auc": 0.471,
+     "mean": -0.026,
+     "mean_won": -0.0293,
+     "mean_lost": -0.0231
+    },
+    "d_life_raw": {
+     "auc": 0.5913,
+     "mean": -0.0833,
+     "mean_won": 0.0699,
+     "mean_lost": -0.2229
+    },
+    "d_hand_raw": {
+     "auc": 0.529,
+     "mean": -0.6967,
+     "mean_won": -0.6573,
+     "mean_lost": -0.7325
+    },
+    "abs_share_theta": 0.462,
+    "corr_logratio_static": 1.0
+   },
+   "4-6": {
+    "rows": 900,
+    "units": 600,
+    "D": {
+     "auc": 0.7046,
+     "mean": -0.4765,
+     "mean_won": 0.2703,
+     "mean_lost": -1.247
+    },
+    "logratio": {
+     "auc": 0.7043,
+     "mean": -0.1085,
+     "mean_won": 0.0211,
+     "mean_lost": -0.2422
+    },
+    "lr_theta": {
+     "auc": 0.571,
+     "mean": -0.0412,
+     "mean_won": 0.0023,
+     "mean_lost": -0.0861
+    },
+    "lr_speed": {
+     "auc": 0.6286,
+     "mean": -0.0672,
+     "mean_won": 0.0188,
+     "mean_lost": -0.156
+    },
+    "d_theta": {
+     "auc": 0.5681,
+     "mean": -0.0481,
+     "mean_won": 0.0039,
+     "mean_lost": -0.1017
+    },
+    "d_speed": {
+     "auc": 0.6282,
+     "mean": -0.0161,
+     "mean_won": -0.0001,
+     "mean_lost": -0.0326
+    },
+    "d_board": {
+     "auc": 0.6282,
+     "mean": -0.0161,
+     "mean_won": -0.0001,
+     "mean_lost": -0.0326
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.5937,
+     "mean": 0.0185,
+     "mean_won": 0.0402,
+     "mean_lost": -0.004
+    },
+    "d_hand_part": {
+     "auc": 0.5213,
+     "mean": 0.0515,
+     "mean_won": 0.0764,
+     "mean_lost": 0.0258
+    },
+    "d_body_part": {
+     "auc": 0.4958,
+     "mean": -0.0079,
+     "mean_won": -0.0082,
+     "mean_lost": -0.0077
+    },
+    "d_life_raw": {
+     "auc": 0.586,
+     "mean": 0.1356,
+     "mean_won": 0.2954,
+     "mean_lost": -0.0293
+    },
+    "d_hand_raw": {
+     "auc": 0.5085,
+     "mean": 0.1122,
+     "mean_won": 0.1313,
+     "mean_lost": 0.0926
+    },
+    "abs_share_theta": 0.459,
+    "corr_logratio_static": 1.0
+   },
+   "7+": {
+    "rows": 1939,
+    "units": 600,
+    "D": {
+     "auc": 0.8013,
+     "mean": -0.2559,
+     "mean_won": 0.9772,
+     "mean_lost": -1.6853
+    },
+    "logratio": {
+     "auc": 0.7932,
+     "mean": -0.3428,
+     "mean_won": 0.465,
+     "mean_lost": -1.2792
+    },
+    "lr_theta": {
+     "auc": 0.7032,
+     "mean": -0.344,
+     "mean_won": 0.2788,
+     "mean_lost": -1.066
+    },
+    "lr_speed": {
+     "auc": 0.6058,
+     "mean": 0.0568,
+     "mean_won": 0.1417,
+     "mean_lost": -0.0417
+    },
+    "d_theta": {
+     "auc": 0.7078,
+     "mean": -0.0814,
+     "mean_won": 0.0648,
+     "mean_lost": -0.251
+    },
+    "d_speed": {
+     "auc": 0.6128,
+     "mean": -0.0074,
+     "mean_won": 0.0245,
+     "mean_lost": -0.0443
+    },
+    "d_board": {
+     "auc": 0.6128,
+     "mean": -0.0074,
+     "mean_won": 0.0245,
+     "mean_lost": -0.0443
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.6247,
+     "mean": 0.0676,
+     "mean_won": 0.1168,
+     "mean_lost": 0.0105
+    },
+    "d_hand_part": {
+     "auc": 0.6259,
+     "mean": 0.0431,
+     "mean_won": 0.0923,
+     "mean_lost": -0.014
+    },
+    "d_body_part": {
+     "auc": 0.5627,
+     "mean": 0.0011,
+     "mean_won": 0.0186,
+     "mean_lost": -0.0192
+    },
+    "d_life_raw": {
+     "auc": 0.626,
+     "mean": 0.4961,
+     "mean_won": 0.8578,
+     "mean_lost": 0.0768
+    },
+    "d_hand_raw": {
+     "auc": 0.5687,
+     "mean": 0.1243,
+     "mean_won": 0.4476,
+     "mean_lost": -0.2506
+    },
+    "abs_share_theta": 0.648,
+    "corr_logratio_static": 0.988
+   }
+  },
+  "by_color": {
+   "赤": {
+    "rows": 1027,
+    "units": 184,
+    "D": {
+     "auc": 0.7498,
+     "mean": -0.3858,
+     "mean_won": 0.8111,
+     "mean_lost": -1.6722
+    },
+    "logratio": {
+     "auc": 0.7445,
+     "mean": -0.3774,
+     "mean_won": 0.1603,
+     "mean_lost": -0.9552
+    },
+    "lr_theta": {
+     "auc": 0.6246,
+     "mean": -0.3717,
+     "mean_won": 0.0031,
+     "mean_lost": -0.7745
+    },
+    "lr_speed": {
+     "auc": 0.6257,
+     "mean": 0.0532,
+     "mean_won": 0.1526,
+     "mean_lost": -0.0537
+    },
+    "d_theta": {
+     "auc": 0.6202,
+     "mean": -0.1347,
+     "mean_won": -0.0531,
+     "mean_lost": -0.2223
+    },
+    "d_speed": {
+     "auc": 0.6286,
+     "mean": -0.0055,
+     "mean_won": 0.0226,
+     "mean_lost": -0.0357
+    },
+    "d_board": {
+     "auc": 0.6286,
+     "mean": -0.0055,
+     "mean_won": 0.0226,
+     "mean_lost": -0.0357
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.6223,
+     "mean": 0.0138,
+     "mean_won": 0.0556,
+     "mean_lost": -0.0318
+    },
+    "d_hand_part": {
+     "auc": 0.5561,
+     "mean": 0.0049,
+     "mean_won": 0.0259,
+     "mean_lost": -0.018
+    },
+    "d_body_part": {
+     "auc": 0.5178,
+     "mean": -0.0173,
+     "mean_won": -0.0114,
+     "mean_lost": -0.0237
+    },
+    "d_life_raw": {
+     "auc": 0.621,
+     "mean": 0.101,
+     "mean_won": 0.4082,
+     "mean_lost": -0.2332
+    },
+    "d_hand_raw": {
+     "auc": 0.4866,
+     "mean": 0.1267,
+     "mean_won": 0.1031,
+     "mean_lost": 0.1525
+    },
+    "abs_share_theta": 0.609,
+    "corr_logratio_static": 0.987
+   },
+   "緑": {
+    "rows": 729,
+    "units": 129,
+    "D": {
+     "auc": 0.6915,
+     "mean": -0.5126,
+     "mean_won": 0.0403,
+     "mean_lost": -1.0608
+    },
+    "logratio": {
+     "auc": 0.7047,
+     "mean": -0.4543,
+     "mean_won": 0.0551,
+     "mean_lost": -0.9596
+    },
+    "lr_theta": {
+     "auc": 0.6113,
+     "mean": -0.4257,
+     "mean_won": -0.027,
+     "mean_lost": -0.821
+    },
+    "lr_speed": {
+     "auc": 0.6036,
+     "mean": 0.0694,
+     "mean_won": 0.1174,
+     "mean_lost": 0.0218
+    },
+    "d_theta": {
+     "auc": 0.6025,
+     "mean": -0.1139,
+     "mean_won": -0.0452,
+     "mean_lost": -0.1819
+    },
+    "d_speed": {
+     "auc": 0.607,
+     "mean": 0.0005,
+     "mean_won": 0.0201,
+     "mean_lost": -0.019
+    },
+    "d_board": {
+     "auc": 0.607,
+     "mean": 0.0005,
+     "mean_won": 0.0201,
+     "mean_lost": -0.019
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.5777,
+     "mean": 0.0224,
+     "mean_won": 0.051,
+     "mean_lost": -0.0056
+    },
+    "d_hand_part": {
+     "auc": 0.5489,
+     "mean": 0.0131,
+     "mean_won": 0.0361,
+     "mean_lost": -0.0094
+    },
+    "d_body_part": {
+     "auc": 0.51,
+     "mean": -0.0074,
+     "mean_won": -0.0008,
+     "mean_lost": -0.0138
+    },
+    "d_life_raw": {
+     "auc": 0.5843,
+     "mean": 0.1642,
+     "mean_won": 0.3746,
+     "mean_lost": -0.0413
+    },
+    "d_hand_raw": {
+     "auc": 0.5834,
+     "mean": 0.0388,
+     "mean_won": 0.4562,
+     "mean_lost": -0.3687
+    },
+    "abs_share_theta": 0.649,
+    "corr_logratio_static": 0.99
+   },
+   "青": {
+    "rows": 937,
+    "units": 163,
+    "D": {
+     "auc": 0.7508,
+     "mean": -0.937,
+     "mean_won": 0.3845,
+     "mean_lost": -2.0674
+    },
+    "logratio": {
+     "auc": 0.7409,
+     "mean": -0.5117,
+     "mean_won": -0.1027,
+     "mean_lost": -0.8616
+    },
+    "lr_theta": {
+     "auc": 0.6446,
+     "mean": -0.4492,
+     "mean_won": -0.1684,
+     "mean_lost": -0.6895
+    },
+    "lr_speed": {
+     "auc": 0.5882,
+     "mean": 0.0021,
+     "mean_won": 0.0993,
+     "mean_lost": -0.081
+    },
+    "d_theta": {
+     "auc": 0.6449,
+     "mean": -0.1316,
+     "mean_won": 0.0043,
+     "mean_lost": -0.248
+    },
+    "d_speed": {
+     "auc": 0.5779,
+     "mean": -0.0153,
+     "mean_won": 0.0048,
+     "mean_lost": -0.0325
+    },
+    "d_board": {
+     "auc": 0.5779,
+     "mean": -0.0153,
+     "mean_won": 0.0048,
+     "mean_lost": -0.0325
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.5874,
+     "mean": 0.0204,
+     "mean_won": 0.0543,
+     "mean_lost": -0.0092
+    },
+    "d_hand_part": {
+     "auc": 0.5966,
+     "mean": -0.0142,
+     "mean_won": 0.0485,
+     "mean_lost": -0.069
+    },
+    "d_body_part": {
+     "auc": 0.5361,
+     "mean": -0.0075,
+     "mean_won": 0.0063,
+     "mean_lost": -0.0194
+    },
+    "d_life_raw": {
+     "auc": 0.5829,
+     "mean": 0.1495,
+     "mean_won": 0.3985,
+     "mean_lost": -0.0678
+    },
+    "d_hand_raw": {
+     "auc": 0.5828,
+     "mean": 0.2453,
+     "mean_won": 0.6566,
+     "mean_lost": -0.1138
+    },
+    "abs_share_theta": 0.576,
+    "corr_logratio_static": 0.985
+   },
+   "紫": {
+    "rows": 717,
+    "units": 128,
+    "D": {
+     "auc": 0.7844,
+     "mean": -0.44,
+     "mean_won": 1.1329,
+     "mean_lost": -1.8427
+    },
+    "logratio": {
+     "auc": 0.7771,
+     "mean": -0.3674,
+     "mean_won": 0.1469,
+     "mean_lost": -0.8261
+    },
+    "lr_theta": {
+     "auc": 0.655,
+     "mean": -0.3603,
+     "mean_won": -0.0113,
+     "mean_lost": -0.6716
+    },
+    "lr_speed": {
+     "auc": 0.6529,
+     "mean": 0.0371,
+     "mean_won": 0.169,
+     "mean_lost": -0.0806
+    },
+    "d_theta": {
+     "auc": 0.6588,
+     "mean": -0.1455,
+     "mean_won": -0.0362,
+     "mean_lost": -0.2429
+    },
+    "d_speed": {
+     "auc": 0.6524,
+     "mean": -0.0093,
+     "mean_won": 0.032,
+     "mean_lost": -0.0461
+    },
+    "d_board": {
+     "auc": 0.6524,
+     "mean": -0.0093,
+     "mean_won": 0.032,
+     "mean_lost": -0.0461
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.6118,
+     "mean": 0.0209,
+     "mean_won": 0.0598,
+     "mean_lost": -0.0142
+    },
+    "d_hand_part": {
+     "auc": 0.5646,
+     "mean": -0.0176,
+     "mean_won": 0.01,
+     "mean_lost": -0.0425
+    },
+    "d_body_part": {
+     "auc": 0.5792,
+     "mean": -0.007,
+     "mean_won": 0.0179,
+     "mean_lost": -0.0294
+    },
+    "d_life_raw": {
+     "auc": 0.6132,
+     "mean": 0.1535,
+     "mean_won": 0.4391,
+     "mean_lost": -0.104
+    },
+    "d_hand_raw": {
+     "auc": 0.5358,
+     "mean": 0.1535,
+     "mean_won": 0.3077,
+     "mean_lost": 0.0145
+    },
+    "abs_share_theta": 0.582,
+    "corr_logratio_static": 0.985
+   },
+   "黒": {
+    "rows": 745,
+    "units": 132,
+    "D": {
+     "auc": 0.7393,
+     "mean": -0.193,
+     "mean_won": 0.5546,
+     "mean_lost": -1.0504
+    },
+    "logratio": {
+     "auc": 0.7386,
+     "mean": -0.1498,
+     "mean_won": 0.3238,
+     "mean_lost": -0.693
+    },
+    "lr_theta": {
+     "auc": 0.6496,
+     "mean": -0.1749,
+     "mean_won": 0.1645,
+     "mean_lost": -0.5642
+    },
+    "lr_speed": {
+     "auc": 0.6106,
+     "mean": 0.0515,
+     "mean_won": 0.1382,
+     "mean_lost": -0.048
+    },
+    "d_theta": {
+     "auc": 0.6384,
+     "mean": -0.0656,
+     "mean_won": 0.0158,
+     "mean_lost": -0.1591
+    },
+    "d_speed": {
+     "auc": 0.6114,
+     "mean": 0.0073,
+     "mean_won": 0.0345,
+     "mean_lost": -0.024
+    },
+    "d_board": {
+     "auc": 0.6114,
+     "mean": 0.0073,
+     "mean_won": 0.0345,
+     "mean_lost": -0.024
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.6208,
+     "mean": 0.0297,
+     "mean_won": 0.0675,
+     "mean_lost": -0.0133
+    },
+    "d_hand_part": {
+     "auc": 0.5661,
+     "mean": 0.0426,
+     "mean_won": 0.0681,
+     "mean_lost": 0.0135
+    },
+    "d_body_part": {
+     "auc": 0.5294,
+     "mean": -0.0042,
+     "mean_won": 0.0053,
+     "mean_lost": -0.0149
+    },
+    "d_life_raw": {
+     "auc": 0.6187,
+     "mean": 0.2183,
+     "mean_won": 0.4958,
+     "mean_lost": -0.0978
+    },
+    "d_hand_raw": {
+     "auc": 0.5384,
+     "mean": -0.1519,
+     "mean_won": -0.0277,
+     "mean_lost": -0.2934
+    },
+    "abs_share_theta": 0.641,
+    "corr_logratio_static": 0.991
+   },
+   "黄": {
+    "rows": 821,
+    "units": 143,
+    "D": {
+     "auc": 0.7448,
+     "mean": -0.043,
+     "mean_won": 0.613,
+     "mean_lost": -0.9214
+    },
+    "logratio": {
+     "auc": 0.746,
+     "mean": -0.0442,
+     "mean_won": 0.4519,
+     "mean_lost": -0.7084
+    },
+    "lr_theta": {
+     "auc": 0.7019,
+     "mean": -0.0018,
+     "mean_won": 0.4328,
+     "mean_lost": -0.5837
+    },
+    "lr_speed": {
+     "auc": 0.5349,
+     "mean": -0.0382,
+     "mean_won": -0.0489,
+     "mean_lost": -0.0239
+    },
+    "d_theta": {
+     "auc": 0.6977,
+     "mean": 0.0473,
+     "mean_won": 0.179,
+     "mean_lost": -0.1291
+    },
+    "d_speed": {
+     "auc": 0.5436,
+     "mean": -0.0159,
+     "mean_won": -0.0108,
+     "mean_lost": -0.0229
+    },
+    "d_board": {
+     "auc": 0.5436,
+     "mean": -0.0159,
+     "mean_won": -0.0108,
+     "mean_lost": -0.0229
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.7215,
+     "mean": 0.0482,
+     "mean_won": 0.1216,
+     "mean_lost": -0.0489
+    },
+    "d_hand_part": {
+     "auc": 0.6374,
+     "mean": 0.1386,
+     "mean_won": 0.1912,
+     "mean_lost": 0.0689
+    },
+    "d_body_part": {
+     "auc": 0.5203,
+     "mean": 0.006,
+     "mean_won": 0.0111,
+     "mean_lost": -0.0007
+    },
+    "d_life_raw": {
+     "auc": 0.7112,
+     "mean": 0.3542,
+     "mean_won": 0.8925,
+     "mean_lost": -0.3591
+    },
+    "d_hand_raw": {
+     "auc": 0.5277,
+     "mean": -0.1598,
+     "mean_won": -0.0678,
+     "mean_lost": -0.2817
+    },
+    "abs_share_theta": 0.665,
+    "corr_logratio_static": 0.99
+   }
+  },
+  "by_color_band": {
+   "赤|1-3": {
+    "rows": 184,
+    "units": 184,
+    "D": {
+     "auc": 0.6724,
+     "mean": -0.7266,
+     "mean_won": 0.2416,
+     "mean_lost": -1.6947
+    },
+    "logratio": {
+     "auc": 0.6728,
+     "mean": -0.1132,
+     "mean_won": -0.001,
+     "mean_lost": -0.2254
+    },
+    "lr_theta": {
+     "auc": 0.4674,
+     "mean": -0.0632,
+     "mean_won": -0.0801,
+     "mean_lost": -0.0463
+    },
+    "lr_speed": {
+     "auc": 0.6581,
+     "mean": -0.05,
+     "mean_won": 0.0791,
+     "mean_lost": -0.1791
+    },
+    "d_theta": {
+     "auc": 0.4647,
+     "mean": -0.0794,
+     "mean_won": -0.1043,
+     "mean_lost": -0.0544
+    },
+    "d_speed": {
+     "auc": 0.6732,
+     "mean": -0.0099,
+     "mean_won": 0.009,
+     "mean_lost": -0.0288
+    },
+    "d_board": {
+     "auc": 0.6732,
+     "mean": -0.0099,
+     "mean_won": 0.009,
+     "mean_lost": -0.0288
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.6522,
+     "mean": -0.0402,
+     "mean_won": -0.0121,
+     "mean_lost": -0.0697
+    },
+    "d_hand_part": {
+     "auc": 0.4331,
+     "mean": 0.0103,
+     "mean_won": -0.0494,
+     "mean_lost": 0.0727
+    },
+    "d_body_part": {
+     "auc": 0.4494,
+     "mean": -0.0387,
+     "mean_won": -0.0428,
+     "mean_lost": -0.0344
+    },
+    "d_life_raw": {
+     "auc": 0.6258,
+     "mean": -0.2955,
+     "mean_won": -0.0889,
+     "mean_lost": -0.5116
+    },
+    "d_hand_raw": {
+     "auc": 0.501,
+     "mean": -0.5227,
+     "mean_won": -0.5111,
+     "mean_lost": -0.5349
+    },
+    "abs_share_theta": 0.43,
+    "corr_logratio_static": 1.0
+   },
+   "赤|4-6": {
+    "rows": 280,
+    "units": 184,
+    "D": {
+     "auc": 0.6705,
+     "mean": -0.6959,
+     "mean_won": 0.0485,
+     "mean_lost": -1.4296
+    },
+    "logratio": {
+     "auc": 0.6684,
+     "mean": -0.1642,
+     "mean_won": -0.0498,
+     "mean_lost": -0.277
+    },
+    "lr_theta": {
+     "auc": 0.5425,
+     "mean": -0.1377,
+     "mean_won": -0.113,
+     "mean_lost": -0.162
+    },
+    "lr_speed": {
+     "auc": 0.6282,
+     "mean": -0.0265,
+     "mean_won": 0.0632,
+     "mean_lost": -0.115
+    },
+    "d_theta": {
+     "auc": 0.5414,
+     "mean": -0.1612,
+     "mean_won": -0.1308,
+     "mean_lost": -0.1911
+    },
+    "d_speed": {
+     "auc": 0.6272,
+     "mean": -0.0079,
+     "mean_won": 0.0097,
+     "mean_lost": -0.0253
+    },
+    "d_board": {
+     "auc": 0.6272,
+     "mean": -0.0079,
+     "mean_won": 0.0097,
+     "mean_lost": -0.0253
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.5615,
+     "mean": -0.0146,
+     "mean_won": 0.002,
+     "mean_lost": -0.0309
+    },
+    "d_hand_part": {
+     "auc": 0.4747,
+     "mean": -0.0459,
+     "mean_won": -0.05,
+     "mean_lost": -0.0418
+    },
+    "d_body_part": {
+     "auc": 0.4892,
+     "mean": -0.0132,
+     "mean_won": -0.0144,
+     "mean_lost": -0.0121
+    },
+    "d_life_raw": {
+     "auc": 0.5554,
+     "mean": -0.1071,
+     "mean_won": 0.0144,
+     "mean_lost": -0.227
+    },
+    "d_hand_raw": {
+     "auc": 0.4386,
+     "mean": 0.2107,
+     "mean_won": 0.0504,
+     "mean_lost": 0.3688
+    },
+    "abs_share_theta": 0.474,
+    "corr_logratio_static": 1.0
+   },
+   "赤|7+": {
+    "rows": 563,
+    "units": 184,
+    "D": {
+     "auc": 0.813,
+     "mean": -0.1203,
+     "mean_won": 1.3373,
+     "mean_lost": -1.7949
+    },
+    "logratio": {
+     "auc": 0.795,
+     "mean": -0.5697,
+     "mean_won": 0.3066,
+     "mean_lost": -1.5765
+    },
+    "lr_theta": {
+     "auc": 0.6953,
+     "mean": -0.5889,
+     "mean_won": 0.0821,
+     "mean_lost": -1.3598
+    },
+    "lr_speed": {
+     "auc": 0.6148,
+     "mean": 0.1266,
+     "mean_won": 0.2164,
+     "mean_lost": 0.0233
+    },
+    "d_theta": {
+     "auc": 0.705,
+     "mean": -0.1396,
+     "mean_won": -0.0016,
+     "mean_lost": -0.2981
+    },
+    "d_speed": {
+     "auc": 0.6216,
+     "mean": -0.0029,
+     "mean_won": 0.0326,
+     "mean_lost": -0.0438
+    },
+    "d_board": {
+     "auc": 0.6216,
+     "mean": -0.0029,
+     "mean_won": 0.0326,
+     "mean_lost": -0.0438
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.6388,
+     "mean": 0.0363,
+     "mean_won": 0.0905,
+     "mean_lost": -0.026
+    },
+    "d_hand_part": {
+     "auc": 0.6223,
+     "mean": 0.0293,
+     "mean_won": 0.0723,
+     "mean_lost": -0.02
+    },
+    "d_body_part": {
+     "auc": 0.5393,
+     "mean": -0.016,
+     "mean_won": -0.0054,
+     "mean_lost": -0.0282
+    },
+    "d_life_raw": {
+     "auc": 0.642,
+     "mean": 0.2664,
+     "mean_won": 0.6645,
+     "mean_lost": -0.1908
+    },
+    "d_hand_raw": {
+     "auc": 0.5016,
+     "mean": 0.1865,
+     "mean_won": 0.2193,
+     "mean_lost": 0.1489
+    },
+    "abs_share_theta": 0.639,
+    "corr_logratio_static": 0.987
+   },
+   "緑|1-3": {
+    "rows": 129,
+    "units": 129,
+    "D": {
+     "auc": 0.5768,
+     "mean": -0.4389,
+     "mean_won": -0.2882,
+     "mean_lost": -0.5784
+    },
+    "logratio": {
+     "auc": 0.5818,
+     "mean": -0.0732,
+     "mean_won": -0.0333,
+     "mean_lost": -0.1102
+    },
+    "lr_theta": {
+     "auc": 0.5323,
+     "mean": -0.0702,
+     "mean_won": -0.0443,
+     "mean_lost": -0.0942
+    },
+    "lr_speed": {
+     "auc": 0.5691,
+     "mean": -0.003,
+     "mean_won": 0.011,
+     "mean_lost": -0.016
+    },
+    "d_theta": {
+     "auc": 0.5313,
+     "mean": -0.1054,
+     "mean_won": -0.0836,
+     "mean_lost": -0.1255
+    },
+    "d_speed": {
+     "auc": 0.5732,
+     "mean": -0.0002,
+     "mean_won": 0.0024,
+     "mean_lost": -0.0025
+    },
+    "d_board": {
+     "auc": 0.5732,
+     "mean": -0.0002,
+     "mean_won": 0.0024,
+     "mean_lost": -0.0025
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.5813,
+     "mean": -0.0331,
+     "mean_won": -0.0227,
+     "mean_lost": -0.0409
+    },
+    "d_hand_part": {
+     "auc": 0.5117,
+     "mean": -0.0752,
+     "mean_won": -0.0315,
+     "mean_lost": -0.108
+    },
+    "d_body_part": {
+     "auc": 0.4525,
+     "mean": -0.0321,
+     "mean_won": -0.0412,
+     "mean_lost": -0.0254
+    },
+    "d_life_raw": {
+     "auc": 0.5471,
+     "mean": -0.2429,
+     "mean_won": -0.1667,
+     "mean_lost": -0.3
+    },
+    "d_hand_raw": {
+     "auc": 0.5183,
+     "mean": -0.6714,
+     "mean_won": -0.6,
+     "mean_lost": -0.725
+    },
+    "abs_share_theta": 0.525,
+    "corr_logratio_static": 1.0
+   },
+   "緑|4-6": {
+    "rows": 188,
+    "units": 129,
+    "D": {
+     "auc": 0.6374,
+     "mean": -0.5756,
+     "mean_won": -0.239,
+     "mean_lost": -0.9122
+    },
+    "logratio": {
+     "auc": 0.6478,
+     "mean": -0.1073,
+     "mean_won": -0.0274,
+     "mean_lost": -0.1871
+    },
+    "lr_theta": {
+     "auc": 0.512,
+     "mean": -0.0692,
+     "mean_won": -0.0587,
+     "mean_lost": -0.0797
+    },
+    "lr_speed": {
+     "auc": 0.6427,
+     "mean": -0.0381,
+     "mean_won": 0.0312,
+     "mean_lost": -0.1074
+    },
+    "d_theta": {
+     "auc": 0.5136,
+     "mean": -0.1111,
+     "mean_won": -0.1118,
+     "mean_lost": -0.1103
+    },
+    "d_speed": {
+     "auc": 0.6515,
+     "mean": -0.0059,
+     "mean_won": 0.0101,
+     "mean_lost": -0.0218
+    },
+    "d_board": {
+     "auc": 0.6515,
+     "mean": -0.0059,
+     "mean_won": 0.0101,
+     "mean_lost": -0.0218
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.5634,
+     "mean": 0.0058,
+     "mean_won": 0.0275,
+     "mean_lost": -0.0159
+    },
+    "d_hand_part": {
+     "auc": 0.4882,
+     "mean": -0.0223,
+     "mean_won": -0.0349,
+     "mean_lost": -0.0098
+    },
+    "d_body_part": {
+     "auc": 0.4522,
+     "mean": -0.0185,
+     "mean_won": -0.0245,
+     "mean_lost": -0.0124
+    },
+    "d_life_raw": {
+     "auc": 0.5865,
+     "mean": 0.0426,
+     "mean_won": 0.2021,
+     "mean_lost": -0.117
+    },
+    "d_hand_raw": {
+     "auc": 0.5114,
+     "mean": 0.1117,
+     "mean_won": 0.1277,
+     "mean_lost": 0.0957
+    },
+    "abs_share_theta": 0.497,
+    "corr_logratio_static": 1.0
+   },
+   "緑|7+": {
+    "rows": 412,
+    "units": 129,
+    "D": {
+     "auc": 0.7526,
+     "mean": -0.5069,
+     "mean_won": 0.2655,
+     "mean_lost": -1.2867
+    },
+    "logratio": {
+     "auc": 0.7569,
+     "mean": -0.732,
+     "mean_won": 0.119,
+     "mean_lost": -1.5914
+    },
+    "lr_theta": {
+     "auc": 0.6683,
+     "mean": -0.6996,
+     "mean_won": -0.0075,
+     "mean_lost": -1.3985
+    },
+    "lr_speed": {
+     "auc": 0.5991,
+     "mean": 0.1411,
+     "mean_won": 0.1884,
+     "mean_lost": 0.0933
+    },
+    "d_theta": {
+     "auc": 0.6649,
+     "mean": -0.1178,
+     "mean_won": -0.0035,
+     "mean_lost": -0.2332
+    },
+    "d_speed": {
+     "auc": 0.6043,
+     "mean": 0.0035,
+     "mean_won": 0.0299,
+     "mean_lost": -0.0231
+    },
+    "d_board": {
+     "auc": 0.6043,
+     "mean": 0.0035,
+     "mean_won": 0.0299,
+     "mean_lost": -0.0231
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.5756,
+     "mean": 0.0393,
+     "mean_won": 0.0724,
+     "mean_lost": 0.006
+    },
+    "d_hand_part": {
+     "auc": 0.5888,
+     "mean": 0.0442,
+     "mean_won": 0.0781,
+     "mean_lost": 0.01
+    },
+    "d_body_part": {
+     "auc": 0.5357,
+     "mean": 0.0019,
+     "mean_won": 0.0159,
+     "mean_lost": -0.0122
+    },
+    "d_life_raw": {
+     "auc": 0.5848,
+     "mean": 0.2888,
+     "mean_won": 0.5314,
+     "mean_lost": 0.0439
+    },
+    "d_hand_raw": {
+     "auc": 0.6172,
+     "mean": 0.1262,
+     "mean_won": 0.7585,
+     "mean_lost": -0.5122
+    },
+    "abs_share_theta": 0.676,
+    "corr_logratio_static": 0.99
+   },
+   "青|1-3": {
+    "rows": 163,
+    "units": 163,
+    "D": {
+     "auc": 0.6603,
+     "mean": -0.9226,
+     "mean_won": 0.2245,
+     "mean_lost": -1.8079
+    },
+    "logratio": {
+     "auc": 0.6612,
+     "mean": -0.1372,
+     "mean_won": -0.0031,
+     "mean_lost": -0.2408
+    },
+    "lr_theta": {
+     "auc": 0.556,
+     "mean": -0.076,
+     "mean_won": -0.0335,
+     "mean_lost": -0.1089
+    },
+    "lr_speed": {
+     "auc": 0.5865,
+     "mean": -0.0612,
+     "mean_won": 0.0305,
+     "mean_lost": -0.1319
+    },
+    "d_theta": {
+     "auc": 0.5505,
+     "mean": -0.1052,
+     "mean_won": -0.0328,
+     "mean_lost": -0.161
+    },
+    "d_speed": {
+     "auc": 0.5759,
+     "mean": -0.0111,
+     "mean_won": -0.0008,
+     "mean_lost": -0.019
+    },
+    "d_board": {
+     "auc": 0.5759,
+     "mean": -0.0111,
+     "mean_won": -0.0008,
+     "mean_lost": -0.019
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.5114,
+     "mean": -0.0299,
+     "mean_won": -0.0251,
+     "mean_lost": -0.034
+    },
+    "d_hand_part": {
+     "auc": 0.4898,
+     "mean": -0.0903,
+     "mean_won": -0.0594,
+     "mean_lost": -0.1169
+    },
+    "d_body_part": {
+     "auc": 0.4444,
+     "mean": -0.0241,
+     "mean_won": -0.03,
+     "mean_lost": -0.0189
+    },
+    "d_life_raw": {
+     "auc": 0.5191,
+     "mean": -0.2195,
+     "mean_won": -0.1842,
+     "mean_lost": -0.25
+    },
+    "d_hand_raw": {
+     "auc": 0.6579,
+     "mean": -0.6463,
+     "mean_won": -0.4211,
+     "mean_lost": -0.8409
+    },
+    "abs_share_theta": 0.429,
+    "corr_logratio_static": 1.0
+   },
+   "青|4-6": {
+    "rows": 244,
+    "units": 163,
+    "D": {
+     "auc": 0.7029,
+     "mean": -1.057,
+     "mean_won": -0.1222,
+     "mean_lost": -1.7515
+    },
+    "logratio": {
+     "auc": 0.6963,
+     "mean": -0.1961,
+     "mean_won": -0.043,
+     "mean_lost": -0.3099
+    },
+    "lr_theta": {
+     "auc": 0.6015,
+     "mean": -0.123,
+     "mean_won": -0.048,
+     "mean_lost": -0.1787
+    },
+    "lr_speed": {
+     "auc": 0.5884,
+     "mean": -0.0731,
+     "mean_won": 0.0049,
+     "mean_lost": -0.1311
+    },
+    "d_theta": {
+     "auc": 0.5968,
+     "mean": -0.1476,
+     "mean_won": -0.042,
+     "mean_lost": -0.2261
+    },
+    "d_speed": {
+     "auc": 0.5826,
+     "mean": -0.0122,
+     "mean_won": 0.0014,
+     "mean_lost": -0.0224
+    },
+    "d_board": {
+     "auc": 0.5826,
+     "mean": -0.0122,
+     "mean_won": 0.0014,
+     "mean_lost": -0.0224
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.5824,
+     "mean": -0.0112,
+     "mean_won": 0.0065,
+     "mean_lost": -0.0243
+    },
+    "d_hand_part": {
+     "auc": 0.5683,
+     "mean": -0.0304,
+     "mean_won": 0.042,
+     "mean_lost": -0.0841
+    },
+    "d_body_part": {
+     "auc": 0.5435,
+     "mean": -0.0096,
+     "mean_won": 0.0004,
+     "mean_lost": -0.0171
+    },
+    "d_life_raw": {
+     "auc": 0.5623,
+     "mean": -0.082,
+     "mean_won": 0.0481,
+     "mean_lost": -0.1786
+    },
+    "d_hand_raw": {
+     "auc": 0.5636,
+     "mean": 0.3279,
+     "mean_won": 0.5385,
+     "mean_lost": 0.1714
+    },
+    "abs_share_theta": 0.441,
+    "corr_logratio_static": 1.0
+   },
+   "青|7+": {
+    "rows": 530,
+    "units": 163,
+    "D": {
+     "auc": 0.7985,
+     "mean": -0.8861,
+     "mean_won": 0.6337,
+     "mean_lost": -2.3168
+    },
+    "logratio": {
+     "auc": 0.7807,
+     "mean": -0.7722,
+     "mean_won": -0.1543,
+     "mean_lost": -1.3538
+    },
+    "lr_theta": {
+     "auc": 0.686,
+     "mean": -0.7142,
+     "mean_won": -0.2544,
+     "mean_lost": -1.1471
+    },
+    "lr_speed": {
+     "auc": 0.5919,
+     "mean": 0.0562,
+     "mean_won": 0.1565,
+     "mean_lost": -0.0382
+    },
+    "d_theta": {
+     "auc": 0.6951,
+     "mean": -0.1324,
+     "mean_won": 0.0333,
+     "mean_lost": -0.2885
+    },
+    "d_speed": {
+     "auc": 0.5858,
+     "mean": -0.018,
+     "mean_won": 0.0077,
+     "mean_lost": -0.0423
+    },
+    "d_board": {
+     "auc": 0.5858,
+     "mean": -0.018,
+     "mean_won": 0.0077,
+     "mean_lost": -0.0423
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.5984,
+     "mean": 0.0427,
+     "mean_won": 0.0853,
+     "mean_lost": 0.0025
+    },
+    "d_hand_part": {
+     "auc": 0.627,
+     "mean": 0.005,
+     "mean_won": 0.0671,
+     "mean_lost": -0.0535
+    },
+    "d_body_part": {
+     "auc": 0.5448,
+     "mean": -0.0039,
+     "mean_won": 0.014,
+     "mean_lost": -0.0207
+    },
+    "d_life_raw": {
+     "auc": 0.5972,
+     "mean": 0.3132,
+     "mean_won": 0.6265,
+     "mean_lost": 0.0183
+    },
+    "d_hand_raw": {
+     "auc": 0.5923,
+     "mean": 0.3453,
+     "mean_won": 0.8638,
+     "mean_lost": -0.1429
+    },
+    "abs_share_theta": 0.609,
+    "corr_logratio_static": 0.986
+   },
+   "紫|1-3": {
+    "rows": 128,
+    "units": 128,
+    "D": {
+     "auc": 0.7297,
+     "mean": -0.6516,
+     "mean_won": 0.8042,
+     "mean_lost": -1.7839
+    },
+    "logratio": {
+     "auc": 0.7336,
+     "mean": -0.1171,
+     "mean_won": 0.0608,
+     "mean_lost": -0.2554
+    },
+    "lr_theta": {
+     "auc": 0.566,
+     "mean": -0.0918,
+     "mean_won": -0.0542,
+     "mean_lost": -0.1212
+    },
+    "lr_speed": {
+     "auc": 0.6687,
+     "mean": -0.0252,
+     "mean_won": 0.115,
+     "mean_lost": -0.1343
+    },
+    "d_theta": {
+     "auc": 0.5623,
+     "mean": -0.1119,
+     "mean_won": -0.0809,
+     "mean_lost": -0.1359
+    },
+    "d_speed": {
+     "auc": 0.6741,
+     "mean": -0.0054,
+     "mean_won": 0.0143,
+     "mean_lost": -0.0207
+    },
+    "d_board": {
+     "auc": 0.6741,
+     "mean": -0.0054,
+     "mean_won": 0.0143,
+     "mean_lost": -0.0207
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.538,
+     "mean": -0.0079,
+     "mean_won": 0.0136,
+     "mean_lost": -0.0244
+    },
+    "d_hand_part": {
+     "auc": 0.5581,
+     "mean": -0.0997,
+     "mean_won": -0.0733,
+     "mean_lost": -0.12
+    },
+    "d_body_part": {
+     "auc": 0.535,
+     "mean": -0.0238,
+     "mean_won": -0.0115,
+     "mean_lost": -0.0332
+    },
+    "d_life_raw": {
+     "auc": 0.5842,
+     "mean": -0.058,
+     "mean_won": 0.1,
+     "mean_lost": -0.1795
+    },
+    "d_hand_raw": {
+     "auc": 0.4671,
+     "mean": -0.6957,
+     "mean_won": -0.7667,
+     "mean_lost": -0.641
+    },
+    "abs_share_theta": 0.464,
+    "corr_logratio_static": 1.0
+   },
+   "紫|4-6": {
+    "rows": 187,
+    "units": 128,
+    "D": {
+     "auc": 0.7706,
+     "mean": -0.5086,
+     "mean_won": 1.0756,
+     "mean_lost": -1.7459
+    },
+    "logratio": {
+     "auc": 0.7719,
+     "mean": -0.1416,
+     "mean_won": 0.0925,
+     "mean_lost": -0.3245
+    },
+    "lr_theta": {
+     "auc": 0.6034,
+     "mean": -0.0935,
+     "mean_won": -0.0383,
+     "mean_lost": -0.1366
+    },
+    "lr_speed": {
+     "auc": 0.6779,
+     "mean": -0.0481,
+     "mean_won": 0.1308,
+     "mean_lost": -0.1878
+    },
+    "d_theta": {
+     "auc": 0.5948,
+     "mean": -0.1137,
+     "mean_won": -0.0484,
+     "mean_lost": -0.1648
+    },
+    "d_speed": {
+     "auc": 0.6801,
+     "mean": -0.0139,
+     "mean_won": 0.0184,
+     "mean_lost": -0.0391
+    },
+    "d_board": {
+     "auc": 0.6801,
+     "mean": -0.0139,
+     "mean_won": 0.0184,
+     "mean_lost": -0.0391
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.5566,
+     "mean": 0.0029,
+     "mean_won": 0.0133,
+     "mean_lost": -0.0052
+    },
+    "d_hand_part": {
+     "auc": 0.5296,
+     "mean": -0.0387,
+     "mean_won": -0.0106,
+     "mean_lost": -0.0607
+    },
+    "d_body_part": {
+     "auc": 0.516,
+     "mean": 0.0043,
+     "mean_won": 0.0133,
+     "mean_lost": -0.0027
+    },
+    "d_life_raw": {
+     "auc": 0.5389,
+     "mean": 0.0214,
+     "mean_won": 0.0976,
+     "mean_lost": -0.0381
+    },
+    "d_hand_raw": {
+     "auc": 0.4977,
+     "mean": -0.0695,
+     "mean_won": -0.0122,
+     "mean_lost": -0.1143
+    },
+    "abs_share_theta": 0.42,
+    "corr_logratio_static": 1.0
+   },
+   "紫|7+": {
+    "rows": 402,
+    "units": 128,
+    "D": {
+     "auc": 0.8129,
+     "mean": -0.3407,
+     "mean_won": 1.2484,
+     "mean_lost": -1.914
+    },
+    "logratio": {
+     "auc": 0.8008,
+     "mean": -0.5521,
+     "mean_won": 0.1934,
+     "mean_lost": -1.2902
+    },
+    "lr_theta": {
+     "auc": 0.7097,
+     "mean": -0.5699,
+     "mean_won": 0.0118,
+     "mean_lost": -1.1459
+    },
+    "lr_speed": {
+     "auc": 0.6375,
+     "mean": 0.0965,
+     "mean_won": 0.1998,
+     "mean_lost": -0.0058
+    },
+    "d_theta": {
+     "auc": 0.7275,
+     "mean": -0.1709,
+     "mean_won": -0.0187,
+     "mean_lost": -0.3217
+    },
+    "d_speed": {
+     "auc": 0.6482,
+     "mean": -0.0084,
+     "mean_won": 0.0426,
+     "mean_lost": -0.0589
+    },
+    "d_board": {
+     "auc": 0.6482,
+     "mean": -0.0084,
+     "mean_won": 0.0426,
+     "mean_lost": -0.0589
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.6377,
+     "mean": 0.0342,
+     "mean_won": 0.0858,
+     "mean_lost": -0.0169
+    },
+    "d_hand_part": {
+     "auc": 0.584,
+     "mean": 0.0063,
+     "mean_won": 0.0309,
+     "mean_lost": -0.018
+    },
+    "d_body_part": {
+     "auc": 0.6112,
+     "mean": -0.0093,
+     "mean_won": 0.0242,
+     "mean_lost": -0.0426
+    },
+    "d_life_raw": {
+     "auc": 0.6418,
+     "mean": 0.2512,
+     "mean_won": 0.63,
+     "mean_lost": -0.1238
+    },
+    "d_hand_raw": {
+     "auc": 0.5467,
+     "mean": 0.403,
+     "mean_won": 0.6,
+     "mean_lost": 0.2079
+    },
+    "abs_share_theta": 0.615,
+    "corr_logratio_static": 0.985
+   },
+   "黒|1-3": {
+    "rows": 132,
+    "units": 132,
+    "D": {
+     "auc": 0.6436,
+     "mean": -0.1939,
+     "mean_won": 0.2507,
+     "mean_lost": -0.6522
+    },
+    "logratio": {
+     "auc": 0.6455,
+     "mean": -0.0449,
+     "mean_won": 0.0193,
+     "mean_lost": -0.1111
+    },
+    "lr_theta": {
+     "auc": 0.5486,
+     "mean": -0.0353,
+     "mean_won": -0.0133,
+     "mean_lost": -0.058
+    },
+    "lr_speed": {
+     "auc": 0.591,
+     "mean": -0.0096,
+     "mean_won": 0.0326,
+     "mean_lost": -0.0531
+    },
+    "d_theta": {
+     "auc": 0.5421,
+     "mean": -0.0423,
+     "mean_won": -0.018,
+     "mean_lost": -0.0673
+    },
+    "d_speed": {
+     "auc": 0.5814,
+     "mean": -0.0033,
+     "mean_won": 0.003,
+     "mean_lost": -0.0099
+    },
+    "d_board": {
+     "auc": 0.5814,
+     "mean": -0.0033,
+     "mean_won": 0.003,
+     "mean_lost": -0.0099
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.5962,
+     "mean": -0.0335,
+     "mean_won": -0.0136,
+     "mean_lost": -0.0506
+    },
+    "d_hand_part": {
+     "auc": 0.4895,
+     "mean": 0.0103,
+     "mean_won": 0.014,
+     "mean_lost": 0.0071
+    },
+    "d_body_part": {
+     "auc": 0.5148,
+     "mean": -0.0167,
+     "mean_won": -0.0169,
+     "mean_lost": -0.0165
+    },
+    "d_life_raw": {
+     "auc": 0.589,
+     "mean": -0.2462,
+     "mean_won": -0.1,
+     "mean_lost": -0.3714
+    },
+    "d_hand_raw": {
+     "auc": 0.4743,
+     "mean": -0.8,
+     "mean_won": -0.8333,
+     "mean_lost": -0.7714
+    },
+    "abs_share_theta": 0.443,
+    "corr_logratio_static": 1.0
+   },
+   "黒|4-6": {
+    "rows": 199,
+    "units": 132,
+    "D": {
+     "auc": 0.6632,
+     "mean": -0.3129,
+     "mean_won": 0.1612,
+     "mean_lost": -0.8318
+    },
+    "logratio": {
+     "auc": 0.6606,
+     "mean": -0.0846,
+     "mean_won": 0.0054,
+     "mean_lost": -0.1832
+    },
+    "lr_theta": {
+     "auc": 0.5377,
+     "mean": -0.0679,
+     "mean_won": -0.0519,
+     "mean_lost": -0.0854
+    },
+    "lr_speed": {
+     "auc": 0.6165,
+     "mean": -0.0167,
+     "mean_won": 0.0573,
+     "mean_lost": -0.0978
+    },
+    "d_theta": {
+     "auc": 0.5351,
+     "mean": -0.0711,
+     "mean_won": -0.051,
+     "mean_lost": -0.0931
+    },
+    "d_speed": {
+     "auc": 0.6176,
+     "mean": -0.0058,
+     "mean_won": 0.0076,
+     "mean_lost": -0.0204
+    },
+    "d_board": {
+     "auc": 0.6176,
+     "mean": -0.0058,
+     "mean_won": 0.0076,
+     "mean_lost": -0.0204
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.5967,
+     "mean": -0.0048,
+     "mean_won": 0.0131,
+     "mean_lost": -0.0244
+    },
+    "d_hand_part": {
+     "auc": 0.5079,
+     "mean": 0.0401,
+     "mean_won": 0.0505,
+     "mean_lost": 0.0287
+    },
+    "d_body_part": {
+     "auc": 0.4613,
+     "mean": -0.0151,
+     "mean_won": -0.022,
+     "mean_lost": -0.0075
+    },
+    "d_life_raw": {
+     "auc": 0.5857,
+     "mean": -0.0352,
+     "mean_won": 0.0962,
+     "mean_lost": -0.1789
+    },
+    "d_hand_raw": {
+     "auc": 0.5162,
+     "mean": -0.0603,
+     "mean_won": -0.0385,
+     "mean_lost": -0.0842
+    },
+    "abs_share_theta": 0.482,
+    "corr_logratio_static": 1.0
+   },
+   "黒|7+": {
+    "rows": 414,
+    "units": 132,
+    "D": {
+     "auc": 0.8006,
+     "mean": -0.135,
+     "mean_won": 0.8245,
+     "mean_lost": -1.2998
+    },
+    "logratio": {
+     "auc": 0.7923,
+     "mean": -0.2146,
+     "mean_won": 0.5595,
+     "mean_lost": -1.1542
+    },
+    "lr_theta": {
+     "auc": 0.7157,
+     "mean": -0.2708,
+     "mean_won": 0.3162,
+     "mean_lost": -0.9834
+    },
+    "lr_speed": {
+     "auc": 0.6129,
+     "mean": 0.1037,
+     "mean_won": 0.2064,
+     "mean_lost": -0.0209
+    },
+    "d_theta": {
+     "auc": 0.7101,
+     "mean": -0.0705,
+     "mean_won": 0.0564,
+     "mean_lost": -0.2245
+    },
+    "d_speed": {
+     "auc": 0.6232,
+     "mean": 0.0169,
+     "mean_won": 0.0561,
+     "mean_lost": -0.0307
+    },
+    "d_board": {
+     "auc": 0.6232,
+     "mean": 0.0169,
+     "mean_won": 0.0561,
+     "mean_lost": -0.0307
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.6306,
+     "mean": 0.0563,
+     "mean_won": 0.1032,
+     "mean_lost": -0.0007
+    },
+    "d_hand_part": {
+     "auc": 0.6078,
+     "mean": 0.0488,
+     "mean_won": 0.0833,
+     "mean_lost": 0.0069
+    },
+    "d_body_part": {
+     "auc": 0.5619,
+     "mean": 0.0031,
+     "mean_won": 0.0207,
+     "mean_lost": -0.0184
+    },
+    "d_life_raw": {
+     "auc": 0.6325,
+     "mean": 0.413,
+     "mean_won": 0.7577,
+     "mean_lost": -0.0053
+    },
+    "d_hand_raw": {
+     "auc": 0.5481,
+     "mean": -0.0942,
+     "mean_won": 0.0837,
+     "mean_lost": -0.3102
+    },
+    "abs_share_theta": 0.676,
+    "corr_logratio_static": 0.991
+   },
+   "黄|1-3": {
+    "rows": 143,
+    "units": 143,
+    "D": {
+     "auc": 0.6232,
+     "mean": 0.0285,
+     "mean_won": 0.4084,
+     "mean_lost": -0.4405
+    },
+    "logratio": {
+     "auc": 0.622,
+     "mean": -0.0289,
+     "mean_won": 0.03,
+     "mean_lost": -0.1016
+    },
+    "lr_theta": {
+     "auc": 0.6155,
+     "mean": 0.07,
+     "mean_won": 0.1345,
+     "mean_lost": -0.0095
+    },
+    "lr_speed": {
+     "auc": 0.5131,
+     "mean": -0.0989,
+     "mean_won": -0.1045,
+     "mean_lost": -0.092
+    },
+    "d_theta": {
+     "auc": 0.6038,
+     "mean": 0.1678,
+     "mean_won": 0.2305,
+     "mean_lost": 0.0904
+    },
+    "d_speed": {
+     "auc": 0.514,
+     "mean": -0.022,
+     "mean_won": -0.0241,
+     "mean_lost": -0.0194
+    },
+    "d_board": {
+     "auc": 0.514,
+     "mean": -0.022,
+     "mean_won": -0.0241,
+     "mean_lost": -0.0194
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.6929,
+     "mean": -0.041,
+     "mean_won": -0.0037,
+     "mean_lost": -0.0794
+    },
+    "d_hand_part": {
+     "auc": 0.548,
+     "mean": 0.0454,
+     "mean_won": 0.0496,
+     "mean_lost": 0.0412
+    },
+    "d_body_part": {
+     "auc": 0.4557,
+     "mean": -0.0233,
+     "mean_won": -0.03,
+     "mean_lost": -0.0164
+    },
+    "d_life_raw": {
+     "auc": 0.6674,
+     "mean": -0.3014,
+     "mean_won": -0.027,
+     "mean_lost": -0.5833
+    },
+    "d_hand_raw": {
+     "auc": 0.5278,
+     "mean": -0.726,
+     "mean_won": -0.6757,
+     "mean_lost": -0.7778
+    },
+    "abs_share_theta": 0.496,
+    "corr_logratio_static": 1.0
+   },
+   "黄|4-6": {
+    "rows": 213,
+    "units": 143,
+    "D": {
+     "auc": 0.6891,
+     "mean": -0.3462,
+     "mean_won": -0.0917,
+     "mean_lost": -0.6808
+    },
+    "logratio": {
+     "auc": 0.6914,
+     "mean": -0.0864,
+     "mean_won": -0.0084,
+     "mean_lost": -0.1888
+    },
+    "lr_theta": {
+     "auc": 0.592,
+     "mean": 0.0459,
+     "mean_won": 0.0937,
+     "mean_lost": -0.0169
+    },
+    "lr_speed": {
+     "auc": 0.5717,
+     "mean": -0.1323,
+     "mean_won": -0.1022,
+     "mean_lost": -0.172
+    },
+    "d_theta": {
+     "auc": 0.5883,
+     "mean": 0.0951,
+     "mean_won": 0.1339,
+     "mean_lost": 0.0441
+    },
+    "d_speed": {
+     "auc": 0.5741,
+     "mean": -0.0346,
+     "mean_won": -0.0283,
+     "mean_lost": -0.0428
+    },
+    "d_board": {
+     "auc": 0.5741,
+     "mean": -0.0346,
+     "mean_won": -0.0283,
+     "mean_lost": -0.0428
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.7069,
+     "mean": 0.0051,
+     "mean_won": 0.0484,
+     "mean_lost": -0.0518
+    },
+    "d_hand_part": {
+     "auc": 0.538,
+     "mean": 0.2802,
+     "mean_won": 0.2815,
+     "mean_lost": 0.2784
+    },
+    "d_body_part": {
+     "auc": 0.4898,
+     "mean": -0.0108,
+     "mean_won": -0.0114,
+     "mean_lost": -0.01
+    },
+    "d_life_raw": {
+     "auc": 0.6929,
+     "mean": 0.0376,
+     "mean_won": 0.3554,
+     "mean_lost": -0.3804
+    },
+    "d_hand_raw": {
+     "auc": 0.5047,
+     "mean": 0.1127,
+     "mean_won": 0.0909,
+     "mean_lost": 0.1413
+    },
+    "abs_share_theta": 0.48,
+    "corr_logratio_static": 1.0
+   },
+   "黄|7+": {
+    "rows": 465,
+    "units": 143,
+    "D": {
+     "auc": 0.8089,
+     "mean": 0.0739,
+     "mean_won": 0.9888,
+     "mean_lost": -1.1927
+    },
+    "logratio": {
+     "auc": 0.7996,
+     "mean": -0.0295,
+     "mean_won": 0.7816,
+     "mean_lost": -1.1527
+    },
+    "lr_theta": {
+     "auc": 0.7633,
+     "mean": -0.0458,
+     "mean_won": 0.672,
+     "mean_lost": -1.0396
+    },
+    "lr_speed": {
+     "auc": 0.5235,
+     "mean": 0.0236,
+     "mean_won": -0.0087,
+     "mean_lost": 0.0683
+    },
+    "d_theta": {
+     "auc": 0.7746,
+     "mean": -0.0117,
+     "mean_won": 0.1842,
+     "mean_lost": -0.2829
+    },
+    "d_speed": {
+     "auc": 0.541,
+     "mean": -0.0055,
+     "mean_won": 0.001,
+     "mean_lost": -0.0146
+    },
+    "d_board": {
+     "auc": 0.541,
+     "mean": -0.0055,
+     "mean_won": 0.001,
+     "mean_lost": -0.0146
+    },
+    "d_stock": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_flow": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_shield": {
+     "auc": 0.5,
+     "mean": 0.0,
+     "mean_won": 0.0,
+     "mean_lost": 0.0
+    },
+    "d_life_part": {
+     "auc": 0.7392,
+     "mean": 0.082,
+     "mean_won": 0.1715,
+     "mean_lost": -0.0419
+    },
+    "d_hand_part": {
+     "auc": 0.7038,
+     "mean": 0.0884,
+     "mean_won": 0.1701,
+     "mean_lost": -0.0248
+    },
+    "d_body_part": {
+     "auc": 0.5326,
+     "mean": 0.0183,
+     "mean_won": 0.0268,
+     "mean_lost": 0.0066
+    },
+    "d_life_raw": {
+     "auc": 0.7306,
+     "mean": 0.6022,
+     "mean_won": 1.2593,
+     "mean_lost": -0.3077
+    },
+    "d_hand_raw": {
+     "auc": 0.5356,
+     "mean": -0.1957,
+     "mean_won": -0.0556,
+     "mean_lost": -0.3897
+    },
+    "abs_share_theta": 0.706,
+    "corr_logratio_static": 0.99
+   }
+  },
+  "gap_band_winrate": {
+   "互角|1-3": {
+    "rows": 121,
+    "games": 105,
+    "win_rate": 0.4793,
+    "theory_W": 0.5543
+   },
+   "互角|4-6": {
+    "rows": 190,
+    "games": 149,
+    "win_rate": 0.6053,
+    "theory_W": 0.5699
+   },
+   "互角|7+": {
+    "rows": 495,
+    "games": 220,
+    "win_rate": 0.6667,
+    "theory_W": 0.6673
+   },
+   "遅れ1|4-6": {
+    "rows": 224,
+    "games": 152,
+    "win_rate": 0.442,
+    "theory_W": 0.4368
+   },
+   "遅れ2+|7+": {
+    "rows": 510,
+    "games": 260,
+    "win_rate": 0.1804,
+    "theory_W": 0.13
+   },
+   "遅れ1|7+": {
+    "rows": 353,
+    "games": 195,
+    "win_rate": 0.4136,
+    "theory_W": 0.3875
+   },
+   "先行1|1-3": {
+    "rows": 78,
+    "games": 78,
+    "win_rate": 0.641,
+    "theory_W": 0.6429
+   },
+   "先行2+|7+": {
+    "rows": 341,
+    "games": 170,
+    "win_rate": 0.8651,
+    "theory_W": 0.9296
+   },
+   "遅れ2+|1-3": {
+    "rows": 185,
+    "games": 181,
+    "win_rate": 0.3459,
+    "theory_W": 0.2628
+   },
+   "遅れ2+|4-6": {
+    "rows": 250,
+    "games": 191,
+    "win_rate": 0.284,
+    "theory_W": 0.2358
+   },
+   "先行2+|1-3": {
+    "rows": 101,
+    "games": 100,
+    "win_rate": 0.7525,
+    "theory_W": 0.8073
+   },
+   "先行1|4-6": {
+    "rows": 119,
+    "games": 108,
+    "win_rate": 0.6891,
+    "theory_W": 0.6973
+   },
+   "先行1|7+": {
+    "rows": 240,
+    "games": 167,
+    "win_rate": 0.7417,
+    "theory_W": 0.8133
+   },
+   "先行2+|4-6": {
+    "rows": 117,
+    "games": 99,
+    "win_rate": 0.7692,
+    "theory_W": 0.8458
+   },
+   "遅れ1|1-3": {
+    "rows": 115,
+    "games": 100,
+    "win_rate": 0.4522,
+    "theory_W": 0.4522
+   }
+  }
+ },
+ "rows_with_clock": 12975,
+ "q3": {
+  "all": {
+   "rows": 12975,
+   "units": 520,
+   "games": 260,
+   "best_mode": "attack",
+   "best_share": {
+    "attack": 0.723,
+    "play": 0.071,
+    "attach": 0.071,
+    "end": 0.07,
+    "effect": 0.064
+   },
+   "played_share": {
+    "attack": 0.425,
+    "attach": 0.276,
+    "play": 0.16,
+    "end": 0.082,
+    "effect": 0.057
+   },
+   "follow_rate": 0.556,
+   "wr_follow": 0.4904,
+   "w_follow": 289.2,
+   "wr_other": 0.512,
+   "w_other": 230.8,
+   "diff": -0.0216,
+   "diff_ci": [
+    -0.0423,
+    -0.0013
+   ],
+   "wr_follow_ci": [
+    0.4814,
+    0.4994
+   ],
+   "wr_other_ci": [
+    0.5007,
+    0.5236
+   ],
+   "verdict": "確かな外れ"
+  },
+  "cells": {
+   "先行2+|1-3": {
+    "rows": 148,
+    "units": 76,
+    "games": 75,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.412,
+     "play": 0.311,
+     "end": 0.176,
+     "attach": 0.068,
+     "effect": 0.034
+    },
+    "played_share": {
+     "play": 0.318,
+     "attack": 0.284,
+     "end": 0.216,
+     "attach": 0.128,
+     "effect": 0.054
+    },
+    "follow_rate": 0.591,
+    "wr_follow": 0.7662,
+    "w_follow": 44.9,
+    "wr_other": 0.7265,
+    "w_other": 31.1,
+    "diff": 0.0397,
+    "diff_ci": [
+     -0.1131,
+     0.2003
+    ],
+    "wr_follow_ci": [
+     0.6509,
+     0.8803
+    ],
+    "wr_other_ci": [
+     0.5835,
+     0.856
+    ],
+    "verdict": "理論どおりが勝つ（気配）",
+    "pairs": {
+     "play→play": {
+      "w": 20.2,
+      "rows": 29,
+      "wr": 0.7778
+     },
+     "attack→attack": {
+      "w": 14.6,
+      "rows": 33,
+      "wr": 0.7143
+     },
+     "play→end": {
+      "w": 10.5,
+      "rows": 13,
+      "wr": 0.8095
+     },
+     "end→end": {
+      "w": 7.2,
+      "rows": 14,
+      "wr": 0.7442
+     },
+     "attack→attach": {
+      "w": 5.1,
+      "rows": 14,
+      "wr": 0.6393
+     },
+     "attack→play": {
+      "w": 3.7,
+      "rows": 10,
+      "wr": 0.6396
+     },
+     "end→play": {
+      "w": 3.5,
+      "rows": 5,
+      "wr": 0.7143
+     },
+     "end→attack": {
+      "w": 2.0,
+      "rows": 5,
+      "wr": 0.75
+     },
+     "effect→effect": {
+      "w": 1.8,
+      "rows": 3,
+      "wr": 1.0
+     },
+     "attach→play": {
+      "w": 1.2,
+      "rows": 3,
+      "wr": 1.0
+     },
+     "attach→attach": {
+      "w": 1.2,
+      "rows": 4,
+      "wr": 1.0
+     },
+     "attach→attack": {
+      "w": 1.0,
+      "rows": 2,
+      "wr": 0.0
+     },
+     "end→effect": {
+      "w": 0.8,
+      "rows": 2,
+      "wr": 1.0
+     },
+     "attack→end": {
+      "w": 0.8,
+      "rows": 2,
+      "wr": 1.0
+     },
+     "effect→end": {
+      "w": 0.7,
+      "rows": 2,
+      "wr": 0.5
+     },
+     "attack→effect": {
+      "w": 0.5,
+      "rows": 2,
+      "wr": 1.0
+     },
+     "attach→end": {
+      "w": 0.5,
+      "rows": 1,
+      "wr": 0.0
+     },
+     "play→attack": {
+      "w": 0.4,
+      "rows": 2,
+      "wr": 1.0
+     },
+     "play→effect": {
+      "w": 0.2,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "play→attach": {
+      "w": 0.2,
+      "rows": 1,
+      "wr": 1.0
+     }
+    },
+    "marks": {
+     "n": 148,
+     "long_clock": 1.0,
+     "mid_turn": 0.507,
+     "effect_or_play": 0.493
+    }
+   },
+   "先行2+|4-6": {
+    "rows": 352,
+    "units": 85,
+    "games": 84,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.702,
+     "end": 0.108,
+     "effect": 0.094,
+     "play": 0.054,
+     "attach": 0.043
+    },
+    "played_share": {
+     "attack": 0.392,
+     "play": 0.259,
+     "end": 0.145,
+     "attach": 0.145,
+     "effect": 0.06
+    },
+    "follow_rate": 0.497,
+    "wr_follow": 0.7308,
+    "w_follow": 42.2,
+    "wr_other": 0.7514,
+    "w_other": 42.8,
+    "diff": -0.0206,
+    "diff_ci": [
+     -0.1296,
+     0.0774
+    ],
+    "wr_follow_ci": [
+     0.6181,
+     0.8379
+    ],
+    "wr_other_ci": [
+     0.6447,
+     0.849
+    ],
+    "verdict": "外れの気配",
+    "pairs": {
+     "attack→attack": {
+      "w": 28.9,
+      "rows": 115,
+      "wr": 0.7142
+     },
+     "attack→play": {
+      "w": 18.4,
+      "rows": 71,
+      "wr": 0.6591
+     },
+     "attack→attach": {
+      "w": 8.5,
+      "rows": 41,
+      "wr": 0.7539
+     },
+     "end→end": {
+      "w": 6.1,
+      "rows": 30,
+      "wr": 0.783
+     },
+     "attack→end": {
+      "w": 4.3,
+      "rows": 12,
+      "wr": 0.7689
+     },
+     "play→play": {
+      "w": 4.0,
+      "rows": 14,
+      "wr": 0.8326
+     },
+     "effect→effect": {
+      "w": 2.8,
+      "rows": 12,
+      "wr": 0.6776
+     },
+     "end→attack": {
+      "w": 2.3,
+      "rows": 8,
+      "wr": 1.0
+     },
+     "effect→attack": {
+      "w": 2.1,
+      "rows": 11,
+      "wr": 0.7235
+     },
+     "attach→end": {
+      "w": 1.6,
+      "rows": 4,
+      "wr": 0.8454
+     },
+     "attack→effect": {
+      "w": 1.3,
+      "rows": 8,
+      "wr": 1.0
+     },
+     "effect→end": {
+      "w": 1.0,
+      "rows": 5,
+      "wr": 1.0
+     },
+     "attach→play": {
+      "w": 0.9,
+      "rows": 4,
+      "wr": 0.714
+     },
+     "attach→attack": {
+      "w": 0.7,
+      "rows": 4,
+      "wr": 0.7303
+     },
+     "play→attach": {
+      "w": 0.6,
+      "rows": 4,
+      "wr": 1.0
+     },
+     "effect→attach": {
+      "w": 0.6,
+      "rows": 3,
+      "wr": 1.0
+     },
+     "attach→attach": {
+      "w": 0.4,
+      "rows": 3,
+      "wr": 0.5135
+     },
+     "effect→play": {
+      "w": 0.3,
+      "rows": 2,
+      "wr": 1.0
+     },
+     "play→effect": {
+      "w": 0.1,
+      "rows": 1,
+      "wr": 1.0
+     }
+    },
+    "marks": {
+     "n": 352,
+     "long_clock": 0.938,
+     "mid_turn": 0.73,
+     "effect_or_play": 0.384
+    }
+   },
+   "先行2+|7+": {
+    "rows": 1832,
+    "units": 157,
+    "games": 150,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.829,
+     "attach": 0.05,
+     "effect": 0.049,
+     "end": 0.042,
+     "play": 0.031
+    },
+    "played_share": {
+     "attack": 0.426,
+     "attach": 0.398,
+     "play": 0.087,
+     "end": 0.055,
+     "effect": 0.033
+    },
+    "follow_rate": 0.577,
+    "wr_follow": 0.7645,
+    "w_follow": 90.7,
+    "wr_other": 0.8093,
+    "w_other": 66.3,
+    "diff": -0.0448,
+    "diff_ci": [
+     -0.1012,
+     0.0107
+    ],
+    "wr_follow_ci": [
+     0.6936,
+     0.8335
+    ],
+    "wr_other_ci": [
+     0.7432,
+     0.8708
+    ],
+    "verdict": "外れの気配",
+    "pairs": {
+     "attack→attack": {
+      "w": 71.6,
+      "rows": 747,
+      "wr": 0.7771
+     },
+     "attack→attach": {
+      "w": 40.1,
+      "rows": 626,
+      "wr": 0.8942
+     },
+     "attack→play": {
+      "w": 13.6,
+      "rows": 124,
+      "wr": 0.67
+     },
+     "end→end": {
+      "w": 5.6,
+      "rows": 65,
+      "wr": 0.7943
+     },
+     "attach→attach": {
+      "w": 5.3,
+      "rows": 71,
+      "wr": 0.8324
+     },
+     "effect→effect": {
+      "w": 4.5,
+      "rows": 45,
+      "wr": 0.6681
+     },
+     "play→play": {
+      "w": 3.6,
+      "rows": 24,
+      "wr": 0.4901
+     },
+     "effect→end": {
+      "w": 1.7,
+      "rows": 15,
+      "wr": 0.827
+     },
+     "play→attack": {
+      "w": 1.3,
+      "rows": 13,
+      "wr": 0.4127
+     },
+     "attach→end": {
+      "w": 1.2,
+      "rows": 10,
+      "wr": 0.5651
+     },
+     "attack→effect": {
+      "w": 1.2,
+      "rows": 13,
+      "wr": 0.8509
+     },
+     "effect→attach": {
+      "w": 1.1,
+      "rows": 15,
+      "wr": 1.0
+     },
+     "attach→play": {
+      "w": 1.0,
+      "rows": 7,
+      "wr": 0.5162
+     },
+     "effect→attack": {
+      "w": 0.9,
+      "rows": 11,
+      "wr": 0.771
+     },
+     "play→attach": {
+      "w": 0.8,
+      "rows": 15,
+      "wr": 0.9627
+     },
+     "end→attack": {
+      "w": 0.7,
+      "rows": 6,
+      "wr": 0.7872
+     },
+     "attack→end": {
+      "w": 0.6,
+      "rows": 8,
+      "wr": 0.786
+     },
+     "effect→play": {
+      "w": 0.5,
+      "rows": 3,
+      "wr": 0.5435
+     },
+     "play→end": {
+      "w": 0.5,
+      "rows": 3,
+      "wr": 0.4935
+     },
+     "attach→attack": {
+      "w": 0.4,
+      "rows": 4,
+      "wr": 0.3899
+     },
+     "end→effect": {
+      "w": 0.2,
+      "rows": 2,
+      "wr": 1.0
+     },
+     "end→attach": {
+      "w": 0.2,
+      "rows": 2,
+      "wr": 0.0
+     },
+     "play→effect": {
+      "w": 0.2,
+      "rows": 1,
+      "wr": 0.0
+     },
+     "end→play": {
+      "w": 0.1,
+      "rows": 2,
+      "wr": 1.0
+     }
+    },
+    "marks": {
+     "n": 1832,
+     "long_clock": 0.517,
+     "mid_turn": 0.84,
+     "effect_or_play": 0.16
+    }
+   },
+   "先行1|1-3": {
+    "rows": 116,
+    "units": 62,
+    "games": 62,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.483,
+     "play": 0.241,
+     "end": 0.147,
+     "effect": 0.112,
+     "attach": 0.017
+    },
+    "played_share": {
+     "end": 0.267,
+     "play": 0.233,
+     "attack": 0.233,
+     "attach": 0.155,
+     "effect": 0.112
+    },
+    "follow_rate": 0.516,
+    "wr_follow": 0.6328,
+    "w_follow": 32.0,
+    "wr_other": 0.6583,
+    "w_other": 30.0,
+    "diff": -0.0255,
+    "diff_ci": [
+     -0.2071,
+     0.17
+    ],
+    "wr_follow_ci": [
+     0.4645,
+     0.7763
+    ],
+    "wr_other_ci": [
+     0.4956,
+     0.8089
+    ],
+    "verdict": "外れの気配",
+    "pairs": {
+     "attack→attack": {
+      "w": 10.4,
+      "rows": 25,
+      "wr": 0.696
+     },
+     "play→play": {
+      "w": 10.0,
+      "rows": 16,
+      "wr": 0.6333
+     },
+     "play→end": {
+      "w": 9.5,
+      "rows": 11,
+      "wr": 0.6842
+     },
+     "end→end": {
+      "w": 7.8,
+      "rows": 10,
+      "wr": 0.5161
+     },
+     "attack→attach": {
+      "w": 5.1,
+      "rows": 16,
+      "wr": 0.6078
+     },
+     "effect→effect": {
+      "w": 3.5,
+      "rows": 6,
+      "wr": 0.6667
+     },
+     "attack→play": {
+      "w": 2.7,
+      "rows": 7,
+      "wr": 0.8148
+     },
+     "effect→end": {
+      "w": 2.5,
+      "rows": 3,
+      "wr": 0.6
+     },
+     "effect→play": {
+      "w": 2.3,
+      "rows": 4,
+      "wr": 1.0
+     },
+     "end→effect": {
+      "w": 2.3,
+      "rows": 4,
+      "wr": 0.3571
+     },
+     "attack→end": {
+      "w": 2.2,
+      "rows": 6,
+      "wr": 0.3182
+     },
+     "end→attack": {
+      "w": 1.5,
+      "rows": 2,
+      "wr": 1.0
+     },
+     "attack→effect": {
+      "w": 0.8,
+      "rows": 2,
+      "wr": 0.3333
+     },
+     "play→effect": {
+      "w": 0.5,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "attach→end": {
+      "w": 0.3,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "attach→attach": {
+      "w": 0.3,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "end→attach": {
+      "w": 0.2,
+      "rows": 1,
+      "wr": 0.0
+     }
+    },
+    "marks": {
+     "n": 116,
+     "long_clock": 1.0,
+     "mid_turn": 0.526,
+     "effect_or_play": 0.466
+    }
+   },
+   "先行1|4-6": {
+    "rows": 380,
+    "units": 100,
+    "games": 99,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.726,
+     "end": 0.092,
+     "effect": 0.082,
+     "attach": 0.053,
+     "play": 0.047
+    },
+    "played_share": {
+     "attack": 0.416,
+     "play": 0.258,
+     "attach": 0.129,
+     "end": 0.118,
+     "effect": 0.079
+    },
+    "follow_rate": 0.524,
+    "wr_follow": 0.6561,
+    "w_follow": 52.4,
+    "wr_other": 0.6432,
+    "w_other": 47.6,
+    "diff": 0.0129,
+    "diff_ci": [
+     -0.0746,
+     0.0982
+    ],
+    "wr_follow_ci": [
+     0.5526,
+     0.7526
+    ],
+    "wr_other_ci": [
+     0.5417,
+     0.746
+    ],
+    "verdict": "理論どおりが勝つ（気配）",
+    "pairs": {
+     "attack→attack": {
+      "w": 36.9,
+      "rows": 138,
+      "wr": 0.6621
+     },
+     "attack→play": {
+      "w": 22.0,
+      "rows": 80,
+      "wr": 0.621
+     },
+     "attack→attach": {
+      "w": 8.6,
+      "rows": 43,
+      "wr": 0.7463
+     },
+     "end→end": {
+      "w": 6.4,
+      "rows": 25,
+      "wr": 0.759
+     },
+     "effect→effect": {
+      "w": 4.2,
+      "rows": 17,
+      "wr": 0.4203
+     },
+     "play→play": {
+      "w": 4.0,
+      "rows": 13,
+      "wr": 0.7066
+     },
+     "attack→end": {
+      "w": 2.7,
+      "rows": 9,
+      "wr": 1.0
+     },
+     "effect→attack": {
+      "w": 2.1,
+      "rows": 8,
+      "wr": 0.6
+     },
+     "end→attack": {
+      "w": 2.0,
+      "rows": 6,
+      "wr": 0.6667
+     },
+     "attach→attack": {
+      "w": 1.8,
+      "rows": 5,
+      "wr": 0.5327
+     },
+     "attack→effect": {
+      "w": 1.4,
+      "rows": 6,
+      "wr": 0.4878
+     },
+     "attach→end": {
+      "w": 1.3,
+      "rows": 6,
+      "wr": 0.8056
+     },
+     "effect→end": {
+      "w": 1.2,
+      "rows": 4,
+      "wr": 0.2857
+     },
+     "attach→attach": {
+      "w": 0.9,
+      "rows": 5,
+      "wr": 0.5758
+     },
+     "attach→play": {
+      "w": 0.9,
+      "rows": 3,
+      "wr": 0.4643
+     },
+     "end→effect": {
+      "w": 0.9,
+      "rows": 4,
+      "wr": 1.0
+     },
+     "effect→play": {
+      "w": 0.8,
+      "rows": 2,
+      "wr": 0.0
+     },
+     "play→effect": {
+      "w": 0.5,
+      "rows": 2,
+      "wr": 0.375
+     },
+     "play→attack": {
+      "w": 0.5,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "play→end": {
+      "w": 0.3,
+      "rows": 1,
+      "wr": 0.0
+     },
+     "play→attach": {
+      "w": 0.3,
+      "rows": 1,
+      "wr": 0.0
+     },
+     "attach→effect": {
+      "w": 0.2,
+      "rows": 1,
+      "wr": 1.0
+     }
+    },
+    "marks": {
+     "n": 380,
+     "long_clock": 0.582,
+     "mid_turn": 0.732,
+     "effect_or_play": 0.376
+    }
+   },
+   "先行1|7+": {
+    "rows": 1172,
+    "units": 149,
+    "games": 139,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.794,
+     "effect": 0.07,
+     "attach": 0.058,
+     "end": 0.04,
+     "play": 0.038
+    },
+    "played_share": {
+     "attack": 0.468,
+     "attach": 0.339,
+     "play": 0.099,
+     "end": 0.052,
+     "effect": 0.043
+    },
+    "follow_rate": 0.596,
+    "wr_follow": 0.7175,
+    "w_follow": 88.8,
+    "wr_other": 0.7191,
+    "w_other": 60.2,
+    "diff": -0.0016,
+    "diff_ci": [
+     -0.0639,
+     0.064
+    ],
+    "wr_follow_ci": [
+     0.6411,
+     0.7893
+    ],
+    "wr_other_ci": [
+     0.6362,
+     0.795
+    ],
+    "verdict": "外れの気配",
+    "pairs": {
+     "attack→attack": {
+      "w": 69.9,
+      "rows": 512,
+      "wr": 0.7533
+     },
+     "attack→attach": {
+      "w": 34.1,
+      "rows": 327,
+      "wr": 0.7878
+     },
+     "attack→play": {
+      "w": 11.9,
+      "rows": 82,
+      "wr": 0.7533
+     },
+     "end→end": {
+      "w": 6.0,
+      "rows": 38,
+      "wr": 0.5787
+     },
+     "effect→effect": {
+      "w": 4.9,
+      "rows": 36,
+      "wr": 0.5688
+     },
+     "attach→attach": {
+      "w": 4.5,
+      "rows": 47,
+      "wr": 0.4878
+     },
+     "play→play": {
+      "w": 3.4,
+      "rows": 18,
+      "wr": 0.7465
+     },
+     "play→attack": {
+      "w": 1.8,
+      "rows": 11,
+      "wr": 0.5337
+     },
+     "attach→play": {
+      "w": 1.7,
+      "rows": 10,
+      "wr": 0.6444
+     },
+     "effect→attack": {
+      "w": 1.4,
+      "rows": 15,
+      "wr": 0.5543
+     },
+     "effect→end": {
+      "w": 1.3,
+      "rows": 11,
+      "wr": 0.6057
+     },
+     "effect→attach": {
+      "w": 1.1,
+      "rows": 16,
+      "wr": 0.6492
+     },
+     "play→end": {
+      "w": 1.1,
+      "rows": 6,
+      "wr": 0.3725
+     },
+     "attack→effect": {
+      "w": 1.0,
+      "rows": 7,
+      "wr": 0.4771
+     },
+     "attach→attack": {
+      "w": 0.8,
+      "rows": 7,
+      "wr": 0.5329
+     },
+     "attack→end": {
+      "w": 0.7,
+      "rows": 3,
+      "wr": 0.6818
+     },
+     "effect→play": {
+      "w": 0.7,
+      "rows": 4,
+      "wr": 0.0598
+     },
+     "play→attach": {
+      "w": 0.7,
+      "rows": 7,
+      "wr": 0.5325
+     },
+     "attach→end": {
+      "w": 0.5,
+      "rows": 3,
+      "wr": 0.2458
+     },
+     "play→effect": {
+      "w": 0.4,
+      "rows": 2,
+      "wr": 0.3636
+     },
+     "end→effect": {
+      "w": 0.3,
+      "rows": 4,
+      "wr": 1.0
+     },
+     "end→attack": {
+      "w": 0.3,
+      "rows": 3,
+      "wr": 1.0
+     },
+     "end→play": {
+      "w": 0.2,
+      "rows": 2,
+      "wr": 0.0
+     },
+     "attach→effect": {
+      "w": 0.2,
+      "rows": 1,
+      "wr": 0.0
+     }
+    },
+    "marks": {
+     "n": 1172,
+     "long_clock": 0.02,
+     "mid_turn": 0.833,
+     "effect_or_play": 0.198
+    }
+   },
+   "互角|1-3": {
+    "rows": 221,
+    "units": 102,
+    "games": 92,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.475,
+     "play": 0.244,
+     "end": 0.136,
+     "effect": 0.122,
+     "attach": 0.023
+    },
+    "played_share": {
+     "play": 0.29,
+     "attack": 0.258,
+     "end": 0.199,
+     "effect": 0.131,
+     "attach": 0.122
+    },
+    "follow_rate": 0.575,
+    "wr_follow": 0.5074,
+    "w_follow": 58.7,
+    "wr_other": 0.4438,
+    "w_other": 43.3,
+    "diff": 0.0636,
+    "diff_ci": [
+     -0.0855,
+     0.2071
+    ],
+    "wr_follow_ci": [
+     0.4093,
+     0.6052
+    ],
+    "wr_other_ci": [
+     0.3235,
+     0.5691
+    ],
+    "verdict": "理論どおりが勝つ（気配）",
+    "pairs": {
+     "attack→attack": {
+      "w": 21.6,
+      "rows": 52,
+      "wr": 0.5255
+     },
+     "play→play": {
+      "w": 20.0,
+      "rows": 34,
+      "wr": 0.6339
+     },
+     "end→end": {
+      "w": 9.6,
+      "rows": 18,
+      "wr": 0.5754
+     },
+     "play→end": {
+      "w": 9.3,
+      "rows": 12,
+      "wr": 0.3571
+     },
+     "attack→attach": {
+      "w": 9.0,
+      "rows": 25,
+      "wr": 0.3727
+     },
+     "effect→effect": {
+      "w": 6.8,
+      "rows": 13,
+      "wr": 0.0295
+     },
+     "attack→play": {
+      "w": 6.6,
+      "rows": 19,
+      "wr": 0.4162
+     },
+     "end→effect": {
+      "w": 2.9,
+      "rows": 9,
+      "wr": 0.435
+     },
+     "effect→play": {
+      "w": 2.9,
+      "rows": 8,
+      "wr": 0.3714
+     },
+     "effect→end": {
+      "w": 2.9,
+      "rows": 6,
+      "wr": 0.7143
+     },
+     "attack→end": {
+      "w": 2.9,
+      "rows": 7,
+      "wr": 0.3605
+     },
+     "play→effect": {
+      "w": 1.9,
+      "rows": 5,
+      "wr": 0.3243
+     },
+     "play→attack": {
+      "w": 1.1,
+      "rows": 3,
+      "wr": 0.4615
+     },
+     "end→play": {
+      "w": 1.0,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "attach→end": {
+      "w": 1.0,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "end→attack": {
+      "w": 0.8,
+      "rows": 2,
+      "wr": 0.6
+     },
+     "attach→attach": {
+      "w": 0.7,
+      "rows": 2,
+      "wr": 0.0
+     },
+     "attack→effect": {
+      "w": 0.5,
+      "rows": 2,
+      "wr": 0.5
+     },
+     "attach→play": {
+      "w": 0.5,
+      "rows": 2,
+      "wr": 1.0
+     }
+    },
+    "marks": {
+     "n": 221,
+     "long_clock": 0.937,
+     "mid_turn": 0.561,
+     "effect_or_play": 0.516
+    }
+   },
+   "互角|4-6": {
+    "rows": 575,
+    "units": 151,
+    "games": 128,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.788,
+     "end": 0.108,
+     "play": 0.038,
+     "effect": 0.035,
+     "attach": 0.031
+    },
+    "played_share": {
+     "attack": 0.437,
+     "play": 0.249,
+     "attach": 0.134,
+     "end": 0.132,
+     "effect": 0.049
+    },
+    "follow_rate": 0.57,
+    "wr_follow": 0.5383,
+    "w_follow": 86.0,
+    "wr_other": 0.6416,
+    "w_other": 65.0,
+    "diff": -0.1033,
+    "diff_ci": [
+     -0.1821,
+     -0.0294
+    ],
+    "wr_follow_ci": [
+     0.4644,
+     0.6154
+    ],
+    "wr_other_ci": [
+     0.5609,
+     0.7179
+    ],
+    "verdict": "確かな外れ",
+    "pairs": {
+     "attack→attack": {
+      "w": 64.5,
+      "rows": 240,
+      "wr": 0.5652
+     },
+     "attack→play": {
+      "w": 33.0,
+      "rows": 118,
+      "wr": 0.5981
+     },
+     "attack→attach": {
+      "w": 15.0,
+      "rows": 69,
+      "wr": 0.6981
+     },
+     "end→end": {
+      "w": 13.8,
+      "rows": 54,
+      "wr": 0.4528
+     },
+     "play→play": {
+      "w": 5.0,
+      "rows": 16,
+      "wr": 0.3535
+     },
+     "attack→end": {
+      "w": 3.7,
+      "rows": 9,
+      "wr": 0.5048
+     },
+     "attack→effect": {
+      "w": 3.5,
+      "rows": 17,
+      "wr": 0.6125
+     },
+     "effect→effect": {
+      "w": 2.1,
+      "rows": 10,
+      "wr": 0.8738
+     },
+     "attach→play": {
+      "w": 2.0,
+      "rows": 7,
+      "wr": 0.7512
+     },
+     "effect→end": {
+      "w": 1.7,
+      "rows": 6,
+      "wr": 0.8552
+     },
+     "end→attack": {
+      "w": 1.4,
+      "rows": 5,
+      "wr": 0.6367
+     },
+     "attach→end": {
+      "w": 1.3,
+      "rows": 5,
+      "wr": 0.8015
+     },
+     "attach→attack": {
+      "w": 0.9,
+      "rows": 3,
+      "wr": 0.7273
+     },
+     "attach→attach": {
+      "w": 0.7,
+      "rows": 3,
+      "wr": 0.0
+     },
+     "effect→attack": {
+      "w": 0.5,
+      "rows": 2,
+      "wr": 1.0
+     },
+     "play→end": {
+      "w": 0.4,
+      "rows": 2,
+      "wr": 0.6
+     },
+     "play→attach": {
+      "w": 0.4,
+      "rows": 3,
+      "wr": 0.7282
+     },
+     "end→effect": {
+      "w": 0.3,
+      "rows": 1,
+      "wr": 0.0
+     },
+     "effect→play": {
+      "w": 0.3,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "end→attach": {
+      "w": 0.2,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "end→play": {
+      "w": 0.2,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "effect→attach": {
+      "w": 0.1,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "play→attack": {
+      "w": 0.1,
+      "rows": 1,
+      "wr": 1.0
+     }
+    },
+    "marks": {
+     "n": 575,
+     "long_clock": 0.177,
+     "mid_turn": 0.739,
+     "effect_or_play": 0.323
+    }
+   },
+   "互角|7+": {
+    "rows": 2229,
+    "units": 267,
+    "games": 190,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.792,
+     "attach": 0.07,
+     "effect": 0.052,
+     "end": 0.045,
+     "play": 0.041
+    },
+    "played_share": {
+     "attack": 0.476,
+     "attach": 0.313,
+     "play": 0.109,
+     "end": 0.056,
+     "effect": 0.047
+    },
+    "follow_rate": 0.606,
+    "wr_follow": 0.6692,
+    "w_follow": 161.8,
+    "wr_other": 0.6437,
+    "w_other": 105.2,
+    "diff": 0.0255,
+    "diff_ci": [
+     -0.0184,
+     0.0668
+    ],
+    "wr_follow_ci": [
+     0.629,
+     0.7101
+    ],
+    "wr_other_ci": [
+     0.6005,
+     0.6884
+    ],
+    "verdict": "理論どおりが勝つ（気配）",
+    "pairs": {
+     "attack→attack": {
+      "w": 135.7,
+      "rows": 976,
+      "wr": 0.6948
+     },
+     "attack→attach": {
+      "w": 57.3,
+      "rows": 568,
+      "wr": 0.6878
+     },
+     "attack→play": {
+      "w": 21.2,
+      "rows": 166,
+      "wr": 0.5641
+     },
+     "attach→attach": {
+      "w": 9.1,
+      "rows": 102,
+      "wr": 0.5677
+     },
+     "end→end": {
+      "w": 8.2,
+      "rows": 77,
+      "wr": 0.4665
+     },
+     "play→play": {
+      "w": 4.9,
+      "rows": 44,
+      "wr": 0.5696
+     },
+     "attack→effect": {
+      "w": 4.1,
+      "rows": 45,
+      "wr": 0.6927
+     },
+     "effect→effect": {
+      "w": 3.9,
+      "rows": 47,
+      "wr": 0.5685
+     },
+     "attach→play": {
+      "w": 2.6,
+      "rows": 23,
+      "wr": 0.5745
+     },
+     "play→attack": {
+      "w": 2.4,
+      "rows": 26,
+      "wr": 0.7478
+     },
+     "attach→attack": {
+      "w": 2.4,
+      "rows": 22,
+      "wr": 0.7353
+     },
+     "effect→end": {
+      "w": 2.2,
+      "rows": 19,
+      "wr": 0.5722
+     },
+     "effect→attack": {
+      "w": 2.0,
+      "rows": 24,
+      "wr": 0.5912
+     },
+     "effect→attach": {
+      "w": 1.9,
+      "rows": 18,
+      "wr": 0.9477
+     },
+     "end→attack": {
+      "w": 1.5,
+      "rows": 12,
+      "wr": 0.7127
+     },
+     "attack→end": {
+      "w": 1.5,
+      "rows": 10,
+      "wr": 0.4309
+     },
+     "play→end": {
+      "w": 1.5,
+      "rows": 11,
+      "wr": 0.5338
+     },
+     "attach→end": {
+      "w": 1.5,
+      "rows": 8,
+      "wr": 0.1099
+     },
+     "end→effect": {
+      "w": 1.0,
+      "rows": 9,
+      "wr": 0.7225
+     },
+     "effect→play": {
+      "w": 0.7,
+      "rows": 7,
+      "wr": 0.3081
+     },
+     "play→attach": {
+      "w": 0.6,
+      "rows": 9,
+      "wr": 0.7223
+     },
+     "end→play": {
+      "w": 0.4,
+      "rows": 3,
+      "wr": 0.3043
+     },
+     "attach→effect": {
+      "w": 0.3,
+      "rows": 2,
+      "wr": 0.3333
+     },
+     "play→effect": {
+      "w": 0.2,
+      "rows": 1,
+      "wr": 0.0
+     }
+    },
+    "marks": {
+     "n": 2229,
+     "long_clock": 0.023,
+     "mid_turn": 0.808,
+     "effect_or_play": 0.204
+    }
+   },
+   "遅れ1|1-3": {
+    "rows": 181,
+    "units": 86,
+    "games": 79,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.448,
+     "play": 0.265,
+     "end": 0.155,
+     "effect": 0.116,
+     "attach": 0.017
+    },
+    "played_share": {
+     "play": 0.315,
+     "end": 0.238,
+     "attack": 0.221,
+     "attach": 0.144,
+     "effect": 0.083
+    },
+    "follow_rate": 0.53,
+    "wr_follow": 0.4898,
+    "w_follow": 45.6,
+    "wr_other": 0.4373,
+    "w_other": 40.4,
+    "diff": 0.0524,
+    "diff_ci": [
+     -0.0981,
+     0.2085
+    ],
+    "wr_follow_ci": [
+     0.368,
+     0.6137
+    ],
+    "wr_other_ci": [
+     0.3185,
+     0.5646
+    ],
+    "verdict": "理論どおりが勝つ（気配）",
+    "pairs": {
+     "play→play": {
+      "w": 20.3,
+      "rows": 31,
+      "wr": 0.4577
+     },
+     "attack→attack": {
+      "w": 16.1,
+      "rows": 38,
+      "wr": 0.4933
+     },
+     "play→end": {
+      "w": 12.3,
+      "rows": 15,
+      "wr": 0.3514
+     },
+     "attack→attach": {
+      "w": 7.3,
+      "rows": 22,
+      "wr": 0.4875
+     },
+     "end→end": {
+      "w": 5.7,
+      "rows": 14,
+      "wr": 0.6667
+     },
+     "attack→play": {
+      "w": 4.5,
+      "rows": 13,
+      "wr": 0.4444
+     },
+     "effect→end": {
+      "w": 4.2,
+      "rows": 9,
+      "wr": 0.66
+     },
+     "end→play": {
+      "w": 3.6,
+      "rows": 7,
+      "wr": 0.7674
+     },
+     "effect→effect": {
+      "w": 3.2,
+      "rows": 8,
+      "wr": 0.3158
+     },
+     "attack→end": {
+      "w": 2.4,
+      "rows": 5,
+      "wr": 0.1379
+     },
+     "effect→play": {
+      "w": 1.6,
+      "rows": 4,
+      "wr": 0.1579
+     },
+     "end→effect": {
+      "w": 1.3,
+      "rows": 3,
+      "wr": 0.0
+     },
+     "attack→effect": {
+      "w": 0.8,
+      "rows": 3,
+      "wr": 0.6809
+     },
+     "attach→play": {
+      "w": 0.8,
+      "rows": 2,
+      "wr": 0.3333
+     },
+     "end→attach": {
+      "w": 0.8,
+      "rows": 3,
+      "wr": 0.0
+     },
+     "play→effect": {
+      "w": 0.3,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "end→attack": {
+      "w": 0.3,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "attach→attach": {
+      "w": 0.2,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "play→attack": {
+      "w": 0.2,
+      "rows": 1,
+      "wr": 1.0
+     }
+    },
+    "marks": {
+     "n": 181,
+     "long_clock": 1.0,
+     "mid_turn": 0.541,
+     "effect_or_play": 0.536
+    }
+   },
+   "遅れ1|4-6": {
+    "rows": 625,
+    "units": 168,
+    "games": 133,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.722,
+     "end": 0.144,
+     "play": 0.053,
+     "effect": 0.045,
+     "attach": 0.037
+    },
+    "played_share": {
+     "attack": 0.413,
+     "play": 0.278,
+     "end": 0.133,
+     "attach": 0.118,
+     "effect": 0.058
+    },
+    "follow_rate": 0.522,
+    "wr_follow": 0.4251,
+    "w_follow": 87.6,
+    "wr_other": 0.4199,
+    "w_other": 80.4,
+    "diff": 0.0052,
+    "diff_ci": [
+     -0.0713,
+     0.0779
+    ],
+    "wr_follow_ci": [
+     0.3576,
+     0.4968
+    ],
+    "wr_other_ci": [
+     0.3546,
+     0.4919
+    ],
+    "verdict": "理論どおりが勝つ（気配）",
+    "pairs": {
+     "attack→attack": {
+      "w": 63.7,
+      "rows": 230,
+      "wr": 0.4136
+     },
+     "attack→play": {
+      "w": 38.3,
+      "rows": 133,
+      "wr": 0.3908
+     },
+     "attack→attach": {
+      "w": 13.0,
+      "rows": 60,
+      "wr": 0.4684
+     },
+     "end→end": {
+      "w": 12.8,
+      "rows": 52,
+      "wr": 0.4206
+     },
+     "play→play": {
+      "w": 7.1,
+      "rows": 23,
+      "wr": 0.512
+     },
+     "attack→end": {
+      "w": 5.0,
+      "rows": 17,
+      "wr": 0.4163
+     },
+     "end→attack": {
+      "w": 4.3,
+      "rows": 15,
+      "wr": 0.5747
+     },
+     "effect→end": {
+      "w": 3.0,
+      "rows": 9,
+      "wr": 0.3872
+     },
+     "end→effect": {
+      "w": 2.6,
+      "rows": 13,
+      "wr": 0.2207
+     },
+     "effect→effect": {
+      "w": 2.4,
+      "rows": 10,
+      "wr": 0.4122
+     },
+     "attach→attack": {
+      "w": 2.3,
+      "rows": 7,
+      "wr": 0.7143
+     },
+     "effect→play": {
+      "w": 2.2,
+      "rows": 5,
+      "wr": 0.3165
+     },
+     "attack→effect": {
+      "w": 2.2,
+      "rows": 11,
+      "wr": 0.6935
+     },
+     "attach→attach": {
+      "w": 1.8,
+      "rows": 9,
+      "wr": 0.5421
+     },
+     "attach→play": {
+      "w": 1.6,
+      "rows": 5,
+      "wr": 0.3093
+     },
+     "end→play": {
+      "w": 1.6,
+      "rows": 8,
+      "wr": 0.6542
+     },
+     "play→end": {
+      "w": 1.5,
+      "rows": 3,
+      "wr": 0.0
+     },
+     "effect→attack": {
+      "w": 1.1,
+      "rows": 4,
+      "wr": 0.2963
+     },
+     "play→attach": {
+      "w": 0.4,
+      "rows": 3,
+      "wr": 0.4293
+     },
+     "attach→end": {
+      "w": 0.3,
+      "rows": 2,
+      "wr": 0.0
+     },
+     "play→effect": {
+      "w": 0.3,
+      "rows": 2,
+      "wr": 0.2353
+     },
+     "end→attach": {
+      "w": 0.3,
+      "rows": 2,
+      "wr": 0.5385
+     },
+     "play→attack": {
+      "w": 0.3,
+      "rows": 2,
+      "wr": 1.0
+     }
+    },
+    "marks": {
+     "n": 625,
+     "long_clock": 0.502,
+     "mid_turn": 0.709,
+     "effect_or_play": 0.37
+    }
+   },
+   "遅れ1|7+": {
+    "rows": 1640,
+    "units": 233,
+    "games": 173,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.778,
+     "effect": 0.067,
+     "attach": 0.055,
+     "play": 0.055,
+     "end": 0.045
+    },
+    "played_share": {
+     "attack": 0.463,
+     "attach": 0.284,
+     "play": 0.14,
+     "end": 0.059,
+     "effect": 0.054
+    },
+    "follow_rate": 0.591,
+    "wr_follow": 0.4137,
+    "w_follow": 137.7,
+    "wr_other": 0.4306,
+    "w_other": 95.3,
+    "diff": -0.017,
+    "diff_ci": [
+     -0.0743,
+     0.037
+    ],
+    "wr_follow_ci": [
+     0.3653,
+     0.4625
+    ],
+    "wr_other_ci": [
+     0.3769,
+     0.4846
+    ],
+    "verdict": "外れの気配",
+    "pairs": {
+     "attack→attack": {
+      "w": 110.2,
+      "rows": 706,
+      "wr": 0.4314
+     },
+     "attack→attach": {
+      "w": 41.9,
+      "rows": 372,
+      "wr": 0.4477
+     },
+     "attack→play": {
+      "w": 26.8,
+      "rows": 153,
+      "wr": 0.3992
+     },
+     "end→end": {
+      "w": 8.9,
+      "rows": 55,
+      "wr": 0.3874
+     },
+     "play→play": {
+      "w": 7.3,
+      "rows": 49,
+      "wr": 0.5398
+     },
+     "attach→attach": {
+      "w": 6.6,
+      "rows": 61,
+      "wr": 0.1338
+     },
+     "effect→effect": {
+      "w": 4.7,
+      "rows": 45,
+      "wr": 0.2471
+     },
+     "attack→effect": {
+      "w": 4.0,
+      "rows": 39,
+      "wr": 0.3846
+     },
+     "effect→end": {
+      "w": 2.8,
+      "rows": 19,
+      "wr": 0.6929
+     },
+     "play→attack": {
+      "w": 2.7,
+      "rows": 21,
+      "wr": 0.5132
+     },
+     "attach→play": {
+      "w": 2.6,
+      "rows": 13,
+      "wr": 0.443
+     },
+     "effect→attack": {
+      "w": 2.2,
+      "rows": 22,
+      "wr": 0.3461
+     },
+     "effect→attach": {
+      "w": 2.0,
+      "rows": 16,
+      "wr": 0.5557
+     },
+     "attach→end": {
+      "w": 1.7,
+      "rows": 10,
+      "wr": 0.4451
+     },
+     "effect→play": {
+      "w": 1.6,
+      "rows": 8,
+      "wr": 0.1538
+     },
+     "play→attach": {
+      "w": 1.5,
+      "rows": 12,
+      "wr": 0.0859
+     },
+     "attack→end": {
+      "w": 1.2,
+      "rows": 6,
+      "wr": 0.6863
+     },
+     "end→play": {
+      "w": 1.2,
+      "rows": 7,
+      "wr": 0.0777
+     },
+     "play→end": {
+      "w": 0.9,
+      "rows": 7,
+      "wr": 0.1671
+     },
+     "end→attack": {
+      "w": 0.8,
+      "rows": 4,
+      "wr": 0.8454
+     },
+     "attach→attack": {
+      "w": 0.6,
+      "rows": 6,
+      "wr": 0.3902
+     },
+     "end→effect": {
+      "w": 0.4,
+      "rows": 3,
+      "wr": 0.1732
+     },
+     "end→attach": {
+      "w": 0.3,
+      "rows": 4,
+      "wr": 1.0
+     },
+     "attach→effect": {
+      "w": 0.2,
+      "rows": 1,
+      "wr": 1.0
+     },
+     "play→effect": {
+      "w": 0.1,
+      "rows": 1,
+      "wr": 1.0
+     }
+    },
+    "marks": {
+     "n": 1640,
+     "long_clock": 0.017,
+     "mid_turn": 0.82,
+     "effect_or_play": 0.254
+    }
+   },
+   "遅れ2+|1-3": {
+    "rows": 329,
+    "units": 151,
+    "games": 147,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.435,
+     "play": 0.219,
+     "effect": 0.14,
+     "end": 0.137,
+     "attach": 0.07
+    },
+    "played_share": {
+     "play": 0.307,
+     "attack": 0.267,
+     "end": 0.201,
+     "attach": 0.134,
+     "effect": 0.091
+    },
+    "follow_rate": 0.536,
+    "wr_follow": 0.3758,
+    "w_follow": 81.0,
+    "wr_other": 0.3223,
+    "w_other": 70.0,
+    "diff": 0.0535,
+    "diff_ci": [
+     -0.0432,
+     0.1574
+    ],
+    "wr_follow_ci": [
+     0.2901,
+     0.4661
+    ],
+    "wr_other_ci": [
+     0.2335,
+     0.4123
+    ],
+    "verdict": "理論どおりが勝つ（気配）",
+    "pairs": {
+     "play→play": {
+      "w": 33.2,
+      "rows": 53,
+      "wr": 0.3926
+     },
+     "attack→attack": {
+      "w": 26.1,
+      "rows": 67,
+      "wr": 0.4077
+     },
+     "play→end": {
+      "w": 12.8,
+      "rows": 17,
+      "wr": 0.1558
+     },
+     "attack→attach": {
+      "w": 10.7,
+      "rows": 34,
+      "wr": 0.4403
+     },
+     "end→end": {
+      "w": 9.8,
+      "rows": 22,
+      "wr": 0.3393
+     },
+     "attack→play": {
+      "w": 9.5,
+      "rows": 25,
+      "wr": 0.4283
+     },
+     "effect→effect": {
+      "w": 8.4,
+      "rows": 16,
+      "wr": 0.3663
+     },
+     "effect→end": {
+      "w": 8.0,
+      "rows": 16,
+      "wr": 0.3125
+     },
+     "end→play": {
+      "w": 6.4,
+      "rows": 14,
+      "wr": 0.2208
+     },
+     "attach→attack": {
+      "w": 5.7,
+      "rows": 13,
+      "wr": 0.1029
+     },
+     "attack→end": {
+      "w": 5.5,
+      "rows": 11,
+      "wr": 0.2259
+     },
+     "attach→attach": {
+      "w": 3.4,
+      "rows": 9,
+      "wr": 0.0976
+     },
+     "effect→play": {
+      "w": 3.3,
+      "rows": 8,
+      "wr": 0.675
+     },
+     "end→effect": {
+      "w": 2.0,
+      "rows": 7,
+      "wr": 0.5306
+     },
+     "attack→effect": {
+      "w": 2.0,
+      "rows": 6,
+      "wr": 0.6557
+     },
+     "effect→attack": {
+      "w": 1.7,
+      "rows": 5,
+      "wr": 0.8
+     },
+     "end→attack": {
+      "w": 0.6,
+      "rows": 2,
+      "wr": 0.0
+     },
+     "play→effect": {
+      "w": 0.5,
+      "rows": 1,
+      "wr": 0.0
+     },
+     "play→attack": {
+      "w": 0.5,
+      "rows": 1,
+      "wr": 0.0
+     },
+     "attach→play": {
+      "w": 0.3,
+      "rows": 1,
+      "wr": 0.0
+     },
+     "effect→attach": {
+      "w": 0.2,
+      "rows": 1,
+      "wr": 0.0
+     }
+    },
+    "marks": {
+     "n": 329,
+     "long_clock": 1.0,
+     "mid_turn": 0.574,
+     "effect_or_play": 0.52
+    }
+   },
+   "遅れ2+|4-6": {
+    "rows": 718,
+    "units": 166,
+    "games": 164,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.636,
+     "end": 0.13,
+     "attach": 0.1,
+     "effect": 0.077,
+     "play": 0.057
+    },
+    "played_share": {
+     "attack": 0.384,
+     "play": 0.248,
+     "attach": 0.152,
+     "end": 0.127,
+     "effect": 0.089
+    },
+    "follow_rate": 0.483,
+    "wr_follow": 0.281,
+    "w_follow": 80.2,
+    "wr_other": 0.3084,
+    "w_other": 85.8,
+    "diff": -0.0274,
+    "diff_ci": [
+     -0.0954,
+     0.0385
+    ],
+    "wr_follow_ci": [
+     0.2064,
+     0.3535
+    ],
+    "wr_other_ci": [
+     0.2294,
+     0.3857
+    ],
+    "verdict": "外れの気配",
+    "pairs": {
+     "attack→attack": {
+      "w": 53.0,
+      "rows": 222,
+      "wr": 0.2779
+     },
+     "attack→play": {
+      "w": 28.2,
+      "rows": 113,
+      "wr": 0.335
+     },
+     "attack→attach": {
+      "w": 17.2,
+      "rows": 88,
+      "wr": 0.3599
+     },
+     "end→end": {
+      "w": 12.8,
+      "rows": 54,
+      "wr": 0.2104
+     },
+     "play→play": {
+      "w": 7.0,
+      "rows": 27,
+      "wr": 0.323
+     },
+     "attach→play": {
+      "w": 5.8,
+      "rows": 27,
+      "wr": 0.3986
+     },
+     "attach→attack": {
+      "w": 5.0,
+      "rows": 23,
+      "wr": 0.2265
+     },
+     "effect→effect": {
+      "w": 4.5,
+      "rows": 24,
+      "wr": 0.3561
+     },
+     "attack→effect": {
+      "w": 4.3,
+      "rows": 20,
+      "wr": 0.0968
+     },
+     "attack→end": {
+      "w": 3.9,
+      "rows": 14,
+      "wr": 0.515
+     },
+     "effect→attack": {
+      "w": 3.7,
+      "rows": 16,
+      "wr": 0.3814
+     },
+     "end→attack": {
+      "w": 3.6,
+      "rows": 13,
+      "wr": 0.2323
+     },
+     "attach→attach": {
+      "w": 2.9,
+      "rows": 14,
+      "wr": 0.4301
+     },
+     "play→end": {
+      "w": 2.3,
+      "rows": 9,
+      "wr": 0.0
+     },
+     "effect→end": {
+      "w": 2.3,
+      "rows": 10,
+      "wr": 0.6234
+     },
+     "end→play": {
+      "w": 2.1,
+      "rows": 9,
+      "wr": 0.2935
+     },
+     "end→effect": {
+      "w": 2.1,
+      "rows": 15,
+      "wr": 0.0608
+     },
+     "effect→play": {
+      "w": 1.2,
+      "rows": 2,
+      "wr": 0.0
+     },
+     "play→attack": {
+      "w": 0.8,
+      "rows": 2,
+      "wr": 0.6
+     },
+     "attach→effect": {
+      "w": 0.8,
+      "rows": 4,
+      "wr": 0.0
+     },
+     "attach→end": {
+      "w": 0.7,
+      "rows": 4,
+      "wr": 0.0
+     },
+     "effect→attach": {
+      "w": 0.5,
+      "rows": 3,
+      "wr": 0.0
+     },
+     "play→attach": {
+      "w": 0.5,
+      "rows": 2,
+      "wr": 0.0
+     },
+     "end→attach": {
+      "w": 0.4,
+      "rows": 2,
+      "wr": 0.0
+     },
+     "play→effect": {
+      "w": 0.2,
+      "rows": 1,
+      "wr": 0.0
+     }
+    },
+    "marks": {
+     "n": 718,
+     "long_clock": 0.876,
+     "mid_turn": 0.727,
+     "effect_or_play": 0.396
+    }
+   },
+   "遅れ2+|7+": {
+    "rows": 2457,
+    "units": 242,
+    "games": 227,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.637,
+     "attach": 0.133,
+     "play": 0.108,
+     "effect": 0.063,
+     "end": 0.059
+    },
+    "played_share": {
+     "attack": 0.42,
+     "attach": 0.327,
+     "play": 0.142,
+     "effect": 0.064,
+     "end": 0.047
+    },
+    "follow_rate": 0.611,
+    "wr_follow": 0.2461,
+    "w_follow": 148.0,
+    "wr_other": 0.2402,
+    "w_other": 94.0,
+    "diff": 0.006,
+    "diff_ci": [
+     -0.0414,
+     0.0518
+    ],
+    "wr_follow_ci": [
+     0.1938,
+     0.2993
+    ],
+    "wr_other_ci": [
+     0.1845,
+     0.2974
+    ],
+    "verdict": "理論どおりが勝つ（気配）",
+    "pairs": {
+     "attack→attack": {
+      "w": 99.7,
+      "rows": 904,
+      "wr": 0.2768
+     },
+     "attack→attach": {
+      "w": 40.0,
+      "rows": 452,
+      "wr": 0.2521
+     },
+     "attach→attach": {
+      "w": 18.1,
+      "rows": 243,
+      "wr": 0.1238
+     },
+     "attack→play": {
+      "w": 17.7,
+      "rows": 161,
+      "wr": 0.2747
+     },
+     "play→play": {
+      "w": 14.1,
+      "rows": 120,
+      "wr": 0.1826
+     },
+     "end→end": {
+      "w": 8.1,
+      "rows": 68,
+      "wr": 0.3471
+     },
+     "effect→effect": {
+      "w": 8.0,
+      "rows": 89,
+      "wr": 0.1507
+     },
+     "play→attach": {
+      "w": 6.5,
+      "rows": 85,
+      "wr": 0.0812
+     },
+     "play→attack": {
+      "w": 3.9,
+      "rows": 43,
+      "wr": 0.3256
+     },
+     "attach→play": {
+      "w": 3.2,
+      "rows": 28,
+      "wr": 0.187
+     },
+     "attach→attack": {
+      "w": 3.1,
+      "rows": 47,
+      "wr": 0.151
+     },
+     "attack→effect": {
+      "w": 3.0,
+      "rows": 33,
+      "wr": 0.2439
+     },
+     "end→effect": {
+      "w": 2.6,
+      "rows": 27,
+      "wr": 0.0396
+     },
+     "end→play": {
+      "w": 2.0,
+      "rows": 20,
+      "wr": 0.3666
+     },
+     "end→attack": {
+      "w": 1.8,
+      "rows": 20,
+      "wr": 0.3021
+     },
+     "effect→end": {
+      "w": 1.6,
+      "rows": 16,
+      "wr": 0.3825
+     },
+     "attack→end": {
+      "w": 1.5,
+      "rows": 15,
+      "wr": 0.2492
+     },
+     "effect→play": {
+      "w": 1.5,
+      "rows": 19,
+      "wr": 0.1224
+     },
+     "effect→attack": {
+      "w": 1.2,
+      "rows": 17,
+      "wr": 0.3341
+     },
+     "effect→attach": {
+      "w": 1.1,
+      "rows": 14,
+      "wr": 0.2281
+     },
+     "play→end": {
+      "w": 1.1,
+      "rows": 10,
+      "wr": 0.3149
+     },
+     "end→attach": {
+      "w": 0.9,
+      "rows": 10,
+      "wr": 0.2087
+     },
+     "attach→end": {
+      "w": 0.6,
+      "rows": 7,
+      "wr": 0.0
+     },
+     "play→effect": {
+      "w": 0.5,
+      "rows": 7,
+      "wr": 0.3125
+     },
+     "attach→effect": {
+      "w": 0.1,
+      "rows": 2,
+      "wr": 1.0
+     }
+    },
+    "marks": {
+     "n": 2457,
+     "long_clock": 0.335,
+     "mid_turn": 0.825,
+     "effect_or_play": 0.281
+    }
+   }
+  },
+  "cells_color": {
+   "赤|先行2+|7+": {
+    "rows": 471,
+    "units": 41,
+    "games": 40,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.851,
+     "attach": 0.049,
+     "effect": 0.042,
+     "play": 0.032,
+     "end": 0.025
+    },
+    "played_share": {
+     "attach": 0.444,
+     "attack": 0.408,
+     "play": 0.081,
+     "end": 0.038,
+     "effect": 0.03
+    },
+    "follow_rate": 0.562,
+    "wr_follow": 0.7371,
+    "w_follow": 23.0,
+    "wr_other": 0.8361,
+    "w_other": 18.0,
+    "verdict": "局数不足"
+   },
+   "赤|先行1|7+": {
+    "rows": 294,
+    "units": 39,
+    "games": 38,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.827,
+     "effect": 0.082,
+     "end": 0.037,
+     "play": 0.031,
+     "attach": 0.024
+    },
+    "played_share": {
+     "attack": 0.493,
+     "attach": 0.327,
+     "play": 0.095,
+     "end": 0.048,
+     "effect": 0.037
+    },
+    "follow_rate": 0.59,
+    "wr_follow": 0.7681,
+    "w_follow": 23.0,
+    "wr_other": 0.7708,
+    "w_other": 16.0,
+    "verdict": "局数不足"
+   },
+   "赤|互角|4-6": {
+    "rows": 170,
+    "units": 43,
+    "games": 42,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.835,
+     "end": 0.071,
+     "attach": 0.041,
+     "play": 0.029,
+     "effect": 0.024
+    },
+    "played_share": {
+     "attack": 0.459,
+     "play": 0.241,
+     "attach": 0.141,
+     "end": 0.106,
+     "effect": 0.053
+    },
+    "follow_rate": 0.546,
+    "wr_follow": 0.5402,
+    "w_follow": 23.5,
+    "wr_other": 0.5797,
+    "w_other": 19.5,
+    "verdict": "局数不足"
+   },
+   "赤|互角|7+": {
+    "rows": 598,
+    "units": 82,
+    "games": 75,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.838,
+     "end": 0.054,
+     "attach": 0.045,
+     "effect": 0.045,
+     "play": 0.018
+    },
+    "played_share": {
+     "attack": 0.527,
+     "attach": 0.264,
+     "play": 0.104,
+     "end": 0.057,
+     "effect": 0.048
+    },
+    "follow_rate": 0.629,
+    "wr_follow": 0.7053,
+    "w_follow": 51.6,
+    "wr_other": 0.645,
+    "w_other": 30.4,
+    "diff": 0.0603,
+    "diff_ci": [
+     -0.0135,
+     0.1338
+    ],
+    "wr_follow_ci": [
+     0.6136,
+     0.7912
+    ],
+    "wr_other_ci": [
+     0.5389,
+     0.751
+    ],
+    "verdict": "理論どおりが勝つ（気配）"
+   },
+   "赤|遅れ1|4-6": {
+    "rows": 260,
+    "units": 60,
+    "games": 55,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.738,
+     "end": 0.154,
+     "effect": 0.038,
+     "play": 0.038,
+     "attach": 0.031
+    },
+    "played_share": {
+     "attack": 0.392,
+     "play": 0.254,
+     "attach": 0.165,
+     "end": 0.15,
+     "effect": 0.038
+    },
+    "follow_rate": 0.503,
+    "wr_follow": 0.44,
+    "w_follow": 30.2,
+    "wr_other": 0.4936,
+    "w_other": 29.8,
+    "verdict": "局数不足"
+   },
+   "赤|遅れ1|7+": {
+    "rows": 484,
+    "units": 75,
+    "games": 71,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.767,
+     "effect": 0.095,
+     "play": 0.062,
+     "attach": 0.041,
+     "end": 0.035
+    },
+    "played_share": {
+     "attack": 0.457,
+     "attach": 0.291,
+     "play": 0.134,
+     "effect": 0.06,
+     "end": 0.058
+    },
+    "follow_rate": 0.558,
+    "wr_follow": 0.4207,
+    "w_follow": 41.8,
+    "wr_other": 0.4644,
+    "w_other": 33.2,
+    "diff": -0.0437,
+    "diff_ci": [
+     -0.1436,
+     0.0587
+    ],
+    "wr_follow_ci": [
+     0.3048,
+     0.5386
+    ],
+    "wr_other_ci": [
+     0.3425,
+     0.5864
+    ],
+    "verdict": "外れの気配"
+   },
+   "赤|遅れ2+|1-3": {
+    "rows": 102,
+    "units": 52,
+    "games": 52,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.373,
+     "play": 0.245,
+     "effect": 0.216,
+     "end": 0.088,
+     "attach": 0.078
+    },
+    "played_share": {
+     "play": 0.265,
+     "attack": 0.216,
+     "end": 0.216,
+     "attach": 0.176,
+     "effect": 0.127
+    },
+    "follow_rate": 0.579,
+    "wr_follow": 0.4206,
+    "w_follow": 30.1,
+    "wr_other": 0.4265,
+    "w_other": 21.9,
+    "verdict": "局数不足"
+   },
+   "赤|遅れ2+|4-6": {
+    "rows": 241,
+    "units": 58,
+    "games": 58,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.697,
+     "end": 0.091,
+     "attach": 0.079,
+     "effect": 0.079,
+     "play": 0.054
+    },
+    "played_share": {
+     "attack": 0.39,
+     "play": 0.286,
+     "attach": 0.141,
+     "effect": 0.095,
+     "end": 0.087
+    },
+    "follow_rate": 0.47,
+    "wr_follow": 0.3257,
+    "w_follow": 27.2,
+    "wr_other": 0.3617,
+    "w_other": 30.8,
+    "verdict": "局数不足"
+   },
+   "赤|遅れ2+|7+": {
+    "rows": 786,
+    "units": 83,
+    "games": 80,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.626,
+     "attach": 0.132,
+     "play": 0.118,
+     "end": 0.066,
+     "effect": 0.057
+    },
+    "played_share": {
+     "attack": 0.417,
+     "attach": 0.335,
+     "play": 0.137,
+     "effect": 0.062,
+     "end": 0.048
+    },
+    "follow_rate": 0.625,
+    "wr_follow": 0.2754,
+    "w_follow": 51.9,
+    "wr_other": 0.28,
+    "w_other": 31.1,
+    "diff": -0.0046,
+    "diff_ci": [
+     -0.0926,
+     0.09
+    ],
+    "wr_follow_ci": [
+     0.1738,
+     0.3743
+    ],
+    "wr_other_ci": [
+     0.1738,
+     0.3875
+    ],
+    "verdict": "外れの気配"
+   },
+   "緑|先行1|7+": {
+    "rows": 290,
+    "units": 34,
+    "games": 34,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.807,
+     "attach": 0.069,
+     "play": 0.055,
+     "end": 0.038,
+     "effect": 0.031
+    },
+    "played_share": {
+     "attack": 0.483,
+     "attach": 0.338,
+     "play": 0.093,
+     "end": 0.055,
+     "effect": 0.031
+    },
+    "follow_rate": 0.573,
+    "wr_follow": 0.7523,
+    "w_follow": 19.5,
+    "wr_other": 0.7124,
+    "w_other": 14.5,
+    "verdict": "局数不足"
+   },
+   "緑|互角|7+": {
+    "rows": 537,
+    "units": 56,
+    "games": 54,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.827,
+     "attach": 0.058,
+     "effect": 0.045,
+     "end": 0.045,
+     "play": 0.026
+    },
+    "played_share": {
+     "attack": 0.471,
+     "attach": 0.322,
+     "play": 0.104,
+     "end": 0.063,
+     "effect": 0.039
+    },
+    "follow_rate": 0.555,
+    "wr_follow": 0.6005,
+    "w_follow": 31.1,
+    "wr_other": 0.5754,
+    "w_other": 24.9,
+    "verdict": "局数不足"
+   },
+   "緑|遅れ1|4-6": {
+    "rows": 151,
+    "units": 40,
+    "games": 40,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.742,
+     "end": 0.146,
+     "effect": 0.046,
+     "play": 0.033,
+     "attach": 0.033
+    },
+    "played_share": {
+     "attack": 0.391,
+     "play": 0.285,
+     "attach": 0.132,
+     "end": 0.126,
+     "effect": 0.066
+    },
+    "follow_rate": 0.457,
+    "wr_follow": 0.2973,
+    "w_follow": 18.3,
+    "wr_other": 0.3023,
+    "w_other": 21.7,
+    "verdict": "局数不足"
+   },
+   "緑|遅れ1|7+": {
+    "rows": 409,
+    "units": 58,
+    "games": 56,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.804,
+     "attach": 0.068,
+     "end": 0.056,
+     "effect": 0.044,
+     "play": 0.027
+    },
+    "played_share": {
+     "attack": 0.474,
+     "attach": 0.271,
+     "play": 0.147,
+     "end": 0.064,
+     "effect": 0.044
+    },
+    "follow_rate": 0.589,
+    "wr_follow": 0.3955,
+    "w_follow": 34.1,
+    "wr_other": 0.44,
+    "w_other": 23.9,
+    "verdict": "局数不足"
+   },
+   "緑|遅れ2+|4-6": {
+    "rows": 129,
+    "units": 31,
+    "games": 31,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.605,
+     "effect": 0.147,
+     "end": 0.109,
+     "attach": 0.07,
+     "play": 0.07
+    },
+    "played_share": {
+     "attack": 0.341,
+     "play": 0.248,
+     "end": 0.147,
+     "effect": 0.132,
+     "attach": 0.132
+    },
+    "follow_rate": 0.444,
+    "wr_follow": 0.433,
+    "w_follow": 13.8,
+    "wr_other": 0.5245,
+    "w_other": 17.2,
+    "verdict": "局数不足"
+   },
+   "緑|遅れ2+|7+": {
+    "rows": 479,
+    "units": 49,
+    "games": 48,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.647,
+     "attach": 0.138,
+     "effect": 0.086,
+     "play": 0.071,
+     "end": 0.058
+    },
+    "played_share": {
+     "attack": 0.407,
+     "attach": 0.351,
+     "play": 0.117,
+     "effect": 0.069,
+     "end": 0.056
+    },
+    "follow_rate": 0.608,
+    "wr_follow": 0.2359,
+    "w_follow": 29.8,
+    "wr_other": 0.2588,
+    "w_other": 19.2,
+    "verdict": "局数不足"
+   },
+   "青|先行2+|7+": {
+    "rows": 503,
+    "units": 41,
+    "games": 40,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.837,
+     "effect": 0.046,
+     "end": 0.044,
+     "attach": 0.04,
+     "play": 0.034
+    },
+    "played_share": {
+     "attack": 0.459,
+     "attach": 0.366,
+     "play": 0.078,
+     "end": 0.054,
+     "effect": 0.044
+    },
+    "follow_rate": 0.627,
+    "wr_follow": 0.7386,
+    "w_follow": 25.7,
+    "wr_other": 0.7201,
+    "w_other": 15.3,
+    "verdict": "局数不足"
+   },
+   "青|先行1|7+": {
+    "rows": 273,
+    "units": 34,
+    "games": 34,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.839,
+     "attach": 0.059,
+     "end": 0.04,
+     "play": 0.033,
+     "effect": 0.029
+    },
+    "played_share": {
+     "attack": 0.48,
+     "attach": 0.363,
+     "play": 0.088,
+     "end": 0.04,
+     "effect": 0.029
+    },
+    "follow_rate": 0.598,
+    "wr_follow": 0.6985,
+    "w_follow": 20.3,
+    "wr_other": 0.7169,
+    "w_other": 13.7,
+    "verdict": "局数不足"
+   },
+   "青|互角|1-3": {
+    "rows": 64,
+    "units": 33,
+    "games": 29,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.594,
+     "play": 0.219,
+     "end": 0.141,
+     "effect": 0.031,
+     "attach": 0.016
+    },
+    "played_share": {
+     "end": 0.297,
+     "play": 0.281,
+     "attack": 0.281,
+     "attach": 0.141
+    },
+    "follow_rate": 0.525,
+    "wr_follow": 0.5769,
+    "w_follow": 17.3,
+    "wr_other": 0.4468,
+    "w_other": 15.7,
+    "verdict": "局数不足"
+   },
+   "青|互角|4-6": {
+    "rows": 144,
+    "units": 39,
+    "games": 36,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.771,
+     "end": 0.118,
+     "play": 0.062,
+     "attach": 0.042,
+     "effect": 0.007
+    },
+    "played_share": {
+     "attack": 0.465,
+     "play": 0.243,
+     "attach": 0.132,
+     "end": 0.118,
+     "effect": 0.042
+    },
+    "follow_rate": 0.57,
+    "wr_follow": 0.542,
+    "w_follow": 22.2,
+    "wr_other": 0.6529,
+    "w_other": 16.8,
+    "verdict": "局数不足"
+   },
+   "青|互角|7+": {
+    "rows": 563,
+    "units": 69,
+    "games": 61,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.792,
+     "attach": 0.076,
+     "play": 0.062,
+     "end": 0.039,
+     "effect": 0.03
+    },
+    "played_share": {
+     "attack": 0.435,
+     "attach": 0.355,
+     "play": 0.114,
+     "effect": 0.048,
+     "end": 0.048
+    },
+    "follow_rate": 0.59,
+    "wr_follow": 0.6682,
+    "w_follow": 40.7,
+    "wr_other": 0.6645,
+    "w_other": 28.3,
+    "verdict": "局数不足"
+   },
+   "青|遅れ1|4-6": {
+    "rows": 152,
+    "units": 46,
+    "games": 44,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.737,
+     "end": 0.112,
+     "play": 0.072,
+     "attach": 0.046,
+     "effect": 0.033
+    },
+    "played_share": {
+     "attack": 0.434,
+     "play": 0.322,
+     "end": 0.125,
+     "attach": 0.092,
+     "effect": 0.026
+    },
+    "follow_rate": 0.502,
+    "wr_follow": 0.4489,
+    "w_follow": 23.1,
+    "wr_other": 0.3769,
+    "w_other": 22.9,
+    "verdict": "局数不足"
+   },
+   "青|遅れ1|7+": {
+    "rows": 419,
+    "units": 62,
+    "games": 56,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.809,
+     "play": 0.084,
+     "attach": 0.048,
+     "end": 0.038,
+     "effect": 0.021
+    },
+    "played_share": {
+     "attack": 0.473,
+     "attach": 0.308,
+     "play": 0.15,
+     "end": 0.053,
+     "effect": 0.017
+    },
+    "follow_rate": 0.581,
+    "wr_follow": 0.4271,
+    "w_follow": 36.0,
+    "wr_other": 0.4856,
+    "w_other": 26.0,
+    "verdict": "局数不足"
+   },
+   "青|遅れ2+|1-3": {
+    "rows": 113,
+    "units": 55,
+    "games": 55,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.389,
+     "play": 0.23,
+     "end": 0.142,
+     "effect": 0.142,
+     "attach": 0.097
+    },
+    "played_share": {
+     "play": 0.319,
+     "attack": 0.31,
+     "end": 0.177,
+     "attach": 0.115,
+     "effect": 0.08
+    },
+    "follow_rate": 0.527,
+    "wr_follow": 0.3534,
+    "w_follow": 29.0,
+    "wr_other": 0.2596,
+    "w_other": 26.0,
+    "verdict": "局数不足"
+   },
+   "青|遅れ2+|4-6": {
+    "rows": 265,
+    "units": 64,
+    "games": 63,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.645,
+     "end": 0.136,
+     "attach": 0.098,
+     "effect": 0.064,
+     "play": 0.057
+    },
+    "played_share": {
+     "attack": 0.408,
+     "play": 0.275,
+     "attach": 0.132,
+     "end": 0.109,
+     "effect": 0.075
+    },
+    "follow_rate": 0.483,
+    "wr_follow": 0.2064,
+    "w_follow": 30.9,
+    "wr_other": 0.2605,
+    "w_other": 33.1,
+    "diff": -0.054,
+    "diff_ci": [
+     -0.1619,
+     0.0449
+    ],
+    "wr_follow_ci": [
+     0.1094,
+     0.3141
+    ],
+    "wr_other_ci": [
+     0.1464,
+     0.3857
+    ],
+    "verdict": "外れの気配"
+   },
+   "青|遅れ2+|7+": {
+    "rows": 906,
+    "units": 78,
+    "games": 78,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.593,
+     "attach": 0.175,
+     "play": 0.124,
+     "effect": 0.063,
+     "end": 0.045
+    },
+    "played_share": {
+     "attack": 0.413,
+     "attach": 0.351,
+     "play": 0.141,
+     "effect": 0.054,
+     "end": 0.041
+    },
+    "follow_rate": 0.625,
+    "wr_follow": 0.1961,
+    "w_follow": 48.7,
+    "wr_other": 0.2202,
+    "w_other": 29.3,
+    "verdict": "局数不足"
+   },
+   "紫|先行2+|7+": {
+    "rows": 354,
+    "units": 33,
+    "games": 33,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.816,
+     "effect": 0.09,
+     "attach": 0.04,
+     "end": 0.037,
+     "play": 0.017
+    },
+    "played_share": {
+     "attach": 0.438,
+     "attack": 0.39,
+     "play": 0.093,
+     "end": 0.054,
+     "effect": 0.025
+    },
+    "follow_rate": 0.564,
+    "wr_follow": 0.7218,
+    "w_follow": 18.6,
+    "wr_other": 0.8734,
+    "w_other": 14.4,
+    "verdict": "局数不足"
+   },
+   "紫|先行1|7+": {
+    "rows": 244,
+    "units": 31,
+    "games": 31,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.795,
+     "effect": 0.115,
+     "end": 0.045,
+     "play": 0.029,
+     "attach": 0.016
+    },
+    "played_share": {
+     "attack": 0.434,
+     "attach": 0.381,
+     "play": 0.078,
+     "end": 0.07,
+     "effect": 0.037
+    },
+    "follow_rate": 0.542,
+    "wr_follow": 0.6036,
+    "w_follow": 16.8,
+    "wr_other": 0.6945,
+    "w_other": 14.2,
+    "verdict": "局数不足"
+   },
+   "紫|互角|4-6": {
+    "rows": 120,
+    "units": 33,
+    "games": 33,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.783,
+     "end": 0.142,
+     "effect": 0.033,
+     "attach": 0.033,
+     "play": 0.008
+    },
+    "played_share": {
+     "attack": 0.45,
+     "play": 0.242,
+     "end": 0.158,
+     "attach": 0.1,
+     "effect": 0.05
+    },
+    "follow_rate": 0.604,
+    "wr_follow": 0.4039,
+    "w_follow": 19.9,
+    "wr_other": 0.608,
+    "w_other": 13.1,
+    "verdict": "局数不足"
+   },
+   "紫|互角|7+": {
+    "rows": 366,
+    "units": 47,
+    "games": 47,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.719,
+     "effect": 0.126,
+     "play": 0.057,
+     "end": 0.055,
+     "attach": 0.044
+    },
+    "played_share": {
+     "attack": 0.486,
+     "attach": 0.26,
+     "play": 0.117,
+     "end": 0.082,
+     "effect": 0.055
+    },
+    "follow_rate": 0.602,
+    "wr_follow": 0.749,
+    "w_follow": 28.3,
+    "wr_other": 0.7381,
+    "w_other": 18.7,
+    "verdict": "局数不足"
+   },
+   "紫|遅れ1|4-6": {
+    "rows": 113,
+    "units": 32,
+    "games": 32,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.735,
+     "end": 0.124,
+     "attach": 0.062,
+     "play": 0.053,
+     "effect": 0.027
+    },
+    "played_share": {
+     "attack": 0.469,
+     "play": 0.265,
+     "end": 0.133,
+     "attach": 0.097,
+     "effect": 0.035
+    },
+    "follow_rate": 0.536,
+    "wr_follow": 0.4297,
+    "w_follow": 17.2,
+    "wr_other": 0.4465,
+    "w_other": 14.8,
+    "verdict": "局数不足"
+   },
+   "紫|遅れ1|7+": {
+    "rows": 387,
+    "units": 52,
+    "games": 50,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.716,
+     "effect": 0.101,
+     "play": 0.088,
+     "attach": 0.049,
+     "end": 0.047
+    },
+    "played_share": {
+     "attack": 0.46,
+     "attach": 0.238,
+     "play": 0.132,
+     "effect": 0.096,
+     "end": 0.075
+    },
+    "follow_rate": 0.589,
+    "wr_follow": 0.3814,
+    "w_follow": 30.6,
+    "wr_other": 0.436,
+    "w_other": 21.4,
+    "verdict": "局数不足"
+   },
+   "紫|遅れ2+|1-3": {
+    "rows": 102,
+    "units": 42,
+    "games": 42,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.392,
+     "play": 0.245,
+     "end": 0.225,
+     "attach": 0.088,
+     "effect": 0.049
+    },
+    "played_share": {
+     "play": 0.343,
+     "attack": 0.294,
+     "end": 0.186,
+     "attach": 0.088,
+     "effect": 0.088
+    },
+    "follow_rate": 0.568,
+    "wr_follow": 0.311,
+    "w_follow": 23.9,
+    "wr_other": 0.1974,
+    "w_other": 18.2,
+    "verdict": "局数不足"
+   },
+   "紫|遅れ2+|4-6": {
+    "rows": 170,
+    "units": 39,
+    "games": 39,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.588,
+     "end": 0.176,
+     "effect": 0.1,
+     "attach": 0.094,
+     "play": 0.041
+    },
+    "played_share": {
+     "attack": 0.424,
+     "play": 0.206,
+     "attach": 0.153,
+     "end": 0.129,
+     "effect": 0.088
+    },
+    "follow_rate": 0.584,
+    "wr_follow": 0.1612,
+    "w_follow": 22.8,
+    "wr_other": 0.2051,
+    "w_other": 16.2,
+    "verdict": "局数不足"
+   },
+   "紫|遅れ2+|7+": {
+    "rows": 597,
+    "units": 58,
+    "games": 58,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.598,
+     "play": 0.122,
+     "attach": 0.112,
+     "end": 0.085,
+     "effect": 0.082
+    },
+    "played_share": {
+     "attack": 0.422,
+     "attach": 0.29,
+     "play": 0.141,
+     "effect": 0.087,
+     "end": 0.06
+    },
+    "follow_rate": 0.641,
+    "wr_follow": 0.2063,
+    "w_follow": 37.2,
+    "wr_other": 0.1599,
+    "w_other": 20.8,
+    "verdict": "局数不足"
+   },
+   "黒|先行2+|7+": {
+    "rows": 437,
+    "units": 32,
+    "games": 32,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.86,
+     "end": 0.046,
+     "attach": 0.039,
+     "effect": 0.034,
+     "play": 0.021
+    },
+    "played_share": {
+     "attack": 0.435,
+     "attach": 0.419,
+     "play": 0.071,
+     "end": 0.057,
+     "effect": 0.018
+    },
+    "follow_rate": 0.579,
+    "wr_follow": 0.817,
+    "w_follow": 18.5,
+    "wr_other": 0.8063,
+    "w_other": 13.5,
+    "verdict": "局数不足"
+   },
+   "黒|先行1|7+": {
+    "rows": 251,
+    "units": 31,
+    "games": 30,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.801,
+     "attach": 0.072,
+     "end": 0.048,
+     "effect": 0.044,
+     "play": 0.036
+    },
+    "played_share": {
+     "attack": 0.498,
+     "attach": 0.283,
+     "play": 0.135,
+     "end": 0.052,
+     "effect": 0.032
+    },
+    "follow_rate": 0.604,
+    "wr_follow": 0.6582,
+    "w_follow": 18.7,
+    "wr_other": 0.5437,
+    "w_other": 12.3,
+    "verdict": "局数不足"
+   },
+   "黒|互角|4-6": {
+    "rows": 128,
+    "units": 31,
+    "games": 30,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.742,
+     "end": 0.125,
+     "effect": 0.047,
+     "play": 0.047,
+     "attach": 0.039
+    },
+    "played_share": {
+     "attack": 0.391,
+     "play": 0.273,
+     "end": 0.195,
+     "attach": 0.109,
+     "effect": 0.031
+    },
+    "follow_rate": 0.531,
+    "wr_follow": 0.4599,
+    "w_follow": 16.5,
+    "wr_other": 0.7174,
+    "w_other": 14.5,
+    "verdict": "局数不足"
+   },
+   "黒|互角|7+": {
+    "rows": 490,
+    "units": 60,
+    "games": 57,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.804,
+     "attach": 0.071,
+     "end": 0.055,
+     "effect": 0.041,
+     "play": 0.029
+    },
+    "played_share": {
+     "attack": 0.486,
+     "attach": 0.298,
+     "play": 0.112,
+     "end": 0.067,
+     "effect": 0.037
+    },
+    "follow_rate": 0.616,
+    "wr_follow": 0.6419,
+    "w_follow": 37.0,
+    "wr_other": 0.6195,
+    "w_other": 23.0,
+    "verdict": "局数不足"
+   },
+   "黒|遅れ1|4-6": {
+    "rows": 149,
+    "units": 35,
+    "games": 33,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.624,
+     "end": 0.174,
+     "play": 0.101,
+     "effect": 0.06,
+     "attach": 0.04
+    },
+    "played_share": {
+     "attack": 0.396,
+     "play": 0.289,
+     "end": 0.141,
+     "effect": 0.101,
+     "attach": 0.074
+    },
+    "follow_rate": 0.581,
+    "wr_follow": 0.4166,
+    "w_follow": 20.3,
+    "wr_other": 0.4451,
+    "w_other": 14.7,
+    "verdict": "局数不足"
+   },
+   "黒|遅れ1|7+": {
+    "rows": 317,
+    "units": 46,
+    "games": 43,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.795,
+     "end": 0.063,
+     "effect": 0.06,
+     "play": 0.047,
+     "attach": 0.035
+    },
+    "played_share": {
+     "attack": 0.448,
+     "attach": 0.246,
+     "play": 0.167,
+     "end": 0.076,
+     "effect": 0.063
+    },
+    "follow_rate": 0.618,
+    "wr_follow": 0.4859,
+    "w_follow": 28.4,
+    "wr_other": 0.4089,
+    "w_other": 17.6,
+    "verdict": "局数不足"
+   },
+   "黒|遅れ2+|4-6": {
+    "rows": 174,
+    "units": 34,
+    "games": 33,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.644,
+     "attach": 0.149,
+     "end": 0.109,
+     "effect": 0.057,
+     "play": 0.04
+    },
+    "played_share": {
+     "attack": 0.368,
+     "play": 0.224,
+     "attach": 0.195,
+     "end": 0.144,
+     "effect": 0.069
+    },
+    "follow_rate": 0.459,
+    "wr_follow": 0.3257,
+    "w_follow": 15.6,
+    "wr_other": 0.4305,
+    "w_other": 18.4,
+    "verdict": "局数不足"
+   },
+   "黒|遅れ2+|7+": {
+    "rows": 452,
+    "units": 50,
+    "games": 49,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.708,
+     "play": 0.113,
+     "end": 0.064,
+     "attach": 0.062,
+     "effect": 0.053
+    },
+    "played_share": {
+     "attack": 0.418,
+     "attach": 0.296,
+     "play": 0.177,
+     "effect": 0.066,
+     "end": 0.042
+    },
+    "follow_rate": 0.557,
+    "wr_follow": 0.2761,
+    "w_follow": 27.9,
+    "wr_other": 0.2398,
+    "w_other": 22.1,
+    "verdict": "局数不足"
+   },
+   "黄|先行2+|7+": {
+    "rows": 534,
+    "units": 45,
+    "games": 45,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.801,
+     "attach": 0.081,
+     "effect": 0.041,
+     "play": 0.039,
+     "end": 0.037
+    },
+    "played_share": {
+     "attack": 0.421,
+     "attach": 0.403,
+     "play": 0.079,
+     "end": 0.056,
+     "effect": 0.041
+    },
+    "follow_rate": 0.6,
+    "wr_follow": 0.8027,
+    "w_follow": 27.0,
+    "wr_other": 0.8515,
+    "w_other": 18.0,
+    "verdict": "局数不足"
+   },
+   "黄|先行1|7+": {
+    "rows": 282,
+    "units": 37,
+    "games": 36,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.755,
+     "effect": 0.092,
+     "attach": 0.067,
+     "play": 0.06,
+     "end": 0.025
+    },
+    "played_share": {
+     "attack": 0.415,
+     "attach": 0.362,
+     "play": 0.121,
+     "effect": 0.064,
+     "end": 0.039
+    },
+    "follow_rate": 0.584,
+    "wr_follow": 0.7952,
+    "w_follow": 21.6,
+    "wr_other": 0.7677,
+    "w_other": 15.4,
+    "verdict": "局数不足"
+   },
+   "黄|互角|4-6": {
+    "rows": 170,
+    "units": 44,
+    "games": 40,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.771,
+     "end": 0.112,
+     "effect": 0.053,
+     "play": 0.047,
+     "attach": 0.018
+    },
+    "played_share": {
+     "attack": 0.412,
+     "play": 0.218,
+     "attach": 0.182,
+     "end": 0.129,
+     "effect": 0.059
+    },
+    "follow_rate": 0.57,
+    "wr_follow": 0.635,
+    "w_follow": 25.1,
+    "wr_other": 0.691,
+    "w_other": 18.9,
+    "verdict": "局数不足"
+   },
+   "黄|互角|7+": {
+    "rows": 554,
+    "units": 66,
+    "games": 62,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.787,
+     "attach": 0.106,
+     "play": 0.038,
+     "effect": 0.034,
+     "end": 0.034
+    },
+    "played_share": {
+     "attack": 0.489,
+     "attach": 0.321,
+     "play": 0.103,
+     "end": 0.049,
+     "effect": 0.038
+    },
+    "follow_rate": 0.634,
+    "wr_follow": 0.6841,
+    "w_follow": 41.8,
+    "wr_other": 0.6365,
+    "w_other": 24.2,
+    "verdict": "局数不足"
+   },
+   "黄|遅れ1|4-6": {
+    "rows": 134,
+    "units": 40,
+    "games": 38,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.739,
+     "end": 0.127,
+     "effect": 0.067,
+     "play": 0.037,
+     "attach": 0.03
+    },
+    "played_share": {
+     "attack": 0.425,
+     "play": 0.254,
+     "end": 0.157,
+     "attach": 0.127,
+     "effect": 0.037
+    },
+    "follow_rate": 0.549,
+    "wr_follow": 0.5301,
+    "w_follow": 22.0,
+    "wr_other": 0.3524,
+    "w_other": 18.0,
+    "verdict": "局数不足"
+   },
+   "黄|遅れ1|7+": {
+    "rows": 469,
+    "units": 61,
+    "games": 57,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.787,
+     "attach": 0.079,
+     "effect": 0.062,
+     "end": 0.038,
+     "play": 0.034
+    },
+    "played_share": {
+     "attack": 0.463,
+     "attach": 0.32,
+     "play": 0.122,
+     "end": 0.051,
+     "effect": 0.045
+    },
+    "follow_rate": 0.609,
+    "wr_follow": 0.3695,
+    "w_follow": 37.1,
+    "wr_other": 0.347,
+    "w_other": 23.9,
+    "verdict": "局数不足"
+   },
+   "黄|遅れ2+|1-3": {
+    "rows": 67,
+    "units": 33,
+    "games": 33,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.552,
+     "play": 0.209,
+     "effect": 0.104,
+     "end": 0.09,
+     "attach": 0.045
+    },
+    "played_share": {
+     "attack": 0.328,
+     "play": 0.284,
+     "attach": 0.179,
+     "end": 0.149,
+     "effect": 0.06
+    },
+    "follow_rate": 0.624,
+    "wr_follow": 0.4251,
+    "w_follow": 20.6,
+    "wr_other": 0.4228,
+    "w_other": 12.4,
+    "verdict": "局数不足"
+   },
+   "黄|遅れ2+|4-6": {
+    "rows": 159,
+    "units": 35,
+    "games": 35,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.66,
+     "attach": 0.113,
+     "end": 0.088,
+     "effect": 0.082,
+     "play": 0.057
+    },
+    "played_share": {
+     "attack": 0.396,
+     "play": 0.226,
+     "attach": 0.17,
+     "end": 0.132,
+     "effect": 0.075
+    },
+    "follow_rate": 0.472,
+    "wr_follow": 0.369,
+    "w_follow": 16.5,
+    "wr_other": 0.3195,
+    "w_other": 18.5,
+    "verdict": "局数不足"
+   },
+   "黄|遅れ2+|7+": {
+    "rows": 465,
+    "units": 55,
+    "games": 55,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.735,
+     "attach": 0.092,
+     "play": 0.073,
+     "end": 0.052,
+     "effect": 0.047
+    },
+    "played_share": {
+     "attack": 0.471,
+     "attach": 0.284,
+     "play": 0.151,
+     "effect": 0.054,
+     "end": 0.041
+    },
+    "follow_rate": 0.626,
+    "wr_follow": 0.2265,
+    "w_follow": 34.4,
+    "wr_other": 0.3014,
+    "w_other": 20.6,
+    "verdict": "局数不足"
+   }
+  },
+  "by_gap": {
+   "先行2+": {
+    "rows": 2332,
+    "units": 212,
+    "games": 189,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.783,
+     "end": 0.06,
+     "effect": 0.054,
+     "play": 0.052,
+     "attach": 0.05
+    },
+    "played_share": {
+     "attack": 0.412,
+     "attach": 0.343,
+     "play": 0.128,
+     "end": 0.079,
+     "effect": 0.039
+    },
+    "follow_rate": 0.565,
+    "wr_follow": 0.7081,
+    "w_follow": 119.8,
+    "wr_other": 0.7502,
+    "w_other": 92.2,
+    "diff": -0.042,
+    "diff_ci": [
+     -0.0989,
+     0.0164
+    ],
+    "wr_follow_ci": [
+     0.6469,
+     0.766
+    ],
+    "wr_other_ci": [
+     0.6893,
+     0.8055
+    ],
+    "verdict": "外れの気配"
+   },
+   "先行1": {
+    "rows": 1668,
+    "units": 229,
+    "games": 196,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.757,
+     "effect": 0.076,
+     "end": 0.059,
+     "play": 0.054,
+     "attach": 0.054
+    },
+    "played_share": {
+     "attack": 0.439,
+     "attach": 0.278,
+     "play": 0.144,
+     "end": 0.082,
+     "effect": 0.056
+    },
+    "follow_rate": 0.561,
+    "wr_follow": 0.6788,
+    "w_follow": 128.4,
+    "wr_other": 0.6843,
+    "w_other": 100.6,
+    "diff": -0.0055,
+    "diff_ci": [
+     -0.0633,
+     0.0494
+    ],
+    "wr_follow_ci": [
+     0.6216,
+     0.7356
+    ],
+    "wr_other_ci": [
+     0.6226,
+     0.7471
+    ],
+    "verdict": "外れの気配"
+   },
+   "互角": {
+    "rows": 3025,
+    "units": 356,
+    "games": 228,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.768,
+     "end": 0.064,
+     "attach": 0.06,
+     "play": 0.055,
+     "effect": 0.054
+    },
+    "played_share": {
+     "attack": 0.452,
+     "attach": 0.265,
+     "play": 0.149,
+     "end": 0.081,
+     "effect": 0.053
+    },
+    "follow_rate": 0.577,
+    "wr_follow": 0.592,
+    "w_follow": 205.6,
+    "wr_other": 0.5937,
+    "w_other": 150.4,
+    "diff": -0.0017,
+    "diff_ci": [
+     -0.0459,
+     0.0407
+    ],
+    "wr_follow_ci": [
+     0.5607,
+     0.626
+    ],
+    "wr_other_ci": [
+     0.5598,
+     0.6312
+    ],
+    "verdict": "外れの気配"
+   },
+   "遅れ1": {
+    "rows": 2446,
+    "units": 323,
+    "games": 203,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.739,
+     "end": 0.078,
+     "play": 0.07,
+     "effect": 0.065,
+     "attach": 0.048
+    },
+    "played_share": {
+     "attack": 0.432,
+     "attach": 0.231,
+     "play": 0.188,
+     "end": 0.091,
+     "effect": 0.057
+    },
+    "follow_rate": 0.57,
+    "wr_follow": 0.4361,
+    "w_follow": 184.1,
+    "wr_other": 0.4516,
+    "w_other": 138.9,
+    "diff": -0.0155,
+    "diff_ci": [
+     -0.0654,
+     0.0351
+    ],
+    "wr_follow_ci": [
+     0.4014,
+     0.4711
+    ],
+    "wr_other_ci": [
+     0.4125,
+     0.4894
+    ],
+    "verdict": "外れの気配"
+   },
+   "遅れ2+": {
+    "rows": 3504,
+    "units": 326,
+    "games": 253,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.618,
+     "attach": 0.12,
+     "play": 0.108,
+     "end": 0.081,
+     "effect": 0.073
+    },
+    "played_share": {
+     "attack": 0.398,
+     "attach": 0.273,
+     "play": 0.179,
+     "end": 0.078,
+     "effect": 0.072
+    },
+    "follow_rate": 0.559,
+    "wr_follow": 0.3415,
+    "w_follow": 182.1,
+    "wr_other": 0.3531,
+    "w_other": 143.9,
+    "diff": -0.0116,
+    "diff_ci": [
+     -0.0555,
+     0.0342
+    ],
+    "wr_follow_ci": [
+     0.2979,
+     0.3845
+    ],
+    "wr_other_ci": [
+     0.3081,
+     0.4003
+    ],
+    "verdict": "外れの気配"
+   }
+  },
+  "by_band": {
+   "1-3": {
+    "rows": 995,
+    "units": 477,
+    "games": 260,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.448,
+     "play": 0.249,
+     "end": 0.147,
+     "effect": 0.113,
+     "attach": 0.043
+    },
+    "played_share": {
+     "play": 0.297,
+     "attack": 0.255,
+     "end": 0.217,
+     "attach": 0.135,
+     "effect": 0.095
+    },
+    "follow_rate": 0.55,
+    "wr_follow": 0.5233,
+    "w_follow": 262.2,
+    "wr_other": 0.4739,
+    "w_other": 214.8,
+    "diff": 0.0495,
+    "diff_ci": [
+     -0.015,
+     0.1104
+    ],
+    "wr_follow_ci": [
+     0.4912,
+     0.5536
+    ],
+    "wr_other_ci": [
+     0.4378,
+     0.5118
+    ],
+    "verdict": "理論どおりが勝つ（気配）"
+   },
+   "4-6": {
+    "rows": 2650,
+    "units": 520,
+    "games": 260,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.711,
+     "end": 0.12,
+     "effect": 0.063,
+     "attach": 0.056,
+     "play": 0.05
+    },
+    "played_share": {
+     "attack": 0.408,
+     "play": 0.258,
+     "attach": 0.136,
+     "end": 0.131,
+     "effect": 0.068
+    },
+    "follow_rate": 0.524,
+    "wr_follow": 0.4964,
+    "w_follow": 272.3,
+    "wr_other": 0.5039,
+    "w_other": 247.7,
+    "diff": -0.0075,
+    "diff_ci": [
+     -0.0434,
+     0.0295
+    ],
+    "wr_follow_ci": [
+     0.4794,
+     0.5142
+    ],
+    "wr_other_ci": [
+     0.4846,
+     0.5226
+    ],
+    "verdict": "外れの気配"
+   },
+   "7+": {
+    "rows": 9330,
+    "units": 520,
+    "games": 260,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.756,
+     "attach": 0.079,
+     "effect": 0.059,
+     "play": 0.059,
+     "end": 0.047
+    },
+    "played_share": {
+     "attack": 0.448,
+     "attach": 0.331,
+     "play": 0.118,
+     "end": 0.054,
+     "effect": 0.05
+    },
+    "follow_rate": 0.581,
+    "wr_follow": 0.4879,
+    "w_follow": 302.2,
+    "wr_other": 0.5168,
+    "w_other": 217.8,
+    "diff": -0.0288,
+    "diff_ci": [
+     -0.055,
+     -0.0035
+    ],
+    "wr_follow_ci": [
+     0.4772,
+     0.4985
+    ],
+    "wr_other_ci": [
+     0.502,
+     0.5321
+    ],
+    "verdict": "確かな外れ"
+   }
+  },
+  "by_color": {
+   "赤": {
+    "rows": 3785,
+    "units": 159,
+    "games": 136,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.737,
+     "end": 0.068,
+     "play": 0.067,
+     "effect": 0.067,
+     "attach": 0.061
+    },
+    "played_share": {
+     "attack": 0.429,
+     "attach": 0.275,
+     "play": 0.161,
+     "end": 0.078,
+     "effect": 0.058
+    },
+    "follow_rate": 0.547,
+    "wr_follow": 0.4991,
+    "w_follow": 87.0,
+    "wr_other": 0.5219,
+    "w_other": 72.0,
+    "diff": -0.0227,
+    "diff_ci": [
+     -0.0571,
+     0.0113
+    ],
+    "wr_follow_ci": [
+     0.4349,
+     0.568
+    ],
+    "wr_other_ci": [
+     0.4555,
+     0.5865
+    ],
+    "verdict": "外れの気配"
+   },
+   "緑": {
+    "rows": 2648,
+    "units": 105,
+    "games": 97,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.742,
+     "attach": 0.072,
+     "end": 0.067,
+     "effect": 0.064,
+     "play": 0.056
+    },
+    "played_share": {
+     "attack": 0.43,
+     "attach": 0.268,
+     "play": 0.16,
+     "end": 0.081,
+     "effect": 0.061
+    },
+    "follow_rate": 0.555,
+    "wr_follow": 0.4834,
+    "w_follow": 58.3,
+    "wr_other": 0.4887,
+    "w_other": 46.7,
+    "diff": -0.0053,
+    "diff_ci": [
+     -0.0473,
+     0.0372
+    ],
+    "wr_follow_ci": [
+     0.3963,
+     0.5734
+    ],
+    "wr_other_ci": [
+     0.4018,
+     0.5844
+    ],
+    "verdict": "外れの気配"
+   },
+   "青": {
+    "rows": 3622,
+    "units": 147,
+    "games": 121,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.711,
+     "play": 0.09,
+     "attach": 0.087,
+     "end": 0.065,
+     "effect": 0.047
+    },
+    "played_share": {
+     "attack": 0.429,
+     "attach": 0.287,
+     "play": 0.163,
+     "end": 0.074,
+     "effect": 0.046
+    },
+    "follow_rate": 0.56,
+    "wr_follow": 0.4214,
+    "w_follow": 82.3,
+    "wr_other": 0.4531,
+    "w_other": 64.7,
+    "diff": -0.0317,
+    "diff_ci": [
+     -0.07,
+     0.0095
+    ],
+    "wr_follow_ci": [
+     0.3547,
+     0.4873
+    ],
+    "wr_other_ci": [
+     0.3842,
+     0.5193
+    ],
+    "verdict": "外れの気配"
+   },
+   "紫": {
+    "rows": 2768,
+    "units": 115,
+    "games": 106,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.68,
+     "effect": 0.09,
+     "end": 0.087,
+     "play": 0.08,
+     "attach": 0.064
+    },
+    "played_share": {
+     "attack": 0.421,
+     "attach": 0.258,
+     "play": 0.159,
+     "end": 0.095,
+     "effect": 0.067
+    },
+    "follow_rate": 0.559,
+    "wr_follow": 0.4146,
+    "w_follow": 64.3,
+    "wr_other": 0.4802,
+    "w_other": 50.7,
+    "diff": -0.0656,
+    "diff_ci": [
+     -0.1082,
+     -0.0266
+    ],
+    "wr_follow_ci": [
+     0.3319,
+     0.5021
+    ],
+    "wr_other_ci": [
+     0.393,
+     0.5668
+    ],
+    "verdict": "確かな外れ"
+   },
+   "黒": {
+    "rows": 2821,
+    "units": 110,
+    "games": 100,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.73,
+     "end": 0.077,
+     "play": 0.077,
+     "effect": 0.058,
+     "attach": 0.058
+    },
+    "played_share": {
+     "attack": 0.417,
+     "attach": 0.256,
+     "play": 0.175,
+     "end": 0.096,
+     "effect": 0.055
+    },
+    "follow_rate": 0.556,
+    "wr_follow": 0.5183,
+    "w_follow": 61.1,
+    "wr_other": 0.518,
+    "w_other": 48.9,
+    "diff": 0.0003,
+    "diff_ci": [
+     -0.0436,
+     0.0439
+    ],
+    "wr_follow_ci": [
+     0.4337,
+     0.6028
+    ],
+    "wr_other_ci": [
+     0.4308,
+     0.6065
+    ],
+    "verdict": "理論どおりが勝つ（気配）"
+   },
+   "黄": {
+    "rows": 3167,
+    "units": 129,
+    "games": 114,
+    "best_mode": "attack",
+    "best_share": {
+     "attack": 0.744,
+     "attach": 0.076,
+     "effect": 0.061,
+     "play": 0.06,
+     "end": 0.059
+    },
+    "played_share": {
+     "attack": 0.431,
+     "attach": 0.29,
+     "play": 0.149,
+     "end": 0.077,
+     "effect": 0.053
+    },
+    "follow_rate": 0.572,
+    "wr_follow": 0.522,
+    "w_follow": 73.8,
+    "wr_other": 0.5521,
+    "w_other": 55.2,
+    "diff": -0.0301,
+    "diff_ci": [
+     -0.0723,
+     0.0105
+    ],
+    "wr_follow_ci": [
+     0.4452,
+     0.5968
+    ],
+    "wr_other_ci": [
+     0.4712,
+     0.6337
+    ],
+    "verdict": "外れの気配"
+   }
+  },
+  "marks_all": {
+   "n": 12975,
+   "long_clock": 0.343,
+   "mid_turn": 0.783,
+   "effect_or_play": 0.275
+  }
+ },
+ "q4": {
+  "by_type": {
+   "attack": {
+    "rows": 5514,
+    "units": 520,
+    "dW_mean": 0.0728,
+    "dW_p10": -0.0091,
+    "dev_mean": 0.592,
+    "forbid_rate": 0.175,
+    "mover_win": 0.5497,
+    "verdict": null
+   },
+   "attach": {
+    "rows": 3586,
+    "units": 509,
+    "dW_mean": -0.0044,
+    "dW_p10": -0.0228,
+    "dev_mean": 1.494,
+    "forbid_rate": 0.478,
+    "mover_win": 0.551,
+    "verdict": null
+   },
+   "play": {
+    "rows": 2132,
+    "units": 519,
+    "dW_mean": -0.0182,
+    "dW_p10": -0.0931,
+    "dev_mean": 1.517,
+    "forbid_rate": 0.558,
+    "mover_win": 0.4841,
+    "verdict": null
+   },
+   "effect": {
+    "rows": 770,
+    "units": 266,
+    "dW_mean": 0.0028,
+    "dW_p10": -0.0309,
+    "dev_mean": 0.512,
+    "forbid_rate": 0.194,
+    "mover_win": 0.4442,
+    "verdict": null
+   },
+   "end": {
+    "rows": 1158,
+    "units": 444,
+    "dW_mean": -0.0277,
+    "dW_p10": -0.0813,
+    "dev_mean": 0.549,
+    "forbid_rate": 0.161,
+    "mover_win": 0.4948,
+    "verdict": null
+   }
+  },
+  "by_role": {
+   "effect:big": {
+    "rows": 120,
+    "units": 48,
+    "dW_mean": 0.0058,
+    "dW_p10": -0.0264,
+    "dev_mean": 0.469,
+    "forbid_rate": 0.225,
+    "mover_win": 0.6333,
+    "verdict": null
+   },
+   "effect:blocker": {
+    "rows": 9,
+    "units": 7,
+    "dW_mean": 0.0,
+    "dW_p10": 0.0,
+    "dev_mean": 0.753,
+    "forbid_rate": 0.444,
+    "mover_win": 0.5556,
+    "verdict": "局数不足"
+   },
+   "effect:counter": {
+    "rows": 105,
+    "units": 60,
+    "dW_mean": -0.0016,
+    "dW_p10": -0.0119,
+    "dev_mean": 0.359,
+    "forbid_rate": 0.124,
+    "mover_win": 0.5048,
+    "verdict": null
+   },
+   "effect:draw": {
+    "rows": 74,
+    "units": 40,
+    "dW_mean": 0.0025,
+    "dW_p10": -0.038,
+    "dev_mean": 0.441,
+    "forbid_rate": 0.176,
+    "mover_win": 0.4054,
+    "verdict": null
+   },
+   "effect:leader": {
+    "rows": 459,
+    "units": 169,
+    "dW_mean": 0.0029,
+    "dW_p10": -0.0412,
+    "dev_mean": 0.543,
+    "forbid_rate": 0.2,
+    "mover_win": 0.4031,
+    "verdict": null
+   },
+   "effect:lock": {
+    "rows": 18,
+    "units": 10,
+    "dW_mean": -0.0004,
+    "dW_p10": -0.0065,
+    "dev_mean": 0.638,
+    "forbid_rate": 0.333,
+    "mover_win": 0.7778,
+    "verdict": "局数不足"
+   },
+   "effect:none": {
+    "rows": 31,
+    "units": 21,
+    "dW_mean": -0.0074,
+    "dW_p10": -0.0251,
+    "dev_mean": 0.508,
+    "forbid_rate": 0.226,
+    "mover_win": 0.3871,
+    "verdict": "局数不足"
+   },
+   "effect:reduction": {
+    "rows": 73,
+    "units": 25,
+    "dW_mean": 0.004,
+    "dW_p10": 0.0,
+    "dev_mean": 0.536,
+    "forbid_rate": 0.151,
+    "mover_win": 0.6575,
+    "verdict": "局数不足"
+   },
+   "effect:removal": {
+    "rows": 44,
+    "units": 19,
+    "dW_mean": 0.003,
+    "dW_p10": 0.0,
+    "dev_mean": 0.258,
+    "forbid_rate": 0.068,
+    "mover_win": 0.7045,
+    "verdict": "局数不足"
+   },
+   "play:big": {
+    "rows": 564,
+    "units": 355,
+    "dW_mean": -0.0002,
+    "dW_p10": -0.094,
+    "dev_mean": 1.798,
+    "forbid_rate": 0.668,
+    "mover_win": 0.5833,
+    "verdict": null
+   },
+   "play:blocker": {
+    "rows": 303,
+    "units": 203,
+    "dW_mean": 0.002,
+    "dW_p10": -0.0862,
+    "dev_mean": 1.541,
+    "forbid_rate": 0.422,
+    "mover_win": 0.462,
+    "verdict": null
+   },
+   "play:counter": {
+    "rows": 1254,
+    "units": 487,
+    "dW_mean": -0.0328,
+    "dW_p10": -0.1018,
+    "dev_mean": 1.569,
+    "forbid_rate": 0.571,
+    "mover_win": 0.4561,
+    "verdict": null
+   },
+   "play:draw": {
+    "rows": 339,
+    "units": 217,
+    "dW_mean": 0.0016,
+    "dW_p10": -0.0756,
+    "dev_mean": 1.096,
+    "forbid_rate": 0.448,
+    "mover_win": 0.5251,
+    "verdict": null
+   },
+   "play:lock": {
+    "rows": 177,
+    "units": 117,
+    "dW_mean": -0.0215,
+    "dW_p10": -0.1148,
+    "dev_mean": 1.787,
+    "forbid_rate": 0.61,
+    "mover_win": 0.4915,
+    "verdict": null
+   },
+   "play:none": {
+    "rows": 158,
+    "units": 120,
+    "dW_mean": -0.0082,
+    "dW_p10": -0.0663,
+    "dev_mean": 1.278,
+    "forbid_rate": 0.506,
+    "mover_win": 0.4937,
+    "verdict": null
+   },
+   "play:reduction": {
+    "rows": 207,
+    "units": 137,
+    "dW_mean": -0.0187,
+    "dW_p10": -0.0703,
+    "dev_mean": 1.617,
+    "forbid_rate": 0.628,
+    "mover_win": 0.5314,
+    "verdict": null
+   },
+   "play:removal": {
+    "rows": 210,
+    "units": 159,
+    "dW_mean": -0.0071,
+    "dW_p10": -0.0897,
+    "dev_mean": 1.637,
+    "forbid_rate": 0.529,
+    "mover_win": 0.4857,
+    "verdict": null
+   }
+  },
+  "by_target": {
+   "leader": {
+    "rows": 4360,
+    "units": 518,
+    "dW_mean": 0.0866,
+    "dW_p10": 0.0,
+    "dev_mean": 0.437,
+    "forbid_rate": 0.12,
+    "mover_win": 0.5697,
+    "verdict": null
+   },
+   "char": {
+    "rows": 1154,
+    "units": 405,
+    "dW_mean": 0.0205,
+    "dW_p10": -0.0531,
+    "dev_mean": 1.177,
+    "forbid_rate": 0.385,
+    "mover_win": 0.474,
+    "verdict": null
+   }
+  },
+  "by_type_color": {
+   "赤|attack": {
+    "rows": 1622,
+    "units": 159,
+    "dW_mean": 0.0844,
+    "dW_p10": -0.0093,
+    "dev_mean": 0.559,
+    "forbid_rate": 0.158,
+    "mover_win": 0.5598,
+    "verdict": null
+   },
+   "赤|attach": {
+    "rows": 1041,
+    "units": 152,
+    "dW_mean": -0.0043,
+    "dW_p10": -0.017,
+    "dev_mean": 1.616,
+    "forbid_rate": 0.496,
+    "mover_win": 0.5754,
+    "verdict": null
+   },
+   "赤|play": {
+    "rows": 619,
+    "units": 159,
+    "dW_mean": -0.0199,
+    "dW_p10": -0.0814,
+    "dev_mean": 1.448,
+    "forbid_rate": 0.574,
+    "mover_win": 0.496,
+    "verdict": null
+   },
+   "赤|effect": {
+    "rows": 228,
+    "units": 94,
+    "dW_mean": 0.0052,
+    "dW_p10": -0.0149,
+    "dev_mean": 0.505,
+    "forbid_rate": 0.197,
+    "mover_win": 0.4649,
+    "verdict": null
+   },
+   "赤|end": {
+    "rows": 322,
+    "units": 137,
+    "dW_mean": -0.024,
+    "dW_p10": -0.0535,
+    "dev_mean": 0.427,
+    "forbid_rate": 0.118,
+    "mover_win": 0.5155,
+    "verdict": null
+   },
+   "緑|attack": {
+    "rows": 1138,
+    "units": 105,
+    "dW_mean": 0.0775,
+    "dW_p10": -0.0073,
+    "dev_mean": 0.536,
+    "forbid_rate": 0.18,
+    "mover_win": 0.5264,
+    "verdict": null
+   },
+   "緑|attach": {
+    "rows": 709,
+    "units": 104,
+    "dW_mean": -0.0026,
+    "dW_p10": -0.0128,
+    "dev_mean": 1.268,
+    "forbid_rate": 0.449,
+    "mover_win": 0.5035,
+    "verdict": null
+   },
+   "緑|play": {
+    "rows": 433,
+    "units": 105,
+    "dW_mean": -0.0279,
+    "dW_p10": -0.0987,
+    "dev_mean": 1.435,
+    "forbid_rate": 0.603,
+    "mover_win": 0.4573,
+    "verdict": null
+   },
+   "緑|effect": {
+    "rows": 171,
+    "units": 56,
+    "dW_mean": 0.0069,
+    "dW_p10": -0.0122,
+    "dev_mean": 0.433,
+    "forbid_rate": 0.181,
+    "mover_win": 0.4269,
+    "verdict": null
+   },
+   "緑|end": {
+    "rows": 234,
+    "units": 83,
+    "dW_mean": -0.0263,
+    "dW_p10": -0.084,
+    "dev_mean": 0.47,
+    "forbid_rate": 0.167,
+    "mover_win": 0.4145,
+    "verdict": null
+   },
+   "青|attack": {
+    "rows": 1555,
+    "units": 147,
+    "dW_mean": 0.0644,
+    "dW_p10": -0.0121,
+    "dev_mean": 0.65,
+    "forbid_rate": 0.19,
+    "mover_win": 0.4952,
+    "verdict": null
+   },
+   "青|attach": {
+    "rows": 1040,
+    "units": 146,
+    "dW_mean": -0.0032,
+    "dW_p10": -0.0242,
+    "dev_mean": 1.544,
+    "forbid_rate": 0.499,
+    "mover_win": 0.4596,
+    "verdict": null
+   },
+   "青|play": {
+    "rows": 607,
+    "units": 147,
+    "dW_mean": -0.0246,
+    "dW_p10": -0.1044,
+    "dev_mean": 1.595,
+    "forbid_rate": 0.57,
+    "mover_win": 0.43,
+    "verdict": null
+   },
+   "青|effect": {
+    "rows": 178,
+    "units": 60,
+    "dW_mean": -0.0077,
+    "dW_p10": -0.0422,
+    "dev_mean": 0.484,
+    "forbid_rate": 0.146,
+    "mover_win": 0.4157,
+    "verdict": null
+   },
+   "青|end": {
+    "rows": 285,
+    "units": 119,
+    "dW_mean": -0.0265,
+    "dW_p10": -0.0907,
+    "dev_mean": 0.501,
+    "forbid_rate": 0.147,
+    "mover_win": 0.4316,
+    "verdict": null
+   },
+   "紫|attack": {
+    "rows": 1166,
+    "units": 115,
+    "dW_mean": 0.0708,
+    "dW_p10": -0.0154,
+    "dev_mean": 0.685,
+    "forbid_rate": 0.203,
+    "mover_win": 0.5051,
+    "verdict": null
+   },
+   "紫|attach": {
+    "rows": 713,
+    "units": 113,
+    "dW_mean": -0.0109,
+    "dW_p10": -0.0496,
+    "dev_mean": 1.441,
+    "forbid_rate": 0.488,
+    "mover_win": 0.5764,
+    "verdict": null
+   },
+   "紫|play": {
+    "rows": 457,
+    "units": 114,
+    "dW_mean": -0.013,
+    "dW_p10": -0.0907,
+    "dev_mean": 1.483,
+    "forbid_rate": 0.543,
+    "mover_win": 0.4508,
+    "verdict": null
+   },
+   "紫|effect": {
+    "rows": 190,
+    "units": 61,
+    "dW_mean": 0.0154,
+    "dW_p10": -0.0495,
+    "dev_mean": 0.562,
+    "forbid_rate": 0.232,
+    "mover_win": 0.3579,
+    "verdict": null
+   },
+   "紫|end": {
+    "rows": 281,
+    "units": 99,
+    "dW_mean": -0.0313,
+    "dW_p10": -0.0835,
+    "dev_mean": 0.659,
+    "forbid_rate": 0.203,
+    "mover_win": 0.4555,
+    "verdict": null
+   },
+   "黒|attack": {
+    "rows": 1177,
+    "units": 110,
+    "dW_mean": 0.0735,
+    "dW_p10": -0.0111,
+    "dev_mean": 0.544,
+    "forbid_rate": 0.152,
+    "mover_win": 0.5845,
+    "verdict": null
+   },
+   "黒|attach": {
+    "rows": 723,
+    "units": 105,
+    "dW_mean": -0.0028,
+    "dW_p10": -0.0272,
+    "dev_mean": 1.347,
+    "forbid_rate": 0.495,
+    "mover_win": 0.556,
+    "verdict": null
+   },
+   "黒|play": {
+    "rows": 513,
+    "units": 110,
+    "dW_mean": -0.0104,
+    "dW_p10": -0.0903,
+    "dev_mean": 1.369,
+    "forbid_rate": 0.53,
+    "mover_win": 0.501,
+    "verdict": null
+   },
+   "黒|effect": {
+    "rows": 161,
+    "units": 57,
+    "dW_mean": 0.0004,
+    "dW_p10": -0.0204,
+    "dev_mean": 0.535,
+    "forbid_rate": 0.199,
+    "mover_win": 0.4099,
+    "verdict": null
+   },
+   "黒|end": {
+    "rows": 303,
+    "units": 102,
+    "dW_mean": -0.0268,
+    "dW_p10": -0.0732,
+    "dev_mean": 0.511,
+    "forbid_rate": 0.112,
+    "mover_win": 0.5248,
+    "verdict": null
+   },
+   "黄|attack": {
+    "rows": 1365,
+    "units": 129,
+    "dW_mean": 0.0744,
+    "dW_p10": -0.0071,
+    "dev_mean": 0.552,
+    "forbid_rate": 0.167,
+    "mover_win": 0.5612,
+    "verdict": null
+   },
+   "黄|attach": {
+    "rows": 917,
+    "units": 128,
+    "dW_mean": -0.0076,
+    "dW_p10": -0.0232,
+    "dev_mean": 1.543,
+    "forbid_rate": 0.478,
+    "mover_win": 0.6031,
+    "verdict": null
+   },
+   "黄|play": {
+    "rows": 485,
+    "units": 129,
+    "dW_mean": -0.0176,
+    "dW_p10": -0.1077,
+    "dev_mean": 1.579,
+    "forbid_rate": 0.548,
+    "mover_win": 0.5031,
+    "verdict": null
+   },
+   "黄|effect": {
+    "rows": 177,
+    "units": 64,
+    "dW_mean": 0.0031,
+    "dW_p10": -0.0115,
+    "dev_mean": 0.503,
+    "forbid_rate": 0.181,
+    "mover_win": 0.5028,
+    "verdict": null
+   },
+   "黄|end": {
+    "rows": 269,
+    "units": 109,
+    "dW_mean": -0.0271,
+    "dW_p10": -0.0944,
+    "dev_mean": 0.461,
+    "forbid_rate": 0.16,
+    "mover_win": 0.539,
+    "verdict": null
+   }
+  },
+  "turn_clock": {
+   "all": {
+    "turns": 2680,
+    "games": 260,
+    "my_clock_ext": -0.202,
+    "opp_clock_change": -0.952,
+    "my_win": 0.5231,
+    "verdict": null
+   },
+   "play": {
+    "turns": 1817,
+    "games": 260,
+    "my_clock_ext": -0.215,
+    "opp_clock_change": -0.979,
+    "my_win": 0.5025,
+    "verdict": null
+   },
+   "attach": {
+    "turns": 1232,
+    "games": 257,
+    "my_clock_ext": -0.155,
+    "opp_clock_change": -0.866,
+    "my_win": 0.5276,
+    "verdict": null
+   },
+   "end": {
+    "turns": 1062,
+    "games": 255,
+    "my_clock_ext": -0.174,
+    "opp_clock_change": -0.842,
+    "my_win": 0.4972,
+    "verdict": null
+   },
+   "attack:leader": {
+    "turns": 2070,
+    "games": 260,
+    "my_clock_ext": -0.209,
+    "opp_clock_change": -1.005,
+    "my_win": 0.5213,
+    "verdict": null
+   },
+   "attack": {
+    "turns": 2357,
+    "games": 260,
+    "my_clock_ext": -0.19,
+    "opp_clock_change": -0.964,
+    "my_win": 0.5261,
+    "verdict": null
+   },
+   "effect": {
+    "turns": 615,
+    "games": 197,
+    "my_clock_ext": -0.159,
+    "opp_clock_change": -0.946,
+    "my_win": 0.5528,
+    "verdict": null
+   },
+   "play:draw": {
+    "turns": 308,
+    "games": 161,
+    "my_clock_ext": -0.329,
+    "opp_clock_change": -1.001,
+    "my_win": 0.461,
+    "verdict": null
+   },
+   "effect:draw": {
+    "turns": 68,
+    "games": 35,
+    "my_clock_ext": -0.612,
+    "opp_clock_change": -0.826,
+    "my_win": 0.6029,
+    "verdict": null
+   },
+   "play:big": {
+    "turns": 560,
+    "games": 232,
+    "my_clock_ext": -0.177,
+    "opp_clock_change": -1.058,
+    "my_win": 0.4196,
+    "verdict": null
+   },
+   "play:blocker": {
+    "turns": 288,
+    "games": 168,
+    "my_clock_ext": -0.182,
+    "opp_clock_change": -0.886,
+    "my_win": 0.5278,
+    "verdict": null
+   },
+   "play:lock": {
+    "turns": 171,
+    "games": 102,
+    "my_clock_ext": -0.039,
+    "opp_clock_change": -0.966,
+    "my_win": 0.5088,
+    "verdict": null
+   },
+   "attack:char": {
+    "turns": 816,
+    "games": 241,
+    "my_clock_ext": -0.175,
+    "opp_clock_change": -0.631,
+    "my_win": 0.511,
+    "verdict": null
+   },
+   "play:reduction": {
+    "turns": 193,
+    "games": 120,
+    "my_clock_ext": -0.226,
+    "opp_clock_change": -1.25,
+    "my_win": 0.4508,
+    "verdict": null
+   },
+   "play:removal": {
+    "turns": 203,
+    "games": 133,
+    "my_clock_ext": -0.087,
+    "opp_clock_change": -0.657,
+    "my_win": 0.5172,
+    "verdict": null
+   },
+   "effect:big": {
+    "turns": 95,
+    "games": 44,
+    "my_clock_ext": -0.397,
+    "opp_clock_change": -0.959,
+    "my_win": 0.2737,
+    "verdict": null
+   },
+   "effect:blocker": {
+    "turns": 9,
+    "games": 7,
+    "my_clock_ext": 0.241,
+    "opp_clock_change": -0.778,
+    "my_win": 0.4444,
+    "verdict": "局数不足"
+   },
+   "effect:lock": {
+    "turns": 17,
+    "games": 10,
+    "my_clock_ext": -0.165,
+    "opp_clock_change": -1.238,
+    "my_win": 0.1765,
+    "verdict": "局数不足"
+   },
+   "effect:reduction": {
+    "turns": 61,
+    "games": 23,
+    "my_clock_ext": -0.184,
+    "opp_clock_change": -1.005,
+    "my_win": 0.3934,
+    "verdict": "局数不足"
+   },
+   "effect:removal": {
+    "turns": 37,
+    "games": 19,
+    "my_clock_ext": -0.18,
+    "opp_clock_change": -1.061,
+    "my_win": 0.3514,
+    "verdict": "局数不足"
+   }
+  }
+ },
+ "q5_small_loss": {
+  "small_rows": 8789,
+  "big_rows": 4186,
+  "groups": {
+   "ALL_small": {
+    "rows": 8789,
+    "units": 520,
+    "resid": -0.0131,
+    "resid_ci": [
+     -0.0178,
+     -0.0083
+    ],
+    "win": 0.542,
+    "W": 0.5424
+   },
+   "ALL_big": {
+    "rows": 4186,
+    "units": 517,
+    "resid": -0.0003,
+    "resid_ci": [
+     -0.0069,
+     0.006
+    ],
+    "win": 0.5029,
+    "W": 0.5052
+   },
+   "attack:char": {
+    "rows": 710,
+    "units": 342,
+    "resid": -0.0163,
+    "resid_ci": [
+     -0.037,
+     0.0043
+    ],
+    "win": 0.4986,
+    "W": 0.4968
+   },
+   "attack:leader": {
+    "rows": 3838,
+    "units": 518,
+    "resid": -0.0186,
+    "resid_ci": [
+     -0.0239,
+     -0.0131
+    ],
+    "win": 0.5834,
+    "W": 0.5607
+   },
+   "role:effect:big": {
+    "rows": 93,
+    "units": 42,
+    "resid": 0.0991,
+    "resid_ci": [
+     0.0242,
+     0.1777
+    ],
+    "win": 0.6022,
+    "W": 0.5609
+   },
+   "role:effect:blocker": {
+    "rows": 5,
+    "units": 4,
+    "verdict": "局数不足"
+   },
+   "role:effect:counter": {
+    "rows": 92,
+    "units": 53,
+    "resid": -0.0203,
+    "resid_ci": [
+     -0.105,
+     0.0608
+    ],
+    "win": 0.4891,
+    "W": 0.505
+   },
+   "role:effect:draw": {
+    "rows": 60,
+    "units": 35,
+    "resid": -0.0401,
+    "resid_ci": [
+     -0.125,
+     0.0394
+    ],
+    "win": 0.3667,
+    "W": 0.4579
+   },
+   "role:effect:leader": {
+    "rows": 336,
+    "units": 155,
+    "resid": 0.0122,
+    "resid_ci": [
+     -0.0287,
+     0.0515
+    ],
+    "win": 0.3839,
+    "W": 0.4506
+   },
+   "role:effect:lock": {
+    "rows": 12,
+    "units": 7,
+    "verdict": "局数不足"
+   },
+   "role:effect:none": {
+    "rows": 23,
+    "units": 18,
+    "verdict": "局数不足"
+   },
+   "role:effect:reduction": {
+    "rows": 61,
+    "units": 23,
+    "verdict": "局数不足"
+   },
+   "role:effect:removal": {
+    "rows": 41,
+    "units": 18,
+    "verdict": "局数不足"
+   },
+   "role:play:big": {
+    "rows": 187,
+    "units": 154,
+    "resid": 0.0416,
+    "resid_ci": [
+     0.0001,
+     0.0839
+    ],
+    "win": 0.6364,
+    "W": 0.5938
+   },
+   "role:play:blocker": {
+    "rows": 175,
+    "units": 137,
+    "resid": -0.0883,
+    "resid_ci": [
+     -0.1437,
+     -0.0305
+    ],
+    "win": 0.48,
+    "W": 0.5468
+   },
+   "role:play:counter": {
+    "rows": 502,
+    "units": 321,
+    "resid": -0.0252,
+    "resid_ci": [
+     -0.0532,
+     0.0026
+    ],
+    "win": 0.4582,
+    "W": 0.4648
+   },
+   "role:play:draw": {
+    "rows": 173,
+    "units": 136,
+    "resid": -0.0335,
+    "resid_ci": [
+     -0.0881,
+     0.0172
+    ],
+    "win": 0.4798,
+    "W": 0.4866
+   },
+   "role:play:lock": {
+    "rows": 68,
+    "units": 57,
+    "resid": -0.0437,
+    "resid_ci": [
+     -0.1293,
+     0.0406
+    ],
+    "win": 0.4853,
+    "W": 0.5445
+   },
+   "role:play:none": {
+    "rows": 74,
+    "units": 61,
+    "resid": 0.0107,
+    "resid_ci": [
+     -0.0712,
+     0.093
+    ],
+    "win": 0.527,
+    "W": 0.525
+   },
+   "role:play:reduction": {
+    "rows": 73,
+    "units": 57,
+    "resid": 0.097,
+    "resid_ci": [
+     0.0173,
+     0.179
+    ],
+    "win": 0.5205,
+    "W": 0.434
+   },
+   "role:play:removal": {
+    "rows": 97,
+    "units": 80,
+    "resid": 0.0317,
+    "resid_ci": [
+     -0.0374,
+     0.1021
+    ],
+    "win": 0.5155,
+    "W": 0.5106
+   },
+   "type:attach": {
+    "rows": 1872,
+    "units": 441,
+    "resid": -0.0019,
+    "resid_ci": [
+     -0.0169,
+     0.0137
+    ],
+    "win": 0.5502,
+    "W": 0.5766
+   },
+   "type:attack": {
+    "rows": 4548,
+    "units": 520,
+    "resid": -0.0144,
+    "resid_ci": [
+     -0.0191,
+     -0.0095
+    ],
+    "win": 0.5701,
+    "W": 0.5507
+   },
+   "type:effect": {
+    "rows": 587,
+    "units": 244,
+    "resid": 0.0227,
+    "resid_ci": [
+     -0.0084,
+     0.0549
+    ],
+    "win": 0.4276,
+    "W": 0.4623
+   },
+   "type:end": {
+    "rows": 890,
+    "units": 406,
+    "resid": -0.0272,
+    "resid_ci": [
+     -0.0457,
+     -0.0076
+    ],
+    "win": 0.5067,
+    "W": 0.5299
+   },
+   "type:play": {
+    "rows": 892,
+    "units": 426,
+    "resid": -0.0151,
+    "resid_ci": [
+     -0.0325,
+     0.0019
+    ],
+    "win": 0.4922,
+    "W": 0.4939
+   },
+   "type×gap:attach|互角": {
+    "rows": 387,
+    "units": 160,
+    "resid": -0.0159,
+    "resid_ci": [
+     -0.058,
+     0.0263
+    ],
+    "win": 0.6718,
+    "W": 0.6769
+   },
+   "type×gap:attach|先行1": {
+    "rows": 252,
+    "units": 89,
+    "resid": -0.0379,
+    "resid_ci": [
+     -0.1026,
+     0.0275
+    ],
+    "win": 0.75,
+    "W": 0.8211
+   },
+   "type×gap:attach|先行2+": {
+    "rows": 464,
+    "units": 106,
+    "resid": -0.068,
+    "resid_ci": [
+     -0.115,
+     -0.0171
+    ],
+    "win": 0.8944,
+    "W": 0.9474
+   },
+   "type×gap:attach|遅れ1": {
+    "rows": 241,
+    "units": 119,
+    "resid": -0.0055,
+    "resid_ci": [
+     -0.0567,
+     0.0451
+    ],
+    "win": 0.39,
+    "W": 0.404
+   },
+   "type×gap:attach|遅れ2+": {
+    "rows": 528,
+    "units": 163,
+    "resid": 0.0582,
+    "resid_ci": [
+     0.0147,
+     0.0992
+    ],
+    "win": 0.1364,
+    "W": 0.1392
+   },
+   "type×gap:attack|互角": {
+    "rows": 1158,
+    "units": 331,
+    "resid": -0.0168,
+    "resid_ci": [
+     -0.0397,
+     0.0072
+    ],
+    "win": 0.6632,
+    "W": 0.6409
+   },
+   "type×gap:attack|先行1": {
+    "rows": 618,
+    "units": 200,
+    "resid": -0.063,
+    "resid_ci": [
+     -0.1047,
+     -0.0183
+    ],
+    "win": 0.7767,
+    "W": 0.7865
+   },
+   "type×gap:attack|先行2+": {
+    "rows": 808,
+    "units": 190,
+    "resid": -0.1468,
+    "resid_ci": [
+     -0.1868,
+     -0.1036
+    ],
+    "win": 0.8478,
+    "W": 0.9181
+   },
+   "type×gap:attack|遅れ1": {
+    "rows": 888,
+    "units": 298,
+    "resid": 0.0312,
+    "resid_ci": [
+     0.0084,
+     0.0535
+    ],
+    "win": 0.4572,
+    "W": 0.4058
+   },
+   "type×gap:attack|遅れ2+": {
+    "rows": 1076,
+    "units": 296,
+    "resid": 0.1273,
+    "resid_ci": [
+     0.0968,
+     0.1557
+    ],
+    "win": 0.2361,
+    "W": 0.162
+   },
+   "type×gap:effect|互角": {
+    "rows": 115,
+    "units": 80,
+    "resid": -0.0441,
+    "resid_ci": [
+     -0.111,
+     0.0235
+    ],
+    "win": 0.4957,
+    "W": 0.6047
+   },
+   "type×gap:effect|先行1": {
+    "rows": 75,
+    "units": 54,
+    "resid": -0.0641,
+    "resid_ci": [
+     -0.1611,
+     0.0277
+    ],
+    "win": 0.6667,
+    "W": 0.7504
+   },
+   "type×gap:effect|先行2+": {
+    "rows": 77,
+    "units": 51,
+    "resid": -0.1046,
+    "resid_ci": [
+     -0.1888,
+     -0.0157
+    ],
+    "win": 0.8182,
+    "W": 0.8911
+   },
+   "type×gap:effect|遅れ1": {
+    "rows": 113,
+    "units": 68,
+    "resid": -0.0449,
+    "resid_ci": [
+     -0.1203,
+     0.0301
+    ],
+    "win": 0.3363,
+    "W": 0.3709
+   },
+   "type×gap:effect|遅れ2+": {
+    "rows": 207,
+    "units": 121,
+    "resid": 0.0572,
+    "resid_ci": [
+     0.0005,
+     0.1074
+    ],
+    "win": 0.2077,
+    "W": 0.1691
+   },
+   "type×gap:end|互角": {
+    "rows": 214,
+    "units": 156,
+    "resid": -0.1034,
+    "resid_ci": [
+     -0.1544,
+     -0.0514
+    ],
+    "win": 0.5,
+    "W": 0.599
+   },
+   "type×gap:end|先行1": {
+    "rows": 108,
+    "units": 93,
+    "resid": -0.0915,
+    "resid_ci": [
+     -0.165,
+     -0.0206
+    ],
+    "win": 0.6667,
+    "W": 0.7267
+   },
+   "type×gap:end|先行2+": {
+    "rows": 159,
+    "units": 106,
+    "resid": -0.1124,
+    "resid_ci": [
+     -0.1682,
+     -0.0484
+    ],
+    "win": 0.805,
+    "W": 0.8804
+   },
+   "type×gap:end|遅れ1": {
+    "rows": 185,
+    "units": 134,
+    "resid": 0.0148,
+    "resid_ci": [
+     -0.0402,
+     0.0697
+    ],
+    "win": 0.4486,
+    "W": 0.4243
+   },
+   "type×gap:end|遅れ2+": {
+    "rows": 224,
+    "units": 159,
+    "resid": 0.0762,
+    "resid_ci": [
+     0.0246,
+     0.1262
+    ],
+    "win": 0.2723,
+    "W": 0.2072
+   },
+   "type×gap:play|互角": {
+    "rows": 180,
+    "units": 139,
+    "resid": -0.038,
+    "resid_ci": [
+     -0.0853,
+     0.011
+    ],
+    "win": 0.5667,
+    "W": 0.5975
+   },
+   "type×gap:play|先行1": {
+    "rows": 108,
+    "units": 83,
+    "resid": -0.0577,
+    "resid_ci": [
+     -0.1364,
+     0.0178
+    ],
+    "win": 0.6944,
+    "W": 0.731
+   },
+   "type×gap:play|先行2+": {
+    "rows": 146,
+    "units": 105,
+    "resid": -0.1321,
+    "resid_ci": [
+     -0.1917,
+     -0.0723
+    ],
+    "win": 0.7671,
+    "W": 0.8655
+   },
+   "type×gap:play|遅れ1": {
+    "rows": 180,
+    "units": 133,
+    "resid": 0.0159,
+    "resid_ci": [
+     -0.0358,
+     0.0644
+    ],
+    "win": 0.4833,
+    "W": 0.4287
+   },
+   "type×gap:play|遅れ2+": {
+    "rows": 278,
+    "units": 165,
+    "resid": 0.0607,
+    "resid_ci": [
+     0.0162,
+     0.1032
+    ],
+    "win": 0.2266,
+    "W": 0.1819
+   }
+  }
+ }
+}
