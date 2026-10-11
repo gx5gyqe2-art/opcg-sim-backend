@@ -1,0 +1,43 @@
+{
+  "branch": "claude/cand-clock-value",
+  "base": "claude/cpu-spec-improvements-yw91jd@35a2756ab",
+  "report": "docs/reports/2026-10-10_clock_value.md",
+  "candidate": {"switch": "OPCG_CLOCK_VALUE", "diagnostic_switches": ["OPCG_CLOCK_VALUE_LITERAL", "OPCG_PRICE_DUMP"],
+                "default_changed": false, "new_constants": 0,
+                "formula_commit": "a91907b1", "impl_and_prediction_commit": "5850c7ca",
+                "judgment_reading_fixed_commit": "c22833a2", "judgment_tool_commit": "369bdf4e",
+                "price": "(W(successor) - W(now)) / kappa(now); successor = true-state fork + search apply + search leaf window rule; TURN_END = forfeit rest of turn; mid-turn rule reads under the switch only"},
+  "recommendation": "adopt (per the pre-fixed reading §2.5); use order-known form for explaining wins, order-unknown form for policy teaching",
+  "judgment": {
+    "quantity": "game-level AUC of the attack-side deviation sum (price x kappa, seat0 - seat1); dG replaced as primary with coordinator's agreement (candidate prices do not enter dG)",
+    "i_minus_attack_premium": {"real": [0.5447, 0.7577], "synthetic_w39": [0.3762, 0.5584]},
+    "ii_same_type": {"real": [0.4296, 0.6610], "synthetic_w39": [0.4041, 0.5445]},
+    "drop_last_turn": {"i": {"real": [0.7997, 0.8429], "synthetic_w39": [0.6419, 0.6946]},
+                       "ii": {"real": [0.7157, 0.7644], "synthetic_w39": [0.6638, 0.6220]}},
+    "kill_a_hit": false, "kill_b_hit": false, "adopt_condition_met": true
+  },
+  "reference": {
+    "dG_auc": {"real": [0.7295, 0.7297], "synthetic_w39": [0.7252, 0.7265]},
+    "dS_atk_auc_with_premium": {"real": [0.5429, 0.7275], "synthetic_w39": [0.3646, 0.5396]},
+    "no_attack_auc": {"real": [0.5761, 0.7269], "synthetic_w39": [0.4244, 0.5789]}
+  },
+  "invariants_switch_on_vs_default": {
+    "crossing_bridge": {"real": {"hit": 0.7051, "bias_int": 0.354, "sigma_T": 1.412, "capped": 9},
+                        "synthetic_900": {"hit": 0.6602, "bias_int": 0.738, "sigma_T": 2.004, "capped": 70}, "identical": true},
+    "win_calib_pre_settle_rel": {"real": {"auc": 0.8076, "logloss": 0.5267, "ece": 0.0168},
+                                 "synthetic_900": {"auc": 0.7241, "logloss": 0.6314, "ece": 0.0584}, "identical": true},
+    "declarations_first_per_seat": {"real": 0.9605, "synthetic_900": 0.946, "identical_on_off": true,
+                                    "note": "this report's count differs from the ledger's .961/.937 definition"}
+  },
+  "draw_decomposition_real": {
+    "order_unknown": {"i": 0.7533, "ii": 0.6482}, "order_known": {"i": 0.7577, "ii": 0.6610},
+    "draw_share_of_gain": {"i": 0.02, "ii": 0.06},
+    "life_revealed_share_of_priced_successors": 0.081
+  },
+  "attack_premium_kappa": {"real": {"default": 0.029, "candidate": 0.066}, "synthetic_w39": {"default": 0.067, "candidate": 0.072},
+                           "winner_minus_loser": {"real": {"default": 0.014, "candidate": 0.028}, "synthetic_w39": {"default": 0.014, "candidate": 0.004}}},
+  "forbid_rate_1x": {"real": {"default": 0.330, "candidate": 0.412}, "synthetic_w39": {"default": 0.357, "candidate": 0.316}},
+  "replay_match": {"w41": "300/300", "w39": "300/300", "w41_shuffle": "300/300"},
+  "reductions": "synthetic linear bridge on w39 (300 games) only; order-unknown arm on real only; literal-read diagnostic on the 10-game slices only",
+  "gate": {"make_test": "green", "cargo": "474 passed, 1 ignored", "pytest": "622 passed, 12 skipped"}
+}
