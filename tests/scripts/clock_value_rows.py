@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""**候補 `OPCG_CLOCK_VALUE` の行ごとの器**（2026-10-10・`docs/reports/2026-10-10_clock_value.md` §1.5）。
+"""**手の値段の行ごとの器**（2026-10-10・`docs/reports/2026-10-10_clock_value.md` §1.5・2026-10-11 から打った後の 2 本の時計の値段が既定）。
 
 `theory_bridge.py` を `OPCG_PRICE_DUMP=<jsonl>` で回した写し（行ごとに `[t, w, 打った手, 最善, κ, 打った手の型, 最善の型, 値段の付いた候補の数]`）
-から、腕ごとに次を出す（新しい式は無い・`theory_bridge` の `s` と `shadow_forbid` の線をそのまま数える）:
+から、腕ごとに次を出す（新しい式は無い・`theory_bridge` の `s` と `shadow_forbid` の線をそのまま数える）。
+腕は `theory_bridge` の既定（打った後の 2 本の時計・並びを知らない形）と `OPCG_CLOCK_VALUE=0`（旧い静的な値段）や
+`OPCG_CLOCK_VALUE_ORDER=known`（並びを知る形＝上限）の写しを渡して比べる（`--dump`＝比べる元・`--dump2`＝比べる先）:
 
 * **打った手と理論の最善の差**（通貨・手札 1 枚の価値 μ で割る）の分布——行は「打った手に値段が付き、値段の付いた候補が 2 本以上」
   （`theory_bridge` の無言でない行と同じ規約）。

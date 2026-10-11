@@ -177,7 +177,8 @@ impl Core {
         out.push(knum((self.ctx.option_depth > 0) as i64 as f64));
         out.push(knum(self.ctx.flow_exercise as i64 as f64));
         if super::super::leaves_to::mid_turn_rules() {
-            // 候補 `OPCG_CLOCK_VALUE` の規則どおりの読み（§1.3）。既定では鍵に何も足さない＝既定の鍵は 1 ビットも変わらない
+            // 手の値段（打った後の 2 本の時計・§1.3）の規則どおりの読み。値段の前後の読みのあいだだけ入る（`drv_tb::clock_prices`・
+            // 別の核 `CORE2`）＝時計・帳簿・守りの窓の読みの鍵には何も足さない
             out.push(K::Str(std::rc::Rc::from("mid_turn")));
         }
         out.push(knum(self.don_cost as i64 as f64));
@@ -280,7 +281,7 @@ pub fn with_core<R>(f: impl FnOnce(&mut Core) -> R) -> R {
 }
 
 thread_local! {
-    /// 候補 `OPCG_CLOCK_VALUE` の値段の読み専用の核（`drv_tb`・覚え書きを既定の読みと混ぜない・§1.5）。
+    /// 手の値段（打った後の 2 本の時計・2026-10-11 から既定）の読み専用の核（`drv_tb::clock_prices`・覚え書きを時計・帳簿の読みと混ぜない・§1.5）。
     static CORE2: std::cell::RefCell<Option<Core>> = const { std::cell::RefCell::new(None) };
 }
 

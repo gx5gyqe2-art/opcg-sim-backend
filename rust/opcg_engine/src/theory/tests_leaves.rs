@@ -144,8 +144,9 @@ fn py_str_of_a_list_is_python_str() {
     assert_eq!(py_str(&PyVal::List(vec![PyVal::Int(1), PyVal::Str("it's".into())])), "[1, \"it's\"]");
 }
 
-/// 候補 `OPCG_CLOCK_VALUE` の「ターンの途中を規則どおりに読む」（`docs/reports/2026-10-10_clock_value.md` §1.3）: 既定では何も変えず、
-/// 入れたときだけ攻撃済みのリーダーを今のターンの攻め手から外し、付けたドンを後のターンのパワーから外す（手で導ける値）。
+/// 手の値段（打った後の 2 本の時計・2026-10-11 から既定）の「ターンの途中を規則どおりに読む」（`docs/reports/2026-10-10_clock_value.md` §1.3）:
+/// 切っているとき（時計・帳簿の読み）は何も変えず、入れたとき（値段の前後の読み）だけ攻撃済みのリーダーを今のターンの攻め手から外し、
+/// 付けたドンを後のターンのパワーから外す（手で導ける値）。
 #[test]
 fn mid_turn_rules_read_the_rested_leader_and_attached_don() {
     use super::leaves_to::{later_don_off, own_attackers_of, set_mid_turn_rules, Tok};

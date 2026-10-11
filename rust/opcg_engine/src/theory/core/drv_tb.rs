@@ -446,8 +446,14 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
         d.set("band", V::dict(vec![]));
         d
     };
-    // 候補 `OPCG_CLOCK_VALUE`（§1.5）: 行の位置ごとの後続局面の表（無ければ既定のまま 1 ビットも変わらない）
+    // **手の値段の既定＝打った後の 2 本の時計**（2026-10-11 採用・`docs/reports/2026-10-10_clock_value.md` §1.5・§6・既定の表は
+    // 並びを知らない形〔`Game.fork_shuffled`〕・並びを知る形は `OPCG_CLOCK_VALUE_ORDER=known` の上限。形の違いは表の中身だけで、ここは同じ読み）:
+    // `in.succ`＝行の位置ごとの後続局面の表（`clock_succ.py`）・`in.clock_value`＝この腕で回しているか（Python の `theory_bridge`
+    // が `OPCG_CLOCK_VALUE` から渡す・既定 true）。`clock_value` が真なら表に無い行は**値段なし**（静的な値段へ黙って落ちない）。
+    // `clock_value` が偽（`OPCG_CLOCK_VALUE=0`）か無い（2026-10-11 より前の記録の呼び出し＝`cargo` の記録の再生）なら
+    // 旧い静的な値段（`score_cand`）のまま＝旧い入力の出力は 1 ビットも変わらない。
     let succ: Vec<(usize, V)> = p.get("in").get("succ").items().iter().map(|e| (e.items()[0].int() as usize, e.items()[1].clone())).collect();
+    let clock_on = p.get("in").get("clock_value").truthy();
     let succ_literal = p.get("in").get("succ_literal").truthy();
     let dump_rows = p.get("in").get("dump_rows").truthy();
     let mut row_dump: Vec<V> = Vec::new();
@@ -545,15 +551,26 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
                 c.leave(s);
                 vals.push(v?);
             }
+            // 既定の値段（打った後の 2 本の時計）: 表に行が在ればその値段。`clock_value` の腕で表に無い行（表に無い局・
+            // 候補の数が合わない行）は値段なし＝無言の行として数える（§1.5「表に無い行・値段なしの候補は値段なし」）。
+            let mut clock_vals: Option<Vec<Option<f64>>> = None;
             if let Some((_, sv)) = succ.iter().find(|(kk, _)| *kk == k) {
                 let cx = ClockCx { t, prof: &prof, cfg, cut_me, cut_opp, mirror_me, dk_me: deck_of(p, w), dk_opp: deck_of(p, 1 - w), literal: succ_literal };
                 let ps = super::state::with_core2(|c2| clock_prices(c2, &row, sv, &cx, &mut stats))?;
                 if ps.len() == kq as usize {
-                    vals = ps;
+                    clock_vals = Some(ps);
                     stats.addi("clock_rows", 1);
                 } else {
                     stats.addi("clock_len_mismatch", 1);
                 }
+            }
+            match clock_vals {
+                Some(ps) => vals = ps,
+                None if clock_on => {
+                    vals = vec![None; kq as usize];
+                    stats.addi("clock_rows_unpriced", 1);
+                }
+                None => {}
             }
             let scored: Vec<f64> = vals.iter().flatten().cloned().collect();
             let played_v = vals[ch as usize];
@@ -832,7 +849,7 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
     Ok(V::dict(out))
 }
 
-/// 候補 `OPCG_CLOCK_VALUE` の読みの文脈（行のもの）
+/// 手の値段の既定（打った後の 2 本の時計）の読みの文脈（行のもの）
 struct ClockCx<'a> {
     t: i64,
     prof: &'a [f64],
@@ -883,7 +900,9 @@ fn clock_read(c2: &mut Core, me: &Row, opp: &Row, cx: &ClockCx) -> R<(f64, f64)>
     Ok((wv, kap))
 }
 
-/// 行の候補ごとの値段 `p(a) = (W(s′_a) − W(s)) / κ(s)`（§1.3）。表の状態: 0／6（`TURN_END`）＝読む・1＝勝ち（W=1）・2＝負け（W=0）・他＝値段なし。
+/// 行の候補ごとの値段 `p(a) = (W(s′_a) − W(s)) / κ(s)`（§1.3・2026-10-11 から理論の既定の手の値段）。
+/// 表の状態: 0／6（`TURN_END`）＝読む・1＝勝ち（W=1）・2＝負け（W=0）・他＝値段なし。
+/// `literal`（診断 `OPCG_CLOCK_VALUE_LITERAL`）でなければ前後の読みのあいだだけ「ターンの途中を規則どおりに読む」を入れる。
 fn clock_prices(c2: &mut Core, row: &Row, sv: &V, cx: &ClockCx, stats: &mut D) -> R<Vec<Option<f64>>> {
     let dt = rw::ci_dtype(row);
     let prev = lt::set_mid_turn_rules(!cx.literal);

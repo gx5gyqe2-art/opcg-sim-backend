@@ -215,8 +215,9 @@ pub fn opp_chars_of(tok: &Tok) -> Vec<(f64, bool)> {
 }
 
 thread_local! {
-    /// 候補 `OPCG_CLOCK_VALUE` の「ターンの途中の局面を規則どおりに読む」（`docs/reports/2026-10-10_clock_value.md` §1.3）。
-    /// 既定は偽＝どの式も 1 ビットも変わらない。値段の前後の読みのあいだだけ真にする（`drv_tb` の別の核で）。
+    /// 手の値段（打った後の 2 本の時計・2026-10-11 から既定）の「ターンの途中の局面を規則どおりに読む」
+    /// （`docs/reports/2026-10-10_clock_value.md` §1.3）。値段の前後の読みのあいだだけ真にする（`drv_tb::clock_prices`・別の核）。
+    /// それ以外（時計・帳簿・守りの窓・ターンの最初の行の読み）では偽＝どの式も 1 ビットも変わらない。
     static MID_TURN_RULES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 

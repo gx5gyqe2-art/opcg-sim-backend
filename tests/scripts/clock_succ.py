@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""**候補 `OPCG_CLOCK_VALUE` の後続局面の表**（2026-10-10・`docs/reports/2026-10-10_clock_value.md` §1.2・§1.5）。
+"""**手の値段（打った後の 2 本の時計）の後続局面の表**（2026-10-10・`docs/reports/2026-10-10_clock_value.md` §1.2・§1.5・
+2026-10-11 からこの値段が理論の既定の手の値段＝`theory_bridge.py` は既定でこの表を `<記録>/clock_succ/` から読む）。
+
+**並びの 2 つの形**（ユーザ決定 2026-10-11「知らない形を既定にして」）: **既定は並びを知らない形**（`--order unknown`・
+`Game.fork_shuffled`＝両席のライフと山札を行ごとに 1 回混ぜ直した複製から後続を作る・理論の約束「手札とデッキの中身は見えるが
+並びは見えない」に合う形）。**並びを知る形**（`--order known`・`Game.fork`＝真の盤面の複製）は切替で残し、後知恵の上限として使う
+（`theory_bridge.py` は `OPCG_CLOCK_VALUE_ORDER=known`）。混ぜ直しの乱数の種は行から決まる（`seed × 100003 + step`・同じ行を
+2 回読めば同じ並び＝同じ値段）。表の npz は `order` に自分の形を書き、`theory_bridge.py` は求めた形と違う表を拒む。
 
 記録の局を記録と同じ設定で打ち直し（T140 `live_theory.replay_and_compare` と同じ経路）、自席ターンのメインの行
 （候補 2 本以上）ごとに次を局ごとの npz に書く:
@@ -17,7 +24,11 @@
 
 使い方（局ごとに `<out>/<seed>.npz`・在る局は飛ばす＝途中から再開できる）:
 
-    OPCG_LOG_SILENT=1 python tests/scripts/clock_succ.py --in <records_dir> --out <dir> [--games 10]
+    OPCG_LOG_SILENT=1 python tests/scripts/clock_succ.py --in <records_dir> [--out <dir>] [--games 10] [--order unknown|known]
+
+`--out` の既定は `<records_dir>/clock_succ`（並びを知らない形・既定）／`<records_dir>/clock_succ_known`（`--order known`）
+＝`theory_bridge.py` の既定（`OPCG_CLOCK_VALUE_ORDER` 未設定／`known`）が読む置き場。`--shuffle` は `--order unknown` の別名
+（報告 §2.5・§3.5 の回し方のまま）。
 """
 
 import argparse
@@ -169,6 +180,7 @@ def replay_game(d, seed, meta, rec_rows, shuffle=False):
 
     res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, max_steps=RG.MAX_STEPS, observer=observer)
     out = {"seed": np.int64(seed), "match": np.int8(chk["bad"] == 0 and chk["rows"] == len(rec_rows)),
+           "order": ("unknown" if shuffle else "known"),           # 並びの形（`theory_bridge.py` が求めた形と照合する）
            "rows_checked": np.int64(chk["rows"]), "rows_bad": np.int64(chk["bad"]),
            "rows_recorded": np.int64(len(rec_rows)), "winner": str(res["winner"])}
     for k, v in rows.items():
@@ -181,10 +193,18 @@ def replay_game(d, seed, meta, rec_rows, shuffle=False):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--in", dest="src", required=True, help="記録のディレクトリ（1 つ）")
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--out", default=None,
+                    help="表の置き場（既定: `<in>/clock_succ`・`--order known` なら `<in>/clock_succ_known`＝`theory_bridge.py` の既定が読む）")
     ap.add_argument("--games", type=int, default=0, help="先頭から何局（0＝全部）")
-    ap.add_argument("--shuffle", action="store_true", help="両席のライフと山札を混ぜ直した複製から後続を作る（並びを知らない形）")
+    ap.add_argument("--order", default="unknown", choices=("unknown", "known"),
+                    help="並びの形（既定 `unknown`＝両席のライフと山札を混ぜ直した複製から後続を作る・`known`＝真の盤面の複製＝後知恵の上限）")
+    ap.add_argument("--shuffle", action="store_true", help="`--order unknown` の別名（旧い回し方・既定と同じ）")
     a = ap.parse_args(argv)
+    if a.shuffle:
+        a.order = "unknown"
+    a.shuffle = a.order == "unknown"
+    if a.out is None:
+        a.out = os.path.join(a.src, "clock_succ" if a.shuffle else "clock_succ_known")
     os.makedirs(a.out, exist_ok=True)
     meta = _meta(a.src)
     rec, order = record_steps(a.src)
