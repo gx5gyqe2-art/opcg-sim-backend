@@ -15,9 +15,9 @@
 | 段 | 置き場 | 状態 |
 |---|---|---|
 | (1) 後続の表（`clock_succ.py --in <w39>`・既定 `--order unknown`） | `<w39>/clock_succ/<seed>.npz` | 済（300 局・不一致 0・2971 秒） |
-| (2) `theory_bridge.py`（既定の値段・`OPCG_PRICE_DUMP` の写し） | `<scratch>/work/dump.jsonl`・`bridge.json`・`bridge.log` | 19:18 開始・22:30 時点 260/300 局（1 局 約 0.7 分） |
+| (2) `theory_bridge.py`（既定の値段・`OPCG_PRICE_DUMP` の写し） | `<scratch>/work/dump.jsonl`・`bridge.json`・`bridge.log` | 済（300 局・19:18〜23:12・14,037 秒） |
 | (3) 時計の行（`theory_map.py clocks`） | `<scratch>/work/clocks.json` | 済（行 3,439・先に回した） |
-| (4) 集計 | **`logs/theory_map/syn_w39.json`**（push する） | **22:30 時点の部分版を push**（写しの在る 260 局・欠けた 40 局は道具の突き合わせで除外・`status` 欄に明記）。全 300 局版で置き換える |
+| (4) 集計 | **`logs/theory_map/syn_w39.json`**（push する） | **済・全 300 局版を push**（行 15,154・時計つき 14,935・突き合わせ 15,796 行で欠け 0）。22:30 の部分版（260 局）は履歴に残る |
 
 ## 合成で直した点
 
@@ -28,3 +28,4 @@
 - 待ちの監視の `pgrep -f` が自分の命令行に一致し、表の完了（17:55）から鎖の起動まで約 75 分空いた。時計の行を先に回してから写しへ進めた（段の順を入れ替えただけ・中身は同じ）。
 - 22:30 に 23:30 に間に合わない見込みが出たので、指示どおり 260 局分の集計を先に push（`logs/theory_map/syn_w39.json` の `status` が PARTIAL）。
 - ゲート: `cargo test` 474 passed／pytest 622 passed（このコンテナに pytest・fastapi が無かったので入れてから回した）。
+- 23:14 に全 300 局の集計が出たので部分版を置き換えた（道具の出力そのまま・`status` 欄なし）。
