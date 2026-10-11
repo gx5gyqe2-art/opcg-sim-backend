@@ -5,7 +5,12 @@
 `OPCG_PRICE_DUMP` で回したもの）と、交点の橋の行（`crossing_bridge.collect`・決着前の勝率の読みは `win_calib` と同じ相対の腕）を
 記録の行と突き合わせ、報告 §1 で先に固定した区切りで 5 つの問いの表を出す。
 
-使い方（記録ごと・`clock_succ.py --in <記録>` の表が要る）:
+使い方（1 本で全部・途中で止まっても出力の在る段は飛ばして再開する）:
+
+    OPCG_LOG_SILENT=1 python tests/scripts/theory_map.py --in <記録> --out <map.json> [--work <dir>]
+
+`--work` の既定は `<map.json>.work/`。段は (1) 手の値段の表（`<記録>/clock_succ/` が局の数だけ無ければ `clock_succ.py --in <記録>`）
+→ (2) `theory_bridge.py`（`OPCG_PRICE_DUMP` の写し）→ (3) 時計の行 → (4) 集計。段ごとに回すときは:
 
     OPCG_LOG_SILENT=1 OPCG_PRICE_DUMP=<dir>/dump.jsonl python tests/scripts/theory_bridge.py --in <記録> --out <dir>/bridge.json
     OPCG_LOG_SILENT=1 python tests/scripts/theory_map.py clocks --in <記録> --out <dir>/clocks.json
@@ -600,7 +605,43 @@ def collect_q5(rows, mu, reps):
     return out
 
 
+def cmd_run(a):
+    """1 本で全部（表 → 写し → 時計 → 集計）。在る出力は作り直さない。"""
+    import subprocess
+    work = a.work or (a.out + ".work")
+    os.makedirs(work, exist_ok=True)
+    env = dict(os.environ, OPCG_LOG_SILENT="1")
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    n_games = len(meta["games"]) if not a.games else a.games
+    tdir = os.path.join(a.src, "clock_succ")
+    have = len([f for f in os.listdir(tdir) if f.endswith(".npz") and not f.endswith(".tmp.npz")]) if os.path.isdir(tdir) else 0
+    if have < n_games:
+        print("[1/4] 手の値段の表（%d/%d 局在る）" % (have, n_games), flush=True)
+        cmd = [sys.executable, os.path.join(_HERE, "clock_succ.py"), "--in", a.src]
+        if a.games:
+            cmd += ["--games", str(a.games)]
+        subprocess.run(cmd, env=env, check=True)
+    dump = os.path.join(work, "dump.jsonl")
+    if not os.path.exists(dump + ".ok"):
+        print("[2/4] theory_bridge（写し）", flush=True)
+        cmd = [sys.executable, os.path.join(_HERE, "theory_bridge.py"), "--in", a.src, "--out", os.path.join(work, "bridge.json")]
+        if a.games:
+            cmd += ["--limit-games", str(a.games)]
+        with open(os.path.join(work, "bridge.log"), "w") as lf:
+            subprocess.run(cmd, env=dict(env, OPCG_PRICE_DUMP=dump), check=True, stdout=lf, stderr=subprocess.STDOUT)
+        open(dump + ".ok", "w").close()
+    clocks = os.path.join(work, "clocks.json")
+    if not os.path.exists(clocks):
+        print("[3/4] 時計の行", flush=True)
+        cmd_clocks(argparse.Namespace(src=a.src, games=a.games, out=clocks))
+    print("[4/4] 集計", flush=True)
+    return cmd_analyze(argparse.Namespace(src=a.src, dump=dump, clocks=clocks, boot=a.boot, out=a.out))
+
+
 def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "-h", "--help"):
+        argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("clocks")
@@ -613,8 +654,14 @@ def main(argv=None):
     z.add_argument("--clocks", required=True)
     z.add_argument("--boot", type=int, default=BOOT)
     z.add_argument("--out", required=True)
+    r = sub.add_parser("run")
+    r.add_argument("--in", dest="src", required=True)
+    r.add_argument("--out", required=True)
+    r.add_argument("--work", default=None)
+    r.add_argument("--games", type=int, default=0)
+    r.add_argument("--boot", type=int, default=BOOT)
     a = ap.parse_args(argv)
-    return cmd_clocks(a) if a.cmd == "clocks" else cmd_analyze(a)
+    return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run}[a.cmd](a)
 
 
 if __name__ == "__main__":
