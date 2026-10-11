@@ -17,15 +17,15 @@
       "json": "logs/theory_map/real_w41.json"
     },
     "syn_w39": {
-      "source": "claude/theory-map-syn @ 9cd883a3 logs/theory_map/syn_w39.json",
-      "status": "PARTIAL: 260/300 games had the theory_bridge price dump at 22:30 UTC (game_missing=40 skipped by the tool's alignment); clocks.json covers all 300. Full 300-game run in progress and will replace this file.",
-      "rows": 13160,
-      "games": 260,
+      "source": "claude/theory-map-syn @ dbaadf7f logs/theory_map/syn_w39.json (full 300; interim 260/300 version replaced)",
+      "rows": 15154,
+      "rows_with_clock": 14935,
+      "games": 300,
       "q3_all": {
-        "diff": -0.0216,
+        "diff": -0.0217,
         "ci": [
-          -0.0423,
-          -0.0013
+          -0.0398,
+          -0.0037
         ]
       },
       "q3_clear_misses": [
@@ -55,7 +55,7 @@
     "q5": "small-loss plays of lock/reduction/draw/blocker and leader activations lose 5-11% vs theory W; big-body plays and attacks when behind win more than W"
   },
   "next_fix_priority": [
-    "attack overpriced vs attach/play mid-game & behind (synth clear miss 互角|4-6 -0.103; real hint)",
+    "attack overpriced vs attach/play mid-game & behind (synth clear miss 互角|4-6 -0.096; real hint -0.013)",
     "play/effect overpriced (blocker in both)",
     "big bodies underpriced (both)",
     "late even-race mover (real only)",
@@ -65,9 +65,9 @@
   "new_constants": 0,
   "theory_code_changed": false,
   "same_direction_both": [
-    "play:blocker small-loss plays lose vs W",
-    "play:big wins vs W",
-    "attack when far behind wins vs W",
+    "play:blocker small-loss plays lose vs W (CI<0 both)",
+    "attack when far behind wins vs W (CI>0 both)",
+    "play:big wins vs W (real CI>0, synth CI crosses 0)",
     "CPU attacks less / attaches more than theory"
   ],
   "real_only": [
