@@ -1,79 +1,52 @@
 {
-  "branch": "claude/adopt-clock-value",
-  "base": "claude/cand-clock-value@3bc6f4a7",
-  "report": "docs/reports/2026-10-10_clock_value.md",
-  "decision": "user 2026-10-11: adopt (a), then 'make the order-unknown form the default' (via coordinator)",
-  "default_flipped": true,
-  "default_price": "(W(successor) - W(now)) / kappa(now); successor from order-unknown copy (Game.fork_shuffled, both seats' life+deck reshuffled once per row, seed = record_seed*100003 + step, deterministic)",
-  "switches": {
-    "OPCG_CLOCK_VALUE": "unset/1 = default (table <record>/clock_succ/); 0 = old static price (score_candidate); <dir> = any table parent (candidate layout)",
-    "OPCG_CLOCK_VALUE_ORDER": "unset/unknown = default; known = order-known form (true-state copy, hindsight upper bound, table <record>/clock_succ_known/)",
-    "diagnostic_unchanged": [
-      "OPCG_CLOCK_VALUE_LITERAL",
-      "OPCG_PRICE_DUMP"
+  "branch": "claude/theory-map",
+  "base": "claude/cpu-spec-improvements-yw91jd@8feb1848",
+  "report": "docs/reports/2026-10-11_theory_map.md",
+  "tool": "tests/scripts/theory_map.py (one-off, no tests)",
+  "decision": "user 2026-10-11 'analysis first' (via coordinator); split: this worker = real w41 only, synth w39 = claude/theory-map-syn",
+  "partitions_fixed_before_data": "afc26604 (report §1)",
+  "theory": "default: post-move two-clock price, order-unknown; clocks = crossing_bridge (pre-settle off, settled marks); W = relative arm",
+  "records": {
+    "real_w41": {
+      "games": 300,
+      "table_match": "300/300",
+      "dump_rows": 18207,
+      "align_mismatch": 0,
+      "analysis_rows": 17563,
+      "rows_with_clock": 17291,
+      "json": "logs/theory_map/real_w41.json"
+    },
+    "syn_w39": "pending from claude/theory-map-syn (logs/theory_map/syn_w39.json)"
+  },
+  "min_games": 30,
+  "bootstrap": "games resampled, 2000 reps, 95% percentile, seed 0",
+  "leader_axis": "all leaders below 30 games (142 leaders, max 9 games) -> colour used as coarse deck axis (fixed before data)",
+  "findings_real": {
+    "q3_follow_vs_other": {
+      "diff": 0.0381,
+      "ci": [
+        0.0202,
+        0.0555
+      ]
+    },
+    "q3_clear_misses": 0,
+    "q3_hint_misses": [
+      "遅れ2+ (all bands) -0.006",
+      "互角|4-6 -0.013"
     ],
-    "clock_succ_py": "--order unknown (default) | known; --shuffle = alias of --order unknown; --out defaults to <in>/clock_succ or <in>/clock_succ_known; npz carries 'order'"
+    "q1": "theory best-type mix nearly identical across colours; CPU attacks less (39-51% vs 60-73% from turn 4) and attaches/plays more",
+    "q2": "early: board attack power decides (AUC .75), durability reversed (.38); late: durability decides (.77), life .72, hand .65; bodies ~.52",
+    "q4": "opp big-body play turns -> my win .374 (all .527) while clocks barely move; opp removal turns -> my clock -0.41, my win .589",
+    "q5": "small-loss plays of lock/reduction/draw/blocker and leader activations lose 5-11% vs theory W; big-body plays and attacks when behind win more than W"
   },
-  "rust": "drv_tb::game takes in.clock_value (Python passes it; absent = legacy = recorded cargo replays unchanged); rows without a table entry are unpriced under the clock arm (stats.clock_rows_unpriced), never silently static",
-  "not_changed": [
-    "crossing_bridge (clocks)",
-    "win_calib / pre-settle calibration",
-    "settlement declarations",
-    "ledger g, kappa, guard windows",
-    "gameplay goldens",
-    "live path: live_theory.price_candidates / shadow_forbid / t18_arena / theory_trace still static (no live successor reader yet; documented)",
-    "theory_table w-bar measurement runs with OPCG_CLOCK_VALUE=0 (prices unused)"
+  "next_fix_priority": [
+    "play/effect prices too high vs outcomes (known: effect pricing coarseness, comparison asymmetry)",
+    "attack overpriced vs attach when far behind / vs play mid-game even (known: attack premium)",
+    "big bodies underpriced (new)",
+    "late even-race mover underestimated (pre-settle calibration)",
+    "early life read with wrong sign"
   ],
-  "identity_check_w41_first_10_games": {
-    "source": "git archive origin/claude/sigma-wip sigma_wip/data/w41",
-    "before_tree": "3bc6f4a7 (git worktree)",
-    "default_vs_before_shuffle_table": {
-      "json_identical": true,
-      "jsonl_sha256_16": "babc07ee13ca0aa5",
-      "jsonl_identical": true
-    },
-    "order_known_vs_before_known_table": {
-      "json_identical": true,
-      "jsonl_sha256_16": "0cdd71bb0a6ce30b",
-      "jsonl_identical": true
-    },
-    "static_vs_before_no_switch": {
-      "json_identical": true,
-      "jsonl_sha256_16": "d206bc3d89e82d36",
-      "jsonl_identical": true
-    },
-    "arms_mutually_distinct": true,
-    "replay_match": "10/10 both tables",
-    "default_arm_stats": {
-      "atk_rows": 596,
-      "atk_silent": 13,
-      "clock_rows": 596,
-      "clock_rows_unpriced": 0,
-      "dS_auc": 0.88,
-      "dG_auc": 0.68,
-      "static_dS_auc": 0.44,
-      "static_dG_auc": 0.68
-    },
-    "seconds_10_games": {
-      "default_clock": 243.0,
-      "order_known": 236.2,
-      "static": 32.8
-    },
-    "missing_table_raises": true,
-    "order_mismatch_refused": true
-  },
-  "make_test_affected": false,
-  "gate": {
-    "make_test": "green",
-    "cargo": "474 passed, 0 failed, 1 ignored",
-    "pytest": "622 passed, 12 skipped",
-    "wall_seconds": 119,
-    "env_note": "maturin, pytest, pytest-xdist, fastapi, httpx were missing in this container and were pip-installed before the green run"
-  },
-  "docs": [
-    "docs/TEST_SPEC.md instrument table (+1 row)",
-    "docs/theory_overview.md §2 (+ '手の値段' row: default = order-unknown form, known = upper bound)",
-    "PROGRESS.md"
-  ],
-  "new_constants": 0
+  "gate": "make test green before push (cargo 474 passed 1 ignored / pytest 622 passed 12 skipped)",
+  "new_constants": 0,
+  "theory_code_changed": false
 }

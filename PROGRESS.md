@@ -6,12 +6,10 @@
 **道具の入口**: `OPCG_LOG_SILENT=1 python tests/scripts/theory_map.py --in <記録> --out <map.json>`（表 → 写し → 時計 → 集計を 1 本で・在る段は飛ばして再開・作業の置き場は `<map.json>.work/`）。
 報告: `docs/reports/2026-10-11_theory_map.md`。
 
-## 状態
+## 状態（21:05 UTC）
 
-- [x] §1（区切り・数え方）を全記録を見る前に書いて push（リーダーは 1 種あたり最大 9 局なので、色を副の区切りに足した）
-- [ ] 実 w41: 手の値段の表は済（300 局・打ち直しは全局一致・17:50 UTC）→ `theory_bridge`（写し・18:43 UTC に 87/300・20:50 頃の見込み）→ 時計の行 → 集計
-- [ ] `theory_bridge`（写しつき）と `crossing_bridge.collect` の行を集める
-- [x] 分析の器（`tests/scripts/theory_map.py`・1 回きり・テストなし）を書いて 3 局で試した（写しと記録の行は 195 行全部一致）。push はゲートの後にまとめて
-- [ ] 報告 §0・§2〜・次に直す候補の表・RESULT.json
-- [x] 道具を push（`make test` green: cargo 474 passed・1 ignored／pytest 622 passed・12 skipped）
-- [ ] 報告の後の最終 push（道具を直したらもう 1 回ゲート）
+- [x] §1 を全記録の前に push（afc26604）
+- [x] 道具を push（5f85261a・ゲート green）
+- [x] 実 w41: 表（300/300 一致）→ 写し（18,207 行・3 時間）→ 時計の行 → 集計（`logs/theory_map/real_w41.json`）
+- [x] 報告 §0・§2〜§8・§10〜§11（実だけ）・RESULT.json
+- [ ] §9 合成 w39（`claude/theory-map-syn` の `logs/theory_map/syn_w39.json` 待ち・23:30 UTC に無ければ「未着」で閉じる）
