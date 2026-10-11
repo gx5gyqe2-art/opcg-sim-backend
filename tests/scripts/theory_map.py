@@ -1,0 +1,621 @@
+#!/usr/bin/env python3
+"""**理論の目で記録を読む**（2026-10-11・`docs/reports/2026-10-11_theory_map.md`・1 回きりの測定・テストなし）。
+
+理論のプログラムは変えない。既定の手の値段（打った後の 2 本の時計・並びを知らない形）の写し（`theory_bridge.py` を
+`OPCG_PRICE_DUMP` で回したもの）と、交点の橋の行（`crossing_bridge.collect`・決着前の勝率の読みは `win_calib` と同じ相対の腕）を
+記録の行と突き合わせ、報告 §1 で先に固定した区切りで 5 つの問いの表を出す。
+
+使い方（記録ごと・`clock_succ.py --in <記録>` の表が要る）:
+
+    OPCG_LOG_SILENT=1 OPCG_PRICE_DUMP=<dir>/dump.jsonl python tests/scripts/theory_bridge.py --in <記録> --out <dir>/bridge.json
+    OPCG_LOG_SILENT=1 python tests/scripts/theory_map.py clocks --in <記録> --out <dir>/clocks.json
+    python tests/scripts/theory_map.py analyze --in <記録> --dump <dir>/dump.jsonl --clocks <dir>/clocks.json --out <dir>/map.json
+"""
+
+import argparse
+import collections
+import json
+import math
+import os
+import sys
+
+import numpy as np
+
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+
+import tests._bootstrap  # noqa: E402,F401
+
+# ---- 報告 §1 で固定した区切り（変えない） ----
+GAP_BINS = ("先行2+", "先行1", "互角", "遅れ1", "遅れ2+")
+TURN_BANDS = ("1-3", "4-6", "7+")
+COLORS = ("赤", "緑", "青", "紫", "黒", "黄")
+TYPES = ("attack", "attach", "play", "effect", "end")
+MIN_GAMES = 30
+BOOT = 2000
+SEED = 0
+HORIZON_FALLBACK = 6          # §1.5 (a): 地平が行に無いときの代わり（整数の時計 ≥ 6）
+
+
+def gap_bin(n_me, n_opp):
+    g = n_opp - n_me
+    return "先行2+" if g >= 2 else "先行1" if g == 1 else "互角" if g == 0 else "遅れ1" if g == -1 else "遅れ2+"
+
+
+def turn_band(t):
+    return "1-3" if t <= 3 else "4-6" if t <= 6 else "7+"
+
+
+def int_clock(tau, cap):
+    return max(1, int(math.ceil(min(float(tau), cap))))
+
+
+# ------------------------------------------------------------------ clocks
+def cmd_clocks(a):
+    import crossing_bridge as CB
+    import lethal_rule as LR
+    import theory_rs as TR
+    import win_calib as WC
+    from theory_rs import MU, THETA
+    dirs = [a.src]
+    CB.set_pre_settle_mode("off")                       # 分析は全行（決着の宣言は印で持つ）
+    rows_out, _led, stats, turn_harm, _tc = CB.collect(dirs, a.games, THETA, MU, "const")
+    sr = CB.sigma_rel_for(dirs)
+    rs = WC.rows_of(rows_out, "theory")
+    old = TR.CLOCK["W_ERR_MODE"]
+    try:
+        TR.set_w_err_mode("rel")
+        p = WC.probs_of(rs, sr, "hyp")
+    finally:
+        TR.set_w_err_mode(old)
+    for r, w in zip(rows_out, p):
+        r["W"] = float(w)
+    settled = LR.settled_map(dirs, a.games)
+    out = {"sigma_rel": sr, "cap": CB.RACE_CAP, "rows_out": rows_out, "turn_harm": turn_harm,
+           "settled": [[s, w, t, bool(d)] for (s, w, t), d in settled.items()], "stats": stats}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, default=float)
+    print("clocks: rows_out %d turn_harm %d settled %d" % (len(rows_out), len(turn_harm), len(settled)))
+    return 0
+
+
+# ------------------------------------------------------------------ helpers
+def family_of(sj):
+    at = sj[0]
+    if at == "ATTACK" or (at == "DON_BOX" and sj[2]):
+        return "attack"
+    if at in ("DON_BOX", "ATTACH_DON"):
+        return "attach"
+    return {"PLAY": "play", "ACTIVATE_MAIN": "effect", "TURN_END": "end"}.get(at, "other")
+
+
+def load_dump(path):
+    out = {}
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            j = json.loads(line)
+            out[int(j["seed"])] = j
+    return out
+
+
+def leader_colors():
+    d = json.load(open(os.path.join(_ROOT, "opcg_sim", "data", "opcg_cards.json"), encoding="utf-8"))
+    return {c["number"]: c["色"].split("/") for c in d if c.get("種類") == "リーダー"}
+
+
+class Roles:
+    def __init__(self):
+        from opcg_sim.loop import decks as D
+        from opcg_sim.learned.n_rel_feat import ROLES, roles_of
+        self.db, self.names, self.f, self.c = D.load_db(), ROLES, roles_of, {}
+
+    def of(self, cid):
+        if cid not in self.c:
+            m = self.db.get_card(cid) if cid else None
+            if m is None:
+                self.c[cid] = ("?",)
+            else:
+                v = self.f(m)
+                self.c[cid] = tuple(n for n, x in zip(self.names, v) if x > 0.5) or ("none",)
+                if getattr(getattr(m, "type", None), "name", "") == "LEADER":
+                    self.c[cid] = ("leader",)
+        return self.c[cid]
+
+
+def build_rows(src, dump, clocks):
+    """記録の判断の行と写しの行を突き合わせ、行ごとの dict を返す（§1.2）。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    meta = json.load(open(os.path.join(src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): g for g in meta["games"]}
+    lcol = leader_colors()
+    roles = Roles()
+    cap = float(clocks["cap"])
+    # 時計の行: (seed, who, t)
+    ck = {}
+    g2seed = {}
+    for r in clocks["rows_out"]:
+        ck[(int(r["seed"]), int(r["who"]), int(r["t"]))] = r
+        g2seed[int(r["g"])] = int(r["seed"])
+    th = {}
+    for r in clocks["turn_harm"]:
+        s = g2seed.get(int(r["g"]))
+        if s is not None:
+            th[(s, int(r["who"]), int(r["j"]))] = r
+    settled = collections.defaultdict(lambda: 10 ** 9)      # (seed) → 最初に宣言されたターン（どちらの席でも）
+    for s, w, t, d in clocks["settled"]:
+        if d:
+            settled[int(s)] = min(settled[int(s)], int(t))
+    rows_all, align = [], collections.Counter()
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    for rows, pol, _ex, L, ptr, idx in PL.iter_games([src], row_cols=cols, pol_cols=("pol_sig", "pol_cid", "pol_tcid")):
+        seed = int(rows["seed"][idx[0]])
+        gm = games_meta.get(seed)
+        dj = dump.get(seed)
+        if gm is None or dj is None:
+            align["game_missing"] += 1
+            continue
+        u2c = PL.uuid_map(pol, L, ptr, idx)
+        cand = []
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+                continue
+            k = int(L[i]); ch = int(rows["pol_chosen"][i])
+            if k < 1:
+                continue
+            s0 = json.loads(pol["pol_sig"][ptr[i]])
+            if s0[0] == "RESOLVE_EFFECT_SELECTION":
+                continue
+            if k < 2 or ch < 0 or ch >= k:
+                continue
+            sigs = [json.loads(pol["pol_sig"][j]) for j in range(ptr[i], ptr[i] + k)]
+            cand.append((i, w, t, sigs, ch))
+        drows = dj["rows"]
+        if len(drows) != len(cand):
+            align["game_len_mismatch"] += 1
+            continue
+        z = dj.get("z") or {}
+        winner = gm.get("winner")
+        first_turn_of = {}
+        for (i, w, t, sigs, ch), dr in zip(cand, drows):
+            fams = [family_of(s) for s in sigs]
+            dfams = [c[0] for c in dr[8]]
+            if int(dr[0]) != t or int(dr[1]) != w or fams != dfams:
+                align["row_mismatch"] += 1
+                continue
+            align["rows"] += 1
+            pv, bv, kap, ptype, btype, nsc = dr[2], dr[3], dr[4], dr[5], dr[6], dr[7]
+            zw = 1.0 if (winner == ("p1" if w == 0 else "p2")) else 0.0
+            lead = gm["leaders"][w]
+            opp_lead = gm["leaders"][1 - w]
+            c = ck.get((seed, w, t))
+            sj = sigs[ch]
+            role = ()
+            target = None
+            if ptype in ("play", "effect"):
+                role = roles.of(u2c.get(sj[1]))
+            elif ptype == "attack":
+                tg = sj[2][0] if sj[2] else None
+                tc = u2c.get(tg)
+                target = "leader" if (tc and roles.of(tc) == ("leader",)) else ("char" if tc else "?")
+            ft = first_turn_of.setdefault((w, t), i)
+            rec = {"seed": seed, "w": w, "t": t, "z": zw, "leader": lead, "opp_leader": opp_lead,
+                   "colors": lcol.get(lead, ["?"]), "opp_colors": lcol.get(opp_lead, ["?"]),
+                   "ptype": ptype, "btype": btype, "pv": pv, "bv": bv, "kap": kap, "nsc": nsc,
+                   "cands": dr[8], "role": list(role), "target": target,
+                   "first_in_turn": ft == i, "settled_after": t >= settled[seed]}
+            if c is not None:
+                n_me, n_op = int_clock(c["tau_me_theory"], cap), int_clock(c["tau_opp_theory"], cap)
+                rec.update({"gap": gap_bin(n_me, n_op), "n_me": n_me, "n_opp": n_op, "W": c["W"],
+                            "tau_me": float(c["tau_me_theory"]), "tau_opp": float(c["tau_opp_theory"])})
+            rows_all.append(rec)
+    return rows_all, align, ck, th, games_meta, lcol
+
+
+# ------------------------------------------------------------------ stats
+def boot_games(units, fn, reps=BOOT, seed=SEED):
+    """units: {seed: [unit, …]}。局を復元抽出して fn(list_of_units) の 95% 区間。"""
+    keys = list(units)
+    if not keys:
+        return None
+    rng = np.random.default_rng(seed)
+    vals = []
+    for _ in range(reps):
+        pick = rng.integers(0, len(keys), len(keys))
+        us = [u for k in pick for u in units[keys[k]]]
+        v = fn(us)
+        if v is not None and not (isinstance(v, float) and math.isnan(v)):
+            vals.append(v)
+    if not vals:
+        return None
+    return [round(float(np.percentile(vals, 2.5)), 4), round(float(np.percentile(vals, 97.5)), 4)]
+
+
+def follow_split(rows):
+    """§1.4: 単位（局×席）ごとに理論どおりの割合 f → 2 群の勝率と重み。"""
+    by = collections.defaultdict(list)
+    for r in rows:
+        by[(r["seed"], r["w"])].append(r)
+    units = []
+    for (s, w), rs in by.items():
+        f = sum(1 for r in rs if r["ptype"] == r["btype"]) / len(rs)
+        units.append((s, f, rs[0]["z"]))
+    return units
+
+
+def wr_of(units):
+    sa = sum(f for _, f, _ in units); sb = sum(1 - f for _, f, _ in units)
+    wa = sum(f * z for _, f, z in units) / sa if sa > 0 else float("nan")
+    wb = sum((1 - f) * z for _, f, z in units) / sb if sb > 0 else float("nan")
+    return wa, wb, sa, sb
+
+
+def follow_table(rows, reps=BOOT):
+    units = follow_split(rows)
+    if not units:
+        return None
+    wa, wb, sa, sb = wr_of(units)
+    bys = collections.defaultdict(list)
+    for u in units:
+        bys[u[0]].append(u)
+    best = collections.Counter(r["btype"] for r in rows)
+    played = collections.Counter(r["ptype"] for r in rows)
+    out = {"rows": len(rows), "units": len(units), "games": len(bys),
+           "best_mode": best.most_common(1)[0][0],
+           "best_share": {k: round(v / len(rows), 3) for k, v in best.most_common()},
+           "played_share": {k: round(v / len(rows), 3) for k, v in played.most_common()},
+           "follow_rate": round(float(np.mean([f for _, f, _ in units])), 3),
+           "wr_follow": round(wa, 4) if not math.isnan(wa) else None, "w_follow": round(sa, 1),
+           "wr_other": round(wb, 4) if not math.isnan(wb) else None, "w_other": round(sb, 1)}
+    if sa < MIN_GAMES or sb < MIN_GAMES:
+        out["verdict"] = "局数不足"
+        return out
+    out["diff"] = round(wa - wb, 4)
+    out["diff_ci"] = boot_games(bys, lambda us: (lambda r: r[0] - r[1])(wr_of(us)), reps)
+    out["wr_follow_ci"] = boot_games(bys, lambda us: wr_of(us)[0], reps)
+    out["wr_other_ci"] = boot_games(bys, lambda us: wr_of(us)[1], reps)
+    ci = out["diff_ci"]
+    out["verdict"] = ("確かな外れ" if ci and ci[1] < 0 else "外れの気配" if out["diff"] < 0
+                      else "理論どおりが勝つ（確か）" if ci and ci[0] > 0 else "理論どおりが勝つ（気配）")
+    return out
+
+
+def pair_table(rows):
+    """理論の最善の型 X × 打った型 Y の勝率（単位の重み: その単位の行のうち (X,Y) の割合）。"""
+    by = collections.defaultdict(list)
+    for r in rows:
+        by[(r["seed"], r["w"])].append(r)
+    acc = collections.defaultdict(lambda: [0.0, 0.0, 0])
+    for _k, rs in by.items():
+        n = len(rs)
+        c = collections.Counter((r["btype"], r["ptype"]) for r in rs)
+        for xy, m in c.items():
+            a = acc[xy]
+            a[0] += m / n * rs[0]["z"]; a[1] += m / n; a[2] += m
+    return {"%s→%s" % xy: {"w": round(v[1], 1), "rows": v[2], "wr": round(v[0] / v[1], 4) if v[1] > 0 else None}
+            for xy, v in sorted(acc.items(), key=lambda kv: -kv[1][1])}
+
+
+def share_by(rows, key):
+    """単位ごとの割合の平均（§1.5 の 1）。"""
+    by = collections.defaultdict(list)
+    for r in rows:
+        by[(r["seed"], r["w"])].append(r[key])
+    if not by:
+        return {}
+    acc = collections.Counter()
+    for v in by.values():
+        c = collections.Counter(v)
+        for k, m in c.items():
+            acc[k] += m / len(v)
+    return {k: round(acc[k] / len(by), 3) for k in TYPES if acc.get(k)}
+
+
+def auc(x, y):
+    from win_calib import auc_of
+    return auc_of(x, y)
+
+
+# ------------------------------------------------------------------ analyze
+def cmd_analyze(a):
+    dump = load_dump(a.dump)
+    clocks = json.load(open(a.clocks, encoding="utf-8"))
+    rows_all, align, ck, th, games_meta, lcol = build_rows(a.src, dump, clocks)
+    from theory_rs import MU
+    rows = [r for r in rows_all if r["pv"] is not None and r["nsc"] >= 2 and r["ptype"] in TYPES and r["btype"] in TYPES]
+    out = {"record": a.src, "align": dict(align), "rows_all": len(rows_all), "rows": len(rows),
+           "games": len({r["seed"] for r in rows}), "mu": MU}
+    reps = a.boot
+
+    # ---- 問い 1: 立ち回り（色 × ターン帯・リーダーは表だけ）
+    q1 = {"by_color_band": {}, "by_band": {}, "by_leader": {}}
+    for band in TURN_BANDS:
+        rb = [r for r in rows if turn_band(r["t"]) == band]
+        q1["by_band"][band] = {"units": len({(r["seed"], r["w"]) for r in rb}),
+                               "best": share_by(rb, "btype"), "played": share_by(rb, "ptype")}
+    for col in COLORS:
+        for band in TURN_BANDS:
+            rb = [r for r in rows if col in r["colors"] and turn_band(r["t"]) == band]
+            nu = len({(r["seed"], r["w"]) for r in rb})
+            e = {"units": nu}
+            if nu >= MIN_GAMES:
+                e.update({"best": share_by(rb, "btype"), "played": share_by(rb, "ptype")})
+            else:
+                e["verdict"] = "局数不足"
+            q1["by_color_band"]["%s|%s" % (col, band)] = e
+    lead_units = collections.Counter()
+    for r in {(r["seed"], r["w"]): r for r in rows}.values():
+        lead_units[r["leader"]] += 1
+    q1["by_leader"] = {"leaders": len(lead_units), "max_units": max(lead_units.values()) if lead_units else 0,
+                       "leaders_with_30": sum(1 for v in lead_units.values() if v >= MIN_GAMES),
+                       "verdict": "全リーダー局数不足" if all(v < MIN_GAMES for v in lead_units.values()) else "一部あり"}
+    out["q1"] = q1
+
+    # ---- 問い 2: 強い盤面（ターンの最初の行・時計の部品）
+    q2 = collect_q2(clocks, th, games_meta, lcol, a.src)
+    out["q2"] = q2
+
+    # ---- 問い 3: 盤面 × 行動（時計の差 × ターン帯）
+    rc = [r for r in rows if "gap" in r]
+    out["rows_with_clock"] = len(rc)
+    q3 = {"all": follow_table(rc, reps), "cells": {}, "cells_color": {}, "by_gap": {}, "by_band": {}}
+    for g in GAP_BINS:
+        q3["by_gap"][g] = follow_table([r for r in rc if r["gap"] == g], reps)
+    for band in TURN_BANDS:
+        q3["by_band"][band] = follow_table([r for r in rc if turn_band(r["t"]) == band], reps)
+    for g in GAP_BINS:
+        for band in TURN_BANDS:
+            sub = [r for r in rc if r["gap"] == g and turn_band(r["t"]) == band]
+            e = follow_table(sub, reps)
+            if e is not None:
+                e["pairs"] = pair_table(sub)
+                e["marks"] = marks_of(sub, clocks["cap"])
+            q3["cells"]["%s|%s" % (g, band)] = e
+    for col in COLORS:
+        for g in GAP_BINS:
+            for band in TURN_BANDS:
+                sub = [r for r in rc if col in r["colors"] and r["gap"] == g and turn_band(r["t"]) == band]
+                if len({(r["seed"], r["w"]) for r in sub}) >= MIN_GAMES:
+                    q3["cells_color"]["%s|%s|%s" % (col, g, band)] = follow_table(sub, reps)
+    for col in COLORS:
+        sub = [r for r in rc if col in r["colors"]]
+        q3.setdefault("by_color", {})[col] = follow_table(sub, reps)
+    q3["marks_all"] = marks_of(rc, clocks["cap"])
+    out["q3"] = q3
+
+    # ---- 問い 4: 相手の手（打った側の勝率の動き＝こちらの符号違い）
+    out["q4"] = collect_q4(rows, ck, clocks, games_meta, lcol, MU)
+
+    # ---- 問い 5（相手側）: 理論は小さな損と言ったのに負けている手
+    out["q5_small_loss"] = collect_q5(rc, MU, reps)
+
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("analyze: rows %d (clock %d) align %s" % (len(rows), len(rc), dict(align)))
+    return 0
+
+
+def marks_of(rows, cap):
+    """§1.5 の既知の外れの印の割合: (a) 自分の時計が整数で 6 以上・(b) ターンの 2 手目以降・(c) 効果・出すが絡む行。"""
+    if not rows:
+        return None
+    n = len(rows)
+    a_ = sum(1 for r in rows if r.get("n_me", 0) >= HORIZON_FALLBACK or r.get("n_opp", 0) >= HORIZON_FALLBACK)
+    b_ = sum(1 for r in rows if not r["first_in_turn"])
+    c_ = sum(1 for r in rows if r["btype"] in ("effect", "play") or r["ptype"] in ("effect", "play"))
+    return {"n": n, "long_clock": round(a_ / n, 3), "mid_turn": round(b_ / n, 3), "effect_or_play": round(c_ / n, 3)}
+
+
+def collect_q2(clocks, th, games_meta, lcol, src):
+    """ターンの最初の行（`rows_out`）で、時計の部品の「自分 − 相手」が勝敗をどれだけ並べるか（単位の AUC）と寄与の平均。"""
+    cap = float(clocks["cap"])
+    recs = []
+    for r in clocks["rows_out"]:
+        s, w = int(r["seed"]), int(r["who"])
+        gm = games_meta.get(s)
+        if gm is None:
+            continue
+        t_me = th.get((s, w, int(r["j_me"])))
+        tm = min(float(r["tau_me_theory"]), cap); to = min(float(r["tau_opp_theory"]), cap)
+        sl_me, sl_op = float(r["slope_theory_me"]), float(r["slope_theory_opp"])
+        th_me, th_op = float(r["theta_me"]), float(r["theta_opp"])
+        e = {"seed": s, "w": w, "t": int(r["t"]), "z": 1.0 if r["won"] else 0.0,
+             "colors": lcol.get(gm["leaders"][w], ["?"]), "W": r.get("W"),
+             "D": to - tm, "logratio": math.log(max(to, 1e-6) / max(tm, 1e-6)),
+             # 耐久: 相手を倒すのに残っている量（自分の時計の分子）− 自分の耐久（相手の時計の分子）
+             "d_theta": th_op - th_me,             # 正＝自分の耐久が相手の耐久より厚い（＝有利）
+             "d_speed": sl_me - sl_op,             # 正＝自分が速い
+             "d_board": float(r["board_me"]) - float(r["board_opp"]),
+             "d_stock": float(r["stock_me"]) - float(r["stock_opp"]),
+             "d_flow": float(r["flow_me"]) - float(r["flow_opp"]),
+             "d_shield": -(float(r.get("shield_me") or 0) - float(r.get("shield_opp") or 0)),
+             "lr_theta": math.log(max(th_op, 1e-6) / max(th_me, 1e-6)),
+             "lr_speed": math.log(max(sl_me, 1e-6) / max(sl_op, 1e-6))}
+        if t_me is not None:
+            # 相手の耐久の中身（自分が削る側）: ライフ・手札・体（大きいほど自分に不利）
+            e["opp_th_life"] = float(t_me["theta"]) - float(t_me["th_hand"]) - float(t_me["th_body"])
+            e["opp_th_hand"] = float(t_me["th_hand"]); e["opp_th_body"] = float(t_me["th_body"])
+            e["opp_life"] = float(t_me["d_life"]); e["opp_hand"] = float(t_me["d_hand"])
+        recs.append(e)
+    # 自分の耐久の中身は、同じ局の相手の行の turn_harm（相手のターンの最初・自分を削る側）を時間の近いもので引く
+    by_seat = collections.defaultdict(list)
+    for e in recs:
+        by_seat[(e["seed"], e["w"])].append(e)
+    for e in recs:
+        prev = [x for x in by_seat.get((e["seed"], 1 - e["w"]), []) if x["t"] < e["t"] and "opp_th_life" in x]
+        if prev and "opp_th_life" in e:
+            p = prev[-1]
+            e["d_life_part"] = p["opp_th_life"] - e["opp_th_life"]     # 正＝自分のライフの耐久が厚い
+            e["d_hand_part"] = p["opp_th_hand"] - e["opp_th_hand"]
+            e["d_body_part"] = p["opp_th_body"] - e["opp_th_body"]
+            e["d_life_raw"] = p["opp_life"] - e["opp_life"]
+            e["d_hand_raw"] = p["opp_hand"] - e["opp_hand"]
+    feats = ["D", "logratio", "lr_theta", "lr_speed", "d_theta", "d_speed", "d_board", "d_stock", "d_flow",
+             "d_shield", "d_life_part", "d_hand_part", "d_body_part", "d_life_raw", "d_hand_raw"]
+
+    def block(rs):
+        o = {"rows": len(rs), "units": len({(e["seed"], e["w"]) for e in rs})}
+        if o["units"] < MIN_GAMES:
+            o["verdict"] = "局数不足"
+            return o
+        for f in feats:
+            xs = [(e[f], e["z"]) for e in rs if f in e]
+            if len(xs) < 20:
+                continue
+            x = np.array([v for v, _ in xs]); z = np.array([v for _, v in xs])
+            a = auc(x, z)
+            o[f] = {"auc": round(a, 4) if a is not None else None, "mean": round(float(x.mean()), 4),
+                    "mean_won": round(float(x[z > .5].mean()), 4) if (z > .5).any() else None,
+                    "mean_lost": round(float(x[z <= .5].mean()), 4) if (z <= .5).any() else None}
+        lr = np.array([e["logratio"] for e in rs]); a_ = np.array([e["lr_theta"] for e in rs]); b_ = np.array([e["lr_speed"] for e in rs])
+        o["abs_share_theta"] = round(float(np.abs(a_).mean() / max(1e-9, np.abs(a_).mean() + np.abs(b_).mean())), 3)
+        o["corr_logratio_static"] = round(float(np.corrcoef(lr, a_ + b_)[0, 1]), 3) if len(lr) > 2 else None
+        return o
+
+    q2 = {"all": block(recs), "by_band": {}, "by_color": {}, "by_color_band": {}}
+    for band in TURN_BANDS:
+        q2["by_band"][band] = block([e for e in recs if turn_band(e["t"]) == band])
+    for col in COLORS:
+        q2["by_color"][col] = block([e for e in recs if col in e["colors"]])
+        for band in TURN_BANDS:
+            q2["by_color_band"]["%s|%s" % (col, band)] = block([e for e in recs if col in e["colors"] and turn_band(e["t"]) == band])
+    # 時計の差の区切りごとの実勝率（強い盤面の土台）
+    wr = {}
+    gb = collections.defaultdict(list)
+    for r in clocks["rows_out"]:
+        g = gap_bin(int_clock(r["tau_me_theory"], cap), int_clock(r["tau_opp_theory"], cap))
+        gb[(g, turn_band(int(r["t"])))].append((int(r["seed"]), 1.0 if r["won"] else 0.0, r.get("W")))
+    for (g, band), xs in gb.items():
+        units = collections.defaultdict(list)
+        for s, z, w in xs:
+            units[s].append((z, w))
+        zs = [z for s, z, w in xs]; ws = [w for s, z, w in xs if w is not None]
+        wr["%s|%s" % (g, band)] = {"rows": len(xs), "games": len(units), "win_rate": round(float(np.mean(zs)), 4),
+                                    "theory_W": round(float(np.mean(ws)), 4) if ws else None}
+    q2["gap_band_winrate"] = wr
+    return q2
+
+
+def collect_q4(rows, ck, clocks, games_meta, lcol, mu):
+    """相手の手を打った側の勝率の動き（値段 × κ）で並べる・型／役割／色ごと＋ターン単位の時計の動き。"""
+    out = {"by_type": {}, "by_role": {}, "by_target": {}, "by_type_color": {}, "turn_clock": {}}
+
+    def agg(rs):
+        if not rs:
+            return None
+        dW = np.array([r["pv"] * r["kap"] for r in rs])
+        dev = np.array([(r["bv"] - r["pv"]) / mu for r in rs])
+        units = len({(r["seed"], r["w"]) for r in rs})
+        return {"rows": len(rs), "units": units, "dW_mean": round(float(dW.mean()), 4),
+                "dW_p10": round(float(np.percentile(dW, 10)), 4), "dev_mean": round(float(dev.mean()), 3),
+                "forbid_rate": round(float((dev >= 1.0).mean()), 3),
+                "mover_win": round(float(np.mean([r["z"] for r in rs])), 4),
+                "verdict": None if units >= MIN_GAMES else "局数不足"}
+    for ty in TYPES:
+        out["by_type"][ty] = agg([r for r in rows if r["ptype"] == ty])
+    roles = collections.defaultdict(list)
+    for r in rows:
+        for ro in r["role"]:
+            roles["%s:%s" % (r["ptype"], ro)].append(r)
+    out["by_role"] = {k: agg(v) for k, v in sorted(roles.items())}
+    for tg in ("leader", "char"):
+        out["by_target"][tg] = agg([r for r in rows if r["ptype"] == "attack" and r["target"] == tg])
+    for col in COLORS:
+        for ty in TYPES:
+            out["by_type_color"]["%s|%s" % (col, ty)] = agg([r for r in rows if col in r["colors"] and r["ptype"] == ty])
+    # 打った手のうち、打った側の勝率を最も下げた手（相手から見て「まずい」の逆＝相手にとっての好手は dW 大）
+    # ターン単位: 相手のターン t（席 o）の最初 → 次の自分のターン t+1（席 me）の最初で、自分の時計・相手の時計の動き
+    cap = float(clocks["cap"])
+    tc = collections.defaultdict(list)
+    turn_moves = collections.defaultdict(list)
+    for r in rows:
+        turn_moves[(r["seed"], r["w"], r["t"])].append(r)
+    for (s, o, t), ms in turn_moves.items():
+        a = ck.get((s, o, t)); b = ck.get((s, 1 - o, t + 1))
+        if a is None or b is None:
+            continue
+        # a は相手（席 o）の側: tau_me＝相手の時計・tau_opp＝自分の時計。b は自分の側。
+        my0, op0 = min(a["tau_opp_theory"], cap), min(a["tau_me_theory"], cap)
+        my1, op1 = min(b["tau_me_theory"], cap), min(b["tau_opp_theory"], cap)
+        kinds = set()
+        for m in ms:
+            kinds.add(m["ptype"])
+            for ro in m["role"]:
+                if ro in ("removal", "reduction", "lock", "blocker", "big", "draw"):
+                    kinds.add("%s:%s" % (m["ptype"], ro))
+            if m["ptype"] == "attack" and m["target"]:
+                kinds.add("attack:%s" % m["target"])
+        e = (s, my1 - my0, op1 - op0, 1.0 - ms[0]["z"])      # 自分の時計の延び・相手の時計の縮み（負＝縮む）・自分の勝ち
+        tc["all"].append(e)
+        for k in kinds:
+            tc[k].append(e)
+    for k, es in tc.items():
+        units = len({x[0] for x in es})
+        out["turn_clock"][k] = {"turns": len(es), "games": units,
+                                "my_clock_ext": round(float(np.mean([x[1] for x in es])), 3),
+                                "opp_clock_change": round(float(np.mean([x[2] for x in es])), 3),
+                                "my_win": round(float(np.mean([x[3] for x in es])), 4),
+                                "verdict": None if units >= MIN_GAMES else "局数不足"}
+    return out
+
+
+def collect_q5(rows, mu, reps):
+    """理論は小さな損（逸脱 < 手札 1 枚）と言った手を、型・役割・時計の差ごとに「実際の勝率 − ターンの最初の理論の勝率」で並べる。"""
+    small = [r for r in rows if (r["bv"] - r["pv"]) / mu < 1.0 and r.get("W") is not None]
+    big = [r for r in rows if (r["bv"] - r["pv"]) / mu >= 1.0 and r.get("W") is not None]
+    groups = collections.defaultdict(list)
+    for r in small:
+        groups["type:" + r["ptype"]].append(r)
+        groups["type×gap:%s|%s" % (r["ptype"], r["gap"])].append(r)
+        for ro in r["role"]:
+            groups["role:%s:%s" % (r["ptype"], ro)].append(r)
+        if r["target"]:
+            groups["attack:" + r["target"]].append(r)
+
+    def res(rs):
+        by = collections.defaultdict(list)
+        for r in rs:
+            by[(r["seed"], r["w"])].append(r["z"] - r["W"])
+        return float(np.mean([np.mean(v) for v in by.values()])) if by else None
+
+    out = {"small_rows": len(small), "big_rows": len(big), "groups": {}}
+    for nm, rs in [("ALL_small", small), ("ALL_big", big)] + sorted(groups.items()):
+        units = {(r["seed"], r["w"]) for r in rs}
+        e = {"rows": len(rs), "units": len(units)}
+        if len(units) < MIN_GAMES:
+            e["verdict"] = "局数不足"
+        else:
+            bys = collections.defaultdict(list)
+            for r in rs:
+                bys[r["seed"]].append(r)
+            e["resid"] = round(res(rs), 4)
+            e["resid_ci"] = boot_games(bys, res, reps)
+            e["win"] = round(float(np.mean([r["z"] for r in rs])), 4)
+            e["W"] = round(float(np.mean([r["W"] for r in rs])), 4)
+        out["groups"][nm] = e
+    return out
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    c = sub.add_parser("clocks")
+    c.add_argument("--in", dest="src", required=True)
+    c.add_argument("--games", type=int, default=0)
+    c.add_argument("--out", required=True)
+    z = sub.add_parser("analyze")
+    z.add_argument("--in", dest="src", required=True)
+    z.add_argument("--dump", required=True)
+    z.add_argument("--clocks", required=True)
+    z.add_argument("--boot", type=int, default=BOOT)
+    z.add_argument("--out", required=True)
+    a = ap.parse_args(argv)
+    return cmd_clocks(a) if a.cmd == "clocks" else cmd_analyze(a)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
