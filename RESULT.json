@@ -1,29 +1,29 @@
 {
-  "branch": "claude/cand-attack-count",
-  "base": "claude/cpu-spec-improvements-yw91jd@b753217b3",
-  "report": "docs/reports/2026-10-10_attack_count.md",
-  "candidate": {"switch": "OPCG_ATTACK_COUNT", "combined_with": "OPCG_LEFTOVER_DON", "default_changed": false,
-                "formula_commit": "12132bf6", "impl_commit": "c44cd76a",
-                "prediction_commit": "1259f1b7", "new_constants": 0},
+  "branch": "claude/cand-don-once",
+  "base": "claude/cand-attack-count@3b81dd0 + claude/cpu-spec-improvements-yw91jd@0ebff53 (docs)",
+  "report": "docs/reports/2026-10-10_don_once.md",
+  "candidate": {"switch": "OPCG_DON_ONCE", "combined_with": ["OPCG_LEFTOVER_DON", "OPCG_ATTACK_COUNT"], "default_changed": false,
+                "formula_commit": "bf9db323", "impl_commit": "303466dc", "prediction_commit": "9301ae64", "new_constants": 0},
   "recommendation": "reject",
   "kill_criteria": {
-    "real":  {"a_capped": [9, 0], "b_S_lt_half_obs_over_pred": [0.927, 0.989], "c_rel_auc": [0.8076, 0.7990], "d_hit": [0.7051, 0.7009], "hit": ["c", "d"]},
-    "synthetic": {"a_capped": [70, 3], "b_S_lt_half_obs_over_pred": [1.102, 1.183], "c_rel_auc": [0.7241, 0.7144], "d_hit": [0.6602, 0.6492], "hit": ["b", "c", "d"]}
+    "real":      {"a_capped": [9, 0], "b_S_lt_half_obs_over_pred": [0.927, 1.005], "c_rel_auc": [0.8076, 0.8001], "d_hit": [0.7051, 0.7045], "hit": ["c", "d"]},
+    "synthetic": {"a_capped": [70, 3], "b_S_lt_half_obs_over_pred": [1.102, 1.212], "c_rel_auc": [0.7241, 0.7174], "d_hit": [0.6602, 0.6520], "hit": ["b", "c", "d"]}
   },
   "arms": {
-    "real":      {"default": {"hit": 0.7051, "rel_auc": 0.8076, "sigma_T": 1.412, "capped": 9},
-                  "leftover_don": {"hit": 0.6964, "rel_auc": 0.7969, "sigma_T": 1.089, "capped": 0},
-                  "attack_count_plus_leftover": {"hit": 0.7009, "rel_auc": 0.7990, "sigma_T": 1.151, "capped": 0}},
-    "synthetic": {"default": {"hit": 0.6602, "rel_auc": 0.7241, "sigma_T": 2.004, "capped": 70},
-                  "leftover_don": {"hit": 0.6493, "rel_auc": 0.7186, "sigma_T": 1.109, "capped": 3},
-                  "attack_count_plus_leftover": {"hit": 0.6492, "rel_auc": 0.7144, "sigma_T": 1.154, "capped": 3}}
+    "real":      {"default": {"hit": 0.7051, "rel_auc": 0.8076, "sigma_T": 1.412, "capped": 9, "linear_bridge_dG_auc": [0.7295, 0.8019]},
+                  "attack_count_plus_leftover": {"hit": 0.7009, "rel_auc": 0.7990, "sigma_T": 1.151, "capped": 0, "linear_bridge_dG_auc": [0.7333, 0.8070]},
+                  "don_once": {"hit": 0.7045, "rel_auc": 0.8001, "sigma_T": 1.180, "capped": 0, "linear_bridge_dG_auc": [0.7351, 0.8087], "kappa_mean": 0.8258}},
+    "synthetic": {"default": {"hit": 0.6602, "rel_auc": 0.7241, "sigma_T": 2.004, "capped": 70, "linear_bridge_dG_auc_w39": [0.7252, 0.6222]},
+                  "attack_count_plus_leftover": {"hit": 0.6492, "rel_auc": 0.7144, "sigma_T": 1.154, "capped": 3, "linear_bridge_dG_auc_w39": [0.7367, 0.6353]},
+                  "don_once": {"hit": 0.6520, "rel_auc": 0.7174, "sigma_T": 1.185, "capped": 3, "linear_bridge_dG_auc_w39": [0.7311, 0.6304], "kappa_mean": 1.3745}}
   },
   "diagnostics": {
-    "later_step_excess_sum_plan_over_actual_S_lt_half": {"real": [1.03, 1.42, 1.33], "synthetic": [0.85, 1.60, 1.51], "order": ["default", "leftover_don", "attack_count_plus_leftover"], "target": [0.8, 1.2]},
-    "later_step_attack_count_plan_over_actual_S_lt_half": {"real": [1.68, 1.63, 1.42], "synthetic": [1.58, 1.52, 1.30]},
-    "delay_slope_on_horizon_same_clocks": {"real": [0.60, 0.24, 0.25], "synthetic": [0.31, 0.13, 0.13]}
+    "later_step_excess_sum_plan_over_actual_S_lt_half": {"real": [1.03, 1.33, 1.21], "synthetic": [0.85, 1.51, 1.29], "order": ["default", "attack_count_plus_leftover", "don_once"], "target": [0.8, 1.2]},
+    "later_step_excess_sum_plan_over_actual_S_ge_half": {"real": [0.55, 1.12, 1.00], "synthetic": [0.52, 1.41, 1.20]},
+    "prediction_items_in_range": "7 of 10 (misses within 0.001-0.04 of the range edge, all directions right)"
   },
   "kappa_vector_bit_identical": true,
-  "reductions": "synthetic default/leftover arms: theory_bridge and relative_ledger reused from 2026-10-09_leftover_don.md (real arms reproduced that report exactly); synthetic theory_bridge on w39 (300 games) only",
-  "gate": {"make_test": "green", "cargo": "475 passed, 1 ignored", "pytest": "622 passed, 12 skipped"}
+  "default_reproduced": "real and synthetic m2_probe + kappa_vector re-run: identical to 2026-10-10_attack_count.md",
+  "reductions": "default and attack-count arms: heavy instruments reused from 2026-10-10_attack_count.md (default m2_probe/kappa_vector re-run and matched; all three arms run on the 10-game slices and matched the prior slices); synthetic theory_bridge on w39 (300 games) only",
+  "gate": {"make_test": "green", "cargo": "476 passed, 1 ignored", "pytest": "622 passed, 12 skipped"}
 }
