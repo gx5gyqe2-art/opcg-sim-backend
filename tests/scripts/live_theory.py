@@ -133,7 +133,13 @@ def raw_candidates(game, name, out):
 
 def price_candidates(sc, tok, ci, cards, idx2cid, cands, theta=THETA, mu=MU):
     """候補ごとの理論値（`two_curves` の `_price_row`——T137a の帳簿の規約のまま・Rust の局の駆動 `price_cands`）。
-    値付けできない候補は `None`（`TURN_END` 等）。`cards`／`idx2cid` は呼び手の互換のため（Rust はカード表を持つ）。"""
+    値付けできない候補は `None`（`TURN_END` 等）。`cards`／`idx2cid` は呼び手の互換のため（Rust はカード表を持つ）。
+
+    **注意（2026-10-11）**: これは**その 1 手だけの静的な値段**（`score_candidate`）。記録の上の理論（`theory_bridge.py`）の既定の手の値段は
+    2026-10-11 から「打った後の局面で 2 本の時計を読み直した勝率の動き」（`clock_succ.py` の後続局面の表・
+    `docs/reports/2026-10-10_clock_value.md`）で、生の局面から読むこの橋（`shadow_forbid`・`t18_arena`・`theory_trace`）には
+    まだその形が無い（後続の複製 `Game.fork`／`fork_shuffled` と窓の解決は在るが、時計と傾きを生の局面で読む器は未作成）。
+    `OPCG_CLOCK_VALUE` はここには効かない。"""
     if not cands:
         return []
     fr = TR.row_frame(sc, tok, ci, cands)

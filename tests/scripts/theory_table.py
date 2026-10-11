@@ -77,7 +77,10 @@ def _run(tool, dirs, out, extra=()):
     cmd = [sys.executable, os.path.join(_HERE, tool + ".py"), "--in", *dirs, *extra, "--out", out]
     print("run", " ".join(cmd), datetime.datetime.utcnow().strftime("%F %T"), flush=True)
     with open(out[:-5] + ".log", "w") as log:
-        rc = subprocess.call(cmd, stdout=log, stderr=subprocess.STDOUT, env=dict(os.environ, OPCG_LOG_SILENT="1"))
+        # `w̄` を測る実行は値段を使わない（`κ` は値段の前に数える）ので、後続局面の表（`clock_succ.py`）を要らせず
+        # 旧い静的な値段で回す（2026-10-11・`theory_bridge` の既定は打った後の 2 本の時計＝表が要る）
+        rc = subprocess.call(cmd, stdout=log, stderr=subprocess.STDOUT,
+                             env=dict(os.environ, OPCG_LOG_SILENT="1", OPCG_CLOCK_VALUE="0"))
     if rc != 0:
         if os.path.exists(out):
             os.remove(out)

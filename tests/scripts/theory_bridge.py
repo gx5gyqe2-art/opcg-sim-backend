@@ -71,8 +71,19 @@ s_t     = −( 実際に払った費用 − min(2 つのうち払えた方) )
 局の突き合わせ（`pair_games`）と集計（AUC・傾き・ブートストラップ・較正）と JSON。
 
 
+**手の値段の既定（ユーザ決定 2026-10-11「(a) 採る」＋「知らない形を既定にして」・`docs/reports/2026-10-10_clock_value.md` §6・§3.5）**:
+攻め側の候補の値段（`s` の `θ(a)`）は**その手を打った後の局面で 2 本の時計を読み直した勝率の動き** `(W(s′_a) − W(s)) / κ(s)`
+（同報告 §1.3）。後続局面は `clock_succ.py` が記録の局を打ち直して作る表から読む。**既定は並びを知らない形**（両席のライフと山札を
+行ごとに 1 回混ぜ直した複製＝理論の約束どおり中身は見えるが並びは見えない・同報告 §3.5 の列＝実 (i) .7533・(ii) .6482）。
+**並びを知る形**（真の盤面の複製＝後知恵の上限・同報告の判定の列）は `OPCG_CLOCK_VALUE_ORDER=known`（表は `clock_succ.py --order known`）。
+旧い「その 1 手だけの静的な値段」（`core/rows.rs::score_candidate`・2026-10-11 までの既定）は `OPCG_CLOCK_VALUE=0` で戻せる。
+変わるのは候補の値段（`vals`）だけで、帳簿の `g`・行の `κ`・守りの窓・時計の読みは値段に依らない（同報告 §1.5）。
+
 実行例:
+  OPCG_LOG_SILENT=1 python tests/scripts/clock_succ.py --in ~/w41          # 後続局面の表（~/w41/clock_succ/・並びを知らない形・1 回だけ）
   OPCG_LOG_SILENT=1 python tests/scripts/theory_bridge.py --in ~/w41 --out ~/bridge.json
+  OPCG_CLOCK_VALUE_ORDER=known OPCG_LOG_SILENT=1 python tests/scripts/theory_bridge.py --in ~/w41 --out ~/bridge_known.json   # 上限（表は --order known）
+  OPCG_CLOCK_VALUE=0 OPCG_LOG_SILENT=1 python tests/scripts/theory_bridge.py --in ~/w41 --out ~/bridge_static.json
 """
 import argparse
 import json
@@ -103,6 +114,17 @@ POL_COLS = ("pol_n", "pol_q", "pol_p", "pol_sig", "pol_cid", "pol_tcid", "pol_si
 MARGIN_COMFORT = 2000.0
 #: **G-2／N-2**: 守りの判断の守る費用（`joint`＝1 枚 1 役の手札の価値の減り・定数・旧 `curve` は凍結ブランチで再現）
 GUARD_S_COST_MODE = "joint"
+#: **手の値段の既定**（2026-10-11・module docstring）: `OPCG_CLOCK_VALUE` の読み方。
+#:   未設定／`1`／`on`  … 既定＝記録ごとの `<記録>/clock_succ/<seed>.npz`（`clock_succ.py --in <記録>` の既定の出力）。
+#:                        並びの形は `OPCG_CLOCK_VALUE_ORDER`: 未設定／`unknown`＝並びを知らない形（既定）・
+#:                        `known`＝並びを知る形（`<記録>/clock_succ_known/`・後知恵の上限）。表の `order` と違えば落ちる。
+#:   `0`／`off`／`static` … 旧い静的な値段（`score_candidate`・切替なしの旧既定）
+#:   その他              … 表の親ディレクトリ（`<親>/<記録名>/<seed>.npz`・候補のときの置き方・任意の表を指す。
+#:                        形は表の `order` に従う＝`OPCG_CLOCK_VALUE_ORDER` を書けばそれと照合する）
+CLOCK_VALUE_ON = ("", "1", "on", "clock")
+CLOCK_VALUE_OFF = ("0", "off", "static")
+CLOCK_ORDERS = ("unknown", "known")
+CLOCK_SUCC_SUBDIR = {"unknown": "clock_succ", "known": "clock_succ_known"}
 
 
 def band_of(v0, close=0.2, decided=0.6):
@@ -220,6 +242,21 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_
              # 実測の `W(D)` の傾きが置いた `σ_D` と合うかの検算
              "d_win": {"<-3": [0, 0], "-3..-1": [0, 0], "-1..1": [0, 0], "1..3": [0, 0], ">3": [0, 0]}}
     mc = MARGIN_COMFORT if margin_comfort is None else margin_comfort
+    # **手の値段の既定＝打った後の 2 本の時計・並びを知らない形**（2026-10-11 採用・module docstring・`docs/reports/2026-10-10_clock_value.md` §1.5）:
+    # 後続局面の表（`clock_succ.py`）を記録ごとに引く。`OPCG_CLOCK_VALUE=0` のときだけ旧い静的な値段（`succ_index is None`）。
+    # 表が在る記録で表に無い局（打ち直しが記録と一致しない局・表に無い局）は**値段なし**（Rust に `clock_value` を渡す＝静的な値段へ黙って落ちない）。
+    clock_order = clock_order_setting(os.environ.get("OPCG_CLOCK_VALUE_ORDER"))
+    if clock_order is None and (os.environ.get("OPCG_CLOCK_VALUE") or "").strip() in CLOCK_VALUE_ON:
+        clock_order = "unknown"                               # 既定の表の置き場では形を既定（知らない形）に固定する
+    succ_index = clock_succ_index(dirs, os.environ.get("OPCG_CLOCK_VALUE"), clock_order)
+    clock_on = succ_index is not None
+    succ_literal = bool(os.environ.get("OPCG_CLOCK_VALUE_LITERAL"))     # 診断: 文字どおりの読み（§1.3）
+    dump_path = os.environ.get("OPCG_PRICE_DUMP")            # 行ごとの値段の写し（jsonl・逸脱の分布と禁止率の器が読む）
+    dump_f = open(dump_path, "w", encoding="utf-8") if dump_path else None
+    stats["move_price"] = "clock" if clock_on else "static"
+    if clock_on:
+        stats["clock_order"] = clock_order or "table"       # `table`＝任意の表（`OPCG_CLOCK_VALUE=<親>`）で形を指定しなかった
+        stats.update({"clock_games": 0, "clock_games_missing": 0, "clock_games_mismatch": 0})
     games = 0
     for game in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
         games += 1
@@ -235,7 +272,24 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_
         c = TR.cfg(theta, mu, theta_mode, prof=prof, nu_targets="leader", GUARD_S_COST_MODE=GUARD_S_COST_MODE,
                    ledger_pricing=str(ledger_pricing), MIRROR_ME=bool(TR.RUN["MIRROR_ME"]), F_PRICING_FIX=True,
                    margin_comfort=float(mc), PLAN_CLASSES=[str(x) for x in PL.PLAN_CLASSES])
+        pin["clock_value"] = clock_on
+        if clock_on:
+            sp = succ_index.get(seed)
+            succ = clock_succ_payload(sp, rows, idx, clock_order) if sp else None
+            if sp is None:
+                stats["clock_games_missing"] += 1
+            elif succ is None:
+                stats["clock_games_mismatch"] += 1
+            else:
+                stats["clock_games"] += 1
+                pin["succ"] = succ
+                pin["succ_literal"] = succ_literal
+        if dump_f is not None:
+            pin["dump_rows"] = True
         res = TR.game_call("theory_bridge", game, {"cfg": c, "in": pin, "stats": stats, "carry": {}})
+        if dump_f is not None:
+            zz = {str(k[1]): r.get("z") for k, r in res["per"]}
+            dump_f.write(json.dumps({"seed": seed, "z": zz, "rows": res.get("row_dump") or []}) + "\n")
         for key, rec in res["per"]:
             key = tuple(key)
             if key in per:
@@ -246,12 +300,95 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_
         new = res["stats"]
         stats.clear()
         stats.update(new)
+    if dump_f is not None:
+        dump_f.close()
     import kappa_needed as KN
     stats["kappa_needed"] = KN.summarise(kn_turns)
     stats["kappa_needed_1turn"] = KN.summarise([dict(t, g0=t["g0_turn"], dW=t["dW_turn"]) for t in kn_turns])
     stats["kappa_split"] = KN.summarise_games(kn_games)        # T81: 相関の中身（窓・型・場の動き）
     stats["last_turn"] = "keep"
     return per, stats
+
+
+def _npz_index(d, out):
+    for f in os.listdir(d):
+        if f.endswith(".npz") and not f.endswith(".tmp.npz"):
+            out[int(f[:-4])] = os.path.join(d, f)
+
+
+def clock_order_setting(setting=None):
+    """`OPCG_CLOCK_VALUE_ORDER` → `unknown`（既定・並びを知らない形）／`known`（並びを知る形＝上限）／`None`（未設定・任意の表のときだけ形を問わない）。"""
+    s = (setting or "").strip().lower()
+    if not s:
+        return None
+    if s not in CLOCK_ORDERS:
+        raise ValueError("OPCG_CLOCK_VALUE_ORDER は unknown／known（%r）" % setting)
+    return s
+
+
+def clock_succ_index(dirs, setting=None, order=None):
+    """後続局面の表 → `{seed: npz のパス}`。**`None` は旧い静的な値段**（`OPCG_CLOCK_VALUE=0`）。
+
+    `setting`（`OPCG_CLOCK_VALUE`・読み方は `CLOCK_VALUE_ON` の注記）が既定（未設定）なら記録ごとの `<記録>/clock_succ/`
+    （`order=known` なら `/clock_succ_known/`）から引く。**表の無い記録は落ちる**（既定の値段を黙って静的な値段に
+    すり替えない——`clock_succ.py --in <記録>` で表を作るか、`OPCG_CLOCK_VALUE=0` で静的な値段を明示する）。
+    それ以外の文字列は表の親ディレクトリ（`<親>/<記録名>/<seed>.npz`・形は表の `order`）。"""
+    setting = (setting or "").strip()
+    if setting in CLOCK_VALUE_OFF:
+        return None
+    if setting in CLOCK_VALUE_ON:
+        setting = ""
+    out = {}
+    if not setting:
+        order = order or "unknown"
+        for d in dirs:
+            sub = os.path.join(d, CLOCK_SUCC_SUBDIR[order])
+            if not os.path.isdir(sub):
+                raise FileNotFoundError(
+                    "theory_bridge: 手の値段の既定（打った後の 2 本の時計・並びを%s形）に要る後続局面の表が無い: %s\n"
+                    "  作る: OPCG_LOG_SILENT=1 python tests/scripts/clock_succ.py --in %s --order %s\n"
+                    "  旧い静的な値段で回す: OPCG_CLOCK_VALUE=0"
+                    % ("知る" if order == "known" else "知らない", sub, d, order))
+            _npz_index(sub, out)
+        return out
+    for sub in sorted(os.listdir(setting)):
+        d = os.path.join(setting, sub)
+        if os.path.isdir(d):
+            _npz_index(d, out)
+    return out
+
+
+def _trip(sc, tok, ci):
+    return [np.asarray(sc, np.float64).tolist(), np.asarray(tok, np.float64).ravel().tolist(),
+            np.asarray(ci, np.int64).tolist()]
+
+
+def clock_succ_payload(path, rows, idx, order=None):
+    """1 局の表 → Rust に渡す `[[行の位置, {"o": 打つ前の相手の側の行, "c": [[状態, 自分の側, 相手の側], …]}], …]`。
+    打ち直しが記録とビットで一致しなかった局は `None`（使わない）。`order` を求めたら表の `order`（2026-10-11 から書く・
+    無い古い表は問わない）と照合し、違えば落ちる（知らない形の既定に知る形の表を黙って混ぜない）。"""
+    d = np.load(path)
+    if order and "order" in d.files and str(d["order"]) != order:
+        raise ValueError("theory_bridge: 後続局面の表 %s は並びを%s形（求めたのは %s）" % (path, str(d["order"]), order))
+    if int(d["match"]) != 1:
+        return None
+    pos = {int(rows["step"][i]): n for n, i in enumerate(idx)}
+    out = []
+    for j in range(len(d["r_step"])):
+        n = pos.get(int(d["r_step"][j]))
+        if n is None:
+            return None
+        p0, m = int(d["r_ptr"][j]), int(d["r_n"][j])
+        cs = []
+        for q in range(p0, p0 + m):
+            st = int(d["c_st"][q])
+            if st in (0, 6):
+                cs.append([st, _trip(d["c_msc"][q], d["c_mtok"][q], d["c_mci"][q]),
+                           _trip(d["c_osc"][q], d["c_otok"][q], d["c_oci"][q])])
+            else:
+                cs.append([st, None, None])
+        out.append([n, {"o": _trip(d["r_osc"][j], d["r_otok"][j], d["r_oci"][j]), "c": cs}])
+    return out
 
 
 def pair_by_band(per, band):
@@ -553,6 +690,7 @@ def main(argv=None):
     pairs = pair_games(per)
     res = {"stats": stats, "decision_rows": "main",
            "provisional": {"P3_theta": a.theta, "P2_silent": "zero",
+                           "move_price": stats["move_price"],                     # 手の値段の腕（`clock` 既定／`static`）
                            "T28c_margin": a.margin_comfort, "w_mode": TR.W_MODE,
                            "flow_pricing": stats["flow_pricing"], "ledger_pricing": stats["ledger_pricing"],
                            "surv_mode": TR.SW["SURV_MODE"], "nu_mode": TR.SW["NU_MODE"],
