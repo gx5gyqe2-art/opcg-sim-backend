@@ -457,6 +457,8 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
     let succ_literal = p.get("in").get("succ_literal").truthy();
     let dump_rows = p.get("in").get("dump_rows").truthy();
     let mut row_dump: Vec<V> = Vec::new();
+    // 守りの窓の写し（診断・`dump_rows` のときだけ・値は何も変えない・2026-10-12 `docs/reports/2026-10-12_don_deck.md` §10）
+    let mut guard_dump: Vec<V> = Vec::new();
     if !succ.is_empty() {
         super::state::with_core2(|c2| super::entry::apply_g(c2, p.get("g")))?;
     }
@@ -718,6 +720,7 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
                 stats.addi("grd_no_attack", 1);
                 continue;
             };
+            let mut spent_dump: Option<f64> = None;
             if let Some(jn) = getk(&tb.first_main, (w, t + 1)) {
                 let before = ld::hand_ids(&c.t, &r.ci);
                 let after = ld::hand_ids(&c.t, &g.rows[jn].ci);
@@ -736,10 +739,32 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
                 let actual = paid_v + if played == "take" { th_g * mu } else { 0.0 };
                 stats.addi("grd_spent_rows", 1);
                 stats.addf("grd_spent_sum", paid_v);
+                spent_dump = Some(paid_v);
                 got.set("g_paid", V::Float(-actual));
                 let price = got.get("price").f();
                 got.set("g_delta", V::Float(price - actual));
                 got.set("g", V::Float(price - actual));
+            }
+            if dump_rows {
+                // [t, w, 打った（take/guard）, 止められると読んだか, 理論の勧め, 止める読みの出所, 超過 x, 受ける費用, 手札で止める費用,
+                //  止める費用（読みに使った値）, 手札の枚数, 払えるカウンター札の枚数, 実際に消えた札の価値, 自分のライフ, 余裕]
+                guard_dump.push(V::list(vec![
+                    V::Int(t),
+                    V::Int(w),
+                    V::s(&played),
+                    got.get("can_guard").clone(),
+                    got.get("theory_says").clone(),
+                    got.get("cost_guard_source").clone(),
+                    got.get("x").clone(),
+                    got.get("cost_take").clone(),
+                    got.get("cost_guard_hand").clone(),
+                    got.get("cost_guard_s").clone(),
+                    got.get("n_hand_cards").clone(),
+                    got.get("n_counter_cards").clone(),
+                    spent_dump.map(V::Float).unwrap_or(V::None),
+                    V::Float(sc[lt::SC_MY_LIFE]),
+                    got.get("margin").clone(),
+                ]));
             }
             let bnd = band_of(r.v0.abs());
             let opp_g = tb.opp_view(w, t);
@@ -845,6 +870,7 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
     ];
     if dump_rows {
         out.push((V::s("row_dump"), V::list(row_dump)));
+        out.push((V::s("guard_dump"), V::list(guard_dump)));
     }
     Ok(V::dict(out))
 }
