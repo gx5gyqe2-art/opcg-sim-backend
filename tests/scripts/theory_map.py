@@ -1000,9 +1000,70 @@ def cmd_paircal(a):
     return 0
 
 
+def cmd_clockside(a):
+    """どちらの時計が外れているか（2026-10-12・`2026-10-12_don_deck.md` §8）。ターン先頭・決着の宣言の前の行で、席のデッキ × 帯ごとに:
+    - 自分の時計: 整数 `max(1, ⌈τ_me⌉)` − 実際に相手を倒すまでの自席ターン（勝った席＝打ち切りなし）。負けた席は打ち切り（実際は「少なくとも」）
+      ＝読みが打ち切りより短い割合（「この局のうちに倒せる」と読んだのに倒せなかった）を数える。
+    - 相手の時計: 整数 `max(1, ⌈τ_opp⌉)` − 実際に自分が倒されるまでの相手のターン（負けた席＝打ち切りなし）。勝った席は打ち切り
+      ＝読みが打ち切りより短い割合（「この局のうちに倒される」と読んだのに倒されなかった）を数える。
+    正＝読みが長い（攻めを低く／守りを高く読む）・負＝読みが短い（攻めを高く／守りを低く読む）。"""
+    clocks = json.load(open(a.clocks, encoding="utf-8"))
+    cap = float(clocks["cap"])
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    settled = collections.defaultdict(lambda: 10 ** 9)
+    for s_, w_, t_, d_ in clocks["settled"]:
+        if d_:
+            settled[int(s_)] = min(settled[int(s_)], int(t_))
+    rows = []
+    for r in clocks["rows_out"]:
+        s_, w_, t_ = int(r["seed"]), int(r["who"]), int(r["t"])
+        gm = games_meta.get(s_)
+        if gm is None or t_ >= settled[s_]:
+            continue
+        rows.append({"seed": s_, "t": t_, "leader": gm["leaders"][w_], "won": bool(r["won"]),
+                     "me": int_clock(r["tau_me_theory"], cap) - int(r["t_me_act"]),
+                     "opp": int_clock(r["tau_opp_theory"], cap) - int(r["t_opp_act"]),
+                     "me_f": min(float(r["tau_me_theory"]), cap) - float(r["t_me_act"]),
+                     "opp_f": min(float(r["tau_opp_theory"]), cap) - float(r["t_opp_act"])})
+
+    def blk(rs):
+        o = {}
+        for side, full, cens in (("me", True, False), ("opp", False, True)):
+            # 打ち切りなし: 自分の時計は勝った席・相手の時計は負けた席
+            un = [x for x in rs if x["won"] == full]
+            ce = [x for x in rs if x["won"] == cens]
+            e = {"n": len(un), "games": len({x["seed"] for x in un})}
+            if un:
+                e["mean_int"] = round(float(np.mean([x[side] for x in un])), 3)
+                e["mean_frac"] = round(float(np.mean([x[side + "_f"] for x in un])), 3)
+                bys = collections.defaultdict(list)
+                for x in un:
+                    bys[x["seed"]].append(x)
+                if len(bys) >= MIN_GAMES:
+                    e["ci_int"] = boot_games(bys, lambda xs, side=side: float(np.mean([x[side] for x in xs])), a.boot)
+                else:
+                    e["verdict"] = "局数不足"
+            e["censored_n"] = len(ce)
+            if ce:
+                # 読み（整数）が打ち切りの時刻より短い＝その局のうちに届くと読んだのに届かなかった
+                e["censored_short_share"] = round(float(np.mean([x[side] < 0 for x in ce])), 3)
+            o[side] = e
+        return o
+    decks = sorted({x["leader"] for x in rows})
+    out = {"record": a.src, "by_deck": {d: {"all": blk([x for x in rows if x["leader"] == d]),
+                                            **{b: blk([x for x in rows if x["leader"] == d and turn_band(x["t"]) == b]) for b in TURN_BANDS}}
+                                        for d in decks},
+           "ALL": blk(rows)}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("clockside: rows %d" % len(rows))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1045,9 +1106,14 @@ def main(argv=None):
     pc.add_argument("--min-games", type=int, default=MIN_GAMES)
     pc.add_argument("--boot", type=int, default=BOOT)
     pc.add_argument("--out", required=True)
+    cs = sub.add_parser("clockside")
+    cs.add_argument("--in", dest="src", required=True)
+    cs.add_argument("--clocks", required=True)
+    cs.add_argument("--boot", type=int, default=BOOT)
+    cs.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
-            "paircal": cmd_paircal}[a.cmd](a)
+            "paircal": cmd_paircal, "clockside": cmd_clockside}[a.cmd](a)
 
 
 if __name__ == "__main__":
