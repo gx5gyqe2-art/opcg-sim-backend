@@ -298,9 +298,9 @@ impl Core {
             let tot = get(&out, &format!("{p}don_total"));
             if !tot.is_none() {
                 // 上限＝この先持てるドンの総数（場のドン＋ドン‼デッキの残り・2026-10-12 `docs/reports/2026-10-12_don_deck.md` §1.1）。
-                // 状態にドン‼デッキの残りが無ければ規則の既定 `DON_CAP`＝10。
+                // 状態にドン‼デッキの残りが無いか、候補の切替 `OPCG_DON_ROOM` が切れていれば規則の既定 `DON_CAP`＝10（旧と同じ）。
                 let deck = get(&out, &format!("{p}don_deck"));
-                let room = if deck.is_none() { DON_CAP } else { py_min(DON_CAP, (tot.f().round() + deck.f()).round()) };
+                let room = if deck.is_none() || !super::super::leaves_to::don_room_on() { DON_CAP } else { py_min(DON_CAP, (tot.f().round() + deck.f()).round()) };
                 let tot2 = py_min(room, tot.f() + (2 * t) as f64);
                 dset_mut(&mut out, &format!("{p}don_total"), V::Float(tot2));
                 dset_mut(&mut out, &format!("{p}don"), V::Int(py_round_int(tot2)));
