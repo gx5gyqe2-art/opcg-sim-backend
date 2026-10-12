@@ -131,11 +131,22 @@ class Roles:
         return self.c[cid]
 
 
+def seat_leaders(meta, gm):
+    """席ごとの実際のリーダー。**記録の `decks` が `"user"`（実デッキ）のとき `meta_games.json` の `leaders` は
+    使われなかった乱数のリーダー対**（`decks.build_pair` は `la`／`lb` を無視して `user_deck_pair(seed)` を使う）
+    ので、そちらから取る（2026-10-12 の訂正・報告 §訂正）。合成（`synth_roles` 等）は meta のまま。"""
+    if meta.get("decks") == "user":
+        from opcg_sim.loop import decks as D
+        up = D.user_deck_pair(int(gm["seed"]))
+        return [up[0][0], up[1][0]]
+    return list(gm["leaders"])
+
+
 def build_rows(src, dump, clocks):
     """記録の判断の行と写しの行を突き合わせ、行ごとの dict を返す（§1.2）。"""
     from opcg_sim.learned.train import plan_labels as PL
     meta = json.load(open(os.path.join(src, "meta_games.json"), encoding="utf-8"))
-    games_meta = {int(g["seed"]): g for g in meta["games"]}
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
     lcol = leader_colors()
     roles = Roles()
     cap = float(clocks["cap"])
@@ -352,6 +363,13 @@ def cmd_analyze(a):
             else:
                 e["verdict"] = "局数不足"
             q1["by_color_band"]["%s|%s" % (col, band)] = e
+    q1["by_deck_band"] = {}
+    for ld in sorted({r["leader"] for r in rows}):
+        for band in TURN_BANDS:
+            rb = [r for r in rows if r["leader"] == ld and turn_band(r["t"]) == band]
+            nu = len({(r["seed"], r["w"]) for r in rb})
+            if nu >= MIN_GAMES:
+                q1["by_deck_band"]["%s|%s" % (ld, band)] = {"units": nu, "best": share_by(rb, "btype"), "played": share_by(rb, "ptype")}
     lead_units = collections.Counter()
     for r in {(r["seed"], r["w"]): r for r in rows}.values():
         lead_units[r["leader"]] += 1
@@ -389,6 +407,17 @@ def cmd_analyze(a):
     for col in COLORS:
         sub = [r for r in rc if col in r["colors"]]
         q3.setdefault("by_color", {})[col] = follow_table(sub, reps)
+    q3["by_deck"] = {}
+    q3["cells_deck"] = {}
+    for ld in sorted({r["leader"] for r in rc}):
+        sub = [r for r in rc if r["leader"] == ld]
+        if len({(r["seed"], r["w"]) for r in sub}) >= MIN_GAMES:
+            q3["by_deck"][ld] = follow_table(sub, reps)
+            for g in GAP_BINS:
+                for band in TURN_BANDS:
+                    s2 = [r for r in sub if r["gap"] == g and turn_band(r["t"]) == band]
+                    if len({(r["seed"], r["w"]) for r in s2}) >= MIN_GAMES:
+                        q3["cells_deck"]["%s|%s|%s" % (ld, g, band)] = follow_table(s2, reps)
     q3["marks_all"] = marks_of(rc, clocks["cap"])
     out["q3"] = q3
 
@@ -429,7 +458,7 @@ def collect_q2(clocks, th, games_meta, lcol, src):
         sl_me, sl_op = float(r["slope_theory_me"]), float(r["slope_theory_opp"])
         th_me, th_op = float(r["theta_me"]), float(r["theta_opp"])
         e = {"seed": s, "w": w, "t": int(r["t"]), "z": 1.0 if r["won"] else 0.0,
-             "colors": lcol.get(gm["leaders"][w], ["?"]), "W": r.get("W"),
+             "colors": lcol.get(gm["leaders"][w], ["?"]), "leader": gm["leaders"][w], "W": r.get("W"),
              "D": to - tm, "logratio": math.log(max(to, 1e-6) / max(tm, 1e-6)),
              # 耐久: 相手を倒すのに残っている量（自分の時計の分子）− 自分の耐久（相手の時計の分子）
              "d_theta": th_op - th_me,             # 正＝自分の耐久が相手の耐久より厚い（＝有利）
@@ -488,6 +517,14 @@ def collect_q2(clocks, th, games_meta, lcol, src):
         q2["by_color"][col] = block([e for e in recs if col in e["colors"]])
         for band in TURN_BANDS:
             q2["by_color_band"]["%s|%s" % (col, band)] = block([e for e in recs if col in e["colors"] and turn_band(e["t"]) == band])
+    q2["by_deck"] = {}
+    q2["by_deck_band"] = {}
+    for ld in sorted({e["leader"] for e in recs}):
+        b = block([e for e in recs if e["leader"] == ld])
+        if b.get("verdict") is None:
+            q2["by_deck"][ld] = b
+            for band in TURN_BANDS:
+                q2["by_deck_band"]["%s|%s" % (ld, band)] = block([e for e in recs if e["leader"] == ld and turn_band(e["t"]) == band])
     # 時計の差の区切りごとの実勝率（強い盤面の土台）
     wr = {}
     gb = collections.defaultdict(list)
@@ -532,6 +569,11 @@ def collect_q4(rows, ck, clocks, games_meta, lcol, mu):
     for col in COLORS:
         for ty in TYPES:
             out["by_type_color"]["%s|%s" % (col, ty)] = agg([r for r in rows if col in r["colors"] and r["ptype"] == ty])
+    out["by_type_deck"] = {}
+    for ld in sorted({r["leader"] for r in rows}):
+        if len({(r["seed"], r["w"]) for r in rows if r["leader"] == ld}) >= MIN_GAMES:
+            for ty in TYPES:
+                out["by_type_deck"]["%s|%s" % (ld, ty)] = agg([r for r in rows if r["leader"] == ld and r["ptype"] == ty])
     # 打った手のうち、打った側の勝率を最も下げた手（相手から見て「まずい」の逆＝相手にとっての好手は dW 大）
     # ターン単位: 相手のターン t（席 o）の最初 → 次の自分のターン t+1（席 me）の最初で、自分の時計・相手の時計の動き
     cap = float(clocks["cap"])
