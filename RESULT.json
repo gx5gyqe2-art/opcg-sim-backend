@@ -300,6 +300,39 @@
       "enel": "defence overread (opp clock +0.74 in lost games; controls +0.04/+0.45); 'attack overread' prediction missed",
       "nami": "defence underread (opp clock -0.84 in lost games); prediction held"
     },
-    "pending": "price dump with candidate formula (turns / q5 before-after) → report §10"
+    "pending": null,
+    "s10_guardside": {
+      "json": "logs/theory_map/real_w41_guardside.json",
+      "enel_can_but_took": 0.608,
+      "controls": {
+        "Shanks": 0.451,
+        "Luffy": 0.514,
+        "Nami": 0.334
+      },
+      "prediction1": "missed (1.2-1.35x, not 2x; Enel counter-0 share 29% not ~50%; payable counter share highest 0.71)",
+      "prediction2": "half (life added 2.22/game held; draw chances 0.08/game missed); theory reads neither (code)",
+      "code_fact": "no on-opponent-attack / on-life-leave trigger anywhere in rust theory; Θ life term = λ·current life"
+    },
+    "s11_prices": {
+      "price_rows_non_enel_identical": "9012/9012",
+      "enel_rows_changed": "2563/9195 (127 games)",
+      "enel_q5_all_small": [
+        -0.1288,
+        -0.1284
+      ],
+      "turn_iii_diff": [
+        0.1649,
+        0.164
+      ]
+    },
+    "s12_synth": {
+      "json": "logs/theory_map/syn_w39_dondeck.json",
+      "invariant": "294 non-Enel games 0 diff",
+      "calibration": "unchanged to 4 decimals",
+      "crossing": [
+        0.6703,
+        0.6703
+      ]
+    }
   }
 }

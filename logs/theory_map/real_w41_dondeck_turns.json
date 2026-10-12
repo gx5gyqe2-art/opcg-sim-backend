@@ -1,0 +1,1697 @@
+{
+ "record": "/home/user/data_rec/sigma_wip/data/w41",
+ "align": {
+  "rows": 18207
+ },
+ "turn_counts": {
+  "turns": 3847,
+  "no_judged_row": 173,
+  "no_clock": 181,
+  "used": 3493
+ },
+ "categories": {
+  "a": {
+   "all": 872,
+   "with_effect": 113
+  },
+  "b": {
+   "all": 1718,
+   "with_effect": 729
+  },
+  "c": {
+   "all": 580,
+   "with_effect": 371
+  },
+  "d": {
+   "all": 232,
+   "with_effect": 61
+  },
+  "e": {
+   "all": 14,
+   "with_effect": 2
+  },
+  "f": {
+   "all": 77,
+   "with_effect": 0
+  }
+ },
+ "rec_by_cat": {
+  "attack": {
+   "a": 716,
+   "b": 1178,
+   "c": 412,
+   "d": 31,
+   "e": 9,
+   "f": 7
+  },
+  "attach": {
+   "a": 48,
+   "b": 68,
+   "c": 39,
+   "d": 3,
+   "e": 2,
+   "f": 2
+  },
+  "play": {
+   "a": 73,
+   "b": 359,
+   "c": 83,
+   "d": 158,
+   "e": 1,
+   "f": 47
+  },
+  "effect": {
+   "a": 12,
+   "b": 53,
+   "c": 27,
+   "d": 8,
+   "e": 1,
+   "f": 1
+  },
+  "end": {
+   "a": 23,
+   "b": 60,
+   "c": 19,
+   "d": 32,
+   "e": 1,
+   "f": 20
+  }
+ },
+ "rec_cat_wr": {
+  "attack|a": {
+   "w": 179.8,
+   "wr": 0.6107,
+   "w_rest": 417.2,
+   "wr_rest": 0.4559
+  },
+  "attack|b": {
+   "w": 289.0,
+   "wr": 0.5059,
+   "w_rest": 308.0,
+   "wr_rest": 0.4994
+  },
+  "attack|c": {
+   "w": 115.9,
+   "wr": 0.3447,
+   "w_rest": 481.1,
+   "wr_rest": 0.5405
+  },
+  "attack|d": {
+   "w": 7.8,
+   "wr": 0.3415,
+   "w_rest": 589.2,
+   "wr_rest": 0.5046
+  },
+  "attack|e": {
+   "w": 2.8,
+   "wr": 0.2651,
+   "w_rest": 594.2,
+   "wr_rest": 0.5036
+  },
+  "attack|f": {
+   "w": 1.8,
+   "wr": 0.3679,
+   "w_rest": 595.2,
+   "wr_rest": 0.5029
+  },
+  "attach|a": {
+   "w": 42.3,
+   "wr": 0.378,
+   "w_rest": 88.7,
+   "wr_rest": 0.3158
+  },
+  "attach|b": {
+   "w": 57.2,
+   "wr": 0.3528,
+   "w_rest": 73.8,
+   "wr_rest": 0.3228
+  },
+  "attach|c": {
+   "w": 25.7,
+   "wr": 0.2662,
+   "w_rest": 105.3,
+   "wr_rest": 0.3528
+  },
+  "attach|d": {
+   "w": 1.8,
+   "wr": 0.0,
+   "w_rest": 129.2,
+   "wr_rest": 0.3406
+  },
+  "attach|e": {
+   "w": 2.0,
+   "wr": 0.0,
+   "w_rest": 129.0,
+   "wr_rest": 0.3411
+  },
+  "attach|f": {
+   "w": 2.0,
+   "wr": 0.5,
+   "w_rest": 129.0,
+   "wr_rest": 0.3333
+  },
+  "play|a": {
+   "w": 38.7,
+   "wr": 0.4716,
+   "w_rest": 381.3,
+   "wr_rest": 0.4531
+  },
+  "play|b": {
+   "w": 192.8,
+   "wr": 0.5456,
+   "w_rest": 227.2,
+   "wr_rest": 0.3777
+  },
+  "play|c": {
+   "w": 40.6,
+   "wr": 0.2825,
+   "w_rest": 379.4,
+   "wr_rest": 0.4732
+  },
+  "play|d": {
+   "w": 114.5,
+   "wr": 0.373,
+   "w_rest": 305.5,
+   "wr_rest": 0.4854
+  },
+  "play|e": {
+   "w": 0.5,
+   "wr": 0.0,
+   "w_rest": 419.5,
+   "wr_rest": 0.4553
+  },
+  "play|f": {
+   "w": 32.8,
+   "wr": 0.4067,
+   "w_rest": 387.2,
+   "wr_rest": 0.4588
+  },
+  "effect|a": {
+   "w": 10.0,
+   "wr": 0.25,
+   "w_rest": 73.0,
+   "wr_rest": 0.2397
+  },
+  "effect|b": {
+   "w": 42.8,
+   "wr": 0.2296,
+   "w_rest": 40.2,
+   "wr_rest": 0.2531
+  },
+  "effect|c": {
+   "w": 21.7,
+   "wr": 0.2154,
+   "w_rest": 61.3,
+   "wr_rest": 0.25
+  },
+  "effect|d": {
+   "w": 7.0,
+   "wr": 0.3571,
+   "w_rest": 76.0,
+   "wr_rest": 0.2303
+  },
+  "effect|e": {
+   "w": 0.5,
+   "wr": 1.0,
+   "w_rest": 82.5,
+   "wr_rest": 0.2364
+  },
+  "effect|f": {
+   "w": 1.0,
+   "wr": 0.0,
+   "w_rest": 82.0,
+   "wr_rest": 0.2439
+  },
+  "end|a": {
+   "w": 16.3,
+   "wr": 0.1837,
+   "w_rest": 114.7,
+   "wr_rest": 0.3837
+  },
+  "end|b": {
+   "w": 52.8,
+   "wr": 0.2114,
+   "w_rest": 78.2,
+   "wr_rest": 0.4584
+  },
+  "end|c": {
+   "w": 12.7,
+   "wr": 0.1974,
+   "w_rest": 118.3,
+   "wr_rest": 0.3761
+  },
+  "end|d": {
+   "w": 30.3,
+   "wr": 0.6758,
+   "w_rest": 100.7,
+   "wr_rest": 0.2632
+  },
+  "end|e": {
+   "w": 1.0,
+   "wr": 0.0,
+   "w_rest": 130.0,
+   "wr_rest": 0.3615
+  },
+  "end|f": {
+   "w": 17.8,
+   "wr": 0.5514,
+   "w_rest": 113.2,
+   "wr_rest": 0.3284
+  }
+ },
+ "i_attack_rec": {
+  "all": {
+   "units": 597,
+   "games": 300,
+   "wr_follow": 0.5062,
+   "w_follow": 584.7,
+   "wr_other": 0.3281,
+   "w_other": 12.3,
+   "verdict": "局数不足",
+   "share_true": 0.979,
+   "turns": 2353
+  },
+  "by_gap": {
+   "先行2+": {
+    "units": 182,
+    "games": 178,
+    "wr_follow": 0.8984,
+    "w_follow": 177.2,
+    "wr_other": 0.5862,
+    "w_other": 4.8,
+    "verdict": "局数不足",
+    "share_true": 0.973,
+    "turns": 406
+   },
+   "先行1": {
+    "units": 202,
+    "games": 190,
+    "wr_follow": 0.7788,
+    "w_follow": 201.2,
+    "wr_other": 0.4,
+    "w_other": 0.8,
+    "verdict": "局数不足",
+    "share_true": 0.996,
+    "turns": 305
+   },
+   "互角": {
+    "units": 317,
+    "games": 231,
+    "wr_follow": 0.6845,
+    "w_follow": 312.2,
+    "wr_other": 0.4828,
+    "w_other": 4.8,
+    "verdict": "局数不足",
+    "share_true": 0.985,
+    "turns": 552
+   },
+   "遅れ1": {
+    "units": 308,
+    "games": 207,
+    "wr_follow": 0.4645,
+    "w_follow": 296.8,
+    "wr_other": 0.2815,
+    "w_other": 11.2,
+    "verdict": "局数不足",
+    "share_true": 0.963,
+    "turns": 489
+   },
+   "遅れ2+": {
+    "units": 300,
+    "games": 272,
+    "wr_follow": 0.2492,
+    "w_follow": 293.9,
+    "wr_other": 0.4521,
+    "w_other": 6.1,
+    "verdict": "局数不足",
+    "share_true": 0.98,
+    "turns": 601
+   }
+  },
+  "by_band": {
+   "1-3": {
+    "units": 215,
+    "games": 215,
+    "wr_follow": 0.6186,
+    "w_follow": 194.0,
+    "wr_other": 0.381,
+    "w_other": 21.0,
+    "verdict": "局数不足",
+    "share_true": 0.902,
+    "turns": 215
+   },
+   "4-6": {
+    "units": 447,
+    "games": 278,
+    "wr_follow": 0.5701,
+    "w_follow": 431.5,
+    "wr_other": 0.4516,
+    "w_other": 15.5,
+    "verdict": "局数不足",
+    "share_true": 0.965,
+    "turns": 605
+   },
+   "7+": {
+    "units": 589,
+    "games": 300,
+    "wr_follow": 0.5091,
+    "w_follow": 587.3,
+    "wr_other": 0.0,
+    "w_other": 1.7,
+    "verdict": "局数不足",
+    "share_true": 0.997,
+    "turns": 1533
+   }
+  },
+  "cells": {
+   "先行2+|1-3": {
+    "units": 39,
+    "games": 39,
+    "wr_follow": 0.9444,
+    "w_follow": 36.0,
+    "wr_other": 0.6667,
+    "w_other": 3.0,
+    "verdict": "局数不足",
+    "share_true": 0.923,
+    "turns": 39
+   },
+   "先行2+|4-6": {
+    "units": 68,
+    "games": 68,
+    "wr_follow": 0.8931,
+    "w_follow": 65.5,
+    "wr_other": 0.6,
+    "w_other": 2.5,
+    "verdict": "局数不足",
+    "share_true": 0.963,
+    "turns": 83
+   },
+   "先行2+|7+": {
+    "units": 146,
+    "games": 145,
+    "wr_follow": 0.9247,
+    "w_follow": 146.0,
+    "wr_other": null,
+    "w_other": 0.0,
+    "verdict": "局数不足",
+    "share_true": 1.0,
+    "turns": 284
+   },
+   "先行1|1-3": {
+    "units": 27,
+    "games": 27,
+    "wr_follow": 0.6923,
+    "w_follow": 26.0,
+    "wr_other": 1.0,
+    "w_other": 1.0,
+    "verdict": "局数不足",
+    "share_true": 0.963,
+    "turns": 27
+   },
+   "先行1|4-6": {
+    "units": 78,
+    "games": 78,
+    "wr_follow": 0.7742,
+    "w_follow": 77.5,
+    "wr_other": 0.0,
+    "w_other": 0.5,
+    "verdict": "局数不足",
+    "share_true": 0.994,
+    "turns": 83
+   },
+   "先行1|7+": {
+    "units": 151,
+    "games": 146,
+    "wr_follow": 0.8079,
+    "w_follow": 151.0,
+    "wr_other": null,
+    "w_other": 0.0,
+    "verdict": "局数不足",
+    "share_true": 1.0,
+    "turns": 195
+   },
+   "互角|1-3": {
+    "units": 47,
+    "games": 47,
+    "wr_follow": 0.6047,
+    "w_follow": 43.0,
+    "wr_other": 0.25,
+    "w_other": 4.0,
+    "verdict": "局数不足",
+    "share_true": 0.915,
+    "turns": 47
+   },
+   "互角|4-6": {
+    "units": 116,
+    "games": 106,
+    "wr_follow": 0.6652,
+    "w_follow": 113.5,
+    "wr_other": 1.0,
+    "w_other": 2.5,
+    "verdict": "局数不足",
+    "share_true": 0.978,
+    "turns": 130
+   },
+   "互角|7+": {
+    "units": 261,
+    "games": 207,
+    "wr_follow": 0.7241,
+    "w_follow": 261.0,
+    "wr_other": null,
+    "w_other": 0.0,
+    "verdict": "局数不足",
+    "share_true": 1.0,
+    "turns": 375
+   },
+   "遅れ1|1-3": {
+    "units": 56,
+    "games": 56,
+    "wr_follow": 0.5208,
+    "w_follow": 48.0,
+    "wr_other": 0.25,
+    "w_other": 8.0,
+    "verdict": "局数不足",
+    "share_true": 0.857,
+    "turns": 56
+   },
+   "遅れ1|4-6": {
+    "units": 138,
+    "games": 109,
+    "wr_follow": 0.5375,
+    "w_follow": 126.5,
+    "wr_other": 0.3478,
+    "w_other": 11.5,
+    "verdict": "局数不足",
+    "share_true": 0.917,
+    "turns": 156
+   },
+   "遅れ1|7+": {
+    "units": 211,
+    "games": 158,
+    "wr_follow": 0.4171,
+    "w_follow": 211.0,
+    "wr_other": null,
+    "w_other": 0.0,
+    "verdict": "局数不足",
+    "share_true": 1.0,
+    "turns": 277
+   },
+   "遅れ2+|1-3": {
+    "units": 46,
+    "games": 46,
+    "wr_follow": 0.4146,
+    "w_follow": 41.0,
+    "wr_other": 0.4,
+    "w_other": 5.0,
+    "verdict": "局数不足",
+    "share_true": 0.891,
+    "turns": 46
+   },
+   "遅れ2+|4-6": {
+    "units": 129,
+    "games": 126,
+    "wr_follow": 0.3083,
+    "w_follow": 126.5,
+    "wr_other": 0.4,
+    "w_other": 2.5,
+    "verdict": "局数不足",
+    "share_true": 0.981,
+    "turns": 153
+   },
+   "遅れ2+|7+": {
+    "units": 245,
+    "games": 239,
+    "wr_follow": 0.1644,
+    "w_follow": 243.3,
+    "wr_other": 0.0,
+    "w_other": 1.7,
+    "verdict": "局数不足",
+    "share_true": 0.993,
+    "turns": 402
+   }
+  },
+  "by_deck": {
+   "OP09-001": {
+    "units": 145,
+    "games": 125,
+    "wr_follow": 0.6554,
+    "w_follow": 141.6,
+    "wr_other": 0.3551,
+    "w_other": 3.4,
+    "verdict": "局数不足",
+    "share_true": 0.976,
+    "turns": 645
+   },
+   "OP11-041": {
+    "units": 134,
+    "games": 120,
+    "wr_follow": 0.7835,
+    "w_follow": 132.3,
+    "wr_other": 0.7864,
+    "w_other": 1.7,
+    "verdict": "局数不足",
+    "share_true": 0.987,
+    "turns": 559
+   },
+   "OP15-058": {
+    "units": 157,
+    "games": 139,
+    "wr_follow": 0.2267,
+    "w_follow": 153.3,
+    "wr_other": 0.0676,
+    "w_other": 3.7,
+    "verdict": "局数不足",
+    "share_true": 0.976,
+    "turns": 502
+   },
+   "OP16-022": {
+    "units": 161,
+    "games": 143,
+    "wr_follow": 0.4112,
+    "w_follow": 157.6,
+    "wr_other": 0.3527,
+    "w_other": 3.4,
+    "verdict": "局数不足",
+    "share_true": 0.979,
+    "turns": 647
+   }
+  }
+ },
+ "i_attack_rec_e_vs_rest": {
+  "all": {
+   "units": 597,
+   "games": 300,
+   "wr_follow": 0.2651,
+   "w_follow": 2.8,
+   "wr_other": 0.5036,
+   "w_other": 594.2,
+   "verdict": "局数不足",
+   "share_true": 0.005,
+   "turns": 2353
+  },
+  "by_gap": {
+   "先行2+": {
+    "units": 182,
+    "games": 178,
+    "wr_follow": 0.25,
+    "w_follow": 1.3,
+    "wr_other": 0.8948,
+    "w_other": 180.7,
+    "verdict": "局数不足",
+    "share_true": 0.007,
+    "turns": 406
+   },
+   "先行1": {
+    "units": 202,
+    "games": 190,
+    "wr_follow": 1.0,
+    "w_follow": 0.3,
+    "wr_other": 0.7769,
+    "w_other": 201.7,
+    "verdict": "局数不足",
+    "share_true": 0.002,
+    "turns": 305
+   },
+   "互角": {
+    "units": 317,
+    "games": 231,
+    "wr_follow": 0.25,
+    "w_follow": 1.3,
+    "wr_other": 0.6832,
+    "w_other": 315.7,
+    "verdict": "局数不足",
+    "share_true": 0.004,
+    "turns": 552
+   },
+   "遅れ1": {
+    "units": 308,
+    "games": 207,
+    "wr_follow": 0.1818,
+    "w_follow": 1.8,
+    "wr_other": 0.4594,
+    "w_other": 306.2,
+    "verdict": "局数不足",
+    "share_true": 0.006,
+    "turns": 489
+   },
+   "遅れ2+": {
+    "units": 300,
+    "games": 272,
+    "wr_follow": 0.0,
+    "w_follow": 1.0,
+    "wr_other": 0.2542,
+    "w_other": 299.0,
+    "verdict": "局数不足",
+    "share_true": 0.003,
+    "turns": 601
+   }
+  },
+  "by_band": {
+   "1-3": {
+    "units": 215,
+    "games": 215,
+    "wr_follow": 0.5,
+    "w_follow": 6.0,
+    "wr_other": 0.5981,
+    "w_other": 209.0,
+    "verdict": "局数不足",
+    "share_true": 0.028,
+    "turns": 215
+   },
+   "4-6": {
+    "units": 447,
+    "games": 278,
+    "wr_follow": 0.5,
+    "w_follow": 1.0,
+    "wr_other": 0.5661,
+    "w_other": 446.0,
+    "verdict": "局数不足",
+    "share_true": 0.002,
+    "turns": 605
+   },
+   "7+": {
+    "units": 589,
+    "games": 300,
+    "wr_follow": 0.0,
+    "w_follow": 1.0,
+    "wr_other": 0.5085,
+    "w_other": 588.0,
+    "verdict": "局数不足",
+    "share_true": 0.002,
+    "turns": 1533
+   }
+  },
+  "cells": {
+   "先行2+|1-3": {
+    "units": 39,
+    "games": 39,
+    "wr_follow": 0.0,
+    "w_follow": 1.0,
+    "wr_other": 0.9474,
+    "w_other": 38.0,
+    "verdict": "局数不足",
+    "share_true": 0.026,
+    "turns": 39
+   },
+   "先行2+|4-6": {
+    "units": 68,
+    "games": 68,
+    "wr_follow": 1.0,
+    "w_follow": 0.5,
+    "wr_other": 0.8815,
+    "w_other": 67.5,
+    "verdict": "局数不足",
+    "share_true": 0.007,
+    "turns": 83
+   },
+   "先行2+|7+": {
+    "units": 146,
+    "games": 145,
+    "wr_follow": null,
+    "w_follow": 0.0,
+    "wr_other": 0.9247,
+    "w_other": 146.0,
+    "verdict": "局数不足",
+    "share_true": 0.0,
+    "turns": 284
+   },
+   "先行1|1-3": {
+    "units": 27,
+    "games": 27,
+    "wr_follow": 1.0,
+    "w_follow": 1.0,
+    "wr_other": 0.6923,
+    "w_other": 26.0,
+    "verdict": "局数不足",
+    "share_true": 0.037,
+    "turns": 27
+   },
+   "先行1|4-6": {
+    "units": 78,
+    "games": 78,
+    "wr_follow": null,
+    "w_follow": 0.0,
+    "wr_other": 0.7692,
+    "w_other": 78.0,
+    "verdict": "局数不足",
+    "share_true": 0.0,
+    "turns": 83
+   },
+   "先行1|7+": {
+    "units": 151,
+    "games": 146,
+    "wr_follow": null,
+    "w_follow": 0.0,
+    "wr_other": 0.8079,
+    "w_other": 151.0,
+    "verdict": "局数不足",
+    "share_true": 0.0,
+    "turns": 195
+   },
+   "互角|1-3": {
+    "units": 47,
+    "games": 47,
+    "wr_follow": 0.5,
+    "w_follow": 2.0,
+    "wr_other": 0.5778,
+    "w_other": 45.0,
+    "verdict": "局数不足",
+    "share_true": 0.043,
+    "turns": 47
+   },
+   "互角|4-6": {
+    "units": 116,
+    "games": 106,
+    "wr_follow": null,
+    "w_follow": 0.0,
+    "wr_other": 0.6724,
+    "w_other": 116.0,
+    "verdict": "局数不足",
+    "share_true": 0.0,
+    "turns": 130
+   },
+   "互角|7+": {
+    "units": 261,
+    "games": 207,
+    "wr_follow": null,
+    "w_follow": 0.0,
+    "wr_other": 0.7241,
+    "w_other": 261.0,
+    "verdict": "局数不足",
+    "share_true": 0.0,
+    "turns": 375
+   },
+   "遅れ1|1-3": {
+    "units": 56,
+    "games": 56,
+    "wr_follow": 0.5,
+    "w_follow": 2.0,
+    "wr_other": 0.4815,
+    "w_other": 54.0,
+    "verdict": "局数不足",
+    "share_true": 0.036,
+    "turns": 56
+   },
+   "遅れ1|4-6": {
+    "units": 138,
+    "games": 109,
+    "wr_follow": 0.0,
+    "w_follow": 1.0,
+    "wr_other": 0.5255,
+    "w_other": 137.0,
+    "verdict": "局数不足",
+    "share_true": 0.007,
+    "turns": 156
+   },
+   "遅れ1|7+": {
+    "units": 211,
+    "games": 158,
+    "wr_follow": null,
+    "w_follow": 0.0,
+    "wr_other": 0.4171,
+    "w_other": 211.0,
+    "verdict": "局数不足",
+    "share_true": 0.0,
+    "turns": 277
+   },
+   "遅れ2+|1-3": {
+    "units": 46,
+    "games": 46,
+    "wr_follow": null,
+    "w_follow": 0.0,
+    "wr_other": 0.413,
+    "w_other": 46.0,
+    "verdict": "局数不足",
+    "share_true": 0.0,
+    "turns": 46
+   },
+   "遅れ2+|4-6": {
+    "units": 129,
+    "games": 126,
+    "wr_follow": null,
+    "w_follow": 0.0,
+    "wr_other": 0.3101,
+    "w_other": 129.0,
+    "verdict": "局数不足",
+    "share_true": 0.0,
+    "turns": 153
+   },
+   "遅れ2+|7+": {
+    "units": 245,
+    "games": 239,
+    "wr_follow": 0.0,
+    "w_follow": 1.0,
+    "wr_other": 0.1639,
+    "w_other": 244.0,
+    "verdict": "局数不足",
+    "share_true": 0.004,
+    "turns": 402
+   }
+  },
+  "by_deck": {
+   "OP09-001": {
+    "units": 145,
+    "games": 125,
+    "wr_follow": 0.375,
+    "w_follow": 0.5,
+    "wr_other": 0.6493,
+    "w_other": 144.5,
+    "verdict": "局数不足",
+    "share_true": 0.004,
+    "turns": 645
+   },
+   "OP11-041": {
+    "units": 134,
+    "games": 120,
+    "wr_follow": 1.0,
+    "w_follow": 0.4,
+    "wr_other": 0.783,
+    "w_other": 133.6,
+    "verdict": "局数不足",
+    "share_true": 0.003,
+    "turns": 559
+   },
+   "OP15-058": {
+    "units": 157,
+    "games": 139,
+    "wr_follow": 0.0,
+    "w_follow": 1.2,
+    "wr_other": 0.2247,
+    "w_other": 155.8,
+    "verdict": "局数不足",
+    "share_true": 0.008,
+    "turns": 502
+   },
+   "OP16-022": {
+    "units": 161,
+    "games": 143,
+    "wr_follow": 0.2703,
+    "w_follow": 0.6,
+    "wr_other": 0.4105,
+    "w_other": 160.4,
+    "verdict": "局数不足",
+    "share_true": 0.004,
+    "turns": 647
+   }
+  }
+ },
+ "ii_order": {
+  "all": {
+   "turns": 2306,
+   "games": 300,
+   "count": {
+    "a": 716,
+    "b": 1178,
+    "c": 412
+   },
+   "wr_a": 0.6085,
+   "w_a": 182.8,
+   "wr_b": 0.5038,
+   "w_b": 294.6,
+   "wr_c": 0.3402,
+   "w_c": 118.6,
+   "b_minus_a": -0.1047,
+   "b_minus_a_ci": [
+    -0.1469,
+    -0.0599
+   ],
+   "c_minus_a": -0.2683,
+   "c_minus_a_ci": [
+    -0.3265,
+    -0.2086
+   ]
+  },
+  "by_gap": {
+   "先行2+": {
+    "turns": 400,
+    "games": 174,
+    "count": {
+     "a": 149,
+     "b": 199,
+     "c": 52
+    },
+    "wr_a": 0.9642,
+    "w_a": 65.2,
+    "wr_b": 0.8934,
+    "w_b": 87.6,
+    "wr_c": 0.749,
+    "w_c": 25.2,
+    "b_minus_a": -0.0708,
+    "b_minus_a_ci": [
+     -0.1378,
+     -0.0082
+    ],
+    "c_minus_a": "局数不足"
+   },
+   "先行1": {
+    "turns": 303,
+    "games": 190,
+    "count": {
+     "a": 90,
+     "b": 168,
+     "c": 45
+    },
+    "wr_a": 0.7727,
+    "w_a": 65.2,
+    "wr_b": 0.7748,
+    "w_b": 107.3,
+    "wr_c": 0.796,
+    "w_c": 29.4,
+    "b_minus_a": 0.0022,
+    "b_minus_a_ci": [
+     -0.1123,
+     0.1192
+    ],
+    "c_minus_a": "局数不足"
+   },
+   "互角": {
+    "turns": 545,
+    "games": 230,
+    "count": {
+     "a": 200,
+     "b": 260,
+     "c": 85
+    },
+    "wr_a": 0.863,
+    "w_a": 119.2,
+    "wr_b": 0.5799,
+    "w_b": 147.4,
+    "wr_c": 0.5622,
+    "w_c": 47.4,
+    "b_minus_a": -0.283,
+    "b_minus_a_ci": [
+     -0.3705,
+     -0.1936
+    ],
+    "c_minus_a": -0.3007,
+    "c_minus_a_ci": [
+     -0.4298,
+     -0.1614
+    ]
+   },
+   "遅れ1": {
+    "turns": 469,
+    "games": 207,
+    "count": {
+     "a": 121,
+     "b": 268,
+     "c": 80
+    },
+    "wr_a": 0.5091,
+    "w_a": 77.8,
+    "wr_b": 0.4617,
+    "w_b": 168.6,
+    "wr_c": 0.3985,
+    "w_c": 56.7,
+    "b_minus_a": -0.0474,
+    "b_minus_a_ci": [
+     -0.1601,
+     0.0678
+    ],
+    "c_minus_a": -0.1106,
+    "c_minus_a_ci": [
+     -0.2573,
+     0.0355
+    ]
+   },
+   "遅れ2+": {
+    "turns": 589,
+    "games": 270,
+    "count": {
+     "a": 156,
+     "b": 283,
+     "c": 150
+    },
+    "wr_a": 0.2792,
+    "w_a": 79.4,
+    "wr_b": 0.3028,
+    "w_b": 136.5,
+    "wr_c": 0.1295,
+    "w_c": 81.1,
+    "b_minus_a": 0.0236,
+    "b_minus_a_ci": [
+     -0.0839,
+     0.1352
+    ],
+    "c_minus_a": -0.1497,
+    "c_minus_a_ci": [
+     -0.2591,
+     -0.0407
+    ]
+   }
+  },
+  "by_band": {
+   "1-3": {
+    "turns": 194,
+    "games": 194,
+    "count": {
+     "a": 104,
+     "b": 58,
+     "c": 32
+    },
+    "wr_a": 0.6923,
+    "w_a": 104.0,
+    "wr_b": 0.5,
+    "w_b": 58.0,
+    "wr_c": 0.5938,
+    "w_c": 32.0,
+    "b_minus_a": -0.1923,
+    "b_minus_a_ci": [
+     -0.3505,
+     -0.035
+    ],
+    "c_minus_a": -0.0986,
+    "c_minus_a_ci": [
+     -0.2943,
+     0.1006
+    ]
+   },
+   "4-6": {
+    "turns": 582,
+    "games": 276,
+    "count": {
+     "a": 58,
+     "b": 469,
+     "c": 55
+    },
+    "wr_a": 0.4744,
+    "w_a": 39.0,
+    "wr_b": 0.5907,
+    "w_b": 364.0,
+    "wr_c": 0.4583,
+    "w_c": 36.0,
+    "b_minus_a": 0.1163,
+    "b_minus_a_ci": [
+     -0.0403,
+     0.2622
+    ],
+    "c_minus_a": -0.016,
+    "c_minus_a_ci": [
+     -0.2271,
+     0.1806
+    ]
+   },
+   "7+": {
+    "turns": 1530,
+    "games": 300,
+    "count": {
+     "a": 554,
+     "b": 651,
+     "c": 325
+    },
+    "wr_a": 0.639,
+    "w_a": 218.0,
+    "wr_b": 0.4866,
+    "w_b": 238.6,
+    "wr_c": 0.3317,
+    "w_c": 131.4,
+    "b_minus_a": -0.1523,
+    "b_minus_a_ci": [
+     -0.2041,
+     -0.1
+    ],
+    "c_minus_a": -0.3073,
+    "c_minus_a_ci": [
+     -0.3722,
+     -0.2407
+    ]
+   }
+  },
+  "by_deck": {
+   "OP09-001": {
+    "turns": 631,
+    "games": 125,
+    "count": {
+     "a": 169,
+     "b": 380,
+     "c": 82
+    },
+    "wr_a": 0.7092,
+    "w_a": 38.9,
+    "wr_b": 0.6329,
+    "w_b": 86.2,
+    "wr_c": 0.5959,
+    "w_c": 20.0,
+    "b_minus_a": -0.0763,
+    "b_minus_a_ci": [
+     -0.1603,
+     0.0086
+    ],
+    "c_minus_a": "局数不足"
+   },
+   "OP11-041": {
+    "turns": 551,
+    "games": 120,
+    "count": {
+     "a": 202,
+     "b": 295,
+     "c": 54
+    },
+    "wr_a": 0.8484,
+    "w_a": 50.6,
+    "wr_b": 0.7447,
+    "w_b": 70.9,
+    "wr_c": 0.7418,
+    "w_c": 12.5,
+    "b_minus_a": -0.1038,
+    "b_minus_a_ci": [
+     -0.1938,
+     -0.0159
+    ],
+    "c_minus_a": "局数不足"
+   },
+   "OP15-058": {
+    "turns": 491,
+    "games": 138,
+    "count": {
+     "a": 115,
+     "b": 197,
+     "c": 179
+    },
+    "wr_a": 0.3681,
+    "w_a": 34.5,
+    "wr_b": 0.218,
+    "w_b": 58.0,
+    "wr_c": 0.152,
+    "w_c": 63.5,
+    "b_minus_a": -0.1501,
+    "b_minus_a_ci": [
+     -0.2456,
+     -0.0565
+    ],
+    "c_minus_a": -0.2161,
+    "c_minus_a_ci": [
+     -0.3167,
+     -0.1113
+    ]
+   },
+   "OP16-022": {
+    "turns": 633,
+    "games": 143,
+    "count": {
+     "a": 230,
+     "b": 306,
+     "c": 97
+    },
+    "wr_a": 0.4766,
+    "w_a": 58.8,
+    "wr_b": 0.3575,
+    "w_b": 79.5,
+    "wr_c": 0.421,
+    "w_c": 22.6,
+    "b_minus_a": -0.1192,
+    "b_minus_a_ci": [
+     -0.1838,
+     -0.0515
+    ],
+    "c_minus_a": "局数不足"
+   }
+  },
+  "any_rec_all": {
+   "turns": 3170,
+   "games": 300,
+   "count": {
+    "a": 872,
+    "b": 1718,
+    "c": 580
+   },
+   "wr_a": 0.5944,
+   "w_a": 163.5,
+   "wr_b": 0.4997,
+   "w_b": 324.4,
+   "wr_c": 0.363,
+   "w_c": 112.1,
+   "b_minus_a": -0.0947,
+   "b_minus_a_ci": [
+    -0.1268,
+    -0.0625
+   ],
+   "c_minus_a": -0.2314,
+   "c_minus_a_ci": [
+    -0.2788,
+    -0.1855
+   ]
+  }
+ },
+ "iii_follow": {
+  "all": {
+   "units": 600,
+   "games": 300,
+   "wr_follow": 0.5179,
+   "w_follow": 534.4,
+   "wr_other": 0.3539,
+   "w_other": 65.6,
+   "diff": 0.164,
+   "diff_ci": [
+    0.1123,
+    0.2127
+   ],
+   "wr_follow_ci": [
+    0.5121,
+    0.524
+   ],
+   "wr_other_ci": [
+    0.3109,
+    0.3999
+   ],
+   "verdict": "理論どおりが勝つ（確か）",
+   "share_true": 0.891,
+   "turns": 3493
+  },
+  "by_gap": {
+   "先行2+": {
+    "units": 216,
+    "games": 204,
+    "wr_follow": 0.8318,
+    "w_follow": 199.1,
+    "wr_other": 0.6145,
+    "w_other": 16.9,
+    "verdict": "局数不足",
+    "share_true": 0.922,
+    "turns": 532
+   },
+   "先行1": {
+    "units": 260,
+    "games": 228,
+    "wr_follow": 0.732,
+    "w_follow": 236.9,
+    "wr_other": 0.5018,
+    "w_other": 23.1,
+    "verdict": "局数不足",
+    "share_true": 0.911,
+    "turns": 420
+   },
+   "互角": {
+    "units": 375,
+    "games": 244,
+    "wr_follow": 0.6268,
+    "w_follow": 340.6,
+    "wr_other": 0.5385,
+    "w_other": 34.4,
+    "diff": 0.0882,
+    "diff_ci": [
+     -0.0458,
+     0.2077
+    ],
+    "wr_follow_ci": [
+     0.5983,
+     0.6558
+    ],
+    "wr_other_ci": [
+     0.4274,
+     0.6632
+    ],
+    "verdict": "理論どおりが勝つ（気配）",
+    "share_true": 0.908,
+    "turns": 788
+   },
+   "遅れ1": {
+    "units": 385,
+    "games": 232,
+    "wr_follow": 0.461,
+    "w_follow": 344.3,
+    "wr_other": 0.3261,
+    "w_other": 40.7,
+    "diff": 0.1349,
+    "diff_ci": [
+     0.003,
+     0.2574
+    ],
+    "wr_follow_ci": [
+     0.4341,
+     0.4869
+    ],
+    "wr_other_ci": [
+     0.2165,
+     0.4427
+    ],
+    "verdict": "理論どおりが勝つ（確か）",
+    "share_true": 0.894,
+    "turns": 735
+   },
+   "遅れ2+": {
+    "units": 356,
+    "games": 290,
+    "wr_follow": 0.2923,
+    "w_follow": 302.1,
+    "wr_other": 0.2541,
+    "w_other": 53.9,
+    "diff": 0.0382,
+    "diff_ci": [
+     -0.0655,
+     0.1458
+    ],
+    "wr_follow_ci": [
+     0.2516,
+     0.3356
+    ],
+    "wr_other_ci": [
+     0.1548,
+     0.3427
+    ],
+    "verdict": "理論どおりが勝つ（気配）",
+    "share_true": 0.849,
+    "turns": 1018
+   }
+  },
+  "by_band": {
+   "1-3": {
+    "units": 546,
+    "games": 300,
+    "wr_follow": 0.4891,
+    "w_follow": 413.0,
+    "wr_other": 0.4662,
+    "w_other": 133.0,
+    "diff": 0.0229,
+    "diff_ci": [
+     -0.0769,
+     0.1209
+    ],
+    "wr_follow_ci": [
+     0.4617,
+     0.5164
+    ],
+    "wr_other_ci": [
+     0.3916,
+     0.5424
+    ],
+    "verdict": "理論どおりが勝つ（気配）",
+    "share_true": 0.756,
+    "turns": 546
+   },
+   "4-6": {
+    "units": 600,
+    "games": 300,
+    "wr_follow": 0.5347,
+    "w_follow": 526.5,
+    "wr_other": 0.2517,
+    "w_other": 73.5,
+    "diff": 0.283,
+    "diff_ci": [
+     0.1883,
+     0.3702
+    ],
+    "wr_follow_ci": [
+     0.5221,
+     0.5485
+    ],
+    "wr_other_ci": [
+     0.1742,
+     0.3356
+    ],
+    "verdict": "理論どおりが勝つ（確か）",
+    "share_true": 0.877,
+    "turns": 900
+   },
+   "7+": {
+    "units": 600,
+    "games": 300,
+    "wr_follow": 0.5133,
+    "w_follow": 559.0,
+    "wr_other": 0.3191,
+    "w_other": 41.0,
+    "diff": 0.1942,
+    "diff_ci": [
+     0.1111,
+     0.278
+    ],
+    "wr_follow_ci": [
+     0.5072,
+     0.5194
+    ],
+    "wr_other_ci": [
+     0.2418,
+     0.3961
+    ],
+    "verdict": "理論どおりが勝つ（確か）",
+    "share_true": 0.932,
+    "turns": 2047
+   }
+  },
+  "cells": {
+   "先行2+|1-3": {
+    "units": 92,
+    "games": 91,
+    "wr_follow": 0.7714,
+    "w_follow": 70.0,
+    "wr_other": 0.7273,
+    "w_other": 22.0,
+    "verdict": "局数不足",
+    "share_true": 0.761,
+    "turns": 92
+   },
+   "先行2+|4-6": {
+    "units": 85,
+    "games": 84,
+    "wr_follow": 0.8354,
+    "w_follow": 79.0,
+    "wr_other": 0.6667,
+    "w_other": 6.0,
+    "verdict": "局数不足",
+    "share_true": 0.929,
+    "turns": 106
+   },
+   "先行2+|7+": {
+    "units": 162,
+    "games": 160,
+    "wr_follow": 0.9049,
+    "w_follow": 157.8,
+    "wr_other": 1.0,
+    "w_other": 4.2,
+    "verdict": "局数不足",
+    "share_true": 0.974,
+    "turns": 334
+   },
+   "先行1|1-3": {
+    "units": 60,
+    "games": 60,
+    "wr_follow": 0.6829,
+    "w_follow": 41.0,
+    "wr_other": 0.5263,
+    "w_other": 19.0,
+    "verdict": "局数不足",
+    "share_true": 0.683,
+    "turns": 60
+   },
+   "先行1|4-6": {
+    "units": 100,
+    "games": 100,
+    "wr_follow": 0.712,
+    "w_follow": 95.5,
+    "wr_other": 0.6667,
+    "w_other": 4.5,
+    "verdict": "局数不足",
+    "share_true": 0.955,
+    "turns": 106
+   },
+   "先行1|7+": {
+    "units": 185,
+    "games": 175,
+    "wr_follow": 0.7778,
+    "w_follow": 178.5,
+    "wr_other": 0.641,
+    "w_other": 6.5,
+    "verdict": "局数不足",
+    "share_true": 0.965,
+    "turns": 254
+   },
+   "互角|1-3": {
+    "units": 125,
+    "games": 106,
+    "wr_follow": 0.5109,
+    "w_follow": 92.0,
+    "wr_other": 0.4848,
+    "w_other": 33.0,
+    "diff": 0.026,
+    "diff_ci": [
+     -0.1723,
+     0.2295
+    ],
+    "wr_follow_ci": [
+     0.4235,
+     0.6
+    ],
+    "wr_other_ci": [
+     0.3181,
+     0.6562
+    ],
+    "verdict": "理論どおりが勝つ（気配）",
+    "share_true": 0.736,
+    "turns": 125
+   },
+   "互角|4-6": {
+    "units": 155,
+    "games": 139,
+    "wr_follow": 0.5661,
+    "w_follow": 147.5,
+    "wr_other": 0.6,
+    "w_other": 7.5,
+    "verdict": "局数不足",
+    "share_true": 0.952,
+    "turns": 178
+   },
+   "互角|7+": {
+    "units": 293,
+    "games": 214,
+    "wr_follow": 0.6925,
+    "w_follow": 277.8,
+    "wr_other": 0.6995,
+    "w_other": 15.2,
+    "verdict": "局数不足",
+    "share_true": 0.948,
+    "turns": 485
+   },
+   "遅れ1|1-3": {
+    "units": 123,
+    "games": 109,
+    "wr_follow": 0.4737,
+    "w_follow": 95.0,
+    "wr_other": 0.3214,
+    "w_other": 28.0,
+    "verdict": "局数不足",
+    "share_true": 0.772,
+    "turns": 123
+   },
+   "遅れ1|4-6": {
+    "units": 203,
+    "games": 152,
+    "wr_follow": 0.4971,
+    "w_follow": 174.0,
+    "wr_other": 0.2586,
+    "w_other": 29.0,
+    "verdict": "局数不足",
+    "share_true": 0.857,
+    "turns": 235
+   },
+   "遅れ1|7+": {
+    "units": 263,
+    "games": 181,
+    "wr_follow": 0.399,
+    "w_follow": 249.2,
+    "wr_other": 0.3313,
+    "w_other": 13.8,
+    "verdict": "局数不足",
+    "share_true": 0.947,
+    "turns": 377
+   },
+   "遅れ2+|1-3": {
+    "units": 146,
+    "games": 146,
+    "wr_follow": 0.2435,
+    "w_follow": 115.0,
+    "wr_other": 0.3548,
+    "w_other": 31.0,
+    "diff": -0.1114,
+    "diff_ci": [
+     -0.3121,
+     0.0758
+    ],
+    "wr_follow_ci": [
+     0.1652,
+     0.3223
+    ],
+    "wr_other_ci": [
+     0.1923,
+     0.5333
+    ],
+    "verdict": "外れの気配",
+    "share_true": 0.788,
+    "turns": 146
+   },
+   "遅れ2+|4-6": {
+    "units": 210,
+    "games": 205,
+    "wr_follow": 0.3125,
+    "w_follow": 168.0,
+    "wr_other": 0.131,
+    "w_other": 42.0,
+    "diff": 0.1815,
+    "diff_ci": [
+     0.065,
+     0.289
+    ],
+    "wr_follow_ci": [
+     0.2446,
+     0.3824
+    ],
+    "wr_other_ci": [
+     0.0455,
+     0.2353
+    ],
+    "verdict": "理論どおりが勝つ（確か）",
+    "share_true": 0.8,
+    "turns": 275
+   },
+   "遅れ2+|7+": {
+    "units": 288,
+    "games": 271,
+    "wr_follow": 0.1861,
+    "w_follow": 254.3,
+    "wr_other": 0.0791,
+    "w_other": 33.7,
+    "diff": 0.107,
+    "diff_ci": [
+     0.0078,
+     0.1932
+    ],
+    "wr_follow_ci": [
+     0.1414,
+     0.2312
+    ],
+    "wr_other_ci": [
+     0.0094,
+     0.167
+    ],
+    "verdict": "理論どおりが勝つ（確か）",
+    "share_true": 0.883,
+    "turns": 597
+   }
+  },
+  "by_deck": {
+   "OP09-001": {
+    "units": 145,
+    "games": 125,
+    "wr_follow": 0.6556,
+    "w_follow": 131.8,
+    "wr_other": 0.5749,
+    "w_other": 13.2,
+    "verdict": "局数不足",
+    "share_true": 0.909,
+    "turns": 903
+   },
+   "OP11-041": {
+    "units": 135,
+    "games": 120,
+    "wr_follow": 0.7887,
+    "w_follow": 122.7,
+    "wr_other": 0.6688,
+    "w_other": 12.3,
+    "verdict": "局数不足",
+    "share_true": 0.909,
+    "turns": 826
+   },
+   "OP15-058": {
+    "units": 159,
+    "games": 141,
+    "wr_follow": 0.2381,
+    "w_follow": 136.3,
+    "wr_other": 0.1121,
+    "w_other": 22.7,
+    "verdict": "局数不足",
+    "share_true": 0.857,
+    "turns": 873
+   },
+   "OP16-022": {
+    "units": 161,
+    "games": 143,
+    "wr_follow": 0.4259,
+    "w_follow": 143.6,
+    "wr_other": 0.2782,
+    "w_other": 17.4,
+    "verdict": "局数不足",
+    "share_true": 0.892,
+    "turns": 891
+   }
+  }
+ }
+}
