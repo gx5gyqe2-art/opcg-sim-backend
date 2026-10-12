@@ -35,3 +35,8 @@
 - 作業の置き場（`work/dump.jsonl`＝写し 300 局・`work/clocks.json`＝時計の行・`bridge.json`）をコンテナが回収されても残るよう
   `logs/theory_map/syn_w39_work.tgz`（2.1MB）に退避した。戻すときは `tar xzf logs/theory_map/syn_w39_work.tgz -C <dir>` → `<dir>/work/`。
   問い 3 の数え直しの道具が来たら、この置き場に無改変で当てる（司令塔の予告 10-12）。
+
+## 問い 3 のターン単位の数え直し（2026-10-12）
+
+- 道具: `claude/theory-map` @ f750773c の `tests/scripts/theory_map.py`（`turns`）を**無改変**で持ち込み、退避した置き場（`work/dump.jsonl`・`clocks.json`）に当てた。
+- 出力: **`logs/theory_map/syn_w39_turns.json`**（ターン 3,739・時計なし 190・判定の行なし 160・使った 3,389・17 秒）。
