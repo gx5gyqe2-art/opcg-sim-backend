@@ -680,9 +680,173 @@ def cmd_run(a):
     return cmd_analyze(argparse.Namespace(src=a.src, dump=dump, clocks=clocks, boot=a.boot, out=a.out))
 
 
+# ------------------------------------------------------------------ turns（2026-10-12・`2026-10-12_turn_plans.md` §1）
+PLAN_CATS = ("a", "b", "c", "d", "e", "f")
+
+
+def turn_category(fams):
+    """ターンの手の型の並び → (a)〜(f)・効果の有無（報告 2026-10-12 §1.2）。"""
+    atk = [i for i, x in enumerate(fams) if x == "attack"]
+    play = [i for i, x in enumerate(fams) if x == "play"]
+    eff = any(x == "effect" for x in fams)
+    if atk:
+        if not play:
+            return "a", eff
+        return ("b" if play[0] < atk[0] else "c"), eff
+    if play:
+        return "d", eff
+    if any(x in ("attach", "effect") for x in fams):
+        return "e", eff
+    return "f", eff
+
+
+def turn_followed(rec, cat, fams):
+    """(iii) の「理論どおり」: 勧めの型をそのターンのどこかで打ったか（終えるは何もせず終えた f のときだけ）。"""
+    if rec == "end":
+        return cat == "f"
+    return rec in fams
+
+
+def build_turns(src, dump, clocks):
+    from opcg_sim.learned.train import plan_labels as PL
+    rows_all, align, _ck, _th, games_meta, _lcol = build_rows(src, dump, clocks)
+    first = {}
+    for r in rows_all:
+        if r["pv"] is None or r["nsc"] < 2 or r["ptype"] not in TYPES or r["btype"] not in TYPES:
+            continue
+        first.setdefault((r["seed"], r["w"], r["t"]), r)
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    turns, cnt = [], collections.Counter()
+    for rows, pol, _ex, L, ptr, idx in PL.iter_games([src], row_cols=cols, pol_cols=("pol_sig", "pol_cid", "pol_tcid")):
+        seed = int(rows["seed"][idx[0]])
+        seq = collections.OrderedDict()
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0 or int(L[i]) < 1:
+                continue
+            if json.loads(pol["pol_sig"][ptr[i]])[0] == "RESOLVE_EFFECT_SELECTION":
+                continue
+            seq.setdefault((w, t), []).append(family_of(json.loads(rows["sig"][i])))
+        for (w, t), fams in seq.items():
+            cnt["turns"] += 1
+            r0 = first.get((seed, w, t))
+            if r0 is None:
+                cnt["no_judged_row"] += 1
+                continue
+            if "gap" not in r0:
+                cnt["no_clock"] += 1
+                continue
+            cat, eff = turn_category(fams)
+            turns.append({"seed": seed, "w": w, "t": t, "z": r0["z"], "leader": r0["leader"], "colors": r0["colors"],
+                          "gap": r0["gap"], "band": turn_band(t), "rec": r0["btype"], "cat": cat, "eff": eff,
+                          "attacked": cat in ("a", "b", "c"), "followed": turn_followed(r0["btype"], cat, fams)})
+    cnt["used"] = len(turns)
+    return turns, dict(cnt), dict(align)
+
+
+def split_table(turns, flag, reps=BOOT):
+    """2 群（flag 真・偽）の勝率・重みは §1.4 と同じ（局×席の重み 1 を群の割合で分ける）。"""
+    if not turns:
+        return None
+    rows = [dict(r, ptype="x" if flag(r) else "y", btype="x") for r in turns]
+    e = follow_table(rows, reps)
+    for k in ("best_mode", "best_share", "played_share"):
+        e.pop(k, None)
+    e["share_true"] = e.pop("follow_rate")
+    e["turns"] = e.pop("rows")
+    return e
+
+
+def order_table(turns, reps=BOOT):
+    """(ii): 攻撃したターンを a・b・c の 3 群に分け、勝率と b−a・c−a。"""
+    turns = [r for r in turns if r["cat"] in ("a", "b", "c")]
+    by = collections.defaultdict(list)
+    for r in turns:
+        by[(r["seed"], r["w"])].append(r)
+    units = []
+    for (s, w), rs in by.items():
+        n = len(rs)
+        units.append((s, {c: sum(1 for r in rs if r["cat"] == c) / n for c in "abc"}, rs[0]["z"]))
+    if not units:
+        return None
+
+    def wr(us):
+        o = {}
+        for c in "abc":
+            sw = sum(u[1][c] for u in us)
+            o[c] = (sum(u[1][c] * u[2] for u in us) / sw) if sw > 0 else float("nan")
+            o["w_" + c] = sw
+        return o
+    w0 = wr(units)
+    out = {"turns": len(turns), "games": len({u[0] for u in units}),
+           "count": {c: sum(1 for r in turns if r["cat"] == c) for c in "abc"}}
+    for c in "abc":
+        out["wr_" + c] = None if math.isnan(w0[c]) else round(w0[c], 4)
+        out["w_" + c] = round(w0["w_" + c], 1)
+    bys = collections.defaultdict(list)
+    for u in units:
+        bys[u[0]].append(u)
+    for c in "bc":
+        if w0["w_a"] < MIN_GAMES or w0["w_" + c] < MIN_GAMES:
+            out["%s_minus_a" % c] = "局数不足"
+            continue
+        out["%s_minus_a" % c] = round(w0[c] - w0["a"], 4)
+        out["%s_minus_a_ci" % c] = boot_games(bys, lambda us, c=c: (lambda o: o[c] - o["a"])(wr(us)), reps)
+    return out
+
+
+def cmd_turns(a):
+    dump_p = a.dump or os.path.join(a.work, "dump.jsonl")
+    clocks_p = a.clocks or os.path.join(a.work, "clocks.json")
+    turns, cnt, align = build_turns(a.src, load_dump(dump_p), json.load(open(clocks_p, encoding="utf-8")))
+    reps = a.boot
+    decks = sorted({r["leader"] for r in turns})
+    out = {"record": a.src, "align": align, "turn_counts": cnt}
+    # 中身の件数（6 つ × 効果の有無）と、勧めごとの中身の内訳
+    out["categories"] = {c: {"all": sum(1 for r in turns if r["cat"] == c),
+                             "with_effect": sum(1 for r in turns if r["cat"] == c and r["eff"])} for c in PLAN_CATS}
+    out["rec_by_cat"] = {rec: {c: sum(1 for r in turns if r["rec"] == rec and r["cat"] == c) for c in PLAN_CATS}
+                         for rec in TYPES}
+    # 勧めごと・中身ごとの勝率（単位の重み・参考）
+    out["rec_cat_wr"] = {}
+    for rec in TYPES:
+        sub = [r for r in turns if r["rec"] == rec]
+        for c in PLAN_CATS:
+            e = split_table(sub, lambda r, c=c: r["cat"] == c, reps=0)
+            if e:
+                out["rec_cat_wr"]["%s|%s" % (rec, c)] = {"w": e["w_follow"], "wr": e["wr_follow"], "w_rest": e["w_other"], "wr_rest": e["wr_other"]}
+
+    def blocks(sel, fn):
+        o = {"all": fn(sel)}
+        o["by_gap"] = {g: fn([r for r in sel if r["gap"] == g]) for g in GAP_BINS}
+        o["by_band"] = {b: fn([r for r in sel if r["band"] == b]) for b in TURN_BANDS}
+        o["cells"] = {"%s|%s" % (g, b): fn([r for r in sel if r["gap"] == g and r["band"] == b]) for g in GAP_BINS for b in TURN_BANDS}
+        o["by_deck"] = {}
+        for d in decks:
+            sub = [r for r in sel if r["leader"] == d]
+            if len({(r["seed"], r["w"]) for r in sub}) >= MIN_GAMES:
+                o["by_deck"][d] = fn(sub)
+        return o
+    atk_rec = [r for r in turns if r["rec"] == "attack"]
+    out["i_attack_rec"] = blocks(atk_rec, lambda ts: split_table(ts, lambda r: r["attacked"], reps))
+    out["i_attack_rec_e_vs_rest"] = blocks(atk_rec, lambda ts: split_table(ts, lambda r: r["cat"] == "e", reps))
+    o2 = {"all": order_table(atk_rec, reps)}
+    o2["by_gap"] = {g: order_table([r for r in atk_rec if r["gap"] == g], reps) for g in GAP_BINS}
+    o2["by_band"] = {b: order_table([r for r in atk_rec if r["band"] == b], reps) for b in TURN_BANDS}
+    o2["by_deck"] = {d: order_table([r for r in atk_rec if r["leader"] == d], reps) for d in decks
+                     if len({(r["seed"], r["w"]) for r in atk_rec if r["leader"] == d}) >= MIN_GAMES}
+    o2["any_rec_all"] = order_table(turns, reps)
+    out["ii_order"] = o2
+    out["iii_follow"] = blocks(turns, lambda ts: split_table(ts, lambda r: r["followed"], reps))
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("turns: %s" % cnt)
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -702,8 +866,15 @@ def main(argv=None):
     r.add_argument("--work", default=None)
     r.add_argument("--games", type=int, default=0)
     r.add_argument("--boot", type=int, default=BOOT)
+    t = sub.add_parser("turns")
+    t.add_argument("--in", dest="src", required=True)
+    t.add_argument("--work", default=None, help="前の報告の作業の置き場（dump.jsonl・clocks.json）")
+    t.add_argument("--dump", default=None)
+    t.add_argument("--clocks", default=None)
+    t.add_argument("--boot", type=int, default=BOOT)
+    t.add_argument("--out", required=True)
     a = ap.parse_args(argv)
-    return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run}[a.cmd](a)
+    return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns}[a.cmd](a)
 
 
 if __name__ == "__main__":
