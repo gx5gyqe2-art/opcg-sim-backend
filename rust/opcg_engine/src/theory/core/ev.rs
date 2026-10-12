@@ -1392,7 +1392,7 @@ impl Core {
             if f <= 0.0 {
                 continue;
             }
-            let gain = self.life_gain_of(ab.get("effect"), st);
+            let gain = self.life_gain_of(ab.get("effect"), st, false);
             if gain <= 0.0 {
                 continue;
             }
@@ -1409,8 +1409,10 @@ impl Core {
         py_max(0.0, tot)
     }
 
-    /// `life_add_on_play` の加える分（効果の木を下る・選択は大きい方）
-    fn life_gain_of(&mut self, e: &V, st: &V) -> f64 {
+    /// `life_add_on_play` の加える分（効果の木を下る・選択は大きい方）。
+    /// `from_life`＝同じ並びの前の動作が自分のライフを見て（`LOOK_LIFE`）並べ直しの場〔`TEMP`〕に出した＝そこからライフへ戻す動作は加算でない
+    /// （アイサ OP06-099「ライフの上から 1 枚を見て、ライフの上か下に置く」。2026-10-12 の訂正・報告 §1.1 の注記）。
+    fn life_gain_of(&mut self, e: &V, st: &V, from_life: bool) -> f64 {
         if !e.is_dict() {
             return 0.0;
         }
@@ -1418,7 +1420,7 @@ impl Core {
         if opts.is_list() && !opts.items().is_empty() {
             let mut best = 0.0f64;
             for o in opts.items().to_vec() {
-                best = best.max(self.life_gain_of(&o, st));
+                best = best.max(self.life_gain_of(&o, st, from_life));
             }
             return best;
         }
@@ -1430,7 +1432,8 @@ impl Core {
                 g += if m > 0.0 { m } else { 1.0 };
             } else if s_of(e, "destination") == "LIFE" {
                 let t = target_of(e);
-                if !(e.get("target").truthy() && side(&t) == "OPPONENT") {
+                let reorder = from_life && zones_eq(&zone(&t, "zone"), &["TEMP"]);
+                if !reorder && !(e.get("target").truthy() && side(&t) == "OPPONENT") {
                     let n = t.get("count");
                     let mut v = if n.is_none() || n.f() < 0.0 { 1.0 } else { n.f() };
                     if zones_eq(&zone(&t, "zone"), &["TRASH"]) {
@@ -1444,17 +1447,23 @@ impl Core {
         }
         let sub = e.get("sub_effect");
         if sub.is_dict() {
-            g += self.life_gain_of(sub, st);
+            g += self.life_gain_of(sub, st, from_life);
         } else if sub.is_list() {
             for x in sub.items().to_vec() {
-                g += self.life_gain_of(&x, st);
+                g += self.life_gain_of(&x, st, from_life);
             }
         }
         for key in ["actions", "effects"] {
             let v = e.get(key);
             if v.is_list() {
+                let mut fl = from_life;
                 for x in v.items().to_vec() {
-                    g += self.life_gain_of(&x, st);
+                    g += self.life_gain_of(&x, st, fl);
+                    if s_of(&x, "type") == "LOOK_LIFE" {
+                        fl = true;
+                    } else if s_of(&x, "type") == "LOOK" {
+                        fl = false;
+                    }
                 }
             }
         }
