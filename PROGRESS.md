@@ -15,3 +15,10 @@
 - [x] §9 合成 w39: 22:54 に 260/300 局の途中の版で書き、23:18 の全 300 局の版（`claude/theory-map-syn` @ dbaadf7f）に差し替えた・§0 に合成の要点・§8 の順位を合成を見て並べ直した
 - [x] 完了（00:30 UTC の締めの前）
 - [x] **訂正（2026-10-12）**: 実 w41 のリーダーは `user_deck_pair(seed)`（meta の `leaders` は使われなかった対）。`theory_map.py` を直し、残っていた写し・時計の行から集計だけ回し直した。デッキを使わない数は JSON が完全一致。報告に「訂正」の節を置き、§3・§4・色の行をデッキ（4 本）と色で作り直した。
+
+## 追加: ターン単位の数え直し（2026-10-12・`docs/reports/2026-10-12_turn_plans.md`）
+
+- [x] §1 を数の前に push（1f3d2795）
+- [x] 道具 `theory_map.py turns` を push（f750773c・ゲート green）し、合成の担当に知らせた
+- [x] 実 w41 の集計（`logs/theory_map/real_w41_turns.json`）と報告 §0・§2〜§7・§9〜§10
+- [ ] §8 合成 w39（`claude/theory-map-syn` の `logs/theory_map/syn_w39_turns.json` 待ち）
