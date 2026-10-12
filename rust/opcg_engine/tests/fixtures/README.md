@@ -75,3 +75,11 @@ OPCG_THEORY_GOLDEN_WRITE=1 cargo test --no-default-features tests_regen -- --inc
 （`OPCG_THEORY_GOLDEN_WRITE` が無ければ書き換える行を数えるだけ。各行を試験と同じ道〔`tests_core`／`tests_outer`／`tests_rows` の
 `run_one`〕で解き、戻りが違う行だけ書き換える。**golden は「その時点の Rust の出力」**＝作り直したら差分を必ずレビューする。）
 
+
+### ドンの上限を盤面から読む作り直し（2026-10-12・`docs/reports/2026-10-12_don_deck.md`）
+
+理論の計画のドンの上限を「10 枚固定」から「場のドン＋ドン‼デッキの残り」（`leaves_to::don_room`）に直したので、
+`theory_outer_golden`（107 行: `hp.search_context` 67・`tb.guard_hand_reading` 30・`cv.L`／`cv.gbar` 各 5）と
+`theory_rows_golden`（13 行: `price_realised`・`transition_ledger`）の戻りの欄を上の器で作り直した。
+**変わった行は全部エネル（ドン‼デッキ 6 枚）の行**——作り直す前に、上限が 10 未満になる呼び出しを数えて全部 6 だったことを確かめた（996 回）。
+`theory_core_golden`・`theory_leaves_golden`・`rd_*_golden` は変わらない。

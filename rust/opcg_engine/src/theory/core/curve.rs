@@ -21,20 +21,23 @@ pub const DON_CAP: f64 = 10.0;
 pub const DON_PER_TURN: f64 = 2.0;
 pub const PLAN_TURNS: i64 = 4;
 
-/// `caps_of(don_active, don_total, turns=4, r_turns)`
-pub fn caps_of(don_active: f64, don_total: f64, r_turns: Option<f64>) -> Vec<i64> {
+/// `caps_of(don_active, don_total, turns=4, r_turns)`。
+/// **`room`**（2026-10-12・`docs/reports/2026-10-12_don_deck.md` §1.1）＝その席がこの先持てるドンの総数（`lt::don_room`・
+/// 場のドン＋ドン‼デッキの残り）。`None`（読めない行）は規則の既定 `DON_CAP`＝10。段ごとの上限と最後の段の総量はこの数で切る。
+pub fn caps_of(don_active: f64, don_total: f64, r_turns: Option<f64>, room: Option<f64>) -> Vec<i64> {
     let turns = PLAN_TURNS;
+    let cap = py_round_int(room.unwrap_or(DON_CAP));
     let mut out = vec![py_round_int(don_active).max(0)];
     for t in 1..(turns - 1) {
         let v = (py_round_int(don_total) + DON_PER_TURN as i64 * t).max(0);
-        out.push((DON_CAP as i64).min(v));
+        out.push(cap.min(v));
     }
     if turns >= 2 {
         let later = match r_turns {
             None => 1,
             Some(r) => (py_round_int(r) - (turns - 1)).max(1),
         };
-        out.push(DON_CAP as i64 * later);
+        out.push(cap * later);
     }
     out
 }
@@ -260,7 +263,7 @@ impl Core {
         let items = self.hand_items(&row.tok, &ci, olp, r)?;
         let dk: Option<Vec<String>> = if deck.is_none() { None } else { Some(deck.items().iter().map(|x| x.pystr()).collect()) };
         let items = self.apply_inflow(&items, dk.as_deref(), &xs, take, olp, r, PLAN_TURNS, &field, &st_base, None)?;
-        let caps = caps_of(sc[lt::SC_MY_DON], lt::don_stock(sc, &row.tok, true), Some(r));
+        let caps = caps_of(sc[lt::SC_MY_DON], lt::don_stock(sc, &row.tok, true), Some(r), lt::don_room(sc, &row.tok, true));
         Ok(V::dict(vec![
             (V::s("hand_items"), V::list(items)),
             (V::s("caps"), V::list(caps.into_iter().map(V::Int).collect())),
@@ -332,7 +335,8 @@ impl Core {
         }
         let total = lt::don_stock(sc, tok, true);
         let nxt = total + DON_PER_TURN;
-        let caps = caps_of(py_min(DON_CAP, nxt), nxt, Some(r_opp));
+        let room = lt::don_room(sc, tok, true);
+        let caps = caps_of(py_min(room.unwrap_or(DON_CAP), nxt), nxt, Some(r_opp), room);
         let xs = self.incoming_of_row(row, &V::None)?;
         let field = self.own_field_ids(&ci);
         let st_base = self.state_of_row(sc, tok, &ci);

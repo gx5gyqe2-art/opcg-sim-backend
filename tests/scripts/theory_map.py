@@ -862,7 +862,7 @@ def cmd_deckcal(a):
         if d_:
             settled[int(s_)] = min(settled[int(s_)], int(t_))
     focus = a.focus
-    out = {"record": a.src, "focus": focus}
+    out = {"record": a.src, "focus": focus, "don_cap": a.don_cap}
     # 1. 較正（ターン先頭の行・決着前）
     cal = []
     for r in clocks["rows_out"]:
@@ -922,7 +922,8 @@ def cmd_deckcal(a):
         for j, (t, f0) in enumerate(ts):
             for k in (1, 2):
                 if j + k < len(ts):
-                    cap = min(DON_RULE_CAP, f0 + 2 * k)
+                    # `--don-cap room`（2026-10-12・`2026-10-12_don_deck.md`）: 上限を場のドン＋ドン‼デッキの残り（＝そのデッキのドン‼デッキの枚数）で切る候補の式
+                    cap = min(DON_DECK_SIZE.get(ld, DON_RULE_CAP) if a.don_cap == "room" else DON_RULE_CAP, f0 + 2 * k)
                     don[ld][k].append((cap - ts[j + k][1], f0, ts[j + k][1], turn_band(t)))
     out["don_check"] = {}
     for ld, byk in don.items():
@@ -977,6 +978,8 @@ def main(argv=None):
     dc.add_argument("--dump", default=None)
     dc.add_argument("--clocks", default=None)
     dc.add_argument("--focus", default="OP15-058", help="切り分けるデッキ（リーダー）")
+    dc.add_argument("--don-cap", default="rule10", choices=("rule10", "room"),
+                    help="ドンの検算の計画の上限: rule10＝min(10, 場＋2k)（2026-10-12 までの式）／room＝min(ドン‼デッキの枚数, 場＋2k)（候補）")
     dc.add_argument("--boot", type=int, default=BOOT)
     dc.add_argument("--out", required=True)
     a = ap.parse_args(argv)
