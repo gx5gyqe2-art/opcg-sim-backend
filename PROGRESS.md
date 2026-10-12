@@ -29,3 +29,9 @@
 - 22:30 に 23:30 に間に合わない見込みが出たので、指示どおり 260 局分の集計を先に push（`logs/theory_map/syn_w39.json` の `status` が PARTIAL）。
 - ゲート: `cargo test` 474 passed／pytest 622 passed（このコンテナに pytest・fastapi が無かったので入れてから回した）。
 - 23:14 に全 300 局の集計が出たので部分版を置き換えた（道具の出力そのまま・`status` 欄なし）。
+
+## 退避（2026-10-12）
+
+- 作業の置き場（`work/dump.jsonl`＝写し 300 局・`work/clocks.json`＝時計の行・`bridge.json`）をコンテナが回収されても残るよう
+  `logs/theory_map/syn_w39_work.tgz`（2.1MB）に退避した。戻すときは `tar xzf logs/theory_map/syn_w39_work.tgz -C <dir>` → `<dir>/work/`。
+  問い 3 の数え直しの道具が来たら、この置き場に無改変で当てる（司令塔の予告 10-12）。
