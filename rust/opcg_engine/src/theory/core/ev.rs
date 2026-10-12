@@ -1370,6 +1370,97 @@ impl Core {
         (Some(super::sp::remaining_deck(&d, &hand, &field)), !cards.is_none())
     }
 
+    /// **候補 `OPCG_LIFE_ADD`**（2026-10-12・`docs/reports/2026-10-12_life_add.md` §1.1）: 札 `cid` の【登場時】が自分のライフに加える枚数 `LA(c)`。
+    /// 加える分（`HEAL`／`LIFE_RECOVER` の値・行き先がライフで対象が相手でない動作の枚数〔トラッシュからは `trash_has_match` を掛ける〕・
+    /// 選択は選択肢の大きい方）− コストで離れる自分のライフ、に `condition_factor` を掛けて能力ごとに足す。コストを払えない能力（`cost_unpayable`）は 0。
+    /// 最後に 0 で下を切る。新定数なし（既存の読みの組み合わせ）。
+    pub fn life_add_on_play(&mut self, cid: &str, st: &V) -> f64 {
+        let c = self.card(cid);
+        if !c.truthy() {
+            return 0.0;
+        }
+        let mut tot = 0.0;
+        for ab in c.get("abilities").items().to_vec() {
+            if !trig_in(&trig_of(&ab), CHAR_ON_PLAY) {
+                continue;
+            }
+            let cost_acts = walk_actions(ab.get("cost"));
+            if !cost_acts.is_empty() && self.cost_unpayable(&cost_acts, &c, st) {
+                continue;
+            }
+            let f = self.condition_factor(&ab, st, false);
+            if f <= 0.0 {
+                continue;
+            }
+            let gain = self.life_gain_of(ab.get("effect"), st);
+            if gain <= 0.0 {
+                continue;
+            }
+            let mut lost = 0.0;
+            for e in &cost_acts {
+                let t = target_of(e);
+                if e.get("target").truthy() && side(&t) == "SELF" && zones_eq(&zone(&t, "zone"), &["LIFE"]) {
+                    let n = t.get("count");
+                    lost += if n.is_none() || n.f() < 0.0 { 1.0 } else { n.f() };
+                }
+            }
+            tot += f * (gain - lost);
+        }
+        py_max(0.0, tot)
+    }
+
+    /// `life_add_on_play` の加える分（効果の木を下る・選択は大きい方）
+    fn life_gain_of(&mut self, e: &V, st: &V) -> f64 {
+        if !e.is_dict() {
+            return 0.0;
+        }
+        let opts = e.get("options");
+        if opts.is_list() && !opts.items().is_empty() {
+            let mut best = 0.0f64;
+            for o in opts.items().to_vec() {
+                best = best.max(self.life_gain_of(&o, st));
+            }
+            return best;
+        }
+        let mut g = 0.0;
+        if e.get("type").truthy() {
+            let at = s_of(e, "type");
+            if at == "HEAL" || at == "LIFE_RECOVER" {
+                let m = magnitude(e);
+                g += if m > 0.0 { m } else { 1.0 };
+            } else if s_of(e, "destination") == "LIFE" {
+                let t = target_of(e);
+                if !(e.get("target").truthy() && side(&t) == "OPPONENT") {
+                    let n = t.get("count");
+                    let mut v = if n.is_none() || n.f() < 0.0 { 1.0 } else { n.f() };
+                    if zones_eq(&zone(&t, "zone"), &["TRASH"]) {
+                        if let Some(p) = self.trash_has_match(&t, st) {
+                            v *= p;
+                        }
+                    }
+                    g += v;
+                }
+            }
+        }
+        let sub = e.get("sub_effect");
+        if sub.is_dict() {
+            g += self.life_gain_of(sub, st);
+        } else if sub.is_list() {
+            for x in sub.items().to_vec() {
+                g += self.life_gain_of(&x, st);
+            }
+        }
+        for key in ["actions", "effects"] {
+            let v = e.get(key);
+            if v.is_list() {
+                for x in v.items().to_vec() {
+                    g += self.life_gain_of(&x, st);
+                }
+            }
+        }
+        g
+    }
+
     /// `trash_has_match(target, st)`
     fn trash_has_match(&mut self, target: &V, st: &V) -> Option<f64> {
         let (pool, has_cards) = self.own_pool(st);

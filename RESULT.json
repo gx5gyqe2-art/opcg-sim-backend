@@ -334,5 +334,48 @@
         0.6703
       ]
     }
+  },
+  "life_add_2026_10_12": {
+    "report": "docs/reports/2026-10-12_life_add.md",
+    "s1_before_data": "8d3c746d",
+    "switch": "OPCG_LIFE_ADD=1 (default old)",
+    "verdict": "hold (Nami +0.1588 -> +0.1451: shrank but not to the 'worked' line +0.106; not killed)",
+    "calibration": {
+      "nami": [
+        0.1588,
+        0.1451
+      ],
+      "nami_bands": {
+        "1-3": [
+          0.2053,
+          0.2052
+        ],
+        "4-6": [
+          0.1918,
+          0.1763
+        ],
+        "7+": [
+          0.1243,
+          0.1068
+        ]
+      },
+      "others_max_move": 0.0035
+    },
+    "crossing": [
+      0.7051,
+      0.711
+    ],
+    "nami_lost_opp_clock": [
+      -0.843,
+      -0.616
+    ],
+    "invariant": {
+      "non_nami_rows_identical": 2087,
+      "nami_rows_changed": "584/1460",
+      "switch_off_20games": "227/227",
+      "theory_goldens_switch_off": 0,
+      "theory_goldens_switch_on": "rows 43"
+    },
+    "recommendation": "(b) keep as switch"
   }
 }

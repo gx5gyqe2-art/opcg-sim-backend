@@ -44,6 +44,22 @@ pub fn hr_v(value: f64, cards: &[(f64, f64)], don: f64, n_hand: i64, life: &[(f6
     ])
 }
 
+/// **候補 `OPCG_LIFE_ADD`**（2026-10-12・`docs/reports/2026-10-12_life_add.md`）が入っているか（呼び出しのたびに読む）
+pub fn life_add_on() -> bool {
+    matches!(std::env::var("OPCG_LIFE_ADD").as_deref(), Ok("1") | Ok("on"))
+}
+
+/// 作り直した手札の読みに、元の読みの `life_add`／`life_add_by` を引き継ぐ（無ければそのまま＝既定の dict は 1 文字も変えない）
+fn carry_life_add(from: &V, to: V) -> V {
+    if !from.has("life_add") {
+        return to;
+    }
+    let mut kv = to.kv().to_vec();
+    dset_mut(&mut kv, "life_add", from.get("life_add").clone());
+    dset_mut(&mut kv, "life_add_by", from.get("life_add_by").clone());
+    V::dict(kv)
+}
+
 /// `isinstance(g, HandRead)`
 #[inline]
 pub fn is_hr(v: &V) -> bool {
@@ -357,9 +373,74 @@ impl Core {
                 None => row.sc[lt::SC_MY_DON],
                 Some(d) => d,
             };
-            return Ok(hand_read_of_items(&items, d_rule, mu, don));
+            let hr = hand_read_of_items(&items, d_rule, mu, don);
+            if life_add_on() {
+                return self.with_life_add(hr, row, &ctx, &items);
+            }
+            return Ok(hr);
         }
         Ok(V::Float(mu * cuttable_share(&items, don)))
+    }
+
+    /// **候補 `OPCG_LIFE_ADD`**（`docs/reports/2026-10-12_life_add.md` §1.1）: 手札のうち次の自分のターンに出せる札の組で、
+    /// `Σ max(0, λ × LA(c) − u(c))` が最大になるもの（印字のコストの和 ≤ 次のターンのドン〔`next_turn_don`〕・LA の和 ≤ 山札の残り）を厳密に選び、
+    /// その和を手札の読みの `life_add`（λ 単位）に、札ごとの内訳を `life_add_by` に持たせる。0 なら鍵を作らない。
+    fn with_life_add(&mut self, hr: V, row: &Row, ctx: &V, items: &[V]) -> R<V> {
+        let Some(ci) = row.ci.as_ref() else { return Ok(hr) };
+        let sc = &row.sc;
+        let st0 = self.state_of(sc, ci, Some(&row.tok), true);
+        let st = super::obj::dset(&st0, "search_ctx", ctx.clone());
+        let olp = lp_or(sc[lt::SC_OPP_LEADER_POWER]);
+        let r = r_clip(sc[lt::SC_OPP_LIFE]);
+        let mut cand: Vec<(String, f64, f64, f64)> = Vec::new(); // (cid, cost, gain, la)
+        for it in items {
+            let cid = it.get("cid").pystr();
+            if cid.is_empty() {
+                continue;
+            }
+            let la = self.life_add_on_play(&cid, &st);
+            if la <= 0.0 {
+                continue;
+            }
+            let info0 = self.info(&cid);
+            let info = if info0.truthy() { info0 } else { V::dict(vec![]) };
+            let u = self.use_value(&cid, &info, olp, r, &V::None)?.unwrap_or(MU);
+            let gain = LAM * la - u;
+            if gain > 0.0 {
+                cand.push((cid, it.get("cost").f_or0(), gain, la));
+            }
+        }
+        if cand.is_empty() {
+            return Ok(hr);
+        }
+        let budget = next_turn_don(sc, &row.tok);
+        let deck = st.get("my_deck");
+        let deck_n = if deck.is_none() { f64::INFINITY } else { deck.f() };
+        let n = cand.len().min(12);
+        let (mut best, mut best_m) = (0.0f64, 0usize);
+        for m in 0..(1usize << n) {
+            let (mut cost, mut gain, mut la) = (0.0, 0.0, 0.0);
+            for (i, c) in cand.iter().take(n).enumerate() {
+                if m & (1 << i) != 0 {
+                    cost += c.1;
+                    gain += c.2;
+                    la += c.3;
+                }
+            }
+            if cost <= budget + 1e-9 && la <= deck_n + 1e-9 && gain > best {
+                best = gain;
+                best_m = m;
+            }
+        }
+        if best <= 0.0 {
+            return Ok(hr);
+        }
+        let by: Vec<V> = cand.iter().take(n).enumerate().filter(|(i, _)| best_m & (1 << i) != 0)
+            .map(|(_, c)| V::list(vec![V::s(&c.0), V::Float(c.2)])).collect();
+        let mut kv = hr.kv().to_vec();
+        dset_mut(&mut kv, "life_add", V::Float(best));
+        dset_mut(&mut kv, "life_add_by", V::list(by));
+        Ok(V::dict(kv))
     }
 
     /// `life_types_of(deck_ids, cards=None, h)`
@@ -405,7 +486,7 @@ impl Core {
         let Some(h) = ou::hand_read_of(hr) else { return hr.clone() };
         let lt_ = self.life_types_of(deck, None);
         let dt_ = self.life_types_of(deck, Some(1.0));
-        hr_v(h.value, &h.cards, h.don, h.n_hand, &lt_, &dt_, &h.arrive)
+        carry_life_add(hr, hr_v(h.value, &h.cards, h.don, h.n_hand, &lt_, &dt_, &h.arrive))
     }
 
     /// `with_hand_blocker(hr, sc, tok_row, ci_row, idx2cid, cards)`
@@ -441,7 +522,29 @@ impl Core {
             }
         }
         let margin = info.get("power").f_or0() - own_lp;
-        Ok(hr_v(h.value, &cards_l, h.don, h.n_hand, &h.life_types, &h.draw_types, &[margin]))
+        let out = carry_life_add(hr, hr_v(h.value, &cards_l, h.don, h.n_hand, &h.life_types, &h.draw_types, &[margin]));
+        // 1 枚 1 役: 手札のブロッカーに選んだ札がライフ加算の組にも入っていれば、その分をライフ加算から外す
+        if out.has("life_add") {
+            let bc = it.get("cid").pystr();
+            let mut la = out.get("life_add").f();
+            let mut by = Vec::new();
+            for e in out.get("life_add_by").items() {
+                if e.items()[0].pystr() == bc {
+                    la -= e.items()[1].f();
+                } else {
+                    by.push(e.clone());
+                }
+            }
+            let mut kv = out.kv().to_vec();
+            if la > 1e-12 {
+                dset_mut(&mut kv, "life_add", V::Float(la));
+                dset_mut(&mut kv, "life_add_by", V::list(by));
+            } else {
+                kv.retain(|(k, _)| k.as_str() != Some("life_add") && k.as_str() != Some("life_add_by"));
+            }
+            return Ok(V::dict(kv));
+        }
+        Ok(out)
     }
 
     /// `hand_blocker_nu(sc, tok_row, ci_row, idx2cid, cards, opp_leader_power)`

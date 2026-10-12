@@ -1704,7 +1704,8 @@ impl Core {
             Some(_) => {
                 if !pl.is_none() && pl.has("theta_parts") {
                     let tp = pl.get("theta_parts").items();
-                    return Ok((tp[0].f(), tp[1].f(), tp[2].f()));
+                    // 候補 `OPCG_LIFE_ADD`: ライフの項に手札のライフ加算（λ 単位・その席の手札の読み）を足す（無ければ 0＝旧と同じ）
+                    return Ok((tp[0].f() + g_hand.get("life_add").f_or0(), tp[1].f(), tp[2].f()));
                 }
             }
         }
@@ -1720,7 +1721,7 @@ impl Core {
         let _ = &mut hand;
         let mut body = body_term(tok, slots, body_ref);
         body += py_max(0.0, hand_blocker);
-        Ok((lam * life, hand, body))
+        Ok((lam * life + g_hand.get("life_add").f_or0(), hand, body))
     }
 
     /// `threshold_of_me_parts(sc, tok, lam, mu, g_hand, hand_blocker)`（`THETA_SIDE_MODE=legacy`）
