@@ -141,5 +141,58 @@
       ]
     },
     "q1_old_claim_withdrawn": "'play style barely changes by colour' / 'leaders cannot be compared' were wrong for real decks; play style differs clearly by deck"
+  },
+  "turn_plans_2026_10_12": {
+    "report": "docs/reports/2026-10-12_turn_plans.md",
+    "s1_before_data": "1f3d2795",
+    "tool": "theory_map.py turns (f750773c)",
+    "real": {
+      "json": "logs/theory_map/real_w41_turns.json",
+      "attacked_when_rec_attack": "2307/2354 (98.0%)",
+      "iii_follow_diff": [
+        0.1649,
+        [
+          0.1139,
+          0.2138
+        ]
+      ],
+      "ii_b_minus_a": [
+        -0.1066,
+        [
+          -0.1485,
+          -0.062
+        ]
+      ]
+    },
+    "syn": {
+      "json": "logs/theory_map/syn_w39_turns.json (claude/theory-map-syn @ 19294474)",
+      "attacked_when_rec_attack": "97.6%",
+      "iii_follow_diff": [
+        0.082,
+        [
+          0.022,
+          0.135
+        ]
+      ],
+      "ii_b_minus_a": [
+        -0.0978,
+        [
+          -0.1384,
+          -0.0573
+        ]
+      ]
+    },
+    "answers": {
+      "mid_even_theory_loses": "gone in both (互角|4-6 insufficient at turn level; no negative cell with CI<0)",
+      "attack_overpriced_when_behind": "gone in both (CPU attacks on ~98% of attack-rec turns)",
+      "play_then_attack_beats_attack_only": "no (b-a about -0.10 in both; position effect, not order)"
+    },
+    "next_fix_priority_turn_unit": [
+      "play/effect overpriced (blocker in both)",
+      "big bodies underpriced",
+      "late even-race mover (real only)",
+      "early life sign (real only)",
+      "(dropped) attack overpriced vs attach/play"
+    ]
   }
 }

@@ -21,4 +21,4 @@
 - [x] §1 を数の前に push（1f3d2795）
 - [x] 道具 `theory_map.py turns` を push（f750773c・ゲート green）し、合成の担当に知らせた
 - [x] 実 w41 の集計（`logs/theory_map/real_w41_turns.json`）と報告 §0・§2〜§7・§9〜§10
-- [ ] §8 合成 w39（`claude/theory-map-syn` の `logs/theory_map/syn_w39_turns.json` 待ち）
+- [x] §8 合成 w39（`claude/theory-map-syn` @ 19294474 の集計を取り込み・§0・§6・§7 も合成込みに）
