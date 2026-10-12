@@ -50,6 +50,12 @@ pub fn life_add_on() -> bool {
     !matches!(std::env::var("OPCG_LIFE_ADD").as_deref(), Ok("0") | Ok("off"))
 }
 
+/// **候補 `OPCG_LIFE_ADD_HORIZON=1`**（`docs/reports/2026-10-13_life_add_horizon.md`）: ライフ加算の読む範囲を次のターンから
+/// 決着までの段（最大 `PLAN_TURNS`）へ伸ばす。既定は切（採用後の形＝次の自分のターンだけ）。
+pub fn life_add_horizon_on() -> bool {
+    matches!(std::env::var("OPCG_LIFE_ADD_HORIZON").as_deref(), Ok("1") | Ok("on"))
+}
+
 /// 作り直した手札の読みに、元の読みの `life_add`／`life_add_by` を引き継ぐ（無ければそのまま＝既定の dict は 1 文字も変えない）
 fn carry_life_add(from: &V, to: V) -> V {
     if !from.has("life_add") {
@@ -414,9 +420,12 @@ impl Core {
         if cand.is_empty() {
             return Ok(hr);
         }
-        let budget = next_turn_don(sc, &row.tok);
         let deck = st.get("my_deck");
         let deck_n = if deck.is_none() { f64::INFINITY } else { deck.f() };
+        if life_add_horizon_on() {
+            return Ok(Self::life_add_horizon(hr, sc, &row.tok, r, deck_n, &cand));
+        }
+        let budget = next_turn_don(sc, &row.tok);
         let n = cand.len().min(12);
         let (mut best, mut best_m) = (0.0f64, 0usize);
         for m in 0..(1usize << n) {
@@ -442,6 +451,59 @@ impl Core {
         dset_mut(&mut kv, "life_add", V::Float(best));
         dset_mut(&mut kv, "life_add_by", V::list(by));
         Ok(V::dict(kv))
+    }
+
+    /// **候補 `OPCG_LIFE_ADD_HORIZON=1`**（`docs/reports/2026-10-13_life_add_horizon.md` §1.1）: 段 t = 1..T
+    /// （T = min(`PLAN_TURNS`, round(r_turns))）の予算 = 場のドン ＋ min(2t, ドン‼デッキの残り)。
+    /// 各札を「出さない」か段 1 つに割り当て（段ごとのコストの和 ≤ 段の予算・LA の和 ≤ 山札）、Σ gain 最大を厳密に選ぶ。
+    fn life_add_horizon(hr: V, sc: &[f64], tok: &Tok, r: f64, deck_n: f64, cand: &[(String, f64, f64, f64)]) -> V {
+        let (act, rest, att, dk) = zones(sc, tok, true);
+        let t_n = (py_round_int(r).max(1) as usize).min(super::curve::PLAN_TURNS as usize);
+        let budgets: Vec<f64> = (1..=t_n).map(|t| act + rest + att + py_min(2.0 * t as f64, dk)).collect();
+        let n = cand.len().min(8);
+        let base = t_n + 1;
+        let total = base.pow(n as u32);
+        let (mut best, mut best_a) = (0.0f64, 0usize);
+        let mut used = vec![0.0f64; t_n];
+        for a in 0..total {
+            for u in used.iter_mut() {
+                *u = 0.0;
+            }
+            let (mut gain, mut la, mut x, mut ok) = (0.0, 0.0, a, true);
+            for c in cand.iter().take(n) {
+                let k = x % base;
+                x /= base;
+                if k == 0 {
+                    continue;
+                }
+                used[k - 1] += c.1;
+                if used[k - 1] > budgets[k - 1] + 1e-9 {
+                    ok = false;
+                    break;
+                }
+                gain += c.2;
+                la += c.3;
+            }
+            if ok && la <= deck_n + 1e-9 && gain > best {
+                best = gain;
+                best_a = a;
+            }
+        }
+        if best <= 0.0 {
+            return hr;
+        }
+        let mut by: Vec<V> = Vec::new();
+        let mut x = best_a;
+        for c in cand.iter().take(n) {
+            if x % base != 0 {
+                by.push(V::list(vec![V::s(&c.0), V::Float(c.2)]));
+            }
+            x /= base;
+        }
+        let mut kv = hr.kv().to_vec();
+        dset_mut(&mut kv, "life_add", V::Float(best));
+        dset_mut(&mut kv, "life_add_by", V::list(by));
+        V::dict(kv)
     }
 
     /// `life_types_of(deck_ids, cards=None, h)`
