@@ -244,5 +244,62 @@
       "big body price",
       "(dropped) role overpricing — was Enel calibration"
     ]
+  },
+  "don_deck_2026_10_12": {
+    "report": "docs/reports/2026-10-12_don_deck.md",
+    "s1_before_data": "17af4477",
+    "switch": "OPCG_DON_ROOM=1 (default old = fixed 10, bit-identical)",
+    "code": [
+      "leaves_to::don_room",
+      "curve::caps_of(+room)",
+      "hp::project_state",
+      "drv_pr caller"
+    ],
+    "verdict": "kill criterion hit (Enel calibration did not shrink); decision on keeping for correctness → user (§9, recommend keep as switch)",
+    "invariants": {
+      "non_enel_clock_rows_identical": "1949/1949 turn-start, 2108/2108 per-turn",
+      "enel_rows_changed": "615/1598 turn-start, 184/1739 per-turn",
+      "switch_off_vs_old_20games": "227/227",
+      "switch_on_vs_candidate_20games": "227/227",
+      "theory_goldens_switch_on": "outer 107 + rows 13 rows change, all cap=6 (996 calls); switch off 0",
+      "gameplay_goldens": "unchanged"
+    },
+    "calibration_enel": {
+      "before": -0.1374,
+      "after": -0.1375,
+      "ci_after": [
+        -0.1789,
+        -0.0933
+      ]
+    },
+    "calibration_others_max_move": 0.0007,
+    "crossing_accuracy": {
+      "before": 0.7051,
+      "after": 0.7048
+    },
+    "don_overestimate_enel": {
+      "step1": [
+        1.137,
+        0.106
+      ],
+      "step2": [
+        2.095,
+        0.196
+      ]
+    },
+    "fallback_rows": "0 / 52433 (all scalars 127 wide)",
+    "why_no_effect": "clock DON series outer.rs::purse_series already capped by DON deck left; fixed-10 cap only reached hand plan (caps_of) and hp projection",
+    "s7_paircal": {
+      "json": "logs/theory_map/real_w41_paircal.json",
+      "enel_vs_luffy": -0.162,
+      "coordinator_prediction": "missed (predicted closer to 0 than -0.05)",
+      "nami_underread_vs_all": "+0.19..+0.24"
+    },
+    "s8_clockside": {
+      "json": "logs/theory_map/real_w41_clockside.json",
+      "enel": "defence overread (opp clock +0.74 in lost games; controls +0.04/+0.45); 'attack overread' prediction missed",
+      "nami": "defence underread (opp clock -0.84 in lost games); prediction held"
+    },
+    "pending": "price dump with candidate formula (turns / q5 before-after) → report §10"
   }
 }
