@@ -2,7 +2,7 @@
  "record": "sigma_wip/data/w39 (synthetic, 300 games)",
  "candidate": "claude/theory-map @ b925d5f3 (code 03cb0906): before = default (adopted life-add, next turn only; bit-identical to 05c15bf6 + OPCG_LIFE_ADD=1), after = OPCG_LIFE_ADD_HORIZON=1",
  "prediction_fixed_before": "overall within ±0.005; games without a life-add card in hand unchanged",
- "verdict": "prediction held: overall +.0025 -> +.0025, colors move at most .0001, crossing hit .6720 -> .6720 (bias/spread unchanged). 15 games move; 13 flagged by the card-text classifier, 9839 = OP17-061 in hand (known), 9753 unexplained (only on-play life text seen: OP13-108 Bonney, which makes the OPPONENT move life to hand — possible misread, asked the real-deck side to check life_add_by)",
+ "verdict": "prediction held: overall +.0025 -> +.0025, colors move at most .0001, crossing hit .6720 -> .6720 (bias/spread unchanged). 15 games move; 13 flagged by the card-text classifier, 9839 = OP17-061 in hand (known), 9753 = EB03-059 (S-Snake, on-play: add a [Trigger] character from hand to the top of own life) held in hand — confirmed by the real-deck side from the engine reading (claude/theory-map @ 5d0a697e report §8.1); it never surfaced in the recorded policy candidates, hence missed by the classifier. All 15 changed games explained.",
  "default_bit_identical_to_05c15bf6_life_add": true,
  "invariant": {
   "settled_identical": true,
@@ -76,7 +76,7 @@
    ],
    "unflagged_notes": {
     "9839": "OP17-061 in hand (confirmed earlier by the real-deck side)",
-    "9753": "unexplained; leaders OP15-002 / OP13-100; only on-play life text among seen cards is OP13-108 (opponent moves life to hand)"
+    "9753": "EB03-059 in hand (Bonney deck), confirmed by the real-deck side from life_add_by (5d0a697e §8.1); absent from recorded policy candidates (checked: 0 occurrences in pol_cid/pol_tcid/pol_sig of seed 9753)"
    }
   }
  },
