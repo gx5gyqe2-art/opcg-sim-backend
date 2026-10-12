@@ -1,19 +1,31 @@
 {
  "record": "sigma_wip/data/w39 (synthetic, 300 games)",
- "candidate": "claude/theory-map @ 1f367b67 with OPCG_LIFE_ADD=1; before = 2026-10-11 clocks.json (8feb1848 default)",
- "prediction_fixed_before": "overall within ±0.005; games without an on-play life-add card unchanged",
- "verdict": "overall/color calibration within ±0.005 (overall +.0022 -> +.0025); crossing hit .6703 -> .6723 (+.0020); invariant: 40 of 43 changed games hold an on-play life-add card per a card-text classifier over cards seen in candidates, 3 changed games (9709, 9839, 9874) not explained by that classifier (it only sees cards that surface as candidates; engine reading not exposed)",
+ "candidate": "claude/theory-map @ 05c15bf6 with OPCG_LIFE_ADD=1 (Aisa LOOK_LIFE reorder no longer counted as life gain); before = 2026-10-11 clocks.json (8feb1848 default). Supersedes the 1f367b67 version of this file (in history at 0fd017dc).",
+ "prediction_fixed_before": "overall within ±0.005; games without an on-play life-add card in hand unchanged",
+ "verdict": "prediction held: overall +.0022 -> +.0025, colors move at most .0012, crossing hit .6703 -> .6720. Invariant: 35 games changed; 34 hold an on-play life-add card per the card-text classifier; the remaining 1 (9839) holds OP17-061 in hand without it ever surfacing as a candidate (confirmed by the real-deck side from the engine's life_add_by).",
+ "change_vs_1f367b67": {
+  "games_no_longer_changed": [
+   "9709",
+   "9771",
+   "9797",
+   "9825",
+   "9844",
+   "9874",
+   "9934",
+   "9964"
+  ],
+  "games_newly_changed": []
+ },
  "invariant": {
   "settled_identical": true,
   "rows_out": {
    "n_old": 3439,
    "n_new": 3439,
-   "diff_rows": 129,
-   "diff_games": 43,
+   "diff_rows": 89,
+   "diff_games": 35,
    "diff_rows_by_game": {
     "9703": 5,
     "9704": 2,
-    "9709": 8,
     "9718": 3,
     "9720": 4,
     "9721": 2,
@@ -22,21 +34,16 @@
     "9744": 2,
     "9745": 7,
     "9770": 2,
-    "9771": 5,
     "9778": 2,
     "9783": 2,
     "9791": 2,
-    "9797": 8,
     "9809": 1,
     "9814": 3,
     "9823": 1,
-    "9825": 7,
     "9839": 4,
-    "9844": 4,
     "9847": 1,
     "9856": 2,
     "9868": 2,
-    "9874": 2,
     "9889": 2,
     "9894": 6,
     "9896": 2,
@@ -45,37 +52,34 @@
     "9924": 2,
     "9930": 2,
     "9933": 2,
-    "9934": 2,
     "9953": 3,
     "9960": 2,
     "9962": 1,
-    "9964": 4,
     "9981": 1,
     "9983": 2,
     "9992": 3,
     "9996": 2
    },
    "diff_fields": {
-    "W": 129,
-    "tau_opp_hist": 72,
-    "tau_opp_theory": 72,
-    "theta_opp": 72,
-    "tau_me_theory": 57,
-    "tau_me_hist": 57,
-    "theta_me": 57,
-    "pred_theory": 11,
-    "pred_hist": 9
+    "W": 89,
+    "theta_opp": 52,
+    "tau_opp_hist": 52,
+    "tau_opp_theory": 52,
+    "tau_me_theory": 37,
+    "tau_me_hist": 37,
+    "theta_me": 37,
+    "pred_theory": 8,
+    "pred_hist": 7
    }
   },
   "turn_harm": {
    "n_old": 3739,
    "n_new": 3739,
-   "diff_rows": 57,
-   "diff_games": 36,
+   "diff_rows": 37,
+   "diff_games": 28,
    "diff_rows_by_game": {
     "9703": 2,
     "9704": 1,
-    "9709": 4,
     "9718": 1,
     "9720": 2,
     "9721": 1,
@@ -84,34 +88,27 @@
     "9744": 1,
     "9745": 3,
     "9770": 1,
-    "9771": 2,
     "9778": 1,
     "9783": 1,
     "9791": 1,
-    "9797": 4,
     "9814": 1,
-    "9825": 4,
     "9839": 2,
-    "9844": 2,
     "9856": 1,
     "9868": 1,
-    "9874": 1,
     "9889": 1,
     "9894": 3,
     "9896": 1,
     "9924": 1,
     "9930": 1,
     "9933": 1,
-    "9934": 1,
     "9953": 1,
     "9960": 1,
-    "9964": 2,
     "9983": 1,
     "9992": 1,
     "9996": 1
    },
    "diff_fields": {
-    "theta": 57,
+    "theta": 37,
     "harm_e2": 5
    }
   },
@@ -162,15 +159,14 @@
     "ST36-002"
    ],
    "flagged_games": 86,
-   "unflagged_games": 214,
-   "changed_in_flagged": 40,
-   "changed_in_unflagged": 3,
+   "changed_in_flagged": 34,
+   "changed_in_unflagged": 1,
    "changed_unflagged_seeds": [
-    "9709",
-    "9839",
-    "9874"
+    "9839"
    ],
-   "flagged_unchanged": 46
+   "unflagged_explained": {
+    "9839": "OP17-061 (大看板) in hand, leader OP17-058 《百獣海賊団》, playable next turn but never played — engine life_add_by checked by the real-deck side"
+   }
   }
  },
  "calibration_overall": {
@@ -191,7 +187,7 @@
    "diff": 0.0025,
    "diff_ci": [
     -0.0017,
-    0.0068
+    0.0067
    ]
   }
  },
@@ -209,12 +205,12 @@
    },
    "after": {
     "units": 128,
-    "W": 0.4634,
+    "W": 0.4638,
     "win": 0.4375,
-    "diff": -0.0259,
+    "diff": -0.0263,
     "diff_ci": [
-     -0.0892,
-     0.039
+     -0.0895,
+     0.0387
     ]
    }
   },
@@ -253,12 +249,12 @@
    },
    "after": {
     "units": 163,
-    "W": 0.4468,
+    "W": 0.4474,
     "win": 0.4356,
-    "diff": -0.0112,
+    "diff": -0.0118,
     "diff_ci": [
-     -0.0599,
-     0.0389
+     -0.0605,
+     0.038
     ]
    }
   },
@@ -275,12 +271,12 @@
    },
    "after": {
     "units": 129,
-    "W": 0.4862,
+    "W": 0.4874,
     "win": 0.4806,
-    "diff": -0.0056,
+    "diff": -0.0068,
     "diff_ci": [
-     -0.075,
-     0.063
+     -0.0763,
+     0.0616
     ]
    }
   },
@@ -297,12 +293,12 @@
    },
    "after": {
     "units": 143,
-    "W": 0.5254,
+    "W": 0.524,
     "win": 0.5524,
-    "diff": 0.027,
+    "diff": 0.0284,
     "diff_ci": [
-     -0.0342,
-     0.0841
+     -0.0331,
+     0.0852
     ]
    }
   },
@@ -352,25 +348,25 @@
     ]
    },
    "changed_games": {
-    "units": 86,
-    "W": 0.4983,
+    "units": 70,
+    "W": 0.5018,
     "win": 0.5,
-    "diff": 0.0017,
+    "diff": -0.0018,
     "diff_ci": [
-     -0.0077,
-     0.0111
+     -0.0121,
+     0.0074
     ]
    }
   },
   "after": {
    "flagged_games": {
     "units": 172,
-    "W": 0.4986,
+    "W": 0.4989,
     "win": 0.5,
-    "diff": 0.0014,
+    "diff": 0.0011,
     "diff_ci": [
-     -0.0048,
-     0.0081
+     -0.0051,
+     0.0078
     ]
    },
    "not_flagged_games": {
@@ -380,17 +376,17 @@
     "diff": 0.003,
     "diff_ci": [
      -0.0023,
-     0.0084
+     0.0085
     ]
    },
    "changed_games": {
-    "units": 86,
-    "W": 0.4962,
+    "units": 70,
+    "W": 0.4997,
     "win": 0.5,
-    "diff": 0.0038,
+    "diff": 0.0003,
     "diff_ci": [
-     -0.0051,
-     0.013
+     -0.009,
+     0.0088
     ]
    }
   }
@@ -409,16 +405,16 @@
    "mae_int": 1.075
   },
   "after": {
-   "sign_accuracy": 0.6723,
-   "bias": 0.358,
-   "bias_int": 0.703,
-   "sigma_T": 2.224,
-   "sigma_rel": 0.2879,
+   "sign_accuracy": 0.672,
+   "bias": 0.348,
+   "bias_int": 0.693,
+   "sigma_T": 2.148,
+   "sigma_rel": 0.288,
    "within1": 0.6932,
-   "exact_int": 0.3987,
-   "late_int": 0.4539,
+   "exact_int": 0.3992,
+   "late_int": 0.4533,
    "early_int": 0.1474,
-   "mae_int": 1.087
+   "mae_int": 1.077
   }
  },
  "deckcal_after": {
@@ -974,33 +970,33 @@
     "all": {
      "rows": 20,
      "games": 4,
-     "W": 0.3125,
+     "W": 0.3229,
      "win": 0.25,
-     "win_minus_W": -0.0625,
+     "win_minus_W": -0.0729,
      "verdict": "局数不足"
     },
     "1-3": {
      "rows": 4,
      "games": 4,
-     "W": 0.3309,
+     "W": 0.3478,
      "win": 0.25,
-     "win_minus_W": -0.0809,
+     "win_minus_W": -0.0978,
      "verdict": "局数不足"
     },
     "4-6": {
      "rows": 5,
      "games": 4,
-     "W": 0.2767,
+     "W": 0.283,
      "win": 0.2,
-     "win_minus_W": -0.0767,
+     "win_minus_W": -0.083,
      "verdict": "局数不足"
     },
     "7+": {
      "rows": 11,
      "games": 4,
-     "W": 0.3221,
+     "W": 0.3319,
      "win": 0.2727,
-     "win_minus_W": -0.0494,
+     "win_minus_W": -0.0592,
      "verdict": "局数不足"
     }
    },
@@ -1450,33 +1446,33 @@
     "all": {
      "rows": 26,
      "games": 5,
-     "W": 0.4006,
+     "W": 0.4094,
      "win": 0.6154,
-     "win_minus_W": 0.2148,
+     "win_minus_W": 0.206,
      "verdict": "局数不足"
     },
     "1-3": {
      "rows": 5,
      "games": 5,
-     "W": 0.3625,
+     "W": 0.3692,
      "win": 0.6,
-     "win_minus_W": 0.2375,
+     "win_minus_W": 0.2308,
      "verdict": "局数不足"
     },
     "4-6": {
      "rows": 6,
      "games": 5,
-     "W": 0.3488,
+     "W": 0.3537,
      "win": 0.5,
-     "win_minus_W": 0.1512,
+     "win_minus_W": 0.1463,
      "verdict": "局数不足"
     },
     "7+": {
      "rows": 15,
      "games": 5,
-     "W": 0.434,
+     "W": 0.445,
      "win": 0.6667,
-     "win_minus_W": 0.2327,
+     "win_minus_W": 0.2217,
      "verdict": "局数不足"
     }
    },
@@ -1756,33 +1752,33 @@
     "all": {
      "rows": 23,
      "games": 5,
-     "W": 0.654,
+     "W": 0.6278,
      "win": 0.5652,
-     "win_minus_W": -0.0888,
+     "win_minus_W": -0.0626,
      "verdict": "局数不足"
     },
     "1-3": {
      "rows": 5,
      "games": 5,
-     "W": 0.6394,
+     "W": 0.6159,
      "win": 0.6,
-     "win_minus_W": -0.0394,
+     "win_minus_W": -0.0159,
      "verdict": "局数不足"
     },
     "4-6": {
      "rows": 7,
      "games": 5,
-     "W": 0.6826,
+     "W": 0.6629,
      "win": 0.7143,
-     "win_minus_W": 0.0317,
+     "win_minus_W": 0.0514,
      "verdict": "局数不足"
     },
     "7+": {
      "rows": 11,
      "games": 5,
-     "W": 0.6425,
+     "W": 0.6108,
      "win": 0.4545,
-     "win_minus_W": -0.188,
+     "win_minus_W": -0.1563,
      "verdict": "局数不足"
     }
    },
@@ -2198,9 +2194,9 @@
     "all": {
      "rows": 41,
      "games": 9,
-     "W": 0.3028,
+     "W": 0.303,
      "win": 0.3171,
-     "win_minus_W": 0.0143,
+     "win_minus_W": 0.0141,
      "verdict": "局数不足"
     },
     "1-3": {
@@ -2214,17 +2210,17 @@
     "4-6": {
      "rows": 15,
      "games": 9,
-     "W": 0.2802,
+     "W": 0.2806,
      "win": 0.2667,
-     "win_minus_W": -0.0135,
+     "win_minus_W": -0.0139,
      "verdict": "局数不足"
     },
     "7+": {
      "rows": 17,
      "games": 9,
-     "W": 0.3157,
+     "W": 0.3159,
      "win": 0.3529,
-     "win_minus_W": 0.0372,
+     "win_minus_W": 0.037,
      "verdict": "局数不足"
     }
    },
@@ -2810,9 +2806,9 @@
     "all": {
      "rows": 26,
      "games": 5,
-     "W": 0.6488,
+     "W": 0.6503,
      "win": 1.0,
-     "win_minus_W": 0.3512,
+     "win_minus_W": 0.3497,
      "verdict": "局数不足"
     },
     "1-3": {
@@ -2834,9 +2830,9 @@
     "7+": {
      "rows": 13,
      "games": 5,
-     "W": 0.6644,
+     "W": 0.6674,
      "win": 1.0,
-     "win_minus_W": 0.3356,
+     "win_minus_W": 0.3326,
      "verdict": "局数不足"
     }
    },
@@ -3796,33 +3792,33 @@
     "all": {
      "rows": 35,
      "games": 7,
-     "W": 0.5628,
+     "W": 0.552,
      "win": 0.7143,
-     "win_minus_W": 0.1515,
+     "win_minus_W": 0.1623,
      "verdict": "局数不足"
     },
     "1-3": {
      "rows": 7,
      "games": 7,
-     "W": 0.6933,
+     "W": 0.6858,
      "win": 0.7143,
-     "win_minus_W": 0.021,
+     "win_minus_W": 0.0285,
      "verdict": "局数不足"
     },
     "4-6": {
      "rows": 12,
      "games": 7,
-     "W": 0.5671,
+     "W": 0.559,
      "win": 0.75,
-     "win_minus_W": 0.1829,
+     "win_minus_W": 0.191,
      "verdict": "局数不足"
     },
     "7+": {
      "rows": 16,
      "games": 7,
-     "W": 0.5025,
+     "W": 0.4883,
      "win": 0.6875,
-     "win_minus_W": 0.185,
+     "win_minus_W": 0.1992,
      "verdict": "局数不足"
     }
    },
@@ -4068,9 +4064,9 @@
     "all": {
      "rows": 40,
      "games": 8,
-     "W": 0.708,
+     "W": 0.7111,
      "win": 0.75,
-     "win_minus_W": 0.042,
+     "win_minus_W": 0.0389,
      "verdict": "局数不足"
     },
     "1-3": {
@@ -4092,9 +4088,9 @@
     "7+": {
      "rows": 19,
      "games": 8,
-     "W": 0.7361,
+     "W": 0.7428,
      "win": 0.6842,
-     "win_minus_W": -0.0519,
+     "win_minus_W": -0.0586,
      "verdict": "局数不足"
     }
    },
@@ -4850,33 +4846,33 @@
     "all": {
      "rows": 12,
      "games": 2,
-     "W": 0.5972,
+     "W": 0.6132,
      "win": 1.0,
-     "win_minus_W": 0.4028,
+     "win_minus_W": 0.3868,
      "verdict": "局数不足"
     },
     "1-3": {
      "rows": 2,
      "games": 2,
-     "W": 0.3438,
+     "W": 0.3588,
      "win": 1.0,
-     "win_minus_W": 0.6562,
+     "win_minus_W": 0.6412,
      "verdict": "局数不足"
     },
     "4-6": {
      "rows": 4,
      "games": 2,
-     "W": 0.4894,
+     "W": 0.5128,
      "win": 1.0,
-     "win_minus_W": 0.5106,
+     "win_minus_W": 0.4872,
      "verdict": "局数不足"
     },
     "7+": {
      "rows": 6,
      "games": 2,
-     "W": 0.7535,
+     "W": 0.7648,
      "win": 1.0,
-     "win_minus_W": 0.2465,
+     "win_minus_W": 0.2352,
      "verdict": "局数不足"
     }
    },
@@ -4918,17 +4914,17 @@
     "all": {
      "rows": 23,
      "games": 5,
-     "W": 0.3451,
+     "W": 0.346,
      "win": 0.5652,
-     "win_minus_W": 0.2201,
+     "win_minus_W": 0.2192,
      "verdict": "局数不足"
     },
     "1-3": {
      "rows": 5,
      "games": 5,
-     "W": 0.3283,
+     "W": 0.3326,
      "win": 0.6,
-     "win_minus_W": 0.2717,
+     "win_minus_W": 0.2674,
      "verdict": "局数不足"
     },
     "4-6": {
@@ -5054,9 +5050,9 @@
     "all": {
      "rows": 24,
      "games": 5,
-     "W": 0.4485,
+     "W": 0.4601,
      "win": 0.5417,
-     "win_minus_W": 0.0932,
+     "win_minus_W": 0.0816,
      "verdict": "局数不足"
     },
     "1-3": {
@@ -5078,9 +5074,9 @@
     "7+": {
      "rows": 12,
      "games": 5,
-     "W": 0.5054,
+     "W": 0.5286,
      "win": 0.5,
-     "win_minus_W": -0.0054,
+     "win_minus_W": -0.0286,
      "verdict": "局数不足"
     }
    },
@@ -5156,12 +5152,12 @@
     "all": {
      "rows": 3147,
      "games": 300,
-     "W": 0.4951,
+     "W": 0.4952,
      "win": 0.4887,
-     "win_minus_W": -0.0064,
+     "win_minus_W": -0.0065,
      "ci": [
-      -0.0112,
-      -0.0013
+      -0.0113,
+      -0.0014
      ]
     },
     "1-3": {
@@ -5182,19 +5178,19 @@
      "win": 0.5078,
      "win_minus_W": 0.011,
      "ci": [
-      -0.0067,
+      -0.0066,
       0.0293
      ]
     },
     "7+": {
      "rows": 1647,
      "games": 300,
-     "W": 0.4928,
+     "W": 0.4929,
      "win": 0.4742,
-     "win_minus_W": -0.0186,
+     "win_minus_W": -0.0187,
      "ci": [
-      -0.027,
-      -0.0104
+      -0.0271,
+      -0.0107
      ]
     }
    }
@@ -5397,10 +5393,10 @@
     "ALL_small": {
      "rows": 10007,
      "units": 594,
-     "resid": -0.0123,
+     "resid": -0.0125,
      "resid_ci": [
-      -0.0178,
-      -0.0071
+      -0.0179,
+      -0.0073
      ],
      "win": 0.5435,
      "W": 0.5421
@@ -5408,21 +5404,21 @@
     "ALL_big": {
      "rows": 4700,
      "units": 591,
-     "resid": -0.0004,
+     "resid": -0.0005,
      "resid_ci": [
       -0.0076,
-      0.0061
+      0.006
      ],
      "win": 0.507,
-     "W": 0.5097
+     "W": 0.5098
     },
     "attack:char": {
      "rows": 820,
      "units": 394,
-     "resid": -0.0151,
+     "resid": -0.0154,
      "resid_ci": [
-      -0.0336,
-      0.0036
+      -0.0338,
+      0.0035
      ],
      "win": 0.4866,
      "W": 0.497
@@ -5430,13 +5426,13 @@
     "attack:leader": {
      "rows": 4384,
      "units": 591,
-     "resid": -0.0178,
+     "resid": -0.018,
      "resid_ci": [
-      -0.0233,
-      -0.0122
+      -0.0235,
+      -0.0124
      ],
      "win": 0.5794,
-     "W": 0.5588
+     "W": 0.5589
     },
     "role:effect:big": {
      "rows": 79,
@@ -5457,13 +5453,13 @@
     "role:effect:counter": {
      "rows": 106,
      "units": 64,
-     "resid": -0.0031,
+     "resid": -0.0014,
      "resid_ci": [
-      -0.0804,
-      0.0727
+      -0.0791,
+      0.0743
      ],
      "win": 0.5094,
-     "W": 0.4981
+     "W": 0.4953
     },
     "role:effect:draw": {
      "rows": 66,
@@ -5479,13 +5475,13 @@
     "role:effect:leader": {
      "rows": 367,
      "units": 175,
-     "resid": 0.0131,
+     "resid": 0.013,
      "resid_ci": [
-      -0.0266,
-      0.0525
+      -0.0269,
+      0.0524
      ],
      "win": 0.4033,
-     "W": 0.461
+     "W": 0.4612
     },
     "role:effect:lock": {
      "rows": 12,
@@ -5510,46 +5506,46 @@
     "role:play:big": {
      "rows": 217,
      "units": 179,
-     "resid": 0.0329,
+     "resid": 0.0331,
      "resid_ci": [
-      -0.0063,
-      0.069
+      -0.0059,
+      0.0695
      ],
      "win": 0.6267,
-     "W": 0.5964
+     "W": 0.5962
     },
     "role:play:blocker": {
      "rows": 197,
      "units": 155,
-     "resid": -0.0808,
+     "resid": -0.0809,
      "resid_ci": [
-      -0.1332,
+      -0.1335,
       -0.03
      ],
      "win": 0.4873,
-     "W": 0.5445
+     "W": 0.5446
     },
     "role:play:counter": {
      "rows": 567,
      "units": 364,
-     "resid": -0.0183,
+     "resid": -0.0184,
      "resid_ci": [
       -0.0431,
       0.0069
      ],
      "win": 0.4515,
-     "W": 0.4586
+     "W": 0.4589
     },
     "role:play:draw": {
      "rows": 186,
      "units": 148,
-     "resid": -0.0192,
+     "resid": -0.0178,
      "resid_ci": [
-      -0.067,
-      0.0277
+      -0.0665,
+      0.0293
      ],
      "win": 0.4892,
-     "W": 0.4848
+     "W": 0.4837
     },
     "role:play:lock": {
      "rows": 84,
@@ -5587,78 +5583,78 @@
     "role:play:removal": {
      "rows": 114,
      "units": 93,
-     "resid": 0.0102,
+     "resid": 0.0108,
      "resid_ci": [
-      -0.0502,
-      0.0719
+      -0.0494,
+      0.0728
      ],
      "win": 0.5175,
-     "W": 0.5296
+     "W": 0.5292
     },
     "type:attach": {
      "rows": 2165,
      "units": 508,
-     "resid": -0.0023,
+     "resid": -0.0024,
      "resid_ci": [
-      -0.0168,
-      0.0128
+      -0.0169,
+      0.0126
      ],
      "win": 0.5575,
-     "W": 0.5761
+     "W": 0.5762
     },
     "type:attack": {
      "rows": 5204,
      "units": 594,
-     "resid": -0.0141,
+     "resid": -0.0143,
      "resid_ci": [
-      -0.0194,
-      -0.0089
+      -0.0196,
+      -0.0091
      ],
      "win": 0.5648,
-     "W": 0.549
+     "W": 0.5491
     },
     "type:effect": {
      "rows": 626,
      "units": 273,
-     "resid": 0.0246,
+     "resid": 0.025,
      "resid_ci": [
-      -0.0048,
-      0.0533
+      -0.0042,
+      0.0537
      ],
      "win": 0.4473,
-     "W": 0.4699
+     "W": 0.4695
     },
     "type:end": {
      "rows": 1003,
      "units": 460,
-     "resid": -0.0145,
+     "resid": -0.0144,
      "resid_ci": [
-      -0.0326,
-      0.0041
+      -0.0324,
+      0.0042
      ],
      "win": 0.5165,
-     "W": 0.5272
+     "W": 0.5273
     },
     "type:play": {
      "rows": 1009,
      "units": 487,
-     "resid": -0.0078,
+     "resid": -0.0075,
      "resid_ci": [
-      -0.0232,
-      0.008
+      -0.0229,
+      0.0083
      ],
      "win": 0.4906,
-     "W": 0.4929
+     "W": 0.4927
     },
     "type×gap:attach|互角": {
-     "rows": 409,
-     "units": 178,
-     "resid": 0.0125,
+     "rows": 407,
+     "units": 177,
+     "resid": 0.0104,
      "resid_ci": [
-      -0.0278,
-      0.052
+      -0.0295,
+      0.0512
      ],
-     "win": 0.7042,
+     "win": 0.7027,
      "W": 0.6757
     },
     "type×gap:attach|先行1": {
@@ -5670,7 +5666,7 @@
       0.0147
      ],
      "win": 0.7796,
-     "W": 0.8363
+     "W": 0.8362
     },
     "type×gap:attach|先行2+": {
      "rows": 538,
@@ -5684,81 +5680,81 @@
      "W": 0.9492
     },
     "type×gap:attach|遅れ1": {
-     "rows": 297,
-     "units": 135,
-     "resid": 0.0028,
+     "rows": 300,
+     "units": 137,
+     "resid": 0.0034,
      "resid_ci": [
-      -0.0487,
-      0.0505
+      -0.047,
+      0.0503
      ],
-     "win": 0.3771,
-     "W": 0.3899
+     "win": 0.38,
+     "W": 0.3908
     },
     "type×gap:attach|遅れ2+": {
-     "rows": 608,
-     "units": 191,
-     "resid": 0.0474,
+     "rows": 607,
+     "units": 190,
+     "resid": 0.0487,
      "resid_ci": [
-      0.0059,
-      0.0843
+      0.0089,
+      0.0874
      ],
-     "win": 0.1234,
-     "W": 0.136
+     "win": 0.1236,
+     "W": 0.1362
     },
     "type×gap:attack|互角": {
-     "rows": 1277,
-     "units": 374,
-     "resid": -0.0182,
+     "rows": 1274,
+     "units": 373,
+     "resid": -0.0169,
      "resid_ci": [
-      -0.0404,
-      0.0042
+      -0.0396,
+      0.0056
      ],
-     "win": 0.6703,
-     "W": 0.6394
+     "win": 0.6688,
+     "W": 0.6397
     },
     "type×gap:attack|先行1": {
-     "rows": 719,
-     "units": 229,
-     "resid": -0.0654,
+     "rows": 724,
+     "units": 230,
+     "resid": -0.0641,
      "resid_ci": [
-      -0.1028,
-      -0.0279
+      -0.1008,
+      -0.0254
      ],
-     "win": 0.7733,
-     "W": 0.7944
+     "win": 0.7749,
+     "W": 0.7937
     },
     "type×gap:attack|先行2+": {
-     "rows": 928,
-     "units": 216,
-     "resid": -0.135,
+     "rows": 926,
+     "units": 215,
+     "resid": -0.1365,
      "resid_ci": [
-      -0.175,
-      -0.0948
+      -0.1754,
+      -0.0975
      ],
-     "win": 0.8621,
-     "W": 0.9185
+     "win": 0.8618,
+     "W": 0.9187
     },
     "type×gap:attack|遅れ1": {
      "rows": 1030,
-     "units": 342,
-     "resid": 0.0335,
+     "units": 340,
+     "resid": 0.0328,
      "resid_ci": [
-      0.0118,
-      0.0545
+      0.0112,
+      0.0542
      ],
-     "win": 0.4379,
-     "W": 0.4012
+     "win": 0.433,
+     "W": 0.4014
     },
     "type×gap:attack|遅れ2+": {
      "rows": 1250,
      "units": 335,
-     "resid": 0.1181,
+     "resid": 0.1211,
      "resid_ci": [
-      0.0893,
-      0.1457
+      0.0918,
+      0.149
      ],
-     "win": 0.2208,
-     "W": 0.1631
+     "win": 0.2256,
+     "W": 0.1632
     },
     "type×gap:effect|互角": {
      "rows": 119,
@@ -5785,145 +5781,145 @@
     "type×gap:effect|先行2+": {
      "rows": 88,
      "units": 58,
-     "resid": -0.0788,
+     "resid": -0.0787,
      "resid_ci": [
-      -0.1558,
-      0.001
+      -0.1556,
+      0.0013
      ],
      "win": 0.8409,
-     "W": 0.8914
+     "W": 0.8912
     },
     "type×gap:effect|遅れ1": {
-     "rows": 110,
-     "units": 77,
-     "resid": -0.0478,
+     "rows": 107,
+     "units": 75,
+     "resid": -0.0668,
      "resid_ci": [
-      -0.1258,
-      0.0218
+      -0.1377,
+      0.0009
      ],
-     "win": 0.3545,
-     "W": 0.3968
+     "win": 0.3364,
+     "W": 0.399
     },
     "type×gap:effect|遅れ2+": {
-     "rows": 228,
-     "units": 133,
-     "resid": 0.0605,
+     "rows": 231,
+     "units": 134,
+     "resid": 0.0654,
      "resid_ci": [
-      0.0096,
-      0.11
+      0.0118,
+      0.1149
      ],
-     "win": 0.2018,
-     "W": 0.1677
+     "win": 0.2121,
+     "W": 0.1688
     },
     "type×gap:end|互角": {
-     "rows": 235,
-     "units": 172,
-     "resid": -0.0758,
+     "rows": 234,
+     "units": 171,
+     "resid": -0.0733,
      "resid_ci": [
-      -0.1239,
-      -0.0279
+      -0.1216,
+      -0.0251
      ],
-     "win": 0.5319,
-     "W": 0.5946
+     "win": 0.5342,
+     "W": 0.595
     },
     "type×gap:end|先行1": {
-     "rows": 124,
+     "rows": 125,
      "units": 107,
-     "resid": -0.0854,
+     "resid": -0.0856,
      "resid_ci": [
-      -0.1491,
-      -0.0214
+      -0.1494,
+      -0.0213
      ],
-     "win": 0.6774,
-     "W": 0.7336
+     "win": 0.68,
+     "W": 0.7334
     },
     "type×gap:end|先行2+": {
-     "rows": 176,
-     "units": 120,
-     "resid": -0.1047,
+     "rows": 175,
+     "units": 119,
+     "resid": -0.1067,
      "resid_ci": [
-      -0.1609,
-      -0.0479
+      -0.1616,
+      -0.0515
      ],
-     "win": 0.8068,
+     "win": 0.8057,
      "W": 0.8768
     },
     "type×gap:end|遅れ1": {
-     "rows": 219,
+     "rows": 222,
      "units": 161,
-     "resid": 0.0303,
+     "resid": 0.017,
      "resid_ci": [
-      -0.0187,
-      0.0775
+      -0.0314,
+      0.0686
      ],
-     "win": 0.4658,
-     "W": 0.423
+     "win": 0.4505,
+     "W": 0.4231
     },
     "type×gap:end|遅れ2+": {
-     "rows": 249,
+     "rows": 247,
      "units": 177,
-     "resid": 0.0687,
+     "resid": 0.0743,
      "resid_ci": [
-      0.0236,
-      0.1143
+      0.0283,
+      0.1193
      ],
-     "win": 0.261,
-     "W": 0.2054
+     "win": 0.2713,
+     "W": 0.2051
     },
     "type×gap:play|互角": {
-     "rows": 194,
-     "units": 154,
-     "resid": -0.0357,
+     "rows": 192,
+     "units": 153,
+     "resid": -0.0377,
      "resid_ci": [
-      -0.0832,
-      0.0117
+      -0.083,
+      0.0089
      ],
-     "win": 0.5722,
-     "W": 0.5937
+     "win": 0.5677,
+     "W": 0.593
     },
     "type×gap:play|先行1": {
-     "rows": 123,
-     "units": 97,
-     "resid": -0.0454,
+     "rows": 125,
+     "units": 98,
+     "resid": -0.042,
      "resid_ci": [
-      -0.1145,
-      0.0242
+      -0.1065,
+      0.0316
      ],
-     "win": 0.7073,
-     "W": 0.7343
+     "win": 0.712,
+     "W": 0.7339
     },
     "type×gap:play|先行2+": {
-     "rows": 169,
+     "rows": 168,
      "units": 119,
-     "resid": -0.1319,
+     "resid": -0.1323,
      "resid_ci": [
-      -0.1845,
-      -0.0757
+      -0.1851,
+      -0.0764
      ],
-     "win": 0.7811,
-     "W": 0.873
+     "win": 0.7798,
+     "W": 0.8732
     },
     "type×gap:play|遅れ1": {
-     "rows": 204,
+     "rows": 205,
      "units": 150,
-     "resid": 0.0295,
+     "resid": 0.022,
      "resid_ci": [
-      -0.0202,
-      0.0768
+      -0.0279,
+      0.0723
      ],
-     "win": 0.4755,
-     "W": 0.4269
+     "win": 0.4683,
+     "W": 0.4265
     },
     "type×gap:play|遅れ2+": {
      "rows": 319,
      "units": 194,
-     "resid": 0.0525,
+     "resid": 0.0573,
      "resid_ci": [
-      0.0111,
-      0.0914
+      0.0156,
+      0.0973
      ],
-     "win": 0.2132,
-     "W": 0.1793
+     "win": 0.2194,
+     "W": 0.18
     }
    }
   },
