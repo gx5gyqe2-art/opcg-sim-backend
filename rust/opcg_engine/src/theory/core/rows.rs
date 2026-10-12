@@ -44,9 +44,10 @@ pub fn hr_v(value: f64, cards: &[(f64, f64)], don: f64, n_hand: i64, life: &[(f6
     ])
 }
 
-/// **候補 `OPCG_LIFE_ADD`**（2026-10-12・`docs/reports/2026-10-12_life_add.md`）が入っているか（呼び出しのたびに読む）
+/// **耐久のライフの項の手札のライフ加算**（`docs/reports/2026-10-12_life_add.md`）が入っているか（呼び出しのたびに読む）。
+/// **2026-10-12 にユーザ決定で既定に採用**（「(a) 既定にする」）。`OPCG_LIFE_ADD=0`（または `off`）で旧い形（λ × 今のライフだけ）に戻す。
 pub fn life_add_on() -> bool {
-    matches!(std::env::var("OPCG_LIFE_ADD").as_deref(), Ok("1") | Ok("on"))
+    !matches!(std::env::var("OPCG_LIFE_ADD").as_deref(), Ok("0") | Ok("off"))
 }
 
 /// 作り直した手札の読みに、元の読みの `life_add`／`life_add_by` を引き継ぐ（無ければそのまま＝既定の dict は 1 文字も変えない）

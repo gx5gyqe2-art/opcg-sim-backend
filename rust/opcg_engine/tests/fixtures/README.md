@@ -83,3 +83,9 @@ OPCG_THEORY_GOLDEN_WRITE=1 cargo test --no-default-features tests_regen -- --inc
 `theory_outer_golden` 107 行（`hp.search_context` 67・`tb.guard_hand_reading` 30・`cv.L`／`cv.gbar` 各 5）と `theory_rows_golden` 13 行が変わる。
 **変わる行は全部エネル（ドン‼デッキ 6 枚）の行**——上限が 10 未満になる呼び出しを数えて全部 6 だったことを確かめた（996 回）。
 既定に入れるときは、その時点で上の器（`OPCG_DON_ROOM=1 OPCG_THEORY_GOLDEN_WRITE=1`）で作り直す。
+
+### 耐久のライフの項の手札のライフ加算を既定に（2026-10-12・ユーザ決定「(a) 既定にする」・`docs/reports/2026-10-12_life_add.md`）
+
+`OPCG_LIFE_ADD` の既定を on に反転した（`=0`／`off` で旧い形）。上の器で `theory_rows_golden` の 43 行（`kappa_vector`・`transition_ledger`・
+`crossing_bridge`・`relative_ledger`・`theory_bridge` の記録・合成 w39 と記録の局）の戻りの欄を作り直した。`theory_core`・`theory_outer` は 0 行。
+作り直した後に器をもう一度回して 0 行・`OPCG_LIFE_ADD=0` で回すと同じ 43 行が旧い値に戻ることを確かめた。
