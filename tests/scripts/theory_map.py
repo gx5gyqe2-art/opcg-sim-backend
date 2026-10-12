@@ -943,9 +943,66 @@ def cmd_deckcal(a):
     return 0
 
 
+def cmd_paircal(a):
+    """対面ごとの較正（2026-10-12・`2026-10-12_don_deck.md` §7）: 先手リーダー × 後手リーダーの組ごとに、席ごとの
+    「実 − 理論」（ターン先頭の行・決着の宣言の前・局ごとの再抽出）。帯（1-3／4-6／7+）でも。"""
+    clocks = json.load(open(a.clocks, encoding="utf-8"))
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    settled = collections.defaultdict(lambda: 10 ** 9)
+    for s_, w_, t_, d_ in clocks["settled"]:
+        if d_:
+            settled[int(s_)] = min(settled[int(s_)], int(t_))
+    rows = []
+    for r in clocks["rows_out"]:
+        s_, w_, t_ = int(r["seed"]), int(r["who"]), int(r["t"])
+        gm = games_meta.get(s_)
+        if gm is None or t_ >= settled[s_] or r.get("W") is None:
+            continue
+        rows.append({"seed": s_, "w": w_, "t": t_, "pair": "%s|%s" % tuple(gm["leaders"]), "W": float(r["W"]),
+                     "z": 1.0 if r["won"] else 0.0})
+
+    def cal(rs):
+        if not rs:
+            return None
+        bys = collections.defaultdict(list)
+        for x in rs:
+            bys[x["seed"]].append(x)
+        e = {"rows": len(rs), "games": len(bys), "W": round(float(np.mean([x["W"] for x in rs])), 4),
+             "win": round(float(np.mean([x["z"] for x in rs])), 4)}
+        e["win_minus_W"] = round(e["win"] - e["W"], 4)
+        if len(bys) >= a.min_games:
+            e["ci"] = boot_games(bys, lambda xs: float(np.mean([x["z"] - x["W"] for x in xs])), a.boot)
+        else:
+            e["verdict"] = "局数不足"
+        return e
+    out = {"record": a.src, "min_games": a.min_games, "pairs": {}}
+    for pr in sorted({x["pair"] for x in rows}):
+        sub = [x for x in rows if x["pair"] == pr]
+        e = {"games": len({x["seed"] for x in sub})}
+        for w in (0, 1):
+            sw = [x for x in sub if x["w"] == w]
+            e["seat%d" % w] = {"all": cal(sw), **{b: cal([x for x in sw if turn_band(x["t"]) == b]) for b in TURN_BANDS}}
+        out["pairs"][pr] = e
+    # 席のデッキ × 相手のデッキ（先手・後手をまとめる）
+    out["deck_vs_deck"] = {}
+    for x in rows:
+        gm = games_meta[x["seed"]]
+        x["me"], x["opp"] = gm["leaders"][x["w"]], gm["leaders"][1 - x["w"]]
+    for me in sorted({x["me"] for x in rows}):
+        for op in sorted({x["opp"] for x in rows}):
+            sub = [x for x in rows if x["me"] == me and x["opp"] == op]
+            if sub:
+                out["deck_vs_deck"]["%s|%s" % (me, op)] = {"all": cal(sub), **{b: cal([x for x in sub if turn_band(x["t"]) == b]) for b in TURN_BANDS}}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("paircal: rows %d pairs %d" % (len(rows), len(out["pairs"])))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -982,8 +1039,15 @@ def main(argv=None):
                     help="ドンの検算の計画の上限: rule10＝min(10, 場＋2k)（2026-10-12 までの式）／room＝min(ドン‼デッキの枚数, 場＋2k)（候補）")
     dc.add_argument("--boot", type=int, default=BOOT)
     dc.add_argument("--out", required=True)
+    pc = sub.add_parser("paircal")
+    pc.add_argument("--in", dest="src", required=True)
+    pc.add_argument("--clocks", required=True)
+    pc.add_argument("--min-games", type=int, default=MIN_GAMES)
+    pc.add_argument("--boot", type=int, default=BOOT)
+    pc.add_argument("--out", required=True)
     a = ap.parse_args(argv)
-    return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal}[a.cmd](a)
+    return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
+            "paircal": cmd_paircal}[a.cmd](a)
 
 
 if __name__ == "__main__":
