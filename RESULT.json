@@ -194,5 +194,55 @@
       "early life sign (real only)",
       "(dropped) attack overpriced vs attach/play"
     ]
+  },
+  "deckcal_2026_10_12": {
+    "report": "docs/reports/2026-10-12_turn_plans.md §11",
+    "tool": "theory_map.py deckcal",
+    "json": "logs/theory_map/real_w41_deckcal.json",
+    "calibration_win_minus_W": {
+      "Enel OP15-058": [
+        -0.1374,
+        [
+          -0.1788,
+          -0.0933
+        ]
+      ],
+      "Nami OP11-041": [
+        0.1588,
+        [
+          0.1048,
+          0.2166
+        ]
+      ],
+      "Shanks OP09-001": [
+        0.0191,
+        [
+          -0.0327,
+          0.069
+        ]
+      ],
+      "Luffy OP16-022": [
+        -0.0114,
+        [
+          -0.0654,
+          0.0435
+        ]
+      ]
+    },
+    "roles_without_enel": "lock -0.012, draw +0.011, reduction +0.038, leader activation +0.003 (all CI cross 0); blocker -0.046 [-0.105,+0.006]",
+    "enel_rows_all_types": "-0.11 to -0.18 (attack -0.122)",
+    "don_overestimate_enel": {
+      "step1_mean": 1.137,
+      "step2_mean": 2.095,
+      "step2_late": 3.893
+    },
+    "don_overestimate_others": 0.0,
+    "next_fix_priority": [
+      "Enel DON deck = 6 ignored by plan caps (curve.rs caps_of / hp.rs DON_CAP)",
+      "passive leader effects (Nami, Shanks) not priced",
+      "blocker play price",
+      "big body price",
+      "(dropped) role overpricing — was Enel calibration"
+    ]
   }
 }

@@ -844,9 +844,107 @@ def cmd_turns(a):
     return 0
 
 
+# ------------------------------------------------------------------ deckcal（2026-10-12・`2026-10-12_turn_plans.md` §11）
+DON_RULE_CAP = 10          # 規則のドン!!デッキの枚数（エネル〔OP15-058〕は「ドン‼デッキは 6 枚」）
+DON_DECK_SIZE = {"OP15-058": 6}
+
+
+def cmd_deckcal(a):
+    """デッキ別の較正（ターン先頭・決着前）・役割の外れのデッキ切り分け・ドンの検算（理論の計画の段のドン vs 記録）。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    dump_p = a.dump or os.path.join(a.work, "dump.jsonl")
+    clocks_p = a.clocks or os.path.join(a.work, "clocks.json")
+    clocks = json.load(open(clocks_p, encoding="utf-8"))
+    from theory_rs import MU
+    rows_all, _align, _ck, _th, games_meta, _lcol = build_rows(a.src, load_dump(dump_p), clocks)
+    settled = collections.defaultdict(lambda: 10 ** 9)
+    for s_, w_, t_, d_ in clocks["settled"]:
+        if d_:
+            settled[int(s_)] = min(settled[int(s_)], int(t_))
+    focus = a.focus
+    out = {"record": a.src, "focus": focus}
+    # 1. 較正（ターン先頭の行・決着前）
+    cal = []
+    for r in clocks["rows_out"]:
+        s_, w_, t_ = int(r["seed"]), int(r["who"]), int(r["t"])
+        gm = games_meta.get(s_)
+        if gm is None or t_ >= settled[s_] or r.get("W") is None:
+            continue
+        cal.append({"seed": s_, "w": w_, "t": t_, "leader": gm["leaders"][w_], "W": float(r["W"]), "z": 1.0 if r["won"] else 0.0})
+
+    def calrow(rs):
+        if not rs:
+            return None
+        bys = collections.defaultdict(list)
+        for x in rs:
+            bys[x["seed"]].append(x)
+        e = {"rows": len(rs), "games": len(bys), "W": round(float(np.mean([x["W"] for x in rs])), 4),
+             "win": round(float(np.mean([x["z"] for x in rs])), 4)}
+        e["win_minus_W"] = round(e["win"] - e["W"], 4)
+        if len(bys) >= MIN_GAMES:
+            e["ci"] = boot_games(bys, lambda xs: float(np.mean([x["z"] - x["W"] for x in xs])), a.boot)
+        else:
+            e["verdict"] = "局数不足"
+        return e
+    decks = sorted({x["leader"] for x in cal})
+    out["calibration"] = {d: {"all": calrow([x for x in cal if x["leader"] == d]),
+                              **{b: calrow([x for x in cal if x["leader"] == d and turn_band(x["t"]) == b]) for b in TURN_BANDS}}
+                          for d in decks}
+    out["calibration"]["ALL"] = {"all": calrow(cal), **{b: calrow([x for x in cal if turn_band(x["t"]) == b]) for b in TURN_BANDS}}
+    # 2. 役割の外れ（問い 5 の相手側の表）を focus のデッキと他で分ける
+    rc = [r for r in rows_all if r["pv"] is not None and r["nsc"] >= 2 and r["ptype"] in TYPES
+          and r["btype"] in TYPES and "gap" in r]
+    out["q5_focus"] = collect_q5([r for r in rc if r["leader"] == focus], MU, a.boot)
+    out["q5_others"] = collect_q5([r for r in rc if r["leader"] != focus], MU, a.boot)
+    out["q5_by_deck"] = {d: collect_q5([r for r in rc if r["leader"] == d], MU, a.boot)["groups"].get("ALL_small") for d in decks}
+    # 3. ドンの検算: 計画の段 k（1・2）のドンの上限 min(10, 今の場のドン + 2k)（`curve.rs::caps_of`）と、記録の k ターン後の場のドン
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    seats = collections.defaultdict(list)
+    for rows, _pol, ex, _L, _ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig",),
+                                                        extra_fn=lambda dd, n: {"sc": np.asarray(dd["scalars"])[:n].astype(np.float64)}):
+        seed = int(rows["seed"][idx[0]])
+        gm = games_meta.get(seed)
+        if gm is None:
+            continue
+        seen = set()
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0 or (w, t) in seen:
+                continue
+            seen.add((w, t))
+            ld = gm["leaders"][w]
+            size = DON_DECK_SIZE.get(ld, DON_RULE_CAP)
+            field = size - int(round(float(ex["sc"][i, 66]) * 10))
+            seats[(seed, w, ld)].append((t, field))
+    don = collections.defaultdict(lambda: {1: [], 2: []})
+    for (seed, w, ld), ts in seats.items():
+        ts.sort()
+        for j, (t, f0) in enumerate(ts):
+            for k in (1, 2):
+                if j + k < len(ts):
+                    cap = min(DON_RULE_CAP, f0 + 2 * k)
+                    don[ld][k].append((cap - ts[j + k][1], f0, ts[j + k][1], turn_band(t)))
+    out["don_check"] = {}
+    for ld, byk in don.items():
+        e = {"deck_size": DON_DECK_SIZE.get(ld, DON_RULE_CAP)}
+        for k, xs in byk.items():
+            ov = np.array([x[0] for x in xs], float)
+            e["step%d" % k] = {"n": len(xs), "over_mean": round(float(ov.mean()), 3),
+                               "over_p10_p50_p90": [round(float(q), 1) for q in np.percentile(ov, [10, 50, 90])],
+                               "share_over": round(float((ov > 0).mean()), 3), "share_under": round(float((ov < 0).mean()), 3),
+                               "dist": {str(int(v)): int((ov == v).sum()) for v in sorted(set(ov.tolist()))},
+                               "by_band": {b: round(float(np.mean([x[0] for x in xs if x[3] == b])), 3)
+                                           for b in TURN_BANDS if any(x[3] == b for x in xs)}}
+        out["don_check"][ld] = e
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("deckcal: cal rows %d" % len(cal))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -873,8 +971,16 @@ def main(argv=None):
     t.add_argument("--clocks", default=None)
     t.add_argument("--boot", type=int, default=BOOT)
     t.add_argument("--out", required=True)
+    dc = sub.add_parser("deckcal")
+    dc.add_argument("--in", dest="src", required=True)
+    dc.add_argument("--work", default=None)
+    dc.add_argument("--dump", default=None)
+    dc.add_argument("--clocks", default=None)
+    dc.add_argument("--focus", default="OP15-058", help="切り分けるデッキ（リーダー）")
+    dc.add_argument("--boot", type=int, default=BOOT)
+    dc.add_argument("--out", required=True)
     a = ap.parse_args(argv)
-    return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns}[a.cmd](a)
+    return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal}[a.cmd](a)
 
 
 if __name__ == "__main__":
