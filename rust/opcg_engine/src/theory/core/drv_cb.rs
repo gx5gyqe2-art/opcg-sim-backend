@@ -275,13 +275,19 @@ pub fn opp_attack_power_on() -> bool {
 
 /// 時計の行（攻める側のターン）を、守る側の【相手のアタック時】の上げ下げで直す（§1.2）: 相手のリーダーのパワー（`sc`）に +X、
 /// 攻める側の一番大きい攻め手の札のパワー −X、守る側の手札の読みから捨てる札（カウンター 0 が在れば外さない・無ければ最小のカウンター札）を外す。
-fn opp_attack_power_adjust(c: &mut Core, row: &Row, g_def: &V) -> Option<(Row, V)> {
+pub(super) fn opp_attack_power_adjust(c: &mut Core, row: &Row, g_def: &V) -> Option<(Row, V)> {
     let ci = row.ci.as_ref()?;
     let sc = &row.sc;
     let tok = &row.tok;
     let mut srcs: Vec<(String, f64)> = Vec::new();
+    let mut printed = f64::INFINITY; // 守る側のリーダーの印字のパワー（上げ幅を既に使った行＝今のパワー ≥ 印字 + X なら足さない）
     if let Some(l) = c.t.cid_of(ci[1]).filter(|x| !x.is_empty()) {
-        srcs.push((l.to_string(), sc[15] * 5.0));
+        let l = l.to_string();
+        let pw = c.info(&l).get("power").f_or0();
+        if pw > 0.0 {
+            printed = pw;
+        }
+        srcs.push((l, sc[15] * 5.0));
     }
     for sl in lt::OPP_FIELD {
         if let Some(x) = c.t.cid_of(ci[sl]).filter(|x| !x.is_empty()) {
@@ -300,7 +306,11 @@ fn opp_attack_power_adjust(c: &mut Core, row: &Row, g_def: &V) -> Option<(Row, V
     let mut hand_left = n_hand;
     let (mut s2, mut t2) = (sc.clone(), tok.clone());
     let mut changed_hand = false;
+    let current = sc[lt::SC_OPP_LEADER_POWER] * 1e4;
     for (x, down, discard) in eff {
+        if !down && current + 1e-6 >= printed + x {
+            continue;
+        }
         if discard {
             if hr.is_none() || hand_left < 1 {
                 continue;

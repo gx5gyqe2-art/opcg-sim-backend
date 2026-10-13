@@ -208,9 +208,9 @@ impl Core {
 
     /// `guard_step(tok, sc, played, free, paid, theta, mu, margin_comfort, hand=…)`（`joint`）→ 戻りの dict（`None`＝来る攻撃が無い）
     #[allow(clippy::too_many_arguments)]
-    fn guard_step(&mut self, r: &GRow, played: &str, free: f64, paid: &[(f64, f64)], theta: f64, mu: f64, margin_comfort: f64, hand: &V) -> R<Option<D>> {
+    fn guard_step(&mut self, r: &GRow, played: &str, free: f64, paid: &[(f64, f64)], theta: f64, mu: f64, margin_comfort: f64, hand: &V, x_shift: f64) -> R<Option<D>> {
         let tok = &r.tok;
-        let xs: Vec<f64> = lt::incoming_x(tok, 0.0, None).into_iter().filter(|&x| x >= -PWR_EPS).collect();
+        let xs: Vec<f64> = lt::incoming_x(tok, 0.0, None).into_iter().map(|x| x - x_shift).filter(|&x| x >= -PWR_EPS).collect();
         if xs.is_empty() {
             return Ok(None);
         }
@@ -716,7 +716,8 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
                 Some(d) => V::list(d.iter().map(|s| V::s(s)).collect()),
             };
             let hand_rd = c.guard_hand_reading(&row, th_g * mu, mu, &dv, has_attack)?;
-            let Some(mut got) = c.guard_step(r, &played, free, &paid, th_g, mu, margin_comfort, &hand_rd)? else {
+            let (hand_rd, x_shift) = if super::drv_cb::opp_attack_power_on() { guard_opp_attack(c, &row, hand_rd) } else { (hand_rd, 0.0) };
+            let Some(mut got) = c.guard_step(r, &played, free, &paid, th_g, mu, margin_comfort, &hand_rd, x_shift)? else {
                 stats.addi("grd_no_attack", 1);
                 continue;
             };
@@ -889,6 +890,65 @@ struct ClockCx<'a> {
 }
 
 /// 表の 1 行（`[sc, tok（22×22 を平らに）, ci]`）→ 行（`ci` の型は記録の行に合わせる）
+/// 候補 `OPCG_OPP_ATTACK_POWER=1` の守りの窓（`2026-10-13_opp_attack_power.md` §9）: 窓の行は守る側の行で、誘発が解決した後なので、
+/// 記録には CPU が使った分が既に入っている。上げ幅は守る側のリーダーの今のパワーが印字 + X 未満（＝まだ使っていない）のときだけ
+/// 来る攻撃の超過から引き、捨てる札（カウンター 0 の枠が在ればそれ・無ければ手札の価値が最小の枠）を手札の読みから外す。下げ幅は足さない。
+fn guard_opp_attack(c: &mut Core, row: &Row, hand: V) -> (V, f64) {
+    let Some(ci) = row.ci.as_ref() else { return (hand, 0.0) };
+    let sc = &row.sc;
+    let tok = &row.tok;
+    let mut srcs: Vec<(String, f64)> = Vec::new();
+    let mut printed = f64::INFINITY;
+    if let Some(l) = c.t.cid_of(ci[0]).filter(|x| !x.is_empty()) {
+        let l = l.to_string();
+        let pw = c.info(&l).get("power").f_or0();
+        if pw > 0.0 {
+            printed = pw;
+        }
+        srcs.push((l, sc[14] * 5.0));
+    }
+    for sl in lt::OWN_FIELD {
+        if let Some(x) = c.t.cid_of(ci[sl]).filter(|x| !x.is_empty()) {
+            srcs.push((x.to_string(), tok.at(sl, lt::S_ATTACHED_DON) * 5.0));
+        }
+    }
+    let (za, zr, zt, _zd) = rw::zones(sc, tok, true);
+    let eff = c.opp_attack_effects(&srcs, za + zr + zt);
+    if eff.is_empty() {
+        return (hand, 0.0);
+    }
+    let current = lt::leader_power_opp_turn_base(tok, Some(sc));
+    let mut slots: Vec<V> = hand.get("slots").items().to_vec();
+    let mut shift = 0.0;
+    for (x, down, discard) in eff {
+        if down || current + 1e-6 >= printed + x {
+            continue;
+        }
+        if discard {
+            if slots.is_empty() {
+                continue;
+            }
+            let pick = slots.iter().position(|s| s.get("counter").f_or0() <= 0.0).unwrap_or_else(|| {
+                let mut b = 0usize;
+                for (i, s) in slots.iter().enumerate() {
+                    if super::hp::v_scalar(s.get("v")) < super::hp::v_scalar(slots[b].get("v")) {
+                        b = i;
+                    }
+                }
+                b
+            });
+            slots.remove(pick);
+        }
+        shift += x;
+    }
+    if shift <= 0.0 {
+        return (hand, 0.0);
+    }
+    let mut kv = hand.kv().to_vec();
+    super::obj::dset_mut(&mut kv, "slots", V::list(slots));
+    (V::dict(kv), shift)
+}
+
 fn row_of_triplet(v: &V, dt: &str) -> Row {
     let it = v.items();
     let sc: Vec<f64> = it[0].items().iter().map(|x| x.f()).collect();
@@ -907,6 +967,12 @@ fn clock_read(c2: &mut Core, me: &Row, opp: &Row, cx: &ClockCx) -> R<(f64, f64)>
     let go = c2.hand_price_mean(opp, MU, true, None)?;
     let go = c2.with_life_types(&go, cx.dk_opp.as_deref());
     let g_opp = c2.with_hand_blocker(&go, opp)?;
+    // 候補 `OPCG_OPP_ATTACK_POWER=1`（`2026-10-13_opp_attack_power.md` §9）: 時計の行と同じ口（攻める側の行・守る側の手札の読み）
+    let adj = if super::drv_cb::opp_attack_power_on() { super::drv_cb::opp_attack_power_adjust(c2, me, &g_opp) } else { None };
+    let (me, g_opp) = match &adj {
+        Some((r2, g2)) => (r2, g2.clone()),
+        None => (me, g_opp),
+    };
     let att = Some((cx.dk_me.clone(), rw::own_turn_index(cx.t) == 0));
     let mirror = if !cx.mirror_me {
         MirrorArg::None
@@ -914,6 +980,10 @@ fn clock_read(c2: &mut Core, me: &Row, opp: &Row, cx: &ClockCx) -> R<(f64, f64)>
         let mrow = c2.mirror_view(me, Some(&opp.tok), opp.ci.as_deref());
         let gm = c2.with_life_types(&g_me, cx.dk_me.as_deref());
         let gm = c2.with_hand_blocker(&gm, me)?;
+        let (mrow, gm) = match if super::drv_cb::opp_attack_power_on() { super::drv_cb::opp_attack_power_adjust(c2, &mrow, &gm) } else { None } {
+            Some(x) => x,
+            None => (mrow, gm),
+        };
         let arow = rw::row_of_f64(mrow.sc.clone(), mrow.tok.clone(), mrow.ci.clone().unwrap(), &rw::ci_dtype(&mrow));
         MirrorArg::Eager(Some(Mirror { row: mrow, g_me: gm, att: Some((arow, cx.dk_opp.clone(), rw::own_turn_index(cx.t + 1) == 0)) }))
     } else {
@@ -983,12 +1053,21 @@ fn kappa_of_row(c: &mut Core, tb: &Tb, mirror_me: bool, r: &GRow, row: &Row, w: 
             let mrow = c.mirror_view(&rowc, Some(&rh.tok), Some(&rh.ci));
             let gm = c.with_life_types(&gme, deck_of(p, w).as_deref());
             let gm = c.with_hand_blocker(&gm, &rowc)?;
+            let (mrow, gm) = match if super::drv_cb::opp_attack_power_on() { super::drv_cb::opp_attack_power_adjust(c, &mrow, &gm) } else { None } {
+                Some(x) => x,
+                None => (mrow, gm),
+            };
             let arow = rw::row_of_f64(mrow.sc.clone(), mrow.tok.clone(), mrow.ci.clone().unwrap(), &rw::ci_dtype(&mrow));
             Ok(Some(Mirror { row: mrow, g_me: gm, att: Some((arow, deck_of(p, 1 - w), rw::own_turn_index(t + 1) == 0)) }))
         });
         MirrorArg::Lazy(f)
     } else {
         MirrorArg::None
+    };
+    let adj = if super::drv_cb::opp_attack_power_on() { super::drv_cb::opp_attack_power_adjust(c, row, g_opp) } else { None };
+    let (row, g_opp) = match &adj {
+        Some((r2, g2)) => (r2, g2),
+        None => (row, g_opp),
     };
     c.curve_d_of_row(row, rw::own_turn_index(t), prof, g_opp, g_me, cut_opp, cut_me, att, mirror, cfg.side_symmetric)
 }
