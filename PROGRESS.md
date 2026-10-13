@@ -95,3 +95,8 @@
 
 - `claude/cpu-spec-improvements-yw91jd` @ 13404026 を取り込み（c3eaea9b・衝突は `theory_map.py`＝向こう・`TEST_SPEC.md`＝両方の行・`PROGRESS.md`＝こちら）。報告 **`docs/reports/2026-10-14_syn_rebase.md`**・数 **`logs/theory_map/syn_w39_rebase.json`**。
 - 的中 .6737 → .6717・較正 +.0028 → +.0029・時計の幅 2.596 → 2.607。動いた分は全部効果 JSON の作り直し（取り込み後の Rust ＋古い JSON は取り込み前と 1 行も違わない）。
+
+## 打ち方の差（物差し 1・2026-10-14・合成 w39）
+
+- §1 を数の前に push（e6932422）。写しを取り込み後のエンジンで取り直し、色 × 帯の外れる量と色の較正を並べた。報告 **`docs/reports/2026-10-14_syn_play_gap.md`**・数 **`logs/theory_map/syn_w39_playgap.json`**。
+- 6 色の順位相関 **−0.60**（予告の線ちょうど＝当たり）・局の再抽出の区間 −0.89〜+0.66（0 をまたぐ）。外れる量は 1.67〜1.89 で色の差は小さい。
