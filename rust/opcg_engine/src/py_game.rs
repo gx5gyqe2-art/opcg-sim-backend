@@ -345,6 +345,12 @@ impl Game {
         to_py_json(&self.session.state().hidden_json(masters))
     }
 
+    /// 画面表示用の継続中の状態（`status_view.rs`。盤面 dict とは別出力＝golden に影響しない）。
+    fn status_json(&self) -> PyResult<String> {
+        let masters = self.masters()?;
+        to_py_json(&self.session.state().status_json(masters))
+    }
+
     /// 1 要求ぶんのイベントログ（直前の `apply_*` が積んだもの）。
     fn events_json(&self) -> PyResult<String> {
         to_py_json(&self.events())

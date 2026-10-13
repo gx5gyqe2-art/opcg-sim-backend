@@ -202,6 +202,29 @@ V2 読み込みに失敗した場合は自動的にレガシーへ退避する�
   正しくイベントを指す。イベントの【メイン】は ACTIVATE_MAIN、無ければ COUNTER）。対象選択は
   既存の SELECT_TARGET 中断・再開機構に乗る。
 
+## 反応型の誘発句（トリガー種別＋raw_text）
+
+「相手がイベントを発動した時」「ライフが0枚になった時」等の誘発句は、**トリガー種別だけを出し、句そのもの
+（主語・要因・絞り込み）は能力の `raw_text` に残す**。エンジンが `raw_text` を読んで、該当する実イベントで
+待ち行列へ積む（`rust/opcg_engine/src/effects/triggers.rs` の反応リスナー）。新しい TriggerType は足さない
+（符号化の次元が変わるため）。
+
+| 誘発句 | トリガー種別 | エンジンが積む契機 |
+|---|---|---|
+| 〜を発動した時（イベント／【ブロッカー】／【トリガー】） | ON_EVENT_PLAY | イベント発動（メイン／カウンター／効果）・ブロック宣言・ライフ【トリガー】の発動 |
+| 〜を登場させた時 | ON_OPP_PLAY | キャラの登場（元々のコスト・バニラ・手札から・キャラの効果で、を読む） |
+| 場を離れた時／手札に戻った時 | ON_LEAVE | 離脱（`Session.effect_actor` で「自分の／相手の効果で」を判定） |
+| ライフが離れた／0枚になった／手札に加わった時 | ON_LIFE_DECREASE | ライフの離脱（離れた側・行き先・離脱後の枚数を読む） |
+| KOされた時／（このキャラのバトルによって）KOした時 | ON_KO | KO・バトルでの KO |
+| ダメージを与えた時 | ON_DAMAGE_DEALT_TO_LIFE | バトルでのライフ・ダメージ |
+| 引いた時／手札が捨てられた時／バトルしたバトル終了時／他のカードのアタック時 | PASSIVE（または timing タグの YOUR_TURN/OPPONENT_TURN） | 効果ドロー・効果で手札を捨てた・バトル終了・アタック宣言 |
+
+- 反応型句は常在の再計算では実行しない（`passives.rs::is_reactive_passive`）。
+- 「バトルした相手のキャラ」は `ref_id: "trigger_subject"`（誘発の契機カード＝`PendingTrigger.subject`）。
+- 「このバトル終了時、〜」は `delay: "BATTLE_END"`（`finish_attack` で解決・発生源が場に居なければ捨てる）。
+- 「効果で自分の手札が捨てられているターン中」は `EVENT_THIS_TURN("HAND_DISCARDED_BY_EFFECT_SEAT")`。
+- 「公開したカードのコスト1につき」は `ValueSource.dynamic_source = "REVEALED_CARD_COST"`。
+
 ## 既知のパース制約（未対応・要確認）
 
 テストで固定していない、パース側の既知制約。エンジン全体の制約は `SPEC.md §6.1`。

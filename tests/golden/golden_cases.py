@@ -487,7 +487,7 @@ CASES = [
                 "effect": {
                     "kind": "action",
                     "type": "REPLACE_EFFECT",
-                    "status": "LEAVE",
+                    "status": "EFFECT_KO,BATTLE_KO",
                     "sub_effect": {"type": "DISCARD", "target": {"zone": "HAND"}},
                 },
             }
@@ -754,7 +754,7 @@ CASES = [
                 "effect": {
                     "kind": "action",
                     "type": "GRANT_KEYWORD",
-                    "status": "速攻",
+                    "status": "速攻:キャラ",     # 「キャラへアタックできる」は【速攻:キャラ】（リーダー不可・2026-10-01）
                     "duration": "PERMANENT",
                 }
             }
@@ -1997,7 +1997,7 @@ CASES = [
         "id": "don_return_deck_optional",
         "text": "相手は自身のアクティブのドン‼1枚をドン‼デッキに戻してもよい。",
         "expect": [
-            {"effect": {"kind": "action", "type": "RETURN_DON", "value": 1, "status": "OPPONENT"}}
+            {"effect": {"kind": "action", "type": "RETURN_DON", "value": 1, "status": "OPPONENT_ACTIVE"}}
         ],
     },
     # ----- 「任意の枚数」可変選択（is_up_to + 大きめ count で 0..N 選択） ----
@@ -2159,11 +2159,13 @@ CASES = [
         "text": "【登場時】自分のトラッシュのコスト4以下のキャラカード1枚までとコスト2以下のキャラカード1枚までを選び、1枚を登場させ、残りをレストで登場させる。",
         "expect": [
             {"trigger": "ON_PLAY", "effect": {"kind": "seq", "actions": [
+                # 各ティアから選んだ 2 枚のうち 1 枚（プレイヤーが選ぶ）をアクティブで、残りをレストで登場
                 {"kind": "seq", "actions": [
-                    {"type": "PLAY_CARD", "target": {"zone": "TRASH", "cost_max": 4}},
-                    {"type": "PLAY_CARD", "status": "RESTED", "target": {"zone": "TRASH", "cost_max": 2}},
+                    {"type": "SELECT", "target": {"zone": "TRASH", "cost_max": 4}},
+                    {"type": "SELECT", "target": {"zone": "TRASH", "cost_max": 2}},
+                    {"type": "PLAY_CARD", "target": {"select_mode": "GROUP_FIRST", "ref_id": "_sel_a+_sel_b"}},
                 ]},
-                {"type": "PLAY_CARD", "target": {"zone": "TEMP"}},
+                {"type": "PLAY_CARD", "status": "RESTED", "target": {"zone": "TEMP", "select_mode": "REMAINING"}},
             ]}}
         ],
     },
@@ -2208,7 +2210,9 @@ CASES = [
                  ]}},
                 {"kind": "branch",
                  "condition": {"type": "TRASH_COUNT", "operator": "GE", "value": 20},
-                 "if_true": {"type": "BUFF", "status": "POWER_OVERRIDE", "value": 7000}},
+                 "if_true": {"kind": "branch",
+                             "condition": {"type": "CONTEXT", "value": "OPPONENT_TURN"},
+                             "if_true": {"type": "BUFF", "status": "POWER_OVERRIDE", "value": 7000}}},
                 {"kind": "branch",
                  "condition": {"type": "TRASH_COUNT", "operator": "GE", "value": 30},
                  "if_true": {"type": "BUFF", "value": 1000}},
@@ -2264,7 +2268,7 @@ CASES = [
         "id": "scoped_rush_traits",
         "text": "自分の特徴《SWORD》を持つキャラは、登場したターンにキャラへアタックできる。",
         "expect": [
-            {"effect": {"kind": "action", "type": "GRANT_KEYWORD", "status": "速攻",
+            {"effect": {"kind": "action", "type": "GRANT_KEYWORD", "status": "速攻:キャラ",
                         "target": {"traits": ["SWORD"], "select_mode": "ALL"}}}
         ],
     },
@@ -2436,11 +2440,14 @@ CASES = [
         "id": "eb03_055_robin_double_tag",
         "text": "【登場時】自分のライフの上から1枚をトラッシュに置くことができる:自分のリーダーが特徴《麦わらの一味》を持つ場合、自分のデッキの上から2枚までを、ライフの上に加える。 / 【相手のターン中】【KO時】相手に1ダメージを与えてもよい。",
         "expect": [
+            # コストを持つ能力の効果側条件は能力全体へ持ち上げず効果の Branch に残す
+            # （条件偽でもコストは払え効果だけ不発・ユーザ決定 2026-10-01）。
             {"trigger": "ON_PLAY",
-             "condition": {"type": "LEADER_TRAIT", "value": "麦わらの一味"},
              "cost": {"kind": "action", "type": "TRASH",
                       "target": {"player": "SELF", "zone": "LIFE"}},
-             "effect": {"kind": "action", "type": "HEAL", "value": 2}},
+             "effect": {"kind": "branch",
+                        "condition": {"type": "LEADER_TRAIT", "value": "麦わらの一味"},
+                        "if_true": {"type": "HEAL", "value": 2}}},
             {"trigger": "ON_KO",
              "condition": {"type": "CONTEXT", "value": "OPPONENT_TURN"},
              "effect": {"kind": "action", "type": "DEAL_DAMAGE", "value": 1}},

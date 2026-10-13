@@ -102,6 +102,11 @@ make test-fast   # 開発中のイテレーション用（slow・cpu_infra除外
 > （合格＝void〔決着せず〕= 0）。ミラー監査では一度も通らない経路があり、そこにしか出ない
 > 欠陥が実在する（2026-08-16 に3件検出）。詳細は `docs/TEST_SPEC.md` §5.0。
 
+> **カード DB（`opcg_sim/data/opcg_cards.json`）を差し替えたら skill `card-effect-audit` を回す**
+> （`make card-audit`）。新カードの効果がパーサで解釈でき・エンジンが読め・本文の句が抜けなく
+> 実行されるかを洗い出し、Claude が 1 枚ずつ意味をレビューして確認済み台帳
+> `tests/fixtures/card_audit_ledger.json` に記録する（手順は `.claude/skills/card-effect-audit/SKILL.md`）。
+
 > **アリーナで新世代を昇格させるときは条件を2本以上測る**（主=ランダム対面×生成デッキ／
 > 副=固定ミラー）。**主条件の生成デッキは 2026-09-10 から `--decks synth_roles`**（除去の型を色ごとに差し込んだ
 > 合成デッキ・実デッキに近い・ユーザ決定・`docs/rust_engine_plan.md` §20.8.8-3）。旧 `synth` は「旧分布への汎化」の

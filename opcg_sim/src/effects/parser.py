@@ -86,6 +86,7 @@ class EffectParser:
         ("相手のキャラがアタックした時", "ON_OPP_ATTACK"),
         ("相手がアタックした時", "ON_OPP_ATTACK"),
         ("ライフが離れた時", "ON_LIFE_DECREASE"),
+        ("レストになった時", "ON_REST"),
     )
 
     def _strip_text_trigger(self, trigger, effect_text: str):
@@ -132,8 +133,21 @@ class EffectParser:
         if not norm or norm.strip() in ['なし', 'None', '']:
             return []
 
+        # 「【ブロッカー】(説明)【自分のターン終了時】…」のように、キーワードの説明括弧の直後へ区切りなしで
+        # 次の能力が続く表記（P-079）。説明括弧が次の能力の本文に混ざり、括弧内の「このカードをレストにし」が
+        # 誤った効果になっていた。キーワード＋説明括弧を別セグメントに切り離す。
+        norm = re.sub(_nfc(r'(【(?:ブロッカー|速攻[^】]*|ダブルアタック|バニッシュ|ブロック不可|貫通)】)\s*[(（][^()（）]*[)）](?=\s*【)'),
+                      r'\1 / ', norm)
+
         segments = re.split(r'\s*/\s*|\n', norm)
         segments = [s.strip() for s in segments if s.strip()]
+
+        # 区切り（` / `・改行）なしで次の能力が続くカード（P-075「…付与する。【アタック時】…」）は、
+        # 句点の直後に別トリガーのタグが始まる位置で能力を分ける。分けないと後半が前半の能力へ畳まれ、
+        # 【登場時】に【アタック時】の効果が走る。
+        _split_re = re.compile(_nfc(
+            r'(?<=。)(?=【(?:登場時|アタック時|KO時|ブロック時|起動メイン|相手のアタック時|自分のターン終了時|相手のターン終了時)】)'))
+        segments = [x.strip() for _seg in segments for x in _split_re.split(_seg) if x.strip()]
 
         # 「以下から…選ぶ」の選択肢項目（` / ` で別セグメントに分かれた「・」項目や
         # 条件付き項目）を、Choice を導入する親セグメントへ `\n` で再結合する。
@@ -168,6 +182,11 @@ class EffectParser:
                     and not self._KEYWORD_ONLY_RE.match(segments[i + 1])):
                 body = re.sub(_nfc(r'^【[^】]+】'), '', segments[i + 1])
                 expanded.append(seg + body)
+                # 「【ドン!!×1】【アタック時】/【ブロック時】…」の【ドン!!×N】は両方のトリガーに掛かる
+                # （ブロック時側の能力にも付ける。OP01-078）。
+                don_tag = re.search(_nfc(r'【ドン[ ]*(?:!!|‼)[ ]*[××][ ]*\d+】'), seg)
+                if don_tag and not re.search(_nfc(r'【ドン[ ]*(?:!!|‼)[ ]*[××][ ]*\d+】'), segments[i + 1]):
+                    segments[i + 1] = don_tag.group(0) + segments[i + 1]
             else:
                 expanded.append(seg)
         segments = expanded
@@ -186,6 +205,8 @@ class EffectParser:
                 ab = self.parse_ability(seg)
                 self._normalize_coreference(ab)
                 self._normalize_replacement_alternative(ab)
+                self._defer_condition_after_self_cost(ab)
+                self._link_played_reference(ab)
                 if ab.trigger != TriggerType.UNKNOWN or ab.effect is not None:
                     abilities.append(ab)
                     # 「（このリーダー/キャラが）アタックした時かアタックされた時」は ON_ATTACK と
@@ -195,6 +216,9 @@ class EffectParser:
                             and _nfc("アタックした時かアタックされた時") in _nfc(seg)):
                         import dataclasses
                         abilities.append(dataclasses.replace(ab, trigger=TriggerType.ON_OPP_ATTACK))
+                    # 「KOされた時か、（相手の効果で）場を離れた時」は ON_KO 1 本のまま持つ（OP10-042）。
+                    # ON_LEAVE へ複製すると相手の効果で KO されたとき両方が誘発し【ターン1回】も割れる。
+                    # 離脱側（バウンス等）はエンジンが ON_KO 能力の句を読んで積む。
             except Exception as e:
                 pass
 
@@ -264,10 +288,125 @@ class EffectParser:
             q = getattr(n, "target", None)
             return q is not None and q.ref_id == "selected_card"
 
-        if not any(is_producer(n) for n in nodes):
+        # 「捨てたカードと同じカード名」（SAME_NAME_AS:discarded_card）の参照元＝コストの捨て札を保存させる。
+        if any(f.startswith("SAME_NAME_AS:") for n in nodes
+               for f in (getattr(getattr(n, "target", None), "flags", None) or ())):
             for n in nodes:
-                if is_consumer(n):
-                    n.target.ref_id = None
+                tq = getattr(n, "target", None)
+                if (isinstance(n, GameAction) and n.type == ActionType.DISCARD and tq is not None
+                        and tq.save_id is None):
+                    tq.save_id = "discarded_card"
+
+        # 「その後、そのキャラのコスト/パワーがN以下の場合、KOする」= 直前に選んだキャラへの条件付き実行。
+        # 未評価の GENERIC 条件＋対象なしの KO になっていた（OP06-074/OP09-098）。選んだキャラへの
+        # 参照（ref_id）にコスト/パワーの上下限を持たせ、エンジンが参照先を絞って実行する（REF_FILTER）。
+        if any(is_producer(n) for n in nodes):
+            for n in nodes:
+                cond = getattr(n, "condition", None)
+                act = getattr(n, "if_true", None)
+                if not (isinstance(n, Branch) and cond is not None and cond.type == ConditionType.GENERIC
+                        and isinstance(act, GameAction)):
+                    continue
+                if re.search(_nfc(r"(?:選んだ|その)キャラのコストが(?:その|選んだ)キャラに付与されているドン[!‼]+の枚数と同じ"),
+                             cond.raw_text or ""):
+                    # 選んだキャラのコスト＝付与ドン!!枚数（OP15-031）。数値比較ではなく参照先どうしの比較。
+                    act.target = TargetQuery(ref_id="selected_card",
+                                             flags={"REF_FILTER", "REF_COST_EQ_ATTACHED_DON"})
+                    act.raw_text = f"{cond.raw_text}、{act.raw_text}" if act.raw_text else cond.raw_text
+                    n.condition = None
+                    continue
+                m = re.search(_nfc(r"そのキャラの(コスト|パワー)が(\d+)(以下|以上)"), cond.raw_text or "")
+                if not m:
+                    continue
+                tq = TargetQuery(ref_id="selected_card", flags={"REF_FILTER"})
+                v = int(m.group(2))
+                if m.group(1) == _nfc("コスト"):
+                    if m.group(3) == _nfc("以下"):
+                        tq.cost_max = v
+                    else:
+                        tq.cost_min = v
+                elif m.group(3) == _nfc("以下"):
+                    tq.power_max = v
+                else:
+                    tq.power_min = v
+                act.target = tq
+                # 消した条件句の本文も実行ノードの raw_text に残す（本文照合で「句が抜けた」扱いにしない）。
+                act.raw_text = f"{cond.raw_text}、{act.raw_text}" if act.raw_text else cond.raw_text
+                n.condition = None
+        if not any(is_producer(n) for n in nodes):
+            # 直前の PLAY_CARD（「登場させた場合、そのキャラは…」）が producer の代わりになる:
+            # 登場させたカードを save_id="played_card" に保存し、「そのキャラ」をそこへ結ぶ
+            # （OP12-058。従来は ref を外して自軍の任意のキャラを選ばせていた）。
+            played = None
+            for n in nodes:
+                tq = getattr(n, "target", None)
+                if (isinstance(n, GameAction) and n.type == ActionType.PLAY_CARD
+                        and tq is not None and tq.select_mode != "SOURCE" and tq.ref_id is None):
+                    played = n
+                elif is_consumer(n):
+                    if played is not None:
+                        played.target.save_id = "played_card"
+                        n.target.ref_id = "played_card"
+                    else:
+                        n.target.ref_id = None
+
+    def _defer_condition_after_self_cost(self, ability) -> None:
+        """「このキャラをトラッシュに置く／手札に戻すことができる：自分のトラッシュが15枚以上ある場合、…」の
+        ように、コストで自身を場から外す能力が、そのコストで数が変わる枚数条件を持つとき、条件を
+        コスト支払い後に評価する（効果側の Branch へ移す）。
+
+        従来は条件が能力レベルでコストの前に評価され、(a) 自身をトラッシュへ送って 15 枚に届く
+        OP15-083 は 14 枚で不発、(b) 自身を戻す P-081 は戻す本人を数えていた。
+        対象は「自身を除去するコスト」×「トラッシュ／場の枚数条件（自分側）」に限る（影響範囲を絞る）。
+        """
+        cond, cost = ability.condition, ability.cost
+        if cond is None or cost is None or ability.effect is None:
+            return
+        if cond.type not in (ConditionType.TRASH_COUNT, ConditionType.FIELD_COUNT):
+            return
+        if cond.player != Player.SELF and cond.type == ConditionType.TRASH_COUNT:
+            return
+        nodes = cost.actions if isinstance(cost, Sequence) else [cost]
+        removes_self = any(
+            isinstance(a, GameAction) and a.target is not None
+            and a.type in (ActionType.TRASH, ActionType.BOUNCE, ActionType.DECK_BOTTOM)
+            and (a.target.ref_id == "self" or a.target.select_mode == "SOURCE")
+            for a in nodes)
+        if not removes_self:
+            return
+        ability.effect = Branch(condition=cond, if_true=ability.effect)
+        ability.condition = None
+
+    def _link_played_reference(self, ability) -> None:
+        """「この効果で登場させたキャラ」= 直前の PLAY_CARD が実際に登場させたカードへの厳密参照。
+
+        後続ノード（速攻付与・終了時のデッキ下 等）の対象を ref_id="played_by_effect" にし、
+        直前の PLAY_CARD の対象へ save_id を付ける。付けないと「自分の任意のキャラ」を選んでしまう
+        （OP15-086・OP11-092）。"""
+        nodes = []
+
+        def walk(node):
+            if node is None:
+                return
+            nodes.append(node)
+            for f in ("if_true", "if_false"):
+                walk(getattr(node, f, None))
+            for f in ("actions", "options"):
+                for child in (getattr(node, f, None) or []):
+                    walk(child)
+
+        walk(ability.effect)
+        producer = None
+        for n in nodes:
+            if not isinstance(n, GameAction):
+                continue
+            if n.type == ActionType.PLAY_CARD and n.target is not None:
+                producer = n
+                continue
+            if producer is not None and _nfc("この効果で登場させた") in _nfc(n.raw_text or ""):
+                producer.target.save_id = "played_by_effect"
+                n.target = TargetQuery(zone=Zone.FIELD, player=Player.SELF, ref_id="played_by_effect",
+                                       card_type=["CHARACTER"], count=1)
 
     def _normalize_replacement_alternative(self, ability) -> None:
         """『（先行効果）の代わりに（後続効果）』= 択一の整形。
@@ -303,17 +442,64 @@ class EffectParser:
             cur_cond = getattr(cur, "condition", None)
             prev = acts[i - 1]
             prev_cond = getattr(prev, "condition", None)
+            # 「Aの代わりにBを選ぶ」（OP04-094）: 先行の除去 A の対象を B の対象へ差し替える択一。
+            sel_m = re.search(_nfc(r'の代わりに(?P<y>[^。]+?)を選ぶ'), text)
+            if (sel_m and cur_cond is not None and isinstance(cur, Branch)
+                    and isinstance(cur.if_true, GameAction) and cur.if_true.type == ActionType.SELECT):
+                base = prev.if_true if isinstance(prev, Branch) else prev
+                if isinstance(base, GameAction) and base.target is not None:
+                    import copy
+                    alt = copy.deepcopy(base)
+                    alt.target = parse_target(_nfc(sel_m.group("y")))
+                    alt.target.is_up_to = base.target.is_up_to
+                    alt.target.count = base.target.count
+                    alt.raw_text = _nfc(cur.if_true.raw_text or text)
+                    not_cur = Condition(type=ConditionType.NOT, args=[cur_cond])
+                    if isinstance(prev, Branch):
+                        prev.condition = (not_cur if prev_cond is None else Condition(
+                            type=ConditionType.AND, args=[prev_cond, not_cur]))
+                    else:
+                        acts[i - 1] = Branch(condition=not_cur, if_true=prev)
+                    acts[i] = Branch(condition=cur_cond, if_true=alt)
+                    continue
             if cur_cond is None or prev_cond is None:
                 continue
             prev.condition = Condition(
                 type=ConditionType.AND,
                 args=[prev_cond, Condition(type=ConditionType.NOT, args=[cur_cond])],
             )
+            # B は A を置き換えるので、A が行われる場面（A の条件成立）でだけ成立する
+            # （OP04-040: ライフ＋手札が4枚以下でない時にコスト8以上だけで HEAL が出てはいけない）。
+            cur.condition = Condition(type=ConditionType.AND, args=[prev_cond, cur_cond])
+            # 「Aの代わりにBできる」の B が任意（できる）で A が単一の行動なら、B を断ったときは
+            # A を行う（B だけの任意枝だと断った場合に A も B も起きない・OP04-040）。
+            # 択一（Choice）にして、どちらかを必ず行う。
+            cur_act = getattr(cur, "if_true", None)
+            prev_act = getattr(prev, "if_true", None)
+            if (isinstance(cur, Branch) and isinstance(prev, Branch)
+                    and isinstance(cur_act, GameAction) and isinstance(prev_act, GameAction)
+                    and cur_act.is_optional and getattr(cur, "if_false", None) is None
+                    and getattr(prev, "if_false", None) is None):
+                import copy
+                new_act = copy.deepcopy(cur_act)
+                new_act.is_optional = False
+                old_act = copy.deepcopy(prev_act)
+                cur.if_true = Choice(
+                    message=_nfc("効果を選択してください"),
+                    options=[new_act, old_act],
+                    option_labels=[new_act.raw_text or "", old_act.raw_text or ""],
+                )
 
     # 「手札のこのカードは、…コスト±N」の符号記号
     _HAND_COST_RE = re.compile(
         _nfc(r'^手札のこのカードは[、,]\s*(?P<cond>.+?)[、,]\s*コスト[ 　]*'
              r'(?P<sign>[+＋\-－−‐])[ 　]*(?P<n>\d+)。?$')
+    )
+
+    # 「手札のこのカードは、…、カウンター+Nを持つ」
+    _HAND_COUNTER_RE = re.compile(
+        _nfc(r'^手札のこのカードは[、,]\s*(?P<cond>.+?)[、,]\s*カウンター[ 　]*'
+             r'(?P<sign>[+＋])[ 　]*(?P<n>\d+)を持つ。?$')
     )
 
     def _try_hand_self_cost(self, norm_text: str):
@@ -324,6 +510,11 @@ class EffectParser:
         条件が解釈不能な場合は None を返し、従来経路に委ねる（無条件の常時軽減化を防ぐ）。
         """
         m = self._HAND_COST_RE.match(norm_text)
+        status = "COST_REDUCTION"
+        if not m:
+            # 手札のこのカードのカウンター値の常在付与（OP17-118）。コストと同じ仕組みで手札の自己値を直す。
+            m = self._HAND_COUNTER_RE.match(norm_text)
+            status = "COUNTER"
         if not m:
             return None
         cond_text = m.group("cond")
@@ -344,7 +535,7 @@ class EffectParser:
             type=ActionType.BUFF,
             target=target,
             value=ValueSource(base=value),
-            status="COST_REDUCTION",
+            status=status,
             duration="INSTANT",
             raw_text=norm_text,
         )
@@ -364,7 +555,7 @@ class EffectParser:
             # 保全する（後段の clean_text がタグを除去するとスコープが失われ、全効果無効と
             # 区別できなくなるため）。同時に、この【登場時】がトリガー誤検出（ON_PLAY）の原因に
             # なっていたのを解消する（このセグメントの真のトリガーは【起動メイン】等）。OP09-081。
-            norm_text = re.sub(_nfc(r'(相手の)【(登場時)】(効果)'), r'\1\2\3', norm_text)
+            norm_text = re.sub(_nfc(r'(相手の|自分の)【(登場時)】(効果)'), r'\1\2\3', norm_text)
 
             # 参照発動「このカードの【登場時】/【KO時】効果を発動する」の参照タグも
             # 非タグ化して保全する（clean_text のタグ除去で参照先が消え、常に
@@ -453,13 +644,18 @@ class EffectParser:
                 # 自動誘発トリガーでは発動前に使用確認を挟むためのフラグ（resolver が参照）。
                 if _nfc("できる") in cost_text or _nfc("してもよい") in cost_text:
                     cost_optional = True
+                # 「ドン!!-N」はルール上「ドン!!をN枚戻すことができる」＝任意の支払い（括弧の注釈が
+                # 無い【トリガー】「ドン!!-1:」でも払うかを選べる＝EB01-038/OP12-075）。
+                if re.match(_nfc(r'^ドン[ 　]*(?:!!|‼)[ 　]*[-－−‐][ 　]*\d+'), cost_text.strip()):
+                    cost_optional = True
                 # ただし起動メインで「源自身を消費する」コスト（このキャラ/リーダー/ステージ/カードを
                 # rest/trash/手札に戻す/デッキ下 等）は**必須**＝「できる」は起動の任意性であってコストの
                 # 任意性ではない（2026-06-27: パーサが一律 optional 化していたため、レストを断って無制限
                 # 起動できる不具合があった＝REPEAT_CAP が覆い隠していた）。源を消費するので自己制限が効く。
                 if (cost_optional and trigger == TriggerType.ACTIVATE_MAIN
-                        and any(_nfc(s) in cost_text for s in
-                                ("このキャラ", "このリーダー", "このステージ", "このカード"))):
+                        and (re.search(_nfc(r"このキャラ(?!以外)"), cost_text)
+                             or any(_nfc(s) in cost_text for s in
+                                    ("このリーダー", "このステージ", "このカード")))):
                     cost_optional = False
 
             # 【ドン!!×N】は「このカードにドン!!がN枚以上付与されている」発動条件であり、
@@ -489,6 +685,7 @@ class EffectParser:
             if trigger == TriggerType.GAME_START:
                 effect_text = re.sub(_nfc(r'^ゲーム開始時、'), '', effect_text).strip()
 
+            played_subject_clause = False
             # 効果本体の解析
             # 埋め込み反応型トリガー（本文の「〜時、」）が認識された能力では、効果文先頭に残る
             # そのトリガー句を除去する。残すと parse_target が KO 条件のフィルタ（特徴/パワー/枚数）を
@@ -496,10 +693,34 @@ class EffectParser:
             # ライフ1枚を手札に加える」で MOVE_CARD 対象にアマゾン・リリー/九蛇/power5000 が混入）。
             if trigger in (TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE,
                            TriggerType.ON_LEAVE, TriggerType.ON_EVENT_PLAY, TriggerType.ON_OPP_PLAY,
-                           TriggerType.ON_REST):
+                           TriggerType.ON_REST, TriggerType.ON_LIFE_DECREASE):
                 effect_text = re.sub(
-                    _nfc(r'^[^。：:]*?(?:された|なった|与えた|離れた|発動した|登場させた)時、'),
+                    _nfc(r'^[^。：:]*?(?:された|なった|与えた|離れた|発動した|登場させた|'
+                         r'戻った|加わった|KOした)時、'),
                     '', effect_text).strip()
+            elif trigger in (TriggerType.YOUR_TURN, TriggerType.OPPONENT_TURN, TriggerType.PASSIVE):
+                # エンジンが誘発句を raw_text から読む常在型の反応（引いた時／捨てられた時／バトル終了時）。
+                # 句が効果本体に残ると対象解析が句の語を拾う（OP05-053 の「ドローフェイズ以外」等）。
+                effect_text = re.sub(
+                    _nfc(r'^[^。：:]*?(?:カードを引いた|手札が捨てられた|バトルしたバトル終了|'
+                         r'アタックされた|アタックした|ドン[!！‼]*が付与された)時、'),
+                    '', effect_text).strip()
+                # 「自分の…キャラが登場した時、そのキャラは〜」（OP16-079）: 誘発句を除き、「そのキャラ」は
+                # 登場したカード（エンジンが契機カードとして積む trigger_subject）を指す。
+                _m_played = re.match(
+                    _nfc(r'^(?![^。：:]*?このキャラが登場した時)[^。：:]*?キャラが登場した時、'), effect_text)
+                if _m_played:
+                    effect_text = effect_text[_m_played.end():].strip()
+                    played_subject_clause = True
+
+            # 「〜を捨てて発動できる。X」＝手札を捨てるのは発動コスト（任意）。効果側に残すと
+            # 捨てられなくても X が実行される（OP17-040）。
+            if cost_node is None:
+                m_inline = re.match(_nfc(r'^(.+?を捨て)て発動できる[。、]?(.*)$'), effect_text, re.DOTALL)
+                if m_inline and m_inline.group(2).strip():
+                    cost_node = self._parse_cost_node(m_inline.group(1) + _nfc('ることができる'))
+                    effect_text = m_inline.group(2).strip()
+                    cost_optional = True
 
             # 効果先頭のゲート条件「〜の場合、」は、後続が単一文（内部に「。」が無く、連用形で
             # 連なる複数アクション）のとき ability.condition へ引き上げる。従来は先頭アクションのみ
@@ -516,10 +737,26 @@ class EffectParser:
                 effect_gate_cond = _lead_cond
                 effect_text = _lead_rest
 
+            # 置換文は「限定句」と「代わりに〜」の本体に分け、限定句は除去されるカードの TargetQuery
+            # （OPPONENT_REMOVAL.target）と前置条件で表す（本文の限定語を落とさない）。
+            repl_split = self._split_replacement(effect_text)
+            if repl_split is not None:
+                effect_text = repl_split["body"]
+
             effect_node = self._parse_to_node(effect_text)
+            if played_subject_clause:
+                self._bind_trigger_subject(effect_node)
 
             # カテゴリH: 先頭ゲート条件が「。その後、」をまたいで後続を無条件化する漏れを是正する。
-            effect_node = self._lift_h_gate(effect_node)
+            effect_node = self._lift_h_gate(effect_node, effect_text)
+
+            # コスト（「：」の前）を持つ能力の効果側条件は、能力全体ではなく効果ノード側に残す
+            # （ユーザ決定 2026-10-01）。公式ルールでは条件が偽でもコストは払え、効果だけが不発になる
+            # （OP05-082/OP10-118/OP12-094/OP09-060/OP15-074）。「A。その後、B」の B まで条件が係る。
+            # コストなし・条件が「：」の前（cost_gate_cond）・見出しの条件は従来どおり能力全体。
+            if effect_gate_cond is not None and cost_node is not None and effect_node is not None:
+                effect_node = Branch(condition=effect_gate_cond, if_true=effect_node, if_false=None)
+                effect_gate_cond = None
 
             # ゲーム開始時のデッキサーチはルール上シャッフルを伴う（OP13-079）。
             if (trigger == TriggerType.GAME_START and effect_node is not None
@@ -573,6 +810,7 @@ class EffectParser:
                 and self._node_moves_life(cost_node))
             if (isinstance(effect_node, Branch) and effect_node.if_false is None
                     and effect_node.condition is not None
+                    and cost_node is None
                     and not _cost_changes_life):
                 if final_condition is None:
                     final_condition = effect_node.condition
@@ -588,6 +826,12 @@ class EffectParser:
             if (activation_optional and isinstance(effect_node, GameAction)
                     and effect_node.type != ActionType.OTHER):
                 effect_node.is_optional = True
+            elif (activation_optional and isinstance(effect_node, Sequence) and effect_node.actions
+                    and isinstance(effect_node.actions[0], GameAction)
+                    and effect_node.actions[0].type != ActionType.OTHER
+                    and not effect_node.actions[0].is_optional):
+                # 複合効果の「発動できる」は先頭の動作を確認点にする（PRB02-009）。
+                effect_node.actions[0].is_optional = True
 
             # 置換効果（「(このキャラ/他のキャラが)KOされる/場を離れる場合、代わりに〜」）。
             # 「…される場合」はゲート条件ではなくトリガー文脈なので、REPLACE_EFFECT で
@@ -595,14 +839,41 @@ class EffectParser:
             # 自身の置換（このキャラ）は条件が status に包含されるので ab.condition は不要。
             # 他のキャラを守る型は OPPONENT_REMOVAL 条件を保持し、_active_replacement で評価。
             repl_status = self._replacement_status(_nfc(text))
+            if repl_split is not None and effect_node is not None:
+                repl_status = repl_split["status"]
+            # 効果側の「〜することができる」（コストの「できる：」ではなく動作そのものが任意）。
+            # 置換（代わりに〜）と常在（PASSIVE）は別扱い（置換の任意は下のコメント参照）。
+            if not repl_status and trigger != TriggerType.PASSIVE:
+                self._mark_optional_effects(effect_node)
             if repl_status and effect_node is not None:
+                # 「代わりに〜できる／てもよい」は任意の置換（払うかを選べる）。バトル KO・効果除去の
+                # どちらもエンジンが sub_effect の is_optional を見て先に確認する
+                # （accept→置換・decline→本来の KO／除去）。
+                if re.search(_nfc(r"できる|てもよい"), _nfc(text)):
+                    if isinstance(effect_node, GameAction):
+                        effect_node.is_optional = True
+                    elif (isinstance(effect_node, Sequence) and effect_node.actions
+                            and isinstance(effect_node.actions[0], GameAction)):
+                        # 「〜し、〜できる」の複合は全体が任意（先頭の動作が確認点）。
+                        effect_node.actions[0].is_optional = True
+                if repl_split is not None:
+                    self._fix_replacement_self_targets(
+                        effect_node,
+                        any(c.type == ConditionType.OPPONENT_REMOVAL for c in repl_split["conds"]))
                 effect_node = GameAction(
                     type=ActionType.REPLACE_EFFECT,
                     status=repl_status,
                     sub_effect=effect_node,
                     raw_text=_nfc(text),
                 )
-                if _nfc("このキャラ") in _nfc(text):
+                if repl_split is not None:
+                    parts = [c for c in (turn_limit_cond, ctx_cond, don_cond, *repl_split["conds"])
+                             if c is not None]
+                    final_condition = None
+                    for c in parts:
+                        final_condition = c if final_condition is None else Condition(
+                            type=ConditionType.AND, args=[final_condition, c])
+                elif _nfc("このキャラ") in _nfc(text):
                     # 自己置換は除去ゲート（「KOされる場合」）が status に包含されるため
                     # 条件は不要だが、【ターン1回】の使用回数制限だけは保持する
                     # （None で捨てると per-turn 制限が落ちて同一ターンに複数回発動してしまう）。
@@ -627,6 +898,35 @@ class EffectParser:
         except Exception as e:
             return Ability(trigger=TriggerType.UNKNOWN, effect=None, raw_text=_nfc(text))
 
+    _OPTIONAL_END_RE = re.compile(_nfc(r"(?:ことが|に)できる$"))
+    _OPTIONAL_TYPES = frozenset({
+        ActionType.MOVE_CARD, ActionType.DRAW, ActionType.DISCARD, ActionType.TRASH,
+        ActionType.DECK_BOTTOM, ActionType.BOUNCE, ActionType.PLAY_CARD, ActionType.HEAL,
+        ActionType.RETURN_DON, ActionType.REVEAL, ActionType.REST, ActionType.ACTIVE, ActionType.KO,
+    })
+
+    def _mark_optional_effects(self, node):
+        """効果ツリーの GameAction のうち、本文が「〜することができる」で終わるものを任意にする。
+
+        「手札に加えることができる」「カード1枚を引くことができる」は、使うかをプレイヤーが選べる
+        （従来は てもよい だけが任意で、強制実行になっていた・2026-10-01 カード効果監査）。
+        「アタックできる」「レストにできない」等の付与・制限は対象の種別で除外している。
+        """
+        if node is None:
+            return
+        if isinstance(node, GameAction):
+            if (node.type in self._OPTIONAL_TYPES and not node.is_optional
+                    and self._OPTIONAL_END_RE.search(_nfc(node.raw_text or ""))
+                    and not _nfc(node.raw_text or "").startswith(_nfc("代わりに"))):
+                node.is_optional = True
+            return
+        for child in (getattr(node, "actions", None) or []):
+            self._mark_optional_effects(child)
+        for attr in ("if_true", "if_false"):
+            self._mark_optional_effects(getattr(node, attr, None))
+        for opt in (getattr(node, "options", None) or []):
+            self._mark_optional_effects(opt)
+
     def _apply_opponent_self_chooser(self, node):
         """effect/cost ツリーを走査し、「相手は自身の〜」（相手が自分のカードを処理する）
         アクションの対象選択者を相手プレイヤー（chooser=OPPONENT）に設定する。
@@ -642,7 +942,10 @@ class EffectParser:
             raw = _nfc(getattr(node, "raw_text", "") or "")
             if (tq is not None and getattr(tq, "player", None) == Player.OPPONENT
                     and getattr(tq, "chooser", None) is None
-                    and _nfc("相手は自身の") in raw):
+                    and (_nfc("相手は自身の") in raw
+                         # 「相手の手札N枚を捨てる」も捨てるカードは相手が自分の手札から選ぶ（OP03-078/ST10-010）。
+                         or (node.type == ActionType.DISCARD and tq.zone == Zone.HAND
+                             and _nfc("相手の手札") in raw))):
                 tq.chooser = Player.OPPONENT
             self._apply_opponent_self_chooser(getattr(node, "sub_effect", None))
             return
@@ -656,8 +959,128 @@ class EffectParser:
             return
         if isinstance(node, Choice):
             for o in node.options:
+                # 「相手は以下から1つを選ぶ。・カード2枚を引く」のドローは選んだ相手が引く（OP17-049）。
+                if (node.player == Player.OPPONENT and isinstance(o, GameAction)
+                        and o.type == ActionType.DRAW and o.target is None):
+                    o.target = TargetQuery(player=Player.OPPONENT, zone=Zone.DECK,
+                                           count=max(o.value.base, 1))
                 self._apply_opponent_self_chooser(o)
             return
+
+    _REPL_HEAD_RE = re.compile(
+        _nfc(r'^(?P<head>[^。]+?場合)(?:か、?(?P<head2>[^。]+?場合))?、(?P<body>.*代わりに.*)$'), re.DOTALL)
+    _REPL_CLAUSE_RE = re.compile(
+        _nfc(r'^(?:(?P<lead>自分のリーダーが[^、]*?)、)?(?P<subj>.+?)(?:が|は)'
+             r'(?P<mod>相手の効果で|相手によって|効果によって|効果で|バトルで)?'
+             r'(?P<kind>KOされる|場を離れる)場合$'))
+    _REPL_CLAUSE2_RE = re.compile(
+        _nfc(r'^(?P<mod>相手の効果で|相手によって|効果によって|効果で|バトルで)?(?P<kind>KOされる|場を離れる)場合$'))
+
+    @staticmethod
+    def _repl_status_of(mod, kind) -> str:
+        """置換の対象除去種別。KOされる＝効果KO(EFFECT_KO)／バトルKO(BATTLE_KO)、場を離れる＝LEAVE
+        （修飾が無ければバトルKOも含む）。複数はカンマ区切り（エンジンが分割して照合する）。"""
+        if mod == _nfc("バトルで"):
+            return "BATTLE_KO"
+        if kind == _nfc("KOされる"):
+            return "EFFECT_KO" if mod else "EFFECT_KO,BATTLE_KO"
+        return "LEAVE" if mod else "LEAVE,BATTLE_KO"
+
+    def _split_replacement(self, effect_text: str):
+        """置換文「〈除去されるカードの限定〉が〈KOされる／場を離れる〉場合、代わりに〜」を分解する。
+
+        戻り値: {status, body, conds}。conds は除去されるカードの限定（TargetQuery 付きの
+        OPPONENT_REMOVAL）と「自分のリーダーが〜」等の前置条件。分解できなければ None。
+        """
+        t = _nfc(effect_text).strip()
+        m = self._REPL_HEAD_RE.match(t)
+        if not m:
+            return None
+        head = m.group("head")
+        # 「KOされるか（、）相手の効果で場を離れる場合」（OP13-046）は 1 つの節に 2 つの除去種別。
+        dual = re.match(_nfc(r'^(?P<pre>.+?)(?:が|は)KOされるか、?(?P<mod>相手の効果で|相手によって)場を離れる場合$'), head)
+        if dual:
+            head = dual.group("pre") + _nfc("がKOされる場合")
+            extra_status = self._repl_status_of(dual.group("mod"), _nfc("場を離れる"))
+        else:
+            extra_status = None
+        c1 = self._REPL_CLAUSE_RE.match(head)
+        if not c1:
+            return None
+        statuses = [self._repl_status_of(c1.group("mod"), c1.group("kind"))]
+        if extra_status:
+            statuses.append(extra_status)
+        if m.group("head2"):
+            c2 = self._REPL_CLAUSE2_RE.match(m.group("head2"))
+            if not c2:
+                return None
+            statuses.append(self._repl_status_of(c2.group("mod"), c2.group("kind")))
+        status = ",".join(dict.fromkeys(",".join(statuses).split(",")))
+        conds = []
+        lead = c1.group("lead")
+        if lead:
+            lc = self._parse_condition_obj(lead)
+            if lc is not None and lc.type != ConditionType.GENERIC:
+                conds.append(lc)
+        subj = c1.group("subj")
+        if subj != _nfc("このキャラ") and subj != _nfc("このリーダー"):
+            tq = parse_target(subj)
+            if _nfc("このキャラ以外") not in subj:
+                # 「「X」以外の〜」は名前の除外であって保護者の除外ではない。
+                tq.flags.discard("EXCLUDE_SOURCE")
+            tq.count = 1
+            conds.append(Condition(
+                type=ConditionType.OPPONENT_REMOVAL, target=tq,
+                value={"trigger": "KO" if _nfc("KOされる") in m.group("head") else "LEAVE"},
+                player=Player.SELF, raw_text=m.group("head")))
+        body = m.group("body")
+        # 「キャラの「X」がいる場合、この効果は無効になる」は置換自体の無効化条件（エンジンが raw_text から読む）。
+        body = re.sub(_nfc(r'。?キャラの「[^」]+」がいる場合、この効果は無効になる。?$'), '', body).strip()
+        # 「そのキャラは〜代わりに、…」の「そのキャラ」は除去されるカード（保護者ではない）。
+        body = re.sub(_nfc(r'^そのキャラは(?:KOされる|場を離れる)代わりに、?'), _nfc('代わりに、そのキャラを、'), body)
+        return {"status": status, "body": body, "conds": conds}
+
+    def _bind_trigger_subject(self, node) -> None:
+        """「そのキャラ」（ref_id=selected_card）を誘発の契機カード（trigger_subject）へ付け替える。"""
+        if node is None:
+            return
+        for a in getattr(node, "actions", None) or []:
+            self._bind_trigger_subject(a)
+        for k in ("if_true", "if_false", "sub_effect"):
+            self._bind_trigger_subject(getattr(node, k, None))
+        tq = getattr(node, "target", None)
+        if tq is not None and tq.ref_id == "selected_card":
+            tq.ref_id = "trigger_subject"
+
+    def _fix_replacement_self_targets(self, node, other_subject: bool = False) -> None:
+        """置換の本体（代わりに〜）の「このキャラを／そのキャラを」の対象を直す。
+
+        「このキャラ」＝置換能力の持ち主（SOURCE）、「そのキャラ」＝除去されるカード
+        （ref_id=removed_card・エンジンが置換実行時に保存する）。汎用の対象解析は両方を
+        場の任意のキャラ選択（持ち主句があれば ALL）にしてしまう。
+        """
+        if node is None:
+            return
+        for a in getattr(node, "actions", None) or []:
+            self._fix_replacement_self_targets(a, other_subject)
+        if not isinstance(node, GameAction) or node.target is None:
+            return
+        raw = _nfc(node.raw_text or "")
+        if (other_subject and node.type == ActionType.MOVE_CARD and node.target.select_mode == "SOURCE"
+                and not re.search(_nfc(r'このキャラ|そのキャラ'), raw)):
+            # 他のキャラを守る置換の「代わりに〜ライフの上に加える」は主語が省かれ、動かすのは
+            # 離れる側のキャラ（除去されるカード）。保護者（SOURCE）ではない（OP11-101）。
+            node.target.ref_id = "removed_card"
+            node.target.select_mode = "CHOOSE"
+        elif re.search(_nfc(r'そのキャラを'), raw):
+            node.target.ref_id = "removed_card"
+            node.target.select_mode = "CHOOSE"
+        elif re.search(_nfc(r'(?:代わりに|、)このキャラを'), raw) and node.target.select_mode != "SOURCE":
+            node.target.select_mode = "SOURCE"
+            node.target.player = Player.SELF
+            node.target.count = 1
+        if node.sub_effect is not None:
+            self._fix_replacement_self_targets(node.sub_effect, other_subject)
 
     def _replacement_status(self, norm_text: str) -> Optional[str]:
         """置換効果（「代わりに〜」）の対象除去種別を返す。
@@ -675,9 +1098,10 @@ class EffectParser:
     # 効果文先頭の「〈イベント〉した時、」をターン内イベント条件へ写像する定義。
     # (正規表現, イベント名, 最小回数)。先頭マッチのみ採用し、本文から除去する。
     _EVENT_CLAUSE_PATTERNS = (
-        (r'^自分の場のドン[ 　]*(?:!!|‼)?が(\d+)枚以上[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED", None),
-        (r'^自分の場のドン[ 　]*(?:!!|‼)?が[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED", 1),
-        (r'^[^。]*?キャラが自分の効果で場を離れた時、', "CHAR_LEFT_BY_OWN_EFFECT", 1),
+        (r'^(?:自分の)?場のドン[ 　]*(?:!!|‼)?が(\d+)枚以上[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED", None),
+        (r'^(?:自分の)?場のドン[ 　]*(?:!!|‼)?が自分の効果によって[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED_OWN", 1),
+        (r'^(?:自分の)?場のドン[ 　]*(?:!!|‼)?が[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、', "DON_RETURNED", 1),
+        (r'^[^。]*?キャラが自分の効果で場を離れた時、', "CHAR_LEFT_BY_OWN_EFFECT_SEAT", 1),
         (r'^自分の特徴《海軍》を持つカードの効果で[^。]*?捨てられた時、', "NAVY_DISCARD", 1),
         (r'^自分の【トリガー】を持つキャラが登場した時、', "TRIGGER_CHAR_PLAYED", 1),
     )
@@ -694,12 +1118,15 @@ class EffectParser:
             rest = t[m.end():].strip()
             # 「〜時、発動できる。」形は「発動できる。」を取り除いて本体を残す。
             rest = re.sub(_nfc(r'^発動できる[。、]?'), '', rest).strip()
+            # 反応は捨てたカード 1 枚ごとに誘発するので「捨てた枚数分」は 1 枚分になる（OP12-040）。
+            if ev_name == "NAVY_DISCARD":
+                rest = rest.replace(_nfc('捨てた枚数分'), '')
             cond = Condition(type=ConditionType.EVENT_THIS_TURN, value=(ev_name, ev_min),
                              operator=CompareOperator.GE, player=Player.SELF, raw_text=t)
             return cond, rest
         return None, effect_text
 
-    def _lift_h_gate(self, effect_node):
+    def _lift_h_gate(self, effect_node, text: str = ''):
         """カテゴリH 是正: 先頭ゲート条件が「。その後、」をまたいで後続を無条件化する漏れを直す。
 
         effect が Sequence で、(無条件セットアップの後)先頭が `Branch(if_false=None)` かつ、その後ろに
@@ -724,7 +1151,13 @@ class EffectParser:
             return effect_node
         tail = acts[branch_idx + 1:]
         # 後続に独立条件の Branch が混在するなら触らない（文ごとに別条件＝H ではない）。
-        if any(isinstance(t, Branch) for t in tail):
+        # ただし「。その後、<条件>の場合、…」は先頭ゲートの内側に続く手順なので、入れ子にして
+        # 先頭条件で支配する（OP09-019「…場合、A。その後、…がいる場合、カードを引く」）。
+        def _then_branch(t):
+            c = getattr(t, 'condition', None)
+            return (isinstance(t, Branch) and c is not None and c.raw_text
+                    and (_nfc('その後、') + _nfc(c.raw_text)) in _nfc(text))
+        if any(isinstance(t, Branch) and not _then_branch(t) for t in tail):
             return effect_node
         # 漏れている実効果（非TEMP）が無ければ何もしない（無害なデッキ整理のみは据え置き）。
         if not any(_h_is_genuine(t) for t in tail):
@@ -834,6 +1267,14 @@ class EffectParser:
                 raw_text=norm
             )
             head = norm[:m.start()].rstrip(' 　')
+            # 「コスト20以上のこのキャラをトラッシュに置く」(OP16-084): 修飾語はコストを払える条件
+            # （現在のコストがその範囲のときだけ払える）。resolver が ref_id="self" でも現在コストで絞る。
+            _cm = re.search(_nfc(r'コスト(\d+)(以上|以下)の$'), head)
+            if _cm:
+                if _cm.group(2) == _nfc('以上'):
+                    self_action.target.cost_min = int(_cm.group(1))
+                else:
+                    self_action.target.cost_max = int(_cm.group(1))
             # head が**区切り**（、 ， , ／ 並列の「と」）で終わっていれば別のコスト
             # （「自分のドン!!1枚とこのキャラをレストにできる」＝ドンのレスト＋自身のレスト）。
             # 終わっていなければ **同じ句の修飾語**であって別コストではない
@@ -882,13 +1323,28 @@ class EffectParser:
         # 【ターン中】タグ + 本文の KO/ライフダメージ誘発は、本来その イベント誘発
         # （ON_KO/ON_DAMAGE_DEALT_TO_LIFE）でありターン中は CONTEXT 条件として後段で保全される。
         # コスト節の後（「手札2枚を捨てる：相手のキャラがKOされた時、〜」OP03-076）も含めて上書きする。
+        # 発動した時（ON_EVENT_PLAY）・登場させた時（ON_OPP_PLAY）・場を離れた／手札に戻った時
+        # （ON_LEAVE）・ライフが離れた時（ON_LIFE_DECREASE）も同じ扱い。エンジンが誘発句を raw_text から
+        # 読んで対応するイベントで積む（`triggers.rs`）。
         primary_reactive = embedded if embedded in (
-            TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE, TriggerType.ON_REST) else None
+            TriggerType.ON_KO, TriggerType.ON_DAMAGE_DEALT_TO_LIFE, TriggerType.ON_REST,
+            TriggerType.ON_EVENT_PLAY, TriggerType.ON_OPP_PLAY, TriggerType.ON_LEAVE,
+            TriggerType.ON_LIFE_DECREASE) else None
+        # 「【トリガー】が発動した時、〜」の【トリガー】は能力の見出しではなく誘発句の目的語。
+        if (embedded == TriggerType.ON_EVENT_PLAY
+                and re.search(_nfc(r'【トリガー】が発動した時'), norm_text)):
+            return TriggerType.ON_EVENT_PLAY
         if _nfc("【自分のターン中】") in norm_text: return primary_reactive or TriggerType.YOUR_TURN
         if _nfc("【相手のターン中】") in norm_text: return primary_reactive or TriggerType.OPPONENT_TURN
         if _nfc("【カウンター】") in norm_text: return TriggerType.COUNTER
         if _nfc("【トリガー】") in norm_text: return TriggerType.TRIGGER
         if _nfc("【ゲーム開始時】") in norm_text: return TriggerType.GAME_START
+
+        # 無タグ（【ターン1回】のみ）の「（自分の場の）ドン!!がドン!!デッキに戻された時、」は起動メインではなく
+        # 反応型の誘発（P-077・ST10-014）。PASSIVE にしておけば再計算では動かず、ドン!!が戻された
+        # 瞬間にエンジンの enqueue_don_returned_listeners が積む。
+        if re.search(_nfc(r'(?:自分の)?場のドン[ 　]*(?:!!|‼)?が[^。]*?ドン[ 　]*(?:!!|‼)?デッキに戻された時、'), norm_text):
+            return TriggerType.PASSIVE
 
         # 【ドン!!×N】 または 【ターン1回】 のみ（既知トリガータグなし）。
         # 【ターン1回】（起動回数制限）を含む、または【ドン!!×N】を含まない → 起動メイン（活性化能力）。
@@ -943,27 +1399,67 @@ class EffectParser:
         # 相手ライフへのダメージ誘発（「このリーダーのアタックによって、相手のライフにダメージを与えた時」）
         if re.search(_nfc(r'ライフに.{0,8}ダメージを与えた時'), norm_text):
             return TriggerType.ON_DAMAGE_DEALT_TO_LIFE
-        # KO 誘発（主語不問:「相手のキャラがKOされた時」「…キャラがKOされた時」）
-        if re.search(_nfc(r'KOされた時'), norm_text):
+        # KO 誘発（主語不問:「相手のキャラがKOされた時」「…キャラがKOされた時」）。
+        # 「このキャラのバトルによって相手のキャラをKOした時」（KOした側）も ON_KO（エンジンは
+        # raw_text の「KOした時」でアタッカー側の誘発として扱う）。
+        if re.search(_nfc(r'KOされた時|KOした時'), norm_text):
             return TriggerType.ON_KO
-        # 場を離れた誘発（「自分の…キャラが場を離れた時」）
-        if re.search(_nfc(r'場を離れた時'), norm_text):
+        # 場を離れた誘発（「自分の…キャラが場を離れた時」「…が自分の効果で持ち主の手札に戻った時」）
+        if re.search(_nfc(r'場を離れた時|手札に戻った時'), norm_text):
             return TriggerType.ON_LEAVE
+        # ライフが離れた／0枚になった／手札に加わった誘発（主語の自分／相手はエンジンが raw_text で読む）
+        if re.search(_nfc(r'ライフが(?:離れた|0枚になった|手札に加わった)時'), norm_text):
+            return TriggerType.ON_LIFE_DECREASE
         # レスト誘発（「（この）キャラが（自分の/相手の効果で）レストになった時」）。
         # 主語（このキャラ/キャラ）・要因（自分の効果で/相手の効果で/アタック）は raw_text から
         # エンジン側で解釈する（_rest_subject_matches）。「レストの場合」等の状態参照は別物。
         if re.search(_nfc(r'レストになった時'), norm_text):
             return TriggerType.ON_REST
-        # イベント発動誘発（「自分がイベントを発動した時」）
-        if re.search(_nfc(r'イベントを発動した時'), norm_text):
+        # 発動誘発（「自分がイベントを発動した時」「相手が【ブロッカー】かイベントを発動した時」
+        # 「相手がイベントか【トリガー】を発動した時」「【トリガー】が発動した時」）。
+        if re.search(_nfc(r'(?:イベント|【ブロッカー】|【トリガー】)[^。、]{0,12}?(?:を|が)発動した時'), norm_text):
             return TriggerType.ON_EVENT_PLAY
-        # 相手の登場誘発（「相手が…登場させた時」）
-        if re.search(_nfc(r'相手が[^。]{0,30}登場させた時'), norm_text):
+        # キャラの登場誘発（「相手が…登場させた時」「自分が…登場させた時」。主語はエンジンが読む）
+        if re.search(_nfc(r'(?:相手|自分)が[^。]{0,40}登場させた時'), norm_text):
             return TriggerType.ON_OPP_PLAY
+        # 「…とバトルしたバトル終了時」: 専用の種別が無いので常在型の反応（エンジンが raw_text で読む）。
+        if re.search(_nfc(r'バトルしたバトル終了時'), norm_text):
+            return TriggerType.PASSIVE
+        # 他のカードのアタック誘発（「自分の…リーダーがアタックした時かアタックされた時」）。
+        # 「このリーダー/キャラが」は ON_ATTACK 側が扱う。専用の種別が無いので常在型の反応。
+        if re.search(_nfc(r'自分の(?:[^。、]*?)(?:リーダー|キャラ)が(?:アタックした|アタックされた)'), norm_text) \
+                and not re.search(_nfc(r'この(?:リーダー|キャラ)がアタック'), norm_text):
+            return TriggerType.PASSIVE
         return None
+
+    _TARGET_SWAP_RE = re.compile(_nfc(
+        r'^(?P<base>[^。]+?)。(?P<cond>[^。、]+?場合)、(?P<old>[^。、]+?)の代わりに(?P<new>[^。、]+?)を選ぶ。?$'))
 
     def _parse_to_node(self, text: str, is_cost: bool = False) -> EffectNode:
         norm_text = _nfc(text)
+
+        # 複合主語「自分の「X」すべてとこのキャラは／を、…」(OP15-071): 名前指定の全体と自身を
+        # 別々のアクションに展開する（片方だけでは「すべて」または自身が脱落する）。
+        _cs = re.match(_nfc(r'^(自分の「[^」]+」すべて)と(このキャラ)(は|を)、?(.+)$'), norm_text, re.DOTALL)
+        if _cs:
+            _rest = _cs.group(4)
+            return Sequence(actions=[
+                self._parse_to_node(_cs.group(1) + _cs.group(3) + _rest, is_cost),
+                self._parse_to_node(_cs.group(2) + _nfc('は、') + _rest, is_cost),
+            ])
+        # 「<効果>。<条件>の場合、<旧対象>の代わりに<新対象>を選ぶ。」= 条件成立時は対象の絞り込みだけが
+        # 差し替わる（OP12-096: コスト8以上のキャラがいれば KO の対象がコスト6以下になる）。
+        # 条件を満たすときは新対象で、満たさないときは旧対象で、同じ効果を 1 回だけ行う。
+        swap = self._TARGET_SWAP_RE.match(norm_text)
+        if swap and swap.group('old') in swap.group('base'):
+            base = swap.group('base')
+            swapped = base.replace(swap.group('old'), swap.group('new'), 1)
+            if_true = self._parse_to_node(swapped, is_cost)
+            if isinstance(if_true, GameAction):
+                if_true.raw_text = norm_text  # 差し替えの句も本文照合で覆えるようにする
+            return Branch(condition=self._parse_condition_obj(swap.group('cond')),
+                          if_true=if_true,
+                          if_false=self._parse_to_node(base, is_cost))
 
         # 選択肢「以下から…選ぶ」: 「・」項目（または改行区切りの各文）を options として
         # Choice を生成する。後続の「。」分割より前に処理しないと選択肢構造が壊れるため、
@@ -1049,7 +1545,7 @@ class EffectParser:
         split_pattern = _nfc(
             r'。|その後、|(?<=置き)、|(?<=加え)、|(?<=引く)、|(?<=捨て)、|発動できる、|させ、'
             r'|(?<=KOし)、|(?<=レストにし)、|(?<=戻し)、|(?<=\d)し、|(?<=付与し)、|(?<=追加し)、'
-            r'|(?<=アクティブにし)、'
+            r'|(?<=アクティブにし)、|(?<=得て)、'
         )
 
         # 条件ゲート（「…場合、」「…なら、」）を含む文は、文内の連用接続（引く、捨て、…し 等）で
@@ -1084,25 +1580,84 @@ class EffectParser:
         # 始まる句のみ対象とし、独自の主語を持つ句（OP14-086「自分の…すべてを、コスト+2」=
         # 始端が「自分の」）は巻き込まない。
         if len(parts) > 1:
-            _bare_buff_re = re.compile(_nfc(r'^(?:パワー|コスト)[ 　]*[+＋\-－−‐]\d'))
-            _subj_re = re.compile(_nfc(r'(この(?:キャラ|リーダー|カード))(?:は|の)?'))
+            # 裸の増減句は自身の「N枚につき、」を前置していてもよい（ST27-004）。
+            _bare_buff_re = re.compile(_nfc(
+                r'^(?:[^、。：:]*?[\d０-９]+枚につき、)?(?:パワー|コスト)[ 　]*[+＋\-－−‐]\d'))
+            _subj_re = re.compile(_nfc(
+                r'(この(?:キャラ|リーダー|カード)|自分のリーダー(?:「[^」]+」)?)(?:は|の)?'))
+            # 先行句の期間（このバトル中／このターン中／次の…まで）も裸の増減句へ引き継ぐ
+            # （継承しないと「…を得て、パワー+N」の後句が INSTANT に落ちる。OP04-071 等）。
+            _dur_carry_re = re.compile(_nfc(
+                r'このバトル中|このターン中|次の(?:自分の|相手の)?(?:ターン|エンドフェイズ)(?:開始|終了)時まで'))
+            # 「…N枚につき、パワー+1000し、コスト+2」の「N枚につき」は後続の裸の増減句にも掛かる
+            # （EB04-048: トラッシュ5枚につきコスト+2。継承しないとコスト+2 が固定値になる）。
+            _per_re = re.compile(_nfc(r'([^、。：:]*?[\d０-９]+枚につき)、'))
             _carry_subj = None
+            _carry_per = None
             for _pi, _p in enumerate(parts):
                 if _carry_subj and _bare_buff_re.match(_p):
-                    parts[_pi] = _carry_subj + 'の' + _p
+                    _dm = _dur_carry_re.search(parts[_pi - 1]) if _pi > 0 else None
+                    _dur = (_dm.group(0) + '、') if (_dm and not _dur_carry_re.search(_p)) else ''
+                    _own_per = _per_re.match(_p) is not None
+                    if _carry_per and not _own_per:
+                        parts[_pi] = _carry_subj + 'は、' + _dur + _carry_per + _p
+                    elif _own_per or _dur:
+                        parts[_pi] = _carry_subj + 'は、' + _dur + _p
+                    else:
+                        parts[_pi] = _carry_subj + 'の' + _p
                 else:
                     _sm = _subj_re.search(_p)
                     if _sm:
                         _carry_subj = _sm.group(1)
+                        _pm = _per_re.search(_p)
+                        _carry_per = (_pm.group(1) + '、') if _pm else None
+
+        # 「次の相手のターン終了時まで、1枚をパワー-3000し、残りをパワー-2000」: 後続の「残りを…」
+        # は期間句を持たないが、先行句の期間（このターン中／このバトル中／次の…まで）を引き継ぐ
+        # （継承しないと INSTANT のまま＝次の相手ターンまで持続しない。OP08-118）。
+        if len(parts) > 1:
+            _dur_re = re.compile(_nfc(
+                r'このバトル中|このターン中|次の(?:自分の|相手の)?(?:ターン|エンドフェイズ)(?:開始|終了)時まで'))
+            for _pi in range(1, len(parts)):
+                _p = parts[_pi]
+                if _p.startswith(_nfc('残りを')) and not _dur_re.search(_p):
+                    _dm = _dur_re.search(parts[_pi - 1])
+                    if _dm:
+                        parts[_pi] = _dm.group(0) + _nfc('、') + _p
 
         if len(parts) > 1:
-            return Sequence(actions=[self._parse_logic_block(p, is_cost) for p in parts])
+            _nodes = [self._parse_logic_block(p, is_cost) for p in parts]
+            # 「自分の手札1枚を捨て、ドン!!1枚をレストにしてもよい」: 末尾の「てもよい」は「捨て、」で
+            # 区切った前句にも掛かる（前句が強制のままだと断れない。OP11-024）。
+            if not is_cost:
+                for _ni in range(1, len(parts)):
+                    _pn = _nodes[_ni - 1]
+                    if (parts[_ni - 1].endswith(_nfc('捨て')) and isinstance(_pn, GameAction)
+                            and _pn.type == ActionType.DISCARD
+                            and re.search(_nfc(r'(してもよい|てもよい)'), parts[_ni])):
+                        _pn.is_optional = True
+                        # 確認点は前句の 1 回だけ（捨てる前に「してもよい」を聞く）。後句まで任意のままだと
+                        # 捨てた後にだけ断れてしまう＝捨て＋レストは一体の任意（OP11-024）。断った（捨てなかった）
+                        # なら後句は行わないので、後句は「直前が成立した場合」だけ実行する分岐で包む。
+                        if isinstance(_nodes[_ni], GameAction):
+                            _nodes[_ni].is_optional = False
+                            _nodes[_ni] = Branch(
+                                condition=Condition(type=ConditionType.PREV_ACTION, value="SUCCEEDED",
+                                                    player=Player.SELF, raw_text=_nfc("そうした")),
+                                if_true=_nodes[_ni])
+            return Sequence(actions=_nodes)
         elif parts:
             return self._parse_logic_block(parts[0], is_cost)
         return None
 
     def _parse_logic_block(self, text: str, is_cost: bool) -> EffectNode:
         norm_text = _nfc(text)
+
+        # 「このキャラが属性(打)を持つキャラとバトルする時、…」(ST05-010): バトル相手の属性ゲート。
+        _bt = re.match(_nfc(r'^(このキャラが属性[(（][^)）]+[)）]を持つキャラとバトル)する時、(.+)$'), norm_text, re.DOTALL)
+        if _bt:
+            return Branch(condition=self._parse_condition_obj(_bt.group(1)),
+                          if_true=self._parse_to_node(_bt.group(2), is_cost))
 
         # 条件分岐
         match = re.search(_nfc(r'^(.+?)(?:場合|なら|することで)、(.+)$'), norm_text)
@@ -1158,6 +1713,11 @@ class EffectParser:
         if (not is_cost and isinstance(node, GameAction)
                 and node.type not in (ActionType.REPLACE_EFFECT, ActionType.DECLARE_COST, ActionType.OTHER)
                 and re.search(_nfc(r"(してもよい|てもよい)"), norm_text)):
+            node.is_optional = True
+        # 「自分のドン!!1枚をレストにできる」（文末の「できる」）も REST_DON は任意（OP12-018）。
+        # 「できる」は他の型で多義なため REST_DON に限る。
+        if (not is_cost and isinstance(node, GameAction) and node.type == ActionType.REST_DON
+                and re.search(_nfc(r"レストにできる$"), norm_text)):
             node.is_optional = True
 
         return node
@@ -1326,6 +1886,43 @@ class EffectParser:
     def _parse_condition_obj(self, text: str) -> Condition:
         norm_text = _nfc(text)
 
+        # 「自分のキャラがカウンターを持たないキャラのみ」= カウンター値を持つ自分のキャラが 0 枚
+        # （OP17-118。従来は HAND_COUNT EQ 0 に誤変換されていた）。
+        if re.search(_nfc(r'キャラが?カウンターを持たないキャラのみ'), norm_text):
+            tq_c = TargetQuery(player=Player.OPPONENT if _nfc("相手") in norm_text else Player.SELF,
+                               card_type=["CHARACTER"], count=-1, select_mode="ALL")
+            tq_c.flags.add("HAS_COUNTER")
+            return Condition(type=ConditionType.FIELD_COUNT, target=tq_c, operator=CompareOperator.LT,
+                             value=1, player=tq_c.player, raw_text=norm_text)
+
+        # 「選んだ(そのキャラ)のコストがそのキャラに付与されているドン!!の枚数と同じ」(OP15-031): 直前に選んだ
+        # キャラ自身との比較。ドン!!枚数の場の条件（DON_COUNT）ではないので GENERIC に留め、
+        # _normalize_coreference が選んだキャラへの参照フィルタ（REF_COST_EQ_ATTACHED_DON）へ変換する。
+        if re.search(_nfc(r'(?:選んだ|その)キャラのコストが(?:その|選んだ)キャラに付与されているドン[!‼]+の枚数と同じ'),
+                     norm_text):
+            return Condition(type=ConditionType.GENERIC, raw_text=norm_text)
+
+        # 「効果で自分の手札が捨てられているターン中」（ST33-004）: このターンに効果で手札が捨てられた
+        # という事実の条件（手札 0 枚ではない）。エンジンが捨てるたびにターン内イベントを記録する。
+        if re.search(_nfc(r'効果で(自分|相手)の手札が捨てられている'), norm_text):
+            return Condition(type=ConditionType.EVENT_THIS_TURN,
+                             value=("HAND_DISCARDED_BY_EFFECT_SEAT", 1),
+                             operator=CompareOperator.GE,
+                             player=(Player.OPPONENT if _nfc('相手の手札') in norm_text else Player.SELF),
+                             raw_text=norm_text)
+        # ターン文脈だけの条件「相手のターン中の場合」「自分のターン中の場合」(OP17-119 の +3000 等)。
+        # 従来は GENERIC（常に真）に落ち、自分のターンにも効いていた。
+        # 「相手のライフが離れているターン中」(P-120): このターン相手のライフが離れた事実（EVENT_THIS_TURN）。
+        # 従来は LIFE_COUNT（相手のライフが 0 枚）に化けていた。
+        if re.search(_nfc(r'相手のライフが離れて(?:いる|いた)'), norm_text):
+            return Condition(type=ConditionType.EVENT_THIS_TURN, value=("OPP_LIFE_LEFT", 1),
+                             operator=CompareOperator.GE, player=Player.SELF, raw_text=norm_text)
+        turn_ctx = re.fullmatch(_nfc(r'(相手|自分)のターン中(?:の場合|の|なら)?'), norm_text.strip())
+        if turn_ctx:
+            return Condition(type=ConditionType.CONTEXT,
+                             value="OPPONENT_TURN" if turn_ctx.group(1) == _nfc("相手") else "SELF_TURN",
+                             player=Player.SELF, raw_text=norm_text)
+
         # 置換の対象指定「（自分の）「X」がKOされる/場を離れる（場合）」: 離れるカードが名前 X か
         # （OP12-061「自分の「トラファルガー・ロー」がKOされる場合」）。離脱カードを source_card として
         # 評価する SOURCE_STATE("NAME", X) にする。従来は GENERIC で名称限定が脱落していた。
@@ -1378,7 +1975,7 @@ class EffectParser:
         # （例「コスト8以上のキャラがいて、手札6枚以下」→ HAND_COUNT>=8 と誤読）。
         split_m = re.search(
             _nfc(r'^(?P<a>.+?(?:がい(?:て|る)|枚以上いて|枚以下いて|がいなくて|があり|がある|'
-                 r'以上でかつ|以下でかつ|以上で|以下で|以上であり|以下であり|を持ち|カード名で|多色で|[」》]で))、(?P<b>.+)$'),
+                 r'以上でかつ|以下でかつ|以上で|以下で|以上であり|以下であり|を持ち|カード名で|多色で|[」》]でかつ|[」》]で))、(?P<b>.+)$'),
             norm_text)
         if split_m:
             a_txt = split_m.group("a")
@@ -1395,6 +1992,7 @@ class EffectParser:
             a_norm = re.sub(_nfc(r'カード名で$'), _nfc('カード名'), a_norm)
             # 「リーダーが「X」で、…」「リーダーが特徴《X》で、…」連結（OP14-059 ほか6枚）。
             # 閉じ括弧直後の連結「で」を落として体言止めに戻す。
+            a_norm = re.sub(_nfc(r'([」》])でかつ$'), r'\1', a_norm)  # OP06-072「特徴《ジェルマ66》でかつ、…」
             a_norm = re.sub(_nfc(r'([」》])で$'), r'\1', a_norm)
             # 「リーダーが多色で、…」連結（EB02-061/PRB02-005）。連結「で」を落とす。
             a_norm = re.sub(_nfc(r'多色で$'), _nfc('多色'), a_norm)
@@ -1411,6 +2009,19 @@ class EffectParser:
         # 他の数値/特徴条件より先に判定する（「コスト」を含むため誤分類を避ける）。
         if _nfc("宣言したコスト") in norm_text and _nfc("同じ") in norm_text:
             return Condition(type=ConditionType.DECLARED_COST_MATCH, raw_text=norm_text)
+
+        # バトル文脈の条件（ST05-010／OP11-088／ST02-010）。バトル中の相手・攻撃者を見る。
+        _am = re.search(_nfc(r'属性[(（]([^)）]+)[)）]を持つ'), norm_text)
+        if _am and re.match(_nfc(r'^そのキャラが'), norm_text):
+            # 「相手のキャラがアタックした時」の「そのキャラ」＝攻撃者。
+            return Condition(type=ConditionType.SOURCE_STATE, value=("ATTACKER_ATTRIBUTE", _am.group(1)),
+                             player=Player.SELF, raw_text=norm_text)
+        if _am and re.match(_nfc(r'^このキャラが属性[(（][^)）]+[)）]を持つキャラとバトル'), norm_text):
+            return Condition(type=ConditionType.SOURCE_STATE, value=("BATTLE_OPP_ATTRIBUTE", _am.group(1)),
+                             player=Player.SELF, raw_text=norm_text)
+        if re.match(_nfc(r'^このキャラが相手のキャラとバトルした$'), norm_text):
+            return Condition(type=ConditionType.SOURCE_STATE, value=("BATTLE_OPP_TYPE", "CHARACTER"),
+                             player=Player.SELF, raw_text=norm_text)
 
         # 比較演算子と数値を抽出
         operator = CompareOperator.EQ
@@ -1465,6 +2076,15 @@ class EffectParser:
                     or re.search(_nfc(r'ドン[ 　]*(?:!!|‼).{0,20}(?:より|以上|以下)'), norm_text)
                     and _nfc("相手") in norm_text):
                 cmp_op, offset = self._compare_op_offset(norm_text, CompareOperator.GE)
+                # 比較の主語が相手側（「相手の場のドン!!の枚数が自分の場のドン!!の枚数より多い」）なら
+                # 向きを反転する。エンジンは「自分 ⟨演算子⟩ 相手(±offset)」で評価するため、
+                # 相手 > 自分 は 自分 < 相手（GT→LT・GE→LE）に直す。
+                _i_opp, _i_self = norm_text.find(_nfc("相手")), norm_text.find(_nfc("自分"))
+                if 0 <= _i_opp < _i_self:
+                    cmp_op = {CompareOperator.GT: CompareOperator.LT,
+                              CompareOperator.LT: CompareOperator.GT,
+                              CompareOperator.GE: CompareOperator.LE,
+                              CompareOperator.LE: CompareOperator.GE}.get(cmp_op, cmp_op)
                 return Condition(type=ConditionType.DON_COUNT_COMPARE, operator=cmp_op,
                                  value=offset, player=Player.SELF, raw_text=norm_text)
             # 「（自分の）付与されているドン‼がある／ない場合」= 付与ドン（attached）の存在条件。
@@ -1534,7 +2154,22 @@ class EffectParser:
                              value=offset, player=Player.SELF, raw_text=norm_text)
 
         if _nfc("ライフ") in norm_text:
-            return Condition(type=ConditionType.LIFE_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
+            # 「表向きの／裏向きのライフがある」: 向きで絞った枚数（target の is_face_up を数える）。
+            # 枚数の指定が無い「ある／ない」は 1 枚以上／0 枚（既定の EQ 0 だと「ある」が逆になる）。
+            _life_op, _life_val = operator, value
+            if not nums:
+                if _nfc("ない") in norm_text:
+                    _life_op, _life_val = CompareOperator.EQ, 0
+                elif _nfc("ある") in norm_text:
+                    _life_op, _life_val = CompareOperator.GE, 1
+            _life_tq = None
+            _face = re.search(_nfc(r'(表向き|裏向き)の?ライフ'), norm_text)
+            if _face:
+                _life_tq = TargetQuery(zone=Zone.LIFE, player=p,
+                                       is_face_up=(_face.group(1) == _nfc('表向き')),
+                                       count=_life_val, raw_text=norm_text)
+            return Condition(type=ConditionType.LIFE_COUNT, operator=_life_op, value=_life_val, player=p,
+                             target=_life_tq, raw_text=norm_text)
 
         if _nfc("手札") in norm_text:
             return Condition(type=ConditionType.HAND_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
@@ -1556,6 +2191,19 @@ class EffectParser:
                 if len(name_conds) == 1:
                     return name_conds[0]
                 return Condition(type=ConditionType.AND, args=name_conds, raw_text=norm_text)
+            # 「トラッシュに<種類>が N枚以上ある」(OP12-059/063/065/066 のイベント4枚以上 等)は
+            # トラッシュ全枚数ではなく、その種類のカードだけを数える。種類（イベント/キャラ/ステージ・
+            # 特徴・色・コスト 等）を TargetQuery（zone=TRASH）で持たせ、エンジンが一致数を数える。
+            typed_m = re.search(_nfc(r'トラッシュ(?:に|の)(?P<what>[^、。]*?)が[\d０-９]+枚'), norm_text)
+            if typed_m and typed_m.group('what').strip() not in ('', 'カード', 'あるカード'):
+                tq = parse_target(typed_m.group('what'))
+                tq.zone = Zone.TRASH
+                tq.player = p
+                tq.count = -1
+                tq.select_mode = "ALL"
+                tq.is_up_to = False
+                return Condition(type=ConditionType.TRASH_COUNT, target=tq, operator=operator,
+                                 value=value, player=p, raw_text=norm_text)
             return Condition(type=ConditionType.TRASH_COUNT, operator=operator, value=value, player=p, raw_text=norm_text)
 
         # デッキ枚数（「自分のデッキが20枚以下の場合」等）。"デッキの上から…" は除外。
@@ -1595,21 +2243,40 @@ class EffectParser:
                     return Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)
             if trait_match:
                 tval = trait_all[0] if len(trait_all) == 1 else trait_all
-                trait_cond = Condition(type=ConditionType.LEADER_TRAIT, value=tval, player=p, raw_text=norm_text)
+                # 「『X』を含む特徴を持つ」は部分一致（CP9／CP0 は『CP』を含む）＝operator=HAS。
+                # 《X》の特徴名そのものは完全一致（既定 EQ）。
+                _contains = bool(re.search(_nfc(r'[』」]を含む特徴'), norm_text))
+                trait_cond = Condition(type=ConditionType.LEADER_TRAIT, value=tval, player=p, raw_text=norm_text,
+                                       operator=CompareOperator.HAS if _contains else CompareOperator.EQ)
                 # 「特徴《X》を持つか「Y」の場合」= 特徴 OR リーダー名（ST23-002 赤髪海賊団 or ウタ／
                 # ワノ国 or エース）。従来は trait のみ返り、名前指定リーダーで常に不成立だった。
-                if name_matches and _nfc("か「") in norm_text:
+                if name_matches and (_nfc("か「") in norm_text
+                                     or re.search(_nfc(r'」か特徴'), norm_text)
+                                     or re.search(_nfc(r'」か(?:特徴)?[《<『]'), norm_text)):
                     nval = name_matches[0] if len(name_matches) == 1 else name_matches
                     name_cond = Condition(type=ConditionType.LEADER_NAME, value=nval, player=p, raw_text=norm_text)
                     trait_cond = Condition(type=ConditionType.OR, player=p,
                                            args=[trait_cond, name_cond], raw_text=norm_text)
+                # 「特徴《X》か属性(Y)を持つ場合」= 特徴 OR 属性（OP13-025 コビー）。属性側が脱落していた。
+                _attr_or = re.search(_nfc(r'か属性[ 　]*[（(]([^）)]+)[）)]'), norm_text)
+                if _attr_or:
+                    attr_cond = Condition(type=ConditionType.LEADER_ATTRIBUTE, value=_attr_or.group(1),
+                                          player=p, raw_text=norm_text)
+                    trait_cond = Condition(type=ConditionType.OR, player=p,
+                                           args=[trait_cond, attr_cond], raw_text=norm_text)
                 if _leader_pow_cond is not None:
                     return Condition(type=ConditionType.AND, player=p,
                                      args=[_leader_pow_cond, trait_cond], raw_text=norm_text)
                 return trait_cond
             if name_matches:
                 val = name_matches[0] if len(name_matches) == 1 else name_matches
-                return Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)
+                name_cond = Condition(type=ConditionType.LEADER_NAME, value=val, player=p, raw_text=norm_text)
+                # 「「X」か多色の場合」(OP13-051): 名前 OR 多色。
+                if re.search(_nfc(r'」か多色'), norm_text):
+                    return Condition(type=ConditionType.OR, player=p, raw_text=norm_text, args=[
+                        name_cond,
+                        Condition(type=ConditionType.LEADER_COLOR, value=_nfc("多色"), player=p, raw_text=norm_text)])
+                return name_cond
             if _nfc("多色") in norm_text:
                 return Condition(type=ConditionType.LEADER_COLOR, value=_nfc("多色"), player=p, raw_text=norm_text)
             # 単色リーダー条件（「自分のリーダーが青を含む」等）
@@ -1641,7 +2308,12 @@ class EffectParser:
 
         # 「（このリーダー/キャラが）（相手のキャラと）バトルしている場合」(OP12-020): 進行中の
         # バトル文脈の条件。FIELD_COUNT（「キャラ」+「いる」を含むため誤分類しうる）より先に捌く。
+        # 「このターン中、…相手のキャラとバトルしている」は進行中のバトルではなく、このターンに
+        # 相手のキャラとバトルしたことがある（起動メイン中は進行中のバトルが無い＝常に偽になっていた）。
         if _nfc("バトルしている") in norm_text:
+            if _nfc("このターン中") in norm_text and _nfc("キャラとバトル") in norm_text:
+                return Condition(type=ConditionType.SOURCE_STATE, value="BATTLED_CHAR_THIS_TURN",
+                                 player=p, raw_text=norm_text)
             return Condition(type=ConditionType.SOURCE_STATE, value="IN_BATTLE", player=p, raw_text=norm_text)
 
         # 「このターン中、（相手/自分の）キャラがKOされている場合」: ターン内に当該プレイヤーの
@@ -1681,13 +2353,31 @@ class EffectParser:
                     _nfc('より多い'): CompareOperator.GT,
                     _nfc('未満'): CompareOperator.LT,
                 }.get(mc.group(2), CompareOperator.GE)
-                # 「N枚いない」→ 実質 N枚未満
-                if _nfc("いない") in norm_text and mc.group(2) is None:
-                    cnt_op = CompareOperator.LT
+                # 「N枚いない」→ 実質 N枚未満。「N枚以上いない」「N枚以下いない」は否定なので反転する
+                # （EB04-005「2枚以上いない場合」が GE 2 のまま＝真偽が逆だった）。
+                if _nfc("いない") in norm_text:
+                    cnt_op = {
+                        CompareOperator.GE: CompareOperator.LT,
+                        CompareOperator.LE: CompareOperator.GT,
+                        CompareOperator.GT: CompareOperator.LE,
+                        CompareOperator.LT: CompareOperator.GE,
+                    }.get(cnt_op, CompareOperator.LT) if mc.group(2) is not None else CompareOperator.LT
             elif _nfc("いない") in norm_text:
                 thr, cnt_op = 1, CompareOperator.LT  # 1枚もいない
             else:
                 thr, cnt_op = 1, CompareOperator.GE  # 「いる」=1枚以上
+            # 「「A」と「B」がいる」= 両方の名前のカードがいる（AND）。従来は names=[A,B] の OR で
+            # どちらか 1 枚で真になった（ST30-016）。
+            if (len(tq.names) >= 2 and re.search(_nfc(r'」と「'), norm_text)
+                    and cnt_op == CompareOperator.GE and "NAME_OR_TYPE" not in tq.flags):
+                import copy
+                subs = []
+                for nm in tq.names:
+                    q = copy.deepcopy(tq)
+                    q.names = [nm]
+                    subs.append(Condition(type=ConditionType.FIELD_COUNT, target=q,
+                                          operator=cnt_op, value=thr, player=q.player, raw_text=norm_text))
+                return Condition(type=ConditionType.AND, args=subs, player=tq.player, raw_text=norm_text)
             return Condition(type=ConditionType.FIELD_COUNT, target=tq,
                              operator=cnt_op, value=thr, player=tq.player, raw_text=norm_text)
 
@@ -1734,6 +2424,19 @@ class EffectParser:
                 _nfc('以下'): CompareOperator.LE,
             }.get(has_char_count_m.group(3) or '', CompareOperator.GE)
             return Condition(type=ConditionType.HAS_CHARACTER, value=(char_name, count_thr), operator=cnt_op, player=p, raw_text=norm_text)
+        # 複数名の並記「「A」と「B」がいる」= 各名前が場にいる条件の AND（OP15-064/072・OP16-040）。
+        # 従来は最後の名前だけを拾い、他の名前の要件が脱落していた。
+        has_multi_m = re.search(_nfc(r'((?:「[^」]+」と)+「[^」]+」)が(?:い(る|ない)|あ(る|ない))'), norm_text)
+        if has_multi_m:
+            names = re.findall(_nfc(r'「([^」]+)」'), has_multi_m.group(1))
+            present = (has_multi_m.group(2) or has_multi_m.group(3)) == _nfc('る')
+            op = CompareOperator.GE if present else CompareOperator.EQ
+            subs = [Condition(type=ConditionType.HAS_CHARACTER, value=nm, operator=op, player=p, raw_text=norm_text)
+                    for nm in names]
+            # 「AとBがいない」は「どちらもいない」ではなく「揃っていない」だが、既存の単名と同じ
+            # 規約で各名の不在の AND にはせず OR にする。
+            return Condition(type=ConditionType.AND if present else ConditionType.OR, args=subs,
+                             player=p, raw_text=norm_text)
         # 存在/不在
         has_char_m = re.search(_nfc(r'「([^」]+)」が(?:い(る|ない)|あ(る|ない))'), norm_text)
         if has_char_m:
@@ -1741,7 +2444,33 @@ class EffectParser:
             present_part = has_char_m.group(2) or has_char_m.group(3)
             present = present_part == _nfc('る')
             op = CompareOperator.GE if present else CompareOperator.EQ
-            return Condition(type=ConditionType.HAS_CHARACTER, value=char_name, operator=op, player=p, raw_text=norm_text)
+            # 「パワーN以上の「X」」「他の「X」」は target で絞る（OP15-080）。
+            _hc_tq = None
+            _pw = re.search(_nfc(r'パワー(\d+)(以上|以下)の「'), norm_text)
+            _other = re.search(_nfc(r'他の(?:[^「」、]*?)「'), norm_text)
+            # 「元々のコストN(以上/以下)の「X」」「コストNの「X」」もコストで絞る（OP12-102）。
+            _cs = re.search(_nfc(r'(元々の)?コスト(\d+)(以上|以下)?の(?:[^「」、]*?)「'), norm_text)
+            if _pw or _other or _cs:
+                _hc_tq = TargetQuery(player=p, raw_text=norm_text)
+                if _other:
+                    _hc_tq.flags.add("EXCLUDE_SOURCE")
+                if _cs:
+                    _cv = int(_cs.group(2))
+                    if _cs.group(3) == _nfc('以上'):
+                        _hc_tq.cost_min = _cv
+                    elif _cs.group(3) == _nfc('以下'):
+                        _hc_tq.cost_max = _cv
+                    else:
+                        _hc_tq.cost_min = _hc_tq.cost_max = _cv
+                    if _cs.group(1):
+                        _hc_tq.flags.add("ORIGINAL_COST")
+            if _pw and _hc_tq is not None:
+                if _pw.group(2) == _nfc('以上'):
+                    _hc_tq.power_min = int(_pw.group(1))
+                else:
+                    _hc_tq.power_max = int(_pw.group(1))
+            return Condition(type=ConditionType.HAS_CHARACTER, value=char_name, operator=op, player=p,
+                             target=_hc_tq, raw_text=norm_text)
 
         # RESTED_COUNT: レスト状態のカード総数（フィールド＋ドン!!）
         if _nfc("レストのカード") in norm_text:
@@ -1759,6 +2488,11 @@ class EffectParser:
             if pow_min_m: val["power_min"] = int(pow_min_m.group(1))
             if cost_max_m: val["cost_max"] = int(cost_max_m.group(1))
             if trait_m: val["trait"] = trait_m.group(1)
+            # 「『X』を含む特徴を持つキャラが…」は部分一致（OP17-021）。
+            contains_m = re.search(_nfc(r'[『「]([^』」]+)[』」]を含む特徴'), norm_text)
+            if contains_m:
+                val["trait"] = contains_m.group(1)
+                val["trait_contains"] = True
             return Condition(type=ConditionType.OPPONENT_REMOVAL, value=val, player=p, raw_text=norm_text)
 
         # FIELD_COUNT_COMPARE: 自分と相手の場キャラ数の相対比較（「N枚以上少ない/多い」も対応）
@@ -1874,6 +2608,16 @@ class EffectParser:
             eff_node = self._parse_to_node(eff_text, is_cost)
             if eff_node is None:
                 continue
+            # 「20枚以上ある場合、相手のターン中、…」: 項目頭の手番限定は効果の外側の条件にする
+            # （落とすと相手ターン限定の効果が常時になる。OP15-092）。
+            _turn_m = re.match(_nfc(r'^(相手|自分)のターン中、'), eff_text)
+            if _turn_m:
+                eff_node = Branch(
+                    condition=Condition(
+                        type=ConditionType.CONTEXT,
+                        value="OPPONENT_TURN" if _turn_m.group(1) == _nfc("相手") else "MY_TURN",
+                        raw_text=_turn_m.group(0)),
+                    if_true=eff_node)
             cond = Condition(type=ctype, operator=CompareOperator.GE, value=thr,
                              player=cplayer, raw_text=opt)
             branches.append(Branch(condition=cond, if_true=eff_node))
@@ -1900,7 +2644,7 @@ class EffectParser:
         chooser = Player.OPPONENT if re.search(_nfc(r'相手は\s*以下から'), head) else Player.SELF
         choice = Choice(
             message=_nfc("効果を選択してください"),
-            options=[self._parse_to_node(opt, is_cost) for opt in options],
+            options=[self._lift_h_gate(self._parse_to_node(opt, is_cost), opt) for opt in options],
             option_labels=options,
             player=chooser,
         )
@@ -1908,6 +2652,13 @@ class EffectParser:
         cond_m = re.search(_nfc(r'^(.+?)(?:場合|なら)、\s*以下から'), head)
         if cond_m:
             return Branch(condition=self._parse_condition_obj(cond_m.group(1)), if_true=choice)
+        # 「カード1枚を引き、以下から1つを選ぶ」(OP17-112): 選択の前に行う動作は Choice の外に残す
+        # （従来は脱落して、ドローが実行されなかった）。
+        pre_m = re.match(_nfc(r'^(?P<pre>[^。、]+?(?:し|き|て|引き|置き|加え))、\s*以下から'), head)
+        if pre_m:
+            pre_node = self._parse_to_node(_nfc(pre_m.group('pre')), is_cost)
+            if pre_node is not None:
+                return Sequence(actions=[pre_node, choice])
         return choice
 
     def _node_has_real_action(self, node) -> bool:
@@ -1943,16 +2694,36 @@ class EffectParser:
         if not left or not right:
             return None
         chooser = Player.OPPONENT if re.search(_nfc(r'相手は'), norm[:boundary]) else Player.SELF
+        # 末尾の「。その後、…」は択一のどれを選んでも行う後続句＝最後の選択肢の中に閉じ込めず外へ出す
+        # （OP05-096「…ライフの上か下に表向きで置く。その後、…カード1枚を引く」）。
+        tail_text = None
+        m_tail = re.search(_nfc(r'。(?=その後)'), right)
+        if m_tail:
+            tail_text = right[m_tail.end():].strip()
+            right = right[:m_tail.start()].strip()
+        # 右側が対象を持たない動詞句（「持ち主の手札に戻す」等）なら、左側の対象を共有する
+        # （「相手のコスト1以下のキャラ1枚までを、KOするか、持ち主の手札に戻すか、…」で
+        #  2 つ目以降の選択肢が対象（コスト上限・相手側）を失っていた: OP05-096）。
+        right_head = right.split(_nfc('。'))[0]
+        sep = left.rfind(_nfc('を、'))
+        if (sep > 0 and _nfc('を') not in right_head
+                and not re.search(_nfc(r'(キャラ|ステージ|リーダー|カード|ドン)'), right_head)):
+            right = f"{left[:sep]}を、{right}"
         opt_a = self._parse_to_node(left, is_cost)
         opt_b = self._parse_to_node(right, is_cost)
         if not (self._node_has_real_action(opt_a) and self._node_has_real_action(opt_b)):
             return None  # どちらかが空振りなら択一にしない（レガシー解釈へ委ねる）
-        return Choice(
+        choice = Choice(
             message=_nfc("効果を選択してください"),
             options=[opt_a, opt_b],
             option_labels=[left, right],
             player=chooser,
         )
+        if tail_text:
+            tail = self._parse_to_node(tail_text, is_cost)
+            if self._node_has_real_action(tail):
+                return Sequence(actions=[choice, tail])
+        return choice
 
     def _parse_target_alternative_choice(self, text: str, is_cost: bool) -> Optional[EffectNode]:
         """「<A対象>か、<B対象><枚数>を、<動詞>」形式の対象択一を Choice 化する（無ければ None）。

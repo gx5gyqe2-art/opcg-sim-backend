@@ -42,11 +42,16 @@ pub mod interact;
 pub mod loader;
 pub mod matcher;
 pub mod passives;
+pub mod probe;
 pub mod resolver;
 #[cfg(test)]
 mod tests_effects;
 #[cfg(test)]
 mod tests_rest_replace;
+#[cfg(test)]
+mod tests_g3;
+#[cfg(test)]
+mod tests_reactions;
 pub mod triggers;
 pub mod value;
 
