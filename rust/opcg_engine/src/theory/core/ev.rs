@@ -1419,6 +1419,87 @@ impl Core {
         (py_max(0.0, tot), moves_all)
     }
 
+    /// **候補 `OPCG_OPP_ATTACK=1`**（`docs/reports/2026-10-13_opp_attack.md` §1.1）: 守る側の持ち主（リーダー・場のキャラ）の
+    /// 【相手のアタック時】（`ON_OPP_ATTACK`）のうち、効果の動作が全部パワーの上げ下げ（`BUFF`）の能力を、仮想のカウンター札にする。
+    /// `srcs` は (札, 付与中のドンの枚数)。戻り＝能力ごとに (X, ドンの費用, 捨てる手札の札の並び〔空＝捨てない〕)。
+    /// 条件は【ターン1回】（窓に 1 回）と【ドン‼×n】（付与中のドン ≥ n）だけ読み、他の条件・他の費用を持つ能力は読まない。
+    pub fn opp_attack_cards(&mut self, srcs: &[(String, f64)], items: &V, st: &V) -> Vec<(f64, f64, Vec<String>)> {
+        let mut out = Vec::new();
+        for (cid, att) in srcs {
+            let c = self.card(cid);
+            if !c.truthy() {
+                continue;
+            }
+            for ab in c.get("abilities").items().to_vec() {
+                if trig_of(&ab).str_or_empty() != "ON_OPP_ATTACK" {
+                    continue;
+                }
+                // 条件: AND／TURN_LIMIT／HAS_DON だけ（HAS_DON は付与中のドンで判定）
+                let mut ok = true;
+                let mut stack = vec![ab.get("condition").clone()];
+                while let Some(cd) = stack.pop() {
+                    if !cd.is_dict() {
+                        continue;
+                    }
+                    match s_of(&cd, "type").as_str() {
+                        "AND" | "TURN_LIMIT" | "" => {}
+                        "HAS_DON" => {
+                            if *att + 1e-9 < cd.get("value").f_or0() {
+                                ok = false;
+                            }
+                        }
+                        _ => ok = false,
+                    }
+                    for a in cd.get("args").items().to_vec() {
+                        stack.push(a);
+                    }
+                }
+                if !ok {
+                    continue;
+                }
+                // 効果: 動作が全部 BUFF・自分の側は上げ（+X）・相手の側は下げ（−X）
+                let acts = walk_actions(ab.get("effect"));
+                if acts.is_empty() || acts.iter().any(|e| s_of(e, "type") != "BUFF") {
+                    continue;
+                }
+                let mut x = 0.0f64;
+                for e in &acts {
+                    let m = magnitude(e);
+                    let opp = side(&target_of(e)) == "OPPONENT";
+                    if (opp && m < 0.0) || (!opp && m > 0.0) {
+                        x = x.max(m.abs());
+                    }
+                }
+                if x <= 0.0 {
+                    continue;
+                }
+                // 費用: DISCARD（手札の条件に合う札）・RETURN_DON（ドンの費用）・なし。他は読まない
+                let mut don_cost = 0.0;
+                let mut discard: Vec<String> = Vec::new();
+                for e in walk_actions(ab.get("cost")) {
+                    match s_of(&e, "type").as_str() {
+                        "RETURN_DON" => don_cost += py_max(1.0, magnitude(&e)),
+                        "DISCARD" => {
+                            let t = target_of(&e);
+                            let n = t.get("count");
+                            let n = if n.is_none() || n.f() < 1.0 { 1 } else { n.f() as usize };
+                            let m = if items.is_none() { Vec::new() } else { self.eligible_hand_cards(&t, items, None, st) };
+                            if m.len() < n {
+                                ok = false;
+                            }
+                            discard = m;
+                        }
+                        _ => ok = false,
+                    }
+                }
+                if ok {
+                    out.push((x, don_cost, discard));
+                }
+            }
+        }
+        out
+    }
+
     /// `life_add_on_play` の加える分（効果の木を下る・選択は大きい方）。
     /// `from_life`＝同じ並びの前の動作が自分のライフを見て（`LOOK_LIFE`）並べ直しの場〔`TEMP`〕に出した＝そこからライフへ戻す動作は加算でない
     /// （アイサ OP06-099「ライフの上から 1 枚を見て、ライフの上か下に置く」。2026-10-12 の訂正・報告 §1.1 の注記）。
