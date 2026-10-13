@@ -1887,9 +1887,285 @@ def cmd_counter(a):
     return 0
 
 
+# ------------------------------------------------------------------ playgap（2026-10-14・`2026-10-14_play_gap.md` §1）
+def _mix64(x):
+    x &= 0xFFFFFFFFFFFFFFFF
+    x = ((x ^ (x >> 30)) * 0xBF58476D1CE4E5B9) & 0xFFFFFFFFFFFFFFFF
+    x = ((x ^ (x >> 27)) * 0x94D049BB133111EB) & 0xFFFFFFFFFFFFFFFF
+    return x ^ (x >> 31)
+
+
+def playgap_points(src):
+    """§1.3: 記録の自席ターンのメインの判断の行（効果の途中の選択を除く・候補 2 本以上）を (席のデッキ, 帯) ごとに。
+    戻り: ({(deck, band): [(hash, seed, step, w, t)]}, {(seed, w): {band: 行の数}}, {(seed, w): deck})。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    meta = json.load(open(os.path.join(src, "meta_games.json"), encoding="utf-8"))
+    gms = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    pts, cnt, dof = collections.defaultdict(list), collections.defaultdict(collections.Counter), {}
+    cols = ("who", "turn", "seed", "kind", "step", "pol_len")
+    for rows, pol, _ex, L, ptr, idx in PL.iter_games([src], row_cols=cols, pol_cols=("pol_sig",)):
+        seed = int(rows["seed"][idx[0]])
+        gm = gms.get(seed)
+        if gm is None:
+            continue
+        for w in (0, 1):
+            dof[(seed, w)] = gm["leaders"][w]
+            cnt[(seed, w)]
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0 or int(L[i]) < 2:
+                continue
+            if json.loads(pol["pol_sig"][ptr[i]])[0] == "RESOLVE_EFFECT_SELECTION":
+                continue
+            st = int(rows["step"][i]); b = turn_band(t)
+            pts[(gm["leaders"][w], b)].append((_mix64(seed * 1000003 + st), seed, st, w, t))
+            cnt[(seed, w)][b] += 1
+    return pts, cnt, dof
+
+
+def cmd_playdeep(a):
+    """§1.3 の物差し 2: 選んだ点の盤面を記録と同じ設定で打ち直して再現し、シミュレーションを `--mult` 倍にした探索（雑音・温度なし）を回す。
+    局ごとに 1 行の jsonl（在る局は飛ばす＝再開できる）。"""
+    from opcg_sim.loop import decks as D
+    from opcg_sim.loop import driver as DR
+    from opcg_sim.loop import engine as E
+    from opcg_sim.loop import record_gen as RG
+    pts, _cnt, dof = playgap_points(a.src)
+    pick = collections.defaultdict(dict)
+    for key, xs in sorted(pts.items()):
+        for h, seed, st, w, t in sorted(xs)[:a.per]:
+            pick[seed][st] = (w, t, key[0], key[1])
+    seeds = sorted(pick)
+    if a.shard:
+        i, n = (int(x) for x in a.shard.split("/"))
+        seeds = [s for k, s in enumerate(seeds) if k % n == i]
+    done = set()
+    if os.path.exists(a.out):
+        for line in open(a.out, encoding="utf-8"):
+            done.add(int(json.loads(line)["seed"]))
+    meta = json.load(open(os.path.join(a.src, "meta_n_record.json"), encoding="utf-8"))
+    # 照合は「記録と同じ手を選んだか」で読む（符号化の行は新しいエンジンで列が変わったので、ビットの照合は使えない・報告 §2）
+    from opcg_sim.learned.train import plan_labels as PL
+    rec, want_s = {}, set(seeds)
+    for rows, _pol, _ex, L, _ptr, idx in PL.iter_games([a.src], row_cols=("seed", "kind", "step", "sig", "pol_len"), pol_cols=()):
+        sd = int(rows["seed"][idx[0]])
+        if sd in want_s:
+            rec[sd] = {int(rows["step"][i]): (json.loads(rows["sig"][i]), int(L[i])) for i in idx if int(rows["kind"][i]) == 0}
+    E.engine()
+    search = {"worlds": int(meta["search"]["worlds"])} if (meta.get("search") or {}).get("worlds") else {}
+    spec = E.SeatSpec(meta.get("net"), sims=int(meta["sims"]), dirichlet_eps=float(meta["dirichlet_eps"]),
+                      temp_turns=int(meta["temp_turns"]), prune_futile=E.GEN_PRUNE_FUTILE, **search)
+    deep = E.SeatSpec(meta.get("net"), sims=int(meta["sims"]) * a.mult, prune_futile=E.GEN_PRUNE_FUTILE, **search)
+    db = D.load_db()
+
+    class _Stop(Exception):
+        pass
+    import time
+    t0 = time.time()
+    with open(a.out, "a", encoding="utf-8") as fo:
+        for seed in seeds:
+            if seed in done:
+                continue
+            want = pick[seed]
+            rr = rec.get(seed, {})
+            st_ = {"bad": False, "left": len(want), "pts": [], "lost": 0}
+
+            def obs(game, name, turn, step, out, move):
+                if out.get("kind") != "main":
+                    return
+                ref = rr.get(int(step))
+                same = ref is not None and list(ref[0]) == list(out.get("sig") or []) and ref[1] == len(out.get("groups") or [])
+                if int(step) not in want:
+                    if not same:
+                        st_["bad"] = True
+                    return
+                if not same:
+                    st_["bad"] = True
+                st_["left"] -= 1
+                w, t, deck, band = want[int(step)]
+                if st_["bad"]:
+                    st_["lost"] += 1
+                else:
+                    o2 = json.loads(game.fork().decide(name, deep.decide_opts(seed, int(turn), name, None)))
+                    legal, legal2 = out["stats"]["legal"], o2["stats"]["legal"]
+
+                    def chosen(o, lg):
+                        # 選んだ束は記録と同じ鍵（箱レベルの sig と付けるドンの枚数・`record_gen._Recorder`）で引く
+                        k = o.get("k")
+                        for g in o["groups"]:
+                            rep = lg[g["rep"]]
+                            dk = (rep.get("payload") or {}).get("don_k")
+                            if RG.move_sig(rep) == o.get("sig") and (None if dk is None else float(dk)) == (None if k is None else float(k)):
+                                return g
+                        return None
+                    gp0, gd = chosen(out, legal), chosen(o2, legal2)
+                    rec_ = {"step": int(step), "w": w, "t": t, "deck": deck, "band": band, "groups": len(out["groups"]),
+                            "deep_groups": len(o2["groups"]), "same_legal": legal == legal2}
+                    g2of = {g["rep"]: g for g in o2["groups"]}
+                    gp = g2of.get(gp0["rep"]) if gp0 is not None else None
+                    if gp is None or gd is None or legal != legal2:
+                        rec_["unmapped"] = True
+                    else:
+                        rec_.update({"agree": gp["rep"] == gd["rep"], "q_played": gp["q"], "n_played": gp["n"],
+                                     "q_deep": gd["q"], "n_deep": gd["n"],
+                                     "q_max": max(g["q"] for g in o2["groups"] if g["n"] > 0),
+                                     "shallow_q_played": gp0["q"], "shallow_n_played": gp0["n"]})
+                        if gp["n"] > 0:
+                            rec_["loss"] = (gd["q"] - gp["q"]) / 2.0
+                    st_["pts"].append(rec_)
+                if st_["left"] <= 0 or st_["bad"]:
+                    raise _Stop()
+
+            def obs_(game, name, turn, step, out, move):
+                obs(game, name, turn, step, out, move)
+                if st_["bad"]:
+                    raise _Stop()
+
+            la, lb = D.leader_pair(db, seed, "random")
+            p1, p2 = D.build_pair(db, la, lb, seed, meta["decks"])
+            t1 = time.time()
+            try:
+                DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, max_steps=RG.MAX_STEPS, observer=obs_)
+            except _Stop:
+                pass
+            lost = st_["lost"] + max(0, st_["left"])
+            fo.write(json.dumps({"seed": seed, "diverged": st_["bad"], "lost": lost, "points": st_["pts"]}) + "\n")
+            fo.flush()
+            print("PLAYDEEP seed=%d pts=%d lost=%d bad=%d %.1fs (total %.0fs)" % (seed, len(st_["pts"]), lost, st_["bad"],
+                                                                                  time.time() - t1, time.time() - t0), flush=True)
+    return 0
+
+
+def cmd_playgap(a):
+    """§1.2・§1.3 の集計: 物差し 1（理論の値段の写し）と物差し 2（`playdeep` の jsonl）。"""
+    _pts, cnt, dof = playgap_points(a.src)
+    decks = sorted(set(dof.values()))
+    bands = TURN_BANDS
+    out = {"record": a.src, "dump": a.dump, "deep": a.deep}
+    rng = np.random.default_rng(SEED)
+
+    def summarize(per_unit, reps=BOOT, seeds=None):
+        """per_unit: {(seed, w): {band: 量}} → デッキ × 帯（と全体）の 局×席の平均・エネル − 他・ナミ中盤 − 他・局の再抽出の区間。
+        `seeds`＝数える局（写しに在る局だけ・その局の行の無い帯は 0）。"""
+        seeds = sorted(seeds if seeds is not None else {s for s, _ in dof})
+
+        def means(ss):
+            m = {}
+            for dk in decks:
+                us = [(s, w) for s in ss for w in (0, 1) if dof.get((s, w)) == dk]
+                if not us:
+                    continue
+                for b in bands + ("all",):
+                    vals = [sum(per_unit.get(u, {}).values()) if b == "all" else per_unit.get(u, {}).get(b, 0.0) for u in us]
+                    m[(dk, b)] = float(np.mean(vals))
+            return m
+
+        def contrasts(m):
+            o = {}
+            for focus, b in (("OP15-058", "all"), ("OP11-041", "4-6")):
+                oth = [m[(dk, b)] for dk in decks if dk != focus and (dk, b) in m]
+                if (focus, b) in m and oth:
+                    o["%s|%s" % (focus, b)] = m[(focus, b)] - float(np.mean(oth))
+            return o
+        m0 = means(seeds)
+        c0 = contrasts(m0)
+        boots = collections.defaultdict(list)
+        for _ in range(reps):
+            ss = [seeds[k] for k in rng.integers(0, len(seeds), len(seeds))]
+            for k, v in contrasts(means(ss)).items():
+                boots[k].append(v)
+        return {"by_deck": {dk: {b: round(m0[(dk, b)], 4) for b in bands + ("all",) if (dk, b) in m0} for dk in decks},
+                "contrast": {k: {"diff": round(v, 4), "ci": [round(float(np.percentile(boots[k], 2.5)), 4),
+                                                             round(float(np.percentile(boots[k], 97.5)), 4)]} for k, v in c0.items()}}
+
+    # ---- 物差し 1
+    if a.dump:
+        stub = {"cap": 99.0, "rows_out": [], "turn_harm": [], "settled": []}
+        rows_all, align, *_r = build_rows(a.src, load_dump(a.dump), stub)
+        rows = [r for r in rows_all if r["pv"] is not None and r["bv"] is not None and r["nsc"] >= 2]
+        dseeds = set(load_dump(a.dump))
+        per = collections.defaultdict(lambda: collections.defaultdict(float))
+        nrow = collections.defaultdict(lambda: collections.defaultdict(int))
+        for r in rows:
+            v = (float(r["bv"]) - float(r["pv"])) * float(r["kap"])
+            per[(r["seed"], r["w"])][turn_band(r["t"])] += v
+            nrow[(r["seed"], r["w"])][turn_band(r["t"])] += 1
+        out["theory"] = {"align": dict(align), "rows_all": len(rows_all), "rows": len(rows),
+                         "per_row_by_deck": {dk: {b: round(float(np.mean([(float(r["bv"]) - float(r["pv"])) * float(r["kap"]) for r in rows
+                                                                          if dof.get((r["seed"], r["w"])) == dk and turn_band(r["t"]) == b] or [float("nan")])), 5)
+                                                  for b in bands} for dk in decks},
+                         "per_row_followed": {dk: round(float(np.mean([r["ptype"] == r["btype"] and abs(float(r["bv"]) - float(r["pv"])) < 1e-12
+                                                                       for r in rows if dof.get((r["seed"], r["w"])) == dk])), 4) for dk in decks},
+                         "games": len(dseeds),
+                         "rows_per_game": summarize({u: dict(v) for u, v in nrow.items()}, reps=1, seeds=dseeds)["by_deck"],
+                         **summarize({u: dict(v) for u, v in per.items()}, seeds=dseeds)}
+    # ---- 物差し 2
+    if a.deep:
+        games = [json.loads(line) for line in open(a.deep, encoding="utf-8")]
+        P = [dict(p, seed=g["seed"]) for g in games for p in g["points"]]
+        rows_pg = {}
+        for dk in decks:
+            us = [u for u in dof if dof[u] == dk]
+            for b in bands:
+                rows_pg[(dk, b)] = float(np.mean([cnt[u].get(b, 0) for u in us]))
+        d2 = {"games": len(games), "diverged_games": sum(g["diverged"] for g in games), "points": len(P),
+              "lost_points": sum(g["lost"] for g in games), "unmapped": sum(1 for p in P if p.get("unmapped")),
+              "no_visit_played": sum(1 for p in P if not p.get("unmapped") and "loss" not in p), "by_deck": {}, "contrast": {}}
+
+        def est(sel):
+            """点の集合 → デッキ × 帯の (一致率, 1 点の劣る量, 1 局の劣る量)。"""
+            o = {}
+            for dk in decks:
+                tot, agw, n_ag = 0.0, 0.0, 0.0
+                for b in bands:
+                    ps = [p for p in sel if p["deck"] == dk and p["band"] == b and not p.get("unmapped")]
+                    ls = [p["loss"] for p in ps if "loss" in p]
+                    ag = float(np.mean([p["agree"] for p in ps])) if ps else float("nan")
+                    lm = float(np.mean(ls)) if ls else float("nan")
+                    o[(dk, b)] = (ag, lm, lm * rows_pg[(dk, b)], len(ps))
+                    if ls:
+                        tot += lm * rows_pg[(dk, b)]
+                    if ps:
+                        agw += ag * rows_pg[(dk, b)]; n_ag += rows_pg[(dk, b)]
+                o[(dk, "all")] = (agw / n_ag if n_ag else float("nan"), float("nan"), tot, sum(o[(dk, b)][3] for b in bands))
+            return o
+
+        def ctr(o):
+            c = {}
+            for focus, b in (("OP15-058", "all"), ("OP11-041", "4-6")):
+                oth = [o[(dk, b)][2] for dk in decks if dk != focus]
+                c["%s|%s" % (focus, b)] = o[(focus, b)][2] - float(np.mean(oth))
+                otha = [o[(dk, b)][0] for dk in decks if dk != focus]
+                c["agree:%s|%s" % (focus, b)] = o[(focus, b)][0] - float(np.mean(otha))
+            return c
+        o0 = est(P)
+        c0 = ctr(o0)
+        by = collections.defaultdict(list)
+        for p in P:
+            by[(p["deck"], p["band"])].append(p)
+        boots = collections.defaultdict(list)
+        for _ in range(BOOT):
+            sel = []
+            for k, xs in by.items():
+                sel.extend(xs[j] for j in rng.integers(0, len(xs), len(xs)))
+            for k, v in ctr(est(sel)).items():
+                boots[k].append(v)
+        for dk in decks:
+            d2["by_deck"][dk] = {b: {"agree": round(o0[(dk, b)][0], 4), "loss_per_point": None if b == "all" else round(o0[(dk, b)][1], 5),
+                                     "loss_per_game": round(o0[(dk, b)][2], 4), "points": o0[(dk, b)][3],
+                                     "rows_per_game": None if b == "all" else round(rows_pg[(dk, b)], 3)} for b in bands + ("all",)}
+        d2["contrast"] = {k: {"diff": round(v, 4), "ci": [round(float(np.nanpercentile(boots[k], 2.5)), 4),
+                                                          round(float(np.nanpercentile(boots[k], 97.5)), 4)]} for k, v in c0.items()}
+        out["deep"] = d2
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps({k: out[k].get("contrast") for k in ("theory", "deep") if k in out}, ensure_ascii=False))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1967,10 +2243,22 @@ def main(argv=None):
     cn.add_argument("--in", dest="src", required=True)
     cn.add_argument("--clocks", required=True, help="`OPCG_REACH_DUMP=1` で作った時計の行")
     cn.add_argument("--out", required=True)
+    pd = sub.add_parser("playdeep")
+    pd.add_argument("--in", dest="src", required=True)
+    pd.add_argument("--out", required=True, help="局ごとの jsonl（在る局は飛ばす）")
+    pd.add_argument("--per", type=int, default=150, help="デッキ × 帯ごとの点の数")
+    pd.add_argument("--mult", type=int, default=4, help="記録のシミュレーションの何倍で探索するか")
+    pd.add_argument("--shard", default=None, help="i/n（局を n 本に分けた i 本目）")
+    pg = sub.add_parser("playgap")
+    pg.add_argument("--in", dest="src", required=True)
+    pg.add_argument("--dump", default=None, help="今の既定で取り直した `OPCG_PRICE_DUMP` の写し（物差し 1）")
+    pg.add_argument("--deep", default=None, help="`playdeep` の jsonl（物差し 2）")
+    pg.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
-            "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter}[a.cmd](a)
+            "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter,
+            "playdeep": cmd_playdeep, "playgap": cmd_playgap}[a.cmd](a)
 
 
 if __name__ == "__main__":
