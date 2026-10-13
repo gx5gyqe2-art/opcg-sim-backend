@@ -89,3 +89,8 @@ OPCG_THEORY_GOLDEN_WRITE=1 cargo test --no-default-features tests_regen -- --inc
 `OPCG_LIFE_ADD` の既定を on に反転した（`=0`／`off` で旧い形）。上の器で `theory_rows_golden` の 43 行（`kappa_vector`・`transition_ledger`・
 `crossing_bridge`・`relative_ledger`・`theory_bridge` の記録・合成 w39 と記録の局）の戻りの欄を作り直した。`theory_core`・`theory_outer` は 0 行。
 作り直した後に器をもう一度回して 0 行・`OPCG_LIFE_ADD=0` で回すと同じ 43 行が旧い値に戻ることを確かめた。
+
+### 【相手のアタック時】をその相手のターンの守る側のリーダーのパワーとして読むのを既定に（2026-10-13・ユーザ決定「(a) 既定にする」・`docs/reports/2026-10-13_opp_attack_power.md`）
+
+`OPCG_OPP_ATTACK_POWER` の既定を on に反転した（`=0`／`off` で旧い形）。上の器で回すと `theory_core`・`theory_outer`・`theory_rows` とも書き換えた行 0。
+上げ幅・下げ幅を一時的に 100 倍にしても 0 行だった＝**golden の局には読む型（`BUFF` だけ）の【相手のアタック時】の持ち主が通る行が無い**（この口は golden では見張られていない。見張りは実 w41 の時計の 20 局のファイル一致で行った）。

@@ -1500,6 +1500,89 @@ impl Core {
         out
     }
 
+    /// **候補 `OPCG_OPP_ATTACK_POWER=1`**（`docs/reports/2026-10-13_opp_attack_power.md` §1.1）: 守る側の持ち主 `srcs`＝(札, 付与中のドン)
+    /// の【相手のアタック時】のうち、効果の動作が全部パワーの上げ下げ（`BUFF`）の能力ごとに (X, 下げ幅か, 手札 1 枚を捨てるか)。
+    /// 条件は【ターン1回】と【ドン‼×n】だけ読み、費用は「条件の無い手札 1 枚を捨てる」・「ドン‼−n」（`field_don` ≥ n）・なし だけ読む。
+    pub fn opp_attack_effects(&mut self, srcs: &[(String, f64)], field_don: f64) -> Vec<(f64, bool, bool)> {
+        let mut out = Vec::new();
+        for (cid, att) in srcs {
+            let c = self.card(cid);
+            if !c.truthy() {
+                continue;
+            }
+            for ab in c.get("abilities").items().to_vec() {
+                if trig_of(&ab).str_or_empty() != "ON_OPP_ATTACK" {
+                    continue;
+                }
+                let mut ok = true;
+                let mut stack = vec![ab.get("condition").clone()];
+                while let Some(cd) = stack.pop() {
+                    if !cd.is_dict() {
+                        continue;
+                    }
+                    match s_of(&cd, "type").as_str() {
+                        "AND" | "TURN_LIMIT" | "" => {}
+                        "HAS_DON" => {
+                            if *att + 1e-9 < cd.get("value").f_or0() {
+                                ok = false;
+                            }
+                        }
+                        _ => ok = false,
+                    }
+                    for a in cd.get("args").items().to_vec() {
+                        stack.push(a);
+                    }
+                }
+                let acts = walk_actions(ab.get("effect"));
+                if !ok || acts.is_empty() || acts.iter().any(|e| s_of(e, "type") != "BUFF") {
+                    continue;
+                }
+                let (mut up, mut down) = (0.0f64, 0.0f64);
+                for e in &acts {
+                    let m = magnitude(e);
+                    if side(&target_of(e)) == "OPPONENT" {
+                        if m < 0.0 {
+                            down = down.max(-m);
+                        }
+                    } else if m > 0.0 {
+                        up = up.max(m);
+                    }
+                }
+                let mut discard = false;
+                for e in walk_actions(ab.get("cost")) {
+                    match s_of(&e, "type").as_str() {
+                        "RETURN_DON" => {
+                            if field_don + 1e-9 < py_max(1.0, magnitude(&e)) {
+                                ok = false;
+                            }
+                        }
+                        "DISCARD" => {
+                            let t = target_of(&e);
+                            let filtered = ["card_type", "traits", "names", "attributes", "colors"].iter().any(|k| t.get(k).truthy())
+                                || t.get("cost_max").truthy()
+                                || t.get("power_max").truthy();
+                            let n = t.get("count");
+                            if filtered || (!n.is_none() && n.f() > 1.0) {
+                                ok = false;
+                            }
+                            discard = true;
+                        }
+                        _ => ok = false,
+                    }
+                }
+                if !ok {
+                    continue;
+                }
+                if up > 0.0 {
+                    out.push((up, false, discard));
+                } else if down > 0.0 {
+                    out.push((down, true, discard));
+                }
+            }
+        }
+        out
+    }
+
     /// `life_add_on_play` の加える分（効果の木を下る・選択は大きい方）。
     /// `from_life`＝同じ並びの前の動作が自分のライフを見て（`LOOK_LIFE`）並べ直しの場〔`TEMP`〕に出した＝そこからライフへ戻す動作は加算でない
     /// （アイサ OP06-099「ライフの上から 1 枚を見て、ライフの上か下に置く」。2026-10-12 の訂正・報告 §1.1 の注記）。

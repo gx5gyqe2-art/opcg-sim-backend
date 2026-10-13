@@ -1180,9 +1180,181 @@ def cmd_guardside(a):
     return 0
 
 
+def cmd_defturns(a):
+    """守る側の相手のターン 1 回ごとの量（2026-10-13・`2026-10-13_defence_gap.md` §8・代案の材料・式には入れない）。
+    記録だけで、デッキ × 帯ごとに: 相手のターンに来た攻撃の本数（全部の対象／リーダーへ）の分布（0／1／2／3 本以上）と、
+    そのターンの最初の守る側の行で手札に「カウンター 0 の札」（カウンターイベントを除く）が 1 枚以上在る割合。"""
+    import deck_refill as DR
+    import theory_rs as TR
+    from opcg_sim.learned.train import plan_labels as PL
+    from opcg_sim.loop import decks as D
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    idx2cid = TR.idx2cid()
+    db = D.load_db()
+    info = {}
+
+    def cinfo(cid):
+        if cid not in info:
+            m = db.get_card(cid)
+            if m is None:
+                info[cid] = None
+            else:
+                ty = getattr(getattr(m, "type", None), "name", "")
+                txt = getattr(m, "effect_text", "") or ""
+                info[cid] = {"counter": int(getattr(m, "counter", 0) or 0), "cev": ty == "EVENT" and "【カウンター】" in txt}
+        return info[cid]
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    turns = []                                    # (守る側のリーダー, 帯, 攻撃の本数, リーダーへの本数, 手札にカウンター 0 が在るか)
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig", "pol_cid", "pol_tcid"),
+                                                    extra_fn=lambda dd, n: {"ci": np.asarray(dd["card_idx"])[:n]}):
+        seed = int(rows["seed"][idx[0]])
+        gm = games_meta.get(seed)
+        if gm is None:
+            continue
+        lead = gm["leaders"]
+        u2c = PL.uuid_map(pol, L, ptr, idx)
+        att, att_l, c0, seen = collections.Counter(), collections.Counter(), {}, set()
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1:
+                continue
+            if PL.is_own_turn(w, t):
+                seen.add((1 - w, t))
+                if int(rows["kind"][i]) == 0:
+                    sj = json.loads(rows["sig"][i])
+                    if sj[0] in ("ATTACK", "DON_BOX") and sj[2]:
+                        att[(1 - w, t)] += 1
+                        att_l[(1 - w, t)] += int(u2c.get(sj[2][0]) == lead[1 - w])
+            elif (w, t) not in c0:
+                has = False
+                for cid in DR.hand_ids(ex["ci"][i], idx2cid):
+                    inf = cinfo(cid)
+                    if inf is not None and not inf["cev"] and inf["counter"] == 0:
+                        has = True
+                c0[(w, t)] = has
+        for (d, t) in sorted(seen):
+            turns.append((lead[d], turn_band(t), att[(d, t)], att_l[(d, t)], c0.get((d, t))))
+
+    def blk(ts):
+        if not ts:
+            return None
+        def dist(k):
+            c = collections.Counter(min(3, x[k]) for x in ts)
+            return {("3+" if n == 3 else str(n)): round(c[n] / len(ts), 3) for n in range(4)}
+        known = [x for x in ts if x[4] is not None]
+        return {"turns": len(ts), "attacks": dist(2), "leader_attacks": dist(3),
+                "attacks_mean": round(float(np.mean([x[2] for x in ts])), 3),
+                "leader_attacks_mean": round(float(np.mean([x[3] for x in ts])), 3),
+                "hand_has_c0": round(sum(1 for x in known if x[4]) / len(known), 3) if known else None}
+    decks = sorted({x[0] for x in turns})
+    out = {"record": a.src, "by_deck": {d: {"all": blk([x for x in turns if x[0] == d]),
+                                            **{b: blk([x for x in turns if x[0] == d and x[1] == b]) for b in TURN_BANDS}} for d in decks}}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("defturns: turns %d" % len(turns))
+    return 0
+
+
+def cmd_parts(a):
+    """耐久を部品ごとに割る（2026-10-13・`2026-10-13_enel_parts.md` §1・1 回きり）。攻める席のターン先頭の行（損害の行・決着の宣言の前）ごとに、
+    守る席の耐久の 3 項（ライフ＝Θ − 手札 − 体・手札・体）と、その行から終局までの実際（ライフの減り × λ・守りの窓で消えた札の価値・
+    ブロックの回数 × ブロッカー 1 体の読み）を並べ、守る席のデッキ × 帯ごとに「実際の和 ÷ 理論の和」を、倒れた局／倒れなかった局（打ち切り）で出す。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    lam = 0.1362                                  # `leaves_to::LAM`
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    ck = json.load(open(a.clocks, encoding="utf-8"))
+    g2s = {int(r["g"]): int(r["seed"]) for r in ck["rows_out"]}
+    tseq, settled = collections.defaultdict(list), set()
+    for sd, w, t, done in ck["settled"]:
+        tseq[(int(sd), int(w))].append(int(t))
+        if done:
+            settled.add((int(sd), int(w), int(t)))
+    for k in tseq:
+        tseq[k].sort()
+    # 守りの窓で消えた札の価値（同じ相手のターンでは最大＝最初の窓を 1 回）
+    spent = collections.defaultdict(float)
+    with open(a.dump, encoding="utf-8") as f:
+        for line in f:
+            j = json.loads(line)
+            for g in j.get("guard") or []:
+                t, w, sp = int(g[0]), int(g[1]), g[12]
+                if sp is not None:
+                    k = (int(j["seed"]), w, t)
+                    spent[k] = max(spent[k], float(sp))
+    # 記録: 席ごとのライフの減り（ターンごと）・ブロックの回数（ターンごと）・勝敗
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    lost, blocks, zof = collections.defaultdict(float), collections.Counter(), {}
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig",),
+                                                    extra_fn=lambda dd, n: {"sc": np.asarray(dd["scalars"])[:n].astype(float)}):
+        seed = int(rows["seed"][idx[0]])
+        prev = {0: None, 1: None}
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i]); sc = ex["sc"][i]
+            zof[(seed, w)] = float(rows["z"][i])
+            for d, life in ((w, sc[0]), (1 - w, sc[1])):
+                if prev[d] is not None and life < prev[d] - 0.5:
+                    lost[(seed, d, t)] += prev[d] - life
+                prev[d] = life
+            if json.loads(rows["sig"][i])[0] == "SELECT_BLOCKER":
+                blocks[(seed, w, t)] += 1
+    def by_seat(dct):
+        out = collections.defaultdict(dict)
+        for (sd, dd, tt), v in dct.items():
+            out[(sd, dd)][tt] = out[(sd, dd)].get(tt, 0.0) + v
+        return out
+    lost_s, spent_s, blocks_s = by_seat(lost), by_seat(spent), by_seat(blocks)
+
+    def after(m, key, t):
+        return sum(v for tt, v in m.get(key, {}).items() if tt >= t)
+    recs = []
+    for r in ck["turn_harm"]:
+        seed = g2s.get(int(r["g"]))
+        if seed is None or seed not in games_meta:
+            continue
+        w = int(r["who"]); jj = int(r["j"]); ts = tseq.get((seed, w), [])
+        if jj >= len(ts):
+            continue
+        t = ts[jj]
+        if (seed, w, t) in settled:
+            continue
+        d = 1 - w
+        th, hh, bb = float(r["theta"]), float(r["th_hand"]), float(r["th_body"])
+        nb = int(r.get("d_blk_n") or 0)
+        per_b = bb / nb if nb > 0 else bb
+        a_life = lam * after(lost_s, (seed, d), t)
+        a_hand = after(spent_s, (seed, d), t)
+        a_body = per_b * after(blocks_s, (seed, d), t)
+        fell = (zof.get((seed, d)) or 0.0) < 0.5
+        recs.append({"leader": games_meta[seed]["leaders"][d], "band": turn_band(t), "fell": fell,
+                     "th": {"life": th - hh - bb, "hand": hh, "body": bb}, "ac": {"life": a_life, "hand": a_hand, "body": a_body}})
+
+    def blk(rs):
+        if not rs:
+            return None
+        out = {"rows": len(rs)}
+        for part in ("life", "hand", "body"):
+            st = sum(x["th"][part] for x in rs); sa = sum(x["ac"][part] for x in rs)
+            out[part] = {"theory": round(st / len(rs), 4), "actual": round(sa / len(rs), 4), "ratio": round(sa / st, 3) if st > 1e-12 else None}
+        return out
+    decks = sorted({x["leader"] for x in recs})
+    res = {}
+    for dk in decks + ["ALL"]:
+        rd = [x for x in recs if dk == "ALL" or x["leader"] == dk]
+        res[dk] = {}
+        for band in ("all",) + TURN_BANDS:
+            rb = [x for x in rd if band == "all" or x["band"] == band]
+            res[dk][band] = {"both": blk(rb), "fell": blk([x for x in rb if x["fell"]]), "survived": blk([x for x in rb if not x["fell"]])}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump({"record": a.src, "clocks": a.clocks, "dump": a.dump, "lam": lam, "parts": res}, f, ensure_ascii=False, indent=1)
+    print("parts: rows %d" % len(recs))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1234,9 +1406,18 @@ def main(argv=None):
     gs.add_argument("--in", dest="src", required=True)
     gs.add_argument("--dump", required=True, help="`guard` 欄つきの写し（`theory_bridge.py` を `OPCG_PRICE_DUMP` で・2026-10-12 以降）")
     gs.add_argument("--out", required=True)
+    dt = sub.add_parser("defturns")
+    dt.add_argument("--in", dest="src", required=True)
+    dt.add_argument("--out", required=True)
+    pt = sub.add_parser("parts")
+    pt.add_argument("--in", dest="src", required=True)
+    pt.add_argument("--clocks", required=True)
+    pt.add_argument("--dump", required=True, help="`guard` 欄つきの写し")
+    pt.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
-            "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside}[a.cmd](a)
+            "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
+            "defturns": cmd_defturns, "parts": cmd_parts}[a.cmd](a)
 
 
 if __name__ == "__main__":
