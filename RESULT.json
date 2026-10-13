@@ -852,5 +852,42 @@
       "logs/theory_map/real_w41_newengine_cal.json",
       "logs/theory_map/real_w41_newengine_clockside.json"
     ]
+  },
+  "attack_speed_2026_10_14": {
+    "report": "docs/reports/2026-10-14_attack_speed.md",
+    "s1_before_data": "21bc92bf",
+    "kind": "diagnostic (records + new-engine clocks)",
+    "tool": "tests/scripts/theory_map.py speed",
+    "log": "logs/theory_map/real_w41_speed.json",
+    "ratio_actual_over_theory": {
+      "enel": {
+        "all": 0.962,
+        "1-3": 0.655,
+        "4-6": 1.028,
+        "7+": 0.979
+      },
+      "others_mean": {
+        "all": 1.014,
+        "1-3": 0.913,
+        "4-6": 1.051,
+        "7+": 1.011
+      }
+    },
+    "enel_minus_others": {
+      "all": -0.052,
+      "1-3": -0.258,
+      "4-6": -0.023,
+      "7+": -0.032
+    },
+    "verdict": "not a hit (early only); mid/late misses -> play-style side",
+    "enel_early": {
+      "attacks_per_turn": 0.484,
+      "life_per_leader_attack": 0.299,
+      "others_life_per_leader_attack": [
+        0.427,
+        0.453,
+        0.73
+      ]
+    }
   }
 }
