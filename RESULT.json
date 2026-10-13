@@ -946,5 +946,26 @@
       "ge7000": 0.105,
       "mean": 4725.5
     }
+  },
+  "reach_2026_10_14": {
+    "report": "docs/reports/2026-10-14_reach.md",
+    "kind": "diagnostic",
+    "switch": "OPCG_REACH_DUMP=1 (diagnostic field reach_theory in turn_harm; default off, values unchanged)",
+    "tool": "tests/scripts/theory_map.py reach",
+    "log": "logs/theory_map/real_w41_reach.json",
+    "theory_over_actual_mid": {
+      "nami": 1.113,
+      "shanks": 0.688,
+      "enel": 1.235,
+      "luffy": 1.055,
+      "others_mean": 0.993
+    },
+    "nami_minus_others_mid": 0.12,
+    "theory_over_actual_late": {
+      "nami": 1.628,
+      "others_mean": 1.351
+    },
+    "verdict": "in between (0.1-0.3)",
+    "correction": "nami_power §4 used pre-DON power; after declaration 72% of mid attacks on Nami's leader reach (1.10/1.53 per turn)"
   }
 }
