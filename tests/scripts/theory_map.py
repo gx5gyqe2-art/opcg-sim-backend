@@ -1352,9 +1352,143 @@ def cmd_parts(a):
     return 0
 
 
+def cmd_reread(a):
+    """対局の読み直し（2026-10-14・`2026-10-14_reread.md` §1・1 回きり・記録だけ）。
+    (E) 出した体が次の相手のターンのうちに場から居なくなった割合を、持ち主のデッキ × 印字のパワー帯 × 出したターンの帯で（場の札の多重集合の差で数える）。
+        理論の読み（`ko_p_of` の山形・定数 0.289）と並べる。
+    (N) 守る席のデッキ別に、相手のターンに自分のライフが減った直後に自分が効果の選択をした回数（【トリガー】の発動の代わりの数）と、
+        ライフが減った回数（1 局あたり・帯別）。デッキの【トリガー】の札の効果の種類（効果 JSON の TRIGGER 能力の動作）を並べる。"""
+    import theory_rs as TR
+    from opcg_sim.learned.train import plan_labels as PL
+    from opcg_sim.loop import decks as D
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    idx2cid = TR.idx2cid()
+    db = D.load_db()
+    eff = json.load(open(os.path.join("opcg_sim", "data", "opcg_effects.json"), encoding="utf-8"))["cards"]
+    pinfo = {}
+
+    def char_power(cid):
+        if cid not in pinfo:
+            m = db.get_card(cid)
+            ty = getattr(getattr(m, "type", None), "name", "") if m is not None else ""
+            pinfo[cid] = float(getattr(m, "power", 0) or 0) if ty == "CHARACTER" else None
+        return pinfo[cid]
+
+    def pband(p):
+        return "<=2000" if p <= 2000 else "3000-4000" if p <= 4000 else "5000-6000" if p <= 6000 else "7000+"
+
+    def ko_curve(p):                               # `leaves_to::ko_p_of`
+        for hi, v in ((2000.0, 0.2417), (4000.0, 0.2782), (6000.0, 0.3297), (8000.0, 0.2436)):
+            if p < hi:
+                return v
+        return 0.1987
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    body = collections.defaultdict(lambda: [0, 0, 0.0])      # (deck, pband, band) → [出した, 居なくなった, 理論の和]
+    trig = collections.defaultdict(lambda: collections.Counter())
+    seats = collections.Counter()
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig",),
+                                                    extra_fn=lambda dd, n: {"sc": np.asarray(dd["scalars"])[:n].astype(float),
+                                                                            "ci": np.asarray(dd["card_idx"])[:n]}):
+        seed = int(rows["seed"][idx[0]])
+        gm = games_meta.get(seed)
+        if gm is None:
+            continue
+        lead = gm["leaders"]
+        for w in (0, 1):
+            seats[lead[w]] += 1
+        first, last = {}, {}
+        prev = {0: None, 1: None}
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i]); sc = ex["sc"][i]; ci = ex["ci"][i]
+            if t < 1:
+                continue
+            for d in (0, 1):
+                sl = range(2, 7) if d == w else range(7, 12)
+                f = collections.Counter(c for c in (idx2cid.get(int(ci[s])) for s in sl) if c)
+                first.setdefault((d, t), f)
+                last[(d, t)] = f
+            life = {w: sc[0], 1 - w: sc[1]}
+            sj = json.loads(rows["sig"][i])
+            own = PL.is_own_turn(w, t)
+            if not own and prev[w] is not None and sj[0] == "RESOLVE_EFFECT_SELECTION" and life[w] < prev[w] - 0.5:
+                trig[(lead[w], turn_band(t))]["sel_after_loss"] += 1
+            for d in (0, 1):
+                if prev[d] is not None and life[d] < prev[d] - 0.5 and not PL.is_own_turn(d, t):
+                    trig[(lead[d], turn_band(t))]["life_lost"] += prev[d] - life[d]
+                prev[d] = life[d]
+        for (d, t), fe in last.items():
+            if not PL.is_own_turn(d, t) or (d, t + 2) not in first:
+                continue
+            fs = first.get((d, t), collections.Counter())
+            fn = first[(d, t + 2)]
+            for cid, ke in fe.items():
+                p = char_power(cid)
+                if p is None:
+                    continue
+                played = max(0, ke - fs.get(cid, 0))
+                if played <= 0:
+                    continue
+                old = ke - played
+                surv = max(0, min(played, fn.get(cid, 0) - old))
+                b = body[(lead[d], pband(p), turn_band(t))]
+                b[0] += played; b[1] += played - surv; b[2] += played * ko_curve(p)
+    out = {"record": a.src, "body": {}, "trigger": {}, "trigger_cards": {}}
+    for dk in sorted({k[0] for k in body}):
+        out["body"][dk] = {}
+        for pb in ("<=2000", "3000-4000", "5000-6000", "7000+"):
+            for band in ("all",) + TURN_BANDS:
+                ks = [k for k in body if k[0] == dk and k[1] == pb and (band == "all" or k[2] == band)]
+                n = sum(body[k][0] for k in ks)
+                if n:
+                    out["body"][dk]["%s|%s" % (pb, band)] = {"played": n, "gone_next_opp_turn": round(sum(body[k][1] for k in ks) / n, 3),
+                                                             "theory_ko_p_of": round(sum(body[k][2] for k in ks) / n, 3), "theory_const": 0.289}
+    for dk in sorted(seats):
+        out["trigger"][dk] = {}
+        for band in ("all",) + TURN_BANDS:
+            ks = [k for k in trig if k[0] == dk and (band == "all" or k[1] == band)]
+            sel = sum(trig[k]["sel_after_loss"] for k in ks); lost = sum(trig[k]["life_lost"] for k in ks)
+            out["trigger"][dk][band] = {"sel_after_loss_per_game": round(sel / seats[dk], 3), "life_lost_per_game": round(lost / seats[dk], 3),
+                                        "sel_per_life_lost": round(sel / lost, 3) if lost else None}
+        deck = None
+        for g in meta["games"]:
+            up = D.user_deck_pair(int(g["seed"])) if meta.get("decks") == "user" else None
+            if up:
+                for l, dd in up[:2]:
+                    if l == dk:
+                        deck = list(dd)
+            if deck:
+                break
+        kinds, n_trig = collections.Counter(), 0
+        for cid in deck or []:
+            for ab in (eff.get(cid) or {}).get("abilities", []):
+                if ab.get("trigger") != "TRIGGER":
+                    continue
+                n_trig += 1
+                acts = []
+
+                def walk(x):
+                    if isinstance(x, dict):
+                        if x.get("node") == "GameAction" and x.get("type"):
+                            acts.append(x["type"])
+                        for v in x.values():
+                            walk(v)
+                    elif isinstance(x, list):
+                        for v in x:
+                            walk(v)
+                walk(ab.get("effect"))
+                for t_ in set(acts):
+                    kinds[t_] += 1
+        out["trigger_cards"][dk] = {"deck_cards": len(deck or []), "trigger_cards": n_trig, "action_types": dict(kinds.most_common())}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("reread: bodies %d" % sum(v[0] for v in body.values()))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1414,10 +1548,13 @@ def main(argv=None):
     pt.add_argument("--clocks", required=True)
     pt.add_argument("--dump", required=True, help="`guard` 欄つきの写し")
     pt.add_argument("--out", required=True)
+    rr = sub.add_parser("reread")
+    rr.add_argument("--in", dest="src", required=True)
+    rr.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
-            "defturns": cmd_defturns, "parts": cmd_parts}[a.cmd](a)
+            "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread}[a.cmd](a)
 
 
 if __name__ == "__main__":
