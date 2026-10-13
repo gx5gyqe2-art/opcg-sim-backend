@@ -750,6 +750,48 @@
       "logs/theory_map/real_w41_oppatkpow_paircal.json",
       "logs/theory_map/real_w41_oppatkpow_clockside.json"
     ],
-    "recommendation": "(a) adopt after adding the same entry to the guard window / price dump (§10)"
+    "recommendation": "(a) adopt after adding the same entry to the guard window / price dump (§10)",
+    "finish": {
+      "code": "8775e827",
+      "clocks_identical_to_entry_only": true,
+      "turns_follow_diff": [
+        0.1749,
+        0.1694
+      ],
+      "turns_follow_band_1_3": [
+        0.0229,
+        -0.0076
+      ],
+      "q5_enel_all": [
+        -0.1242,
+        -0.1086
+      ],
+      "q5_others_all": [
+        0.0393,
+        0.0357
+      ],
+      "guard_nami": {
+        "windows": [
+          676,
+          634
+        ],
+        "can_share": [
+          0.611,
+          0.655
+        ],
+        "can_but_took": [
+          0.334,
+          0.354
+        ]
+      },
+      "logs": [
+        "logs/theory_map/real_w41_oppatkpow_turns_before.json",
+        "logs/theory_map/real_w41_oppatkpow_turns_after.json",
+        "logs/theory_map/real_w41_oppatkpow_q5_before.json",
+        "logs/theory_map/real_w41_oppatkpow_q5_after.json",
+        "logs/theory_map/real_w41_oppatkpow_guard_before.json",
+        "logs/theory_map/real_w41_oppatkpow_guard_after.json"
+      ]
+    }
   }
 }
