@@ -430,5 +430,97 @@
       "logs/theory_map/real_w41_horizon_clockside.json"
     ],
     "recommendation": "(b) do not adopt, keep as switch"
+  },
+  "opp_attack_2026_10_13": {
+    "report": "docs/reports/2026-10-13_opp_attack.md",
+    "s1_before_data": "4716a6be",
+    "code": {
+      "hand_life_fix": "ee9cdeee",
+      "switch": "88a78466"
+    },
+    "switch": "OPCG_OPP_ATTACK=1 (default off = old); durability hand term only (guard window and attack price not touched)",
+    "verdict": "killed by pre-registered criteria (Nami overall worsened +0.1451 -> +0.1512; Nami early moved 0.0015 < 0.02); Shanks moved toward zero",
+    "calibration": {
+      "nami": [
+        0.1451,
+        0.1512
+      ],
+      "nami_bands": {
+        "1-3": [
+          0.2052,
+          0.2067
+        ],
+        "4-6": [
+          0.1763,
+          0.1813
+        ],
+        "7+": [
+          0.1068,
+          0.115
+        ]
+      },
+      "shanks": [
+        0.0226,
+        0.0087
+      ],
+      "shanks_bands": {
+        "1-3": [
+          0.0458,
+          0.0349
+        ],
+        "4-6": [
+          0.0829,
+          0.0677
+        ],
+        "7+": [
+          -0.0133,
+          -0.0276
+        ]
+      },
+      "enel": [
+        -0.1345,
+        -0.1308
+      ],
+      "luffy": [
+        -0.0086,
+        -0.0015
+      ]
+    },
+    "crossing": [
+      0.711,
+      0.7147
+    ],
+    "pair": {
+      "nami_vs_shanks": [
+        0.173,
+        0.199
+      ],
+      "nami_vs_enel": [
+        0.226,
+        0.224
+      ],
+      "nami_vs_luffy": [
+        0.216,
+        0.213
+      ]
+    },
+    "invariant": {
+      "enel_luffy_only_games": 86,
+      "rows_identical": 951,
+      "switch_off_20games": "identical file",
+      "theory_goldens_switch_off": 0
+    },
+    "hand_life_fix": {
+      "real_w41": "bit-identical",
+      "synth_w39_clock_rows_changed": "17/3439 in 8 games",
+      "harm_rows_changed": 8,
+      "golden_rows": 0
+    },
+    "logs": [
+      "logs/theory_map/real_w41_oppatk_cal.json",
+      "logs/theory_map/real_w41_oppatk_paircal.json",
+      "logs/theory_map/real_w41_oppatk_clockside.json"
+    ],
+    "recommendation": "(b) do not adopt, keep as switch"
   }
 }
