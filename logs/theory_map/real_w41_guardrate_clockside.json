@@ -1,0 +1,455 @@
+{
+ "record": "/home/user/data_rec/sigma_wip/data/w41",
+ "by_deck": {
+  "OP09-001": {
+   "all": {
+    "me": {
+     "n": 515,
+     "games": 94,
+     "mean_int": -0.233,
+     "mean_frac": -0.703,
+     "ci_int": [
+      -0.3672,
+      -0.094
+     ],
+     "censored_n": 316,
+     "censored_short_share": 0.222
+    },
+    "opp": {
+     "n": 316,
+     "games": 51,
+     "mean_int": -0.313,
+     "mean_frac": -0.733,
+     "ci_int": [
+      -0.503,
+      -0.0957
+     ],
+     "censored_n": 515,
+     "censored_short_share": 0.109
+    }
+   },
+   "1-3": {
+    "me": {
+     "n": 94,
+     "games": 94,
+     "mean_int": -0.287,
+     "mean_frac": -0.857,
+     "ci_int": [
+      -0.5,
+      -0.0638
+     ],
+     "censored_n": 51,
+     "censored_short_share": 0.451
+    },
+    "opp": {
+     "n": 51,
+     "games": 51,
+     "mean_int": -0.294,
+     "mean_frac": -0.804,
+     "ci_int": [
+      -0.6471,
+      0.098
+     ],
+     "censored_n": 94,
+     "censored_short_share": 0.16
+    }
+   },
+   "4-6": {
+    "me": {
+     "n": 144,
+     "games": 94,
+     "mean_int": -0.271,
+     "mean_frac": -0.766,
+     "ci_int": [
+      -0.4653,
+      -0.0876
+     ],
+     "censored_n": 78,
+     "censored_short_share": 0.282
+    },
+    "opp": {
+     "n": 78,
+     "games": 51,
+     "mean_int": -0.782,
+     "mean_frac": -1.205,
+     "ci_int": [
+      -1.1111,
+      -0.4614
+     ],
+     "censored_n": 144,
+     "censored_short_share": 0.201
+    }
+   },
+   "7+": {
+    "me": {
+     "n": 277,
+     "games": 94,
+     "mean_int": -0.195,
+     "mean_frac": -0.618,
+     "ci_int": [
+      -0.3197,
+      -0.0577
+     ],
+     "censored_n": 187,
+     "censored_short_share": 0.134
+    },
+    "opp": {
+     "n": 187,
+     "games": 51,
+     "mean_int": -0.123,
+     "mean_frac": -0.517,
+     "ci_int": [
+      -0.2807,
+      0.0671
+     ],
+     "censored_n": 277,
+     "censored_short_share": 0.043
+    }
+   }
+  },
+  "OP11-041": {
+   "all": {
+    "me": {
+     "n": 531,
+     "games": 105,
+     "mean_int": -0.48,
+     "mean_frac": -0.984,
+     "ci_int": [
+      -0.6697,
+      -0.3009
+     ],
+     "censored_n": 185,
+     "censored_short_share": 0.378
+    },
+    "opp": {
+     "n": 185,
+     "games": 30,
+     "mean_int": -0.881,
+     "mean_frac": -1.333,
+     "ci_int": [
+      -1.2303,
+      -0.5307
+     ],
+     "censored_n": 531,
+     "censored_short_share": 0.192
+    }
+   },
+   "1-3": {
+    "me": {
+     "n": 105,
+     "games": 105,
+     "mean_int": -0.495,
+     "mean_frac": -1.05,
+     "ci_int": [
+      -0.7333,
+      -0.2571
+     ],
+     "censored_n": 30,
+     "censored_short_share": 0.733
+    },
+    "opp": {
+     "n": 30,
+     "games": 30,
+     "mean_int": -1.6,
+     "mean_frac": -2.197,
+     "ci_int": [
+      -2.0667,
+      -1.1667
+     ],
+     "censored_n": 105,
+     "censored_short_share": 0.324
+    }
+   },
+   "4-6": {
+    "me": {
+     "n": 154,
+     "games": 105,
+     "mean_int": -0.494,
+     "mean_frac": -1.007,
+     "ci_int": [
+      -0.7152,
+      -0.2839
+     ],
+     "censored_n": 50,
+     "censored_short_share": 0.52
+    },
+    "opp": {
+     "n": 50,
+     "games": 30,
+     "mean_int": -1.3,
+     "mean_frac": -1.733,
+     "ci_int": [
+      -1.8462,
+      -0.7778
+     ],
+     "censored_n": 154,
+     "censored_short_share": 0.221
+    }
+   },
+   "7+": {
+    "me": {
+     "n": 272,
+     "games": 105,
+     "mean_int": -0.467,
+     "mean_frac": -0.945,
+     "ci_int": [
+      -0.6599,
+      -0.2771
+     ],
+     "censored_n": 105,
+     "censored_short_share": 0.21
+    },
+    "opp": {
+     "n": 105,
+     "games": 30,
+     "mean_int": -0.476,
+     "mean_frac": -0.897,
+     "ci_int": [
+      -0.7658,
+      -0.1942
+     ],
+     "censored_n": 272,
+     "censored_short_share": 0.125
+    }
+   }
+  },
+  "OP15-058": {
+   "all": {
+    "me": {
+     "n": 172,
+     "games": 35,
+     "mean_int": 0.994,
+     "mean_frac": 0.499,
+     "ci_int": [
+      0.779,
+      1.1966
+     ],
+     "censored_n": 655,
+     "censored_short_share": 0.023
+    },
+    "opp": {
+     "n": 655,
+     "games": 124,
+     "mean_int": 0.237,
+     "mean_frac": -0.246,
+     "ci_int": [
+      0.0747,
+      0.4012
+     ],
+     "censored_n": 172,
+     "censored_short_share": 0.023
+    }
+   },
+   "1-3": {
+    "me": {
+     "n": 35,
+     "games": 35,
+     "mean_int": 2.286,
+     "mean_frac": 1.723,
+     "ci_int": [
+      1.8571,
+      2.7429
+     ],
+     "censored_n": 124,
+     "censored_short_share": 0.048
+    },
+    "opp": {
+     "n": 124,
+     "games": 124,
+     "mean_int": 0.847,
+     "mean_frac": 0.324,
+     "ci_int": [
+      0.4677,
+      1.2419
+     ],
+     "censored_n": 35,
+     "censored_short_share": 0.029
+    }
+   },
+   "4-6": {
+    "me": {
+     "n": 44,
+     "games": 35,
+     "mean_int": 1.477,
+     "mean_frac": 0.929,
+     "ci_int": [
+      1.1667,
+      1.7778
+     ],
+     "censored_n": 185,
+     "censored_short_share": 0.011
+    },
+    "opp": {
+     "n": 185,
+     "games": 124,
+     "mean_int": 0.476,
+     "mean_frac": -0.066,
+     "ci_int": [
+      0.2282,
+      0.741
+     ],
+     "censored_n": 44,
+     "censored_short_share": 0.023
+    }
+   },
+   "7+": {
+    "me": {
+     "n": 93,
+     "games": 35,
+     "mean_int": 0.28,
+     "mean_frac": -0.164,
+     "ci_int": [
+      0.0652,
+      0.495
+     ],
+     "censored_n": 346,
+     "censored_short_share": 0.02
+    },
+    "opp": {
+     "n": 346,
+     "games": 124,
+     "mean_int": -0.11,
+     "mean_frac": -0.546,
+     "ci_int": [
+      -0.2143,
+      -0.003
+     ],
+     "censored_n": 93,
+     "censored_short_share": 0.022
+    }
+   }
+  },
+  "OP16-022": {
+   "all": {
+    "me": {
+     "n": 334,
+     "games": 66,
+     "mean_int": 0.5,
+     "mean_frac": 0.016,
+     "ci_int": [
+      0.3158,
+      0.686
+     ],
+     "censored_n": 496,
+     "censored_short_share": 0.058
+    },
+    "opp": {
+     "n": 496,
+     "games": 95,
+     "mean_int": 0.022,
+     "mean_frac": -0.437,
+     "ci_int": [
+      -0.16,
+      0.2133
+     ],
+     "censored_n": 334,
+     "censored_short_share": 0.048
+    }
+   },
+   "1-3": {
+    "me": {
+     "n": 66,
+     "games": 66,
+     "mean_int": 0.864,
+     "mean_frac": 0.299,
+     "ci_int": [
+      0.5909,
+      1.1515
+     ],
+     "censored_n": 95,
+     "censored_short_share": 0.063
+    },
+    "opp": {
+     "n": 95,
+     "games": 95,
+     "mean_int": 0.642,
+     "mean_frac": 0.105,
+     "ci_int": [
+      0.3158,
+      0.9895
+     ],
+     "censored_n": 66,
+     "censored_short_share": 0.061
+    }
+   },
+   "4-6": {
+    "me": {
+     "n": 98,
+     "games": 66,
+     "mean_int": 0.551,
+     "mean_frac": 0.092,
+     "ci_int": [
+      0.2989,
+      0.7957
+     ],
+     "censored_n": 147,
+     "censored_short_share": 0.054
+    },
+    "opp": {
+     "n": 147,
+     "games": 95,
+     "mean_int": 0.054,
+     "mean_frac": -0.429,
+     "ci_int": [
+      -0.174,
+      0.2912
+     ],
+     "censored_n": 98,
+     "censored_short_share": 0.061
+    }
+   },
+   "7+": {
+    "me": {
+     "n": 170,
+     "games": 66,
+     "mean_int": 0.329,
+     "mean_frac": -0.139,
+     "ci_int": [
+      0.16,
+      0.5065
+     ],
+     "censored_n": 254,
+     "censored_short_share": 0.059
+    },
+    "opp": {
+     "n": 254,
+     "games": 95,
+     "mean_int": -0.228,
+     "mean_frac": -0.644,
+     "ci_int": [
+      -0.3804,
+      -0.0817
+     ],
+     "censored_n": 170,
+     "censored_short_share": 0.035
+    }
+   }
+  }
+ },
+ "ALL": {
+  "me": {
+   "n": 1552,
+   "games": 300,
+   "mean_int": -0.024,
+   "mean_frac": -0.511,
+   "ci_int": [
+    -0.1397,
+    0.0807
+   ],
+   "censored_n": 1652,
+   "censored_short_share": 0.111
+  },
+  "opp": {
+   "n": 1652,
+   "games": 300,
+   "mean_int": -0.058,
+   "mean_frac": -0.518,
+   "ci_int": [
+    -0.1715,
+    0.0453
+   ],
+   "censored_n": 1552,
+   "censored_short_share": 0.115
+  }
+ }
+}
