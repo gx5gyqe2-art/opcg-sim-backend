@@ -632,5 +632,57 @@
       "logs/theory_map/real_w41_guardrate_clockside.json",
       "logs/theory_map/real_w41_defturns.json"
     ]
+  },
+  "enel_parts_2026_10_13": {
+    "report": "docs/reports/2026-10-13_enel_parts.md",
+    "s1_before_data": "b130b4b0",
+    "kind": "diagnostic (no formula change)",
+    "tool": "tests/scripts/theory_map.py parts",
+    "log": "logs/theory_map/real_w41_parts.json",
+    "ratio_actual_over_theory_all": {
+      "enel": {
+        "life": 0.955,
+        "hand": 0.439,
+        "body": 0.41
+      },
+      "luffy": {
+        "life": 0.901,
+        "hand": 0.356,
+        "body": 1.055
+      },
+      "shanks": {
+        "life": 0.743,
+        "hand": 0.358,
+        "body": 0.638
+      },
+      "nami": {
+        "life": 0.893,
+        "hand": 0.955,
+        "body": 0.419
+      }
+    },
+    "ratio_fell_only": {
+      "enel": {
+        "life": 1.0,
+        "hand": 0.456,
+        "body": 0.407
+      },
+      "luffy": {
+        "life": 1.0,
+        "hand": 0.354,
+        "body": 1.202
+      },
+      "shanks": {
+        "life": 1.0,
+        "hand": 0.459,
+        "body": 0.867
+      },
+      "nami": {
+        "life": 1.505,
+        "hand": 1.34,
+        "body": 0.669
+      }
+    },
+    "verdict": "prediction 'Enel hand term most off' missed (Enel 0.44 vs Luffy/Shanks 0.36); life term exact for non-life-adding decks in fell games; body small; the outlier is Nami (hand 0.96, life 1.5x in fell games)"
   }
 }
