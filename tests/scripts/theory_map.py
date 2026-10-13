@@ -1767,9 +1767,129 @@ def cmd_reach(a):
     return 0
 
 
+def cmd_counter(a):
+    """カウンターの効き（2026-10-14・`2026-10-14_counter.md` §1・1 回きり）。相手のリーダーへの攻撃ごとに「宣言の行」から「攻める側の次の選択の行」までを
+    区間とし、届いたか・超過・使ったカウンター（守る側の `SELECT_COUNTER`）・上がったパワー・止めたか（守る側のライフが減らない）を数える。
+    時計の行（`OPCG_REACH_DUMP=1`）の理論の `stopped_theory`（決着までに手札で止めると見込む攻撃の数）と、その行から終局までに実際に
+    カウンターで止めた攻撃の数を、守る側のデッキ × 帯で比べる。"""
+    import theory_rs as TR
+    from opcg_sim.learned.train import plan_labels as PL
+    idx2cid = TR.idx2cid()
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    ck = json.load(open(a.clocks, encoding="utf-8"))
+    g2s = {int(r["g"]): int(r["seed"]) for r in ck["rows_out"]}
+    tseq, settled = collections.defaultdict(list), set()
+    for sd, w, t, done in ck["settled"]:
+        tseq[(int(sd), int(w))].append(int(t))
+        if done:
+            settled.add((int(sd), int(w), int(t)))
+    for k in tseq:
+        tseq[k].sort()
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    atks, zof = [], {}
+    stops = collections.defaultdict(lambda: collections.Counter())       # (seed, 守る席) → {t: カウンターで止めた数}
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig", "pol_cid", "pol_tcid"),
+                                                    extra_fn=lambda dd, n: {"sc": np.asarray(dd["scalars"])[:n].astype(float),
+                                                                            "ci": np.asarray(dd["card_idx"])[:n],
+                                                                            "tok": np.asarray(dd["tokens"])[:n].astype(float)}):
+        seed = int(rows["seed"][idx[0]])
+        gm = games_meta.get(seed)
+        if gm is None:
+            continue
+        lead = gm["leaders"]
+        u2c = PL.uuid_map(pol, L, ptr, idx)
+        idl = list(idx)
+        for i in idl:
+            zof[(seed, int(rows["who"][i]))] = float(rows["z"][i])
+        for k, i in enumerate(idl[:-1]):
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+                continue
+            sj = json.loads(rows["sig"][i])
+            if sj[0] not in ("ATTACK", "DON_BOX") or not sj[2] or u2c.get(sj[2][0]) != lead[1 - w]:
+                continue
+            d = 1 - w
+            acid = u2c.get(sj[1])
+            j = idl[k + 1]
+            wj = int(rows["who"][j]); ci = ex["ci"][j]; tok = ex["tok"][j]; sc = ex["sc"][j]
+            slots = ([0] + list(range(2, 7))) if wj == w else ([1] + list(range(7, 12)))
+            sl = next((q for q in slots if acid and idx2cid.get(int(ci[q])) == acid), None)
+            if sl is None:
+                continue
+            dpow0 = (sc[13] if wj == w else sc[12]) * 1e4
+            apow = float(tok[sl][0]) * 1e4
+            life0 = ex["sc"][i][1]
+            counters, pmax, lmin = 0, dpow0, life0
+            for j2 in idl[k + 1:]:
+                w2 = int(rows["who"][j2])
+                if int(rows["turn"][j2]) != t or (w2 == w and int(rows["kind"][j2]) == 0):
+                    break
+                sc2 = ex["sc"][j2]
+                dp = (sc2[12] if w2 == d else sc2[13]) * 1e4
+                lf = sc2[0] if w2 == d else sc2[1]
+                pmax = max(pmax, dp); lmin = min(lmin, lf)
+                if w2 == d and json.loads(rows["sig"][j2])[0] == "SELECT_COUNTER":
+                    counters += 1
+            reached = apow >= dpow0 - 1
+            stopped = lmin >= life0 - 0.5
+            cstop = stopped and counters > 0
+            atks.append({"def": lead[d], "band": turn_band(t), "reached": reached, "excess": apow - dpow0, "counters": counters,
+                         "raise": pmax - dpow0, "stopped": stopped, "cstop": cstop})
+            if cstop:
+                stops[(seed, d)][t] += 1
+
+    def ablk(xs):
+        r = [x for x in xs if x["reached"]]
+        if not r:
+            return None
+        cs = [x for x in r if x["cstop"]]
+        used = sum(x["counters"] for x in r)
+        return {"reached_attacks": len(r), "counters_per_reached": round(used / len(r), 3),
+                "raise_per_reached": round(sum(max(0.0, x["raise"]) for x in r) / len(r), 1),
+                "stops_per_counter": round(len(cs) / used, 3) if used else None,
+                "stopped_share": round(sum(x["stopped"] for x in r) / len(r), 3), "counter_stop_share": round(len(cs) / len(r), 3),
+                "excess_mean_counter_stops": round(float(np.mean([x["excess"] for x in cs])), 1) if cs else None,
+                "counters_mean_counter_stops": round(float(np.mean([x["counters"] for x in cs])), 3) if cs else None}
+    recs = []
+    for r in ck["turn_harm"]:
+        seed = g2s.get(int(r["g"]))
+        if seed is None or seed not in games_meta or "stopped_theory" not in r:
+            continue
+        w = int(r["who"]); jj = int(r["j"]); ts = tseq.get((seed, w), [])
+        if jj >= len(ts):
+            continue
+        t = ts[jj]
+        if (seed, w, t) in settled:
+            continue
+        d = 1 - w
+        act = sum(v for tt, v in stops.get((seed, d), {}).items() if tt >= t)
+        recs.append({"def": games_meta[seed]["leaders"][d], "band": turn_band(t), "theory": float(r["stopped_theory"] or 0.0),
+                     "cut": float(r.get("cut_theory") or 0.0), "actual": float(act), "fell": (zof.get((seed, d)) or 0.0) < 0.5})
+
+    def rblk(xs):
+        if not xs:
+            return None
+        th = sum(x["theory"] for x in xs); ac = sum(x["actual"] for x in xs)
+        return {"rows": len(xs), "theory_stopped": round(th / len(xs), 3), "actual_counter_stops": round(ac / len(xs), 3),
+                "actual_over_theory": round(ac / th, 3) if th > 1e-12 else None, "theory_cut": round(sum(x["cut"] for x in xs) / len(xs), 3)}
+    decks = sorted({x["def"] for x in atks})
+    out = {"record": a.src, "clocks": a.clocks, "attacks": {}, "horizon": {}}
+    for dk in decks:
+        out["attacks"][dk] = {"all": ablk([x for x in atks if x["def"] == dk]), **{b: ablk([x for x in atks if x["def"] == dk and x["band"] == b]) for b in TURN_BANDS}}
+        out["horizon"][dk] = {}
+        for b in ("all",) + TURN_BANDS:
+            xs = [x for x in recs if x["def"] == dk and (b == "all" or x["band"] == b)]
+            out["horizon"][dk][b] = {"both": rblk(xs), "fell": rblk([x for x in xs if x["fell"]]), "survived": rblk([x for x in xs if not x["fell"]])}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("counter: attacks %d rows %d" % (len(atks), len(recs)))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1843,10 +1963,14 @@ def main(argv=None):
     rc.add_argument("--in", dest="src", required=True)
     rc.add_argument("--clocks", required=True, help="`OPCG_REACH_DUMP=1` で作った時計の行")
     rc.add_argument("--out", required=True)
+    cn = sub.add_parser("counter")
+    cn.add_argument("--in", dest="src", required=True)
+    cn.add_argument("--clocks", required=True, help="`OPCG_REACH_DUMP=1` で作った時計の行")
+    cn.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
-            "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach}[a.cmd](a)
+            "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter}[a.cmd](a)
 
 
 if __name__ == "__main__":

@@ -967,5 +967,26 @@
     },
     "verdict": "in between (0.1-0.3)",
     "correction": "nami_power §4 used pre-DON power; after declaration 72% of mid attacks on Nami's leader reach (1.10/1.53 per turn)"
+  },
+  "counter_2026_10_14": {
+    "report": "docs/reports/2026-10-14_counter.md",
+    "kind": "diagnostic",
+    "tool": "tests/scripts/theory_map.py counter",
+    "log": "logs/theory_map/real_w41_counter.json",
+    "switch": "OPCG_REACH_DUMP=1 also writes stopped_theory / cut_theory (defender plan; default off, values unchanged)",
+    "actual_over_theory_stopped_mid": {
+      "nami": 0.499,
+      "shanks": 0.348,
+      "enel": 0.511,
+      "luffy": 0.614,
+      "others_mean": 0.491
+    },
+    "nami_minus_others_mid": 0.008,
+    "verdict": "missed (<0.1) -> Nami mid to play-style side",
+    "mid_per_attack_nami": {
+      "counters_per_reached": 0.653,
+      "stops_per_counter": 0.828,
+      "stopped_share": 0.883
+    }
   }
 }

@@ -516,6 +516,8 @@ fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row:
     if matches!(std::env::var("OPCG_REACH_DUMP").as_deref(), Ok("1")) && !don_plan.is_none() && don_plan.has("xs_first") {
         let n = don_plan.get("xs_first").items().iter().filter(|x| x.f() >= -lt::PWR_EPS).count();
         d.set("reach_theory", V::Int(n as i64));
+        d.set("stopped_theory", don_plan.get("stopped").clone());
+        d.set("cut_theory", don_plan.get("cut").clone());
     }
     // **M-2 の計器**（`OPCG_M2_PROBE` のときだけ・値は変えず診断の欄を足す・`m2probe.rs`）
     if super::m2probe::on() {
@@ -895,6 +897,8 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
             ]);
             if d.kv.iter().any(|(k, _)| *k == "reach_theory") {
                 kv.push((V::s("reach_theory"), d.get("reach_theory").clone()));
+                kv.push((V::s("stopped_theory"), d.get("stopped_theory").clone()));
+                kv.push((V::s("cut_theory"), d.get("cut_theory").clone()));
             }
             for (k2, v2) in guard_read_for(c, &gs, 1 - w, t, &xs)? {
                 kv.push((V::s(k2), v2));
