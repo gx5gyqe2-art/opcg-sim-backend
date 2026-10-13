@@ -30,7 +30,7 @@ use crate::ops;
 use crate::state::EngineError;
 
 use super::super::ast::{ActionType, GameAction};
-use super::super::interact::don_pool_player;
+use super::super::interact::{don_active_only, don_pool_player};
 use super::super::NodeRef;
 
 /// プレイヤーレベル・ハンドラ。担当外なら `None`。
@@ -45,16 +45,16 @@ pub fn game_handler(
     value: i32,
     source_card: Option<CardIdx>,
 ) -> Option<Result<bool, EngineError>> {
-    let _ = (masters, node_ref, targets, source_card);
+    let _ = (node_ref, targets);
     match action.ty {
         ActionType::RampDon => Some(Ok(ramp_don(s, actor, action, value))),
-        ActionType::ReturnDon => Some(Ok(return_don(s, actor, action, value))),
+        ActionType::ReturnDon => Some(return_don(s, masters, actor, action, value)),
         ActionType::RestDon => Some(Ok(rest_don(s, actor, action, value))),
         ActionType::FreezeDon => Some(Ok(freeze_don(s, actor, action, value))),
         // Python: `@game_handler(ActionType.ACTIVE_DON, when=lambda a: not a.target)`。
         // guard が偽（target あり）なら `None` を返して対象ループ（`ACTIVE` と同じハンドラ）へ。
         ActionType::ActiveDon if action.target.is_none() => {
-            Some(Ok(active_don_by_count(s, actor, action, value)))
+            Some(Ok(active_don_by_count(s, masters, actor, action, value, source_card)))
         }
         ActionType::MoveAttachedDon => Some(Ok(move_attached_don(s, actor, value))),
         _ => None,
@@ -79,10 +79,10 @@ pub fn apply_target(
     value: i32,
     source_card: Option<CardIdx>,
 ) -> Result<(), EngineError> {
-    let _ = (masters, owner, source_list, source_card);
+    let _ = (owner, source_list, source_card);
     match action.ty {
         ActionType::AttachDon => {
-            attach_don(s, actor, action, target, value);
+            attach_don(s, masters, actor, action, target, value);
             Ok(())
         }
         _ => Err(EngineError::Unimplemented(format!(
@@ -101,8 +101,10 @@ pub fn apply_target(
 /// 「ドン!!デッキから N 枚を（アクティブ／レストで）追加する」。プールは**実行者**固定
 /// （Python も `player` をそのまま使い `_don_pool_player` を通さない）。
 fn ramp_don(s: &mut Session, actor: Seat, action: &GameAction, value: i32) -> bool {
-    // status=="RESTED" なら「レストで追加」。
-    let add_rested = action.status.as_deref() == Some("RESTED");
+    // status が RESTED を含めば「レストで追加」。「相手はドン!!デッキからドン!!1枚を追加してもよい」
+    // （status が OPPONENT で始まる）は追加先のプールが相手（OP12-075）。
+    let add_rested = action.status.as_deref().is_some_and(|st| st.contains("RESTED"));
+    let actor = don_pool_player(actor, action);
     let zone = if add_rested {
         DonZone::Rested
     } else {
@@ -125,7 +127,13 @@ fn ramp_don(s: &mut Session, actor: Seat, action: &GameAction, value: i32) -> bo
 /// 「ドン!!-N」／「ドン!!デッキに戻す」。resolver が対象を選ばせた場合（`SELECT_RESOURCE`）は
 /// `return_don_selection` の uuid を戻し、無ければ影響の小さい順（レスト→アクティブ→付与中）に
 /// 末尾から自動で戻す。
-fn return_don(s: &mut Session, actor: Seat, action: &GameAction, value: i32) -> bool {
+fn return_don(
+    s: &mut Session,
+    masters: &MasterTable,
+    actor: Seat,
+    action: &GameAction,
+    value: i32,
+) -> Result<bool, EngineError> {
     let tp = don_pool_player(actor, action);
     // Python は `getattr` で取り出して即 None に戻す（空 list は falsy＝自動選択へ落ちる）。
     let selection = s.state().return_don_selection.clone();
@@ -152,13 +160,14 @@ fn return_don(s: &mut Session, actor: Seat, action: &GameAction, value: i32) -> 
             }
         }
         None => {
+            let active_only = don_active_only(action);
             for _ in 0..value {
                 let p = s.state().player(tp);
-                let don = if let Some(d) = p.don_rested.last() {
+                let don = if let (false, Some(d)) = (active_only, p.don_rested.last()) {
                     *d
                 } else if let Some(d) = p.don_active.last() {
                     *d
-                } else if let Some(d) = p.don_attached.last() {
+                } else if let (false, Some(d)) = (active_only, p.don_attached.last()) {
                     *d
                 } else {
                     break;
@@ -171,8 +180,16 @@ fn return_don(s: &mut Session, actor: Seat, action: &GameAction, value: i32) -> 
     }
     if returned > 0 {
         ops::record_turn_event(s, "DON_RETURNED", returned);
+        // 「自分の効果によって戻された時」用: 戻した効果の発動者が持ち主のときだけ数える。
+        let by_own_effect = tp == actor;
+        if by_own_effect {
+            ops::record_turn_event(s, "DON_RETURNED_OWN", returned);
+        }
+        // 「ドン!!がドン!!デッキに戻された時」の誘発（反応型は再計算で動かないためここで積む）。
+        super::super::triggers::enqueue_don_returned_listeners(s, masters, tp, by_own_effect)?;
+        super::super::triggers::advance_pending_triggers(s, masters)?;
     }
-    true
+    Ok(true)
 }
 
 /// Python `player_level.rest_don`（アクティブ→レスト。先頭から取る）。
@@ -213,10 +230,23 @@ fn freeze_don(s: &mut Session, actor: Seat, action: &GameAction, value: i32) -> 
 }
 
 /// Python `player_level.active_don_by_count`（レスト→アクティブ。**末尾**から取る）。
-fn active_don_by_count(s: &mut Session, actor: Seat, action: &GameAction, value: i32) -> bool {
+fn active_don_by_count(
+    s: &mut Session,
+    masters: &MasterTable,
+    actor: Seat,
+    action: &GameAction,
+    value: i32,
+    source_card: Option<CardIdx>,
+) -> bool {
     let tp = don_pool_player(actor, action);
-    // 「キャラの効果でドン‼をアクティブにできない」
-    if crate::rules::active_restriction_mut(s, tp, "CANNOT_ACTIVATE_DON").is_some() {
+    // 「キャラの効果でドン‼をアクティブにできない」＝効果の発生源がキャラのときだけ止める
+    // （イベント・リーダー・ステージの効果は止めない＝EB04-016/OP10-030）。
+    // 発生源が不明（None）のときは従来どおり止める。
+    let from_character = match source_card {
+        Some(c) => masters.get(s.state().card(c).master).ty == crate::model::CardType::Character,
+        None => true,
+    };
+    if from_character && crate::rules::active_restriction_mut(s, tp, "CANNOT_ACTIVATE_DON").is_some() {
         return true;
     }
     let mut activated = 0;
@@ -278,17 +308,70 @@ fn move_attached_don(s: &mut Session, actor: Seat, value: i32) -> bool {
 /// status に `"RESTED"` を含めば**既にレストのドン!!だけ**を付与する（アクティブは巻き込まない）。
 /// `"OPP"` を含めば相手のドン!!プールから付与する。どちらも無ければ アクティブ優先・
 /// 尽きたらレスト（1 枚ごとにプールを選び直す＝Python の `for` 内 `or`）。
-fn attach_don(s: &mut Session, actor: Seat, action: &GameAction, target: CardIdx, value: i32) {
+fn attach_don(
+    s: &mut Session,
+    masters: &MasterTable,
+    actor: Seat,
+    action: &GameAction,
+    target: CardIdx,
+    value: i32,
+) {
     let st = action.status.as_deref().unwrap_or("");
     let from_rested = st.contains("RESTED");
     let from_opp = st.contains("OPP");
-    let don_owner = if from_opp { actor.other() } else { actor };
+    // `OWNER`＝「持ち主のレストのドン!!」: ドン!!は付与先カードの持ち主のプールから取る
+    // （付与先は両陣営から選べる＝OP15-010/012/017/023）。
+    let don_owner = if st.contains("OWNER") {
+        s.state().card(target).owner
+    } else if from_opp {
+        actor.other()
+    } else {
+        actor
+    };
     let n = if value > 0 { value } else { 1 };
+    let mut attached_any = false;
     for _ in 0..n {
-        if !ops::attach_don(s, don_owner, target, from_rested) {
+        let ok = if st.contains("MOVE") {
+            move_attached_to(s, don_owner, target)
+        } else {
+            ops::attach_don(s, don_owner, target, from_rested)
+        };
+        if !ok {
             break;
         }
+        attached_any = true;
     }
+    // 「ドン!!が付与された時」の誘発（反応型は再計算で動かないためここで積む。消化は呼び出し側）。
+    if attached_any {
+        let host_owner = s.state().card(target).owner;
+        let _ = super::super::triggers::enqueue_don_attached_listeners(s, masters, target, host_owner);
+    }
+}
+
+/// 「付与されているドン!!を、…に付与する」（status に MOVE）: すでに付与されているドン!!を
+/// 別のカード（`target`）へ付け替える。付与先が `target` 自身のものは動かさない。
+/// 付け替えられるドン!!が無ければ `false`（EB02-009／OP07-001）。
+fn move_attached_to(s: &mut Session, owner: Seat, target: CardIdx) -> bool {
+    let don = s
+        .state()
+        .player(owner)
+        .don_attached
+        .iter()
+        .copied()
+        .find(|d| s.state().don(*d).attached_to != Some(target));
+    let Some(don) = don else {
+        return false;
+    };
+    let host = s.state().don(don).attached_to;
+    let mut e = s.edit();
+    if let Some(h) = host {
+        let cur = e.state().card(h).attached_don;
+        e.set_card_i32(h, CardI32Field::AttachedDon, (cur - 1).max(0));
+    }
+    let cur_t = e.state().card(target).attached_don;
+    e.set_don_attached_to(don, Some(target));
+    e.set_card_i32(target, CardI32Field::AttachedDon, cur_t + 1);
+    true
 }
 
 // ---------------------------------------------------------------------------
@@ -679,6 +762,104 @@ mod tests {
         assert_eq!(zones(s.state(), Seat::P1), (0, 0, 2, 0), "自分のドン!!は不動");
         assert_eq!(zones(s.state(), Seat::P2), (0, 0, 1, 1));
         assert_eq!(s.state().don(opp[0]).attached_to, Some(target));
+    }
+
+    /// 「持ち主のレストのドン!!」（status に OWNER）: 付与先カードの持ち主のプールから取る。
+    #[test]
+    fn attach_don_owner_uses_target_owners_pool() {
+        let mut b = BoardBuilder::new();
+        let target = b.put_field(Seat::P2, M_CHAR);
+        b.dons(Seat::P1, "rested", 2);
+        let opp = b.dons(Seat::P2, "rested", 2);
+        let (masters, mut s) = session(b);
+        let mut action = testkit::action(ActionType::AttachDon, 1);
+        action.status = Some("RESTED_OWNER".into());
+        attach(&mut s, &masters, Seat::P1, &action, target, 1);
+        assert_eq!(zones(s.state(), Seat::P1), (0, 0, 2, 0), "自分のドン!!は不動");
+        assert_eq!(zones(s.state(), Seat::P2), (0, 0, 1, 1));
+        assert_eq!(s.state().don(opp[0]).attached_to, Some(target));
+    }
+
+    /// 「付与されているドン!!を…に付与する」（status に MOVE）: 付与済みのドン!!を付け替える。
+    #[test]
+    fn attach_don_move_rehomes_an_attached_don() {
+        let mut b = BoardBuilder::new();
+        let from = b.put_field(Seat::P1, M_CHAR);
+        let to = b.put_field(Seat::P1, M_CHAR);
+        let d = b.attach_don(Seat::P1, from);
+        b.dons(Seat::P1, "active", 2);
+        let (masters, mut s) = session(b);
+        let mut action = testkit::action(ActionType::AttachDon, 1);
+        action.status = Some("MOVE".into());
+        attach(&mut s, &masters, Seat::P1, &action, to, 1);
+        assert_eq!(s.state().don(d).attached_to, Some(to));
+        assert_eq!(s.state().card(from).attached_don, 0);
+        assert_eq!(s.state().card(to).attached_don, 1);
+        // アクティブのドン!!は使わない。付与済みが無くなれば何もしない。
+        assert_eq!(zones(s.state(), Seat::P1), (0, 2, 0, 1));
+        attach(&mut s, &masters, Seat::P1, &action, from, 1);
+        assert_eq!(s.state().card(from).attached_don, 1);
+        assert_eq!(s.state().card(to).attached_don, 0);
+    }
+
+    /// 「アクティブのドン!!N枚を戻す」（status=ACTIVE）: レスト・付与中のドン!!は戻さない。
+    #[test]
+    fn return_don_active_only_ignores_rested_and_attached() {
+        let mut b = BoardBuilder::new();
+        let host = b.put_field(Seat::P1, M_CHAR);
+        b.attach_don(Seat::P1, host);
+        b.dons(Seat::P1, "rested", 2);
+        b.dons(Seat::P1, "active", 1);
+        let (masters, mut s) = session(b);
+        let mut action = testkit::action(ActionType::ReturnDon, 3);
+        action.status = Some("ACTIVE".into());
+        assert!(game(&mut s, &masters, Seat::P1, &action, 3));
+        // アクティブ 1 枚だけ戻り、レスト 2・付与 1 は残る。
+        assert_eq!(zones(s.state(), Seat::P1), (1, 0, 2, 1));
+    }
+
+    /// 「相手はドン!!デッキからドン!!1枚を追加してもよい」（status=OPPONENT）: 追加先は相手のプール。
+    #[test]
+    fn ramp_don_opponent_adds_to_opponent_pool() {
+        let mut b = BoardBuilder::new();
+        b.dons(Seat::P1, "deck", 2);
+        b.dons(Seat::P2, "deck", 2);
+        let (masters, mut s) = session(b);
+        let mut action = testkit::action(ActionType::RampDon, 1);
+        action.status = Some("OPPONENT".into());
+        assert!(game(&mut s, &masters, Seat::P1, &action, 1));
+        assert_eq!(zones(s.state(), Seat::P1), (2, 0, 0, 0));
+        assert_eq!(zones(s.state(), Seat::P2), (1, 1, 0, 0));
+    }
+
+    /// 「キャラの効果で…アクティブにできない」はキャラ以外（イベント）の効果を止めない。
+    #[test]
+    fn cannot_activate_don_only_blocks_character_effects() {
+        let mut b = BoardBuilder::new();
+        b.dons(Seat::P1, "rested", 2);
+        let ch = b.put_field(Seat::P1, M_CHAR);
+        let ev = b.put_field(Seat::P1, testkit::M_EVENT);
+        let (masters, mut s) = session(b);
+        s.edit().set_restrictions(
+            Seat::P1,
+            vec![crate::model::Restriction {
+                key: "CANNOT_ACTIVATE_DON".into(),
+                expire: 99,
+                min_cost: None,
+            }],
+        );
+        let action = testkit::action(ActionType::ActiveDon, 2);
+        let node = NodeRef::root(0, super::super::super::NodeRoot::Effect);
+        // 発生源がキャラ: 止まる。
+        game_handler(&mut s, &masters, Seat::P1, &action, &node, &[], 2, Some(ch))
+            .expect("担当")
+            .expect("ok");
+        assert_eq!(zones(s.state(), Seat::P1), (0, 0, 2, 0));
+        // 発生源がイベント: 止まらない（レストのドン!!2枚がアクティブへ）。
+        game_handler(&mut s, &masters, Seat::P1, &action, &node, &[], 2, Some(ev))
+            .expect("担当")
+            .expect("ok");
+        assert_eq!(zones(s.state(), Seat::P1), (0, 2, 0, 0));
     }
 
     /// Python `attach_don`: プールが尽きたらそこで止まる。

@@ -11,10 +11,12 @@
 //!     multiplier != 1 なら * multiplier
 //! ```
 //!
-//! `dynamic_source` は 5 種:
+//! `dynamic_source` は 8 種（下の 6 種＋`HAND_TO_N`＝手札がN枚になるまで引く＋`DON_TO_OPP_COUNT`＝
+//! 相手の場のドン!!枚数に揃うまで戻す超過分。`TARGET_ATTACHED_DON` は対象別でバフ側が計算する）:
 //! `COUNT_REFERENCE`（自分のトラッシュ枚数）／`PREV_ACTION_COUNT`（直前アクションの枚数）／
 //! `COUNT_QUERY`（範囲クエリの該当数）／`REFERENCE_POWER`（参照カードの現在パワー）／
-//! `REFERENCE_BASE_POWER`（参照カードの印刷時パワー）。それ以外の文字列は `base` に落ちる。
+//! `REFERENCE_BASE_POWER`（参照カードの印刷時パワー）／`REVEALED_CARD_COST`（直前に公開したカードの
+//! コスト。「公開したカードのコスト1につき」）。それ以外の文字列は `base` に落ちる。
 //!
 //! Python の `targets` 引数は `get_dynamic_value` が一切見ない（受け取るだけ）。契約どおり
 //! 受け取るが、ここでも使わない。
@@ -61,6 +63,18 @@ fn dynamic_value(
 ) -> Result<i32, EngineError> {
     match value.dynamic_source.as_deref() {
         Some("COUNT_REFERENCE") => Ok(state.player(actor).trash.len() as i32),
+        // 「相手の場のドン!!の枚数と同じ枚数になるように自分の場のドン!!を戻す」: 超過分だけ戻す
+        // （自分の場のドン!! − 相手の場のドン!!・下限 0。OP08-074）。
+        Some("DON_TO_OPP_COUNT") => {
+            let don = |seat: Seat| {
+                let p = state.player(seat);
+                (p.don_active.len() + p.don_rested.len() + p.don_attached.len()) as i32
+            };
+            Ok((don(actor) - don(actor.other())).max(0))
+        }
+        // 「手札がN枚になるようにカードを引く」: 不足分（N − 現在の手札枚数・下限 0）だけ引く。
+        // `base` が目標の手札枚数。
+        Some("HAND_TO_N") => Ok((value.base - state.hand_len(actor) as i32).max(0)),
         // 文脈依存「直前アクションで捨てた/戻した/KO した…カードN枚につき」（§7-5）。
         // §11.6: 未設定（`None`）は Python の `context.get("_last_action_count", 0)` と同じ 0。
         Some("PREV_ACTION_COUNT") => Ok(ctx.prev_action_count.unwrap_or(0)),
@@ -85,6 +99,14 @@ fn dynamic_value(
                 .is_some_and(|(seat, _)| seat == state.turn_player);
             Ok(card.get_power(masters.get(card.master), is_ref_turn))
         }
+        // 「公開したカードのコスト1につき」: 直前に公開したカード（`last_revealed_card`）のコスト。
+        Some("REVEALED_CARD_COST") => Ok(ctx
+            .last_revealed_card
+            .map(|c| {
+                let card = state.card(c);
+                card.current_cost(masters.get(card.master))
+            })
+            .unwrap_or(0)),
         // 「元々のパワーと同じ」: 参照カードの基礎値（master.power）。
         Some("REFERENCE_BASE_POWER") => {
             let Some(reference) = power_reference(state, actor, value.ref_id.as_deref(), ctx) else {
@@ -160,6 +182,28 @@ mod tests {
         );
     }
 
+    /// 「相手の場のドン!!の枚数と同じ枚数になるように戻す」＝超過分（下限 0。OP08-074）。
+    #[test]
+    fn don_to_opp_count_is_the_excess_over_the_opponents_don() {
+        let (masters, state) = testkit::effect_board();
+        let don = |seat: Seat| {
+            let p = state.player(seat);
+            (p.don_active.len() + p.don_rested.len() + p.don_attached.len()) as i32
+        };
+        let want = (don(Seat::P1) - don(Seat::P2)).max(0);
+        let vs = source(json!({"dynamic_source": "DON_TO_OPP_COUNT"}));
+        let got = calculate_value(
+            &state, &masters, &masters.abilities, &vs, Seat::P1, &[], &EffectContext::default(),
+        )
+        .unwrap();
+        assert_eq!(got, want);
+        let got2 = calculate_value(
+            &state, &masters, &masters.abilities, &vs, Seat::P2, &[], &EffectContext::default(),
+        )
+        .unwrap();
+        assert_eq!(got2, (don(Seat::P2) - don(Seat::P1)).max(0));
+    }
+
     #[test]
     fn count_reference_counts_the_trash() {
         let ctx = EffectContext::default();
@@ -213,6 +257,20 @@ mod tests {
             calculate_value(&state, &masters, &masters.abilities, &vs, Seat::P1, &[], &ctx).unwrap(),
             5000
         );
+    }
+
+    #[test]
+    fn hand_to_n_draws_only_the_shortfall() {
+        let (masters, state) = testkit::effect_board();
+        let hand = state.player(Seat::P1).hand.len() as i32;
+        let calc = |n: i32| {
+            let vs = source(json!({"dynamic_source": "HAND_TO_N", "base": n}));
+            calculate_value(&state, &masters, &masters.abilities, &vs, Seat::P1, &[], &EffectContext::default())
+                .unwrap()
+        };
+        assert_eq!(calc(hand + 2), 2);
+        assert_eq!(calc(hand), 0);
+        assert_eq!(calc(0), 0);
     }
 
     #[test]

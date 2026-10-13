@@ -188,6 +188,70 @@ fn summoning_sickness_blocks_the_attack_unless_the_card_has_rush() {
     assert!(s.state().card(rush).is_rest, "宣言でレストになる");
 }
 
+/// 【速攻:キャラ】は登場したターンにキャラへだけアタックできる（リーダーへは不可）。
+/// 2026-10-01 のカード効果監査で、このキーワードが未処理（登場ターンは何にも攻撃できない）と判明。
+#[test]
+fn rush_character_lets_a_fresh_character_attack_characters_only() {
+    let mut b = BoardBuilder::new().turn(3, Seat::P1);
+    let fresh = b.put_field(Seat::P1, M_CHAR);
+    b.card_mut(fresh).is_newly_played = true;
+    b.card_mut(fresh).timed_keywords.push("速攻:キャラ".to_string());
+    let victim = b.put_field(Seat::P2, M_CHAR);
+    b.card_mut(victim).is_rest = true;
+    b.put_deck(Seat::P1, M_CHAR);
+    b.put_deck(Seat::P2, M_CHAR);
+    b.put_life(Seat::P2, M_CHAR);
+    let (masters, mut s) = session(b.build());
+    let leader = s.state().player(Seat::P2).leader.unwrap();
+
+    let err = battle::declare_attack(&mut s, &masters, fresh, leader).unwrap_err();
+    assert!(matches!(err, crate::state::EngineError::BadPayload(ref m) if m.contains("速攻")));
+    battle::declare_attack(&mut s, &masters, fresh, victim).expect("キャラへは攻撃できる");
+}
+
+/// 合法手の列挙も同じ（登場ターンの【速攻:キャラ】はリーダーを狙う手を出さない）。
+#[test]
+fn rush_character_legal_moves_exclude_the_leader() {
+    let mut b = BoardBuilder::new().turn(3, Seat::P1);
+    let fresh = b.put_field(Seat::P1, M_CHAR);
+    b.card_mut(fresh).is_newly_played = true;
+    b.card_mut(fresh).timed_keywords.push("速攻:キャラ".to_string());
+    let victim = b.put_field(Seat::P2, M_CHAR);
+    b.card_mut(victim).is_rest = true;
+    b.put_deck(Seat::P1, M_CHAR);
+    b.put_deck(Seat::P2, M_CHAR);
+    let (masters, mut s) = session(b.build());
+    let leader_uuid = s.state().card(s.state().player(Seat::P2).leader.unwrap()).uuid.clone();
+    let victim_uuid = s.state().card(victim).uuid.clone();
+    let fresh_uuid = s.state().card(fresh).uuid.clone();
+
+    let moves = legal::get_legal_actions(&mut s, &masters, Seat::P1).expect("legal");
+    let targets: Vec<&str> = moves
+        .iter()
+        .filter(|m| m["action_type"] == "ATTACK" && m["payload"]["uuid"] == json!(fresh_uuid))
+        .filter_map(|m| m["payload"]["target_ids"][0].as_str())
+        .collect();
+    assert!(targets.contains(&victim_uuid.as_str()), "キャラへは攻撃できる");
+    assert!(!targets.contains(&leader_uuid.as_str()), "リーダーへは攻撃できない");
+}
+
+/// 【ブロック不可】のアタッカーは、ブロッカーが居てもブロックステップを飛ばす。
+#[test]
+fn an_unblockable_attacker_skips_the_block_step() {
+    let mut b = BoardBuilder::new().turn(3, Seat::P1);
+    let atk = b.put_field(Seat::P1, M_BIG);
+    b.card_mut(atk).timed_keywords.push("ブロック不可".to_string());
+    b.put_field(Seat::P2, M_BLOCKER);
+    b.put_deck(Seat::P1, M_CHAR);
+    b.put_deck(Seat::P2, M_CHAR);
+    b.put_life(Seat::P2, M_CHAR);
+    let (masters, mut s) = session(b.build());
+    let target = s.state().player(Seat::P2).leader.unwrap();
+
+    battle::declare_attack(&mut s, &masters, atk, target).expect("declare");
+    assert_eq!(s.state().phase, Phase::BattleCounter, "ブロックされない");
+}
+
 /// Python `declare_attack`: 最初のターン（turn_count <= 2）はアタックできない。
 #[test]
 fn the_first_two_turns_cannot_attack() {
@@ -216,6 +280,32 @@ fn only_rested_characters_can_be_attacked() {
     let err = battle::declare_attack(&mut s, &masters, atk, active_target).unwrap_err();
     assert!(matches!(err, crate::state::EngineError::BadPayload(ref m) if m.contains("レスト状態")));
     battle::declare_attack(&mut s, &masters, atk, rested_target).expect("レストなら狙える");
+}
+
+/// 「リーダーがアタックする際【ブロッカー】を発動できない」（OP13-057）: 制限を持つ側のリーダーの
+/// アタックだけブロックできない（キャラのアタックには効かない）。
+#[test]
+fn leader_attack_block_lock_suppresses_only_leader_attacks() {
+    use crate::model::{ActiveBattle, Restriction};
+    let mut b = BoardBuilder::new().turn(3, Seat::P1);
+    let atk = b.put_field(Seat::P1, M_BIG);
+    let _blocker = b.put_field(Seat::P2, M_BLOCKER);
+    let (_masters, mut s) = session(b.build());
+    let leader = s.state().player(Seat::P1).leader.unwrap();
+    let target = s.state().player(Seat::P2).leader.unwrap();
+    let turn = s.state().turn_count;
+    s.edit().set_restrictions(
+        Seat::P1,
+        vec![Restriction { key: "OPP_NO_BLOCK_VS_LEADER".into(), expire: turn, min_cost: None }],
+    );
+    let battle = |attacker| ActiveBattle {
+        attacker, target, attacker_owner: Seat::P1, target_owner: Seat::P2, counter_buff: 0,
+    };
+    s.edit().set_active_battle(Some(battle(atk)));
+    assert!(battle::has_blocker(&s, Seat::P2), "キャラのアタックには効かない");
+    s.edit().set_active_battle(Some(battle(leader)));
+    assert!(!battle::has_blocker(&s, Seat::P2), "リーダーのアタックはブロックできない");
+    assert!(pending::blocker_candidates(s.state(), Seat::P2).is_empty());
 }
 
 /// Python `_advance_battle_triggers`: ブロッカーが居れば BLOCK_STEP、居なければ BATTLE_COUNTER。
@@ -341,10 +431,20 @@ fn winning_a_character_battle_kos_the_target_and_records_the_event() {
     let p2 = s.state().player(Seat::P2);
     assert!(p2.field.is_empty());
     assert_eq!(p2.trash, vec![victim]);
-    assert_eq!(
-        s.state().turn_events,
-        vec![("CHAR_KOED_p2".to_string(), 1)]
-    );
+    // バトルした双方に「相手のキャラとバトルした」印（BATTLED_CHAR_<uuid>）も付く（OP12-020）。
+    let koed: Vec<_> = s
+        .state()
+        .turn_events
+        .iter()
+        .filter(|(k, _)| !k.starts_with("BATTLED_CHAR_"))
+        .cloned()
+        .collect();
+    assert_eq!(koed, vec![("CHAR_KOED_p2".to_string(), 1)]);
+    let battled = |c| {
+        let key = format!("BATTLED_CHAR_{}", s.state().card(c).uuid);
+        s.state().turn_events.iter().any(|(k, _)| *k == key)
+    };
+    assert!(battled(atk) && battled(victim));
     assert!(!s.state().card(victim).is_rest, "トラッシュでレストは解除");
 }
 
@@ -744,4 +844,77 @@ fn attaching_a_don_takes_the_first_active_one_and_keeps_it_active() {
     let card = s.state().card(ch);
     assert_eq!(card.get_power(masters.get(card.master), true), 4000);
     assert_eq!(card.get_power(masters.get(card.master), false), 3000);
+}
+
+// --- カード効果監査（2026-10-01・WP A_target）: 攻撃先の制限 ------------------------------
+
+/// 攻撃側カードの `ATTACK_BAN_LEADER`（OP03-004）／`ATTACK_BAN_CHAR_OCOST_LE_n`（OP12-020）は
+/// 攻撃先だけを縛る（全アタック禁止ではない）。
+#[test]
+fn attack_ban_flags_limit_only_the_attack_target() {
+    let mut b = BoardBuilder::new().turn(3, Seat::P1);
+    let atk = b.put_field(Seat::P1, M_BIG);
+    b.card_mut(atk).timed_flags.push("ATTACK_BAN_LEADER".to_string());
+    let victim = b.put_field(Seat::P2, M_BLOCKER); // コスト 3
+    b.card_mut(victim).is_rest = true;
+    let (masters, s) = session(b.build());
+    let leader = s.state().player(Seat::P2).leader.unwrap();
+    assert!(crate::rules::attack_target_banned(s.state(), &masters, atk, leader));
+    assert!(!crate::rules::attack_target_banned(s.state(), &masters, atk, victim));
+
+    let mut b = BoardBuilder::new().turn(3, Seat::P1);
+    let atk = b.put_field(Seat::P1, M_BIG);
+    b.card_mut(atk).timed_flags.push("ATTACK_BAN_CHAR_OCOST_LE_3".to_string());
+    let victim = b.put_field(Seat::P2, M_BLOCKER);
+    b.card_mut(victim).is_rest = true;
+    let (masters, mut s) = session(b.build());
+    let leader = s.state().player(Seat::P2).leader.unwrap();
+    assert!(crate::rules::attack_target_banned(s.state(), &masters, atk, victim), "元々コスト3以下のキャラへは不可");
+    assert!(!crate::rules::attack_target_banned(s.state(), &masters, atk, leader), "リーダーへは可");
+    // 合法手の列挙も同じ判定（declare_attack と食い違わない）。
+    let moves = legal::get_legal_actions(&mut s, &masters, Seat::P1).expect("legal");
+    let victim_uuid = s.state().card(victim).uuid.clone();
+    let atk_uuid = s.state().card(atk).uuid.clone();
+    assert!(!moves.iter().any(|m| m["action_type"] == "ATTACK"
+        && m["payload"]["uuid"] == json!(atk_uuid)
+        && m["payload"]["target_ids"][0] == json!(victim_uuid)));
+    assert!(moves.iter().any(|m| m["action_type"] == "ATTACK"
+        && m["payload"]["uuid"] == json!(atk_uuid)), "リーダーへは攻撃できる");
+    assert!(battle::declare_attack(&mut s, &masters, atk, victim).is_err());
+}
+
+/// 「相手はキャラの「X」以外にアタックできない」（OP01-051/OP17-044/P-067）: 相手側に
+/// `ATTACK_CHAR_ONLY:X` が載っている間、キャラへは X という名前のカードにしか攻撃できない（リーダーへは自由）。
+#[test]
+fn attack_char_only_restriction_allows_the_named_character_and_the_leader() {
+    let mut b = BoardBuilder::new().turn(3, Seat::P1);
+    let atk = b.put_field(Seat::P1, M_BIG);
+    let named = b.put_field(Seat::P2, M_BLOCKER); // ロロノア・ゾロ
+    let other = b.put_field(Seat::P2, M_CHAR);
+    b.card_mut(named).is_rest = true;
+    b.card_mut(other).is_rest = true;
+    let (masters, mut s) = session(b.build());
+    let leader = s.state().player(Seat::P2).leader.unwrap();
+    let turn = s.state().turn_count;
+    s.edit().set_restrictions(
+        Seat::P1,
+        vec![crate::model::Restriction {
+            key: format!("{}ロロノア・ゾロ", crate::rules::ATTACK_CHAR_ONLY_PREFIX),
+            expire: turn,
+            min_cost: None,
+        }],
+    );
+    assert!(!crate::rules::attack_target_banned(s.state(), &masters, atk, named));
+    assert!(crate::rules::attack_target_banned(s.state(), &masters, atk, other));
+    assert!(!crate::rules::attack_target_banned(s.state(), &masters, atk, leader));
+    // 期限切れ（次ターン以降）なら効かない。
+    s.edit().set_restrictions(
+        Seat::P1,
+        vec![crate::model::Restriction {
+            key: format!("{}ロロノア・ゾロ", crate::rules::ATTACK_CHAR_ONLY_PREFIX),
+            expire: turn - 1,
+            min_cost: None,
+        }],
+    );
+    assert!(!crate::rules::attack_target_banned(s.state(), &masters, atk, other));
 }

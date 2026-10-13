@@ -11,6 +11,29 @@ from .schemas import GameStateSchema, PendingRequestSchema
 from .state import GAMES, RULE_ROOMS
 
 
+def merge_statuses(board: Dict[str, Any], status: Dict[str, Any]) -> None:
+    """継続中の状態（`RsGame.statuses`）を盤面 dict の各カード・プレイヤーへ合流させる。
+
+    場のカード（リーダー・キャラ・ステージ）に `statuses`／`power_mod`／`cost_mod`、
+    プレイヤーに `don_frozen`（レストの凍結ドン!!枚数）を足す。状態の無いカードも空/0 で埋める
+    ＝フロントは「キーがある＝最新」として、状態が消えたら表示を消せる。
+    """
+    cards = status.get("cards", {})
+    for seat, player in (board.get("players") or {}).items():
+        if not isinstance(player, dict):
+            continue
+        player["don_frozen"] = status.get("players", {}).get(seat, {}).get("don_frozen", 0)
+        zones = player.get("zones") or {}
+        on_board = [player.get("leader"), player.get("stage"), zones.get("stage"), *(zones.get("field") or [])]
+        for card in on_board:
+            if not isinstance(card, dict):
+                continue
+            entry = cards.get(card.get("uuid"), {})
+            card["statuses"] = entry.get("statuses", [])
+            card["power_mod"] = entry.get("power_mod", 0)
+            card["cost_mod"] = entry.get("cost_mod", 0)
+
+
 def build_game_result_hybrid(manager: RsGame, game_id: str, success: bool = True, error_code: str = None, error_msg: str = None) -> Dict[str, Any]:
     """対局状態を API レスポンス（契約）へ整形する。
 
@@ -25,6 +48,7 @@ def build_game_result_hybrid(manager: RsGame, game_id: str, success: bool = True
     if manager:
         raw_game_state = manager.board()
         raw_game_state["game_id"] = game_id
+        merge_statuses(raw_game_state, manager.statuses())
     else:
         raw_game_state = {
             "game_id": game_id,

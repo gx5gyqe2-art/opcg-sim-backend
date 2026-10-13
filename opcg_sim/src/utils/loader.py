@@ -13,7 +13,10 @@ from ..models.enums import CardType, Attribute, Color, TriggerType
 
 
 # カードが本来持つキーワード能力（タグ【X】が能力として記載されているもの）。
-_STATIC_KEYWORDS = ["ブロッカー", "速攻", "ダブルアタック", "バニッシュ"]
+_STATIC_KEYWORDS = ["ブロッカー", "速攻", "ダブルアタック", "バニッシュ", "速攻:キャラ", "ブロック不可"]
+# 本文の表記ゆれ→keywords の正規形（`速攻:キャラ` は本文では全角コロン「速攻：キャラ」。付与側
+# GRANT_KEYWORD の status は半角で出るので、半角に揃える。Rust の KW_RUSH_CHAR と同じ形）。
+_KEYWORD_TAG_PATTERNS = {"速攻:キャラ": r"速攻[:：]キャラ"}
 
 
 def _extract_static_keywords(effect_text: str):
@@ -25,7 +28,7 @@ def _extract_static_keywords(effect_text: str):
         return kws
     t = unicodedata.normalize("NFC", effect_text)
     for k in _STATIC_KEYWORDS:
-        for m in re.finditer(r'【' + re.escape(k) + r'】', t):
+        for m in re.finditer(r'【' + _KEYWORD_TAG_PATTERNS.get(k, re.escape(k)) + r'】', t):
             after = t[m.end():m.end() + 4]
             if after.startswith("を得") or after.startswith("を発動") \
                     or after.startswith("を持") or after.startswith("を無効"):
