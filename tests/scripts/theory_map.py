@@ -1180,9 +1180,85 @@ def cmd_guardside(a):
     return 0
 
 
+def cmd_defturns(a):
+    """守る側の相手のターン 1 回ごとの量（2026-10-13・`2026-10-13_defence_gap.md` §8・代案の材料・式には入れない）。
+    記録だけで、デッキ × 帯ごとに: 相手のターンに来た攻撃の本数（全部の対象／リーダーへ）の分布（0／1／2／3 本以上）と、
+    そのターンの最初の守る側の行で手札に「カウンター 0 の札」（カウンターイベントを除く）が 1 枚以上在る割合。"""
+    import deck_refill as DR
+    import theory_rs as TR
+    from opcg_sim.learned.train import plan_labels as PL
+    from opcg_sim.loop import decks as D
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    idx2cid = TR.idx2cid()
+    db = D.load_db()
+    info = {}
+
+    def cinfo(cid):
+        if cid not in info:
+            m = db.get_card(cid)
+            if m is None:
+                info[cid] = None
+            else:
+                ty = getattr(getattr(m, "type", None), "name", "")
+                txt = getattr(m, "effect_text", "") or ""
+                info[cid] = {"counter": int(getattr(m, "counter", 0) or 0), "cev": ty == "EVENT" and "【カウンター】" in txt}
+        return info[cid]
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    turns = []                                    # (守る側のリーダー, 帯, 攻撃の本数, リーダーへの本数, 手札にカウンター 0 が在るか)
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig", "pol_cid", "pol_tcid"),
+                                                    extra_fn=lambda dd, n: {"ci": np.asarray(dd["card_idx"])[:n]}):
+        seed = int(rows["seed"][idx[0]])
+        gm = games_meta.get(seed)
+        if gm is None:
+            continue
+        lead = gm["leaders"]
+        u2c = PL.uuid_map(pol, L, ptr, idx)
+        att, att_l, c0, seen = collections.Counter(), collections.Counter(), {}, set()
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1:
+                continue
+            if PL.is_own_turn(w, t):
+                seen.add((1 - w, t))
+                if int(rows["kind"][i]) == 0:
+                    sj = json.loads(rows["sig"][i])
+                    if sj[0] in ("ATTACK", "DON_BOX") and sj[2]:
+                        att[(1 - w, t)] += 1
+                        att_l[(1 - w, t)] += int(u2c.get(sj[2][0]) == lead[1 - w])
+            elif (w, t) not in c0:
+                has = False
+                for cid in DR.hand_ids(ex["ci"][i], idx2cid):
+                    inf = cinfo(cid)
+                    if inf is not None and not inf["cev"] and inf["counter"] == 0:
+                        has = True
+                c0[(w, t)] = has
+        for (d, t) in sorted(seen):
+            turns.append((lead[d], turn_band(t), att[(d, t)], att_l[(d, t)], c0.get((d, t))))
+
+    def blk(ts):
+        if not ts:
+            return None
+        def dist(k):
+            c = collections.Counter(min(3, x[k]) for x in ts)
+            return {("3+" if n == 3 else str(n)): round(c[n] / len(ts), 3) for n in range(4)}
+        known = [x for x in ts if x[4] is not None]
+        return {"turns": len(ts), "attacks": dist(2), "leader_attacks": dist(3),
+                "attacks_mean": round(float(np.mean([x[2] for x in ts])), 3),
+                "leader_attacks_mean": round(float(np.mean([x[3] for x in ts])), 3),
+                "hand_has_c0": round(sum(1 for x in known if x[4]) / len(known), 3) if known else None}
+    decks = sorted({x[0] for x in turns})
+    out = {"record": a.src, "by_deck": {d: {"all": blk([x for x in turns if x[0] == d]),
+                                            **{b: blk([x for x in turns if x[0] == d and x[1] == b]) for b in TURN_BANDS}} for d in decks}}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("defturns: turns %d" % len(turns))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1234,9 +1310,13 @@ def main(argv=None):
     gs.add_argument("--in", dest="src", required=True)
     gs.add_argument("--dump", required=True, help="`guard` 欄つきの写し（`theory_bridge.py` を `OPCG_PRICE_DUMP` で・2026-10-12 以降）")
     gs.add_argument("--out", required=True)
+    dt = sub.add_parser("defturns")
+    dt.add_argument("--in", dest="src", required=True)
+    dt.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
-            "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside}[a.cmd](a)
+            "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
+            "defturns": cmd_defturns}[a.cmd](a)
 
 
 if __name__ == "__main__":

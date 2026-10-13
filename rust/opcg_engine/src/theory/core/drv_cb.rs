@@ -268,6 +268,30 @@ fn seat_row(c: &mut Core, gs: &Gs, cut: &mut Option<CutFrames>, st: &mut D, w: i
     r
 }
 
+thread_local! {
+    static GUARD_RATE: std::cell::RefCell<Option<(String, serde_json::Value)>> = const { std::cell::RefCell::new(None) };
+}
+
+/// **診断の切替 `OPCG_GUARD_RATE`**（`docs/reports/2026-10-13_defence_gap.md` §1・既定は切＝旧）: 耐久の手札の項に、守る席
+/// （行の相手＝枠 1 のリーダー）のデッキ・帯（1-3／4-6／7+・行のターン `t`）の「止められると読んだ窓で実際に止めた割合」q を掛ける。
+/// 値は JSON（`{"リーダー": {"1-3": q, "4-6": q, "7+": q}}`）のファイルの道か、`{` で始まる JSON そのもの。表に無いリーダーは 1（掛けない）。
+/// q を出した記録で測る診断であって、式の候補ではない。
+fn guard_rate_q(c: &Core, row: &Row, t: i64) -> Option<f64> {
+    let env = std::env::var("OPCG_GUARD_RATE").ok().filter(|s| !s.is_empty() && s != "0" && s != "off")?;
+    let ci = row.ci.as_ref()?;
+    let lead = c.t.cid_of(ci[1]).filter(|x| !x.is_empty())?.to_string();
+    let band = if t <= 3 { "1-3" } else if t <= 6 { "4-6" } else { "7+" };
+    GUARD_RATE.with(|g| {
+        let mut g = g.borrow_mut();
+        if g.as_ref().map(|(k, _)| k != &env).unwrap_or(true) {
+            let txt = if env.trim_start().starts_with('{') { env.clone() } else { std::fs::read_to_string(&env).expect("OPCG_GUARD_RATE: 読めない") };
+            let v: serde_json::Value = serde_json::from_str(&txt).expect("OPCG_GUARD_RATE: JSON でない");
+            *g = Some((env.clone(), v));
+        }
+        g.as_ref().unwrap().1.get(&lead).and_then(|m| m.get(band)).and_then(|q| q.as_f64())
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row: &Row, f_real: f64, t_left: i64, sink: bool) -> R<SeatD> {
     let mut snk = D::new();
@@ -280,7 +304,10 @@ fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row:
     let mut actx: Option<Actx> = c.attacker_ctx(row, theta, mu, dk0.as_deref(), j == 0, None)?;
     let don_plan = c.rule_don_plan_for(row, &g_def, actx.as_mut())?;
     let hb = gs.hb_for(1 - w, t);
-    let (th_life, th_hand, th_body) = c.threshold_parts(row, &g_def, hb, actx.as_mut(), &don_plan)?;
+    let (th_life, mut th_hand, th_body) = c.threshold_parts(row, &g_def, hb, actx.as_mut(), &don_plan)?;
+    if let Some(q) = guard_rate_q(c, row, t) {
+        th_hand *= q;
+    }
     let th_hb = py_max(0.0, hb);
     let (shield, sh_rate) = (0.0, 0.0);
     let hb2 = gs.hb_for(1 - w, t);
