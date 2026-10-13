@@ -1,0 +1,91 @@
+{
+ "record": "/home/user/data_rec/sigma_wip/data/w41",
+ "nami": {
+  "all": {
+   "opp_turns": 887,
+   "don_on_leader_at_turn_start": 0.587,
+   "don_on_leader_at_attack": 0.769,
+   "theory_reads_7000": 0.581,
+   "already_7000_at_turn_start": 0.0,
+   "turns_with_buff_seen": 0.386,
+   "windows_with_buff": 0.306,
+   "attacks_followed_by_buffed_window": 0.271,
+   "effect_selections_per_turn": 2.57,
+   "don_and_buff_but_theory_5000": 0.002,
+   "buff_seen_but_theory_5000": 0.002,
+   "attacks_per_turn": 2.17
+  },
+  "1-3": {
+   "opp_turns": 204,
+   "don_on_leader_at_turn_start": 0.0,
+   "don_on_leader_at_attack": 0.0,
+   "theory_reads_7000": 0.0,
+   "already_7000_at_turn_start": 0.0,
+   "turns_with_buff_seen": 0.0,
+   "windows_with_buff": 0.0,
+   "attacks_followed_by_buffed_window": 0.0,
+   "effect_selections_per_turn": 0.123,
+   "don_and_buff_but_theory_5000": 0.0,
+   "buff_seen_but_theory_5000": 0.0,
+   "attacks_per_turn": 0.412
+  },
+  "4-6": {
+   "opp_turns": 201,
+   "don_on_leader_at_turn_start": 0.637,
+   "don_on_leader_at_attack": 0.673,
+   "theory_reads_7000": 0.637,
+   "already_7000_at_turn_start": 0.0,
+   "turns_with_buff_seen": 0.363,
+   "windows_with_buff": 0.189,
+   "attacks_followed_by_buffed_window": 0.145,
+   "effect_selections_per_turn": 1.478,
+   "don_and_buff_but_theory_5000": 0.0,
+   "buff_seen_but_theory_5000": 0.0,
+   "attacks_per_turn": 1.612
+  },
+  "7+": {
+   "opp_turns": 482,
+   "don_on_leader_at_turn_start": 0.815,
+   "don_on_leader_at_attack": 0.833,
+   "theory_reads_7000": 0.803,
+   "already_7000_at_turn_start": 0.0,
+   "turns_with_buff_seen": 0.558,
+   "windows_with_buff": 0.339,
+   "attacks_followed_by_buffed_window": 0.312,
+   "effect_selections_per_turn": 4.062,
+   "don_and_buff_but_theory_5000": 0.004,
+   "buff_seen_but_theory_5000": 0.004,
+   "attacks_per_turn": 3.147
+  }
+ },
+ "attack_power_into_nami": {
+  "all": {
+   "attacks_with_power": 1925,
+   "lt5000": 0.166,
+   "5000_6999": 0.463,
+   "ge7000": 0.37,
+   "mean": 6301.5
+  },
+  "1-3": {
+   "attacks_with_power": 84,
+   "lt5000": 0.238,
+   "5000_6999": 0.512,
+   "ge7000": 0.25,
+   "mean": 5119.1
+  },
+  "4-6": {
+   "attacks_with_power": 324,
+   "lt5000": 0.275,
+   "5000_6999": 0.62,
+   "ge7000": 0.105,
+   "mean": 4725.5
+  },
+  "7+": {
+   "attacks_with_power": 1517,
+   "lt5000": 0.139,
+   "5000_6999": 0.427,
+   "ge7000": 0.434,
+   "mean": 6703.6
+  }
+ }
+}
