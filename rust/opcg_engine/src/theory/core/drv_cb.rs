@@ -512,6 +512,11 @@ fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row:
         d.set("shield_rate", if srv.truthy() { srv } else { V::Float(0.0) });
     }
     let _ = th_w;
+    // **診断 `OPCG_REACH_DUMP=1`**（`2026-10-14_reach.md` §1.2・既定は切・値は変えない）: 計画の 1 段目で「届く」とみなした攻撃の数
+    if matches!(std::env::var("OPCG_REACH_DUMP").as_deref(), Ok("1")) && !don_plan.is_none() && don_plan.has("xs_first") {
+        let n = don_plan.get("xs_first").items().iter().filter(|x| x.f() >= -lt::PWR_EPS).count();
+        d.set("reach_theory", V::Int(n as i64));
+    }
     // **M-2 の計器**（`OPCG_M2_PROBE` のときだけ・値は変えず診断の欄を足す・`m2probe.rs`）
     if super::m2probe::on() {
         let why = if model_theta {
@@ -888,6 +893,9 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
                 (V::s("th_hand"), V::Float(th_hand)),
                 (V::s("theta"), V::Float(th_w)),
             ]);
+            if d.kv.iter().any(|(k, _)| *k == "reach_theory") {
+                kv.push((V::s("reach_theory"), d.get("reach_theory").clone()));
+            }
             for (k2, v2) in guard_read_for(c, &gs, 1 - w, t, &xs)? {
                 kv.push((V::s(k2), v2));
             }

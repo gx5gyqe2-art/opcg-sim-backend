@@ -1679,9 +1679,97 @@ def cmd_namipower(a):
     return 0
 
 
+def cmd_reach(a):
+    """リーダーに届く攻撃の数（2026-10-14・`2026-10-14_reach.md` §1・1 回きり）。攻める席のターンの先頭の行（損害の行・決着の宣言の前）ごとに、
+    理論の計画が 1 段目で届くとみなした攻撃の数（`reach_theory`・`OPCG_REACH_DUMP=1` の時計）と、記録の実際（相手のリーダーへの攻撃ごとに、
+    宣言の次の行で攻め手のパワー ≥ 守る側のリーダーのパワー なら届いた）・ドンを付けずに攻撃した割合を、守る側のデッキ × 帯で並べる。"""
+    import theory_rs as TR
+    from opcg_sim.learned.train import plan_labels as PL
+    idx2cid = TR.idx2cid()
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    ck = json.load(open(a.clocks, encoding="utf-8"))
+    g2s = {int(r["g"]): int(r["seed"]) for r in ck["rows_out"]}
+    tseq, settled = collections.defaultdict(list), set()
+    for sd, w, t, done in ck["settled"]:
+        tseq[(int(sd), int(w))].append(int(t))
+        if done:
+            settled.add((int(sd), int(w), int(t)))
+    for k in tseq:
+        tseq[k].sort()
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    rec = collections.defaultdict(collections.Counter)
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig", "pol_cid", "pol_tcid"),
+                                                    extra_fn=lambda dd, n: {"sc": np.asarray(dd["scalars"])[:n].astype(float),
+                                                                            "ci": np.asarray(dd["card_idx"])[:n],
+                                                                            "tok": np.asarray(dd["tokens"])[:n].astype(float)}):
+        seed = int(rows["seed"][idx[0]])
+        gm = games_meta.get(seed)
+        if gm is None:
+            continue
+        lead = gm["leaders"]
+        u2c = PL.uuid_map(pol, L, ptr, idx)
+        idl = list(idx)
+        for k, i in enumerate(idl[:-1]):
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+                continue
+            sj = json.loads(rows["sig"][i])
+            if sj[0] not in ("ATTACK", "DON_BOX") or not sj[2] or u2c.get(sj[2][0]) != lead[1 - w]:
+                continue
+            acid = u2c.get(sj[1])
+            j = idl[k + 1]
+            wj = int(rows["who"][j]); ci = ex["ci"][j]; tok = ex["tok"][j]; sc = ex["sc"][j]
+            slots = ([0] + list(range(2, 7))) if wj == w else ([1] + list(range(7, 12)))
+            dpow = (sc[13] if wj == w else sc[12]) * 1e4
+            sl = next((q for q in slots if acid and idx2cid.get(int(ci[q])) == acid), None)
+            r = rec[(seed, w, t)]
+            r["leader_attacks"] += 1
+            if sl is None:
+                r["unresolved"] += 1
+                continue
+            p = float(tok[sl][0]) * 1e4
+            r["reached"] += int(p >= dpow - 1)
+            r["no_don"] += int(float(tok[sl][2]) * 5 < 0.5)
+            r["resolved"] += 1
+    recs = []
+    for r in ck["turn_harm"]:
+        seed = g2s.get(int(r["g"]))
+        if seed is None or seed not in games_meta or "reach_theory" not in r:
+            continue
+        w = int(r["who"]); jj = int(r["j"]); ts = tseq.get((seed, w), [])
+        if jj >= len(ts):
+            continue
+        t = ts[jj]
+        if (seed, w, t) in settled:
+            continue
+        q = rec.get((seed, w, t), collections.Counter())
+        recs.append({"def": games_meta[seed]["leaders"][1 - w], "band": turn_band(t), "theory": float(r["reach_theory"] or 0),
+                     **{k2: float(q.get(k2, 0)) for k2 in ("leader_attacks", "reached", "no_don", "resolved", "unresolved")}})
+
+    def blk(rs):
+        if not rs:
+            return None
+        n = len(rs)
+        th = sum(x["theory"] for x in rs); re_ = sum(x["reached"] for x in rs); res = sum(x["resolved"] for x in rs)
+        return {"turns": n, "theory_reach_per_turn": round(th / n, 3), "actual_reach_per_turn": round(re_ / n, 3),
+                "theory_over_actual": round(th / re_, 3) if re_ else None,
+                "leader_attacks_per_turn": round(sum(x["leader_attacks"] for x in rs) / n, 3),
+                "no_don_share": round(sum(x["no_don"] for x in rs) / res, 3) if res else None,
+                "unresolved_attacks": int(sum(x["unresolved"] for x in rs))}
+    decks = sorted({x["def"] for x in recs})
+    out = {"record": a.src, "clocks": a.clocks, "by_defender": {d: {"all": blk([x for x in recs if x["def"] == d]),
+                                                                   **{b: blk([x for x in recs if x["def"] == d and x["band"] == b]) for b in TURN_BANDS}}
+                                                               for d in decks}}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("reach: rows %d" % len(recs))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1751,10 +1839,14 @@ def main(argv=None):
     npw = sub.add_parser("namipower")
     npw.add_argument("--in", dest="src", required=True)
     npw.add_argument("--out", required=True)
+    rc = sub.add_parser("reach")
+    rc.add_argument("--in", dest="src", required=True)
+    rc.add_argument("--clocks", required=True, help="`OPCG_REACH_DUMP=1` で作った時計の行")
+    rc.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
-            "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower}[a.cmd](a)
+            "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach}[a.cmd](a)
 
 
 if __name__ == "__main__":
