@@ -405,14 +405,27 @@ impl Core {
             if cid.is_empty() {
                 continue;
             }
-            let la = self.life_add_on_play(&cid, &st);
+            let (la, moves) = self.life_add_on_play_moves(&cid, &st);
             if la <= 0.0 {
                 continue;
             }
             let info0 = self.info(&cid);
             let info = if info0.truthy() { info0 } else { V::dict(vec![]) };
             let u = self.use_value(&cid, &info, olp, r, &V::None)?.unwrap_or(MU);
-            let gain = LAM * la - u;
+            // 手札からライフへ動かす札は、動かした札の手札の価値（条件に合う札のうち最小）も失う（2026-10-13 の直し）
+            let mut moved_u = 0.0;
+            for (f, m) in &moves {
+                let mut lo = f64::INFINITY;
+                for mc in m {
+                    let mi0 = self.info(mc);
+                    let mi = if mi0.truthy() { mi0 } else { V::dict(vec![]) };
+                    lo = lo.min(self.use_value(mc, &mi, olp, r, &V::None)?.unwrap_or(MU));
+                }
+                if lo.is_finite() {
+                    moved_u += f * lo;
+                }
+            }
+            let gain = LAM * la - u - moved_u;
             if gain > 0.0 {
                 cand.push((cid, it.get("cost").f_or0(), gain, la));
             }
