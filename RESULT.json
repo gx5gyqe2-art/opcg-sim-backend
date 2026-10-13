@@ -925,5 +925,26 @@
       "life_gained_in_opp_turn": 0.0
     },
     "reading": "none of trigger/counter/blocker/life-add; attacks likely fall short of Nami leader power (+2000, inference)"
+  },
+  "nami_power_2026_10_14": {
+    "report": "docs/reports/2026-10-14_nami_power.md",
+    "kind": "diagnostic (records only)",
+    "tool": "tests/scripts/theory_map.py namipower",
+    "log": "logs/theory_map/real_w41_namipower.json",
+    "code_location": "rust/opcg_engine/src/theory/core/drv_cb.rs::opp_attack_power_adjust (sc[15]*5 at the attacker turn-start row) + ev.rs::opp_attack_effects (HAS_DON)",
+    "mid": {
+      "don_at_turn_start": 0.637,
+      "don_at_attack": 0.673,
+      "theory_reads_7000": 0.637,
+      "buff_seen_turns": 0.363,
+      "don_and_buff_but_theory_5000": 0.0
+    },
+    "verdict": "missed (0% < 10%): no rule misreading; theory reads the +2000 more often than it is used",
+    "attack_power_into_nami_mid": {
+      "lt5000": 0.275,
+      "5000_6999": 0.62,
+      "ge7000": 0.105,
+      "mean": 4725.5
+    }
   }
 }

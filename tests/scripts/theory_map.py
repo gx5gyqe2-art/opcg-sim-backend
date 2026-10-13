@@ -1579,9 +1579,109 @@ def cmd_speed(a):
     return 0
 
 
+def cmd_namipower(a):
+    """ナミのリーダーの +2000 の取りこぼし（2026-10-14・`2026-10-14_nami_power.md` §1・1 回きり・記録だけ）。ナミが守る相手のターンごとに:
+    相手のターンの先頭の行（攻める側の最初の行＝理論の判定と同じ盤面）でのナミのリーダーの付与中のドン・手札の枚数・リーダーのパワー、
+    相手の各攻撃の時点の付与中のドン、ナミの行（守りの窓）でリーダーのパワーが印字 + 2000 以上だったか、ナミが効果を選んだ数。
+    理論の読み＝先頭の行で（ドン ≥ 1・手札 ≥ 1・パワー < 印字 + 2000）なら 7000、それ以外は 5000（`drv_cb::opp_attack_power_adjust`）。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    NAMI, PRINTED, X = "OP11-041", 5000.0, 2000.0
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    turns = []
+    import theory_rs as TR
+    idx2cid = TR.idx2cid()
+    apow = collections.defaultdict(list)                      # 帯 → 攻撃のパワー（攻める側の札の欄・その行）
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig", "pol_cid", "pol_tcid"),
+                                                    extra_fn=lambda dd, n: {"sc": np.asarray(dd["scalars"])[:n].astype(float),
+                                                                            "ci": np.asarray(dd["card_idx"])[:n],
+                                                                            "tok": np.asarray(dd["tokens"])[:n].astype(float)}):
+        seed = int(rows["seed"][idx[0]])
+        gm = games_meta.get(seed)
+        if gm is None or NAMI not in gm["leaders"]:
+            continue
+        u2c = PL.uuid_map(pol, L, ptr, idx)
+        for d in (0, 1):
+            if gm["leaders"][d] != NAMI:
+                continue
+            cur = {}
+            for i in idx:
+                w = int(rows["who"][i]); t = int(rows["turn"][i]); sc = ex["sc"][i]
+                if t < 1 or PL.is_own_turn(d, t):
+                    continue
+                me = (w == d)
+                don = (sc[14] if me else sc[15]) * 5.0
+                hand = sc[6] if me else sc[7]
+                pw = (sc[12] if me else sc[13]) * 1e4
+                c = cur.setdefault(t, {"t": t, "start": None, "atk": 0, "atk_don": 0, "win": 0, "win_buff": 0, "sel": 0, "buff_after_atk": 0, "_pend": False})
+                if not me and c["start"] is None:
+                    c["start"] = {"don": don, "hand": hand, "pw": pw}
+                sj = json.loads(rows["sig"][i])
+                if not me and int(rows["kind"][i]) == 0 and sj[0] in ("ATTACK", "DON_BOX") and sj[2]:
+                    c["atk"] += 1
+                    c["atk_don"] += int(don >= 0.5)
+                    c["_pend"] = True
+                    acid = u2c.get(sj[1])
+                    for sl in [0] + list(range(2, 7)):
+                        if acid and idx2cid.get(int(ex["ci"][i][sl])) == acid:
+                            apow[turn_band(t)].append(float(ex["tok"][i][sl][0]) * 1e4)
+                            break
+                if me:
+                    c["win"] += 1
+                    c["win_buff"] += int(pw >= PRINTED + X - 1)
+                    if c["_pend"]:
+                        c["buff_after_atk"] += int(pw >= PRINTED + X - 1)
+                        c["_pend"] = False
+                    if sj[0] == "RESOLVE_EFFECT_SELECTION":
+                        c["sel"] += 1
+            for t, c in cur.items():
+                if c["start"] is None:
+                    continue
+                st = c["start"]
+                theory7000 = st["don"] >= 0.5 and st["hand"] >= 1 and st["pw"] < PRINTED + X - 1
+                turns.append({"band": turn_band(t), "don_start": st["don"] >= 0.5, "theory7000": theory7000,
+                              "already7000_start": st["pw"] >= PRINTED + X - 1, "atk": c["atk"], "atk_don": c["atk_don"],
+                              "win": c["win"], "win_buff": c["win_buff"], "buff_seen": c["win_buff"] > 0,
+                              "buff_after_atk": c["buff_after_atk"], "sel": c["sel"]})
+
+    def blk(ts):
+        if not ts:
+            return None
+        n = len(ts)
+        atk = sum(x["atk"] for x in ts)
+        win = sum(x["win"] for x in ts)
+        miss = [x for x in ts if (x["don_start"] or x["atk_don"] > 0) and x["buff_seen"] and not x["theory7000"]]
+        return {"opp_turns": n, "don_on_leader_at_turn_start": round(sum(x["don_start"] for x in ts) / n, 3),
+                "don_on_leader_at_attack": round(sum(x["atk_don"] for x in ts) / atk, 3) if atk else None,
+                "theory_reads_7000": round(sum(x["theory7000"] for x in ts) / n, 3),
+                "already_7000_at_turn_start": round(sum(x["already7000_start"] for x in ts) / n, 3),
+                "turns_with_buff_seen": round(sum(x["buff_seen"] for x in ts) / n, 3),
+                "windows_with_buff": round(sum(x["win_buff"] for x in ts) / win, 3) if win else None,
+                "attacks_followed_by_buffed_window": round(sum(x["buff_after_atk"] for x in ts) / atk, 3) if atk else None,
+                "effect_selections_per_turn": round(sum(x["sel"] for x in ts) / n, 3),
+                "don_and_buff_but_theory_5000": round(len(miss) / n, 3),
+                "buff_seen_but_theory_5000": round(sum(1 for x in ts if x["buff_seen"] and not x["theory7000"]) / n, 3),
+                "attacks_per_turn": round(atk / n, 3)}
+    out = {"record": a.src, "nami": {"all": blk(turns), **{b: blk([x for x in turns if x["band"] == b]) for b in TURN_BANDS}}}
+
+    def pdist(ps):
+        if not ps:
+            return None
+        n = len(ps)
+        return {"attacks_with_power": n, "lt5000": round(sum(p < 5000 - 1 for p in ps) / n, 3),
+                "5000_6999": round(sum(5000 - 1 <= p < 7000 - 1 for p in ps) / n, 3), "ge7000": round(sum(p >= 7000 - 1 for p in ps) / n, 3),
+                "mean": round(float(np.mean(ps)), 1)}
+    out["attack_power_into_nami"] = {"all": pdist(sum(apow.values(), [])), **{b: pdist(apow.get(b, [])) for b in TURN_BANDS}}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("namipower: opp turns %d" % len(turns))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1648,10 +1748,13 @@ def main(argv=None):
     sp.add_argument("--in", dest="src", required=True)
     sp.add_argument("--clocks", required=True)
     sp.add_argument("--out", required=True)
+    npw = sub.add_parser("namipower")
+    npw.add_argument("--in", dest="src", required=True)
+    npw.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
-            "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed}[a.cmd](a)
+            "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower}[a.cmd](a)
 
 
 if __name__ == "__main__":
