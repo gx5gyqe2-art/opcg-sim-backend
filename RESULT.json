@@ -1047,5 +1047,76 @@
   },
   "verdict": "hit by the letter (both directions, Enel gap >=0.05 on both measures); caveats: Enel CIs cross 0, Luffy has the largest loss yet ~0 residual",
   "encoding_split": "cond_ok0 changes: parser 1cacb6a1 (308 cards, 8 in w41 decks) + engine FIELD_ALL_TRAIT (Luffy leader OP16-022)"
+ },
+ "play_gap_split_2026_10_14": {
+  "report": "docs/reports/2026-10-14_play_gap_split.md",
+  "kind": "diagnostic",
+  "tool": "tests/scripts/theory_map.py playsplit",
+  "log": "logs/theory_map/real_w41_playsplit.json",
+  "post_share": {
+   "theory": {
+    "shanks": 0.125,
+    "nami": 0.189,
+    "enel": 0.041,
+    "luffy": 0.048
+   },
+   "deep": {
+    "shanks": 0.0,
+    "nami": 0.007,
+    "enel": 0.001,
+    "luffy": 0.006
+   }
+  },
+  "pre_only_minus_others": {
+   "enel_all": {
+    "theory": [
+     0.352,
+     [
+      0.141,
+      0.582
+     ]
+    ],
+    "deep": [
+     0.092,
+     [
+      -0.013,
+      0.21
+     ]
+    ]
+   },
+   "nami_mid": {
+    "theory": [
+     -0.191,
+     [
+      -0.243,
+      -0.137
+     ]
+    ],
+    "deep": [
+     -0.081,
+     [
+      -0.116,
+      -0.042
+     ]
+    ]
+   },
+   "luffy_all": {
+    "theory": [
+     0.788,
+     [
+      0.586,
+      0.988
+     ]
+    ],
+    "deep": [
+     0.162,
+     [
+      0.047,
+      0.291
+     ]
+    ]
+   }
+  },
+  "verdict": "missed (Luffy post share <40%, pre-only Luffy >= +0.1 on both) -> Luffy counterexample is not a measurement artefact; 'loss does not map to outcome for another reason'"
  }
 }
