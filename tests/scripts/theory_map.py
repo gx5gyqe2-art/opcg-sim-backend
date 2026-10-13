@@ -1519,11 +1519,18 @@ def cmd_speed(a):
                 continue
             life = {w: sc[0], 1 - w: sc[1]}
             att = w if PL.is_own_turn(w, t) else 1 - w           # このターンの攻める席
-            if prev[1 - att] is not None and life[1 - att] < prev[1 - att] - 0.5:
+            sj = json.loads(rows["sig"][i])
+            lost_now = prev[1 - att] is not None and life[1 - att] < prev[1 - att] - 0.5
+            if lost_now:
                 rec[(seed, att, t)]["opp_life_lost"] += prev[1 - att] - life[1 - att]
+            if prev[1 - att] is not None and life[1 - att] > prev[1 - att] + 0.5:
+                rec[(seed, att, t)]["def_life_gained"] += life[1 - att] - prev[1 - att]
+            if w != att and sj[0] == "SELECT_COUNTER":
+                rec[(seed, att, t)]["counters"] += 1
+            if w != att and lost_now and sj[0] == "RESOLVE_EFFECT_SELECTION":
+                rec[(seed, att, t)]["trig_proxy"] += 1
             for d in (0, 1):
                 prev[d] = life[d]
-            sj = json.loads(rows["sig"][i])
             if w == att and int(rows["kind"][i]) == 0 and sj[0] in ("ATTACK", "DON_BOX") and sj[2]:
                 rec[(seed, att, t)]["attacks"] += 1
                 rec[(seed, att, t)]["leader_attacks"] += int(u2c.get(sj[2][0]) == lead[1 - att])
@@ -1541,8 +1548,8 @@ def cmd_speed(a):
         if (seed, w, t) in settled:
             continue
         q = rec.get((seed, w, t), collections.Counter())
-        recs.append({"deck": games_meta[seed]["leaders"][w], "band": turn_band(t), "theory": float(r.get("slope_theory") or 0.0),
-                     "harm": float(r.get("harm") or 0.0), **{k: float(q.get(k, 0)) for k in ("opp_life_lost", "attacks", "leader_attacks", "blocks")}})
+        recs.append({"deck": games_meta[seed]["leaders"][w], "def": games_meta[seed]["leaders"][1 - w], "band": turn_band(t), "theory": float(r.get("slope_theory") or 0.0),
+                     "harm": float(r.get("harm") or 0.0), **{k: float(q.get(k, 0)) for k in ("opp_life_lost", "attacks", "leader_attacks", "blocks", "counters", "def_life_gained", "trig_proxy")}})
 
     def blk(rs):
         if not rs:
@@ -1553,11 +1560,19 @@ def cmd_speed(a):
         return {"turns": n, "theory_per_turn": round(st / n, 4), "harm_per_turn": round(sh / n, 4), "ratio": round(sh / st, 3) if st > 1e-12 else None,
                 "opp_life_lost_per_turn": round(ll / n, 3), "attacks_per_turn": round(sum(x["attacks"] for x in rs) / n, 3),
                 "leader_attacks_per_turn": round(la / n, 3), "life_per_leader_attack": round(ll / la, 3) if la else None,
-                "blocks_per_turn": round(sum(x["blocks"] for x in rs) / n, 3)}
+                "blocks_per_turn": round(sum(x["blocks"] for x in rs) / n, 3),
+                "counters_per_turn": round(sum(x["counters"] for x in rs) / n, 3),
+                "def_life_gained_per_turn": round(sum(x["def_life_gained"] for x in rs) / n, 3),
+                "trig_proxy_per_turn": round(sum(x["trig_proxy"] for x in rs) / n, 3)}
     decks = sorted({x["deck"] for x in recs})
     out = {"record": a.src, "clocks": a.clocks, "by_deck": {d: {"all": blk([x for x in recs if x["deck"] == d]),
                                                                **{b: blk([x for x in recs if x["deck"] == d and x["band"] == b]) for b in TURN_BANDS}}
                                                            for d in decks}}
+    # 守る側（行の相手）で集める・守る側 × 攻める側の比（2026-10-14・`2026-10-14_defence_side.md`）
+    out["by_defender"] = {d: {"all": blk([x for x in recs if x["def"] == d]),
+                              **{b: blk([x for x in recs if x["def"] == d and x["band"] == b]) for b in TURN_BANDS}} for d in decks}
+    out["def_x_att"] = {d: {o: {b: (lambda r: r and r["ratio"])(blk([x for x in recs if x["def"] == d and x["deck"] == o and (b == "all" or x["band"] == b)]))
+                                for b in ("all",) + TURN_BANDS} for o in decks} for d in decks}
     with open(a.out, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=1)
     print("speed: rows %d" % len(recs))
