@@ -268,9 +268,10 @@ fn seat_row(c: &mut Core, gs: &Gs, cut: &mut Option<CutFrames>, st: &mut D, w: i
     r
 }
 
-/// **候補 `OPCG_OPP_ATTACK_POWER=1`**（`docs/reports/2026-10-13_opp_attack_power.md`・既定は切＝旧）。
+/// **【相手のアタック時】をその相手のターンの守る側のリーダーのパワーとして読む**（`docs/reports/2026-10-13_opp_attack_power.md`）。
+/// **2026-10-13 にユーザ決定で既定に採用**（「(a) 既定にする」）。`OPCG_OPP_ATTACK_POWER=0`（または `off`）で旧い形に戻す。
 pub fn opp_attack_power_on() -> bool {
-    matches!(std::env::var("OPCG_OPP_ATTACK_POWER").as_deref(), Ok("1") | Ok("on"))
+    !matches!(std::env::var("OPCG_OPP_ATTACK_POWER").as_deref(), Ok("0") | Ok("off"))
 }
 
 /// 時計の行（攻める側のターン）を、守る側の【相手のアタック時】の上げ下げで直す（§1.2）: 相手のリーダーのパワー（`sc`）に +X、
