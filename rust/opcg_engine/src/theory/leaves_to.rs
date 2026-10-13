@@ -549,6 +549,28 @@ pub fn don_stock(sc: &[f64], tok: &Tok, me: bool) -> f64 {
     a + r + ld * 5.0 + att
 }
 
+/// **その席がこの先持てるドンの総数**（2026-10-12・`docs/reports/2026-10-12_don_deck.md` §1.1）＝場のドン（`don_stock`）＋ドン‼デッキの残り
+/// （スカラー 66＝自分・67＝相手 × 10）。規則では 10 枚（エネル〔OP15-058〕は 6 枚）。整数に丸め、規則の既定 10 を超えない。
+/// スカラーにドン‼デッキの残りが無い行（68 列未満）は `None`（呼び手が既定 10 に落とす）。
+/// **候補の切替**（既定は旧＝10 枚固定）: 環境変数 `OPCG_DON_ROOM=1` のときだけ盤面から読む（`don_room_on`）。切っているときは
+/// いつも `None`＝旧い出力と 1 ビットも変わらない。
+pub fn don_room(sc: &[f64], tok: &Tok, me: bool) -> Option<f64> {
+    let k = if me { 66 } else { 67 };
+    if !don_room_on() || sc.len() <= 67 {
+        return None;
+    }
+    let deck = (sc[k] * 10.0).round();
+    Some((don_stock(sc, tok, me).round() + deck).min(DON_RULE_TOTAL))
+}
+
+/// 候補 `OPCG_DON_ROOM`（2026-10-12・`docs/reports/2026-10-12_don_deck.md`）が入っているか（呼び出しのたびに読む＝試験で切り替えられる）
+pub fn don_room_on() -> bool {
+    matches!(std::env::var("OPCG_DON_ROOM").as_deref(), Ok("1") | Ok("on"))
+}
+
+/// 規則の既定のドン‼デッキの枚数（ドン‼デッキの残りが読めない行の落ち先）
+pub const DON_RULE_TOTAL: f64 = 10.0;
+
 pub fn don_attached(sc: &[f64], tok: &Tok, me: bool) -> f64 {
     let (_a, _r, ld, att) = don_parts(sc, tok, me);
     ld * 5.0 + att

@@ -289,7 +289,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_
         res = TR.game_call("theory_bridge", game, {"cfg": c, "in": pin, "stats": stats, "carry": {}})
         if dump_f is not None:
             zz = {str(k[1]): r.get("z") for k, r in res["per"]}
-            dump_f.write(json.dumps({"seed": seed, "z": zz, "rows": res.get("row_dump") or []}) + "\n")
+            dump_f.write(json.dumps({"seed": seed, "z": zz, "rows": res.get("row_dump") or [],
+                                     "guard": res.get("guard_dump") or []}) + "\n")
         for key, rec in res["per"]:
             key = tuple(key)
             if key in per:

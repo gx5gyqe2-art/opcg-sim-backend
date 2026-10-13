@@ -844,9 +844,517 @@ def cmd_turns(a):
     return 0
 
 
+# ------------------------------------------------------------------ deckcal（2026-10-12・`2026-10-12_turn_plans.md` §11）
+DON_RULE_CAP = 10          # 規則のドン!!デッキの枚数（エネル〔OP15-058〕は「ドン‼デッキは 6 枚」）
+DON_DECK_SIZE = {"OP15-058": 6}
+
+
+def cmd_deckcal(a):
+    """デッキ別の較正（ターン先頭・決着前）・役割の外れのデッキ切り分け・ドンの検算（理論の計画の段のドン vs 記録）。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    dump_p = a.dump or os.path.join(a.work, "dump.jsonl")
+    clocks_p = a.clocks or os.path.join(a.work, "clocks.json")
+    clocks = json.load(open(clocks_p, encoding="utf-8"))
+    from theory_rs import MU
+    rows_all, _align, _ck, _th, games_meta, _lcol = build_rows(a.src, load_dump(dump_p), clocks)
+    settled = collections.defaultdict(lambda: 10 ** 9)
+    for s_, w_, t_, d_ in clocks["settled"]:
+        if d_:
+            settled[int(s_)] = min(settled[int(s_)], int(t_))
+    focus = a.focus
+    out = {"record": a.src, "focus": focus, "don_cap": a.don_cap}
+    # 1. 較正（ターン先頭の行・決着前）
+    cal = []
+    for r in clocks["rows_out"]:
+        s_, w_, t_ = int(r["seed"]), int(r["who"]), int(r["t"])
+        gm = games_meta.get(s_)
+        if gm is None or t_ >= settled[s_] or r.get("W") is None:
+            continue
+        cal.append({"seed": s_, "w": w_, "t": t_, "leader": gm["leaders"][w_], "W": float(r["W"]), "z": 1.0 if r["won"] else 0.0})
+
+    def calrow(rs):
+        if not rs:
+            return None
+        bys = collections.defaultdict(list)
+        for x in rs:
+            bys[x["seed"]].append(x)
+        e = {"rows": len(rs), "games": len(bys), "W": round(float(np.mean([x["W"] for x in rs])), 4),
+             "win": round(float(np.mean([x["z"] for x in rs])), 4)}
+        e["win_minus_W"] = round(e["win"] - e["W"], 4)
+        if len(bys) >= MIN_GAMES:
+            e["ci"] = boot_games(bys, lambda xs: float(np.mean([x["z"] - x["W"] for x in xs])), a.boot)
+        else:
+            e["verdict"] = "局数不足"
+        return e
+    decks = sorted({x["leader"] for x in cal})
+    out["calibration"] = {d: {"all": calrow([x for x in cal if x["leader"] == d]),
+                              **{b: calrow([x for x in cal if x["leader"] == d and turn_band(x["t"]) == b]) for b in TURN_BANDS}}
+                          for d in decks}
+    out["calibration"]["ALL"] = {"all": calrow(cal), **{b: calrow([x for x in cal if turn_band(x["t"]) == b]) for b in TURN_BANDS}}
+    # 2. 役割の外れ（問い 5 の相手側の表）を focus のデッキと他で分ける
+    rc = [r for r in rows_all if r["pv"] is not None and r["nsc"] >= 2 and r["ptype"] in TYPES
+          and r["btype"] in TYPES and "gap" in r]
+    out["q5_focus"] = collect_q5([r for r in rc if r["leader"] == focus], MU, a.boot)
+    out["q5_others"] = collect_q5([r for r in rc if r["leader"] != focus], MU, a.boot)
+    out["q5_by_deck"] = {d: collect_q5([r for r in rc if r["leader"] == d], MU, a.boot)["groups"].get("ALL_small") for d in decks}
+    # 3. ドンの検算: 計画の段 k（1・2）のドンの上限 min(10, 今の場のドン + 2k)（`curve.rs::caps_of`）と、記録の k ターン後の場のドン
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    seats = collections.defaultdict(list)
+    for rows, _pol, ex, _L, _ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig",),
+                                                        extra_fn=lambda dd, n: {"sc": np.asarray(dd["scalars"])[:n].astype(np.float64)}):
+        seed = int(rows["seed"][idx[0]])
+        gm = games_meta.get(seed)
+        if gm is None:
+            continue
+        seen = set()
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0 or (w, t) in seen:
+                continue
+            seen.add((w, t))
+            ld = gm["leaders"][w]
+            size = DON_DECK_SIZE.get(ld, DON_RULE_CAP)
+            field = size - int(round(float(ex["sc"][i, 66]) * 10))
+            seats[(seed, w, ld)].append((t, field))
+    don = collections.defaultdict(lambda: {1: [], 2: []})
+    for (seed, w, ld), ts in seats.items():
+        ts.sort()
+        for j, (t, f0) in enumerate(ts):
+            for k in (1, 2):
+                if j + k < len(ts):
+                    # `--don-cap room`（2026-10-12・`2026-10-12_don_deck.md`）: 上限を場のドン＋ドン‼デッキの残り（＝そのデッキのドン‼デッキの枚数）で切る候補の式
+                    cap = min(DON_DECK_SIZE.get(ld, DON_RULE_CAP) if a.don_cap == "room" else DON_RULE_CAP, f0 + 2 * k)
+                    don[ld][k].append((cap - ts[j + k][1], f0, ts[j + k][1], turn_band(t)))
+    out["don_check"] = {}
+    for ld, byk in don.items():
+        e = {"deck_size": DON_DECK_SIZE.get(ld, DON_RULE_CAP)}
+        for k, xs in byk.items():
+            ov = np.array([x[0] for x in xs], float)
+            e["step%d" % k] = {"n": len(xs), "over_mean": round(float(ov.mean()), 3),
+                               "over_p10_p50_p90": [round(float(q), 1) for q in np.percentile(ov, [10, 50, 90])],
+                               "share_over": round(float((ov > 0).mean()), 3), "share_under": round(float((ov < 0).mean()), 3),
+                               "dist": {str(int(v)): int((ov == v).sum()) for v in sorted(set(ov.tolist()))},
+                               "by_band": {b: round(float(np.mean([x[0] for x in xs if x[3] == b])), 3)
+                                           for b in TURN_BANDS if any(x[3] == b for x in xs)}}
+        out["don_check"][ld] = e
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("deckcal: cal rows %d" % len(cal))
+    return 0
+
+
+def cmd_paircal(a):
+    """対面ごとの較正（2026-10-12・`2026-10-12_don_deck.md` §7）: 先手リーダー × 後手リーダーの組ごとに、席ごとの
+    「実 − 理論」（ターン先頭の行・決着の宣言の前・局ごとの再抽出）。帯（1-3／4-6／7+）でも。"""
+    clocks = json.load(open(a.clocks, encoding="utf-8"))
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    settled = collections.defaultdict(lambda: 10 ** 9)
+    for s_, w_, t_, d_ in clocks["settled"]:
+        if d_:
+            settled[int(s_)] = min(settled[int(s_)], int(t_))
+    rows = []
+    for r in clocks["rows_out"]:
+        s_, w_, t_ = int(r["seed"]), int(r["who"]), int(r["t"])
+        gm = games_meta.get(s_)
+        if gm is None or t_ >= settled[s_] or r.get("W") is None:
+            continue
+        rows.append({"seed": s_, "w": w_, "t": t_, "pair": "%s|%s" % tuple(gm["leaders"]), "W": float(r["W"]),
+                     "z": 1.0 if r["won"] else 0.0})
+
+    def cal(rs):
+        if not rs:
+            return None
+        bys = collections.defaultdict(list)
+        for x in rs:
+            bys[x["seed"]].append(x)
+        e = {"rows": len(rs), "games": len(bys), "W": round(float(np.mean([x["W"] for x in rs])), 4),
+             "win": round(float(np.mean([x["z"] for x in rs])), 4)}
+        e["win_minus_W"] = round(e["win"] - e["W"], 4)
+        if len(bys) >= a.min_games:
+            e["ci"] = boot_games(bys, lambda xs: float(np.mean([x["z"] - x["W"] for x in xs])), a.boot)
+        else:
+            e["verdict"] = "局数不足"
+        return e
+    out = {"record": a.src, "min_games": a.min_games, "pairs": {}}
+    for pr in sorted({x["pair"] for x in rows}):
+        sub = [x for x in rows if x["pair"] == pr]
+        e = {"games": len({x["seed"] for x in sub})}
+        for w in (0, 1):
+            sw = [x for x in sub if x["w"] == w]
+            e["seat%d" % w] = {"all": cal(sw), **{b: cal([x for x in sw if turn_band(x["t"]) == b]) for b in TURN_BANDS}}
+        out["pairs"][pr] = e
+    # 席のデッキ × 相手のデッキ（先手・後手をまとめる）
+    out["deck_vs_deck"] = {}
+    for x in rows:
+        gm = games_meta[x["seed"]]
+        x["me"], x["opp"] = gm["leaders"][x["w"]], gm["leaders"][1 - x["w"]]
+    for me in sorted({x["me"] for x in rows}):
+        for op in sorted({x["opp"] for x in rows}):
+            sub = [x for x in rows if x["me"] == me and x["opp"] == op]
+            if sub:
+                out["deck_vs_deck"]["%s|%s" % (me, op)] = {"all": cal(sub), **{b: cal([x for x in sub if turn_band(x["t"]) == b]) for b in TURN_BANDS}}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("paircal: rows %d pairs %d" % (len(rows), len(out["pairs"])))
+    return 0
+
+
+def cmd_clockside(a):
+    """どちらの時計が外れているか（2026-10-12・`2026-10-12_don_deck.md` §8）。ターン先頭・決着の宣言の前の行で、席のデッキ × 帯ごとに:
+    - 自分の時計: 整数 `max(1, ⌈τ_me⌉)` − 実際に相手を倒すまでの自席ターン（勝った席＝打ち切りなし）。負けた席は打ち切り（実際は「少なくとも」）
+      ＝読みが打ち切りより短い割合（「この局のうちに倒せる」と読んだのに倒せなかった）を数える。
+    - 相手の時計: 整数 `max(1, ⌈τ_opp⌉)` − 実際に自分が倒されるまでの相手のターン（負けた席＝打ち切りなし）。勝った席は打ち切り
+      ＝読みが打ち切りより短い割合（「この局のうちに倒される」と読んだのに倒されなかった）を数える。
+    正＝読みが長い（攻めを低く／守りを高く読む）・負＝読みが短い（攻めを高く／守りを低く読む）。"""
+    clocks = json.load(open(a.clocks, encoding="utf-8"))
+    cap = float(clocks["cap"])
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    settled = collections.defaultdict(lambda: 10 ** 9)
+    for s_, w_, t_, d_ in clocks["settled"]:
+        if d_:
+            settled[int(s_)] = min(settled[int(s_)], int(t_))
+    rows = []
+    for r in clocks["rows_out"]:
+        s_, w_, t_ = int(r["seed"]), int(r["who"]), int(r["t"])
+        gm = games_meta.get(s_)
+        if gm is None or t_ >= settled[s_]:
+            continue
+        rows.append({"seed": s_, "t": t_, "leader": gm["leaders"][w_], "won": bool(r["won"]),
+                     "me": int_clock(r["tau_me_theory"], cap) - int(r["t_me_act"]),
+                     "opp": int_clock(r["tau_opp_theory"], cap) - int(r["t_opp_act"]),
+                     "me_f": min(float(r["tau_me_theory"]), cap) - float(r["t_me_act"]),
+                     "opp_f": min(float(r["tau_opp_theory"]), cap) - float(r["t_opp_act"])})
+
+    def blk(rs):
+        o = {}
+        for side, full, cens in (("me", True, False), ("opp", False, True)):
+            # 打ち切りなし: 自分の時計は勝った席・相手の時計は負けた席
+            un = [x for x in rs if x["won"] == full]
+            ce = [x for x in rs if x["won"] == cens]
+            e = {"n": len(un), "games": len({x["seed"] for x in un})}
+            if un:
+                e["mean_int"] = round(float(np.mean([x[side] for x in un])), 3)
+                e["mean_frac"] = round(float(np.mean([x[side + "_f"] for x in un])), 3)
+                bys = collections.defaultdict(list)
+                for x in un:
+                    bys[x["seed"]].append(x)
+                if len(bys) >= MIN_GAMES:
+                    e["ci_int"] = boot_games(bys, lambda xs, side=side: float(np.mean([x[side] for x in xs])), a.boot)
+                else:
+                    e["verdict"] = "局数不足"
+            e["censored_n"] = len(ce)
+            if ce:
+                # 読み（整数）が打ち切りの時刻より短い＝その局のうちに届くと読んだのに届かなかった
+                e["censored_short_share"] = round(float(np.mean([x[side] < 0 for x in ce])), 3)
+            o[side] = e
+        return o
+    decks = sorted({x["leader"] for x in rows})
+    out = {"record": a.src, "by_deck": {d: {"all": blk([x for x in rows if x["leader"] == d]),
+                                            **{b: blk([x for x in rows if x["leader"] == d and turn_band(x["t"]) == b]) for b in TURN_BANDS}}
+                                        for d in decks},
+           "ALL": blk(rows)}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("clockside: rows %d" % len(rows))
+    return 0
+
+
+def cmd_guardside(a):
+    """守りの時計の外れをもう 1 段割る（2026-10-12・`2026-10-12_don_deck.md` §10）。
+    (1) 理論の守りの窓の読み（`theory_bridge` の写しの `guard`＝`guard_dump`）: デッキ × 帯ごとに「止められると読んだ」割合・
+        そのうち実際に受けた（止めなかった／止められなかった）割合・払えるカウンター札の枚数／手札の枚数・実際に消えた札の価値。
+    (2) 記録だけの量: 守りの窓での手札の中身（カウンター 0／カウンターイベント／カウンター値あり・カードの印字）、
+        ライフに加えた枚数・自分のターン中にライフが離れた回数・相手のリーダーへの攻撃 1 回あたりに失ったライフ（1 局×席あたり）。"""
+    import deck_refill as DR
+    import theory_rs as TR
+    from opcg_sim.learned.train import plan_labels as PL
+    from opcg_sim.loop import decks as D
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    out = {"record": a.src}
+    # (1) 理論の守りの窓
+    win = []
+    with open(a.dump, encoding="utf-8") as f:
+        for line in f:
+            j = json.loads(line)
+            gm = games_meta.get(int(j["seed"]))
+            if gm is None:
+                continue
+            for g in j.get("guard") or []:
+                t, w, played, can, says, src_, x, ctake, chand, cgs, nh, nc, spent, life, margin = g
+                win.append({"seed": int(j["seed"]), "t": int(t), "leader": gm["leaders"][int(w)], "played": played,
+                            "can": bool(can), "says": says, "src": src_, "nh": nh or 0, "nc": nc or 0, "spent": spent})
+
+    def gblk(ws):
+        if not ws:
+            return None
+        can = [x for x in ws if x["can"]]
+        says_g = [x for x in ws if x["says"] == "guard"]
+        sp = [x["spent"] for x in ws if x["spent"] is not None]
+        return {"windows": len(ws), "games": len({x["seed"] for x in ws}),
+                "can_share": round(len(can) / len(ws), 3),
+                "can_but_took": round(sum(1 for x in can if x["played"] == "take") / len(can), 3) if can else None,
+                "says_guard_share": round(len(says_g) / len(ws), 3),
+                "says_guard_but_took": round(sum(1 for x in says_g if x["played"] == "take") / len(says_g), 3) if says_g else None,
+                "took_share": round(sum(1 for x in ws if x["played"] == "take") / len(ws), 3),
+                "src": dict(collections.Counter(x["src"] for x in ws)),
+                "payable_counter_per_hand": round(float(np.mean([x["nc"] / x["nh"] for x in ws if x["nh"]])), 3) if any(x["nh"] for x in ws) else None,
+                "payable_counter_cards": round(float(np.mean([x["nc"] for x in ws])), 3),
+                "spent_mean": round(float(np.mean(sp)), 4) if sp else None}
+    decks = sorted({x["leader"] for x in win})
+    out["guard"] = {d: {"all": gblk([x for x in win if x["leader"] == d]),
+                        **{b: gblk([x for x in win if x["leader"] == d and turn_band(x["t"]) == b]) for b in TURN_BANDS}} for d in decks}
+    out["guard"]["ALL"] = {"all": gblk(win)}
+    # (2) 記録だけ
+    idx2cid = TR.idx2cid()
+    db = D.load_db()
+    info = {}
+
+    def cinfo(cid):
+        if cid not in info:
+            m = db.get_card(cid)
+            if m is None:
+                info[cid] = None
+            else:
+                ty = getattr(getattr(m, "type", None), "name", "")
+                txt = getattr(m, "effect_text", "") or ""
+                info[cid] = {"counter": int(getattr(m, "counter", 0) or 0), "cev": ty == "EVENT" and "【カウンター】" in txt}
+        return info[cid]
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    hand = collections.defaultdict(collections.Counter)
+    life_add, life_left_own, seats, attacks, life_lost = (collections.Counter() for _ in range(5))
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig", "pol_cid", "pol_tcid"),
+                                                    extra_fn=lambda dd, n: {"sc": np.asarray(dd["scalars"])[:n].astype(float),
+                                                                            "ci": np.asarray(dd["card_idx"])[:n]}):
+        seed = int(rows["seed"][idx[0]])
+        gm = games_meta.get(seed)
+        if gm is None:
+            continue
+        lead = gm["leaders"]
+        u2c = PL.uuid_map(pol, L, ptr, idx)
+        for w in (0, 1):
+            seats[lead[w]] += 1
+        seen, prev_life, prev_turn, start_life = set(), {0: None, 1: None}, {0: None, 1: None}, {}
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i]); sc = ex["sc"][i]
+            if t < 1:
+                continue
+            own = PL.is_own_turn(w, t)
+            if not own and (w, t) not in seen:
+                seen.add((w, t))
+                for cid in DR.hand_ids(ex["ci"][i], idx2cid):
+                    inf = cinfo(cid)
+                    if inf is None:
+                        continue
+                    k = "cev" if inf["cev"] else ("c0" if inf["counter"] == 0 else "cpos")
+                    hand[(lead[w], turn_band(t))][k] += 1
+                    hand[(lead[w], "all")][k] += 1
+            start_life.setdefault((w, t), sc[0])
+            if prev_life[w] is not None:
+                dl = sc[0] - prev_life[w]
+                if dl > 0.5:
+                    life_add[lead[w]] += dl
+                if dl < -0.5 and own and prev_turn[w] == t:
+                    life_left_own[lead[w]] += -dl
+            prev_life[w], prev_turn[w] = sc[0], t
+            if own and int(rows["kind"][i]) == 0:
+                sj = json.loads(rows["sig"][i])
+                if sj[0] in ("ATTACK", "DON_BOX") and sj[2] and u2c.get(sj[2][0]) == lead[1 - w]:
+                    attacks[lead[1 - w]] += 1
+        for (w, t), l0 in start_life.items():
+            if not PL.is_own_turn(w, t):
+                nxt = start_life.get((w, t + 1))
+                if nxt is not None and nxt < l0:
+                    life_lost[lead[w]] += l0 - nxt
+    out["hand"] = {"%s|%s" % k: {"cards": sum(c.values()), **{x: round(c[x] / sum(c.values()), 3) for x in ("c0", "cev", "cpos")}}
+                   for k, c in sorted(hand.items())}
+    out["life"] = {d: {"seats": seats[d], "life_added_per_seat": round(life_add[d] / seats[d], 3),
+                       "life_left_own_turn_per_seat": round(life_left_own[d] / seats[d], 3),
+                       "leader_attacks_received": attacks[d], "life_lost_per_attack": round(life_lost[d] / max(1, attacks[d]), 3)}
+                   for d in seats}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("guardside: windows %d" % len(win))
+    return 0
+
+
+def cmd_defturns(a):
+    """守る側の相手のターン 1 回ごとの量（2026-10-13・`2026-10-13_defence_gap.md` §8・代案の材料・式には入れない）。
+    記録だけで、デッキ × 帯ごとに: 相手のターンに来た攻撃の本数（全部の対象／リーダーへ）の分布（0／1／2／3 本以上）と、
+    そのターンの最初の守る側の行で手札に「カウンター 0 の札」（カウンターイベントを除く）が 1 枚以上在る割合。"""
+    import deck_refill as DR
+    import theory_rs as TR
+    from opcg_sim.learned.train import plan_labels as PL
+    from opcg_sim.loop import decks as D
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    idx2cid = TR.idx2cid()
+    db = D.load_db()
+    info = {}
+
+    def cinfo(cid):
+        if cid not in info:
+            m = db.get_card(cid)
+            if m is None:
+                info[cid] = None
+            else:
+                ty = getattr(getattr(m, "type", None), "name", "")
+                txt = getattr(m, "effect_text", "") or ""
+                info[cid] = {"counter": int(getattr(m, "counter", 0) or 0), "cev": ty == "EVENT" and "【カウンター】" in txt}
+        return info[cid]
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    turns = []                                    # (守る側のリーダー, 帯, 攻撃の本数, リーダーへの本数, 手札にカウンター 0 が在るか)
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig", "pol_cid", "pol_tcid"),
+                                                    extra_fn=lambda dd, n: {"ci": np.asarray(dd["card_idx"])[:n]}):
+        seed = int(rows["seed"][idx[0]])
+        gm = games_meta.get(seed)
+        if gm is None:
+            continue
+        lead = gm["leaders"]
+        u2c = PL.uuid_map(pol, L, ptr, idx)
+        att, att_l, c0, seen = collections.Counter(), collections.Counter(), {}, set()
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1:
+                continue
+            if PL.is_own_turn(w, t):
+                seen.add((1 - w, t))
+                if int(rows["kind"][i]) == 0:
+                    sj = json.loads(rows["sig"][i])
+                    if sj[0] in ("ATTACK", "DON_BOX") and sj[2]:
+                        att[(1 - w, t)] += 1
+                        att_l[(1 - w, t)] += int(u2c.get(sj[2][0]) == lead[1 - w])
+            elif (w, t) not in c0:
+                has = False
+                for cid in DR.hand_ids(ex["ci"][i], idx2cid):
+                    inf = cinfo(cid)
+                    if inf is not None and not inf["cev"] and inf["counter"] == 0:
+                        has = True
+                c0[(w, t)] = has
+        for (d, t) in sorted(seen):
+            turns.append((lead[d], turn_band(t), att[(d, t)], att_l[(d, t)], c0.get((d, t))))
+
+    def blk(ts):
+        if not ts:
+            return None
+        def dist(k):
+            c = collections.Counter(min(3, x[k]) for x in ts)
+            return {("3+" if n == 3 else str(n)): round(c[n] / len(ts), 3) for n in range(4)}
+        known = [x for x in ts if x[4] is not None]
+        return {"turns": len(ts), "attacks": dist(2), "leader_attacks": dist(3),
+                "attacks_mean": round(float(np.mean([x[2] for x in ts])), 3),
+                "leader_attacks_mean": round(float(np.mean([x[3] for x in ts])), 3),
+                "hand_has_c0": round(sum(1 for x in known if x[4]) / len(known), 3) if known else None}
+    decks = sorted({x[0] for x in turns})
+    out = {"record": a.src, "by_deck": {d: {"all": blk([x for x in turns if x[0] == d]),
+                                            **{b: blk([x for x in turns if x[0] == d and x[1] == b]) for b in TURN_BANDS}} for d in decks}}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("defturns: turns %d" % len(turns))
+    return 0
+
+
+def cmd_parts(a):
+    """耐久を部品ごとに割る（2026-10-13・`2026-10-13_enel_parts.md` §1・1 回きり）。攻める席のターン先頭の行（損害の行・決着の宣言の前）ごとに、
+    守る席の耐久の 3 項（ライフ＝Θ − 手札 − 体・手札・体）と、その行から終局までの実際（ライフの減り × λ・守りの窓で消えた札の価値・
+    ブロックの回数 × ブロッカー 1 体の読み）を並べ、守る席のデッキ × 帯ごとに「実際の和 ÷ 理論の和」を、倒れた局／倒れなかった局（打ち切り）で出す。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    lam = 0.1362                                  # `leaves_to::LAM`
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    ck = json.load(open(a.clocks, encoding="utf-8"))
+    g2s = {int(r["g"]): int(r["seed"]) for r in ck["rows_out"]}
+    tseq, settled = collections.defaultdict(list), set()
+    for sd, w, t, done in ck["settled"]:
+        tseq[(int(sd), int(w))].append(int(t))
+        if done:
+            settled.add((int(sd), int(w), int(t)))
+    for k in tseq:
+        tseq[k].sort()
+    # 守りの窓で消えた札の価値（同じ相手のターンでは最大＝最初の窓を 1 回）
+    spent = collections.defaultdict(float)
+    with open(a.dump, encoding="utf-8") as f:
+        for line in f:
+            j = json.loads(line)
+            for g in j.get("guard") or []:
+                t, w, sp = int(g[0]), int(g[1]), g[12]
+                if sp is not None:
+                    k = (int(j["seed"]), w, t)
+                    spent[k] = max(spent[k], float(sp))
+    # 記録: 席ごとのライフの減り（ターンごと）・ブロックの回数（ターンごと）・勝敗
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    lost, blocks, zof = collections.defaultdict(float), collections.Counter(), {}
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig",),
+                                                    extra_fn=lambda dd, n: {"sc": np.asarray(dd["scalars"])[:n].astype(float)}):
+        seed = int(rows["seed"][idx[0]])
+        prev = {0: None, 1: None}
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i]); sc = ex["sc"][i]
+            zof[(seed, w)] = float(rows["z"][i])
+            for d, life in ((w, sc[0]), (1 - w, sc[1])):
+                if prev[d] is not None and life < prev[d] - 0.5:
+                    lost[(seed, d, t)] += prev[d] - life
+                prev[d] = life
+            if json.loads(rows["sig"][i])[0] == "SELECT_BLOCKER":
+                blocks[(seed, w, t)] += 1
+    def by_seat(dct):
+        out = collections.defaultdict(dict)
+        for (sd, dd, tt), v in dct.items():
+            out[(sd, dd)][tt] = out[(sd, dd)].get(tt, 0.0) + v
+        return out
+    lost_s, spent_s, blocks_s = by_seat(lost), by_seat(spent), by_seat(blocks)
+
+    def after(m, key, t):
+        return sum(v for tt, v in m.get(key, {}).items() if tt >= t)
+    recs = []
+    for r in ck["turn_harm"]:
+        seed = g2s.get(int(r["g"]))
+        if seed is None or seed not in games_meta:
+            continue
+        w = int(r["who"]); jj = int(r["j"]); ts = tseq.get((seed, w), [])
+        if jj >= len(ts):
+            continue
+        t = ts[jj]
+        if (seed, w, t) in settled:
+            continue
+        d = 1 - w
+        th, hh, bb = float(r["theta"]), float(r["th_hand"]), float(r["th_body"])
+        nb = int(r.get("d_blk_n") or 0)
+        per_b = bb / nb if nb > 0 else bb
+        a_life = lam * after(lost_s, (seed, d), t)
+        a_hand = after(spent_s, (seed, d), t)
+        a_body = per_b * after(blocks_s, (seed, d), t)
+        fell = (zof.get((seed, d)) or 0.0) < 0.5
+        recs.append({"leader": games_meta[seed]["leaders"][d], "band": turn_band(t), "fell": fell,
+                     "th": {"life": th - hh - bb, "hand": hh, "body": bb}, "ac": {"life": a_life, "hand": a_hand, "body": a_body}})
+
+    def blk(rs):
+        if not rs:
+            return None
+        out = {"rows": len(rs)}
+        for part in ("life", "hand", "body"):
+            st = sum(x["th"][part] for x in rs); sa = sum(x["ac"][part] for x in rs)
+            out[part] = {"theory": round(st / len(rs), 4), "actual": round(sa / len(rs), 4), "ratio": round(sa / st, 3) if st > 1e-12 else None}
+        return out
+    decks = sorted({x["leader"] for x in recs})
+    res = {}
+    for dk in decks + ["ALL"]:
+        rd = [x for x in recs if dk == "ALL" or x["leader"] == dk]
+        res[dk] = {}
+        for band in ("all",) + TURN_BANDS:
+            rb = [x for x in rd if band == "all" or x["band"] == band]
+            res[dk][band] = {"both": blk(rb), "fell": blk([x for x in rb if x["fell"]]), "survived": blk([x for x in rb if not x["fell"]])}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump({"record": a.src, "clocks": a.clocks, "dump": a.dump, "lam": lam, "parts": res}, f, ensure_ascii=False, indent=1)
+    print("parts: rows %d" % len(recs))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -873,8 +1381,43 @@ def main(argv=None):
     t.add_argument("--clocks", default=None)
     t.add_argument("--boot", type=int, default=BOOT)
     t.add_argument("--out", required=True)
+    dc = sub.add_parser("deckcal")
+    dc.add_argument("--in", dest="src", required=True)
+    dc.add_argument("--work", default=None)
+    dc.add_argument("--dump", default=None)
+    dc.add_argument("--clocks", default=None)
+    dc.add_argument("--focus", default="OP15-058", help="切り分けるデッキ（リーダー）")
+    dc.add_argument("--don-cap", default="rule10", choices=("rule10", "room"),
+                    help="ドンの検算の計画の上限: rule10＝min(10, 場＋2k)（2026-10-12 までの式）／room＝min(ドン‼デッキの枚数, 場＋2k)（候補）")
+    dc.add_argument("--boot", type=int, default=BOOT)
+    dc.add_argument("--out", required=True)
+    pc = sub.add_parser("paircal")
+    pc.add_argument("--in", dest="src", required=True)
+    pc.add_argument("--clocks", required=True)
+    pc.add_argument("--min-games", type=int, default=MIN_GAMES)
+    pc.add_argument("--boot", type=int, default=BOOT)
+    pc.add_argument("--out", required=True)
+    cs = sub.add_parser("clockside")
+    cs.add_argument("--in", dest="src", required=True)
+    cs.add_argument("--clocks", required=True)
+    cs.add_argument("--boot", type=int, default=BOOT)
+    cs.add_argument("--out", required=True)
+    gs = sub.add_parser("guardside")
+    gs.add_argument("--in", dest="src", required=True)
+    gs.add_argument("--dump", required=True, help="`guard` 欄つきの写し（`theory_bridge.py` を `OPCG_PRICE_DUMP` で・2026-10-12 以降）")
+    gs.add_argument("--out", required=True)
+    dt = sub.add_parser("defturns")
+    dt.add_argument("--in", dest="src", required=True)
+    dt.add_argument("--out", required=True)
+    pt = sub.add_parser("parts")
+    pt.add_argument("--in", dest="src", required=True)
+    pt.add_argument("--clocks", required=True)
+    pt.add_argument("--dump", required=True, help="`guard` 欄つきの写し")
+    pt.add_argument("--out", required=True)
     a = ap.parse_args(argv)
-    return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns}[a.cmd](a)
+    return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
+            "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
+            "defturns": cmd_defturns, "parts": cmd_parts}[a.cmd](a)
 
 
 if __name__ == "__main__":

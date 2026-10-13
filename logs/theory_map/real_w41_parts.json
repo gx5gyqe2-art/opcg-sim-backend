@@ -1,0 +1,1138 @@
+{
+ "record": "/home/user/data_rec/sigma_wip/data/w41",
+ "clocks": "/home/user/tm/la/clocks.json",
+ "dump": "/home/user/tm/don/guard_dump.jsonl",
+ "lam": 0.1362,
+ "parts": {
+  "OP09-001": {
+   "all": {
+    "both": {
+     "rows": 937,
+     "life": {
+      "theory": 0.5676,
+      "actual": 0.422,
+      "ratio": 0.743
+     },
+     "hand": {
+      "theory": 0.3883,
+      "actual": 0.1392,
+      "ratio": 0.358
+     },
+     "body": {
+      "theory": 0.1366,
+      "actual": 0.0872,
+      "ratio": 0.638
+     }
+    },
+    "fell": {
+     "rows": 332,
+     "life": {
+      "theory": 0.5456,
+      "actual": 0.5456,
+      "ratio": 1.0
+     },
+     "hand": {
+      "theory": 0.3502,
+      "actual": 0.1606,
+      "ratio": 0.459
+     },
+     "body": {
+      "theory": 0.13,
+      "actual": 0.1127,
+      "ratio": 0.867
+     }
+    },
+    "survived": {
+     "rows": 605,
+     "life": {
+      "theory": 0.5797,
+      "actual": 0.3541,
+      "ratio": 0.611
+     },
+     "hand": {
+      "theory": 0.4092,
+      "actual": 0.1274,
+      "ratio": 0.311
+     },
+     "body": {
+      "theory": 0.1402,
+      "actual": 0.0732,
+      "ratio": 0.522
+     }
+    }
+   },
+   "1-3": {
+    "both": {
+     "rows": 222,
+     "life": {
+      "theory": 0.681,
+      "actual": 0.5325,
+      "ratio": 0.782
+     },
+     "hand": {
+      "theory": 0.4298,
+      "actual": 0.2145,
+      "ratio": 0.499
+     },
+     "body": {
+      "theory": 0.0279,
+      "actual": 0.0361,
+      "ratio": 1.293
+     }
+    },
+    "fell": {
+     "rows": 78,
+     "life": {
+      "theory": 0.681,
+      "actual": 0.681,
+      "ratio": 1.0
+     },
+     "hand": {
+      "theory": 0.4145,
+      "actual": 0.2496,
+      "ratio": 0.602
+     },
+     "body": {
+      "theory": 0.0226,
+      "actual": 0.0324,
+      "ratio": 1.432
+     }
+    },
+    "survived": {
+     "rows": 144,
+     "life": {
+      "theory": 0.681,
+      "actual": 0.4521,
+      "ratio": 0.664
+     },
+     "hand": {
+      "theory": 0.4382,
+      "actual": 0.1955,
+      "ratio": 0.446
+     },
+     "body": {
+      "theory": 0.0307,
+      "actual": 0.038,
+      "ratio": 1.238
+     }
+    }
+   },
+   "4-6": {
+    "both": {
+     "rows": 213,
+     "life": {
+      "theory": 0.6401,
+      "actual": 0.4917,
+      "ratio": 0.768
+     },
+     "hand": {
+      "theory": 0.488,
+      "actual": 0.1685,
+      "ratio": 0.345
+     },
+     "body": {
+      "theory": 0.1615,
+      "actual": 0.1717,
+      "ratio": 1.063
+     }
+    },
+    "fell": {
+     "rows": 75,
+     "life": {
+      "theory": 0.6283,
+      "actual": 0.6283,
+      "ratio": 1.0
+     },
+     "hand": {
+      "theory": 0.4604,
+      "actual": 0.1981,
+      "ratio": 0.43
+     },
+     "body": {
+      "theory": 0.1657,
+      "actual": 0.2161,
+      "ratio": 1.304
+     }
+    },
+    "survived": {
+     "rows": 138,
+     "life": {
+      "theory": 0.6465,
+      "actual": 0.4175,
+      "ratio": 0.646
+     },
+     "hand": {
+      "theory": 0.5029,
+      "actual": 0.1523,
+      "ratio": 0.303
+     },
+     "body": {
+      "theory": 0.1592,
+      "actual": 0.1476,
+      "ratio": 0.927
+     }
+    }
+   },
+   "7+": {
+    "both": {
+     "rows": 502,
+     "life": {
+      "theory": 0.4867,
+      "actual": 0.3435,
+      "ratio": 0.706
+     },
+     "hand": {
+      "theory": 0.3276,
+      "actual": 0.0934,
+      "ratio": 0.285
+     },
+     "body": {
+      "theory": 0.1741,
+      "actual": 0.074,
+      "ratio": 0.425
+     }
+    },
+    "fell": {
+     "rows": 179,
+     "life": {
+      "theory": 0.452,
+      "actual": 0.452,
+      "ratio": 1.0
+     },
+     "hand": {
+      "theory": 0.276,
+      "actual": 0.1061,
+      "ratio": 0.384
+     },
+     "body": {
+      "theory": 0.1619,
+      "actual": 0.1043,
+      "ratio": 0.645
+     }
+    },
+    "survived": {
+     "rows": 323,
+     "life": {
+      "theory": 0.506,
+      "actual": 0.2834,
+      "ratio": 0.56
+     },
+     "hand": {
+      "theory": 0.3562,
+      "actual": 0.0864,
+      "ratio": 0.242
+     },
+     "body": {
+      "theory": 0.1809,
+      "actual": 0.0571,
+      "ratio": 0.316
+     }
+    }
+   }
+  },
+  "OP11-041": {
+   "all": {
+    "both": {
+     "rows": 847,
+     "life": {
+      "theory": 0.5632,
+      "actual": 0.5028,
+      "ratio": 0.893
+     },
+     "hand": {
+      "theory": 0.3591,
+      "actual": 0.3429,
+      "ratio": 0.955
+     },
+     "body": {
+      "theory": 0.0736,
+      "actual": 0.0309,
+      "ratio": 0.419
+     }
+    },
+    "fell": {
+     "rows": 196,
+     "life": {
+      "theory": 0.5223,
+      "actual": 0.7859,
+      "ratio": 1.505
+     },
+     "hand": {
+      "theory": 0.3242,
+      "actual": 0.4343,
+      "ratio": 1.34
+     },
+     "body": {
+      "theory": 0.082,
+      "actual": 0.0549,
+      "ratio": 0.669
+     }
+    },
+    "survived": {
+     "rows": 651,
+     "life": {
+      "theory": 0.5756,
+      "actual": 0.4176,
+      "ratio": 0.726
+     },
+     "hand": {
+      "theory": 0.3696,
+      "actual": 0.3154,
+      "ratio": 0.853
+     },
+     "body": {
+      "theory": 0.0711,
+      "actual": 0.0236,
+      "ratio": 0.332
+     }
+    }
+   },
+   "1-3": {
+    "both": {
+     "rows": 204,
+     "life": {
+      "theory": 0.5448,
+      "actual": 0.6122,
+      "ratio": 1.124
+     },
+     "hand": {
+      "theory": 0.4138,
+      "actual": 0.5014,
+      "ratio": 1.212
+     },
+     "body": {
+      "theory": 0.0125,
+      "actual": 0.0101,
+      "ratio": 0.811
+     }
+    },
+    "fell": {
+     "rows": 50,
+     "life": {
+      "theory": 0.5448,
+      "actual": 0.9507,
+      "ratio": 1.745
+     },
+     "hand": {
+      "theory": 0.3767,
+      "actual": 0.6003,
+      "ratio": 1.593
+     },
+     "body": {
+      "theory": 0.0097,
+      "actual": 0.0152,
+      "ratio": 1.571
+     }
+    },
+    "survived": {
+     "rows": 154,
+     "life": {
+      "theory": 0.5448,
+      "actual": 0.5023,
+      "ratio": 0.922
+     },
+     "hand": {
+      "theory": 0.4258,
+      "actual": 0.4692,
+      "ratio": 1.102
+     },
+     "body": {
+      "theory": 0.0134,
+      "actual": 0.0085,
+      "ratio": 0.633
+     }
+    }
+   },
+   "4-6": {
+    "both": {
+     "rows": 201,
+     "life": {
+      "theory": 0.5208,
+      "actual": 0.5475,
+      "ratio": 1.051
+     },
+     "hand": {
+      "theory": 0.4391,
+      "actual": 0.4425,
+      "ratio": 1.008
+     },
+     "body": {
+      "theory": 0.0855,
+      "actual": 0.0493,
+      "ratio": 0.577
+     }
+    },
+    "fell": {
+     "rows": 40,
+     "life": {
+      "theory": 0.4953,
+      "actual": 0.8478,
+      "ratio": 1.712
+     },
+     "hand": {
+      "theory": 0.422,
+      "actual": 0.5263,
+      "ratio": 1.247
+     },
+     "body": {
+      "theory": 0.1093,
+      "actual": 0.0695,
+      "ratio": 0.637
+     }
+    },
+    "survived": {
+     "rows": 161,
+     "life": {
+      "theory": 0.5271,
+      "actual": 0.4729,
+      "ratio": 0.897
+     },
+     "hand": {
+      "theory": 0.4434,
+      "actual": 0.4217,
+      "ratio": 0.951
+     },
+     "body": {
+      "theory": 0.0795,
+      "actual": 0.0443,
+      "ratio": 0.557
+     }
+    }
+   },
+   "7+": {
+    "both": {
+     "rows": 442,
+     "life": {
+      "theory": 0.5911,
+      "actual": 0.432,
+      "ratio": 0.731
+     },
+     "hand": {
+      "theory": 0.2975,
+      "actual": 0.2245,
+      "ratio": 0.754
+     },
+     "body": {
+      "theory": 0.0964,
+      "actual": 0.032,
+      "ratio": 0.332
+     }
+    },
+    "fell": {
+     "rows": 106,
+     "life": {
+      "theory": 0.5219,
+      "actual": 0.6849,
+      "ratio": 1.312
+     },
+     "hand": {
+      "theory": 0.2625,
+      "actual": 0.3212,
+      "ratio": 1.224
+     },
+     "body": {
+      "theory": 0.1059,
+      "actual": 0.0681,
+      "ratio": 0.643
+     }
+    },
+    "survived": {
+     "rows": 336,
+     "life": {
+      "theory": 0.6129,
+      "actual": 0.3523,
+      "ratio": 0.575
+     },
+     "hand": {
+      "theory": 0.3086,
+      "actual": 0.1939,
+      "ratio": 0.628
+     },
+     "body": {
+      "theory": 0.0934,
+      "actual": 0.0206,
+      "ratio": 0.221
+     }
+    }
+   }
+  },
+  "OP15-058": {
+   "all": {
+    "both": {
+     "rows": 873,
+     "life": {
+      "theory": 0.571,
+      "actual": 0.5453,
+      "ratio": 0.955
+     },
+     "hand": {
+      "theory": 0.4308,
+      "actual": 0.1893,
+      "ratio": 0.439
+     },
+     "body": {
+      "theory": 0.0816,
+      "actual": 0.0334,
+      "ratio": 0.41
+     }
+    },
+    "fell": {
+     "rows": 675,
+     "life": {
+      "theory": 0.57,
+      "actual": 0.57,
+      "ratio": 1.0
+     },
+     "hand": {
+      "theory": 0.4143,
+      "actual": 0.1889,
+      "ratio": 0.456
+     },
+     "body": {
+      "theory": 0.0805,
+      "actual": 0.0328,
+      "ratio": 0.407
+     }
+    },
+    "survived": {
+     "rows": 198,
+     "life": {
+      "theory": 0.5744,
+      "actual": 0.4609,
+      "ratio": 0.802
+     },
+     "hand": {
+      "theory": 0.4871,
+      "actual": 0.1905,
+      "ratio": 0.391
+     },
+     "body": {
+      "theory": 0.0852,
+      "actual": 0.0356,
+      "ratio": 0.417
+     }
+    }
+   },
+   "1-3": {
+    "both": {
+     "rows": 229,
+     "life": {
+      "theory": 0.681,
+      "actual": 0.6614,
+      "ratio": 0.971
+     },
+     "hand": {
+      "theory": 0.5352,
+      "actual": 0.2628,
+      "ratio": 0.491
+     },
+     "body": {
+      "theory": 0.0053,
+      "actual": 0.0026,
+      "ratio": 0.5
+     }
+    },
+    "fell": {
+     "rows": 185,
+     "life": {
+      "theory": 0.681,
+      "actual": 0.681,
+      "ratio": 1.0
+     },
+     "hand": {
+      "theory": 0.5179,
+      "actual": 0.2621,
+      "ratio": 0.506
+     },
+     "body": {
+      "theory": 0.0065,
+      "actual": 0.0032,
+      "ratio": 0.5
+     }
+    },
+    "survived": {
+     "rows": 44,
+     "life": {
+      "theory": 0.681,
+      "actual": 0.5788,
+      "ratio": 0.85
+     },
+     "hand": {
+      "theory": 0.6079,
+      "actual": 0.2658,
+      "ratio": 0.437
+     },
+     "body": {
+      "theory": 0.0,
+      "actual": 0.0,
+      "ratio": null
+     }
+    }
+   },
+   "4-6": {
+    "both": {
+     "rows": 248,
+     "life": {
+      "theory": 0.6426,
+      "actual": 0.6129,
+      "ratio": 0.954
+     },
+     "hand": {
+      "theory": 0.5262,
+      "actual": 0.2269,
+      "ratio": 0.431
+     },
+     "body": {
+      "theory": 0.0886,
+      "actual": 0.0547,
+      "ratio": 0.617
+     }
+    },
+    "fell": {
+     "rows": 187,
+     "life": {
+      "theory": 0.6395,
+      "actual": 0.6395,
+      "ratio": 1.0
+     },
+     "hand": {
+      "theory": 0.5122,
+      "actual": 0.2248,
+      "ratio": 0.439
+     },
+     "body": {
+      "theory": 0.0898,
+      "actual": 0.0561,
+      "ratio": 0.625
+     }
+    },
+    "survived": {
+     "rows": 61,
+     "life": {
+      "theory": 0.652,
+      "actual": 0.5314,
+      "ratio": 0.815
+     },
+     "hand": {
+      "theory": 0.5692,
+      "actual": 0.2332,
+      "ratio": 0.41
+     },
+     "body": {
+      "theory": 0.0847,
+      "actual": 0.0502,
+      "ratio": 0.593
+     }
+    }
+   },
+   "7+": {
+    "both": {
+     "rows": 396,
+     "life": {
+      "theory": 0.4626,
+      "actual": 0.4358,
+      "ratio": 0.942
+     },
+     "hand": {
+      "theory": 0.3107,
+      "actual": 0.1232,
+      "ratio": 0.397
+     },
+     "body": {
+      "theory": 0.1213,
+      "actual": 0.0379,
+      "ratio": 0.312
+     }
+    },
+    "fell": {
+     "rows": 303,
+     "life": {
+      "theory": 0.4594,
+      "actual": 0.4594,
+      "ratio": 1.0
+     },
+     "hand": {
+      "theory": 0.2906,
+      "actual": 0.1221,
+      "ratio": 0.42
+     },
+     "body": {
+      "theory": 0.12,
+      "actual": 0.0364,
+      "ratio": 0.303
+     }
+    },
+    "survived": {
+     "rows": 93,
+     "life": {
+      "theory": 0.473,
+      "actual": 0.3588,
+      "ratio": 0.759
+     },
+     "hand": {
+      "theory": 0.3761,
+      "actual": 0.1269,
+      "ratio": 0.337
+     },
+     "body": {
+      "theory": 0.1258,
+      "actual": 0.0428,
+      "ratio": 0.34
+     }
+    }
+   }
+  },
+  "OP16-022": {
+   "all": {
+    "both": {
+     "rows": 898,
+     "life": {
+      "theory": 0.4506,
+      "actual": 0.406,
+      "ratio": 0.901
+     },
+     "hand": {
+      "theory": 0.421,
+      "actual": 0.15,
+      "ratio": 0.356
+     },
+     "body": {
+      "theory": 0.0869,
+      "actual": 0.0917,
+      "ratio": 1.055
+     }
+    },
+    "fell": {
+     "rows": 517,
+     "life": {
+      "theory": 0.4555,
+      "actual": 0.4555,
+      "ratio": 1.0
+     },
+     "hand": {
+      "theory": 0.4167,
+      "actual": 0.1476,
+      "ratio": 0.354
+     },
+     "body": {
+      "theory": 0.0882,
+      "actual": 0.106,
+      "ratio": 1.202
+     }
+    },
+    "survived": {
+     "rows": 381,
+     "life": {
+      "theory": 0.444,
+      "actual": 0.3389,
+      "ratio": 0.763
+     },
+     "hand": {
+      "theory": 0.427,
+      "actual": 0.1533,
+      "ratio": 0.359
+     },
+     "body": {
+      "theory": 0.0852,
+      "actual": 0.0724,
+      "ratio": 0.85
+     }
+    }
+   },
+   "1-3": {
+    "both": {
+     "rows": 245,
+     "life": {
+      "theory": 0.5448,
+      "actual": 0.502,
+      "ratio": 0.921
+     },
+     "hand": {
+      "theory": 0.5081,
+      "actual": 0.2248,
+      "ratio": 0.442
+     },
+     "body": {
+      "theory": 0.0252,
+      "actual": 0.0405,
+      "ratio": 1.61
+     }
+    },
+    "fell": {
+     "rows": 147,
+     "life": {
+      "theory": 0.5448,
+      "actual": 0.5448,
+      "ratio": 1.0
+     },
+     "hand": {
+      "theory": 0.5179,
+      "actual": 0.227,
+      "ratio": 0.438
+     },
+     "body": {
+      "theory": 0.0276,
+      "actual": 0.0511,
+      "ratio": 1.852
+     }
+    },
+    "survived": {
+     "rows": 98,
+     "life": {
+      "theory": 0.5448,
+      "actual": 0.4378,
+      "ratio": 0.804
+     },
+     "hand": {
+      "theory": 0.4934,
+      "actual": 0.2216,
+      "ratio": 0.449
+     },
+     "body": {
+      "theory": 0.0215,
+      "actual": 0.0245,
+      "ratio": 1.143
+     }
+    }
+   },
+   "4-6": {
+    "both": {
+     "rows": 238,
+     "life": {
+      "theory": 0.5053,
+      "actual": 0.4601,
+      "ratio": 0.911
+     },
+     "hand": {
+      "theory": 0.5327,
+      "actual": 0.1784,
+      "ratio": 0.335
+     },
+     "body": {
+      "theory": 0.0995,
+      "actual": 0.1456,
+      "ratio": 1.463
+     }
+    },
+    "fell": {
+     "rows": 138,
+     "life": {
+      "theory": 0.5083,
+      "actual": 0.5083,
+      "ratio": 1.0
+     },
+     "hand": {
+      "theory": 0.5289,
+      "actual": 0.1712,
+      "ratio": 0.324
+     },
+     "body": {
+      "theory": 0.0987,
+      "actual": 0.1597,
+      "ratio": 1.618
+     }
+    },
+    "survived": {
+     "rows": 100,
+     "life": {
+      "theory": 0.5012,
+      "actual": 0.3936,
+      "ratio": 0.785
+     },
+     "hand": {
+      "theory": 0.5378,
+      "actual": 0.1882,
+      "ratio": 0.35
+     },
+     "body": {
+      "theory": 0.1007,
+      "actual": 0.1263,
+      "ratio": 1.254
+     }
+    }
+   },
+   "7+": {
+    "both": {
+     "rows": 415,
+     "life": {
+      "theory": 0.3636,
+      "actual": 0.3183,
+      "ratio": 0.875
+     },
+     "hand": {
+      "theory": 0.3056,
+      "actual": 0.0897,
+      "ratio": 0.293
+     },
+     "body": {
+      "theory": 0.1162,
+      "actual": 0.0911,
+      "ratio": 0.784
+     }
+    },
+    "fell": {
+     "rows": 232,
+     "life": {
+      "theory": 0.3675,
+      "actual": 0.3675,
+      "ratio": 1.0
+     },
+     "hand": {
+      "theory": 0.2857,
+      "actual": 0.0834,
+      "ratio": 0.292
+     },
+     "body": {
+      "theory": 0.1204,
+      "actual": 0.1088,
+      "ratio": 0.904
+     }
+    },
+    "survived": {
+     "rows": 183,
+     "life": {
+      "theory": 0.3587,
+      "actual": 0.256,
+      "ratio": 0.714
+     },
+     "hand": {
+      "theory": 0.3308,
+      "actual": 0.0977,
+      "ratio": 0.295
+     },
+     "body": {
+      "theory": 0.1109,
+      "actual": 0.0686,
+      "ratio": 0.619
+     }
+    }
+   }
+  },
+  "ALL": {
+   "all": {
+    "both": {
+     "rows": 3555,
+     "life": {
+      "theory": 0.5379,
+      "actual": 0.4675,
+      "ratio": 0.869
+     },
+     "hand": {
+      "theory": 0.4,
+      "actual": 0.2028,
+      "ratio": 0.507
+     },
+     "body": {
+      "theory": 0.0955,
+      "actual": 0.0617,
+      "ratio": 0.646
+     }
+    },
+    "fell": {
+     "rows": 1720,
+     "life": {
+      "theory": 0.5254,
+      "actual": 0.5555,
+      "ratio": 1.057
+     },
+     "hand": {
+      "theory": 0.3924,
+      "actual": 0.199,
+      "ratio": 0.507
+     },
+     "body": {
+      "theory": 0.0926,
+      "actual": 0.0727,
+      "ratio": 0.786
+     }
+    },
+    "survived": {
+     "rows": 1835,
+     "life": {
+      "theory": 0.5495,
+      "actual": 0.385,
+      "ratio": 0.701
+     },
+     "hand": {
+      "theory": 0.4073,
+      "actual": 0.2063,
+      "ratio": 0.506
+     },
+     "body": {
+      "theory": 0.0983,
+      "actual": 0.0514,
+      "ratio": 0.523
+     }
+    }
+   },
+   "1-3": {
+    "both": {
+     "rows": 900,
+     "life": {
+      "theory": 0.6131,
+      "actual": 0.5751,
+      "ratio": 0.938
+     },
+     "hand": {
+      "theory": 0.4743,
+      "actual": 0.2946,
+      "ratio": 0.621
+     },
+     "body": {
+      "theory": 0.0179,
+      "actual": 0.0229,
+      "ratio": 1.279
+     }
+    },
+    "fell": {
+     "rows": 460,
+     "life": {
+      "theory": 0.6227,
+      "actual": 0.6668,
+      "ratio": 1.071
+     },
+     "hand": {
+      "theory": 0.485,
+      "actual": 0.2855,
+      "ratio": 0.589
+     },
+     "body": {
+      "theory": 0.0163,
+      "actual": 0.0248,
+      "ratio": 1.519
+     }
+    },
+    "survived": {
+     "rows": 440,
+     "life": {
+      "theory": 0.603,
+      "actual": 0.4792,
+      "ratio": 0.795
+     },
+     "hand": {
+      "theory": 0.4631,
+      "actual": 0.3041,
+      "ratio": 0.657
+     },
+     "body": {
+      "theory": 0.0195,
+      "actual": 0.0209,
+      "ratio": 1.069
+     }
+    }
+   },
+   "4-6": {
+    "both": {
+     "rows": 900,
+     "life": {
+      "theory": 0.5785,
+      "actual": 0.5292,
+      "ratio": 0.915
+     },
+     "hand": {
+      "theory": 0.4994,
+      "actual": 0.2484,
+      "ratio": 0.497
+     },
+     "body": {
+      "theory": 0.108,
+      "actual": 0.1052,
+      "ratio": 0.974
+     }
+    },
+    "fell": {
+     "rows": 440,
+     "life": {
+      "theory": 0.5833,
+      "actual": 0.6154,
+      "ratio": 1.055
+     },
+     "hand": {
+      "theory": 0.5004,
+      "actual": 0.2309,
+      "ratio": 0.461
+     },
+     "body": {
+      "theory": 0.1073,
+      "actual": 0.1171,
+      "ratio": 1.091
+     }
+    },
+    "survived": {
+     "rows": 460,
+     "life": {
+      "theory": 0.5738,
+      "actual": 0.4468,
+      "ratio": 0.779
+     },
+     "hand": {
+      "theory": 0.4985,
+      "actual": 0.2651,
+      "ratio": 0.532
+     },
+     "body": {
+      "theory": 0.1087,
+      "actual": 0.0939,
+      "ratio": 0.864
+     }
+    }
+   },
+   "7+": {
+    "both": {
+     "rows": 1755,
+     "life": {
+      "theory": 0.4785,
+      "actual": 0.3807,
+      "ratio": 0.796
+     },
+     "hand": {
+      "theory": 0.311,
+      "actual": 0.1323,
+      "ratio": 0.425
+     },
+     "body": {
+      "theory": 0.1289,
+      "actual": 0.0593,
+      "ratio": 0.46
+     }
+    },
+    "fell": {
+     "rows": 820,
+     "life": {
+      "theory": 0.4399,
+      "actual": 0.4609,
+      "ratio": 1.048
+     },
+     "hand": {
+      "theory": 0.2824,
+      "actual": 0.1334,
+      "ratio": 0.472
+     },
+     "body": {
+      "theory": 0.1274,
+      "actual": 0.0758,
+      "ratio": 0.595
+     }
+    },
+    "survived": {
+     "rows": 935,
+     "life": {
+      "theory": 0.5123,
+      "actual": 0.3103,
+      "ratio": 0.606
+     },
+     "hand": {
+      "theory": 0.3361,
+      "actual": 0.1313,
+      "ratio": 0.391
+     },
+     "body": {
+      "theory": 0.1303,
+      "actual": 0.0448,
+      "ratio": 0.344
+     }
+    }
+   }
+  }
+ }
+}

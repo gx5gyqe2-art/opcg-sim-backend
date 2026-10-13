@@ -91,7 +91,7 @@ impl Core {
         let sc = &after.sc;
         let olp = lp_or(sc[lt::SC_OPP_LEADER_POWER]);
         let r = r_clip(sc[lt::SC_OPP_LIFE]);
-        let caps = caps_of(sc[lt::SC_MY_DON], lt::don_stock(sc, &after.tok, true), Some(r));
+        let caps = caps_of(sc[lt::SC_MY_DON], lt::don_stock(sc, &after.tok, true), Some(r), lt::don_room(sc, &after.tok, true));
         let row = after.row();
         let xs = self.incoming_of_row(&row, &V::None)?;
         let take = ld::take_cost_of(Some(sc[lt::SC_MY_LIFE]), MU, lt::theta_const());

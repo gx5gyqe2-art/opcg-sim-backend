@@ -268,19 +268,137 @@ fn seat_row(c: &mut Core, gs: &Gs, cut: &mut Option<CutFrames>, st: &mut D, w: i
     r
 }
 
+/// **【相手のアタック時】をその相手のターンの守る側のリーダーのパワーとして読む**（`docs/reports/2026-10-13_opp_attack_power.md`）。
+/// **2026-10-13 にユーザ決定で既定に採用**（「(a) 既定にする」）。`OPCG_OPP_ATTACK_POWER=0`（または `off`）で旧い形に戻す。
+pub fn opp_attack_power_on() -> bool {
+    !matches!(std::env::var("OPCG_OPP_ATTACK_POWER").as_deref(), Ok("0") | Ok("off"))
+}
+
+/// 時計の行（攻める側のターン）を、守る側の【相手のアタック時】の上げ下げで直す（§1.2）: 相手のリーダーのパワー（`sc`）に +X、
+/// 攻める側の一番大きい攻め手の札のパワー −X、守る側の手札の読みから捨てる札（カウンター 0 が在れば外さない・無ければ最小のカウンター札）を外す。
+pub(super) fn opp_attack_power_adjust(c: &mut Core, row: &Row, g_def: &V) -> Option<(Row, V)> {
+    let ci = row.ci.as_ref()?;
+    let sc = &row.sc;
+    let tok = &row.tok;
+    let mut srcs: Vec<(String, f64)> = Vec::new();
+    let mut printed = f64::INFINITY; // 守る側のリーダーの印字のパワー（上げ幅を既に使った行＝今のパワー ≥ 印字 + X なら足さない）
+    if let Some(l) = c.t.cid_of(ci[1]).filter(|x| !x.is_empty()) {
+        let l = l.to_string();
+        let pw = c.info(&l).get("power").f_or0();
+        if pw > 0.0 {
+            printed = pw;
+        }
+        srcs.push((l, sc[15] * 5.0));
+    }
+    for sl in lt::OPP_FIELD {
+        if let Some(x) = c.t.cid_of(ci[sl]).filter(|x| !x.is_empty()) {
+            srcs.push((x.to_string(), tok.at(sl, lt::S_ATTACHED_DON) * 5.0));
+        }
+    }
+    let (za, zr, zt, _zd) = super::rows::zones(sc, tok, false);
+    let eff = c.opp_attack_effects(&srcs, za + zr + zt);
+    if eff.is_empty() {
+        return None;
+    }
+    let hr = super::outer::hand_read_of(g_def);
+    let mut cards: Vec<(f64, f64)> = hr.as_ref().map(|h| h.cards.clone()).unwrap_or_default();
+    let n_hand = hr.as_ref().map(|h| h.n_hand).unwrap_or(0);
+    let mut c0_left = (n_hand - cards.len() as i64).max(0); // カウンター 0 の札の枚数
+    let mut hand_left = n_hand;
+    let (mut s2, mut t2) = (sc.clone(), tok.clone());
+    let mut changed_hand = false;
+    let current = sc[lt::SC_OPP_LEADER_POWER] * 1e4;
+    for (x, down, discard) in eff {
+        if !down && current + 1e-6 >= printed + x {
+            continue;
+        }
+        if discard {
+            if hr.is_none() || hand_left < 1 {
+                continue;
+            }
+            hand_left -= 1;
+            if c0_left > 0 {
+                c0_left -= 1;
+            } else if let Some((j, _)) = cards.iter().enumerate().min_by(|a, b| a.1 .0.partial_cmp(&b.1 .0).unwrap()) {
+                cards.remove(j);
+                changed_hand = true;
+            }
+        }
+        if down {
+            // 一番大きい攻め手（攻撃できるリーダー・キャラ）の札のパワー −X
+            let mut best: Option<(usize, f64)> = None;
+            if lt::leader_attacks_now(&t2) {
+                best = Some((0, t2.at(0, lt::S_POWER)));
+            }
+            for sl in lt::OWN_FIELD {
+                if t2.at(sl, lt::S_IS_CHAR) > 0.5 && t2.at(sl, lt::S_CAN_ATTACK) > 0.5 && best.map_or(true, |(_, p)| t2.at(sl, lt::S_POWER) > p) {
+                    best = Some((sl, t2.at(sl, lt::S_POWER)));
+                }
+            }
+            if let Some((sl, p)) = best {
+                t2.v[sl * t2.cols + lt::S_POWER] = p - x / 1e4;
+            }
+        } else {
+            s2[lt::SC_OPP_LEADER_POWER] += x / 1e4;
+        }
+    }
+    let dt = super::rows::ci_dtype(row);
+    let r2 = super::rows::row_of_f64(s2, t2, ci.clone(), &dt);
+    let g2 = if changed_hand {
+        let mut kv = g_def.kv().to_vec();
+        super::obj::dset_mut(&mut kv, "cards", V::list(cards.iter().map(|c| V::list(vec![V::Float(c.0), V::Float(c.1)])).collect()));
+        V::dict(kv)
+    } else {
+        g_def.clone()
+    };
+    Some((r2, g2))
+}
+
+thread_local! {
+    static GUARD_RATE: std::cell::RefCell<Option<(String, serde_json::Value)>> = const { std::cell::RefCell::new(None) };
+}
+
+/// **診断の切替 `OPCG_GUARD_RATE`**（`docs/reports/2026-10-13_defence_gap.md` §1・既定は切＝旧）: 耐久の手札の項に、守る席
+/// （行の相手＝枠 1 のリーダー）のデッキ・帯（1-3／4-6／7+・行のターン `t`）の「止められると読んだ窓で実際に止めた割合」q を掛ける。
+/// 値は JSON（`{"リーダー": {"1-3": q, "4-6": q, "7+": q}}`）のファイルの道か、`{` で始まる JSON そのもの。表に無いリーダーは 1（掛けない）。
+/// q を出した記録で測る診断であって、式の候補ではない。
+fn guard_rate_q(c: &Core, row: &Row, t: i64) -> Option<f64> {
+    let env = std::env::var("OPCG_GUARD_RATE").ok().filter(|s| !s.is_empty() && s != "0" && s != "off")?;
+    let ci = row.ci.as_ref()?;
+    let lead = c.t.cid_of(ci[1]).filter(|x| !x.is_empty())?.to_string();
+    let band = if t <= 3 { "1-3" } else if t <= 6 { "4-6" } else { "7+" };
+    GUARD_RATE.with(|g| {
+        let mut g = g.borrow_mut();
+        if g.as_ref().map(|(k, _)| k != &env).unwrap_or(true) {
+            let txt = if env.trim_start().starts_with('{') { env.clone() } else { std::fs::read_to_string(&env).expect("OPCG_GUARD_RATE: 読めない") };
+            let v: serde_json::Value = serde_json::from_str(&txt).expect("OPCG_GUARD_RATE: JSON でない");
+            *g = Some((env.clone(), v));
+        }
+        g.as_ref().unwrap().1.get(&lead).and_then(|m| m.get(band)).and_then(|q| q.as_f64())
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 fn seat_row_body(c: &mut Core, gs: &Gs, st: &mut D, w: i64, t: i64, j: i64, row: &Row, f_real: f64, t_left: i64, sink: bool) -> R<SeatD> {
     let mut snk = D::new();
     let (theta, mu) = (gs.cfg.theta, gs.cfg.mu);
+    let g_def = gs.g_for(if sink { &mut snk } else { &mut *st }, 1 - w, t);
+    let adj = if opp_attack_power_on() { opp_attack_power_adjust(c, row, &g_def) } else { None };
+    let (row, g_def) = match &adj {
+        Some((r2, g2)) => (r2, g2.clone()),
+        None => (row, g_def),
+    };
     let sc = &row.sc;
     let tok = &row.tok;
     let olp = lp_or(sc[lt::SC_OPP_LEADER_POWER]);
-    let g_def = gs.g_for(if sink { &mut snk } else { &mut *st }, 1 - w, t);
     let dk0 = gs.seat_deck(w);
     let mut actx: Option<Actx> = c.attacker_ctx(row, theta, mu, dk0.as_deref(), j == 0, None)?;
     let don_plan = c.rule_don_plan_for(row, &g_def, actx.as_mut())?;
     let hb = gs.hb_for(1 - w, t);
-    let (th_life, th_hand, th_body) = c.threshold_parts(row, &g_def, hb, actx.as_mut(), &don_plan)?;
+    let (th_life, mut th_hand, th_body) = c.threshold_parts(row, &g_def, hb, actx.as_mut(), &don_plan)?;
+    if let Some(q) = guard_rate_q(c, row, t) {
+        th_hand *= q;
+    }
     let th_hb = py_max(0.0, hb);
     let (shield, sh_rate) = (0.0, 0.0);
     let hb2 = gs.hb_for(1 - w, t);

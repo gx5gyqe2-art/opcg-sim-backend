@@ -77,6 +77,11 @@
           "title": "Cost",
           "type": "integer"
         },
+        "cost_mod": {
+          "default": 0,
+          "title": "Cost Mod",
+          "type": "integer"
+        },
         "counter": {
           "default": 0,
           "title": "Counter",
@@ -105,6 +110,19 @@
           "minimum": 0,
           "title": "Power",
           "type": "integer"
+        },
+        "power_mod": {
+          "default": 0,
+          "title": "Power Mod",
+          "type": "integer"
+        },
+        "statuses": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Statuses",
+          "type": "array"
         },
         "type": {
           "title": "Type",
@@ -168,6 +186,11 @@
               "title": "Cost",
               "type": "integer"
             },
+            "cost_mod": {
+              "default": 0,
+              "title": "Cost Mod",
+              "type": "integer"
+            },
             "counter": {
               "default": 0,
               "title": "Counter",
@@ -196,6 +219,19 @@
               "minimum": 0,
               "title": "Power",
               "type": "integer"
+            },
+            "power_mod": {
+              "default": 0,
+              "title": "Power Mod",
+              "type": "integer"
+            },
+            "statuses": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "title": "Statuses",
+              "type": "array"
             },
             "type": {
               "title": "Type",
@@ -350,6 +386,11 @@
             "don_deck_count": {
               "default": 10,
               "title": "Don Deck Count",
+              "type": "integer"
+            },
+            "don_frozen": {
+              "default": 0,
+              "title": "Don Frozen",
               "type": "integer"
             },
             "don_rested": {
@@ -545,6 +586,11 @@
               "title": "Cost",
               "type": "integer"
             },
+            "cost_mod": {
+              "default": 0,
+              "title": "Cost Mod",
+              "type": "integer"
+            },
             "counter": {
               "default": 0,
               "title": "Counter",
@@ -573,6 +619,19 @@
               "minimum": 0,
               "title": "Power",
               "type": "integer"
+            },
+            "power_mod": {
+              "default": 0,
+              "title": "Power Mod",
+              "type": "integer"
+            },
+            "statuses": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "title": "Statuses",
+              "type": "array"
             },
             "type": {
               "title": "Type",
@@ -604,6 +663,11 @@
             "don_deck_count": {
               "default": 10,
               "title": "Don Deck Count",
+              "type": "integer"
+            },
+            "don_frozen": {
+              "default": 0,
+              "title": "Don Frozen",
               "type": "integer"
             },
             "don_rested": {
@@ -759,6 +823,11 @@
               "title": "Cost",
               "type": "integer"
             },
+            "cost_mod": {
+              "default": 0,
+              "title": "Cost Mod",
+              "type": "integer"
+            },
             "counter": {
               "default": 0,
               "title": "Counter",
@@ -787,6 +856,19 @@
               "minimum": 0,
               "title": "Power",
               "type": "integer"
+            },
+            "power_mod": {
+              "default": 0,
+              "title": "Power Mod",
+              "type": "integer"
+            },
+            "statuses": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "title": "Statuses",
+              "type": "array"
             },
             "type": {
               "title": "Type",
@@ -911,6 +993,11 @@
               "title": "Cost",
               "type": "integer"
             },
+            "cost_mod": {
+              "default": 0,
+              "title": "Cost Mod",
+              "type": "integer"
+            },
             "counter": {
               "default": 0,
               "title": "Counter",
@@ -939,6 +1026,19 @@
               "minimum": 0,
               "title": "Power",
               "type": "integer"
+            },
+            "power_mod": {
+              "default": 0,
+              "title": "Power Mod",
+              "type": "integer"
+            },
+            "statuses": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "title": "Statuses",
+              "type": "array"
             },
             "type": {
               "title": "Type",
@@ -1025,6 +1125,11 @@
           "title": "Don Deck Count",
           "type": "integer"
         },
+        "don_frozen": {
+          "default": 0,
+          "title": "Don Frozen",
+          "type": "integer"
+        },
         "don_rested": {
           "items": {},
           "title": "Don Rested",
@@ -1086,6 +1191,11 @@
               "title": "Cost",
               "type": "integer"
             },
+            "cost_mod": {
+              "default": 0,
+              "title": "Cost Mod",
+              "type": "integer"
+            },
             "counter": {
               "default": 0,
               "title": "Counter",
@@ -1114,6 +1224,19 @@
               "minimum": 0,
               "title": "Power",
               "type": "integer"
+            },
+            "power_mod": {
+              "default": 0,
+              "title": "Power Mod",
+              "type": "integer"
+            },
+            "statuses": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "title": "Statuses",
+              "type": "array"
             },
             "type": {
               "title": "Type",

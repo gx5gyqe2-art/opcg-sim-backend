@@ -18,7 +18,7 @@ use crate::state::EngineError;
 use super::passive::apply_passive_effects;
 use super::{
     card_type, has_flag, has_keyword, has_timed_flag, KW_ATTACK_ACTIVE, KW_BANISH, KW_BLOCKER,
-    KW_DOUBLE_ATTACK, KW_RUSH,
+    KW_DOUBLE_ATTACK, KW_RUSH, KW_RUSH_CHAR, KW_UNBLOCKABLE,
 };
 
 fn bad(msg: impl Into<String>) -> EngineError {
@@ -31,6 +31,9 @@ fn bad(msg: impl Into<String>) -> EngineError {
 /// `BLOCKER_DISABLED` も見る）。Python のまま移す。
 pub fn has_blocker(s: &Session, seat: Seat) -> bool {
     let st = s.state();
+    if super::blocking_suppressed(st) {
+        return false;
+    }
     st.player(seat).field.iter().any(|c| {
         !st.card(*c).is_rest
             && has_keyword(st, *c, KW_BLOCKER)
@@ -72,13 +75,19 @@ pub fn declare_attack(
         ));
     }
     // 召喚酔い（登場したターンのキャラ。速攻を持てば可。リーダーは is_newly_played=false）。
+    // 【速攻:キャラ】は登場したターンにキャラへだけアタックできる（リーダーへは不可）。
     if card_type(s.state(), masters, attacker) == CardType::Character
         && s.state().card(attacker).is_newly_played
         && !has_keyword(s.state(), attacker, KW_RUSH)
+        && !(has_keyword(s.state(), attacker, KW_RUSH_CHAR)
+            && card_type(s.state(), masters, target) == CardType::Character)
     {
         return Err(bad(
             "登場したターンのキャラクターは攻撃できません（速攻を除く）。",
         ));
+    }
+    if super::attack_target_banned(s.state(), masters, attacker, target) {
+        return Err(bad("効果により、そのカードにはアタックできません。"));
     }
     if card_type(s.state(), masters, target) == CardType::Leader
         && super::active_restriction_mut(s, attacker_owner, "CANNOT_ATTACK_LEADER").is_some()
@@ -119,11 +128,23 @@ pub fn declare_attack(
         target_owner,
         counter_buff: 0,
     }));
+    record_char_battle(s, masters, attacker, target);
     // ON_ATTACK / ON_REST（アタック宣言によるレスト）/ ON_OPP_ATTACK を待ち行列へ積む。
     let queue =
         triggers::enqueue_battle_triggers(s, masters, attacker, attacker_owner, target_owner)?;
     s.edit().set_trigger_queue(TriggerQueue::Battle, queue);
     advance_battle_triggers(s, masters)
+}
+
+/// 「このターン中、相手のキャラとバトルしている」用: バトルした 2 枚のうち、相手が
+/// キャラクターである側へ `BATTLED_CHAR_<uuid>` を記録する（ターン切替で消える）。
+fn record_char_battle(s: &mut Session, masters: &MasterTable, a: CardIdx, b: CardIdx) {
+    for (me, other) in [(a, b), (b, a)] {
+        if masters.get(s.state().card(other).master).ty == crate::model::CardType::Character {
+            let name = format!("BATTLED_CHAR_{}", s.state().card(me).uuid);
+            ops::record_turn_event(s, &name, 1);
+        }
+    }
 }
 
 /// Python `_advance_battle_triggers`: 積んだトリガーを 1 つずつ解決し、
@@ -156,7 +177,10 @@ pub fn advance_battle_triggers(
     let Some(battle) = s.state().active_battle.clone() else {
         return Ok(());
     };
-    let phase = if has_blocker(s, battle.target_owner) {
+    // 【ブロック不可】のアタッカーはブロックされない（ブロッカーを構えていてもブロックステップを飛ばす）。
+    let phase = if has_blocker(s, battle.target_owner)
+        && !has_keyword(s.state(), battle.attacker, KW_UNBLOCKABLE)
+    {
         Phase::BlockStep
     } else {
         Phase::BattleCounter
@@ -181,6 +205,14 @@ pub fn handle_block(
         let mut updated = battle.clone();
         updated.target = blocker;
         s.edit().set_active_battle(Some(updated));
+        record_char_battle(s, masters, battle.attacker, blocker);
+        // 「相手が【ブロッカー】を発動した時」の誘発（消化は【ブロック時】の後）。
+        triggers::enqueue_activation_listeners(
+            s,
+            masters,
+            triggers::Activation::Blocker,
+            battle.target_owner,
+        )?;
         // 【ブロック時】効果を発動する。
         triggers::resolve_on_block(s, masters, blocker, battle.target_owner)?;
         if s.state().active_interaction().is_some() {
@@ -189,6 +221,9 @@ pub fn handle_block(
         }
     }
     s.edit().set_phase(Phase::BattleCounter);
+    if blocker.is_some() {
+        triggers::advance_pending_triggers(s, masters)?;
+    }
     Ok(())
 }
 
@@ -211,19 +246,23 @@ pub fn apply_counter(
         // `_register_granted_replacements` → トラッシュ。
         let cost = masters.get(s.state().card(counter_card).master).cost;
         ops::pay_cost(s, seat, cost, None)?;
+        triggers::enqueue_activation_listeners(s, masters, triggers::Activation::Event, seat)?;
         let ids = masters
             .get(s.state().card(counter_card).master)
             .ability_ids
             .clone();
-        for (index, id) in ids.iter().enumerate() {
-            if crate::effects::ability(masters, *id)?.trigger
-                == crate::effects::ast::TriggerType::Counter
-            {
-                crate::effects::resolver::game_resolve_ability(
-                    s, masters, seat, counter_card, index, false,
-                )?;
+        s.with_resolving_event(counter_card, |s| -> Result<(), EngineError> {
+            for (index, id) in ids.iter().enumerate() {
+                if crate::effects::ability(masters, *id)?.trigger
+                    == crate::effects::ast::TriggerType::Counter
+                {
+                    crate::effects::resolver::game_resolve_ability(
+                        s, masters, seat, counter_card, index, false,
+                    )?;
+                }
             }
-        }
+            Ok(())
+        })?;
         crate::effects::actions::rules::register_granted_replacements(
             s, masters, seat, counter_card,
         )?;
@@ -235,6 +274,7 @@ pub fn apply_counter(
             seat,
             Position::Bottom,
         )?;
+        triggers::advance_pending_triggers(s, masters)?;
         return Ok(());
     }
     let value = super::current_counter(s.state(), masters, counter_card);
@@ -296,6 +336,19 @@ pub fn resolve_attack(s: &mut Session, masters: &MasterTable) -> Result<(), Engi
                     trigger_ability_index(s, masters, life_card)?
                 };
                 let dest = if banish { Zone::Trash } else { Zone::Hand };
+                // 「表向きのライフは手札に加わる代わりにデッキの下に置かれる」（ST13-003）。
+                let dest = if dest == Zone::Hand
+                    && s.state().card(life_card).is_face_up
+                    && crate::effects::actions::rules::has_face_up_life_to_deck_rule(
+                        s,
+                        masters,
+                        target_owner,
+                    )?
+                {
+                    Zone::Deck
+                } else {
+                    dest
+                };
                 crate::effects::actions::move_card(
                     s,
                     masters,
@@ -309,6 +362,10 @@ pub fn resolve_attack(s: &mut Session, masters: &MasterTable) -> Result<(), Engi
                 if let Some(index) = trigger_ability {
                     triggers::enqueue_trigger(s, target_owner, life_card, index, true);
                 }
+            }
+            if life_lost > 0 {
+                triggers::enqueue_damage_dealt_listeners(s, masters, attacker, attacker_owner, life_lost)?;
+                triggers::enqueue_damaged_listeners(s, masters, target_owner, life_lost)?;
             }
         }
     } else if attacker_pwr >= target_pwr {
@@ -358,6 +415,7 @@ pub fn resolve_attack(s: &mut Session, masters: &MasterTable) -> Result<(), Engi
                         Position::Bottom,
                     )?;
                     triggers::resolve_on_ko(s, masters, target, target_owner, "BATTLE", None)?;
+                    triggers::enqueue_battle_ko_listeners(s, masters, attacker, attacker_owner)?;
                 }
             }
         }
@@ -392,6 +450,8 @@ pub fn finish_attack(
     target: CardIdx,
     life_lost: i32,
 ) -> Result<(), EngineError> {
+    // バトルの当事者（終了時の誘発と、ライフ離脱の行き先＝バニッシュの判定に使う）。
+    let battle = s.state().active_battle.clone();
     ops::reset_turn_status(s, masters, target, true, false);
     s.edit().set_active_battle(None);
     s.edit().set_phase(Phase::Main);
@@ -403,8 +463,24 @@ pub fn finish_attack(
         apply_passive_effects(s, masters, tp)?;
     }
     // ライフが離れた回数ぶん ON_LIFE_DECREASE を積み、【トリガー】と共に消化する。
+    if life_lost > 0 {
+        let defender = s.state().card(target).owner;
+        ops::record_life_left(s, defender, life_lost);
+    }
     if life_lost > 0 && s.state().winner.is_none() {
-        triggers::enqueue_life_decrease(s, masters, life_lost)?;
+        let life_owner = s.state().card(target).owner;
+        let to_hand = battle
+            .as_ref()
+            .map(|b| !has_keyword(s.state(), b.attacker, KW_BANISH))
+            .unwrap_or(true);
+        triggers::enqueue_life_decrease(s, masters, life_owner, life_lost, to_hand)?;
+    }
+    // 「このバトル終了時、〜」の遅延アクションと「…とバトルしたバトル終了時」の誘発。
+    if s.state().winner.is_none() {
+        triggers::flush_pending_battle_end(s, masters)?;
+        if let Some(b) = battle.as_ref() {
+            triggers::enqueue_battle_end_listeners(s, masters, b.attacker, b.target)?;
+        }
     }
     triggers::advance_pending_triggers(s, masters)
 }
@@ -413,28 +489,28 @@ pub fn finish_attack(
 /// の置換〔`VICTORY`／`REPLACE_DECKOUT_LOSS`・OP03-040 等〕を
 /// [`crate::effects::actions::rules::has_deckout_win_replace`] に接続した）。
 pub fn check_victory(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
-    if s.state().player(Seat::P1).deck.is_empty() {
-        let winner = if crate::effects::actions::rules::has_deckout_win_replace(
-            s,
-            masters,
-            Seat::P1,
-        )? {
-            Seat::P1
+    for seat in [Seat::P1, Seat::P2] {
+        if !s.state().player(seat).deck.is_empty() {
+            continue;
+        }
+        // 「ルール上、デッキが0枚でも敗北せず、0枚になったターン終了時に敗北する」（OP15-022）:
+        // 即敗北にせず記録だけ残し、ターン終了時（`end_turn`）に敗北させる。
+        if crate::effects::actions::rules::has_deckout_delay(s, masters, seat)? {
+            ops::record_turn_event(s, &deckout_delay_event(seat), 1);
+            continue;
+        }
+        let winner = if crate::effects::actions::rules::has_deckout_win_replace(s, masters, seat)? {
+            seat
         } else {
-            Seat::P2
+            seat.other()
         };
         s.edit().set_winner(Some(winner));
-    } else if s.state().player(Seat::P2).deck.is_empty() {
-        let winner = if crate::effects::actions::rules::has_deckout_win_replace(
-            s,
-            masters,
-            Seat::P2,
-        )? {
-            Seat::P2
-        } else {
-            Seat::P1
-        };
-        s.edit().set_winner(Some(winner));
+        break;
     }
     Ok(())
+}
+
+/// デッキ0枚の敗北を持ち越した事実の記録名（ターン内イベント）。
+pub fn deckout_delay_event(seat: Seat) -> String {
+    format!("DECKOUT_DELAY_{}", seat.name())
 }

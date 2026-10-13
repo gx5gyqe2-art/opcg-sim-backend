@@ -75,3 +75,22 @@ OPCG_THEORY_GOLDEN_WRITE=1 cargo test --no-default-features tests_regen -- --inc
 （`OPCG_THEORY_GOLDEN_WRITE` が無ければ書き換える行を数えるだけ。各行を試験と同じ道〔`tests_core`／`tests_outer`／`tests_rows` の
 `run_one`〕で解き、戻りが違う行だけ書き換える。**golden は「その時点の Rust の出力」**＝作り直したら差分を必ずレビューする。）
 
+
+### ドンの上限を盤面から読む候補（2026-10-12・`docs/reports/2026-10-12_don_deck.md`）
+
+理論の計画のドンの上限を「10 枚固定」から「場のドン＋ドン‼デッキの残り」（`leaves_to::don_room`）に直す候補は、**切替 `OPCG_DON_ROOM=1` のときだけ**入る
+（既定は旧＝golden は作り直していない・既定で 1 ビットも変わらない）。切替を入れて上の器を数えるだけで回すと、
+`theory_outer_golden` 107 行（`hp.search_context` 67・`tb.guard_hand_reading` 30・`cv.L`／`cv.gbar` 各 5）と `theory_rows_golden` 13 行が変わる。
+**変わる行は全部エネル（ドン‼デッキ 6 枚）の行**——上限が 10 未満になる呼び出しを数えて全部 6 だったことを確かめた（996 回）。
+既定に入れるときは、その時点で上の器（`OPCG_DON_ROOM=1 OPCG_THEORY_GOLDEN_WRITE=1`）で作り直す。
+
+### 耐久のライフの項の手札のライフ加算を既定に（2026-10-12・ユーザ決定「(a) 既定にする」・`docs/reports/2026-10-12_life_add.md`）
+
+`OPCG_LIFE_ADD` の既定を on に反転した（`=0`／`off` で旧い形）。上の器で `theory_rows_golden` の 43 行（`kappa_vector`・`transition_ledger`・
+`crossing_bridge`・`relative_ledger`・`theory_bridge` の記録・合成 w39 と記録の局）の戻りの欄を作り直した。`theory_core`・`theory_outer` は 0 行。
+作り直した後に器をもう一度回して 0 行・`OPCG_LIFE_ADD=0` で回すと同じ 43 行が旧い値に戻ることを確かめた。
+
+### 【相手のアタック時】をその相手のターンの守る側のリーダーのパワーとして読むのを既定に（2026-10-13・ユーザ決定「(a) 既定にする」・`docs/reports/2026-10-13_opp_attack_power.md`）
+
+`OPCG_OPP_ATTACK_POWER` の既定を on に反転した（`=0`／`off` で旧い形）。上の器で回すと `theory_core`・`theory_outer`・`theory_rows` とも書き換えた行 0。
+上げ幅・下げ幅を一時的に 100 倍にしても 0 行だった＝**golden の局には読む型（`BUFF` だけ）の【相手のアタック時】の持ち主が通る行が無い**（この口は golden では見張られていない。見張りは実 w41 の時計の 20 局のファイル一致で行った）。

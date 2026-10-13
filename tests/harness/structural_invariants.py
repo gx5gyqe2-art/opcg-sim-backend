@@ -7,6 +7,9 @@
 検出器（すべて現状 0 件＝ラチェット上限0。新規混入を機械的に検出する）:
 
   - H_LEADING_GATE_LEAK : 先頭ゲート条件が「。その後、」をまたいで後続を無条件化（カテゴリH 本体）
+  - H_COST_GATE_LIFT    : コスト（「：」の前）を持つ能力で、「：」の後ろ（効果側）の条件が能力全体の
+                          ability.condition へ持ち上がっている（条件偽でもコストは払え効果だけ不発になる
+                          ルールに反し、起動／誘発自体が止まる。ユーザ決定 2026-10-01）
   - DURATION_WRITEOFF   : 「このターン中/まで」等の時限テキストがあるのに付与系が duration=INSTANT
   - CHOOSER_MISSING     : 「相手は自身の…」で対象選択者が controller のまま（相手の隠匿札を自分が選ぶ）
   - SUBETE_COUNT_DEGRADE: 「すべて」なのに対象 count≥1 かつ select_mode が全体でない（数量詞の退化）
@@ -18,6 +21,7 @@
 import argparse
 import os
 import re
+import unicodedata
 
 import os as _os, sys as _sys  # noqa: E402  test bootstrap (sys.path + google stub)
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
@@ -33,7 +37,7 @@ DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.absp
                     "opcg_sim", "data", "opcg_cards.json")
 
 CATEGORIES = (
-    "H_LEADING_GATE_LEAK", "DURATION_WRITEOFF", "CHOOSER_MISSING", "SUBETE_COUNT_DEGRADE",
+    "H_LEADING_GATE_LEAK", "H_COST_GATE_LIFT", "DURATION_WRITEOFF", "CHOOSER_MISSING", "SUBETE_COUNT_DEGRADE",
 )
 
 # 時限テキスト（期間付き効果を意図する表現）。
@@ -84,6 +88,35 @@ def _scan_h(ab):
     return None
 
 
+def _cond_texts(c):
+    """条件木から raw_text を持つ葉の本文を集める（AND/OR は args を辿る）。"""
+    if c is None:
+        return []
+    out = [c.raw_text] if getattr(c, "raw_text", "") else []
+    for a in getattr(c, "args", None) or []:
+        out += _cond_texts(a)
+    return out
+
+
+def _scan_cost_gate_lift(ab):
+    """コストあり能力の ability.condition に、「：」より後ろの本文にしか現れない条件句が
+    持ち上がっていないか（`EffectParser` の「効果側条件は効果ノードに残す」定義と同一）。"""
+    if ab.cost is None or ab.condition is None:
+        return None
+    raw = unicodedata.normalize("NFC", ab.raw_text or "")
+    masked = re.sub(r"【[^】]*】", lambda m: "〇" * len(m.group(0)), raw)
+    m = re.search("[：:]", masked)
+    if not m:
+        return None
+    after = raw[m.end():]
+    before = raw[:m.start()]
+    for t in _cond_texts(ab.condition):
+        t = unicodedata.normalize("NFC", t)
+        if t and t in after and t not in before:
+            return t[:30]
+    return None
+
+
 def scan(db):
     """全カードを走査し、カテゴリ別に (card_id, trigger, detail) を返す。"""
     findings = {c: [] for c in CATEGORIES}
@@ -96,6 +129,9 @@ def scan(db):
             h = _scan_h(ab)
             if h:
                 findings["H_LEADING_GATE_LEAK"].append((cid, trig, h))
+            g = _scan_cost_gate_lift(ab)
+            if g:
+                findings["H_COST_GATE_LIFT"].append((cid, trig, g))
             for nd in (ab.cost, ab.effect):
                 for a in _walk(nd):
                     rt = a.raw_text or ""

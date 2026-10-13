@@ -1370,6 +1370,296 @@ impl Core {
         (Some(super::sp::remaining_deck(&d, &hand, &field)), !cards.is_none())
     }
 
+    /// **候補 `OPCG_LIFE_ADD`**（2026-10-12・`docs/reports/2026-10-12_life_add.md` §1.1）: 札 `cid` の【登場時】が自分のライフに加える枚数 `LA(c)`。
+    /// 加える分（`HEAL`／`LIFE_RECOVER` の値・行き先がライフで対象が相手でない動作の枚数〔トラッシュからは `trash_has_match` を掛ける〕・
+    /// 選択は選択肢の大きい方）− コストで離れる自分のライフ、に `condition_factor` を掛けて能力ごとに足す。コストを払えない能力（`cost_unpayable`）は 0。
+    /// 最後に 0 で下を切る。新定数なし（既存の読みの組み合わせ）。
+    pub fn life_add_on_play(&mut self, cid: &str, st: &V) -> f64 {
+        self.life_add_on_play_moves(cid, st).0
+    }
+
+    /// `life_add_on_play` と、手札からライフへ動かす動作ごとの（能力の条件の係数, 手札で条件に合う札）。
+    /// 手札から加える札（EB03-059・OP10-119 型）は、手札（出す札そのものを除く）に条件に合う札が無ければ 0 枚と読む
+    /// （2026-10-13 の正しさの直し・`docs/reports/2026-10-13_opp_attack.md` §2）。動かした札の手札の価値は呼び手（`rows.rs::with_life_add`）が引く。
+    pub fn life_add_on_play_moves(&mut self, cid: &str, st: &V) -> (f64, Vec<(f64, Vec<String>)>) {
+        let mut moves_all: Vec<(f64, Vec<String>)> = Vec::new();
+        let c = self.card(cid);
+        if !c.truthy() {
+            return (0.0, moves_all);
+        }
+        let mut tot = 0.0;
+        for ab in c.get("abilities").items().to_vec() {
+            if !trig_in(&trig_of(&ab), CHAR_ON_PLAY) {
+                continue;
+            }
+            let cost_acts = walk_actions(ab.get("cost"));
+            if !cost_acts.is_empty() && self.cost_unpayable(&cost_acts, &c, st) {
+                continue;
+            }
+            let f = self.condition_factor(&ab, st, false);
+            if f <= 0.0 {
+                continue;
+            }
+            let mut moved: Vec<Vec<String>> = Vec::new();
+            let gain = self.life_gain_of(ab.get("effect"), st, false, cid, &mut moved);
+            if gain <= 0.0 {
+                continue;
+            }
+            moves_all.extend(moved.into_iter().map(|m| (f, m)));
+            let mut lost = 0.0;
+            for e in &cost_acts {
+                let t = target_of(e);
+                if e.get("target").truthy() && side(&t) == "SELF" && zones_eq(&zone(&t, "zone"), &["LIFE"]) {
+                    let n = t.get("count");
+                    lost += if n.is_none() || n.f() < 0.0 { 1.0 } else { n.f() };
+                }
+            }
+            tot += f * (gain - lost);
+        }
+        (py_max(0.0, tot), moves_all)
+    }
+
+    /// **候補 `OPCG_OPP_ATTACK=1`**（`docs/reports/2026-10-13_opp_attack.md` §1.1）: 守る側の持ち主（リーダー・場のキャラ）の
+    /// 【相手のアタック時】（`ON_OPP_ATTACK`）のうち、効果の動作が全部パワーの上げ下げ（`BUFF`）の能力を、仮想のカウンター札にする。
+    /// `srcs` は (札, 付与中のドンの枚数)。戻り＝能力ごとに (X, ドンの費用, 捨てる手札の札の並び〔空＝捨てない〕)。
+    /// 条件は【ターン1回】（窓に 1 回）と【ドン‼×n】（付与中のドン ≥ n）だけ読み、他の条件・他の費用を持つ能力は読まない。
+    pub fn opp_attack_cards(&mut self, srcs: &[(String, f64)], items: &V, st: &V) -> Vec<(f64, f64, Vec<String>)> {
+        let mut out = Vec::new();
+        for (cid, att) in srcs {
+            let c = self.card(cid);
+            if !c.truthy() {
+                continue;
+            }
+            for ab in c.get("abilities").items().to_vec() {
+                if trig_of(&ab).str_or_empty() != "ON_OPP_ATTACK" {
+                    continue;
+                }
+                // 条件: AND／TURN_LIMIT／HAS_DON だけ（HAS_DON は付与中のドンで判定）
+                let mut ok = true;
+                let mut stack = vec![ab.get("condition").clone()];
+                while let Some(cd) = stack.pop() {
+                    if !cd.is_dict() {
+                        continue;
+                    }
+                    match s_of(&cd, "type").as_str() {
+                        "AND" | "TURN_LIMIT" | "" => {}
+                        "HAS_DON" => {
+                            if *att + 1e-9 < cd.get("value").f_or0() {
+                                ok = false;
+                            }
+                        }
+                        _ => ok = false,
+                    }
+                    for a in cd.get("args").items().to_vec() {
+                        stack.push(a);
+                    }
+                }
+                if !ok {
+                    continue;
+                }
+                // 効果: 動作が全部 BUFF・自分の側は上げ（+X）・相手の側は下げ（−X）
+                let acts = walk_actions(ab.get("effect"));
+                if acts.is_empty() || acts.iter().any(|e| s_of(e, "type") != "BUFF") {
+                    continue;
+                }
+                let mut x = 0.0f64;
+                for e in &acts {
+                    let m = magnitude(e);
+                    let opp = side(&target_of(e)) == "OPPONENT";
+                    if (opp && m < 0.0) || (!opp && m > 0.0) {
+                        x = x.max(m.abs());
+                    }
+                }
+                if x <= 0.0 {
+                    continue;
+                }
+                // 費用: DISCARD（手札の条件に合う札）・RETURN_DON（ドンの費用）・なし。他は読まない
+                let mut don_cost = 0.0;
+                let mut discard: Vec<String> = Vec::new();
+                for e in walk_actions(ab.get("cost")) {
+                    match s_of(&e, "type").as_str() {
+                        "RETURN_DON" => don_cost += py_max(1.0, magnitude(&e)),
+                        "DISCARD" => {
+                            let t = target_of(&e);
+                            let n = t.get("count");
+                            let n = if n.is_none() || n.f() < 1.0 { 1 } else { n.f() as usize };
+                            let m = if items.is_none() { Vec::new() } else { self.eligible_hand_cards(&t, items, None, st) };
+                            if m.len() < n {
+                                ok = false;
+                            }
+                            discard = m;
+                        }
+                        _ => ok = false,
+                    }
+                }
+                if ok {
+                    out.push((x, don_cost, discard));
+                }
+            }
+        }
+        out
+    }
+
+    /// **候補 `OPCG_OPP_ATTACK_POWER=1`**（`docs/reports/2026-10-13_opp_attack_power.md` §1.1）: 守る側の持ち主 `srcs`＝(札, 付与中のドン)
+    /// の【相手のアタック時】のうち、効果の動作が全部パワーの上げ下げ（`BUFF`）の能力ごとに (X, 下げ幅か, 手札 1 枚を捨てるか)。
+    /// 条件は【ターン1回】と【ドン‼×n】だけ読み、費用は「条件の無い手札 1 枚を捨てる」・「ドン‼−n」（`field_don` ≥ n）・なし だけ読む。
+    pub fn opp_attack_effects(&mut self, srcs: &[(String, f64)], field_don: f64) -> Vec<(f64, bool, bool)> {
+        let mut out = Vec::new();
+        for (cid, att) in srcs {
+            let c = self.card(cid);
+            if !c.truthy() {
+                continue;
+            }
+            for ab in c.get("abilities").items().to_vec() {
+                if trig_of(&ab).str_or_empty() != "ON_OPP_ATTACK" {
+                    continue;
+                }
+                let mut ok = true;
+                let mut stack = vec![ab.get("condition").clone()];
+                while let Some(cd) = stack.pop() {
+                    if !cd.is_dict() {
+                        continue;
+                    }
+                    match s_of(&cd, "type").as_str() {
+                        "AND" | "TURN_LIMIT" | "" => {}
+                        "HAS_DON" => {
+                            if *att + 1e-9 < cd.get("value").f_or0() {
+                                ok = false;
+                            }
+                        }
+                        _ => ok = false,
+                    }
+                    for a in cd.get("args").items().to_vec() {
+                        stack.push(a);
+                    }
+                }
+                let acts = walk_actions(ab.get("effect"));
+                if !ok || acts.is_empty() || acts.iter().any(|e| s_of(e, "type") != "BUFF") {
+                    continue;
+                }
+                let (mut up, mut down) = (0.0f64, 0.0f64);
+                for e in &acts {
+                    let m = magnitude(e);
+                    if side(&target_of(e)) == "OPPONENT" {
+                        if m < 0.0 {
+                            down = down.max(-m);
+                        }
+                    } else if m > 0.0 {
+                        up = up.max(m);
+                    }
+                }
+                let mut discard = false;
+                for e in walk_actions(ab.get("cost")) {
+                    match s_of(&e, "type").as_str() {
+                        "RETURN_DON" => {
+                            if field_don + 1e-9 < py_max(1.0, magnitude(&e)) {
+                                ok = false;
+                            }
+                        }
+                        "DISCARD" => {
+                            let t = target_of(&e);
+                            let filtered = ["card_type", "traits", "names", "attributes", "colors"].iter().any(|k| t.get(k).truthy())
+                                || t.get("cost_max").truthy()
+                                || t.get("power_max").truthy();
+                            let n = t.get("count");
+                            if filtered || (!n.is_none() && n.f() > 1.0) {
+                                ok = false;
+                            }
+                            discard = true;
+                        }
+                        _ => ok = false,
+                    }
+                }
+                if !ok {
+                    continue;
+                }
+                if up > 0.0 {
+                    out.push((up, false, discard));
+                } else if down > 0.0 {
+                    out.push((down, true, discard));
+                }
+            }
+        }
+        out
+    }
+
+    /// `life_add_on_play` の加える分（効果の木を下る・選択は大きい方）。
+    /// `from_life`＝同じ並びの前の動作が自分のライフを見て（`LOOK_LIFE`）並べ直しの場〔`TEMP`〕に出した＝そこからライフへ戻す動作は加算でない
+    /// （アイサ OP06-099「ライフの上から 1 枚を見て、ライフの上か下に置く」。2026-10-12 の訂正・報告 §1.1 の注記）。
+    fn life_gain_of(&mut self, e: &V, st: &V, from_life: bool, me: &str, moved: &mut Vec<Vec<String>>) -> f64 {
+        if !e.is_dict() {
+            return 0.0;
+        }
+        let opts = e.get("options");
+        if opts.is_list() && !opts.items().is_empty() {
+            let mut best = 0.0f64;
+            let mut best_mv: Vec<Vec<String>> = Vec::new();
+            for o in opts.items().to_vec() {
+                let mut mv: Vec<Vec<String>> = Vec::new();
+                let g = self.life_gain_of(&o, st, from_life, me, &mut mv);
+                if g > best {
+                    best = g;
+                    best_mv = mv;
+                }
+            }
+            moved.extend(best_mv);
+            return best;
+        }
+        let mut g = 0.0;
+        if e.get("type").truthy() {
+            let at = s_of(e, "type");
+            if at == "HEAL" || at == "LIFE_RECOVER" {
+                let m = magnitude(e);
+                g += if m > 0.0 { m } else { 1.0 };
+            } else if s_of(e, "destination") == "LIFE" {
+                let t = target_of(e);
+                let reorder = from_life && zones_eq(&zone(&t, "zone"), &["TEMP"]);
+                if !reorder && !(e.get("target").truthy() && side(&t) == "OPPONENT") {
+                    let n = t.get("count");
+                    let mut v = if n.is_none() || n.f() < 0.0 { 1.0 } else { n.f() };
+                    if zones_eq(&zone(&t, "zone"), &["TRASH"]) {
+                        if let Some(p) = self.trash_has_match(&t, st) {
+                            v *= p;
+                        }
+                    } else if zones_eq(&zone(&t, "zone"), &["HAND"]) {
+                        let items = st.get("search_ctx").get("hand_items").clone();
+                        if !items.is_none() {
+                            let m = self.eligible_hand_cards(&t, &items, Some(me), st);
+                            v = v.min(m.len() as f64);
+                            if v > 0.0 {
+                                moved.push(m);
+                            }
+                        }
+                    }
+                    g += v;
+                }
+            }
+        }
+        let sub = e.get("sub_effect");
+        if sub.is_dict() {
+            g += self.life_gain_of(sub, st, from_life, me, moved);
+        } else if sub.is_list() {
+            for x in sub.items().to_vec() {
+                g += self.life_gain_of(&x, st, from_life, me, moved);
+            }
+        }
+        for key in ["actions", "effects"] {
+            let v = e.get(key);
+            if v.is_list() {
+                let mut fl = from_life;
+                for x in v.items().to_vec() {
+                    g += self.life_gain_of(&x, st, fl, me, moved);
+                    if s_of(&x, "type") == "LOOK_LIFE" {
+                        fl = true;
+                    } else if s_of(&x, "type") == "LOOK" {
+                        fl = false;
+                    }
+                }
+            }
+        }
+        g
+    }
+
     /// `trash_has_match(target, st)`
     fn trash_has_match(&mut self, target: &V, st: &V) -> Option<f64> {
         let (pool, has_cards) = self.own_pool(st);
