@@ -1486,9 +1486,87 @@ def cmd_reread(a):
     return 0
 
 
+def cmd_speed(a):
+    """相手を削る速さの理論と実際（2026-10-14・`2026-10-14_attack_speed.md` §1・1 回きり）。攻める席のターン先頭の行（損害の行・決着の宣言の前）ごとに、
+    理論の見込み（`slope_theory`）と実際の耐久の減り（`harm`）を、攻める側のデッキ × 帯で比べる。記録から、そのターンの相手のライフの減り・
+    攻撃の数・相手のリーダーへの攻撃の数・相手のブロックの数（1 ターンあたり）も出す。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    games_meta = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    ck = json.load(open(a.clocks, encoding="utf-8"))
+    g2s = {int(r["g"]): int(r["seed"]) for r in ck["rows_out"]}
+    tseq, settled = collections.defaultdict(list), set()
+    for sd, w, t, done in ck["settled"]:
+        tseq[(int(sd), int(w))].append(int(t))
+        if done:
+            settled.add((int(sd), int(w), int(t)))
+    for k in tseq:
+        tseq[k].sort()
+    cols = ("sig", "who", "turn", "seed", "z", "kind", "step", "pol_len", "pol_chosen")
+    rec = collections.defaultdict(collections.Counter)          # (seed, w, t) → 量
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig", "pol_cid", "pol_tcid"),
+                                                    extra_fn=lambda dd, n: {"sc": np.asarray(dd["scalars"])[:n].astype(float)}):
+        seed = int(rows["seed"][idx[0]])
+        gm = games_meta.get(seed)
+        if gm is None:
+            continue
+        lead = gm["leaders"]
+        u2c = PL.uuid_map(pol, L, ptr, idx)
+        prev = {0: None, 1: None}
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i]); sc = ex["sc"][i]
+            if t < 1:
+                continue
+            life = {w: sc[0], 1 - w: sc[1]}
+            att = w if PL.is_own_turn(w, t) else 1 - w           # このターンの攻める席
+            if prev[1 - att] is not None and life[1 - att] < prev[1 - att] - 0.5:
+                rec[(seed, att, t)]["opp_life_lost"] += prev[1 - att] - life[1 - att]
+            for d in (0, 1):
+                prev[d] = life[d]
+            sj = json.loads(rows["sig"][i])
+            if w == att and int(rows["kind"][i]) == 0 and sj[0] in ("ATTACK", "DON_BOX") and sj[2]:
+                rec[(seed, att, t)]["attacks"] += 1
+                rec[(seed, att, t)]["leader_attacks"] += int(u2c.get(sj[2][0]) == lead[1 - att])
+            if w != att and sj[0] == "SELECT_BLOCKER":
+                rec[(seed, att, t)]["blocks"] += 1
+    recs = []
+    for r in ck["turn_harm"]:
+        seed = g2s.get(int(r["g"]))
+        if seed is None or seed not in games_meta:
+            continue
+        w = int(r["who"]); jj = int(r["j"]); ts = tseq.get((seed, w), [])
+        if jj >= len(ts):
+            continue
+        t = ts[jj]
+        if (seed, w, t) in settled:
+            continue
+        q = rec.get((seed, w, t), collections.Counter())
+        recs.append({"deck": games_meta[seed]["leaders"][w], "band": turn_band(t), "theory": float(r.get("slope_theory") or 0.0),
+                     "harm": float(r.get("harm") or 0.0), **{k: float(q.get(k, 0)) for k in ("opp_life_lost", "attacks", "leader_attacks", "blocks")}})
+
+    def blk(rs):
+        if not rs:
+            return None
+        n = len(rs)
+        st = sum(x["theory"] for x in rs); sh = sum(x["harm"] for x in rs)
+        la = sum(x["leader_attacks"] for x in rs); ll = sum(x["opp_life_lost"] for x in rs)
+        return {"turns": n, "theory_per_turn": round(st / n, 4), "harm_per_turn": round(sh / n, 4), "ratio": round(sh / st, 3) if st > 1e-12 else None,
+                "opp_life_lost_per_turn": round(ll / n, 3), "attacks_per_turn": round(sum(x["attacks"] for x in rs) / n, 3),
+                "leader_attacks_per_turn": round(la / n, 3), "life_per_leader_attack": round(ll / la, 3) if la else None,
+                "blocks_per_turn": round(sum(x["blocks"] for x in rs) / n, 3)}
+    decks = sorted({x["deck"] for x in recs})
+    out = {"record": a.src, "clocks": a.clocks, "by_deck": {d: {"all": blk([x for x in recs if x["deck"] == d]),
+                                                               **{b: blk([x for x in recs if x["deck"] == d and x["band"] == b]) for b in TURN_BANDS}}
+                                                           for d in decks}}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print("speed: rows %d" % len(recs))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1551,10 +1629,14 @@ def main(argv=None):
     rr = sub.add_parser("reread")
     rr.add_argument("--in", dest="src", required=True)
     rr.add_argument("--out", required=True)
+    sp = sub.add_parser("speed")
+    sp.add_argument("--in", dest="src", required=True)
+    sp.add_argument("--clocks", required=True)
+    sp.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
-            "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread}[a.cmd](a)
+            "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed}[a.cmd](a)
 
 
 if __name__ == "__main__":
