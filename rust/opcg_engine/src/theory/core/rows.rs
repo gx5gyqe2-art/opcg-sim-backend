@@ -50,6 +50,18 @@ pub fn life_add_on() -> bool {
     !matches!(std::env::var("OPCG_LIFE_ADD").as_deref(), Ok("0") | Ok("off"))
 }
 
+/// **候補 `OPCG_LIFE_ADD_HORIZON=1`**（`docs/reports/2026-10-13_life_add_horizon.md`）: ライフ加算の読む範囲を次のターンから
+/// 決着までの段（最大 `PLAN_TURNS`）へ伸ばす。既定は切（採用後の形＝次の自分のターンだけ）。
+pub fn life_add_horizon_on() -> bool {
+    matches!(std::env::var("OPCG_LIFE_ADD_HORIZON").as_deref(), Ok("1") | Ok("on"))
+}
+
+/// **候補 `OPCG_OPP_ATTACK=1`**（`docs/reports/2026-10-13_opp_attack.md`）: 守る側の【相手のアタック時】のパワーの上げ下げを、
+/// 耐久の手札の項のカウンター札の並びに仮想の札として足す。既定は切（旧）。
+pub fn opp_attack_on() -> bool {
+    matches!(std::env::var("OPCG_OPP_ATTACK").as_deref(), Ok("1") | Ok("on"))
+}
+
 /// 作り直した手札の読みに、元の読みの `life_add`／`life_add_by` を引き継ぐ（無ければそのまま＝既定の dict は 1 文字も変えない）
 fn carry_life_add(from: &V, to: V) -> V {
     if !from.has("life_add") {
@@ -375,8 +387,9 @@ impl Core {
                 Some(d) => d,
             };
             let hr = hand_read_of_items(&items, d_rule, mu, don);
-            if life_add_on() {
-                return self.with_life_add(hr, row, &ctx, &items);
+            let hr = if life_add_on() { self.with_life_add(hr, row, &ctx, &items)? } else { hr };
+            if opp_attack_on() {
+                return self.with_opp_attack(hr, row, &ctx, &items);
             }
             return Ok(hr);
         }
@@ -399,14 +412,27 @@ impl Core {
             if cid.is_empty() {
                 continue;
             }
-            let la = self.life_add_on_play(&cid, &st);
+            let (la, moves) = self.life_add_on_play_moves(&cid, &st);
             if la <= 0.0 {
                 continue;
             }
             let info0 = self.info(&cid);
             let info = if info0.truthy() { info0 } else { V::dict(vec![]) };
             let u = self.use_value(&cid, &info, olp, r, &V::None)?.unwrap_or(MU);
-            let gain = LAM * la - u;
+            // 手札からライフへ動かす札は、動かした札の手札の価値（条件に合う札のうち最小）も失う（2026-10-13 の直し）
+            let mut moved_u = 0.0;
+            for (f, m) in &moves {
+                let mut lo = f64::INFINITY;
+                for mc in m {
+                    let mi0 = self.info(mc);
+                    let mi = if mi0.truthy() { mi0 } else { V::dict(vec![]) };
+                    lo = lo.min(self.use_value(mc, &mi, olp, r, &V::None)?.unwrap_or(MU));
+                }
+                if lo.is_finite() {
+                    moved_u += f * lo;
+                }
+            }
+            let gain = LAM * la - u - moved_u;
             if gain > 0.0 {
                 cand.push((cid, it.get("cost").f_or0(), gain, la));
             }
@@ -414,9 +440,12 @@ impl Core {
         if cand.is_empty() {
             return Ok(hr);
         }
-        let budget = next_turn_don(sc, &row.tok);
         let deck = st.get("my_deck");
         let deck_n = if deck.is_none() { f64::INFINITY } else { deck.f() };
+        if life_add_horizon_on() {
+            return Ok(Self::life_add_horizon(hr, sc, &row.tok, r, deck_n, &cand));
+        }
+        let budget = next_turn_don(sc, &row.tok);
         let n = cand.len().min(12);
         let (mut best, mut best_m) = (0.0f64, 0usize);
         for m in 0..(1usize << n) {
@@ -442,6 +471,129 @@ impl Core {
         dset_mut(&mut kv, "life_add", V::Float(best));
         dset_mut(&mut kv, "life_add_by", V::list(by));
         Ok(V::dict(kv))
+    }
+
+    /// **候補 `OPCG_OPP_ATTACK=1`**（`docs/reports/2026-10-13_opp_attack.md` §1.1）: 持ち主（リーダー〔枠 0〕・場のキャラ）の
+    /// 【相手のアタック時】のパワーの上げ下げを仮想のカウンター札 (X, ドンの費用) として `cards` に足す。
+    /// 手札を捨てる能力は、条件に合う札のうち手札の価値（`v`）が最小の札を捨てる（1 枚 1 役・能力ごとに別の札）。
+    /// その札がカウンター札なら並びから外して置き換える（カウンター値が X 以上なら起動しない）。足した札の内訳は `opp_attack_by`。
+    fn with_opp_attack(&mut self, hr: V, row: &Row, ctx: &V, items: &[V]) -> R<V> {
+        let Some(ci) = row.ci.as_ref() else { return Ok(hr) };
+        let Some(h) = ou::hand_read_of(&hr) else { return Ok(hr) };
+        let sc = &row.sc;
+        let tok = &row.tok;
+        let mut srcs: Vec<(String, f64)> = Vec::new();
+        if let Some(l) = self.t.cid_of(ci[0]).filter(|c| !c.is_empty()) {
+            srcs.push((l.to_string(), sc[14] * 5.0));
+        }
+        for sl in lt::OWN_FIELD {
+            if let Some(c) = self.t.cid_of(ci[sl]).filter(|c| !c.is_empty()) {
+                srcs.push((c.to_string(), tok.at(sl, lt::S_ATTACHED_DON) * 5.0));
+            }
+        }
+        let st0 = self.state_of(sc, ci, Some(tok), true);
+        let st = super::obj::dset(&st0, "search_ctx", ctx.clone());
+        let items_v = V::list(items.to_vec());
+        let got = self.opp_attack_cards(&srcs, &items_v, &st);
+        if got.is_empty() {
+            return Ok(hr);
+        }
+        let mut cards = h.cards.clone();
+        let mut used: Vec<usize> = Vec::new(); // 捨てる札に選んだ手札の位置
+        let mut by: Vec<V> = Vec::new();
+        for (x, d, disc) in got {
+            if disc.is_empty() {
+                cards.push((x, d));
+                by.push(V::list(vec![V::Float(x), V::Float(d), V::None]));
+                continue;
+            }
+            // 条件に合う札のうち、まだ選んでいない、手札の価値が最小の札
+            let mut pick: Option<(usize, f64)> = None;
+            for (i, it) in items.iter().enumerate() {
+                if used.contains(&i) || !disc.contains(&it.get("cid").pystr()) {
+                    continue;
+                }
+                let v = if it.get("v").is_none() { MU } else { super::hp::v_scalar(it.get("v")) };
+                if pick.map_or(true, |(_, pv)| v < pv) {
+                    pick = Some((i, v));
+                }
+            }
+            let Some((i, _)) = pick else { continue };
+            let it = &items[i];
+            let c = it.get("counter").f_or0();
+            if c >= x {
+                continue;
+            }
+            if c > 0.0 {
+                let k = (c, if it.get("event").truthy() { it.get("cost").f_or0() } else { 0.0 });
+                if let Some(j) = cards.iter().position(|y| y.0 == k.0 && y.1 == k.1) {
+                    cards.remove(j);
+                }
+            }
+            used.push(i);
+            cards.push((x, d));
+            by.push(V::list(vec![V::Float(x), V::Float(d), it.get("cid").clone()]));
+        }
+        if by.is_empty() {
+            return Ok(hr);
+        }
+        let mut kv = hr.kv().to_vec();
+        dset_mut(&mut kv, "cards", V::list(cards.iter().map(|c| V::list(vec![V::Float(c.0), V::Float(c.1)])).collect()));
+        dset_mut(&mut kv, "opp_attack_by", V::list(by));
+        Ok(V::dict(kv))
+    }
+
+    /// **候補 `OPCG_LIFE_ADD_HORIZON=1`**（`docs/reports/2026-10-13_life_add_horizon.md` §1.1）: 段 t = 1..T
+    /// （T = min(`PLAN_TURNS`, round(r_turns))）の予算 = 場のドン ＋ min(2t, ドン‼デッキの残り)。
+    /// 各札を「出さない」か段 1 つに割り当て（段ごとのコストの和 ≤ 段の予算・LA の和 ≤ 山札）、Σ gain 最大を厳密に選ぶ。
+    fn life_add_horizon(hr: V, sc: &[f64], tok: &Tok, r: f64, deck_n: f64, cand: &[(String, f64, f64, f64)]) -> V {
+        let (act, rest, att, dk) = zones(sc, tok, true);
+        let t_n = (py_round_int(r).max(1) as usize).min(super::curve::PLAN_TURNS as usize);
+        let budgets: Vec<f64> = (1..=t_n).map(|t| act + rest + att + py_min(2.0 * t as f64, dk)).collect();
+        let n = cand.len().min(8);
+        let base = t_n + 1;
+        let total = base.pow(n as u32);
+        let (mut best, mut best_a) = (0.0f64, 0usize);
+        let mut used = vec![0.0f64; t_n];
+        for a in 0..total {
+            for u in used.iter_mut() {
+                *u = 0.0;
+            }
+            let (mut gain, mut la, mut x, mut ok) = (0.0, 0.0, a, true);
+            for c in cand.iter().take(n) {
+                let k = x % base;
+                x /= base;
+                if k == 0 {
+                    continue;
+                }
+                used[k - 1] += c.1;
+                if used[k - 1] > budgets[k - 1] + 1e-9 {
+                    ok = false;
+                    break;
+                }
+                gain += c.2;
+                la += c.3;
+            }
+            if ok && la <= deck_n + 1e-9 && gain > best {
+                best = gain;
+                best_a = a;
+            }
+        }
+        if best <= 0.0 {
+            return hr;
+        }
+        let mut by: Vec<V> = Vec::new();
+        let mut x = best_a;
+        for c in cand.iter().take(n) {
+            if x % base != 0 {
+                by.push(V::list(vec![V::s(&c.0), V::Float(c.2)]));
+            }
+            x /= base;
+        }
+        let mut kv = hr.kv().to_vec();
+        dset_mut(&mut kv, "life_add", V::Float(best));
+        dset_mut(&mut kv, "life_add_by", V::list(by));
+        V::dict(kv)
     }
 
     /// `life_types_of(deck_ids, cards=None, h)`
