@@ -793,5 +793,64 @@
         "logs/theory_map/real_w41_oppatkpow_guard_after.json"
       ]
     }
+  },
+  "reread_2026_10_14": {
+    "report": "docs/reports/2026-10-14_reread.md",
+    "s1_before_data": "a28ededa",
+    "kind": "diagnostic (records only) + baseline remeasure on the new engine",
+    "merge": "claude/cpu-spec-improvements-yw91jd @ 13404026 -> 71b3da94 (effects JSON regenerated: 3387 abilities)",
+    "E_body_gone_next_opp_turn": {
+      "enel_le2000": [
+        0.12,
+        "theory 0.278"
+      ],
+      "others_5000plus": "0.03-0.25"
+    },
+    "E_verdict": "missed (Enel small bodies survive more, not less)",
+    "N_trigger_proxy_per_game": {
+      "nami": 2.437,
+      "enel": 0.289,
+      "shanks": 0.207,
+      "luffy": 0.0
+    },
+    "N_nami_by_band": {
+      "1-3": 0.119,
+      "4-6": 0.133,
+      "7+": 2.185
+    },
+    "N_verdict": "held (but concentrated late; little bearing on Nami mid band)",
+    "new_engine_baseline": {
+      "hit": [
+        0.731,
+        0.726
+      ],
+      "nami": [
+        0.1148,
+        0.1226
+      ],
+      "nami_4_6": [
+        0.1762,
+        0.1906
+      ],
+      "enel": [
+        -0.1173,
+        -0.1188
+      ],
+      "shanks": [
+        0.012,
+        0.0085
+      ],
+      "luffy": [
+        0.0134,
+        0.0126
+      ],
+      "rows_changed": "2771/3547",
+      "cause": "theory side only (records unchanged)"
+    },
+    "logs": [
+      "logs/theory_map/real_w41_reread.json",
+      "logs/theory_map/real_w41_newengine_cal.json",
+      "logs/theory_map/real_w41_newengine_clockside.json"
+    ]
   }
 }
