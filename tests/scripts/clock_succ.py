@@ -169,6 +169,10 @@ def successor_follow(game, name, turn, mv, opts, slot, k):
     if int(f.turn_count or 0) != int(turn) or pend.get("player_id") != name or pend.get("action") != "MAIN_ACTION":
         return successor(game, name, turn, mv, opts)
     st, me, op, plies = follow_attack(f, name, turn, slot, k, opts)
+    if st == ST_ERR:
+        # エンジンが攻撃を拒んだ（効果で攻撃できない・レストにできない など）＝規則で打てない攻撃。
+        # その候補は 1 回殴らず、今の後続のまま（`2026-10-14_followup_plan_fix.md`）
+        return successor(game, name, turn, mv, opts)
     return st, me, op, r["plies"] + plies
 
 
