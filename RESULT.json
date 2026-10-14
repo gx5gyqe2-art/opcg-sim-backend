@@ -1,797 +1,1223 @@
 {
-  "branch": "claude/theory-map",
-  "base": "claude/cpu-spec-improvements-yw91jd@8feb1848",
-  "report": "docs/reports/2026-10-11_theory_map.md",
-  "tool": "tests/scripts/theory_map.py (one-off, no tests)",
-  "decision": "user 2026-10-11 'analysis first' (via coordinator); split: this worker = real w41 only, synth w39 = claude/theory-map-syn",
-  "partitions_fixed_before_data": "afc26604 (report §1)",
-  "theory": "default: post-move two-clock price, order-unknown; clocks = crossing_bridge (pre-settle off, settled marks); W = relative arm",
-  "records": {
-    "real_w41": {
-      "games": 300,
-      "table_match": "300/300",
-      "dump_rows": 18207,
-      "align_mismatch": 0,
-      "analysis_rows": 17563,
-      "rows_with_clock": 17291,
-      "json": "logs/theory_map/real_w41.json"
-    },
-    "syn_w39": {
-      "source": "claude/theory-map-syn @ dbaadf7f logs/theory_map/syn_w39.json (full 300; interim 260/300 version replaced)",
-      "rows": 15154,
-      "rows_with_clock": 14935,
-      "games": 300,
-      "q3_all": {
-        "diff": -0.0217,
-        "ci": [
-          -0.0398,
-          -0.0037
-        ]
-      },
-      "q3_clear_misses": [
-        "互角|4-6"
-      ]
-    }
+ "branch": "claude/theory-map",
+ "base": "claude/cpu-spec-improvements-yw91jd@8feb1848",
+ "report": "docs/reports/2026-10-11_theory_map.md",
+ "tool": "tests/scripts/theory_map.py (one-off, no tests)",
+ "decision": "user 2026-10-11 'analysis first' (via coordinator); split: this worker = real w41 only, synth w39 = claude/theory-map-syn",
+ "partitions_fixed_before_data": "afc26604 (report §1)",
+ "theory": "default: post-move two-clock price, order-unknown; clocks = crossing_bridge (pre-settle off, settled marks); W = relative arm",
+ "records": {
+  "real_w41": {
+   "games": 300,
+   "table_match": "300/300",
+   "dump_rows": 18207,
+   "align_mismatch": 0,
+   "analysis_rows": 17563,
+   "rows_with_clock": 17291,
+   "json": "logs/theory_map/real_w41.json"
   },
-  "min_games": 30,
-  "bootstrap": "games resampled, 2000 reps, 95% percentile, seed 0",
-  "leader_axis": "real: 4 user decks (135-161 seats) -> per-deck comparisons; synth: 139 leaders, max 9 games -> colour",
-  "findings_real": {
-    "q3_follow_vs_other": {
-      "diff": 0.0381,
-      "ci": [
-        0.0202,
-        0.0555
-      ]
-    },
-    "q3_clear_misses": 0,
-    "q3_hint_misses": [
-      "遅れ2+ (all bands) -0.006",
-      "互角|4-6 -0.013"
-    ],
-    "q1": "theory best-type mix nearly identical across colours; CPU attacks less (39-51% vs 60-73% from turn 4) and attaches/plays more",
-    "q2": "early: board attack power decides (AUC .75), durability reversed (.38); late: durability decides (.77), life .72, hand .65; bodies ~.52",
-    "q4": "opp big-body play turns -> my win .374 (all .527) while clocks barely move; opp removal turns -> my clock -0.41, my win .589",
-    "q5": "small-loss plays of lock/reduction/draw/blocker and leader activations lose 5-11% vs theory W; big-body plays and attacks when behind win more than W"
-  },
-  "next_fix_priority": [
-    "attack overpriced vs attach/play mid-game & behind (synth clear miss 互角|4-6 -0.096; real hint -0.013)",
-    "play/effect overpriced (blocker in both)",
-    "big bodies underpriced (both)",
-    "late even-race mover (real only)",
-    "early life sign (real only)"
-  ],
-  "gate": "make test green before push (cargo 474 passed 1 ignored / pytest 622 passed 12 skipped)",
-  "new_constants": 0,
-  "theory_code_changed": false,
-  "same_direction_both": [
-    "play:blocker small-loss plays lose vs W (CI<0 both)",
-    "attack when far behind wins vs W (CI>0 both)",
-    "play:big wins vs W (real CI>0, synth CI crosses 0)",
-    "CPU attacks less / attaches more than theory"
-  ],
-  "real_only": [
-    "q3 follow>other overall (synth reversed)",
-    "lock/draw/reduction/leader-activation overpriced",
-    "late even-race mover underestimated",
-    "early life sign reversed"
-  ],
-  "correction_2026_10_12": {
-    "error": "w41 is decks='user': meta_games.json leaders are the unused random pair; actual leaders = decks.user_deck_pair(seed) (checked: in all 300 games the leader cards seen in the record candidates are the user_deck_pair pair)",
-    "fix": "theory_map.seat_leaders: decks=='user' -> user_deck_pair; synth unchanged; analyze rerun from kept dump/clocks (prices and clocks read the board, not leader names)",
-    "unchanged_bitwise": [
-      "q3 all/by_gap/by_band/cells/marks",
-      "q5",
-      "q4 by_type/by_role/by_target/turn_clock",
-      "q1 by_band",
-      "q2 all/by_band/gap_band_winrate"
-    ],
-    "changed": [
-      "§1.3 leader count note",
-      "§3 deck×band (new) and colour tables",
-      "§4 deck columns",
-      "q3/q4 colour rows; deck rows added"
-    ],
-    "real_decks": {
-      "OP15-058 Enel (purple)": [
-        159,
-        0.22
-      ],
-      "OP16-022 Luffy (green/blue)": [
-        161,
-        0.41
-      ],
-      "OP09-001 Shanks (red)": [
-        145,
-        0.648
-      ],
-      "OP11-041 Nami (blue/yellow)": [
-        135,
-        0.778
-      ]
-    },
-    "q3_by_deck": {
-      "OP09-001": [
-        0.0395,
-        [
-          0.0058,
-          0.0728
-        ]
-      ],
-      "OP11-041": [
-        -0.0028,
-        [
-          -0.0301,
-          0.0257
-        ]
-      ],
-      "OP15-058": [
-        0.0655,
-        [
-          0.0437,
-          0.0883
-        ]
-      ],
-      "OP16-022": [
-        -0.0066,
-        [
-          -0.0386,
-          0.0254
-        ]
-      ]
-    },
-    "q1_old_claim_withdrawn": "'play style barely changes by colour' / 'leaders cannot be compared' were wrong for real decks; play style differs clearly by deck"
-  },
-  "turn_plans_2026_10_12": {
-    "report": "docs/reports/2026-10-12_turn_plans.md",
-    "s1_before_data": "1f3d2795",
-    "tool": "theory_map.py turns (f750773c)",
-    "real": {
-      "json": "logs/theory_map/real_w41_turns.json",
-      "attacked_when_rec_attack": "2307/2354 (98.0%)",
-      "iii_follow_diff": [
-        0.1649,
-        [
-          0.1139,
-          0.2138
-        ]
-      ],
-      "ii_b_minus_a": [
-        -0.1066,
-        [
-          -0.1485,
-          -0.062
-        ]
-      ]
-    },
-    "syn": {
-      "json": "logs/theory_map/syn_w39_turns.json (claude/theory-map-syn @ 19294474)",
-      "attacked_when_rec_attack": "97.6%",
-      "iii_follow_diff": [
-        0.082,
-        [
-          0.022,
-          0.135
-        ]
-      ],
-      "ii_b_minus_a": [
-        -0.0978,
-        [
-          -0.1384,
-          -0.0573
-        ]
-      ]
-    },
-    "answers": {
-      "mid_even_theory_loses": "gone in both (互角|4-6 insufficient at turn level; no negative cell with CI<0)",
-      "attack_overpriced_when_behind": "gone in both (CPU attacks on ~98% of attack-rec turns)",
-      "play_then_attack_beats_attack_only": "no (b-a about -0.10 in both; position effect, not order)"
-    },
-    "next_fix_priority_turn_unit": [
-      "play/effect overpriced (blocker in both)",
-      "big bodies underpriced",
-      "late even-race mover (real only)",
-      "early life sign (real only)",
-      "(dropped) attack overpriced vs attach/play"
+  "syn_w39": {
+   "source": "claude/theory-map-syn @ dbaadf7f logs/theory_map/syn_w39.json (full 300; interim 260/300 version replaced)",
+   "rows": 15154,
+   "rows_with_clock": 14935,
+   "games": 300,
+   "q3_all": {
+    "diff": -0.0217,
+    "ci": [
+     -0.0398,
+     -0.0037
     ]
-  },
-  "deckcal_2026_10_12": {
-    "report": "docs/reports/2026-10-12_turn_plans.md §11",
-    "tool": "theory_map.py deckcal",
-    "json": "logs/theory_map/real_w41_deckcal.json",
-    "calibration_win_minus_W": {
-      "Enel OP15-058": [
-        -0.1374,
-        [
-          -0.1788,
-          -0.0933
-        ]
-      ],
-      "Nami OP11-041": [
-        0.1588,
-        [
-          0.1048,
-          0.2166
-        ]
-      ],
-      "Shanks OP09-001": [
-        0.0191,
-        [
-          -0.0327,
-          0.069
-        ]
-      ],
-      "Luffy OP16-022": [
-        -0.0114,
-        [
-          -0.0654,
-          0.0435
-        ]
-      ]
-    },
-    "roles_without_enel": "lock -0.012, draw +0.011, reduction +0.038, leader activation +0.003 (all CI cross 0); blocker -0.046 [-0.105,+0.006]",
-    "enel_rows_all_types": "-0.11 to -0.18 (attack -0.122)",
-    "don_overestimate_enel": {
-      "step1_mean": 1.137,
-      "step2_mean": 2.095,
-      "step2_late": 3.893
-    },
-    "don_overestimate_others": 0.0,
-    "next_fix_priority": [
-      "Enel DON deck = 6 ignored by plan caps (curve.rs caps_of / hp.rs DON_CAP)",
-      "passive leader effects (Nami, Shanks) not priced",
-      "blocker play price",
-      "big body price",
-      "(dropped) role overpricing — was Enel calibration"
-    ]
-  },
-  "don_deck_2026_10_12": {
-    "report": "docs/reports/2026-10-12_don_deck.md",
-    "s1_before_data": "17af4477",
-    "switch": "OPCG_DON_ROOM=1 (default old = fixed 10, bit-identical)",
-    "code": [
-      "leaves_to::don_room",
-      "curve::caps_of(+room)",
-      "hp::project_state",
-      "drv_pr caller"
-    ],
-    "verdict": "kill criterion hit (Enel calibration did not shrink); decision on keeping for correctness → user (§9, recommend keep as switch)",
-    "invariants": {
-      "non_enel_clock_rows_identical": "1949/1949 turn-start, 2108/2108 per-turn",
-      "enel_rows_changed": "615/1598 turn-start, 184/1739 per-turn",
-      "switch_off_vs_old_20games": "227/227",
-      "switch_on_vs_candidate_20games": "227/227",
-      "theory_goldens_switch_on": "outer 107 + rows 13 rows change, all cap=6 (996 calls); switch off 0",
-      "gameplay_goldens": "unchanged"
-    },
-    "calibration_enel": {
-      "before": -0.1374,
-      "after": -0.1375,
-      "ci_after": [
-        -0.1789,
-        -0.0933
-      ]
-    },
-    "calibration_others_max_move": 0.0007,
-    "crossing_accuracy": {
-      "before": 0.7051,
-      "after": 0.7048
-    },
-    "don_overestimate_enel": {
-      "step1": [
-        1.137,
-        0.106
-      ],
-      "step2": [
-        2.095,
-        0.196
-      ]
-    },
-    "fallback_rows": "0 / 52433 (all scalars 127 wide)",
-    "why_no_effect": "clock DON series outer.rs::purse_series already capped by DON deck left; fixed-10 cap only reached hand plan (caps_of) and hp projection",
-    "s7_paircal": {
-      "json": "logs/theory_map/real_w41_paircal.json",
-      "enel_vs_luffy": -0.162,
-      "coordinator_prediction": "missed (predicted closer to 0 than -0.05)",
-      "nami_underread_vs_all": "+0.19..+0.24"
-    },
-    "s8_clockside": {
-      "json": "logs/theory_map/real_w41_clockside.json",
-      "enel": "defence overread (opp clock +0.74 in lost games; controls +0.04/+0.45); 'attack overread' prediction missed",
-      "nami": "defence underread (opp clock -0.84 in lost games); prediction held"
-    },
-    "pending": null,
-    "s10_guardside": {
-      "json": "logs/theory_map/real_w41_guardside.json",
-      "enel_can_but_took": 0.608,
-      "controls": {
-        "Shanks": 0.451,
-        "Luffy": 0.514,
-        "Nami": 0.334
-      },
-      "prediction1": "missed (1.2-1.35x, not 2x; Enel counter-0 share 29% not ~50%; payable counter share highest 0.71)",
-      "prediction2": "half (life added 2.22/game held; draw chances 0.08/game missed); theory reads neither (code)",
-      "code_fact": "no on-opponent-attack / on-life-leave trigger anywhere in rust theory; Θ life term = λ·current life"
-    },
-    "s11_prices": {
-      "price_rows_non_enel_identical": "9012/9012",
-      "enel_rows_changed": "2563/9195 (127 games)",
-      "enel_q5_all_small": [
-        -0.1288,
-        -0.1284
-      ],
-      "turn_iii_diff": [
-        0.1649,
-        0.164
-      ]
-    },
-    "s12_synth": {
-      "json": "logs/theory_map/syn_w39_dondeck.json",
-      "invariant": "294 non-Enel games 0 diff",
-      "calibration": "unchanged to 4 decimals",
-      "crossing": [
-        0.6703,
-        0.6703
-      ]
-    }
-  },
-  "life_add_2026_10_12": {
-    "report": "docs/reports/2026-10-12_life_add.md",
-    "s1_before_data": "8d3c746d",
-    "switch": "OPCG_LIFE_ADD=1 (default old)",
-    "verdict": "hold (Nami +0.1588 -> +0.1451: shrank but not to the 'worked' line +0.106; not killed)",
-    "calibration": {
-      "nami": [
-        0.1588,
-        0.1451
-      ],
-      "nami_bands": {
-        "1-3": [
-          0.2053,
-          0.2052
-        ],
-        "4-6": [
-          0.1918,
-          0.1763
-        ],
-        "7+": [
-          0.1243,
-          0.1068
-        ]
-      },
-      "others_max_move": 0.0035
-    },
-    "crossing": [
-      0.7051,
-      0.711
-    ],
-    "nami_lost_opp_clock": [
-      -0.843,
-      -0.616
-    ],
-    "invariant": {
-      "non_nami_rows_identical": 2087,
-      "nami_rows_changed": "584/1460",
-      "switch_off_20games": "227/227",
-      "theory_goldens_switch_off": 0,
-      "theory_goldens_switch_on": "rows 43"
-    },
-    "recommendation": "(b) keep as switch"
-  },
-  "life_add_horizon_2026_10_13": {
-    "report": "docs/reports/2026-10-13_life_add_horizon.md",
-    "s1_before_data": "2f5ba9cb",
-    "code": "03cb0906",
-    "switch": "OPCG_LIFE_ADD_HORIZON=1 (default off = adopted life-add form)",
-    "verdict": "killed by pre-registered criterion (early band moved 0.019 < 0.02); all other indicators improved",
-    "calibration": {
-      "nami": [
-        0.1451,
-        0.1367
-      ],
-      "nami_bands": {
-        "1-3": [
-          0.2052,
-          0.1862
-        ],
-        "4-6": [
-          0.1763,
-          0.1603
-        ],
-        "7+": [
-          0.1068,
-          0.1063
-        ]
-      },
-      "others_max_move": 0.0084
-    },
-    "crossing": [
-      0.711,
-      0.7155
-    ],
-    "nami_lost_opp_clock": [
-      -0.616,
-      -0.503
-    ],
-    "nami_rows_theta_changed": {
-      "1-3": "13/135",
-      "4-6": "21/204",
-      "7+": "14/515"
-    },
-    "invariant": {
-      "non_nami_rows_identical": 2087,
-      "nami_rows_changed": "354/1460",
-      "switch_off_20games": "identical file",
-      "theory_goldens_switch_off": 0
-    },
-    "logs": [
-      "logs/theory_map/real_w41_horizon_cal.json",
-      "logs/theory_map/real_w41_horizon_paircal.json",
-      "logs/theory_map/real_w41_horizon_clockside.json"
-    ],
-    "recommendation": "(b) do not adopt, keep as switch"
-  },
-  "opp_attack_2026_10_13": {
-    "report": "docs/reports/2026-10-13_opp_attack.md",
-    "s1_before_data": "4716a6be",
-    "code": {
-      "hand_life_fix": "ee9cdeee",
-      "switch": "88a78466"
-    },
-    "switch": "OPCG_OPP_ATTACK=1 (default off = old); durability hand term only (guard window and attack price not touched)",
-    "verdict": "killed by pre-registered criteria (Nami overall worsened +0.1451 -> +0.1512; Nami early moved 0.0015 < 0.02); Shanks moved toward zero",
-    "calibration": {
-      "nami": [
-        0.1451,
-        0.1512
-      ],
-      "nami_bands": {
-        "1-3": [
-          0.2052,
-          0.2067
-        ],
-        "4-6": [
-          0.1763,
-          0.1813
-        ],
-        "7+": [
-          0.1068,
-          0.115
-        ]
-      },
-      "shanks": [
-        0.0226,
-        0.0087
-      ],
-      "shanks_bands": {
-        "1-3": [
-          0.0458,
-          0.0349
-        ],
-        "4-6": [
-          0.0829,
-          0.0677
-        ],
-        "7+": [
-          -0.0133,
-          -0.0276
-        ]
-      },
-      "enel": [
-        -0.1345,
-        -0.1308
-      ],
-      "luffy": [
-        -0.0086,
-        -0.0015
-      ]
-    },
-    "crossing": [
-      0.711,
-      0.7147
-    ],
-    "pair": {
-      "nami_vs_shanks": [
-        0.173,
-        0.199
-      ],
-      "nami_vs_enel": [
-        0.226,
-        0.224
-      ],
-      "nami_vs_luffy": [
-        0.216,
-        0.213
-      ]
-    },
-    "invariant": {
-      "enel_luffy_only_games": 86,
-      "rows_identical": 951,
-      "switch_off_20games": "identical file",
-      "theory_goldens_switch_off": 0
-    },
-    "hand_life_fix": {
-      "real_w41": "bit-identical",
-      "synth_w39_clock_rows_changed": "17/3439 in 8 games",
-      "harm_rows_changed": 8,
-      "golden_rows": 0
-    },
-    "logs": [
-      "logs/theory_map/real_w41_oppatk_cal.json",
-      "logs/theory_map/real_w41_oppatk_paircal.json",
-      "logs/theory_map/real_w41_oppatk_clockside.json"
-    ],
-    "recommendation": "(b) do not adopt, keep as switch"
-  },
-  "defence_gap_2026_10_13": {
-    "report": "docs/reports/2026-10-13_defence_gap.md",
-    "s1_before_data": "3e48b54c",
-    "switch": "OPCG_GUARD_RATE=<path|json> (diagnostic, default off; q = 1 - can_but_took by defender deck x band, multiplied into the durability hand term)",
-    "kind": "diagnostic, not a formula candidate (q from the same record)",
-    "q": {
-      "OP09-001": {
-        "1-3": 0.542,
-        "4-6": 0.63,
-        "7+": 0.492
-      },
-      "OP11-041": {
-        "1-3": 0.333,
-        "4-6": 0.775,
-        "7+": 0.663
-      },
-      "OP15-058": {
-        "1-3": 0.518,
-        "4-6": 0.464,
-        "7+": 0.248
-      },
-      "OP16-022": {
-        "1-3": 0.527,
-        "4-6": 0.583,
-        "7+": 0.399
-      }
-    },
-    "verdict": "predictions missed -> the formula still lacks something: Enel all bands, Nami early/mid remain",
-    "calibration": {
-      "enel": [
-        -0.1345,
-        -0.1382
-      ],
-      "enel_bands": {
-        "1-3": [
-          -0.168,
-          -0.2002
-        ],
-        "4-6": [
-          -0.1706,
-          -0.1627
-        ],
-        "7+": [
-          -0.1036,
-          -0.1031
-        ]
-      },
-      "nami": [
-        0.1451,
-        0.1303
-      ],
-      "nami_bands": {
-        "1-3": [
-          0.2052,
-          0.2516
-        ],
-        "4-6": [
-          0.1763,
-          0.1605
-        ],
-        "7+": [
-          0.1068,
-          0.0707
-        ]
-      },
-      "luffy": [
-        -0.0086,
-        -0.0259
-      ],
-      "shanks": [
-        0.0226,
-        0.0157
-      ],
-      "all": [
-        0.0014,
-        -0.0092
-      ]
-    },
-    "crossing": [
-      0.711,
-      0.7133
-    ],
-    "clock_bias_all": {
-      "me": [
-        0.485,
-        -0.024
-      ],
-      "opp": [
-        0.366,
-        -0.058
-      ]
-    },
-    "nami_defending_turns": {
-      "turns": 887,
-      "leader_attacks_mean": 1.65,
-      "leader_attacks_2plus": 0.5,
-      "late_leader_attacks_2plus": 0.714,
-      "hand_has_c0": 0.815
-    },
-    "invariant": {
-      "switch_off_20games": "identical file",
-      "theory_goldens_switch_off": 0
-    },
-    "logs": [
-      "logs/theory_map/real_w41_guardrate_cal.json",
-      "logs/theory_map/real_w41_guardrate_paircal.json",
-      "logs/theory_map/real_w41_guardrate_clockside.json",
-      "logs/theory_map/real_w41_defturns.json"
-    ]
-  },
-  "enel_parts_2026_10_13": {
-    "report": "docs/reports/2026-10-13_enel_parts.md",
-    "s1_before_data": "b130b4b0",
-    "kind": "diagnostic (no formula change)",
-    "tool": "tests/scripts/theory_map.py parts",
-    "log": "logs/theory_map/real_w41_parts.json",
-    "ratio_actual_over_theory_all": {
-      "enel": {
-        "life": 0.955,
-        "hand": 0.439,
-        "body": 0.41
-      },
-      "luffy": {
-        "life": 0.901,
-        "hand": 0.356,
-        "body": 1.055
-      },
-      "shanks": {
-        "life": 0.743,
-        "hand": 0.358,
-        "body": 0.638
-      },
-      "nami": {
-        "life": 0.893,
-        "hand": 0.955,
-        "body": 0.419
-      }
-    },
-    "ratio_fell_only": {
-      "enel": {
-        "life": 1.0,
-        "hand": 0.456,
-        "body": 0.407
-      },
-      "luffy": {
-        "life": 1.0,
-        "hand": 0.354,
-        "body": 1.202
-      },
-      "shanks": {
-        "life": 1.0,
-        "hand": 0.459,
-        "body": 0.867
-      },
-      "nami": {
-        "life": 1.505,
-        "hand": 1.34,
-        "body": 0.669
-      }
-    },
-    "verdict": "prediction 'Enel hand term most off' missed (Enel 0.44 vs Luffy/Shanks 0.36); life term exact for non-life-adding decks in fell games; body small; the outlier is Nami (hand 0.96, life 1.5x in fell games)"
-  },
-  "opp_attack_power_2026_10_13": {
-    "report": "docs/reports/2026-10-13_opp_attack_power.md",
-    "s1_before_data": "3dbbfb79",
-    "code": "c0562ea2",
-    "switch": "OPCG_OPP_ATTACK_POWER=1 (default off); clock rows only (drv_cb seat_row_body): defender leader power +X for the turn, largest attacker -X, discard from hand reading",
-    "verdict": "no kill criterion hit; Nami early halved; Nami overall missed the 'worked' line by 0.009; hit rate +0.020",
-    "calibration": {
-      "nami": [
-        0.1451,
-        0.1148
-      ],
-      "nami_bands": {
-        "1-3": [
-          0.2052,
-          0.106
-        ],
-        "4-6": [
-          0.1763,
-          0.1762
-        ],
-        "7+": [
-          0.1068,
-          0.0847
-        ]
-      },
-      "shanks": [
-        0.0226,
-        0.012
-      ],
-      "shanks_bands": {
-        "4-6": [
-          0.0829,
-          0.0605
-        ]
-      },
-      "enel": [
-        -0.1345,
-        -0.1173
-      ],
-      "luffy": [
-        -0.0086,
-        0.0134
-      ]
-    },
-    "crossing": [
-      0.711,
-      0.731
-    ],
-    "nami_opp_clock": [
-      -0.616,
-      -0.119
-    ],
-    "shanks_opp_clock": [
-      0.038,
-      0.326
-    ],
-    "invariant": {
-      "enel_luffy_only_rows_identical": 951,
-      "switch_off_20games": "identical file"
-    },
-    "logs": [
-      "logs/theory_map/real_w41_oppatkpow_cal.json",
-      "logs/theory_map/real_w41_oppatkpow_paircal.json",
-      "logs/theory_map/real_w41_oppatkpow_clockside.json"
-    ],
-    "recommendation": "(a) adopt after adding the same entry to the guard window / price dump (§10)",
-    "finish": {
-      "code": "8775e827",
-      "clocks_identical_to_entry_only": true,
-      "turns_follow_diff": [
-        0.1749,
-        0.1694
-      ],
-      "turns_follow_band_1_3": [
-        0.0229,
-        -0.0076
-      ],
-      "q5_enel_all": [
-        -0.1242,
-        -0.1086
-      ],
-      "q5_others_all": [
-        0.0393,
-        0.0357
-      ],
-      "guard_nami": {
-        "windows": [
-          676,
-          634
-        ],
-        "can_share": [
-          0.611,
-          0.655
-        ],
-        "can_but_took": [
-          0.334,
-          0.354
-        ]
-      },
-      "logs": [
-        "logs/theory_map/real_w41_oppatkpow_turns_before.json",
-        "logs/theory_map/real_w41_oppatkpow_turns_after.json",
-        "logs/theory_map/real_w41_oppatkpow_q5_before.json",
-        "logs/theory_map/real_w41_oppatkpow_q5_after.json",
-        "logs/theory_map/real_w41_oppatkpow_guard_before.json",
-        "logs/theory_map/real_w41_oppatkpow_guard_after.json"
-      ]
-    }
+   },
+   "q3_clear_misses": [
+    "互角|4-6"
+   ]
   }
+ },
+ "min_games": 30,
+ "bootstrap": "games resampled, 2000 reps, 95% percentile, seed 0",
+ "leader_axis": "real: 4 user decks (135-161 seats) -> per-deck comparisons; synth: 139 leaders, max 9 games -> colour",
+ "findings_real": {
+  "q3_follow_vs_other": {
+   "diff": 0.0381,
+   "ci": [
+    0.0202,
+    0.0555
+   ]
+  },
+  "q3_clear_misses": 0,
+  "q3_hint_misses": [
+   "遅れ2+ (all bands) -0.006",
+   "互角|4-6 -0.013"
+  ],
+  "q1": "theory best-type mix nearly identical across colours; CPU attacks less (39-51% vs 60-73% from turn 4) and attaches/plays more",
+  "q2": "early: board attack power decides (AUC .75), durability reversed (.38); late: durability decides (.77), life .72, hand .65; bodies ~.52",
+  "q4": "opp big-body play turns -> my win .374 (all .527) while clocks barely move; opp removal turns -> my clock -0.41, my win .589",
+  "q5": "small-loss plays of lock/reduction/draw/blocker and leader activations lose 5-11% vs theory W; big-body plays and attacks when behind win more than W"
+ },
+ "next_fix_priority": [
+  "attack overpriced vs attach/play mid-game & behind (synth clear miss 互角|4-6 -0.096; real hint -0.013)",
+  "play/effect overpriced (blocker in both)",
+  "big bodies underpriced (both)",
+  "late even-race mover (real only)",
+  "early life sign (real only)"
+ ],
+ "gate": "make test green before push (cargo 474 passed 1 ignored / pytest 622 passed 12 skipped)",
+ "new_constants": 0,
+ "theory_code_changed": false,
+ "same_direction_both": [
+  "play:blocker small-loss plays lose vs W (CI<0 both)",
+  "attack when far behind wins vs W (CI>0 both)",
+  "play:big wins vs W (real CI>0, synth CI crosses 0)",
+  "CPU attacks less / attaches more than theory"
+ ],
+ "real_only": [
+  "q3 follow>other overall (synth reversed)",
+  "lock/draw/reduction/leader-activation overpriced",
+  "late even-race mover underestimated",
+  "early life sign reversed"
+ ],
+ "correction_2026_10_12": {
+  "error": "w41 is decks='user': meta_games.json leaders are the unused random pair; actual leaders = decks.user_deck_pair(seed) (checked: in all 300 games the leader cards seen in the record candidates are the user_deck_pair pair)",
+  "fix": "theory_map.seat_leaders: decks=='user' -> user_deck_pair; synth unchanged; analyze rerun from kept dump/clocks (prices and clocks read the board, not leader names)",
+  "unchanged_bitwise": [
+   "q3 all/by_gap/by_band/cells/marks",
+   "q5",
+   "q4 by_type/by_role/by_target/turn_clock",
+   "q1 by_band",
+   "q2 all/by_band/gap_band_winrate"
+  ],
+  "changed": [
+   "§1.3 leader count note",
+   "§3 deck×band (new) and colour tables",
+   "§4 deck columns",
+   "q3/q4 colour rows; deck rows added"
+  ],
+  "real_decks": {
+   "OP15-058 Enel (purple)": [
+    159,
+    0.22
+   ],
+   "OP16-022 Luffy (green/blue)": [
+    161,
+    0.41
+   ],
+   "OP09-001 Shanks (red)": [
+    145,
+    0.648
+   ],
+   "OP11-041 Nami (blue/yellow)": [
+    135,
+    0.778
+   ]
+  },
+  "q3_by_deck": {
+   "OP09-001": [
+    0.0395,
+    [
+     0.0058,
+     0.0728
+    ]
+   ],
+   "OP11-041": [
+    -0.0028,
+    [
+     -0.0301,
+     0.0257
+    ]
+   ],
+   "OP15-058": [
+    0.0655,
+    [
+     0.0437,
+     0.0883
+    ]
+   ],
+   "OP16-022": [
+    -0.0066,
+    [
+     -0.0386,
+     0.0254
+    ]
+   ]
+  },
+  "q1_old_claim_withdrawn": "'play style barely changes by colour' / 'leaders cannot be compared' were wrong for real decks; play style differs clearly by deck"
+ },
+ "turn_plans_2026_10_12": {
+  "report": "docs/reports/2026-10-12_turn_plans.md",
+  "s1_before_data": "1f3d2795",
+  "tool": "theory_map.py turns (f750773c)",
+  "real": {
+   "json": "logs/theory_map/real_w41_turns.json",
+   "attacked_when_rec_attack": "2307/2354 (98.0%)",
+   "iii_follow_diff": [
+    0.1649,
+    [
+     0.1139,
+     0.2138
+    ]
+   ],
+   "ii_b_minus_a": [
+    -0.1066,
+    [
+     -0.1485,
+     -0.062
+    ]
+   ]
+  },
+  "syn": {
+   "json": "logs/theory_map/syn_w39_turns.json (claude/theory-map-syn @ 19294474)",
+   "attacked_when_rec_attack": "97.6%",
+   "iii_follow_diff": [
+    0.082,
+    [
+     0.022,
+     0.135
+    ]
+   ],
+   "ii_b_minus_a": [
+    -0.0978,
+    [
+     -0.1384,
+     -0.0573
+    ]
+   ]
+  },
+  "answers": {
+   "mid_even_theory_loses": "gone in both (互角|4-6 insufficient at turn level; no negative cell with CI<0)",
+   "attack_overpriced_when_behind": "gone in both (CPU attacks on ~98% of attack-rec turns)",
+   "play_then_attack_beats_attack_only": "no (b-a about -0.10 in both; position effect, not order)"
+  },
+  "next_fix_priority_turn_unit": [
+   "play/effect overpriced (blocker in both)",
+   "big bodies underpriced",
+   "late even-race mover (real only)",
+   "early life sign (real only)",
+   "(dropped) attack overpriced vs attach/play"
+  ]
+ },
+ "deckcal_2026_10_12": {
+  "report": "docs/reports/2026-10-12_turn_plans.md §11",
+  "tool": "theory_map.py deckcal",
+  "json": "logs/theory_map/real_w41_deckcal.json",
+  "calibration_win_minus_W": {
+   "Enel OP15-058": [
+    -0.1374,
+    [
+     -0.1788,
+     -0.0933
+    ]
+   ],
+   "Nami OP11-041": [
+    0.1588,
+    [
+     0.1048,
+     0.2166
+    ]
+   ],
+   "Shanks OP09-001": [
+    0.0191,
+    [
+     -0.0327,
+     0.069
+    ]
+   ],
+   "Luffy OP16-022": [
+    -0.0114,
+    [
+     -0.0654,
+     0.0435
+    ]
+   ]
+  },
+  "roles_without_enel": "lock -0.012, draw +0.011, reduction +0.038, leader activation +0.003 (all CI cross 0); blocker -0.046 [-0.105,+0.006]",
+  "enel_rows_all_types": "-0.11 to -0.18 (attack -0.122)",
+  "don_overestimate_enel": {
+   "step1_mean": 1.137,
+   "step2_mean": 2.095,
+   "step2_late": 3.893
+  },
+  "don_overestimate_others": 0.0,
+  "next_fix_priority": [
+   "Enel DON deck = 6 ignored by plan caps (curve.rs caps_of / hp.rs DON_CAP)",
+   "passive leader effects (Nami, Shanks) not priced",
+   "blocker play price",
+   "big body price",
+   "(dropped) role overpricing — was Enel calibration"
+  ]
+ },
+ "don_deck_2026_10_12": {
+  "report": "docs/reports/2026-10-12_don_deck.md",
+  "s1_before_data": "17af4477",
+  "switch": "OPCG_DON_ROOM=1 (default old = fixed 10, bit-identical)",
+  "code": [
+   "leaves_to::don_room",
+   "curve::caps_of(+room)",
+   "hp::project_state",
+   "drv_pr caller"
+  ],
+  "verdict": "kill criterion hit (Enel calibration did not shrink); decision on keeping for correctness → user (§9, recommend keep as switch)",
+  "invariants": {
+   "non_enel_clock_rows_identical": "1949/1949 turn-start, 2108/2108 per-turn",
+   "enel_rows_changed": "615/1598 turn-start, 184/1739 per-turn",
+   "switch_off_vs_old_20games": "227/227",
+   "switch_on_vs_candidate_20games": "227/227",
+   "theory_goldens_switch_on": "outer 107 + rows 13 rows change, all cap=6 (996 calls); switch off 0",
+   "gameplay_goldens": "unchanged"
+  },
+  "calibration_enel": {
+   "before": -0.1374,
+   "after": -0.1375,
+   "ci_after": [
+    -0.1789,
+    -0.0933
+   ]
+  },
+  "calibration_others_max_move": 0.0007,
+  "crossing_accuracy": {
+   "before": 0.7051,
+   "after": 0.7048
+  },
+  "don_overestimate_enel": {
+   "step1": [
+    1.137,
+    0.106
+   ],
+   "step2": [
+    2.095,
+    0.196
+   ]
+  },
+  "fallback_rows": "0 / 52433 (all scalars 127 wide)",
+  "why_no_effect": "clock DON series outer.rs::purse_series already capped by DON deck left; fixed-10 cap only reached hand plan (caps_of) and hp projection",
+  "s7_paircal": {
+   "json": "logs/theory_map/real_w41_paircal.json",
+   "enel_vs_luffy": -0.162,
+   "coordinator_prediction": "missed (predicted closer to 0 than -0.05)",
+   "nami_underread_vs_all": "+0.19..+0.24"
+  },
+  "s8_clockside": {
+   "json": "logs/theory_map/real_w41_clockside.json",
+   "enel": "defence overread (opp clock +0.74 in lost games; controls +0.04/+0.45); 'attack overread' prediction missed",
+   "nami": "defence underread (opp clock -0.84 in lost games); prediction held"
+  },
+  "pending": null,
+  "s10_guardside": {
+   "json": "logs/theory_map/real_w41_guardside.json",
+   "enel_can_but_took": 0.608,
+   "controls": {
+    "Shanks": 0.451,
+    "Luffy": 0.514,
+    "Nami": 0.334
+   },
+   "prediction1": "missed (1.2-1.35x, not 2x; Enel counter-0 share 29% not ~50%; payable counter share highest 0.71)",
+   "prediction2": "half (life added 2.22/game held; draw chances 0.08/game missed); theory reads neither (code)",
+   "code_fact": "no on-opponent-attack / on-life-leave trigger anywhere in rust theory; Θ life term = λ·current life"
+  },
+  "s11_prices": {
+   "price_rows_non_enel_identical": "9012/9012",
+   "enel_rows_changed": "2563/9195 (127 games)",
+   "enel_q5_all_small": [
+    -0.1288,
+    -0.1284
+   ],
+   "turn_iii_diff": [
+    0.1649,
+    0.164
+   ]
+  },
+  "s12_synth": {
+   "json": "logs/theory_map/syn_w39_dondeck.json",
+   "invariant": "294 non-Enel games 0 diff",
+   "calibration": "unchanged to 4 decimals",
+   "crossing": [
+    0.6703,
+    0.6703
+   ]
+  }
+ },
+ "life_add_2026_10_12": {
+  "report": "docs/reports/2026-10-12_life_add.md",
+  "s1_before_data": "8d3c746d",
+  "switch": "OPCG_LIFE_ADD=1 (default old)",
+  "verdict": "hold (Nami +0.1588 -> +0.1451: shrank but not to the 'worked' line +0.106; not killed)",
+  "calibration": {
+   "nami": [
+    0.1588,
+    0.1451
+   ],
+   "nami_bands": {
+    "1-3": [
+     0.2053,
+     0.2052
+    ],
+    "4-6": [
+     0.1918,
+     0.1763
+    ],
+    "7+": [
+     0.1243,
+     0.1068
+    ]
+   },
+   "others_max_move": 0.0035
+  },
+  "crossing": [
+   0.7051,
+   0.711
+  ],
+  "nami_lost_opp_clock": [
+   -0.843,
+   -0.616
+  ],
+  "invariant": {
+   "non_nami_rows_identical": 2087,
+   "nami_rows_changed": "584/1460",
+   "switch_off_20games": "227/227",
+   "theory_goldens_switch_off": 0,
+   "theory_goldens_switch_on": "rows 43"
+  },
+  "recommendation": "(b) keep as switch"
+ },
+ "life_add_horizon_2026_10_13": {
+  "report": "docs/reports/2026-10-13_life_add_horizon.md",
+  "s1_before_data": "2f5ba9cb",
+  "code": "03cb0906",
+  "switch": "OPCG_LIFE_ADD_HORIZON=1 (default off = adopted life-add form)",
+  "verdict": "killed by pre-registered criterion (early band moved 0.019 < 0.02); all other indicators improved",
+  "calibration": {
+   "nami": [
+    0.1451,
+    0.1367
+   ],
+   "nami_bands": {
+    "1-3": [
+     0.2052,
+     0.1862
+    ],
+    "4-6": [
+     0.1763,
+     0.1603
+    ],
+    "7+": [
+     0.1068,
+     0.1063
+    ]
+   },
+   "others_max_move": 0.0084
+  },
+  "crossing": [
+   0.711,
+   0.7155
+  ],
+  "nami_lost_opp_clock": [
+   -0.616,
+   -0.503
+  ],
+  "nami_rows_theta_changed": {
+   "1-3": "13/135",
+   "4-6": "21/204",
+   "7+": "14/515"
+  },
+  "invariant": {
+   "non_nami_rows_identical": 2087,
+   "nami_rows_changed": "354/1460",
+   "switch_off_20games": "identical file",
+   "theory_goldens_switch_off": 0
+  },
+  "logs": [
+   "logs/theory_map/real_w41_horizon_cal.json",
+   "logs/theory_map/real_w41_horizon_paircal.json",
+   "logs/theory_map/real_w41_horizon_clockside.json"
+  ],
+  "recommendation": "(b) do not adopt, keep as switch"
+ },
+ "opp_attack_2026_10_13": {
+  "report": "docs/reports/2026-10-13_opp_attack.md",
+  "s1_before_data": "4716a6be",
+  "code": {
+   "hand_life_fix": "ee9cdeee",
+   "switch": "88a78466"
+  },
+  "switch": "OPCG_OPP_ATTACK=1 (default off = old); durability hand term only (guard window and attack price not touched)",
+  "verdict": "killed by pre-registered criteria (Nami overall worsened +0.1451 -> +0.1512; Nami early moved 0.0015 < 0.02); Shanks moved toward zero",
+  "calibration": {
+   "nami": [
+    0.1451,
+    0.1512
+   ],
+   "nami_bands": {
+    "1-3": [
+     0.2052,
+     0.2067
+    ],
+    "4-6": [
+     0.1763,
+     0.1813
+    ],
+    "7+": [
+     0.1068,
+     0.115
+    ]
+   },
+   "shanks": [
+    0.0226,
+    0.0087
+   ],
+   "shanks_bands": {
+    "1-3": [
+     0.0458,
+     0.0349
+    ],
+    "4-6": [
+     0.0829,
+     0.0677
+    ],
+    "7+": [
+     -0.0133,
+     -0.0276
+    ]
+   },
+   "enel": [
+    -0.1345,
+    -0.1308
+   ],
+   "luffy": [
+    -0.0086,
+    -0.0015
+   ]
+  },
+  "crossing": [
+   0.711,
+   0.7147
+  ],
+  "pair": {
+   "nami_vs_shanks": [
+    0.173,
+    0.199
+   ],
+   "nami_vs_enel": [
+    0.226,
+    0.224
+   ],
+   "nami_vs_luffy": [
+    0.216,
+    0.213
+   ]
+  },
+  "invariant": {
+   "enel_luffy_only_games": 86,
+   "rows_identical": 951,
+   "switch_off_20games": "identical file",
+   "theory_goldens_switch_off": 0
+  },
+  "hand_life_fix": {
+   "real_w41": "bit-identical",
+   "synth_w39_clock_rows_changed": "17/3439 in 8 games",
+   "harm_rows_changed": 8,
+   "golden_rows": 0
+  },
+  "logs": [
+   "logs/theory_map/real_w41_oppatk_cal.json",
+   "logs/theory_map/real_w41_oppatk_paircal.json",
+   "logs/theory_map/real_w41_oppatk_clockside.json"
+  ],
+  "recommendation": "(b) do not adopt, keep as switch"
+ },
+ "defence_gap_2026_10_13": {
+  "report": "docs/reports/2026-10-13_defence_gap.md",
+  "s1_before_data": "3e48b54c",
+  "switch": "OPCG_GUARD_RATE=<path|json> (diagnostic, default off; q = 1 - can_but_took by defender deck x band, multiplied into the durability hand term)",
+  "kind": "diagnostic, not a formula candidate (q from the same record)",
+  "q": {
+   "OP09-001": {
+    "1-3": 0.542,
+    "4-6": 0.63,
+    "7+": 0.492
+   },
+   "OP11-041": {
+    "1-3": 0.333,
+    "4-6": 0.775,
+    "7+": 0.663
+   },
+   "OP15-058": {
+    "1-3": 0.518,
+    "4-6": 0.464,
+    "7+": 0.248
+   },
+   "OP16-022": {
+    "1-3": 0.527,
+    "4-6": 0.583,
+    "7+": 0.399
+   }
+  },
+  "verdict": "predictions missed -> the formula still lacks something: Enel all bands, Nami early/mid remain",
+  "calibration": {
+   "enel": [
+    -0.1345,
+    -0.1382
+   ],
+   "enel_bands": {
+    "1-3": [
+     -0.168,
+     -0.2002
+    ],
+    "4-6": [
+     -0.1706,
+     -0.1627
+    ],
+    "7+": [
+     -0.1036,
+     -0.1031
+    ]
+   },
+   "nami": [
+    0.1451,
+    0.1303
+   ],
+   "nami_bands": {
+    "1-3": [
+     0.2052,
+     0.2516
+    ],
+    "4-6": [
+     0.1763,
+     0.1605
+    ],
+    "7+": [
+     0.1068,
+     0.0707
+    ]
+   },
+   "luffy": [
+    -0.0086,
+    -0.0259
+   ],
+   "shanks": [
+    0.0226,
+    0.0157
+   ],
+   "all": [
+    0.0014,
+    -0.0092
+   ]
+  },
+  "crossing": [
+   0.711,
+   0.7133
+  ],
+  "clock_bias_all": {
+   "me": [
+    0.485,
+    -0.024
+   ],
+   "opp": [
+    0.366,
+    -0.058
+   ]
+  },
+  "nami_defending_turns": {
+   "turns": 887,
+   "leader_attacks_mean": 1.65,
+   "leader_attacks_2plus": 0.5,
+   "late_leader_attacks_2plus": 0.714,
+   "hand_has_c0": 0.815
+  },
+  "invariant": {
+   "switch_off_20games": "identical file",
+   "theory_goldens_switch_off": 0
+  },
+  "logs": [
+   "logs/theory_map/real_w41_guardrate_cal.json",
+   "logs/theory_map/real_w41_guardrate_paircal.json",
+   "logs/theory_map/real_w41_guardrate_clockside.json",
+   "logs/theory_map/real_w41_defturns.json"
+  ]
+ },
+ "enel_parts_2026_10_13": {
+  "report": "docs/reports/2026-10-13_enel_parts.md",
+  "s1_before_data": "b130b4b0",
+  "kind": "diagnostic (no formula change)",
+  "tool": "tests/scripts/theory_map.py parts",
+  "log": "logs/theory_map/real_w41_parts.json",
+  "ratio_actual_over_theory_all": {
+   "enel": {
+    "life": 0.955,
+    "hand": 0.439,
+    "body": 0.41
+   },
+   "luffy": {
+    "life": 0.901,
+    "hand": 0.356,
+    "body": 1.055
+   },
+   "shanks": {
+    "life": 0.743,
+    "hand": 0.358,
+    "body": 0.638
+   },
+   "nami": {
+    "life": 0.893,
+    "hand": 0.955,
+    "body": 0.419
+   }
+  },
+  "ratio_fell_only": {
+   "enel": {
+    "life": 1.0,
+    "hand": 0.456,
+    "body": 0.407
+   },
+   "luffy": {
+    "life": 1.0,
+    "hand": 0.354,
+    "body": 1.202
+   },
+   "shanks": {
+    "life": 1.0,
+    "hand": 0.459,
+    "body": 0.867
+   },
+   "nami": {
+    "life": 1.505,
+    "hand": 1.34,
+    "body": 0.669
+   }
+  },
+  "verdict": "prediction 'Enel hand term most off' missed (Enel 0.44 vs Luffy/Shanks 0.36); life term exact for non-life-adding decks in fell games; body small; the outlier is Nami (hand 0.96, life 1.5x in fell games)"
+ },
+ "opp_attack_power_2026_10_13": {
+  "report": "docs/reports/2026-10-13_opp_attack_power.md",
+  "s1_before_data": "3dbbfb79",
+  "code": "c0562ea2",
+  "switch": "OPCG_OPP_ATTACK_POWER=1 (default off); clock rows only (drv_cb seat_row_body): defender leader power +X for the turn, largest attacker -X, discard from hand reading",
+  "verdict": "no kill criterion hit; Nami early halved; Nami overall missed the 'worked' line by 0.009; hit rate +0.020",
+  "calibration": {
+   "nami": [
+    0.1451,
+    0.1148
+   ],
+   "nami_bands": {
+    "1-3": [
+     0.2052,
+     0.106
+    ],
+    "4-6": [
+     0.1763,
+     0.1762
+    ],
+    "7+": [
+     0.1068,
+     0.0847
+    ]
+   },
+   "shanks": [
+    0.0226,
+    0.012
+   ],
+   "shanks_bands": {
+    "4-6": [
+     0.0829,
+     0.0605
+    ]
+   },
+   "enel": [
+    -0.1345,
+    -0.1173
+   ],
+   "luffy": [
+    -0.0086,
+    0.0134
+   ]
+  },
+  "crossing": [
+   0.711,
+   0.731
+  ],
+  "nami_opp_clock": [
+   -0.616,
+   -0.119
+  ],
+  "shanks_opp_clock": [
+   0.038,
+   0.326
+  ],
+  "invariant": {
+   "enel_luffy_only_rows_identical": 951,
+   "switch_off_20games": "identical file"
+  },
+  "logs": [
+   "logs/theory_map/real_w41_oppatkpow_cal.json",
+   "logs/theory_map/real_w41_oppatkpow_paircal.json",
+   "logs/theory_map/real_w41_oppatkpow_clockside.json"
+  ],
+  "recommendation": "(a) adopt after adding the same entry to the guard window / price dump (§10)",
+  "finish": {
+   "code": "8775e827",
+   "clocks_identical_to_entry_only": true,
+   "turns_follow_diff": [
+    0.1749,
+    0.1694
+   ],
+   "turns_follow_band_1_3": [
+    0.0229,
+    -0.0076
+   ],
+   "q5_enel_all": [
+    -0.1242,
+    -0.1086
+   ],
+   "q5_others_all": [
+    0.0393,
+    0.0357
+   ],
+   "guard_nami": {
+    "windows": [
+     676,
+     634
+    ],
+    "can_share": [
+     0.611,
+     0.655
+    ],
+    "can_but_took": [
+     0.334,
+     0.354
+    ]
+   },
+   "logs": [
+    "logs/theory_map/real_w41_oppatkpow_turns_before.json",
+    "logs/theory_map/real_w41_oppatkpow_turns_after.json",
+    "logs/theory_map/real_w41_oppatkpow_q5_before.json",
+    "logs/theory_map/real_w41_oppatkpow_q5_after.json",
+    "logs/theory_map/real_w41_oppatkpow_guard_before.json",
+    "logs/theory_map/real_w41_oppatkpow_guard_after.json"
+   ]
+  }
+ },
+ "reread_2026_10_14": {
+  "report": "docs/reports/2026-10-14_reread.md",
+  "s1_before_data": "a28ededa",
+  "kind": "diagnostic (records only) + baseline remeasure on the new engine",
+  "merge": "claude/cpu-spec-improvements-yw91jd @ 13404026 -> 71b3da94 (effects JSON regenerated: 3387 abilities)",
+  "E_body_gone_next_opp_turn": {
+   "enel_le2000": [
+    0.12,
+    "theory 0.278"
+   ],
+   "others_5000plus": "0.03-0.25"
+  },
+  "E_verdict": "missed (Enel small bodies survive more, not less)",
+  "N_trigger_proxy_per_game": {
+   "nami": 2.437,
+   "enel": 0.289,
+   "shanks": 0.207,
+   "luffy": 0.0
+  },
+  "N_nami_by_band": {
+   "1-3": 0.119,
+   "4-6": 0.133,
+   "7+": 2.185
+  },
+  "N_verdict": "held (but concentrated late; little bearing on Nami mid band)",
+  "new_engine_baseline": {
+   "hit": [
+    0.731,
+    0.726
+   ],
+   "nami": [
+    0.1148,
+    0.1226
+   ],
+   "nami_4_6": [
+    0.1762,
+    0.1906
+   ],
+   "enel": [
+    -0.1173,
+    -0.1188
+   ],
+   "shanks": [
+    0.012,
+    0.0085
+   ],
+   "luffy": [
+    0.0134,
+    0.0126
+   ],
+   "rows_changed": "2771/3547",
+   "cause": "theory side only (records unchanged)"
+  },
+  "logs": [
+   "logs/theory_map/real_w41_reread.json",
+   "logs/theory_map/real_w41_newengine_cal.json",
+   "logs/theory_map/real_w41_newengine_clockside.json"
+  ]
+ },
+ "attack_speed_2026_10_14": {
+  "report": "docs/reports/2026-10-14_attack_speed.md",
+  "s1_before_data": "21bc92bf",
+  "kind": "diagnostic (records + new-engine clocks)",
+  "tool": "tests/scripts/theory_map.py speed",
+  "log": "logs/theory_map/real_w41_speed.json",
+  "ratio_actual_over_theory": {
+   "enel": {
+    "all": 0.962,
+    "1-3": 0.655,
+    "4-6": 1.028,
+    "7+": 0.979
+   },
+   "others_mean": {
+    "all": 1.014,
+    "1-3": 0.913,
+    "4-6": 1.051,
+    "7+": 1.011
+   }
+  },
+  "enel_minus_others": {
+   "all": -0.052,
+   "1-3": -0.258,
+   "4-6": -0.023,
+   "7+": -0.032
+  },
+  "verdict": "not a hit (early only); mid/late misses -> play-style side",
+  "enel_early": {
+   "attacks_per_turn": 0.484,
+   "life_per_leader_attack": 0.299,
+   "others_life_per_leader_attack": [
+    0.427,
+    0.453,
+    0.73
+   ]
+  }
+ },
+ "defence_side_2026_10_14": {
+  "report": "docs/reports/2026-10-14_defence_side.md",
+  "kind": "diagnostic (records + new-engine clocks)",
+  "tool": "tests/scripts/theory_map.py speed (by_defender, def_x_att)",
+  "log": "logs/theory_map/real_w41_speed.json",
+  "ratio_by_defender": {
+   "nami": {
+    "all": 0.985,
+    "1-3": 0.699,
+    "4-6": 0.81,
+    "7+": 1.04
+   },
+   "others_mean": {
+    "all": 1.008,
+    "1-3": 0.864,
+    "4-6": 1.149,
+    "7+": 0.993
+   }
+  },
+  "nami_minus_others": {
+   "all": -0.023,
+   "1-3": -0.165,
+   "4-6": -0.339,
+   "7+": 0.047
+  },
+  "verdict": "hit (mid -0.34)",
+  "mid_breakdown_nami": {
+   "leader_attacks": 1.532,
+   "life_per_leader_attack": 0.175,
+   "blocks": 0.095,
+   "counters": 0.776,
+   "trig_proxy": 0.09,
+   "life_gained_in_opp_turn": 0.0
+  },
+  "reading": "none of trigger/counter/blocker/life-add; attacks likely fall short of Nami leader power (+2000, inference)"
+ },
+ "nami_power_2026_10_14": {
+  "report": "docs/reports/2026-10-14_nami_power.md",
+  "kind": "diagnostic (records only)",
+  "tool": "tests/scripts/theory_map.py namipower",
+  "log": "logs/theory_map/real_w41_namipower.json",
+  "code_location": "rust/opcg_engine/src/theory/core/drv_cb.rs::opp_attack_power_adjust (sc[15]*5 at the attacker turn-start row) + ev.rs::opp_attack_effects (HAS_DON)",
+  "mid": {
+   "don_at_turn_start": 0.637,
+   "don_at_attack": 0.673,
+   "theory_reads_7000": 0.637,
+   "buff_seen_turns": 0.363,
+   "don_and_buff_but_theory_5000": 0.0
+  },
+  "verdict": "missed (0% < 10%): no rule misreading; theory reads the +2000 more often than it is used",
+  "attack_power_into_nami_mid": {
+   "lt5000": 0.275,
+   "5000_6999": 0.62,
+   "ge7000": 0.105,
+   "mean": 4725.5
+  }
+ },
+ "reach_2026_10_14": {
+  "report": "docs/reports/2026-10-14_reach.md",
+  "kind": "diagnostic",
+  "switch": "OPCG_REACH_DUMP=1 (diagnostic field reach_theory in turn_harm; default off, values unchanged)",
+  "tool": "tests/scripts/theory_map.py reach",
+  "log": "logs/theory_map/real_w41_reach.json",
+  "theory_over_actual_mid": {
+   "nami": 1.113,
+   "shanks": 0.688,
+   "enel": 1.235,
+   "luffy": 1.055,
+   "others_mean": 0.993
+  },
+  "nami_minus_others_mid": 0.12,
+  "theory_over_actual_late": {
+   "nami": 1.628,
+   "others_mean": 1.351
+  },
+  "verdict": "in between (0.1-0.3)",
+  "correction": "nami_power §4 used pre-DON power; after declaration 72% of mid attacks on Nami's leader reach (1.10/1.53 per turn)"
+ },
+ "counter_2026_10_14": {
+  "report": "docs/reports/2026-10-14_counter.md",
+  "kind": "diagnostic",
+  "tool": "tests/scripts/theory_map.py counter",
+  "log": "logs/theory_map/real_w41_counter.json",
+  "switch": "OPCG_REACH_DUMP=1 also writes stopped_theory / cut_theory (defender plan; default off, values unchanged)",
+  "actual_over_theory_stopped_mid": {
+   "nami": 0.499,
+   "shanks": 0.348,
+   "enel": 0.511,
+   "luffy": 0.614,
+   "others_mean": 0.491
+  },
+  "nami_minus_others_mid": 0.008,
+  "verdict": "missed (<0.1) -> Nami mid to play-style side",
+  "mid_per_attack_nami": {
+   "counters_per_reached": 0.653,
+   "stops_per_counter": 0.828,
+   "stopped_share": 0.883
+  }
+ },
+ "play_gap_2026_10_14": {
+  "report": "docs/reports/2026-10-14_play_gap.md",
+  "kind": "diagnostic",
+  "tool": "tests/scripts/theory_map.py playdeep / playgap",
+  "log": "logs/theory_map/real_w41_playgap.json",
+  "deep_engine": "a28ededa (records' engine; new engine leaves the records, see report §7)",
+  "theory_loss_per_game": {
+   "shanks": 1.757,
+   "nami": 1.623,
+   "enel": 2.21,
+   "luffy": 2.569
+  },
+  "deep_loss_per_game": {
+   "shanks": 0.207,
+   "nami": 0.154,
+   "enel": 0.352,
+   "luffy": 0.408
+  },
+  "deep_agree": {
+   "shanks": 0.784,
+   "nami": 0.819,
+   "enel": 0.569,
+   "luffy": 0.619
+  },
+  "enel_minus_others_all": {
+   "theory": [
+    0.227,
+    [
+     -0.029,
+     0.477
+    ]
+   ],
+   "deep": [
+    0.095,
+    [
+     -0.011,
+     0.206
+    ]
+   ]
+  },
+  "nami_mid_minus_others": {
+   "theory": [
+    -0.191,
+    [
+     -0.243,
+     -0.137
+    ]
+   ],
+   "deep": [
+    -0.081,
+    [
+     -0.116,
+     -0.04
+    ]
+   ]
+  },
+  "verdict": "hit by the letter (both directions, Enel gap >=0.05 on both measures); caveats: Enel CIs cross 0, Luffy has the largest loss yet ~0 residual",
+  "encoding_split": "cond_ok0 changes: parser 1cacb6a1 (308 cards, 8 in w41 decks) + engine FIELD_ALL_TRAIT (Luffy leader OP16-022)"
+ },
+ "play_gap_split_2026_10_14": {
+  "report": "docs/reports/2026-10-14_play_gap_split.md",
+  "kind": "diagnostic",
+  "tool": "tests/scripts/theory_map.py playsplit",
+  "log": "logs/theory_map/real_w41_playsplit.json",
+  "post_share": {
+   "theory": {
+    "shanks": 0.125,
+    "nami": 0.189,
+    "enel": 0.041,
+    "luffy": 0.048
+   },
+   "deep": {
+    "shanks": 0.0,
+    "nami": 0.007,
+    "enel": 0.001,
+    "luffy": 0.006
+   }
+  },
+  "pre_only_minus_others": {
+   "enel_all": {
+    "theory": [
+     0.352,
+     [
+      0.141,
+      0.582
+     ]
+    ],
+    "deep": [
+     0.092,
+     [
+      -0.013,
+      0.21
+     ]
+    ]
+   },
+   "nami_mid": {
+    "theory": [
+     -0.191,
+     [
+      -0.243,
+      -0.137
+     ]
+    ],
+    "deep": [
+     -0.081,
+     [
+      -0.116,
+      -0.042
+     ]
+    ]
+   },
+   "luffy_all": {
+    "theory": [
+     0.788,
+     [
+      0.586,
+      0.988
+     ]
+    ],
+    "deep": [
+     0.162,
+     [
+      0.047,
+      0.291
+     ]
+    ]
+   }
+  },
+  "verdict": "missed (Luffy post share <40%, pre-only Luffy >= +0.1 on both) -> Luffy counterexample is not a measurement artefact; 'loss does not map to outcome for another reason'"
+ },
+ "theory_vs_deep_2026_10_14": {
+  "report": "docs/reports/2026-10-14_theory_vs_deep.md",
+  "kind": "diagnostic",
+  "tool": "tests/scripts/theory_map.py playdeep (group indices) / theorydeep",
+  "log": "logs/theory_map/real_w41_theorydeep.json",
+  "rerun_identical_points": 1800,
+  "disagree_theory_points_to": {
+   "shanks": [
+    0.48,
+    0.18
+   ],
+   "nami": [
+    0.34,
+    0.26
+   ],
+   "enel": [
+    0.35,
+    0.2
+   ],
+   "luffy": [
+    0.25,
+    0.3
+   ],
+   "all": [
+    0.34,
+    0.24
+   ]
+  },
+  "agree_theory_same": 0.45,
+  "enel_disagree": {
+   "deep": 0.347,
+   "deep_ci": [
+    0.277,
+    0.411
+   ],
+   "record": 0.198,
+   "deep_minus_record": 0.149,
+   "ci": [
+    0.05,
+    0.243
+   ]
+  },
+  "verdict": "inconclusive (0.3<=0.35<0.5, above record) -> no T18 design written"
+ },
+ "theory_ties_2026_10_14": {
+  "report": "docs/reports/2026-10-14_theory_ties.md",
+  "kind": "diagnostic",
+  "tool": "tests/scripts/theory_map.py theoryties",
+  "log": "logs/theory_map/real_w41_theoryties.json",
+  "mu": 0.0551,
+  "i_agree_theory_elsewhere": {
+   "n": 586,
+   "median_mu": 1.64,
+   "ge_mu": 0.66
+  },
+  "ii_disagree_third": {
+   "n": 278,
+   "median_mu": 2.48,
+   "ge_mu": 0.76
+  },
+  "iii_best_minus_record": {
+   "n": 1692,
+   "median_mu": 0.44,
+   "ge_mu": 0.41
+  },
+  "forbid_at_mu_all": {
+   "deep_forbidden": 0.404,
+   "record_miss_forbidden": 0.486,
+   "ratio": 0.83,
+   "ci": [
+    0.76,
+    0.91
+   ]
+  },
+  "forbid_at_mu_enel_early": {
+   "ratio": 0.69,
+   "ci": [
+    0.53,
+    0.89
+   ]
+  },
+  "verdict": "missed (theory reads deep-search moves as clearly worse: median 1.64 mu, 66% >= mu) -> no T18 design"
+ },
+ "theory_ties_type_2026_10_14": {
+  "report": "docs/reports/2026-10-14_theory_ties_type.md",
+  "kind": "diagnostic",
+  "tool": "tests/scripts/theory_map.py theorytype",
+  "log": "logs/theory_map/real_w41_theorytype.json",
+  "switch": "OPCG_CLOCK_PARTS_DUMP=1 (per-candidate clocks and opp-clock-only W in the price dump; default off; 18,207 rows identical)",
+  "best_attack_other_nonattack": {
+   "gap_share": 0.46,
+   "opp_clock_part": 0.26,
+   "own_clock_part": 0.74
+  },
+  "max_coarse_cell_share": 0.23,
+  "enel_best_attack_other_nonattack": {
+   "gap_share": 0.2,
+   "opp_clock_part": -0.04
+  },
+  "verdict": "missed (max coarse cell <30%; battle-resolution upper bound 26%, not a majority) -> attack-bonus hypothesis rejected; gap mostly in own clock"
+ }
 }

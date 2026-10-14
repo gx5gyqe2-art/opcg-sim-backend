@@ -1,0 +1,423 @@
+{
+ "record": "/home/user/data_rec/sigma_wip/data/w41",
+ "body": {
+  "OP09-001": {
+   "<=2000|all": {
+    "played": 150,
+    "gone_next_opp_turn": 0.047,
+    "theory_ko_p_of": 0.276,
+    "theory_const": 0.289
+   },
+   "<=2000|1-3": {
+    "played": 105,
+    "gone_next_opp_turn": 0.038,
+    "theory_ko_p_of": 0.277,
+    "theory_const": 0.289
+   },
+   "<=2000|4-6": {
+    "played": 32,
+    "gone_next_opp_turn": 0.094,
+    "theory_ko_p_of": 0.275,
+    "theory_const": 0.289
+   },
+   "<=2000|7+": {
+    "played": 13,
+    "gone_next_opp_turn": 0.0,
+    "theory_ko_p_of": 0.278,
+    "theory_const": 0.289
+   },
+   "3000-4000|all": {
+    "played": 17,
+    "gone_next_opp_turn": 0.235,
+    "theory_ko_p_of": 0.33,
+    "theory_const": 0.289
+   },
+   "3000-4000|4-6": {
+    "played": 17,
+    "gone_next_opp_turn": 0.235,
+    "theory_ko_p_of": 0.33,
+    "theory_const": 0.289
+   },
+   "5000-6000|all": {
+    "played": 201,
+    "gone_next_opp_turn": 0.204,
+    "theory_ko_p_of": 0.244,
+    "theory_const": 0.289
+   },
+   "5000-6000|4-6": {
+    "played": 157,
+    "gone_next_opp_turn": 0.14,
+    "theory_ko_p_of": 0.244,
+    "theory_const": 0.289
+   },
+   "5000-6000|7+": {
+    "played": 44,
+    "gone_next_opp_turn": 0.432,
+    "theory_ko_p_of": 0.244,
+    "theory_const": 0.289
+   },
+   "7000+|all": {
+    "played": 358,
+    "gone_next_opp_turn": 0.047,
+    "theory_ko_p_of": 0.203,
+    "theory_const": 0.289
+   },
+   "7000+|4-6": {
+    "played": 3,
+    "gone_next_opp_turn": 0.0,
+    "theory_ko_p_of": 0.199,
+    "theory_const": 0.289
+   },
+   "7000+|7+": {
+    "played": 355,
+    "gone_next_opp_turn": 0.048,
+    "theory_ko_p_of": 0.203,
+    "theory_const": 0.289
+   }
+  },
+  "OP11-041": {
+   "<=2000|all": {
+    "played": 55,
+    "gone_next_opp_turn": 0.255,
+    "theory_ko_p_of": 0.278,
+    "theory_const": 0.289
+   },
+   "<=2000|1-3": {
+    "played": 34,
+    "gone_next_opp_turn": 0.147,
+    "theory_ko_p_of": 0.278,
+    "theory_const": 0.289
+   },
+   "<=2000|4-6": {
+    "played": 14,
+    "gone_next_opp_turn": 0.429,
+    "theory_ko_p_of": 0.278,
+    "theory_const": 0.289
+   },
+   "<=2000|7+": {
+    "played": 7,
+    "gone_next_opp_turn": 0.429,
+    "theory_ko_p_of": 0.278,
+    "theory_const": 0.289
+   },
+   "3000-4000|all": {
+    "played": 2,
+    "gone_next_opp_turn": 0.0,
+    "theory_ko_p_of": 0.278,
+    "theory_const": 0.289
+   },
+   "3000-4000|7+": {
+    "played": 2,
+    "gone_next_opp_turn": 0.0,
+    "theory_ko_p_of": 0.278,
+    "theory_const": 0.289
+   },
+   "5000-6000|all": {
+    "played": 192,
+    "gone_next_opp_turn": 0.135,
+    "theory_ko_p_of": 0.26,
+    "theory_const": 0.289
+   },
+   "5000-6000|4-6": {
+    "played": 141,
+    "gone_next_opp_turn": 0.099,
+    "theory_ko_p_of": 0.263,
+    "theory_const": 0.289
+   },
+   "5000-6000|7+": {
+    "played": 51,
+    "gone_next_opp_turn": 0.235,
+    "theory_ko_p_of": 0.252,
+    "theory_const": 0.289
+   },
+   "7000+|all": {
+    "played": 303,
+    "gone_next_opp_turn": 0.116,
+    "theory_ko_p_of": 0.209,
+    "theory_const": 0.289
+   },
+   "7000+|4-6": {
+    "played": 26,
+    "gone_next_opp_turn": 0.192,
+    "theory_ko_p_of": 0.244,
+    "theory_const": 0.289
+   },
+   "7000+|7+": {
+    "played": 277,
+    "gone_next_opp_turn": 0.108,
+    "theory_ko_p_of": 0.206,
+    "theory_const": 0.289
+   }
+  },
+  "OP15-058": {
+   "<=2000|all": {
+    "played": 483,
+    "gone_next_opp_turn": 0.12,
+    "theory_ko_p_of": 0.278,
+    "theory_const": 0.289
+   },
+   "<=2000|1-3": {
+    "played": 186,
+    "gone_next_opp_turn": 0.07,
+    "theory_ko_p_of": 0.278,
+    "theory_const": 0.289
+   },
+   "<=2000|4-6": {
+    "played": 162,
+    "gone_next_opp_turn": 0.136,
+    "theory_ko_p_of": 0.278,
+    "theory_const": 0.289
+   },
+   "<=2000|7+": {
+    "played": 135,
+    "gone_next_opp_turn": 0.17,
+    "theory_ko_p_of": 0.278,
+    "theory_const": 0.289
+   },
+   "5000-6000|all": {
+    "played": 78,
+    "gone_next_opp_turn": 0.295,
+    "theory_ko_p_of": 0.33,
+    "theory_const": 0.289
+   },
+   "5000-6000|1-3": {
+    "played": 7,
+    "gone_next_opp_turn": 0.0,
+    "theory_ko_p_of": 0.33,
+    "theory_const": 0.289
+   },
+   "5000-6000|4-6": {
+    "played": 44,
+    "gone_next_opp_turn": 0.25,
+    "theory_ko_p_of": 0.33,
+    "theory_const": 0.289
+   },
+   "5000-6000|7+": {
+    "played": 27,
+    "gone_next_opp_turn": 0.444,
+    "theory_ko_p_of": 0.33,
+    "theory_const": 0.289
+   },
+   "7000+|all": {
+    "played": 205,
+    "gone_next_opp_turn": 0.024,
+    "theory_ko_p_of": 0.199,
+    "theory_const": 0.289
+   },
+   "7000+|4-6": {
+    "played": 82,
+    "gone_next_opp_turn": 0.0,
+    "theory_ko_p_of": 0.199,
+    "theory_const": 0.289
+   },
+   "7000+|7+": {
+    "played": 123,
+    "gone_next_opp_turn": 0.041,
+    "theory_ko_p_of": 0.199,
+    "theory_const": 0.289
+   }
+  },
+  "OP16-022": {
+   "<=2000|all": {
+    "played": 295,
+    "gone_next_opp_turn": 0.044,
+    "theory_ko_p_of": 0.255,
+    "theory_const": 0.289
+   },
+   "<=2000|1-3": {
+    "played": 126,
+    "gone_next_opp_turn": 0.024,
+    "theory_ko_p_of": 0.257,
+    "theory_const": 0.289
+   },
+   "<=2000|4-6": {
+    "played": 103,
+    "gone_next_opp_turn": 0.049,
+    "theory_ko_p_of": 0.254,
+    "theory_const": 0.289
+   },
+   "<=2000|7+": {
+    "played": 66,
+    "gone_next_opp_turn": 0.076,
+    "theory_ko_p_of": 0.252,
+    "theory_const": 0.289
+   },
+   "3000-4000|all": {
+    "played": 72,
+    "gone_next_opp_turn": 0.111,
+    "theory_ko_p_of": 0.302,
+    "theory_const": 0.289
+   },
+   "3000-4000|1-3": {
+    "played": 20,
+    "gone_next_opp_turn": 0.25,
+    "theory_ko_p_of": 0.278,
+    "theory_const": 0.289
+   },
+   "3000-4000|4-6": {
+    "played": 36,
+    "gone_next_opp_turn": 0.083,
+    "theory_ko_p_of": 0.307,
+    "theory_const": 0.289
+   },
+   "3000-4000|7+": {
+    "played": 16,
+    "gone_next_opp_turn": 0.0,
+    "theory_ko_p_of": 0.32,
+    "theory_const": 0.289
+   },
+   "5000-6000|all": {
+    "played": 375,
+    "gone_next_opp_turn": 0.248,
+    "theory_ko_p_of": 0.248,
+    "theory_const": 0.289
+   },
+   "5000-6000|4-6": {
+    "played": 231,
+    "gone_next_opp_turn": 0.19,
+    "theory_ko_p_of": 0.248,
+    "theory_const": 0.289
+   },
+   "5000-6000|7+": {
+    "played": 144,
+    "gone_next_opp_turn": 0.34,
+    "theory_ko_p_of": 0.248,
+    "theory_const": 0.289
+   },
+   "7000+|all": {
+    "played": 93,
+    "gone_next_opp_turn": 0.032,
+    "theory_ko_p_of": 0.199,
+    "theory_const": 0.289
+   },
+   "7000+|7+": {
+    "played": 93,
+    "gone_next_opp_turn": 0.032,
+    "theory_ko_p_of": 0.199,
+    "theory_const": 0.289
+   }
+  }
+ },
+ "trigger": {
+  "OP09-001": {
+   "all": {
+    "sel_after_loss_per_game": 0.207,
+    "life_lost_per_game": 3.814,
+    "sel_per_life_lost": 0.054
+   },
+   "1-3": {
+    "sel_after_loss_per_game": 0.021,
+    "life_lost_per_game": 0.248,
+    "sel_per_life_lost": 0.083
+   },
+   "4-6": {
+    "sel_after_loss_per_game": 0.007,
+    "life_lost_per_game": 0.51,
+    "sel_per_life_lost": 0.014
+   },
+   "7+": {
+    "sel_after_loss_per_game": 0.179,
+    "life_lost_per_game": 3.055,
+    "sel_per_life_lost": 0.059
+   }
+  },
+  "OP11-041": {
+   "all": {
+    "sel_after_loss_per_game": 2.437,
+    "life_lost_per_game": 4.341,
+    "sel_per_life_lost": 0.561
+   },
+   "1-3": {
+    "sel_after_loss_per_game": 0.119,
+    "life_lost_per_game": 0.326,
+    "sel_per_life_lost": 0.364
+   },
+   "4-6": {
+    "sel_after_loss_per_game": 0.133,
+    "life_lost_per_game": 0.4,
+    "sel_per_life_lost": 0.333
+   },
+   "7+": {
+    "sel_after_loss_per_game": 2.185,
+    "life_lost_per_game": 3.615,
+    "sel_per_life_lost": 0.605
+   }
+  },
+  "OP15-058": {
+   "all": {
+    "sel_after_loss_per_game": 0.289,
+    "life_lost_per_game": 4.799,
+    "sel_per_life_lost": 0.06
+   },
+   "1-3": {
+    "sel_after_loss_per_game": 0.013,
+    "life_lost_per_game": 0.208,
+    "sel_per_life_lost": 0.061
+   },
+   "4-6": {
+    "sel_after_loss_per_game": 0.019,
+    "life_lost_per_game": 0.792,
+    "sel_per_life_lost": 0.024
+   },
+   "7+": {
+    "sel_after_loss_per_game": 0.258,
+    "life_lost_per_game": 3.799,
+    "sel_per_life_lost": 0.068
+   }
+  },
+  "OP16-022": {
+   "all": {
+    "sel_after_loss_per_game": 0.0,
+    "life_lost_per_game": 3.652,
+    "sel_per_life_lost": 0.0
+   },
+   "1-3": {
+    "sel_after_loss_per_game": 0.0,
+    "life_lost_per_game": 0.23,
+    "sel_per_life_lost": 0.0
+   },
+   "4-6": {
+    "sel_after_loss_per_game": 0.0,
+    "life_lost_per_game": 0.571,
+    "sel_per_life_lost": 0.0
+   },
+   "7+": {
+    "sel_after_loss_per_game": 0.0,
+    "life_lost_per_game": 2.851,
+    "sel_per_life_lost": 0.0
+   }
+  }
+ },
+ "trigger_cards": {
+  "OP09-001": {
+   "deck_cards": 50,
+   "trigger_cards": 3,
+   "action_types": {
+    "BUFF": 3
+   }
+  },
+  "OP11-041": {
+   "deck_cards": 50,
+   "trigger_cards": 25,
+   "action_types": {
+    "PLAY_CARD": 17,
+    "EXECUTE_MAIN_EFFECT": 4,
+    "NEGATE_EFFECT": 4,
+    "KO": 4,
+    "DRAW": 2
+   }
+  },
+  "OP15-058": {
+   "deck_cards": 50,
+   "trigger_cards": 4,
+   "action_types": {
+    "RAMP_DON": 4
+   }
+  },
+  "OP16-022": {
+   "deck_cards": 50,
+   "trigger_cards": 0,
+   "action_types": {}
+  }
+ }
+}

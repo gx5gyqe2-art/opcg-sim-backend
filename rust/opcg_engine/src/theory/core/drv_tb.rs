@@ -283,19 +283,27 @@ impl Core {
     #[allow(clippy::too_many_arguments)]
     pub fn curve_d_of_row(&mut self, row: &Row, j: i64, prof: &[f64], g_opp: &V, g_me: &V, cut_opp: Option<f64>, cut_me: Option<f64>, attacker: Option<(Option<Vec<String>>, bool)>, mirror: MirrorArg, symmetric: bool) -> R<(f64, f64, f64)> {
         let s = self.enter(cut_opp);
-        let th_me = (|| -> R<f64> {
+        let th_me = (|| -> R<(f64, f64, f64)> {
             let mut ax = match &attacker {
                 None => None,
                 Some((dk, no_now)) => self.attacker_ctx(row, super::to::theta(), MU, dk.as_deref(), *no_now, None)?,
             };
-            self.threshold(row, g_opp, ax.as_mut(), &V::None)
+            self.threshold_parts(row, g_opp, 0.0, ax.as_mut(), &V::None)
         })();
         self.leave(s);
-        let th_me = th_me?;
+        let pm = th_me?;
+        let hp_m = Core::last_hand_plan();
+        let th_me = pm.0 + pm.1 + pm.2;
         let s = self.enter(cut_me);
-        let th_opp = self.state_th_me(row, g_me, mirror, symmetric);
+        let th_opp = self.state_th_me_parts(row, g_me, mirror, symmetric);
         self.leave(s);
-        let th_opp = th_opp?;
+        let po = th_opp?;
+        let hp_o = Core::last_hand_plan();
+        let th_opp = po.0 + po.1 + po.2;
+        // 診断（`OPCG_CLOCK_PARTS_DUMP=1`・値は変えない）: 自分の時計の元＝相手の耐久の 3 項、相手の時計の元＝自分の耐久の 3 項
+        let hc = |h: Option<(f64, f64)>| h.map(|x| [x.0, x.1]).unwrap_or([f64::NAN, f64::NAN]);
+        let (a, b) = (hc(hp_m), hc(hp_o));
+        CURVE_PARTS.with(|c| c.set(Some([pm.0, pm.1, pm.2, a[0], a[1], po.0, po.1, po.2, b[0], b[1]])));
         let tau_me = rw::tau_from_profile(th_me, j, prof, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         let tau_opp = rw::tau_from_profile(th_opp, j, prof, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         Ok((tau_opp - tau_me, tau_me, tau_opp))
@@ -556,9 +564,10 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
             // 既定の値段（打った後の 2 本の時計）: 表に行が在ればその値段。`clock_value` の腕で表に無い行（表に無い局・
             // 候補の数が合わない行）は値段なし＝無言の行として数える（§1.5「表に無い行・値段なしの候補は値段なし」）。
             let mut clock_vals: Option<Vec<Option<f64>>> = None;
+            let mut parts: Option<V> = if dump_rows && clock_parts_dump_on() { Some(V::None) } else { None };
             if let Some((_, sv)) = succ.iter().find(|(kk, _)| *kk == k) {
                 let cx = ClockCx { t, prof: &prof, cfg, cut_me, cut_opp, mirror_me, dk_me: deck_of(p, w), dk_opp: deck_of(p, 1 - w), literal: succ_literal };
-                let ps = super::state::with_core2(|c2| clock_prices(c2, &row, sv, &cx, &mut stats))?;
+                let ps = super::state::with_core2(|c2| clock_prices(c2, &row, sv, &cx, &mut stats, &mut parts))?;
                 if ps.len() == kq as usize {
                     clock_vals = Some(ps);
                     stats.addi("clock_rows", 1);
@@ -587,7 +596,7 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
                         }
                     }
                 }
-                row_dump.push(V::list(vec![
+                let mut drow = vec![
                     V::Int(t),
                     V::Int(w),
                     played_v.map(V::Float).unwrap_or(V::None),
@@ -598,7 +607,12 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
                     V::Int(scored.len() as i64),
                     // 候補ごとの [型, 値段]（型ごとの値段の水準の診断）
                     V::list((0..kq as usize).map(|i| V::list(vec![V::s(move_family(&g.cands[b + i].sig)), vals[i].map(V::Float).unwrap_or(V::None)])).collect()),
-                ]));
+                ];
+                // 診断 `OPCG_CLOCK_PARTS_DUMP=1`: 10 番目に [[τ_me0, τ_opp0, W0, κ0], 候補ごとの [τ_me, τ_opp, W, 相手の時計だけを動かした W]]
+                if let Some(pv) = parts.take() {
+                    drow.push(pv);
+                }
+                row_dump.push(V::list(drow));
             }
             let (Some(played_v), true) = (played_v, scored.len() >= 2) else {
                 stats.addi("atk_silent", 1);
@@ -963,6 +977,32 @@ fn row_of_triplet(v: &V, dt: &str) -> Row {
 /// 1 つの局面の勝率と局面の傾き（§1.3）: `theory_bridge` の行の読み（`kappa_of_row`）と同じ関数を、相手の手札と鏡の手札を
 /// `opp`（同じ局面を相手の側から符号化した行）から取って呼ぶ。戻り＝`(W, κ)`。
 fn clock_read(c2: &mut Core, me: &Row, opp: &Row, cx: &ClockCx) -> R<(f64, f64)> {
+    let (wv, kap, _tm, _to) = clock_read_full(c2, me, opp, cx)?;
+    Ok((wv, kap))
+}
+
+thread_local! {
+    /// 直前の `curve_d_of_row` の耐久の項（診断 `OPCG_CLOCK_PARTS_DUMP=1` だけが読む）:
+    /// [相手の耐久 ライフ・手札・体・手札から出す枚数・止める数, 自分の耐久 ライフ・手札・体・出す枚数・止める数]（計画が無ければ枚数・止める数は NaN）
+    static CURVE_PARTS: std::cell::Cell<Option<[f64; 10]>> = const { std::cell::Cell::new(None) };
+}
+
+/// 診断 `OPCG_CLOCK_PARTS_DUMP=1`（`docs/reports/2026-10-14_theory_ties_type.md` §1.4・既定は切・値は変えない）:
+/// 手の値段の写しに、候補ごとの後続の 2 本の時計と勝率・「相手の時計だけを動かした勝率」を書き足す。
+pub(super) fn clock_parts_dump_on() -> bool {
+    matches!(std::env::var("OPCG_CLOCK_PARTS_DUMP").ok().as_deref().map(str::trim), Some("1") | Some("on") | Some("true"))
+}
+
+fn curve_parts_v() -> V {
+    match CURVE_PARTS.with(|c| c.get()) {
+        Some(a) => V::list(a.iter().map(|x| if x.is_nan() { V::None } else { V::Float(*x) }).collect()),
+        None => V::None,
+    }
+}
+
+/// `clock_read` と同じ読み＋その時計 `(W, κ, τ_me, τ_opp)`。
+fn clock_read_full(c2: &mut Core, me: &Row, opp: &Row, cx: &ClockCx) -> R<(f64, f64, f64, f64)> {
+    CURVE_PARTS.with(|c| c.set(None));
     let g_me = c2.hand_price_mean(me, MU, true, None)?;
     let go = c2.hand_price_mean(opp, MU, true, None)?;
     let go = c2.with_life_types(&go, cx.dk_opp.as_deref());
@@ -993,18 +1033,21 @@ fn clock_read(c2: &mut Core, me: &Row, opp: &Row, cx: &ClockCx) -> R<(f64, f64)>
     let wv = lt::prob_of_d(&cx.cfg.clock, d, None, Some(tm), Some(to), "hyp", false);
     let (cm, co) = if cx.cfg.clock.w_err_rel { (Some(tm), Some(to)) } else { (None, None) };
     let kap = lt::state_factor(&cx.cfg.clock, d, true, cm, co, "hyp");
-    Ok((wv, kap))
+    Ok((wv, kap, tm, to))
 }
 
 /// 行の候補ごとの値段 `p(a) = (W(s′_a) − W(s)) / κ(s)`（§1.3・2026-10-11 から理論の既定の手の値段）。
 /// 表の状態: 0／6（`TURN_END`）＝読む・1＝勝ち（W=1）・2＝負け（W=0）・他＝値段なし。
 /// `literal`（診断 `OPCG_CLOCK_VALUE_LITERAL`）でなければ前後の読みのあいだだけ「ターンの途中を規則どおりに読む」を入れる。
-fn clock_prices(c2: &mut Core, row: &Row, sv: &V, cx: &ClockCx, stats: &mut D) -> R<Vec<Option<f64>>> {
+fn clock_prices(c2: &mut Core, row: &Row, sv: &V, cx: &ClockCx, stats: &mut D, parts: &mut Option<V>) -> R<Vec<Option<f64>>> {
     let dt = rw::ci_dtype(row);
     let prev = lt::set_mid_turn_rules(!cx.literal);
+    let want_parts = parts.is_some();
     let out = (|| -> R<Vec<Option<f64>>> {
         let opp0 = row_of_triplet(sv.get("o"), &dt);
-        let (w0, k0) = clock_read(c2, row, &opp0, cx)?;
+        let (w0, k0, tm0, to0) = clock_read_full(c2, row, &opp0, cx)?;
+        let base_parts = if want_parts { curve_parts_v() } else { V::None };
+        let mut cparts: Vec<V> = Vec::new();
         stats.addf("clock_kappa_sum", k0);
         let mut ps = Vec::new();
         for e in sv.get("c").items() {
@@ -1015,16 +1058,31 @@ fn clock_prices(c2: &mut Core, row: &Row, sv: &V, cx: &ClockCx, stats: &mut D) -
                 0 | 6 => {
                     let me1 = row_of_triplet(&it[1], &dt);
                     let op1 = row_of_triplet(&it[2], &dt);
-                    Some(clock_read(c2, &me1, &op1, cx)?.0)
+                    let (wv, _k, tm, to) = clock_read_full(c2, &me1, &op1, cx)?;
+                    if want_parts {
+                        // 相手の時計だけを動かした勝率（自分の時計は打つ前のまま）
+                        let w_opp = lt::prob_of_d(&cx.cfg.clock, to - tm0, None, Some(tm0), Some(to), "hyp", false);
+                        cparts.push(V::list(vec![V::Float(tm), V::Float(to), V::Float(wv), V::Float(w_opp), curve_parts_v()]));
+                    }
+                    Some(wv)
                 }
                 1 => Some(1.0),
                 2 => Some(0.0),
                 _ => None,
             };
+            if want_parts && !matches!(st, 0 | 6) {
+                cparts.push(match w1 {
+                    Some(x) => V::list(vec![V::None, V::None, V::Float(x), V::None]),
+                    None => V::None,
+                });
+            }
             ps.push(match w1 {
                 Some(x) if k0 > 0.0 => Some((x - w0) / k0),
                 _ => None,
             });
+        }
+        if want_parts {
+            *parts = Some(V::list(vec![V::list(vec![V::Float(tm0), V::Float(to0), V::Float(w0), V::Float(k0), base_parts]), V::list(cparts)]));
         }
         Ok(ps)
     })();

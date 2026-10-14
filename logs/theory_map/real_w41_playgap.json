@@ -1,0 +1,268 @@
+{
+ "record": "/home/user/data_rec/sigma_wip/data/w41",
+ "dump": "/home/user/tm/pg/dump_all.jsonl",
+ "deep": {
+  "games": 300,
+  "diverged_games": 0,
+  "points": 1800,
+  "lost_points": 0,
+  "unmapped": 0,
+  "no_visit_played": 2,
+  "by_deck": {
+   "OP09-001": {
+    "1-3": {
+     "agree": 0.54,
+     "loss_per_point": 0.01015,
+     "loss_per_game": 0.0241,
+     "points": 150,
+     "rows_per_game": 2.379
+    },
+    "4-6": {
+     "agree": 0.6333,
+     "loss_per_point": 0.02019,
+     "loss_per_game": 0.1051,
+     "points": 150,
+     "rows_per_game": 5.207
+    },
+    "7+": {
+     "agree": 0.8533,
+     "loss_per_point": 0.00397,
+     "loss_per_game": 0.078,
+     "points": 150,
+     "rows_per_game": 19.662
+    },
+    "all": {
+     "agree": 0.7839,
+     "loss_per_point": null,
+     "loss_per_game": 0.2073,
+     "points": 450,
+     "rows_per_game": null
+    }
+   },
+   "OP11-041": {
+    "1-3": {
+     "agree": 0.5133,
+     "loss_per_point": 0.02103,
+     "loss_per_game": 0.0327,
+     "points": 150,
+     "rows_per_game": 1.556
+    },
+    "4-6": {
+     "agree": 0.78,
+     "loss_per_point": 0.00888,
+     "loss_per_game": 0.0376,
+     "points": 150,
+     "rows_per_game": 4.237
+    },
+    "7+": {
+     "agree": 0.8533,
+     "loss_per_point": 0.00444,
+     "loss_per_game": 0.0832,
+     "points": 150,
+     "rows_per_game": 18.726
+    },
+    "all": {
+     "agree": 0.8191,
+     "loss_per_point": null,
+     "loss_per_game": 0.1535,
+     "points": 450,
+     "rows_per_game": null
+    }
+   },
+   "OP15-058": {
+    "1-3": {
+     "agree": 0.3867,
+     "loss_per_point": 0.02099,
+     "loss_per_game": 0.1224,
+     "points": 150,
+     "rows_per_game": 5.83
+    },
+    "4-6": {
+     "agree": 0.58,
+     "loss_per_point": 0.01059,
+     "loss_per_game": 0.0938,
+     "points": 150,
+     "rows_per_game": 8.855
+    },
+    "7+": {
+     "agree": 0.6133,
+     "loss_per_point": 0.00616,
+     "loss_per_game": 0.1355,
+     "points": 150,
+     "rows_per_game": 22.0
+    },
+    "all": {
+     "agree": 0.5693,
+     "loss_per_point": null,
+     "loss_per_game": 0.3517,
+     "points": 450,
+     "rows_per_game": null
+    }
+   },
+   "OP16-022": {
+    "1-3": {
+     "agree": 0.52,
+     "loss_per_point": 0.0139,
+     "loss_per_game": 0.0458,
+     "points": 150,
+     "rows_per_game": 3.298
+    },
+    "4-6": {
+     "agree": 0.6067,
+     "loss_per_point": 0.01913,
+     "loss_per_game": 0.1562,
+     "points": 150,
+     "rows_per_game": 8.168
+    },
+    "7+": {
+     "agree": 0.64,
+     "loss_per_point": 0.01015,
+     "loss_per_game": 0.2061,
+     "points": 150,
+     "rows_per_game": 20.292
+    },
+    "all": {
+     "agree": 0.619,
+     "loss_per_point": null,
+     "loss_per_game": 0.4081,
+     "points": 450,
+     "rows_per_game": null
+    }
+   }
+  },
+  "contrast": {
+   "OP15-058|all": {
+    "diff": 0.0953,
+    "ci": [
+     -0.011,
+     0.2058
+    ]
+   },
+   "agree:OP15-058|all": {
+    "diff": -0.1714,
+    "ci": [
+     -0.2303,
+     -0.114
+    ]
+   },
+   "OP11-041|4-6": {
+    "diff": -0.0808,
+    "ci": [
+     -0.116,
+     -0.0404
+    ]
+   },
+   "agree:OP11-041|4-6": {
+    "diff": 0.1733,
+    "ci": [
+     0.0911,
+     0.2533
+    ]
+   }
+  }
+ },
+ "theory": {
+  "align": {
+   "rows": 18207
+  },
+  "rows_all": 18207,
+  "rows": 17563,
+  "per_row_by_deck": {
+   "OP09-001": {
+    "1-3": 0.06104,
+    "4-6": 0.06027,
+    "7+": 0.06848
+   },
+   "OP11-041": {
+    "1-3": 0.05728,
+    "4-6": 0.07195,
+    "7+": 0.06792
+   },
+   "OP15-058": {
+    "1-3": 0.0908,
+    "4-6": 0.07237,
+    "7+": 0.05268
+   },
+   "OP16-022": {
+    "1-3": 0.04962,
+    "4-6": 0.07356,
+    "7+": 0.0922
+   }
+  },
+  "per_row_followed": {
+   "OP09-001": 0.3729,
+   "OP11-041": 0.398,
+   "OP15-058": 0.3913,
+   "OP16-022": 0.3462
+  },
+  "games": 300,
+  "rows_per_game": {
+   "OP09-001": {
+    "1-3": 1.8414,
+    "4-6": 5.069,
+    "7+": 19.5586,
+    "all": 26.469
+   },
+   "OP11-041": {
+    "1-3": 1.5037,
+    "4-6": 4.163,
+    "7+": 18.2148,
+    "all": 23.8815
+   },
+   "OP15-058": {
+    "1-3": 5.6478,
+    "4-6": 8.1384,
+    "7+": 21.0252,
+    "all": 34.8113
+   },
+   "OP16-022": {
+    "1-3": 3.0248,
+    "4-6": 7.8509,
+    "7+": 19.9689,
+    "all": 30.8447
+   }
+  },
+  "by_deck": {
+   "OP09-001": {
+    "1-3": 0.1124,
+    "4-6": 0.3055,
+    "7+": 1.3393,
+    "all": 1.7572
+   },
+   "OP11-041": {
+    "1-3": 0.0861,
+    "4-6": 0.2995,
+    "7+": 1.2372,
+    "all": 1.6229
+   },
+   "OP15-058": {
+    "1-3": 0.5128,
+    "4-6": 0.589,
+    "7+": 1.1077,
+    "all": 2.2095
+   },
+   "OP16-022": {
+    "1-3": 0.1501,
+    "4-6": 0.5775,
+    "7+": 1.8411,
+    "all": 2.5687
+   }
+  },
+  "contrast": {
+   "OP15-058|all": {
+    "diff": 0.2266,
+    "ci": [
+     -0.029,
+     0.4765
+    ]
+   },
+   "OP11-041|4-6": {
+    "diff": -0.1912,
+    "ci": [
+     -0.2434,
+     -0.1365
+    ]
+   }
+  }
+ }
+}

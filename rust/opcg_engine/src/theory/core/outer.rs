@@ -25,6 +25,10 @@ use super::obj::{dset_mut, knum, V, K};
 use super::state::Core;
 use super::to::{theta, DELTA, ATTACK_DON_MAX};
 
+thread_local! {
+    static LAST_HAND_PLAN: std::cell::Cell<Option<(f64, f64)>> = const { std::cell::Cell::new(None) };
+}
+
 pub const RACE_CAP: f64 = 30.0;
 pub const SLOPE_FLOOR: f64 = 1e-3;
 pub const EX_STATE_BUDGET: usize = 300000;
@@ -1685,6 +1689,12 @@ impl Core {
         Ok((Some(self.cut_card_price(mu) * cut.f()), plan))
     }
 
+    /// 診断 `OPCG_CLOCK_PARTS_DUMP=1` 用（`docs/reports/2026-10-14_own_clock_parts.md`）: 直前の `threshold_parts_side` が
+    /// 守る側の計画（`theta_parts`）から手札の項を取ったときの (手札から出す札の枚数, 手札で止める攻撃の数)。値は何も変えない。
+    pub fn last_hand_plan() -> Option<(f64, f64)> {
+        LAST_HAND_PLAN.with(|c| c.get())
+    }
+
     /// `threshold_parts_side(sc, tok, side, lam, mu, g_hand, hand_blocker, attacker, plan)` → (ライフ, 手札, 体)
     #[allow(clippy::too_many_arguments)]
     pub fn threshold_parts_side(&mut self, sc: &[f64], tok: &Tok, side_opp: bool, lam: f64, mu: f64, g_hand: &V, hand_blocker: f64, attacker: Option<&mut Actx>, plan: &V) -> R<(f64, f64, f64)> {
@@ -1697,6 +1707,7 @@ impl Core {
         };
         let g = g_value(g_hand).unwrap_or(mu);
         let active = self.cut_active();
+        LAST_HAND_PLAN.with(|c| c.set(None));
         let mut hand;
         let (rule_hand, pl) = self.rule_don_term(sc, tok, side_opp, g_hand, attacker, mu, None, plan, true)?;
         match rule_hand {
@@ -1704,6 +1715,7 @@ impl Core {
             Some(_) => {
                 if !pl.is_none() && pl.has("theta_parts") {
                     let tp = pl.get("theta_parts").items();
+                    LAST_HAND_PLAN.with(|c| c.set(Some((pl.get("cut").f_or0(), pl.get("stopped").f_or0()))));
                     // 候補 `OPCG_LIFE_ADD`: ライフの項に手札のライフ加算（λ 単位・その席の手札の読み）を足す（無ければ 0＝旧と同じ）
                     return Ok((tp[0].f() + g_hand.get("life_add").f_or0(), tp[1].f(), tp[2].f()));
                 }
@@ -1726,6 +1738,7 @@ impl Core {
 
     /// `threshold_of_me_parts(sc, tok, lam, mu, g_hand, hand_blocker)`（`THETA_SIDE_MODE=legacy`）
     pub fn threshold_of_me_parts_legacy(&mut self, sc: &[f64], tok: &Tok, lam: f64, mu: f64, g_hand: &V) -> (f64, f64, f64) {
+        LAST_HAND_PLAN.with(|c| c.set(None));
         let olp = lp_or(sc[lt::SC_OPP_LEADER_POWER]);
         let g = g_value(g_hand).unwrap_or(mu);
         let body = body_term(tok, lt::OWN_FIELD, olp);
