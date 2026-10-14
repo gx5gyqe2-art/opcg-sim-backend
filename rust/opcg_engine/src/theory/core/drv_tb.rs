@@ -293,6 +293,7 @@ impl Core {
         self.leave(s);
         let pm = th_me?;
         let hp_m = Core::last_hand_plan();
+        let ap_m = Core::last_att_plan();
         let th_me = pm.0 + pm.1 + pm.2;
         let s = self.enter(cut_me);
         let th_opp = self.state_th_me_parts(row, g_me, mirror, symmetric);
@@ -304,6 +305,7 @@ impl Core {
         let hc = |h: Option<(f64, f64)>| h.map(|x| [x.0, x.1]).unwrap_or([f64::NAN, f64::NAN]);
         let (a, b) = (hc(hp_m), hc(hp_o));
         CURVE_PARTS.with(|c| c.set(Some([pm.0, pm.1, pm.2, a[0], a[1], po.0, po.1, po.2, b[0], b[1]])));
+        CURVE_ATT.with(|c| *c.borrow_mut() = ap_m);
         let tau_me = rw::tau_from_profile(th_me, j, prof, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         let tau_opp = rw::tau_from_profile(th_opp, j, prof, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         Ok((tau_opp - tau_me, tau_me, tau_opp))
@@ -985,12 +987,21 @@ thread_local! {
     /// 直前の `curve_d_of_row` の耐久の項（診断 `OPCG_CLOCK_PARTS_DUMP=1` だけが読む）:
     /// [相手の耐久 ライフ・手札・体・手札から出す枚数・止める数, 自分の耐久 ライフ・手札・体・出す枚数・止める数]（計画が無ければ枚数・止める数は NaN）
     static CURVE_PARTS: std::cell::Cell<Option<[f64; 10]>> = const { std::cell::Cell::new(None) };
+    /// 直前の `curve_d_of_row` の自分の時計（相手の耐久）の攻め手の計画の 1 段目 [(枠, 超過, 付けるドン)]（`2026-10-14_followup_plan.md`）
+    static CURVE_ATT: std::cell::RefCell<Option<Vec<(i64, f64, i64)>>> = const { std::cell::RefCell::new(None) };
 }
 
 /// 診断 `OPCG_CLOCK_PARTS_DUMP=1`（`docs/reports/2026-10-14_theory_ties_type.md` §1.4・既定は切・値は変えない）:
 /// 手の値段の写しに、候補ごとの後続の 2 本の時計と勝率・「相手の時計だけを動かした勝率」を書き足す。
 pub(super) fn clock_parts_dump_on() -> bool {
     matches!(std::env::var("OPCG_CLOCK_PARTS_DUMP").ok().as_deref().map(str::trim), Some("1") | Some("on") | Some("true"))
+}
+
+fn curve_att_v() -> V {
+    match CURVE_ATT.with(|c| c.borrow().clone()) {
+        Some(v) => V::list(v.iter().map(|&(sl, x, k)| V::list(vec![V::Int(sl), V::Float(x), V::Int(k)])).collect()),
+        None => V::None,
+    }
 }
 
 fn curve_parts_v() -> V {
@@ -1003,6 +1014,7 @@ fn curve_parts_v() -> V {
 /// `clock_read` と同じ読み＋その時計 `(W, κ, τ_me, τ_opp)`。
 fn clock_read_full(c2: &mut Core, me: &Row, opp: &Row, cx: &ClockCx) -> R<(f64, f64, f64, f64)> {
     CURVE_PARTS.with(|c| c.set(None));
+    CURVE_ATT.with(|c| *c.borrow_mut() = None);
     let g_me = c2.hand_price_mean(me, MU, true, None)?;
     let go = c2.hand_price_mean(opp, MU, true, None)?;
     let go = c2.with_life_types(&go, cx.dk_opp.as_deref());
@@ -1062,7 +1074,7 @@ fn clock_prices(c2: &mut Core, row: &Row, sv: &V, cx: &ClockCx, stats: &mut D, p
                     if want_parts {
                         // 相手の時計だけを動かした勝率（自分の時計は打つ前のまま）
                         let w_opp = lt::prob_of_d(&cx.cfg.clock, to - tm0, None, Some(tm0), Some(to), "hyp", false);
-                        cparts.push(V::list(vec![V::Float(tm), V::Float(to), V::Float(wv), V::Float(w_opp), curve_parts_v()]));
+                        cparts.push(V::list(vec![V::Float(tm), V::Float(to), V::Float(wv), V::Float(w_opp), curve_parts_v(), curve_att_v()]));
                     }
                     Some(wv)
                 }
