@@ -97,7 +97,33 @@ fn bits_eq(a: f64, b: f64) -> bool {
 }
 
 #[test]
+fn survival_first_order_spends_no_card_when_taking_the_hits_still_survives() {
+    // 既定の比べ方（生き延びるターン → 切る札 → 防いだ本数）。旧い順の例 2 と同じ盤面: ライフ 2・超過 0 の攻撃 2 本・手札 1 枚＋ブロッカー 1 体。
+    // 2 本とも受けてもライフ 0 で残る（負けは「ライフ 0 で受けたとき」だけ）＝生き延びるターンは止めても受けても 2 で同じ
+    // → 次の比べ方「切る札が少ない」で、手札を切らない守りを選ぶ（旧い順は「防いだ本数」を先に見て 1 枚切っていた）。
+    if !super::defender::hand_stop_survive() {
+        return; // `OPCG_HAND_STOP=off` で回したときは旧い順の試験だけが見る
+    }
+    let mut p = P::base();
+    p.cards = vec![(1000.0, 0.0)];
+    p.don = 1.0;
+    p.xs = vec![0.0, 0.0];
+    p.seq = vec![vec![1000.0]];
+    p.blk = vec![1000.0];
+    p.life = 2.0;
+    p.turns = Some(2);
+    p.lt = vec![(1000.0, 0.0, 0.5)];
+    let o = p.solve(&mut Defender::new(None)).unwrap();
+    assert_eq!((o.cut, o.alive), (0.0, 2.0));
+}
+
+#[test]
 fn hand_checked_small_problems() {
+    // 旧い比べ方の順（防いだ本数 → 切る札 → 生き延びるターン・`OPCG_HAND_STOP=off` と同じ）で導いた値・記録
+    super::defender::with_legacy_order(hand_checked_small_problems_legacy)
+}
+
+fn hand_checked_small_problems_legacy() {
     // 1: ブロッカーも手札も無い・ライフ 1 で攻撃 1 本。受けるしか無い（harms = lam_net）。
     let mut p = P::base();
     p.xs = vec![1000.0];
@@ -380,6 +406,11 @@ fn dec_triples(v: &serde_json::Value) -> Vec<(f64, f64, f64)> {
 
 #[test]
 fn recorded_real_and_synthetic_dp_calls_replay_bit_identically() {
+    // 旧い比べ方の順（防いだ本数 → 切る札 → 生き延びるターン・`OPCG_HAND_STOP=off` と同じ）で導いた値・記録
+    super::defender::with_legacy_order(recorded_real_and_synthetic_dp_calls_replay_bit_identically_legacy)
+}
+
+fn recorded_real_and_synthetic_dp_calls_replay_bit_identically_legacy() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/rd_dp_golden.jsonl");
     let text = std::fs::read_to_string(path).expect("記録した動的計画の呼び出し（rd_dp_golden.jsonl）が無い");
     let (mut n_real, mut n_syn, mut n_cut) = (0, 0, 0);
@@ -520,6 +551,11 @@ fn recorded_rule_don_solves_replay_bit_identically() {
 
 /// 記録した解の行を再生する。`[実, 合成, 局面, 解いた数, 縮めた数]`。
 fn replay_solves(lines: &[&str]) -> [usize; 5] {
+    // 記録は旧い比べ方の順で取った（`OPCG_HAND_STOP=off` と同じ）
+    super::defender::with_legacy_order(|| replay_solves_legacy(lines))
+}
+
+fn replay_solves_legacy(lines: &[&str]) -> [usize; 5] {
     use super::plans::{run, Mask, SolveIn};
     use super::sched::{StepIn, Tables};
     let (mut n_real, mut n_syn, mut n_frame, mut n_runs, mut n_cut) = (0, 0, 0, 0, 0);
