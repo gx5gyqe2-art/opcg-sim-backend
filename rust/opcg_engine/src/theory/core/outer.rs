@@ -27,6 +27,8 @@ use super::to::{theta, DELTA, ATTACK_DON_MAX};
 
 thread_local! {
     static LAST_HAND_PLAN: std::cell::Cell<Option<(f64, f64)>> = const { std::cell::Cell::new(None) };
+    /// 直前の `threshold_parts_side` の攻め手の計画の 1 段目 [(枠, 超過 x, 計画が付けるドン k)]（診断・`2026-10-14_followup_plan.md`）
+    static LAST_ATT_PLAN: std::cell::RefCell<Option<Vec<(i64, f64, i64)>>> = const { std::cell::RefCell::new(None) };
 }
 
 pub const RACE_CAP: f64 = 30.0;
@@ -1695,6 +1697,11 @@ impl Core {
         LAST_HAND_PLAN.with(|c| c.get())
     }
 
+    /// 診断: 直前の `threshold_parts_side` の攻め手の計画の 1 段目（無ければ None）。
+    pub fn last_att_plan() -> Option<Vec<(i64, f64, i64)>> {
+        LAST_ATT_PLAN.with(|c| c.borrow().clone())
+    }
+
     /// `threshold_parts_side(sc, tok, side, lam, mu, g_hand, hand_blocker, attacker, plan)` → (ライフ, 手札, 体)
     #[allow(clippy::too_many_arguments)]
     pub fn threshold_parts_side(&mut self, sc: &[f64], tok: &Tok, side_opp: bool, lam: f64, mu: f64, g_hand: &V, hand_blocker: f64, attacker: Option<&mut Actx>, plan: &V) -> R<(f64, f64, f64)> {
@@ -1708,8 +1715,18 @@ impl Core {
         let g = g_value(g_hand).unwrap_or(mu);
         let active = self.cut_active();
         LAST_HAND_PLAN.with(|c| c.set(None));
+        LAST_ATT_PLAN.with(|c| *c.borrow_mut() = None);
+        let att1: Option<Vec<(i64, f64)>> = attacker.as_ref().map(|a| a.att1.clone());
         let mut hand;
         let (rule_hand, pl) = self.rule_don_term(sc, tok, side_opp, g_hand, attacker, mu, None, plan, true)?;
+        if let Some(a1) = &att1 {
+            if !pl.is_none() && pl.has("k") {
+                let ks: Vec<i64> = pl.get("k").items().iter().map(|x| x.int()).collect();
+                if ks.len() == a1.len() {
+                    LAST_ATT_PLAN.with(|c| *c.borrow_mut() = Some(a1.iter().zip(ks.iter()).map(|(&(sl, x), &k)| (sl, x, k)).collect()));
+                }
+            }
+        }
         match rule_hand {
             None => self.outer.ev("rule_fallback", V::Int(1)),
             Some(_) => {

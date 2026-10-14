@@ -2753,9 +2753,109 @@ def cmd_ownparts(a):
     return 0
 
 
+def cmd_followplan(a):
+    """`2026-10-14_followup_plan.md` §1.2 の 1 段目: 既定の表で取った写し（`OPCG_CLOCK_PARTS_DUMP=1`・攻め手の計画つき）から、
+    殴らない候補（出す・付与・起動）の後続ごとに、理論の計画の 1 段目で「超過 + 1000 × 付けるドン」が最大の攻め手（同点は計画の並びで先）を選ぶ。
+    届かない（最大が −10 未満）・攻め手がいない・部品の無い候補は選ばない（今の後続のまま）。出力 {seed: {step: {候補: [枠, ドン]}}}。"""
+    stub = {"cap": 99.0, "rows_out": [], "turn_harm": [], "settled": []}
+    dump = load_dump(a.dump)
+    rows_all, _al, *_r = build_rows(a.src, dump, stub)
+    by_seed = collections.defaultdict(list)
+    for r in rows_all:
+        by_seed[r["seed"]].append(r)
+    out, cnt = {}, collections.Counter()
+    for seed, rs in by_seed.items():
+        keyed = collections.defaultdict(list)
+        for k, x in enumerate(dump[seed]["rows"]):
+            keyed[(int(x[0]), int(x[1]), json.dumps(x[8]))].append(k)
+        for r in rs:
+            ks = keyed.get((r["t"], r["w"], json.dumps(r["cands"])))
+            if not ks:
+                cnt["row_unmatched"] += 1
+                continue
+            dr = dump[seed]["rows"][ks.pop(0)]
+            pt = dr[9] if len(dr) > 9 else None
+            if not pt:
+                cnt["row_no_parts"] += 1
+                continue
+            cp = pt[1]
+            for gi, (fam, _v) in enumerate(r["cands"]):
+                if fam not in ("play", "attach", "effect"):
+                    continue
+                cnt["nonattack_cands"] += 1
+                e = cp[gi] if gi < len(cp) else None
+                if not e or len(e) < 6 or e[5] is None:
+                    cnt["skip_no_plan"] += 1
+                    continue
+                plan = e[5]
+                if not plan:
+                    cnt["skip_no_attacker"] += 1
+                    continue
+                best = max(range(len(plan)), key=lambda q: (plan[q][1] + 1000.0 * plan[q][2], -q))
+                sl, x, kk = plan[best]
+                if x + 1000.0 * kk < -10.0:
+                    cnt["skip_no_reach"] += 1
+                    continue
+                out.setdefault(str(seed), {}).setdefault(str(r["step"]), {})[str(gi)] = [int(sl), int(kk)]
+                cnt["chosen"] += 1
+                cnt["chosen_slot_%s" % ("leader" if int(sl) == 0 else "char")] += 1
+                cnt["chosen_k_%d" % int(kk)] += 1
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f)
+    print(json.dumps(dict(cnt)))
+    return 0
+
+
+def cmd_followcheck(a):
+    """`2026-10-14_followup_plan.md` §1.3 の不変量: 既定の表の写しと `--followup plan` の表の写しを比べ、作り直していない候補
+    （攻撃・パス・届く攻め手がいない・計画の無い候補）の値段と、打つ前の勝率 W0・傾き κ0 が 1 ビットも違わないかを数える。"""
+    stub = {"cap": 99.0, "rows_out": [], "turn_harm": [], "settled": []}
+    d0, d1 = load_dump(a.base_dump), load_dump(a.follow_dump)
+    plan = json.load(open(a.plan, encoding="utf-8"))
+    rows_all, _al, *_r = build_rows(a.src, d0, stub)
+    steps = collections.defaultdict(list)
+    for r in rows_all:
+        steps[r["seed"]].append(r["step"])
+    cnt = collections.Counter()
+    for seed in sorted(set(d0) & set(d1)):
+        r0, r1 = d0[seed]["rows"], d1[seed]["rows"]
+        if len(r0) != len(r1):
+            cnt["games_len_mismatch"] += 1
+            continue
+        cnt["games"] += 1
+        st = steps.get(seed, [])
+        pl = plan.get(str(seed), {})
+        for k, (x0, x1) in enumerate(zip(r0, r1)):
+            if x0[:2] != x1[:2] or [c[0] for c in x0[8]] != [c[0] for c in x1[8]]:
+                cnt["rows_key_mismatch"] += 1
+                continue
+            cnt["rows"] += 1
+            step = st[k] if k < len(st) and len(st) == len(r0) else None
+            fol = pl.get(str(step), {}) if step is not None else {}
+            if step is None:
+                cnt["rows_no_step"] += 1
+            p0 = x0[9] if len(x0) > 9 else None
+            p1 = x1[9] if len(x1) > 9 else None
+            if p0 and p1:
+                cnt["w0k0_same" if p0[0][2:4] == p1[0][2:4] else "w0k0_diff"] += 1
+            for gi, (c0, c1) in enumerate(zip(x0[8], x1[8])):
+                fam = c0[0]
+                if str(gi) in fol:
+                    cnt["followed"] += 1
+                    cnt["followed_changed" if c0[1] != c1[1] else "followed_same"] += 1
+                    continue
+                key = "attack" if fam == "attack" else ("end" if fam == "end" else "other_unfollowed")
+                cnt["%s_same" % key if c0[1] == c1[1] else "%s_diff" % key] += 1
+    out = dict(cnt)
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps(out))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "followplan", "followcheck", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -2870,11 +2970,21 @@ def main(argv=None):
     op.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1`（耐久の項つき・5630fbb1 以降）で取り直した写し")
     op.add_argument("--deep", required=True)
     op.add_argument("--out", required=True)
+    fp = sub.add_parser("followplan")
+    fp.add_argument("--in", dest="src", required=True)
+    fp.add_argument("--dump", required=True, help="既定の表で `OPCG_CLOCK_PARTS_DUMP=1`（攻め手の計画つき・2e915f46 以降）で取った写し")
+    fp.add_argument("--out", required=True)
+    fc = sub.add_parser("followcheck")
+    fc.add_argument("--in", dest="src", required=True)
+    fc.add_argument("--base-dump", required=True, help="既定の表で取った写し")
+    fc.add_argument("--follow-dump", required=True, help="`--followup plan` の表で取った写し")
+    fc.add_argument("--plan", required=True, help="`followplan` の json")
+    fc.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
             "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter,
-            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts}[a.cmd](a)
+            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "followplan": cmd_followplan, "followcheck": cmd_followcheck}[a.cmd](a)
 
 
 if __name__ == "__main__":
