@@ -2491,7 +2491,7 @@ TT_COARSE = {"atk_leader": "attack", "atk_char": "attack", "atk_other": "attack"
              "activate": "activate", "pass": "pass", "other": "other"}
 
 
-def cmd_theorytype(a):
+def theorytype_points(a):
     """`2026-10-14_theory_ties_type.md` §1: `theory_ties` の (i)(ii)(iii) の点を手の型で割り、差を相手の時計・自分の時計の部品に分ける
     （写しは `OPCG_CLOCK_PARTS_DUMP=1` で取り直したもの）。"""
     from theory_rs import MU
@@ -2608,7 +2608,9 @@ def cmd_theorytype(a):
                         wb, wx = cp[bi][2], cp[x][2]
                         opp = cp[bi][3] - cp[x][3]
                         tot = wb - wx
-                        rec.update({"w_gap": tot, "w_opp": opp, "w_own": tot - opp, "k0": base[3]})
+                        rec.update({"w_gap": tot, "w_opp": opp, "w_own": tot - opp, "k0": base[3],
+                                    "pb": cp[bi][4] if len(cp[bi]) > 4 else None, "px": cp[x][4] if len(cp[x]) > 4 else None,
+                                    "p0": base[4] if len(base) > 4 else None})
                         if base[3] > 0 and abs(tot / base[3] - (mx - pr[x])) > 1e-6:
                             cnt["parts_price_mismatch"] += 1
                     else:
@@ -2617,6 +2619,13 @@ def cmd_theorytype(a):
                     cnt["parts_none_" + gname] += 1
                 P.append(rec)
     cnt.update({"recs_" + k: v for k, v in collections.Counter(x["g"] for x in P).items()})
+    return P, cnt, MU
+
+
+def cmd_theorytype(a):
+    """`2026-10-14_theory_ties_type.md` §1: `theory_ties` の (i)(ii)(iii) の点を手の型で割り、差を相手の時計・自分の時計の部品に分ける
+    （写しは `OPCG_CLOCK_PARTS_DUMP=1` で取り直したもの）。"""
+    P, cnt, MU = theorytype_points(a)
 
     def table(xs, kb, kx):
         tot = sum(x["gap"] for x in xs) or 1.0
@@ -2659,9 +2668,94 @@ def cmd_theorytype(a):
     return 0
 
 
+def cmd_ownparts(a):
+    """`2026-10-14_own_clock_parts.md` §1: 「最善が攻撃・探索の手が攻撃でない」組などの時計の部品を、耐久の 3 項（ライフ・手札・体）に配る。
+    自分の時計の部品は相手の耐久（候補の後続の `P[0..2]`）、相手の時計の部品は自分の耐久（`P[5..7]`）で配る。"""
+    P, cnt, MU = theorytype_points(a)
+    eps = 0.01 * MU
+    TERMS = ("life", "hand", "body")
+
+    def split(xs, side):
+        """side='own'（自分の時計＝相手の耐久 P[0..2]）／'opp'（相手の時計＝自分の耐久 P[5..7]）。"""
+        off = 0 if side == "own" else 5
+        part_key = "w_own" if side == "own" else "w_opp"
+        acc = dict.fromkeys(TERMS, 0.0)
+        raw = dict.fromkeys(TERMS, 0.0)
+        tot, n, skipped = 0.0, 0, 0
+        hand_detail = {"cut": [], "stopped": [], "price": []}
+        for x in xs:
+            pb, px = x.get("pb"), x.get("px")
+            if not pb or not px or part_key not in x:
+                continue
+            # 差 = 探索（記録）の手の後 − 最善の手の後（殴らなかった分だけ残っている耐久）
+            d = [px[off + k] - pb[off + k] for k in range(3)]
+            s_ = sum(d)
+            for k, t in enumerate(TERMS):
+                raw[t] += d[k]
+            if abs(s_) < eps:
+                skipped += 1
+                continue
+            w = x[part_key]
+            for k, t in enumerate(TERMS):
+                acc[t] += w * d[k] / s_
+            tot += w
+            n += 1
+            cb, cx_ = pb[off + 3], px[off + 3]
+            sb, sx = pb[off + 4], px[off + 4]
+            if None not in (cb, cx_, sb, sx):
+                hand_detail["cut"].append(cx_ - cb)
+                hand_detail["stopped"].append(sx - sb)
+                pbp = pb[off + 1] / cb if cb else None
+                pxp = px[off + 1] / cx_ if cx_ else None
+                if pbp is not None and pxp is not None:
+                    hand_detail["price"].append(pxp - pbp)
+        rs = sum(raw.values())
+        o = {"n": n, "skipped_small": skipped, "w_part_sum": round(tot, 4),
+             "share": {t: (round(acc[t] / tot, 4) if tot else None) for t in TERMS},
+             "raw_share": {t: (round(raw[t] / rs, 4) if rs else None) for t in TERMS},
+             "raw_sum": {t: round(raw[t], 3) for t in TERMS}}
+        for k, v in hand_detail.items():
+            o["hand_d_" + k] = {"n": len(v), "mean": round(float(np.mean(v)), 4) if v else None,
+                                "median": round(float(np.median(v)), 4) if v else None}
+        return o
+
+    def grp(xs):
+        atk_non = [x for x in xs if x["bc"] == "attack" and x["xc"] != "attack"]
+        return {"n": len(xs), "atk_non": {"n": len(atk_non), "own": split(atk_non, "own"), "opp": split(atk_non, "opp")},
+                "all": {"own": split(xs, "own"), "opp": split(xs, "opp")}}
+
+    def play_char_check(xs):
+        """(4): 探索（記録）の手がキャラを出す点で、その手の後 − 打つ前の自分の耐久（P[5..7]）。"""
+        rows = []
+        for x in xs:
+            if x["xt"] != "play_char" or not x.get("px") or not x.get("p0"):
+                continue
+            px, p0 = x["px"], x["p0"]
+            dh = px[6] - p0[6]
+            db = px[7] - p0[7]
+            rows.append((dh, db))
+        if not rows:
+            return {"n": 0}
+        return {"n": len(rows), "hand_change_mean_mu": round(float(np.mean([r[0] for r in rows])) / MU, 4),
+                "body_change_mean_mu": round(float(np.mean([r[1] for r in rows])) / MU, 4),
+                "hand_drop_gt_body_gain": round(float(np.mean([(-r[0]) > r[1] for r in rows])), 4)}
+    out = {"record": a.src, "dump": a.dump, "deep": a.deep, "mu": MU, "count": dict(cnt), "groups": {}}
+    for gsel, names in (("i+ii", ("i", "ii")), ("iii", ("iii",))):
+        xs = [x for x in P if x["g"] in names]
+        e = {"all": grp(xs), "by_band": {b: grp([x for x in xs if x["band"] == b]) for b in TURN_BANDS},
+             "enel": grp([x for x in xs if x["deck"] == "OP15-058"]),
+             "by_deck": {dk: grp([x for x in xs if x["deck"] == dk]) for dk in sorted({x["deck"] for x in xs})},
+             "play_char": play_char_check(xs)}
+        out["groups"][gsel] = e
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps(out["groups"]["i+ii"]["all"]["atk_non"]["own"]["share"]))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -2771,11 +2865,16 @@ def main(argv=None):
     ty.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1` で取り直した写し")
     ty.add_argument("--deep", required=True)
     ty.add_argument("--out", required=True)
+    op = sub.add_parser("ownparts")
+    op.add_argument("--in", dest="src", required=True)
+    op.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1`（耐久の項つき・5630fbb1 以降）で取り直した写し")
+    op.add_argument("--deep", required=True)
+    op.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
             "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter,
-            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype}[a.cmd](a)
+            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts}[a.cmd](a)
 
 
 if __name__ == "__main__":
