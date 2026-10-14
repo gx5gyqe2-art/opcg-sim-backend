@@ -126,7 +126,53 @@ def successor(game, name, turn, mv, opts):
     return ST_MAIN, _cast(f, name), _cast(f, opp), r["plies"]
 
 
-def replay_game(d, seed, meta, rec_rows, shuffle=False):
+def follow_attack(game, name, turn, slot, k, opts):
+    """**`--followup plan`**（`docs/reports/2026-10-14_followup_plan.md` §1.2）: 殴らない候補の後続（メインに戻った盤面 `game`・複製）で、
+    理論の計画が選んだ攻め手（自分の側の枠 `slot`）に `k` 枚のドンを付けて相手のリーダーを殴り、戦闘の窓を同じ既定の規則で閉じる。
+    攻撃の候補の後続と同じ手順（`DON_BOX` を `apply_search_move` → `resolve_windows`）。戻り＝`successor` と同じ形。"""
+    opp = "p2" if name == "p1" else "p1"
+    idx = json.loads(game.dump_index_json(name))
+    by_slot = {int(v): u for u, v in idx["slots"].items()}
+    att, ldr = by_slot.get(int(slot)), by_slot.get(1)
+    if att is None or ldr is None:
+        return ST_ERR, None, None, 0
+    mv = {"kind": "game", "action_type": "DON_BOX", "payload": {"uuid": att, "don_k": int(k), "target_ids": [ldr]}}
+    try:
+        game.apply_search_move(name, json.dumps(mv, ensure_ascii=False))
+        r = json.loads(game.resolve_windows(opts))
+    except Exception:                                       # noqa: BLE001  適用できない＝値段なし
+        return ST_ERR, None, None, 0
+    w = game.winner()
+    if w is not None:
+        return (ST_WON if w == name else ST_LOST), None, None, r["plies"]
+    if r["open"]:
+        return ST_OPEN, None, None, r["plies"]
+    pend = json.loads(game.pending_json()) or {}
+    if int(game.turn_count or 0) != int(turn) or pend.get("player_id") != name:
+        return ST_TURN, None, None, r["plies"]
+    if pend.get("action") != "MAIN_ACTION":
+        return ST_OPEN, None, None, r["plies"]
+    return ST_MAIN, _cast(game, name), _cast(game, opp), r["plies"]
+
+
+def successor_follow(game, name, turn, mv, opts, slot, k):
+    """`successor` の後続がメインに戻ったら、さらに `follow_attack` を 1 回（`--followup plan`）。"""
+    f = game.fork()
+    try:
+        f.apply_search_move(name, json.dumps(mv, ensure_ascii=False))
+        r = json.loads(f.resolve_windows(opts))
+    except Exception:                                       # noqa: BLE001
+        return ST_ERR, None, None, 0
+    if f.winner() is not None or r["open"]:
+        return successor(game, name, turn, mv, opts)       # 後続がメインでない＝今の後続のまま（呼び出し側は作り直さない）
+    pend = json.loads(f.pending_json()) or {}
+    if int(f.turn_count or 0) != int(turn) or pend.get("player_id") != name or pend.get("action") != "MAIN_ACTION":
+        return successor(game, name, turn, mv, opts)
+    st, me, op, plies = follow_attack(f, name, turn, slot, k, opts)
+    return st, me, op, r["plies"] + plies
+
+
+def replay_game(d, seed, meta, rec_rows, shuffle=False, follow=None, base_npz=None):
     """1 局を打ち直して表を作る。戻り＝npz に書く dict。"""
     E.engine()
     search = {"worlds": int(meta["search"]["worlds"])} if (meta.get("search") or {}).get("worlds") else {}
@@ -166,10 +212,29 @@ def replay_game(d, seed, meta, rec_rows, shuffle=False):
         # **`--shuffle`**（報告 §2.5・司令塔の点検）: 両席のライフと山札を混ぜ直した複製を元に後続を作る（並びを知らない形）。
         # 並べ直しは行ごとに 1 回（同じ行の候補は同じ並びで比べる）・種は (seed, step) から決まる。
         base = game.fork_shuffled(int(seed) * 100003 + int(step)) if shuffle else game
-        for g in groups:
+        fr = (follow or {}).get(int(step), {})
+        use_base = base_npz is not None
+        if use_base:
+            ri = len(rows["step"]) - 1
+            if ri >= len(base_npz["r_step"]) or int(base_npz["r_step"][ri]) != int(step) or int(base_npz["r_n"][ri]) != len(groups):
+                chk["bad"] += 1                             # 既定の表と行が揃わない（この局は使わない）
+                fr, use_base = {}, False
+        for gi, g in enumerate(groups):
             mv = legal[g["rep"]]
+            if use_base and gi not in fr:
+                # `--followup`: 作り直さない候補は既定の表の後続をそのまま写す（§1.3 の不変量）
+                j = int(base_npz["r_ptr"][ri]) + gi
+                cand["st"].append(int(base_npz["c_st"][j])); cand["plies"].append(int(base_npz["c_plies"][j]))
+                for kk in ("msc", "mtok", "mci", "osc", "otok", "oci"):
+                    cand[kk].append(base_npz["c_" + kk][j])
+                chk["copied"] = chk.get("copied", 0) + 1
+                continue
             if mv.get("action_type") == "TURN_END":
                 st, me, op, plies = ST_END, end_of_turn(mine), o, 0
+            elif gi in fr:
+                st, me, op, plies = successor_follow(base, name, turn, mv, opts, fr[gi][0], fr[gi][1])
+                chk["followed"] = chk.get("followed", 0) + 1
+                chk["followed_st_%d" % st] = chk.get("followed_st_%d" % st, 0) + 1
             else:
                 st, me, op, plies = successor(base, name, turn, mv, opts)
             cand["st"].append(st); cand["plies"].append(plies)
@@ -179,7 +244,10 @@ def replay_game(d, seed, meta, rec_rows, shuffle=False):
             cand["osc"].append(op[0]); cand["otok"].append(op[1]); cand["oci"].append(op[2])
 
     res = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, max_steps=RG.MAX_STEPS, observer=observer)
+    if base_npz is not None and len(rows["step"]) != len(base_npz["r_step"]):
+        chk["bad"] += 1                                     # 既定の表と行が揃わない＝この局は使わない
     out = {"seed": np.int64(seed), "match": np.int8(chk["bad"] == 0 and chk["rows"] == len(rec_rows)),
+           "followed": np.int64(chk.get("followed", 0)), "copied": np.int64(chk.get("copied", 0)),
            "order": ("unknown" if shuffle else "known"),           # 並びの形（`theory_bridge.py` が求めた形と照合する）
            "rows_checked": np.int64(chk["rows"]), "rows_bad": np.int64(chk["bad"]),
            "rows_recorded": np.int64(len(rec_rows)), "winner": str(res["winner"])}
@@ -199,10 +267,25 @@ def main(argv=None):
     ap.add_argument("--order", default="unknown", choices=("unknown", "known"),
                     help="並びの形（既定 `unknown`＝両席のライフと山札を混ぜ直した複製から後続を作る・`known`＝真の盤面の複製＝後知恵の上限）")
     ap.add_argument("--shuffle", action="store_true", help="`--order unknown` の別名（旧い回し方・既定と同じ）")
+    ap.add_argument("--followup", default="off", choices=("off", "plan"),
+                    help="`plan`＝殴らない候補の後続で、理論の計画が選んだ攻撃を 1 回エンジンで解決してから読む（`2026-10-14_followup_plan.md`・"
+                         "`--plan` と既定の表 `--base` が要る・作り直さない候補は既定の表をそのまま写す）")
+    ap.add_argument("--shard", default=None, help="i/n（局を n 本に分けた i 本目・並列に回すとき）")
+    ap.add_argument("--plan", default=None, help="`theory_map.py followplan` の json（{seed: {step: {候補: [枠, ドン]}}}）")
+    ap.add_argument("--base", default=None, help="既定の表の置き場（既定 `<in>/clock_succ`）")
     a = ap.parse_args(argv)
     if a.shuffle:
         a.order = "unknown"
     a.shuffle = a.order == "unknown"
+    plan = None
+    if a.followup == "plan":
+        if not a.plan:
+            raise SystemExit("--followup plan には --plan が要る")
+        plan = {int(sd): {int(st): {int(gi): v for gi, v in cs.items()} for st, cs in steps.items()}
+                for sd, steps in json.load(open(a.plan, encoding="utf-8")).items()}
+        a.base = a.base or os.path.join(a.src, "clock_succ" if a.shuffle else "clock_succ_known")
+        if a.out is None:
+            a.out = os.path.join(a.src, "clock_succ_followup_plan")
     if a.out is None:
         a.out = os.path.join(a.src, "clock_succ" if a.shuffle else "clock_succ_known")
     os.makedirs(a.out, exist_ok=True)
@@ -210,6 +293,9 @@ def main(argv=None):
     rec, order = record_steps(a.src)
     if a.games:
         order = order[:a.games]
+    if a.shard:
+        si, sn = (int(x) for x in a.shard.split("/"))
+        order = [sd for k, sd in enumerate(order) if k % sn == si]
     t0 = time.time()
     n_done = n_bad = 0
     for s in order:
@@ -217,14 +303,20 @@ def main(argv=None):
         if os.path.exists(path):
             continue
         t1 = time.time()
-        out = replay_game(a.src, s, meta, rec[s], shuffle=a.shuffle)
+        if plan is not None:
+            bz = dict(np.load(os.path.join(a.base, "%d.npz" % s)))
+            if str(bz["order"]) != ("unknown" if a.shuffle else "known"):
+                raise SystemExit("既定の表の並びの形が違う: %s" % bz["order"])
+            out = replay_game(a.src, s, meta, rec[s], shuffle=a.shuffle, follow=plan.get(s, {}), base_npz=bz)
+        else:
+            out = replay_game(a.src, s, meta, rec[s], shuffle=a.shuffle)
         tmp = path + ".tmp.npz"
         np.savez_compressed(tmp, **out)
         os.replace(tmp, path)
         n_done += 1
         n_bad += int(out["match"]) == 0
-        print("CLOCK_SUCC seed=%d rows=%d cands=%d match=%d %.1fs (total %.0fs)"
-              % (s, len(out["r_step"]), len(out["c_st"]), int(out["match"]), time.time() - t1, time.time() - t0),
+        print("CLOCK_SUCC seed=%d rows=%d cands=%d match=%d followed=%d %.1fs (total %.0fs)"
+              % (s, len(out["r_step"]), len(out["c_st"]), int(out["match"]), int(out.get("followed", 0)), time.time() - t1, time.time() - t0),
               flush=True)
     print("CLOCK_SUCC_DONE games=%d mismatched=%d %.0fs" % (n_done, n_bad, time.time() - t0), flush=True)
     return 0
