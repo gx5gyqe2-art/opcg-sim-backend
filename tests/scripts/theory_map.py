@@ -2719,10 +2719,35 @@ def cmd_ownparts(a):
                                 "median": round(float(np.median(v)), 4) if v else None}
         return o
 
+    def sources(xs):
+        """`2026-10-14_ranking_parts.md` §1.3: 差（勝率の単位）を「自分の攻め手の計画」＝自分の時計の部品の全部、
+        「出す札の値段」＝相手の時計の部品のうち自分の手札・体の項、「その他」＝相手の時計の部品のうち自分のライフの項
+        （と 3 項の差の和が μ の 0.01 倍未満で配れない相手の時計の部品）に寄せる。"""
+        plan = play = other = 0.0
+        n = 0
+        for x in xs:
+            if "w_own" not in x:
+                continue
+            n += 1
+            plan += x["w_own"]
+            pb, px = x.get("pb"), x.get("px")
+            if pb and px:
+                d = [px[5 + k] - pb[5 + k] for k in range(3)]
+                s_ = sum(d)
+                if abs(s_) >= eps:
+                    play += x["w_opp"] * (d[1] + d[2]) / s_
+                    other += x["w_opp"] * d[0] / s_
+                    continue
+            other += x["w_opp"]
+        tot = plan + play + other
+        return {"n": n, "w_sum": round(tot, 4),
+                "share": {"attack_plan": round(plan / tot, 4) if tot else None, "play_price": round(play / tot, 4) if tot else None,
+                          "other": round(other / tot, 4) if tot else None}}
+
     def grp(xs):
         atk_non = [x for x in xs if x["bc"] == "attack" and x["xc"] != "attack"]
         return {"n": len(xs), "atk_non": {"n": len(atk_non), "own": split(atk_non, "own"), "opp": split(atk_non, "opp")},
-                "all": {"own": split(xs, "own"), "opp": split(xs, "opp")}}
+                "all": {"own": split(xs, "own"), "opp": split(xs, "opp")}, "sources": sources(xs)}
 
     def play_char_check(xs):
         """(4): 探索（記録）の手がキャラを出す点で、その手の後 − 打つ前の自分の耐久（P[5..7]）。"""
