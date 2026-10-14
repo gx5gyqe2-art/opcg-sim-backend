@@ -1249,5 +1249,78 @@
   },
   "play_char_hand_drop_gt_body_gain": 0.65,
   "verdict": "inconclusive (opp hand 48%, between 30% and 60%)"
+ },
+ "followup_plan_2026_10_14": {
+  "report": "docs/reports/2026-10-14_followup_plan.md",
+  "kind": "switch measurement",
+  "switch": "OPCG_CLOCK_VALUE_FOLLOWUP=plan (table built by clock_succ.py --followup plan; default off)",
+  "tools": [
+   "tests/scripts/clock_succ.py --followup plan --plan --shard",
+   "tests/scripts/theory_map.py followplan / followcheck"
+  ],
+  "logs": [
+   "logs/theory_map/real_w41_followcheck.json",
+   "logs/theory_map/real_w41_followup_theorydeep.json",
+   "logs/theory_map/real_w41_followup_theoryties.json",
+   "logs/theory_map/real_w41_followup_theorytype.json"
+  ],
+  "invariants": "all unfollowed candidates and W0/kappa0 bit-identical; clock rows identical",
+  "agree_theory_same_same_points": [
+   0.437,
+   0.522
+  ],
+  "forbid_ratio_1mu_same_points": [
+   0.815,
+   0.76
+  ],
+  "crossing_hit": "unchanged (.7260)",
+  "attack_vs_nonattack_gap_share": [
+   0.46,
+   0.19
+  ],
+  "followed": 70778,
+  "followed_unpriced_err": 3629,
+  "verdict": "inconclusive (0.522 between 0.5 and 0.6; ratio 0.76 > 0.5; hit unchanged)"
+ },
+ "hand_stop_2026_10_14": {
+  "report": "docs/reports/2026-10-14_hand_stop.md",
+  "kind": "switch measurement",
+  "switch": "OPCG_HAND_STOP=survive (defender objective: survival > cards cut > attacks stopped; default off; 782fea69)",
+  "logs": [
+   "logs/theory_map/real_w41_handstop_arms.json",
+   "logs/theory_map/real_w41_handstop_counter.json"
+  ],
+  "premise": "value condition (counter sum >= excess+1000) already in defender.rs::compute_counter_sets",
+  "arms_same_1597": {
+   "default": [
+    0.437,
+    0.815
+   ],
+   "followup": [
+    0.522,
+    0.76
+   ],
+   "survive": [
+    0.449,
+    0.827
+   ],
+   "both": [
+    0.526,
+    0.783
+   ]
+  },
+  "crossing_hit": [
+   0.726,
+   0.7262
+  ],
+  "bias_turns": [
+   0.137,
+   0.026
+  ],
+  "counter_ratio_mean": [
+   0.475,
+   0.581
+  ],
+  "verdict": "inconclusive (both: agreement 0.526, ratio 0.783, counter ratio mean 0.58); survive moves clock bias toward 0 but barely changes move ranking"
  }
 }
