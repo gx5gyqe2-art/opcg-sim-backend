@@ -1118,5 +1118,49 @@
    }
   },
   "verdict": "missed (Luffy post share <40%, pre-only Luffy >= +0.1 on both) -> Luffy counterexample is not a measurement artefact; 'loss does not map to outcome for another reason'"
+ },
+ "theory_vs_deep_2026_10_14": {
+  "report": "docs/reports/2026-10-14_theory_vs_deep.md",
+  "kind": "diagnostic",
+  "tool": "tests/scripts/theory_map.py playdeep (group indices) / theorydeep",
+  "log": "logs/theory_map/real_w41_theorydeep.json",
+  "rerun_identical_points": 1800,
+  "disagree_theory_points_to": {
+   "shanks": [
+    0.48,
+    0.18
+   ],
+   "nami": [
+    0.34,
+    0.26
+   ],
+   "enel": [
+    0.35,
+    0.2
+   ],
+   "luffy": [
+    0.25,
+    0.3
+   ],
+   "all": [
+    0.34,
+    0.24
+   ]
+  },
+  "agree_theory_same": 0.45,
+  "enel_disagree": {
+   "deep": 0.347,
+   "deep_ci": [
+    0.277,
+    0.411
+   ],
+   "record": 0.198,
+   "deep_minus_record": 0.149,
+   "ci": [
+    0.05,
+    0.243
+   ]
+  },
+  "verdict": "inconclusive (0.3<=0.35<0.5, above record) -> no T18 design written"
  }
 }

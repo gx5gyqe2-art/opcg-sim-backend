@@ -219,7 +219,7 @@ def build_rows(src, dump, clocks):
                 tc = u2c.get(tg)
                 target = "leader" if (tc and roles.of(tc) == ("leader",)) else ("char" if tc else "?")
             ft = first_turn_of.setdefault((w, t), i)
-            rec = {"seed": seed, "w": w, "t": t, "z": zw, "leader": lead, "opp_leader": opp_lead,
+            rec = {"seed": seed, "w": w, "t": t, "step": int(rows["step"][i]), "z": zw, "leader": lead, "opp_leader": opp_lead,
                    "colors": lcol.get(lead, ["?"]), "opp_colors": lcol.get(opp_lead, ["?"]),
                    "ptype": ptype, "btype": btype, "pv": pv, "bv": bv, "kap": kap, "nsc": nsc,
                    "cands": dr[8], "role": list(role), "target": target,
@@ -2014,6 +2014,11 @@ def cmd_playdeep(a):
                                      "shallow_q_played": gp0["q"], "shallow_n_played": gp0["n"]})
                         if gp["n"] > 0:
                             rec_["loss"] = (gd["q"] - gp["q"]) / 2.0
+                        # 記録の候補の並び（`out["groups"]`＝記録の `pol` の順）での束の番号と、深い探索の束ごとの訪問・値（`theory_vs_deep` §1.2）
+                        ri = {g["rep"]: k for k, g in enumerate(out["groups"])}
+                        rec_["gi_played"] = ri.get(gp0["rep"])
+                        rec_["gi_deep"] = ri.get(gd["rep"])
+                        rec_["deep_nq"] = [[g2of[g["rep"]]["n"], g2of[g["rep"]]["q"]] if g["rep"] in g2of else None for g in out["groups"]]
                     st_["pts"].append(rec_)
                 if st_["left"] <= 0 or st_["bad"]:
                     raise _Stop()
@@ -2304,9 +2309,98 @@ def cmd_playsplit(a):
     return 0
 
 
+def cmd_theorydeep(a):
+    """`2026-10-14_theory_vs_deep.md` §1: 深い探索の点（`playdeep` の束の番号つき）ごとに、記録の手・深い探索の手・理論の最善（値段の写し）を並べる。"""
+    _pts, _cnt, dof = playgap_points(a.src)
+    decks = sorted(set(dof.values()))
+    stub = {"cap": 99.0, "rows_out": [], "turn_harm": [], "settled": []}
+    rows_all, _al, *_r = build_rows(a.src, load_dump(a.dump), stub)
+    drow = {(r["seed"], r["step"]): r for r in rows_all}
+    cnt = collections.Counter()
+    P = []
+    for line in open(a.deep, encoding="utf-8"):
+        g = json.loads(line)
+        for p in g["points"]:
+            cnt["points"] += 1
+            if p.get("unmapped") or p.get("gi_played") is None or p.get("gi_deep") is None:
+                cnt["unmapped"] += 1
+                continue
+            r = drow.get((g["seed"], p["step"]))
+            if r is None or r["nsc"] < 2:
+                cnt["no_theory_row"] += 1
+                continue
+            pr = [c[1] for c in r["cands"]]
+            if len(pr) != p["groups"]:
+                cnt["len_mismatch"] += 1
+                continue
+            gp, gd = p["gi_played"], p["gi_deep"]
+            priced = [k for k, v in enumerate(pr) if v is not None]
+            mx = max(pr[k] for k in priced)
+            best = [k for k in priced if abs(pr[k] - mx) < 1e-12]
+            agree = gp == gd
+            rec = {"seed": g["seed"], "deck": p["deck"], "band": p["band"], "agree": agree, "tie": len(best) > 1,
+                   "no_price": pr[gd] is None or pr[gp] is None}
+            if gd in best:
+                rec["to"] = "deep"
+            elif gp in best:
+                rec["to"] = "record"
+            else:
+                rec["to"] = "third"
+            if not agree and not rec["no_price"]:
+                rec["diff"] = (pr[gd] - pr[gp]) * float(r["kap"])
+            # 記録の手が写しの打った手と同じか（照合）
+            cnt["played_matches_dump"] += int(abs((pr[gp] if pr[gp] is not None else float("nan")) - float(r["pv"])) < 1e-12) if r["pv"] is not None else 0
+            P.append(rec)
+    cnt["used"] = len(P)
+    rng = np.random.default_rng(SEED)
+
+    def shares(xs):
+        xs = [x for x in xs if not x["no_price"]]
+        if not xs:
+            return None
+        n = len(xs)
+        return {k: sum(1 for x in xs if x["to"] == k) / n for k in ("deep", "record", "third")}
+
+    def blk(xs, boot=False):
+        o = {"points": len(xs), "no_price": sum(1 for x in xs if x["no_price"]), "ties": sum(1 for x in xs if x["tie"])}
+        sh = shares(xs)
+        if sh is None:
+            return o
+        o.update({k: round(v, 4) for k, v in sh.items()})
+        o["deep_minus_record"] = round(sh["deep"] - sh["record"], 4)
+        if boot:
+            xs2 = [x for x in xs if not x["no_price"]]
+            bd, bm = [], []
+            for _ in range(BOOT):
+                ss = [xs2[j] for j in rng.integers(0, len(xs2), len(xs2))]
+                s2 = shares(ss)
+                bd.append(s2["deep"]); bm.append(s2["deep"] - s2["record"])
+            o["deep_ci"] = [round(float(np.percentile(bd, 2.5)), 4), round(float(np.percentile(bd, 97.5)), 4)]
+            o["deep_minus_record_ci"] = [round(float(np.percentile(bm, 2.5)), 4), round(float(np.percentile(bm, 97.5)), 4)]
+        ds = [x["diff"] for x in xs if "diff" in x]
+        if ds:
+            o["diff"] = {"n": len(ds), "mean": round(float(np.mean(ds)), 5), "median": round(float(np.median(ds)), 5),
+                         "pos_share": round(float(np.mean([d > 1e-12 for d in ds])), 4),
+                         "q25": round(float(np.percentile(ds, 25)), 5), "q75": round(float(np.percentile(ds, 75)), 5)}
+        return o
+    out = {"record": a.src, "dump": a.dump, "deep": a.deep, "count": dict(cnt), "by_deck": {}}
+    for dk in decks:
+        out["by_deck"][dk] = {}
+        for b in TURN_BANDS + ("all",):
+            for ag in (True, False):
+                xs = [x for x in P if x["deck"] == dk and (b == "all" or x["band"] == b) and x["agree"] == ag]
+                out["by_deck"][dk]["%s|%s" % (b, "agree" if ag else "disagree")] = blk(xs, boot=(b == "all"))
+    for ag in (True, False):
+        out["all|%s" % ("agree" if ag else "disagree")] = blk([x for x in P if x["agree"] == ag], boot=True)
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps(out["count"]))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -2401,11 +2495,16 @@ def main(argv=None):
     ps.add_argument("--deep", required=True)
     ps.add_argument("--clocks", required=True, help="決着のフラグ（`settled`）の在る時計の行")
     ps.add_argument("--out", required=True)
+    td = sub.add_parser("theorydeep")
+    td.add_argument("--in", dest="src", required=True)
+    td.add_argument("--dump", required=True)
+    td.add_argument("--deep", required=True, help="`playdeep` の jsonl（束の番号つき・2026-10-14 以降）")
+    td.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
             "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter,
-            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit}[a.cmd](a)
+            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep}[a.cmd](a)
 
 
 if __name__ == "__main__":
