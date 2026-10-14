@@ -2610,6 +2610,7 @@ def theorytype_points(a):
                         tot = wb - wx
                         rec.update({"w_gap": tot, "w_opp": opp, "w_own": tot - opp, "k0": base[3],
                                     "pb": cp[bi][4] if len(cp[bi]) > 4 else None, "px": cp[x][4] if len(cp[x]) > 4 else None,
+                                    "planb": cp[bi][5] if len(cp[bi]) > 5 else None, "planx": cp[x][5] if len(cp[x]) > 5 else None,
                                     "p0": base[4] if len(base) > 4 else None})
                         if base[3] > 0 and abs(tot / base[3] - (mx - pr[x])) > 1e-6:
                             cnt["parts_price_mismatch"] += 1
@@ -2719,10 +2720,63 @@ def cmd_ownparts(a):
                                 "median": round(float(np.median(v)), 4) if v else None}
         return o
 
+    def sources(xs):
+        """`2026-10-14_ranking_parts.md` §1.3: 差（勝率の単位）を「自分の攻め手の計画」＝自分の時計の部品の全部、
+        「出す札の値段」＝相手の時計の部品のうち自分の手札・体の項、「その他」＝相手の時計の部品のうち自分のライフの項
+        （と 3 項の差の和が μ の 0.01 倍未満で配れない相手の時計の部品）に寄せる。"""
+        plan = play = other = 0.0
+        n = 0
+        for x in xs:
+            if "w_own" not in x:
+                continue
+            n += 1
+            plan += x["w_own"]
+            pb, px = x.get("pb"), x.get("px")
+            if pb and px:
+                d = [px[5 + k] - pb[5 + k] for k in range(3)]
+                s_ = sum(d)
+                if abs(s_) >= eps:
+                    play += x["w_opp"] * (d[1] + d[2]) / s_
+                    other += x["w_opp"] * d[0] / s_
+                    continue
+            other += x["w_opp"]
+        tot = plan + play + other
+        # §1.6: 自分の時計の部品を (a) 攻め手の計画が違う点・(b) 計画が同じ点の相手の手札の項・盤面の結果（同じ点のライフ・体）・割れない に
+        a_ = b_ = board = nosplit = 0.0
+        n_same = n_diff = 0
+        for x in xs:
+            if "w_own" not in x:
+                continue
+            w = x["w_own"]
+            pl_b, pl_x = x.get("planb"), x.get("planx")
+            if pl_b is None or pl_x is None:
+                nosplit += w
+                continue
+            if pl_b != pl_x:
+                a_ += w
+                n_diff += 1
+                continue
+            n_same += 1
+            pb, px = x.get("pb"), x.get("px")
+            d = [px[k] - pb[k] for k in range(3)] if (pb and px) else None
+            s_ = sum(d) if d else 0.0
+            if not d or abs(s_) < eps:
+                nosplit += w
+                continue
+            b_ += w * d[1] / s_
+            board += w * (d[0] + d[2]) / s_
+        sp = a_ + b_ + board + nosplit
+        return {"n": n, "w_sum": round(tot, 4),
+                "share": {"attack_plan": round(plan / tot, 4) if tot else None, "play_price": round(play / tot, 4) if tot else None,
+                          "other": round(other / tot, 4) if tot else None},
+                "own_split": {"n_plan_diff": n_diff, "n_plan_same": n_same,
+                              "share_of_own": {"a_plan_differs": round(a_ / sp, 4) if sp else None, "b_defender_hand": round(b_ / sp, 4) if sp else None,
+                                               "board_result": round(board / sp, 4) if sp else None, "unsplit": round(nosplit / sp, 4) if sp else None}}}
+
     def grp(xs):
         atk_non = [x for x in xs if x["bc"] == "attack" and x["xc"] != "attack"]
         return {"n": len(xs), "atk_non": {"n": len(atk_non), "own": split(atk_non, "own"), "opp": split(atk_non, "opp")},
-                "all": {"own": split(xs, "own"), "opp": split(xs, "opp")}}
+                "all": {"own": split(xs, "own"), "opp": split(xs, "opp")}, "sources": sources(xs)}
 
     def play_char_check(xs):
         """(4): 探索（記録）の手がキャラを出す点で、その手の後 − 打つ前の自分の耐久（P[5..7]）。"""
@@ -2779,10 +2833,16 @@ def cmd_followplan(a):
                 cnt["row_no_parts"] += 1
                 continue
             cp = pt[1]
+            # 規則: どちらの席も自分の最初のターンは攻撃できない（エンジンの規則・理論の `attacker_ctx` の `no_now` と同じ）。
+            # その行では 1 回殴る攻撃を選ばない（選ぶとエンジンが適用を拒み、後続が値段なしになる・2026-10-14 の訂正）
+            first_turn = (r["t"] - 1) // 2 == 0
             for gi, (fam, _v) in enumerate(r["cands"]):
                 if fam not in ("play", "attach", "effect"):
                     continue
                 cnt["nonattack_cands"] += 1
+                if first_turn:
+                    cnt["skip_first_turn"] += 1
+                    continue
                 e = cp[gi] if gi < len(cp) else None
                 if not e or len(e) < 6 or e[5] is None:
                     cnt["skip_no_plan"] += 1

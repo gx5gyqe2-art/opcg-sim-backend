@@ -1,0 +1,3049 @@
+{
+ "record": "/home/user/data_rec/sigma_wip/data/w41",
+ "dump": "/home/user/tm/pg/b3dump_all.jsonl",
+ "deep": "/home/user/tm/pg/deep2_all.jsonl",
+ "mu": 0.0551,
+ "count": {
+  "best_tie_mixed_type_i": 48,
+  "best_tie_mixed_type_iii": 420,
+  "skip": 25,
+  "parts_terminal_or_missing_iii": 52,
+  "best_tie_mixed_type_ii": 22,
+  "parts_terminal_or_missing_i": 3,
+  "recs_ii": 239,
+  "recs_iii": 1692,
+  "recs_i": 499
+ },
+ "groups": {
+  "i+ii": {
+   "all": {
+    "n": 738,
+    "atk_non": {
+     "n": 152,
+     "own": {
+      "n": 125,
+      "skipped_small": 26,
+      "w_part_sum": 7.7609,
+      "share": {
+       "life": -0.0206,
+       "hand": 0.8071,
+       "body": 0.2135
+      },
+      "raw_share": {
+       "life": -0.051,
+       "hand": 0.7508,
+       "body": 0.3002
+      },
+      "raw_sum": {
+       "life": -0.681,
+       "hand": 10.029,
+       "body": 4.009
+      },
+      "hand_d_cut": {
+       "n": 125,
+       "mean": 1.2786,
+       "median": 0.9678
+      },
+      "hand_d_stopped": {
+       "n": 125,
+       "mean": 0.9793,
+       "median": 0.6367
+      },
+      "hand_d_price": {
+       "n": 119,
+       "mean": 0.0,
+       "median": 0.0
+      }
+     },
+     "opp": {
+      "n": 123,
+      "skipped_small": 28,
+      "w_part_sum": 11.3944,
+      "share": {
+       "life": -0.0234,
+       "hand": 1.0448,
+       "body": -0.0214
+      },
+      "raw_share": {
+       "life": -0.0249,
+       "hand": 1.0447,
+       "body": -0.0198
+      },
+      "raw_sum": {
+       "life": 0.546,
+       "hand": -22.895,
+       "body": 0.435
+      },
+      "hand_d_cut": {
+       "n": 123,
+       "mean": -2.6853,
+       "median": -2.0174
+      },
+      "hand_d_stopped": {
+       "n": 123,
+       "mean": -2.0924,
+       "median": -1.6367
+      },
+      "hand_d_price": {
+       "n": 110,
+       "mean": -0.0,
+       "median": 0.0
+      }
+     }
+    },
+    "all": {
+     "own": {
+      "n": 610,
+      "skipped_small": 125,
+      "w_part_sum": 46.5324,
+      "share": {
+       "life": 0.0873,
+       "hand": 0.7807,
+       "body": 0.132
+      },
+      "raw_share": {
+       "life": 0.0797,
+       "hand": 0.7919,
+       "body": 0.1284
+      },
+      "raw_sum": {
+       "life": 6.767,
+       "hand": 67.235,
+       "body": 10.899
+      },
+      "hand_d_cut": {
+       "n": 610,
+       "mean": 1.7371,
+       "median": 0.9631
+      },
+      "hand_d_stopped": {
+       "n": 610,
+       "mean": 1.4118,
+       "median": 0.7067
+      },
+      "hand_d_price": {
+       "n": 534,
+       "mean": 0.0,
+       "median": 0.0
+      }
+     },
+     "opp": {
+      "n": 585,
+      "skipped_small": 150,
+      "w_part_sum": 39.0907,
+      "share": {
+       "life": 0.0072,
+       "hand": 0.8857,
+       "body": 0.1071
+      },
+      "raw_share": {
+       "life": 0.0065,
+       "hand": 0.8988,
+       "body": 0.0947
+      },
+      "raw_sum": {
+       "life": -0.463,
+       "hand": -63.601,
+       "body": -6.699
+      },
+      "hand_d_cut": {
+       "n": 585,
+       "mean": -1.53,
+       "median": -1.0
+      },
+      "hand_d_stopped": {
+       "n": 585,
+       "mean": -1.1186,
+       "median": -0.6845
+      },
+      "hand_d_price": {
+       "n": 540,
+       "mean": -0.0,
+       "median": 0.0
+      }
+     }
+    },
+    "sources": {
+     "n": 735,
+     "w_sum": 84.9627,
+     "share": {
+      "attack_plan": 0.5399,
+      "play_price": 0.4568,
+      "other": 0.0033
+     },
+     "own_split": {
+      "n_plan_diff": 373,
+      "n_plan_same": 362,
+      "share_of_own": {
+       "a_plan_differs": 0.6577,
+       "b_defender_hand": 0.2789,
+       "board_result": 0.0716,
+       "unsplit": -0.0082
+      }
+     }
+    }
+   },
+   "by_band": {
+    "1-3": {
+     "n": 191,
+     "atk_non": {
+      "n": 30,
+      "own": {
+       "n": 19,
+       "skipped_small": 11,
+       "w_part_sum": 0.158,
+       "share": {
+        "life": -2.3195,
+        "hand": 3.3195,
+        "body": 0.0
+       },
+       "raw_share": {
+        "life": 0.0,
+        "hand": 1.0,
+        "body": 0.0
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": 0.615,
+        "body": 0.0
+       },
+       "hand_d_cut": {
+        "n": 19,
+        "mean": 0.5149,
+        "median": -0.5456
+       },
+       "hand_d_stopped": {
+        "n": 19,
+        "mean": 0.4437,
+        "median": -0.6775
+       },
+       "hand_d_price": {
+        "n": 19,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 29,
+       "skipped_small": 1,
+       "w_part_sum": 3.0444,
+       "share": {
+        "life": 0.0,
+        "hand": 0.9933,
+        "body": 0.0067
+       },
+       "raw_share": {
+        "life": -0.0,
+        "hand": 0.9862,
+        "body": 0.0138
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": -6.391,
+        "body": -0.089
+       },
+       "hand_d_cut": {
+        "n": 29,
+        "mean": -3.5821,
+        "median": -2.4556
+       },
+       "hand_d_stopped": {
+        "n": 29,
+        "mean": -2.9435,
+        "median": -1.5522
+       },
+       "hand_d_price": {
+        "n": 24,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "all": {
+      "own": {
+       "n": 143,
+       "skipped_small": 48,
+       "w_part_sum": 11.1532,
+       "share": {
+        "life": -0.0413,
+        "hand": 1.0164,
+        "body": 0.0249
+       },
+       "raw_share": {
+        "life": 0.0226,
+        "hand": 0.9548,
+        "body": 0.0226
+       },
+       "raw_sum": {
+        "life": 0.545,
+        "hand": 23.035,
+        "body": 0.544
+       },
+       "hand_d_cut": {
+        "n": 143,
+        "mean": 2.5089,
+        "median": 1.0253
+       },
+       "hand_d_stopped": {
+        "n": 143,
+        "mean": 2.1609,
+        "median": 0.9607
+       },
+       "hand_d_price": {
+        "n": 135,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 175,
+       "skipped_small": 16,
+       "w_part_sum": 10.6122,
+       "share": {
+        "life": 0.0281,
+        "hand": 0.8113,
+        "body": 0.1605
+       },
+       "raw_share": {
+        "life": 0.032,
+        "hand": 0.811,
+        "body": 0.1569
+       },
+       "raw_sum": {
+        "life": -0.689,
+        "hand": -17.446,
+        "body": -3.376
+       },
+       "hand_d_cut": {
+        "n": 175,
+        "mean": -1.5397,
+        "median": -0.7859
+       },
+       "hand_d_stopped": {
+        "n": 175,
+        "mean": -1.0499,
+        "median": -0.2792
+       },
+       "hand_d_price": {
+        "n": 163,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "sources": {
+      "n": 191,
+      "w_sum": 21.6633,
+      "share": {
+       "attack_plan": 0.5101,
+       "play_price": 0.4761,
+       "other": 0.0138
+      },
+      "own_split": {
+       "n_plan_diff": 67,
+       "n_plan_same": 124,
+       "share_of_own": {
+        "a_plan_differs": 0.6299,
+        "b_defender_hand": 0.4065,
+        "board_result": -0.0271,
+        "unsplit": -0.0092
+       }
+      }
+     }
+    },
+    "4-6": {
+     "n": 266,
+     "atk_non": {
+      "n": 61,
+      "own": {
+       "n": 53,
+       "skipped_small": 8,
+       "w_part_sum": 3.134,
+       "share": {
+        "life": -0.0309,
+        "hand": 0.6193,
+        "body": 0.4115
+       },
+       "raw_share": {
+        "life": 0.1353,
+        "hand": 0.6475,
+        "body": 0.2172
+       },
+       "raw_sum": {
+        "life": 0.817,
+        "hand": 3.911,
+        "body": 1.312
+       },
+       "hand_d_cut": {
+        "n": 53,
+        "mean": 1.1661,
+        "median": 0.9274
+       },
+       "hand_d_stopped": {
+        "n": 53,
+        "mean": 0.9336,
+        "median": 0.6134
+       },
+       "hand_d_price": {
+        "n": 52,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 54,
+       "skipped_small": 7,
+       "w_part_sum": 4.4207,
+       "share": {
+        "life": -0.0319,
+        "hand": 1.132,
+        "body": -0.1001
+       },
+       "raw_share": {
+        "life": -0.0282,
+        "hand": 1.1102,
+        "body": -0.082
+       },
+       "raw_sum": {
+        "life": 0.264,
+        "hand": -10.397,
+        "body": 0.768
+       },
+       "hand_d_cut": {
+        "n": 54,
+        "mean": -2.5861,
+        "median": -2.0343
+       },
+       "hand_d_stopped": {
+        "n": 54,
+        "mean": -2.0601,
+        "median": -1.6698
+       },
+       "hand_d_price": {
+        "n": 52,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "all": {
+      "own": {
+       "n": 232,
+       "skipped_small": 34,
+       "w_part_sum": 17.2108,
+       "share": {
+        "life": 0.0842,
+        "hand": 0.7557,
+        "body": 0.1601
+       },
+       "raw_share": {
+        "life": 0.1091,
+        "hand": 0.7687,
+        "body": 0.1223
+       },
+       "raw_sum": {
+        "life": 3.677,
+        "hand": 25.917,
+        "body": 4.123
+       },
+       "hand_d_cut": {
+        "n": 232,
+        "mean": 1.7039,
+        "median": 0.981
+       },
+       "hand_d_stopped": {
+        "n": 232,
+        "mean": 1.4112,
+        "median": 0.743
+       },
+       "hand_d_price": {
+        "n": 217,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 224,
+       "skipped_small": 42,
+       "w_part_sum": 14.72,
+       "share": {
+        "life": -0.0119,
+        "hand": 0.9842,
+        "body": 0.0277
+       },
+       "raw_share": {
+        "life": -0.0131,
+        "hand": 0.9989,
+        "body": 0.0142
+       },
+       "raw_sum": {
+        "life": 0.36,
+        "hand": -27.503,
+        "body": -0.391
+       },
+       "hand_d_cut": {
+        "n": 224,
+        "mean": -1.7539,
+        "median": -1.2454
+       },
+       "hand_d_stopped": {
+        "n": 224,
+        "mean": -1.4198,
+        "median": -1.0689
+       },
+       "hand_d_price": {
+        "n": 222,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "sources": {
+      "n": 266,
+      "w_sum": 31.7906,
+      "share": {
+       "attack_plan": 0.537,
+       "play_price": 0.4685,
+       "other": -0.0055
+      },
+      "own_split": {
+       "n_plan_diff": 124,
+       "n_plan_same": 142,
+       "share_of_own": {
+        "a_plan_differs": 0.598,
+        "b_defender_hand": 0.2813,
+        "board_result": 0.1261,
+        "unsplit": -0.0055
+       }
+      }
+     }
+    },
+    "7+": {
+     "n": 281,
+     "atk_non": {
+      "n": 61,
+      "own": {
+       "n": 53,
+       "skipped_small": 7,
+       "w_part_sum": 4.469,
+       "share": {
+        "life": 0.0679,
+        "hand": 0.8499,
+        "body": 0.0823
+       },
+       "raw_share": {
+        "life": -0.2236,
+        "hand": 0.8211,
+        "body": 0.4025
+       },
+       "raw_sum": {
+        "life": -1.498,
+        "hand": 5.503,
+        "body": 2.697
+       },
+       "hand_d_cut": {
+        "n": 53,
+        "mean": 1.6648,
+        "median": 1.0
+       },
+       "hand_d_stopped": {
+        "n": 53,
+        "mean": 1.2169,
+        "median": 0.6798
+       },
+       "hand_d_price": {
+        "n": 48,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 40,
+       "skipped_small": 20,
+       "w_part_sum": 3.9293,
+       "share": {
+        "life": -0.032,
+        "hand": 0.9865,
+        "body": 0.0455
+       },
+       "raw_share": {
+        "life": -0.0463,
+        "hand": 1.0062,
+        "body": 0.0402
+       },
+       "raw_sum": {
+        "life": 0.281,
+        "hand": -6.106,
+        "body": -0.244
+       },
+       "hand_d_cut": {
+        "n": 40,
+        "mean": -2.1691,
+        "median": -1.9081
+       },
+       "hand_d_stopped": {
+        "n": 40,
+        "mean": -1.519,
+        "median": -1.4553
+       },
+       "hand_d_price": {
+        "n": 34,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "all": {
+      "own": {
+       "n": 235,
+       "skipped_small": 43,
+       "w_part_sum": 18.1685,
+       "share": {
+        "life": 0.1691,
+        "hand": 0.6597,
+        "body": 0.1712
+       },
+       "raw_share": {
+        "life": 0.094,
+        "hand": 0.6757,
+        "body": 0.2303
+       },
+       "raw_sum": {
+        "life": 2.545,
+        "hand": 18.283,
+        "body": 6.231
+       },
+       "hand_d_cut": {
+        "n": 235,
+        "mean": 1.3003,
+        "median": 0.8962
+       },
+       "hand_d_stopped": {
+        "n": 235,
+        "mean": 0.9565,
+        "median": 0.5152
+       },
+       "hand_d_price": {
+        "n": 182,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 186,
+       "skipped_small": 92,
+       "w_part_sum": 13.7585,
+       "share": {
+        "life": 0.0114,
+        "hand": 0.8378,
+        "body": 0.1508
+       },
+       "raw_share": {
+        "life": 0.0062,
+        "hand": 0.8588,
+        "body": 0.135
+       },
+       "raw_sum": {
+        "life": -0.134,
+        "hand": -18.652,
+        "body": -2.933
+       },
+       "hand_d_cut": {
+        "n": 186,
+        "mean": -1.2513,
+        "median": -1.0
+       },
+       "hand_d_stopped": {
+        "n": 186,
+        "mean": -0.8204,
+        "median": -0.6305
+       },
+       "hand_d_price": {
+        "n": 155,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "sources": {
+      "n": 278,
+      "w_sum": 31.5088,
+      "share": {
+       "attack_plan": 0.5633,
+       "play_price": 0.4317,
+       "other": 0.005
+      },
+      "own_split": {
+       "n_plan_diff": 182,
+       "n_plan_same": 96,
+       "share_of_own": {
+        "a_plan_differs": 0.7325,
+        "b_defender_hand": 0.1971,
+        "board_result": 0.0807,
+        "unsplit": -0.0102
+       }
+      }
+     }
+    }
+   },
+   "enel": {
+    "n": 208,
+    "atk_non": {
+     "n": 26,
+     "own": {
+      "n": 26,
+      "skipped_small": 0,
+      "w_part_sum": 2.8322,
+      "share": {
+       "life": -0.1365,
+       "hand": 0.9452,
+       "body": 0.1912
+      },
+      "raw_share": {
+       "life": -0.0871,
+       "hand": 0.9122,
+       "body": 0.175
+      },
+      "raw_sum": {
+       "life": -0.409,
+       "hand": 4.277,
+       "body": 0.821
+      },
+      "hand_d_cut": {
+       "n": 26,
+       "mean": 2.6877,
+       "median": 1.873
+      },
+      "hand_d_stopped": {
+       "n": 26,
+       "mean": 2.3407,
+       "median": 1.2356
+      },
+      "hand_d_price": {
+       "n": 25,
+       "mean": 0.0,
+       "median": 0.0
+      }
+     },
+     "opp": {
+      "n": 19,
+      "skipped_small": 7,
+      "w_part_sum": 0.6342,
+      "share": {
+       "life": 0.0,
+       "hand": 1.0431,
+       "body": -0.0431
+      },
+      "raw_share": {
+       "life": -0.0,
+       "hand": 1.0527,
+       "body": -0.0527
+      },
+      "raw_sum": {
+       "life": 0.0,
+       "hand": -1.38,
+       "body": 0.069
+      },
+      "hand_d_cut": {
+       "n": 19,
+       "mean": -1.144,
+       "median": -1.0002
+      },
+      "hand_d_stopped": {
+       "n": 19,
+       "mean": -0.6078,
+       "median": -0.6448
+      },
+      "hand_d_price": {
+       "n": 17,
+       "mean": -0.0,
+       "median": 0.0
+      }
+     }
+    },
+    "all": {
+     "own": {
+      "n": 173,
+      "skipped_small": 35,
+      "w_part_sum": 22.3834,
+      "share": {
+       "life": 0.013,
+       "hand": 0.8927,
+       "body": 0.0944
+      },
+      "raw_share": {
+       "life": 0.0065,
+       "hand": 0.9373,
+       "body": 0.0562
+      },
+      "raw_sum": {
+       "life": 0.272,
+       "hand": 39.285,
+       "body": 2.356
+      },
+      "hand_d_cut": {
+       "n": 173,
+       "mean": 3.5712,
+       "median": 1.7483
+      },
+      "hand_d_stopped": {
+       "n": 173,
+       "mean": 2.9032,
+       "median": 1.4773
+      },
+      "hand_d_price": {
+       "n": 150,
+       "mean": 0.0,
+       "median": 0.0
+      }
+     },
+     "opp": {
+      "n": 154,
+      "skipped_small": 54,
+      "w_part_sum": 6.319,
+      "share": {
+       "life": 0.0,
+       "hand": 0.8711,
+       "body": 0.1289
+      },
+      "raw_share": {
+       "life": -0.0,
+       "hand": 0.9606,
+       "body": 0.0394
+      },
+      "raw_sum": {
+       "life": 0.0,
+       "hand": -9.213,
+       "body": -0.378
+      },
+      "hand_d_cut": {
+       "n": 154,
+       "mean": -0.9421,
+       "median": -0.6349
+      },
+      "hand_d_stopped": {
+       "n": 154,
+       "mean": -0.7331,
+       "median": -0.4483
+      },
+      "hand_d_price": {
+       "n": 149,
+       "mean": -0.0,
+       "median": 0.0
+      }
+     }
+    },
+    "sources": {
+     "n": 208,
+     "w_sum": 28.7669,
+     "share": {
+      "attack_plan": 0.7803,
+      "play_price": 0.2197,
+      "other": 0.0
+     },
+     "own_split": {
+      "n_plan_diff": 112,
+      "n_plan_same": 96,
+      "share_of_own": {
+       "a_plan_differs": 0.6547,
+       "b_defender_hand": 0.3226,
+       "board_result": 0.0199,
+       "unsplit": 0.0028
+      }
+     }
+    }
+   },
+   "by_deck": {
+    "OP09-001": {
+     "n": 162,
+     "atk_non": {
+      "n": 40,
+      "own": {
+       "n": 33,
+       "skipped_small": 7,
+       "w_part_sum": 1.1113,
+       "share": {
+        "life": -0.9073,
+        "hand": 0.6187,
+        "body": 1.2886
+       },
+       "raw_share": {
+        "life": -0.1526,
+        "hand": 0.6588,
+        "body": 0.4938
+       },
+       "raw_sum": {
+        "life": -0.272,
+        "hand": 1.176,
+        "body": 0.881
+       },
+       "hand_d_cut": {
+        "n": 33,
+        "mean": 0.6216,
+        "median": 0.6562
+       },
+       "hand_d_stopped": {
+        "n": 33,
+        "mean": 0.3305,
+        "median": 0.3796
+       },
+       "hand_d_price": {
+        "n": 32,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 33,
+       "skipped_small": 7,
+       "w_part_sum": 2.4738,
+       "share": {
+        "life": 0.0,
+        "hand": 1.0273,
+        "body": -0.0273
+       },
+       "raw_share": {
+        "life": -0.0,
+        "hand": 1.017,
+        "body": -0.017
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": -4.852,
+        "body": 0.081
+       },
+       "hand_d_cut": {
+        "n": 33,
+        "mean": -2.0796,
+        "median": -1.6841
+       },
+       "hand_d_stopped": {
+        "n": 33,
+        "mean": -1.5071,
+        "median": -1.4154
+       },
+       "hand_d_price": {
+        "n": 30,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "all": {
+      "own": {
+       "n": 143,
+       "skipped_small": 19,
+       "w_part_sum": 9.2672,
+       "share": {
+        "life": 0.0267,
+        "hand": 0.7065,
+        "body": 0.2668
+       },
+       "raw_share": {
+        "life": 0.1624,
+        "hand": 0.6671,
+        "body": 0.1705
+       },
+       "raw_sum": {
+        "life": 2.545,
+        "hand": 10.455,
+        "body": 2.673
+       },
+       "hand_d_cut": {
+        "n": 143,
+        "mean": 1.0792,
+        "median": 1.0
+       },
+       "hand_d_stopped": {
+        "n": 143,
+        "mean": 0.7869,
+        "median": 0.5984
+       },
+       "hand_d_price": {
+        "n": 119,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 133,
+       "skipped_small": 29,
+       "w_part_sum": 7.2913,
+       "share": {
+        "life": 0.0,
+        "hand": 0.8613,
+        "body": 0.1387
+       },
+       "raw_share": {
+        "life": -0.0,
+        "hand": 0.8408,
+        "body": 0.1592
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": -12.163,
+        "body": -2.304
+       },
+       "hand_d_cut": {
+        "n": 133,
+        "mean": -1.1405,
+        "median": -0.6977
+       },
+       "hand_d_stopped": {
+        "n": 133,
+        "mean": -0.649,
+        "median": -0.382
+       },
+       "hand_d_price": {
+        "n": 119,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "sources": {
+      "n": 162,
+      "w_sum": 16.4335,
+      "share": {
+       "attack_plan": 0.5563,
+       "play_price": 0.4437,
+       "other": 0.0001
+      },
+      "own_split": {
+       "n_plan_diff": 90,
+       "n_plan_same": 72,
+       "share_of_own": {
+        "a_plan_differs": 0.6119,
+        "b_defender_hand": 0.3092,
+        "board_result": 0.0921,
+        "unsplit": -0.0132
+       }
+      }
+     }
+    },
+    "OP11-041": {
+     "n": 177,
+     "atk_non": {
+      "n": 41,
+      "own": {
+       "n": 33,
+       "skipped_small": 7,
+       "w_part_sum": 2.4211,
+       "share": {
+        "life": -0.4204,
+        "hand": 0.7998,
+        "body": 0.6206
+       },
+       "raw_share": {
+        "life": -0.0335,
+        "hand": 0.723,
+        "body": 0.3105
+       },
+       "raw_sum": {
+        "life": -0.136,
+        "hand": 2.942,
+        "body": 1.263
+       },
+       "hand_d_cut": {
+        "n": 33,
+        "mean": 1.3996,
+        "median": 0.9185
+       },
+       "hand_d_stopped": {
+        "n": 33,
+        "mean": 1.0851,
+        "median": 0.5468
+       },
+       "hand_d_price": {
+        "n": 31,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 30,
+       "skipped_small": 10,
+       "w_part_sum": 3.4657,
+       "share": {
+        "life": -0.0769,
+        "hand": 1.0637,
+        "body": 0.0132
+       },
+       "raw_share": {
+        "life": -0.0718,
+        "hand": 1.0605,
+        "body": 0.0112
+       },
+       "raw_sum": {
+        "life": 0.546,
+        "hand": -8.063,
+        "body": -0.085
+       },
+       "hand_d_cut": {
+        "n": 30,
+        "mean": -4.3926,
+        "median": -2.6938
+       },
+       "hand_d_stopped": {
+        "n": 30,
+        "mean": -3.5828,
+        "median": -1.9446
+       },
+       "hand_d_price": {
+        "n": 24,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "all": {
+      "own": {
+       "n": 148,
+       "skipped_small": 26,
+       "w_part_sum": 5.6278,
+       "share": {
+        "life": -0.0584,
+        "hand": 0.6118,
+        "body": 0.4466
+       },
+       "raw_share": {
+        "life": 0.1933,
+        "hand": 0.5206,
+        "body": 0.2861
+       },
+       "raw_sum": {
+        "life": 2.179,
+        "hand": 5.868,
+        "body": 3.225
+       },
+       "hand_d_cut": {
+        "n": 148,
+        "mean": 0.6031,
+        "median": 0.2876
+       },
+       "hand_d_stopped": {
+        "n": 148,
+        "mean": 0.5275,
+        "median": 0.2751
+       },
+       "hand_d_price": {
+        "n": 129,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 141,
+       "skipped_small": 33,
+       "w_part_sum": 13.6806,
+       "share": {
+        "life": 0.0205,
+        "hand": 0.8503,
+        "body": 0.1292
+       },
+       "raw_share": {
+        "life": 0.0179,
+        "hand": 0.8579,
+        "body": 0.1242
+       },
+       "raw_sum": {
+        "life": -0.463,
+        "hand": -22.214,
+        "body": -3.217
+       },
+       "hand_d_cut": {
+        "n": 141,
+        "mean": -2.4818,
+        "median": -1.4457
+       },
+       "hand_d_stopped": {
+        "n": 141,
+        "mean": -1.9362,
+        "median": -0.9581
+       },
+       "hand_d_price": {
+        "n": 124,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "sources": {
+      "n": 174,
+      "w_sum": 19.0498,
+      "share": {
+       "attack_plan": 0.2819,
+       "play_price": 0.7034,
+       "other": 0.0148
+      },
+      "own_split": {
+       "n_plan_diff": 73,
+       "n_plan_same": 101,
+       "share_of_own": {
+        "a_plan_differs": 0.5571,
+        "b_defender_hand": 0.2896,
+        "board_result": 0.1786,
+        "unsplit": -0.0253
+       }
+      }
+     }
+    },
+    "OP15-058": {
+     "n": 208,
+     "atk_non": {
+      "n": 26,
+      "own": {
+       "n": 26,
+       "skipped_small": 0,
+       "w_part_sum": 2.8322,
+       "share": {
+        "life": -0.1365,
+        "hand": 0.9452,
+        "body": 0.1912
+       },
+       "raw_share": {
+        "life": -0.0871,
+        "hand": 0.9122,
+        "body": 0.175
+       },
+       "raw_sum": {
+        "life": -0.409,
+        "hand": 4.277,
+        "body": 0.821
+       },
+       "hand_d_cut": {
+        "n": 26,
+        "mean": 2.6877,
+        "median": 1.873
+       },
+       "hand_d_stopped": {
+        "n": 26,
+        "mean": 2.3407,
+        "median": 1.2356
+       },
+       "hand_d_price": {
+        "n": 25,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 19,
+       "skipped_small": 7,
+       "w_part_sum": 0.6342,
+       "share": {
+        "life": 0.0,
+        "hand": 1.0431,
+        "body": -0.0431
+       },
+       "raw_share": {
+        "life": -0.0,
+        "hand": 1.0527,
+        "body": -0.0527
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": -1.38,
+        "body": 0.069
+       },
+       "hand_d_cut": {
+        "n": 19,
+        "mean": -1.144,
+        "median": -1.0002
+       },
+       "hand_d_stopped": {
+        "n": 19,
+        "mean": -0.6078,
+        "median": -0.6448
+       },
+       "hand_d_price": {
+        "n": 17,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "all": {
+      "own": {
+       "n": 173,
+       "skipped_small": 35,
+       "w_part_sum": 22.3834,
+       "share": {
+        "life": 0.013,
+        "hand": 0.8927,
+        "body": 0.0944
+       },
+       "raw_share": {
+        "life": 0.0065,
+        "hand": 0.9373,
+        "body": 0.0562
+       },
+       "raw_sum": {
+        "life": 0.272,
+        "hand": 39.285,
+        "body": 2.356
+       },
+       "hand_d_cut": {
+        "n": 173,
+        "mean": 3.5712,
+        "median": 1.7483
+       },
+       "hand_d_stopped": {
+        "n": 173,
+        "mean": 2.9032,
+        "median": 1.4773
+       },
+       "hand_d_price": {
+        "n": 150,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 154,
+       "skipped_small": 54,
+       "w_part_sum": 6.319,
+       "share": {
+        "life": 0.0,
+        "hand": 0.8711,
+        "body": 0.1289
+       },
+       "raw_share": {
+        "life": -0.0,
+        "hand": 0.9606,
+        "body": 0.0394
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": -9.213,
+        "body": -0.378
+       },
+       "hand_d_cut": {
+        "n": 154,
+        "mean": -0.9421,
+        "median": -0.6349
+       },
+       "hand_d_stopped": {
+        "n": 154,
+        "mean": -0.7331,
+        "median": -0.4483
+       },
+       "hand_d_price": {
+        "n": 149,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "sources": {
+      "n": 208,
+      "w_sum": 28.7669,
+      "share": {
+       "attack_plan": 0.7803,
+       "play_price": 0.2197,
+       "other": 0.0
+      },
+      "own_split": {
+       "n_plan_diff": 112,
+       "n_plan_same": 96,
+       "share_of_own": {
+        "a_plan_differs": 0.6547,
+        "b_defender_hand": 0.3226,
+        "board_result": 0.0199,
+        "unsplit": 0.0028
+       }
+      }
+     }
+    },
+    "OP16-022": {
+     "n": 191,
+     "atk_non": {
+      "n": 45,
+      "own": {
+       "n": 33,
+       "skipped_small": 12,
+       "w_part_sum": 1.3964,
+       "share": {
+        "life": 1.6134,
+        "hand": 0.6893,
+        "body": -1.3027
+       },
+       "raw_share": {
+        "life": 0.0484,
+        "hand": 0.5807,
+        "body": 0.3709
+       },
+       "raw_sum": {
+        "life": 0.136,
+        "hand": 1.634,
+        "body": 1.044
+       },
+       "hand_d_cut": {
+        "n": 33,
+        "mean": 0.7043,
+        "median": 0.7416
+       },
+       "hand_d_stopped": {
+        "n": 33,
+        "mean": 0.4495,
+        "median": 0.5047
+       },
+       "hand_d_price": {
+        "n": 31,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 41,
+       "skipped_small": 4,
+       "w_part_sum": 4.8208,
+       "share": {
+        "life": 0.0,
+        "hand": 1.0404,
+        "body": -0.0404
+       },
+       "raw_share": {
+        "life": -0.0,
+        "hand": 1.0449,
+        "body": -0.0449
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": -8.6,
+        "body": 0.37
+       },
+       "hand_d_cut": {
+        "n": 41,
+        "mean": -2.6377,
+        "median": -2.5803
+       },
+       "hand_d_stopped": {
+        "n": 41,
+        "mean": -2.1609,
+        "median": -2.0
+       },
+       "hand_d_price": {
+        "n": 39,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "all": {
+      "own": {
+       "n": 146,
+       "skipped_small": 45,
+       "w_part_sum": 9.2541,
+       "share": {
+        "life": 0.4162,
+        "hand": 0.6869,
+        "body": -0.1031
+       },
+       "raw_share": {
+        "life": 0.1104,
+        "hand": 0.7248,
+        "body": 0.1649
+       },
+       "raw_sum": {
+        "life": 1.771,
+        "hand": 11.627,
+        "body": 2.645
+       },
+       "hand_d_cut": {
+        "n": 146,
+        "mean": 1.3579,
+        "median": 0.7544
+       },
+       "hand_d_stopped": {
+        "n": 146,
+        "mean": 1.153,
+        "median": 0.6962
+       },
+       "hand_d_price": {
+        "n": 136,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 157,
+       "skipped_small": 34,
+       "w_part_sum": 11.7998,
+       "share": {
+        "life": 0.0,
+        "hand": 0.9497,
+        "body": 0.0503
+       },
+       "raw_share": {
+        "life": -0.0,
+        "hand": 0.9615,
+        "body": 0.0385
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": -20.011,
+        "body": -0.801
+       },
+       "hand_d_cut": {
+        "n": 157,
+        "mean": -1.5819,
+        "median": -1.3163
+       },
+       "hand_d_stopped": {
+        "n": 157,
+        "mean": -1.1602,
+        "median": -1.0
+       },
+       "hand_d_price": {
+        "n": 148,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "sources": {
+      "n": 191,
+      "w_sum": 20.7125,
+      "share": {
+       "attack_plan": 0.4303,
+       "play_price": 0.5697,
+       "other": 0.0
+      },
+      "own_split": {
+       "n_plan_diff": 98,
+       "n_plan_same": 93,
+       "share_of_own": {
+        "a_plan_differs": 0.773,
+        "b_defender_hand": 0.1312,
+        "board_result": 0.1164,
+        "unsplit": -0.0206
+       }
+      }
+     }
+    }
+   },
+   "play_char": {
+    "n": 172,
+    "hand_change_mean_mu": -1.1268,
+    "body_change_mean_mu": 0.129,
+    "hand_drop_gt_body_gain": 0.5988
+   }
+  },
+  "iii": {
+   "all": {
+    "n": 1692,
+    "atk_non": {
+     "n": 173,
+     "own": {
+      "n": 146,
+      "skipped_small": 26,
+      "w_part_sum": 10.4069,
+      "share": {
+       "life": 0.2055,
+       "hand": 0.6762,
+       "body": 0.1183
+      },
+      "raw_share": {
+       "life": 0.0434,
+       "hand": 0.7007,
+       "body": 0.2559
+      },
+      "raw_sum": {
+       "life": 0.817,
+       "hand": 13.202,
+       "body": 4.822
+      },
+      "hand_d_cut": {
+       "n": 146,
+       "mean": 1.4775,
+       "median": 1.0822
+      },
+      "hand_d_stopped": {
+       "n": 146,
+       "mean": 1.2281,
+       "median": 0.745
+      },
+      "hand_d_price": {
+       "n": 139,
+       "mean": 0.0,
+       "median": 0.0
+      }
+     },
+     "opp": {
+      "n": 139,
+      "skipped_small": 33,
+      "w_part_sum": 10.5854,
+      "share": {
+       "life": -0.0243,
+       "hand": 1.0425,
+       "body": -0.0182
+      },
+      "raw_share": {
+       "life": -0.0266,
+       "hand": 1.0419,
+       "body": -0.0153
+      },
+      "raw_sum": {
+       "life": 0.537,
+       "hand": -21.028,
+       "body": 0.309
+      },
+      "hand_d_cut": {
+       "n": 139,
+       "mean": -2.1169,
+       "median": -1.7553
+      },
+      "hand_d_stopped": {
+       "n": 139,
+       "mean": -1.5368,
+       "median": -1.2319
+      },
+      "hand_d_price": {
+       "n": 131,
+       "mean": -0.0,
+       "median": 0.0
+      }
+     }
+    },
+    "all": {
+     "own": {
+      "n": 724,
+      "skipped_small": 916,
+      "w_part_sum": 53.7465,
+      "share": {
+       "life": 0.1218,
+       "hand": 0.7544,
+       "body": 0.1238
+      },
+      "raw_share": {
+       "life": 0.0975,
+       "hand": 0.7774,
+       "body": 0.1252
+      },
+      "raw_sum": {
+       "life": 9.491,
+       "hand": 75.695,
+       "body": 12.187
+      },
+      "hand_d_cut": {
+       "n": 724,
+       "mean": 1.669,
+       "median": 0.9306
+      },
+      "hand_d_stopped": {
+       "n": 724,
+       "mean": 1.3945,
+       "median": 0.6957
+      },
+      "hand_d_price": {
+       "n": 643,
+       "mean": 0.0,
+       "median": 0.0
+      }
+     },
+     "opp": {
+      "n": 705,
+      "skipped_small": 935,
+      "w_part_sum": 46.8429,
+      "share": {
+       "life": 0.0076,
+       "hand": 0.8801,
+       "body": 0.1123
+      },
+      "raw_share": {
+       "life": 0.004,
+       "hand": 0.8927,
+       "body": 0.1033
+      },
+      "raw_sum": {
+       "life": -0.346,
+       "hand": -76.417,
+       "body": -8.839
+      },
+      "hand_d_cut": {
+       "n": 705,
+       "mean": -1.5391,
+       "median": -1.0969
+      },
+      "hand_d_stopped": {
+       "n": 705,
+       "mean": -1.1317,
+       "median": -0.742
+      },
+      "hand_d_price": {
+       "n": 656,
+       "mean": -0.0,
+       "median": 0.0
+      }
+     }
+    },
+    "sources": {
+     "n": 1640,
+     "w_sum": 99.685,
+     "share": {
+      "attack_plan": 0.5301,
+      "play_price": 0.4663,
+      "other": 0.0036
+     },
+     "own_split": {
+      "n_plan_diff": 445,
+      "n_plan_same": 1195,
+      "share_of_own": {
+       "a_plan_differs": 0.6401,
+       "b_defender_hand": 0.2777,
+       "board_result": 0.0934,
+       "unsplit": -0.0111
+      }
+     }
+    }
+   },
+   "by_band": {
+    "1-3": {
+     "n": 540,
+     "atk_non": {
+      "n": 34,
+      "own": {
+       "n": 28,
+       "skipped_small": 6,
+       "w_part_sum": 1.6012,
+       "share": {
+        "life": 0.4384,
+        "hand": 0.7348,
+        "body": -0.1732
+       },
+       "raw_share": {
+        "life": 0.235,
+        "hand": 0.765,
+        "body": 0.0
+       },
+       "raw_sum": {
+        "life": 0.817,
+        "hand": 2.66,
+        "body": 0.0
+       },
+       "hand_d_cut": {
+        "n": 28,
+        "mean": 1.5334,
+        "median": 1.1129
+       },
+       "hand_d_stopped": {
+        "n": 28,
+        "mean": 1.3647,
+        "median": 0.816
+       },
+       "hand_d_price": {
+        "n": 28,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 31,
+       "skipped_small": 3,
+       "w_part_sum": 2.2189,
+       "share": {
+        "life": 0.0,
+        "hand": 0.9793,
+        "body": 0.0207
+       },
+       "raw_share": {
+        "life": -0.0,
+        "hand": 0.9687,
+        "body": 0.0313
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": -4.527,
+        "body": -0.146
+       },
+       "hand_d_cut": {
+        "n": 31,
+        "mean": -2.0418,
+        "median": -1.9735
+       },
+       "hand_d_stopped": {
+        "n": 31,
+        "mean": -1.2107,
+        "median": -0.8212
+       },
+       "hand_d_price": {
+        "n": 30,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "all": {
+      "own": {
+       "n": 218,
+       "skipped_small": 322,
+       "w_part_sum": 15.945,
+       "share": {
+        "life": 0.0628,
+        "hand": 0.9377,
+        "body": -0.0005
+       },
+       "raw_share": {
+        "life": 0.0838,
+        "hand": 0.9023,
+        "body": 0.0139
+       },
+       "raw_sum": {
+        "life": 2.86,
+        "hand": 30.797,
+        "body": 0.475
+       },
+       "hand_d_cut": {
+        "n": 218,
+        "mean": 2.2175,
+        "median": 1.0207
+       },
+       "hand_d_stopped": {
+        "n": 218,
+        "mean": 1.9171,
+        "median": 0.9863
+       },
+       "hand_d_price": {
+        "n": 209,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 255,
+       "skipped_small": 285,
+       "w_part_sum": 15.6124,
+       "share": {
+        "life": 0.0163,
+        "hand": 0.8151,
+        "body": 0.1686
+       },
+       "raw_share": {
+        "life": 0.0179,
+        "hand": 0.8146,
+        "body": 0.1675
+       },
+       "raw_sum": {
+        "life": -0.569,
+        "hand": -25.874,
+        "body": -5.321
+       },
+       "hand_d_cut": {
+        "n": 255,
+        "mean": -1.553,
+        "median": -0.8964
+       },
+       "hand_d_stopped": {
+        "n": 255,
+        "mean": -1.0283,
+        "median": -0.4135
+       },
+       "hand_d_price": {
+        "n": 244,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "sources": {
+      "n": 540,
+      "w_sum": 31.3938,
+      "share": {
+       "attack_plan": 0.5027,
+       "play_price": 0.4892,
+       "other": 0.0081
+      },
+      "own_split": {
+       "n_plan_diff": 119,
+       "n_plan_same": 421,
+       "share_of_own": {
+        "a_plan_differs": 0.6012,
+        "b_defender_hand": 0.3608,
+        "board_result": 0.0467,
+        "unsplit": -0.0088
+       }
+      }
+     }
+    },
+    "4-6": {
+     "n": 569,
+     "atk_non": {
+      "n": 76,
+      "own": {
+       "n": 65,
+       "skipped_small": 11,
+       "w_part_sum": 4.5712,
+       "share": {
+        "life": 0.017,
+        "hand": 0.6431,
+        "body": 0.3399
+       },
+       "raw_share": {
+        "life": 0.1094,
+        "hand": 0.672,
+        "body": 0.2186
+       },
+       "raw_sum": {
+        "life": 0.953,
+        "hand": 5.855,
+        "body": 1.905
+       },
+       "hand_d_cut": {
+        "n": 65,
+        "mean": 1.4299,
+        "median": 1.086
+       },
+       "hand_d_stopped": {
+        "n": 65,
+        "mean": 1.3085,
+        "median": 0.7589
+       },
+       "hand_d_price": {
+        "n": 64,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 64,
+       "skipped_small": 12,
+       "w_part_sum": 4.4786,
+       "share": {
+        "life": -0.0315,
+        "hand": 1.1121,
+        "body": -0.0806
+       },
+       "raw_share": {
+        "life": -0.0282,
+        "hand": 1.0942,
+        "body": -0.066
+       },
+       "raw_sum": {
+        "life": 0.264,
+        "hand": -10.241,
+        "body": 0.618
+       },
+       "hand_d_cut": {
+        "n": 64,
+        "mean": -2.1781,
+        "median": -1.7053
+       },
+       "hand_d_stopped": {
+        "n": 64,
+        "mean": -1.7141,
+        "median": -1.3369
+       },
+       "hand_d_price": {
+        "n": 62,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "all": {
+      "own": {
+       "n": 263,
+       "skipped_small": 306,
+       "w_part_sum": 19.1636,
+       "share": {
+        "life": 0.1031,
+        "hand": 0.7496,
+        "body": 0.1474
+       },
+       "raw_share": {
+        "life": 0.1153,
+        "hand": 0.7661,
+        "body": 0.1187
+       },
+       "raw_sum": {
+        "life": 4.222,
+        "hand": 28.063,
+        "body": 4.346
+       },
+       "hand_d_cut": {
+        "n": 263,
+        "mean": 1.6418,
+        "median": 0.9274
+       },
+       "hand_d_stopped": {
+        "n": 263,
+        "mean": 1.4238,
+        "median": 0.7344
+       },
+       "hand_d_price": {
+        "n": 247,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 251,
+       "skipped_small": 318,
+       "w_part_sum": 16.7499,
+       "share": {
+        "life": -0.0137,
+        "hand": 0.9845,
+        "body": 0.0292
+       },
+       "raw_share": {
+        "life": -0.0148,
+        "hand": 1.0002,
+        "body": 0.0146
+       },
+       "raw_sum": {
+        "life": 0.453,
+        "hand": -30.567,
+        "body": -0.447
+       },
+       "hand_d_cut": {
+        "n": 251,
+        "mean": -1.7431,
+        "median": -1.3791
+       },
+       "hand_d_stopped": {
+        "n": 251,
+        "mean": -1.4327,
+        "median": -1.121
+       },
+       "hand_d_price": {
+        "n": 248,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "sources": {
+      "n": 569,
+      "w_sum": 35.6795,
+      "share": {
+       "attack_plan": 0.5305,
+       "play_price": 0.4759,
+       "other": -0.0064
+      },
+      "own_split": {
+       "n_plan_diff": 137,
+       "n_plan_same": 432,
+       "share_of_own": {
+        "a_plan_differs": 0.5918,
+        "b_defender_hand": 0.2882,
+        "board_result": 0.1305,
+        "unsplit": -0.0105
+       }
+      }
+     }
+    },
+    "7+": {
+     "n": 583,
+     "atk_non": {
+      "n": 63,
+      "own": {
+       "n": 53,
+       "skipped_small": 9,
+       "w_part_sum": 4.2345,
+       "share": {
+        "life": 0.3209,
+        "hand": 0.6898,
+        "body": -0.0108
+       },
+       "raw_share": {
+        "life": -0.1434,
+        "hand": 0.7048,
+        "body": 0.4385
+       },
+       "raw_sum": {
+        "life": -0.953,
+        "hand": 4.687,
+        "body": 2.917
+       },
+       "hand_d_cut": {
+        "n": 53,
+        "mean": 1.5064,
+        "median": 1.0191
+       },
+       "hand_d_stopped": {
+        "n": 53,
+        "mean": 1.0574,
+        "median": 0.7373
+       },
+       "hand_d_price": {
+        "n": 47,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 44,
+       "skipped_small": 18,
+       "w_part_sum": 3.8879,
+       "share": {
+        "life": -0.03,
+        "hand": 0.9986,
+        "body": 0.0314
+       },
+       "raw_share": {
+        "life": -0.0443,
+        "hand": 1.0179,
+        "body": 0.0264
+       },
+       "raw_sum": {
+        "life": 0.272,
+        "hand": -6.259,
+        "body": -0.163
+       },
+       "hand_d_cut": {
+        "n": 44,
+        "mean": -2.0809,
+        "median": -1.696
+       },
+       "hand_d_stopped": {
+        "n": 44,
+        "mean": -1.5088,
+        "median": -1.1908
+       },
+       "hand_d_price": {
+        "n": 39,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "all": {
+      "own": {
+       "n": 243,
+       "skipped_small": 288,
+       "w_part_sum": 18.6378,
+       "share": {
+        "life": 0.1916,
+        "hand": 0.6026,
+        "body": 0.2058
+       },
+       "raw_share": {
+        "life": 0.0905,
+        "hand": 0.6327,
+        "body": 0.2768
+       },
+       "raw_sum": {
+        "life": 2.409,
+        "hand": 16.835,
+        "body": 7.365
+       },
+       "hand_d_cut": {
+        "n": 243,
+        "mean": 1.2065,
+        "median": 0.8428
+       },
+       "hand_d_stopped": {
+        "n": 243,
+        "mean": 0.894,
+        "median": 0.5145
+       },
+       "hand_d_price": {
+        "n": 187,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 199,
+       "skipped_small": 332,
+       "w_part_sum": 14.4806,
+       "share": {
+        "life": 0.0229,
+        "hand": 0.8294,
+        "body": 0.1477
+       },
+       "raw_share": {
+        "life": 0.0099,
+        "hand": 0.8582,
+        "body": 0.1319
+       },
+       "raw_sum": {
+        "life": -0.23,
+        "hand": -19.977,
+        "body": -3.071
+       },
+       "hand_d_cut": {
+        "n": 199,
+        "mean": -1.264,
+        "median": -1.0
+       },
+       "hand_d_stopped": {
+        "n": 199,
+        "mean": -0.8844,
+        "median": -0.5794
+       },
+       "hand_d_price": {
+        "n": 164,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "sources": {
+      "n": 531,
+      "w_sum": 32.6117,
+      "share": {
+       "attack_plan": 0.5559,
+       "play_price": 0.4339,
+       "other": 0.0102
+      },
+      "own_split": {
+       "n_plan_diff": 189,
+       "n_plan_same": 342,
+       "share_of_own": {
+        "a_plan_differs": 0.7243,
+        "b_defender_hand": 0.1943,
+        "board_result": 0.0952,
+        "unsplit": -0.0138
+       }
+      }
+     }
+    }
+   },
+   "enel": {
+    "n": 420,
+    "atk_non": {
+     "n": 32,
+     "own": {
+      "n": 30,
+      "skipped_small": 2,
+      "w_part_sum": 3.1547,
+      "share": {
+       "life": 0.0389,
+       "hand": 0.8932,
+       "body": 0.0679
+      },
+      "raw_share": {
+       "life": -0.0451,
+       "hand": 0.9228,
+       "body": 0.1223
+      },
+      "raw_sum": {
+       "life": -0.272,
+       "hand": 5.577,
+       "body": 0.739
+      },
+      "hand_d_cut": {
+       "n": 30,
+       "mean": 3.0479,
+       "median": 1.4736
+      },
+      "hand_d_stopped": {
+       "n": 30,
+       "mean": 2.9408,
+       "median": 1.3985
+      },
+      "hand_d_price": {
+       "n": 29,
+       "mean": 0.0,
+       "median": 0.0
+      }
+     },
+     "opp": {
+      "n": 24,
+      "skipped_small": 8,
+      "w_part_sum": 0.7788,
+      "share": {
+       "life": 0.0,
+       "hand": 1.058,
+       "body": -0.058
+      },
+      "raw_share": {
+       "life": -0.0,
+       "hand": 1.044,
+       "body": -0.044
+      },
+      "raw_sum": {
+       "life": 0.0,
+       "hand": -1.637,
+       "body": 0.069
+      },
+      "hand_d_cut": {
+       "n": 24,
+       "mean": -1.1032,
+       "median": -1.0655
+      },
+      "hand_d_stopped": {
+       "n": 24,
+       "mean": -0.6402,
+       "median": -0.6884
+      },
+      "hand_d_price": {
+       "n": 24,
+       "mean": 0.0,
+       "median": 0.0
+      }
+     }
+    },
+    "all": {
+     "own": {
+      "n": 211,
+      "skipped_small": 202,
+      "w_part_sum": 26.0998,
+      "share": {
+       "life": 0.031,
+       "hand": 0.8815,
+       "body": 0.0876
+      },
+      "raw_share": {
+       "life": 0.0195,
+       "hand": 0.9244,
+       "body": 0.0562
+      },
+      "raw_sum": {
+       "life": 0.953,
+       "hand": 45.265,
+       "body": 2.75
+      },
+      "hand_d_cut": {
+       "n": 211,
+       "mean": 3.4387,
+       "median": 1.5696
+      },
+      "hand_d_stopped": {
+       "n": 211,
+       "mean": 2.9026,
+       "median": 1.4823
+      },
+      "hand_d_price": {
+       "n": 186,
+       "mean": -0.0,
+       "median": 0.0
+      }
+     },
+     "opp": {
+      "n": 187,
+      "skipped_small": 226,
+      "w_part_sum": 8.2772,
+      "share": {
+       "life": 0.0,
+       "hand": 0.8065,
+       "body": 0.1935
+      },
+      "raw_share": {
+       "life": -0.0,
+       "hand": 0.8531,
+       "body": 0.1469
+      },
+      "raw_sum": {
+       "life": 0.0,
+       "hand": -10.926,
+       "body": -1.881
+      },
+      "hand_d_cut": {
+       "n": 187,
+       "mean": -0.8947,
+       "median": -0.7935
+      },
+      "hand_d_stopped": {
+       "n": 187,
+       "mean": -0.6905,
+       "median": -0.5138
+      },
+      "hand_d_price": {
+       "n": 182,
+       "mean": -0.0,
+       "median": 0.0
+      }
+     }
+    },
+    "sources": {
+     "n": 413,
+     "w_sum": 34.4292,
+     "share": {
+      "attack_plan": 0.7596,
+      "play_price": 0.2404,
+      "other": 0.0
+     },
+     "own_split": {
+      "n_plan_diff": 140,
+      "n_plan_same": 273,
+      "share_of_own": {
+       "a_plan_differs": 0.6581,
+       "b_defender_hand": 0.3024,
+       "board_result": 0.0361,
+       "unsplit": 0.0034
+      }
+     }
+    }
+   },
+   "by_deck": {
+    "OP09-001": {
+     "n": 406,
+     "atk_non": {
+      "n": 48,
+      "own": {
+       "n": 37,
+       "skipped_small": 11,
+       "w_part_sum": 1.8418,
+       "share": {
+        "life": -0.2565,
+        "hand": 0.5889,
+        "body": 0.6676
+       },
+       "raw_share": {
+        "life": 0.0,
+        "hand": 0.5998,
+        "body": 0.4002
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": 1.759,
+        "body": 1.174
+       },
+       "hand_d_cut": {
+        "n": 37,
+        "mean": 0.7694,
+        "median": 0.9324
+       },
+       "hand_d_stopped": {
+        "n": 37,
+        "mean": 0.4598,
+        "median": 0.3796
+       },
+       "hand_d_price": {
+        "n": 36,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 41,
+       "skipped_small": 7,
+       "w_part_sum": 2.2524,
+       "share": {
+        "life": 0.0,
+        "hand": 1.0488,
+        "body": -0.0488
+       },
+       "raw_share": {
+        "life": -0.0,
+        "hand": 1.037,
+        "body": -0.037
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": -4.559,
+        "body": 0.163
+       },
+       "hand_d_cut": {
+        "n": 41,
+        "mean": -1.5731,
+        "median": -1.2665
+       },
+       "hand_d_stopped": {
+        "n": 41,
+        "mean": -1.1095,
+        "median": -1.0713
+       },
+       "hand_d_price": {
+        "n": 39,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "all": {
+      "own": {
+       "n": 170,
+       "skipped_small": 216,
+       "w_part_sum": 9.7951,
+       "share": {
+        "life": 0.0542,
+        "hand": 0.7105,
+        "body": 0.2353
+       },
+       "raw_share": {
+        "life": 0.1596,
+        "hand": 0.6639,
+        "body": 0.1765
+       },
+       "raw_sum": {
+        "life": 2.681,
+        "hand": 11.155,
+        "body": 2.965
+       },
+       "hand_d_cut": {
+        "n": 170,
+        "mean": 0.959,
+        "median": 0.9302
+       },
+       "hand_d_stopped": {
+        "n": 170,
+        "mean": 0.7097,
+        "median": 0.4818
+       },
+       "hand_d_price": {
+        "n": 145,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 169,
+       "skipped_small": 217,
+       "w_part_sum": 9.2334,
+       "share": {
+        "life": 0.0,
+        "hand": 0.8685,
+        "body": 0.1315
+       },
+       "raw_share": {
+        "life": -0.0,
+        "hand": 0.851,
+        "body": 0.149
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": -15.128,
+        "body": -2.649
+       },
+       "hand_d_cut": {
+        "n": 169,
+        "mean": -1.1185,
+        "median": -0.7611
+       },
+       "hand_d_stopped": {
+        "n": 169,
+        "mean": -0.6801,
+        "median": -0.5099
+       },
+       "hand_d_price": {
+        "n": 152,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "sources": {
+      "n": 386,
+      "w_sum": 18.8789,
+      "share": {
+       "attack_plan": 0.5109,
+       "play_price": 0.4891,
+       "other": 0.0001
+      },
+      "own_split": {
+       "n_plan_diff": 112,
+       "n_plan_same": 274,
+       "share_of_own": {
+        "a_plan_differs": 0.6244,
+        "b_defender_hand": 0.324,
+        "board_result": 0.0659,
+        "unsplit": -0.0143
+       }
+      }
+     }
+    },
+    "OP11-041": {
+     "n": 441,
+     "atk_non": {
+      "n": 42,
+      "own": {
+       "n": 36,
+       "skipped_small": 5,
+       "w_part_sum": 2.7461,
+       "share": {
+        "life": -0.0876,
+        "hand": 0.6311,
+        "body": 0.4565
+       },
+       "raw_share": {
+        "life": 0.1095,
+        "hand": 0.697,
+        "body": 0.1935
+       },
+       "raw_sum": {
+        "life": 0.545,
+        "hand": 3.467,
+        "body": 0.963
+       },
+       "hand_d_cut": {
+        "n": 36,
+        "mean": 1.6166,
+        "median": 1.1129
+       },
+       "hand_d_stopped": {
+        "n": 36,
+        "mean": 1.4113,
+        "median": 1.0
+       },
+       "hand_d_price": {
+        "n": 34,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 31,
+       "skipped_small": 10,
+       "w_part_sum": 2.5196,
+       "share": {
+        "life": -0.1022,
+        "hand": 1.0658,
+        "body": 0.0364
+       },
+       "raw_share": {
+        "life": -0.0967,
+        "hand": 1.0689,
+        "body": 0.0278
+       },
+       "raw_sum": {
+        "life": 0.537,
+        "hand": -5.932,
+        "body": -0.154
+       },
+       "hand_d_cut": {
+        "n": 31,
+        "mean": -2.8079,
+        "median": -1.8006
+       },
+       "hand_d_stopped": {
+        "n": 31,
+        "mean": -1.8238,
+        "median": -0.6478
+       },
+       "hand_d_price": {
+        "n": 28,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "all": {
+      "own": {
+       "n": 179,
+       "skipped_small": 244,
+       "w_part_sum": 7.1151,
+       "share": {
+        "life": 0.1382,
+        "hand": 0.5564,
+        "body": 0.3054
+       },
+       "raw_share": {
+        "life": 0.3018,
+        "hand": 0.5107,
+        "body": 0.1875
+       },
+       "raw_sum": {
+        "life": 4.222,
+        "hand": 7.146,
+        "body": 2.624
+       },
+       "hand_d_cut": {
+        "n": 179,
+        "mean": 0.6356,
+        "median": 0.4096
+       },
+       "hand_d_stopped": {
+        "n": 179,
+        "mean": 0.5749,
+        "median": 0.4096
+       },
+       "hand_d_price": {
+        "n": 160,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 164,
+       "skipped_small": 259,
+       "w_part_sum": 15.3331,
+       "share": {
+        "life": 0.0233,
+        "hand": 0.8731,
+        "body": 0.1036
+       },
+       "raw_share": {
+        "life": 0.0119,
+        "hand": 0.8879,
+        "body": 0.1002
+       },
+       "raw_sum": {
+        "life": -0.346,
+        "hand": -25.874,
+        "body": -2.92
+       },
+       "hand_d_cut": {
+        "n": 164,
+        "mean": -2.4956,
+        "median": -1.4535
+       },
+       "hand_d_stopped": {
+        "n": 164,
+        "mean": -1.9269,
+        "median": -0.798
+       },
+       "hand_d_price": {
+        "n": 147,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "sources": {
+      "n": 423,
+      "w_sum": 22.0872,
+      "share": {
+       "attack_plan": 0.3058,
+       "play_price": 0.6781,
+       "other": 0.0162
+      },
+      "own_split": {
+       "n_plan_diff": 79,
+       "n_plan_same": 344,
+       "share_of_own": {
+        "a_plan_differs": 0.4102,
+        "b_defender_hand": 0.3585,
+        "board_result": 0.2669,
+        "unsplit": -0.0356
+       }
+      }
+     }
+    },
+    "OP15-058": {
+     "n": 420,
+     "atk_non": {
+      "n": 32,
+      "own": {
+       "n": 30,
+       "skipped_small": 2,
+       "w_part_sum": 3.1547,
+       "share": {
+        "life": 0.0389,
+        "hand": 0.8932,
+        "body": 0.0679
+       },
+       "raw_share": {
+        "life": -0.0451,
+        "hand": 0.9228,
+        "body": 0.1223
+       },
+       "raw_sum": {
+        "life": -0.272,
+        "hand": 5.577,
+        "body": 0.739
+       },
+       "hand_d_cut": {
+        "n": 30,
+        "mean": 3.0479,
+        "median": 1.4736
+       },
+       "hand_d_stopped": {
+        "n": 30,
+        "mean": 2.9408,
+        "median": 1.3985
+       },
+       "hand_d_price": {
+        "n": 29,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 24,
+       "skipped_small": 8,
+       "w_part_sum": 0.7788,
+       "share": {
+        "life": 0.0,
+        "hand": 1.058,
+        "body": -0.058
+       },
+       "raw_share": {
+        "life": -0.0,
+        "hand": 1.044,
+        "body": -0.044
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": -1.637,
+        "body": 0.069
+       },
+       "hand_d_cut": {
+        "n": 24,
+        "mean": -1.1032,
+        "median": -1.0655
+       },
+       "hand_d_stopped": {
+        "n": 24,
+        "mean": -0.6402,
+        "median": -0.6884
+       },
+       "hand_d_price": {
+        "n": 24,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "all": {
+      "own": {
+       "n": 211,
+       "skipped_small": 202,
+       "w_part_sum": 26.0998,
+       "share": {
+        "life": 0.031,
+        "hand": 0.8815,
+        "body": 0.0876
+       },
+       "raw_share": {
+        "life": 0.0195,
+        "hand": 0.9244,
+        "body": 0.0562
+       },
+       "raw_sum": {
+        "life": 0.953,
+        "hand": 45.265,
+        "body": 2.75
+       },
+       "hand_d_cut": {
+        "n": 211,
+        "mean": 3.4387,
+        "median": 1.5696
+       },
+       "hand_d_stopped": {
+        "n": 211,
+        "mean": 2.9026,
+        "median": 1.4823
+       },
+       "hand_d_price": {
+        "n": 186,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 187,
+       "skipped_small": 226,
+       "w_part_sum": 8.2772,
+       "share": {
+        "life": 0.0,
+        "hand": 0.8065,
+        "body": 0.1935
+       },
+       "raw_share": {
+        "life": -0.0,
+        "hand": 0.8531,
+        "body": 0.1469
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": -10.926,
+        "body": -1.881
+       },
+       "hand_d_cut": {
+        "n": 187,
+        "mean": -0.8947,
+        "median": -0.7935
+       },
+       "hand_d_stopped": {
+        "n": 187,
+        "mean": -0.6905,
+        "median": -0.5138
+       },
+       "hand_d_price": {
+        "n": 182,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "sources": {
+      "n": 413,
+      "w_sum": 34.4292,
+      "share": {
+       "attack_plan": 0.7596,
+       "play_price": 0.2404,
+       "other": 0.0
+      },
+      "own_split": {
+       "n_plan_diff": 140,
+       "n_plan_same": 273,
+       "share_of_own": {
+        "a_plan_differs": 0.6581,
+        "b_defender_hand": 0.3024,
+        "board_result": 0.0361,
+        "unsplit": 0.0034
+       }
+      }
+     }
+    },
+    "OP16-022": {
+     "n": 425,
+     "atk_non": {
+      "n": 51,
+      "own": {
+       "n": 43,
+       "skipped_small": 8,
+       "w_part_sum": 2.6643,
+       "share": {
+        "life": 1.0244,
+        "hand": 0.5261,
+        "body": -0.5505
+       },
+       "raw_share": {
+        "life": 0.1114,
+        "hand": 0.4906,
+        "body": 0.398
+       },
+       "raw_sum": {
+        "life": 0.545,
+        "hand": 2.399,
+        "body": 1.946
+       },
+       "hand_d_cut": {
+        "n": 43,
+        "mean": 0.8747,
+        "median": 0.9274
+       },
+       "hand_d_stopped": {
+        "n": 43,
+        "mean": 0.541,
+        "median": 0.4707
+       },
+       "hand_d_price": {
+        "n": 40,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 43,
+       "skipped_small": 8,
+       "w_part_sum": 5.0345,
+       "share": {
+        "life": 0.0,
+        "hand": 1.0257,
+        "body": -0.0257
+       },
+       "raw_share": {
+        "life": -0.0,
+        "hand": 1.0267,
+        "body": -0.0267
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": -8.9,
+        "body": 0.232
+       },
+       "hand_d_cut": {
+        "n": 43,
+        "mean": -2.7031,
+        "median": -2.5803
+       },
+       "hand_d_stopped": {
+        "n": 43,
+        "mean": -2.2379,
+        "median": -2.0619
+       },
+       "hand_d_price": {
+        "n": 40,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "all": {
+      "own": {
+       "n": 164,
+       "skipped_small": 254,
+       "w_part_sum": 10.7365,
+       "share": {
+        "life": 0.3935,
+        "hand": 0.6167,
+        "body": -0.0102
+       },
+       "raw_share": {
+        "life": 0.0928,
+        "hand": 0.6887,
+        "body": 0.2185
+       },
+       "raw_sum": {
+        "life": 1.634,
+        "hand": 12.129,
+        "body": 3.847
+       },
+       "hand_d_cut": {
+        "n": 164,
+        "mean": 1.2562,
+        "median": 0.7688
+       },
+       "hand_d_stopped": {
+        "n": 164,
+        "mean": 1.0586,
+        "median": 0.6983
+       },
+       "hand_d_price": {
+        "n": 152,
+        "mean": 0.0,
+        "median": 0.0
+       }
+      },
+      "opp": {
+       "n": 185,
+       "skipped_small": 233,
+       "w_part_sum": 13.9992,
+       "share": {
+        "life": 0.0,
+        "hand": 0.9389,
+        "body": 0.0611
+       },
+       "raw_share": {
+        "life": -0.0,
+        "hand": 0.9463,
+        "body": 0.0537
+       },
+       "raw_sum": {
+        "life": 0.0,
+        "hand": -24.49,
+        "body": -1.39
+       },
+       "hand_d_cut": {
+        "n": 185,
+        "mean": -1.7267,
+        "median": -1.4784
+       },
+       "hand_d_stopped": {
+        "n": 185,
+        "mean": -1.2852,
+        "median": -1.1094
+       },
+       "hand_d_price": {
+        "n": 175,
+        "mean": -0.0,
+        "median": 0.0
+       }
+      }
+     },
+     "sources": {
+      "n": 418,
+      "w_sum": 24.2897,
+      "share": {
+       "attack_plan": 0.4236,
+       "play_price": 0.5763,
+       "other": 0.0
+      },
+      "own_split": {
+       "n_plan_diff": 114,
+       "n_plan_same": 304,
+       "share_of_own": {
+        "a_plan_differs": 0.7599,
+        "b_defender_hand": 0.1183,
+        "board_result": 0.1507,
+        "unsplit": -0.029
+       }
+      }
+     }
+    }
+   },
+   "play_char": {
+    "n": 275,
+    "hand_change_mean_mu": -0.9173,
+    "body_change_mean_mu": 0.1646,
+    "hand_drop_gt_body_gain": 0.5527
+   }
+  }
+ }
+}
