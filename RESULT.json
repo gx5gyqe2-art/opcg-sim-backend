@@ -1201,5 +1201,23 @@
    ]
   },
   "verdict": "missed (theory reads deep-search moves as clearly worse: median 1.64 mu, 66% >= mu) -> no T18 design"
+ },
+ "theory_ties_type_2026_10_14": {
+  "report": "docs/reports/2026-10-14_theory_ties_type.md",
+  "kind": "diagnostic",
+  "tool": "tests/scripts/theory_map.py theorytype",
+  "log": "logs/theory_map/real_w41_theorytype.json",
+  "switch": "OPCG_CLOCK_PARTS_DUMP=1 (per-candidate clocks and opp-clock-only W in the price dump; default off; 18,207 rows identical)",
+  "best_attack_other_nonattack": {
+   "gap_share": 0.46,
+   "opp_clock_part": 0.26,
+   "own_clock_part": 0.74
+  },
+  "max_coarse_cell_share": 0.23,
+  "enel_best_attack_other_nonattack": {
+   "gap_share": 0.2,
+   "opp_clock_part": -0.04
+  },
+  "verdict": "missed (max coarse cell <30%; battle-resolution upper bound 26%, not a majority) -> attack-bonus hypothesis rejected; gap mostly in own clock"
  }
 }
