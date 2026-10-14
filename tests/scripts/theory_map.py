@@ -2486,9 +2486,182 @@ def cmd_theoryties(a):
     return 0
 
 
+TT_COARSE = {"atk_leader": "attack", "atk_char": "attack", "atk_other": "attack", "play_char": "play", "play_stage": "play",
+             "play_event": "play", "play_other": "play", "attach_leader": "attach", "attach_char": "attach", "attach_other": "attach",
+             "activate": "activate", "pass": "pass", "other": "other"}
+
+
+def cmd_theorytype(a):
+    """`2026-10-14_theory_ties_type.md` §1: `theory_ties` の (i)(ii)(iii) の点を手の型で割り、差を相手の時計・自分の時計の部品に分ける
+    （写しは `OPCG_CLOCK_PARTS_DUMP=1` で取り直したもの）。"""
+    from theory_rs import MU
+    from opcg_sim.learned.train import plan_labels as PL
+    from opcg_sim.loop import decks as D
+    db = D.load_db()
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    gms = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    ctype = {}
+
+    def kind_of(cid):
+        if cid not in ctype:
+            m = db.get_card(cid) if cid else None
+            ctype[cid] = getattr(getattr(m, "type", None), "name", "") if m is not None else ""
+        return ctype[cid]
+    # (seed, step) → 候補（束）ごとの細かい型
+    types = {}
+    for rows, pol, _ex, L, ptr, idx in PL.iter_games([a.src], row_cols=("who", "turn", "seed", "kind", "step", "pol_len"),
+                                                     pol_cols=("pol_sig", "pol_cid", "pol_tcid")):
+        seed = int(rows["seed"][idx[0]])
+        gm = gms.get(seed)
+        if gm is None:
+            continue
+        u2c = PL.uuid_map(pol, L, ptr, idx)
+        for i in idx:
+            if int(rows["kind"][i]) != 0 or int(L[i]) < 2:
+                continue
+            w = int(rows["who"][i])
+            my_l, op_l = gm["leaders"][w], gm["leaders"][1 - w]
+            tl = []
+            for j in range(ptr[i], ptr[i] + int(L[i])):
+                sj = json.loads(pol["pol_sig"][j])
+                at = sj[0]
+                if at in ("ATTACK", "DON_BOX") and sj[2]:
+                    tc = u2c.get(sj[2][0])
+                    tl.append("atk_leader" if tc == op_l else ("atk_char" if tc else "atk_other"))
+                elif at in ("DON_BOX", "ATTACH_DON"):
+                    rc = u2c.get(sj[1])
+                    tl.append("attach_leader" if rc == my_l else ("attach_char" if rc else "attach_other"))
+                elif at == "PLAY":
+                    k = kind_of(u2c.get(sj[1]))
+                    tl.append({"CHARACTER": "play_char", "STAGE": "play_stage", "EVENT": "play_event"}.get(k, "play_other"))
+                elif at == "ACTIVATE_MAIN":
+                    tl.append("activate")
+                elif at in ("TURN_END", "PASS"):
+                    tl.append("pass")
+                else:
+                    tl.append("other")
+            types[(seed, int(rows["step"][i]))] = tl
+    stub = {"cap": 99.0, "rows_out": [], "turn_harm": [], "settled": []}
+    dump = load_dump(a.dump)
+    rows_all, _al, *_r = build_rows(a.src, dump, stub)
+    # 写しの 10 番目（部品）を引く: (ターン, 席, 候補ごとの [型, 値段]) で写しの行を特定する
+    parts_of = {}
+    for seed, dj in dump.items():
+        parts_of[seed] = [dr[9] if len(dr) > 9 else None for dr in dj["rows"]]
+    rparts = {}
+    by_seed = collections.defaultdict(list)
+    for r in rows_all:
+        by_seed[r["seed"]].append(r)
+    cnt = collections.Counter()
+    for seed, rs in by_seed.items():
+        ps = parts_of.get(seed) or []
+        dr = dump[seed]["rows"]
+        # 行の値段（候補ごと）で写しの行を特定する
+        keyed = collections.defaultdict(list)
+        for k, x in enumerate(dr):
+            keyed[(int(x[0]), int(x[1]), json.dumps(x[8]))].append(k)
+        for r in rs:
+            ks = keyed.get((r["t"], r["w"], json.dumps(r["cands"])))
+            if ks:
+                rparts[(seed, r["step"])] = ps[ks.pop(0)]
+            else:
+                cnt["parts_unmatched"] += 1
+    drow = {(r["seed"], r["step"]): r for r in rows_all}
+    P = []
+    for line in open(a.deep, encoding="utf-8"):
+        g = json.loads(line)
+        for p in g["points"]:
+            if p.get("unmapped") or p.get("gi_played") is None or p.get("gi_deep") is None:
+                continue
+            key = (g["seed"], p["step"])
+            r = drow.get(key)
+            tl = types.get(key)
+            if r is None or r["nsc"] < 2 or tl is None or len(tl) != len(r["cands"]):
+                cnt["skip"] += 1
+                continue
+            pr = [c[1] for c in r["cands"]]
+            gp, gd = p["gi_played"], p["gi_deep"]
+            mx = max(v for v in pr if v is not None)
+            best = [k for k, v in enumerate(pr) if v is not None and abs(v - mx) < 1e-12]
+            pt = rparts.get(key)
+            agree = gp == gd
+            grp = []
+            if agree and gd not in best and pr[gd] is not None:
+                grp.append(("i", gd))
+            if not agree and gd not in best and gp not in best and pr[gd] is not None:
+                grp.append(("ii", gd))
+            if pr[gp] is not None:
+                grp.append(("iii", gp))
+            for gname, x in grp:
+                if gname == "iii" and x in best:
+                    bi = x
+                else:
+                    bi = best[0]
+                if len({TT_COARSE[tl[k]] for k in best}) > 1:
+                    cnt["best_tie_mixed_type_" + gname] += 1
+                gap = (mx - pr[x]) / MU
+                rec = {"g": gname, "deck": p["deck"], "band": p["band"], "bt": tl[bi], "xt": tl[x], "gap": gap,
+                       "bc": TT_COARSE[tl[bi]], "xc": TT_COARSE[tl[x]]}
+                if pt and isinstance(pt, list) and len(pt) == 2:
+                    base, cp = pt
+                    if len(cp) == len(pr) and cp[bi] and cp[x] and cp[bi][0] is not None and cp[x][0] is not None:
+                        wb, wx = cp[bi][2], cp[x][2]
+                        opp = cp[bi][3] - cp[x][3]
+                        tot = wb - wx
+                        rec.update({"w_gap": tot, "w_opp": opp, "w_own": tot - opp, "k0": base[3]})
+                        if base[3] > 0 and abs(tot / base[3] - (mx - pr[x])) > 1e-6:
+                            cnt["parts_price_mismatch"] += 1
+                    else:
+                        cnt["parts_terminal_or_missing_" + gname] += 1
+                else:
+                    cnt["parts_none_" + gname] += 1
+                P.append(rec)
+    cnt.update({"recs_" + k: v for k, v in collections.Counter(x["g"] for x in P).items()})
+
+    def table(xs, kb, kx):
+        tot = sum(x["gap"] for x in xs) or 1.0
+        o = {}
+        for key, ys in sorted(collections.defaultdict(list, {k: [y for y in xs if (y[kb], y[kx]) == k] for k in {(y[kb], y[kx]) for y in xs}}).items(),
+                              key=lambda kv: -sum(y["gap"] for y in kv[1])):
+            o["%s>%s" % key] = {"n": len(ys), "median_mu": round(float(np.median([y["gap"] for y in ys])), 4),
+                                "gap_share": round(sum(y["gap"] for y in ys) / tot, 4)}
+        return o
+
+    def parts(xs):
+        ys = [x for x in xs if "w_gap" in x]
+        if not ys:
+            return {"n": 0}
+        t = sum(y["w_gap"] for y in ys)
+        return {"n": len(ys), "n_all": len(xs), "w_gap_sum": round(t, 4), "opp_share": round(sum(y["w_opp"] for y in ys) / t, 4) if t else None,
+                "own_share": round(sum(y["w_own"] for y in ys) / t, 4) if t else None,
+                "median_opp_mu": round(float(np.median([y["w_opp"] / y["k0"] / MU for y in ys if y["k0"] > 0])), 4),
+                "median_own_mu": round(float(np.median([y["w_own"] / y["k0"] / MU for y in ys if y["k0"] > 0])), 4)}
+
+    def summary(xs):
+        tot = sum(x["gap"] for x in xs) or 1.0
+        atk_non = [x for x in xs if x["bc"] == "attack" and x["xc"] != "attack"]
+        rev = [x for x in xs if x["bc"] in ("play", "attach") and x["xc"] == "attack"]
+        coarse = table(xs, "bc", "xc")
+        return {"n": len(xs), "gap_sum_mu": round(tot, 2),
+                "best_attack_other_nonattack": {"n": len(atk_non), "gap_share": round(sum(x["gap"] for x in atk_non) / tot, 4), "parts": parts(atk_non)},
+                "best_play_attach_other_attack": {"n": len(rev), "gap_share": round(sum(x["gap"] for x in rev) / tot, 4), "parts": parts(rev)},
+                "max_coarse_cell_share": max((v["gap_share"] for v in coarse.values()), default=None),
+                "coarse": coarse, "fine": table(xs, "bt", "xt"), "parts_all": parts(xs)}
+    out = {"record": a.src, "dump": a.dump, "deep": a.deep, "mu": MU, "count": dict(cnt), "groups": {}}
+    for gsel, names in (("i+ii", ("i", "ii")), ("i", ("i",)), ("ii", ("ii",)), ("iii", ("iii",))):
+        xs = [x for x in P if x["g"] in names]
+        e = {"all": summary(xs), "by_band": {b: summary([x for x in xs if x["band"] == b]) for b in TURN_BANDS}}
+        e["by_deck"] = {dk: summary([x for x in xs if x["deck"] == dk]) for dk in sorted({x["deck"] for x in xs})}
+        out["groups"][gsel] = e
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps(out["count"]))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -2593,11 +2766,16 @@ def main(argv=None):
     tt.add_argument("--dump", required=True)
     tt.add_argument("--deep", required=True, help="`playdeep` の jsonl（束の番号つき）")
     tt.add_argument("--out", required=True)
+    ty = sub.add_parser("theorytype")
+    ty.add_argument("--in", dest="src", required=True)
+    ty.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1` で取り直した写し")
+    ty.add_argument("--deep", required=True)
+    ty.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
             "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter,
-            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties}[a.cmd](a)
+            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype}[a.cmd](a)
 
 
 if __name__ == "__main__":
