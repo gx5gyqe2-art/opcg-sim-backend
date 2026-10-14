@@ -1162,5 +1162,44 @@
    ]
   },
   "verdict": "inconclusive (0.3<=0.35<0.5, above record) -> no T18 design written"
+ },
+ "theory_ties_2026_10_14": {
+  "report": "docs/reports/2026-10-14_theory_ties.md",
+  "kind": "diagnostic",
+  "tool": "tests/scripts/theory_map.py theoryties",
+  "log": "logs/theory_map/real_w41_theoryties.json",
+  "mu": 0.0551,
+  "i_agree_theory_elsewhere": {
+   "n": 586,
+   "median_mu": 1.64,
+   "ge_mu": 0.66
+  },
+  "ii_disagree_third": {
+   "n": 278,
+   "median_mu": 2.48,
+   "ge_mu": 0.76
+  },
+  "iii_best_minus_record": {
+   "n": 1692,
+   "median_mu": 0.44,
+   "ge_mu": 0.41
+  },
+  "forbid_at_mu_all": {
+   "deep_forbidden": 0.404,
+   "record_miss_forbidden": 0.486,
+   "ratio": 0.83,
+   "ci": [
+    0.76,
+    0.91
+   ]
+  },
+  "forbid_at_mu_enel_early": {
+   "ratio": 0.69,
+   "ci": [
+    0.53,
+    0.89
+   ]
+  },
+  "verdict": "missed (theory reads deep-search moves as clearly worse: median 1.64 mu, 66% >= mu) -> no T18 design"
  }
 }

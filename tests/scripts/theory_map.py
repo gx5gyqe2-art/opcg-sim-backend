@@ -2398,9 +2398,97 @@ def cmd_theorydeep(a):
     return 0
 
 
+def cmd_theoryties(a):
+    """`2026-10-14_theory_ties.md` §1: 理論の最善と深い探索の手（・記録の手）の値段の差を、手札 1 枚の価値 μ の倍数で読む。"""
+    from theory_rs import MU
+    _pts, _cnt, dof = playgap_points(a.src)
+    decks = sorted(set(dof.values()))
+    stub = {"cap": 99.0, "rows_out": [], "turn_harm": [], "settled": []}
+    rows_all, _al, *_r = build_rows(a.src, load_dump(a.dump), stub)
+    drow = {(r["seed"], r["step"]): r for r in rows_all}
+    P = []
+    for line in open(a.deep, encoding="utf-8"):
+        g = json.loads(line)
+        for p in g["points"]:
+            if p.get("unmapped") or p.get("gi_played") is None or p.get("gi_deep") is None:
+                continue
+            r = drow.get((g["seed"], p["step"]))
+            if r is None or r["nsc"] < 2:
+                continue
+            pr = [c[1] for c in r["cands"]]
+            gp, gd = p["gi_played"], p["gi_deep"]
+            mx = max(v for v in pr if v is not None)
+            kap = float(r["kap"])
+            best = [k for k, v in enumerate(pr) if v is not None and abs(v - mx) < 1e-12]
+            P.append({"deck": p["deck"], "band": p["band"], "agree": gp == gd,
+                      "d_deep": None if pr[gd] is None else mx - pr[gd], "d_rec": None if pr[gp] is None else mx - pr[gp],
+                      "deep_best": gd in best, "rec_best": gp in best, "kap": kap})
+    rng = np.random.default_rng(SEED)
+    KS = (0.5, 1.0, 2.0)
+
+    def dist(xs):
+        """xs: [(値段の差, 傾き)] → μ の倍数の分布と勝率の単位。"""
+        if not xs:
+            return {"n": 0}
+        d = np.array([x[0] for x in xs]) / MU
+        w = np.array([x[0] * x[1] for x in xs])
+        o = {"n": len(xs), "median_mu": round(float(np.median(d)), 4), "mean_mu": round(float(np.mean(d)), 4),
+             "q25_mu": round(float(np.percentile(d, 25)), 4), "q75_mu": round(float(np.percentile(d, 75)), 4),
+             "q90_mu": round(float(np.percentile(d, 90)), 4), "ge_mu": round(float(np.mean(d >= 1.0)), 4),
+             "median_win": round(float(np.median(w)), 5), "mean_win": round(float(np.mean(w)), 5)}
+        for k in KS:
+            o["ge_%gmu" % k] = round(float(np.mean(d >= k)), 4)
+        return o
+
+    def groups(xs):
+        g1 = [(x["d_deep"], x["kap"]) for x in xs if x["agree"] and not x["deep_best"] and x["d_deep"] is not None]
+        g2 = [(x["d_deep"], x["kap"]) for x in xs if not x["agree"] and not x["deep_best"] and not x["rec_best"] and x["d_deep"] is not None]
+        g3 = [(x["d_rec"], x["kap"]) for x in xs if x["d_rec"] is not None]
+        return g1, g2, g3
+
+    def rates(xs, k):
+        dd = [x for x in xs if x["d_deep"] is not None]
+        rr = [x for x in xs if not x["agree"] and x["d_rec"] is not None]
+        fd = float(np.mean([x["d_deep"] > k * MU for x in dd])) if dd else float("nan")
+        fr = float(np.mean([x["d_rec"] > k * MU for x in rr])) if rr else float("nan")
+        return fd, fr, len(dd), len(rr)
+
+    def blk(xs, boot):
+        g1, g2, g3 = groups(xs)
+        o = {"i_agree_theory_elsewhere": dist(g1), "ii_disagree_third": dist(g2), "iii_best_minus_record": dist(g3), "forbid": {}}
+        for k in KS:
+            fd, fr, nd, nr = rates(xs, k)
+            e = {"deep_forbidden": round(fd, 4), "record_miss_forbidden": round(fr, 4), "n_deep": nd, "n_miss": nr,
+                 "ratio": round(fd / fr, 4) if fr and not math.isnan(fr) and fr > 0 else None}
+            if boot:
+                bd, br, bq = [], [], []
+                for _ in range(BOOT):
+                    ss = [xs[j] for j in rng.integers(0, len(xs), len(xs))]
+                    a_, b_, _n1, _n2 = rates(ss, k)
+                    bd.append(a_); br.append(b_)
+                    if b_ and not math.isnan(b_) and b_ > 0:
+                        bq.append(a_ / b_)
+                e["deep_ci"] = [round(float(np.nanpercentile(bd, 2.5)), 4), round(float(np.nanpercentile(bd, 97.5)), 4)]
+                e["miss_ci"] = [round(float(np.nanpercentile(br, 2.5)), 4), round(float(np.nanpercentile(br, 97.5)), 4)]
+                if bq:
+                    e["ratio_ci"] = [round(float(np.percentile(bq, 2.5)), 4), round(float(np.percentile(bq, 97.5)), 4)]
+            o["forbid"]["%gmu" % k] = e
+        return o
+    out = {"record": a.src, "dump": a.dump, "deep": a.deep, "mu": MU, "points": len(P), "all": blk(P, True), "by_deck": {}}
+    for dk in decks:
+        out["by_deck"][dk] = {}
+        for b in TURN_BANDS + ("all",):
+            xs = [x for x in P if x["deck"] == dk and (b == "all" or x["band"] == b)]
+            out["by_deck"][dk][b] = blk(xs, boot=(b == "all" or (dk == "OP15-058" and b == "1-3")))
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps(out["all"]["i_agree_theory_elsewhere"]))
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -2500,11 +2588,16 @@ def main(argv=None):
     td.add_argument("--dump", required=True)
     td.add_argument("--deep", required=True, help="`playdeep` の jsonl（束の番号つき・2026-10-14 以降）")
     td.add_argument("--out", required=True)
+    tt = sub.add_parser("theoryties")
+    tt.add_argument("--in", dest="src", required=True)
+    tt.add_argument("--dump", required=True)
+    tt.add_argument("--deep", required=True, help="`playdeep` の jsonl（束の番号つき）")
+    tt.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
             "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter,
-            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep}[a.cmd](a)
+            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties}[a.cmd](a)
 
 
 if __name__ == "__main__":
