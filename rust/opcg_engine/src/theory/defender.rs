@@ -390,12 +390,14 @@ impl Cand {
     }
 }
 
-/// 候補 `OPCG_HAND_STOP=survive`（`docs/reports/2026-10-14_hand_stop.md` §1.3・既定は切）: 守る側の比べ方の辞書式の順を
+/// `OPCG_HAND_STOP`（`docs/reports/2026-10-14_hand_stop.md` §1.3）: 守る側の比べ方の辞書式の順を
 /// 「生き延びるターン → 切る札 → 防いだ本数 → 損害の並び」にする（既定は「防いだ本数 → 切る札 → 生き延びるターン → 損害」）。
 /// 規則の負けは「ライフ 0 で受けたとき」だけで、止める目的は倒れないこと（止めた本数そのものではない）。新定数ゼロ。
+/// **2026-10-14 にユーザ決定で既定に採用**（「(a) 合成で確かめて既定に」・実 w41 の的中 .7260 → .7262・偏り +0.137 → +0.026・合成 w39 の的中 .6717 → .6682・偏り +0.458 → +0.324）。
+/// `OPCG_HAND_STOP=0`（または `off`）で旧い順に戻す。
 pub fn hand_stop_survive() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| matches!(std::env::var("OPCG_HAND_STOP").ok().as_deref().map(str::trim), Some("survive")))
+    *ON.get_or_init(|| !matches!(std::env::var("OPCG_HAND_STOP").ok().as_deref().map(str::trim), Some("0") | Some("off")))
 }
 
 /// 守る側の比較（期待値・同点は誤差で・E9）。

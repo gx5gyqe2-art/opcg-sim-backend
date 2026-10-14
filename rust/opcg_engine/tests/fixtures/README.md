@@ -94,3 +94,8 @@ OPCG_THEORY_GOLDEN_WRITE=1 cargo test --no-default-features tests_regen -- --inc
 
 `OPCG_OPP_ATTACK_POWER` の既定を on に反転した（`=0`／`off` で旧い形）。上の器で回すと `theory_core`・`theory_outer`・`theory_rows` とも書き換えた行 0。
 上げ幅・下げ幅を一時的に 100 倍にしても 0 行だった＝**golden の局には読む型（`BUFF` だけ）の【相手のアタック時】の持ち主が通る行が無い**（この口は golden では見張られていない。見張りは実 w41 の時計の 20 局のファイル一致で行った）。
+
+### 守る側の目的を「倒れない」を先にする順を既定に（2026-10-14・ユーザ決定「(a) 合成で確かめて既定に」・`docs/reports/2026-10-14_hand_stop.md`・`2026-10-14_syn_hand_stop.md`）
+
+`OPCG_HAND_STOP` の既定を `survive` に反転した（`=0`／`off` で旧い順「防いだ本数 → 切る札 → 生き延びるターン」）。上の器で `theory_outer_golden` 97 行・
+`theory_rows_golden` 3 行の戻りの欄を作り直した。`theory_core` は 0 行。作り直した後に器をもう一度回して 0 行・`OPCG_HAND_STOP=off` で回すと同じ 97／3 行が旧い値に戻ることを確かめた。
