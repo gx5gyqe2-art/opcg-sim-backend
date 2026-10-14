@@ -2833,10 +2833,16 @@ def cmd_followplan(a):
                 cnt["row_no_parts"] += 1
                 continue
             cp = pt[1]
+            # 規則: どちらの席も自分の最初のターンは攻撃できない（エンジンの規則・理論の `attacker_ctx` の `no_now` と同じ）。
+            # その行では 1 回殴る攻撃を選ばない（選ぶとエンジンが適用を拒み、後続が値段なしになる・2026-10-14 の訂正）
+            first_turn = (r["t"] - 1) // 2 == 0
             for gi, (fam, _v) in enumerate(r["cands"]):
                 if fam not in ("play", "attach", "effect"):
                     continue
                 cnt["nonattack_cands"] += 1
+                if first_turn:
+                    cnt["skip_first_turn"] += 1
+                    continue
                 e = cp[gi] if gi < len(cp) else None
                 if not e or len(e) < 6 or e[5] is None:
                     cnt["skip_no_plan"] += 1
