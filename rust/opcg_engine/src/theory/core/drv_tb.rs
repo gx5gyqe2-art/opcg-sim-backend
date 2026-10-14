@@ -283,19 +283,27 @@ impl Core {
     #[allow(clippy::too_many_arguments)]
     pub fn curve_d_of_row(&mut self, row: &Row, j: i64, prof: &[f64], g_opp: &V, g_me: &V, cut_opp: Option<f64>, cut_me: Option<f64>, attacker: Option<(Option<Vec<String>>, bool)>, mirror: MirrorArg, symmetric: bool) -> R<(f64, f64, f64)> {
         let s = self.enter(cut_opp);
-        let th_me = (|| -> R<f64> {
+        let th_me = (|| -> R<(f64, f64, f64)> {
             let mut ax = match &attacker {
                 None => None,
                 Some((dk, no_now)) => self.attacker_ctx(row, super::to::theta(), MU, dk.as_deref(), *no_now, None)?,
             };
-            self.threshold(row, g_opp, ax.as_mut(), &V::None)
+            self.threshold_parts(row, g_opp, 0.0, ax.as_mut(), &V::None)
         })();
         self.leave(s);
-        let th_me = th_me?;
+        let pm = th_me?;
+        let hp_m = Core::last_hand_plan();
+        let th_me = pm.0 + pm.1 + pm.2;
         let s = self.enter(cut_me);
-        let th_opp = self.state_th_me(row, g_me, mirror, symmetric);
+        let th_opp = self.state_th_me_parts(row, g_me, mirror, symmetric);
         self.leave(s);
-        let th_opp = th_opp?;
+        let po = th_opp?;
+        let hp_o = Core::last_hand_plan();
+        let th_opp = po.0 + po.1 + po.2;
+        // 診断（`OPCG_CLOCK_PARTS_DUMP=1`・値は変えない）: 自分の時計の元＝相手の耐久の 3 項、相手の時計の元＝自分の耐久の 3 項
+        let hc = |h: Option<(f64, f64)>| h.map(|x| [x.0, x.1]).unwrap_or([f64::NAN, f64::NAN]);
+        let (a, b) = (hc(hp_m), hc(hp_o));
+        CURVE_PARTS.with(|c| c.set(Some([pm.0, pm.1, pm.2, a[0], a[1], po.0, po.1, po.2, b[0], b[1]])));
         let tau_me = rw::tau_from_profile(th_me, j, prof, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         let tau_opp = rw::tau_from_profile(th_opp, j, prof, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         Ok((tau_opp - tau_me, tau_me, tau_opp))
@@ -973,14 +981,28 @@ fn clock_read(c2: &mut Core, me: &Row, opp: &Row, cx: &ClockCx) -> R<(f64, f64)>
     Ok((wv, kap))
 }
 
+thread_local! {
+    /// 直前の `curve_d_of_row` の耐久の項（診断 `OPCG_CLOCK_PARTS_DUMP=1` だけが読む）:
+    /// [相手の耐久 ライフ・手札・体・手札から出す枚数・止める数, 自分の耐久 ライフ・手札・体・出す枚数・止める数]（計画が無ければ枚数・止める数は NaN）
+    static CURVE_PARTS: std::cell::Cell<Option<[f64; 10]>> = const { std::cell::Cell::new(None) };
+}
+
 /// 診断 `OPCG_CLOCK_PARTS_DUMP=1`（`docs/reports/2026-10-14_theory_ties_type.md` §1.4・既定は切・値は変えない）:
 /// 手の値段の写しに、候補ごとの後続の 2 本の時計と勝率・「相手の時計だけを動かした勝率」を書き足す。
 pub(super) fn clock_parts_dump_on() -> bool {
     matches!(std::env::var("OPCG_CLOCK_PARTS_DUMP").ok().as_deref().map(str::trim), Some("1") | Some("on") | Some("true"))
 }
 
+fn curve_parts_v() -> V {
+    match CURVE_PARTS.with(|c| c.get()) {
+        Some(a) => V::list(a.iter().map(|x| if x.is_nan() { V::None } else { V::Float(*x) }).collect()),
+        None => V::None,
+    }
+}
+
 /// `clock_read` と同じ読み＋その時計 `(W, κ, τ_me, τ_opp)`。
 fn clock_read_full(c2: &mut Core, me: &Row, opp: &Row, cx: &ClockCx) -> R<(f64, f64, f64, f64)> {
+    CURVE_PARTS.with(|c| c.set(None));
     let g_me = c2.hand_price_mean(me, MU, true, None)?;
     let go = c2.hand_price_mean(opp, MU, true, None)?;
     let go = c2.with_life_types(&go, cx.dk_opp.as_deref());
@@ -1024,6 +1046,7 @@ fn clock_prices(c2: &mut Core, row: &Row, sv: &V, cx: &ClockCx, stats: &mut D, p
     let out = (|| -> R<Vec<Option<f64>>> {
         let opp0 = row_of_triplet(sv.get("o"), &dt);
         let (w0, k0, tm0, to0) = clock_read_full(c2, row, &opp0, cx)?;
+        let base_parts = if want_parts { curve_parts_v() } else { V::None };
         let mut cparts: Vec<V> = Vec::new();
         stats.addf("clock_kappa_sum", k0);
         let mut ps = Vec::new();
@@ -1039,7 +1062,7 @@ fn clock_prices(c2: &mut Core, row: &Row, sv: &V, cx: &ClockCx, stats: &mut D, p
                     if want_parts {
                         // 相手の時計だけを動かした勝率（自分の時計は打つ前のまま）
                         let w_opp = lt::prob_of_d(&cx.cfg.clock, to - tm0, None, Some(tm0), Some(to), "hyp", false);
-                        cparts.push(V::list(vec![V::Float(tm), V::Float(to), V::Float(wv), V::Float(w_opp)]));
+                        cparts.push(V::list(vec![V::Float(tm), V::Float(to), V::Float(wv), V::Float(w_opp), curve_parts_v()]));
                     }
                     Some(wv)
                 }
@@ -1059,7 +1082,7 @@ fn clock_prices(c2: &mut Core, row: &Row, sv: &V, cx: &ClockCx, stats: &mut D, p
             });
         }
         if want_parts {
-            *parts = Some(V::list(vec![V::list(vec![V::Float(tm0), V::Float(to0), V::Float(w0), V::Float(k0)]), V::list(cparts)]));
+            *parts = Some(V::list(vec![V::list(vec![V::Float(tm0), V::Float(to0), V::Float(w0), V::Float(k0), base_parts]), V::list(cparts)]));
         }
         Ok(ps)
     })();

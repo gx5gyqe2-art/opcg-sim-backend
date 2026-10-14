@@ -78,6 +78,12 @@ impl Core {
 
     /// `state_of_row` の `th_me`（`cut_me` の窓の中）
     pub fn state_th_me(&mut self, row: &Row, g_me: &V, mirror: MirrorArg, symmetric: bool) -> R<f64> {
+        let (a, b, c) = self.state_th_me_parts(row, g_me, mirror, symmetric)?;
+        Ok(a + b + c)
+    }
+
+    /// `state_th_me` の 3 つの項（ライフ・手札・体）。和は `state_th_me` と同じ（`threshold`／`threshold_of_me` が同じ順で足すため）。
+    pub fn state_th_me_parts(&mut self, row: &Row, g_me: &V, mirror: MirrorArg, symmetric: bool) -> R<(f64, f64, f64)> {
         let m = match mirror {
             MirrorArg::None => None,
             MirrorArg::Eager(m) => m,
@@ -90,11 +96,11 @@ impl Core {
                     Some((r, dk, no_now)) => self.attacker_ctx(r, super::to::theta(), lt::MU, dk.as_deref(), *no_now, None)?,
                 };
                 match ax {
-                    Some(mut a) => self.threshold(&m.row, &m.g_me, Some(&mut a), &V::None),
-                    None => self.threshold(&m.row, &m.g_me, None, &V::None),
+                    Some(mut a) => self.threshold_parts(&m.row, &m.g_me, 0.0, Some(&mut a), &V::None),
+                    None => self.threshold_parts(&m.row, &m.g_me, 0.0, None, &V::None),
                 }
             }
-            None => self.threshold_of_me(row, g_me, symmetric),
+            None => self.threshold_of_me_parts(row, g_me, symmetric),
         }
     }
 
