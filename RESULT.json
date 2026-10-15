@@ -1571,6 +1571,24 @@
   "logs": [
    "logs/theory_map/real_w41_two_curves_clock.json"
   ],
-  "verdict": "play < 0.35: the price form does not explain play moves (skip T18 replay); attack also drops 0.82 -> 0.29 (forecast missed)"
+  "verdict": "play < 0.35: the price form does not explain play moves (skip T18 replay); attack also drops 0.82 -> 0.29 (forecast missed)",
+  "correction": {
+   "report": "docs/reports/2026-10-15_two_curves_clock_fix.md",
+   "body": "fallback zero",
+   "by_family_body": {
+    "attack": 0.288,
+    "play": 0.133,
+    "effect": -0.136,
+    "attach": -0.003,
+    "end": 0.195
+   },
+   "increment_corr_raw_body": 0.3533,
+   "increment_corr_demeaned_body": 0.1692,
+   "fallback_rows": {
+    "end_single": 2067,
+    "play_no_price": 614
+   },
+   "verdict": "unchanged"
+  }
  }
 }
