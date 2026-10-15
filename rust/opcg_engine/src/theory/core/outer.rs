@@ -31,6 +31,8 @@ thread_local! {
     static LAST_ATT_PLAN: std::cell::RefCell<Option<Vec<(i64, f64, i64)>>> = const { std::cell::RefCell::new(None) };
     /// 直前の `threshold_parts_side` の守る側の今のターンの守りの期待値（診断 `OPCG_DEF_TRACE_DUMP=1`・`2026-10-15_defend_foresee.md`）
     static LAST_DEF_TRACE: std::cell::RefCell<Option<Vec<f64>>> = const { std::cell::RefCell::new(None) };
+    /// 直前の `threshold_parts_side` の攻め手の計画が出す札の枚数（診断 `OPCG_OPP_TURN_DUMP=1`・`2026-10-15_opp_turn_split.md`）
+    static LAST_PLAY_N: std::cell::Cell<Option<i64>> = const { std::cell::Cell::new(None) };
 }
 
 pub const RACE_CAP: f64 = 30.0;
@@ -1713,6 +1715,11 @@ impl Core {
         LAST_DEF_TRACE.with(|c| c.borrow().clone())
     }
 
+    /// 診断: 直前の `threshold_parts_side` の攻め手の計画が出す札の枚数（無ければ None）。
+    pub fn last_play_n() -> Option<i64> {
+        LAST_PLAY_N.with(|c| c.get())
+    }
+
     /// `threshold_parts_side(sc, tok, side, lam, mu, g_hand, hand_blocker, attacker, plan)` → (ライフ, 手札, 体)
     #[allow(clippy::too_many_arguments)]
     pub fn threshold_parts_side(&mut self, sc: &[f64], tok: &Tok, side_opp: bool, lam: f64, mu: f64, g_hand: &V, hand_blocker: f64, attacker: Option<&mut Actx>, plan: &V) -> R<(f64, f64, f64)> {
@@ -1728,9 +1735,14 @@ impl Core {
         LAST_HAND_PLAN.with(|c| c.set(None));
         LAST_ATT_PLAN.with(|c| *c.borrow_mut() = None);
         LAST_DEF_TRACE.with(|c| *c.borrow_mut() = None);
+        LAST_PLAY_N.with(|c| c.set(None));
         let att1: Option<Vec<(i64, f64)>> = attacker.as_ref().map(|a| a.att1.clone());
         let mut hand;
         let (rule_hand, pl) = self.rule_don_term(sc, tok, side_opp, g_hand, attacker, mu, None, plan, true)?;
+        if !pl.is_none() && pl.has("play") {
+            let n = pl.get("play").items().len() as i64;
+            LAST_PLAY_N.with(|c| c.set(Some(n)));
+        }
         if !pl.is_none() && pl.has("def_trace") {
             let tr: Vec<f64> = pl.get("def_trace").items().iter().map(|x| x.f_or0()).collect();
             LAST_DEF_TRACE.with(|c| *c.borrow_mut() = Some(tr));
