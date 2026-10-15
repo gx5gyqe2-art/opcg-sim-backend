@@ -394,8 +394,18 @@ impl Cand {
 /// 「生き延びるターン → 切る札 → 防いだ本数 → 損害の並び」にする（既定は「防いだ本数 → 切る札 → 生き延びるターン → 損害」）。
 /// 規則の負けは「ライフ 0 で受けたとき」だけで、止める目的は倒れないこと（止めた本数そのものではない）。新定数ゼロ。
 pub fn hand_stop_survive() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| matches!(std::env::var("OPCG_HAND_STOP").ok().as_deref().map(str::trim), Some("survive")))
+    hand_stop_mode() != 0
+}
+
+/// `OPCG_HAND_STOP` の形: 0＝切（既定）・1＝`survive`・2＝`value`（`docs/reports/2026-10-16_hand_stop_value.md` §1.3）。
+/// `value` も `survive` と同じく比べ方（`better`）だけで守りを選ぶ。
+fn hand_stop_mode() -> u8 {
+    static M: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
+    *M.get_or_init(|| match std::env::var("OPCG_HAND_STOP").ok().as_deref().map(str::trim) {
+        Some("survive") => 1,
+        Some("value") => 2,
+        _ => 0,
+    })
 }
 
 /// 守る側の比較（期待値・同点は誤差で・E9）。
@@ -416,8 +426,10 @@ enum Act {
 }
 
 fn better(arena: &[f64], a: &Cand, b: &Cand, feq: f64) -> bool {
-    if hand_stop_survive() {
-        return better_survive(arena, a, b, feq);
+    match hand_stop_mode() {
+        1 => return better_survive(arena, a, b, feq),
+        2 => return better_value(arena, a, b, feq),
+        _ => {}
     }
     let mut d = a.v[0] - b.v[0];
     if d > feq || d < -feq {
@@ -458,6 +470,36 @@ fn better_survive(arena: &[f64], a: &Cand, b: &Cand, feq: f64) -> bool {
         return a.v[0] > b.v[0];
     }
     let (la, lb) = (a.hlen(), b.hlen());
+    for q in 0..la.max(lb) {
+        let u = if q < la { a.h(arena, q) } else { 0.0 };
+        let v = if q < lb { b.h(arena, q) } else { 0.0 };
+        d = u - v;
+        if d > feq || d < -feq {
+            return u < v;
+        }
+    }
+    false
+}
+
+/// 候補 `OPCG_HAND_STOP=value`（`docs/reports/2026-10-16_hand_stop_value.md` §1.3・既定は切）: 生き延びるターン → 損害の価値の和
+/// （損害の並びの全段の和＝受けたライフの `lam_net`・切った札の μ・倒れたブロッカーの ν・倒れの値。既にある値をそのまま足すだけ）
+/// → 防いだ本数 → 損害の並び。新定数ゼロ。
+fn better_value(arena: &[f64], a: &Cand, b: &Cand, feq: f64) -> bool {
+    let mut d = a.v[2] - b.v[2];
+    if d > feq || d < -feq {
+        return a.v[2] > b.v[2];
+    }
+    let (la, lb) = (a.hlen(), b.hlen());
+    let sa: f64 = (0..la).map(|q| a.h(arena, q)).sum();
+    let sb: f64 = (0..lb).map(|q| b.h(arena, q)).sum();
+    d = sa - sb;
+    if d > feq || d < -feq {
+        return sa < sb;
+    }
+    d = a.v[0] - b.v[0];
+    if d > feq || d < -feq {
+        return a.v[0] > b.v[0];
+    }
     for q in 0..la.max(lb) {
         let u = if q < la { a.h(arena, q) } else { 0.0 };
         let v = if q < lb { b.h(arena, q) } else { 0.0 };
