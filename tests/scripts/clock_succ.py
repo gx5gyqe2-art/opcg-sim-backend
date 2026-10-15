@@ -176,7 +176,62 @@ def successor_follow(game, name, turn, mv, opts, slot, k):
     return st, me, op, r["plies"] + plies
 
 
-def replay_game(d, seed, meta, rec_rows, shuffle=False, follow=None, base_npz=None):
+def successor_turn(game, name, turn, mv, opts, seq, cnt):
+    """**`--followup turn`**（`docs/reports/2026-10-15_followup_turn.md` §1.2）: 今の後続がメインに戻ったら、そのターンに残る攻撃
+    `seq`＝[[枠, ドン], …]（理論の攻め手の計画の 1 段目・届くものだけ・計画の並び）を順にエンジンで解決し（1 回ずつ `DON_BOX` → `resolve_windows`）、
+    ターンを終えた盤面（`end_of_turn`）を返す。拒まれた攻撃・窓が閉じない／ターンが渡る攻撃は、その前の盤面に戻して飛ばす。
+    メインに戻らない後続は今の後続のまま（`successor`）。`cnt` に数を足す。"""
+    opp = "p2" if name == "p1" else "p1"
+    f = game.fork()
+    try:
+        f.apply_search_move(name, json.dumps(mv, ensure_ascii=False))
+        r = json.loads(f.resolve_windows(opts))
+    except Exception:                                       # noqa: BLE001
+        return successor(game, name, turn, mv, opts)
+    if f.winner() is not None or r["open"]:
+        cnt["turn_not_main"] = cnt.get("turn_not_main", 0) + 1
+        return successor(game, name, turn, mv, opts)
+    pend = json.loads(f.pending_json()) or {}
+    if int(f.turn_count or 0) != int(turn) or pend.get("player_id") != name or pend.get("action") != "MAIN_ACTION":
+        cnt["turn_not_main"] = cnt.get("turn_not_main", 0) + 1
+        return successor(game, name, turn, mv, opts)
+    plies = r["plies"]
+    idx = json.loads(f.dump_index_json(name))
+    by_slot = {int(v): u for u, v in idx["slots"].items()}   # 枠と札の対応は攻撃を始める前に 1 回だけ取る
+    ldr = by_slot.get(1)
+    cnt["turn_cands"] = cnt.get("turn_cands", 0) + 1
+    if not seq:
+        cnt["turn_no_attack"] = cnt.get("turn_no_attack", 0) + 1
+    for slot, k in seq:
+        cnt["turn_planned"] = cnt.get("turn_planned", 0) + 1
+        att = by_slot.get(int(slot))
+        if att is None or ldr is None:
+            cnt["turn_skip_noslot"] = cnt.get("turn_skip_noslot", 0) + 1
+            continue
+        g2 = f.fork()
+        mvx = {"kind": "game", "action_type": "DON_BOX", "payload": {"uuid": att, "don_k": int(k), "target_ids": [ldr]}}
+        try:
+            g2.apply_search_move(name, json.dumps(mvx, ensure_ascii=False))
+            r2 = json.loads(g2.resolve_windows(opts))
+        except Exception as e:                              # noqa: BLE001  エンジンが拒んだ攻撃は飛ばす
+            key = "turn_rej:" + ("first_turn" if (int(turn) - 1) // 2 == 0 else str(e).strip().splitlines()[0][:80] if str(e).strip() else type(e).__name__)
+            cnt[key] = cnt.get(key, 0) + 1
+            continue
+        w = g2.winner()
+        if w is not None:
+            cnt["turn_won"] = cnt.get("turn_won", 0) + 1
+            return (ST_WON if w == name else ST_LOST), None, None, plies + r2["plies"]
+        pend = json.loads(g2.pending_json()) or {}
+        if r2["open"] or int(g2.turn_count or 0) != int(turn) or pend.get("player_id") != name or pend.get("action") != "MAIN_ACTION":
+            cnt["turn_skip_open"] = cnt.get("turn_skip_open", 0) + 1
+            continue
+        f = g2
+        plies += r2["plies"]
+        cnt["turn_resolved"] = cnt.get("turn_resolved", 0) + 1
+    return ST_END, end_of_turn(_cast(f, name)), _cast(f, opp), plies
+
+
+def replay_game(d, seed, meta, rec_rows, shuffle=False, follow=None, base_npz=None, mode="plan"):
     """1 局を打ち直して表を作る。戻り＝npz に書く dict。"""
     E.engine()
     search = {"worlds": int(meta["search"]["worlds"])} if (meta.get("search") or {}).get("worlds") else {}
@@ -235,6 +290,10 @@ def replay_game(d, seed, meta, rec_rows, shuffle=False, follow=None, base_npz=No
                 continue
             if mv.get("action_type") == "TURN_END":
                 st, me, op, plies = ST_END, end_of_turn(mine), o, 0
+            elif gi in fr and mode == "turn":
+                st, me, op, plies = successor_turn(base, name, turn, mv, opts, fr[gi], chk)
+                chk["followed"] = chk.get("followed", 0) + 1
+                chk["followed_st_%d" % st] = chk.get("followed_st_%d" % st, 0) + 1
             elif gi in fr:
                 st, me, op, plies = successor_follow(base, name, turn, mv, opts, fr[gi][0], fr[gi][1])
                 chk["followed"] = chk.get("followed", 0) + 1
@@ -254,7 +313,8 @@ def replay_game(d, seed, meta, rec_rows, shuffle=False, follow=None, base_npz=No
            "followed": np.int64(chk.get("followed", 0)), "copied": np.int64(chk.get("copied", 0)),
            "order": ("unknown" if shuffle else "known"),           # 並びの形（`theory_bridge.py` が求めた形と照合する）
            "rows_checked": np.int64(chk["rows"]), "rows_bad": np.int64(chk["bad"]),
-           "rows_recorded": np.int64(len(rec_rows)), "winner": str(res["winner"])}
+           "rows_recorded": np.int64(len(rec_rows)), "winner": str(res["winner"]),
+           "stats": json.dumps({k: v for k, v in chk.items() if k not in ("rows", "bad")}, ensure_ascii=False)}
     for k, v in rows.items():
         out["r_" + k] = np.asarray(v) if v else np.zeros(0)
     for k, v in cand.items():
@@ -271,25 +331,27 @@ def main(argv=None):
     ap.add_argument("--order", default="unknown", choices=("unknown", "known"),
                     help="並びの形（既定 `unknown`＝両席のライフと山札を混ぜ直した複製から後続を作る・`known`＝真の盤面の複製＝後知恵の上限）")
     ap.add_argument("--shuffle", action="store_true", help="`--order unknown` の別名（旧い回し方・既定と同じ）")
-    ap.add_argument("--followup", default="off", choices=("off", "plan"),
+    ap.add_argument("--followup", default="off", choices=("off", "plan", "turn"),
                     help="`plan`＝殴らない候補の後続で、理論の計画が選んだ攻撃を 1 回エンジンで解決してから読む（`2026-10-14_followup_plan.md`・"
-                         "`--plan` と既定の表 `--base` が要る・作り直さない候補は既定の表をそのまま写す）")
+                         "`--plan` と既定の表 `--base` が要る・作り直さない候補は既定の表をそのまま写す）。"
+                         "`turn`＝ターンを終える候補以外の後続で、そのターンに残る攻撃を理論の計画どおりに解決してターンの終わりで読む"
+                         "（`2026-10-15_followup_turn.md`・`--plan` は `theory_map.py followturn` の json）")
     ap.add_argument("--shard", default=None, help="i/n（局を n 本に分けた i 本目・並列に回すとき）")
-    ap.add_argument("--plan", default=None, help="`theory_map.py followplan` の json（{seed: {step: {候補: [枠, ドン]}}}）")
+    ap.add_argument("--plan", default=None, help="`theory_map.py followplan` の json（{seed: {step: {候補: [枠, ドン]}}}）・`--followup turn` は `followturn` の json（{…: {候補: [[枠, ドン], …]}}}）")
     ap.add_argument("--base", default=None, help="既定の表の置き場（既定 `<in>/clock_succ`）")
     a = ap.parse_args(argv)
     if a.shuffle:
         a.order = "unknown"
     a.shuffle = a.order == "unknown"
     plan = None
-    if a.followup == "plan":
+    if a.followup in ("plan", "turn"):
         if not a.plan:
-            raise SystemExit("--followup plan には --plan が要る")
+            raise SystemExit("--followup %s には --plan が要る" % a.followup)
         plan = {int(sd): {int(st): {int(gi): v for gi, v in cs.items()} for st, cs in steps.items()}
                 for sd, steps in json.load(open(a.plan, encoding="utf-8")).items()}
         a.base = a.base or os.path.join(a.src, "clock_succ" if a.shuffle else "clock_succ_known")
         if a.out is None:
-            a.out = os.path.join(a.src, "clock_succ_followup_plan")
+            a.out = os.path.join(a.src, "clock_succ_followup_" + a.followup)
     if a.out is None:
         a.out = os.path.join(a.src, "clock_succ" if a.shuffle else "clock_succ_known")
     os.makedirs(a.out, exist_ok=True)
@@ -311,7 +373,7 @@ def main(argv=None):
             bz = dict(np.load(os.path.join(a.base, "%d.npz" % s)))
             if str(bz["order"]) != ("unknown" if a.shuffle else "known"):
                 raise SystemExit("既定の表の並びの形が違う: %s" % bz["order"])
-            out = replay_game(a.src, s, meta, rec[s], shuffle=a.shuffle, follow=plan.get(s, {}), base_npz=bz)
+            out = replay_game(a.src, s, meta, rec[s], shuffle=a.shuffle, follow=plan.get(s, {}), base_npz=bz, mode=a.followup)
         else:
             out = replay_game(a.src, s, meta, rec[s], shuffle=a.shuffle)
         tmp = path + ".tmp.npz"
