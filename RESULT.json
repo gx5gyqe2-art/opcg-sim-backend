@@ -1530,5 +1530,47 @@
    "logs/theory_map/real_w41_defend.json"
   ],
   "verdict": "inconclusive, opposite to the forecast: the DP expects the defender to cut half the cards and take 1.34x the life this turn"
+ },
+ "two_curves_clock_2026_10_15": {
+  "report": "docs/reports/2026-10-15_two_curves_clock.md",
+  "kind": "switch (two_curves --clock-dump; default unchanged, static output byte-identical)",
+  "price_dump": "followup_turn arm 1 (default table + OPCG_HAND_STOP=survive)",
+  "increment_corr_raw": {
+   "static_T137b": 0.6419,
+   "static_now": 0.6574,
+   "clock": 0.3409,
+   "clock_zero": 0.3533
+  },
+  "increment_corr_demeaned": {
+   "static_T137b": 0.3513,
+   "static_now": 0.3854,
+   "clock": 0.1498,
+   "clock_zero": 0.1692
+  },
+  "by_family_clock": {
+   "attack": 0.288,
+   "play": 0.088,
+   "effect": -0.136,
+   "attach": -0.003,
+   "end": 0.158
+  },
+  "by_family_static_now": {
+   "attack": 0.817,
+   "play": 0.251,
+   "effect": -0.092
+  },
+  "rows": {
+   "clock": 17593,
+   "fallback": 2681,
+   "fallback_abs_share": 0.064
+  },
+  "audit_cross": {
+   "games": 240,
+   "void": 0
+  },
+  "logs": [
+   "logs/theory_map/real_w41_two_curves_clock.json"
+  ],
+  "verdict": "play < 0.35: the price form does not explain play moves (skip T18 replay); attack also drops 0.82 -> 0.29 (forecast missed)"
  }
 }

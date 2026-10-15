@@ -59,27 +59,84 @@ from theory_bridge import POL_COLS, ROW_COLS, _extra  # noqa: E402
 from theory_rs import MU, THETA  # noqa: E402
 
 
-def two_curves_for_game(game, theta=THETA, mu=MU):
+def clock_map_for_game(game, dj, stats):
+    """**切替**（`2026-10-15_two_curves_clock.md` §1.5）: 値段の写し（`theory_bridge.py` の `OPCG_PRICE_DUMP`）の 1 局ぶん `dj` から、
+    局の行の位置（`idx` の中の順＝Rust の行の番号）→ 選んだ手の今の値段 の並び `[[k, p], …]` を作る。写しの行は
+    `theory_map.build_rows` と同じ規則（自席ターンのメインの行・候補 2 本以上・効果の選択でない）で記録の行に対応させる。"""
+    from theory_map import family_of
+    rows, pol, _ex, L, ptr, idx = game
+    cand = []
+    for k, i in enumerate(idx):
+        w = int(rows["who"][i]); t = int(rows["turn"][i])
+        if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+            continue
+        kq = int(L[i]); ch = int(rows["pol_chosen"][i])
+        if kq < 1:
+            continue
+        if json.loads(pol["pol_sig"][ptr[i]])[0] == "RESOLVE_EFFECT_SELECTION":
+            continue
+        if kq < 2 or ch < 0 or ch >= kq:
+            continue
+        cand.append((k, w, t, ch, [family_of(json.loads(pol["pol_sig"][j])) for j in range(ptr[i], ptr[i] + kq)]))
+    drows = dj["rows"]
+    if len(drows) != len(cand):
+        stats["game_len_mismatch"] = stats.get("game_len_mismatch", 0) + 1
+        return []
+    out = []
+    for (k, w, t, ch, fams), dr in zip(cand, drows):
+        if int(dr[0]) != t or int(dr[1]) != w or fams != [c[0] for c in dr[8]]:
+            stats["row_mismatch"] = stats.get("row_mismatch", 0) + 1
+            continue
+        pv = dr[8][ch][1]
+        if pv is None:
+            stats["chosen_no_price"] = stats.get("chosen_no_price", 0) + 1
+            continue
+        out.append([int(k), float(pv)])
+    stats["rows_clock"] = stats.get("rows_clock", 0) + len(out)
+    return out
+
+
+def two_curves_for_game(game, theta=THETA, mu=MU, clock=None, clock_fallback="static", cstats=None):
     """1 局ぶんの `G(t)`／`R(t)`（局×席の累積系列・Rust の局の駆動 `two_curves`）。戻り値:
     `{w: {"turns": [...], "g": [...], "r": [...], "g_fam": [...], "r_life": [...], "r_hand": [...], "r_body": [...]}}`
     ＋ `winner`（0/1/None）。`turns` はその席の自席ターン番号の並び（昇順）。**T143**: `r_life`／`r_hand`／`r_body` は
     `R(t)` を 3 項（相手のライフ・手札・体）に分けた累積——**足すと `r` に戻る**。"""
-    res = TR.game_call("two_curves", game, {"cfg": TR.cfg(theta, mu), "in": {}, "stats": {}, "carry": {}})
+    inp = {} if clock is None else {"clock": clock, "clock_fallback": clock_fallback}
+    res = TR.game_call("two_curves", game, {"cfg": TR.cfg(theta, mu), "in": inp, "stats": {}, "carry": {}})
     curves = res["curves"]
+    if cstats is not None and res.get("clock_stats"):
+        for kk, v in res["clock_stats"].items():
+            cstats[kk] = cstats.get(kk, 0) + v
     return {0: curves[0], 1: curves[1]}, res["winner"]
 
 
-def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
+def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None, clock_dump=None, clock_fallback="static"):
     games = 0
     winner_final_r = []          # 勝った席の R(最終自席ターン)（配線の検算に使う）
     end_g, end_r = [], []        # 各局・各席の終点（G, R）
     n_games = n_seats = 0
+    cdump = None
+    cstats = {}
+    if clock_dump:
+        cdump = {}
+        with open(clock_dump, encoding="utf-8") as f:
+            for line in f:
+                j = json.loads(line)
+                cdump[int(j["seed"])] = j
     for game in PL.iter_games(dirs, row_cols=ROW_COLS, pol_cols=POL_COLS, extra_fn=_extra):
         games += 1
         if limit_games and games > limit_games:
             break
         seed_g = TR.seed_of(game)
-        curves, winner = two_curves_for_game(game, theta, mu)
+        clock = None
+        if cdump is not None:
+            dj = cdump.get(int(seed_g))
+            if dj is None:
+                cstats["game_missing"] = cstats.get("game_missing", 0) + 1
+                clock = []
+            else:
+                clock = clock_map_for_game(game, dj, cstats)
+        curves, winner = two_curves_for_game(game, theta, mu, clock=clock, clock_fallback=clock_fallback, cstats=cstats)
         n_games += 1
         for w in (0, 1):
             c = curves[w]
@@ -97,6 +154,8 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, dump=None):
            "end_r_mean": round(float(end_r.mean()), 4) if end_r.size else None,
            "winner_final_r_mean": round(float(np.mean(winner_final_r)), 4) if winner_final_r else None,
            "winner_final_r_n": len(winner_final_r)}
+    if cdump is not None:
+        out["clock"] = {"dump": clock_dump, "fallback": clock_fallback, **cstats}
     return out
 
 
@@ -130,13 +189,17 @@ def build_parser():
     ap.add_argument("--verify", action="store_true", help="crossing_bridge の F_end_mean と独立実装で突き合わせる")
     ap.add_argument("--dump", default="", help="局×席ごとの累積系列を JSON に書く（T137b/c/d の材料）")
     ap.add_argument("--json", default="")
+    ap.add_argument("--clock-dump", default="", help="切替（`2026-10-15_two_curves_clock.md`）: `theory_bridge.py` の値段の写し。"
+                    "選んだ手の今の値段（打った後の 2 本の時計）で G の増分を差し替える（既定は使わない＝今の器のまま）")
+    ap.add_argument("--clock-fallback", default="static", choices=("static", "zero"),
+                    help="今の値段が無い決定の行（候補 1 本など）: static＝静的な値のまま（既定）・zero＝0")
     return ap
 
 
 def main(argv=None):
     a = build_parser().parse_args(argv)
     dump = [] if a.dump else None
-    out = collect(a.src, a.games, dump=dump)
+    out = collect(a.src, a.games, dump=dump, clock_dump=a.clock_dump or None, clock_fallback=a.clock_fallback)
     if a.verify:
         out["verify"] = verify_against_crossing_bridge(a.src, a.games)
     print(json.dumps(out, ensure_ascii=False, indent=2))
