@@ -1004,6 +1004,12 @@ fn curve_def_v() -> V {
 
 /// 診断 `OPCG_CLOCK_PARTS_DUMP=1`（`docs/reports/2026-10-14_theory_ties_type.md` §1.4・既定は切・値は変えない）:
 /// 手の値段の写しに、候補ごとの後続の 2 本の時計と勝率・「相手の時計だけを動かした勝率」を書き足す。
+/// 診断 `OPCG_TEMPO_DUMP=1`（`docs/reports/2026-10-15_tempo_sum.md` §1.4・既定は切・値は変えない）。
+fn tempo_dump_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| matches!(std::env::var("OPCG_TEMPO_DUMP").ok().as_deref().map(str::trim), Some("1") | Some("on") | Some("true")))
+}
+
 /// 切替 `OPCG_CLOCK_VALUE_END=opp`（`docs/reports/2026-10-15_end_as_opp.md` §1.2・既定は切）: ターンを終える候補の後続を、
 /// 相手のターンの始まりとして相手の側から読む。
 fn clock_value_end_opp() -> bool {
@@ -1079,6 +1085,35 @@ fn clock_prices(c2: &mut Core, row: &Row, sv: &V, cx: &ClockCx, stats: &mut D, p
         let (w0, k0, tm0, to0) = clock_read_full(c2, row, &opp0, cx)?;
         let base_parts = if want_parts { curve_parts_v() } else { V::None };
         let base_def = if want_parts && super::super::defender::def_trace_on() { Some(curve_def_v()) } else { None };
+        // 診断 `OPCG_TEMPO_DUMP=1`（`2026-10-15_tempo_sum.md` §1.2・既定は切・値は変えない）: 同じ盤面を相手の側から読んだ勝率
+        // （書き換えなし＝相手の側の行を相手の席の文脈で・書き換えあり＝鏡の読みで相手のターンの始まりにして t+1 で）。
+        let tempo = if want_parts && tempo_dump_on() {
+            let cxs = ClockCx {
+                t: cx.t,
+                prof: cx.prof,
+                cfg: cx.cfg,
+                cut_me: cx.cut_opp,
+                cut_opp: cx.cut_me,
+                mirror_me: cx.mirror_me,
+                dk_me: cx.dk_opp.clone(),
+                dk_opp: cx.dk_me.clone(),
+                literal: cx.literal,
+            };
+            let (wn, _kn, tmn, ton) = clock_read_full(c2, &opp0, row, &cxs)?;
+            let rw_v = if row.ci.is_some() && opp0.ci.is_some() {
+                let mrow = c2.mirror_view(row, Some(&opp0.tok), opp0.ci.as_deref());
+                let cxo = ClockCx { t: cx.t + 1, ..cxs };
+                let (wr, _kr, tmr, tor) = clock_read_full(c2, &mrow, row, &cxo)?;
+                vec![V::Float(wr), V::Float(tmr), V::Float(tor)]
+            } else {
+                vec![V::None, V::None, V::None]
+            };
+            let mut v = vec![V::Float(wn), V::Float(tmn), V::Float(ton)];
+            v.extend(rw_v);
+            Some(V::list(v))
+        } else {
+            None
+        };
         let mut cparts: Vec<V> = Vec::new();
         stats.addf("clock_kappa_sum", k0);
         let mut ps = Vec::new();
@@ -1166,6 +1201,10 @@ fn clock_prices(c2: &mut Core, row: &Row, sv: &V, cx: &ClockCx, stats: &mut D, p
             let mut bv = vec![V::Float(tm0), V::Float(to0), V::Float(w0), V::Float(k0), base_parts];
             if let Some(dv) = base_def {
                 bv.push(dv); // 診断 `OPCG_DEF_TRACE_DUMP=1`: 打つ前の自分の時計の守る側の今のターンの守り
+            }
+            if let Some(tv) = tempo {
+                // 診断 `OPCG_TEMPO_DUMP=1`: [W_相手（書き換えなし）, その τ_me, τ_opp, W_相手（書き換えあり）, その τ_me, τ_opp]（相手の側から見た時計）
+                bv.push(V::dict(vec![(V::s("tempo"), tv)]));
             }
             *parts = Some(V::list(vec![V::list(bv), V::list(cparts)]));
         }

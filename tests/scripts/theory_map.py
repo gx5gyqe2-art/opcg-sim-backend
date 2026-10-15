@@ -3343,6 +3343,72 @@ def cmd_foreseeall(a):
     return 0
 
 
+def cmd_tempo(a):
+    """`2026-10-15_tempo_sum.md` §1: 同じ盤面を自分の側（W0）と相手の側（書き換えなし・書き換えあり）から読んだ勝率の和 S と、手番の価値 1 − S。
+    写しは `OPCG_CLOCK_PARTS_DUMP=1 OPCG_TEMPO_DUMP=1`。"""
+    from theory_rs import MU
+    dump = load_dump(a.dump)
+    P = []
+    cnt = collections.Counter()
+    for seed, dj in dump.items():
+        for dr in dj["rows"]:
+            pt = dr[9] if len(dr) > 9 else None
+            if not pt:
+                cnt["no_parts"] += 1
+                continue
+            base = pt[0]
+            tv = next((e["tempo"] for e in base[5:] if isinstance(e, dict) and "tempo" in e), None)
+            if tv is None:
+                cnt["no_tempo"] += 1
+                continue
+            tm0, to0, w0, k0 = base[0], base[1], base[2], base[3]
+            rec = {"seed": int(seed), "band": turn_band(int(dr[0])), "dt": tm0 - to0, "w0": w0, "k0": k0,
+                   "sn": w0 + tv[0], "sr": (w0 + tv[3]) if tv[3] is not None else None}
+            P.append(rec)
+            cnt["rows"] += 1
+
+    def summ(xs, key):
+        ys = [x for x in xs if x[key] is not None]
+        if not ys:
+            return {"n": 0}
+        S = np.array([y[key] for y in ys])
+        one = 1.0 - S
+        units = collections.defaultdict(list)
+        for y in ys:
+            units[y["seed"]].append(y[key])
+        mu_v = np.array([(1.0 - y[key]) / y["k0"] / MU for y in ys if y["k0"] > 0])
+        return {"n": len(ys), "S_median": round(float(np.median(S)), 4), "S_mean": round(float(S.mean()), 4),
+                "S_mean_ci": boot_games(units, lambda us: float(np.mean(us))),
+                "abs_one_minus_S_median": round(float(np.median(np.abs(one))), 4),
+                "one_minus_S_median_mu": round(float(np.median(mu_v)), 3) if mu_v.size else None,
+                "one_minus_S_mean_mu": round(float(mu_v.mean()), 3) if mu_v.size else None,
+                "S_p10_p90": [round(float(np.percentile(S, 10)), 4), round(float(np.percentile(S, 90)), 4)]}
+
+    def dbin(d):
+        if d <= -2:
+            return "<=-2"
+        if d <= -1:
+            return "(-2,-1]"
+        if d < 0:
+            return "(-1,0)"
+        if d == 0:
+            return "0"
+        if d < 1:
+            return "(0,1)"
+        if d < 2:
+            return "[1,2)"
+        return ">=2"
+    BINS = ("<=-2", "(-2,-1]", "(-1,0)", "0", "(0,1)", "[1,2)", ">=2")
+    out = {"dump": a.dump, "mu": MU, "count": dict(cnt)}
+    for key, nm in (("sn", "no_rewrite"), ("sr", "rewrite")):
+        out[nm] = {"all": summ(P, key), "by_band": {b: summ([x for x in P if x["band"] == b], key) for b in TURN_BANDS},
+                   "by_clock_diff": {b: summ([x for x in P if dbin(x["dt"]) == b], key) for b in BINS}}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps(out["count"]))
+    return 0
+
+
 def cmd_followplan(a):
     """`2026-10-14_followup_plan.md` §1.2 の 1 段目: 既定の表で取った写し（`OPCG_CLOCK_PARTS_DUMP=1`・攻め手の計画つき）から、
     殴らない候補（出す・付与・起動）の後続ごとに、理論の計画の 1 段目で「超過 + 1000 × 付けるドン」が最大の攻め手（同点は計画の並びで先）を選ぶ。
@@ -3502,7 +3568,7 @@ def cmd_followcheck(a):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "foresee", "foreseeall", "defend", "followplan", "followturn", "followcheck", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "foresee", "foreseeall", "tempo", "defend", "followplan", "followturn", "followcheck", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -3631,6 +3697,9 @@ def main(argv=None):
     fs.add_argument("--dump", required=True, help="既定の表で `OPCG_CLOCK_PARTS_DUMP=1` で取った写し（守る側の比べ方を明示）")
     fs.add_argument("--table", required=True, help="写しが使った後続局面の表（`<記録>/clock_succ`）")
     fs.add_argument("--out", required=True)
+    tp = sub.add_parser("tempo")
+    tp.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1 OPCG_TEMPO_DUMP=1` で取った写し")
+    tp.add_argument("--out", required=True)
     fa = sub.add_parser("foreseeall")
     fa.add_argument("--in", dest="src", required=True)
     fa.add_argument("--dump", required=True, help="既定の表で `OPCG_CLOCK_PARTS_DUMP=1` で取った写し（守る側の比べ方を明示）")
@@ -3654,7 +3723,7 @@ def main(argv=None):
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
             "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter,
-            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "foresee": cmd_foresee, "foreseeall": cmd_foreseeall, "defend": cmd_defend, "followplan": cmd_followplan, "followturn": cmd_followturn, "followcheck": cmd_followcheck}[a.cmd](a)
+            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "foresee": cmd_foresee, "foreseeall": cmd_foreseeall, "tempo": cmd_tempo, "defend": cmd_defend, "followplan": cmd_followplan, "followturn": cmd_followturn, "followcheck": cmd_followcheck}[a.cmd](a)
 
 
 if __name__ == "__main__":
