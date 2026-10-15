@@ -1626,5 +1626,50 @@
    "logs/theory_map/real_w41_foreseeall.json"
   ],
   "verdict": "all types except turn-end below 1 mu (consistent); turn-end 2.93 mu -> fix candidates listed (read the turn-end successor as the opponent's turn start; opponent's hand after their own plan)"
+ },
+ "end_as_opp_2026_10_15": {
+  "report": "docs/reports/2026-10-15_end_as_opp.md",
+  "kind": "switch (OPCG_CLOCK_VALUE_END=opp, Rust drv_tb::clock_prices, default off)",
+  "end_foresee": {
+   "median_mu": [
+    2.93,
+    3.1
+   ],
+   "mean_mu": [
+    1.93,
+    3.38
+   ]
+  },
+  "agreement": [
+   0.46,
+   0.388
+  ],
+  "forbid_ratio": [
+   0.847,
+   0.878
+  ],
+  "end_best_share": [
+   0.175,
+   0.235
+  ],
+  "one_side_end_gap_share": [
+   0.202,
+   0.363
+  ],
+  "end_terms_arm6": {
+   "d_tau_me": 0.14,
+   "d_tau_opp": -0.94,
+   "d_opp_cut": -0.01,
+   "d_opp_stopped": -0.15
+  },
+  "audit_cross": {
+   "games": 240,
+   "void": 0
+  },
+  "logs": [
+   "logs/theory_map/real_w41_endopp_foreseeall.json",
+   "logs/theory_map/real_w41_endopp_arms.json"
+  ],
+  "verdict": "turn-order re-reading is not the main cause (median 3.10 >= 2.5); ranking moved away from deep search"
  }
 }
