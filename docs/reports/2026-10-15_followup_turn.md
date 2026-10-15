@@ -44,12 +44,20 @@
 - そこで、この切替では「**1 段目に載っている攻め手を全部**（届くものだけ）解決する」。
   - `followup_plan` は 1 段目の最大の 1 回だけだった。
   - 2 段目以降は次のターン以降の攻撃なので、このターンには解決しない。
+- この読み替えは**司令塔が確認済み**（2026-10-15・数を見る前。依頼文の「2 段目以降も使う」は誤りだった）。
 
 道具（合成側と共有）:
 - `theory_map.py followturn --in <記録> --dump <腕①の写し> --out <json>`: 候補ごとの攻撃の並び {seed: {step: {候補: [[枠, ドン], …]}}} を書く。
 - `clock_succ.py --followup turn --plan <json> --base <既定の表> --out <表> [--shard i/n]`: 表を作る。記録を作った古いエンジン（a28ededa）で回す。
   - ターンを終える候補・メインに戻らない候補は、既定の表から写す。
 - `theory_bridge.py` は `OPCG_CLOCK_VALUE=<表の親>` で読む（今の `followup_plan` と同じ）。
+
+**古いエンジンで表を作る手順**（合成側も同じ・数を見る前に追記）:
+1. 記録を作ったコミット（実側は a28ededa）の worktree を作り、そのコミットのエンジンの wheel を別のディレクトリに展開する（実側は `/home/user/tm/oldwt`・`/home/user/tm/oldeng`）。
+2. **新しい木の `tests/scripts/clock_succ.py` をその worktree にコピーする**。
+3. **その worktree を cwd にして**回す:
+   `PYTHONPATH=<wheel の展開先>:<worktree> OPCG_LOG_SILENT=1 python tests/scripts/clock_succ.py --in <記録> --followup turn --plan <followturn の json> --base <既定の表> --out <表の親>/<記録名> --shard i/n`
+4. 新しい木で回すと、スクリプトが新しい木の `opcg_sim`（生成物の `opcg_sim/data/opcg_effects.json` を含む）を先に読む。そのため古いエンジンでも記録とずれる（2026-10-15 に実測: 最初のメインの行から `match=0`）。表の各局の `match` が 1 であることを確かめる。
 
 ### 1.3 不変量（数の前に確かめる）
 
