@@ -1322,5 +1322,94 @@
    0.581
   ],
   "verdict": "inconclusive (both: agreement 0.526, ratio 0.783, counter ratio mean 0.58); survive moves clock bias toward 0 but barely changes move ranking"
+ },
+ "followup_plan_fix_2026_10_14": {
+  "report": "docs/reports/2026-10-14_followup_plan_fix.md",
+  "kind": "correction",
+  "defect": "3,629 follow-up attacks rejected by the engine (1,406 first-turn; 2,223 effect-prohibited attackers) -> unpriced",
+  "fix": [
+   "df428822 followplan skips first own turn",
+   "db897256 clock_succ keeps default successor when the engine rejects"
+  ],
+  "arms_same_1775": {
+   "default": [
+    0.446,
+    0.832
+   ],
+   "followup": [
+    0.522,
+    0.782
+   ],
+   "survive": [
+    0.46,
+    0.847
+   ],
+   "both": [
+    0.528,
+    0.804
+   ]
+  },
+  "verdicts": "unchanged (followup_plan and hand_stop both inconclusive)",
+  "logs": [
+   "logs/theory_map/real_w41_followcheck_fix.json",
+   "logs/theory_map/real_w41_followup_fix_arms.json"
+  ]
+ },
+ "ranking_parts_2026_10_14": {
+  "report": "docs/reports/2026-10-14_ranking_parts.md",
+  "kind": "diagnostic",
+  "logs": [
+   "logs/theory_map/real_w41_rankparts_ownparts.json",
+   "logs/theory_map/real_w41_rankparts_theorytype.json"
+  ],
+  "sources": {
+   "attack_plan": 0.54,
+   "play_price": 0.457,
+   "other": 0.003
+  },
+  "own_split": {
+   "plan_differs": 0.658,
+   "defender_hand": 0.279,
+   "board_result": 0.072
+  },
+  "by_deck_attack_plan": {
+   "shanks": 0.556,
+   "nami": 0.282,
+   "enel": 0.78,
+   "luffy": 0.43
+  },
+  "verdict": "inconclusive (max part 54%)"
+ },
+ "enel_plan_2026_10_15": {
+  "report": "docs/reports/2026-10-15_enel_plan.md",
+  "kind": "diagnostic",
+  "arm": "followup=plan table (corrected) + OPCG_HAND_STOP=survive explicit; ranking_parts dump reused",
+  "logs": [
+   "logs/theory_map/real_w41_enelplan.json"
+  ],
+  "enel_share": {
+   "count": 0.557,
+   "who": 0.215,
+   "don": 0.094,
+   "excess": 0.135
+  },
+  "all_share": {
+   "count": 0.506,
+   "who": 0.312,
+   "don": 0.092,
+   "excess": 0.09
+  },
+  "posthoc_turn_end": {
+   "enel": 0.416,
+   "all": 0.298,
+   "pass_side_plan_empty": "93/93"
+  },
+  "posthoc_excl_turn_end_enel": {
+   "count": 0.242,
+   "who": 0.367,
+   "don": 0.16,
+   "excess": 0.23
+  },
+  "verdict": "inconclusive (Enel max class 55.7%)"
  }
 }
