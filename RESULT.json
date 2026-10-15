@@ -1411,5 +1411,50 @@
    "excess": 0.23
   },
   "verdict": "inconclusive (Enel max class 55.7%)"
+ },
+ "followup_turn_2026_10_15": {
+  "report": "docs/reports/2026-10-15_followup_turn.md",
+  "kind": "switch (table only, default off)",
+  "switch": "clock_succ.py --followup turn + theory_map.py followturn; read via OPCG_CLOCK_VALUE=<table parent>",
+  "arms_survive": {
+   "1_default": [
+    0.46,
+    0.847
+   ],
+   "2_followup_plan": [
+    0.528,
+    0.804
+   ],
+   "5_followup_turn": [
+    0.55,
+    0.815
+   ]
+  },
+  "one_side_turn_end_gap_share": {
+   "all": [
+    0.202,
+    0.271,
+    0.12
+   ],
+   "enel": [
+    0.365,
+    0.423,
+    0.102
+   ]
+  },
+  "invariants": "pass prices and W0/k0 bit-identical (18,207); clock rows identical; 300/300 replays match",
+  "engine_rejected": {
+   "cannot_rest": 5485,
+   "cannot_attack": 4673,
+   "first_turn": 1406,
+   "attacker_gone": 1111,
+   "summoning": 7
+  },
+  "logs": [
+   "logs/theory_map/real_w41_followturn_arms.json",
+   "logs/theory_map/real_w41_followturn_build.json",
+   "logs/theory_map/real_w41_followturn_check.json"
+  ],
+  "verdict": "inconclusive (agreement 0.550, +0.02 from 0.53; ratio 0.815)"
  }
 }
