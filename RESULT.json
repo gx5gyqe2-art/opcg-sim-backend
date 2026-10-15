@@ -1456,5 +1456,39 @@
    "logs/theory_map/real_w41_followturn_check.json"
   ],
   "verdict": "inconclusive (agreement 0.550, +0.02 from 0.53; ratio 0.815)"
+ },
+ "foresee_actual_2026_10_15": {
+  "report": "docs/reports/2026-10-15_foresee_actual.md",
+  "kind": "diagnostic",
+  "arm": "default table + OPCG_HAND_STOP=survive (followup_turn arm-1 dump reused)",
+  "points": 5838,
+  "abs_median": 0.0225,
+  "abs_median_mu": 0.41,
+  "mean": 0.031,
+  "mean_ci": [
+   0.026,
+   0.036
+  ],
+  "sd": 0.173,
+  "no_trigger": {
+   "n": 2997,
+   "abs_median": 0.0014,
+   "mean": 0.023
+  },
+  "term_agree": {
+   "life": 0.8,
+   "hand": 0.53,
+   "blocker": 0.95
+  },
+  "per_term_abs_share": {
+   "hand": 0.743,
+   "life": 0.321,
+   "blocker": 0.075
+  },
+  "posthoc": "no-trigger points: 909/1031 hand mismatches have the expected defence cutting more cards (D mean +0.068)",
+  "logs": [
+   "logs/theory_map/real_w41_foresee.json"
+  ],
+  "verdict": "median |D| below mu: the ranking disagreement does not come from here (closed); most-off term = hand (hit); mean ~0 (miss: +0.56 mu)"
  }
 }
