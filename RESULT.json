@@ -1696,5 +1696,49 @@
    "logs/theory_map/real_w41_tempo.json"
   ],
   "verdict": "rule: asymmetry first (no-rewrite |1-S| 0.073 > 0.05); the asymmetry comes from reading the waiting side un-rewritten; with the turn-start rewrite S ~ 1, and the default price already reads the opponent clock through the mirror"
+ },
+ "opp_turn_split_2026_10_15": {
+  "report": "docs/reports/2026-10-15_opp_turn_split.md",
+  "kind": "diagnostic (OPCG_OPP_TURN_DUMP, Rust, default off, values unchanged)",
+  "points": 1382,
+  "exp_vs_act": {
+   "attacks": [
+    1.68,
+    1.57
+   ],
+   "don": [
+    1.83,
+    0.73
+   ],
+   "life": [
+    1.11,
+    0.62
+   ],
+   "cut": [
+    0.57,
+    1.13
+   ],
+   "blk": [
+    0.04,
+    0.14
+   ],
+   "play_char": [
+    0.66,
+    0.91
+   ]
+  },
+  "shrink_split": {
+   "life": 0.39,
+   "hand": 0.38,
+   "body": 0.23
+  },
+  "audit_cross": {
+   "games": 240,
+   "void": 0
+  },
+  "logs": [
+   "logs/theory_map/real_w41_oppturn.json"
+  ],
+  "verdict": "rule: opponent attack-plan reading (life+body 62%); caveat: the split is the composition of the actual durability change; the largest item gap is my own defence (cut 2x, life 0.56x), same direction as defend_foresee"
  }
 }
