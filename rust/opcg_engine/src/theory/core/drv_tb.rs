@@ -1004,6 +1004,13 @@ fn curve_def_v() -> V {
 
 /// 診断 `OPCG_CLOCK_PARTS_DUMP=1`（`docs/reports/2026-10-14_theory_ties_type.md` §1.4・既定は切・値は変えない）:
 /// 手の値段の写しに、候補ごとの後続の 2 本の時計と勝率・「相手の時計だけを動かした勝率」を書き足す。
+/// 切替 `OPCG_CLOCK_VALUE_END=opp`（`docs/reports/2026-10-15_end_as_opp.md` §1.2・既定は切）: ターンを終える候補の後続を、
+/// 相手のターンの始まりとして相手の側から読む。
+fn clock_value_end_opp() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| matches!(std::env::var("OPCG_CLOCK_VALUE_END").ok().as_deref().map(str::trim), Some("opp")))
+}
+
 pub(super) fn clock_parts_dump_on() -> bool {
     matches!(std::env::var("OPCG_CLOCK_PARTS_DUMP").ok().as_deref().map(str::trim), Some("1") | Some("on") | Some("true"))
 }
@@ -1080,6 +1087,55 @@ fn clock_prices(c2: &mut Core, row: &Row, sv: &V, cx: &ClockCx, stats: &mut D, p
             let st = it[0].int();
             stats.sub_mut("clock_status", |d| d.addi(&st.to_string(), 1));
             let w1 = match st {
+                6 if clock_value_end_opp() => {
+                    // 切替 `OPCG_CLOCK_VALUE_END=opp`（`2026-10-15_end_as_opp.md` §1.2・既定は切）: ターンを終えた後続を、相手のターンの
+                    // 始まりとして相手の側から読む（鏡の読み `mirror_view`＝時計の中で相手の次のターンを読む形）。W＝1 − W_相手。
+                    let me1 = row_of_triplet(&it[1], &dt);
+                    let op1 = row_of_triplet(&it[2], &dt);
+                    if me1.ci.is_none() || op1.ci.is_none() {
+                        stats.addi("end_opp_fallback", 1);
+                        let (wv, _k, tm, to) = clock_read_full(c2, &me1, &op1, cx)?;
+                        if want_parts {
+                            let w_opp = lt::prob_of_d(&cx.cfg.clock, to - tm0, None, Some(tm0), Some(to), "hyp", false);
+                            cparts.push(V::list(vec![V::Float(tm), V::Float(to), V::Float(wv), V::Float(w_opp), curve_parts_v(), curve_att_v()]));
+                        }
+                        Some(wv)
+                    } else {
+                        let mrow = c2.mirror_view(&me1, Some(&op1.tok), op1.ci.as_deref());
+                        let cxo = ClockCx {
+                            t: cx.t + 1,
+                            prof: cx.prof,
+                            cfg: cx.cfg,
+                            cut_me: cx.cut_opp,
+                            cut_opp: cx.cut_me,
+                            mirror_me: cx.mirror_me,
+                            dk_me: cx.dk_opp.clone(),
+                            dk_opp: cx.dk_me.clone(),
+                            literal: cx.literal,
+                        };
+                        let (wo, _k, tm_o, to_o) = clock_read_full(c2, &mrow, &me1, &cxo)?;
+                        stats.addi("end_opp_rows", 1);
+                        let wv = 1.0 - wo;
+                        if want_parts {
+                            // 自分の側から見た時計（自分の時計＝相手の側の読みの相手の時計）と、耐久の 10 項の前後を入れ替えたもの
+                            let (tm, to) = (to_o, tm_o);
+                            let w_opp = lt::prob_of_d(&cx.cfg.clock, to - tm0, None, Some(tm0), Some(to), "hyp", false);
+                            let pv = match curve_parts_v() {
+                                V::None => V::None,
+                                v => {
+                                    let a = v.items().to_vec();
+                                    if a.len() == 10 {
+                                        V::list(a[5..10].iter().chain(a[0..5].iter()).cloned().collect())
+                                    } else {
+                                        V::None
+                                    }
+                                }
+                            };
+                            cparts.push(V::list(vec![V::Float(tm), V::Float(to), V::Float(wv), V::Float(w_opp), pv, V::None]));
+                        }
+                        Some(wv)
+                    }
+                }
                 0 | 6 => {
                     let me1 = row_of_triplet(&it[1], &dt);
                     let op1 = row_of_triplet(&it[2], &dt);
