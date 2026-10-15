@@ -2807,6 +2807,85 @@ def cmd_ownparts(a):
     return 0
 
 
+def cmd_enelplan(a):
+    """`2026-10-15_enel_plan.md` §1: `ranking_parts` §1.6 の (a)（最善の手の後と探索の手の後で自分の攻め手の計画の 1 段目が違う点）を、
+    (1) 攻め手の数・(2) 誰が殴るか（枠の集合）・(3) ドンの配り方・(4) 超過 に分け（上から順に取る）、重み＝自分の時計の部品の割合を出す。"""
+    P, cnt, MU = theorytype_points(a)
+    CLS = ("1_count", "2_who", "3_don", "4_excess")
+
+    def classify(x):
+        pb = [tuple(e) for e in x["planb"]]
+        px = [tuple(e) for e in x["planx"]]
+        if len(pb) != len(px):
+            more = len(px) > len(pb)
+            bat, xat = x["bc"] == "attack", x["xc"] == "attack"
+            bpc, xpc = x["bt"] == "play_char", x["xt"] == "play_char"
+            # 攻撃でレストした: 片方だけが攻撃で、攻撃した側の後の方が少ない
+            if bat != xat and (more == bat):
+                why = "rest_by_attack"
+            elif bpc != xpc and (more == xpc):
+                why = "played_char"
+            else:
+                why = "other"
+            return "1_count", ("search_more" if more else "search_fewer"), why
+        if sorted(e[0] for e in pb) != sorted(e[0] for e in px):
+            return "2_who", None, None
+        db = {e[0]: e for e in pb}
+        dx = {e[0]: e for e in px}
+        if any(db[s][2] != dx[s][2] for s in db):
+            return "3_don", None, None
+        return "4_excess", None, None
+
+    def tab(xs):
+        ys = [x for x in xs if "w_own" in x and x.get("planb") is not None and x.get("planx") is not None and x["planb"] != x["planx"]]
+        tot = sum(y["w_own"] for y in ys)
+        acc = {c: [0, 0.0] for c in CLS}
+        sub = collections.defaultdict(lambda: [0, 0.0])
+        dn = []
+        for y in ys:
+            c, d, why = classify(y)
+            acc[c][0] += 1
+            acc[c][1] += y["w_own"]
+            if c == "1_count":
+                sub[d + "/" + why][0] += 1
+                sub[d + "/" + why][1] += y["w_own"]
+                dn.append(len(y["planx"]) - len(y["planb"]))
+        o = {"n": len(ys), "w_own_sum": round(tot, 4),
+             "share": {c: {"n": acc[c][0], "w_share": round(acc[c][1] / tot, 4) if tot else None} for c in CLS},
+             "count_sub": {k: {"n": v[0], "w_share_of_all": round(v[1] / tot, 4) if tot else None} for k, v in sorted(sub.items())},
+             "count_diff_hist": dict(sorted(collections.Counter(dn).items()))}
+        ws = [o["share"][c]["w_share"] for c in CLS if o["share"][c]["w_share"] is not None]
+        o["max_share"] = max(ws) if ws else None
+        # 事後（数を見た後に足した）: 片方の手だけがターンを終える点。ターンを終えた後続は相手のターンなので 1 段目の計画は空。
+        te = [y for y in ys if (y["bt"] == "pass") != (y["xt"] == "pass")]
+        rest = [y for y in ys if (y["bt"] == "pass") == (y["xt"] == "pass")]
+        rt = sum(y["w_own"] for y in rest)
+        acc2 = {c: [0, 0.0] for c in CLS}
+        for y in rest:
+            c = classify(y)[0]
+            acc2[c][0] += 1
+            acc2[c][1] += y["w_own"]
+        o["posthoc_turn_end"] = {"n": len(te), "w_share_of_all": round(sum(y["w_own"] for y in te) / tot, 4) if tot else None,
+                                 "n_in_count": sum(1 for y in te if len(y["planb"]) != len(y["planx"])),
+                                 "pass_side_plan_empty": sum(1 for y in te if not (y["planb"] if y["bt"] == "pass" else y["planx"]))}
+        o["posthoc_excl_turn_end"] = {"n": len(rest), "w_own_sum": round(rt, 4),
+                                      "share": {c: {"n": acc2[c][0], "w_share": round(acc2[c][1] / rt, 4) if rt else None} for c in CLS}}
+        return o
+
+    out = {"record": a.src, "dump": a.dump, "deep": a.deep, "mu": MU, "count": dict(cnt), "groups": {}}
+    for gsel, names in (("i+ii", ("i", "ii")), ("iii", ("iii",))):
+        xs = [x for x in P if x["g"] in names]
+        e = {"all": tab(xs), "by_band": {b: tab([x for x in xs if x["band"] == b]) for b in TURN_BANDS},
+             "by_deck": {dk: tab([x for x in xs if x["deck"] == dk]) for dk in sorted({x["deck"] for x in xs})},
+             "by_deck_band": {dk + "|" + b: tab([x for x in xs if x["deck"] == dk and x["band"] == b])
+                              for dk in sorted({x["deck"] for x in xs}) for b in TURN_BANDS}}
+        out["groups"][gsel] = e
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps(out["count"]))
+    return 0
+
+
 def cmd_followplan(a):
     """`2026-10-14_followup_plan.md` §1.2 の 1 段目: 既定の表で取った写し（`OPCG_CLOCK_PARTS_DUMP=1`・攻め手の計画つき）から、
     殴らない候補（出す・付与・起動）の後続ごとに、理論の計画の 1 段目で「超過 + 1000 × 付けるドン」が最大の攻め手（同点は計画の並びで先）を選ぶ。
@@ -2915,7 +2994,7 @@ def cmd_followcheck(a):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "followplan", "followcheck", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "followplan", "followcheck", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -3030,6 +3109,11 @@ def main(argv=None):
     op.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1`（耐久の項つき・5630fbb1 以降）で取り直した写し")
     op.add_argument("--deep", required=True)
     op.add_argument("--out", required=True)
+    ep = sub.add_parser("enelplan")
+    ep.add_argument("--in", dest="src", required=True)
+    ep.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1`（攻め手の計画つき）の写し")
+    ep.add_argument("--deep", required=True)
+    ep.add_argument("--out", required=True)
     fp = sub.add_parser("followplan")
     fp.add_argument("--in", dest="src", required=True)
     fp.add_argument("--dump", required=True, help="既定の表で `OPCG_CLOCK_PARTS_DUMP=1`（攻め手の計画つき・2e915f46 以降）で取った写し")
@@ -3044,7 +3128,7 @@ def main(argv=None):
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
             "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter,
-            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "followplan": cmd_followplan, "followcheck": cmd_followcheck}[a.cmd](a)
+            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "followplan": cmd_followplan, "followcheck": cmd_followcheck}[a.cmd](a)
 
 
 if __name__ == "__main__":

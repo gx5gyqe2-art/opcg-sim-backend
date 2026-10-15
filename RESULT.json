@@ -1379,5 +1379,37 @@
    "luffy": 0.43
   },
   "verdict": "inconclusive (max part 54%)"
+ },
+ "enel_plan_2026_10_15": {
+  "report": "docs/reports/2026-10-15_enel_plan.md",
+  "kind": "diagnostic",
+  "arm": "followup=plan table (corrected) + OPCG_HAND_STOP=survive explicit; ranking_parts dump reused",
+  "logs": [
+   "logs/theory_map/real_w41_enelplan.json"
+  ],
+  "enel_share": {
+   "count": 0.557,
+   "who": 0.215,
+   "don": 0.094,
+   "excess": 0.135
+  },
+  "all_share": {
+   "count": 0.506,
+   "who": 0.312,
+   "don": 0.092,
+   "excess": 0.09
+  },
+  "posthoc_turn_end": {
+   "enel": 0.416,
+   "all": 0.298,
+   "pass_side_plan_empty": "93/93"
+  },
+  "posthoc_excl_turn_end_enel": {
+   "count": 0.242,
+   "who": 0.367,
+   "don": 0.16,
+   "excess": 0.23
+  },
+  "verdict": "inconclusive (Enel max class 55.7%)"
  }
 }
