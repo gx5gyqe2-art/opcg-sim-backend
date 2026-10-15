@@ -1671,5 +1671,30 @@
    "logs/theory_map/real_w41_endopp_arms.json"
   ],
   "verdict": "turn-order re-reading is not the main cause (median 3.10 >= 2.5); ranking moved away from deep search"
+ },
+ "tempo_sum_2026_10_15": {
+  "report": "docs/reports/2026-10-15_tempo_sum.md",
+  "kind": "diagnostic (OPCG_TEMPO_DUMP, Rust, default off, values unchanged)",
+  "rows": 18207,
+  "no_rewrite": {
+   "S_median": 0.934,
+   "S_mean": 0.891,
+   "abs_1mS_median": 0.073,
+   "one_minus_S_median_mu": 1.44
+  },
+  "rewrite": {
+   "S_median": 0.995,
+   "S_mean": 0.978,
+   "abs_1mS_median": 0.032,
+   "one_minus_S_median_mu": 0.13
+  },
+  "audit_cross": {
+   "games": 240,
+   "void": 0
+  },
+  "logs": [
+   "logs/theory_map/real_w41_tempo.json"
+  ],
+  "verdict": "rule: asymmetry first (no-rewrite |1-S| 0.073 > 0.05); the asymmetry comes from reading the waiting side un-rewritten; with the turn-start rewrite S ~ 1, and the default price already reads the opponent clock through the mirror"
  }
 }
