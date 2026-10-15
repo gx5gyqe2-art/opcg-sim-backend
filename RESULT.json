@@ -1490,5 +1490,45 @@
    "logs/theory_map/real_w41_foresee.json"
   ],
   "verdict": "median |D| below mu: the ranking disagreement does not come from here (closed); most-off term = hand (hit); mean ~0 (miss: +0.56 mu)"
+ },
+ "defend_foresee_2026_10_15": {
+  "report": "docs/reports/2026-10-15_defend_foresee.md",
+  "kind": "diagnostic",
+  "switch": "OPCG_DEF_TRACE_DUMP=1 (Rust, default off, values unchanged: 18,207 rows identical); theory_map.py defend",
+  "arm": "default table + OPCG_HAND_STOP=survive + OPCG_CLOCK_PARTS_DUMP=1",
+  "body_turns": 1547,
+  "cut_ratio": [
+   0.51,
+   [
+    0.48,
+    0.55
+   ]
+  ],
+  "life_ratio": [
+   1.34,
+   [
+    1.29,
+    1.39
+   ]
+  ],
+  "block_ratio": 0.31,
+  "kill": [
+   0.089,
+   0.07
+  ],
+  "by_def_deck_cut_ratio": {
+   "shanks": 0.64,
+   "nami": 0.69,
+   "enel": 0.34,
+   "luffy": 0.58
+  },
+  "audit_cross": {
+   "games": 240,
+   "void": 0
+  },
+  "logs": [
+   "logs/theory_map/real_w41_defend.json"
+  ],
+  "verdict": "inconclusive, opposite to the forecast: the DP expects the defender to cut half the cards and take 1.34x the life this turn"
  }
 }
