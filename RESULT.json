@@ -1590,5 +1590,41 @@
    },
    "verdict": "unchanged"
   }
+ },
+ "foresee_all_2026_10_15": {
+  "report": "docs/reports/2026-10-15_foresee_all.md",
+  "kind": "diagnostic",
+  "arm": "default table + OPCG_HAND_STOP=survive (followup_turn arm-1 dump reused)",
+  "abs_median_mu": {
+   "attack": 0.33,
+   "play": 0.0,
+   "effect": 0.0,
+   "attach": 0.0,
+   "end": 2.93
+  },
+  "mean_mu": {
+   "attack": 0.58,
+   "play": -0.13,
+   "effect": 0.08,
+   "attach": 0.0,
+   "end": 1.93
+  },
+  "corr_expected_actual": {
+   "attack": 0.67,
+   "play": 0.73,
+   "effect": 0.81,
+   "attach": 1.0,
+   "end": 0.14
+  },
+  "end_terms": {
+   "d_tau_me": -0.71,
+   "d_tau_opp": -1.1,
+   "d_opp_cut": -1.8,
+   "d_opp_stopped": -1.92
+  },
+  "logs": [
+   "logs/theory_map/real_w41_foreseeall.json"
+  ],
+  "verdict": "all types except turn-end below 1 mu (consistent); turn-end 2.93 mu -> fix candidates listed (read the turn-end successor as the opponent's turn start; opponent's hand after their own plan)"
  }
 }
