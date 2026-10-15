@@ -418,6 +418,22 @@ pub fn with_legacy_order<T>(f: impl FnOnce() -> T) -> T {
 }
 
 /// 守る側の比較（期待値・同点は誤差で・E9）。
+/// 診断 `OPCG_DEF_TRACE_DUMP=1`（`docs/reports/2026-10-15_defend_foresee.md` §1・既定は切・値は変えない）:
+/// 守る側の最善の守りを、今のターン（1 段目）の攻撃の並びについて辿り、受けたライフ・切った札・ブロック・カウンターで止めた数・
+/// 倒された確率の期待値を写す（[`Defender::trace_first`]）。
+pub fn def_trace_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| matches!(std::env::var("OPCG_DEF_TRACE_DUMP").ok().as_deref().map(str::trim), Some("1") | Some("on") | Some("true")))
+}
+
+/// 1 つの状態で選ばれた守り（診断の辿りだけが使う）。
+#[derive(Clone, Copy)]
+enum Act {
+    Take,
+    Block(usize),
+    Counter(usize),
+}
+
 fn better(arena: &[f64], a: &Cand, b: &Cand, feq: f64, survive: bool) -> bool {
     if survive {
         return better_survive(arena, a, b, feq);
@@ -568,6 +584,107 @@ impl Defender {
 
     /// 1 問を解く。予算を超えたら `Err(DpErr::Budget)`（その試行は捨てる）。
     pub fn solve(&mut self, inp: &Input) -> R<Output> {
+        let (p, mut cur, l0_f, nu_all) = match self.prepare(inp)? {
+            Ok(x) => x,
+            Err(out) => return Ok(out),
+        };
+        let r = self.lookup(&p, &mut cur)?;
+        let harms = self.harms[r.off as usize..(r.off + r.len) as usize].to_vec();
+        Ok(Output {
+            cut: r.v[1],
+            stopped: r.v[3],
+            alive: r.v[2],
+            prevented: r.v[0],
+            harms,
+            theta: inp.lam * l0_f + inp.mu * r.v[1] + nu_all,
+            nu_all,
+        })
+    }
+
+    /// 診断（[`def_trace_on`]）: `solve` と同じ問題の最善の守りを、今のターン（1 段目）の攻撃の並びが尽きるまで辿り、
+    /// [受けたライフ, 切った札, ブロック, カウンターで止めた数, 倒された確率, 守った攻撃の数] の期待値と、届く攻撃の数（根の並びの長さ）を返す。
+    /// 子は覚え書きからだけ読む（覚え書きに無い状態に出会ったら `Bad`・覚え書きは増やさない）。根は `solve` 済みであること。
+    pub fn trace_first(&mut self, inp: &Input) -> R<[f64; 7]> {
+        let (p, mut cur, _l0, _nu) = match self.prepare(inp)? {
+            Ok(x) => x,
+            Err(_) => return Ok([0.0; 7]),
+        };
+        let n_hits = cur.rem.len() as f64;
+        let t = self.trace(&p, &mut cur)?;
+        Ok([t[0], t[1], t[2], t[3], t[4], t[5], n_hits])
+    }
+
+    fn trace(&mut self, p: &Prob, cur: &mut Cur) -> R<[f64; 6]> {
+        if cur.rem.is_empty() || cur.t != 0 {
+            return Ok([0.0; 6]);
+        }
+        let (_c, ch) = self.choose(p, cur, true)?;
+        let Some((i, act)) = ch else { return Ok([0.0; 6]) };
+        let x = cur.rem.remove(i);
+        let out = (|| -> R<[f64; 6]> {
+            match act {
+                Act::Take => {
+                    if cur.lf <= 0 {
+                        return Ok([0.0, 0.0, 0.0, 0.0, 1.0, 1.0]);
+                    }
+                    let mut acc = [0.0; 6];
+                    let mut ptot = 0.0;
+                    let moves: Vec<Option<usize>> = succ::recv_moves(&p.prep).collect();
+                    for mv in moves {
+                        succ::recv(cur, &p.prep, mv);
+                        let r = self.trace(p, cur);
+                        succ::undo_recv(cur, &p.prep, mv);
+                        let r = r?;
+                        let prob = match mv {
+                            Some(ti) => p.tprob[ti],
+                            None => p.prep.p_none,
+                        };
+                        ptot += prob;
+                        for q in 0..6 {
+                            acc[q] += prob * r[q];
+                        }
+                    }
+                    if ptot > 0.0 {
+                        for v in acc.iter_mut() {
+                            *v /= ptot;
+                        }
+                    }
+                    acc[0] += 1.0;
+                    acc[5] += 1.0;
+                    Ok(acc)
+                }
+                Act::Block(bi) => {
+                    let b = succ::block(cur, bi, x, p.eps);
+                    let r = self.trace(p, cur);
+                    succ::undo_block(cur, &b);
+                    let mut r = r?;
+                    r[2] += 1.0;
+                    r[5] += 1.0;
+                    Ok(r)
+                }
+                Act::Counter(ci) => {
+                    let sets = self.sets.get(p.kid, &p.prep.kvals, &p.prep.kdons, p.eps, x, &cur.hand, cur.dl);
+                    let cs = sets.get(ci).ok_or_else(|| DpErr::Bad("trace: counter set missing".to_string()))?;
+                    let (saved_hand, saved_dl) = (cur.hand.clone(), cur.dl);
+                    succ::counter(cur, cs);
+                    let r = self.trace(p, cur);
+                    cur.hand.copy_from_slice(&saved_hand);
+                    cur.dl = saved_dl;
+                    let mut r = r?;
+                    r[1] += cs.nc as f64;
+                    r[3] += 1.0;
+                    r[5] += 1.0;
+                    Ok(r)
+                }
+            }
+        })();
+        cur.rem.insert(i, x);
+        out
+    }
+
+    /// `solve` の下ごしらえ（問題の値と根の状態）。地平が 0 なら `Err(答え)`。
+    #[allow(clippy::type_complexity)]
+    fn prepare(&mut self, inp: &Input) -> R<Result<(Prob, Cur, f64, f64), Output>> {
         let prep = Prep::new(inp.cards, inp.life_types, inp.draw_types);
         // L0 = int(max(0, round(float(life))))
         let l0f = bankers_round(inp.life);
@@ -594,7 +711,7 @@ impl Defender {
         let nu_all = naive_sum(nu_all_terms.iter().copied());
         let l0_f = l0 as f64;
         if cap <= 0 {
-            return Ok(Output {
+            return Ok(Err(Output {
                 cut: 0.0,
                 stopped: 0.0,
                 alive: 0.0,
@@ -602,7 +719,7 @@ impl Defender {
                 harms: Vec::new(),
                 theta: inp.lam * l0_f + nu_all,
                 nu_all,
-            });
+            }));
         }
         if cap >= 65_535 || l0 >= 65_535 || prep.cnt0.iter().any(|&c| c >= 30_000) {
             return Err(DpErr::Bad("problem outside the kernel limits".to_string()));
@@ -665,7 +782,7 @@ impl Defender {
             hits_f: hits_f.clone(),
             prep,
         };
-        let mut cur = Cur {
+        let cur = Cur {
             t: 0,
             lf: l0 as i32,
             dl: don,
@@ -675,17 +792,7 @@ impl Defender {
             rested: rest0,
             pend: arr0,
         };
-        let r = self.lookup(&p, &mut cur)?;
-        let harms = self.harms[r.off as usize..(r.off + r.len) as usize].to_vec();
-        Ok(Output {
-            cut: r.v[1],
-            stopped: r.v[3],
-            alive: r.v[2],
-            prevented: r.v[0],
-            harms,
-            theta: inp.lam * l0_f + inp.mu * r.v[1] + nu_all,
-            nu_all,
-        })
+        Ok(Ok((p, cur, l0_f, nu_all)))
     }
 
     // -----------------------------------------------------------------------------------------
@@ -775,12 +882,31 @@ impl Defender {
 
     /// 覚え書きに無い状態を解く（`within`）。Python の `not d < -FEQ` をそのまま写す（NaN は来ない）。
     /// 子の作り方は [`succ`]（段ごとの数え方と同じ遷移）。
-    #[allow(clippy::neg_cmp_op_on_partial_ord)]
     fn within(&mut self, p: &Prob, cur: &mut Cur) -> R<Res> {
         if cur.rem.is_empty() {
             return self.within_end(p, cur);
         }
+        let (c, _ch) = self.choose(p, cur, false)?;
+        self.store(p, cur, &c)
+    }
+
+    /// 子の値（`memo_only` なら覚え書きからだけ・無ければ `Bad`＝診断の辿りが覚え書きを増やさない）。
+    fn child(&mut self, p: &Prob, cur: &mut Cur, memo_only: bool) -> R<Res> {
+        if !memo_only {
+            return self.lookup(p, cur);
+        }
+        let mut kb = std::mem::take(&mut self.kb);
+        write_key(&mut kb, p.ctx, cur);
+        let hit = self.memo.get(&kb);
+        self.kb = kb;
+        hit.ok_or_else(|| DpErr::Bad("trace: state not in memo".to_string()))
+    }
+
+    /// `within` の本体: 攻め手の順と守る側の選択の最善（と、選んだ攻撃の位置・守り）。`memo_only` は診断の辿りだけ。
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    fn choose(&mut self, p: &Prob, cur: &mut Cur, memo_only: bool) -> R<(Cand, Option<(usize, Act)>)> {
         let mut best_att: Option<Cand> = None;
+        let mut att_choice: Option<(usize, Act)> = None;
         let mut kill_def: Option<f64> = None;
         let nrem = cur.rem.len();
         for i in 0..nrem {
@@ -791,6 +917,7 @@ impl Defender {
             let x = removed;
             // 受ける
             let mut best_def: Cand;
+            let mut def_choice = Act::Take;
             if cur.lf <= 0 {
                 let kill = *kill_def.get_or_insert_with(|| {
                     p.kill_base
@@ -807,7 +934,7 @@ impl Defender {
                 let mut acc = Acc::new();
                 for mv in succ::recv_moves(&p.prep) {
                     succ::recv(cur, &p.prep, mv);
-                    let r = self.lookup(p, cur);
+                    let r = self.child(p, cur, memo_only);
                     succ::undo_recv(cur, &p.prep, mv); // 失敗で戻る道では値は使わない（巻き戻しの不足で落とさない）
                     let prob = match mv {
                         Some(ti) => p.tprob[ti],
@@ -830,7 +957,7 @@ impl Defender {
                     continue;
                 }
                 let b = succ::block(cur, bi, x, p.eps);
-                let r = self.lookup(p, cur);
+                let r = self.child(p, cur, memo_only);
                 succ::undo_block(cur, &b);
                 let r = r?;
                 let bump = if b.killed { Some(p.nu_of(b.m)) } else { None };
@@ -843,14 +970,21 @@ impl Defender {
                 };
                 if pick {
                     best_def = cand;
+                    def_choice = Act::Block(bi);
                 }
             }
             // カウンターを切る
             let sets = self.sets.get(p.kid, &p.prep.kvals, &p.prep.kdons, p.eps, x, &cur.hand, cur.dl);
             let (saved_hand, saved_dl) = (cur.hand.clone(), cur.dl);
-            for cs in sets.iter() {
+            for (ci, cs) in sets.iter().enumerate() {
                 succ::counter(cur, cs);
-                let r = self.lookup(p, cur)?;
+                let r = self.child(p, cur, memo_only);
+                if r.is_err() {
+                    cur.hand.copy_from_slice(&saved_hand);
+                    cur.dl = saved_dl;
+                    cur.rem.insert(i, removed);
+                }
+                let r = r?;
                 let nc = cs.nc as f64;
                 let cand = Cand {
                     v: [r.v[0] + 1.0, r.v[1] + nc, r.v[2], r.v[3] + 1.0],
@@ -865,6 +999,7 @@ impl Defender {
                 };
                 if pick {
                     best_def = cand;
+                    def_choice = Act::Counter(ci);
                 }
             }
             cur.hand.copy_from_slice(&saved_hand);
@@ -877,10 +1012,10 @@ impl Defender {
             };
             if take {
                 best_att = Some(best_def);
+                att_choice = Some((i, def_choice));
             }
         }
-        let c = best_att.unwrap_or_else(Cand::zero);
-        self.store(p, cur, &c)
+        Ok((best_att.unwrap_or_else(Cand::zero), att_choice))
     }
 
     /// 残りの攻撃が無い状態（段の終わり）: ブロッカーが戻り、1 枚引いて次の段へ。
