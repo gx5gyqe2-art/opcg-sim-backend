@@ -2886,6 +2886,463 @@ def cmd_enelplan(a):
     return 0
 
 
+def cmd_foresee(a):
+    """`2026-10-15_foresee_actual.md` §1: 記録で打った攻撃の手ごとに、値段が見込む後続（表・quiesce の守りで 1 回解決）の W と、
+    記録で相手が実際に守った後の次のメインの行の W0 を並べ、差 D＝(W の見込み − W の実際)/κ0 を相手のライフ・手札・アクティブなブロッカーの
+    枚数のずれで組に分ける。写しは `OPCG_CLOCK_PARTS_DUMP=1`（既定の表）。"""
+    from theory_rs import MU
+    from opcg_sim.learned.train import plan_labels as PL
+    import live_theory as LT
+    SC_OPP_LIFE, SC_OPP_HAND = 1, 7
+    S_IS_REST, S_IS_BLOCKER, S_IS_CHAR = 3, 6, 18
+    OPP_FIELD = range(7, 12)
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    gms = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    dump = load_dump(a.dump)
+    cnt = collections.Counter()
+
+    def counts(sc, tok):
+        tok = np.asarray(tok, np.float64).reshape(22, -1)
+        bl = sum(1 for s_ in OPP_FIELD if tok[s_, S_IS_CHAR] > 0.5 and tok[s_, S_IS_BLOCKER] > 0.5 and tok[s_, S_IS_REST] <= 0.5)
+        return int(round(float(sc[SC_OPP_LIFE]))), int(round(float(sc[SC_OPP_HAND]))), bl
+    P = []
+    cols = ("who", "turn", "seed", "kind", "step", "pol_len", "pol_chosen")
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig",), extra_fn=LT._extra):
+        seed = int(rows["seed"][idx[0]])
+        gm = gms.get(seed)
+        dj = dump.get(seed)
+        if gm is None or dj is None:
+            cnt["game_missing"] += 1
+            continue
+        tb_path = os.path.join(a.table, "%d.npz" % seed)
+        tb = np.load(tb_path)
+        if int(tb["match"]) != 1:
+            cnt["table_mismatch_game"] += 1
+            continue
+        tpos = {int(x): j for j, x in enumerate(tb["r_step"])}
+        # 記録のメインの行（自分のターン・kind 0）と、写しの行（候補 2 本以上）を `build_rows` と同じ規則で並べる
+        mains, cand = [], []
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+                continue
+            k = int(L[i]); ch = int(rows["pol_chosen"][i])
+            if k < 1:
+                continue
+            s0 = json.loads(pol["pol_sig"][ptr[i]])
+            if s0[0] == "RESOLVE_EFFECT_SELECTION":
+                continue
+            mains.append(i)
+            if k < 2 or ch < 0 or ch >= k:
+                continue
+            cand.append((i, w, t, [family_of(json.loads(pol["pol_sig"][j])) for j in range(ptr[i], ptr[i] + k)], ch))
+        drows = dj["rows"]
+        if len(drows) != len(cand):
+            cnt["game_len_mismatch"] += 1
+            continue
+        by_i = {}
+        for (i, w, t, fams, ch), dr in zip(cand, drows):
+            if int(dr[0]) != t or int(dr[1]) != w or fams != [c[0] for c in dr[8]]:
+                cnt["row_mismatch"] += 1
+                continue
+            by_i[i] = (w, t, fams, ch, dr)
+        nxt = {mains[q]: mains[q + 1] for q in range(len(mains) - 1)}
+        for i, (w, t, fams, ch, dr) in by_i.items():
+            if fams[ch] != "attack":
+                continue
+            cnt["attack_rows"] += 1
+            pt = dr[9] if len(dr) > 9 else None
+            if not pt:
+                cnt["skip_no_parts"] += 1
+                continue
+            base, cp = pt
+            k0 = base[3]
+            e = cp[ch] if ch < len(cp) else None
+            if not e or e[0] is None:
+                cnt["skip_expected_not_main"] += 1
+                continue
+            j = tpos.get(int(rows["step"][i]))
+            if j is None:
+                cnt["skip_table_row"] += 1
+                continue
+            q = int(tb["r_ptr"][j]) + ch
+            if int(tb["c_st"][q]) != 0:
+                cnt["skip_expected_not_main"] += 1
+                continue
+            i2 = nxt.get(i)
+            if i2 is None or int(rows["who"][i2]) != w or int(rows["turn"][i2]) != t:
+                cnt["skip_actual_turn_over"] += 1
+                continue
+            d2 = by_i.get(i2)
+            if d2 is None:
+                cnt["skip_actual_single_cand"] += 1
+                continue
+            pt2 = d2[4][9] if len(d2[4]) > 9 else None
+            if not pt2:
+                cnt["skip_actual_no_parts"] += 1
+                continue
+            if not k0 or k0 <= 0:
+                cnt["skip_k0"] += 1
+                continue
+            we, wa = e[2], pt2[0][2]
+            ce = counts(tb["c_msc"][q], tb["c_mtok"][q])
+            ca = counts(ex["sc"][i2], ex["tok"][i2])
+            c0 = counts(ex["sc"][i], ex["tok"][i])
+            band = turn_band(t)
+            P.append({"seed": seed, "deck": gm["leaders"][w], "t": t, "band": band, "D": (we - wa) / k0,
+                      "exp": ce, "act": ca, "pre": c0, "we": we, "wa": wa, "k0": k0})
+            cnt["points"] += 1
+
+    TERMS = ("life", "hand", "blocker")
+
+    def summ(xs):
+        if not xs:
+            return {"n": 0}
+        D = np.array([x["D"] for x in xs])
+        units = collections.defaultdict(list)
+        for x in xs:
+            units[x["seed"]].append(x["D"])
+        ci = boot_games(units, lambda us: float(np.mean(us)))
+        aD = np.abs(D)
+        tot_abs = float(aD.sum())
+        o = {"n": len(xs), "mean": round(float(D.mean()), 5), "mean_ci": ci, "abs_median": round(float(np.median(aD)), 5),
+             "abs_median_mu": round(float(np.median(aD)) / MU, 3), "pos_share": round(float(np.mean(D > 0)), 4),
+             "zero_share": round(float(np.mean(D == 0)), 4), "sd": round(float(D.std()), 5)}
+        agree = {}
+        diffs = {}
+        for k, tname in enumerate(TERMS):
+            dd = [x["exp"][k] - x["act"][k] for x in xs]
+            agree[tname] = round(float(np.mean([v == 0 for v in dd])), 4)
+            diffs[tname] = dict(sorted(collections.Counter(dd).items()))
+        o["term_agree"] = agree
+        o["term_diff_hist"] = {k: {str(a_): b_ for a_, b_ in v.items()} for k, v in diffs.items()}
+        groups = collections.defaultdict(list)
+        per_term = dict.fromkeys(TERMS, 0.0)
+        for x in xs:
+            dk = [TERMS[k] for k in range(3) if x["exp"][k] != x["act"][k]]
+            g = "none" if not dk else (dk[0] + "_only" if len(dk) == 1 else "two_or_more")
+            groups[g].append(x)
+            for tname in dk:
+                per_term[tname] += abs(x["D"])
+        o["groups"] = {g: {"n": len(v), "D_sum": round(sum(y["D"] for y in v), 4),
+                           "abs_share": round(sum(abs(y["D"]) for y in v) / tot_abs, 4) if tot_abs else None,
+                           "abs_median": round(float(np.median([abs(y["D"]) for y in v])), 5)}
+                       for g, v in sorted(groups.items())}
+        o["per_term_abs_share"] = {k: round(v / tot_abs, 4) if tot_abs else None for k, v in per_term.items()}
+        o["most_off_term"] = max(per_term, key=per_term.get) if tot_abs else None
+        # 事後（数を見た後に足した）: 相手の手札のずれの向き（見込み − 実際 < 0＝値段が見込む守りの方が札を多く切った）
+        hd = collections.defaultdict(list)
+        for x in xs:
+            v = x["exp"][1] - x["act"][1]
+            hd["exp_fewer_cards" if v < 0 else ("exp_more_cards" if v > 0 else "same")].append(x)
+        o["posthoc_hand_direction"] = {k: {"n": len(v), "D_mean": round(float(np.mean([y["D"] for y in v])), 5),
+                                           "abs_share": round(sum(abs(y["D"]) for y in v) / tot_abs, 4) if tot_abs else None,
+                                           "pos_share": round(float(np.mean([y["D"] > 0 for y in v])), 4)}
+                                       for k, v in sorted(hd.items())}
+        return o
+
+    def block(xs):
+        nt = [x for x in xs if x["exp"][0] == x["pre"][0] and x["act"][0] == x["pre"][0]]
+        return {"all": summ(xs), "no_trigger": summ(nt), "life_taken_either": summ([x for x in xs if x not in nt])}
+    out = {"record": a.src, "dump": a.dump, "table": a.table, "mu": MU, "count": dict(cnt), "all": block(P),
+           "by_deck": {dk: block([x for x in P if x["deck"] == dk]) for dk in sorted({x["deck"] for x in P})},
+           "by_band": {b: block([x for x in P if x["band"] == b]) for b in TURN_BANDS},
+           "by_half": {"early_1-6": block([x for x in P if x["band"] != "7+"]), "late_7+": block([x for x in P if x["band"] == "7+"])}}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps(out["count"]))
+    return 0
+
+
+def cmd_defend(a):
+    """`2026-10-15_defend_foresee.md` §1: 自分のターンの値段の写しがある最初のメインの行で、打つ前の自分の時計の守る側の動的計画が
+    見込んだ今のターンの守り（`OPCG_DEF_TRACE_DUMP=1` の欄）と、記録でその行からターンの終わりまでに相手が実際に守った結果を比べる。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    gms = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    dump = load_dump(a.dump)
+    cnt = collections.Counter()
+    P = []
+    cols = ("sig", "who", "turn", "seed", "kind", "step", "pol_len", "pol_chosen")
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig", "pol_cid", "pol_tcid"),
+                                                    extra_fn=lambda dd, n: {"sc": np.asarray(dd["scalars"])[:n].astype(float)}):
+        seed = int(rows["seed"][idx[0]])
+        gm = gms.get(seed)
+        dj = dump.get(seed)
+        if gm is None or dj is None:
+            cnt["game_missing"] += 1
+            continue
+        lead = gm["leaders"]
+        u2c = PL.uuid_map(pol, L, ptr, idx)
+        cand = []
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+                continue
+            k = int(L[i]); ch = int(rows["pol_chosen"][i])
+            if k < 1:
+                continue
+            s0 = json.loads(pol["pol_sig"][ptr[i]])
+            if s0[0] == "RESOLVE_EFFECT_SELECTION":
+                continue
+            if k < 2 or ch < 0 or ch >= k:
+                continue
+            cand.append((i, w, t, [family_of(json.loads(pol["pol_sig"][j])) for j in range(ptr[i], ptr[i] + k)]))
+        drows = dj["rows"]
+        if len(drows) != len(cand):
+            cnt["game_len_mismatch"] += 1
+            continue
+        first = {}
+        for (i, w, t, fams), dr in zip(cand, drows):
+            if int(dr[0]) != t or int(dr[1]) != w or fams != [c[0] for c in dr[8]]:
+                cnt["row_mismatch"] += 1
+                continue
+            if (w, t) not in first:
+                first[(w, t)] = (i, dr)
+        idx_l = list(idx)
+        pos = {i: q for q, i in enumerate(idx_l)}
+        last_t = max(int(rows["turn"][i]) for i in idx_l)
+        winner = gm.get("winner")
+        for (w, t), (i0, dr) in sorted(first.items(), key=lambda kv: kv[0][1]):
+            if (t - 1) // 2 == 0:
+                cnt["skip_first_turn"] += 1
+                continue
+            pt = dr[9] if len(dr) > 9 else None
+            if not pt or len(pt[0]) < 6 or pt[0][5] is None:
+                cnt["skip_no_trace"] += 1
+                continue
+            tr = pt[0][5]
+            act = collections.Counter()
+            prev = None
+            for q in range(pos[i0], len(idx_l)):
+                i = idx_l[q]
+                if int(rows["turn"][i]) != t:
+                    break
+                wi = int(rows["who"][i]); sc = ex["sc"][i]
+                opp_life = sc[1] if wi == w else sc[0]
+                if prev is not None and opp_life < prev - 0.5:
+                    act["life"] += prev - opp_life
+                prev = opp_life
+                sj = json.loads(rows["sig"][i])
+                if wi != w and sj[0] == "SELECT_COUNTER":
+                    act["cut"] += 1
+                if wi != w and sj[0] == "SELECT_BLOCKER":
+                    act["blk"] += 1
+                if wi == w and int(rows["kind"][i]) == 0 and sj[0] in ("ATTACK", "DON_BOX") and sj[2]:
+                    act["attacks"] += 1
+                    act["leader_attacks"] += int(u2c.get(sj[2][0]) == lead[1 - w])
+            killed = int(t == last_t and winner == ("p1" if w == 0 else "p2"))
+            P.append({"seed": seed, "t": t, "band": turn_band(t), "deck_def": lead[1 - w], "deck_att": lead[w],
+                      "th": {"life": tr[0], "cut": tr[1], "blk": tr[2], "stop": tr[3], "kill": tr[4], "n_def": tr[5],
+                             "n_hits": tr[6] if len(tr) > 6 else None},
+                      "act": {"life": float(act["life"]), "cut": float(act["cut"]), "blk": float(act["blk"]), "kill": float(killed),
+                              "attacks": int(act["attacks"]), "leader_attacks": int(act["leader_attacks"])}})
+            cnt["points"] += 1
+
+    def ratio(xs, kk):
+        units = collections.defaultdict(list)
+        for x in xs:
+            units[x["seed"]].append((x["th"][kk], x["act"][kk]))
+        se = sum(x["th"][kk] for x in xs)
+        sa = sum(x["act"][kk] for x in xs)
+        ci = boot_games(units, lambda us: (sum(u[0] for u in us) / sum(u[1] for u in us)) if sum(u[1] for u in us) > 0 else float("nan"))
+        return {"exp_sum": round(se, 3), "act_sum": round(sa, 3), "ratio": round(se / sa, 4) if sa > 0 else None, "ratio_ci": ci,
+                "exp_mean": round(se / len(xs), 4), "act_mean": round(sa / len(xs), 4)}
+
+    def summ(xs):
+        if not xs:
+            return {"n": 0}
+        o = {"n": len(xs)}
+        for kk in ("cut", "life", "blk", "kill"):
+            o[kk] = ratio(xs, kk)
+        nd = sum(x["th"]["n_def"] for x in xs)
+        na = sum(x["act"]["leader_attacks"] for x in xs)
+        o["per_attack"] = {"exp_cut": round(sum(x["th"]["cut"] for x in xs) / nd, 4) if nd else None,
+                           "act_cut": round(sum(x["act"]["cut"] for x in xs) / na, 4) if na else None,
+                           "exp_life": round(sum(x["th"]["life"] for x in xs) / nd, 4) if nd else None,
+                           "act_life": round(sum(x["act"]["life"] for x in xs) / na, 4) if na else None,
+                           "exp_blk": round(sum(x["th"]["blk"] for x in xs) / nd, 4) if nd else None,
+                           "act_blk": round(sum(x["act"]["blk"] for x in xs) / na, 4) if na else None}
+        o["exp_counter_stops_mean"] = round(sum(x["th"]["stop"] for x in xs) / len(xs), 4)
+        o["attacks_mean"] = {"exp_hits": round(sum((x["th"]["n_hits"] or 0) for x in xs) / len(xs), 4),
+                             "act_leader": round(sum(x["act"]["leader_attacks"] for x in xs) / len(xs), 4)}
+        return o
+
+    def split(xs):
+        same = [x for x in xs if x["th"]["n_hits"] is not None and int(round(x["th"]["n_hits"])) == x["act"]["leader_attacks"]]
+        more = [x for x in xs if x["th"]["n_hits"] is not None and int(round(x["th"]["n_hits"])) > x["act"]["leader_attacks"]]
+        fewer = [x for x in xs if x["th"]["n_hits"] is not None and int(round(x["th"]["n_hits"])) < x["act"]["leader_attacks"]]
+        same_pos = [x for x in same if x["act"]["leader_attacks"] > 0]
+        return {"same": summ(same), "same_with_attacks": summ(same_pos), "theory_more": summ(more), "theory_fewer": summ(fewer), "all": summ(xs)}
+    out = {"record": a.src, "dump": a.dump, "count": dict(cnt), "all": split(P),
+           "by_def_deck": {dk: split([x for x in P if x["deck_def"] == dk]) for dk in sorted({x["deck_def"] for x in P})},
+           "by_band": {b: split([x for x in P if x["band"] == b]) for b in TURN_BANDS}}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps(out["count"]))
+    return 0
+
+
+def cmd_foreseeall(a):
+    """`2026-10-15_foresee_all.md` §1: 記録で打った手（全型）ごとに、値段が見込む後続の W と、打った後の実際の盤面（同じ席の次のメインの行・
+    ターンを終える手は次の自分のターンの最初のメインの行・局が終われば 1／0）を同じ理論で読んだ W を比べる。差 D＝(見込み − 実際)/κ0。"""
+    from theory_rs import MU
+    from opcg_sim.learned.train import plan_labels as PL
+    import live_theory as LT
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    gms = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    dump = load_dump(a.dump)
+    cnt = collections.Counter()
+    P = []
+    cols = ("who", "turn", "seed", "kind", "step", "pol_len", "pol_chosen")
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig",), extra_fn=LT._extra):
+        seed = int(rows["seed"][idx[0]])
+        gm = gms.get(seed)
+        dj = dump.get(seed)
+        if gm is None or dj is None:
+            cnt["game_missing"] += 1
+            continue
+        tb = np.load(os.path.join(a.table, "%d.npz" % seed))
+        if int(tb["match"]) != 1:
+            cnt["table_mismatch_game"] += 1
+            continue
+        tpos = {int(x): j for j, x in enumerate(tb["r_step"])}
+        mains, cand = [], []
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+                continue
+            k = int(L[i]); ch = int(rows["pol_chosen"][i])
+            if k < 1:
+                continue
+            if json.loads(pol["pol_sig"][ptr[i]])[0] == "RESOLVE_EFFECT_SELECTION":
+                continue
+            mains.append(i)
+            if k < 2 or ch < 0 or ch >= k:
+                continue
+            cand.append((i, w, t, [family_of(json.loads(pol["pol_sig"][j])) for j in range(ptr[i], ptr[i] + k)], ch))
+        drows = dj["rows"]
+        if len(drows) != len(cand):
+            cnt["game_len_mismatch"] += 1
+            continue
+        by_i = {}
+        for (i, w, t, fams, ch), dr in zip(cand, drows):
+            if int(dr[0]) != t or int(dr[1]) != w or fams != [c[0] for c in dr[8]]:
+                cnt["row_mismatch"] += 1
+                continue
+            by_i[i] = (w, t, fams, ch, dr)
+        pos = {i: q for q, i in enumerate(mains)}
+        last_t = max(int(rows["turn"][i]) for i in idx)
+        winner = gm.get("winner")
+        for i, (w, t, fams, ch, dr) in by_i.items():
+            fam = fams[ch]
+            cnt["rows_" + fam] += 1
+            pt = dr[9] if len(dr) > 9 else None
+            if not pt:
+                cnt["skip_no_parts"] += 1
+                continue
+            base, cp = pt
+            k0, w0 = base[3], base[2]
+            e = cp[ch] if ch < len(cp) else None
+            if not e or e[2] is None:
+                cnt["skip_expected_none_" + fam] += 1
+                continue
+            if not k0 or k0 <= 0:
+                cnt["skip_k0"] += 1
+                continue
+            we = e[2]
+            # 実際の行: 同じ席の次のメインの行（ターンを終える手は次の自分のターンの最初の行）
+            i2 = None
+            for q in range(pos[i] + 1, len(mains)):
+                j2 = mains[q]
+                if int(rows["who"][j2]) != w:
+                    continue
+                i2 = j2
+                break
+            wa = None
+            how = None
+            # 局が終わった: ターンを終える手以外は「同じターンで局が終わった（以後に自分のメインの行が無い）」、
+            # ターンを終える手は「次の自分のターンの前に局が終わった」。
+            over = i2 is None and winner in ("p1", "p2") and (fam == "end" or last_t == t)
+            if over:
+                wa = 1.0 if winner == ("p1" if w == 0 else "p2") else 0.0
+                how = "game_over"
+            elif i2 is None or (fam != "end" and int(rows["turn"][i2]) != t):
+                cnt["skip_turn_crossed_" + fam] += 1
+                continue
+            else:
+                d2 = by_i.get(i2)
+                if d2 is None:
+                    cnt["skip_actual_single_cand_" + fam] += 1
+                    continue
+                pt2 = d2[4][9] if len(d2[4]) > 9 else None
+                if not pt2:
+                    cnt["skip_actual_no_parts"] += 1
+                    continue
+                wa = pt2[0][2]
+                how = "next_row"
+            trig = None
+            if fam == "attack" and how == "next_row":
+                j = tpos.get(int(rows["step"][i]))
+                q = int(tb["r_ptr"][j]) + ch if j is not None else None
+                if q is not None and int(tb["c_st"][q]) == 0:
+                    l0 = float(ex["sc"][i][1]); le = float(tb["c_msc"][q][1]); la = float(ex["sc"][i2][1])
+                    trig = not (abs(le - l0) < 0.5 and abs(la - l0) < 0.5)
+            # 項（中央値 ≥ 1 μ の型を割るため・§1.6）: 見込みと実際の 2 本の時計と耐久の 10 項（実際が次の行のときだけ）
+            parts = None
+            if how == "next_row" and e[0] is not None and len(e) > 4 and e[4] and pt2[0][4]:
+                parts = {"tm": (e[0], pt2[0][0]), "to": (e[1], pt2[0][1]), "P": (e[4], pt2[0][4])}
+            P.append({"seed": seed, "fam": fam, "deck": gm["leaders"][w], "band": turn_band(t), "how": how, "trig": trig,
+                      "D": (we - wa) / k0, "pe": (we - w0) / k0, "pa": (wa - w0) / k0, "parts": parts})
+            cnt["points_" + fam] += 1
+
+    def summ(xs):
+        if not xs:
+            return {"n": 0}
+        D = np.array([x["D"] for x in xs])
+        units = collections.defaultdict(list)
+        for x in xs:
+            units[x["seed"]].append(x["D"])
+        ci = boot_games(units, lambda us: float(np.mean(us)))
+        aD = np.abs(D)
+        pe = np.array([x["pe"] for x in xs]); pa = np.array([x["pa"] for x in xs])
+        cr = float(np.corrcoef(pe, pa)[0, 1]) if pe.std() > 1e-12 and pa.std() > 1e-12 else None
+        return {"n": len(xs), "abs_median": round(float(np.median(aD)), 5), "abs_median_mu": round(float(np.median(aD)) / MU, 3),
+                "mean": round(float(D.mean()), 5), "mean_mu": round(float(D.mean()) / MU, 3), "mean_ci": ci,
+                "pos_share": round(float(np.mean(D > 0)), 4), "zero_share": round(float(np.mean(D == 0)), 4),
+                "sd_mu": round(float(D.std()) / MU, 3), "corr_expected_actual": round(cr, 4) if cr is not None else None,
+                "pe_mean_mu": round(float(pe.mean()) / MU, 3), "pa_mean_mu": round(float(pa.mean()) / MU, 3),
+                "game_over_n": sum(1 for x in xs if x["how"] == "game_over"),
+                "terms": terms(xs)}
+
+    PNAMES = ("opp_life", "opp_hand", "opp_body", "opp_cut", "opp_stopped", "my_life", "my_hand", "my_body", "my_cut", "my_stopped")
+
+    def terms(xs):
+        """実際 − 見込み の平均（2 本の時計・耐久の 10 項）。自分の時計＝相手の耐久（opp_*）、相手の時計＝自分の耐久（my_*）。"""
+        ys = [x["parts"] for x in xs if x.get("parts")]
+        if not ys:
+            return {"n": 0}
+        o = {"n": len(ys), "d_tau_me": round(float(np.mean([y["tm"][1] - y["tm"][0] for y in ys])), 4),
+             "d_tau_opp": round(float(np.mean([y["to"][1] - y["to"][0] for y in ys])), 4)}
+        for k, nm in enumerate(PNAMES):
+            v = [y["P"][1][k] - y["P"][0][k] for y in ys if y["P"][0][k] is not None and y["P"][1][k] is not None]
+            o["d_" + nm] = round(float(np.mean(v)), 4) if v else None
+        return o
+
+    FAMS = sorted({x["fam"] for x in P})
+    out = {"record": a.src, "dump": a.dump, "table": a.table, "mu": MU, "count": dict(cnt),
+           "by_fam": {f: summ([x for x in P if x["fam"] == f]) for f in FAMS},
+           "by_fam_band": {f: {b: summ([x for x in P if x["fam"] == f and x["band"] == b]) for b in TURN_BANDS} for f in FAMS},
+           "by_fam_deck": {f: {dk: summ([x for x in P if x["fam"] == f and x["deck"] == dk]) for dk in sorted({x["deck"] for x in P})} for f in FAMS},
+           "attack_trigger": {"no_trigger": summ([x for x in P if x["fam"] == "attack" and x["trig"] is False]),
+                              "life_taken_either": summ([x for x in P if x["fam"] == "attack" and x["trig"] is True])},
+           "all_but_end": summ([x for x in P if x["fam"] != "end"])}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps(out["count"]))
+    return 0
+
+
 def cmd_followplan(a):
     """`2026-10-14_followup_plan.md` §1.2 の 1 段目: 既定の表で取った写し（`OPCG_CLOCK_PARTS_DUMP=1`・攻め手の計画つき）から、
     殴らない候補（出す・付与・起動）の後続ごとに、理論の計画の 1 段目で「超過 + 1000 × 付けるドン」が最大の攻め手（同点は計画の並びで先）を選ぶ。
@@ -3045,7 +3502,7 @@ def cmd_followcheck(a):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "followplan", "followturn", "followcheck", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "foresee", "foreseeall", "defend", "followplan", "followturn", "followcheck", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -3169,6 +3626,20 @@ def main(argv=None):
     ft.add_argument("--in", dest="src", required=True)
     ft.add_argument("--dump", required=True, help="既定の表で `OPCG_CLOCK_PARTS_DUMP=1`（攻め手の計画つき）で取った写し（守る側の比べ方を明示）")
     ft.add_argument("--out", required=True)
+    fs = sub.add_parser("foresee")
+    fs.add_argument("--in", dest="src", required=True)
+    fs.add_argument("--dump", required=True, help="既定の表で `OPCG_CLOCK_PARTS_DUMP=1` で取った写し（守る側の比べ方を明示）")
+    fs.add_argument("--table", required=True, help="写しが使った後続局面の表（`<記録>/clock_succ`）")
+    fs.add_argument("--out", required=True)
+    fa = sub.add_parser("foreseeall")
+    fa.add_argument("--in", dest="src", required=True)
+    fa.add_argument("--dump", required=True, help="既定の表で `OPCG_CLOCK_PARTS_DUMP=1` で取った写し（守る側の比べ方を明示）")
+    fa.add_argument("--table", required=True, help="写しが使った後続局面の表（`<記録>/clock_succ`）")
+    fa.add_argument("--out", required=True)
+    dfd = sub.add_parser("defend")
+    dfd.add_argument("--in", dest="src", required=True)
+    dfd.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1 OPCG_DEF_TRACE_DUMP=1` で取った写し（守る側の比べ方を明示）")
+    dfd.add_argument("--out", required=True)
     fp = sub.add_parser("followplan")
     fp.add_argument("--in", dest="src", required=True)
     fp.add_argument("--dump", required=True, help="既定の表で `OPCG_CLOCK_PARTS_DUMP=1`（攻め手の計画つき・2e915f46 以降）で取った写し")
@@ -3183,7 +3654,7 @@ def main(argv=None):
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
             "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter,
-            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "followplan": cmd_followplan, "followturn": cmd_followturn, "followcheck": cmd_followcheck}[a.cmd](a)
+            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "foresee": cmd_foresee, "foreseeall": cmd_foreseeall, "defend": cmd_defend, "followplan": cmd_followplan, "followturn": cmd_followturn, "followcheck": cmd_followcheck}[a.cmd](a)
 
 
 if __name__ == "__main__":

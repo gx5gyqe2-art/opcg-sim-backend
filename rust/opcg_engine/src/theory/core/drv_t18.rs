@@ -84,8 +84,22 @@ fn opt_f(x: Option<f64>) -> V {
 
 /// `two_curves.two_curves_for_game`
 #[allow(clippy::needless_range_loop)] // Python の `for n, i in enumerate(order)` の形のまま
-fn two_curves(c: &mut Core, g: &Game, cfg: &Cfg) -> R<V> {
+fn two_curves(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
     let n = g.n();
+    // 切替（`2026-10-15_two_curves_clock.md` §1.5・既定は無し＝1 ビットも変えない）: `in.clock`＝[[行の位置, 今の値段], …]
+    // （選んだ手の打った後の 2 本の時計の値段）。渡された行は静的な値の代わりに今の値段を使う。渡されない決定の行は
+    // `in.clock_fallback`＝"static"（静的な値のまま・既定）／"zero"（0）。
+    let clock_in = p.get("in").get("clock");
+    let clock: Option<Vec<(usize, f64)>> = if clock_in.is_none() {
+        None
+    } else {
+        Some(clock_in.items().iter().map(|e| {
+            let it = e.items();
+            (it[0].int() as usize, it[1].f())
+        }).collect())
+    };
+    let fallback_zero = matches!(p.get("in").get("clock_fallback").pystr().as_str(), "zero");
+    let (mut n_clock, mut n_fallback, mut abs_clock, mut abs_fallback) = (0i64, 0i64, 0.0f64, 0.0f64);
     let mut by_seat: Vec<(i64, Vec<usize>)> = Vec::new();
     for k in 0..n {
         if g.is_decision_row(k) {
@@ -163,7 +177,22 @@ fn two_curves(c: &mut Core, g: &Game, cfg: &Cfg) -> R<V> {
             acc[ai].4[2] += gp("opp_body");
         }
         let b = r.ptr + ch as usize;
-        let gv = c.t18_price_row(r, &g.cands[b], true, cfg.theta, cfg.mu, &cfg.theta_mode)?;
+        let gv = match &clock {
+            None => c.t18_price_row(r, &g.cands[b], true, cfg.theta, cfg.mu, &cfg.theta_mode)?,
+            Some(cl) => match cl.iter().find(|e| e.0 == k) {
+                Some(&(_, pv)) => {
+                    n_clock += 1;
+                    abs_clock += pv.abs();
+                    Some(pv)
+                }
+                None => {
+                    let sv = if fallback_zero { None } else { c.t18_price_row(r, &g.cands[b], true, cfg.theta, cfg.mu, &cfg.theta_mode)? };
+                    n_fallback += 1;
+                    abs_fallback += sv.unwrap_or(0.0).abs();
+                    sv
+                }
+            },
+        };
         if let Some(gv) = gv {
             acc[ai].1 += gv;
             let fam = move_family(&g.cands[b].sig);
@@ -206,7 +235,19 @@ fn two_curves(c: &mut Core, g: &Game, cfg: &Cfg) -> R<V> {
             (V::s("r_body"), V::list(rb)),
         ]));
     }
-    Ok(V::dict(vec![(V::s("curves"), V::list(curves)), (V::s("winner"), winner)]))
+    let mut out = vec![(V::s("curves"), V::list(curves)), (V::s("winner"), winner)];
+    if clock.is_some() {
+        out.push((
+            V::s("clock_stats"),
+            V::dict(vec![
+                (V::s("n_clock"), V::Int(n_clock)),
+                (V::s("n_fallback"), V::Int(n_fallback)),
+                (V::s("abs_clock"), V::Float(abs_clock)),
+                (V::s("abs_fallback"), V::Float(abs_fallback)),
+            ]),
+        ));
+    }
+    Ok(V::dict(out))
 }
 
 /// `two_curves_state.state_by_turn(rows, ex, idx, cards, idx2cid, seat_decks, seed_g, theta, mu, with_parts)`
@@ -311,7 +352,7 @@ fn live_turn(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
 
 pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V, tool: &str) -> R<V> {
     match tool {
-        "two_curves" => two_curves(c, g, cfg),
+        "two_curves" => two_curves(c, g, cfg, p),
         "two_curves_state" => two_curves_state(c, g, cfg, p),
         "price_cands" => price_cands(c, g, cfg, p),
         "live_turn" => live_turn(c, g, cfg, p),

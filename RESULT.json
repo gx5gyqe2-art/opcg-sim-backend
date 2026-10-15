@@ -1411,5 +1411,220 @@
    "excess": 0.23
   },
   "verdict": "inconclusive (Enel max class 55.7%)"
+ },
+ "followup_turn_2026_10_15": {
+  "report": "docs/reports/2026-10-15_followup_turn.md",
+  "kind": "switch (table only, default off)",
+  "switch": "clock_succ.py --followup turn + theory_map.py followturn; read via OPCG_CLOCK_VALUE=<table parent>",
+  "arms_survive": {
+   "1_default": [
+    0.46,
+    0.847
+   ],
+   "2_followup_plan": [
+    0.528,
+    0.804
+   ],
+   "5_followup_turn": [
+    0.55,
+    0.815
+   ]
+  },
+  "one_side_turn_end_gap_share": {
+   "all": [
+    0.202,
+    0.271,
+    0.12
+   ],
+   "enel": [
+    0.365,
+    0.423,
+    0.102
+   ]
+  },
+  "invariants": "pass prices and W0/k0 bit-identical (18,207); clock rows identical; 300/300 replays match",
+  "engine_rejected": {
+   "cannot_rest": 5485,
+   "cannot_attack": 4673,
+   "first_turn": 1406,
+   "attacker_gone": 1111,
+   "summoning": 7
+  },
+  "logs": [
+   "logs/theory_map/real_w41_followturn_arms.json",
+   "logs/theory_map/real_w41_followturn_build.json",
+   "logs/theory_map/real_w41_followturn_check.json"
+  ],
+  "verdict": "inconclusive (agreement 0.550, +0.02 from 0.53; ratio 0.815)"
+ },
+ "foresee_actual_2026_10_15": {
+  "report": "docs/reports/2026-10-15_foresee_actual.md",
+  "kind": "diagnostic",
+  "arm": "default table + OPCG_HAND_STOP=survive (followup_turn arm-1 dump reused)",
+  "points": 5838,
+  "abs_median": 0.0225,
+  "abs_median_mu": 0.41,
+  "mean": 0.031,
+  "mean_ci": [
+   0.026,
+   0.036
+  ],
+  "sd": 0.173,
+  "no_trigger": {
+   "n": 2997,
+   "abs_median": 0.0014,
+   "mean": 0.023
+  },
+  "term_agree": {
+   "life": 0.8,
+   "hand": 0.53,
+   "blocker": 0.95
+  },
+  "per_term_abs_share": {
+   "hand": 0.743,
+   "life": 0.321,
+   "blocker": 0.075
+  },
+  "posthoc": "no-trigger points: 909/1031 hand mismatches have the expected defence cutting more cards (D mean +0.068)",
+  "logs": [
+   "logs/theory_map/real_w41_foresee.json"
+  ],
+  "verdict": "median |D| below mu: the ranking disagreement does not come from here (closed); most-off term = hand (hit); mean ~0 (miss: +0.56 mu)"
+ },
+ "defend_foresee_2026_10_15": {
+  "report": "docs/reports/2026-10-15_defend_foresee.md",
+  "kind": "diagnostic",
+  "switch": "OPCG_DEF_TRACE_DUMP=1 (Rust, default off, values unchanged: 18,207 rows identical); theory_map.py defend",
+  "arm": "default table + OPCG_HAND_STOP=survive + OPCG_CLOCK_PARTS_DUMP=1",
+  "body_turns": 1547,
+  "cut_ratio": [
+   0.51,
+   [
+    0.48,
+    0.55
+   ]
+  ],
+  "life_ratio": [
+   1.34,
+   [
+    1.29,
+    1.39
+   ]
+  ],
+  "block_ratio": 0.31,
+  "kill": [
+   0.089,
+   0.07
+  ],
+  "by_def_deck_cut_ratio": {
+   "shanks": 0.64,
+   "nami": 0.69,
+   "enel": 0.34,
+   "luffy": 0.58
+  },
+  "audit_cross": {
+   "games": 240,
+   "void": 0
+  },
+  "logs": [
+   "logs/theory_map/real_w41_defend.json"
+  ],
+  "verdict": "inconclusive, opposite to the forecast: the DP expects the defender to cut half the cards and take 1.34x the life this turn"
+ },
+ "two_curves_clock_2026_10_15": {
+  "report": "docs/reports/2026-10-15_two_curves_clock.md",
+  "kind": "switch (two_curves --clock-dump; default unchanged, static output byte-identical)",
+  "price_dump": "followup_turn arm 1 (default table + OPCG_HAND_STOP=survive)",
+  "increment_corr_raw": {
+   "static_T137b": 0.6419,
+   "static_now": 0.6574,
+   "clock": 0.3409,
+   "clock_zero": 0.3533
+  },
+  "increment_corr_demeaned": {
+   "static_T137b": 0.3513,
+   "static_now": 0.3854,
+   "clock": 0.1498,
+   "clock_zero": 0.1692
+  },
+  "by_family_clock": {
+   "attack": 0.288,
+   "play": 0.088,
+   "effect": -0.136,
+   "attach": -0.003,
+   "end": 0.158
+  },
+  "by_family_static_now": {
+   "attack": 0.817,
+   "play": 0.251,
+   "effect": -0.092
+  },
+  "rows": {
+   "clock": 17593,
+   "fallback": 2681,
+   "fallback_abs_share": 0.064
+  },
+  "audit_cross": {
+   "games": 240,
+   "void": 0
+  },
+  "logs": [
+   "logs/theory_map/real_w41_two_curves_clock.json"
+  ],
+  "verdict": "play < 0.35: the price form does not explain play moves (skip T18 replay); attack also drops 0.82 -> 0.29 (forecast missed)",
+  "correction": {
+   "report": "docs/reports/2026-10-15_two_curves_clock_fix.md",
+   "body": "fallback zero",
+   "by_family_body": {
+    "attack": 0.288,
+    "play": 0.133,
+    "effect": -0.136,
+    "attach": -0.003,
+    "end": 0.195
+   },
+   "increment_corr_raw_body": 0.3533,
+   "increment_corr_demeaned_body": 0.1692,
+   "fallback_rows": {
+    "end_single": 2067,
+    "play_no_price": 614
+   },
+   "verdict": "unchanged"
+  }
+ },
+ "foresee_all_2026_10_15": {
+  "report": "docs/reports/2026-10-15_foresee_all.md",
+  "kind": "diagnostic",
+  "arm": "default table + OPCG_HAND_STOP=survive (followup_turn arm-1 dump reused)",
+  "abs_median_mu": {
+   "attack": 0.33,
+   "play": 0.0,
+   "effect": 0.0,
+   "attach": 0.0,
+   "end": 2.93
+  },
+  "mean_mu": {
+   "attack": 0.58,
+   "play": -0.13,
+   "effect": 0.08,
+   "attach": 0.0,
+   "end": 1.93
+  },
+  "corr_expected_actual": {
+   "attack": 0.67,
+   "play": 0.73,
+   "effect": 0.81,
+   "attach": 1.0,
+   "end": 0.14
+  },
+  "end_terms": {
+   "d_tau_me": -0.71,
+   "d_tau_opp": -1.1,
+   "d_opp_cut": -1.8,
+   "d_opp_stopped": -1.92
+  },
+  "logs": [
+   "logs/theory_map/real_w41_foreseeall.json"
+  ],
+  "verdict": "all types except turn-end below 1 mu (consistent); turn-end 2.93 mu -> fix candidates listed (read the turn-end successor as the opponent's turn start; opponent's hand after their own plan)"
  }
 }

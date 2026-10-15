@@ -74,6 +74,8 @@ pub struct Best {
     pub tau: f64,
     pub sched: Vec<f64>,
     pub res: Output,
+    /// 診断 `OPCG_DEF_TRACE_DUMP=1`: 最善の計画の今のターンの守りの期待値（[`super::defender::Defender::trace_first`]・既定は `None`）。
+    pub trace: Option<[f64; 7]>,
 }
 
 /// 開示（`EX_SPEED_STATS` の増分と試行ごとの状態の数）。
@@ -215,12 +217,42 @@ pub fn attempt(inp: &SolveIn, turns: i64, d: &mut Defender) -> Result<Best, DpEr
                 Some((bs, _)) => score.lt(bs),
             };
             if take {
-                best = Some((score, Best { mask: mi, ks: ks.to_vec(), paid, incr, val, tau, sched: sc, res }));
+                best = Some((score, Best { mask: mi, ks: ks.to_vec(), paid, incr, val, tau, sched: sc, res, trace: None }));
             }
             Ok(())
         })?;
     }
-    best.map(|b| b.1).ok_or_else(|| DpErr::Bad("no plan".to_string()))
+    let mut b = best.map(|b| b.1).ok_or_else(|| DpErr::Bad("no plan".to_string()))?;
+    if super::defender::def_trace_on() {
+        // 診断（値は変えない）: 選んだ計画の今のターンの守りを、同じ覚え書きから辿る（覚え書きは増やさない）
+        let (lam, lam_net, mu, olp, mlp) = inp.prices;
+        let m = &inp.masks[b.mask];
+        let xf = first_of(inp, m, &b.ks);
+        b.trace = d
+            .trace_first(&Input {
+                cards: inp.cards,
+                don: inp.don,
+                xs_first: &xf,
+                seq: &m.later_seq,
+                blk: inp.blk,
+                life: inp.life,
+                turns: Some(turns),
+                life_types: inp.life_types,
+                draw_types: inp.draw_types,
+                lam,
+                lam_net,
+                mu,
+                olp,
+                mlp,
+                rest: inp.rest,
+                arrive: inp.arrive,
+                nu: inp.nu,
+                eps: inp.eps,
+                feq: inp.feq,
+            })
+            .ok();
+    }
+    Ok(b)
 }
 
 /// 1 つの出す札の組で守る側の計算に渡る今のターンの攻撃の並びの全部（`_mask_firsts`・順は要らない）。
