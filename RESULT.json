@@ -1925,5 +1925,57 @@
    "logs/theory_map/real_w41_temporesid.json"
   ],
   "verdict": "neither line: overall tempo +0.049 CI>0 but clock layers disagree; main error is turn-start reading too extreme; tempo at W 0.4-0.6 is +0.035 (0.6 mu); decision asked on order (slope first recommended)"
+ },
+ "steep_reading_2026_10_16": {
+  "report": "docs/reports/2026-10-16_steep_reading.md",
+  "kind": "measurement (theory_map.py steep; tpdump survive + survive clocks; no Rust change)",
+  "sets": {
+   "S1_turn_start": {
+    "n": 3731,
+    "slope_b": 0.5688,
+    "width": 0.1151,
+    "conv_a": 0.4686,
+    "len_ratio": 1.2139
+   },
+   "S2_all_own_main": {
+    "n": 18207,
+    "slope_b": 0.7122,
+    "width": 0.0878,
+    "conv_a": 0.6115,
+    "len_ratio": 1.1893
+   },
+   "S4_crossing_rows": {
+    "n": 3547,
+    "slope_b": 0.9819,
+    "width": 0.0115,
+    "conv_a": 0.9728,
+    "len_ratio": 1.0166
+   }
+  },
+  "S1_len_ratio_by_absD": {
+   "<1": 1.2584,
+   "1..3": 1.1875,
+   ">=3": 1.1865
+  },
+  "price_vs_bridge": {
+   "n": 3511,
+   "corr_D": 0.4697,
+   "corr_W_outcome": [
+    0.3116,
+    0.5896
+   ],
+   "band_1_3_corr_W_outcome": [
+    -0.0573,
+    0.4428
+   ],
+   "sigma_rel": [
+    0.4427,
+    0.3875
+   ]
+  },
+  "logs": [
+   "logs/theory_map/real_w41_steep.json"
+  ],
+  "verdict": "neither line: only the move-price reading (curve tau) is too extreme; crossing-bridge reading is calibrated; price clocks say the end ~20% later (not faster) and its D ranks outcomes poorly (corr 0.31 vs 0.59); decision asked: diagnose price vs bridge parts (recommended)"
  }
 }
