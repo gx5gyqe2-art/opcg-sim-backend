@@ -3374,6 +3374,123 @@ def cmd_defres(a):
     return 0
 
 
+def cmd_temporesid(a):
+    """`2026-10-16_tempo_residual.md` §1: 自分のターンの最初のメインの行で、手番の側の残差 r＝勝敗 − W0（手番の価値＝r の平均）と、
+    参考に手番でない席自身の読み（`OPCG_TEMPO_DUMP=1` の欄）・次のターンの最初の行の 1 − W0′ の残差を出す。"""
+    from theory_rs import MU
+    from opcg_sim.learned.train import plan_labels as PL
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    gms = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    dump = load_dump(a.dump)
+    cnt = collections.Counter()
+    P = []
+    cols = ("sig", "who", "turn", "seed", "kind", "step", "pol_len", "pol_chosen")
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig", "pol_cid", "pol_tcid")):
+        seed = int(rows["seed"][idx[0]])
+        gm = gms.get(seed)
+        dj = dump.get(seed)
+        if gm is None or dj is None:
+            cnt["game_missing"] += 1
+            continue
+        winner = gm.get("winner")
+        if winner not in ("p1", "p2"):
+            cnt["game_no_winner"] += 1
+            continue
+        lead = gm["leaders"]
+        u2c = PL.uuid_map(pol, L, ptr, idx)
+        cand = []
+        latk = collections.Counter()
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+                continue
+            sj = json.loads(rows["sig"][i])
+            if (sj[0] == "ATTACK" or (sj[0] == "DON_BOX" and sj[2])) and sj[2] and u2c.get(sj[2][0]) == lead[1 - w]:
+                latk[(w, t)] += 1
+            k = int(L[i]); ch = int(rows["pol_chosen"][i])
+            if k < 1:
+                continue
+            if json.loads(pol["pol_sig"][ptr[i]])[0] == "RESOLVE_EFFECT_SELECTION":
+                continue
+            if k < 2 or ch < 0 or ch >= k:
+                continue
+            cand.append((i, w, t, [family_of(json.loads(pol["pol_sig"][j])) for j in range(ptr[i], ptr[i] + k)]))
+        drows = dj["rows"]
+        if len(drows) != len(cand):
+            cnt["game_len_mismatch"] += 1
+            continue
+        first = {}
+        for (i, w, t, fams), dr in zip(cand, drows):
+            if int(dr[0]) != t or int(dr[1]) != w or fams != [c[0] for c in dr[8]]:
+                cnt["row_mismatch"] += 1
+                continue
+            if (w, t) not in first and len(dr) > 9 and dr[9]:
+                first[(w, t)] = dr[9][0]
+        for (w, t), base in sorted(first.items(), key=lambda kv: kv[0][1]):
+            z = 1.0 if winner == ("p1" if w == 0 else "p2") else 0.0
+            w0 = float(base[2])
+            tv = next((e["tempo"] for e in base[5:] if isinstance(e, dict) and "tempo" in e), None)
+            nx = first.get((1 - w, t + 1))
+            P.append({"seed": seed, "t": t, "band": turn_band(t), "deck": lead[w], "seat": "first" if w == 0 else "second",
+                      "dt": float(base[0]) - float(base[1]), "k0": float(base[3]), "W": w0, "z": z, "r": z - w0,
+                      "r_nn": ((1.0 - z) - tv[0]) if tv is not None and tv[0] is not None else None,
+                      "r_nr": ((1.0 - z) - tv[3]) if tv is not None and tv[3] is not None else None,
+                      "r_next": (z - (1.0 - float(nx[2]))) if nx is not None else None,
+                      "latk": latk[(w, t)]})
+            cnt["points"] += 1
+
+    def summ(xs):
+        if not xs:
+            return {"n": 0}
+        units = collections.defaultdict(list)
+        for x in xs:
+            units[x["seed"]].append(x)
+        r = np.array([x["r"] for x in xs])
+        k0 = np.array([x["k0"] for x in xs])
+        o = {"n": len(xs), "games": len(units), "W_mean": round(float(np.mean([x["W"] for x in xs])), 4),
+             "win_rate": round(float(np.mean([x["z"] for x in xs])), 4),
+             "tempo": round(float(r.mean()), 4), "tempo_ci": boot_games(units, lambda us: float(np.mean([u["r"] for u in us]))),
+             "tempo_mu": round(float(r.mean()) / float(k0.mean()) / MU, 3) if k0.mean() > 0 else None, "k0_mean": round(float(k0.mean()), 4)}
+        for key, nm in (("r_nn", "own_reading_no_rewrite"), ("r_nr", "own_reading_rewrite"), ("r_next", "next_turn_row")):
+            ys = [x for x in xs if x[key] is not None]
+            if not ys:
+                o[nm] = {"n": 0}
+                continue
+            uu = collections.defaultdict(list)
+            for y in ys:
+                uu[y["seed"]].append(y)
+            if key == "r_next":
+                f = lambda us: float(np.mean([(u["r"] - u["r_next"]) / 2.0 for u in us]))
+                o[nm] = {"n": len(ys), "resid_nonmover": round(float(np.mean([y["r_next"] for y in ys])), 4),
+                         "tempo": round(f(ys), 4), "tempo_ci": boot_games(uu, f)}
+            else:
+                f = lambda us, key=key: float(np.mean([(u["r"] - u[key]) / 2.0 for u in us]))
+                g = lambda us, key=key: float(np.mean([u["r"] + u[key] for u in us]))
+                o[nm] = {"n": len(ys), "resid_nonmover": round(float(np.mean([y[key] for y in ys])), 4),
+                         "tempo": round(f(ys), 4), "tempo_ci": boot_games(uu, f),
+                         "common_bias": round(g(ys) / 2.0, 4), "common_bias_ci": [round(v / 2.0, 4) for v in boot_games(uu, g)]}
+        return o
+
+    def dbin(x):
+        d = int(round(x["dt"]))
+        return "<=-2" if d <= -2 else ">=2" if d >= 2 else "-1..1"
+
+    def strat(key):
+        return {k: summ([x for x in P if key(x) == k]) for k in sorted({key(x) for x in P})}
+    inv = max((abs(x["r"] + ((1.0 - x["z"]) - (1.0 - x["W"]))) for x in P), default=0.0)
+    out = {"record": a.src, "dump": a.dump, "mu": MU, "count": dict(cnt), "invariant_complement_max_abs": inv,
+           "all": summ(P), "by_clock": strat(dbin), "by_band": strat(lambda x: x["band"]), "by_deck": strat(lambda x: x["deck"]),
+           "by_seat": strat(lambda x: x["seat"]),
+           "by_leader_attack": strat(lambda x: "attacked" if x["latk"] > 0 else "no_attack"),
+           # §1 の外（数を見た後に足した参考）: 読みの区間で割る＝時計の差の層の逆向きが「読みの傾き」か「手番」かを見る
+           "by_W": strat(lambda x: "<0.2" if x["W"] < 0.2 else "0.2-0.4" if x["W"] < 0.4 else "0.4-0.6" if x["W"] < 0.6 else "0.6-0.8" if x["W"] < 0.8 else ">=0.8"),
+           "by_clock_band": {b: {c: summ([x for x in P if x["band"] == b and dbin(x) == c]) for c in ("<=-2", "-1..1", ">=2")} for b in TURN_BANDS}}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps(out["count"]))
+    return 0
+
+
 def cmd_foreseeall(a):
     """`2026-10-15_foresee_all.md` §1: 記録で打った手（全型）ごとに、値段が見込む後続の W と、打った後の実際の盤面（同じ席の次のメインの行・
     ターンを終える手は次の自分のターンの最初のメインの行・局が終われば 1／0）を同じ理論で読んだ W を比べる。差 D＝(見込み − 実際)/κ0。"""
@@ -3937,7 +4054,7 @@ def cmd_followcheck(a):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "foresee", "foreseeall", "tempo", "oppturn", "defend", "defres", "followplan", "followturn", "followcheck", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "foresee", "foreseeall", "tempo", "oppturn", "defend", "defres", "temporesid", "followplan", "followturn", "followcheck", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -4086,6 +4203,10 @@ def main(argv=None):
     dfr.add_argument("--in", dest="src", required=True)
     dfr.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1 OPCG_DEF_TRACE_DUMP=1` で取った写し（守る側の比べ方を明示）")
     dfr.add_argument("--out", required=True)
+    tr_ = sub.add_parser("temporesid")
+    tr_.add_argument("--in", dest="src", required=True)
+    tr_.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1 OPCG_TEMPO_DUMP=1` で取った写し（守る側の比べ方を明示）")
+    tr_.add_argument("--out", required=True)
     fp = sub.add_parser("followplan")
     fp.add_argument("--in", dest="src", required=True)
     fp.add_argument("--dump", required=True, help="既定の表で `OPCG_CLOCK_PARTS_DUMP=1`（攻め手の計画つき・2e915f46 以降）で取った写し")
@@ -4100,7 +4221,7 @@ def main(argv=None):
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
             "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter,
-            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "foresee": cmd_foresee, "foreseeall": cmd_foreseeall, "tempo": cmd_tempo, "oppturn": cmd_oppturn, "defend": cmd_defend, "defres": cmd_defres, "followplan": cmd_followplan, "followturn": cmd_followturn, "followcheck": cmd_followcheck}[a.cmd](a)
+            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "foresee": cmd_foresee, "foreseeall": cmd_foreseeall, "tempo": cmd_tempo, "oppturn": cmd_oppturn, "defend": cmd_defend, "defres": cmd_defres, "temporesid": cmd_temporesid, "followplan": cmd_followplan, "followturn": cmd_followturn, "followcheck": cmd_followcheck}[a.cmd](a)
 
 
 if __name__ == "__main__":
