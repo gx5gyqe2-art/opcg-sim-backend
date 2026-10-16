@@ -19,27 +19,27 @@
   "dir": "n32_rean/w04"
  },
  "metrics": {
-  "games": 59,
-  "points": 708,
+  "games": 113,
+  "points": 1356,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
   "points_by_rule": {
-   "early": 236,
-   "end_and_attack": 236,
+   "early": 452,
+   "end_and_attack": 452,
    "enel": 2,
-   "random": 234
+   "random": 450
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
-   "early": 0.1822,
-   "end_and_attack": 0.3517,
+   "early": 0.2124,
+   "end_and_attack": 0.3717,
    "enel": 0.0,
-   "random": 0.3291
+   "random": 0.3622
   },
-  "deep_best_differs_all": 0.2867,
-  "sec_replay_per_game": 17.49,
-  "sec_deep_per_game": 12.66
+  "deep_best_differs_all": 0.3149,
+  "sec_replay_per_game": 16.87,
+  "sec_deep_per_game": 12.22
  },
  "commit": "0af60ccda",
  "notes": ""
