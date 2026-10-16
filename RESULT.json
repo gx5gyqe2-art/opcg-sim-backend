@@ -2086,5 +2086,61 @@
    "logs/theory_map/real_w41_resolution.json"
   ],
   "verdict": "both lines hit (deep gap 5.2x bridge gap; 41% of points exceed 1 mu) but even large gaps are ordered right only ~half the time (0.50/0.42): direction, not resolution, is the bottleneck; turn-end is reversed"
+ },
+ "reanalysis_pilot_2026_10_16": {
+  "report": "docs/reports/2026-10-16_reanalysis_pilot.md",
+  "kind": "stage 1: tool opcg_sim/loop/reanalyze.py + 40-game pilots (mult 4)",
+  "engine_commits": {
+   "n29_w01": "0be4a48f3",
+   "n32_w01": "0af60ccda (code = 3d042a63c)"
+  },
+  "replay_rate": {
+   "n29": 1.0,
+   "n32": 1.0
+  },
+  "unmapped": {
+   "n29": 0,
+   "n32": 0
+  },
+  "deep_best_differs": {
+   "n29": 0.2479,
+   "n32": 0.2667,
+   "rule_early": [
+    0.1959,
+    0.2317
+   ],
+   "rule_end_and_attack": [
+    0.328,
+    0.3333
+   ]
+  },
+  "sec_per_point": [
+   3.362,
+   3.553
+  ],
+  "sec_replay_per_game": [
+   59.1,
+   53.07
+  ],
+  "entropy": {
+   "n29": {
+    "rec_visits": 1.3394,
+    "deep_visits": 1.2472,
+    "rec_pi": 0.9657,
+    "deep_pi": 0.5753
+   },
+   "n32": {
+    "rec_visits": 1.308,
+    "deep_visits": 1.2093,
+    "rec_pi": 0.813,
+    "deep_pi": 0.4324
+   }
+  },
+  "selection_issue": "rules (3) Enel and (4) random got 0 points (cap 12 filled by rules 1-2)",
+  "logs": [
+   "logs/reanalysis/pilot_n29_w01_summary.json",
+   "logs/reanalysis/pilot_n32_w01_summary.json"
+  ],
+  "verdict": "replay perfect (40/40 both); deep best differs 25-27%; slower than predicted (3.4-3.6 s/pt, 53-59 s replay/game); decision asked on point selection"
  }
 }
