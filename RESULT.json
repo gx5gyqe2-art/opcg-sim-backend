@@ -1,7 +1,7 @@
 {
  "job": "rean-n32-w03",
  "role": "reanalyze",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "record": "claude/n32-w03:n_records/n32_w03",
   "engine_commit": "0af60ccda",
@@ -19,27 +19,27 @@
   "dir": "n32_rean/w03"
  },
  "metrics": {
-  "games": 161,
-  "points": 1932,
+  "games": 200,
+  "points": 2400,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
   "points_by_rule": {
-   "early": 644,
-   "end_and_attack": 644,
+   "early": 799,
+   "end_and_attack": 800,
    "enel": 12,
-   "random": 632
+   "random": 789
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
-   "early": 0.2034,
-   "end_and_attack": 0.3929,
+   "early": 0.209,
+   "end_and_attack": 0.3825,
    "enel": 0.3333,
-   "random": 0.2785
+   "random": 0.3016
   },
-  "deep_best_differs_all": 0.2919,
-  "sec_replay_per_game": 14.65,
-  "sec_deep_per_game": 9.54
+  "deep_best_differs_all": 0.2979,
+  "sec_replay_per_game": 14.58,
+  "sec_deep_per_game": 9.52
  },
  "commit": "0af60ccda",
  "notes": ""
