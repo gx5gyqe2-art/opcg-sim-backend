@@ -1,9 +1,0 @@
-{
-  "job": "rean-n32-w06",
-  "role": "reanalyze",
-  "status": "failed",
-  "inputs": {"record": "claude/n32-w06:n_records/n32_w06", "engine_commit": "0af60ccda", "net": "claude/train-r5:n1_results/nrel_r5.npz"},
-  "outputs": {"dir": "n32_rean/w06"},
-  "metrics": {"games_done": 0},
-  "notes": "準備(ブロック1)は成功(wheel ビルド・効果JSON・記録取得)。ブロック2は即死: 入力記録 claude/n32-w06 に meta_n_record.json / meta_games.json が無い(生成が打ち切られ未生成。同ブランチの RESULT.json の notes にも明記)。reanalyze.py の load_record がこの2ファイルを必須とし、sims・dirichlet_eps・temp_turns と局ごとのリーダー(leaders)を meta から読むため、npz だけでは再生できない(npz にリーダーの列は無い)。w05 の meta から値を推測して補うと再分析の前提が変わるため、コード変更・meta の捏造はせず停止した。必要な対処: コーディネータが n32-w06 の meta を(seed_base=2323500・450局のリーダーを含め)補うか、w06 を除外する。"
-}
