@@ -473,15 +473,17 @@ tail -n 3 ~/rean_n${W}_w${XX}.log
 - 規則ごとの点の数と「深い最善 ≠ 記録」の割合は `python -m opcg_sim.loop.reanalyze --summarize <dir…>` で出る。
 - **枠の注意**: 生成デッキ（`synth_roles`）の局でエネルがリーダーなのは、先頭 200 局のうち波 29 で 1 局、波 32 で 5 局しか無い。規則 (3) の枠はほとんど (4) 乱数に回る。
 
-### 7.6 再分析の第 3 段: 訓練 r11a／r11b → 評価帯 → アリーナ（1 セッション・下書き 2026-10-16）
+### 7.6 再分析の第 3 段: 訓練 r11b（主）・r11a（対照）→ 評価帯 → アリーナ（1 セッション・2026-10-16 確定）
 
-**下書き**（司令塔が本走の回収後に確定する）。§7.5 の 16 dir（`claude/rean-n{29,32}-w{01..08}` の `n{W}_rean/w{XX}`）を教材にする。
+§7.5 の 16 dir（`claude/rean-n{29,32}-w{01..08}` の `n{W}_rean/w{XX}`）を教材にする。司令塔が留保 4 点を決めて確定した（2026-10-16）。
 
-**2 本の候補**:
-- **r11a**: π は再分析の 16 dir だけ（約 38,000 点・`--in`）。z は波 27〜32 の全部（`--z-in`）。
-- **r11b**: 波 29（14 シャード）と波 32（16 シャード）の全行を π に使う。再分析した行だけ深い探索の値に差し替える（`reanalyze.py --merge`）。
-  - w01〜w08 は再分析の行を差し込んだ dir、他のシャードは元のまま。
-  - z は波 27・28・30・31（`--z-in`）。
+**主候補 r11b**: 波 29（14 シャード）と波 32（16 シャード）の全行を π に使う。
+- 再分析した行だけ深い探索の値に差し替える（`reanalyze.py --merge`）。w01〜w08 は差し込み済みの dir、他は元のまま。
+- 教材の量は従来の訓練と同じ形で、差し替えた行だけが変わる＝差分が教師の深さだけになる。
+- z は波 27・28・30・31（`--z-in`）。
+
+**対照 r11a**（深い教師だけ）: π は再分析の 16 dir だけ（約 38,000 点・`--in`）。z は波 27〜32 の全部（`--z-in`）。
+- **`--pi-steps-mult 4`**（3.8 万点 × 2 epochs × 4 ≒ 波 1 本の 3 割の更新量。それ以上はこの点数では過学習の側）。
 
 **共通**:
 - warm-start r3（`opcg_sim/data/learned/nrel_r3.npz`・v14 へ pad＝r5 と同じ）。
@@ -490,18 +492,18 @@ tail -n 3 ~/rean_n${W}_w${XX}.log
 
 **評価帯**:
 - 波 28・30・32 の holdout（`--holdout-mod 7`）を別々に、`--policy` つきで、r3／r11a／r11b を並べる。
-- 波 28 の dump には `pol_p` が無い（v13・v2 dump）。そのため `--pi-prior-net` に波 28 の生成役を渡す（台帳 §6 の波 28 の行で確かめる・下書きでは a1）。
+- 波 28 の dump には `pol_p` が無い（v13・v2 dump）。`--pi-prior-net` に波 28 の生成役 **a1**（台帳: 波 27・28＝era6・生成役 a1）を渡す。
 
-**アリーナ**: r11a・r11b それぞれ vs r3（出荷既定）。
+**アリーナ**: r11b・r11a それぞれ vs r3（出荷既定）。
 - 主 random × synth_roles（帯 591000〜598000）・副 固定ミラー（601000〜608000）。
 - 各 8 帯 × 24 ペア・両席 serve 既定。
-- **2 本を同じ帯で測る**（同じ物差し・台帳 §6 の行）。
+- **2 本を同じ帯で測る**（同じ物差し）。主候補 r11b を先に回す。
 
-**下書きの留保**（司令塔が確定するときに決める）:
-1. r11a の π の点は約 38,000 で、波 29 の 1 波（約 97 万行・main 約 45 万点）より 1 桁以上少ない。epochs 2 では方策の更新回数がとても少ない。`--pi-steps-mult`（方策の回数の倍率）を使うかは未定（下書きでは使わない＝既定 1.0）。
-2. π' の P_net: 波 29 の dump と再分析の dir には `pol_p` が無い。訓練器は、1 本でも `pol_p` の無い波が混ざると、全部の波の P_net を warm-start（r3）の forward で作る（`build_pi_teacher`）。波 32 の行（生成役 r5）の P_net も r3 で作られる。
-3. r11a は、`--in`（再分析の行・z つき）と `--z-in`（波 29・32 の元の全行）で、同じ盤面の value 行が重複する（約 38,000 行・全体の 1% 未満）。
-4. メモリ: z の波が多い（r11a は 6 波＋π）。OOM なら古い z の波から落とす（27 → 28）。落とした旨を notes に書く。
+**決定済みの留保**（司令塔・2026-10-16）:
+1. r11a は `--pi-steps-mult 4`（上）。
+2. π' の P_net は全部 warm-start r3 の forward で可（r4q と同じ条件。4 倍の探索ではほぼ全候補が訪問済みなので、P_net の寄与は小さい）。報告に「P_net は r3」と 1 行書く。
+3. r11a の value 行の重複（`--in` の再分析の行と、`--z-in` の波 29・32 の元の行・1% 未満）は許容。数を notes に書く。
+4. OOM なら z の波を 27 → 28 の順に落として notes に書く（§7.1 と同じ）。
 
 指示書（作業セッション用・opus・1 セッションで順に）:
 
@@ -534,20 +536,20 @@ R11B_PI=""
 for W in 29 32; do for d in ~/n${W}_wave/w*/n_records/n${W}_w*; do
   XX=$(basename $d | sed "s/n${W}_w//"); if [ -d ~/n${W}_merged/w$XX ]; then R11B_PI="$R11B_PI $HOME/n${W}_merged/w$XX"; else R11B_PI="$R11B_PI $d"; fi; done; done
 
-# ① 訓練 r11a（π＝再分析の 16 dir・z＝波 27〜32）
-OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train \
-  --in "$HOME/rean/n29_rean/w*" "$HOME/rean/n32_rean/w*" \
-  --z-in "$HOME/n32_wave/w*/n_records/n32_w*" "$HOME/n31_wave/w*/n_records/n31_w*" "$HOME/n30_wave/w*/n_records/n30_w*" \
-         "$HOME/n29_wave/w*/n_records/n29_w*" "$HOME/n28_wave/w*/n28_records" "$HOME/n27_wave/w*/n27_records" \
-  --ablate rel --aux-weight 0.1 --epochs 2 --lr 2e-4 --pi-teacher q_improved \
-  --warm-start opcg_sim/data/learned/nrel_r3.npz --out ~/nrel_r11a.npz 2>&1 | tee ~/train_r11a.log
-# ② 訓練 r11b（π＝波 29・32 の全行〔再分析の行だけ差し替え〕・z＝波 27・28・30・31）
+# ① 訓練 r11b（主候補・π＝波 29・32 の全行〔再分析の行だけ差し替え〕・z＝波 27・28・30・31）
 OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train \
   --in $R11B_PI \
   --z-in "$HOME/n31_wave/w*/n_records/n31_w*" "$HOME/n30_wave/w*/n_records/n30_w*" \
          "$HOME/n28_wave/w*/n28_records" "$HOME/n27_wave/w*/n27_records" \
   --ablate rel --aux-weight 0.1 --epochs 2 --lr 2e-4 --pi-teacher q_improved \
   --warm-start opcg_sim/data/learned/nrel_r3.npz --out ~/nrel_r11b.npz 2>&1 | tee ~/train_r11b.log
+# ② 訓練 r11a（対照・π＝再分析の 16 dir・z＝波 27〜32・--pi-steps-mult 4）
+OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train \
+  --in "$HOME/rean/n29_rean/w*" "$HOME/rean/n32_rean/w*" \
+  --z-in "$HOME/n32_wave/w*/n_records/n32_w*" "$HOME/n31_wave/w*/n_records/n31_w*" "$HOME/n30_wave/w*/n_records/n30_w*" \
+         "$HOME/n29_wave/w*/n_records/n29_w*" "$HOME/n28_wave/w*/n28_records" "$HOME/n27_wave/w*/n27_records" \
+  --ablate rel --aux-weight 0.1 --epochs 2 --lr 2e-4 --pi-teacher q_improved --pi-steps-mult 4 \
+  --warm-start opcg_sim/data/learned/nrel_r3.npz --out ~/nrel_r11a.npz 2>&1 | tee ~/train_r11a.log
 （OOM なら --z-in から 27 → 28 の順に外して再実行し、notes に書く。訓練開始時の RSS を notes に書く。）
 
 # ③ 評価帯（波 28・30・32 の holdout・r3／r11a／r11b・方策つき）
@@ -559,7 +561,7 @@ for N in 28 30 32; do
     --holdout-mod 7 --out ~/band_r11_w$N.json 2>&1 | tee ~/band_r11_w$N.log; done
 
 # ④ アリーナ r11a・r11b vs r3（同じ帯・両席 serve 既定）
-for C in r11a r11b; do mkdir -p ~/arena_$C
+for C in r11b r11a; do mkdir -p ~/arena_$C
   for k in 0 1 2 3 4 5 6 7; do
     OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline "" \
       --pairs 24 --max-pairs 24 --seed-base $(( 591000 + k*1000 )) --workers 4 \
