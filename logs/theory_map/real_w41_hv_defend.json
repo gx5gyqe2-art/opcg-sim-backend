@@ -1,0 +1,2383 @@
+{
+ "record": "/home/user/data_rec/sigma_wip/data/w41",
+ "dump": "/home/user/tm/pg/hvdump_all.jsonl",
+ "count": {
+  "skip_first_turn": 484,
+  "points": 3247
+ },
+ "all": {
+  "same": {
+   "n": 1546,
+   "cut": {
+    "exp_sum": 1003.263,
+    "act_sum": 1908.0,
+    "ratio": 0.5258,
+    "ratio_ci": [
+     0.4883,
+     0.5649
+    ],
+    "exp_mean": 0.6489,
+    "act_mean": 1.2342
+   },
+   "life": {
+    "exp_sum": 1774.527,
+    "act_sum": 1327.0,
+    "ratio": 1.3372,
+    "ratio_ci": [
+     1.2897,
+     1.3851
+    ],
+    "exp_mean": 1.1478,
+    "act_mean": 0.8583
+   },
+   "blk": {
+    "exp_sum": 65.089,
+    "act_sum": 213.0,
+    "ratio": 0.3056,
+    "ratio_ci": [
+     0.2517,
+     0.3674
+    ],
+    "exp_mean": 0.0421,
+    "act_mean": 0.1378
+   },
+   "kill": {
+    "exp_sum": 138.269,
+    "act_sum": 109.0,
+    "ratio": 1.2685,
+    "ratio_ci": [
+     1.1324,
+     1.4277
+    ],
+    "exp_mean": 0.0894,
+    "act_mean": 0.0705
+   },
+   "per_attack": {
+    "exp_cut": 0.3588,
+    "act_cut": 0.6674,
+    "exp_life": 0.6346,
+    "act_life": 0.4641,
+    "exp_blk": 0.0233,
+    "act_blk": 0.0745
+   },
+   "exp_counter_stops_mean": 0.5295,
+   "attacks_mean": {
+    "exp_hits": 1.8493,
+    "act_leader": 1.8493
+   }
+  },
+  "same_with_attacks": {
+   "n": 1503,
+   "cut": {
+    "exp_sum": 1003.263,
+    "act_sum": 1899.0,
+    "ratio": 0.5283,
+    "ratio_ci": [
+     0.491,
+     0.567
+    ],
+    "exp_mean": 0.6675,
+    "act_mean": 1.2635
+   },
+   "life": {
+    "exp_sum": 1774.527,
+    "act_sum": 1327.0,
+    "ratio": 1.3372,
+    "ratio_ci": [
+     1.2897,
+     1.3851
+    ],
+    "exp_mean": 1.1807,
+    "act_mean": 0.8829
+   },
+   "blk": {
+    "exp_sum": 65.089,
+    "act_sum": 211.0,
+    "ratio": 0.3085,
+    "ratio_ci": [
+     0.2534,
+     0.3715
+    ],
+    "exp_mean": 0.0433,
+    "act_mean": 0.1404
+   },
+   "kill": {
+    "exp_sum": 138.269,
+    "act_sum": 109.0,
+    "ratio": 1.2685,
+    "ratio_ci": [
+     1.1324,
+     1.4277
+    ],
+    "exp_mean": 0.092,
+    "act_mean": 0.0725
+   },
+   "per_attack": {
+    "exp_cut": 0.3588,
+    "act_cut": 0.6642,
+    "exp_life": 0.6346,
+    "act_life": 0.4641,
+    "exp_blk": 0.0233,
+    "act_blk": 0.0738
+   },
+   "exp_counter_stops_mean": 0.5446,
+   "attacks_mean": {
+    "exp_hits": 1.9022,
+    "act_leader": 1.9022
+   }
+  },
+  "theory_more": {
+   "n": 1057,
+   "cut": {
+    "exp_sum": 820.159,
+    "act_sum": 1185.0,
+    "ratio": 0.6921,
+    "ratio_ci": [
+     0.6335,
+     0.7519
+    ],
+    "exp_mean": 0.7759,
+    "act_mean": 1.1211
+   },
+   "life": {
+    "exp_sum": 1689.673,
+    "act_sum": 680.0,
+    "ratio": 2.4848,
+    "ratio_ci": [
+     2.3364,
+     2.6511
+    ],
+    "exp_mean": 1.5986,
+    "act_mean": 0.6433
+   },
+   "blk": {
+    "exp_sum": 34.77,
+    "act_sum": 117.0,
+    "ratio": 0.2972,
+    "ratio_ci": [
+     0.2097,
+     0.3909
+    ],
+    "exp_mean": 0.0329,
+    "act_mean": 0.1107
+   },
+   "kill": {
+    "exp_sum": 217.673,
+    "act_sum": 166.0,
+    "ratio": 1.3113,
+    "ratio_ci": [
+     1.233,
+     1.4039
+    ],
+    "exp_mean": 0.2059,
+    "act_mean": 0.157
+   },
+   "per_attack": {
+    "exp_cut": 0.3128,
+    "act_cut": 0.7832,
+    "exp_life": 0.6445,
+    "act_life": 0.4494,
+    "exp_blk": 0.0133,
+    "act_blk": 0.0773
+   },
+   "exp_counter_stops_mean": 0.6428,
+   "attacks_mean": {
+    "exp_hits": 2.824,
+    "act_leader": 1.4314
+   }
+  },
+  "theory_fewer": {
+   "n": 644,
+   "cut": {
+    "exp_sum": 324.638,
+    "act_sum": 786.0,
+    "ratio": 0.413,
+    "ratio_ci": [
+     0.3642,
+     0.4651
+    ],
+    "exp_mean": 0.5041,
+    "act_mean": 1.2205
+   },
+   "life": {
+    "exp_sum": 526.629,
+    "act_sum": 483.0,
+    "ratio": 1.0903,
+    "ratio_ci": [
+     1.0075,
+     1.1816
+    ],
+    "exp_mean": 0.8177,
+    "act_mean": 0.75
+   },
+   "blk": {
+    "exp_sum": 29.71,
+    "act_sum": 125.0,
+    "ratio": 0.2377,
+    "ratio_ci": [
+     0.1604,
+     0.3183
+    ],
+    "exp_mean": 0.0461,
+    "act_mean": 0.1941
+   },
+   "kill": {
+    "exp_sum": 14.794,
+    "act_sum": 22.0,
+    "ratio": 0.6725,
+    "ratio_ci": [
+     0.449,
+     0.9918
+    ],
+    "exp_mean": 0.023,
+    "act_mean": 0.0342
+   },
+   "per_attack": {
+    "exp_cut": 0.3843,
+    "act_cut": 0.458,
+    "exp_life": 0.6234,
+    "act_life": 0.2815,
+    "exp_blk": 0.0352,
+    "act_blk": 0.0728
+   },
+   "exp_counter_stops_mean": 0.4249,
+   "attacks_mean": {
+    "exp_hits": 1.3261,
+    "act_leader": 2.6646
+   }
+  },
+  "all": {
+   "n": 3247,
+   "cut": {
+    "exp_sum": 2148.061,
+    "act_sum": 3879.0,
+    "ratio": 0.5538,
+    "ratio_ci": [
+     0.5259,
+     0.5819
+    ],
+    "exp_mean": 0.6616,
+    "act_mean": 1.1946
+   },
+   "life": {
+    "exp_sum": 3990.829,
+    "act_sum": 2490.0,
+    "ratio": 1.6027,
+    "ratio_ci": [
+     1.5499,
+     1.656
+    ],
+    "exp_mean": 1.2291,
+    "act_mean": 0.7669
+   },
+   "blk": {
+    "exp_sum": 129.569,
+    "act_sum": 455.0,
+    "ratio": 0.2848,
+    "ratio_ci": [
+     0.2431,
+     0.3294
+    ],
+    "exp_mean": 0.0399,
+    "act_mean": 0.1401
+   },
+   "kill": {
+    "exp_sum": 370.737,
+    "act_sum": 297.0,
+    "ratio": 1.2483,
+    "ratio_ci": [
+     1.1793,
+     1.3172
+    ],
+    "exp_mean": 0.1142,
+    "act_mean": 0.0915
+   },
+   "per_attack": {
+    "exp_cut": 0.343,
+    "act_cut": 0.6372,
+    "exp_life": 0.6372,
+    "act_life": 0.409,
+    "exp_blk": 0.0207,
+    "act_blk": 0.0747
+   },
+   "exp_counter_stops_mean": 0.5456,
+   "attacks_mean": {
+    "exp_hits": 2.0628,
+    "act_leader": 1.875
+   }
+  }
+ },
+ "by_def_deck": {
+  "OP09-001": {
+   "same": {
+    "n": 363,
+    "cut": {
+     "exp_sum": 181.145,
+     "act_sum": 282.0,
+     "ratio": 0.6424,
+     "ratio_ci": [
+      0.5367,
+      0.766
+     ],
+     "exp_mean": 0.499,
+     "act_mean": 0.7769
+    },
+    "life": {
+     "exp_sum": 410.588,
+     "act_sum": 303.0,
+     "ratio": 1.3551,
+     "ratio_ci": [
+      1.2577,
+      1.4543
+     ],
+     "exp_mean": 1.1311,
+     "act_mean": 0.8347
+    },
+    "blk": {
+     "exp_sum": 16.0,
+     "act_sum": 40.0,
+     "ratio": 0.4,
+     "ratio_ci": [
+      0.25,
+      0.5714
+     ],
+     "exp_mean": 0.0441,
+     "act_mean": 0.1102
+    },
+    "kill": {
+     "exp_sum": 27.162,
+     "act_sum": 25.0,
+     "ratio": 1.0865,
+     "ratio_ci": [
+      0.8591,
+      1.3815
+     ],
+     "exp_mean": 0.0748,
+     "act_mean": 0.0689
+    },
+    "per_attack": {
+     "exp_cut": 0.3007,
+     "act_cut": 0.4646,
+     "exp_life": 0.6815,
+     "act_life": 0.4992,
+     "exp_blk": 0.0266,
+     "act_blk": 0.0659
+    },
+    "exp_counter_stops_mean": 0.4097,
+    "attacks_mean": {
+     "exp_hits": 1.6722,
+     "act_leader": 1.6722
+    }
+   },
+   "same_with_attacks": {
+    "n": 320,
+    "cut": {
+     "exp_sum": 181.145,
+     "act_sum": 273.0,
+     "ratio": 0.6635,
+     "ratio_ci": [
+      0.5549,
+      0.7939
+     ],
+     "exp_mean": 0.5661,
+     "act_mean": 0.8531
+    },
+    "life": {
+     "exp_sum": 410.588,
+     "act_sum": 303.0,
+     "ratio": 1.3551,
+     "ratio_ci": [
+      1.2607,
+      1.4541
+     ],
+     "exp_mean": 1.2831,
+     "act_mean": 0.9469
+    },
+    "blk": {
+     "exp_sum": 16.0,
+     "act_sum": 38.0,
+     "ratio": 0.4211,
+     "ratio_ci": [
+      0.2632,
+      0.6
+     ],
+     "exp_mean": 0.05,
+     "act_mean": 0.1187
+    },
+    "kill": {
+     "exp_sum": 27.162,
+     "act_sum": 25.0,
+     "ratio": 1.0865,
+     "ratio_ci": [
+      0.8628,
+      1.3991
+     ],
+     "exp_mean": 0.0849,
+     "act_mean": 0.0781
+    },
+    "per_attack": {
+     "exp_cut": 0.3007,
+     "act_cut": 0.4498,
+     "exp_life": 0.6815,
+     "act_life": 0.4992,
+     "exp_blk": 0.0266,
+     "act_blk": 0.0626
+    },
+    "exp_counter_stops_mean": 0.4648,
+    "attacks_mean": {
+     "exp_hits": 1.8969,
+     "act_leader": 1.8969
+    }
+   },
+   "theory_more": {
+    "n": 205,
+    "cut": {
+     "exp_sum": 147.965,
+     "act_sum": 163.0,
+     "ratio": 0.9078,
+     "ratio_ci": [
+      0.7402,
+      1.1082
+     ],
+     "exp_mean": 0.7218,
+     "act_mean": 0.7951
+    },
+    "life": {
+     "exp_sum": 330.846,
+     "act_sum": 97.0,
+     "ratio": 3.4108,
+     "ratio_ci": [
+      2.8866,
+      4.1836
+     ],
+     "exp_mean": 1.6139,
+     "act_mean": 0.4732
+    },
+    "blk": {
+     "exp_sum": 9.0,
+     "act_sum": 24.0,
+     "ratio": 0.375,
+     "ratio_ci": [
+      0.1429,
+      0.6552
+     ],
+     "exp_mean": 0.0439,
+     "act_mean": 0.1171
+    },
+    "kill": {
+     "exp_sum": 27.224,
+     "act_sum": 25.0,
+     "ratio": 1.0889,
+     "ratio_ci": [
+      0.9089,
+      1.2794
+     ],
+     "exp_mean": 0.1328,
+     "act_mean": 0.122
+    },
+    "per_attack": {
+     "exp_cut": 0.2986,
+     "act_cut": 0.6599,
+     "exp_life": 0.6676,
+     "act_life": 0.3927,
+     "exp_blk": 0.0182,
+     "act_blk": 0.0972
+    },
+    "exp_counter_stops_mean": 0.6269,
+    "attacks_mean": {
+     "exp_hits": 2.6049,
+     "act_leader": 1.2049
+    }
+   },
+   "theory_fewer": {
+    "n": 265,
+    "cut": {
+     "exp_sum": 70.703,
+     "act_sum": 161.0,
+     "ratio": 0.4391,
+     "ratio_ci": [
+      0.3319,
+      0.5586
+     ],
+     "exp_mean": 0.2668,
+     "act_mean": 0.6075
+    },
+    "life": {
+     "exp_sum": 156.269,
+     "act_sum": 153.0,
+     "ratio": 1.0214,
+     "ratio_ci": [
+      0.8768,
+      1.1858
+     ],
+     "exp_mean": 0.5897,
+     "act_mean": 0.5774
+    },
+    "blk": {
+     "exp_sum": 5.0,
+     "act_sum": 65.0,
+     "ratio": 0.0769,
+     "ratio_ci": [
+      0.0175,
+      0.1429
+     ],
+     "exp_mean": 0.0189,
+     "act_mean": 0.2453
+    },
+    "kill": {
+     "exp_sum": 1.219,
+     "act_sum": 1.0,
+     "ratio": 1.2191,
+     "ratio_ci": [
+      0.466,
+      2.7252
+     ],
+     "exp_mean": 0.0046,
+     "act_mean": 0.0038
+    },
+    "per_attack": {
+     "exp_cut": 0.3199,
+     "act_cut": 0.2747,
+     "exp_life": 0.7071,
+     "act_life": 0.2611,
+     "exp_blk": 0.0226,
+     "act_blk": 0.1109
+    },
+    "exp_counter_stops_mean": 0.2208,
+    "attacks_mean": {
+     "exp_hits": 0.834,
+     "act_leader": 2.2113
+    }
+   },
+   "all": {
+    "n": 833,
+    "cut": {
+     "exp_sum": 399.813,
+     "act_sum": 606.0,
+     "ratio": 0.6598,
+     "ratio_ci": [
+      0.5911,
+      0.7375
+     ],
+     "exp_mean": 0.48,
+     "act_mean": 0.7275
+    },
+    "life": {
+     "exp_sum": 897.704,
+     "act_sum": 553.0,
+     "ratio": 1.6233,
+     "ratio_ci": [
+      1.5088,
+      1.7475
+     ],
+     "exp_mean": 1.0777,
+     "act_mean": 0.6639
+    },
+    "blk": {
+     "exp_sum": 30.0,
+     "act_sum": 129.0,
+     "ratio": 0.2326,
+     "ratio_ci": [
+      0.1525,
+      0.3178
+     ],
+     "exp_mean": 0.036,
+     "act_mean": 0.1549
+    },
+    "kill": {
+     "exp_sum": 55.604,
+     "act_sum": 51.0,
+     "ratio": 1.0903,
+     "ratio_ci": [
+      0.9491,
+      1.2544
+     ],
+     "exp_mean": 0.0668,
+     "act_mean": 0.0612
+    },
+    "per_attack": {
+     "exp_cut": 0.3031,
+     "act_cut": 0.4208,
+     "exp_life": 0.6806,
+     "act_life": 0.384,
+     "exp_blk": 0.0227,
+     "act_blk": 0.0896
+    },
+    "exp_counter_stops_mean": 0.4031,
+    "attacks_mean": {
+     "exp_hits": 1.6351,
+     "act_leader": 1.7287
+    }
+   }
+  },
+  "OP11-041": {
+   "same": {
+    "n": 337,
+    "cut": {
+     "exp_sum": 241.415,
+     "act_sum": 326.0,
+     "ratio": 0.7405,
+     "ratio_ci": [
+      0.6298,
+      0.8699
+     ],
+     "exp_mean": 0.7164,
+     "act_mean": 0.9674
+    },
+    "life": {
+     "exp_sum": 412.163,
+     "act_sum": 277.0,
+     "ratio": 1.488,
+     "ratio_ci": [
+      1.3447,
+      1.667
+     ],
+     "exp_mean": 1.223,
+     "act_mean": 0.822
+    },
+    "blk": {
+     "exp_sum": 5.84,
+     "act_sum": 29.0,
+     "ratio": 0.2014,
+     "ratio_ci": [
+      0.0708,
+      0.3478
+     ],
+     "exp_mean": 0.0173,
+     "act_mean": 0.0861
+    },
+    "kill": {
+     "exp_sum": 19.515,
+     "act_sum": 18.0,
+     "ratio": 1.0842,
+     "ratio_ci": [
+      0.8716,
+      1.3662
+     ],
+     "exp_mean": 0.0579,
+     "act_mean": 0.0534
+    },
+    "per_attack": {
+     "exp_cut": 0.3848,
+     "act_cut": 0.515,
+     "exp_life": 0.6569,
+     "act_life": 0.4376,
+     "exp_blk": 0.0093,
+     "act_blk": 0.0458
+    },
+    "exp_counter_stops_mean": 0.5636,
+    "attacks_mean": {
+     "exp_hits": 1.8783,
+     "act_leader": 1.8783
+    }
+   },
+   "same_with_attacks": {
+    "n": 337,
+    "cut": {
+     "exp_sum": 241.415,
+     "act_sum": 326.0,
+     "ratio": 0.7405,
+     "ratio_ci": [
+      0.6298,
+      0.8699
+     ],
+     "exp_mean": 0.7164,
+     "act_mean": 0.9674
+    },
+    "life": {
+     "exp_sum": 412.163,
+     "act_sum": 277.0,
+     "ratio": 1.488,
+     "ratio_ci": [
+      1.3447,
+      1.667
+     ],
+     "exp_mean": 1.223,
+     "act_mean": 0.822
+    },
+    "blk": {
+     "exp_sum": 5.84,
+     "act_sum": 29.0,
+     "ratio": 0.2014,
+     "ratio_ci": [
+      0.0708,
+      0.3478
+     ],
+     "exp_mean": 0.0173,
+     "act_mean": 0.0861
+    },
+    "kill": {
+     "exp_sum": 19.515,
+     "act_sum": 18.0,
+     "ratio": 1.0842,
+     "ratio_ci": [
+      0.8716,
+      1.3662
+     ],
+     "exp_mean": 0.0579,
+     "act_mean": 0.0534
+    },
+    "per_attack": {
+     "exp_cut": 0.3848,
+     "act_cut": 0.515,
+     "exp_life": 0.6569,
+     "act_life": 0.4376,
+     "exp_blk": 0.0093,
+     "act_blk": 0.0458
+    },
+    "exp_counter_stops_mean": 0.5636,
+    "attacks_mean": {
+     "exp_hits": 1.8783,
+     "act_leader": 1.8783
+    }
+   },
+   "theory_more": {
+    "n": 277,
+    "cut": {
+     "exp_sum": 257.552,
+     "act_sum": 336.0,
+     "ratio": 0.7665,
+     "ratio_ci": [
+      0.6562,
+      0.8909
+     ],
+     "exp_mean": 0.9298,
+     "act_mean": 1.213
+    },
+    "life": {
+     "exp_sum": 606.463,
+     "act_sum": 217.0,
+     "ratio": 2.7948,
+     "ratio_ci": [
+      2.5315,
+      3.1299
+     ],
+     "exp_mean": 2.1894,
+     "act_mean": 0.7834
+    },
+    "blk": {
+     "exp_sum": 6.235,
+     "act_sum": 19.0,
+     "ratio": 0.3281,
+     "ratio_ci": [
+      0.1197,
+      0.5639
+     ],
+     "exp_mean": 0.0225,
+     "act_mean": 0.0686
+    },
+    "kill": {
+     "exp_sum": 22.703,
+     "act_sum": 9.0,
+     "ratio": 2.5225,
+     "ratio_ci": [
+      1.7311,
+      4.6902
+     ],
+     "exp_mean": 0.082,
+     "act_mean": 0.0325
+    },
+    "per_attack": {
+     "exp_cut": 0.3068,
+     "act_cut": 0.7483,
+     "exp_life": 0.7224,
+     "act_life": 0.4833,
+     "exp_blk": 0.0074,
+     "act_blk": 0.0423
+    },
+    "exp_counter_stops_mean": 0.7369,
+    "attacks_mean": {
+     "exp_hits": 3.1083,
+     "act_leader": 1.6209
+    }
+   },
+   "theory_fewer": {
+    "n": 138,
+    "cut": {
+     "exp_sum": 86.271,
+     "act_sum": 178.0,
+     "ratio": 0.4847,
+     "ratio_ci": [
+      0.3766,
+      0.616
+     ],
+     "exp_mean": 0.6252,
+     "act_mean": 1.2899
+    },
+    "life": {
+     "exp_sum": 128.729,
+     "act_sum": 92.0,
+     "ratio": 1.3992,
+     "ratio_ci": [
+      1.1805,
+      1.6895
+     ],
+     "exp_mean": 0.9328,
+     "act_mean": 0.6667
+    },
+    "blk": {
+     "exp_sum": 2.0,
+     "act_sum": 13.0,
+     "ratio": 0.1538,
+     "ratio_ci": [
+      0.0,
+      0.3846
+     ],
+     "exp_mean": 0.0145,
+     "act_mean": 0.0942
+    },
+    "kill": {
+     "exp_sum": 1.542,
+     "act_sum": 3.0,
+     "ratio": 0.5139,
+     "ratio_ci": [
+      0.0,
+      2.2176
+     ],
+     "exp_mean": 0.0112,
+     "act_mean": 0.0217
+    },
+    "per_attack": {
+     "exp_cut": 0.4301,
+     "act_cut": 0.4635,
+     "exp_life": 0.6417,
+     "act_life": 0.2396,
+     "exp_blk": 0.01,
+     "act_blk": 0.0339
+    },
+    "exp_counter_stops_mean": 0.4952,
+    "attacks_mean": {
+     "exp_hits": 1.4565,
+     "act_leader": 2.7826
+    }
+   },
+   "all": {
+    "n": 752,
+    "cut": {
+     "exp_sum": 585.238,
+     "act_sum": 840.0,
+     "ratio": 0.6967,
+     "ratio_ci": [
+      0.6334,
+      0.7653
+     ],
+     "exp_mean": 0.7782,
+     "act_mean": 1.117
+    },
+    "life": {
+     "exp_sum": 1147.356,
+     "act_sum": 586.0,
+     "ratio": 1.9579,
+     "ratio_ci": [
+      1.8289,
+      2.1125
+     ],
+     "exp_mean": 1.5257,
+     "act_mean": 0.7793
+    },
+    "blk": {
+     "exp_sum": 14.074,
+     "act_sum": 61.0,
+     "ratio": 0.2307,
+     "ratio_ci": [
+      0.1375,
+      0.3416
+     ],
+     "exp_mean": 0.0187,
+     "act_mean": 0.0811
+    },
+    "kill": {
+     "exp_sum": 43.759,
+     "act_sum": 30.0,
+     "ratio": 1.4586,
+     "ratio_ci": [
+      1.1762,
+      1.7462
+     ],
+     "exp_mean": 0.0582,
+     "act_mean": 0.0399
+    },
+    "per_attack": {
+     "exp_cut": 0.351,
+     "act_cut": 0.573,
+     "exp_life": 0.688,
+     "act_life": 0.3997,
+     "exp_blk": 0.0084,
+     "act_blk": 0.0416
+    },
+    "exp_counter_stops_mean": 0.6149,
+    "attacks_mean": {
+     "exp_hits": 2.254,
+     "act_leader": 1.9495
+    }
+   }
+  },
+  "OP15-058": {
+   "same": {
+    "n": 425,
+    "cut": {
+     "exp_sum": 256.786,
+     "act_sum": 744.0,
+     "ratio": 0.3451,
+     "ratio_ci": [
+      0.2944,
+      0.3975
+     ],
+     "exp_mean": 0.6042,
+     "act_mean": 1.7506
+    },
+    "life": {
+     "exp_sum": 555.266,
+     "act_sum": 450.0,
+     "ratio": 1.2339,
+     "ratio_ci": [
+      1.154,
+      1.3148
+     ],
+     "exp_mean": 1.3065,
+     "act_mean": 1.0588
+    },
+    "blk": {
+     "exp_sum": 10.0,
+     "act_sum": 33.0,
+     "ratio": 0.303,
+     "ratio_ci": [
+      0.1429,
+      0.4815
+     ],
+     "exp_mean": 0.0235,
+     "act_mean": 0.0776
+    },
+    "kill": {
+     "exp_sum": 53.89,
+     "act_sum": 37.0,
+     "ratio": 1.4565,
+     "ratio_ci": [
+      1.2063,
+      1.8419
+     ],
+     "exp_mean": 0.1268,
+     "act_mean": 0.0871
+    },
+    "per_attack": {
+     "exp_cut": 0.3115,
+     "act_cut": 0.8661,
+     "exp_life": 0.6735,
+     "act_life": 0.5239,
+     "exp_blk": 0.0121,
+     "act_blk": 0.0384
+    },
+    "exp_counter_stops_mean": 0.4829,
+    "attacks_mean": {
+     "exp_hits": 2.0212,
+     "act_leader": 2.0212
+    }
+   },
+   "same_with_attacks": {
+    "n": 425,
+    "cut": {
+     "exp_sum": 256.786,
+     "act_sum": 744.0,
+     "ratio": 0.3451,
+     "ratio_ci": [
+      0.2944,
+      0.3975
+     ],
+     "exp_mean": 0.6042,
+     "act_mean": 1.7506
+    },
+    "life": {
+     "exp_sum": 555.266,
+     "act_sum": 450.0,
+     "ratio": 1.2339,
+     "ratio_ci": [
+      1.154,
+      1.3148
+     ],
+     "exp_mean": 1.3065,
+     "act_mean": 1.0588
+    },
+    "blk": {
+     "exp_sum": 10.0,
+     "act_sum": 33.0,
+     "ratio": 0.303,
+     "ratio_ci": [
+      0.1429,
+      0.4815
+     ],
+     "exp_mean": 0.0235,
+     "act_mean": 0.0776
+    },
+    "kill": {
+     "exp_sum": 53.89,
+     "act_sum": 37.0,
+     "ratio": 1.4565,
+     "ratio_ci": [
+      1.2063,
+      1.8419
+     ],
+     "exp_mean": 0.1268,
+     "act_mean": 0.0871
+    },
+    "per_attack": {
+     "exp_cut": 0.3115,
+     "act_cut": 0.8661,
+     "exp_life": 0.6735,
+     "act_life": 0.5239,
+     "exp_blk": 0.0121,
+     "act_blk": 0.0384
+    },
+    "exp_counter_stops_mean": 0.4829,
+    "attacks_mean": {
+     "exp_hits": 2.0212,
+     "act_leader": 2.0212
+    }
+   },
+   "theory_more": {
+    "n": 307,
+    "cut": {
+     "exp_sum": 180.71,
+     "act_sum": 380.0,
+     "ratio": 0.4756,
+     "ratio_ci": [
+      0.3938,
+      0.5688
+     ],
+     "exp_mean": 0.5886,
+     "act_mean": 1.2378
+    },
+    "life": {
+     "exp_sum": 385.949,
+     "act_sum": 193.0,
+     "ratio": 1.9997,
+     "ratio_ci": [
+      1.8177,
+      2.2034
+     ],
+     "exp_mean": 1.2572,
+     "act_mean": 0.6287
+    },
+    "blk": {
+     "exp_sum": 9.105,
+     "act_sum": 28.0,
+     "ratio": 0.3252,
+     "ratio_ci": [
+      0.1403,
+      0.507
+     ],
+     "exp_mean": 0.0297,
+     "act_mean": 0.0912
+    },
+    "kill": {
+     "exp_sum": 93.022,
+     "act_sum": 78.0,
+     "ratio": 1.1926,
+     "ratio_ci": [
+      1.102,
+      1.2997
+     ],
+     "exp_mean": 0.303,
+     "act_mean": 0.2541
+    },
+    "per_attack": {
+     "exp_cut": 0.2804,
+     "act_cut": 0.936,
+     "exp_life": 0.5988,
+     "act_life": 0.4754,
+     "exp_blk": 0.0141,
+     "act_blk": 0.069
+    },
+    "exp_counter_stops_mean": 0.5098,
+    "attacks_mean": {
+     "exp_hits": 2.6743,
+     "act_leader": 1.3225
+    }
+   },
+   "theory_fewer": {
+    "n": 105,
+    "cut": {
+     "exp_sum": 52.892,
+     "act_sum": 181.0,
+     "ratio": 0.2922,
+     "ratio_ci": [
+      0.2227,
+      0.3756
+     ],
+     "exp_mean": 0.5037,
+     "act_mean": 1.7238
+    },
+    "life": {
+     "exp_sum": 112.957,
+     "act_sum": 120.0,
+     "ratio": 0.9413,
+     "ratio_ci": [
+      0.8032,
+      1.0926
+     ],
+     "exp_mean": 1.0758,
+     "act_mean": 1.1429
+    },
+    "blk": {
+     "exp_sum": 7.992,
+     "act_sum": 13.0,
+     "ratio": 0.6148,
+     "ratio_ci": [
+      0.384,
+      0.8571
+     ],
+     "exp_mean": 0.0761,
+     "act_mean": 0.1238
+    },
+    "kill": {
+     "exp_sum": 7.712,
+     "act_sum": 8.0,
+     "ratio": 0.964,
+     "ratio_ci": [
+      0.5384,
+      1.606
+     ],
+     "exp_mean": 0.0734,
+     "act_mean": 0.0762
+    },
+    "per_attack": {
+     "exp_cut": 0.2971,
+     "act_cut": 0.5728,
+     "exp_life": 0.6346,
+     "act_life": 0.3797,
+     "exp_blk": 0.0449,
+     "act_blk": 0.0411
+    },
+    "exp_counter_stops_mean": 0.4699,
+    "attacks_mean": {
+     "exp_hits": 1.7524,
+     "act_leader": 3.0095
+    }
+   },
+   "all": {
+    "n": 837,
+    "cut": {
+     "exp_sum": 490.389,
+     "act_sum": 1305.0,
+     "ratio": 0.3758,
+     "ratio_ci": [
+      0.3384,
+      0.4154
+     ],
+     "exp_mean": 0.5859,
+     "act_mean": 1.5591
+    },
+    "life": {
+     "exp_sum": 1054.171,
+     "act_sum": 763.0,
+     "ratio": 1.3816,
+     "ratio_ci": [
+      1.3107,
+      1.454
+     ],
+     "exp_mean": 1.2595,
+     "act_mean": 0.9116
+    },
+    "blk": {
+     "exp_sum": 27.097,
+     "act_sum": 74.0,
+     "ratio": 0.3662,
+     "ratio_ci": [
+      0.2547,
+      0.4924
+     ],
+     "exp_mean": 0.0324,
+     "act_mean": 0.0884
+    },
+    "kill": {
+     "exp_sum": 154.624,
+     "act_sum": 123.0,
+     "ratio": 1.2571,
+     "ratio_ci": [
+      1.1639,
+      1.3521
+     ],
+     "exp_mean": 0.1847,
+     "act_mean": 0.147
+    },
+    "per_attack": {
+     "exp_cut": 0.2978,
+     "act_cut": 0.8254,
+     "exp_life": 0.6401,
+     "act_life": 0.4826,
+     "exp_blk": 0.0165,
+     "act_blk": 0.0468
+    },
+    "exp_counter_stops_mean": 0.4911,
+    "attacks_mean": {
+     "exp_hits": 2.227,
+     "act_leader": 1.8889
+    }
+   }
+  },
+  "OP16-022": {
+   "same": {
+    "n": 421,
+    "cut": {
+     "exp_sum": 323.917,
+     "act_sum": 556.0,
+     "ratio": 0.5826,
+     "ratio_ci": [
+      0.5226,
+      0.6471
+     ],
+     "exp_mean": 0.7694,
+     "act_mean": 1.3207
+    },
+    "life": {
+     "exp_sum": 396.51,
+     "act_sum": 297.0,
+     "ratio": 1.335,
+     "ratio_ci": [
+      1.2338,
+      1.4393
+     ],
+     "exp_mean": 0.9418,
+     "act_mean": 0.7055
+    },
+    "blk": {
+     "exp_sum": 33.249,
+     "act_sum": 111.0,
+     "ratio": 0.2995,
+     "ratio_ci": [
+      0.2215,
+      0.3846
+     ],
+     "exp_mean": 0.079,
+     "act_mean": 0.2637
+    },
+    "kill": {
+     "exp_sum": 37.703,
+     "act_sum": 29.0,
+     "ratio": 1.3001,
+     "ratio_ci": [
+      0.9946,
+      1.722
+     ],
+     "exp_mean": 0.0896,
+     "act_mean": 0.0689
+    },
+    "per_attack": {
+     "exp_cut": 0.4365,
+     "act_cut": 0.7316,
+     "exp_life": 0.5343,
+     "act_life": 0.3908,
+     "exp_blk": 0.0448,
+     "act_blk": 0.1461
+    },
+    "exp_counter_stops_mean": 0.6524,
+    "attacks_mean": {
+     "exp_hits": 1.8052,
+     "act_leader": 1.8052
+    }
+   },
+   "same_with_attacks": {
+    "n": 421,
+    "cut": {
+     "exp_sum": 323.917,
+     "act_sum": 556.0,
+     "ratio": 0.5826,
+     "ratio_ci": [
+      0.5226,
+      0.6471
+     ],
+     "exp_mean": 0.7694,
+     "act_mean": 1.3207
+    },
+    "life": {
+     "exp_sum": 396.51,
+     "act_sum": 297.0,
+     "ratio": 1.335,
+     "ratio_ci": [
+      1.2338,
+      1.4393
+     ],
+     "exp_mean": 0.9418,
+     "act_mean": 0.7055
+    },
+    "blk": {
+     "exp_sum": 33.249,
+     "act_sum": 111.0,
+     "ratio": 0.2995,
+     "ratio_ci": [
+      0.2215,
+      0.3846
+     ],
+     "exp_mean": 0.079,
+     "act_mean": 0.2637
+    },
+    "kill": {
+     "exp_sum": 37.703,
+     "act_sum": 29.0,
+     "ratio": 1.3001,
+     "ratio_ci": [
+      0.9946,
+      1.722
+     ],
+     "exp_mean": 0.0896,
+     "act_mean": 0.0689
+    },
+    "per_attack": {
+     "exp_cut": 0.4365,
+     "act_cut": 0.7316,
+     "exp_life": 0.5343,
+     "act_life": 0.3908,
+     "exp_blk": 0.0448,
+     "act_blk": 0.1461
+    },
+    "exp_counter_stops_mean": 0.6524,
+    "attacks_mean": {
+     "exp_hits": 1.8052,
+     "act_leader": 1.8052
+    }
+   },
+   "theory_more": {
+    "n": 268,
+    "cut": {
+     "exp_sum": 233.932,
+     "act_sum": 306.0,
+     "ratio": 0.7645,
+     "ratio_ci": [
+      0.6577,
+      0.8834
+     ],
+     "exp_mean": 0.8729,
+     "act_mean": 1.1418
+    },
+    "life": {
+     "exp_sum": 366.415,
+     "act_sum": 173.0,
+     "ratio": 2.118,
+     "ratio_ci": [
+      1.9233,
+      2.3466
+     ],
+     "exp_mean": 1.3672,
+     "act_mean": 0.6455
+    },
+    "blk": {
+     "exp_sum": 10.43,
+     "act_sum": 46.0,
+     "ratio": 0.2267,
+     "ratio_ci": [
+      0.1108,
+      0.3783
+     ],
+     "exp_mean": 0.0389,
+     "act_mean": 0.1716
+    },
+    "kill": {
+     "exp_sum": 74.724,
+     "act_sum": 54.0,
+     "ratio": 1.3838,
+     "ratio_ci": [
+      1.2498,
+      1.5443
+     ],
+     "exp_mean": 0.2788,
+     "act_mean": 0.2015
+    },
+    "per_attack": {
+     "exp_cut": 0.3644,
+     "act_cut": 0.7445,
+     "exp_life": 0.5708,
+     "act_life": 0.4209,
+     "exp_blk": 0.0162,
+     "act_blk": 0.1119
+    },
+    "exp_counter_stops_mean": 0.7102,
+    "attacks_mean": {
+     "exp_hits": 2.8694,
+     "act_leader": 1.5336
+    }
+   },
+   "theory_fewer": {
+    "n": 136,
+    "cut": {
+     "exp_sum": 114.772,
+     "act_sum": 266.0,
+     "ratio": 0.4315,
+     "ratio_ci": [
+      0.358,
+      0.5143
+     ],
+     "exp_mean": 0.8439,
+     "act_mean": 1.9559
+    },
+    "life": {
+     "exp_sum": 128.674,
+     "act_sum": 118.0,
+     "ratio": 1.0905,
+     "ratio_ci": [
+      0.9399,
+      1.2748
+     ],
+     "exp_mean": 0.9461,
+     "act_mean": 0.8676
+    },
+    "blk": {
+     "exp_sum": 14.718,
+     "act_sum": 34.0,
+     "ratio": 0.4329,
+     "ratio_ci": [
+      0.2442,
+      0.6496
+     ],
+     "exp_mean": 0.1082,
+     "act_mean": 0.25
+    },
+    "kill": {
+     "exp_sum": 4.322,
+     "act_sum": 10.0,
+     "ratio": 0.4322,
+     "ratio_ci": [
+      0.135,
+      0.7981
+     ],
+     "exp_mean": 0.0318,
+     "act_mean": 0.0735
+    },
+    "per_attack": {
+     "exp_cut": 0.4682,
+     "act_cut": 0.6186,
+     "exp_life": 0.5249,
+     "act_life": 0.2744,
+     "exp_blk": 0.06,
+     "act_blk": 0.0791
+    },
+    "exp_counter_stops_mean": 0.7164,
+    "attacks_mean": {
+     "exp_hits": 1.8235,
+     "act_leader": 3.1618
+    }
+   },
+   "all": {
+    "n": 825,
+    "cut": {
+     "exp_sum": 672.621,
+     "act_sum": 1128.0,
+     "ratio": 0.5963,
+     "ratio_ci": [
+      0.5469,
+      0.6451
+     ],
+     "exp_mean": 0.8153,
+     "act_mean": 1.3673
+    },
+    "life": {
+     "exp_sum": 891.599,
+     "act_sum": 588.0,
+     "ratio": 1.5163,
+     "ratio_ci": [
+      1.4337,
+      1.5993
+     ],
+     "exp_mean": 1.0807,
+     "act_mean": 0.7127
+    },
+    "blk": {
+     "exp_sum": 58.398,
+     "act_sum": 191.0,
+     "ratio": 0.3057,
+     "ratio_ci": [
+      0.2412,
+      0.374
+     ],
+     "exp_mean": 0.0708,
+     "act_mean": 0.2315
+    },
+    "kill": {
+     "exp_sum": 116.749,
+     "act_sum": 93.0,
+     "ratio": 1.2554,
+     "ratio_ci": [
+      1.1102,
+      1.3982
+     ],
+     "exp_mean": 0.1415,
+     "act_mean": 0.1127
+    },
+    "per_attack": {
+     "exp_cut": 0.4129,
+     "act_cut": 0.7046,
+     "exp_life": 0.5473,
+     "act_life": 0.3673,
+     "exp_blk": 0.0358,
+     "act_blk": 0.1193
+    },
+    "exp_counter_stops_mean": 0.6817,
+    "attacks_mean": {
+     "exp_hits": 2.1539,
+     "act_leader": 1.9406
+    }
+   }
+  }
+ },
+ "by_band": {
+  "1-3": {
+   "same": {
+    "n": 219,
+    "cut": {
+     "exp_sum": 65.0,
+     "act_sum": 171.0,
+     "ratio": 0.3801,
+     "ratio_ci": [
+      0.2707,
+      0.5154
+     ],
+     "exp_mean": 0.2968,
+     "act_mean": 0.7808
+    },
+    "life": {
+     "exp_sum": 178.0,
+     "act_sum": 125.0,
+     "ratio": 1.424,
+     "ratio_ci": [
+      1.259,
+      1.6306
+     ],
+     "exp_mean": 0.8128,
+     "act_mean": 0.5708
+    },
+    "blk": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "kill": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "per_attack": {
+     "exp_cut": 0.2686,
+     "act_cut": 0.7066,
+     "exp_life": 0.7355,
+     "act_life": 0.5165,
+     "exp_blk": 0.0,
+     "act_blk": 0.0
+    },
+    "exp_counter_stops_mean": 0.2922,
+    "attacks_mean": {
+     "exp_hits": 1.105,
+     "act_leader": 1.105
+    }
+   },
+   "same_with_attacks": {
+    "n": 218,
+    "cut": {
+     "exp_sum": 65.0,
+     "act_sum": 171.0,
+     "ratio": 0.3801,
+     "ratio_ci": [
+      0.2659,
+      0.5168
+     ],
+     "exp_mean": 0.2982,
+     "act_mean": 0.7844
+    },
+    "life": {
+     "exp_sum": 178.0,
+     "act_sum": 125.0,
+     "ratio": 1.424,
+     "ratio_ci": [
+      1.2573,
+      1.6283
+     ],
+     "exp_mean": 0.8165,
+     "act_mean": 0.5734
+    },
+    "blk": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "kill": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "per_attack": {
+     "exp_cut": 0.2686,
+     "act_cut": 0.7066,
+     "exp_life": 0.7355,
+     "act_life": 0.5165,
+     "exp_blk": 0.0,
+     "act_blk": 0.0
+    },
+    "exp_counter_stops_mean": 0.2936,
+    "attacks_mean": {
+     "exp_hits": 1.1101,
+     "act_leader": 1.1101
+    }
+   },
+   "theory_more": {
+    "n": 39,
+    "cut": {
+     "exp_sum": 23.0,
+     "act_sum": 8.0,
+     "ratio": 2.875,
+     "ratio_ci": [
+      1.6667,
+      8.3333
+     ],
+     "exp_mean": 0.5897,
+     "act_mean": 0.2051
+    },
+    "life": {
+     "exp_sum": 28.0,
+     "act_sum": 3.0,
+     "ratio": 9.3333,
+     "ratio_ci": [
+      4.0,
+      31.0
+     ],
+     "exp_mean": 0.7179,
+     "act_mean": 0.0769
+    },
+    "blk": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "kill": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "per_attack": {
+     "exp_cut": 0.46,
+     "act_cut": 0.8889,
+     "exp_life": 0.56,
+     "act_life": 0.3333,
+     "exp_blk": 0.0,
+     "act_blk": 0.0
+    },
+    "exp_counter_stops_mean": 0.5641,
+    "attacks_mean": {
+     "exp_hits": 1.2821,
+     "act_leader": 0.2308
+    }
+   },
+   "theory_fewer": {
+    "n": 42,
+    "cut": {
+     "exp_sum": 11.0,
+     "act_sum": 37.0,
+     "ratio": 0.2973,
+     "ratio_ci": [
+      0.1041,
+      0.6
+     ],
+     "exp_mean": 0.2619,
+     "act_mean": 0.881
+    },
+    "life": {
+     "exp_sum": 33.0,
+     "act_sum": 22.0,
+     "ratio": 1.5,
+     "ratio_ci": [
+      1.1111,
+      2.1431
+     ],
+     "exp_mean": 0.7857,
+     "act_mean": 0.5238
+    },
+    "blk": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "kill": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "per_attack": {
+     "exp_cut": 0.2683,
+     "act_cut": 0.4302,
+     "exp_life": 0.8049,
+     "act_life": 0.2558,
+     "exp_blk": 0.0,
+     "act_blk": 0.0
+    },
+    "exp_counter_stops_mean": 0.1905,
+    "attacks_mean": {
+     "exp_hits": 0.9762,
+     "act_leader": 2.0476
+    }
+   },
+   "all": {
+    "n": 300,
+    "cut": {
+     "exp_sum": 99.0,
+     "act_sum": 216.0,
+     "ratio": 0.4583,
+     "ratio_ci": [
+      0.3509,
+      0.5972
+     ],
+     "exp_mean": 0.33,
+     "act_mean": 0.72
+    },
+    "life": {
+     "exp_sum": 239.0,
+     "act_sum": 150.0,
+     "ratio": 1.5933,
+     "ratio_ci": [
+      1.4099,
+      1.8196
+     ],
+     "exp_mean": 0.7967,
+     "act_mean": 0.5
+    },
+    "blk": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "kill": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "per_attack": {
+     "exp_cut": 0.2973,
+     "act_cut": 0.6409,
+     "exp_life": 0.7177,
+     "act_life": 0.4451,
+     "exp_blk": 0.0,
+     "act_blk": 0.0
+    },
+    "exp_counter_stops_mean": 0.3133,
+    "attacks_mean": {
+     "exp_hits": 1.11,
+     "act_leader": 1.1233
+    }
+   }
+  },
+  "4-6": {
+   "same": {
+    "n": 495,
+    "cut": {
+     "exp_sum": 302.22,
+     "act_sum": 392.0,
+     "ratio": 0.771,
+     "ratio_ci": [
+      0.6754,
+      0.8762
+     ],
+     "exp_mean": 0.6105,
+     "act_mean": 0.7919
+    },
+    "life": {
+     "exp_sum": 271.978,
+     "act_sum": 191.0,
+     "ratio": 1.424,
+     "ratio_ci": [
+      1.235,
+      1.6421
+     ],
+     "exp_mean": 0.5495,
+     "act_mean": 0.3859
+    },
+    "blk": {
+     "exp_sum": 14.0,
+     "act_sum": 79.0,
+     "ratio": 0.1772,
+     "ratio_ci": [
+      0.0909,
+      0.2667
+     ],
+     "exp_mean": 0.0283,
+     "act_mean": 0.1596
+    },
+    "kill": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "per_attack": {
+     "exp_cut": 0.5311,
+     "act_cut": 0.6889,
+     "exp_life": 0.478,
+     "act_life": 0.3357,
+     "exp_blk": 0.0246,
+     "act_blk": 0.1388
+    },
+    "exp_counter_stops_mean": 0.5718,
+    "attacks_mean": {
+     "exp_hits": 1.1495,
+     "act_leader": 1.1495
+    }
+   },
+   "same_with_attacks": {
+    "n": 473,
+    "cut": {
+     "exp_sum": 302.22,
+     "act_sum": 392.0,
+     "ratio": 0.771,
+     "ratio_ci": [
+      0.6841,
+      0.8775
+     ],
+     "exp_mean": 0.6389,
+     "act_mean": 0.8288
+    },
+    "life": {
+     "exp_sum": 271.978,
+     "act_sum": 191.0,
+     "ratio": 1.424,
+     "ratio_ci": [
+      1.2335,
+      1.6401
+     ],
+     "exp_mean": 0.575,
+     "act_mean": 0.4038
+    },
+    "blk": {
+     "exp_sum": 14.0,
+     "act_sum": 77.0,
+     "ratio": 0.1818,
+     "ratio_ci": [
+      0.0972,
+      0.2754
+     ],
+     "exp_mean": 0.0296,
+     "act_mean": 0.1628
+    },
+    "kill": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "per_attack": {
+     "exp_cut": 0.5311,
+     "act_cut": 0.6889,
+     "exp_life": 0.478,
+     "act_life": 0.3357,
+     "exp_blk": 0.0246,
+     "act_blk": 0.1353
+    },
+    "exp_counter_stops_mean": 0.5984,
+    "attacks_mean": {
+     "exp_hits": 1.203,
+     "act_leader": 1.203
+    }
+   },
+   "theory_more": {
+    "n": 129,
+    "cut": {
+     "exp_sum": 98.641,
+     "act_sum": 81.0,
+     "ratio": 1.2178,
+     "ratio_ci": [
+      0.9306,
+      1.6588
+     ],
+     "exp_mean": 0.7647,
+     "act_mean": 0.6279
+    },
+    "life": {
+     "exp_sum": 102.875,
+     "act_sum": 22.0,
+     "ratio": 4.6761,
+     "ratio_ci": [
+      3.4074,
+      7.0684
+     ],
+     "exp_mean": 0.7975,
+     "act_mean": 0.1705
+    },
+    "blk": {
+     "exp_sum": 1.0,
+     "act_sum": 15.0,
+     "ratio": 0.0667,
+     "ratio_ci": [
+      0.0,
+      0.2727
+     ],
+     "exp_mean": 0.0078,
+     "act_mean": 0.1163
+    },
+    "kill": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "per_attack": {
+     "exp_cut": 0.5033,
+     "act_cut": 1.3279,
+     "exp_life": 0.5249,
+     "act_life": 0.3607,
+     "exp_blk": 0.0051,
+     "act_blk": 0.2459
+    },
+    "exp_counter_stops_mean": 0.7141,
+    "attacks_mean": {
+     "exp_hits": 1.5194,
+     "act_leader": 0.4729
+    }
+   },
+   "theory_fewer": {
+    "n": 276,
+    "cut": {
+     "exp_sum": 112.801,
+     "act_sum": 219.0,
+     "ratio": 0.5151,
+     "ratio_ci": [
+      0.4281,
+      0.6238
+     ],
+     "exp_mean": 0.4087,
+     "act_mean": 0.7935
+    },
+    "life": {
+     "exp_sum": 104.199,
+     "act_sum": 133.0,
+     "ratio": 0.7835,
+     "ratio_ci": [
+      0.6368,
+      0.956
+     ],
+     "exp_mean": 0.3775,
+     "act_mean": 0.4819
+    },
+    "blk": {
+     "exp_sum": 7.0,
+     "act_sum": 66.0,
+     "ratio": 0.1061,
+     "ratio_ci": [
+      0.039,
+      0.1857
+     ],
+     "exp_mean": 0.0254,
+     "act_mean": 0.2391
+    },
+    "kill": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "per_attack": {
+     "exp_cut": 0.5151,
+     "act_cut": 0.3662,
+     "exp_life": 0.4758,
+     "act_life": 0.2224,
+     "exp_blk": 0.032,
+     "act_blk": 0.1104
+    },
+    "exp_counter_stops_mean": 0.3906,
+    "attacks_mean": {
+     "exp_hits": 0.7935,
+     "act_leader": 2.1667
+    }
+   },
+   "all": {
+    "n": 900,
+    "cut": {
+     "exp_sum": 513.662,
+     "act_sum": 692.0,
+     "ratio": 0.7423,
+     "ratio_ci": [
+      0.676,
+      0.8147
+     ],
+     "exp_mean": 0.5707,
+     "act_mean": 0.7689
+    },
+    "life": {
+     "exp_sum": 479.052,
+     "act_sum": 346.0,
+     "ratio": 1.3845,
+     "ratio_ci": [
+      1.2487,
+      1.5333
+     ],
+     "exp_mean": 0.5323,
+     "act_mean": 0.3844
+    },
+    "blk": {
+     "exp_sum": 22.0,
+     "act_sum": 160.0,
+     "ratio": 0.1375,
+     "ratio_ci": [
+      0.0857,
+      0.1936
+     ],
+     "exp_mean": 0.0244,
+     "act_mean": 0.1778
+    },
+    "kill": {
+     "exp_sum": 0.0,
+     "act_sum": 0.0,
+     "ratio": null,
+     "ratio_ci": null,
+     "exp_mean": 0.0,
+     "act_mean": 0.0
+    },
+    "per_attack": {
+     "exp_cut": 0.522,
+     "act_cut": 0.5635,
+     "exp_life": 0.4868,
+     "act_life": 0.2818,
+     "exp_blk": 0.0224,
+     "act_blk": 0.1303
+    },
+    "exp_counter_stops_mean": 0.5366,
+    "attacks_mean": {
+     "exp_hits": 1.0933,
+     "act_leader": 1.3644
+    }
+   }
+  },
+  "7+": {
+   "same": {
+    "n": 832,
+    "cut": {
+     "exp_sum": 636.043,
+     "act_sum": 1345.0,
+     "ratio": 0.4729,
+     "ratio_ci": [
+      0.4304,
+      0.5137
+     ],
+     "exp_mean": 0.7645,
+     "act_mean": 1.6166
+    },
+    "life": {
+     "exp_sum": 1324.548,
+     "act_sum": 1011.0,
+     "ratio": 1.3101,
+     "ratio_ci": [
+      1.2662,
+      1.3585
+     ],
+     "exp_mean": 1.592,
+     "act_mean": 1.2151
+    },
+    "blk": {
+     "exp_sum": 51.089,
+     "act_sum": 134.0,
+     "ratio": 0.3813,
+     "ratio_ci": [
+      0.3011,
+      0.4599
+     ],
+     "exp_mean": 0.0614,
+     "act_mean": 0.1611
+    },
+    "kill": {
+     "exp_sum": 138.269,
+     "act_sum": 109.0,
+     "ratio": 1.2685,
+     "ratio_ci": [
+      1.1301,
+      1.4331
+     ],
+     "exp_mean": 0.1662,
+     "act_mean": 0.131
+    },
+    "per_attack": {
+     "exp_cut": 0.3204,
+     "act_cut": 0.6567,
+     "exp_life": 0.6671,
+     "act_life": 0.4937,
+     "exp_blk": 0.0257,
+     "act_blk": 0.0654
+    },
+    "exp_counter_stops_mean": 0.5667,
+    "attacks_mean": {
+     "exp_hits": 2.4615,
+     "act_leader": 2.4615
+    }
+   },
+   "same_with_attacks": {
+    "n": 812,
+    "cut": {
+     "exp_sum": 636.043,
+     "act_sum": 1336.0,
+     "ratio": 0.4761,
+     "ratio_ci": [
+      0.434,
+      0.518
+     ],
+     "exp_mean": 0.7833,
+     "act_mean": 1.6453
+    },
+    "life": {
+     "exp_sum": 1324.548,
+     "act_sum": 1011.0,
+     "ratio": 1.3101,
+     "ratio_ci": [
+      1.2662,
+      1.3585
+     ],
+     "exp_mean": 1.6312,
+     "act_mean": 1.2451
+    },
+    "blk": {
+     "exp_sum": 51.089,
+     "act_sum": 134.0,
+     "ratio": 0.3813,
+     "ratio_ci": [
+      0.3011,
+      0.4599
+     ],
+     "exp_mean": 0.0629,
+     "act_mean": 0.165
+    },
+    "kill": {
+     "exp_sum": 138.269,
+     "act_sum": 109.0,
+     "ratio": 1.2685,
+     "ratio_ci": [
+      1.1301,
+      1.4331
+     ],
+     "exp_mean": 0.1703,
+     "act_mean": 0.1342
+    },
+    "per_attack": {
+     "exp_cut": 0.3204,
+     "act_cut": 0.6523,
+     "exp_life": 0.6671,
+     "act_life": 0.4937,
+     "exp_blk": 0.0257,
+     "act_blk": 0.0654
+    },
+    "exp_counter_stops_mean": 0.5807,
+    "attacks_mean": {
+     "exp_hits": 2.5222,
+     "act_leader": 2.5222
+    }
+   },
+   "theory_more": {
+    "n": 889,
+    "cut": {
+     "exp_sum": 698.518,
+     "act_sum": 1096.0,
+     "ratio": 0.6373,
+     "ratio_ci": [
+      0.5812,
+      0.6988
+     ],
+     "exp_mean": 0.7857,
+     "act_mean": 1.2328
+    },
+    "life": {
+     "exp_sum": 1558.798,
+     "act_sum": 655.0,
+     "ratio": 2.3798,
+     "ratio_ci": [
+      2.2249,
+      2.5447
+     ],
+     "exp_mean": 1.7534,
+     "act_mean": 0.7368
+    },
+    "blk": {
+     "exp_sum": 33.77,
+     "act_sum": 102.0,
+     "ratio": 0.3311,
+     "ratio_ci": [
+      0.2341,
+      0.431
+     ],
+     "exp_mean": 0.038,
+     "act_mean": 0.1147
+    },
+    "kill": {
+     "exp_sum": 217.673,
+     "act_sum": 166.0,
+     "ratio": 1.3113,
+     "ratio_ci": [
+      1.2276,
+      1.3992
+     ],
+     "exp_mean": 0.2449,
+     "act_mean": 0.1867
+    },
+    "per_attack": {
+     "exp_cut": 0.294,
+     "act_cut": 0.7595,
+     "exp_life": 0.6562,
+     "act_life": 0.4539,
+     "exp_blk": 0.0142,
+     "act_blk": 0.0707
+    },
+    "exp_counter_stops_mean": 0.6359,
+    "attacks_mean": {
+     "exp_hits": 3.081,
+     "act_leader": 1.6232
+    }
+   },
+   "theory_fewer": {
+    "n": 326,
+    "cut": {
+     "exp_sum": 200.837,
+     "act_sum": 530.0,
+     "ratio": 0.3789,
+     "ratio_ci": [
+      0.3245,
+      0.4377
+     ],
+     "exp_mean": 0.6161,
+     "act_mean": 1.6258
+    },
+    "life": {
+     "exp_sum": 389.43,
+     "act_sum": 328.0,
+     "ratio": 1.1873,
+     "ratio_ci": [
+      1.0915,
+      1.2921
+     ],
+     "exp_mean": 1.1946,
+     "act_mean": 1.0061
+    },
+    "blk": {
+     "exp_sum": 22.71,
+     "act_sum": 59.0,
+     "ratio": 0.3849,
+     "ratio_ci": [
+      0.2567,
+      0.5211
+     ],
+     "exp_mean": 0.0697,
+     "act_mean": 0.181
+    },
+    "kill": {
+     "exp_sum": 14.794,
+     "act_sum": 22.0,
+     "ratio": 0.6725,
+     "ratio_ci": [
+      0.4367,
+      0.9847
+     ],
+     "exp_mean": 0.0454,
+     "act_mean": 0.0675
+    },
+    "per_attack": {
+     "exp_cut": 0.3435,
+     "act_cut": 0.5136,
+     "exp_life": 0.666,
+     "act_life": 0.3178,
+     "exp_blk": 0.0388,
+     "act_blk": 0.0572
+    },
+    "exp_counter_stops_mean": 0.4841,
+    "attacks_mean": {
+     "exp_hits": 1.8221,
+     "act_leader": 3.1656
+    }
+   },
+   "all": {
+    "n": 2047,
+    "cut": {
+     "exp_sum": 1535.398,
+     "act_sum": 2971.0,
+     "ratio": 0.5168,
+     "ratio_ci": [
+      0.4856,
+      0.549
+     ],
+     "exp_mean": 0.7501,
+     "act_mean": 1.4514
+    },
+    "life": {
+     "exp_sum": 3272.777,
+     "act_sum": 1994.0,
+     "ratio": 1.6413,
+     "ratio_ci": [
+      1.5828,
+      1.7034
+     ],
+     "exp_mean": 1.5988,
+     "act_mean": 0.9741
+    },
+    "blk": {
+     "exp_sum": 107.569,
+     "act_sum": 295.0,
+     "ratio": 0.3646,
+     "ratio_ci": [
+      0.3118,
+      0.4213
+     ],
+     "exp_mean": 0.0525,
+     "act_mean": 0.1441
+    },
+    "kill": {
+     "exp_sum": 370.737,
+     "act_sum": 297.0,
+     "ratio": 1.2483,
+     "ratio_ci": [
+      1.1793,
+      1.3172
+     ],
+     "exp_mean": 0.1811,
+     "act_mean": 0.1451
+    },
+    "per_attack": {
+     "exp_cut": 0.3104,
+     "act_cut": 0.6569,
+     "exp_life": 0.6617,
+     "act_life": 0.4409,
+     "exp_blk": 0.0217,
+     "act_blk": 0.0652
+    },
+    "exp_counter_stops_mean": 0.5836,
+    "attacks_mean": {
+     "exp_hits": 2.6287,
+     "act_leader": 2.2096
+    }
+   }
+  }
+ }
+}
