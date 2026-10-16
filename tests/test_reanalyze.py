@@ -58,3 +58,21 @@ def test_reanalyze_copies_rows_and_replaces_only_visits_values(tmp_path):
             assert np.allclose(va, vb) if k in ("pol_n", "pol_q") else np.array_equal(va, vb), k
         n, q = b["pol_n"][ptr_b[j]:ptr_b[j + 1]], b["pol_q"][ptr_b[j]:ptr_b[j + 1]]
         assert abs(float(b["pol_v0"][j]) - float((n * q).sum() / n.sum())) < 1e-2
+
+    # r11b の差し込み（`--merge`）: 元の全行を写し、再分析した行だけ pol_n／pol_q／pol_v0 が再分析の値になる
+    mg = str(tmp_path / "mg")
+    _run([os.path.join("opcg_sim", "loop", "reanalyze.py"), "--in", rec, "--out", mg, "--merge", out], tmp_path)
+    c = np.load(os.path.join(mg, "n_record_00000.npz"))
+    assert set(c.files) == set(a.files)
+    got = {(int(s), int(t)) for s, t in zip(b["seed"], b["step"])}
+    for i in range(len(a["seed"])):
+        sl = slice(ptr_a[i], ptr_a[i + 1])
+        if (int(a["seed"][i]), int(a["step"][i])) not in got:
+            assert np.array_equal(a["pol_n"][sl], c["pol_n"][sl]) and a["pol_v0"][i] == c["pol_v0"][i]
+    for j in range(len(b["seed"])):
+        i = at[(int(b["seed"][j]), int(b["step"][j]))]
+        assert np.array_equal(c["pol_n"][ptr_a[i]:ptr_a[i + 1]], b["pol_n"][ptr_b[j]:ptr_b[j + 1]])
+        assert c["pol_v0"][i] == b["pol_v0"][j]
+    for k in a.files:
+        if k not in ("pol_n", "pol_q", "pol_v0"):
+            assert np.array_equal(a[k], c[k]), k
