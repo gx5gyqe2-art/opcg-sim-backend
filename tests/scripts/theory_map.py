@@ -3183,6 +3183,197 @@ def cmd_defend(a):
     return 0
 
 
+def cmd_defres(a):
+    """`2026-10-16_defend_residual.md` §1: 相手のリーダーへの攻撃 1 回ごとに、攻撃の行の守る側の動的計画の辿り（受ける／どこかで止める）×
+    記録の実際の守り（受けた／切った／ブロック）で群を作り、残差＝守る席の勝敗 − (1 − 攻撃の行の W0) を比べる。"""
+    from opcg_sim.learned.train import plan_labels as PL
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    gms = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    dump = load_dump(a.dump)
+    cnt = collections.Counter()
+    P, T = [], []
+    cols = ("sig", "who", "turn", "seed", "kind", "step", "pol_len", "pol_chosen")
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig", "pol_cid", "pol_tcid"),
+                                                    extra_fn=lambda dd, n: {"sc": np.asarray(dd["scalars"])[:n].astype(float)}):
+        seed = int(rows["seed"][idx[0]])
+        gm = gms.get(seed)
+        dj = dump.get(seed)
+        if gm is None or dj is None:
+            cnt["game_missing"] += 1
+            continue
+        winner = gm.get("winner")
+        if winner not in ("p1", "p2"):
+            cnt["game_no_winner"] += 1
+            continue
+        lead = gm["leaders"]
+        u2c = PL.uuid_map(pol, L, ptr, idx)
+        cand = []
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+                continue
+            k = int(L[i]); ch = int(rows["pol_chosen"][i])
+            if k < 1:
+                continue
+            s0 = json.loads(pol["pol_sig"][ptr[i]])
+            if s0[0] == "RESOLVE_EFFECT_SELECTION":
+                continue
+            if k < 2 or ch < 0 or ch >= k:
+                continue
+            cand.append((i, w, t, [family_of(json.loads(pol["pol_sig"][j])) for j in range(ptr[i], ptr[i] + k)]))
+        drows = dj["rows"]
+        if len(drows) != len(cand):
+            cnt["game_len_mismatch"] += 1
+            continue
+        by_i = {}
+        for (i, w, t, fams), dr in zip(cand, drows):
+            if int(dr[0]) != t or int(dr[1]) != w or fams != [c[0] for c in dr[8]]:
+                cnt["row_mismatch"] += 1
+                continue
+            by_i[i] = dr
+        idx_l = list(idx)
+        turn_pts = collections.defaultdict(list)
+        first = {}
+        for q, i in enumerate(idx_l):
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+                continue
+            if i in by_i and (w, t) not in first:
+                first[(w, t)] = by_i[i]
+            sj = json.loads(rows["sig"][i])
+            if not (sj[0] == "ATTACK" or (sj[0] == "DON_BOX" and sj[2])) or not sj[2]:
+                continue
+            if u2c.get(sj[2][0]) != lead[1 - w]:
+                continue
+            cnt["leader_attacks"] += 1
+            dr = by_i.get(i)
+            pt = dr[9] if dr is not None and len(dr) > 9 else None
+            if not pt or len(pt[0]) < 6 or pt[0][5] is None:
+                cnt["skip_no_row_or_trace"] += 1
+                continue
+            base = pt[0]
+            tr = base[5]
+            # 戦闘の窓: 攻める席の次のメインの行の前まで
+            blk = cut = 0
+            nxt = None
+            for q2 in range(q + 1, len(idx_l)):
+                j = idx_l[q2]
+                wj = int(rows["who"][j])
+                if wj == w and int(rows["kind"][j]) == 0 and int(rows["turn"][j]) == t:
+                    nxt = j
+                    break
+                if int(rows["turn"][j]) != t:
+                    nxt = j
+                    break
+                if wj != w:
+                    s2 = json.loads(rows["sig"][j])[0]
+                    blk += int(s2 == "SELECT_BLOCKER")
+                    cut += int(s2 == "SELECT_COUNTER")
+            l0 = float(ex["sc"][i][1])
+            if nxt is not None:
+                l1 = float(ex["sc"][nxt][1] if int(rows["who"][nxt]) == w else ex["sc"][nxt][0])
+                lost = l1 < l0 - 0.5
+                died = False
+            else:
+                died = winner == ("p1" if w == 0 else "p2")
+                lost = died
+            act = "block" if blk else "cut" if cut else "take"
+            sub = (("stopped" if not lost else "took") if act != "block" else ("took" if lost else "stopped"))
+            th = "take" if (tr[1] <= 0 and tr[2] <= 0 and tr[3] <= 0) else ("stop_cut" if tr[1] > 0 else "stop_blk")
+            wd = 1.0 - float(base[2])
+            z = 1.0 if winner == ("p1" if w == 1 else "p2") else 0.0
+            x = {"seed": seed, "t": t, "band": turn_band(t), "deck_def": lead[1 - w], "life": l0, "W": wd, "z": z, "r": z - wd,
+                 "dclock": float(base[0]) - float(base[1]), "th": th, "act": act, "sub": sub, "n_cut": cut, "died": died}
+            P.append(x)
+            turn_pts[(w, t)].append(x)
+            cnt["points"] += 1
+        for (w, t), xs in turn_pts.items():
+            fb = first.get((w, t))
+            if fb is None or len(fb) <= 9 or not fb[9] or fb[9][0][5] is None:
+                cnt["turn_skip_no_first"] += 1
+                continue
+            tr = fb[9][0][5]
+            wd = 1.0 - float(fb[9][0][2])
+            z = xs[0]["z"]
+            T.append({"seed": seed, "t": t, "band": turn_band(t), "life": xs[0]["life"], "W": wd, "z": z, "r": z - wd,
+                      "dclock": float(fb[9][0][0]) - float(fb[9][0][1]),
+                      "th": "take" if (tr[1] <= 0 and tr[2] <= 0 and tr[3] <= 0) else ("stop_cut" if tr[1] > 0 else "stop_blk"),
+                      "act": "block" if any(y["act"] == "block" for y in xs) else "cut" if any(y["act"] == "cut" for y in xs) else "take"})
+            cnt["turns"] += 1
+
+    def mean_ci(xs):
+        if not xs:
+            return {"n": 0}
+        units = collections.defaultdict(list)
+        for x in xs:
+            units[x["seed"]].append(x["r"])
+        r = np.array([x["r"] for x in xs])
+        return {"n": len(xs), "games": len(units), "resid": round(float(r.mean()), 4),
+                "resid_ci": boot_games(units, lambda us: float(np.mean(us))),
+                "W_mean": round(float(np.mean([x["W"] for x in xs])), 4), "win_rate": round(float(np.mean([x["z"] for x in xs])), 4)}
+
+    def diff(xa, xb):
+        """xa の平均残差 − xb の平均残差（局ごとの復元抽出）。"""
+        if not xa or not xb:
+            return None
+        units = collections.defaultdict(list)
+        for x in xa:
+            units[x["seed"]].append((0, x["r"]))
+        for x in xb:
+            units[x["seed"]].append((1, x["r"]))
+
+        def fn(us):
+            ra = [u[1] for u in us if u[0] == 0]
+            rb = [u[1] for u in us if u[0] == 1]
+            return float(np.mean(ra) - np.mean(rb)) if ra and rb else None
+        d = float(np.mean([x["r"] for x in xa]) - np.mean([x["r"] for x in xb]))
+        return {"diff": round(d, 4), "ci": boot_games(units, fn), "n": [len(xa), len(xb)]}
+
+    def groups(xs):
+        o = {}
+        for th in ("take", "stop_cut", "stop_blk"):
+            for ac in ("take", "cut", "block"):
+                o[th + "|" + ac] = mean_ci([x for x in xs if x["th"] == th and x["act"] == ac])
+        o["main_diff_cut_minus_take"] = diff([x for x in xs if x["th"] == "take" and x["act"] == "cut"],
+                                             [x for x in xs if x["th"] == "take" and x["act"] == "take"])
+        o["block_minus_take"] = diff([x for x in xs if x["th"] == "take" and x["act"] == "block"],
+                                     [x for x in xs if x["th"] == "take" and x["act"] == "take"])
+        o["all"] = mean_ci(xs)
+        return o
+
+    def lbin(x):
+        lf = int(round(x["life"]))
+        return "0" if lf <= 0 else "1" if lf == 1 else "2" if lf == 2 else "3+"
+
+    def cbin(x):
+        d = x["dclock"]
+        return "<-1" if d < -1 else ">1" if d > 1 else "-1..1"
+
+    def wbin(x):
+        return "close" if 0.3 <= x["W"] <= 0.7 else "other"
+
+    def cut_sub(xs):
+        o = {}
+        for th in ("take",):
+            for ac in ("take", "cut", "block"):
+                for sb in ("took", "stopped"):
+                    o[th + "|" + ac + "|" + sb] = mean_ci([x for x in xs if x["th"] == th and x["act"] == ac and x["sub"] == sb])
+        return o
+
+    def strat(xs, key):
+        return {k: groups([x for x in xs if key(x) == k]) for k in sorted({key(x) for x in xs})}
+    out = {"record": a.src, "dump": a.dump, "count": dict(cnt), "points": groups(P), "points_sub": cut_sub(P),
+           "points_by_band": strat(P, lambda x: x["band"]), "points_by_life": strat(P, lbin),
+           "points_by_clock": strat(P, cbin), "points_by_W": strat(P, wbin),
+           "points_by_life_W": {lb: strat([x for x in P if lbin(x) == lb], wbin) for lb in ("1", "2", "3+")},
+           "points_no_lethal": groups([x for x in P if x["life"] > 0.5]),
+           "turns": groups(T), "turns_by_W": strat(T, wbin), "turns_by_life": strat(T, lbin)}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps(out["count"]))
+    return 0
+
+
 def cmd_foreseeall(a):
     """`2026-10-15_foresee_all.md` §1: 記録で打った手（全型）ごとに、値段が見込む後続の W と、打った後の実際の盤面（同じ席の次のメインの行・
     ターンを終える手は次の自分のターンの最初のメインの行・局が終われば 1／0）を同じ理論で読んだ W を比べる。差 D＝(見込み − 実際)/κ0。"""
@@ -3746,7 +3937,7 @@ def cmd_followcheck(a):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "foresee", "foreseeall", "tempo", "oppturn", "defend", "followplan", "followturn", "followcheck", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "foresee", "foreseeall", "tempo", "oppturn", "defend", "defres", "followplan", "followturn", "followcheck", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -3891,6 +4082,10 @@ def main(argv=None):
     dfd.add_argument("--in", dest="src", required=True)
     dfd.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1 OPCG_DEF_TRACE_DUMP=1` で取った写し（守る側の比べ方を明示）")
     dfd.add_argument("--out", required=True)
+    dfr = sub.add_parser("defres")
+    dfr.add_argument("--in", dest="src", required=True)
+    dfr.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1 OPCG_DEF_TRACE_DUMP=1` で取った写し（守る側の比べ方を明示）")
+    dfr.add_argument("--out", required=True)
     fp = sub.add_parser("followplan")
     fp.add_argument("--in", dest="src", required=True)
     fp.add_argument("--dump", required=True, help="既定の表で `OPCG_CLOCK_PARTS_DUMP=1`（攻め手の計画つき・2e915f46 以降）で取った写し")
@@ -3905,7 +4100,7 @@ def main(argv=None):
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
             "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter,
-            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "foresee": cmd_foresee, "foreseeall": cmd_foreseeall, "tempo": cmd_tempo, "oppturn": cmd_oppturn, "defend": cmd_defend, "followplan": cmd_followplan, "followturn": cmd_followturn, "followcheck": cmd_followcheck}[a.cmd](a)
+            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "foresee": cmd_foresee, "foreseeall": cmd_foreseeall, "tempo": cmd_tempo, "oppturn": cmd_oppturn, "defend": cmd_defend, "defres": cmd_defres, "followplan": cmd_followplan, "followturn": cmd_followturn, "followcheck": cmd_followcheck}[a.cmd](a)
 
 
 if __name__ == "__main__":
