@@ -3762,6 +3762,106 @@ def cmd_pricedist(a):
     return 0
 
 
+def cmd_resolution(a):
+    """`2026-10-16_resolution.md` §1: 深い探索の束（`playdeep`）の点ごとに、深い探索の最善と 2 番目の q の差と、理論の 2 つの読み
+    （今の値段の写し・橋の読みの写し）の最善と 2 番目の値段の差・探索の 2 手を理論で読んだ差を、勝率と μ（今の読みの κ0）の単位で並べる。"""
+    from theory_rs import MU
+    stub = {"cap": 99.0, "rows_out": [], "turn_harm": [], "settled": []}
+    arms = {}
+    for nm, path in (("base", a.dump), ("bridge", a.bridge_dump)):
+        rows_all, *_r = build_rows(a.src, load_dump(path), stub)
+        arms[nm] = {(r["seed"], r["step"]): r for r in rows_all}
+    cnt = collections.Counter()
+    P = []
+    for line in open(a.deep, encoding="utf-8"):
+        g = json.loads(line)
+        for p in g["points"]:
+            cnt["points"] += 1
+            if p.get("unmapped") or p.get("gi_played") is None or p.get("gi_deep") is None:
+                cnt["unmapped"] += 1
+                continue
+            rs = {nm: arms[nm].get((g["seed"], p["step"])) for nm in arms}
+            if any(r is None or r["nsc"] < 2 or len(r["cands"]) != p["groups"] for r in rs.values()):
+                cnt["no_theory_row_either"] += 1
+                continue
+            nq = p["deep_nq"]
+            gd = p["gi_deep"]
+            vis = [k for k, (n, _q) in enumerate(nq) if n >= 1 and k != gd]
+            if not vis:
+                cnt["no_second"] += 1
+                continue
+            d2 = max(vis, key=lambda k: nq[k][1])
+            nmax = max(n for n, _q in nq)
+            vis10 = [k for k in vis if nq[k][0] >= 0.1 * nmax]
+            d2b = max(vis10, key=lambda k: nq[k][1]) if vis10 else None
+            k0 = float(rs["base"]["kap"])
+            if k0 <= 0:
+                cnt["k0_nonpos"] += 1
+                continue
+            unit = k0 * MU
+            x = {"seed": g["seed"], "band": p["band"], "deck": p["deck"], "fam": rs["base"]["cands"][gd][0],
+                 "deep": (nq[gd][1] - nq[d2][1]), "deep10": (nq[gd][1] - nq[d2b][1]) if d2b is not None else None, "unit": unit}
+            for nm, r in rs.items():
+                pr = [c[1] for c in r["cands"]]
+                kap = float(r["kap"])
+                srt = sorted((v for v in pr if v is not None), reverse=True)
+                x[nm + "_gap"] = (srt[0] - srt[1]) * kap if len(srt) >= 2 else None
+                x[nm + "_pair"] = (pr[gd] - pr[d2]) * kap if pr[gd] is not None and pr[d2] is not None else None
+            P.append(x)
+            cnt["used"] += 1
+
+    def q(v, pct):
+        return round(float(np.percentile(v, pct)), 5)
+
+    def dist(v, unit):
+        v = np.asarray(v, float)
+        if not v.size:
+            return {"n": 0}
+        mu_v = v / np.asarray(unit, float)
+        return {"n": int(v.size), "median": q(v, 50), "q25": q(v, 25), "q75": q(v, 75), "mean": round(float(v.mean()), 5),
+                "median_mu": q(mu_v, 50), "q25_mu": q(mu_v, 25), "q75_mu": q(mu_v, 75), "mean_mu": round(float(mu_v.mean()), 4)}
+
+    def summ(xs):
+        if not xs:
+            return {"n": 0}
+        o = {"n": len(xs)}
+        U = [x["unit"] for x in xs]
+        o["deep_signed"] = dist([x["deep"] for x in xs], U)
+        o["deep_abs"] = dist([abs(x["deep"]) for x in xs], U)
+        ys = [x for x in xs if x["deep10"] is not None]
+        o["deep10_abs"] = dist([abs(x["deep10"]) for x in ys], [x["unit"] for x in ys])
+        o["deep_neg_share"] = round(float(np.mean([x["deep"] < 0 for x in xs])), 4)
+        for nm in ("base", "bridge"):
+            ys = [x for x in xs if x[nm + "_gap"] is not None]
+            o[nm + "_gap"] = dist([x[nm + "_gap"] for x in ys], [x["unit"] for x in ys])
+            o[nm + "_tie_share"] = round(float(np.mean([x[nm + "_gap"] <= 1e-12 for x in ys])), 4) if ys else None
+            ys = [x for x in xs if x[nm + "_pair"] is not None]
+            o[nm + "_pair"] = dist([x[nm + "_pair"] for x in ys], [x["unit"] for x in ys])
+            o[nm + "_pair_missing"] = len(xs) - len(ys)
+        o["thresholds"] = {}
+        for th in (0.25, 0.5, 1.0):
+            sel = [x for x in xs if abs(x["deep"]) > th * x["unit"]]
+            e = {"share": round(len(sel) / len(xs), 4), "n": len(sel)}
+            for nm in ("base", "bridge"):
+                ys = [x for x in sel if x[nm + "_pair"] is not None]
+                if ys:
+                    same = [np.sign(x[nm + "_pair"]) == np.sign(x["deep"]) and abs(x[nm + "_pair"]) > 1e-12 for x in ys]
+                    tie = [abs(x[nm + "_pair"]) <= 1e-12 for x in ys]
+                    e[nm] = {"n": len(ys), "same_sign": round(float(np.mean(same)), 4), "tie": round(float(np.mean(tie)), 4)}
+            o["thresholds"][str(th)] = e
+        ties = [x for x in xs if x["bridge_gap"] is not None and x["bridge_gap"] <= 1e-12]
+        o["bridge_tie_points_deep_abs"] = dist([abs(x["deep"]) for x in ties], [x["unit"] for x in ties])
+        return o
+    out = {"record": a.src, "dump": a.dump, "bridge_dump": a.bridge_dump, "deep": a.deep, "mu": MU, "count": dict(cnt),
+           "all": summ(P), "by_band": {b: summ([x for x in P if x["band"] == b]) for b in TURN_BANDS},
+           "by_fam": {f: summ([x for x in P if x["fam"] == f]) for f in sorted({x["fam"] for x in P})},
+           "by_deck": {d: summ([x for x in P if x["deck"] == d]) for d in sorted({x["deck"] for x in P})}}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps(out["count"]))
+    return 0
+
+
 def cmd_foreseeall(a):
     """`2026-10-15_foresee_all.md` §1: 記録で打った手（全型）ごとに、値段が見込む後続の W と、打った後の実際の盤面（同じ席の次のメインの行・
     ターンを終える手は次の自分のターンの最初のメインの行・局が終われば 1／0）を同じ理論で読んだ W を比べる。差 D＝(見込み − 実際)/κ0。"""
@@ -4325,7 +4425,7 @@ def cmd_followcheck(a):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "foresee", "foreseeall", "tempo", "oppturn", "defend", "defres", "temporesid", "steep", "pricedist", "followplan", "followturn", "followcheck", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "foresee", "foreseeall", "tempo", "oppturn", "defend", "defres", "temporesid", "steep", "pricedist", "resolution", "followplan", "followturn", "followcheck", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -4486,6 +4586,12 @@ def main(argv=None):
     pdi = sub.add_parser("pricedist")
     pdi.add_argument("--dump", required=True, help="`theory_bridge.py` の `OPCG_PRICE_DUMP` の写し")
     pdi.add_argument("--out", required=True)
+    rsn = sub.add_parser("resolution")
+    rsn.add_argument("--in", dest="src", required=True)
+    rsn.add_argument("--dump", required=True, help="今の値段の読みの写し")
+    rsn.add_argument("--bridge-dump", required=True, help="`OPCG_CLOCK_VALUE_READ=bridge` の写し")
+    rsn.add_argument("--deep", required=True, help="`playdeep` の jsonl（束の番号つき）")
+    rsn.add_argument("--out", required=True)
     fp = sub.add_parser("followplan")
     fp.add_argument("--in", dest="src", required=True)
     fp.add_argument("--dump", required=True, help="既定の表で `OPCG_CLOCK_PARTS_DUMP=1`（攻め手の計画つき・2e915f46 以降）で取った写し")
@@ -4500,7 +4606,7 @@ def main(argv=None):
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
             "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter,
-            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "foresee": cmd_foresee, "foreseeall": cmd_foreseeall, "tempo": cmd_tempo, "oppturn": cmd_oppturn, "defend": cmd_defend, "defres": cmd_defres, "temporesid": cmd_temporesid, "steep": cmd_steep, "pricedist": cmd_pricedist, "followplan": cmd_followplan, "followturn": cmd_followturn, "followcheck": cmd_followcheck}[a.cmd](a)
+            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "foresee": cmd_foresee, "foreseeall": cmd_foreseeall, "tempo": cmd_tempo, "oppturn": cmd_oppturn, "defend": cmd_defend, "defres": cmd_defres, "temporesid": cmd_temporesid, "steep": cmd_steep, "pricedist": cmd_pricedist, "resolution": cmd_resolution, "followplan": cmd_followplan, "followturn": cmd_followturn, "followcheck": cmd_followcheck}[a.cmd](a)
 
 
 if __name__ == "__main__":
