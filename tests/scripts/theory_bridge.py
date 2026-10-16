@@ -251,6 +251,18 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_
     succ_index = clock_succ_index(dirs, os.environ.get("OPCG_CLOCK_VALUE"), clock_order)
     clock_on = succ_index is not None
     succ_literal = bool(os.environ.get("OPCG_CLOCK_VALUE_LITERAL"))     # 診断: 文字どおりの読み（§1.3）
+    # 切替 `OPCG_CLOCK_VALUE_READ=bridge`（`docs/reports/2026-10-16_price_bridge_read.md` §1.2・既定は切）: 手の値段の 2 本の時計を
+    # 交点の橋の読みで読む。橋と同じ局の文脈（`crossing_bridge.collect` と同じ `refill`／席のデッキ／切らせた札のデッキ）と、
+    # 理論の τ の相対の幅（`sigma_rel_for(…, slope="theory")`・測る記録と別のセット）を局ごとに `in.bridge` で渡す。
+    bridge_read = (os.environ.get("OPCG_CLOCK_VALUE_READ") or "").strip() == "bridge"
+    if bridge_read:
+        br_refill = DR.shares_by_seed(dirs)
+        br_decks = DR.decks_by_seed(dirs)
+        br_sigma = CB.sigma_rel_for(dirs, harm_profile, slope="theory")
+        if br_sigma is None:
+            raise ValueError("OPCG_CLOCK_VALUE_READ=bridge: 理論の τ の相対の幅が引けない（%s）" % harm_profile)
+        stats["clock_read"] = "bridge"
+        stats["bridge_sigma_rel"] = float(br_sigma)
     dump_path = os.environ.get("OPCG_PRICE_DUMP")            # 行ごとの値段の写し（jsonl・逸脱の分布と禁止率の器が読む）
     dump_f = open(dump_path, "w", encoding="utf-8") if dump_path else None
     stats["move_price"] = "clock" if clock_on else "static"
@@ -284,6 +296,13 @@ def collect(dirs, limit_games=0, theta=THETA, mu=MU, theta_mode="const", margin_
                 stats["clock_games"] += 1
                 pin["succ"] = succ
                 pin["succ_literal"] = succ_literal
+        if bridge_read and clock_on:
+            sh = br_refill.get(seed)
+            dp = br_decks.get(seed) or (None, None)
+            pin["bridge"] = {"in": {"refill": None if sh is None else [float(x) for x in sh], "has_seat_decks": bool(br_decks),
+                                    "decks": [None if d is None else list(d) for d in dp],
+                                    "cut_decks": [None if d is None else list(d) for d in dp]},
+                             "sigma_rel": float(br_sigma)}
         if dump_f is not None:
             pin["dump_rows"] = True
         res = TR.game_call("theory_bridge", game, {"cfg": c, "in": pin, "stats": stats, "carry": {}})
