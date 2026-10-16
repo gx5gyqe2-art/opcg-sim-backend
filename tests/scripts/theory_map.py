@@ -3491,6 +3491,229 @@ def cmd_temporesid(a):
     return 0
 
 
+def cmd_steep(a):
+    """`2026-10-16_steep_reading.md` §1: 読みの較正の曲線を行の集合別（S1 ターンの始まり・S2 自席メインの全行・S4 交点の橋の行）に出し、
+    ずれを時計の側（(ア) 理論の決着までの長さ ÷ 実際・勝った席の時計の残差・D の実際の下限）と換算の側（(イ) D の区間の勝率・
+    Φ(a·Φ⁻¹(W0)) の a）に割る。"""
+    import theory_rs as TR
+    from crossing_bridge import RACE_CAP as CAP
+    from opcg_sim.learned.train import plan_labels as PL
+    from statistics import NormalDist
+    ND = NormalDist()
+    meta = json.load(open(os.path.join(a.src, "meta_games.json"), encoding="utf-8"))
+    gms = {int(g["seed"]): dict(g, leaders=seat_leaders(meta, g)) for g in meta["games"]}
+    dump = load_dump(a.dump)
+    cnt = collections.Counter()
+    P = []
+    cols = ("who", "turn", "seed", "kind", "step", "pol_len", "pol_chosen")
+    for rows, pol, ex, L, ptr, idx in PL.iter_games([a.src], row_cols=cols, pol_cols=("pol_sig",)):
+        seed = int(rows["seed"][idx[0]])
+        gm = gms.get(seed)
+        dj = dump.get(seed)
+        if gm is None or dj is None:
+            cnt["game_missing"] += 1
+            continue
+        winner = gm.get("winner")
+        if winner not in ("p1", "p2"):
+            cnt["game_no_winner"] += 1
+            continue
+        lead = gm["leaders"]
+        t_end = max(int(rows["turn"][i]) for i in idx)
+        cand = []
+        for i in idx:
+            w = int(rows["who"][i]); t = int(rows["turn"][i])
+            if t < 1 or not PL.is_own_turn(w, t) or int(rows["kind"][i]) != 0:
+                continue
+            k = int(L[i]); ch = int(rows["pol_chosen"][i])
+            if k < 1:
+                continue
+            if json.loads(pol["pol_sig"][ptr[i]])[0] == "RESOLVE_EFFECT_SELECTION":
+                continue
+            if k < 2 or ch < 0 or ch >= k:
+                continue
+            cand.append((i, w, t, [family_of(json.loads(pol["pol_sig"][j])) for j in range(ptr[i], ptr[i] + k)]))
+        drows = dj["rows"]
+        if len(drows) != len(cand):
+            cnt["game_len_mismatch"] += 1
+            continue
+        seen = set()
+        for (i, w, t, fams), dr in zip(cand, drows):
+            if int(dr[0]) != t or int(dr[1]) != w or fams != [c[0] for c in dr[8]]:
+                cnt["row_mismatch"] += 1
+                continue
+            if len(dr) <= 9 or not dr[9]:
+                cnt["no_parts"] += 1
+                continue
+            base = dr[9][0]
+            first = (w, t) not in seen
+            seen.add((w, t))
+            won = winner == ("p1" if w == 0 else "p2")
+            P.append(dict(point(seed, t, w, float(base[0]), float(base[1]), float(base[2]), won, t_end, CAP),
+                          deck=lead[w], first=first))
+            cnt["S2"] += 1
+            cnt["S1"] += int(first)
+    S4 = []
+    if a.clocks:
+        cj = json.load(open(a.clocks, encoding="utf-8"))
+        for r in cj["rows_out"]:
+            gm = gms.get(int(r["seed"]))
+            if gm is None:
+                continue
+            x = point(int(r["seed"]), int(r["t"]), int(r["who"]), float(r["tau_me_theory"]), float(r["tau_opp_theory"]),
+                      float(r["W"]), bool(r["won"]), None, CAP, t_me_act=int(r["t_me_act"]), t_opp_act=int(r["t_opp_act"]))
+            x["deck"] = gm["leaders"][int(r["who"])]
+            S4.append(x)
+        cnt["S4"] = len(S4)
+    # 不変量: 行ごとの換算の幅 ÷ 尺度 s(τ_me, τ_opp) が一定（相対の幅）か
+    inv = None
+    ok = [x for x in P if 0.02 < x["W"] < 0.98 and abs(x["D"]) > 0.05]
+    if ok:
+        sc = TR.clock_scale([(x["tm"], x["to"]) for x in ok])
+        rat = np.array([x["D"] / ND.inv_cdf(x["W"]) / s_ for x, s_ in zip(ok, sc) if s_ > 0])
+        inv = {"n": int(rat.size), "sigma_rel_median": round(float(np.median(rat)), 5),
+               "p05_p95": [round(float(np.percentile(rat, 5)), 5), round(float(np.percentile(rat, 95)), 5)]}
+    out = {"record": a.src, "dump": a.dump, "clocks": a.clocks, "cap": CAP, "count": dict(cnt), "invariant_width_over_scale": inv}
+    sets = {"S1": [x for x in P if x["first"]], "S2": P, "S4": S4}
+    for nm, xs in sets.items():
+        if not xs:
+            continue
+        o = {"all": steep_summ(xs)}
+        o["by_band"] = {b: steep_summ([x for x in xs if turn_band(x["t"]) == b]) for b in TURN_BANDS}
+        o["by_deck"] = {d: steep_summ([x for x in xs if x["deck"] == d]) for d in sorted({x["deck"] for x in xs})}
+        out[nm] = o
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps(out["count"]))
+    return 0
+
+
+def point(seed, t, w, tm, to, W, won, t_end, cap, t_me_act=None, t_opp_act=None):
+    """`steep`: 1 点。整数の時計は今のターンを 1 と数える（交点の橋の `t_me_act` と同じ）。"""
+    tm_c, to_c = min(tm, cap), min(to, cap)
+    if t_end is not None:
+        n_me = (t_end - t) // 2 + 1                         # 手番の席が打てる自席ターン（今のターンを含む）
+        n_opp = (t_end - t - 1) // 2 + 1 if t_end > t else 0
+        if won:
+            t_me_act, t_opp_act, cens = n_me, n_opp + 1, "opp"
+        else:
+            t_me_act, t_opp_act, cens = n_me + 1, n_opp, "me"
+    else:
+        cens = "opp" if won else "me"
+    k_me, k_opp = max(1, math.ceil(tm_c)), max(1, math.ceil(to_c))
+    # 理論の決着までの長さ（ターン・今のターンを 1）: 手番の席は今のターンから・相手は次のターンから 2 ターンおき
+    l_th = min(2 * (k_me - 1) + 1, 2 * (k_opp - 1) + 2)
+    l_act = (2 * (t_me_act - 1) + 1) if won else (2 * (t_opp_act - 1) + 2)
+    fav_me = tm_c < to_c or (tm_c == to_c)                 # 手番の席が先に届く（同じなら手番の席）
+    win_clock = (k_me - t_me_act) if won else (k_opp - t_opp_act)
+    return {"seed": seed, "t": t, "w": w, "tm": tm_c, "to": to_c, "D": to_c - tm_c, "W": W, "z": 1.0 if won else 0.0,
+            "l_th": l_th, "l_act": l_act, "win_clock": win_clock, "fav_won": fav_me == bool(won),
+            "D_act_bound": float(t_opp_act - t_me_act), "cens": cens}
+
+
+def _ncdf(x):
+    """Φ（Abramowitz–Stegun 7.1.26・誤差 1.5e-7）。"""
+    x = np.asarray(x, float)
+    z = np.abs(x) / math.sqrt(2.0)
+    t = 1.0 / (1.0 + 0.3275911 * z)
+    y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * np.exp(-z * z)
+    return 0.5 * (1.0 + np.sign(x) * y)
+
+
+def _fit_a(q, z):
+    """Φ(a·q) の最尤の a（黄金分割・[0.02, 3]）。"""
+    def nll(a_):
+        p = np.clip(_ncdf(a_ * q), 1e-9, 1 - 1e-9)
+        return -float(np.sum(z * np.log(p) + (1 - z) * np.log(1 - p)))
+    lo, hi = 0.02, 3.0
+    g = (math.sqrt(5) - 1) / 2
+    c, d = hi - g * (hi - lo), lo + g * (hi - lo)
+    fc, fd = nll(c), nll(d)
+    for _ in range(40):
+        if fc < fd:
+            hi, d, fd = d, c, fc
+            c = hi - g * (hi - lo)
+            fc = nll(c)
+        else:
+            lo, c, fc = c, d, fd
+            d = lo + g * (hi - lo)
+            fd = nll(d)
+    return (lo + hi) / 2
+
+
+STEEP_WBINS = ((0.0, 0.2, "<0.2"), (0.2, 0.4, "0.2-0.4"), (0.4, 0.6, "0.4-0.6"), (0.6, 0.8, "0.6-0.8"), (0.8, 1.01, ">=0.8"))
+STEEP_DBINS = ((-1e9, -3.0, "<-3"), (-3.0, -1.0, "-3..-1"), (-1.0, 1.0, "-1..1"), (1.0, 3.0, "1..3"), (3.0, 1e9, ">3"))
+STEEP_ABINS = ((0.0, 1.0, "<1"), (1.0, 3.0, "1..3"), (3.0, 1e9, ">=3"))
+
+
+def steep_summ(xs, reps=1000):
+    """`steep` の集計 1 つ（局ごとの復元抽出は numpy の添字で）。"""
+    from statistics import NormalDist
+    if not xs:
+        return {"n": 0}
+    ND = NormalDist()
+    W = np.array([x["W"] for x in xs]); z = np.array([x["z"] for x in xs]); D = np.array([x["D"] for x in xs])
+    q = np.array([ND.inv_cdf(min(max(w, 1e-6), 1 - 1e-6)) for w in W])
+    lth = np.array([x["l_th"] for x in xs], float); lact = np.array([x["l_act"] for x in xs], float)
+    seeds = np.array([x["seed"] for x in xs])
+    keys, inv_ = np.unique(seeds, return_inverse=True)
+    groups = [np.nonzero(inv_ == k)[0] for k in range(len(keys))]
+    rng = np.random.default_rng(SEED)
+    boots = [np.concatenate([groups[j] for j in rng.integers(0, len(groups), len(groups))]) for _ in range(reps)]
+
+    def ci(fn):
+        v = [fn(ix) for ix in boots]
+        v = [x for x in v if x is not None and not math.isnan(x)]
+        return [round(float(np.percentile(v, 2.5)), 4), round(float(np.percentile(v, 97.5)), 4)] if v else None
+
+    def slope(ix):
+        w_, z_ = W[ix], z[ix]
+        vw = w_.var()
+        return float(((w_ - w_.mean()) * (z_ - z_.mean())).mean() / vw) if vw > 0 else None
+
+    def width(ix):
+        w_, z_ = W[ix], z[ix]
+        tot = 0.0
+        for lo, hi, _nm in STEEP_WBINS:
+            m = (w_ >= lo) & (w_ < hi)
+            if m.any():
+                tot += m.sum() * abs(z_[m].mean() - w_[m].mean())
+        return tot / len(ix)
+    o = {"n": len(xs), "games": len(keys), "W_mean": round(float(W.mean()), 4), "win_rate": round(float(z.mean()), 4),
+         "slope_b": round(slope(np.arange(len(xs))), 4), "slope_b_ci": ci(slope),
+         "width": round(width(np.arange(len(xs))), 4), "width_ci": ci(width),
+         "conv_a": round(_fit_a(q, z), 4), "conv_a_ci": ci(lambda ix: _fit_a(q[ix], z[ix])),
+         "by_W": {}, "by_D": {}, "clock_by_absD": {}}
+    for lo, hi, nm in STEEP_WBINS:
+        m = (W >= lo) & (W < hi)
+        if m.any():
+            o["by_W"][nm] = {"n": int(m.sum()), "W": round(float(W[m].mean()), 4), "win": round(float(z[m].mean()), 4),
+                             "resid": round(float(z[m].mean() - W[m].mean()), 4)}
+    for lo, hi, nm in STEEP_DBINS:
+        m = (D >= lo) & (D < hi)
+        if m.any():
+            o["by_D"][nm] = {"n": int(m.sum()), "D": round(float(D[m].mean()), 3), "W": round(float(W[m].mean()), 4),
+                             "win": round(float(z[m].mean()), 4),
+                             "D_act_bound": round(float(np.mean([x["D_act_bound"] for x, mm in zip(xs, m) if mm])), 3)}
+    aD = np.abs(D)
+    fav = np.array([x["fav_won"] for x in xs]); wc = np.array([x["win_clock"] for x in xs], float)
+    for lo, hi, nm in STEEP_ABINS + ((0.0, 1e9, "all"),):
+        m = (aD >= lo) & (aD < hi)
+        if not m.any():
+            continue
+        bm = [ix[m[ix]] for ix in boots]
+        o["clock_by_absD"][nm] = {
+            "n": int(m.sum()), "absD": round(float(aD[m].mean()), 3),
+            "len_theory": round(float(lth[m].mean()), 3), "len_actual": round(float(lact[m].mean()), 3),
+            "ratio": round(float(lth[m].mean() / lact[m].mean()), 4),
+            "ratio_ci": (lambda v: [round(float(np.percentile(v, 2.5)), 4), round(float(np.percentile(v, 97.5)), 4)])(
+                [lth[b].mean() / lact[b].mean() for b in bm if b.size]),
+            "fav_won_share": round(float(fav[m].mean()), 4),
+            "win_clock_resid_fav_won": round(float(wc[m & fav].mean()), 3) if (m & fav).any() else None,
+            "win_clock_resid_unfav_won": round(float(wc[m & ~fav].mean()), 3) if (m & ~fav).any() else None,
+            "n_unfav_won": int((m & ~fav).sum())}
+    return o
+
+
 def cmd_foreseeall(a):
     """`2026-10-15_foresee_all.md` §1: 記録で打った手（全型）ごとに、値段が見込む後続の W と、打った後の実際の盤面（同じ席の次のメインの行・
     ターンを終える手は次の自分のターンの最初のメインの行・局が終われば 1／0）を同じ理論で読んだ W を比べる。差 D＝(見込み − 実際)/κ0。"""
@@ -4054,7 +4277,7 @@ def cmd_followcheck(a):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "foresee", "foreseeall", "tempo", "oppturn", "defend", "defres", "temporesid", "followplan", "followturn", "followcheck", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "foresee", "foreseeall", "tempo", "oppturn", "defend", "defres", "temporesid", "steep", "followplan", "followturn", "followcheck", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -4207,6 +4430,11 @@ def main(argv=None):
     tr_.add_argument("--in", dest="src", required=True)
     tr_.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1 OPCG_TEMPO_DUMP=1` で取った写し（守る側の比べ方を明示）")
     tr_.add_argument("--out", required=True)
+    stp = sub.add_parser("steep")
+    stp.add_argument("--in", dest="src", required=True)
+    stp.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1` で取った写し（守る側の比べ方を明示）")
+    stp.add_argument("--clocks", default="", help="S4: `theory_map.py clocks` の json（同じ守る側の比べ方）")
+    stp.add_argument("--out", required=True)
     fp = sub.add_parser("followplan")
     fp.add_argument("--in", dest="src", required=True)
     fp.add_argument("--dump", required=True, help="既定の表で `OPCG_CLOCK_PARTS_DUMP=1`（攻め手の計画つき・2e915f46 以降）で取った写し")
@@ -4221,7 +4449,7 @@ def main(argv=None):
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
             "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter,
-            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "foresee": cmd_foresee, "foreseeall": cmd_foreseeall, "tempo": cmd_tempo, "oppturn": cmd_oppturn, "defend": cmd_defend, "defres": cmd_defres, "temporesid": cmd_temporesid, "followplan": cmd_followplan, "followturn": cmd_followturn, "followcheck": cmd_followcheck}[a.cmd](a)
+            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "foresee": cmd_foresee, "foreseeall": cmd_foreseeall, "tempo": cmd_tempo, "oppturn": cmd_oppturn, "defend": cmd_defend, "defres": cmd_defres, "temporesid": cmd_temporesid, "steep": cmd_steep, "followplan": cmd_followplan, "followturn": cmd_followturn, "followcheck": cmd_followcheck}[a.cmd](a)
 
 
 if __name__ == "__main__":
