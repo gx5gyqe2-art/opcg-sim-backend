@@ -3733,6 +3733,35 @@ def steep_summ(xs, reps=1000):
     return o
 
 
+def cmd_pricedist(a):
+    """`2026-10-16_price_bridge_read.md` §1.3 (iv): 値段の写しの候補の値段の分布（型別の |p| の中央値・μ 超の割合）と、型別の理論の最善の割合・
+    最善の同値（上位 2 つの差が 1e-9 以下）の行の割合。写しの行は [t, w, 打った, 最善, κ, 打った型, 最善の型, 値段の数, 候補ごとの [型, 値段]]。"""
+    from theory_rs import MU
+    dump = load_dump(a.dump)
+    vals = collections.defaultdict(list)
+    best = collections.Counter()
+    rows = ties = 0
+    for dj in dump.values():
+        for dr in dj["rows"]:
+            ps = [(c[0], c[1]) for c in dr[8] if c[1] is not None]
+            if len(ps) < 2:
+                continue
+            rows += 1
+            for fam, v in ps:
+                vals[fam].append(abs(float(v)) / MU)
+            srt = sorted((v for _f, v in ps), reverse=True)
+            ties += int(srt[0] - srt[1] <= 1e-9)
+            best[dr[6]] += 1
+    out = {"dump": a.dump, "rows": rows, "tie_share": round(ties / rows, 4) if rows else None,
+           "by_fam": {f: {"n": len(v), "abs_median_mu": round(float(np.median(v)), 4), "gt_mu": round(float(np.mean(np.array(v) > 1.0)), 4),
+                          "zero_share": round(float(np.mean(np.array(v) <= 1e-12)), 4), "best_share": round(best[f] / rows, 4) if rows else None}
+                      for f, v in sorted(vals.items())}}
+    with open(a.out, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=1)
+    print(json.dumps({"rows": rows}))
+    return 0
+
+
 def cmd_foreseeall(a):
     """`2026-10-15_foresee_all.md` §1: 記録で打った手（全型）ごとに、値段が見込む後続の W と、打った後の実際の盤面（同じ席の次のメインの行・
     ターンを終える手は次の自分のターンの最初のメインの行・局が終われば 1／0）を同じ理論で読んだ W を比べる。差 D＝(見込み − 実際)/κ0。"""
@@ -4296,7 +4325,7 @@ def cmd_followcheck(a):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "foresee", "foreseeall", "tempo", "oppturn", "defend", "defres", "temporesid", "steep", "followplan", "followturn", "followcheck", "-h", "--help"):
+    if not argv or argv[0] not in ("clocks", "analyze", "run", "turns", "deckcal", "paircal", "clockside", "guardside", "defturns", "parts", "reread", "speed", "namipower", "reach", "counter", "playdeep", "playgap", "playsplit", "theorydeep", "theoryties", "theorytype", "ownparts", "enelplan", "foresee", "foreseeall", "tempo", "oppturn", "defend", "defres", "temporesid", "steep", "pricedist", "followplan", "followturn", "followcheck", "-h", "--help"):
         argv = ["run"] + argv                     # 入口の既定: `--in <記録> --out <json>`
     ap = argparse.ArgumentParser(description="理論の目で記録を読む（1 回きり）")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -4454,6 +4483,9 @@ def main(argv=None):
     stp.add_argument("--dump", required=True, help="`OPCG_CLOCK_PARTS_DUMP=1` で取った写し（守る側の比べ方を明示）")
     stp.add_argument("--clocks", default="", help="S4: `theory_map.py clocks` の json（同じ守る側の比べ方）")
     stp.add_argument("--out", required=True)
+    pdi = sub.add_parser("pricedist")
+    pdi.add_argument("--dump", required=True, help="`theory_bridge.py` の `OPCG_PRICE_DUMP` の写し")
+    pdi.add_argument("--out", required=True)
     fp = sub.add_parser("followplan")
     fp.add_argument("--in", dest="src", required=True)
     fp.add_argument("--dump", required=True, help="既定の表で `OPCG_CLOCK_PARTS_DUMP=1`（攻め手の計画つき・2e915f46 以降）で取った写し")
@@ -4468,7 +4500,7 @@ def main(argv=None):
     return {"clocks": cmd_clocks, "analyze": cmd_analyze, "run": cmd_run, "turns": cmd_turns, "deckcal": cmd_deckcal,
             "paircal": cmd_paircal, "clockside": cmd_clockside, "guardside": cmd_guardside,
             "defturns": cmd_defturns, "parts": cmd_parts, "reread": cmd_reread, "speed": cmd_speed, "namipower": cmd_namipower, "reach": cmd_reach, "counter": cmd_counter,
-            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "foresee": cmd_foresee, "foreseeall": cmd_foreseeall, "tempo": cmd_tempo, "oppturn": cmd_oppturn, "defend": cmd_defend, "defres": cmd_defres, "temporesid": cmd_temporesid, "steep": cmd_steep, "followplan": cmd_followplan, "followturn": cmd_followturn, "followcheck": cmd_followcheck}[a.cmd](a)
+            "playdeep": cmd_playdeep, "playgap": cmd_playgap, "playsplit": cmd_playsplit, "theorydeep": cmd_theorydeep, "theoryties": cmd_theoryties, "theorytype": cmd_theorytype, "ownparts": cmd_ownparts, "enelplan": cmd_enelplan, "foresee": cmd_foresee, "foreseeall": cmd_foreseeall, "tempo": cmd_tempo, "oppturn": cmd_oppturn, "defend": cmd_defend, "defres": cmd_defres, "temporesid": cmd_temporesid, "steep": cmd_steep, "pricedist": cmd_pricedist, "followplan": cmd_followplan, "followturn": cmd_followturn, "followcheck": cmd_followcheck}[a.cmd](a)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,42 @@
+{
+ "dump": "/home/user/tm/pg/pbdump_all.jsonl",
+ "rows": 17838,
+ "tie_share": 0.408,
+ "by_fam": {
+  "attach": {
+   "n": 46700,
+   "abs_median_mu": 0.0421,
+   "gt_mu": 0.1995,
+   "zero_share": 0.4106,
+   "best_share": 0.1403
+  },
+  "attack": {
+   "n": 108386,
+   "abs_median_mu": 0.4145,
+   "gt_mu": 0.3242,
+   "zero_share": 0.2219,
+   "best_share": 0.48
+  },
+  "effect": {
+   "n": 6072,
+   "abs_median_mu": 0.0,
+   "gt_mu": 0.112,
+   "zero_share": 0.6001,
+   "best_share": 0.0986
+  },
+  "end": {
+   "n": 17838,
+   "abs_median_mu": 1.2743,
+   "gt_mu": 0.5433,
+   "zero_share": 0.2236,
+   "best_share": 0.0767
+  },
+  "play": {
+   "n": 33306,
+   "abs_median_mu": 0.237,
+   "gt_mu": 0.2492,
+   "zero_share": 0.27,
+   "best_share": 0.2045
+  }
+ }
+}
