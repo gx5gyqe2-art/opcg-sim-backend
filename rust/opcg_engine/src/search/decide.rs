@@ -22,7 +22,10 @@ use crate::model::{CardIdx, GameState, MasterTable, Seat};
 use crate::state::EngineError;
 use serde_json::{json, Map, Value};
 
-use super::mcts::{TreeMcts, C_PUCT, SERVE_SIMS};
+use super::mcts::{
+    principal_variation_of, q_min_n_floor, select_index, Node, PvStep, RunOut, SelectRule, TreeMcts,
+    C_PUCT, Q_MIN_FRAC, SERVE_SIMS,
+};
 use super::quiesce::{
     best_branch, in_battle, in_dialog, resolve_battle_inplace, resolved_branch_values, BoxBudget,
     Ctx, SearchState, Window, BOX_RESOLVE_DEPTH, QUIESCE_MAX_PLIES,
@@ -53,10 +56,35 @@ pub struct DecideOptions {
     pub residual_dig: bool,
     /// `residual_activate`（腕 A2・"low"／"high"）
     pub residual_activate: Option<String>,
+    /// 根で出す手の選び方（§20.5・既定＝訪問数最多＝今までの挙動）
+    pub select_rule: SelectRule,
+    /// `select_rule="q_min_n"` の訪問下限の割合（§20.5・既定 `Q_MIN_FRAC`＝sims/8）
+    pub q_min_frac: f64,
+    /// 根の事前分布の平坦化 `P^(1/t)`（§20.5・既定 1.0＝何もしない）
+    pub root_prior_temp: f64,
+    /// 1 回の decide で引く世界サンプルの本数（§20.7.1・既定 1＝今までどおり 1 本）。
+    ///
+    /// 2 以上なら K 本の世界で同じ sims の木を並列に回し、根の統計を束ねる
+    /// （N は和・Q は N 重みの平均・P は世界 0 のもの）。[`DecideOptions::search_seed`] が
+    /// 無いと世界 1 以降の乱数を作れないので 1 に落ちる（[`DecideOptions::effective_worlds`]）。
+    pub worlds: usize,
+    /// 探索乱数の seed（`Game.decide` の `search_seed`）。世界 i の乱数は `seed + i`（§20.7.1）。
+    pub search_seed: Option<u64>,
     /// 候補生成（`OPCGGame`）
     pub search: SearchOptions,
     /// `BOX_BRANCH_BUDGET`（`None`＝無制限）
     pub budget: Option<i64>,
+}
+
+impl DecideOptions {
+    /// 実際に回す世界の本数（§20.7.1）。`search_seed` が無ければ世界 1 以降の乱数を作れない
+    /// ＝1 本に落ちる（記録した出目で回すオラクル経路がこれに当たる）。
+    pub fn effective_worlds(&self) -> usize {
+        if self.search_seed.is_none() {
+            return 1;
+        }
+        self.worlds.max(1)
+    }
 }
 
 impl Default for DecideOptions {
@@ -72,6 +100,11 @@ impl Default for DecideOptions {
             quiesce: true,
             residual_dig: false,
             residual_activate: None,
+            select_rule: SelectRule::Visits,
+            q_min_frac: Q_MIN_FRAC,
+            root_prior_temp: 1.0,
+            worlds: 1,
+            search_seed: None,
             search: SearchOptions::default(),
             budget: Some(super::quiesce::BOX_BRANCH_BUDGET),
         }
@@ -140,9 +173,36 @@ pub struct DecideOut {
     pub p: Option<Vec<f64>>,
     /// 等価手マージ後の候補（`record["groups"]` と同じ集計）
     pub groups: Vec<Group>,
+    /// 選択規則の束ね（§20.7.8 の 4・準備箱の枝を card_id で 1 グループに）。箱が無ければ空。
+    pub select_groups: Vec<SelectGroup>,
     pub carry: DecideCarry,
     pub budget_used: i64,
     pub budget_exhausted: u64,
+    /// PV（主変化・§20.4）: kind=main のときだけ木から辿る（window／commit は空）。
+    pub pv: Vec<PvStep>,
+    /// 回した世界の本数（§20.7.1・1＝今までどおりの単一世界）。
+    pub worlds: usize,
+    /// 世界ごとの根の統計（`worlds>1` のときだけ・並びは世界 0 の `legal`）。
+    pub per_world: Vec<WorldStats>,
+    /// PV とコミットの継続を採った世界（`worlds>1` のときだけ・§20.7.1）。
+    pub world_used: Option<usize>,
+}
+
+/// 1 つの世界の根の統計（§20.7.1・思考ログで「世界によって答えが割れたか」を読む）。
+#[derive(Debug, Clone)]
+pub struct WorldStats {
+    /// その世界の乱数 seed（`search_seed + i`）
+    pub seed: u64,
+    /// 根の訪問数（**世界 0 の `legal` の並び**へ写したもの）
+    pub n: Vec<f64>,
+    /// 根の行動価値（同じ並び）
+    pub q: Vec<f64>,
+    /// その世界だけで選ぶならどの手か（`select_rule` を適用・世界 0 の `legal` の添字）
+    pub best: Option<usize>,
+    /// 世界 0 の `legal` に対応づけられなかった手の数（0＝並びが一致）
+    pub unmapped: usize,
+    /// 根の事前分布 P が世界 0 と違ったか（ネットの出力は世界に依らないはず＝通常 false）
+    pub p_differs: bool,
 }
 
 /// `_merge_root_stats` の 1 グループ。
@@ -151,6 +211,24 @@ pub struct Group {
     pub rep: usize,
     pub idxs: Vec<usize>,
     pub n: f64,
+    pub q: f64,
+}
+
+/// 選択規則の束ね（§20.7.8 の 4）の 1 グループ。
+///
+/// 等価手マージ（[`merge_root_stats`]）の**上に重ねる**: 同じ card_id の `SETUP_BOX` の枝
+/// （素の準備の手が候補に残っていればそれも）を 1 グループにし、それ以外は 1 手 1 グループ。
+#[derive(Debug, Clone)]
+pub struct SelectGroup {
+    /// 束ねの鍵（`["setup", card_id]`／`["move", 等価グループの添字]`）
+    pub key: Value,
+    /// 束ねた等価グループ（[`merge_root_stats`] の並びの添字）
+    pub idxs: Vec<usize>,
+    /// 束ねた訪問数の和
+    pub n: f64,
+    /// 代表の手（`legal` の添字）＝グループ内で N が最大の枝
+    pub rep: usize,
+    /// 代表の Q
     pub q: f64,
 }
 
@@ -435,8 +513,80 @@ pub fn merge_root_stats(
     out
 }
 
+/// 準備の手の action_type（素の手として候補に残りうるもの）。
+const SETUP_ACTIONS: [&str; 2] = ["PLAY", "ACTIVATE_MAIN"];
+
+/// 手の主体の card_id ラベル（`move_equiv_key` の 2 欄目と同じ引き方）。
+fn move_card_label(state: &GameState, masters: &MasterTable, mv: &Move) -> Value {
+    let null = Value::Null;
+    let p = mv.get("payload").unwrap_or(&null);
+    let uuid = p
+        .get("uuid")
+        .and_then(Value::as_str)
+        .or_else(|| mv.get("card_uuid").and_then(Value::as_str));
+    card_label(state, masters, uuid)
+}
+
+/// 選択規則の束ね（§20.7.8 の 4）。**箱が 1 つも無ければ空**を返す（＝既定は無影響）。
+///
+/// 同じ card_id の `SETUP_BOX` の枝（素の準備の手が候補に残っていればそれも）を 1 グループに
+/// 束ね、それ以外は 1 手 1 グループ（等価手マージの結果をそのまま 1 グループにする）。
+/// グループの N は和・代表は N 最大の枝・Q はその代表の Q。
+pub fn select_groups(
+    state: &GameState,
+    masters: &MasterTable,
+    legal: &[Move],
+    groups: &[Group],
+) -> Vec<SelectGroup> {
+    let is_box = |mv: &Move| mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX");
+    let mut boxed: Vec<Value> = Vec::new();
+    for mv in legal.iter().filter(|m| is_box(m)) {
+        let card = move_card_label(state, masters, mv);
+        if !card.is_null() && !boxed.contains(&card) {
+            boxed.push(card);
+        }
+    }
+    if boxed.is_empty() {
+        return Vec::new();
+    }
+    let mut out: Vec<SelectGroup> = Vec::new();
+    // グループごとの「今の代表の N」（代表は N 最大の枝・同点は先に出た方）。
+    let mut rep_n: Vec<f64> = Vec::new();
+    for (gi, g) in groups.iter().enumerate() {
+        let mv = &legal[g.rep];
+        let at = mv.get("action_type").and_then(Value::as_str).unwrap_or("");
+        let card = move_card_label(state, masters, mv);
+        let key = if (is_box(mv) || SETUP_ACTIONS.contains(&at)) && boxed.contains(&card) {
+            json!(["setup", card])
+        } else {
+            json!(["move", gi]) // 1 手 1 グループ（既存の等価手マージのまま）
+        };
+        match out.iter().position(|s| s.key == key) {
+            Some(k) => {
+                out[k].idxs.push(gi);
+                out[k].n += g.n;
+                if g.n > rep_n[k] {
+                    rep_n[k] = g.n;
+                    out[k].rep = g.rep;
+                    out[k].q = g.q;
+                }
+            }
+            None => {
+                out.push(SelectGroup { key, idxs: vec![gi], n: g.n, rep: g.rep, q: g.q });
+                rep_n.push(g.n);
+            }
+        }
+    }
+    out
+}
+
 /// Python `cpu_ai.don_box_first_primitive`（DON_BOX → 先頭原始手）。
+///
+/// 準備箱（`SETUP_BOX`・§20.7.2）も同じ規約で先頭原始手（素の PLAY／ACTIVATE_MAIN）へ落とす。
 pub fn don_box_first_primitive(mv: &Move) -> Move {
+    if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
+        return super::r#macro::setup_box_first_primitive(mv);
+    }
     if mv.get("action_type").and_then(Value::as_str) != Some("DON_BOX") {
         return mv.clone();
     }
@@ -673,6 +823,9 @@ fn commit_window_continuation(
 }
 
 /// Python `_commit_play_dialog`（PLAY / ACTIVATE_MAIN の後続対話をコミットする）。
+///
+/// 世界サンプルをここで引く（単一世界の経路）。複数世界（§20.7.1）は木を回した世界を
+/// 使い回す＝[`commit_play_dialog_in_world`] を直に呼ぶ（乱数はもう引かない）。
 fn commit_play_dialog(
     ctx: &Ctx,
     real: &GameState,
@@ -682,12 +835,23 @@ fn commit_play_dialog(
     st: &mut SearchState,
 ) -> Result<Vec<Step>, EngineError> {
     let world = super::determinize::determinize_with(real, name, rng)?;
-    let mut s = Session::new(world);
+    Ok(commit_play_dialog_in_world(ctx, &world, name, mv, st))
+}
+
+/// [`commit_play_dialog`] の「世界を外から渡す」版（§20.7.1 の `worlds>1` が使う）。
+fn commit_play_dialog_in_world(
+    ctx: &Ctx,
+    world: &GameState,
+    name: Seat,
+    mv: &Move,
+    st: &mut SearchState,
+) -> Vec<Step> {
+    let mut s = Session::new(world.clone());
     if apply::apply_move_inplace(&mut s, ctx.masters, name, mv, true).is_err() {
-        return Ok(Vec::new());
+        return Vec::new();
     }
     if !in_dialog(&mut s) || in_battle(&s) {
-        return Ok(Vec::new()); // 対話が無ければコミット無し
+        return Vec::new(); // 対話が無ければコミット無し
     }
     let mut trace: Vec<(Seat, Move)> = Vec::new();
     let ok = resolve_battle_inplace(
@@ -701,9 +865,28 @@ fn commit_play_dialog(
         Some(&mut trace),
     );
     if ok.is_err() {
-        return Ok(Vec::new());
+        return Vec::new();
     }
-    Ok(trace_to_steps(&trace, name))
+    trace_to_steps(&trace, name)
+}
+
+/// 準備箱（`SETUP_BOX`・§20.7.2）の「素の手より後」の手順をコミットへ積む。
+///
+/// `commit_play_dialog` と同じ流儀（世界サンプルの上で継続を打ち直し、自分の手だけ手順化）。
+fn commit_setup_box(
+    ctx: &Ctx,
+    real: &GameState,
+    name: Seat,
+    mv: &Move,
+    rng: &mut dyn SearchRng,
+) -> Result<Vec<Step>, EngineError> {
+    let world = super::determinize::determinize_with(real, name, rng)?;
+    let mut s = Session::new(world);
+    match super::r#macro::setup_box_continuation(&mut s, ctx.masters, name, mv) {
+        Ok(trace) => Ok(trace_to_steps(&trace, name)),
+        Err(e @ EngineError::Unimplemented(_)) => Err(e),
+        Err(_) => Ok(Vec::new()), // コミット生成の失敗は手を止めない（Python の `except: pass`）
+    }
 }
 
 // --- 残ドン掘り／残り起動（腕 A・A2）------------------------------------------------
@@ -907,6 +1090,199 @@ fn residual_attach_move(
                    "payload": Value::Object(obj)})))
 }
 
+// --- 複数世界（§20.7.1・WP `rs-pimc-worlds`）----------------------------------------
+
+/// 1 つの世界の探索結果。木（ノード列）と根の世界サンプルを持ち帰るのは、PV と
+/// コミットの継続を「選んだ手の訪問が最も多い世界」から採るため（§20.7.1）。
+struct WorldRun {
+    /// この世界の乱数 seed（`search_seed + i`）
+    seed: u64,
+    run: RunOut,
+    nodes: Vec<Node>,
+    /// 根の世界サンプル（コミットの継続をこの盤面で作る）
+    world: GameState,
+}
+
+/// 1 本の木を回す（つまみは全世界で同じ）。
+fn run_one_world(
+    ctx: &Ctx,
+    opts: &DecideOptions,
+    world: GameState,
+    rng: &mut dyn SearchRng,
+    st: &mut SearchState,
+) -> Result<(RunOut, Vec<Node>), EngineError> {
+    let mut tree = TreeMcts::new(ctx, opts.c_puct, opts.sims, opts.dirichlet_eps);
+    tree.select_rule = opts.select_rule;
+    tree.q_min_frac = opts.q_min_frac;
+    tree.root_prior_temp = opts.root_prior_temp;
+    let run = tree.run_in_world(world, rng, st)?;
+    Ok((run, tree.into_nodes()))
+}
+
+/// K 本の世界を引いて木を回す（§20.7.1）。
+///
+/// - 世界 0 は**呼び出し側の `rng`** で引き、**このスレッド**で回す＝`K=1` なら今までの
+///   `TreeMcts::run` と 1 bit も変わらない（出目の消費順も同じ）。
+/// - 世界 `i>=1` は `Pcg32SearchRng::new(search_seed + i)` を各スレッドで作る＝同じ seed なら
+///   何度回しても同じ（スレッドの終わる順に依らない）。枝予算も世界ごとに独立に張る
+///   （1 本の木から見た予算は `K=1` のときと同じ）。
+fn run_worlds(
+    ctx: &Ctx,
+    state: &GameState,
+    name: Seat,
+    opts: &DecideOptions,
+    rng: &mut dyn SearchRng,
+    st: &mut SearchState,
+) -> Result<Vec<WorldRun>, EngineError> {
+    let k = opts.effective_worlds();
+    let seed0 = opts.search_seed.unwrap_or(0);
+    let world0 = super::determinize::determinize_with(state, name, rng)?;
+    if k <= 1 {
+        let (run, nodes) = run_one_world(ctx, opts, world0.clone(), rng, st)?;
+        return Ok(vec![WorldRun { seed: seed0, run, nodes, world: world0 }]);
+    }
+    let mut runs: Vec<WorldRun> = Vec::with_capacity(k);
+    let mut extra_used = 0i64;
+    let mut extra_exhausted = 0u64;
+    std::thread::scope(|scope| -> Result<(), EngineError> {
+        let handles: Vec<_> = (1..k)
+            .map(|i| {
+                let seed = seed0.wrapping_add(i as u64);
+                scope.spawn(move || -> Result<(WorldRun, i64, u64), EngineError> {
+                    // 準備箱（§20.7.2）の状態は **thread_local**（`macro::SETUP`）＝新しい
+                    // スレッドでは既定（無効）で始まる。世界 0（このスレッド）と同じ候補列挙に
+                    // するため、世界ごとに張り直す（張らないと世界 1 以降だけ箱が出ず、根の
+                    // `legal` が世界 0 と食い違って `unmapped` に落ちる）。枝の計測は世界 0 の
+                    // ぶんだけが `boxes` に出る（他世界の計測はスレッドと共に捨てる）。
+                    super::r#macro::reset_setup_state(
+                        opts.search.setup_box,
+                        opts.search.select_branch_on(),
+                    );
+                    let mut r = super::rng::Pcg32SearchRng::new(seed);
+                    let mut wst = SearchState {
+                        budget: BoxBudget::new(opts.budget),
+                    };
+                    let world = super::determinize::determinize_with(state, name, &mut r)?;
+                    let (run, nodes) =
+                        run_one_world(ctx, opts, world.clone(), &mut r, &mut wst)?;
+                    Ok((
+                        WorldRun { seed, run, nodes, world },
+                        wst.budget.used,
+                        wst.budget.exhausted,
+                    ))
+                })
+            })
+            .collect();
+        // 世界 0 はこのスレッドで回す（スレッドは K-1 本＝K 本が同時に走る）。
+        let (run, nodes) = run_one_world(ctx, opts, world0.clone(), rng, st)?;
+        runs.push(WorldRun { seed: seed0, run, nodes, world: world0 });
+        for h in handles {
+            let (wr, used, exhausted) = h.join().map_err(|_| {
+                EngineError::BadPayload("decide: 世界の探索スレッドが panic した".into())
+            })??;
+            extra_used += used;
+            extra_exhausted += exhausted;
+            runs.push(wr);
+        }
+        Ok(())
+    })?;
+    // 予算の実績だけ足す（`left` は世界 0 のものを残す＝この後のコミット生成の見え方を変えない）。
+    st.budget.used += extra_used;
+    st.budget.exhausted += extra_exhausted;
+    Ok(runs)
+}
+
+/// 根の統計を束ねる（§20.7.1）。
+///
+/// N は和・Q は N 重みの平均（`W = Q*N` を足して和 N で割る）・P と `legal` の並びは世界 0。
+/// 世界の `legal` は同じ盤面の同じ列挙なので普通は完全に一致するが、一致しない場合に備えて
+/// [`move_sig`] で突き合わせる（対応が付かない手は捨て、[`WorldStats::unmapped`] に数える）。
+///
+/// 戻り値の 3 つ目は「世界 0 の添字 → その世界の添字」（PV の 1 手目を引くのに使う）。
+#[allow(clippy::type_complexity)]
+fn merge_worlds(
+    runs: &[WorldRun],
+    opts: &DecideOptions,
+) -> (RunOut, Vec<WorldStats>, Vec<Vec<Option<usize>>>) {
+    if runs.len() == 1 {
+        // 単一世界は**そのまま**返す（束ねの算術を通さない＝1 bit も変わらない）。
+        return (runs[0].run.clone(), Vec::new(), Vec::new());
+    }
+    let legal = runs[0].run.legal.clone();
+    let m = legal.len();
+    let sigs: Vec<Value> = legal.iter().map(move_sig).collect();
+    let mut n = vec![0.0f64; m];
+    let mut w = vec![0.0f64; m];
+    let mut per_world = Vec::with_capacity(runs.len());
+    let mut back: Vec<Vec<Option<usize>>> = Vec::with_capacity(runs.len());
+    let floor = q_min_n_floor(opts.sims, opts.q_min_frac);
+    for (wi, r) in runs.iter().enumerate() {
+        // その世界の添字 → 世界 0 の添字
+        // 世界 0、または並びが世界 0 と完全に一致する世界は恒等写像（普通はこちら）。
+        let same_order = wi == 0
+            || (r.run.legal.len() == m
+                && r.run.legal.iter().zip(&sigs).all(|(mv, s)| move_sig(mv) == *s));
+        let to_root: Vec<Option<usize>> = if same_order {
+            (0..r.run.legal.len()).map(Some).collect()
+        } else {
+            r.run
+                .legal
+                .iter()
+                .map(|mv| {
+                    let sg = move_sig(mv);
+                    sigs.iter().position(|s| *s == sg)
+                })
+                .collect()
+        };
+        let mut wn = vec![0.0f64; m];
+        let mut wq = vec![0.0f64; m];
+        let mut bk: Vec<Option<usize>> = vec![None; m];
+        let mut unmapped = 0usize;
+        for (j, tgt) in to_root.iter().enumerate() {
+            let Some(i) = *tgt else {
+                unmapped += 1;
+                continue;
+            };
+            let (nj, qj) = (r.run.n[j], r.run.q[j]);
+            n[i] += nj;
+            w[i] += qj * nj;
+            wn[i] = nj;
+            wq[i] = qj;
+            bk[i] = Some(j);
+        }
+        let best = if r.run.legal.is_empty() {
+            None
+        } else {
+            let bj = select_index(&r.run.n, &r.run.q, opts.select_rule, floor);
+            to_root.get(bj).copied().flatten()
+        };
+        per_world.push(WorldStats {
+            seed: r.seed,
+            n: wn,
+            q: wq,
+            best,
+            unmapped,
+            p_differs: r.run.p != runs[0].run.p,
+        });
+        back.push(bk);
+    }
+    let q: Vec<f64> = n.iter().zip(&w).map(|(n, w)| w / n.max(1.0)).collect();
+    // 束ねた統計の「訪問下限」は実効 sims（K×sims）で測る＝1 世界のときと同じ割合になる。
+    let best = if legal.is_empty() {
+        None
+    } else {
+        let bi = select_index(
+            &n,
+            &q,
+            opts.select_rule,
+            q_min_n_floor(opts.sims * runs.len(), opts.q_min_frac),
+        );
+        Some(legal[bi].clone())
+    };
+    let p = runs[0].run.p.clone();
+    (RunOut { best, legal, n, q, p }, per_world, back)
+}
+
 // --- decide 本体 ------------------------------------------------------------------
 
 /// Python `LearnedEngine.decide`／`_decide_inner`。
@@ -950,9 +1326,14 @@ fn empty_out(kind: &'static str, mv: Option<Move>, carry: DecideCarry, st: &Sear
         q: Vec::new(),
         p: None,
         groups: Vec::new(),
+        select_groups: Vec::new(),
         carry,
         budget_used: st.budget.used,
         budget_exhausted: st.budget.exhausted,
+        pv: Vec::new(),
+        worlds: 1,
+        per_world: Vec::new(),
+        world_used: None,
     }
 }
 
@@ -1018,37 +1399,97 @@ fn decide_inner(
                 q: pick.q,
                 p: None,
                 groups: Vec::new(),
+                select_groups: Vec::new(),
                 carry,
                 budget_used: st.budget.used,
                 budget_exhausted: st.budget.exhausted,
+                pv: Vec::new(),
+                worlds: 1,
+                per_world: Vec::new(),
+                world_used: None,
             });
         }
     }
 
-    // ④ 木
-    let mut tree = TreeMcts::new(ctx, opts.c_puct, opts.sims, opts.dirichlet_eps);
-    let run = tree.run(state, name, rng, st)?;
+    // ④ 木（§20.7.1: 世界を K 本引いて根で束ねる。K=1＝今までどおりの 1 本）
+    let runs = run_worlds(ctx, state, name, opts, rng, st)?;
+    let (run, per_world, back) = merge_worlds(&runs, opts);
+    let worlds = runs.len();
+    // 束ねた統計の実効 sims（K×sims）＝`q_min_n` の訪問下限はこれで測る。
+    let eff_sims = opts.sims * worlds;
     let mut mv = run.best.clone();
+    // 出す手の添字（世界 0 の `legal` 基準・PV とコミットの世界を選ぶのに使う）
+    let mut chosen_idx = if run.legal.is_empty() {
+        None
+    } else {
+        Some(select_index(
+            &run.n,
+            &run.q,
+            opts.select_rule,
+            q_min_n_floor(eff_sims, opts.q_min_frac),
+        ))
+    };
     let mut groups = Vec::new();
+    let mut sel_groups: Vec<SelectGroup> = Vec::new();
     if !run.legal.is_empty() {
         groups = merge_root_stats(state, ctx.masters, &run.legal, &run.n, &run.q);
+        sel_groups = select_groups(state, ctx.masters, &run.legal, &groups);
         if !groups.is_empty() {
-            let mut gi = 0usize;
+            // 出す手は**マージ後のグループ**から選ぶ（Python `_decide_inner` と同じ＝訪問数
+            // 降順の先頭）。`select_rule="q_min_n"` はこの並びに対して「訪問下限を満たす
+            // グループの中で Q 最大」を採る（下限を満たすグループが無ければ先頭＝訪問数最多）。
+            let floor = q_min_n_floor(eff_sims, opts.q_min_frac);
+            let gn: Vec<f64> = groups.iter().map(|g| g.n).collect();
+            let gq: Vec<f64> = groups.iter().map(|g| g.q).collect();
+            let gi = select_index(&gn, &gq, opts.select_rule, floor);
+            let mut rep = groups[gi].rep;
+            // §20.7.8 の 4: `q_min_n` のときだけ、準備箱の枝を card_id で束ねた
+            // グループ（`select_groups`）に対して訪問下限を測る（`visits` は不変）。
+            if opts.select_rule == SelectRule::QMinN && !sel_groups.is_empty() {
+                let sn: Vec<f64> = sel_groups.iter().map(|g| g.n).collect();
+                let sq: Vec<f64> = sel_groups.iter().map(|g| g.q).collect();
+                rep = sel_groups[select_index(&sn, &sq, SelectRule::QMinN, floor)].rep;
+            }
             // 生成の温度サンプリング（序盤は訪問分布から引く）
             if opts.temp_turns > 0 && state.turn_count <= opts.temp_turns {
                 let ns: Vec<f64> = groups.iter().map(|g| g.n).collect();
                 let total: f64 = ns.iter().sum();
                 if total > 0.0 {
                     let probs: Vec<f64> = ns.iter().map(|n| n / total).collect();
-                    gi = rng.choice(&probs)?;
+                    rep = groups[rng.choice(&probs)?].rep;
                 }
             }
-            mv = Some(run.legal[groups[gi].rep].clone());
+            mv = Some(run.legal[rep].clone());
+            chosen_idx = Some(rep);
         }
     }
     if mv.is_none() {
         mv = run.legal.first().cloned();
+        chosen_idx = if run.legal.is_empty() { None } else { Some(0) };
     }
+    // PV とコミットの継続を採る世界（§20.7.1）: 選んだ手の訪問が最も多い世界（同点は若い方）。
+    let world_used = if worlds > 1 {
+        chosen_idx.map(|i| {
+            (0..worlds).fold(0usize, |best, w| {
+                if per_world[w].n[i] > per_world[best].n[i] {
+                    w
+                } else {
+                    best
+                }
+            })
+        })
+    } else {
+        None
+    };
+    let pv_world = world_used.unwrap_or(0);
+    // PV（主変化・§20.4）: 8 手または葉まで。単一世界は root の argmax(N)（＝今までどおり）、
+    // 複数世界は「束ねた統計で選んだ手」から辿る（その世界の argmax とは限らないため）。
+    let pv_first = if worlds > 1 {
+        chosen_idx.and_then(|i| back[pv_world][i])
+    } else {
+        None
+    };
+    let pv = principal_variation_of(&runs[pv_world].nodes, pv_first, 8);
     // 棋譜ダンプの鍵はここで採る（Python `_decide_inner` の `record` と同じ位置＝残ドン掘り／
     // 残り起動の差し替えと先頭原始手化の**前**＝訪問分布の候補と突き合わせられる箱レベル）。
     let rec_sig = mv.as_ref().map(move_sig);
@@ -1095,7 +1536,19 @@ fn decide_inner(
                     }
                 }
                 Some("PLAY") | Some("ACTIVATE_MAIN") => {
-                    let steps = commit_play_dialog(ctx, state, name, &m, rng, st)?;
+                    // 複数世界は木を回した世界（PV と同じ）で継続を作る＝乱数を引き直さない。
+                    let steps = if worlds > 1 {
+                        commit_play_dialog_in_world(ctx, &runs[pv_world].world, name, &m, st)
+                    } else {
+                        commit_play_dialog(ctx, state, name, &m, rng, st)?
+                    };
+                    if !steps.is_empty() {
+                        carry.commit = steps;
+                    }
+                }
+                // 準備箱（§20.7.2）: 素の手より後（対話 → 攻撃箱）を機械実行へ積む。
+                Some("SETUP_BOX") => {
+                    let steps = commit_setup_box(ctx, state, name, &m, rng)?;
                     if !steps.is_empty() {
                         carry.commit = steps;
                     }
@@ -1117,14 +1570,19 @@ fn decide_inner(
         q: run.q,
         p: Some(run.p),
         groups,
+        select_groups: sel_groups,
         carry,
         budget_used: st.budget.used,
         budget_exhausted: st.budget.exhausted,
+        pv,
+        worlds,
+        per_world,
+        world_used,
     })
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
 
     #[test]
@@ -1316,5 +1774,405 @@ mod tests {
         let rest = vec![("a".to_string(), 5000, false), ("b".to_string(), 3000, false)];
         assert_eq!(pick_attach_target(&rest, "low").as_deref(), Some("b"));
         assert_eq!(pick_attach_target(&[], "low"), None);
+    }
+
+    // --- PV（§20.4・思考ログ）------------------------------------------------------
+
+    /// テスト用のゼロ重みネット（forward は全て 0＝priors 一様・value 0）。vocab は空＝
+    /// 全カードが PAD 行（index 0）を指す（盤面差は読まないが、形は正しいので木は普通に回る）。
+    /// `principal_variation` の検証に要るのは「木が壊れず回ること」だけなので十分。
+    pub(in crate::search) fn zero_net() -> crate::net::LoadedNet {
+        use crate::encode::{Vocab, ABILITY_DIM, MAX_AB, R_DIM, STATS_DIM};
+        use crate::net::nrel::{CardStatics, D_AB};
+        use crate::net::{Mat, NRelWeights, D_C, D_PIN, D_R, D_T, D_X, D_Z};
+        let mat = |rows: usize, cols: usize| Mat::new(rows, cols, vec![0.0f32; rows * cols]);
+        let hidden = 8usize;
+        let weights = NRelWeights {
+            wa: mat(ABILITY_DIM, D_AB),
+            ba: vec![0.0; D_AB],
+            wt: mat(D_X, D_T),
+            bt: vec![0.0; D_T],
+            wr: mat(2 * D_T + R_DIM, D_R),
+            br: vec![0.0; D_R],
+            wc: mat(2 * D_T + R_DIM, D_C),
+            bc: vec![0.0; D_C],
+            w1: mat(D_Z, hidden),
+            b1: vec![0.0; hidden],
+            w2: mat(hidden, 64),
+            b2: vec![0.0; 64],
+            wv: mat(64, 1),
+            bv: vec![0.0; 1],
+            wp1: mat(D_PIN, 64),
+            bp1: vec![0.0; 64],
+            wp2: mat(64, 1),
+            bp2: vec![0.0; 1],
+            hidden,
+            ablate: Default::default(),
+            meta_json: String::new(),
+            vocab_ids: Vec::new(),
+            enc_version: crate::encode::ENC_VERSION,
+        };
+        let vocab = Vocab::from_ids(&[]);
+        let tables = crate::encode::EffTables {
+            n: 1,
+            stats: vec![0.0; STATS_DIM],
+            ab: vec![0.0; MAX_AB * ABILITY_DIM],
+            abm: vec![0.0; MAX_AB],
+            pwr: vec![0.0; 1],
+            isl: vec![0.0; 1],
+        };
+        let tab = crate::net::card_table(&weights, &tables).expect("zero net: card_table");
+        let statics = CardStatics { pwr: vec![0.0], isl: vec![0.0], ret_don: vec![0.0] };
+        crate::net::LoadedNet { weights, tab, vocab, statics }
+    }
+
+    /// PV の先頭は「木が返した手」と一致し、長さは 8 以下（§20.4 の受け入れ）。
+    #[test]
+    fn pv_head_matches_the_returned_move_and_is_bounded() {
+        use crate::testkit::{BoardBuilder, M_CHAR};
+        let mut b = BoardBuilder::new();
+        b.put_hand(Seat::P1, M_CHAR); // コスト2・3000（PLAY と TURN_END の 2 候補ができる）
+        b.dons(Seat::P1, "active", 2);
+        let (masters, state) = b.build();
+        let net = zero_net();
+        let opts = DecideOptions { sims: 8, ..DecideOptions::default() };
+        let mut rng = crate::search::Pcg32SearchRng::new(1);
+        let carry = DecideCarry::default();
+        let out = decide(&masters, &net, &state, Seat::P1, &opts, &mut rng, &carry).unwrap();
+        assert_eq!(out.kind, "main");
+        assert!(!out.pv.is_empty(), "main の決定は少なくとも 1 手の PV を持つ");
+        assert!(out.pv.len() <= 8, "PV は 8 手まで");
+        assert_eq!(out.mv.as_ref(), Some(&out.pv[0].mv), "PV の先頭は返した手と同じ");
+        assert_eq!(out.pv[0].seat, Seat::P1);
+    }
+
+    // --- 探索の設定（§20.5・WP `rs-search-a`）------------------------------------
+
+    /// 既定値を**明示して渡しても**出力は 1 bit も変わらない（serve・生成・アリーナは無影響）。
+    #[test]
+    fn spelling_out_the_defaults_changes_nothing() {
+        use crate::testkit::{BoardBuilder, M_CHAR};
+        let mut b = BoardBuilder::new();
+        b.put_hand(Seat::P1, M_CHAR);
+        b.dons(Seat::P1, "active", 2);
+        let (masters, state) = b.build();
+        let net = zero_net();
+        let carry = DecideCarry::default();
+        let base = DecideOptions { sims: 8, ..DecideOptions::default() };
+        let spelled = DecideOptions {
+            sims: 8,
+            select_rule: SelectRule::Visits,
+            q_min_frac: Q_MIN_FRAC,
+            root_prior_temp: 1.0,
+            ..DecideOptions::default()
+        };
+        let a = decide(
+            &masters,
+            &net,
+            &state,
+            Seat::P1,
+            &base,
+            &mut crate::search::Pcg32SearchRng::new(7),
+            &carry,
+        )
+        .unwrap();
+        let c = decide(
+            &masters,
+            &net,
+            &state,
+            Seat::P1,
+            &spelled,
+            &mut crate::search::Pcg32SearchRng::new(7),
+            &carry,
+        )
+        .unwrap();
+        assert_eq!(a.sig, c.sig);
+        assert_eq!(a.n, c.n);
+        assert_eq!(a.q, c.q);
+        assert_eq!(a.p, c.p);
+        assert_eq!(a.pv.len(), c.pv.len());
+    }
+
+    /// `select_rule="q_min_n"` は「訪問下限を満たすグループの中で Q 最大」を出す
+    /// （decide の配線＝根の集計と選択が同じ並びを見ていること）。
+    #[test]
+    fn q_min_n_selects_the_group_with_the_best_q_above_the_floor() {
+        use crate::testkit::{BoardBuilder, M_CHAR};
+        let mut b = BoardBuilder::new();
+        b.put_hand(Seat::P1, M_CHAR);
+        b.dons(Seat::P1, "active", 2);
+        let (masters, state) = b.build();
+        let net = zero_net();
+        let opts = DecideOptions {
+            sims: 8,
+            select_rule: SelectRule::QMinN,
+            ..DecideOptions::default()
+        };
+        let mut rng = crate::search::Pcg32SearchRng::new(7);
+        let out = decide(
+            &masters,
+            &net,
+            &state,
+            Seat::P1,
+            &opts,
+            &mut rng,
+            &DecideCarry::default(),
+        )
+        .unwrap();
+        assert_eq!(out.kind, "main");
+        assert!(out.groups.len() >= 2, "PLAY と TURN_END の 2 候補は出るはず");
+        let gn: Vec<f64> = out.groups.iter().map(|g| g.n).collect();
+        let gq: Vec<f64> = out.groups.iter().map(|g| g.q).collect();
+        let want = select_index(&gn, &gq, SelectRule::QMinN, q_min_n_floor(8, Q_MIN_FRAC));
+        let rep = out.groups[want].rep;
+        assert_eq!(out.sig.as_ref(), Some(&move_sig(&out.legal[rep])));
+        // 選んだグループは下限を満たす手の中で Q 最大（下限を満たす手が居る盤面）。
+        let floor = q_min_n_floor(8, Q_MIN_FRAC);
+        assert!(gn.iter().any(|n| *n >= floor));
+        for (i, n) in gn.iter().enumerate() {
+            if *n >= floor {
+                assert!(gq[want] >= gq[i], "Q 最大でない: {:?} / {:?}", gn, gq);
+            }
+        }
+    }
+
+    /// `root_prior_temp` は根の P だけを丸め、和は 1 のまま（返り値の `stats.P`）。
+    #[test]
+    fn root_prior_temp_keeps_the_root_prior_a_distribution() {
+        use crate::testkit::{BoardBuilder, M_CHAR};
+        let mut b = BoardBuilder::new();
+        b.put_hand(Seat::P1, M_CHAR);
+        b.dons(Seat::P1, "active", 2);
+        let (masters, state) = b.build();
+        let net = zero_net();
+        let opts = DecideOptions {
+            sims: 8,
+            root_prior_temp: 2.0,
+            ..DecideOptions::default()
+        };
+        let out = decide(
+            &masters,
+            &net,
+            &state,
+            Seat::P1,
+            &opts,
+            &mut crate::search::Pcg32SearchRng::new(7),
+            &DecideCarry::default(),
+        )
+        .unwrap();
+        let p = out.p.expect("kind=main は P を返す");
+        assert!(p.len() >= 2);
+        let s: f64 = p.iter().sum();
+        assert!((s - 1.0).abs() < 1e-9, "根の P の和が 1 でない: {s}");
+        assert!(p.iter().all(|x| *x >= 0.0));
+    }
+
+    /// kind=window（戦闘窓の根畳み）のとき PV は空（§20.4）。
+    #[test]
+    fn pv_is_empty_when_kind_is_window() {
+        use crate::model::ActiveBattle;
+        use crate::testkit::{BoardBuilder, M_CHAR};
+        let mut b = BoardBuilder::new();
+        let atk = b.put_field(Seat::P1, M_CHAR);
+        let (masters, mut state) = b.build();
+        let target = state.player(Seat::P2).leader.expect("p2 leader");
+        // p2 は手札・場が空＝ブロッカー無し・カウンター無し＝合法手は PASS 1 つだけ
+        // （`window_choice` の legal.len()==1 分岐＝ネットの forward すら要らない）。
+        state.active_battle = Some(ActiveBattle {
+            attacker: atk,
+            target,
+            attacker_owner: Seat::P1,
+            target_owner: Seat::P2,
+            counter_buff: 0,
+        });
+        let net = zero_net();
+        let opts = DecideOptions::default();
+        let mut rng = crate::search::Pcg32SearchRng::new(2);
+        let carry = DecideCarry::default();
+        let out = decide(&masters, &net, &state, Seat::P2, &opts, &mut rng, &carry).unwrap();
+        assert_eq!(out.kind, "window");
+        assert!(out.pv.is_empty(), "window の決定に PV は無い");
+    }
+
+    // --- 複数世界（§20.7.1・WP `rs-pimc-worlds`）------------------------------------
+
+    /// 世界を引ける盤面（相手に手札と山札がある＝`determinize` が実際に混ぜる）。
+    fn worlds_board() -> (crate::model::MasterTable, GameState) {
+        use crate::testkit::{BoardBuilder, M_BLOCKER, M_CHAR, M_EVENT};
+        let mut b = BoardBuilder::new();
+        b.put_hand(Seat::P1, M_CHAR); // PLAY と TURN_END の 2 候補
+        b.dons(Seat::P1, "active", 2);
+        // 相手の伏せ札（手札 2・山札 3）＝世界サンプルの pool が 5 枚
+        b.put_hand(Seat::P2, M_CHAR);
+        b.put_hand(Seat::P2, M_EVENT);
+        b.put_deck(Seat::P2, M_BLOCKER);
+        b.put_deck(Seat::P2, M_CHAR);
+        b.put_deck(Seat::P2, M_EVENT);
+        b.build()
+    }
+
+    fn worlds_opts(worlds: usize, seed: Option<u64>) -> DecideOptions {
+        DecideOptions { sims: 8, worlds, search_seed: seed, ..DecideOptions::default() }
+    }
+
+    /// `worlds=1`（明示・既定どちらも）は今までの単一世界と **1 bit も変わらない**。
+    /// `search_seed` を渡しても変わらない（世界 0 は呼び出し側の rng で引くため）。
+    #[test]
+    fn worlds_one_is_bit_identical_to_the_default() {
+        let (masters, state) = worlds_board();
+        let net = zero_net();
+        let carry = DecideCarry::default();
+        let run = |opts: &DecideOptions| {
+            decide(
+                &masters,
+                &net,
+                &state,
+                Seat::P1,
+                opts,
+                &mut crate::search::Pcg32SearchRng::new(11),
+                &carry,
+            )
+            .unwrap()
+        };
+        let base = run(&DecideOptions { sims: 8, ..DecideOptions::default() });
+        for opts in [worlds_opts(1, None), worlds_opts(1, Some(11)), worlds_opts(4, None)] {
+            // `worlds=4` でも `search_seed` が無ければ 1 本に落ちる（＝既定と同じ）。
+            let got = run(&opts);
+            assert_eq!(got.mv, base.mv);
+            assert_eq!(got.sig, base.sig);
+            assert_eq!(got.n, base.n);
+            assert_eq!(got.q, base.q);
+            assert_eq!(got.p, base.p);
+            assert_eq!(got.pv.len(), base.pv.len());
+            assert_eq!(got.worlds, 1);
+            assert!(got.per_world.is_empty(), "単一世界は per_world を持たない");
+            assert!(got.world_used.is_none());
+        }
+    }
+
+    /// `worlds=K`: 根の訪問数の合計が `K * sims`・`per_world` が K 本・
+    /// 世界 0 の統計は単一世界で回したときと同じ（seed の派生が seed+i である証拠）。
+    #[test]
+    fn worlds_k_sums_visits_and_keeps_world_zero() {
+        let (masters, state) = worlds_board();
+        let net = zero_net();
+        let carry = DecideCarry::default();
+        let single = decide(
+            &masters,
+            &net,
+            &state,
+            Seat::P1,
+            &worlds_opts(1, Some(11)),
+            &mut crate::search::Pcg32SearchRng::new(11),
+            &carry,
+        )
+        .unwrap();
+        let k = 4usize;
+        let out = decide(
+            &masters,
+            &net,
+            &state,
+            Seat::P1,
+            &worlds_opts(k, Some(11)),
+            &mut crate::search::Pcg32SearchRng::new(11),
+            &carry,
+        )
+        .unwrap();
+        assert_eq!(out.kind, "main");
+        assert_eq!(out.worlds, k);
+        assert_eq!(out.per_world.len(), k, "per_world の数は K");
+        let total: f64 = out.n.iter().sum();
+        assert_eq!(total, (k * 8) as f64, "根の訪問の和は K×sims");
+        // 世界 0 は単一世界のときと同じ木（乱数も同じ列）＝統計が一致する。
+        assert_eq!(out.per_world[0].n, single.n);
+        assert_eq!(out.per_world[0].q, single.q);
+        assert_eq!(out.p, single.p, "P は世界 0 のもの");
+        // 各世界の訪問の和も sims（＝K 本とも同じ sims で回っている）。
+        for (i, w) in out.per_world.iter().enumerate() {
+            let n: f64 = w.n.iter().sum();
+            assert_eq!(n, 8.0, "世界 {i} の訪問の和");
+            assert_eq!(w.seed, 11 + i as u64, "世界 {i} の seed は search_seed+i");
+            assert_eq!(w.unmapped, 0, "世界 {i} の legal が世界 0 と対応しない");
+            assert!(!w.p_differs, "世界 {i} の P が世界 0 と違う");
+        }
+        // PV とコミットを採った世界は「選んだ手の訪問が最も多い世界」。
+        let used = out.world_used.expect("worlds>1 は world_used を持つ");
+        assert!(used < k);
+        assert!(!out.pv.is_empty());
+        assert_eq!(out.mv.as_ref(), Some(&out.pv[0].mv), "PV の先頭は返した手と同じ");
+    }
+
+    /// 同じ seed で 2 回回せば同じ出力（スレッドの終わる順に依らない＝再現性）。
+    #[test]
+    fn worlds_are_reproducible_for_the_same_seed() {
+        let (masters, state) = worlds_board();
+        let net = zero_net();
+        let carry = DecideCarry::default();
+        let run = || {
+            decide(
+                &masters,
+                &net,
+                &state,
+                Seat::P1,
+                &worlds_opts(8, Some(5)),
+                &mut crate::search::Pcg32SearchRng::new(5),
+                &carry,
+            )
+            .unwrap()
+        };
+        let a = run();
+        let b = run();
+        assert_eq!(a.mv, b.mv);
+        assert_eq!(a.n, b.n);
+        assert_eq!(a.q, b.q);
+        assert_eq!(a.world_used, b.world_used);
+        assert_eq!(a.per_world.len(), b.per_world.len());
+        for (x, y) in a.per_world.iter().zip(&b.per_world) {
+            assert_eq!(x.seed, y.seed);
+            assert_eq!(x.n, y.n);
+            assert_eq!(x.q, y.q);
+            assert_eq!(x.best, y.best);
+        }
+        for (x, y) in a.pv.iter().zip(&b.pv) {
+            assert_eq!(x.mv, y.mv);
+            assert_eq!(x.n, y.n);
+        }
+    }
+
+    /// 束ねの算術そのもの（N は和・Q は N 重みの平均）を [`merge_worlds`] で直に見る。
+    #[test]
+    fn merge_worlds_sums_n_and_weights_q_by_n() {
+        let legal = vec![
+            json!({"action_type":"PLAY","payload":{"uuid":"a"}}),
+            json!({"action_type":"TURN_END","payload":{}}),
+        ];
+        let mk = |seed: u64, n: Vec<f64>, q: Vec<f64>| WorldRun {
+            seed,
+            run: RunOut {
+                best: Some(legal[0].clone()),
+                legal: legal.clone(),
+                n,
+                q,
+                p: vec![0.5, 0.5],
+            },
+            nodes: Vec::new(),
+            world: crate::testkit::sample_state(),
+        };
+        let runs = vec![
+            mk(0, vec![6.0, 2.0], vec![1.0, -1.0]),
+            mk(1, vec![2.0, 6.0], vec![0.0, 0.5]),
+        ];
+        let opts = DecideOptions { sims: 8, worlds: 2, ..DecideOptions::default() };
+        let (merged, per_world, back) = merge_worlds(&runs, &opts);
+        assert_eq!(merged.n, vec![8.0, 8.0]);
+        // (6*1.0 + 2*0.0)/8 = 0.75 ／ (2*-1.0 + 6*0.5)/8 = 0.125
+        assert_eq!(merged.q, vec![0.75, 0.125]);
+        assert_eq!(merged.p, vec![0.5, 0.5], "P は世界 0 のもの");
+        // 訪問数最多（既定 visits）は同点＝添字が小さい方。
+        assert_eq!(merged.best, Some(legal[0].clone()));
+        assert_eq!(per_world.len(), 2);
+        assert_eq!(per_world[0].best, Some(0));
+        assert_eq!(per_world[1].best, Some(1));
+        assert_eq!(back[1], vec![Some(0), Some(1)], "並びが同じなら恒等写像");
     }
 }

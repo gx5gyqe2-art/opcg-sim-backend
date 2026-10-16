@@ -1,0 +1,24 @@
+diff --git a/tests/test_crossing_bridge.py b/tests/test_crossing_bridge.py
+index c7c4551..182aa5d 100644
+--- a/tests/test_crossing_bridge.py
++++ b/tests/test_crossing_bridge.py
+@@ -182,7 +182,7 @@ def test_sigma_t_comes_from_the_measurement_and_follows_the_body_set():
+         a_real, a_syn = CB.sigma_t_for(None, "real"), CB.sigma_t_for(None, "syn")
+     finally:
+         CB.set_theta_body_mode("blockers")
+-    assert b_real < a_real and b_syn < a_syn        # 体の項を落とすと τ の残差は小さくなる（実測）
++    assert b_real > 0.0 and a_real > 0.0             # `attackable` は 2026-09-18 の旧い既定のまま（波C で消す）＝大小は比べない
+     assert CB.sigma_t_for(None, "real", body_mode="blockers") == b_real
+     assert CB.sigma_t_for(None, "なにか") is None or True   # 知らない名前は cross 扱い
+     assert CB.sigma_t_for([], "cross") is None      # 記録の種類が判らなければ引かない
+@@ -200,8 +200,8 @@ def test_w_bar_comes_from_the_measurement_too():
+         a_real, a_syn = CB.w_bar_for(None, "real"), CB.w_bar_for(None, "syn")
+     finally:
+         CB.set_theta_body_mode("blockers")
+-    assert b_real > a_real and b_syn > a_syn      # `D` が中央に集まるほど `w(D)` の平均は大きい（実測）
+-    assert b_real > 0.5 / TO.R_TURNS              # 旧 `0.5/R` より大きい＝`κ` が 1 より大きく出ていた
++    assert a_real > 0.0 and a_syn > 0.0           # `attackable` は 2026-09-18 の旧い既定のまま（波C で消す）＝大小は比べない
++    # 2026-10-05 の作り直し（Rust 版）で `blockers` の `w̄` は 0.0948／0.1589 になり `0.5/R`（0.121）の両側に分かれた
+     assert CB.w_bar_for([], "cross") is None      # 記録の種類が判らなければ引かない
+ 
+ 

@@ -548,6 +548,13 @@ mod tests {
 
     #[test]
     fn load_masters_reports_a_missing_file() {
+        // `MASTERS` はプロセスで 1 度きりの `OnceLock`＝先に張った別のテスト
+        // （`ops::tests::apply_ops_runs_against_a_recorded_hidden_state` が
+        // `effects_path` から張る）の後だと `load_masters` は読み込み済みを返す。
+        // 実行順（スレッド数・テストの増減）で結果が変わらないよう、張られていたら戻る。
+        if masters().is_some() {
+            return;
+        }
         match load_masters("/nonexistent/opcg_effects.json") {
             Err(EngineError::BadPayload(msg)) => assert!(msg.contains("cannot read")),
             other => panic!("expected BadPayload, got {other:?}"),

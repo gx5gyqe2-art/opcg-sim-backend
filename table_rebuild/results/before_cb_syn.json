@@ -1,0 +1,849 @@
+{
+  "nu_mode": "pair",
+  "stats": {
+    "games": 900,
+    "turns": 11086,
+    "rows_bracketed": 42709,
+    "mirror_rows": 10186,
+    "theta_hand": "rule_don",
+    "slope_mode": "hand",
+    "theta_body": "blockers",
+    "slope_block": "on",
+    "rate_through": "off",
+    "through_n": 0,
+    "through_sum": 0.0,
+    "through_missing": 0,
+    "race": "static",
+    "r_deck_n": 0,
+    "r_deck_sum": 0.0,
+    "r_deck_missing": 0,
+    "slope_hand": "flow",
+    "a_flow_n": 11086,
+    "a_flow_sum": 0.0,
+    "a_flow_missing": 0,
+    "rate_walk": "grow",
+    "rate_decay": "off",
+    "stock_n": 11086,
+    "stock_sum": 0.0,
+    "rate_rush": "on",
+    "stock_rush_sum": 0.0,
+    "flow_rush_sum": 0.0,
+    "rate_t1": "on",
+    "tau_capped": 70,
+    "tau_rows": 20372,
+    "slope_effect": "hand",
+    "eff_sum": 1.050134400000004,
+    "eff_n": 11086,
+    "eff1_sum": 4.632507000000011,
+    "don_purse": "all",
+    "rate_don": "flow",
+    "rate_don_pay": true,
+    "rate_ramp": 0.0,
+    "sched_n": 11086,
+    "sched_j1_sum": 1852.221557961257,
+    "sched_j5_sum": 3234.0397555218806,
+    "last_close_n": 900,
+    "last_close_sum": 14.129299325365912,
+    "last_close_open": 10186,
+    "theta_don": "rule",
+    "hb_don_sum": 0.0,
+    "cut_share_sum": 0.0,
+    "cut_n": 0,
+    "race_n": 0,
+    "race_front_sum": 0.0,
+    "race_th_sum": 0.0,
+    "race_a_sum": 0.0,
+    "race_paid_sum": 0.0,
+    "theta_hand_blocker": "on",
+    "hb_sum": 336.9033000000009,
+    "hb_n": 11086,
+    "hb_hit": 3243,
+    "theta_return": "untap",
+    "theta_hand_place": "stock",
+    "theta_hand_window": "horizon",
+    "thw_n": 866,
+    "thw_cut_sum": 0.4353007850033378,
+    "thw_hit": 9,
+    "thw_tau_sum": 6425.907813634465,
+    "shield_n": 0,
+    "shield_sum": 0.0,
+    "shield_rate_sum": 0.0,
+    "g_sum": 1433.4085706351614,
+    "g_n": 40744,
+    "g_fallback": 1800,
+    "g_win_sum": 728.7527749207354,
+    "g_win_n": 20372,
+    "g_lose_sum": 704.6557957143694,
+    "g_lose_n": 20372,
+    "cut_price": "joint",
+    "cut_corr_noframe": 526,
+    "cut_mlp_next": 10186,
+    "cut_frames": 11086,
+    "cut_cand_sum": 33949,
+    "cut_L1_n": 10442,
+    "cut_L1_sum": 491.30878917753716,
+    "cut_corr_turns": 9740,
+    "cut_corr_n": 17472,
+    "cut_corr_sum": -7.988436988311065,
+    "cut_corr_nofinal": 873,
+    "cut_view_flat": 1520,
+    "cut_mlp_rule": 900,
+    "rule_n": 20372,
+    "rule_fallback": 900,
+    "rule_cut_sum": 123501.8772204742,
+    "rule_stop_sum": 104231.08051353872,
+    "rule_hand_mismatch": 140,
+    "plan_n": 20372,
+    "rule_don_attach_sum": 54263.0,
+    "rule_don_play_n": 11843,
+    "plan_cut": 266,
+    "plan_cut_turns": 1231,
+    "g_mean": 0.0352,
+    "g_win_mean": 0.0358,
+    "g_lose_mean": 0.0346
+  },
+  "frozen": {
+    "lambda": 0.1362,
+    "mu": 0.0551,
+    "theta": 1.5819
+  },
+  "summary": {
+    "n": 10186,
+    "by_slope": {
+      "hist": {
+        "sign_accuracy": 0.6011,
+        "bias": 12.309,
+        "sigma_T": 10.3,
+        "sigma_rel": 0.2839,
+        "n_scale0": 20,
+        "within1": 0.144,
+        "mae": 12.423,
+        "tau_me_median": 14.417,
+        "win_by_D": {
+          "<-3": {
+            "n": 3449,
+            "win_rate": 0.3801
+          },
+          "-3..-1": {
+            "n": 854,
+            "win_rate": 0.4988
+          },
+          "-1..1": {
+            "n": 2718,
+            "win_rate": 0.5471
+          },
+          "1..3": {
+            "n": 626,
+            "win_rate": 0.6917
+          },
+          ">3": {
+            "n": 2539,
+            "win_rate": 0.6522
+          }
+        },
+        "sigma_rel_floor": 0.2545,
+        "sigma_rel_whole": 0.7313,
+        "bias_int": 12.664,
+        "mae_int": 12.688,
+        "exact_int": 0.0683,
+        "late_int": 0.9222,
+        "early_int": 0.0094
+      },
+      "theory": {
+        "sign_accuracy": 0.6602,
+        "bias": 0.386,
+        "sigma_T": 2.004,
+        "sigma_rel": 0.2737,
+        "n_scale0": 18,
+        "within1": 0.6688,
+        "mae": 1.045,
+        "tau_me_median": 4.0,
+        "win_by_D": {
+          "<-3": {
+            "n": 954,
+            "win_rate": 0.196
+          },
+          "-3..-1": {
+            "n": 2754,
+            "win_rate": 0.3282
+          },
+          "-1..1": {
+            "n": 4399,
+            "win_rate": 0.5892
+          },
+          "1..3": {
+            "n": 1459,
+            "win_rate": 0.7738
+          },
+          ">3": {
+            "n": 620,
+            "win_rate": 0.8081
+          }
+        },
+        "sigma_rel_floor": 0.2006,
+        "sigma_rel_whole": 0.3875,
+        "bias_int": 0.738,
+        "mae_int": 1.112,
+        "exact_int": 0.3866,
+        "late_int": 0.4721,
+        "early_int": 0.1413
+      },
+      "curve": {
+        "sign_accuracy": 0.6097,
+        "bias": 1.105,
+        "sigma_T": 2.133,
+        "sigma_rel": 0.2567,
+        "n_scale0": 20,
+        "within1": 0.4831,
+        "mae": 1.537,
+        "tau_me_median": 4.965,
+        "win_by_D": {
+          "<-3": {
+            "n": 1452,
+            "win_rate": 0.3209
+          },
+          "-3..-1": {
+            "n": 2657,
+            "win_rate": 0.4163
+          },
+          "-1..1": {
+            "n": 3473,
+            "win_rate": 0.5583
+          },
+          "1..3": {
+            "n": 1551,
+            "win_rate": 0.6435
+          },
+          ">3": {
+            "n": 1053,
+            "win_rate": 0.7635
+          }
+        },
+        "sigma_rel_floor": 0.2203,
+        "sigma_rel_whole": 0.4427,
+        "bias_int": 1.612,
+        "mae_int": 1.789,
+        "exact_int": 0.2074,
+        "late_int": 0.7214,
+        "early_int": 0.0712
+      },
+      "curve_scaled": {
+        "sign_accuracy": 0.6504,
+        "bias": -0.153,
+        "sigma_T": 2.838,
+        "sigma_rel": 0.3955,
+        "n_scale0": 20,
+        "within1": 0.5201,
+        "mae": 1.663,
+        "tau_me_median": 3.337,
+        "win_by_D": {
+          "<-3": {
+            "n": 1074,
+            "win_rate": 0.1872
+          },
+          "-3..-1": {
+            "n": 1609,
+            "win_rate": 0.3306
+          },
+          "-1..1": {
+            "n": 4185,
+            "win_rate": 0.5474
+          },
+          "1..3": {
+            "n": 1713,
+            "win_rate": 0.6416
+          },
+          ">3": {
+            "n": 1605,
+            "win_rate": 0.7414
+          }
+        },
+        "sigma_rel_floor": 0.3755,
+        "sigma_rel_whole": 1.4543,
+        "bias_int": 0.381,
+        "mae_int": 1.572,
+        "exact_int": 0.2775,
+        "late_int": 0.4112,
+        "early_int": 0.3113
+      }
+    },
+    "harm_profile": {
+      "harm_by_turn": [
+        0.0004,
+        0.0601,
+        0.1035,
+        0.1965,
+        0.248,
+        0.2283,
+        0.2022,
+        0.1708,
+        0.1558,
+        0.0971,
+        0.0971,
+        0.0971,
+        0.0971
+      ],
+      "priced_by_turn": [
+        0.0,
+        0.0533,
+        0.0813,
+        0.1582,
+        0.198,
+        0.1689,
+        0.15,
+        0.123,
+        0.1141,
+        0.0882,
+        0.0882,
+        0.0882,
+        0.0882
+      ],
+      "attack_share_by_turn": [
+        0.0,
+        0.887,
+        0.786,
+        0.805,
+        0.798,
+        0.739,
+        0.742,
+        0.72,
+        0.733,
+        0.908,
+        0.908,
+        0.908,
+        0.908
+      ],
+      "theory_slope_by_turn": [
+        0.0,
+        0.0947,
+        0.1227,
+        0.1913,
+        0.274,
+        0.298,
+        0.2964,
+        0.2951,
+        0.3223,
+        0.2315,
+        0.2315,
+        0.2315,
+        0.2315
+      ],
+      "ratio_by_turn": [
+        0.0,
+        1.575,
+        1.186,
+        0.973,
+        1.105,
+        1.305,
+        1.466,
+        1.728,
+        2.069,
+        2.384,
+        2.384,
+        2.384,
+        2.384
+      ],
+      "cum_harm_by_turn": [
+        0.0004,
+        0.0605,
+        0.164,
+        0.3605,
+        0.6085,
+        0.8368,
+        1.0391,
+        1.2098,
+        1.3656,
+        1.4627,
+        1.5598,
+        1.6569,
+        1.7541
+      ],
+      "cum_theory_by_turn": [
+        0.0,
+        0.0947,
+        0.2174,
+        0.4087,
+        0.6826,
+        0.9806,
+        1.2771,
+        1.5722,
+        1.8946,
+        2.1261,
+        2.3576,
+        2.5891,
+        2.8206
+      ],
+      "by_turns_left": {
+        "1": {
+          "n": 1800,
+          "harm": 0.2147,
+          "theory": 0.3105,
+          "priced": 0.1579,
+          "ratio": 1.447,
+          "attack_share": 0.736
+        },
+        "2": {
+          "n": 1800,
+          "harm": 0.2329,
+          "theory": 0.2542,
+          "priced": 0.1771,
+          "ratio": 1.092,
+          "attack_share": 0.76
+        },
+        "3": {
+          "n": 1800,
+          "harm": 0.1767,
+          "theory": 0.1892,
+          "priced": 0.1454,
+          "ratio": 1.071,
+          "attack_share": 0.823
+        },
+        "4": {
+          "n": 1798,
+          "harm": 0.1235,
+          "theory": 0.1369,
+          "priced": 0.1007,
+          "ratio": 1.108,
+          "attack_share": 0.816
+        },
+        "5": {
+          "n": 1731,
+          "harm": 0.0694,
+          "theory": 0.0854,
+          "priced": 0.0578,
+          "ratio": 1.23,
+          "attack_share": 0.833
+        },
+        "6+": {
+          "n": 2157,
+          "harm": 0.0317,
+          "theory": 0.0469,
+          "priced": 0.028,
+          "ratio": 1.481,
+          "attack_share": 0.884
+        }
+      },
+      "late_by_outcome": {
+        "lose": {
+          "n": 346,
+          "harm": 0.2141,
+          "theory": 0.274,
+          "priced": 0.1446,
+          "ratio": 1.279,
+          "attack_share": 0.675
+        },
+        "win": {
+          "n": 562,
+          "harm": 0.1729,
+          "theory": 0.3127,
+          "priced": 0.1352,
+          "ratio": 1.808,
+          "attack_share": 0.782
+        }
+      },
+      "excl_last_turn": {
+        "n": 9286,
+        "harm_by_turn": [
+          0.0004,
+          0.0601,
+          0.1033,
+          0.1961,
+          0.246,
+          0.2347,
+          0.2231,
+          0.1916,
+          0.1913,
+          0.1913,
+          0.1913,
+          0.1913,
+          0.1913
+        ],
+        "theory_slope_by_turn": [
+          0.0,
+          0.0947,
+          0.1226,
+          0.1908,
+          0.2596,
+          0.272,
+          0.2814,
+          0.2636,
+          0.2428,
+          0.2428,
+          0.2428,
+          0.2428,
+          0.2428
+        ],
+        "ratio_by_turn": [
+          0.0,
+          1.575,
+          1.186,
+          0.973,
+          1.055,
+          1.159,
+          1.261,
+          1.376,
+          1.269,
+          1.269,
+          1.269,
+          1.269,
+          1.269
+        ],
+        "attack_share_by_turn": [
+          0.0,
+          0.887,
+          0.785,
+          0.804,
+          0.79,
+          0.805,
+          0.775,
+          0.872,
+          0.636,
+          0.636,
+          0.636,
+          0.636,
+          0.636
+        ]
+      }
+    },
+    "theta_check": {
+      "n": 5773,
+      "by_turns_left": {
+        "1": {
+          "n": 900,
+          "theta": 0.3249,
+          "need": 0.1836,
+          "theta_over_need": 1.77,
+          "life": 0.1365,
+          "hand": 0.13,
+          "body": 0.0585
+        },
+        "2": {
+          "n": 900,
+          "theta": 0.6378,
+          "need": 0.4614,
+          "theta_over_need": 1.382,
+          "life": 0.354,
+          "hand": 0.2172,
+          "body": 0.0666
+        },
+        "3": {
+          "n": 900,
+          "theta": 0.845,
+          "need": 0.6677,
+          "theta_over_need": 1.266,
+          "life": 0.4669,
+          "hand": 0.3126,
+          "body": 0.0655
+        },
+        "4": {
+          "n": 900,
+          "theta": 0.9894,
+          "need": 0.8105,
+          "theta_over_need": 1.221,
+          "life": 0.5371,
+          "hand": 0.3904,
+          "body": 0.0619
+        },
+        "5": {
+          "n": 894,
+          "theta": 1.0788,
+          "need": 0.8954,
+          "theta_over_need": 1.205,
+          "life": 0.5779,
+          "hand": 0.4538,
+          "body": 0.0471
+        },
+        "6+": {
+          "n": 1279,
+          "theta": 1.0725,
+          "need": 1.0738,
+          "theta_over_need": 0.999,
+          "life": 0.6127,
+          "hand": 0.4291,
+          "body": 0.0307
+        }
+      },
+      "tau_matched": {
+        "0.5": {
+          "n": 2111,
+          "share": 0.366,
+          "by_turns_left": {
+            "1": {
+              "n": 623,
+              "theta": 0.3634,
+              "need": 0.1938,
+              "theta_over_need": 1.875,
+              "life": 0.15,
+              "hand": 0.1492,
+              "body": 0.0642
+            },
+            "2": {
+              "n": 330,
+              "theta": 0.6211,
+              "need": 0.4976,
+              "theta_over_need": 1.248,
+              "life": 0.3764,
+              "hand": 0.2013,
+              "body": 0.0433
+            },
+            "3": {
+              "n": 366,
+              "theta": 0.8307,
+              "need": 0.6971,
+              "theta_over_need": 1.192,
+              "life": 0.4778,
+              "hand": 0.2941,
+              "body": 0.0587
+            },
+            "4": {
+              "n": 331,
+              "theta": 0.9785,
+              "need": 0.851,
+              "theta_over_need": 1.15,
+              "life": 0.5337,
+              "hand": 0.3737,
+              "body": 0.0712
+            },
+            "5": {
+              "n": 218,
+              "theta": 1.0733,
+              "need": 0.9489,
+              "theta_over_need": 1.131,
+              "life": 0.5792,
+              "hand": 0.4431,
+              "body": 0.0511
+            },
+            "6+": {
+              "n": 243,
+              "theta": 1.1166,
+              "need": 1.0405,
+              "theta_over_need": 1.073,
+              "life": 0.6087,
+              "hand": 0.4846,
+              "body": 0.0234
+            }
+          },
+          "pooled_theta_over_need": 1.221
+        },
+        "1.0": {
+          "n": 3621,
+          "share": 0.627,
+          "by_turns_left": {
+            "1": {
+              "n": 847,
+              "theta": 0.3086,
+              "need": 0.1791,
+              "theta_over_need": 1.723,
+              "life": 0.1303,
+              "hand": 0.124,
+              "body": 0.0544
+            },
+            "2": {
+              "n": 663,
+              "theta": 0.6394,
+              "need": 0.4818,
+              "theta_over_need": 1.327,
+              "life": 0.3716,
+              "hand": 0.2115,
+              "body": 0.0562
+            },
+            "3": {
+              "n": 648,
+              "theta": 0.8497,
+              "need": 0.6943,
+              "theta_over_need": 1.224,
+              "life": 0.479,
+              "hand": 0.3096,
+              "body": 0.0611
+            },
+            "4": {
+              "n": 581,
+              "theta": 0.9807,
+              "need": 0.8441,
+              "theta_over_need": 1.162,
+              "life": 0.5401,
+              "hand": 0.3756,
+              "body": 0.065
+            },
+            "5": {
+              "n": 420,
+              "theta": 1.0852,
+              "need": 0.942,
+              "theta_over_need": 1.152,
+              "life": 0.5834,
+              "hand": 0.449,
+              "body": 0.0528
+            },
+            "6+": {
+              "n": 462,
+              "theta": 1.1117,
+              "need": 1.0567,
+              "theta_over_need": 1.052,
+              "life": 0.6138,
+              "hand": 0.4726,
+              "body": 0.0254
+            }
+          },
+          "pooled_theta_over_need": 1.209
+        },
+        "2.0": {
+          "n": 4885,
+          "share": 0.846,
+          "by_turns_left": {
+            "1": {
+              "n": 888,
+              "theta": 0.3221,
+              "need": 0.1841,
+              "theta_over_need": 1.749,
+              "life": 0.1359,
+              "hand": 0.1295,
+              "body": 0.0568
+            },
+            "2": {
+              "n": 865,
+              "theta": 0.6342,
+              "need": 0.4664,
+              "theta_over_need": 1.36,
+              "life": 0.3568,
+              "hand": 0.2131,
+              "body": 0.0643
+            },
+            "3": {
+              "n": 827,
+              "theta": 0.8487,
+              "need": 0.6774,
+              "theta_over_need": 1.253,
+              "life": 0.4705,
+              "hand": 0.3151,
+              "body": 0.0631
+            },
+            "4": {
+              "n": 778,
+              "theta": 0.982,
+              "need": 0.8262,
+              "theta_over_need": 1.188,
+              "life": 0.5401,
+              "hand": 0.3801,
+              "body": 0.0617
+            },
+            "5": {
+              "n": 680,
+              "theta": 1.0801,
+              "need": 0.9255,
+              "theta_over_need": 1.167,
+              "life": 0.5825,
+              "hand": 0.4477,
+              "body": 0.05
+            },
+            "6+": {
+              "n": 847,
+              "theta": 1.085,
+              "need": 1.0829,
+              "theta_over_need": 1.002,
+              "life": 0.6127,
+              "hand": 0.4426,
+              "body": 0.0298
+            }
+          },
+          "pooled_theta_over_need": 1.192
+        }
+      },
+      "tau_missed": {
+        "n": 2152,
+        "theta_over_need": 1.162,
+        "tau_minus_left": 1.28
+      },
+      "tau_minus_left_mean": 0.52,
+      "with_refill": {
+        "n": 5773,
+        "by_turns_left": {
+          "1": {
+            "n": 900,
+            "theta": 0.3249,
+            "theta_plus_refill": 0.3249,
+            "need": 0.1836,
+            "theta_over_need": 1.77,
+            "with_refill_over_need": 1.77,
+            "full": 0.3249,
+            "full_over_need": 1.77
+          },
+          "2": {
+            "n": 900,
+            "theta": 0.6378,
+            "theta_plus_refill": 0.6774,
+            "need": 0.4614,
+            "theta_over_need": 1.382,
+            "with_refill_over_need": 1.468,
+            "full": 0.6774,
+            "full_over_need": 1.468
+          },
+          "3": {
+            "n": 900,
+            "theta": 0.845,
+            "theta_plus_refill": 0.924,
+            "need": 0.6677,
+            "theta_over_need": 1.266,
+            "with_refill_over_need": 1.384,
+            "full": 0.924,
+            "full_over_need": 1.384
+          },
+          "4": {
+            "n": 900,
+            "theta": 0.9894,
+            "theta_plus_refill": 1.108,
+            "need": 0.8105,
+            "theta_over_need": 1.221,
+            "with_refill_over_need": 1.367,
+            "full": 1.108,
+            "full_over_need": 1.367
+          },
+          "5": {
+            "n": 894,
+            "theta": 1.0788,
+            "theta_plus_refill": 1.2371,
+            "need": 0.8954,
+            "theta_over_need": 1.205,
+            "with_refill_over_need": 1.382,
+            "full": 1.2371,
+            "full_over_need": 1.382
+          },
+          "6+": {
+            "n": 1279,
+            "theta": 1.0725,
+            "theta_plus_refill": 1.2995,
+            "need": 1.0738,
+            "theta_over_need": 0.999,
+            "with_refill_over_need": 1.21,
+            "full": 1.2995,
+            "full_over_need": 1.21
+          }
+        },
+        "pooled": {
+          "theta_over_need": 1.188,
+          "with_refill_over_need": 1.346,
+          "full_over_need": 1.346,
+          "r_mean": 0.0397
+        }
+      }
+    },
+    "rate_check": {
+      "n": 900,
+      "turns_mean": 6.41,
+      "rate_real_mean": 0.1692,
+      "rate_theory_mean": 0.1831,
+      "theory_over_real": 1.083,
+      "tau_at_real_rate": 6.28,
+      "tau_at_theory_rate": 1062783.73,
+      "tau_net_start": 20.34
+    },
+    "ledger": {
+      "winners": 900,
+      "F_end_mean": 0.9431,
+      "theta_start_mean": 0.9963,
+      "F_end_over_theta_start": 0.947,
+      "F_priced_end_mean": 0.7308,
+      "F_priced_over_F_real": 0.775
+    }
+  },
+  "seconds": 942.0
+}

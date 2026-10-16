@@ -1,0 +1,236 @@
+{
+  "slope": "theory",
+  "games": 300,
+  "rows": 3255,
+  "pre_settle": "on",
+  "sigma_d": 1.4142,
+  "scale_mode": "hyp",
+  "stretch": [
+    {
+      "q": 1,
+      "n": 651,
+      "scale_mean": 2.92,
+      "d_mean": -0.726,
+      "d_sd": 1.153,
+      "d_over_scale_sd": 0.3889
+    },
+    {
+      "q": 2,
+      "n": 651,
+      "scale_mean": 4.559,
+      "d_mean": -0.718,
+      "d_sd": 1.593,
+      "d_over_scale_sd": 0.3507
+    },
+    {
+      "q": 3,
+      "n": 651,
+      "scale_mean": 6.088,
+      "d_mean": -0.62,
+      "d_sd": 1.898,
+      "d_over_scale_sd": 0.3123
+    },
+    {
+      "q": 4,
+      "n": 651,
+      "scale_mean": 7.855,
+      "d_mean": -0.612,
+      "d_sd": 1.915,
+      "d_over_scale_sd": 0.244
+    },
+    {
+      "q": 5,
+      "n": 651,
+      "scale_mean": 11.377,
+      "d_mean": -0.187,
+      "d_sd": 6.15,
+      "d_over_scale_sd": 0.4096
+    }
+  ],
+  "settle_cond": "whole",
+  "sigma_floor": "off",
+  "abs": {
+    "n": 3255,
+    "base_win_rate": 0.4793,
+    "logloss": 0.609,
+    "logloss_const": 0.6923,
+    "beats_coin": true,
+    "brier": 0.1876,
+    "auc": 0.7991,
+    "ece": 0.0666,
+    "calibration": [
+      {
+        "bin": 1,
+        "n": 325,
+        "p_mean": 0.0076,
+        "win_rate": 0.0554,
+        "gap": -0.0478
+      },
+      {
+        "bin": 2,
+        "n": 326,
+        "p_mean": 0.0829,
+        "win_rate": 0.1656,
+        "gap": -0.0828
+      },
+      {
+        "bin": 3,
+        "n": 325,
+        "p_mean": 0.1787,
+        "win_rate": 0.2554,
+        "gap": -0.0767
+      },
+      {
+        "bin": 4,
+        "n": 326,
+        "p_mean": 0.3071,
+        "win_rate": 0.3804,
+        "gap": -0.0733
+      },
+      {
+        "bin": 5,
+        "n": 325,
+        "p_mean": 0.3993,
+        "win_rate": 0.4554,
+        "gap": -0.0561
+      },
+      {
+        "bin": 6,
+        "n": 326,
+        "p_mean": 0.5159,
+        "win_rate": 0.4969,
+        "gap": 0.019
+      },
+      {
+        "bin": 7,
+        "n": 325,
+        "p_mean": 0.6351,
+        "win_rate": 0.6246,
+        "gap": 0.0105
+      },
+      {
+        "bin": 8,
+        "n": 326,
+        "p_mean": 0.7662,
+        "win_rate": 0.6902,
+        "gap": 0.076
+      },
+      {
+        "bin": 9,
+        "n": 325,
+        "p_mean": 0.8999,
+        "win_rate": 0.7877,
+        "gap": 0.1122
+      },
+      {
+        "bin": 10,
+        "n": 326,
+        "p_mean": 0.9923,
+        "win_rate": 0.8804,
+        "gap": 0.1119
+      }
+    ]
+  },
+  "rel": {
+    "n": 3255,
+    "base_win_rate": 0.4793,
+    "logloss": 0.5266,
+    "logloss_const": 0.6923,
+    "beats_coin": true,
+    "brier": 0.1784,
+    "auc": 0.8076,
+    "ece": 0.0168,
+    "calibration": [
+      {
+        "bin": 1,
+        "n": 325,
+        "p_mean": 0.0635,
+        "win_rate": 0.0308,
+        "gap": 0.0327
+      },
+      {
+        "bin": 2,
+        "n": 326,
+        "p_mean": 0.1613,
+        "win_rate": 0.1472,
+        "gap": 0.0141
+      },
+      {
+        "bin": 3,
+        "n": 325,
+        "p_mean": 0.2666,
+        "win_rate": 0.2615,
+        "gap": 0.005
+      },
+      {
+        "bin": 4,
+        "n": 326,
+        "p_mean": 0.3615,
+        "win_rate": 0.3865,
+        "gap": -0.025
+      },
+      {
+        "bin": 5,
+        "n": 325,
+        "p_mean": 0.4358,
+        "win_rate": 0.4708,
+        "gap": -0.035
+      },
+      {
+        "bin": 6,
+        "n": 326,
+        "p_mean": 0.5104,
+        "win_rate": 0.5092,
+        "gap": 0.0012
+      },
+      {
+        "bin": 7,
+        "n": 325,
+        "p_mean": 0.5892,
+        "win_rate": 0.6092,
+        "gap": -0.02
+      },
+      {
+        "bin": 8,
+        "n": 326,
+        "p_mean": 0.6771,
+        "win_rate": 0.6871,
+        "gap": -0.0101
+      },
+      {
+        "bin": 9,
+        "n": 325,
+        "p_mean": 0.7882,
+        "win_rate": 0.7877,
+        "gap": 0.0005
+      },
+      {
+        "bin": 10,
+        "n": 326,
+        "p_mean": 0.9262,
+        "win_rate": 0.9018,
+        "gap": 0.0244
+      }
+    ]
+  },
+  "sigma_rel": 0.3875,
+  "scale_auc": {
+    "hyp": 0.8076,
+    "sum": 0.8069,
+    "mean": 0.8069,
+    "max": 0.8069,
+    "geo": 0.8035
+  },
+  "rule_stats": {
+    "rule_n": 7094,
+    "rule_fallback": 300,
+    "rule_cut_sum": 41865.337661428995,
+    "rule_stop_sum": 32645.03074266645,
+    "rule_hand_mismatch": 2,
+    "plan_n": 7094,
+    "rule_don_attach_sum": 16530.0,
+    "rule_don_play_n": 4736,
+    "plan_cut": 21,
+    "plan_cut_turns": 54
+  }
+}

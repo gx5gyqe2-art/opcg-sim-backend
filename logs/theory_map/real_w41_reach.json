@@ -1,0 +1,158 @@
+{
+ "record": "/home/user/data_rec/sigma_wip/data/w41",
+ "clocks": "/home/user/tm/rc/clocks.json",
+ "by_defender": {
+  "OP09-001": {
+   "all": {
+    "turns": 860,
+    "theory_reach_per_turn": 1.44,
+    "actual_reach_per_turn": 1.066,
+    "theory_over_actual": 1.35,
+    "leader_attacks_per_turn": 1.563,
+    "no_don_share": 0.528,
+    "unresolved_attacks": 0
+   },
+   "1-3": {
+    "turns": 145,
+    "theory_reach_per_turn": 0.524,
+    "actual_reach_per_turn": 0.476,
+    "theory_over_actual": 1.101,
+    "leader_attacks_per_turn": 0.572,
+    "no_don_share": 0.313,
+    "unresolved_attacks": 0
+   },
+   "4-6": {
+    "turns": 213,
+    "theory_reach_per_turn": 0.61,
+    "actual_reach_per_turn": 0.887,
+    "theory_over_actual": 0.688,
+    "leader_attacks_per_turn": 1.31,
+    "no_don_share": 0.513,
+    "unresolved_attacks": 0
+   },
+   "7+": {
+    "turns": 502,
+    "theory_reach_per_turn": 2.056,
+    "actual_reach_per_turn": 1.313,
+    "theory_over_actual": 1.566,
+    "leader_attacks_per_turn": 1.956,
+    "no_don_share": 0.551,
+    "unresolved_attacks": 0
+   }
+  },
+  "OP11-041": {
+   "all": {
+    "turns": 778,
+    "theory_reach_per_turn": 1.976,
+    "actual_reach_per_turn": 1.325,
+    "theory_over_actual": 1.491,
+    "leader_attacks_per_turn": 1.72,
+    "no_don_share": 0.575,
+    "unresolved_attacks": 0
+   },
+   "1-3": {
+    "turns": 135,
+    "theory_reach_per_turn": 0.585,
+    "actual_reach_per_turn": 0.481,
+    "theory_over_actual": 1.215,
+    "leader_attacks_per_turn": 0.622,
+    "no_don_share": 0.262,
+    "unresolved_attacks": 0
+   },
+   "4-6": {
+    "turns": 201,
+    "theory_reach_per_turn": 1.229,
+    "actual_reach_per_turn": 1.104,
+    "theory_over_actual": 1.113,
+    "leader_attacks_per_turn": 1.532,
+    "no_don_share": 0.588,
+    "unresolved_attacks": 0
+   },
+   "7+": {
+    "turns": 442,
+    "theory_reach_per_turn": 2.74,
+    "actual_reach_per_turn": 1.683,
+    "theory_over_actual": 1.628,
+    "leader_attacks_per_turn": 2.14,
+    "no_don_share": 0.598,
+    "unresolved_attacks": 0
+   }
+  },
+  "OP15-058": {
+   "all": {
+    "turns": 803,
+    "theory_reach_per_turn": 1.77,
+    "actual_reach_per_turn": 1.447,
+    "theory_over_actual": 1.223,
+    "leader_attacks_per_turn": 1.6,
+    "no_don_share": 0.544,
+    "unresolved_attacks": 0
+   },
+   "1-3": {
+    "turns": 159,
+    "theory_reach_per_turn": 0.509,
+    "actual_reach_per_turn": 0.409,
+    "theory_over_actual": 1.246,
+    "leader_attacks_per_turn": 0.503,
+    "no_don_share": 0.4,
+    "unresolved_attacks": 0
+   },
+   "4-6": {
+    "turns": 248,
+    "theory_reach_per_turn": 1.294,
+    "actual_reach_per_turn": 1.048,
+    "theory_over_actual": 1.235,
+    "leader_attacks_per_turn": 1.29,
+    "no_don_share": 0.609,
+    "unresolved_attacks": 0
+   },
+   "7+": {
+    "turns": 396,
+    "theory_reach_per_turn": 2.573,
+    "actual_reach_per_turn": 2.114,
+    "theory_over_actual": 1.217,
+    "leader_attacks_per_turn": 2.235,
+    "no_don_share": 0.533,
+    "unresolved_attacks": 0
+   }
+  },
+  "OP16-022": {
+   "all": {
+    "turns": 814,
+    "theory_reach_per_turn": 1.791,
+    "actual_reach_per_turn": 1.469,
+    "theory_over_actual": 1.219,
+    "leader_attacks_per_turn": 1.701,
+    "no_don_share": 0.476,
+    "unresolved_attacks": 0
+   },
+   "1-3": {
+    "turns": 161,
+    "theory_reach_per_turn": 0.596,
+    "actual_reach_per_turn": 0.478,
+    "theory_over_actual": 1.247,
+    "leader_attacks_per_turn": 0.559,
+    "no_don_share": 0.267,
+    "unresolved_attacks": 0
+   },
+   "4-6": {
+    "turns": 238,
+    "theory_reach_per_turn": 1.214,
+    "actual_reach_per_turn": 1.151,
+    "theory_over_actual": 1.055,
+    "leader_attacks_per_turn": 1.349,
+    "no_don_share": 0.548,
+    "unresolved_attacks": 0
+   },
+   "7+": {
+    "turns": 415,
+    "theory_reach_per_turn": 2.586,
+    "actual_reach_per_turn": 2.036,
+    "theory_over_actual": 1.27,
+    "leader_attacks_per_turn": 2.347,
+    "no_don_share": 0.471,
+    "unresolved_attacks": 0
+   }
+  }
+ }
+}

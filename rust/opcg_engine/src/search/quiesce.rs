@@ -24,13 +24,16 @@ use crate::journal::Session;
 use crate::model::{CardIdx, GameState, MasterTable, Seat};
 use crate::net::{nrel, Candidate, LoadedNet};
 use crate::state::EngineError;
-use serde_json::Value;
+use serde_json::{json, Value};
+use std::cell::RefCell;
 use std::collections::HashMap;
 
-use super::{adapter, apply, Move, SearchOptions};
+use super::{adapter, apply, LeafRollout, Move, SearchOptions};
 
 /// Python `config.QUIESCE_MAX_PLIES`。
 pub const QUIESCE_MAX_PLIES: usize = 12;
+/// 葉の打ち切り（§20.7.9）で 1 葉あたりに打てる手の上限。
+pub const LEAF_ROLLOUT_MAX_PLIES: usize = 12;
 /// Python `config.BOX_RESOLVE_DEPTH`。
 pub const BOX_RESOLVE_DEPTH: i32 = 1;
 /// Python `config.BOX_BRANCH_BUDGET`。
@@ -171,8 +174,47 @@ impl<'a> Ctx<'a> {
     }
 
     /// Python `OPCGGame.legal_actions`（探索用の候補・順序込み）。
+    ///
+    /// `opts.setup_box`（既定 false）のときだけ、準備箱（`SETUP_BOX`・§20.7.2）を末尾に足す。
+    ///
+    /// §20.7.6（WP `rs-setup-box-2`）: **箱ができた準備の手（素の PLAY／ACTIVATE_MAIN）は
+    /// 候補から落とす**（配分箱・アタック箱と同じ扱い）。§20.7.8 では箱が「発動 → 対象選択 →
+    /// 効果」で止まる＝素の手の意味は各枝がそのまま持つ。
+    /// 箱が作れなかった準備の手（予算切れ・素の手が今の盤面で打てない）は今までどおり残る。
     pub fn legal_actions(&self, s: &mut Session) -> Result<Vec<Move>, EngineError> {
-        adapter::legal_actions(s, self.masters, &self.opts)
+        let mut moves = adapter::legal_actions(s, self.masters, &self.opts)?;
+        if !self.opts.setup_box {
+            return Ok(moves);
+        }
+        let Some((seat, "MAIN_ACTION")) = crate::rules::pending::pending_actor_action(s) else {
+            return Ok(moves);
+        };
+        let boxes = super::r#macro::setup_box_candidates(self, s, seat, &moves)?;
+        if !boxes.is_empty() && !self.opts.setup_box_keep_bare {
+            let boxed: Vec<&Value> = boxes
+                .iter()
+                .filter_map(|b| b.get("payload").and_then(|p| p.get("base")))
+                .collect();
+            moves.retain(|m| !boxed.contains(&m));
+        }
+        moves.extend(boxes);
+        Ok(moves)
+    }
+
+    /// 準備箱を切った文脈（箱の中で候補生成が再帰しないようにする）。
+    pub fn without_setup_box(&self) -> Ctx<'a> {
+        Ctx {
+            masters: self.masters,
+            net: self.net,
+            opts: SearchOptions {
+                setup_box: false,
+                ..self.opts.clone()
+            },
+            box_battle: self.box_battle,
+            box_dialog: self.box_dialog,
+            quiesce: self.quiesce,
+            quiesce_max_plies: self.quiesce_max_plies,
+        }
     }
 
     /// Python `cpu_learned._value_fn`（NRel＝`predict_state`・終局は ±1）。
@@ -228,13 +270,37 @@ impl<'a> Ctx<'a> {
             Err(e @ EngineError::Unimplemented(_)) => return Err(e),
             Err(_) => return Ok(None),
         };
+        // §20.7.8 の 3: 同じ準備の手（`payload.base`）から出た `SETUP_BOX` の枝は、ネットには
+        // **1 行**として見せる（枝の候補行は素の手の行そのものなので、k 本並べると softmax が
+        // その手を k 回数えてしまう）。行の P を枝へ配るのは下の `setup_branch_shares`。
+        let rows = setup_row_map(legal);
+        let cand_target = self.net.weights.cand_target();
         let refs: Vec<CandOwned> = {
             let state = s.state();
+            // 効果の発生源（対象選択の候補行の主体・§20.9 の A）。中断していなければ None。
+            let src: Option<String> = if cand_target {
+                state
+                    .active_interaction()
+                    .and_then(|it| it.source_card)
+                    .map(|c| state.card(c).uuid.clone())
+            } else {
+                None
+            };
             let slots = slot_index(state, me);
             let uidx = uuid_index(state);
-            legal
+            rows.heads
                 .iter()
-                .map(|mv| cand_owned(state, self.masters, &uidx, &slots, mv))
+                .map(|i| {
+                    cand_owned(
+                        state,
+                        self.masters,
+                        &uidx,
+                        &slots,
+                        &legal[*i],
+                        src.as_deref(),
+                        cand_target,
+                    )
+                })
                 .collect()
         };
         let cands = match self.cand_rows(&enc, &refs) {
@@ -242,12 +308,60 @@ impl<'a> Ctx<'a> {
             Err(e @ EngineError::Unimplemented(_)) => return Err(e),
             Err(_) => return Ok(None),
         };
-        match crate::net::priors(&self.net.weights, &self.net.tab, &enc, &cands) {
-            Ok(p) if p.len() == legal.len() => Ok(Some(p)),
-            Ok(_) => Ok(None),
-            Err(e @ EngineError::Unimplemented(_)) => Err(e),
-            Err(_) => Ok(None),
+        let p_rows = match crate::net::priors(&self.net.weights, &self.net.tab, &enc, &cands) {
+            Ok(p) if p.len() == rows.heads.len() => p,
+            Ok(_) => return Ok(None),
+            Err(e @ EngineError::Unimplemented(_)) => return Err(e),
+            Err(_) => return Ok(None),
+        };
+        if rows.heads.len() == legal.len() {
+            return Ok(Some(p_rows)); // 箱が無い＝今までどおり（1 bit も変わらない）
         }
+        // 箱の枝の P ＝「素の手の P（＝行の P）× 対象選択の P」＝枝の和が素の手の P。
+        let shares = self.setup_branch_shares(s, me, legal)?;
+        Ok(Some(
+            (0..legal.len())
+                .map(|i| p_rows[rows.row_of[i]] * shares[i])
+                .collect(),
+        ))
+    }
+
+    /// 枝ごとの配分（非 `SETUP_BOX` は 1.0・同じ準備の手の枝は和 1）。
+    fn setup_branch_shares(
+        &self,
+        s: &mut Session,
+        me: Seat,
+        legal: &[Move],
+    ) -> Result<Vec<f32>, EngineError> {
+        let mut w = vec![1.0f32; legal.len()];
+        let mut bases: Vec<(&Value, Vec<usize>)> = Vec::new();
+        for (i, mv) in legal.iter().enumerate() {
+            if mv.get("action_type").and_then(Value::as_str) != Some("SETUP_BOX") {
+                continue;
+            }
+            let Some(base) = mv.get("payload").and_then(|p| p.get("base")) else {
+                continue;
+            };
+            match bases.iter_mut().find(|(b, _)| *b == base) {
+                Some((_, idxs)) => idxs.push(i),
+                None => bases.push((base, vec![i])),
+            }
+        }
+        if bases.is_empty() {
+            return Ok(w);
+        }
+        let state = s.state().clone();
+        for (base, idxs) in &bases {
+            let firsts: Vec<Vec<Value>> = idxs
+                .iter()
+                .map(|i| super::r#macro::setup_box_first_select(&legal[*i]))
+                .collect();
+            let ws = super::r#macro::setup_branch_weights(self, &state, me, base, &firsts)?;
+            for (k, i) in idxs.iter().enumerate() {
+                w[*i] = ws[k];
+            }
+        }
+        Ok(w)
     }
 
     fn cand_rows(
@@ -275,6 +389,40 @@ impl<'a> Ctx<'a> {
             &borrowed,
         )
     }
+}
+
+/// ネットに見せる候補行と `legal` の対応（§20.7.8 の 3）。
+///
+/// 同じ準備の手（`payload.base`）から出た `SETUP_BOX` の枝は**1 行**に畳む
+/// （枝の候補行は素の手の行そのもの＝k 本並べると softmax がその手を k 回数えてしまう）。
+struct RowMap {
+    /// 各行の代表となる `legal` の添字（`legal` の初出順）
+    heads: Vec<usize>,
+    /// `legal` の添字 → 行の添字
+    row_of: Vec<usize>,
+}
+
+fn setup_row_map(legal: &[Move]) -> RowMap {
+    let mut heads: Vec<usize> = Vec::with_capacity(legal.len());
+    let mut row_of: Vec<usize> = Vec::with_capacity(legal.len());
+    let mut seen: Vec<(&Value, usize)> = Vec::new();
+    for (i, mv) in legal.iter().enumerate() {
+        let base = if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
+            mv.get("payload").and_then(|p| p.get("base"))
+        } else {
+            None
+        };
+        if let Some(base) = base {
+            if let Some((_, row)) = seen.iter().find(|(b, _)| *b == base) {
+                row_of.push(*row);
+                continue;
+            }
+            seen.push((base, heads.len()));
+        }
+        row_of.push(heads.len());
+        heads.push(i);
+    }
+    RowMap { heads, row_of }
 }
 
 /// 手 1 件から解けた識別（`nrel::CandRef` の所有版）。
@@ -338,36 +486,66 @@ pub fn slot_index(state: &GameState, me: Seat) -> HashMap<&str, i32> {
     out
 }
 
-/// 手 → `CandOwned`（Python `_cand_row`／`_cand_rows` の uuid 解決と同じ規則）。
+/// 効果の対象選択の手（対象は `payload.target_ids` ではなく `selected_uuids` に入る）。
+pub const SELECT_AT: &str = "RESOLVE_EFFECT_SELECTION";
+
+/// 手 → `CandOwned`（Python `n_rel.cand_ids`／`_cand_rows` の uuid 解決と同じ規則）。
 ///
 /// 主体は `card_uuid` → `payload.uuid` の順（Python の `mv.get("card_uuid") or p.get("uuid")`）、
 /// 対象は `payload.target_ids[0]`。引けない uuid は `card_id=None`（＝vocab の PAD 0）。
+///
+/// **符号化 v14（§20.9 の A）**: `cand_target=true`（v14 のネット）のときだけ、
+/// `RESOLVE_EFFECT_SELECTION` の対象を `payload.selected_uuids[0]`・主体を効果の発生源
+/// （`src_uuid`＝中断している対話の `source_card_uuid`）にする。これが無いと「A を KO」と
+/// 「B を KO」が同じ候補行になり P が対象を区別できない。v13 のネットでは `false`＝
+/// 今までどおり（1 bit も変わらない）。
 pub fn cand_owned(
     state: &GameState,
     masters: &MasterTable,
     uidx: &HashMap<&str, CardIdx>,
     slots: &HashMap<&str, i32>,
     mv: &Move,
+    src_uuid: Option<&str>,
+    cand_target: bool,
 ) -> CandOwned {
     let null = Value::Null;
+    // 準備箱（§20.7.2）はネットに**素の手として**見せる（`SETUP_BOX` は語彙に無い＝
+    // どの枝も同じ PAD 行になってしまう）。枝ごとの配分は `Ctx::setup_branch_shares`
+    // （§20.7.8 の 3＝行は 1 本に畳んでから、その P を対象選択の P で割り振る）。
+    if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
+        if let Some(base) = mv.get("payload").and_then(|p| p.get("base")) {
+            return cand_owned(state, masters, uidx, slots, base, src_uuid, cand_target);
+        }
+    }
+    let at = mv.get("action_type").and_then(Value::as_str).unwrap_or("");
     let p = mv.get("payload").unwrap_or(&null);
-    let su = mv
+    let mut su = mv
         .get("card_uuid")
         .and_then(Value::as_str)
         .or_else(|| p.get("uuid").and_then(Value::as_str));
-    let tids = p.get("target_ids").and_then(Value::as_array);
-    let has_target = tids.map(|a| !a.is_empty()).unwrap_or(false);
-    let tu = tids.and_then(|a| a.first()).and_then(Value::as_str);
+    let (has_target, tu) = if cand_target && at == SELECT_AT {
+        if su.is_none() {
+            su = src_uuid;
+        }
+        let sel = p
+            .get("selected_uuids")
+            .and_then(Value::as_array)
+            .and_then(|a| a.first())
+            .and_then(Value::as_str);
+        (sel.is_some(), sel)
+    } else {
+        let tids = p.get("target_ids").and_then(Value::as_array);
+        (
+            tids.map(|a| !a.is_empty()).unwrap_or(false),
+            tids.and_then(|a| a.first()).and_then(Value::as_str),
+        )
+    };
     let card_id = |u: Option<&str>| -> Option<String> {
         let c = *uidx.get(u?)?;
         Some(masters.get(state.card(c).master).card_id.clone())
     };
     CandOwned {
-        action_type: mv
-            .get("action_type")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_owned(),
+        action_type: at.to_owned(),
         don_k: p.get("don_k").and_then(Value::as_f64),
         has_target,
         card_id: card_id(su),
@@ -455,6 +633,11 @@ pub fn resolve_battle_inplace(
     mut trace: Option<&mut Vec<(Seat, Move)>>,
 ) -> Result<usize, EngineError> {
     let mut n = 0usize;
+    // §20.7.2 の共通規則: 攻撃箱／防御箱の中でも「**自分が**選ぶ最初の対象選択」を 1 段だけ
+    // 枝にする（2 つ目以降と相手側は既定のまま）。深い箱（`box_depth > 0`）では下の一般の
+    // 枝評価が全 ply を見るので、ここは既定解決に落ちていた入れ子（`box_depth <= 0`）のためにある。
+    // §20.7.8 の 5: 入り切りは `select_branch`（明示が無ければ `setup_box` と同じ）。
+    let mut sel_branch_left = usize::from(ctx.opts.select_branch_on() && box_depth >= 0);
     for _ in 0..max_plies {
         if ctx.is_terminal(s) || !window.holds(s) {
             break;
@@ -468,6 +651,26 @@ pub fn resolve_battle_inplace(
         }
         let mut pick: Option<usize> = None;
         if box_value && box_depth > 0 && legal.len() > 1 {
+            let vals = resolved_branch_values(
+                ctx,
+                s,
+                st,
+                name,
+                &legal,
+                max_plies,
+                box_depth - 1,
+                window,
+            )?;
+            pick = best_branch(&vals);
+        }
+        if pick.is_none()
+            && sel_branch_left > 0
+            && legal.len() > 1
+            && own_first_selection(s, ctx, name)
+        {
+            sel_branch_left -= 1;
+            let is_attack = s.state().turn_player == name;
+            super::r#macro::record_window_branches(is_attack, legal.len());
             let vals = resolved_branch_values(
                 ctx,
                 s,
@@ -514,6 +717,8 @@ pub fn resolved_branch_values(
     if !st.budget.take(legal.len()) {
         return Ok(vec![None; legal.len()]);
     }
+    // §20.7.2 の共通規則: この箱の持ち主（＝相手側の選択は枝にしない）。
+    let prev_seat = super::r#macro::set_branch_seat(Some(name));
     // CRN: 全枝を同一の乱数列から評価し、抜けるときに戻す（Python の `random.getstate/setstate`）。
     let base_rng = s.rng.snapshot();
     let mut vals = Vec::with_capacity(legal.len());
@@ -545,12 +750,227 @@ pub fn resolved_branch_values(
         vals.push(v);
     }
     s.rng.restore(&base_rng);
+    super::r#macro::set_branch_seat(prev_seat);
     Ok(vals)
+}
+
+/// 今の中断が「`name` 自身が選ぶ対象選択」か（§20.7.2 の共通規則の適用条件）。
+///
+/// 相手のブロック／カウンター／相手のトリガーは対象外（`may_branch_selection` が席で弾く）。
+fn own_first_selection(s: &mut Session, ctx: &Ctx, name: Seat) -> bool {
+    if !super::r#macro::may_branch_selection(name) {
+        return false;
+    }
+    match crate::rules::pending::pending_actor_action(s) {
+        Some((seat, action)) => {
+            seat == name
+                && action == adapter::SELECT_ACTION
+                && adapter::selection_moves(s, ctx.masters, name)
+                    .map(|a| a.len() >= 2)
+                    .unwrap_or(false)
+        }
+        None => false,
+    }
+}
+
+// --- 葉の打ち切り（§20.7.9・WP `rs-leaf-rollout`）------------------------------------
+
+/// 葉を「そのターンの終わり」まで方策で打ち切る（`leaf_rollout="turn_end"`）。
+///
+/// **その場で進める**（巻き戻さない）＝呼び出し側（[`super::mcts::TreeMcts::leaf_value`]）が
+/// `transaction` の中で呼び、退出で巻き戻す。乱数とイベントログの復元も呼び出し側の責任
+/// （今の `leaf_value` と同じ＝CRN 一貫性）。
+///
+/// 1 手ぶんの手順:
+/// 1. 終局・**手番の側のメインフェイズ**（`MAIN_ACTION`）でない・ターンが替わった・上限 ply の
+///    どれかで止める。
+/// 2. 木と同じ候補（[`Ctx::legal_actions`]＝箱を含む）から [`quiesce_choice`]（方策優先・
+///    P 最大・乱数を使わない）で 1 つ選び、適用する。
+/// 3. `TURN_END` を打ったらそこで止める（ターンは替わっている）。
+/// 4. 途中で開いた戦闘窓／対話窓は**既定解決**で進める（[`resolve_battle_inplace`]）。
+///    ここは `box_value=false`・`box_depth=-1` で呼ぶ＝枝評価を 1 度も起こさない
+///    ＝**枝予算（[`BOX_BRANCH_BUDGET`]）を引かない**（`value_fn=None` の流儀・§20.7.9）。
+///    窓を解決しないと「そのターンの終わり」へ到達できないので、ここは `ctx.quiesce` に
+///    依らず常に進める（打ち切り自体が `leaf_rollout` で明示的に選ばれた振る舞い）。
+///
+/// 戻り値は `(打った手の数, 上限で止まったか)`。
+pub fn leaf_rollout_turn_end(
+    ctx: &Ctx,
+    s: &mut Session,
+    st: &mut SearchState,
+) -> Result<(usize, bool), EngineError> {
+    let (turn0, tp0) = {
+        let x = s.state();
+        (x.turn_count, x.turn_player)
+    };
+    let mut plies = 0usize;
+    loop {
+        if ctx.is_terminal(s) {
+            return Ok((plies, false));
+        }
+        // 「手番の側のメインフェイズ」＝自由な手が打てる決定点だけを打ち切る。
+        // 相手の応手（ブロック／カウンター）や中断の途中は上の窓の既定解決に任せる。
+        let seat = match crate::rules::pending::pending_actor_action(s) {
+            Some((seat, action)) if action == crate::rules::pending::ACT_MAIN_ACTION => seat,
+            _ => return Ok((plies, false)),
+        };
+        {
+            let x = s.state();
+            if x.turn_count != turn0 || x.turn_player != tp0 || seat != x.turn_player {
+                return Ok((plies, false));
+            }
+        }
+        if plies >= LEAF_ROLLOUT_MAX_PLIES {
+            return Ok((plies, true));
+        }
+        let legal = ctx.legal_actions(s)?;
+        if legal.is_empty() {
+            return Ok((plies, false));
+        }
+        let pick = quiesce_choice(ctx, s, &legal, true)?;
+        let mv = legal[pick].clone();
+        let is_turn_end = mv.get("action_type").and_then(Value::as_str) == Some("TURN_END");
+        match apply::apply_move_inplace(s, ctx.masters, seat, &mv, true) {
+            Ok(()) => {}
+            Err(e @ EngineError::Unimplemented(_)) => return Err(e),
+            Err(_) => return Ok((plies, false)), // Python の `except Exception: break` と同じ扱い
+        }
+        plies += 1;
+        if is_turn_end {
+            return Ok((plies, false));
+        }
+        // 開いた対話窓（`box_dialog` のときだけ＝`leaf_value` の `noisy` と同じ約束）→ 戦闘窓の順。
+        if ctx.box_dialog && !in_battle(s) && in_dialog(s) {
+            resolve_battle_inplace(
+                ctx,
+                s,
+                st,
+                Window::Dialog,
+                ctx.quiesce_max_plies,
+                false,
+                -1,
+                None,
+            )?;
+        }
+        if in_battle(s) {
+            resolve_battle_inplace(
+                ctx,
+                s,
+                st,
+                Window::Battle,
+                ctx.quiesce_max_plies,
+                false,
+                -1,
+                None,
+            )?;
+        }
+    }
+}
+
+/// 葉の打ち切りの実績（`decide` 1 回のあいだだけ張る＝[`reset_rollout_stats`]）。
+#[derive(Debug, Default, Clone)]
+struct RolloutStats {
+    enabled: bool,
+    /// 打ち切りを試みた葉の数（`leaf_value` の呼び出し回数）
+    leaves: u64,
+    /// 実際に 1 手以上打てた葉の数
+    rolled: u64,
+    /// 打った手の総数
+    plies: u64,
+    /// 上限 ply で止まった葉の数
+    capped: u64,
+}
+
+thread_local! {
+    /// `macro::SETUP` と同じ理由で thread_local（[`Ctx`] は `&mut SearchState` を持ち回さない
+    /// 経路〔`legal_actions`〕からも触られる）。世界ごとのスレッド（§20.7.1）では
+    /// **世界 0 のぶんだけ**が `decide` の戻り値に出る（`boxes` と同じ）。
+    static ROLLOUT: RefCell<RolloutStats> = RefCell::new(RolloutStats::default());
+}
+
+/// decide 1 回ぶんの実績を張り直す（`search::decide_on_state`）。
+pub fn reset_rollout_stats(mode: LeafRollout) {
+    ROLLOUT.with(|c| {
+        *c.borrow_mut() = RolloutStats {
+            enabled: mode.enabled(),
+            ..RolloutStats::default()
+        }
+    });
+}
+
+/// 1 葉ぶんの実績を足す（[`super::mcts::TreeMcts::leaf_value`] から）。
+pub fn record_rollout(plies: usize, capped: bool) {
+    ROLLOUT.with(|c| {
+        let mut st = c.borrow_mut();
+        if !st.enabled {
+            return;
+        }
+        st.leaves += 1;
+        st.plies += plies as u64;
+        if plies > 0 {
+            st.rolled += 1;
+        }
+        if capped {
+            st.capped += 1;
+        }
+    });
+}
+
+/// 葉の打ち切りの実績（`leaf_rollout="none"` の decide では [`Value::Null`]＝欄ごと出ない）。
+pub fn take_rollout_stats() -> Value {
+    ROLLOUT.with(|c| {
+        let st = c.borrow();
+        if !st.enabled {
+            return Value::Null;
+        }
+        let round3 = |x: f64| (x * 1000.0).round() / 1000.0;
+        let per = |n: u64| -> Value {
+            if st.leaves == 0 {
+                Value::Null
+            } else {
+                Value::from(round3(n as f64 / st.leaves as f64))
+            }
+        };
+        json!({
+            "leaves": st.leaves,
+            "rolled": st.rolled,
+            "plies": st.plies,
+            "mean_plies": per(st.plies),
+            "capped": st.capped,
+            "capped_frac": per(st.capped),
+            "max_plies": LEAF_ROLLOUT_MAX_PLIES,
+        })
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 実績は `enabled` のときだけ溜まり、`take` は `none` で `null`（＝trace の形が変わらない）。
+    #[test]
+    fn rollout_stats_are_null_unless_enabled() {
+        reset_rollout_stats(LeafRollout::None);
+        record_rollout(5, true);
+        assert!(take_rollout_stats().is_null());
+
+        reset_rollout_stats(LeafRollout::TurnEnd);
+        record_rollout(3, false);
+        record_rollout(0, false);
+        record_rollout(LEAF_ROLLOUT_MAX_PLIES, true);
+        let v = take_rollout_stats();
+        assert_eq!(v["leaves"], json!(3));
+        assert_eq!(v["rolled"], json!(2));
+        assert_eq!(v["plies"], json!(15));
+        assert_eq!(v["mean_plies"], json!(5.0));
+        assert_eq!(v["capped"], json!(1));
+        assert_eq!(v["capped_frac"], json!(0.333));
+        assert_eq!(v["max_plies"], json!(LEAF_ROLLOUT_MAX_PLIES));
+        // 張り直すと 0 から（decide をまたがない）。
+        reset_rollout_stats(LeafRollout::TurnEnd);
+        assert_eq!(take_rollout_stats()["leaves"], json!(0));
+        reset_rollout_stats(LeafRollout::None);
+    }
 
     #[test]
     fn budget_stops_after_the_allowance() {
@@ -582,5 +1002,72 @@ mod tests {
         assert_eq!(best_branch(&[None, Some(1.0), Some(1.0)]), Some(1));
         assert_eq!(best_branch(&[None, None]), None);
         assert_eq!(best_branch(&[Some(-1.0), Some(0.5)]), Some(1));
+    }
+
+    // --- 候補行の対象（符号化 v14・§20.9 の A）-------------------------------------
+    //
+    // 「A を KO」と「B を KO」が**別の行**になること（v14）と、v13 のネットでは
+    // 1 bit も変わらないこと（同じ PAD 行のまま）を固定する。
+
+    fn select_move(sel: &str) -> Move {
+        json!({"kind": "game", "action_type": SELECT_AT,
+               "payload": {"selected_uuids": [sel], "index": 0, "accepted": true}})
+    }
+
+    #[test]
+    fn cand_owned_reads_the_selected_target_on_v14() {
+        use crate::testkit::{BoardBuilder, M_CHAR};
+        let mut b = BoardBuilder::new();
+        let src = b.put_field(Seat::P1, M_CHAR); // 効果の発生源（自分の場）
+        let a = b.put_field(Seat::P2, M_CHAR); // 相手の場（対象の候補 A）
+        let c = b.put_field(Seat::P2, M_CHAR); // 同 B
+        let (masters, state) = b.build();
+        let (su, ua, ub) = (
+            state.card(src).uuid.clone(),
+            state.card(a).uuid.clone(),
+            state.card(c).uuid.clone(),
+        );
+        let slots = slot_index(&state, Seat::P1);
+        let uidx = uuid_index(&state);
+        let row = |sel: &str, v14: bool| {
+            cand_owned(
+                &state,
+                &masters,
+                &uidx,
+                &slots,
+                &select_move(sel),
+                Some(su.as_str()),
+                v14,
+            )
+        };
+        // v14: 対象＝selected_uuids[0]・主体＝効果の発生源（枠も引ける）
+        let ra = row(&ua, true);
+        let rb = row(&ub, true);
+        assert!(ra.has_target && rb.has_target);
+        assert_eq!(ra.si, slots[su.as_str()]);
+        assert_eq!(ra.ti, slots[ua.as_str()]);
+        assert_eq!(rb.ti, slots[ub.as_str()]);
+        assert_ne!(ra.ti, rb.ti, "A と B が同じ行になっている");
+        // v13（r3／a1）: 今までどおり対象なし・主体なし＝2 つは同じ行
+        let oa = row(&ua, false);
+        let ob = row(&ub, false);
+        assert!(!oa.has_target && !ob.has_target);
+        assert_eq!((oa.si, oa.ti), (-1, -1));
+        assert_eq!((oa.si, oa.ti), (ob.si, ob.ti));
+        assert_eq!(oa.card_id, ob.card_id);
+    }
+
+    /// `selected_uuids` が空（＝「選ばない」）なら v14 でも対象なしのまま。
+    #[test]
+    fn cand_owned_keeps_empty_selection_targetless() {
+        use crate::testkit::BoardBuilder;
+        let (masters, state) = BoardBuilder::new().build();
+        let slots = slot_index(&state, Seat::P1);
+        let uidx = uuid_index(&state);
+        let mv = json!({"kind": "game", "action_type": SELECT_AT,
+                        "payload": {"selected_uuids": [], "accepted": true}});
+        let r = cand_owned(&state, &masters, &uidx, &slots, &mv, None, true);
+        assert!(!r.has_target);
+        assert_eq!(r.ti, -1);
     }
 }

@@ -24,14 +24,17 @@ import pytest
 import conftest  # noqa: F401
 import _bootstrap  # noqa: F401
 
+from opcg_sim.learned import n_rel as NL
+from opcg_sim.learned import n_rel_feat as NR
 from opcg_sim.learned.train import dump_io as DIO
 from opcg_sim.learned.n_rel import N_TOK
 
 pytestmark = pytest.mark.cpu_infra
 
 MAX_CI = 24          # `record_gen.MAX_CI`（card_idx の PAD 長）
-S_DIM = 20           # `n_rel_feat.S_DIM`
-SC_DIM = 123         # 符号化 v13（94+29）
+# 合成の波は**符号化 v13 の形**で作る（＝`dump_io` の 0 埋めの経路を通す・§20.9 の E）。
+S_DIM = NR.S_DIM_V13     # 20
+SC_DIM = NL.D_SC_V13     # 123（94+29）
 VOCAB = {f"C{i}": i for i in range(1, 40)}
 
 
@@ -120,17 +123,40 @@ def test_v2_and_v3_read_the_same(waves):
 
 
 def test_values_match_the_source_shards(waves):
-    """pack の中身が元の npz の cast と一致する（波の連結順＝dir 順・シャード順）。"""
+    """pack の中身が元の npz の cast と一致する（波の連結順＝dir 順・シャード順）。
+
+    符号化 v14（§20.9 の E）から pack は**現行の形**（tokens 22×22・scalars 127）で書くので、
+    v13 の波（ここで作る合成の波）は**新しい列が 0** で入る。元の列はそのまま。
+    """
     V, _P, _C = _load(waves, "v2")
     src = waves["shards"]["w01"] + waves["shards"]["w02"]
     tok = np.concatenate([s["tokens"] for s in src]).astype(np.float16)
     sc = np.concatenate([s["scalars"] for s in src]).astype(np.float16)
     ci = np.concatenate([s["card_idx"] for s in src])[:, :N_TOK].astype(np.int16)
     idx = np.arange(len(tok))
-    assert np.array_equal(V["tok"][idx], tok)
-    assert np.array_equal(V["sc"][idx], sc)
+    assert V["tok"].shape[1:] == (N_TOK, NR.S_DIM), "pack は現行の形に揃える"
+    assert V["sc"].shape[1] == NL.D_SC
+    assert np.array_equal(V["tok"][idx][:, :, :S_DIM], tok)
+    assert not np.asarray(V["tok"][idx][:, :, S_DIM:]).any(), "v13 の波の新しい列は 0"
+    assert np.array_equal(V["sc"][idx][:, :SC_DIM], sc)
+    assert not np.asarray(V["sc"][idx][:, SC_DIM:]).any()
     assert np.array_equal(V["ci"][idx], ci)
     assert np.array_equal(V["z"][idx], np.concatenate([s["z"] for s in src]).astype(np.float16))
+
+
+def test_a_v14_shaped_wave_is_kept_as_is(tmp_path):
+    """v14 の波（現行の形）はそのまま入る＝0 埋めは古い波にだけ効く。"""
+    rng = np.random.default_rng(3)
+    s = _shard(rng, 12, 700)
+    s["tokens"] = rng.standard_normal((12, N_TOK, NR.S_DIM)).astype(np.float32)
+    s["scalars"] = rng.standard_normal((12, NL.D_SC)).astype(np.float32)
+    d = tmp_path / "w14"
+    d.mkdir()
+    np.savez_compressed(d / "n_record_00000.npz", **s)
+    V, _P, _C = DIO.load_dump([str(d)], VOCAB, cache_dir=str(tmp_path / "cache"))
+    assert V["tok"].shape[1:] == (N_TOK, NR.S_DIM)
+    assert np.array_equal(np.asarray(V["tok"]), s["tokens"].astype(np.float16))
+    assert np.array_equal(np.asarray(V["sc"]), s["scalars"].astype(np.float16))
 
 
 # --- 2. memmap と切り出し ---------------------------------------------------

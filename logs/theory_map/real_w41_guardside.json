@@ -1,0 +1,428 @@
+{
+ "record": "/home/user/data_rec/sigma_wip/data/w41",
+ "guard": {
+  "OP09-001": {
+   "all": {
+    "windows": 675,
+    "games": 125,
+    "can_share": 0.696,
+    "can_but_took": 0.451,
+    "says_guard_share": 0.409,
+    "says_guard_but_took": 0.399,
+    "took_share": 0.544,
+    "src": {
+     "joint": 352,
+     "blocker": 118,
+     "curve": 205
+    },
+    "payable_counter_per_hand": 0.516,
+    "payable_counter_cards": 2.89,
+    "spent_mean": 0.0427
+   },
+   "1-3": {
+    "windows": 68,
+    "games": 68,
+    "can_share": 0.868,
+    "can_but_took": 0.458,
+    "says_guard_share": 0.809,
+    "says_guard_but_took": 0.436,
+    "took_share": 0.529,
+    "src": {
+     "joint": 59,
+     "curve": 9
+    },
+    "payable_counter_per_hand": 0.567,
+    "payable_counter_cards": 3.279,
+    "spent_mean": 0.0327
+   },
+   "4-6": {
+    "windows": 182,
+    "games": 119,
+    "can_share": 0.951,
+    "can_but_took": 0.37,
+    "says_guard_share": 0.676,
+    "says_guard_but_took": 0.366,
+    "took_share": 0.39,
+    "src": {
+     "joint": 116,
+     "blocker": 57,
+     "curve": 9
+    },
+    "payable_counter_per_hand": 0.522,
+    "payable_counter_cards": 3.242,
+    "spent_mean": 0.0335
+   },
+   "7+": {
+    "windows": 425,
+    "games": 124,
+    "can_share": 0.56,
+    "can_but_took": 0.508,
+    "says_guard_share": 0.231,
+    "says_guard_but_took": 0.418,
+    "took_share": 0.612,
+    "src": {
+     "joint": 177,
+     "curve": 187,
+     "blocker": 61
+    },
+    "payable_counter_per_hand": 0.505,
+    "payable_counter_cards": 2.678,
+    "spent_mean": 0.0482
+   }
+  },
+  "OP11-041": {
+   "all": {
+    "windows": 676,
+    "games": 120,
+    "can_share": 0.611,
+    "can_but_took": 0.334,
+    "says_guard_share": 0.351,
+    "says_guard_but_took": 0.333,
+    "took_share": 0.389,
+    "src": {
+     "joint": 361,
+     "curve": 263,
+     "blocker": 52
+    },
+    "payable_counter_per_hand": 0.687,
+    "payable_counter_cards": 3.68,
+    "spent_mean": 0.0984
+   },
+   "1-3": {
+    "windows": 63,
+    "games": 63,
+    "can_share": 0.905,
+    "can_but_took": 0.667,
+    "says_guard_share": 0.81,
+    "says_guard_but_took": 0.647,
+    "took_share": 0.698,
+    "src": {
+     "joint": 57,
+     "curve": 6
+    },
+    "payable_counter_per_hand": 0.674,
+    "payable_counter_cards": 3.841,
+    "spent_mean": 0.041
+   },
+   "4-6": {
+    "windows": 194,
+    "games": 118,
+    "can_share": 0.918,
+    "can_but_took": 0.225,
+    "says_guard_share": 0.737,
+    "says_guard_but_took": 0.245,
+    "took_share": 0.222,
+    "src": {
+     "joint": 157,
+     "curve": 16,
+     "blocker": 21
+    },
+    "payable_counter_per_hand": 0.662,
+    "payable_counter_cards": 4.258,
+    "spent_mean": 0.0912
+   },
+   "7+": {
+    "windows": 419,
+    "games": 120,
+    "can_share": 0.425,
+    "can_but_took": 0.337,
+    "says_guard_share": 0.103,
+    "says_guard_but_took": 0.256,
+    "took_share": 0.42,
+    "src": {
+     "joint": 147,
+     "blocker": 31,
+     "curve": 241
+    },
+    "payable_counter_per_hand": 0.701,
+    "payable_counter_cards": 3.389,
+    "spent_mean": 0.1104
+   }
+  },
+  "OP15-058": {
+   "all": {
+    "windows": 636,
+    "games": 141,
+    "can_share": 0.594,
+    "can_but_took": 0.608,
+    "says_guard_share": 0.25,
+    "says_guard_but_took": 0.421,
+    "took_share": 0.719,
+    "src": {
+     "joint": 311,
+     "curve": 258,
+     "blocker": 67
+    },
+    "payable_counter_per_hand": 0.713,
+    "payable_counter_cards": 3.316,
+    "spent_mean": 0.065
+   },
+   "1-3": {
+    "windows": 62,
+    "games": 62,
+    "can_share": 0.903,
+    "can_but_took": 0.482,
+    "says_guard_share": 0.581,
+    "says_guard_but_took": 0.306,
+    "took_share": 0.532,
+    "src": {
+     "joint": 56,
+     "curve": 6
+    },
+    "payable_counter_per_hand": 0.705,
+    "payable_counter_cards": 3.548,
+    "spent_mean": 0.06
+   },
+   "4-6": {
+    "windows": 206,
+    "games": 126,
+    "can_share": 0.879,
+    "can_but_took": 0.536,
+    "says_guard_share": 0.524,
+    "says_guard_but_took": 0.444,
+    "took_share": 0.539,
+    "src": {
+     "joint": 156,
+     "blocker": 25,
+     "curve": 25
+    },
+    "payable_counter_per_hand": 0.69,
+    "payable_counter_cards": 3.471,
+    "spent_mean": 0.0548
+   },
+   "7+": {
+    "windows": 368,
+    "games": 141,
+    "can_share": 0.383,
+    "can_but_took": 0.752,
+    "says_guard_share": 0.041,
+    "says_guard_but_took": 0.533,
+    "took_share": 0.851,
+    "src": {
+     "joint": 99,
+     "curve": 227,
+     "blocker": 42
+    },
+    "payable_counter_per_hand": 0.727,
+    "payable_counter_cards": 3.19,
+    "spent_mean": 0.0715
+   }
+  },
+  "OP16-022": {
+   "all": {
+    "windows": 681,
+    "games": 143,
+    "can_share": 0.797,
+    "can_but_took": 0.514,
+    "says_guard_share": 0.443,
+    "says_guard_but_took": 0.46,
+    "took_share": 0.581,
+    "src": {
+     "joint": 411,
+     "curve": 138,
+     "blocker": 132
+    },
+    "payable_counter_per_hand": 0.675,
+    "payable_counter_cards": 3.699,
+    "spent_mean": 0.0511
+   },
+   "1-3": {
+    "windows": 76,
+    "games": 76,
+    "can_share": 0.974,
+    "can_but_took": 0.473,
+    "says_guard_share": 0.803,
+    "says_guard_but_took": 0.377,
+    "took_share": 0.487,
+    "src": {
+     "joint": 74,
+     "curve": 2
+    },
+    "payable_counter_per_hand": 0.73,
+    "payable_counter_cards": 4.105,
+    "spent_mean": 0.0505
+   },
+   "4-6": {
+    "windows": 218,
+    "games": 138,
+    "can_share": 0.945,
+    "can_but_took": 0.417,
+    "says_guard_share": 0.665,
+    "says_guard_but_took": 0.428,
+    "took_share": 0.413,
+    "src": {
+     "joint": 152,
+     "blocker": 54,
+     "curve": 12
+    },
+    "payable_counter_per_hand": 0.693,
+    "payable_counter_cards": 4.069,
+    "spent_mean": 0.0494
+   },
+   "7+": {
+    "windows": 387,
+    "games": 143,
+    "can_share": 0.68,
+    "can_but_took": 0.601,
+    "says_guard_share": 0.248,
+    "says_guard_but_took": 0.562,
+    "took_share": 0.695,
+    "src": {
+     "joint": 185,
+     "curve": 124,
+     "blocker": 78
+    },
+    "payable_counter_per_hand": 0.654,
+    "payable_counter_cards": 3.411,
+    "spent_mean": 0.0522
+   }
+  },
+  "ALL": {
+   "all": {
+    "windows": 2668,
+    "games": 300,
+    "can_share": 0.676,
+    "can_but_took": 0.476,
+    "says_guard_share": 0.365,
+    "says_guard_but_took": 0.406,
+    "took_share": 0.556,
+    "src": {
+     "joint": 1435,
+     "curve": 864,
+     "blocker": 369
+    },
+    "payable_counter_per_hand": 0.647,
+    "payable_counter_cards": 3.398,
+    "spent_mean": 0.0643
+   }
+  }
+ },
+ "hand": {
+  "OP09-001|1-3": {
+   "cards": 394,
+   "c0": 0.409,
+   "cev": 0.051,
+   "cpos": 0.541
+  },
+  "OP09-001|4-6": {
+   "cards": 1199,
+   "c0": 0.434,
+   "cev": 0.053,
+   "cpos": 0.513
+  },
+  "OP09-001|7+": {
+   "cards": 2847,
+   "c0": 0.431,
+   "cev": 0.063,
+   "cpos": 0.506
+  },
+  "OP09-001|all": {
+   "cards": 4440,
+   "c0": 0.43,
+   "cev": 0.059,
+   "cpos": 0.511
+  },
+  "OP11-041|1-3": {
+   "cards": 360,
+   "c0": 0.328,
+   "cev": 0.0,
+   "cpos": 0.672
+  },
+  "OP11-041|4-6": {
+   "cards": 1263,
+   "c0": 0.337,
+   "cev": 0.0,
+   "cpos": 0.663
+  },
+  "OP11-041|7+": {
+   "cards": 2257,
+   "c0": 0.29,
+   "cev": 0.0,
+   "cpos": 0.71
+  },
+  "OP11-041|all": {
+   "cards": 3880,
+   "c0": 0.309,
+   "cev": 0.0,
+   "cpos": 0.691
+  },
+  "OP15-058|1-3": {
+   "cards": 308,
+   "c0": 0.286,
+   "cev": 0.26,
+   "cpos": 0.455
+  },
+  "OP15-058|4-6": {
+   "cards": 1201,
+   "c0": 0.303,
+   "cev": 0.231,
+   "cpos": 0.466
+  },
+  "OP15-058|7+": {
+   "cards": 2294,
+   "c0": 0.288,
+   "cev": 0.16,
+   "cpos": 0.553
+  },
+  "OP15-058|all": {
+   "cards": 3803,
+   "c0": 0.292,
+   "cev": 0.19,
+   "cpos": 0.517
+  },
+  "OP16-022|1-3": {
+   "cards": 432,
+   "c0": 0.178,
+   "cev": 0.153,
+   "cpos": 0.669
+  },
+  "OP16-022|4-6": {
+   "cards": 1334,
+   "c0": 0.196,
+   "cev": 0.163,
+   "cpos": 0.641
+  },
+  "OP16-022|7+": {
+   "cards": 2607,
+   "c0": 0.166,
+   "cev": 0.279,
+   "cpos": 0.555
+  },
+  "OP16-022|all": {
+   "cards": 4373,
+   "c0": 0.176,
+   "cev": 0.231,
+   "cpos": 0.593
+  }
+ },
+ "life": {
+  "OP11-041": {
+   "seats": 135,
+   "life_added_per_seat": 2.222,
+   "life_left_own_turn_per_seat": 0.081,
+   "leader_attacks_received": 1466,
+   "life_lost_per_attack": 0.349
+  },
+  "OP15-058": {
+   "seats": 159,
+   "life_added_per_seat": 0.0,
+   "life_left_own_turn_per_seat": 0.019,
+   "leader_attacks_received": 1581,
+   "life_lost_per_attack": 0.405
+  },
+  "OP09-001": {
+   "seats": 145,
+   "life_added_per_seat": 0.0,
+   "life_left_own_turn_per_seat": 0.097,
+   "leader_attacks_received": 1440,
+   "life_lost_per_attack": 0.34
+  },
+  "OP16-022": {
+   "seats": 161,
+   "life_added_per_seat": 0.0,
+   "life_left_own_turn_per_seat": 0.025,
+   "leader_attacks_received": 1601,
+   "life_lost_per_attack": 0.306
+  }
+ }
+}

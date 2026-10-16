@@ -1,0 +1,1444 @@
+{
+ "record": "/tmp/claude-0/-home-user-opcg-sim-backend/ddd28cd7-f60e-52c6-ab75-a44ab4cf19b8/scratchpad/data/sigma_wip/data/w39",
+ "align": {
+  "rows": 15796
+ },
+ "rows": 15154,
+ "best_value_matches_dump_bv": 15154,
+ "mu": 0.0551,
+ "bands": {
+  "1-3": {
+   "rows": 1372,
+   "diff_sum": 1016.44,
+   "share_best_attack_played_not": 0.4399,
+   "share_ci": [
+    0.3822,
+    0.4974
+   ],
+   "share_rows_best_attack_played_not": 0.1931,
+   "table": {
+    "atk_leader|don_leader": {
+     "n": 115,
+     "median": 1.3884,
+     "sum": 177.3
+    },
+    "atk_leader|play_char": {
+     "n": 72,
+     "median": 1.9232,
+     "sum": 150.4
+    },
+    "play_event|pass": {
+     "n": 68,
+     "median": 0.5829,
+     "sum": 94.13
+    },
+    "atk_leader|atk_leader": {
+     "n": 243,
+     "median": 0.0,
+     "sum": 89.46
+    },
+    "play_char|pass": {
+     "n": 35,
+     "median": 0.7203,
+     "sum": 58.72
+    },
+    "atk_leader|pass": {
+     "n": 35,
+     "median": 1.407,
+     "sum": 55.15
+    },
+    "effect|pass": {
+     "n": 70,
+     "median": 0.4289,
+     "sum": 49.27
+    },
+    "pass|play_char": {
+     "n": 38,
+     "median": 0.4222,
+     "sum": 29.76
+    },
+    "play_event|play_char": {
+     "n": 25,
+     "median": 0.6053,
+     "sum": 26.36
+    },
+    "effect|play_char": {
+     "n": 28,
+     "median": 0.6305,
+     "sum": 23.65
+    },
+    "atk_leader|effect": {
+     "n": 16,
+     "median": 1.0413,
+     "sum": 23.23
+    },
+    "play_event|atk_leader": {
+     "n": 6,
+     "median": 2.1156,
+     "sum": 19.08
+    },
+    "don_leader|play_char": {
+     "n": 10,
+     "median": 1.942,
+     "sum": 18.78
+    },
+    "don_char|atk_leader": {
+     "n": 6,
+     "median": 3.2611,
+     "sum": 17.04
+    },
+    "atk_leader|don_char": {
+     "n": 11,
+     "median": 1.3758,
+     "sum": 16.3
+    },
+    "play_char|play_char": {
+     "n": 114,
+     "median": 0.0,
+     "sum": 16.19
+    },
+    "pass|atk_leader": {
+     "n": 13,
+     "median": 0.9079,
+     "sum": 15.25
+    },
+    "atk_leader|play_event": {
+     "n": 10,
+     "median": 1.3869,
+     "sum": 14.53
+    },
+    "don_leader|atk_leader": {
+     "n": 12,
+     "median": 0.8107,
+     "sum": 14.13
+    },
+    "play_stage|pass": {
+     "n": 22,
+     "median": 0.4625,
+     "sum": 14.02
+    },
+    "pass|effect": {
+     "n": 35,
+     "median": 0.0551,
+     "sum": 13.02
+    },
+    "pass|play_event": {
+     "n": 13,
+     "median": 0.2489,
+     "sum": 11.77
+    },
+    "effect|play_event": {
+     "n": 5,
+     "median": 0.3795,
+     "sum": 7.66
+    },
+    "play_event|effect": {
+     "n": 8,
+     "median": 0.6591,
+     "sum": 7.24
+    },
+    "play_stage|play_char": {
+     "n": 10,
+     "median": 0.5396,
+     "sum": 7.09
+    },
+    "atk_leader|play_stage": {
+     "n": 3,
+     "median": 2.793,
+     "sum": 5.66
+    },
+    "effect|atk_leader": {
+     "n": 6,
+     "median": 0.8312,
+     "sum": 5.43
+    },
+    "don_leader|don_leader": {
+     "n": 14,
+     "median": 0.0,
+     "sum": 3.25
+    },
+    "don_char|effect": {
+     "n": 1,
+     "median": 2.75,
+     "sum": 2.75
+    },
+    "effect|play_stage": {
+     "n": 5,
+     "median": 0.4623,
+     "sum": 2.65
+    },
+    "don_leader|pass": {
+     "n": 2,
+     "median": 1.3139,
+     "sum": 2.63
+    },
+    "play_char|effect": {
+     "n": 3,
+     "median": 0.6417,
+     "sum": 2.39
+    },
+    "play_char|play_stage": {
+     "n": 3,
+     "median": 0.8775,
+     "sum": 2.37
+    },
+    "don_char|pass": {
+     "n": 2,
+     "median": 1.0332,
+     "sum": 2.07
+    },
+    "don_leader|effect": {
+     "n": 1,
+     "median": 1.8426,
+     "sum": 1.84
+    },
+    "atk_char|pass": {
+     "n": 1,
+     "median": 1.6624,
+     "sum": 1.66
+    },
+    "effect|effect": {
+     "n": 85,
+     "median": 0.0,
+     "sum": 1.61
+    },
+    "atk_char|don_leader": {
+     "n": 1,
+     "median": 1.5512,
+     "sum": 1.55
+    },
+    "atk_leader|atk_char": {
+     "n": 3,
+     "median": 0.7017,
+     "sum": 1.47
+    },
+    "play_event|play_event": {
+     "n": 55,
+     "median": 0.0,
+     "sum": 1.44
+    },
+    "atk_char|don_char": {
+     "n": 1,
+     "median": 1.3556,
+     "sum": 1.36
+    },
+    "atk_char|atk_leader": {
+     "n": 1,
+     "median": 1.2762,
+     "sum": 1.28
+    },
+    "don_leader|play_stage": {
+     "n": 1,
+     "median": 1.2146,
+     "sum": 1.21
+    },
+    "play_event|play_stage": {
+     "n": 1,
+     "median": 0.8679,
+     "sum": 0.87
+    },
+    "play_char|play_event": {
+     "n": 2,
+     "median": 0.3651,
+     "sum": 0.73
+    },
+    "play_event|don_char": {
+     "n": 1,
+     "median": 0.7235,
+     "sum": 0.72
+    },
+    "pass|don_leader": {
+     "n": 2,
+     "median": 0.3166,
+     "sum": 0.63
+    },
+    "don_char|play_char": {
+     "n": 1,
+     "median": 0.5116,
+     "sum": 0.51
+    },
+    "don_char|don_char": {
+     "n": 3,
+     "median": 0.0115,
+     "sum": 0.28
+    },
+    "effect|don_char": {
+     "n": 1,
+     "median": 0.2581,
+     "sum": 0.26
+    },
+    "pass|don_char": {
+     "n": 2,
+     "median": 0.1238,
+     "sum": 0.25
+    },
+    "play_char|atk_leader": {
+     "n": 1,
+     "median": 0.0715,
+     "sum": 0.07
+    },
+    "pass|play_stage": {
+     "n": 2,
+     "median": 0.0,
+     "sum": 0.0
+    },
+    "pass|pass": {
+     "n": 135,
+     "median": 0.0,
+     "sum": 0.0
+    },
+    "play_stage|play_stage": {
+     "n": 12,
+     "median": 0.0,
+     "sum": 0.0
+    },
+    "atk_char|atk_char": {
+     "n": 1,
+     "median": 0.0,
+     "sum": 0.0
+    }
+   }
+  },
+  "4-6": {
+   "rows": 3072,
+   "diff_sum": 2731.07,
+   "share_best_attack_played_not": 0.6932,
+   "share_ci": [
+    0.6614,
+    0.727
+   ],
+   "share_rows_best_attack_played_not": 0.3529,
+   "table": {
+    "atk_leader|play_char": {
+     "n": 540,
+     "median": 1.6564,
+     "sum": 1073.48
+    },
+    "atk_leader|don_leader": {
+     "n": 256,
+     "median": 1.2919,
+     "sum": 396.92
+    },
+    "atk_leader|atk_leader": {
+     "n": 894,
+     "median": 0.0,
+     "sum": 161.89
+    },
+    "atk_char|play_char": {
+     "n": 38,
+     "median": 2.5393,
+     "sum": 96.52
+    },
+    "atk_leader|don_char": {
+     "n": 61,
+     "median": 1.0388,
+     "sum": 82.54
+    },
+    "atk_leader|effect": {
+     "n": 66,
+     "median": 1.0026,
+     "sum": 75.81
+    },
+    "atk_leader|atk_char": {
+     "n": 68,
+     "median": 0.9225,
+     "sum": 72.95
+    },
+    "don_leader|play_char": {
+     "n": 35,
+     "median": 1.4451,
+     "sum": 62.93
+    },
+    "atk_leader|pass": {
+     "n": 65,
+     "median": 0.6465,
+     "sum": 60.29
+    },
+    "play_char|play_char": {
+     "n": 75,
+     "median": 0.0,
+     "sum": 47.5
+    },
+    "atk_char|don_leader": {
+     "n": 22,
+     "median": 1.9429,
+     "sum": 45.36
+    },
+    "effect|pass": {
+     "n": 42,
+     "median": 0.5931,
+     "sum": 44.4
+    },
+    "effect|atk_leader": {
+     "n": 39,
+     "median": 0.5629,
+     "sum": 44.11
+    },
+    "pass|play_char": {
+     "n": 20,
+     "median": 1.143,
+     "sum": 39.57
+    },
+    "don_leader|atk_leader": {
+     "n": 22,
+     "median": 1.2786,
+     "sum": 34.59
+    },
+    "pass|atk_leader": {
+     "n": 51,
+     "median": 0.2389,
+     "sum": 29.68
+    },
+    "atk_char|atk_leader": {
+     "n": 33,
+     "median": 0.7011,
+     "sum": 29.0
+    },
+    "don_char|atk_leader": {
+     "n": 23,
+     "median": 0.7615,
+     "sum": 28.82
+    },
+    "atk_leader|play_event": {
+     "n": 14,
+     "median": 1.5434,
+     "sum": 26.84
+    },
+    "play_event|play_char": {
+     "n": 20,
+     "median": 1.0189,
+     "sum": 26.02
+    },
+    "don_char|play_char": {
+     "n": 19,
+     "median": 0.8656,
+     "sum": 24.52
+    },
+    "pass|effect": {
+     "n": 35,
+     "median": 0.0,
+     "sum": 23.08
+    },
+    "play_char|pass": {
+     "n": 11,
+     "median": 1.2363,
+     "sum": 21.45
+    },
+    "effect|play_char": {
+     "n": 13,
+     "median": 0.273,
+     "sum": 14.05
+    },
+    "atk_char|effect": {
+     "n": 7,
+     "median": 2.1557,
+     "sum": 13.85
+    },
+    "atk_char|don_char": {
+     "n": 8,
+     "median": 1.8301,
+     "sum": 13.75
+    },
+    "don_char|pass": {
+     "n": 19,
+     "median": 0.1534,
+     "sum": 12.59
+    },
+    "atk_char|atk_char": {
+     "n": 100,
+     "median": 0.0,
+     "sum": 11.21
+    },
+    "pass|atk_char": {
+     "n": 6,
+     "median": 1.0456,
+     "sum": 9.92
+    },
+    "don_char|don_leader": {
+     "n": 4,
+     "median": 2.1506,
+     "sum": 8.73
+    },
+    "play_char|atk_char": {
+     "n": 3,
+     "median": 1.4956,
+     "sum": 7.25
+    },
+    "don_char|effect": {
+     "n": 4,
+     "median": 0.4152,
+     "sum": 7.02
+    },
+    "atk_leader|play_stage": {
+     "n": 5,
+     "median": 1.338,
+     "sum": 7.0
+    },
+    "pass|don_leader": {
+     "n": 3,
+     "median": 1.1357,
+     "sum": 6.54
+    },
+    "don_leader|don_leader": {
+     "n": 22,
+     "median": 0.0,
+     "sum": 6.45
+    },
+    "don_leader|atk_char": {
+     "n": 4,
+     "median": 1.949,
+     "sum": 6.35
+    },
+    "effect|atk_char": {
+     "n": 8,
+     "median": 0.4426,
+     "sum": 6.09
+    },
+    "play_char|don_char": {
+     "n": 7,
+     "median": 0.5909,
+     "sum": 5.96
+    },
+    "don_leader|pass": {
+     "n": 2,
+     "median": 2.6681,
+     "sum": 5.34
+    },
+    "play_char|atk_leader": {
+     "n": 5,
+     "median": 1.5657,
+     "sum": 5.08
+    },
+    "effect|don_leader": {
+     "n": 5,
+     "median": 1.2135,
+     "sum": 4.65
+    },
+    "effect|effect": {
+     "n": 80,
+     "median": 0.0,
+     "sum": 4.28
+    },
+    "play_stage|pass": {
+     "n": 1,
+     "median": 3.5559,
+     "sum": 3.56
+    },
+    "effect|don_char": {
+     "n": 4,
+     "median": 0.7265,
+     "sum": 3.35
+    },
+    "play_char|don_leader": {
+     "n": 4,
+     "median": 0.4511,
+     "sum": 3.27
+    },
+    "play_event|effect": {
+     "n": 3,
+     "median": 0.5633,
+     "sum": 2.16
+    },
+    "don_leader|effect": {
+     "n": 2,
+     "median": 0.9472,
+     "sum": 1.89
+    },
+    "effect|play_stage": {
+     "n": 1,
+     "median": 1.8857,
+     "sum": 1.89
+    },
+    "play_event|pass": {
+     "n": 5,
+     "median": 0.165,
+     "sum": 1.72
+    },
+    "play_stage|don_leader": {
+     "n": 2,
+     "median": 0.629,
+     "sum": 1.26
+    },
+    "play_char|effect": {
+     "n": 2,
+     "median": 0.6123,
+     "sum": 1.22
+    },
+    "effect|play_event": {
+     "n": 1,
+     "median": 1.1187,
+     "sum": 1.12
+    },
+    "play_char|play_event": {
+     "n": 1,
+     "median": 0.9149,
+     "sum": 0.91
+    },
+    "play_stage|effect": {
+     "n": 1,
+     "median": 0.9052,
+     "sum": 0.91
+    },
+    "atk_char|pass": {
+     "n": 2,
+     "median": 0.4322,
+     "sum": 0.86
+    },
+    "play_stage|don_char": {
+     "n": 2,
+     "median": 0.4319,
+     "sum": 0.86
+    },
+    "play_stage|atk_leader": {
+     "n": 1,
+     "median": 0.6054,
+     "sum": 0.61
+    },
+    "play_event|play_event": {
+     "n": 7,
+     "median": 0.0,
+     "sum": 0.45
+    },
+    "play_stage|play_char": {
+     "n": 1,
+     "median": 0.4296,
+     "sum": 0.43
+    },
+    "don_char|play_stage": {
+     "n": 1,
+     "median": 0.1622,
+     "sum": 0.16
+    },
+    "don_char|don_char": {
+     "n": 19,
+     "median": 0.0,
+     "sum": 0.04
+    },
+    "play_event|don_leader": {
+     "n": 1,
+     "median": 0.0309,
+     "sum": 0.03
+    },
+    "play_event|don_char": {
+     "n": 1,
+     "median": 0.0065,
+     "sum": 0.01
+    },
+    "pass|pass": {
+     "n": 248,
+     "median": 0.0,
+     "sum": 0.0
+    },
+    "play_stage|play_stage": {
+     "n": 5,
+     "median": 0.0,
+     "sum": 0.0
+    },
+    "pass|don_char": {
+     "n": 2,
+     "median": 0.0,
+     "sum": 0.0
+    },
+    "pass|play_stage": {
+     "n": 1,
+     "median": 0.0,
+     "sum": 0.0
+    }
+   }
+  },
+  "7+": {
+   "rows": 10710,
+   "diff_sum": 11183.33,
+   "share_best_attack_played_not": 0.6073,
+   "share_ci": [
+    0.5726,
+    0.6404
+   ],
+   "share_rows_best_attack_played_not": 0.3438,
+   "table": {
+    "atk_leader|don_char": {
+     "n": 1839,
+     "median": 1.0686,
+     "sum": 2980.12
+    },
+    "atk_leader|don_leader": {
+     "n": 596,
+     "median": 1.1141,
+     "sum": 1373.36
+    },
+    "atk_leader|play_char": {
+     "n": 623,
+     "median": 1.5602,
+     "sum": 1305.61
+    },
+    "atk_leader|atk_char": {
+     "n": 605,
+     "median": 1.0941,
+     "sum": 1043.87
+    },
+    "atk_leader|atk_leader": {
+     "n": 3123,
+     "median": 0.0,
+     "sum": 728.89
+    },
+    "atk_char|atk_leader": {
+     "n": 243,
+     "median": 0.7694,
+     "sum": 357.44
+    },
+    "atk_char|don_char": {
+     "n": 183,
+     "median": 1.4481,
+     "sum": 334.03
+    },
+    "atk_char|don_leader": {
+     "n": 72,
+     "median": 1.3141,
+     "sum": 216.35
+    },
+    "atk_char|atk_char": {
+     "n": 423,
+     "median": 0.0,
+     "sum": 213.59
+    },
+    "play_char|atk_leader": {
+     "n": 75,
+     "median": 0.7732,
+     "sum": 205.37
+    },
+    "atk_char|play_char": {
+     "n": 105,
+     "median": 1.6745,
+     "sum": 195.88
+    },
+    "atk_leader|effect": {
+     "n": 132,
+     "median": 1.1913,
+     "sum": 185.19
+    },
+    "play_char|play_char": {
+     "n": 193,
+     "median": 0.0,
+     "sum": 132.3
+    },
+    "effect|atk_leader": {
+     "n": 71,
+     "median": 0.9464,
+     "sum": 128.22
+    },
+    "effect|pass": {
+     "n": 88,
+     "median": 0.6055,
+     "sum": 125.89
+    },
+    "effect|don_char": {
+     "n": 73,
+     "median": 1.0756,
+     "sum": 110.06
+    },
+    "play_char|don_char": {
+     "n": 72,
+     "median": 0.2704,
+     "sum": 101.47
+    },
+    "don_char|don_char": {
+     "n": 520,
+     "median": 0.0,
+     "sum": 89.72
+    },
+    "pass|play_char": {
+     "n": 35,
+     "median": 1.8708,
+     "sum": 81.85
+    },
+    "play_event|atk_leader": {
+     "n": 31,
+     "median": 0.4474,
+     "sum": 80.57
+    },
+    "don_char|pass": {
+     "n": 47,
+     "median": 0.4965,
+     "sum": 76.92
+    },
+    "don_char|play_char": {
+     "n": 72,
+     "median": 0.591,
+     "sum": 71.01
+    },
+    "atk_leader|play_event": {
+     "n": 38,
+     "median": 1.3995,
+     "sum": 69.58
+    },
+    "play_event|play_char": {
+     "n": 28,
+     "median": 1.3638,
+     "sum": 61.55
+    },
+    "pass|atk_leader": {
+     "n": 49,
+     "median": 0.2929,
+     "sum": 57.01
+    },
+    "don_char|atk_leader": {
+     "n": 47,
+     "median": 0.9161,
+     "sum": 56.43
+    },
+    "atk_leader|pass": {
+     "n": 40,
+     "median": 0.6966,
+     "sum": 55.94
+    },
+    "play_event|don_char": {
+     "n": 45,
+     "median": 0.9364,
+     "sum": 49.77
+    },
+    "pass|don_char": {
+     "n": 17,
+     "median": 1.2652,
+     "sum": 43.9
+    },
+    "effect|play_char": {
+     "n": 38,
+     "median": 0.8582,
+     "sum": 39.56
+    },
+    "pass|effect": {
+     "n": 48,
+     "median": 0.5875,
+     "sum": 39.15
+    },
+    "effect|atk_char": {
+     "n": 31,
+     "median": 1.2874,
+     "sum": 38.57
+    },
+    "don_leader|don_leader": {
+     "n": 63,
+     "median": 0.0,
+     "sum": 35.2
+    },
+    "effect|don_leader": {
+     "n": 18,
+     "median": 1.9187,
+     "sum": 32.32
+    },
+    "play_event|pass": {
+     "n": 20,
+     "median": 0.4653,
+     "sum": 32.09
+    },
+    "don_leader|play_char": {
+     "n": 17,
+     "median": 1.0298,
+     "sum": 28.1
+    },
+    "atk_char|effect": {
+     "n": 20,
+     "median": 0.7504,
+     "sum": 27.57
+    },
+    "don_leader|atk_leader": {
+     "n": 31,
+     "median": 0.7402,
+     "sum": 27.48
+    },
+    "don_char|atk_char": {
+     "n": 13,
+     "median": 1.437,
+     "sum": 27.16
+    },
+    "don_char|don_leader": {
+     "n": 7,
+     "median": 0.6065,
+     "sum": 25.52
+    },
+    "atk_leader|play_stage": {
+     "n": 15,
+     "median": 1.3815,
+     "sum": 23.51
+    },
+    "play_char|atk_char": {
+     "n": 16,
+     "median": 1.1268,
+     "sum": 20.78
+    },
+    "play_event|don_leader": {
+     "n": 10,
+     "median": 1.6892,
+     "sum": 20.15
+    },
+    "pass|atk_char": {
+     "n": 21,
+     "median": 0.365,
+     "sum": 19.12
+    },
+    "play_event|atk_char": {
+     "n": 13,
+     "median": 0.7636,
+     "sum": 18.3
+    },
+    "play_stage|don_char": {
+     "n": 6,
+     "median": 2.136,
+     "sum": 17.33
+    },
+    "play_char|pass": {
+     "n": 10,
+     "median": 0.6049,
+     "sum": 16.37
+    },
+    "play_stage|play_char": {
+     "n": 11,
+     "median": 0.9648,
+     "sum": 14.46
+    },
+    "atk_char|play_event": {
+     "n": 7,
+     "median": 1.294,
+     "sum": 14.02
+    },
+    "effect|effect": {
+     "n": 306,
+     "median": 0.0,
+     "sum": 12.83
+    },
+    "pass|play_event": {
+     "n": 4,
+     "median": 0.4757,
+     "sum": 10.0
+    },
+    "play_char|effect": {
+     "n": 8,
+     "median": 0.7065,
+     "sum": 8.71
+    },
+    "play_char|don_leader": {
+     "n": 7,
+     "median": 0.7142,
+     "sum": 8.66
+    },
+    "play_char|play_event": {
+     "n": 4,
+     "median": 0.6574,
+     "sum": 8.59
+    },
+    "effect|play_event": {
+     "n": 8,
+     "median": 0.6814,
+     "sum": 8.4
+    },
+    "play_char|play_stage": {
+     "n": 5,
+     "median": 0.7966,
+     "sum": 7.73
+    },
+    "play_stage|play_event": {
+     "n": 3,
+     "median": 1.383,
+     "sum": 7.71
+    },
+    "don_char|effect": {
+     "n": 6,
+     "median": 0.4039,
+     "sum": 7.58
+    },
+    "don_leader|don_char": {
+     "n": 6,
+     "median": 0.9079,
+     "sum": 6.87
+    },
+    "don_leader|atk_char": {
+     "n": 8,
+     "median": 0.5324,
+     "sum": 6.49
+    },
+    "atk_char|pass": {
+     "n": 8,
+     "median": 0.7505,
+     "sum": 5.52
+    },
+    "don_char|play_event": {
+     "n": 2,
+     "median": 2.6357,
+     "sum": 5.27
+    },
+    "atk_char|play_stage": {
+     "n": 4,
+     "median": 1.4263,
+     "sum": 4.79
+    },
+    "pass|don_leader": {
+     "n": 6,
+     "median": 0.4992,
+     "sum": 4.56
+    },
+    "play_stage|pass": {
+     "n": 6,
+     "median": 0.4782,
+     "sum": 3.57
+    },
+    "play_event|effect": {
+     "n": 3,
+     "median": 1.0179,
+     "sum": 3.07
+    },
+    "play_stage|atk_leader": {
+     "n": 3,
+     "median": 0.766,
+     "sum": 2.67
+    },
+    "play_event|play_stage": {
+     "n": 2,
+     "median": 1.3344,
+     "sum": 2.67
+    },
+    "play_event|play_event": {
+     "n": 28,
+     "median": 0.0,
+     "sum": 2.67
+    },
+    "don_char|play_stage": {
+     "n": 2,
+     "median": 1.0881,
+     "sum": 2.18
+    },
+    "play_stage|effect": {
+     "n": 1,
+     "median": 2.1507,
+     "sum": 2.15
+    },
+    "don_leader|effect": {
+     "n": 1,
+     "median": 1.0359,
+     "sum": 1.04
+    },
+    "effect|play_stage": {
+     "n": 3,
+     "median": 0.3384,
+     "sum": 0.92
+    },
+    "pass|pass": {
+     "n": 354,
+     "median": 0.0,
+     "sum": 0.0
+    },
+    "play_stage|play_stage": {
+     "n": 22,
+     "median": 0.0,
+     "sum": 0.0
+    }
+   }
+  },
+  "all": {
+   "rows": 15154,
+   "diff_sum": 14930.84,
+   "share_best_attack_played_not": 0.6116,
+   "share_ci": [
+    0.5854,
+    0.6365
+   ],
+   "share_rows_best_attack_played_not": 0.332,
+   "table": {
+    "atk_leader|don_char": {
+     "n": 1911,
+     "median": 1.0686,
+     "sum": 3078.96
+    },
+    "atk_leader|play_char": {
+     "n": 1235,
+     "median": 1.6338,
+     "sum": 2529.49
+    },
+    "atk_leader|don_leader": {
+     "n": 967,
+     "median": 1.1988,
+     "sum": 1947.58
+    },
+    "atk_leader|atk_char": {
+     "n": 676,
+     "median": 1.0801,
+     "sum": 1118.29
+    },
+    "atk_leader|atk_leader": {
+     "n": 4260,
+     "median": 0.0,
+     "sum": 980.24
+    },
+    "atk_char|atk_leader": {
+     "n": 277,
+     "median": 0.7694,
+     "sum": 387.72
+    },
+    "atk_char|don_char": {
+     "n": 192,
+     "median": 1.4567,
+     "sum": 349.14
+    },
+    "atk_char|play_char": {
+     "n": 143,
+     "median": 1.8109,
+     "sum": 292.4
+    },
+    "atk_leader|effect": {
+     "n": 214,
+     "median": 1.1139,
+     "sum": 284.23
+    },
+    "atk_char|don_leader": {
+     "n": 95,
+     "median": 1.5967,
+     "sum": 263.26
+    },
+    "atk_char|atk_char": {
+     "n": 524,
+     "median": 0.0,
+     "sum": 224.8
+    },
+    "effect|pass": {
+     "n": 200,
+     "median": 0.4898,
+     "sum": 219.57
+    },
+    "play_char|atk_leader": {
+     "n": 81,
+     "median": 0.7732,
+     "sum": 210.52
+    },
+    "play_char|play_char": {
+     "n": 382,
+     "median": 0.0,
+     "sum": 195.99
+    },
+    "effect|atk_leader": {
+     "n": 116,
+     "median": 0.7704,
+     "sum": 177.76
+    },
+    "atk_leader|pass": {
+     "n": 140,
+     "median": 0.8363,
+     "sum": 171.38
+    },
+    "pass|play_char": {
+     "n": 93,
+     "median": 0.6161,
+     "sum": 151.18
+    },
+    "play_event|pass": {
+     "n": 93,
+     "median": 0.5485,
+     "sum": 127.93
+    },
+    "play_event|play_char": {
+     "n": 73,
+     "median": 0.9505,
+     "sum": 113.93
+    },
+    "effect|don_char": {
+     "n": 78,
+     "median": 0.9657,
+     "sum": 113.67
+    },
+    "atk_leader|play_event": {
+     "n": 62,
+     "median": 1.4457,
+     "sum": 110.95
+    },
+    "don_leader|play_char": {
+     "n": 62,
+     "median": 1.3711,
+     "sum": 109.8
+    },
+    "play_char|don_char": {
+     "n": 79,
+     "median": 0.2704,
+     "sum": 107.43
+    },
+    "don_char|atk_leader": {
+     "n": 76,
+     "median": 0.9648,
+     "sum": 102.28
+    },
+    "pass|atk_leader": {
+     "n": 113,
+     "median": 0.3198,
+     "sum": 101.94
+    },
+    "play_event|atk_leader": {
+     "n": 37,
+     "median": 0.7886,
+     "sum": 99.66
+    },
+    "play_char|pass": {
+     "n": 56,
+     "median": 0.6983,
+     "sum": 96.53
+    },
+    "don_char|play_char": {
+     "n": 92,
+     "median": 0.6121,
+     "sum": 96.04
+    },
+    "don_char|pass": {
+     "n": 68,
+     "median": 0.3919,
+     "sum": 91.58
+    },
+    "don_char|don_char": {
+     "n": 542,
+     "median": 0.0,
+     "sum": 90.03
+    },
+    "effect|play_char": {
+     "n": 79,
+     "median": 0.7062,
+     "sum": 77.26
+    },
+    "don_leader|atk_leader": {
+     "n": 65,
+     "median": 0.8311,
+     "sum": 76.19
+    },
+    "pass|effect": {
+     "n": 118,
+     "median": 0.2655,
+     "sum": 75.24
+    },
+    "play_event|don_char": {
+     "n": 47,
+     "median": 0.8833,
+     "sum": 50.5
+    },
+    "don_leader|don_leader": {
+     "n": 99,
+     "median": 0.0,
+     "sum": 44.9
+    },
+    "effect|atk_char": {
+     "n": 39,
+     "median": 1.14,
+     "sum": 44.66
+    },
+    "pass|don_char": {
+     "n": 21,
+     "median": 0.2477,
+     "sum": 44.15
+    },
+    "atk_char|effect": {
+     "n": 27,
+     "median": 0.9052,
+     "sum": 41.42
+    },
+    "effect|don_leader": {
+     "n": 23,
+     "median": 1.4598,
+     "sum": 36.97
+    },
+    "atk_leader|play_stage": {
+     "n": 23,
+     "median": 1.3815,
+     "sum": 36.17
+    },
+    "don_char|don_leader": {
+     "n": 11,
+     "median": 1.9506,
+     "sum": 34.25
+    },
+    "pass|atk_char": {
+     "n": 27,
+     "median": 0.4136,
+     "sum": 29.04
+    },
+    "play_char|atk_char": {
+     "n": 19,
+     "median": 1.1693,
+     "sum": 28.03
+    },
+    "don_char|atk_char": {
+     "n": 13,
+     "median": 1.437,
+     "sum": 27.16
+    },
+    "play_stage|play_char": {
+     "n": 22,
+     "median": 0.5856,
+     "sum": 21.98
+    },
+    "pass|play_event": {
+     "n": 17,
+     "median": 0.3205,
+     "sum": 21.78
+    },
+    "play_stage|pass": {
+     "n": 29,
+     "median": 0.564,
+     "sum": 21.15
+    },
+    "play_event|don_leader": {
+     "n": 11,
+     "median": 1.6758,
+     "sum": 20.18
+    },
+    "effect|effect": {
+     "n": 471,
+     "median": 0.0,
+     "sum": 18.72
+    },
+    "play_event|atk_char": {
+     "n": 13,
+     "median": 0.7636,
+     "sum": 18.3
+    },
+    "play_stage|don_char": {
+     "n": 8,
+     "median": 1.4123,
+     "sum": 18.2
+    },
+    "don_char|effect": {
+     "n": 11,
+     "median": 0.5558,
+     "sum": 17.35
+    },
+    "effect|play_event": {
+     "n": 14,
+     "median": 0.6078,
+     "sum": 17.18
+    },
+    "atk_char|play_event": {
+     "n": 7,
+     "median": 1.294,
+     "sum": 14.02
+    },
+    "don_leader|atk_char": {
+     "n": 12,
+     "median": 1.0484,
+     "sum": 12.84
+    },
+    "play_event|effect": {
+     "n": 14,
+     "median": 0.6652,
+     "sum": 12.47
+    },
+    "play_char|effect": {
+     "n": 13,
+     "median": 0.6763,
+     "sum": 12.33
+    },
+    "play_char|don_leader": {
+     "n": 11,
+     "median": 0.4694,
+     "sum": 11.93
+    },
+    "pass|don_leader": {
+     "n": 11,
+     "median": 0.4992,
+     "sum": 11.73
+    },
+    "play_char|play_event": {
+     "n": 7,
+     "median": 0.3833,
+     "sum": 10.24
+    },
+    "play_char|play_stage": {
+     "n": 8,
+     "median": 0.837,
+     "sum": 10.1
+    },
+    "atk_char|pass": {
+     "n": 11,
+     "median": 0.7898,
+     "sum": 8.04
+    },
+    "don_leader|pass": {
+     "n": 4,
+     "median": 1.6583,
+     "sum": 7.96
+    },
+    "play_stage|play_event": {
+     "n": 3,
+     "median": 1.383,
+     "sum": 7.71
+    },
+    "don_leader|don_char": {
+     "n": 6,
+     "median": 0.9079,
+     "sum": 6.87
+    },
+    "effect|play_stage": {
+     "n": 9,
+     "median": 0.4623,
+     "sum": 5.45
+    },
+    "don_char|play_event": {
+     "n": 2,
+     "median": 2.6357,
+     "sum": 5.27
+    },
+    "atk_char|play_stage": {
+     "n": 4,
+     "median": 1.4263,
+     "sum": 4.79
+    },
+    "don_leader|effect": {
+     "n": 4,
+     "median": 1.1508,
+     "sum": 4.77
+    },
+    "play_event|play_event": {
+     "n": 90,
+     "median": 0.0,
+     "sum": 4.55
+    },
+    "play_event|play_stage": {
+     "n": 3,
+     "median": 1.3014,
+     "sum": 3.54
+    },
+    "play_stage|atk_leader": {
+     "n": 4,
+     "median": 0.7055,
+     "sum": 3.27
+    },
+    "play_stage|effect": {
+     "n": 2,
+     "median": 1.528,
+     "sum": 3.06
+    },
+    "don_char|play_stage": {
+     "n": 3,
+     "median": 0.1622,
+     "sum": 2.34
+    },
+    "play_stage|don_leader": {
+     "n": 2,
+     "median": 0.629,
+     "sum": 1.26
+    },
+    "don_leader|play_stage": {
+     "n": 1,
+     "median": 1.2146,
+     "sum": 1.21
+    },
+    "pass|play_stage": {
+     "n": 3,
+     "median": 0.0,
+     "sum": 0.0
+    },
+    "pass|pass": {
+     "n": 737,
+     "median": 0.0,
+     "sum": 0.0
+    },
+    "play_stage|play_stage": {
+     "n": 39,
+     "median": 0.0,
+     "sum": 0.0
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,212 @@
+{
+  "games": 60,
+  "rows": 4407,
+  "priced": 3960,
+  "d_mode": "curve",
+  "sigma_rel": 0.4427,
+  "kappa_sigma_mode": "match",
+  "attack_rest_mode": "return",
+  "pre_settle": false,
+  "scale_a": 1.0,
+  "scale_currency": 1.0,
+  "dead_rows": 2670,
+  "dead_share": 0.6742,
+  "last_turn_rows": 736,
+  "capped_share": 0.0,
+  "K_mean": 0.4213,
+  "r_median": 1.0117,
+  "dlog_abs_mean": 0.04936,
+  "w0_mean": 0.409,
+  "by_family": {
+    "play": 721,
+    "end": 647,
+    "attach": 754,
+    "attack": 1577,
+    "effect": 261
+  },
+  "invariance": {
+    "p5_n": 3960,
+    "p5_bad": 3960,
+    "p5_max": 0.444316942569,
+    "p5_bad_offcap": 2030,
+    "p7_n": 3960,
+    "p7_bad": 0,
+    "p7_max": 0.0,
+    "p7_bad_offcap": 0
+  },
+  "arms": {
+    "abs_flat": {
+      "n": 60,
+      "auc": 0.6409,
+      "corr": 0.2313,
+      "slope": 0.21188,
+      "sep": 0.2524,
+      "bias": -0.2849,
+      "w0_gap": -0.037
+    },
+    "abs_kappa": {
+      "n": 60,
+      "auc": 0.8283,
+      "corr": 0.5698,
+      "slope": 0.54984,
+      "sep": 0.5905,
+      "bias": -0.1835,
+      "w0_gap": -0.037
+    },
+    "rel_flat": {
+      "n": 60,
+      "auc": 0.8743,
+      "corr": 0.6056,
+      "slope": 0.24449,
+      "sep": 1.4999,
+      "bias": -0.3439,
+      "w0_gap": -0.037
+    },
+    "rel_K": {
+      "n": 60,
+      "auc": 0.8967,
+      "corr": 0.6368,
+      "slope": 0.69938,
+      "sep": 0.5799,
+      "bias": -0.079,
+      "w0_gap": -0.037
+    },
+    "rel_exact": {
+      "n": 60,
+      "auc": 0.8507,
+      "corr": 0.5686,
+      "slope": 0.72032,
+      "sep": 0.4489,
+      "bias": -0.0919,
+      "w0_gap": -0.037
+    },
+    "plac_K": {
+      "n": 60,
+      "auc": 0.7385,
+      "corr": 0.4058,
+      "slope": 0.70884,
+      "sep": 0.2324,
+      "bias": -0.134,
+      "w0_gap": -0.037
+    },
+    "plac_shift": {
+      "n": 60,
+      "auc": 0.8563,
+      "corr": 0.6246,
+      "slope": 0.85344,
+      "sep": 0.4571,
+      "bias": -0.1473,
+      "w0_gap": -0.037
+    }
+  },
+  "before": {
+    "abs_flat": {
+      "n": 60,
+      "auc": 0.7778,
+      "corr": 0.431,
+      "slope": 0.42021
+    },
+    "abs_kappa": {
+      "n": 60,
+      "auc": 0.8429,
+      "corr": 0.5997,
+      "slope": 0.63529
+    },
+    "rel_flat": {
+      "n": 60,
+      "auc": 0.9136,
+      "corr": 0.6729,
+      "slope": 0.50613
+    },
+    "rel_K": {
+      "n": 60,
+      "auc": 0.8889,
+      "corr": 0.6468,
+      "slope": 1.06931
+    },
+    "rel_exact": {
+      "n": 60,
+      "auc": 0.8485,
+      "corr": 0.5859,
+      "slope": 1.05469
+    },
+    "plac_K": {
+      "n": 60,
+      "auc": 0.752,
+      "corr": 0.4495,
+      "slope": 0.86178
+    },
+    "plac_shift": {
+      "n": 60,
+      "auc": 0.8496,
+      "corr": 0.5839,
+      "slope": 1.18523
+    }
+  },
+  "last_turn": {
+    "abs_flat": {
+      "n": 60,
+      "auc": 0.3008,
+      "corr": -0.3582,
+      "slope": -0.67621
+    },
+    "abs_kappa": {
+      "n": 60,
+      "auc": 0.5769,
+      "corr": 0.0472,
+      "slope": 0.09142
+    },
+    "rel_flat": {
+      "n": 60,
+      "auc": 0.771,
+      "corr": 0.3401,
+      "slope": 0.1911
+    },
+    "rel_K": {
+      "n": 60,
+      "auc": 0.7059,
+      "corr": 0.3721,
+      "slope": 0.73412
+    },
+    "rel_exact": {
+      "n": 60,
+      "auc": 0.6386,
+      "corr": 0.2705,
+      "slope": 0.59281
+    },
+    "plac_K": {
+      "n": 60,
+      "auc": 0.541,
+      "corr": -0.0122,
+      "slope": -0.07149
+    },
+    "plac_shift": {
+      "n": 60,
+      "auc": 0.7082,
+      "corr": 0.3898,
+      "slope": 0.89649
+    }
+  },
+  "cut_price": {
+    "mode": "joint",
+    "cut_view_flat": 85,
+    "cut_mlp_next": 707,
+    "cut_frames": 1414,
+    "cut_cand_sum": 5059,
+    "cut_L1_n": 1382,
+    "cut_L1_sum": 68.40114433861875,
+    "cut_mlp_rule": 707
+  },
+  "rule_stats": {
+    "rule_n": 8572,
+    "rule_fallback": 0,
+    "rule_cut_sum": 50830.74201098681,
+    "rule_stop_sum": 39402.748243236754,
+    "rule_hand_mismatch": 3897,
+    "plan_n": 4993,
+    "rule_don_attach_sum": 22301.0,
+    "rule_don_play_n": 6008,
+    "plan_cut": 102,
+    "plan_cut_turns": 298
+  }
+}

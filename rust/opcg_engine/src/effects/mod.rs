@@ -47,6 +47,8 @@ pub mod resolver;
 #[cfg(test)]
 mod tests_effects;
 #[cfg(test)]
+mod tests_rest_replace;
+#[cfg(test)]
 mod tests_g3;
 #[cfg(test)]
 mod tests_reactions;

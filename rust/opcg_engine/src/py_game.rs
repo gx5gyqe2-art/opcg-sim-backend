@@ -398,18 +398,25 @@ impl Game {
     /// そのまま渡す＝**中断の途中でも正しく決められる**。生成・アリーナ・serve はこれを使う。
     ///
     /// `opts_json` は [`crate::search::decide_json`] と同じ欄（`sims`／`c_puct`／
-    /// `dirichlet_eps`／`temp_turns`／箱まわり／候補生成／`budget`／`commit`／
-    /// `resact_pending`）に加えて:
+    /// `dirichlet_eps`／`temp_turns`／箱まわり／候補生成／`budget`／`select_rule`／
+    /// `q_min_frac`／`root_prior_temp`／`commit`／`resact_pending`）に加えて:
     ///
     /// - `search_seed`（必須）… 探索の乱数（世界サンプル・Dirichlet・温度）を作る seed。
     ///   [`crate::search::Pcg32SearchRng`] を**毎回この seed から作り直す**ので、
     ///   同じ (対局, ターン, 席) に同じ seed を渡せば Python の
     ///   `LearnedEngine._world_rng`（同一 seed から `default_rng` を作り直す）と同じ
     ///   「ターン内 sticky 世界線」になる（計画 §8.17 の申告 (2)）。
+    /// - `worlds`（省略＝1）… 1 回の決定で引く世界サンプルの本数（§20.7.1）。2 以上なら
+    ///   K 本の世界で同じ sims の木を**並列**（`std::thread::scope`）に回し、根の統計を束ねる。
+    ///   世界 i の乱数は `search_seed + i`。
+    ///
+    /// 木を回す間は **GIL を放す**（`Python::detach`＝旧 `allow_threads`）＝世界スレッドが
+    /// 走っている間も他の Python スレッド（API のリクエスト処理）が動ける。探索は Python を
+    /// 一切触らない。
     ///
     /// 戻り値は `decide` と同形（`rng_used` だけは出ない＝出目は自前で作るので数える意味がない）。
     /// `load_masters()` と `load_net()` が先に要る。
-    fn decide(&mut self, player_id: &str, opts_json: &str) -> PyResult<String> {
+    fn decide(&mut self, py: Python<'_>, player_id: &str, opts_json: &str) -> PyResult<String> {
         let masters = self.masters()?;
         let seat = self.seat_of(player_id)?;
         let ov = parse_json(opts_json, "decide opts")?;
@@ -433,16 +440,12 @@ impl Game {
         let mut rng = crate::search::Pcg32SearchRng::new(seed);
         // 返す手は `legal_json` と同じ**席名のまま**（表示名へ差し替えない）。呼び出し側は
         // これをそのまま `apply_game_action`／`apply_battle_action` へ渡す。
-        let body = crate::search::decide_on_state(
-            masters,
-            net,
-            self.session.state(),
-            seat,
-            &opts,
-            &mut rng,
-            &carry,
-        )
-        .map_err(|e| self.map_err(e))?;
+        let state = self.session.state();
+        let body = py
+            .detach(|| {
+                crate::search::decide_on_state(masters, net, state, seat, &opts, &mut rng, &carry)
+            })
+            .map_err(|e| self.map_err(e))?;
         to_py_json(&body)
     }
 
@@ -560,6 +563,110 @@ impl Game {
             "rel_oo": enc.rel_oo,
             "extra": enc.extra,
         }))
+    }
+
+    /// **読み取り専用の複製**（手の値段の後続局面・`clock_succ.py`・`docs/reports/2026-10-10_clock_value.md` §1.2）。
+    ///
+    /// 真の盤面（完全情報）を写した別の対局を返す。乱数は `Replay`（混ぜない）・巻き戻しの記録は空。
+    /// 元の対局は 1 ビットも変わらない（理論の器が「1 手打った後の局面」を読むためだけの口）。
+    fn fork(&self) -> Game {
+        Game {
+            session: Session::new(self.session.state().clone()),
+            names: self.names.clone(),
+        }
+    }
+
+    /// **並びを知らない複製**（`clock_succ.py --shuffle`・方策の教師に使う形・`docs/reports/2026-10-10_clock_value.md` §2.5・§3.5）: `fork` と同じだが、両席とも
+    /// ライフと山札を 1 つに混ぜて並べ直す（ライフの枚数・山札の枚数・手札・場はそのまま）。理論の約束（手札とデッキの中身は見えるが並びは見えない）に
+    /// 合わせた後続を作るためだけの口。並びは `seed` の PCG32（Fisher–Yates）。
+    fn fork_shuffled(&self, seed: u64) -> Game {
+        use crate::journal::CardZone;
+        let mut s = Session::new(self.session.state().clone());
+        let mut g = Pcg32::new(seed);
+        {
+            let mut e = s.edit();
+            for seat in [Seat::P1, Seat::P2] {
+                let n_life = e.card_zone(seat, CardZone::Life).len();
+                let mut pool = Vec::new();
+                for zone in [CardZone::Life, CardZone::Deck] {
+                    let len = e.card_zone(seat, zone).len();
+                    for _ in 0..len {
+                        pool.push(e.card_zone(seat, zone)[0]);
+                        e.card_zone_remove_at(seat, zone, 0);
+                    }
+                }
+                for i in (1..pool.len()).rev() {
+                    let j = (g.next_u32() as usize) % (i + 1);
+                    pool.swap(i, j);
+                }
+                for (i, card) in pool.into_iter().enumerate() {
+                    let zone = if i < n_life { CardZone::Life } else { CardZone::Deck };
+                    e.card_zone_push(seat, zone, card);
+                }
+            }
+        }
+        Game { session: Session::new(s.into_state()), names: self.names.clone() }
+    }
+
+    /// 探索が木の中で使う適用（`search::apply::apply_move_inplace`・`DON_BOX` は付与 k 回＋攻撃に展開・
+    /// 分岐する自分の選択は残す）で 1 手進める。`fork` した対局にだけ使う（§1.2 の 3）。
+    fn apply_search_move(&mut self, player_id: &str, move_json: &str) -> PyResult<()> {
+        let masters = self.masters()?;
+        let seat = self.seat_of(player_id)?;
+        let mv = parse_json(move_json, "move")?;
+        self.session.reset_events();
+        crate::search::apply::apply_move_inplace(&mut self.session, masters, seat, &mv, true)
+            .map_err(|e| self.map_err(e))
+    }
+
+    /// 戦闘・対話の窓を**探索が葉を評価する前に閉じる規則**で閉じる（`search::mcts::leaf_value` の
+    /// 「対話の窓 → 戦闘の窓」・`resolve_battle_inplace`・静止探索の方策の最良 → `PASS` → 先頭）。
+    /// 1 巡で窓が残れば（戦闘の後に開いた対話など）同じ巡を繰り返す（最大 4 巡）。`fork` した対局にだけ使う（§1.2 の 4）。
+    ///
+    /// `opts_json` は `decide` と同じ設定（ネット・箱化・静止探索の入り切り）。戻り値 `{"open": 窓が残ったか, "plies": 手数}`。
+    fn resolve_windows(&mut self, py: Python<'_>, opts_json: &str) -> PyResult<String> {
+        use crate::search::quiesce::{in_battle, in_dialog, resolve_battle_inplace, BoxBudget, Ctx, SearchState, Window, QUIESCE_MAX_PLIES};
+        let masters = self.masters()?;
+        let ov = parse_json(opts_json, "resolve opts")?;
+        let net = match ov.get("net").and_then(Value::as_str) {
+            Some(key) => crate::net::net_named(key)
+                .ok_or_else(|| PyValueError::new_err(format!("resolve_windows: ネット '{key}' が未ロード")))?,
+            None => crate::net::net().ok_or_else(|| PyValueError::new_err("resolve_windows: load_net が先に要る"))?,
+        };
+        let (opts, _carry) = crate::search::decide_opts_and_carry(&ov).map_err(err)?;
+        let session = &mut self.session;
+        let res = py.detach(|| -> Result<(bool, usize), EngineError> {
+            crate::search::r#macro::reset_setup_state(opts.search.setup_box, opts.search.select_branch_on());
+            let ctx = Ctx {
+                masters,
+                net,
+                opts: opts.search.clone(),
+                box_battle: opts.box_battle,
+                box_dialog: opts.box_dialog,
+                quiesce: opts.quiesce,
+                quiesce_max_plies: QUIESCE_MAX_PLIES,
+            };
+            let mut st = SearchState { budget: BoxBudget::new(opts.budget) };
+            let mut plies = 0usize;
+            for _ in 0..4 {
+                if ctx.is_terminal(session) {
+                    break;
+                }
+                let noisy = in_battle(session) || (ctx.box_dialog && in_dialog(session));
+                if !noisy {
+                    break;
+                }
+                if ctx.box_dialog && in_dialog(session) && !in_battle(session) {
+                    plies += resolve_battle_inplace(&ctx, session, &mut st, Window::Dialog, ctx.quiesce_max_plies, false, 0, None)?;
+                }
+                plies += resolve_battle_inplace(&ctx, session, &mut st, Window::Battle, ctx.quiesce_max_plies, false, 0, None)?;
+            }
+            let open = !ctx.is_terminal(session) && (in_battle(session) || in_dialog(session));
+            st.budget.clear();
+            Ok((open, plies))
+        });
+        let (open, plies) = res.map_err(|e| self.map_err(e))?;
+        to_py_json(&serde_json::json!({"open": open, "plies": plies}))
     }
 }
 

@@ -1,0 +1,230 @@
+{
+ "keys": {
+  "F1": {
+   "kami_before_attack": 0,
+   "gammaknife": 0,
+   "kami_ko": 1,
+   "lethal": 0,
+   "runs": 8
+  },
+  "F2": {
+   "kami_before_attack": 4,
+   "gammaknife": 0,
+   "kami_ko": 1,
+   "lethal": 2,
+   "runs": 8
+  },
+  "F3": {
+   "kami_before_attack": 4,
+   "gammaknife": 0,
+   "kami_ko": 1,
+   "lethal": 4,
+   "runs": 8
+  }
+ },
+ "keys_detail": {
+  "F1": {
+   "kami_before_attack": {
+    "scenario": "enel_human_20260810_t9-9",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": false,
+     "s4": false,
+     "s5": false,
+     "s6": false,
+     "s7": false
+    }
+   },
+   "gammaknife": {
+    "scenario": "human_enel_vs_roger_20260904_t7-8",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": false,
+     "s4": false,
+     "s5": false,
+     "s6": false,
+     "s7": false
+    }
+   },
+   "kami_ko": {
+    "scenario": "human_enel_vs_luffy_20260904_t4-5",
+    "per_seed": {
+     "s0": "no_kami",
+     "s1": true,
+     "s2": false,
+     "s3": false,
+     "s4": "no_kami",
+     "s5": "no_kami",
+     "s6": "no_kami",
+     "s7": "no_kami"
+    },
+    "played": 3
+   },
+   "lethal": {
+    "scenario": "enel_human_20260810_t9-9",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": false,
+     "s4": false,
+     "s5": false,
+     "s6": false,
+     "s7": false
+    }
+   }
+  },
+  "F2": {
+   "kami_before_attack": {
+    "scenario": "enel_human_20260810_t9-9",
+    "per_seed": {
+     "s0": true,
+     "s1": true,
+     "s2": false,
+     "s3": false,
+     "s4": false,
+     "s5": true,
+     "s6": false,
+     "s7": true
+    }
+   },
+   "gammaknife": {
+    "scenario": "human_enel_vs_roger_20260904_t7-8",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": false,
+     "s4": false,
+     "s5": false,
+     "s6": false,
+     "s7": false
+    }
+   },
+   "kami_ko": {
+    "scenario": "human_enel_vs_luffy_20260904_t4-5",
+    "per_seed": {
+     "s0": "no_kami",
+     "s1": false,
+     "s2": false,
+     "s3": false,
+     "s4": "no_kami",
+     "s5": "no_kami",
+     "s6": true,
+     "s7": "no_kami"
+    },
+    "played": 4
+   },
+   "lethal": {
+    "scenario": "enel_human_20260810_t9-9",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": false,
+     "s4": false,
+     "s5": true,
+     "s6": false,
+     "s7": true
+    }
+   }
+  },
+  "F3": {
+   "kami_before_attack": {
+    "scenario": "enel_human_20260810_t9-9",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": true,
+     "s4": true,
+     "s5": true,
+     "s6": false,
+     "s7": true
+    }
+   },
+   "gammaknife": {
+    "scenario": "human_enel_vs_roger_20260904_t7-8",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": false,
+     "s4": false,
+     "s5": false,
+     "s6": false,
+     "s7": false
+    }
+   },
+   "kami_ko": {
+    "scenario": "human_enel_vs_luffy_20260904_t4-5",
+    "per_seed": {
+     "s0": "no_kami",
+     "s1": "no_kami",
+     "s2": true,
+     "s3": "no_kami",
+     "s4": "no_kami",
+     "s5": "no_kami",
+     "s6": "no_kami",
+     "s7": "no_kami"
+    },
+    "played": 1
+   },
+   "lethal": {
+    "scenario": "enel_human_20260810_t9-9",
+    "per_seed": {
+     "s0": false,
+     "s1": false,
+     "s2": false,
+     "s3": true,
+     "s4": true,
+     "s5": true,
+     "s6": false,
+     "s7": true
+    }
+   }
+  }
+ },
+ "rollout": {
+  "F1": {
+   "decisions": 746,
+   "decisions_with_rollout": 746,
+   "leaves": 20430,
+   "rolled": 19733,
+   "plies": 58223,
+   "capped": 0,
+   "mean_plies": 2.8499,
+   "mean_plies_when_rolled": 2.9505,
+   "rolled_frac": 0.9659,
+   "capped_frac": 0.0
+  },
+  "F2": {
+   "decisions": 795,
+   "decisions_with_rollout": 795,
+   "leaves": 27938,
+   "rolled": 25951,
+   "plies": 82019,
+   "capped": 86,
+   "mean_plies": 2.9358,
+   "mean_plies_when_rolled": 3.1605,
+   "rolled_frac": 0.9289,
+   "capped_frac": 0.0031
+  },
+  "F3": {
+   "decisions": 719,
+   "decisions_with_rollout": 719,
+   "leaves": 24039,
+   "rolled": 22958,
+   "plies": 74385,
+   "capped": 211,
+   "mean_plies": 3.0943,
+   "mean_plies_when_rolled": 3.24,
+   "rolled_frac": 0.955,
+   "capped_frac": 0.0088
+  }
+ }
+}

@@ -177,6 +177,7 @@ pub fn suspend_for_trigger_confirm(
         allow_position: false,
         allow_reorder: false,
         continuation: Some(cont),
+        intent: crate::model::SelectionIntent::Unknown,
     });
     Ok(())
 }

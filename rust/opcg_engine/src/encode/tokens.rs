@@ -23,6 +23,8 @@
 //! | 17 | `threat_next` | 自分の場の枠 × 相手の未見プールの「次ターンに届く」しきい値効果の割合 |
 //! | 18 | `is_char` | 種別 CHARACTER |
 //! | 19 | `is_event` | 種別 EVENT |
+//! | 20 | `power_opp_turn` | **v14**: 相手ターンの側で評価したパワー（自枠は守り・相手枠は攻め） |
+//! | 21 | `act_avail` | **v14**: 未使用の【起動メイン】を持つか（場の枠のみ・リーダーも） |
 //!
 //! ## 関係 R（`n_rel_feat.R_COLS`・5 列）
 //!
@@ -48,6 +50,10 @@
 //! | | （役割＝removal/reduction/lock/draw/counter/blocker/big） | | 26 | `don_next_turn` |
 //! | | | | 27 | `max_play_next_turn` |
 //! | | | | 28 | `guard_per_card` |
+//! | | **v14 の 4 列** | | 29 | `deck_removal_fixed` |
+//! | | | | 30 | `opp_pool_removal_fixed` |
+//! | | | | 31 | `deck_bounce` |
+//! | | | | 32 | `opp_pool_bounce` |
 //!
 //! 浮動小数は Python（numpy）の型に合わせる: `tok` は float32、そこから作り直す
 //! `pw = tok[:,0]*10000` / `cs = tok[:,1]*10` も **float32**（この丸めが `_reach` の
@@ -63,10 +69,13 @@ use crate::model::{CardIdx, CardType, MasterIdx, MasterTable, Seat};
 use crate::state::EngineError;
 
 use super::{
-    walk_all, EXTRA_DIM, GAP_SAT, MAX_AB, MAX_FIELD, MAX_HAND, N_OPP, N_OWN, N_TOK, R_DIM, S_DIM,
+    walk_all, EXTRA_DIM, EXTRA_DIM_V13, GAP_SAT, MAX_AB, MAX_FIELD, MAX_HAND, N_OPP, N_OWN, N_TOK,
+    R_DIM, S_DIM,
 };
 
 const N_ROLES: usize = 7;
+/// v14 の追加役割（`n_rel_feat.ROLES2`＝removal_fixed／bounce）。
+const N_ROLES2: usize = 2;
 const BIG_POWER: i32 = 7000;
 const BIG_COST: i32 = 7;
 const KW_BLOCKER: &str = "ブロッカー";
@@ -101,6 +110,10 @@ pub struct Profile {
     pub conds: Vec<(usize, u32)>,
     /// `roles_of(master)`（ROLES の順・0/1）。
     pub roles: [f32; N_ROLES],
+    /// **v14**: `roles2_of(master)`（`n_rel_feat.ROLES2`＝[removal_fixed, bounce]・0/1）。
+    pub roles2: [f32; N_ROLES2],
+    /// **v14**: 【起動メイン】の能力 index（`ability_used_this_turn` の鍵と同じ）。
+    pub act_idx: Vec<usize>,
     /// `thr_rows(master)`＝[n, 6] (P, C, needs_rest, allow_leader, no_threshold, red)。空なら None。
     pub thr_rows: Option<Vec<[f64; 6]>>,
 }
@@ -154,6 +167,32 @@ fn is_red_op(t: ActionType) -> bool {
     matches!(t, ActionType::BpBuff | ActionType::Buff)
 }
 
+/// **v14 の「直した除去」**（`n_rel_feat._FORM_OF_OP`・`deck_roles` と同じ規則）。
+///
+/// `is_removal_op`（v13 の列の正本）との違い: `BOUNCE` を数え、`REST`/`FREEZE` 等の lock は
+/// 数えず、**対象ゾーンが FIELD のときだけ**数える。戻り値は form（"bounce" かどうかだけ区別
+/// すればよいので bool 2 つ）。
+fn form_of_op(t: ActionType) -> Option<bool> {
+    // Some(true)＝bounce、Some(false)＝KO/deck/trash、None＝盤面の除去ではない
+    match t {
+        ActionType::Bounce | ActionType::MoveToHand => Some(true),
+        ActionType::Ko
+        | ActionType::DeckBottom
+        | ActionType::DeckTop
+        | ActionType::MoveCard
+        | ActionType::Trash
+        | ActionType::Discard => Some(false),
+        _ => None,
+    }
+}
+
+/// Python `n_rel_feat._is_field(tgt)`（対象ゾーンが **FIELD 1 つだけ**）。
+fn is_field(a: &GameAction) -> bool {
+    a.target
+        .as_ref()
+        .is_some_and(|t| t.zone.len() == 1 && t.zone[0] == crate::effects::ast::ZoneRef::Field)
+}
+
 fn is_ramp_op(t: ActionType) -> bool {
     matches!(t, ActionType::RampDon | ActionType::ActiveDon)
 }
@@ -173,10 +212,29 @@ fn base_of(a: &GameAction) -> f64 {
 fn build_profile(masters: &MasterTable, mi: MasterIdx) -> Profile {
     let m = masters.get(mi);
     let mut p = Profile::default();
+    // v14: 直した除去の form（効果木と**能力コスト**の両方を見る・`n_rel_feat._forms_fixed`）。
+    let (mut rm_fixed, mut bounce) = (false, false);
     for (k, aid) in m.ability_ids.iter().enumerate() {
         let Some(ab) = masters.abilities.get(*aid) else {
             continue;
         };
+        if ab.trigger == TriggerType::ActivateMain {
+            p.act_idx.push(k);
+        }
+        {
+            let mut fixed: Vec<&GameAction> = Vec::new();
+            walk_all(ab.effect.as_ref(), &mut fixed);
+            walk_all(ab.cost.as_ref(), &mut fixed);
+            for a in &fixed {
+                if !is_opp(a) || !is_field(a) {
+                    continue;
+                }
+                if let Some(is_bounce) = form_of_op(a.ty) {
+                    rm_fixed = true;
+                    bounce |= is_bounce;
+                }
+            }
+        }
         let is_counter_trigger = ab.trigger == TriggerType::Counter;
         match ab.trigger {
             TriggerType::OnKo => p.trig_ko = true,
@@ -241,6 +299,8 @@ fn build_profile(masters: &MasterTable, mi: MasterIdx) -> Profile {
         f32::from(p.blocker),
         f32::from(m.ty == CardType::Character && (m.power >= BIG_POWER || m.cost >= BIG_COST)),
     ];
+    // roles2_of（v14）
+    p.roles2 = [f32::from(rm_fixed), f32::from(bounce)];
     // thr_rows
     p.thr_rows = if p.thr.is_empty() {
         None
@@ -582,6 +642,7 @@ pub fn encode_rel(
     // `_pool_summary`: 次ターンのドンで撃てるしきい値効果の行列＋役割/脅威の要約。
     let mut pool_arr: Vec<[f64; 6]> = Vec::new();
     let mut pr = [0.0f32; N_ROLES];
+    let mut pr2 = [0.0f32; N_ROLES2];
     let (mut pmax, mut pbig, mut pctr, mut pblk) = (0.0f32, 0i32, 0.0f32, 0i32);
     for c in &pool {
         let mi = s.state().card(*c).master;
@@ -594,6 +655,9 @@ pub fn encode_rel(
         }
         for k in 0..N_ROLES {
             pr[k] += p.roles[k];
+        }
+        for k in 0..N_ROLES2 {
+            pr2[k] += p.roles2[k];
         }
         let pp = m.power as f32;
         if m.ty == CardType::Character {
@@ -630,7 +694,7 @@ pub fn encode_rel(
         let mi = s.state().card(card).master;
         let m = masters.get(mi);
         let ty = m.ty;
-        let (ret_norm, trig_ko, trig_atk, trig_oatk, counter_event, conds) = {
+        let (ret_norm, trig_ko, trig_atk, trig_oatk, counter_event, conds, act_idx) = {
             let p = cache.get(masters, mi);
             (
                 p.ret_norm(),
@@ -639,6 +703,7 @@ pub fn encode_rel(
                 f32::from(p.trig_opp_attack),
                 p.counter_event,
                 p.conds.clone(),
+                p.act_idx.clone(),
             )
         };
         let is_unit = ty == CardType::Leader || ty == CardType::Character;
@@ -689,6 +754,20 @@ pub fn encode_rel(
         }
         tok[b + 18] = f32::from(ty == CardType::Character);
         tok[b + 19] = f32::from(ty == CardType::Event);
+        // --- v14（§20.9 の B）-----------------------------------------------------------
+        // `power_opp_turn`: 「**視点の相手**が手番のとき」のパワー＝自分の枠は owner_turn=false・
+        // 相手の枠は owner_turn=true（Python `_power(c, not own_side)`）。
+        tok[b + 20] = if is_unit {
+            s.state().card(card).get_power(m, !own_side) as f32 / 10000.0
+        } else {
+            0.0
+        };
+        // `act_avail`: 未使用の【起動メイン】を持つか（場の枠のみ）。
+        tok[b + 21] = if on_board {
+            act_avail(s, card, &act_idx)
+        } else {
+            0.0
+        };
     }
 
     // threat_next（自分の場の枠 × 相手プールのしきい値効果）— Python の一括版と同じ式（float64）。
@@ -782,10 +861,14 @@ pub fn encode_rel(
     ex[5] = ((opp_attack as f32 - my_guard) / 20000.0).clamp(-1.5, 1.5);
 
     let mut dr = [0.0f32; N_ROLES];
+    let mut dr2 = [0.0f32; N_ROLES2];
     for c in &st.player(me).deck {
         let p = cache.get(masters, st.card(*c).master);
         for k in 0..N_ROLES {
             dr[k] += p.roles[k];
+        }
+        for k in 0..N_ROLES2 {
+            dr2[k] += p.roles2[k];
         }
     }
     for k in 0..N_ROLES {
@@ -830,6 +913,11 @@ pub fn encode_rel(
         .count()
         .max(1) as f32;
     ex[bb + 8] = ((my_guard / 2000.0) / n_opp_attackers).min(5.0) / 5.0;
+    // --- v14（§20.9 の C）: 直した除去の枚数（自デッキ残／相手の未見プール）-----------------
+    ex[EXTRA_DIM_V13] = dr2[0].min(10.0) / 10.0; // deck_removal_fixed
+    ex[EXTRA_DIM_V13 + 1] = pr2[0].min(10.0) / 10.0; // opp_pool_removal_fixed
+    ex[EXTRA_DIM_V13 + 2] = dr2[1].min(10.0) / 10.0; // deck_bounce
+    ex[EXTRA_DIM_V13 + 3] = pr2[1].min(10.0) / 10.0; // opp_pool_bounce
 
     Ok(RelEncoding {
         tok,
@@ -837,6 +925,28 @@ pub fn encode_rel(
         rel_oo,
         extra: ex,
     })
+}
+
+/// Python `n_rel_feat._act_avail`（v14）: 未使用の【起動メイン】を持つか。
+///
+/// 「未使用」は `ability_used_this_turn[k] == 0`（Python の `used.get(k, 0)` と同じ）。
+/// 合法手を引かない＝盤面だけで決まる（相手の枠でも同じ規則で立つ）。
+fn act_avail(s: &Session, card: CardIdx, act_idx: &[usize]) -> f32 {
+    if act_idx.is_empty() {
+        return 0.0;
+    }
+    let used = &s.state().card(card).ability_used_this_turn;
+    for k in act_idx {
+        let n = used
+            .iter()
+            .find(|(key, _)| *key as usize == *k)
+            .map(|(_, n)| *n)
+            .unwrap_or(0);
+        if n == 0 {
+            return 1.0;
+        }
+    }
+    0.0
 }
 
 /// Python `n_rel_feat._cond_flags`（条件はエンジンの `_check_condition`・例外は 1.0）。

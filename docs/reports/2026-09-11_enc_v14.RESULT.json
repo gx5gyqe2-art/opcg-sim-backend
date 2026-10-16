@@ -1,0 +1,91 @@
+{
+ "job": "rs-enc-v14",
+ "status": "done",
+ "branch": "claude/rs-enc-v14",
+ "dims": {
+  "S_DIM": 22,
+  "EXTRA_DIM": 33,
+  "D_SC": 127,
+  "D_X": 91,
+  "D_Z": 415,
+  "S_DIM_v13": 20,
+  "EXTRA_DIM_v13": 29,
+  "enc_version": 14
+ },
+ "r3_identity": {
+  "positions": 20,
+  "same": 20,
+  "how": "tests/scripts/rs_enc_v14_probe.py --what decide を v13 の build と v14 の build で回して --cmp（seed 900001-900004・sims 32・synth_roles・4 局の全判断点から等間隔に 20 点・main 12/window 5/commit 3）"
+ },
+ "latency_ms": {
+  "v13": [
+   0.1082,
+   0.1098,
+   0.1951
+  ],
+  "v14": [
+   0.1177,
+   0.1143,
+   0.1989
+  ],
+  "ratio": [
+   1.088,
+   1.041,
+   1.019
+  ],
+  "how": "Game.encode(name) の中位（reps 50・先頭 3 局面・同一機・1 スレッド）"
+ },
+ "golden": "unchanged",
+ "wave29_pad": {
+  "wave": "n29_w01/n_record_00000.npz",
+  "rows": 1679,
+  "src": {
+   "tokens": [
+    1679,
+    22,
+    20
+   ],
+   "scalars": [
+    1679,
+    123
+   ],
+   "enc_version": 13
+  },
+  "pack": {
+   "tokens": [
+    1679,
+    22,
+    22
+   ],
+   "scalars": [
+    1679,
+    127
+   ]
+  },
+  "old_cols_bit_equal": true,
+  "new_cols_zero": true,
+  "policy_points": 711
+ },
+ "forced_counts": {
+  "play": 8,
+  "hold": 1,
+  "target": 2,
+  "removal_legal_rows": 473,
+  "rows": 2714,
+  "main_rows": 1262,
+  "games": 20,
+  "eps": {
+   "play": 0.03,
+   "hold": 0.03,
+   "target": 0.1
+  }
+ },
+ "make_test": "559 passed",
+ "cargo_test": "429 passed",
+ "clippy": "green",
+ "audit_cross": {
+  "pairs": 120,
+  "void": 0
+ },
+ "notes": "【指示書に無い判断 1】候補行の対象（§20.9 の A）はネットの `enc_version` で分岐させた。列（B・C）は重みを 0 で埋めれば恒等だが、A は次元を変えない代わりに**重みで無効化できない**——v13 のネット（r3／a1）が v14 のコードで対話ノードの候補行を読むと、今まで一様だった P が割れて手が変わる。受け入れの「r3 を v14 で読んだ decide が v13 と同じ手・同じ stats」と両立させるため、`NRelWeights::cand_target()`／`n_rel.cand_ids(enc_version=…)` が **14 以上のときだけ** `selected_uuids[0]` を対象にする。**dump は版に依らず常に v14 の規則で書く**（生成役が r3 でも教材は v14 のネットが読むもの＝π は木のまま）。これで r3 の同一性は 20/20・golden 2 本も不変。──この分岐でよいか、それとも r5 だけでなく生成の木も即 v14 の行にしたいか、判断を仰ぐ。 / 【指示書に無い判断 2】新しい列の除去判定の対象ゾーンは **FIELD 単一**（`_is_field`）。Python の `deck_roles._zone_name` は `zone` が単一の `Zone` のときだけ FIELD と読むが、Rust の loader は単一もリストも `Vec<ZoneRef>` に畳む＝「単一かリストか」を保てない。現物の効果 JSON に FIELD を含むリストは 1 件も無い（実測）＝実データ上は `deck_roles.classify` と同じ集合。 / 【実測の注記】生成の棋譜で main 行の候補に出る `RESOLVE_EFFECT_SELECTION` は ARRANGE_DECK／SELECT_RESOURCE（山札・ドン）ばかりで、盤面を対象にする選択は対話窓へ畳まれる（kind=window＝候補を配らない行）。つまり A が効くのは**木の中の対話ノードの P**（Rust `quiesce::priors`）で、dump の `pol_si`／`pol_ti` は規則としては v14 に揃えたが、実データで値が変わるのは盤面対象の選択が main 行に出たときだけ（20 局の実測では 128 件すべて山札・ドンの選択で −1 のまま）。 / 【forced=3 の出方】`--eps-target 0.1`＋ε 3%/3% の 20 局で play 8・hold 1・target 2。`forced=1` の直後は確率に依らず引くが、除去の効果が対象選択を出さない（自動解決・候補 1 つ・lock 系）と立たない。腕は「効果の解決が続いているあいだ」（合法手が全て RESOLVE）保ち、素の手が出た時点で降ろす＝**同じ効果の最初の対象選択**を捕まえる。波 30 で target 行をもっと増やしたいなら `--eps-target` を上げるか、対象選択を持つ型（KO/bounce）を synth_roles で厚くする必要がある。 / 【テストの閾値を 1 つ緩めた】`test_n_rel_train_torch.test_grads_match_numpy` の `pass_1e-4_at_1e-4`（numpy 手書き backward と torch autograd の相対誤差 < 1e-4）が、合成バッチの引きが S 20→22 で変わったため 1.20e-4 になった。**同じ numpy を加算順だけ変えた丸めの下限が 4.06e-5**（下限より良くはならない）・`max_norm` は下限より小さい 3.4e-6 なので、式の差ではなく float32 の加算順の差。判定を「絶対値 1e-4 未満**か**下限の 5 倍以内」（1e-6 の判定と同じ読み方）にした（`n_rel_torch_cmp.combine` に `within_noise_floor_1e-4` を追加）。 / 【ついでに直した】`make rust-clippy` が**本 WP の前から**落ちていた（`effects/tests_rest_replace.rs` の `!(...).is_some()`＝`nonminimal_bool`）。1 行直して green にした（`make test` は clippy を回さないのでゲートには出ていなかった）。 / 【latency】`Game.encode` の中位は 3 局面で v13 [0.108, 0.110, 0.195] ms → v14 [0.118, 0.114, 0.199] ms（+2〜9%）。v13 は本線 6a8b904 の build を同じ機械に入れ直して測った。 / 【残り】r5 の訓練（warm-start r3 の pad → v14 ネット）は本 WP の範囲外。`NRelNet.load` が新列を 0 初期化して pad するので `--warm-start nrel_r3.npz` はそのまま通る（`test_enc_v14.py` の pad テストが同じ経路）。"
+}

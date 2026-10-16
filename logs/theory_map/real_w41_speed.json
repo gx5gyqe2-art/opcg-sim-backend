@@ -1,0 +1,578 @@
+{
+ "record": "/home/user/data_rec/sigma_wip/data/w41",
+ "clocks": "/home/user/tm/nm/clocks.json",
+ "by_deck": {
+  "OP09-001": {
+   "all": {
+    "turns": 901,
+    "theory_per_turn": 0.1456,
+    "harm_per_turn": 0.1637,
+    "ratio": 1.124,
+    "opp_life_lost_per_turn": 0.626,
+    "attacks_per_turn": 1.892,
+    "leader_attacks_per_turn": 1.393,
+    "life_per_leader_attack": 0.449,
+    "blocks_per_turn": 0.124,
+    "counters_per_turn": 0.866,
+    "def_life_gained_per_turn": 0.004,
+    "trig_proxy_per_turn": 0.111
+   },
+   "1-3": {
+    "turns": 213,
+    "theory_per_turn": 0.0277,
+    "harm_per_turn": 0.0242,
+    "ratio": 0.876,
+    "opp_life_lost_per_turn": 0.164,
+    "attacks_per_turn": 0.385,
+    "leader_attacks_per_turn": 0.385,
+    "life_per_leader_attack": 0.427,
+    "blocks_per_turn": 0.0,
+    "counters_per_turn": 0.221,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.023
+   },
+   "4-6": {
+    "turns": 222,
+    "theory_per_turn": 0.0846,
+    "harm_per_turn": 0.078,
+    "ratio": 0.923,
+    "opp_life_lost_per_turn": 0.342,
+    "attacks_per_turn": 1.495,
+    "leader_attacks_per_turn": 1.221,
+    "life_per_leader_attack": 0.28,
+    "blocks_per_turn": 0.18,
+    "counters_per_turn": 0.671,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.041
+   },
+   "7+": {
+    "turns": 466,
+    "theory_per_turn": 0.2285,
+    "harm_per_turn": 0.2682,
+    "ratio": 1.174,
+    "opp_life_lost_per_turn": 0.972,
+    "attacks_per_turn": 2.77,
+    "leader_attacks_per_turn": 1.936,
+    "life_per_leader_attack": 0.502,
+    "blocks_per_turn": 0.155,
+    "counters_per_turn": 1.253,
+    "def_life_gained_per_turn": 0.009,
+    "trig_proxy_per_turn": 0.185
+   }
+  },
+  "OP11-041": {
+   "all": {
+    "turns": 798,
+    "theory_per_turn": 0.1647,
+    "harm_per_turn": 0.1401,
+    "ratio": 0.851,
+    "opp_life_lost_per_turn": 0.64,
+    "attacks_per_turn": 1.689,
+    "leader_attacks_per_turn": 1.376,
+    "life_per_leader_attack": 0.465,
+    "blocks_per_turn": 0.134,
+    "counters_per_turn": 1.016,
+    "def_life_gained_per_turn": 0.003,
+    "trig_proxy_per_turn": 0.118
+   },
+   "1-3": {
+    "turns": 201,
+    "theory_per_turn": 0.0344,
+    "harm_per_turn": 0.0323,
+    "ratio": 0.939,
+    "opp_life_lost_per_turn": 0.229,
+    "attacks_per_turn": 0.313,
+    "leader_attacks_per_turn": 0.313,
+    "life_per_leader_attack": 0.73,
+    "blocks_per_turn": 0.0,
+    "counters_per_turn": 0.229,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.045
+   },
+   "4-6": {
+    "turns": 204,
+    "theory_per_turn": 0.1047,
+    "harm_per_turn": 0.1095,
+    "ratio": 1.046,
+    "opp_life_lost_per_turn": 0.637,
+    "attacks_per_turn": 1.377,
+    "leader_attacks_per_turn": 1.23,
+    "life_per_leader_attack": 0.518,
+    "blocks_per_turn": 0.191,
+    "counters_per_turn": 0.779,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.02
+   },
+   "7+": {
+    "turns": 393,
+    "theory_per_turn": 0.2624,
+    "harm_per_turn": 0.2112,
+    "ratio": 0.805,
+    "opp_life_lost_per_turn": 0.852,
+    "attacks_per_turn": 2.555,
+    "leader_attacks_per_turn": 1.995,
+    "life_per_leader_attack": 0.427,
+    "blocks_per_turn": 0.173,
+    "counters_per_turn": 1.542,
+    "def_life_gained_per_turn": 0.005,
+    "trig_proxy_per_turn": 0.206
+   }
+  },
+  "OP15-058": {
+   "all": {
+    "turns": 935,
+    "theory_per_turn": 0.1405,
+    "harm_per_turn": 0.1352,
+    "ratio": 0.962,
+    "opp_life_lost_per_turn": 0.558,
+    "attacks_per_turn": 2.104,
+    "leader_attacks_per_turn": 1.617,
+    "life_per_leader_attack": 0.345,
+    "blocks_per_turn": 0.099,
+    "counters_per_turn": 0.914,
+    "def_life_gained_per_turn": 0.002,
+    "trig_proxy_per_turn": 0.082
+   },
+   "1-3": {
+    "turns": 248,
+    "theory_per_turn": 0.0424,
+    "harm_per_turn": 0.0278,
+    "ratio": 0.655,
+    "opp_life_lost_per_turn": 0.141,
+    "attacks_per_turn": 0.484,
+    "leader_attacks_per_turn": 0.472,
+    "life_per_leader_attack": 0.299,
+    "blocks_per_turn": 0.0,
+    "counters_per_turn": 0.254,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.012
+   },
+   "4-6": {
+    "turns": 229,
+    "theory_per_turn": 0.1069,
+    "harm_per_turn": 0.1099,
+    "ratio": 1.028,
+    "opp_life_lost_per_turn": 0.266,
+    "attacks_per_turn": 1.86,
+    "leader_attacks_per_turn": 1.528,
+    "life_per_leader_attack": 0.174,
+    "blocks_per_turn": 0.175,
+    "counters_per_turn": 0.76,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.022
+   },
+   "7+": {
+    "turns": 458,
+    "theory_per_turn": 0.2104,
+    "harm_per_turn": 0.206,
+    "ratio": 0.979,
+    "opp_life_lost_per_turn": 0.93,
+    "attacks_per_turn": 3.103,
+    "leader_attacks_per_turn": 2.282,
+    "life_per_leader_attack": 0.408,
+    "blocks_per_turn": 0.116,
+    "counters_per_turn": 1.349,
+    "def_life_gained_per_turn": 0.004,
+    "trig_proxy_per_turn": 0.151
+   }
+  },
+  "OP16-022": {
+   "all": {
+    "turns": 921,
+    "theory_per_turn": 0.1377,
+    "harm_per_turn": 0.147,
+    "ratio": 1.067,
+    "opp_life_lost_per_turn": 0.663,
+    "attacks_per_turn": 2.036,
+    "leader_attacks_per_turn": 1.615,
+    "life_per_leader_attack": 0.411,
+    "blocks_per_turn": 0.113,
+    "counters_per_turn": 1.053,
+    "def_life_gained_per_turn": 0.002,
+    "trig_proxy_per_turn": 0.089
+   },
+   "1-3": {
+    "turns": 238,
+    "theory_per_turn": 0.0264,
+    "harm_per_turn": 0.0243,
+    "ratio": 0.924,
+    "opp_life_lost_per_turn": 0.143,
+    "attacks_per_turn": 0.315,
+    "leader_attacks_per_turn": 0.315,
+    "life_per_leader_attack": 0.453,
+    "blocks_per_turn": 0.0,
+    "counters_per_turn": 0.252,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.017
+   },
+   "4-6": {
+    "turns": 245,
+    "theory_per_turn": 0.0756,
+    "harm_per_turn": 0.0895,
+    "ratio": 1.184,
+    "opp_life_lost_per_turn": 0.322,
+    "attacks_per_turn": 1.714,
+    "leader_attacks_per_turn": 1.453,
+    "life_per_leader_attack": 0.222,
+    "blocks_per_turn": 0.167,
+    "counters_per_turn": 0.857,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.016
+   },
+   "7+": {
+    "turns": 438,
+    "theory_per_turn": 0.233,
+    "harm_per_turn": 0.2457,
+    "ratio": 1.054,
+    "opp_life_lost_per_turn": 1.137,
+    "attacks_per_turn": 3.151,
+    "leader_attacks_per_turn": 2.411,
+    "life_per_leader_attack": 0.472,
+    "blocks_per_turn": 0.144,
+    "counters_per_turn": 1.598,
+    "def_life_gained_per_turn": 0.005,
+    "trig_proxy_per_turn": 0.169
+   }
+  }
+ },
+ "by_defender": {
+  "OP09-001": {
+   "all": {
+    "turns": 937,
+    "theory_per_turn": 0.1239,
+    "harm_per_turn": 0.1306,
+    "ratio": 1.054,
+    "opp_life_lost_per_turn": 0.551,
+    "attacks_per_turn": 1.955,
+    "leader_attacks_per_turn": 1.434,
+    "life_per_leader_attack": 0.384,
+    "blocks_per_turn": 0.128,
+    "counters_per_turn": 0.618,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.029
+   },
+   "1-3": {
+    "turns": 222,
+    "theory_per_turn": 0.0292,
+    "harm_per_turn": 0.022,
+    "ratio": 0.754,
+    "opp_life_lost_per_turn": 0.162,
+    "attacks_per_turn": 0.378,
+    "leader_attacks_per_turn": 0.374,
+    "life_per_leader_attack": 0.434,
+    "blocks_per_turn": 0.0,
+    "counters_per_turn": 0.14,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.014
+   },
+   "4-6": {
+    "turns": 213,
+    "theory_per_turn": 0.0572,
+    "harm_per_turn": 0.0706,
+    "ratio": 1.234,
+    "opp_life_lost_per_turn": 0.347,
+    "attacks_per_turn": 1.667,
+    "leader_attacks_per_turn": 1.31,
+    "life_per_leader_attack": 0.265,
+    "blocks_per_turn": 0.282,
+    "counters_per_turn": 0.3,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.005
+   },
+   "7+": {
+    "turns": 502,
+    "theory_per_turn": 0.194,
+    "harm_per_turn": 0.2041,
+    "ratio": 1.052,
+    "opp_life_lost_per_turn": 0.809,
+    "attacks_per_turn": 2.775,
+    "leader_attacks_per_turn": 1.956,
+    "life_per_leader_attack": 0.413,
+    "blocks_per_turn": 0.12,
+    "counters_per_turn": 0.964,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.046
+   }
+  },
+  "OP11-041": {
+   "all": {
+    "turns": 847,
+    "theory_per_turn": 0.1653,
+    "harm_per_turn": 0.1628,
+    "ratio": 0.985,
+    "opp_life_lost_per_turn": 0.607,
+    "attacks_per_turn": 2.115,
+    "leader_attacks_per_turn": 1.58,
+    "life_per_leader_attack": 0.384,
+    "blocks_per_turn": 0.066,
+    "counters_per_turn": 0.946,
+    "def_life_gained_per_turn": 0.012,
+    "trig_proxy_per_turn": 0.341
+   },
+   "1-3": {
+    "turns": 204,
+    "theory_per_turn": 0.0377,
+    "harm_per_turn": 0.0263,
+    "ratio": 0.699,
+    "opp_life_lost_per_turn": 0.216,
+    "attacks_per_turn": 0.412,
+    "leader_attacks_per_turn": 0.412,
+    "life_per_leader_attack": 0.524,
+    "blocks_per_turn": 0.0,
+    "counters_per_turn": 0.201,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.078
+   },
+   "4-6": {
+    "turns": 201,
+    "theory_per_turn": 0.111,
+    "harm_per_turn": 0.0898,
+    "ratio": 0.81,
+    "opp_life_lost_per_turn": 0.269,
+    "attacks_per_turn": 1.612,
+    "leader_attacks_per_turn": 1.532,
+    "life_per_leader_attack": 0.175,
+    "blocks_per_turn": 0.095,
+    "counters_per_turn": 0.776,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.09
+   },
+   "7+": {
+    "turns": 442,
+    "theory_per_turn": 0.249,
+    "harm_per_turn": 0.259,
+    "ratio": 1.04,
+    "opp_life_lost_per_turn": 0.941,
+    "attacks_per_turn": 3.129,
+    "leader_attacks_per_turn": 2.14,
+    "life_per_leader_attack": 0.44,
+    "blocks_per_turn": 0.084,
+    "counters_per_turn": 1.367,
+    "def_life_gained_per_turn": 0.023,
+    "trig_proxy_per_turn": 0.577
+   }
+  },
+  "OP15-058": {
+   "all": {
+    "turns": 873,
+    "theory_per_turn": 0.1487,
+    "harm_per_turn": 0.1487,
+    "ratio": 1.0,
+    "opp_life_lost_per_turn": 0.756,
+    "attacks_per_turn": 1.832,
+    "leader_attacks_per_turn": 1.472,
+    "life_per_leader_attack": 0.514,
+    "blocks_per_turn": 0.079,
+    "counters_per_turn": 1.186,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.042
+   },
+   "1-3": {
+    "turns": 229,
+    "theory_per_turn": 0.0298,
+    "harm_per_turn": 0.0292,
+    "ratio": 0.98,
+    "opp_life_lost_per_turn": 0.144,
+    "attacks_per_turn": 0.349,
+    "leader_attacks_per_turn": 0.349,
+    "life_per_leader_attack": 0.412,
+    "blocks_per_turn": 0.0,
+    "counters_per_turn": 0.323,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.009
+   },
+   "4-6": {
+    "turns": 248,
+    "theory_per_turn": 0.103,
+    "harm_per_turn": 0.1076,
+    "ratio": 1.045,
+    "opp_life_lost_per_turn": 0.508,
+    "attacks_per_turn": 1.641,
+    "leader_attacks_per_turn": 1.29,
+    "life_per_leader_attack": 0.394,
+    "blocks_per_turn": 0.093,
+    "counters_per_turn": 0.996,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.012
+   },
+   "7+": {
+    "turns": 396,
+    "theory_per_turn": 0.2461,
+    "harm_per_turn": 0.2436,
+    "ratio": 0.99,
+    "opp_life_lost_per_turn": 1.265,
+    "attacks_per_turn": 2.808,
+    "leader_attacks_per_turn": 2.235,
+    "life_per_leader_attack": 0.566,
+    "blocks_per_turn": 0.116,
+    "counters_per_turn": 1.803,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.081
+   }
+  },
+  "OP16-022": {
+   "all": {
+    "turns": 898,
+    "theory_per_turn": 0.1502,
+    "harm_per_turn": 0.1458,
+    "ratio": 0.971,
+    "opp_life_lost_per_turn": 0.577,
+    "attacks_per_turn": 1.863,
+    "leader_attacks_per_turn": 1.542,
+    "life_per_leader_attack": 0.374,
+    "blocks_per_turn": 0.19,
+    "counters_per_turn": 1.115,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.0
+   },
+   "1-3": {
+    "turns": 245,
+    "theory_per_turn": 0.0352,
+    "harm_per_turn": 0.0302,
+    "ratio": 0.859,
+    "opp_life_lost_per_turn": 0.151,
+    "attacks_per_turn": 0.376,
+    "leader_attacks_per_turn": 0.367,
+    "life_per_leader_attack": 0.411,
+    "blocks_per_turn": 0.0,
+    "counters_per_turn": 0.286,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.0
+   },
+   "4-6": {
+    "turns": 238,
+    "theory_per_turn": 0.0971,
+    "harm_per_turn": 0.1133,
+    "ratio": 1.167,
+    "opp_life_lost_per_turn": 0.387,
+    "attacks_per_turn": 1.567,
+    "leader_attacks_per_turn": 1.349,
+    "life_per_leader_attack": 0.287,
+    "blocks_per_turn": 0.244,
+    "counters_per_turn": 0.945,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.0
+   },
+   "7+": {
+    "turns": 415,
+    "theory_per_turn": 0.2484,
+    "harm_per_turn": 0.2326,
+    "ratio": 0.936,
+    "opp_life_lost_per_turn": 0.937,
+    "attacks_per_turn": 2.911,
+    "leader_attacks_per_turn": 2.347,
+    "life_per_leader_attack": 0.399,
+    "blocks_per_turn": 0.272,
+    "counters_per_turn": 1.701,
+    "def_life_gained_per_turn": 0.0,
+    "trig_proxy_per_turn": 0.0
+   }
+  }
+ },
+ "def_x_att": {
+  "OP09-001": {
+   "OP09-001": {
+    "all": 1.281,
+    "1-3": 0.986,
+    "4-6": 1.166,
+    "7+": 1.306
+   },
+   "OP11-041": {
+    "all": 0.869,
+    "1-3": 0.722,
+    "4-6": 1.316,
+    "7+": 0.83
+   },
+   "OP15-058": {
+    "all": 0.913,
+    "1-3": 0.602,
+    "4-6": 0.862,
+    "7+": 0.954
+   },
+   "OP16-022": {
+    "all": 1.087,
+    "1-3": 0.74,
+    "4-6": 2.072,
+    "7+": 1.037
+   }
+  },
+  "OP11-041": {
+   "OP09-001": {
+    "all": 1.206,
+    "1-3": 1.02,
+    "4-6": 0.726,
+    "7+": 1.294
+   },
+   "OP11-041": {
+    "all": 0.901,
+    "1-3": 0.68,
+    "4-6": 0.855,
+    "7+": 0.92
+   },
+   "OP15-058": {
+    "all": 0.879,
+    "1-3": 0.511,
+    "4-6": 0.799,
+    "7+": 0.954
+   },
+   "OP16-022": {
+    "all": 0.963,
+    "1-3": 0.913,
+    "4-6": 0.857,
+    "7+": 0.985
+   }
+  },
+  "OP15-058": {
+   "OP09-001": {
+    "all": 1.045,
+    "1-3": 0.778,
+    "4-6": 0.998,
+    "7+": 1.077
+   },
+   "OP11-041": {
+    "all": 0.83,
+    "1-3": 1.153,
+    "4-6": 1.095,
+    "7+": 0.733
+   },
+   "OP15-058": {
+    "all": 1.021,
+    "1-3": 0.929,
+    "4-6": 0.95,
+    "7+": 1.049
+   },
+   "OP16-022": {
+    "all": 1.098,
+    "1-3": 1.077,
+    "4-6": 1.104,
+    "7+": 1.098
+   }
+  },
+  "OP16-022": {
+   "OP09-001": {
+    "all": 0.951,
+    "1-3": 0.777,
+    "4-6": 0.894,
+    "7+": 0.974
+   },
+   "OP11-041": {
+    "all": 0.79,
+    "1-3": 1.165,
+    "4-6": 1.047,
+    "7+": 0.687
+   },
+   "OP15-058": {
+    "all": 1.018,
+    "1-3": 0.666,
+    "4-6": 1.446,
+    "7+": 0.966
+   },
+   "OP16-022": {
+    "all": 1.114,
+    "1-3": 0.995,
+    "4-6": 1.265,
+    "7+": 1.091
+   }
+  }
+ }
+}

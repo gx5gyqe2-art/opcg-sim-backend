@@ -1,0 +1,1082 @@
+//! 守る側の動的計画（Python `_rule_guard_plan_ex`／`_ex_prep`／`_ex_counter_sets` の写し）。
+//!
+//! 契約（設計書 E1〜E12・14・22・23）:
+//! * 値は Python と**ビットで同じ**。足す順（受けた枝の確率つきの和・引く札の和・ブロッカー／カウンターの候補）と
+//!   比べ方（誤差 `FEQ` つきの `better`・候補を試す順）を Python と同じにしてある。
+//! * 状態の覚え書きは**試行ごとに空で始める**（`Defender` 1 つ = Python の `memo` 1 つ）。状態の数
+//!   （`n_states`）は Python の `len(memo)` と一致し、予算 `limit` を超えたら `DpErr::Budget`。超えるかは
+//!   「作る状態の数 > 予算」だけで決まる（深さ優先の順に依らない）。
+//! * 状態の鍵は `u64` の列に詰め、**全体を比べる**（`table::KeyTable`）。`-0.0` は `0.0` に正規化して鍵にする
+//!   （Python の組の等しさと同じ＝状態の数が合う）。
+//!
+//! 状態は `(文脈, t, 残りの攻撃, 手札, 使えるブロッカー, レスト中, 次のターンから出る, ドン, ライフ)`。
+//! 再帰は 1 つの作業用の状態（[`Cur`]）を書き換えて戻す形（子ごとに配列を作らない）。
+
+use std::collections::HashMap;
+use std::rc::Rc;
+
+use super::numeric::{bankers_round, canon_bits, naive_sum, py_round};
+use super::succ::{self, TurnStart};
+use super::table::KeyTable;
+
+/// 動的計画の失敗。
+#[derive(Debug, Clone, PartialEq)]
+pub enum DpErr {
+    /// 状態の数が予算を超えた（`_ModelBudget`）。
+    Budget,
+    /// 入力が核の扱える範囲に無い（呼び出し側のバグ）。
+    Bad(String),
+}
+
+/// 1 回の問題の入力（Python の `_rule_guard_plan_ex` の引数）。
+pub struct Input<'a> {
+    pub cards: &'a [(f64, f64)],
+    pub don: f64,
+    pub xs_first: &'a [f64],
+    /// 2 ターン目からの攻撃の並び（段ごと）。核の側で昇順に整える（`_norm_seq`）。
+    pub seq: &'a [Vec<f64>],
+    pub blk: &'a [f64],
+    pub life: f64,
+    pub turns: Option<i64>,
+    pub life_types: &'a [(f64, f64, f64)],
+    pub draw_types: &'a [(f64, f64, f64)],
+    pub lam: f64,
+    pub lam_net: f64,
+    pub mu: f64,
+    pub olp: f64,
+    pub mlp: f64,
+    pub rest: &'a [f64],
+    pub arrive: &'a [f64],
+    /// `(余裕 m, ν(m))`——Python が `nu_meas_of(m + olp, mlp)` で作った値（ブロッカーの余裕ごと）。
+    pub nu: &'a [(f64, f64)],
+    pub eps: f64,
+    pub feq: f64,
+}
+
+/// 守る側の最善の守り（Python が返す辞書と同じ欄）。
+#[derive(Debug, Clone, PartialEq)]
+pub struct Output {
+    pub cut: f64,
+    pub stopped: f64,
+    pub alive: f64,
+    pub prevented: f64,
+    pub harms: Vec<f64>,
+    pub theta: f64,
+    pub nu_all: f64,
+}
+
+// ---------------------------------------------------------------------------------------------
+// 手札の形（`_ex_prep`・E1）
+
+/// 守る側の計算の手札の形。状態の数え方（`layers`）も同じものを読む。
+pub struct Prep {
+    pub types: Vec<(f64, f64, f64)>,
+    pub p_none: f64,
+    pub dtypes: Vec<(f64, f64, f64)>,
+    pub pd_none: f64,
+    pub kinds: Vec<(f64, f64)>,
+    pub kvals: Vec<f64>,
+    pub kdons: Vec<f64>,
+    pub type_ix: Vec<usize>,
+    pub dtype_ix: Vec<usize>,
+    pub cnt0: Vec<u16>,
+}
+
+fn rest_prob(types: &[(f64, f64, f64)]) -> f64 {
+    // max(0.0, 1.0 - sum(p ...))
+    let v = 1.0 - naive_sum(types.iter().map(|t| t.2));
+    if v > 0.0 {
+        v
+    } else {
+        0.0
+    }
+}
+
+impl Prep {
+    pub fn new(
+        cards: &[(f64, f64)],
+        life_types: &[(f64, f64, f64)],
+        draw_types: &[(f64, f64, f64)],
+    ) -> Prep {
+        let types: Vec<_> = life_types.iter().copied().filter(|t| t.2 > 0.0).collect();
+        let p_none = rest_prob(&types);
+        let dtypes: Vec<_> = draw_types.iter().copied().filter(|t| t.2 > 0.0).collect();
+        let pd_none = rest_prob(&dtypes);
+        let mut kinds: Vec<(f64, f64)> = Vec::new();
+        let mut add = |kd: (f64, f64)| {
+            if !kinds.iter().any(|k| k.0 == kd.0 && k.1 == kd.1) {
+                kinds.push(kd);
+            }
+        };
+        for &(c, d) in cards {
+            if c > 0.0 {
+                add((c, d));
+            }
+        }
+        for t in &types {
+            add((t.0, t.1));
+        }
+        for t in &dtypes {
+            add((t.0, t.1));
+        }
+        // sorted(..., reverse=True)＝組の降順
+        kinds.sort_by(|a, b| {
+            b.0.partial_cmp(&a.0)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal))
+        });
+        let ix = |c: f64, d: f64| kinds.iter().position(|k| k.0 == c && k.1 == d).unwrap_or(0);
+        let mut cnt0 = vec![0u16; kinds.len()];
+        for &(c, d) in cards {
+            if c > 0.0 {
+                cnt0[ix(c, d)] += 1;
+            }
+        }
+        let type_ix = types.iter().map(|t| ix(t.0, t.1)).collect();
+        let dtype_ix = dtypes.iter().map(|t| ix(t.0, t.1)).collect();
+        let kvals = kinds.iter().map(|k| k.0).collect();
+        let kdons = kinds.iter().map(|k| k.1).collect();
+        Prep { types, p_none, dtypes, pd_none, kinds, kvals, kdons, type_ix, dtype_ix, cnt0 }
+    }
+}
+
+/// 昇順に並べる（Python の `sorted(floats)`・同じ値の順は変えない）。
+pub fn sort_asc(v: &mut [f64]) {
+    v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+}
+
+/// 降順に並べる（`sorted(floats, reverse=True)`）。
+pub fn sort_desc(v: &mut [f64]) {
+    v.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+}
+
+/// 攻撃の並びの正規化（`_norm_seq`: 段ごとに昇順・空なら 1 段の空）。
+pub fn norm_seq(seq: &[Vec<f64>]) -> Vec<Vec<f64>> {
+    let mut out: Vec<Vec<f64>> = seq
+        .iter()
+        .map(|s| {
+            let mut v = s.clone();
+            sort_asc(&mut v);
+            v
+        })
+        .collect();
+    if out.is_empty() {
+        out.push(Vec::new());
+    }
+    out
+}
+
+/// `_seq_prep`: 命中するものだけ・攻撃が尽きる段・最後の段を繰り返すか。
+pub fn seq_prep(seq: &[Vec<f64>], eps: f64) -> (Vec<Vec<f64>>, i64, bool) {
+    let fs: Vec<Vec<f64>> = seq.iter().map(|s| s.iter().copied().filter(|&x| x >= -eps).collect()).collect();
+    let mut last_hit: i64 = -1;
+    for (i, s) in fs.iter().enumerate() {
+        if !s.is_empty() {
+            last_hit = i as i64;
+        }
+    }
+    let repeat = fs.last().map(|s| !s.is_empty()).unwrap_or(false);
+    (fs, last_hit, repeat)
+}
+
+// ---------------------------------------------------------------------------------------------
+// 過不足の無い札の組（`_ex_counter_sets`・E12）
+
+/// 超過を止める札の組 1 つ（新しい手札・払ったドンの残り・切る枚数）。
+#[derive(Debug, Clone, PartialEq)]
+pub struct CSet {
+    pub nh: Vec<u16>,
+    pub dl2: f64,
+    pub nc: i64,
+}
+
+/// `_ex_counter_sets` の本体。結果の順は Python の辞書の挿入順（種類の辞書順・先に出た組が残る）。
+pub fn compute_counter_sets(kvals: &[f64], kdons: &[f64], eps: f64, x: f64, hand: &[u16], dl: f64) -> Vec<CSet> {
+    let need = x + 1000.0 - eps;
+    let nk = kvals.len();
+    struct Rec<'a> {
+        kvals: &'a [f64],
+        kdons: &'a [f64],
+        hand: &'a [u16],
+        need: f64,
+        dl: f64,
+        nk: usize,
+        used: Vec<u16>,
+        seen: HashMap<(Vec<u16>, u64), ()>,
+        out: Vec<CSet>,
+    }
+    fn rec(r: &mut Rec, i: usize, s: f64, dc: f64) {
+        if dc > r.dl + 1e-9 {
+            return;
+        }
+        if i == r.nk {
+            if s < r.need {
+                return;
+            }
+            for q in 0..r.nk {
+                if r.used[q] > 0 && s - r.kvals[q] >= r.need {
+                    return;
+                }
+            }
+            let nh: Vec<u16> = (0..r.nk).map(|q| r.hand[q] - r.used[q]).collect();
+            let dl2 = py_round(r.dl - dc, 9);
+            let key = (nh.clone(), canon_bits(dl2));
+            if r.seen.contains_key(&key) {
+                return;
+            }
+            r.seen.insert(key, ());
+            let nc: i64 = r.used.iter().map(|&u| u as i64).sum();
+            r.out.push(CSet { nh, dl2, nc });
+            return;
+        }
+        for n in 0..=r.hand[i] {
+            r.used[i] = n;
+            let nf = n as f64;
+            let (s2, dc2) = (s + nf * r.kvals[i], dc + nf * r.kdons[i]);
+            rec(r, i + 1, s2, dc2);
+        }
+        r.used[i] = 0;
+    }
+    let mut r = Rec { kvals, kdons, hand, need, dl, nk, used: vec![0; nk], seen: HashMap::new(), out: Vec::new() };
+    rec(&mut r, 0, 0.0, 0.0);
+    r.out
+}
+
+/// 札の組の覚え書き（`_RULE_EX_SETS`）。鍵は (札の種類の番号, 超過, 手札, ドン)。
+pub struct SetCache {
+    idx: KeyTable<u32>,
+    vals: Vec<Rc<Vec<CSet>>>,
+    kb: Vec<u64>,
+}
+
+impl Default for SetCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SetCache {
+    pub fn new() -> Self {
+        SetCache { idx: KeyTable::new(), vals: Vec::new(), kb: Vec::new() }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn get(&mut self, kid: u32, kvals: &[f64], kdons: &[f64], eps: f64, x: f64, hand: &[u16], dl: f64) -> Rc<Vec<CSet>> {
+        self.kb.clear();
+        self.kb.push(kid as u64);
+        self.kb.push(canon_bits(x));
+        self.kb.push(canon_bits(dl));
+        pack_hand(&mut self.kb, hand);
+        if let Some(i) = self.idx.get(&self.kb) {
+            return self.vals[i as usize].clone();
+        }
+        let r = Rc::new(compute_counter_sets(kvals, kdons, eps, x, hand, dl));
+        if self.vals.len() > 400_000 {
+            // 値を変えない掃除（Python も 40 万で捨てる）
+            self.idx = KeyTable::new();
+            self.vals.clear();
+        }
+        let n = self.vals.len() as u32;
+        self.idx.insert_if_absent(&self.kb, n);
+        self.vals.push(r.clone());
+        r
+    }
+}
+
+fn pack_hand(kb: &mut Vec<u64>, hand: &[u16]) {
+    for ch in hand.chunks(4) {
+        let mut w = 0u64;
+        for (i, &n) in ch.iter().enumerate() {
+            w |= (n as u64) << (16 * i);
+        }
+        kb.push(w);
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// 状態
+
+/// 作業用の状態（1 つを書き換えて戻す）。
+#[derive(Clone)]
+pub struct Cur {
+    pub t: u32,
+    pub lf: i32,
+    pub dl: f64,
+    pub rem: Vec<f64>,
+    pub hand: Vec<u16>,
+    pub ready: Vec<f64>,
+    pub rested: Vec<f64>,
+    pub pend: Vec<f64>,
+}
+
+/// 状態の鍵（`ctx` は文脈の番号・数え方では 0）。
+pub fn write_key(kb: &mut Vec<u64>, ctx: u32, c: &Cur) {
+    kb.clear();
+    kb.push((ctx as u64) | ((c.t as u64) << 32) | ((c.lf as u64 & 0xffff) << 48));
+    kb.push(
+        (c.rem.len() as u64)
+            | ((c.ready.len() as u64) << 16)
+            | ((c.rested.len() as u64) << 32)
+            | ((c.pend.len() as u64) << 48),
+    );
+    kb.push(canon_bits(c.dl));
+    for v in [&c.rem, &c.ready, &c.rested, &c.pend] {
+        for &x in v.iter() {
+            kb.push(canon_bits(x));
+        }
+    }
+    pack_hand(kb, &c.hand);
+}
+
+/// 覚え書きの値（調和 `harms` は `Defender::harms` の中の `[off, off+len)`）。
+#[derive(Clone, Copy)]
+pub struct Res {
+    pub v: [f64; 4], // 防いだ本数・切る札・生き延びるターン・止めた本数
+    pub off: u32,
+    pub len: u32,
+}
+
+#[derive(Clone)]
+enum Src {
+    Arena(u32, u32),
+    Own(Vec<f64>),
+}
+
+/// 候補（結果の組）。`bump` は損害の先頭に足す値（ブロッカー ν／切った札 μ·枚数）。
+#[derive(Clone)]
+struct Cand {
+    v: [f64; 4],
+    src: Src,
+    bump: Option<f64>,
+}
+
+impl Cand {
+    fn zero() -> Cand {
+        Cand { v: [0.0; 4], src: Src::Own(Vec::new()), bump: None }
+    }
+    fn from_res(r: &Res) -> Cand {
+        Cand { v: r.v, src: Src::Arena(r.off, r.len), bump: None }
+    }
+    fn src_len(&self) -> usize {
+        match &self.src {
+            Src::Arena(_, l) => *l as usize,
+            Src::Own(v) => v.len(),
+        }
+    }
+    /// 損害の長さ。`bump` つきで空なら 1 本（`(0.0 + v,)`）。
+    fn hlen(&self) -> usize {
+        let l = self.src_len();
+        if self.bump.is_some() && l == 0 {
+            1
+        } else {
+            l
+        }
+    }
+    fn h(&self, arena: &[f64], q: usize) -> f64 {
+        let base = match &self.src {
+            Src::Arena(o, l) => {
+                if q < *l as usize {
+                    arena[*o as usize + q]
+                } else {
+                    0.0
+                }
+            }
+            Src::Own(v) => v.get(q).copied().unwrap_or(0.0),
+        };
+        match self.bump {
+            Some(b) if q == 0 => base + b,
+            _ => base,
+        }
+    }
+}
+
+/// `OPCG_HAND_STOP`（`docs/reports/2026-10-14_hand_stop.md` §1.3）: 守る側の比べ方の辞書式の順を
+/// 「生き延びるターン → 切る札 → 防いだ本数 → 損害の並び」にする（既定は「防いだ本数 → 切る札 → 生き延びるターン → 損害」）。
+/// 規則の負けは「ライフ 0 で受けたとき」だけで、止める目的は倒れないこと（止めた本数そのものではない）。新定数ゼロ。
+/// **2026-10-14 にユーザ決定で既定に採用**（「(a) 合成で確かめて既定に」・実 w41 の的中 .7260 → .7262・偏り +0.137 → +0.026・合成 w39 の的中 .6717 → .6682・偏り +0.458 → +0.324）。
+/// `OPCG_HAND_STOP=0`（または `off`）で旧い順に戻す。
+pub fn hand_stop_survive() -> bool {
+    hand_stop_mode() != 0
+}
+
+/// `OPCG_HAND_STOP` の形: 1＝`survive`（**既定**・2026-10-14 採用）・0＝切（`0`／`off`・旧い順）・2＝`value`
+/// （`docs/reports/2026-10-16_hand_stop_value.md` §1.3）。`value` も `survive` と同じく比べ方（`better`）だけで守りを選ぶ。
+/// 旧い順に固定した糸（[`with_legacy_order`]）では 0。
+pub fn hand_stop_mode() -> u8 {
+    if LEGACY_ORDER.with(|c| c.get()) {
+        return 0;
+    }
+    static M: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
+    *M.get_or_init(|| match std::env::var("OPCG_HAND_STOP").ok().as_deref().map(str::trim) {
+        Some("0") | Some("off") => 0,
+        Some("value") => 2,
+        _ => 1,
+    })
+}
+
+thread_local! {
+    static LEGACY_ORDER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// この糸で作る `Defender` を旧い比べ方の順（防いだ本数 → 切る札 → 生き延びるターン・`OPCG_HAND_STOP=off` と同じ）に固定して `f` を回す。
+/// 旧い順で記録した呼び出しの再生と、旧い順で手で導いた値の試験が使う。
+#[cfg(test)]
+pub fn with_legacy_order<T>(f: impl FnOnce() -> T) -> T {
+    LEGACY_ORDER.with(|c| c.set(true));
+    let r = f();
+    LEGACY_ORDER.with(|c| c.set(false));
+    r
+}
+
+/// 守る側の比較（期待値・同点は誤差で・E9）。
+/// 診断 `OPCG_DEF_TRACE_DUMP=1`（`docs/reports/2026-10-15_defend_foresee.md` §1・既定は切・値は変えない）:
+/// 守る側の最善の守りを、今のターン（1 段目）の攻撃の並びについて辿り、受けたライフ・切った札・ブロック・カウンターで止めた数・
+/// 倒された確率の期待値を写す（[`Defender::trace_first`]）。
+pub fn def_trace_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| matches!(std::env::var("OPCG_DEF_TRACE_DUMP").ok().as_deref().map(str::trim), Some("1") | Some("on") | Some("true")))
+}
+
+/// 1 つの状態で選ばれた守り（診断の辿りだけが使う）。
+#[derive(Clone, Copy)]
+enum Act {
+    Take,
+    Block(usize),
+    Counter(usize),
+}
+
+fn better(arena: &[f64], a: &Cand, b: &Cand, feq: f64, mode: u8) -> bool {
+    match mode {
+        1 => return better_survive(arena, a, b, feq),
+        2 => return better_value(arena, a, b, feq),
+        _ => {}
+    }
+    let mut d = a.v[0] - b.v[0];
+    if d > feq || d < -feq {
+        return a.v[0] > b.v[0];
+    }
+    d = a.v[1] - b.v[1];
+    if d > feq || d < -feq {
+        return a.v[1] < b.v[1];
+    }
+    d = a.v[2] - b.v[2];
+    if d > feq || d < -feq {
+        return a.v[2] > b.v[2];
+    }
+    let (la, lb) = (a.hlen(), b.hlen());
+    for q in 0..la.max(lb) {
+        let u = if q < la { a.h(arena, q) } else { 0.0 };
+        let v = if q < lb { b.h(arena, q) } else { 0.0 };
+        d = u - v;
+        if d > feq || d < -feq {
+            return u < v;
+        }
+    }
+    false
+}
+
+/// `OPCG_HAND_STOP=survive` の比べ方（生き延びるターン → 切る札 → 防いだ本数 → 損害の並び）。
+fn better_survive(arena: &[f64], a: &Cand, b: &Cand, feq: f64) -> bool {
+    let mut d = a.v[2] - b.v[2];
+    if d > feq || d < -feq {
+        return a.v[2] > b.v[2];
+    }
+    d = a.v[1] - b.v[1];
+    if d > feq || d < -feq {
+        return a.v[1] < b.v[1];
+    }
+    d = a.v[0] - b.v[0];
+    if d > feq || d < -feq {
+        return a.v[0] > b.v[0];
+    }
+    let (la, lb) = (a.hlen(), b.hlen());
+    for q in 0..la.max(lb) {
+        let u = if q < la { a.h(arena, q) } else { 0.0 };
+        let v = if q < lb { b.h(arena, q) } else { 0.0 };
+        d = u - v;
+        if d > feq || d < -feq {
+            return u < v;
+        }
+    }
+    false
+}
+
+/// 候補 `OPCG_HAND_STOP=value`（`docs/reports/2026-10-16_hand_stop_value.md` §1.3・既定は切）: 生き延びるターン → 損害の価値の和
+/// （損害の並びの全段の和＝受けたライフの `lam_net`・切った札の μ・倒れたブロッカーの ν・倒れの値。既にある値をそのまま足すだけ）
+/// → 防いだ本数 → 損害の並び。新定数ゼロ。
+fn better_value(arena: &[f64], a: &Cand, b: &Cand, feq: f64) -> bool {
+    let mut d = a.v[2] - b.v[2];
+    if d > feq || d < -feq {
+        return a.v[2] > b.v[2];
+    }
+    let (la, lb) = (a.hlen(), b.hlen());
+    let sa: f64 = (0..la).map(|q| a.h(arena, q)).sum();
+    let sb: f64 = (0..lb).map(|q| b.h(arena, q)).sum();
+    d = sa - sb;
+    if d > feq || d < -feq {
+        return sa < sb;
+    }
+    d = a.v[0] - b.v[0];
+    if d > feq || d < -feq {
+        return a.v[0] > b.v[0];
+    }
+    for q in 0..la.max(lb) {
+        let u = if q < la { a.h(arena, q) } else { 0.0 };
+        let v = if q < lb { b.h(arena, q) } else { 0.0 };
+        d = u - v;
+        if d > feq || d < -feq {
+            return u < v;
+        }
+    }
+    false
+}
+
+/// 確率つきの和（`comb`・足す順は Python と同じ）。
+struct Acc {
+    v: [f64; 4],
+    hh: Vec<f64>,
+}
+
+impl Acc {
+    fn new() -> Acc {
+        Acc { v: [0.0; 4], hh: Vec::new() }
+    }
+    fn add(&mut self, p: f64, c: &Cand, arena: &[f64]) {
+        self.v[0] += p * c.v[0];
+        self.v[1] += p * c.v[1];
+        self.v[2] += p * c.v[2];
+        self.v[3] += p * c.v[3];
+        let n4 = c.hlen();
+        if n4 > self.hh.len() {
+            self.hh.resize(n4, 0.0);
+        }
+        for j in 0..n4 {
+            self.hh[j] += p * c.h(arena, j);
+        }
+    }
+    fn into_cand(self) -> Cand {
+        Cand { v: self.v, src: Src::Own(self.hh), bump: None }
+    }
+}
+
+/// 問題 1 つ分の読み取り専用の値（`solve` が作る）。
+struct Prob {
+    ctx: u32,
+    kid: u32,
+    prep: Prep,
+    tprob: Vec<f64>,
+    dprob: Vec<f64>,
+    seq: Vec<Vec<f64>>,
+    last_hit: i64,
+    repeat_hits: bool,
+    cap: i64,
+    don: f64,
+    lam_net: f64,
+    mu: f64,
+    kill_base: f64,
+    eps: f64,
+    feq: f64,
+    nu: Vec<(f64, f64)>,
+    hits_f: Vec<f64>,
+}
+
+impl Prob {
+    fn nu_of(&self, m: f64) -> f64 {
+        for &(k, v) in &self.nu {
+            if k == m {
+                return v;
+            }
+        }
+        f64::NAN // `solve` が先に全部そろっていることを確かめてある
+    }
+}
+
+/// 守る側の動的計画 1 試行ぶん（覚え書き・予算）。
+pub struct Defender {
+    limit: Option<usize>,
+    ctx_ids: HashMap<Vec<u64>, u32>,
+    kid_ids: HashMap<Vec<u64>, u32>,
+    memo: KeyTable<Res>,
+    harms: Vec<f64>,
+    sets: SetCache,
+    kb: Vec<u64>,
+    /// 比べ方の順（作るときに `hand_stop_survive()` を写す）。
+    survive: bool,
+    /// 比べ方の形（作るときに `hand_stop_mode()` を写す・0＝旧い順・1＝survive・2＝value）。
+    mode: u8,
+}
+
+type R<T> = Result<T, DpErr>;
+
+impl Defender {
+    pub fn new(limit: Option<usize>) -> Defender {
+        Defender {
+            limit,
+            ctx_ids: HashMap::new(),
+            kid_ids: HashMap::new(),
+            memo: KeyTable::new(),
+            harms: Vec::new(),
+            sets: SetCache::new(),
+            kb: Vec::new(),
+            survive: hand_stop_survive(),
+            mode: hand_stop_mode(),
+        }
+    }
+
+    /// これまでに作った状態の数（Python の `len(memo)`）。
+    pub fn n_states(&self) -> usize {
+        self.memo.len()
+    }
+
+    /// 1 問を解く。予算を超えたら `Err(DpErr::Budget)`（その試行は捨てる）。
+    pub fn solve(&mut self, inp: &Input) -> R<Output> {
+        let (p, mut cur, l0_f, nu_all) = match self.prepare(inp)? {
+            Ok(x) => x,
+            Err(out) => return Ok(out),
+        };
+        let r = self.lookup(&p, &mut cur)?;
+        let harms = self.harms[r.off as usize..(r.off + r.len) as usize].to_vec();
+        Ok(Output {
+            cut: r.v[1],
+            stopped: r.v[3],
+            alive: r.v[2],
+            prevented: r.v[0],
+            harms,
+            theta: inp.lam * l0_f + inp.mu * r.v[1] + nu_all,
+            nu_all,
+        })
+    }
+
+    /// 診断（[`def_trace_on`]）: `solve` と同じ問題の最善の守りを、今のターン（1 段目）の攻撃の並びが尽きるまで辿り、
+    /// [受けたライフ, 切った札, ブロック, カウンターで止めた数, 倒された確率, 守った攻撃の数] の期待値と、届く攻撃の数（根の並びの長さ）を返す。
+    /// 子は覚え書きからだけ読む（覚え書きに無い状態に出会ったら `Bad`・覚え書きは増やさない）。根は `solve` 済みであること。
+    pub fn trace_first(&mut self, inp: &Input) -> R<[f64; 7]> {
+        let (p, mut cur, _l0, _nu) = match self.prepare(inp)? {
+            Ok(x) => x,
+            Err(_) => return Ok([0.0; 7]),
+        };
+        let n_hits = cur.rem.len() as f64;
+        let t = self.trace(&p, &mut cur)?;
+        Ok([t[0], t[1], t[2], t[3], t[4], t[5], n_hits])
+    }
+
+    fn trace(&mut self, p: &Prob, cur: &mut Cur) -> R<[f64; 6]> {
+        if cur.rem.is_empty() || cur.t != 0 {
+            return Ok([0.0; 6]);
+        }
+        let (_c, ch) = self.choose(p, cur, true)?;
+        let Some((i, act)) = ch else { return Ok([0.0; 6]) };
+        let x = cur.rem.remove(i);
+        let out = (|| -> R<[f64; 6]> {
+            match act {
+                Act::Take => {
+                    if cur.lf <= 0 {
+                        return Ok([0.0, 0.0, 0.0, 0.0, 1.0, 1.0]);
+                    }
+                    let mut acc = [0.0; 6];
+                    let mut ptot = 0.0;
+                    let moves: Vec<Option<usize>> = succ::recv_moves(&p.prep).collect();
+                    for mv in moves {
+                        succ::recv(cur, &p.prep, mv);
+                        let r = self.trace(p, cur);
+                        succ::undo_recv(cur, &p.prep, mv);
+                        let r = r?;
+                        let prob = match mv {
+                            Some(ti) => p.tprob[ti],
+                            None => p.prep.p_none,
+                        };
+                        ptot += prob;
+                        for q in 0..6 {
+                            acc[q] += prob * r[q];
+                        }
+                    }
+                    if ptot > 0.0 {
+                        for v in acc.iter_mut() {
+                            *v /= ptot;
+                        }
+                    }
+                    acc[0] += 1.0;
+                    acc[5] += 1.0;
+                    Ok(acc)
+                }
+                Act::Block(bi) => {
+                    let b = succ::block(cur, bi, x, p.eps);
+                    let r = self.trace(p, cur);
+                    succ::undo_block(cur, &b);
+                    let mut r = r?;
+                    r[2] += 1.0;
+                    r[5] += 1.0;
+                    Ok(r)
+                }
+                Act::Counter(ci) => {
+                    let sets = self.sets.get(p.kid, &p.prep.kvals, &p.prep.kdons, p.eps, x, &cur.hand, cur.dl);
+                    let cs = sets.get(ci).ok_or_else(|| DpErr::Bad("trace: counter set missing".to_string()))?;
+                    let (saved_hand, saved_dl) = (cur.hand.clone(), cur.dl);
+                    succ::counter(cur, cs);
+                    let r = self.trace(p, cur);
+                    cur.hand.copy_from_slice(&saved_hand);
+                    cur.dl = saved_dl;
+                    let mut r = r?;
+                    r[1] += cs.nc as f64;
+                    r[3] += 1.0;
+                    r[5] += 1.0;
+                    Ok(r)
+                }
+            }
+        })();
+        cur.rem.insert(i, x);
+        out
+    }
+
+    /// `solve` の下ごしらえ（問題の値と根の状態）。地平が 0 なら `Err(答え)`。
+    #[allow(clippy::type_complexity)]
+    fn prepare(&mut self, inp: &Input) -> R<Result<(Prob, Cur, f64, f64), Output>> {
+        let prep = Prep::new(inp.cards, inp.life_types, inp.draw_types);
+        // L0 = int(max(0, round(float(life))))
+        let l0f = bankers_round(inp.life);
+        let l0: i64 = if l0f > 0.0 { l0f as i64 } else { 0 };
+        let cnt_sum: i64 = prep.cnt0.iter().map(|&c| c as i64).sum();
+        let cap: i64 = match inp.turns {
+            None => cnt_sum + 2 * l0 + 2,
+            Some(t) => t.max(0),
+        };
+        let mut blk0 = inp.blk.to_vec();
+        sort_desc(&mut blk0);
+        let mut rest0 = inp.rest.to_vec();
+        sort_desc(&mut rest0);
+        let mut arr0 = inp.arrive.to_vec();
+        sort_desc(&mut arr0);
+        // 余裕ごとの ν（全部そろっていること）
+        let mut nu_all_terms = Vec::with_capacity(blk0.len() + rest0.len() + arr0.len());
+        for &m in blk0.iter().chain(rest0.iter()).chain(arr0.iter()) {
+            match inp.nu.iter().find(|(k, _)| *k == m) {
+                Some(&(_, v)) => nu_all_terms.push(v),
+                None => return Err(DpErr::Bad(format!("nu missing for margin {m}"))),
+            }
+        }
+        let nu_all = naive_sum(nu_all_terms.iter().copied());
+        let l0_f = l0 as f64;
+        if cap <= 0 {
+            return Ok(Err(Output {
+                cut: 0.0,
+                stopped: 0.0,
+                alive: 0.0,
+                prevented: 0.0,
+                harms: Vec::new(),
+                theta: inp.lam * l0_f + nu_all,
+                nu_all,
+            }));
+        }
+        if cap >= 65_535 || l0 >= 65_535 || prep.cnt0.iter().any(|&c| c >= 30_000) {
+            return Err(DpErr::Bad("problem outside the kernel limits".to_string()));
+        }
+        let mut hits_f: Vec<f64> = inp.xs_first.iter().copied().filter(|&x| x >= -inp.eps).collect();
+        sort_asc(&mut hits_f);
+        let seq_n = norm_seq(inp.seq);
+        let (seq, last_hit, repeat_hits) = seq_prep(&seq_n, inp.eps);
+        let don = py_round(inp.don, 9);
+
+        // 文脈・札の種類の番号（鍵の先頭）
+        let mut kk: Vec<u64> = Vec::new();
+        kk.push(prep.kinds.len() as u64);
+        for k in &prep.kinds {
+            kk.push(canon_bits(k.0));
+            kk.push(canon_bits(k.1));
+        }
+        let mut ck = kk.clone();
+        for ts in [&prep.types, &prep.dtypes] {
+            ck.push(ts.len() as u64);
+            for t in ts.iter() {
+                ck.extend([canon_bits(t.0), canon_bits(t.1), canon_bits(t.2)]);
+            }
+        }
+        ck.push(seq.len() as u64);
+        for s in &seq {
+            ck.push(s.len() as u64);
+            for &x in s {
+                ck.push(canon_bits(x));
+            }
+        }
+        ck.extend([canon_bits(don), l0 as u64, cap as u64]);
+        // Python の文脈の鍵（`ctx_t`）と同じ中身だけ（ν・誤差・EPS は鍵に入れない＝値段が同じなら同じ文脈）
+        for x in [inp.lam, inp.lam_net, inp.mu, inp.olp, inp.mlp] {
+            ck.push(canon_bits(x));
+        }
+        let next_kid = self.kid_ids.len() as u32;
+        let kid = *self.kid_ids.entry(kk).or_insert(next_kid);
+        let next_ctx = self.ctx_ids.len() as u32;
+        let ctx = *self.ctx_ids.entry(ck).or_insert(next_ctx);
+
+        let tprob = prep.types.iter().map(|t| t.2).collect();
+        let dprob = prep.dtypes.iter().map(|t| t.2).collect();
+        let p = Prob {
+            ctx,
+            kid,
+            tprob,
+            dprob,
+            seq,
+            last_hit,
+            repeat_hits,
+            cap,
+            don,
+            lam_net: inp.lam_net,
+            mu: inp.mu,
+            kill_base: (inp.lam - inp.lam_net) * l0_f,
+            eps: inp.eps,
+            feq: inp.feq,
+            nu: inp.nu.to_vec(),
+            hits_f: hits_f.clone(),
+            prep,
+        };
+        let cur = Cur {
+            t: 0,
+            lf: l0 as i32,
+            dl: don,
+            rem: hits_f,
+            hand: p.prep.cnt0.clone(),
+            ready: blk0,
+            rested: rest0,
+            pend: arr0,
+        };
+        Ok(Ok((p, cur, l0_f, nu_all)))
+    }
+
+    // -----------------------------------------------------------------------------------------
+
+    fn lookup(&mut self, p: &Prob, cur: &mut Cur) -> R<Res> {
+        let mut kb = std::mem::take(&mut self.kb);
+        write_key(&mut kb, p.ctx, cur);
+        let hit = self.memo.get(&kb);
+        self.kb = kb;
+        match hit {
+            Some(r) => Ok(r),
+            None => self.within(p, cur),
+        }
+    }
+
+    /// 解いた状態を覚える（`cur` は解く前と同じ状態に戻してある）。予算を超えたら失敗。
+    fn store(&mut self, p: &Prob, cur: &Cur, c: &Cand) -> R<Res> {
+        let (off, len) = match (&c.src, c.bump) {
+            (Src::Arena(o, l), None) => (*o, *l), // そのまま共有
+            _ => {
+                let off = self.harms.len() as u32;
+                let n = c.hlen();
+                for q in 0..n {
+                    let v = c.h(&self.harms, q);
+                    self.harms.push(v);
+                }
+                (off, n as u32)
+            }
+        };
+        let res = Res { v: c.v, off, len };
+        let mut kb = std::mem::take(&mut self.kb);
+        write_key(&mut kb, p.ctx, cur);
+        self.memo.insert_if_absent(&kb, res);
+        self.kb = kb;
+        if let Some(l) = self.limit {
+            if self.memo.len() > l {
+                return Err(DpErr::Budget);
+            }
+        }
+        Ok(res)
+    }
+
+    /// t 段目の始まり（`turn`）。`cur.t` は新しい段・`cur.rem` は空・`cur.ready` に戻ったブロッカー。
+    fn turn(&mut self, p: &Prob, cur: &mut Cur) -> R<Cand> {
+        let t = cur.t as i64;
+        match succ::turn_start(t, p.cap, &p.hits_f, &p.seq, p.last_hit, p.repeat_hits) {
+            TurnStart::Horizon => Ok(Cand::zero()),
+            TurnStart::Dry => {
+                let mut c = Cand::zero();
+                c.v[2] = (p.cap - t) as f64; // 以後ずっと命中が無い
+                Ok(c)
+            }
+            TurnStart::Hits(hits) => {
+                cur.rem.clear();
+                cur.rem.extend_from_slice(hits);
+                let r = self.lookup(p, cur)?;
+                cur.rem.clear();
+                Ok(Cand::from_res(&r))
+            }
+        }
+    }
+
+    /// 守る側のターン（1 枚引く）を挟んで次の段へ（`next_turn`）。
+    fn next_turn(&mut self, p: &Prob, cur: &mut Cur) -> R<Cand> {
+        let t = cur.t as i64;
+        if t + 1 >= p.cap || p.prep.dtypes.is_empty() {
+            cur.t += 1;
+            let r = self.turn(p, cur);
+            cur.t -= 1;
+            return r;
+        }
+        let mut acc = Acc::new();
+        cur.t += 1;
+        for mv in succ::draw_moves(&p.prep) {
+            succ::draw(cur, &p.prep, mv);
+            let r = self.turn(p, cur);
+            succ::undo_draw(cur, &p.prep, mv); // 失敗で戻る道では値は使わない（巻き戻しの不足で落とさない）
+            let prob = match mv {
+                Some(di) => p.dprob[di],
+                None => p.prep.pd_none,
+            };
+            acc.add(prob, &r?, &self.harms);
+        }
+        cur.t -= 1;
+        Ok(acc.into_cand())
+    }
+
+    /// 覚え書きに無い状態を解く（`within`）。Python の `not d < -FEQ` をそのまま写す（NaN は来ない）。
+    /// 子の作り方は [`succ`]（段ごとの数え方と同じ遷移）。
+    fn within(&mut self, p: &Prob, cur: &mut Cur) -> R<Res> {
+        if cur.rem.is_empty() {
+            return self.within_end(p, cur);
+        }
+        let (c, _ch) = self.choose(p, cur, false)?;
+        self.store(p, cur, &c)
+    }
+
+    /// 子の値（`memo_only` なら覚え書きからだけ・無ければ `Bad`＝診断の辿りが覚え書きを増やさない）。
+    fn child(&mut self, p: &Prob, cur: &mut Cur, memo_only: bool) -> R<Res> {
+        if !memo_only {
+            return self.lookup(p, cur);
+        }
+        let mut kb = std::mem::take(&mut self.kb);
+        write_key(&mut kb, p.ctx, cur);
+        let hit = self.memo.get(&kb);
+        self.kb = kb;
+        hit.ok_or_else(|| DpErr::Bad("trace: state not in memo".to_string()))
+    }
+
+    /// `within` の本体: 攻め手の順と守る側の選択の最善（と、選んだ攻撃の位置・守り）。`memo_only` は診断の辿りだけ。
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    fn choose(&mut self, p: &Prob, cur: &mut Cur, memo_only: bool) -> R<(Cand, Option<(usize, Act)>)> {
+        let mut best_att: Option<Cand> = None;
+        let mut att_choice: Option<(usize, Act)> = None;
+        let mut kill_def: Option<f64> = None;
+        let nrem = cur.rem.len();
+        for i in 0..nrem {
+            if succ::is_repeat(&cur.rem, i) {
+                continue;
+            }
+            let removed = cur.rem.remove(i);
+            let x = removed;
+            // 受ける
+            let mut best_def: Cand;
+            let mut def_choice = Act::Take;
+            if cur.lf <= 0 {
+                let kill = *kill_def.get_or_insert_with(|| {
+                    p.kill_base
+                        + naive_sum(
+                            cur.ready
+                                .iter()
+                                .chain(cur.rested.iter())
+                                .chain(cur.pend.iter())
+                                .map(|&m| p.nu_of(m)),
+                        )
+                });
+                best_def = Cand { v: [0.0; 4], src: Src::Own(vec![kill]), bump: None };
+            } else {
+                let mut acc = Acc::new();
+                for mv in succ::recv_moves(&p.prep) {
+                    succ::recv(cur, &p.prep, mv);
+                    let r = self.child(p, cur, memo_only);
+                    succ::undo_recv(cur, &p.prep, mv); // 失敗で戻る道では値は使わない（巻き戻しの不足で落とさない）
+                    let prob = match mv {
+                        Some(ti) => p.tprob[ti],
+                        None => p.prep.p_none,
+                    };
+                    acc.add(prob, &Cand::from_res(&r?), &self.harms);
+                }
+                let mut hh = acc.hh;
+                if hh.is_empty() {
+                    hh.push(0.0 + p.lam_net);
+                } else {
+                    hh[0] += p.lam_net;
+                }
+                best_def = Cand { v: acc.v, src: Src::Own(hh), bump: None };
+            }
+            // 横取りする
+            let nready = cur.ready.len();
+            for bi in 0..nready {
+                if !succ::can_block(cur, bi) {
+                    continue;
+                }
+                let b = succ::block(cur, bi, x, p.eps);
+                let r = self.child(p, cur, memo_only);
+                succ::undo_block(cur, &b);
+                let r = r?;
+                let bump = if b.killed { Some(p.nu_of(b.m)) } else { None };
+                let cand = Cand { v: [r.v[0] + 1.0, r.v[1], r.v[2], r.v[3]], src: Src::Arena(r.off, r.len), bump };
+                let d = cand.v[0] - best_def.v[0];
+                let pick = if self.survive {
+                    better(&self.harms, &cand, &best_def, p.feq, self.mode)
+                } else {
+                    d > p.feq || (!(d < -p.feq) && better(&self.harms, &cand, &best_def, p.feq, self.mode))
+                };
+                if pick {
+                    best_def = cand;
+                    def_choice = Act::Block(bi);
+                }
+            }
+            // カウンターを切る
+            let sets = self.sets.get(p.kid, &p.prep.kvals, &p.prep.kdons, p.eps, x, &cur.hand, cur.dl);
+            let (saved_hand, saved_dl) = (cur.hand.clone(), cur.dl);
+            for (ci, cs) in sets.iter().enumerate() {
+                succ::counter(cur, cs);
+                let r = self.child(p, cur, memo_only);
+                if r.is_err() {
+                    cur.hand.copy_from_slice(&saved_hand);
+                    cur.dl = saved_dl;
+                    cur.rem.insert(i, removed);
+                }
+                let r = r?;
+                let nc = cs.nc as f64;
+                let cand = Cand {
+                    v: [r.v[0] + 1.0, r.v[1] + nc, r.v[2], r.v[3] + 1.0],
+                    src: Src::Arena(r.off, r.len),
+                    bump: Some(p.mu * nc),
+                };
+                let d = cand.v[0] - best_def.v[0];
+                let pick = if self.survive {
+                    better(&self.harms, &cand, &best_def, p.feq, self.mode)
+                } else {
+                    d > p.feq || (!(d < -p.feq) && better(&self.harms, &cand, &best_def, p.feq, self.mode))
+                };
+                if pick {
+                    best_def = cand;
+                    def_choice = Act::Counter(ci);
+                }
+            }
+            cur.hand.copy_from_slice(&saved_hand);
+            cur.dl = saved_dl;
+            cur.rem.insert(i, removed);
+            // 攻め手は守る側の値を最小にする順番
+            let take = match &best_att {
+                None => true,
+                Some(ba) => better(&self.harms, ba, &best_def, p.feq, self.mode),
+            };
+            if take {
+                best_att = Some(best_def);
+                att_choice = Some((i, def_choice));
+            }
+        }
+        Ok((best_att.unwrap_or_else(Cand::zero), att_choice))
+    }
+
+    /// 残りの攻撃が無い状態（段の終わり）: ブロッカーが戻り、1 枚引いて次の段へ。
+    fn within_end(&mut self, p: &Prob, cur: &mut Cur) -> R<Res> {
+        let e = succ::end_turn(cur, p.don);
+        let r = self.next_turn(p, cur);
+        succ::undo_end_turn(cur, e);
+        let r = r?;
+        let n = r.hlen();
+        let mut hv = Vec::with_capacity(n + 1);
+        hv.push(0.0);
+        for q in 0..n {
+            hv.push(r.h(&self.harms, q));
+        }
+        let out = Cand { v: [r.v[0], r.v[1], r.v[2] + 1.0, r.v[3]], src: Src::Own(hv), bump: None };
+        self.store(p, cur, &out)
+    }
+}

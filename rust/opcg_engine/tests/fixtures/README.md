@@ -42,3 +42,60 @@ OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_audit_replay.py \
 （`counts` も数え直す）を `audit_masters_v4.json` へ書く（どちらも
 `json.dump(..., ensure_ascii=False, sort_keys=True, separators=(",",":"))`）。
 **期待値は Python の出力**で、Rust の出力から作り直してはいけない。
+
+## 理論の全移植の golden（段 1〜6・2026-10-06／07）
+
+| ファイル | 中身 |
+|---|---|
+| `theory_leaves_golden.jsonl.gz` | 葉（`src/theory/leaves_*.rs`・`cond.rs`）の**記録した呼び出し** 20,859 行（Python が本物の通し〔8 器 × `f_identity/rec`・実 w41・合成 w39 の各 5 局〕の中で実際に解いた入力・大域・核の答え・出力・浮動小数は 16 進のビット）。`theory::tests_leaves` が解き直してビットで比べる。約 1 MB |
+| `theory_core_golden.jsonl.gz` | 値付けの核（段 3）の記録した呼び出し。`theory::core::tests_core` |
+| `theory_outer_golden.jsonl.gz` | 守る側の外側と耐久（段 4）の記録した呼び出し。`theory::core::tests_outer` |
+| `theory_rows_golden.jsonl.gz` | 局の駆動と行の関数（段 5／6）の記録した呼び出し（局の枠つき）。`theory::core::tests_rows` |
+| `rd_dp_golden.jsonl`・`rd_solve_golden.jsonl.gz` | 守る側の計算（第 1〜3 段）の記録した解。`theory::tests` |
+| `theory_cards.json.gz`・`theory_effects.json.gz` | 記録を取ったときのカード表と語彙（2803 枚）・効果の木 |
+
+**段 7（2026-10-07）で Python の理論（記録を取った側）と、記録の器・間引きの道具（旧 `tests/scripts/theory_capture*.py`・
+`theory_*_golden.py`・`rd_kernel_golden.py`・答え合わせの原文 `tests/harness/rule_don_ref.py`）を消した**——これらの golden は
+**固定の正本**（Python の最後の出力の写し）で、Python 無しで `cargo test` が解き直す。**式を意図して変えたら**記録を取り直す道具は
+もう無いので、変えた Rust の出力で作り直し（golden は「その時点の Rust の出力」になる＝正しさの独立した証拠ではない）、
+差分を必ずレビューする。旧い Python は凍結ブランチ `claude/theory-switches-final` と履歴で辿れる。
+
+### 覚え書きの鍵を正確にした作り直し（2026-10-07・`docs/reports/2026-10-07_memo_exact.md`）
+
+値付けの核・外側・局の駆動の覚え書きの鍵を全部正確にした（丸めた鍵・文脈の抜け・先勝ちの共有をやめた）ので、
+`theory_core_golden`・`theory_outer_golden`・`theory_rows_golden` の**戻りの欄**（`r`・`cs`・`ev`／`result`）を Rust の出力で作り直した
+（入力の欄は 1 文字も変えていない・記録の再生で前もって入れる覚え書き `pre` は読まなくなったので全部の行から外した）。
+`theory_leaves_golden`・`rd_*_golden` は覚え書きを通らないので変わらない。作り直しの器は Rust だけで回る:
+
+```bash
+cd rust/opcg_engine
+OPCG_THEORY_GOLDEN_WRITE=1 cargo test --no-default-features tests_regen -- --include-ignored --nocapture
+```
+
+（`OPCG_THEORY_GOLDEN_WRITE` が無ければ書き換える行を数えるだけ。各行を試験と同じ道〔`tests_core`／`tests_outer`／`tests_rows` の
+`run_one`〕で解き、戻りが違う行だけ書き換える。**golden は「その時点の Rust の出力」**＝作り直したら差分を必ずレビューする。）
+
+
+### ドンの上限を盤面から読む候補（2026-10-12・`docs/reports/2026-10-12_don_deck.md`）
+
+理論の計画のドンの上限を「10 枚固定」から「場のドン＋ドン‼デッキの残り」（`leaves_to::don_room`）に直す候補は、**切替 `OPCG_DON_ROOM=1` のときだけ**入る
+（既定は旧＝golden は作り直していない・既定で 1 ビットも変わらない）。切替を入れて上の器を数えるだけで回すと、
+`theory_outer_golden` 107 行（`hp.search_context` 67・`tb.guard_hand_reading` 30・`cv.L`／`cv.gbar` 各 5）と `theory_rows_golden` 13 行が変わる。
+**変わる行は全部エネル（ドン‼デッキ 6 枚）の行**——上限が 10 未満になる呼び出しを数えて全部 6 だったことを確かめた（996 回）。
+既定に入れるときは、その時点で上の器（`OPCG_DON_ROOM=1 OPCG_THEORY_GOLDEN_WRITE=1`）で作り直す。
+
+### 耐久のライフの項の手札のライフ加算を既定に（2026-10-12・ユーザ決定「(a) 既定にする」・`docs/reports/2026-10-12_life_add.md`）
+
+`OPCG_LIFE_ADD` の既定を on に反転した（`=0`／`off` で旧い形）。上の器で `theory_rows_golden` の 43 行（`kappa_vector`・`transition_ledger`・
+`crossing_bridge`・`relative_ledger`・`theory_bridge` の記録・合成 w39 と記録の局）の戻りの欄を作り直した。`theory_core`・`theory_outer` は 0 行。
+作り直した後に器をもう一度回して 0 行・`OPCG_LIFE_ADD=0` で回すと同じ 43 行が旧い値に戻ることを確かめた。
+
+### 【相手のアタック時】をその相手のターンの守る側のリーダーのパワーとして読むのを既定に（2026-10-13・ユーザ決定「(a) 既定にする」・`docs/reports/2026-10-13_opp_attack_power.md`）
+
+`OPCG_OPP_ATTACK_POWER` の既定を on に反転した（`=0`／`off` で旧い形）。上の器で回すと `theory_core`・`theory_outer`・`theory_rows` とも書き換えた行 0。
+上げ幅・下げ幅を一時的に 100 倍にしても 0 行だった＝**golden の局には読む型（`BUFF` だけ）の【相手のアタック時】の持ち主が通る行が無い**（この口は golden では見張られていない。見張りは実 w41 の時計の 20 局のファイル一致で行った）。
+
+### 守る側の目的を「倒れない」を先にする順を既定に（2026-10-14・ユーザ決定「(a) 合成で確かめて既定に」・`docs/reports/2026-10-14_hand_stop.md`・`2026-10-14_syn_hand_stop.md`）
+
+`OPCG_HAND_STOP` の既定を `survive` に反転した（`=0`／`off` で旧い順「防いだ本数 → 切る札 → 生き延びるターン」）。上の器で `theory_outer_golden` 97 行・
+`theory_rows_golden` 3 行の戻りの欄を作り直した。`theory_core` は 0 行。作り直した後に器をもう一度回して 0 行・`OPCG_HAND_STOP=off` で回すと同じ 97／3 行が旧い値に戻ることを確かめた。

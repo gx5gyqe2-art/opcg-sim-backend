@@ -1,0 +1,552 @@
+{
+ "record": "/home/user/data_rec/sigma_wip/data/w41",
+ "clocks": "/home/user/tm/pg/hs_clocks.json",
+ "attacks": {
+  "OP09-001": {
+   "all": {
+    "reached_attacks": 1012,
+    "counters_per_reached": 0.433,
+    "raise_per_reached": 52.3,
+    "stops_per_counter": 0.703,
+    "stopped_share": 0.906,
+    "counter_stop_share": 0.304,
+    "excess_mean_counter_stops": 1263.2,
+    "counters_mean_counter_stops": 1.39
+   },
+   "1-3": {
+    "reached_attacks": 69,
+    "counters_per_reached": 0.449,
+    "raise_per_reached": 318.7,
+    "stops_per_counter": 0.742,
+    "stopped_share": 0.797,
+    "counter_stop_share": 0.333,
+    "excess_mean_counter_stops": 1174.4,
+    "counters_mean_counter_stops": 1.174
+   },
+   "4-6": {
+    "reached_attacks": 189,
+    "counters_per_reached": 0.302,
+    "raise_per_reached": 63.5,
+    "stops_per_counter": 0.947,
+    "stopped_share": 0.942,
+    "counter_stop_share": 0.286,
+    "excess_mean_counter_stops": 1167.5,
+    "counters_mean_counter_stops": 1.019
+   },
+   "7+": {
+    "reached_attacks": 754,
+    "counters_per_reached": 0.464,
+    "raise_per_reached": 25.2,
+    "stops_per_counter": 0.66,
+    "stopped_share": 0.907,
+    "counter_stop_share": 0.306,
+    "excess_mean_counter_stops": 1294.5,
+    "counters_mean_counter_stops": 1.498
+   }
+  },
+  "OP11-041": {
+   "all": {
+    "reached_attacks": 1138,
+    "counters_per_reached": 0.526,
+    "raise_per_reached": 564.7,
+    "stops_per_counter": 0.725,
+    "stopped_share": 0.69,
+    "counter_stop_share": 0.381,
+    "excess_mean_counter_stops": 1018.9,
+    "counters_mean_counter_stops": 1.29
+   },
+   "1-3": {
+    "reached_attacks": 65,
+    "counters_per_reached": 0.615,
+    "raise_per_reached": 0.0,
+    "stops_per_counter": 0.575,
+    "stopped_share": 0.646,
+    "counter_stop_share": 0.354,
+    "excess_mean_counter_stops": 783.4,
+    "counters_mean_counter_stops": 1.478
+   },
+   "4-6": {
+    "reached_attacks": 222,
+    "counters_per_reached": 0.653,
+    "raise_per_reached": 649.3,
+    "stops_per_counter": 0.828,
+    "stopped_share": 0.883,
+    "counter_stop_share": 0.541,
+    "excess_mean_counter_stops": 742.2,
+    "counters_mean_counter_stops": 1.15
+   },
+   "7+": {
+    "reached_attacks": 851,
+    "counters_per_reached": 0.486,
+    "raise_per_reached": 585.8,
+    "stops_per_counter": 0.703,
+    "stopped_share": 0.643,
+    "counter_stop_share": 0.342,
+    "excess_mean_counter_stops": 1151.7,
+    "counters_mean_counter_stops": 1.333
+   }
+  },
+  "OP15-058": {
+   "all": {
+    "reached_attacks": 1457,
+    "counters_per_reached": 0.812,
+    "raise_per_reached": 506.9,
+    "stops_per_counter": 0.555,
+    "stopped_share": 0.894,
+    "counter_stop_share": 0.45,
+    "excess_mean_counter_stops": 1499.0,
+    "counters_mean_counter_stops": 1.779
+   },
+   "1-3": {
+    "reached_attacks": 65,
+    "counters_per_reached": 1.108,
+    "raise_per_reached": 1031.2,
+    "stops_per_counter": 0.514,
+    "stopped_share": 0.862,
+    "counter_stop_share": 0.569,
+    "excess_mean_counter_stops": 676.1,
+    "counters_mean_counter_stops": 1.784
+   },
+   "4-6": {
+    "reached_attacks": 260,
+    "counters_per_reached": 0.819,
+    "raise_per_reached": 785.2,
+    "stops_per_counter": 0.718,
+    "stopped_share": 0.885,
+    "counter_stop_share": 0.588,
+    "excess_mean_counter_stops": 549.5,
+    "counters_mean_counter_stops": 1.359
+   },
+   "7+": {
+    "reached_attacks": 1132,
+    "counters_per_reached": 0.793,
+    "raise_per_reached": 412.8,
+    "stops_per_counter": 0.519,
+    "stopped_share": 0.898,
+    "counter_stop_share": 0.412,
+    "excess_mean_counter_stops": 1876.1,
+    "counters_mean_counter_stops": 1.916
+   }
+  },
+  "OP16-022": {
+   "all": {
+    "reached_attacks": 1411,
+    "counters_per_reached": 0.741,
+    "raise_per_reached": 301.7,
+    "stops_per_counter": 0.695,
+    "stopped_share": 0.934,
+    "counter_stop_share": 0.515,
+    "excess_mean_counter_stops": 1215.6,
+    "counters_mean_counter_stops": 1.421
+   },
+   "1-3": {
+    "reached_attacks": 77,
+    "counters_per_reached": 0.883,
+    "raise_per_reached": 545.1,
+    "stops_per_counter": 0.632,
+    "stopped_share": 0.844,
+    "counter_stop_share": 0.558,
+    "excess_mean_counter_stops": 1233.0,
+    "counters_mean_counter_stops": 1.465
+   },
+   "4-6": {
+    "reached_attacks": 274,
+    "counters_per_reached": 0.774,
+    "raise_per_reached": 306.4,
+    "stops_per_counter": 0.906,
+    "stopped_share": 0.934,
+    "counter_stop_share": 0.701,
+    "excess_mean_counter_stops": 745.5,
+    "counters_mean_counter_stops": 1.104
+   },
+   "7+": {
+    "reached_attacks": 1060,
+    "counters_per_reached": 0.722,
+    "raise_per_reached": 282.8,
+    "stops_per_counter": 0.642,
+    "stopped_share": 0.941,
+    "counter_stop_share": 0.463,
+    "excess_mean_counter_stops": 1397.9,
+    "counters_mean_counter_stops": 1.542
+   }
+  }
+ },
+ "horizon": {
+  "OP09-001": {
+   "all": {
+    "both": {
+     "rows": 860,
+     "theory_stopped": 4.057,
+     "actual_counter_stops": 1.667,
+     "actual_over_theory": 0.411,
+     "theory_cut": 4.673
+    },
+    "fell": {
+     "rows": 305,
+     "theory_stopped": 3.51,
+     "actual_counter_stops": 1.81,
+     "actual_over_theory": 0.516,
+     "theory_cut": 3.888
+    },
+    "survived": {
+     "rows": 555,
+     "theory_stopped": 4.357,
+     "actual_counter_stops": 1.589,
+     "actual_over_theory": 0.365,
+     "theory_cut": 5.105
+    }
+   },
+   "1-3": {
+    "both": {
+     "rows": 145,
+     "theory_stopped": 6.948,
+     "actual_counter_stops": 2.359,
+     "actual_over_theory": 0.339,
+     "theory_cut": 7.441
+    },
+    "fell": {
+     "rows": 51,
+     "theory_stopped": 6.025,
+     "actual_counter_stops": 2.608,
+     "actual_over_theory": 0.433,
+     "theory_cut": 6.339
+    },
+    "survived": {
+     "rows": 94,
+     "theory_stopped": 7.449,
+     "actual_counter_stops": 2.223,
+     "actual_over_theory": 0.298,
+     "theory_cut": 8.039
+    }
+   },
+   "4-6": {
+    "both": {
+     "rows": 213,
+     "theory_stopped": 4.868,
+     "actual_counter_stops": 2.089,
+     "actual_over_theory": 0.429,
+     "theory_cut": 5.684
+    },
+    "fell": {
+     "rows": 75,
+     "theory_stopped": 4.451,
+     "actual_counter_stops": 2.333,
+     "actual_over_theory": 0.524,
+     "theory_cut": 4.948
+    },
+    "survived": {
+     "rows": 138,
+     "theory_stopped": 5.095,
+     "actual_counter_stops": 1.957,
+     "actual_over_theory": 0.384,
+     "theory_cut": 6.083
+    }
+   },
+   "7+": {
+    "both": {
+     "rows": 502,
+     "theory_stopped": 2.878,
+     "actual_counter_stops": 1.289,
+     "actual_over_theory": 0.448,
+     "theory_cut": 3.445
+    },
+    "fell": {
+     "rows": 179,
+     "theory_stopped": 2.4,
+     "actual_counter_stops": 1.363,
+     "actual_over_theory": 0.568,
+     "theory_cut": 2.746
+    },
+    "survived": {
+     "rows": 323,
+     "theory_stopped": 3.142,
+     "actual_counter_stops": 1.248,
+     "actual_over_theory": 0.397,
+     "theory_cut": 3.833
+    }
+   }
+  },
+  "OP11-041": {
+   "all": {
+    "both": {
+     "rows": 778,
+     "theory_stopped": 4.402,
+     "actual_counter_stops": 2.383,
+     "actual_over_theory": 0.541,
+     "theory_cut": 5.187
+    },
+    "fell": {
+     "rows": 176,
+     "theory_stopped": 3.453,
+     "actual_counter_stops": 2.835,
+     "actual_over_theory": 0.821,
+     "theory_cut": 4.005
+    },
+    "survived": {
+     "rows": 602,
+     "theory_stopped": 4.68,
+     "actual_counter_stops": 2.251,
+     "actual_over_theory": 0.481,
+     "theory_cut": 5.532
+    }
+   },
+   "1-3": {
+    "both": {
+     "rows": 135,
+     "theory_stopped": 6.559,
+     "actual_counter_stops": 3.556,
+     "actual_over_theory": 0.542,
+     "theory_cut": 6.789
+    },
+    "fell": {
+     "rows": 30,
+     "theory_stopped": 6.197,
+     "actual_counter_stops": 4.1,
+     "actual_over_theory": 0.662,
+     "theory_cut": 6.451
+    },
+    "survived": {
+     "rows": 105,
+     "theory_stopped": 6.663,
+     "actual_counter_stops": 3.4,
+     "actual_over_theory": 0.51,
+     "theory_cut": 6.886
+    }
+   },
+   "4-6": {
+    "both": {
+     "rows": 201,
+     "theory_stopped": 5.483,
+     "actual_counter_stops": 3.224,
+     "actual_over_theory": 0.588,
+     "theory_cut": 6.422
+    },
+    "fell": {
+     "rows": 40,
+     "theory_stopped": 4.373,
+     "actual_counter_stops": 3.95,
+     "actual_over_theory": 0.903,
+     "theory_cut": 5.282
+    },
+    "survived": {
+     "rows": 161,
+     "theory_stopped": 5.759,
+     "actual_counter_stops": 3.043,
+     "actual_over_theory": 0.528,
+     "theory_cut": 6.705
+    }
+   },
+   "7+": {
+    "both": {
+     "rows": 442,
+     "theory_stopped": 3.251,
+     "actual_counter_stops": 1.643,
+     "actual_over_theory": 0.505,
+     "theory_cut": 4.135
+    },
+    "fell": {
+     "rows": 106,
+     "theory_stopped": 2.329,
+     "actual_counter_stops": 2.057,
+     "actual_over_theory": 0.883,
+     "theory_cut": 2.83
+    },
+    "survived": {
+     "rows": 336,
+     "theory_stopped": 3.542,
+     "actual_counter_stops": 1.512,
+     "actual_over_theory": 0.427,
+     "theory_cut": 4.547
+    }
+   }
+  },
+  "OP15-058": {
+   "all": {
+    "both": {
+     "rows": 803,
+     "theory_stopped": 4.938,
+     "actual_counter_stops": 3.183,
+     "actual_over_theory": 0.645,
+     "theory_cut": 5.393
+    },
+    "fell": {
+     "rows": 614,
+     "theory_stopped": 4.742,
+     "actual_counter_stops": 3.342,
+     "actual_over_theory": 0.705,
+     "theory_cut": 5.188
+    },
+    "survived": {
+     "rows": 189,
+     "theory_stopped": 5.573,
+     "actual_counter_stops": 2.667,
+     "actual_over_theory": 0.478,
+     "theory_cut": 6.061
+    }
+   },
+   "1-3": {
+    "both": {
+     "rows": 159,
+     "theory_stopped": 8.083,
+     "actual_counter_stops": 4.226,
+     "actual_over_theory": 0.523,
+     "theory_cut": 8.471
+    },
+    "fell": {
+     "rows": 124,
+     "theory_stopped": 7.947,
+     "actual_counter_stops": 4.282,
+     "actual_over_theory": 0.539,
+     "theory_cut": 8.298
+    },
+    "survived": {
+     "rows": 35,
+     "theory_stopped": 8.567,
+     "actual_counter_stops": 4.029,
+     "actual_over_theory": 0.47,
+     "theory_cut": 9.083
+    }
+   },
+   "4-6": {
+    "both": {
+     "rows": 248,
+     "theory_stopped": 6.152,
+     "actual_counter_stops": 3.823,
+     "actual_over_theory": 0.621,
+     "theory_cut": 6.493
+    },
+    "fell": {
+     "rows": 187,
+     "theory_stopped": 5.883,
+     "actual_counter_stops": 3.952,
+     "actual_over_theory": 0.672,
+     "theory_cut": 6.229
+    },
+    "survived": {
+     "rows": 61,
+     "theory_stopped": 6.976,
+     "actual_counter_stops": 3.426,
+     "actual_over_theory": 0.491,
+     "theory_cut": 7.302
+    }
+   },
+   "7+": {
+    "both": {
+     "rows": 396,
+     "theory_stopped": 2.914,
+     "actual_counter_stops": 2.364,
+     "actual_over_theory": 0.811,
+     "theory_cut": 3.469
+    },
+    "fell": {
+     "rows": 303,
+     "theory_stopped": 2.726,
+     "actual_counter_stops": 2.581,
+     "actual_over_theory": 0.947,
+     "theory_cut": 3.273
+    },
+    "survived": {
+     "rows": 93,
+     "theory_stopped": 3.526,
+     "actual_counter_stops": 1.656,
+     "actual_over_theory": 0.47,
+     "theory_cut": 4.109
+    }
+   }
+  },
+  "OP16-022": {
+   "all": {
+    "both": {
+     "rows": 814,
+     "theory_stopped": 4.655,
+     "actual_counter_stops": 3.375,
+     "actual_over_theory": 0.725,
+     "theory_cut": 5.189
+    },
+    "fell": {
+     "rows": 465,
+     "theory_stopped": 4.662,
+     "actual_counter_stops": 3.456,
+     "actual_over_theory": 0.741,
+     "theory_cut": 5.085
+    },
+    "survived": {
+     "rows": 349,
+     "theory_stopped": 4.646,
+     "actual_counter_stops": 3.266,
+     "actual_over_theory": 0.703,
+     "theory_cut": 5.327
+    }
+   },
+   "1-3": {
+    "both": {
+     "rows": 161,
+     "theory_stopped": 7.474,
+     "actual_counter_stops": 4.677,
+     "actual_over_theory": 0.626,
+     "theory_cut": 7.815
+    },
+    "fell": {
+     "rows": 95,
+     "theory_stopped": 7.593,
+     "actual_counter_stops": 4.789,
+     "actual_over_theory": 0.631,
+     "theory_cut": 7.91
+    },
+    "survived": {
+     "rows": 66,
+     "theory_stopped": 7.304,
+     "actual_counter_stops": 4.515,
+     "actual_over_theory": 0.618,
+     "theory_cut": 7.679
+    }
+   },
+   "4-6": {
+    "both": {
+     "rows": 238,
+     "theory_stopped": 5.789,
+     "actual_counter_stops": 4.273,
+     "actual_over_theory": 0.738,
+     "theory_cut": 6.371
+    },
+    "fell": {
+     "rows": 138,
+     "theory_stopped": 5.894,
+     "actual_counter_stops": 4.377,
+     "actual_over_theory": 0.743,
+     "theory_cut": 6.292
+    },
+    "survived": {
+     "rows": 100,
+     "theory_stopped": 5.644,
+     "actual_counter_stops": 4.13,
+     "actual_over_theory": 0.732,
+     "theory_cut": 6.48
+    }
+   },
+   "7+": {
+    "both": {
+     "rows": 415,
+     "theory_stopped": 2.911,
+     "actual_counter_stops": 2.354,
+     "actual_over_theory": 0.809,
+     "theory_cut": 3.492
+    },
+    "fell": {
+     "rows": 232,
+     "theory_stopped": 2.729,
+     "actual_counter_stops": 2.362,
+     "actual_over_theory": 0.866,
+     "theory_cut": 3.21
+    },
+    "survived": {
+     "rows": 183,
+     "theory_stopped": 3.142,
+     "actual_counter_stops": 2.344,
+     "actual_over_theory": 0.746,
+     "theory_cut": 3.849
+    }
+   }
+  }
+ }
+}

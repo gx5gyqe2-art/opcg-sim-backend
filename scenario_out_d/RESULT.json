@@ -1,0 +1,64 @@
+{
+ "job": "rs-setup-box-2",
+ "status": "partial",
+ "branch": "claude/rs-setup-box-2",
+ "base": "claude/cpu-spec-improvements-yw91jd (f857753)",
+ "net": "nrel_r3.npz",
+ "conditions": {
+  "C_all": "--worlds 4 --setup-box --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2 --sims 160 --seeds 8",
+  "C_box_r2": "--setup-box --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2 --sims 160 --seeds 8"
+ },
+ "keys": {
+  "C_all": {
+   "kami_before_attack": 0,
+   "lethal": 0,
+   "gammaknife": 0,
+   "kami_ko": 2,
+   "kami_played": 3,
+   "chose_box": 67,
+   "chose_bare": 0,
+   "bare_gt_box": "0/0",
+   "decisions_with_box": 181
+  },
+  "C_box_r2": {
+   "kami_before_attack": 0,
+   "lethal": 0,
+   "gammaknife": 0,
+   "kami_ko": 4,
+   "kami_played": 4,
+   "chose_box": 94,
+   "chose_bare": 0,
+   "bare_gt_box": "0/0",
+   "decisions_with_box": 210
+  }
+ },
+ "keys_before_this_wp": {
+  "note": "分析 #6 の同じ条件（scenario_out_c/・素の手を残し P を等分していた版）を同じ鍵で読み直した値。",
+  "C_all": {"kami_before_attack": 0, "lethal": 0, "gammaknife": 5, "kami_ko": 1, "kami_played": 1,
+            "chose_box": 22, "chose_bare": 49, "bare_gt_box": "348/833", "decisions_with_box": 219},
+  "C_box_r2": {"kami_before_attack": 4, "lethal": 0, "gammaknife": 5, "kami_ko": 5, "kami_played": 5,
+               "chose_box": 36, "chose_bare": 85, "bare_gt_box": "388/936", "decisions_with_box": 273},
+  "C_w4_r2_reference": {"kami_before_attack": 5, "lethal": 4}
+ },
+ "latency_ms": {
+  "C_all": 1578.5,
+  "C_box_r2": 589.2,
+  "detail": {
+   "C_all": {"enel_human_20260810_t9-9": 1963.8, "human_enel_vs_roger_20260904_t7-8": 1578.5,
+             "human_enel_vs_luffy_20260904_t4-5": 961.0},
+   "C_box_r2": {"enel_human_20260810_t9-9": 202.7, "human_enel_vs_roger_20260904_t7-8": 589.2,
+                "human_enel_vs_luffy_20260904_t4-5": 784.4}
+  },
+  "note": "rs_search_a_latency.py・同じ 3 局面・単独プロセス・repeat 3 の中位（sims 160）。分析 #6 は C_all 1460 ms・C_box_r2 730 ms。"
+ },
+ "make_test": "458 passed, 1 skipped（pytest）＋ cargo test 409 passed（cargo clippy -D warnings も clean）",
+ "audit_cross": {"pairs": 120, "games": 240, "void": 0},
+ "changes": [
+  "1: 箱ができた素の PLAY／ACTIVATE_MAIN を候補から落とす（quiesce::Ctx::legal_actions）。箱が作れない準備の手（枝予算切れ・素の手が今の盤面で打てない）は今までどおり素の手が残る。",
+  "1b: 素の手の意味を残すため、全枝に続きの攻撃が付いた準備の手には「攻撃しない」枝（payload.attack=null）を 1 本足す（setup_box_candidates）。箱ごとの枝数は最大 SETUP_BOX_BRANCH_CAP + 1 = 10。",
+  "2: split_setup_box_priors を削除＝箱の P を等分しない（各枝の候補行は素の手の行なので、ネットが出した素の手の P がそのまま各枝の P になる）。根の平坦化は今までどおりその後。",
+  "3: 同名 2 枚の箱の重複は move_equiv_key（card_id 基準）で 1 グループに束ねられていることを確認＝退避（同じ card_id は 1 枚だけ箱にする）は不要。Rust テスト duplicate_copies_of_a_setup_move_merge_into_one_group で固定。",
+  "4: rs_search_a_keys.py に box_vs_bare（決定数／箱を選んだ／素の手を選んだ／素 N > 箱 N 和）と enel_t9_winner を追加。_is_play は SETUP_BOX も拾うようにした（素の手が落ちたので detail 鍵が空になるのを避ける）。"
+ ],
+ "notes": "受け入れの目標（C_all で 神の裁き→攻撃 5/8 以上・ガンマナイフ 5/8・KO 5/8）は未達＝status=partial。指示の 1〜4 は全部入り、既定（setup_box=false）は 1 bit も変えていない（cargo の setup_box_is_off_by_default と pytest の test_default_is_unchanged）。■ 構造の狙いは達成: 素の手と箱の取り合いは消えた（chose_bare 49→0・22→0、素 N > 箱 N 和 の組が 833→0・936→0＝そもそも同じ決定に両方居ない）。箱が選ばれた決定は C_all 22→67・C_box_r2 36→94 と 3 倍近い。■ ところが実プレイの鍵は退行した: ガンマナイフが両条件とも 5/8 → 0/8。原因ははっきりしている——分析 #6 の 5/8 は**全部が素の PLAY**（sig=\"PLAY\"）で打たれていた（scenario_out_c の 10 run すべて確認・箱経由は 1 度も無い）。つまり今回落とした候補そのものが効き目の出所だった。箱の枝は (a) 訪問が割れる（T7 の箱は 3 枝で N max 4〜23・q_min_n の下限 20〔K=1〕/80〔K=4〕に届かない）、(b) Q が素の手より低い（素 -0.229 に対し箱 -0.31/-0.47/-0.51）——箱は「対話の選択を枝で固定 ＋ 続きの攻撃を方策で決め打ち」なので、素の手が持っていた『選択を木のノードとして後から読む』自由度を失う。神の裁き→攻撃（T9）も C_box_r2 で 4/8 → 0/8（根の箱の枝は P 0.0184 ずつ・N 0）。■ 良くなった側: 神の裁きの KO は C_all で 1/8 → 2/8（打った 1 → 3・打った run はすべて KO）。C_box_r2 は 5/8 → 4/8 だが、旧 5 本のうち 1 本は素の PLAY 由来なので箱経由は 4 → 4 で不変。■ 判定材料としての読み: 「素の手を落とす」と「P を等分しない」は**取り合いは消すが、訪問の分裂は消さない**。分析 #6 §4-4 が挙げた残りの一手——選択規則（q_min_n の訪問下限）を『同じ準備の手の枝を束ねたグループ』に対して適用する——が要る。今の merge_root_stats は等価キーが一致する枝（＝同じ選択・同じ攻撃対象）しか束ねないので、神の裁きの 8 枝・ガンマナイフの 3 枝は別グループのまま下限を割る。これは decide.rs の move_equiv_key／merge_root_stats に手を入れる話で、本 WP の触ってよい範囲（decide.rs は箱コミットの腕だけ）の外なので入れていない。■ 質問: (Q1) 上の『枝を束ねてから下限を見る』を次の WP にして、束ね方は「action_type=SETUP_BOX なら card_id だけで束ねる（選択・攻撃対象を無視する）」でよいか（代表は N 最大の枝＝実際に打つ枝）。(Q2) それでも素の手の Q が箱より良い局面（T7 のガンマナイフ）は残る＝「箱を残しつつ素の手も残す」を条件付き（箱の枝が全部 attack つきのときだけ素の手を残す等）に戻す案も要るか。(Q3) 1b で足した『攻撃しない』枝は指示に無い追加（『「攻撃しない」枝が素の手の意味を持つ』が成り立つよう保証するため）。要らなければ外す。■ レイテンシは C_all 1.58 s（分析 #6 の 1.46 s と同程度・候補が減って枝が増えたぶん相殺）・C_box_r2 0.59 s（0.73 s から改善）。■ 環境メモ: この作業セッションには maturin・pytest・opcg_sim/requirements.txt・httpx が入っていなかったので入れた（コンテナは使い捨て）。opcg_sim/data/opcg_effects.json（生成物）も export_effects_json で作り直した——無いと tests_setup_box.rs は何も検査せずに戻る（実際に最初の cargo test はそれで『全部 pass』に見えた）。"
+}
