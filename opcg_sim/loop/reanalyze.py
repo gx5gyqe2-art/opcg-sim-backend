@@ -301,6 +301,58 @@ def summarize(dirs, c_scale=0.3, n_min=1.0, c_visit=50.0):
     return out
 
 
+def merge(orig, rean_dirs, out):
+    """元の波の dir（`record_gen` の出力）の全行を写し、再分析した main 行だけ `pol_n`／`pol_q`（と、元に列が在れば `pol_v0`）を
+    再分析の値に差し替えた dump を `out` に書く（r11b の教材・`docs/n_loop_ops.md` §7.6）。照合は (seed, step) と、候補の数・
+    候補の並び（`pol_sig`）。差し替えない行・列はビットのまま。元に `pol_v0` が無い波（波 29）は列を足さない
+    （訓練は訪問で重み付けた q の平均で補う＝再分析の v0 と同じ式）。"""
+    rep = {}
+    for d in rean_dirs:
+        for fn_ in sorted(f for f in os.listdir(d) if f.startswith("n_record_") and f.endswith(".npz")):
+            z = np.load(os.path.join(d, fn_))
+            ptr = np.concatenate([[0], np.cumsum(z["pol_len"].astype(np.int64))])
+            for i in range(len(z["seed"])):
+                rep[(int(z["seed"][i]), int(z["step"][i]))] = (
+                    z["pol_n"][ptr[i]:ptr[i + 1]], z["pol_q"][ptr[i]:ptr[i + 1]], z["pol_sig"][ptr[i]:ptr[i + 1]],
+                    float(z["pol_v0"][i]))
+    os.makedirs(out, exist_ok=True)
+    n_rep = n_rows = 0
+    used = set()
+    for fn_ in sorted(f for f in os.listdir(orig) if f.startswith("n_record_") and f.endswith(".npz")):
+        z = np.load(os.path.join(orig, fn_))
+        cols = {k: z[k].copy() for k in z.files}
+        ptr = np.concatenate([[0], np.cumsum(cols["pol_len"].astype(np.int64))])
+        for i in range(len(cols["seed"])):
+            key = (int(cols["seed"][i]), int(cols["step"][i]))
+            if key not in rep:
+                continue
+            n2, q2, sig2, v0 = rep[key]
+            a, b = ptr[i], ptr[i + 1]
+            if b - a != len(n2) or not np.array_equal(cols["pol_sig"][a:b], sig2):
+                raise ValueError("%s: seed=%d step=%d の候補が再分析と合わない" % (fn_, key[0], key[1]))
+            cols["pol_n"][a:b] = n2
+            cols["pol_q"][a:b] = q2
+            if "pol_v0" in cols:
+                cols["pol_v0"][i] = v0
+            used.add(key)
+            n_rep += 1
+        n_rows += len(cols["seed"])
+        tmp = os.path.join(out, "." + fn_ + ".tmp.npz")
+        np.savez_compressed(tmp, **cols)
+        os.replace(tmp, os.path.join(out, fn_))
+    if len(used) != len(rep):
+        raise ValueError("再分析の行 %d のうち %d 行が元の波に無い（波・シャードの取り違え）" % (len(rep), len(rep) - len(used)))
+    m = json.load(open(os.path.join(orig, "meta_n_record.json"), encoding="utf-8"))
+    m["reanalysis_merged"] = {"rean_dirs": [os.path.abspath(d) for d in rean_dirs], "rows_replaced": n_rep, "rows": n_rows}
+    with open(os.path.join(out, "meta_n_record.json"), "w", encoding="utf-8") as f:
+        json.dump(m, f, ensure_ascii=False)
+    for extra in ("meta_games.json",):
+        if os.path.exists(os.path.join(orig, extra)):
+            with open(os.path.join(orig, extra), "rb") as fi, open(os.path.join(out, extra), "wb") as fo:
+                fo.write(fi.read())
+    return {"rows": n_rows, "rows_replaced": n_rep}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--in", dest="src", help="記録の dir（record_gen の出力）")
@@ -310,6 +362,8 @@ def main(argv=None):
     ap.add_argument("--job", default=None, help="--result の job 名（rean-n{W}-w{XX}）")
     ap.add_argument("--record", default=None, help="--result に書く記録の出どころ（ブランチ:パス）")
     ap.add_argument("--target-games", type=int, default=200, help="--result: これだけ終えたら status=done")
+    ap.add_argument("--merge", nargs="+", default=None,
+                    help="再分析の出力 dir 群を、--in の元の波の dir の全行へ差し込んで --out に書く（r11b の教材・§7.6）")
     ap.add_argument("--mult", type=int, default=4, help="深い探索の sims の倍率")
     ap.add_argument("--games", type=int, default=0, help="先頭から何局（0＝全部）")
     ap.add_argument("--shard", default="", help="i/n＝局を n 分割した i 番目")
@@ -339,6 +393,9 @@ def main(argv=None):
         return 0
     if not a.src or not a.out:
         ap.error("--in と --out が要る")
+    if a.merge:
+        print("REANALYZE_MERGE " + json.dumps(merge(a.src, a.merge, a.out)), flush=True)
+        return 0
     a.quota = [int(x) for x in a.quota.split(",")]
     if len(a.quota) != len(RULES) or min(a.quota) < 0:
         ap.error("--quota は %d 個の 0 以上の整数" % len(RULES))

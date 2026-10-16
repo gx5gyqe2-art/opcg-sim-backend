@@ -476,6 +476,126 @@ tail -n 3 ~/rean_n${W}_w${XX}.log
 - 規則ごとの点の数と「深い最善 ≠ 記録」の割合は `python -m opcg_sim.loop.reanalyze --summarize <dir…>` で出る。
 - **枠の注意**: 生成デッキ（`synth_roles`）の局でエネルがリーダーなのは、先頭 200 局のうち波 29 で 1 局、波 32 で 5 局しか無い。規則 (3) の枠はほとんど (4) 乱数に回る。
 
+### 7.6 再分析の第 3 段: 訓練 r11b（主）・r11a（対照）→ 評価帯 → アリーナ（1 セッション・2026-10-16 確定）
+
+§7.5 の 16 dir（`claude/rean-n{29,32}-w{01..08}` の `n{W}_rean/w{XX}`）を教材にする。司令塔が留保 4 点を決めて確定した（2026-10-16）。
+
+**主候補 r11b**: 波 29（14 シャード）と波 32（16 シャード）の全行を π に使う。
+- 再分析した行だけ深い探索の値に差し替える（`reanalyze.py --merge`）。w01〜w08 は差し込み済みの dir、他は元のまま。
+- 教材の量は従来の訓練と同じ形で、差し替えた行だけが変わる＝差分が教師の深さだけになる。
+- z は波 27・28・30・31（`--z-in`）。
+
+**対照 r11a**（深い教師だけ）: π は再分析の 16 dir だけ（約 38,000 点・`--in`）。z は波 27〜32 の全部（`--z-in`）。
+- **`--pi-steps-mult 4`**（3.8 万点 × 2 epochs × 4 ≒ 波 1 本の 3 割の更新量。それ以上はこの点数では過学習の側）。
+
+**共通**:
+- warm-start r3（`opcg_sim/data/learned/nrel_r3.npz`・v14 へ pad＝r5 と同じ）。
+- `--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2`（best epoch）・backend torch（既定）。
+- **`--pi-teacher q_improved`**（c_scale 0.3＝r4q のとき〔`2026-09-10_q_pi_judgment.md`〕と同じ・既定値）。
+
+**評価帯**:
+- 波 28・30・32 の holdout（`--holdout-mod 7`）を別々に、`--policy` つきで、r3／r11a／r11b を並べる。
+- 波 28 の dump には `pol_p` が無い（v13・v2 dump）。`--pi-prior-net` に波 28 の生成役 **a1**（台帳: 波 27・28＝era6・生成役 a1）を渡す。
+
+**アリーナ**: r11b・r11a それぞれ vs r3（出荷既定）。
+- 主 random × synth_roles（帯 591000〜598000）・副 固定ミラー（601000〜608000）。
+- 各 8 帯 × 24 ペア・両席 serve 既定。
+- **2 本を同じ帯で測る**（同じ物差し）。主候補 r11b を先に回す。
+
+**決定済みの留保**（司令塔・2026-10-16）:
+1. r11a は `--pi-steps-mult 4`（上）。
+2. π' の P_net は全部 warm-start r3 の forward で可（r4q と同じ条件。4 倍の探索ではほぼ全候補が訪問済みなので、P_net の寄与は小さい）。報告に「P_net は r3」と 1 行書く。
+3. r11a の value 行の重複（`--in` の再分析の行と、`--z-in` の波 29・32 の元の行・1% 未満）は許容。数を notes に書く。
+4. OOM なら z の波を 27 → 28 の順に落として notes に書く（§7.1 と同じ）。
+
+指示書（作業セッション用・opus・1 セッションで順に）:
+
+```
+作業: 再分析の第 3 段（訓練 r11a／r11b → 評価帯 → アリーナ・docs/n_loop_ops.md §7.6・§5）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新（reanalyze.py の --merge を含む）を checkout。メモリ 12GB 以上。
+長い実行は nohup かバックグラウンドで回し、段ごとに途中経過を同じブランチへ push してよい（RESULT.json は最後）。
+質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+pip install -r opcg_sim/requirements.txt maturin torch   （torch は CPU 版）
+make rust-develop
+
+# 教材 ── 再分析の 16 dir
+for W in 29 32; do for XX in 01 02 03 04 05 06 07 08; do
+  git fetch -q origin claude/rean-n${W}-w${XX}:tmpw && mkdir -p ~/rean && git archive tmpw n${W}_rean | tar -x -C ~/rean && git branch -qD tmpw; done; done
+# 元の波 29（14 シャード）・32（16 シャード）・30／31（16 シャード）・27／28（8 シャード）
+for w in 01 02 03 05 06 07 08 09 10 11 12 14 15 16; do
+  git fetch -q origin claude/n29-w$w:tmpw && mkdir -p ~/n29_wave/w$w && git archive tmpw n_records/n29_w$w | tar -x -C ~/n29_wave/w$w && git branch -qD tmpw; done
+for N in 30 31 32; do for w in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16; do
+  git fetch -q origin claude/n${N}-w$w:tmpw 2>/dev/null || continue
+  mkdir -p ~/n${N}_wave/w$w && git archive tmpw n_records | tar -x -C ~/n${N}_wave/w$w && rm -rf ~/n${N}_wave/w$w/n_records/*_trial && git branch -qD tmpw; done; done
+for N in 27 28; do for w in 01 02 03 04 05 06 07 08; do
+  git fetch -q origin claude/n${N}-w$w:tmpw && mkdir -p ~/n${N}_wave/w$w && git archive tmpw n${N}_records | tar -x -C ~/n${N}_wave/w$w && git branch -qD tmpw; done; done
+
+# r11b の教材: 波 29・32 の w01〜w08 に再分析の行を差し込む（他のシャードはそのまま使う）
+for W in 29 32; do for XX in 01 02 03 04 05 06 07 08; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.reanalyze --in ~/n${W}_wave/w$XX/n_records/n${W}_w$XX \
+    --merge ~/rean/n${W}_rean/w$XX --out ~/n${W}_merged/w$XX | tail -1; done; done
+R11B_PI=""
+for W in 29 32; do for d in ~/n${W}_wave/w*/n_records/n${W}_w*; do
+  XX=$(basename $d | sed "s/n${W}_w//"); if [ -d ~/n${W}_merged/w$XX ]; then R11B_PI="$R11B_PI $HOME/n${W}_merged/w$XX"; else R11B_PI="$R11B_PI $d"; fi; done; done
+
+# ① 訓練 r11b（主候補・π＝波 29・32 の全行〔再分析の行だけ差し替え〕・z＝波 27・28・30・31）
+OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train \
+  --in $R11B_PI \
+  --z-in "$HOME/n31_wave/w*/n_records/n31_w*" "$HOME/n30_wave/w*/n_records/n30_w*" \
+         "$HOME/n28_wave/w*/n28_records" "$HOME/n27_wave/w*/n27_records" \
+  --ablate rel --aux-weight 0.1 --epochs 2 --lr 2e-4 --pi-teacher q_improved \
+  --warm-start opcg_sim/data/learned/nrel_r3.npz --out ~/nrel_r11b.npz 2>&1 | tee ~/train_r11b.log
+# ② 訓練 r11a（対照・π＝再分析の 16 dir・z＝波 27〜32・--pi-steps-mult 4）
+OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train \
+  --in "$HOME/rean/n29_rean/w*" "$HOME/rean/n32_rean/w*" \
+  --z-in "$HOME/n32_wave/w*/n_records/n32_w*" "$HOME/n31_wave/w*/n_records/n31_w*" "$HOME/n30_wave/w*/n_records/n30_w*" \
+         "$HOME/n29_wave/w*/n_records/n29_w*" "$HOME/n28_wave/w*/n28_records" "$HOME/n27_wave/w*/n27_records" \
+  --ablate rel --aux-weight 0.1 --epochs 2 --lr 2e-4 --pi-teacher q_improved --pi-steps-mult 4 \
+  --warm-start opcg_sim/data/learned/nrel_r3.npz --out ~/nrel_r11a.npz 2>&1 | tee ~/train_r11a.log
+（OOM なら --z-in から 27 → 28 の順に外して再実行し、notes に書く。訓練開始時の RSS を notes に書く。）
+
+# ③ 評価帯（波 28・30・32 の holdout・r3／r11a／r11b・方策つき）
+for N in 28 30 32; do
+  case $N in 28) IN="$HOME/n28_wave/w*/n28_records"; PP="--pi-prior-net opcg_sim/data/learned/nrel_a1.npz";;
+             30) IN="$HOME/n30_wave/w*/n_records/n30_w*"; PP="";; 32) IN="$HOME/n32_wave/w*/n_records/n32_w*"; PP="";; esac
+  OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$IN" \
+    --nrel opcg_sim/data/learned/nrel_r3.npz ~/nrel_r11a.npz ~/nrel_r11b.npz --policy $PP \
+    --holdout-mod 7 --out ~/band_r11_w$N.json 2>&1 | tee ~/band_r11_w$N.log; done
+
+# ④ アリーナ r11a・r11b vs r3（同じ帯・両席 serve 既定）
+for C in r11b r11a; do mkdir -p ~/arena_$C
+  for k in 0 1 2 3 4 5 6 7; do
+    OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline "" \
+      --pairs 24 --max-pairs 24 --seed-base $(( 591000 + k*1000 )) --workers 4 \
+      --leaders random --decks synth_roles --out ~/arena_$C/main_w0$k.jsonl 2>&1 | tail -3
+    OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline "" \
+      --pairs 24 --max-pairs 24 --seed-base $(( 601000 + k*1000 )) --workers 4 \
+      --out ~/arena_$C/mirror_w0$k.jsonl 2>&1 | tail -3; done
+  python -m opcg_sim.loop.arena_merge --in "$HOME/arena_$C/main_w0*.jsonl" --label "$C vs r3 main" | tee ~/arena_$C/merge_main.log
+  python -m opcg_sim.loop.arena_merge --in "$HOME/arena_$C/mirror_w0*.jsonl" --label "$C vs r3 mirror" | tee ~/arena_$C/merge_mirror.log; done
+
+# 成果物
+git checkout -B claude/train-r11
+mkdir -p n1_results/arena_r11a n1_results/arena_r11b && cp ~/nrel_r11a.npz ~/nrel_r11b.npz n1_results/ \
+  && cp ~/train_r11a.log ~/train_r11b.log ~/band_r11_w*.json ~/band_r11_w*.log . \
+  && cp ~/arena_r11a/* n1_results/arena_r11a/ && cp ~/arena_r11b/* n1_results/arena_r11b/
+（RESULT.json〔§5 の形〕:
+ inputs＝warm_start r3・r11a の π dir 16 本と z 波・r11b の π dir〔差し込み済みの dir と元の dir〕と z 波・epochs・lr・pi_teacher・c_scale・rss_gb
+ metrics＝r11a／r11b それぞれ best_ep・val v_mse／v_sign／pi_top1・PI_TEACHER の行〔p_net_src・エントロピー〕
+ band＝波ごとに r3／r11a／r11b の v_mse と方策の指標
+ arena＝main と mirror の pairs・wr・ci95・elo・void
+ train_sec・band_sec・arena_sec／notes）
+git add -f n1_results/nrel_r11a.npz n1_results/nrel_r11b.npz n1_results/arena_r11a/ n1_results/arena_r11b/ train_r11*.log band_r11_w*.json band_r11_w*.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r11a／r11b のセット（訓練・評価帯・アリーナ）"
+git push -u origin claude/train-r11
+
+補足:
+- 訓練は 1 本 2〜4 時間（r11b は π 2 波）。2 本は順に回す（並列にしない・§7 の「訓練は 1 コンテナ 1 ジョブ」）。
+- 評価帯 3 本で 30〜45 分。アリーナ 2 候補 × 2 条件で 4 時間弱。
+- コミットメッセージにモデル名を入れない。
+```
+
 ## 8. コーディネータが守ること
 
 - 指示書を出したら、**その指示書の内容（入力・帯・判断基準）を本書 §6 と
