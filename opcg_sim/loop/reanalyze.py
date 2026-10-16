@@ -9,11 +9,16 @@
 再生は**記録を作ったコミットの wheel**で回す（新しいエンジンでは手が分岐する）。この器は依存を `record_gen`・`driver`・
 `decks`・`engine` の古いコミットにもある口だけに絞ってある＝その worktree へ写して、worktree を cwd にして回す。
 
-    python opcg_sim/loop/reanalyze.py --in n_records/n29_w01 --out re/n29_w01_s0 --mult 4 --games 40 --shard 0/1 \
+    python opcg_sim/loop/reanalyze.py --in n_records/n29_w01 --out re/n29_w01 --mult 4 --games 200 --quota 4,4,2,2 \
         --net opcg_sim/data/learned/nrel_r3.npz
 
-点の選び方（局ごと・上限 `--per-game`・優先順・§1.1）: (1) ターン 1〜3 の main 行は全部、(2) 候補に「ターンを終える」と
-「攻撃」が両方在る行、(3) エネル（OP15-058）がリーダーの席の行は全部、(4) 残りは乱数（種は局の seed）。
+点の選び方（局ごと・規則ごとの枠 `--quota`・既定 4,4,2,2・司令塔の決定 2026-10-16）: (1) ターン 1〜3 の main 行、
+(2) 候補に「ターンを終える」と「攻撃」が両方在る行、(3) エネル（OP15-058）がリーダーの席の行、(4) 乱数。
+規則の順に、まだ取っていない行から枠の数だけ取る（候補が枠より多ければ乱数・種は局の seed）。エネルの席が無い局の (3) の枠と、
+(1)〜(3) で候補が足りずに余った枠は (4) に回す。(4) はまだ取っていない全部の main 行から引く。
+
+**再開できる**: 局ごとに `n_record_<seed>.npz`（点が 1 つも読めなかった局は書かない）と `points.jsonl` の局の行を書き、
+`meta_n_record.json`／`meta_games.json` をその都度書き直す。`points.jsonl` に局の行が在る seed は飛ばす（同じコマンドで再開）。
 """
 import argparse
 import inspect
@@ -72,30 +77,32 @@ def load_record(src):
     return games, meta, gmeta
 
 
-def select_points(g, leaders, seed, per_game):
-    """局の main 行（候補 2 つ以上）から点を選ぶ → [(行の番号, 規則)]（step の昇順）。"""
+def select_points(g, leaders, seed, quota):
+    """局の main 行（候補 2 つ以上）から規則ごとの枠で点を選ぶ → [(行の番号, 規則)]（step の昇順）。"""
     c, ptr = g["cols"], g["ptr"]
-    by = {r: [] for r in RULES}
+    pool = {r: [] for r in RULES}
     for i in g["rows"]:
         if int(c["kind"][i]) != 0 or int(c["pol_len"][i]) < 2:
             continue
         fams = {family(json.loads(s)) for s in c["pol_sig"][ptr[i]:ptr[i + 1]]}
         if int(c["turn"][i]) <= 3:
-            by["early"].append(int(i))
-        elif "end" in fams and "attack" in fams:
-            by["end_and_attack"].append(int(i))
-        elif leaders[int(c["who"][i])] == ENEL:
-            by["enel"].append(int(i))
-        else:
-            by["random"].append(int(i))
+            pool["early"].append(int(i))
+        if "end" in fams and "attack" in fams:
+            pool["end_and_attack"].append(int(i))
+        if leaders[int(c["who"][i])] == ENEL:
+            pool["enel"].append(int(i))
+        pool["random"].append(int(i))
     rng = random.Random(seed)
-    out = []
+    q = dict(zip(RULES, quota))
+    taken, out = set(), []
     for r in RULES:
-        room = per_game - len(out)
-        if room <= 0:
-            break
-        xs = by[r] if len(by[r]) <= room else rng.sample(by[r], room)
-        out.extend((i, r) for i in xs)
+        k = q[r]
+        xs = [i for i in pool[r] if i not in taken]
+        pick = xs if len(xs) <= k else rng.sample(xs, k)
+        out.extend((i, r) for i in pick)
+        taken.update(pick)
+        if r != "random":
+            q["random"] += k - len(pick)
     return sorted(out, key=lambda x: int(c["step"][x[0]]))
 
 
@@ -179,54 +186,73 @@ def replay_game(seed, g, picks, meta, rec_spec, deep, db, leaders):
     return st
 
 
-def write_dump(out_dir, games, results, meta, gmeta, args, sel_counts):
-    """再分析した main 行だけの dump（記録の全列をコピー・`pol_n`／`pol_q`／`pol_v0` だけ差し替え）と meta。"""
-    os.makedirs(out_dir, exist_ok=True)
-    buf = None
-    n_rows = 0
-    for seed, st in results:
-        g = games[seed]
-        c, ptr = g["cols"], g["ptr"]
-        ok = [p for p in st["pts"] if not p.get("unmapped")]
-        if not ok:
-            continue
-        if buf is None:
-            buf = {k: [] for k in g["row_cols"] + g["pol_cols"] + (["pol_v0"] if "pol_v0" not in c else [])}
-        for p in ok:
-            i = p["i"]
-            for k in g["row_cols"]:
-                buf[k].append(c[k][i:i + 1])
-            for k in g["pol_cols"]:
-                v = c[k][ptr[i]:ptr[i + 1]]
-                if k == "pol_n":
-                    v = np.asarray(p["n"], c[k].dtype)
-                elif k == "pol_q":
-                    v = np.asarray(p["q"], c[k].dtype)
-                buf[k].append(v)
-            if "pol_v0" in c:
-                buf["pol_v0"][-1] = np.asarray([p["v0"]], c["pol_v0"].dtype)
-            else:
-                buf["pol_v0"].append(np.asarray([p["v0"]], np.float16))
-            n_rows += 1
-    tag = args.shard.replace("/", "of") if args.shard else "0of1"
-    if buf:
-        tmp = os.path.join(out_dir, ".n_record_00000.tmp.npz")
-        np.savez_compressed(tmp, **{k: np.concatenate(v) for k, v in buf.items()})
-        os.replace(tmp, os.path.join(out_dir, "n_record_00000.npz"))
-    seeds = {s for s, st in results if any(not p.get("unmapped") for p in st["pts"])}
-    with open(os.path.join(out_dir, "meta_games.json"), "w", encoding="utf-8") as f:
-        json.dump({**{k: v for k, v in gmeta.items() if k != "games"},
-                   "games": [x for x in gmeta["games"] if int(x["seed"]) in seeds]}, f, ensure_ascii=False)
+def write_game(out_dir, g, st):
+    """1 局ぶんの dump（再分析した main 行だけ・記録の全列をコピー・`pol_n`／`pol_q`／`pol_v0` だけ差し替え）→ 行の数。"""
+    c, ptr = g["cols"], g["ptr"]
+    ok = [p for p in st["pts"] if not p.get("unmapped")]
+    if not ok:
+        return 0
+    buf = {k: [] for k in g["row_cols"] + g["pol_cols"] + (["pol_v0"] if "pol_v0" not in c else [])}
+    for p in ok:
+        i = p["i"]
+        for k in g["row_cols"]:
+            buf[k].append(c[k][i:i + 1])
+        for k in g["pol_cols"]:
+            v = c[k][ptr[i]:ptr[i + 1]]
+            if k == "pol_n":
+                v = np.asarray(p["n"], c[k].dtype)
+            elif k == "pol_q":
+                v = np.asarray(p["q"], c[k].dtype)
+            buf[k].append(v)
+        if "pol_v0" in c:
+            buf["pol_v0"][-1] = np.asarray([p["v0"]], c["pol_v0"].dtype)
+        else:
+            buf["pol_v0"].append(np.asarray([p["v0"]], np.float16))
+    seed = int(c["seed"][ok[0]["i"]])
+    tmp = os.path.join(out_dir, ".n_record_%d.tmp.npz" % seed)
+    np.savez_compressed(tmp, **{k: np.concatenate(v) for k, v in buf.items()})
+    os.replace(tmp, os.path.join(out_dir, "n_record_%d.npz" % seed))
+    return len(ok)
+
+
+def read_progress(out_dir):
+    """`points.jsonl` → (局の行, 点の行)。局の行が無い局（途中で止まった局）の点は捨てる。"""
+    path = os.path.join(out_dir, "points.jsonl")
+    if not os.path.exists(path):
+        return [], []
+    games, pts = [], []
+    for line in open(path, encoding="utf-8"):
+        try:
+            x = json.loads(line)
+        except json.JSONDecodeError:
+            continue                                 # 書きかけの最後の行
+        (games if "game" in x else pts).append(x)
+    done = {int(x["game"]) for x in games}
+    return games, [p for p in pts if int(p["seed"]) in done]
+
+
+def write_meta(out_dir, meta, gmeta, args, games_done, pts_done):
+    """`meta_n_record.json`／`meta_games.json` を、ここまでに終えた局から書き直す（原子的に）。"""
+    seeds = {int(p["seed"]) for p in pts_done if not p.get("unmapped")}
+    sel = {r: sum(int((x.get("sel") or {}).get(r, 0)) for x in games_done) for r in RULES}
+    pts_rule = {r: sum(1 for p in pts_done if p["rule"] == r and not p.get("unmapped")) for r in RULES}
+    n_rows = sum(1 for p in pts_done if not p.get("unmapped"))
     m2 = dict(meta)
     m2.update({"games": len(seeds), "rows": n_rows, "main_rows": n_rows})
-    m2["reanalyzed"] = {"mult": args.mult, "points": n_rows, "games": len(results),
-                        "diverged": sum(1 for _s, st in results if st["bad_step"] is not None),
-                        "unmapped": sum(1 for _s, st in results for p in st["pts"] if p.get("unmapped")),
-                        "selection": sel_counts, "per_game": args.per_game, "shard": tag,
+    m2["reanalyzed"] = {"mult": args.mult, "points": n_rows, "points_by_rule": pts_rule, "games": len(games_done),
+                        "diverged": sum(1 for x in games_done if x["bad_step"] is not None),
+                        "unmapped": sum(1 for p in pts_done if p.get("unmapped")),
+                        "lost_to_divergence": sum(int(x["picks"]) - int(x["pts"]) for x in games_done),
+                        "selection": sel, "quota": list(args.quota), "shard": args.shard or "0/1",
                         "record_dir": os.path.abspath(args.src), "net": args.net or meta.get("net"),
                         "engine_commit": args.engine_commit}
-    with open(os.path.join(out_dir, "meta_n_record.json"), "w", encoding="utf-8") as f:
-        json.dump(m2, f, ensure_ascii=False)
+    for name, obj in (("meta_n_record.json", m2),
+                      ("meta_games.json", {**{k: v for k, v in gmeta.items() if k != "games"},
+                                           "games": [x for x in gmeta["games"] if int(x["seed"]) in seeds]})):
+        tmp = os.path.join(out_dir, "." + name + ".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(obj, f, ensure_ascii=False)
+        os.replace(tmp, os.path.join(out_dir, name))
 
 
 def summarize(dirs, c_scale=0.3, n_min=1.0, c_visit=50.0):
@@ -280,18 +306,42 @@ def main(argv=None):
     ap.add_argument("--in", dest="src", help="記録の dir（record_gen の出力）")
     ap.add_argument("--out", help="再分析の dump を書く dir")
     ap.add_argument("--summarize", nargs="+", default=None, help="再分析の出力 dir 群を集計して json を印字（§1.3）")
+    ap.add_argument("--result", default=None, help="再分析の出力 dir 1 つから RESULT.json（`docs/n_loop_ops.md` §5・§7.5）を印字")
+    ap.add_argument("--job", default=None, help="--result の job 名（rean-n{W}-w{XX}）")
+    ap.add_argument("--record", default=None, help="--result に書く記録の出どころ（ブランチ:パス）")
+    ap.add_argument("--target-games", type=int, default=200, help="--result: これだけ終えたら status=done")
     ap.add_argument("--mult", type=int, default=4, help="深い探索の sims の倍率")
     ap.add_argument("--games", type=int, default=0, help="先頭から何局（0＝全部）")
     ap.add_argument("--shard", default="", help="i/n＝局を n 分割した i 番目")
-    ap.add_argument("--per-game", type=int, default=12)
+    ap.add_argument("--quota", default="4,4,2,2",
+                    help="規則ごとの枠（ターン 1〜3／終える手と攻撃／エネルの席／乱数）。合計が 1 局の点の数")
     ap.add_argument("--net", default=None, help="meta のネットの置き場が手元に無いときの上書き")
     ap.add_argument("--engine-commit", default=None, help="再生に使った wheel のコミット（meta に記録するだけ）")
     a = ap.parse_args(argv)
     if a.summarize:
         print(json.dumps(summarize(a.summarize), ensure_ascii=False, indent=1))
         return 0
+    if a.result:
+        sm = summarize([a.result])
+        m = json.load(open(os.path.join(a.result, "meta_n_record.json"), encoding="utf-8"))["reanalyzed"]
+        print(json.dumps({"job": a.job, "role": "reanalyze", "status": "done" if sm["games"] >= a.target_games else "partial",
+                          "inputs": {"record": a.record, "engine_commit": a.engine_commit, "net": a.net, "mult": m["mult"],
+                                     "games": a.target_games, "quota": m.get("quota")},
+                          "outputs": {"dir": os.path.relpath(a.result, os.getcwd())},
+                          "metrics": {"games": sm["games"], "points": m["points"], "diverged": m["diverged"],
+                                      "unmapped": m["unmapped"], "lost_to_divergence": m.get("lost_to_divergence"),
+                                      "points_by_rule": m.get("points_by_rule"), "replay_rate": sm["replay_rate"],
+                                      "deep_best_differs": {r: o.get("deep_best_differs") for r, o in sm["by_rule"].items()},
+                                      "deep_best_differs_all": sm["all"].get("deep_best_differs"),
+                                      "sec_replay_per_game": sm["sec_replay_per_game"],
+                                      "sec_deep_per_game": sm["sec_deep_per_game"]},
+                          "commit": a.engine_commit, "notes": ""}, ensure_ascii=False, indent=1))
+        return 0
     if not a.src or not a.out:
         ap.error("--in と --out が要る")
+    a.quota = [int(x) for x in a.quota.split(",")]
+    if len(a.quota) != len(RULES) or min(a.quota) < 0:
+        ap.error("--quota は %d 個の 0 以上の整数" % len(RULES))
     games, meta, gmeta = load_record(a.src)
     seeds = sorted(games)
     if a.games:
@@ -299,42 +349,55 @@ def main(argv=None):
     if a.shard:
         i, n = (int(x) for x in a.shard.split("/"))
         seeds = [s for k, s in enumerate(seeds) if k % n == i]
+    os.makedirs(a.out, exist_ok=True)
+    games_done, pts_done = read_progress(a.out)
+    done = {int(x["game"]) for x in games_done}
+    # 途中で止まった局の点の行を捨てて書き直す（再開）
+    with open(os.path.join(a.out, ".points.jsonl.tmp"), "w", encoding="utf-8") as f:
+        for x in pts_done + games_done:
+            f.write(json.dumps(x) + "\n")
+    os.replace(os.path.join(a.out, ".points.jsonl.tmp"), os.path.join(a.out, "points.jsonl"))
     E.engine()
     net = a.net or meta.get("net")
     rec_spec, deep = specs(meta, net, a.mult)
     db = D.load_db()
     lead = {int(x["seed"]): x["leaders"] for x in gmeta["games"]}
-    os.makedirs(a.out, exist_ok=True)
-    sel = {r: 0 for r in RULES}
-    results = []
     t0 = time.time()
-    with open(os.path.join(a.out, "points.jsonl"), "w", encoding="utf-8") as fp:
-        for seed in seeds:
-            g = games[seed]
-            leaders = lead[seed]
-            picks = select_points(g, leaders, seed, a.per_game)
-            for _i, r in picks:
-                sel[r] += 1
-            st = replay_game(seed, g, picks, meta, rec_spec, deep, db, leaders)
-            results.append((seed, st))
-            c, ptr = g["cols"], g["ptr"]
+    todo = [s for s in seeds if s not in done]
+    print("REANALYZE_START " + json.dumps({"games": len(seeds), "done": len(seeds) - len(todo), "todo": len(todo)}), flush=True)
+    for seed in todo:
+        g = games[seed]
+        leaders = lead[seed]
+        picks = select_points(g, leaders, seed, a.quota)
+        sel = {r: sum(1 for _i, rr in picks if rr == r) for r in RULES}
+        st = replay_game(seed, g, picks, meta, rec_spec, deep, db, leaders)
+        c, ptr = g["cols"], g["ptr"]
+        for p in st["pts"]:
+            i = p["i"]
+            p.update({"seed": seed, "who": int(c["who"][i]), "leader": leaders[int(c["who"][i])],
+                      "rec_n": [float(x) for x in c["pol_n"][ptr[i]:ptr[i + 1]]],
+                      "rec_q": [float(x) for x in c["pol_q"][ptr[i]:ptr[i + 1]]],
+                      "rec_p": ([float(x) for x in c["pol_p"][ptr[i]:ptr[i + 1]]] if "pol_p" in c else None),
+                      "fams": [family(json.loads(s)) for s in c["pol_sig"][ptr[i]:ptr[i + 1]]]})
+        write_game(a.out, g, st)
+        gl = {"game": seed, "picks": len(picks), "pts": len(st["pts"]), "bad_step": st["bad_step"], "sel": sel,
+              "last_pick_step": max([int(c["step"][i]) for i, _r in picks], default=-1),
+              "t_replay": st["t_replay"], "t_deep": st["t_deep"]}
+        with open(os.path.join(a.out, "points.jsonl"), "a", encoding="utf-8") as fp:
             for p in st["pts"]:
-                i = p["i"]
-                p.update({"seed": seed, "who": int(c["who"][i]), "leader": leaders[int(c["who"][i])],
-                          "rec_n": [float(x) for x in c["pol_n"][ptr[i]:ptr[i + 1]]],
-                          "rec_q": [float(x) for x in c["pol_q"][ptr[i]:ptr[i + 1]]],
-                          "rec_p": ([float(x) for x in c["pol_p"][ptr[i]:ptr[i + 1]]] if "pol_p" in c else None),
-                          "fams": [family(json.loads(s)) for s in c["pol_sig"][ptr[i]:ptr[i + 1]]]})
                 fp.write(json.dumps(p) + "\n")
-            lost = len(picks) - len(st["pts"])
-            print("REANALYZE seed=%d picks=%d pts=%d lost=%d bad_step=%s replay=%.1fs deep=%.1fs (total %.0fs)"
-                  % (seed, len(picks), len(st["pts"]), lost, st["bad_step"], st["t_replay"], st["t_deep"],
-                     time.time() - t0), flush=True)
-            fp.write(json.dumps({"game": seed, "picks": len(picks), "pts": len(st["pts"]), "bad_step": st["bad_step"],
-                                 "last_pick_step": max([int(c["step"][i]) for i, _r in picks], default=-1),
-                                 "t_replay": st["t_replay"], "t_deep": st["t_deep"]}) + "\n")
-    write_dump(a.out, games, results, meta, gmeta, a, sel)
-    print("REANALYZE_DONE " + json.dumps({"games": len(results), "selection": sel}), flush=True)
+            fp.write(json.dumps(gl) + "\n")
+            fp.flush()
+            os.fsync(fp.fileno())
+        games_done.append(gl)
+        pts_done.extend(st["pts"])
+        write_meta(a.out, meta, gmeta, a, games_done, pts_done)
+        print("REANALYZE seed=%d picks=%d pts=%d lost=%d bad_step=%s replay=%.1fs deep=%.1fs (done %d/%d total %.0fs)"
+              % (seed, len(picks), len(st["pts"]), len(picks) - len(st["pts"]), st["bad_step"], st["t_replay"],
+                 st["t_deep"], len(games_done), len(seeds), time.time() - t0), flush=True)
+    write_meta(a.out, meta, gmeta, a, games_done, pts_done)
+    sel = {r: sum(int((x.get("sel") or {}).get(r, 0)) for x in games_done) for r in RULES}
+    print("REANALYZE_DONE " + json.dumps({"games": len(games_done), "selection": sel}), flush=True)
     return 0
 
 
