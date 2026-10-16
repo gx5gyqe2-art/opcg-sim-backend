@@ -476,6 +476,10 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
     if !succ.is_empty() {
         super::state::with_core2(|c2| super::entry::apply_g(c2, p.get("g")))?;
     }
+    // 切替 `OPCG_CLOCK_VALUE_READ=bridge`（`docs/reports/2026-10-16_price_bridge_read.md` §1.2・既定は切）: Python が `in.bridge` を
+    // 渡したときだけ、手の値段の 2 本の時計を交点の橋の読みで読む（無ければ今の読みのまま＝出力は 1 ビットも変わらない）。
+    let bridge_v = p.get("in").get("bridge");
+    let mut bridge = if bridge_v.is_none() || succ.is_empty() { None } else { Some(super::drv_cb::bridge_read(c, g, cfg, bridge_v)?) };
     for k in 0..n {
         let r = &g.rows[k];
         let (w, t) = (r.who, r.turn);
@@ -573,7 +577,10 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
             let mut parts: Option<V> = if dump_rows && clock_parts_dump_on() { Some(V::None) } else { None };
             if let Some((_, sv)) = succ.iter().find(|(kk, _)| *kk == k) {
                 let cx = ClockCx { t, prof: &prof, cfg, cut_me, cut_opp, mirror_me, dk_me: deck_of(p, w), dk_opp: deck_of(p, 1 - w), literal: succ_literal };
-                let ps = super::state::with_core2(|c2| clock_prices(c2, &row, sv, &cx, &mut stats, &mut parts))?;
+                let ps = match bridge.as_mut() {
+                    Some(bx) => clock_prices_bridge(c, bx, w, &row, sv, &cx, &mut stats, &mut parts)?,
+                    None => super::state::with_core2(|c2| clock_prices(c2, &row, sv, &cx, &mut stats, &mut parts))?,
+                };
                 if ps.len() == kq as usize {
                     clock_vals = Some(ps);
                     stats.addi("clock_rows", 1);
@@ -1244,6 +1251,79 @@ fn clock_prices(c2: &mut Core, row: &Row, sv: &V, cx: &ClockCx, stats: &mut D, p
                 bv.push(V::dict(vec![(V::s("tempo"), tv)]));
             }
             *parts = Some(V::list(vec![V::list(bv), V::list(cparts)]));
+        }
+        Ok(ps)
+    })();
+    lt::set_mid_turn_rules(prev);
+    out
+}
+
+/// 切替 `OPCG_CLOCK_VALUE_READ=bridge` の値段（§1.2）: 打つ前の行と後続の自分の側の行の 2 本の時計を交点の橋の読み
+/// （`drv_cb::BridgeRead::taus`・局の文脈は今の行のもの）で読み、勝率は橋と同じ相対の幅・手番の補正あり（`mover=True`・全部の行で同じ）、
+/// κ はその時計と幅の局所の傾き ÷ 今の `w̄`。値段 p(a) = (W(後続 a) − W(今)) / κ(今)。読めない行・候補は値段なし。
+/// 写し（`OPCG_CLOCK_PARTS_DUMP=1`）は [τ_me, τ_opp, W, κ, None] と候補ごとの [τ_me, τ_opp, W, 相手の時計だけを動かした W]。
+#[allow(clippy::too_many_arguments)]
+fn clock_prices_bridge(c: &mut Core, bx: &mut super::drv_cb::BridgeRead, w: i64, row: &Row, sv: &V, cx: &ClockCx, stats: &mut D, parts: &mut Option<V>) -> R<Vec<Option<f64>>> {
+    let dt = rw::ci_dtype(row);
+    let prev = lt::set_mid_turn_rules(!cx.literal);
+    let out = (|| -> R<Vec<Option<f64>>> {
+        let mut clk = cx.cfg.clock.clone();
+        clk.sigma_rel = Some(bx.sigma_rel);
+        let read = |tm: f64, to: f64| lt::prob_of_d(&clk, to - tm, None, Some(tm), Some(to), "hyp", true);
+        let n_c = sv.get("c").items().len();
+        let Some((tm0, to0)) = bx.taus(c, w, cx.t, row)? else {
+            stats.addi("bridge_unread_rows", 1);
+            return Ok(vec![None; n_c]);
+        };
+        let w0 = read(tm0, to0);
+        let (cm, co) = if clk.w_err_rel { (Some(tm0), Some(to0)) } else { (None, None) };
+        let k0 = lt::state_factor(&clk, to0 - tm0, true, cm, co, "hyp");
+        stats.addi("bridge_rows", 1);
+        stats.addf("clock_kappa_sum", k0);
+        let want_parts = parts.is_some();
+        let mut cparts: Vec<V> = Vec::new();
+        let mut ps = Vec::new();
+        for e in sv.get("c").items() {
+            let it = e.items();
+            let st = it[0].int();
+            stats.sub_mut("clock_status", |d| d.addi(&st.to_string(), 1));
+            let w1 = match st {
+                0 | 6 => {
+                    let me1 = row_of_triplet(&it[1], &dt);
+                    match bx.taus(c, w, cx.t, &me1)? {
+                        Some((tm, to)) => {
+                            let wv = read(tm, to);
+                            if want_parts {
+                                cparts.push(V::list(vec![V::Float(tm), V::Float(to), V::Float(wv), V::Float(read(tm0, to))]));
+                            }
+                            Some(wv)
+                        }
+                        None => {
+                            stats.addi("bridge_unread_cands", 1);
+                            if want_parts {
+                                cparts.push(V::None);
+                            }
+                            None
+                        }
+                    }
+                }
+                1 => Some(1.0),
+                2 => Some(0.0),
+                _ => None,
+            };
+            if want_parts && !matches!(st, 0 | 6) {
+                cparts.push(match w1 {
+                    Some(x) => V::list(vec![V::None, V::None, V::Float(x), V::None]),
+                    None => V::None,
+                });
+            }
+            ps.push(match w1 {
+                Some(x) if k0 > 0.0 => Some((x - w0) / k0),
+                _ => None,
+            });
+        }
+        if want_parts {
+            *parts = Some(V::list(vec![V::list(vec![V::Float(tm0), V::Float(to0), V::Float(w0), V::Float(k0), V::None]), V::list(cparts)]));
         }
         Ok(ps)
     })();
