@@ -1740,5 +1740,70 @@
    "logs/theory_map/real_w41_oppturn.json"
   ],
   "verdict": "rule: opponent attack-plan reading (life+body 62%); caveat: the split is the composition of the actual durability change; the largest item gap is my own defence (cut 2x, life 0.56x), same direction as defend_foresee"
+ },
+ "hand_stop_value_2026_10_16": {
+  "report": "docs/reports/2026-10-16_hand_stop_value.md",
+  "kind": "switch (OPCG_HAND_STOP=value, Rust defender.rs; off/survive unchanged)",
+  "defend_ratio": {
+   "cut": [
+    0.515,
+    0.526
+   ],
+   "life": [
+    1.342,
+    1.337
+   ],
+   "blk": [
+    0.314,
+    0.306
+   ]
+  },
+  "oppturn_exp": {
+   "cut": [
+    0.571,
+    0.568
+   ],
+   "life": [
+    1.109,
+    1.121
+   ]
+  },
+  "end_foresee_median_mu": [
+   2.93,
+   2.98
+  ],
+  "agreement": [
+   0.46,
+   0.457
+  ],
+  "forbid_ratio": [
+   0.847,
+   0.834
+  ],
+  "crossing": {
+   "hit": [
+    0.7262,
+    0.7271
+   ],
+   "bias": [
+    0.026,
+    0.059
+   ]
+  },
+  "counter_ratio_avg": [
+   0.581,
+   0.564
+  ],
+  "audit_cross": {
+   "games": 240,
+   "void": 0
+  },
+  "logs": [
+   "logs/theory_map/real_w41_hv_defend.json",
+   "logs/theory_map/real_w41_hv_oppturn.json",
+   "logs/theory_map/real_w41_hv_foreseeall.json",
+   "logs/theory_map/real_w41_hv_arms.json"
+  ],
+  "verdict": "comparison order is not the cause (cut ratio moves 0.011 < 0.1); saving cards comes from the defender's card-vs-life value reading"
  }
 }
