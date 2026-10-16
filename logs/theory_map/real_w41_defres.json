@@ -1,0 +1,3617 @@
+{
+ "record": "/home/user/data_rec/sigma_wip/data/w41",
+ "dump": "/home/user/tm/pg/dtdump_all.jsonl",
+ "count": {
+  "leader_attacks": 6088,
+  "points": 6088,
+  "turns": 2969
+ },
+ "points": {
+  "take|take": {
+   "n": 2612,
+   "games": 300,
+   "resid": -0.0146,
+   "resid_ci": [
+    -0.0337,
+    0.0059
+   ],
+   "W_mean": 0.4729,
+   "win_rate": 0.4583
+  },
+  "take|cut": {
+   "n": 943,
+   "games": 290,
+   "resid": -0.0225,
+   "resid_ci": [
+    -0.0511,
+    0.0062
+   ],
+   "W_mean": 0.436,
+   "win_rate": 0.4136
+  },
+  "take|block": {
+   "n": 148,
+   "games": 112,
+   "resid": 0.011,
+   "resid_ci": [
+    -0.0639,
+    0.0845
+   ],
+   "W_mean": 0.5431,
+   "win_rate": 0.5541
+  },
+  "stop_cut|take": {
+   "n": 913,
+   "games": 280,
+   "resid": -0.0661,
+   "resid_ci": [
+    -0.0951,
+    -0.0396
+   ],
+   "W_mean": 0.5995,
+   "win_rate": 0.5334
+  },
+  "stop_cut|cut": {
+   "n": 1164,
+   "games": 291,
+   "resid": -0.009,
+   "resid_ci": [
+    -0.0371,
+    0.019
+   ],
+   "W_mean": 0.4918,
+   "win_rate": 0.4828
+  },
+  "stop_cut|block": {
+   "n": 168,
+   "games": 124,
+   "resid": -0.1673,
+   "resid_ci": [
+    -0.2401,
+    -0.0893
+   ],
+   "W_mean": 0.5185,
+   "win_rate": 0.3512
+  },
+  "stop_blk|take": {
+   "n": 30,
+   "games": 25,
+   "resid": -0.1391,
+   "resid_ci": [
+    -0.3317,
+    0.0423
+   ],
+   "W_mean": 0.4724,
+   "win_rate": 0.3333
+  },
+  "stop_blk|cut": {
+   "n": 24,
+   "games": 22,
+   "resid": 0.0383,
+   "resid_ci": [
+    -0.1539,
+    0.2359
+   ],
+   "W_mean": 0.42,
+   "win_rate": 0.4583
+  },
+  "stop_blk|block": {
+   "n": 86,
+   "games": 77,
+   "resid": -0.0736,
+   "resid_ci": [
+    -0.1736,
+    0.0211
+   ],
+   "W_mean": 0.4224,
+   "win_rate": 0.3488
+  },
+  "main_diff_cut_minus_take": {
+   "diff": -0.0078,
+   "ci": [
+    -0.0401,
+    0.0233
+   ],
+   "n": [
+    943,
+    2612
+   ]
+  },
+  "block_minus_take": {
+   "diff": 0.0256,
+   "ci": [
+    -0.055,
+    0.0995
+   ],
+   "n": [
+    148,
+    2612
+   ]
+  },
+  "all": {
+   "n": 6088,
+   "games": 300,
+   "resid": -0.0273,
+   "resid_ci": [
+    -0.0382,
+    -0.016
+   ],
+   "W_mean": 0.4918,
+   "win_rate": 0.4645
+  }
+ },
+ "points_sub": {
+  "take|take|took": {
+   "n": 1679,
+   "games": 300,
+   "resid": -0.0892,
+   "resid_ci": [
+    -0.1102,
+    -0.0694
+   ],
+   "W_mean": 0.4167,
+   "win_rate": 0.3276
+  },
+  "take|take|stopped": {
+   "n": 933,
+   "games": 272,
+   "resid": 0.1195,
+   "resid_ci": [
+    0.0785,
+    0.1596
+   ],
+   "W_mean": 0.574,
+   "win_rate": 0.6935
+  },
+  "take|cut|took": {
+   "n": 127,
+   "games": 109,
+   "resid": -0.1478,
+   "resid_ci": [
+    -0.2165,
+    -0.0787
+   ],
+   "W_mean": 0.384,
+   "win_rate": 0.2362
+  },
+  "take|cut|stopped": {
+   "n": 816,
+   "games": 281,
+   "resid": -0.003,
+   "resid_ci": [
+    -0.0344,
+    0.0281
+   ],
+   "W_mean": 0.4441,
+   "win_rate": 0.4412
+  },
+  "take|block|took": {
+   "n": 0
+  },
+  "take|block|stopped": {
+   "n": 148,
+   "games": 112,
+   "resid": 0.011,
+   "resid_ci": [
+    -0.0639,
+    0.0845
+   ],
+   "W_mean": 0.5431,
+   "win_rate": 0.5541
+  }
+ },
+ "points_by_band": {
+  "1-3": {
+   "take|take": {
+    "n": 163,
+    "games": 143,
+    "resid": 0.0472,
+    "resid_ci": [
+     -0.0407,
+     0.1378
+    ],
+    "W_mean": 0.4559,
+    "win_rate": 0.5031
+   },
+   "take|cut": {
+    "n": 107,
+    "games": 105,
+    "resid": -0.083,
+    "resid_ci": [
+     -0.1844,
+     0.0187
+    ],
+    "W_mean": 0.4849,
+    "win_rate": 0.4019
+   },
+   "take|block": {
+    "n": 0
+   },
+   "stop_cut|take": {
+    "n": 29,
+    "games": 27,
+    "resid": 0.0362,
+    "resid_ci": [
+     -0.1326,
+     0.2117
+    ],
+    "W_mean": 0.4811,
+    "win_rate": 0.5172
+   },
+   "stop_cut|cut": {
+    "n": 38,
+    "games": 35,
+    "resid": 0.0407,
+    "resid_ci": [
+     -0.1509,
+     0.2262
+    ],
+    "W_mean": 0.433,
+    "win_rate": 0.4737
+   },
+   "stop_cut|block": {
+    "n": 0
+   },
+   "stop_blk|take": {
+    "n": 0
+   },
+   "stop_blk|cut": {
+    "n": 0
+   },
+   "stop_blk|block": {
+    "n": 0
+   },
+   "main_diff_cut_minus_take": {
+    "diff": -0.1301,
+    "ci": [
+     -0.259,
+     0.0053
+    ],
+    "n": [
+     107,
+     163
+    ]
+   },
+   "block_minus_take": null,
+   "all": {
+    "n": 337,
+    "games": 269,
+    "resid": 0.0042,
+    "resid_ci": [
+     -0.0585,
+     0.0663
+    ],
+    "W_mean": 0.4647,
+    "win_rate": 0.4688
+   }
+  },
+  "4-6": {
+   "take|take": {
+    "n": 464,
+    "games": 239,
+    "resid": 0.0497,
+    "resid_ci": [
+     -0.0037,
+     0.1068
+    ],
+    "W_mean": 0.543,
+    "win_rate": 0.5927
+   },
+   "take|cut": {
+    "n": 197,
+    "games": 150,
+    "resid": 0.032,
+    "resid_ci": [
+     -0.049,
+     0.1127
+    ],
+    "W_mean": 0.501,
+    "win_rate": 0.533
+   },
+   "take|block": {
+    "n": 75,
+    "games": 70,
+    "resid": 0.065,
+    "resid_ci": [
+     -0.0381,
+     0.1644
+    ],
+    "W_mean": 0.575,
+    "win_rate": 0.64
+   },
+   "stop_cut|take": {
+    "n": 145,
+    "games": 124,
+    "resid": 0.0178,
+    "resid_ci": [
+     -0.0718,
+     0.111
+    ],
+    "W_mean": 0.5063,
+    "win_rate": 0.5241
+   },
+   "stop_cut|cut": {
+    "n": 267,
+    "games": 184,
+    "resid": -0.0123,
+    "resid_ci": [
+     -0.0713,
+     0.0429
+    ],
+    "W_mean": 0.4767,
+    "win_rate": 0.4644
+   },
+   "stop_cut|block": {
+    "n": 52,
+    "games": 50,
+    "resid": -0.1721,
+    "resid_ci": [
+     -0.3149,
+     -0.0298
+    ],
+    "W_mean": 0.5183,
+    "win_rate": 0.3462
+   },
+   "stop_blk|take": {
+    "n": 5,
+    "games": 5,
+    "resid": -0.0347,
+    "resid_ci": [
+     -0.5593,
+     0.4898
+    ],
+    "W_mean": 0.4347,
+    "win_rate": 0.4
+   },
+   "stop_blk|cut": {
+    "n": 0
+   },
+   "stop_blk|block": {
+    "n": 23,
+    "games": 23,
+    "resid": 0.0982,
+    "resid_ci": [
+     -0.0866,
+     0.2933
+    ],
+    "W_mean": 0.467,
+    "win_rate": 0.5652
+   },
+   "main_diff_cut_minus_take": {
+    "diff": -0.0176,
+    "ci": [
+     -0.1039,
+     0.069
+    ],
+    "n": [
+     197,
+     464
+    ]
+   },
+   "block_minus_take": {
+    "diff": 0.0153,
+    "ci": [
+     -0.0968,
+     0.1307
+    ],
+    "n": [
+     75,
+     464
+    ]
+   },
+   "all": {
+    "n": 1228,
+    "games": 300,
+    "resid": 0.0217,
+    "resid_ci": [
+     -0.0134,
+     0.0579
+    ],
+    "W_mean": 0.5165,
+    "win_rate": 0.5383
+   }
+  },
+  "7+": {
+   "take|take": {
+    "n": 1985,
+    "games": 300,
+    "resid": -0.0348,
+    "resid_ci": [
+     -0.0561,
+     -0.0129
+    ],
+    "W_mean": 0.4579,
+    "win_rate": 0.4232
+   },
+   "take|cut": {
+    "n": 639,
+    "games": 272,
+    "resid": -0.0291,
+    "resid_ci": [
+     -0.0616,
+     0.0026
+    ],
+    "W_mean": 0.4079,
+    "win_rate": 0.3787
+   },
+   "take|block": {
+    "n": 73,
+    "games": 61,
+    "resid": -0.0445,
+    "resid_ci": [
+     -0.1558,
+     0.0613
+    ],
+    "W_mean": 0.5102,
+    "win_rate": 0.4658
+   },
+   "stop_cut|take": {
+    "n": 739,
+    "games": 269,
+    "resid": -0.0866,
+    "resid_ci": [
+     -0.1174,
+     -0.0585
+    ],
+    "W_mean": 0.6224,
+    "win_rate": 0.5359
+   },
+   "stop_cut|cut": {
+    "n": 859,
+    "games": 275,
+    "resid": -0.0101,
+    "resid_ci": [
+     -0.0437,
+     0.0251
+    ],
+    "W_mean": 0.4991,
+    "win_rate": 0.4889
+   },
+   "stop_cut|block": {
+    "n": 116,
+    "games": 90,
+    "resid": -0.1652,
+    "resid_ci": [
+     -0.2468,
+     -0.08
+    ],
+    "W_mean": 0.5186,
+    "win_rate": 0.3534
+   },
+   "stop_blk|take": {
+    "n": 25,
+    "games": 20,
+    "resid": -0.16,
+    "resid_ci": [
+     -0.361,
+     0.0391
+    ],
+    "W_mean": 0.48,
+    "win_rate": 0.32
+   },
+   "stop_blk|cut": {
+    "n": 24,
+    "games": 22,
+    "resid": 0.0383,
+    "resid_ci": [
+     -0.1539,
+     0.2359
+    ],
+    "W_mean": 0.42,
+    "win_rate": 0.4583
+   },
+   "stop_blk|block": {
+    "n": 63,
+    "games": 59,
+    "resid": -0.1363,
+    "resid_ci": [
+     -0.2363,
+     -0.0317
+    ],
+    "W_mean": 0.4061,
+    "win_rate": 0.2698
+   },
+   "main_diff_cut_minus_take": {
+    "diff": 0.0056,
+    "ci": [
+     -0.0299,
+     0.0421
+    ],
+    "n": [
+     639,
+     1985
+    ]
+   },
+   "block_minus_take": {
+    "diff": -0.0097,
+    "ci": [
+     -0.1246,
+     0.1031
+    ],
+    "n": [
+     73,
+     1985
+    ]
+   },
+   "all": {
+    "n": 4523,
+    "games": 300,
+    "resid": -0.043,
+    "resid_ci": [
+     -0.0554,
+     -0.0301
+    ],
+    "W_mean": 0.4871,
+    "win_rate": 0.4442
+   }
+  }
+ },
+ "points_by_life": {
+  "0": {
+   "take|take": {
+    "n": 279,
+    "games": 242,
+    "resid": -0.0871,
+    "resid_ci": [
+     -0.1303,
+     -0.0439
+    ],
+    "W_mean": 0.1983,
+    "win_rate": 0.1111
+   },
+   "take|cut": {
+    "n": 109,
+    "games": 101,
+    "resid": -0.1191,
+    "resid_ci": [
+     -0.1753,
+     -0.0644
+    ],
+    "W_mean": 0.1649,
+    "win_rate": 0.0459
+   },
+   "take|block": {
+    "n": 1,
+    "games": 1,
+    "resid": -0.0119,
+    "resid_ci": [
+     -0.0119,
+     -0.0119
+    ],
+    "W_mean": 0.0119,
+    "win_rate": 0.0
+   },
+   "stop_cut|take": {
+    "n": 4,
+    "games": 4,
+    "resid": -0.404,
+    "resid_ci": [
+     -0.7899,
+     -0.1063
+    ],
+    "W_mean": 0.404,
+    "win_rate": 0.0
+   },
+   "stop_cut|cut": {
+    "n": 65,
+    "games": 52,
+    "resid": 0.0468,
+    "resid_ci": [
+     -0.0802,
+     0.1756
+    ],
+    "W_mean": 0.3994,
+    "win_rate": 0.4462
+   },
+   "stop_cut|block": {
+    "n": 11,
+    "games": 10,
+    "resid": -0.1367,
+    "resid_ci": [
+     -0.3913,
+     0.1354
+    ],
+    "W_mean": 0.5912,
+    "win_rate": 0.4545
+   },
+   "stop_blk|take": {
+    "n": 0
+   },
+   "stop_blk|cut": {
+    "n": 10,
+    "games": 9,
+    "resid": 0.0465,
+    "resid_ci": [
+     -0.2754,
+     0.3404
+    ],
+    "W_mean": 0.3535,
+    "win_rate": 0.4
+   },
+   "stop_blk|block": {
+    "n": 21,
+    "games": 20,
+    "resid": -0.1847,
+    "resid_ci": [
+     -0.2968,
+     -0.0937
+    ],
+    "W_mean": 0.2324,
+    "win_rate": 0.0476
+   },
+   "main_diff_cut_minus_take": {
+    "diff": -0.0319,
+    "ci": [
+     -0.1051,
+     0.0407
+    ],
+    "n": [
+     109,
+     279
+    ]
+   },
+   "block_minus_take": {
+    "diff": 0.0752,
+    "ci": [
+     0.0314,
+     0.1152
+    ],
+    "n": [
+     1,
+     279
+    ]
+   },
+   "all": {
+    "n": 500,
+    "games": 299,
+    "resid": -0.0816,
+    "resid_ci": [
+     -0.115,
+     -0.0458
+    ],
+    "W_mean": 0.2316,
+    "win_rate": 0.15
+   }
+  },
+  "1": {
+   "take|take": {
+    "n": 354,
+    "games": 259,
+    "resid": -0.0912,
+    "resid_ci": [
+     -0.1335,
+     -0.0459
+    ],
+    "W_mean": 0.3257,
+    "win_rate": 0.2345
+   },
+   "take|cut": {
+    "n": 138,
+    "games": 113,
+    "resid": -0.0456,
+    "resid_ci": [
+     -0.1064,
+     0.0142
+    ],
+    "W_mean": 0.3355,
+    "win_rate": 0.2899
+   },
+   "take|block": {
+    "n": 8,
+    "games": 8,
+    "resid": -0.0612,
+    "resid_ci": [
+     -0.2585,
+     0.17
+    ],
+    "W_mean": 0.4362,
+    "win_rate": 0.375
+   },
+   "stop_cut|take": {
+    "n": 67,
+    "games": 65,
+    "resid": -0.0512,
+    "resid_ci": [
+     -0.1619,
+     0.0568
+    ],
+    "W_mean": 0.4691,
+    "win_rate": 0.4179
+   },
+   "stop_cut|cut": {
+    "n": 139,
+    "games": 106,
+    "resid": 0.022,
+    "resid_ci": [
+     -0.0721,
+     0.1133
+    ],
+    "W_mean": 0.4528,
+    "win_rate": 0.4748
+   },
+   "stop_cut|block": {
+    "n": 24,
+    "games": 21,
+    "resid": -0.0944,
+    "resid_ci": [
+     -0.2843,
+     0.11
+    ],
+    "W_mean": 0.4277,
+    "win_rate": 0.3333
+   },
+   "stop_blk|take": {
+    "n": 7,
+    "games": 7,
+    "resid": -0.1023,
+    "resid_ci": [
+     -0.4119,
+     0.1682
+    ],
+    "W_mean": 0.2451,
+    "win_rate": 0.1429
+   },
+   "stop_blk|cut": {
+    "n": 4,
+    "games": 4,
+    "resid": 0.1733,
+    "resid_ci": [
+     -0.1027,
+     0.6332
+    ],
+    "W_mean": 0.3267,
+    "win_rate": 0.5
+   },
+   "stop_blk|block": {
+    "n": 13,
+    "games": 13,
+    "resid": -0.1272,
+    "resid_ci": [
+     -0.4576,
+     0.243
+    ],
+    "W_mean": 0.5119,
+    "win_rate": 0.3846
+   },
+   "main_diff_cut_minus_take": {
+    "diff": 0.0456,
+    "ci": [
+     -0.0284,
+     0.1266
+    ],
+    "n": [
+     138,
+     354
+    ]
+   },
+   "block_minus_take": {
+    "diff": 0.03,
+    "ci": [
+     -0.1956,
+     0.2729
+    ],
+    "n": [
+     8,
+     354
+    ]
+   },
+   "all": {
+    "n": 754,
+    "games": 298,
+    "resid": -0.0576,
+    "resid_ci": [
+     -0.0942,
+     -0.0201
+    ],
+    "W_mean": 0.3706,
+    "win_rate": 0.313
+   }
+  },
+  "2": {
+   "take|take": {
+    "n": 375,
+    "games": 238,
+    "resid": -0.0213,
+    "resid_ci": [
+     -0.0641,
+     0.0228
+    ],
+    "W_mean": 0.4266,
+    "win_rate": 0.4053
+   },
+   "take|cut": {
+    "n": 125,
+    "games": 103,
+    "resid": -0.0202,
+    "resid_ci": [
+     -0.1048,
+     0.0706
+    ],
+    "W_mean": 0.4202,
+    "win_rate": 0.4
+   },
+   "take|block": {
+    "n": 16,
+    "games": 14,
+    "resid": 0.0297,
+    "resid_ci": [
+     -0.2176,
+     0.2688
+    ],
+    "W_mean": 0.4078,
+    "win_rate": 0.4375
+   },
+   "stop_cut|take": {
+    "n": 163,
+    "games": 133,
+    "resid": -0.1125,
+    "resid_ci": [
+     -0.1656,
+     -0.0603
+    ],
+    "W_mean": 0.5849,
+    "win_rate": 0.4724
+   },
+   "stop_cut|cut": {
+    "n": 227,
+    "games": 143,
+    "resid": -0.0445,
+    "resid_ci": [
+     -0.1055,
+     0.0198
+    ],
+    "W_mean": 0.4762,
+    "win_rate": 0.4317
+   },
+   "stop_cut|block": {
+    "n": 37,
+    "games": 31,
+    "resid": -0.3196,
+    "resid_ci": [
+     -0.4406,
+     -0.1887
+    ],
+    "W_mean": 0.5088,
+    "win_rate": 0.1892
+   },
+   "stop_blk|take": {
+    "n": 4,
+    "games": 4,
+    "resid": -0.3265,
+    "resid_ci": [
+     -0.8901,
+     0.2793
+    ],
+    "W_mean": 0.5765,
+    "win_rate": 0.25
+   },
+   "stop_blk|cut": {
+    "n": 1,
+    "games": 1,
+    "resid": 0.7024,
+    "resid_ci": [
+     0.7024,
+     0.7024
+    ],
+    "W_mean": 0.2976,
+    "win_rate": 1.0
+   },
+   "stop_blk|block": {
+    "n": 13,
+    "games": 13,
+    "resid": -0.0892,
+    "resid_ci": [
+     -0.276,
+     0.1293
+    ],
+    "W_mean": 0.32,
+    "win_rate": 0.2308
+   },
+   "main_diff_cut_minus_take": {
+    "diff": 0.0011,
+    "ci": [
+     -0.0923,
+     0.0941
+    ],
+    "n": [
+     125,
+     375
+    ]
+   },
+   "block_minus_take": {
+    "diff": 0.051,
+    "ci": [
+     -0.217,
+     0.3182
+    ],
+    "n": [
+     16,
+     375
+    ]
+   },
+   "all": {
+    "n": 961,
+    "games": 295,
+    "resid": -0.0541,
+    "resid_ci": [
+     -0.0835,
+     -0.0223
+    ],
+    "W_mean": 0.4662,
+    "win_rate": 0.4121
+   }
+  },
+  "3+": {
+   "take|take": {
+    "n": 1604,
+    "games": 299,
+    "resid": 0.0164,
+    "resid_ci": [
+     -0.0103,
+     0.0423
+    ],
+    "W_mean": 0.564,
+    "win_rate": 0.5804
+   },
+   "take|cut": {
+    "n": 571,
+    "games": 252,
+    "resid": 0.0011,
+    "resid_ci": [
+     -0.0447,
+     0.043
+    ],
+    "W_mean": 0.5156,
+    "win_rate": 0.5166
+   },
+   "take|block": {
+    "n": 123,
+    "games": 97,
+    "resid": 0.0134,
+    "resid_ci": [
+     -0.0675,
+     0.0946
+    ],
+    "W_mean": 0.5719,
+    "win_rate": 0.5854
+   },
+   "stop_cut|take": {
+    "n": 679,
+    "games": 266,
+    "resid": -0.0545,
+    "resid_ci": [
+     -0.0861,
+     -0.0224
+    ],
+    "W_mean": 0.617,
+    "win_rate": 0.5626
+   },
+   "stop_cut|cut": {
+    "n": 733,
+    "games": 262,
+    "resid": -0.0088,
+    "resid_ci": [
+     -0.0426,
+     0.0247
+    ],
+    "W_mean": 0.5122,
+    "win_rate": 0.5034
+   },
+   "stop_cut|block": {
+    "n": 96,
+    "games": 86,
+    "resid": -0.1304,
+    "resid_ci": [
+     -0.2287,
+     -0.0351
+    ],
+    "W_mean": 0.5367,
+    "win_rate": 0.4062
+   },
+   "stop_blk|take": {
+    "n": 19,
+    "games": 17,
+    "resid": -0.1132,
+    "resid_ci": [
+     -0.3471,
+     0.0932
+    ],
+    "W_mean": 0.5342,
+    "win_rate": 0.4211
+   },
+   "stop_blk|cut": {
+    "n": 9,
+    "games": 8,
+    "resid": -0.1045,
+    "resid_ci": [
+     -0.4019,
+     0.2716
+    ],
+    "W_mean": 0.549,
+    "win_rate": 0.4444
+   },
+   "stop_blk|block": {
+    "n": 39,
+    "games": 38,
+    "resid": 0.0094,
+    "resid_ci": [
+     -0.1494,
+     0.1624
+    ],
+    "W_mean": 0.5291,
+    "win_rate": 0.5385
+   },
+   "main_diff_cut_minus_take": {
+    "diff": -0.0154,
+    "ci": [
+     -0.0569,
+     0.0282
+    ],
+    "n": [
+     571,
+     1604
+    ]
+   },
+   "block_minus_take": {
+    "diff": -0.003,
+    "ci": [
+     -0.085,
+     0.0833
+    ],
+    "n": [
+     123,
+     1604
+    ]
+   },
+   "all": {
+    "n": 3873,
+    "games": 300,
+    "resid": -0.0078,
+    "resid_ci": [
+     -0.0226,
+     0.0075
+    ],
+    "W_mean": 0.5554,
+    "win_rate": 0.5476
+   }
+  }
+ },
+ "points_by_clock": {
+  "-1..1": {
+   "take|take": {
+    "n": 950,
+    "games": 260,
+    "resid": -0.0363,
+    "resid_ci": [
+     -0.071,
+     -0.0016
+    ],
+    "W_mean": 0.4868,
+    "win_rate": 0.4505
+   },
+   "take|cut": {
+    "n": 353,
+    "games": 205,
+    "resid": -0.0465,
+    "resid_ci": [
+     -0.0948,
+     0.0038
+    ],
+    "W_mean": 0.48,
+    "win_rate": 0.4334
+   },
+   "take|block": {
+    "n": 49,
+    "games": 44,
+    "resid": 0.0376,
+    "resid_ci": [
+     -0.0976,
+     0.1726
+    ],
+    "W_mean": 0.5134,
+    "win_rate": 0.551
+   },
+   "stop_cut|take": {
+    "n": 301,
+    "games": 177,
+    "resid": -0.0711,
+    "resid_ci": [
+     -0.1305,
+     -0.0137
+    ],
+    "W_mean": 0.5229,
+    "win_rate": 0.4518
+   },
+   "stop_cut|cut": {
+    "n": 441,
+    "games": 205,
+    "resid": 0.0048,
+    "resid_ci": [
+     -0.0394,
+     0.0462
+    ],
+    "W_mean": 0.5122,
+    "win_rate": 0.517
+   },
+   "stop_cut|block": {
+    "n": 66,
+    "games": 57,
+    "resid": -0.1032,
+    "resid_ci": [
+     -0.2161,
+     0.0176
+    ],
+    "W_mean": 0.5123,
+    "win_rate": 0.4091
+   },
+   "stop_blk|take": {
+    "n": 9,
+    "games": 9,
+    "resid": -0.169,
+    "resid_ci": [
+     -0.5037,
+     0.2042
+    ],
+    "W_mean": 0.5023,
+    "win_rate": 0.3333
+   },
+   "stop_blk|cut": {
+    "n": 15,
+    "games": 13,
+    "resid": 0.0064,
+    "resid_ci": [
+     -0.2724,
+     0.2745
+    ],
+    "W_mean": 0.4603,
+    "win_rate": 0.4667
+   },
+   "stop_blk|block": {
+    "n": 35,
+    "games": 33,
+    "resid": -0.0649,
+    "resid_ci": [
+     -0.2254,
+     0.0923
+    ],
+    "W_mean": 0.4935,
+    "win_rate": 0.4286
+   },
+   "main_diff_cut_minus_take": {
+    "diff": -0.0103,
+    "ci": [
+     -0.067,
+     0.0447
+    ],
+    "n": [
+     353,
+     950
+    ]
+   },
+   "block_minus_take": {
+    "diff": 0.0739,
+    "ci": [
+     -0.0614,
+     0.208
+    ],
+    "n": [
+     49,
+     950
+    ]
+   },
+   "all": {
+    "n": 2219,
+    "games": 285,
+    "resid": -0.0355,
+    "resid_ci": [
+     -0.057,
+     -0.0138
+    ],
+    "W_mean": 0.497,
+    "win_rate": 0.4615
+   }
+  },
+  "<-1": {
+   "take|take": {
+    "n": 896,
+    "games": 280,
+    "resid": 0.0771,
+    "resid_ci": [
+     0.0399,
+     0.1154
+    ],
+    "W_mean": 0.1495,
+    "win_rate": 0.2266
+   },
+   "take|cut": {
+    "n": 363,
+    "games": 206,
+    "resid": 0.0706,
+    "resid_ci": [
+     0.0243,
+     0.1186
+    ],
+    "W_mean": 0.1608,
+    "win_rate": 0.2314
+   },
+   "take|block": {
+    "n": 39,
+    "games": 36,
+    "resid": 0.1908,
+    "resid_ci": [
+     0.0381,
+     0.3529
+    ],
+    "W_mean": 0.2451,
+    "win_rate": 0.4359
+   },
+   "stop_cut|take": {
+    "n": 211,
+    "games": 149,
+    "resid": 0.013,
+    "resid_ci": [
+     -0.0488,
+     0.0756
+    ],
+    "W_mean": 0.1955,
+    "win_rate": 0.2085
+   },
+   "stop_cut|cut": {
+    "n": 397,
+    "games": 214,
+    "resid": 0.0775,
+    "resid_ci": [
+     0.0201,
+     0.1378
+    ],
+    "W_mean": 0.1946,
+    "win_rate": 0.272
+   },
+   "stop_cut|block": {
+    "n": 49,
+    "games": 43,
+    "resid": -0.0298,
+    "resid_ci": [
+     -0.1232,
+     0.0795
+    ],
+    "W_mean": 0.1931,
+    "win_rate": 0.1633
+   },
+   "stop_blk|take": {
+    "n": 12,
+    "games": 11,
+    "resid": 0.0118,
+    "resid_ci": [
+     -0.1443,
+     0.2194
+    ],
+    "W_mean": 0.1548,
+    "win_rate": 0.1667
+   },
+   "stop_blk|cut": {
+    "n": 6,
+    "games": 6,
+    "resid": 0.2036,
+    "resid_ci": [
+     -0.0927,
+     0.521
+    ],
+    "W_mean": 0.1297,
+    "win_rate": 0.3333
+   },
+   "stop_blk|block": {
+    "n": 34,
+    "games": 31,
+    "resid": 0.0212,
+    "resid_ci": [
+     -0.0859,
+     0.1471
+    ],
+    "W_mean": 0.1553,
+    "win_rate": 0.1765
+   },
+   "main_diff_cut_minus_take": {
+    "diff": -0.0065,
+    "ci": [
+     -0.052,
+     0.0394
+    ],
+    "n": [
+     363,
+     896
+    ]
+   },
+   "block_minus_take": {
+    "diff": 0.1137,
+    "ci": [
+     -0.0365,
+     0.2676
+    ],
+    "n": [
+     39,
+     896
+    ]
+   },
+   "all": {
+    "n": 2007,
+    "games": 300,
+    "resid": 0.0679,
+    "resid_ci": [
+     0.0336,
+     0.1035
+    ],
+    "W_mean": 0.1683,
+    "win_rate": 0.2362
+   }
+  },
+  ">1": {
+   "take|take": {
+    "n": 766,
+    "games": 266,
+    "resid": -0.0951,
+    "resid_ci": [
+     -0.1438,
+     -0.0487
+    ],
+    "W_mean": 0.834,
+    "win_rate": 0.7389
+   },
+   "take|cut": {
+    "n": 227,
+    "games": 148,
+    "resid": -0.1339,
+    "resid_ci": [
+     -0.2053,
+     -0.065
+    ],
+    "W_mean": 0.8079,
+    "win_rate": 0.674
+   },
+   "take|block": {
+    "n": 60,
+    "games": 51,
+    "resid": -0.1276,
+    "resid_ci": [
+     -0.2555,
+     0.003
+    ],
+    "W_mean": 0.761,
+    "win_rate": 0.6333
+   },
+   "stop_cut|take": {
+    "n": 401,
+    "games": 206,
+    "resid": -0.104,
+    "resid_ci": [
+     -0.1557,
+     -0.0565
+    ],
+    "W_mean": 0.8696,
+    "win_rate": 0.7656
+   },
+   "stop_cut|cut": {
+    "n": 326,
+    "games": 195,
+    "resid": -0.1329,
+    "resid_ci": [
+     -0.1882,
+     -0.0815
+    ],
+    "W_mean": 0.8261,
+    "win_rate": 0.6933
+   },
+   "stop_cut|block": {
+    "n": 53,
+    "games": 46,
+    "resid": -0.3744,
+    "resid_ci": [
+     -0.5038,
+     -0.2383
+    ],
+    "W_mean": 0.8272,
+    "win_rate": 0.4528
+   },
+   "stop_blk|take": {
+    "n": 9,
+    "games": 8,
+    "resid": -0.3105,
+    "resid_ci": [
+     -0.7422,
+     0.0276
+    ],
+    "W_mean": 0.866,
+    "win_rate": 0.5556
+   },
+   "stop_blk|cut": {
+    "n": 3,
+    "games": 3,
+    "resid": -0.1327,
+    "resid_ci": [
+     -0.7169,
+     0.2972
+    ],
+    "W_mean": 0.7994,
+    "win_rate": 0.6667
+   },
+   "stop_blk|block": {
+    "n": 17,
+    "games": 16,
+    "resid": -0.2808,
+    "resid_ci": [
+     -0.5347,
+     -0.032
+    ],
+    "W_mean": 0.8102,
+    "win_rate": 0.5294
+   },
+   "main_diff_cut_minus_take": {
+    "diff": -0.0388,
+    "ci": [
+     -0.1071,
+     0.0316
+    ],
+    "n": [
+     227,
+     766
+    ]
+   },
+   "block_minus_take": {
+    "diff": -0.0325,
+    "ci": [
+     -0.1626,
+     0.0951
+    ],
+    "n": [
+     60,
+     766
+    ]
+   },
+   "all": {
+    "n": 1862,
+    "games": 300,
+    "resid": -0.1202,
+    "resid_ci": [
+     -0.1584,
+     -0.0809
+    ],
+    "W_mean": 0.8345,
+    "win_rate": 0.7143
+   }
+  }
+ },
+ "points_by_W": {
+  "close": {
+   "take|take": {
+    "n": 971,
+    "games": 277,
+    "resid": 0.011,
+    "resid_ci": [
+     -0.0245,
+     0.0483
+    ],
+    "W_mean": 0.5008,
+    "win_rate": 0.5118
+   },
+   "take|cut": {
+    "n": 399,
+    "games": 215,
+    "resid": -0.0241,
+    "resid_ci": [
+     -0.0724,
+     0.0242
+    ],
+    "W_mean": 0.4978,
+    "win_rate": 0.4737
+   },
+   "take|block": {
+    "n": 81,
+    "games": 64,
+    "resid": 0.0609,
+    "resid_ci": [
+     -0.039,
+     0.1577
+    ],
+    "W_mean": 0.5193,
+    "win_rate": 0.5802
+   },
+   "stop_cut|take": {
+    "n": 343,
+    "games": 193,
+    "resid": -0.0482,
+    "resid_ci": [
+     -0.1027,
+     0.0066
+    ],
+    "W_mean": 0.5059,
+    "win_rate": 0.4577
+   },
+   "stop_cut|cut": {
+    "n": 529,
+    "games": 229,
+    "resid": -0.0082,
+    "resid_ci": [
+     -0.0472,
+     0.0291
+    ],
+    "W_mean": 0.4959,
+    "win_rate": 0.4877
+   },
+   "stop_cut|block": {
+    "n": 79,
+    "games": 64,
+    "resid": -0.1163,
+    "resid_ci": [
+     -0.225,
+     -0.006
+    ],
+    "W_mean": 0.5214,
+    "win_rate": 0.4051
+   },
+   "stop_blk|take": {
+    "n": 10,
+    "games": 9,
+    "resid": 0.0353,
+    "resid_ci": [
+     -0.2712,
+     0.3689
+    ],
+    "W_mean": 0.4647,
+    "win_rate": 0.5
+   },
+   "stop_blk|cut": {
+    "n": 13,
+    "games": 11,
+    "resid": -0.0448,
+    "resid_ci": [
+     -0.3402,
+     0.2596
+    ],
+    "W_mean": 0.5063,
+    "win_rate": 0.4615
+   },
+   "stop_blk|block": {
+    "n": 36,
+    "games": 35,
+    "resid": 0.0224,
+    "resid_ci": [
+     -0.1426,
+     0.1876
+    ],
+    "W_mean": 0.4776,
+    "win_rate": 0.5
+   },
+   "main_diff_cut_minus_take": {
+    "diff": -0.0351,
+    "ci": [
+     -0.0947,
+     0.0239
+    ],
+    "n": [
+     399,
+     971
+    ]
+   },
+   "block_minus_take": {
+    "diff": 0.0499,
+    "ci": [
+     -0.0519,
+     0.1602
+    ],
+    "n": [
+     81,
+     971
+    ]
+   },
+   "all": {
+    "n": 2461,
+    "games": 293,
+    "resid": -0.0095,
+    "resid_ci": [
+     -0.0299,
+     0.01
+    ],
+    "W_mean": 0.5008,
+    "win_rate": 0.4913
+   }
+  },
+  "other": {
+   "take|take": {
+    "n": 1641,
+    "games": 296,
+    "resid": -0.0298,
+    "resid_ci": [
+     -0.0525,
+     -0.0076
+    ],
+    "W_mean": 0.4564,
+    "win_rate": 0.4266
+   },
+   "take|cut": {
+    "n": 544,
+    "games": 244,
+    "resid": -0.0213,
+    "resid_ci": [
+     -0.0545,
+     0.0141
+    ],
+    "W_mean": 0.3908,
+    "win_rate": 0.3695
+   },
+   "take|block": {
+    "n": 67,
+    "games": 56,
+    "resid": -0.0494,
+    "resid_ci": [
+     -0.1584,
+     0.0635
+    ],
+    "W_mean": 0.5718,
+    "win_rate": 0.5224
+   },
+   "stop_cut|take": {
+    "n": 570,
+    "games": 240,
+    "resid": -0.0769,
+    "resid_ci": [
+     -0.1079,
+     -0.0461
+    ],
+    "W_mean": 0.6558,
+    "win_rate": 0.5789
+   },
+   "stop_cut|cut": {
+    "n": 635,
+    "games": 255,
+    "resid": -0.0096,
+    "resid_ci": [
+     -0.0503,
+     0.0321
+    ],
+    "W_mean": 0.4883,
+    "win_rate": 0.4787
+   },
+   "stop_cut|block": {
+    "n": 89,
+    "games": 75,
+    "resid": -0.2126,
+    "resid_ci": [
+     -0.3086,
+     -0.1188
+    ],
+    "W_mean": 0.516,
+    "win_rate": 0.3034
+   },
+   "stop_blk|take": {
+    "n": 20,
+    "games": 17,
+    "resid": -0.2263,
+    "resid_ci": [
+     -0.4317,
+     -0.0152
+    ],
+    "W_mean": 0.4763,
+    "win_rate": 0.25
+   },
+   "stop_blk|cut": {
+    "n": 11,
+    "games": 11,
+    "resid": 0.1365,
+    "resid_ci": [
+     -0.1276,
+     0.4025
+    ],
+    "W_mean": 0.318,
+    "win_rate": 0.4545
+   },
+   "stop_blk|block": {
+    "n": 50,
+    "games": 47,
+    "resid": -0.1427,
+    "resid_ci": [
+     -0.2573,
+     -0.0326
+    ],
+    "W_mean": 0.3827,
+    "win_rate": 0.24
+   },
+   "main_diff_cut_minus_take": {
+    "diff": 0.0085,
+    "ci": [
+     -0.0299,
+     0.0475
+    ],
+    "n": [
+     544,
+     1641
+    ]
+   },
+   "block_minus_take": {
+    "diff": -0.0196,
+    "ci": [
+     -0.137,
+     0.0918
+    ],
+    "n": [
+     67,
+     1641
+    ]
+   },
+   "all": {
+    "n": 3627,
+    "games": 300,
+    "resid": -0.0394,
+    "resid_ci": [
+     -0.0539,
+     -0.0249
+    ],
+    "W_mean": 0.4858,
+    "win_rate": 0.4464
+   }
+  }
+ },
+ "points_by_life_W": {
+  "1": {
+   "close": {
+    "take|take": {
+     "n": 63,
+     "games": 57,
+     "resid": -0.0969,
+     "resid_ci": [
+      -0.2165,
+      0.0197
+     ],
+     "W_mean": 0.4779,
+     "win_rate": 0.381
+    },
+    "take|cut": {
+     "n": 24,
+     "games": 22,
+     "resid": -0.1207,
+     "resid_ci": [
+      -0.3096,
+      0.0725
+     ],
+     "W_mean": 0.5373,
+     "win_rate": 0.4167
+    },
+    "take|block": {
+     "n": 3,
+     "games": 3,
+     "resid": -0.087,
+     "resid_ci": [
+      -0.5,
+      0.566
+     ],
+     "W_mean": 0.4203,
+     "win_rate": 0.3333
+    },
+    "stop_cut|take": {
+     "n": 13,
+     "games": 13,
+     "resid": -0.1203,
+     "resid_ci": [
+      -0.3604,
+      0.1352
+     ],
+     "W_mean": 0.5049,
+     "win_rate": 0.3846
+    },
+    "stop_cut|cut": {
+     "n": 27,
+     "games": 25,
+     "resid": 0.0886,
+     "resid_ci": [
+      -0.0999,
+      0.2571
+     ],
+     "W_mean": 0.4669,
+     "win_rate": 0.5556
+    },
+    "stop_cut|block": {
+     "n": 4,
+     "games": 4,
+     "resid": 0.2488,
+     "resid_ci": [
+      -0.2705,
+      0.5705
+     ],
+     "W_mean": 0.5012,
+     "win_rate": 0.75
+    },
+    "stop_blk|take": {
+     "n": 1,
+     "games": 1,
+     "resid": 0.5,
+     "resid_ci": [
+      0.5,
+      0.5
+     ],
+     "W_mean": 0.5,
+     "win_rate": 1.0
+    },
+    "stop_blk|cut": {
+     "n": 0
+    },
+    "stop_blk|block": {
+     "n": 4,
+     "games": 4,
+     "resid": 0.0718,
+     "resid_ci": [
+      -0.3781,
+      0.5216
+     ],
+     "W_mean": 0.4282,
+     "win_rate": 0.5
+    },
+    "main_diff_cut_minus_take": {
+     "diff": -0.0238,
+     "ci": [
+      -0.2515,
+      0.2114
+     ],
+     "n": [
+      24,
+      63
+     ]
+    },
+    "block_minus_take": {
+     "diff": 0.0099,
+     "ci": [
+      -0.4307,
+      0.7102
+     ],
+     "n": [
+      3,
+      63
+     ]
+    },
+    "all": {
+     "n": 139,
+     "games": 96,
+     "resid": -0.0478,
+     "resid_ci": [
+      -0.1356,
+      0.0374
+     ],
+     "W_mean": 0.4867,
+     "win_rate": 0.4388
+    }
+   },
+   "other": {
+    "take|take": {
+     "n": 291,
+     "games": 228,
+     "resid": -0.09,
+     "resid_ci": [
+      -0.1375,
+      -0.0451
+     ],
+     "W_mean": 0.2928,
+     "win_rate": 0.2027
+    },
+    "take|cut": {
+     "n": 114,
+     "games": 95,
+     "resid": -0.0298,
+     "resid_ci": [
+      -0.0986,
+      0.0335
+     ],
+     "W_mean": 0.293,
+     "win_rate": 0.2632
+    },
+    "take|block": {
+     "n": 5,
+     "games": 5,
+     "resid": -0.0458,
+     "resid_ci": [
+      -0.1707,
+      0.0741
+     ],
+     "W_mean": 0.4458,
+     "win_rate": 0.4
+    },
+    "stop_cut|take": {
+     "n": 54,
+     "games": 52,
+     "resid": -0.0346,
+     "resid_ci": [
+      -0.1599,
+      0.0844
+     ],
+     "W_mean": 0.4605,
+     "win_rate": 0.4259
+    },
+    "stop_cut|cut": {
+     "n": 112,
+     "games": 88,
+     "resid": 0.006,
+     "resid_ci": [
+      -0.0991,
+      0.1039
+     ],
+     "W_mean": 0.4494,
+     "win_rate": 0.4554
+    },
+    "stop_cut|block": {
+     "n": 20,
+     "games": 19,
+     "resid": -0.163,
+     "resid_ci": [
+      -0.3639,
+      0.0516
+     ],
+     "W_mean": 0.413,
+     "win_rate": 0.25
+    },
+    "stop_blk|take": {
+     "n": 6,
+     "games": 6,
+     "resid": -0.2026,
+     "resid_ci": [
+      -0.4762,
+      -0.0464
+     ],
+     "W_mean": 0.2026,
+     "win_rate": 0.0
+    },
+    "stop_blk|cut": {
+     "n": 4,
+     "games": 4,
+     "resid": 0.1733,
+     "resid_ci": [
+      -0.1027,
+      0.6332
+     ],
+     "W_mean": 0.3267,
+     "win_rate": 0.5
+    },
+    "stop_blk|block": {
+     "n": 9,
+     "games": 9,
+     "resid": -0.2157,
+     "resid_ci": [
+      -0.6492,
+      0.2484
+     ],
+     "W_mean": 0.549,
+     "win_rate": 0.3333
+    },
+    "main_diff_cut_minus_take": {
+     "diff": 0.0602,
+     "ci": [
+      -0.0255,
+      0.1389
+     ],
+     "n": [
+      114,
+      291
+     ]
+    },
+    "block_minus_take": {
+     "diff": 0.0442,
+     "ci": [
+      -0.1103,
+      0.1934
+     ],
+     "n": [
+      5,
+      291
+     ]
+    },
+    "all": {
+     "n": 615,
+     "games": 280,
+     "resid": -0.0598,
+     "resid_ci": [
+      -0.099,
+      -0.0206
+     ],
+     "W_mean": 0.3443,
+     "win_rate": 0.2846
+    }
+   }
+  },
+  "2": {
+   "close": {
+    "take|take": {
+     "n": 113,
+     "games": 93,
+     "resid": -0.0133,
+     "resid_ci": [
+      -0.1005,
+      0.0721
+     ],
+     "W_mean": 0.4824,
+     "win_rate": 0.469
+    },
+    "take|cut": {
+     "n": 31,
+     "games": 29,
+     "resid": -0.0293,
+     "resid_ci": [
+      -0.2191,
+      0.1592
+     ],
+     "W_mean": 0.4809,
+     "win_rate": 0.4516
+    },
+    "take|block": {
+     "n": 6,
+     "games": 5,
+     "resid": 0.2094,
+     "resid_ci": [
+      -0.1795,
+      0.5675
+     ],
+     "W_mean": 0.4573,
+     "win_rate": 0.6667
+    },
+    "stop_cut|take": {
+     "n": 39,
+     "games": 37,
+     "resid": -0.1313,
+     "resid_ci": [
+      -0.2762,
+      0.0091
+     ],
+     "W_mean": 0.5159,
+     "win_rate": 0.3846
+    },
+    "stop_cut|cut": {
+     "n": 69,
+     "games": 56,
+     "resid": -0.0721,
+     "resid_ci": [
+      -0.1853,
+      0.0395
+     ],
+     "W_mean": 0.4923,
+     "win_rate": 0.4203
+    },
+    "stop_cut|block": {
+     "n": 14,
+     "games": 14,
+     "resid": -0.4359,
+     "resid_ci": [
+      -0.5647,
+      -0.2579
+     ],
+     "W_mean": 0.5073,
+     "win_rate": 0.0714
+    },
+    "stop_blk|take": {
+     "n": 1,
+     "games": 1,
+     "resid": 0.6531,
+     "resid_ci": [
+      0.6531,
+      0.6531
+     ],
+     "W_mean": 0.3469,
+     "win_rate": 1.0
+    },
+    "stop_blk|cut": {
+     "n": 0
+    },
+    "stop_blk|block": {
+     "n": 4,
+     "games": 4,
+     "resid": -0.2761,
+     "resid_ci": [
+      -0.5432,
+      0.1746
+     ],
+     "W_mean": 0.5261,
+     "win_rate": 0.25
+    },
+    "main_diff_cut_minus_take": {
+     "diff": -0.0159,
+     "ci": [
+      -0.2189,
+      0.1871
+     ],
+     "n": [
+      31,
+      113
+     ]
+    },
+    "block_minus_take": {
+     "diff": 0.2227,
+     "ci": [
+      -0.2367,
+      0.6097
+     ],
+     "n": [
+      6,
+      113
+     ]
+    },
+    "all": {
+     "n": 277,
+     "games": 150,
+     "resid": -0.0643,
+     "resid_ci": [
+      -0.129,
+      -0.0057
+     ],
+     "W_mean": 0.4903,
+     "win_rate": 0.426
+    }
+   },
+   "other": {
+    "take|take": {
+     "n": 262,
+     "games": 189,
+     "resid": -0.0247,
+     "resid_ci": [
+      -0.0742,
+      0.0249
+     ],
+     "W_mean": 0.4025,
+     "win_rate": 0.3779
+    },
+    "take|cut": {
+     "n": 94,
+     "games": 78,
+     "resid": -0.0171,
+     "resid_ci": [
+      -0.1035,
+      0.0753
+     ],
+     "W_mean": 0.4001,
+     "win_rate": 0.383
+    },
+    "take|block": {
+     "n": 10,
+     "games": 10,
+     "resid": -0.0781,
+     "resid_ci": [
+      -0.3964,
+      0.2699
+     ],
+     "W_mean": 0.3781,
+     "win_rate": 0.3
+    },
+    "stop_cut|take": {
+     "n": 124,
+     "games": 106,
+     "resid": -0.1066,
+     "resid_ci": [
+      -0.166,
+      -0.0504
+     ],
+     "W_mean": 0.6066,
+     "win_rate": 0.5
+    },
+    "stop_cut|cut": {
+     "n": 158,
+     "games": 110,
+     "resid": -0.0324,
+     "resid_ci": [
+      -0.1047,
+      0.0455
+     ],
+     "W_mean": 0.4691,
+     "win_rate": 0.4367
+    },
+    "stop_cut|block": {
+     "n": 23,
+     "games": 20,
+     "resid": -0.2488,
+     "resid_ci": [
+      -0.4182,
+      -0.0797
+     ],
+     "W_mean": 0.5097,
+     "win_rate": 0.2609
+    },
+    "stop_blk|take": {
+     "n": 3,
+     "games": 3,
+     "resid": -0.6531,
+     "resid_ci": [
+      -0.9381,
+      -0.1789
+     ],
+     "W_mean": 0.6531,
+     "win_rate": 0.0
+    },
+    "stop_blk|cut": {
+     "n": 1,
+     "games": 1,
+     "resid": 0.7024,
+     "resid_ci": [
+      0.7024,
+      0.7024
+     ],
+     "W_mean": 0.2976,
+     "win_rate": 1.0
+    },
+    "stop_blk|block": {
+     "n": 9,
+     "games": 9,
+     "resid": -0.0062,
+     "resid_ci": [
+      -0.1631,
+      0.2484
+     ],
+     "W_mean": 0.2284,
+     "win_rate": 0.2222
+    },
+    "main_diff_cut_minus_take": {
+     "diff": 0.0075,
+     "ci": [
+      -0.086,
+      0.112
+     ],
+     "n": [
+      94,
+      262
+     ]
+    },
+    "block_minus_take": {
+     "diff": -0.0534,
+     "ci": [
+      -0.4038,
+      0.3122
+     ],
+     "n": [
+      10,
+      262
+     ]
+    },
+    "all": {
+     "n": 684,
+     "games": 275,
+     "resid": -0.05,
+     "resid_ci": [
+      -0.0818,
+      -0.0184
+     ],
+     "W_mean": 0.4565,
+     "win_rate": 0.4064
+    }
+   }
+  },
+  "3+": {
+   "close": {
+    "take|take": {
+     "n": 752,
+     "games": 267,
+     "resid": 0.0417,
+     "resid_ci": [
+      0.001,
+      0.0823
+     ],
+     "W_mean": 0.5062,
+     "win_rate": 0.5479
+    },
+    "take|cut": {
+     "n": 324,
+     "games": 193,
+     "resid": 0.0094,
+     "resid_ci": [
+      -0.0481,
+      0.0664
+     ],
+     "W_mean": 0.4968,
+     "win_rate": 0.5062
+    },
+    "take|block": {
+     "n": 72,
+     "games": 58,
+     "resid": 0.0547,
+     "resid_ci": [
+      -0.0447,
+      0.1614
+     ],
+     "W_mean": 0.5286,
+     "win_rate": 0.5833
+    },
+    "stop_cut|take": {
+     "n": 290,
+     "games": 181,
+     "resid": -0.0325,
+     "resid_ci": [
+      -0.0892,
+      0.0247
+     ],
+     "W_mean": 0.5049,
+     "win_rate": 0.4724
+    },
+    "stop_cut|cut": {
+     "n": 424,
+     "games": 211,
+     "resid": -0.0099,
+     "resid_ci": [
+      -0.0549,
+      0.0327
+     ],
+     "W_mean": 0.4981,
+     "win_rate": 0.4882
+    },
+    "stop_cut|block": {
+     "n": 60,
+     "games": 53,
+     "resid": -0.0795,
+     "resid_ci": [
+      -0.2053,
+      0.0481
+     ],
+     "W_mean": 0.5295,
+     "win_rate": 0.45
+    },
+    "stop_blk|take": {
+     "n": 8,
+     "games": 7,
+     "resid": -0.1,
+     "resid_ci": [
+      -0.4096,
+      0.2951
+     ],
+     "W_mean": 0.475,
+     "win_rate": 0.375
+    },
+    "stop_blk|cut": {
+     "n": 7,
+     "games": 6,
+     "resid": -0.0745,
+     "resid_ci": [
+      -0.3791,
+      0.3315
+     ],
+     "W_mean": 0.503,
+     "win_rate": 0.4286
+    },
+    "stop_blk|block": {
+     "n": 25,
+     "games": 25,
+     "resid": 0.1302,
+     "resid_ci": [
+      -0.0563,
+      0.3175
+     ],
+     "W_mean": 0.4698,
+     "win_rate": 0.6
+    },
+    "main_diff_cut_minus_take": {
+     "diff": -0.0323,
+     "ci": [
+      -0.0998,
+      0.0356
+     ],
+     "n": [
+      324,
+      752
+     ]
+    },
+    "block_minus_take": {
+     "diff": 0.013,
+     "ci": [
+      -0.1017,
+      0.1253
+     ],
+     "n": [
+      72,
+      752
+     ]
+    },
+    "all": {
+     "n": 1962,
+     "games": 292,
+     "resid": 0.0111,
+     "resid_ci": [
+      -0.0104,
+      0.0324
+     ],
+     "W_mean": 0.5036,
+     "win_rate": 0.5148
+    }
+   },
+   "other": {
+    "take|take": {
+     "n": 852,
+     "games": 267,
+     "resid": -0.0059,
+     "resid_ci": [
+      -0.0384,
+      0.0265
+     ],
+     "W_mean": 0.615,
+     "win_rate": 0.6092
+    },
+    "take|cut": {
+     "n": 247,
+     "games": 157,
+     "resid": -0.0099,
+     "resid_ci": [
+      -0.0677,
+      0.0461
+     ],
+     "W_mean": 0.5403,
+     "win_rate": 0.5304
+    },
+    "take|block": {
+     "n": 51,
+     "games": 44,
+     "resid": -0.0448,
+     "resid_ci": [
+      -0.1696,
+      0.0821
+     ],
+     "W_mean": 0.6331,
+     "win_rate": 0.5882
+    },
+    "stop_cut|take": {
+     "n": 389,
+     "games": 203,
+     "resid": -0.0708,
+     "resid_ci": [
+      -0.1089,
+      -0.0334
+     ],
+     "W_mean": 0.7006,
+     "win_rate": 0.6298
+    },
+    "stop_cut|cut": {
+     "n": 309,
+     "games": 174,
+     "resid": -0.0072,
+     "resid_ci": [
+      -0.0621,
+      0.0494
+     ],
+     "W_mean": 0.5315,
+     "win_rate": 0.5243
+    },
+    "stop_cut|block": {
+     "n": 36,
+     "games": 34,
+     "resid": -0.2152,
+     "resid_ci": [
+      -0.3737,
+      -0.0579
+     ],
+     "W_mean": 0.5485,
+     "win_rate": 0.3333
+    },
+    "stop_blk|take": {
+     "n": 11,
+     "games": 11,
+     "resid": -0.1228,
+     "resid_ci": [
+      -0.3882,
+      0.1237
+     ],
+     "W_mean": 0.5773,
+     "win_rate": 0.4545
+    },
+    "stop_blk|cut": {
+     "n": 2,
+     "games": 2,
+     "resid": -0.2099,
+     "resid_ci": [
+      -0.7169,
+      0.2972
+     ],
+     "W_mean": 0.7099,
+     "win_rate": 0.5
+    },
+    "stop_blk|block": {
+     "n": 14,
+     "games": 14,
+     "resid": -0.2062,
+     "resid_ci": [
+      -0.4248,
+      -0.0089
+     ],
+     "W_mean": 0.6348,
+     "win_rate": 0.4286
+    },
+    "main_diff_cut_minus_take": {
+     "diff": -0.004,
+     "ci": [
+      -0.0655,
+      0.0571
+     ],
+     "n": [
+      247,
+      852
+     ]
+    },
+    "block_minus_take": {
+     "diff": -0.039,
+     "ci": [
+      -0.1743,
+      0.0843
+     ],
+     "n": [
+      51,
+      852
+     ]
+    },
+    "all": {
+     "n": 1911,
+     "games": 294,
+     "resid": -0.0272,
+     "resid_ci": [
+      -0.0495,
+      -0.0076
+     ],
+     "W_mean": 0.6085,
+     "win_rate": 0.5814
+    }
+   }
+  }
+ },
+ "points_no_lethal": {
+  "take|take": {
+   "n": 2333,
+   "games": 300,
+   "resid": -0.006,
+   "resid_ci": [
+    -0.0265,
+    0.0154
+   ],
+   "W_mean": 0.5058,
+   "win_rate": 0.4998
+  },
+  "take|cut": {
+   "n": 834,
+   "games": 280,
+   "resid": -0.0098,
+   "resid_ci": [
+    -0.042,
+    0.0238
+   ],
+   "W_mean": 0.4715,
+   "win_rate": 0.4616
+  },
+  "take|block": {
+   "n": 147,
+   "games": 112,
+   "resid": 0.0111,
+   "resid_ci": [
+    -0.0641,
+    0.0851
+   ],
+   "W_mean": 0.5467,
+   "win_rate": 0.5578
+  },
+  "stop_cut|take": {
+   "n": 909,
+   "games": 279,
+   "resid": -0.0646,
+   "resid_ci": [
+    -0.0918,
+    -0.0366
+   ],
+   "W_mean": 0.6004,
+   "win_rate": 0.5358
+  },
+  "stop_cut|cut": {
+   "n": 1099,
+   "games": 288,
+   "resid": -0.0122,
+   "resid_ci": [
+    -0.0424,
+    0.0171
+   ],
+   "W_mean": 0.4972,
+   "win_rate": 0.485
+  },
+  "stop_cut|block": {
+   "n": 157,
+   "games": 117,
+   "resid": -0.1695,
+   "resid_ci": [
+    -0.2425,
+    -0.0964
+   ],
+   "W_mean": 0.5134,
+   "win_rate": 0.3439
+  },
+  "stop_blk|take": {
+   "n": 30,
+   "games": 25,
+   "resid": -0.1391,
+   "resid_ci": [
+    -0.3317,
+    0.0423
+   ],
+   "W_mean": 0.4724,
+   "win_rate": 0.3333
+  },
+  "stop_blk|cut": {
+   "n": 14,
+   "games": 13,
+   "resid": 0.0325,
+   "resid_ci": [
+    -0.2282,
+    0.3277
+   ],
+   "W_mean": 0.4675,
+   "win_rate": 0.5
+  },
+  "stop_blk|block": {
+   "n": 65,
+   "games": 61,
+   "resid": -0.0376,
+   "resid_ci": [
+    -0.1604,
+    0.0786
+   ],
+   "W_mean": 0.4838,
+   "win_rate": 0.4462
+  },
+  "main_diff_cut_minus_take": {
+   "diff": -0.0039,
+   "ci": [
+    -0.0385,
+    0.0304
+   ],
+   "n": [
+    834,
+    2333
+   ]
+  },
+  "block_minus_take": {
+   "diff": 0.0171,
+   "ci": [
+    -0.0634,
+    0.0922
+   ],
+   "n": [
+    147,
+    2333
+   ]
+  },
+  "all": {
+   "n": 5588,
+   "games": 300,
+   "resid": -0.0225,
+   "resid_ci": [
+    -0.0334,
+    -0.011
+   ],
+   "W_mean": 0.5151,
+   "win_rate": 0.4927
+  }
+ },
+ "turns": {
+  "take|take": {
+   "n": 633,
+   "games": 261,
+   "resid": -0.0518,
+   "resid_ci": [
+    -0.0884,
+    -0.0158
+   ],
+   "W_mean": 0.5241,
+   "win_rate": 0.4724
+  },
+  "take|cut": {
+   "n": 656,
+   "games": 266,
+   "resid": -0.0865,
+   "resid_ci": [
+    -0.1173,
+    -0.0559
+   ],
+   "W_mean": 0.4965,
+   "win_rate": 0.4101
+  },
+  "take|block": {
+   "n": 143,
+   "games": 113,
+   "resid": -0.0554,
+   "resid_ci": [
+    -0.1332,
+    0.0293
+   ],
+   "W_mean": 0.5729,
+   "win_rate": 0.5175
+  },
+  "stop_cut|take": {
+   "n": 355,
+   "games": 212,
+   "resid": -0.0475,
+   "resid_ci": [
+    -0.0966,
+    0.0053
+   ],
+   "W_mean": 0.5884,
+   "win_rate": 0.5408
+  },
+  "stop_cut|cut": {
+   "n": 918,
+   "games": 290,
+   "resid": -0.0807,
+   "resid_ci": [
+    -0.1056,
+    -0.0564
+   ],
+   "W_mean": 0.5774,
+   "win_rate": 0.4967
+  },
+  "stop_cut|block": {
+   "n": 180,
+   "games": 127,
+   "resid": -0.1675,
+   "resid_ci": [
+    -0.2379,
+    -0.0918
+   ],
+   "W_mean": 0.5619,
+   "win_rate": 0.3944
+  },
+  "stop_blk|take": {
+   "n": 8,
+   "games": 7,
+   "resid": 0.1813,
+   "resid_ci": [
+    -0.1785,
+    0.5306
+   ],
+   "W_mean": 0.4437,
+   "win_rate": 0.625
+  },
+  "stop_blk|cut": {
+   "n": 9,
+   "games": 9,
+   "resid": 0.1501,
+   "resid_ci": [
+    -0.1382,
+    0.4454
+   ],
+   "W_mean": 0.5166,
+   "win_rate": 0.6667
+  },
+  "stop_blk|block": {
+   "n": 67,
+   "games": 61,
+   "resid": -0.099,
+   "resid_ci": [
+    -0.2141,
+    0.0111
+   ],
+   "W_mean": 0.4572,
+   "win_rate": 0.3582
+  },
+  "main_diff_cut_minus_take": {
+   "diff": -0.0347,
+   "ci": [
+    -0.081,
+    0.0103
+   ],
+   "n": [
+    656,
+    633
+   ]
+  },
+  "block_minus_take": {
+   "diff": -0.0036,
+   "ci": [
+    -0.0952,
+    0.0814
+   ],
+   "n": [
+    143,
+    633
+   ]
+  },
+  "all": {
+   "n": 2969,
+   "games": 300,
+   "resid": -0.0749,
+   "resid_ci": [
+    -0.0846,
+    -0.0648
+   ],
+   "W_mean": 0.5451,
+   "win_rate": 0.4702
+  }
+ },
+ "turns_by_W": {
+  "close": {
+   "take|take": {
+    "n": 293,
+    "games": 189,
+    "resid": -0.0165,
+    "resid_ci": [
+     -0.0761,
+     0.044
+    ],
+    "W_mean": 0.5011,
+    "win_rate": 0.4846
+   },
+   "take|cut": {
+    "n": 291,
+    "games": 188,
+    "resid": -0.0739,
+    "resid_ci": [
+     -0.1267,
+     -0.0232
+    ],
+    "W_mean": 0.5103,
+    "win_rate": 0.4364
+   },
+   "take|block": {
+    "n": 83,
+    "games": 71,
+    "resid": 0.0031,
+    "resid_ci": [
+     -0.0932,
+     0.1088
+    ],
+    "W_mean": 0.5149,
+    "win_rate": 0.5181
+   },
+   "stop_cut|take": {
+    "n": 176,
+    "games": 136,
+    "resid": -0.027,
+    "resid_ci": [
+     -0.0962,
+     0.0422
+    ],
+    "W_mean": 0.51,
+    "win_rate": 0.483
+   },
+   "stop_cut|cut": {
+    "n": 468,
+    "games": 237,
+    "resid": -0.0833,
+    "resid_ci": [
+     -0.1239,
+     -0.0417
+    ],
+    "W_mean": 0.4979,
+    "win_rate": 0.4145
+   },
+   "stop_cut|block": {
+    "n": 86,
+    "games": 68,
+    "resid": -0.0957,
+    "resid_ci": [
+     -0.1903,
+     -0.0001
+    ],
+    "W_mean": 0.491,
+    "win_rate": 0.3953
+   },
+   "stop_blk|take": {
+    "n": 3,
+    "games": 3,
+    "resid": -0.1587,
+    "resid_ci": [
+     -0.5108,
+     0.5199
+    ],
+    "W_mean": 0.492,
+    "win_rate": 0.3333
+   },
+   "stop_blk|cut": {
+    "n": 3,
+    "games": 3,
+    "resid": -0.0456,
+    "resid_ci": [
+     -0.4777,
+     0.6432
+    ],
+    "W_mean": 0.3789,
+    "win_rate": 0.3333
+   },
+   "stop_blk|block": {
+    "n": 28,
+    "games": 26,
+    "resid": 0.1069,
+    "resid_ci": [
+     -0.0766,
+     0.2874
+    ],
+    "W_mean": 0.4645,
+    "win_rate": 0.5714
+   },
+   "main_diff_cut_minus_take": {
+    "diff": -0.0574,
+    "ci": [
+     -0.137,
+     0.0253
+    ],
+    "n": [
+     291,
+     293
+    ]
+   },
+   "block_minus_take": {
+    "diff": 0.0196,
+    "ci": [
+     -0.0997,
+     0.1388
+    ],
+    "n": [
+     83,
+     293
+    ]
+   },
+   "all": {
+    "n": 1431,
+    "games": 295,
+    "resid": -0.0529,
+    "resid_ci": [
+     -0.0728,
+     -0.033
+    ],
+    "W_mean": 0.5022,
+    "win_rate": 0.4493
+   }
+  },
+  "other": {
+   "take|take": {
+    "n": 340,
+    "games": 190,
+    "resid": -0.0822,
+    "resid_ci": [
+     -0.1332,
+     -0.0347
+    ],
+    "W_mean": 0.544,
+    "win_rate": 0.4618
+   },
+   "take|cut": {
+    "n": 365,
+    "games": 211,
+    "resid": -0.0965,
+    "resid_ci": [
+     -0.136,
+     -0.0535
+    ],
+    "W_mean": 0.4856,
+    "win_rate": 0.389
+   },
+   "take|block": {
+    "n": 60,
+    "games": 53,
+    "resid": -0.1364,
+    "resid_ci": [
+     -0.2872,
+     0.0228
+    ],
+    "W_mean": 0.6531,
+    "win_rate": 0.5167
+   },
+   "stop_cut|take": {
+    "n": 179,
+    "games": 130,
+    "resid": -0.0677,
+    "resid_ci": [
+     -0.1496,
+     0.0124
+    ],
+    "W_mean": 0.6654,
+    "win_rate": 0.5978
+   },
+   "stop_cut|cut": {
+    "n": 450,
+    "games": 226,
+    "resid": -0.0778,
+    "resid_ci": [
+     -0.1156,
+     -0.0387
+    ],
+    "W_mean": 0.6601,
+    "win_rate": 0.5822
+   },
+   "stop_cut|block": {
+    "n": 94,
+    "games": 75,
+    "resid": -0.2331,
+    "resid_ci": [
+     -0.3318,
+     -0.1398
+    ],
+    "W_mean": 0.6267,
+    "win_rate": 0.3936
+   },
+   "stop_blk|take": {
+    "n": 5,
+    "games": 4,
+    "resid": 0.3852,
+    "resid_ci": [
+     0.1054,
+     0.805
+    ],
+    "W_mean": 0.4148,
+    "win_rate": 0.8
+   },
+   "stop_blk|cut": {
+    "n": 6,
+    "games": 6,
+    "resid": 0.2479,
+    "resid_ci": [
+     -0.0564,
+     0.573
+    ],
+    "W_mean": 0.5854,
+    "win_rate": 0.8333
+   },
+   "stop_blk|block": {
+    "n": 39,
+    "games": 39,
+    "resid": -0.2468,
+    "resid_ci": [
+     -0.3737,
+     -0.1135
+    ],
+    "W_mean": 0.4519,
+    "win_rate": 0.2051
+   },
+   "main_diff_cut_minus_take": {
+    "diff": -0.0143,
+    "ci": [
+     -0.0709,
+     0.0459
+    ],
+    "n": [
+     365,
+     340
+    ]
+   },
+   "block_minus_take": {
+    "diff": -0.0542,
+    "ci": [
+     -0.2066,
+     0.105
+    ],
+    "n": [
+     60,
+     340
+    ]
+   },
+   "all": {
+    "n": 1538,
+    "games": 298,
+    "resid": -0.0953,
+    "resid_ci": [
+     -0.1165,
+     -0.0769
+    ],
+    "W_mean": 0.5849,
+    "win_rate": 0.4896
+   }
+  }
+ },
+ "turns_by_life": {
+  "0": {
+   "take|take": {
+    "n": 56,
+    "games": 56,
+    "resid": -0.1925,
+    "resid_ci": [
+     -0.2774,
+     -0.114
+    ],
+    "W_mean": 0.1925,
+    "win_rate": 0.0
+   },
+   "take|cut": {
+    "n": 26,
+    "games": 26,
+    "resid": -0.1628,
+    "resid_ci": [
+     -0.2516,
+     -0.0863
+    ],
+    "W_mean": 0.1628,
+    "win_rate": 0.0
+   },
+   "take|block": {
+    "n": 1,
+    "games": 1,
+    "resid": -0.0119,
+    "resid_ci": [
+     -0.0119,
+     -0.0119
+    ],
+    "W_mean": 0.0119,
+    "win_rate": 0.0
+   },
+   "stop_cut|take": {
+    "n": 1,
+    "games": 1,
+    "resid": -0.8588,
+    "resid_ci": [
+     -0.8588,
+     -0.8588
+    ],
+    "W_mean": 0.8588,
+    "win_rate": 0.0
+   },
+   "stop_cut|cut": {
+    "n": 1,
+    "games": 1,
+    "resid": 0.0119,
+    "resid_ci": [
+     0.0119,
+     0.0119
+    ],
+    "W_mean": 0.9881,
+    "win_rate": 1.0
+   },
+   "stop_cut|block": {
+    "n": 8,
+    "games": 8,
+    "resid": -0.2915,
+    "resid_ci": [
+     -0.5965,
+     -0.0151
+    ],
+    "W_mean": 0.7915,
+    "win_rate": 0.5
+   },
+   "stop_blk|take": {
+    "n": 0
+   },
+   "stop_blk|cut": {
+    "n": 2,
+    "games": 2,
+    "resid": -0.1369,
+    "resid_ci": [
+     -0.3022,
+     0.0283
+    ],
+    "W_mean": 0.6369,
+    "win_rate": 0.5
+   },
+   "stop_blk|block": {
+    "n": 17,
+    "games": 17,
+    "resid": -0.1905,
+    "resid_ci": [
+     -0.3133,
+     -0.0917
+    ],
+    "W_mean": 0.2493,
+    "win_rate": 0.0588
+   },
+   "main_diff_cut_minus_take": {
+    "diff": 0.0296,
+    "ci": [
+     -0.0859,
+     0.1472
+    ],
+    "n": [
+     26,
+     56
+    ]
+   },
+   "block_minus_take": {
+    "diff": 0.1805,
+    "ci": [
+     0.1027,
+     0.2636
+    ],
+    "n": [
+     1,
+     56
+    ]
+   },
+   "all": {
+    "n": 112,
+    "games": 102,
+    "resid": -0.1939,
+    "resid_ci": [
+     -0.2522,
+     -0.1371
+    ],
+    "W_mean": 0.2564,
+    "win_rate": 0.0625
+   }
+  },
+  "1": {
+   "take|take": {
+    "n": 44,
+    "games": 44,
+    "resid": -0.2628,
+    "resid_ci": [
+     -0.3833,
+     -0.1398
+    ],
+    "W_mean": 0.3537,
+    "win_rate": 0.0909
+   },
+   "take|cut": {
+    "n": 80,
+    "games": 80,
+    "resid": -0.2442,
+    "resid_ci": [
+     -0.3211,
+     -0.1682
+    ],
+    "W_mean": 0.2817,
+    "win_rate": 0.0375
+   },
+   "take|block": {
+    "n": 6,
+    "games": 6,
+    "resid": 0.0987,
+    "resid_ci": [
+     -0.1875,
+     0.3713
+    ],
+    "W_mean": 0.5679,
+    "win_rate": 0.6667
+   },
+   "stop_cut|take": {
+    "n": 10,
+    "games": 10,
+    "resid": 0.2907,
+    "resid_ci": [
+     0.0601,
+     0.5103
+    ],
+    "W_mean": 0.5093,
+    "win_rate": 0.8
+   },
+   "stop_cut|cut": {
+    "n": 28,
+    "games": 27,
+    "resid": -0.092,
+    "resid_ci": [
+     -0.2848,
+     0.1043
+    ],
+    "W_mean": 0.5205,
+    "win_rate": 0.4286
+   },
+   "stop_cut|block": {
+    "n": 14,
+    "games": 13,
+    "resid": -0.0685,
+    "resid_ci": [
+     -0.3386,
+     0.2292
+    ],
+    "W_mean": 0.4971,
+    "win_rate": 0.4286
+   },
+   "stop_blk|take": {
+    "n": 1,
+    "games": 1,
+    "resid": -0.0287,
+    "resid_ci": [
+     -0.0287,
+     -0.0287
+    ],
+    "W_mean": 0.0287,
+    "win_rate": 0.0
+   },
+   "stop_blk|cut": {
+    "n": 2,
+    "games": 2,
+    "resid": 0.4401,
+    "resid_ci": [
+     0.0215,
+     0.8586
+    ],
+    "W_mean": 0.5599,
+    "win_rate": 1.0
+   },
+   "stop_blk|block": {
+    "n": 11,
+    "games": 11,
+    "resid": -0.342,
+    "resid_ci": [
+     -0.6243,
+     -0.0407
+    ],
+    "W_mean": 0.4329,
+    "win_rate": 0.0909
+   },
+   "main_diff_cut_minus_take": {
+    "diff": 0.0186,
+    "ci": [
+     -0.1306,
+     0.1622
+    ],
+    "n": [
+     80,
+     44
+    ]
+   },
+   "block_minus_take": {
+    "diff": 0.3615,
+    "ci": [
+     0.0242,
+     0.6968
+    ],
+    "n": [
+     6,
+     44
+    ]
+   },
+   "all": {
+    "n": 196,
+    "games": 165,
+    "resid": -0.1737,
+    "resid_ci": [
+     -0.2402,
+     -0.1049
+    ],
+    "W_mean": 0.3778,
+    "win_rate": 0.2041
+   }
+  },
+  "2": {
+   "take|take": {
+    "n": 48,
+    "games": 46,
+    "resid": -0.214,
+    "resid_ci": [
+     -0.3342,
+     -0.0841
+    ],
+    "W_mean": 0.464,
+    "win_rate": 0.25
+   },
+   "take|cut": {
+    "n": 72,
+    "games": 69,
+    "resid": -0.1286,
+    "resid_ci": [
+     -0.2255,
+     -0.0296
+    ],
+    "W_mean": 0.4202,
+    "win_rate": 0.2917
+   },
+   "take|block": {
+    "n": 7,
+    "games": 7,
+    "resid": -0.4038,
+    "resid_ci": [
+     -0.7675,
+     0.0927
+    ],
+    "W_mean": 0.5466,
+    "win_rate": 0.1429
+   },
+   "stop_cut|take": {
+    "n": 15,
+    "games": 15,
+    "resid": -0.172,
+    "resid_ci": [
+     -0.4828,
+     0.1417
+    ],
+    "W_mean": 0.572,
+    "win_rate": 0.4
+   },
+   "stop_cut|cut": {
+    "n": 127,
+    "games": 93,
+    "resid": -0.1325,
+    "resid_ci": [
+     -0.2053,
+     -0.0622
+    ],
+    "W_mean": 0.5814,
+    "win_rate": 0.4488
+   },
+   "stop_cut|block": {
+    "n": 37,
+    "games": 33,
+    "resid": -0.2972,
+    "resid_ci": [
+     -0.4176,
+     -0.174
+    ],
+    "W_mean": 0.5134,
+    "win_rate": 0.2162
+   },
+   "stop_blk|take": {
+    "n": 1,
+    "games": 1,
+    "resid": 0.8804,
+    "resid_ci": [
+     0.8804,
+     0.8804
+    ],
+    "W_mean": 0.1196,
+    "win_rate": 1.0
+   },
+   "stop_blk|cut": {
+    "n": 2,
+    "games": 2,
+    "resid": 0.1906,
+    "resid_ci": [
+     -0.262,
+     0.6432
+    ],
+    "W_mean": 0.3094,
+    "win_rate": 0.5
+   },
+   "stop_blk|block": {
+    "n": 5,
+    "games": 5,
+    "resid": -0.1856,
+    "resid_ci": [
+     -0.6418,
+     0.3007
+    ],
+    "W_mean": 0.3856,
+    "win_rate": 0.2
+   },
+   "main_diff_cut_minus_take": {
+    "diff": 0.0854,
+    "ci": [
+     -0.0705,
+     0.2409
+    ],
+    "n": [
+     72,
+     48
+    ]
+   },
+   "block_minus_take": {
+    "diff": -0.1898,
+    "ci": [
+     -0.6187,
+     0.369
+    ],
+    "n": [
+     7,
+     48
+    ]
+   },
+   "all": {
+    "n": 314,
+    "games": 209,
+    "resid": -0.167,
+    "resid_ci": [
+     -0.2138,
+     -0.1202
+    ],
+    "W_mean": 0.5109,
+    "win_rate": 0.3439
+   }
+  },
+  "3+": {
+   "take|take": {
+    "n": 485,
+    "games": 240,
+    "resid": -0.0003,
+    "resid_ci": [
+     -0.04,
+     0.0403
+    ],
+    "W_mean": 0.5839,
+    "win_rate": 0.5835
+   },
+   "take|cut": {
+    "n": 478,
+    "games": 238,
+    "resid": -0.0496,
+    "resid_ci": [
+     -0.0884,
+     -0.0108
+    ],
+    "W_mean": 0.5621,
+    "win_rate": 0.5126
+   },
+   "take|block": {
+    "n": 129,
+    "games": 101,
+    "resid": -0.044,
+    "resid_ci": [
+     -0.1278,
+     0.0363
+    ],
+    "W_mean": 0.5789,
+    "win_rate": 0.5349
+   },
+   "stop_cut|take": {
+    "n": 329,
+    "games": 203,
+    "resid": -0.0497,
+    "resid_ci": [
+     -0.1019,
+     0.0038
+    ],
+    "W_mean": 0.5907,
+    "win_rate": 0.541
+   },
+   "stop_cut|cut": {
+    "n": 762,
+    "games": 280,
+    "resid": -0.0717,
+    "resid_ci": [
+     -0.0986,
+     -0.0449
+    ],
+    "W_mean": 0.5783,
+    "win_rate": 0.5066
+   },
+   "stop_cut|block": {
+    "n": 121,
+    "games": 98,
+    "resid": -0.131,
+    "resid_ci": [
+     -0.2239,
+     -0.0452
+    ],
+    "W_mean": 0.5691,
+    "win_rate": 0.438
+   },
+   "stop_blk|take": {
+    "n": 6,
+    "games": 5,
+    "resid": 0.0997,
+    "resid_ci": [
+     -0.2894,
+     0.474
+    ],
+    "W_mean": 0.5669,
+    "win_rate": 0.6667
+   },
+   "stop_blk|cut": {
+    "n": 3,
+    "games": 3,
+    "resid": 0.1211,
+    "resid_ci": [
+     -0.4777,
+     0.7332
+    ],
+    "W_mean": 0.5456,
+    "win_rate": 0.6667
+   },
+   "stop_blk|block": {
+    "n": 34,
+    "games": 32,
+    "resid": 0.0381,
+    "resid_ci": [
+     -0.1402,
+     0.1987
+    ],
+    "W_mean": 0.5795,
+    "win_rate": 0.6176
+   },
+   "main_diff_cut_minus_take": {
+    "diff": -0.0492,
+    "ci": [
+     -0.112,
+     0.0127
+    ],
+    "n": [
+     478,
+     485
+    ]
+   },
+   "block_minus_take": {
+    "diff": -0.0437,
+    "ci": [
+     -0.1386,
+     0.0524
+    ],
+    "n": [
+     129,
+     485
+    ]
+   },
+   "all": {
+    "n": 2347,
+    "games": 300,
+    "resid": -0.0486,
+    "resid_ci": [
+     -0.0595,
+     -0.0372
+    ],
+    "W_mean": 0.5774,
+    "win_rate": 0.5288
+   }
+  }
+ }
+}

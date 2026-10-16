@@ -1740,5 +1740,122 @@
    "logs/theory_map/real_w41_oppturn.json"
   ],
   "verdict": "rule: opponent attack-plan reading (life+body 62%); caveat: the split is the composition of the actual durability change; the largest item gap is my own defence (cut 2x, life 0.56x), same direction as defend_foresee"
+ },
+ "hand_stop_value_2026_10_16": {
+  "report": "docs/reports/2026-10-16_hand_stop_value.md",
+  "kind": "switch (OPCG_HAND_STOP=value, Rust defender.rs; off/survive unchanged)",
+  "defend_ratio": {
+   "cut": [
+    0.515,
+    0.526
+   ],
+   "life": [
+    1.342,
+    1.337
+   ],
+   "blk": [
+    0.314,
+    0.306
+   ]
+  },
+  "oppturn_exp": {
+   "cut": [
+    0.571,
+    0.568
+   ],
+   "life": [
+    1.109,
+    1.121
+   ]
+  },
+  "end_foresee_median_mu": [
+   2.93,
+   2.98
+  ],
+  "agreement": [
+   0.46,
+   0.457
+  ],
+  "forbid_ratio": [
+   0.847,
+   0.834
+  ],
+  "crossing": {
+   "hit": [
+    0.7262,
+    0.7271
+   ],
+   "bias": [
+    0.026,
+    0.059
+   ]
+  },
+  "counter_ratio_avg": [
+   0.581,
+   0.564
+  ],
+  "audit_cross": {
+   "games": 240,
+   "void": 0
+  },
+  "logs": [
+   "logs/theory_map/real_w41_hv_defend.json",
+   "logs/theory_map/real_w41_hv_oppturn.json",
+   "logs/theory_map/real_w41_hv_foreseeall.json",
+   "logs/theory_map/real_w41_hv_arms.json"
+  ],
+  "verdict": "comparison order is not the cause (cut ratio moves 0.011 < 0.1); saving cards comes from the defender's card-vs-life value reading"
+ },
+ "defend_residual_2026_10_16": {
+  "report": "docs/reports/2026-10-16_defend_residual.md",
+  "kind": "measurement (theory_map.py defres; reuses dtdump survive+DEF_TRACE; no Rust change)",
+  "points": 6088,
+  "turns": 2969,
+  "main_diff_cut_minus_take": {
+   "diff": -0.0078,
+   "ci": [
+    -0.0401,
+    0.0233
+   ],
+   "n": [
+    943,
+    2612
+   ]
+  },
+  "resid": {
+   "take_take": -0.0146,
+   "take_cut": -0.0225,
+   "take_block": 0.011,
+   "stopcut_block": -0.1673
+  },
+  "by_life_diff": {
+   "0": -0.0319,
+   "1": 0.0456,
+   "2": 0.0011,
+   "3+": -0.0154
+  },
+  "close_diff": {
+   "diff": -0.0351,
+   "ci": [
+    -0.0947,
+    0.0239
+   ]
+  },
+  "turn_level_diff": {
+   "diff": -0.0347,
+   "ci": [
+    -0.081,
+    0.0103
+   ]
+  },
+  "clock_bins_resid": {
+   "<-1": 0.0679,
+   "-1..1": -0.0355,
+   ">1": -0.1202
+  },
+  "logs": [
+   "logs/theory_map/real_w41_defres.json"
+  ],
+  "verdict": "diff CI crosses 0: theory's defence is not worse than actual; decide by matches (guard-window intervention)"
  }
 }
