@@ -1977,5 +1977,81 @@
    "logs/theory_map/real_w41_steep.json"
   ],
   "verdict": "neither line: only the move-price reading (curve tau) is too extreme; crossing-bridge reading is calibrated; price clocks say the end ~20% later (not faster) and its D ranks outcomes poorly (corr 0.31 vs 0.59); decision asked: diagnose price vs bridge parts (recommended)"
+ },
+ "price_bridge_read_2026_10_16": {
+  "report": "docs/reports/2026-10-16_price_bridge_read.md",
+  "kind": "switch (OPCG_CLOCK_VALUE_READ=bridge, Rust drv_cb::BridgeRead + drv_tb::clock_prices_bridge; default off, 10 games bit-identical)",
+  "calibration_S1": {
+   "slope_b": [
+    0.5688,
+    1.0005
+   ],
+   "width": [
+    0.1151,
+    0.0614
+   ],
+   "corr_W_outcome": [
+    0.3116,
+    0.5671
+   ]
+  },
+  "calibration_S2": {
+   "slope_b": [
+    0.7122,
+    0.9715
+   ],
+   "width": [
+    0.0878,
+    0.0224
+   ]
+  },
+  "agreement": [
+   0.4603,
+   0.4671
+  ],
+  "forbid_ratio_1mu": [
+   0.8465,
+   0.9723
+  ],
+  "end_foresee_median_mu": [
+   2.93,
+   2.396
+  ],
+  "end_foresee_mean_mu": [
+   1.93,
+   0.284
+  ],
+  "best_share": {
+   "attack": [
+    0.6312,
+    0.48
+   ],
+   "play": [
+    0.144,
+    0.2045
+   ],
+   "attach": [
+    0.0637,
+    0.1403
+   ]
+  },
+  "tie_share": [
+   0.3533,
+   0.408
+  ],
+  "crossing_bridge_unchanged": true,
+  "audit_cross": {
+   "games": 240,
+   "void": 0
+  },
+  "logs": [
+   "logs/theory_map/real_w41_pb_steep.json",
+   "logs/theory_map/real_w41_pb_foreseeall.json",
+   "logs/theory_map/real_w41_pb_theorydeep.json",
+   "logs/theory_map/real_w41_pb_theoryties.json",
+   "logs/theory_map/real_w41_pb_pricedist.json",
+   "logs/theory_map/real_w41_base_pricedist.json"
+  ],
+  "verdict": "reading level fixed (b 0.57->1.00, corr 0.31->0.57) but move differences not (agreement +0.007, forbid ratio 0.847->0.972): the source of price errors is elsewhere"
  }
 }

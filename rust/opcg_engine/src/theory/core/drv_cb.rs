@@ -1075,3 +1075,99 @@ pub fn game(c: &mut Core, g: &Game, cfg: &Cfg, p: &V) -> R<V> {
     }
     Ok(V::dict(outv))
 }
+
+/// 切替 `OPCG_CLOCK_VALUE_READ=bridge`（`docs/reports/2026-10-16_price_bridge_read.md` §1.2・既定は切）: 手の値段の経路（`drv_tb`）が
+/// 2 本の時計を交点の橋の読み（`seat_row` → `tau_theory_of`・相手の時計は `mirror_view` の行）で読むための局の文脈。
+/// 表（自席ターンの並び・始まりと最後の行・手札 1 枚の価格・手札のブロッカー・切った札の枠）は `game` と同じ取り方で作る
+/// （`game` は触らない＝交点の橋の出力は 1 ビットも変わらない）。`pb` は Python が渡す `in.bridge`（`{"in": {refill, decks, cut_decks,
+/// has_seat_decks}, "sigma_rel"}`）。
+pub(super) struct BridgeRead<'a> {
+    gs: Gs<'a>,
+    cut: Option<CutFrames>,
+    rd: bool,
+    pub(super) sigma_rel: f64,
+}
+
+pub(super) fn bridge_read<'a>(c: &mut Core, g: &'a Game, cfg: &'a Cfg, pb: &'a V) -> R<BridgeRead<'a>> {
+    let mu = cfg.mu;
+    let mut turn_start: Vec<(K2, usize)> = Vec::new();
+    let mut turn_last: Vec<(K2, usize)> = Vec::new();
+    let mut turn_seq: [Vec<i64>; 2] = [Vec::new(), Vec::new()];
+    let mut z_of: Vec<(i64, f64)> = Vec::new();
+    let mut own_last: Vec<(K2, usize)> = Vec::new();
+    for k in 0..g.n() {
+        let r = &g.rows[k];
+        let (w, t) = (r.who, r.turn);
+        if r.z != 0.0 {
+            let zz = if r.z > 0.0 { 1.0 } else { 0.0 };
+            match z_of.iter_mut().find(|(a, _)| *a == w) {
+                Some(e) => e.1 = zz,
+                None => z_of.push((w, zz)),
+            }
+        }
+        if t < 1 || !is_own_turn(w, t) || !g.is_decision_row(k) {
+            continue;
+        }
+        if r.l < 1 || r.chosen < 0 || r.chosen >= r.l {
+            continue;
+        }
+        put(&mut own_last, (w, t), k);
+        put(&mut turn_last, (w, t), k);
+        if getk(&turn_start, (w, t)).is_none() {
+            turn_start.push(((w, t), k));
+            turn_seq[w as usize].push(t);
+        }
+    }
+    let cut_decks = match pb.get("in").get("cut_decks") {
+        V::None => None,
+        d => {
+            let it = d.items();
+            let one = |x: &V| if x.is_none() { None } else { Some(x.items().iter().map(|s| s.pystr()).collect::<Vec<String>>()) };
+            Some([one(&it[0]), one(&it[1])])
+        }
+    };
+    let cut = Some(CutFrames::new(own_last, mu, cut_decks, true, true));
+    let has_seat_decks = pb.get("in").get("has_seat_decks").truthy();
+    let decks = [super::drv_kv::deck_of(pb, 0), super::drv_kv::deck_of(pb, 1)];
+    let mut gs = Gs { g, cfg, p: pb, turn_seq: turn_seq.clone(), turn_start, turn_last, z_of, g_self: Vec::new(), hb_self: Vec::new(), has_seat_decks, decks };
+    for w in 0..2i64 {
+        for &t in &turn_seq[w as usize] {
+            let r = &g.rows[gs.last_or_start((w, t))];
+            let row = r.row();
+            let don_left = r.sc[lt::SC_MY_DON];
+            let mut gv = c.hand_price_mean(&row, mu, true, Some(don_left))?;
+            if has_seat_decks {
+                gv = c.with_life_types(&gv, gs.decks[w as usize].as_deref());
+            }
+            gv = c.with_hand_blocker(&gv, &row)?;
+            gs.g_self.push(((w, t), gv));
+        }
+    }
+    for w in 0..2i64 {
+        for &t in &turn_seq[w as usize] {
+            let r = &g.rows[gs.last_or_start((w, t))];
+            let olp_w = lp_or(r.sc[lt::SC_OPP_LEADER_POWER]);
+            let hb = c.hand_blocker_nu(&r.row(), olp_w)?;
+            gs.hb_self.push(((w, t), hb));
+        }
+    }
+    let sigma_rel = pb.get("sigma_rel").f();
+    Ok(BridgeRead { gs, cut, rd: cfg.rate_decay_ko, sigma_rel })
+}
+
+impl BridgeRead<'_> {
+    /// 行 `row`（席 `w`・ターン `t` の盤面）の 2 本の時計 `(τ_me, τ_opp)`。自分の時計は `seat_row(w, t, j)`、相手の時計は
+    /// 同じ行を相手の直前の自席ターンの最後の行の盤面・カードで `mirror_view` した行を `seat_row(1 − w, t, 相手の番号)` で読む。
+    /// 自席ターンの並びに `t` が無いか、相手の直前の自席ターンが無ければ `None`（橋も読まない行）。計数は捨てる（`sink`）。
+    pub(super) fn taus(&mut self, c: &mut Core, w: i64, t: i64, row: &Row) -> R<Option<(f64, f64)>> {
+        let Some(j) = self.gs.turn_seq[w as usize].iter().position(|&x| x == t) else { return Ok(None) };
+        let prev_o: Vec<i64> = self.gs.turn_seq[(1 - w) as usize].iter().cloned().filter(|&tt| tt < t).collect();
+        let Some(&po) = prev_o.last() else { return Ok(None) };
+        let mut st = D::new();
+        let me = seat_row(c, &self.gs, &mut self.cut, &mut st, w, t, j as i64, row, 0.0, 0, true)?;
+        let rb = &self.gs.g.rows[self.gs.last_or_start((1 - w, po))];
+        let mrow = c.mirror_view(row, Some(&rb.tok), Some(&rb.ci));
+        let op = seat_row(c, &self.gs, &mut self.cut, &mut st, 1 - w, t, prev_o.len() as i64, &mrow, 0.0, 0, true)?;
+        Ok(Some((py_min(tau_theory_of(&me, self.rd), RACE_CAP), py_min(tau_theory_of(&op, self.rd), RACE_CAP))))
+    }
+}
