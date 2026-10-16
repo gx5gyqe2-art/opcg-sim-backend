@@ -3573,6 +3573,25 @@ def cmd_steep(a):
         inv = {"n": int(rat.size), "sigma_rel_median": round(float(np.median(rat)), 5),
                "p05_p95": [round(float(np.percentile(rat, 5)), 5), round(float(np.percentile(rat, 95)), 5)]}
     out = {"record": a.src, "dump": a.dump, "clocks": a.clocks, "cap": CAP, "count": dict(cnt), "invariant_width_over_scale": inv}
+    # §1 の外（数を見た後に足した参考）: 同じ (局・席・ターン) で S1（値段の読み）と S4（交点の橋の読み）の時計と勝率を並べる
+    if S4:
+        s4 = {(x["seed"], x["w"], x["t"]): x for x in S4}
+        mp = [(x, s4[(x["seed"], x["w"], x["t"])]) for x in P if x["first"] and (x["seed"], x["w"], x["t"]) in s4]
+        if mp:
+            def cmp(ms):
+                tm1 = np.array([u["tm"] for u, _ in ms]); to1 = np.array([u["to"] for u, _ in ms])
+                tm4 = np.array([v["tm"] for _, v in ms]); to4 = np.array([v["to"] for _, v in ms])
+                D1, D4 = to1 - tm1, to4 - tm4
+                w1 = np.array([u["W"] for u, _ in ms]); w4 = np.array([v["W"] for _, v in ms]); z_ = np.array([u["z"] for u, _ in ms])
+                cr = lambda x, y: round(float(np.corrcoef(x, y)[0, 1]), 4) if x.std() > 0 and y.std() > 0 else None
+                return {"n": len(ms), "tau_me": [round(float(tm1.mean()), 3), round(float(tm4.mean()), 3)],
+                        "tau_opp": [round(float(to1.mean()), 3), round(float(to4.mean()), 3)],
+                        "sd_D": [round(float(D1.std()), 3), round(float(D4.std()), 3)], "corr_D": cr(D1, D4),
+                        "slope_D_price_on_bridge": round(float(np.polyfit(D4, D1, 1)[0]), 4), "corr_W": cr(w1, w4),
+                        "corr_W_outcome": [cr(w1, z_), cr(w4, z_)]}
+            out["price_vs_bridge"] = {"all": cmp(mp), "by_band": {b: cmp([m for m in mp if turn_band(m[0]["t"]) == b]) for b in TURN_BANDS},
+                                      "sigma_rel": {"price_implied": inv["sigma_rel_median"] if inv else None,
+                                                    "bridge": cj.get("sigma_rel")}}
     sets = {"S1": [x for x in P if x["first"]], "S2": P, "S4": S4}
     for nm, xs in sets.items():
         if not xs:
