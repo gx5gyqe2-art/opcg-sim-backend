@@ -32,10 +32,12 @@ def test_reanalyze_copies_rows_and_replaces_only_visits_values(tmp_path):
     rec, out = str(tmp_path / "rec"), str(tmp_path / "re")
     _run(["-m", "opcg_sim.loop.record_gen", "--games", "1", "--seed-base", "990401", "--workers", "1", "--sims", "8",
           "--net", NET, "--out", rec, "--dirichlet-eps", "0", "--temp-turns", "0", "--decks", "synth_roles"], tmp_path)
-    _run([os.path.join("opcg_sim", "loop", "reanalyze.py"), "--in", rec, "--out", out, "--mult", "1", "--per-game", "12"],
+    _run([os.path.join("opcg_sim", "loop", "reanalyze.py"), "--in", rec, "--out", out, "--mult", "1", "--quota", "4,4,2,2"],
          tmp_path)
     a = np.load(os.path.join(rec, "n_record_00000.npz"))
-    b = np.load(os.path.join(out, "n_record_00000.npz"))
+    files = sorted(f for f in os.listdir(out) if f.startswith("n_record_") and f.endswith(".npz"))
+    assert files == ["n_record_990401.npz"]                      # 局ごとに 1 本（再開の単位）
+    b = np.load(os.path.join(out, files[0]))
     assert set(a.files) == set(b.files)
     meta = json.load(open(os.path.join(out, "meta_n_record.json"), encoding="utf-8"))
     assert meta["reanalyzed"]["unmapped"] == 0 and meta["reanalyzed"]["diverged"] == 0

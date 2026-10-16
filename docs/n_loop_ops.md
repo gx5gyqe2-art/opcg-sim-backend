@@ -390,6 +390,91 @@ card_idx が int16・meta の `dump_version`=3）。学習側は波ごとに mem
 - 判定・台帳・`n1-results` への取り込みはコーディネータ（本セッション）が行う＝オーケストレータは
   `opcg_sim.loop.arena_merge` の出力を報告するだけ。
 
+### 7.5 再分析の本走（16 セッション・1 セッション 1 記録シャード・2026-10-16）
+
+再分析（`opcg_sim/loop/reanalyze.py`・`docs/reports/2026-10-16_reanalysis_pilot.md`）の第 2 段。
+
+- **対象**: 波 29 と波 32 の記録シャード w01〜w08。各シャードの先頭 200 局 × 12 点（規則ごとの枠 4・4・2・2）・`--mult 4`。
+- **再生は記録を作ったコミットの wheel で回す**（新しいエンジンでは手が分岐する）。
+  - 波 29＝**0be4a48f3**。ネットは r3（そのコミットの `opcg_sim/data/learned/nrel_r3.npz`）。
+  - 波 32＝**0af60ccda**。ネットは r5（`claude/train-r5:n1_results/nrel_r5.npz`）。
+  - どちらのコミットも本線の first-parent には無い（`claude/arena-b-w01` ほかに在る）。clone すれば手元に来る。
+- **器**: コミットは `claude/theory-map` の `opcg_sim/loop/reanalyze.py` の最新（§7.5 を足したコミット以降）。wheel の worktree へ写し、worktree を cwd にして回す（パイロットで通した手順そのまま）。
+- **所要の見積り**: 1 セッション 1 本なら 1 局 ≒ 20〜30 秒（波 32 の wheel で 2 局を単独で測った: 再生 10〜17 秒＋深い探索 12 点で 8〜13 秒）× 200 局 ≒ **1.5〜2 時間**。パイロットの 1 局 ≒ 95 秒は 4 コアに 4 本並列で回したときの値（競合で約 3 倍遅い）。**1 セッションで 2 本以上を並列に回さない**。
+
+セッションの変数は `{W}`（29 か 32）と `{XX}`（01〜08）の 2 つだけ。保全の手順はスクリプト `~/rean_save.sh` に書き出してから使う（heredoc の入れ子を避ける）。
+
+指示書（作業セッション用）:
+
+````
+再分析の本走を 1 シャードぶん回してください。コードは変更せず、下記を実行して結果ブランチを push するだけです。
+PR は作らないでください。質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+出どころの照合（origin 側で）:
+  (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
+  (2) 台帳: git fetch origin claude/theory-map && git show origin/claude/theory-map:docs/n_loop_ops.md | grep -n "7.5 再分析の本走"
+  (3) 器: git show origin/claude/theory-map:opcg_sim/loop/reanalyze.py | grep -n -- "--quota"
+この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
+
+bash で次の 2 つのブロックを順に実行してください。コンテナが再起動したら、2 つとも最初からもう一度実行します（冪等・終えた局は飛ばす）。
+
+--- ブロック 1（準備）---
+export W={W} XX={XX}
+pip install -q numpy maturin
+[ -d ~/opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git ~/opcg-sim-backend
+cd ~/opcg-sim-backend
+git fetch -q origin claude/theory-map && git checkout -q -B claude/rean-n${W}-w${XX} origin/claude/theory-map
+# 前のコンテナの途中経過があれば戻す（無ければ何もしない）
+git fetch -q origin claude/rean-n${W}-w${XX} 2>/dev/null && git checkout -q FETCH_HEAD -- n${W}_rean 2>/dev/null || true
+if [ "$W" = 29 ]; then export EC=0be4a48f3; else export EC=0af60ccda; fi
+[ -d ~/wt$W ] || git worktree add -q --detach ~/wt$W $EC
+if [ ! -d ~/eng$W/opcg_engine ]; then
+  (cd ~/wt$W/rust/opcg_engine && CARGO_TARGET_DIR=~/target$W maturin build --release -o ~/wheel$W) > ~/build$W.log 2>&1
+  rm -rf ~/eng$W && mkdir -p ~/eng$W && (cd ~/eng$W && unzip -q -o ~/wheel$W/*.whl)
+fi
+cp opcg_sim/loop/reanalyze.py ~/wt$W/opcg_sim/loop/reanalyze.py
+if [ "$W" = 29 ]; then export NET=~/wt29/opcg_sim/data/learned/nrel_r3.npz
+else [ -f ~/nrel_r5.npz ] || { git fetch -q origin claude/train-r5:r5net && git show r5net:n1_results/nrel_r5.npz > ~/nrel_r5.npz; }; export NET=~/nrel_r5.npz; fi
+if [ ! -d ~/rec/n_records/n${W}_w${XX} ]; then
+  git fetch -q origin claude/n${W}-w${XX}:tmpw && mkdir -p ~/rec && git archive tmpw n_records/n${W}_w${XX} | tar -x -C ~/rec && git branch -qD tmpw
+fi
+# 効果 JSON を先に作る（同時に作らせると壊れる）
+[ -f ~/wt$W/opcg_sim/data/opcg_effects.json ] || (cd ~/wt$W && PYTHONPATH=~/eng$W:~/wt$W python -m opcg_sim.tools.export_effects_json --out ~/wt$W/opcg_sim/data/opcg_effects.json > /dev/null)
+export OUT=~/opcg-sim-backend/n${W}_rean/w${XX}; mkdir -p $OUT
+# 保全のスクリプト（RESULT.json を書いて commit・push）。中身は opcg_sim/loop/reanalyze.py の --result を呼ぶだけ
+printf '%s\n' 'cd ~/opcg-sim-backend' \
+  'python -m opcg_sim.loop.reanalyze --result "$OUT" --job "rean-n${W}-w${XX}" --record "claude/n${W}-w${XX}:n_records/n${W}_w${XX}" --engine-commit "$EC" --net "$NET" --target-games 200 > RESULT.json' \
+  'cp ~/rean_n${W}_w${XX}.log . 2>/dev/null' \
+  'git add -f n${W}_rean/w${XX} RESULT.json rean_n${W}_w${XX}.log' \
+  'git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "rean wave ${W} shard ${XX}"' \
+  'git push -q -u origin claude/rean-n${W}-w${XX}' > ~/rean_save.sh
+
+--- ブロック 2（実行と保全・50 局ごとと終了時に push）---
+cd ~/wt$W
+OPCG_LOG_SILENT=1 PYTHONPATH=~/eng$W:~/wt$W nohup python -m opcg_sim.loop.reanalyze --in ~/rec/n_records/n${W}_w${XX} --out $OUT \
+  --mult 4 --games 200 --quota 4,4,2,2 --engine-commit $EC --net $NET >> ~/rean_n${W}_w${XX}.log 2>&1 &
+RPID=$!
+last=$(cat $OUT/points.jsonl 2>/dev/null | grep -c '"game"')
+while kill -0 $RPID 2>/dev/null; do
+  sleep 300
+  n=$(cat $OUT/points.jsonl 2>/dev/null | grep -c '"game"')
+  if [ "$n" -ge $((last + 50)) ]; then bash ~/rean_save.sh; last=$n; fi
+done
+bash ~/rean_save.sh
+tail -n 3 ~/rean_n${W}_w${XX}.log
+
+補足:
+- 所要は約 1.5〜2 時間（同じコンテナで他の重い処理を並べると 3 倍まで遅くなる）。
+- ログで `bad_step=` が数値の行は、記録と手が分岐した局（その点から先は捨てる）。完走後の RESULT.json の replay_rate が 0.9 を割ったら、notes に書く。
+- ビルドや効果 JSON で落ちたら、~/build${W}.log の末尾を notes に書き、status を failed にして push する。
+````
+
+**回収**（コーディネータ）:
+- `git fetch origin claude/rean-n{W}-w{XX}:tmp && git archive tmp n{W}_rean | tar -x`。
+- 各 dir（`n{W}_rean/w{XX}`）は、そのまま `n_rel_train.py --in` に渡せる（局ごとの `n_record_<seed>.npz`・`meta_n_record.json` の `reanalyzed`）。
+- 規則ごとの点の数と「深い最善 ≠ 記録」の割合は `python -m opcg_sim.loop.reanalyze --summarize <dir…>` で出る。
+- **枠の注意**: 生成デッキ（`synth_roles`）の局でエネルがリーダーなのは、先頭 200 局のうち波 29 で 1 局、波 32 で 5 局しか無い。規則 (3) の枠はほとんど (4) 乱数に回る。
+
 ## 8. コーディネータが守ること
 
 - 指示書を出したら、**その指示書の内容（入力・帯・判断基準）を本書 §6 と
