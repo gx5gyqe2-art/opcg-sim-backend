@@ -19,27 +19,27 @@
   "dir": "n29_rean/w06"
  },
  "metrics": {
-  "games": 108,
-  "points": 1296,
+  "games": 162,
+  "points": 1944,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
   "points_by_rule": {
-   "early": 430,
-   "end_and_attack": 432,
+   "early": 646,
+   "end_and_attack": 648,
    "enel": 0,
-   "random": 434
+   "random": 650
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
-   "early": 0.207,
-   "end_and_attack": 0.2963,
+   "early": 0.1997,
+   "end_and_attack": 0.3318,
    "enel": null,
-   "random": 0.2995
+   "random": 0.2908
   },
-  "deep_best_differs_all": 0.2677,
-  "sec_replay_per_game": 18.18,
-  "sec_deep_per_game": 11.99
+  "deep_best_differs_all": 0.2742,
+  "sec_replay_per_game": 17.74,
+  "sec_deep_per_game": 11.77
  },
  "commit": "0be4a48f3",
  "notes": ""
