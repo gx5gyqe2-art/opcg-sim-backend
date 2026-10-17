@@ -40,5 +40,5 @@
   "sec_play_mean": 29.89,
   "sec_rean_mean": 56.15
  },
- "notes": ""
+ "notes": "途中の push は git proxy の許可外で 403 だった（add_repo で追加後に最後にまとめて push）。生成自体は中断・再起動なしで 4 本完走。"
 }
