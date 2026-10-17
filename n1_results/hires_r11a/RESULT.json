@@ -1,0 +1,1 @@
+{"job":"hires-r11a-w03","status":"done","seed_base":1033000,"pairs":175,"merge":{"pairs":175,"wr":0.4771,"ci95":[0.4194,0.5349],"elo":-15.9,"void":0,"dup_seeds":0},"sec":1055,"notes":"Ran as instructed, no code changes. Launcher exit-code noise only; arena completed 175/175 in one pass. Not promoted."}
