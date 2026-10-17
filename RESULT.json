@@ -1,7 +1,7 @@
 {
  "job": "reanu-n32-w04",
  "role": "reanalyze",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "record": "claude/n32-w04:n_records/n32_w04",
   "engine_commit": "0af60ccda",
@@ -19,8 +19,8 @@
   "dir": "n32_reanu/w04"
  },
  "metrics": {
-  "games": 169,
-  "points": 2028,
+  "games": 200,
+  "points": 2400,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
@@ -28,18 +28,18 @@
    "early": 0,
    "end_and_attack": 0,
    "enel": 0,
-   "random": 2028
+   "random": 2400
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
    "early": null,
    "end_and_attack": null,
    "enel": null,
-   "random": 0.3195
+   "random": 0.3146
   },
-  "deep_best_differs_all": 0.3195,
-  "sec_replay_per_game": 15.34,
-  "sec_deep_per_game": 11.16
+  "deep_best_differs_all": 0.3146,
+  "sec_replay_per_game": 15.44,
+  "sec_deep_per_game": 11.21
  },
  "commit": "0af60ccda",
  "notes": ""
