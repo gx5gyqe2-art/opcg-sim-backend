@@ -1,0 +1,34 @@
+# Cloud Run ジョブ用のイメージ（再分析・アリーナ・`docs/cloud_run_jobs.md`）。
+# 中身は API の `Dockerfile` と同じ（Rust wheel ＋ Python・カードのキャッシュと効果 JSON を焼き込む）で、
+# 違うのは入口だけ: uvicorn ではなく `python -m opcg_sim.loop.cloud_job`（引数はジョブの `--args` で渡す）。
+#
+# 再分析は**記録を作ったコミットの wheel と効果 JSON**で打ち直す（新しいエンジンでは手が分岐する）。
+# そのイメージは、記録のコミットの worktree にこのファイルと `opcg_sim/loop/cloud_job.py`・`reanalyze.py` を
+# 写して、その worktree でビルドする（手順は `docs/cloud_run_jobs.md` §3.2）。アリーナは今のコミットでビルドする。
+FROM rust:slim-trixie AS rustbuild
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip3 install --no-cache-dir --break-system-packages maturin==1.15.0
+WORKDIR /build
+COPY rust/opcg_engine /build/opcg_engine
+RUN cd /build/opcg_engine && maturin build --release --compatibility linux --out /wheels
+
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY opcg_sim/requirements.txt /app/requirements.txt
+# google-cloud-storage は requirements.txt に在る（gs:// の読み書き）。
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+COPY --from=rustbuild /wheels/*.whl /tmp/wheels/
+RUN pip install --no-cache-dir /tmp/wheels/*.whl && rm -rf /tmp/wheels
+
+COPY . /app
+
+RUN python -m opcg_sim.tools.build_card_cache
+RUN python -m opcg_sim.tools.export_effects_json --out opcg_sim/data/opcg_effects.json
+
+# 効果処理ごとの盤面ダンプを止める（Cloud Logging の費用・API の Dockerfile と同じ）。
+ENV OPCG_LOG_SILENT=1
+ENV PYTHONUNBUFFERED=1
+ENTRYPOINT ["python", "-m", "opcg_sim.loop.cloud_job"]
