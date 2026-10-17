@@ -50,50 +50,6 @@ def pair_level_ci(pair_scores: List[float]) -> Dict[str, float]:
             "elo": elo_delta(mean), "elo_lo": elo_delta(lo), "elo_hi": elo_delta(hi)}
 
 
-#: 逐次判定（`docs/reports/2026-10-17_arena_sequential.md` §1.3）の線。主＝下限 > 0.50・副＝下限 ≥ 0.45（今の規約）。
-SEQ_LINES = {"main": (0.50, True), "mirror": (0.45, False)}
-
-
-def cs_rho(planned: int, sigma: float = 0.5, alpha: float = 0.05) -> float:
-    """信頼系列の混合の幅 ρ: 計画のペア数 planned のところで半幅 u(σ²N)/N が最小になる値（数値で解く・pure）。"""
-    v = sigma * sigma * max(1, planned)
-    f = lambda r: (v + r) * math.log((v + r) / (r * alpha * alpha))   # noqa: E731
-    lo, hi = math.log(v) - 12.0, math.log(v) + 12.0                    # ln ρ の黄金分割（f は ln ρ で単峰）
-    g = (math.sqrt(5.0) - 1.0) / 2.0
-    for _ in range(200):
-        a, b = hi - g * (hi - lo), lo + g * (hi - lo)
-        if f(math.exp(a)) < f(math.exp(b)):
-            hi = b
-        else:
-            lo = a
-    return math.exp((lo + hi) / 2.0)
-
-
-def cs_halfwidth(t: int, rho: float, sigma: float = 0.5, alpha: float = 0.05) -> float:
-    """t ペア目の信頼系列の半幅 u(σ² t)/t。u(v) = √((v+ρ)·ln((v+ρ)/(ρα²)))（正規混合・両側・全時点で同時に 1−α）。"""
-    v = sigma * sigma * t
-    return math.sqrt((v + rho) * math.log((v + rho) / (rho * alpha * alpha))) / t
-
-
-def sequential_stop(pair_scores: List[float], planned: int, line: float = 0.50, strict: bool = True,
-                    sigma: float = 0.5, alpha: float = 0.05, rho: Optional[float] = None) -> Dict[str, Any]:
-    """ペアのスコア（0〜1）を順に積み、信頼系列が線の片側に入った最初の時点を返す（pure・既定の判定は変えない）。
-
-    上: 下限 > 線（strict）／下限 ≥ 線（strict=False）。下: 上限 < 線。どちらにも入らなければ stopped=None。
-    """
-    rho = cs_rho(planned, sigma, alpha) if rho is None else rho
-    s = 0.0
-    for t, x in enumerate(pair_scores, 1):
-        s += x
-        m, h = s / t, cs_halfwidth(t, rho, sigma, alpha)
-        lo, hi = m - h, m + h
-        if (lo > line) if strict else (lo >= line):
-            return {"stopped": t, "side": "above", "mean": m, "lo": lo, "hi": hi, "rho": rho}
-        if hi < line:
-            return {"stopped": t, "side": "below", "mean": m, "lo": lo, "hi": hi, "rho": rho}
-    return {"stopped": None, "side": None, "rho": rho, "n": len(pair_scores)}
-
-
 def plan_bands(pairs: int, bands: int, seed_base: int, stride: int = 100000) -> List[List[int]]:
     """帯ごとに離れた seed 基点へ pairs を等分する（旧 `arena_gate.plan_bands`・pure）。"""
     per = pairs // bands
