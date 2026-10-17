@@ -1,0 +1,1 @@
+{"job":"hires-r11a-w02","status":"done","seed_base":1032000,"pairs":175,"merge":{"pairs":175,"wr":0.5371,"ci95":[0.4821,0.5922],"elo":25.9,"void":0,"dup_seeds":0},"sec":1178,"notes":"No issues. Ran once without restart. 350 games, void 0, promoted=false (shard-level)."}
