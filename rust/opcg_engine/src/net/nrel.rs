@@ -46,6 +46,7 @@ fn bad(msg: impl Into<String>) -> EngineError {
 // --- 小さな線形代数（すべて行優先 float32・加算は k 昇順）---------------------------
 
 /// `y[j] = sum_k x[k] * w[k][j] + b[j]`（`x @ W + b`）。
+#[inline(always)]
 fn affine(x: &[f32], w: &Mat, b: &[f32]) -> Vec<f32> {
     let mut y = b.to_vec();
     for (k, xv) in x.iter().enumerate().take(w.rows) {
@@ -61,6 +62,7 @@ fn affine(x: &[f32], w: &Mat, b: &[f32]) -> Vec<f32> {
 }
 
 /// `y[j] = sum_k x[k] * w[k+off][j]`（W の行区間 [off, off+len(x)) だけを使う・バイアス無し）。
+#[inline(always)]
 fn matvec_rows(x: &[f32], w: &Mat, off: usize) -> Vec<f32> {
     let mut y = vec![0.0f32; w.cols];
     for (k, xv) in x.iter().enumerate() {
@@ -75,6 +77,7 @@ fn matvec_rows(x: &[f32], w: &Mat, off: usize) -> Vec<f32> {
     y
 }
 
+#[inline(always)]
 fn relu_inplace(v: &mut [f32]) {
     for x in v.iter_mut() {
         if *x < 0.0 {
@@ -199,6 +202,11 @@ fn check_encoding(enc: &Encoding) -> Result<(), EngineError> {
 
 /// `NRelNet.tokens_forward`（B=1・`_tokens_forward_1` と同値）。
 pub fn tokens_forward(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Tokens, EngineError> {
+    tokens_forward_impl(w, tab, enc)
+}
+
+#[inline(always)]
+fn tokens_forward_impl(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Tokens, EngineError> {
     check_encoding(enc)?;
     let no_rel = w.ablated("rel");
     if !no_rel {
@@ -235,29 +243,21 @@ pub fn tokens_forward(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<To
         return Ok(Tokens { h, present });
     }
 
-    // t_i = relu(x_i Wt + bt)、x_i = [構造64, S20, ゾーン5]
-    let t_of = |i: usize| -> Result<Vec<f32>, EngineError> {
-        let ci = enc.card_idx[i] as usize;
-        if ci >= ntab {
-            return Err(bad(format!("net: card_idx[{i}]={ci} がカード表の外（n={ntab}）")));
-        }
-        let mut x = vec![0.0f32; D_X];
-        x[..D_CARD_FEAT].copy_from_slice(&tab[ci * D_CARD_FEAT..(ci + 1) * D_CARD_FEAT]);
-        x[D_CARD_FEAT..D_CARD_FEAT + S_DIM].copy_from_slice(&enc.tok[i * S_DIM..(i + 1) * S_DIM]);
-        x[D_CARD_FEAT + S_DIM + zone_id(i)] = 1.0;
-        let mut t = affine(&x, &w.wt, &w.bt);
-        relu_inplace(&mut t);
-        Ok(t)
-    };
-    let to: Vec<Vec<f32>> = own.iter().map(|&i| t_of(i)).collect::<Result<_, _>>()?;
-    let tp: Vec<Vec<f32>> = opp.iter().map(|&i| t_of(i)).collect::<Result<_, _>>()?;
+    // t_i = relu(x_i Wt + bt)、x_i = [構造64, S20, ゾーン5]。自分の枠は対の頭の前半（r の自・c の両側）、
+    // 相手の枠は r の相手側まで同じ枠で作る（[`tok_feat`]＝decide の中ならキャッシュ・値は同じ）。
+    let own_f: Vec<std::rc::Rc<TokFeat>> =
+        own.iter().map(|&i| tok_feat(w, tab, enc, i, true, ntab)).collect::<Result<_, _>>()?;
+    let opp_f: Vec<std::rc::Rc<TokFeat>> =
+        opp.iter().map(|&i| tok_feat(w, tab, enc, i, false, ntab)).collect::<Result<_, _>>()?;
+    let to: Vec<&[f32]> = own_f.iter().map(|f| f.t.as_slice()).collect();
+    let tp: Vec<&[f32]> = opp_f.iter().map(|f| f.t.as_slice()).collect();
     let (no, np) = (to.len(), tp.len());
 
     // 自×相手 r_ij・自×自 c_ik（前半／後半の行区間に分けて 1 度ずつ掛ける）
-    let a_r: Vec<Vec<f32>> = to.iter().map(|t| matvec_rows(t, &w.wr, 0)).collect();
-    let b_r: Vec<Vec<f32>> = tp.iter().map(|t| matvec_rows(t, &w.wr, D_T)).collect();
-    let a_c: Vec<Vec<f32>> = to.iter().map(|t| matvec_rows(t, &w.wc, 0)).collect();
-    let b_c: Vec<Vec<f32>> = to.iter().map(|t| matvec_rows(t, &w.wc, D_T)).collect();
+    let a_r: Vec<&[f32]> = own_f.iter().map(|f| f.r.as_slice()).collect();
+    let b_r: Vec<&[f32]> = opp_f.iter().map(|f| f.r.as_slice()).collect();
+    let a_c: Vec<&[f32]> = own_f.iter().map(|f| f.c_a.as_slice()).collect();
+    let b_c: Vec<&[f32]> = own_f.iter().map(|f| f.c_b.as_slice()).collect();
 
     let mut mx_j = vec![[0.0f32; D_R]; no];
     let mut mean_j = vec![[0.0f32; D_R]; no];
@@ -333,18 +333,112 @@ pub fn tokens_forward(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<To
     // h_i = [t_i, max_j r_ij, mean_j r_ij, max_k c_ik]／h_j = [t_j, max_i, mean_i, 0]
     for (i, &slot) in own.iter().enumerate() {
         let dst = &mut h[slot * D_H..(slot + 1) * D_H];
-        dst[..D_T].copy_from_slice(&to[i]);
+        dst[..D_T].copy_from_slice(to[i]);
         dst[D_T..D_T + D_R].copy_from_slice(&mx_j[i]);
         dst[D_T + D_R..D_T + 2 * D_R].copy_from_slice(&mean_j[i]);
         dst[D_T + 2 * D_R..].copy_from_slice(&mx_k[i]);
     }
     for (j, &slot) in opp.iter().enumerate() {
         let dst = &mut h[slot * D_H..(slot + 1) * D_H];
-        dst[..D_T].copy_from_slice(&tp[j]);
+        dst[..D_T].copy_from_slice(tp[j]);
         dst[D_T..D_T + D_R].copy_from_slice(&mx_i[j]);
         dst[D_T + D_R..D_T + 2 * D_R].copy_from_slice(&mean_i[j]);
     }
     Ok(Tokens { h, present })
+}
+
+/// 1 枠ぶんのトークンの前半（その枠の入力だけで決まる部分）。
+///
+/// `t`＝relu(x Wt + bt)。自分の枠は `r`＝t Wr[0..D_T]・`c_a`＝t Wc[0..D_T]・`c_b`＝t Wc[D_T..2D_T]、
+/// 相手の枠は `r`＝t Wr[D_T..2D_T]（`c_*` は空）。
+pub struct TokFeat {
+    t: Vec<f32>,
+    r: Vec<f32>,
+    c_a: Vec<f32>,
+    c_b: Vec<f32>,
+}
+
+/// キャッシュの鍵: ネット（重みとカード表の置き場）・自分の枠か・カード表の行・ゾーン・状態の素性（ビット列）。
+/// `TokFeat` はこの鍵だけの関数（`tok_feat_compute`）＝同じ鍵なら同じ値。
+type TokKey = (usize, usize, bool, u32, u8, [u32; S_DIM]);
+
+thread_local! {
+    static TOK_CACHE: std::cell::RefCell<Option<std::collections::HashMap<TokKey, std::rc::Rc<TokFeat>>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// decide（とその世界のスレッド）の入口で張る（`docs/reports/2026-10-17_game_speed.md` §2）。落とすと元へ戻す。
+/// 張っていないスレッド（decide の外の `net_eval` など）は毎回計算する。
+pub struct TokCacheScope {
+    prev: Option<std::collections::HashMap<TokKey, std::rc::Rc<TokFeat>>>,
+}
+
+pub fn tok_cache_scope() -> TokCacheScope {
+    let prev = TOK_CACHE.with(|c| c.borrow_mut().replace(std::collections::HashMap::new()));
+    TokCacheScope { prev }
+}
+
+impl Drop for TokCacheScope {
+    fn drop(&mut self) {
+        let prev = self.prev.take();
+        TOK_CACHE.with(|c| *c.borrow_mut() = prev);
+    }
+}
+
+#[inline(always)]
+fn tok_feat(
+    w: &NRelWeights,
+    tab: &[f32],
+    enc: &Encoding,
+    i: usize,
+    own: bool,
+    ntab: usize,
+) -> Result<std::rc::Rc<TokFeat>, EngineError> {
+    let ci = enc.card_idx[i] as usize;
+    if ci >= ntab {
+        return Err(bad(format!("net: card_idx[{i}]={ci} がカード表の外（n={ntab}）")));
+    }
+    let mut bits = [0u32; S_DIM];
+    for (b, v) in bits.iter_mut().zip(&enc.tok[i * S_DIM..(i + 1) * S_DIM]) {
+        *b = v.to_bits();
+    }
+    let key: TokKey = (
+        w as *const NRelWeights as usize,
+        tab.as_ptr() as usize,
+        own,
+        ci as u32,
+        zone_id(i) as u8,
+        bits,
+    );
+    if let Some(f) = TOK_CACHE.with(|c| c.borrow().as_ref().and_then(|m| m.get(&key).cloned())) {
+        return Ok(f);
+    }
+    let f = std::rc::Rc::new(tok_feat_compute(w, tab, enc, i, own, ci));
+    TOK_CACHE.with(|c| {
+        if let Some(m) = c.borrow_mut().as_mut() {
+            m.insert(key, f.clone());
+        }
+    });
+    Ok(f)
+}
+
+#[inline(always)]
+fn tok_feat_compute(w: &NRelWeights, tab: &[f32], enc: &Encoding, i: usize, own: bool, ci: usize) -> TokFeat {
+    let mut x = vec![0.0f32; D_X];
+    x[..D_CARD_FEAT].copy_from_slice(&tab[ci * D_CARD_FEAT..(ci + 1) * D_CARD_FEAT]);
+    x[D_CARD_FEAT..D_CARD_FEAT + S_DIM].copy_from_slice(&enc.tok[i * S_DIM..(i + 1) * S_DIM]);
+    x[D_CARD_FEAT + S_DIM + zone_id(i)] = 1.0;
+    let mut t = affine(&x, &w.wt, &w.bt);
+    relu_inplace(&mut t);
+    if own {
+        let r = matvec_rows(&t, &w.wr, 0);
+        let c_a = matvec_rows(&t, &w.wc, 0);
+        let c_b = matvec_rows(&t, &w.wc, D_T);
+        TokFeat { t, r, c_a, c_b }
+    } else {
+        let r = matvec_rows(&t, &w.wr, D_T);
+        TokFeat { t, r, c_a: Vec::new(), c_b: Vec::new() }
+    }
 }
 
 /// 22 枠 → ゾーン id（`n_rel._ZONE_ID`）。
@@ -362,6 +456,11 @@ fn zone_id(i: usize) -> usize {
 
 /// `NRelNet.body`（z → e）。
 pub fn body(w: &NRelWeights, sc: &[f32], tk: &Tokens) -> Vec<f32> {
+    body_impl(w, sc, tk)
+}
+
+#[inline(always)]
+fn body_impl(w: &NRelWeights, sc: &[f32], tk: &Tokens) -> Vec<f32> {
     let sc = w.mask_sc(sc);
     let n = tk.present.iter().sum::<f32>().max(1.0);
     let mut z = vec![0.0f32; D_Z];
@@ -387,12 +486,66 @@ pub fn body(w: &NRelWeights, sc: &[f32], tk: &Tokens) -> Vec<f32> {
     e
 }
 
+/// トークンと本体（`value` と `priors` が共有する前半）。同じ符号化からは同じ演算を同じ順で行う
+/// ＝`priors` で作った幹を `value_head` に渡すと、`value` を回し直したのとビット一致
+/// （`docs/reports/2026-10-17_game_speed.md` §1.2 の「同じ盤面の forward の使い回し」）。
+pub struct Trunk {
+    pub tk: Tokens,
+    pub e: Vec<f32>,
+}
+
+pub fn trunk(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Trunk, EngineError> {
+    #[cfg(target_arch = "x86_64")]
+    if avx2() {
+        // SAFETY: AVX2 が使えることを実行時に確かめた（`avx2`）。
+        return unsafe { trunk_avx2(w, tab, enc) };
+    }
+    trunk_impl(w, tab, enc)
+}
+
+/// AVX2 が使えるか（実行時に 1 度だけ確かめる）。`OPCG_NO_AVX2=1` で切れる（照合用）。
+///
+/// AVX2 の版は**同じ関数本体**を AVX2 の命令で組み直したもの: 出力の列ごとに独立な掛け算と足し算を
+/// 広いレジスタで同時に行うだけで、各列の足し算の順は変わらない。積和の融合（FMA）は有効にしない
+/// （Rust は浮動小数の演算を勝手に融合しない）＝**結果はビット一致**（`docs/reports/2026-10-17_game_speed.md` §2）。
+#[cfg(target_arch = "x86_64")]
+fn avx2() -> bool {
+    static A: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *A.get_or_init(|| {
+        std::is_x86_feature_detected!("avx2")
+            && std::env::var("OPCG_NO_AVX2").map(|v| v.trim() != "1").unwrap_or(true)
+    })
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn trunk_avx2(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Trunk, EngineError> {
+    trunk_impl(w, tab, enc)
+}
+
+#[inline(always)]
+fn trunk_impl(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Trunk, EngineError> {
+    let tk = {
+        let _prof = crate::prof::enter(crate::prof::Cat::FwdTokens);
+        tokens_forward_impl(w, tab, enc)?
+    };
+    let e = {
+        let _prof = crate::prof::enter(crate::prof::Cat::FwdBody);
+        body_impl(w, &enc.scalars, &tk)
+    };
+    Ok(Trunk { tk, e })
+}
+
+/// 価値の頭（tanh 済み）。
+pub fn value_head(w: &NRelWeights, t: &Trunk) -> f32 {
+    let v = affine(&t.e, &w.wv, &w.bv);
+    v[0].tanh()
+}
+
 /// `NRelNet.value`（B=1・to-move 視点・tanh 済み）。
 pub fn value(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<f32, EngineError> {
-    let tk = tokens_forward(w, tab, enc)?;
-    let e = body(w, &enc.scalars, &tk);
-    let v = affine(&e, &w.wv, &w.bv);
-    Ok(v[0].tanh())
+    let t = trunk(w, tab, enc)?;
+    Ok(value_head(w, &t))
 }
 
 // --- 方策 ----------------------------------------------------------------------
@@ -407,8 +560,45 @@ pub fn priors(
     if cands.is_empty() {
         return Ok(Vec::new());
     }
-    let tk = tokens_forward(w, tab, enc)?;
-    let e = body(w, &enc.scalars, &tk);
+    let t = trunk(w, tab, enc)?;
+    priors_from(w, enc, &t, cands)
+}
+
+/// 方策の頭（幹は `trunk` で作ったもの・`cands` は空でない）。
+pub fn priors_from(
+    w: &NRelWeights,
+    enc: &Encoding,
+    t: &Trunk,
+    cands: &[Candidate],
+) -> Result<Vec<f32>, EngineError> {
+    #[cfg(target_arch = "x86_64")]
+    if avx2() {
+        // SAFETY: AVX2 が使えることを実行時に確かめた（`avx2`）。
+        return unsafe { priors_from_avx2(w, enc, t, cands) };
+    }
+    priors_from_impl(w, enc, t, cands)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn priors_from_avx2(
+    w: &NRelWeights,
+    enc: &Encoding,
+    t: &Trunk,
+    cands: &[Candidate],
+) -> Result<Vec<f32>, EngineError> {
+    priors_from_impl(w, enc, t, cands)
+}
+
+#[inline(always)]
+fn priors_from_impl(
+    w: &NRelWeights,
+    enc: &Encoding,
+    t: &Trunk,
+    cands: &[Candidate],
+) -> Result<Vec<f32>, EngineError> {
+    let _prof = crate::prof::enter(crate::prof::Cat::FwdPolicy);
+    let (tk, e) = (&t.tk, &t.e);
     let no_rel = w.ablated("rel");
     let mut logits = Vec::with_capacity(cands.len());
     for c in cands {
@@ -416,7 +606,7 @@ pub fn priors(
             return Err(bad(format!("net: 候補素性が {} 列（{F_CAND} が要る）", c.feats.len())));
         }
         let mut u = Vec::with_capacity(super::D_PIN);
-        u.extend_from_slice(&e);
+        u.extend_from_slice(e);
         // 主体 h_si / 対象 h_ti（枠が無い＝−1 は 0 ベクトル）
         for idx in [c.si, c.ti] {
             if idx >= 0 && (idx as usize) < N_TOK {

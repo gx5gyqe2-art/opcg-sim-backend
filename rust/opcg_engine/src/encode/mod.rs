@@ -179,6 +179,93 @@ pub fn encode(
     scalars::encode(&mut session, masters, vocab, me, opts)
 }
 
+// --- decide 1 回のあいだのマスター単位のキャッシュ（`docs/reports/2026-10-17_game_speed.md` §2）-------------
+//
+// 符号化は 1 回ごとに `ProfileCache`／`LeaderCache`（マスター単位の静的な要約）を空から作っていた。
+// 中身はマスター（カードの定義）だけの関数なので、**同じ decide の中**では使い回せる（decide の間、
+// マスター表は不変参照で借りられたまま＝書き換わらない）。decide の外の符号化は今までどおり毎回空から作る。
+
+type DecideCaches = (usize, tokens::ProfileCache, leader::LeaderCache);
+
+thread_local! {
+    static DECIDE_CACHE: std::cell::RefCell<Option<DecideCaches>> = const { std::cell::RefCell::new(None) };
+}
+
+/// decide（とその世界のスレッド）の入口で張る。落とすと元へ戻す。
+pub struct DecideCacheScope {
+    prev: Option<DecideCaches>,
+}
+
+pub fn decide_cache_scope(masters: &MasterTable) -> DecideCacheScope {
+    let key = masters as *const MasterTable as usize;
+    let prev = DECIDE_CACHE.with(|c| {
+        c.borrow_mut()
+            .replace((key, tokens::ProfileCache::default(), leader::LeaderCache::default()))
+    });
+    DecideCacheScope { prev }
+}
+
+impl Drop for DecideCacheScope {
+    fn drop(&mut self) {
+        let prev = self.prev.take();
+        DECIDE_CACHE.with(|c| *c.borrow_mut() = prev);
+    }
+}
+
+/// 符号化 1 回ぶんのキャッシュ（decide の中なら張ったものを借り、落とすと返す）。
+pub(crate) struct EncCaches {
+    pub profiles: tokens::ProfileCache,
+    pub leaders: leader::LeaderCache,
+    key: Option<usize>,
+}
+
+impl EncCaches {
+    pub(crate) fn take(masters: &MasterTable) -> EncCaches {
+        let key = masters as *const MasterTable as usize;
+        let got = DECIDE_CACHE.with(|c| {
+            let mut b = c.borrow_mut();
+            match b.as_mut() {
+                Some((k, p, l)) if *k == key => Some((std::mem::take(p), std::mem::take(l))),
+                _ => None,
+            }
+        });
+        match got {
+            Some((profiles, leaders)) => EncCaches { profiles, leaders, key: Some(key) },
+            None => EncCaches {
+                profiles: tokens::ProfileCache::default(),
+                leaders: leader::LeaderCache::default(),
+                key: None,
+            },
+        }
+    }
+}
+
+impl Drop for EncCaches {
+    fn drop(&mut self) {
+        let Some(key) = self.key else { return };
+        let (p, l) = (std::mem::take(&mut self.profiles), std::mem::take(&mut self.leaders));
+        DECIDE_CACHE.with(|c| {
+            if let Some((k, cp, cl)) = c.borrow_mut().as_mut() {
+                if *k == key {
+                    *cp = p;
+                    *cl = l;
+                }
+            }
+        });
+    }
+}
+
+/// [`encode`] と同じ値を、盤面を複製せずに `s` の上で作る（[`Session::isolated`]・探索の葉の評価が使う）。
+pub fn encode_in(
+    s: &mut Session,
+    masters: &MasterTable,
+    vocab: &Vocab,
+    me: Seat,
+    opts: &EncodeOptions,
+) -> Result<Encoding, EngineError> {
+    s.isolated(|s| scalars::encode(s, masters, vocab, me, opts))
+}
+
 // --- プロセス内の語彙とカード表（`lib.rs` の `set_vocab`／`encode_state` が使う）-----------
 //
 // 語彙（`vocab_ids`）はネット側の資産（npz）なので、符号化側は npz を読まない

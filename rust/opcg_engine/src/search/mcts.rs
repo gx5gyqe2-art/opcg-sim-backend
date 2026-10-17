@@ -394,7 +394,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         }
 
         let n = legal.len();
-        let priors = ctx.priors(s, &legal)?;
+        let (priors, trunk) = ctx.priors_keep(s, &legal)?;
         {
             let node = &mut self.nodes[node];
             node.legal = legal;
@@ -415,7 +415,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         }
         match leaf_v {
             Some(v) => Ok(v),
-            None => self.leaf_value(s, st, to_move_seat),
+            None => self.leaf_value_reusing(s, st, to_move_seat, trunk.as_ref()),
         }
     }
 
@@ -434,12 +434,24 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         st: &mut SearchState,
         to_move: Seat,
     ) -> Result<f64, EngineError> {
+        self.leaf_value_reusing(s, st, to_move, None)
+    }
+
+    /// [`leaf_value`](Self::leaf_value) の、展開で作った同じ盤面の幹を使い回す版。幹を使うのは
+    /// 「窓を解決せず、打ち切りもせず、今の盤面をそのまま評価する」ときだけ（盤面が変わらない＝同じ符号化）。
+    fn leaf_value_reusing(
+        &mut self,
+        s: &mut Session,
+        st: &mut SearchState,
+        to_move: Seat,
+        trunk: Option<&(Seat, crate::net::Trunk)>,
+    ) -> Result<f64, EngineError> {
         let ctx = self.ctx;
         let rollout = ctx.opts.leaf_rollout == LeafRollout::TurnEnd;
         let noisy = in_battle(s) || (ctx.box_dialog && in_dialog(s));
         let resolve_windows = ctx.quiesce && noisy;
         if !resolve_windows && !rollout {
-            return ctx.value(s, to_move);
+            return ctx.value_reusing(s, to_move, trunk);
         }
         let rng_state = s.rng.snapshot();
         let saved = s.swap_events(Vec::new());

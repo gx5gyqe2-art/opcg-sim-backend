@@ -17,6 +17,7 @@ pub fn determinize_with(
     me: Seat,
     rng: &mut dyn crate::search::rng::SearchRng,
 ) -> Result<GameState, EngineError> {
+    let _prof = crate::prof::enter(crate::prof::Cat::Determinize);
     let pool: Vec<String> = {
         let p = state.player(me.other());
         p.hand

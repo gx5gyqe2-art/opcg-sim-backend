@@ -182,6 +182,7 @@ impl<'a> Ctx<'a> {
     /// 効果」で止まる＝素の手の意味は各枝がそのまま持つ。
     /// 箱が作れなかった準備の手（予算切れ・素の手が今の盤面で打てない）は今までどおり残る。
     pub fn legal_actions(&self, s: &mut Session) -> Result<Vec<Move>, EngineError> {
+        let _prof = crate::prof::enter(crate::prof::Cat::Legal);
         let mut moves = adapter::legal_actions(s, self.masters, &self.opts)?;
         if !self.opts.setup_box {
             return Ok(moves);
@@ -219,10 +220,30 @@ impl<'a> Ctx<'a> {
 
     /// Python `cpu_learned._value_fn`（NRel＝`predict_state`・終局は ±1）。
     pub fn value(&self, s: &mut Session, to_move: Seat) -> Result<f64, EngineError> {
+        self.value_reusing(s, to_move, None)
+    }
+
+    /// [`value`](Self::value) の、同じ盤面の幹（[`priors_keep`](Self::priors_keep) が作ったもの）を使い回す版。
+    /// 幹の席が `to_move` と違えば、幹は使わず `value` と同じく回す。
+    pub fn value_reusing(
+        &self,
+        s: &mut Session,
+        to_move: Seat,
+        trunk: Option<&(Seat, crate::net::Trunk)>,
+    ) -> Result<f64, EngineError> {
         if let Some(w) = s.state().winner {
             return Ok(if w == to_move { 1.0 } else { -1.0 });
         }
+        if let Some((seat, t)) = trunk {
+            if *seat == to_move {
+                let _prof = crate::prof::enter(crate::prof::Cat::Forward);
+                crate::prof::add(crate::prof::N_VALUE_REUSED, 1);
+                return Ok(crate::net::value_head(&self.net.weights, t) as f64);
+            }
+        }
         let enc = self.encode_for(s, to_move)?;
+        let _prof = crate::prof::enter(crate::prof::Cat::Forward);
+        crate::prof::add(crate::prof::N_VALUE, 1);
         Ok(crate::net::value(&self.net.weights, &self.net.tab, &enc)? as f64)
     }
 
@@ -232,8 +253,9 @@ impl<'a> Ctx<'a> {
         s: &mut Session,
         to_move: Seat,
     ) -> Result<crate::encode::Encoding, EngineError> {
-        let mut enc = crate::encode::encode(
-            s.state(),
+        let _prof = crate::prof::enter(crate::prof::Cat::Encode);
+        let mut enc = crate::encode::encode_in(
+            s,
             self.masters,
             self.vocab(),
             to_move,
@@ -259,20 +281,34 @@ impl<'a> Ctx<'a> {
         s: &mut Session,
         legal: &[Move],
     ) -> Result<Option<Vec<f32>>, EngineError> {
+        Ok(self.priors_keep(s, legal)?.0)
+    }
+
+    /// [`priors`](Self::priors) と同じ値に加えて、作った幹（トークン＋本体）と席を返す。
+    ///
+    /// 木の展開（`TreeMcts::expand`）は、窓を解決しない葉では直後に**同じ盤面・同じ席**で
+    /// [`value`](Self::value) を回す。その幹をここで作ったものに置き換えると、同じ演算を
+    /// 同じ順で 1 回だけ行う＝ビット一致（`docs/reports/2026-10-17_game_speed.md` §1.2）。
+    pub fn priors_keep(
+        &self,
+        s: &mut Session,
+        legal: &[Move],
+    ) -> Result<(Option<Vec<f32>>, Option<(Seat, crate::net::Trunk)>), EngineError> {
         if legal.is_empty() {
-            return Ok(None);
+            return Ok((None, None));
         }
         let Some((me, _)) = crate::rules::pending::pending_actor_action(s) else {
-            return Ok(None);
+            return Ok((None, None));
         };
         let enc = match self.encode_for(s, me) {
             Ok(e) => e,
             Err(e @ EngineError::Unimplemented(_)) => return Err(e),
-            Err(_) => return Ok(None),
+            Err(_) => return Ok((None, None)),
         };
         // §20.7.8 の 3: 同じ準備の手（`payload.base`）から出た `SETUP_BOX` の枝は、ネットには
         // **1 行**として見せる（枝の候補行は素の手の行そのものなので、k 本並べると softmax が
         // その手を k 回数えてしまう）。行の P を枝へ配るのは下の `setup_branch_shares`。
+        let prof_cand = crate::prof::enter(crate::prof::Cat::CandRows);
         let rows = setup_row_map(legal);
         let cand_target = self.net.weights.cand_target();
         let refs: Vec<CandOwned> = {
@@ -306,23 +342,40 @@ impl<'a> Ctx<'a> {
         let cands = match self.cand_rows(&enc, &refs) {
             Ok(c) => c,
             Err(e @ EngineError::Unimplemented(_)) => return Err(e),
-            Err(_) => return Ok(None),
+            Err(_) => return Ok((None, None)),
         };
-        let p_rows = match crate::net::priors(&self.net.weights, &self.net.tab, &enc, &cands) {
+        drop(prof_cand);
+        let prof_fwd = crate::prof::enter(crate::prof::Cat::Forward);
+        crate::prof::add(crate::prof::N_PRIORS, 1);
+        // `crate::net::priors` と同じ順（候補が空なら幹を作らない・幹 → 方策の頭）・同じ誤りの扱い。
+        let (p, trunk) = if cands.is_empty() {
+            (Ok(Vec::new()), None)
+        } else {
+            match crate::net::trunk(&self.net.weights, &self.net.tab, &enc) {
+                Ok(t) => (crate::net::priors_from(&self.net.weights, &enc, &t, &cands), Some((me, t))),
+                Err(e) => (Err(e), None),
+            }
+        };
+        let p_rows = match p {
             Ok(p) if p.len() == rows.heads.len() => p,
-            Ok(_) => return Ok(None),
+            Ok(_) => return Ok((None, trunk)),
             Err(e @ EngineError::Unimplemented(_)) => return Err(e),
-            Err(_) => return Ok(None),
+            Err(_) => return Ok((None, trunk)),
         };
+        drop(prof_fwd);
         if rows.heads.len() == legal.len() {
-            return Ok(Some(p_rows)); // 箱が無い＝今までどおり（1 bit も変わらない）
+            return Ok((Some(p_rows), trunk)); // 箱が無い＝今までどおり（1 bit も変わらない）
         }
         // 箱の枝の P ＝「素の手の P（＝行の P）× 対象選択の P」＝枝の和が素の手の P。
+        // `setup_branch_shares` の探索は transaction の中で巻き戻す＝盤面はビット一致で戻る（幹はそのまま使える）。
         let shares = self.setup_branch_shares(s, me, legal)?;
-        Ok(Some(
-            (0..legal.len())
-                .map(|i| p_rows[rows.row_of[i]] * shares[i])
-                .collect(),
+        Ok((
+            Some(
+                (0..legal.len())
+                    .map(|i| p_rows[rows.row_of[i]] * shares[i])
+                    .collect(),
+            ),
+            trunk,
         ))
     }
 

@@ -1149,6 +1149,9 @@ fn run_worlds(
             .map(|i| {
                 let seed = seed0.wrapping_add(i as u64);
                 scope.spawn(move || -> Result<(WorldRun, i64, u64), EngineError> {
+                    let _prof = crate::prof::enter_top(crate::prof::Cat::Search);
+                    let _enc_cache = crate::encode::decide_cache_scope(ctx.masters);
+                    let _tok_cache = crate::net::nrel::tok_cache_scope();
                     // 準備箱（§20.7.2）の状態は **thread_local**（`macro::SETUP`）＝新しい
                     // スレッドでは既定（無効）で始まる。世界 0（このスレッド）と同じ候補列挙に
                     // するため、世界ごとに張り直す（張らないと世界 1 以降だけ箱が出ず、根の
