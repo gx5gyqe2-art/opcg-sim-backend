@@ -115,3 +115,5 @@ REANALYZE seed=2294055 picks=12 pts=12 lost=0 bad_step=None replay=21.0s deep=22
 REANALYZE seed=2294056 picks=12 pts=12 lost=0 bad_step=None replay=52.0s deep=26.6s (done 57/200 total 2351s)
 REANALYZE seed=2294056 picks=12 pts=12 lost=0 bad_step=None replay=51.7s deep=26.4s (done 57/200 total 2357s)
 REANALYZE seed=2294057 picks=12 pts=12 lost=0 bad_step=None replay=14.6s deep=10.6s (done 58/200 total 2376s)
+REANALYZE seed=2294057 picks=12 pts=12 lost=0 bad_step=None replay=15.2s deep=10.6s (done 58/200 total 2383s)
+REANALYZE seed=2294058 picks=12 pts=12 lost=0 bad_step=None replay=14.3s deep=16.0s (done 59/200 total 2407s)
