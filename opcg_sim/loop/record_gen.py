@@ -556,7 +556,7 @@ def _don_k(mv):
 
 
 def _init_worker(sims, net, dirichlet_eps, temp_turns, decks=DEFAULT_DECKS, aux=True,
-                 eps_play=0.0, eps_hold=0.0, search=None, eps_target=0.0):
+                 eps_play=0.0, eps_hold=0.0, search=None, eps_target=0.0, rean=None):
     E.engine()
     # `search`＝探索の設定の上書き（§20.8.6・波 29〜: worlds／select_rule／q_min_frac／
     # root_prior_temp）。None／空＝serve 既定のまま＝歴代の波と同じ。
@@ -567,6 +567,13 @@ def _init_worker(sims, net, dirichlet_eps, temp_turns, decks=DEFAULT_DECKS, aux=
     _G["db"] = D.load_db()
     _G["decks"] = decks
     _G["aux"] = bool(aux)
+    # 生成の中での再分析（`--reanalyze-mult`・`docs/reports/2026-10-17_compute_shortening.md` §1.1）。
+    # 深い席は `reanalyze.specs` の深い席と同じ組み方（sims × mult・雑音なし・温度なし・ε なし・探索の設定は生成と同じ）。
+    _G["rean"] = None
+    if rean:
+        _G["rean"] = {"quota": list(rean["quota"]),
+                      "deep": E.SeatSpec(net, sims=sims * int(rean["mult"]),
+                                         prune_futile=E.GEN_PRUNE_FUTILE, **(search or {}))}
 
 
 class _Recorder:
@@ -593,6 +600,9 @@ class _Recorder:
         # 補助教師の台帳（dump v4・§20.8.2）: `snaps[k]`＝手 k の直前の盤面・`steps[k]`＝手 k。
         self.snaps = []
         self.steps = []
+        #: 生成の中での再分析（`--reanalyze-mult`）: step → (盤面の写し, 席, ターン, 探索の出力の候補)。
+        #: None＝切（既定）。写しは盤面を動かさない＝通常の記録の列は変わらない（§1.1 の不変量 (i)）。
+        self.stash = None
 
     def post(self, game, name, turn, step, move, events):
         """`driver.run_game(post=…)`＝**手を適用した直後**に台帳を 1 枚積む（`step=-1` は初期盤面）。"""
@@ -737,6 +747,10 @@ class _Recorder:
         ntot = sum(float(g["n"]) for g in groups)
         self.rows["pol_v0"][-1] = (
             sum(float(g["n"]) * float(g["q"]) for g in groups) / ntot) if ntot > 0 else 0.0
+        # 再分析の点の候補（`reanalyze.select_points` が選べる行＝main で候補 2 つ以上）だけ写しを取る。
+        if self.stash is not None and len(groups) >= 2:
+            self.stash[int(step)] = (game.fork(), name, int(turn),
+                                     {"stats": {"legal": legal}, "groups": groups})
 
 
 def play_one(seed):
@@ -747,6 +761,9 @@ def play_one(seed):
                     eps_hold=getattr(spec, "eps_hold", 0.0),
                     eps_target=getattr(spec, "eps_target", 0.0))
     aux_on = _G.get("aux", True)
+    t_start = time.time()
+    if _G.get("rean"):
+        rec.stash = {}
     try:
         la, lb = D.leader_pair(db, seed, "random")
         p1, p2, kinds = D.build_pair(db, la, lb, seed, _G.get("decks", DEFAULT_DECKS),
@@ -810,7 +827,42 @@ def play_one(seed):
                     "aux_mask": aux_mask,
                     # dump v5: 守る側の補助教師（P8・`2026-09-24_p8_defender_columns.md`）。**訓練は読まない**（理論の計器専用）。
                     "aux_def": aux_def.astype(np.float16), "aux_def_row": aux_def_row.astype(np.float16)})
+    out["_meta"]["sec"] = round(time.time() - t_start, 3)          # 1 局の秒（再分析を含まない）
+    if rec.stash is not None:
+        out["_rean"] = inline_reanalyze(out, rec.stash, seed, [la, lb], _G["rean"])
+        out["_meta"]["sec_rean"] = round(time.time() - t_start - out["_meta"]["sec"], 3)
+        rec.stash = None
     return out
+
+
+def inline_reanalyze(out, stash, seed, leaders, rean):
+    """生成の中での再分析（§1.1）: 局の行から `reanalyze.select_points` で点を選び、取っておいた写しで深い探索を打つ。
+
+    点の選び方・深い探索と候補の対応付け・差し替えた行の組み立ては `reanalyze.py` の関数そのもの
+    （打ち直しの器と同じ値になる＝§1.1 の不変量 (ii)）。→ {"cols": 差し替えた行の列（点が無ければ None）, "pts", "game"}
+    """
+    from opcg_sim.loop import reanalyze as RA
+    cols = {k: v for k, v in out.items() if not k.startswith("_")}
+    pol_cols = [k for k in cols if k.startswith("pol_") and k not in RA.ROW_POL_COLS]
+    ptr = np.concatenate([[0], np.cumsum(cols["pol_len"].astype(np.int64))])
+    g = {"cols": cols, "rows": np.argsort(cols["step"], kind="stable"), "ptr": ptr,
+         "row_cols": [k for k in cols if k not in pol_cols], "pol_cols": pol_cols}
+    picks = RA.select_points(g, leaders, seed, rean["quota"])
+    pts, t_deep = [], 0.0
+    for i, rule in picks:
+        step = int(cols["step"][i])
+        fk, name, turn, o = stash[step]
+        t0 = time.time()
+        p = {"i": int(i), "rule": rule, "step": step, "turn": turn}
+        p.update(RA.deep_point(fk, name, turn, seed, o, rean["deep"], int(cols["pol_len"][i])))
+        p["sec"] = time.time() - t0
+        t_deep += p["sec"]
+        pts.append(RA.point_detail(p, g, seed, leaders))
+    sel = {r: sum(1 for _i, rr in picks if rr == r) for r in RA.RULES}
+    return {"cols": RA.rean_rows(g, pts), "pts": pts,
+            "game": {"game": seed, "picks": len(picks), "pts": len(pts), "bad_step": None, "sel": sel,
+                     "last_pick_step": max([int(cols["step"][i]) for i, _r in picks], default=-1),
+                     "t_replay": 0.0, "t_deep": t_deep, "stashed": len(stash)}}
 
 
 _ROW_KEYS = ("scalars", "field", "card_idx", "z", "who", "kind", "turn", "step",
@@ -867,8 +919,29 @@ def main(argv=None):
                     help="q_min_n の訪問下限の割合（既定 0.125）")
     ap.add_argument("--root-prior-temp", type=float, default=None,
                     help="根の事前分布を P^(1/t) へ（既定 1.0・2.0 で平坦化）")
+    ap.add_argument("--reanalyze-mult", type=int, default=0,
+                    help="生成の中で再分析する（`docs/reports/2026-10-17_compute_shortening.md` §1.1）: 局ごとに "
+                         "`reanalyze.select_points` で選んだ点に sims × この倍率の深い探索を打ち、`pol_n`／`pol_q`／`pol_v0` "
+                         "を差し替えた行を --reanalyze-out に書く（既定 0＝切・通常の記録は変わらない）")
+    ap.add_argument("--reanalyze-quota", default="4,4,2,2",
+                    help="規則ごとの枠（`reanalyze.py --quota` と同じ・ターン 1〜3／終える手と攻撃／エネルの席／乱数）")
+    ap.add_argument("--reanalyze-per-game", type=int, default=None,
+                    help="1 局の点の数（枠の合計と一致を確かめるだけ）")
+    ap.add_argument("--reanalyze-out", default=None,
+                    help="再分析の dump の dir（既定 <--out>_rean・`n_rel_train.py --in` にそのまま渡せる）")
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
+    rean = None
+    if args.reanalyze_mult:
+        quota = [int(x) for x in args.reanalyze_quota.split(",")]
+        from opcg_sim.loop import reanalyze as RA
+        if len(quota) != len(RA.RULES) or min(quota) < 0:
+            ap.error("--reanalyze-quota は %d 個の 0 以上の整数" % len(RA.RULES))
+        if args.reanalyze_per_game is not None and sum(quota) != args.reanalyze_per_game:
+            ap.error("--reanalyze-per-game %d が枠の合計 %d と合わない" % (args.reanalyze_per_game, sum(quota)))
+        rean = {"mult": args.reanalyze_mult, "quota": quota}
+        rean_out = args.reanalyze_out or args.out.rstrip("/") + "_rean"
+        os.makedirs(rean_out, exist_ok=True)
     search = {k: v for k, v in (("worlds", args.worlds), ("select_rule", args.select_rule),
                                 ("q_min_frac", args.q_min_frac),
                                 ("root_prior_temp", args.root_prior_temp)) if v is not None}
@@ -883,7 +956,8 @@ def main(argv=None):
     games = []                                         # part の sidecar（対局メタ）
     shard = n_rows = n_drop = n_main = 0
     initargs = (args.sims, args.net, args.dirichlet_eps, args.temp_turns, args.decks,
-                not args.no_aux, args.eps_play, args.eps_hold, search, args.eps_target)
+                not args.no_aux, args.eps_play, args.eps_hold, search, args.eps_target, rean)
+    rbuf, rgames, rshard = {k: [] for k in keys}, [], 0     # 再分析の dump（--reanalyze-mult）
     with mp.get_context("spawn").Pool(args.workers, initializer=_init_worker,
                                       initargs=initargs) as pool:
         done = 0
@@ -894,6 +968,12 @@ def main(argv=None):
                 n_drop += 1
             else:
                 games.append(r.pop("_meta"))
+                ri = r.pop("_rean", None)
+                if ri is not None:
+                    rgames.append(ri)
+                    if ri["cols"] is not None:
+                        for k in rbuf:
+                            rbuf[k].append(ri["cols"][k])
                 for k in buf:
                     buf[k].append(r[k])
                 n_rows += len(r["z"])
@@ -906,6 +986,12 @@ def main(argv=None):
                     os.replace(tmp, path)
                     shard += 1
                     buf = {k: [] for k in keys}
+                if rean and rbuf["seed"]:
+                    tmp = os.path.join(rean_out, f".n_record_{rshard:05d}.tmp.npz")
+                    np.savez_compressed(tmp, **{k: np.concatenate(rbuf[k]) for k in rbuf})
+                    os.replace(tmp, os.path.join(rean_out, f"n_record_{rshard:05d}.npz"))
+                    rshard += 1
+                    rbuf = {k: [] for k in keys}
                 print(f"  {done}/{args.games}局 行{n_rows}（main {n_main}） 棄却{n_drop}"
                       f" {time.time()-t0:.0f}s", flush=True)
     forced = {"play": sum(g["forced"]["play"] for g in games),
@@ -932,10 +1018,39 @@ def main(argv=None):
                    # 探索の設定の上書き（§20.8.6・空＝serve 既定）
                    "search": search},
                   f, ensure_ascii=False)
+    if rean:
+        write_rean_meta(rean_out, args, rean, games, rgames)
     print("N_RECORD_DONE " + json.dumps({"rows": n_rows, "main_rows": n_main,
                                          "dropped": n_drop, "forced": forced,
                                          "removal_legal_rows": removal_legal}))
     return 0
+
+
+def write_rean_meta(rean_out, args, rean, games, rgames):
+    """再分析の dump の `points.jsonl`／`meta_n_record.json`／`meta_games.json`（`reanalyze.py` の出力と同じ形）。"""
+    from opcg_sim.loop import reanalyze as RA
+    with open(os.path.join(rean_out, "points.jsonl"), "w", encoding="utf-8") as fp:
+        for ri in rgames:
+            for p in ri["pts"]:
+                fp.write(json.dumps(p) + "\n")
+            fp.write(json.dumps(ri["game"]) + "\n")
+    pts = [p for ri in rgames for p in ri["pts"] if not p.get("unmapped")]
+    seeds = {int(p["seed"]) for p in pts}
+    meta = json.load(open(os.path.join(args.out, "meta_n_record.json"), encoding="utf-8"))
+    meta.update({"games": len(seeds), "rows": len(pts), "main_rows": len(pts)})
+    meta["reanalyzed"] = {"mult": rean["mult"], "points": len(pts),
+                          "points_by_rule": {r: sum(1 for p in pts if p["rule"] == r) for r in RA.RULES},
+                          "games": len(rgames), "diverged": 0,
+                          "unmapped": sum(1 for ri in rgames for p in ri["pts"] if p.get("unmapped")),
+                          "lost_to_divergence": 0,
+                          "selection": {r: sum(ri["game"]["sel"][r] for ri in rgames) for r in RA.RULES},
+                          "quota": rean["quota"], "inline": True, "record_dir": os.path.abspath(args.out),
+                          "net": E.resolve_net(args.net)}
+    with open(os.path.join(rean_out, "meta_n_record.json"), "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False)
+    with open(os.path.join(rean_out, "meta_games.json"), "w", encoding="utf-8") as f:
+        json.dump({"decks": args.decks, "seed_base": args.seed_base,
+                   "games": [g for g in games if int(g["seed"]) in seeds]}, f, ensure_ascii=False)
 
 
 if __name__ == "__main__":
