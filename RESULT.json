@@ -19,8 +19,8 @@
   "dir": "n29_reanu/w07"
  },
  "metrics": {
-  "games": 231,
-  "points": 1392,
+  "games": 285,
+  "points": 1716,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
@@ -28,18 +28,18 @@
    "early": 0,
    "end_and_attack": 0,
    "enel": 0,
-   "random": 1392
+   "random": 1716
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
    "early": null,
    "end_and_attack": null,
    "enel": null,
-   "random": 0.2843
+   "random": 0.2822
   },
-  "deep_best_differs_all": 0.2843,
-  "sec_replay_per_game": 24.6,
-  "sec_deep_per_game": 16.93
+  "deep_best_differs_all": 0.2822,
+  "sec_replay_per_game": 24.86,
+  "sec_deep_per_game": 17.12
  },
  "commit": "0be4a48f3",
  "notes": ""
