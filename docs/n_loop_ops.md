@@ -717,7 +717,74 @@ echo ALL_DONE
 - コミットメッセージにモデル名を入れない。
 ````
 
-**回収**（コーディネータ）: `git fetch origin claude/n42-w{K}:tmp && git archive tmp n_records | tar -x`。記録は `n_records/n42_w{K}_p{J}`、4 倍の教師は `…_rean4`、8 倍は `…_rean8`。訓練・評価帯・アリーナの指示書は回収後にこの節へ足す。
+**回収**（コーディネータ）: `git fetch origin claude/n42-w{K}:tmp && git archive tmp n_records | tar -x`。記録は `n_records/n42_w{K}_p{J}`、4 倍の教師は `…_rean4`、8 倍は `…_rean8`。訓練・評価帯・アリーナの指示書は下。
+
+訓練・評価帯の指示書（作業セッション用・1 セッションで順に・メモリ 12GB 以上・波 42 の 16 本が揃ってから）:
+
+```
+作業: r12（4 倍の教師）と r12x（8 倍の教師）の訓練 → 評価帯（docs/n_loop_ops.md §7.7）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（~/opcg-sim-backend）。長い実行は nohup で回し、
+**完走までターンを終えない**（9 分以内の待ちを繰り返す・待機に入るとコンテナが止まる）。迷った点は RESULT.json の notes に書いて完走する。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch          # torch は訓練専用の dir（ゲートの環境に入れない）
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+
+# 教材 ── 波 42（16 本）と、z 用の波 27〜32（§7.6 と同じ取り方）
+for k in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16; do
+  git fetch -q origin claude/n42-w$k:tmpw && mkdir -p ~/n42 && git archive tmpw n_records | tar -x -C ~/n42 && git branch -qD tmpw; done
+ls -d ~/n42/n_records/n42_w*_p[0-3] | wc -l      # 64 であること（16 本 × 4）。足りなければ notes に書いて止める
+（波 27〜32 の取得は §7.6 の「元の波 29…・30／31・27／28」のブロックをそのまま使う。32 も 30／31 と同じ形で取る）
+
+Z42="$HOME/n42/n_records/n42_w*_p[0-3]"
+ZOLD="$HOME/n32_wave/w*/n_records/n32_w* $HOME/n31_wave/w*/n_records/n31_w* $HOME/n30_wave/w*/n_records/n30_w* $HOME/n29_wave/w*/n_records/n29_w* $HOME/n28_wave/w*/n28_records $HOME/n27_wave/w*/n27_records"
+COMMON="--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.5 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz"
+
+# ① r12（π＝4 倍の教師）  ② r12x（π＝8 倍の教師）——深さ以外は同一。順に回す（並列にしない）
+for C in 4 8; do N=$([ $C = 4 ] && echo r12 || echo r12x)
+  env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train \
+    --in "$HOME/n42/n_records/n42_w*_p[0-3]_rean$C" --z-in "$Z42" $ZOLD $COMMON --out ~/nrel_$N.npz 2>&1 | tee ~/train_$N.log; done
+（OOM なら $ZOLD から 27 → 28 → 29 の順に外して**両方とも同じ窓で**やり直し、notes に書く。訓練開始時の RSS を notes に書く。）
+
+# ③ 評価帯（波 42 の holdout・全ネットが未見）
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$Z42" \
+  --nrel opcg_sim/data/learned/nrel_r3.npz opcg_sim/data/learned/nrel_r11a.npz ~/nrel_r12.npz ~/nrel_r12x.npz \
+         ~/nrel_r12.ep0.npz ~/nrel_r12x.ep0.npz --policy --holdout-mod 7 --out ~/band_r12.json 2>&1 | tee ~/band_r12.log
+
+# 成果物
+git checkout -B claude/train-r12
+mkdir -p n1_results && cp ~/nrel_r12*.npz n1_results/ && cp ~/train_r12*.log ~/band_r12.json ~/band_r12.log .
+（RESULT.json〔§5 の形〕: inputs＝warm_start r11a・π dir 数・z の波・行数／点数・rss_gb／metrics＝r12・r12x それぞれ best_ep・
+ 各周の val v_mse／v_sign／pi_top1／band＝ネットごとの v_mse と方策の指標／train_sec・band_sec／notes）
+git add -f n1_results/nrel_r12*.npz train_r12*.log band_r12.json band_r12.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r12／r12x のセット（訓練・評価帯）"
+git push -u origin claude/train-r12
+
+補足: 訓練は 1 本 30〜40 分の見込み（`--fast`）・評価帯 15 分。コミットメッセージにモデル名を入れない。
+```
+
+アリーナの指示書（作業セッション用・16 セッション・`claude/train-r12` が push されてから）:
+- セッション k（1〜16）は 2 つを順に回す: (1) アリーナ 1 の 1 帯（k ≤ 8 は主条件の帯 k、k ≥ 9 は副条件の帯 k−8）、(2) 高分解能の 1 シャード k。
+- ネットの取得: `git fetch origin claude/train-r12:r12 && git show r12:n1_results/nrel_r12.npz > ~/nrel_r12.npz && git show r12:n1_results/nrel_r12x.npz > ~/nrel_r12x.npz`。
+
+```
+B=$(( k <= 8 ? k-1 : k-9 ))
+# (1) アリーナ 1: r12 と r12x を同じ帯で、基準 r11a を明示（主＝random×synth_roles 611000〜／副＝固定ミラー 621000〜）
+for C in r12 r12x; do
+  if [ $k -le 8 ]; then
+    OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r11a.npz \
+      --pairs 24 --max-pairs 24 --seed-base $(( 611000 + B*1000 )) --workers 4 --leaders random --decks synth_roles --out ~/a1_${C}_main_w0$B.jsonl
+  else
+    OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r11a.npz \
+      --pairs 24 --max-pairs 24 --seed-base $(( 621000 + B*1000 )) --workers 4 --out ~/a1_${C}_mirror_w0$B.jsonl
+  fi; done
+# (2) 高分解能: r12x vs r12（主条件のみ・175 ペア）
+OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_r12x.npz --baseline ~/nrel_r12.npz \
+  --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( 1051000 + (k-1)*1000 )) --workers 4 --leaders random --decks synth_roles \
+  --out ~/hires_r12x_w$(printf %02d $k).jsonl
+```
+- 出力は `claude/arena-r12-w{kk}`（jsonl と RESULT.json）。1 段ごとに push する。**完走までターンを終えない**。
+- 合算はコーディネータが `arena_merge` で行う。
 
 ## 8. コーディネータが守ること
 
