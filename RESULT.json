@@ -22,20 +22,21 @@
  },
  "outputs": {
   "dirs": [
-   "n_records/n42_w13_p0"
+   "n_records/n42_w13_p0",
+   "n_records/n42_w13_p1"
   ]
  },
  "metrics": {
-  "parts_done": 1,
-  "games": 120,
-  "rows": 17291,
+  "parts_done": 2,
+  "games": 240,
+  "rows": 34893,
   "dropped": 0,
-  "points4": 1440,
-  "points8": 1440,
+  "points4": 2880,
+  "points8": 2880,
   "unmapped4": 0,
   "unmapped8": 0,
-  "sec_play_mean": 32.46,
-  "sec_rean_mean": 60.45
+  "sec_play_mean": 31.99,
+  "sec_rean_mean": 59.54
  },
  "notes": ""
 }
