@@ -1,0 +1,1 @@
+{"job":"hires-r11a-w01","status":"done","seed_base":1031000,"pairs":175,"merge":{"pairs":175,"wr":0.6029,"ci95":[0.5471,0.6586],"elo":72.5,"void":0,"dup_seeds":0},"sec":1140,"notes":"No code changes. Ran in one pass (1140s, no restart). games=350, wins=211.0, elo95=[32.8,114.2], promoted=true by arena_merge criteria."}
