@@ -1,0 +1,1 @@
+{"job":"hires-r11a-w07","status":"done","seed_base":1037000,"pairs":175,"merge":{"pairs":175,"wr":0.4971,"ci95":[0.4418,0.5525],"elo":-2.0,"void":0,"dup_seeds":0},"sec":1095,"notes":"Ran uninterrupted in one pass (1095s). No code changes. opcg_effects.json existed/was generated as needed."}
