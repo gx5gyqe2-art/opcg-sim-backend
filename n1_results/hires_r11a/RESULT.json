@@ -1,0 +1,1 @@
+{"job":"hires-r11a-w15","status":"done","seed_base":1045000,"pairs":175,"merge":{"pairs":175,"wr":0.5114,"ci95":[0.4564,0.5664],"elo":7.9,"void":0,"dup_seeds":0},"sec":1115,"notes":"Ran from /home/user/opcg-sim-backend (script run via file because inline newlines were flattened). Not promoted; elo95 [-30.4, 46.4]."}
