@@ -1071,6 +1071,11 @@ def train(args):
                         "train_plan": list(getattr(backend, "plan_loss", (0.0, 0)))})
             print(f"  plan val mse {vq:.4f}（{nq} 行）", flush=True)
         print("N_REL_TRAIN_EPOCH " + json.dumps(row), flush=True)
+        if getattr(args, "save_each_epoch", False):
+            # その周の終わりの重みを別名で残す（最良の選び方は変えない・1 周で足りるかをアリーナで比べる用）
+            ep_out = (args.out[:-4] if args.out.endswith(".npz") else args.out) + f".ep{ep}.npz"
+            _save(net, args, vocab, V, P, ep, out=ep_out)
+            print(f"  ep{ep} の重みを {ep_out} に保存", flush=True)
         if best is None or vmse < best[0]:
             best = (vmse, {p: getattr(net, p).copy() for p in net._trainable()}); best_ep = ep
             # epoch ごとに最良を書き出す（16 シャード×2 epoch ≒ 3.5 時間・途中で落ちても ep0 が残る）
@@ -1085,9 +1090,9 @@ def train(args):
     return 0
 
 
-def _save(net, args, vocab, V, P, best_ep):
+def _save(net, args, vocab, V, P, best_ep, out=None):
     net.vocab_ids = [cid for cid, _i in sorted(vocab.items(), key=lambda kv: kv[1])]
-    net.save(args.out, meta={"rows_v": int(len(V["z"])), "points_p": int(len(P["len"])),
+    net.save(out or args.out, meta={"rows_v": int(len(V["z"])), "points_p": int(len(P["len"])),
                              "epochs": args.epochs, "best_ep": best_ep, "hidden": args.hidden,
                              "src": args.src, "kind": "nrel-a",
                              # z 専用の dump（`--z-in`）も焼く（2026-09-13）。`src` だけだと
@@ -1177,6 +1182,8 @@ def main(argv=None):
     tr.add_argument("--threads", type=int, default=0,
                     help="torch のスレッド数（0＝全コア）。numpy backend では効かない")
     tr.add_argument("--out", required=True)
+    tr.add_argument("--save-each-epoch", action="store_true",
+                    help="各周の終わりの重みを <--out>.ep{周}.npz にも書く（--out は従来どおり検証で最良の周）")
     args = ap.parse_args(argv)
     if args.cmd == "train":
         return train(args)

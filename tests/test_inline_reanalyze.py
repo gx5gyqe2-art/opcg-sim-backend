@@ -3,6 +3,8 @@
 CLAUDE.md「値を変えない移植の一致の見張り」に当たる（打ち直しの器 `reanalyze.py` を使わなくなったら一緒に消す）:
 - (i) `--reanalyze-*` を付けても、通常の記録の列は同じ seed でビット一致する。
 - (ii) その場の再分析の点（選び方・n・q・v0）は、同じ記録を `reanalyze.py --mult 4` で打ち直した値と一致する。
+- (iii) 倍率を複数渡すと（`--reanalyze-mult 4,8`）、4 倍の dump は倍率 1 つで回したものと点も値も一致し、
+  8 倍の dump は同じ点を読む（深さだけが違う教材の組・r12 の 4 倍と 8 倍の比較）。
 
 雑音・温度は生成の既定のまま（再分析の器は記録と同じ設定で打ち直し、深い探索だけ雑音なし）。小さな局（sims 8・2 局）で回す。
 """
@@ -71,3 +73,22 @@ def test_inline_reanalysis_keeps_record_and_matches_reanalyze(tmp_path):
     assert np.isclose(c["pol_n"].sum(), d["pol_n"].sum()) and np.isclose(c["pol_q"].sum(), d["pol_q"].sum())
     m = json.load(open(os.path.join(inl + "_rean", "meta_n_record.json"), encoding="utf-8"))
     assert m["reanalyzed"]["inline"] is True and m["reanalyzed"]["points"] == len(c["seed"])
+
+
+def test_inline_reanalysis_two_mults_share_points(tmp_path):
+    pytest.importorskip("opcg_engine")
+    one, two = str(tmp_path / "one"), str(tmp_path / "two")
+    _run(GEN + ["--out", one, "--reanalyze-mult", "4", "--reanalyze-quota", "4,4,2,2"])
+    _run(GEN + ["--out", two, "--reanalyze-mult", "4,8", "--reanalyze-quota", "4,4,2,2"])
+    a, b4, b8 = _points(one + "_rean"), _points(two + "_rean4"), _points(two + "_rean8")
+    assert set(a) == set(b4) == set(b8) and len(a) > 0          # (iii) 同じ点を選ぶ
+    for key, x in a.items():
+        y = b4[key]
+        assert x["rule"] == y["rule"] == b8[key]["rule"], key
+        if not x.get("unmapped"):
+            assert x["n"] == y["n"] and x["q"] == y["q"] and x["v0"] == y["v0"], key
+    for m in (4, 8):
+        meta = json.load(open(os.path.join(two + "_rean%d" % m, "meta_n_record.json"), encoding="utf-8"))
+        assert meta["reanalyzed"]["mult"] == m
+    deeper = [k for k, x in b8.items() if not x.get("unmapped")]
+    assert deeper and all(sum(b8[k]["n"]) > sum(b4[k]["n"]) for k in deeper if not b4[k].get("unmapped"))

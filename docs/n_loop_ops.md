@@ -175,6 +175,9 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 
 | 用途 | 帯 | 状態 |
 |---|---|---|
+| 生成 **波42**（**r12 の教材**・生成役 r11a＝era9・設定は波 29〜32 と同じ・**`--reanalyze-mult 4,8`**＝同じ点を 4 倍と 8 倍で読む・§7.7） | 2421000〜2428500（予約帯をそのまま使う・16 シャード × 480 局・シャード k の base は 2420000 + ceil(k/2)×1000 + (k 偶数なら 500)・各シャードは 120 局 × 4 本） | 指示済み（2026-10-17・ユーザ決定「8 倍が効くかを確かめたい」・台帳 2+251） |
+| 検証 **r12／r12x vs r11a**（主 random × synth_roles／副 固定ミラー・各 8 帯 × 24 ペア・2 候補を同じ帯で・基準 r11a を明示） | ランダム 611000〜618000／ミラー 621000〜628000 | 予約（2026-10-17・§7.7） |
+| 検証 **高分解能 r12x vs r12**（8 倍の教師が効くか・主条件のみ・16 シャード × 175 ペア＝2,800 ペア・`--bands 1`） | 1051000〜1066000（シャード k の base は 1051000 + (k−1)×1000・各 175 seed） | 予約（2026-10-17・§7.7） |
 | **再分析の本走（一様選択・切り分け用）**（§7.5 と同じ 14 シャード・各 先頭 200 局 × 12 点・**枠 0,0,0,12＝全部乱数**・mult 4・ユーザ指示 2026-10-17「切り分けの 2 本も回しておいて」） | —（記録の seed をそのまま打ち直す） | 指示済み（2026-10-17 UTC・14 セッション〔sonnet・tag `reanu`〕・出力 `claude/reanu-n29-w{01,02,03,05,06,07,08,09}`／`claude/reanu-n32-w{01,03,04,05,07,08}`・dir `n{W}_reanu/w{XX}`） |
 | 検証 **r11c（r11b ＋ 更新量 4 倍）vs r3／r11d（一様選択の再分析で r11a と同じ訓練）vs r3**（主 random × synth_roles／副 固定ミラー・各 8 帯 × 24 ペア） | ランダム 591000〜598000／ミラー 601000〜608000（**再利用**＝r11a／r11b と同じ物差し） | 指示済み（2026-10-17・台帳 `cpu_theory_gap.md` 2+237） |
 | 検証 **高分解能 r11a vs r3**（主 random × synth_roles のみ・16 シャード × 175 ペア＝2,800 ペア・`--bands 1`・両席 serve 既定・`--workers 4`・ユーザ決定 2026-10-16「(a) 高分解能で測り直してから採用」） | **1031000〜1046000**（シャード k の base は 1031000 + (k−1)×1000・各 175 seed） | 払い出し済み（2026-10-17 UTC・16 セッションをコーディネータが create_session で起こした〔sonnet・tag `hires-r11a`〕・出力 `claude/arena-hires-r11a-w01`〜`w16`・候補 `claude/theory-map:n1_results/r11/nrel_r11a.npz`・基準 r3＝出荷既定。判定: 2,800 ペアの 95% CI 下限 > 0.50 で採用〔出荷既定と生成役を r11a に・era9〕） |
@@ -604,6 +607,108 @@ git push -u origin claude/train-r11
 - 評価帯 3 本で 30〜45 分。アリーナ 2 候補 × 2 条件で 4 時間弱。
 - コミットメッセージにモデル名を入れない。
 ```
+
+### 7.7 r12 の 1 サイクル——4 倍と 8 倍の教師を同じ局・同じ点で作る（16 セッション・2026-10-17）
+
+ユーザ決定（2026-10-17）: 「一番上のやつ（r12＝生成の中で再分析・2 周の訓練）で進めたい」→「8 倍が効くかを確かめたい」（台帳 `cpu_theory_gap.md` 2+250・2+251）。
+
+- **教材（波 42）**:
+  - 生成役は r11a（出荷既定・`opcg_sim/data/learned/nrel_r11a.npz`）。設定は波 29〜32 と同じ（sims 160・worlds 4・q_min_n 1/8・t=2・synth_roles・両方向 ε 3%）。
+  - 16 シャード × 480 局。seed は §6 の予約帯 2421000〜2428500 で、シャード k の base は 2420000 + ceil(k/2)×1000 + (k が偶数なら 500)。
+  - `--reanalyze-mult 4,8`: 同じ局・同じ 12 点（枠 4,4,2,2）を **4 倍と 8 倍の両方**で読み、`<out>_rean4`／`<out>_rean8` に書く。教材の差が深さだけになる。
+  - **1 シャードを 120 局 × 4 本に分けて回す**。record_gen には再開が無いので、コンテナが再起動しても失うのは最大 1 本。
+- **実測の速さ**（このコンテナ・4 プロセス・8 局・2026-10-17）:
+  - 1 局 24.5 秒（壁時計・4 並列の割り）。480 局で約 **3.3 時間**。
+  - プロセス内の内訳: 対局 31.4 秒・4 倍の再分析 22.2 秒・8 倍の再分析 39.2 秒（4 並列の競合込み）。
+  - 4 倍だけなら約 14 秒／局と見積もれる。
+  - 8 局 96 点のうち、**8 倍の最善手が 4 倍と違う点は 12 点（12.5%）**。記録（1 倍）と 4 倍の違いは 21 点（22%）。
+- **訓練**: r12（4 倍の教師）と r12x（8 倍の教師）を、**深さ以外は同一**で順に回す。
+  - warm-start は r11a。
+  - π は波 42 の `_rean4` か `_rean8` の全シャード。z は波 42 の記録と波 32〜27 を新しい順に入るだけ使い、OOM なら古い順に落とす（CLAUDE.md の窓）。
+  - 方策の更新量は r11a と同じ程度にする: r11a は 33,600 点 × 4、今回は約 92,000 点なので `--pi-steps-mult 1.5`（台帳 2+241: 更新を 4 倍にしても強くならない）。
+  - `--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --fast --save-each-epoch`。`--out` は検証で最良の周、`.ep0`／`.ep1` は各周の重み（1 周で足りるかの比較用）。
+- **評価帯**: 波 42 の holdout（`--holdout-mod 7`・既存の全ネットが未見）で r3／r11a／r12／r12x を並べる。
+- **アリーナ 1（各候補 vs r11a・同じ帯）**:
+  - 主: random × synth_roles・611000〜618000。副: 固定ミラー・621000〜628000。各 8 帯 × 24 ペア。
+  - r12 と r12x を同じ帯で測る。`--baseline opcg_sim/data/learned/nrel_r11a.npz` を明示する。
+- **アリーナ 2（8 倍が効くかの判定・高分解能）**:
+  - r12x vs r12 を直接打たせる。主条件のみ・16 シャード × 175 ペア＝2,800 ペア・`--bands 1`・1051000〜1066000（シャード k の base は 1051000 + (k−1)×1000）。
+- **予告（数を見る前・司令塔）**:
+  - r12 vs r11a の主条件の勝率は 0.52〜0.56。
+  - r12x vs r12（2,800 ペア）は 0.50〜0.52（0〜+15 Elo）。8 倍で最善手が変わるのは 1 割強で、4 倍（記録との違い 2 割強）より効きは小さいと読む。
+  - 判定: 95% CI 下限が 0.50 を超えれば「8 倍は効く」、跨げば「4 倍で足りる（8 倍は時間が倍で差は見えない）」。
+  - 採用（出荷既定の切替）は従来の規則による。良い方の候補が r11a に主条件で下限 > 0.50・副で下限 ≥ 0.45。高分解能の測り直しは r11a のときと同じく、主条件の 2,800 ペアで行う。
+
+生成の指示書（作業セッション用・シャード k、`{K}`＝01〜16、`{BASE}`＝上の式）:
+
+````
+波 42 の生成を 1 シャードぶん回してください（docs/n_loop_ops.md §7.7）。コードは変更せず、下記を実行して結果ブランチを push するだけです。
+PR は作らないでください。質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+出どころの照合（origin 側で）:
+  (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
+  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.7 r12"
+  (3) 器: git show origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/record_gen.py | grep -n "rean%d"
+この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
+
+bash で次の 2 つのブロックを順に実行してください。コンテナが再起動したら、2 つとも最初からもう一度実行します（冪等・終えた本は飛ばす）。
+
+--- ブロック 1（準備）---
+export K={K} BASE={BASE}
+pip install -q numpy maturin
+[ -d ~/opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git ~/opcg-sim-backend
+cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/n42-w${K} origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/n42-w${K} 2>/dev/null && git checkout -q FETCH_HEAD -- n_records 2>/dev/null || true
+[ -f ~/built ] || { make rust-develop > ~/build.log 2>&1 && touch ~/built; }
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+printf '%s\n' 'cd ~/opcg-sim-backend' \
+  'cp ~/n42_w${K}.log . 2>/dev/null' \
+  'git add -f n_records RESULT.json n42_w${K}.log 2>/dev/null' \
+  'git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "gen wave 42 shard ${K}"' \
+  'git push -q -u origin claude/n42-w${K}' > ~/save.sh
+
+--- ブロック 2（4 本を順に・1 本ごとに push）---
+cd ~/opcg-sim-backend
+for J in 0 1 2 3; do
+  D=n_records/n42_w${K}_p$J
+  [ -f $D/meta_n_record.json ] && [ -f ${D}_rean8/meta_n_record.json ] && continue
+  rm -rf $D ${D}_rean4 ${D}_rean8
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen --games 120 --seed-base $((BASE + 120*J)) --workers 4 \
+    --sims 160 --worlds 4 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2.0 \
+    --eps-play 0.03 --eps-hold 0.03 --decks synth_roles --shard-games 10 \
+    --net opcg_sim/data/learned/nrel_r11a.npz \
+    --reanalyze-mult 4,8 --reanalyze-quota 4,4,2,2 --reanalyze-per-game 12 --out $D >> ~/n42_w${K}.log 2>&1
+  python - <<'PY' > RESULT.json
+import glob, json, os
+K = os.environ["K"]; parts = sorted(glob.glob(f"n_records/n42_w{K}_p[0-3]"))
+done = [p for p in parts if os.path.exists(p + "/meta_n_record.json") and os.path.exists(p + "_rean8/meta_n_record.json")]
+m = [json.load(open(p + "/meta_n_record.json")) for p in done]
+r4 = [json.load(open(p + "_rean4/meta_n_record.json"))["reanalyzed"] for p in done]
+r8 = [json.load(open(p + "_rean8/meta_n_record.json"))["reanalyzed"] for p in done]
+g = [x for p in done for x in json.load(open(p + "/meta_games.json"))["games"]]
+print(json.dumps({"job": f"n42-w{K}", "role": "gen", "status": "done" if len(done) == 4 else "partial",
+  "inputs": {"net": "opcg_sim/data/learned/nrel_r11a.npz", "seed_base": int(os.environ["BASE"]), "games": 480,
+             "sims": 160, "worlds": 4, "decks": "synth_roles", "reanalyze_mult": [4, 8], "quota": [4, 4, 2, 2]},
+  "outputs": {"dirs": done},
+  "metrics": {"parts_done": len(done), "games": sum(x["games"] for x in m), "rows": sum(x["rows"] for x in m),
+              "dropped": sum(x["dropped"] for x in m),
+              "points4": sum(x["points"] for x in r4), "points8": sum(x["points"] for x in r8),
+              "unmapped4": sum(x["unmapped"] for x in r4), "unmapped8": sum(x["unmapped"] for x in r8),
+              "sec_play_mean": round(sum(x["sec"] for x in g) / max(1, len(g)), 2),
+              "sec_rean_mean": round(sum(x.get("sec_rean", 0) for x in g) / max(1, len(g)), 2)},
+  "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  bash ~/save.sh
+done
+tail -n 2 ~/n42_w${K}.log
+
+補足:
+- 所要は 1 本（120 局）約 50 分・4 本で約 3.3 時間（同じコンテナで他の重い処理を並べない）。
+- コミットメッセージにモデル名を入れない。
+````
+
+**回収**（コーディネータ）: `git fetch origin claude/n42-w{K}:tmp && git archive tmp n_records | tar -x`。記録は `n_records/n42_w{K}_p{J}`、4 倍の教師は `…_rean4`、8 倍は `…_rean8`。訓練・評価帯・アリーナの指示書は回収後にこの節へ足す。
 
 ## 8. コーディネータが守ること
 
