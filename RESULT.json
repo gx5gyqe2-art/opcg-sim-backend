@@ -1,7 +1,7 @@
 {
  "job": "reanu-n29-w02",
  "role": "reanalyze",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "record": "claude/n29-w02:n_records/n29_w02",
   "engine_commit": "0be4a48f3",
@@ -19,8 +19,8 @@
   "dir": "n29_reanu/w02"
  },
  "metrics": {
-  "games": 163,
-  "points": 1956,
+  "games": 200,
+  "points": 2400,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
@@ -28,18 +28,18 @@
    "early": 0,
    "end_and_attack": 0,
    "enel": 0,
-   "random": 1956
+   "random": 2400
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
    "early": null,
    "end_and_attack": null,
    "enel": null,
-   "random": 0.3037
+   "random": 0.3067
   },
-  "deep_best_differs_all": 0.3037,
-  "sec_replay_per_game": 13.01,
-  "sec_deep_per_game": 9.1
+  "deep_best_differs_all": 0.3067,
+  "sec_replay_per_game": 13.58,
+  "sec_deep_per_game": 9.24
  },
  "commit": "0be4a48f3",
  "notes": ""
