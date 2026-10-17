@@ -1,0 +1,1 @@
+{"job":"hires-r11a-w09","status":"done","seed_base":1039000,"pairs":175,"merge":{"pairs":175,"wr":0.54,"ci95":[0.483,0.597],"elo":27.9,"void":0,"dup_seeds":0},"sec":944,"notes":"Ran as specified, no code changes. Arena 944s for 175 pairs; void 0, dup_seeds 0, promoted false. A wrapper shell exited 1 and a waiter hit its time limit, but the shard itself completed 175/175."}
