@@ -390,22 +390,42 @@ impl Cand {
     }
 }
 
-/// 候補 `OPCG_HAND_STOP=survive`（`docs/reports/2026-10-14_hand_stop.md` §1.3・既定は切）: 守る側の比べ方の辞書式の順を
+/// `OPCG_HAND_STOP`（`docs/reports/2026-10-14_hand_stop.md` §1.3）: 守る側の比べ方の辞書式の順を
 /// 「生き延びるターン → 切る札 → 防いだ本数 → 損害の並び」にする（既定は「防いだ本数 → 切る札 → 生き延びるターン → 損害」）。
 /// 規則の負けは「ライフ 0 で受けたとき」だけで、止める目的は倒れないこと（止めた本数そのものではない）。新定数ゼロ。
+/// **2026-10-14 にユーザ決定で既定に採用**（「(a) 合成で確かめて既定に」・実 w41 の的中 .7260 → .7262・偏り +0.137 → +0.026・合成 w39 の的中 .6717 → .6682・偏り +0.458 → +0.324）。
+/// `OPCG_HAND_STOP=0`（または `off`）で旧い順に戻す。
 pub fn hand_stop_survive() -> bool {
     hand_stop_mode() != 0
 }
 
-/// `OPCG_HAND_STOP` の形: 0＝切（既定）・1＝`survive`・2＝`value`（`docs/reports/2026-10-16_hand_stop_value.md` §1.3）。
-/// `value` も `survive` と同じく比べ方（`better`）だけで守りを選ぶ。
-fn hand_stop_mode() -> u8 {
+/// `OPCG_HAND_STOP` の形: 1＝`survive`（**既定**・2026-10-14 採用）・0＝切（`0`／`off`・旧い順）・2＝`value`
+/// （`docs/reports/2026-10-16_hand_stop_value.md` §1.3）。`value` も `survive` と同じく比べ方（`better`）だけで守りを選ぶ。
+/// 旧い順に固定した糸（[`with_legacy_order`]）では 0。
+pub fn hand_stop_mode() -> u8 {
+    if LEGACY_ORDER.with(|c| c.get()) {
+        return 0;
+    }
     static M: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
     *M.get_or_init(|| match std::env::var("OPCG_HAND_STOP").ok().as_deref().map(str::trim) {
-        Some("survive") => 1,
+        Some("0") | Some("off") => 0,
         Some("value") => 2,
-        _ => 0,
+        _ => 1,
     })
+}
+
+thread_local! {
+    static LEGACY_ORDER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// この糸で作る `Defender` を旧い比べ方の順（防いだ本数 → 切る札 → 生き延びるターン・`OPCG_HAND_STOP=off` と同じ）に固定して `f` を回す。
+/// 旧い順で記録した呼び出しの再生と、旧い順で手で導いた値の試験が使う。
+#[cfg(test)]
+pub fn with_legacy_order<T>(f: impl FnOnce() -> T) -> T {
+    LEGACY_ORDER.with(|c| c.set(true));
+    let r = f();
+    LEGACY_ORDER.with(|c| c.set(false));
+    r
 }
 
 /// 守る側の比較（期待値・同点は誤差で・E9）。
@@ -425,8 +445,8 @@ enum Act {
     Counter(usize),
 }
 
-fn better(arena: &[f64], a: &Cand, b: &Cand, feq: f64) -> bool {
-    match hand_stop_mode() {
+fn better(arena: &[f64], a: &Cand, b: &Cand, feq: f64, mode: u8) -> bool {
+    match mode {
         1 => return better_survive(arena, a, b, feq),
         2 => return better_value(arena, a, b, feq),
         _ => {}
@@ -580,6 +600,10 @@ pub struct Defender {
     harms: Vec<f64>,
     sets: SetCache,
     kb: Vec<u64>,
+    /// 比べ方の順（作るときに `hand_stop_survive()` を写す）。
+    survive: bool,
+    /// 比べ方の形（作るときに `hand_stop_mode()` を写す・0＝旧い順・1＝survive・2＝value）。
+    mode: u8,
 }
 
 type R<T> = Result<T, DpErr>;
@@ -594,6 +618,8 @@ impl Defender {
             harms: Vec::new(),
             sets: SetCache::new(),
             kb: Vec::new(),
+            survive: hand_stop_survive(),
+            mode: hand_stop_mode(),
         }
     }
 
@@ -983,10 +1009,10 @@ impl Defender {
                 let bump = if b.killed { Some(p.nu_of(b.m)) } else { None };
                 let cand = Cand { v: [r.v[0] + 1.0, r.v[1], r.v[2], r.v[3]], src: Src::Arena(r.off, r.len), bump };
                 let d = cand.v[0] - best_def.v[0];
-                let pick = if hand_stop_survive() {
-                    better(&self.harms, &cand, &best_def, p.feq)
+                let pick = if self.survive {
+                    better(&self.harms, &cand, &best_def, p.feq, self.mode)
                 } else {
-                    d > p.feq || (!(d < -p.feq) && better(&self.harms, &cand, &best_def, p.feq))
+                    d > p.feq || (!(d < -p.feq) && better(&self.harms, &cand, &best_def, p.feq, self.mode))
                 };
                 if pick {
                     best_def = cand;
@@ -1012,10 +1038,10 @@ impl Defender {
                     bump: Some(p.mu * nc),
                 };
                 let d = cand.v[0] - best_def.v[0];
-                let pick = if hand_stop_survive() {
-                    better(&self.harms, &cand, &best_def, p.feq)
+                let pick = if self.survive {
+                    better(&self.harms, &cand, &best_def, p.feq, self.mode)
                 } else {
-                    d > p.feq || (!(d < -p.feq) && better(&self.harms, &cand, &best_def, p.feq))
+                    d > p.feq || (!(d < -p.feq) && better(&self.harms, &cand, &best_def, p.feq, self.mode))
                 };
                 if pick {
                     best_def = cand;
@@ -1028,7 +1054,7 @@ impl Defender {
             // 攻め手は守る側の値を最小にする順番
             let take = match &best_att {
                 None => true,
-                Some(ba) => better(&self.harms, ba, &best_def, p.feq),
+                Some(ba) => better(&self.harms, ba, &best_def, p.feq, self.mode),
             };
             if take {
                 best_att = Some(best_def);

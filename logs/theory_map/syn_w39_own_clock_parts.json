@@ -1,0 +1,308 @@
+{
+ "record": "/tmp/claude-0/-home-user-opcg-sim-backend/ddd28cd7-f60e-52c6-ab75-a44ab4cf19b8/scratchpad/data/sigma_wip/data/w39",
+ "align": {
+  "rows": 15796,
+  "parts_missing": 868
+ },
+ "rows": 15154,
+ "best_value_matches_dump_bv": 15154,
+ "mu": 0.0551,
+ "bands": {
+  "1-3": {
+   "pair_best_attack_played_not": {
+    "n": 265,
+    "n_parts": 265,
+    "price_ok": 265,
+    "w_gap_sum": 24.6647,
+    "opp_share": 0.2499,
+    "own_share": 0.7501,
+    "own_clock_opp_durability": {
+     "n": 265,
+     "sum_life": -17.025,
+     "sum_hand": -21.124,
+     "sum_body": -2.575,
+     "share_life": 0.4181,
+     "share_hand": 0.5187,
+     "share_body": 0.0632
+    },
+    "opp_clock_own_durability": {
+     "n": 265,
+     "sum_life": 0.409,
+     "sum_hand": 13.488,
+     "sum_body": 0.081,
+     "share_life": 0.0292,
+     "share_hand": 0.965,
+     "share_body": 0.0058
+    },
+    "mean_d_opp_cards_cut": -1.351,
+    "n_opp_cards_cut": 265,
+    "mean_d_opp_stopped": -1.2159,
+    "n_opp_stopped": 265,
+    "mean_d_own_cards_cut": 0.9372,
+    "n_own_cards_cut": 265,
+    "mean_d_own_stopped": 0.4233,
+    "n_own_stopped": 265
+   },
+   "all_rows": {
+    "n": 1372,
+    "n_parts": 1372,
+    "price_ok": 1372,
+    "w_gap_sum": 53.1105,
+    "opp_share": 0.3754,
+    "own_share": 0.6246,
+    "own_clock_opp_durability": {
+     "n": 1372,
+     "sum_life": -18.387,
+     "sum_hand": -58.091,
+     "sum_body": -3.339,
+     "share_life": 0.2304,
+     "share_hand": 0.7278,
+     "share_body": 0.0418
+    },
+    "opp_clock_own_durability": {
+     "n": 1372,
+     "sum_life": 0.953,
+     "sum_hand": 43.741,
+     "sum_body": 4.43,
+     "share_life": 0.0194,
+     "share_hand": 0.8904,
+     "share_body": 0.0902
+    },
+    "mean_d_opp_cards_cut": -0.7385,
+    "n_opp_cards_cut": 1372,
+    "mean_d_opp_stopped": -0.7304,
+    "n_opp_stopped": 1372,
+    "mean_d_own_cards_cut": 0.5885,
+    "n_own_cards_cut": 1372,
+    "mean_d_own_stopped": 0.4697,
+    "n_own_stopped": 1372
+   },
+   "pair_hand_share_ci": [
+    0.4573,
+    0.5755
+   ]
+  },
+  "4-6": {
+   "pair_best_attack_played_not": {
+    "n": 1084,
+    "n_parts": 1084,
+    "price_ok": 1084,
+    "w_gap_sum": 114.0523,
+    "opp_share": 0.2181,
+    "own_share": 0.7819,
+    "own_clock_opp_durability": {
+     "n": 1084,
+     "sum_life": -72.376,
+     "sum_hand": -84.336,
+     "sum_body": -21.499,
+     "share_life": 0.4061,
+     "share_hand": 0.4732,
+     "share_body": 0.1206
+    },
+    "opp_clock_own_durability": {
+     "n": 1084,
+     "sum_life": 2.224,
+     "sum_hand": 61.662,
+     "sum_body": -4.951,
+     "share_life": 0.0377,
+     "share_hand": 1.0463,
+     "share_body": -0.084
+    },
+    "mean_d_opp_cards_cut": -1.304,
+    "n_opp_cards_cut": 1084,
+    "mean_d_opp_stopped": -1.1194,
+    "n_opp_stopped": 1084,
+    "mean_d_own_cards_cut": 0.8628,
+    "n_own_cards_cut": 1084,
+    "mean_d_own_stopped": 0.6041,
+    "n_own_stopped": 1084
+   },
+   "all_rows": {
+    "n": 3072,
+    "n_parts": 3072,
+    "price_ok": 3072,
+    "w_gap_sum": 165.3314,
+    "opp_share": 0.2731,
+    "own_share": 0.7269,
+    "own_clock_opp_durability": {
+     "n": 3072,
+     "sum_life": -83.734,
+     "sum_hand": -136.167,
+     "sum_body": -23.194,
+     "share_life": 0.3445,
+     "share_hand": 0.5601,
+     "share_body": 0.0954
+    },
+    "opp_clock_own_durability": {
+     "n": 3072,
+     "sum_life": 1.666,
+     "sum_hand": 102.073,
+     "sum_body": 0.268,
+     "share_life": 0.016,
+     "share_hand": 0.9814,
+     "share_body": 0.0026
+    },
+    "mean_d_opp_cards_cut": -0.7541,
+    "n_opp_cards_cut": 3072,
+    "mean_d_opp_stopped": -0.684,
+    "n_opp_stopped": 3072,
+    "mean_d_own_cards_cut": 0.4992,
+    "n_own_cards_cut": 3072,
+    "mean_d_own_stopped": 0.4084,
+    "n_own_stopped": 3072
+   },
+   "pair_hand_share_ci": [
+    0.4379,
+    0.5084
+   ]
+  },
+  "7+": {
+   "pair_best_attack_played_not": {
+    "n": 3682,
+    "n_parts": 3211,
+    "price_ok": 3211,
+    "w_gap_sum": 460.6272,
+    "opp_share": 0.132,
+    "own_share": 0.868,
+    "own_clock_opp_durability": {
+     "n": 3211,
+     "sum_life": -300.649,
+     "sum_hand": -184.445,
+     "sum_body": -64.825,
+     "share_life": 0.5467,
+     "share_hand": 0.3354,
+     "share_body": 0.1179
+    },
+    "opp_clock_own_durability": {
+     "n": 3211,
+     "sum_life": 5.511,
+     "sum_hand": 103.705,
+     "sum_body": -9.512,
+     "share_life": 0.0553,
+     "share_hand": 1.0401,
+     "share_body": -0.0954
+    },
+    "mean_d_opp_cards_cut": -0.9398,
+    "n_opp_cards_cut": 3211,
+    "mean_d_opp_stopped": -0.6245,
+    "n_opp_stopped": 3211,
+    "mean_d_own_cards_cut": 0.4214,
+    "n_own_cards_cut": 3211,
+    "mean_d_own_stopped": 0.3143,
+    "n_own_stopped": 3211
+   },
+   "all_rows": {
+    "n": 10710,
+    "n_parts": 9842,
+    "price_ok": 9842,
+    "w_gap_sum": 777.8026,
+    "opp_share": 0.2583,
+    "own_share": 0.7417,
+    "own_clock_opp_durability": {
+     "n": 9842,
+     "sum_life": -355.088,
+     "sum_hand": -345.587,
+     "sum_body": -87.372,
+     "share_life": 0.4506,
+     "share_hand": 0.4385,
+     "share_body": 0.1109
+    },
+    "opp_clock_own_durability": {
+     "n": 9842,
+     "sum_life": 10.039,
+     "sum_hand": 266.408,
+     "sum_body": 15.779,
+     "share_life": 0.0344,
+     "share_hand": 0.9117,
+     "share_body": 0.054
+    },
+    "mean_d_opp_cards_cut": -0.5795,
+    "n_opp_cards_cut": 9842,
+    "mean_d_opp_stopped": -0.4302,
+    "n_opp_stopped": 9842,
+    "mean_d_own_cards_cut": 0.3041,
+    "n_own_cards_cut": 9842,
+    "mean_d_own_stopped": 0.2157,
+    "n_own_stopped": 9842
+   },
+   "pair_hand_share_ci": [
+    0.3057,
+    0.3641
+   ]
+  },
+  "all": {
+   "pair_best_attack_played_not": {
+    "n": 5031,
+    "n_parts": 4560,
+    "price_ok": 4560,
+    "w_gap_sum": 599.3442,
+    "opp_share": 0.1533,
+    "own_share": 0.8467,
+    "own_clock_opp_durability": {
+     "n": 4560,
+     "sum_life": -390.05,
+     "sum_hand": -289.905,
+     "sum_body": -88.9,
+     "share_life": 0.5073,
+     "share_hand": 0.3771,
+     "share_body": 0.1156
+    },
+    "opp_clock_own_durability": {
+     "n": 4560,
+     "sum_life": 8.144,
+     "sum_hand": 178.855,
+     "sum_body": -14.381,
+     "share_life": 0.0472,
+     "share_hand": 1.0361,
+     "share_body": -0.0833
+    },
+    "mean_d_opp_cards_cut": -1.0502,
+    "n_opp_cards_cut": 4560,
+    "mean_d_opp_stopped": -0.7765,
+    "n_opp_stopped": 4560,
+    "mean_d_own_cards_cut": 0.5563,
+    "n_own_cards_cut": 4560,
+    "mean_d_own_stopped": 0.3895,
+    "n_own_stopped": 4560
+   },
+   "all_rows": {
+    "n": 15154,
+    "n_parts": 14286,
+    "price_ok": 14286,
+    "w_gap_sum": 996.2444,
+    "opp_share": 0.267,
+    "own_share": 0.733,
+    "own_clock_opp_durability": {
+     "n": 14286,
+     "sum_life": -457.21,
+     "sum_hand": -539.845,
+     "sum_body": -113.905,
+     "share_life": 0.4115,
+     "share_hand": 0.4859,
+     "share_body": 0.1025
+    },
+    "opp_clock_own_durability": {
+     "n": 14286,
+     "sum_life": 12.658,
+     "sum_hand": 412.221,
+     "sum_body": 20.477,
+     "share_life": 0.0284,
+     "share_hand": 0.9256,
+     "share_body": 0.046
+    },
+    "mean_d_opp_cards_cut": -0.6323,
+    "n_opp_cards_cut": 14286,
+    "mean_d_opp_stopped": -0.5136,
+    "n_opp_stopped": 14286,
+    "mean_d_own_cards_cut": 0.3734,
+    "n_own_cards_cut": 14286,
+    "mean_d_own_stopped": 0.2815,
+    "n_own_stopped": 14286
+   },
+   "pair_hand_share_ci": [
+    0.3531,
+    0.4008
+   ]
+  }
+ }
+}

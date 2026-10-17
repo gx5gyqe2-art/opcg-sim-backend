@@ -1,0 +1,2110 @@
+{
+ "record": "/tmp/claude-0/-home-user-opcg-sim-backend/ddd28cd7-f60e-52c6-ab75-a44ab4cf19b8/scratchpad/data/sigma_wip/data/w39",
+ "dump": "/tmp/claude-0/-home-user-opcg-sim-backend/ddd28cd7-f60e-52c6-ab75-a44ab4cf19b8/scratchpad/ts/dump_t.jsonl",
+ "clocks": "/tmp/claude-0/-home-user-opcg-sim-backend/ddd28cd7-f60e-52c6-ab75-a44ab4cf19b8/scratchpad/ft/clocks_a1.json",
+ "cap": 30.0,
+ "count": {
+  "S2": 15796,
+  "S1": 3658,
+  "S4": 3439
+ },
+ "invariant_width_over_scale": {
+  "n": 13539,
+  "sigma_rel_median": 0.3874,
+  "p05_p95": [
+   0.3874,
+   0.3874
+  ]
+ },
+ "price_vs_bridge": {
+  "all": {
+   "n": 3426,
+   "tau_me": [
+    3.926,
+    4.557
+   ],
+   "tau_opp": [
+    3.795,
+    4.21
+   ],
+   "sd_D": [
+    1.988,
+    4.495
+   ],
+   "corr_D": 0.2554,
+   "slope_D_price_on_bridge": 0.113,
+   "corr_W": 0.4993,
+   "corr_W_outcome": [
+    0.2623,
+    0.4498
+   ]
+  },
+  "by_band": {
+   "1-3": {
+    "n": 587,
+    "tau_me": [
+     6.372,
+     7.346
+    ],
+    "tau_opp": [
+     6.492,
+     6.9
+    ],
+    "sd_D": [
+     2.372,
+     4.259
+    ],
+    "corr_D": 0.1994,
+    "slope_D_price_on_bridge": 0.111,
+    "corr_W": 0.2863,
+    "corr_W_outcome": [
+     0.0584,
+     0.2654
+    ]
+   },
+   "4-6": {
+    "n": 900,
+    "tau_me": [
+     5.016,
+     5.576
+    ],
+    "tau_opp": [
+     4.973,
+     5.091
+    ],
+    "sd_D": [
+     2.176,
+     4.208
+    ],
+    "corr_D": 0.2416,
+    "slope_D_price_on_bridge": 0.1249,
+    "corr_W": 0.3425,
+    "corr_W_outcome": [
+     0.0903,
+     0.3505
+    ]
+   },
+   "7+": {
+    "n": 1939,
+    "tau_me": [
+     2.68,
+     3.239
+    ],
+    "tau_opp": [
+     2.432,
+     2.986
+    ],
+    "sd_D": [
+     1.746,
+     4.686
+    ],
+    "corr_D": 0.2957,
+    "slope_D_price_on_bridge": 0.1102,
+    "corr_W": 0.5679,
+    "corr_W_outcome": [
+     0.3617,
+     0.5287
+    ]
+   }
+  },
+  "sigma_rel": {
+   "price_implied": 0.3874,
+   "bridge": 0.387
+  }
+ },
+ "S1": {
+  "all": {
+   "n": 3658,
+   "games": 300,
+   "W_mean": 0.471,
+   "win_rate": 0.5183,
+   "slope_b": 0.4813,
+   "slope_b_ci": [
+    0.3567,
+    0.5933
+   ],
+   "width": 0.1191,
+   "width_ci": [
+    0.0926,
+    0.1473
+   ],
+   "conv_a": 0.3401,
+   "conv_a_ci": [
+    0.2541,
+    0.4311
+   ],
+   "by_W": {
+    "<0.2": {
+     "n": 656,
+     "W": 0.0756,
+     "win": 0.346,
+     "resid": 0.2704
+    },
+    "0.2-0.4": {
+     "n": 769,
+     "W": 0.3116,
+     "win": 0.4395,
+     "resid": 0.1279
+    },
+    "0.4-0.6": {
+     "n": 1061,
+     "W": 0.4989,
+     "win": 0.5259,
+     "resid": 0.027
+    },
+    "0.6-0.8": {
+     "n": 753,
+     "W": 0.6927,
+     "win": 0.5883,
+     "resid": -0.1044
+    },
+    ">=0.8": {
+     "n": 419,
+     "W": 0.9136,
+     "win": 0.7876,
+     "resid": -0.126
+    }
+   },
+   "by_D": {
+    "<-3": {
+     "n": 157,
+     "D": -4.609,
+     "W": 0.066,
+     "win": 0.1975,
+     "D_act_bound": -0.803
+    },
+    "-3..-1": {
+     "n": 861,
+     "D": -1.716,
+     "W": 0.1877,
+     "win": 0.3926,
+     "D_act_bound": -0.607
+    },
+    "-1..1": {
+     "n": 1795,
+     "D": -0.032,
+     "W": 0.4884,
+     "win": 0.5432,
+     "D_act_bound": -0.457
+    },
+    "1..3": {
+     "n": 724,
+     "D": 1.69,
+     "W": 0.7787,
+     "win": 0.6367,
+     "D_act_bound": -0.363
+    },
+    ">3": {
+     "n": 121,
+     "D": 4.955,
+     "W": 0.9137,
+     "win": 0.7521,
+     "D_act_bound": -0.248
+    }
+   },
+   "clock_by_absD": {
+    "<1": {
+     "n": 1795,
+     "absD": 0.473,
+     "len_theory": 7.746,
+     "len_actual": 7.106,
+     "ratio": 1.0901,
+     "ratio_ci": [
+      1.0603,
+      1.1245
+     ],
+     "fav_won_share": 0.5443,
+     "win_clock_resid_fav_won": 0.466,
+     "win_clock_resid_unfav_won": 0.815,
+     "n_unfav_won": 818
+    },
+    "1..3": {
+     "n": 1585,
+     "absD": 1.704,
+     "len_theory": 6.826,
+     "len_actual": 6.624,
+     "ratio": 1.0306,
+     "ratio_ci": [
+      0.9967,
+      1.065
+     ],
+     "fav_won_share": 0.6208,
+     "win_clock_resid_fav_won": 0.211,
+     "win_clock_resid_unfav_won": 1.507,
+     "n_unfav_won": 601
+    },
+    ">=3": {
+     "n": 278,
+     "absD": 4.76,
+     "len_theory": 6.219,
+     "len_actual": 5.993,
+     "ratio": 1.0378,
+     "ratio_ci": [
+      0.9816,
+      1.0922
+     ],
+     "fav_won_share": 0.7806,
+     "win_clock_resid_fav_won": 0.055,
+     "win_clock_resid_unfav_won": 5.918,
+     "n_unfav_won": 61
+    },
+    "all": {
+     "n": 3658,
+     "absD": 1.332,
+     "len_theory": 7.232,
+     "len_actual": 6.812,
+     "ratio": 1.0615,
+     "ratio_ci": [
+      1.0339,
+      1.0917
+     ],
+     "fav_won_share": 0.5954,
+     "win_clock_resid_fav_won": 0.31,
+     "win_clock_resid_unfav_won": 1.307,
+     "n_unfav_won": 1480
+    }
+   }
+  },
+  "by_band": {
+   "1-3": {
+    "n": 819,
+    "games": 300,
+    "W_mean": 0.5059,
+    "win_rate": 0.486,
+    "slope_b": 0.2354,
+    "slope_b_ci": [
+     -0.1067,
+     0.5747
+    ],
+    "width": 0.0807,
+    "width_ci": [
+     0.046,
+     0.1242
+    ],
+    "conv_a": 0.1994,
+    "conv_a_ci": [
+     0.02,
+     0.511
+    ],
+    "by_W": {
+     "<0.2": {
+      "n": 21,
+      "W": 0.1378,
+      "win": 0.4286,
+      "resid": 0.2908
+     },
+     "0.2-0.4": {
+      "n": 187,
+      "W": 0.3274,
+      "win": 0.4278,
+      "resid": 0.1004
+     },
+     "0.4-0.6": {
+      "n": 385,
+      "W": 0.5029,
+      "win": 0.4961,
+      "resid": -0.0068
+     },
+     "0.6-0.8": {
+      "n": 209,
+      "W": 0.6775,
+      "win": 0.5263,
+      "resid": -0.1512
+     },
+     ">=0.8": {
+      "n": 17,
+      "W": 0.8803,
+      "win": 0.4706,
+      "resid": -0.4097
+     }
+    },
+    "by_D": {
+     "<-3": {
+      "n": 24,
+      "D": -5.542,
+      "W": 0.1547,
+      "win": 0.4583,
+      "D_act_bound": -0.542
+     },
+     "-3..-1": {
+      "n": 162,
+      "D": -1.677,
+      "W": 0.3204,
+      "win": 0.4444,
+      "D_act_bound": -0.556
+     },
+     "-1..1": {
+      "n": 424,
+      "D": 0.017,
+      "W": 0.5014,
+      "win": 0.4811,
+      "D_act_bound": -0.519
+     },
+     "1..3": {
+      "n": 178,
+      "D": 1.674,
+      "W": 0.6757,
+      "win": 0.5393,
+      "D_act_bound": -0.461
+     },
+     ">3": {
+      "n": 31,
+      "D": 5.872,
+      "W": 0.8334,
+      "win": 0.4839,
+      "D_act_bound": -0.516
+     }
+    },
+    "clock_by_absD": {
+     "<1": {
+      "n": 424,
+      "absD": 0.457,
+      "len_theory": 12.519,
+      "len_actual": 11.443,
+      "ratio": 1.094,
+      "ratio_ci": [
+       1.0626,
+       1.1275
+      ],
+      "fav_won_share": 0.5094,
+      "win_clock_resid_fav_won": 0.731,
+      "win_clock_resid_unfav_won": 1.019,
+      "n_unfav_won": 208
+     },
+     "1..3": {
+      "n": 340,
+      "absD": 1.676,
+      "len_theory": 11.953,
+      "len_actual": 11.259,
+      "ratio": 1.0617,
+      "ratio_ci": [
+       1.0298,
+       1.095
+      ],
+      "fav_won_share": 0.5471,
+      "win_clock_resid_fav_won": 0.366,
+      "win_clock_resid_unfav_won": 2.013,
+      "n_unfav_won": 154
+     },
+     ">=3": {
+      "n": 55,
+      "absD": 5.728,
+      "len_theory": 12.091,
+      "len_actual": 11.709,
+      "ratio": 1.0326,
+      "ratio_ci": [
+       0.9691,
+       1.0946
+      ],
+      "fav_won_share": 0.5091,
+      "win_clock_resid_fav_won": 0.143,
+      "win_clock_resid_unfav_won": 5.926,
+      "n_unfav_won": 27
+     },
+     "all": {
+      "n": 819,
+      "absD": 1.317,
+      "len_theory": 12.255,
+      "len_actual": 11.385,
+      "ratio": 1.0765,
+      "ratio_ci": [
+       1.0515,
+       1.1029
+      ],
+      "fav_won_share": 0.525,
+      "win_clock_resid_fav_won": 0.535,
+      "win_clock_resid_unfav_won": 1.753,
+      "n_unfav_won": 389
+     }
+    }
+   },
+   "4-6": {
+    "n": 900,
+    "games": 300,
+    "W_mean": 0.4972,
+    "win_rate": 0.5078,
+    "slope_b": 0.2418,
+    "slope_b_ci": [
+     -0.0306,
+     0.5118
+    ],
+    "width": 0.1071,
+    "width_ci": [
+     0.0662,
+     0.1499
+    ],
+    "conv_a": 0.2111,
+    "conv_a_ci": [
+     0.02,
+     0.4614
+    ],
+    "by_W": {
+     "<0.2": {
+      "n": 43,
+      "W": 0.1291,
+      "win": 0.3023,
+      "resid": 0.1732
+     },
+     "0.2-0.4": {
+      "n": 255,
+      "W": 0.3196,
+      "win": 0.4667,
+      "resid": 0.147
+     },
+     "0.4-0.6": {
+      "n": 323,
+      "W": 0.4954,
+      "win": 0.5201,
+      "resid": 0.0247
+     },
+     "0.6-0.8": {
+      "n": 235,
+      "W": 0.6909,
+      "win": 0.5702,
+      "resid": -0.1206
+     },
+     ">=0.8": {
+      "n": 44,
+      "W": 0.8655,
+      "win": 0.5227,
+      "resid": -0.3427
+     }
+    },
+    "by_D": {
+     "<-3": {
+      "n": 29,
+      "D": -6.547,
+      "W": 0.1168,
+      "win": 0.2759,
+      "D_act_bound": -0.724
+     },
+     "-3..-1": {
+      "n": 179,
+      "D": -1.586,
+      "W": 0.2799,
+      "win": 0.4637,
+      "D_act_bound": -0.536
+     },
+     "-1..1": {
+      "n": 477,
+      "D": -0.057,
+      "W": 0.491,
+      "win": 0.522,
+      "D_act_bound": -0.478
+     },
+     "1..3": {
+      "n": 188,
+      "D": 1.632,
+      "W": 0.7232,
+      "win": 0.5266,
+      "D_act_bound": -0.473
+     },
+     ">3": {
+      "n": 27,
+      "D": 5.754,
+      "W": 0.8842,
+      "win": 0.6667,
+      "D_act_bound": -0.333
+     }
+    },
+    "clock_by_absD": {
+     "<1": {
+      "n": 477,
+      "absD": 0.484,
+      "len_theory": 9.166,
+      "len_actual": 8.413,
+      "ratio": 1.0895,
+      "ratio_ci": [
+       1.0535,
+       1.1273
+      ],
+      "fav_won_share": 0.5073,
+      "win_clock_resid_fav_won": 0.517,
+      "win_clock_resid_unfav_won": 0.898,
+      "n_unfav_won": 235
+     },
+     "1..3": {
+      "n": 367,
+      "absD": 1.61,
+      "len_theory": 8.741,
+      "len_actual": 8.469,
+      "ratio": 1.0322,
+      "ratio_ci": [
+       0.9896,
+       1.0757
+      ],
+      "fav_won_share": 0.5313,
+      "win_clock_resid_fav_won": 0.426,
+      "win_clock_resid_unfav_won": 1.477,
+      "n_unfav_won": 172
+     },
+     ">=3": {
+      "n": 56,
+      "absD": 6.165,
+      "len_theory": 9.839,
+      "len_actual": 8.857,
+      "ratio": 1.1109,
+      "ratio_ci": [
+       1.0359,
+       1.1895
+      ],
+      "fav_won_share": 0.6964,
+      "win_clock_resid_fav_won": 0.462,
+      "win_clock_resid_unfav_won": 7.765,
+      "n_unfav_won": 17
+     },
+     "all": {
+      "n": 900,
+      "absD": 1.297,
+      "len_theory": 9.034,
+      "len_actual": 8.463,
+      "ratio": 1.0675,
+      "ratio_ci": [
+       1.037,
+       1.0991
+      ],
+      "fav_won_share": 0.5289,
+      "win_clock_resid_fav_won": 0.475,
+      "win_clock_resid_unfav_won": 1.408,
+      "n_unfav_won": 424
+     }
+    }
+   },
+   "7+": {
+    "n": 1939,
+    "games": 300,
+    "W_mean": 0.4441,
+    "win_rate": 0.5369,
+    "slope_b": 0.5608,
+    "slope_b_ci": [
+     0.4492,
+     0.6699
+    ],
+    "width": 0.1437,
+    "width_ci": [
+     0.114,
+     0.175
+    ],
+    "conv_a": 0.3609,
+    "conv_a_ci": [
+     0.2762,
+     0.4494
+    ],
+    "by_W": {
+     "<0.2": {
+      "n": 592,
+      "W": 0.0695,
+      "win": 0.3463,
+      "resid": 0.2768
+     },
+     "0.2-0.4": {
+      "n": 327,
+      "W": 0.2963,
+      "win": 0.4251,
+      "resid": 0.1288
+     },
+     "0.4-0.6": {
+      "n": 353,
+      "W": 0.4978,
+      "win": 0.5637,
+      "resid": 0.0659
+     },
+     "0.6-0.8": {
+      "n": 309,
+      "W": 0.7044,
+      "win": 0.644,
+      "resid": -0.0604
+     },
+     ">=0.8": {
+      "n": 358,
+      "W": 0.921,
+      "win": 0.8352,
+      "resid": -0.0858
+     }
+    },
+    "by_D": {
+     "<-3": {
+      "n": 104,
+      "D": -3.853,
+      "W": 0.0313,
+      "win": 0.1154,
+      "D_act_bound": -0.885
+     },
+     "-3..-1": {
+      "n": 520,
+      "D": -1.772,
+      "W": 0.1147,
+      "win": 0.3519,
+      "D_act_bound": -0.648
+     },
+     "-1..1": {
+      "n": 894,
+      "D": -0.043,
+      "W": 0.4809,
+      "win": 0.5839,
+      "D_act_bound": -0.416
+     },
+     "1..3": {
+      "n": 358,
+      "D": 1.727,
+      "W": 0.859,
+      "win": 0.743,
+      "D_act_bound": -0.257
+     },
+     ">3": {
+      "n": 63,
+      "D": 4.161,
+      "W": 0.9659,
+      "win": 0.9206,
+      "D_act_bound": -0.079
+     }
+    },
+    "clock_by_absD": {
+     "<1": {
+      "n": 894,
+      "absD": 0.476,
+      "len_theory": 4.725,
+      "len_actual": 4.351,
+      "ratio": 1.0859,
+      "ratio_ci": [
+       1.046,
+       1.137
+      ],
+      "fav_won_share": 0.5805,
+      "win_clock_resid_fav_won": 0.331,
+      "win_clock_resid_unfav_won": 0.651,
+      "n_unfav_won": 375
+     },
+     "1..3": {
+      "n": 878,
+      "absD": 1.754,
+      "len_theory": 4.041,
+      "len_actual": 4.058,
+      "ratio": 0.9958,
+      "ratio_ci": [
+       0.949,
+       1.0449
+      ],
+      "fav_won_share": 0.6868,
+      "win_clock_resid_fav_won": 0.095,
+      "win_clock_resid_unfav_won": 1.244,
+      "n_unfav_won": 275
+     },
+     ">=3": {
+      "n": 167,
+      "absD": 3.969,
+      "len_theory": 3.072,
+      "len_actual": 3.15,
+      "ratio": 0.9753,
+      "ratio_ci": [
+       0.8866,
+       1.0731
+      ],
+      "fav_won_share": 0.8982,
+      "win_clock_resid_fav_won": -0.067,
+      "win_clock_resid_unfav_won": 4.059,
+      "n_unfav_won": 17
+     },
+     "all": {
+      "n": 1939,
+      "absD": 1.355,
+      "len_theory": 4.273,
+      "len_actual": 4.115,
+      "ratio": 1.0384,
+      "ratio_ci": [
+       1.0003,
+       1.0798
+      ],
+      "fav_won_share": 0.656,
+      "win_clock_resid_fav_won": 0.172,
+      "win_clock_resid_unfav_won": 0.982,
+      "n_unfav_won": 667
+     }
+    }
+   }
+  },
+  "by_deck_count": 139,
+  "by_deck_top10": {
+   "OP14-001": {
+    "n": 53,
+    "slope_b": 0.9335,
+    "width": 0.1943
+   },
+   "P-117": {
+    "n": 53,
+    "slope_b": 0.0,
+    "width": 0.388
+   },
+   "OP16-080": {
+    "n": 51,
+    "slope_b": 0.2223,
+    "width": 0.3182
+   },
+   "OP17-020": {
+    "n": 50,
+    "slope_b": 0.1461,
+    "width": 0.218
+   },
+   "OP03-040": {
+    "n": 49,
+    "slope_b": 0.0,
+    "width": 0.4734
+   },
+   "OP10-099": {
+    "n": 49,
+    "slope_b": 0.0,
+    "width": 0.3212
+   },
+   "EB03-001": {
+    "n": 48,
+    "slope_b": 0.5209,
+    "width": 0.2419
+   },
+   "ST13-003": {
+    "n": 48,
+    "slope_b": 1.0258,
+    "width": 0.1537
+   },
+   "OP08-002": {
+    "n": 46,
+    "slope_b": -0.6725,
+    "width": 0.2992
+   },
+   "ST02-001": {
+    "n": 46,
+    "slope_b": -0.0111,
+    "width": 0.2965
+   }
+  }
+ },
+ "S2": {
+  "all": {
+   "n": 15796,
+   "games": 300,
+   "W_mean": 0.5184,
+   "win_rate": 0.5245,
+   "slope_b": 0.5902,
+   "slope_b_ci": [
+    0.4771,
+    0.6906
+   ],
+   "width": 0.1089,
+   "width_ci": [
+    0.0843,
+    0.1389
+   ],
+   "conv_a": 0.4455,
+   "conv_a_ci": [
+    0.3585,
+    0.5367
+   ],
+   "by_W": {
+    "<0.2": {
+     "n": 2927,
+     "W": 0.0751,
+     "win": 0.272,
+     "resid": 0.1968
+    },
+    "0.2-0.4": {
+     "n": 2771,
+     "W": 0.3054,
+     "win": 0.4193,
+     "resid": 0.114
+    },
+    "0.4-0.6": {
+     "n": 3631,
+     "W": 0.502,
+     "win": 0.5065,
+     "resid": 0.0045
+    },
+    "0.6-0.8": {
+     "n": 2981,
+     "W": 0.6979,
+     "win": 0.5877,
+     "resid": -0.1102
+    },
+    ">=0.8": {
+     "n": 3486,
+     "W": 0.9236,
+     "win": 0.7849,
+     "resid": -0.1388
+    }
+   },
+   "by_D": {
+    "<-3": {
+     "n": 544,
+     "D": -4.392,
+     "W": 0.0578,
+     "win": 0.1673,
+     "D_act_bound": -0.833
+    },
+    "-3..-1": {
+     "n": 3246,
+     "D": -1.712,
+     "W": 0.1675,
+     "win": 0.3358,
+     "D_act_bound": -0.664
+    },
+    "-1..1": {
+     "n": 7536,
+     "D": 0.01,
+     "W": 0.5015,
+     "win": 0.5167,
+     "D_act_bound": -0.483
+    },
+    "1..3": {
+     "n": 3793,
+     "D": 1.772,
+     "W": 0.8421,
+     "win": 0.695,
+     "D_act_bound": -0.305
+    },
+    ">3": {
+     "n": 677,
+     "D": 4.399,
+     "W": 0.9461,
+     "win": 0.8479,
+     "D_act_bound": -0.152
+    }
+   },
+   "clock_by_absD": {
+    "<1": {
+     "n": 7536,
+     "absD": 0.471,
+     "len_theory": 6.029,
+     "len_actual": 5.866,
+     "ratio": 1.0277,
+     "ratio_ci": [
+      0.9969,
+      1.0644
+     ],
+     "fav_won_share": 0.5697,
+     "win_clock_resid_fav_won": 0.22,
+     "win_clock_resid_unfav_won": 0.621,
+     "n_unfav_won": 3243
+    },
+    "1..3": {
+     "n": 7039,
+     "absD": 1.744,
+     "len_theory": 5.305,
+     "len_actual": 5.499,
+     "ratio": 0.9649,
+     "ratio_ci": [
+      0.9306,
+      1.0018
+     ],
+     "fav_won_share": 0.6808,
+     "win_clock_resid_fav_won": -0.016,
+     "win_clock_resid_unfav_won": 1.45,
+     "n_unfav_won": 2247
+    },
+    ">=3": {
+     "n": 1221,
+     "absD": 4.396,
+     "len_theory": 4.684,
+     "len_actual": 4.961,
+     "ratio": 0.9442,
+     "ratio_ci": [
+      0.8902,
+      1.0027
+     ],
+     "fav_won_share": 0.8411,
+     "win_clock_resid_fav_won": -0.187,
+     "win_clock_resid_unfav_won": 5.284,
+     "n_unfav_won": 194
+    },
+    "all": {
+     "n": 15796,
+     "absD": 1.342,
+     "len_theory": 5.602,
+     "len_actual": 5.632,
+     "ratio": 0.9947,
+     "ratio_ci": [
+      0.9666,
+      1.025
+     ],
+     "fav_won_share": 0.6402,
+     "win_clock_resid_fav_won": 0.067,
+     "win_clock_resid_unfav_won": 1.108,
+     "n_unfav_won": 5684
+    }
+   }
+  },
+  "by_band": {
+   "1-3": {
+    "n": 1568,
+    "games": 300,
+    "W_mean": 0.5022,
+    "win_rate": 0.4949,
+    "slope_b": 0.1959,
+    "slope_b_ci": [
+     -0.1493,
+     0.5191
+    ],
+    "width": 0.0874,
+    "width_ci": [
+     0.0544,
+     0.1334
+    ],
+    "conv_a": 0.172,
+    "conv_a_ci": [
+     0.02,
+     0.4697
+    ],
+    "by_W": {
+     "<0.2": {
+      "n": 43,
+      "W": 0.1387,
+      "win": 0.5581,
+      "resid": 0.4195
+     },
+     "0.2-0.4": {
+      "n": 373,
+      "W": 0.3223,
+      "win": 0.4424,
+      "resid": 0.1201
+     },
+     "0.4-0.6": {
+      "n": 724,
+      "W": 0.5023,
+      "win": 0.4972,
+      "resid": -0.005
+     },
+     "0.6-0.8": {
+      "n": 389,
+      "W": 0.6772,
+      "win": 0.527,
+      "resid": -0.1503
+     },
+     ">=0.8": {
+      "n": 39,
+      "W": 0.8745,
+      "win": 0.5641,
+      "resid": -0.3104
+     }
+    },
+    "by_D": {
+     "<-3": {
+      "n": 45,
+      "D": -5.344,
+      "W": 0.1495,
+      "win": 0.5333,
+      "D_act_bound": -0.467
+     },
+     "-3..-1": {
+      "n": 317,
+      "D": -1.742,
+      "W": 0.3112,
+      "win": 0.4543,
+      "D_act_bound": -0.546
+     },
+     "-1..1": {
+      "n": 825,
+      "D": 0.011,
+      "W": 0.501,
+      "win": 0.4921,
+      "D_act_bound": -0.508
+     },
+     "1..3": {
+      "n": 324,
+      "D": 1.681,
+      "W": 0.6815,
+      "win": 0.5309,
+      "D_act_bound": -0.469
+     },
+     ">3": {
+      "n": 57,
+      "D": 6.235,
+      "W": 0.8399,
+      "win": 0.5263,
+      "D_act_bound": -0.474
+     }
+    },
+    "clock_by_absD": {
+     "<1": {
+      "n": 825,
+      "absD": 0.46,
+      "len_theory": 11.97,
+      "len_actual": 11.088,
+      "ratio": 1.0795,
+      "ratio_ci": [
+       1.0489,
+       1.1129
+      ],
+      "fav_won_share": 0.5236,
+      "win_clock_resid_fav_won": 0.586,
+      "win_clock_resid_unfav_won": 0.962,
+      "n_unfav_won": 393
+     },
+     "1..3": {
+      "n": 641,
+      "absD": 1.711,
+      "len_theory": 11.594,
+      "len_actual": 10.883,
+      "ratio": 1.0654,
+      "ratio_ci": [
+       1.0352,
+       1.0972
+      ],
+      "fav_won_share": 0.5382,
+      "win_clock_resid_fav_won": 0.362,
+      "win_clock_resid_unfav_won": 2.061,
+      "n_unfav_won": 296
+     },
+     ">=3": {
+      "n": 102,
+      "absD": 5.842,
+      "len_theory": 11.833,
+      "len_actual": 11.51,
+      "ratio": 1.0281,
+      "ratio_ci": [
+       0.9658,
+       1.0966
+      ],
+      "fav_won_share": 0.5,
+      "win_clock_resid_fav_won": 0.078,
+      "win_clock_resid_unfav_won": 5.627,
+      "n_unfav_won": 51
+     },
+     "all": {
+      "n": 1568,
+      "absD": 1.321,
+      "len_theory": 11.807,
+      "len_actual": 11.032,
+      "ratio": 1.0703,
+      "ratio_ci": [
+       1.046,
+       1.0969
+      ],
+      "fav_won_share": 0.5281,
+      "win_clock_resid_fav_won": 0.461,
+      "win_clock_resid_unfav_won": 1.723,
+      "n_unfav_won": 740
+     }
+    }
+   },
+   "4-6": {
+    "n": 3232,
+    "games": 300,
+    "W_mean": 0.4995,
+    "win_rate": 0.5195,
+    "slope_b": 0.3042,
+    "slope_b_ci": [
+     0.0177,
+     0.566
+    ],
+    "width": 0.1115,
+    "width_ci": [
+     0.0705,
+     0.1536
+    ],
+    "conv_a": 0.2749,
+    "conv_a_ci": [
+     0.0223,
+     0.5176
+    ],
+    "by_W": {
+     "<0.2": {
+      "n": 185,
+      "W": 0.1443,
+      "win": 0.3946,
+      "resid": 0.2503
+     },
+     "0.2-0.4": {
+      "n": 903,
+      "W": 0.3163,
+      "win": 0.4574,
+      "resid": 0.141
+     },
+     "0.4-0.6": {
+      "n": 1136,
+      "W": 0.5009,
+      "win": 0.5352,
+      "resid": 0.0343
+     },
+     "0.6-0.8": {
+      "n": 802,
+      "W": 0.6925,
+      "win": 0.5561,
+      "resid": -0.1364
+     },
+     ">=0.8": {
+      "n": 206,
+      "W": 0.8616,
+      "win": 0.6748,
+      "resid": -0.1868
+     }
+    },
+    "by_D": {
+     "<-3": {
+      "n": 94,
+      "D": -5.732,
+      "W": 0.1188,
+      "win": 0.3191,
+      "D_act_bound": -0.681
+     },
+     "-3..-1": {
+      "n": 701,
+      "D": -1.625,
+      "W": 0.2745,
+      "win": 0.4593,
+      "D_act_bound": -0.541
+     },
+     "-1..1": {
+      "n": 1642,
+      "D": -0.034,
+      "W": 0.4946,
+      "win": 0.5305,
+      "D_act_bound": -0.47
+     },
+     "1..3": {
+      "n": 684,
+      "D": 1.68,
+      "W": 0.7315,
+      "win": 0.5439,
+      "D_act_bound": -0.456
+     },
+     ">3": {
+      "n": 111,
+      "D": 4.978,
+      "W": 0.8839,
+      "win": 0.7568,
+      "D_act_bound": -0.243
+     }
+    },
+    "clock_by_absD": {
+     "<1": {
+      "n": 1642,
+      "absD": 0.464,
+      "len_theory": 8.917,
+      "len_actual": 8.234,
+      "ratio": 1.0829,
+      "ratio_ci": [
+       1.0485,
+       1.1207
+      ],
+      "fav_won_share": 0.5104,
+      "win_clock_resid_fav_won": 0.548,
+      "win_clock_resid_unfav_won": 0.806,
+      "n_unfav_won": 804
+     },
+     "1..3": {
+      "n": 1385,
+      "absD": 1.652,
+      "len_theory": 8.566,
+      "len_actual": 8.351,
+      "ratio": 1.0258,
+      "ratio_ci": [
+       0.9844,
+       1.0686
+      ],
+      "fav_won_share": 0.5422,
+      "win_clock_resid_fav_won": 0.325,
+      "win_clock_resid_unfav_won": 1.527,
+      "n_unfav_won": 634
+     },
+     ">=3": {
+      "n": 205,
+      "absD": 5.324,
+      "len_theory": 9.127,
+      "len_actual": 8.702,
+      "ratio": 1.0488,
+      "ratio_ci": [
+       0.9915,
+       1.1046
+      ],
+      "fav_won_share": 0.722,
+      "win_clock_resid_fav_won": 0.25,
+      "win_clock_resid_unfav_won": 6.018,
+      "n_unfav_won": 57
+     },
+     "all": {
+      "n": 3232,
+      "absD": 1.282,
+      "len_theory": 8.78,
+      "len_actual": 8.314,
+      "ratio": 1.056,
+      "ratio_ci": [
+       1.026,
+       1.0885
+      ],
+      "fav_won_share": 0.5374,
+      "win_clock_resid_fav_won": 0.426,
+      "win_clock_resid_unfav_won": 1.31,
+      "n_unfav_won": 1495
+     }
+    }
+   },
+   "7+": {
+    "n": 10996,
+    "games": 300,
+    "W_mean": 0.5263,
+    "win_rate": 0.5302,
+    "slope_b": 0.6297,
+    "slope_b_ci": [
+     0.5218,
+     0.7288
+    ],
+    "width": 0.1153,
+    "width_ci": [
+     0.086,
+     0.1478
+    ],
+    "conv_a": 0.4625,
+    "conv_a_ci": [
+     0.3745,
+     0.5553
+    ],
+    "by_W": {
+     "<0.2": {
+      "n": 2699,
+      "W": 0.0694,
+      "win": 0.259,
+      "resid": 0.1896
+     },
+     "0.2-0.4": {
+      "n": 1495,
+      "W": 0.2945,
+      "win": 0.3906,
+      "resid": 0.0961
+     },
+     "0.4-0.6": {
+      "n": 1771,
+      "W": 0.5026,
+      "win": 0.4918,
+      "resid": -0.0108
+     },
+     "0.6-0.8": {
+      "n": 1790,
+      "W": 0.7048,
+      "win": 0.6151,
+      "resid": -0.0897
+     },
+     ">=0.8": {
+      "n": 3241,
+      "W": 0.9282,
+      "win": 0.7945,
+      "resid": -0.1337
+     }
+    },
+    "by_D": {
+     "<-3": {
+      "n": 405,
+      "D": -3.976,
+      "W": 0.0334,
+      "win": 0.0914,
+      "D_act_bound": -0.909
+     },
+     "-3..-1": {
+      "n": 2228,
+      "D": -1.735,
+      "W": 0.1133,
+      "win": 0.2801,
+      "D_act_bound": -0.72
+     },
+     "-1..1": {
+      "n": 5069,
+      "D": 0.024,
+      "W": 0.5038,
+      "win": 0.5163,
+      "D_act_bound": -0.484
+     },
+     "1..3": {
+      "n": 2785,
+      "D": 1.805,
+      "W": 0.888,
+      "win": 0.7512,
+      "D_act_bound": -0.249
+     },
+     ">3": {
+      "n": 509,
+      "D": 4.068,
+      "W": 0.9715,
+      "win": 0.9037,
+      "D_act_bound": -0.096
+     }
+    },
+    "clock_by_absD": {
+     "<1": {
+      "n": 5069,
+      "absD": 0.475,
+      "len_theory": 4.126,
+      "len_actual": 4.249,
+      "ratio": 0.9711,
+      "ratio_ci": [
+       0.9312,
+       1.0176
+      ],
+      "fav_won_share": 0.5964,
+      "win_clock_resid_fav_won": 0.077,
+      "win_clock_resid_unfav_won": 0.483,
+      "n_unfav_won": 2046
+     },
+     "1..3": {
+      "n": 5013,
+      "absD": 1.774,
+      "len_theory": 3.6,
+      "len_actual": 4.022,
+      "ratio": 0.8952,
+      "ratio_ci": [
+       0.8515,
+       0.9408
+      ],
+      "fav_won_share": 0.7373,
+      "win_clock_resid_fav_won": -0.121,
+      "win_clock_resid_unfav_won": 1.276,
+      "n_unfav_won": 1317
+     },
+     ">=3": {
+      "n": 914,
+      "absD": 4.027,
+      "len_theory": 2.889,
+      "len_actual": 3.391,
+      "ratio": 0.8522,
+      "ratio_ci": [
+       0.778,
+       0.9349
+      ],
+      "fav_won_share": 0.9059,
+      "win_clock_resid_fav_won": -0.281,
+      "win_clock_resid_unfav_won": 4.593,
+      "n_unfav_won": 86
+     },
+     "all": {
+      "n": 10996,
+      "absD": 1.362,
+      "len_theory": 3.784,
+      "len_actual": 4.074,
+      "ratio": 0.9287,
+      "ratio_ci": [
+       0.8949,
+       0.9647
+      ],
+      "fav_won_share": 0.6863,
+      "win_clock_resid_fav_won": -0.059,
+      "win_clock_resid_unfav_won": 0.888,
+      "n_unfav_won": 3449
+     }
+    }
+   }
+  },
+  "by_deck_count": 139,
+  "by_deck_top10": {
+   "OP14-001": {
+    "n": 261,
+    "slope_b": 0.9866,
+    "width": 0.093
+   },
+   "P-117": {
+    "n": 247,
+    "slope_b": 0.0,
+    "width": 0.3249
+   },
+   "OP17-020": {
+    "n": 241,
+    "slope_b": 0.2201,
+    "width": 0.1616
+   },
+   "OP15-058": {
+    "n": 233,
+    "slope_b": 0.4525,
+    "width": 0.2722
+   },
+   "OP15-098": {
+    "n": 230,
+    "slope_b": 0.1841,
+    "width": 0.1884
+   },
+   "OP10-099": {
+    "n": 227,
+    "slope_b": 0.0,
+    "width": 0.2186
+   },
+   "EB03-001": {
+    "n": 226,
+    "slope_b": 0.8181,
+    "width": 0.1748
+   },
+   "ST02-001": {
+    "n": 223,
+    "slope_b": 0.2679,
+    "width": 0.2767
+   },
+   "OP01-031": {
+    "n": 220,
+    "slope_b": 0.2045,
+    "width": 0.2327
+   },
+   "OP16-080": {
+    "n": 219,
+    "slope_b": 0.3755,
+    "width": 0.2746
+   }
+  }
+ },
+ "S4": {
+  "all": {
+   "n": 3439,
+   "games": 300,
+   "W_mean": 0.5216,
+   "win_rate": 0.5228,
+   "slope_b": 0.7963,
+   "slope_b_ci": [
+    0.6869,
+    0.896
+   ],
+   "width": 0.0538,
+   "width_ci": [
+    0.0288,
+    0.0821
+   ],
+   "conv_a": 0.6627,
+   "conv_a_ci": [
+    0.5385,
+    0.8018
+   ],
+   "by_W": {
+    "<0.2": {
+     "n": 576,
+     "W": 0.0979,
+     "win": 0.1806,
+     "resid": 0.0827
+    },
+    "0.2-0.4": {
+     "n": 609,
+     "W": 0.3036,
+     "win": 0.3612,
+     "resid": 0.0576
+    },
+    "0.4-0.6": {
+     "n": 870,
+     "W": 0.5013,
+     "win": 0.5149,
+     "resid": 0.0136
+    },
+    "0.6-0.8": {
+     "n": 713,
+     "W": 0.7,
+     "win": 0.662,
+     "resid": -0.038
+    },
+    ">=0.8": {
+     "n": 671,
+     "W": 0.9201,
+     "win": 0.8256,
+     "resid": -0.0945
+    }
+   },
+   "by_D": {
+    "<-3": {
+     "n": 359,
+     "D": -6.869,
+     "W": 0.0966,
+     "win": 0.1783,
+     "D_act_bound": -0.178
+    },
+    "-3..-1": {
+     "n": 868,
+     "D": -1.823,
+     "W": 0.2627,
+     "win": 0.3249,
+     "D_act_bound": -0.325
+    },
+    "-1..1": {
+     "n": 1475,
+     "D": -0.092,
+     "W": 0.5993,
+     "win": 0.5851,
+     "D_act_bound": -0.585
+    },
+    "1..3": {
+     "n": 507,
+     "D": 1.79,
+     "W": 0.8483,
+     "win": 0.783,
+     "D_act_bound": -0.783
+    },
+    ">3": {
+     "n": 230,
+     "D": 9.085,
+     "W": 0.9446,
+     "win": 0.8348,
+     "D_act_bound": -0.835
+    }
+   },
+   "clock_by_absD": {
+    "<1": {
+     "n": 1460,
+     "absD": 0.46,
+     "len_theory": 6.951,
+     "len_actual": 6.566,
+     "ratio": 1.0585,
+     "ratio_ci": [
+      1.023,
+      1.0965
+     ],
+     "fav_won_share": 0.5664,
+     "win_clock_resid_fav_won": 0.32,
+     "win_clock_resid_unfav_won": 0.613,
+     "n_unfav_won": 633
+    },
+    "1..3": {
+     "n": 1390,
+     "absD": 1.802,
+     "len_theory": 6.431,
+     "len_actual": 6.277,
+     "ratio": 1.0245,
+     "ratio_ci": [
+      0.9946,
+      1.0589
+     ],
+     "fav_won_share": 0.7079,
+     "win_clock_resid_fav_won": 0.121,
+     "win_clock_resid_unfav_won": 1.401,
+     "n_unfav_won": 406
+    },
+    ">=3": {
+     "n": 589,
+     "absD": 7.734,
+     "len_theory": 6.947,
+     "len_actual": 6.557,
+     "ratio": 1.0596,
+     "ratio_ci": [
+      1.0022,
+      1.1165
+     ],
+     "fav_won_share": 0.8268,
+     "win_clock_resid_fav_won": 0.09,
+     "win_clock_resid_unfav_won": 9.657,
+     "n_unfav_won": 102
+    },
+    "all": {
+     "n": 3439,
+     "absD": 2.248,
+     "len_theory": 6.74,
+     "len_actual": 6.448,
+     "ratio": 1.0453,
+     "ratio_ci": [
+      1.0184,
+      1.0748
+     ],
+     "fav_won_share": 0.6682,
+     "win_clock_resid_fav_won": 0.186,
+     "win_clock_resid_unfav_won": 1.702,
+     "n_unfav_won": 1141
+    }
+   }
+  },
+  "by_band": {
+   "1-3": {
+    "n": 600,
+    "games": 300,
+    "W_mean": 0.4979,
+    "win_rate": 0.5,
+    "slope_b": 0.6607,
+    "slope_b_ci": [
+     0.4154,
+     0.9013
+    ],
+    "width": 0.0501,
+    "width_ci": [
+     0.022,
+     0.0972
+    ],
+    "conv_a": 0.5615,
+    "conv_a_ci": [
+     0.3243,
+     0.8378
+    ],
+    "by_W": {
+     "<0.2": {
+      "n": 48,
+      "W": 0.1299,
+      "win": 0.25,
+      "resid": 0.1201
+     },
+     "0.2-0.4": {
+      "n": 139,
+      "W": 0.31,
+      "win": 0.3813,
+      "resid": 0.0713
+     },
+     "0.4-0.6": {
+      "n": 231,
+      "W": 0.4998,
+      "win": 0.4935,
+      "resid": -0.0063
+     },
+     "0.6-0.8": {
+      "n": 138,
+      "W": 0.6871,
+      "win": 0.6449,
+      "resid": -0.0422
+     },
+     ">=0.8": {
+      "n": 44,
+      "W": 0.8892,
+      "win": 0.7273,
+      "resid": -0.1619
+     }
+    },
+    "by_D": {
+     "<-3": {
+      "n": 75,
+      "D": -6.291,
+      "W": 0.1698,
+      "win": 0.2667,
+      "D_act_bound": -0.267
+     },
+     "-3..-1": {
+      "n": 161,
+      "D": -1.824,
+      "W": 0.3556,
+      "win": 0.4348,
+      "D_act_bound": -0.435
+     },
+     "-1..1": {
+      "n": 240,
+      "D": -0.081,
+      "W": 0.5485,
+      "win": 0.5083,
+      "D_act_bound": -0.508
+     },
+     "1..3": {
+      "n": 81,
+      "D": 1.82,
+      "W": 0.7277,
+      "win": 0.7037,
+      "D_act_bound": -0.704
+     },
+     ">3": {
+      "n": 43,
+      "D": 8.762,
+      "W": 0.8877,
+      "win": 0.7209,
+      "D_act_bound": -0.721
+     }
+    },
+    "clock_by_absD": {
+     "<1": {
+      "n": 240,
+      "absD": 0.474,
+      "len_theory": 12.458,
+      "len_actual": 11.075,
+      "ratio": 1.1249,
+      "ratio_ci": [
+       1.0847,
+       1.1694
+      ],
+      "fav_won_share": 0.5458,
+      "win_clock_resid_fav_won": 0.931,
+      "win_clock_resid_unfav_won": 1.064,
+      "n_unfav_won": 109
+     },
+     "1..3": {
+      "n": 242,
+      "absD": 1.823,
+      "len_theory": 11.839,
+      "len_actual": 10.938,
+      "ratio": 1.0824,
+      "ratio_ci": [
+       1.0464,
+       1.1205
+      ],
+      "fav_won_share": 0.6116,
+      "win_clock_resid_fav_won": 0.446,
+      "win_clock_resid_unfav_won": 1.989,
+      "n_unfav_won": 94
+     },
+     ">=3": {
+      "n": 118,
+      "absD": 7.191,
+      "len_theory": 12.737,
+      "len_actual": 10.788,
+      "ratio": 1.1807,
+      "ratio_ci": [
+       1.1174,
+       1.248
+      ],
+      "fav_won_share": 0.7288,
+      "win_clock_resid_fav_won": 0.674,
+      "win_clock_resid_unfav_won": 9.469,
+      "n_unfav_won": 32
+     },
+     "all": {
+      "n": 600,
+      "absD": 2.339,
+      "len_theory": 12.263,
+      "len_actual": 10.963,
+      "ratio": 1.1186,
+      "ratio_ci": [
+       1.0907,
+       1.1488
+      ],
+      "fav_won_share": 0.6083,
+      "win_clock_resid_fav_won": 0.674,
+      "win_clock_resid_unfav_won": 2.579,
+      "n_unfav_won": 235
+     }
+    }
+   },
+   "4-6": {
+    "n": 900,
+    "games": 300,
+    "W_mean": 0.4975,
+    "win_rate": 0.5078,
+    "slope_b": 0.7734,
+    "slope_b_ci": [
+     0.5817,
+     0.9748
+    ],
+    "width": 0.0442,
+    "width_ci": [
+     0.0263,
+     0.0843
+    ],
+    "conv_a": 0.6417,
+    "conv_a_ci": [
+     0.4431,
+     0.8865
+    ],
+    "by_W": {
+     "<0.2": {
+      "n": 105,
+      "W": 0.1255,
+      "win": 0.2667,
+      "resid": 0.1411
+     },
+     "0.2-0.4": {
+      "n": 189,
+      "W": 0.3067,
+      "win": 0.3175,
+      "resid": 0.0108
+     },
+     "0.4-0.6": {
+      "n": 323,
+      "W": 0.4995,
+      "win": 0.5232,
+      "resid": 0.0237
+     },
+     "0.6-0.8": {
+      "n": 186,
+      "W": 0.6961,
+      "win": 0.6882,
+      "resid": -0.0079
+     },
+     ">=0.8": {
+      "n": 97,
+      "W": 0.8842,
+      "win": 0.7423,
+      "resid": -0.1419
+     }
+    },
+    "by_D": {
+     "<-3": {
+      "n": 92,
+      "D": -6.731,
+      "W": 0.125,
+      "win": 0.2391,
+      "D_act_bound": -0.239
+     },
+     "-3..-1": {
+      "n": 245,
+      "D": -1.797,
+      "W": 0.3164,
+      "win": 0.351,
+      "D_act_bound": -0.351
+     },
+     "-1..1": {
+      "n": 394,
+      "D": -0.14,
+      "W": 0.5556,
+      "win": 0.5609,
+      "D_act_bound": -0.561
+     },
+     "1..3": {
+      "n": 121,
+      "D": 1.834,
+      "W": 0.7903,
+      "win": 0.7438,
+      "D_act_bound": -0.744
+     },
+     ">3": {
+      "n": 48,
+      "D": 9.507,
+      "W": 0.9202,
+      "win": 0.7917,
+      "D_act_bound": -0.792
+     }
+    },
+    "clock_by_absD": {
+     "<1": {
+      "n": 394,
+      "absD": 0.468,
+      "len_theory": 8.944,
+      "len_actual": 8.688,
+      "ratio": 1.0295,
+      "ratio_ci": [
+       0.9918,
+       1.0672
+      ],
+      "fav_won_share": 0.5406,
+      "win_clock_resid_fav_won": 0.254,
+      "win_clock_resid_unfav_won": 0.586,
+      "n_unfav_won": 181
+     },
+     "1..3": {
+      "n": 366,
+      "absD": 1.809,
+      "len_theory": 8.473,
+      "len_actual": 8.197,
+      "ratio": 1.0337,
+      "ratio_ci": [
+       0.9936,
+       1.0757
+      ],
+      "fav_won_share": 0.6803,
+      "win_clock_resid_fav_won": 0.197,
+      "win_clock_resid_unfav_won": 1.496,
+      "n_unfav_won": 117
+     },
+     ">=3": {
+      "n": 140,
+      "absD": 7.683,
+      "len_theory": 8.929,
+      "len_actual": 8.529,
+      "ratio": 1.0469,
+      "ratio_ci": [
+       0.9864,
+       1.1137
+      ],
+      "fav_won_share": 0.7714,
+      "win_clock_resid_fav_won": 0.157,
+      "win_clock_resid_unfav_won": 8.812,
+      "n_unfav_won": 32
+     },
+     "all": {
+      "n": 900,
+      "absD": 2.136,
+      "len_theory": 8.75,
+      "len_actual": 8.463,
+      "ratio": 1.0339,
+      "ratio_ci": [
+       1.0054,
+       1.0645
+      ],
+      "fav_won_share": 0.6333,
+      "win_clock_resid_fav_won": 0.211,
+      "win_clock_resid_unfav_won": 1.706,
+      "n_unfav_won": 330
+     }
+    }
+   },
+   "7+": {
+    "n": 1939,
+    "games": 300,
+    "W_mean": 0.5402,
+    "win_rate": 0.5369,
+    "slope_b": 0.8187,
+    "slope_b_ci": [
+     0.7168,
+     0.9132
+    ],
+    "width": 0.0609,
+    "width_ci": [
+     0.0326,
+     0.0943
+    ],
+    "conv_a": 0.6797,
+    "conv_a_ci": [
+     0.5641,
+     0.8186
+    ],
+    "by_W": {
+     "<0.2": {
+      "n": 423,
+      "W": 0.0874,
+      "win": 0.1513,
+      "resid": 0.0639
+     },
+     "0.2-0.4": {
+      "n": 281,
+      "W": 0.2984,
+      "win": 0.3808,
+      "resid": 0.0823
+     },
+     "0.4-0.6": {
+      "n": 316,
+      "W": 0.5043,
+      "win": 0.5222,
+      "resid": 0.0179
+     },
+     "0.6-0.8": {
+      "n": 389,
+      "W": 0.7065,
+      "win": 0.6555,
+      "resid": -0.051
+     },
+     ">=0.8": {
+      "n": 530,
+      "W": 0.9293,
+      "win": 0.8491,
+      "resid": -0.0802
+     }
+    },
+    "by_D": {
+     "<-3": {
+      "n": 192,
+      "D": -7.16,
+      "W": 0.0544,
+      "win": 0.1146,
+      "D_act_bound": -0.115
+     },
+     "-3..-1": {
+      "n": 462,
+      "D": -1.836,
+      "W": 0.2018,
+      "win": 0.2727,
+      "D_act_bound": -0.273
+     },
+     "-1..1": {
+      "n": 841,
+      "D": -0.073,
+      "W": 0.6343,
+      "win": 0.6183,
+      "D_act_bound": -0.618
+     },
+     "1..3": {
+      "n": 305,
+      "D": 1.765,
+      "W": 0.9033,
+      "win": 0.8197,
+      "D_act_bound": -0.82
+     },
+     ">3": {
+      "n": 139,
+      "D": 9.039,
+      "W": 0.9706,
+      "win": 0.8849,
+      "D_act_bound": -0.885
+     }
+    },
+    "clock_by_absD": {
+     "<1": {
+      "n": 826,
+      "absD": 0.453,
+      "len_theory": 4.4,
+      "len_actual": 4.245,
+      "ratio": 1.0365,
+      "ratio_ci": [
+       0.9907,
+       1.091
+      ],
+      "fav_won_share": 0.5847,
+      "win_clock_resid_fav_won": 0.184,
+      "win_clock_resid_unfav_won": 0.484,
+      "n_unfav_won": 343
+     },
+     "1..3": {
+      "n": 782,
+      "absD": 1.792,
+      "len_theory": 3.802,
+      "len_actual": 3.936,
+      "ratio": 0.9659,
+      "ratio_ci": [
+       0.9167,
+       1.0152
+      ],
+      "fav_won_share": 0.7506,
+      "win_clock_resid_fav_won": 0.007,
+      "win_clock_resid_unfav_won": 1.062,
+      "n_unfav_won": 195
+     },
+     ">=3": {
+      "n": 331,
+      "absD": 7.949,
+      "len_theory": 4.045,
+      "len_actual": 4.215,
+      "ratio": 0.9599,
+      "ratio_ci": [
+       0.8682,
+       1.0498
+      ],
+      "fav_won_share": 0.8852,
+      "win_clock_resid_fav_won": -0.106,
+      "win_clock_resid_unfav_won": 10.526,
+      "n_unfav_won": 38
+     },
+     "all": {
+      "n": 1939,
+      "absD": 2.273,
+      "len_theory": 4.098,
+      "len_actual": 4.115,
+      "ratio": 0.9959,
+      "ratio_ci": [
+       0.9571,
+       1.0378
+      ],
+      "fav_won_share": 0.7029,
+      "win_clock_resid_fav_won": 0.045,
+      "win_clock_resid_unfav_won": 1.342,
+      "n_unfav_won": 576
+     }
+    }
+   }
+  },
+  "by_deck_count": 139,
+  "by_deck_top10": {
+   "P-117": {
+    "n": 50,
+    "slope_b": 0.0,
+    "width": 0.1791
+   },
+   "OP14-001": {
+    "n": 48,
+    "slope_b": 0.7647,
+    "width": 0.0888
+   },
+   "OP10-099": {
+    "n": 47,
+    "slope_b": 0.0,
+    "width": 0.2355
+   },
+   "OP16-080": {
+    "n": 47,
+    "slope_b": 0.3255,
+    "width": 0.1954
+   },
+   "OP17-020": {
+    "n": 47,
+    "slope_b": 0.499,
+    "width": 0.1776
+   },
+   "EB03-001": {
+    "n": 45,
+    "slope_b": 0.43,
+    "width": 0.1276
+   },
+   "OP03-040": {
+    "n": 45,
+    "slope_b": 0.0,
+    "width": 0.2749
+   },
+   "OP08-002": {
+    "n": 45,
+    "slope_b": 0.8946,
+    "width": 0.0546
+   },
+   "ST02-001": {
+    "n": 45,
+    "slope_b": 0.3001,
+    "width": 0.2331
+   },
+   "ST13-003": {
+    "n": 44,
+    "slope_b": 1.2545,
+    "width": 0.1311
+   }
+  }
+ }
+}
