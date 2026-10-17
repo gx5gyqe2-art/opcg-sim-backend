@@ -1,0 +1,1 @@
+{"job":"hires-r11a-w14","status":"done","seed_base":1044000,"pairs":175,"merge":{"pairs":175,"wr":0.4771,"ci95":[0.4173,0.537],"elo":-15.9,"void":0,"dup_seeds":0},"sec":1221,"notes":"No code changes. Ran as written; repo located at /root/opcg-sim-backend (clone fallback path). elo95 [-58.0, 25.8]; promoted=false; 350 games, 167 wins, void 0."}
