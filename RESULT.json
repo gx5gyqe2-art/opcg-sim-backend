@@ -40,5 +40,5 @@
   "sec_play_mean": 29.28,
   "sec_rean_mean": 55.11
  },
- "notes": ""
+ "notes": "コンテナ停止で生成が一度消え、p0 を最初からやり直した。最初の push は git proxy の 403(リポジトリ未認可)で失敗し、add_repo(push) で認可後に再 push。p0 の push が遅れたのみで、記録は 4 本とも揃っている。dropped=1(p2)。"
 }
