@@ -1,0 +1,1 @@
+{"job":"hires-r11a-w04","status":"done","seed_base":1034000,"pairs":175,"merge":{"pairs":175,"wr":0.5229,"ci95":[0.4657,0.58],"elo":15.9,"void":0,"dup_seeds":0},"sec":1189,"notes":"No issues. Ran in one pass (1189s). Wrapper wc error on relative path was harmless; arena completed. promoted=false (single shard)."}
