@@ -911,6 +911,17 @@ def train(args):
     backend, backend_name, note = make_backend(args.backend, net, args.lr, args.threads,
                                                aux_weight=aux_w, plan_weight=plan_w,
                                                time_weight=time_w)
+    if getattr(args, "fast", False):
+        args.fast_pairs = args.fast_max = args.fast_index = True
+    if getattr(args, "fast_pairs", False) and hasattr(backend, "tn"):
+        backend.tn.factor_pairs = True
+        note = (note + " " if note else "") + "fast-pairs"
+    if getattr(args, "fast_max", False) and hasattr(backend, "tn"):
+        backend.tn.fast_max = True
+        note = (note + " " if note else "") + "fast-max"
+    if getattr(args, "fast_index", False) and hasattr(backend, "tn"):
+        backend.tn.fast_index = True
+        note = (note + " " if note else "") + "fast-index"
     print(f"backend: {backend_name}{(' ' + note) if note else ''}", flush=True)
     # 方策点ごとに決まる値は**ここで 1 回だけ**作る（§18.6-2/3）。ループでは切り出すだけ。
     t_pre = time.time()
@@ -1151,6 +1162,18 @@ def main(argv=None):
                     help="π' の σ の定数項 c_visit（既定 50）")
     tr.add_argument("--pi-c-scale", type=float, default=PI_C_SCALE,
                     help="π' の σ の倍率 c_scale（既定 0.3）")
+    tr.add_argument("--fast", action="store_true",
+                    help="torch: --fast-pairs --fast-max --fast-index をまとめて入れる（訓練ループ 2.1 倍・"
+                         "docs/reports/2026-10-17_train_speed.md）")
+    tr.add_argument("--fast-pairs", action="store_true",
+                    help="torch: 対のネット（自×相手・自×自）を重みの区切りごとに掛けて足す（式は同じ・足す順だけが違う＝"
+                         "丸めの範囲の一致・既定は切・docs/reports/2026-10-17_train_speed.md）")
+    tr.add_argument("--fast-max", action="store_true",
+                    help="torch: 空枠に番兵を置かずに max を取る（値は relu の後で 0 以上・空枠は 0＝同じ値・既定は切・"
+                         "docs/reports/2026-10-17_train_speed.md）")
+    tr.add_argument("--fast-index", action="store_true",
+                    help="torch: カードの行と枠の行を embedding／index_select で引く（forward は同じ値・backward の累積の"
+                         "仕方だけが違う＝丸めの範囲の一致・既定は切・docs/reports/2026-10-17_train_speed.md）")
     tr.add_argument("--threads", type=int, default=0,
                     help="torch のスレッド数（0＝全コア）。numpy backend では効かない")
     tr.add_argument("--out", required=True)
