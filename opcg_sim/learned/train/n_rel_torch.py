@@ -96,6 +96,12 @@ class TorchNRel(torch.nn.Module):
                              else torch.ones(D_SC).index_fill_(0, torch.tensor(cols), 0.0))
         self._sc_masked = bool(cols)
         self._zeros = {}      # 遮断した R の入れ物（バッチ幅ごとに 1 本だけ持ち回す・§18.6-4）
+        # 対のネットを重みの区切りごとに掛ける（`--fast-pairs`・既定は切＝従来の式の順のまま）
+        self.factor_pairs = False
+        # 空枠に番兵を置かずに max を取る（値はすべて relu の後で 0 以上・空枠は 0＝`--fast-max`・既定は切）
+        self.fast_max = False
+        # 行の引き方（embedding／index_select・forward は同じ値・backward の累積の仕方だけが違う＝`--fast-index`・既定は切）
+        self.fast_index = False
 
     def rel_zeros(self, B):
         """`--ablate rel` のときに R の代わりに使うゼロ（読むだけ・バッチ幅ごとに再利用）。
@@ -116,9 +122,12 @@ class TorchNRel(torch.nn.Module):
         nn = torch.clamp(m.sum(1), min=1.0)
         mean = (R * m).sum(1) / nn
         # 番兵は**スカラ**で置く（`full_like` の一時テンソルを作らない＝値は同じ・§18.6）
-        masked = torch.where(m > 0, R, NEG)
-        mx = masked.max(1).values
-        mx = torch.where(mx < -1e8, 0.0, mx)
+        if self.fast_max:
+            mx = (R * m).max(1).values          # R ≥ 0（relu）＝空枠を 0 にしても max は同じ（`--fast-max`）
+        else:
+            masked = torch.where(m > 0, R, NEG)
+            mx = masked.max(1).values
+            mx = torch.where(mx < -1e8, 0.0, mx)
         return torch.cat([self.STATS, mean, mx], 1)
 
     # --- トークン → h（numpy 版 `tokens_forward` の一括経路と同じ式） ---
@@ -126,38 +135,67 @@ class TorchNRel(torch.nn.Module):
         B = ci.shape[0]
         # numpy 版 `mask_rel` と同じ（入口で遮断）。`rel_om is None`＝呼び出し側が最初から
         # R を作っていない（§18.6-4）。どちらもゼロを読む＝結果はビット一致。
-        if "rel" in self.ablate or rel_om is None:
+        rel_zero = "rel" in self.ablate or rel_om is None
+        if rel_zero:
             rel_om, rel_oo = self.rel_zeros(B)
         present = (ci > 0).float()
         cix = torch.clamp(ci, 0, tab.shape[0] - 1)
-        x = torch.cat([tab[cix], tok, self.ZONE.expand(B, N_TOK, D_ZONE)], 2)
+        # `--fast-index`: 同じ行を引く（forward は同じ値）。backward は index_put の累積ではなく embedding の累積
+        emb = torch.nn.functional.embedding(cix, tab) if self.fast_index else tab[cix]
+        x = torch.cat([emb, tok, self.ZONE.expand(B, N_TOK, D_ZONE)], 2)
         x = x * present[:, :, None]
         t = torch.relu(x @ self.Wt + self.bt) * present[:, :, None]
-        to = t[:, self.own]; tp = t[:, self.opp]
+        if self.fast_index:
+            to = t.index_select(1, self.own); tp = t.index_select(1, self.opp)
+        else:
+            to = t[:, self.own]; tp = t[:, self.opp]
         po = present[:, self.own]; pp = present[:, self.opp]
         # 自×相手
-        u = torch.cat([to[:, :, None, :].expand(B, N_OWN, N_OPP, D_T),
-                       tp[:, None, :, :].expand(B, N_OWN, N_OPP, D_T), rel_om], 3)
-        r = torch.relu(u @ self.Wr + self.br)
+        if self.factor_pairs:
+            # 連結 [自, 相手, R] @ Wr を、重みの区切りごとに掛けて足す（`docs/reports/2026-10-17_train_speed.md`）。
+            # 式は同じで足す順だけが違う＝丸めの範囲の一致。対（16×16）ぶんの行列積がトークン（16＋16）ぶんになる。
+            # R を遮断したとき（ゼロ）は R の項を足さない。
+            pre = (to @ self.Wr[:D_T])[:, :, None, :] + (tp @ self.Wr[D_T:2 * D_T])[:, None, :, :]
+            if not rel_zero:
+                pre = pre + rel_om @ self.Wr[2 * D_T:]
+            r = torch.relu(pre + self.br)
+        else:
+            u = torch.cat([to[:, :, None, :].expand(B, N_OWN, N_OPP, D_T),
+                           tp[:, None, :, :].expand(B, N_OWN, N_OPP, D_T), rel_om], 3)
+            r = torch.relu(u @ self.Wr + self.br)
         mask_om = (po[:, :, None] * pp[:, None, :])[:, :, :, None]
         r = r * mask_om
         n_j = torch.clamp(mask_om.sum(2), min=1.0)
         n_i = torch.clamp(mask_om.sum(1), min=1.0)
-        r_masked = torch.where(mask_om > 0, r, NEG)
-        mx_j = r_masked.max(2).values; mx_j = torch.where(mx_j < -1e8, 0.0, mx_j)
+        if self.fast_max:
+            # r ≥ 0 で空の対は既に 0（r * mask_om）＝番兵を置かずに max を取っても同じ値（`--fast-max`）
+            mx_j = r.max(2).values
+            mx_i = r.max(1).values
+        else:
+            r_masked = torch.where(mask_om > 0, r, NEG)
+            mx_j = r_masked.max(2).values; mx_j = torch.where(mx_j < -1e8, 0.0, mx_j)
+            mx_i = r_masked.max(1).values; mx_i = torch.where(mx_i < -1e8, 0.0, mx_i)
         mean_j = r.sum(2) / n_j
-        mx_i = r_masked.max(1).values; mx_i = torch.where(mx_i < -1e8, 0.0, mx_i)
         mean_i = r.sum(1) / n_i
         # 自×自（k≠i）
-        v = torch.cat([to[:, :, None, :].expand(B, N_OWN, N_OWN, D_T),
-                       to[:, None, :, :].expand(B, N_OWN, N_OWN, D_T), rel_oo], 3)
-        c = torch.relu(v @ self.Wc + self.bc)
+        if self.factor_pairs:
+            pre = (to @ self.Wc[:D_T])[:, :, None, :] + (to @ self.Wc[D_T:2 * D_T])[:, None, :, :]
+            if not rel_zero:
+                pre = pre + rel_oo @ self.Wc[2 * D_T:]
+            c = torch.relu(pre + self.bc)
+        else:
+            v = torch.cat([to[:, :, None, :].expand(B, N_OWN, N_OWN, D_T),
+                           to[:, None, :, :].expand(B, N_OWN, N_OWN, D_T), rel_oo], 3)
+            c = torch.relu(v @ self.Wc + self.bc)
         mask_oo = (po[:, :, None] * po[:, None, :])[:, :, :, None] * (1.0 - self.eye)
         # `c * mask_oo` は入れない: `c` を読むのは次の `where`（mask>0 の枠だけ）で、そこでは
         # mask が 1.0＝`c*1.0` は `c` と**ビット一致**、mask=0 の枠は番兵に置き換わって値も
         # 勾配も 0 になる。8.4MB の一時テンソル 1 本と backward の掛け算が消える（§18.6）。
-        c_masked = torch.where(mask_oo > 0, c, NEG)
-        mx_k = c_masked.max(2).values; mx_k = torch.where(mx_k < -1e8, 0.0, mx_k)
+        if self.fast_max:
+            mx_k = (c * mask_oo).max(2).values  # c ≥ 0＝空の対を 0 にしても max は同じ（`--fast-max`）
+        else:
+            c_masked = torch.where(mask_oo > 0, c, NEG)
+            mx_k = c_masked.max(2).values; mx_k = torch.where(mx_k < -1e8, 0.0, mx_k)
         h_own = torch.cat([to, mx_j, mean_j, mx_k], 2)
         h_opp = torch.cat([tp, mx_i, mean_i, torch.zeros(B, N_OPP, D_C)], 2)
         h = torch.zeros(B, N_TOK, D_H).index_copy(1, self.own, h_own).index_copy(1, self.opp, h_opp)
@@ -168,9 +206,12 @@ class TorchNRel(torch.nn.Module):
             sc = sc * self.sc_keep
         n = torch.clamp(present.sum(1, keepdim=True), min=1.0)
         mean = h.sum(1) / n
-        h_masked = torch.where(present[:, :, None] > 0, h, NEG)
-        mx = h_masked.max(1).values
-        mx = torch.where(mx < -1e8, 0.0, mx)
+        if self.fast_max:
+            mx = h.max(1).values                # h ≥ 0 で空枠は既に 0（h * present）（`--fast-max`）
+        else:
+            h_masked = torch.where(present[:, :, None] > 0, h, NEG)
+            mx = h_masked.max(1).values
+            mx = torch.where(mx < -1e8, 0.0, mx)
         z = torch.cat([sc, mean, mx], 1)
         r1 = torch.relu(z @ self.W1 + self.b1)
         return torch.relu(r1 @ self.W2 + self.b2)

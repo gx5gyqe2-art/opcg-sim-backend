@@ -553,6 +553,7 @@ fn relations_from_tokens(
 ///
 /// `legal` は Python と同じ `get_legal_actions`（探索用の枝刈り前の合法手）。
 fn leader_act_avail(s: &mut Session, masters: &MasterTable, me: Seat) -> f32 {
+    let _prof = crate::prof::enter(crate::prof::Cat::EncLeaderLegal);
     let Some(leader) = s.state().player(me).leader else {
         return 0.0;
     };

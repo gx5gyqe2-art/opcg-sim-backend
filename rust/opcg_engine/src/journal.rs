@@ -371,6 +371,7 @@ impl Session {
 
     /// 直近の `begin` まで巻き戻す（記録を逆順に再生）。印が無ければ何もしない。
     pub fn rollback(&mut self) {
+        let _prof = crate::prof::enter(crate::prof::Cat::Apply);
         let Some(mark) = self.journal.marks.pop() else {
             return;
         };
@@ -390,6 +391,26 @@ impl Session {
             // 誰も戻せない記録は保持しない（Python の不活性時＝記録しないに対応）。
             self.journal.undo.clear();
         }
+    }
+
+    /// `f` を「この盤面の写しから作った新しいセッション」で回したのと同じ結果を、盤面を複製せずに得る。
+    ///
+    /// 新しいセッション（[`Session::new`]）と同じ見え方にする: 乱数は混ぜない（`Replay`）・イベントログは空・
+    /// 混ぜた席は空・効果の主体は無し。盤面の書き換えはトランザクションで記録して最後に巻き戻す
+    /// （盤面は `&mut GameState` を外へ出さない＝書き換えは全て journal を通る）。終わったら乱数・ログ・
+    /// 混ぜた席・効果の主体を元へ戻す。journal の記録中かどうかを読む口は journal の外に無い。
+    /// 符号化（`encode::encode_in`）が使う（`docs/reports/2026-10-17_game_speed.md` §2）。
+    pub fn isolated<R>(&mut self, f: impl FnOnce(&mut Session) -> R) -> R {
+        let rng = std::mem::take(&mut self.rng);
+        let events = std::mem::take(&mut self.action_events);
+        let shuffled = std::mem::take(&mut self.shuffled);
+        let actor = self.effect_actor.take();
+        let out = self.transaction(f);
+        self.rng = rng;
+        self.action_events = events;
+        self.shuffled = shuffled;
+        self.effect_actor = actor;
+        out
     }
 
     /// Python の `with journal.transaction():` と同じ——**必ず巻き戻す**。

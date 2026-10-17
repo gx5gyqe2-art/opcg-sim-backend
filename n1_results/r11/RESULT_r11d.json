@@ -1,0 +1,183 @@
+{
+ "job": "train-r11d",
+ "status": "done",
+ "inputs": {
+  "warm_start": "nrel_r3.npz",
+  "pi": "一様選択の再分析 14 dir（claude/reanu-n{29,32}-wXX・枠 0,0,0,12・mult 4）・30,012 点・取り出し 2026-10-17 07:31 UTC",
+  "partial_shards": {
+   "n29-w06": "115 局",
+   "n29-w08": "npz 67 局（points.jsonl 62 行）",
+   "n32-w04": "119 局"
+  },
+  "z": [
+   27,
+   28,
+   29,
+   30,
+   31,
+   32
+  ],
+  "epochs": 2,
+  "lr": 0.0002,
+  "pi_teacher": "q_improved",
+  "c_scale": 0.3,
+  "pi_steps_mult": 4.0,
+  "torch": "2.14.1+cu130 (CPU)",
+  "wheel": "r11a 採用の merge 前にビルドした wheel（PYTHONPATH）"
+ },
+ "metrics": {
+  "best_ep": 1,
+  "val_vmse": 0.5048,
+  "train_sec": 2916,
+  "value_rows": 6115638,
+  "policy_points": 30012
+ },
+ "arena": {
+  "main": {
+   "pairs": 192,
+   "games": 384,
+   "void": 0,
+   "wins": 209.0,
+   "wr": 0.5443,
+   "ci95": [
+    0.4907,
+    0.5978
+   ],
+   "elo": 30.8,
+   "elo95": [
+    -6.4,
+    68.9
+   ],
+   "promoted": false,
+   "shards": 8,
+   "dup_seeds": 0
+  },
+  "mirror": {
+   "pairs": 192,
+   "games": 384,
+   "void": 0,
+   "wins": 191.0,
+   "wr": 0.4974,
+   "ci95": [
+    0.4561,
+    0.5387
+   ],
+   "elo": -1.8,
+   "elo95": [
+    -30.6,
+    26.9
+   ],
+   "promoted": false,
+   "shards": 8,
+   "dup_seeds": 0
+  },
+  "baseline": "opcg_sim/data/learned/nrel_r3.npz（明示）"
+ },
+ "paired": {
+  "r11d-r11a_main": {
+   "n": 192,
+   "diff": -0.0573,
+   "ci95": [
+    -0.1083,
+    -0.0062
+   ]
+  },
+  "r11d-r11a_mirror": {
+   "n": 192,
+   "diff": -0.0651,
+   "ci95": [
+    -0.1225,
+    -0.0077
+   ]
+  },
+  "r11d-r11b_main": {
+   "n": 192,
+   "diff": -0.0286,
+   "ci95": [
+    -0.0834,
+    0.0261
+   ]
+  },
+  "r11d-r11b_mirror": {
+   "n": 192,
+   "diff": -0.0521,
+   "ci95": [
+    -0.1122,
+    0.008
+   ]
+  },
+  "r11d-r11c_main": {
+   "n": 192,
+   "diff": -0.0365,
+   "ci95": [
+    -0.0913,
+    0.0184
+   ]
+  },
+  "r11d-r11c_mirror": {
+   "n": 192,
+   "diff": -0.0234,
+   "ci95": [
+    -0.0773,
+    0.0304
+   ]
+  },
+  "r11c-r11b_main": {
+   "n": 192,
+   "diff": 0.0078,
+   "ci95": [
+    -0.0475,
+    0.0632
+   ]
+  },
+  "r11c-r11b_mirror": {
+   "n": 192,
+   "diff": -0.0286,
+   "ci95": [
+    -0.0875,
+    0.0302
+   ]
+  },
+  "r11c-r11a_main": {
+   "n": 192,
+   "diff": -0.0208,
+   "ci95": [
+    -0.0768,
+    0.0351
+   ]
+  },
+  "r11c-r11a_mirror": {
+   "n": 192,
+   "diff": -0.0417,
+   "ci95": [
+    -0.1006,
+    0.0173
+   ]
+  },
+  "r11a-r11b_main": {
+   "n": 192,
+   "diff": 0.0286,
+   "ci95": [
+    -0.0236,
+    0.0809
+   ]
+  },
+  "r11a-r11b_mirror": {
+   "n": 192,
+   "diff": 0.013,
+   "ci95": [
+    -0.0494,
+    0.0755
+   ]
+  }
+ },
+ "band": [
+  "n1_results/r11/band_r11d_w28.json",
+  "n1_results/r11/band_r11d_w30.json",
+  "n1_results/r11/band_r11d_w32.json"
+ ],
+ "notes": [
+  "主 0.544 は予告 0.56〜0.60 を下に外れた",
+  "r11d−r11a の対の差は主・副とも 0 を跨がない（留保は報告 §4.3）"
+ ]
+}

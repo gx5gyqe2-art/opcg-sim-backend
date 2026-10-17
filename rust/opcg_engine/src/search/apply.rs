@@ -77,6 +77,7 @@ pub fn apply_move_inplace(
     mv: &Move,
     stop_at_select: bool,
 ) -> Result<(), EngineError> {
+    let _prof = crate::prof::enter(crate::prof::Cat::Apply);
     let bad = |m: String| EngineError::BadPayload(m);
     let action_type = mv
         .get("action_type")
