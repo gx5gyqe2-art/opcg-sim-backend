@@ -1,0 +1,1 @@
+{"job":"hires-r11a-w13","status":"done","seed_base":1043000,"pairs":175,"merge":{"pairs":175,"wr":0.5457,"ci95":[0.4883,0.6031],"elo":31.9,"void":0,"dup_seeds":0},"sec":1018,"notes":"175 pairs finished in one run (1018s), no restarts. Code unchanged. ARENA_RESUME_FINAL promoted=false."}
