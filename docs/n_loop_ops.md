@@ -671,7 +671,9 @@ printf '%s\n' 'cd ~/opcg-sim-backend' \
 --- ブロック 2（4 本を順に・1 本ごとに push）---
 下の「#!/bin/bash」から「echo ALL_DONE」までを ~/run.sh に保存し（ファイル作成のツールでよい）、
 `nohup bash ~/run.sh > ~/run.out 2>&1 &` でバックグラウンドに回す（3 時間を超えるのでフォアグラウンドで待たない）。
-20〜30 分ごとに `tail -n 2 ~/n42_w{K}.log; tail -n 3 ~/run.out` で進みを見て、run.out に ALL_DONE が出たら完了。
+**完走（run.out に ALL_DONE）までターンを終えない**——待機に入るとコンテナが止まり、生成のプロセスも消える（2026-10-17・波 42 の w01 で実測）。
+`timeout 540 bash -c 'until grep -q ALL_DONE ~/run.out; do sleep 30; done'; tail -n 1 ~/n42_w{K}.log` のような 9 分以内の待ちを、ALL_DONE が出るまで繰り返し呼ぶ。
+生きているかの確認は `ps -eo pid,etime,cmd | grep "[o]pcg_sim.loop.record_gen"`（`pgrep -f record_gen` は確認コマンド自身に当たって 1 になる）。
 
 #!/bin/bash
 export K={K} BASE={BASE}
