@@ -1,0 +1,1 @@
+{"job":"hires-r11a-w05","status":"done","seed_base":1035000,"pairs":175,"merge":{"pairs":175,"wr":0.5857,"ci95":[0.5304,0.641],"elo":60.2,"void":0,"dup_seeds":0},"sec":946,"notes":"No issues. Container did not restart. Two helper wait loops were mistakenly killed/failed but the arena process itself ran uninterrupted. elo95=[21.2,100.7]."}
