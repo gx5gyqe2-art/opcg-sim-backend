@@ -23,20 +23,21 @@
  "outputs": {
   "dirs": [
    "n_records/n42_w10_p0",
-   "n_records/n42_w10_p1"
+   "n_records/n42_w10_p1",
+   "n_records/n42_w10_p2"
   ]
  },
  "metrics": {
-  "parts_done": 2,
-  "games": 240,
-  "rows": 33483,
+  "parts_done": 3,
+  "games": 360,
+  "rows": 49847,
   "dropped": 2,
-  "points4": 2856,
-  "points8": 2856,
+  "points4": 4296,
+  "points8": 4296,
   "unmapped4": 0,
   "unmapped8": 0,
-  "sec_play_mean": 30.62,
-  "sec_rean_mean": 58.76
+  "sec_play_mean": 29.84,
+  "sec_rean_mean": 58.14
  },
  "notes": ""
 }
