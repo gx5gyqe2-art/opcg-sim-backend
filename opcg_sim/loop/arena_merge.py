@@ -26,7 +26,7 @@ import json
 import os
 import sys
 
-from opcg_sim.loop.arena import pair_level_ci
+from opcg_sim.loop.arena import SEQ_LINES, pair_level_ci, sequential_stop
 
 
 def read_ledger(path):
@@ -94,6 +94,11 @@ def summarize(done, frac=0.55):
             "promoted": bool(ci["win_rate"] >= frac and ci["lo"] > 0.50)}
 
 
+def ledger_order_scores(per_file):
+    """記録の順（ファイルの並び × ファイルの中の seed 順）のペアのスコア（0〜1・void は飛ばす）。"""
+    return [d[s] / 2.0 for _p, d in per_file for s in sorted(d) if d[s] is not None]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--in", dest="src", nargs="+", required=True,
@@ -105,6 +110,12 @@ def main():
     ap.add_argument("--allow-mixed-cand-opts", action="store_true",
                     help="シャードで候補席の探索設定が割れていても判定を出す"
                          "（既定は落とす＝違う設定の測定を混ぜない）")
+    ap.add_argument("--sequential", choices=sorted(SEQ_LINES), default=None,
+                    help="逐次判定を足す（既定は切・判定の規約は変えない）: main＝下限 > 0.50／mirror＝下限 ≥ 0.45。"
+                         "記録の順にペアを積み、全時点で同時に 95% の信頼系列が線の片側に入った最初のペア数を印字する"
+                         "（docs/reports/2026-10-17_arena_sequential.md）")
+    ap.add_argument("--planned", type=int, default=0,
+                    help="--sequential の計画のペア数（信頼系列の幅を合わせる点・0＝今ある有効ペアの数）")
     args = ap.parse_args()
 
     paths = []
@@ -146,6 +157,14 @@ def main():
     if cand_opts != ["{}"]:
         res["cand_opts"] = [json.loads(s) for s in cand_opts]
     print(f"{head}ARENA_MERGE_FINAL " + json.dumps(res, ensure_ascii=False), flush=True)
+    if args.sequential:
+        line, strict = SEQ_LINES[args.sequential]
+        xs = ledger_order_scores(per_file)
+        seq = sequential_stop(xs, args.planned or len(xs), line, strict)
+        seq.update({"rule": args.sequential, "line": line, "pairs_seen": len(xs),
+                    "planned": args.planned or len(xs)})
+        print(f"{head}ARENA_SEQUENTIAL " + json.dumps({k: (round(v, 4) if isinstance(v, float) else v)
+                                                        for k, v in seq.items()}, ensure_ascii=False), flush=True)
     return 0 if res["promoted"] else 1
 
 
