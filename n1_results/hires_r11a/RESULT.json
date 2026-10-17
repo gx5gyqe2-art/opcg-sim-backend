@@ -1,0 +1,1 @@
+{"job":"hires-r11a-w06","status":"done","seed_base":1036000,"pairs":175,"merge":{"pairs":175,"wr":0.58,"ci95":[0.5229,0.6371],"elo":56.1,"void":0,"dup_seeds":0},"sec":1113,"notes":"No issues; ran in one go (1113s). 203/350 wins, void 0."}
