@@ -1,0 +1,12 @@
+REANALYZE_START {"games": 200, "done": 0, "todo": 200}
+REANALYZE seed=2322500 picks=12 pts=12 lost=0 bad_step=None replay=12.8s deep=6.3s (done 1/200 total 19s)
+REANALYZE seed=2322501 picks=12 pts=12 lost=0 bad_step=None replay=11.3s deep=6.0s (done 2/200 total 36s)
+REANALYZE seed=2322502 picks=12 pts=12 lost=0 bad_step=None replay=16.3s deep=13.8s (done 3/200 total 66s)
+REANALYZE seed=2322503 picks=12 pts=12 lost=0 bad_step=None replay=26.5s deep=20.8s (done 4/200 total 114s)
+REANALYZE seed=2322504 picks=12 pts=12 lost=0 bad_step=None replay=12.4s deep=8.3s (done 5/200 total 134s)
+REANALYZE seed=2322505 picks=12 pts=12 lost=0 bad_step=None replay=8.4s deep=5.8s (done 6/200 total 149s)
+REANALYZE seed=2322506 picks=12 pts=12 lost=0 bad_step=None replay=23.7s deep=13.1s (done 7/200 total 185s)
+REANALYZE seed=2322507 picks=12 pts=12 lost=0 bad_step=None replay=18.2s deep=16.6s (done 8/200 total 220s)
+REANALYZE seed=2322508 picks=12 pts=12 lost=0 bad_step=None replay=10.2s deep=5.3s (done 9/200 total 236s)
+REANALYZE seed=2322509 picks=12 pts=12 lost=0 bad_step=None replay=20.2s deep=11.2s (done 10/200 total 267s)
+REANALYZE seed=2322510 picks=12 pts=12 lost=0 bad_step=None replay=7.2s deep=12.9s (done 11/200 total 287s)
