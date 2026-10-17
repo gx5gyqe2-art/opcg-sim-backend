@@ -341,6 +341,9 @@ pub fn decide_on_state(
     // 準備箱（§20.7.2）の枝予算と計測をこの decide のぶんだけ張る（既定 false のときは
     // 1 度も触られない＝出力にも `boxes` は出ない）。共通規則の入り切りは §20.7.8 の 5。
     r#macro::reset_setup_state(opts.search.setup_box, opts.search.select_branch_on());
+    // 符号化のマスター単位の要約をこの decide のあいだ使い回す（値は同じ・`encode::decide_cache_scope`）。
+    let _enc_cache = crate::encode::decide_cache_scope(masters);
+    let _tok_cache = crate::net::nrel::tok_cache_scope();
     // 葉の打ち切り（§20.7.9）の実績もこの decide のぶんだけ張る（既定＝`none` では
     // 1 度も触られず、戻り値に `rollout` の欄も出ない＝trace の形が変わらない）。
     quiesce::reset_rollout_stats(opts.search.leaf_rollout);
