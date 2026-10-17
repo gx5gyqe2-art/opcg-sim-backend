@@ -133,6 +133,42 @@ class _Stop(Exception):
     pass
 
 
+def deep_point(game, name, turn, seed, out, deep, pol_len):
+    """1 局面の深い探索 → 記録の候補の並び（`out` の groups の順）での n・q・v0（・p_deep）。対応が付かなければ unmapped。
+
+    `out` は記録の探索の出力（`stats.legal` と `groups`）。`reanalyze.py` の打ち直しと `record_gen --reanalyze-mult`
+    （生成の中での再分析）が同じこの関数を通る＝点の値の作り方は 1 本。
+    """
+    # `decide` は盤面を変えない（`record_gen` の注記）。`fork` の無い古い wheel では生の局で読む
+    # （その後の再生が記録と同じ手を打ち続けるかは、次の行の照合がそのまま確かめる）。
+    g_read = game.fork() if hasattr(game, "fork") else game
+    o2 = json.loads(g_read.decide(name, deep.decide_opts(seed, int(turn), name, None)))
+    legal = (out.get("stats") or {}).get("legal") or []
+    legal2 = (o2.get("stats") or {}).get("legal") or []
+    g2 = {gg["rep"]: gg for gg in (o2.get("groups") or [])}
+    reps = [gg["rep"] for gg in (out.get("groups") or [])]
+    if legal != legal2 or any(r not in g2 for r in reps) or len(reps) != int(pol_len):
+        return {"unmapped": True}
+    n2 = [float(g2[r]["n"]) for r in reps]
+    q2 = [float(g2[r]["q"]) for r in reps]
+    tot = sum(n2)
+    pr = (o2.get("stats") or {}).get("P")
+    return {"n": n2, "q": q2, "v0": (sum(a * b for a, b in zip(n2, q2)) / tot) if tot > 0 else 0.0,
+            "p_deep": [sum(float(pr[k]) for k in gg["idxs"]) for gg in out["groups"]] if pr else None}
+
+
+def point_detail(p, g, seed, leaders):
+    """点の行（`points.jsonl`）に記録側の値を足す（`summarize` の物差しが読む）。"""
+    c, ptr = g["cols"], g["ptr"]
+    i = p["i"]
+    p.update({"seed": seed, "who": int(c["who"][i]), "leader": leaders[int(c["who"][i])],
+              "rec_n": [float(x) for x in c["pol_n"][ptr[i]:ptr[i + 1]]],
+              "rec_q": [float(x) for x in c["pol_q"][ptr[i]:ptr[i + 1]]],
+              "rec_p": ([float(x) for x in c["pol_p"][ptr[i]:ptr[i + 1]]] if "pol_p" in c else None),
+              "fams": [family(json.loads(s)) for s in c["pol_sig"][ptr[i]:ptr[i + 1]]]})
+    return p
+
+
 def replay_game(seed, g, picks, meta, rec_spec, deep, db, leaders):
     """1 局を打ち直し、選んだ点で深い探索 → (点のリスト, 局の状態)。"""
     c, ptr = g["cols"], g["ptr"]
@@ -152,25 +188,10 @@ def replay_game(seed, g, picks, meta, rec_spec, deep, db, leaders):
         if int(step) in want:
             i, rule = want[int(step)]
             t0 = time.time()
-            # `decide` は盤面を変えない（`record_gen` の注記）。`fork` の無い古い wheel では生の局で読む
-            # （その後の再生が記録と同じ手を打ち続けるかは、次の行の照合がそのまま確かめる）。
-            g_read = game.fork() if hasattr(game, "fork") else game
-            o2 = json.loads(g_read.decide(name, deep.decide_opts(seed, int(turn), name, None)))
-            st["t_deep"] += time.time() - t0
-            p = {"i": int(i), "rule": rule, "step": int(step), "turn": int(turn), "sec": time.time() - t0}
-            legal = (out.get("stats") or {}).get("legal") or []
-            legal2 = (o2.get("stats") or {}).get("legal") or []
-            g2 = {gg["rep"]: gg for gg in (o2.get("groups") or [])}
-            reps = [gg["rep"] for gg in (out.get("groups") or [])]
-            if legal != legal2 or any(r not in g2 for r in reps) or len(reps) != int(c["pol_len"][i]):
-                p["unmapped"] = True
-            else:
-                n2 = [float(g2[r]["n"]) for r in reps]
-                q2 = [float(g2[r]["q"]) for r in reps]
-                tot = sum(n2)
-                p.update({"n": n2, "q": q2, "v0": (sum(a * b for a, b in zip(n2, q2)) / tot) if tot > 0 else 0.0})
-                pr = (o2.get("stats") or {}).get("P")
-                p["p_deep"] = [sum(float(pr[k]) for k in gg["idxs"]) for gg in out["groups"]] if pr else None
+            p = {"i": int(i), "rule": rule, "step": int(step), "turn": int(turn)}
+            p.update(deep_point(game, name, turn, seed, out, deep, int(c["pol_len"][i])))
+            p["sec"] = time.time() - t0
+            st["t_deep"] += p["sec"]
             st["pts"].append(p)
         if int(step) >= last:
             raise _Stop()
@@ -186,12 +207,12 @@ def replay_game(seed, g, picks, meta, rec_spec, deep, db, leaders):
     return st
 
 
-def write_game(out_dir, g, st):
-    """1 局ぶんの dump（再分析した main 行だけ・記録の全列をコピー・`pol_n`／`pol_q`／`pol_v0` だけ差し替え）→ 行の数。"""
+def rean_rows(g, pts):
+    """再分析した main 行だけの列（記録の全列をコピー・`pol_n`／`pol_q`／`pol_v0` だけ差し替え）→ {列: 配列}（点が無ければ None）。"""
     c, ptr = g["cols"], g["ptr"]
-    ok = [p for p in st["pts"] if not p.get("unmapped")]
+    ok = [p for p in pts if not p.get("unmapped")]
     if not ok:
-        return 0
+        return None
     buf = {k: [] for k in g["row_cols"] + g["pol_cols"] + (["pol_v0"] if "pol_v0" not in c else [])}
     for p in ok:
         i = p["i"]
@@ -208,11 +229,19 @@ def write_game(out_dir, g, st):
             buf["pol_v0"][-1] = np.asarray([p["v0"]], c["pol_v0"].dtype)
         else:
             buf["pol_v0"].append(np.asarray([p["v0"]], np.float16))
-    seed = int(c["seed"][ok[0]["i"]])
+    return {k: np.concatenate(v) for k, v in buf.items()}
+
+
+def write_game(out_dir, g, st):
+    """1 局ぶんの dump（`rean_rows`）を `n_record_<seed>.npz` に書く → 行の数。"""
+    cols = rean_rows(g, st["pts"])
+    if cols is None:
+        return 0
+    seed = int(cols["seed"][0])
     tmp = os.path.join(out_dir, ".n_record_%d.tmp.npz" % seed)
-    np.savez_compressed(tmp, **{k: np.concatenate(v) for k, v in buf.items()})
+    np.savez_compressed(tmp, **cols)
     os.replace(tmp, os.path.join(out_dir, "n_record_%d.npz" % seed))
-    return len(ok)
+    return len(cols["seed"])
 
 
 def read_progress(out_dir):
@@ -428,14 +457,9 @@ def main(argv=None):
         picks = select_points(g, leaders, seed, a.quota)
         sel = {r: sum(1 for _i, rr in picks if rr == r) for r in RULES}
         st = replay_game(seed, g, picks, meta, rec_spec, deep, db, leaders)
-        c, ptr = g["cols"], g["ptr"]
+        c = g["cols"]
         for p in st["pts"]:
-            i = p["i"]
-            p.update({"seed": seed, "who": int(c["who"][i]), "leader": leaders[int(c["who"][i])],
-                      "rec_n": [float(x) for x in c["pol_n"][ptr[i]:ptr[i + 1]]],
-                      "rec_q": [float(x) for x in c["pol_q"][ptr[i]:ptr[i + 1]]],
-                      "rec_p": ([float(x) for x in c["pol_p"][ptr[i]:ptr[i + 1]]] if "pol_p" in c else None),
-                      "fams": [family(json.loads(s)) for s in c["pol_sig"][ptr[i]:ptr[i + 1]]]})
+            point_detail(p, g, seed, leaders)
         write_game(a.out, g, st)
         gl = {"game": seed, "picks": len(picks), "pts": len(st["pts"]), "bad_step": st["bad_step"], "sel": sel,
               "last_pick_step": max([int(c["step"][i]) for i, _r in picks], default=-1),
