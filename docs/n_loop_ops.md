@@ -669,6 +669,12 @@ printf '%s\n' 'cd ~/opcg-sim-backend' \
   'git push -q -u origin claude/n42-w${K}' > ~/save.sh
 
 --- ブロック 2（4 本を順に・1 本ごとに push）---
+下の「#!/bin/bash」から「echo ALL_DONE」までを ~/run.sh に保存し（ファイル作成のツールでよい）、
+`nohup bash ~/run.sh > ~/run.out 2>&1 &` でバックグラウンドに回す（3 時間を超えるのでフォアグラウンドで待たない）。
+20〜30 分ごとに `tail -n 2 ~/n42_w{K}.log; tail -n 3 ~/run.out` で進みを見て、run.out に ALL_DONE が出たら完了。
+
+#!/bin/bash
+export K={K} BASE={BASE}
 cd ~/opcg-sim-backend
 for J in 0 1 2 3; do
   D=n_records/n42_w${K}_p$J
@@ -702,6 +708,7 @@ PY
   bash ~/save.sh
 done
 tail -n 2 ~/n42_w${K}.log
+echo ALL_DONE
 
 補足:
 - 所要は 1 本（120 局）約 50 分・4 本で約 3.3 時間（同じコンテナで他の重い処理を並べない）。
