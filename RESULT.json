@@ -1,7 +1,7 @@
 {
  "job": "n42-w05",
  "role": "gen",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r11a.npz",
   "seed_base": 2423000,
@@ -24,20 +24,21 @@
   "dirs": [
    "n_records/n42_w05_p0",
    "n_records/n42_w05_p1",
-   "n_records/n42_w05_p2"
+   "n_records/n42_w05_p2",
+   "n_records/n42_w05_p3"
   ]
  },
  "metrics": {
-  "parts_done": 3,
-  "games": 360,
-  "rows": 52019,
+  "parts_done": 4,
+  "games": 480,
+  "rows": 69194,
   "dropped": 0,
-  "points4": 4320,
-  "points8": 4320,
+  "points4": 5760,
+  "points8": 5760,
   "unmapped4": 0,
   "unmapped8": 0,
-  "sec_play_mean": 37.19,
-  "sec_rean_mean": 71.08
+  "sec_play_mean": 36.69,
+  "sec_rean_mean": 70.08
  },
  "notes": ""
 }
