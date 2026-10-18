@@ -175,6 +175,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 
 | 用途 | 帯 | 状態 |
 |---|---|---|
+| 検証 **出荷の探索を増やす**（r11a の両席・候補席だけ `--cand-sims` 320／640／1280＝2／4／8 倍・主 random × synth_roles のみ・各 16 シャード × 175 ペア＝2,800 ペア・`--bands 1`・**3 腕とも同じ帯**＝対応のある比較・ユーザ決定 2026-10-18「2 倍 4 倍 8 倍までやってみましょうか」） | **1091000〜1106000**（シャード k の base は 1091000 + (k−1)×1000・各 175 seed） | 指示済み（2026-10-18・16 セッション〔tag `sims-r11a`〕・出力 `claude/arena-sims-w01`〜`w16`・§7.9） |
 | 検証 **高分解能 r12 vs r11a**（採用の判定・主 random × synth_roles のみ・16 シャード × 175 ペア＝2,800 ペア・`--bands 1`・両席 serve 既定・ユーザ決定 2026-10-18「(a) 2,800 ペアで測り直す」） | **1071000〜1086000**（シャード k の base は 1071000 + (k−1)×1000・各 175 seed） | 指示済み（2026-10-18・16 セッション〔tag `hires-r12`〕・出力 `claude/arena-hires-r12-w01`〜`w16`・判定: 2,800 ペアの 95% CI 下限 > 0.50 で採用〔副条件は 192 ペアで退行なし済み〕） |
 | 生成 **波42**（**r12 の教材**・生成役 r11a＝era9・設定は波 29〜32 と同じ・**`--reanalyze-mult 4,8`**＝同じ点を 4 倍と 8 倍で読む・§7.7） | 2421000〜2428500（予約帯をそのまま使う・16 シャード × 480 局・シャード k の base は 2420000 + ceil(k/2)×1000 + (k 偶数なら 500)・各シャードは 120 局 × 4 本） | 指示済み（2026-10-17・ユーザ決定「8 倍が効くかを確かめたい」・台帳 2+251） |
 | 検証 **r12／r12x vs r11a**（主 random × synth_roles／副 固定ミラー・各 8 帯 × 24 ペア・2 候補を同じ帯で・基準 r11a を明示） | ランダム 611000〜618000／ミラー 621000〜628000 | 予約（2026-10-17・§7.7） |
@@ -874,6 +875,50 @@ git add -f arena_hires_r12 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com 
 git push -q -u origin claude/arena-hires-r12-w{KK} && echo ALL_DONE || echo PUSH_FAILED
 
 補足: arena_shard は終えたペアを飛ばして再開する。コンテナが再起動したら準備から全部やり直してよい。PUSH_FAILED なら出力をそのまま報告。コミットメッセージにモデル名を入れない。所要は約 15〜20 分。
+````
+
+### 7.9 出荷の探索を増やす（r11a・2／4／8 倍・16 セッション・2026-10-18）
+
+ユーザ決定（2026-10-18）「2 倍 4 倍 8 倍までやってみましょうか」。台帳 `cpu_theory_gap.md` 2+260。両席 r11a・serve 既定、候補席だけ探索の回数を 160 → 320／640／1280。3 腕は同じ seed の帯（1091000〜）。`{K}`＝1〜16・`{KK}`＝01〜16・`{BASE}`＝1091000 + (k−1)×1000。
+
+作業セッション用の本文:
+
+````
+出荷の探索を増やすアリーナ（r11a・候補席だけ 2／4／8 倍）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.9）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-sims-w{KK} に push します。
+
+**完走（ALL_DONE と最後の push）までターンを終えないでください**——待機に入るとコンテナが止まり、処理も消えます。長い実行は nohup で回し、`timeout 540 bash -c 'until grep -q -E "ALL_DONE|PUSH_FAILED" ~/run.out; do sleep 30; done'; tail -n 3 ~/run.out` のような 9 分以内の待ちを繰り返し呼んでください。
+
+準備（bash）:
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-sims-w{KK} origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/arena-sims-w{KK} 2>/dev/null && git checkout -q FETCH_HEAD -- arena_sims 2>/dev/null || true
+[ -f ~/built ] || { make rust-develop > ~/build.log 2>&1 && touch ~/built; }
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_sims
+
+次を ~/run.sh に保存し（ファイル作成のツールでよい）、`nohup bash ~/run.sh > ~/run.out 2>&1 &` で回す:
+
+#!/bin/bash
+cd ~/opcg-sim-backend
+for S in 320 640 1280; do
+  T0=$(date +%s)
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate opcg_sim/data/learned/nrel_r11a.npz --baseline opcg_sim/data/learned/nrel_r11a.npz \
+    --cand-sims $S --pairs 175 --max-pairs 175 --bands 1 --seed-base {BASE} --workers 4 --leaders random --decks synth_roles \
+    --out arena_sims/sims${S}_w{KK}.jsonl
+  echo "sims $S sec $(( $(date +%s) - T0 ))" >> arena_sims/time_w{KK}.txt
+  printf '{"job": "arena-sims-w{KK}", "role": "arena", "status": "partial", "inputs": {"net": "nrel_r11a.npz", "cand_sims": [320, 640, 1280], "seed_base": {BASE}, "pairs": 175}, "outputs": {"dir": "arena_sims"}, "notes": ""}\n' > RESULT.json
+  git add -f arena_sims RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena sims $S shard {KK}"
+  git push -q -u origin HEAD:claude/arena-sims-w{KK} || echo PUSH_FAILED
+done
+sed -i 's/"status": "partial"/"status": "done"/' RESULT.json
+git add -f RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena sims done shard {KK}"
+git push -q -u origin HEAD:claude/arena-sims-w{KK} && echo ALL_DONE || echo PUSH_FAILED
+
+補足:
+- arena_shard は終えたペアを飛ばして再開する。コンテナが再起動したら準備から全部やり直してよい（終えた腕はすぐ終わる）。
+- push の後に `git ls-remote origin refs/heads/claude/arena-sims-w{KK}` で、手元の HEAD と同じコミットが origin に載ったことを確かめる（載っていなければ PUSH_FAILED と同じ扱いで報告）。
+- 所要の見込み: 320 は約 15 分・640 は約 25 分・1280 は約 50 分（合計 約 1.5 時間）。コミットメッセージにモデル名を入れない。
 ````
 
 ## 8. コーディネータが守ること
