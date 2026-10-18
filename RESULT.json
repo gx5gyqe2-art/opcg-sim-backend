@@ -1,1 +1,1 @@
-{"job": "arena-nobudget-w10", "role": "arena", "status": "partial", "inputs": {"net": "nrel_r11a.npz", "cand_sims": [640, 1280], "cand_budget": 0, "seed_base": 1100000, "pairs": 175}, "outputs": {"dir": "arena_nobudget"}, "notes": ""}
+{"job": "arena-nobudget-w10", "role": "arena", "status": "done", "inputs": {"net": "nrel_r11a.npz", "cand_sims": [640, 1280], "cand_budget": 0, "seed_base": 1100000, "pairs": 175}, "outputs": {"dir": "arena_nobudget"}, "notes": ""}
