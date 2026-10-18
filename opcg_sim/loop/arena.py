@@ -236,6 +236,9 @@ def add_cand_args(ap) -> None:
                          "スレッドを使うので --workers を下げること")
     ap.add_argument("--cand-setup-box", action="store_true",
                     help="候補席だけ準備箱（§20.7.2・既定 OFF）")
+    ap.add_argument("--cand-budget", type=int, default=None,
+                    help="候補席だけ戦闘箱の枝予算（1 decide あたり・既定 8000・0＝無制限）。"
+                         "sims を上げると予算が先に切れる（2026-10-18・台帳 2+261）")
 
 
 #: `--cand-<flag>` → `Game.decide` の opts の欄（値をそのまま流す欄・省略＝既定）。
@@ -245,6 +248,7 @@ CAND_VALUE_FLAGS = {
     "cand_q_min_frac": "q_min_frac",
     "cand_root_prior_temp": "root_prior_temp",
     "cand_worlds": "worlds",
+    "cand_budget": "budget",
     "cand_residual_activate": "residual_activate",
 }
 

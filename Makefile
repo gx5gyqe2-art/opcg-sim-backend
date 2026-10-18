@@ -73,6 +73,8 @@ theory-table-check:
 CROSS ?= 120
 CROSS_SEED ?= 0
 audit-cross:
+	# 前回の出力が残っていると arena_shard が再開して 1 局も打たずに終わる（2026-10-17 発覚）＝必ず消してから打つ
+	rm -f /tmp/audit_cross_$(CROSS_SEED).jsonl
 	OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard \
 	  --candidate "" --pairs $(CROSS) --bands 1 --max-pairs $(CROSS) --workers 4 --sims 32 \
 	  --leaders random --decks synth --seed-base $(CROSS_SEED) \

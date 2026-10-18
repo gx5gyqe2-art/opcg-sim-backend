@@ -185,6 +185,28 @@ pub fn value(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<f32, Engine
     nrel::value(w, tab, enc)
 }
 
+pub use nrel::Trunk;
+
+/// トークンと本体（`value`／`priors` の前半・`nrel::trunk`）。
+pub fn trunk(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Trunk, EngineError> {
+    nrel::trunk(w, tab, enc)
+}
+
+/// 価値の頭（`nrel::value_head`）。
+pub fn value_head(w: &NRelWeights, t: &Trunk) -> f32 {
+    nrel::value_head(w, t)
+}
+
+/// 方策の頭（`nrel::priors_from`）。
+pub fn priors_from(
+    w: &NRelWeights,
+    enc: &Encoding,
+    t: &Trunk,
+    cands: &[Candidate],
+) -> Result<Vec<f32>, EngineError> {
+    nrel::priors_from(w, enc, t, cands)
+}
+
 /// `NRelNet.policy_logits`＋`seg_softmax`（候補上の確率）。
 pub fn priors(
     w: &NRelWeights,

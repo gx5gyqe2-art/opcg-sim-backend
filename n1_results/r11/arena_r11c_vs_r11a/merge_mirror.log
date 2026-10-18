@@ -1,0 +1,9 @@
+  mirror_w00.jsonl             25.0/48 = 0.5208 void 0
+  mirror_w01.jsonl             23.0/48 = 0.4792 void 0
+  mirror_w02.jsonl             28.0/48 = 0.5833 void 0
+  mirror_w03.jsonl             18.0/48 = 0.3750 void 0
+  mirror_w04.jsonl             20.0/48 = 0.4167 void 0
+  mirror_w05.jsonl             20.0/48 = 0.4167 void 0
+  mirror_w06.jsonl             26.0/48 = 0.5417 void 0
+  mirror_w07.jsonl             19.0/48 = 0.3958 void 0
+[r11c vs r11a mirror] ARENA_MERGE_FINAL {"pairs": 192, "games": 384, "void": 0, "wins": 179.0, "wr": 0.4661, "ci95": [0.4209, 0.5114], "elo": -23.6, "elo95": [-55.4, 7.9], "promoted": false, "shards": 8, "dup_seeds": 0}
