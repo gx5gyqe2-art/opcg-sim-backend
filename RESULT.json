@@ -4,11 +4,13 @@
  "status": "partial",
  "outputs": {
   "files": [
-   "arena_r12/a1_r12_mirror_w04.jsonl"
+   "arena_r12/a1_r12_mirror_w04.jsonl",
+   "arena_r12/a1_r12x_mirror_w04.jsonl"
   ]
  },
  "metrics": {
-  "arena_r12/a1_r12_mirror_w04.jsonl": 24
+  "arena_r12/a1_r12_mirror_w04.jsonl": 24,
+  "arena_r12/a1_r12x_mirror_w04.jsonl": 24
  },
  "notes": ""
 }
