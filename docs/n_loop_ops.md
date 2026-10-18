@@ -841,6 +841,41 @@ echo ALL_DONE
 - コミットメッセージにモデル名を入れない。
 ````
 
+### 7.8 高分解能 r12 vs r11a（16 セッション・2026-10-18・ユーザ決定「(a) 2,800 ペアで測り直す」）
+
+`{K}`＝1〜16・`{KK}`＝01〜16・`{BASE}`＝1071000 + (k−1)×1000。判定: 2,800 ペアの 95% CI 下限 > 0.50 で採用（副条件は §7.7 の 192 ペアで退行なし＝0.5026 [0.4583, 0.5469]）。
+
+高分解能の作業セッション用の本文:
+
+````
+高分解能アリーナ r12 vs r11a の 1 シャード（175 ペア）を回してください。シャードは k={K} です（N系ループの分散運用・CLAUDE.md §「N系ループの分散運用」・台帳 docs/n_loop_ops.md §6 の「高分解能 r12 vs r11a」の行）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-hires-r12-w{KK} に push します。
+
+**完走（ALL_DONE と最後の push）までターンを終えないでください**——待機に入るとコンテナが止まり、処理も消えます。長い実行は nohup で回し、`timeout 540 bash -c 'until grep -q ALL_DONE ~/run.out; do sleep 30; done'; tail -n 2 ~/run.out` のような 9 分以内の待ちを繰り返し呼んでください。
+
+準備（bash）:
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-hires-r12-w{KK} origin/claude/cpu-spec-improvements-yw91jd
+[ -f ~/built ] || { make rust-develop > ~/build.log 2>&1 && touch ~/built; }
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r12:r12net && git show r12net:n1_results/nrel_r12.npz > ~/nrel_r12.npz
+mkdir -p arena_hires_r12
+
+次を ~/run.sh に保存し（ファイル作成のツールでよい）、`nohup bash ~/run.sh > ~/run.out 2>&1 &` で回す:
+
+#!/bin/bash
+cd ~/opcg-sim-backend
+OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_r12.npz --baseline opcg_sim/data/learned/nrel_r11a.npz \
+  --pairs 175 --max-pairs 175 --bands 1 --seed-base {BASE} --workers 4 --leaders random --decks synth_roles \
+  --out arena_hires_r12/hires_r12_w{KK}.jsonl
+N=$(wc -l < arena_hires_r12/hires_r12_w{KK}.jsonl)
+printf '{"job": "arena-hires-r12-w{KK}", "role": "arena", "status": "done", "inputs": {"candidate": "claude/train-r12:n1_results/nrel_r12.npz", "baseline": "nrel_r11a.npz", "seed_base": {BASE}, "pairs": 175}, "outputs": {"file": "arena_hires_r12/hires_r12_w{KK}.jsonl"}, "metrics": {"lines": %s}, "notes": ""}\n' "$N" > RESULT.json
+git add -f arena_hires_r12 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "hires r12 vs r11a shard {KK}"
+git push -q -u origin claude/arena-hires-r12-w{KK} && echo ALL_DONE || echo PUSH_FAILED
+
+補足: arena_shard は終えたペアを飛ばして再開する。コンテナが再起動したら準備から全部やり直してよい。PUSH_FAILED なら出力をそのまま報告。コミットメッセージにモデル名を入れない。所要は約 15〜20 分。
+````
+
 ## 8. コーディネータが守ること
 
 - 指示書を出したら、**その指示書の内容（入力・帯・判断基準）を本書 §6 と
