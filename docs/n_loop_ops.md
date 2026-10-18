@@ -175,6 +175,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 
 | 用途 | 帯 | 状態 |
 |---|---|---|
+| 検証 **予算を外した探索**（r11a の両席・候補席だけ `--cand-sims` 640／1280 ＋ `--cand-budget 0`・主 random × synth_roles・各 2,800 ペア・`--bands 1`） | **1091000〜1106000 を再利用**（§7.9 の 2／4／8 倍と同じ seed＝予算あり／なしの対応のある比較） | 予約（2026-10-18・§7.10・ユーザ判断待ち） |
 | 検証 **出荷の探索を増やす**（r11a の両席・候補席だけ `--cand-sims` 320／640／1280＝2／4／8 倍・主 random × synth_roles のみ・各 16 シャード × 175 ペア＝2,800 ペア・`--bands 1`・**3 腕とも同じ帯**＝対応のある比較・ユーザ決定 2026-10-18「2 倍 4 倍 8 倍までやってみましょうか」） | **1091000〜1106000**（シャード k の base は 1091000 + (k−1)×1000・各 175 seed） | 指示済み（2026-10-18・16 セッション〔tag `sims-r11a`〕・出力 `claude/arena-sims-w01`〜`w16`・§7.9） |
 | 検証 **高分解能 r12 vs r11a**（採用の判定・主 random × synth_roles のみ・16 シャード × 175 ペア＝2,800 ペア・`--bands 1`・両席 serve 既定・ユーザ決定 2026-10-18「(a) 2,800 ペアで測り直す」） | **1071000〜1086000**（シャード k の base は 1071000 + (k−1)×1000・各 175 seed） | 指示済み（2026-10-18・16 セッション〔tag `hires-r12`〕・出力 `claude/arena-hires-r12-w01`〜`w16`・判定: 2,800 ペアの 95% CI 下限 > 0.50 で採用〔副条件は 192 ペアで退行なし済み〕） |
 | 生成 **波42**（**r12 の教材**・生成役 r11a＝era9・設定は波 29〜32 と同じ・**`--reanalyze-mult 4,8`**＝同じ点を 4 倍と 8 倍で読む・§7.7） | 2421000〜2428500（予約帯をそのまま使う・16 シャード × 480 局・シャード k の base は 2420000 + ceil(k/2)×1000 + (k 偶数なら 500)・各シャードは 120 局 × 4 本） | 指示済み（2026-10-17・ユーザ決定「8 倍が効くかを確かめたい」・台帳 2+251） |
@@ -920,6 +921,32 @@ git push -q -u origin HEAD:claude/arena-sims-w{KK} && echo ALL_DONE || echo PUSH
 - push の後に `git ls-remote origin refs/heads/claude/arena-sims-w{KK}` で、手元の HEAD と同じコミットが origin に載ったことを確かめる（載っていなければ PUSH_FAILED と同じ扱いで報告）。
 - 所要の見込み: 320 は約 15 分・640 は約 25 分・1280 は約 50 分（合計 約 1.5 時間）。コミットメッセージにモデル名を入れない。
 ````
+
+### 7.10 予算を外した探索（r11a・4／8 倍・`--cand-budget 0`・16 セッション・2026-10-18）
+
+§7.9 の 8 倍が 4 倍より弱かった（対応のある比較 z −3.1）。候補 (A)＝戦闘箱の枝予算（1 decide 8,000 本固定）が 8 倍では 14%・4 倍では 7% の decide で切れる（台帳 2+261）。候補席の予算を外して同じ seed で測り直す。`{K}`・`{KK}`・`{BASE}` は §7.9 と同じ（1091000 + (k−1)×1000）。
+
+作業セッション用の本文（§7.9 の本文と同じで、run.sh の中身だけ次に替える。出力ブランチは `claude/arena-nobudget-w{KK}`・dir は `arena_nobudget`）:
+
+````
+#!/bin/bash
+cd ~/opcg-sim-backend
+for S in 640 1280; do
+  T0=$(date +%s)
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate opcg_sim/data/learned/nrel_r11a.npz --baseline opcg_sim/data/learned/nrel_r11a.npz \
+    --cand-sims $S --cand-budget 0 --pairs 175 --max-pairs 175 --bands 1 --seed-base {BASE} --workers 4 --leaders random --decks synth_roles \
+    --out arena_nobudget/nb${S}_w{KK}.jsonl
+  echo "sims $S budget 0 sec $(( $(date +%s) - T0 ))" >> arena_nobudget/time_w{KK}.txt
+  printf '{"job": "arena-nobudget-w{KK}", "role": "arena", "status": "partial", "inputs": {"net": "nrel_r11a.npz", "cand_sims": [640, 1280], "cand_budget": 0, "seed_base": {BASE}, "pairs": 175}, "outputs": {"dir": "arena_nobudget"}, "notes": ""}\n' > RESULT.json
+  git add -f arena_nobudget RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena nobudget $S shard {KK}"
+  git push -q -u origin HEAD:claude/arena-nobudget-w{KK} || echo PUSH_FAILED
+done
+sed -i 's/"status": "partial"/"status": "done"/' RESULT.json
+git add -f RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena nobudget done shard {KK}"
+git push -q -u origin HEAD:claude/arena-nobudget-w{KK} && echo ALL_DONE || echo PUSH_FAILED
+````
+
+注意: `--cand-budget` は本線 57b629aa4 以降にある（checkout する本線がそれ以降であることを `python -m opcg_sim.loop.arena_shard --help | grep cand-budget` で確かめる）。予算なしは 1 decide が重くなる＝8 倍の 1 本は 50〜70 分の見込み。所要は時間ファイルに残す。
 
 ## 8. コーディネータが守ること
 
