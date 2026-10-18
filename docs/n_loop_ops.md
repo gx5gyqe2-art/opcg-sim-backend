@@ -786,6 +786,60 @@ OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_r12x.np
 - 出力は `claude/arena-r12-w{kk}`（jsonl と RESULT.json）。1 段ごとに push する。**完走までターンを終えない**。
 - 合算はコーディネータが `arena_merge` で行う。
 
+アリーナの作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16。上の 2 つを 1 本にまとめたもの）:
+
+````
+アリーナ（r12／r12x）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.7「アリーナの指示書」）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r12-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**——待機に入るとコンテナが止まり、バックグラウンドの処理も消えます。長い実行は nohup で回し、`timeout 540 bash -c '...'` のような 9 分以内の待ちを繰り返し呼んで見張ってください。
+
+bash で順に:
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r12-w$KK origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/arena-r12-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r12 2>/dev/null || true
+[ -f ~/built ] || { make rust-develop > ~/build.log 2>&1 && touch ~/built; }
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r12:r12net && git show r12net:n1_results/nrel_r12.npz > ~/nrel_r12.npz && git show r12net:n1_results/nrel_r12x.npz > ~/nrel_r12x.npz
+mkdir -p arena_r12
+
+次の内容を ~/run.sh に保存し（ファイル作成のツールでよい）、`nohup bash ~/run.sh > ~/run.out 2>&1 &` で回す。run.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k <= 8 ? k-1 : k-9 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r12/*.jsonl"))
+print(json.dumps({"job": "arena-r12-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r12 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r12 shard $KK" ; git push -q -u origin claude/arena-r12-w$KK; }
+for C in r12 r12x; do
+  if [ $k -le 8 ]; then F=arena_r12/a1_${C}_main_w0$B.jsonl
+    OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r11a.npz \
+      --pairs 24 --max-pairs 24 --seed-base $(( 611000 + B*1000 )) --workers 4 --leaders random --decks synth_roles --out $F
+  else F=arena_r12/a1_${C}_mirror_w0$B.jsonl
+    OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r11a.npz \
+      --pairs 24 --max-pairs 24 --seed-base $(( 621000 + B*1000 )) --workers 4 --out $F
+  fi
+  save
+done
+OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_r12x.npz --baseline ~/nrel_r12.npz \
+  --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( 1051000 + (k-1)*1000 )) --workers 4 --leaders random --decks synth_roles \
+  --out arena_r12/hires_r12x_w$KK.jsonl
+ST=done save
+echo ALL_DONE
+
+補足:
+- arena_shard は終えたペアを飛ばして再開する。コンテナが再起動したら上の準備から全部やり直してよい（run.sh も同じものを作り直す）。
+- 最初の push が 403 などで失敗したら、その出力を RESULT.json の notes に書き、報告してください。
+- コミットメッセージにモデル名を入れない。
+````
+
 ## 8. コーディネータが守ること
 
 - 指示書を出したら、**その指示書の内容（入力・帯・判断基準）を本書 §6 と
