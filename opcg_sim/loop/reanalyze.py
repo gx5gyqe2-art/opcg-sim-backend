@@ -106,8 +106,11 @@ def select_points(g, leaders, seed, quota):
     return sorted(out, key=lambda x: int(c["step"][x[0]]))
 
 
-def specs(meta, net, mult):
-    """記録の席（`record_gen._init_worker` と同じ組み方）と深い探索の席。"""
+def specs(meta, net, mult, budget=None):
+    """記録の席（`record_gen._init_worker` と同じ組み方）と深い探索の席。
+
+    `budget`＝深い席だけの戦闘箱の枝予算（None＝既定 8000・0＝無制限・2026-10-18 台帳 2+265）。
+    """
     search = dict(meta.get("search") or {})
     kw = {"prune_futile": E.GEN_PRUNE_FUTILE, **search}
     want = {"eps_play": meta.get("eps_play", 0.0), "eps_hold": meta.get("eps_hold", 0.0),
@@ -119,7 +122,10 @@ def specs(meta, net, mult):
         raise SystemExit("このコミットの SeatSpec は %s を受けない（記録は非 0）" % sorted(lost))
     rec = E.SeatSpec(net, sims=int(meta["sims"]), dirichlet_eps=float(meta["dirichlet_eps"]),
                      temp_turns=int(meta["temp_turns"]), **eps, **kw)
-    deep = E.SeatSpec(net, sims=int(meta["sims"]) * int(mult), **kw)
+    dk = dict(kw)
+    if budget is not None:
+        dk["budget"] = int(budget)
+    deep = E.SeatSpec(net, sims=int(meta["sims"]) * int(mult), **dk)
     return rec, deep
 
 
@@ -268,7 +274,7 @@ def write_meta(out_dir, meta, gmeta, args, games_done, pts_done):
     n_rows = sum(1 for p in pts_done if not p.get("unmapped"))
     m2 = dict(meta)
     m2.update({"games": len(seeds), "rows": n_rows, "main_rows": n_rows})
-    m2["reanalyzed"] = {"mult": args.mult, "points": n_rows, "points_by_rule": pts_rule, "games": len(games_done),
+    m2["reanalyzed"] = {"mult": args.mult, "budget": getattr(args, "budget", None), "points": n_rows, "points_by_rule": pts_rule, "games": len(games_done),
                         "diverged": sum(1 for x in games_done if x["bad_step"] is not None),
                         "unmapped": sum(1 for p in pts_done if p.get("unmapped")),
                         "lost_to_divergence": sum(int(x["picks"]) - int(x["pts"]) for x in games_done),
@@ -394,6 +400,8 @@ def main(argv=None):
     ap.add_argument("--merge", nargs="+", default=None,
                     help="再分析の出力 dir 群を、--in の元の波の dir の全行へ差し込んで --out に書く（r11b の教材・§7.6）")
     ap.add_argument("--mult", type=int, default=4, help="深い探索の sims の倍率")
+    ap.add_argument("--budget", type=int, default=None,
+                    help="深い席だけの戦闘箱の枝予算（既定 8000・0＝無制限）。倍率を上げると予算が先に切れる（台帳 2+261）")
     ap.add_argument("--games", type=int, default=0, help="先頭から何局（0＝全部）")
     ap.add_argument("--shard", default="", help="i/n＝局を n 分割した i 番目")
     ap.add_argument("--quota", default="4,4,2,2",
@@ -445,7 +453,7 @@ def main(argv=None):
     os.replace(os.path.join(a.out, ".points.jsonl.tmp"), os.path.join(a.out, "points.jsonl"))
     E.engine()
     net = a.net or meta.get("net")
-    rec_spec, deep = specs(meta, net, a.mult)
+    rec_spec, deep = specs(meta, net, a.mult, a.budget)
     db = D.load_db()
     lead = {int(x["seed"]): x["leaders"] for x in gmeta["games"]}
     t0 = time.time()
