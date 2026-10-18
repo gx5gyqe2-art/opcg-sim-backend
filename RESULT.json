@@ -6,13 +6,15 @@
   "files": [
    "arena_r13/r13_main_w09.jsonl",
    "arena_r13/r13_mirror_w09.jsonl",
-   "arena_r13/r13b_main_w09.jsonl"
+   "arena_r13/r13b_main_w09.jsonl",
+   "arena_r13/r13b_mirror_w09.jsonl"
   ]
  },
  "metrics": {
   "arena_r13/r13_main_w09.jsonl": 175,
   "arena_r13/r13_mirror_w09.jsonl": 175,
-  "arena_r13/r13b_main_w09.jsonl": 175
+  "arena_r13/r13b_main_w09.jsonl": 175,
+  "arena_r13/r13b_mirror_w09.jsonl": 175
  },
  "notes": "repo lives at /home/user/opcg-sim-backend (symlinked to ~/opcg-sim-backend)"
 }
