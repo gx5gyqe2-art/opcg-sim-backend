@@ -1,1 +1,1 @@
-{"job": "arena-sims-w09", "role": "arena", "status": "partial", "inputs": {"net": "nrel_r11a.npz", "cand_sims": [320, 640, 1280], "seed_base": 1099000, "pairs": 175}, "outputs": {"dir": "arena_sims"}, "notes": ""}
+{"job": "arena-sims-w09", "role": "arena", "status": "done", "inputs": {"net": "nrel_r11a.npz", "cand_sims": [320, 640, 1280], "seed_base": 1099000, "pairs": 175}, "outputs": {"dir": "arena_sims"}, "notes": ""}
