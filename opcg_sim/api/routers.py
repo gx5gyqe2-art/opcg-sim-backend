@@ -31,6 +31,7 @@ from .services.replay import (_replay_enabled, _replay_record_action, _capture_f
                               _replay_record_frame)
 from .services.games import _resolve_first_player_seat
 from opcg_sim.api import engine_rs
+from opcg_sim.loop import engine as E
 from .engine_rs import RsGame
 
 _logger = logging.getLogger("opcg.api")
@@ -212,7 +213,8 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                 # CPU の思考は Rust（`opcg_engine.Game.decide` を生の盤面に対して呼ぶ）。
                 # 2026-09-07・第 2 段 `rs-archive-cutover` で、`hidden` から `GameManager` を
                 # 組み直して Python に読ませる暫定経路（§15.1）を撤去した。
-                move = manager.decide(cpu_pid, trace=tr)
+                # 探索は対戦 API だけの既定（`PLAY_SIMS`／`PLAY_BUDGET`・2026-10-18）。
+                move = manager.decide(cpu_pid, trace=tr, sims=E.PLAY_SIMS, budget=E.PLAY_BUDGET)
                 if move is not None:
                     if trace_on:
                         # action_index＝直後に記録する actions のインデックス（決定↔アクションの明示対応）。

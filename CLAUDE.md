@@ -200,7 +200,9 @@ make test-fast   # 開発中のイテレーション用（slow・cpu_infra除外
   - **NRel（N系 v3・rN/aN）** = 22 枠の「効果構造＋今の状態＋ゾーン」トークン＋対の小ネット
     （`opcg_sim/learned/n_rel.py`・`n_rel_feat.py`・符号化 v14・`docs/n_attention_plan.md`）。
     **現在の出荷既定は NRel r11a**〔2026-10-17 採用・`nrel_r11a.npz`・`opcg_sim/loop/engine.py::DEFAULT_NET`
-    が正本（生成・アリーナ・serve が同じもの）・`docs/reports/r11a_adoption_20261017.md`〕。方策の教師は
+    が正本（生成・アリーナ・serve が同じもの）・`docs/reports/r11a_adoption_20261017.md`〕。
+    **対戦 API の CPU だけ探索は 8 倍（1,280 回）・戦闘箱の枝予算なし**（2026-10-18 ユーザ決定・+46.5 Elo・
+    `opcg_sim/loop/engine.py::PLAY_SIMS`／`PLAY_BUDGET`・生成・アリーナの物差しは 160 回のまま）。方策の教師は
     **4 倍の深さの再分析**（`docs/n_loop_ops.md` §7.5／§7.6・高分解能 2,800 ペアで r3 に +29 Elo）。
     **ロールバック先は r3**（同梱 `nrel_r3.npz`・2026-09-08 採用・`r3_adoption_20260908.md`）。その前は
     a1（同梱 `nrel_a1.npz`・2026-09-05 採用）。構成は**関係 R なし・相手デッキ知識あり**（ユーザ決定

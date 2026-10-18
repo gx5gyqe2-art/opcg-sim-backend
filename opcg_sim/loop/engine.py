@@ -34,6 +34,12 @@ DEFAULT_NET = os.path.join(MODELS, "nrel_r11a.npz")
 #: serve 既定（`opcg_sim/learned/config.py` の共有既定と同じ値。Rust 側 `DecideOptions`
 #: の既定と一致するので、通常はここを触らない）。
 SERVE_SIMS = 160
+#: 対戦 API（`/api/game/cpu/step`）の CPU **だけ**の探索。8 倍の探索＋戦闘箱の枝予算なし
+#: （2026-10-18 ユーザ決定・主条件 2,622 ペアで出荷 160 回に +46.5 Elo・1 手平均 0.8 秒・
+#: 最大 19 秒・`docs/reports/2026-10-18_serve_sims.md`）。生成・アリーナ・golden の物差しは
+#: `SERVE_SIMS`／既定の予算のまま（ここを触っても学習側は変わらない）。0＝予算なし。
+PLAY_SIMS = 1280
+PLAY_BUDGET = 0
 GEN_PRUNE_FUTILE = False   # 生成は枝刈りを外す（v6 柱⑤: 刈った枝は学習データに現れない）
 
 _STATE: Dict[str, Any] = {}
