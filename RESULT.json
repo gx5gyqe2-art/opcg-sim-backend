@@ -1,16 +1,18 @@
 {
  "job": "arena-r12-w02",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "outputs": {
   "files": [
    "arena_r12/a1_r12_main_w01.jsonl",
-   "arena_r12/a1_r12x_main_w01.jsonl"
+   "arena_r12/a1_r12x_main_w01.jsonl",
+   "arena_r12/hires_r12x_w02.jsonl"
   ]
  },
  "metrics": {
   "arena_r12/a1_r12_main_w01.jsonl": 24,
-  "arena_r12/a1_r12x_main_w01.jsonl": 24
+  "arena_r12/a1_r12x_main_w01.jsonl": 24,
+  "arena_r12/hires_r12x_w02.jsonl": 175
  },
  "notes": ""
 }
