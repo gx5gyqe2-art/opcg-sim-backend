@@ -49,7 +49,7 @@ use crate::model::{
 use crate::state::EngineError;
 
 use super::{
-    leader::LeaderCache, tokens::ProfileCache, Encoding, EncodeOptions, Vocab, D_SC, MAX_FIELD,
+    Encoding, EncodeOptions, Vocab, D_SC, MAX_FIELD,
     MAX_HAND, N_CARD_IDX, PER_CHAR,
 };
 
@@ -336,18 +336,37 @@ pub fn onplay_option_scan(
     masters: &MasterTable,
     actor: Seat,
 ) -> (i32, i32, f64) {
-    // メイン手番の要求が actor 宛てでなければ (0,0,0)。
-    {
-        let mut probe = Session::new(state.clone());
-        let pending = crate::rules::pending::get_pending_request(&mut probe, masters, false);
-        let ok = pending.as_ref().is_some_and(|p| {
-            p.get("action").and_then(|v| v.as_str()) == Some("MAIN_ACTION")
-                && p.get("player_id").and_then(|v| v.as_str()) == Some(actor.name())
-        });
-        if !ok {
-            return (0, 0, 0.0);
-        }
+    let mut probe = Session::new(state.clone());
+    if !main_for(&mut probe, masters, actor) {
+        return (0, 0, 0.0);
     }
+    onplay_scan_body(state, masters, actor)
+}
+
+/// [`onplay_option_scan`] と同じ値を、入口の判定（保留中の要求）だけ `s` の上で読む版
+/// （盤面の写しを作らない＝[`Session::isolated`]・`docs/reports/2026-10-17_game_speed.md` §2）。
+pub fn onplay_option_scan_in(s: &mut Session, masters: &MasterTable, actor: Seat) -> (i32, i32, f64) {
+    let ok = {
+        let _prof = crate::prof::enter(crate::prof::Cat::EncOnplayProbe);
+        s.isolated(|s| main_for(s, masters, actor))
+    };
+    if !ok {
+        return (0, 0, 0.0);
+    }
+    onplay_scan_body(s.state(), masters, actor)
+}
+
+/// メイン手番の要求が `actor` 宛てか（`get_pending_request` は `&mut Session` を取る）。
+fn main_for(s: &mut Session, masters: &MasterTable, actor: Seat) -> bool {
+    let pending = crate::rules::pending::get_pending_request(s, masters, false);
+    pending.as_ref().is_some_and(|p| {
+        p.get("action").and_then(|v| v.as_str()) == Some("MAIN_ACTION")
+            && p.get("player_id").and_then(|v| v.as_str()) == Some(actor.name())
+    })
+}
+
+/// [`onplay_option_scan`] の入口の判定より後（メイン手番が `actor` 宛てのとき）。
+fn onplay_scan_body(state: &GameState, masters: &MasterTable, actor: Seat) -> (i32, i32, f64) {
     // 対象＝手札の ON_PLAY 持ち。
     let targets: Vec<CardIdx> = state
         .player(actor)
@@ -453,17 +472,24 @@ pub fn encode(
     let onplay = if opts.skip_onplay {
         [0.0f32, 0.0, 0.0]
     } else {
-        let (n_live, n_dead, keep_live) = onplay_option_scan(s.state(), masters, me);
+        let (n_live, n_dead, keep_live) = {
+            let _prof = crate::prof::enter(crate::prof::Cat::EncOnplay);
+            onplay_option_scan_in(s, masters, me)
+        };
         [
             n_live as f32 / 5.0,
             ((keep_live / 2000.0).min(1.0)) as f32,
             n_dead as f32 / 5.0,
         ]
     };
-    let mut profiles = ProfileCache::default();
-    let rel = super::tokens::encode_rel(s, masters, me, !opts.skip_relations, &mut profiles)?;
+    // マスター単位の要約は decide の中なら使い回す（`encode::decide_cache_scope`）。値は同じ。
+    let mut caches = super::EncCaches::take(masters);
+    let rel = {
+        let _prof = crate::prof::enter(crate::prof::Cat::EncRel);
+        super::tokens::encode_rel(s, masters, me, !opts.skip_relations, &mut caches.profiles)?
+    };
 
-    let mut leaders = LeaderCache::default();
+    let leaders = &mut caches.leaders;
     let state = s.state();
     let (p_me, p_opp) = (state.player(me), state.player(opp));
     let is_my_turn = f32::from(state.turn_player == me);

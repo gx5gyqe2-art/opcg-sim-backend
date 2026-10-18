@@ -18,6 +18,7 @@ mod journal;
 mod model;
 mod net;
 mod ops;
+pub mod prof;
 mod py_game;
 mod rules;
 mod search;
@@ -41,6 +42,12 @@ impl From<EngineError> for PyErr {
 /// crate のバージョン（`Cargo.toml` の `package.version`）。
 ///
 /// Python 側の疎通確認・wheel の取り違え検出に使う。
+/// `decide` の時間の内訳（`OPCG_PROF=1` のときだけ数える・`src/prof.rs`）。JSON を返して 0 に戻す。
+#[pyfunction]
+fn prof_take() -> String {
+    prof::take().to_string()
+}
+
 #[pyfunction]
 fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
@@ -424,6 +431,7 @@ fn decide(hidden_json: &str, seat: &str, opts_json: &str, rng_json: &str) -> PyR
 fn opcg_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add_function(wrap_pyfunction!(version, m)?)?;
+    m.add_function(wrap_pyfunction!(prof_take, m)?)?;
     m.add_function(wrap_pyfunction!(record_version, m)?)?;
     m.add_function(wrap_pyfunction!(echo_state, m)?)?;
     m.add_function(wrap_pyfunction!(load_masters, m)?)?;

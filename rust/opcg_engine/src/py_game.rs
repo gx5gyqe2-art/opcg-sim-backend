@@ -417,6 +417,7 @@ impl Game {
     /// 戻り値は `decide` と同形（`rng_used` だけは出ない＝出目は自前で作るので数える意味がない）。
     /// `load_masters()` と `load_net()` が先に要る。
     fn decide(&mut self, py: Python<'_>, player_id: &str, opts_json: &str) -> PyResult<String> {
+        let t_py = std::time::Instant::now();
         let masters = self.masters()?;
         let seat = self.seat_of(player_id)?;
         let ov = parse_json(opts_json, "decide opts")?;
@@ -443,10 +444,19 @@ impl Game {
         let state = self.session.state();
         let body = py
             .detach(|| {
-                crate::search::decide_on_state(masters, net, state, seat, &opts, &mut rng, &carry)
+                let t0 = std::time::Instant::now();
+                let out = {
+                    let _prof = crate::prof::enter_top(crate::prof::Cat::Search);
+                    crate::search::decide_on_state(masters, net, state, seat, &opts, &mut rng, &carry)
+                };
+                crate::prof::add(crate::prof::DECIDE_WALL, t0.elapsed().as_nanos() as u64);
+                crate::prof::add(crate::prof::DECIDES, 1);
+                out
             })
             .map_err(|e| self.map_err(e))?;
-        to_py_json(&body)
+        let out = to_py_json(&body);
+        crate::prof::add(crate::prof::PY_DECIDE_WALL, t_py.elapsed().as_nanos() as u64);
+        out
     }
 
     /// 直前の `apply_*` のあいだに**山札を混ぜた席**（`["p1","p2"]`）。

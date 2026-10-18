@@ -27,13 +27,19 @@ MODELS = os.path.join(DATA, "learned")
 CARDS_PATH = os.path.join(DATA, "opcg_cards.json")
 
 #: 出荷既定のネット（生成・アリーナ・serve が同じものを使う＝物差しを 1 本に保つ）。
-#: **r3**（2026-09-08 採用・`docs/reports/r3_adoption_20260908.md`）。ロールバック先は a1
-#: （同梱 `nrel_a1.npz`・2026-09-05 採用）。
-DEFAULT_NET = os.path.join(MODELS, "nrel_r3.npz")
+#: **r11a**（2026-10-17 採用・`docs/reports/r11a_adoption_20261017.md`・教師は 4 倍の再分析＝era9）。
+#: ロールバック先は r3（同梱 `nrel_r3.npz`・2026-09-08 採用）、その先は a1（`nrel_a1.npz`）。
+DEFAULT_NET = os.path.join(MODELS, "nrel_r11a.npz")
 
 #: serve 既定（`opcg_sim/learned/config.py` の共有既定と同じ値。Rust 側 `DecideOptions`
 #: の既定と一致するので、通常はここを触らない）。
 SERVE_SIMS = 160
+#: 対戦 API（`/api/game/cpu/step`）の CPU **だけ**の探索。8 倍の探索＋戦闘箱の枝予算なし
+#: （2026-10-18 ユーザ決定・主条件 2,622 ペアで出荷 160 回に +46.5 Elo・1 手平均 0.8 秒・
+#: 最大 19 秒・`docs/reports/2026-10-18_serve_sims.md`）。生成・アリーナ・golden の物差しは
+#: `SERVE_SIMS`／既定の予算のまま（ここを触っても学習側は変わらない）。0＝予算なし。
+PLAY_SIMS = 1280
+PLAY_BUDGET = 0
 GEN_PRUNE_FUTILE = False   # 生成は枝刈りを外す（v6 柱⑤: 刈った枝は学習データに現れない）
 
 _STATE: Dict[str, Any] = {}

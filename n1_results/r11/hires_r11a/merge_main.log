@@ -1,0 +1,17 @@
+  main_w01.jsonl               211.0/350 = 0.6029 void 0
+  main_w02.jsonl               188.0/350 = 0.5371 void 0
+  main_w03.jsonl               167.0/350 = 0.4771 void 0
+  main_w04.jsonl               183.0/350 = 0.5229 void 0
+  main_w05.jsonl               205.0/350 = 0.5857 void 0
+  main_w06.jsonl               203.0/350 = 0.5800 void 0
+  main_w07.jsonl               174.0/350 = 0.4971 void 0
+  main_w08.jsonl               206.0/350 = 0.5886 void 0
+  main_w09.jsonl               189.0/350 = 0.5400 void 0
+  main_w10.jsonl               183.0/350 = 0.5229 void 0
+  main_w11.jsonl               204.0/350 = 0.5829 void 0
+  main_w12.jsonl               194.0/350 = 0.5543 void 0
+  main_w13.jsonl               191.0/350 = 0.5457 void 0
+  main_w14.jsonl               167.0/350 = 0.4771 void 0
+  main_w15.jsonl               179.0/350 = 0.5114 void 0
+  main_w16.jsonl               189.0/350 = 0.5400 void 0
+[r11a vs r3 main hires] ARENA_MERGE_FINAL {"pairs": 2800, "games": 5600, "void": 0, "wins": 3033.0, "wr": 0.5416, "ci95": [0.5274, 0.5558], "elo": 29.0, "elo95": [19.0, 39.0], "promoted": false, "shards": 16, "dup_seeds": 0}

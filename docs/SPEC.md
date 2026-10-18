@@ -186,7 +186,7 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
     学習側は `value_net.extend_to_vocab`（末尾追記・出力恒等）で新カードを取り込む。
     経緯は `docs/reports/net_vocab_pinning_20260715.md`。
   - **learned の serve 探索**（`cpu_learned.LearnedEngine.decide`・net 非依存の探索層＝net を差し替えても有効）:
-    NN誘導 PUCT MCTS（`learned/mcts.py`・SERVE_SIMS=160）＋ (a) **終局値の深さ減衰**
+    NN誘導 PUCT MCTS（`learned/mcts.py`・SERVE_SIMS=160。**対戦 API の CPU だけは `PLAY_SIMS=1280`・戦闘箱の枝予算なし**〔2026-10-18・`opcg_sim/loop/engine.py`・`docs/reports/2026-10-18_serve_sims.md`〕）＋ (a) **終局値の深さ減衰**
     ±max(TERM_FLOOR, 1−TERM_DECAY·depth)（L1 の ±(W_WIN−ply) と同原理＝最短リーサル優先・敗勢では
     粘る側を選ぶ）、(b) **root 読み出しの二重ゲート乗り換え**（等価手マージ後、「訪問比 ≥ 0.4 かつ
     Q 差 ≥ 0.05」の代替のみ argmax(N) から乗り換え・min_gap=inf で従来一致。低訪問 Q の楽観バイアス対策＝

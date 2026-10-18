@@ -1,0 +1,60 @@
+{
+ "dirs": [
+  "/home/user/tm/re/out/n32_w01_s0",
+  "/home/user/tm/re/out/n32_w01_s1"
+ ],
+ "games": 40,
+ "replay_rate": 1.0,
+ "diverged_games": 0,
+ "picked": 480,
+ "points": 480,
+ "unmapped": 0,
+ "lost_to_divergence": 0,
+ "sec_replay_per_game": 53.07,
+ "sec_deep_per_game": 42.64,
+ "all": {
+  "n": 480,
+  "deep_best_differs": 0.2667,
+  "entropy": {
+   "rec_visits": 1.308,
+   "deep_visits": 1.2093,
+   "rec_pi": 0.813,
+   "deep_pi": 0.4324
+  },
+  "sec_per_point": 3.553,
+  "cands_mean": 7.34
+ },
+ "by_rule": {
+  "early": {
+   "n": 315,
+   "deep_best_differs": 0.2317,
+   "entropy": {
+    "rec_visits": 1.0187,
+    "deep_visits": 0.9129,
+    "rec_pi": 0.5204,
+    "deep_pi": 0.2239
+   },
+   "sec_per_point": 3.389,
+   "cands_mean": 3.82
+  },
+  "end_and_attack": {
+   "n": 165,
+   "deep_best_differs": 0.3333,
+   "entropy": {
+    "rec_visits": 1.8602,
+    "deep_visits": 1.775,
+    "rec_pi": 1.3717,
+    "deep_pi": 0.8303
+   },
+   "sec_per_point": 3.866,
+   "cands_mean": 14.06
+  },
+  "enel": {
+   "n": 0
+  },
+  "random": {
+   "n": 0
+  }
+ },
+ "c_scale": 0.3
+}
