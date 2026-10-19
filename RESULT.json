@@ -16,7 +16,7 @@
   ]
  },
  "metrics": {
-  "arena_prod2/prod_r13d_w17.jsonl": 22
+  "arena_prod2/prod_r13d_w17.jsonl": 44
  },
  "notes": "repo used via symlink ~/opcg-sim-backend -> /home/user/opcg-sim-backend"
 }
