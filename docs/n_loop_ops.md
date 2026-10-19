@@ -175,6 +175,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 
 | 用途 | 帯 | 状態 |
 |---|---|---|
+| 検証 **r13c／r13d vs r13b**（価値の窓だけ違う 2 本・両席 160 回・各 16 シャード × 175 ペア＝2,800 ペア・`--bands 1`・§7.13） | r13c 主 1231000〜1246000／r13c 副 1251000〜1266000／r13d 主 1271000〜1286000／r13d 副 1291000〜1306000 | 予約（2026-10-19・訓練の push 後に指示） |
 | 検証 **本番の設定 r13b vs r11a**（両席 1,280 回・枝予算なし・主 random × synth_roles・32 シャード × 88 ペア＝2,816 ペア・`--bands 1`・§7.12） | 1191000〜1222000（シャード k の base は 1191000 + (k−1)×1000） | 使用済み（2026-10-19・2,730 ペア・w16 は 7 ペアのみ・台帳 2+271） |
 | 生成 **波43**（**r13 の教材**・生成役 r11a・**出荷と同じ読み＝sims 1280・worlds 1・`--budget 0`**・読み直しなし・他は波 42 と同じ・§7.11） | 2431000〜2438500（16 シャード × 480 局・シャード k の base は 2430000 + ceil(k/2)×1000 + (k 偶数なら 500)・各シャードは 120 局 × 4 本） | 回収済み（2026-10-18 18:06 UTC・7,680 局・114 万行・棄却 9・`claude/n43-w01`〜`w16`・台帳 2+267／2+268） |
 | 検証 **r13／r13b vs r11a**（両席 serve 既定・各 16 シャード × 175 ペア＝2,800 ペア・`--bands 1`・§7.11） | r13 主 1111000〜1126000／r13 副 1131000〜1146000／r13b 主 1151000〜1166000／r13b 副 1171000〜1186000 | 指示済み（2026-10-18 19:39 UTC・新しい 16 セッション `arena-r13-w01`〜`w16`・ネットは `claude/train-r13`） |
@@ -1192,6 +1193,103 @@ ST=done save
 echo ALL_DONE
 
 補足: 22 ペアずつ進め（6 回目までに 88 ペアに届く・届いた後の回は何もしない）、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。全体で約 2.5 時間。コミットメッセージにモデル名を入れない。
+````
+
+### 7.13 価値の教師を新しい波に絞る——r13c（波 43 だけ）・r13d（波 43＋42）（2026-10-19）
+
+ユーザ指示（2026-10-19「まずは上の方を今ある材料でやってみましょうか」・台帳 2+273）。r13b の価値の教師 947 万行のうち、
+出荷と同じ読みで打った波 43 は約 100 万行で、残りは 160 回・世界 4 本・予算ありの古い波（42・32〜27）。**価値の教師を新しい波に絞ると強くなるか**を、
+r13b と**価値の窓だけが違う**2 本で測る（方策の教師・warm-start r11a・その他の設定は r13b と同じ）。
+
+- **r13c**: 価値＝波 43 だけ（`--z-in` なし）。
+- **r13d**: 価値＝波 43＋42（波 42 は 160 回の記録だが一番新しい打ち手 r11a の対局）。
+- 評価帯: 波 43 holdout で r11a／r13b／r13c／r13d（＋各 `.ep0`／`.ep1`）。
+- アリーナ（両席 160 回・基準 **r13b**＝現既定・各 16 シャード × 175 ペア＝2,800 ペア・`--bands 1`）:
+  シャード k の base: r13c 主 1231000／r13c 副 1251000／r13d 主 1271000／r13d 副 1291000（いずれも + (k−1)×1000）。
+- **予告（数を見る前）**: r13c vs r13b 主 −5〜+10 Elo（価値の行が 1/9 になる損と、教師が新しくなる得が打ち消し合う）。r13d vs r13b 主 0〜+10。
+  2 本とも評価帯の価値の誤差は r13b と ±0.005 以内。採用は従来の規約（主の下限 > 0.50・副の下限 ≥ 0.45）。
+
+訓練・評価帯の指示書（作業セッション用・1 セッション・メモリ 12GB 以上）:
+
+```
+作業: r13c／r13d の訓練 → 評価帯（docs/n_loop_ops.md §7.13）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（~/opcg-sim-backend）。長い実行は nohup で回し、
+**push し終えるまでターンを終えない**（9 分以内の待ちを繰り返す）。迷った点は RESULT.json の notes に書いて完走する。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+for N in 43 42; do for k in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16; do
+  git fetch -q origin claude/n$N-w$k:tmpw && mkdir -p ~/n$N && git archive tmpw n_records | tar -x -C ~/n$N && git branch -qD tmpw; done; done
+ls -d ~/n43/n_records/n43_w*_p[0-3] | wc -l      # 64
+git fetch -q origin claude/train-r13:r13net && git show r13net:n1_results/nrel_r13b.npz > ~/nrel_r13b.npz
+
+P43="$HOME/n43/n_records/n43_w*_p[0-3]"
+Z42="$HOME/n42/n_records/n42_w*_p[0-3]"
+COMMON="--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz"
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P43" $COMMON --out ~/nrel_r13c.npz 2>&1 | tee ~/train_r13c.log
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P43" --z-in "$Z42" $COMMON --out ~/nrel_r13d.npz 2>&1 | tee ~/train_r13d.log
+
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$P43" \
+  --nrel opcg_sim/data/learned/nrel_r11a.npz ~/nrel_r13b.npz ~/nrel_r13c.npz ~/nrel_r13d.npz \
+         ~/nrel_r13c.ep0.npz ~/nrel_r13c.ep1.npz ~/nrel_r13d.ep0.npz ~/nrel_r13d.ep1.npz \
+  --policy --holdout-mod 7 --out ~/band_r13cd.json 2>&1 | tee ~/band_r13cd.log
+
+git checkout -B claude/train-r13cd
+mkdir -p n1_results && cp ~/nrel_r13c*.npz ~/nrel_r13d*.npz n1_results/ && cp ~/train_r13c.log ~/train_r13d.log ~/band_r13cd.json ~/band_r13cd.log .
+（RESULT.json〔§5 の形〕: inputs＝warm_start r11a・π dir 数・r13c／r13d それぞれの価値の波と行数・rss_gb／metrics＝それぞれ best_ep・
+ 各周の val v_mse／v_sign／pi_top1／band＝ネットごとの v_mse と方策の指標／train_sec・band_sec／notes）
+git add -f n1_results/nrel_r13c*.npz n1_results/nrel_r13d*.npz train_r13c.log train_r13d.log band_r13cd.json band_r13cd.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r13c／r13d のセット（訓練・評価帯）"
+git push -u origin claude/train-r13cd
+```
+
+アリーナの作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16・`claude/train-r13cd` の push 後）:
+
+````
+アリーナ（r13c／r13d vs r13b）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.13）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r13cd-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r13cd-w$KK origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/arena-r13cd-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r13cd 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r13cd:r13cd && git show r13cd:n1_results/nrel_r13c.npz > ~/nrel_r13c.npz && git show r13cd:n1_results/nrel_r13d.npz > ~/nrel_r13d.npz
+mkdir -p arena_r13cd
+
+次の内容を ~/run13cd.sh に保存し、`nohup bash ~/run13cd.sh > ~/run13cd.out 2>&1 &` で回す。run13cd.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r13cd/*.jsonl"))
+print(json.dumps({"job": "arena-r13cd-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r13cd RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r13cd shard $KK"; git push -q -u origin claude/arena-r13cd-w$KK || echo PUSH_FAILED; }
+for C in r13c r13d; do
+  if [ $C = r13c ]; then BM=1231000; BR=1251000; else BM=1271000; BR=1291000; fi
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13b.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BM + B*1000 )) --workers 4 --leaders random --decks synth_roles \
+    --out arena_r13cd/${C}_main_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13b.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR + B*1000 )) --workers 4 \
+    --out arena_r13cd/${C}_mirror_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 12 分 × 4 本＝約 50 分。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
 ````
 
 ## 8. コーディネータが守ること
