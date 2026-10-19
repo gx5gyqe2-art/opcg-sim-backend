@@ -49,6 +49,8 @@ def build_parser():
     ap.add_argument("--frac", type=float, default=0.55)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--sims", type=int, default=E.SERVE_SIMS)
+    ap.add_argument("--budget", type=int, default=None,
+                    help="基準席の戦闘箱の枝予算（既定 8000・0＝無制限）。候補席は --cand-budget")
     ap.add_argument("--leaders", default="fixed", choices=("fixed", "random", "real", "purple"),
                     help="対面の選び方: fixed=既定リーダーミラー（歴代判定と地続き）／"
                          "random=全リーダーからペアごとに 2 枚引く（汎化）／"
@@ -78,7 +80,7 @@ def main(argv=None):
         batch = todo[: args.max_pairs]
         t0 = time.time()
         initargs = (args.candidate, args.baseline, cand_kw, args.leaders,
-                    args.decks, args.pair_timeout, args.sims)
+                    args.decks, args.pair_timeout, args.sims, args.budget)
         with mp.get_context("spawn").Pool(args.workers, initializer=A.init_pool,
                                           initargs=initargs) as pool:
             with open(args.out, "a") as f:

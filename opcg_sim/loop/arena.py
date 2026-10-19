@@ -118,7 +118,7 @@ class PairTimeout(BaseException):
 
 
 def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
-              decks="singleton", pair_timeout=0, sims=E.SERVE_SIMS):
+              decks="singleton", pair_timeout=0, sims=E.SERVE_SIMS, budget=None):
     """子プロセス初期化: カード DB と席のつまみを 1 回だけ作る（以後の全ペアで共有）。
 
     `cand_kw` は**候補席にだけ**渡す探索のつまみ（`{"macro_moves": True}` 等）。機構を
@@ -127,6 +127,9 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
 
     `cand_kw["sims"]`（`--cand-sims`）だけは `SeatSpec` の名前付き引数と衝突するので取り出す
     ＝候補席だけ sims を変えられる（基準席は `sims` のまま）。
+
+    `budget`（`--budget`）は**基準席の**戦闘箱の枝予算（None＝既定 8000・0＝無制限）。両席を出荷と
+    同じ読みで打たせるときに `--cand-budget` と組で使う（2026-10-19・台帳 2+270）。
     """
     E.engine()
     _G["leaders_mode"] = leaders_mode
@@ -137,7 +140,8 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
     _G["cand_opts"] = dict(kw)                 # 台帳に書く候補席の設定（既定なら空）
     cand_sims = int(kw.pop("sims", sims))
     _G["cand"] = E.SeatSpec(cand_spec or None, sims=cand_sims, **kw)
-    _G["best"] = E.SeatSpec(best_spec or None, sims=sims)
+    _G["best"] = E.SeatSpec(best_spec or None, sims=sims,
+                            **({} if budget is None else {"budget": int(budget)}))
 
 
 def play_pair(seed: int) -> float:
