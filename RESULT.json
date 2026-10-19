@@ -16,7 +16,7 @@
   ]
  },
  "metrics": {
-  "arena_prod/prod_r13b_w26.jsonl": 66
+  "arena_prod/prod_r13b_w26.jsonl": 88
  },
  "notes": "repo was pre-cloned at /home/user/opcg-sim-backend (script cd adapted); otherwise as written in n_loop_ops 7.12"
 }
