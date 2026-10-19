@@ -1,7 +1,7 @@
 {
  "job": "arena-r14-w02",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "outputs": {
   "files": [
    "arena_r14/r14_main_w02.jsonl",
