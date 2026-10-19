@@ -16,7 +16,7 @@
   ]
  },
  "metrics": {
-  "arena_prod/prod_r13b_w03.jsonl": 83
+  "arena_prod/prod_r13b_w03.jsonl": 88
  },
  "notes": "repo at /home/user/opcg-sim-backend (pre-existing clone) instead of ~/opcg-sim-backend"
 }
