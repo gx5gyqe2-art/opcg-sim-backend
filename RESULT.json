@@ -1,7 +1,7 @@
 {
  "job": "arena-prod2-w13",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r13d.npz",
   "baseline": "nrel_r13b.npz",
