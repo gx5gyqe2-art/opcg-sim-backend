@@ -58,3 +58,4 @@
 {"seed": 1199057, "score": 0.0, "leaders": ["P-086", "OP14-079"], "games": [0.0, 0.0], "cand_leaders": ["P-086", "P-086"], "turns": [12, 13], "cand_opts": {"budget": 0}}
 {"seed": 1199058, "score": 2.0, "leaders": ["OP10-002", "P-086"], "games": [1.0, 1.0], "cand_leaders": ["OP10-002", "OP10-002"], "turns": [13, 18], "cand_opts": {"budget": 0}}
 {"seed": 1199060, "score": 0.0, "leaders": ["OP06-022", "OP10-099"], "games": [0.0, 0.0], "cand_leaders": ["OP06-022", "OP06-022"], "turns": [12, 11], "cand_opts": {"budget": 0}}
+{"seed": 1199059, "score": 1.0, "leaders": ["P-076", "OP04-019"], "games": [0.0, 1.0], "cand_leaders": ["P-076", "P-076"], "turns": [14, 12], "cand_opts": {"budget": 0}}
