@@ -16,7 +16,7 @@
   ]
  },
  "metrics": {
-  "arena_prod2/prod_r13d_w03.jsonl": 22
+  "arena_prod2/prod_r13d_w03.jsonl": 44
  },
  "notes": "repo path /home/user/opcg-sim-backend used instead of ~/opcg-sim-backend"
 }
