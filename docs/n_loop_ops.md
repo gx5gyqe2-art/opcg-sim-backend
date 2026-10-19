@@ -1362,7 +1362,7 @@ PR は作らないでください。git の作業が安全確認で止められ�
 
 出どころの照合（origin 側で）:
   (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
-  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.15 波 44"
+  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.15 次の 1 周"
   (3) 器: git show origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/record_gen.py | grep -n '"--budget"'
 この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
 
