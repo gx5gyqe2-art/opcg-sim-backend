@@ -175,7 +175,8 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 
 | 用途 | 帯 | 状態 |
 |---|---|---|
-| 検証 **r13c／r13d vs r13b**（価値の窓だけ違う 2 本・両席 160 回・各 16 シャード × 175 ペア＝2,800 ペア・`--bands 1`・§7.13） | r13c 主 1231000〜1246000／r13c 副 1251000〜1266000／r13d 主 1271000〜1286000／r13d 副 1291000〜1306000 | 指示済み（2026-10-19 05:59 UTC・新しい 16 セッション `arena-r13cd-w01`〜`w16`・ネットは `claude/train-r13cd`） |
+| 検証 **本番の設定 r13d vs r13b**（両席 1,280 回・枝予算なし・主 random × synth_roles・32 シャード × 88 ペア＝2,816 ペア・§7.14） | 1311000〜1342000（シャード k の base は 1311000 + (k−1)×1000） | 指示済み（2026-10-19・台帳 2+275） |
+| 検証 **r13c／r13d vs r13b**（価値の窓だけ違う 2 本・両席 160 回・各 16 シャード × 175 ペア＝2,800 ペア・`--bands 1`・§7.13） | r13c 主 1231000〜1246000／r13c 副 1251000〜1266000／r13d 主 1271000〜1286000／r13d 副 1291000〜1306000 | 使用済み（2026-10-19・台帳 2+275） |
 | 検証 **本番の設定 r13b vs r11a**（両席 1,280 回・枝予算なし・主 random × synth_roles・32 シャード × 88 ペア＝2,816 ペア・`--bands 1`・§7.12） | 1191000〜1222000（シャード k の base は 1191000 + (k−1)×1000） | 使用済み（2026-10-19・2,730 ペア・w16 は 7 ペアのみ・台帳 2+271） |
 | 生成 **波43**（**r13 の教材**・生成役 r11a・**出荷と同じ読み＝sims 1280・worlds 1・`--budget 0`**・読み直しなし・他は波 42 と同じ・§7.11） | 2431000〜2438500（16 シャード × 480 局・シャード k の base は 2430000 + ceil(k/2)×1000 + (k 偶数なら 500)・各シャードは 120 局 × 4 本） | 回収済み（2026-10-18 18:06 UTC・7,680 局・114 万行・棄却 9・`claude/n43-w01`〜`w16`・台帳 2+267／2+268） |
 | 検証 **r13／r13b vs r11a**（両席 serve 既定・各 16 シャード × 175 ペア＝2,800 ペア・`--bands 1`・§7.11） | r13 主 1111000〜1126000／r13 副 1131000〜1146000／r13b 主 1151000〜1166000／r13b 副 1171000〜1186000 | 指示済み（2026-10-18 19:39 UTC・新しい 16 セッション `arena-r13-w01`〜`w16`・ネットは `claude/train-r13`） |
@@ -1290,6 +1291,56 @@ ST=done save
 echo ALL_DONE
 
 補足: 1 本 約 12 分 × 4 本＝約 50 分。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
+````
+
+### 7.14 本番の設定のアリーナ——r13d vs r13b（両席 1,280 回・枝予算なし・32 セッション・2026-10-19）
+
+§7.13 で r13d（価値＝波 43＋42）が 160 回の物差しで r13b に主 +21.5 Elo（下限 0.5166）・副 −7.3（下限 0.4773）。§7.12 と同じ形で本番の設定でも測る（台帳 2+275）。
+32 シャード × 88 ペア＝2,816 ペア・シャード k（1〜32）の base は 1311000 + (k−1)×1000。
+**予告（数を見る前）**: +10〜25 Elo（160 回とほぼ同じ幅・前回は 160 回 +11.6 → 本番 +12.5）。下限 > 0.50 なら採用の根拠。
+
+作業セッション用の本文（`{K}`＝1〜32・`{KK}`＝01〜32）:
+
+````
+本番の設定のアリーナ（r13d vs r13b・両席 1,280 回・枝予算なし）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.14）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-prod2-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。git の作業が安全確認で止められたら、`git stash -u` してから同じコマンドを実行してよい。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください（待機に入るとコンテナが止まり、処理も消えます）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-prod2-w$KK origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/arena-prod2-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_prod2 2>/dev/null || true
+rm -f ~/built; make rust-develop > ~/build.log 2>&1 && touch ~/built
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+python -m opcg_sim.loop.arena_shard --help | grep -q -- "--budget" || echo "NO_BUDGET_FLAG（notes に書いて止める）"
+git fetch -q origin claude/train-r13cd:r13cd && git show r13cd:n1_results/nrel_r13d.npz > ~/nrel_r13d.npz
+mkdir -p arena_prod2
+
+次の内容を ~/runp.sh に保存し、`nohup bash ~/runp.sh > ~/runp.out 2>&1 &` で回す。runp.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_prod2/*.jsonl"))
+print(json.dumps({"job": "arena-prod2-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz", "baseline": "nrel_r13b.npz", "sims": 1280, "budget": 0, "cand_budget": 0, "pairs": 88},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_prod2 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena prod2 shard $KK"; git push -q -u origin claude/arena-prod2-w$KK || echo PUSH_FAILED; }
+for J in 0 1 2 3 4 5; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_r13d.npz --baseline opcg_sim/data/learned/nrel_r13b.npz \
+    --sims 1280 --budget 0 --cand-budget 0 --pairs 88 --max-pairs 22 --bands 1 \
+    --seed-base $(( 1311000 + (k-1)*1000 )) --workers 4 --leaders random --decks synth_roles --pair-timeout 3600 \
+    --out arena_prod2/prod_r13d_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 22 ペアずつ進め（6 回目までに 88 ペアに届く・届いた後の回は何もしない）、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。全体で約 2.5 時間。コミットメッセージにモデル名を入れない。
 ````
 
 ## 8. コーディネータが守ること
