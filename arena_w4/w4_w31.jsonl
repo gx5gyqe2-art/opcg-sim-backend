@@ -47,3 +47,20 @@
 {"seed": 1501047, "score": 1.0, "leaders": ["OP15-022", "OP13-004"], "games": [1.0, 0.0], "cand_leaders": ["OP15-022", "OP15-022"], "turns": [17, 11], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
 {"seed": 1501046, "score": 0.0, "leaders": ["OP09-062", "OP02-002"], "games": [0.0, 0.0], "cand_leaders": ["OP09-062", "OP09-062"], "turns": [12, 13], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
 {"seed": 1501049, "score": 2.0, "leaders": ["ST11-001", "OP06-042"], "games": [1.0, 1.0], "cand_leaders": ["ST11-001", "ST11-001"], "turns": [11, 10], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501048, "score": 2.0, "leaders": ["OP05-041", "OP09-001"], "games": [1.0, 1.0], "cand_leaders": ["OP05-041", "OP05-041"], "turns": [11, 12], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501050, "score": null, "leaders": ["OP04-058", "OP03-021"], "void": "GameAborted: seed=1501050 step=118 ValueError: 不明なアクションです: DON_BOX", "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501052, "score": 0.0, "leaders": ["OP02-071", "OP11-001"], "games": [0.0, 0.0], "cand_leaders": ["OP02-071", "OP02-071"], "turns": [14, 11], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501053, "score": 2.0, "leaders": ["OP05-001", "ST13-001"], "games": [1.0, 1.0], "cand_leaders": ["OP05-001", "OP05-001"], "turns": [11, 10], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501054, "score": 2.0, "leaders": ["OP07-079", "OP01-091"], "games": [1.0, 1.0], "cand_leaders": ["OP07-079", "OP07-079"], "turns": [15, 14], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501055, "score": 1.0, "leaders": ["OP09-022", "OP15-098"], "games": [1.0, 0.0], "cand_leaders": ["OP09-022", "OP09-022"], "turns": [9, 11], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501056, "score": 0.0, "leaders": ["OP06-020", "OP11-021"], "games": [0.0, 0.0], "cand_leaders": ["OP06-020", "OP06-020"], "turns": [12, 13], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501051, "score": 1.0, "leaders": ["OP11-022", "P-047"], "games": [1.0, 0.0], "cand_leaders": ["OP11-022", "OP11-022"], "turns": [13, 15], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501058, "score": 0.0, "leaders": ["OP07-097", "OP14-020"], "games": [0.0, 0.0], "cand_leaders": ["OP07-097", "OP07-097"], "turns": [16, 13], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501057, "score": 2.0, "leaders": ["ST30-001", "OP15-098"], "games": [1.0, 1.0], "cand_leaders": ["ST30-001", "ST30-001"], "turns": [11, 12], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501060, "score": 1.0, "leaders": ["OP10-001", "OP09-081"], "games": [1.0, 0.0], "cand_leaders": ["OP10-001", "OP10-001"], "turns": [15, 13], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501061, "score": 1.0, "leaders": ["OP13-100", "ST10-003"], "games": [1.0, 0.0], "cand_leaders": ["OP13-100", "OP13-100"], "turns": [11, 9], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501063, "score": 0.0, "leaders": ["OP02-026", "OP02-071"], "games": [0.0, 0.0], "cand_leaders": ["OP02-026", "OP02-026"], "turns": [14, 11], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501059, "score": 1.0, "leaders": ["OP14-040", "OP11-001"], "games": [1.0, 0.0], "cand_leaders": ["OP14-040", "OP14-040"], "turns": [13, 11], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501062, "score": 0.0, "leaders": ["P-086", "OP13-003"], "games": [0.0, 0.0], "cand_leaders": ["P-086", "P-086"], "turns": [12, 13], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501065, "score": 0.0, "leaders": ["OP05-001", "OP07-019"], "games": [0.0, 0.0], "cand_leaders": ["OP05-001", "OP05-001"], "turns": [10, 9], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1501064, "score": 0.0, "leaders": ["OP05-001", "ST08-001"], "games": [0.0, 0.0], "cand_leaders": ["OP05-001", "OP05-001"], "turns": [12, 13], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
