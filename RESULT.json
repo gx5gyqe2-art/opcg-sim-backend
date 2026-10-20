@@ -13,7 +13,7 @@
   ]
  },
  "metrics": {
-  "arena_w4/w4_w03.jsonl": 22
+  "arena_w4/w4_w03.jsonl": 44
  },
  "notes": "repo at /home/user/opcg-sim-backend (not ~/); 4-core container"
 }
