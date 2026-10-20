@@ -177,7 +177,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 |---|---|---|
 | 検証 **r15／r15b vs r13d**（両席 160 回・各 16 シャード × 175 ペア・§7.16） | r15 主 1391000〜1406000／副 1411000〜1426000／r15b 主 1431000〜1446000／副 1451000〜1466000 | 使用済み（2026-10-20・r15 主 −1.6／副 0.0・r15b 主 +0.9／副 +13.9・どちらも非昇格・`2026-10-20_r15_judgment.md`） |
 | 検証 **世界 4 本 × 320 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・32 シャード × 88 ペア・§7.17） | 1471000〜1502000 | 使用済み（2026-10-20・2,724 ペア 0.4831 [0.4688, 0.4974]・−11.7・世界 4 本は有意に弱い・`2026-10-20_worlds4_and_policy_errors.md`） |
-| 生成 **波 46**（生成役 r13d・**世界 4 本 × 1,280 回**・枝予算なし・64 シャード × 120 局・§7.18） | 2461000〜2492620 | 指示済み（2026-10-20・claude/n46-w01〜w64） |
+| 生成 **波 46**（生成役 r13d・**世界 4 本 × 1,280 回**・枝予算なし・64 シャード × 120 局・§7.18） | 2461000〜2484620（w01〜w49）・2485000〜2492620 は未使用 | 指示済み（2026-10-20・claude/n46-w01〜w49・w50〜w64 は起動前に取り消し） |
 | 検証 **世界 4 本 × 1,280 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・16 シャード × 88 ペア・§7.18） | 1511000〜1526000 | 指示済み（2026-10-20・claude/arena-w4f-w01〜w16） |
 | 生成 **波45**（**r14 が昇格しなければ**・生成役 r13d のまま・設定は波 44 と同じ・§7.15） | 2451000〜2458500（シャード k の base は 2450000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 指示済み（2026-10-20・r14 非昇格・台帳 2+282） |
 | 生成 **波44**（r14 の教材・**生成役 r13d**・出荷と同じ読み・設定は波 43 と同じ・§7.15） | 2441000〜2448500（16 シャード × 480 局・シャード k の base は 2440000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 回収済み（2026-10-19 18:13 UTC・64/64・台帳 2+281） |
@@ -1754,6 +1754,7 @@ echo ALL_DONE
 
 - **教材（波 46）**: 生成役 r13d・世界 4 本 × 1,280 回・枝予算なし・それ以外は波 45 と同じ。**64 シャード × 120 局（30 局 × 4 本）**＝7,680 局。
   seed 2461000〜2492620（シャード k の base は 2460000 + ceil(k/2)×1000 + (k が偶数なら 500)）。実測（このコンテナ・2 局）: 1 局 約 330 秒（2 並列）＝1 シャード約 5.5 時間。
+- **2026-10-20 15:30 UTC 変更**: 同時に動けるセッションは約 50 で、64 シャードのうち w50〜w64 と教師のアリーナ 16 本が待ちになった。**波 46 は w01〜w49 の 49 シャード（5,880 局）で締め**、w50〜w64 は起動前に取り消した（seed 2485000〜2492620 は未使用）。r16c の π も波 45 から同じ 5,880 局にそろえる。
 - **訓練（2 本・どちらも warm-start r11a・価値は波 46＋45＋44〔どれも生成役 r13d〕）**:
   - **r16**: π＝波 46（世界 4 本の教師）。
   - **r16c（対照）**: π＝波 45（世界 1 本の教師・ほぼ同じ点数）。**違いは π の教師の強さだけ**。
@@ -1835,7 +1836,7 @@ echo ALL_DONE
 - コミットメッセージにモデル名を入れない。
 ````
 
-訓練・評価帯の指示書（作業セッション用・1 セッション・波 46 の 64 本が揃ってから）:
+訓練・評価帯の指示書（作業セッション用・1 セッション・波 46 の 49 シャード〔196 本〕が揃ってから）:
 
 ```
 作業: r16／r16c の訓練 → 評価帯（docs/n_loop_ops.md §7.18）。コードは変更しない。PR は作らない。
@@ -1846,18 +1847,22 @@ git の作業が安全確認で止められたら、`git stash -u` してから�
 pip install -q numpy maturin && make rust-develop
 pip install -q --target ~/torch_env torch
 export TP="PYTHONPATH=$HOME/torch_env:$PWD"
-for k in $(seq -w 1 64); do git fetch -q origin claude/n46-w$k:tmpw && mkdir -p ~/n46 && git archive tmpw n_records | tar -x -C ~/n46 && git branch -qD tmpw; done
+for k in $(seq -w 1 49); do git fetch -q origin claude/n46-w$k:tmpw && mkdir -p ~/n46 && git archive tmpw n_records | tar -x -C ~/n46 && git branch -qD tmpw; done
 for N in 45 44; do for k in $(seq -w 1 16); do
   git fetch -q origin claude/n$N-w$k:tmpw && mkdir -p ~/n$N && git archive tmpw n_records | tar -x -C ~/n$N && git branch -qD tmpw; done; done
-ls -d ~/n46/n_records/n46_w*_p[0-3] | wc -l      # 256
+ls -d ~/n46/n_records/n46_w*_p[0-3] | wc -l      # 196（w01〜w49）
 
 P46="$HOME/n46/n_records/n46_w*_p[0-3]"
 P45="$HOME/n45/n_records/n45_w*_p[0-3]"
 Z44="$HOME/n44/n_records/n44_w*_p[0-3]"
 COMMON="--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz"
 # r16＝π は波 46（世界 4 本の教師）・r16c＝π は波 45（世界 1 本の教師）。価値はどちらも波 46＋45＋44（同じ行）。
+# 2026-10-20 追記: 波 46 は 49 シャード（w01〜w49・196 本＝5,880 局）で締めた（同時に動けるセッション数の上限）。
+# r16c の π は波 45 から同じ局数（5,880 局＝49 本: w01〜w12 の全部と w13_p0）を取り、残りの 15 本は価値だけに回す＝価値の行は 2 本で同じ。
+P45A="$HOME/n45/n_records/n45_w0[1-9]_p[0-3] $HOME/n45/n_records/n45_w1[0-2]_p[0-3] $HOME/n45/n_records/n45_w13_p0"
+P45B="$HOME/n45/n_records/n45_w13_p[1-3] $HOME/n45/n_records/n45_w1[4-6]_p[0-3]"
 env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P46" --z-in "$P45" "$Z44" $COMMON --out ~/nrel_r16.npz 2>&1 | tee ~/train_r16.log
-env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P45" --z-in "$P46" "$Z44" $COMMON --out ~/nrel_r16c.npz 2>&1 | tee ~/train_r16c.log
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in $P45A --z-in "$P46" $P45B "$Z44" $COMMON --out ~/nrel_r16c.npz 2>&1 | tee ~/train_r16c.log
 （OOM なら notes に書いて止める。訓練開始時の RSS を notes に書く。）
 
 env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$P46" \
