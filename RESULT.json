@@ -4,11 +4,13 @@
  "status": "partial",
  "outputs": {
   "files": [
-   "arena_r16/r16_main_w12.jsonl"
+   "arena_r16/r16_main_w12.jsonl",
+   "arena_r16/r16_mirror_w12.jsonl"
   ]
  },
  "metrics": {
-  "arena_r16/r16_main_w12.jsonl": 175
+  "arena_r16/r16_main_w12.jsonl": 175,
+  "arena_r16/r16_mirror_w12.jsonl": 175
  },
  "notes": "repo dir was /home/user/opcg-sim-backend (pre-cloned) instead of ~/opcg-sim-backend"
 }
