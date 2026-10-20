@@ -13,7 +13,7 @@
   ]
  },
  "metrics": {
-  "arena_ism8/ism8_w07.jsonl": 22
+  "arena_ism8/ism8_w07.jsonl": 44
  },
  "notes": "ran in existing checkout /home/user/opcg-sim-backend (code at 00ea254)"
 }
