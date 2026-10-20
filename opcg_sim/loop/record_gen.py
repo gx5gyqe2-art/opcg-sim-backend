@@ -919,6 +919,8 @@ def main(argv=None):
     # §20.8.6（波 29〜）: 探索の設定。省略＝serve 既定（worlds 1・visits・t=1）＝歴代の波と同じ。
     ap.add_argument("--worlds", type=int, default=None,
                     help="1 決定あたりの世界サンプル本数（§20.7.1・既定 1）")
+    ap.add_argument("--budget", type=int, default=None,
+                    help="戦闘箱の枝予算（1 decide あたり・既定 8000・0＝無制限）。波 43〜 は出荷と同じ 0（台帳 2+267）")
     ap.add_argument("--select-rule", default=None, choices=("visits", "q_min_n"),
                     help="根で出す手の選び方（§20.5・既定 visits）")
     ap.add_argument("--q-min-frac", type=float, default=None,
@@ -960,7 +962,8 @@ def main(argv=None):
             os.makedirs(d, exist_ok=True)
     search = {k: v for k, v in (("worlds", args.worlds), ("select_rule", args.select_rule),
                                 ("q_min_frac", args.q_min_frac),
-                                ("root_prior_temp", args.root_prior_temp)) if v is not None}
+                                ("root_prior_temp", args.root_prior_temp),
+                                ("budget", args.budget)) if v is not None}
 
     os.makedirs(args.out, exist_ok=True)
     t0 = time.time()
