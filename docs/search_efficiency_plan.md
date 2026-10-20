@@ -143,3 +143,48 @@ Phase 0 → Phase 1 → Phase 3（Phase 4 の (a)(b) を合間に）→ Phase 4 
 - 相手の手番ノードで照合を省けない比率（訪問に占める割合）と、新しい手が追加された回数。
 
 **成果物**: ブランチ `claude/rs-ismcts`（コード・テスト・TEST_SPEC の 1 行・RESULT.json〔§5 の形: inputs＝元コミット／outputs＝変更ファイル／metrics＝上の計測／notes＝設計の注記・確認した依存・限界〕）。`make test`（`make rust-develop` 済み）と `make audit-cross` を通してから push。コミットメッセージにモデル名を入れない。
+
+### 7.2 WP `rs-speed-a`——エンジン内の高速化（Phase 4 の (a)(c)・作業セッション用・opus）
+
+ユーザ決定（2026-10-21「全部やってください」）。本線 `claude/cpu-spec-improvements-yw91jd` の最新から分岐し `claude/rs-speed-a` に push。PR は作らない。質問で止まらず、迷った点は注記と RESULT.json の notes に書いて完走する。
+
+**不変条件（最優先）**: 探索の出力（選ぶ手・根の訪問数・値・PV・イベント）は **1 bit も変わらない**。速くするだけ。golden 3 本（`tests/test_rs_golden_audit.py`・`tests/test_rs_golden_replay.py`）は**作り直さずに** green のまま。
+
+**対象**（`rust/opcg_engine` の探索の中だけ。`OPCG_PROF=1` で内訳を測ってから、効きの大きい順に）:
+- (a) 展開時の forward の使い回し——同じ盤面（同じ手の列）を同じ読みの中で 2 回以上評価していないかを調べ、あれば結果を使い回す。葉の評価と展開の事前分布が別々に forward を呼んでいるならまとめる。
+- (c) 合法手生成の割り当て削減——`legal_actions` と降下ごとの `Vec`／`String`／複製を減らす（再利用バッファ・参照・小さい配列）。
+- ほかに内訳で大きいもの（符号化の残りなど）があれば、手を変えない範囲で触ってよい。ただし**手の表現（Move の JSON→構造体）は WP `rs-speed-b` の担当**なので触らない（衝突を避ける）。触ったファイルは RESULT.json の notes に列挙する。
+
+**一致の確かめ方（必須）**:
+1. 変更前のコミットで、固定の局面集（`tests/scripts/rs_decide_latency.py` と同じ seed の局面で 1 手ずつ・1×1280／4×1280／1×160＋予算あり の 3 設定・計 1,000 判断点以上）の `decide` の出力（手・根の訪問数・値）を JSONL に書き出す。
+2. 変更後に同じものを書き出し、**全件一致**を確かめる（不一致が 1 件でもあれば直すか、その変更を戻す）。比較スクリプトは作業用（tests に入れない）。
+3. `make test`（`make rust-develop` 済み）と `make audit-cross` を通す。
+
+**計測して RESULT.json に書くもの**: 1 コア固定（`taskset -c 0`）で `rs_decide_latency.py --sims 1280 --budget 0 --games 8` と `--worlds 4` の前後（平均・90%・99%・最大）。`OPCG_PROF=1` の内訳の前後。各変更の効き（どれが何割効いたか）。一致の件数。
+
+**成果物**: ブランチ `claude/rs-speed-a`（コード・RESULT.json〔inputs＝元コミット／outputs＝変更ファイル／metrics＝上の計測／notes＝変更の説明・触ったファイル・効かなかった試み〕）。新しいテストは足さない（挙動不変の移植中の見張りは上の一致確認で行う）。コミットメッセージにモデル名を入れない。
+
+### 7.3 WP `rs-speed-b`——手の表現を構造体へ・符号化（Phase 4 の (b)(d)・作業セッション用・opus）
+
+§7.2 と同じ前提・不変条件・一致の確かめ方・計測・成果物（ブランチは `claude/rs-speed-b`）。対象だけが違う:
+- (b) 手（Move）の表現を JSON（`serde_json::Value` など）から型付きの構造体へ——探索の中の降下・照合（`move_sig`）・適用で JSON を作る／複製する／比べる所を構造体で行う。Python との境目（`py_game.rs`）の入出力の形は変えない（JSON への変換は境目だけで行う）。
+- (d) 符号化（ネットの入力を作る部分）の残り——割り当て・複製・同じ値の再計算を減らす。
+- **展開時の forward の使い回しと合法手生成の割り当ては WP `rs-speed-a` の担当**なので触らない。触ったファイルは notes に列挙する（後で 2 本を合わせるため）。
+
+### 7.4 WP `play-rethink`——迷う局面だけ世界 4 本で読み直す（Phase 1・作業セッション用・opus）
+
+ユーザ決定（2026-10-21「全部やってください」）。本線の最新から分岐し `claude/play-rethink` に push。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
+
+**仕様**:
+1. 1 本 × S 回で読み、**迷い**なら同じ `search_seed` で世界 K 本 × S 回を読み直し、その手に差し替える。迷いの尺度は根の **2 位の訪問数 ÷ 1 位の訪問数**（`r`）。`r ≥ τ` で読み直す。`τ` は引数（既定 off）。線は Phase 0 の結果で後から決めるので、**値を埋め込まない**。
+2. 入れる場所: 対戦 API（`opcg_sim/api/routers.py` の CPU 手番の `manager.decide`）と、アリーナの席（`SeatSpec`／`arena.py`）が**同じ関数**を通るようにする（物差しは 1 本）。アリーナの候補席の引数 `--cand-rethink-ratio τ`・`--cand-rethink-worlds K`（既定 4）、基準席用 `--rethink-ratio`・`--rethink-worlds`（`arena_shard.py` も）。対戦 API の既定（`opcg_sim/loop/engine.py` に `PLAY_RETHINK_RATIO = None`〔off〕・`PLAY_RETHINK_WORLDS = 4`）は off のまま。
+3. trace（`tr`）に `rethink: {r, fired, first_move, final_move}` を残す（発動率・入れ替わり率を後で数える）。
+4. 戦闘箱・対話箱など根の合法手が 1 つの局面は読み直さない。
+
+**不変条件**: off（既定）のとき出力は 1 bit も変わらない（golden 3 本・`make test` green）。
+
+**テスト（必須＝ゲームプレイに関わる）**: (a) off で今と同一 (b) `τ = 0`（必ず発動）で、結果が世界 K 本の `decide` と同一 (c) `τ` が十分大きい（発動しない）とき 1 本の `decide` と同一 (d) trace の形。`docs/TEST_SPEC.md` §2 に 1 行。
+
+**計測して RESULT.json に書くもの**: 固定の局面集（`rs_decide_latency.py` と同じ seed・1 コア固定）で τ ∈ {0.3, 0.5, 0.7, 0.9} の発動率・入れ替わり率・1 手の時間（平均・90%・99%・最大）。
+
+**成果物**: ブランチ `claude/play-rethink`（コード・テスト・TEST_SPEC の 1 行・RESULT.json）。`make test` と `make audit-cross` を通してから push。コミットメッセージにモデル名を入れない。
