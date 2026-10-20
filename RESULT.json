@@ -14,15 +14,16 @@
  "outputs": {
   "dirs": [
    "n_records/n46_w41_p0",
-   "n_records/n46_w41_p1"
+   "n_records/n46_w41_p1",
+   "n_records/n46_w41_p2"
   ]
  },
  "metrics": {
-  "parts_done": 2,
-  "games": 60,
-  "rows": 8603,
+  "parts_done": 3,
+  "games": 90,
+  "rows": 13414,
   "dropped": 1,
-  "sec_play_mean": 136.59
+  "sec_play_mean": 146.04
  },
  "notes": "HOME=/root; repo at /home/user/opcg-sim-backend symlinked to ~/opcg-sim-backend"
 }
