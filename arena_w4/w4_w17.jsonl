@@ -13,3 +13,10 @@
 {"seed": 1487011, "score": 2.0, "leaders": ["OP15-098", "OP04-040"], "games": [1.0, 1.0], "cand_leaders": ["OP15-098", "OP15-098"], "turns": [13, 12], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
 {"seed": 1487014, "score": 0.0, "leaders": ["OP02-072", "OP02-093"], "games": [0.0, 0.0], "cand_leaders": ["OP02-072", "OP02-072"], "turns": [12, 11], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
 {"seed": 1487013, "score": 1.0, "leaders": ["OP17-058", "OP12-081"], "games": [0.0, 1.0], "cand_leaders": ["OP17-058", "OP17-058"], "turns": [10, 10], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1487016, "score": 1.0, "leaders": ["P-011", "OP11-041"], "games": [1.0, 0.0], "cand_leaders": ["P-011", "P-011"], "turns": [19, 15], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1487015, "score": 1.0, "leaders": ["OP17-020", "ST06-001"], "games": [1.0, 0.0], "cand_leaders": ["OP17-020", "OP17-020"], "turns": [13, 13], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1487018, "score": 0.0, "leaders": ["EB03-001", "OP01-062"], "games": [0.0, 0.0], "cand_leaders": ["EB03-001", "EB03-001"], "turns": [10, 13], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1487017, "score": 0.0, "leaders": ["OP02-072", "OP15-058"], "games": [0.0, 0.0], "cand_leaders": ["OP02-072", "OP02-072"], "turns": [12, 15], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1487020, "score": 0.0, "leaders": ["ST13-002", "OP01-002"], "games": [0.0, 0.0], "cand_leaders": ["ST13-002", "ST13-002"], "turns": [12, 13], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1487021, "score": 0.0, "leaders": ["ST10-003", "OP08-021"], "games": [0.0, 0.0], "cand_leaders": ["ST10-003", "ST10-003"], "turns": [10, 13], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
+{"seed": 1487019, "score": 2.0, "leaders": ["OP14-040", "OP09-061"], "games": [1.0, 1.0], "cand_leaders": ["OP14-040", "OP14-040"], "turns": [11, 10], "cand_opts": {"sims": 320, "worlds": 4, "budget": 0}}
