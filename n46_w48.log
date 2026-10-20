@@ -12,3 +12,10 @@ N_RECORD_DONE {"rows": 4008, "main_rows": 1859, "dropped": 0, "forced": {"play":
   25/30局 行3506（main 1580） 棄却0 2959s
   30/30局 行4185（main 1873） 棄却0 3648s
 N_RECORD_DONE {"rows": 4185, "main_rows": 1873, "dropped": 0, "forced": {"play": 12, "hold": 7, "target": 5}, "removal_legal_rows": 734}
+  5/30局 行699（main 326） 棄却0 588s
+  10/30局 行1407（main 657） 棄却0 1113s
+  15/30局 行2093（main 1005） 棄却0 1508s
+  20/30局 行2732（main 1313） 棄却0 2003s
+  25/30局 行3452（main 1625） 棄却0 2779s
+  30/30局 行4111（main 1923） 棄却0 3351s
+N_RECORD_DONE {"rows": 4111, "main_rows": 1923, "dropped": 0, "forced": {"play": 19, "hold": 3, "target": 6}, "removal_legal_rows": 697}
