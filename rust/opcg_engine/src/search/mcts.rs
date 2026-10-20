@@ -137,6 +137,10 @@ pub struct Node {
     pub expanded: bool,
     pub terminal: bool,
     pub term_val: f64,
+    /// 展開時に箱（戦闘箱・対話箱）で 1 手へ畳んだか（世界の引き直し〔§7.1〕だけが読む）。
+    pub boxed: bool,
+    /// `legal` の [`move_sig`](super::decide::move_sig)（世界の引き直しの照合で初めて要るときに埋める）。
+    pub sigs: Vec<serde_json::Value>,
 }
 
 /// PV（主変化）の 1 手（`docs/rust_engine_plan.md` §20.4 の思考ログ・[`TreeMcts::principal_variation`]）。
@@ -195,6 +199,76 @@ pub fn principal_variation_of(nodes: &[Node], first: Option<usize>, max_len: usi
     out
 }
 
+/// 世界の引き直し（`docs/search_efficiency_plan.md` §7.1・WP `rs-ismcts`）の設定。
+///
+/// `every` 回の読みごとに根の世界を `root`（引き直す前の盤面）から `determinize_with` で
+/// 引き直し、木は共有したまま読み続ける。`None`（既定）なら 1 度も触られない。
+#[derive(Debug, Clone)]
+pub struct Redet {
+    /// 引き直す前の根の盤面（`decide` が受け取った `state`）
+    pub root: GameState,
+    /// 探索する側（相手の手札＋山札を引き直す）
+    pub me: Seat,
+    /// 何回の読みごとに引き直すか（> 0）
+    pub every: usize,
+}
+
+/// 世界の引き直しの実績（`decide` 1 回ぶん・世界 0 のスレッドだけ・[`take_redet_stats`]）。
+#[derive(Debug, Default, Clone)]
+struct RedetStats {
+    enabled: bool,
+    /// 引き直した回数（最初の世界は数えない）
+    redraws: u64,
+    /// 展開済みノードでの選択の回数（引き直しが有効な読みでの降下）
+    visits: u64,
+    /// そのうち照合した回数（相手の手番・対話窓の中・自分の手が打てなかった後）
+    checked: u64,
+    /// 照合で追加した新しい手の数
+    added: u64,
+    /// 照合を省いた自分の手番で、選んだ手がこの世界で打てなかった回数（照合へ切り替えた）
+    unplayable: u64,
+    /// ノードの手番（終局か）がこの世界の盤面と食い違い、葉として評価した回数
+    mismatch: u64,
+    /// 照合した結果、打てる手が 1 つも無く葉として評価した回数（畳んだ箱の手が打てない等）
+    empty: u64,
+}
+
+thread_local! {
+    /// `quiesce::ROLLOUT` と同じ理由で thread_local（世界 0 のぶんだけが戻り値に出る）。
+    static REDET: std::cell::RefCell<RedetStats> = std::cell::RefCell::new(RedetStats::default());
+}
+
+/// decide 1 回ぶんの実績を張り直す（`search::decide_on_state`・`every=0` なら無効）。
+pub fn reset_redet_stats(every: usize) {
+    REDET.with(|c| {
+        *c.borrow_mut() = RedetStats { enabled: every > 0, ..RedetStats::default() }
+    });
+}
+
+fn redet_stat(f: impl FnOnce(&mut RedetStats)) {
+    REDET.with(|c| {
+        let mut st = c.borrow_mut();
+        if st.enabled {
+            f(&mut st);
+        }
+    });
+}
+
+/// 世界の引き直しの実績（無効なら [`serde_json::Value::Null`]＝欄ごと出ない）。
+pub fn take_redet_stats() -> serde_json::Value {
+    REDET.with(|c| {
+        let st = c.borrow();
+        if !st.enabled {
+            return serde_json::Value::Null;
+        }
+        serde_json::json!({
+            "redraws": st.redraws, "visits": st.visits, "checked": st.checked,
+            "added": st.added, "unplayable": st.unplayable, "mismatch": st.mismatch,
+            "empty": st.empty,
+        })
+    })
+}
+
 /// 木の探索（Python `TreeMCTS`）。
 pub struct TreeMcts<'a, 'b> {
     pub ctx: &'a Ctx<'b>,
@@ -208,6 +282,8 @@ pub struct TreeMcts<'a, 'b> {
     pub q_min_frac: f64,
     /// 根の事前分布の平坦化（§20.5・既定 1.0＝何もしない）。
     pub root_prior_temp: f64,
+    /// 世界の引き直し（§7.1・既定 `None`＝今までどおり 1 つの世界で読む）。
+    pub redet: Option<Redet>,
     nodes: Vec<Node>,
 }
 
@@ -222,6 +298,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             select_rule: SelectRule::Visits,
             q_min_frac: Q_MIN_FRAC,
             root_prior_temp: 1.0,
+            redet: None,
             nodes: Vec::new(),
         }
     }
@@ -287,8 +364,18 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             node.p_f32 = false;
         }
         // 各シミュレーション冒頭で乱数を基準へ戻す（CRN・§12.4-4）。
-        let base_rng = s.rng.snapshot();
-        for _ in 0..self.n_sims {
+        let mut base_rng = s.rng.snapshot();
+        let every = self.redet.as_ref().map_or(0, |r| r.every);
+        for i in 0..self.n_sims {
+            // 世界の引き直し（§7.1）: `every` 回ごとに元の根から引き直す（木は共有）。
+            // 乱数は `rng`（世界 i の探索乱数）をそのまま進める。既定（0）では入らない。
+            if every > 0 && i > 0 && i % every == 0 {
+                let r = self.redet.as_ref().expect("every > 0 なら設定がある");
+                let world = super::determinize::determinize_with(&r.root, r.me, rng)?;
+                s = Session::new(world);
+                base_rng = s.rng.snapshot();
+                redet_stat(|t| t.redraws += 1);
+            }
             s.rng.restore(&base_rng);
             self.simulate(root, &mut s, st)?;
         }
@@ -368,6 +455,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             if let Some(b) = best_branch(&vals) {
                 leaf_v = vals[b];
                 legal = vec![legal[b].clone()];
+                self.nodes[node].boxed = true;
             }
         }
         // 対話箱（`TREE_BOX_DIALOG`）: 効果対話窓も同じ規約で畳む（物差しは本体 value）。
@@ -390,6 +478,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             if let Some(b) = best_branch(&vals) {
                 leaf_v = vals[b];
                 legal = vec![legal[b].clone()];
+                self.nodes[node].boxed = true;
             }
         }
 
@@ -548,18 +637,36 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         s: &mut Session,
         st: &mut SearchState,
     ) -> Result<f64, EngineError> {
+        Ok(self
+            .descend_inner(node, a, s, st, false)?
+            .expect("soft=false は必ず値を返す"))
+    }
+
+    /// [`descend`](Self::descend) の本体。`soft=true`（世界の引き直しで照合を省いたノード）では
+    /// 手が適用できなかったとき死んだ子を作らず `None` を返す（この世界で打てないだけかもしれない）。
+    fn descend_inner(
+        &mut self,
+        node: usize,
+        a: usize,
+        s: &mut Session,
+        st: &mut SearchState,
+        soft: bool,
+    ) -> Result<Option<f64>, EngineError> {
         let masters = self.ctx.masters;
         let to_move = self.nodes[node].to_move.expect("降下は手番のあるノードから");
         let mv = self.nodes[node].legal[a].clone();
         let saved = s.swap_events(Vec::new());
-        let out = s.transaction(|s| -> Result<f64, EngineError> {
+        let out = s.transaction(|s| -> Result<Option<f64>, EngineError> {
             let dead = match apply::apply_move_inplace(s, masters, to_move, &mv, true) {
                 Ok(()) => false,
                 Err(e @ EngineError::Unimplemented(_)) => return Err(e),
                 Err(_) => true, // Python の `except Exception: dead = True`
             };
             if dead {
-                return Ok(self.dead_child(node, a));
+                if soft {
+                    return Ok(None);
+                }
+                return Ok(Some(self.dead_child(node, a)));
             }
             let child = match self.nodes[node].children[a] {
                 Some(c) => c,
@@ -569,7 +676,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
                     c
                 }
             };
-            self.simulate(child, s, st)
+            self.simulate(child, s, st).map(Some)
         });
         s.swap_events(saved);
         out
@@ -592,6 +699,9 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             let to_move = self.nodes[node].to_move.expect("展開済みなら手番がある");
             return self.leaf_value(s, st, to_move);
         }
+        if self.redet.is_some() {
+            return self.simulate_redet(node, s, st);
+        }
         let a = self.puct_select(node);
         let v_child = self.descend(node, a, s, st)?;
         let child = self.nodes[node].children[a].expect("降下すれば子は必ず作られる");
@@ -601,6 +711,147 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         n.n[a] += 1.0;
         n.w[a] += v;
         Ok(v)
+    }
+
+    /// 世界の引き直し（§7.1）が有効なときの展開済みノードの 1 回の選択・降下・backup。
+    ///
+    /// ノードは盤面を持たない＝同じ手順でも世界ごとに盤面が違いうる。そこで:
+    /// - ノードの手番（終局か）がこの世界の盤面と食い違えば、葉としてこの盤面を評価して返す
+    ///   （ノードの統計は触らない）。
+    /// - 相手の手番・中断（対話窓など `active_interaction` のある窓）の中では、この世界の
+    ///   合法手と [`move_sig`](super::decide::move_sig) で照合し（[`reconcile`](Self::reconcile)）、
+    ///   打てる手だけを PUCT の候補にする（親の訪問数は候補の `n` の和）。
+    /// - 自分の手番の中断でない窓は照合を省く。選んだ手が適用できなければ照合へ切り替えて
+    ///   選び直す（照合した上で打てる手が適用できないなら、今までどおり死んだ子にする）。
+    fn simulate_redet(
+        &mut self,
+        node: usize,
+        s: &mut Session,
+        st: &mut SearchState,
+    ) -> Result<f64, EngineError> {
+        let ctx = self.ctx;
+        let me = self.redet.as_ref().expect("simulate_redet は引き直しが有効なときだけ").me;
+        let tm = self.nodes[node].to_move.expect("展開済みなら手番がある");
+        if ctx.is_terminal(s) {
+            redet_stat(|t| t.mismatch += 1);
+            let w = s.state().winner;
+            return Ok(match w {
+                Some(w) if w == tm => 1.0,
+                Some(_) => -1.0,
+                None => 0.0,
+            });
+        }
+        if ctx.current_player(s) != Some(tm) {
+            redet_stat(|t| t.mismatch += 1);
+            return self.leaf_value(s, st, tm);
+        }
+        redet_stat(|t| t.visits += 1);
+        let check = tm != me || s.state().active_interaction().is_some();
+        let mut mask: Option<Vec<bool>> = if check { Some(self.reconcile(node, s)?) } else { None };
+        loop {
+            let a = match &mask {
+                Some(m) => {
+                    if !m.iter().any(|x| *x) {
+                        redet_stat(|t| t.empty += 1);
+                        return self.leaf_value(s, st, tm);
+                    }
+                    self.puct_select_masked(node, m)
+                }
+                None => self.puct_select(node),
+            };
+            let soft = mask.is_none();
+            let Some(v_child) = self.descend_inner(node, a, s, st, soft)? else {
+                // 照合を省いた自分の手がこの世界で打てなかった＝照合して選び直す。
+                redet_stat(|t| t.unplayable += 1);
+                mask = Some(self.reconcile(node, s)?);
+                continue;
+            };
+            let child = self.nodes[node].children[a].expect("降下すれば子は必ず作られる");
+            let same = self.nodes[child].to_move == self.nodes[node].to_move;
+            let v = if same { v_child } else { -v_child };
+            let n = &mut self.nodes[node];
+            n.n[a] += 1.0;
+            n.w[a] += v;
+            return Ok(v);
+        }
+    }
+
+    /// この世界の合法手とノードの `legal` を照合する（§7.1 の 3）。戻り値はノードの `legal`
+    /// と同じ並びの「この世界で打てるか」。
+    ///
+    /// - 同じ `move_sig` が複数あれば出現数ぶんだけ対応を付ける（先頭から）。
+    /// - この世界にだけある手は `legal`／`p`／`n`／`w`／`children` に追加する。事前分布は
+    ///   この世界の合法手全体に `priors_keep` を 1 回回した値（既存の手の `p` は最初の値のまま）。
+    /// - 箱で畳んだノード（`boxed`）と根（node 0＝出力の並びを世界 0 に保つ）には追加しない。
+    fn reconcile(&mut self, node: usize, s: &mut Session) -> Result<Vec<bool>, EngineError> {
+        use super::decide::move_sig;
+        let ctx = self.ctx;
+        redet_stat(|t| t.checked += 1);
+        let now = ctx.legal_actions(s)?;
+        {
+            let nd = &mut self.nodes[node];
+            if nd.sigs.len() != nd.legal.len() {
+                nd.sigs = nd.legal.iter().map(move_sig).collect();
+            }
+        }
+        let mut mask = vec![false; self.nodes[node].legal.len()];
+        let mut fresh: Vec<(usize, serde_json::Value)> = Vec::new();
+        for (j, mv) in now.iter().enumerate() {
+            let sig = move_sig(mv);
+            let nd = &self.nodes[node];
+            match (0..nd.sigs.len()).find(|i| !mask[*i] && nd.sigs[*i] == sig) {
+                Some(i) => mask[i] = true,
+                None => fresh.push((j, sig)),
+            }
+        }
+        if fresh.is_empty() || node == 0 || self.nodes[node].boxed {
+            return Ok(mask);
+        }
+        let (priors, _) = ctx.priors_keep(s, &now)?;
+        let uniform = 1.0 / now.len() as f64;
+        let nd = &mut self.nodes[node];
+        for (j, sig) in fresh {
+            let p = match &priors {
+                Some(p) => p[j] as f64,
+                None => uniform,
+            };
+            nd.legal.push(now[j].clone());
+            nd.sigs.push(sig);
+            nd.p.push(p);
+            nd.n.push(0.0);
+            nd.w.push(0.0);
+            nd.children.push(None);
+            mask.push(true);
+            redet_stat(|t| t.added += 1);
+        }
+        Ok(mask)
+    }
+
+    /// [`puct_select`](Self::puct_select) の、候補を `mask` に絞った版（親の訪問数は候補の
+    /// `n` の和・候補外は選ばない・同点は添字が小さい方）。
+    fn puct_select_masked(&self, node: usize, mask: &[bool]) -> usize {
+        let n = &self.nodes[node];
+        let total: f64 = (0..n.legal.len()).filter(|i| mask[*i]).map(|i| n.n[i]).sum();
+        let sqrt_n = if total > 0.0 { total.sqrt() } else { 1.0 };
+        let u: Vec<f64> = (0..n.legal.len())
+            .map(|i| {
+                if !mask[i] {
+                    return f64::NEG_INFINITY;
+                }
+                let q = if n.n[i] > 0.0 {
+                    n.w[i] / n.n[i].max(1.0)
+                } else {
+                    0.0
+                };
+                let bonus = if n.p_f32 {
+                    ((self.c_puct as f32 * n.p[i] as f32) * sqrt_n as f32) as f64
+                } else {
+                    self.c_puct * n.p[i] * sqrt_n
+                };
+                q + bonus / (1.0 + n.n[i])
+            })
+            .collect();
+        argmax_f64(&u)
     }
 
     /// PV（主変化・`docs/rust_engine_plan.md` §20.4）: root（node 0）から「訪問数最多の子」を

@@ -507,3 +507,201 @@ fn apply_move_inplace_expands_a_don_box() {
     assert_eq!(s.state().card(mine).attached_don, 3);
     assert!(s.state().active_battle.is_some(), "アタック箱は攻撃する");
 }
+
+// --- 世界の引き直し（`docs/search_efficiency_plan.md` §7.1・WP `rs-ismcts`）---------------
+
+mod redet {
+    use super::super::decide::{decide, DecideCarry, DecideOptions, DecideOut};
+    use super::super::mcts::{reset_redet_stats, take_redet_stats, Redet, TreeMcts};
+    use super::super::quiesce::{Ctx, SearchState};
+    use super::super::SearchOptions;
+    use crate::model::{GameState, MasterTable, Seat};
+    use crate::testkit::{BoardBuilder, M_CHAR, M_EVENT, M_RUSH};
+
+    fn net() -> &'static crate::net::LoadedNet {
+        static NET: std::sync::OnceLock<crate::net::LoadedNet> = std::sync::OnceLock::new();
+        NET.get_or_init(super::super::decide::tests::zero_net)
+    }
+
+    /// p1 は PLAY（手札 1・ドン!! 2）と TURN_END の 2 択（ターン 2＝アタック不可）。
+    /// TURN_END で降りると p2 のターン 3（ドン!! 2 枚・ドロー 1）＝相手の手番ノードが木の 2 段目に出る。
+    /// `opp_hidden=true` なら p2 の手札 2・山札 4 が全部別カード＝世界ごとに p2 の PLAY が変わる。
+    fn board(opp_hidden: bool) -> (MasterTable, GameState) {
+        let mut b = BoardBuilder::new().turn(2, Seat::P1);
+        b.put_hand(Seat::P1, M_CHAR);
+        b.dons(Seat::P1, "active", 2);
+        for _ in 0..3 {
+            b.put_life(Seat::P1, M_CHAR);
+            b.put_life(Seat::P2, M_CHAR);
+            b.put_deck(Seat::P1, M_CHAR);
+        }
+        b.dons(Seat::P2, "deck", 4);
+        if opp_hidden {
+            b.put_hand(Seat::P2, M_CHAR);
+            b.put_hand(Seat::P2, M_EVENT);
+            b.put_deck(Seat::P2, M_RUSH);
+            b.put_deck(Seat::P2, M_CHAR);
+            b.put_deck(Seat::P2, M_EVENT);
+            b.put_deck(Seat::P2, M_RUSH);
+        }
+        b.build()
+    }
+
+    fn opts(sims: usize, every: usize, seed: Option<u64>) -> DecideOptions {
+        DecideOptions {
+            sims,
+            redeterminize_every: every,
+            search_seed: seed,
+            ..DecideOptions::default()
+        }
+    }
+
+    fn run(masters: &MasterTable, state: &GameState, o: &DecideOptions) -> DecideOut {
+        decide(
+            masters,
+            net(),
+            state,
+            Seat::P1,
+            o,
+            &mut crate::search::Pcg32SearchRng::new(5),
+            &DecideCarry::default(),
+        )
+        .expect("decide")
+    }
+
+    fn same(a: &DecideOut, b: &DecideOut) {
+        assert_eq!(a.mv, b.mv);
+        assert_eq!(a.sig, b.sig);
+        assert_eq!(a.legal, b.legal);
+        assert_eq!(a.n, b.n);
+        assert_eq!(a.q, b.q);
+        assert_eq!(a.p, b.p);
+        let pv = |o: &DecideOut| -> Vec<(serde_json::Value, f64, f64)> {
+            o.pv.iter().map(|p| (p.mv.clone(), p.n, p.q)).collect()
+        };
+        assert_eq!(pv(a), pv(b));
+        assert_eq!(a.carry.commit, b.carry.commit);
+    }
+
+    /// (a) `redeterminize_every=0`（既定・明示）は今までの単一世界と 1 bit も変わらない。
+    /// `search_seed` が無ければ m>0 でも off に落ちる（記録した出目の経路は引き直さない）。
+    /// off の decide の戻り値（JSON）に `redet` の欄は出ない。
+    #[test]
+    fn redeterminize_off_is_bit_identical() {
+        let (masters, state) = board(true);
+        let base = run(&masters, &state, &DecideOptions { sims: 24, ..DecideOptions::default() });
+        for o in [opts(24, 0, None), opts(24, 0, Some(5)), opts(24, 4, None)] {
+            same(&run(&masters, &state, &o), &base);
+        }
+        let body = crate::search::decide_on_state(
+            &masters,
+            net(),
+            &state,
+            Seat::P1,
+            &opts(24, 0, Some(5)),
+            &mut crate::search::Pcg32SearchRng::new(5),
+            &DecideCarry::default(),
+        )
+        .expect("decide_on_state");
+        assert!(body.get("redet").is_none(), "off では `redet` の欄が出ない");
+        let on = crate::search::decide_on_state(
+            &masters,
+            net(),
+            &state,
+            Seat::P1,
+            &opts(24, 4, Some(5)),
+            &mut crate::search::Pcg32SearchRng::new(5),
+            &DecideCarry::default(),
+        )
+        .expect("decide_on_state");
+        assert_eq!(on["redet"]["redraws"], serde_json::json!(5), "24 回・4 回ごと＝引き直し 5 回");
+    }
+
+    /// (b) 相手の手札＋山札が空なら引き直しても同じ世界＝m>0 でも m=0 と同一。
+    #[test]
+    fn redeterminize_without_hidden_cards_is_identical() {
+        let (masters, state) = board(false);
+        let base = run(&masters, &state, &opts(24, 0, Some(5)));
+        for every in [1usize, 3, 8] {
+            same(&run(&masters, &state, &opts(24, every, Some(5))), &base);
+        }
+    }
+
+    /// (c) 相手の手札が世界で変わる盤面: 相手の手番ノードでは「この世界で打てない手」を
+    /// 一度も選ばない（選べば適用に失敗して死んだ子＝終局葉ができる）・新しい手は追加される。
+    #[test]
+    fn redeterminize_masks_and_adds_opponent_moves() {
+        let (masters, state) = board(true);
+        let ctx: &'static Ctx<'static> = Box::leak(Box::new(Ctx {
+            masters: Box::leak(Box::new(masters)),
+            net: net(),
+            opts: SearchOptions::default(),
+            box_battle: true,
+            box_dialog: true,
+            quiesce: true,
+            quiesce_max_plies: super::super::quiesce::QUIESCE_MAX_PLIES,
+        }));
+        reset_redet_stats(1);
+        let mut rng = crate::search::Pcg32SearchRng::new(9);
+        let world = super::super::determinize::determinize_with(&state, Seat::P1, &mut rng)
+            .expect("world");
+        // 最初の世界での p2 の手札（PLAY できる uuid の候補）
+        let first_hand: Vec<String> = world
+            .player(Seat::P2)
+            .hand
+            .iter()
+            .map(|c| world.card(*c).uuid.clone())
+            .collect();
+        let mut t = TreeMcts::new(ctx, 1.5, 64, 0.0);
+        t.redet = Some(Redet { root: state.clone(), me: Seat::P1, every: 1 });
+        let out = t
+            .run_in_world(world, &mut rng, &mut SearchState::default())
+            .expect("run");
+        assert_eq!(out.n.iter().sum::<f64>(), 64.0);
+        let stats = take_redet_stats();
+        let nodes = t.into_nodes();
+        // p2 の手番（ターン 3 のメイン）のノード
+        let opp: Vec<_> = nodes
+            .iter()
+            .filter(|n| n.expanded && !n.terminal && n.to_move == Some(Seat::P2))
+            .collect();
+        assert!(!opp.is_empty(), "相手の手番ノードが木にある");
+        assert!(stats["checked"].as_u64().unwrap() > 0, "相手の手番で照合した: {stats}");
+        assert!(stats["added"].as_u64().unwrap() > 0, "新しい手が追加された: {stats}");
+        assert_eq!(stats["redraws"], serde_json::json!(63));
+        // 追加された手がある＝最初の世界の手札に無いカードの PLAY が legal に居る。
+        let played: Vec<String> = opp
+            .iter()
+            .flat_map(|n| n.legal.iter())
+            .filter(|m| m["action_type"] == serde_json::json!("PLAY"))
+            .filter_map(|m| m["payload"]["uuid"].as_str().map(str::to_owned))
+            .collect();
+        assert!(
+            played.iter().any(|u| !first_hand.contains(u)),
+            "最初の世界に無い手が追加されている: {played:?} / {first_hand:?}"
+        );
+        // 打てない手を選べば適用に失敗して死んだ子（終局葉・値 -1）ができる＝1 つも無い。
+        assert!(
+            nodes.iter().all(|n| !n.terminal),
+            "死んだ子（打てない手の適用失敗）が無い"
+        );
+        // ノードの並びは揃っている（追加で legal／p／n／w／children の長さがずれない）。
+        for n in nodes.iter().filter(|n| n.expanded && !n.terminal) {
+            let k = n.legal.len();
+            assert!(n.p.len() == k && n.n.len() == k && n.w.len() == k && n.children.len() == k);
+        }
+    }
+
+    /// (d) 同じ seed で 2 回回せば同一（単一世界・複数世界の両方）。
+    #[test]
+    fn redeterminize_is_reproducible() {
+        let (masters, state) = board(true);
+        for worlds in [1usize, 3] {
+            let o = DecideOptions { worlds, ..opts(32, 2, Some(5)) };
+            let a = run(&masters, &state, &o);
+            let b = run(&masters, &state, &o);
+            same(&a, &b);
+            assert_eq!(a.n.iter().sum::<f64>(), (32 * worlds) as f64);
+        }
+    }
+}

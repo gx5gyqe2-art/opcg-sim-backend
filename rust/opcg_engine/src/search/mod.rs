@@ -347,6 +347,8 @@ pub fn decide_on_state(
     // 葉の打ち切り（§20.7.9）の実績もこの decide のぶんだけ張る（既定＝`none` では
     // 1 度も触られず、戻り値に `rollout` の欄も出ない＝trace の形が変わらない）。
     quiesce::reset_rollout_stats(opts.search.leaf_rollout);
+    // 世界の引き直し（§7.1）の実績も同じ扱い（off では欄が出ない）。
+    mcts::reset_redet_stats(opts.effective_redeterminize_every());
     let out = decide::decide(masters, net, state, name, opts, rng, carry)?;
     // 複数世界（§20.7.1）の欄は `worlds>1` のときだけ出す＝**既定（1 本）の戻り値は
     // 1 bit も変わらない**（Python 側の trace の形も変わらない）。
@@ -409,10 +411,14 @@ pub fn decide_on_state(
     // **世界 0 のぶんだけ**が出る（世界 1 以降はスレッドが違う＝thread_local の計測を
     // スレッドと共に捨てる。`boxes` と同じ扱い・`decide::run_worlds` の注記）。
     let rollout = quiesce::take_rollout_stats();
+    let redet = mcts::take_redet_stats();
     if let Some(o) = body.as_object_mut() {
         o.extend(worlds_fields);
         if !rollout.is_null() {
             o.insert("rollout".into(), rollout);
+        }
+        if !redet.is_null() {
+            o.insert("redet".into(), redet);
         }
     }
     Ok(body)
@@ -541,6 +547,12 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .filter(|n| *n > 0)
             .unwrap_or(d.worlds),
         search_seed: v.get("search_seed").and_then(Value::as_u64),
+        // §7.1 の世界の引き直し（省略・0・負＝off）。
+        redeterminize_every: v
+            .get("redeterminize_every")
+            .and_then(Value::as_u64)
+            .map(|n| n as usize)
+            .unwrap_or(d.redeterminize_every),
         search: options_from_json(v),
         budget: match v.get("budget") {
             None | Some(Value::Null) => d.budget,

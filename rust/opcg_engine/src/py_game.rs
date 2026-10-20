@@ -409,6 +409,8 @@ impl Game {
     /// - `worlds`（省略＝1）… 1 回の決定で引く世界サンプルの本数（§20.7.1）。2 以上なら
     ///   K 本の世界で同じ sims の木を**並列**（`std::thread::scope`）に回し、根の統計を束ねる。
     ///   世界 i の乱数は `search_seed + i`。
+    /// - `redeterminize_every`（省略＝0＝off）… この回数の読みごとに根の世界を引き直し、木は
+    ///   共有する（`docs/search_efficiency_plan.md` §7.1）。戻り値に `redet`（実績）が足される。
     ///
     /// 木を回す間は **GIL を放す**（`Python::detach`＝旧 `allow_threads`）＝世界スレッドが
     /// 走っている間も他の Python スレッド（API のリクエスト処理）が動ける。探索は Python を

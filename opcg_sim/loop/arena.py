@@ -118,7 +118,8 @@ class PairTimeout(BaseException):
 
 
 def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
-              decks="singleton", pair_timeout=0, sims=E.SERVE_SIMS, budget=None):
+              decks="singleton", pair_timeout=0, sims=E.SERVE_SIMS, budget=None,
+              redeterminize_every=None):
     """子プロセス初期化: カード DB と席のつまみを 1 回だけ作る（以後の全ペアで共有）。
 
     `cand_kw` は**候補席にだけ**渡す探索のつまみ（`{"macro_moves": True}` 等）。機構を
@@ -130,6 +131,7 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
 
     `budget`（`--budget`）は**基準席の**戦闘箱の枝予算（None＝既定 8000・0＝無制限）。両席を出荷と
     同じ読みで打たせるときに `--cand-budget` と組で使う（2026-10-19・台帳 2+270）。
+    `redeterminize_every`（`--redeterminize-every`）も**基準席の**世界の引き直し（§7.1・None／0＝off）。
     """
     E.engine()
     _G["leaders_mode"] = leaders_mode
@@ -140,8 +142,10 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
     _G["cand_opts"] = dict(kw)                 # 台帳に書く候補席の設定（既定なら空）
     cand_sims = int(kw.pop("sims", sims))
     _G["cand"] = E.SeatSpec(cand_spec or None, sims=cand_sims, **kw)
-    _G["best"] = E.SeatSpec(best_spec or None, sims=sims,
-                            **({} if budget is None else {"budget": int(budget)}))
+    best_kw: Dict[str, Any] = {} if budget is None else {"budget": int(budget)}
+    if redeterminize_every:
+        best_kw["redeterminize_every"] = int(redeterminize_every)
+    _G["best"] = E.SeatSpec(best_spec or None, sims=sims, **best_kw)
 
 
 def play_pair(seed: int) -> float:
@@ -238,6 +242,9 @@ def add_cand_args(ap) -> None:
     ap.add_argument("--cand-worlds", type=int, default=None,
                     help="候補席だけ世界サンプルの本数 K（§20.7.1・既定 1）。K 本ぶん"
                          "スレッドを使うので --workers を下げること")
+    ap.add_argument("--cand-redeterminize-every", type=int, default=None,
+                    help="候補席だけ世界の引き直し（`docs/search_efficiency_plan.md` §7.1）: この回数の"
+                         "読みごとに根の世界を引き直し、木は共有する（既定 0＝off）")
     ap.add_argument("--cand-setup-box", action="store_true",
                     help="候補席だけ準備箱（§20.7.2・既定 OFF）")
     ap.add_argument("--cand-budget", type=int, default=None,
@@ -252,6 +259,7 @@ CAND_VALUE_FLAGS = {
     "cand_q_min_frac": "q_min_frac",
     "cand_root_prior_temp": "root_prior_temp",
     "cand_worlds": "worlds",
+    "cand_redeterminize_every": "redeterminize_every",
     "cand_budget": "budget",
     "cand_residual_activate": "residual_activate",
 }

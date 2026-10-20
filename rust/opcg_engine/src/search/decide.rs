@@ -70,6 +70,10 @@ pub struct DecideOptions {
     pub worlds: usize,
     /// 探索乱数の seed（`Game.decide` の `search_seed`）。世界 i の乱数は `seed + i`（§20.7.1）。
     pub search_seed: Option<u64>,
+    /// 世界の引き直し（`docs/search_efficiency_plan.md` §7.1・WP `rs-ismcts`）: この回数の読みごとに
+    /// 根の世界を引き直し、木は共有する（既定 0＝off＝今までどおり 1 つの世界で読む）。
+    /// `worlds > 1` と併用でき、各世界の木がそれぞれ引き直す（乱数は世界 i の探索乱数を進める）。
+    pub redeterminize_every: usize,
     /// 候補生成（`OPCGGame`）
     pub search: SearchOptions,
     /// `BOX_BRANCH_BUDGET`（`None`＝無制限）
@@ -84,6 +88,15 @@ impl DecideOptions {
             return 1;
         }
         self.worlds.max(1)
+    }
+
+    /// 実際に使う世界の引き直しの間隔（§7.1）。`search_seed` が無い経路（記録した出目で回す
+    /// オラクル）は引き直す出目を持たない＝0（off）に落ちる（`effective_worlds` と同じ扱い）。
+    pub fn effective_redeterminize_every(&self) -> usize {
+        if self.search_seed.is_none() {
+            return 0;
+        }
+        self.redeterminize_every
     }
 }
 
@@ -105,6 +118,7 @@ impl Default for DecideOptions {
             root_prior_temp: 1.0,
             worlds: 1,
             search_seed: None,
+            redeterminize_every: 0,
             search: SearchOptions::default(),
             budget: Some(super::quiesce::BOX_BRANCH_BUDGET),
         }
@@ -1104,10 +1118,14 @@ struct WorldRun {
 }
 
 /// 1 本の木を回す（つまみは全世界で同じ）。
+///
+/// `root`＝引き直す前の盤面と探索する側（世界の引き直し〔§7.1〕が `redeterminize_every > 0`
+/// のときだけ使う＝既定では触らない）。
 fn run_one_world(
     ctx: &Ctx,
     opts: &DecideOptions,
     world: GameState,
+    root: (&GameState, Seat),
     rng: &mut dyn SearchRng,
     st: &mut SearchState,
 ) -> Result<(RunOut, Vec<Node>), EngineError> {
@@ -1115,6 +1133,10 @@ fn run_one_world(
     tree.select_rule = opts.select_rule;
     tree.q_min_frac = opts.q_min_frac;
     tree.root_prior_temp = opts.root_prior_temp;
+    let every = opts.effective_redeterminize_every();
+    if every > 0 {
+        tree.redet = Some(super::mcts::Redet { root: root.0.clone(), me: root.1, every });
+    }
     let run = tree.run_in_world(world, rng, st)?;
     Ok((run, tree.into_nodes()))
 }
@@ -1138,7 +1160,7 @@ fn run_worlds(
     let seed0 = opts.search_seed.unwrap_or(0);
     let world0 = super::determinize::determinize_with(state, name, rng)?;
     if k <= 1 {
-        let (run, nodes) = run_one_world(ctx, opts, world0.clone(), rng, st)?;
+        let (run, nodes) = run_one_world(ctx, opts, world0.clone(), (state, name), rng, st)?;
         return Ok(vec![WorldRun { seed: seed0, run, nodes, world: world0 }]);
     }
     let mut runs: Vec<WorldRun> = Vec::with_capacity(k);
@@ -1167,7 +1189,7 @@ fn run_worlds(
                     };
                     let world = super::determinize::determinize_with(state, name, &mut r)?;
                     let (run, nodes) =
-                        run_one_world(ctx, opts, world.clone(), &mut r, &mut wst)?;
+                        run_one_world(ctx, opts, world.clone(), (state, name), &mut r, &mut wst)?;
                     Ok((
                         WorldRun { seed, run, nodes, world },
                         wst.budget.used,
@@ -1177,7 +1199,7 @@ fn run_worlds(
             })
             .collect();
         // 世界 0 はこのスレッドで回す（スレッドは K-1 本＝K 本が同時に走る）。
-        let (run, nodes) = run_one_world(ctx, opts, world0.clone(), rng, st)?;
+        let (run, nodes) = run_one_world(ctx, opts, world0.clone(), (state, name), rng, st)?;
         runs.push(WorldRun { seed: seed0, run, nodes, world: world0 });
         for h in handles {
             let (wr, used, exhausted) = h.join().map_err(|_| {
