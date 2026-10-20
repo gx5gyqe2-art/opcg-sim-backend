@@ -101,3 +101,45 @@ Phase 0 → Phase 1 → Phase 3（Phase 4 の (a)(b) を合間に）→ Phase 4 
 ## 6. 時間の基準
 
 ユーザ決定（2026-10-21）: **時間の基準は今は決めず、最後（Phase 5 の曲線が出た後）に判断する**。各段では時間を記録するだけで、合否には使わない。
+
+## 7. WP の指示書
+
+### 7.1 WP `rs-ismcts`——木を 1 本にして世界を毎回引き直す（Phase 3・作業セッション用・opus）
+
+作業: `rust/opcg_engine` の探索に「m 回の読みごとに根の世界を引き直し、木は共有する」選択肢を足す。本線 `claude/cpu-spec-improvements-yw91jd` の最新から分岐し `claude/rs-ismcts` に push。PR は作らない。質問で止まらず、迷った点は実装の注記と RESULT.json の notes に書いて完走する。
+
+**不変条件（最優先）**: 選択肢が off（既定）のとき、探索の出力は **1 bit も変わらない**（golden 3 本＝`tests/test_rs_golden_audit.py`・`tests/test_rs_golden_replay.py`・`make test` が green のまま）。
+
+**今の作り（読んでから始める）**:
+- `search/decide.rs::run_worlds`＝K 本の世界で `run_one_world` を独立に回し `merge_worlds` で根の統計を足す（木は共有しない・計算量 K 倍）。
+- `search/mcts.rs::TreeMcts::run_in_world(world, rng, st)`＝`Session::new(world)` の上で `n_sims` 回 `simulate`。ノード（`Node`）は盤面を持たず `legal`／`p`／`n`／`w`／`children` だけ。降下は `descend` で手を適用（トランザクション）して戻る。
+- `expand` は `legal_actions(s)` と `priors_keep` でノードを作る（戦闘箱・対話箱は展開時に最良の 1 手へ畳む）。
+- `search/determinize.rs::determinize_with(state, me, rng)`＝相手の手札＋山札を引き直した盤面。
+- `decide.rs::move_sig(mv)`＝手の同一性（action_type・uuid・target_ids・selected_uuids・accepted）。
+
+**仕様**:
+1. `DecideOptions.redeterminize_every: usize`（既定 0＝off）。opts JSON の鍵 `redeterminize_every`。`worlds > 1` と併用可（各世界の木がそれぞれ引き直す）。
+2. `run_in_world` で、`redeterminize_every = m > 0` なら **m 回の読みごとに**根の世界を `determinize_with(root_state, me, rng)` で引き直し、`Session` をその世界で作り直す。木（`nodes`）は保持する。根の盤面（引き直す前の `state`）は `TreeMcts` が保持する（今は `run_in_world` が受け取った `world` が根＝呼び出し側 `run_worlds` で `determinize_with` 済み。引き直しは**元の `state`**から行う必要があるので、`run_worlds` から元の `state` も渡す）。世界 i の乱数は今の規約どおり（`search_seed` 由来の `rng` をそのまま進める）。
+3. **世界に依存するノードの扱い**: 降下で訪れたノードが「相手の手番」または「対話窓の中（`in_dialog`）」なら、その世界で `legal_actions(s)` を取り直し、`move_sig` でノードの `legal` と照合する。
+   - 照合できた手だけを今回の選択（`puct_select`）の候補にする（この世界で打てない手は除く）。親の訪問数は候補に入った手の `n` の和。
+   - この世界にだけある新しい手は `legal`／`p`／`n`／`w`／`children` に**追加**する。追加した手の事前分布は、その時点でこの世界の合法手全体に `priors_keep` を 1 回回して得た値を使う（既存の手の `p` は最初の値のまま）。
+   - 自分の手番で対話窓でないノードは、合法手が世界に依らないものとして照合を省く。**ただし実装前に確認**: 相手の手札・山札の中身に依存する自分の手（相手の手札から選ぶ対話など）が無いか `rules/legal.rs`・`rules/pending.rs` を読み、あれば「対話窓の中」の条件で拾えているかを確かめ、注記に書く。
+   - 展開時の箱の畳み（戦闘箱・対話箱）は最初に展開した世界で固定する（限界として注記）。
+4. 終局判定・値は今のまま（勝者・ライフ・山札の枚数は公開情報）。
+5. 根の出力（`RunOut`）は今のまま。PV とコミットの継続（`world_used`）は**世界 0**（最初の世界）で作る（今の単一世界と同じ）。
+6. 配線: `py_game.rs` の opts 読み取り → `RsGame.decide(redeterminize_every=)`（`opcg_sim/api/engine_rs.py`）→ `arena.py` の `--cand-redeterminize-every`（`_CAND_KEYS` に追加）・`arena_shard.py` の基準席用 `--redeterminize-every`・`record_gen.py --redeterminize-every`（meta の `search` に入る）。`SeatSpec(**kw)` は汎用なので追加不要。
+7. `OPCG_PROF` の区分に世界の引き直しを含める（`Determinize` は既にある）。
+
+**テスト（Rust・必須＝ゲームプレイに関わる）**:
+- (a) `redeterminize_every = 0` で今の `run_in_world` と出力が同一（既存のテスト盤面で `RunOut` を比較）。
+- (b) 相手の手札＋山札が空の盤面では `m > 0` でも `m = 0` と同一。
+- (c) 相手の手札が世界で変わる盤面を作り、相手の手番ノードで「この世界で打てない手」が一度も選ばれないこと・新しい手が追加されること。
+- (d) 同じ seed で 2 回回して同一。
+テストは `tests_search.rs` に足し、`docs/TEST_SPEC.md` §2 の該当表に 1 行追記。
+
+**計測して RESULT.json に書くもの**（手元・4 コアでよい）:
+- `tests/scripts/rs_decide_latency.py --sims 1280 --budget 0 --games 10` を `m = 0／1／8／64` で（`--redeterminize-every` を足す）。1 手の平均と最大。
+- `OPCG_PROF=1` の内訳（`Legal`・`Determinize`・`Forward` の増分）。
+- 相手の手番ノードで照合を省けない比率（訪問に占める割合）と、新しい手が追加された回数。
+
+**成果物**: ブランチ `claude/rs-ismcts`（コード・テスト・TEST_SPEC の 1 行・RESULT.json〔§5 の形: inputs＝元コミット／outputs＝変更ファイル／metrics＝上の計測／notes＝設計の注記・確認した依存・限界〕）。`make test`（`make rust-develop` 済み）と `make audit-cross` を通してから push。コミットメッセージにモデル名を入れない。
