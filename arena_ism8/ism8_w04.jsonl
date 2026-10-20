@@ -28,3 +28,4 @@
 {"seed": 1614029, "score": 0.0, "leaders": ["OP14-060", "OP15-001"], "games": [0.0, 0.0], "cand_leaders": ["OP14-060", "OP14-060"], "turns": [12, 11], "cand_opts": {"sims": 1280, "redeterminize_every": 8, "budget": 0}}
 {"seed": 1614027, "score": 0.0, "leaders": ["OP03-058", "P-076"], "games": [0.0, 0.0], "cand_leaders": ["OP03-058", "OP03-058"], "turns": [12, 15], "cand_opts": {"sims": 1280, "redeterminize_every": 8, "budget": 0}}
 {"seed": 1614026, "score": 1.0, "leaders": ["P-047", "OP11-022"], "games": [0.0, 1.0], "cand_leaders": ["P-047", "P-047"], "turns": [14, 26], "cand_opts": {"sims": 1280, "redeterminize_every": 8, "budget": 0}}
+{"seed": 1614030, "score": 0.0, "leaders": ["OP09-042", "OP10-099"], "games": [0.0, 0.0], "cand_leaders": ["OP09-042", "OP09-042"], "turns": [14, 11], "cand_opts": {"sims": 1280, "redeterminize_every": 8, "budget": 0}}
