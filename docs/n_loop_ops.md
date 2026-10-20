@@ -180,6 +180,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 生成 **波 46**（生成役 r13d・**世界 4 本 × 1,280 回**・枝予算なし・64 シャード × 120 局・§7.18） | 2461000〜2484620（w01〜w49）・2485000〜2492620 は未使用 | 指示済み（2026-10-20・claude/n46-w01〜w49・w50〜w64 は起動前に取り消し） |
 | 検証 **世界 4 本 × 1,280 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・16 シャード × 88 ペア・§7.18） | 1511000〜1526000 | 使用済み（2026-10-21・1,336 ペア 0.5434 [0.5227, 0.5642]・+30.2・`2026-10-21_r16_teacher_strength.md`） |
 | 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 使用済み（2026-10-21・r16 主 −5.3／副 +4.7・r16c 主 −7.7／副 +0.4・どちらも非昇格） |
+| 検証 **木 1 本で世界を引き直す（M=8／M=64）vs 今の出荷**（同じ r13d・本番の設定・各 16 シャード × 88 ペア・§7.19） | M=8 1611000〜1626000／M=64 1631000〜1646000 | 指示済み（2026-10-21・claude/arena-ism8-w01〜w16・claude/arena-ism64-w01〜w16） |
 | 生成 **波45**（**r14 が昇格しなければ**・生成役 r13d のまま・設定は波 44 と同じ・§7.15） | 2451000〜2458500（シャード k の base は 2450000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 指示済み（2026-10-20・r14 非昇格・台帳 2+282） |
 | 生成 **波44**（r14 の教材・**生成役 r13d**・出荷と同じ読み・設定は波 43 と同じ・§7.15） | 2441000〜2448500（16 シャード × 480 局・シャード k の base は 2440000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 回収済み（2026-10-19 18:13 UTC・64/64・台帳 2+281） |
 | 検証 **r14 vs r13d**（両席 160 回・各 16 シャード × 175 ペア・`--bands 1`・§7.15） | 主 1351000〜1366000／副 1371000〜1386000 | 使用済み（2026-10-20・r14 非昇格・台帳 2+282） |
@@ -1970,6 +1971,58 @@ ST=done save
 echo ALL_DONE
 
 補足: 1 本 約 12 分 × 4 本＝約 50 分。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
+````
+
+### 7.19 Phase 3 の本番アリーナ——木 1 本で世界を引き直す（WP `rs-ismcts`・2026-10-21）
+
+`docs/search_efficiency_plan.md` Phase 3・§7.1。実装は `claude/rs-ismcts`（`00ea2545c`・off で 1 bit 不変を golden 3 本と `make test` で確認済み）。
+同じ局面で測った 1 手の時間（4 コア容器・各 1 コア・1,284 判断点）: m=0（今）平均 311 ms／m=1 299／**m=8 232**／**m=64 217**（世界を切り替えると木が浅くなり評価回数が減る＝速くなる・作業セッションの仮説）。
+
+- 両席 r13d。基準席＝今の出荷（1 本 × 1,280 回・`--budget 0`）。候補席＝`--cand-sims 1280 --cand-redeterminize-every M --cand-budget 0`。
+- **2 腕**: M=8（seed 1611000〜1626000）・M=64（1631000〜1646000）。主条件のみ・各 16 シャード × 88 ペア＝1,408 ペア（±20 Elo）。
+- **予告（数を見る前）**: M=8 +15〜+30・M=64 +5〜+20（引き直しが少ない＝平均される世界が少ない）。どちらも下限 > 0.50 なら 2,800 ペアに増やして確定し、4 本 × 1,280 回（+30.2）と並べる。
+
+作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16・`{M}`＝8 か 64・`{BASE}`＝M=8 は 1611000／M=64 は 1631000）:
+
+````
+本番の設定のアリーナ（同じ r13d・候補席は木 1 本で {M} 回ごとに世界を引き直す × 1,280 回・基準席は今の出荷＝世界 1 本 × 1,280 回・どちらも枝予算なし）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.19）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-ism{M}-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください（待機に入るとコンテナが止まり、処理も消えます）。git の作業が安全確認で止められたら、`git stash -u` してから `-f` なしで実行してよい。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/rs-ismcts && git checkout -q -B claude/arena-ism{M}-w$KK origin/claude/rs-ismcts
+git fetch -q origin claude/arena-ism{M}-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_ism{M} 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_ism{M}
+
+次の内容を ~/runi.sh に保存し、`nohup bash ~/runi.sh > ~/runi.out 2>&1 &` で回す。runi.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+N=opcg_sim/data/learned/nrel_r13d.npz
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_ism{M}/*.jsonl"))
+print(json.dumps({"job": "arena-ism{M}-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz + redeterminize_every {M} x sims 1280 + budget 0", "baseline": "nrel_r13d.npz + worlds 1 x sims 1280 + budget 0", "pairs": 88},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_ism{M} RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena ism{M} shard $KK"; git push -q -u origin claude/arena-ism{M}-w$KK || echo PUSH_FAILED; }
+for J in 0 1 2 3 4 5; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --budget 0 --cand-sims 1280 --cand-redeterminize-every {M} --cand-budget 0 --pairs 88 --max-pairs 22 --bands 1 \
+    --seed-base $(( {BASE} + (k-1)*1000 )) --workers 4 --leaders random --decks synth_roles --pair-timeout 3600 \
+    --out arena_ism{M}/ism{M}_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 22 ペアずつ進め（6 回目までに 88 ペアに届く・届いた後の回は何もしない）、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。全体で約 2〜3 時間。コミットメッセージにモデル名を入れない。
 ````
 
 ## 8. コーディネータが守ること
