@@ -11,6 +11,9 @@
 - `--redeterminize-every m`（§7.1・WP `rs-ismcts`）では decide の戻り値の `redet`
   （引き直し・照合・追加の回数＝世界 0 のぶん）を合算し、「照合を省けない比率」
   （`checked / visits`）と「新しい手が追加された回数」も出す。
+- `--compare-every 1,8,64` を足すと、主の設定で打つ対局の**同じ局面**で、引き直しの間隔だけを変えた
+  decide も追加で呼んで時間を測る（打つ手は主の設定のもの・追加の decide は盤面を変えない・持ち越し
+  〔箱コミット〕は主と同じものを渡す）＝腕ごとに局面の集合が違う問題が無い対の比較。結果は `paired`。
 - `OPCG_PROF=1` を付けて回すと最後に `opcg_engine.prof_take()` の内訳（区分ごとの秒）も載せる。
 
 §1 の物差しは 1 コアに固定（`taskset -c 0`）して回す。
@@ -73,6 +76,8 @@ def main(argv=None) -> int:
     ap.add_argument("--seed-base", type=int, default=91000)
     ap.add_argument("--leaders", default="random")
     ap.add_argument("--decks", default="synth_roles")
+    ap.add_argument("--compare-every", default=None,
+                    help="同じ局面で追加に測る引き直しの間隔（カンマ区切り・例 1,8,64・0 は off）")
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
 
@@ -83,7 +88,34 @@ def main(argv=None) -> int:
         kw["worlds"] = int(args.worlds)
     if args.redeterminize_every:
         kw["redeterminize_every"] = int(args.redeterminize_every)
-    spec = E.SeatSpec(args.net, sims=args.sims, **kw)
+    last = {}
+
+    class _Spec(E.SeatSpec):
+        """主の席。直前の decide に渡した (seed, turn, seat, carry) を覚える（対の比較が同じ入力を使う）。"""
+
+        def decide_opts(self, game_seed, turn, seat, carry=None):
+            last["args"] = (game_seed, turn, seat, carry)
+            return super().decide_opts(game_seed, turn, seat, carry)
+
+    spec = _Spec(args.net, sims=args.sims, **kw)
+    compare = [int(x) for x in str(args.compare_every).split(",")] if args.compare_every else []
+    cmp_specs = {}
+    for m in compare:
+        ckw = {k: v for k, v in kw.items() if k != "redeterminize_every"}
+        if m:
+            ckw["redeterminize_every"] = m
+        cmp_specs[m] = E.SeatSpec(args.net, sims=args.sims, **ckw)
+    paired = {m: {"ms": [], "redet": {k: 0 for k in REDET_KEYS}} for m in compare}
+    paired_main = []
+    prof_on = os.environ.get("OPCG_PROF", "").strip() == "1"
+    paired_prof = {m: {} for m in compare}
+    main_prof = {}
+
+    def _prof_add(bucket):
+        for k, v in json.loads(E.engine().prof_take()).items():
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                bucket[k] = bucket.get(k, 0) + v
+
     db = D.load_db()
 
     ms = []
@@ -94,10 +126,25 @@ def main(argv=None) -> int:
     def post(_game, _name, _turn, _step, _move, _events):
         clock["t"] = time.perf_counter()
 
-    def observer(_game, _name, _turn, _step, out, _move):
-        ms.append((time.perf_counter() - clock["t"]) * 1000.0)
+    def observer(game, name, _turn, _step, out, _move):
+        dt = (time.perf_counter() - clock["t"]) * 1000.0
+        ms.append(dt)
         for k in REDET_KEYS:
             redet[k] += int((out.get("redet") or {}).get(k) or 0)
+        if compare:
+            paired_main.append(dt)
+            if prof_on:
+                _prof_add(main_prof)
+            for m, cs in cmp_specs.items():
+                opts = cs.decide_opts(*last["args"])
+                t1 = time.perf_counter()
+                cout = json.loads(game.decide(name, opts))
+                paired[m]["ms"].append((time.perf_counter() - t1) * 1000.0)
+                if prof_on:
+                    _prof_add(paired_prof[m])
+                for k in REDET_KEYS:
+                    paired[m]["redet"][k] += int((cout.get("redet") or {}).get(k) or 0)
+            clock["t"] = time.perf_counter()     # 追加の decide の時間を次の手に混ぜない
 
     t0 = time.time()
     for g in range(args.games):
@@ -123,7 +170,23 @@ def main(argv=None) -> int:
         data["redet"] = dict(redet)
         data["redet"]["checked_frac"] = (round(redet["checked"] / redet["visits"], 4)
                                          if redet["visits"] else None)
-    if os.environ.get("OPCG_PROF", "").strip() == "1":
+    if compare:
+        # 対の比較: 同じ局面の列。`raw_ms` は局面ごとの実測（シャードを足し合わせて集計し直すため）。
+        data["paired"] = {"main": {"every": int(args.redeterminize_every or 0),
+                                   "ms": summarize(paired_main),
+                                   "raw_ms": [round(x, 2) for x in paired_main]}}
+        for m, v in paired.items():
+            row = {"ms": summarize(v["ms"]), "raw_ms": [round(x, 2) for x in v["ms"]]}
+            if m:
+                row["redet"] = dict(v["redet"])
+                row["redet"]["checked_frac"] = (round(v["redet"]["checked"] / v["redet"]["visits"], 4)
+                                                if v["redet"]["visits"] else None)
+            if prof_on:
+                row["prof"] = paired_prof[m]
+            data["paired"][str(m)] = row
+    if prof_on and compare:
+        data["paired"]["main"]["prof"] = main_prof
+    elif prof_on:
         prof = json.loads(E.engine().prof_take())
         data["prof"] = prof
     text = json.dumps(data, ensure_ascii=False, indent=1)
