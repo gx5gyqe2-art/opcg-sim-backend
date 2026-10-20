@@ -42,3 +42,25 @@
 {"seed": 1516040, "score": 1.0, "leaders": ["ST06-001", "OP17-020"], "games": [1.0, 0.0], "cand_leaders": ["ST06-001", "ST06-001"], "turns": [13, 11], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
 {"seed": 1516043, "score": 1.0, "leaders": ["OP15-002", "OP16-022"], "games": [1.0, 0.0], "cand_leaders": ["OP15-002", "OP15-002"], "turns": [11, 13], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
 {"seed": 1516042, "score": 0.0, "leaders": ["OP12-041", "ST07-001"], "games": [0.0, 0.0], "cand_leaders": ["OP12-041", "OP12-041"], "turns": [14, 13], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516046, "score": 2.0, "leaders": ["OP13-100", "OP08-058"], "games": [1.0, 1.0], "cand_leaders": ["OP13-100", "OP13-100"], "turns": [13, 8], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516045, "score": 1.0, "leaders": ["EB01-021", "OP09-062"], "games": [1.0, 0.0], "cand_leaders": ["EB01-021", "EB01-021"], "turns": [11, 11], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516047, "score": 2.0, "leaders": ["OP11-041", "OP15-001"], "games": [1.0, 1.0], "cand_leaders": ["OP11-041", "OP11-041"], "turns": [15, 14], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516044, "score": 2.0, "leaders": ["OP10-099", "OP16-060"], "games": [1.0, 1.0], "cand_leaders": ["OP10-099", "OP10-099"], "turns": [15, 14], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516048, "score": 0.0, "leaders": ["OP12-041", "OP01-062"], "games": [0.0, 0.0], "cand_leaders": ["OP12-041", "OP12-041"], "turns": [12, 11], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516051, "score": 1.0, "leaders": ["ST10-002", "ST30-001"], "games": [1.0, 0.0], "cand_leaders": ["ST10-002", "ST10-002"], "turns": [13, 9], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516049, "score": 0.0, "leaders": ["OP09-022", "OP02-093"], "games": [0.0, 0.0], "cand_leaders": ["OP09-022", "OP09-022"], "turns": [12, 11], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516050, "score": 1.0, "leaders": ["OP03-001", "P-011"], "games": [0.0, 1.0], "cand_leaders": ["OP03-001", "OP03-001"], "turns": [14, 16], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516052, "score": 2.0, "leaders": ["OP17-058", "ST13-003"], "games": [1.0, 1.0], "cand_leaders": ["OP17-058", "OP17-058"], "turns": [13, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516054, "score": 0.0, "leaders": ["PRB01-001", "OP11-001"], "games": [0.0, 0.0], "cand_leaders": ["PRB01-001", "PRB01-001"], "turns": [12, 9], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516053, "score": 0.0, "leaders": ["OP02-026", "OP15-058"], "games": [0.0, 0.0], "cand_leaders": ["OP02-026", "OP02-026"], "turns": [10, 9], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516057, "score": 2.0, "leaders": ["OP16-022", "OP07-097"], "games": [1.0, 1.0], "cand_leaders": ["OP16-022", "OP16-022"], "turns": [11, 10], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516058, "score": 0.0, "leaders": ["OP10-003", "OP03-077"], "games": [0.0, 0.0], "cand_leaders": ["OP10-003", "OP10-003"], "turns": [12, 13], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516055, "score": 2.0, "leaders": ["OP17-020", "OP11-021"], "games": [1.0, 1.0], "cand_leaders": ["OP17-020", "OP17-020"], "turns": [15, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516059, "score": 2.0, "leaders": ["OP17-058", "EB04-001"], "games": [1.0, 1.0], "cand_leaders": ["OP17-058", "OP17-058"], "turns": [13, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516056, "score": 2.0, "leaders": ["OP03-058", "OP11-062"], "games": [1.0, 1.0], "cand_leaders": ["OP03-058", "OP03-058"], "turns": [15, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516060, "score": 2.0, "leaders": ["OP06-001", "P-086"], "games": [1.0, 1.0], "cand_leaders": ["OP06-001", "OP06-001"], "turns": [11, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516062, "score": 1.0, "leaders": ["EB01-001", "OP11-021"], "games": [1.0, 0.0], "cand_leaders": ["EB01-001", "EB01-001"], "turns": [13, 11], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516061, "score": 2.0, "leaders": ["ST14-001", "ST03-001"], "games": [1.0, 1.0], "cand_leaders": ["ST14-001", "ST14-001"], "turns": [9, 14], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516063, "score": 0.0, "leaders": ["ST01-001", "OP13-003"], "games": [0.0, 0.0], "cand_leaders": ["ST01-001", "ST01-001"], "turns": [16, 13], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516065, "score": 1.0, "leaders": ["OP16-080", "OP13-001"], "games": [0.0, 1.0], "cand_leaders": ["OP16-080", "OP16-080"], "turns": [12, 10], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1516064, "score": null, "leaders": ["OP13-001", "OP17-079"], "void": "GameAborted: seed=1516064 決着せず（上限手数）", "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
