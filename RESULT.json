@@ -1,7 +1,7 @@
 {
  "job": "arena-r16-w08",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "outputs": {
   "files": [
    "arena_r16/r16_main_w08.jsonl",
