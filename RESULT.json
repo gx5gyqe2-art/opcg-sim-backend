@@ -1,7 +1,7 @@
 {
  "job": "arena-w4f-w13",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r13d.npz + worlds 4 x sims 1280 + budget 0",
   "baseline": "nrel_r13d.npz + worlds 1 x sims 1280 + budget 0",
@@ -15,5 +15,5 @@
  "metrics": {
   "arena_w4f/w4f_w13.jsonl": 88
  },
- "notes": ""
+ "notes": "repo at /home/user/opcg-sim-backend (not ~). A duplicate runner was started by accident early on and killed within ~1 min; arena_shard resumes by skipping finished pairs. The runner script exited before ALL_DONE, so the final status was written by hand after confirming 88/88 pairs in the jsonl. Some partial commits were made by hand (committer g.x5gyqe2@gmail.com)."
 }
