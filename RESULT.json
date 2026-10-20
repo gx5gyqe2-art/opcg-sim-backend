@@ -13,15 +13,16 @@
  },
  "outputs": {
   "dirs": [
-   "n_records/n46_w40_p0"
+   "n_records/n46_w40_p0",
+   "n_records/n46_w40_p1"
   ]
  },
  "metrics": {
-  "parts_done": 1,
-  "games": 30,
-  "rows": 4283,
+  "parts_done": 2,
+  "games": 60,
+  "rows": 8603,
   "dropped": 0,
-  "sec_play_mean": 227.56
+  "sec_play_mean": 222.29
  },
  "notes": "worker ran in /home/user/opcg-sim-backend (symlinked as ~/opcg-sim-backend)"
 }
