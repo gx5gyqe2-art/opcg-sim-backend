@@ -7,3 +7,4 @@
 {"seed": 1523005, "score": 1.0, "leaders": ["OP09-022", "OP11-062"], "games": [0.0, 1.0], "cand_leaders": ["OP09-022", "OP09-022"], "turns": [14, 14], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
 {"seed": 1523008, "score": 1.0, "leaders": ["OP09-081", "OP09-081"], "games": [0.0, 1.0], "cand_leaders": ["OP09-081", "OP09-081"], "turns": [16, 14], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
 {"seed": 1523011, "score": 2.0, "leaders": ["OP07-038", "P-011"], "games": [1.0, 1.0], "cand_leaders": ["OP07-038", "OP07-038"], "turns": [13, 16], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1523007, "score": 2.0, "leaders": ["OP17-001", "ST29-001"], "games": [1.0, 1.0], "cand_leaders": ["OP17-001", "OP17-001"], "turns": [13, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
