@@ -10,7 +10,7 @@
  },
  "metrics": {
   "arena_r15/r15_main_w01.jsonl": 175,
-  "arena_r15/r15_mirror_w01.jsonl": 121
+  "arena_r15/r15_mirror_w01.jsonl": 175
  },
  "notes": "repo at /home/user/opcg-sim-backend instead of ~/opcg-sim-backend"
 }
