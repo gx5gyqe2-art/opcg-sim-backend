@@ -179,6 +179,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **世界 4 本 × 320 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・32 シャード × 88 ペア・§7.17） | 1471000〜1502000 | 使用済み（2026-10-20・2,724 ペア 0.4831 [0.4688, 0.4974]・−11.7・世界 4 本は有意に弱い・`2026-10-20_worlds4_and_policy_errors.md`） |
 | 生成 **波 46**（生成役 r13d・**世界 4 本 × 1,280 回**・枝予算なし・64 シャード × 120 局・§7.18） | 2461000〜2484620（w01〜w49）・2485000〜2492620 は未使用 | 指示済み（2026-10-20・claude/n46-w01〜w49・w50〜w64 は起動前に取り消し） |
 | 検証 **世界 4 本 × 1,280 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・16 シャード × 88 ペア・§7.18） | 1511000〜1526000 | 指示済み（2026-10-20・claude/arena-w4f-w01〜w16） |
+| 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 指示済み（2026-10-20 19:40・claude/arena-r16-w01〜w16） |
 | 生成 **波45**（**r14 が昇格しなければ**・生成役 r13d のまま・設定は波 44 と同じ・§7.15） | 2451000〜2458500（シャード k の base は 2450000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 指示済み（2026-10-20・r14 非昇格・台帳 2+282） |
 | 生成 **波44**（r14 の教材・**生成役 r13d**・出荷と同じ読み・設定は波 43 と同じ・§7.15） | 2441000〜2448500（16 シャード × 480 局・シャード k の base は 2440000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 回収済み（2026-10-19 18:13 UTC・64/64・台帳 2+281） |
 | 検証 **r14 vs r13d**（両席 160 回・各 16 シャード × 175 ペア・`--bands 1`・§7.15） | 主 1351000〜1366000／副 1371000〜1386000 | 使用済み（2026-10-20・r14 非昇格・台帳 2+282） |
@@ -1918,6 +1919,56 @@ ST=done save
 echo ALL_DONE
 
 補足: 22 ペアずつ進め（6 回目までに 88 ペアに届く・届いた後の回は何もしない）、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。全体で約 3〜4 時間。コミットメッセージにモデル名を入れない。
+````
+
+
+判定のアリーナの作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16・`claude/train-r16` の push 後・2026-10-20 19:40 UTC 追記）。
+r16 主 1531000〜／副 1551000〜／r16c 主 1571000〜／副 1591000〜（各 16 シャード × 1000）:
+
+````
+アリーナ（r16／r16c vs r13d）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.18）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r16-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r16-w$KK origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/arena-r16-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r16 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r16:r16net && git show r16net:n1_results/nrel_r16.npz > ~/nrel_r16.npz && git show r16net:n1_results/nrel_r16c.npz > ~/nrel_r16c.npz
+mkdir -p arena_r16
+
+次の内容を ~/run16.sh に保存し、`nohup bash ~/run16.sh > ~/run16.out 2>&1 &` で回す。run16.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r16/*.jsonl"))
+print(json.dumps({"job": "arena-r16-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r16 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r16 shard $KK"; git push -q -u origin claude/arena-r16-w$KK || echo PUSH_FAILED; }
+for C in r16 r16c; do
+  if [ $C = r16 ]; then BM=1531000; BR=1551000; else BM=1571000; BR=1591000; fi
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BM + B*1000 )) --workers 4 --leaders random --decks synth_roles \
+    --out arena_r16/${C}_main_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR + B*1000 )) --workers 4 \
+    --out arena_r16/${C}_mirror_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 12 分 × 4 本＝約 50 分。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
 ````
 
 ## 8. コーディネータが守ること
