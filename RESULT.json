@@ -16,5 +16,5 @@
   "arena_r15/r15b_main_w09.jsonl": 175,
   "arena_r15/r15b_mirror_w09.jsonl": 175
  },
- "notes": ""
+ "notes": "コンテナ再起動で r15b 副が中断→run15.sh を再実行して再開（終えたペアは飛ばされる）。コード変更なし。"
 }
