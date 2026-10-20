@@ -1,7 +1,7 @@
 {
  "job": "arena-w4-w17",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r13d.npz + worlds 4 x sims 320 + budget 0",
   "baseline": "nrel_r13d.npz + worlds 1 x sims 1280 + budget 0",
