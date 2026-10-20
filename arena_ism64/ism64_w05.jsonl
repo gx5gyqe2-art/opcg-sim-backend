@@ -39,3 +39,6 @@
 {"seed": 1635036, "score": 2.0, "leaders": ["P-011", "OP07-079"], "games": [1.0, 1.0], "cand_leaders": ["P-011", "P-011"], "turns": [15, 14], "cand_opts": {"sims": 1280, "redeterminize_every": 64, "budget": 0}}
 {"seed": 1635037, "score": 0.0, "leaders": ["ST10-002", "OP15-039"], "games": [0.0, 0.0], "cand_leaders": ["ST10-002", "ST10-002"], "turns": [12, 13], "cand_opts": {"sims": 1280, "redeterminize_every": 64, "budget": 0}}
 {"seed": 1635040, "score": 0.0, "leaders": ["OP12-081", "OP17-020"], "games": [0.0, 0.0], "cand_leaders": ["OP12-081", "OP12-081"], "turns": [12, 11], "cand_opts": {"sims": 1280, "redeterminize_every": 64, "budget": 0}}
+{"seed": 1635043, "score": 1.0, "leaders": ["OP03-099", "EB03-001"], "games": [0.0, 1.0], "cand_leaders": ["OP03-099", "OP03-099"], "turns": [10, 12], "cand_opts": {"sims": 1280, "redeterminize_every": 64, "budget": 0}}
+{"seed": 1635041, "score": 2.0, "leaders": ["ST11-001", "OP04-039"], "games": [1.0, 1.0], "cand_leaders": ["ST11-001", "ST11-001"], "turns": [11, 12], "cand_opts": {"sims": 1280, "redeterminize_every": 64, "budget": 0}}
+{"seed": 1635042, "score": 1.0, "leaders": ["ST07-001", "OP07-019"], "games": [0.0, 1.0], "cand_leaders": ["ST07-001", "ST07-001"], "turns": [12, 14], "cand_opts": {"sims": 1280, "redeterminize_every": 64, "budget": 0}}
