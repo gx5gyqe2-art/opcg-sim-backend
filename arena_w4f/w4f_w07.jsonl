@@ -57,3 +57,10 @@
 {"seed": 1517054, "score": 2.0, "leaders": ["OP02-093", "OP11-041"], "games": [1.0, 1.0], "cand_leaders": ["OP02-093", "OP02-093"], "turns": [19, 14], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
 {"seed": 1517057, "score": 2.0, "leaders": ["ST21-001", "OP14-060"], "games": [1.0, 1.0], "cand_leaders": ["ST21-001", "ST21-001"], "turns": [15, 14], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
 {"seed": 1517060, "score": 2.0, "leaders": ["OP06-080", "OP08-057"], "games": [1.0, 1.0], "cand_leaders": ["OP06-080", "OP06-080"], "turns": [9, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1517059, "score": 0.0, "leaders": ["OP03-001", "OP17-001"], "games": [0.0, 0.0], "cand_leaders": ["OP03-001", "OP03-001"], "turns": [14, 13], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1517058, "score": 2.0, "leaders": ["OP17-020", "OP13-004"], "games": [1.0, 1.0], "cand_leaders": ["OP17-020", "OP17-020"], "turns": [13, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1517061, "score": 1.0, "leaders": ["OP02-071", "OP15-022"], "games": [1.0, 0.0], "cand_leaders": ["OP02-071", "OP02-071"], "turns": [11, 11], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1517062, "score": 2.0, "leaders": ["OP15-098", "OP09-061"], "games": [1.0, 1.0], "cand_leaders": ["OP15-098", "OP15-098"], "turns": [9, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1517064, "score": 2.0, "leaders": ["OP14-041", "ST30-001"], "games": [1.0, 1.0], "cand_leaders": ["OP14-041", "OP14-041"], "turns": [11, 10], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1517065, "score": 0.0, "leaders": ["OP04-058", "OP01-060"], "games": [0.0, 0.0], "cand_leaders": ["OP04-058", "OP04-058"], "turns": [10, 11], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1517063, "score": 0.0, "leaders": ["OP08-021", "OP15-058"], "games": [0.0, 0.0], "cand_leaders": ["OP08-021", "OP08-021"], "turns": [10, 17], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
