@@ -5,12 +5,14 @@
  "outputs": {
   "files": [
    "arena_r15/r15_main_w07.jsonl",
-   "arena_r15/r15_mirror_w07.jsonl"
+   "arena_r15/r15_mirror_w07.jsonl",
+   "arena_r15/r15b_main_w07.jsonl"
   ]
  },
  "metrics": {
   "arena_r15/r15_main_w07.jsonl": 175,
-  "arena_r15/r15_mirror_w07.jsonl": 175
+  "arena_r15/r15_mirror_w07.jsonl": 175,
+  "arena_r15/r15b_main_w07.jsonl": 175
  },
  "notes": ""
 }
