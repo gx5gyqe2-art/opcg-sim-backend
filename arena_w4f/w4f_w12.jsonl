@@ -3,3 +3,10 @@
 {"seed": 1522001, "score": 2.0, "leaders": ["OP15-098", "OP07-019"], "games": [1.0, 1.0], "cand_leaders": ["OP15-098", "OP15-098"], "turns": [9, 18], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
 {"seed": 1522003, "score": 0.0, "leaders": ["OP09-022", "OP10-099"], "games": [0.0, 0.0], "cand_leaders": ["OP09-022", "OP09-022"], "turns": [16, 11], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
 {"seed": 1522004, "score": 2.0, "leaders": ["OP10-022", "ST04-001"], "games": [1.0, 1.0], "cand_leaders": ["OP10-022", "OP10-022"], "turns": [13, 14], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1522006, "score": 2.0, "leaders": ["OP08-098", "ST22-001"], "games": [1.0, 1.0], "cand_leaders": ["OP08-098", "OP08-098"], "turns": [15, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1522005, "score": 1.0, "leaders": ["P-117", "EB01-001"], "games": [0.0, 1.0], "cand_leaders": ["P-117", "P-117"], "turns": [10, 14], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1522009, "score": 2.0, "leaders": ["OP09-081", "OP02-025"], "games": [1.0, 1.0], "cand_leaders": ["OP09-081", "OP09-081"], "turns": [11, 14], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1522008, "score": 0.0, "leaders": ["OP08-021", "OP10-022"], "games": [0.0, 0.0], "cand_leaders": ["OP08-021", "OP08-021"], "turns": [14, 13], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1522007, "score": 1.0, "leaders": ["OP02-002", "OP09-061"], "games": [0.0, 1.0], "cand_leaders": ["OP02-002", "OP02-002"], "turns": [10, 10], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1522011, "score": 1.0, "leaders": ["OP11-062", "OP08-001"], "games": [1.0, 0.0], "cand_leaders": ["OP11-062", "OP11-062"], "turns": [13, 9], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1522010, "score": 0.0, "leaders": ["OP02-002", "OP04-058"], "games": [0.0, 0.0], "cand_leaders": ["OP02-002", "OP02-002"], "turns": [10, 11], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
