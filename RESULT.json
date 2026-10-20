@@ -1,7 +1,7 @@
 {
  "job": "arena-r15-w10",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "outputs": {
   "files": [
    "arena_r15/r15_main_w10.jsonl",
