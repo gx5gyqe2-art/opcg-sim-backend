@@ -15,7 +15,7 @@
   ]
  },
  "metrics": {
-  "arena_oppblind/oppblind_w12.jsonl": 100
+  "arena_oppblind/oppblind_w12.jsonl": 110
  },
  "notes": "run in /home/user/opcg-sim-backend (existing clone) instead of ~/opcg-sim-backend"
 }
