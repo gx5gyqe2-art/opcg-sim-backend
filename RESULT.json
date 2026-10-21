@@ -1,198 +1,21 @@
 {
- "job": "rs-reveal",
- "role": "engine-option",
- "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.11 (origin/claude/cpu-spec-improvements-yw91jd; ledger 2+311; n_loop_ops seed ledger row '見える範囲を分けた探索' / §7.25)",
+ "job": "arena-omni5120-w04",
+ "role": "arena",
+ "status": "partial",
  "inputs": {
-  "base": "claude/rs-omniscient @ 0ce78d4",
-  "net": "nrel_r13d.npz (both seats)"
+  "candidate": "nrel_r13d.npz + --cand-sims 5120 --cand-omniscient --cand-budget 0",
+  "baseline": "nrel_r13d.npz + --sims 1280 --omniscient --budget 0",
+  "decks": "synth_roles",
+  "pairs": 120,
+  "code": "claude/rs-reveal"
  },
  "outputs": {
-  "branch": "claude/rs-reveal",
-  "code_commit": "944b3c0",
   "files": [
-   "rust/opcg_engine/src/search/determinize.rs (determinize_opp_deck_with, determinize_fair_with)",
-   "rust/opcg_engine/src/search/decide.rs (enum Reveal, DecideOptions.reveal, validate(), WorldView; sample_world dispatch; tests reveal_* / omniscient_and_reveal_together_is_an_error)",
-   "rust/opcg_engine/src/search/mod.rs (opts JSON key 'reveal'; unknown value / omniscient+reveal -> error in decide_opts_and_carry)",
-   "rust/opcg_engine/src/search/tests_search.rs (decide_options_json_reads_reveal)",
-   "opcg_sim/api/engine_rs.py (RsGame.decide(reveal=...))",
-   "opcg_sim/loop/arena.py (--cand-reveal {opp_hand,fair} via CAND_VALUE_FLAGS)",
-   "opcg_sim/loop/arena_shard.py (--reveal for the baseline seat via _best_kw)",
-   "tests/scripts/rs_decide_latency.py (--reveal)",
-   "docs/TEST_SPEC.md §2 (1 row)",
-   "arena_reveal_local/rvhand_local.jsonl, arena_reveal_local/rvfair_local.jsonl (local arena ledgers)"
+   "arena_omni5120/omni5120_w04.jsonl"
   ]
  },
- "gates": {
-  "make_rust_develop": "ok",
-  "make_test": "green: cargo test 582 passed / 1 ignored; pytest 847 passed, 13 skipped (skips = torch not installed in this container; golden audit + replay ran and passed: 6 passed when re-run alone)",
-  "make_audit_cross": "void 0 (120 pairs, seed 0, default both seats; wr 0.5333)",
-  "audit_cross_with_cand_reveal": "extra check, not required: --cand-reveal opp_hand void 0 (wr 0.5625) / --cand-reveal fair void 0 (wr 0.5625), same 120 pairs, sims 32"
- },
  "metrics": {
-  "local_arena": {
-   "opp_hand": {
-    "cmd": "arena_shard --candidate r13d --baseline r13d --sims 1280 --budget 0 --cand-sims 1280 --cand-reveal opp_hand --cand-budget 0 --pairs 40 --max-pairs 40 --bands 1 --seed-base 1676000 --workers 4 --leaders random --decks synth_roles --pair-timeout 7200",
-    "seeds": "1676000-1676039",
-    "pairs": 40,
-    "games": 80,
-    "void": 0,
-    "wins": 45.0,
-    "wr": 0.5625,
-    "ci95": [
-     0.4505,
-     0.6745
-    ],
-    "elo": 43.7,
-    "wall_sec": 507
-   },
-   "fair": {
-    "cmd": "arena_shard --candidate r13d --baseline r13d --sims 1280 --budget 0 --cand-sims 1280 --cand-reveal fair --cand-budget 0 --pairs 40 --max-pairs 40 --bands 1 --seed-base 1677000 --workers 4 --leaders random --decks synth_roles --pair-timeout 7200",
-    "seeds": "1677000-1677039",
-    "pairs": 40,
-    "games": 80,
-    "void": 0,
-    "wins": 36.0,
-    "wr": 0.45,
-    "ci95": [
-     0.3295,
-     0.5705
-    ],
-    "elo": -34.9
-   },
-   "reference_omniscient_local_prev_wp": {
-    "seeds": "1675000-1675039",
-    "wr": 0.6125,
-    "elo": 79.5
-   }
-  },
-  "latency_1core": {
-   "cmd": "taskset -c N python tests/scripts/rs_decide_latency.py --sims 1280 --worlds 1 --budget 0 --games 20 [--reveal M] (3 runs in parallel on cores 0/1/2)",
-   "default": {
-    "sims": 1280,
-    "worlds": 1,
-    "budget": 0,
-    "games": 20,
-    "moves": 2512,
-    "mean": 0.153,
-    "p50": 0.003,
-    "p90": 0.379,
-    "p99": 1.17,
-    "max": 4.59,
-    "wall_sec": 385.6,
-    "affinity": [
-     0
-    ]
-   },
-   "opp_hand": {
-    "sims": 1280,
-    "worlds": 1,
-    "budget": 0,
-    "reveal": "opp_hand",
-    "games": 20,
-    "moves": 2672,
-    "mean": 0.166,
-    "p50": 0.012,
-    "p90": 0.394,
-    "p99": 1.414,
-    "max": 3.76,
-    "wall_sec": 444.0,
-    "affinity": [
-     1
-    ]
-   },
-   "fair": {
-    "sims": 1280,
-    "worlds": 1,
-    "budget": 0,
-    "reveal": "fair",
-    "games": 20,
-    "moves": 2853,
-    "mean": 0.148,
-    "p50": 0.002,
-    "p90": 0.38,
-    "p99": 0.933,
-    "max": 5.64,
-    "wall_sec": 423.5,
-    "affinity": [
-     2
-    ]
-   },
-   "mean_ratio_opp_hand_over_default": 1.085,
-   "mean_ratio_fair_over_default": 0.967
-  }
+  "arena_omni5120/omni5120_w04.jsonl": 10
  },
- "hidden_zones_table": [
-  {
-   "zone": "own hand",
-   "visible_to_me": true,
-   "default": "real",
-   "opp_hand": "real",
-   "fair": "real"
-  },
-  {
-   "zone": "own deck (order)",
-   "visible_to_me": false,
-   "default": "real (search already sees own future draws)",
-   "opp_hand": "real",
-   "fair": "shuffled together with own face-down life"
-  },
-  {
-   "zone": "own life, face-down",
-   "visible_to_me": false,
-   "default": "real",
-   "opp_hand": "real",
-   "fair": "shuffled together with own deck"
-  },
-  {
-   "zone": "own life, face-up",
-   "visible_to_me": true,
-   "default": "real",
-   "opp_hand": "real",
-   "fair": "real (position and card kept)"
-  },
-  {
-   "zone": "opp hand",
-   "visible_to_me": false,
-   "default": "shuffled with opp deck",
-   "opp_hand": "real",
-   "fair": "shuffled with opp deck + opp face-down life"
-  },
-  {
-   "zone": "opp deck (order)",
-   "visible_to_me": false,
-   "default": "shuffled with opp hand",
-   "opp_hand": "shuffled (deck only)",
-   "fair": "shuffled with opp hand + opp face-down life"
-  },
-  {
-   "zone": "opp life, face-down",
-   "visible_to_me": false,
-   "default": "real",
-   "opp_hand": "real",
-   "fair": "shuffled with opp hand + deck"
-  },
-  {
-   "zone": "opp life, face-up",
-   "visible_to_me": true,
-   "default": "real",
-   "opp_hand": "real",
-   "fair": "real"
-  },
-  {
-   "zone": "field / stage / leader / trash / DON!! (both)",
-   "visible_to_me": true,
-   "default": "real",
-   "opp_hand": "real",
-   "fair": "real"
-  },
-  {
-   "zone": "temp_zone (cards being looked at mid-effect, both)",
-   "visible_to_me": "own: yes; opp: no (transient)",
-   "default": "real",
-   "opp_hand": "real",
-   "fair": "real (not touched; see notes)"
-  }
- ],
- "notes": "Default is untouched: DecideOptions.reveal defaults to Reveal::Default and sample_world() calls determinize_with exactly as before in that case (same rng draws). Unit test (a) checks sample_world(Default) == determinize_with on 8 seeds and decide output identical; goldens (audit 3,386 + replay 200) pass; the default latency run reproduced the previous WP's 20 games move for move (2,512 moves, identical count).\nVisibility table (hidden_zones_table) follows the OPCG zone rules: deck = non-public to both players (owner included); hand = public to owner only; life = face-down cards are non-public to both players incl. the owner, face-up life is public; field/stage/leader/trash/cost area (DON!!) are public. In the engine the only per-card visibility flag is CardInstance.is_face_up (used for life); the engine does not track 'revealed' hand cards or known deck positions (e.g. after a look-and-put-to-bottom effect), so fair treats them as hidden. That is a conservative simplification: fair slightly over-hides vs. a real player's knowledge.\ntemp_zone is left untouched in all modes: it holds cards an effect is currently looking at (own look effects -> visible to me). An opponent's temp_zone during my decision would be hidden in real play but is transient and rare; not shuffled (noted, not handled).\nInterpretation choice for opp_hand: the spec says 'shuffle only the opp deck (and the face-down areas mixed into it)'. I shuffle the opp deck ONLY and keep opp face-down life real, because the current determinization and omniscient both keep opp life real; this makes the decomposition clean: default -> opp_hand differs only in knowing the opp hand; opp_hand -> omniscient differs only in the opp deck order. If the coordinator wanted opp life shuffled too in opp_hand, it is a one-line change (hidden_slots(..., life=true)).\nfair pools: opponent pool = opp hand + opp deck + opp face-down life, drawn with one shuffle_order call; own pool = own deck + own face-down life, a second call (opp first). Per-zone counts preserved; face-up life cards keep their positions; empty pools draw nothing from the rng.\nomniscient + reveal together -> EngineError::BadPayload from DecideOptions::validate (called in decide() and in decide_opts_and_carry). An unknown reveal string or a non-string value is also an error at the JSON layer (not silently defaulted), because a typo would otherwise silently measure the default.\nreveal keeps worlds>1 working (unlike omniscient): each world i re-samples with its own rng as before.\nTreeMcts::run in mcts.rs still calls determinize_with directly; not on the decide path (same as the previous WP), left alone.\nLocal arenas (40 pairs each, ~+-55 Elo CI) are indicative only: opp_hand +43.7 [0.45..0.67], fair -34.9 [0.33..0.57], vs. omniscient +79.5 local (+83.7 production). Read naively: knowing the opp hand gives roughly half of the omniscient gain, and fair (not seeing own future draws/life) is worse than the current shipped search, i.e. the current search's gain may partly come from peeking at its own deck order. Too wide to decide; the production arenas (§7.25) are the judge.\nLatency: per-move mean on one core is about the same for all three (default 0.153 s, opp_hand 0.166, fair 0.148); games length differs (moves over 20 games: 2512 / 2672 / 2853).\nThe container restarted once during the opp_hand arena (uptime reset); arena_shard resumed from its jsonl ledger, 40 distinct seeds, no duplicates.\nContainer lacked maturin/pytest/fastapi; installed via pip (maturin, opcg_sim/requirements.txt, pytest, pytest-xdist) before the gate."
+ "notes": ""
 }
