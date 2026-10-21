@@ -68,3 +68,9 @@
 {"seed": 1658069, "score": 2.0, "leaders": ["OP16-079", "OP05-041"], "games": [1.0, 1.0], "cand_leaders": ["OP16-079", "OP16-079"], "turns": [11, 8], "cand_opts": {"omniscient": true, "sims": 5120, "budget": 0}}
 {"seed": 1658065, "score": null, "leaders": ["OP17-099", "OP17-079"], "void": "GameAborted: seed=1658065 決着せず（上限手数）", "cand_opts": {"omniscient": true, "sims": 5120, "budget": 0}}
 {"seed": 1658067, "score": 2.0, "leaders": ["OP08-098", "OP17-001"], "games": [1.0, 1.0], "cand_leaders": ["OP08-098", "OP08-098"], "turns": [11, 20], "cand_opts": {"omniscient": true, "sims": 5120, "budget": 0}}
+{"seed": 1658070, "score": 2.0, "leaders": ["ST13-001", "EB04-001"], "games": [1.0, 1.0], "cand_leaders": ["ST13-001", "ST13-001"], "turns": [15, 16], "cand_opts": {"omniscient": true, "sims": 5120, "budget": 0}}
+{"seed": 1658072, "score": 1.0, "leaders": ["OP12-040", "OP04-058"], "games": [0.0, 1.0], "cand_leaders": ["OP12-040", "OP12-040"], "turns": [12, 12], "cand_opts": {"omniscient": true, "sims": 5120, "budget": 0}}
+{"seed": 1658073, "score": 0.0, "leaders": ["ST10-002", "OP01-091"], "games": [0.0, 0.0], "cand_leaders": ["ST10-002", "ST10-002"], "turns": [14, 11], "cand_opts": {"omniscient": true, "sims": 5120, "budget": 0}}
+{"seed": 1658071, "score": 2.0, "leaders": ["OP09-042", "OP07-079"], "games": [1.0, 1.0], "cand_leaders": ["OP09-042", "OP09-042"], "turns": [17, 16], "cand_opts": {"omniscient": true, "sims": 5120, "budget": 0}}
+{"seed": 1658076, "score": 2.0, "leaders": ["OP15-001", "OP03-076"], "games": [1.0, 1.0], "cand_leaders": ["OP15-001", "OP15-001"], "turns": [13, 14], "cand_opts": {"omniscient": true, "sims": 5120, "budget": 0}}
+{"seed": 1658075, "score": 0.0, "leaders": ["EB01-040", "OP07-079"], "games": [0.0, 0.0], "cand_leaders": ["EB01-040", "EB01-040"], "turns": [14, 13], "cand_opts": {"omniscient": true, "sims": 5120, "budget": 0}}
