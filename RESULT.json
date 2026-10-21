@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_w4/w4_w10.jsonl": 208
+  "arena_w4/w4_w10.jsonl": 120
  },
- "notes": ""
+ "notes": "origin 上の同名ブランチに別実験の 88 行（sims 320・seed 1480xxx）が先に在った。今回の腕と無関係なので台帳から除いた（履歴には残る）。残りは sims 1280・worlds 4・budget 0・seed 1660000〜1660119 の 120 ペア。"
 }
