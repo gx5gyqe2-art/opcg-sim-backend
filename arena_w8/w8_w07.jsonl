@@ -1,0 +1,10 @@
+{"seed": 1657000, "score": 1.0, "leaders": ["OP06-020", "OP08-002"], "games": [1.0, 0.0], "cand_leaders": ["OP06-020", "OP06-020"], "turns": [11, 15], "cand_opts": {"sims": 1280, "worlds": 8, "budget": 0}}
+{"seed": 1657002, "score": 2.0, "leaders": ["EB01-021", "OP03-058"], "games": [1.0, 1.0], "cand_leaders": ["EB01-021", "EB01-021"], "turns": [9, 12], "cand_opts": {"sims": 1280, "worlds": 8, "budget": 0}}
+{"seed": 1657001, "score": 1.0, "leaders": ["OP10-042", "OP03-076"], "games": [1.0, 0.0], "cand_leaders": ["OP10-042", "OP10-042"], "turns": [13, 13], "cand_opts": {"sims": 1280, "worlds": 8, "budget": 0}}
+{"seed": 1657003, "score": 2.0, "leaders": ["EB01-001", "ST10-003"], "games": [1.0, 1.0], "cand_leaders": ["EB01-001", "EB01-001"], "turns": [15, 12], "cand_opts": {"sims": 1280, "worlds": 8, "budget": 0}}
+{"seed": 1657006, "score": 1.0, "leaders": ["OP02-025", "OP09-062"], "games": [1.0, 0.0], "cand_leaders": ["OP02-025", "OP02-025"], "turns": [11, 11], "cand_opts": {"sims": 1280, "worlds": 8, "budget": 0}}
+{"seed": 1657005, "score": 1.0, "leaders": ["ST10-003", "OP16-001"], "games": [0.0, 1.0], "cand_leaders": ["ST10-003", "ST10-003"], "turns": [18, 12], "cand_opts": {"sims": 1280, "worlds": 8, "budget": 0}}
+{"seed": 1657007, "score": 1.0, "leaders": ["OP02-093", "OP02-025"], "games": [0.0, 1.0], "cand_leaders": ["OP02-093", "OP02-093"], "turns": [10, 10], "cand_opts": {"sims": 1280, "worlds": 8, "budget": 0}}
+{"seed": 1657008, "score": 0.0, "leaders": ["OP13-001", "OP01-060"], "games": [0.0, 0.0], "cand_leaders": ["OP13-001", "OP13-001"], "turns": [10, 11], "cand_opts": {"sims": 1280, "worlds": 8, "budget": 0}}
+{"seed": 1657009, "score": 0.0, "leaders": ["OP14-020", "OP05-041"], "games": [0.0, 0.0], "cand_leaders": ["OP14-020", "OP14-020"], "turns": [12, 11], "cand_opts": {"sims": 1280, "worlds": 8, "budget": 0}}
+{"seed": 1657004, "score": 1.0, "leaders": ["OP13-003", "ST07-001"], "games": [1.0, 0.0], "cand_leaders": ["OP13-003", "OP13-003"], "turns": [13, 19], "cand_opts": {"sims": 1280, "worlds": 8, "budget": 0}}
