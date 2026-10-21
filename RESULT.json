@@ -13,7 +13,7 @@
   ]
  },
  "metrics": {
-  "arena_rt09/rt09_w05.jsonl": 80
+  "arena_rt09/rt09_w05.jsonl": 100
  },
  "notes": "repo was at /home/user/opcg-sim-backend (not ~); run on pre-cloned checkout of origin/claude/play-rethink 085308b"
 }
