@@ -17,5 +17,5 @@
  "metrics": {
   "arena_omni5120/omni5120_w08.jsonl": 120
  },
- "notes": ""
+ "notes": "120/120 ペア完走。最終: 119 ペア有効・void 1・勝 151/238・wr 0.6345 CI95 [0.5646,0.7043]・elo +95.8（arena_shard の ARENA_RESUME_FINAL）。起動時の表示『基準席は既定』は文言のみで、基準席には指定どおり --sims 1280 --omniscient --budget 0 を渡した。実行中にコンテナが 1 回再起動し、arena_shard の再開機能で続行した（終えたペアは保持）。途中経過は手動でも push した。コミットの committer メール（g.x5gyqe2@gmail.com）は手順どおり。履歴は書き換えていない。"
 }
