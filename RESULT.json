@@ -17,5 +17,5 @@
  "metrics": {
   "arena_oppblind/oppblind_w02.jsonl": 120
  },
- "notes": ""
+ "notes": "119/120 pairs scored (1 void pair); wr 0.4412 CI95 [0.3708,0.5115], Elo -41.1 (candidate: opp-blind vs baseline r13d). No code changes."
 }
