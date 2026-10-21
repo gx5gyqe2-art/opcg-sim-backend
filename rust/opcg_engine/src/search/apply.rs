@@ -9,7 +9,7 @@ use crate::rules::pending::{get_pending_request, pending_actor_action};
 use crate::state::EngineError;
 use serde_json::{json, Value};
 
-use super::{adapter, Move};
+use super::{adapter, Move, MoveRef, PayloadRef};
 
 /// Python `cpu_ai._DRAIN_LIMIT`（クローン上で自分側対話を解決する最大回数）。
 pub const DRAIN_LIMIT: usize = 12;
@@ -42,21 +42,23 @@ pub fn drain_own_interactions(
         ) {
             return Ok(());
         }
-        // 要求と既定解決は 1 回だけ作り、分岐の判定にも渡す（`selection_moves` が中で作るのと同じ値:
-        // 間で盤面を書き換えない・`get_pending_request` の正規化は冪等）。
+        // 探索モードでは分岐可能な選択もドレインしない（探索ノードとして残す）。
+        // 要求は 1 度だけ読み、判定は候補を組まずに数える（`adapter::selection_branch_exists`
+        // ＝`selection_moves(..).is_some()`。`get_pending_request` の書き換えは戦闘フェイズの
+        // 正規化だけ＝冪等なので、判定の後に読み直した値と同じ）。
         let pending = get_pending_request(s, masters, false);
+        if stop_at_select
+            && pending
+                .as_ref()
+                .is_some_and(|p| adapter::selection_branch_exists(p, actor))
+        {
+            return Ok(());
+        }
         let payload = crate::effects::interact::default_interaction_payload(
             s.state(),
             masters,
             pending.as_ref(),
         );
-        // 探索モードでは分岐可能な選択もドレインしない（探索ノードとして残す）。
-        if stop_at_select
-            && adapter::selection_moves_with(s, masters, actor, pending.as_ref(), Some(&payload))
-                .is_some()
-        {
-            return Ok(());
-        }
         match crate::rules::actions::apply_game_action(
             s,
             masters,
@@ -84,9 +86,9 @@ pub fn apply_move_inplace(
 ) -> Result<(), EngineError> {
     let _prof = crate::prof::enter(crate::prof::Cat::Apply);
     let bad = |m: String| EngineError::BadPayload(m);
-    let action_type = mv
-        .get("action_type")
-        .and_then(Value::as_str)
+    let r = MoveRef::of(mv);
+    let action_type = r
+        .action_type_str()
         .ok_or_else(|| bad("move: 'action_type' がありません。".into()))?;
 
     if action_type == "SETUP_BOX" {
@@ -97,25 +99,19 @@ pub fn apply_move_inplace(
 
     if action_type == "DON_BOX" {
         let null = Value::Null;
-        let payload = mv.get("payload").unwrap_or(&null);
-        let uuid = payload.get("uuid").cloned().unwrap_or(Value::Null);
-        let don_k = payload.get("don_k").and_then(Value::as_i64).unwrap_or(0);
-        for _ in 0..don_k.max(0) {
-            crate::rules::actions::apply_game_action(
-                s,
-                masters,
-                actor,
-                "ATTACH_DON",
-                &json!({"uuid": uuid}),
-            )?;
-            drain_own_interactions(s, masters, actor, stop_at_select)?;
+        let p = PayloadRef::of(r.payload);
+        let uuid = p.uuid.unwrap_or(&null);
+        let don_k = p.don_k.and_then(Value::as_i64).unwrap_or(0);
+        if don_k > 0 {
+            // 付与の payload は k 回とも同じ＝1 度だけ組む。
+            let attach = json!({"uuid": uuid});
+            for _ in 0..don_k {
+                crate::rules::actions::apply_game_action(s, masters, actor, "ATTACH_DON", &attach)?;
+                drain_own_interactions(s, masters, actor, stop_at_select)?;
+            }
         }
-        let target_ids = payload
-            .get("target_ids")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-        if !target_ids.is_empty() {
+        let target_ids = p.target_ids.and_then(Value::as_array).filter(|t| !t.is_empty());
+        if let Some(target_ids) = target_ids {
             crate::rules::actions::apply_game_action(
                 s,
                 masters,
@@ -129,17 +125,23 @@ pub fn apply_move_inplace(
     }
 
     // Python は `move["kind"]` を添字で読む＝欄が無ければ KeyError（＝例外手）。
-    let kind = mv
-        .get("kind")
+    let kind = r
+        .kind
         .and_then(Value::as_str)
         .ok_or_else(|| bad("move: 'kind' がありません。".into()))?;
     if kind == "battle" {
-        let card_uuid = mv.get("card_uuid").and_then(Value::as_str);
+        let card_uuid = r.card_uuid.and_then(Value::as_str);
         crate::rules::actions::apply_battle_action(s, masters, actor, action_type, card_uuid)?;
     } else {
-        let empty = Value::Object(serde_json::Map::new());
-        let payload = mv.get("payload").unwrap_or(&empty);
-        crate::rules::actions::apply_game_action(s, masters, actor, action_type, payload)?;
+        match r.payload {
+            Some(payload) => {
+                crate::rules::actions::apply_game_action(s, masters, actor, action_type, payload)?
+            }
+            None => {
+                let empty = Value::Object(serde_json::Map::new());
+                crate::rules::actions::apply_game_action(s, masters, actor, action_type, &empty)?
+            }
+        }
     }
     drain_own_interactions(s, masters, actor, stop_at_select)
 }

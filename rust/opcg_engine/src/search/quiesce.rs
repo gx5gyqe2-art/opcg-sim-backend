@@ -26,9 +26,8 @@ use crate::net::{nrel, Candidate, LoadedNet};
 use crate::state::EngineError;
 use serde_json::{json, Value};
 use std::cell::RefCell;
-use crate::fxhash::FxHashMap;
 
-use super::{adapter, apply, LeafRollout, Move, SearchOptions};
+use super::{adapter, apply, LeafRollout, Move, MoveRef, PayloadRef, SearchOptions};
 
 /// Python `config.QUIESCE_MAX_PLIES`。
 pub const QUIESCE_MAX_PLIES: usize = 12;
@@ -264,14 +263,15 @@ impl<'a> Ctx<'a> {
             to_move,
             &self.enc_opts(),
         )?;
-        // 関係を遮断したネット（`ablate rel`）は R を 1 か所も読まない（幹・方策の頭とも `!no_rel` のときだけ
-        // 読む）＝0 埋めの配列を作らない。読むネットには今までどおり 0 を埋める。
-        let reads_rel = !self.net.weights.ablated("rel");
-        if reads_rel && enc.rel_om.is_empty() {
-            enc.rel_om = vec![0.0; N_OWN * N_OPP * R_DIM];
-        }
-        if reads_rel && enc.rel_oo.is_empty() {
-            enc.rel_oo = vec![0.0; N_OWN * N_OWN * R_DIM];
+        // 関係 R を遮断したネット（`ablate={"rel"}`＝a1 以降の NRel）は R を 1 度も読まない
+        // （`net::nrel` の読み・長さの検査はどちらも遮断時に飛ばす）＝0 埋めを作らない。
+        if !self.net.weights.ablated("rel") {
+            if enc.rel_om.is_empty() {
+                enc.rel_om = vec![0.0; N_OWN * N_OPP * R_DIM];
+            }
+            if enc.rel_oo.is_empty() {
+                enc.rel_oo = vec![0.0; N_OWN * N_OWN * R_DIM];
+            }
         }
         // ネットが読むのは先頭 22 枠（Python `ci = base["card_idx"][:N_TOK]`）。
         enc.card_idx.truncate(N_TOK);
@@ -317,35 +317,27 @@ impl<'a> Ctx<'a> {
         let prof_cand = crate::prof::enter(crate::prof::Cat::CandRows);
         let rows = setup_row_map(legal);
         let cand_target = self.net.weights.cand_target();
-        let refs: Vec<CandOwned> = {
+        let cands = {
             let state = s.state();
             // 効果の発生源（対象選択の候補行の主体・§20.9 の A）。中断していなければ None。
-            let src: Option<String> = if cand_target {
+            let src: Option<&str> = if cand_target {
                 state
                     .active_interaction()
                     .and_then(|it| it.source_card)
-                    .map(|c| state.card(c).uuid.clone())
+                    .map(|c| state.card(c).uuid.as_str())
             } else {
                 None
             };
             let slots = slot_index(state, me);
             let uidx = uuid_index(state);
-            rows.heads
+            let refs: Vec<nrel::CandRef<'_>> = rows
+                .heads
                 .iter()
-                .map(|i| {
-                    cand_owned(
-                        state,
-                        self.masters,
-                        &uidx,
-                        &slots,
-                        &legal[*i],
-                        src.as_deref(),
-                        cand_target,
-                    )
-                })
-                .collect()
+                .map(|i| cand_owned(state, self.masters, &uidx, &slots, &legal[*i], src, cand_target))
+                .collect();
+            self.cand_rows(&enc, &refs)
         };
-        let cands = match self.cand_rows(&enc, &refs) {
+        let cands = match cands {
             Ok(c) => c,
             Err(e @ EngineError::Unimplemented(_)) => return Err(e),
             Err(_) => return Ok((None, None)),
@@ -426,27 +418,9 @@ impl<'a> Ctx<'a> {
     fn cand_rows(
         &self,
         enc: &crate::encode::Encoding,
-        refs: &[CandOwned],
+        refs: &[nrel::CandRef<'_>],
     ) -> Result<Vec<Candidate>, EngineError> {
-        let borrowed: Vec<nrel::CandRef<'_>> = refs
-            .iter()
-            .map(|r| nrel::CandRef {
-                action_type: r.action_type.as_str(),
-                don_k: r.don_k,
-                has_target: r.has_target,
-                card_id: r.card_id.as_deref(),
-                target_card_id: r.target_card_id.as_deref(),
-                si: r.si,
-                ti: r.ti,
-            })
-            .collect();
-        nrel::cand_rows(
-            &self.net.tab,
-            &self.net.statics,
-            self.vocab(),
-            enc,
-            &borrowed,
-        )
+        nrel::cand_rows(&self.net.tab, &self.net.statics, self.vocab(), enc, refs)
     }
 }
 
@@ -466,8 +440,9 @@ fn setup_row_map(legal: &[Move]) -> RowMap {
     let mut row_of: Vec<usize> = Vec::with_capacity(legal.len());
     let mut seen: Vec<(&Value, usize)> = Vec::new();
     for (i, mv) in legal.iter().enumerate() {
-        let base = if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
-            mv.get("payload").and_then(|p| p.get("base"))
+        let r = MoveRef::of(mv);
+        let base = if r.action_type_str() == Some("SETUP_BOX") {
+            PayloadRef::of(r.payload).base
         } else {
             None
         };
@@ -484,24 +459,18 @@ fn setup_row_map(legal: &[Move]) -> RowMap {
     RowMap { heads, row_of }
 }
 
-/// 手 1 件から解けた識別（`nrel::CandRef` の所有版）。
-pub struct CandOwned {
-    pub action_type: String,
-    pub don_k: Option<f64>,
-    pub has_target: bool,
-    pub card_id: Option<String>,
-    pub target_card_id: Option<String>,
-    pub si: i32,
-    pub ti: i32,
-}
+/// uuid → 値の表（[`crate::fxhash::FxHasher`]＝引くだけの表・SipHash より軽い。引いた値は同じ。
+/// 並びを外へ出す [`slot_index`] の呼び出し元は、もともと実行ごとに並びが乱れる
+/// `RandomState` だった＝並びに意味は無い）。
+pub type UuidMap<'a, V> = crate::fxhash::FxHashMap<&'a str, V>;
 
 /// Python `n_eff._uuid_index`（uuid → カード。**ゾーンの範囲と優先順を Python に揃える**:
 /// リーダー → 場 → 手札 → トラッシュ → ライフ → ステージ、p1 が先・先勝ち）。
 ///
 /// 全カードを走査する [`crate::ops::find_card_by_uuid`] とは範囲が違う（山札・一時ゾーンを
 /// 含めない）＝方策の `card_id` 解決はこちらを使う。
-pub fn uuid_index(state: &GameState) -> FxHashMap<&str, CardIdx> {
-    let mut idx: FxHashMap<&str, CardIdx> = FxHashMap::default();
+pub fn uuid_index(state: &GameState) -> UuidMap<'_, CardIdx> {
+    let mut idx: UuidMap<'_, CardIdx> = UuidMap::default();
     for seat in [Seat::P1, Seat::P2] {
         let p = state.player(seat);
         let zones = p
@@ -521,7 +490,7 @@ pub fn uuid_index(state: &GameState) -> FxHashMap<&str, CardIdx> {
 }
 
 /// Python `n_rel_feat._slots` の逆写像（uuid → 22 枠 index）。
-pub fn slot_index(state: &GameState, me: Seat) -> FxHashMap<&str, i32> {
+pub fn slot_index(state: &GameState, me: Seat) -> UuidMap<'_, i32> {
     let opp = me.other();
     let mut slots: Vec<Option<CardIdx>> = Vec::with_capacity(N_TOK);
     slots.push(state.player(me).leader);
@@ -535,7 +504,7 @@ pub fn slot_index(state: &GameState, me: Seat) -> FxHashMap<&str, i32> {
     for k in 0..crate::encode::MAX_HAND {
         slots.push(state.player(me).hand.get(k).copied());
     }
-    let mut out: FxHashMap<&str, i32> = FxHashMap::default();
+    let mut out: UuidMap<'_, i32> = UuidMap::default();
     for (i, c) in slots.iter().enumerate() {
         if let Some(c) = c {
             // Python は dict 内包＝**後勝ち**（同じ uuid が 2 枠に出ることは無いので実質同じ）
@@ -548,7 +517,7 @@ pub fn slot_index(state: &GameState, me: Seat) -> FxHashMap<&str, i32> {
 /// 効果の対象選択の手（対象は `payload.target_ids` ではなく `selected_uuids` に入る）。
 pub const SELECT_AT: &str = "RESOLVE_EFFECT_SELECTION";
 
-/// 手 → `CandOwned`（Python `n_rel.cand_ids`／`_cand_rows` の uuid 解決と同じ規則）。
+/// 手 → 候補行の識別 `nrel::CandRef`（手・盤面・マスターを借りる。Python `n_rel.cand_ids`／`_cand_rows` の uuid 解決と同じ規則）。
 ///
 /// 主体は `card_uuid` → `payload.uuid` の順（Python の `mv.get("card_uuid") or p.get("uuid")`）、
 /// 対象は `payload.target_ids[0]`。引けない uuid は `card_id=None`（＝vocab の PAD 0）。
@@ -558,54 +527,55 @@ pub const SELECT_AT: &str = "RESOLVE_EFFECT_SELECTION";
 /// （`src_uuid`＝中断している対話の `source_card_uuid`）にする。これが無いと「A を KO」と
 /// 「B を KO」が同じ候補行になり P が対象を区別できない。v13 のネットでは `false`＝
 /// 今までどおり（1 bit も変わらない）。
-pub fn cand_owned(
+pub fn cand_owned<'a>(
     state: &GameState,
-    masters: &MasterTable,
-    uidx: &FxHashMap<&str, CardIdx>,
-    slots: &FxHashMap<&str, i32>,
-    mv: &Move,
+    masters: &'a MasterTable,
+    uidx: &UuidMap<'_, CardIdx>,
+    slots: &UuidMap<'_, i32>,
+    mv: &'a Move,
     src_uuid: Option<&str>,
     cand_target: bool,
-) -> CandOwned {
-    let null = Value::Null;
+) -> nrel::CandRef<'a> {
+    // 手と payload の欄は 1 度の走査で読む（`MoveRef`／`PayloadRef`＝`get` と同じ値）。
+    let r = MoveRef::of(mv);
+    let p = PayloadRef::of(r.payload);
     // 準備箱（§20.7.2）はネットに**素の手として**見せる（`SETUP_BOX` は語彙に無い＝
     // どの枝も同じ PAD 行になってしまう）。枝ごとの配分は `Ctx::setup_branch_shares`
     // （§20.7.8 の 3＝行は 1 本に畳んでから、その P を対象選択の P で割り振る）。
-    if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
-        if let Some(base) = mv.get("payload").and_then(|p| p.get("base")) {
+    if r.action_type_str() == Some("SETUP_BOX") {
+        if let Some(base) = p.base {
             return cand_owned(state, masters, uidx, slots, base, src_uuid, cand_target);
         }
     }
-    let at = mv.get("action_type").and_then(Value::as_str).unwrap_or("");
-    let p = mv.get("payload").unwrap_or(&null);
-    let mut su = mv
-        .get("card_uuid")
+    let at = r.action_type_str().unwrap_or("");
+    let mut su = r
+        .card_uuid
         .and_then(Value::as_str)
-        .or_else(|| p.get("uuid").and_then(Value::as_str));
+        .or_else(|| p.uuid.and_then(Value::as_str));
     let (has_target, tu) = if cand_target && at == SELECT_AT {
         if su.is_none() {
             su = src_uuid;
         }
         let sel = p
-            .get("selected_uuids")
+            .selected_uuids
             .and_then(Value::as_array)
             .and_then(|a| a.first())
             .and_then(Value::as_str);
         (sel.is_some(), sel)
     } else {
-        let tids = p.get("target_ids").and_then(Value::as_array);
+        let tids = p.target_ids.and_then(Value::as_array);
         (
             tids.map(|a| !a.is_empty()).unwrap_or(false),
             tids.and_then(|a| a.first()).and_then(Value::as_str),
         )
     };
-    let card_id = |u: Option<&str>| -> Option<String> {
+    let card_id = |u: Option<&str>| -> Option<&'a str> {
         let c = *uidx.get(u?)?;
-        Some(masters.get(state.card(c).master).card_id.clone())
+        Some(masters.get(state.card(c).master).card_id.as_str())
     };
-    CandOwned {
-        action_type: at.to_owned(),
-        don_k: p.get("don_k").and_then(Value::as_f64),
+    nrel::CandRef {
+        action_type: at,
+        don_k: p.don_k.and_then(Value::as_f64),
         has_target,
         card_id: card_id(su),
         // Python は `if tids:` のときだけ対象の card_id を引く
@@ -783,9 +753,8 @@ pub fn resolved_branch_values(
     let mut vals = Vec::with_capacity(legal.len());
     for mv in legal {
         s.rng.restore(&base_rng);
-        let saved = s.swap_events(Vec::new());
         let mut unimplemented: Option<EngineError> = None;
-        let v = s.transaction(|s| {
+        let v = s.discard_events(|s| s.transaction(|s| {
             let out = (|| -> Result<f64, EngineError> {
                 apply::apply_move_inplace(s, ctx.masters, name, mv, true)?;
                 resolve_battle_inplace(
@@ -801,8 +770,7 @@ pub fn resolved_branch_values(
                 }
                 Err(_) => None,
             }
-        });
-        s.swap_events(saved);
+        }));
         if let Some(e) = unimplemented {
             return Err(e);
         }
@@ -1088,32 +1056,26 @@ mod tests {
         );
         let slots = slot_index(&state, Seat::P1);
         let uidx = uuid_index(&state);
-        let row = |sel: &str, v14: bool| {
-            cand_owned(
-                &state,
-                &masters,
-                &uidx,
-                &slots,
-                &select_move(sel),
-                Some(su.as_str()),
-                v14,
-            )
+        let (ma, mb) = (select_move(&ua), select_move(&ub));
+        let row = |mv: &Move, v14: bool| {
+            let r = cand_owned(&state, &masters, &uidx, &slots, mv, Some(su.as_str()), v14);
+            (r.has_target, r.si, r.ti, r.card_id.map(str::to_owned))
         };
         // v14: 対象＝selected_uuids[0]・主体＝効果の発生源（枠も引ける）
-        let ra = row(&ua, true);
-        let rb = row(&ub, true);
-        assert!(ra.has_target && rb.has_target);
-        assert_eq!(ra.si, slots[su.as_str()]);
-        assert_eq!(ra.ti, slots[ua.as_str()]);
-        assert_eq!(rb.ti, slots[ub.as_str()]);
-        assert_ne!(ra.ti, rb.ti, "A と B が同じ行になっている");
+        let ra = row(&ma, true);
+        let rb = row(&mb, true);
+        assert!(ra.0 && rb.0);
+        assert_eq!(ra.1, slots[su.as_str()]);
+        assert_eq!(ra.2, slots[ua.as_str()]);
+        assert_eq!(rb.2, slots[ub.as_str()]);
+        assert_ne!(ra.2, rb.2, "A と B が同じ行になっている");
         // v13（r3／a1）: 今までどおり対象なし・主体なし＝2 つは同じ行
-        let oa = row(&ua, false);
-        let ob = row(&ub, false);
-        assert!(!oa.has_target && !ob.has_target);
-        assert_eq!((oa.si, oa.ti), (-1, -1));
-        assert_eq!((oa.si, oa.ti), (ob.si, ob.ti));
-        assert_eq!(oa.card_id, ob.card_id);
+        let oa = row(&ma, false);
+        let ob = row(&mb, false);
+        assert!(!oa.0 && !ob.0);
+        assert_eq!((oa.1, oa.2), (-1, -1));
+        assert_eq!((oa.1, oa.2), (ob.1, ob.2));
+        assert_eq!(oa.3, ob.3);
     }
 
     /// `selected_uuids` が空（＝「選ばない」）なら v14 でも対象なしのまま。

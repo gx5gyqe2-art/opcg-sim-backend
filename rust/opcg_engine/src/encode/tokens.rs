@@ -125,16 +125,26 @@ impl Profile {
 }
 
 /// マスター単位のキャッシュ（Python のモジュール辞書 `_PROFILES`／`_ROLES`／`_THR_ROWS`／`_STATIC`）。
+///
+/// 符号化 1 回で 100 回前後引かれるので、表はマスター添字で直接引く（`slot[mi]`＝`profiles` の
+/// 添字＋1・0＝未作成。ハッシュを回さない）。中身はマスターだけの関数＝引いた値は同じ。
 #[derive(Debug, Default)]
 pub struct ProfileCache {
-    map: crate::fxhash::FxHashMap<MasterIdx, Profile>,
+    slot: Vec<u32>,
+    profiles: Vec<Profile>,
 }
 
 impl ProfileCache {
     pub fn get(&mut self, masters: &MasterTable, mi: MasterIdx) -> &Profile {
-        self.map
-            .entry(mi)
-            .or_insert_with(|| build_profile(masters, mi))
+        let i = mi as usize;
+        if i >= self.slot.len() {
+            self.slot.resize(i + 1, 0);
+        }
+        if self.slot[i] == 0 {
+            self.profiles.push(build_profile(masters, mi));
+            self.slot[i] = self.profiles.len() as u32;
+        }
+        &self.profiles[self.slot[i] as usize - 1]
     }
 }
 
@@ -694,18 +704,16 @@ pub fn encode_rel(
         let mi = s.state().card(card).master;
         let m = masters.get(mi);
         let ty = m.ty;
-        let (ret_norm, trig_ko, trig_atk, trig_oatk, counter_event, conds, act_idx) = {
-            let p = cache.get(masters, mi);
-            (
-                p.ret_norm(),
-                f32::from(p.trig_ko),
-                f32::from(p.trig_attack),
-                f32::from(p.trig_opp_attack),
-                p.counter_event,
-                p.conds.clone(),
-                p.act_idx.clone(),
-            )
-        };
+        // 要約はキャッシュから借りる（`conds`／`act_idx` を複製しない）。
+        let p = cache.get(masters, mi);
+        let (ret_norm, trig_ko, trig_atk, trig_oatk, counter_event) = (
+            p.ret_norm(),
+            f32::from(p.trig_ko),
+            f32::from(p.trig_attack),
+            f32::from(p.trig_opp_attack),
+            p.counter_event,
+        );
+        let (conds, act_idx) = (&p.conds, &p.act_idx);
         let is_unit = ty == CardType::Leader || ty == CardType::Character;
         pw[i] = if is_unit {
             s.state().card(card).get_power(m, owner_turn)
@@ -746,7 +754,7 @@ pub fn encode_rel(
         tok[b + 16] = trig_oatk;
         if !conds.is_empty() {
             let owner = if own_side { me } else { opp };
-            let flags = cond_flags(s, masters, owner, card, &conds);
+            let flags = cond_flags(s, masters, owner, card, conds);
             tok[b + 10..b + 14].copy_from_slice(&flags);
         }
         if own_side && z != ZoneKind::Hand && has_pool_arr {
@@ -764,7 +772,7 @@ pub fn encode_rel(
         };
         // `act_avail`: 未使用の【起動メイン】を持つか（場の枠のみ）。
         tok[b + 21] = if on_board {
-            act_avail(s, card, &act_idx)
+            act_avail(s, card, act_idx)
         } else {
             0.0
         };
