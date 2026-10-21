@@ -13,7 +13,7 @@
   ]
  },
  "metrics": {
-  "arena_rt09/rt09_w01.jsonl": 40
+  "arena_rt09/rt09_w01.jsonl": 60
  },
  "notes": "run in /home/user/opcg-sim-backend (pre-existing clone); play-rethink 085308b"
 }
