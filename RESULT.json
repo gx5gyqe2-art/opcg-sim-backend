@@ -13,7 +13,7 @@
   ]
  },
  "metrics": {
-  "arena_rt09/rt09_w06.jsonl": 60
+  "arena_rt09/rt09_w06.jsonl": 80
  },
  "notes": "ran in /home/user/opcg-sim-backend (existing clone) instead of ~/opcg-sim-backend; no remote arena branch existed at start"
 }
