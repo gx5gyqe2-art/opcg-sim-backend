@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_ismfix/ismfix_w12.jsonl": 110
+  "arena_ismfix/ismfix_w12.jsonl": 120
  },
  "notes": "repo at /home/user/opcg-sim-backend symlinked as ~/opcg-sim-backend; no deviations"
 }
