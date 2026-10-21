@@ -15,7 +15,7 @@
   ]
  },
  "metrics": {
-  "arena_rdnet/rdnet_w06.jsonl": 30
+  "arena_rdnet/rdnet_w06.jsonl": 40
  },
  "notes": "worked in /home/user/opcg-sim-backend (not ~); code=本線 interpreted as claude/cpu-spec-improvements-yw91jd"
 }
