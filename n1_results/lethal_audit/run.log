@@ -91,3 +91,161 @@ todo 939 (done 61) -> n1_results/lethal_audit/points_3011000_1000.jsonl
 [28/939] seed=3011087 pts=51 sec=131.4 winner=p1
 [29/939] seed=3011090 pts=66 sec=99.0 winner=p1
 [30/939] seed=3011089 pts=35 sec=170.4 winner=p2
+[31/939] seed=3011092 pts=53 sec=112.0 winner=p1
+[32/939] seed=3011093 pts=65 sec=159.7 winner=p2
+[33/939] seed=3011094 pts=59 sec=168.5 winner=p2
+[34/939] seed=3011096 pts=78 sec=110.1 winner=p2
+[35/939] seed=3011095 pts=59 sec=177.8 winner=p1
+[36/939] seed=3011091 pts=104 sec=399.9 winner=p1
+[37/939] seed=3011097 pts=54 sec=154.0 winner=p1
+[38/939] seed=3011098 pts=61 sec=152.4 winner=p1
+[39/939] seed=3011100 pts=44 sec=149.5 winner=p1
+[40/939] seed=3011099 pts=47 sec=222.8 winner=p1
+[41/939] seed=3011101 pts=45 sec=147.9 winner=p1
+[42/939] seed=3011103 pts=44 sec=51.1 winner=p2
+[43/939] seed=3011102 pts=65 sec=132.7 winner=p2
+[44/939] seed=3011107 pts=41 sec=65.7 winner=p2
+[45/939] seed=3011106 pts=61 sec=84.0 winner=p2
+[46/939] seed=3011104 pts=58 sec=219.6 winner=p1
+[47/939] seed=3011108 pts=47 sec=132.6 winner=p2
+[48/939] seed=3011109 pts=35 sec=139.7 winner=p1
+[49/939] seed=3011110 pts=48 sec=70.1 winner=p2
+[50/939] seed=3011105 pts=98 sec=369.8 winner=p1
+[51/939] seed=3011113 pts=81 sec=88.2 winner=p1
+[52/939] seed=3011111 pts=60 sec=160.3 winner=p1
+[53/939] seed=3011112 pts=50 sec=150.0 winner=p2
+[54/939] seed=3011114 pts=78 sec=98.9 winner=p1
+[55/939] seed=3011117 pts=41 sec=59.7 winner=p1
+[56/939] seed=3011115 pts=85 sec=118.3 winner=p1
+[57/939] seed=3011116 pts=43 sec=93.7 winner=p1
+[58/939] seed=3011121 pts=35 sec=56.5 winner=p2
+[59/939] seed=3011118 pts=24 sec=115.0 winner=p1
+[60/939] seed=3011122 pts=55 sec=87.9 winner=p1
+[61/939] seed=3011120 pts=30 sec=200.9 winner=p2
+[62/939] seed=3011123 pts=47 sec=160.2 winner=p1
+[63/939] seed=3011119 pts=66 sec=267.0 winner=p2
+[64/939] seed=3011124 pts=89 sec=161.7 winner=p1
+[65/939] seed=3011125 pts=41 sec=136.4 winner=p1
+[66/939] seed=3011126 pts=58 sec=124.3 winner=p2
+[67/939] seed=3011127 pts=52 sec=130.7 winner=p1
+[68/939] seed=3011129 pts=56 sec=132.7 winner=p2
+[69/939] seed=3011131 pts=54 sec=103.9 winner=p2
+[70/939] seed=3011130 pts=66 sec=162.2 winner=p1
+[71/939] seed=3011133 pts=23 sec=57.4 winner=p2
+[72/939] seed=3011128 pts=63 sec=232.2 winner=p2
+[73/939] seed=3011136 pts=35 sec=110.4 winner=p2
+[74/939] seed=3011134 pts=39 sec=139.3 winner=p1
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+                    ~~~~^^^^^^^^^^^^^^^
+  File "/home/user/opcg-sim-backend/tests/scripts/lethal_audit.py", line 467, in play_one
+    r = DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, observer=obs)
+  File "/home/user/opcg-sim-backend/opcg_sim/loop/driver.py", line 108, in run_game
+    observer(game, name, turn, steps, out, move)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/opcg-sim-backend/tests/scripts/lethal_audit.py", line 457, in obs
+    ko = judge(game, name, a.sec, a.max_nodes, memo, a.char_attacks)
+  File "/home/user/opcg-sim-backend/tests/scripts/lethal_audit.py", line 343, in judge
+    r: Optional[bool] = s.win(game.fork())
+                        ~~~~~^^^^^^^^^^^^^
+  File "/home/user/opcg-sim-backend/tests/scripts/lethal_audit.py", line 205, in win
+    return self._solve(game, None)
+           ~~~~~~~~~~~^^^^^^^^^^^^
+  File "/home/user/opcg-sim-backend/tests/scripts/lethal_audit.py", line 282, in _solve
+    r = self._solve(child, nxt)
+  File "/home/user/opcg-sim-backend/tests/scripts/lethal_audit.py", line 282, in _solve
+    r = self._solve(child, nxt)
+  File "/home/user/opcg-sim-backend/tests/scripts/lethal_audit.py", line 282, in _solve
+    r = self._solve(child, nxt)
+  [Previous line repeated 972 more times]
+  File "/home/user/opcg-sim-backend/tests/scripts/lethal_audit.py", line 246, in _solve
+    moves = expand(game, actor, pend)
+  File "/home/user/opcg-sim-backend/tests/scripts/lethal_audit.py", line 139, in expand
+    live = _in_play(game)
+  File "/home/user/opcg-sim-backend/tests/scripts/lethal_audit.py", line 109, in _in_play
+    h = json.loads(game.hidden_json())
+  File "/usr/lib/python3.13/json/__init__.py", line 352, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/usr/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+RecursionError: maximum recursion depth exceeded
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/user/opcg-sim-backend/tests/scripts/lethal_audit.py", line 608, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/opcg-sim-backend/tests/scripts/lethal_audit.py", line 604, in main
+    (cmd_run if a.cmd == "run" else cmd_summarize)(a)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/home/user/opcg-sim-backend/tests/scripts/lethal_audit.py", line 490, in cmd_run
+    for i, recs in enumerate(pool.imap_unordered(play_one, [(s, a) for s in seeds])):
+                   ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/multiprocessing/pool.py", line 873, in next
+    raise value
+RecursionError: maximum recursion depth exceeded
+todo 865 (done 135) -> n1_results/lethal_audit/points_3011000_1000.jsonl
+[1/865] seed=3011137 pts=42 sec=73.2 winner=p1
+[2/865] seed=3011139 pts=55 sec=123.2 winner=p1
+[3/865] seed=3011138 pts=99 sec=213.1 winner=p2
+[4/865] seed=3011132 pts=57 sec=223.6 winner=p1
+[5/865] seed=3011135 pts=88 sec=233.1 winner=p1
+[6/865] seed=3011142 pts=33 sec=85.9 winner=p1
+[7/865] seed=3011143 pts=80 sec=82.1 winner=p2
+[8/865] seed=3011144 pts=24 sec=63.9 winner=p2
+[9/865] seed=3011140 pts=63 sec=180.7 winner=p2
+[10/865] seed=3011141 pts=72 sec=177.0 winner=p2
+[11/865] seed=3011147 pts=16 sec=26.3 winner=p1
+[12/865] seed=3011148 pts=32 sec=38.8 winner=p2
+[13/865] seed=3011149 pts=39 sec=48.1 winner=p2
+[14/865] seed=3011145 pts=65 sec=182.2 winner=p1
+[15/865] seed=3011151 pts=35 sec=137.5 winner=p1
+[16/865] seed=3011150 pts=111 sec=160.9 winner=p2
+[17/865] seed=3011154 pts=18 sec=18.9 winner=p1
+[18/865] seed=3011155 pts=37 sec=32.4 winner=p1
+[19/865] seed=3011152 pts=49 sec=153.5 winner=p1
+[20/865] seed=3011146 pts=124 sec=283.5 winner=p2
+[21/865] seed=3011156 pts=26 sec=17.4 winner=p1
+[22/865] seed=3011158 pts=21 sec=34.1 winner=p1
+[23/865] seed=3011153 pts=47 sec=140.7 winner=p1
+[24/865] seed=3011157 pts=77 sec=133.0 winner=p2
+[25/865] seed=3011159 pts=30 sec=152.8 winner=p2
+[26/865] seed=3011161 pts=31 sec=100.5 winner=p1
+[27/865] seed=3011160 pts=77 sec=162.9 winner=p1
+[28/865] seed=3011162 pts=58 sec=126.0 winner=p1
+[29/865] seed=3011163 pts=34 sec=101.6 winner=p1
+[30/865] seed=3011165 pts=71 sec=79.6 winner=p1
+[31/865] seed=3011164 pts=51 sec=107.0 winner=p2
+[32/865] seed=3011167 pts=48 sec=91.1 winner=p1
+[33/865] seed=3011170 pts=17 sec=10.2 winner=p1
+[34/865] seed=3011166 pts=52 sec=125.1 winner=p2
+[35/865] seed=3011168 pts=47 sec=108.5 winner=p1
+[36/865] seed=3011169 pts=58 sec=164.7 winner=p1
+[37/865] seed=3011172 pts=48 sec=74.8 winner=p1
+[38/865] seed=3011173 pts=24 sec=82.7 winner=p2
+[39/865] seed=3011176 pts=23 sec=39.2 winner=p2
+[40/865] seed=3011175 pts=45 sec=79.3 winner=p1
+[41/865] seed=3011178 pts=33 sec=62.7 winner=p1
+[42/865] seed=3011171 pts=62 sec=262.2 winner=p1
+[43/865] seed=3011174 pts=68 sec=210.8 winner=p1
+[44/865] seed=3011177 pts=72 sec=175.5 winner=p2
+[45/865] seed=3011181 pts=17 sec=45.0 winner=p1
+[46/865] seed=3011180 pts=48 sec=89.5 winner=p2
+[47/865] seed=3011179 pts=63 sec=157.6 winner=p2
+[48/865] seed=3011184 pts=38 sec=74.6 winner=p1
+[49/865] seed=3011186 pts=47 sec=25.3 winner=p1
+[50/865] seed=3011182 pts=47 sec=147.3 winner=p1
+[51/865] seed=3011187 pts=39 sec=51.8 winner=p2
+[52/865] seed=3011188 pts=30 sec=33.7 winner=p2
+[53/865] seed=3011190 pts=21 sec=11.9 winner=p1
+[54/865] seed=3011185 pts=57 sec=138.1 winner=p1
+[55/865] seed=3011183 pts=56 sec=190.1 winner=p1
+[56/865] seed=3011193 pts=33 sec=26.0 winner=p1
+[57/865] seed=3011189 pts=37 sec=86.0 winner=p1
