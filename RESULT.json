@@ -17,5 +17,5 @@
  "metrics": {
   "arena_rdw2/rdw2_w01.jsonl": 120
  },
- "notes": ""
+ "notes": "ワーカー再起動でプロセスが 70 ペア付近で一度止まり、71 ペア目から同じスクリプトで再開（arena_shard は終えたペアを飛ばす）。コードは変更なし。CODE=本線 claude/cpu-spec-improvements-yw91jd（14558d9）。"
 }
