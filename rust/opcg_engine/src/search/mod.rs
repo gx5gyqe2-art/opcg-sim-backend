@@ -42,6 +42,72 @@ use serde_json::Value;
 /// 探索用の手（Python の dict と同じ JSON）。
 pub type Move = Value;
 
+/// 手（[`Move`]）の欄を **1 度の走査**で読んだ借用ビュー（WP `rs-speed-b`）。
+///
+/// `Value::get` は欄ごとに鍵を SipHash で引く（`serde_json` の `preserve_order` は `IndexMap`）。
+/// 探索の適用・候補行は 1 手から 3〜6 欄を読むので、数欄の小さな dict を 1 度なめて鍵を文字列で
+/// 突き合わせる方が軽い。欄が無ければ `None`（`get` と同じ）・中身は借りるだけ＝読む値は同じ。
+#[derive(Debug, Default, Clone, Copy)]
+pub struct MoveRef<'a> {
+    pub kind: Option<&'a Value>,
+    pub action_type: Option<&'a Value>,
+    pub payload: Option<&'a Value>,
+    pub card_uuid: Option<&'a Value>,
+}
+
+impl<'a> MoveRef<'a> {
+    pub fn of(mv: &'a Move) -> MoveRef<'a> {
+        let mut r = MoveRef::default();
+        if let Some(o) = mv.as_object() {
+            for (k, v) in o {
+                match k.as_str() {
+                    "kind" => r.kind = Some(v),
+                    "action_type" => r.action_type = Some(v),
+                    "payload" => r.payload = Some(v),
+                    "card_uuid" => r.card_uuid = Some(v),
+                    _ => {}
+                }
+            }
+        }
+        r
+    }
+
+    /// `mv.get("action_type").and_then(Value::as_str)`。
+    pub fn action_type_str(&self) -> Option<&'a str> {
+        self.action_type.and_then(Value::as_str)
+    }
+}
+
+/// 手の `payload` の欄を 1 度の走査で読んだ借用ビュー（[`MoveRef`] と同じ考え方）。
+#[derive(Debug, Default, Clone, Copy)]
+pub struct PayloadRef<'a> {
+    pub uuid: Option<&'a Value>,
+    pub target_ids: Option<&'a Value>,
+    pub don_k: Option<&'a Value>,
+    pub selected_uuids: Option<&'a Value>,
+    pub base: Option<&'a Value>,
+}
+
+impl<'a> PayloadRef<'a> {
+    /// `payload` が無い／dict でなければ全部 `None`（`Value::get` と同じ）。
+    pub fn of(payload: Option<&'a Value>) -> PayloadRef<'a> {
+        let mut r = PayloadRef::default();
+        if let Some(o) = payload.and_then(Value::as_object) {
+            for (k, v) in o {
+                match k.as_str() {
+                    "uuid" => r.uuid = Some(v),
+                    "target_ids" => r.target_ids = Some(v),
+                    "don_k" => r.don_k = Some(v),
+                    "selected_uuids" => r.selected_uuids = Some(v),
+                    "base" => r.base = Some(v),
+                    _ => {}
+                }
+            }
+        }
+        r
+    }
+}
+
 /// 葉の打ち切り（§20.7.9・WP `rs-leaf-rollout`）。**既定は [`LeafRollout::None`]＝今までどおり**。
 ///
 /// [`LeafRollout::TurnEnd`] は `mcts::TreeMcts::leaf_value` が戦闘窓／対話窓を解決し終えた後、

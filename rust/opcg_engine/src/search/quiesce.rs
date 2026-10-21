@@ -27,7 +27,7 @@ use crate::state::EngineError;
 use serde_json::{json, Value};
 use std::cell::RefCell;
 
-use super::{adapter, apply, LeafRollout, Move, SearchOptions};
+use super::{adapter, apply, LeafRollout, Move, MoveRef, PayloadRef, SearchOptions};
 
 /// Python `config.QUIESCE_MAX_PLIES`。
 pub const QUIESCE_MAX_PLIES: usize = 12;
@@ -437,8 +437,9 @@ fn setup_row_map(legal: &[Move]) -> RowMap {
     let mut row_of: Vec<usize> = Vec::with_capacity(legal.len());
     let mut seen: Vec<(&Value, usize)> = Vec::new();
     for (i, mv) in legal.iter().enumerate() {
-        let base = if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
-            mv.get("payload").and_then(|p| p.get("base"))
+        let r = MoveRef::of(mv);
+        let base = if r.action_type_str() == Some("SETUP_BOX") {
+            PayloadRef::of(r.payload).base
         } else {
             None
         };
@@ -532,33 +533,34 @@ pub fn cand_owned<'a>(
     src_uuid: Option<&str>,
     cand_target: bool,
 ) -> nrel::CandRef<'a> {
-    let null = Value::Null;
+    // 手と payload の欄は 1 度の走査で読む（`MoveRef`／`PayloadRef`＝`get` と同じ値）。
+    let r = MoveRef::of(mv);
+    let p = PayloadRef::of(r.payload);
     // 準備箱（§20.7.2）はネットに**素の手として**見せる（`SETUP_BOX` は語彙に無い＝
     // どの枝も同じ PAD 行になってしまう）。枝ごとの配分は `Ctx::setup_branch_shares`
     // （§20.7.8 の 3＝行は 1 本に畳んでから、その P を対象選択の P で割り振る）。
-    if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
-        if let Some(base) = mv.get("payload").and_then(|p| p.get("base")) {
+    if r.action_type_str() == Some("SETUP_BOX") {
+        if let Some(base) = p.base {
             return cand_owned(state, masters, uidx, slots, base, src_uuid, cand_target);
         }
     }
-    let at = mv.get("action_type").and_then(Value::as_str).unwrap_or("");
-    let p = mv.get("payload").unwrap_or(&null);
-    let mut su = mv
-        .get("card_uuid")
+    let at = r.action_type_str().unwrap_or("");
+    let mut su = r
+        .card_uuid
         .and_then(Value::as_str)
-        .or_else(|| p.get("uuid").and_then(Value::as_str));
+        .or_else(|| p.uuid.and_then(Value::as_str));
     let (has_target, tu) = if cand_target && at == SELECT_AT {
         if su.is_none() {
             su = src_uuid;
         }
         let sel = p
-            .get("selected_uuids")
+            .selected_uuids
             .and_then(Value::as_array)
             .and_then(|a| a.first())
             .and_then(Value::as_str);
         (sel.is_some(), sel)
     } else {
-        let tids = p.get("target_ids").and_then(Value::as_array);
+        let tids = p.target_ids.and_then(Value::as_array);
         (
             tids.map(|a| !a.is_empty()).unwrap_or(false),
             tids.and_then(|a| a.first()).and_then(Value::as_str),
@@ -570,7 +572,7 @@ pub fn cand_owned<'a>(
     };
     nrel::CandRef {
         action_type: at,
-        don_k: p.get("don_k").and_then(Value::as_f64),
+        don_k: p.don_k.and_then(Value::as_f64),
         has_target,
         card_id: card_id(su),
         // Python は `if tids:` のときだけ対象の card_id を引く

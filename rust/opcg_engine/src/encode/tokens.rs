@@ -125,16 +125,26 @@ impl Profile {
 }
 
 /// マスター単位のキャッシュ（Python のモジュール辞書 `_PROFILES`／`_ROLES`／`_THR_ROWS`／`_STATIC`）。
+///
+/// 符号化 1 回で 100 回前後引かれるので、表はマスター添字で直接引く（`slot[mi]`＝`profiles` の
+/// 添字＋1・0＝未作成。ハッシュを回さない）。中身はマスターだけの関数＝引いた値は同じ。
 #[derive(Debug, Default)]
 pub struct ProfileCache {
-    map: super::FastMap<MasterIdx, Profile>,
+    slot: Vec<u32>,
+    profiles: Vec<Profile>,
 }
 
 impl ProfileCache {
     pub fn get(&mut self, masters: &MasterTable, mi: MasterIdx) -> &Profile {
-        self.map
-            .entry(mi)
-            .or_insert_with(|| build_profile(masters, mi))
+        let i = mi as usize;
+        if i >= self.slot.len() {
+            self.slot.resize(i + 1, 0);
+        }
+        if self.slot[i] == 0 {
+            self.profiles.push(build_profile(masters, mi));
+            self.slot[i] = self.profiles.len() as u32;
+        }
+        &self.profiles[self.slot[i] as usize - 1]
     }
 }
 
