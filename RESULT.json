@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_rvhand/rvhand_w03.jsonl": 20
+  "arena_rvhand/rvhand_w03.jsonl": 30
  },
  "notes": "ran in existing checkout /home/user/opcg-sim-backend (no clone); 4 cores"
 }
