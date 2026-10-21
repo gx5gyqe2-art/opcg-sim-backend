@@ -56,6 +56,9 @@ def build_parser():
                          "候補席は --cand-rethink-ratio")
     ap.add_argument("--rethink-worlds", type=int, default=None,
                     help="基準席の読み直しの世界の本数 K（省略＝4）")
+    ap.add_argument("--omniscient", action="store_true",
+                    help="基準席を全部見える探索で打たせる（`docs/search_efficiency_plan.md` §7.10・"
+                         "測定専用）。候補席は --cand-omniscient")
     ap.add_argument("--leaders", default="fixed", choices=("fixed", "random", "real", "purple"),
                     help="対面の選び方: fixed=既定リーダーミラー（歴代判定と地続き）／"
                          "random=全リーダーからペアごとに 2 枚引く（汎化）／"
@@ -73,9 +76,10 @@ def build_parser():
 
 
 def _best_kw(args):
-    """基準席のつまみ（§7.4 の読み直し）。何も立っていなければ None＝基準席は今までどおり。"""
+    """基準席のつまみ（§7.4 の読み直し・§7.10 の全部見える探索）。何も立っていなければ None＝基準席は今までどおり。"""
     kw = {k: v for k, v in (("rethink_ratio", args.rethink_ratio),
-                            ("rethink_worlds", args.rethink_worlds)) if v is not None}
+                            ("rethink_worlds", args.rethink_worlds),
+                            ("omniscient", True if args.omniscient else None)) if v is not None}
     return kw or None
 
 

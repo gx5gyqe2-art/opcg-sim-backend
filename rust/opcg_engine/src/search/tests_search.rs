@@ -507,3 +507,12 @@ fn apply_move_inplace_expands_a_don_box() {
     assert_eq!(s.state().card(mine).attached_don, 3);
     assert!(s.state().active_battle.is_some(), "アタック箱は攻撃する");
 }
+
+/// opts JSON の `omniscient`（§7.10）: 省略・false は既定（false）、true だけが立つ。
+#[test]
+fn decide_options_json_reads_omniscient() {
+    let read = |j: &str| super::decide_options_from_json(&serde_json::from_str(j).unwrap());
+    assert!(!read("{}").omniscient);
+    assert!(!read(r#"{"omniscient": false}"#).omniscient);
+    assert!(read(r#"{"omniscient": true}"#).omniscient);
+}

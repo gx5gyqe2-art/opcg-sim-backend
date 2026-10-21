@@ -612,6 +612,8 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             None | Some(Value::Null) => d.budget,
             Some(other) => other.as_i64().filter(|b| *b > 0),
         },
+        // 全部見える探索（`search_efficiency_plan.md` §7.10・測定専用・既定 false）。
+        omniscient: flag("omniscient", d.omniscient),
     }
 }
 

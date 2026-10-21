@@ -26,6 +26,8 @@ def main(argv=None):
     ap.add_argument("--seed-base", type=int, default=2999900)
     ap.add_argument("--net", default=None)
     ap.add_argument("--decks", default="synth_roles")
+    ap.add_argument("--omniscient", action="store_true",
+                    help="両席とも全部見える探索（`docs/search_efficiency_plan.md` §7.10・測定専用）")
     a = ap.parse_args(argv)
     E.engine()
     db = D.load_db()
@@ -34,6 +36,8 @@ def main(argv=None):
         kw["budget"] = a.budget
     if a.worlds > 1:
         kw["worlds"] = a.worlds
+    if a.omniscient:
+        kw["omniscient"] = True
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     ts = []
     last = [0.0]
@@ -52,7 +56,8 @@ def main(argv=None):
         DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, observer=obs)
     ts.sort()
     n = len(ts)
-    print(json.dumps({"sims": a.sims, "worlds": a.worlds, "budget": a.budget, "games": a.games, "moves": n,
+    print(json.dumps({"sims": a.sims, "worlds": a.worlds, "budget": a.budget,
+                      **({"omniscient": True} if a.omniscient else {}), "games": a.games, "moves": n,
                       "mean": round(statistics.mean(ts), 3), "p50": round(ts[n // 2], 3),
                       "p90": round(ts[int(n * 0.9)], 3), "p99": round(ts[int(n * 0.99)], 3),
                       "max": round(ts[-1], 2), "wall_sec": round(time.perf_counter() - t0, 1),
