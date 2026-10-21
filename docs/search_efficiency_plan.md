@@ -205,3 +205,13 @@ Phase 0 → Phase 1 → Phase 3（Phase 4 の (a)(b) を合間に）→ Phase 4 
 **直した後**: 手元のアリーナ（`arena_shard`・候補 `--cand-sims 1280 --cand-redeterminize-every 8 --cand-budget 0`・基準 今の出荷・`--pairs 88 --workers 4`・seed base 1671000）で 88 ペアを回し、勝率を RESULT.json に（本番の判定はコーディネータが別にアリーナを出す）。直せなかった場合も、どこまで確かめて何が残ったかを書く。
 
 **成果物**: ブランチ `claude/rs-ismcts-diag`（修正・Rust テスト〔直した欠陥が再発しないこと・ゲームプレイに関わるので必須〕・RESULT.json）。`make test` と `make audit-cross` を通してから push。コミットメッセージにモデル名を入れない。
+
+### 7.6 WP `speed-merge`——高速化 2 本と読み直し方式を本線にまとめる（Phase 4・作業セッション用・opus）
+
+ユーザ決定（2026-10-21「全部やってください」）。`claude/rs-speed-a`（`eb00b6134`・1 本 × 1,280 回 ×1.50）・`claude/rs-speed-b`（`6ff385e72`・×1.39）・`claude/play-rethink`（`085308bf0`・既定 off）を、本線 `claude/cpu-spec-improvements-yw91jd` の最新にマージしたブランチ `claude/speed-merge` を作って push。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
+
+- 2 本の高速化は同じファイル（`search/mcts.rs`・`apply.rs`・`adapter.rs`・`quiesce.rs`・`journal.rs`・`encode/*`）を触っている。衝突は**両方の効きを残す形**で解く。どちらかを捨てるなら、捨てた変更と理由を notes に。
+- **不変条件**: 打つ手は本線と 1 bit も変わらない。§7.2 の一致の確かめ方（本線の wheel と、マージ後の wheel で、1×1280／4×1280／1×160＋予算あり の 3 設定・計 2,000 判断点以上の `decide` の出力とイベントを行ごとに比べる）で全件一致。`rs-speed-a`／`rs-speed-b` の作業用比較スクリプトがあれば使ってよい。
+- 読み直し方式は off で不変（`tests/test_play_rethink.py` が見る）。
+- 計測: 1 コア固定で `rs_decide_latency.py --budget 0 --games 8` を本線とマージ後で並べて（1 本 × 1,280 回・4 本 × 1,280 回・1 本 × 5,120 回）。平均・90%・99%・最大。
+- `make rust-develop`・`make test`・`make audit-cross` を通してから push。成果物は RESULT.json（inputs＝3 本のコミット／outputs＝衝突を解いたファイル／metrics＝一致件数・時間の前後／notes）。コミットメッセージにモデル名を入れない。
