@@ -15,7 +15,7 @@
   ]
  },
  "metrics": {
-  "arena_rdnet/rdnet_w05.jsonl": 50
+  "arena_rdnet/rdnet_w05.jsonl": 60
  },
  "notes": "CODE=本線 was interpreted as claude/cpu-spec-improvements-yw91jd; ran in /home/user/opcg-sim-backend."
 }
