@@ -15,7 +15,7 @@
   ]
  },
  "metrics": {
-  "arena_rdnet/rdnet_w03.jsonl": 60
+  "arena_rdnet/rdnet_w03.jsonl": 70
  },
  "notes": "repo dir was /home/user/opcg-sim-backend (not ~/opcg-sim-backend)"
 }
