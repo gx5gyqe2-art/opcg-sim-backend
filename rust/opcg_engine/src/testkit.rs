@@ -929,5 +929,6 @@ pub fn effect_table() -> AbilityTable {
                 cost_optional: false,
             },
         ],
+        ..Default::default()
     }
 }

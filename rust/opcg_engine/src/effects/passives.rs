@@ -118,26 +118,45 @@ fn resolve_trigger_over(
     trigger: TriggerType,
 ) -> Result<(), EngineError> {
     for card in units(s, owner) {
-        let ids = masters.get(s.state().card(card).master).ability_ids.clone();
+        // 能力の列はマスター表（不変）から借りる（盤面の書き換えとは別の借用）。
+        let ids = &masters.get(s.state().card(card).master).ability_ids;
         for (index, id) in ids.iter().enumerate() {
             let ab = ability(masters, *id)?;
             if ab.trigger != trigger {
                 continue;
             }
-            if is_reactive_passive(ab) {
-                continue; // 「…された時」型はイベント誘発であり再計算で実行しない
-            }
-            if super::actions::rules::is_rest_replacement(ab) {
-                // 「〜になる場合、代わりに〜」の置換（PRB02-006）は**置換であって継続効果では
-                // ない**＝再計算で実行しない（実体はレストの現場の `active_rest_replacement`）。
-                // 再計算で実行すると、条件が偽にならないまま対象選択で中断し続けて要求が
-                // 無限に往復する（§20.8.1-1 の発見 2・seed 930028 の void）。
+            if recalc_skip(&masters.abilities, *id, ab) {
                 continue;
             }
             game_resolve_ability(s, masters, actor, card, index, false)?;
         }
     }
     Ok(())
+}
+
+/// 再計算で実行しない能力か（[`recalc_skips`] の 1 件・表の印を引く）。
+fn recalc_skip(table: &super::ast::AbilityTable, id: u32, ab: &super::ast::Ability) -> bool {
+    let marks = table
+        .recalc_skip
+        .get_or_init(|| table.abilities.iter().map(recalc_skips).collect());
+    match marks.get(id as usize) {
+        // 印を作った後に足された能力（単体テストだけ）はその場で判定する。
+        Some(m) if marks.len() == table.abilities.len() => *m,
+        _ => recalc_skips(ab),
+    }
+}
+
+/// 継続効果の再計算（`resolve_trigger_over`）で実行しない能力か。
+///
+/// - 「…された時」型（[`is_reactive_passive`]）はイベント誘発であり再計算で実行しない。
+/// - 「〜になる場合、代わりに〜」の置換（PRB02-006）は**置換であって継続効果では
+///   ない**＝再計算で実行しない（実体はレストの現場の `active_rest_replacement`）。
+///   再計算で実行すると、条件が偽にならないまま対象選択で中断し続けて要求が
+///   無限に往復する（§20.8.1-1 の発見 2・seed 930028 の void）。
+///
+/// どちらも能力（マスター）だけで決まる＝表ごとに 1 度だけ作る（[`recalc_skip`]）。
+pub fn recalc_skips(ab: &super::ast::Ability) -> bool {
+    is_reactive_passive(ab) || super::actions::rules::is_rest_replacement(ab)
 }
 
 /// Python `_is_reactive_passive`（無タグの反応型かどうか）。
