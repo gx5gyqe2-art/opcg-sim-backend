@@ -16,5 +16,5 @@
  "metrics": {
   "arena_w4/w4_w06.jsonl": 208
  },
- "notes": ""
+ "notes": "ARENA_RESUME_FINAL: pairs 120, games 240, void 0, wr 0.5333 CI95 [0.467,0.5997], elo +23.2. jsonl has 208 lines (>120 pairs): origin already held 88 pairs from an earlier run of this shard and the script kept appending 10 pairs/pass up to the 12-pass cap; the final summary counts 120 pairs. Push once failed non-fast-forward (origin had earlier commit); merged with -X ours, no force."
 }
