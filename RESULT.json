@@ -15,7 +15,7 @@
   ]
  },
  "metrics": {
-  "arena_oppblind/oppblind_w01.jsonl": 60
+  "arena_oppblind/oppblind_w01.jsonl": 70
  },
  "notes": "repo at /home/user/opcg-sim-backend (not ~/) used instead of fresh clone"
 }
