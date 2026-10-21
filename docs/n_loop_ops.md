@@ -181,6 +181,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **世界 4 本 × 1,280 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・16 シャード × 88 ペア・§7.18） | 1511000〜1526000 | 使用済み（2026-10-21・1,336 ペア 0.5434 [0.5227, 0.5642]・+30.2・`2026-10-21_r16_teacher_strength.md`） |
 | 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 使用済み（2026-10-21・r16 主 −5.3／副 +4.7・r16c 主 −7.7／副 +0.4・どちらも非昇格） |
 | 検証 **木 1 本の方式の診断の手元アリーナ**（WP `rs-ismcts-diag`・88 ペア・`search_efficiency_plan.md` §7.5） | 1671000〜1671087 | 指示済み（2026-10-21・claude/rs-ismcts-diag） |
+| 検証 **伸びしろの探り A・B・C**（§7.26: 相手に手札を見せない／全部見える 5,120 回 vs 全部見える 1,280 回／実デッキでの世界 2 本・世代の伸び） | A・B は 1651000〜1662000（共有）／C は **1701000〜1712000**（実デッキ・新規） | 指示済み（2026-10-21・claude/arena-{oppblind,omni5120,rdw2,rdnet}-w01〜w12・A は WP `claude/rs-oppblind` の後） |
 | 計測 **相手の手札の当てやすさ**（WP `hand-infer-a`・両席 r13d・160 回・2,000 局・`search_efficiency_plan.md` §7.12）／**詰みの見逃し**（WP `lethal-audit`・出荷の設定・1,000 局・§7.13） | 3001000〜3002999／3011000〜3011999 | 指示済み（2026-10-21・claude/hand-infer-a・claude/lethal-audit） |
 | 検証 **見える範囲を分けた探索（相手の手札だけ／見えないものは全部混ぜ直す）vs 今の出荷**（各 12 シャード × 120 ペア・§7.25）／WP `rs-reveal` の手元 各 40 ペア | 1651000〜1662000（共有）／手元 1676000〜1676039・1677000〜1677039 | 使用済み（2026-10-21・相手の手札だけ 10 シャード 1,200 ペア **+76.5**／公平 1,436 ペア **−24.5**・`2026-10-21_reveal_arena.md`） |
 | 検証 **全部見える探索 vs 今の出荷**（同じ r13d・本番の設定・12 シャード × 120 ペア・§7.24）／WP `rs-omniscient` の手元アリーナ 40 ペア | 1651000〜1662000（共有）／手元 1675000〜1675039 | 使用済み（2026-10-21・手元 40 ペア +79.5／本番 1,438 ペア 0.6182・**+83.7**・`2026-10-21_omniscient_arena.md`） |
@@ -2262,6 +2263,64 @@ echo ALL_DONE
 - `{ARM}`＝`rvfair`・`{CAND}`＝`--cand-sims 1280 --cand-reveal fair --cand-budget 0`（自分の先の引き・ライフも混ぜ直す＝見えないものは全部見えない）
 - **読み方（数を見る前）**: rvhand が +60 前後なら相手の手札の推定に大きな上限がある／+20 以下なら +84 の大半は相手の山札の並び（推定できない）。
   rvfair が大きく負なら、今の CPU の強さの一部は自分の先の引きを見ていることから来ている（＝出荷の CPU は少しずるをしている）。
+
+### 7.26 伸びしろの探り A・B・C（2026-10-21）
+
+ユーザ決定（2026-10-21「A、B、C でお願い」）。台帳 2+314。各腕 12 シャード × 120 ペア。
+
+| 腕 `{ARM}` | 問い | 候補席 `{CANDNET}`／`{CAND}` | 基準席 `{BASENET}`／`{BASEFLAGS}` | デッキ `{DECKS}` | seed `{BASE}` | コード `{CODE}` |
+|---|---|---|---|---|---|---|
+| `oppblind` | A: 相手に手札を見せない | r13d／`--cand-sims 1280 --cand-opp-blind --cand-budget 0` | r13d／`--sims 1280 --budget 0` | synth_roles | 1651000（共有） | `claude/rs-oppblind`（WP の push 後） |
+| `omni5120` | B: 情報が完全なら探索はまだ伸びるか | r13d／`--cand-sims 5120 --cand-omniscient --cand-budget 0` | r13d／`--sims 1280 --omniscient --budget 0` | synth_roles | 1651000（共有・基準が違うので他の腕との組の比較はしない） | `claude/rs-reveal` |
+| `rdw2` | C1: 世界 2 本の +18 は実デッキでも出るか | r13d／`--cand-sims 1280 --cand-worlds 2 --cand-budget 0` | r13d／`--sims 1280 --budget 0` | **user**（実デッキ 4 本・ホールドアウト） | 1701000 | 本線 |
+| `rdnet` | C2: 世代の伸び（r13b→r13d の +24.6）は実デッキでも出るか | **r13b**／`--cand-sims 1280 --cand-budget 0` | r13d／`--sims 1280 --budget 0` | **user** | 1701000（rdw2 と共有） | 本線 |
+
+- 予告（数を見る前）: A は −5〜+15（警戒のしすぎが実在すれば正）。B は +10〜+25（情報が完全でも探索が伸びるなら、ネットの葉の評価に粗さが残る）。C1 は +10〜+20（合成の +18 と同程度なら汎化に問題なし・半分以下なら教材の分布に伸びしろ）。C2 は −30〜−15（合成の −24.6 の裏返し・大きく縮めば世代の伸びは合成デッキに特化している）。
+- `--decks user` はリーダーを無視して seed から実デッキ 2 本を引く（`opcg_sim/loop/decks.py`）。**実デッキは訓練の教材にしない**（ホールドアウトの規約）。
+
+作業セッション用の本文（`{K}`＝1〜12・`{KK}`＝01〜12・残りは上の表）:
+
+````
+本番の設定のアリーナの 1 シャードを回してください。シャードは k={K}・腕 {ARM} です（docs/n_loop_ops.md §7.26）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-{ARM}-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください（待機に入るとコンテナが止まり、処理も消えます）。git の作業が安全確認で止められたら、`git stash -u` してから `-f` なしで実行してよい。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin {CODE} && git checkout -q -B claude/arena-{ARM}-w$KK origin/{CODE}
+git fetch -q origin claude/arena-{ARM}-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_{ARM} 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_{ARM}
+
+次の内容を ~/runb.sh に保存し、`nohup bash ~/runb.sh > ~/runb.out 2>&1 &` で回す。runb.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+CN=opcg_sim/data/learned/nrel_{CANDNET}.npz
+BN=opcg_sim/data/learned/nrel_{BASENET}.npz
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_{ARM}/*.jsonl"))
+print(json.dumps({"job": "arena-{ARM}-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_{CANDNET}.npz + {CAND}", "baseline": "nrel_{BASENET}.npz + {BASEFLAGS}", "decks": "{DECKS}", "pairs": 120, "code": "{CODE}"},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_{ARM} RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena {ARM} shard $KK"; git push -q -u origin claude/arena-{ARM}-w$KK || echo PUSH_FAILED; }
+for J in 0 1 2 3 4 5 6 7 8 9 10 11; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $CN --baseline $BN \
+    {BASEFLAGS} {CAND} --pairs 120 --max-pairs 10 --bands 1 \
+    --seed-base $(( {BASE} + (k-1)*1000 )) --workers 4 --leaders random --decks {DECKS} --pair-timeout 7200 \
+    --out arena_{ARM}/{ARM}_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 10 ペアずつ進め、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。omni5120 は候補席が 4 倍重い（2〜3 時間）。コミットメッセージにモデル名を入れない。
+````
 
 ## 8. コーディネータが守ること
 
