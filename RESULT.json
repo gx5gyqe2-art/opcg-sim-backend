@@ -1,183 +1,19 @@
 {
- "job": "play-rethink",
- "role": "impl",
- "status": "done",
+ "job": "arena-rt05-w06",
+ "role": "arena",
+ "status": "partial",
  "inputs": {
-  "base_branch": "claude/cpu-spec-improvements-yw91jd",
-  "base_commit": "66266aa",
-  "instruction": "docs/search_efficiency_plan.md §7.4 (WP play-rethink)",
-  "net": "opcg_sim/data/learned/nrel_r13d.npz (DEFAULT_NET)"
+  "candidate": "nrel_r13d.npz + sims 1280 + budget 0 + rethink ratio 0.5 worlds 4",
+  "baseline": "nrel_r13d.npz + worlds 1 x sims 1280 + budget 0",
+  "pairs": 120
  },
  "outputs": {
-  "branch": "claude/play-rethink",
-  "changed_files": [
-   "opcg_sim/loop/engine.py",
-   "opcg_sim/loop/driver.py",
-   "opcg_sim/api/engine_rs.py",
-   "opcg_sim/api/routers.py",
-   "opcg_sim/loop/arena.py",
-   "opcg_sim/loop/arena_shard.py",
-   "tests/test_play_rethink.py",
-   "tests/scripts/rs_rethink_sweep.py",
-   "docs/TEST_SPEC.md",
-   "logs/play_rethink/sweep_s1280_k4.jsonl.gz",
-   "RESULT.json"
-  ],
-  "flags": {
-   "shared_function": "opcg_sim.loop.engine.decide_with_rethink(decide, opts_json, ratio, worlds) — used by both RsGame._decide (API) and driver.run_game (arena/gen seats)",
-   "ratio": "opcg_sim.loop.engine.rethink_ratio(out) = 2nd / 1st visit count of root groups (merged equal moves)",
-   "api_defaults": "opcg_sim/loop/engine.py PLAY_RETHINK_RATIO = None (off), PLAY_RETHINK_WORLDS = 4; routers.py passes both",
-   "RsGame.decide": "rethink_ratio=, rethink_worlds=",
-   "SeatSpec": "rethink_ratio=, rethink_worlds= (named args; NOT put into decide opts)",
-   "arena_shard": "--cand-rethink-ratio / --cand-rethink-worlds (candidate seat, via add_cand_args, so gate.py gets them too); --rethink-ratio / --rethink-worlds (baseline seat; ARENA_RESUME_FINAL gets best_opts when set)",
-   "trace": "tr['rethink'] = {r, fired, first_move, final_move} only when ratio is not None (moves via describe_move); driver out['rethink'] same with raw moves",
-   "meter": "tests/scripts/rs_rethink_sweep.py (TEST_SPEC §3 row added)"
-  }
- },
- "gates": {
-  "make_rust_develop": "ok (maturin build + pip install)",
-  "make_test": "green (cargo 572 passed / 1 ignored; pytest 847 passed / 13 skipped)",
-  "golden_audit_and_replay": "6 passed (explicitly re-run, not skipped)",
-  "make_audit_cross": "120 pairs void 0 (default seats = off path)",
-  "audit_cross_with_rethink_on": "same command + --cand-rethink-ratio 0.0 --cand-rethink-worlds 4 --rethink-ratio 0.5: 120 pairs void 0",
-  "new_tests": "tests/test_play_rethink.py 9 passed (required tier, no cpu_infra): (a) off identical move+trace, single decide call; (b) tau=0 == worlds=4 decide (move and full trace); (c) tau=1.01 == 1-world decide, and run_game 40 steps same move sequence; (d) trace shape; pure branch tests (window/commit/1 candidate/already K worlds don't fire; re-read changes only worlds)"
+  "files": [
+   "arena_rt05/rt05_w06.jsonl"
+  ]
  },
  "metrics": {
-  "command": "python tests/scripts/rs_rethink_sweep.py --games 20 --jobs 3 --out sweep.jsonl  (sims 1280, budget 0, K=4, seeds 2999900-2999919, random leaders x synth_roles, both seats r13d)",
-  "machine": "4-core container; 3 worker processes, each pinned to its own core (sched_setaffinity) — K worlds run serially on that one core",
-  "method": "positions follow the off seat (1 world x 1280); at every decision the 1-world decide is timed (t1) and, if r >= 0.3, the 4-world decide with the identical opts is timed too (tK). Per tau the per-move time = t1 + (tK if r >= tau). Same positions for every tau.",
-  "summary": {
-   "games": 20,
-   "moves": 2512,
-   "tree_moves": 1113,
-   "tree_share": 0.4431,
-   "off": {
-    "mean": 0.321,
-    "p50": 0.004,
-    "p90": 0.789,
-    "p99": 2.476,
-    "max": 10.22
-   },
-   "taus": {
-    "0.3": {
-     "fired": 696,
-     "fire_rate": 0.2771,
-     "fire_rate_tree": 0.6253,
-     "swaps": 123,
-     "swap_rate_of_fired": 0.1767,
-     "swap_rate": 0.049,
-     "compute_x": 3.202,
-     "mean": 1.028,
-     "p50": 0.004,
-     "p90": 3.16,
-     "p99": 7.224,
-     "max": 52.99
-    },
-    "0.5": {
-     "fired": 510,
-     "fire_rate": 0.203,
-     "fire_rate_tree": 0.4582,
-     "swaps": 99,
-     "swap_rate_of_fired": 0.1941,
-     "swap_rate": 0.0394,
-     "compute_x": 2.573,
-     "mean": 0.826,
-     "p50": 0.004,
-     "p90": 2.843,
-     "p99": 7.108,
-     "max": 42.75
-    },
-    "0.7": {
-     "fired": 335,
-     "fire_rate": 0.1334,
-     "fire_rate_tree": 0.301,
-     "swaps": 78,
-     "swap_rate_of_fired": 0.2328,
-     "swap_rate": 0.0311,
-     "compute_x": 2.055,
-     "mean": 0.66,
-     "p50": 0.004,
-     "p90": 2.14,
-     "p99": 5.979,
-     "max": 42.75
-    },
-    "0.9": {
-     "fired": 156,
-     "fire_rate": 0.0621,
-     "fire_rate_tree": 0.1402,
-     "swaps": 43,
-     "swap_rate_of_fired": 0.2756,
-     "swap_rate": 0.0171,
-     "compute_x": 1.5,
-     "mean": 0.482,
-     "p50": 0.004,
-     "p90": 1.035,
-     "p99": 4.377,
-     "max": 42.75
-    }
-   }
-  },
-  "tK_over_t1_on_fired": "4.13 (sum ratio) / 4.19 (median)",
-  "tree_decisions_share_of_time": 0.91,
-  "table": {
-   "0.3": {
-    "fire_rate": 0.2771,
-    "fire_rate_tree": 0.6253,
-    "swap_rate_of_fired": 0.1767,
-    "swap_rate": 0.049,
-    "compute_x": 3.202,
-    "mean": 1.028,
-    "p90": 3.16,
-    "p99": 7.224,
-    "max": 52.99
-   },
-   "0.5": {
-    "fire_rate": 0.203,
-    "fire_rate_tree": 0.4582,
-    "swap_rate_of_fired": 0.1941,
-    "swap_rate": 0.0394,
-    "compute_x": 2.573,
-    "mean": 0.826,
-    "p90": 2.843,
-    "p99": 7.108,
-    "max": 42.75
-   },
-   "0.7": {
-    "fire_rate": 0.1334,
-    "fire_rate_tree": 0.301,
-    "swap_rate_of_fired": 0.2328,
-    "swap_rate": 0.0311,
-    "compute_x": 2.055,
-    "mean": 0.66,
-    "p90": 2.14,
-    "p99": 5.979,
-    "max": 42.75
-   },
-   "0.9": {
-    "fire_rate": 0.0621,
-    "fire_rate_tree": 0.1402,
-    "swap_rate_of_fired": 0.2756,
-    "swap_rate": 0.0171,
-    "compute_x": 1.5,
-    "mean": 0.482,
-    "p90": 1.035,
-    "p99": 4.377,
-    "max": 42.75
-   }
-  }
+  "arena_rt05/rt05_w06.jsonl": 20
  },
- "notes": [
-  "Base: the instruction says branch from the latest mainline; origin/main is behind (stops at PR #212), so I branched from claude/cpu-spec-improvements-yw91jd@66266aa (the commit that adds §7.4), as n_loop_ops §5 says.",
-  "r is read from out['groups'] (equal moves merged; this is the list the played move is chosen from), not from raw stats.N. Decisions with kind != 'main' (battle/dialog window root folds, box commit) and with fewer than 2 groups are not re-read (they don't use worlds, so the re-read would give the same move) — r is None there.",
-  "If the seat's opts already have worlds >= K, it does not re-read (it would be the same read again); r is still reported.",
-  "When it fires, the whole decide output is replaced (move, stats, groups, commit/resact carry, per_world), so test (b) checks the full trace equals worlds=K.",
-  "Off path: decide_with_rethink with ratio None calls decide once with the caller's original opts_json string and returns json.loads of it unchanged (no key added). The API keeps json.dumps(opts); the driver keeps spec.decide_opts(...). SeatSpec does not put rethink_* into opts, so arena ledgers without the new flags look the same as before.",
-  "Compute is well above the plan's forecast (×1.3–1.6): fire rate at tau 0.3/0.5 is 28%/20% of all decisions (inside the 15–30% forecast), but the re-read happens only on tree decisions, which are 91% of the time, and a 4-world re-read on one core costs about 4.1× the 1-world read. Result: compute ×3.20 / ×2.57 / ×2.06 / ×1.50 for tau 0.3/0.5/0.7/0.9. Only tau 0.9 is inside the forecast range.",
-  "Swap rate (re-read picks a different move) goes up as tau goes up: 17.7% / 19.4% / 23.3% / 27.6% of fired decisions — the closer the top two, the more often 4 worlds change the move. Per decision overall: 4.9% / 3.9% / 3.1% / 1.7%.",
-  "Tail: the longest single move is 53.0 s at tau 0.3 and 42.8 s at tau 0.5–0.9 (off: 10.2 s). Off mean here is 0.321 s, vs 0.80 s in 2026-10-18_serve_sims.md; rs-ismcts measured 311 ms on other seeds with the same engine, so the engine got faster since then (not because of this change).",
-  "Timing caveat: 3 pinned processes ran at the same time (shared L3/memory bandwidth), so absolute times may be a bit higher than a single process on an idle machine; the ratios between taus share the positions and the machine state.",
-  "gate.py's baseline seat is not given rethink options (the instruction only names arena_shard); candidate --cand-rethink-* also reach gate.py through add_cand_args.",
-  "Container setup: maturin, pytest, pytest-xdist and opcg_sim/requirements.txt were not installed; I installed them with pip before make rust-develop / make test.",
-  "The meter rs_rethink_sweep.py has no test (CLAUDE.md: measure tools get minimal tests); it got a TEST_SPEC §3 row. The §3 row and RESULT.json were written after make test passed; tests read neither (checked by grep)."
- ]
+ "notes": ""
 }
