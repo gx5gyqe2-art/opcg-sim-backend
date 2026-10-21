@@ -85,6 +85,9 @@ pub struct Candidate {
     pub ti: i32,
     /// 予算 3 列
     pub budget: [f32; 3],
+    /// 行を作った材料の短い識別（[`nrel::cand_rows`] だけが入れる・`None`＝素性と予算そのものを鍵にする）。
+    /// 方策の頭の memo の鍵に使う＝**入れた後に `feats`／`budget` を書き換えない**こと（材料が同じなら行も同じ）。
+    pub(crate) id: Option<[u32; nrel::CAND_ID_LEN]>,
 }
 
 /// npz（zip の stored/deflate＋npy）を読む（実装は `npz.rs`・依存は `miniz_oxide` のみ）。
