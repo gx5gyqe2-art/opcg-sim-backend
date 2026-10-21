@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_rvhand/rvhand_w06.jsonl": 10
+  "arena_rvhand/rvhand_w06.jsonl": 20
  },
  "notes": "ran in /home/user/opcg-sim-backend (pre-cloned) instead of ~/opcg-sim-backend"
 }
