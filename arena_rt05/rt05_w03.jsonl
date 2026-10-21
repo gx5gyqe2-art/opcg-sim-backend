@@ -108,3 +108,5 @@
 {"seed": 1653107, "score": 0.0, "leaders": ["ST10-001", "OP05-098"], "games": [0.0, 0.0], "cand_leaders": ["ST10-001", "ST10-001"], "turns": [12, 13], "cand_opts": {"sims": 1280, "budget": 0, "rethink_ratio": 0.5, "rethink_worlds": 4}}
 {"seed": 1653109, "score": 2.0, "leaders": ["OP12-040", "OP16-079"], "games": [1.0, 1.0], "cand_leaders": ["OP12-040", "OP12-040"], "turns": [13, 12], "cand_opts": {"sims": 1280, "budget": 0, "rethink_ratio": 0.5, "rethink_worlds": 4}}
 {"seed": 1653110, "score": 0.0, "leaders": ["P-117", "OP02-049"], "games": [0.0, 0.0], "cand_leaders": ["P-117", "P-117"], "turns": [12, 15], "cand_opts": {"sims": 1280, "budget": 0, "rethink_ratio": 0.5, "rethink_worlds": 4}}
+{"seed": 1653108, "score": 1.0, "leaders": ["OP05-041", "OP13-079"], "games": [1.0, 0.0], "cand_leaders": ["OP05-041", "OP05-041"], "turns": [15, 13], "cand_opts": {"sims": 1280, "budget": 0, "rethink_ratio": 0.5, "rethink_worlds": 4}}
+{"seed": 1653111, "score": 0.0, "leaders": ["ST29-001", "OP17-039"], "games": [0.0, 0.0], "cand_leaders": ["ST29-001", "ST29-001"], "turns": [12, 13], "cand_opts": {"sims": 1280, "budget": 0, "rethink_ratio": 0.5, "rethink_worlds": 4}}
