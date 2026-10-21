@@ -15,7 +15,7 @@
   ]
  },
  "metrics": {
-  "arena_rdnet/rdnet_w09.jsonl": 110
+  "arena_rdnet/rdnet_w09.jsonl": 120
  },
  "notes": "CODE=本線 was interpreted as the checkout line claude/cpu-spec-improvements-yw91jd."
 }
