@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_w8/w8_w04.jsonl": 80
+  "arena_w8/w8_w04.jsonl": 90
  },
  "notes": "ran in /home/user/opcg-sim-backend (existing clone) instead of ~/opcg-sim-backend"
 }
