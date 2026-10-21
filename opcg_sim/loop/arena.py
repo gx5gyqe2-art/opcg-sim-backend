@@ -135,6 +135,7 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
     `best_kw`（`--rethink-ratio`／`--rethink-worlds`）は**基準席の**「迷う局面だけ世界 K 本で
     読み直す」（`docs/search_efficiency_plan.md` §7.4）。None＝基準席は読み直さない（今までどおり）。
     `arena_shard --omniscient` も同じ口から基準席へ `{"omniscient": True}` を渡す（§7.10）。
+    `arena_shard --reveal {opp_hand,fair}` も同じ口から `{"reveal": ...}` を渡す（§7.11）。
     """
     E.engine()
     _G["leaders_mode"] = leaders_mode
@@ -255,6 +256,11 @@ def add_cand_args(ap) -> None:
                     help="候補席だけ全部見える探索（`docs/search_efficiency_plan.md` §7.10・測定専用）。"
                          "探索の中で世界を引き直さず本当の盤面（相手の手札・両者の山札の並び）で読む"
                          "（worlds は 1 扱い）。天井の切り分けにだけ使う")
+    ap.add_argument("--cand-reveal", default=None, choices=("opp_hand", "fair"),
+                    help="候補席だけ見える範囲を分けた探索（`docs/search_efficiency_plan.md` §7.11・測定専用）。"
+                         "opp_hand＝相手の手札は本当のまま・相手の山札だけ混ぜ直す／fair＝自分に見えない物"
+                         "（相手の手札＋山札＋裏向きライフ・自分の山札＋裏向きライフ）を全部混ぜ直す。"
+                         "--cand-omniscient とは排他")
     # --- 迷う局面だけ世界 K 本で読み直す（§7.4・WP `play-rethink`）------------------------
     ap.add_argument("--cand-rethink-ratio", type=float, default=None,
                     help="候補席だけ、根の 2 位の訪問数 ÷ 1 位 ≥ τ の決定を同じ seed で世界 K 本"
@@ -272,6 +278,7 @@ CAND_VALUE_FLAGS = {
     "cand_worlds": "worlds",
     "cand_budget": "budget",
     "cand_residual_activate": "residual_activate",
+    "cand_reveal": "reveal",
     # 下の 2 つは opts には入らない（`SeatSpec` の名前付き引数・`decide_with_rethink`）。
     "cand_rethink_ratio": "rethink_ratio",
     "cand_rethink_worlds": "rethink_worlds",

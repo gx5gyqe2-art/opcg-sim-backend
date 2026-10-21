@@ -294,7 +294,8 @@ class RsGame:
               budget: Optional[int] = None,
               rethink_ratio: Optional[float] = None,
               rethink_worlds: Optional[int] = None,
-              omniscient: Optional[bool] = None):
+              omniscient: Optional[bool] = None,
+              reveal: Optional[str] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
         `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
@@ -331,6 +332,10 @@ class RsGame:
         True なら探索の中で世界を引き直さず本当の盤面（相手の手札・両者の山札の並び）で読む
         （`worlds` は 1 扱い）。ゲームとしては不正な読み＝アリーナの天井の切り分けにだけ使う。
         **省略（None）すれば今までと同じ**（対戦 API は渡さない）。
+        `reveal`（省略可・§7.11・**測定専用**）＝見える範囲を分けた探索。`"opp_hand"`＝相手の手札は
+        本当のまま・相手の山札だけ混ぜ直す／`"fair"`＝自分に見えない物（相手の手札＋山札＋裏向きライフ・
+        自分の山札＋裏向きライフ）を全部混ぜ直す。`omniscient` と同時に渡すと Rust がエラーにする。
+        **省略（None）すれば今までと同じ**。
         """
         move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
                                 select_rule=select_rule, q_min_frac=q_min_frac,
@@ -339,7 +344,8 @@ class RsGame:
                                 select_branch=select_branch,
                                 setup_box_keep_bare=setup_box_keep_bare,
                                 budget=budget, rethink_ratio=rethink_ratio,
-                                rethink_worlds=rethink_worlds, omniscient=omniscient)
+                                rethink_worlds=rethink_worlds, omniscient=omniscient,
+                                reveal=reveal)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
@@ -354,7 +360,8 @@ class RsGame:
                budget: Optional[int] = None,
                rethink_ratio: Optional[float] = None,
                rethink_worlds: Optional[int] = None,
-               omniscient: Optional[bool] = None):
+               omniscient: Optional[bool] = None,
+               reveal: Optional[str] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -410,6 +417,9 @@ class RsGame:
         # 全部見える探索（§7.10・測定専用）。None／False＝渡さない＝Rust 側の既定（false）。
         if omniscient:
             opts["omniscient"] = True
+        # 見える範囲を分けた探索（§7.11・測定専用）。None＝渡さない＝今までどおり。
+        if reveal is not None:
+            opts["reveal"] = str(reveal)
         # 迷う局面だけの読み直し（§7.4）。None＝off＝`decide` を 1 回呼ぶだけ（今までと同じ）。
         from opcg_sim.loop import engine as _LE
         out = _LE.decide_with_rethink(lambda o: self._game.decide(player_id, o), json.dumps(opts),
