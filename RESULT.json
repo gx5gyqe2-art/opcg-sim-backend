@@ -16,5 +16,5 @@
  "metrics": {
   "arena_w4/w4_w03.jsonl": 120
  },
- "notes": ""
+ "notes": "origin branch claude/arena-w4-w03 already held 88 stale rows from a 2026-10-20 run (seeds 1473xxx, cand sims 320). They were removed from arena_w4/w4_w03.jsonl (and the first run overshot to 167 rows, trimmed). Final file: 120 pairs, all seeds 1653xxx, cand_opts sims 1280/worlds 4/budget 0. Earlier commits on the branch still contain the stale rows in history. Working dir ~/opcg-sim-backend symlinks /home/user/opcg-sim-backend."
 }
