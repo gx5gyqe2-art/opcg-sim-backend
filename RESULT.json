@@ -1,101 +1,21 @@
 {
- "job": "rs-oppblind",
- "role": "engine-option",
- "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.14 (origin/claude/cpu-spec-improvements-yw91jd; ledger 2+314; n_loop_ops seed ledger row '伸びしろの探り A・B・C' / §7.26 arm oppblind)",
+ "job": "arena-oppblind-w02",
+ "role": "arena",
+ "status": "partial",
  "inputs": {
-  "base": "claude/rs-reveal @ ded552f",
-  "net": "nrel_r13d.npz (both seats)"
+  "candidate": "nrel_r13d.npz + --cand-sims 1280 --cand-opp-blind --cand-budget 0",
+  "baseline": "nrel_r13d.npz + --sims 1280 --budget 0",
+  "decks": "synth_roles",
+  "pairs": 120,
+  "code": "claude/rs-oppblind"
  },
  "outputs": {
-  "branch": "claude/rs-oppblind",
-  "code_commit": "2b4590c",
   "files": [
-   "rust/opcg_engine/src/search/determinize.rs (determinize_self_with: my hand+deck+face-down life as one pool)",
-   "rust/opcg_engine/src/search/mcts.rs (struct OppBlind, TreeMcts.opp_blind; expand split into legal-on-real + expand_eval on the blinded copy for opponent nodes; test-only BLIND_TRACE)",
-   "rust/opcg_engine/src/search/decide.rs (DecideOptions.opp_blind, opp_blind_seed, run_one_world takes seat+world seed; tests opp_blind_*)",
-   "rust/opcg_engine/src/search/mod.rs (opts JSON key 'opp_blind')",
-   "rust/opcg_engine/src/py_game.rs (doc)",
-   "opcg_sim/api/engine_rs.py (RsGame.decide(opp_blind=...))",
-   "opcg_sim/loop/arena.py (--cand-opp-blind via CAND_FLAGS)",
-   "opcg_sim/loop/arena_shard.py (--opp-blind for the baseline seat via _best_kw)",
-   "tests/scripts/rs_decide_latency.py (--opp-blind)",
-   "docs/TEST_SPEC.md §2 (1 row)",
-   "arena_oppblind_local/oppblind_local.jsonl (local arena ledger)"
+   "arena_oppblind/oppblind_w02.jsonl"
   ]
  },
- "gates": {
-  "make_rust_develop": "ok",
-  "make_test": "green: cargo test 586 passed / 1 ignored; pytest 847 passed, 13 skipped (same counts as rs-reveal; skips = torch not installed)",
-  "make_audit_cross": "void 0 (120 pairs, seed 0, default both seats; wr 0.5333 — identical to rs-reveal's value)",
-  "audit_cross_with_cand_opp_blind": "extra check, not required: --cand-opp-blind void 0, wr 0.5333 (same total by coincidence; 18 of 120 pair rows differ in turns/results, so the option does act)"
- },
  "metrics": {
-  "local_arena": {
-   "cmd": "arena_shard --candidate opcg_sim/data/learned/nrel_r13d.npz --baseline opcg_sim/data/learned/nrel_r13d.npz --sims 1280 --budget 0 --cand-sims 1280 --cand-opp-blind --cand-budget 0 --pairs 40 --max-pairs 40 --bands 1 --seed-base 1678000 --workers 4 --leaders random --decks synth_roles --pair-timeout 7200",
-   "seeds": "1678000-1678039",
-   "pairs": 40,
-   "games": 80,
-   "void": 0,
-   "wins": 46.0,
-   "wr": 0.575,
-   "ci95": [
-    0.4557,
-    0.6943
-   ],
-   "elo": 52.5,
-   "wall_sec": 501,
-   "reading": "40 pairs only; CI includes 0.5. Forecast was -5..+15; the point estimate is above it but not distinguishable from it. The production arena (§7.26, 12x120) decides."
-  },
-  "latency_1core": {
-   "cmd": "taskset -c N python tests/scripts/rs_decide_latency.py --sims 1280 --worlds 1 --budget 0 --games 20 [--opp-blind] (2 runs in parallel on cores 0/1)",
-   "default": {
-    "sims": 1280,
-    "worlds": 1,
-    "budget": 0,
-    "games": 20,
-    "moves": 2512,
-    "mean": 0.161,
-    "p50": 0.003,
-    "p90": 0.401,
-    "p99": 1.239,
-    "max": 4.83,
-    "wall_sec": 405.9,
-    "affinity": [
-     0
-    ]
-   },
-   "opp_blind": {
-    "sims": 1280,
-    "worlds": 1,
-    "budget": 0,
-    "opp_blind": true,
-    "games": 20,
-    "moves": 2300,
-    "mean": 0.19,
-    "p50": 0.006,
-    "p90": 0.46,
-    "p99": 1.397,
-    "max": 4.94,
-    "wall_sec": 436.9,
-    "affinity": [
-     1
-    ]
-   },
-   "mean_ratio": 1.18,
-   "cost": "one GameState clone + one shuffle of my hand+deck+face-down life per opponent-node expansion (plus encoding that copy instead of reusing nothing extra); mean +18% (0.161 -> 0.190 s/move). Different moves are played, so the game sets are not identical (2512 vs 2300 moves)."
-  }
+  "arena_oppblind/oppblind_w02.jsonl": 10
  },
- "notes": [
-  "What is blinded: in TreeMcts::expand, when the node's player to move is not the searching seat, legal moves are generated on the real world state; then the whole evaluation part (battle-box / dialog-box folds, priors, leaf value incl. window resolution and leaf rollout) runs on a fresh Session over determinize_self_with(real, me) — my hand + deck + face-down life reshuffled as one pool, opponent side and public zones untouched, zone sizes and face-up life kept. The chosen fold index / priors apply to the real legal list; descent and move application stay on the real world (test (c) checks the real state is unchanged after expansion).",
-  "Board RNG (CRN): the session's game RNG is lent to the blinded copy and restored to its pre-evaluation snapshot afterwards (each evaluation path already restored it in the default code, so consumption order is unchanged).",
-  "Blind RNG: a separate Pcg32 per tree, seeded with (search_seed + world index) XOR 0x0B11D5EED0FF5EED, so it never touches the world-sampling/Dirichlet stream; deterministic per world and per thread. Paths without search_seed (recorded-RNG oracle) use the constant with seed 0 (still deterministic).",
-  "Item 4 (boxes where the opponent chooses): the in-tree battle/dialog box folds at opponent nodes are computed on the blinded copy. NOT blinded: opponent choices made inside window resolution that starts from MY nodes (resolve_battle_inplace's quiesce_choice priors and nested box picks during my leaf values / my box folds), the root window fold (window_choice) and the commit paths (dialog/setup box) — those are my own decisions evaluated in the sampled world. Threading the blind context into quiesce would be needed to cover them.",
-  "Inside an opponent node's evaluation, the window resolution also plays MY replies in the blinded world (i.e. the opponent's model of me). This is the 'opponent's view' evaluation as a whole, not only the net call.",
-  "Cards of mine that were publicly revealed earlier (e.g. by effects) are not tracked; everything in my hand is treated as hidden from the opponent.",
-  "If an opponent move in a box fold references one of my hidden cards by uuid, applying it on the blinded copy may fail; that branch then counts as None (same as any failing branch).",
-  "Combinations: works with worlds>1 (each world thread has its own blind RNG), reveal (opp_hand/fair: the world is sampled first, then my side is reshuffled again at opponent nodes), omniscient (opponent side real; meaning 'only the opponent is fair'). Test (d) covers all.",
-  "Default (opp_blind=false): TreeMcts.opp_blind is None and expand goes straight to the original code path (expand_eval with the real session); test (a) checks decide output and RNG consumption are bit-identical; audit-cross default wr equals rs-reveal's.",
-  "The arena_shard command in the rs-reveal RESULT ('--candidate r13d') does not load a bare name; I used the full npz path for both seats."
- ]
+ "notes": ""
 }
