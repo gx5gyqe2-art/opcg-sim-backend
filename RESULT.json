@@ -15,7 +15,7 @@
   ]
  },
  "metrics": {
-  "arena_rdnet/rdnet_w02.jsonl": 110
+  "arena_rdnet/rdnet_w02.jsonl": 120
  },
  "notes": "code branch = 本線 claude/cpu-spec-improvements-yw91jd (14558d9)"
 }
