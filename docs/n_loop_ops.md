@@ -180,6 +180,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 生成 **波 46**（生成役 r13d・**世界 4 本 × 1,280 回**・枝予算なし・64 シャード × 120 局・§7.18） | 2461000〜2484620（w01〜w49）・2485000〜2492620 は未使用 | 指示済み（2026-10-20・claude/n46-w01〜w49・w50〜w64 は起動前に取り消し） |
 | 検証 **世界 4 本 × 1,280 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・16 シャード × 88 ペア・§7.18） | 1511000〜1526000 | 使用済み（2026-10-21・1,336 ペア 0.5434 [0.5227, 0.5642]・+30.2・`2026-10-21_r16_teacher_strength.md`） |
 | 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 使用済み（2026-10-21・r16 主 −5.3／副 +4.7・r16c 主 −7.7／副 +0.4・どちらも非昇格） |
+| 生成 **波 47**（公平な物差しの最初の波・生成役 r13d・設定は波 45 と同じ・§7.28） | 2501000〜2508500（シャード k の base は 2500000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 指示済み（2026-10-21・claude/n47-w01〜w16） |
 | 検証 **公平化の価格（新しい既定〔fair＋知識〕vs peek・12 シャード × 120 ペア・§7.27）** | 1651000〜1662000（共有） | 指示済み（2026-10-21・claude/arena-fairprod-w01〜w12） |
 | 検証 **公平を既定にする WP `rs-fair` の手元アリーナ**（新しい既定 vs `peek`・40 ペア・`search_efficiency_plan.md` §7.15） | 1679000〜1679039 | 使用済み（2026-10-21・40 ペア 0.45・−34.9〔CI ±100 級〕・本番は §7.27） |
 | 検証 **木 1 本の方式の診断の手元アリーナ**（WP `rs-ismcts-diag`・88 ペア・`search_efficiency_plan.md` §7.5） | 1671000〜1671087 | 指示済み（2026-10-21・claude/rs-ismcts-diag） |
@@ -2328,6 +2329,92 @@ echo ALL_DONE
 
 ユーザ決定（2026-10-21 判断 1 (a)・判断 2 (a)）。台帳 2+318。12 シャード × 120 ペア。**腕 `fairprod`**: 候補席＝**新しい既定**（`fair`＋知っている札の固定・r13d・`--cand-sims 1280 --cand-budget 0`・`reveal` 指定なし）／基準席＝**今までの動き**（r13d・`--sims 1280 --budget 0 --reveal peek`）。synth_roles・seed 1651000 帯（§7.20 以降と共有＝世界 2 本〔+18.1〕・公平〔知識なし・−24.5〕と同じ配りで組にできる）。コード `claude/rs-fair`（本線に取り込み済みの同じコミット）。
 予告: −25 前後（再訓練前の公平化の価格。知識の固定で −24.5 より少し戻るなら正）。本文は §7.26 の雛形で `{ARM}=fairprod`・`{CANDNET}={BASENET}=r13d`・`{CAND}=--cand-sims 1280 --cand-budget 0`・`{BASEFLAGS}=--sims 1280 --budget 0 --reveal peek`・`{DECKS}=synth_roles`・`{BASE}=1651000`・`{CODE}=claude/rs-fair`。
+
+### 7.28 波 47——公平な物差しで打つ最初の波（生成役 r13d・2026-10-21）
+
+ユーザ決定（2026-10-21「その方針で進めてください」）。台帳 2+319。**世界の引き直しの既定が公平になった最初の教材**（WP `rs-fair`・本線 `70ae591db` 以降。自分の山札の並びと伏せたライフを見ない・公開済みの札は固定）。
+波 44〜46 は r13d の固定点に留まり（r14／r15／r15b／r16／r16c いずれも非昇格・教師を強くしてもネットに移らない）、
+全部見える同士では探索が 2 倍伸びる（`2026-10-21_probe_ab_arena.md`）＝伸びしろはネットの葉の評価にある。この波は **公平な入力で育て直す土台**であり、
+次の訓練（r17）は (1) 公平な教材、(2) 入力の点検（§7.17 WP `enc-audit`）、(3) 全部見える評価の教師（§7.16 WP `omni-value`・間に合えば）を合わせて 1 本にする。
+
+- **教材（波 47）**: 生成役 **r13d**・設定は波 45 と同じ（sims 1280・worlds 1・`--budget 0`・q_min_n 1/8・t=2・synth_roles・両方向 ε 3%）＝物差しは出荷と同じ読み（世界 1 本）。**`reveal` は指定しない＝公平が既定**。16 シャード × 480 局。
+  seed **2501000〜2508500**（シャード k の base は 2500000 + ceil(k/2)×1000 + (k が偶数なら 500)）。
+- **訓練（r17・別の指示書）**: warm-start r11a・π＝波 47（公平な教材だけ）・価値＝波 47＋46＋45（生成役 r13d の波・CLAUDE.md の窓）。入力の点検の結果（符号化 v15 があれば）を入れる。
+- **判定（公平同士）**: r17 vs r13d・両席 160 回・主＋副・各 16 シャード × 175 ペア。**どちらの席も公平な既定で打つ**（今の出荷との比較は参考値・採用は公平同士の勝敗で決める）。seed は指示のときに払い出す。
+- **予告（数を見る前）**: r17 vs r13d（公平同士）主 +10〜+30（r13d は覗き見の教材で育ったので、公平な入力では価値がずれる。公平な教材で育て直した分が出る）。評価帯（波 47 holdout）の価値の誤差は r13d より小さい。
+
+生成の作業セッション用の本文（`{K}`＝01〜16・`{BASE}`＝上の式）:
+
+````
+波 47 の生成を 1 シャードぶん回してください（docs/n_loop_ops.md §7.28）。コードは変更せず、下記を実行して結果ブランチを push するだけです。
+PR は作らないでください。git の作業が安全確認で止められたら、`git stash -u` してから実行してよい。質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+出どころの照合（origin 側で）:
+  (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
+  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.28 波 47"
+  (3) 器: git show origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/record_gen.py | grep -n '"--budget"'
+この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
+
+bash で次の 2 つのブロックを順に実行してください。コンテナが再起動したら、2 つとも最初からもう一度実行します（冪等・終えた本は飛ばす）。
+
+--- ブロック 1（準備）---
+export K={K} BASE={BASE}
+pip install -q numpy maturin
+[ -d ~/opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git ~/opcg-sim-backend
+cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/n47-w${K} origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/n47-w${K} 2>/dev/null && git checkout -q FETCH_HEAD -- n_records 2>/dev/null || true
+rm -f ~/built; make rust-develop > ~/build.log 2>&1 && touch ~/built
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+printf '%s\n' 'cd ~/opcg-sim-backend' \
+  'cp ~/n47_w${K}.log . 2>/dev/null' \
+  'git add -f n_records RESULT.json n47_w${K}.log 2>/dev/null' \
+  'git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "gen wave 47 shard ${K}"' \
+  'git push -q -u origin claude/n47-w${K} || echo PUSH_FAILED' > ~/save47.sh
+
+--- ブロック 2（4 本を順に・1 本ごとに push）---
+下の「#!/bin/bash」から「echo ALL_DONE」までを ~/run47.sh に保存し（ファイル作成のツールでよい）、
+`nohup bash ~/run47.sh > ~/run47.out 2>&1 &` でバックグラウンドに回す（2 時間を超えるのでフォアグラウンドで待たない）。
+**完走（run47.out に ALL_DONE）までターンを終えない**——待機に入るとコンテナが止まり、生成のプロセスも消える。
+`timeout 540 bash -c 'until grep -q ALL_DONE ~/run47.out; do sleep 30; done'; tail -n 1 ~/n47_w{K}.log` のような 9 分以内の待ちを、ALL_DONE が出るまで繰り返し呼ぶ。
+生きているかの確認は `ps -eo pid,etime,cmd | grep "[o]pcg_sim.loop.record_gen"`。
+
+#!/bin/bash
+export K={K} BASE={BASE}
+cd ~/opcg-sim-backend
+for J in 0 1 2 3; do
+  D=n_records/n47_w${K}_p$J
+  [ -f $D/meta_n_record.json ] && continue
+  rm -rf $D
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen --games 120 --seed-base $((BASE + 120*J)) --workers 4 \
+    --sims 1280 --worlds 1 --budget 0 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2.0 \
+    --eps-play 0.03 --eps-hold 0.03 --decks synth_roles --shard-games 10 \
+    --net opcg_sim/data/learned/nrel_r13d.npz --out $D >> ~/n47_w${K}.log 2>&1
+  python - <<'PY' > RESULT.json
+import glob, json, os
+K = os.environ["K"]; parts = sorted(glob.glob(f"n_records/n47_w{K}_p[0-3]"))
+done = [p for p in parts if os.path.exists(p + "/meta_n_record.json")]
+m = [json.load(open(p + "/meta_n_record.json")) for p in done]
+g = [x for p in done for x in json.load(open(p + "/meta_games.json"))["games"]]
+print(json.dumps({"job": f"n47-w{K}", "role": "gen", "status": "done" if len(done) == 4 else "partial",
+  "inputs": {"net": "opcg_sim/data/learned/nrel_r13d.npz", "seed_base": int(os.environ["BASE"]), "games": 480,
+             "sims": 1280, "worlds": 1, "budget": 0, "decks": "synth_roles"},
+  "outputs": {"dirs": done},
+  "metrics": {"parts_done": len(done), "games": sum(x["games"] for x in m), "rows": sum(x["rows"] for x in m),
+              "dropped": sum(x["dropped"] for x in m),
+              "sec_play_mean": round(sum(x["sec"] for x in g) / max(1, len(g)), 2)},
+  "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  bash ~/save47.sh
+done
+tail -n 2 ~/n47_w${K}.log
+echo ALL_DONE
+
+補足:
+- 所要は 1 本（120 局）約 32 分・4 本で約 2.1 時間（同じコンテナで他の重い処理を並べない）。
+- 最初の push が失敗したら（PUSH_FAILED）、その出力を報告してください。
+- コミットメッセージにモデル名を入れない。
+````
 
 ## 8. コーディネータが守ること
 
