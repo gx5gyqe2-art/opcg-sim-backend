@@ -13,7 +13,7 @@
   ]
  },
  "metrics": {
-  "arena_rt05/rt05_w02.jsonl": 100
+  "arena_rt05/rt05_w02.jsonl": 120
  },
  "notes": "ran in /home/user/opcg-sim-backend checkout of origin/claude/play-rethink (085308b)"
 }
