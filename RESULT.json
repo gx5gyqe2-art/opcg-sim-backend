@@ -1,171 +1,125 @@
 {
- "job": "speed-merge",
- "role": "engine-speed-merge",
+ "job": "rs-speed-d",
+ "role": "engine-speed",
  "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.6 (origin/claude/cpu-spec-improvements-yw91jd @ dadd89e; ledger 2+299)",
+ "spec": "docs/search_efficiency_plan.md §7.8 (with §7.7 / §7.2 premises) on origin/claude/cpu-spec-improvements-yw91jd @ e15b2ad; ledger 2+302 (user decision 2026-10-21 「始めてください」)",
  "inputs": {
-  "mainline": "claude/cpu-spec-improvements-yw91jd @ dadd89e3",
-  "rs-speed-a": "claude/rs-speed-a @ eb00b6134",
-  "rs-speed-b": "claude/rs-speed-b @ 6ff385e72",
-  "play-rethink": "claude/play-rethink @ 085308bf0",
+  "base": "claude/cpu-spec-improvements-yw91jd @ e15b2ad (speed-merge already merged: x2.00 at 1x1280)",
   "net": "default (opcg_sim/loop/engine.py::DEFAULT_NET = nrel_r13d.npz)"
  },
  "outputs": {
-  "branch": "claude/speed-merge",
-  "merge_order": "mainline <- rs-speed-a (clean) <- rs-speed-b (8 conflicts) <- play-rethink (RESULT.json only)",
-  "conflicts_resolved": {
-   "rust/opcg_engine/src/journal.rs": "both added Undo::DonPush + StateMut::push_don (same semantics): kept one variant (B's comment / placement), dropped A's duplicate push_don and duplicate apply_undo arm",
-   "rust/opcg_engine/src/encode/mod.rs": "A's crate::fxhash::FxHashMap for Vocab kept; B's Fnv hasher + FastMap alias removed (all their users switched to Fx)",
-   "rust/opcg_engine/src/encode/leader.rs": "LeaderCache map: A's FxHashMap",
-   "rust/opcg_engine/src/encode/tokens.rs": "ProfileCache: B's dense slot[mi] index (no hashing; supersedes A's Fx map); relation comment from A",
-   "rust/opcg_engine/src/encode/scalars.rs": "both had moved the on-play probe in-place (Session::isolated + journaled temp DON!!): kept B's push_temp_dons / main_for(pending_actor_action), dropped A's add_temp_dons",
-   "rust/opcg_engine/src/search/apply.rs": "drain_own_interactions: pending read once (both); stop_at_select test = B's adapter::selection_branch_exists before building the default payload (A's later selection_moves_with check removed as redundant — same predicate)",
-   "rust/opcg_engine/src/search/quiesce.rs": "B's MoveRef/PayloadRef cand_owned + UuidMap alias kept, UuidMap now = crate::fxhash::FxHashMap (was B's FastMap); A's rel zero-fill skip and B's are the same check (kept B's form)",
-   "RESULT.json": "replaced by this file"
-  },
-  "auto_merged_with_both_sides": [
-   "search/mcts.rs",
-   "search/adapter.rs",
-   "effects/resolver.rs",
-   "rules/actions.rs",
-   "search/mod.rs",
-   "net/nrel.rs (A only)",
-   "rules/legal.rs (A only)",
-   "effects/interact.rs (A only)",
-   "effects/passives.rs (A only)",
-   "fxhash.rs (A, new)"
+  "branch": "claude/rs-speed-d",
+  "commits": [
+   "6f5da7b typed Move in legal generation and search (JSON only at the boundary)",
+   "77db9a9 borrow effect nodes in process_stack; cache recalc-skip marks per ability table",
+   "af2880e typed legal list in the encoder scans; per-master DON!! condition cache; borrowed box dedupe keys",
+   "69b8876 drains read the active interaction instead of the pending JSON; borrowed merge keys; hoisted target-query flags; presized unit lists",
+   "64d3d2e presize the lookup-only uuid/slot maps of the candidate rows",
+   "e93f410 defense-box kinds without a hash set; RESOLVE application skips the unused card fields",
+   "637b7e0 module doc for the typed Move; drop the scratch unit test; clippy tidy"
   ],
-  "rethink_files": "opcg_sim/api/*, opcg_sim/loop/{engine,arena,arena_shard,driver}.py, tests/test_play_rethink.py, tests/scripts/rs_rethink_sweep.py, docs/TEST_SPEC.md (merged without conflict)"
+  "files_touched": {
+   "new": ["rust/opcg_engine/src/rules/moves.rs (Move / Payload / PayloadRef / GameArgs)"],
+   "move_and_legal (WP core)": [
+    "rules/legal.rs", "rules/actions.rs (apply_game_action_with: typed args; apply_game_action keeps its JSON signature)",
+    "rules/mod.rs", "search/mod.rs", "search/adapter.rs", "search/apply.rs", "search/prune.rs",
+    "search/macro.rs", "search/quiesce.rs", "search/decide.rs", "search/mcts.rs", "py_game.rs"
+   ],
+   "apply path (rules/effects reached from apply_move_inplace)": [
+    "effects/resolver.rs (process_stack borrows the node)", "effects/passives.rs (recalc-skip cache, ability ids borrowed, presized units)",
+    "effects/ast.rs (AbilityTable.recalc_skip OnceLock)", "effects/matcher.rs (loop-invariant flags hoisted)",
+    "effects/interact.rs (default_interaction_payload_of)", "effects/triggers.rs (presized units)", "rules/turn.rs (presized units)",
+    "model.rs (MasterTable.don_cond OnceLock)", "effects/mod.rs, testkit.rs (struct literals)"
+   ],
+   "encode (only the legal-move consumers)": [
+    "encode/scalars.rs (on-play scan: typed legal list, drain without pending JSON, action read via pending_actor_action)",
+    "encode/tokens.rs (leader_act_avail: typed legal list)"
+   ],
+   "tests (mechanical: JSON-literal moves wrapped in Move::from_json, indexing via to_json)": [
+    "search/tests_search.rs", "search/tests_setup_box.rs", "search/tests_leaf_rollout.rs", "search/decide.rs (tests mod)", "search/quiesce.rs (tests mod)", "search/mcts.rs (tests mod)"
+   ],
+   "not_touched": "net/* (WP rs-speed-c), goldens/fixtures (not regenerated), Python"
+  }
  },
  "gates": {
-  "make_rust_develop": "ok (installed .so md5 0b00118f39bea08247efe4a7cc27eb97 == the wheel used for the equality dump)",
-  "make_test": "green: cargo 572 passed / 1 ignored; pytest 847 passed, 13 skipped (goldens and test_play_rethink ran, 15 passed)",
-  "make_audit_cross": "240 games, void 0 (wr 0.5333 = mirror noise, not a judgement)",
-  "clippy": "1 pre-existing warning in ops.rs (untouched)"
+  "make_rust_develop": "ok (installed .so md5 94fecd556b6555c0923141f8aac0e863 == the wheel of 637b7e0 used for the equality dump)",
+  "make_test": "green: cargo 572 passed / 1 ignored (same as base); pytest 847 passed, 13 skipped (same as base). Goldens test_rs_golden_audit / test_rs_golden_replay (+ test_golden, test_play_rethink) ran and passed without regeneration",
+  "make_audit_cross": "240 games, void 0 (wr 0.5333 / ci95 [0.464, 0.6027] — the same numbers speed-merge recorded on the base, as expected when every move is identical; mirror noise, not a judgement)",
+  "clippy": "only the pre-existing ops.rs:278 collapsible_match remains (untouched); no new lints"
  },
  "metrics": {
   "equality": {
-   "method": "driver.run_game with observer (every decide output JSON) + post (events_json + md5 of board_json after every applied move), sort_keys JSONL; mainline = worktree @ dadd89e with its own wheel, merged = this branch with its wheel; compared line by line",
-   "seeds": "2999900.. (leader_pair random, decks synth_roles), same as rs_decide_latency.py",
+   "method": "driver.run_game with observer (every decide output, sort_keys JSON) + post (events_json + md5 of board_json after every applied move); base = wheel built from e15b2ad, new = wheel built from each stage commit; compared line by line (work-only scripts in the scratchpad, not committed)",
+   "seeds": "2999900.. (leader_pair random, decks synth_roles) = rs_decide_latency.py seeds",
    "settings": {
-    "1x1280_budget0": {
-     "games": 8,
-     "decides": 956,
-     "lines": 1928,
-     "mismatch": 0
-    },
-    "4x1280_budget0": {
-     "games": 4,
-     "decides": 480,
-     "lines": 968,
-     "mismatch": 0
-    },
-    "1x160_budget_default": {
-     "games": 12,
-     "decides": 1390,
-     "lines": 2804,
-     "mismatch": 0
-    }
+    "1x1280_budget0": {"games": 8, "decides": 956, "lines": 1928, "mismatch": 0},
+    "4x1280_budget0": {"games": 4, "decides": 480, "lines": 968, "mismatch": 0},
+    "1x160_budget_default": {"games": 12, "decides": 1390, "lines": 2804, "mismatch": 0}
    },
    "decides_total": 2826,
    "lines_total": 5700,
-   "mismatch_total": 0
+   "mismatch_total": 0,
+   "checked_commits": ["6f5da7b", "77db9a9", "af2880e", "64d3d2e", "637b7e0 (final)"],
+   "note": "every checked stage was 2826/2826 identical; e93f410 differs from 637b7e0 only in docs/test removal/a clippy signature (self by value on a Copy view)"
   },
   "latency_1core": {
-   "how": "taskset -c N (4 runs side by side on cores 0-3, one per core; 4 worlds share one core), rs_decide_latency.py --budget 0 --games 8, same seeds",
+   "how": "taskset -c N, 4 runs side by side on cores 0-3 (one process per core; the 4 worlds share their core), rs_decide_latency.py --sims 1280 --budget 0 --games 8, same seeds",
    "1x1280": {
-    "mainline": {
-     "moves": 956,
-     "mean": 0.292,
-     "p50": 0.006,
-     "p90": 0.764,
-     "p99": 2.003,
-     "max": 3.36,
-     "wall_sec": 279.3,
-     "affinity": [
-      2
-     ]
-    },
-    "merged": {
-     "moves": 956,
-     "mean": 0.146,
-     "p50": 0.003,
-     "p90": 0.391,
-     "p99": 0.96,
-     "max": 1.67,
-     "wall_sec": 139.4,
-     "affinity": [
-      3
-     ]
-    },
-    "speedup_wall": 2.0,
-    "speedup_mean": 2.0
+    "base": {"moves": 956, "mean": 0.155, "p50": 0.003, "p90": 0.416, "p99": 1.02, "max": 1.8, "wall_sec": 148.4},
+    "new": {"moves": 956, "mean": 0.089, "p50": 0.002, "p90": 0.238, "p99": 0.62, "max": 1.19, "wall_sec": 85.6},
+    "speedup_wall": 1.73
    },
    "4x1280": {
-    "mainline": {
-     "moves": 992,
-     "mean": 1.192,
-     "p50": 0.004,
-     "p90": 2.913,
-     "p99": 9.125,
-     "max": 12.73,
-     "wall_sec": 1182.8,
-     "affinity": [
-      0
-     ]
-    },
-    "merged": {
-     "moves": 992,
-     "mean": 0.638,
-     "p50": 0.003,
-     "p90": 1.559,
-     "p99": 4.988,
-     "max": 7.12,
-     "wall_sec": 633.3,
-     "affinity": [
-      1
-     ]
-    },
-    "speedup_wall": 1.87,
-    "speedup_mean": 1.87
-   },
-   "1x5120": {
-    "mainline": {
-     "moves": 1064,
-     "mean": 1.085,
-     "p50": 0.003,
-     "p90": 3.045,
-     "p99": 5.752,
-     "max": 7.78,
-     "wall_sec": 1154.7,
-     "affinity": [
-      2
-     ]
-    },
-    "merged": {
-     "moves": 1064,
-     "mean": 0.543,
-     "p50": 0.002,
-     "p90": 1.531,
-     "p99": 2.902,
-     "max": 3.84,
-     "wall_sec": 578.4,
-     "affinity": [
-      3
-     ]
-    },
-    "speedup_wall": 2.0,
-    "speedup_mean": 2.0
+    "base": {"moves": 992, "mean": 0.657, "p50": 0.003, "p90": 1.59, "p99": 4.996, "max": 7.47, "wall_sec": 652.0},
+    "new": {"moves": 992, "mean": 0.382, "p50": 0.003, "p90": 0.939, "p99": 3.169, "max": 5.09, "wall_sec": 379.0},
+    "speedup_wall": 1.72
    }
+  },
+  "opcg_prof": {
+   "how": "OPCG_PROF=1, 1x1280 budget 0, 3 games, core 0, sequential (base then new); seconds per exclusive category",
+   "decide_wall_sec": {"base": 49.67, "new": 28.97, "speedup": 1.71},
+   "sec": {
+    "legal":            {"base": 11.04, "new": 2.39, "x": 4.62},
+    "apply":            {"base": 12.03, "new": 7.80, "x": 1.54},
+    "search_other":     {"base": 3.06,  "new": 1.77, "x": 1.73},
+    "cand_rows":        {"base": 2.80,  "new": 1.57, "x": 1.78},
+    "enc_onplay":       {"base": 4.06,  "new": 1.60, "x": 2.54},
+    "enc_leader_legal": {"base": 1.08,  "new": 0.16, "x": 6.75},
+    "enc_rel":          {"base": 4.61,  "new": 3.49, "x": 1.32},
+    "encode":           {"base": 1.96,  "new": 1.81, "x": 1.08},
+    "forward":          {"base": 1.63,  "new": 1.49, "x": 1.09},
+    "fwd_tokens":       {"base": 3.18,  "new": 2.93, "x": 1.09},
+    "fwd_body":         {"base": 1.71,  "new": 1.56, "x": 1.10},
+    "fwd_policy":       {"base": 2.38,  "new": 2.25, "x": 1.06}
+   },
+   "counts_identical": "decides 296, n_value 807052, n_priors 787802, n_value_reused 90337, n_trunk_hit 1314748 (same in base and new)",
+   "share_after": "net forward (forward+fwd_*) is now ~30% of decide time and encode ~25%; legal ~8%, apply ~27%"
+  },
+  "callgrind_instructions": {
+   "how": "valgrind callgrind, 1 game, 1x640, seed 2999900 (same game)",
+   "base_e15b2ad": 242077206859,
+   "stage_77db9a9": 176484678918,
+   "note": "-27% instructions after the first two stages; malloc/free were ~25% of all instructions at base"
+  },
+  "effect_by_change (from the stage-by-stage 3-game 1-core runs and callgrind)": {
+   "typed Move (6f5da7b)": "48.1 s -> 36.0 s (x1.34) on its own: no JSON dict / key strings per candidate, no IndexMap lookups, no Value drops; decision windows (main / block / counter / mulligan) are listed without building the pending-request JSON",
+   "process_stack borrow + recalc-skip cache (77db9a9)": "removes the per-step EffectNode/GameAction/TargetQuery subtree clone and drop (~4-5% of instructions) and the per-recalc reactive/replacement text scans",
+   "encoder legal consumers, don-cond cache, borrowed keys (af2880e)": "enc_onplay / enc_leader_legal no longer build JSON move lists (x2.5 / x6.8)",
+   "drain without pending JSON, merge keys, hoisted flags, presized lists, presized cand maps, defense-box (69b8876..e93f410)": "36.0 s -> 28.3 s cumulative with the above (3-game runs: base 48.4 s -> 28.3 s, x1.71)"
   }
  },
  "notes": [
-  "Invariant held: every decide output, every applied move's events and the board after it are identical to mainline on 2,826 decision points (3 settings). Goldens were not regenerated and are green.",
-  "Nothing from either speed branch was dropped as an effect: where both did the same thing (in-place on-play probe with journaled DonPush, rel zero-fill skip, single pending read in drains) one implementation was kept; where they differed only in hashing, A's Fx hasher was used crate-wide (one hasher, lookup-only tables) and B's FNV was removed; ProfileCache uses B's dense index (faster than any hash map).",
-  "Combined speedup (wall, 1 core): 1x1280 x2.00, 4x1280 x1.87, 1x5120 x2.00 — larger than either branch alone (A x1.50 / B x1.39 at 1x1280), as expected since A mostly cut forward/encode repeats and B cut JSON building/copies.",
-  "Latency runs were 4 concurrent single-core-pinned processes (mainline and merged at the same time on separate cores), so absolute numbers include shared-cache/memory-bandwidth effects; the ratio is what to read. Mainline 1x1280 (279 s) matches rs-speed-a's own 'before' (284 s).",
-  "Rethink (play-rethink) is default off; with off, driver.run_game goes through engine.decide_with_rethink which returns the single decide unchanged — confirmed by the equality dump above (which ran through that path on the merged side) and tests/test_play_rethink.py.",
-  "The equality/compare scripts were work-only (scratchpad), not committed, per §7.2.",
+  "Invariant held: on 2,826 decision points in 3 settings (1x1280, 4x1280, 1x160 with the default budget) every decide output (move, sig, k, legal, N, Q, P, groups, PV, commit, budget), every applied move's events and the board after it are identical to base e15b2ad. Goldens were not regenerated and are green.",
+  "Move design: rules/moves.rs. Move = Game{at, payload} | Battle{at, card_uuid} | Json(Value); Payload = Empty | Uuid | Attack{uuid,target} | DonBox{uuid,target_ids,don_k} | Json(Value). to_json() rebuilds exactly the dicts the old code built (same key order: kind, action_type, payload / card_uuid; uuid, target_ids, don_k). Accessors (action_type, kind, card_uuid, payload().uuid / first_target_id / has_target_ids / don_k_i64 / don_k_f64 / first_selected / get) return the same values as the old Value::get(..).and_then(as_*) on both typed and Json forms. Equality = JSON equality: typed-vs-typed compares fields (the typed->JSON map is injective), anything involving Json compares to_json(). Moves coming in from Python (commit replay, search_apply, describe_move, apply_search_move) stay Json, so their re-serialization is byte-identical.",
+  "Boundary: Python-facing JSON is unchanged — decide output converts with to_json at search/mod.rs (move, stats.legal, pv), get_legal_actions (py_game / state.rs) maps the typed list to JSON, search_legal maps on output. rules::actions::apply_game_action(&Value) keeps its signature (thin wrapper over apply_game_action_with(GameArgs, payload)); the search's DON_BOX expansion passes the same uuid / target the old {\"uuid\"} / {\"uuid\",\"target_ids\"} dicts yielded.",
+  "Decision-window listing: get_legal_moves / adapter::legal_actions use pending_actor_action (same branches and the same idempotent battle-phase normalization as get_pending_request) and build MULLIGAN / SELECT_BLOCKER / SELECT_COUNTER / MAIN moves from blocker_candidates / counter_candidates / main_actions directly — the exact functions get_pending_request uses for selectable_uuids. Interaction front actions never coincide with those four (checked InteractionKind::front_action), and selection_moves (dialog alternatives) returns None for them, so the merge step is a no-op there as before. Dialogs still build the pending JSON once (default payload + alternatives read it).",
+  "Drains (search/apply.rs and encode's on-play probe): the old code built the pending JSON only to read player_id / action / can_skip / selectable_uuids / constraints / intent / allow_* for selection_branch_exists and default_interaction_payload. These now read the same values from the active Interaction (selection_branch_exists_of, default_interaction_payload_of; the shared payload body is default_payload_from). Reached only for interaction actions (pending_actor_action checks mulligan, then the interaction, so any action other than the four decision kinds is the interaction's front_action).",
+  "Merge keys of dialog alternatives: the HashSet<String> of JSON-text keys became a linear scan with json_text_eq, which equals to_string() equality (arrays elementwise, numbers by text when a float is involved, dicts by text). Insertion order and first-wins are unchanged.",
+  "Caches of master-only facts (no change in what is read): AbilityTable.recalc_skip (is_reactive_passive || is_rest_replacement per ability, built once per table) and MasterTable.don_cond (don_cond_max_n of each card text; has_don_conditional == don_cond_max_n.is_some()). Both are OnceLock and fall back to computing on the spot if the table grew after the cache was built (only unit tests push to tables; production tables are immutable after load; with_extra_masters / without_abilities clones behave correctly via the length check / fresh default).",
+  "process_stack now borrows the node from the immutable master ability table instead of cloning the subtree each step; get_target_cards reads its 15 loop-invariant query flags once before the candidate loop; units()/units_with_stage presize; slot/uuid maps for candidate rows are presized only inside priors_keep (slot_index itself is unchanged because py_game serializes its iteration order); defense_box_prune checks kinds without a SipHash set; RESOLVE application does not parse uuid/target fields (only the payload is read in that arm; operating_card is a pure lookup).",
+  "Scope: WP rs-speed-d asked for the typed Move and allocation/copy cuts in legal generation (rules/legal.rs) and move application (search/apply.rs). I also touched rules/effects code that apply_move_inplace reaches (resolver, passives, matcher, interact, triggers, turn) and the two encoder call sites that consume legal-move lists — all listed in outputs.files_touched for the later merge with rs-speed-c. net/* was not touched. Possible merge overlap with rs-speed-c: search/quiesce.rs (priors_keep candidate-map presize, cand_owned/cand_parts) and encode/scalars.rs / encode/tokens.rs (only the legal-list / drain lines).",
+  "Not done / left for later (measured on the stage-2 callgrind): passive recalculation after every action (apply_passive_effects -> game_resolve_ability -> get_target_cards) is still ~9% of instructions; avoiding it needs an incremental/dirty-tracking scheme, which is a semantic change, not a copy cut. Dialog windows still build the pending JSON once per listing (default payload + alternatives read it; ~1-2%). Encode allocations (Option<u32> vectors in scalars::encode, own_ids/opp_ids) ~1.5% — encode is outside this WP.",
+  "Process: wheels for the equality checks were built from a separate git worktree checked out at each commit (one early stage-4 build was discarded because sources were edited while it compiled). The cargo registry copy of serde_json was briefly modified by a mis-targeted edit script and immediately restored by deleting and re-extracting it from the cargo cache before any build used it.",
   "Python deps (fastapi etc. from opcg_sim/requirements.txt, pytest-xdist, maturin) had to be installed in this fresh container before the gates."
  ]
 }
