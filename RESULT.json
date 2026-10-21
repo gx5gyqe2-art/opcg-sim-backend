@@ -16,5 +16,5 @@
  "metrics": {
   "arena_rvfair/rvfair_w08.jsonl": 120
  },
- "notes": ""
+ "notes": "120 pairs, void 0, wr 0.5000 exactly (elo 0.0, CI 0.4334-0.5666). Exactly 0.5 with 120 pairs is unusual: candidate may be indistinguishable from baseline (e.g. reveal=fair not changing play); not investigated (code unchanged per instructions)."
 }
