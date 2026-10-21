@@ -47,6 +47,14 @@ def sig(mv):
                        p.get("accepted")], ensure_ascii=False, sort_keys=True)
 
 
+def chosen(out):
+    """選んだ手の鍵。箱は実対局へ先頭の原始手で出る（`move`）ので、根の候補と同じ箱の形の
+    `sig`（`decide.rs` の `rec_sig`）を使う（無ければ `move` から作る）。"""
+    if out.get("sig") is not None:
+        return json.dumps(out["sig"], ensure_ascii=False, sort_keys=True)
+    return sig(out.get("move"))
+
+
 def root_stats(out):
     """根の候補の (sig → (n, q))。同じカードの別の実体はグループ（`groups`＝束ねた統計）で読む。"""
     st = out.get("stats") or {}
@@ -88,6 +96,8 @@ def main(argv=None) -> int:
     ap.add_argument("--budget", type=int, default=0)
     ap.add_argument("--main-every", type=int, default=0, help="打つ手を決める席の引き直しの間隔")
     ap.add_argument("--arms", default="0,100000,8,64")
+    ap.add_argument("--redet-extra", default=None,
+                    help="引き直しの腕だけに足す opts（JSON）")
     ap.add_argument("--same", default=None, help="一致を見る 2 腕（例 0,100000）")
     ap.add_argument("--ref-sims", type=int, default=0)
     ap.add_argument("--ref-worlds", type=int, default=4)
@@ -100,6 +110,7 @@ def main(argv=None) -> int:
     ap.add_argument("--dump", default=None, help="判断点ごとの各腕の手を書き出す（jsonl）")
     ap.add_argument("--score-dump", action="append", default=[],
                     help="LABEL=PATH: 別の実行（別の wheel）の --dump の手も参照で採点する（同じ局面列が前提）")
+    ap.add_argument("--ref-dump", default=None, help="参照の根の統計を判断点ごとに書き出す（jsonl）")
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
     extra = {}
@@ -111,6 +122,7 @@ def main(argv=None) -> int:
                 for m, mv in row["moves"].items():
                     extra.setdefault(f"{label}:{m}", {})[tuple(row["key"])] = mv
     dump_f = open(args.dump, "w", encoding="utf-8") if args.dump else None
+    ref_f = open(args.ref_dump, "w", encoding="utf-8") if args.ref_dump else None
 
     base = {"budget": int(args.budget)}
     arms = [int(x) for x in args.arms.split(",") if x.strip()]
@@ -120,6 +132,7 @@ def main(argv=None) -> int:
         if m:
             kw["redeterminize_every"] = m
             kw["redet_diag"] = True
+            kw.update(json.loads(args.redet_extra) if args.redet_extra else {})
         specs[m] = E.SeatSpec(args.net, sims=args.sims, **kw)
     ref = None
     if args.ref_sims:
@@ -140,9 +153,11 @@ def main(argv=None) -> int:
             return super().decide_opts(game_seed, turn, seat, carry)
 
     spec = _Spec(args.net, sims=args.sims, **mkw)
-    scored = {k: {"loss_sum": 0.0, "loss_n": 0, "loss_pos": 0, "missing": 0} for k in extra}
+    scored = {k: {"loss_sum": 0.0, "loss_n": 0, "loss_pos": 0, "missing": 0, "match_ref_best": 0,
+                  "share_sum": 0.0, "loss_clip_sum": 0.0} for k in extra}
     res = {m: {"points": 0, "searched": 0, "redet": {}, "loss_sum": 0.0, "loss_n": 0,
-               "loss_pos": 0, "match_ref_best": 0, "loss_missing": 0, "ms": 0.0} for m in arms}
+               "loss_pos": 0, "match_ref_best": 0, "loss_missing": 0, "share_sum": 0.0,
+               "loss_clip_sum": 0.0, "ms": 0.0} for m in arms}
     agree = {"points": 0, "searched": 0, "same_move": 0, "same_all": 0, "diffs": []}
     pts = {"n": 0, "searched": 0}
 
@@ -164,7 +179,7 @@ def main(argv=None) -> int:
         key = (last["args"][0], step, name)
         if dump_f is not None:
             dump_f.write(json.dumps({"key": list(key), "searched": searched,
-                                     "moves": {str(m): sig(outs[m].get("move")) for m in arms}},
+                                     "moves": {str(m): chosen(outs[m]) for m in arms}},
                                     ensure_ascii=False) + "\n")
         if searched:
             pts["searched"] += 1
@@ -172,7 +187,7 @@ def main(argv=None) -> int:
             a, b = outs[same[0]], outs[same[1]]
             agree["points"] += 1
             agree["searched"] += int(searched)
-            sm = sig(a.get("move")) == sig(b.get("move"))
+            sm = chosen(a) == chosen(b) and sig(a.get("move")) == sig(b.get("move"))
             sa = sm and raw_stats(a) == raw_stats(b) and a.get("commit") == b.get("commit") and a.get("pv") == b.get("pv")
             agree["same_move"] += int(sm)
             agree["same_all"] += int(sa)
@@ -186,24 +201,39 @@ def main(argv=None) -> int:
                 # 参照の最善＝参照の訪問数最多の手（その Q）。損は「参照の最善の Q − 選んだ手の Q」。
                 best_k = max(rs, key=lambda k: rs[k][0])
                 best = rs[best_k][1]
+                tot = sum(v[0] for v in rs.values()) or 1.0
+                if ref_f is not None:
+                    ref_f.write(json.dumps({"key": list(key), "best": best_k,
+                                            "stats": {k: list(v) for k, v in rs.items()}},
+                                           ensure_ascii=False) + "\n")
                 for lab, mv_by in extra.items():
                     k = mv_by.get(key)
+                    if k in rs:
+                        # 一致率と参照の訪問の取り分は候補にある手すべてで、損は参照が訪れた手だけで測る
+                        scored[lab]["scored_n"] = scored[lab].get("scored_n", 0) + 1
+                        scored[lab]["match_ref_best"] += int(k == best_k)
+                        scored[lab]["share_sum"] += rs[k][0] / tot
                     if k in rs and rs[k][0] > 0:
                         loss = best - rs[k][1]
                         scored[lab]["loss_sum"] += loss
                         scored[lab]["loss_n"] += 1
                         scored[lab]["loss_pos"] += int(loss > 1e-9)
-                        scored[lab]["match_ref_best"] = scored[lab].get("match_ref_best", 0) + int(k == best_k)
+                        scored[lab]["loss_clip_sum"] += max(0.0, loss)
                     else:
                         scored[lab]["missing"] += 1
                 for m in arms:
-                    k = sig(outs[m].get("move"))
+                    k = chosen(outs[m])
+                    if k in rs:
+                        # 一致率と参照の訪問の取り分は候補にある手すべてで、損は参照が訪れた手だけで測る
+                        res[m]["scored_n"] = res[m].get("scored_n", 0) + 1
+                        res[m]["match_ref_best"] += int(k == best_k)
+                        res[m]["share_sum"] += rs[k][0] / tot
                     if k in rs and rs[k][0] > 0:
                         loss = best - rs[k][1]
                         res[m]["loss_sum"] += loss
                         res[m]["loss_n"] += 1
                         res[m]["loss_pos"] += int(loss > 1e-9)
-                        res[m]["match_ref_best"] += int(k == best_k)
+                        res[m]["loss_clip_sum"] += max(0.0, loss)
                     else:
                         res[m]["loss_missing"] += 1
         for m in arms:
@@ -233,6 +263,10 @@ def main(argv=None) -> int:
         r["ms_mean"] = round(r.pop("ms") / max(1, r["points"]), 1)
         if r["loss_n"]:
             r["loss_mean"] = round(r["loss_sum"] / r["loss_n"], 5)
+            r["loss_clip_mean"] = round(r["loss_clip_sum"] / r["loss_n"], 5)
+        if r.get("scored_n"):
+            r["share_mean"] = round(r["share_sum"] / r["scored_n"], 4)
+            r["match_ref_best_frac"] = round(r["match_ref_best"] / r["scored_n"], 4)
         rd = r["redet"]
         if rd.get("sims"):
             ends = ("expand", "terminal", "dead", "no_legal", "mismatch", "empty")
@@ -253,10 +287,16 @@ def main(argv=None) -> int:
     for v in scored.values():
         if v["loss_n"]:
             v["loss_mean"] = round(v["loss_sum"] / v["loss_n"], 5)
+            v["loss_clip_mean"] = round(v["loss_clip_sum"] / v["loss_n"], 5)
+        if v.get("scored_n"):
+            v["share_mean"] = round(v["share_sum"] / v["scored_n"], 4)
+            v["match_ref_best_frac"] = round(v["match_ref_best"] / v["scored_n"], 4)
     if scored:
         data["scored_dumps"] = scored
     if dump_f is not None:
         dump_f.close()
+    if ref_f is not None:
+        ref_f.close()
     text = json.dumps(data, ensure_ascii=False, indent=1)
     if args.out:
         with open(args.out, "w", encoding="utf-8") as f:
