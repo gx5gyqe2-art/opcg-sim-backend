@@ -347,16 +347,11 @@ fn onplay_scan_body(s: &mut Session, masters: &MasterTable, actor: Seat) -> (i32
         - n_active as i32;
     let playable: Vec<String> = s.isolated(|sess| {
         push_temp_dons(sess, actor, need_max.max(0) as usize);
-        match crate::rules::legal::get_legal_actions(sess, masters, actor) {
+        match crate::rules::legal::get_legal_moves(sess, masters, actor) {
             Ok(moves) => moves
                 .iter()
-                .filter(|m| m.get("action_type").and_then(|v| v.as_str()) == Some("PLAY"))
-                .filter_map(|m| {
-                    m.get("payload")
-                        .and_then(|p| p.get("uuid"))
-                        .and_then(|v| v.as_str())
-                        .map(str::to_owned)
-                })
+                .filter(|m| m.action_type() == Some("PLAY"))
+                .filter_map(|m| m.payload_uuid().map(str::to_owned))
                 .collect(),
             Err(_) => Vec::new(), // Python `except: playable = set()`
         }

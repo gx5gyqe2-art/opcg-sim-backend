@@ -17,7 +17,7 @@ use serde_json::{json, Value};
 use std::cell::RefCell;
 use std::collections::HashSet;
 
-use super::prune::{action_type, don_cond_max_n, first_target_id, own_units, payload_uuid};
+use super::prune::{action_type, first_target_id, master_don_cond, own_units, payload_uuid};
 use super::quiesce::BOX_BRANCH_BUDGET;
 use super::{adapter, apply, Move, Payload};
 
@@ -95,7 +95,8 @@ pub fn don_alloc_candidates(
     }
     let units = own_units(state, seat);
     let mut out: Vec<Move> = Vec::new();
-    let mut seen: HashSet<(String, i64)> = HashSet::new();
+    // 既出の（対象, k）。鍵は手から借りる（集合の判定だけに使う＝並びに影響しない）。
+    let mut seen: HashSet<(&str, i64)> = HashSet::new();
     for mv in attach_moves {
         if action_type(mv) != Some("ATTACH_DON") {
             continue;
@@ -105,14 +106,14 @@ pub fn don_alloc_candidates(
             continue;
         };
         let mut ks: Vec<i64> = vec![1, budget];
-        if let Some(n) = don_cond_max_n(&masters.get(state.card(card).master).effect_text) {
+        if let Some(n) = master_don_cond(masters, state.card(card).master) {
             let attached = state.card(card).attached_don;
             if attached < n {
                 ks.push((n - attached) as i64);
             }
         }
         for k in py_set_order(&ks) {
-            let key = (uuid.to_owned(), k);
+            let key = (uuid, k);
             if (1..=budget).contains(&k) && !seen.contains(&key) {
                 seen.insert(key);
                 out.push(don_box(uuid, Vec::new(), k));
@@ -136,7 +137,7 @@ pub fn attack_box_candidates(
     let attackers = own_units(state, seat);
     let targets = own_units(state, seat.other());
     let mut out: Vec<Move> = Vec::new();
-    let mut seen: HashSet<(String, String, i64)> = HashSet::new();
+    let mut seen: HashSet<(&str, &str, i64)> = HashSet::new();
     for mv in attack_moves {
         if action_type(mv) != Some("ATTACK") {
             continue;
@@ -155,7 +156,7 @@ pub fn attack_box_candidates(
         let k_min = ceil_don(l - p).max(0);
         let k_two = ceil_don(l + 2000 - p).max(0);
         for k in py_set_order(&[0, k_min, k_two]) {
-            let key = (uuid.to_owned(), tid.to_owned(), k);
+            let key = (uuid, tid, k);
             if (0..=budget).contains(&k) && !seen.contains(&key) {
                 seen.insert(key);
                 out.push(don_box(uuid, vec![tid], k));
