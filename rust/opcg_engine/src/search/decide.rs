@@ -74,6 +74,9 @@ pub struct DecideOptions {
     /// 根の世界を引き直し、木は共有する（既定 0＝off＝今までどおり 1 つの世界で読む）。
     /// `worlds > 1` と併用でき、各世界の木がそれぞれ引き直す（乱数は世界 i の探索乱数を進める）。
     pub redeterminize_every: usize,
+    /// 世界の引き直しの診断（WP `rs-ismcts-diag`・既定 false）: 自分の手番の世界依存を数える
+    /// （`redet` の欄が増えるだけ・出力の手と統計は変えない）。引き直しが off なら効かない。
+    pub redet_diag: bool,
     /// 候補生成（`OPCGGame`）
     pub search: SearchOptions,
     /// `BOX_BRANCH_BUDGET`（`None`＝無制限）
@@ -119,6 +122,7 @@ impl Default for DecideOptions {
             worlds: 1,
             search_seed: None,
             redeterminize_every: 0,
+            redet_diag: false,
             search: SearchOptions::default(),
             budget: Some(super::quiesce::BOX_BRANCH_BUDGET),
         }
@@ -642,6 +646,38 @@ fn trace_to_steps(trace: &[(Seat, Move)], name: Seat) -> Vec<Step> {
     steps
 }
 
+/// 診断（WP `rs-ismcts-diag` の 4）: コミットの続きの最初の手が、木で選んだ手の子
+/// （自分の手番の対話）の訪問最多の手と同じかを数える（出力は変えない）。
+fn note_commit_vs_tree(nodes: &[Node], chosen: Option<usize>, steps: &[Step], name: Seat) {
+    let Some(child) = chosen.and_then(|i| nodes.first().and_then(|r| r.children.get(i).copied().flatten()))
+    else {
+        return;
+    };
+    let c = &nodes[child];
+    if !c.expanded || c.terminal || c.legal.is_empty() || c.to_move != Some(name) {
+        return;
+    }
+    if c.n.iter().sum::<f64>() <= 0.0 {
+        return;
+    }
+    let best = argmax_n(&c.n);
+    let first = match &steps[0] {
+        Step::Sig(sig) => sig,
+        Step::Box { sig, .. } => sig,
+    };
+    super::mcts::redet_note_commit(move_sig(&c.legal[best]) != *first);
+}
+
+fn argmax_n(n: &[f64]) -> usize {
+    let mut b = 0;
+    for (i, x) in n.iter().enumerate() {
+        if *x > n[b] {
+            b = i;
+        }
+    }
+    b
+}
+
 /// DON_BOX の総原始手数（付与 k 枚＋攻撃形なら 1）。
 fn box_total(mv: &Move) -> i64 {
     let null = Value::Null;
@@ -1135,7 +1171,12 @@ fn run_one_world(
     tree.root_prior_temp = opts.root_prior_temp;
     let every = opts.effective_redeterminize_every();
     if every > 0 {
-        tree.redet = Some(super::mcts::Redet { root: root.0.clone(), me: root.1, every });
+        tree.redet = Some(super::mcts::Redet {
+            root: root.0.clone(),
+            me: root.1,
+            every,
+            diag: opts.redet_diag,
+        });
     }
     let run = tree.run_in_world(world, rng, st)?;
     Ok((run, tree.into_nodes()))
@@ -1567,6 +1608,10 @@ fn decide_inner(
                     } else {
                         commit_play_dialog(ctx, state, name, &m, rng, st)?
                     };
+                    // 診断（WP `rs-ismcts-diag` の 4・引き直しが有効なときだけ数える）
+                    if opts.effective_redeterminize_every() > 0 && !steps.is_empty() {
+                        note_commit_vs_tree(&runs[pv_world].nodes, chosen_idx, &steps, name);
+                    }
                     if !steps.is_empty() {
                         carry.commit = steps;
                     }

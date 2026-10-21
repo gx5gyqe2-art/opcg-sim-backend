@@ -553,6 +553,7 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .and_then(Value::as_u64)
             .map(|n| n as usize)
             .unwrap_or(d.redeterminize_every),
+        redet_diag: v.get("redet_diag").and_then(Value::as_bool).unwrap_or(false),
         search: options_from_json(v),
         budget: match v.get("budget") {
             None | Some(Value::Null) => d.budget,

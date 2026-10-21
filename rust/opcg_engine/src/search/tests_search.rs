@@ -516,7 +516,7 @@ mod redet {
     use super::super::quiesce::{Ctx, SearchState};
     use super::super::SearchOptions;
     use crate::model::{GameState, MasterTable, Seat};
-    use crate::testkit::{BoardBuilder, M_CHAR, M_EVENT, M_RUSH};
+    use crate::testkit::{BoardBuilder, M_BIG, M_CHAR, M_EVENT, M_RUSH};
 
     fn net() -> &'static crate::net::LoadedNet {
         static NET: std::sync::OnceLock<crate::net::LoadedNet> = std::sync::OnceLock::new();
@@ -653,7 +653,7 @@ mod redet {
             .map(|c| world.card(*c).uuid.clone())
             .collect();
         let mut t = TreeMcts::new(ctx, 1.5, 64, 0.0);
-        t.redet = Some(Redet { root: state.clone(), me: Seat::P1, every: 1 });
+        t.redet = Some(Redet { root: state.clone(), me: Seat::P1, every: 1, diag: false });
         let out = t
             .run_in_world(world, &mut rng, &mut SearchState::default())
             .expect("run");
@@ -702,6 +702,79 @@ mod redet {
             let b = run(&masters, &state, &o);
             same(&a, &b);
             assert_eq!(a.n.iter().sum::<f64>(), (32 * worlds) as f64);
+        }
+    }
+
+    /// p1 のアタッカー（パワー 9000）が p2 のリーダー（5000）を叩ける盤面（ターン 3）。p2 は
+    /// 手札 2・山札 4（カウンター 1000 のキャラ 3 枚＋カウンター無しのイベント 3 枚）・ドン!! 無し。
+    /// カウンターを 1 枚使った後、手札にもう 1 枚キャラが残る世界では p2 がまた選び、残らない世界
+    /// では戦闘が解決して p1 のメインに戻る＝**同じ手順でも世界で次に動く側が変わる**。
+    fn counter_board() -> (MasterTable, GameState) {
+        let mut b = BoardBuilder::new().turn(3, Seat::P1);
+        b.put_field(Seat::P1, M_BIG);
+        b.dons(Seat::P1, "active", 2);
+        for _ in 0..3 {
+            b.put_life(Seat::P1, M_CHAR);
+            b.put_life(Seat::P2, M_CHAR);
+            b.put_deck(Seat::P1, M_CHAR);
+        }
+        b.put_hand(Seat::P2, M_CHAR);
+        b.put_hand(Seat::P2, M_EVENT);
+        b.put_deck(Seat::P2, M_CHAR);
+        b.put_deck(Seat::P2, M_CHAR);
+        b.put_deck(Seat::P2, M_EVENT);
+        b.put_deck(Seat::P2, M_EVENT);
+        let (mut masters, state) = b.build();
+        masters.masters[M_EVENT as usize].counter = 0;
+        (masters, state)
+    }
+
+    /// (e) WP `rs-ismcts-diag` の修正の見張り: 読みが「ノードの手番がこの世界と食い違う」・
+    /// 「箱で畳んだ手がこの世界で打てない」で葉として終わらない（修正前は木を伸ばさずに返していた
+    /// ＝実対局で読みの 3〜4 割）。局面の型が違う世界のための別の子と、畳み直した手が作られる。
+    #[test]
+    fn redeterminize_reads_always_reach_a_leaf() {
+        let (masters, state) = counter_board();
+        let ctx: &'static Ctx<'static> = Box::leak(Box::new(Ctx {
+            masters: Box::leak(Box::new(masters)),
+            net: net(),
+            opts: SearchOptions::default(),
+            box_battle: true,
+            box_dialog: true,
+            quiesce: true,
+            quiesce_max_plies: super::super::quiesce::QUIESCE_MAX_PLIES,
+        }));
+        reset_redet_stats(1);
+        let mut rng = crate::search::Pcg32SearchRng::new(11);
+        let world = super::super::determinize::determinize_with(&state, Seat::P1, &mut rng)
+            .expect("world");
+        let sims = 400;
+        let mut t = TreeMcts::new(ctx, 1.5, sims, 0.0);
+        t.redet = Some(Redet { root: state.clone(), me: Seat::P1, every: 1, diag: true });
+        let out = t
+            .run_in_world(world, &mut rng, &mut SearchState::default())
+            .expect("run");
+        assert_eq!(out.n.iter().sum::<f64>(), sims as f64);
+        let stats = take_redet_stats();
+        let g = |k: &str| stats[k].as_u64().unwrap_or_else(|| panic!("{k}: {stats}"));
+        assert_eq!(g("sims"), sims as u64);
+        assert_eq!(g("end_mismatch"), 0, "手番の食い違いで終わった読みが無い: {stats}");
+        assert_eq!(g("end_empty"), 0, "打てる手が無くて終わった読みが無い: {stats}");
+        assert!(g("alt_children") > 0, "局面の型が違う世界の別の子がある: {stats}");
+        assert!(g("reboxed") > 0, "畳み直した手がある: {stats}");
+        assert_eq!(g("own_diff"), 0, "自分の手番の合法手は世界に依らない: {stats}");
+        // 同じ手の子どうしは局面の型（終局か・手番・待っている操作）が全部違う。
+        let nodes = t.into_nodes();
+        for n in &nodes {
+            for (a, c) in &n.alts {
+                let key = |i: usize| (nodes[i].terminal, nodes[i].to_move, nodes[i].act);
+                let mut keys = vec![key(n.children[*a].expect("別の子は最初の子の後"))];
+                keys.extend(n.alts.iter().filter(|(b, _)| b == a).map(|(_, d)| key(*d)));
+                let k = keys.len();
+                keys.sort_by_key(|x| format!("{x:?}"));
+                keys.dedup();
+                assert_eq!(keys.len(), k, "手 {a} の子 {c} の型が重複: {keys:?}");
+            }
         }
     }
 }
