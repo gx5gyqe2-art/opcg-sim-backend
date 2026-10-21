@@ -244,3 +244,23 @@ Phase 0 → Phase 1 → Phase 3（Phase 4 の (a)(b) を合間に）→ Phase 4 
 
 §7.6 と同じ形。`claude/rs-speed-c`（ネットの計算・1 本 × 1,280 回で ×1.12・2,826 判断点で全件一致）と `claude/rs-speed-d`（手の表現・合法手の生成・×1.73・2,826 判断点で全件一致）を、本線 `claude/cpu-spec-improvements-yw91jd` の最新にマージしたブランチ `claude/speed-merge2` を作って push。
 衝突は両方の効きを残す形で解き、捨てた変更があれば notes に。不変条件・一致の確かめ方（本線の wheel とマージ後の wheel で 3 設定・2,000 判断点以上が全件一致）・1 コア固定の時間の前後（1 本 × 1,280 回・4 本 × 1,280 回・2 本 × 1,280 回・1 本 × 5,120 回）・`make rust-develop`・`make test`・`make audit-cross` は §7.6 のとおり。PR は作らない。コミットメッセージにモデル名を入れない。
+
+### 7.10 WP `rs-omniscient`——全部見える探索（天井の切り分け用・作業セッション用・opus）
+
+ユーザ決定（2026-10-21「全部見える CPU との対戦もやってください」）。計算 ×2〜×8 の設定がどれも +20 前後で止まった（台帳 2+305）。
+天井が「見えないことの扱い」（世界の中で隠れ情報が見えている前提で読むずれ・相手の手札を無作為に引くこと）か「ネットの評価」かを切り分けるため、
+**候補席だけ本当の盤面（相手の手札・両者の山札の並び）で読む**選択肢を足す。本線の最新から分岐し `claude/rs-omniscient` に push。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
+
+**仕様**:
+1. `DecideOptions.omniscient: bool`（既定 false）・opts JSON の鍵 `omniscient`。true のとき、探索で世界を引く所（`search/determinize.rs::determinize_with` の呼び出し元すべて——`decide.rs` の `run_worlds`／`run_one_world` と、箱・対話・続きの解決で世界を引く所）で**引き直さず本当の盤面をそのまま使う**。`worlds > 1` は意味が無いので 1 として扱う（注記）。
+2. 配線: `py_game.rs` の opts 読み取り → `opcg_sim/api/engine_rs.py` → `arena.py` の `--cand-omniscient`（`_CAND_KEYS`）・`arena_shard.py` の基準席用 `--omniscient`。対戦 API の既定は変えない。
+3. 見える範囲は探索の中だけ。手を選んだ後の盤面の進行は今のまま（ゲームとしては不正だが、測定専用の選択肢として明記する）。
+
+**不変条件**: 既定（false）で出力は 1 bit も変わらない（golden 3 本・`make test`・`make audit-cross`）。
+
+**テスト（Rust・必須）**: (a) false で今と同一 (b) true で、相手の手札＋山札が空の盤面では false と同一 (c) true で世界を引く関数が呼ばれない（または引いた世界が本当の盤面と等しい）こと。`docs/TEST_SPEC.md` §2 に 1 行。
+
+**計測して RESULT.json に書くもの**: 手元の短いアリーナ（候補 `--cand-sims 1280 --cand-omniscient --cand-budget 0`・基準 今の出荷・`--pairs 40 --workers 4`・seed base 1675000）の勝率。1 コア固定の 1 手の時間（`rs_decide_latency.py` に `--omniscient` を足してよい）。
+
+**成果物**: ブランチ `claude/rs-omniscient`（コード・テスト・TEST_SPEC の 1 行・RESULT.json）。コミットメッセージにモデル名を入れない。
+本番のアリーナ（同じ seed 帯 1651000〜・12 シャード × 120 ペア）はコーディネータが別に出す（`n_loop_ops.md` §7.24）。
