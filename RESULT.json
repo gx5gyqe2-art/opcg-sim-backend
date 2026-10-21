@@ -16,5 +16,5 @@
  "metrics": {
   "arena_w4/w4_w11.jsonl": 208
  },
- "notes": ""
+ "notes": "ARENA_RESUME_FINAL: pairs 119, games 238, void 1, wr 0.5546 CI95 [0.4827,0.6265], elo +38.1. 88 pairs came from a prior session's push on this branch (different base commit); merged with 'merge -s ours' (our file kept the prior 88 lines as prefix), no force push. The 'cumulative N/120' log counter exceeded 120 (likely counts games, not pairs); final file is the source of truth. Interim manual commits were made to satisfy a stop hook."
 }
