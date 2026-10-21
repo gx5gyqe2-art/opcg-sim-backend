@@ -183,3 +183,10 @@
 {"seed": 1662096, "score": 2.0, "leaders": ["OP14-040", "OP03-022"], "games": [1.0, 1.0], "cand_leaders": ["OP14-040", "OP14-040"], "turns": [9, 14], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
 {"seed": 1662097, "score": 0.0, "leaders": ["OP01-003", "OP04-019"], "games": [0.0, 0.0], "cand_leaders": ["OP01-003", "OP01-003"], "turns": [12, 15], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
 {"seed": 1662094, "score": 2.0, "leaders": ["EB01-001", "OP13-004"], "games": [1.0, 1.0], "cand_leaders": ["EB01-001", "EB01-001"], "turns": [11, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1662098, "score": 2.0, "leaders": ["ST14-001", "ST05-001"], "games": [1.0, 1.0], "cand_leaders": ["ST14-001", "ST14-001"], "turns": [15, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1662095, "score": 2.0, "leaders": ["OP17-039", "OP04-020"], "games": [1.0, 1.0], "cand_leaders": ["OP17-039", "OP17-039"], "turns": [11, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1662100, "score": 0.0, "leaders": ["OP04-019", "OP12-081"], "games": [0.0, 0.0], "cand_leaders": ["OP04-019", "OP04-019"], "turns": [14, 11], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1662099, "score": 1.0, "leaders": ["OP16-001", "OP08-098"], "games": [1.0, 0.0], "cand_leaders": ["OP16-001", "OP16-001"], "turns": [11, 11], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1662102, "score": 0.0, "leaders": ["OP12-020", "ST04-001"], "games": [0.0, 0.0], "cand_leaders": ["OP12-020", "OP12-020"], "turns": [14, 13], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1662103, "score": 2.0, "leaders": ["OP09-081", "OP07-097"], "games": [1.0, 1.0], "cand_leaders": ["OP09-081", "OP09-081"], "turns": [15, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
+{"seed": 1662101, "score": 1.0, "leaders": ["OP01-062", "OP12-001"], "games": [0.0, 1.0], "cand_leaders": ["OP01-062", "OP01-062"], "turns": [12, 12], "cand_opts": {"sims": 1280, "worlds": 4, "budget": 0}}
