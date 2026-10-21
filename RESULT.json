@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_rvfair/rvfair_w04.jsonl": 90
+  "arena_rvfair/rvfair_w04.jsonl": 100
  },
  "notes": "worked in /home/user/opcg-sim-backend instead of ~/opcg-sim-backend (existing checkout)"
 }
