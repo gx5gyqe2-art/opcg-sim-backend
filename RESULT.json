@@ -15,7 +15,7 @@
   ]
  },
  "metrics": {
-  "arena_fairprod/fairprod_w02.jsonl": 10
+  "arena_fairprod/fairprod_w02.jsonl": 20
  },
  "notes": "worked in /home/user/opcg-sim-backend (~/opcg-sim-backend clone was an empty stub)"
 }
