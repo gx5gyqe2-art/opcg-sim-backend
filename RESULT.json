@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_w4/w4_w01.jsonl": 158
+  "arena_w4/w4_w01.jsonl": 168
  },
  "notes": "ran in existing checkout /home/user/opcg-sim-backend (not ~/opcg-sim-backend clone)"
 }
