@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_rvfair/rvfair_w05.jsonl": 50
+  "arena_rvfair/rvfair_w05.jsonl": 60
  },
  "notes": "ran in /home/user/opcg-sim-backend; effects json exported locally"
 }
