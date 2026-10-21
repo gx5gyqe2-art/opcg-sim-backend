@@ -17,5 +17,5 @@
  "metrics": {
   "arena_fairprod/fairprod_w08.jsonl": 120
  },
- "notes": ""
+ "notes": "Setup: fresh git clone into ~ hung, so ~/opcg-sim-backend was symlinked to the existing /home/user/opcg-sim-backend checkout (already at claude/rs-fair tip 70ae591). Final: 120 pairs, 240 games, void 0, wins 116, wr 0.4833, CI95 [0.4178,0.5489], elo -11.6 (candidate fair+knowledge vs baseline peek, r13d, synth_roles, seed-base 1657000)."
 }
