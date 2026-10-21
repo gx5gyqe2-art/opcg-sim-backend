@@ -340,7 +340,8 @@ pub fn onplay_option_scan(
     if !main_for(&mut probe, masters, actor) {
         return (0, 0, 0.0);
     }
-    onplay_scan_body(state, masters, actor)
+    // 入口の判定が `probe` を動かしていても、本体は元の盤面から回す（今までどおり）。
+    onplay_scan_body(&mut Session::new(state.clone()), masters, actor)
 }
 
 /// [`onplay_option_scan`] と同じ値を、入口の判定（保留中の要求）だけ `s` の上で読む版
@@ -353,7 +354,22 @@ pub fn onplay_option_scan_in(s: &mut Session, masters: &MasterTable, actor: Seat
     if !ok {
         return (0, 0, 0.0);
     }
-    onplay_scan_body(s.state(), masters, actor)
+    onplay_scan_body(s, masters, actor)
+}
+
+/// [`with_temp_dons`] と同じ一時ドン!!を `s` の上に足す（journal を通す＝`isolated` の退出で消える）。
+fn add_temp_dons(s: &mut Session, seat: Seat, n: usize) {
+    let mut e = s.edit();
+    for k in 0..n {
+        let idx = e.push_don(DonInstance {
+            owner: seat,
+            uuid: format!("__onplay_tmp_don_{k}"),
+            is_rest: false,
+            attached_to: None,
+            is_frozen: false,
+        });
+        e.don_zone_push(seat, crate::journal::DonZone::Active, idx);
+    }
 }
 
 /// メイン手番の要求が `actor` 宛てか（`get_pending_request` は `&mut Session` を取る）。
@@ -366,7 +382,11 @@ fn main_for(s: &mut Session, masters: &MasterTable, actor: Seat) -> bool {
 }
 
 /// [`onplay_option_scan`] の入口の判定より後（メイン手番が `actor` 宛てのとき）。
-fn onplay_scan_body(state: &GameState, masters: &MasterTable, actor: Seat) -> (i32, i32, f64) {
+///
+/// 試し打ちは「一時ドン!!を補った盤面の写しから作った新しいセッション」と同じ見え方の
+/// [`Session::isolated`] で `s` の上に回す（盤面を写さない・退出で巻き戻す＝`s` の盤面は元のまま）。
+fn onplay_scan_body(s: &mut Session, masters: &MasterTable, actor: Seat) -> (i32, i32, f64) {
+    let state = s.state();
     // 対象＝手札の ON_PLAY 持ち。
     let targets: Vec<CardIdx> = state
         .player(actor)
@@ -395,9 +415,9 @@ fn onplay_scan_body(state: &GameState, masters: &MasterTable, actor: Seat) -> (i
         .max()
         .unwrap_or(0)
         - n_active as i32;
-    let playable: Vec<String> = {
-        let mut sess = Session::new(with_temp_dons(state, actor, need_max.max(0) as usize));
-        match crate::rules::legal::get_legal_actions(&mut sess, masters, actor) {
+    let playable: Vec<String> = s.isolated(|sess| {
+        add_temp_dons(sess, actor, need_max.max(0) as usize);
+        match crate::rules::legal::get_legal_actions(sess, masters, actor) {
             Ok(moves) => moves
                 .iter()
                 .filter(|m| m.get("action_type").and_then(|v| v.as_str()) == Some("PLAY"))
@@ -410,40 +430,42 @@ fn onplay_scan_body(state: &GameState, masters: &MasterTable, actor: Seat) -> (i
                 .collect(),
             Err(_) => Vec::new(), // Python `except: playable = set()`
         }
-    };
+    });
 
     let (mut n_live, mut n_dead, mut keep_live) = (0, 0, 0.0f64);
     for ci in &targets {
-        let uuid = state.card(*ci).uuid.clone();
-        let cost = masters.get(state.card(*ci).master).cost;
+        let uuid = s.state().card(*ci).uuid.clone();
+        let cost = masters.get(s.state().card(*ci).master).cost;
         let need = (cost - n_active as i32).max(0) as usize;
         let mut fired = false;
         if playable.contains(&uuid) {
-            let mut sess = Session::new(with_temp_dons(state, actor, need));
-            resolver::reset_effect_events();
-            let applied = crate::rules::actions::apply_game_action(
-                &mut sess,
-                masters,
-                actor,
-                "PLAY",
-                &serde_json::json!({"uuid": uuid}),
-            );
-            if applied.is_ok() {
-                drain_own_interactions(&mut sess, masters, actor, true);
-                let pend =
-                    crate::rules::pending::get_pending_request(&mut sess, masters, false);
+            fired = s.isolated(|sess| {
+                add_temp_dons(sess, actor, need);
+                resolver::reset_effect_events();
+                let applied = crate::rules::actions::apply_game_action(
+                    sess,
+                    masters,
+                    actor,
+                    "PLAY",
+                    &serde_json::json!({"uuid": uuid}),
+                );
+                if applied.is_err() {
+                    return false;
+                }
+                drain_own_interactions(sess, masters, actor, true);
+                let pend = crate::rules::pending::get_pending_request(sess, masters, false);
                 let not_main = pend
                     .as_ref()
                     .and_then(|p| p.get("action"))
                     .and_then(|v| v.as_str())
                     != Some("MAIN_ACTION");
-                fired = not_main || resolver::effect_events() > 0;
-            }
+                not_main || resolver::effect_events() > 0
+            });
         }
         if fired {
             n_live += 1;
             keep_live += f64::from(crate::effects::interact::card_keep_value(
-                state, masters, *ci,
+                s.state(), masters, *ci,
             ));
         } else {
             n_dead += 1;

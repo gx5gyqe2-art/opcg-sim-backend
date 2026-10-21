@@ -188,6 +188,8 @@ pub enum Undo {
     ResolvingEvent(Option<CardIdx>),
     /// 中断（対話）を丸ごと差し替えた（Python の `active_interaction = {...}`＝先頭置換）。
     InteractionReplace(Box<Interaction>),
+    /// ドン!!の実体を末尾に足した（戻すときは末尾を落とす）。
+    DonPush,
 }
 
 /// P3 で足した `GameManager` の bool 欄。
@@ -568,6 +570,14 @@ impl StateMut<'_> {
         self.rec(Undo::DonZoneInsert(seat, zone, at));
     }
 
+    /// ドン!!の実体を末尾に足す（添字を返す）。符号化の登場時スキャンが一時ドン!!を補うのに使う。
+    pub fn push_don(&mut self, don: crate::model::DonInstance) -> DonIdx {
+        let idx = self.state.dons.len() as DonIdx;
+        self.state.dons.push(don);
+        self.rec(Undo::DonPush);
+        idx
+    }
+
     pub fn don_zone_push(&mut self, seat: Seat, zone: DonZone, don: DonIdx) {
         let at = don_zone_ref(self.state.player(seat), zone).len();
         self.don_zone_insert(seat, zone, at, don);
@@ -909,6 +919,9 @@ fn apply_undo(state: &mut GameState, entry: Undo) {
         },
         Undo::InteractionPush => {
             state.interaction_stack.pop();
+        }
+        Undo::DonPush => {
+            state.dons.pop();
         }
         Undo::InteractionPop(old) => state.interaction_stack.push(*old),
         Undo::TriggerQueue(which, old) => *trigger_queue_mut(state, which) = old,

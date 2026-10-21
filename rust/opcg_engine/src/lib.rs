@@ -14,6 +14,7 @@ use pyo3::prelude::*;
 mod audit;
 mod effects;
 mod encode;
+mod fxhash;
 mod journal;
 mod model;
 mod net;

@@ -21,7 +21,6 @@
 //! 重み `w` はトリガー種別の発火頻度（`leader_feat._RATE`・既定 0.3）。コスト句は `sign=-1`。
 //! 最後に `[-5, 5]` へクリップする。
 
-use std::collections::HashMap;
 
 use crate::effects::ast::{ActionType, EffectNode, GameAction, PlayerRef, TriggerType, ValueSource, ZoneRef};
 use crate::model::{CardMaster, MasterIdx, MasterTable};
@@ -243,7 +242,7 @@ pub fn leader_static_vector(masters: &MasterTable, mi: MasterIdx) -> [f32; LEADE
 /// `leader_static_vector` のキャッシュ（Python は `(card_id, effect_text)` キーのモジュール辞書）。
 #[derive(Debug, Default)]
 pub struct LeaderCache {
-    map: HashMap<MasterIdx, [f32; LEADER_FEAT_DIM]>,
+    map: crate::fxhash::FxHashMap<MasterIdx, [f32; LEADER_FEAT_DIM]>,
 }
 
 impl LeaderCache {

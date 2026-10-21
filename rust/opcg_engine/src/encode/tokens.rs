@@ -60,7 +60,6 @@
 //! `g <= 0` の境界を決めるので f64 で計算すると答えが変わりうる）。`threat_next` の
 //! 一括計算だけは Python も float64（`pool_arr` と生の整数）なので f64 で行う。
 
-use std::collections::HashMap;
 
 use crate::effects::ast::{ActionType, GameAction, PlayerRef, TriggerType};
 use crate::effects::EffectContext;
@@ -128,7 +127,7 @@ impl Profile {
 /// マスター単位のキャッシュ（Python のモジュール辞書 `_PROFILES`／`_ROLES`／`_THR_ROWS`／`_STATIC`）。
 #[derive(Debug, Default)]
 pub struct ProfileCache {
-    map: HashMap<MasterIdx, Profile>,
+    map: crate::fxhash::FxHashMap<MasterIdx, Profile>,
 }
 
 impl ProfileCache {
@@ -797,15 +796,16 @@ pub fn encode_rel(
     }
 
     // ---- 関係 R ----
-    let profs_owned: Vec<Option<Profile>> = slots
-        .iter()
-        .map(|c| c.map(|c| cache.get(masters, s.state().card(c).master).clone()))
-        .collect();
-    let mut profs: [Option<&Profile>; N_TOK] = [None; N_TOK];
-    for i in 0..N_TOK {
-        profs[i] = profs_owned[i].as_ref();
-    }
+    // 要約の写しは関係を作るときだけ要る（作らないなら読まない）。
     let (rel_om, rel_oo) = if with_relations {
+        let profs_owned: Vec<Option<Profile>> = slots
+            .iter()
+            .map(|c| c.map(|c| cache.get(masters, s.state().card(c).master).clone()))
+            .collect();
+        let mut profs: [Option<&Profile>; N_TOK] = [None; N_TOK];
+        for i in 0..N_TOK {
+            profs[i] = profs_owned[i].as_ref();
+        }
         relations_from_tokens(&profs, &tok)
     } else {
         (Vec::new(), Vec::new())

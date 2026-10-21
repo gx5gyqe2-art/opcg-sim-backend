@@ -51,12 +51,16 @@ pub fn apply_passive_effects(
     // Step 1: 両プレイヤーのバフ・一時キーワードをリセット（値が変わるときだけ書く）。
     for seat in [player, opponent] {
         for card in units(s, seat) {
-            let keywords = masters.get(s.state().card(card).master).keywords.clone();
+            let master_kw = &masters.get(s.state().card(card).master).keywords;
+            // 書き込みは値が同じなら何もしない＝同じときは写しを作らない（結果は同じ）。
+            let keywords = (s.state().card(card).current_keywords != *master_kw).then(|| master_kw.clone());
             let mut e = s.edit();
             e.set_card_i32(card, CardI32Field::CostBuff, 0);
             e.set_card_i32(card, CardI32Field::PassivePower, 0);
             e.set_card_opt_i32(card, CardOptI32Field::PassivePowerOverride, None);
-            e.set_card_strs(card, CardStrsField::CurrentKeywords, keywords);
+            if let Some(keywords) = keywords {
+                e.set_card_strs(card, CardStrsField::CurrentKeywords, keywords);
+            }
         }
         for card in s.state().player(seat).hand.clone() {
             let mut e = s.edit();
@@ -143,12 +147,17 @@ fn resolve_trigger_over(
 pub fn is_reactive_passive(ab: &super::ast::Ability) -> bool {
     let first = ab.effect.as_ref().and_then(find_first_action);
     let raw = first.map(|a| a.raw_text.as_str()).unwrap_or("");
-    let combined = format!("{raw} {}", ab.raw_text);
-    reactive_re_search(&combined)
+    // Python は `f"{raw} {ab.raw_text}"` を探す。句はどれも空白を含まない＝つなぎ目をまたいでは一致しない
+    // ので、2 つを別々に探すのと同じ（文字列を組まない）。
+    reactive_re_search(raw) || reactive_re_search(&ab.raw_text)
 }
 
 /// `(された|した|受けた|なった|離れた)時、` を含むか（Python の正規表現と同値）。
 fn reactive_re_search(text: &str) -> bool {
+    // 句はどれも「時、」で終わる＝それを含まなければどれとも一致しない（先に 1 回だけ探す）。
+    if !text.contains("時、") {
+        return false;
+    }
     for pat in [
         "された時、",
         "した時、",

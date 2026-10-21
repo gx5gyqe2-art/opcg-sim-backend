@@ -16,6 +16,8 @@ use crate::encode::{
     N_TOK, ONPLAY_COLS, R_DIM, S_DIM, STATS_DIM,
 };
 use crate::state::EngineError;
+use crate::fxhash::FxHashMap;
+use std::rc::Rc;
 
 /// `n_eff.D_AB`（能力埋め込み幅）。
 pub const D_AB: usize = 24;
@@ -362,27 +364,85 @@ pub struct TokFeat {
 /// `TokFeat` はこの鍵だけの関数（`tok_feat_compute`）＝同じ鍵なら同じ値。
 type TokKey = (usize, usize, bool, u32, u8, [u32; S_DIM]);
 
+type TokMap = FxHashMap<TokKey, std::rc::Rc<TokFeat>>;
+
+
+/// 幹のキャッシュ: 鍵（[`trunk_key_into`] の語の列）のハッシュ → (鍵, 幹)。[`trunk_impl`] は鍵の語だけの関数
+/// ＝同じ鍵なら同じ幹（同じ演算を同じ順で行った結果そのもの）。一致は鍵の語の全一致で確かめる。
+type TrunkGen = FxHashMap<u64, Vec<(Box<[u32]>, Rc<Trunk>)>>;
+
+#[derive(Default)]
+struct TrunkCache {
+    cur: TrunkGen,
+    old: TrunkGen,
+    n_cur: usize,
+    /// 鍵を組む作業場（引くたびに使い回す）
+    scratch: Vec<u32>,
+}
+
+/// 幹のキャッシュの 1 世代の上限（件数）。新しい世代が満ちたら古い世代を捨てて入れ替える
+/// （最近の盤面を残す）。引ける値は変わらない＝結果は同じ・メモリだけの都合（1 件 ≈ 15 KB）。
+const TRUNK_GEN_MAX: usize = 4096;
+
 thread_local! {
-    static TOK_CACHE: std::cell::RefCell<Option<std::collections::HashMap<TokKey, std::rc::Rc<TokFeat>>>> =
-        const { std::cell::RefCell::new(None) };
+    static TOK_CACHE: std::cell::RefCell<Option<TokMap>> = const { std::cell::RefCell::new(None) };
+    static TRUNK_CACHE: std::cell::RefCell<Option<TrunkCache>> = const { std::cell::RefCell::new(None) };
 }
 
 /// decide（とその世界のスレッド）の入口で張る（`docs/reports/2026-10-17_game_speed.md` §2）。落とすと元へ戻す。
-/// 張っていないスレッド（decide の外の `net_eval` など）は毎回計算する。
+/// 張っていないスレッド（decide の外の `net_eval` など）は毎回計算する。トークンの前半と幹の両方を張る。
 pub struct TokCacheScope {
-    prev: Option<std::collections::HashMap<TokKey, std::rc::Rc<TokFeat>>>,
+    prev: Option<TokMap>,
+    prev_trunk: Option<TrunkCache>,
 }
 
 pub fn tok_cache_scope() -> TokCacheScope {
-    let prev = TOK_CACHE.with(|c| c.borrow_mut().replace(std::collections::HashMap::new()));
-    TokCacheScope { prev }
+    let prev = TOK_CACHE.with(|c| c.borrow_mut().replace(TokMap::default()));
+    let prev_trunk = TRUNK_CACHE.with(|c| c.borrow_mut().replace(TrunkCache::default()));
+    TokCacheScope { prev, prev_trunk }
 }
 
 impl Drop for TokCacheScope {
     fn drop(&mut self) {
         let prev = self.prev.take();
         TOK_CACHE.with(|c| *c.borrow_mut() = prev);
+        let prev_trunk = self.prev_trunk.take();
+        TRUNK_CACHE.with(|c| *c.borrow_mut() = prev_trunk);
     }
+}
+
+/// 幹が読む欄（`scalars`・`card_idx`・`tok`、関係を使うネットなら `rel_om`・`rel_oo`）をビット列にして
+/// `k` に書く（欄ごとに長さを先に置く＝欄の境目がずれた別の符号化と混ざらない）。先頭はネットとカード表の置き場。
+fn trunk_key_into(w: &NRelWeights, tab: &[f32], enc: &Encoding, k: &mut Vec<u32>) {
+    k.clear();
+    let wp = w as *const NRelWeights as usize as u64;
+    let tp = tab.as_ptr() as usize as u64;
+    k.extend_from_slice(&[wp as u32, (wp >> 32) as u32, tp as u32, (tp >> 32) as u32, tab.len() as u32]);
+    k.push(enc.card_idx.len() as u32);
+    k.extend_from_slice(&enc.card_idx);
+    let mut put = |v: &[f32]| {
+        k.push(v.len() as u32);
+        k.extend(v.iter().map(|x| x.to_bits()));
+    };
+    put(&enc.scalars);
+    put(&enc.tok);
+    if !w.ablated("rel") {
+        put(&enc.rel_om);
+        put(&enc.rel_oo);
+    }
+}
+
+fn hash_words(k: &[u32]) -> u64 {
+    use std::hash::Hasher;
+    let mut h = crate::fxhash::FxHasher::default();
+    let mut it = k.chunks_exact(2);
+    for c in &mut it {
+        h.write_u64(c[0] as u64 | ((c[1] as u64) << 32));
+    }
+    for x in it.remainder() {
+        h.write_u32(*x);
+    }
+    h.finish()
 }
 
 #[inline(always)]
@@ -492,9 +552,67 @@ fn body_impl(w: &NRelWeights, sc: &[f32], tk: &Tokens) -> Vec<f32> {
 pub struct Trunk {
     pub tk: Tokens,
     pub e: Vec<f32>,
+    /// 方策の頭の候補ごとの logit（鍵＝[`cand_key`]）。候補の logit は幹（`e`・`tk.h`）と、関係を使うネットなら
+    /// `rel_om`（幹のキャッシュの鍵に入っている＝同じ幹なら同じ値）と、候補の行だけの関数＝同じ鍵なら同じ値。
+    memo: std::cell::RefCell<FxHashMap<Box<[u32]>, f32>>,
 }
 
-pub fn trunk(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Trunk, EngineError> {
+/// 候補 1 行の鍵（ネットの置き場・主体／対象の枠・素性と予算のビット列）。
+fn cand_key(w: &NRelWeights, c: &Candidate) -> Box<[u32]> {
+    let wp = w as *const NRelWeights as usize as u64;
+    let mut k = Vec::with_capacity(4 + c.feats.len() + c.budget.len());
+    k.extend_from_slice(&[wp as u32, (wp >> 32) as u32, c.si as u32, c.ti as u32]);
+    k.extend(c.feats.iter().map(|x| x.to_bits()));
+    k.extend(c.budget.iter().map(|x| x.to_bits()));
+    k.into_boxed_slice()
+}
+
+/// decide の中（[`tok_cache_scope`] を張ったスレッド）では、同じ符号化の幹を使い回す
+/// （探索は同じ盤面を何度も評価する: 戦闘箱の枝・静止探索の手番ごとの方策・葉の価値）。
+/// 張っていなければ毎回計算する（今までどおり）。
+pub fn trunk(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Rc<Trunk>, EngineError> {
+    // 張っていれば鍵を組んで引く（作業場は借りたまま、計算の間は返しておく）。
+    let probe = TRUNK_CACHE.with(|c| {
+        let mut b = c.borrow_mut();
+        let cache = b.as_mut()?;
+        let mut k = std::mem::take(&mut cache.scratch);
+        trunk_key_into(w, tab, enc, &mut k);
+        let h = hash_words(&k);
+        let hit = [&cache.cur, &cache.old].into_iter().find_map(|m| {
+            m.get(&h)?.iter().find(|(key, _)| **key == *k).map(|(_, t)| t.clone())
+        });
+        Some((h, k, hit))
+    });
+    let Some((h, k, hit)) = probe else {
+        return trunk_compute(w, tab, enc).map(Rc::new);
+    };
+    if let Some(t) = hit {
+        TRUNK_CACHE.with(|c| {
+            if let Some(cache) = c.borrow_mut().as_mut() {
+                cache.scratch = k;
+            }
+        });
+        crate::prof::add(crate::prof::N_TRUNK_HIT, 1);
+        return Ok(t);
+    }
+    let out = trunk_compute(w, tab, enc).map(Rc::new);
+    TRUNK_CACHE.with(|c| {
+        if let Some(cache) = c.borrow_mut().as_mut() {
+            if let Ok(t) = &out {
+                if cache.n_cur >= TRUNK_GEN_MAX {
+                    cache.old = std::mem::take(&mut cache.cur);
+                    cache.n_cur = 0;
+                }
+                cache.cur.entry(h).or_default().push((k.as_slice().into(), t.clone()));
+                cache.n_cur += 1;
+            }
+            cache.scratch = k;
+        }
+    });
+    out
+}
+
+fn trunk_compute(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Trunk, EngineError> {
     #[cfg(target_arch = "x86_64")]
     if avx2() {
         // SAFETY: AVX2 が使えることを実行時に確かめた（`avx2`）。
@@ -533,7 +651,7 @@ fn trunk_impl(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Trunk, Eng
         let _prof = crate::prof::enter(crate::prof::Cat::FwdBody);
         body_impl(w, &enc.scalars, &tk)
     };
-    Ok(Trunk { tk, e })
+    Ok(Trunk { tk, e, memo: Default::default() })
 }
 
 /// 価値の頭（tanh 済み）。
@@ -605,6 +723,11 @@ fn priors_from_impl(
         if c.feats.len() != F_CAND {
             return Err(bad(format!("net: 候補素性が {} 列（{F_CAND} が要る）", c.feats.len())));
         }
+        let key = cand_key(w, c);
+        if let Some(l) = t.memo.borrow().get(&key) {
+            logits.push(*l);
+            continue;
+        }
         let mut u = Vec::with_capacity(super::D_PIN);
         u.extend_from_slice(e);
         // 主体 h_si / 対象 h_ti（枠が無い＝−1 は 0 ベクトル）
@@ -633,7 +756,9 @@ fn priors_from_impl(
         }
         let mut rp = affine(&u, &w.wp1, &w.bp1);
         relu_inplace(&mut rp);
-        logits.push(affine(&rp, &w.wp2, &w.bp2)[0]);
+        let l = affine(&rp, &w.wp2, &w.bp2)[0];
+        t.memo.borrow_mut().insert(key, l);
+        logits.push(l);
     }
     Ok(seg_softmax(&logits))
 }

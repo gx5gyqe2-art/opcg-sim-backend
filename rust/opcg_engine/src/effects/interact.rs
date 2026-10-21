@@ -1041,23 +1041,29 @@ pub fn selection_entries(
     uuids: &[String],
 ) -> Vec<SelectionEntry> {
     let opp = pid.other();
-    let mut index: Vec<(String, &'static str, &'static str, Option<CardIdx>)> = Vec::new();
-    let seen = |index: &Vec<(String, &'static str, &'static str, Option<CardIdx>)>,
-                    u: &str| index.iter().any(|(k, _, _, _)| k == u);
+    // 走査は参照のまま（ゾーンの並びも uuid も複製しない）。並び・先勝ちは今までと同じ
+    // （「候補に入っているか」「もう載せたか」は集合で引く＝線形の比較と同じ答え）。
+    let mut index: crate::fxhash::FxHashMap<&str, (&'static str, &'static str, Option<CardIdx>)> =
+        crate::fxhash::FxHashMap::default();
+    let want: std::collections::HashSet<&str, crate::fxhash::FxBuild> =
+        uuids.iter().map(String::as_str).collect();
+    let wanted = |u: &str| want.contains(u);
+    let seen = |index: &crate::fxhash::FxHashMap<&str, (&'static str, &'static str, Option<CardIdx>)>,
+                u: &str| index.contains_key(u);
     for (owner, side) in [(pid, "own"), (opp, "opp")] {
         for (zname, zone) in SELECTION_ZONES {
-            let cards: Vec<CardIdx> = match zone {
-                CardZone::Hand => state.player(owner).hand.clone(),
-                CardZone::Deck => state.player(owner).deck.clone(),
-                CardZone::Trash => state.player(owner).trash.clone(),
-                CardZone::Field => state.player(owner).field.clone(),
-                CardZone::Life => state.player(owner).life.clone(),
-                CardZone::Temp => Vec::new(),
+            let cards: &[CardIdx] = match zone {
+                CardZone::Hand => &state.player(owner).hand,
+                CardZone::Deck => &state.player(owner).deck,
+                CardZone::Trash => &state.player(owner).trash,
+                CardZone::Field => &state.player(owner).field,
+                CardZone::Life => &state.player(owner).life,
+                CardZone::Temp => &[],
             };
-            for c in cards {
-                let u = state.card(c).uuid.clone();
-                if uuids.contains(&u) && !seen(&index, &u) {
-                    index.push((u, side, zname, Some(c)));
+            for &c in cards {
+                let u = state.card(c).uuid.as_str();
+                if wanted(u) && !seen(&index, u) {
+                    index.insert(u, (side, zname, Some(c)));
                 }
             }
         }
@@ -1066,9 +1072,9 @@ pub fn selection_entries(
             ("stage", state.player(owner).stage),
         ] {
             if let Some(c) = slot {
-                let u = state.card(c).uuid.clone();
-                if uuids.contains(&u) && !seen(&index, &u) {
-                    index.push((u, side, zname, Some(c)));
+                let u = state.card(c).uuid.as_str();
+                if wanted(u) && !seen(&index, u) {
+                    index.insert(u, (side, zname, Some(c)));
                 }
             }
         }
@@ -1080,19 +1086,19 @@ pub fn selection_entries(
         if it.player == pid {
             for t in &it.candidates {
                 let (u, card) = match *t {
-                    TargetRef::Card(c) => (state.card(c).uuid.clone(), Some(c)),
-                    TargetRef::Don(d) => (state.don(d).uuid.clone(), None),
+                    TargetRef::Card(c) => (state.card(c).uuid.as_str(), Some(c)),
+                    TargetRef::Don(d) => (state.don(d).uuid.as_str(), None),
                 };
-                if uuids.contains(&u) && !seen(&index, &u) {
-                    index.push((u, "own", "temp", card));
+                if wanted(u) && !seen(&index, u) {
+                    index.insert(u, ("own", "temp", card));
                 }
             }
         }
     }
     uuids
         .iter()
-        .map(|u| match index.iter().find(|(k, _, _, _)| k == u) {
-            Some((_, side, zone, card)) => SelectionEntry {
+        .map(|u| match index.get(u.as_str()) {
+            Some((side, zone, card)) => SelectionEntry {
                 uuid: u.clone(),
                 side: Some(side),
                 zone: Some(zone),
