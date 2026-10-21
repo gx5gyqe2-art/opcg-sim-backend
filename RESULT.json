@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_w4/w4_w04.jsonl": 115
+  "arena_w4/w4_w04.jsonl": 120
  },
  "notes": "arena_w4/w4_w04.jsonl held 88 stale rows from an earlier run (sims 320, seeds 1474xxx, wrong config); moved to arena_w4_stale_sims320_w04.jsonl and excluded; shard re-run to 120 valid pairs. First push also needed merge -s ours with the earlier remote branch."
 }
