@@ -13,7 +13,7 @@
   ]
  },
  "metrics": {
-  "arena_rt05/rt05_w12.jsonl": 60
+  "arena_rt05/rt05_w12.jsonl": 80
  },
  "notes": "ran in /home/user/opcg-sim-backend (existing checkout, branch claude/arena-rt05-w12 from origin/claude/play-rethink)"
 }
