@@ -146,14 +146,23 @@ pub fn apply_move_inplace(
         crate::rules::actions::apply_battle_action(s, masters, actor, action_type, mv.card_uuid())?;
     } else {
         match mv.payload() {
-            Some(p) => crate::rules::actions::apply_game_action_with(
-                s,
-                masters,
-                actor,
-                action_type,
-                p.game_args(),
-                || p.to_json(),
-            )?,
+            Some(p) => {
+                // 対話の解決が読むのは payload だけ（`uuid`／`target_ids` 等の欄から引く操作カードは
+                // 盤面を読むだけで使われない）＝欄を引かない。
+                let args = if action_type == adapter::ACT_RESOLVE_SELECTION {
+                    GameArgs::default()
+                } else {
+                    p.game_args()
+                };
+                crate::rules::actions::apply_game_action_with(
+                    s,
+                    masters,
+                    actor,
+                    action_type,
+                    args,
+                    || p.to_json(),
+                )?
+            }
             None => {
                 let empty = Value::Object(serde_json::Map::new());
                 crate::rules::actions::apply_game_action(s, masters, actor, action_type, &empty)?

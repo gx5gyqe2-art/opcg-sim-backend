@@ -187,12 +187,13 @@ pub fn defense_box_prune(
     moves: Vec<Move>,
 ) -> Vec<Move> {
     // Python の `kinds = {m.get("action_type") for m in moves}` は欄が無い手を `None` として
-    // 集合に入れる（＝`kinds <= {"SELECT_COUNTER","PASS"}` が偽になり窓を触らない）。同じにする。
-    let kinds: HashSet<Option<&str>> = moves.iter().map(action_type).collect();
-    if !kinds.contains(&Some("SELECT_COUNTER"))
-        || !kinds
-            .iter()
-            .all(|k| *k == Some("SELECT_COUNTER") || *k == Some("PASS"))
+    // 集合に入れる（＝`kinds <= {"SELECT_COUNTER","PASS"}` が偽になり窓を触らない）。同じにする
+    // （集合を作らず手を直接なめる＝「含む」「全部が部分集合」の判定は同じ）。
+    if !moves.iter().any(|m| action_type(m) == Some("SELECT_COUNTER"))
+        || !moves.iter().all(|m| {
+            let k = action_type(m);
+            k == Some("SELECT_COUNTER") || k == Some("PASS")
+        })
     {
         return moves;
     }
