@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_w4/w4_w02.jsonl": 59
+  "arena_w4/w4_w02.jsonl": 69
  },
  "notes": "88 earlier-session pairs had a stale seed base (1472000..) and were moved to arena_w4/stale_seed1472000.txt (excluded); only seeds 1652000..1652119 counted; script progress counter had included the stale rows"
 }
