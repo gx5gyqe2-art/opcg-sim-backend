@@ -1,171 +1,86 @@
 {
- "job": "speed-merge",
- "role": "engine-speed-merge",
+ "job": "rs-omniscient",
+ "role": "engine-option",
  "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.6 (origin/claude/cpu-spec-improvements-yw91jd @ dadd89e; ledger 2+299)",
+ "spec": "docs/search_efficiency_plan.md §7.10 (origin/claude/cpu-spec-improvements-yw91jd @ 04b2c7c; ledger 2+306; n_loop_ops §7.24)",
  "inputs": {
-  "mainline": "claude/cpu-spec-improvements-yw91jd @ dadd89e3",
-  "rs-speed-a": "claude/rs-speed-a @ eb00b6134",
-  "rs-speed-b": "claude/rs-speed-b @ 6ff385e72",
-  "play-rethink": "claude/play-rethink @ 085308bf0",
-  "net": "default (opcg_sim/loop/engine.py::DEFAULT_NET = nrel_r13d.npz)"
+  "mainline": "claude/cpu-spec-improvements-yw91jd @ 04b2c7c",
+  "net": "nrel_r13d.npz (both seats)"
  },
  "outputs": {
-  "branch": "claude/speed-merge",
-  "merge_order": "mainline <- rs-speed-a (clean) <- rs-speed-b (8 conflicts) <- play-rethink (RESULT.json only)",
-  "conflicts_resolved": {
-   "rust/opcg_engine/src/journal.rs": "both added Undo::DonPush + StateMut::push_don (same semantics): kept one variant (B's comment / placement), dropped A's duplicate push_don and duplicate apply_undo arm",
-   "rust/opcg_engine/src/encode/mod.rs": "A's crate::fxhash::FxHashMap for Vocab kept; B's Fnv hasher + FastMap alias removed (all their users switched to Fx)",
-   "rust/opcg_engine/src/encode/leader.rs": "LeaderCache map: A's FxHashMap",
-   "rust/opcg_engine/src/encode/tokens.rs": "ProfileCache: B's dense slot[mi] index (no hashing; supersedes A's Fx map); relation comment from A",
-   "rust/opcg_engine/src/encode/scalars.rs": "both had moved the on-play probe in-place (Session::isolated + journaled temp DON!!): kept B's push_temp_dons / main_for(pending_actor_action), dropped A's add_temp_dons",
-   "rust/opcg_engine/src/search/apply.rs": "drain_own_interactions: pending read once (both); stop_at_select test = B's adapter::selection_branch_exists before building the default payload (A's later selection_moves_with check removed as redundant — same predicate)",
-   "rust/opcg_engine/src/search/quiesce.rs": "B's MoveRef/PayloadRef cand_owned + UuidMap alias kept, UuidMap now = crate::fxhash::FxHashMap (was B's FastMap); A's rel zero-fill skip and B's are the same check (kept B's form)",
-   "RESULT.json": "replaced by this file"
-  },
-  "auto_merged_with_both_sides": [
-   "search/mcts.rs",
-   "search/adapter.rs",
-   "effects/resolver.rs",
-   "rules/actions.rs",
-   "search/mod.rs",
-   "net/nrel.rs (A only)",
-   "rules/legal.rs (A only)",
-   "effects/interact.rs (A only)",
-   "effects/passives.rs (A only)",
-   "fxhash.rs (A, new)"
-  ],
-  "rethink_files": "opcg_sim/api/*, opcg_sim/loop/{engine,arena,arena_shard,driver}.py, tests/test_play_rethink.py, tests/scripts/rs_rethink_sweep.py, docs/TEST_SPEC.md (merged without conflict)"
+  "branch": "claude/rs-omniscient",
+  "code_commit": "89cd0d0",
+  "files": [
+   "rust/opcg_engine/src/search/decide.rs (DecideOptions.omniscient, sample_world, tests omniscient_*)",
+   "rust/opcg_engine/src/search/mod.rs (opts JSON key 'omniscient')",
+   "rust/opcg_engine/src/search/tests_search.rs (decide_options_json_reads_omniscient)",
+   "rust/opcg_engine/src/py_game.rs (doc only)",
+   "opcg_sim/api/engine_rs.py (RsGame.decide(omniscient=...))",
+   "opcg_sim/loop/arena.py (--cand-omniscient via CAND_FLAGS)",
+   "opcg_sim/loop/arena_shard.py (--omniscient for the baseline seat via _best_kw)",
+   "tests/scripts/rs_decide_latency.py (--omniscient)",
+   "docs/TEST_SPEC.md §2 (1 row)",
+   "arena_omni_local/omni_local.jsonl (local arena ledger)"
+  ]
  },
  "gates": {
-  "make_rust_develop": "ok (installed .so md5 0b00118f39bea08247efe4a7cc27eb97 == the wheel used for the equality dump)",
-  "make_test": "green: cargo 572 passed / 1 ignored; pytest 847 passed, 13 skipped (goldens and test_play_rethink ran, 15 passed)",
-  "make_audit_cross": "240 games, void 0 (wr 0.5333 = mirror noise, not a judgement)",
-  "clippy": "1 pre-existing warning in ops.rs (untouched)"
+  "make_rust_develop": "ok",
+  "make_test": "green: cargo test 576 passed / 1 ignored; pytest 798 passed, 62 skipped (all skips = torch optional dependency not installed in this container; golden audit/replay ran, not skipped)",
+  "make_audit_cross": "void 0 (120 pairs, seed 0, default both seats)",
+  "audit_cross_with_cand_omniscient": "void 0 (same 120 pairs, candidate seat omniscient, sims 32) -- extra check, not required"
  },
  "metrics": {
-  "equality": {
-   "method": "driver.run_game with observer (every decide output JSON) + post (events_json + md5 of board_json after every applied move), sort_keys JSONL; mainline = worktree @ dadd89e with its own wheel, merged = this branch with its wheel; compared line by line",
-   "seeds": "2999900.. (leader_pair random, decks synth_roles), same as rs_decide_latency.py",
-   "settings": {
-    "1x1280_budget0": {
-     "games": 8,
-     "decides": 956,
-     "lines": 1928,
-     "mismatch": 0
-    },
-    "4x1280_budget0": {
-     "games": 4,
-     "decides": 480,
-     "lines": 968,
-     "mismatch": 0
-    },
-    "1x160_budget_default": {
-     "games": 12,
-     "decides": 1390,
-     "lines": 2804,
-     "mismatch": 0
-    }
-   },
-   "decides_total": 2826,
-   "lines_total": 5700,
-   "mismatch_total": 0
+  "local_arena": {
+   "cmd": "arena_shard --candidate r13d --baseline r13d --sims 1280 --budget 0 --cand-sims 1280 --cand-omniscient --cand-budget 0 --pairs 40 --max-pairs 40 --bands 1 --seed-base 1675000 --workers 4 --leaders random --decks synth_roles --pair-timeout 7200",
+   "pairs": 40,
+   "games": 80,
+   "void": 0,
+   "wins": 49.0,
+   "wr": 0.6125,
+   "ci95": [
+    0.4989,
+    0.7261
+   ],
+   "elo": 79.5,
+   "wall_sec": 520
   },
   "latency_1core": {
-   "how": "taskset -c N (4 runs side by side on cores 0-3, one per core; 4 worlds share one core), rs_decide_latency.py --budget 0 --games 8, same seeds",
-   "1x1280": {
-    "mainline": {
-     "moves": 956,
-     "mean": 0.292,
-     "p50": 0.006,
-     "p90": 0.764,
-     "p99": 2.003,
-     "max": 3.36,
-     "wall_sec": 279.3,
-     "affinity": [
-      2
-     ]
-    },
-    "merged": {
-     "moves": 956,
-     "mean": 0.146,
-     "p50": 0.003,
-     "p90": 0.391,
-     "p99": 0.96,
-     "max": 1.67,
-     "wall_sec": 139.4,
-     "affinity": [
-      3
-     ]
-    },
-    "speedup_wall": 2.0,
-    "speedup_mean": 2.0
+   "cmd": "taskset -c N python tests/scripts/rs_decide_latency.py --sims 1280 --worlds 1 --budget 0 --games 20 [--omniscient]",
+   "default": {
+    "sims": 1280,
+    "worlds": 1,
+    "budget": 0,
+    "games": 20,
+    "moves": 2512,
+    "mean": 0.156,
+    "p50": 0.003,
+    "p90": 0.386,
+    "p99": 1.208,
+    "max": 4.64,
+    "wall_sec": 393.4,
+    "affinity": [
+     0
+    ]
    },
-   "4x1280": {
-    "mainline": {
-     "moves": 992,
-     "mean": 1.192,
-     "p50": 0.004,
-     "p90": 2.913,
-     "p99": 9.125,
-     "max": 12.73,
-     "wall_sec": 1182.8,
-     "affinity": [
-      0
-     ]
-    },
-    "merged": {
-     "moves": 992,
-     "mean": 0.638,
-     "p50": 0.003,
-     "p90": 1.559,
-     "p99": 4.988,
-     "max": 7.12,
-     "wall_sec": 633.3,
-     "affinity": [
-      1
-     ]
-    },
-    "speedup_wall": 1.87,
-    "speedup_mean": 1.87
+   "omniscient": {
+    "sims": 1280,
+    "worlds": 1,
+    "budget": 0,
+    "omniscient": true,
+    "games": 20,
+    "moves": 2912,
+    "mean": 0.16,
+    "p50": 0.004,
+    "p90": 0.392,
+    "p99": 1.052,
+    "max": 7.06,
+    "wall_sec": 467.2,
+    "affinity": [
+     1
+    ]
    },
-   "1x5120": {
-    "mainline": {
-     "moves": 1064,
-     "mean": 1.085,
-     "p50": 0.003,
-     "p90": 3.045,
-     "p99": 5.752,
-     "max": 7.78,
-     "wall_sec": 1154.7,
-     "affinity": [
-      2
-     ]
-    },
-    "merged": {
-     "moves": 1064,
-     "mean": 0.543,
-     "p50": 0.002,
-     "p90": 1.531,
-     "p99": 2.902,
-     "max": 3.84,
-     "wall_sec": 578.4,
-     "affinity": [
-      3
-     ]
-    },
-    "speedup_wall": 2.0,
-    "speedup_mean": 2.0
-   }
+   "mean_ratio_omni_over_default": 1.026
   }
  },
- "notes": [
-  "Invariant held: every decide output, every applied move's events and the board after it are identical to mainline on 2,826 decision points (3 settings). Goldens were not regenerated and are green.",
-  "Nothing from either speed branch was dropped as an effect: where both did the same thing (in-place on-play probe with journaled DonPush, rel zero-fill skip, single pending read in drains) one implementation was kept; where they differed only in hashing, A's Fx hasher was used crate-wide (one hasher, lookup-only tables) and B's FNV was removed; ProfileCache uses B's dense index (faster than any hash map).",
-  "Combined speedup (wall, 1 core): 1x1280 x2.00, 4x1280 x1.87, 1x5120 x2.00 — larger than either branch alone (A x1.50 / B x1.39 at 1x1280), as expected since A mostly cut forward/encode repeats and B cut JSON building/copies.",
-  "Latency runs were 4 concurrent single-core-pinned processes (mainline and merged at the same time on separate cores), so absolute numbers include shared-cache/memory-bandwidth effects; the ratio is what to read. Mainline 1x1280 (279 s) matches rs-speed-a's own 'before' (284 s).",
-  "Rethink (play-rethink) is default off; with off, driver.run_game goes through engine.decide_with_rethink which returns the single decide unchanged — confirmed by the equality dump above (which ran through that path on the merged side) and tests/test_play_rethink.py.",
-  "The equality/compare scripts were work-only (scratchpad), not committed, per §7.2.",
-  "Python deps (fastapi etc. from opcg_sim/requirements.txt, pytest-xdist, maturin) had to be installed in this fresh container before the gates."
- ]
+ "notes": "Default off is untouched: omniscient is a new field defaulting to false; every determinize_with call site in decide.rs (run_worlds world 0 and worlds>=1 threads, window_choice, commit_play_dialog, commit_setup_box) now goes through sample_world(), which calls determinize_with exactly as before when omniscient=false (same rng consumption). Goldens (audit 3,386 + replay 200) pass unchanged.\nTreeMcts::run in mcts.rs still calls determinize_with directly; it is not on the decide path (decide uses run_in_world), so it was left alone.\nomniscient=true: the world is a clone of the real state and NO shuffle is drawn from the rng (so the later Dirichlet/temperature draws shift vs. off; irrelevant since this is a separate measurement mode). Own deck order was already the real order in the current determinization (only the opponent's hand+deck is re-drawn), so 'both decks visible' follows from not re-drawing.\nworlds>1 with omniscient is treated as 1 via DecideOptions::effective_worlds (rethink, which only raises worlds, therefore becomes a same-seed re-read of the same world).\nThe spec named arena.py '_CAND_KEYS'; that name does not exist on the mainline -- the equivalent tables are CAND_FLAGS (boolean flags) / CAND_VALUE_FLAGS, so --cand-omniscient is a CAND_FLAGS entry. Ledger rows carry cand_opts.omniscient=true.\nVisibility is search-only; play after the chosen move is unchanged (game-illegal by design, flagged as measurement-only in docstrings/help). Serve API default unchanged (RsGame.decide passes the key only when omniscient=True).\nTest (c) uses a counting rng on the main (tree) path plus a direct sample_world check; no dedicated battle/dialog-window test (window_choice and the commits go through the same sample_world helper).\nLocal arena +79.5 Elo [CI 0.499..0.726] on 40 pairs -- between the +20..+50 and +100 reading bands of n_loop_ops §7.24 and too wide to decide; the production arena (12 x 120 pairs) is the judge. Latency: omniscient mean per move ~same as default (0.160 vs 0.156 s on one core); games ran longer in moves (2912 vs 2512 over 20 games).\nContainer lacked maturin/pytest/fastapi; installed via pip (maturin, opcg_sim/requirements.txt, pytest, pytest-xdist) before the gate."
 }
