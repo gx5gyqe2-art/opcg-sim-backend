@@ -16,5 +16,5 @@
  "metrics": {
   "arena_omni/omni_w11.jsonl": 120
  },
- "notes": ""
+ "notes": "ARENA_RESUME_FINAL: 119 pairs / 238 games / void 1 / wr 0.6092 CI95 [0.5379,0.6805] / elo +77.2. jsonl has 120 lines (1 void line). Ran in /home/user/opcg-sim-backend (not ~), same steps as the body. No code changed."
 }
