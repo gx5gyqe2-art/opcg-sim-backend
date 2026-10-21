@@ -1,7 +1,7 @@
 {
  "job": "arena-fairprod-w02",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r13d.npz + --cand-sims 1280 --cand-budget 0 (new default: fair + knowledge)",
   "baseline": "nrel_r13d.npz + --sims 1280 --budget 0 --reveal peek",
