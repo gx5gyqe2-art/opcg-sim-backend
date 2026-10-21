@@ -329,7 +329,9 @@ impl<'a> Ctx<'a> {
             } else {
                 None
             };
-            let slots = slot_index(state, me);
+            // 引くだけの表＝枠の数ぶんを先に取っておく（中身は [`slot_index`] と同じ）。
+            let mut slots: UuidMap<'_, i32> = UuidMap::with_capacity_and_hasher(N_TOK, Default::default());
+            fill_slot_index(state, me, &mut slots);
             let uidx = uuid_index(state);
             let refs: Vec<nrel::CandRef<'_>> = rows
                 .heads
@@ -471,7 +473,15 @@ pub type UuidMap<'a, V> = crate::fxhash::FxHashMap<&'a str, V>;
 /// 全カードを走査する [`crate::ops::find_card_by_uuid`] とは範囲が違う（山札・一時ゾーンを
 /// 含めない）＝方策の `card_id` 解決はこちらを使う。
 pub fn uuid_index(state: &GameState) -> UuidMap<'_, CardIdx> {
-    let mut idx: UuidMap<'_, CardIdx> = UuidMap::default();
+    // 引くだけの表＝先に件数ぶんを取っておく（中身は同じ・伸ばし直しの再ハッシュをしない）。
+    let n: usize = [Seat::P1, Seat::P2]
+        .iter()
+        .map(|seat| {
+            let p = state.player(*seat);
+            2 + p.field.len() + p.hand.len() + p.trash.len() + p.life.len()
+        })
+        .sum();
+    let mut idx: UuidMap<'_, CardIdx> = UuidMap::with_capacity_and_hasher(n, Default::default());
     for seat in [Seat::P1, Seat::P2] {
         let p = state.player(seat);
         let zones = p
@@ -492,6 +502,14 @@ pub fn uuid_index(state: &GameState) -> UuidMap<'_, CardIdx> {
 
 /// Python `n_rel_feat._slots` の逆写像（uuid → 22 枠 index）。
 pub fn slot_index(state: &GameState, me: Seat) -> UuidMap<'_, i32> {
+    let mut out: UuidMap<'_, i32> = UuidMap::default();
+    fill_slot_index(state, me, &mut out);
+    out
+}
+
+/// [`slot_index`] の中身を `out` へ入れる（`out` の容量は呼び出し側が決める＝引くだけの使い方
+/// なら先に取っておける。並びを外へ出す [`slot_index`] は今までどおり既定の容量から伸ばす）。
+fn fill_slot_index<'s>(state: &'s GameState, me: Seat, out: &mut UuidMap<'s, i32>) {
     let opp = me.other();
     let mut slots: Vec<Option<CardIdx>> = Vec::with_capacity(N_TOK);
     slots.push(state.player(me).leader);
@@ -505,14 +523,12 @@ pub fn slot_index(state: &GameState, me: Seat) -> UuidMap<'_, i32> {
     for k in 0..crate::encode::MAX_HAND {
         slots.push(state.player(me).hand.get(k).copied());
     }
-    let mut out: UuidMap<'_, i32> = UuidMap::default();
     for (i, c) in slots.iter().enumerate() {
         if let Some(c) = c {
             // Python は dict 内包＝**後勝ち**（同じ uuid が 2 枠に出ることは無いので実質同じ）
             out.insert(state.card(*c).uuid.as_str(), i as i32);
         }
     }
-    out
 }
 
 /// 効果の対象選択の手（対象は `payload.target_ids` ではなく `selected_uuids` に入る）。
