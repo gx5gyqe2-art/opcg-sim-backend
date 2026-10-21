@@ -242,21 +242,15 @@ fn drain_own_interactions(
         ) {
             return;
         }
-        // 要求は 1 度だけ読む（`get_pending_request` の書き換えは戦闘フェイズの正規化だけ＝冪等。
-        // 判定と既定解決が同じ値を読む）。
-        let pending = crate::rules::pending::get_pending_request(s, masters, false);
-        if stop_at_select
-            && pending
-                .as_ref()
-                .is_some_and(|p| crate::search::adapter::selection_branch_exists(p, actor))
-        {
-            return;
-        }
-        let Some(pending) = pending else {
+        // ここに来るのは効果対話だけ＝要求の dict は組まず、要求の対話分岐（`get_pending_request`）が
+        // 出す値を進行中の中断から直接読む（`search::apply::drain_own_interactions` と同じ・WP `rs-speed-d`）。
+        let Some(it) = s.state().active_interaction() else {
             return;
         };
-        let payload =
-            crate::rules::legal::default_interaction_payload(s.state(), masters, &pending);
+        if stop_at_select && crate::search::adapter::selection_branch_exists_of(it, actor) {
+            return;
+        }
+        let payload = crate::effects::interact::default_interaction_payload_of(s.state(), masters, it);
         // Python はここで `manager.action_events = []` と置き直す＝直前までのイベントを捨てる。
         resolver::reset_effect_events();
         if crate::rules::actions::apply_game_action(
@@ -347,16 +341,11 @@ fn onplay_scan_body(s: &mut Session, masters: &MasterTable, actor: Seat) -> (i32
         - n_active as i32;
     let playable: Vec<String> = s.isolated(|sess| {
         push_temp_dons(sess, actor, need_max.max(0) as usize);
-        match crate::rules::legal::get_legal_actions(sess, masters, actor) {
+        match crate::rules::legal::get_legal_moves(sess, masters, actor) {
             Ok(moves) => moves
                 .iter()
-                .filter(|m| m.get("action_type").and_then(|v| v.as_str()) == Some("PLAY"))
-                .filter_map(|m| {
-                    m.get("payload")
-                        .and_then(|p| p.get("uuid"))
-                        .and_then(|v| v.as_str())
-                        .map(str::to_owned)
-                })
+                .filter(|m| m.action_type() == Some("PLAY"))
+                .filter_map(|m| m.payload_uuid().map(str::to_owned))
                 .collect(),
             Err(_) => Vec::new(), // Python `except: playable = set()`
         }
@@ -383,11 +372,9 @@ fn onplay_scan_body(s: &mut Session, masters: &MasterTable, actor: Seat) -> (i32
                     return false;
                 }
                 drain_own_interactions(sess, masters, actor, true);
-                let pend = crate::rules::pending::get_pending_request(sess, masters, false);
-                let not_main = pend
-                    .as_ref()
-                    .and_then(|p| p.get("action"))
-                    .and_then(|v| v.as_str())
+                // 要求の `action` だけを読む＝`pending_actor_action`（`get_pending_request` と同じ分岐・
+                // 同じ書き換え）。
+                let not_main = crate::rules::pending::pending_actor_action(sess).map(|(_, a)| a)
                     != Some("MAIN_ACTION");
                 not_main || resolver::effect_events() > 0
             });

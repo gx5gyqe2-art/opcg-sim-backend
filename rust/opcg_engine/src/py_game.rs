@@ -487,7 +487,7 @@ impl Game {
     /// 現在の要求（`selectable_uuids`）を見るので、**手を適用する前**に呼ぶこと。
     fn describe_move_json(&mut self, move_json: &str) -> PyResult<String> {
         let masters = self.masters()?;
-        let mv = parse_json(move_json, "move")?;
+        let mv = crate::search::Move::from_json(parse_json(move_json, "move")?);
         let pending =
             crate::rules::pending::get_pending_request(&mut self.session, masters, false);
         let d = crate::search::decide::describe_move(
@@ -623,7 +623,7 @@ impl Game {
     fn apply_search_move(&mut self, player_id: &str, move_json: &str) -> PyResult<()> {
         let masters = self.masters()?;
         let seat = self.seat_of(player_id)?;
-        let mv = parse_json(move_json, "move")?;
+        let mv = crate::search::Move::from_json(parse_json(move_json, "move")?);
         self.session.reset_events();
         crate::search::apply::apply_move_inplace(&mut self.session, masters, seat, &mv, true)
             .map_err(|e| self.map_err(e))

@@ -27,7 +27,7 @@ use crate::state::EngineError;
 use serde_json::{json, Value};
 use std::cell::RefCell;
 
-use super::{adapter, apply, LeafRollout, Move, MoveRef, PayloadRef, SearchOptions};
+use super::{adapter, apply, LeafRollout, Move, PayloadRef, SearchOptions};
 
 /// Python `config.QUIESCE_MAX_PLIES`。
 pub const QUIESCE_MAX_PLIES: usize = 12;
@@ -194,11 +194,12 @@ impl<'a> Ctx<'a> {
         };
         let boxes = super::r#macro::setup_box_candidates(self, s, seat, &moves)?;
         if !boxes.is_empty() && !self.opts.setup_box_keep_bare {
-            let boxed: Vec<&Value> = boxes
+            let boxed: Vec<Move> = boxes
                 .iter()
-                .filter_map(|b| b.get("payload").and_then(|p| p.get("base")))
+                .filter_map(|b| b.payload().and_then(|p| p.get("base")))
+                .map(|v| Move::from_json(v.into_owned()))
                 .collect();
-            moves.retain(|m| !boxed.contains(&m));
+            moves.retain(|m| !boxed.contains(m));
         }
         moves.extend(boxes);
         Ok(moves)
@@ -328,7 +329,9 @@ impl<'a> Ctx<'a> {
             } else {
                 None
             };
-            let slots = slot_index(state, me);
+            // 引くだけの表＝枠の数ぶんを先に取っておく（中身は [`slot_index`] と同じ）。
+            let mut slots: UuidMap<'_, i32> = UuidMap::with_capacity_and_hasher(N_TOK, Default::default());
+            fill_slot_index(state, me, &mut slots);
             let uidx = uuid_index(state);
             let refs: Vec<nrel::CandRef<'_>> = rows
                 .heads
@@ -385,12 +388,12 @@ impl<'a> Ctx<'a> {
         legal: &[Move],
     ) -> Result<Vec<f32>, EngineError> {
         let mut w = vec![1.0f32; legal.len()];
-        let mut bases: Vec<(&Value, Vec<usize>)> = Vec::new();
+        let mut bases: Vec<(std::borrow::Cow<'_, Value>, Vec<usize>)> = Vec::new();
         for (i, mv) in legal.iter().enumerate() {
-            if mv.get("action_type").and_then(Value::as_str) != Some("SETUP_BOX") {
+            if mv.action_type() != Some("SETUP_BOX") {
                 continue;
             }
-            let Some(base) = mv.get("payload").and_then(|p| p.get("base")) else {
+            let Some(base) = mv.payload().and_then(|p| p.get("base")) else {
                 continue;
             };
             match bases.iter_mut().find(|(b, _)| *b == base) {
@@ -407,7 +410,8 @@ impl<'a> Ctx<'a> {
                 .iter()
                 .map(|i| super::r#macro::setup_box_first_select(&legal[*i]))
                 .collect();
-            let ws = super::r#macro::setup_branch_weights(self, &state, me, base, &firsts)?;
+            let base = Move::from_json(base.clone().into_owned());
+            let ws = super::r#macro::setup_branch_weights(self, &state, me, &base, &firsts)?;
             for (k, i) in idxs.iter().enumerate() {
                 w[*i] = ws[k];
             }
@@ -438,11 +442,10 @@ struct RowMap {
 fn setup_row_map(legal: &[Move]) -> RowMap {
     let mut heads: Vec<usize> = Vec::with_capacity(legal.len());
     let mut row_of: Vec<usize> = Vec::with_capacity(legal.len());
-    let mut seen: Vec<(&Value, usize)> = Vec::new();
+    let mut seen: Vec<(std::borrow::Cow<'_, Value>, usize)> = Vec::new();
     for (i, mv) in legal.iter().enumerate() {
-        let r = MoveRef::of(mv);
-        let base = if r.action_type_str() == Some("SETUP_BOX") {
-            PayloadRef::of(r.payload).base
+        let base = if mv.action_type() == Some("SETUP_BOX") {
+            mv.payload().and_then(|p| p.get("base"))
         } else {
             None
         };
@@ -470,7 +473,15 @@ pub type UuidMap<'a, V> = crate::fxhash::FxHashMap<&'a str, V>;
 /// 全カードを走査する [`crate::ops::find_card_by_uuid`] とは範囲が違う（山札・一時ゾーンを
 /// 含めない）＝方策の `card_id` 解決はこちらを使う。
 pub fn uuid_index(state: &GameState) -> UuidMap<'_, CardIdx> {
-    let mut idx: UuidMap<'_, CardIdx> = UuidMap::default();
+    // 引くだけの表＝先に件数ぶんを取っておく（中身は同じ・伸ばし直しの再ハッシュをしない）。
+    let n: usize = [Seat::P1, Seat::P2]
+        .iter()
+        .map(|seat| {
+            let p = state.player(*seat);
+            2 + p.field.len() + p.hand.len() + p.trash.len() + p.life.len()
+        })
+        .sum();
+    let mut idx: UuidMap<'_, CardIdx> = UuidMap::with_capacity_and_hasher(n, Default::default());
     for seat in [Seat::P1, Seat::P2] {
         let p = state.player(seat);
         let zones = p
@@ -491,6 +502,14 @@ pub fn uuid_index(state: &GameState) -> UuidMap<'_, CardIdx> {
 
 /// Python `n_rel_feat._slots` の逆写像（uuid → 22 枠 index）。
 pub fn slot_index(state: &GameState, me: Seat) -> UuidMap<'_, i32> {
+    let mut out: UuidMap<'_, i32> = UuidMap::default();
+    fill_slot_index(state, me, &mut out);
+    out
+}
+
+/// [`slot_index`] の中身を `out` へ入れる（`out` の容量は呼び出し側が決める＝引くだけの使い方
+/// なら先に取っておける。並びを外へ出す [`slot_index`] は今までどおり既定の容量から伸ばす）。
+fn fill_slot_index<'s>(state: &'s GameState, me: Seat, out: &mut UuidMap<'s, i32>) {
     let opp = me.other();
     let mut slots: Vec<Option<CardIdx>> = Vec::with_capacity(N_TOK);
     slots.push(state.player(me).leader);
@@ -504,14 +523,12 @@ pub fn slot_index(state: &GameState, me: Seat) -> UuidMap<'_, i32> {
     for k in 0..crate::encode::MAX_HAND {
         slots.push(state.player(me).hand.get(k).copied());
     }
-    let mut out: UuidMap<'_, i32> = UuidMap::default();
     for (i, c) in slots.iter().enumerate() {
         if let Some(c) = c {
             // Python は dict 内包＝**後勝ち**（同じ uuid が 2 枠に出ることは無いので実質同じ）
             out.insert(state.card(*c).uuid.as_str(), i as i32);
         }
     }
-    out
 }
 
 /// 効果の対象選択の手（対象は `payload.target_ids` ではなく `selected_uuids` に入る）。
@@ -536,37 +553,63 @@ pub fn cand_owned<'a>(
     src_uuid: Option<&str>,
     cand_target: bool,
 ) -> nrel::CandRef<'a> {
-    // 手と payload の欄は 1 度の走査で読む（`MoveRef`／`PayloadRef`＝`get` と同じ値）。
-    let r = MoveRef::of(mv);
-    let p = PayloadRef::of(r.payload);
+    cand_parts(
+        state,
+        masters,
+        uidx,
+        slots,
+        mv.action_type(),
+        mv.card_uuid(),
+        mv.payload(),
+        src_uuid,
+        cand_target,
+    )
+}
+
+/// [`cand_owned`] の本体（手の欄＝`action_type`・`card_uuid`・`payload` から）。準備箱の素の手
+/// （`payload.base`＝JSON）も同じ読みで辿る。
+#[allow(clippy::too_many_arguments)]
+fn cand_parts<'a>(
+    state: &GameState,
+    masters: &'a MasterTable,
+    uidx: &UuidMap<'_, CardIdx>,
+    slots: &UuidMap<'_, i32>,
+    at: Option<&'a str>,
+    card_uuid: Option<&'a str>,
+    p: Option<PayloadRef<'a>>,
+    src_uuid: Option<&str>,
+    cand_target: bool,
+) -> nrel::CandRef<'a> {
     // 準備箱（§20.7.2）はネットに**素の手として**見せる（`SETUP_BOX` は語彙に無い＝
     // どの枝も同じ PAD 行になってしまう）。枝ごとの配分は `Ctx::setup_branch_shares`
     // （§20.7.8 の 3＝行は 1 本に畳んでから、その P を対象選択の P で割り振る）。
-    if r.action_type_str() == Some("SETUP_BOX") {
-        if let Some(base) = p.base {
-            return cand_owned(state, masters, uidx, slots, base, src_uuid, cand_target);
+    if at == Some("SETUP_BOX") {
+        if let Some(base) = p.and_then(|p| p.as_json()).and_then(|v| v.get("base")) {
+            return cand_parts(
+                state,
+                masters,
+                uidx,
+                slots,
+                base.get("action_type").and_then(Value::as_str),
+                base.get("card_uuid").and_then(Value::as_str),
+                base.get("payload").map(PayloadRef::Json),
+                src_uuid,
+                cand_target,
+            );
         }
     }
-    let at = r.action_type_str().unwrap_or("");
-    let mut su = r
-        .card_uuid
-        .and_then(Value::as_str)
-        .or_else(|| p.uuid.and_then(Value::as_str));
+    let at = at.unwrap_or("");
+    let mut su = card_uuid.or_else(|| p.and_then(|p| p.uuid()));
     let (has_target, tu) = if cand_target && at == SELECT_AT {
         if su.is_none() {
             su = src_uuid;
         }
-        let sel = p
-            .selected_uuids
-            .and_then(Value::as_array)
-            .and_then(|a| a.first())
-            .and_then(Value::as_str);
+        let sel = p.and_then(|p| p.first_selected());
         (sel.is_some(), sel)
     } else {
-        let tids = p.target_ids.and_then(Value::as_array);
         (
-            tids.map(|a| !a.is_empty()).unwrap_or(false),
-            tids.and_then(|a| a.first()).and_then(Value::as_str),
+            p.is_some_and(|p| p.has_target_ids()),
+            p.and_then(|p| p.first_target_id()),
         )
     };
     let card_id = |u: Option<&str>| -> Option<&'a str> {
@@ -575,7 +618,7 @@ pub fn cand_owned<'a>(
     };
     nrel::CandRef {
         action_type: at,
-        don_k: p.don_k.and_then(Value::as_f64),
+        don_k: p.and_then(|p| p.don_k_f64()),
         has_target,
         card_id: card_id(su),
         // Python は `if tids:` のときだけ対象の card_id を引く
@@ -600,7 +643,7 @@ pub fn quiesce_choice(
         }
     }
     for (i, mv) in legal.iter().enumerate() {
-        if mv.get("action_type").and_then(Value::as_str) == Some("PASS") {
+        if mv.action_type() == Some("PASS") {
             return Ok(i);
         }
     }
@@ -856,7 +899,7 @@ pub fn leaf_rollout_turn_end(
         }
         let pick = quiesce_choice(ctx, s, &legal, true)?;
         let mv = legal[pick].clone();
-        let is_turn_end = mv.get("action_type").and_then(Value::as_str) == Some("TURN_END");
+        let is_turn_end = mv.action_type() == Some("TURN_END");
         match apply::apply_move_inplace(s, ctx.masters, seat, &mv, true) {
             Ok(()) => {}
             Err(e @ EngineError::Unimplemented(_)) => return Err(e),
@@ -1037,8 +1080,8 @@ mod tests {
     // 1 bit も変わらないこと（同じ PAD 行のまま）を固定する。
 
     fn select_move(sel: &str) -> Move {
-        json!({"kind": "game", "action_type": SELECT_AT,
-               "payload": {"selected_uuids": [sel], "index": 0, "accepted": true}})
+        Move::from_json(json!({"kind": "game", "action_type": SELECT_AT,
+               "payload": {"selected_uuids": [sel], "index": 0, "accepted": true}}))
     }
 
     #[test]
@@ -1085,8 +1128,8 @@ mod tests {
         let (masters, state) = BoardBuilder::new().build();
         let slots = slot_index(&state, Seat::P1);
         let uidx = uuid_index(&state);
-        let mv = json!({"kind": "game", "action_type": SELECT_AT,
-                        "payload": {"selected_uuids": [], "accepted": true}});
+        let mv = Move::from_json(json!({"kind": "game", "action_type": SELECT_AT,
+                        "payload": {"selected_uuids": [], "accepted": true}}));
         let r = cand_owned(&state, &masters, &uidx, &slots, &mv, None, true);
         assert!(!r.has_target);
         assert_eq!(r.ti, -1);

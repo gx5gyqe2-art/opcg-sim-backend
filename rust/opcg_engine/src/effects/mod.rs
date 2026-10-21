@@ -426,6 +426,7 @@ mod tests {
                 raw_text: String::new(),
                 cost_optional: false,
             }],
+            ..Default::default()
         }
     }
 

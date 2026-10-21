@@ -236,6 +236,9 @@ pub struct SelectGroup {
 
 /// Python `plan.move_sig`（action_type・uuid・target_ids・selected_uuids・accepted）。
 pub fn move_sig(mv: &Move) -> Value {
+    // 根でしか呼ばれない読み＝手の JSON（`Move::json`）をそのまま読む（WP `rs-speed-d`）。
+    let mvj = mv.json();
+    let mv: &Value = &mvj;
     let null = Value::Null;
     let p = mv.get("payload").unwrap_or(&null);
     let at = match mv.get("action_type") {
@@ -313,6 +316,9 @@ pub fn describe_move(
     mv: &Move,
     pending: Option<&Value>,
 ) -> Value {
+    // 根でしか呼ばれない読み＝手の JSON（`Move::json`）をそのまま読む（WP `rs-speed-d`）。
+    let mvj = mv.json();
+    let mv: &Value = &mvj;
     let null = Value::Null;
     let p = mv.get("payload").unwrap_or(&null);
     let extra = p.get("extra").unwrap_or(&null);
@@ -403,6 +409,9 @@ pub fn describe_move(
 /// 返り値は `[action_type, card, targets, selected, index, position, accepted, don_k]`。
 /// `_describe_move` の `selected_slots`（同名複製の曖昧性解消）は等価キーが読まないので作らない。
 pub fn move_equiv_key(state: &GameState, masters: &MasterTable, mv: &Move) -> Value {
+    // 根でしか呼ばれない読み＝手の JSON（`Move::json`）をそのまま読む（WP `rs-speed-d`）。
+    let mvj = mv.json();
+    let mv: &Value = &mvj;
     let null = Value::Null;
     let p = mv.get("payload").unwrap_or(&null);
     let extra = p.get("extra").unwrap_or(&null);
@@ -518,6 +527,9 @@ const SETUP_ACTIONS: [&str; 2] = ["PLAY", "ACTIVATE_MAIN"];
 
 /// 手の主体の card_id ラベル（`move_equiv_key` の 2 欄目と同じ引き方）。
 fn move_card_label(state: &GameState, masters: &MasterTable, mv: &Move) -> Value {
+    // 根でしか呼ばれない読み＝手の JSON（`Move::json`）をそのまま読む（WP `rs-speed-d`）。
+    let mvj = mv.json();
+    let mv: &Value = &mvj;
     let null = Value::Null;
     let p = mv.get("payload").unwrap_or(&null);
     let uuid = p
@@ -538,7 +550,7 @@ pub fn select_groups(
     legal: &[Move],
     groups: &[Group],
 ) -> Vec<SelectGroup> {
-    let is_box = |mv: &Move| mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX");
+    let is_box = |mv: &Move| mv.action_type() == Some("SETUP_BOX");
     let mut boxed: Vec<Value> = Vec::new();
     for mv in legal.iter().filter(|m| is_box(m)) {
         let card = move_card_label(state, masters, mv);
@@ -554,7 +566,7 @@ pub fn select_groups(
     let mut rep_n: Vec<f64> = Vec::new();
     for (gi, g) in groups.iter().enumerate() {
         let mv = &legal[g.rep];
-        let at = mv.get("action_type").and_then(Value::as_str).unwrap_or("");
+        let at = mv.action_type().unwrap_or("");
         let card = move_card_label(state, masters, mv);
         let key = if (is_box(mv) || SETUP_ACTIONS.contains(&at)) && boxed.contains(&card) {
             json!(["setup", card])
@@ -584,12 +596,15 @@ pub fn select_groups(
 ///
 /// 準備箱（`SETUP_BOX`・§20.7.2）も同じ規約で先頭原始手（素の PLAY／ACTIVATE_MAIN）へ落とす。
 pub fn don_box_first_primitive(mv: &Move) -> Move {
-    if mv.get("action_type").and_then(Value::as_str) == Some("SETUP_BOX") {
+    if mv.action_type() == Some("SETUP_BOX") {
         return super::r#macro::setup_box_first_primitive(mv);
     }
-    if mv.get("action_type").and_then(Value::as_str) != Some("DON_BOX") {
+    if mv.action_type() != Some("DON_BOX") {
         return mv.clone();
     }
+    // 根でしか呼ばれない読み＝手の JSON（`Move::json`）をそのまま読む（WP `rs-speed-d`）。
+    let mvj = mv.json();
+    let mv: &Value = &mvj;
     let null = Value::Null;
     let p = mv.get("payload").unwrap_or(&null);
     let k = p.get("don_k").and_then(Value::as_f64).unwrap_or(0.0) as i64;
@@ -597,11 +612,11 @@ pub fn don_box_first_primitive(mv: &Move) -> Move {
     let uuid = p.get("uuid").cloned().unwrap_or(Value::Null);
     if k <= 0 {
         if let Some(t) = tids.filter(|a| !a.is_empty()) {
-            return json!({"kind": "game", "action_type": "ATTACK",
-                          "payload": {"uuid": uuid, "target_ids": Value::Array(t.clone())}});
+            return Move::from_json(json!({"kind": "game", "action_type": "ATTACK",
+                          "payload": {"uuid": uuid, "target_ids": Value::Array(t.clone())}}));
         }
     }
-    json!({"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": uuid}})
+    Move::from_json(json!({"kind": "game", "action_type": "ATTACH_DON", "payload": {"uuid": uuid}}))
 }
 
 // --- 箱コミット -------------------------------------------------------------------
@@ -613,7 +628,7 @@ fn trace_to_steps(trace: &[(Seat, Move)], name: Seat) -> Vec<Step> {
         if *actor != name {
             continue;
         }
-        if mv.get("action_type").and_then(Value::as_str) == Some("DON_BOX") {
+        if mv.action_type() == Some("DON_BOX") {
             let total = box_total(mv);
             if total >= 1 {
                 steps.push(Step::Box {
@@ -630,6 +645,9 @@ fn trace_to_steps(trace: &[(Seat, Move)], name: Seat) -> Vec<Step> {
 
 /// DON_BOX の総原始手数（付与 k 枚＋攻撃形なら 1）。
 fn box_total(mv: &Move) -> i64 {
+    // 根でしか呼ばれない読み＝手の JSON（`Move::json`）をそのまま読む（WP `rs-speed-d`）。
+    let mvj = mv.json();
+    let mv: &Value = &mvj;
     let null = Value::Null;
     let p = mv.get("payload").unwrap_or(&null);
     let k = p.get("don_k").and_then(Value::as_f64).unwrap_or(0.0) as i64;
@@ -685,21 +703,22 @@ pub fn commit_step(
                         .and_then(Value::as_array)
                         .cloned()
                         .unwrap_or_default();
-                    mv = Some(if !tgts.is_empty() && left <= 1 {
+                    mv = Some(Move::from_json(if !tgts.is_empty() && left <= 1 {
                         json!({"kind": "game", "action_type": "ATTACK",
                                "payload": {"uuid": uuid, "target_ids": tgts}})
                     } else {
                         json!({"kind": "game", "action_type": "ATTACH_DON",
                                "payload": {"uuid": uuid}})
-                    });
+                    }));
                 }
             }
             Step::Sig(sig) => {
                 if let Some(found) = find_move(&legal, &sig).cloned() {
-                    let null = Value::Null;
-                    let p = found.get("payload").unwrap_or(&null);
-                    let k = p.get("don_k").and_then(Value::as_f64).unwrap_or(0.0) as i64;
-                    if found.get("action_type").and_then(Value::as_str) == Some("DON_BOX") && k > 0
+                    let k = found
+                        .payload()
+                        .and_then(|p| p.don_k_f64())
+                        .unwrap_or(0.0) as i64;
+                    if found.action_type() == Some("DON_BOX") && k > 0
                     {
                         // 防御的経路（生成側はカウントダウン形へ変換済み＝通常来ない）
                         let total = box_total(&found);
@@ -955,10 +974,10 @@ fn residual_dig_move(
         return None;
     }
     for mv in legal {
-        if mv.get("action_type").and_then(Value::as_str) != Some("PLAY") {
+        if mv.action_type() != Some("PLAY") {
             continue;
         }
-        let u = mv.get("payload")?.get("uuid").and_then(Value::as_str);
+        let u = mv.payload()?.uuid();
         let Some(u) = u else { continue };
         let card = p.hand.iter().find(|c| state.card(**c).uuid == u);
         let Some(card) = card else { continue };
@@ -983,14 +1002,10 @@ fn residual_activate_move(
     }
     let leader_uuid = state.card(leader).uuid.clone();
     for mv in legal {
-        if mv.get("action_type").and_then(Value::as_str) != Some("ACTIVATE_MAIN") {
+        if mv.action_type() != Some("ACTIVATE_MAIN") {
             continue;
         }
-        if mv
-            .get("payload")
-            .and_then(|p| p.get("uuid"))
-            .and_then(Value::as_str)
-            != Some(leader_uuid.as_str())
+        if mv.payload_uuid() != Some(leader_uuid.as_str())
         {
             continue;
         }
@@ -1063,12 +1078,12 @@ fn residual_attach_move(
     };
     let legal = ctx.legal_actions(s)?;
     for mv in &legal {
-        if mv.get("action_type").and_then(Value::as_str) != Some("RESOLVE_EFFECT_SELECTION") {
+        if mv.action_type() != Some("RESOLVE_EFFECT_SELECTION") {
             continue;
         }
-        let su: Vec<&str> = mv
-            .get("payload")
-            .and_then(|p| p.get("selected_uuids"))
+        let sel = mv.payload().and_then(|p| p.get("selected_uuids"));
+        let su: Vec<&str> = sel
+            .as_deref()
             .and_then(Value::as_array)
             .map(|a| a.iter().filter_map(Value::as_str).collect())
             .unwrap_or_default();
@@ -1086,8 +1101,8 @@ fn residual_attach_move(
     let mut obj: Map<String, Value> = obj;
     obj.insert("selected_uuids".into(), json!([target]));
     obj.insert("accepted".into(), Value::Bool(true));
-    Ok(Some(json!({"kind": "game", "action_type": "RESOLVE_EFFECT_SELECTION",
-                   "payload": Value::Object(obj)})))
+    Ok(Some(Move::from_json(json!({"kind": "game", "action_type": "RESOLVE_EFFECT_SELECTION",
+                   "payload": Value::Object(obj)}))))
 }
 
 // --- 複数世界（§20.7.1・WP `rs-pimc-worlds`）----------------------------------------
@@ -1498,15 +1513,14 @@ fn decide_inner(
     let rec_sig = mv.as_ref().map(move_sig);
     let rec_k = mv
         .as_ref()
-        .and_then(|m| m.get("payload"))
-        .and_then(|p| p.get("don_k"))
-        .and_then(Value::as_f64);
+        .and_then(|m| m.payload())
+        .and_then(|p| p.don_k_f64());
 
     // ⑤ 残ドン掘り／残り起動（腕 A・A2）
     let mut dig_override = false;
     let is_turn_end = mv
         .as_ref()
-        .and_then(|m| m.get("action_type").and_then(Value::as_str))
+        .and_then(|m| m.action_type())
         == Some("TURN_END");
     if is_turn_end && !in_battle(&real) && !in_dialog(&mut real) {
         let legal = ctx.legal_actions(&mut real)?;
@@ -1528,7 +1542,7 @@ fn decide_inner(
     // ⑥ 箱コミット（木が選んだ箱の自分側の残り手順を確定）
     if opts.box_commit && !dig_override {
         if let Some(m) = mv.clone() {
-            match m.get("action_type").and_then(Value::as_str) {
+            match m.action_type() {
                 Some("DON_BOX") => {
                     let total = box_total(&m);
                     if total > 1 {
@@ -1594,38 +1608,38 @@ pub(super) mod tests {
                        "payload":{"uuid":"u1","target_ids":["t1"]}});
         let b = json!({"kind":"game","action_type":"ATTACK",
                        "payload":{"uuid":"u1","target_ids":["t2"]}});
-        assert_ne!(move_sig(&a), move_sig(&b));
+        assert_ne!(move_sig(&Move::from_json((a).clone())), move_sig(&Move::from_json((b).clone())));
         // don_k は sig に入らない（残回数はステップ側が持つ）
         let c = json!({"action_type":"DON_BOX","payload":{"uuid":"u1","don_k":2}});
         let d = json!({"action_type":"DON_BOX","payload":{"uuid":"u1","don_k":3}});
-        assert_eq!(move_sig(&c), move_sig(&d));
+        assert_eq!(move_sig(&Move::from_json((c).clone())), move_sig(&Move::from_json((d).clone())));
         // 効果選択は selected_uuids と accepted で割れる
         let e = json!({"action_type":"RESOLVE_EFFECT_SELECTION","payload":{"selected_uuids":["x"]}});
         let f = json!({"action_type":"RESOLVE_EFFECT_SELECTION","payload":{"selected_uuids":[]}});
-        assert_ne!(move_sig(&e), move_sig(&f));
+        assert_ne!(move_sig(&Move::from_json((e).clone())), move_sig(&Move::from_json((f).clone())));
     }
 
     #[test]
     fn don_box_first_primitive_expands_the_head() {
         let attach = json!({"action_type":"DON_BOX","payload":{"uuid":"u","don_k":2}});
         assert_eq!(
-            don_box_first_primitive(&attach)["action_type"],
+            don_box_first_primitive(&Move::from_json((attach).clone())).to_json()["action_type"],
             Value::from("ATTACH_DON")
         );
         // k=0 のアタック箱は ATTACK をそのまま出す
         let atk = json!({"action_type":"DON_BOX","payload":{"uuid":"u","don_k":0,"target_ids":["t"]}});
-        let out = don_box_first_primitive(&atk);
-        assert_eq!(out["action_type"], Value::from("ATTACK"));
-        assert_eq!(out["payload"]["target_ids"], json!(["t"]));
+        let out = don_box_first_primitive(&Move::from_json((atk).clone()));
+        assert_eq!(out.to_json()["action_type"], Value::from("ATTACK"));
+        assert_eq!(out.to_json()["payload"]["target_ids"], json!(["t"]));
         // 付与つきの攻撃形はまず付与
         let both = json!({"action_type":"DON_BOX","payload":{"uuid":"u","don_k":1,"target_ids":["t"]}});
         assert_eq!(
-            don_box_first_primitive(&both)["action_type"],
+            don_box_first_primitive(&Move::from_json((both).clone())).to_json()["action_type"],
             Value::from("ATTACH_DON")
         );
         // DON_BOX 以外は素通し
         let end = json!({"action_type":"TURN_END","payload":{}});
-        assert_eq!(don_box_first_primitive(&end), end);
+        assert_eq!(don_box_first_primitive(&Move::from_json((end).clone())), Move::from_json(end));
     }
 
     #[test]
@@ -1633,9 +1647,9 @@ pub(super) mod tests {
         let mine = json!({"action_type":"DON_BOX","payload":{"uuid":"u","don_k":2,"target_ids":["t"]}});
         let plain = json!({"action_type":"PASS","payload":{}});
         let trace = vec![
-            (Seat::P1, mine.clone()),
-            (Seat::P2, plain.clone()),
-            (Seat::P1, plain.clone()),
+            (Seat::P1, Move::from_json(mine.clone())),
+            (Seat::P2, Move::from_json(plain.clone())),
+            (Seat::P1, Move::from_json(plain.clone())),
         ];
         let steps = trace_to_steps(&trace, Seat::P1);
         assert_eq!(steps.len(), 2);
@@ -1643,7 +1657,7 @@ pub(super) mod tests {
             Step::Box { left, .. } => assert_eq!(*left, 3), // 付与 2 ＋ 攻撃 1
             other => panic!("箱の形でない: {other:?}"),
         }
-        assert_eq!(steps[1], Step::Sig(move_sig(&plain)));
+        assert_eq!(steps[1], Step::Sig(move_sig(&Move::from_json((plain).clone()))));
     }
 
     /// 箱コミットの残回数: 付与 k 枚＋攻撃形は「付与 → … → 攻撃」で消化し、
@@ -1669,8 +1683,8 @@ pub(super) mod tests {
         let mut s = Session::new(state);
         // `commit_step` は現在の合法手を引くが、この盤面では候補が出ない（＝契約違反）。
         // 残り手順が消化されないこと（`None`）だけを見る＝箱ごと破棄する側の分岐。
-        let sig = move_sig(&json!({"action_type": "DON_BOX",
-                                   "payload": {"uuid": "u", "target_ids": ["t"]}}));
+        let sig = move_sig(&Move::from_json(json!({"action_type": "DON_BOX",
+                                   "payload": {"uuid": "u", "target_ids": ["t"]}})));
         let mut steps = vec![Step::Box { sig: sig.clone(), left: 2 }];
         assert!(commit_step(&ctx, &mut s, Seat::P1, &mut steps).unwrap().is_none());
 
@@ -1679,19 +1693,19 @@ pub(super) mod tests {
         let head = |left: i64| -> Move {
             let uuid = sig.get(1).cloned().unwrap();
             let tgts = sig.get(2).and_then(Value::as_array).cloned().unwrap();
-            if !tgts.is_empty() && left <= 1 {
+            Move::from_json(if !tgts.is_empty() && left <= 1 {
                 json!({"kind":"game","action_type":"ATTACK",
                        "payload":{"uuid":uuid,"target_ids":tgts}})
             } else {
                 json!({"kind":"game","action_type":"ATTACH_DON","payload":{"uuid":uuid}})
-            }
+            })
         };
-        assert_eq!(head(2)["action_type"], Value::from("ATTACH_DON"));
-        assert_eq!(head(1)["action_type"], Value::from("ATTACK"));
+        assert_eq!(head(2).to_json()["action_type"], Value::from("ATTACH_DON"));
+        assert_eq!(head(1).to_json()["action_type"], Value::from("ATTACK"));
         // 生成側（木が箱を選んだ直後）の残回数＝総原始手数 − 1。
         let box_move = json!({"action_type":"DON_BOX",
                               "payload":{"uuid":"u","don_k":2,"target_ids":["t"]}});
-        assert_eq!(box_total(&box_move), 3);
+        assert_eq!(box_total(&Move::from_json((box_move).clone())), 3);
     }
 
     /// 等価手マージ: 同名カードの別実体（card_id が同じ）は 1 グループへ畳み、
@@ -1705,8 +1719,8 @@ pub(super) mod tests {
         let (masters, state) = b.build();
         let ua = state.card(a).uuid.clone();
         let uc = state.card(c).uuid.clone();
-        let play = |u: &str| json!({"kind":"game","action_type":"PLAY","payload":{"uuid":u}});
-        let end = json!({"kind":"game","action_type":"TURN_END","payload":{}});
+        let play = |u: &str| Move::from_json(json!({"kind":"game","action_type":"PLAY","payload":{"uuid":u}}));
+        let end = Move::from_json(json!({"kind":"game","action_type":"TURN_END","payload":{}}));
         let legal = vec![play(&ua), end.clone(), play(&uc)];
         let n = [30.0, 38.0, 30.0];
         let q = [0.5, -0.5, 0.1];
@@ -1729,7 +1743,7 @@ pub(super) mod tests {
         let a = b.put_hand(Seat::P1, M_CHAR);
         let c = b.put_hand(Seat::P1, M_BLOCKER);
         let (masters, state) = b.build();
-        let play = |u: &str| json!({"kind":"game","action_type":"PLAY","payload":{"uuid":u}});
+        let play = |u: &str| Move::from_json(json!({"kind":"game","action_type":"PLAY","payload":{"uuid":u}}));
         let legal = vec![
             play(&state.card(a).uuid.clone()),
             play(&state.card(c).uuid.clone()),
@@ -1743,8 +1757,8 @@ pub(super) mod tests {
     #[test]
     fn merge_root_stats_splits_boxes_by_don_k() {
         let (masters, state) = crate::testkit::BoardBuilder::new().build();
-        let bx = |k: i64| json!({"kind":"game","action_type":"DON_BOX",
-                                 "payload":{"uuid":"u","target_ids":[],"don_k":k}});
+        let bx = |k: i64| Move::from_json(json!({"kind":"game","action_type":"DON_BOX",
+                                 "payload":{"uuid":"u","target_ids":[],"don_k":k}}));
         let legal = vec![bx(1), bx(2), bx(1)];
         let groups = merge_root_stats(&state, &masters, &legal, &[1.0, 5.0, 2.0], &[0.0; 3]);
         assert_eq!(groups.len(), 2);
@@ -2146,8 +2160,8 @@ pub(super) mod tests {
     #[test]
     fn merge_worlds_sums_n_and_weights_q_by_n() {
         let legal = vec![
-            json!({"action_type":"PLAY","payload":{"uuid":"a"}}),
-            json!({"action_type":"TURN_END","payload":{}}),
+            Move::from_json(json!({"action_type":"PLAY","payload":{"uuid":"a"}})),
+            Move::from_json(json!({"action_type":"TURN_END","payload":{}})),
         ];
         let mk = |seed: u64, n: Vec<f64>, q: Vec<f64>| WorldRun {
             seed,

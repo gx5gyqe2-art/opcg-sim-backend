@@ -209,7 +209,7 @@ fn turn_end_evaluates_the_leaf_after_playing_out_the_remaining_attack() {
         .expect("legal");
     let play = legal
         .iter()
-        .find(|m| m["action_type"] == json!("PLAY"))
+        .find(|m| m.to_json()["action_type"] == json!("PLAY"))
         .expect("PLAY が候補に居る")
         .clone();
     apply::apply_move_inplace(&mut s, masters(), Seat::P1, &play, true).expect("PLAY");
@@ -274,7 +274,7 @@ fn turn_end_does_not_start_outside_the_turn_players_main_phase() {
     let legal = ctx.legal_actions(&mut s).expect("legal");
     let atk = legal
         .iter()
-        .find(|m| m["action_type"] == json!("ATTACK"))
+        .find(|m| m.to_json()["action_type"] == json!("ATTACK"))
         .expect("ATTACK が候補に居る")
         .clone();
     apply::apply_move_inplace(&mut s, masters(), Seat::P1, &atk, true).expect("ATTACK");
