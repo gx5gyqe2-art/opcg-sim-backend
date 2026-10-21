@@ -13,7 +13,7 @@
   ]
  },
  "metrics": {
-  "arena_rt05/rt05_w08.jsonl": 100
+  "arena_rt05/rt05_w08.jsonl": 120
  },
  "notes": "repo symlinked ~/opcg-sim-backend -> /home/user/opcg-sim-backend instead of cloning"
 }
