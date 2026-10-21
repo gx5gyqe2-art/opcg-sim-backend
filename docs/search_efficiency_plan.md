@@ -215,3 +215,23 @@ Phase 0 → Phase 1 → Phase 3（Phase 4 の (a)(b) を合間に）→ Phase 4 
 - 読み直し方式は off で不変（`tests/test_play_rethink.py` が見る）。
 - 計測: 1 コア固定で `rs_decide_latency.py --budget 0 --games 8` を本線とマージ後で並べて（1 本 × 1,280 回・4 本 × 1,280 回・1 本 × 5,120 回）。平均・90%・99%・最大。
 - `make rust-develop`・`make test`・`make audit-cross` を通してから push。成果物は RESULT.json（inputs＝3 本のコミット／outputs＝衝突を解いたファイル／metrics＝一致件数・時間の前後／notes）。コミットメッセージにモデル名を入れない。
+
+### 7.7 WP `rs-speed-c`——ネットの計算を速くする（Phase 4 の続き・作業セッション用・opus）
+
+ユーザ決定（2026-10-21「始めてください」）。本線 `claude/cpu-spec-improvements-yw91jd` の最新（`claude/speed-merge` 取り込み済み・1 本 × 1,280 回で ×2.00）から分岐し `claude/rs-speed-c` に push。PR は作らない。質問で止まらず、迷った点は注記と RESULT.json の notes に書いて完走する。
+
+**不変条件・一致の確かめ方・計測・成果物は §7.2 と同じ**（比較の相手は本線の今の wheel。1×1280／4×1280／1×160＋予算あり の 3 設定・計 2,000 判断点以上で `decide` の出力とイベントが全件一致。golden は作り直さずに green。`make test`・`make audit-cross`）。
+**浮動小数の結果を 1 bit も変えない**こと——足し算の順序を変える最適化（SIMD の横方向の和・行列積の分割・まとめ計算）は結果が変わりうる。変えるなら一致の確認で全件一致することを示し、1 件でも違えばその変更は戻す。精度を落とす（量子化・f16）は対象外。
+
+**対象**（まとめた後の `OPCG_PROF` の内訳でネットの計算が約 4 割: `fwd_tokens`・`fwd_body`・`fwd_policy`）:
+- 同じ読みの中で同じ入力の forward が残っていないか（`rs-speed-a` の使い回しの続き）。
+- 行列積・活性化の実装（ループの順序・メモリの並び・割り当ての再利用・境界検査の除去）。
+- 展開で子の候補をまとめて評価できる所があればまとめる（結果が変わらない範囲）。
+- **触らない**: 手の表現（Move）と合法手の生成（WP `rs-speed-d` の担当）。触ったファイルは notes に列挙。
+
+### 7.8 WP `rs-speed-d`——手の表現を構造体へ・合法手の生成（Phase 4 の続き・作業セッション用・opus）
+
+§7.7 と同じ前提・不変条件・一致の確かめ方・計測・成果物（ブランチは `claude/rs-speed-d`）。対象だけが違う:
+- 手（Move）を探索の中で JSON（`serde_json::Value` など）ではなく型付きの構造体で持つ（§7.3 で未実施だった部分）。Python との境目（`py_game.rs`）の入出力の形は変えない。
+- 合法手の生成（`rules/legal.rs`）と手の適用（`search/apply.rs`）の割り当て・複製の削減。
+- **触らない**: ネットの計算（WP `rs-speed-c` の担当）。触ったファイルは notes に列挙。
