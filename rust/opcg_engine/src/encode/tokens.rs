@@ -60,7 +60,6 @@
 //! `g <= 0` の境界を決めるので f64 で計算すると答えが変わりうる）。`threat_next` の
 //! 一括計算だけは Python も float64（`pool_arr` と生の整数）なので f64 で行う。
 
-use std::collections::HashMap;
 
 use crate::effects::ast::{ActionType, GameAction, PlayerRef, TriggerType};
 use crate::effects::EffectContext;
@@ -128,7 +127,7 @@ impl Profile {
 /// マスター単位のキャッシュ（Python のモジュール辞書 `_PROFILES`／`_ROLES`／`_THR_ROWS`／`_STATIC`）。
 #[derive(Debug, Default)]
 pub struct ProfileCache {
-    map: HashMap<MasterIdx, Profile>,
+    map: super::FastMap<MasterIdx, Profile>,
 }
 
 impl ProfileCache {
@@ -695,18 +694,16 @@ pub fn encode_rel(
         let mi = s.state().card(card).master;
         let m = masters.get(mi);
         let ty = m.ty;
-        let (ret_norm, trig_ko, trig_atk, trig_oatk, counter_event, conds, act_idx) = {
-            let p = cache.get(masters, mi);
-            (
-                p.ret_norm(),
-                f32::from(p.trig_ko),
-                f32::from(p.trig_attack),
-                f32::from(p.trig_opp_attack),
-                p.counter_event,
-                p.conds.clone(),
-                p.act_idx.clone(),
-            )
-        };
+        // 要約はキャッシュから借りる（`conds`／`act_idx` を複製しない）。
+        let p = cache.get(masters, mi);
+        let (ret_norm, trig_ko, trig_atk, trig_oatk, counter_event) = (
+            p.ret_norm(),
+            f32::from(p.trig_ko),
+            f32::from(p.trig_attack),
+            f32::from(p.trig_opp_attack),
+            p.counter_event,
+        );
+        let (conds, act_idx) = (&p.conds, &p.act_idx);
         let is_unit = ty == CardType::Leader || ty == CardType::Character;
         pw[i] = if is_unit {
             s.state().card(card).get_power(m, owner_turn)
@@ -747,7 +744,7 @@ pub fn encode_rel(
         tok[b + 16] = trig_oatk;
         if !conds.is_empty() {
             let owner = if own_side { me } else { opp };
-            let flags = cond_flags(s, masters, owner, card, &conds);
+            let flags = cond_flags(s, masters, owner, card, conds);
             tok[b + 10..b + 14].copy_from_slice(&flags);
         }
         if own_side && z != ZoneKind::Hand && has_pool_arr {
@@ -765,7 +762,7 @@ pub fn encode_rel(
         };
         // `act_avail`: 未使用の【起動メイン】を持つか（場の枠のみ）。
         tok[b + 21] = if on_board {
-            act_avail(s, card, &act_idx)
+            act_avail(s, card, act_idx)
         } else {
             0.0
         };
@@ -796,16 +793,16 @@ pub fn encode_rel(
         tok[*i * S_DIM + 17] = (cnt / n_pool).min(1.0) as f32;
     }
 
-    // ---- 関係 R ----
-    let profs_owned: Vec<Option<Profile>> = slots
-        .iter()
-        .map(|c| c.map(|c| cache.get(masters, s.state().card(c).master).clone()))
-        .collect();
-    let mut profs: [Option<&Profile>; N_TOK] = [None; N_TOK];
-    for i in 0..N_TOK {
-        profs[i] = profs_owned[i].as_ref();
-    }
+    // ---- 関係 R ----（作らないときは要約の写しも作らない）
     let (rel_om, rel_oo) = if with_relations {
+        let profs_owned: Vec<Option<Profile>> = slots
+            .iter()
+            .map(|c| c.map(|c| cache.get(masters, s.state().card(c).master).clone()))
+            .collect();
+        let mut profs: [Option<&Profile>; N_TOK] = [None; N_TOK];
+        for i in 0..N_TOK {
+            profs[i] = profs_owned[i].as_ref();
+        }
         relations_from_tokens(&profs, &tok)
     } else {
         (Vec::new(), Vec::new())

@@ -43,10 +43,17 @@ pub fn drain_own_interactions(
             return Ok(());
         }
         // 探索モードでは分岐可能な選択もドレインしない（探索ノードとして残す）。
-        if stop_at_select && adapter::selection_moves(s, masters, actor).is_some() {
+        // 要求は 1 度だけ読み、判定は候補を組まずに数える（`adapter::selection_branch_exists`
+        // ＝`selection_moves(..).is_some()`。`get_pending_request` の書き換えは戦闘フェイズの
+        // 正規化だけ＝冪等なので、判定の後に読み直した値と同じ）。
+        let pending = get_pending_request(s, masters, false);
+        if stop_at_select
+            && pending
+                .as_ref()
+                .is_some_and(|p| adapter::selection_branch_exists(p, actor))
+        {
             return Ok(());
         }
-        let pending = get_pending_request(s, masters, false);
         let payload = crate::effects::interact::default_interaction_payload(
             s.state(),
             masters,
@@ -93,24 +100,21 @@ pub fn apply_move_inplace(
     if action_type == "DON_BOX" {
         let null = Value::Null;
         let payload = mv.get("payload").unwrap_or(&null);
-        let uuid = payload.get("uuid").cloned().unwrap_or(Value::Null);
+        let uuid = payload.get("uuid").unwrap_or(&null);
         let don_k = payload.get("don_k").and_then(Value::as_i64).unwrap_or(0);
-        for _ in 0..don_k.max(0) {
-            crate::rules::actions::apply_game_action(
-                s,
-                masters,
-                actor,
-                "ATTACH_DON",
-                &json!({"uuid": uuid}),
-            )?;
-            drain_own_interactions(s, masters, actor, stop_at_select)?;
+        if don_k > 0 {
+            // 付与の payload は k 回とも同じ＝1 度だけ組む。
+            let attach = json!({"uuid": uuid});
+            for _ in 0..don_k {
+                crate::rules::actions::apply_game_action(s, masters, actor, "ATTACH_DON", &attach)?;
+                drain_own_interactions(s, masters, actor, stop_at_select)?;
+            }
         }
         let target_ids = payload
             .get("target_ids")
             .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-        if !target_ids.is_empty() {
+            .filter(|t| !t.is_empty());
+        if let Some(target_ids) = target_ids {
             crate::rules::actions::apply_game_action(
                 s,
                 masters,

@@ -269,6 +269,71 @@ pub fn selection_moves(s: &mut Session, masters: &MasterTable, seat: Seat) -> Op
     None
 }
 
+/// [`selection_moves`]`(...).is_some()`（Python `cpu_ai._selection_moves(...) is not None`・
+/// `stop_at_select` の判定だけを写す）を、読み終えた `pending`（`get_pending_request` の値）から出す。
+///
+/// 手そのものは使わないので、**候補が何手になるか**だけを数える（既定解決の payload も候補の
+/// 並べ替えも作らない）。ドレイン（`apply::drain_own_interactions`・符号化の登場時スキャン）が使う。
+pub fn selection_branch_exists(pending: &Value, actor: Seat) -> bool {
+    if pending.get("player_id").and_then(|v| v.as_str()) != Some(actor.name()) {
+        return false;
+    }
+    let action = pending.get("action").and_then(|v| v.as_str()).unwrap_or("");
+    let can_skip = pending
+        .get("can_skip")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if action == "CONFIRM_OPTIONAL" && can_skip {
+        return true; // accept / decline の 2 手
+    }
+    let uuids: Vec<&str> = pending
+        .get("selectable_uuids")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
+        .unwrap_or_default();
+    if action == "ARRANGE_DECK" {
+        let allow_pos = pending
+            .get("allow_position")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let allow_reorder = pending
+            .get("allow_reorder")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        if uuids.is_empty() || !(allow_pos || (allow_reorder && uuids.len() >= 2)) {
+            return false;
+        }
+        let n_orders = if allow_reorder && uuids.len() >= 2 {
+            1 + uuids.len().min(HARD_SELECT_CAP) - 1
+        } else {
+            1
+        };
+        let n_pos = if allow_pos { 2 } else { 1 };
+        return n_orders * n_pos >= 2;
+    }
+    if action != SELECT_ACTION || uuids.is_empty() {
+        return false;
+    }
+    let constraints = pending.get("constraints");
+    let min_n = constraints
+        .and_then(|c| c.get("min"))
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let max_n = constraints
+        .and_then(|c| c.get("max"))
+        .and_then(|v| v.as_i64())
+        .unwrap_or(uuids.len() as i64);
+    if max_n == 1 && min_n <= 1 {
+        return true;
+    }
+    if max_n >= 2 && (0..=max_n).contains(&min_n) {
+        let hi = max_n.min(uuids.len() as i64);
+        let lo = min_n.max(0);
+        return lo <= hi;
+    }
+    false
+}
+
 /// Python `cpu_ai._rank_select_candidates`（自分＝価値の低い順／相手＝価値の高い順）。
 ///
 /// 序列は `engine.interaction.card_keep_value`（ドレイン既定と同じ 1 本）。カードが

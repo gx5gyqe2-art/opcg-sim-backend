@@ -88,16 +88,47 @@ pub fn walk_all<'a>(node: Option<&'a EffectNode>, out: &mut Vec<&'a GameAction>)
     }
 }
 
+/// 引くだけの表（中身の並びを外へ出さない表）に使う軽いハッシュ（FNV-1a）。
+///
+/// std の既定（SipHash）は探索の 1 回の符号化・priors で数十〜百回回って重い。表の中身は
+/// 同じ＝引いた値は 1 bit も変わらない（並びに意味を持たせる表には使わない）。
+#[derive(Clone, Copy)]
+pub struct Fnv(u64);
+
+impl Default for Fnv {
+    fn default() -> Self {
+        Fnv(0xcbf2_9ce4_8422_2325)
+    }
+}
+
+impl std::hash::Hasher for Fnv {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        let mut h = self.0;
+        for b in bytes {
+            h ^= u64::from(*b);
+            h = h.wrapping_mul(0x0100_0000_01b3);
+        }
+        self.0 = h;
+    }
+}
+
+/// [`Fnv`] の表。
+pub type FastMap<K, V> = HashMap<K, V, std::hash::BuildHasherDefault<Fnv>>;
+
 /// 語彙: card_id → index（0=PAD/UNK）。npz の `vocab_ids`（index 1..）から作る。
 #[derive(Debug, Clone, Default)]
 pub struct Vocab {
     pub ids: Vec<String>,
-    pub index: HashMap<String, u32>,
+    pub index: FastMap<String, u32>,
 }
 
 impl Vocab {
     pub fn from_ids(ids: &[String]) -> Vocab {
-        let mut index = HashMap::new();
+        let mut index = FastMap::default();
         for (i, id) in ids.iter().enumerate() {
             index.insert(id.clone(), (i + 1) as u32); // Python `vocab_from_ids`: 1 始まり・0 は PAD
         }
