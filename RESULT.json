@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_ismfix/ismfix_w04.jsonl": 90
+  "arena_ismfix/ismfix_w04.jsonl": 100
  },
  "notes": "run in /home/user/opcg-sim-backend (not ~/)"
 }
