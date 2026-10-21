@@ -134,6 +134,16 @@ pub fn sample_masters() -> MasterTable {
     MasterTable { masters, by_id, abilities: effect_table(), don_cond: Default::default() }
 }
 
+/// 知識の印（`CardInstance::known_by`・§7.15）を全部 0 にした複製。「盤面不変」を確かめるテストが
+/// 印（ルールは読まない）を除いて比べるのに使う。
+pub fn without_knowledge(st: &GameState) -> GameState {
+    let mut out = st.clone();
+    for c in out.cards.iter_mut() {
+        c.known_by = 0;
+    }
+    out
+}
+
 fn card(m: MasterIdx, owner: Seat, uuid: &str) -> CardInstance {
     CardInstance {
         master: m,
@@ -160,6 +170,7 @@ fn card(m: MasterIdx, owner: Seat, uuid: &str) -> CardInstance {
         timed_cost: 0,
         timed_keywords: Vec::new(),
         temp_origin_life: false,
+        known_by: 0,
     }
 }
 

@@ -83,6 +83,8 @@ pub fn apply_target(
         ActionType::PlayCard => play_card(s, masters, action, target, owner, source_list),
         ActionType::Reveal => {
             reveal();
+            // 知識（§7.15）: 公開した札は両席が知る（ルールは読まない印）。
+            s.edit().set_card_known(target, crate::journal::KNOWN_BOTH);
             Ok(())
         }
         other => Err(EngineError::Unimplemented(format!(
@@ -105,6 +107,13 @@ pub fn apply_target(
 /// `move_card`（`is_rest` のリセット等が走る）は使わない。
 fn look(s: &mut Session, actor: Seat, action: &GameAction, value: i32) -> Result<bool, EngineError> {
     if action.status.as_deref() == Some("OPPONENT") {
+        // 知識（§7.15）: 盤面は変えないが、見た席は相手の山札の上 N 枚を知る。
+        let opp = actor.other();
+        let top: Vec<CardIdx> = s.state().player(opp).deck.iter().take(value.max(0) as usize).copied().collect();
+        let mut e = s.edit();
+        for card in top {
+            e.add_card_known(card, actor.know_bit());
+        }
         return Ok(true);
     }
     let mut count = value;
@@ -116,6 +125,9 @@ fn look(s: &mut Session, actor: Seat, action: &GameAction, value: i32) -> Result
     for _ in 0..count.max(0) {
         let card = e.card_zone_remove_at(actor, CardZone::Deck, 0);
         e.card_zone_push(actor, CardZone::Temp, card);
+        // 知識（§7.15）: 見た席が知る（残りを山札の上下へ戻しても持ち越す＝並べ替えの効果が公平化で
+        // 無意味にならない）。
+        e.add_card_known(card, actor.know_bit());
     }
     Ok(true)
 }
@@ -435,7 +447,14 @@ mod tests {
         let mut action = testkit::action(ActionType::Look, 1);
         action.status = Some("OPPONENT".to_string());
         assert!(run(&mut s, &masters, &action, &[], 1));
-        assert_eq!(s.state(), &before, "公開だけ＝盤面は 1 欄も変わらない");
+        assert_eq!(
+            testkit::without_knowledge(s.state()),
+            testkit::without_knowledge(&before),
+            "公開だけ＝盤面は 1 欄も変わらない（知識の印を除く）"
+        );
+        // 知識（§7.15）: 見た席（P1）が相手の山札の上 1 枚を知る。
+        let top = s.state().player(Seat::P2).deck[0];
+        assert_eq!(s.state().card(top).known_by, Seat::P1.know_bit());
     }
 
     // --- SELECT -------------------------------------------------------------
@@ -466,7 +485,9 @@ mod tests {
         let before = s.state().clone();
 
         assert!(run(&mut s, &masters, &testkit::action(ActionType::Reveal, 1), &[c, h], 1));
-        assert_eq!(s.state(), &before);
+        assert_eq!(testkit::without_knowledge(s.state()), testkit::without_knowledge(&before));
+        // 知識（§7.15）: 公開した札（手札の h も）は両席が知る。
+        assert_eq!(s.state().card(h).known_by, crate::journal::KNOWN_BOTH);
     }
 
     // --- EXECUTE_EVENT ------------------------------------------------------

@@ -429,8 +429,8 @@ fn legal_actions_keeps_futile_moves_when_pruning_is_off() {
 
 // --- determinize -----------------------------------------------------------------
 
-/// `_determinize_opponent`: 相手の手札枚数は保存し、中身は「山札＋手札」から渡された並びで
-/// 引き直す。自分側は一切変わらない。
+/// `_determinize_opponent`（＝`reveal="peek"`・2026-10-21 までの既定・§7.15 で測定用に残した）:
+/// 相手の手札枚数は保存し、中身は「山札＋手札」から渡された並びで引き直す。自分側は一切変わらない。
 #[test]
 fn determinize_resamples_only_the_opponent_hand() {
     let mut b = BoardBuilder::new();
@@ -517,20 +517,22 @@ fn decide_options_json_reads_omniscient() {
     assert!(read(r#"{"omniscient": true}"#).omniscient);
 }
 
-/// opts JSON の `reveal`（§7.11）: 省略・null は既定、`opp_hand`／`fair` だけが立つ。知らない値・
-/// `omniscient` との同時指定は `decide_opts_and_carry` がエラーにする。
+/// opts JSON の `reveal`（§7.11・§7.15）: 省略・null は既定（`fair`）、`fair`／`peek`／`opp_hand` が立つ。
+/// 知らない値・`omniscient` との同時指定（`"fair"` の明示も）は `decide_opts_and_carry` がエラーにする。
 #[test]
 fn decide_options_json_reads_reveal() {
     use super::decide::Reveal;
     let j = |s: &str| serde_json::from_str::<serde_json::Value>(s).unwrap();
     let read = |s: &str| super::decide_opts_and_carry(&j(s)).map(|(o, _)| o.reveal);
-    assert_eq!(read("{}").unwrap(), Reveal::Default);
-    assert_eq!(read(r#"{"reveal": null}"#).unwrap(), Reveal::Default);
+    assert_eq!(read("{}").unwrap(), Reveal::Fair);
+    assert_eq!(read(r#"{"reveal": null}"#).unwrap(), Reveal::Fair);
     assert_eq!(read(r#"{"reveal": "opp_hand"}"#).unwrap(), Reveal::OppHand);
     assert_eq!(read(r#"{"reveal": "fair"}"#).unwrap(), Reveal::Fair);
+    assert_eq!(read(r#"{"reveal": "peek"}"#).unwrap(), Reveal::Peek);
     assert!(read(r#"{"reveal": "all"}"#).is_err());
     assert!(read(r#"{"reveal": true}"#).is_err());
     assert!(read(r#"{"reveal": "fair", "omniscient": true}"#).is_err());
+    assert!(read(r#"{"reveal": "peek", "omniscient": true}"#).is_err());
     assert!(read(r#"{"reveal": "opp_hand", "omniscient": true}"#).is_err());
     assert!(read(r#"{"omniscient": true}"#).is_ok());
 }

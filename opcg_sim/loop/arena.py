@@ -135,7 +135,7 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
     `best_kw`（`--rethink-ratio`／`--rethink-worlds`）は**基準席の**「迷う局面だけ世界 K 本で
     読み直す」（`docs/search_efficiency_plan.md` §7.4）。None＝基準席は読み直さない（今までどおり）。
     `arena_shard --omniscient` も同じ口から基準席へ `{"omniscient": True}` を渡す（§7.10）。
-    `arena_shard --reveal {opp_hand,fair}` も同じ口から `{"reveal": ...}` を渡す（§7.11）。
+    `arena_shard --reveal {fair,peek,opp_hand}` も同じ口から `{"reveal": ...}` を渡す（§7.11）。
     `arena_shard --opp-blind` も同じ口から `{"opp_blind": True}` を渡す（§7.14）。
     """
     E.engine()
@@ -259,11 +259,11 @@ def add_cand_args(ap) -> None:
                     help="候補席だけ全部見える探索（`docs/search_efficiency_plan.md` §7.10・測定専用）。"
                          "探索の中で世界を引き直さず本当の盤面（相手の手札・両者の山札の並び）で読む"
                          "（worlds は 1 扱い）。天井の切り分けにだけ使う")
-    ap.add_argument("--cand-reveal", default=None, choices=("opp_hand", "fair"),
-                    help="候補席だけ見える範囲を分けた探索（`docs/search_efficiency_plan.md` §7.11・測定専用）。"
-                         "opp_hand＝相手の手札は本当のまま・相手の山札だけ混ぜ直す／fair＝自分に見えない物"
-                         "（相手の手札＋山札＋裏向きライフ・自分の山札＋裏向きライフ）を全部混ぜ直す。"
-                         "--cand-omniscient とは排他")
+    ap.add_argument("--cand-reveal", default=None, choices=("fair", "peek", "opp_hand"),
+                    help="候補席だけ探索の世界の見える範囲を指定する（`docs/search_efficiency_plan.md` §7.11・§7.15）。"
+                         "省略＝既定の fair（自分に見えない物を全部混ぜ直し、知っている札は固定）。測定用に"
+                         "peek＝2026-10-21 までの既定（自分の山札と裏向きライフを本物のまま読む）／"
+                         "opp_hand＝相手の手札は本当のまま・相手の山札だけ混ぜ直す。--cand-omniscient とは排他")
     ap.add_argument("--cand-opp-blind", action="store_true",
                     help="候補席だけ、木の中の相手の番のノードを「こちらの手札＋山札＋裏向きライフを混ぜ直した"
                          "複製」で評価する（`docs/search_efficiency_plan.md` §7.14・測定専用）。合法手と手の適用は"

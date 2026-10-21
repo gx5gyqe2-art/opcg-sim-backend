@@ -28,10 +28,12 @@ def main(argv=None):
     ap.add_argument("--decks", default="synth_roles")
     ap.add_argument("--omniscient", action="store_true",
                     help="両席とも全部見える探索（`docs/search_efficiency_plan.md` §7.10・測定専用）")
-    ap.add_argument("--reveal", default=None, choices=("opp_hand", "fair"),
-                    help="両席とも見える範囲を分けた探索（§7.11・測定専用）")
+    ap.add_argument("--reveal", default=None, choices=("fair", "peek", "opp_hand"),
+                    help="両席とも探索の世界の見える範囲（§7.11・§7.15・省略＝既定の fair・peek は旧既定）")
     ap.add_argument("--opp-blind", action="store_true",
                     help="両席とも木の中の相手にこちらの手札を見せない（§7.14・測定専用）")
+    ap.add_argument("--knowledge", action="store_true",
+                    help="決定点ごとに打つ席の「知っている札」（§7.15・`Game.knowledge_json`）を数え、分布を出力に足す")
     a = ap.parse_args(argv)
     E.engine()
     db = D.load_db()
@@ -49,11 +51,14 @@ def main(argv=None):
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     ts = []
     last = [0.0]
+    know = []
 
     def obs(game, name, turn, step, out, move):
         now = time.perf_counter()
         ts.append(now - last[0])
-        last[0] = now
+        if a.knowledge:
+            know.append(json.loads(game.knowledge_json(name)))
+        last[0] = time.perf_counter()
 
     t0 = time.perf_counter()
     for g in range(a.games):
@@ -71,7 +76,27 @@ def main(argv=None):
                       "mean": round(statistics.mean(ts), 3), "p50": round(ts[n // 2], 3),
                       "p90": round(ts[int(n * 0.9)], 3), "p99": round(ts[int(n * 0.99)], 3),
                       "max": round(ts[-1], 2), "wall_sec": round(time.perf_counter() - t0, 1),
-                      "affinity": sorted(os.sched_getaffinity(0))}))
+                      "affinity": sorted(os.sched_getaffinity(0)),
+                      **({"knowledge": _knowledge_summary(know)} if a.knowledge else {})}))
+
+
+def _knowledge_summary(rows):
+    """決定点ごとの「知っている札」の枚数の分布（§7.15）。total＝隠れた領域で知っている札の合計。"""
+    keys = ("opp_hand", "opp_deck", "opp_life", "my_deck", "my_life", "deck_top")
+    out = {"points": len(rows)}
+    for k in keys + ("total",):
+        vals = sorted(sum(r[x] for x in keys[:5]) if k == "total" else r[k] for r in rows)
+        if not vals:
+            continue
+        hist = {}
+        for v in vals:
+            hist[str(v)] = hist.get(str(v), 0) + 1
+        out[k] = {"mean": round(statistics.mean(vals), 3), "p50": vals[len(vals) // 2],
+                  "p90": vals[int(len(vals) * 0.9)], "max": vals[-1],
+                  "share_nonzero": round(sum(1 for v in vals if v) / len(vals), 3), "hist": hist}
+    out["opp_hand_share_known"] = round(
+        sum(r["opp_hand"] for r in rows) / max(1, sum(r["opp_hand_n"] for r in rows)), 4)
+    return out
 
 
 if __name__ == "__main__":

@@ -206,6 +206,15 @@ fn shuffle(s: &mut Session, actor: Seat, action: &GameAction) -> Result<bool, En
 
 /// `random.shuffle(player.deck)`（乱数源が `Replay` なら何もしない）。
 pub fn shuffle_deck(s: &mut Session, seat: Seat) {
+    // 知識（§7.15）: 混ぜた山札の札はどの席も位置を知らない。再生（混ぜない乱数）でも実際の対局では
+    // 混ぜている＝乱数の有無に関わらず消す（知識はルールの結果を変えない）。
+    {
+        let deck = s.state().player(seat).deck.clone();
+        let mut e = s.edit();
+        for card in deck {
+            e.set_card_known(card, 0);
+        }
+    }
     if !s.rng.shuffles() {
         return;
     }
@@ -285,6 +294,8 @@ fn look_life(
         let mut e = s.edit();
         e.set_card_bool(card, CardBoolField::TempOriginLife, true);
         e.card_zone_push(target_player, CardZone::Temp, card);
+        // 知識（§7.15）: 見た席（効果の実行者）が知る。
+        e.add_card_known(card, actor.know_bit());
     }
     Ok(true)
 }

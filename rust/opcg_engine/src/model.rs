@@ -168,6 +168,10 @@ pub enum Seat {
 }
 
 impl Seat {
+    /// [`CardInstance::known_by`] でこの席を表す bit。
+    pub fn know_bit(self) -> u8 {
+        1u8 << (self as u8)
+    }
     pub fn other(self) -> Seat {
         match self {
             Seat::P1 => Seat::P2,
@@ -712,6 +716,15 @@ pub struct CardInstance {
     /// 記録 v3/v4 の `card_record` には**無い**（Python 側も動的属性で、`temp_zone` が空の
     /// 記録境界でしか観測されない）＝`from_record` では常に `false` で始まる。
     pub temp_origin_life: bool,
+    /// 席ごとの「この札の正体と位置を知っている」印（`search_efficiency_plan.md` §7.15・WP `rs-fair`）。
+    ///
+    /// bit `1 << seat`（[`Seat::know_bit`]）。意味を持つのは札が**隠れた領域**（手札・山札・裏向きの
+    /// ライフ・一時領域）にあるときだけ。探索の世界の引き直し（`reveal="fair"`・既定）が、引く席の bit が
+    /// 立った札をその位置に固定し、残りだけを混ぜる。更新は [`crate::journal::StateMut`] のゾーン操作が
+    /// 一手に担う（経路の表は `docs/SPEC.md` の探索の節）。**ルールの結果を変えない**＝効果の解決・
+    /// 合法手・手の適用・符号化はこれを読まない。記録（`card_record`）・盤面 JSON には載らない
+    /// （`from_record` では 0＝誰も知らない、で始まる）。
+    pub known_by: u8,
 }
 
 /// 記録 v2 の `card_record`（`rs_diff_replay.py::card_record`）が持つ欄。
@@ -857,6 +870,7 @@ impl CardInstance {
             timed_cost: f_i32(o, "timed_cost", ctx)?,
             timed_keywords: f_str_set(o, "timed_keywords", ctx)?,
             temp_origin_life: false, // 記録に無い（上のフィールド docstring 参照）
+            known_by: 0,             // 記録に無い（上のフィールド docstring 参照）
         })
     }
 }

@@ -272,7 +272,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         rng: &mut dyn SearchRng,
         st: &mut SearchState,
     ) -> Result<RunOut, EngineError> {
-        let world = super::determinize::determinize_with(real, me, rng)?;
+        let world = super::determinize::determinize_fair_with(real, me, rng)?; // 既定の `reveal="fair"`（§7.15）
         self.run_in_world(world, rng, st)
     }
 

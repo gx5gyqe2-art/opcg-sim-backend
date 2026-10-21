@@ -75,10 +75,16 @@ def _decide_once(hidden: dict, **kw):
     return move, tr
 
 
-def test_worlds_four_runs_and_fills_the_trace(engine):
-    """`worlds=4` で決められ、trace に `worlds`／`world_used`／`per_world` が入る。"""
+@pytest.mark.parametrize("reveal", [None, "peek"])
+def test_worlds_four_runs_and_fills_the_trace(engine, reveal):
+    """`worlds=4` で決められ、trace に `worlds`／`world_used`／`per_world` が入る。
+
+    既定（`reveal="fair"`・§7.15）は自分の山札＋裏向きライフも世界ごとに混ぜ直すので、符号化の
+    「自デッキ残の集約」が世界ごとに変わり P も変わりうる（旧既定は本物の山札＝ライフに何があるかを
+    覗いていた）。「P は世界に依らない」は相手の伏せ札だけを混ぜる `peek` で見る。"""
     hidden = _first_hidden()
-    _, tr = _decide_once(hidden, worlds=WORLDS)
+    kw = {"reveal": reveal} if reveal else {}
+    _, tr = _decide_once(hidden, worlds=WORLDS, **kw)
     if tr.get("kind") != "main":
         pytest.skip(f"木を回さない決定だった（kind={tr.get('kind')}）")
     assert tr["worlds"] == WORLDS
@@ -94,7 +100,8 @@ def test_worlds_four_runs_and_fills_the_trace(engine):
         assert len(w["Q"]) == len(legal)
         assert sum(w["N"]) == SIMS, f"世界 {i} の訪問の和は sims"
         assert w["unmapped"] == 0, f"世界 {i} の legal が世界 0 と対応しない"
-        assert w["p_differs"] is False, f"世界 {i} の P が世界 0 と違う（ネットは世界に依らない）"
+        if reveal == "peek":
+            assert w["p_differs"] is False, f"世界 {i} の P が世界 0 と違う（peek ではネットは世界に依らない）"
         # その世界だけで選ぶならどの手か（.md の (4) が読む欄）。
         assert w["best"] is None or (isinstance(w["best"], dict) and w["best"])
 

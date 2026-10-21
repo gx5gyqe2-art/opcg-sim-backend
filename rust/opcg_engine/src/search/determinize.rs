@@ -148,21 +148,32 @@ fn reshuffle_slots(
 }
 
 /// `seat` の (手札?)＋山札＋(裏向きのライフ?) の位置の列（この順・pool の並び）。
-fn hidden_slots(state: &GameState, seat: Seat, hand: bool, deck: bool, life: bool) -> Vec<(Seat, CardZone, usize)> {
+///
+/// `viewer` が `Some(v)` なら、`v` が**知っている札**（[`CardInstance::known_by`](crate::model::CardInstance::known_by)
+/// に `v` の bit）の位置を除く＝その札は動かさない（§7.15 の `fair`）。`None` は印を読まない（`opp_hand`）。
+fn hidden_slots(
+    state: &GameState,
+    seat: Seat,
+    hand: bool,
+    deck: bool,
+    life: bool,
+    viewer: Option<Seat>,
+) -> Vec<(Seat, CardZone, usize)> {
     let p = state.player(seat);
+    let unknown = |c: CardIdx| viewer.map_or(true, |v| state.card(c).known_by & v.know_bit() == 0);
     let mut out = Vec::new();
     if hand {
-        out.extend((0..p.hand.len()).map(|i| (seat, CardZone::Hand, i)));
+        out.extend(p.hand.iter().enumerate().filter(|(_, c)| unknown(**c)).map(|(i, _)| (seat, CardZone::Hand, i)));
     }
     if deck {
-        out.extend((0..p.deck.len()).map(|i| (seat, CardZone::Deck, i)));
+        out.extend(p.deck.iter().enumerate().filter(|(_, c)| unknown(**c)).map(|(i, _)| (seat, CardZone::Deck, i)));
     }
     if life {
         out.extend(
             p.life
                 .iter()
                 .enumerate()
-                .filter(|(_, c)| !state.card(**c).is_face_up)
+                .filter(|(_, c)| !state.card(**c).is_face_up && unknown(**c))
                 .map(|(i, _)| (seat, CardZone::Life, i)),
         );
     }
@@ -178,15 +189,17 @@ pub fn determinize_opp_deck_with(
 ) -> Result<GameState, EngineError> {
     let _prof = crate::prof::enter(crate::prof::Cat::Determinize);
     let mut out = state.clone();
-    let slots = hidden_slots(state, me.other(), false, true, false);
+    let slots = hidden_slots(state, me.other(), false, true, false, None);
     reshuffle_slots(&mut out, &slots, rng)?;
     Ok(out)
 }
 
-/// `reveal="fair"`（§7.11）: **自分に見えないものを全部**混ぜ直す。
+/// `reveal="fair"`（**既定**・§7.11／§7.15）: **自分に見えないものを全部**混ぜ直す。ただし自分が
+/// **知っている札**（[`CardInstance::known_by`](crate::model::CardInstance::known_by) に `me` の bit＝
+/// 手札に戻した札・公開した札・見て並べた山札の上など）はその位置に固定し、残りの枠だけを混ぜる。
 ///
-/// - 相手の山: 相手の手札＋山札＋裏向きのライフ（この順で 1 回 `shuffle_order`）
-/// - 自分の山: 自分の山札＋自分の裏向きのライフ（続けてもう 1 回）
+/// - 相手の山: 相手の手札＋山札＋裏向きのライフのうち知らない枠（この順で 1 回 `shuffle_order`）
+/// - 自分の山: 自分の山札＋自分の裏向きのライフのうち知らない枠（続けてもう 1 回）
 ///
 /// 各ゾーンの枚数・表向きのライフの位置と中身は保つ。手札（自分）・場・ステージ・リーダー・
 /// トラッシュ・一時領域（効果の解決中に見ているカード）・ドン!!は動かさない。空の山は乱数を消費しない。
@@ -197,9 +210,9 @@ pub fn determinize_fair_with(
 ) -> Result<GameState, EngineError> {
     let _prof = crate::prof::enter(crate::prof::Cat::Determinize);
     let mut out = state.clone();
-    let opp = hidden_slots(state, me.other(), true, true, true);
+    let opp = hidden_slots(state, me.other(), true, true, true, Some(me));
     reshuffle_slots(&mut out, &opp, rng)?;
-    let mine = hidden_slots(state, me, false, true, true);
+    let mine = hidden_slots(state, me, false, true, true, Some(me));
     reshuffle_slots(&mut out, &mine, rng)?;
     Ok(out)
 }
@@ -207,7 +220,8 @@ pub fn determinize_fair_with(
 /// `opp_blind`（`search_efficiency_plan.md` §7.14・WP `rs-oppblind`・測定専用）: **相手から見えない
 /// こちらの札**＝`me` の手札＋山札＋裏向きのライフを 1 つの山として混ぜ直す（`fair` の自分側と同じ作り
 /// に、相手から見えない手札を足したもの）。相手の側・表向きのライフ（位置と中身）・公開領域・各ゾーンの
-/// 枚数は動かさない。山が空なら乱数を消費しない。
+/// 枚数は動かさない。山が空なら乱数を消費しない。**相手が知っているこちらの札**（`known_by` に相手の
+/// bit）はその位置に固定する（§7.15）。
 pub fn determinize_self_with(
     state: &GameState,
     me: Seat,
@@ -215,7 +229,7 @@ pub fn determinize_self_with(
 ) -> Result<GameState, EngineError> {
     let _prof = crate::prof::enter(crate::prof::Cat::Determinize);
     let mut out = state.clone();
-    let mine = hidden_slots(state, me, true, true, true);
+    let mine = hidden_slots(state, me, true, true, true, Some(me.other()));
     reshuffle_slots(&mut out, &mine, rng)?;
     Ok(out)
 }

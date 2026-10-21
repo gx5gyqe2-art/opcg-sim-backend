@@ -81,8 +81,9 @@ pub struct DecideOptions {
     /// 世界は 1 通りしか無いので `worlds > 1` は 1 として扱う（[`DecideOptions::effective_worlds`]）。
     /// 見えるのは探索の中だけ（選んだ手の後の進行は変えない）。ゲームとしては不正な読み。
     pub omniscient: bool,
-    /// 見える範囲を分けた世界サンプル（`search_efficiency_plan.md` §7.11・**測定専用**・既定
-    /// [`Reveal::Default`]＝今までどおり）。`omniscient` とは排他（両方は [`DecideOptions::validate`] がエラー）。
+    /// 世界サンプルの見える範囲（`search_efficiency_plan.md` §7.11・§7.15・既定 [`Reveal::Fair`]＝
+    /// 自分に見えないものを混ぜ・知っている札は固定）。`Peek`／`OppHand` は測定用。`omniscient` とは
+    /// 排他（`Fair` 以外との組は [`DecideOptions::validate`] がエラー）。
     pub reveal: Reveal,
     /// 木の中の相手に「こちらの手札」を見せない（`search_efficiency_plan.md` §7.14・**測定専用**・
     /// 既定 false）。true なら木の中で**相手が動く番のノードを展開するとき**（事前分布・葉の価値・
@@ -98,27 +99,33 @@ pub(crate) fn opp_blind_seed(world_seed: u64) -> u64 {
     world_seed ^ 0x0B11_D5EE_D0FF_5EEDu64
 }
 
-/// 探索の世界サンプルで何を混ぜ直すか（§7.11・opts JSON の鍵 `reveal`）。
+/// 探索の世界サンプルで何を混ぜ直すか（§7.11・§7.15・opts JSON の鍵 `reveal`）。
 ///
-/// | 値 | 相手の手札 | 相手の山札 | 相手の裏向きライフ | 自分の山札 | 自分の裏向きライフ |
-/// |---|---|---|---|---|---|
-/// | `Default`（鍵なし） | 混ぜる（山札と 1 つの山） | 混ぜる | 本当のまま | 本当のまま | 本当のまま |
-/// | `OppHand`（`"opp_hand"`） | 本当のまま | 混ぜる | 本当のまま | 本当のまま | 本当のまま |
-/// | `Fair`（`"fair"`） | 混ぜる（相手の 3 つで 1 つの山） | 混ぜる | 混ぜる | 混ぜる（自分の 2 つで 1 つの山） | 混ぜる |
+/// **既定は `Fair`**（2026-10-21 ユーザ決定「全部公平の方が良さそう」・WP `rs-fair`）＝自分に見えない
+/// ものを全部混ぜ、自分が知っている札（[`CardInstance::known_by`](crate::model::CardInstance::known_by)）
+/// はその位置に固定する。`Peek` は 2026-10-21 までの既定（自分の山札の並びと裏向きのライフを本物のまま
+/// 読む）で、`OppHand` と同じく**測定用**に残す。
+///
+/// | 値 | 相手の手札 | 相手の山札 | 相手の裏向きライフ | 自分の山札 | 自分の裏向きライフ | 知っている札 |
+/// |---|---|---|---|---|---|---|
+/// | `Fair`（鍵なし・`"fair"`） | 混ぜる（相手の 3 つで 1 つの山） | 混ぜる | 混ぜる | 混ぜる（自分の 2 つで 1 つの山） | 混ぜる | 固定 |
+/// | `Peek`（`"peek"`） | 混ぜる（山札と 1 つの山） | 混ぜる | 本当のまま | 本当のまま | 本当のまま | 読まない |
+/// | `OppHand`（`"opp_hand"`） | 本当のまま | 混ぜる | 本当のまま | 本当のまま | 本当のまま | 読まない |
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Reveal {
     #[default]
-    Default,
-    OppHand,
     Fair,
+    Peek,
+    OppHand,
 }
 
 impl Reveal {
     /// opts JSON の値から（知らない値は `None`＝呼び出し側がエラーにする）。
     pub fn from_name(s: &str) -> Option<Reveal> {
         match s {
-            "opp_hand" => Some(Reveal::OppHand),
             "fair" => Some(Reveal::Fair),
+            "peek" => Some(Reveal::Peek),
+            "opp_hand" => Some(Reveal::OppHand),
             _ => None,
         }
     }
@@ -134,9 +141,9 @@ pub(crate) struct WorldView {
 impl DecideOptions {
     /// 実際に回す世界の本数（§20.7.1）。`search_seed` が無ければ世界 1 以降の乱数を作れない
     /// ＝1 本に落ちる（記録した出目で回すオラクル経路がこれに当たる）。
-    /// 組み合わせの検査（§7.11: `omniscient` と `reveal` は排他）。
+    /// 組み合わせの検査（§7.11: `omniscient` と `reveal` は排他。既定の `Fair` は「指定なし」と同じ扱い）。
     pub fn validate(&self) -> Result<(), EngineError> {
-        if self.omniscient && self.reveal != Reveal::Default {
+        if self.omniscient && self.reveal != Reveal::Fair {
             return Err(EngineError::BadPayload(
                 "decide: omniscient と reveal は同時に指定できない".into(),
             ));
@@ -177,15 +184,15 @@ impl Default for DecideOptions {
             search: SearchOptions::default(),
             budget: Some(super::quiesce::BOX_BRANCH_BUDGET),
             omniscient: false,
-            reveal: Reveal::Default,
+            reveal: Reveal::Fair,
             opp_blind: false,
         }
     }
 }
 
 /// 探索で使う世界を 1 つ作る（§7.10）。`omniscient` なら本当の盤面のクローン（乱数を引かない）、
-/// そうでなければ今までどおり相手の伏せ手札を引き直す（[`determinize_with`](super::determinize::determinize_with)）。
-/// `reveal`（§7.11）なら見える範囲に合わせて混ぜ直す範囲を変える（[`Reveal`] の表）。
+/// そうでなければ `reveal`（§7.11・§7.15）の見える範囲に合わせて混ぜ直す（[`Reveal`] の表・既定は
+/// `Fair`＝[`determinize_fair_with`](super::determinize::determinize_fair_with)）。
 fn sample_world(
     state: &GameState,
     name: Seat,
@@ -196,9 +203,9 @@ fn sample_world(
         return Ok(state.clone());
     }
     match view.reveal {
-        Reveal::Default => super::determinize::determinize_with(state, name, rng),
-        Reveal::OppHand => super::determinize::determinize_opp_deck_with(state, name, rng),
         Reveal::Fair => super::determinize::determinize_fair_with(state, name, rng),
+        Reveal::Peek => super::determinize::determinize_with(state, name, rng),
+        Reveal::OppHand => super::determinize::determinize_opp_deck_with(state, name, rng),
     }
 }
 
@@ -1699,6 +1706,10 @@ fn decide_inner(
 }
 
 #[cfg(test)]
+#[path = "tests_fair.rs"]
+mod tests_fair;
+
+#[cfg(test)]
 pub(super) mod tests {
     use super::*;
 
@@ -2458,23 +2469,32 @@ pub(super) mod tests {
         }
     }
 
-    /// (a) `reveal` の既定は今までどおり（JSON の省略・null も既定）。既定の世界は今の
-    /// `determinize_with` と同じ rng の出目で 1 bit も同じ・decide も明示の Default と同一。
+    /// (a) `reveal` の既定は `fair`（§7.15）＝既定の世界は `determinize_fair_with` と同じ rng の出目で
+    /// 1 bit も同じ・decide も明示の `Fair` と同一。`peek` は 2026-10-21 までの既定（`determinize_with`）と
+    /// 1 bit も同じ。
     #[test]
-    fn reveal_default_is_bit_identical() {
+    fn reveal_default_is_fair_and_peek_is_the_old_default() {
         let (masters, state) = reveal_board();
-        assert_eq!(DecideOptions::default().reveal, Reveal::Default);
+        assert_eq!(DecideOptions::default().reveal, Reveal::Fair);
         for seed in 0..8u64 {
             let mut r1 = crate::search::Pcg32SearchRng::new(seed);
             let mut r2 = crate::search::Pcg32SearchRng::new(seed);
             let a = sample_world(&state, Seat::P1, DecideOptions::default().world_view(), &mut r1).unwrap();
-            let b = super::super::determinize::determinize_with(&state, Seat::P1, &mut r2).unwrap();
+            let b = super::super::determinize::determinize_fair_with(&state, Seat::P1, &mut r2).unwrap();
             assert_eq!(a, b);
+            let mut r3 = crate::search::Pcg32SearchRng::new(seed);
+            let mut r4 = crate::search::Pcg32SearchRng::new(seed);
+            let c = sample_world(&state, Seat::P1, reveal_view(Reveal::Peek), &mut r3).unwrap();
+            let d = super::super::determinize::determinize_with(&state, Seat::P1, &mut r4).unwrap();
+            assert_eq!(c, d);
+            // peek は自分の山札・裏向きのライフを本物のまま読む。
+            assert_eq!(c.player(Seat::P1), state.player(Seat::P1));
+            assert_eq!(c.player(Seat::P2).life, state.player(Seat::P2).life);
         }
         let base_opts = DecideOptions { sims: 8, ..DecideOptions::default() };
         let (base, base_shuffles) = omni_run(&masters, &state, &base_opts);
         let (got, got_shuffles) =
-            omni_run(&masters, &state, &DecideOptions { reveal: Reveal::Default, ..base_opts });
+            omni_run(&masters, &state, &DecideOptions { reveal: Reveal::Fair, ..base_opts });
         assert_same_out(&got, &base);
         assert_eq!(got_shuffles, base_shuffles);
     }
@@ -2556,7 +2576,7 @@ pub(super) mod tests {
     #[test]
     fn reveal_modes_decide_and_are_deterministic() {
         let (masters, state) = reveal_board();
-        for reveal in [Reveal::OppHand, Reveal::Fair] {
+        for reveal in [Reveal::OppHand, Reveal::Fair, Reveal::Peek] {
             for worlds in [1usize, 4] {
                 let opts = DecideOptions { reveal, ..worlds_opts(worlds, Some(5)) };
                 let (a, _) = omni_run(&masters, &state, &opts);
@@ -2567,12 +2587,13 @@ pub(super) mod tests {
         }
     }
 
-    /// (d) `omniscient` と `reveal` の両方はエラー（decide も opts JSON も）。
+    /// (d) `omniscient` と `reveal`（既定の `fair` 以外）の両方はエラー（decide も opts JSON も・JSON では
+    /// `"fair"` の明示もエラー＝`tests_search::decide_options_json_reads_reveal`）。
     #[test]
     fn omniscient_and_reveal_together_is_an_error() {
         let (masters, state) = reveal_board();
         let net = zero_net();
-        for reveal in [Reveal::OppHand, Reveal::Fair] {
+        for reveal in [Reveal::OppHand, Reveal::Peek] {
             let opts = DecideOptions { sims: 8, omniscient: true, reveal, ..DecideOptions::default() };
             assert!(opts.validate().is_err());
             let mut rng = crate::search::Pcg32SearchRng::new(1);

@@ -442,14 +442,20 @@ pub fn decide_opts_and_carry(
             .and_then(Value::as_bool)
             .unwrap_or(false),
     };
-    // `reveal`（§7.11）: 省略・null だけが既定。知らない値・文字列でない値は黙って既定へ落とさない。
+    // `reveal`（§7.11・§7.15）: 省略・null は既定（`fair`）。知らない値・文字列でない値は黙って既定へ
+    // 落とさない。`omniscient` と同時に明示したらエラー（既定と同じ `"fair"` を明示した場合も）。
     match ov.get("reveal") {
         None | Some(Value::Null) => {}
         Some(r) => {
             if r.as_str().and_then(decide::Reveal::from_name).is_none() {
                 return Err(EngineError::BadPayload(format!(
-                    "decide: reveal は \"opp_hand\"／\"fair\" のどちらか（{r}）"
+                    "decide: reveal は \"fair\"／\"peek\"／\"opp_hand\" のどれか（{r}）"
                 )));
+            }
+            if ov.get("omniscient").and_then(Value::as_bool) == Some(true) {
+                return Err(EngineError::BadPayload(
+                    "decide: omniscient と reveal は同時に指定できない".into(),
+                ));
             }
         }
     }
@@ -567,7 +573,7 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
         },
         // 全部見える探索（`search_efficiency_plan.md` §7.10・測定専用・既定 false）。
         omniscient: flag("omniscient", d.omniscient),
-        // 見える範囲を分けた世界サンプル（§7.11・測定専用・既定＝今までどおり）。知らない値は
+        // 世界サンプルの見える範囲（§7.11・§7.15・既定 `fair`・`peek`／`opp_hand` は測定用）。知らない値は
         // [`decide_opts_and_carry`] がエラーにする（ここでは既定へ落とす）。
         reveal: v
             .get("reveal")

@@ -198,6 +198,27 @@ def test_cpu_step_uses_play_search_settings(client, monkeypatch):
     assert kw.get("sims") == E.PLAY_SIMS and kw.get("budget") == E.PLAY_BUDGET
 
 
+def test_cpu_step_does_not_override_reveal(client, monkeypatch):
+    """対戦 API の CPU は探索の世界の見える範囲（`reveal`）を渡さない＝Rust の既定 `fair`（自分に見えない
+    物は混ぜ直し・知っている札は固定・`docs/search_efficiency_plan.md` §7.15）で読む。測定用の
+    `peek`／`opp_hand`・`omniscient`・`opp_blind` が対戦 API に紛れ込むのを見張る（物差し 1 本の原則）。"""
+    import json as _json
+    from opcg_sim.loop import engine as E
+    seen = []
+    orig = E.decide_with_rethink
+
+    def spy(call, opts_json, *a, **kw):
+        seen.append(_json.loads(opts_json))
+        return orig(call, opts_json, *a, **kw)
+
+    monkeypatch.setattr(E, "decide_with_rethink", spy)
+    gid = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="hard").json()["game_id"]
+    _drive_full_or_cap(client, gid, cap=40)
+    assert seen, "CPU が一度も読まなかった"
+    for opts in seen:
+        assert "reveal" not in opts and "omniscient" not in opts and "opp_blind" not in opts, opts
+
+
 def test_cpu_step_on_non_cpu_game(client):
     gid = _create_game(client).json()["game_id"]  # 通常対局（CPU ではない）
     r = client.post("/api/game/cpu/step", json={"game_id": gid})

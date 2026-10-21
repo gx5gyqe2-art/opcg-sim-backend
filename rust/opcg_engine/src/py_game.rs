@@ -475,6 +475,29 @@ impl Game {
         ))
     }
 
+    /// 席 `player_id` が**知っている札**（`CardInstance::known_by`・`search_efficiency_plan.md` §7.15）の枚数を
+    /// 隠れた領域ごとに数える（計測用・盤面 dict とは別出力＝golden に影響しない）。`deck_top` は自分の山札の上から
+    /// 続けて知っている枚数。
+    fn knowledge_json(&self, player_id: &str) -> PyResult<String> {
+        let me = self.seat_of(player_id)?;
+        let st = self.session.state();
+        let bit = me.know_bit();
+        let knows = |c: &crate::model::CardIdx| st.card(*c).known_by & bit != 0;
+        let count = |v: &[crate::model::CardIdx]| v.iter().filter(|c| knows(c)).count();
+        let down = |seat: Seat| -> Vec<crate::model::CardIdx> {
+            st.player(seat).life.iter().copied().filter(|c| !st.card(*c).is_face_up).collect()
+        };
+        let (mine, opp) = (st.player(me), st.player(me.other()));
+        to_py_json(&serde_json::json!({
+            "opp_hand": count(&opp.hand), "opp_hand_n": opp.hand.len(),
+            "opp_deck": count(&opp.deck), "opp_deck_n": opp.deck.len(),
+            "opp_life": count(&down(me.other())), "opp_life_n": down(me.other()).len(),
+            "my_deck": count(&mine.deck), "my_deck_n": mine.deck.len(),
+            "my_life": count(&down(me)), "my_life_n": down(me).len(),
+            "deck_top": mine.deck.iter().take_while(|c| knows(c)).count(),
+        }))
+    }
+
     /// 山札の残り枚数（`{"p1": n, "p2": n}`）。盤面 dict は伏せ情報なので出さない欄で、
     /// 思考トレースのリプレイフレーム（`services/replay._frame_side`）だけが使う。
     fn deck_counts_json(&self) -> PyResult<String> {

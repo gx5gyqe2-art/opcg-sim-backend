@@ -59,9 +59,10 @@ def build_parser():
     ap.add_argument("--omniscient", action="store_true",
                     help="基準席を全部見える探索で打たせる（`docs/search_efficiency_plan.md` §7.10・"
                          "測定専用）。候補席は --cand-omniscient")
-    ap.add_argument("--reveal", default=None, choices=("opp_hand", "fair"),
-                    help="基準席を見える範囲を分けた探索で打たせる（`docs/search_efficiency_plan.md` §7.11・"
-                         "測定専用）。候補席は --cand-reveal。--omniscient とは排他")
+    ap.add_argument("--reveal", default=None, choices=("fair", "peek", "opp_hand"),
+                    help="基準席の探索の世界の見える範囲（`docs/search_efficiency_plan.md` §7.11・§7.15）。"
+                         "省略＝既定の fair。peek＝2026-10-21 までの既定（自分の山札と裏向きライフを本物のまま"
+                         "読む・測定用）／opp_hand（測定用）。候補席は --cand-reveal。--omniscient とは排他")
     ap.add_argument("--opp-blind", action="store_true",
                     help="基準席の木の中の相手にこちらの手札を見せない（`docs/search_efficiency_plan.md` §7.14・"
                          "測定専用）。候補席は --cand-opp-blind")
