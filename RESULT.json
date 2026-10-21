@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_omni/omni_w02.jsonl": 10
+  "arena_omni/omni_w02.jsonl": 20
  },
  "notes": "repo at /home/user/opcg-sim-backend (no ~/opcg-sim-backend clone)"
 }
