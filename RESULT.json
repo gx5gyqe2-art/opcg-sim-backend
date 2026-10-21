@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_omni/omni_w04.jsonl": 20
+  "arena_omni/omni_w04.jsonl": 30
  },
  "notes": "repo at /home/user/opcg-sim-backend (not ~); script path adjusted"
 }
