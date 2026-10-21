@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_s5120/s5120_w12.jsonl": 100
+  "arena_s5120/s5120_w12.jsonl": 110
  },
  "notes": "ran in /home/user/opcg-sim-backend (not ~/opcg-sim-backend)"
 }
