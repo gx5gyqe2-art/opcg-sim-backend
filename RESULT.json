@@ -1,7 +1,7 @@
 {
  "job": "arena-omni5120-w01",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r13d.npz + --cand-sims 5120 --cand-omniscient --cand-budget 0",
   "baseline": "nrel_r13d.npz + --sims 1280 --omniscient --budget 0",
