@@ -239,3 +239,8 @@ Phase 0 → Phase 1 → Phase 3（Phase 4 の (a)(b) を合間に）→ Phase 4 
 - 手（Move）を探索の中で JSON（`serde_json::Value` など）ではなく型付きの構造体で持つ（§7.3 で未実施だった部分）。Python との境目（`py_game.rs`）の入出力の形は変えない。
 - 合法手の生成（`rules/legal.rs`）と手の適用（`search/apply.rs`）の割り当て・複製の削減。
 - **触らない**: ネットの計算（WP `rs-speed-c` の担当）。触ったファイルは notes に列挙。
+
+### 7.9 WP `speed-merge2`——高速化の続き 2 本を本線にまとめる（Phase 4・作業セッション用・opus）
+
+§7.6 と同じ形。`claude/rs-speed-c`（ネットの計算・1 本 × 1,280 回で ×1.12・2,826 判断点で全件一致）と `claude/rs-speed-d`（手の表現・合法手の生成・×1.73・2,826 判断点で全件一致）を、本線 `claude/cpu-spec-improvements-yw91jd` の最新にマージしたブランチ `claude/speed-merge2` を作って push。
+衝突は両方の効きを残す形で解き、捨てた変更があれば notes に。不変条件・一致の確かめ方（本線の wheel とマージ後の wheel で 3 設定・2,000 判断点以上が全件一致）・1 コア固定の時間の前後（1 本 × 1,280 回・4 本 × 1,280 回・2 本 × 1,280 回・1 本 × 5,120 回）・`make rust-develop`・`make test`・`make audit-cross` は §7.6 のとおり。PR は作らない。コミットメッセージにモデル名を入れない。
