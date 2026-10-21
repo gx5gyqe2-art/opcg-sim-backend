@@ -1,7 +1,7 @@
 {
  "job": "arena-ismfix-w05",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r13d.npz + --cand-sims 1280 --cand-redeterminize-every 8 --cand-budget 0",
   "baseline": "nrel_r13d.npz + worlds 1 x sims 1280 + budget 0",
