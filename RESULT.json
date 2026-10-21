@@ -17,5 +17,5 @@
  "metrics": {
   "arena_fairprod/fairprod_w01.jsonl": 120
  },
- "notes": ""
+ "notes": "完走(120ペア・240局・void 0)。候補(fair既定) wr 0.4458 CI95[0.3784,0.5133] Elo -37.8 非昇格。ログは基準席を『既定』と表示(--reveal peek は best_opts に反映済み)。コード変更なし。"
 }
