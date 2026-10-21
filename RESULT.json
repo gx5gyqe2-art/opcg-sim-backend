@@ -1,86 +1,20 @@
 {
- "job": "rs-omniscient",
- "role": "engine-option",
- "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.10 (origin/claude/cpu-spec-improvements-yw91jd @ 04b2c7c; ledger 2+306; n_loop_ops §7.24)",
+ "job": "arena-omni-w08",
+ "role": "arena",
+ "status": "partial",
  "inputs": {
-  "mainline": "claude/cpu-spec-improvements-yw91jd @ 04b2c7c",
-  "net": "nrel_r13d.npz (both seats)"
+  "candidate": "nrel_r13d.npz + --cand-sims 1280 --cand-omniscient --cand-budget 0",
+  "baseline": "nrel_r13d.npz + worlds 1 x sims 1280 + budget 0",
+  "pairs": 120,
+  "code": "claude/rs-omniscient"
  },
  "outputs": {
-  "branch": "claude/rs-omniscient",
-  "code_commit": "89cd0d0",
   "files": [
-   "rust/opcg_engine/src/search/decide.rs (DecideOptions.omniscient, sample_world, tests omniscient_*)",
-   "rust/opcg_engine/src/search/mod.rs (opts JSON key 'omniscient')",
-   "rust/opcg_engine/src/search/tests_search.rs (decide_options_json_reads_omniscient)",
-   "rust/opcg_engine/src/py_game.rs (doc only)",
-   "opcg_sim/api/engine_rs.py (RsGame.decide(omniscient=...))",
-   "opcg_sim/loop/arena.py (--cand-omniscient via CAND_FLAGS)",
-   "opcg_sim/loop/arena_shard.py (--omniscient for the baseline seat via _best_kw)",
-   "tests/scripts/rs_decide_latency.py (--omniscient)",
-   "docs/TEST_SPEC.md §2 (1 row)",
-   "arena_omni_local/omni_local.jsonl (local arena ledger)"
+   "arena_omni/omni_w08.jsonl"
   ]
  },
- "gates": {
-  "make_rust_develop": "ok",
-  "make_test": "green: cargo test 576 passed / 1 ignored; pytest 798 passed, 62 skipped (all skips = torch optional dependency not installed in this container; golden audit/replay ran, not skipped)",
-  "make_audit_cross": "void 0 (120 pairs, seed 0, default both seats)",
-  "audit_cross_with_cand_omniscient": "void 0 (same 120 pairs, candidate seat omniscient, sims 32) -- extra check, not required"
- },
  "metrics": {
-  "local_arena": {
-   "cmd": "arena_shard --candidate r13d --baseline r13d --sims 1280 --budget 0 --cand-sims 1280 --cand-omniscient --cand-budget 0 --pairs 40 --max-pairs 40 --bands 1 --seed-base 1675000 --workers 4 --leaders random --decks synth_roles --pair-timeout 7200",
-   "pairs": 40,
-   "games": 80,
-   "void": 0,
-   "wins": 49.0,
-   "wr": 0.6125,
-   "ci95": [
-    0.4989,
-    0.7261
-   ],
-   "elo": 79.5,
-   "wall_sec": 520
-  },
-  "latency_1core": {
-   "cmd": "taskset -c N python tests/scripts/rs_decide_latency.py --sims 1280 --worlds 1 --budget 0 --games 20 [--omniscient]",
-   "default": {
-    "sims": 1280,
-    "worlds": 1,
-    "budget": 0,
-    "games": 20,
-    "moves": 2512,
-    "mean": 0.156,
-    "p50": 0.003,
-    "p90": 0.386,
-    "p99": 1.208,
-    "max": 4.64,
-    "wall_sec": 393.4,
-    "affinity": [
-     0
-    ]
-   },
-   "omniscient": {
-    "sims": 1280,
-    "worlds": 1,
-    "budget": 0,
-    "omniscient": true,
-    "games": 20,
-    "moves": 2912,
-    "mean": 0.16,
-    "p50": 0.004,
-    "p90": 0.392,
-    "p99": 1.052,
-    "max": 7.06,
-    "wall_sec": 467.2,
-    "affinity": [
-     1
-    ]
-   },
-   "mean_ratio_omni_over_default": 1.026
-  }
+  "arena_omni/omni_w08.jsonl": 10
  },
- "notes": "Default off is untouched: omniscient is a new field defaulting to false; every determinize_with call site in decide.rs (run_worlds world 0 and worlds>=1 threads, window_choice, commit_play_dialog, commit_setup_box) now goes through sample_world(), which calls determinize_with exactly as before when omniscient=false (same rng consumption). Goldens (audit 3,386 + replay 200) pass unchanged.\nTreeMcts::run in mcts.rs still calls determinize_with directly; it is not on the decide path (decide uses run_in_world), so it was left alone.\nomniscient=true: the world is a clone of the real state and NO shuffle is drawn from the rng (so the later Dirichlet/temperature draws shift vs. off; irrelevant since this is a separate measurement mode). Own deck order was already the real order in the current determinization (only the opponent's hand+deck is re-drawn), so 'both decks visible' follows from not re-drawing.\nworlds>1 with omniscient is treated as 1 via DecideOptions::effective_worlds (rethink, which only raises worlds, therefore becomes a same-seed re-read of the same world).\nThe spec named arena.py '_CAND_KEYS'; that name does not exist on the mainline -- the equivalent tables are CAND_FLAGS (boolean flags) / CAND_VALUE_FLAGS, so --cand-omniscient is a CAND_FLAGS entry. Ledger rows carry cand_opts.omniscient=true.\nVisibility is search-only; play after the chosen move is unchanged (game-illegal by design, flagged as measurement-only in docstrings/help). Serve API default unchanged (RsGame.decide passes the key only when omniscient=True).\nTest (c) uses a counting rng on the main (tree) path plus a direct sample_world check; no dedicated battle/dialog-window test (window_choice and the commits go through the same sample_world helper).\nLocal arena +79.5 Elo [CI 0.499..0.726] on 40 pairs -- between the +20..+50 and +100 reading bands of n_loop_ops §7.24 and too wide to decide; the production arena (12 x 120 pairs) is the judge. Latency: omniscient mean per move ~same as default (0.160 vs 0.156 s on one core); games ran longer in moves (2912 vs 2512 over 20 games).\nContainer lacked maturin/pytest/fastapi; installed via pip (maturin, opcg_sim/requirements.txt, pytest, pytest-xdist) before the gate."
+ "notes": ""
 }
