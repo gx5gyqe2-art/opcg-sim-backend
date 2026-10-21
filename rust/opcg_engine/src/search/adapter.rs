@@ -228,6 +228,11 @@ impl<'a> MergeKey<'a> {
     }
 }
 
+/// JSON の文字列（[`json_text_eq`] の dict 用）。
+fn json_text(v: &Value) -> String {
+    v.to_string()
+}
+
 /// `a.to_string() == b.to_string()`（JSON の文字列としての一致）を、文字列を組まずに判定する。
 ///
 /// 配列は要素ごと・文字列／真偽／null は値・数は表記（`Number` の文字列化）で比べる。dict は
@@ -247,7 +252,7 @@ fn json_text_eq(a: &Value, b: &Value) -> bool {
         (Value::Array(x), Value::Array(y)) => {
             x.len() == y.len() && x.iter().zip(y.iter()).all(|(a, b)| json_text_eq(a, b))
         }
-        (Value::Object(_), Value::Object(_)) => a.to_string() == b.to_string(),
+        (Value::Object(_), Value::Object(_)) => json_text(a) == json_text(b),
         _ => false,
     }
 }

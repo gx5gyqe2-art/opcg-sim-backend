@@ -8,9 +8,11 @@
 //! - WP `rs-p4-mcts`（上の統合後）: `TreeMCTS`／静止探索／戦闘箱・対話箱／`decide`（窓の根畳み・箱コミット・
 //!   等価手マージ・温度・残り腕）。
 //!
-//! 手（`Move`）は Python の dict と同じ JSON（`kind`／`action_type`／`payload`／`card_uuid`・DON_BOX の
-//! `uuid`／`don_k`／`target_ids`）。乱数は**出目を受け取る**（[`RecordedRng`]＝`rs_search_oracle.py` が
-//! Python の `np.random.Generator` をラップして記録する）。自前の生成器は P5。
+//! 手（`Move`）は型（[`crate::rules::moves`]・WP `rs-speed-d`）。意味は Python の dict と同じ
+//! （`kind`／`action_type`／`payload`／`card_uuid`・DON_BOX の `uuid`／`don_k`／`target_ids`）で、
+//! JSON の形（[`Move::to_json`]）は境目（`decide` の出力・`search_legal` など）でだけ作る。
+//! 乱数は**出目を受け取る**（[`RecordedRng`]＝`rs_search_oracle.py` が Python の
+//! `np.random.Generator` をラップして記録する）。自前の生成器は P5。
 
 #![allow(dead_code)]
 

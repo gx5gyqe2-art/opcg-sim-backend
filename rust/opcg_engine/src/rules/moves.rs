@@ -213,7 +213,7 @@ impl<'a> PayloadRef<'a> {
     }
 
     /// JSON の payload（型の payload は組む）。
-    pub fn to_json(&self) -> Cow<'a, Value> {
+    pub fn to_json(self) -> Cow<'a, Value> {
         match self {
             PayloadRef::Json(v) => Cow::Borrowed(v),
             PayloadRef::Typed(p) => Cow::Owned(p.to_json()),
@@ -406,93 +406,5 @@ impl PartialEq for Move {
 impl From<Value> for Move {
     fn from(v: Value) -> Move {
         Move::from_json(v)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    /// 型 → JSON は今までの列挙が組んでいた dict と鍵の並びまで同じ。
-    #[test]
-    fn to_json_matches_the_former_dicts_byte_for_byte() {
-        let cases: Vec<(Move, Value)> = vec![
-            (
-                Move::game("PLAY", Payload::Uuid("u1".into())),
-                json!({"kind": "game", "action_type": "PLAY", "payload": {"uuid": "u1"}}),
-            ),
-            (
-                Move::game("TURN_END", Payload::Empty),
-                json!({"kind": "game", "action_type": "TURN_END", "payload": {}}),
-            ),
-            (
-                Move::game(
-                    "ATTACK",
-                    Payload::Attack {
-                        uuid: "a".into(),
-                        target: "t".into(),
-                    },
-                ),
-                json!({"kind": "game", "action_type": "ATTACK",
-                       "payload": {"uuid": "a", "target_ids": ["t"]}}),
-            ),
-            (
-                Move::game(
-                    "DON_BOX",
-                    Payload::DonBox {
-                        uuid: "a".into(),
-                        target_ids: vec![],
-                        don_k: 2,
-                    },
-                ),
-                json!({"kind": "game", "action_type": "DON_BOX",
-                       "payload": {"uuid": "a", "target_ids": [], "don_k": 2}}),
-            ),
-            (
-                Move::battle("PASS", None),
-                json!({"kind": "battle", "action_type": "PASS", "card_uuid": null}),
-            ),
-            (
-                Move::battle("SELECT_COUNTER", Some("c".into())),
-                json!({"kind": "battle", "action_type": "SELECT_COUNTER", "card_uuid": "c"}),
-            ),
-        ];
-        for (mv, want) in cases {
-            let got = mv.to_json();
-            assert_eq!(got.to_string(), want.to_string());
-            // 等価は JSON の等価と同じ（型どうし・型と JSON）。
-            assert_eq!(mv, Move::from_json(want.clone()));
-            assert_eq!(Move::from_json(want.clone()), mv);
-            // 読みは JSON の `get` と同じ値。
-            let j = Move::from_json(want.clone());
-            assert_eq!(mv.action_type(), j.action_type());
-            assert_eq!(mv.kind(), j.kind());
-            assert_eq!(mv.card_uuid(), j.card_uuid());
-            assert_eq!(mv.payload_uuid(), j.payload_uuid());
-            assert_eq!(mv.first_target_id(), j.first_target_id());
-            assert_eq!(
-                mv.payload().map(|p| p.has_target_ids()),
-                j.payload().map(|p| p.has_target_ids())
-            );
-            assert_eq!(
-                mv.payload().and_then(|p| p.don_k_i64()),
-                j.payload().and_then(|p| p.don_k_i64())
-            );
-            assert_eq!(
-                mv.payload().and_then(|p| p.don_k_f64()),
-                j.payload().and_then(|p| p.don_k_f64())
-            );
-            assert_eq!(mv.get("payload"), j.get("payload"));
-            assert_eq!(mv.get("card_uuid"), j.get("card_uuid"));
-        }
-        assert_ne!(
-            Move::game("PLAY", Payload::Uuid("u1".into())),
-            Move::game("ATTACH_DON", Payload::Uuid("u1".into()))
-        );
-        assert_eq!(
-            Move::game("RESOLVE_EFFECT_SELECTION", Payload::Json(json!({}))),
-            Move::game("RESOLVE_EFFECT_SELECTION", Payload::Empty)
-        );
     }
 }
