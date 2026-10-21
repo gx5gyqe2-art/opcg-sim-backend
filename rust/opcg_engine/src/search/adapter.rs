@@ -134,7 +134,7 @@ fn merged_search_actions_with(
     pending: Option<Value>,
     dialog_payload: Option<Value>,
 ) -> Vec<Move> {
-    let Some(alts) = selection_moves_with(s, masters, seat, pending, dialog_payload) else {
+    let Some(alts) = selection_moves_with(s, masters, seat, pending.as_ref(), dialog_payload.as_ref()) else {
         return base_moves;
     };
     if alts.is_empty() {
@@ -193,27 +193,31 @@ fn selectable_uuids(pending: &Value) -> Vec<String> {
 /// 無ければ `None`（＝`merged_search_actions` は `base_moves` をそのまま返す）。
 pub fn selection_moves(s: &mut Session, masters: &MasterTable, seat: Seat) -> Option<Vec<Move>> {
     let pending = get_pending_request(s, masters, false);
-    selection_moves_with(s, masters, seat, pending, None)
+    selection_moves_with(s, masters, seat, pending.as_ref(), None)
 }
 
 /// [`selection_moves`] の、要求（`get_pending_request(s, masters, false)` の値）と、分かっていれば
 /// その既定解決の payload（`default_interaction_payload` の値）を外から渡す版。
-fn selection_moves_with(
+pub(crate) fn selection_moves_with(
     s: &mut Session,
     masters: &MasterTable,
     seat: Seat,
-    pending: Option<Value>,
-    base_payload: Option<Value>,
+    pending: Option<&Value>,
+    base_payload: Option<&Value>,
 ) -> Option<Vec<Move>> {
     let pending = pending?;
-    if request_actor(&pending) != Some(seat) {
+    if request_actor(pending) != Some(seat) {
         return None;
     }
-    let action = request_action(&pending)?.to_owned();
+    let action = request_action(pending)?.to_owned();
     let state = s.state();
-    let base = match base_payload {
-        Some(b) => b,
-        None => crate::effects::interact::default_interaction_payload(state, masters, Some(&pending)),
+    let base: std::borrow::Cow<'_, Value> = match base_payload {
+        Some(b) => std::borrow::Cow::Borrowed(b),
+        None => std::borrow::Cow::Owned(crate::effects::interact::default_interaction_payload(
+            state,
+            masters,
+            Some(pending),
+        )),
     };
 
     // 任意確認（任意コスト／任意効果の発動可否）: accept / decline を採点させる。
@@ -251,7 +255,7 @@ fn selection_moves_with(
         let mut moves = Vec::new();
         for order in &orders {
             for position in &positions {
-                let mut payload = base.clone();
+                let mut payload = base.as_ref().clone();
                 if let Some(order) = order {
                     payload = with_field(&payload, "selected_uuids", json!(order));
                 }

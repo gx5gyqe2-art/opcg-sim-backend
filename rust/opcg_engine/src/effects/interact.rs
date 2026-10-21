@@ -1041,12 +1041,15 @@ pub fn selection_entries(
     uuids: &[String],
 ) -> Vec<SelectionEntry> {
     let opp = pid.other();
-    // 走査は参照のまま（ゾーンの並びも uuid も複製しない）。並び・先勝ちは今までと同じ。
-    let mut index: Vec<(&str, &'static str, &'static str, Option<CardIdx>)> = Vec::new();
-    let wanted = |u: &str| uuids.iter().any(|x| x == u);
-    let seen = |index: &Vec<(&str, &'static str, &'static str, Option<CardIdx>)>, u: &str| {
-        index.iter().any(|(k, _, _, _)| *k == u)
-    };
+    // 走査は参照のまま（ゾーンの並びも uuid も複製しない）。並び・先勝ちは今までと同じ
+    // （「候補に入っているか」「もう載せたか」は集合で引く＝線形の比較と同じ答え）。
+    let mut index: crate::fxhash::FxHashMap<&str, (&'static str, &'static str, Option<CardIdx>)> =
+        crate::fxhash::FxHashMap::default();
+    let want: std::collections::HashSet<&str, crate::fxhash::FxBuild> =
+        uuids.iter().map(String::as_str).collect();
+    let wanted = |u: &str| want.contains(u);
+    let seen = |index: &crate::fxhash::FxHashMap<&str, (&'static str, &'static str, Option<CardIdx>)>,
+                u: &str| index.contains_key(u);
     for (owner, side) in [(pid, "own"), (opp, "opp")] {
         for (zname, zone) in SELECTION_ZONES {
             let cards: &[CardIdx] = match zone {
@@ -1060,7 +1063,7 @@ pub fn selection_entries(
             for &c in cards {
                 let u = state.card(c).uuid.as_str();
                 if wanted(u) && !seen(&index, u) {
-                    index.push((u, side, zname, Some(c)));
+                    index.insert(u, (side, zname, Some(c)));
                 }
             }
         }
@@ -1071,7 +1074,7 @@ pub fn selection_entries(
             if let Some(c) = slot {
                 let u = state.card(c).uuid.as_str();
                 if wanted(u) && !seen(&index, u) {
-                    index.push((u, side, zname, Some(c)));
+                    index.insert(u, (side, zname, Some(c)));
                 }
             }
         }
@@ -1087,15 +1090,15 @@ pub fn selection_entries(
                     TargetRef::Don(d) => (state.don(d).uuid.as_str(), None),
                 };
                 if wanted(u) && !seen(&index, u) {
-                    index.push((u, "own", "temp", card));
+                    index.insert(u, ("own", "temp", card));
                 }
             }
         }
     }
     uuids
         .iter()
-        .map(|u| match index.iter().find(|(k, _, _, _)| *k == u.as_str()) {
-            Some((_, side, zone, card)) => SelectionEntry {
+        .map(|u| match index.get(u.as_str()) {
+            Some((side, zone, card)) => SelectionEntry {
                 uuid: u.clone(),
                 side: Some(side),
                 zone: Some(zone),

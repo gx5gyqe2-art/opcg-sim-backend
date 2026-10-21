@@ -42,16 +42,21 @@ pub fn drain_own_interactions(
         ) {
             return Ok(());
         }
-        // 探索モードでは分岐可能な選択もドレインしない（探索ノードとして残す）。
-        if stop_at_select && adapter::selection_moves(s, masters, actor).is_some() {
-            return Ok(());
-        }
+        // 要求と既定解決は 1 回だけ作り、分岐の判定にも渡す（`selection_moves` が中で作るのと同じ値:
+        // 間で盤面を書き換えない・`get_pending_request` の正規化は冪等）。
         let pending = get_pending_request(s, masters, false);
         let payload = crate::effects::interact::default_interaction_payload(
             s.state(),
             masters,
             pending.as_ref(),
         );
+        // 探索モードでは分岐可能な選択もドレインしない（探索ノードとして残す）。
+        if stop_at_select
+            && adapter::selection_moves_with(s, masters, actor, pending.as_ref(), Some(&payload))
+                .is_some()
+        {
+            return Ok(());
+        }
         match crate::rules::actions::apply_game_action(
             s,
             masters,
