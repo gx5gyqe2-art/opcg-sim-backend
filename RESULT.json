@@ -16,5 +16,5 @@
  "metrics": {
   "arena_s5120/s5120_w07.jsonl": 120
  },
- "notes": ""
+ "notes": "シャード k=7 完走。ARENA_RESUME_FINAL: pairs 119/120（void 1 局のため 1 ペアが成立せず）・wr 0.4958・CI95 [0.4291,0.5625]・Elo -2.9。コード変更なし。~/opcg-sim-backend は /home/user/opcg-sim-backend への symlink で実行。"
 }
