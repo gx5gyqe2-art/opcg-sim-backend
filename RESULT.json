@@ -17,5 +17,5 @@
  "metrics": {
   "arena_fairprod/fairprod_w12.jsonl": 120
  },
- "notes": ""
+ "notes": "完走。120ペア/240局・void 0・候補(fair)勝率0.4708 CI95[0.406,0.5357] Elo -20.3 (peek基準に対し)。コード変更なし。"
 }
