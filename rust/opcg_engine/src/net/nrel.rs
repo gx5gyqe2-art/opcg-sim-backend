@@ -550,6 +550,19 @@ fn body_impl(w: &NRelWeights, sc: &[f32], tk: &Tokens) -> Vec<f32> {
 pub struct Trunk {
     pub tk: Tokens,
     pub e: Vec<f32>,
+    /// 方策の頭の候補ごとの logit（鍵＝[`cand_key`]）。候補の logit は幹（`e`・`tk.h`）と、関係を使うネットなら
+    /// `rel_om`（幹のキャッシュの鍵に入っている＝同じ幹なら同じ値）と、候補の行だけの関数＝同じ鍵なら同じ値。
+    memo: std::cell::RefCell<FxHashMap<Box<[u32]>, f32>>,
+}
+
+/// 候補 1 行の鍵（ネットの置き場・主体／対象の枠・素性と予算のビット列）。
+fn cand_key(w: &NRelWeights, c: &Candidate) -> Box<[u32]> {
+    let wp = w as *const NRelWeights as usize as u64;
+    let mut k = Vec::with_capacity(4 + c.feats.len() + c.budget.len());
+    k.extend_from_slice(&[wp as u32, (wp >> 32) as u32, c.si as u32, c.ti as u32]);
+    k.extend(c.feats.iter().map(|x| x.to_bits()));
+    k.extend(c.budget.iter().map(|x| x.to_bits()));
+    k.into_boxed_slice()
 }
 
 /// decide の中（[`tok_cache_scope`] を張ったスレッド）では、同じ符号化の幹を使い回す
@@ -636,7 +649,7 @@ fn trunk_impl(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Trunk, Eng
         let _prof = crate::prof::enter(crate::prof::Cat::FwdBody);
         body_impl(w, &enc.scalars, &tk)
     };
-    Ok(Trunk { tk, e })
+    Ok(Trunk { tk, e, memo: Default::default() })
 }
 
 /// 価値の頭（tanh 済み）。
@@ -708,6 +721,11 @@ fn priors_from_impl(
         if c.feats.len() != F_CAND {
             return Err(bad(format!("net: 候補素性が {} 列（{F_CAND} が要る）", c.feats.len())));
         }
+        let key = cand_key(w, c);
+        if let Some(l) = t.memo.borrow().get(&key) {
+            logits.push(*l);
+            continue;
+        }
         let mut u = Vec::with_capacity(super::D_PIN);
         u.extend_from_slice(e);
         // 主体 h_si / 対象 h_ti（枠が無い＝−1 は 0 ベクトル）
@@ -736,7 +754,9 @@ fn priors_from_impl(
         }
         let mut rp = affine(&u, &w.wp1, &w.bp1);
         relu_inplace(&mut rp);
-        logits.push(affine(&rp, &w.wp2, &w.bp2)[0]);
+        let l = affine(&rp, &w.wp2, &w.bp2)[0];
+        t.memo.borrow_mut().insert(key, l);
+        logits.push(l);
     }
     Ok(seg_softmax(&logits))
 }

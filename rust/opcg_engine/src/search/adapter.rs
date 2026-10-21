@@ -41,8 +41,16 @@ pub fn legal_actions(
     let Some((seat, _)) = pending_actor_action(s) else {
         return Ok(Vec::new());
     };
-    let base = crate::rules::legal::get_legal_actions(s, masters, seat)?;
-    let mut moves = merged_search_actions(s, masters, seat, base);
+    // 要求は 1 回だけ作り、合法手の列挙と対話の分岐の両方に渡す（`get_pending_request` が盤面に触るのは
+    // 冪等な戦闘フェイズの正規化だけ＝2 回目は 1 回目と同じ値を返す。間の列挙は盤面を読むだけ）。
+    let pending = get_pending_request(s, masters, false);
+    let base = crate::rules::legal::get_legal_actions_for(s, masters, seat, pending.as_ref())?;
+    // 対話の既定解決（列挙が返した唯一の RESOLVE 手の payload）は、対話の分岐の土台と同じ値。
+    let dialog_payload = match base.as_slice() {
+        [m] if action_type(m) == Some(ACT_RESOLVE_SELECTION) => m.get("payload").cloned(),
+        _ => None,
+    };
+    let mut moves = merged_search_actions_with(s, masters, seat, base, pending, dialog_payload);
 
     if opts.prune_futile {
         moves = prune::prune_don_moves(s.state(), masters, seat, moves, opts.don_margin);
@@ -113,7 +121,20 @@ pub fn merged_search_actions(
     seat: Seat,
     base_moves: Vec<Move>,
 ) -> Vec<Move> {
-    let Some(alts) = selection_moves(s, masters, seat) else {
+    let pending = get_pending_request(s, masters, false);
+    merged_search_actions_with(s, masters, seat, base_moves, pending, None)
+}
+
+/// [`merged_search_actions`] の、要求と（あれば）対話の既定解決の payload を外から渡す版。
+fn merged_search_actions_with(
+    s: &mut Session,
+    masters: &MasterTable,
+    seat: Seat,
+    base_moves: Vec<Move>,
+    pending: Option<Value>,
+    dialog_payload: Option<Value>,
+) -> Vec<Move> {
+    let Some(alts) = selection_moves_with(s, masters, seat, pending, dialog_payload) else {
         return base_moves;
     };
     if alts.is_empty() {
@@ -171,13 +192,29 @@ fn selectable_uuids(pending: &Value) -> Vec<String> {
 ///
 /// 無ければ `None`（＝`merged_search_actions` は `base_moves` をそのまま返す）。
 pub fn selection_moves(s: &mut Session, masters: &MasterTable, seat: Seat) -> Option<Vec<Move>> {
-    let pending = get_pending_request(s, masters, false)?;
+    let pending = get_pending_request(s, masters, false);
+    selection_moves_with(s, masters, seat, pending, None)
+}
+
+/// [`selection_moves`] の、要求（`get_pending_request(s, masters, false)` の値）と、分かっていれば
+/// その既定解決の payload（`default_interaction_payload` の値）を外から渡す版。
+fn selection_moves_with(
+    s: &mut Session,
+    masters: &MasterTable,
+    seat: Seat,
+    pending: Option<Value>,
+    base_payload: Option<Value>,
+) -> Option<Vec<Move>> {
+    let pending = pending?;
     if request_actor(&pending) != Some(seat) {
         return None;
     }
     let action = request_action(&pending)?.to_owned();
     let state = s.state();
-    let base = crate::effects::interact::default_interaction_payload(state, masters, Some(&pending));
+    let base = match base_payload {
+        Some(b) => b,
+        None => crate::effects::interact::default_interaction_payload(state, masters, Some(&pending)),
+    };
 
     // 任意確認（任意コスト／任意効果の発動可否）: accept / decline を採点させる。
     if action == "CONFIRM_OPTIONAL"

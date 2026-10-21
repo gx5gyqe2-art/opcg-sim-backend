@@ -26,7 +26,7 @@ use crate::net::{nrel, Candidate, LoadedNet};
 use crate::state::EngineError;
 use serde_json::{json, Value};
 use std::cell::RefCell;
-use std::collections::HashMap;
+use crate::fxhash::FxHashMap;
 
 use super::{adapter, apply, LeafRollout, Move, SearchOptions};
 
@@ -261,10 +261,13 @@ impl<'a> Ctx<'a> {
             to_move,
             &self.enc_opts(),
         )?;
-        if enc.rel_om.is_empty() {
+        // 関係を遮断したネット（`ablate rel`）は R を 1 か所も読まない（幹・方策の頭とも `!no_rel` のときだけ
+        // 読む）＝0 埋めの配列を作らない。読むネットには今までどおり 0 を埋める。
+        let reads_rel = !self.net.weights.ablated("rel");
+        if reads_rel && enc.rel_om.is_empty() {
             enc.rel_om = vec![0.0; N_OWN * N_OPP * R_DIM];
         }
-        if enc.rel_oo.is_empty() {
+        if reads_rel && enc.rel_oo.is_empty() {
             enc.rel_oo = vec![0.0; N_OWN * N_OWN * R_DIM];
         }
         // ネットが読むのは先頭 22 枠（Python `ci = base["card_idx"][:N_TOK]`）。
@@ -494,8 +497,8 @@ pub struct CandOwned {
 ///
 /// 全カードを走査する [`crate::ops::find_card_by_uuid`] とは範囲が違う（山札・一時ゾーンを
 /// 含めない）＝方策の `card_id` 解決はこちらを使う。
-pub fn uuid_index(state: &GameState) -> HashMap<&str, CardIdx> {
-    let mut idx: HashMap<&str, CardIdx> = HashMap::new();
+pub fn uuid_index(state: &GameState) -> FxHashMap<&str, CardIdx> {
+    let mut idx: FxHashMap<&str, CardIdx> = FxHashMap::default();
     for seat in [Seat::P1, Seat::P2] {
         let p = state.player(seat);
         let zones = p
@@ -515,7 +518,7 @@ pub fn uuid_index(state: &GameState) -> HashMap<&str, CardIdx> {
 }
 
 /// Python `n_rel_feat._slots` の逆写像（uuid → 22 枠 index）。
-pub fn slot_index(state: &GameState, me: Seat) -> HashMap<&str, i32> {
+pub fn slot_index(state: &GameState, me: Seat) -> FxHashMap<&str, i32> {
     let opp = me.other();
     let mut slots: Vec<Option<CardIdx>> = Vec::with_capacity(N_TOK);
     slots.push(state.player(me).leader);
@@ -529,7 +532,7 @@ pub fn slot_index(state: &GameState, me: Seat) -> HashMap<&str, i32> {
     for k in 0..crate::encode::MAX_HAND {
         slots.push(state.player(me).hand.get(k).copied());
     }
-    let mut out: HashMap<&str, i32> = HashMap::new();
+    let mut out: FxHashMap<&str, i32> = FxHashMap::default();
     for (i, c) in slots.iter().enumerate() {
         if let Some(c) = c {
             // Python は dict 内包＝**後勝ち**（同じ uuid が 2 枠に出ることは無いので実質同じ）
@@ -555,8 +558,8 @@ pub const SELECT_AT: &str = "RESOLVE_EFFECT_SELECTION";
 pub fn cand_owned(
     state: &GameState,
     masters: &MasterTable,
-    uidx: &HashMap<&str, CardIdx>,
-    slots: &HashMap<&str, i32>,
+    uidx: &FxHashMap<&str, CardIdx>,
+    slots: &FxHashMap<&str, i32>,
     mv: &Move,
     src_uuid: Option<&str>,
     cand_target: bool,
