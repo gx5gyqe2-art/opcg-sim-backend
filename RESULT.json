@@ -17,5 +17,5 @@
  "metrics": {
   "arena_rdw2/rdw2_w08.jsonl": 120
  },
- "notes": ""
+ "notes": "120/120 ペア完走。コードは本線 claude/cpu-spec-improvements-yw91jd を変更せず使用。途中で push が 1 回失敗（手動の中間 push と衝突）したが再 push で回復・履歴の書き換えなし。コミットの committer は指示どおり g.x5gyqe2@gmail.com（GitHub 上は Unverified 表示）。"
 }
