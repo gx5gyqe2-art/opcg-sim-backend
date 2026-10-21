@@ -274,7 +274,9 @@ pub fn apply_hand_self_cost(
 /// リーダー＋場＋ステージ（Python の走査対象）。
 fn units(s: &Session, seat: Seat) -> Vec<CardIdx> {
     let p = s.state().player(seat);
-    let mut out: Vec<CardIdx> = p.leader.into_iter().collect();
+    // 並びと中身は同じ（先に長さぶんを取っておくだけ）。
+    let mut out: Vec<CardIdx> = Vec::with_capacity(2 + p.field.len());
+    out.extend(p.leader);
     out.extend(p.field.iter().copied());
     out.extend(p.stage);
     out

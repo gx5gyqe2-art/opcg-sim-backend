@@ -5,7 +5,7 @@
 
 use crate::journal::Session;
 use crate::model::{MasterTable, Seat};
-use crate::rules::pending::{get_pending_request, pending_actor_action};
+use crate::rules::pending::pending_actor_action;
 use crate::state::EngineError;
 use crate::rules::moves::GameArgs;
 use serde_json::Value;
@@ -44,23 +44,19 @@ pub fn drain_own_interactions(
         ) {
             return Ok(());
         }
-        // 探索モードでは分岐可能な選択もドレインしない（探索ノードとして残す）。
-        // 要求は 1 度だけ読み、判定は候補を組まずに数える（`adapter::selection_branch_exists`
-        // ＝`selection_moves(..).is_some()`。`get_pending_request` の書き換えは戦闘フェイズの
-        // 正規化だけ＝冪等なので、判定の後に読み直した値と同じ）。
-        let pending = get_pending_request(s, masters, false);
-        if stop_at_select
-            && pending
-                .as_ref()
-                .is_some_and(|p| adapter::selection_branch_exists(p, actor))
-        {
+        // ここに来るのは効果対話だけ（`pending_actor_action` はマリガンの次に中断を見る＝上の 4 種
+        // 以外の種別は進行中の中断の `front_action`）。要求の dict は組まず、要求の対話分岐
+        // （`get_pending_request`）が出す値を中断から直接読む（WP `rs-speed-d`）。
+        // 探索モードでは分岐可能な選択もドレインしない（探索ノードとして残す）。判定は候補を
+        // 組まずに数える（`adapter::selection_branch_exists_of`＝`selection_moves(..).is_some()`）。
+        let Some(it) = s.state().active_interaction() else {
+            return Ok(());
+        };
+        if stop_at_select && adapter::selection_branch_exists_of(it, actor) {
             return Ok(());
         }
-        let payload = crate::effects::interact::default_interaction_payload(
-            s.state(),
-            masters,
-            pending.as_ref(),
-        );
+        let payload =
+            crate::effects::interact::default_interaction_payload_of(s.state(), masters, it);
         match crate::rules::actions::apply_game_action(
             s,
             masters,

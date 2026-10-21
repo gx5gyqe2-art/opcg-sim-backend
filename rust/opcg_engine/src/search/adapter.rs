@@ -154,20 +154,23 @@ fn merged_search_actions_with(
     if alts.is_empty() {
         return base_moves; // Python: `if not alts` は空 list も素通し
     }
+    // 鍵は手から借りる＝先に「足すか」を決めてから足す（並びと判定は 1 手ずつ足すのと同じ）。
+    let keep: Vec<bool> = {
+        let mut seen: Vec<MergeKey<'_>> = base_moves.iter().map(MergeKey::of).collect();
+        alts.iter()
+            .map(|m| {
+                let k = MergeKey::of(m);
+                if seen.iter().any(|x| x.same(&k)) {
+                    false
+                } else {
+                    seen.push(k);
+                    true
+                }
+            })
+            .collect()
+    };
     let mut out = base_moves;
-    let mut seen: Vec<MergeKey<'static>> = Vec::new();
-    // 鍵は手から借りる＝`out` を伸ばす前に作って持てないので、鍵の値を複製して持つ
-    // （対話の候補は高々十数手）。
-    for m in &out {
-        seen.push(MergeKey::of(m).owned());
-    }
-    for m in alts {
-        let k = MergeKey::of(&m).owned();
-        if !seen.iter().any(|x| x.same(&k)) {
-            seen.push(k);
-            out.push(m);
-        }
-    }
+    out.extend(alts.into_iter().zip(keep).filter_map(|(m, k)| k.then_some(m)));
     out
 }
 
@@ -176,7 +179,15 @@ fn merged_search_actions_with(
 ///
 /// 欄が無ければ `null`。等しさは**今まで鍵にしていた JSON 文字列の一致**と同じ（[`json_text_eq`]）。
 struct MergeKey<'a> {
-    vals: [std::borrow::Cow<'a, Value>; 5],
+    /// `action_type`（文字列ならそのまま借りる）
+    at: KeyAt<'a>,
+    /// `selected_uuids`／`accepted`／`index`／`position`
+    vals: [std::borrow::Cow<'a, Value>; 4],
+}
+
+enum KeyAt<'a> {
+    Str(&'a str),
+    Json(std::borrow::Cow<'a, Value>),
 }
 
 impl<'a> MergeKey<'a> {
@@ -184,14 +195,14 @@ impl<'a> MergeKey<'a> {
         use std::borrow::Cow;
         let null = || Cow::Owned(Value::Null);
         let at = match mv.action_type() {
-            Some(a) => Cow::Owned(Value::String(a.to_owned())),
-            None => mv.get("action_type").unwrap_or_else(null),
+            Some(a) => KeyAt::Str(a),
+            None => KeyAt::Json(mv.get("action_type").unwrap_or_else(null)),
         };
         let p = mv.payload();
         let field = |k: &str| p.and_then(|p| p.get(k)).unwrap_or_else(null);
         MergeKey {
+            at,
             vals: [
-                at,
                 field("selected_uuids"),
                 field("accepted"),
                 field("index"),
@@ -200,17 +211,20 @@ impl<'a> MergeKey<'a> {
         }
     }
 
-    fn owned(self) -> MergeKey<'static> {
-        MergeKey {
-            vals: self.vals.map(|v| std::borrow::Cow::Owned(v.into_owned())),
-        }
-    }
-
     fn same(&self, other: &MergeKey<'_>) -> bool {
-        self.vals
-            .iter()
-            .zip(other.vals.iter())
-            .all(|(a, b)| json_text_eq(a, b))
+        let at_eq = match (&self.at, &other.at) {
+            (KeyAt::Str(a), KeyAt::Str(b)) => a == b,
+            (KeyAt::Str(a), KeyAt::Json(v)) | (KeyAt::Json(v), KeyAt::Str(a)) => {
+                v.as_str() == Some(*a)
+            }
+            (KeyAt::Json(a), KeyAt::Json(b)) => json_text_eq(a, b),
+        };
+        at_eq
+            && self
+                .vals
+                .iter()
+                .zip(other.vals.iter())
+                .all(|(a, b)| json_text_eq(a, b))
     }
 }
 
@@ -438,6 +452,54 @@ pub fn selection_branch_exists(pending: &Value, actor: Seat) -> bool {
     }
     if max_n >= 2 && (0..=max_n).contains(&min_n) {
         let hi = max_n.min(uuids.len() as i64);
+        let lo = min_n.max(0);
+        return lo <= hi;
+    }
+    false
+}
+
+/// [`selection_branch_exists`] の、要求の dict を組まずに**進行中の中断**から読む版（ドレイン用）。
+///
+/// 読む欄は要求の対話分岐（`rules::pending::get_pending_request`）が出す値そのもの:
+/// `player_id`＝`player`・`action`＝`kind.front_action()`・`can_skip`・`selectable_uuids`
+/// （`selectable`／無ければ `candidates`）・`allow_position`／`allow_reorder`（ARRANGE_DECK だけ
+/// 出る＝他は欄が無い＝偽）・`constraints`（無ければ `null`）。
+pub fn selection_branch_exists_of(it: &crate::model::Interaction, actor: Seat) -> bool {
+    if it.player != actor {
+        return false;
+    }
+    let action = it.kind.front_action();
+    if action == "CONFIRM_OPTIONAL" && it.can_skip {
+        return true; // accept / decline の 2 手
+    }
+    let n_uuids = it.selectable.as_ref().unwrap_or(&it.candidates).len();
+    if action == "ARRANGE_DECK" {
+        let arrange = it.kind == crate::model::InteractionKind::ArrangeDeck;
+        let allow_pos = arrange && it.allow_position;
+        let allow_reorder = arrange && it.allow_reorder;
+        if n_uuids == 0 || !(allow_pos || (allow_reorder && n_uuids >= 2)) {
+            return false;
+        }
+        let n_orders = if allow_reorder && n_uuids >= 2 {
+            1 + n_uuids.min(HARD_SELECT_CAP) - 1
+        } else {
+            1
+        };
+        let n_pos = if allow_pos { 2 } else { 1 };
+        return n_orders * n_pos >= 2;
+    }
+    if action != SELECT_ACTION || n_uuids == 0 {
+        return false;
+    }
+    let (min_n, max_n) = match it.constraints {
+        Some((mn, mx)) => (i64::from(mn), i64::from(mx)),
+        None => (0, n_uuids as i64),
+    };
+    if max_n == 1 && min_n <= 1 {
+        return true;
+    }
+    if max_n >= 2 && (0..=max_n).contains(&min_n) {
+        let hi = max_n.min(n_uuids as i64);
         let lo = min_n.max(0);
         return lo <= hi;
     }

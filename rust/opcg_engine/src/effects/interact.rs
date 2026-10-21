@@ -1324,7 +1324,44 @@ pub fn default_interaction_payload(
         Some("COST") => SelectionIntent::Cost,
         _ => SelectionIntent::Unknown,
     };
+    default_payload_from(state, masters, uuids, min_n, max_n, pid, intent)
+}
 
+/// [`default_interaction_payload`] の、要求の dict を組まずに**進行中の中断**から読む版
+/// （探索のドレイン用・WP `rs-speed-d`）。
+///
+/// 要求の対話分岐（`rules::pending::get_pending_request`）が出す値をそのまま使う:
+/// `selectable_uuids`＝`selectable`（無ければ `candidates`）の uuid・`constraints`＝
+/// `{"min","max"}`（無ければ `null`）・`player_id`＝`player`・`intent`＝`intent.name()`。
+pub fn default_interaction_payload_of(
+    state: &GameState,
+    masters: &MasterTable,
+    it: &crate::model::Interaction,
+) -> Value {
+    let uuids: Vec<String> = it
+        .selectable
+        .as_ref()
+        .unwrap_or(&it.candidates)
+        .iter()
+        .map(|t| state.target_uuid(*t).to_owned())
+        .collect();
+    let (min_n, max_n) = match it.constraints {
+        Some((mn, mx)) => (mn, mx),
+        None => (0, uuids.len() as i32),
+    };
+    default_payload_from(state, masters, uuids, min_n, max_n, Some(it.player), it.intent)
+}
+
+/// 既定解決の本体（要求から読んだ値を受ける）。
+fn default_payload_from(
+    state: &GameState,
+    masters: &MasterTable,
+    uuids: Vec<String>,
+    min_n: i32,
+    max_n: i32,
+    pid: Option<Seat>,
+    intent: SelectionIntent,
+) -> Value {
     let mut selected: Option<Vec<String>> = None;
     if !uuids.is_empty() && max_n >= 1 {
         if let Some(pid) = pid {

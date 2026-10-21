@@ -233,6 +233,23 @@ pub fn get_target_cards(
     let mut results: Vec<TargetRef> = Vec::new();
     let mut seen_names: HashSet<&str> = HashSet::new();
 
+    // 候補ごとに読む旗は query（不変）だけで決まる＝ループの外で 1 度だけ引く（同じ真偽値）。
+    let fl_attr_or_type = query.has_flag("ATTR_OR_TYPE");
+    let fl_cost_0_or_ge_8 = query.has_flag("COST_0_OR_GE_8");
+    let fl_has_counter = query.has_flag("HAS_COUNTER");
+    let fl_has_trigger = query.has_flag("HAS_TRIGGER");
+    let fl_name_or_colortype = query.has_flag("NAME_OR_COLORTYPE");
+    let fl_name_or_type = query.has_flag("NAME_OR_TYPE");
+    let fl_name_or_typed_name = query.has_flag("NAME_OR_TYPED_NAME");
+    let fl_no_counter = query.has_flag("NO_COUNTER");
+    let fl_original_power = query.has_flag("ORIGINAL_POWER");
+    let fl_rest_leader_only = query.has_flag("REST_LEADER_ONLY");
+    let fl_selector_or = query.has_flag("SELECTOR_OR");
+    let fl_single_color = query.has_flag("SINGLE_COLOR");
+    let fl_trait_or_name = query.has_flag("TRAIT_OR_NAME");
+    let fl_trait_or_trigger = query.has_flag("TRAIT_OR_TRIGGER");
+    let fl_trait_partial = query.has_flag("TRAIT_PARTIAL");
+
     for cand in candidates {
         // Python: `if exclude_source and source_card is not None and card is source_card: continue`
         if exclude_source && cand == TargetRef::Card(source_idx) {
@@ -278,8 +295,8 @@ pub fn get_target_cards(
         }
 
         // --- 種類／色／属性（OR 合成フラグの有無で分かれる）------------------------
-        if query.has_flag("ATTR_OR_TYPE") || query.has_flag("NAME_OR_COLORTYPE") {
-            let first_ok = if query.has_flag("NAME_OR_COLORTYPE") {
+        if fl_attr_or_type || fl_name_or_colortype {
+            let first_ok = if fl_name_or_colortype {
                 // Python は `matches_name(n)`＝**partial を渡さない**（NAME_PARTIAL が
                 // 立っていても完全一致）。下の `_name_in` とは規則が違うので写し分ける。
                 !query.names.is_empty()
@@ -301,8 +318,8 @@ pub fn get_target_cards(
         } else {
             if !query.card_type.is_empty()
                 && !query.card_type.iter().any(|t| t == master.ty.name())
-                && !query.has_flag("NAME_OR_TYPE")
-                && !query.has_flag("NAME_OR_TYPED_NAME")
+                && !fl_name_or_type
+                && !fl_name_or_typed_name
             {
                 continue;
             }
@@ -317,7 +334,7 @@ pub fn get_target_cards(
             }
             // SELECTOR_OR（名前／特徴／属性のいずれか）のときは後段でまとめて判定する。
             if !query.attributes.is_empty()
-                && !query.has_flag("SELECTOR_OR")
+                && !fl_selector_or
                 && !query.attributes.iter().any(|a| card.has_attribute(master, a))
             {
                 continue;
@@ -344,7 +361,7 @@ pub fn get_target_cards(
             continue;
         }
         // 「単色の」: 色を 1 色だけ持つカード。
-        if query.has_flag("SINGLE_COLOR") && master.colors.len() != 1 {
+        if fl_single_color && master.colors.len() != 1 {
             continue;
         }
 
@@ -352,7 +369,7 @@ pub fn get_target_cards(
         let cost = filter_cost(query, card, master);
         // 「赤のイベントかコスト3以上のキャラ」: コスト条件は COST_ONLY_<種類> の種類にだけ掛かる。
         let cost_scoped = scope_applies(query, "COST_ONLY_", master.ty.name());
-        if cost_scoped && query.has_flag("COST_0_OR_GE_8") && !(cost == 0 || cost >= 8) {
+        if cost_scoped && fl_cost_0_or_ge_8 && !(cost == 0 || cost >= 8) {
             continue;
         }
         if cost_scoped && query.cost_max.is_some_and(|m| cost > m) {
@@ -367,7 +384,7 @@ pub fn get_target_cards(
 
         // --- パワー（「元々のパワー」は印刷時パワー。付与ドン!!は持ち主のターン中のみ）-----
         let don_turn = card.owner == state.turn_player;
-        let power = if query.has_flag("ORIGINAL_POWER") {
+        let power = if fl_original_power {
             master.power
         } else {
             card.get_power(master, don_turn)
@@ -385,11 +402,11 @@ pub fn get_target_cards(
         if query.is_face_up.is_some_and(|f| card.is_face_up != f) {
             continue;
         }
-        if query.has_flag("NO_COUNTER") && master.counter > 0 {
+        if fl_no_counter && master.counter > 0 {
             continue;
         }
         // 「カウンターを持つ」カードだけ（OP17-118 の「カウンターを持たないキャラのみ」の判定用）。
-        if query.has_flag("HAS_COUNTER") && master.counter <= 0 {
+        if fl_has_counter && master.counter <= 0 {
             continue;
         }
         // Python は `ab.trigger.name == query.lacks_trigger` の**文字列比較**＝未知の名前は
@@ -417,14 +434,14 @@ pub fn get_target_cards(
         // だけに掛かり、リーダーは除外名の対象外。
         let excluded = || -> bool {
             !query.exclude_names.is_empty()
-                && !(query.has_flag("REST_LEADER_ONLY") && master.ty == CardType::Leader)
+                && !(fl_rest_leader_only && master.ty == CardType::Leader)
                 && query
                     .exclude_names
                     .iter()
                     .any(|en| matches_name(master, en, false))
         };
         // 「『X』を含む特徴」（TRAIT_PARTIAL）は特徴名の部分一致（「元ロックス海賊団」等も該当）。
-        let trait_partial = query.has_flag("TRAIT_PARTIAL");
+        let trait_partial = fl_trait_partial;
         let trait_in = || -> bool {
             !query.traits.is_empty()
                 && query.traits.iter().any(|t| {
@@ -436,7 +453,7 @@ pub fn get_target_cards(
                 })
         };
 
-        if query.has_flag("SELECTOR_OR") {
+        if fl_selector_or {
             // 「特徴《A》か属性(斬)を持つ」「「ペローナ」か属性(斬)を持つ」: 指定された名前・特徴・属性の
             // いずれかに当てはまればよい（他の絞り込み＝種類／コスト／除外名は AND のまま）。
             let attr_ok = !query.attributes.is_empty()
@@ -447,11 +464,11 @@ pub fn get_target_cards(
             if excluded() {
                 continue;
             }
-        } else if query.has_flag("NAME_OR_COLORTYPE") {
+        } else if fl_name_or_colortype {
             if excluded() {
                 continue;
             }
-        } else if query.has_flag("NAME_OR_TYPED_NAME")
+        } else if fl_name_or_typed_name
             && query.names.len() >= 2
             && !query.card_type.is_empty()
         {
@@ -464,7 +481,7 @@ pub fn get_target_cards(
             if excluded() {
                 continue;
             }
-        } else if query.has_flag("NAME_OR_TYPE")
+        } else if fl_name_or_type
             && !query.names.is_empty()
             && !query.card_type.is_empty()
         {
@@ -475,7 +492,7 @@ pub fn get_target_cards(
             if excluded() {
                 continue;
             }
-        } else if query.has_flag("TRAIT_OR_NAME")
+        } else if fl_trait_or_name
             && (!query.names.is_empty() || !query.traits.is_empty())
         {
             if !(name_in(&query.names) || trait_in()) {
@@ -493,7 +510,7 @@ pub fn get_target_cards(
             }
             if !query.traits.is_empty() && !trait_in() {
                 // 「《特徴》か【トリガー】を持つ」は特徴 OR トリガー所持。
-                if !query.has_flag("TRAIT_OR_TRIGGER") {
+                if !fl_trait_or_trigger {
                     continue;
                 }
                 if !has_trigger(master, abilities) {
@@ -504,13 +521,13 @@ pub fn get_target_cards(
 
         // REST_LEADER_ONLY（「レストのリーダーか、…のキャラ」）: 状態の絞りはリーダーだけに掛かる。
         if query.is_rest.is_some_and(|r| card.is_rest != r)
-            && !(query.has_flag("REST_LEADER_ONLY") && master.ty != CardType::Leader)
+            && !(fl_rest_leader_only && master.ty != CardType::Leader)
         {
             continue;
         }
 
-        if query.has_flag("HAS_TRIGGER")
-            && !query.has_flag("TRAIT_OR_TRIGGER")
+        if fl_has_trigger
+            && !fl_trait_or_trigger
             && !has_trigger(master, abilities)
         {
             continue;
