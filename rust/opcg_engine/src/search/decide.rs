@@ -77,6 +77,8 @@ pub struct DecideOptions {
     /// 世界の引き直しの診断（WP `rs-ismcts-diag`・既定 false）: 自分の手番の世界依存を数える
     /// （`redet` の欄が増えるだけ・出力の手と統計は変えない）。引き直しが off なら効かない。
     pub redet_diag: bool,
+    /// 世界の引き直しで、相手の手番のノードを相手の手札でも分ける（[`super::mcts::Redet::split_opp`]）。
+    pub redet_split_opp: bool,
     /// 候補生成（`OPCGGame`）
     pub search: SearchOptions,
     /// `BOX_BRANCH_BUDGET`（`None`＝無制限）
@@ -123,6 +125,7 @@ impl Default for DecideOptions {
             search_seed: None,
             redeterminize_every: 0,
             redet_diag: false,
+            redet_split_opp: false,
             search: SearchOptions::default(),
             budget: Some(super::quiesce::BOX_BRANCH_BUDGET),
         }
@@ -1176,6 +1179,7 @@ fn run_one_world(
             me: root.1,
             every,
             diag: opts.redet_diag,
+            split_opp: opts.redet_split_opp,
         });
     }
     let run = tree.run_in_world(world, rng, st)?;

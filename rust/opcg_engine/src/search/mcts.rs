@@ -145,6 +145,11 @@ pub struct Node {
     /// [`TreeMcts::redet_child`]）と、型が違う世界のための別の子 (手の添字, 子)。
     pub act: Option<&'static str>,
     pub alts: Vec<(usize, usize)>,
+    /// 相手の手番のノードを作った世界の相手の手札の鍵（`split_opp` のときだけ）
+    pub hand: Option<u64>,
+    /// 箱で畳んだノードの「今の世界で畳んだ手」（`legal` の添字）と、それを畳んだ世界の番号
+    pub box_idx: usize,
+    pub box_epoch: u32,
 }
 
 /// PV（主変化）の 1 手（`docs/rust_engine_plan.md` §20.4 の思考ログ・[`TreeMcts::principal_variation`]）。
@@ -218,6 +223,21 @@ pub struct Redet {
     /// 診断（WP `rs-ismcts-diag`）: 照合を省く自分の手番でもこの世界の合法手を取り、木の手と
     /// 食い違うかを数えるだけ（出力は変えない・時間は増える）。
     pub diag: bool,
+    /// 相手の手番のノードを「相手の手札（カードの種類の多重集合）」でも分ける（WP `rs-ismcts-diag`・
+    /// 既定 false）。相手は自分の手札を知って打つ＝相手の判断を手札の違う世界どうしで混ぜない。
+    /// 自分の手番のノード（根から最初の相手の手番まで）は世界をまたいで共有したまま。
+    pub split_opp: bool,
+}
+
+/// 相手の手札の鍵（マスタの多重集合の 64 bit ハッシュ・[`Redet::split_opp`]）。
+fn hand_key(st: &GameState, seat: Seat) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut ms: Vec<String> =
+        st.player(seat).hand.iter().map(|c| format!("{:?}", st.card(*c).master)).collect();
+    ms.sort_unstable();
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    ms.hash(&mut h);
+    h.finish()
 }
 
 /// 1 回の読みの終わり方（WP `rs-ismcts-diag` の 2・引き直しが有効なときだけ数える）。
@@ -276,8 +296,9 @@ struct RedetStats {
     own_diff_extra: u64,
     /// 局面の型が違う世界のために作った別の子の数（修正後の [`TreeMcts::redet_child`]）
     alt_children: u64,
-    /// 箱で畳んだノードで畳んだ手がどれも打てず、この世界で畳み直して足した手の数
+    /// 箱で畳んだノードを新しい世界で畳み直した回数と、そのうち畳んだ手が前の世界と違った回数
     reboxed: u64,
+    refold_changed: u64,
     /// 根の出力（4）: コミットの続き（同じ手番で続けて打つ手）を作った回数と、その最初の手が
     /// 木（選んだ手の子）の訪問最多の手と違った回数
     commit_n: u64,
@@ -336,6 +357,7 @@ pub fn take_redet_stats() -> serde_json::Value {
             "own_diff_missing": st.own_diff_missing, "own_diff_extra": st.own_diff_extra,
             "commit_n": st.commit_n, "commit_diff": st.commit_diff,
             "alt_children": st.alt_children, "reboxed": st.reboxed,
+            "refold_changed": st.refold_changed,
         })
     })
 }
@@ -360,6 +382,8 @@ pub struct TreeMcts<'a, 'b> {
     /// 降下中の文脈（引き直しの診断用）: 相手の手番を越えたか・山札を見る対話を越えたか
     path_opp: bool,
     path_look: bool,
+    /// 世界の番号（引き直すたびに 1 増える・箱の畳み直しを世界ごとに 1 回にする）
+    epoch: u32,
     nodes: Vec<Node>,
 }
 
@@ -378,6 +402,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             end: SimEnd::Expand,
             path_opp: false,
             path_look: false,
+            epoch: 0,
             nodes: Vec::new(),
         }
     }
@@ -453,6 +478,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
                 let world = super::determinize::determinize_with(&r.root, r.me, rng)?;
                 s = Session::new(world);
                 base_rng = s.rng.snapshot();
+                self.epoch += 1;
                 redet_stat(|t| t.redraws += 1);
             }
             s.rng.restore(&base_rng);
@@ -543,6 +569,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
                 leaf_v = vals[b];
                 legal = vec![legal[b].clone()];
                 self.nodes[node].boxed = true;
+                self.nodes[node].box_epoch = self.epoch;
             }
         }
         // 対話箱（`TREE_BOX_DIALOG`）: 効果対話窓も同じ規約で畳む（物差しは本体 value）。
@@ -566,6 +593,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
                 leaf_v = vals[b];
                 legal = vec![legal[b].clone()];
                 self.nodes[node].boxed = true;
+                self.nodes[node].box_epoch = self.epoch;
             }
         }
 
@@ -789,11 +817,16 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
     fn redet_child(&mut self, node: usize, a: usize, s: &mut Session) -> usize {
         let term = self.ctx.is_terminal(s);
         let pa = crate::rules::pending::pending_actor_action(s);
+        let r = self.redet.as_ref().expect("引き直しが有効なときだけ");
+        let hand = match pa {
+            Some((seat, _)) if r.split_opp && !term && seat != r.me => Some(hand_key(s.state(), seat)),
+            _ => None,
+        };
         let fits = |c: &Node| -> bool {
             if term || c.terminal {
                 return term && c.terminal;
             }
-            c.to_move == pa.map(|x| x.0) && c.act == pa.map(|x| x.1)
+            c.to_move == pa.map(|x| x.0) && c.act == pa.map(|x| x.1) && c.hand == hand
         };
         let nd = &self.nodes[node];
         let found = nd.children[a]
@@ -805,6 +838,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         }
         let c = self.new_child_after_apply(node, s);
         self.nodes[c].act = if term { None } else { pa.map(|x| x.1) };
+        self.nodes[c].hand = hand;
         if self.nodes[node].children[a].is_none() {
             self.nodes[node].children[a] = Some(c);
         } else {
@@ -891,7 +925,13 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         if !check && self.redet.as_ref().is_some_and(|r| r.diag) {
             self.diag_own_turn(node, s, me)?;
         }
-        let mut mask: Option<Vec<bool>> = if check { Some(self.reconcile(node, s, st)?) } else { None };
+        let mut mask: Option<Vec<bool>> = if self.nodes[node].boxed && node != 0 {
+            Some(self.refold(node, s, st)?)
+        } else if check {
+            Some(self.reconcile(node, s)?)
+        } else {
+            None
+        };
         // 診断の文脈（相手の手番を越えた・山札を見る対話を越えた）を子へ渡す（戻りで復元）。
         let saved_ctx = (self.path_opp, self.path_look);
         if tm != me {
@@ -931,7 +971,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             let Some((v_child, child)) = self.descend_inner(node, a, s, st, soft)? else {
                 // 照合を省いた自分の手がこの世界で打てなかった＝照合して選び直す。
                 redet_stat(|t| t.unplayable += 1);
-                mask = Some(self.reconcile(node, s, st)?);
+                mask = Some(self.reconcile(node, s)?);
                 continue;
             };
             let same = self.nodes[child].to_move == self.nodes[node].to_move;
@@ -985,6 +1025,92 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         Ok(())
     }
 
+    /// 箱で畳んだノード（戦闘箱・対話箱）の選択（WP `rs-ismcts-diag` の修正）。戻り値は
+    /// 「今の世界で畳んだ 1 手」だけが立った候補。
+    ///
+    /// 箱は「その世界での最良の 1 手」へ畳む規約なので、世界が替わったら（その世界で初めて
+    /// 訪れたとき 1 回だけ）この世界で畳み直す（展開時と同じ規約・物差しは本体 value）。畳んだ手が
+    /// 木に無ければ足す。修正前は畳んだ手を最初の世界で固定していた＝他の世界では「その手が
+    /// 打てなければ空振り（葉として評価）」、「打てれば最良でなくてもその手」になっていた
+    /// （例: 相手のカウンターの箱に「カウンターしない」が入ると、カウンターできる世界でも相手が
+    /// カウンターしない＝攻めが楽観的に読まれる）。
+    fn refold(
+        &mut self,
+        node: usize,
+        s: &mut Session,
+        st: &mut SearchState,
+    ) -> Result<Vec<bool>, EngineError> {
+        use super::decide::move_sig;
+        let ctx = self.ctx;
+        let k = self.nodes[node].legal.len();
+        if self.nodes[node].box_epoch == self.epoch && self.nodes[node].box_idx < k {
+            let mut mask = vec![false; k];
+            mask[self.nodes[node].box_idx] = true;
+            return Ok(mask);
+        }
+        let now = ctx.legal_actions(s)?;
+        let tm = self.nodes[node].to_move.expect("展開済みなら手番がある");
+        let window = if ctx.box_battle && in_battle(s) {
+            Some(Window::Battle)
+        } else if ctx.box_dialog && !in_battle(s) && in_dialog(s) {
+            Some(Window::Dialog)
+        } else {
+            None
+        };
+        let pick = match window {
+            _ if now.len() == 1 => Some(0),
+            Some(w) => {
+                let vals = resolved_branch_values(
+                    ctx,
+                    s,
+                    st,
+                    tm,
+                    &now,
+                    ctx.quiesce_max_plies,
+                    super::quiesce::BOX_RESOLVE_DEPTH,
+                    w,
+                )?;
+                best_branch(&vals)
+            }
+            None => None,
+        };
+        let Some(b) = pick else {
+            // 窓が無い（型の鍵が同じなら起きない）・合法手が無い＝ふつうの照合へ落とす。
+            return self.reconcile(node, s);
+        };
+        let sig = move_sig(&now[b]);
+        {
+            let nd = &mut self.nodes[node];
+            if nd.sigs.len() != nd.legal.len() {
+                nd.sigs = nd.legal.iter().map(move_sig).collect();
+            }
+        }
+        let prev = self.nodes[node].box_idx;
+        let idx = match self.nodes[node].sigs.iter().position(|x| *x == sig) {
+            Some(i) => i,
+            None => {
+                let nd = &mut self.nodes[node];
+                nd.legal.push(now[b].clone());
+                nd.sigs.push(sig);
+                nd.p.push(1.0);
+                nd.n.push(0.0);
+                nd.w.push(0.0);
+                nd.children.push(None);
+                nd.legal.len() - 1
+            }
+        };
+        let nd = &mut self.nodes[node];
+        nd.box_idx = idx;
+        nd.box_epoch = self.epoch;
+        redet_stat(|t| {
+            t.reboxed += 1;
+            t.refold_changed += u64::from(idx != prev);
+        });
+        let mut mask = vec![false; nd.legal.len()];
+        mask[idx] = true;
+        Ok(mask)
+    }
+
     /// この世界の合法手とノードの `legal` を照合する（§7.1 の 3）。戻り値はノードの `legal`
     /// と同じ並びの「この世界で打てるか」。
     ///
@@ -992,12 +1118,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
     /// - この世界にだけある手は `legal`／`p`／`n`／`w`／`children` に追加する。事前分布は
     ///   この世界の合法手全体に `priors_keep` を 1 回回した値（既存の手の `p` は最初の値のまま）。
     /// - 箱で畳んだノード（`boxed`）と根（node 0＝出力の並びを世界 0 に保つ）には追加しない。
-    fn reconcile(
-        &mut self,
-        node: usize,
-        s: &mut Session,
-        st: &mut SearchState,
-    ) -> Result<Vec<bool>, EngineError> {
+    fn reconcile(&mut self, node: usize, s: &mut Session) -> Result<Vec<bool>, EngineError> {
         use super::decide::move_sig;
         let ctx = self.ctx;
         redet_stat(|t| t.checked += 1);
@@ -1016,49 +1137,6 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             match (0..nd.sigs.len()).find(|i| !mask[*i] && nd.sigs[*i] == sig) {
                 Some(i) => mask[i] = true,
                 None => fresh.push((j, sig)),
-            }
-        }
-        // 箱で畳んだノード（WP `rs-ismcts-diag` の修正）: 畳んだ手がこの世界でどれも打てなければ、
-        // この世界で畳み直して（展開時と同じ規約・物差しは本体 value）その 1 手を足す。修正前は
-        // 何も足さず、打てる手が無い＝葉として評価して返していた（読みの約 8% が空回り）。
-        if self.nodes[node].boxed && node != 0 && !fresh.is_empty() && !mask.iter().any(|x| *x) {
-            let tm = self.nodes[node].to_move.expect("展開済みなら手番がある");
-            let window = if ctx.box_battle && in_battle(s) {
-                Some(Window::Battle)
-            } else if ctx.box_dialog && !in_battle(s) && in_dialog(s) {
-                Some(Window::Dialog)
-            } else {
-                None
-            };
-            let pick = match window {
-                _ if now.len() == 1 => Some(0),
-                Some(w) => {
-                    let vals = resolved_branch_values(
-                        ctx,
-                        s,
-                        st,
-                        tm,
-                        &now,
-                        ctx.quiesce_max_plies,
-                        super::quiesce::BOX_RESOLVE_DEPTH,
-                        w,
-                    )?;
-                    best_branch(&vals)
-                }
-                None => None,
-            };
-            if let Some(b) = pick {
-                let sig = move_sig(&now[b]);
-                let nd = &mut self.nodes[node];
-                nd.legal.push(now[b].clone());
-                nd.sigs.push(sig);
-                nd.p.push(1.0);
-                nd.n.push(0.0);
-                nd.w.push(0.0);
-                nd.children.push(None);
-                mask.push(true);
-                redet_stat(|t| t.reboxed += 1);
-                return Ok(mask);
             }
         }
         if fresh.is_empty() || node == 0 || self.nodes[node].boxed {

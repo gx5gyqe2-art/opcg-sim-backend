@@ -653,7 +653,7 @@ mod redet {
             .map(|c| world.card(*c).uuid.clone())
             .collect();
         let mut t = TreeMcts::new(ctx, 1.5, 64, 0.0);
-        t.redet = Some(Redet { root: state.clone(), me: Seat::P1, every: 1, diag: false });
+        t.redet = Some(Redet { root: state.clone(), me: Seat::P1, every: 1, diag: false, split_opp: false });
         let out = t
             .run_in_world(world, &mut rng, &mut SearchState::default())
             .expect("run");
@@ -731,7 +731,8 @@ mod redet {
 
     /// (e) WP `rs-ismcts-diag` の修正の見張り: 読みが「ノードの手番がこの世界と食い違う」・
     /// 「箱で畳んだ手がこの世界で打てない」で葉として終わらない（修正前は木を伸ばさずに返していた
-    /// ＝実対局で読みの 3〜4 割）。局面の型が違う世界のための別の子と、畳み直した手が作られる。
+    /// ＝実対局で読みの 3〜4 割）。局面の型が違う世界のための別の子が作られ、箱（ここでは守り側の
+    /// カウンターの選択）は世界ごとに畳み直される（最初の世界の手に固定しない）。
     #[test]
     fn redeterminize_reads_always_reach_a_leaf() {
         let (masters, state) = counter_board();
@@ -750,7 +751,7 @@ mod redet {
             .expect("world");
         let sims = 400;
         let mut t = TreeMcts::new(ctx, 1.5, sims, 0.0);
-        t.redet = Some(Redet { root: state.clone(), me: Seat::P1, every: 1, diag: true });
+        t.redet = Some(Redet { root: state.clone(), me: Seat::P1, every: 1, diag: true, split_opp: false });
         let out = t
             .run_in_world(world, &mut rng, &mut SearchState::default())
             .expect("run");
@@ -761,7 +762,8 @@ mod redet {
         assert_eq!(g("end_mismatch"), 0, "手番の食い違いで終わった読みが無い: {stats}");
         assert_eq!(g("end_empty"), 0, "打てる手が無くて終わった読みが無い: {stats}");
         assert!(g("alt_children") > 0, "局面の型が違う世界の別の子がある: {stats}");
-        assert!(g("reboxed") > 0, "畳み直した手がある: {stats}");
+        assert!(g("reboxed") > 0, "新しい世界で箱を畳み直した: {stats}");
+        assert!(g("refold_changed") > 0, "畳み直すと世界によって畳む手が変わる（カウンターの札）: {stats}");
         assert_eq!(g("own_diff"), 0, "自分の手番の合法手は世界に依らない: {stats}");
         // 同じ手の子どうしは局面の型（終局か・手番・待っている操作）が全部違う。
         let nodes = t.into_nodes();
@@ -774,6 +776,59 @@ mod redet {
                 keys.sort_by_key(|x| format!("{x:?}"));
                 keys.dedup();
                 assert_eq!(keys.len(), k, "手 {a} の子 {c} の型が重複: {keys:?}");
+            }
+        }
+    }
+
+    /// (f) `split_opp`（WP `rs-ismcts-diag`）: 相手の手番のノードは相手の手札の鍵でも分かれる
+    /// ＝同じ手の子どうしで (手番・待っている操作・手札の鍵) が重複せず、相手の手番の子は手札の鍵を
+    /// 持ち、自分の手番の子は持たない。読みは必ず葉に届く。off（既定）は (e) と同じ木。
+    #[test]
+    fn redeterminize_split_opp_keys_opponent_nodes_by_hand() {
+        let (masters, state) = counter_board();
+        let ctx: &'static Ctx<'static> = Box::leak(Box::new(Ctx {
+            masters: Box::leak(Box::new(masters)),
+            net: net(),
+            opts: SearchOptions::default(),
+            box_battle: true,
+            box_dialog: true,
+            quiesce: true,
+            quiesce_max_plies: super::super::quiesce::QUIESCE_MAX_PLIES,
+        }));
+        reset_redet_stats(1);
+        let mut rng = crate::search::Pcg32SearchRng::new(11);
+        let world = super::super::determinize::determinize_with(&state, Seat::P1, &mut rng)
+            .expect("world");
+        let sims = 400;
+        let mut t = TreeMcts::new(ctx, 1.5, sims, 0.0);
+        t.redet = Some(Redet { root: state.clone(), me: Seat::P1, every: 1, diag: false, split_opp: true });
+        let out = t
+            .run_in_world(world, &mut rng, &mut SearchState::default())
+            .expect("run");
+        assert_eq!(out.n.iter().sum::<f64>(), sims as f64);
+        let stats = take_redet_stats();
+        let g = |k: &str| stats[k].as_u64().unwrap_or_else(|| panic!("{k}: {stats}"));
+        assert_eq!(g("end_mismatch") + g("end_empty"), 0, "読みは葉に届く: {stats}");
+        let nodes = t.into_nodes();
+        let mut opp_keys = std::collections::BTreeSet::new();
+        for n in nodes.iter().filter(|n| n.expanded && !n.terminal) {
+            if n.act.is_some() {
+                assert_eq!(n.hand.is_some(), n.to_move == Some(Seat::P2), "手札の鍵は相手の手番だけ");
+            }
+            if let Some(h) = n.hand {
+                opp_keys.insert(h);
+            }
+        }
+        assert!(opp_keys.len() > 1, "相手の手札の違う世界で相手の手番のノードが分かれた");
+        for n in &nodes {
+            for (a, _) in &n.alts {
+                let key = |i: usize| (nodes[i].terminal, nodes[i].to_move, nodes[i].act, nodes[i].hand);
+                let mut keys = vec![key(n.children[*a].expect("別の子は最初の子の後"))];
+                keys.extend(n.alts.iter().filter(|(b, _)| b == a).map(|(_, d)| key(*d)));
+                let k = keys.len();
+                keys.sort_by_key(|x| format!("{x:?}"));
+                keys.dedup();
+                assert_eq!(keys.len(), k, "手 {a} の子の型が重複: {keys:?}");
             }
         }
     }

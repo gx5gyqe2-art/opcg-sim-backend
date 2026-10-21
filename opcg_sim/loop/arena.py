@@ -207,6 +207,7 @@ CAND_FLAGS = {
     "box_commit": dict(box_commit=True),
     "no_box_commit": dict(box_commit=False),
     "residual_dig": dict(residual_dig=True),
+    "redet_split_opp": dict(redet_split_opp=True),
 }
 
 
@@ -245,6 +246,9 @@ def add_cand_args(ap) -> None:
     ap.add_argument("--cand-redeterminize-every", type=int, default=None,
                     help="候補席だけ世界の引き直し（`docs/search_efficiency_plan.md` §7.1）: この回数の"
                          "読みごとに根の世界を引き直し、木は共有する（既定 0＝off）")
+    ap.add_argument("--cand-redet-split-opp", action="store_true",
+                    help="候補席だけ、世界の引き直しで相手の手番のノードを相手の手札でも分ける"
+                         "（WP `rs-ismcts-diag`・--cand-redeterminize-every と併用）")
     ap.add_argument("--cand-setup-box", action="store_true",
                     help="候補席だけ準備箱（§20.7.2・既定 OFF）")
     ap.add_argument("--cand-budget", type=int, default=None,
