@@ -16,5 +16,5 @@
  "metrics": {
   "arena_w4/w4_w12.jsonl": 202
  },
- "notes": ""
+ "notes": "Resumed from 88 pre-existing pairs on the branch (counter total 208 = 88 + 120 new). Remote branch had earlier commits; merged with -X ours (jsonl, no duplicate lines). One transient PUSH_FAILED (non-fast-forward) resolved by merge; later one push race with manual partial push, no data lost."
 }
