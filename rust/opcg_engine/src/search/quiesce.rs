@@ -229,7 +229,7 @@ impl<'a> Ctx<'a> {
         &self,
         s: &mut Session,
         to_move: Seat,
-        trunk: Option<&(Seat, crate::net::Trunk)>,
+        trunk: Option<&(Seat, std::rc::Rc<crate::net::Trunk>)>,
     ) -> Result<f64, EngineError> {
         if let Some(w) = s.state().winner {
             return Ok(if w == to_move { 1.0 } else { -1.0 });
@@ -293,7 +293,7 @@ impl<'a> Ctx<'a> {
         &self,
         s: &mut Session,
         legal: &[Move],
-    ) -> Result<(Option<Vec<f32>>, Option<(Seat, crate::net::Trunk)>), EngineError> {
+    ) -> Result<(Option<Vec<f32>>, Option<(Seat, std::rc::Rc<crate::net::Trunk>)>), EngineError> {
         if legal.is_empty() {
             return Ok((None, None));
         }

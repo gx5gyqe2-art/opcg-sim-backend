@@ -444,7 +444,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         s: &mut Session,
         st: &mut SearchState,
         to_move: Seat,
-        trunk: Option<&(Seat, crate::net::Trunk)>,
+        trunk: Option<&(Seat, std::rc::Rc<crate::net::Trunk>)>,
     ) -> Result<f64, EngineError> {
         let ctx = self.ctx;
         let rollout = ctx.opts.leaf_rollout == LeafRollout::TurnEnd;

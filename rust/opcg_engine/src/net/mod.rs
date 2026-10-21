@@ -188,7 +188,7 @@ pub fn value(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<f32, Engine
 pub use nrel::Trunk;
 
 /// トークンと本体（`value`／`priors` の前半・`nrel::trunk`）。
-pub fn trunk(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<Trunk, EngineError> {
+pub fn trunk(w: &NRelWeights, tab: &[f32], enc: &Encoding) -> Result<std::rc::Rc<Trunk>, EngineError> {
     nrel::trunk(w, tab, enc)
 }
 
