@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_w4/w4_w07.jsonl": 208
+  "arena_w4/w4_w07.jsonl": 120
  },
- "notes": ""
+ "notes": "branch claude/arena-w4-w07 already held 88 rows from an earlier run (seeds 1477000-1477087, cand sims 320 worlds 4) and a non-fast-forward push; merged with -s ours and removed those 88 foreign rows from the jsonl (still in git history of the remote branch). Ledger now holds exactly seeds 1657000-1657119 (120 pairs, sims 1280 worlds 4 budget 0). Final: wr 0.4917 CI95 [0.4221,0.5612] elo -5.8 void 0."
 }
