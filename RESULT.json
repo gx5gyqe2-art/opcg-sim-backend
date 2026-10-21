@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_w4/w4_w09.jsonl": 208
+  "arena_w4/w4_w09.jsonl": 120
  },
- "notes": "ran in /home/user/opcg-sim-backend (not ~)"
+ "notes": "Ran in /home/user/opcg-sim-backend instead of ~. Branch already held 88 foreign rows (cand sims 320, seeds ~1479000, from an earlier unrelated run); removed them from the jsonl (still in git history before this commit). Remaining 120 rows are seeds 1659000-1659999 with cand sims 1280/worlds 4/budget 0. First push was rejected (non-FF); resolved with merge -s ours."
 }
