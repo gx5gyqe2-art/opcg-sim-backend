@@ -13,7 +13,7 @@
   ]
  },
  "metrics": {
-  "arena_w2/w2_w09.jsonl": 40
+  "arena_w2/w2_w09.jsonl": 60
  },
  "notes": "repo was a pre-existing clone at /home/user/opcg-sim-backend (symlinked to ~/opcg-sim-backend; git clone into ~ failed)"
 }
