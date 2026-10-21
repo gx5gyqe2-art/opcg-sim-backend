@@ -54,7 +54,7 @@ const NAMES: [&str; N] = [
     "enc_onplay_probe",
 ];
 /// 区分外の累計: decide の壁時計・py_game.decide の壁時計・decide の回数・forward の回数（value／priors）。
-const N_EXTRA: usize = 6;
+const N_EXTRA: usize = 7;
 const EXTRA: [&str; N_EXTRA] = [
     "decide_wall",
     "py_decide_wall",
@@ -62,6 +62,7 @@ const EXTRA: [&str; N_EXTRA] = [
     "n_value",
     "n_priors",
     "n_value_reused",
+    "n_trunk_hit",
 ];
 
 #[allow(clippy::declare_interior_mutable_const)]
@@ -154,6 +155,7 @@ pub const DECIDES: usize = 2;
 pub const N_VALUE: usize = 3;
 pub const N_PRIORS: usize = 4;
 pub const N_VALUE_REUSED: usize = 5;
+pub const N_TRUNK_HIT: usize = 6;
 
 /// 累計を JSON で返して 0 に戻す（ns・回数）。
 pub fn take() -> serde_json::Value {

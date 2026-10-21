@@ -188,6 +188,8 @@ pub enum Undo {
     ResolvingEvent(Option<CardIdx>),
     /// 中断（対話）を丸ごと差し替えた（Python の `active_interaction = {...}`＝先頭置換）。
     InteractionReplace(Box<Interaction>),
+    /// `dons` へ 1 枚足した → 末尾を捨てる（符号化の登場時スキャンの一時ドン!!）。
+    DonPush,
 }
 
 /// P3 で足した `GameManager` の bool 欄。
@@ -256,6 +258,8 @@ pub struct Session {
     /// （`tests/harness/rs_golden.py::mask_shuffled_targets`）。journal の外＝巻き戻さない
     /// （記録は「実際に混ぜたか」を残す）。
     shuffled: Vec<Seat>,
+    /// イベントログを捨てる区間の中か（[`Session::discard_events`]）。journal の外。
+    events_muted: bool,
     /// いま対象ループで効果を実行している席（「自分の効果で」「相手の効果で」の判定用）。
     /// journal の外の一時値＝対象 1 枚の処理の前後で立てて戻す。効果の外（バトル等）は `None`。
     effect_actor: Option<(Seat, Option<CardIdx>)>,
@@ -268,6 +272,7 @@ impl Session {
             journal: Journal::new(),
             rng: crate::search::rng::Rng::Replay,
             action_events: Vec::new(),
+            events_muted: false,
             shuffled: Vec::new(),
             effect_actor: None,
         }
@@ -309,8 +314,32 @@ impl Session {
     }
 
     /// イベントを 1 件積む（Python の `manager.action_events.append({...})` と 1:1）。
+    ///
+    /// [`Session::discard_events`] の区間の中では積まない（区間を抜けると捨てる＝誰も読まない）。
     pub fn push_event(&mut self, event: serde_json::Value) {
-        self.action_events.push(event);
+        if !self.events_muted {
+            self.action_events.push(event);
+        }
+    }
+
+    /// イベントを積むか（[`Session::discard_events`] の区間の外か）。積まないなら、呼び出し側は
+    /// イベントの JSON を組まなくてよい（盤面・乱数・判定はイベントを読まない）。
+    pub fn events_on(&self) -> bool {
+        !self.events_muted
+    }
+
+    /// `f` の間のイベントログを捨てる（探索の降下・枝の評価）。
+    ///
+    /// `swap_events(Vec::new())` … `swap_events(saved)` と同じ見え方（入ると空・抜けると元のログ）で、
+    /// 区間の中では JSON を組まない。イベントログは盤面の外にあり、探索・ルール・符号化は
+    /// 読まない（読むのはフロント／記録へ返す入口だけ）＝打つ手は 1 bit も変わらない。
+    pub fn discard_events<R>(&mut self, f: impl FnOnce(&mut Session) -> R) -> R {
+        let saved = std::mem::take(&mut self.action_events);
+        let muted = std::mem::replace(&mut self.events_muted, true);
+        let out = f(self);
+        self.action_events = saved;
+        self.events_muted = muted;
+        out
     }
 
     /// 要求の先頭で空にする（Python の API ハンドラの `manager.action_events = []`）。
@@ -514,6 +543,14 @@ impl StateMut<'_> {
         }
         let old = std::mem::replace(slot, value);
         self.rec(Undo::DonBool(idx, field, old));
+    }
+
+    /// ドン!!を 1 枚足す（添字は末尾）。巻き戻すと取り除く。
+    pub fn push_don(&mut self, don: DonInstance) -> DonIdx {
+        let idx = self.state.dons.len() as DonIdx;
+        self.state.dons.push(don);
+        self.rec(Undo::DonPush);
+        idx
     }
 
     pub fn set_don_attached_to(&mut self, idx: DonIdx, value: Option<CardIdx>) {
@@ -870,6 +907,9 @@ fn apply_undo(state: &mut GameState, entry: Undo) {
         }
         Undo::CardZoneRemove(seat, zone, at, card) => {
             card_zone_mut(&mut state.players[seat as usize], zone).insert(at, card);
+        }
+        Undo::DonPush => {
+            state.dons.pop();
         }
         Undo::DonZoneInsert(seat, zone, at) => {
             don_zone_mut(&mut state.players[seat as usize], zone).remove(at);

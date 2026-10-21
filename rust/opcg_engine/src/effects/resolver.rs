@@ -261,7 +261,8 @@ pub fn push_effect_events(
     history: &[Value],
     trigger: Option<TriggerType>,
 ) {
-    if history.is_empty() {
+    // 捨てる区間（`Session::discard_events`）では組まない（積んでも捨てられる）。
+    if history.is_empty() || !s.events_on() {
         return;
     }
     let card_name = masters.get(s.state().card(source).master).name.clone();
@@ -859,11 +860,13 @@ impl Resolver {
         if let Some(query) = action_target {
             if targets.is_empty() && !query.is_up_to {
                 // Python の失敗履歴（`{"action":..,"success":False,"reason":"No targets found"}`）。
-                self.action_history.push(serde_json::json!({
-                    "action": action.ty.name(),
-                    "success": false,
-                    "reason": "No targets found",
-                }));
+                if s.events_on() {
+                    self.action_history.push(serde_json::json!({
+                        "action": action.ty.name(),
+                        "success": false,
+                        "reason": "No targets found",
+                    }));
+                }
                 record_effect_event(s);
                 return Ok(false);
             }
@@ -998,6 +1001,12 @@ impl Resolver {
         }
 
         // Python の実行履歴（`action_history`）。ドン!!（master 無し）は "DON!!" 表記。
+        // 履歴の行き先は `action_events` の EFFECT 行だけ（`push_effect_events`）＝イベントを捨てる
+        // 区間（`Session::discard_events`）では組まない。計数（`record_effect_event`）は常に行う。
+        if !s.events_on() {
+            record_effect_event(s);
+            return Ok(success);
+        }
         let target_names: Vec<Value> = targets
             .iter()
             .map(|t| match *t {

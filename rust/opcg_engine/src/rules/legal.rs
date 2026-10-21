@@ -34,14 +34,26 @@ pub fn get_legal_actions(
     seat: Seat,
 ) -> Result<Vec<Value>, EngineError> {
     // Python も合法手列挙は request_id を読まない高速パスで要求を取る。
-    let Some(pending) = get_pending_request(s, masters, false) else {
+    let pending = get_pending_request(s, masters, false);
+    get_legal_actions_for(s, masters, seat, pending.as_ref())
+}
+
+/// [`get_legal_actions`] の、要求（`get_pending_request(s, masters, false)` の値）を外から渡す版。
+/// 探索の候補生成（`search::adapter::legal_actions`）は同じ盤面の要求を対話の分岐にも使う＝1 回だけ作る。
+pub fn get_legal_actions_for(
+    s: &mut Session,
+    masters: &MasterTable,
+    seat: Seat,
+    pending: Option<&Value>,
+) -> Result<Vec<Value>, EngineError> {
+    let Some(pending) = pending else {
         return Ok(Vec::new());
     };
     // 要求先と異なるプレイヤーは合法手なし（手番/フェイズ外）。
-    if request_actor(&pending) != Some(seat) {
+    if request_actor(pending) != Some(seat) {
         return Ok(Vec::new());
     }
-    let action = request_action(&pending)
+    let action = request_action(pending)
         .ok_or_else(|| EngineError::BadPayload("pending: 'action' が読めない".into()))?
         .to_owned();
 
@@ -52,7 +64,7 @@ pub fn get_legal_actions(
         ]);
     }
     if action == ACT_SELECT_BLOCKER || action == ACT_SELECT_COUNTER {
-        let mut moves: Vec<Value> = selectable_uuids(&pending)
+        let mut moves: Vec<Value> = selectable_uuids(pending)
             .iter()
             .map(|u| battle_move(&action, Some(u)))
             .collect();
@@ -63,7 +75,7 @@ pub fn get_legal_actions(
         return main_actions(s.state(), masters, seat);
     }
     // 効果対話は「妥当な既定解決」を 1 手として返す。
-    let payload = default_interaction_payload(s.state(), masters, &pending);
+    let payload = default_interaction_payload(s.state(), masters, pending);
     Ok(vec![game_move("RESOLVE_EFFECT_SELECTION", payload)])
 }
 

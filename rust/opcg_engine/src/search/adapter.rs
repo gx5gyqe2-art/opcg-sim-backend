@@ -41,8 +41,16 @@ pub fn legal_actions(
     let Some((seat, _)) = pending_actor_action(s) else {
         return Ok(Vec::new());
     };
-    let base = crate::rules::legal::get_legal_actions(s, masters, seat)?;
-    let mut moves = merged_search_actions(s, masters, seat, base);
+    // 要求は 1 回だけ作り、合法手の列挙と対話の分岐の両方に渡す（`get_pending_request` が盤面に触るのは
+    // 冪等な戦闘フェイズの正規化だけ＝2 回目は 1 回目と同じ値を返す。間の列挙は盤面を読むだけ）。
+    let pending = get_pending_request(s, masters, false);
+    let base = crate::rules::legal::get_legal_actions_for(s, masters, seat, pending.as_ref())?;
+    // 対話の既定解決（列挙が返した唯一の RESOLVE 手の payload）は、対話の分岐の土台と同じ値。
+    let dialog_payload = match base.as_slice() {
+        [m] if action_type(m) == Some(ACT_RESOLVE_SELECTION) => m.get("payload").cloned(),
+        _ => None,
+    };
+    let mut moves = merged_search_actions_with(s, masters, seat, base, pending, dialog_payload);
 
     if opts.prune_futile {
         moves = prune::prune_don_moves(s.state(), masters, seat, moves, opts.don_margin);
@@ -113,7 +121,20 @@ pub fn merged_search_actions(
     seat: Seat,
     base_moves: Vec<Move>,
 ) -> Vec<Move> {
-    let Some(alts) = selection_moves(s, masters, seat) else {
+    let pending = get_pending_request(s, masters, false);
+    merged_search_actions_with(s, masters, seat, base_moves, pending, None)
+}
+
+/// [`merged_search_actions`] の、要求と（あれば）対話の既定解決の payload を外から渡す版。
+fn merged_search_actions_with(
+    s: &mut Session,
+    masters: &MasterTable,
+    seat: Seat,
+    base_moves: Vec<Move>,
+    pending: Option<Value>,
+    dialog_payload: Option<Value>,
+) -> Vec<Move> {
+    let Some(alts) = selection_moves_with(s, masters, seat, pending.as_ref(), dialog_payload.as_ref()) else {
         return base_moves;
     };
     if alts.is_empty() {
@@ -171,13 +192,33 @@ fn selectable_uuids(pending: &Value) -> Vec<String> {
 ///
 /// 無ければ `None`（＝`merged_search_actions` は `base_moves` をそのまま返す）。
 pub fn selection_moves(s: &mut Session, masters: &MasterTable, seat: Seat) -> Option<Vec<Move>> {
-    let pending = get_pending_request(s, masters, false)?;
-    if request_actor(&pending) != Some(seat) {
+    let pending = get_pending_request(s, masters, false);
+    selection_moves_with(s, masters, seat, pending.as_ref(), None)
+}
+
+/// [`selection_moves`] の、要求（`get_pending_request(s, masters, false)` の値）と、分かっていれば
+/// その既定解決の payload（`default_interaction_payload` の値）を外から渡す版。
+pub(crate) fn selection_moves_with(
+    s: &mut Session,
+    masters: &MasterTable,
+    seat: Seat,
+    pending: Option<&Value>,
+    base_payload: Option<&Value>,
+) -> Option<Vec<Move>> {
+    let pending = pending?;
+    if request_actor(pending) != Some(seat) {
         return None;
     }
-    let action = request_action(&pending)?.to_owned();
+    let action = request_action(pending)?.to_owned();
     let state = s.state();
-    let base = crate::effects::interact::default_interaction_payload(state, masters, Some(&pending));
+    let base: std::borrow::Cow<'_, Value> = match base_payload {
+        Some(b) => std::borrow::Cow::Borrowed(b),
+        None => std::borrow::Cow::Owned(crate::effects::interact::default_interaction_payload(
+            state,
+            masters,
+            Some(pending),
+        )),
+    };
 
     // 任意確認（任意コスト／任意効果の発動可否）: accept / decline を採点させる。
     if action == "CONFIRM_OPTIONAL"
@@ -191,7 +232,7 @@ pub fn selection_moves(s: &mut Session, masters: &MasterTable, seat: Seat) -> Op
 
     // 並び替え／上下選択: 「どれを先頭にするか」の回転 × 上/下だけを候補化する。
     if action == "ARRANGE_DECK" {
-        let uuids = selectable_uuids(&pending);
+        let uuids = selectable_uuids(pending);
         let allow_pos = pending.get("allow_position").and_then(Value::as_bool).unwrap_or(false);
         let allow_reorder = pending.get("allow_reorder").and_then(Value::as_bool).unwrap_or(false);
         if uuids.is_empty() || !(allow_pos || (allow_reorder && uuids.len() >= 2)) {
@@ -214,7 +255,7 @@ pub fn selection_moves(s: &mut Session, masters: &MasterTable, seat: Seat) -> Op
         let mut moves = Vec::new();
         for order in &orders {
             for position in &positions {
-                let mut payload = base.clone();
+                let mut payload = base.as_ref().clone();
                 if let Some(order) = order {
                     payload = with_field(&payload, "selected_uuids", json!(order));
                 }
@@ -230,7 +271,7 @@ pub fn selection_moves(s: &mut Session, masters: &MasterTable, seat: Seat) -> Op
     if action != SELECT_ACTION {
         return None;
     }
-    let uuids = selectable_uuids(&pending);
+    let uuids = selectable_uuids(pending);
     let constraints = pending.get("constraints");
     let min_n = constraints
         .and_then(|c| c.get("min"))
@@ -267,6 +308,71 @@ pub fn selection_moves(s: &mut Session, masters: &MasterTable, seat: Seat) -> Op
         return if moves.is_empty() { None } else { Some(moves) };
     }
     None
+}
+
+/// [`selection_moves`]`(...).is_some()`（Python `cpu_ai._selection_moves(...) is not None`・
+/// `stop_at_select` の判定だけを写す）を、読み終えた `pending`（`get_pending_request` の値）から出す。
+///
+/// 手そのものは使わないので、**候補が何手になるか**だけを数える（既定解決の payload も候補の
+/// 並べ替えも作らない）。ドレイン（`apply::drain_own_interactions`・符号化の登場時スキャン）が使う。
+pub fn selection_branch_exists(pending: &Value, actor: Seat) -> bool {
+    if pending.get("player_id").and_then(|v| v.as_str()) != Some(actor.name()) {
+        return false;
+    }
+    let action = pending.get("action").and_then(|v| v.as_str()).unwrap_or("");
+    let can_skip = pending
+        .get("can_skip")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if action == "CONFIRM_OPTIONAL" && can_skip {
+        return true; // accept / decline の 2 手
+    }
+    let uuids: Vec<&str> = pending
+        .get("selectable_uuids")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
+        .unwrap_or_default();
+    if action == "ARRANGE_DECK" {
+        let allow_pos = pending
+            .get("allow_position")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let allow_reorder = pending
+            .get("allow_reorder")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        if uuids.is_empty() || !(allow_pos || (allow_reorder && uuids.len() >= 2)) {
+            return false;
+        }
+        let n_orders = if allow_reorder && uuids.len() >= 2 {
+            1 + uuids.len().min(HARD_SELECT_CAP) - 1
+        } else {
+            1
+        };
+        let n_pos = if allow_pos { 2 } else { 1 };
+        return n_orders * n_pos >= 2;
+    }
+    if action != SELECT_ACTION || uuids.is_empty() {
+        return false;
+    }
+    let constraints = pending.get("constraints");
+    let min_n = constraints
+        .and_then(|c| c.get("min"))
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let max_n = constraints
+        .and_then(|c| c.get("max"))
+        .and_then(|v| v.as_i64())
+        .unwrap_or(uuids.len() as i64);
+    if max_n == 1 && min_n <= 1 {
+        return true;
+    }
+    if max_n >= 2 && (0..=max_n).contains(&min_n) {
+        let hi = max_n.min(uuids.len() as i64);
+        let lo = min_n.max(0);
+        return lo <= hi;
+    }
+    false
 }
 
 /// Python `cpu_ai._rank_select_candidates`（自分＝価値の低い順／相手＝価値の高い順）。

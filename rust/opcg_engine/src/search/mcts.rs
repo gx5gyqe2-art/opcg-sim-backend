@@ -444,7 +444,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         s: &mut Session,
         st: &mut SearchState,
         to_move: Seat,
-        trunk: Option<&(Seat, crate::net::Trunk)>,
+        trunk: Option<&super::quiesce::SeatTrunk>,
     ) -> Result<f64, EngineError> {
         let ctx = self.ctx;
         let rollout = ctx.opts.leaf_rollout == LeafRollout::TurnEnd;
@@ -454,8 +454,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             return ctx.value_reusing(s, to_move, trunk);
         }
         let rng_state = s.rng.snapshot();
-        let saved = s.swap_events(Vec::new());
-        let out = s.transaction(|s| -> Result<f64, EngineError> {
+        let out = s.discard_events(|s| s.transaction(|s| -> Result<f64, EngineError> {
             if resolve_windows {
                 if ctx.box_dialog && in_dialog(s) && !in_battle(s) {
                     resolve_battle_inplace(
@@ -485,8 +484,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
                 record_rollout(plies, capped);
             }
             ctx.value(s, to_move)
-        });
-        s.swap_events(saved);
+        }));
         s.rng.restore(&rng_state);
         out
     }
@@ -550,10 +548,10 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
     ) -> Result<f64, EngineError> {
         let masters = self.ctx.masters;
         let to_move = self.nodes[node].to_move.expect("降下は手番のあるノードから");
-        let mv = self.nodes[node].legal[a].clone();
-        let saved = s.swap_events(Vec::new());
-        let out = s.transaction(|s| -> Result<f64, EngineError> {
-            let dead = match apply::apply_move_inplace(s, masters, to_move, &mv, true) {
+        s.discard_events(|s| s.transaction(|s| -> Result<f64, EngineError> {
+            // 手は複製せずに借りる（借用は適用が終われば切れる＝下の木の書き換えとは重ならない）。
+            let applied = apply::apply_move_inplace(s, masters, to_move, &self.nodes[node].legal[a], true);
+            let dead = match applied {
                 Ok(()) => false,
                 Err(e @ EngineError::Unimplemented(_)) => return Err(e),
                 Err(_) => true, // Python の `except Exception: dead = True`
@@ -570,9 +568,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
                 }
             };
             self.simulate(child, s, st)
-        });
-        s.swap_events(saved);
-        out
+        }))
     }
 
     /// Python `TreeMCTS._simulate`（node 手番視点の value を返す）。

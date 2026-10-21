@@ -96,7 +96,10 @@ def run_game(seed: int, seats: Dict[str, "E.SeatSpec"], p1: tuple, p2: tuple,
         spec = seats[name]
         turn = int(game.turn_count or 0)
         carry = carries[name].get(turn, name)
-        out = json.loads(game.decide(name, spec.decide_opts(seed, turn, name, carry)))
+        out = E.decide_with_rethink(lambda o: game.decide(name, o),
+                                    spec.decide_opts(seed, turn, name, carry),
+                                    getattr(spec, "rethink_ratio", None),
+                                    getattr(spec, "rethink_worlds", E.PLAY_RETHINK_WORLDS))
         move = out.get("move")
         if move is None:
             carries[name].put(out)
