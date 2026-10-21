@@ -38,6 +38,10 @@ OUT_DIR = os.path.join("n1_results", "lethal_audit")
 MAIN = "MAIN_ACTION"
 
 
+#: 1 本の手順の深さの上限（このターンの残りの手＋相手の応手＋対話。超えたら判定不能）。
+MAX_DEPTH = 300
+
+
 class Unknown(Exception):
     """時間・節点の上限を超えた（判定不能）。"""
 
@@ -187,6 +191,8 @@ class Solver:
         self.full_don = full_don
         self.use_bound = use_bound
         self.bound_cuts = 0
+        self.too_deep = False
+        self.crash = None
         self.deadline = time.perf_counter() + seconds
         self.max_nodes = max_nodes
         self.nodes = 0
@@ -225,7 +231,7 @@ class Solver:
                if m.get("action_type") == "ATTACK" and _target(m) == self.opp_leader}
         return len(att) < need
 
-    def _solve(self, game, commit: Optional[str]) -> bool:
+    def _solve(self, game, commit: Optional[str], depth: int = 0) -> bool:
         w = game.winner()
         if w is not None:
             return w == self.me
@@ -241,6 +247,10 @@ class Solver:
         if key is not None and key in self.tt:
             return self.tt[key]
         self.nodes += 1
+        if depth > MAX_DEPTH:
+            # 同じ対話が回り続ける等の深すぎる手順（2026-10-21 の本番で RecursionError が出た）＝判定不能
+            self.too_deep = True
+            raise Unknown()
         if self.nodes > self.max_nodes or time.perf_counter() > self.deadline:
             raise Unknown()
         moves = expand(game, actor, pend)
@@ -279,7 +289,7 @@ class Solver:
             nxt = None
             if mine and mv.get("action_type") == "ATTACH_DON" and not self.full_don:
                 nxt = (mv.get("payload") or {}).get("uuid")
-            r = self._solve(child, nxt)
+            r = self._solve(child, nxt, depth + 1)
             if mine and r:
                 res = True
                 self.best[key] = mv
@@ -343,7 +353,14 @@ def judge(game, me: str, seconds: float, max_nodes: int, memo: Optional[Dict[str
         r: Optional[bool] = s.win(game.fork())
     except Unknown:
         r = None
+    except Exception as exc:  # noqa: BLE001  判定器の例外で計測を止めない（判定不能として数える）
+        r = None
+        s.crash = f"{type(exc).__name__}: {exc}"[:200]
     out = {"res": r, "nodes": s.nodes, "sec": round(time.perf_counter() - t0, 3), "errors": s.errors}
+    if s.too_deep:
+        out["too_deep"] = True
+    if s.crash:
+        out["crash"] = s.crash
     if r:
         out["line"] = s.line(game)
     return out
@@ -390,7 +407,12 @@ def judge_otsu(game, me: str, seconds: float, max_nodes: int, n_rand: int, seed:
     per = []
     for m in modes:
         h = redeal(hidden, opp, m, rng)
-        g = E.engine().Game.from_hidden(json.dumps(h, ensure_ascii=False), "p1", "p2", None)
+        try:
+            g = E.engine().Game.from_hidden(json.dumps(h, ensure_ascii=False), "p1", "p2", None)
+        except Exception as exc:  # noqa: BLE001
+            per.append({"mode": m, "res": None, "crash": str(exc)[:200]})
+            res = None
+            continue
         j = judge(g, me, seconds, max_nodes, None, char_attacks)
         j.pop("line", None)
         j["mode"] = m
