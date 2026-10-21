@@ -15,7 +15,7 @@
   ]
  },
  "metrics": {
-  "arena_rdnet/rdnet_w04.jsonl": 80
+  "arena_rdnet/rdnet_w04.jsonl": 90
  },
  "notes": "run in /home/user/opcg-sim-backend (existing clone) instead of ~/opcg-sim-backend"
 }
