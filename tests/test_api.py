@@ -176,6 +176,28 @@ def test_cpu_step_contract(client):
     assert body["waiting_for"] in ("cpu", "human", "human_decision", "game_over")
 
 
+def test_cpu_step_uses_play_search_settings(client, monkeypatch):
+    """対戦 API の CPU は出荷の探索設定（`PLAY_SIMS`／`PLAY_BUDGET`／`PLAY_WORLDS`）で読む。
+    出荷の設定が気づかないうちに変わる（世界の本数が渡らず 1 本に戻る等）のを見張る。"""
+    from opcg_sim.api import engine_rs
+    from opcg_sim.loop import engine as E
+    assert E.PLAY_WORLDS == 2  # 2026-10-21 ユーザ決定（世界 2 本 × 1,280 回）
+    seen = []
+    orig = engine_rs.RsGame.decide
+
+    def spy(self, player_id, *a, **kw):
+        seen.append(kw)
+        return orig(self, player_id, *a, **kw)
+
+    monkeypatch.setattr(engine_rs.RsGame, "decide", spy)
+    gid = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="hard").json()["game_id"]
+    _drive_full_or_cap(client, gid, cap=40)
+    assert seen, "CPU が一度も読まなかった"
+    kw = seen[0]
+    assert kw.get("worlds") == E.PLAY_WORLDS
+    assert kw.get("sims") == E.PLAY_SIMS and kw.get("budget") == E.PLAY_BUDGET
+
+
 def test_cpu_step_on_non_cpu_game(client):
     gid = _create_game(client).json()["game_id"]  # 通常対局（CPU ではない）
     r = client.post("/api/game/cpu/step", json={"game_id": gid})

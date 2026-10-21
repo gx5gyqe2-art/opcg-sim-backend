@@ -40,6 +40,11 @@ SERVE_SIMS = 160
 #: `SERVE_SIMS`／既定の予算のまま（ここを触っても学習側は変わらない）。0＝予算なし。
 PLAY_SIMS = 1280
 PLAY_BUDGET = 0
+#: 対戦 API の CPU が 1 回の決定で引く世界（相手の手札・山札の並びの引き直し）の本数。
+#: 2026-10-21 ユーザ決定「b でお願いします」: 世界 2 本 × 1,280 回（同じ seed 帯の 1,438 ペアで +18.1 Elo・
+#: 世界 4 本／8 本・5,120 回／10,240 回とは組の差が有意でない＝計算 ×2 で頭打ち・1 コアの 1 手平均 0.24 秒・最大 2.2 秒。
+#: `docs/reports/2026-10-21_phase5_curve.md`・`2026-10-21_phase6_materials.md`）。生成・アリーナの物差しは 1 本のまま。
+PLAY_WORLDS = 2
 #: 対戦 API の「迷う局面だけ世界 K 本で読み直す」（`docs/search_efficiency_plan.md` §7.4・WP
 #: `play-rethink`）。根の 2 位の訪問数 ÷ 1 位の訪問数が `PLAY_RETHINK_RATIO` 以上なら、同じ
 #: `search_seed` で世界 `PLAY_RETHINK_WORLDS` 本の読みをやり直してその手に差し替える。
