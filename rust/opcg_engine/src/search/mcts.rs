@@ -195,6 +195,33 @@ pub fn principal_variation_of(nodes: &[Node], first: Option<usize>, max_len: usi
     out
 }
 
+/// 木の中の相手に「こちらの手札」を見せない（`search_efficiency_plan.md` §7.14・**測定専用**）。
+///
+/// [`TreeMcts::expand`] が `me` 以外の席の番のノードを展開するとき、評価に使う盤面だけを
+/// [`determinize_self_with`](super::determinize::determinize_self_with)（`me` の手札＋山札＋裏向きの
+/// ライフを 1 つの山として混ぜ直した複製）に差し替える。合法手は本当の世界で作り、木の降下・手の
+/// 適用も本当の世界のまま＝木の整合は崩さない。
+pub struct OppBlind {
+    /// 探索している席（＝隠す側）
+    pub me: Seat,
+    /// 混ぜ直しの乱数（世界ごとに決定的・[`opp_blind_seed`](super::decide::opp_blind_seed) から作る）
+    rng: super::rng::Pcg32SearchRng,
+}
+
+impl OppBlind {
+    pub fn new(me: Seat, seed: u64) -> OppBlind {
+        OppBlind { me, rng: super::rng::Pcg32SearchRng::new(seed) }
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// テスト用: `opp_blind` で展開した相手ノードの (本当の盤面, 評価に使った盤面, 合法手, 展開後の本当の盤面)。
+    pub(in crate::search) static BLIND_TRACE: std::cell::RefCell<
+        Option<Vec<(GameState, GameState, Vec<Move>, GameState)>>,
+    > = const { std::cell::RefCell::new(None) };
+}
+
 /// 木の探索（Python `TreeMCTS`）。
 pub struct TreeMcts<'a, 'b> {
     pub ctx: &'a Ctx<'b>,
@@ -208,6 +235,8 @@ pub struct TreeMcts<'a, 'b> {
     pub q_min_frac: f64,
     /// 根の事前分布の平坦化（§20.5・既定 1.0＝何もしない）。
     pub root_prior_temp: f64,
+    /// 木の中の相手にこちらの手札を見せない（§7.14・既定 `None`＝今までどおり）。
+    pub opp_blind: Option<OppBlind>,
     nodes: Vec<Node>,
 }
 
@@ -222,6 +251,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             select_rule: SelectRule::Visits,
             q_min_frac: Q_MIN_FRAC,
             root_prior_temp: 1.0,
+            opp_blind: None,
             nodes: Vec::new(),
         }
     }
@@ -349,9 +379,51 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         }
         let to_move = ctx.current_player(s);
         self.nodes[node].to_move = to_move;
-        let mut legal = ctx.legal_actions(s)?;
-        let mut leaf_v: Option<f64> = None;
+        let legal = ctx.legal_actions(s)?;
         let to_move_seat = to_move.expect("非終局なら手番が居る");
+
+        // §7.14 `opp_blind`: 相手の番のノードは、評価（箱の畳み・事前分布・葉の価値）だけを
+        // こちらの隠れ札を混ぜ直した複製の上で行う。合法手は上で本当の世界から作った。
+        // 盤面の乱数（CRN）は複製へ貸して、評価の後に基準へ戻す（評価の各経路も元から戻している）。
+        let blinded = match self.opp_blind.as_mut() {
+            Some(b) if b.me != to_move_seat => Some(super::determinize::determinize_self_with(
+                s.state(),
+                b.me,
+                &mut b.rng,
+            )?),
+            _ => None,
+        };
+        let Some(world) = blinded else {
+            return self.expand_eval(node, legal, to_move_seat, s, st);
+        };
+        #[cfg(test)]
+        let trace = BLIND_TRACE.with(|t| t.borrow().is_some()).then(|| (s.state().clone(), world.clone(), legal.clone()));
+        let base_rng = s.rng.snapshot();
+        let mut b = Session::new(world);
+        b.rng = std::mem::take(&mut s.rng);
+        let out = b.discard_events(|b| self.expand_eval(node, legal, to_move_seat, b, st));
+        s.rng = std::mem::take(&mut b.rng);
+        s.rng.restore(&base_rng);
+        #[cfg(test)]
+        if let Some((real, w, l)) = trace {
+            let after = s.state().clone();
+            BLIND_TRACE.with(|t| t.borrow_mut().as_mut().map(|v| v.push((real, w, l, after))));
+        }
+        out
+    }
+
+    /// [`expand`](Self::expand) の評価の部分（箱の畳み・事前分布・葉の価値）。`s` は評価に使う盤面
+    /// （既定では本当の世界そのもの・§7.14 の相手ノードでは混ぜ直した複製）、`legal` は本当の世界の合法手。
+    fn expand_eval(
+        &mut self,
+        node: usize,
+        mut legal: Vec<Move>,
+        to_move_seat: Seat,
+        s: &mut Session,
+        st: &mut SearchState,
+    ) -> Result<f64, EngineError> {
+        let ctx = self.ctx;
+        let mut leaf_v: Option<f64> = None;
 
         // 木の中の箱化（`TREE_BOX_BATTLE`）: 戦闘窓は出口 value 最良の 1 手へ畳む。
         if ctx.box_battle && legal.len() > 1 && in_battle(s) {

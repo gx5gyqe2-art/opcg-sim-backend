@@ -203,3 +203,19 @@ pub fn determinize_fair_with(
     reshuffle_slots(&mut out, &mine, rng)?;
     Ok(out)
 }
+
+/// `opp_blind`（`search_efficiency_plan.md` §7.14・WP `rs-oppblind`・測定専用）: **相手から見えない
+/// こちらの札**＝`me` の手札＋山札＋裏向きのライフを 1 つの山として混ぜ直す（`fair` の自分側と同じ作り
+/// に、相手から見えない手札を足したもの）。相手の側・表向きのライフ（位置と中身）・公開領域・各ゾーンの
+/// 枚数は動かさない。山が空なら乱数を消費しない。
+pub fn determinize_self_with(
+    state: &GameState,
+    me: Seat,
+    rng: &mut dyn crate::search::rng::SearchRng,
+) -> Result<GameState, EngineError> {
+    let _prof = crate::prof::enter(crate::prof::Cat::Determinize);
+    let mut out = state.clone();
+    let mine = hidden_slots(state, me, true, true, true);
+    reshuffle_slots(&mut out, &mine, rng)?;
+    Ok(out)
+}

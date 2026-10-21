@@ -411,6 +411,9 @@ impl Game {
     ///   世界 i の乱数は `search_seed + i`。
     /// - `omniscient`（省略＝false）… 全部見える探索（`search_efficiency_plan.md` §7.10・測定専用）。
     ///   true なら世界を引き直さず本当の盤面で読む（`worlds` は 1 扱い）。
+    /// - `reveal`（省略＝今までどおり）… 見える範囲を分けた世界サンプル（§7.11・`"opp_hand"`／`"fair"`）。
+    /// - `opp_blind`（省略＝false）… 木の中の相手にこちらの手札を見せない（§7.14・測定専用）。
+    ///   相手の番のノードの評価だけ、こちらの手札＋山札＋裏向きのライフを混ぜ直した複製で行う。
     ///
     /// 木を回す間は **GIL を放す**（`Python::detach`＝旧 `allow_threads`）＝世界スレッドが
     /// 走っている間も他の Python スレッド（API のリクエスト処理）が動ける。探索は Python を

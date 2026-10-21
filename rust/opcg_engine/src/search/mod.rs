@@ -634,6 +634,8 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .and_then(Value::as_str)
             .and_then(decide::Reveal::from_name)
             .unwrap_or(d.reveal),
+        // 木の中の相手にこちらの手札を見せない（§7.14・測定専用・既定 false）。
+        opp_blind: flag("opp_blind", d.opp_blind),
     }
 }
 
