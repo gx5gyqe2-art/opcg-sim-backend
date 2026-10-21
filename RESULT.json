@@ -15,7 +15,7 @@
   ]
  },
  "metrics": {
-  "arena_rdw2/rdw2_w10.jsonl": 10
+  "arena_rdw2/rdw2_w10.jsonl": 20
  },
  "notes": "CODE 欄が「本線」だったため claude/cpu-spec-improvements-yw91jd を使用（--cand-worlds / decks user をこのブランチが持つことを確認済み）"
 }
