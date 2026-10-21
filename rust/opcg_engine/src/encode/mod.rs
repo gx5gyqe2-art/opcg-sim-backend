@@ -19,7 +19,6 @@ use crate::effects::ast::{EffectNode, GameAction};
 use crate::journal::Session;
 use crate::model::{GameState, MasterTable, Seat};
 use crate::state::EngineError;
-use std::collections::HashMap;
 
 /// `encoder.scalars_dim(14)`＝94（v12）＋33（`n_rel_feat.EXTRA_DIM`）。
 ///
@@ -92,12 +91,12 @@ pub fn walk_all<'a>(node: Option<&'a EffectNode>, out: &mut Vec<&'a GameAction>)
 #[derive(Debug, Clone, Default)]
 pub struct Vocab {
     pub ids: Vec<String>,
-    pub index: HashMap<String, u32>,
+    pub index: crate::fxhash::FxHashMap<String, u32>,
 }
 
 impl Vocab {
     pub fn from_ids(ids: &[String]) -> Vocab {
-        let mut index = HashMap::new();
+        let mut index = crate::fxhash::FxHashMap::default();
         for (i, id) in ids.iter().enumerate() {
             index.insert(id.clone(), (i + 1) as u32); // Python `vocab_from_ids`: 1 始まり・0 は PAD
         }

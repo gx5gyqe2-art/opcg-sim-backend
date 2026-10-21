@@ -232,7 +232,7 @@ pub(crate) fn selection_moves_with(
 
     // 並び替え／上下選択: 「どれを先頭にするか」の回転 × 上/下だけを候補化する。
     if action == "ARRANGE_DECK" {
-        let uuids = selectable_uuids(&pending);
+        let uuids = selectable_uuids(pending);
         let allow_pos = pending.get("allow_position").and_then(Value::as_bool).unwrap_or(false);
         let allow_reorder = pending.get("allow_reorder").and_then(Value::as_bool).unwrap_or(false);
         if uuids.is_empty() || !(allow_pos || (allow_reorder && uuids.len() >= 2)) {
@@ -271,7 +271,7 @@ pub(crate) fn selection_moves_with(
     if action != SELECT_ACTION {
         return None;
     }
-    let uuids = selectable_uuids(&pending);
+    let uuids = selectable_uuids(pending);
     let constraints = pending.get("constraints");
     let min_n = constraints
         .and_then(|c| c.get("min"))

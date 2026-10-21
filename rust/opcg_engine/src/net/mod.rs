@@ -16,7 +16,6 @@ use crate::encode::{
 };
 use crate::state::EngineError;
 use serde_json::{json, Value};
-use std::collections::HashSet;
 use std::sync::OnceLock;
 
 pub const D_STRUCT: usize = 64;
@@ -64,8 +63,8 @@ pub struct NRelWeights {
     pub wp1: Mat, pub bp1: Vec<f32>,
     pub wp2: Mat, pub bp2: Vec<f32>,
     pub hidden: usize,
-    /// meta の `ablate`（"rel"／"opp_pool"／"onplay"）。
-    pub ablate: HashSet<String>,
+    /// meta の `ablate`（"rel"／"opp_pool"／"onplay"）。高々数件＝順序木（引くのは文字列の比較だけ・ハッシュを回さない）。
+    pub ablate: std::collections::BTreeSet<String>,
     /// meta（JSON 文字列そのまま）。
     pub meta_json: String,
     /// `vocab_ids`（index 1.. の card_id）。
@@ -111,7 +110,7 @@ pub fn load_npz(path: &str) -> Result<NRelWeights, EngineError> {
         None => String::new(),
     };
     // meta の `ablate`（JSON 文字列。壊れていても落とさない＝Python の `except` と同じ）
-    let mut ablate = HashSet::new();
+    let mut ablate = std::collections::BTreeSet::new();
     let mut enc_version = ENC_VERSION_V13;
     if let Ok(Value::Object(m)) = serde_json::from_str::<Value>(&meta_json) {
         if let Some(Value::Array(a)) = m.get("ablate") {

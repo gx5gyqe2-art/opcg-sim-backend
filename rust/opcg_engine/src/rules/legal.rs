@@ -50,10 +50,10 @@ pub fn get_legal_actions_for(
         return Ok(Vec::new());
     };
     // 要求先と異なるプレイヤーは合法手なし（手番/フェイズ外）。
-    if request_actor(&pending) != Some(seat) {
+    if request_actor(pending) != Some(seat) {
         return Ok(Vec::new());
     }
-    let action = request_action(&pending)
+    let action = request_action(pending)
         .ok_or_else(|| EngineError::BadPayload("pending: 'action' が読めない".into()))?
         .to_owned();
 

@@ -369,10 +369,12 @@ type TokMap = FxHashMap<TokKey, std::rc::Rc<TokFeat>>;
 
 /// 幹のキャッシュ: 鍵（[`trunk_key_into`] の語の列）のハッシュ → (鍵, 幹)。[`trunk_impl`] は鍵の語だけの関数
 /// ＝同じ鍵なら同じ幹（同じ演算を同じ順で行った結果そのもの）。一致は鍵の語の全一致で確かめる。
+type TrunkGen = FxHashMap<u64, Vec<(Box<[u32]>, Rc<Trunk>)>>;
+
 #[derive(Default)]
 struct TrunkCache {
-    cur: FxHashMap<u64, Vec<(Box<[u32]>, Rc<Trunk>)>>,
-    old: FxHashMap<u64, Vec<(Box<[u32]>, Rc<Trunk>)>>,
+    cur: TrunkGen,
+    old: TrunkGen,
     n_cur: usize,
     /// 鍵を組む作業場（引くたびに使い回す）
     scratch: Vec<u32>,

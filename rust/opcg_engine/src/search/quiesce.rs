@@ -133,6 +133,9 @@ pub struct SearchState {
 
 // --- 評価器（value／priors）の文脈 ----------------------------------------------
 
+/// 展開で作った幹とその席（同じ盤面の価値に使い回す）。
+pub type SeatTrunk = (Seat, std::rc::Rc<crate::net::Trunk>);
+
 /// 探索が触る「盤面以外」＝カード表・ネット・候補生成の設定。
 pub struct Ctx<'a> {
     pub masters: &'a MasterTable,
@@ -229,7 +232,7 @@ impl<'a> Ctx<'a> {
         &self,
         s: &mut Session,
         to_move: Seat,
-        trunk: Option<&(Seat, std::rc::Rc<crate::net::Trunk>)>,
+        trunk: Option<&SeatTrunk>,
     ) -> Result<f64, EngineError> {
         if let Some(w) = s.state().winner {
             return Ok(if w == to_move { 1.0 } else { -1.0 });
@@ -296,7 +299,7 @@ impl<'a> Ctx<'a> {
         &self,
         s: &mut Session,
         legal: &[Move],
-    ) -> Result<(Option<Vec<f32>>, Option<(Seat, std::rc::Rc<crate::net::Trunk>)>), EngineError> {
+    ) -> Result<(Option<Vec<f32>>, Option<SeatTrunk>), EngineError> {
         if legal.is_empty() {
             return Ok((None, None));
         }
