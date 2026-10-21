@@ -1,111 +1,171 @@
 {
- "job": "rs-speed-a",
- "role": "engine-speed",
+ "job": "speed-merge",
+ "role": "engine-speed-merge",
  "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.2 (origin/claude/cpu-spec-improvements-yw91jd @ 66266aa6)",
+ "spec": "docs/search_efficiency_plan.md §7.6 (origin/claude/cpu-spec-improvements-yw91jd @ dadd89e; ledger 2+299)",
  "inputs": {
-  "base_commit": "66266aa6223b2ecaec0e6427a15cc7591444fcc1",
-  "base_branch": "claude/cpu-spec-improvements-yw91jd",
-  "net": "default (opcg_sim/loop/engine.py::DEFAULT_NET = nrel_r13d.npz)",
-  "positions": "rs_decide_latency.py seeds 2999900.. (leader_pair random, decks synth_roles)"
+  "mainline": "claude/cpu-spec-improvements-yw91jd @ dadd89e3",
+  "rs-speed-a": "claude/rs-speed-a @ eb00b6134",
+  "rs-speed-b": "claude/rs-speed-b @ 6ff385e72",
+  "play-rethink": "claude/play-rethink @ 085308bf0",
+  "net": "default (opcg_sim/loop/engine.py::DEFAULT_NET = nrel_r13d.npz)"
  },
  "outputs": {
-  "branch": "claude/rs-speed-a",
-  "commits": [
-   "07bff71 trunk reuse for identical encodings + fx hasher + no-copy selection_entries",
-   "cf613e5 policy-logit memo, fx maps in encode caches, in-place on-play probe, passive recalc / legal copies",
-   "5fedeec set-based selection_entries, one pending + default payload per drain step",
-   "19259fa fx vocab map, ordered set for ablate, clippy tidy"
+  "branch": "claude/speed-merge",
+  "merge_order": "mainline <- rs-speed-a (clean) <- rs-speed-b (8 conflicts) <- play-rethink (RESULT.json only)",
+  "conflicts_resolved": {
+   "rust/opcg_engine/src/journal.rs": "both added Undo::DonPush + StateMut::push_don (same semantics): kept one variant (B's comment / placement), dropped A's duplicate push_don and duplicate apply_undo arm",
+   "rust/opcg_engine/src/encode/mod.rs": "A's crate::fxhash::FxHashMap for Vocab kept; B's Fnv hasher + FastMap alias removed (all their users switched to Fx)",
+   "rust/opcg_engine/src/encode/leader.rs": "LeaderCache map: A's FxHashMap",
+   "rust/opcg_engine/src/encode/tokens.rs": "ProfileCache: B's dense slot[mi] index (no hashing; supersedes A's Fx map); relation comment from A",
+   "rust/opcg_engine/src/encode/scalars.rs": "both had moved the on-play probe in-place (Session::isolated + journaled temp DON!!): kept B's push_temp_dons / main_for(pending_actor_action), dropped A's add_temp_dons",
+   "rust/opcg_engine/src/search/apply.rs": "drain_own_interactions: pending read once (both); stop_at_select test = B's adapter::selection_branch_exists before building the default payload (A's later selection_moves_with check removed as redundant — same predicate)",
+   "rust/opcg_engine/src/search/quiesce.rs": "B's MoveRef/PayloadRef cand_owned + UuidMap alias kept, UuidMap now = crate::fxhash::FxHashMap (was B's FastMap); A's rel zero-fill skip and B's are the same check (kept B's form)",
+   "RESULT.json": "replaced by this file"
+  },
+  "auto_merged_with_both_sides": [
+   "search/mcts.rs",
+   "search/adapter.rs",
+   "effects/resolver.rs",
+   "rules/actions.rs",
+   "search/mod.rs",
+   "net/nrel.rs (A only)",
+   "rules/legal.rs (A only)",
+   "effects/interact.rs (A only)",
+   "effects/passives.rs (A only)",
+   "fxhash.rs (A, new)"
   ],
-  "changed_files": [
-   "rust/opcg_engine/src/fxhash.rs (new)",
-   "rust/opcg_engine/src/lib.rs",
-   "rust/opcg_engine/src/net/nrel.rs",
-   "rust/opcg_engine/src/net/mod.rs",
-   "rust/opcg_engine/src/prof.rs",
-   "rust/opcg_engine/src/search/quiesce.rs",
-   "rust/opcg_engine/src/search/mcts.rs",
-   "rust/opcg_engine/src/search/adapter.rs",
-   "rust/opcg_engine/src/search/apply.rs",
-   "rust/opcg_engine/src/rules/legal.rs",
-   "rust/opcg_engine/src/effects/interact.rs",
-   "rust/opcg_engine/src/effects/passives.rs",
-   "rust/opcg_engine/src/encode/mod.rs",
-   "rust/opcg_engine/src/encode/scalars.rs",
-   "rust/opcg_engine/src/encode/tokens.rs",
-   "rust/opcg_engine/src/encode/leader.rs",
-   "rust/opcg_engine/src/journal.rs"
-  ]
+  "rethink_files": "opcg_sim/api/*, opcg_sim/loop/{engine,arena,arena_shard,driver}.py, tests/test_play_rethink.py, tests/scripts/rs_rethink_sweep.py, docs/TEST_SPEC.md (merged without conflict)"
+ },
+ "gates": {
+  "make_rust_develop": "ok (installed .so md5 0b00118f39bea08247efe4a7cc27eb97 == the wheel used for the equality dump)",
+  "make_test": "green: cargo 572 passed / 1 ignored; pytest 847 passed, 13 skipped (goldens and test_play_rethink ran, 15 passed)",
+  "make_audit_cross": "240 games, void 0 (wr 0.5333 = mirror noise, not a judgement)",
+  "clippy": "1 pre-existing warning in ops.rs (untouched)"
  },
  "metrics": {
   "equality": {
-   "method": "decide output JSON (move, legal, n, q, p, groups, pv, budget, commit, k, kind ...) of every decision + events_json and board hash after every applied move, written as sort_keys JSONL with the pre-change wheel and with each post-change wheel, compared line by line",
+   "method": "driver.run_game with observer (every decide output JSON) + post (events_json + md5 of board_json after every applied move), sort_keys JSONL; mainline = worktree @ dadd89e with its own wheel, merged = this branch with its wheel; compared line by line",
+   "seeds": "2999900.. (leader_pair random, decks synth_roles), same as rs_decide_latency.py",
    "settings": {
-    "1x1280_budget0": {"games": 6, "decides": 730},
-    "4x1280_budget0": {"games": 3, "decides": 371},
-    "1x160_budget_default": {"games": 10, "decides": 1153}
+    "1x1280_budget0": {
+     "games": 8,
+     "decides": 956,
+     "lines": 1928,
+     "mismatch": 0
+    },
+    "4x1280_budget0": {
+     "games": 4,
+     "decides": 480,
+     "lines": 968,
+     "mismatch": 0
+    },
+    "1x160_budget_default": {
+     "games": 12,
+     "decides": 1390,
+     "lines": 2804,
+     "mismatch": 0
+    }
    },
-   "decides_total": 2254,
-   "lines_total": 4546,
-   "mismatch": {"v1_07bff71": 0, "v2_cf613e5_part": 0, "v3_cf613e5": 0, "v4_5fedeec": 0, "final_19259fa": 0},
-   "final_wheel_md5": "61c685cac2336f82abf535daac467cf8 (the wheel `make rust-develop` installed for the gates is byte-identical to the one checked)"
+   "decides_total": 2826,
+   "lines_total": 5700,
+   "mismatch_total": 0
   },
   "latency_1core": {
-   "how": "taskset -c 0 (before) and taskset -c 1 (after) run side by side; rs_decide_latency.py --budget 0 --games 8, same seeds",
+   "how": "taskset -c N (4 runs side by side on cores 0-3, one per core; 4 worlds share one core), rs_decide_latency.py --budget 0 --games 8, same seeds",
    "1x1280": {
-    "before": {"mean": 0.297, "p50": 0.006, "p90": 0.778, "p99": 1.993, "max": 3.33, "wall_sec": 284.1, "moves": 956},
-    "after":  {"mean": 0.197, "p50": 0.004, "p90": 0.524, "p99": 1.224, "max": 2.15, "wall_sec": 188.8, "moves": 956},
-    "speedup_wall": 1.50
+    "mainline": {
+     "moves": 956,
+     "mean": 0.292,
+     "p50": 0.006,
+     "p90": 0.764,
+     "p99": 2.003,
+     "max": 3.36,
+     "wall_sec": 279.3,
+     "affinity": [
+      2
+     ]
+    },
+    "merged": {
+     "moves": 956,
+     "mean": 0.146,
+     "p50": 0.003,
+     "p90": 0.391,
+     "p99": 0.96,
+     "max": 1.67,
+     "wall_sec": 139.4,
+     "affinity": [
+      3
+     ]
+    },
+    "speedup_wall": 2.0,
+    "speedup_mean": 2.0
    },
    "4x1280": {
-    "before": {"mean": 1.239, "p50": 0.004, "p90": 3.005, "p99": 9.303, "max": 13.38, "wall_sec": 1229.0, "moves": 992},
-    "after":  {"mean": 0.852, "p50": 0.003, "p90": 2.059, "p99": 5.968, "max": 8.73, "wall_sec": 845.4, "moves": 992},
-    "speedup_wall": 1.45
+    "mainline": {
+     "moves": 992,
+     "mean": 1.192,
+     "p50": 0.004,
+     "p90": 2.913,
+     "p99": 9.125,
+     "max": 12.73,
+     "wall_sec": 1182.8,
+     "affinity": [
+      0
+     ]
+    },
+    "merged": {
+     "moves": 992,
+     "mean": 0.638,
+     "p50": 0.003,
+     "p90": 1.559,
+     "p99": 4.988,
+     "max": 7.12,
+     "wall_sec": 633.3,
+     "affinity": [
+      1
+     ]
+    },
+    "speedup_wall": 1.87,
+    "speedup_mean": 1.87
+   },
+   "1x5120": {
+    "mainline": {
+     "moves": 1064,
+     "mean": 1.085,
+     "p50": 0.003,
+     "p90": 3.045,
+     "p99": 5.752,
+     "max": 7.78,
+     "wall_sec": 1154.7,
+     "affinity": [
+      2
+     ]
+    },
+    "merged": {
+     "moves": 1064,
+     "mean": 0.543,
+     "p50": 0.002,
+     "p90": 1.531,
+     "p99": 2.902,
+     "max": 3.84,
+     "wall_sec": 578.4,
+     "affinity": [
+      3
+     ]
+    },
+    "speedup_wall": 2.0,
+    "speedup_mean": 2.0
    }
-  },
-  "prof_1x1280_2games_sec": {
-   "how": "OPCG_PROF=1, taskset -c 2 / -c 3, 2 games, same seeds",
-   "before": {"apply": 20.09, "fwd_tokens": 11.59, "legal": 11.22, "enc_onplay": 8.48, "fwd_body": 8.22, "enc_rel": 6.32, "fwd_policy": 4.69, "search_other": 3.55, "cand_rows": 3.05, "encode": 2.46, "enc_onplay_probe": 1.17, "enc_leader_legal": 0.83, "forward": 0.44, "decide_wall": 82.13},
-   "after":  {"apply": 17.22, "legal": 8.83, "enc_onplay": 4.10, "enc_rel": 3.84, "search_other": 3.71, "cand_rows": 2.89, "fwd_tokens": 2.67, "fwd_policy": 2.14, "encode": 1.78, "fwd_body": 1.66, "forward": 1.35, "enc_onplay_probe": 1.15, "enc_leader_legal": 0.77, "decide_wall": 52.12},
-   "groups": {"forward_total": [24.94, 7.82], "encode_total": [19.26, 11.64], "apply": [20.09, 17.22], "legal": [11.22, 8.83]},
-   "counts": {"n_value": 616692, "n_priors": 664837, "trunk_cache_hits_after": 1050082, "note": "1,281,529 trunks requested -> 231,447 computed after"}
-  },
-  "prof_4x1280_1game_sec": {
-   "before": {"decide_wall": 328.93, "apply": 242.43, "fwd_tokens": 181.10, "legal": 171.56, "fwd_body": 122.59, "enc_onplay": 101.02, "search_other": 100.37, "enc_rel": 94.96, "fwd_policy": 74.60},
-   "after":  {"decide_wall": 207.86, "apply": 208.51, "legal": 132.68, "search_other": 82.66, "enc_rel": 56.24, "fwd_tokens": 50.43, "enc_onplay": 49.15, "fwd_policy": 34.48, "fwd_body": 23.17},
-   "note": "4 world threads pinned to one core: per-category times are per-thread clocks (inflated by time-slicing), decide_wall is the real one"
-  },
-  "per_change_1x1280_2games_wall_sec": {
-   "how": "rs_decide_latency.py --sims 1280 --budget 0 --games 2, two versions at a time on cores 0/1",
-   "base": 79.6,
-   "v1_07bff71_trunk_cache": 63.3,
-   "v2_logit_memo_fx_encode_caches_onplay_in_place_passives": 51.5,
-   "v3_cf613e5_rel_zero_skip_single_pending": 50.1,
-   "v4_5fedeec_set_selection_entries_drain": 50.7,
-   "final_19259fa": 51.4,
-   "reading": "v1 (trunk reuse) ~-20%, v2 bundle ~-19% (of which the in-place on-play probe and the policy memo are the big ones by OPCG_PROF), v3..final within the +-1 s noise of this 2-game check"
-  },
-  "gates": {
-   "make_rust_develop": "ok",
-   "make_test": "green: cargo 572 passed / 1 ignored; pytest 838 passed / 13 skipped (44.7 s)",
-   "golden": "tests/test_rs_golden_audit.py + tests/test_rs_golden_replay.py: 6 passed, not regenerated",
-   "make_audit_cross": "void 0 (120 pairs / 240 games, fresh run: 0/120 resumed; wr 0.5333 mirror-candidate noise)"
   }
  },
- "command": "rs_decide_latency.py --sims 1280 --budget 0 --games 8 [--worlds 4] under taskset; equality dump = driver.run_game observer/post hooks writing json.dumps(out, sort_keys=True)",
  "notes": [
-  "Invariant held: no golden regenerated, every decide output identical (2,254/2,254) for each step and for the final tree.",
-  "(a) forward reuse: within one decide (and per world thread) the trunk (tokens + body) is cached by the exact bit pattern of the encoding fields it reads (scalars, card_idx, tok; rel_om/rel_oo only for nets that read R) plus net/table pointers; a hit is confirmed by full key equality, never by hash alone. 84% of trunk evaluations in a 1x1280 game were repeats (battle-box branches re-resolved along the chosen line, quiescence priors, leaf values). Cache is 2 generations x 4096 entries (~15 KB each) per thread; outside a decide nothing is cached.",
-  "(a) policy head: per-candidate logits are memoized on the shared trunk, keyed by the candidate row bits (si, ti, feats, budget) and net pointer; R(si,ti) is covered because rel_om is part of the trunk key whenever the net reads it.",
-  "Tried and dropped: a GameState-keyed cache (encode + trunk + priors). Only 35% of evaluations repeat the exact GameState (vs 84% repeating the encoding) and full-state compare/clone made decide 14% slower. Not committed.",
-  "(c) legal generation: adapter::legal_actions and apply::drain_own_interactions build the pending request and default dialog payload once (get_pending_request only mutates via an idempotent battle-phase normalization, nothing in between writes); selection_entries walks zones by reference with hash sets instead of cloning zones/uuids and quadratic string compares; uuid_index/slot_index/ProfileCache/LeaderCache/Vocab use a local Fx hasher (no new crate; lookups only, iteration order never read except dump_index_json whose map order was already random).",
-  "encode (outside the WP's named items, allowed by 'other large items'): the on-play probe ran a full GameState clone per probe (with_temp_dons, ~4.6% of instructions); it now runs on the live session inside Session::isolated with a new journaled Undo::DonPush for the temporary DONs, which is the same view as a fresh Session on a copy. The relation zero-fill (1,760 floats per encode) is skipped for nets with ablate=rel (R is never read then); Profile copies are made only when R is built.",
-  "Passive recalc: keywords are not cloned when already equal (the setter was a no-op then); is_reactive_passive no longer builds format!(\"{raw} {text}\") (no pattern contains a space, so searching both parts separately is equivalent) and rejects early when '時、' is absent.",
-  "Not touched (WP rs-speed-b owns them): Move JSON representation, move_sig, py_game boundary, serde_json map hashing (SipHash inside serde_json IndexMap is still ~4% of instructions), encoding internals beyond the probe/zero-fill/profile-copy items above. Files touched are listed in outputs.changed_files for the later merge with rs-speed-b; the most likely overlaps are search/quiesce.rs (priors_keep / encode_for), net/nrel.rs (trunk/priors_from) and encode/*.",
-  "Remaining profile (after): apply 33%, legal 17%, encode 22% (on-play probe 8%, rel features 7%), forward 15%. Allocation (malloc/free) was ~23% of instructions before and is still the largest single cost; most of what is left is JSON move/pending construction (rs-speed-b) and the effect resolver's AST clones.",
-  "Measurement caveat: before/after latency runs were made side by side on two pinned cores (cores 0 and 1) rather than one after the other on core 0, to keep machine drift equal for both; the OPCG_PROF runs ran at the same time on cores 2/3. A separate 2-game check (cores 0/1, quiet) gave 79.3 s -> 50.1 s.",
-  "Target 1.5-2x: 1.50x on 1x1280 and 1.45x on 4x1280 for this WP alone (a + c); rs-speed-b (b + d) is expected to stack on top.",
-  "Environment: the container had no pytest/fastapi; installed opcg_sim/requirements.txt + pytest + pytest-xdist + httpx to run make test. maturin installed via pip. No code depends on that.",
-  "New prof counter n_trunk_hit (OPCG_PROF only). No tests added (per WP); the equality check scripts are work files and were not committed."
+  "Invariant held: every decide output, every applied move's events and the board after it are identical to mainline on 2,826 decision points (3 settings). Goldens were not regenerated and are green.",
+  "Nothing from either speed branch was dropped as an effect: where both did the same thing (in-place on-play probe with journaled DonPush, rel zero-fill skip, single pending read in drains) one implementation was kept; where they differed only in hashing, A's Fx hasher was used crate-wide (one hasher, lookup-only tables) and B's FNV was removed; ProfileCache uses B's dense index (faster than any hash map).",
+  "Combined speedup (wall, 1 core): 1x1280 x2.00, 4x1280 x1.87, 1x5120 x2.00 — larger than either branch alone (A x1.50 / B x1.39 at 1x1280), as expected since A mostly cut forward/encode repeats and B cut JSON building/copies.",
+  "Latency runs were 4 concurrent single-core-pinned processes (mainline and merged at the same time on separate cores), so absolute numbers include shared-cache/memory-bandwidth effects; the ratio is what to read. Mainline 1x1280 (279 s) matches rs-speed-a's own 'before' (284 s).",
+  "Rethink (play-rethink) is default off; with off, driver.run_game goes through engine.decide_with_rethink which returns the single decide unchanged — confirmed by the equality dump above (which ran through that path on the merged side) and tests/test_play_rethink.py.",
+  "The equality/compare scripts were work-only (scratchpad), not committed, per §7.2.",
+  "Python deps (fastapi etc. from opcg_sim/requirements.txt, pytest-xdist, maturin) had to be installed in this fresh container before the gates."
  ]
 }
