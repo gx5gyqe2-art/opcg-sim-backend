@@ -74,13 +74,82 @@ pub struct DecideOptions {
     pub search: SearchOptions,
     /// `BOX_BRANCH_BUDGET`（`None`＝無制限）
     pub budget: Option<i64>,
+    /// 全部見える探索（`search_efficiency_plan.md` §7.10・**測定専用**・既定 false）。
+    ///
+    /// true なら探索で世界を引く所（木・窓の根畳み・対話／準備箱のコミット）で引き直さず、
+    /// 渡された本当の盤面（相手の手札・両者の山札の並び）をそのまま使う＝乱数も消費しない。
+    /// 世界は 1 通りしか無いので `worlds > 1` は 1 として扱う（[`DecideOptions::effective_worlds`]）。
+    /// 見えるのは探索の中だけ（選んだ手の後の進行は変えない）。ゲームとしては不正な読み。
+    pub omniscient: bool,
+    /// 見える範囲を分けた世界サンプル（`search_efficiency_plan.md` §7.11・**測定専用**・既定
+    /// [`Reveal::Default`]＝今までどおり）。`omniscient` とは排他（両方は [`DecideOptions::validate`] がエラー）。
+    pub reveal: Reveal,
+    /// 木の中の相手に「こちらの手札」を見せない（`search_efficiency_plan.md` §7.14・**測定専用**・
+    /// 既定 false）。true なら木の中で**相手が動く番のノードを展開するとき**（事前分布・葉の価値・
+    /// 戦闘箱／対話箱の畳み）だけ、こちらの手札＋山札＋裏向きのライフを相手の視点で混ぜ直した複製で
+    /// 評価する。合法手の生成と手の適用は本当の世界のまま（[`TreeMcts`](super::mcts::TreeMcts) の
+    /// `opp_blind`）。混ぜ直しの乱数は世界ごとに `search_seed + i` から作る（[`opp_blind_seed`]）。
+    pub opp_blind: bool,
+}
+
+/// `opp_blind`（§7.14）の混ぜ直しの乱数の seed（世界 `i` の探索乱数 `search_seed + i` と同じ値から、
+/// 別の系列になるよう定数で混ぜる＝世界の引き直し・Dirichlet の出目とは重ならない）。
+pub(crate) fn opp_blind_seed(world_seed: u64) -> u64 {
+    world_seed ^ 0x0B11_D5EE_D0FF_5EEDu64
+}
+
+/// 探索の世界サンプルで何を混ぜ直すか（§7.11・opts JSON の鍵 `reveal`）。
+///
+/// | 値 | 相手の手札 | 相手の山札 | 相手の裏向きライフ | 自分の山札 | 自分の裏向きライフ |
+/// |---|---|---|---|---|---|
+/// | `Default`（鍵なし） | 混ぜる（山札と 1 つの山） | 混ぜる | 本当のまま | 本当のまま | 本当のまま |
+/// | `OppHand`（`"opp_hand"`） | 本当のまま | 混ぜる | 本当のまま | 本当のまま | 本当のまま |
+/// | `Fair`（`"fair"`） | 混ぜる（相手の 3 つで 1 つの山） | 混ぜる | 混ぜる | 混ぜる（自分の 2 つで 1 つの山） | 混ぜる |
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Reveal {
+    #[default]
+    Default,
+    OppHand,
+    Fair,
+}
+
+impl Reveal {
+    /// opts JSON の値から（知らない値は `None`＝呼び出し側がエラーにする）。
+    pub fn from_name(s: &str) -> Option<Reveal> {
+        match s {
+            "opp_hand" => Some(Reveal::OppHand),
+            "fair" => Some(Reveal::Fair),
+            _ => None,
+        }
+    }
+}
+
+/// 世界の作り方（`omniscient` と `reveal` の組・[`sample_world`] が読む）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct WorldView {
+    omniscient: bool,
+    reveal: Reveal,
 }
 
 impl DecideOptions {
     /// 実際に回す世界の本数（§20.7.1）。`search_seed` が無ければ世界 1 以降の乱数を作れない
     /// ＝1 本に落ちる（記録した出目で回すオラクル経路がこれに当たる）。
+    /// 組み合わせの検査（§7.11: `omniscient` と `reveal` は排他）。
+    pub fn validate(&self) -> Result<(), EngineError> {
+        if self.omniscient && self.reveal != Reveal::Default {
+            return Err(EngineError::BadPayload(
+                "decide: omniscient と reveal は同時に指定できない".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn world_view(&self) -> WorldView {
+        WorldView { omniscient: self.omniscient, reveal: self.reveal }
+    }
+
     pub fn effective_worlds(&self) -> usize {
-        if self.search_seed.is_none() {
+        if self.search_seed.is_none() || self.omniscient {
             return 1;
         }
         self.worlds.max(1)
@@ -107,7 +176,29 @@ impl Default for DecideOptions {
             search_seed: None,
             search: SearchOptions::default(),
             budget: Some(super::quiesce::BOX_BRANCH_BUDGET),
+            omniscient: false,
+            reveal: Reveal::Default,
+            opp_blind: false,
         }
+    }
+}
+
+/// 探索で使う世界を 1 つ作る（§7.10）。`omniscient` なら本当の盤面のクローン（乱数を引かない）、
+/// そうでなければ今までどおり相手の伏せ手札を引き直す（[`determinize_with`](super::determinize::determinize_with)）。
+/// `reveal`（§7.11）なら見える範囲に合わせて混ぜ直す範囲を変える（[`Reveal`] の表）。
+fn sample_world(
+    state: &GameState,
+    name: Seat,
+    view: WorldView,
+    rng: &mut dyn SearchRng,
+) -> Result<GameState, EngineError> {
+    if view.omniscient {
+        return Ok(state.clone());
+    }
+    match view.reveal {
+        Reveal::Default => super::determinize::determinize_with(state, name, rng),
+        Reveal::OppHand => super::determinize::determinize_opp_deck_with(state, name, rng),
+        Reveal::Fair => super::determinize::determinize_fair_with(state, name, rng),
     }
 }
 
@@ -764,11 +855,12 @@ fn window_choice(
     ctx: &Ctx,
     real: &GameState,
     name: Seat,
+    view: WorldView,
     rng: &mut dyn SearchRng,
     st: &mut SearchState,
 ) -> Result<Option<WindowPick>, EngineError> {
     let battle = real.active_battle.is_some();
-    let world = super::determinize::determinize_with(real, name, rng)?;
+    let world = sample_world(real, name, view, rng)?;
     let mut s = Session::new(world.clone());
     let legal = ctx.legal_actions(&mut s)?;
     if legal.is_empty() {
@@ -850,10 +942,11 @@ fn commit_play_dialog(
     real: &GameState,
     name: Seat,
     mv: &Move,
+    view: WorldView,
     rng: &mut dyn SearchRng,
     st: &mut SearchState,
 ) -> Result<Vec<Step>, EngineError> {
-    let world = super::determinize::determinize_with(real, name, rng)?;
+    let world = sample_world(real, name, view, rng)?;
     Ok(commit_play_dialog_in_world(ctx, &world, name, mv, st))
 }
 
@@ -897,9 +990,10 @@ fn commit_setup_box(
     real: &GameState,
     name: Seat,
     mv: &Move,
+    view: WorldView,
     rng: &mut dyn SearchRng,
 ) -> Result<Vec<Step>, EngineError> {
-    let world = super::determinize::determinize_with(real, name, rng)?;
+    let world = sample_world(real, name, view, rng)?;
     let mut s = Session::new(world);
     match super::r#macro::setup_box_continuation(&mut s, ctx.masters, name, mv) {
         Ok(trace) => Ok(trace_to_steps(&trace, name)),
@@ -1122,6 +1216,8 @@ struct WorldRun {
 fn run_one_world(
     ctx: &Ctx,
     opts: &DecideOptions,
+    name: Seat,
+    world_seed: u64,
     world: GameState,
     rng: &mut dyn SearchRng,
     st: &mut SearchState,
@@ -1130,6 +1226,9 @@ fn run_one_world(
     tree.select_rule = opts.select_rule;
     tree.q_min_frac = opts.q_min_frac;
     tree.root_prior_temp = opts.root_prior_temp;
+    if opts.opp_blind {
+        tree.opp_blind = Some(super::mcts::OppBlind::new(name, opp_blind_seed(world_seed)));
+    }
     let run = tree.run_in_world(world, rng, st)?;
     Ok((run, tree.into_nodes()))
 }
@@ -1151,9 +1250,9 @@ fn run_worlds(
 ) -> Result<Vec<WorldRun>, EngineError> {
     let k = opts.effective_worlds();
     let seed0 = opts.search_seed.unwrap_or(0);
-    let world0 = super::determinize::determinize_with(state, name, rng)?;
+    let world0 = sample_world(state, name, opts.world_view(), rng)?;
     if k <= 1 {
-        let (run, nodes) = run_one_world(ctx, opts, world0.clone(), rng, st)?;
+        let (run, nodes) = run_one_world(ctx, opts, name, seed0, world0.clone(), rng, st)?;
         return Ok(vec![WorldRun { seed: seed0, run, nodes, world: world0 }]);
     }
     let mut runs: Vec<WorldRun> = Vec::with_capacity(k);
@@ -1180,9 +1279,9 @@ fn run_worlds(
                     let mut wst = SearchState {
                         budget: BoxBudget::new(opts.budget),
                     };
-                    let world = super::determinize::determinize_with(state, name, &mut r)?;
+                    let world = sample_world(state, name, opts.world_view(), &mut r)?;
                     let (run, nodes) =
-                        run_one_world(ctx, opts, world.clone(), &mut r, &mut wst)?;
+                        run_one_world(ctx, opts, name, seed, world.clone(), &mut r, &mut wst)?;
                     Ok((
                         WorldRun { seed, run, nodes, world },
                         wst.budget.used,
@@ -1192,7 +1291,7 @@ fn run_worlds(
             })
             .collect();
         // 世界 0 はこのスレッドで回す（スレッドは K-1 本＝K 本が同時に走る）。
-        let (run, nodes) = run_one_world(ctx, opts, world0.clone(), rng, st)?;
+        let (run, nodes) = run_one_world(ctx, opts, name, seed0, world0.clone(), rng, st)?;
         runs.push(WorldRun { seed: seed0, run, nodes, world: world0 });
         for h in handles {
             let (wr, used, exhausted) = h.join().map_err(|_| {
@@ -1325,6 +1424,7 @@ pub fn decide(
         quiesce_max_plies: QUIESCE_MAX_PLIES,
     };
     // 戦闘箱の枝予算をこの decide のぶんだけ張る（Python `reset_box_budget()`／`clear_box_budget()`）。
+    opts.validate()?;
     let mut st = SearchState {
         budget: BoxBudget::new(opts.budget),
     };
@@ -1397,7 +1497,7 @@ fn decide_inner(
 
     // ③ 窓の根畳み（戦闘窓／対話箱が有効なら効果対話窓）
     if in_battle(&real) || (opts.box_dialog && in_dialog(&mut real)) {
-        if let Some(pick) = window_choice(ctx, state, name, rng, st)? {
+        if let Some(pick) = window_choice(ctx, state, name, opts.world_view(), rng, st)? {
             if opts.box_commit {
                 if let Some(world) = &pick.world {
                     let steps =
@@ -1557,7 +1657,7 @@ fn decide_inner(
                     let steps = if worlds > 1 {
                         commit_play_dialog_in_world(ctx, &runs[pv_world].world, name, &m, st)
                     } else {
-                        commit_play_dialog(ctx, state, name, &m, rng, st)?
+                        commit_play_dialog(ctx, state, name, &m, opts.world_view(), rng, st)?
                     };
                     if !steps.is_empty() {
                         carry.commit = steps;
@@ -1565,7 +1665,7 @@ fn decide_inner(
                 }
                 // 準備箱（§20.7.2）: 素の手より後（対話 → 攻撃箱）を機械実行へ積む。
                 Some("SETUP_BOX") => {
-                    let steps = commit_setup_box(ctx, state, name, &m, rng)?;
+                    let steps = commit_setup_box(ctx, state, name, &m, opts.world_view(), rng)?;
                     if !steps.is_empty() {
                         carry.commit = steps;
                     }
@@ -2191,5 +2291,431 @@ pub(super) mod tests {
         assert_eq!(per_world[0].best, Some(0));
         assert_eq!(per_world[1].best, Some(1));
         assert_eq!(back[1], vec![Some(0), Some(1)], "並びが同じなら恒等写像");
+    }
+
+    // --- 全部見える探索（`search_efficiency_plan.md` §7.10・WP `rs-omniscient`）---------------
+
+    /// 並びを引いた回数を数える rng（中身は PCG32）。世界サンプルを引いたかどうかの証拠。
+    struct CountingRng {
+        inner: crate::search::Pcg32SearchRng,
+        shuffles: usize,
+    }
+
+    impl SearchRng for CountingRng {
+        fn shuffle_order(&mut self, pool: &[String]) -> Result<Vec<String>, EngineError> {
+            self.shuffles += 1;
+            self.inner.shuffle_order(pool)
+        }
+        fn dirichlet(&mut self, alpha: f64, n: usize) -> Result<Vec<f64>, EngineError> {
+            self.inner.dirichlet(alpha, n)
+        }
+        fn choice(&mut self, probs: &[f64]) -> Result<usize, EngineError> {
+            self.inner.choice(probs)
+        }
+    }
+
+    fn omni_run(
+        masters: &crate::model::MasterTable,
+        state: &GameState,
+        opts: &DecideOptions,
+    ) -> (DecideOut, usize) {
+        let net = zero_net();
+        let mut rng = CountingRng { inner: crate::search::Pcg32SearchRng::new(11), shuffles: 0 };
+        let out =
+            decide(masters, &net, state, Seat::P1, opts, &mut rng, &DecideCarry::default()).unwrap();
+        (out, rng.shuffles)
+    }
+
+    fn assert_same_out(got: &DecideOut, base: &DecideOut) {
+        assert_eq!(got.kind, base.kind);
+        assert_eq!(got.mv, base.mv);
+        assert_eq!(got.sig, base.sig);
+        assert_eq!(got.legal, base.legal);
+        assert_eq!(got.n, base.n);
+        assert_eq!(got.q, base.q);
+        assert_eq!(got.p, base.p);
+        assert_eq!(got.pv.len(), base.pv.len());
+        assert_eq!(got.worlds, base.worlds);
+    }
+
+    /// (a) `omniscient=false` を明示しても既定と 1 bit も変わらない（世界も今までどおり引く）。
+    #[test]
+    fn omniscient_false_is_bit_identical_to_the_default() {
+        let (masters, state) = worlds_board();
+        let base_opts = DecideOptions { sims: 8, ..DecideOptions::default() };
+        assert!(!base_opts.omniscient, "既定は false");
+        let (base, base_shuffles) = omni_run(&masters, &state, &base_opts);
+        let (got, got_shuffles) =
+            omni_run(&masters, &state, &DecideOptions { omniscient: false, ..base_opts.clone() });
+        assert_same_out(&got, &base);
+        assert_eq!(got_shuffles, base_shuffles);
+        assert!(base_shuffles >= 1, "相手の伏せ札がある盤面では既定は世界を引く");
+    }
+
+    /// (b) 相手の手札＋山札が空の盤面では、引き直す物が無い＝true でも false と同一。
+    #[test]
+    fn omniscient_matches_default_when_the_opponent_has_no_hidden_cards() {
+        use crate::testkit::{BoardBuilder, M_CHAR};
+        let mut b = BoardBuilder::new();
+        b.put_hand(Seat::P1, M_CHAR);
+        b.dons(Seat::P1, "active", 2);
+        let (masters, state) = b.build();
+        assert!(state.player(Seat::P2).hand.is_empty() && state.player(Seat::P2).deck.is_empty());
+        let base_opts = DecideOptions { sims: 8, ..DecideOptions::default() };
+        let (base, base_shuffles) = omni_run(&masters, &state, &base_opts);
+        let (got, got_shuffles) =
+            omni_run(&masters, &state, &DecideOptions { omniscient: true, ..base_opts });
+        assert_same_out(&got, &base);
+        assert_eq!((base_shuffles, got_shuffles), (0, 0), "pool が空なら並びは引かない");
+    }
+
+    /// (c) true なら世界を引く関数（並び）を一度も呼ばない＝探索は本当の盤面で読む。
+    /// `worlds>1`（`search_seed` あり）でも 1 本として扱う。
+    #[test]
+    fn omniscient_never_samples_a_world() {
+        let (masters, state) = worlds_board();
+        for worlds in [1usize, 4] {
+            let opts = DecideOptions { omniscient: true, ..worlds_opts(worlds, Some(11)) };
+            assert_eq!(opts.effective_worlds(), 1);
+            let (out, shuffles) = omni_run(&masters, &state, &opts);
+            assert_eq!(out.kind, "main");
+            assert_eq!(shuffles, 0, "worlds={worlds}: 世界サンプルを引いた");
+            assert_eq!(out.worlds, 1);
+            assert!(out.per_world.is_empty());
+        }
+        // 引き直さない世界＝本当の盤面そのもの（`sample_world` の契約）。
+        let mut rng = CountingRng { inner: crate::search::Pcg32SearchRng::new(3), shuffles: 0 };
+        let view = DecideOptions { omniscient: true, ..DecideOptions::default() }.world_view();
+        let world = sample_world(&state, Seat::P1, view, &mut rng).unwrap();
+        assert_eq!(rng.shuffles, 0);
+        assert_eq!(world.player(Seat::P2).hand, state.player(Seat::P2).hand);
+        assert_eq!(world.player(Seat::P2).deck, state.player(Seat::P2).deck);
+        assert_eq!(world.player(Seat::P1).deck, state.player(Seat::P1).deck);
+    }
+
+    // --- 見える範囲を分けた探索（`search_efficiency_plan.md` §7.11・WP `rs-reveal`）---------------
+
+    /// 自分（P1）: 手札 1・山札 5・ライフ 4（位置 1 が表向き）・場 1／相手（P2）: 手札 2・山札 4・
+    /// ライフ 3（位置 2 が表向き）。
+    fn reveal_board() -> (crate::model::MasterTable, GameState) {
+        use crate::testkit::{BoardBuilder, M_BLOCKER, M_CHAR, M_EVENT};
+        let mut b = BoardBuilder::new();
+        b.put_hand(Seat::P1, M_CHAR);
+        b.put_field(Seat::P1, M_BLOCKER);
+        b.dons(Seat::P1, "active", 2);
+        for m in [M_CHAR, M_EVENT, M_BLOCKER, M_CHAR, M_EVENT] {
+            b.put_deck(Seat::P1, m);
+        }
+        for i in 0..4 {
+            let c = b.put_life(Seat::P1, M_CHAR);
+            b.card_mut(c).is_face_up = i == 1;
+        }
+        b.put_hand(Seat::P2, M_CHAR);
+        b.put_hand(Seat::P2, M_EVENT);
+        for m in [M_BLOCKER, M_CHAR, M_EVENT, M_CHAR] {
+            b.put_deck(Seat::P2, m);
+        }
+        for i in 0..3 {
+            let c = b.put_life(Seat::P2, M_EVENT);
+            b.card_mut(c).is_face_up = i == 2;
+        }
+        b.build()
+    }
+
+    fn reveal_view(reveal: Reveal) -> WorldView {
+        DecideOptions { reveal, ..DecideOptions::default() }.world_view()
+    }
+
+    fn sorted(mut v: Vec<CardIdx>) -> Vec<CardIdx> {
+        v.sort_unstable();
+        v
+    }
+
+    /// 裏向きのライフだけ（位置つき）・表向きのライフだけ（位置つき）。
+    fn life_split(st: &GameState, seat: Seat) -> (Vec<CardIdx>, Vec<(usize, CardIdx)>) {
+        let life = &st.player(seat).life;
+        let down = life.iter().copied().filter(|c| !st.card(*c).is_face_up).collect();
+        let up = life
+            .iter()
+            .copied()
+            .enumerate()
+            .filter(|(_, c)| st.card(*c).is_face_up)
+            .collect();
+        (down, up)
+    }
+
+    /// 公開領域（場・トラッシュ・ステージ・リーダー・一時領域・ドン!!）は両席とも本当のまま。
+    fn assert_public_kept(w: &GameState, s: &GameState) {
+        for seat in [Seat::P1, Seat::P2] {
+            let (a, b) = (w.player(seat), s.player(seat));
+            assert_eq!(a.field, b.field);
+            assert_eq!(a.trash, b.trash);
+            assert_eq!(a.stage, b.stage);
+            assert_eq!(a.leader, b.leader);
+            assert_eq!(a.temp_zone, b.temp_zone);
+            assert_eq!(a.don_active, b.don_active);
+            assert_eq!(a.don_deck, b.don_deck);
+        }
+    }
+
+    /// (a) `reveal` の既定は今までどおり（JSON の省略・null も既定）。既定の世界は今の
+    /// `determinize_with` と同じ rng の出目で 1 bit も同じ・decide も明示の Default と同一。
+    #[test]
+    fn reveal_default_is_bit_identical() {
+        let (masters, state) = reveal_board();
+        assert_eq!(DecideOptions::default().reveal, Reveal::Default);
+        for seed in 0..8u64 {
+            let mut r1 = crate::search::Pcg32SearchRng::new(seed);
+            let mut r2 = crate::search::Pcg32SearchRng::new(seed);
+            let a = sample_world(&state, Seat::P1, DecideOptions::default().world_view(), &mut r1).unwrap();
+            let b = super::super::determinize::determinize_with(&state, Seat::P1, &mut r2).unwrap();
+            assert_eq!(a, b);
+        }
+        let base_opts = DecideOptions { sims: 8, ..DecideOptions::default() };
+        let (base, base_shuffles) = omni_run(&masters, &state, &base_opts);
+        let (got, got_shuffles) =
+            omni_run(&masters, &state, &DecideOptions { reveal: Reveal::Default, ..base_opts });
+        assert_same_out(&got, &base);
+        assert_eq!(got_shuffles, base_shuffles);
+    }
+
+    /// (b) `opp_hand`: 相手の手札は本当のまま・相手の山札だけ混ざる（自分の物・相手のライフは動かない）。
+    #[test]
+    fn reveal_opp_hand_keeps_the_hand_and_shuffles_the_deck() {
+        let (_m, state) = reveal_board();
+        let mut deck_moved = false;
+        for seed in 0..16u64 {
+            let mut rng = CountingRng { inner: crate::search::Pcg32SearchRng::new(seed), shuffles: 0 };
+            let w = sample_world(&state, Seat::P1, reveal_view(Reveal::OppHand), &mut rng).unwrap();
+            assert_eq!(rng.shuffles, 1, "相手の山札だけで 1 回");
+            let (o, t) = (w.player(Seat::P2), state.player(Seat::P2));
+            assert_eq!(o.hand, t.hand, "相手の手札は本当のまま");
+            assert_eq!(o.life, t.life, "相手のライフは本当のまま");
+            assert_eq!(sorted(o.deck.clone()), sorted(t.deck.clone()));
+            deck_moved |= o.deck != t.deck;
+            assert_eq!(w.player(Seat::P1), state.player(Seat::P1), "自分の物は動かない");
+            assert_public_kept(&w, &state);
+        }
+        assert!(deck_moved, "16 本の種のどれかで相手の山札の並びが変わる");
+        // 山札が空なら乱数を消費しない。
+        let mut s2 = state.clone();
+        s2.player_mut(Seat::P2).deck.clear();
+        let mut rng = CountingRng { inner: crate::search::Pcg32SearchRng::new(1), shuffles: 0 };
+        let w = sample_world(&s2, Seat::P1, reveal_view(Reveal::OppHand), &mut rng).unwrap();
+        assert_eq!((rng.shuffles, &w), (0, &s2));
+    }
+
+    /// (c) `fair`: 相手の手札＋山札＋裏向きライフ、自分の山札＋裏向きライフをそれぞれ 1 つの山として
+    /// 混ぜる。表向きのライフ（位置と中身）・自分の手札・公開領域と各ゾーンの枚数は保つ。
+    #[test]
+    fn reveal_fair_shuffles_everything_hidden_from_me() {
+        let (_m, state) = reveal_board();
+        let (mut my_deck_moved, mut my_life_moved, mut opp_cross) = (false, false, false);
+        for seed in 0..32u64 {
+            let mut rng = CountingRng { inner: crate::search::Pcg32SearchRng::new(seed), shuffles: 0 };
+            let w = sample_world(&state, Seat::P1, reveal_view(Reveal::Fair), &mut rng).unwrap();
+            assert_eq!(rng.shuffles, 2, "相手の山と自分の山で 2 回");
+            assert_public_kept(&w, &state);
+            for seat in [Seat::P1, Seat::P2] {
+                let (a, t) = (w.player(seat), state.player(seat));
+                assert_eq!(
+                    (a.hand.len(), a.deck.len(), a.life.len()),
+                    (t.hand.len(), t.deck.len(), t.life.len()),
+                    "枚数は保つ"
+                );
+                assert_eq!(life_split(&w, seat).1, life_split(&state, seat).1, "表向きのライフは動かない");
+            }
+            // 自分: 手札は本当のまま・山札＋裏向きライフは同じ集合の並べ替え。
+            let (a, t) = (w.player(Seat::P1), state.player(Seat::P1));
+            assert_eq!(a.hand, t.hand);
+            let pool = |st: &GameState| {
+                let mut v = st.player(Seat::P1).deck.clone();
+                v.extend(life_split(st, Seat::P1).0);
+                sorted(v)
+            };
+            assert_eq!(pool(&w), pool(&state));
+            my_deck_moved |= a.deck != t.deck;
+            my_life_moved |= life_split(&w, Seat::P1).0 != life_split(&state, Seat::P1).0;
+            // 相手: 手札＋山札＋裏向きライフが同じ集合の並べ替え。
+            let opool = |st: &GameState| {
+                let p = st.player(Seat::P2);
+                let mut v = p.hand.clone();
+                v.extend(p.deck.iter().copied());
+                v.extend(life_split(st, Seat::P2).0);
+                sorted(v)
+            };
+            assert_eq!(opool(&w), opool(&state));
+            let true_life = life_split(&state, Seat::P2).0;
+            opp_cross |= w.player(Seat::P2).hand.iter().any(|c| true_life.contains(c));
+        }
+        assert!(my_deck_moved && my_life_moved, "自分の山札・裏向きライフが混ざる");
+        assert!(opp_cross, "相手の裏向きライフが手札と 1 つの山で混ざる");
+    }
+
+    /// `opp_hand`／`fair` の decide が回る（`worlds=4`＋seed でも）・同じ種なら同じ手。
+    #[test]
+    fn reveal_modes_decide_and_are_deterministic() {
+        let (masters, state) = reveal_board();
+        for reveal in [Reveal::OppHand, Reveal::Fair] {
+            for worlds in [1usize, 4] {
+                let opts = DecideOptions { reveal, ..worlds_opts(worlds, Some(5)) };
+                let (a, _) = omni_run(&masters, &state, &opts);
+                let (b, _) = omni_run(&masters, &state, &opts);
+                assert_eq!(a.kind, "main");
+                assert_same_out(&a, &b);
+            }
+        }
+    }
+
+    /// (d) `omniscient` と `reveal` の両方はエラー（decide も opts JSON も）。
+    #[test]
+    fn omniscient_and_reveal_together_is_an_error() {
+        let (masters, state) = reveal_board();
+        let net = zero_net();
+        for reveal in [Reveal::OppHand, Reveal::Fair] {
+            let opts = DecideOptions { sims: 8, omniscient: true, reveal, ..DecideOptions::default() };
+            assert!(opts.validate().is_err());
+            let mut rng = crate::search::Pcg32SearchRng::new(1);
+            let r = decide(&masters, &net, &state, Seat::P1, &opts, &mut rng, &DecideCarry::default());
+            assert!(matches!(r, Err(EngineError::BadPayload(_))));
+        }
+        let ok = DecideOptions { omniscient: true, ..DecideOptions::default() };
+        assert!(ok.validate().is_ok(), "omniscient 単独は可");
+    }
+
+    // --- 木の中の相手にこちらの手札を見せない（`search_efficiency_plan.md` §7.14・WP `rs-oppblind`）---
+
+    /// `opp_blind` で decide を回し、相手ノードの展開の記録（`mcts::BLIND_TRACE`）を持ち帰る。
+    fn blind_run(
+        masters: &crate::model::MasterTable,
+        state: &GameState,
+        opts: &DecideOptions,
+    ) -> (DecideOut, Vec<(GameState, GameState, Vec<Move>, GameState)>) {
+        crate::search::mcts::BLIND_TRACE.with(|t| *t.borrow_mut() = Some(Vec::new()));
+        let (out, _) = omni_run(masters, state, opts);
+        let trace = crate::search::mcts::BLIND_TRACE.with(|t| t.borrow_mut().take()).unwrap();
+        (out, trace)
+    }
+
+    fn blind_opts(sims: usize) -> DecideOptions {
+        DecideOptions { sims, opp_blind: true, search_seed: Some(7), ..DecideOptions::default() }
+    }
+
+    /// (a) `opp_blind` の既定は false・明示の false は既定と 1 bit も同じ（相手ノードの記録も出ない）。
+    #[test]
+    fn opp_blind_false_is_bit_identical_to_the_default() {
+        let (masters, state) = reveal_board();
+        assert!(!DecideOptions::default().opp_blind);
+        for sims in [8usize, 64] {
+            let base_opts = DecideOptions { sims, search_seed: Some(7), ..DecideOptions::default() };
+            let (base, base_shuffles) = omni_run(&masters, &state, &base_opts);
+            let (got, trace) =
+                blind_run(&masters, &state, &DecideOptions { opp_blind: false, ..base_opts.clone() });
+            assert_same_out(&got, &base);
+            assert!(trace.is_empty(), "既定では相手ノードを混ぜ直さない");
+            let (_, got_shuffles) = omni_run(&masters, &state, &base_opts);
+            assert_eq!(got_shuffles, base_shuffles, "探索の乱数の消費も同じ");
+        }
+    }
+
+    /// (b) true: 相手ノードの評価に渡る盤面は、こちら（P1）の手札＋山札＋裏向きライフだけが同じ集合の
+    /// 並べ替えで、相手（P2）の側と公開領域・各ゾーンの枚数・表向きのライフは本当の世界と同一。
+    /// こちらの手札は（一般に）本当の手札と違う。
+    #[test]
+    fn opp_blind_evaluates_opponent_nodes_on_a_reshuffled_copy_of_my_hidden_cards() {
+        let (masters, state) = reveal_board();
+        let (_, trace) = blind_run(&masters, &state, &blind_opts(96));
+        assert!(!trace.is_empty(), "相手の番のノードが展開される");
+        let mut hand_differs = false;
+        for (real, w, _, _) in &trace {
+            assert_eq!(w.player(Seat::P2), real.player(Seat::P2), "相手の側は触らない");
+            assert_public_kept(w, real);
+            let (a, t) = (w.player(Seat::P1), real.player(Seat::P1));
+            assert_eq!(
+                (a.hand.len(), a.deck.len(), a.life.len()),
+                (t.hand.len(), t.deck.len(), t.life.len()),
+                "枚数は保つ"
+            );
+            assert_eq!(life_split(w, Seat::P1).1, life_split(real, Seat::P1).1, "表向きのライフは動かない");
+            let pool = |st: &GameState| {
+                let p = st.player(Seat::P1);
+                let mut v = p.hand.clone();
+                v.extend(p.deck.iter().copied());
+                v.extend(life_split(st, Seat::P1).0);
+                sorted(v)
+            };
+            assert_eq!(pool(w), pool(real));
+            hand_differs |= a.hand != t.hand;
+            // 混ぜ直し以外（手番・フェイズ・戦闘・中断）は同じ。
+            assert_eq!(w.turn_player, real.turn_player);
+            assert_eq!(w.active_battle.is_some(), real.active_battle.is_some());
+        }
+        assert!(hand_differs, "こちらの手札が本当の手札と違う複製が出る");
+    }
+
+    /// (c) true でも合法手は本当の世界から作り、展開の後の本当の盤面は展開前と同一（木の降下・手の
+    /// 適用は本当の世界のまま）。根の合法手も既定と同じ。
+    #[test]
+    fn opp_blind_keeps_legal_moves_and_the_real_world() {
+        let (masters, state) = reveal_board();
+        let opts = blind_opts(96);
+        let (out, trace) = blind_run(&masters, &state, &opts);
+        let net = zero_net();
+        let ctx = Ctx {
+            masters: &masters,
+            net: &net,
+            opts: opts.search.clone(),
+            box_battle: opts.box_battle,
+            box_dialog: opts.box_dialog,
+            quiesce: opts.quiesce,
+            quiesce_max_plies: QUIESCE_MAX_PLIES,
+        };
+        super::super::r#macro::reset_setup_state(opts.search.setup_box, opts.search.select_branch_on());
+        for (real, w, legal, after) in &trace {
+            assert_eq!(after, real, "展開は本当の世界を変えない");
+            let mut s = Session::new(real.clone());
+            assert_eq!(&ctx.legal_actions(&mut s).unwrap(), legal, "合法手は本当の世界から");
+            assert_ne!(w, real, "評価だけが複製の上");
+        }
+        let (base, _) = omni_run(&masters, &state, &DecideOptions { opp_blind: false, ..opts.clone() });
+        assert_eq!(out.legal, base.legal, "根の合法手は同じ");
+    }
+
+    /// (d) 同じ seed なら決定的（`worlds=1`／`4`・`reveal`・`omniscient` との併用も）。seed を変えると
+    /// 混ぜ直しが変わる。
+    #[test]
+    fn opp_blind_is_deterministic_and_combines_with_other_views() {
+        let (masters, state) = reveal_board();
+        let combos = [
+            DecideOptions { worlds: 1, ..blind_opts(32) },
+            DecideOptions { worlds: 4, ..blind_opts(32) },
+            DecideOptions { reveal: Reveal::Fair, ..blind_opts(32) },
+            DecideOptions { reveal: Reveal::OppHand, ..blind_opts(32) },
+            DecideOptions { omniscient: true, ..blind_opts(32) },
+        ];
+        for opts in &combos {
+            let (a, ta) = blind_run(&masters, &state, opts);
+            let (b, tb) = blind_run(&masters, &state, opts);
+            assert_eq!(a.kind, "main");
+            assert_same_out(&a, &b);
+            let ws = |t: &Vec<(GameState, GameState, Vec<Move>, GameState)>| {
+                t.iter().map(|x| x.1.clone()).collect::<Vec<_>>()
+            };
+            assert_eq!(ws(&ta), ws(&tb), "混ぜ直しの盤面も同じ");
+        }
+        let (_, t7) = blind_run(&masters, &state, &blind_opts(96));
+        let (_, t8) =
+            blind_run(&masters, &state, &DecideOptions { search_seed: Some(8), ..blind_opts(96) });
+        let hands = |t: &Vec<(GameState, GameState, Vec<Move>, GameState)>| {
+            t.iter().map(|x| x.1.player(Seat::P1).hand.clone()).collect::<Vec<_>>()
+        };
+        assert_ne!(hands(&t7), hands(&t8), "seed が違えば混ぜ直しも違う");
+        // JSON の鍵。
+        let j = |x: &str| serde_json::from_str::<serde_json::Value>(x).unwrap();
+        let read = |x: &str| super::super::decide_opts_and_carry(&j(x)).map(|(o, _)| o.opp_blind).unwrap();
+        assert!(!read("{}"));
+        assert!(!read(r#"{"opp_blind": false}"#));
+        assert!(read(r#"{"opp_blind": true}"#));
+        assert!(read(r#"{"opp_blind": true, "omniscient": true}"#), "omniscient と併用できる");
     }
 }
