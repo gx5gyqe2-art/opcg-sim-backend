@@ -7,9 +7,11 @@ use crate::journal::Session;
 use crate::model::{MasterTable, Seat};
 use crate::rules::pending::{get_pending_request, pending_actor_action};
 use crate::state::EngineError;
-use serde_json::{json, Value};
+use crate::rules::moves::GameArgs;
+use serde_json::Value;
+use std::borrow::Cow;
 
-use super::{adapter, Move, MoveRef, PayloadRef};
+use super::{adapter, Move};
 
 /// Python `cpu_ai._DRAIN_LIMIT`（クローン上で自分側対話を解決する最大回数）。
 pub const DRAIN_LIMIT: usize = 12;
@@ -86,9 +88,8 @@ pub fn apply_move_inplace(
 ) -> Result<(), EngineError> {
     let _prof = crate::prof::enter(crate::prof::Cat::Apply);
     let bad = |m: String| EngineError::BadPayload(m);
-    let r = MoveRef::of(mv);
-    let action_type = r
-        .action_type_str()
+    let action_type = mv
+        .action_type()
         .ok_or_else(|| bad("move: 'action_type' がありません。".into()))?;
 
     if action_type == "SETUP_BOX" {
@@ -98,26 +99,43 @@ pub fn apply_move_inplace(
     }
 
     if action_type == "DON_BOX" {
-        let null = Value::Null;
-        let p = PayloadRef::of(r.payload);
-        let uuid = p.uuid.unwrap_or(&null);
-        let don_k = p.don_k.and_then(Value::as_i64).unwrap_or(0);
+        // 付与も攻撃も、適用が読むのは `uuid`（文字列）と `target_ids[0]`（文字列）だけ
+        // （今までの `{"uuid": uuid}`／`{"uuid": uuid, "target_ids": target_ids}` の dict から
+        // `apply_game_action` が読んでいた値と同じ）。
+        let p = mv.payload();
+        let uuid = p.and_then(|p| p.uuid());
+        let don_k = p.and_then(|p| p.don_k_i64()).unwrap_or(0);
         if don_k > 0 {
-            // 付与の payload は k 回とも同じ＝1 度だけ組む。
-            let attach = json!({"uuid": uuid});
+            let attach = GameArgs {
+                card_uuid: uuid,
+                target_uuid: None,
+                ability_index: None,
+            };
             for _ in 0..don_k {
-                crate::rules::actions::apply_game_action(s, masters, actor, "ATTACH_DON", &attach)?;
+                crate::rules::actions::apply_game_action_with(
+                    s,
+                    masters,
+                    actor,
+                    "ATTACH_DON",
+                    attach,
+                    no_payload,
+                )?;
                 drain_own_interactions(s, masters, actor, stop_at_select)?;
             }
         }
-        let target_ids = p.target_ids.and_then(Value::as_array).filter(|t| !t.is_empty());
-        if let Some(target_ids) = target_ids {
-            crate::rules::actions::apply_game_action(
+        if p.is_some_and(|p| p.has_target_ids()) {
+            let attack = GameArgs {
+                card_uuid: uuid,
+                target_uuid: p.and_then(|p| p.first_target_id()),
+                ability_index: None,
+            };
+            crate::rules::actions::apply_game_action_with(
                 s,
                 masters,
                 actor,
                 "ATTACK",
-                &json!({"uuid": uuid, "target_ids": target_ids}),
+                attack,
+                no_payload,
             )?;
             drain_own_interactions(s, masters, actor, stop_at_select)?;
         }
@@ -125,18 +143,21 @@ pub fn apply_move_inplace(
     }
 
     // Python は `move["kind"]` を添字で読む＝欄が無ければ KeyError（＝例外手）。
-    let kind = r
-        .kind
-        .and_then(Value::as_str)
+    let kind = mv
+        .kind()
         .ok_or_else(|| bad("move: 'kind' がありません。".into()))?;
     if kind == "battle" {
-        let card_uuid = r.card_uuid.and_then(Value::as_str);
-        crate::rules::actions::apply_battle_action(s, masters, actor, action_type, card_uuid)?;
+        crate::rules::actions::apply_battle_action(s, masters, actor, action_type, mv.card_uuid())?;
     } else {
-        match r.payload {
-            Some(payload) => {
-                crate::rules::actions::apply_game_action(s, masters, actor, action_type, payload)?
-            }
+        match mv.payload() {
+            Some(p) => crate::rules::actions::apply_game_action_with(
+                s,
+                masters,
+                actor,
+                action_type,
+                p.game_args(),
+                || p.to_json(),
+            )?,
             None => {
                 let empty = Value::Object(serde_json::Map::new());
                 crate::rules::actions::apply_game_action(s, masters, actor, action_type, &empty)?
@@ -144,4 +165,9 @@ pub fn apply_move_inplace(
         }
     }
     drain_own_interactions(s, masters, actor, stop_at_select)
+}
+
+/// 付与・攻撃の適用は payload を読まない（読むのは対話の解決だけ）。
+fn no_payload() -> Cow<'static, Value> {
+    Cow::Owned(Value::Object(serde_json::Map::new()))
 }

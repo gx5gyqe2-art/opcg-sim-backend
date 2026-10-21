@@ -11,7 +11,6 @@
 
 use crate::model::{CardIdx, GameState, MasterTable, Seat};
 use crate::rules::{has_keyword, KW_RUSH};
-use serde_json::Value;
 use std::sync::OnceLock;
 
 use super::Move;
@@ -289,19 +288,15 @@ pub fn prune_futile_attacks(
 // --- 手（JSON dict）の小道具 -----------------------------------------------------
 
 pub(super) fn action_type(mv: &Move) -> Option<&str> {
-    mv.get("action_type").and_then(Value::as_str)
+    mv.action_type()
 }
 
 pub(super) fn payload_uuid(mv: &Move) -> Option<&str> {
-    mv.get("payload")?.get("uuid")?.as_str()
+    mv.payload_uuid()
 }
 
 pub(super) fn first_target_id(mv: &Move) -> Option<&str> {
-    mv.get("payload")?
-        .get("target_ids")?
-        .as_array()?
-        .first()?
-        .as_str()
+    mv.first_target_id()
 }
 
 #[cfg(test)]

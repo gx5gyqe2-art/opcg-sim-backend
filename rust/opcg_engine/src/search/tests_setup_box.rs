@@ -179,7 +179,7 @@ fn ctx_for(masters: &'static MasterTable, net: &'static LoadedNet, setup_box: bo
 fn setup_boxes(moves: &[Move]) -> Vec<Move> {
     moves
         .iter()
-        .filter(|m| m["action_type"] == json!("SETUP_BOX"))
+        .filter(|m| m.to_json()["action_type"] == json!("SETUP_BOX"))
         .cloned()
         .collect()
 }
@@ -187,13 +187,13 @@ fn setup_boxes(moves: &[Move]) -> Vec<Move> {
 fn box_of(moves: &[Move], uuid: &str) -> Vec<Move> {
     setup_boxes(moves)
         .into_iter()
-        .filter(|m| m["payload"]["uuid"] == json!(uuid))
+        .filter(|m| m.to_json()["payload"]["uuid"] == json!(uuid))
         .collect()
 }
 
 /// 枝の選択列（`selects`）を「選んだ uuid の平たい列」で見る。
 fn flat_selects(mv: &Move) -> Vec<String> {
-    mv["payload"]["selects"]
+    mv.to_json()["payload"]["selects"]
         .as_array()
         .map(|a| {
             a.iter()
@@ -301,7 +301,7 @@ fn kami_no_sabaki_branches_on_ko_and_no_ko() {
     assert!(
         !moves
             .iter()
-            .any(|m| m["action_type"] == json!("PLAY") && m["payload"]["uuid"] == json!("p1-kami")),
+            .any(|m| m.to_json()["action_type"] == json!("PLAY") && m.to_json()["payload"]["uuid"] == json!("p1-kami")),
         "箱ができた素の PLAY は候補に残らない: {moves:?}"
     );
 }
@@ -317,8 +317,8 @@ fn setup_boxes_never_carry_a_follow_up_attack() {
     let all = setup_boxes(&moves);
     assert!(!all.is_empty(), "準備箱が出るはず");
     for m in &all {
-        assert!(m["payload"]["attack"].is_null(), "攻撃の欄が残っている: {m:?}");
-        assert!(m["payload"]["target_ids"].is_null(), "攻撃対象が載っている: {m:?}");
+        assert!(m.to_json()["payload"]["attack"].is_null(), "攻撃の欄が残っている: {m:?}");
+        assert!(m.to_json()["payload"]["target_ids"].is_null(), "攻撃対象が載っている: {m:?}");
     }
 }
 
@@ -343,7 +343,7 @@ fn setup_box_priors_split_by_the_selection_policy() {
     let plain: Vec<f32> = p
         .iter()
         .zip(&moves)
-        .filter(|(_, m)| m["action_type"] != json!("SETUP_BOX"))
+        .filter(|(_, m)| m.to_json()["action_type"] != json!("SETUP_BOX"))
         .map(|(x, _)| *x)
         .collect();
     assert!(!plain.is_empty(), "非箱の手（TURN_END 等）も候補に居るはず");
@@ -351,7 +351,7 @@ fn setup_box_priors_split_by_the_selection_policy() {
     // 準備の手（base の uuid）ごとに枝の P を足す＝素の手 1 つぶんの P になる。
     let mut bases: Vec<String> = setup_boxes(&moves)
         .iter()
-        .filter_map(|m| m["payload"]["uuid"].as_str().map(str::to_owned))
+        .filter_map(|m| m.to_json()["payload"]["uuid"].as_str().map(str::to_owned))
         .collect();
     bases.sort();
     bases.dedup();
@@ -360,7 +360,7 @@ fn setup_box_priors_split_by_the_selection_policy() {
             .iter()
             .zip(&moves)
             .filter(|(_, m)| {
-                m["action_type"] == json!("SETUP_BOX") && m["payload"]["uuid"] == json!(uuid)
+                m.to_json()["action_type"] == json!("SETUP_BOX") && m.to_json()["payload"]["uuid"] == json!(uuid)
             })
             .map(|(x, _)| *x)
             .sum();
@@ -371,7 +371,7 @@ fn setup_box_priors_split_by_the_selection_policy() {
         let branches = box_of(&moves, uuid);
         if branches.len() > 1 {
             for (x, m) in p.iter().zip(&moves) {
-                if m["action_type"] == json!("SETUP_BOX") && m["payload"]["uuid"] == json!(uuid) {
+                if m.to_json()["action_type"] == json!("SETUP_BOX") && m.to_json()["payload"]["uuid"] == json!(uuid) {
                     assert!(*x < bare, "枝の P {x} が素の手の P {bare} より小さくない");
                 }
             }
@@ -395,8 +395,8 @@ fn applying_the_kami_box_expands_into_primitive_moves() {
 
     // 先頭原始手は素の PLAY（実対局へはこれが出る）。
     let head = super::decide::don_box_first_primitive(&ko_box);
-    assert_eq!(head["action_type"], json!("PLAY"), "先頭原始手は素の PLAY");
-    assert_eq!(head["payload"]["uuid"], json!("p1-kami"));
+    assert_eq!(head.to_json()["action_type"], json!("PLAY"), "先頭原始手は素の PLAY");
+    assert_eq!(head.to_json()["payload"]["uuid"], json!("p1-kami"));
 
     // 続き（コミットに積まれる手順）は「対話 → 攻撃」の原始手だけ。
     let mut w = Session::new(s.state().clone());
@@ -404,7 +404,7 @@ fn applying_the_kami_box_expands_into_primitive_moves() {
         boxes::setup_box_continuation(&mut w, masters, Seat::P1, &ko_box).expect("箱の継続");
     let kinds: Vec<&str> = trace
         .iter()
-        .map(|(_, m)| m["action_type"].as_str().unwrap_or("?"))
+        .map(|(_, m)| m.action_type().unwrap_or("?"))
         .collect();
     assert!(
         kinds.iter().all(|k| *k == "RESOLVE_EFFECT_SELECTION"),
@@ -463,7 +463,7 @@ fn gamma_knife_box_stops_after_the_effect_and_leaves_the_attacks_to_the_tree() {
     assert!(
         trace
             .iter()
-            .all(|(_, m)| m["action_type"] == json!("RESOLVE_EFFECT_SELECTION")),
+            .all(|(_, m)| m.to_json()["action_type"] == json!("RESOLVE_EFFECT_SELECTION")),
         "コミットの手順は対話の解決だけ（攻撃は入らない）: {trace:?}"
     );
     assert!(
@@ -481,8 +481,8 @@ fn gamma_knife_box_stops_after_the_effect_and_leaves_the_attacks_to_the_tree() {
     let after = ctx.without_setup_box().legal_actions(&mut w).expect("候補");
     let targets: Vec<&str> = after
         .iter()
-        .filter(|m| m["action_type"] == json!("ATTACK") || m["action_type"] == json!("DON_BOX"))
-        .filter_map(|m| m["payload"]["target_ids"][0].as_str())
+        .filter(|m| m.to_json()["action_type"] == json!("ATTACK") || m.to_json()["action_type"] == json!("DON_BOX"))
+        .filter_map(|m| m.first_target_id())
         .collect();
     assert!(targets.contains(&"p2-leader"), "リーダーへの攻撃箱: {targets:?}");
     assert!(targets.contains(&"p2-weak"), "-5000 後のキャラへの攻撃箱: {targets:?}");
@@ -508,9 +508,9 @@ fn duplicate_copies_of_a_setup_move_merge_into_one_group() {
     let groups = super::decide::merge_root_stats(s.state(), masters, &moves, &n, &q);
     // 神の裁きの箱だけを見る（エネルの起動メインなど、他の準備の手の箱は 1 枚ぶんしか無い）。
     let is_kami_box = |i: usize| -> bool {
-        moves[i]["action_type"] == json!("SETUP_BOX")
-            && (moves[i]["payload"]["uuid"] == json!("p1-kami")
-                || moves[i]["payload"]["uuid"] == json!("p1-kami2"))
+        moves[i].to_json()["action_type"] == json!("SETUP_BOX")
+            && (moves[i].to_json()["payload"]["uuid"] == json!("p1-kami")
+                || moves[i].to_json()["payload"]["uuid"] == json!("p1-kami2"))
     };
     let per_group: Vec<usize> = groups
         .iter()
@@ -572,9 +572,9 @@ fn select_groups_bundle_branches_so_q_min_n_can_reach_the_floor() {
         moves.iter().enumerate().filter(|(_, m)| pred(m)).map(|(i, _)| i).collect()
     };
     let kami_idx = idx_of(&|m: &Move| {
-        m["action_type"] == json!("SETUP_BOX") && m["payload"]["uuid"] == json!("p1-kami")
+        m.to_json()["action_type"] == json!("SETUP_BOX") && m.to_json()["payload"]["uuid"] == json!("p1-kami")
     });
-    let end_idx = idx_of(&|m: &Move| m["action_type"] == json!("TURN_END"));
+    let end_idx = idx_of(&|m: &Move| m.to_json()["action_type"] == json!("TURN_END"));
     assert!(!end_idx.is_empty(), "TURN_END は必ず候補に居る");
     let mut n = vec![0.0f64; moves.len()];
     let mut q = vec![-0.9f64; moves.len()];

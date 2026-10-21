@@ -11,13 +11,15 @@
 
 use crate::journal::Session;
 use crate::model::{GameState, MasterTable, Seat};
-use crate::rules::pending::{get_pending_request, pending_actor_action, request_action, request_actor};
+use crate::rules::pending::{
+    get_pending_request, pending_actor_action, request_action, request_actor, ACT_MAIN_ACTION,
+    ACT_MULLIGAN, ACT_SELECT_BLOCKER, ACT_SELECT_COUNTER,
+};
 use crate::state::EngineError;
 use serde_json::{json, Map, Value};
-use std::collections::HashSet;
 
 use super::prune::action_type;
-use super::{r#macro as boxes, prune, Move, SearchOptions};
+use super::{r#macro as boxes, prune, Move, Payload, SearchOptions};
 
 /// Python `action_api.ACT_RESOLVE_SELECTION`。
 pub const ACT_RESOLVE_SELECTION: &str = "RESOLVE_EFFECT_SELECTION";
@@ -38,19 +40,24 @@ pub fn legal_actions(
     masters: &MasterTable,
     opts: &SearchOptions,
 ) -> Result<Vec<Move>, EngineError> {
-    let Some((seat, _)) = pending_actor_action(s) else {
+    let Some((seat, action)) = pending_actor_action(s) else {
         return Ok(Vec::new());
     };
-    // 要求は 1 回だけ作り、合法手の列挙と対話の分岐の両方に渡す（`get_pending_request` が盤面に触るのは
-    // 冪等な戦闘フェイズの正規化だけ＝2 回目は 1 回目と同じ値を返す。間の列挙は盤面を読むだけ）。
-    let pending = get_pending_request(s, masters, false);
-    let base = crate::rules::legal::get_legal_actions_for(s, masters, seat, pending.as_ref())?;
-    // 対話の既定解決（列挙が返した唯一の RESOLVE 手の payload）は、対話の分岐の土台と同じ値。
-    let dialog_payload = match base.as_slice() {
-        [m] if action_type(m) == Some(ACT_RESOLVE_SELECTION) => m.get("payload").cloned(),
-        _ => None,
+    let mut moves = match action {
+        // 意思決定（マリガン／ブロック／カウンター／メイン）は要求の dict を組まずに列挙する
+        // （`rules::legal::get_legal_moves` と同じ規則）。対話の代替手の併合（`selection_moves`）は
+        // これらの要求では何も足さない（`CONFIRM_OPTIONAL`／`ARRANGE_DECK`／`SEARCH_AND_SELECT` だけ）。
+        ACT_MULLIGAN | ACT_SELECT_BLOCKER | ACT_SELECT_COUNTER | ACT_MAIN_ACTION => {
+            crate::rules::legal::decision_moves(s, masters, seat, action)?
+        }
+        _ => {
+            // 要求は 1 回だけ作り、合法手の列挙と対話の分岐の両方に渡す（`get_pending_request` が盤面に
+            // 触るのは冪等な戦闘フェイズの正規化だけ＝2 回目は 1 回目と同じ値を返す。間の列挙は盤面を読むだけ）。
+            let pending = get_pending_request(s, masters, false);
+            let base = crate::rules::legal::get_legal_moves_for(s, masters, seat, pending.as_ref())?;
+            merged_search_actions_with(s, masters, seat, base, pending, true)
+        }
     };
-    let mut moves = merged_search_actions_with(s, masters, seat, base, pending, dialog_payload);
 
     if opts.prune_futile {
         moves = prune::prune_don_moves(s.state(), masters, seat, moves, opts.don_margin);
@@ -105,11 +112,7 @@ pub fn legal_actions(
 
 /// Python の `(m.get("payload") or {}).get("target_ids")` の真偽（空 list は偽）。
 fn has_target_ids(mv: &Move) -> bool {
-    mv.get("payload")
-        .and_then(|p| p.get("target_ids"))
-        .and_then(Value::as_array)
-        .map(|a| !a.is_empty())
-        .unwrap_or(false)
+    mv.payload().is_some_and(|p| p.has_target_ids())
 }
 
 // --- 対話の代替手の併合 ---------------------------------------------------------
@@ -122,29 +125,46 @@ pub fn merged_search_actions(
     base_moves: Vec<Move>,
 ) -> Vec<Move> {
     let pending = get_pending_request(s, masters, false);
-    merged_search_actions_with(s, masters, seat, base_moves, pending, None)
+    merged_search_actions_with(s, masters, seat, base_moves, pending, false)
 }
 
-/// [`merged_search_actions`] の、要求と（あれば）対話の既定解決の payload を外から渡す版。
+/// [`merged_search_actions`] の、要求を外から渡す版。`base_is_listing=true` は `base_moves` が
+/// その要求の列挙（`get_legal_moves_for`）そのもの＝唯一の RESOLVE 手の payload が対話の既定解決
+/// （`default_interaction_payload`）と同じ値なので、分岐の土台に使い回す。
 fn merged_search_actions_with(
     s: &mut Session,
     masters: &MasterTable,
     seat: Seat,
     base_moves: Vec<Move>,
     pending: Option<Value>,
-    dialog_payload: Option<Value>,
+    base_is_listing: bool,
 ) -> Vec<Move> {
-    let Some(alts) = selection_moves_with(s, masters, seat, pending.as_ref(), dialog_payload.as_ref()) else {
+    let alts = {
+        let dialog_payload = match base_moves.as_slice() {
+            [m] if base_is_listing && action_type(m) == Some(ACT_RESOLVE_SELECTION) => {
+                m.payload().map(|p| p.to_json())
+            }
+            _ => None,
+        };
+        selection_moves_with(s, masters, seat, pending.as_ref(), dialog_payload.as_deref())
+    };
+    let Some(alts) = alts else {
         return base_moves;
     };
     if alts.is_empty() {
         return base_moves; // Python: `if not alts` は空 list も素通し
     }
     let mut out = base_moves;
-    let mut seen: HashSet<String> = out.iter().map(selection_merge_key).collect();
+    let mut seen: Vec<MergeKey<'static>> = Vec::new();
+    // 鍵は手から借りる＝`out` を伸ばす前に作って持てないので、鍵の値を複製して持つ
+    // （対話の候補は高々十数手）。
+    for m in &out {
+        seen.push(MergeKey::of(m).owned());
+    }
     for m in alts {
-        let k = selection_merge_key(&m);
-        if seen.insert(k) {
+        let k = MergeKey::of(&m).owned();
+        if !seen.iter().any(|x| x.same(&k)) {
+            seen.push(k);
             out.push(m);
         }
     }
@@ -154,23 +174,72 @@ fn merged_search_actions_with(
 /// Python `cpu_ai._selection_merge_key`
 /// （`(action_type, tuple(selected_uuids), accepted, index, position)`）。
 ///
-/// Rust では同じ 5 つ組を JSON 配列の文字列にして使う（tuple の等価性と同じ判別になる）。
-fn selection_merge_key(mv: &Move) -> String {
-    let null = Value::Null;
-    let p = mv.get("payload").unwrap_or(&null);
-    let su = p.get("selected_uuids").unwrap_or(&null);
-    json!([
-        mv.get("action_type").unwrap_or(&null),
-        su,
-        p.get("accepted").unwrap_or(&null),
-        p.get("index").unwrap_or(&null),
-        p.get("position").unwrap_or(&null),
-    ])
-    .to_string()
+/// 欄が無ければ `null`。等しさは**今まで鍵にしていた JSON 文字列の一致**と同じ（[`json_text_eq`]）。
+struct MergeKey<'a> {
+    vals: [std::borrow::Cow<'a, Value>; 5],
+}
+
+impl<'a> MergeKey<'a> {
+    fn of(mv: &'a Move) -> MergeKey<'a> {
+        use std::borrow::Cow;
+        let null = || Cow::Owned(Value::Null);
+        let at = match mv.action_type() {
+            Some(a) => Cow::Owned(Value::String(a.to_owned())),
+            None => mv.get("action_type").unwrap_or_else(null),
+        };
+        let p = mv.payload();
+        let field = |k: &str| p.and_then(|p| p.get(k)).unwrap_or_else(null);
+        MergeKey {
+            vals: [
+                at,
+                field("selected_uuids"),
+                field("accepted"),
+                field("index"),
+                field("position"),
+            ],
+        }
+    }
+
+    fn owned(self) -> MergeKey<'static> {
+        MergeKey {
+            vals: self.vals.map(|v| std::borrow::Cow::Owned(v.into_owned())),
+        }
+    }
+
+    fn same(&self, other: &MergeKey<'_>) -> bool {
+        self.vals
+            .iter()
+            .zip(other.vals.iter())
+            .all(|(a, b)| json_text_eq(a, b))
+    }
+}
+
+/// `a.to_string() == b.to_string()`（JSON の文字列としての一致）を、文字列を組まずに判定する。
+///
+/// 配列は要素ごと・文字列／真偽／null は値・数は表記（`Number` の文字列化）で比べる。dict は
+/// 鍵の並びも表記に効くので文字列化して比べる（対話の鍵には現れない）。
+fn json_text_eq(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Null, Value::Null) => true,
+        (Value::Bool(x), Value::Bool(y)) => x == y,
+        (Value::String(x), Value::String(y)) => x == y,
+        (Value::Number(x), Value::Number(y)) => {
+            if x.is_f64() || y.is_f64() {
+                x.to_string() == y.to_string()
+            } else {
+                x == y
+            }
+        }
+        (Value::Array(x), Value::Array(y)) => {
+            x.len() == y.len() && x.iter().zip(y.iter()).all(|(a, b)| json_text_eq(a, b))
+        }
+        (Value::Object(_), Value::Object(_)) => a.to_string() == b.to_string(),
+        _ => false,
+    }
 }
 
 fn resolve_move(payload: Value) -> Move {
-    json!({"kind": "game", "action_type": ACT_RESOLVE_SELECTION, "payload": payload})
+    Move::game(ACT_RESOLVE_SELECTION, Payload::Json(payload))
 }
 
 /// `default_interaction_payload` の複製に 1 欄だけ上書きした payload（Python の `dict(base)`）。

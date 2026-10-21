@@ -12,6 +12,9 @@ use crate::effects::ast::TriggerType;
 use crate::ops;
 use crate::state::EngineError;
 use serde_json::Value;
+use std::borrow::Cow;
+
+use super::moves::GameArgs;
 
 use super::passive::{apply_passive_effects, refresh_passive_state};
 use super::pending::{pending_actor_action, ACT_PASS, ACT_SELECT_BLOCKER, ACT_SELECT_COUNTER};
@@ -287,16 +290,25 @@ pub fn apply_game_action(
     action_type: &str,
     payload: &Value,
 ) -> Result<(), EngineError> {
-    let card_uuid = payload
-        .get("uuid")
-        .and_then(Value::as_str)
-        .or_else(|| payload.get("card_id").and_then(Value::as_str));
-    let target_uuid = payload
-        .get("target_ids")
-        .and_then(Value::as_array)
-        .and_then(|a| a.first())
-        .and_then(Value::as_str)
-        .or_else(|| payload.get("target_uuid").and_then(Value::as_str));
+    let args = GameArgs::of_json(payload);
+    apply_game_action_with(s, masters, seat, action_type, args, || Cow::Borrowed(payload))
+}
+
+/// [`apply_game_action`] の、payload から読む欄（[`GameArgs`]）を外から渡す版（探索の型の手・
+/// WP `rs-speed-d`）。`payload` は対話の解決（`RESOLVE_EFFECT_SELECTION`）だけが読む。
+pub fn apply_game_action_with<'p>(
+    s: &mut Session,
+    masters: &MasterTable,
+    seat: Seat,
+    action_type: &str,
+    args: GameArgs<'_>,
+    payload: impl FnOnce() -> Cow<'p, Value>,
+) -> Result<(), EngineError> {
+    let GameArgs {
+        card_uuid,
+        target_uuid,
+        ability_index,
+    } = args;
     let operating = card_uuid.and_then(|u| operating_card(s.state(), seat, u));
 
     match action_type {
@@ -397,10 +409,7 @@ pub fn apply_game_action(
         }
         "ACTIVATE_MAIN" => {
             let card = operating.ok_or_else(|| bad("効果を発動するカードが見つかりません。"))?;
-            let index = payload
-                .get("ability_index")
-                .and_then(Value::as_u64)
-                .map(|n| n as usize);
+            let index = ability_index;
             if s.events_on() {
                 let name = masters.get(s.state().card(card).master).name.clone();
                 s.push_event(serde_json::json!({
@@ -411,7 +420,7 @@ pub fn apply_game_action(
             activate_main(s, masters, seat, card, index)?;
         }
         "RESOLVE_EFFECT_SELECTION" => {
-            resolve_interaction(s, masters, seat, payload)?;
+            resolve_interaction(s, masters, seat, &payload())?;
         }
         "MULLIGAN" => {
             super::turn::do_mulligan(s, masters, seat)?;
