@@ -11,7 +11,6 @@
 
 use crate::model::{CardIdx, GameState, MasterTable, Seat};
 use crate::rules::{has_keyword, KW_RUSH};
-use serde_json::Value;
 use std::sync::OnceLock;
 
 use super::Move;
@@ -149,6 +148,24 @@ pub fn don_cond_max_n(text: &str) -> Option<i32> {
     don_cond_ns(text).into_iter().max()
 }
 
+/// カード `m` の本文の [`don_cond_max_n`]（`Some` ⇔ [`has_don_conditional`]）。
+///
+/// 本文はマスター（不変）なので、表の全カードぶんを 1 度だけ作って引く（候補生成のたびに
+/// 本文を走査しない）。印を作った後に足されたカード（単体テストの表だけ）はその場で読む。
+pub fn master_don_cond(masters: &MasterTable, m: crate::model::MasterIdx) -> Option<i32> {
+    let marks = masters.don_cond.get_or_init(|| {
+        masters
+            .masters
+            .iter()
+            .map(|cm| don_cond_max_n(&cm.effect_text))
+            .collect()
+    });
+    match marks.get(m as usize) {
+        Some(n) if marks.len() == masters.masters.len() => *n,
+        _ => don_cond_max_n(&masters.get(m).effect_text),
+    }
+}
+
 // --- ドン!!付与の枝刈り ---------------------------------------------------------
 
 fn power(state: &GameState, masters: &MasterTable, card: CardIdx, is_my_turn: bool) -> i32 {
@@ -180,7 +197,7 @@ pub fn attach_don_meaningful(
         return false;
     }
     // (B) 付与ドン条件を持つカードは保守的に残す。
-    if has_don_conditional(&masters.get(state.card(card).master).effect_text) {
+    if master_don_cond(masters, state.card(card).master).is_some() {
         return true;
     }
     // (A) 戦闘結果を変えうる付与のみ（付与先はこのターン攻撃できる体に限る）。
@@ -289,19 +306,15 @@ pub fn prune_futile_attacks(
 // --- 手（JSON dict）の小道具 -----------------------------------------------------
 
 pub(super) fn action_type(mv: &Move) -> Option<&str> {
-    mv.get("action_type").and_then(Value::as_str)
+    mv.action_type()
 }
 
 pub(super) fn payload_uuid(mv: &Move) -> Option<&str> {
-    mv.get("payload")?.get("uuid")?.as_str()
+    mv.payload_uuid()
 }
 
 pub(super) fn first_target_id(mv: &Move) -> Option<&str> {
-    mv.get("payload")?
-        .get("target_ids")?
-        .as_array()?
-        .first()?
-        .as_str()
+    mv.first_target_id()
 }
 
 #[cfg(test)]

@@ -8,9 +8,11 @@
 //! - WP `rs-p4-mcts`（上の統合後）: `TreeMCTS`／静止探索／戦闘箱・対話箱／`decide`（窓の根畳み・箱コミット・
 //!   等価手マージ・温度・残り腕）。
 //!
-//! 手（`Move`）は Python の dict と同じ JSON（`kind`／`action_type`／`payload`／`card_uuid`・DON_BOX の
-//! `uuid`／`don_k`／`target_ids`）。乱数は**出目を受け取る**（[`RecordedRng`]＝`rs_search_oracle.py` が
-//! Python の `np.random.Generator` をラップして記録する）。自前の生成器は P5。
+//! 手（`Move`）は型（[`crate::rules::moves`]・WP `rs-speed-d`）。意味は Python の dict と同じ
+//! （`kind`／`action_type`／`payload`／`card_uuid`・DON_BOX の `uuid`／`don_k`／`target_ids`）で、
+//! JSON の形（[`Move::to_json`]）は境目（`decide` の出力・`search_legal` など）でだけ作る。
+//! 乱数は**出目を受け取る**（[`RecordedRng`]＝`rs_search_oracle.py` が Python の
+//! `np.random.Generator` をラップして記録する）。自前の生成器は P5。
 
 #![allow(dead_code)]
 
@@ -39,74 +41,8 @@ use crate::model::{GameState, MasterTable, Seat};
 use crate::state::EngineError;
 use serde_json::Value;
 
-/// 探索用の手（Python の dict と同じ JSON）。
-pub type Move = Value;
-
-/// 手（[`Move`]）の欄を **1 度の走査**で読んだ借用ビュー（WP `rs-speed-b`）。
-///
-/// `Value::get` は欄ごとに鍵を SipHash で引く（`serde_json` の `preserve_order` は `IndexMap`）。
-/// 探索の適用・候補行は 1 手から 3〜6 欄を読むので、数欄の小さな dict を 1 度なめて鍵を文字列で
-/// 突き合わせる方が軽い。欄が無ければ `None`（`get` と同じ）・中身は借りるだけ＝読む値は同じ。
-#[derive(Debug, Default, Clone, Copy)]
-pub struct MoveRef<'a> {
-    pub kind: Option<&'a Value>,
-    pub action_type: Option<&'a Value>,
-    pub payload: Option<&'a Value>,
-    pub card_uuid: Option<&'a Value>,
-}
-
-impl<'a> MoveRef<'a> {
-    pub fn of(mv: &'a Move) -> MoveRef<'a> {
-        let mut r = MoveRef::default();
-        if let Some(o) = mv.as_object() {
-            for (k, v) in o {
-                match k.as_str() {
-                    "kind" => r.kind = Some(v),
-                    "action_type" => r.action_type = Some(v),
-                    "payload" => r.payload = Some(v),
-                    "card_uuid" => r.card_uuid = Some(v),
-                    _ => {}
-                }
-            }
-        }
-        r
-    }
-
-    /// `mv.get("action_type").and_then(Value::as_str)`。
-    pub fn action_type_str(&self) -> Option<&'a str> {
-        self.action_type.and_then(Value::as_str)
-    }
-}
-
-/// 手の `payload` の欄を 1 度の走査で読んだ借用ビュー（[`MoveRef`] と同じ考え方）。
-#[derive(Debug, Default, Clone, Copy)]
-pub struct PayloadRef<'a> {
-    pub uuid: Option<&'a Value>,
-    pub target_ids: Option<&'a Value>,
-    pub don_k: Option<&'a Value>,
-    pub selected_uuids: Option<&'a Value>,
-    pub base: Option<&'a Value>,
-}
-
-impl<'a> PayloadRef<'a> {
-    /// `payload` が無い／dict でなければ全部 `None`（`Value::get` と同じ）。
-    pub fn of(payload: Option<&'a Value>) -> PayloadRef<'a> {
-        let mut r = PayloadRef::default();
-        if let Some(o) = payload.and_then(Value::as_object) {
-            for (k, v) in o {
-                match k.as_str() {
-                    "uuid" => r.uuid = Some(v),
-                    "target_ids" => r.target_ids = Some(v),
-                    "don_k" => r.don_k = Some(v),
-                    "selected_uuids" => r.selected_uuids = Some(v),
-                    "base" => r.base = Some(v),
-                    _ => {}
-                }
-            }
-        }
-        r
-    }
-}
+/// 探索用の手（型・JSON の形は境目だけ＝[`crate::rules::moves`]・WP `rs-speed-d`）。
+pub use crate::rules::moves::{Move, Payload, PayloadRef};
 
 /// 葉の打ち切り（§20.7.9・WP `rs-leaf-rollout`）。**既定は [`LeafRollout::None`]＝今までどおり**。
 ///
@@ -314,7 +250,8 @@ pub fn search_legal(hidden_json: &str, opts_json: &str) -> Result<String, Engine
                     "search_legal: prefix[{i}] を打つ主体が居ない（要求が無い）"
                 )));
             };
-            apply::apply_move_inplace(&mut s, masters, actor, mv, true).map_err(|e| match e {
+            let mv = Move::from_json(mv.clone());
+            apply::apply_move_inplace(&mut s, masters, actor, &mv, true).map_err(|e| match e {
                 EngineError::BadPayload(m) => {
                     EngineError::BadPayload(format!("search_legal: prefix[{i}]: {m}"))
                 }
@@ -325,7 +262,10 @@ pub fn search_legal(hidden_json: &str, opts_json: &str) -> Result<String, Engine
         }
     }
     let moves = legal_actions(&mut s, masters, &opts)?;
-    dump(&Value::Array(moves), "search_legal")
+    dump(
+        &Value::Array(moves.iter().map(Move::to_json).collect()),
+        "search_legal",
+    )
 }
 
 /// `opcg_engine.search_determinize(hidden_json, seat, order_json)` → 盤面 dict。
@@ -442,13 +382,13 @@ pub fn decide_on_state(
     }
     let boxes = r#macro::take_setup_stats();
     let mut body = serde_json::json!({
-        "move": out.mv,
+        "move": out.mv.as_ref().map(Move::to_json),
         // 棋譜ダンプの鍵（箱レベル・原始手化と残り掘りの前＝Python `record["sig"]`／`["k"]`）
         "sig": out.sig,
         "k": out.k,
         "kind": out.kind,
         "stats": {
-            "legal": out.legal,
+            "legal": out.legal.iter().map(Move::to_json).collect::<Vec<_>>(),
             "N": out.n,
             "Q": out.q,
             "P": out.p,
@@ -463,7 +403,7 @@ pub fn decide_on_state(
         })).collect::<Vec<_>>(),
         // PV（主変化・§20.4・kind=main のときだけ埋まる）。
         "pv": out.pv.iter().map(|p| serde_json::json!({
-            "move": p.mv, "seat": p.seat.name(), "n": p.n, "q": p.q,
+            "move": p.mv.to_json(), "seat": p.seat.name(), "n": p.n, "q": p.q,
         })).collect::<Vec<_>>(),
         "commit": out.carry.commit.iter().map(decide::Step::to_json).collect::<Vec<_>>(),
         "resact_pending": out.carry.resact_pending,
@@ -663,7 +603,7 @@ pub fn search_apply(
     let masters = masters_or_err("search_apply")?;
     let hidden = parse(hidden_json, "search_apply: hidden")?;
     let actor = seat_or_err(seat, "search_apply")?;
-    let mv = parse(move_json, "search_apply: move")?;
+    let mv = Move::from_json(parse(move_json, "search_apply: move")?);
     let mut s = Session::new(GameState::from_record(&hidden, masters)?);
     apply_move_inplace(&mut s, masters, actor, &mv, stop_at_select)?;
     let board = board_with_pending(&mut s, masters)?;

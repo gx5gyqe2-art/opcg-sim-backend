@@ -131,7 +131,7 @@ pub fn sample_masters() -> MasterTable {
         .enumerate()
         .map(|(i, m)| (m.card_id.clone(), i as MasterIdx))
         .collect();
-    MasterTable { masters, by_id, abilities: effect_table() }
+    MasterTable { masters, by_id, abilities: effect_table(), don_cond: Default::default() }
 }
 
 fn card(m: MasterIdx, owner: Seat, uuid: &str) -> CardInstance {
@@ -929,5 +929,6 @@ pub fn effect_table() -> AbilityTable {
                 cost_optional: false,
             },
         ],
+        ..Default::default()
     }
 }

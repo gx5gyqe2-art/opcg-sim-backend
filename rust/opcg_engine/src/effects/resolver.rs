@@ -558,13 +558,14 @@ impl Resolver {
                 self.execution_stack.push(node_ref);
                 return Ok(());
             }
-            let node = node_ref.resolve(&masters.abilities).cloned().ok_or_else(|| {
+            // ノードはマスター表（不変）から借りる＝部分木を複製しない（読む値は同じ・WP `rs-speed-d`）。
+            let node = node_ref.resolve(&masters.abilities).ok_or_else(|| {
                 EngineError::BadPayload(format!("process_stack: 解決できないノード {node_ref:?}"))
             })?;
 
             match node {
                 EffectNode::Action(action) => {
-                    if self.step_action(s, masters, actor, source_card, &action, &node_ref)? {
+                    if self.step_action(s, masters, actor, source_card, action, &node_ref)? {
                         continue;
                     }
                     return Ok(());

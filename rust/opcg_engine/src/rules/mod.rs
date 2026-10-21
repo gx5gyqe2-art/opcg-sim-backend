@@ -22,6 +22,7 @@
 pub mod actions;
 pub mod battle;
 pub mod legal;
+pub mod moves;
 pub mod passive;
 pub mod pending;
 pub mod turn;

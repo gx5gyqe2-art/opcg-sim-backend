@@ -576,24 +576,26 @@ fn leader_act_avail(s: &mut Session, masters: &MasterTable, me: Seat) -> f32 {
         return 0.0;
     }
     let lu = s.state().card(leader).uuid.clone();
-    let Ok(legal) = crate::rules::legal::get_legal_actions(s, masters, me) else {
+    let Ok(legal) = crate::rules::legal::get_legal_moves(s, masters, me) else {
         return 0.0; // Python は例外を握って 0.0
     };
     for a in &legal {
-        if a.get("action_type").and_then(|v| v.as_str()) != Some("ACTIVATE_MAIN") {
+        if a.action_type() != Some("ACTIVATE_MAIN") {
             continue;
         }
-        let payload = a.get("payload");
-        let uuid = a
-            .get("card_uuid")
-            .and_then(|v| v.as_str())
-            .or_else(|| payload.and_then(|p| p.get("uuid")).and_then(|v| v.as_str()))
-            .or_else(|| {
+        // 主体は `card_uuid` → `payload.uuid` → `payload.card_uuid` の順（今までと同じ読み）。
+        let payload = a.payload();
+        let hit = match a.card_uuid().or_else(|| payload.and_then(|p| p.uuid())) {
+            Some(u) => u == lu,
+            None => {
                 payload
                     .and_then(|p| p.get("card_uuid"))
+                    .as_deref()
                     .and_then(|v| v.as_str())
-            });
-        if uuid == Some(lu.as_str()) {
+                    == Some(lu.as_str())
+            }
+        };
+        if hit {
             return 1.0;
         }
     }

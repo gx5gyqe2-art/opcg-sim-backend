@@ -448,6 +448,9 @@ pub struct MasterTable {
     pub by_id: std::collections::HashMap<String, MasterIdx>,
     /// 全カードの能力（`CardMaster.ability_ids` が指す先）。
     pub abilities: crate::effects::ast::AbilityTable,
+    /// カードごとの本文の【ドン!!×N】の最大 N（`search::prune::master_don_cond`）。本文から
+    /// 決まる値を表ごとに 1 度だけ作って持つ。
+    pub don_cond: std::sync::OnceLock<Vec<Option<i32>>>,
 }
 
 /// `CardMaster` を作る際に読む欄（`export_effects_json.py` の出力と 1:1）。
@@ -571,6 +574,7 @@ impl MasterTable {
             masters: Vec::with_capacity(entries.len()),
             by_id: HashMap::with_capacity(entries.len()),
             abilities: crate::effects::ast::AbilityTable::default(),
+            don_cond: Default::default(),
         };
         for (key, card) in entries {
             table.add_master(card, &format!("effects json: cards.{key}"))?;

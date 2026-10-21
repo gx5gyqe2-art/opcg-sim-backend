@@ -668,7 +668,10 @@ mod tests {
             let n = &mut t.nodes[node];
             n.expanded = true;
             n.to_move = Some(Seat::P1);
-            n.legal = vec![serde_json::json!({}), serde_json::json!({})];
+            n.legal = vec![
+                Move::from_json(serde_json::json!({})),
+                Move::from_json(serde_json::json!({})),
+            ];
             n.p = vec![0.4, 0.6];
             n.n = vec![0.0, 0.0];
             n.w = vec![0.0, 0.0];
