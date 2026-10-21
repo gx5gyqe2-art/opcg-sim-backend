@@ -51,6 +51,11 @@ def build_parser():
     ap.add_argument("--sims", type=int, default=E.SERVE_SIMS)
     ap.add_argument("--budget", type=int, default=None,
                     help="基準席の戦闘箱の枝予算（既定 8000・0＝無制限）。候補席は --cand-budget")
+    ap.add_argument("--rethink-ratio", type=float, default=None,
+                    help="基準席の「迷う局面だけ世界 K 本で読み直す」の線 τ（§7.4・省略＝off）。"
+                         "候補席は --cand-rethink-ratio")
+    ap.add_argument("--rethink-worlds", type=int, default=None,
+                    help="基準席の読み直しの世界の本数 K（省略＝4）")
     ap.add_argument("--leaders", default="fixed", choices=("fixed", "random", "real", "purple"),
                     help="対面の選び方: fixed=既定リーダーミラー（歴代判定と地続き）／"
                          "random=全リーダーからペアごとに 2 枚引く（汎化）／"
@@ -67,6 +72,13 @@ def build_parser():
     return ap
 
 
+def _best_kw(args):
+    """基準席のつまみ（§7.4 の読み直し）。何も立っていなければ None＝基準席は今までどおり。"""
+    kw = {k: v for k, v in (("rethink_ratio", args.rethink_ratio),
+                            ("rethink_worlds", args.rethink_worlds)) if v is not None}
+    return kw or None
+
+
 def main(argv=None):
     args = build_parser().parse_args(argv)
     cand_kw = A.cand_kw_from_args(args)
@@ -80,7 +92,8 @@ def main(argv=None):
         batch = todo[: args.max_pairs]
         t0 = time.time()
         initargs = (args.candidate, args.baseline, cand_kw, args.leaders,
-                    args.decks, args.pair_timeout, args.sims, args.budget)
+                    args.decks, args.pair_timeout, args.sims, args.budget,
+                    _best_kw(args))
         with mp.get_context("spawn").Pool(args.workers, initializer=A.init_pool,
                                           initargs=initargs) as pool:
             with open(args.out, "a") as f:
@@ -98,6 +111,8 @@ def main(argv=None):
         res["candidate"] = args.candidate
         if cand_kw:
             res["cand_opts"] = cand_kw          # 判定は設定に紐づく（§20.5.3）
+        if _best_kw(args):
+            res["best_opts"] = _best_kw(args)   # 基準席の読み直しも判定に紐づく（§7.4）
         print(f"ARENA_RESUME_FINAL {json.dumps(res, ensure_ascii=False)}", flush=True)
     return 0
 

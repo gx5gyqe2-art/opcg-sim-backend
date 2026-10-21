@@ -18,7 +18,7 @@ import json
 import os
 import subprocess
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA = os.path.join(_REPO_ROOT, "opcg_sim", "data")
@@ -40,6 +40,12 @@ SERVE_SIMS = 160
 #: `SERVE_SIMS`／既定の予算のまま（ここを触っても学習側は変わらない）。0＝予算なし。
 PLAY_SIMS = 1280
 PLAY_BUDGET = 0
+#: 対戦 API の「迷う局面だけ世界 K 本で読み直す」（`docs/search_efficiency_plan.md` §7.4・WP
+#: `play-rethink`）。根の 2 位の訪問数 ÷ 1 位の訪問数が `PLAY_RETHINK_RATIO` 以上なら、同じ
+#: `search_seed` で世界 `PLAY_RETHINK_WORLDS` 本の読みをやり直してその手に差し替える。
+#: **None＝off（既定）**＝1 本の読みのまま 1 bit も変わらない。線は Phase 0 の結果で決める。
+PLAY_RETHINK_RATIO: Optional[float] = None
+PLAY_RETHINK_WORLDS = 4
 GEN_PRUNE_FUTILE = False   # 生成は枝刈りを外す（v6 柱⑤: 刈った枝は学習データに現れない）
 
 _STATE: Dict[str, Any] = {}
@@ -123,6 +129,55 @@ def search_seed(game_seed: int, turn: int, seat: str) -> int:
     return x ^ (x >> 31)
 
 
+def rethink_ratio(out: Dict[str, Any]) -> Optional[float]:
+    """根の迷いの尺度 r＝2 位の訪問数 ÷ 1 位の訪問数（pure）。
+
+    読むのは**等価手マージ後のグループ**（`out["groups"]`・出す手もここから選ばれる）。木を
+    回した決定（`kind == "main"`）で候補が 2 つ以上のときだけ値を返す。戦闘窓・対話窓の根畳み
+    （`window`）・箱コミットの機械実行（`commit`）・候補 1 つの決定は None＝読み直さない
+    （窓・コミットは世界の本数を見ないので、読み直しても同じ手になる）。
+    """
+    if out.get("kind") != "main":
+        return None
+    ns = sorted((float(g.get("n") or 0.0) for g in (out.get("groups") or [])), reverse=True)
+    if len(ns) < 2 or ns[0] <= 0.0:
+        return None
+    return ns[1] / ns[0]
+
+
+def decide_with_rethink(decide: Callable[[str], str], opts_json: str,
+                        ratio: Optional[float] = None,
+                        worlds: int = PLAY_RETHINK_WORLDS) -> Dict[str, Any]:
+    """1 回の `Game.decide`（`decide(opts_json) -> out JSON`）＋迷うときだけの読み直し。
+
+    対戦 API（`RsGame._decide`）とアリーナ・生成の席（`driver.run_game`）が**同じ関数**を
+    通る＝物差しは 1 本（§7.4 の 2）。
+
+    - `ratio is None`（既定）: `decide(opts_json)` を 1 回呼んだ結果をそのまま返す（off＝1 bit
+      も変わらない・戻り値に鍵も足さない）。
+    - それ以外: 1 本目の結果の [`rethink_ratio`] が `ratio` 以上なら、**同じ opts（同じ
+      `search_seed`・同じ持ち越し）の `worlds` だけを K 本にして**読み直し、その結果に丸ごと
+      差し替える（手・統計・持ち越し）。`decide` は盤面を動かさないので 2 回呼んでよい。
+      opts が既に K 本以上の世界を持つときは読み直さない（同じ読みの繰り返しになる）。
+      戻り値に `rethink: {r, fired, first_move, final_move}` を足す（発動率・入れ替わり率を
+      後で数える・`r` は読み直さない決定では None）。
+    """
+    out = json.loads(decide(opts_json))
+    if ratio is None:
+        return out
+    r = rethink_ratio(out)
+    first = out.get("move")
+    info: Dict[str, Any] = {"r": r, "fired": False, "first_move": first, "final_move": first}
+    opts = json.loads(opts_json)
+    if r is not None and r >= float(ratio) and int(worlds) > int(opts.get("worlds") or 1):
+        opts["worlds"] = int(worlds)
+        out = json.loads(decide(json.dumps(opts, ensure_ascii=False)))
+        info["fired"] = True
+        info["final_move"] = out.get("move")
+    out["rethink"] = info
+    return out
+
+
 class SeatSpec:
     """1 席の思考（ネット＋探索のつまみ）。`Game.decide` の `opts` を組む。
 
@@ -135,8 +190,13 @@ class SeatSpec:
     def __init__(self, net: Optional[str] = None, sims: int = SERVE_SIMS,
                  dirichlet_eps: float = 0.0, temp_turns: int = 0,
                  eps_play: float = 0.0, eps_hold: float = 0.0,
-                 eps_target: float = 0.0, **kw):
+                 eps_target: float = 0.0, rethink_ratio: Optional[float] = None,
+                 rethink_worlds: Optional[int] = None, **kw):
         self.net = load_net(net)
+        #: 迷う局面だけ世界 K 本で読み直す（§7.4・[`decide_with_rethink`]）。**decide の opts には
+        #: 入れない**——1 本目の結果を見てから 2 回目を呼ぶ Python 側のつまみ。既定 None＝off。
+        self.rethink_ratio = None if rethink_ratio is None else float(rethink_ratio)
+        self.rethink_worlds = int(rethink_worlds or PLAY_RETHINK_WORLDS)
         #: 両方向 ε 探索（§20.8.5・生成の対照づくり）。**decide の opts には入れない**——
         #: 木も π も変えず、「decide が返した後で打つ手だけを差し替える」Python 側のつまみ
         #: （差し替えの実体は `record_gen.eps_swap`・入口は `driver.run_game(swap=…)`）。

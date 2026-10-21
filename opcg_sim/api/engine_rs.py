@@ -291,7 +291,9 @@ class RsGame:
               leaf_rollout: Optional[str] = None,
               select_branch: Optional[bool] = None,
               setup_box_keep_bare: Optional[bool] = None,
-              budget: Optional[int] = None):
+              budget: Optional[int] = None,
+              rethink_ratio: Optional[float] = None,
+              rethink_worlds: Optional[int] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
         `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
@@ -319,6 +321,11 @@ class RsGame:
         `select_branch`（省略可・§20.7.8 の 5）＝診断つまみ。全箱共通の「自分の対象選択を
         枝にする」規則だけを on/off する（`None`＝`setup_box` に従う＝今までどおり）。
         `budget`（省略可）＝戦闘箱の枝予算（1 decide あたり・0＝無制限・省略＝Rust 既定 8000）。
+        `rethink_ratio`／`rethink_worlds`（省略可・`docs/search_efficiency_plan.md` §7.4）＝迷う局面
+        だけ世界 K 本で読み直す（根の 2 位の訪問数 ÷ 1 位 ≥ `rethink_ratio` なら同じ seed で
+        `worlds=rethink_worlds`〔既定 4〕を読み直して差し替える・アリーナの席と同じ
+        `opcg_sim.loop.engine.decide_with_rethink`）。trace に `rethink: {r, fired, first_move,
+        final_move}` が入る。**省略（None）すれば 1 本の読みのまま**（trace の欄も増えない）。
         """
         move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
                                 select_rule=select_rule, q_min_frac=q_min_frac,
@@ -326,7 +333,8 @@ class RsGame:
                                 setup_box=setup_box, leaf_rollout=leaf_rollout,
                                 select_branch=select_branch,
                                 setup_box_keep_bare=setup_box_keep_bare,
-                                budget=budget)
+                                budget=budget, rethink_ratio=rethink_ratio,
+                                rethink_worlds=rethink_worlds)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
@@ -338,7 +346,9 @@ class RsGame:
                leaf_rollout: Optional[str] = None,
                select_branch: Optional[bool] = None,
                setup_box_keep_bare: Optional[bool] = None,
-               budget: Optional[int] = None):
+               budget: Optional[int] = None,
+               rethink_ratio: Optional[float] = None,
+               rethink_worlds: Optional[int] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -391,7 +401,12 @@ class RsGame:
         # 戦闘箱の枝予算。None＝渡さない＝Rust 側の既定（8000）・0＝無制限。
         if budget is not None:
             opts["budget"] = int(budget)
-        out = json.loads(self._game.decide(player_id, json.dumps(opts)))
+        # 迷う局面だけの読み直し（§7.4）。None＝off＝`decide` を 1 回呼ぶだけ（今までと同じ）。
+        from opcg_sim.loop import engine as _LE
+        out = _LE.decide_with_rethink(lambda o: self._game.decide(player_id, o), json.dumps(opts),
+                                      rethink_ratio,
+                                      _LE.PLAY_RETHINK_WORLDS if rethink_worlds is None
+                                      else int(rethink_worlds))
         self._carry_key = (turn, seat)
         self._carry = {"commit": out.get("commit") or [],
                        "resact_pending": bool(out.get("resact_pending"))}
@@ -492,6 +507,15 @@ class RsGame:
         # 葉の打ち切りの実績（§20.7.9 の計測・`leaf_rollout="turn_end"` の decide だけ欄が出る）。
         if out.get("rollout") is not None:
             tr["rollout"] = out["rollout"]
+        # 迷う局面だけの読み直し（§7.4・`rethink_ratio` を渡した decide だけ欄が出る）。
+        rt = out.get("rethink")
+        if rt is not None:
+            tr["rethink"] = {
+                "r": (None if rt.get("r") is None else round(float(rt["r"]), 4)),
+                "fired": bool(rt.get("fired")),
+                "first_move": self.describe_move(rt["first_move"]) if rt.get("first_move") else None,
+                "final_move": self.describe_move(rt["final_move"]) if rt.get("final_move") else None,
+            }
         return tr
 
     @staticmethod

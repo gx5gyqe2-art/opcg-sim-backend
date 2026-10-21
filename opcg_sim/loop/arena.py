@@ -118,7 +118,8 @@ class PairTimeout(BaseException):
 
 
 def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
-              decks="singleton", pair_timeout=0, sims=E.SERVE_SIMS, budget=None):
+              decks="singleton", pair_timeout=0, sims=E.SERVE_SIMS, budget=None,
+              best_kw=None):
     """子プロセス初期化: カード DB と席のつまみを 1 回だけ作る（以後の全ペアで共有）。
 
     `cand_kw` は**候補席にだけ**渡す探索のつまみ（`{"macro_moves": True}` 等）。機構を
@@ -130,6 +131,9 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
 
     `budget`（`--budget`）は**基準席の**戦闘箱の枝予算（None＝既定 8000・0＝無制限）。両席を出荷と
     同じ読みで打たせるときに `--cand-budget` と組で使う（2026-10-19・台帳 2+270）。
+
+    `best_kw`（`--rethink-ratio`／`--rethink-worlds`）は**基準席の**「迷う局面だけ世界 K 本で
+    読み直す」（`docs/search_efficiency_plan.md` §7.4）。None＝基準席は読み直さない（今までどおり）。
     """
     E.engine()
     _G["leaders_mode"] = leaders_mode
@@ -140,8 +144,9 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
     _G["cand_opts"] = dict(kw)                 # 台帳に書く候補席の設定（既定なら空）
     cand_sims = int(kw.pop("sims", sims))
     _G["cand"] = E.SeatSpec(cand_spec or None, sims=cand_sims, **kw)
-    _G["best"] = E.SeatSpec(best_spec or None, sims=sims,
-                            **({} if budget is None else {"budget": int(budget)}))
+    best_extra = {} if budget is None else {"budget": int(budget)}
+    best_extra.update({k: v for k, v in (best_kw or {}).items() if v is not None})
+    _G["best"] = E.SeatSpec(best_spec or None, sims=sims, **best_extra)
 
 
 def play_pair(seed: int) -> float:
@@ -243,6 +248,12 @@ def add_cand_args(ap) -> None:
     ap.add_argument("--cand-budget", type=int, default=None,
                     help="候補席だけ戦闘箱の枝予算（1 decide あたり・既定 8000・0＝無制限）。"
                          "sims を上げると予算が先に切れる（2026-10-18・台帳 2+261）")
+    # --- 迷う局面だけ世界 K 本で読み直す（§7.4・WP `play-rethink`）------------------------
+    ap.add_argument("--cand-rethink-ratio", type=float, default=None,
+                    help="候補席だけ、根の 2 位の訪問数 ÷ 1 位 ≥ τ の決定を同じ seed で世界 K 本"
+                         "で読み直す（省略＝off）。K 本ぶんスレッドを使うので --workers を下げること")
+    ap.add_argument("--cand-rethink-worlds", type=int, default=None,
+                    help="候補席の読み直しの世界の本数 K（省略＝4・--cand-rethink-ratio と組で使う）")
 
 
 #: `--cand-<flag>` → `Game.decide` の opts の欄（値をそのまま流す欄・省略＝既定）。
@@ -254,6 +265,9 @@ CAND_VALUE_FLAGS = {
     "cand_worlds": "worlds",
     "cand_budget": "budget",
     "cand_residual_activate": "residual_activate",
+    # 下の 2 つは opts には入らない（`SeatSpec` の名前付き引数・`decide_with_rethink`）。
+    "cand_rethink_ratio": "rethink_ratio",
+    "cand_rethink_worlds": "rethink_worlds",
 }
 
 
