@@ -14,7 +14,20 @@
   ]
  },
  "metrics": {
-  "arena_r19p/r19p_w07.jsonl": 84
+  "arena_r19p/r19p_w07.jsonl": 84,
+  "final": {
+   "pairs": 84,
+   "games": 168,
+   "void": 0,
+   "wins": 83.0,
+   "wr": 0.494,
+   "ci95": [
+    0.4331,
+    0.555
+   ],
+   "elo": -4.1,
+   "promoted": false
+  }
  },
- "notes": ""
+ "notes": "arena_shard の起動ログに「（基準席は既定）」と出るが、_best_kw で基準席にも worlds=2 が渡り sims 1280・budget 0 も引数で渡る（最終行 best_opts={'worlds':2}）。表示だけの文言。5 回目のループは消化済みで何もしなかった。"
 }
