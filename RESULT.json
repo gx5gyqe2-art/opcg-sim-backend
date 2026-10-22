@@ -14,7 +14,22 @@
   ]
  },
  "metrics": {
-  "arena_r19p/r19p_w08.jsonl": 84
+  "arena_r19p/r19p_w08.jsonl": 84,
+  "final": {
+   "pairs": 84,
+   "games": 168,
+   "void": 0,
+   "wins": 92.0,
+   "wr": 0.5476,
+   "ci95": [
+    0.491,
+    0.6042
+   ],
+   "elo": 33.2,
+   "best_opts": {
+    "worlds": 2
+   }
+  }
  },
- "notes": ""
+ "notes": "~ への clone がネットワーク切断で失敗したため、既存の /home/user/opcg-sim-backend を ~/opcg-sim-backend へ symlink して手順どおり実行。ログの『（基準席は既定）』は固定文言で、基準席の --worlds 2 は best_opts={'worlds': 2} として渡っている（ARENA_RESUME_FINAL で確認）。--sims 1280 --budget 0 は基準席にも渡る。void 0。"
 }
