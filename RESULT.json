@@ -6,13 +6,15 @@
   "files": [
    "arena_r20/r20_mirror_w14.jsonl",
    "arena_r20/r20_real_w14.jsonl",
-   "arena_r20/r20_synth2_w14.jsonl"
+   "arena_r20/r20_synth2_w14.jsonl",
+   "arena_r20/r20s_real_w14.jsonl"
   ]
  },
  "metrics": {
   "arena_r20/r20_mirror_w14.jsonl": 175,
   "arena_r20/r20_real_w14.jsonl": 175,
-  "arena_r20/r20_synth2_w14.jsonl": 175
+  "arena_r20/r20_synth2_w14.jsonl": 175,
+  "arena_r20/r20s_real_w14.jsonl": 175
  },
  "notes": ""
 }
