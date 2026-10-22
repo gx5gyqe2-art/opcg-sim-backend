@@ -1,7 +1,7 @@
 {
  "job": "n50s-w05",
  "role": "gen",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r13d.npz",
   "seed_base": 2543000,
@@ -15,15 +15,16 @@
   "dirs": [
    "n_records/n50s_w05_p0",
    "n_records/n50s_w05_p1",
-   "n_records/n50s_w05_p2"
+   "n_records/n50s_w05_p2",
+   "n_records/n50s_w05_p3"
   ]
  },
  "metrics": {
-  "parts_done": 3,
-  "games": 360,
-  "rows": 50824,
+  "parts_done": 4,
+  "games": 480,
+  "rows": 67477,
   "dropped": 1,
-  "sec_play_mean": 11.25
+  "sec_play_mean": 11.33
  },
  "notes": ""
 }
