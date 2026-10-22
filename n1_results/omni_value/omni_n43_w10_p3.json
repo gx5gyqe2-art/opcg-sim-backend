@@ -1,0 +1,20 @@
+{
+ "dir": "/root/n43/n_records/n43_w10_p3",
+ "out": "n1_results/omni_value/omni_n43_w10_p3.npz",
+ "rows": 17143,
+ "games": 120,
+ "ok_rows": 17054,
+ "omni_rows": 10500,
+ "failed_games": [
+  {
+   "seed": 2435891,
+   "rows": 180,
+   "fail": "符号化が一致しない（step 91）",
+   "beam_max": 65,
+   "file": "n_record_00003.npz"
+  }
+ ],
+ "beam_max": 66,
+ "decide_sec_sum": 346.36859130859375,
+ "wall_sec": 96.5
+}
