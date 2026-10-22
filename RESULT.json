@@ -17,5 +17,5 @@
  "metrics": {
   "arena_fairprod/fairprod_w03.jsonl": 120
  },
- "notes": ""
+ "notes": "120 pairs/240 games, void 0, cand wr 0.4667 CI95 [0.3964,0.537], elo -23.2 (fair vs peek). Log said baseline seat 'default' but --reveal peek was passed (best_opts reveal=peek). Ran 12x10-pair chunks, pushed each."
 }
