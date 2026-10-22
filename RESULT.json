@@ -16,5 +16,21 @@
  "metrics": {
   "arena_r19p/r19p_w17.jsonl": 84
  },
- "notes": ""
+ "notes": "Completed 84/84 pairs in 4 batches of about 6 min each (21 pairs per batch); the 5th run had nothing left to do. The log line says '候補席の設定 ...（基準席は既定）', but that wording is old: per arena_shard._best_kw the baseline seat also got worlds=2, and ARENA_RESUME_FINAL records best_opts={'worlds': 2}. The baseline seat's sims=1280 and budget=0 come from --sims/--budget. Cloned to /root/opcg-sim-backend because HOME=/root (separate from /home/user/opcg-sim-backend).",
+ "final": {
+  "pairs": 84,
+  "games": 168,
+  "void": 0,
+  "wins": 93.0,
+  "wr": 0.5536,
+  "ci95": [
+   0.4985,
+   0.6087
+  ],
+  "elo": 37.4,
+  "promoted": false,
+  "best_opts": {
+   "worlds": 2
+  }
+ }
 }
