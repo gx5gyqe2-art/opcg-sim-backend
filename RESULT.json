@@ -17,5 +17,5 @@
  "metrics": {
   "arena_fairprod/fairprod_w11.jsonl": 120
  },
- "notes": ""
+ "notes": "120 pairs run, 119 counted in final (1 void game). ARENA_RESUME_FINAL: games 238, void 1, wins 115.0, wr 0.4832, ci95 [0.4093,0.5571], elo -11.7, promoted false. No deviations from the instructions."
 }
