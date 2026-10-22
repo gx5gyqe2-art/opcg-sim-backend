@@ -32,6 +32,9 @@ def main(argv=None):
                     help="両席とも探索の世界の見える範囲（§7.11・§7.15・省略＝既定の fair・peek は旧既定）")
     ap.add_argument("--opp-blind", action="store_true",
                     help="両席とも木の中の相手にこちらの手札を見せない（§7.14・測定専用）")
+    ap.add_argument("--lethal-proof", default=None, choices=("off", "root", "root_reply"),
+                    help="両席とも詰みの証明（§7.21）。出力に発動の頻度と根の判定の節点・秒の分布を足す"
+                         "（秒は同じ盤面で `Game.lethal_json` を測り直す＝1 手の時間からは外す）")
     ap.add_argument("--knowledge", action="store_true",
                     help="決定点ごとに打つ席の「知っている札」（§7.15・`Game.knowledge_json`）を数え、分布を出力に足す")
     a = ap.parse_args(argv)
@@ -48,21 +51,34 @@ def main(argv=None):
         kw["reveal"] = a.reveal
     if a.opp_blind:
         kw["opp_blind"] = True
+    if a.lethal_proof and a.lethal_proof != "off":
+        kw["lethal_proof"] = a.lethal_proof
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     ts = []
     last = [0.0]
     know = []
+    leth = []
 
     def obs(game, name, turn, step, out, move):
         now = time.perf_counter()
         ts.append(now - last[0])
         if a.knowledge:
             know.append(json.loads(game.knowledge_json(name)))
+        if a.lethal_proof:
+            pend = json.loads(game.pending_json())
+            row = {"main": pend.get("action") == "MAIN_ACTION" and game.turn_player() == name,
+                   "kind": out.get("kind"), "lethal": out.get("lethal")}
+            if (out.get("lethal") or {}).get("root"):
+                r = json.loads(game.lethal_json(name, json.dumps({"search_seed": E.search_seed(seed_now[0], turn, name)})))
+                row["root_sec"] = r.get("sec")
+            leth.append(row)
         last[0] = time.perf_counter()
 
     t0 = time.perf_counter()
+    seed_now = [0]
     for g in range(a.games):
         seed = a.seed_base + g
+        seed_now[0] = seed
         la, lb = D.leader_pair(db, seed, "random")
         p1, p2 = D.build_pair(db, la, lb, seed, a.decks)
         last[0] = time.perf_counter()
@@ -77,7 +93,34 @@ def main(argv=None):
                       "p90": round(ts[int(n * 0.9)], 3), "p99": round(ts[int(n * 0.99)], 3),
                       "max": round(ts[-1], 2), "wall_sec": round(time.perf_counter() - t0, 1),
                       "affinity": sorted(os.sched_getaffinity(0)),
+                      **({"lethal_proof": a.lethal_proof, "lethal": _lethal_summary(leth)} if a.lethal_proof else {}),
                       **({"knowledge": _knowledge_summary(know)} if a.knowledge else {})}))
+
+
+def _q(vals, f):
+    return vals[min(len(vals) - 1, int(len(vals) * f))] if vals else None
+
+
+def _lethal_summary(rows):
+    """詰みの証明（§7.21）: 判断点のうち根の判定をした割合・証明した割合・根の節点と秒の分布・応手の証明の実績。"""
+    main = [r for r in rows if r["main"]]
+    tried = [r for r in rows if (r["lethal"] or {}).get("root")]
+    nodes = sorted(r["lethal"]["root"]["nodes"] for r in tried)
+    secs = sorted(r["root_sec"] for r in tried if r.get("root_sec") is not None)
+    st = {}
+    for r in tried:
+        k = r["lethal"]["root"]["status"]
+        st[k] = st.get(k, 0) + 1
+    rep = [r["lethal"]["reply"] for r in rows if (r["lethal"] or {}).get("reply")]
+    return {"decisions": len(rows), "main_points": len(main), "root_tried": len(tried),
+            "root_tried_per_main": round(len(tried) / max(1, len(main)), 4),
+            "root_status": st, "fired": st.get("win", 0),
+            "fired_per_main": round(st.get("win", 0) / max(1, len(main)), 4),
+            "root_nodes": {"mean": round(sum(nodes) / max(1, len(nodes)), 1), "p50": _q(nodes, .5),
+                           "p90": _q(nodes, .9), "max": nodes[-1] if nodes else None},
+            "root_sec": {"mean": round(sum(secs) / max(1, len(secs)), 4), "p50": _q(secs, .5),
+                         "p90": _q(secs, .9), "p99": _q(secs, .99), "max": secs[-1] if secs else None},
+            "reply": {k: sum(r[k] for r in rep) for k in ("checked", "children", "proven", "nodes")} if rep else None}
 
 
 def _knowledge_summary(rows):

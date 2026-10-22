@@ -1242,6 +1242,7 @@ struct WorldRun {
 }
 
 /// 1 本の木を回す（つまみは全世界で同じ）。
+#[allow(clippy::too_many_arguments)]
 fn run_one_world(
     ctx: &Ctx,
     opts: &DecideOptions,

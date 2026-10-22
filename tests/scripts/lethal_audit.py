@@ -453,6 +453,8 @@ def play_one(args) -> List[Dict[str, Any]]:
     kw = {"budget": a.budget}
     if a.worlds > 1:
         kw["worlds"] = a.worlds
+    if a.lethal_proof and a.lethal_proof != "off":
+        kw["lethal_proof"] = a.lethal_proof     # §7.21 の打ち直し（WP `rs-lethal-root`）
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     la, lb = D.leader_pair(db, seed, "random")
     p1, p2 = D.build_pair(db, la, lb, seed, "synth_roles")
@@ -481,6 +483,12 @@ def play_one(args) -> List[Dict[str, Any]]:
         if ko["res"]:
             rec["otsu"] = judge_otsu(game, name, a.sec_otsu, a.max_nodes, a.rand_hands, seed * 1000 + step,
                                      a.char_attacks)
+        if a.rs_check:
+            # §7.21: Rust の判定器（公平な配り方・本当の配り方は読まない）を同じ点で回して並べる
+            rec["rs"] = json.loads(game.lethal_json(name, json.dumps({"search_seed": seed * 1000 + step,
+                                                                          "force": True})))
+            rec["lethal"] = out.get("lethal")
+            rec["kind"] = out.get("kind")
         rec["board"] = summarize_board(game, name)
         points.append(rec)
 
@@ -634,6 +642,10 @@ def main(argv=None):
             p.add_argument("--max-nodes", type=int, default=200000)
             p.add_argument("--rand-hands", type=int, default=4)
             p.add_argument("--char-attacks", action="store_true", help="キャラへのアタックも手順に含める（既定は外す）")
+            p.add_argument("--lethal-proof", default=None, choices=("off", "root", "root_reply"),
+                           help="両席の CPU の詰みの証明（§7.21・WP rs-lethal-root の打ち直し）")
+            p.add_argument("--rs-check", action="store_true",
+                           help="各点で Rust の判定器（Game.lethal_json・公平な配り方）も回して記録する（§7.21 の照合）")
         else:
             p.add_argument("--points", default=None)
     a = ap.parse_args(argv)

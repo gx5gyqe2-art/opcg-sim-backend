@@ -435,8 +435,7 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
         // 証明できた応手は相手から見て負け＝相手は選ばない。証明できない応手が在ればそれだけを残す（箱の畳みも
         // その中から選ぶ）。全部が証明できたら、全部の子を相手から見て -1 の終局に固定する。
         let mut all_proven = false;
-        if self.lethal_reply.is_some() && self.reply_nodes.contains(&node) {
-            let rp = self.lethal_reply.as_mut().expect("checked");
+        if let Some(rp) = self.lethal_reply.as_mut().filter(|_| self.reply_nodes.contains(&node)) {
             let proven = rp.prove_children(ctx.masters, s, node, &legal)?;
             if proven.iter().all(|p| *p) && !proven.is_empty() {
                 all_proven = true;

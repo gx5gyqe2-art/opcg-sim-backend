@@ -23,9 +23,7 @@ fn board(opp_hand: usize, bigs: usize, swap: bool) -> (MasterTable, GameState) {
     }
     // 相手の山（手札の枠 opp_hand・山札 4）。`swap` は本当の手札と山札の札を入れ替える。
     let mut pool: Vec<u32> = vec![M_CHAR; opp_hand + 4];
-    for i in 0..bigs {
-        pool[i] = M_BIG;
-    }
+    pool[..bigs].fill(M_BIG);
     if swap {
         pool.reverse();
     }
