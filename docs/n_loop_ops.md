@@ -181,7 +181,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **世界 4 本 × 1,280 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・16 シャード × 88 ペア・§7.18） | 1511000〜1526000 | 使用済み（2026-10-21・1,336 ペア 0.5434 [0.5227, 0.5642]・+30.2・`2026-10-21_r16_teacher_strength.md`） |
 | 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 使用済み（2026-10-21・r16 主 −5.3／副 +4.7・r16c 主 −7.7／副 +0.4・どちらも非昇格） |
 | 検証 **WP `rs-lethal-root`**（手元 40 ペア × 2 本 root／root_reply vs off・出荷の設定）／監査のやり直し 300 局／本番アリーナ（root・root_reply 各 12 シャード × 120 ペア・合流後） | 1682000〜1682039／1683000〜1683039／3012000〜3012299／2031000〜2042000／2051000〜2062000 | 指示済み（2026-10-22・claude/rs-lethal-root） |
-| 検証 **r18 vs r13d（公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.29）** | 主 synth_roles2 1951000〜1966000／副 ミラー 1971000〜1986000／実デッキ 1991000〜2006000／旧主 synth_roles 2011000〜2026000 | 払い出し済み（2026-10-22・訓練 claude/train-r18 の後に起動） |
+| 検証 **r18 vs r13d（公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.29）** | 主 synth_roles2 1951000〜1966000／副 ミラー 1971000〜1986000／実デッキ 1991000〜2006000／旧主 synth_roles 2011000〜2026000 | 指示済み（2026-10-22・claude/arena-r18-w01〜w16・今の本線のコード） |
 | 検証 **r13o／r13m／r17m vs r13d（公平同士・両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.30）** | r13o 主 1831000〜1846000／副 1851000〜1866000・r13m 主 1871000〜1886000／副 1891000〜1906000・r17m 主 1911000〜1926000／副 1931000〜1946000 | 使用済み（2026-10-22・r13o 主 −8.3／r13m 主 −13.2／r17m 主 −9.1・**3 本とも非昇格**・`2026-10-22_omni_value_stage2.md`） |
 | 検証 **WP `rs-trigger-order` の手元アリーナ**（修正後 vs 修正前・40 ペア） | 1681000〜1681039 | 使用済み（2026-10-22・修正後 void 0・40 ペア中 37 ペアが旧新で同一・`2026-10-22_trigger_order.md`） |
 | 生成 **波 48**（合成デッキ v2・符号化 v15・生成役 r13d〔r17 昇格なら r17〕・§7.29） | 2511000〜2518500（シャード k の base は 2510000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,080,222 行・dropped 1・enc v15・claude/n48-w01〜w16） |
@@ -2557,6 +2557,65 @@ git add -f n1_results/nrel_r18*.npz train_r18.log band_r18.json band_r18.log RES
 git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r18 のセット（訓練・評価帯）"
 git push -u origin claude/train-r18
 ```
+
+
+**r18 の結果（訓練・評価帯・2026-10-22）**: 価値 2,219,641 行・best ep0。評価帯（波 48 holdout・152,176 行・r18 には訓練の波＝有利）: 価値の誤差 **r18 0.5881** < r11a 0.6241 < r13d 0.6264 < r17 0.6282・符号一致 r18 0.780（最良）・方策 top1 r18 0.5206 > r17 0.5166 > r13d 0.5133。2 周目は価値が過学習気味（val 0.636 → 0.657）。
+
+判定のアリーナの作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16・1 シャードで主 synth_roles2 → 副ミラー → 実デッキ → 旧主 synth_roles の 4 本を順に）:
+
+````
+アリーナ（r18 vs r13d・公平同士・4 条件）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.29）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r18-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r18-w$KK origin/claude/cpu-spec-improvements-yw91jd   # 今の本線（公平が既定・v15・誘発の順序の修正後）
+git fetch -q origin claude/arena-r18-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r18 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r18:r18net && git show r18net:n1_results/nrel_r18.npz > ~/nrel_r18.npz
+mkdir -p arena_r18
+
+次の内容を ~/run18.sh に保存し、`nohup bash ~/run18.sh > ~/run18.out 2>&1 &` で回す。run18.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r18/*.jsonl"))
+print(json.dumps({"job": "arena-r18-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r18 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r18 shard $KK"; git push -q -u origin claude/arena-r18-w$KK || echo PUSH_FAILED; }
+for C in r18; do
+  BM=1951000; BR=1971000; BU=1991000; BO=2011000
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BM + B*1000 )) --workers 4 --leaders random --decks synth_roles2 \
+    --out arena_r18/${C}_main_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR + B*1000 )) --workers 4 \
+    --out arena_r18/${C}_mirror_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BU + B*1000 )) --workers 4 --leaders random --decks user \
+    --out arena_r18/${C}_user_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BO + B*1000 )) --workers 4 --leaders random --decks synth_roles \
+    --out arena_r18/${C}_old_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 12 分 × 4 本＝約 50 分（両席とも公平が既定＝`--reveal` は指定しない）。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
+````
 
 生成の作業セッション用の本文（`{K}`＝01〜16・`{BASE}`＝上の式）:
 
