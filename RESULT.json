@@ -1,7 +1,7 @@
 {
  "job": "omni47-s2",
  "role": "relabel",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "wave": 47,
   "shards": "03 04",
