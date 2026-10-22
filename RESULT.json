@@ -1,7 +1,7 @@
 {
  "job": "arena-lethal-w01",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r13d.npz + lethal_proof root (root_*.jsonl) / off (off_*.jsonl)",
   "baseline": "nrel_r13d.npz",
