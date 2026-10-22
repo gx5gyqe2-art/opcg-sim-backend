@@ -1,70 +1,226 @@
 {
- "job": "enc-v15",
- "role": "implement",
+ "job": "train-omni",
+ "role": "train",
  "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.19 (origin/claude/cpu-spec-improvements-yw91jd @ 25a51f28a; ledger 2+322); basis docs/reports/2026-10-22_enc_audit.md §2, §3.1 plan A",
  "inputs": {
-  "base": "claude/cpu-spec-improvements-yw91jd @ 25a51f28a",
-  "net": "nrel_r13d.npz (DEFAULT_NET; meta enc_version 14, read by v15 without pad)"
+  "r13o": {
+   "warm_start": "opcg_sim/data/learned/nrel_r11a.npz",
+   "z_mode": "omni",
+   "pi_waves": [
+    43
+   ],
+   "pi_dirs": 64,
+   "z_waves": [
+    43,
+    42
+   ],
+   "z_dirs": {
+    "43": 64,
+    "42": 64
+   },
+   "omni_wave": 43,
+   "omni_files": 64,
+   "value_rows": 2244753,
+   "value_val_rows": 321898,
+   "policy_points": 492448,
+   "policy_val_points": 70178,
+   "omni_replaced_rows": 691121,
+   "epochs": 2,
+   "lr": 0.0002,
+   "rss_gb": null,
+   "encoding": "v14"
+  },
+  "r13m": {
+   "warm_start": "opcg_sim/data/learned/nrel_r11a.npz",
+   "z_mode": "mix",
+   "pi_waves": [
+    43
+   ],
+   "pi_dirs": 64,
+   "z_waves": [
+    43,
+    42
+   ],
+   "z_dirs": {
+    "43": 64,
+    "42": 64
+   },
+   "omni_wave": 43,
+   "omni_files": 64,
+   "value_rows": 2244753,
+   "value_val_rows": 321898,
+   "policy_points": 492448,
+   "policy_val_points": 70178,
+   "omni_replaced_rows": 691121,
+   "epochs": 2,
+   "lr": 0.0002,
+   "rss_gb": 7.25,
+   "encoding": "v14"
+  },
+  "r17m": {
+   "warm_start": "opcg_sim/data/learned/nrel_r11a.npz",
+   "z_mode": "mix",
+   "pi_waves": [
+    47
+   ],
+   "pi_dirs": 64,
+   "z_waves": [
+    47,
+    46,
+    45
+   ],
+   "z_dirs": {
+    "47": 64,
+    "46": 196,
+    "45": 64
+   },
+   "omni_wave": 47,
+   "omni_files": 64,
+   "value_rows": 3136161,
+   "value_val_rows": 446447,
+   "policy_points": 485991,
+   "policy_val_points": 69297,
+   "omni_replaced_rows": 683444,
+   "epochs": 2,
+   "lr": 0.0002,
+   "rss_gb": 9.28,
+   "encoding": "v14"
+  }
  },
  "outputs": {
-  "branch": "claude/enc-v15",
-  "report": "docs/reports/2026-10-22_enc_v15.md",
-  "enc_version": 15,
-  "files": [
-   "rust/opcg_engine/src/encode/mod.rs (ENC_VERSION 15, ENC_VERSION_V14, OwnRemaining, EncodeOptions.deck_v14)",
-   "rust/opcg_engine/src/encode/scalars.rs (deck_aggregate / deck_apex read OwnRemaining)",
-   "rust/opcg_engine/src/encode/tokens.rs (own-deck roles 7+2 as expectation)",
-   "rust/opcg_engine/src/net/nrel.rs (cand_target pinned to v14; encode_options carries deck_v14)",
-   "rust/opcg_engine/src/net/mod.rs, search/quiesce.rs, lib.rs, py_game.rs, search/decide.rs (measurement-only switch: npz meta enc_deck=v14 / encode opts deck_v14)",
-   "rust/opcg_engine/src/search/tests_fair.rs (+1 test: enc_v15_own_deck_columns_are_world_invariant)",
-   "opcg_sim/learned/n_rel_feat.py (own_remaining, expect_combine, _deck_roles(rem) + cache key)",
-   "opcg_sim/learned/encoder.py (_deck_aggregate(me), _deck_apex(me), version map 15)",
-   "opcg_sim/learned/n_rel.py (NR_ENC_VERSION 15, NR_ENC_VERSION_V14; pad boundary stays 14)",
-   "opcg_sim/loop/record_gen.py (meta enc_version 15 = ENC_VERSION_V15)",
-   "tests/test_enc_v14.py, tests/test_n_record_v3.py (version assertions; v14-stamped npz read by v15 matches Python forward)",
-   "tests/scripts/rs_enc_v14_probe.py (--what agree)",
-   "tests/fixtures/rs_goldens/replay/a1_*.json (a1 band regenerated; 34 files changed)",
-   "docs/SPEC.md §2.5.9 (encoding now reads own knowledge for the 16 columns), docs/TEST_SPEC.md rows",
-   "n1_results/enc_v15/ (fair_diff ship/side json+tables, agree, arena jsonl, a1 divergence, void seed reruns)"
-  ]
+  "nets": [
+   "n1_results/nrel_r13o.npz",
+   "n1_results/nrel_r13m.npz",
+   "n1_results/nrel_r17m.npz"
+  ],
+  "per_epoch": "n1_results/nrel_r1{3o,3m,7m}.ep{0,1}.npz",
+  "train_logs": [
+   "train_r13o.log",
+   "train_r13m.log",
+   "train_r17m.log"
+  ],
+  "band": "band_omni.json",
+  "band_log": "band_omni.log"
  },
- "results": {
-  "world_invariance": {
-   "ship_1280x2": {"decision_points": 2559, "features": 287, "features_with_any_diff": 0, "value_diff_all_pairs": 0.0, "approximation_cases": 0},
-   "side_160x2": {"decision_points": 2622, "features": 287, "features_with_any_diff": 0, "value_diff_all_pairs": 0.0, "approximation_cases": 0},
-   "pairs_checked": ["peek_fair", "truth_peek", "truth_fair", "fair_world0_vs_1"]
+ "metrics": {
+  "r13o": {
+   "best_ep": 0,
+   "epochs": [
+    {
+     "ep": 0,
+     "val_v_mse": 0.2453,
+     "val_v_sign": 0.878,
+     "pi_top1": 0.5367,
+     "pi_top1_visits": 0.5723,
+     "train_mse": 0.3645
+    },
+    {
+     "ep": 1,
+     "val_v_mse": 0.2526,
+     "val_v_sign": 0.8717,
+     "pi_top1": 0.5385,
+     "pi_top1_visits": 0.5697,
+     "train_mse": 0.3506
+    }
+   ]
   },
-  "switch_identity": "r13d + meta enc_deck=v14 on the v15 wheel == branch-point v14 wheel: 40/40 decide rows identical (kind/sig/k/cands n,q)",
-  "move_agreement_r13d_v15_vs_v14": {
-   "setting": "sims 1280, worlds 1, budget 0, synth_roles, seeds 1680000-1680007 (8 games), same board/carry/search seed per point",
-   "all_points": {"n": 1064, "same": 1052, "rate": 0.9887},
-   "free_points_2plus_candidates_no_commit": {"n": 443, "same": 433, "rate": 0.9774},
-   "by_turn_free": {"0-2": [29, 1.0], "3-5": [68, 0.971], "6-8": [130, 0.962], "9+": [216, 0.986]}
+  "r13m": {
+   "best_ep": 0,
+   "epochs": [
+    {
+     "ep": 0,
+     "val_v_mse": 0.3197,
+     "val_v_sign": 0.8102,
+     "pi_top1": 0.5345,
+     "pi_top1_visits": 0.5707,
+     "train_mse": 0.4
+    },
+    {
+     "ep": 1,
+     "val_v_mse": 0.3325,
+     "val_v_sign": 0.8021,
+     "pi_top1": 0.5387,
+     "pi_top1_visits": 0.5715,
+     "train_mse": 0.3837
+    }
+   ]
   },
-  "arena_local_40": {
-   "candidate": "r13d v15", "baseline": "r13d v14 (meta enc_deck=v14)",
-   "setting": "sims 1280, budget 0 both, worlds 1, leaders random, decks synth_roles, seed base 1680000",
-   "pairs_scored": 39, "void": 1, "void_rate": 0.025, "wins": 35.0, "games": 78, "wr": 0.4487, "ci95": [0.3304, 0.567], "elo": -35.8,
-   "forecast": "±10",
-   "verdict": "none (void rate 2.5% > 2%, CLAUDE.md; also CI far too wide at 40 pairs)"
+  "r17m": {
+   "best_ep": 1,
+   "epochs": [
+    {
+     "ep": 0,
+     "val_v_mse": 0.3549,
+     "val_v_sign": 0.7792,
+     "pi_top1": 0.505,
+     "pi_top1_visits": 0.5317,
+     "train_mse": 0.4475
+    },
+    {
+     "ep": 1,
+     "val_v_mse": 0.354,
+     "val_v_sign": 0.7816,
+     "pi_top1": 0.5108,
+     "pi_top1_visits": 0.5405,
+     "train_mse": 0.4309
+    }
+   ]
   },
-  "golden": {
-   "audit_3386": "unchanged (test green, not regenerated)",
-   "replay_random_150": "unchanged (test green, not regenerated)",
-   "replay_a1_50": {"regenerated": true, "identical": 16, "diverged": 34, "winner_changed": 9, "first_divergence_step_median": 28, "first_divergence_frac_median": 0.27, "first_divergence_min": 0, "first_divergence_max": 116, "total_steps_old": 5514, "total_steps_new": 5826}
-  },
-  "gates": {"make_test": "green (cargo 594 passed 1 ignored; pytest 854 passed 13 skipped)", "audit_cross": "void 0 (120 pairs, 240 games)"},
-  "encode_latency_ms_median": {"v15": [0.065, 0.066, 0.093], "v14": [0.064, 0.064, 0.093]}
+  "band": {
+   "rows": 162063,
+   "src": "n47 holdout-mod 7",
+   "nets": {
+    "nrel_r13d": {
+     "v_mse": 0.555,
+     "v_sign": 0.7944,
+     "top1_visits": 0.5373,
+     "ce_visits": 1.8679,
+     "top1_q_improved": 0.5035,
+     "ce_q_improved": 1.7552
+    },
+    "nrel_r17": {
+     "v_mse": 0.5578,
+     "v_sign": 0.7916,
+     "top1_visits": 0.53815,
+     "ce_visits": 1.8571,
+     "top1_q_improved": 0.5082,
+     "ce_q_improved": 1.7237
+    },
+    "nrel_r13o": {
+     "v_mse": 0.5536,
+     "v_sign": 0.7936,
+     "top1_visits": 0.5354,
+     "ce_visits": 1.868,
+     "top1_q_improved": 0.5014,
+     "ce_q_improved": 1.7549
+    },
+    "nrel_r13m": {
+     "v_mse": 0.5542,
+     "v_sign": 0.7938,
+     "top1_visits": 0.53625,
+     "ce_visits": 1.8673,
+     "top1_q_improved": 0.5027,
+     "ce_q_improved": 1.754
+    },
+    "nrel_r17m": {
+     "v_mse": 0.5542,
+     "v_sign": 0.7926,
+     "top1_visits": 0.53875,
+     "ce_visits": 1.8566,
+     "top1_q_improved": 0.5086,
+     "ce_q_improved": 1.7227
+    }
+   }
+  }
  },
  "notes": [
-  "cand_target() compared enc_version >= ENC_VERSION; bumping to 15 would have silently dropped the v14 candidate-target rule for r13d (enc_version 14) and changed its moves. Pinned to ENC_VERSION_V14 (Python cand_ids already used a literal 14; Python pad boundary moved to NR_ENC_VERSION_V14).",
-  "The 16 columns are computed v15-style regardless of the version argument in both languages (NRel's Python path builds on E.encode(version=12)+encode_rel, so a version gate could not switch them; Rust never had per-version encoding). Only the measurement switch deck_v14 reproduces v14. c-series Python encoding (n_eff, v12) goes through the same helpers.",
-  "Cache key (report §3.1): Rust had no deck-content-keyed cache (trunk cache keys on scalar bits = automatically correct). Only Python _DECK_ROLES_CACHE needed a new key (known ids, unknown ids, unknown deck slots).",
-  "Python known_by port: card attribute known_by (Rust bits P1=1, P2=2) and player attribute know_bit. Python boards carry neither today -> computed as 'no known cards'. The Python-vs-Rust encoding oracle (rs_encode_oracle.py) lives in legacy/ and is not in the current suite, so there were 0 oracle boards to restrict. Proposal (not implemented): add known_by per card to record v5 'hidden' so Python can reproduce v15 exactly on boards with known cards (51% of decision points have >=1 known own-deck card, mean 2.9).",
-  "Apex uses the plain max over known-deck + unknown cards (report's recommendation); it over-reads by the chance the top card sits in face-down life.",
-  "Void in the local arena (seed 1680032, OP17-079 Luffy vs OP06-080 Moria) is an engine trigger-ordering defect, not the encoding: Brogy (OP17-092) / Dorry (OP17-085) on-play each play the other from trash; the field-overflow dialog makes the child's queued ON_PLAY resolve before the parent's remaining 'then you cannot play Character cards this turn', so they ping-pong until the 400-step cap. Reproduces with both seats v15; both seats v14 take a different line. A trial patch making effect play_card honour CANNOT_PLAY_CHARACTER did NOT stop it (restriction not yet applied) -> root cause is the ordering. Not fixed here (changes rules + goldens; out of scope). Proposed: separate WP to drain queued triggers only after the parent ability finishes, plus effect play honouring CANNOT_PLAY_CHARACTER; report §4 has the decision write-up (recommend (c): merge v15, fix in parallel WP).",
-  "Arena verdict withheld per CLAUDE.md (void > 2%). The 0.449 over 39 pairs is reference only; at 40 pairs the CI (±0.12) cannot resolve the ±10 forecast.",
-  "Training data: record shape unchanged, meta enc_version 15; existing waves (<=47) keep v14 (leaky) columns; with current windows all training input is v15 after 2 waves (48, 49)."
+  "指示書どおり実行（コード変更なし）。作業ツリーは /home/user/opcg-sim-backend（~/opcg-sim-backend ではない）・データは ~ 配下。",
+  "訓練ログの val v_mse は差し替えた教師に対して測られる（r13o 0.245・r13m 0.320・r17m 0.354 は z 版の r13d／r17 と比べられない）。比較は評価帯（波 47 holdout・z に対する誤差）で読む。",
+  "評価帯 v_mse（低いほど良い）: r13o 0.5536 < r17m 0.5542 ≈ r13m 0.5542 < r13d 0.5550 < r17 0.5578。差は 0.001〜0.004 と小さい。v_sign は r13d 0.7944 が最良で r13o／r13m はわずかに下（0.7936／0.7938）。",
+  "r17m vs r17: v_mse 0.5578→0.5542（−0.0035）・v_sign 0.7916→0.7926・方策はほぼ同じ（top1_visits 0.5382→0.5388）。r13o／r13m vs r13d: v_mse −0.0014／−0.0008・方策はほぼ同じ（top1_visits 0.5373→0.5354／0.5363）。",
+  "r17／r17m は波 47 で訓練しており、評価帯も波 47（holdout-mod 7＝訓練の val と同じ分割のはず）。r13 系にとっては未見の波なので、r17 系と r13 系の比較は土俵が揃わない。",
+  "r13o／r13m は best=ep0（差し替えた教師の val v_mse で選択）、r17m は best=ep1。",
+  "rss_gb は /proc の VmHWM を 5 秒おきに採ったもの。r13o は採取開始前に終わったため null（同じ入力の r13m が 7.25GB）。r17m 9.28GB で 14GB 以内＝波 45 は外していない。",
+  "nrel_r17.npz は claude/train-r17 の n1_results から取得（同梱しない）。"
  ]
 }
