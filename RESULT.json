@@ -14,7 +14,20 @@
   ]
  },
  "metrics": {
-  "arena_r19p/r19p_w05.jsonl": 84
+  "arena_r19p/r19p_w05.jsonl": 84,
+  "final": {
+   "pairs": 84,
+   "games": 168,
+   "void": 0,
+   "wins": 88.0,
+   "wr": 0.5238,
+   "ci95": [
+    0.4597,
+    0.5879
+   ],
+   "elo": 16.6,
+   "promoted": false
+  }
  },
- "notes": ""
+ "notes": "Completed with 0 void. The '(baseline seat uses defaults)' wording in the startup log is just the cand_kw print text. In the code the baseline seat gets --sims 1280 / --budget 0 passed to init_pool, and worlds 2 goes through best_kw (best_opts={\"worlds\":2} in ARENA_RESUME_FINAL), so both seats ran the shipping settings. reveal was not specified, so the engine default (fair) applies. The four 21-pair runs took 355/375/334/293 s. The 5th run had nothing left to do. The clone is ~/opcg-sim-backend (/root), separate from /home/user."
 }
