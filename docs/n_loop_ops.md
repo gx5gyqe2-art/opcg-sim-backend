@@ -180,10 +180,11 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 生成 **波 46**（生成役 r13d・**世界 4 本 × 1,280 回**・枝予算なし・64 シャード × 120 局・§7.18） | 2461000〜2484620（w01〜w49）・2485000〜2492620 は未使用 | 指示済み（2026-10-20・claude/n46-w01〜w49・w50〜w64 は起動前に取り消し） |
 | 検証 **世界 4 本 × 1,280 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・16 シャード × 88 ペア・§7.18） | 1511000〜1526000 | 使用済み（2026-10-21・1,336 ペア 0.5434 [0.5227, 0.5642]・+30.2・`2026-10-21_r16_teacher_strength.md`） |
 | 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 使用済み（2026-10-21・r16 主 −5.3／副 +4.7・r16c 主 −7.7／副 +0.4・どちらも非昇格） |
-| 検証 **WP `rs-trigger-order` の手元アリーナ**（修正後 vs 修正前・40 ペア） | 1681000〜1681039 | 指示済み（2026-10-22・claude/rs-trigger-order） |
-| 生成 **波 48**（合成デッキ v2・符号化 v15・生成役 r13d〔r17 昇格なら r17〕・§7.29） | 2511000〜2518500（シャード k の base は 2510000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 払い出し済み（2026-10-22・WP `enc-v15` の合流後に起動） |
+| 検証 **r13o／r13m／r17m vs r13d（公平同士・両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.30）** | r13o 主 1831000〜1846000／副 1851000〜1866000・r13m 主 1871000〜1886000／副 1891000〜1906000・r17m 主 1911000〜1926000／副 1931000〜1946000 | 指示済み（2026-10-22・claude/arena-omni2-w01〜w16） |
+| 検証 **WP `rs-trigger-order` の手元アリーナ**（修正後 vs 修正前・40 ペア） | 1681000〜1681039 | 使用済み（2026-10-22・修正後 void 0・40 ペア中 37 ペアが旧新で同一・`2026-10-22_trigger_order.md`） |
+| 生成 **波 48**（合成デッキ v2・符号化 v15・生成役 r13d〔r17 昇格なら r17〕・§7.29） | 2511000〜2518500（シャード k の base は 2510000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 指示済み（2026-10-22・生成役 r13d〔r17 非昇格〕・v15・誘発の順序の修正の後・claude/n48-w01〜w16） |
 | 検証 **WP `enc-v15` の手元アリーナ**（v15 vs v14・40 ペア） | 1680000〜1680039 | 使用済み（2026-10-22・決着 39 ペア 0.449・void 1〔誘発の順序の欠陥〕＝判定なし・`2026-10-22_enc_v15.md`） |
-| 検証 **r17 vs r13d（公平同士・両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.28）** | 主 1791000〜1806000／副 1811000〜1826000 | 指示済み（2026-10-22・claude/arena-r17-w01〜w16・コード 25a51f28a に固定） |
+| 検証 **r17 vs r13d（公平同士・両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.28）** | 主 1791000〜1806000／副 1811000〜1826000 | 使用済み（2026-10-22・主 0.4987・−0.9／副 0.5021・+1.5・**非昇格**・`2026-10-22_r17_judgment.md`） |
 | 生成 **波 47**（公平な物差しの最初の波・生成役 r13d・設定は波 45 と同じ・§7.28） | 2501000〜2508500（シャード k の base は 2500000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,139,419 行・claude/n47-w01〜w16） |
 | 検証 **公平化の価格（新しい既定〔fair＋知識〕vs peek・12 シャード × 120 ペア・§7.27）** | 1651000〜1662000（共有） | 使用済み（2026-10-22・1,438 ペア 0.4687・**−21.8**・知識の固定は +0.008／ペア z 0.6・`2026-10-22_fair_default_arena.md`） |
 | 検証 **公平を既定にする WP `rs-fair` の手元アリーナ**（新しい既定 vs `peek`・40 ペア・`search_efficiency_plan.md` §7.15） | 1679000〜1679039 | 使用済み（2026-10-21・40 ペア 0.45・−34.9〔CI ±100 級〕・本番は §7.27） |
@@ -2388,6 +2389,8 @@ git push -u origin claude/train-r17
 ```
 メモリが 14GB を超えそうなら `--z-in` から波 45 を外して波 47＋46（約 200 万行）で回し、notes に書く。
 
+**r17 の判定（2026-10-22）**: 主 2,798 ペア 0.4987 [0.4843, 0.5132]・−0.9／副 2,800 ペア 0.5021・+1.5 ＝**非昇格**（`2026-10-22_r17_judgment.md`）。波 48 の生成役は r13d のまま。
+
 判定のアリーナの作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16・2026-10-22 追記・r17 の評価帯: 価値の誤差 r13d 0.5550・r17 0.5578・方策 top1 r13d 0.5035・r17 0.5082〔波 47 holdout〕）:
 
 ````
@@ -2639,6 +2642,58 @@ git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "omni-value 
 git push -u origin claude/train-omni
 ```
 注意: 検証の v_mse は差し替えた教師に対して測られる（訓練ログの数字は z の版と比べられない）。比較は評価帯（z に対する誤差）で読む。メモリが 14GB を超えそうなら r17m の `--z-in` から波 45 を外して notes に書く。
+
+
+**段階 2 の結果（訓練・評価帯・2026-10-22）**: 差し替えた行 r13o／r13m 691,121（価値の 224 万行のうち 31%）・r17m 683,444。評価帯（波 47 holdout・z に対する誤差・小さいほど良い）: **r13o 0.5536 < r17m 0.5542 ≈ r13m 0.5542 < r13d 0.5550 < r17 0.5578**（差は 0.001〜0.004）。勝ち負けの符号の一致は r13d 0.7944 が最良（r13o 0.7936・r13m 0.7938）。方策はほぼ同じ。
+**判定のアリーナ**: 3 本とも基準 r13d・公平同士・両席 160 回・各 16 シャード × 175 ペア・コードは r17 と同じ `25a51f28a` に固定（同じ物差しで並べる）。seed: r13o 主 1831000〜／副 1851000〜・r13m 主 1871000〜／副 1891000〜・r17m 主 1911000〜／副 1931000〜。
+
+判定のアリーナの作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（r13o／r13m／r17m vs r13d・公平同士）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.30）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-omni2-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-omni2-w$KK 25a51f28a   # 判定のコードは公平が既定・符号化 v14 の本線に固定する
+git fetch -q origin claude/arena-omni2-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_omni2 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-omni:omninet && for C in r13o r13m r17m; do git show omninet:n1_results/nrel_$C.npz > ~/nrel_$C.npz; done
+mkdir -p arena_omni2
+
+次の内容を ~/runo2.sh に保存し、`nohup bash ~/runo2.sh > ~/runo2.out 2>&1 &` で回す。runo2.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_omni2/*.jsonl"))
+print(json.dumps({"job": "arena-omni2-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_omni2 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena omni2 shard $KK"; git push -q -u origin claude/arena-omni2-w$KK || echo PUSH_FAILED; }
+for C in r13o r13m r17m; do
+  case $C in r13o) BM=1831000; BR=1851000;; r13m) BM=1871000; BR=1891000;; r17m) BM=1911000; BR=1931000;; esac
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BM + B*1000 )) --workers 4 --leaders random --decks synth_roles \
+    --out arena_omni2/${C}_main_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR + B*1000 )) --workers 4 \
+    --out arena_omni2/${C}_mirror_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 12 分 × 6 本＝約 75 分（両席とも公平が既定＝`--reveal` は指定しない）。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
+````
 
 付け直しの作業セッション用の本文（`{WAVE}`＝43／47・`{K}`＝1〜8・`{SHARDS}`＝その K の w 番号の並び〔例 `03 04`。波 43 の K=1 は `02` だけ〕）:
 
