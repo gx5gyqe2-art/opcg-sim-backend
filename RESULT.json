@@ -5,12 +5,14 @@
  "outputs": {
   "files": [
    "arena_r18/r18_main_w04.jsonl",
-   "arena_r18/r18_mirror_w04.jsonl"
+   "arena_r18/r18_mirror_w04.jsonl",
+   "arena_r18/r18_user_w04.jsonl"
   ]
  },
  "metrics": {
   "arena_r18/r18_main_w04.jsonl": 175,
-  "arena_r18/r18_mirror_w04.jsonl": 175
+  "arena_r18/r18_mirror_w04.jsonl": 175,
+  "arena_r18/r18_user_w04.jsonl": 175
  },
  "notes": ""
 }
