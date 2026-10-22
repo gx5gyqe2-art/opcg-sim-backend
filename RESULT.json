@@ -20,5 +20,5 @@
   "arena_r20/r20s_real_w09.jsonl": 175,
   "arena_r20/r20s_synth2_w09.jsonl": 175
  },
- "notes": ""
+ "notes": "Done: 6 runs (2 nets x 3 conditions) at dfc24929e, k=9. r20_synth2_w09 has 174 decided pairs + 1 void (void=1, 175 rows). No other voids. Summary vs r13d: r20 real 0.500 / mirror 0.531 / synth2 0.494; r20s real 0.483 / mirror 0.523 / synth2 0.500."
 }
