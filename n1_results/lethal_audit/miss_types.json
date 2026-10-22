@@ -1,0 +1,66 @@
+{
+ "ko": {
+  "missed_turns": 281,
+  "losing_move_type": {
+   "ATTACK_leader": 112,
+   "ATTACK_char": 71,
+   "ATTACH_DON": 26,
+   "PLAY": 40,
+   "TURN_END": 29,
+   "ACTIVATE_MAIN": 3
+  },
+  "opp_life_at_losing_move": {
+   "0": 184,
+   "1": 60,
+   "2": 32,
+   "3": 5
+  },
+  "next_point_result": {
+   "False": 230,
+   "no_later_point": 30,
+   "None": 21
+  },
+  "game_outcome_for_cpu": {
+   "lost": 119,
+   "won": 160,
+   "void": 2
+  }
+ },
+ "otsu": {
+  "missed_turns": 101,
+  "losing_move_type": {
+   "ATTACK_leader": 48,
+   "PLAY": 15,
+   "ATTACH_DON": 9,
+   "ATTACK_char": 20,
+   "TURN_END": 8,
+   "ACTIVATE_MAIN": 1
+  },
+  "opp_life_at_losing_move": {
+   "0": 89,
+   "1": 11,
+   "2": 1
+  },
+  "next_point_result": {
+   "False": 21,
+   "None": 71,
+   "no_later_point": 9
+  },
+  "game_outcome_for_cpu": {
+   "lost": 44,
+   "won": 55,
+   "void": 2
+  }
+ },
+ "opp_life_0": {
+  "points": 9968,
+  "ko": 5326,
+  "miss_ko": 649,
+  "miss_otsu": 258
+ },
+ "unknown_ko_not_won": 12072,
+ "unknown_ko_won": 2247,
+ "no_lethal_but_won": 270,
+ "too_deep": 34,
+ "crash": 0
+}

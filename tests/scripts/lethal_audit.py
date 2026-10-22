@@ -527,7 +527,9 @@ def cmd_summarize(a):
     path = a.points or os.path.join(a.out, f"points_{a.seed_base}_{a.games}.jsonl")
     games, pts = {}, []
     pending: List[Dict[str, Any]] = []
-    for line in open(path, encoding="utf-8"):
+    import gzip
+    fh = gzip.open(path, "rt", encoding="utf-8") if path.endswith(".gz") else open(path, encoding="utf-8")
+    for line in fh:
         d = json.loads(line)
         if "game" in d:
             games[d["game"]["seed"]] = d["game"]
@@ -585,12 +587,24 @@ def cmd_summarize(a):
         "solver_sec": {"mean": round(sum(secs) / n, 3) if n else None, "p50": secs[n // 2] if n else None,
                        "p99": secs[int(n * 0.99)] if n else None, "max": secs[-1] if n else None},
     }
-    ex_src = sorted(miss_ot, key=lambda p: (p["seed"], p["step"])) + \
-        sorted([p for p in miss_ko if p not in miss_ot], key=lambda p: (p["seed"], p["step"]))
+    # 例は「見逃した手番」ごとに 1 件・その手番で詰みが在った最後の点（＝勝ちを手放した手）。乙を先に。
+    def _last(kind):
+        out = []
+        for v in turns.values():
+            v = sorted(v, key=lambda x: x["step"])
+            ok = [x for x in v if (x["ko"]["res"] is True if kind == "ko" else (x.get("otsu") or {}).get("res") is True)]
+            if ok and not v[0]["won_this_turn"]:
+                out.append(ok[-1])
+        return sorted(out, key=lambda p: (p["seed"], p["turn"]))
+    last_ot = _last("otsu")
+    miss_ot_set = {id(p) for p in last_ot}
+    ex_src = last_ot[:7] + [p for p in _last("ko") if id(p) not in miss_ot_set
+                            and (p["seed"], p["seat"], p["turn"]) not in {(q["seed"], q["seat"], q["turn"]) for q in last_ot}]
+    miss_ot = [p for p in miss_ot]
     examples = []
     for p in ex_src[:10]:
         examples.append({"seed": p["seed"], "seat": p["seat"], "turn": p["turn"], "step": p["step"],
-                         "kind": "otsu" if p in miss_ot else "ko_only", "opp_life": p["opp_life"],
+                         "kind": "otsu" if id(p) in miss_ot_set else "ko_only", "opp_life": p["opp_life"],
                          "cpu_move": p["move"], "board": p["board"], "winning_line": p["ko"].get("line"),
                          "game_winner": games[p["seed"]]["winner"]})
     summ["examples"] = examples

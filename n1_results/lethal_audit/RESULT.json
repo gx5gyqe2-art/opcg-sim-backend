@@ -1,0 +1,371 @@
+{
+ "job": "lethal-audit",
+ "role": "measurement",
+ "status": "done",
+ "spec": "docs/search_efficiency_plan.md §7.13 (origin/claude/cpu-spec-improvements-yw91jd @ c4bc90a; ledger 2+312; n_loop_ops seed ledger 3011000-3011999)",
+ "inputs": {
+  "mainline": "claude/cpu-spec-improvements-yw91jd @ c4bc90a (no mainline code touched)",
+  "net": "nrel_r13d.npz (both seats)",
+  "cpu": "sims 1280, worlds 1, budget 0 (spec: 1 world x 1,280 sims, no branch budget)",
+  "decks": "random leaders x synth_roles",
+  "seeds": "3011000-3011999 (1,000 games)",
+  "targets": "own MAIN decision points with opp life <= 3 and turn_count >= 4 (both seats)",
+  "solver_limits": "ko 5 s/point, otsu 3 s/deal (7 deals), depth 300"
+ },
+ "outputs": {
+  "branch": "claude/lethal-audit",
+  "files": [
+   "tests/scripts/lethal_audit.py",
+   "docs/TEST_SPEC.md §3 (1 row)",
+   "n1_results/lethal_audit/points_3011000_1000_merged.jsonl.gz (all points, 1,000 games)",
+   "n1_results/lethal_audit/summary.json (rates + 10 examples with board and winning line)",
+   "n1_results/lethal_audit/miss_types.json (which move lost the win)",
+   "n1_results/lethal_audit/run.log",
+   "n1_results/lethal_audit/RESULT.json"
+  ],
+  "shards": {
+   "3011000-3011249": "this branch",
+   "3011250-3011499": "claude/lethal-audit-s2",
+   "3011500-3011749": "claude/lethal-audit-s3",
+   "3011750-3011999": "claude/lethal-audit-s4"
+  }
+ },
+ "gates": {
+  "make_test": "green: cargo test 572 passed / 1 ignored; pytest 848 passed, 13 skipped (after pip install fastapi/httpx in this container; first try had 13 import errors from missing fastapi only)",
+  "docs_only": false
+ },
+ "metrics": {
+  "games": 1000,
+  "void_games": 1,
+  "target_points": 48018,
+  "target_turns": 6822,
+  "ko_exists": {
+   "k": 7512,
+   "n": 48018,
+   "rate": 0.1564
+  },
+  "ko_unknown": {
+   "k": 14319,
+   "n": 48018,
+   "rate": 0.2982
+  },
+  "otsu_exists": {
+   "k": 4169,
+   "n": 48018,
+   "rate": 0.0868
+  },
+  "otsu_unknown_among_ko": {
+   "k": 2281,
+   "n": 7512,
+   "rate": 0.3036
+  },
+  "miss_per_point": {
+   "ko": {
+    "k": 1173,
+    "n": 48018,
+    "rate": 0.0244
+   },
+   "otsu": {
+    "k": 339,
+    "n": 48018,
+    "rate": 0.0071
+   }
+  },
+  "miss_given_lethal_exists": {
+   "ko": {
+    "k": 1173,
+    "n": 7512,
+    "rate": 0.1562
+   },
+   "otsu": {
+    "k": 339,
+    "n": 4169,
+    "rate": 0.0813
+   }
+  },
+  "miss_per_turn": {
+   "ko": {
+    "k": 281,
+    "n": 6822,
+    "rate": 0.0412
+   },
+   "otsu": {
+    "k": 101,
+    "n": 6822,
+    "rate": 0.0148
+   },
+   "ko_at_first_point": {
+    "k": 75,
+    "n": 6822,
+    "rate": 0.011
+   },
+   "otsu_at_first_point": {
+    "k": 20,
+    "n": 6822,
+    "rate": 0.0029
+   },
+   "turns_with_ko": 1200,
+   "turns_with_otsu": 835
+  },
+  "miss_per_game": {
+   "ko": {
+    "k": 247,
+    "n": 1000,
+    "rate": 0.247
+   },
+   "otsu": {
+    "k": 95,
+    "n": 1000,
+    "rate": 0.095
+   },
+   "otsu_missed_then_lost": 41
+  },
+  "by_opp_life": {
+   "1": {
+    "points": 10116,
+    "ko": {
+     "k": 1618,
+     "n": 10116,
+     "rate": 0.1599
+    },
+    "miss_ko": {
+     "k": 346,
+     "n": 10116,
+     "rate": 0.0342
+    },
+    "miss_otsu": {
+     "k": 64,
+     "n": 10116,
+     "rate": 0.0063
+    }
+   },
+   "2": {
+    "points": 12506,
+    "ko": {
+     "k": 494,
+     "n": 12506,
+     "rate": 0.0395
+    },
+    "miss_ko": {
+     "k": 151,
+     "n": 12506,
+     "rate": 0.0121
+    },
+    "miss_otsu": {
+     "k": 16,
+     "n": 12506,
+     "rate": 0.0013
+    }
+   },
+   "3": {
+    "points": 15428,
+    "ko": {
+     "k": 74,
+     "n": 15428,
+     "rate": 0.0048
+    },
+    "miss_ko": {
+     "k": 27,
+     "n": 15428,
+     "rate": 0.0018
+    },
+    "miss_otsu": {
+     "k": 1,
+     "n": 15428,
+     "rate": 0.0001
+    }
+   },
+   "0": {
+    "points": 9968,
+    "ko": 5326,
+    "miss_ko": 649,
+    "miss_otsu": 258
+   }
+  },
+  "miss_types": {
+   "ko": {
+    "missed_turns": 281,
+    "losing_move_type": {
+     "ATTACK_leader": 112,
+     "ATTACK_char": 71,
+     "ATTACH_DON": 26,
+     "PLAY": 40,
+     "TURN_END": 29,
+     "ACTIVATE_MAIN": 3
+    },
+    "opp_life_at_losing_move": {
+     "0": 184,
+     "1": 60,
+     "2": 32,
+     "3": 5
+    },
+    "next_point_result": {
+     "False": 230,
+     "no_later_point": 30,
+     "None": 21
+    },
+    "game_outcome_for_cpu": {
+     "lost": 119,
+     "won": 160,
+     "void": 2
+    }
+   },
+   "otsu": {
+    "missed_turns": 101,
+    "losing_move_type": {
+     "ATTACK_leader": 48,
+     "PLAY": 15,
+     "ATTACH_DON": 9,
+     "ATTACK_char": 20,
+     "TURN_END": 8,
+     "ACTIVATE_MAIN": 1
+    },
+    "opp_life_at_losing_move": {
+     "0": 89,
+     "1": 11,
+     "2": 1
+    },
+    "next_point_result": {
+     "False": 21,
+     "None": 71,
+     "no_later_point": 9
+    },
+    "game_outcome_for_cpu": {
+     "lost": 44,
+     "won": 55,
+     "void": 2
+    }
+   }
+  },
+  "unknown_points_cpu_did_not_win": 12072,
+  "no_lethal_but_cpu_won (defender CPU mistakes)": 270,
+  "too_deep_points": 34,
+  "solver_sec": {
+   "mean": 1.718,
+   "p50": 0.098,
+   "p99": 5.004,
+   "max": 5.022
+  },
+  "examples": [
+   {
+    "seed": 3011002,
+    "seat": "p1",
+    "turn": 9,
+    "step": 89,
+    "kind": "otsu",
+    "opp_life": 0,
+    "cpu_move": "{\"action_type\": \"ATTACK\", \"card\": \"OP15-033\", \"targets\": [\"OP15-098\"]}",
+    "game_winner": "p2"
+   },
+   {
+    "seed": 3011009,
+    "seat": "p1",
+    "turn": 11,
+    "step": 134,
+    "kind": "otsu",
+    "opp_life": 0,
+    "cpu_move": "{\"action_type\": \"PLAY\", \"card\": \"OP14-087\"}",
+    "game_winner": "p2"
+   },
+   {
+    "seed": 3011010,
+    "seat": "p2",
+    "turn": 14,
+    "step": 191,
+    "kind": "otsu",
+    "opp_life": 0,
+    "cpu_move": "{\"action_type\": \"ATTACK\", \"card\": \"OP10-106\", \"targets\": [\"OP16-060\"]}",
+    "game_winner": "p1"
+   },
+   {
+    "seed": 3011014,
+    "seat": "p2",
+    "turn": 10,
+    "step": 101,
+    "kind": "otsu",
+    "opp_life": 0,
+    "cpu_move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP14-016\"}",
+    "game_winner": "p1"
+   },
+   {
+    "seed": 3011014,
+    "seat": "p2",
+    "turn": 12,
+    "step": 131,
+    "kind": "otsu",
+    "opp_life": 0,
+    "cpu_move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP01-001\"}",
+    "game_winner": "p1"
+   },
+   {
+    "seed": 3011017,
+    "seat": "p2",
+    "turn": 12,
+    "step": 125,
+    "kind": "otsu",
+    "opp_life": 0,
+    "cpu_move": "{\"action_type\": \"ATTACK\", \"card\": \"OP16-092\", \"targets\": [\"OP15-081\"]}",
+    "game_winner": "p1"
+   },
+   {
+    "seed": 3011023,
+    "seat": "p2",
+    "turn": 10,
+    "step": 108,
+    "kind": "otsu",
+    "opp_life": 0,
+    "cpu_move": "{\"action_type\": \"ATTACK\", \"card\": \"OP14-114\", \"targets\": [\"OP05-015\"]}",
+    "game_winner": "p2"
+   },
+   {
+    "seed": 3011011,
+    "seat": "p1",
+    "turn": 9,
+    "step": 79,
+    "kind": "ko_only",
+    "opp_life": 0,
+    "cpu_move": "{\"action_type\": \"ATTACK\", \"card\": \"EB02-010\", \"targets\": [\"OP16-080\"]}",
+    "game_winner": "p2"
+   },
+   {
+    "seed": 3011014,
+    "seat": "p1",
+    "turn": 11,
+    "step": 110,
+    "kind": "ko_only",
+    "opp_life": 2,
+    "cpu_move": "{\"action_type\": \"ATTACK\", \"card\": \"OP17-007\", \"targets\": [\"ST31-002\"]}",
+    "game_winner": "p1"
+   },
+   {
+    "seed": 3011015,
+    "seat": "p1",
+    "turn": 11,
+    "step": 97,
+    "kind": "ko_only",
+    "opp_life": 2,
+    "cpu_move": "{\"action_type\": \"ATTACK\", \"card\": \"OP17-020\", \"targets\": [\"OP13-044\"]}",
+    "game_winner": "p1"
+   }
+  ]
+ },
+ "prediction_check": {
+  "forecast": "otsu miss 2-5% of target points, ko miss 5-15%",
+  "observed": "otsu miss 0.71% of points (1.48% of turns), ko miss 2.44% of points (4.12% of turns) -- both BELOW the forecast range",
+  "decision_rule": "otsu > 5% -> worth adding an exact lethal check to search: NOT met (0.71%)",
+  "but": "conditional on a forced win existing, the CPU fails to take it 15.6% (ko) / 8.1% (otsu) of the time; 95 of 1,000 games contain an otsu miss and in 41 of them the missing side went on to lose"
+ },
+ "notes": [
+  "4 シャード並走・各 250 局（本体 3011000-3011249・s2/s3/s4 が残り）。本体は 250 局を超えて回したが（コンテナ再起動・RecursionError での再開を挟み 602 局まで）、重複分は捨てた（本体の 3011250 以降の行は使っていない・seed の重複なしを確認）。4 本とも同じ lethal_audit.py（md5 bcc6a505…）。",
+  "CPU の設定: 指示書どおり世界 1 本 × 1,280 回・枝予算 0。今の対戦 API の既定は世界 2 本（PLAY_WORLDS=2・2026-10-21）だが、指示書の『出荷の設定＝1 本』に従った。",
+  "対象点は両席（両席とも r13d＝どちらも『CPU』）。『そのターンに勝ったか』＝局の勝者がその席でかつ局の終了ターン＝その点のターン。",
+  "判定器の近似（甲を少なめに数えうる方向）: (1) キャラへのアタックは手順から外す（打点にならない・アタック時効果の副作用は落とす） (2) ドン!! の付与は『付けたユニットでそのままアタックするか起動メインを使う』形だけ・レストのユニットへの付与は外す (3) 自分の効果の対象選びは場のカードだけ 1 枚ずつ分ける（サーチ・捨てる・並べ替えは既定解決だけ） (4) 攻撃の回数の上界での枝刈りは、自分の札（手札・場・トラッシュ・リーダー・ステージ）に打点を増やしうる文言が 1 枚も無いときだけ（健全）。",
+  "相手側の近似（甲を多めに数えうる方向）: 相手の効果の対話も (3) と同じ分け方（サーチ等は既定解決）。カウンター・ブロッカー・トリガーの受ける/受けない・選択肢は全部読む。",
+  "乙は全部の配り方ではなく『本当の配り方（甲）＋守りの値〔カウンター値・カウンターイベントのパワー上げ＋500〕の高い順に手札へ 2 通り＋無作為 4 通り』の全部で甲が成り立つこと（必要条件側＝乙を多めに数えうる）。配り直すのは相手の手札＋山札＋裏向きのライフ。自分の山札の並びは本当のまま。",
+  "判定不能は 29.8%（相手ライフ 0 で 21%・1〜3 で 31〜33%）。判定不能の点で CPU が勝てなかったのは 12,072 点＝見逃しの上界はこれだけ広い（判定不能の大半は詰み無しを証明しきれない点と見るが、未確認）。時間の上限 5 秒は 1,000 局を回し切るための費用で決めた（判定器は Python から Rust の Game を叩く総当たりで 1 節点 ≈1ms・鍵〔hidden_json〕が支配的。本線を触らない約束のため Rust 側の判定器にはしていない）。",
+  "『見逃し』は CPU の手の誤りだけではなく、甲は見えない前提では取りに行けない詰みも含む（指示書どおり）。逆に『詰み無しなのに勝った』270 点は守る側の CPU の受け損ね。",
+  "勝ちを手放した手（見逃した手番で詰みが在った最後の点の手）: 甲 281 手番＝リーダーへのアタック 112（順番・付ける量の誤り）・キャラへのアタック 71・登場 40・ターン終了 29・付与 26。乙 101 手番＝リーダーへのアタック 48・キャラへのアタック 20・登場 15・付与 9・ターン終了 8。乙の見逃しの 88% は相手ライフ 0（あと 1 点）の手番。",
+  "乙の『次の点』の 71/101 は判定不能か甲不成立で乙を測っていない＝『その手で失った』の帰属は近似。",
+  "make test は green（gates 欄）。最終ツリー（このコミット）で実行。"
+ ]
+}
