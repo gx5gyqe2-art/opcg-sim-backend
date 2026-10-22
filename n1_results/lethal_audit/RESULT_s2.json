@@ -3,8 +3,8 @@
  "status": "done",
  "seed_base": 3011250,
  "games": 250,
- "points": 12283,
+ "points": 12033,
  "elapsed_sec": 8871,
  "workers": 4,
- "notes": "No Traceback in run log; no restart needed. Single uninterrupted run. summarize not run."
+ "notes": "No Traceback in run log; no restart needed. Single uninterrupted run. summarize not run. jsonl has 12033 point rows + 250 game-summary rows (12283 lines total)."
 }
