@@ -1,0 +1,253 @@
+{
+ "job": "rs-lethal-root",
+ "role": "implementation+measurement",
+ "status": "done",
+ "spec": "docs/search_efficiency_plan.md §7.21 (revised 2026-10-22, b8893c7; ledger 2+327)",
+ "branch": "claude/rs-lethal-root",
+ "report": "docs/reports/2026-10-22_lethal_root.md",
+ "outputs": {
+  "code": [
+   "rust/opcg_engine/src/search/lethal.rs",
+   "rust/opcg_engine/src/search/tests_lethal.rs",
+   "decide.rs/mcts.rs/mod.rs/determinize.rs/py_game.rs",
+   "opcg_sim/api/engine_rs.py",
+   "opcg_sim/loop/{engine,arena,arena_shard}.py",
+   "opcg_sim/api/routers.py",
+   "tests/scripts/{lethal_audit,rs_decide_latency}.py"
+  ],
+  "switch": "DecideOptions.lethal_proof {off,root,root_reply} (default off); opts lethal_nodes=20000, lethal_reply_nodes=5000, lethal_reply_total=40000; engine.PLAY_LETHAL_PROOF='off'; arena --cand-lethal-proof / arena_shard --lethal-proof (+ --worlds for the baseline seat)",
+  "data": "n1_results/lethal_root/ (latency_*.json, arena_*.jsonl, agree.json, redo/, redo_off/, v1_main_only/)"
+ },
+ "gates": {
+  "make_test": "green on the final tree: cargo test 601 passed / 1 ignored; pytest 854 passed, 13 skipped (pytest-xdist, fastapi, httpx pip-installed in this container). cargo clippy: no new warnings from this WP (3 pre-existing in ops.rs / test helpers).",
+  "audit_cross_off": "void 0 / 120 pairs",
+  "audit_cross_lethal_root_reply_both_seats": "void 0 / 120 pairs (sims 32)",
+  "golden": "rs_golden_audit / rs_golden_replay pass inside make test (default off unchanged)"
+ },
+ "metrics": {
+  "solver_agreement_v2": {
+   "otsu_200": {
+    "otsu|unknown": 13,
+    "otsu|win": 182,
+    "otsu|no": 5
+   },
+   "non_otsu_200": {
+    "none|no": 180,
+    "none|unknown": 11,
+    "ko_only|no": 9
+   },
+   "all_points": {
+    "ko_only|no": 331,
+    "ko_only|unknown": 16,
+    "ko_only|win": 32,
+    "none|no": 7520,
+    "none|unknown": 194,
+    "none|win": 15,
+    "otsu|no": 35,
+    "otsu|unknown": 102,
+    "otsu|win": 993,
+    "unknown|no": 563,
+    "unknown|unknown": 3586,
+    "unknown|win": 110
+   },
+   "rs_win_but_audit_no_otsu": {
+    "n": 47,
+    "won_this_turn": {
+     "True": 28,
+     "False": 19
+    }
+   }
+  },
+  "latency_1core_worlds2_sims1280": {
+   "off": {
+    "mean": 0.178,
+    "p50": 0.002,
+    "p90": 0.443,
+    "p99": 1.144,
+    "max": 4.03,
+    "moves": 2639
+   },
+   "root": {
+    "mean": 0.243,
+    "p50": 0.164,
+    "p90": 0.635,
+    "p99": 1.372,
+    "max": 4.11,
+    "moves": 2657
+   },
+   "root_reply": {
+    "mean": 0.361,
+    "p50": 0.195,
+    "p90": 1.03,
+    "p99": 2.281,
+    "max": 4.65,
+    "moves": 2660
+   }
+  },
+  "trigger_and_cost": {
+   "root": {
+    "decisions": 2657,
+    "main_points": 1424,
+    "root_tried": 1487,
+    "root_tried_per_main": 1.0442,
+    "root_status": {
+     "no": 948,
+     "unknown": 450,
+     "win": 89
+    },
+    "fired": 89,
+    "fired_per_main": 0.0625,
+    "root_nodes": {
+     "mean": 6071.9,
+     "p50": 329,
+     "p90": 20001,
+     "max": 20001
+    },
+    "root_sec": {
+     "mean": 0.1103,
+     "p50": 0.004375188,
+     "p90": 0.416070904,
+     "p99": 0.622692198,
+     "max": 0.75406894
+    },
+    "reply": null
+   },
+   "root_reply": {
+    "decisions": 2660,
+    "main_points": 1425,
+    "root_tried": 1486,
+    "root_tried_per_main": 1.0428,
+    "root_status": {
+     "no": 952,
+     "unknown": 447,
+     "win": 87
+    },
+    "fired": 87,
+    "fired_per_main": 0.0611,
+    "root_nodes": {
+     "mean": 6083.3,
+     "p50": 337,
+     "p90": 20001,
+     "max": 20001
+    },
+    "root_sec": {
+     "mean": 0.1105,
+     "p50": 0.004422479,
+     "p90": 0.418154225,
+     "p99": 0.62704754,
+     "max": 0.804238125
+    },
+    "reply": {
+     "checked": 7296,
+     "children": 22887,
+     "proven": 99,
+     "nodes": 15673294
+    }
+   }
+  },
+  "arena_40_pairs": {
+   "root_1682000": {
+    "wins": 43,
+    "of": 80,
+    "wr": 0.5375,
+    "ci95": [
+     0.4191,
+     0.6559
+    ],
+    "elo": 26.1
+   },
+   "root_reply_1683000": {
+    "wins": 34,
+    "of": 80,
+    "wr": 0.425,
+    "ci95": [
+     0.3057,
+     0.5443
+    ],
+    "elo": -52.5
+   },
+   "extra_root_reply_1682000": {
+    "wins": 43,
+    "identical_games_to_root": 80
+   },
+   "extra_off_vs_off_1682000": {
+    "wins": 43
+   },
+   "extra_off_vs_off_1683000": {
+    "wins": 34
+   },
+   "paired_vs_off_off": {
+    "games_changed": 5,
+    "of": 160,
+    "loss_to_win": 0,
+    "win_to_loss": 0,
+    "note": "all 5 changed games: candidate wins 2 turns earlier"
+   }
+  },
+  "audit_redo_300": {
+   "v2_root_reply": {
+    "games": 300,
+    "void": 1,
+    "turns": 1980,
+    "otsu_miss_per_turn": {
+     "k": 14,
+     "n": 1980,
+     "rate": 0.0071
+    },
+    "turns_with_otsu": 242,
+    "otsu_missed_then_lost": 5
+   },
+   "v1_main_only": {
+    "otsu_miss_per_turn": {
+     "k": 19,
+     "n": 1985,
+     "rate": 0.0096
+    },
+    "turns_with_otsu": 246,
+    "otsu_missed_then_lost": 9
+   },
+   "off_control_first_100": {
+    "otsu_miss_per_turn": {
+     "k": 5,
+     "n": 645,
+     "rate": 0.0078
+    },
+    "turns_with_otsu": 79,
+    "otsu_missed_then_lost": 4
+   },
+   "v2_first_100": {
+    "otsu_miss_per_turn": {
+     "k": 4,
+     "n": 641,
+     "rate": 0.0062
+    },
+    "turns_with_otsu": 79,
+    "otsu_missed_then_lost": 0
+   },
+   "audit_reference": {
+    "otsu_miss_per_turn": 0.0148,
+    "given_exists": "101/835"
+   }
+  }
+ },
+ "prediction_check": {
+  "root_+5_to_+15": "undecidable at 40 pairs; paired against off-vs-off on the same seeds the difference is 0 wins (5/160 games changed, all already won)",
+  "root_reply_ge_root": "root_reply identical to root on the 1682000 band (80/80 games); costs +0.12 s/move",
+  "miss_rate_down": "0.71%/turn vs audit 1.48%, but today's off is 0.78% (100-game control); within noise"
+ },
+ "notes": [
+  "Instruction revised mid-session (coordinator message, b8893c7): switched from the time-limited override (lethal_root) to the proven-node design (lethal_proof off/root/root_reply), node-count cutoff, reachability trigger, unrestricted opponent replies. The early version was rewritten, not kept.",
+  "Deviation: the trigger was extended from own MAIN to own effect dialogs in own turn (v2). With MAIN only (v1), the search decided the dialogs inside a proven line differently and threw away wins (seed 3012154 p2 t14). v1 results are kept in n1_results/lethal_root/v1_main_only/. Arena games were identical between v1 and v2 on both bands.",
+  "Validation could not use the audit's own 1,000 boards: replaying the same seeds on today's code diverges (same move at 1 of 75 audit points), so the 200+200 points were drawn from the 300-game redo, where each point carries both the audit judge (true deal) and the Rust judge (fair deals). Non-otsu sample = ko_only and none points (unknown audit points excluded).",
+  "The audit judge itself has false negatives (28 of 47 'Rust win, audit no' points were actually won that turn; its TT key is the hidden JSON which lacks per-turn ability usage / continuous effects).",
+  "Soundness caveats: proof = all 8 sampled fair deals, not all deals (19 of 993 proven points not won); later own decisions may differ per deal (not a single strategy over the information set); root_reply builds reply states with apply_move_inplace which default-drains the opponent's follow-up dialogs; opponent ARRANGE_DECK of 2+ cards and >64 selection combos abort the proof.",
+  "Defensive deals rank by counter value (+500 for counter events, blocker keyword as a tie-break); hand blockers cannot defend this turn, so the blocker bonus is only ordering. Life triggers are not ranked (left to the random fair deals).",
+  "Value of a proven-lost reply child is -1 in the engine's [-1,1] scale (= win prob 0 for the opponent). Proven children are removed from the reply node (the battle box chooses among the rest); only if all are proven are all children fixed at -1. Win propagation (all children lost => parent lost) not implemented, per spec.",
+  "Reply budget 40,000 per decision is split evenly across worlds (deterministic under threads).",
+  "The trigger is loose: 87% of own MAIN points (danger words are common), so the root judge runs almost everywhere; 30% of judged points hit the 20,000-node cap.",
+  "kind='lethal' decisions carry no N/Q statistics; record_gen maps unknown kinds to 0 (main) but writes no policy row (groups empty), so the proven move would not reach the policy teacher as-is if lethal_proof is enabled in generation.",
+  "Added arena_shard --worlds (baseline seat worlds) to run both seats at the shipping setting (2 worlds x 1,280 sims).",
+  "Off-vs-off on the same seeds is deterministic and reproduces the candidate's score where nothing changed (43/80 and 34/80): recommend running it alongside the production arena to read only the changed games.",
+  "The session's container restarted once during the v2 redo; the run resumed from its ledger (finished games only)."
+ ]
+}
