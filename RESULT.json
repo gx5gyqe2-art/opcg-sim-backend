@@ -1,7 +1,7 @@
 {
  "job": "n49-w12",
  "role": "gen",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r13d.npz",
   "seed_base": 2526500,
@@ -15,15 +15,16 @@
   "dirs": [
    "n_records/n49_w12_p0",
    "n_records/n49_w12_p1",
-   "n_records/n49_w12_p2"
+   "n_records/n49_w12_p2",
+   "n_records/n49_w12_p3"
   ]
  },
  "metrics": {
-  "parts_done": 3,
-  "games": 360,
-  "rows": 53422,
+  "parts_done": 4,
+  "games": 480,
+  "rows": 71601,
   "dropped": 0,
-  "sec_play_mean": 12.85
+  "sec_play_mean": 13.1
  },
  "notes": "ledger grep key '7.29 wave 49' in instruction did not match (section is 7.32); proceeded per user instruction"
 }
