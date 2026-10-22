@@ -283,8 +283,9 @@ fn blocks_character_play(s: &Session, masters: &MasterTable, card: CardIdx, owne
 ///
 /// `triggers::resolve_on_play`（`play_card_action` 用）と違い、**「相手の登場時効果は無効になる」
 /// (OPP_ONPLAY) を見ない**——Python の効果による登場は `negate_onplay_until` を参照しない。
-/// 中断中と**効果の解決中**は待ち行列へ積む（今解決中の効果を解決し切った後に消化される・
-/// WP `rs-trigger-order`。2026-10-22 までは効果の途中でその場で解決していた）。
+/// 中断中と**効果の解決中**（`triggers::must_queue`＝【KO時】【レスト時】と同じ判定）は待ち行列へ積む
+/// （今解決中の効果を解決し切った後に消化される・WP `rs-trigger-order`。2026-10-22 までは効果の途中で
+/// その場で解決していた）。
 fn resolve_effect_on_play(
     s: &mut Session,
     masters: &MasterTable,
@@ -301,7 +302,7 @@ fn resolve_effect_on_play(
         if ability(masters, *id)?.trigger != TriggerType::OnPlay {
             continue;
         }
-        if s.state().active_interaction().is_some() || s.resolving_depth() > 0 {
+        if triggers::must_queue(s) {
             triggers::enqueue_trigger(s, owner, card, index, false);
         } else {
             crate::effects::resolver::game_resolve_ability(s, masters, owner, card, index, false)?;
