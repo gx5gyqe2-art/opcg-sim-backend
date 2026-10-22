@@ -1,0 +1,3 @@
+{"job":"lethal-audit-s4","status":"done","seed_base":3011750,"games":250,"points":11853,"jsonl_lines":12103,
+ "duration":"about 2h30m (22:56 to 01:26 UTC, 4 workers)",
+ "notes":"No Traceback, no restart, no resume needed. Output has 250 per-game summary lines (key 'game', no 'seed') plus 11853 point lines (250 distinct seeds). Checkpoints pushed periodically. summarize not run. Spec asked for RESULT.json; named RESULT_s4.json in n1_results/lethal_audit/ to avoid colliding with other shards."}
