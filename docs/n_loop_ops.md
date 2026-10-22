@@ -180,9 +180,10 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 生成 **波 46**（生成役 r13d・**世界 4 本 × 1,280 回**・枝予算なし・64 シャード × 120 局・§7.18） | 2461000〜2484620（w01〜w49）・2485000〜2492620 は未使用 | 指示済み（2026-10-20・claude/n46-w01〜w49・w50〜w64 は起動前に取り消し） |
 | 検証 **世界 4 本 × 1,280 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・16 シャード × 88 ペア・§7.18） | 1511000〜1526000 | 使用済み（2026-10-21・1,336 ペア 0.5434 [0.5227, 0.5642]・+30.2・`2026-10-21_r16_teacher_strength.md`） |
 | 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 使用済み（2026-10-21・r16 主 −5.3／副 +4.7・r16c 主 −7.7／副 +0.4・どちらも非昇格） |
+| 検証 **WP `rs-trigger-order` の手元アリーナ**（修正後 vs 修正前・40 ペア） | 1681000〜1681039 | 指示済み（2026-10-22・claude/rs-trigger-order） |
 | 生成 **波 48**（合成デッキ v2・符号化 v15・生成役 r13d〔r17 昇格なら r17〕・§7.29） | 2511000〜2518500（シャード k の base は 2510000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 払い出し済み（2026-10-22・WP `enc-v15` の合流後に起動） |
-| 検証 **WP `enc-v15` の手元アリーナ**（v15 vs v14・40 ペア） | 1680000〜1680039 | 指示済み（2026-10-22・claude/enc-v15） |
-| 検証 **r17 vs r13d（公平同士・両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.28）** | 主 1791000〜1806000／副 1811000〜1826000 | 払い出し済み（2026-10-22・訓練 claude/train-r17 の後に起動） |
+| 検証 **WP `enc-v15` の手元アリーナ**（v15 vs v14・40 ペア） | 1680000〜1680039 | 使用済み（2026-10-22・決着 39 ペア 0.449・void 1〔誘発の順序の欠陥〕＝判定なし・`2026-10-22_enc_v15.md`） |
+| 検証 **r17 vs r13d（公平同士・両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.28）** | 主 1791000〜1806000／副 1811000〜1826000 | 指示済み（2026-10-22・claude/arena-r17-w01〜w16・コード 25a51f28a に固定） |
 | 生成 **波 47**（公平な物差しの最初の波・生成役 r13d・設定は波 45 と同じ・§7.28） | 2501000〜2508500（シャード k の base は 2500000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,139,419 行・claude/n47-w01〜w16） |
 | 検証 **公平化の価格（新しい既定〔fair＋知識〕vs peek・12 シャード × 120 ペア・§7.27）** | 1651000〜1662000（共有） | 使用済み（2026-10-22・1,438 ペア 0.4687・**−21.8**・知識の固定は +0.008／ペア z 0.6・`2026-10-22_fair_default_arena.md`） |
 | 検証 **公平を既定にする WP `rs-fair` の手元アリーナ**（新しい既定 vs `peek`・40 ペア・`search_efficiency_plan.md` §7.15） | 1679000〜1679039 | 使用済み（2026-10-21・40 ペア 0.45・−34.9〔CI ±100 級〕・本番は §7.27） |
@@ -2387,6 +2388,54 @@ git push -u origin claude/train-r17
 ```
 メモリが 14GB を超えそうなら `--z-in` から波 45 を外して波 47＋46（約 200 万行）で回し、notes に書く。
 
+判定のアリーナの作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16・2026-10-22 追記・r17 の評価帯: 価値の誤差 r13d 0.5550・r17 0.5578・方策 top1 r13d 0.5035・r17 0.5082〔波 47 holdout〕）:
+
+````
+アリーナ（r17 vs r13d・公平同士）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.28）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r17-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r17-w$KK 25a51f28a   # 判定のコードは公平が既定・符号化 v14 の本線に固定する
+git fetch -q origin claude/arena-r17-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r17 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r17:r17net && git show r17net:n1_results/nrel_r17.npz > ~/nrel_r17.npz
+mkdir -p arena_r17
+
+次の内容を ~/run17.sh に保存し、`nohup bash ~/run17.sh > ~/run17.out 2>&1 &` で回す。run17.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r17/*.jsonl"))
+print(json.dumps({"job": "arena-r17-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r17 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r17 shard $KK"; git push -q -u origin claude/arena-r17-w$KK || echo PUSH_FAILED; }
+for C in r17; do
+  BM=1791000; BR=1811000
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BM + B*1000 )) --workers 4 --leaders random --decks synth_roles \
+    --out arena_r17/${C}_main_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR + B*1000 )) --workers 4 \
+    --out arena_r17/${C}_mirror_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 12 分 × 2 本＝約 25 分（両席とも公平が既定＝`--reveal` は指定しない）。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
+````
+
 生成の作業セッション用の本文（`{K}`＝01〜16・`{BASE}`＝上の式）:
 
 ````
@@ -2547,6 +2596,49 @@ echo ALL_DONE
 - **訓練（段階 2・別の指示書・付け直しの回収後）**: (i) **r13o**＝r13d と同じ作り（warm-start r11a・π＝波 43・価値＝波 43＋42）で `--z-mode omni`、(ii) **r13m**＝同じで `--z-mode mix`。波 42 は付け直さない（z のまま）。(iii) r17 が昇格の候補なら **r17o**＝r17 と同じ作りで `--z-mode mix`（波 47 の付け直しを使う）。
 - **判定**: 公平同士（両席とも既定）・両席 160 回・主＋副・各 16 シャード × 175 ペア。基準 r13d。seed は訓練の後に払い出す。
 - **予告**: r13o／r13m vs r13d 主 +5〜+20（価値の教師が勝敗をよりよく当てる分。ただし全部見える評価は r13d 自身の偏りを受け継ぐ）。r13m ≧ r13o（混ぜたほうが偏りが薄まる）。
+
+
+**段階 2 の訓練の指示書**（作業セッション用・1 セッション・`claude/train-omni`・2026-10-22 追記・付け直しは 16 本とも完走〔波 43: 64 本・波 47: 64 本〕）。
+3 本: **r13o**（r13d と同じ作り・`--z-mode omni`）／**r13m**（同じ・`--z-mode mix`）／**r17m**（r17 と同じ作り・`--z-mode mix`・波 47 の付け直し）。評価帯は波 47 holdout で r13d／r17／r13o／r13m／r17m。
+
+```
+作業: omni-value 段階 2 の訓練 → 評価帯（docs/n_loop_ops.md §7.30）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（~/opcg-sim-backend）。長い実行は nohup で回し、
+**push し終えるまでターンを終えない**（9 分以内の待ちを繰り返す）。迷った点は RESULT.json の notes に書いて完走する。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+for N in 43 42 47 46 45; do
+  M=16; [ $N = 46 ] && M=49
+  for k in $(seq -w 1 $M); do git fetch -q origin claude/n$N-w$k:tmpw && mkdir -p ~/n$N && git archive tmpw n_records | tar -x -C ~/n$N && git branch -qD tmpw; done; done
+mkdir -p ~/omni
+for W in 43 47; do for K in 1 2 3 4 5 6 7 8; do
+  git fetch -q origin claude/omni$W-s$K:tmpo && git archive tmpo n1_results/omni_value | tar -x -C ~/omni && git branch -qD tmpo; done; done
+ls ~/omni/n1_results/omni_value/omni_n43_w*_p*.npz | wc -l   # 64
+ls ~/omni/n1_results/omni_value/omni_n47_w*_p*.npz | wc -l   # 64
+
+P43="$HOME/n43/n_records/n43_w*_p[0-3]"; Z42="$HOME/n42/n_records/n42_w*_p[0-3]"
+P47="$HOME/n47/n_records/n47_w*_p[0-3]"; Z46="$HOME/n46/n_records/n46_w*_p[0-3]"; Z45="$HOME/n45/n_records/n45_w*_p[0-3]"
+O43="$HOME/omni/n1_results/omni_value/omni_n43_w*_p*.npz"; O47="$HOME/omni/n1_results/omni_value/omni_n47_w*_p*.npz"
+COMMON="--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz"
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P43" --z-in "$Z42" $COMMON --z-mode omni --omni-in "$O43" --out ~/nrel_r13o.npz 2>&1 | tee ~/train_r13o.log
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P43" --z-in "$Z42" $COMMON --z-mode mix  --omni-in "$O43" --out ~/nrel_r13m.npz 2>&1 | tee ~/train_r13m.log
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P47" --z-in "$Z46" "$Z45" $COMMON --z-mode mix --omni-in "$O47" --out ~/nrel_r17m.npz 2>&1 | tee ~/train_r17m.log
+git fetch -q origin claude/train-r17:r17net && git show r17net:n1_results/nrel_r17.npz > ~/nrel_r17.npz
+
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$P47" \
+  --nrel opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r17.npz ~/nrel_r13o.npz ~/nrel_r13m.npz ~/nrel_r17m.npz \
+  --policy --holdout-mod 7 --out ~/band_omni.json 2>&1 | tee ~/band_omni.log
+
+git checkout -B claude/train-omni
+mkdir -p n1_results && cp ~/nrel_r13o*.npz ~/nrel_r13m*.npz ~/nrel_r17m*.npz n1_results/ && cp ~/train_r13o.log ~/train_r13m.log ~/train_r17m.log ~/band_omni.json ~/band_omni.log .
+（RESULT.json〔§5 の形〕: inputs＝3 本それぞれの warm_start・π dir 数・価値の波と行数・差し替えた行数〔ログの「z-mode … 差し替えた行」〕・rss_gb／metrics＝各 best_ep・各周の val v_mse／v_sign／pi_top1／band＝ネットごとの v_mse・v_sign と方策の指標／notes）
+git add -f n1_results/nrel_r13o*.npz n1_results/nrel_r13m*.npz n1_results/nrel_r17m*.npz train_r13o.log train_r13m.log train_r17m.log band_omni.json band_omni.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "omni-value 段階 2（r13o・r13m・r17m の訓練・評価帯）"
+git push -u origin claude/train-omni
+```
+注意: 検証の v_mse は差し替えた教師に対して測られる（訓練ログの数字は z の版と比べられない）。比較は評価帯（z に対する誤差）で読む。メモリが 14GB を超えそうなら r17m の `--z-in` から波 45 を外して notes に書く。
 
 付け直しの作業セッション用の本文（`{WAVE}`＝43／47・`{K}`＝1〜8・`{SHARDS}`＝その K の w 番号の並び〔例 `03 04`。波 43 の K=1 は `02` だけ〕）:
 
