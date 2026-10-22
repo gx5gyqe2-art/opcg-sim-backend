@@ -16,5 +16,5 @@
   "arena_r18/r18_old_w08.jsonl": 175,
   "arena_r18/r18_user_w08.jsonl": 175
  },
- "notes": ""
+ "notes": "作業ディレクトリは ~/opcg-sim-backend ではなく /home/user/opcg-sim-backend（run18.sh の cd のみ置換）。コードは変更なし。void は全 4 本で 0。"
 }
