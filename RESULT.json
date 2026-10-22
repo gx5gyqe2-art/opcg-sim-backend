@@ -14,7 +14,20 @@
   ]
  },
  "metrics": {
-  "arena_r19p/r19p_w26.jsonl": 84
+  "arena_r19p/r19p_w26.jsonl": 84,
+  "final": {
+   "pairs": 83,
+   "games": 166,
+   "void_pairs": 1,
+   "wins": 89.0,
+   "wr": 0.5361,
+   "ci95": [
+    0.4785,
+    0.5938
+   ],
+   "elo": 25.2,
+   "promoted": false
+  }
  },
- "notes": ""
+ "notes": "84 行・うち 1 ペア void（seed=2166035・OP11-062 vs OP15-058・GameAborted 上限手数）＝判定は 83 ペア 166 局。void 率 1/84=1.2%（2% 以下）。arena_shard の表示『基準席は既定』は表示上のみで、基準席にも --sims 1280 --budget 0 が渡り、best_opts={worlds:2} が記録されている（両席とも出荷の設定）。21 ペアは約 5〜6 分。"
 }
