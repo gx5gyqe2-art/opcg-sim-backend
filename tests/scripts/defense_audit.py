@@ -336,7 +336,7 @@ class Audit:
         self.stats["end_turns_audited"] += 1
         memo = self.memo(opp, turn)
         t0 = time.perf_counter()
-        actual = LA.judge(game, opp, a.sec, a.max_nodes, memo, False)
+        actual = LA.judge(game, opp, a.sec_end, a.max_nodes, memo, False)
         line = actual.pop("line", None)
         rec = {"kind": "end", "seed": self.seed, "seat": me, "turn": my_turn, "step": step,
                "my_life": my_life, "opp_life": len(h["players"][opp]["life"]),
@@ -647,6 +647,8 @@ def main(argv=None):
             p.add_argument("--max-life", type=int, default=3, help="自分のライフがこれ以下の点だけ対象にする")
             p.add_argument("--sec", type=float, default=5.0, help="甲の 1 応手あたりの時間の上限")
             p.add_argument("--sec-otsu", type=float, default=3.0, help="乙の配り方 1 つあたりの時間の上限")
+            p.add_argument("--sec-end", type=float, default=10.0,
+                           help="副の『実際の終わり方』（相手の手番の頭）の甲の時間の上限（置換表は同じ手番の応手の点と共有）")
             p.add_argument("--max-nodes", type=int, default=200000)
             p.add_argument("--rand-hands", type=int, default=4)
             p.add_argument("--max-alts", type=int, default=16, help="副（終わり方）で試す別の 1 手の上限")
