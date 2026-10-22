@@ -16,5 +16,5 @@
  "metrics": {
   "arena_r19p/r19p_w14.jsonl": 84
  },
- "notes": ""
+ "notes": "84/84 pairs, void 0. Shard result: wins 78/168, wr 0.4643, ci95 [0.4049, 0.5236], elo -24.9. The startup log says '(基準席は既定)' but that text is stale: --sims 1280 / --budget 0 are passed to the baseline seat directly, and the final best_opts reports {worlds: 2}. Each batch of 21 pairs took 297-375 s with --workers 2."
 }
