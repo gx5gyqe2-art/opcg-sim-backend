@@ -14,7 +14,28 @@
   ]
  },
  "metrics": {
-  "arena_r19p/r19p_w21.jsonl": 84
+  "arena_r19p/r19p_w21.jsonl": 84,
+  "arena_final": {
+   "pairs": 84,
+   "games": 168,
+   "void": 0,
+   "wins": 87.0,
+   "wr": 0.5179,
+   "ci95": [
+    0.4466,
+    0.5891
+   ],
+   "elo": 12.4,
+   "promoted": false,
+   "cand_opts": {
+    "sims": 1280,
+    "worlds": 2,
+    "budget": 0
+   },
+   "best_opts": {
+    "worlds": 2
+   }
+  }
  },
- "notes": ""
+ "notes": "84/84 pairs, void 0. arena_shard prints '（基準席は既定）' after the candidate settings, but that message is stale: the baseline seat did get worlds 2 through _best_kw (best_opts={'worlds': 2} in ARENA_RESUME_FINAL); --sims 1280 --budget 0 go to the baseline through initargs. The shard took about 340s per 21 pairs (4 cores)."
 }
