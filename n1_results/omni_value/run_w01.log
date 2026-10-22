@@ -1,0 +1,20 @@
+n43_w01_p0: 40/120 局 33s
+n43_w01_p0: 80/120 局 74s
+n43_w01_p0: 120/120 局 113s
+{"dir": "/root/n43/n_records/n43_w01_p0", "out": "/root/omni/omni_n43_w01_p0.npz", "rows": 18413, "games": 120, "ok_rows": 18413, "omni_rows": 11111, "beam_max": 32, "decide_sec_sum": 403.9476318359375, "wall_sec": 113.4}
+  復元に失敗した局 0
+n43_w01_p1: 40/120 局 38s
+n43_w01_p1: 80/120 局 71s
+n43_w01_p1: 120/120 局 105s
+{"dir": "/root/n43/n_records/n43_w01_p1", "out": "/root/omni/omni_n43_w01_p1.npz", "rows": 18341, "games": 120, "ok_rows": 18341, "omni_rows": 10971, "beam_max": 48, "decide_sec_sum": 378.67266845703125, "wall_sec": 104.7}
+  復元に失敗した局 0
+n43_w01_p2: 40/119 局 63s
+n43_w01_p2: 80/119 局 81s
+n43_w01_p2: 119/119 局 117s
+{"dir": "/root/n43/n_records/n43_w01_p2", "out": "/root/omni/omni_n43_w01_p2.npz", "rows": 18357, "games": 119, "ok_rows": 18357, "omni_rows": 11121, "beam_max": 66, "decide_sec_sum": 427.7655029296875, "wall_sec": 116.9}
+  復元に失敗した局 0
+n43_w01_p3: 40/120 局 38s
+n43_w01_p3: 80/120 局 73s
+n43_w01_p3: 120/120 局 128s
+{"dir": "/root/n43/n_records/n43_w01_p3", "out": "/root/omni/omni_n43_w01_p3.npz", "rows": 17759, "games": 120, "ok_rows": 17759, "omni_rows": 10810, "beam_max": 65, "decide_sec_sum": 420.6859436035156, "wall_sec": 128.1}
+  復元に失敗した局 0

@@ -1,0 +1,12 @@
+{
+ "dir": "~/n43/n_records/n43_w01_p1",
+ "out": "~/omni/omni_n43_w01_p1.npz",
+ "rows": 18341,
+ "games": 120,
+ "ok_rows": 18341,
+ "omni_rows": 10971,
+ "failed_games": [],
+ "beam_max": 48,
+ "decide_sec_sum": 378.67266845703125,
+ "wall_sec": 104.7
+}
