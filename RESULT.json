@@ -1,7 +1,7 @@
 {
  "job": "arena-r19-w13",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "outputs": {
   "files": [
    "arena_r19/r19_mirror_w13.jsonl",
