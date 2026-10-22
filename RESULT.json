@@ -14,7 +14,18 @@
   ]
  },
  "metrics": {
-  "arena_r19p/r19p_w06.jsonl": 84
+  "arena_r19p/r19p_w06.jsonl": 84,
+  "shard_final": {
+   "pairs": 84,
+   "games": 168,
+   "void": 0,
+   "wins": 84.0,
+   "wr": 0.5,
+   "ci95": [
+    0.4475,
+    0.5525
+   ]
+  }
  },
- "notes": ""
+ "notes": "84/84 ペア・168 局・void 0。シャード単体の値: wr 0.5000（CI95 0.4475–0.5525）・Elo ±0。ログの「（基準席は既定）」は表示だけの古い文言で、基準席にも sims 1280・budget 0・worlds 2 が渡っている（best_opts {worlds:2}・initargs に sims/budget）。作業ディレクトリは ~/opcg-sim-backend（=/root/opcg-sim-backend）。"
 }
