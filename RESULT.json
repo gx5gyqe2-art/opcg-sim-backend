@@ -1,124 +1,20 @@
 {
- "job": "rs-trigger-order",
- "role": "implement",
- "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.20 (origin/claude/cpu-spec-improvements-yw91jd @ 96869e9e3; ledger 2+323); defect docs/reports/2026-10-22_enc_v15.md §4",
+ "job": "arena-r19p-w06",
+ "role": "arena",
+ "status": "partial",
  "inputs": {
-  "base": "origin/claude/cpu-spec-improvements-yw91jd@96869e9e3",
-  "net": "opcg_sim/data/learned/nrel_r13d.npz (both seats)"
+  "candidate": "nrel_r19.npz",
+  "baseline": "nrel_r13d.npz",
+  "both": "sims 1280 x worlds 2 x budget 0 (fair)",
+  "pairs": 84
  },
  "outputs": {
-  "branch": "claude/rs-trigger-order",
-  "report": "docs/reports/2026-10-22_trigger_order.md",
-  "code": [
-   "rust/opcg_engine/src/journal.rs",
-   "rust/opcg_engine/src/effects/resolver.rs",
-   "rust/opcg_engine/src/effects/triggers.rs",
-   "rust/opcg_engine/src/effects/interact.rs",
-   "rust/opcg_engine/src/effects/actions/flow.rs",
-   "rust/opcg_engine/src/rules/actions.rs",
-   "rust/opcg_engine/src/rules/turn.rs",
-   "rust/opcg_engine/src/rules/battle.rs"
-  ],
-  "tests": [
-   "rust/opcg_engine/src/effects/tests_trigger_order.rs"
-  ],
-  "goldens": [
-   "tests/fixtures/rs_goldens/audit.json",
-   "tests/fixtures/rs_goldens/replay/ (17 files)"
-  ],
-  "ledger": "tests/fixtures/card_audit_ledger.json (20 IMPL_CHANGED re-reviewed ok)",
-  "docs": [
-   "docs/SPEC.md §1.5 §3.5",
-   "docs/TEST_SPEC.md (1 row)"
+  "files": [
+   "arena_r19p/r19p_w06.jsonl"
   ]
  },
- "results": {
-  "repro_seed1680032": {
-   "before": "void (step cap)",
-   "after": "2/2 games decided",
-   "settings": "both r13d (v15), 1280 sims, budget 0, synth_roles, leaders random"
-  },
-  "rust_tests": {
-   "cargo_test": "596 passed (594 existing + 2 new)",
-   "new_tests_fail_on_old_engine": true
-  },
-  "golden_audit": {
-   "total": 3387,
-   "changed": 15,
-   "by_trigger": {
-    "TRIGGER": 15
-   },
-   "by_action": {
-    "PLAY_CARD": 15,
-    "RETURN_DON": 2,
-    "KO": 1,
-    "DISCARD": 1
-   },
-   "verdict": {
-    "correct_now": 1,
-    "equivalent_event_order_only": 14,
-    "suspicious": 0
-   }
-  },
-  "golden_replay": {
-   "total": 200,
-   "changed": 17,
-   "random": 12,
-   "a1": 5,
-   "winner_changed": 0,
-   "verdict": {
-    "correct_now": 5,
-    "equivalent_event_order_only": 11,
-    "decision_only": 1,
-    "suspicious": 0
-   }
-  },
-  "card_audit": {
-   "all_scan_findings": "ACTION_NOT_FIRED 7->5 (OP16-105, ST13-006 now fire 3rd play); no new findings",
-   "impl_changed_reviewed": 20
-  },
-  "audit_cross": {
-   "pairs": 120,
-   "games": 240,
-   "void": 0,
-   "wr": 0.4833
-  },
-  "arena_local": {
-   "pairs": 40,
-   "seed_base": 1681000,
-   "settings": "both r13d, 1280 sims, budget 0, synth_roles, leaders random",
-   "after_wheel": {
-    "void": 0,
-    "wins": 50.0,
-    "wr": 0.625,
-    "ci95": [
-     0.4997,
-     0.7503
-    ]
-   },
-   "before_wheel": {
-    "void": 0,
-    "wins": 51.0,
-    "wr": 0.6375,
-    "ci95": [
-     0.511,
-     0.764
-    ]
-   },
-   "pairs_identical_results_and_turns": 37,
-   "pairs_result_changed": 1
-  },
-  "make_test": "green: cargo test 596 passed; pytest 854 passed, 13 skipped (43 s)"
+ "metrics": {
+  "arena_r19p/r19p_w06.jsonl": 21
  },
- "notes": [
-  "Root cause was worse than enc_v15 §4 assumed: the field-overflow interaction has no continuation, so the resolver holding the parent's remaining steps (OP17-092 'then you cannot play Character cards this turn') was dropped, not merely ordered later. Fixed generally: any interaction raised inside an action now defers the rest of the effect's stack (as removal replacement already did) and it resumes before queued triggers.",
-  "Ordering rule implemented: triggers raised while an effect resolves wait in pending_triggers until the outermost effect finishes (Session resolving depth, journal-outside temp like effect_actor); drain after game_resolve_ability (after event flush) and settle_pending (deferred remainder first, then queue) after dialogs and at action/battle/turn boundaries. Rule basis cited as comprehensive rules 8-6-1 (auto effects triggered during an effect's processing activate after it); the repo has no rules text, so the article number/wording is from memory — please verify against the official CR.",
-  "Life [Trigger] stays immediate even during effect damage (part of damage processing, not an auto effect); only life-trigger items are processed while holding.",
-  "Effect PLAY_CARD of a character now honours CANNOT_PLAY_CHARACTER (with min_cost on master cost), same rule as hand play.",
-  "Out of scope, left as-is: own [On K.O.] (triggers::fire_on_ko) and [On Rest] resolve inline instead of via the queue; by the same rule they should wait for the current effect. Proposal: separate WP if wanted (would move goldens further).",
-  "Event log order changed: a child's EFFECT events are now emitted after the parent's (old engine logged the inline child first). 14/15 audit-golden and 11/17 replay-golden changes are this alone (states identical).",
-  "Arena 'after vs before wheel' cannot be played inside one game (one rules engine per game; two builds of the same extension cannot load in one process). Measured instead as the same 40 pairs played once per wheel and compared pair by pair: void 0 both, 37/40 identical results and turns, 1 game flipped. The wr ~0.63 is same-net seat/seed-set noise in both runs, not strength.",
-  "make card-audit default scope is now back to 285 UNREVIEWED vanilla cards only."
- ]
+ "notes": ""
 }
