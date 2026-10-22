@@ -14,7 +14,28 @@
   ]
  },
  "metrics": {
-  "arena_r19p/r19p_w02.jsonl": 84
+  "arena_r19p/r19p_w02.jsonl": 84,
+  "final": {
+   "pairs": 84,
+   "games": 168,
+   "void": 0,
+   "wins": 83.0,
+   "wr": 0.494,
+   "ci95": [
+    0.4266,
+    0.5615
+   ],
+   "elo": -4.1,
+   "promoted": false,
+   "cand_opts": {
+    "sims": 1280,
+    "worlds": 2,
+    "budget": 0
+   },
+   "best_opts": {
+    "worlds": 2
+   }
+  }
  },
- "notes": ""
+ "notes": "seed-base 2142000（k=2）。21 ペア×4 回・各約 305 秒・push 失敗なし。ログの「（基準席は既定）」は表示の文言だけで、基準席は --sims 1280 --budget 0 と best_opts={worlds:2} で打っている（ARENA_RESUME_FINAL の best_opts で確認）。台帳の各行は cand_opts だけを持ち best_opts は持たない。"
 }
