@@ -159,22 +159,49 @@ pub struct LethalOut {
     pub nodes: u64,
 }
 
-/// 発動条件（§7.21 の 1）: 手番が自分のメインの判断点で、**このターンに出せる攻撃の数**が相手のライフ＋1 以上
-/// （届きうる）。数え方は判定器の上界と同じ（今アタックできるユニットの数・自分の札に打点を増やしうる文言が
-/// 1 枚でも在れば届きうる扱い＝[`Solver::bound_fails`]）。
+/// 発動条件（§7.21 の 1）: 手番が自分で、自分が答える判断点（メイン、または自分の効果対話）で、**このターンに出せる
+/// 攻撃の数**が相手のライフ＋1 以上（届きうる）。数え方は判定器の上界と同じ（[`Solver::bound_fails`]・自分の札に
+/// 打点を増やしうる文言が 1 枚でも在れば届きうる扱い）。メインでは今アタックできるユニット（合法手）を数え、効果対話
+/// では合法手に攻撃が出ないので、アクティブで攻撃できるユニット（レストでない・登場したターンなら速攻持ち）＋いま
+/// 自分が攻撃中なら 1 を数える。
+///
+/// 指示書（§7.21 の 1）はメインだけだが、証明した手順の途中の自分の効果対話（アタック時・登場時の選択）を探索に任せる
+/// と、探索が別の答えを選んで勝ちを手放す例が出た（打ち直しの監査・`2026-10-22_lethal_root.md` §4）ため対話にも広げた。
 pub fn applies(s: &mut Session, masters: &MasterTable, me: Seat) -> bool {
     let st = s.state();
     if st.winner.is_some() || st.turn_player != me {
         return false;
     }
-    if crate::rules::pending::pending_actor_action(s) != Some((me, MAIN)) {
+    let action = match crate::rules::pending::pending_actor_action(s) {
+        Some((seat, action)) if seat == me => action,
+        _ => return false,
+    };
+    if matches!(action, "MULLIGAN" | "SELECT_BLOCKER" | "SELECT_COUNTER") {
         return false;
     }
-    let Ok(legal) = crate::rules::legal::get_legal_moves(s, masters, me) else {
-        return false;
-    };
     let mut solver = Solver::new(masters, s.state(), me, 0);
-    !solver.bound_fails(s.state(), &legal)
+    if action == MAIN {
+        let Ok(legal) = crate::rules::legal::get_legal_moves(s, masters, me) else {
+            return false;
+        };
+        return !solver.bound_fails(s.state(), &legal);
+    }
+    let st = s.state();
+    if solver.has_danger(st) {
+        return true;
+    }
+    let p = st.player(me);
+    let ready = p
+        .leader
+        .iter()
+        .chain(&p.field)
+        .filter(|c| {
+            let card = st.card(**c);
+            !card.is_rest && (!card.is_newly_played || card.current_keywords.iter().any(|k| k == "速攻"))
+        })
+        .count();
+    let attacking = st.active_battle.as_ref().is_some_and(|b| b.attacker_owner == me) as usize;
+    ready + attacking > st.player(me.other()).life.len()
 }
 
 // --- 守りの強さ（守りの強い配り方を作るためだけ）---------------------------------------------
@@ -482,8 +509,9 @@ impl<'a> Solver<'a> {
         Some(moves)
     }
 
-    /// 攻撃の回数の上界で詰みが無いと言えるか（自分の札に回数を増やしうる文言が 1 枚も無いときだけ）。
-    fn bound_fails(&mut self, st: &GameState, moves: &[Move]) -> bool {
+    /// 自分の札（手札・場・トラッシュ・リーダー・ステージ、登場させうる札が在れば山札も）に打点の回数を増やしうる
+    /// 文言が在るか。
+    fn has_danger(&mut self, st: &GameState) -> bool {
         let p = st.player(self.me);
         let mut cards: Vec<CardIdx> = p.hand.iter().chain(&p.field).chain(&p.trash).copied().collect();
         cards.extend(p.leader);
@@ -492,16 +520,17 @@ impl<'a> Solver<'a> {
         for c in cards {
             let (d, sm) = self.danger_of(st.card(c).master);
             if d {
-                return false;
+                return true;
             }
             summon |= sm;
         }
-        if summon {
-            for &c in &p.deck {
-                if self.danger_of(st.card(c).master).0 {
-                    return false;
-                }
-            }
+        summon && p.deck.iter().any(|&c| self.danger_of(st.card(c).master).0)
+    }
+
+    /// 攻撃の回数の上界で詰みが無いと言えるか（自分の札に回数を増やしうる文言が 1 枚も無いときだけ）。
+    fn bound_fails(&mut self, st: &GameState, moves: &[Move]) -> bool {
+        if self.has_danger(st) {
+            return false;
         }
         let need = st.player(self.me.other()).life.len() + 1;
         let mut att: Vec<&str> = moves
