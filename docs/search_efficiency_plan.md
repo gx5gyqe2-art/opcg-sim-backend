@@ -563,3 +563,25 @@ Phase 0 → Phase 1 → Phase 3（Phase 4 の (a)(b) を合間に）→ Phase 4 
 **予告（数を見る前）**: 発動条件を締めるだけで判定に入る点がメインの 87% → 40〜60% に減り、費用は +37% → +15〜20%。配り方の順で打ち切りの一部が「無い」に変わり、さらに −3〜5 ポイント。
 
 **完了条件**: 不変量が成り立つ変更だけを本線に出す（`claude/lethal-speed`）・報告 `docs/reports/2026-10-22_lethal_speed.md`・`RESULT.json`・`make test` green・`make audit-cross` void 0・push。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
+
+### 7.26 WP `rs-commit-sig`——守りの手順の続きで「どの札で」を照合に入れる（ゲームプレイの欠陥の修正・作業セッション用・opus・2026-10-23）
+
+ユーザ決定（2026-10-23「a でお願いします」）。台帳 2+349。根拠は `docs/reports/2026-10-22_defense_audit.md` §2。
+**欠陥**: 箱の commit（窓の根畳みが決めた手順の続き）を消化するとき、各段は `move_sig`（`rust/opcg_engine/src/search/decide.rs`）の署名で合法手と照合され、`find_move` は署名が一致する**最初の合法手**を取る。
+署名は `payload.uuid` だけを読み、**戦闘の手（`SELECT_COUNTER`／`SELECT_BLOCKER`）は札を最上位の `card_uuid` に持つ**ので署名が `["SELECT_COUNTER", null, [], [], null]` になり、どの札で切るか・どの札でブロックするかが落ちる。
+監査では、守りの見逃し 28 点のうち 21 点がこれ（読み直せば 21 点とも守る）・300 局中 22 局がその手番に負けた。
+
+**手順**:
+1. 本線の最新を checkout（`3c9ffd90a` 以降）・ブランチ `claude/rs-commit-sig`・`make rust-develop`。
+2. **署名の修正**: `move_sig` の札の欄を `payload.uuid` → なければ最上位の `card_uuid`（同じファイルの 454・540・656 行と同じ形）にする。あわせて、**署名に手の区別が落ちている手の種類が他に無いか**を合法手の全種類（`rules/moves.rs` の `Move` の型ごと）で洗い、落ちていれば同じく足す（洗った結果の表を報告に）。`move_sig` の単体テストに戦闘の手の 2 本（札の違うカウンター・ブロッカーで署名が割れる）を足す。
+3. **測定用の旗**: `DecideOptions.commit_sig_legacy: bool`（既定 false＝修正後。true で旧い署名＝測定専用）・opts の鍵・`engine_rs.py`・`arena.py --cand-commit-sig-legacy`／`arena_shard.py --commit-sig-legacy`（基準席）を足す（本番アリーナで 1 局の中に旧新を並べるため。§7.21 の `lethal_proof` と同じ配線）。
+4. **再監査**: `tests/scripts/defense_audit.py` を §7.24 と同じ設定・同じ seed（3013000〜3013299・300 局）で回し直し、**21 点が消えたか**（確かめ〔`verify`〕込み）・乙の見逃しの総数・見逃して負けた局を前後で並べる。費用が重ければ、前回の見逃しの点を含む局だけ（24 局）を先に回してよい（全 300 局は後で）。
+5. **合成デッキの再現性（同じブランチ・別のコミット・再監査の後）**: `opcg_sim/loop/deck_synth2.py` が `deck_synth.names_in_text`（集合）を順に回すので、デッキの中身が `PYTHONHASHSEED` で変わる（`docs/reports/2026-10-22_value_to_move.md` §1）。集合を回す箇所を名前の順（`sorted`）にする。`deck_synth.py` の 219・281 行など、同じ形が他に在れば同じく直す。`PYTHONHASHSEED=1/2/3` で同じ seed のデッキが一致することを確かめる。
+6. 検証: `make golden-audit`／`make golden-replay` の作り直しと**差分の 1 件ずつのレビュー**（署名の修正で変わったか・デッキの修正で変わったかを分けて書く）・`make test`・`make audit-cross`（void 0）。
+7. 報告 `docs/reports/2026-10-23_commit_sig.md`・`docs/SPEC.md` の該当節の追記・`RESULT.json`（§5 の形）・push。
+
+**予告（数を見る前）**: 再監査で commit 由来の 21 点のうち 18 以上が消え、乙の見逃しは 28 → 10 以下・見逃して負けた局は 22 → 8 以下。golden の再生（a1 の 50 局）で 1〜5 局が変わる（打った手が変わる）。
+
+**本番アリーナ（取り込みの後にコーディネータが別に起こす）**: 候補席＝修正後・基準席＝`--commit-sig-legacy`。両席 r13d・出荷の設定・random × real・16 シャード × 150 ペア・seed 3171000 + (k−1)×1000。
+
+**完了条件**: `make test` green・`make audit-cross` void 0・golden の差分レビュー済み・再監査の結果つきで push。PR は作らない。質問で止まらず、迷った点は `RESULT.json` の notes に書いて完走する。
