@@ -1,0 +1,4 @@
+候補席の設定 {"lethal_proof": "root_reply"}（基準席は既定）
+消化済み 0/120 ペア・残り 120
+今回 120 ペア（1721s）・累計 120/120
+ARENA_RESUME_FINAL {"pairs": 120, "games": 240, "void": 0, "wins": 121.0, "wr": 0.5042, "ci95": [0.437, 0.5713], "elo": 2.9, "promoted": false, "candidate": "", "cand_opts": {"lethal_proof": "root_reply"}, "best_opts": {"lethal_proof": "root_reply"}}

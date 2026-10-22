@@ -1,0 +1,4 @@
+候補席の設定 {"sims": 1280, "worlds": 2, "budget": 0, "lethal_proof": "root_reply"}（基準席は既定）
+消化済み 0/40 ペア・残り 40
+今回 40 ペア（3141s）・累計 40/40
+ARENA_RESUME_FINAL {"pairs": 40, "games": 80, "void": 0, "wins": 34.0, "wr": 0.425, "ci95": [0.3057, 0.5443], "elo": -52.5, "promoted": false, "candidate": "opcg_sim/data/learned/nrel_r13d.npz", "cand_opts": {"sims": 1280, "worlds": 2, "budget": 0, "lethal_proof": "root_reply"}, "best_opts": {"worlds": 2}}

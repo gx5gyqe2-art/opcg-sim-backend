@@ -664,6 +664,41 @@ impl Game {
         Game { session: Session::new(s.into_state()), names: self.names.clone() }
     }
 
+    /// 根の詰みの判定だけを回す（`search_efficiency_plan.md` §7.21・計測用・盤面は動かさない）。
+    ///
+    /// `opts_json`: `search_seed`（配り方の乱数・決定と同じ導出）・`rand`（公平な引き直しの数・既定 6）・
+    /// `max_nodes`（既定 20000）・`force`（true なら発動条件〔自分のメイン・届きうる攻撃の数〕を見ずに回す）。
+    /// 本当の配り方は読まない。戻り値 `{"applies", "status", "move", "line_len", "deals", "nodes", "sec"}`
+    /// （発動条件を満たさず `force` も無ければ `status="skip"`）。`sec` は計測のための実時間（判定は節点で打ち切る）。
+    fn lethal_json(&mut self, py: Python<'_>, player_id: &str, opts_json: &str) -> PyResult<String> {
+        use crate::search::lethal;
+        let masters = self.masters()?;
+        let seat = self.seat_of(player_id)?;
+        let ov = parse_json(opts_json, "lethal opts")?;
+        let seed = ov.get("search_seed").and_then(Value::as_u64).unwrap_or(0);
+        let rand = ov.get("rand").and_then(Value::as_u64).map_or(lethal::LETHAL_RAND_DEALS, |n| n as usize);
+        let nodes = ov.get("max_nodes").and_then(Value::as_u64).unwrap_or(lethal::LETHAL_ROOT_NODES);
+        let force = ov.get("force").and_then(Value::as_bool).unwrap_or(false);
+        let applies = lethal::applies(&mut self.session, masters, seat);
+        if !applies && !force {
+            return to_py_json(&serde_json::json!({"applies": false, "status": "skip"}));
+        }
+        let state = self.session.state();
+        let t0 = std::time::Instant::now();
+        let out = py
+            .detach(|| -> Result<lethal::LethalOut, EngineError> {
+                let deals = lethal::make_deals(state, masters, seat, lethal::lethal_seed(seed), rand)?;
+                Ok(lethal::solve_root(masters, state, seat, &deals, nodes))
+            })
+            .map_err(|e| self.map_err(e))?;
+        to_py_json(&serde_json::json!({
+            "applies": applies, "status": out.status,
+            "move": out.mv.as_ref().map(crate::search::Move::to_json),
+            "line_len": out.line_len, "deals": out.deals, "nodes": out.nodes,
+            "sec": t0.elapsed().as_secs_f64(),
+        }))
+    }
+
     /// 探索が木の中で使う適用（`search::apply::apply_move_inplace`・`DON_BOX` は付与 k 回＋攻撃に展開・
     /// 分岐する自分の選択は残す）で 1 手進める。`fork` した対局にだけ使う（§1.2 の 3）。
     fn apply_search_move(&mut self, player_id: &str, move_json: &str) -> PyResult<()> {

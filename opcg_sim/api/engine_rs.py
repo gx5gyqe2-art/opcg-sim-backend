@@ -296,7 +296,8 @@ class RsGame:
               rethink_worlds: Optional[int] = None,
               omniscient: Optional[bool] = None,
               reveal: Optional[str] = None,
-              opp_blind: Optional[bool] = None):
+              opp_blind: Optional[bool] = None,
+              lethal_proof: Optional[str] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
         `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
@@ -340,6 +341,11 @@ class RsGame:
         （相手の手札は本当のまま・相手の山札だけ混ぜ直す）。`omniscient` と同時に渡すと Rust がエラーにする。
         `opp_blind`（省略可・§7.14・**測定専用**）＝木の中の相手の番のノードだけ、こちらの手札＋山札＋
         裏向きライフを混ぜ直した複製で評価する（合法手と手の適用は本当の世界のまま）。**省略すれば今までと同じ**。
+        `lethal_proof`（省略可・§7.21）＝詰みの証明（"off"／"root"／"root_reply"）。"root" は自分のメインで
+        このターンに届きうるとき、公平な配り方の全部で勝てる最初の 1 手が在ればそれを打つ（`kind="lethal"`）。
+        "root_reply" は加えて、根の直後の相手の応手の節点で「この応手なら次にこちらの勝ちが証明できる」子を
+        相手から見て負けに固定する。**省略（None）／"off"＝渡さない＝今までと同じ**（対戦 API は
+        `PLAY_LETHAL_PROOF` を渡す・既定 "off"）。
         """
         move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
                                 select_rule=select_rule, q_min_frac=q_min_frac,
@@ -349,7 +355,7 @@ class RsGame:
                                 setup_box_keep_bare=setup_box_keep_bare,
                                 budget=budget, rethink_ratio=rethink_ratio,
                                 rethink_worlds=rethink_worlds, omniscient=omniscient,
-                                reveal=reveal, opp_blind=opp_blind)
+                                reveal=reveal, opp_blind=opp_blind, lethal_proof=lethal_proof)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
@@ -366,7 +372,8 @@ class RsGame:
                rethink_worlds: Optional[int] = None,
                omniscient: Optional[bool] = None,
                reveal: Optional[str] = None,
-               opp_blind: Optional[bool] = None):
+               opp_blind: Optional[bool] = None,
+               lethal_proof: Optional[str] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -428,6 +435,9 @@ class RsGame:
         # 木の中の相手にこちらの手札を見せない（§7.14・測定専用）。None／False＝渡さない。
         if opp_blind:
             opts["opp_blind"] = True
+        # 詰みの証明（§7.21）。None／"off"＝渡さない＝Rust の既定（off）。
+        if lethal_proof and lethal_proof != "off":
+            opts["lethal_proof"] = str(lethal_proof)
         # 迷う局面だけの読み直し（§7.4）。None＝off＝`decide` を 1 回呼ぶだけ（今までと同じ）。
         from opcg_sim.loop import engine as _LE
         out = _LE.decide_with_rethink(lambda o: self._game.decide(player_id, o), json.dumps(opts),

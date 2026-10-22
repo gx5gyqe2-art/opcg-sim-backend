@@ -1,0 +1,1112 @@
+{
+ "points": 13544,
+ "games": 300,
+ "class_counts": {
+  "unknown": 4214,
+  "none": 7799,
+  "otsu": 1149,
+  "ko_only": 382
+ },
+ "sample_otsu": {
+  "n": 200,
+  "rs_status": {
+   "win": 177,
+   "unknown": 18,
+   "no": 5
+  },
+  "by_class": {
+   "otsu|win": 177,
+   "otsu|unknown": 18,
+   "otsu|no": 5
+  }
+ },
+ "sample_non_otsu": {
+  "n": 200,
+  "rs_status": {
+   "no": 198,
+   "unknown": 2
+  },
+  "by_class": {
+   "none|no": 188,
+   "ko_only|no": 10,
+   "none|unknown": 2
+  }
+ },
+ "full_table": {
+  "ko_only|no": 331,
+  "ko_only|unknown": 17,
+  "ko_only|win": 34,
+  "none|no": 7580,
+  "none|unknown": 204,
+  "none|win": 15,
+  "otsu|no": 36,
+  "otsu|unknown": 111,
+  "otsu|win": 1002,
+  "unknown|no": 521,
+  "unknown|unknown": 3584,
+  "unknown|win": 109
+ },
+ "rs_win_audit_no_won_this_turn": {
+  "True": 30,
+  "False": 19
+ },
+ "rs_win_audit_no": [
+  {
+   "seed": 3012034,
+   "seat": "p2",
+   "turn": 12,
+   "step": 104,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"OP12-054\", \"targets\": [\"OP09-081\"]}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "6861d3d6-db72-4b2c-9d88-5534acd57d7e",
+     "target_ids": [
+      "bcd86bc2-94fd-4844-9052-8ed7b1407f6d"
+     ]
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 3
+  },
+  {
+   "seed": 3012038,
+   "seat": "p1",
+   "turn": 13,
+   "step": 133,
+   "opp_life": 1,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP16-045\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "56e76b32-d18c-434f-affa-7646fb18dd80"
+    }
+   },
+   "won_this_turn": false,
+   "kind": "main",
+   "audit_ko_nodes": 0
+  },
+  {
+   "seed": 3012049,
+   "seat": "p1",
+   "turn": 15,
+   "step": 163,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP07-019\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "fe4592b8-6461-48b1-9891-7bc1d23e568f"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 68
+  },
+  {
+   "seed": 3012049,
+   "seat": "p1",
+   "turn": 15,
+   "step": 164,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"OP07-019\", \"targets\": [\"OP02-049\"]}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "fe4592b8-6461-48b1-9891-7bc1d23e568f",
+     "target_ids": [
+      "da49bbc8-3f54-4901-b910-d7adaa4a15b4"
+     ]
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 230
+  },
+  {
+   "seed": 3012049,
+   "seat": "p1",
+   "turn": 15,
+   "step": 168,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"ST16-001\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "359d60c9-d78d-4bde-bbd3-584107ee396e"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 0
+  },
+  {
+   "seed": 3012049,
+   "seat": "p1",
+   "turn": 15,
+   "step": 169,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"ST16-001\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "359d60c9-d78d-4bde-bbd3-584107ee396e"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 5
+  },
+  {
+   "seed": 3012049,
+   "seat": "p1",
+   "turn": 15,
+   "step": 170,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"ST16-001\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "359d60c9-d78d-4bde-bbd3-584107ee396e"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 5
+  },
+  {
+   "seed": 3012049,
+   "seat": "p1",
+   "turn": 15,
+   "step": 171,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"ST16-001\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "359d60c9-d78d-4bde-bbd3-584107ee396e"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 17
+  },
+  {
+   "seed": 3012049,
+   "seat": "p1",
+   "turn": 15,
+   "step": 172,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"ST16-001\", \"targets\": [\"OP02-049\"]}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "359d60c9-d78d-4bde-bbd3-584107ee396e",
+     "target_ids": [
+      "da49bbc8-3f54-4901-b910-d7adaa4a15b4"
+     ]
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 17
+  },
+  {
+   "seed": 3012055,
+   "seat": "p2",
+   "turn": 12,
+   "step": 121,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"ST05-002\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "60248f64-24ab-412b-8d30-cd5f7371c3fc"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 4
+  },
+  {
+   "seed": 3012061,
+   "seat": "p2",
+   "turn": 14,
+   "step": 154,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP12-084\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "b2ab16bf-9d4a-4956-afa4-b3ababff8df1",
+     "target_ids": [
+      "8dbd4744-10be-461a-924e-c6f43fdae6e7"
+     ]
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 6
+  },
+  {
+   "seed": 3012066,
+   "seat": "p1",
+   "turn": 11,
+   "step": 114,
+   "opp_life": 1,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"ST24-005\", \"targets\": [\"OP14-001\"]}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "4c742085-24dd-4aab-b28e-62c95acfba9a",
+     "target_ids": [
+      "e9c652af-45a4-4445-bb66-6f1dac670aec"
+     ]
+    }
+   },
+   "won_this_turn": true,
+   "kind": "main",
+   "audit_ko_nodes": 0
+  },
+  {
+   "seed": 3012084,
+   "seat": "p2",
+   "turn": 8,
+   "step": 55,
+   "opp_life": 1,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP10-094\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "8b544c2a-5608-4d62-a9f9-40c4a9a38389"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 0
+  },
+  {
+   "seed": 3012084,
+   "seat": "p2",
+   "turn": 8,
+   "step": 56,
+   "opp_life": 1,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP10-094\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "8b544c2a-5608-4d62-a9f9-40c4a9a38389"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 6
+  },
+  {
+   "seed": 3012084,
+   "seat": "p2",
+   "turn": 8,
+   "step": 57,
+   "opp_life": 1,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP10-094\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "8b544c2a-5608-4d62-a9f9-40c4a9a38389"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 6
+  },
+  {
+   "seed": 3012084,
+   "seat": "p2",
+   "turn": 8,
+   "step": 58,
+   "opp_life": 1,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP10-094\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "8b544c2a-5608-4d62-a9f9-40c4a9a38389"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 6
+  },
+  {
+   "seed": 3012084,
+   "seat": "p2",
+   "turn": 8,
+   "step": 59,
+   "opp_life": 1,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP10-094\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "8b544c2a-5608-4d62-a9f9-40c4a9a38389"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 6
+  },
+  {
+   "seed": 3012084,
+   "seat": "p2",
+   "turn": 8,
+   "step": 60,
+   "opp_life": 1,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"OP10-094\", \"targets\": [\"OP08-058\"]}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "8b544c2a-5608-4d62-a9f9-40c4a9a38389",
+     "target_ids": [
+      "44639a7f-e153-4b78-919a-b3dd9cfed86f"
+     ]
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 6
+  },
+  {
+   "seed": 3012080,
+   "seat": "p1",
+   "turn": 11,
+   "step": 103,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP09-044\"}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "c25a8f34-d3b8-46dc-bec2-2a728fb19c25"
+    }
+   },
+   "won_this_turn": false,
+   "kind": "lethal",
+   "audit_ko_nodes": 998
+  },
+  {
+   "seed": 3012080,
+   "seat": "p1",
+   "turn": 11,
+   "step": 104,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP09-044\"}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "c25a8f34-d3b8-46dc-bec2-2a728fb19c25"
+    }
+   },
+   "won_this_turn": false,
+   "kind": "lethal",
+   "audit_ko_nodes": 31
+  },
+  {
+   "seed": 3012080,
+   "seat": "p1",
+   "turn": 11,
+   "step": 105,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP09-044\"}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "c25a8f34-d3b8-46dc-bec2-2a728fb19c25"
+    }
+   },
+   "won_this_turn": false,
+   "kind": "lethal",
+   "audit_ko_nodes": 21
+  },
+  {
+   "seed": 3012080,
+   "seat": "p1",
+   "turn": 11,
+   "step": 106,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP09-044\"}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "c25a8f34-d3b8-46dc-bec2-2a728fb19c25"
+    }
+   },
+   "won_this_turn": false,
+   "kind": "lethal",
+   "audit_ko_nodes": 16
+  },
+  {
+   "seed": 3012080,
+   "seat": "p1",
+   "turn": 11,
+   "step": 107,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP09-044\"}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "c25a8f34-d3b8-46dc-bec2-2a728fb19c25"
+    }
+   },
+   "won_this_turn": false,
+   "kind": "lethal",
+   "audit_ko_nodes": 14
+  },
+  {
+   "seed": 3012080,
+   "seat": "p1",
+   "turn": 11,
+   "step": 108,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP09-044\"}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "c25a8f34-d3b8-46dc-bec2-2a728fb19c25"
+    }
+   },
+   "won_this_turn": false,
+   "kind": "lethal",
+   "audit_ko_nodes": 13
+  },
+  {
+   "seed": 3012080,
+   "seat": "p1",
+   "turn": 11,
+   "step": 109,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"OP09-044\", \"targets\": [\"OP16-022\"]}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "c25a8f34-d3b8-46dc-bec2-2a728fb19c25",
+     "target_ids": [
+      "89e6afec-738d-4d41-923d-b1933ae0b6ad"
+     ]
+    }
+   },
+   "won_this_turn": false,
+   "kind": "lethal",
+   "audit_ko_nodes": 3
+  },
+  {
+   "seed": 3012137,
+   "seat": "p2",
+   "turn": 12,
+   "step": 146,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"OP13-110\", \"targets\": [\"OP05-001\"]}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "8727741a-339b-44e2-9662-324940d66ec6",
+     "target_ids": [
+      "da64904f-2d66-492c-a6fd-2972dc3558ee"
+     ]
+    }
+   },
+   "won_this_turn": false,
+   "kind": "main",
+   "audit_ko_nodes": 1369
+  },
+  {
+   "seed": 3012140,
+   "seat": "p2",
+   "turn": 10,
+   "step": 103,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP09-031\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "26dec214-517f-4764-8828-7d2c66a46edc"
+    }
+   },
+   "won_this_turn": false,
+   "kind": "commit",
+   "audit_ko_nodes": 7
+  },
+  {
+   "seed": 3012157,
+   "seat": "p2",
+   "turn": 12,
+   "step": 124,
+   "opp_life": 2,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"EB01-003\", \"targets\": [\"OP10-042\"]}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "5ac58eeb-c536-498e-bf3d-3df5629f0833",
+     "target_ids": [
+      "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+     ]
+    }
+   },
+   "won_this_turn": false,
+   "kind": "lethal",
+   "audit_ko_nodes": 0
+  },
+  {
+   "seed": 3012155,
+   "seat": "p1",
+   "turn": 15,
+   "step": 178,
+   "opp_life": 3,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"ST27-004\"}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "TURN_END",
+    "payload": {}
+   },
+   "won_this_turn": false,
+   "kind": "main",
+   "audit_ko_nodes": 1
+  },
+  {
+   "seed": 3012155,
+   "seat": "p1",
+   "turn": 15,
+   "step": 179,
+   "opp_life": 3,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"ST27-004\", \"targets\": [\"OP14-080\"]}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "TURN_END",
+    "payload": {}
+   },
+   "won_this_turn": false,
+   "kind": "commit",
+   "audit_ko_nodes": 1
+  },
+  {
+   "seed": 3012155,
+   "seat": "p1",
+   "turn": 15,
+   "step": 181,
+   "opp_life": 2,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"OP09-093\", \"targets\": [\"OP14-080\"]}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "TURN_END",
+    "payload": {}
+   },
+   "won_this_turn": false,
+   "kind": "main",
+   "audit_ko_nodes": 1
+  },
+  {
+   "seed": 3012155,
+   "seat": "p1",
+   "turn": 15,
+   "step": 183,
+   "opp_life": 1,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"OP09-093\", \"targets\": [\"OP14-080\"]}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "TURN_END",
+    "payload": {}
+   },
+   "won_this_turn": false,
+   "kind": "main",
+   "audit_ko_nodes": 1
+  },
+  {
+   "seed": 3012155,
+   "seat": "p1",
+   "turn": 15,
+   "step": 185,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"TURN_END\"}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "TURN_END",
+    "payload": {}
+   },
+   "won_this_turn": false,
+   "kind": "main",
+   "audit_ko_nodes": 1
+  },
+  {
+   "seed": 3012171,
+   "seat": "p1",
+   "turn": 9,
+   "step": 78,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP14-041\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "222d0d49-70ca-41ba-84e7-08ce4827cfd7"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 8
+  },
+  {
+   "seed": 3012175,
+   "seat": "p1",
+   "turn": 11,
+   "step": 101,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"OP12-053\", \"targets\": [\"OP12-041\"]}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "21d58273-99cf-4275-8fbe-215f3790081a",
+     "target_ids": [
+      "1fac4bcd-06aa-40cb-98e5-2e94bb2d24f6"
+     ]
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 29
+  },
+  {
+   "seed": 3012193,
+   "seat": "p2",
+   "turn": 12,
+   "step": 126,
+   "opp_life": 1,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"P-102\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "0d27d026-6bb6-413e-9e18-212c2941a02a"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "main",
+   "audit_ko_nodes": 335
+  },
+  {
+   "seed": 3012193,
+   "seat": "p2",
+   "turn": 12,
+   "step": 127,
+   "opp_life": 1,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"P-102\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "0d27d026-6bb6-413e-9e18-212c2941a02a"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "main",
+   "audit_ko_nodes": 242
+  },
+  {
+   "seed": 3012195,
+   "seat": "p1",
+   "turn": 13,
+   "step": 153,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"OP05-106\", \"targets\": [\"ST03-001\"]}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "5e31d224-f877-4e99-9972-824de2a97bd8",
+     "target_ids": [
+      "aa511383-6e83-4517-aba4-2baf29832904"
+     ]
+    }
+   },
+   "won_this_turn": true,
+   "kind": "main",
+   "audit_ko_nodes": 13
+  },
+  {
+   "seed": 3012201,
+   "seat": "p1",
+   "turn": 15,
+   "step": 156,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"EB01-022\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "4ac04f83-a381-471b-8b96-a291d280a215"
+    }
+   },
+   "won_this_turn": false,
+   "kind": "main",
+   "audit_ko_nodes": 0
+  },
+  {
+   "seed": 3012205,
+   "seat": "p2",
+   "turn": 10,
+   "step": 98,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP06-051\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "bdb8096d-90cc-4649-9520-87e0c07d5f0c"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "commit",
+   "audit_ko_nodes": 2
+  },
+  {
+   "seed": 3012206,
+   "seat": "p2",
+   "turn": 10,
+   "step": 91,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"ST31-002\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "3dfe510c-93a6-42df-a26c-e4ea8a97944f",
+     "target_ids": [
+      "06a1229b-bf33-4fec-8c05-beb51db88ecd"
+     ]
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 3
+  },
+  {
+   "seed": 3012208,
+   "seat": "p2",
+   "turn": 12,
+   "step": 129,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"PLAY\", \"card\": \"OP10-004\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "PLAY",
+    "payload": {
+     "uuid": "b268f64c-b3e7-4ffc-87f6-6708eb4641bc"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 30
+  },
+  {
+   "seed": 3012208,
+   "seat": "p2",
+   "turn": 12,
+   "step": 139,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"OP10-023\", \"targets\": [\"EB01-021\"]}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "8b90cf4f-8ca0-4915-8cab-2e0674318d80",
+     "target_ids": [
+      "41c396c5-a879-46ea-a079-dc18cc3fe47d"
+     ]
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 0
+  },
+  {
+   "seed": 3012218,
+   "seat": "p1",
+   "turn": 11,
+   "step": 80,
+   "opp_life": 1,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"EB02-002\"}",
+   "ko": false,
+   "otsu": null,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8"
+    }
+   },
+   "won_this_turn": false,
+   "kind": "main",
+   "audit_ko_nodes": 3520
+  },
+  {
+   "seed": 3012218,
+   "seat": "p2",
+   "turn": 18,
+   "step": 201,
+   "opp_life": 1,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"ST05-001\", \"targets\": [\"OP13-003\"]}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+    }
+   },
+   "won_this_turn": false,
+   "kind": "main",
+   "audit_ko_nodes": 11
+  },
+  {
+   "seed": 3012226,
+   "seat": "p1",
+   "turn": 11,
+   "step": 103,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP13-027\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "a35e49f9-b832-4873-b6bb-ffe2eea8ff91"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 7
+  },
+  {
+   "seed": 3012239,
+   "seat": "p1",
+   "turn": 9,
+   "step": 70,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"EB03-057\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "c410f9d8-a2bc-4818-9009-83817500e512"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 6
+  },
+  {
+   "seed": 3012285,
+   "seat": "p2",
+   "turn": 8,
+   "step": 76,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACK\", \"card\": \"OP11-034\", \"targets\": [\"OP02-001\"]}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "42896e7e-21f7-42e5-a7df-2c898dfacf65",
+     "target_ids": [
+      "901a1004-7606-43ab-b767-dbc2c7e1d21b"
+     ]
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 0
+  },
+  {
+   "seed": 3012285,
+   "seat": "p2",
+   "turn": 8,
+   "step": 78,
+   "opp_life": 0,
+   "move": "{\"action_type\": \"ATTACH_DON\", \"card\": \"OP13-027\"}",
+   "ko": true,
+   "otsu": false,
+   "rs_move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "ba281c70-71fc-4770-b116-fef9f1e053a1"
+    }
+   },
+   "won_this_turn": true,
+   "kind": "lethal",
+   "audit_ko_nodes": 0
+  }
+ ],
+ "otsu_not_rs_win": [
+  [
+   [
+    "unknown",
+    0
+   ],
+   61
+  ],
+  [
+   [
+    "unknown",
+    1
+   ],
+   36
+  ],
+  [
+   [
+    "no",
+    0
+   ],
+   21
+  ],
+  [
+   [
+    "unknown",
+    2
+   ],
+   14
+  ],
+  [
+   [
+    "no",
+    1
+   ],
+   10
+  ],
+  [
+   [
+    "no",
+    2
+   ],
+   5
+  ]
+ ],
+ "rs_applies_rate": 0.9152
+}

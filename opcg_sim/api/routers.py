@@ -215,10 +215,12 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
                 # 組み直して Python に読ませる暫定経路（§15.1）を撤去した。
                 # 探索は対戦 API だけの既定（`PLAY_SIMS`／`PLAY_BUDGET`・2026-10-18・`PLAY_WORLDS`・2026-10-21）。
                 # 迷う局面だけ世界 K 本で読み直す（§7.4・既定 `PLAY_RETHINK_RATIO=None`＝off）。
+                # 詰みの証明（§7.21・既定 `PLAY_LETHAL_PROOF="off"`）。
                 move = manager.decide(cpu_pid, trace=tr, sims=E.PLAY_SIMS, budget=E.PLAY_BUDGET,
                                       worlds=E.PLAY_WORLDS,
                                       rethink_ratio=E.PLAY_RETHINK_RATIO,
-                                      rethink_worlds=E.PLAY_RETHINK_WORLDS)
+                                      rethink_worlds=E.PLAY_RETHINK_WORLDS,
+                                      lethal_proof=E.PLAY_LETHAL_PROOF)
                 if move is not None:
                     if trace_on:
                         # action_index＝直後に記録する actions のインデックス（決定↔アクションの明示対応）。
