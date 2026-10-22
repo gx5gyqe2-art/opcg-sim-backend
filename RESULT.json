@@ -1,449 +1,231 @@
 {
- "job": "rs-fair",
- "role": "engine-default",
+ "job": "omni-value",
+ "role": "tool",
  "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.15 (origin/claude/cpu-spec-improvements-yw91jd @ 8a3fa42; ledger 2+318)",
+ "branch": "claude/omni-value",
+ "base": "claude/cpu-spec-improvements-yw91jd@93da7d38f",
  "inputs": {
-  "base": "claude/cpu-spec-improvements-yw91jd @ 8a3fa42",
-  "merged": "claude/rs-oppblind @ 1b9f1cb",
-  "net": "nrel_r13d.npz (both seats)"
+  "records": "claude/n43-w01 の n_records/n43_w01_p0〜p3（dump v5・enc v14・生成役 r11a・1,280 回・peek 時代）",
+  "decide": {
+   "omniscient": true,
+   "sims": 320,
+   "worlds": 1,
+   "budget": 0,
+   "net": "opcg_sim/data/learned/nrel_r13d.npz"
+  }
  },
  "outputs": {
-  "branch": "claude/rs-fair",
-  "commits": {
-   "stage0_merge": "24ec28e",
-   "stage1_2_code": "2da9fda"
-  },
+  "tool": "tests/scripts/omni_value_relabel.py",
+  "train_hook": "opcg_sim/learned/train/n_rel_train.py --z-mode {z,omni,mix} --omni-in <glob>",
+  "tests": "tests/test_n_rel_train_omni.py（2 本・cpu_infra）",
   "files": [
-   "rust/opcg_engine/src/model.rs (CardInstance.known_by: u8 per-seat bits; Seat::know_bit)",
-   "rust/opcg_engine/src/journal.rs (Undo::CardKnown; set_card_known/add_card_known; know_on_enter/know_on_leave hooked into card_zone_insert/card_zone_remove_at/set_slot/IsFaceUp; KNOWN_BOTH)",
-   "rust/opcg_engine/src/effects/actions/zone.rs (shuffle_deck clears the deck's knowledge even when the rng does not shuffle; LOOK_LIFE marks the viewer)",
-   "rust/opcg_engine/src/effects/actions/flow.rs (LOOK marks the viewer, LOOK OPPONENT marks the viewer on opp deck top N; REVEAL marks both)",
-   "rust/opcg_engine/src/search/decide.rs (enum Reveal { Fair (default), Peek, OppHand }; validate; sample_world dispatch)",
-   "rust/opcg_engine/src/search/determinize.rs (hidden_slots(viewer): fair and opp_blind skip known slots)",
-   "rust/opcg_engine/src/search/mod.rs (opts JSON: fair/peek/opp_hand; explicit reveal + omniscient = error)",
-   "rust/opcg_engine/src/search/mcts.rs (TreeMcts::run uses the fair sampler too; not on the decide path)",
-   "rust/opcg_engine/src/search/tests_fair.rs (new: 7 tests) + updated reveal tests in decide.rs / tests_search.rs / flow.rs",
-   "rust/opcg_engine/src/py_game.rs (Game.knowledge_json(player_id) — measurement only, not in board JSON)",
-   "opcg_sim/api/engine_rs.py, opcg_sim/loop/arena.py, opcg_sim/loop/arena_shard.py, tests/scripts/rs_decide_latency.py (--reveal {fair,peek,opp_hand}; --knowledge)",
-   "tests/test_api.py (test_cpu_step_does_not_override_reveal), tests/test_pimc_worlds.py (P-identical check moved to peek)",
-   "tests/fixtures/rs_goldens/replay/a1_*.json (50 re-recorded)",
-   "docs/SPEC.md §2.5.9 (new), docs/TEST_SPEC.md §2 (+2 rows, 2 edited) §3 (latency row), CLAUDE.md (NRel paragraph, 1 line), docs/rust_engine_plan.md §20.7.1 (1 line)",
-   "arena_fair_local/fair_local.jsonl"
+   "n1_results/omni_value/omni_n43_w01_p0.npz",
+   "n1_results/omni_value/omni_n43_w01_p1.npz",
+   "n1_results/omni_value/omni_n43_w01_p2.npz",
+   "n1_results/omni_value/omni_n43_w01_p3.npz",
+   "n1_results/omni_value/summary_w01.json",
+   "n1_results/omni_value/summary_w01_holdout.json",
+   "n1_results/omni_value/run_w01.log"
   ]
  },
- "gates": {
-  "stage0": "after merging rs-oppblind, before any change: make test green (cargo 586 passed / 1 ignored; pytest 799 passed, 62 skipped — skips = torch/fastapi missing at that moment; golden audit+replay re-run alone: 6 passed); make audit-cross void 0 (120 pairs, wr 0.5333). Merge conflict only in RESULT.json (took mainline's).",
-  "make_test": "green on the final code tree: cargo test 593 passed / 1 ignored; pytest 850 passed, 13 skipped (skips = torch not installed)",
-  "make_audit_cross": "void 0 (120 pairs, seed 0, both seats default=fair, sims 32; wr 0.5083)",
-  "golden_audit": "make golden-audit regenerated audit.json byte-identical (git diff empty) — rules/effects unchanged",
-  "golden_replay_random150": "make golden-replay regenerated all 150 random_*.json byte-identical (git diff empty)",
-  "golden_replay_a1_50": "re-recorded (written 50, mismatched 0); replay test passes",
-  "clippy": "not part of the gate; my one finding (Option::is_none_or above MSRV 1.75) fixed. Pre-existing clippy errors on rustc 1.97 remain (ops.rs collapsible_match, type_complexity in rs-oppblind's BLIND_TRACE) — untouched"
- },
  "metrics": {
-  "local_arena": {
-   "cmd": "arena_shard --candidate opcg_sim/data/learned/nrel_r13d.npz --baseline opcg_sim/data/learned/nrel_r13d.npz --sims 1280 --budget 0 --cand-sims 1280 --cand-budget 0 --reveal peek --pairs 40 --max-pairs 40 --bands 1 --seed-base 1679000 --workers 4 --leaders random --decks synth_roles --pair-timeout 7200",
-   "candidate": "new default (fair + knowledge), worlds 1",
-   "baseline": "--reveal peek (old default), worlds 1",
-   "seeds": "1679000-1679039",
-   "pairs": 40,
-   "games": 80,
-   "void": 0,
-   "wins": 36.0,
-   "wr": 0.45,
-   "ci95": [
-    0.3459,
-    0.5541
+  "restore": {
+   "games": 479,
+   "rows": 72870,
+   "rows_restored": 72870,
+   "games_failed": 0,
+   "rows_with_v_omni": 44013,
+   "beam_max": 66
+  },
+  "cost": {
+   "sec_per_searched_point": 0.0368,
+   "sec_per_row_incl_unsearched": 0.0224,
+   "wall_sec_per_dir_4cores": [
+    113.4,
+    104.7,
+    116.9,
+    128.1
    ],
-   "elo": -34.9,
-   "wall_sec": 267,
-   "forecast": "about -25 (price of fairness before retraining; not a regression)",
-   "reading": "inside the forecast band (CI spans roughly -110..+38 Elo); same point estimate as rs-reveal's fair without knowledge (-34.9 on seeds 1677000) — 40 pairs cannot resolve the knowledge gain, which the production arena (coordinator) should judge"
+   "wall_min_per_shard_4cores": 7.7,
+   "decide_cpu_sec_per_shard": 1631,
+   "projection": "1 シャード（w01＝4 本・72,870 行・v_omni 44,013 点）は 4 コアで約 7.7 分。波 43 の 16 シャードは 1 セッション 4 コアで約 2 時間、8 セッションなら各約 15 分"
   },
-  "latency_1core": {
-   "cmd": "taskset -c N python tests/scripts/rs_decide_latency.py --sims 1280 --worlds 1 --budget 0 --games 20 [--reveal peek] --knowledge (2 runs in parallel on cores 0/1)",
-   "fair_default": {
-    "sims": 1280,
-    "worlds": 1,
-    "budget": 0,
-    "games": 20,
-    "moves": 2554,
-    "mean": 0.08,
-    "p50": 0.001,
-    "p90": 0.206,
-    "p99": 0.517,
-    "max": 2.6,
-    "wall_sec": 204.2,
-    "affinity": [
-     0
-    ]
-   },
-   "peek": {
-    "sims": 1280,
-    "worlds": 1,
-    "budget": 0,
-    "reveal": "peek",
-    "games": 20,
-    "moves": 2512,
-    "mean": 0.079,
-    "p50": 0.001,
-    "p90": 0.193,
-    "p99": 0.639,
-    "max": 2.36,
-    "wall_sec": 199.1,
-    "affinity": [
-     1
-    ]
-   },
-   "reading": "per-move mean 0.080 s (fair) vs 0.079 s (peek): the knowledge tracking (journaled u8 per moved card) and the two-pile reshuffle cost nothing measurable"
+  "corr_all_rows": {
+   "n": 44013,
+   "corr_omni_z": 0.6912,
+   "corr_raw_z": 0.6685,
+   "corr_v0_z": 0.6369,
+   "corr_omni_raw": 0.9469,
+   "corr_omni_v0": 0.9396,
+   "mse_omni_z": 0.5224,
+   "mse_raw_z": 0.554,
+   "sign_omni_z": 0.8007,
+   "sign_raw_z": 0.79,
+   "mean_abs_omni_minus_raw": 0.1384
   },
-  "knowledge_size": {
-   "source": "same 20 games as latency_1core.fair_default (seeds 2999900-2999919), one row per decision point of the deciding seat",
-   "fair_default": {
-    "points": 2554,
-    "opp_hand": {
-     "mean": 0.057,
-     "p50": 0,
-     "p90": 0,
-     "max": 2,
-     "share_nonzero": 0.054,
-     "hist": {
-      "0": 2417,
-      "1": 129,
-      "2": 8
-     }
-    },
-    "opp_deck": {
-     "mean": 0.11,
-     "p50": 0,
-     "p90": 0,
-     "max": 3,
-     "share_nonzero": 0.062,
-     "hist": {
-      "0": 2396,
-      "1": 67,
-      "2": 59,
-      "3": 32
-     }
-    },
-    "opp_life": {
-     "mean": 0.003,
-     "p50": 0,
-     "p90": 0,
-     "max": 1,
-     "share_nonzero": 0.003,
-     "hist": {
-      "0": 2547,
-      "1": 7
-     }
-    },
-    "my_deck": {
-     "mean": 2.717,
-     "p50": 1,
-     "p90": 8,
-     "max": 17,
-     "share_nonzero": 0.506,
-     "hist": {
-      "0": 1262,
-      "1": 122,
-      "2": 139,
-      "3": 102,
-      "4": 369,
-      "5": 29,
-      "6": 136,
-      "7": 62,
-      "8": 176,
-      "9": 7,
-      "10": 71,
-      "13": 18,
-      "14": 30,
-      "17": 31
-     }
-    },
-    "my_life": {
-     "mean": 0.014,
-     "p50": 0,
-     "p90": 0,
-     "max": 1,
-     "share_nonzero": 0.014,
-     "hist": {
-      "0": 2519,
-      "1": 35
-     }
-    },
-    "deck_top": {
-     "mean": 0.055,
-     "p50": 0,
-     "p90": 0,
-     "max": 3,
-     "share_nonzero": 0.025,
-     "hist": {
-      "0": 2490,
-      "1": 14,
-      "2": 24,
-      "3": 26
-     }
-    },
-    "total": {
-     "mean": 2.9,
-     "p50": 2,
-     "p90": 8,
-     "max": 17,
-     "share_nonzero": 0.548,
-     "hist": {
-      "0": 1154,
-      "1": 118,
-      "2": 239,
-      "3": 67,
-      "4": 378,
-      "5": 31,
-      "6": 143,
-      "7": 80,
-      "8": 132,
-      "9": 55,
-      "10": 65,
-      "11": 13,
-      "13": 18,
-      "14": 30,
-      "17": 31
-     }
-    },
-    "opp_hand_share_known": 0.0123
-   },
-   "peek_games_for_reference": {
-    "points": 2512,
-    "opp_hand": {
-     "mean": 0.082,
-     "p50": 0,
-     "p90": 0,
-     "max": 3,
-     "share_nonzero": 0.061,
-     "hist": {
-      "0": 2359,
-      "1": 110,
-      "2": 32,
-      "3": 11
-     }
-    },
-    "opp_deck": {
-     "mean": 0.063,
-     "p50": 0,
-     "p90": 0,
-     "max": 2,
-     "share_nonzero": 0.051,
-     "hist": {
-      "0": 2384,
-      "1": 98,
-      "2": 30
-     }
-    },
-    "opp_life": {
-     "mean": 0.008,
-     "p50": 0,
-     "p90": 0,
-     "max": 2,
-     "share_nonzero": 0.006,
-     "hist": {
-      "0": 2497,
-      "1": 9,
-      "2": 6
-     }
-    },
-    "my_deck": {
-     "mean": 2.457,
-     "p50": 1,
-     "p90": 8,
-     "max": 12,
-     "share_nonzero": 0.509,
-     "hist": {
-      "0": 1233,
-      "1": 86,
-      "2": 146,
-      "3": 159,
-      "4": 519,
-      "5": 53,
-      "6": 28,
-      "7": 19,
-      "8": 90,
-      "9": 6,
-      "10": 87,
-      "12": 86
-     }
-    },
-    "my_life": {
-     "mean": 0.026,
-     "p50": 0,
-     "p90": 0,
-     "max": 2,
-     "share_nonzero": 0.018,
-     "hist": {
-      "0": 2468,
-      "1": 23,
-      "2": 21
-     }
-    },
-    "deck_top": {
-     "mean": 0.09,
-     "p50": 0,
-     "p90": 0,
-     "max": 3,
-     "share_nonzero": 0.052,
-     "hist": {
-      "0": 2382,
-      "1": 63,
-      "2": 37,
-      "3": 30
-     }
-    },
-    "total": {
-     "mean": 2.637,
-     "p50": 2,
-     "p90": 8,
-     "max": 14,
-     "share_nonzero": 0.557,
-     "hist": {
-      "0": 1112,
-      "1": 136,
-      "2": 169,
-      "3": 145,
-      "4": 520,
-      "5": 111,
-      "6": 30,
-      "7": 19,
-      "8": 65,
-      "9": 26,
-      "10": 93,
-      "12": 56,
-      "13": 9,
-      "14": 21
-     }
-    },
-    "opp_hand_share_known": 0.0172
-   },
-   "reading": "45% of decision points know nothing hidden; mean 2.9 known hidden cards (max 17). Almost all of it is my own deck (mean 2.7, 51% of points) — cards a look-N effect put back at the bottom; the deck top is known at only 2.5% of points (look-and-reorder to the top is rare in the pool). Opponent hand: 1.2% of its cards known (5.4% of points know at least one), from bounces / reveals."
+  "corr_holdout_rows": {
+   "n": 5930,
+   "corr_omni_z": 0.6784,
+   "corr_raw_z": 0.6352,
+   "corr_v0_z": 0.6211,
+   "corr_omni_raw": 0.9357,
+   "corr_omni_v0": 0.9278,
+   "mse_omni_z": 0.5405,
+   "mse_raw_z": 0.5992,
+   "sign_omni_z": 0.7887,
+   "sign_raw_z": 0.7666,
+   "mean_abs_omni_minus_raw": 0.1488
   },
-  "golden_replay_a1": {
-   "games": 50,
-   "identical": 0,
-   "diverged": 50,
-   "first_diverge_step": {
-    "min": 0,
-    "p50": 1,
-    "mean": 3.5,
-    "max": 20
+  "by_turn_holdout": {
+   "turn_0-2": {
+    "n": 402,
+    "corr_omni_z": 0.3382,
+    "corr_raw_z": 0.3312,
+    "corr_v0_z": 0.3515,
+    "corr_omni_raw": 0.9392,
+    "corr_omni_v0": 0.8632,
+    "mse_omni_z": 0.9081,
+    "mse_raw_z": 0.9141,
+    "sign_omni_z": 0.6642,
+    "sign_raw_z": 0.6418,
+    "mean_abs_omni_minus_raw": 0.1391
    },
-   "decisions_before_divergence_share": 0.031,
-   "decisions_total_old": 5639,
-   "decisions_total_new": 5514,
-   "decisions_identical_prefix": 174,
-   "winner_changed": 19
+   "turn_3-4": {
+    "n": 623,
+    "corr_omni_z": 0.4685,
+    "corr_raw_z": 0.4156,
+    "corr_v0_z": 0.4169,
+    "corr_omni_raw": 0.9247,
+    "corr_omni_v0": 0.845,
+    "mse_omni_z": 0.7865,
+    "mse_raw_z": 0.8396,
+    "sign_omni_z": 0.6934,
+    "sign_raw_z": 0.6758,
+    "mean_abs_omni_minus_raw": 0.1567
+   },
+   "turn_5-6": {
+    "n": 760,
+    "corr_omni_z": 0.5167,
+    "corr_raw_z": 0.4819,
+    "corr_v0_z": 0.4849,
+    "corr_omni_raw": 0.9416,
+    "corr_omni_v0": 0.87,
+    "mse_omni_z": 0.7381,
+    "mse_raw_z": 0.7817,
+    "sign_omni_z": 0.6961,
+    "sign_raw_z": 0.6882,
+    "mean_abs_omni_minus_raw": 0.1471
+   },
+   "turn_7-8": {
+    "n": 1043,
+    "corr_omni_z": 0.6555,
+    "corr_raw_z": 0.6028,
+    "corr_v0_z": 0.6313,
+    "corr_omni_raw": 0.9352,
+    "corr_omni_v0": 0.9423,
+    "mse_omni_z": 0.5702,
+    "mse_raw_z": 0.6402,
+    "sign_omni_z": 0.7632,
+    "sign_raw_z": 0.7363,
+    "mean_abs_omni_minus_raw": 0.1559
+   },
+   "turn_9-99": {
+    "n": 3102,
+    "corr_omni_z": 0.7836,
+    "corr_raw_z": 0.7396,
+    "corr_v0_z": 0.7291,
+    "corr_omni_raw": 0.9367,
+    "corr_omni_v0": 0.9483,
+    "mse_omni_z": 0.3851,
+    "mse_raw_z": 0.4517,
+    "sign_omni_z": 0.8553,
+    "sign_raw_z": 0.8304,
+    "mean_abs_omni_minus_raw": 0.1466
+   }
   },
-  "golden_replay_a1_first_divergence_kind": {
-   "KEEP_HAND->MULLIGAN": 16,
-   "MULLIGAN->KEEP_HAND": 14,
-   "RESOLVE_EFFECT_SELECTION": 4,
-   "SELECT_COUNTER": 4,
-   "PLAY": 3,
-   "ATTACH_DON->ATTACK": 3,
-   "SELECT_COUNTER->PASS": 2,
-   "other": 4
-  },
-  "golden_replay_a1_per_game_first_divergence_step": {
-   "5000150": 0,
-   "5000151": 12,
-   "5000152": 1,
-   "5000153": 8,
-   "5000154": 0,
-   "5000155": 1,
-   "5000156": 0,
-   "5000157": 1,
-   "5000158": 3,
-   "5000159": 0,
-   "5000160": 15,
-   "5000161": 0,
-   "5000162": 1,
-   "5000163": 6,
-   "5000164": 0,
-   "5000165": 4,
-   "5000166": 6,
-   "5000167": 1,
-   "5000168": 0,
-   "5000169": 0,
-   "5000170": 7,
-   "5000171": 9,
-   "5000172": 7,
-   "5000173": 20,
-   "5000174": 0,
-   "5000175": 7,
-   "5000176": 7,
-   "5000177": 1,
-   "5000178": 9,
-   "5000179": 0,
-   "5000180": 1,
-   "5000181": 4,
-   "5000182": 0,
-   "5000183": 0,
-   "5000184": 7,
-   "5000185": 1,
-   "5000186": 0,
-   "5000187": 9,
-   "5000188": 12,
-   "5000189": 0,
-   "5000190": 6,
-   "5000191": 0,
-   "5000192": 7,
-   "5000193": 0,
-   "5000194": 0,
-   "5000195": 1,
-   "5000196": 0,
-   "5000197": 0,
-   "5000198": 0,
-   "5000199": 0
+  "by_turn_all": {
+   "turn_0-2": {
+    "n": 2777,
+    "corr_omni_z": 0.4518,
+    "corr_raw_z": 0.4413,
+    "corr_v0_z": 0.4167,
+    "corr_omni_raw": 0.9331,
+    "corr_omni_v0": 0.8866,
+    "mse_omni_z": 0.799,
+    "mse_raw_z": 0.8101,
+    "sign_omni_z": 0.6896,
+    "sign_raw_z": 0.686,
+    "mean_abs_omni_minus_raw": 0.1467
+   },
+   "turn_3-4": {
+    "n": 4224,
+    "corr_omni_z": 0.5034,
+    "corr_raw_z": 0.4711,
+    "corr_v0_z": 0.4618,
+    "corr_omni_raw": 0.9251,
+    "corr_omni_v0": 0.8748,
+    "mse_omni_z": 0.7484,
+    "mse_raw_z": 0.7813,
+    "sign_omni_z": 0.7083,
+    "sign_raw_z": 0.6958,
+    "mean_abs_omni_minus_raw": 0.1553
+   },
+   "turn_5-6": {
+    "n": 5179,
+    "corr_omni_z": 0.5362,
+    "corr_raw_z": 0.5086,
+    "corr_v0_z": 0.4932,
+    "corr_omni_raw": 0.942,
+    "corr_omni_v0": 0.9073,
+    "mse_omni_z": 0.7154,
+    "mse_raw_z": 0.7462,
+    "sign_omni_z": 0.7196,
+    "sign_raw_z": 0.7079,
+    "mean_abs_omni_minus_raw": 0.1447
+   },
+   "turn_7-8": {
+    "n": 7187,
+    "corr_omni_z": 0.6149,
+    "corr_raw_z": 0.5916,
+    "corr_v0_z": 0.5732,
+    "corr_omni_raw": 0.9464,
+    "corr_omni_v0": 0.9371,
+    "mse_omni_z": 0.6244,
+    "mse_raw_z": 0.6541,
+    "sign_omni_z": 0.7583,
+    "sign_raw_z": 0.7504,
+    "mean_abs_omni_minus_raw": 0.1442
+   },
+   "turn_9-99": {
+    "n": 24646,
+    "corr_omni_z": 0.7846,
+    "corr_raw_z": 0.7626,
+    "corr_v0_z": 0.7434,
+    "corr_omni_raw": 0.9502,
+    "corr_omni_v0": 0.9547,
+    "mse_omni_z": 0.3822,
+    "mse_raw_z": 0.4165,
+    "sign_omni_z": 0.8584,
+    "sign_raw_z": 0.8467,
+    "mean_abs_omni_minus_raw": 0.1315
+   }
   }
  },
- "hidden_zones_table": "unchanged from claude/rs-reveal RESULT.json (copied into docs/SPEC.md §2.5.9): own deck order and own face-down life are hidden from me too; opp hand/deck/face-down life hidden; face-up life, field/stage/leader/trash/DON public; temp_zone not touched",
- "knowledge_path_table": [
-  {
-   "path": "leaves field / trash / stage / leader slot / face-up life (to hand, deck top/bottom, face-down life)",
-   "who_knows": "both"
-  },
-  {
-   "path": "REVEAL target (reveal hand card, reveal from deck top, search-and-reveal)",
-   "who_knows": "both"
-  },
-  {
-   "path": "life turned face up (FACE_UP_LIFE, 'add face up')",
-   "who_knows": "both"
-  },
-  {
-   "path": "LOOK own deck top N -> temp (the rest go back to top/bottom in any order: mark carried)",
-   "who_knows": "viewer"
-  },
-  {
-   "path": "LOOK status OPPONENT (opp deck top N; board unchanged)",
-   "who_knows": "viewer"
-  },
-  {
-   "path": "LOOK_LIFE",
-   "who_knows": "viewer (effect actor)"
-  },
-  {
-   "path": "leaves hand / deck / face-down life (draw, damage life->hand, hand face-down to deck, deck top -> life)",
-   "who_knows": "owner bit kept only (other seat cannot follow it)"
-  },
-  {
-   "path": "enters hand",
-   "who_knows": "owner added"
-  },
-  {
-   "path": "enters deck / face-down life / temp, leaves temp",
-   "who_knows": "carried over"
-  },
-  {
-   "path": "deck shuffled (SHUFFLE effect, mulligan, game start)",
-   "who_knows": "nobody (whole deck cleared)"
-  }
+ "notes": [
+  "盤面の復元: dump v5 の npz に hidden の列は無い（列は符号化・候補・z・sig／forced_sig・aux だけ。meta_games.json は seed・リーダー・型・勝者）。lethal_audit／hand_infer_probe は自分で打った局の hidden_json を使っており、記録からの復元はしていない。そこで『局の seed から対局を作り直し、記録の手を順に当て直す』で復元した（探索は回さない）。",
+  "探索で同じ手を引き直す道は使えない: 波 43 の後に既定が reveal=fair に変わり高速化も入ったので、同じ seed・同じ設定でも 5 手目で別の手になった（実測・seed 2431003）。",
+  "当て直しの規則: forced≠0 の行は forced_sig／DON_BOX は先頭原始手（付与 k>0 なら ATTACH_DON・k=0 なら ATTACK）／SETUP_BOX は素の PLAY・ACTIVATE_MAIN／効果の対話は既定の payload に sig の selected_uuids・accepted を書き込む。sig で決まらない手（カウンターに使う札〔battle の手は sig に uuid を持たない〕・CHOICE の番号・ARRANGE_DECK の上／下）は候補を全部当て、次の行の符号化が記録と一致する枝だけ残すビーム（上限 64・実測の最大 66 候補→64 に切っても全局成功）。",
+  "罠（実測）: Game.fork() は対局の乱数を写さない（fork した盤面で山札を混ぜる効果の後に記録と食い違う）。分岐は seed から手の列を当て直して作る。NpzFile は列を引くたびに展開する（行ごとに引くとメモリが 8GB を超えた）＝列は 1 度だけ読む。",
+  "検算: 各行で復元した盤面の符号化（tokens 22×22・scalars 127）が記録と float16 でビット一致することを確かめた。w01 の 479 局・72,870 行の全部が一致（失敗 0 局）。",
+  "v_omni が付くのは根の探索がある点だけ: main 行 34,711 のうち 34,706、commit 行 23,253 のうち 9,305（箱の残り手順を持ち越さずに decide し直すと main の探索になる点）、window 行 14,906 のうち 2（窓は探索しない＝根の Q が無い）。計 44,013／72,870 行（60%）。残りは NaN で、訓練の受け口は z のまま使う（--z-mode omni でも全行の 4 割は z）。窓・commit 行にも付けたいなら、直後の同じ席の main 行の v_omni を写す等の規則が要る（段階 2 で決める・未実装）。",
+  "v_omni の向き: 記録の pol_v0 と同じ式（訪問で重み付けた根の Q の平均）＝手番の席から見た値。v_omni と pol_v0（1,280 回・公平でない peek の世界 1 本）の相関 0.94。",
+  "先行の読み取り（holdout＝seed%7==0 の 5,930 点・r13d はこの行の z を見ていない）: v_omni と z の相関 0.678／素の価値と z 0.635／記録の根の価値 pol_v0 と z 0.621。二乗誤差（対 z）0.541 vs 素 0.599、符号一致 0.789 vs 0.767。全行（訓練行を含む）では 0.691 vs 0.668。全部見える評価は z をより良く当てる＝勝敗に近い情報を持つ（ただし v_omni と素の価値の相関は 0.94 と高く、差は平均 0.15）。",
+  "ターン帯（holdout）: 0〜2 ターンは v_omni と z 0.338・素 0.331（ほぼ差なし・序盤は全部見えても勝敗は読めない）、9 ターン以降は 0.784 vs 0.740（終盤ほど差が開く＝詰みや手札の中身が効く局面）。全行のターン帯も同じ傾向（summary_w01.json）。",
+  "解釈の注意: v_omni は r13d の葉の評価＋全部見える 320 回の探索なので、r13d 自身の偏りを受け継ぐ（独立した教師ではない）。z より分散が小さい分、価値の学習のノイズは減るはず。z は 72,870 行全部に付くが v_omni は 6 割。|v_omni|>0.9 の点が 34%（全部見える探索は決着の近い局面を ±1 近くに読み切る）。",
+  "費用: 探索のある点 1 つあたり 0.037 秒（1 コア・320 回）、全行平均 0.022 秒。1 シャード（4 本・72,870 行）は 4 コアで約 7.7 分（ディレクトリごとに 105〜128 秒）。指示書の目安（0.02 秒／点・1 シャード 20 分）より速い（点あたりは遅いが、根の探索が無い行が 4 割あるため）。",
+  "8 シャードの作業セッション（K=1〜8・w(2K-1)〜w(2K)）の手順: claude/n43-wKK の n_records を ~/n43 に展開 → `python tests/scripts/omni_value_relabel.py run --in \"$HOME/n43/n_records/n43_w{KK}_p*\" --out-dir n1_results/omni_value --workers 4`（2 シャード 8 本で約 15 分）→ RESULT.json と一緒に claude/omni-value-sK へ。w01 の分は本ブランチに同梱済み（K=1 は w02 だけでよい）。",
+  "訓練の受け口: --z-mode z（既定）は V['z'] に触れない＝今までと 1 bit も同じ。omni／mix は (seed, step) で omni_*.npz の行と突き合わせ（記録の step 列は dump_io.load_row_col で読む）、一致した行だけ差し替える。差し替えた行数をログに出す。検証の v_mse もこの教師に対して測られる（z との比較には評価帯を使う）。torch は環境に無いので実訓練は未実行（段階 2）。",
+  "make test: gate 欄を参照。"
  ],
- "notes": "Stage 0: merging origin/claude/rs-oppblind into the mainline conflicted only in RESULT.json (took mainline's; this file replaces it). decide.rs/mcts.rs/mod.rs/py_game.rs auto-merged with the Move struct / speed work; gate + goldens + audit-cross green with output unchanged before any stage-1 change (merge commit 24ec28e, pushed).\nDefault switch: Reveal::Fair is #[default]; the old behaviour is Reveal::Peek ('peek'). Every world draw (tree, worlds>1, rethink via worlds, window root fold, dialog/setup box commits) goes through sample_world, so the API, generation, arena and golden a1 all use fair unless told otherwise. PLAY_SIMS / PLAY_BUDGET / PLAY_WORLDS untouched. TreeMcts::run (not on the decide path) was switched to the fair sampler for consistency.\nomniscient vs reveal: struct validation errors on omniscient + reveal != Fair (Fair = 'not specified'); the JSON layer additionally errors when the reveal key is given at all together with omniscient=true (even 'fair'), so an explicit fair+omniscient is not silently ignored.\nKnowledge representation: per-card u8 bitmask CardInstance.known_by (bit 1<<seat), journaled (Undo::CardKnown) so search apply/rollback restores it. It is NOT serialized into the board JSON, hidden_json or card_record — that is what keeps the random-150 replay golden byte-identical. The spec said 'GameState の一部・記録と golden に載る'; I kept it in GameState but out of records/goldens because putting it in the board JSON would change every replay golden hash, contradicting the stronger invariant (random 150 unchanged). Consequence: a Game rebuilt from a record (from_hidden / replay) starts with empty knowledge (= nobody knows anything = maximally fair). The live API / generation / arena keep one Rust Game per match, so knowledge accumulates normally there. Measurement accessor: Game.knowledge_json(player_id).\nKnowledge updates are done in the journal zone primitives (one place) instead of per effect: that covers every bounce/return-to-deck/field-to-life path without auditing each action. Effects only add LOOK (viewer), LOOK OPPONENT (viewer on opp deck top N), LOOK_LIFE (viewer = actor) and REVEAL (both, per target in flow::apply_target). shuffle_deck clears before the rng check (replay rngs do not shuffle, but the real game did).\nConservative choices ('迷ったら知らない側'): a card leaving hand/deck/face-down life keeps only its owner's bit — e.g. the opponent drawing a card I knew was on top of their deck (because it was returned there) becomes unknown to me, even though in reality I could follow it into their hand. Search-to-hand effects that do not emit a REVEAL action stay unknown to the opponent. 'Look at the opponent's hand' does not exist as an effect in the engine (would mark the viewer if added). Opponent temp_zone (transient) is still not shuffled, as in rs-reveal.\nOwner bit on own hand cards and on cards the opponent alone knows can travel with a card when fair reshuffles it (the mask is per card, not per slot). Only bits of the drawing seat decide fixing, and all shuffled cards have that bit = 0, so fair itself is exact; in nested draws inside a world (opp_blind's opponent view) an opponent-only bit may sit at a reshuffled position — rare and only affects the measurement-only opp_blind.\nRules unchanged: golden-audit and random-150 replay are byte-identical after regeneration; tests_fair::knowledge_does_not_change_rules applies every legal move on a board with noisy masks vs zero masks and compares board (masks stripped), events and the next legal set. Two existing 'board unchanged' tests (LOOK OPPONENT, REVEAL) now compare with masks stripped and assert the new marks.\nEncoder interaction (worth knowing for retraining): the scalar features read 'my remaining deck' aggregates (deck_aggregate / deck_apex over me.deck). Under peek that was the real deck, which leaked which of my cards sit in face-down life; under fair it is the world's deck (deck+life reshuffled), so root priors differ per world. tests/test_pimc_worlds.py asserted P identical across worlds; that check now runs under reveal='peek' and the default case only checks the wiring. Part of the -25..-35 price is this input shift (the net was trained on peek-era positions); retraining on fair-generated waves should absorb it.\na1 golden: all 50 games diverge; 30 of them at the very first decision (mulligan: the old search evaluated the redraw against the real deck order), median first divergence = step 1, mean 3.5, max 20; 174 of 5,639 old decisions are in the identical prefix; 19 winners changed. Decisions 5,639 -> 5,514.\nLocal arena: fair+knowledge vs peek = 36/80, wr 0.45, -34.9 Elo [0.346, 0.554], void 0 — matches the forecast (≈-25, price of fairness before retraining). Identical point estimate to rs-reveal's fair without knowledge on a different seed band; 40 pairs cannot separate the knowledge gain (expected small: knowledge is non-empty at 55% of decision points and mostly concerns my own deck bottom).\nLatency: fair 0.080 s/move vs peek 0.079 s on one core (1280 sims, 1 world, no budget, 20 games) — no measurable cost.\nEnvironment: installed maturin, pytest, pytest-xdist and opcg_sim/requirements.txt via pip before the gate. First arena attempt used '--candidate r13d' (name, not path) and failed in the workers; rerun with explicit npz paths (the ledger contains only the valid run).\nCommit messages contain no model name."
+ "gate": "make test green（cargo test ＋ pytest 852 passed・13 skipped・40 秒）。torch は環境に入らず（PyPI の CUDA 版は時間切れ・CPU 版の索引はプロキシで不可）＝torch を要るテストは importorskip で skip。fastapi は手で入れた"
 }
