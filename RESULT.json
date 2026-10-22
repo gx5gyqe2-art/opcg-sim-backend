@@ -4,11 +4,13 @@
  "status": "partial",
  "outputs": {
   "files": [
-   "arena_r17/r17_main_w13.jsonl"
+   "arena_r17/r17_main_w13.jsonl",
+   "arena_r17/r17_mirror_w13.jsonl"
   ]
  },
  "metrics": {
-  "arena_r17/r17_main_w13.jsonl": 175
+  "arena_r17/r17_main_w13.jsonl": 175,
+  "arena_r17/r17_mirror_w13.jsonl": 175
  },
  "notes": "repo dir was /home/user/opcg-sim-backend (not ~/opcg-sim-backend); code at 25a51f28a"
 }
