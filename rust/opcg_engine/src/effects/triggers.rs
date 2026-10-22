@@ -117,6 +117,14 @@ fn holding_triggers(s: &Session) -> bool {
     s.resolving_depth() > 0 || !s.state().deferred_continuations.is_empty()
 }
 
+/// 効果の中で起きた誘発（自分の【KO時】・【レスト時】・効果による登場の【登場時】）を、その場で解決せず
+/// 待ち行列へ積むべきか＝効果の解決中（[`holding_triggers`]）か、対話で中断している間。
+/// 効果の外（戦闘の結果の KO・行動の境目）では偽＝従来どおりその場で解決する
+/// （WP `rs-trigger-order`／`rs-trigger-order-2`）。
+pub fn must_queue(s: &Session) -> bool {
+    s.state().active_interaction().is_some() || holding_triggers(s)
+}
+
 fn advance_pending_triggers_inner(
     s: &mut Session,
     masters: &MasterTable,
@@ -431,6 +439,12 @@ pub fn ko_trigger_matches(
 }
 
 /// Python `_resolve_on_ko`。
+///
+/// 自身の【KO時】は、**効果の中で KO されたとき**（[`must_queue`]＝効果の解決中・対話の中断中）は
+/// 待ち行列に積み、親の効果を解決し切ってから解決する（WP `rs-trigger-order-2`・2026-10-22 までは
+/// KO の場で解決し、親の「その後」の手順より先に子が走っていた）。**戦闘の結果の KO**（効果の外＝
+/// 深さ 0・対話なし）は従来どおりその場で解決する（自身の【KO時】 → 他カードのリスナーの順は、
+/// 待ち行列を通しても同じ順になる＝積む順を揃えてある）。
 pub fn resolve_on_ko(
     s: &mut Session,
     masters: &MasterTable,
@@ -442,6 +456,22 @@ pub fn resolve_on_ko(
     // このターンに当該プレイヤーのキャラが KO された事実を記録する。
     let name = format!("CHAR_KOED_{}", owner.name());
     ops::record_turn_event(s, &name, 1);
+    // 自身の【KO時】（要因・タイミングの修飾は KO の時点で判定する）。
+    let mut own: Vec<usize> = Vec::new();
+    let ids = masters.get(s.state().card(card).master).ability_ids.clone();
+    for (index, id) in ids.iter().enumerate() {
+        let ab = ability(masters, *id)?;
+        if ab.trigger == TriggerType::OnKo && ko_trigger_matches(s, ab, owner, cause, effect_controller) {
+            own.push(index);
+        }
+    }
+    let queued = must_queue(s);
+    if queued {
+        // 効果の中の KO: 親の効果の後。他カードのリスナーより先に積む（その場で解決していた旧順と同じ並び）。
+        for index in &own {
+            enqueue_trigger(s, owner, card, *index, false);
+        }
+    }
     // 他カードの「…キャラがKOされた時」リスナーを積む（自身の【KO時】とは独立）。
     enqueue_ko_listeners(s, masters, card, owner)?;
     // 「このキャラのバトルによって相手のキャラをKOした時」: バトルで KO したアタッカー自身の誘発。
@@ -463,16 +493,11 @@ pub fn resolve_on_ko(
             }
         }
     }
-    let ids = masters.get(s.state().card(card).master).ability_ids.clone();
-    for (index, id) in ids.iter().enumerate() {
-        let ab = ability(masters, *id)?;
-        if ab.trigger != TriggerType::OnKo {
-            continue;
+    if !queued {
+        // 効果の外（戦闘の結果の KO）: 従来どおりその場で解決する。
+        for index in own {
+            game_resolve_ability(s, masters, owner, card, index, false)?;
         }
-        if !ko_trigger_matches(s, ab, owner, cause, effect_controller) {
-            continue;
-        }
-        game_resolve_ability(s, masters, owner, card, index, false)?;
     }
     Ok(())
 }
@@ -518,6 +543,9 @@ pub fn rest_subject_matches(
 }
 
 /// Python `_fire_on_rest_triggers`（レストになった時の誘発を探して解決する）。
+///
+/// 効果の中でレストになったとき（[`must_queue`]）は待ち行列に積み、親の効果を解決し切ってから解決する
+/// （WP `rs-trigger-order-2`・2026-10-22 まではレストの場で解決していた）。主語・要因の判定はレストの時点で行う。
 pub fn fire_on_rest_triggers(
     s: &mut Session,
     masters: &MasterTable,
@@ -553,6 +581,13 @@ pub fn fire_on_rest_triggers(
                 }
             }
         }
+    }
+    if must_queue(s) {
+        // 効果の中のレスト: 親の効果を解決し切ってから（待ち行列・WP `rs-trigger-order-2`）。
+        for (owner, host, index) in pending {
+            enqueue_trigger(s, owner, host, index, false);
+        }
+        return Ok(());
     }
     for (owner, host, index) in pending {
         game_resolve_ability(s, masters, owner, host, index, false)?;
