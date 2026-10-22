@@ -16,5 +16,17 @@
  "metrics": {
   "arena_r19p/r19p_w10.jsonl": 84
  },
- "notes": ""
+ "notes": "84 pairs played; 1 pair void (seed 2150054, leaders OP14-020 vs OP13-003): GameAborted step=139 ValueError: 不明なアクションです: DON_BOX — looks like an engine/API action-name bug (unknown action DON_BOX), not a timeout; void rate 1/84=1.2% (<2%). arena_shard prints '（基準席は既定）' but baseline seat does receive --sims 1280 --budget 0 and worlds 2 (best_opts={'worlds':2}); message wording is stale only.",
+ "final": {
+  "pairs": 83,
+  "games": 166,
+  "void": 1,
+  "wins": 83.0,
+  "wr": 0.5,
+  "ci95": [
+   0.4394,
+   0.5606
+  ],
+  "elo": -0.0
+ }
 }
