@@ -1,124 +1,229 @@
 {
- "job": "rs-trigger-order",
- "role": "implement",
+ "job": "train-r20s",
+ "role": "train",
  "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.20 (origin/claude/cpu-spec-improvements-yw91jd @ 96869e9e3; ledger 2+323); defect docs/reports/2026-10-22_enc_v15.md §4",
  "inputs": {
-  "base": "origin/claude/cpu-spec-improvements-yw91jd@96869e9e3",
-  "net": "opcg_sim/data/learned/nrel_r13d.npz (both seats)"
+  "warm_start": "opcg_sim/data/learned/nrel_r11a.npz",
+  "pi_waves": [
+   "50s",
+   "48"
+  ],
+  "z_waves": [
+   "50s",
+   "48"
+  ],
+  "pi_dirs": {
+   "n50s": 64,
+   "n48": 64
+  },
+  "pi_points": 929118,
+  "value_rows": 2163723,
+  "value_rows_by_wave": {
+   "n50s": 1083501,
+   "n48": 1080222
+  },
+  "wave_meta": {
+   "n50s": {
+    "games": 7680,
+    "decks": "synth_roles2",
+    "net": "nrel_r13d",
+    "enc_version": 15,
+    "sims": 1280
+   },
+   "n48": {
+    "games": 7680,
+    "decks": "synth_roles2",
+    "net": "nrel_r13d",
+    "enc_version": 15,
+    "sims": 1280
+   }
+  },
+  "epochs": 2,
+  "lr": 0.0002,
+  "ablate": [
+   "rel"
+  ],
+  "aux_weight": 0.1,
+  "pi_teacher": "q_improved",
+  "pi_steps_mult": 1.0,
+  "rss_gb": 7.48,
+  "enc_version": 15,
+  "base_commit": "dfc2492"
  },
  "outputs": {
-  "branch": "claude/rs-trigger-order",
-  "report": "docs/reports/2026-10-22_trigger_order.md",
-  "code": [
-   "rust/opcg_engine/src/journal.rs",
-   "rust/opcg_engine/src/effects/resolver.rs",
-   "rust/opcg_engine/src/effects/triggers.rs",
-   "rust/opcg_engine/src/effects/interact.rs",
-   "rust/opcg_engine/src/effects/actions/flow.rs",
-   "rust/opcg_engine/src/rules/actions.rs",
-   "rust/opcg_engine/src/rules/turn.rs",
-   "rust/opcg_engine/src/rules/battle.rs"
-  ],
-  "tests": [
-   "rust/opcg_engine/src/effects/tests_trigger_order.rs"
-  ],
-  "goldens": [
-   "tests/fixtures/rs_goldens/audit.json",
-   "tests/fixtures/rs_goldens/replay/ (17 files)"
-  ],
-  "ledger": "tests/fixtures/card_audit_ledger.json (20 IMPL_CHANGED re-reviewed ok)",
-  "docs": [
-   "docs/SPEC.md §1.5 §3.5",
-   "docs/TEST_SPEC.md (1 row)"
+  "net": "n1_results/nrel_r20s.npz",
+  "ep0": "n1_results/nrel_r20s.ep0.npz",
+  "ep1": "n1_results/nrel_r20s.ep1.npz",
+  "band": [
+   "band_r20s_n50.json",
+   "band_r20s_n50s.json"
   ]
  },
- "results": {
-  "repro_seed1680032": {
-   "before": "void (step cap)",
-   "after": "2/2 games decided",
-   "settings": "both r13d (v15), 1280 sims, budget 0, synth_roles, leaders random"
-  },
-  "rust_tests": {
-   "cargo_test": "596 passed (594 existing + 2 new)",
-   "new_tests_fail_on_old_engine": true
-  },
-  "golden_audit": {
-   "total": 3387,
-   "changed": 15,
-   "by_trigger": {
-    "TRIGGER": 15
+ "metrics": {
+  "best_ep": 1,
+  "epochs": [
+   {
+    "ep": 0,
+    "val_v_mse": 0.5055,
+    "val_v_sign": 0.8182,
+    "val_pi_top1": 0.5415,
+    "val_pi_top1_visits": 0.5697,
+    "val_p_loss": 1.6435
    },
-   "by_action": {
-    "PLAY_CARD": 15,
-    "RETURN_DON": 2,
-    "KO": 1,
-    "DISCARD": 1
-   },
-   "verdict": {
-    "correct_now": 1,
-    "equivalent_event_order_only": 14,
-    "suspicious": 0
+   {
+    "ep": 1,
+    "val_v_mse": 0.5023,
+    "val_v_sign": 0.8158,
+    "val_pi_top1": 0.544,
+    "val_pi_top1_visits": 0.5675,
+    "val_p_loss": 1.6292
    }
-  },
-  "golden_replay": {
-   "total": 200,
-   "changed": 17,
-   "random": 12,
-   "a1": 5,
-   "winner_changed": 0,
-   "verdict": {
-    "correct_now": 5,
-    "equivalent_event_order_only": 11,
-    "decision_only": 1,
-    "suspicious": 0
-   }
-  },
-  "card_audit": {
-   "all_scan_findings": "ACTION_NOT_FIRED 7->5 (OP16-105, ST13-006 now fire 3rd play); no new findings",
-   "impl_changed_reviewed": 20
-  },
-  "audit_cross": {
-   "pairs": 120,
-   "games": 240,
-   "void": 0,
-   "wr": 0.4833
-  },
-  "arena_local": {
-   "pairs": 40,
-   "seed_base": 1681000,
-   "settings": "both r13d, 1280 sims, budget 0, synth_roles, leaders random",
-   "after_wheel": {
-    "void": 0,
-    "wins": 50.0,
-    "wr": 0.625,
-    "ci95": [
-     0.4997,
-     0.7503
-    ]
-   },
-   "before_wheel": {
-    "void": 0,
-    "wins": 51.0,
-    "wr": 0.6375,
-    "ci95": [
-     0.511,
-     0.764
-    ]
-   },
-   "pairs_identical_results_and_turns": 37,
-   "pairs_result_changed": 1
-  },
-  "make_test": "green: cargo test 596 passed; pytest 854 passed, 13 skipped (43 s)"
+  ]
  },
- "notes": [
-  "Root cause was worse than enc_v15 §4 assumed: the field-overflow interaction has no continuation, so the resolver holding the parent's remaining steps (OP17-092 'then you cannot play Character cards this turn') was dropped, not merely ordered later. Fixed generally: any interaction raised inside an action now defers the rest of the effect's stack (as removal replacement already did) and it resumes before queued triggers.",
-  "Ordering rule implemented: triggers raised while an effect resolves wait in pending_triggers until the outermost effect finishes (Session resolving depth, journal-outside temp like effect_actor); drain after game_resolve_ability (after event flush) and settle_pending (deferred remainder first, then queue) after dialogs and at action/battle/turn boundaries. Rule basis cited as comprehensive rules 8-6-1 (auto effects triggered during an effect's processing activate after it); the repo has no rules text, so the article number/wording is from memory — please verify against the official CR.",
-  "Life [Trigger] stays immediate even during effect damage (part of damage processing, not an auto effect); only life-trigger items are processed while holding.",
-  "Effect PLAY_CARD of a character now honours CANNOT_PLAY_CHARACTER (with min_cost on master cost), same rule as hand play.",
-  "Out of scope, left as-is: own [On K.O.] (triggers::fire_on_ko) and [On Rest] resolve inline instead of via the queue; by the same rule they should wait for the current effect. Proposal: separate WP if wanted (would move goldens further).",
-  "Event log order changed: a child's EFFECT events are now emitted after the parent's (old engine logged the inline child first). 14/15 audit-golden and 11/17 replay-golden changes are this alone (states identical).",
-  "Arena 'after vs before wheel' cannot be played inside one game (one rules engine per game; two builds of the same extension cannot load in one process). Measured instead as the same 40 pairs played once per wheel and compared pair by pair: void 0 both, 37/40 identical results and turns, 1 game flipped. The wr ~0.63 is same-net seat/seed-set noise in both runs, not strength.",
-  "make card-audit default scope is now back to 285 UNREVIEWED vanilla cards only."
- ]
+ "band": {
+  "n50": {
+   "rows": 164246,
+   "nets": {
+    "nrel_r13d.npz": {
+     "v_mse": 0.6367,
+     "v_sign": 0.7605,
+     "top1_visits": 0.5432,
+     "ce_visits": 1.8262,
+     "top1_q_improved": 0.5006,
+     "ce_q_improved": 1.7271,
+     "gate": {
+      "p_mass_removal": 0.2568,
+      "argmax_removal": 0.2556,
+      "data_chose_removal": 0.2413
+     }
+    },
+    "nrel_r19.npz": {
+     "v_mse": 0.561,
+     "v_sign": 0.7921,
+     "top1_visits": 0.5516,
+     "ce_visits": 1.8084,
+     "top1_q_improved": 0.5097,
+     "ce_q_improved": 1.6911,
+     "gate": {
+      "p_mass_removal": 0.2515,
+      "argmax_removal": 0.2489,
+      "data_chose_removal": 0.2413
+     }
+    },
+    "nrel_r20s.npz": {
+     "v_mse": 0.6095,
+     "v_sign": 0.7703,
+     "top1_visits": 0.5524,
+     "ce_visits": 1.8123,
+     "top1_q_improved": 0.5112,
+     "ce_q_improved": 1.6896,
+     "gate": {
+      "p_mass_removal": 0.2588,
+      "argmax_removal": 0.2624,
+      "data_chose_removal": 0.2413
+     }
+    },
+    "nrel_r20s.ep0.npz": {
+     "v_mse": 0.6086,
+     "v_sign": 0.7696,
+     "top1_visits": 0.5507,
+     "ce_visits": 1.8146,
+     "top1_q_improved": 0.5101,
+     "ce_q_improved": 1.7003,
+     "gate": {
+      "p_mass_removal": 0.2535,
+      "argmax_removal": 0.2546,
+      "data_chose_removal": 0.2413
+     }
+    },
+    "nrel_r20s.ep1.npz": {
+     "v_mse": 0.6095,
+     "v_sign": 0.7703,
+     "top1_visits": 0.5524,
+     "ce_visits": 1.8123,
+     "top1_q_improved": 0.5112,
+     "ce_q_improved": 1.6896,
+     "gate": {
+      "p_mass_removal": 0.2588,
+      "argmax_removal": 0.2624,
+      "data_chose_removal": 0.2413
+     }
+    }
+   }
+  },
+  "n50s": {
+   "rows": 155292,
+   "nets": {
+    "nrel_r13d.npz": {
+     "v_mse": 0.5728,
+     "v_sign": 0.7836,
+     "top1_visits": 0.544,
+     "ce_visits": 1.8079,
+     "top1_q_improved": 0.5107,
+     "ce_q_improved": 1.6991,
+     "gate": {
+      "p_mass_removal": 0.2275,
+      "argmax_removal": 0.2147,
+      "data_chose_removal": 0.2304
+     }
+    },
+    "nrel_r19.npz": {
+     "v_mse": 0.5577,
+     "v_sign": 0.7893,
+     "top1_visits": 0.5373,
+     "ce_visits": 1.8109,
+     "top1_q_improved": 0.5063,
+     "ce_q_improved": 1.6925,
+     "gate": {
+      "p_mass_removal": 0.2339,
+      "argmax_removal": 0.2257,
+      "data_chose_removal": 0.2304
+     }
+    },
+    "nrel_r20s.npz": {
+     "v_mse": 0.5497,
+     "v_sign": 0.7945,
+     "top1_visits": 0.5581,
+     "ce_visits": 1.7854,
+     "top1_q_improved": 0.5287,
+     "ce_q_improved": 1.6485,
+     "gate": {
+      "p_mass_removal": 0.231,
+      "argmax_removal": 0.2231,
+      "data_chose_removal": 0.2304
+     }
+    },
+    "nrel_r20s.ep0.npz": {
+     "v_mse": 0.5488,
+     "v_sign": 0.7952,
+     "top1_visits": 0.557,
+     "ce_visits": 1.7906,
+     "top1_q_improved": 0.527,
+     "ce_q_improved": 1.6622,
+     "gate": {
+      "p_mass_removal": 0.2274,
+      "argmax_removal": 0.2168,
+      "data_chose_removal": 0.2304
+     }
+    },
+    "nrel_r20s.ep1.npz": {
+     "v_mse": 0.5497,
+     "v_sign": 0.7945,
+     "top1_visits": 0.5581,
+     "ce_visits": 1.7854,
+     "top1_q_improved": 0.5287,
+     "ce_q_improved": 1.6485,
+     "gate": {
+      "p_mass_removal": 0.231,
+      "argmax_removal": 0.2231,
+      "data_chose_removal": 0.2304
+     }
+    }
+   }
+  }
+ },
+ "train_sec": 531,
+ "band_sec": 1057,
+ "command": "python -m opcg_sim.learned.train.n_rel_train train --in \"$HOME/n50s/n_records/n50s_w*_p[0-3]\" \"$HOME/n48/n_records/n48_w*_p[0-3]\" --ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz --out ~/nrel_r20s.npz",
+ "notes": "指示どおり完走（OOM なし・π・価値とも波 50s＋48）。rss_gb は 15 秒ごとの ps 標本の最大（/usr/bin/time が無いため）。best_ep=1 なので nrel_r20s.npz は ep1 と同一。帯 n50（実デッキ）では r20s v_mse 0.6095 で r19（0.5610）より悪く r13d（0.6367）より良い＝合成デッキの教材は実デッキ帯へ一部しか効かない。方策の指標は r19 とほぼ同等。最初の起動は /usr/bin/time 不在で即失敗（何も書かず）→ 外して再実行した。 帯 n50s では r20s が最良（v_mse 0.5497・top1_q_improved 0.529）だが、波 50s は r20s の訓練入力（帯は --holdout-mod 7 の holdout 行で測るが同じ局の分布）なので r20s に有利な帯である点に注意。"
 }
