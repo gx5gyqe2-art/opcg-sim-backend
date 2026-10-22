@@ -1,7 +1,7 @@
 {
  "job": "arena-r18real-w12",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "outputs": {
   "files": [
    "arena_r18real/r18_real_w12.jsonl"
