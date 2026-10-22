@@ -1,0 +1,10 @@
+{
+ "job": "lethal-audit-s2",
+ "status": "done",
+ "seed_base": 3011250,
+ "games": 250,
+ "points": 12283,
+ "elapsed_sec": 8871,
+ "workers": 4,
+ "notes": "No Traceback in run log; no restart needed. Single uninterrupted run. summarize not run."
+}
