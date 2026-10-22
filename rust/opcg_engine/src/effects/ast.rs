@@ -485,7 +485,7 @@ impl Duration {
 }
 
 /// Python `TargetQuery`（全フィールド・既定値は Python と同じ）。
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TargetQuery {
     /// Python は `Zone | List[Zone]`。単一なら要素 1 の Vec。既定 `[FIELD]`。
     pub zone: Vec<ZoneRef>,

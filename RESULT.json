@@ -1,101 +1,107 @@
 {
- "job": "rs-trigger-order-2",
+ "job": "lethal-speed",
  "role": "engine",
  "status": "done",
+ "branch": "claude/lethal-speed",
+ "base": "claude/cpu-spec-improvements-yw91jd@38191d7",
+ "spec": "docs/search_efficiency_plan.md 7.25 (coordinator branch)",
+ "report": "docs/reports/2026-10-22_lethal_speed.md",
  "inputs": {
-  "base": "claude/cpu-spec-improvements-yw91jd@38191d7",
-  "spec": "docs/search_efficiency_plan.md §7.23",
-  "prev": "docs/reports/2026-10-22_trigger_order.md"
+  "invariant_points": "n1_results/lethal_root/redo/points_3012000_300.jsonl.gz (300 games, 13,497 points, seeds 3012000-3012299, both seats r13d, 1 world x 1280 sims, budget 0, root_reply)",
+  "latency": "tests/scripts/rs_decide_latency.py --worlds 2 --lethal-proof root (20 games, seed 2999900-, taskset -c 0)"
+ },
+ "changes": {
+  "candidate_1_trigger": "attack upper bound counts only cards usable this turn (board + hand payable with active DON; hand/trash/deck widened by summon/cost-reduction/trash words) and only abilities live this turn (parsed Ability.raw_text; ON_PLAY only from hand, ON_ATTACK only on board or with rush, no opp-turn/counter/trigger/turn-start/turn-end). Bound = ready attackers + payable rush hand chars + double-attack cards. Same bound prunes own MAIN nodes in the tree.",
+  "candidate_2_deal_order": "already present (defensive deals first in make_deals); no change",
+  "candidate_3_node_cap": "curve only; not adopted (10k loses 71 of 1,175 proofs, 5k loses 160)",
+  "candidate_4_speed": "TT key: FxHasher instead of SipHash; Debug-string hashing of restrictions/replacements/battle/triggers/continuous/delayed/interaction stack replaced by derived Hash; plain cards hashed as 1 byte; variant dedupe by Value equality. Node counts bit-identical. Tried and reverted: TT on opponent nodes (-0.5% nodes, key cost larger).",
+  "instrument": "tests/scripts/lethal_speed_check.py (record / judge / compare); Game.lethal_json gains 'bound' diagnostics; prof categories lethal_*"
  },
  "outputs": {
-  "branch": "claude/rs-trigger-order-2",
-  "report": "docs/reports/2026-10-22_trigger_order2.md",
-  "code": [
-   "rust/opcg_engine/src/effects/triggers.rs",
-   "rust/opcg_engine/src/effects/actions/flow.rs"
-  ],
-  "tests": "rust/opcg_engine/src/effects/tests_trigger_order.rs (+2: the_own_on_ko_waits_for_the_parent_to_finish, the_on_rest_waits_for_the_parent_to_finish)",
-  "goldens": "tests/fixtures/rs_goldens (audit: 0 changed; replay: 3/200 changed, reviewed)",
-  "spec": [
-   "docs/SPEC.md §1.5/§3.5",
-   "docs/TEST_SPEC.md §2 row"
-  ],
-  "arena_ledgers": [
-   "n1_results/trigger_order2/arena_after_b1684000.jsonl",
-   "n1_results/trigger_order2/arena_before_b1684000.jsonl"
-  ]
+  "data": "n1_results/lethal_speed/ (record_3012000_300.jsonl.gz, judge_after*.jsonl.gz, compare_*.json, lat_*.json)"
  },
  "metrics": {
-  "cargo_test": {
-   "passed": 603,
-   "failed": 0,
-   "new": 2,
-   "new_fail_on_old_engine": true
+  "latency_per_move_sec": {
+   "off": 0.176,
+   "root_before": 0.241,
+   "root_after": 0.194,
+   "root_c1_plus_key_only": 0.202
   },
-  "make_test": {
-   "rust": 603,
-   "pytest_passed": 855,
-   "pytest_skipped": 13,
-   "green": true
+  "root_cost_increase": {
+   "before": "+37%",
+   "after": "+10%",
+   "target": "<= +15%"
   },
-  "golden_audit": {
-   "total": 3387,
-   "changed": 0
+  "root_tried_per_main": {
+   "before": 1.044,
+   "after": 0.854
   },
-  "golden_replay": {
-   "total": 200,
-   "changed": 3,
-   "moves_changed": 0,
-   "winner_changed": 0,
-   "review": {
-    "correct_now": 2,
-    "event_order_only": 1,
-    "suspicious": 0
+  "root_status_20games": {
+   "before": {
+    "win": 89,
+    "no": 948,
+    "unknown": 450
+   },
+   "after": {
+    "win": 90,
+    "no": 706,
+    "unknown": 420
    }
   },
-  "card_audit": {
-   "impl_changed": 0,
-   "text_changed": 0,
-   "new_findings": 0,
-   "action_not_fired": 5
+  "root_judge_sec_mean": {
+   "before": 0.1089,
+   "after": 0.0497
   },
-  "audit_cross": {
-   "pairs": 120,
-   "games": 240,
-   "void": 0,
-   "wr": 0.4833
+  "invariant_13497_points": {
+   "win_before": 1150,
+   "win_after": 1175,
+   "win_lost": 0,
+   "win_move_changed": 0,
+   "proven_points_dropped_by_trigger": 0,
+   "unknown_to_win": 25,
+   "unknown_to_no": 181,
+   "applies_true_to_false": 1431,
+   "nodes_ratio": 0.9368,
+   "invariant_ok": true
   },
-  "arena_local": {
-   "seed_base": 1684000,
-   "pairs": 40,
-   "games": 80,
-   "setting": "both r13d, sims 1280, budget 0, worlds 2, lethal_proof root, fair, synth_roles, leaders random",
-   "after": {
-    "void": 0,
-    "cand_wins": 44,
-    "wr": 0.55,
-    "ci95": [
-     0.4295,
-     0.6705
-    ],
-    "mean_turns": 12.53
+  "record_reproduces_audit": {
+   "points": 13497,
+   "status_identical": true,
+   "nodes_identical": true
+  },
+  "cap_curve": {
+   "20000": {
+    "win": 1175,
+    "nodes_ratio": 1.0
    },
-   "before": {
-    "void": 0,
-    "cand_wins": 44,
-    "wr": 0.55,
-    "ci95": [
-     0.4295,
-     0.6705
-    ],
-    "mean_turns": 12.5
+   "10000": {
+    "win": 1104,
+    "nodes_ratio": 0.567
    },
-   "identical_pairs": 39,
-   "differing_pairs": [
-    1684036
-   ]
+   "5000": {
+    "win": 1015,
+    "nodes_ratio": 0.321
+   }
+  },
+  "us_per_node_3games": {
+   "before": 15.67,
+   "after": 8.04,
+   "nodes": 261350
+  },
+  "gates": {
+   "cargo_test_lethal": "6 passed",
+   "make_test": "green (855 passed, 13 skipped; cargo 602 passed)",
+   "make_audit_cross_void": "0 (120 pairs)"
   }
  },
- "command": "make rust-develop; cargo test --no-default-features; make golden-audit; make golden-replay; make card-audit [--all]; make test; make audit-cross; python -m opcg_sim.loop.arena_shard --candidate opcg_sim/data/learned/nrel_r13d.npz --pairs 40 --bands 1 --max-pairs 40 --workers 2 --sims 1280 --budget 0 --cand-budget 0 --worlds 2 --cand-worlds 2 --lethal-proof root --cand-lethal-proof root --leaders random --decks synth_roles --seed-base 1684000 --out <ledger> (before: same with the pre-fix wheel on PYTHONPATH)",
- "notes": "(1) golden の変化は予告（監査 5〜20・再生 5〜15）より少ない: 監査 0・再生 3。監査の汎用盤面は両席がバニラのフィラーなので、効果の中で KO・レストされる札に【KO時】【レスト時】が無く、本 WP の経路を一度も通らない（指紋の変化 0＝IMPL_CHANGED 0 も同じ理由）。再生の 3 局は全件レビュー済み（正しくなった 2・イベントの順だけ 1・疑わしい 0・打った手の変化 0・勝者の変化 0）。【レスト時】の経路は 200 局に現れなかった（Rust テストが見る）。(2) 戦闘の結果の KO は即時のまま: 待ち行列を通しても自身の【KO時】→KO リスナー→バトル KO リスナーの順は同じだが、消化点が finish_attack の末尾（active_battle の解除・このバトル中の失効の後）になるので変えない（報告 §2.2）。(3) 待ち行列は積んだ順で消化する既存の規則のまま（手番側優先の選択は未実装）。効果の中の KO では「場を離れた時」リスナー→自身の【KO時】→「KOされた時」リスナーの順（報告 §2.3）。(4) 効果による登場の【登場時】の判定も同じ述語 must_queue に揃えた（退避中の残りがある深さ 0 でも積む。PLAY_CARD がその経路を通ることは無いので挙動は同じ）。(5) cargo clippy -D warnings はこのコンテナの clippy 1.97 が触っていないファイル（ops.rs・search/decide.rs・search/mcts.rs）で 4 件出す＝本線由来・make test の対象外・触っていない。(6) 総合ルールの条文番号・文言は §7.20 と同じく記憶による。(7) このコンテナには maturin も wheel も無かったので pip で maturin 1.15.0 と requirements を入れ、効果 JSON を export_effects_json で生成してから回した。修正前の wheel は修正前のツリーから別途ビルドし pip --target で隔離して同じアリーナを打った。"
+ "command": "python tests/scripts/lethal_speed_check.py record --games 300 --workers 3; ... judge --tag after; ... compare --a <audit points> --b judge_after.jsonl; taskset -c 0 python tests/scripts/rs_decide_latency.py --worlds 2 --lethal-proof root",
+ "notes": [
+  "Trigger tightening (candidate 1) cut judged points by 18% (main 104% -> 85%) but barely reduced aborts: 80% of aborted points reach life+1 with ready attackers alone; most of the cost reduction came from candidate 4 (TT key hashing was 53% of per-node time).",
+  "unknown -> win at 25 of 13,497 points (and 1 of 20 latency games): smaller trees finish within 20,000 nodes; this changes the played move at those points in the direction of more proofs. Treated as allowed (spec forbids only win decreasing).",
+  "The baseline wheel replay reproduces the audit's 13,497 points bit-for-bit (status and nodes), so the audit's rs field is the 'before'.",
+  "Deck danger cards are still gated only by summon words (search text is not considered), same as before; trash is now gated by 'トラッシュ' text in usable cards' live abilities (before: trash always counted).",
+  "The invariant set contains 1 void game (seed 3012272, DON_BOX apply error at step 156, pre-existing in the audit redo); judge stops that game at the failing move.",
+  "Symmetric-card folding (identical copies in hand/field as one move) was analysed but not implemented; estimated further node reduction in aborted points, result-preserving. Left as next step.",
+  "Session container restarted once mid-run; the judge chain was relaunched from the saved record (results unaffected: judging is deterministic)."
+ ]
 }

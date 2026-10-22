@@ -34,9 +34,18 @@ pub enum Cat {
     FwdPolicy = 12,
     /// 登場時の試し打ちの入口（盤面の写し＋保留中の要求の読み）
     EncOnplayProbe = 13,
+    /// 詰みの証明（`search::lethal`）の内訳: 置換表の鍵・要求の手の列挙（対話の分岐）・巻き戻し
+    LethalKey = 14,
+    LethalExpand = 15,
+    LethalRollback = 16,
+    /// 詰みの証明の内訳: 手の適用（エンジン）・攻撃の数の上界
+    LethalApply = 17,
+    LethalBound = 18,
+    /// 置換表の鍵のうち対話の節点（中断の中身も混ぜる）
+    LethalKeyDialog = 19,
 }
 
-const N: usize = 14;
+const N: usize = 20;
 const NAMES: [&str; N] = [
     "search_other",
     "forward",
@@ -52,6 +61,12 @@ const NAMES: [&str; N] = [
     "fwd_body",
     "fwd_policy",
     "enc_onplay_probe",
+    "lethal_key",
+    "lethal_expand",
+    "lethal_rollback",
+    "lethal_apply",
+    "lethal_bound",
+    "lethal_key_dialog",
 ];
 /// 区分外の累計: decide の壁時計・py_game.decide の壁時計・decide の回数・forward の回数（value／priors）。
 const N_EXTRA: usize = 9;

@@ -5,6 +5,7 @@
 //! (c) 配り方の 1 つでも守り切られる盤面では証明しない
 //! (d) 本当の配り方を読まない（相手の手札と山札の札を入れ替えても判定が変わらない）
 //! (e) 同じ seed で決定的
+//! (f) 発動条件は今この手番で使える札だけで数える（§7.25 の 1・WP `lethal-speed`）
 
 use super::*;
 use crate::model::{GameState, MasterTable, Seat};
@@ -117,4 +118,29 @@ fn off_by_default_and_identical_when_not_triggered() {
     let out = decide(&m2, &net, &st2, Seat::P1, &o, &mut rng, &DecideCarry::default()).unwrap();
     assert_eq!(out.kind, "lethal");
     assert_eq!(out.mv.as_ref().and_then(|m| m.action_type()), Some("ATTACK"));
+}
+
+/// (f) 発動条件の上界は**今この手番で使える札**だけで数える（§7.25 の 1）: 自分（リーダー＋キャラ 1 枚＝今アタックできる
+/// ユニット 2）・相手のライフ 2（必要な攻撃 3）・手札に速攻のキャラ（コスト 2）。アクティブのドン!!が 1 枚なら登場できない
+/// ＝上界 2 で判定に入らない。2 枚なら登場して殴れる＝上界 3 で判定に入る。
+#[test]
+fn trigger_counts_only_cards_usable_this_turn() {
+    let build = |don_active: usize| {
+        let mut b = BoardBuilder::new();
+        b.put_field(Seat::P1, M_CHAR);
+        b.put_hand(Seat::P1, crate::testkit::M_RUSH);
+        b.dons(Seat::P1, "active", don_active);
+        for _ in 0..2 {
+            b.put_life(Seat::P2, M_CHAR);
+        }
+        for _ in 0..4 {
+            b.put_deck(Seat::P2, M_CHAR);
+            b.put_deck(Seat::P1, M_CHAR);
+        }
+        b.turn(5, Seat::P1).build()
+    };
+    let (m, st) = build(1);
+    assert!(!applies(&mut crate::journal::Session::new(st), &m, Seat::P1), "払えない速攻は数えない");
+    let (m, st) = build(2);
+    assert!(applies(&mut crate::journal::Session::new(st), &m, Seat::P1), "払える速攻は 1 回の攻撃として数える");
 }

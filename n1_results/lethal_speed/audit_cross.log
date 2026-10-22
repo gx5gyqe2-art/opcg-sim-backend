@@ -1,0 +1,10 @@
+# 前回の出力が残っていると arena_shard が再開して 1 局も打たずに終わる（2026-10-17 発覚）＝必ず消してから打つ
+rm -f /tmp/audit_cross_0.jsonl
+OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard \
+  --candidate "" --pairs 120 --bands 1 --max-pairs 120 --workers 4 --sims 32 \
+  --leaders random --decks synth --seed-base 0 \
+  --out /tmp/audit_cross_0.jsonl
+消化済み 0/120 ペア・残り 120
+今回 120 ペア（23s）・累計 120/120
+ARENA_RESUME_FINAL {"pairs": 120, "games": 240, "void": 0, "wins": 116.0, "wr": 0.4833, "ci95": [0.4168, 0.5499], "elo": -11.6, "promoted": false, "candidate": ""}
+AUDIT-EXIT 0
