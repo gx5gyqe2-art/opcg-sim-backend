@@ -17,5 +17,5 @@
  "metrics": {
   "arena_fairprod/fairprod_w06.jsonl": 120
  },
- "notes": ""
+ "notes": "120 pairs done, no push failures. Mid-setup I accidentally emptied and re-cloned the checkout (no unpushed work lost); rebuilt wheel, then ran the script unchanged. The arena_shard banner printed 'baseline seat: default' but the baseline command line passed --sims 1280 --budget 0 --reveal peek as specified."
 }
