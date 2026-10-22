@@ -20,5 +20,5 @@
   "arena_r20/r20s_real_w07.jsonl": 175,
   "arena_r20/r20s_synth2_w07.jsonl": 175
  },
- "notes": ""
+ "notes": "r20_real_w07: 1 pair void (pairs=174 counted of 175, void=1/350 games=0.3%, below 2%). Others void=0. Finals: r20 real wr0.5057 / mirror 0.5457 / synth2 0.4314; r20s real 0.4886 / mirror 0.5057 / synth2 0.5057 (vs r13d, shard k=7)."
 }
