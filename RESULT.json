@@ -1,107 +1,105 @@
 {
- "job": "lethal-speed",
- "role": "engine",
+ "job": "value-to-move",
+ "role": "measure",
  "status": "done",
- "branch": "claude/lethal-speed",
- "base": "claude/cpu-spec-improvements-yw91jd@38191d7",
- "spec": "docs/search_efficiency_plan.md 7.25 (coordinator branch)",
- "report": "docs/reports/2026-10-22_lethal_speed.md",
  "inputs": {
-  "invariant_points": "n1_results/lethal_root/redo/points_3012000_300.jsonl.gz (300 games, 13,497 points, seeds 3012000-3012299, both seats r13d, 1 world x 1280 sims, budget 0, root_reply)",
-  "latency": "tests/scripts/rs_decide_latency.py --worlds 2 --lethal-proof root (20 games, seed 2999900-, taskset -c 0)"
- },
- "changes": {
-  "candidate_1_trigger": "attack upper bound counts only cards usable this turn (board + hand payable with active DON; hand/trash/deck widened by summon/cost-reduction/trash words) and only abilities live this turn (parsed Ability.raw_text; ON_PLAY only from hand, ON_ATTACK only on board or with rush, no opp-turn/counter/trigger/turn-start/turn-end). Bound = ready attackers + payable rush hand chars + double-attack cards. Same bound prunes own MAIN nodes in the tree.",
-  "candidate_2_deal_order": "already present (defensive deals first in make_deals); no change",
-  "candidate_3_node_cap": "curve only; not adopted (10k loses 71 of 1,175 proofs, 5k loses 160)",
-  "candidate_4_speed": "TT key: FxHasher instead of SipHash; Debug-string hashing of restrictions/replacements/battle/triggers/continuous/delayed/interaction stack replaced by derived Hash; plain cards hashed as 1 byte; variant dedupe by Value equality. Node counts bit-identical. Tried and reverted: TT on opponent nodes (-0.5% nodes, key cost larger).",
-  "instrument": "tests/scripts/lethal_speed_check.py (record / judge / compare); Game.lethal_json gains 'bound' diagnostics; prof categories lethal_*"
- },
- "outputs": {
-  "data": "n1_results/lethal_speed/ (record_3012000_300.jsonl.gz, judge_after*.jsonl.gz, compare_*.json, lat_*.json)"
- },
- "metrics": {
-  "latency_per_move_sec": {
-   "off": 0.176,
-   "root_before": 0.241,
-   "root_after": 0.194,
-   "root_c1_plus_key_only": 0.202
+  "base": "origin/claude/cpu-spec-improvements-yw91jd@cbdb6c61b",
+  "nets": {
+   "r13d": "opcg_sim/data/learned/nrel_r13d.npz",
+   "r19": "claude/train-r19:n1_results/nrel_r19.npz",
+   "r20": "claude/train-r20:n1_results/nrel_r20.npz",
+   "r20s": "claude/train-r20s:n1_results/nrel_r20s.npz"
   },
-  "root_cost_increase": {
-   "before": "+37%",
-   "after": "+10%",
-   "target": "<= +15%"
+  "bands": {
+   "real": "claude/n50-w01..16 n_records holdout (seed%7==0), 32 games/shard, 6 pts/game",
+   "synth_roles2": "claude/n50s-w01..16 同"
   },
-  "root_tried_per_main": {
-   "before": 1.044,
-   "after": 0.854
-  },
-  "root_status_20games": {
-   "before": {
-    "win": 89,
-    "no": 948,
-    "unknown": 450
-   },
-   "after": {
-    "win": 90,
-    "no": 706,
-    "unknown": 420
-   }
-  },
-  "root_judge_sec_mean": {
-   "before": 0.1089,
-   "after": 0.0497
-  },
-  "invariant_13497_points": {
-   "win_before": 1150,
-   "win_after": 1175,
-   "win_lost": 0,
-   "win_move_changed": 0,
-   "proven_points_dropped_by_trigger": 0,
-   "unknown_to_win": 25,
-   "unknown_to_no": 181,
-   "applies_true_to_false": 1431,
-   "nodes_ratio": 0.9368,
-   "invariant_ok": true
-  },
-  "record_reproduces_audit": {
-   "points": 13497,
-   "status_identical": true,
-   "nodes_identical": true
-  },
-  "cap_curve": {
-   "20000": {
-    "win": 1175,
-    "nodes_ratio": 1.0
-   },
-   "10000": {
-    "win": 1104,
-    "nodes_ratio": 0.567
-   },
-   "5000": {
-    "win": 1015,
-    "nodes_ratio": 0.321
-   }
-  },
-  "us_per_node_3games": {
-   "before": 15.67,
-   "after": 8.04,
-   "nodes": 261350
-  },
-  "gates": {
-   "cargo_test_lethal": "6 passed",
-   "make_test": "green (855 passed, 13 skipped; cargo 602 passed)",
-   "make_audit_cross_void": "0 (120 pairs)"
+  "settings": {
+   "s160": "160 sims, worlds 1 (arena seat)",
+   "prod": "1280 sims, worlds 2, budget 0, lethal proof off",
+   "deep": "5120 sims, worlds 4, budget 0, search_seed xor JUDGE_XOR"
   }
  },
- "command": "python tests/scripts/lethal_speed_check.py record --games 300 --workers 3; ... judge --tag after; ... compare --a <audit points> --b judge_after.jsonl; taskset -c 0 python tests/scripts/rs_decide_latency.py --worlds 2 --lethal-proof root",
- "notes": [
-  "Trigger tightening (candidate 1) cut judged points by 18% (main 104% -> 85%) but barely reduced aborts: 80% of aborted points reach life+1 with ready attackers alone; most of the cost reduction came from candidate 4 (TT key hashing was 53% of per-node time).",
-  "unknown -> win at 25 of 13,497 points (and 1 of 20 latency games): smaller trees finish within 20,000 nodes; this changes the played move at those points in the direction of more proofs. Treated as allowed (spec forbids only win decreasing).",
-  "The baseline wheel replay reproduces the audit's 13,497 points bit-for-bit (status and nodes), so the audit's rs field is the 'before'.",
-  "Deck danger cards are still gated only by summon words (search text is not considered), same as before; trash is now gated by 'トラッシュ' text in usable cards' live abilities (before: trash always counted).",
-  "The invariant set contains 1 void game (seed 3012272, DON_BOX apply error at step 156, pre-existing in the audit redo); judge stops that game at the failing move.",
-  "Symmetric-card folding (identical copies in hand/field as one move) was analysed but not implemented; estimated further node reduction in aborted points, result-preserving. Left as next step.",
-  "Session container restarted once mid-run; the judge chain was relaunched from the saved record (results unaffected: judging is deterministic)."
- ]
+ "outputs": {
+  "tool": "tests/scripts/value_to_move.py",
+  "report": "docs/reports/2026-10-22_value_to_move.md",
+  "data": "logs/value_to_move/",
+  "summary": "logs/value_to_move/summary.json"
+ },
+ "metrics": {
+  "real": {
+   "games": 512,
+   "diverged_games": 0,
+   "points": 3072,
+   "agree_r20_vs_r13d": {
+    "prior": 0.736,
+    "s160": 0.7484,
+    "prod": 0.7113
+   },
+   "agree_r19_vs_r13d": {
+    "s160": 0.7646,
+    "prod": 0.738
+   },
+   "agree_r20s_vs_r13d": {
+    "s160": 0.7591,
+    "prod": 0.7285
+   },
+   "r13d_self_reseed": {
+    "s160": 0.8486,
+    "prod": 0.7917
+   },
+   "r20_vs_r13d_independent_seeds": {
+    "s160": 0.7119,
+    "prod": 0.6777
+   },
+   "prior_eq_search_r13d": {
+    "s160": 0.8232,
+    "prod": 0.7432
+   },
+   "r20_prod_changed_better_by_visits": {
+    "judge_r13d": 0.2702,
+    "judge_r20": 0.7095,
+    "calib_r13d_reseed_judge_r13d": 0.5063,
+    "calib_judge_r20": 0.5279
+   }
+  },
+  "synth_roles2": {
+   "games": 512,
+   "diverged_games": 23,
+   "points": 2934,
+   "agree_r20_vs_r13d": {
+    "prior": 0.7416,
+    "s160": 0.7399,
+    "prod": 0.7103
+   },
+   "agree_r19_vs_r13d": {
+    "s160": 0.7614,
+    "prod": 0.7369
+   },
+   "agree_r20s_vs_r13d": {
+    "s160": 0.7669,
+    "prod": 0.7393
+   },
+   "r13d_self_reseed": {
+    "s160": 0.8525,
+    "prod": 0.7968
+   },
+   "r20_vs_r13d_independent_seeds": {
+    "s160": 0.7066,
+    "prod": 0.6724
+   },
+   "prior_eq_search_r13d": {
+    "s160": 0.8265,
+    "prod": 0.7399
+   },
+   "r20_prod_changed_better_by_visits": {
+    "judge_r13d": 0.2904,
+    "judge_r20": 0.6885,
+    "calib_r13d_reseed_judge_r13d": 0.5167,
+    "calib_judge_r20": 0.5389
+   }
+  }
+ },
+ "reading": "手は変わるが良くならない（変化の大半は探索の乱数の揺らぎと方策の最大の手の違い・変わった手の良し悪しは判定役のネットの好みで逆転）",
+ "notes": "(1) 手順 3（方策と価値の入れ替え）は飛ばした: 幹を共有し、Rust の forward は幅が定数（D_T/D_H/D_E/D_PIN）なので npz の組み替えでは作れない。代わりに方策の最大が同じ点・違う点の分解を置いた。 (2) 合成デッキ v2 は deck_synth2 が names_in_text（集合）を回すため PYTHONHASHSEED でデッキが変わり、seed から再現しない局がある（512 局中 23 局を捨てた）。挙動は変えていない（報告のみ・要修正の候補）。 (3) 手順 4 の判定役は仕様と 3 点違う: 根の 1 本の木で 2 つの子を比べた／判定役の search_seed をずらした（同じ seed だと r13d の出荷の手に寄る偏り: 378 点で一致 86%・deep_sameseed に残す）／r13d に加え r20 でも判定した。 (4) 出荷の設定は詰みの証明を外した（ネットに依らない手で一致を水増しするため）。 (5) 実デッキ帯の判定役では盤面照合の float16 許容が厳しすぎ 91 点（5.3%）を捨てた（後で許容を直し、捨てた点が一致することを確かめた）。 (6) 標本数は仕様どおり各帯 3,000 点前後（実 3,072・合成 2,934）・減らしていない。途中でワーカーが 1 回再起動したが、台帳は再開で続きから埋めた。"
 }
