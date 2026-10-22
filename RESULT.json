@@ -1,7 +1,7 @@
 {
  "job": "n48-w04",
  "role": "gen",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r13d.npz",
   "seed_base": 2512500,
@@ -15,15 +15,16 @@
   "dirs": [
    "n_records/n48_w04_p0",
    "n_records/n48_w04_p1",
-   "n_records/n48_w04_p2"
+   "n_records/n48_w04_p2",
+   "n_records/n48_w04_p3"
   ]
  },
  "metrics": {
-  "parts_done": 3,
-  "games": 360,
-  "rows": 50352,
+  "parts_done": 4,
+  "games": 480,
+  "rows": 67155,
   "dropped": 0,
-  "sec_play_mean": 11.26
+  "sec_play_mean": 11.49
  },
  "notes": ""
 }
