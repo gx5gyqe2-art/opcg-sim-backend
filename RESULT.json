@@ -1,6 +1,105 @@
-{"job": "value-to-move", "role": "measure", "status": "partial",
- "inputs": {"base": "origin/claude/cpu-spec-improvements-yw91jd@cbdb6c61b", "nets": ["r13d", "r19", "r20", "r20s"],
-            "bands": {"real": "claude/n50-w01..16 holdout (seed%7==0)", "synth_roles2": "claude/n50s-w01..16 holdout"}},
- "outputs": {"tool": "tests/scripts/value_to_move.py", "data": "logs/value_to_move/"},
- "metrics": {},
- "notes": "途中経過: 手順 1・2（局面の再現と手の一致）まで。深い読み（手順 4）は実行中。"}
+{
+ "job": "value-to-move",
+ "role": "measure",
+ "status": "done",
+ "inputs": {
+  "base": "origin/claude/cpu-spec-improvements-yw91jd@cbdb6c61b",
+  "nets": {
+   "r13d": "opcg_sim/data/learned/nrel_r13d.npz",
+   "r19": "claude/train-r19:n1_results/nrel_r19.npz",
+   "r20": "claude/train-r20:n1_results/nrel_r20.npz",
+   "r20s": "claude/train-r20s:n1_results/nrel_r20s.npz"
+  },
+  "bands": {
+   "real": "claude/n50-w01..16 n_records holdout (seed%7==0), 32 games/shard, 6 pts/game",
+   "synth_roles2": "claude/n50s-w01..16 同"
+  },
+  "settings": {
+   "s160": "160 sims, worlds 1 (arena seat)",
+   "prod": "1280 sims, worlds 2, budget 0, lethal proof off",
+   "deep": "5120 sims, worlds 4, budget 0, search_seed xor JUDGE_XOR"
+  }
+ },
+ "outputs": {
+  "tool": "tests/scripts/value_to_move.py",
+  "report": "docs/reports/2026-10-22_value_to_move.md",
+  "data": "logs/value_to_move/",
+  "summary": "logs/value_to_move/summary.json"
+ },
+ "metrics": {
+  "real": {
+   "games": 512,
+   "diverged_games": 0,
+   "points": 3072,
+   "agree_r20_vs_r13d": {
+    "prior": 0.736,
+    "s160": 0.7484,
+    "prod": 0.7113
+   },
+   "agree_r19_vs_r13d": {
+    "s160": 0.7646,
+    "prod": 0.738
+   },
+   "agree_r20s_vs_r13d": {
+    "s160": 0.7591,
+    "prod": 0.7285
+   },
+   "r13d_self_reseed": {
+    "s160": 0.8486,
+    "prod": 0.7917
+   },
+   "r20_vs_r13d_independent_seeds": {
+    "s160": 0.7119,
+    "prod": 0.6777
+   },
+   "prior_eq_search_r13d": {
+    "s160": 0.8232,
+    "prod": 0.7432
+   },
+   "r20_prod_changed_better_by_visits": {
+    "judge_r13d": 0.2702,
+    "judge_r20": 0.7095,
+    "calib_r13d_reseed_judge_r13d": 0.5063,
+    "calib_judge_r20": 0.5279
+   }
+  },
+  "synth_roles2": {
+   "games": 512,
+   "diverged_games": 23,
+   "points": 2934,
+   "agree_r20_vs_r13d": {
+    "prior": 0.7416,
+    "s160": 0.7399,
+    "prod": 0.7103
+   },
+   "agree_r19_vs_r13d": {
+    "s160": 0.7614,
+    "prod": 0.7369
+   },
+   "agree_r20s_vs_r13d": {
+    "s160": 0.7669,
+    "prod": 0.7393
+   },
+   "r13d_self_reseed": {
+    "s160": 0.8525,
+    "prod": 0.7968
+   },
+   "r20_vs_r13d_independent_seeds": {
+    "s160": 0.7066,
+    "prod": 0.6724
+   },
+   "prior_eq_search_r13d": {
+    "s160": 0.8265,
+    "prod": 0.7399
+   },
+   "r20_prod_changed_better_by_visits": {
+    "judge_r13d": 0.2904,
+    "judge_r20": 0.6885,
+    "calib_r13d_reseed_judge_r13d": 0.5167,
+    "calib_judge_r20": 0.5389
+   }
+  }
+ },
+ "reading": "手は変わるが良くならない（変化の大半は探索の乱数の揺らぎと方策の最大の手の違い・変わった手の良し悪しは判定役のネットの好みで逆転）",
+ "notes": "(1) 手順 3（方策と価値の入れ替え）は飛ばした: 幹を共有し、Rust の forward は幅が定数（D_T/D_H/D_E/D_PIN）なので npz の組み替えでは作れない。代わりに方策の最大が同じ点・違う点の分解を置いた。 (2) 合成デッキ v2 は deck_synth2 が names_in_text（集合）を回すため PYTHONHASHSEED でデッキが変わり、seed から再現しない局がある（512 局中 23 局を捨てた）。挙動は変えていない（報告のみ・要修正の候補）。 (3) 手順 4 の判定役は仕様と 3 点違う: 根の 1 本の木で 2 つの子を比べた／判定役の search_seed をずらした（同じ seed だと r13d の出荷の手に寄る偏り: 378 点で一致 86%・deep_sameseed に残す）／r13d に加え r20 でも判定した。 (4) 出荷の設定は詰みの証明を外した（ネットに依らない手で一致を水増しするため）。 (5) 実デッキ帯の判定役では盤面照合の float16 許容が厳しすぎ 91 点（5.3%）を捨てた（後で許容を直し、捨てた点が一致することを確かめた）。 (6) 標本数は仕様どおり各帯 3,000 点前後（実 3,072・合成 2,934）・減らしていない。途中でワーカーが 1 回再起動したが、台帳は再開で続きから埋めた。"
+}

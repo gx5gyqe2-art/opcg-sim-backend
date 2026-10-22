@@ -245,7 +245,8 @@ def cmd_points(a):
 
 # ---------------------------------------------------------------- 段 2
 
-def _init_deep(net):
+def _init_deep(net, judge_xor=0):
+    _G["judge_xor"] = int(judge_xor)
     E.engine()
     _G["deep_net"] = E.load_net(net)
     _G["db"] = D.load_db()
@@ -273,10 +274,14 @@ def replay_points(mv, pts, decks, fn):
             row.update({"seed": seed, "step": step, "sec": round(time.time() - t0, 2)})
             out.append(row)
         name = json.loads(game.pending_json())["player_id"]
-        if move.get("kind") == "battle":
-            game.apply_battle_action(name, move["action_type"], move.get("card_uuid"))
-        else:
-            game.apply_game_action(name, move["action_type"], json.dumps(move.get("payload") or {}, ensure_ascii=False))
+        try:
+            if move.get("kind") == "battle":
+                game.apply_battle_action(name, move["action_type"], move.get("card_uuid"))
+            else:
+                game.apply_game_action(name, move["action_type"],
+                                       json.dumps(move.get("payload") or {}, ensure_ascii=False))
+        except Exception:                       # noqa: BLE001  別のデッキになった局（合成 v2）＝ここで打ち切る
+            break
     return out
 
 
@@ -292,11 +297,16 @@ def same_as_record(game, name, p):
     src = np.asarray(enc["card_idx"], np.int64)[:RG.MAX_CI]
     ci[:len(src)] = src
     return bool(np.array_equal(ci, c["card_idx"][i[0]])
-                and np.allclose(np.asarray(enc["scalars"], np.float32), c["scalars"][i[0]], atol=1e-3))
+                and np.allclose(np.asarray(enc["scalars"], np.float32), c["scalars"][i[0]], rtol=2e-3, atol=1e-3))
+
+
+#: 深い読みの seed のずらし。**比べる読みと同じ seed にしない**（同じ seed だと世界 0・1 が出荷の設定の 2 本と同じ世界になり、
+#: 深い読みが同じネットの出荷の手に寄る＝判定役が偏る・報告 §4）。
+JUDGE_XOR = 0x1D6E00007E570000
 
 
 def _deep_fn(game, name, seed, turn, p):
-    opts = {"net": _G["deep_net"], "search_seed": E.search_seed(seed, turn, name), **DEEP}
+    opts = {"net": _G["deep_net"], "search_seed": E.search_seed(seed, turn, name) ^ _G.get("judge_xor", 0), **DEEP}
     o = json.loads(game.fork().decide(name, json.dumps(opts)))
     ok = (name == p["who"] and turn == p["turn"] and legal_key(o) == p["legal"])
     return {"ok": ok, "rep": chosen_rep(o), "groups": groups_brief(o), "v0": _v0(o)}
@@ -325,9 +335,9 @@ def deep_game(job):
     return replay_points(mv, pts, decks, _deep_fn if mode == "deep" else _reseed_fn)
 
 
-def _init_any(mode, arg):
+def _init_any(mode, arg, judge_xor=0):
     if mode == "deep":
-        _init_deep(arg)
+        _init_deep(arg, judge_xor)
     else:
         _init_points(parse_nets(arg))
 
@@ -357,7 +367,8 @@ def cmd_deep(a):
     t0 = time.time()
     n = 0
     with Pool(a.workers, initializer=_init_any,
-              initargs=(mode, a.reseed_nets if mode == "reseed" else a.deep_net)) as pool:
+              initargs=(mode, a.reseed_nets if mode == "reseed" else a.deep_net,
+                        JUDGE_XOR if a.judge_reseed else 0)) as pool:
         for rows in pool.imap_unordered(deep_game, jobs, chunksize=1):
             with open(dpath, "a", encoding="utf-8") as f:
                 for r in rows:
@@ -424,6 +435,18 @@ def summarize_band(out_dir):
                 # 乱数を替えた基準と、乱数を替えたこのネット（同じ乱数同士）の一致＝別の seed での agree_with_base
                 noise[f"{k}_vs_{base}/{sk}@reseed"] = rate(
                     sum(r["res"][k][sk]["rep"] == r["res"][base][sk]["rep"] for p, r in ok), len(ok))
+    # 乱数も替えた・ネットも替えた（独立な 2 本）: このネット@元の seed vs 基準@替えた seed。方策の最大が同じ点に絞った値も
+    for k in nets[1:]:
+        for sk in SETTINGS:
+            ok = [(p, r) for p, r in rs if p["res"][k][sk]["rep"] is not None]
+            noise[f"{k}@seed_vs_{base}@reseed/{sk}"] = rate(
+                sum(p["res"][k][sk]["rep"] == r["res"][base][sk]["rep"] for p, r in ok), len(ok))
+            same = [(p, r) for p, r in ok if p["res"][k]["prior"] == p["res"][base]["prior"]]
+            noise[f"{k}@seed_vs_{base}@reseed/{sk}|prior_same"] = rate(
+                sum(p["res"][k][sk]["rep"] == r["res"][base][sk]["rep"] for p, r in same), len(same))
+            # 同じ点の集合での基準自身の揺らぎ（方策の最大が同じ点は易しい点に偏りうるので、比べる相手を揃える）
+            noise[f"{base}@seed_vs_{base}@reseed/{sk}|prior_same_as_{k}"] = rate(
+                sum(p["res"][base][sk]["rep"] == r["res"][base][sk]["rep"] for p, r in same), len(same))
     s["reseed_agree"] = noise
     s["reseed_points"] = len(rs)
     # 方策の最大が基準と同じ点・違う点に分けた探索の一致（価値と方策のどちらから手が変わるか）
@@ -440,14 +463,37 @@ def summarize_band(out_dir):
     s["s160_eq_prod"] = self_set
     # 4. 変わった手の良し悪し（深い読み: 訪問の多い方／値の高い方）・深い読みの最善との一致
     for jn, jd in judges.items():
-        s["judge_" + jn] = judge(pts, jd, nets, base)
+        s["judge_" + jn] = judge(pts, jd, nets, base, reseed)
     s["judge_points"] = {jn: len(jd) for jn, jd in judges.items()}
     return s
 
 
-def judge(pts, deep, nets, base):
+def judge(pts, deep, nets, base, reseed=None):
     s = {}
     better, deep_eq = {}, {}
+    # 判定役の偏りの較正: 基準が乱数だけで手を替えた点（基準@替えた seed vs 基準）を同じ物差しで読む。
+    # 判定役が基準のネットそのものでも、両方とも基準の手なので偏りが無ければ 50%（点は判定役が読んだ点＝ずれた点の部分集合）。
+    for sk in SETTINGS:
+        wn = wq = 0
+        dq = []
+        for p in pts:
+            key = (int(p["seed"]), int(p["step"]))
+            d, r = deep.get(key), (reseed or {}).get(key)
+            if not d or not d["ok"] or not r or not r["ok"] or base not in r["res"]:
+                continue
+            a_, b_ = p["res"][base][sk]["rep"], r["res"][base][sk]["rep"]
+            if a_ is None or b_ is None or a_ == b_:
+                continue
+            ga, gb = d["groups"].get(str(a_)), d["groups"].get(str(b_))
+            if ga is None or gb is None:
+                continue
+            wn += gb[0] > ga[0]
+            wq += gb[1] > ga[1]
+            dq.append(gb[1] - ga[1])
+        m = len(dq)
+        better[f"{base}@reseed/{sk}"] = {"changed": m, "net_more_visits": rate(wn, m), "net_higher_q": rate(wq, m),
+                                         "dq_mean": round(sum(dq) / m, 4) if m else None,
+                                         "dq_median": round(sorted(dq)[m // 2], 4) if m else None}
     for k in nets:
         for sk in list(SETTINGS) + ["prior"]:
             def rep_of(p, kk):
@@ -509,6 +555,8 @@ def main(argv=None):
     p.add_argument("--name", default="deep", help="書く台帳の名前（<name>.jsonl・判定役のネットを替えるとき）")
     p.add_argument("--reseed-nets", default=None,
                    help="深い読みの代わりに、探索の乱数だけを替えて（RESEED_XOR）これらのネットの 2 設定を読み直す（揺らぎの対照）")
+    p.add_argument("--judge-reseed", action="store_true",
+                   help="深い読みの seed を JUDGE_XOR でずらす（比べる読みと世界を共有させない）")
     p.add_argument("--changed-only", action="store_true",
                    help="基準と手が違った点（どれかのネット・どれかの設定）だけ読む")
     p = sub.add_parser("summary")
