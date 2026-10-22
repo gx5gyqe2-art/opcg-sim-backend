@@ -1209,7 +1209,7 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
 迷う効果は「知らない」側に倒す（控えめ＝公平側）。「相手の手札を見る」効果はエンジンに無い（足したら見た席の印を立てる）。
 `peek`・`opp_hand`・`omniscient` は知識を読まない。
 
-### 2.5.10 詰みの証明（Rust・opts の `lethal_proof`・**既定 `off`**・2026-10-22〜）
+### 2.5.10 詰みの証明（Rust・opts の `lethal_proof`・**エンジンの既定 `off`・対戦 API は `root`**・2026-10-22〜）
 
 > 正本はコード（`rust/opcg_engine/src/search/lethal.rs`・`decide.rs` の ⓪・`mcts.rs` の `lethal_reply`）。経緯は
 > `docs/search_efficiency_plan.md` §7.21（WP `rs-lethal-root`）・`docs/reports/2026-10-22_lethal_audit.md`・
@@ -1218,7 +1218,7 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
 「このターンに勝ち切れる」ことを総当たりで**証明**できたときだけ、その結論を探索に入れる（MCTS-Solver の最も単純な形）。
 
 - **値**: `off`（既定＝1 bit も変わらない）／`root`／`root_reply`。対戦 API は `opcg_sim/loop/engine.py::PLAY_LETHAL_PROOF`
-  （既定 `"off"`）を渡す。アリーナは `--cand-lethal-proof`（候補席）・`arena_shard --lethal-proof`（基準席）。
+  （**`"root"`**・2026-10-22 ユーザ決定・本番アリーナ +5.2 Elo・1 手 +37%・`docs/reports/2026-10-22_lethal_prod_arena.md`）を渡す。生成・アリーナは旗のまま（既定 off）。アリーナは `--cand-lethal-proof`（候補席）・`arena_shard --lethal-proof`（基準席）。
 - **発動条件**: 自分の手番のメインの判断点で、**このターンに出せる攻撃の数**（今アタックできるユニットの数。自分の札に
   打点を増やしうる文言〔速攻・ダブルアタック・アクティブに・ダメージ・相手のライフ…〕が 1 枚でも在れば届きうる扱い）が
   相手のライフ＋1 以上。

@@ -55,8 +55,9 @@ PLAY_RETHINK_WORLDS = 4
 #: "root_reply"。root＝自分のメインでこのターンに届きうるとき、公平な配り方（世界の引き直し 6 通り＋守りの強い
 #: 2 通り）の全部で勝てる最初の 1 手が在ればそれを打つ（節点 20,000 で打ち切り・証明できなければ今の探索）。
 #: root_reply＝加えて根の直後の相手の応手の節点でも証明する。**"off"（既定）**＝1 bit も変わらない。
-#: 既定は本番アリーナの後にコーディネータが決める。
-PLAY_LETHAL_PROOF = "off"
+#: **対戦 API の既定は "root"**（2026-10-22 ユーザ決定「入れる」・本番アリーナ +5.2 Elo［+3.1, +7.3］・1 手 +37%・
+#: `docs/reports/2026-10-22_lethal_prod_arena.md`）。生成・アリーナは各自の旗のまま（既定 off）。
+PLAY_LETHAL_PROOF = "root"
 GEN_PRUNE_FUTILE = False   # 生成は枝刈りを外す（v6 柱⑤: 刈った枝は学習データに現れない）
 
 _STATE: Dict[str, Any] = {}
