@@ -16,5 +16,5 @@
  "metrics": {
   "arena_r19p/r19p_w19.jsonl": 84
  },
- "notes": ""
+ "notes": "84/84 pairs, no void-free check done here (coordinator aggregates). Shard score 88/168=0.524 for r19. arena_shard prints '（基準席は既定）' but _best_kw passes --worlds 2 to the baseline seat, so both seats ran sims 1280 x worlds 2 x budget 0 as instructed. No PUSH_FAILED."
 }
