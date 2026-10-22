@@ -1,7 +1,7 @@
 {
  "job": "arena-r20-w08",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "outputs": {
   "files": [
    "arena_r20/r20_mirror_w08.jsonl",
