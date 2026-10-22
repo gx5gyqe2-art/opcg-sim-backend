@@ -8,7 +8,8 @@
    "arena_r20/r20_real_w02.jsonl",
    "arena_r20/r20_synth2_w02.jsonl",
    "arena_r20/r20s_mirror_w02.jsonl",
-   "arena_r20/r20s_real_w02.jsonl"
+   "arena_r20/r20s_real_w02.jsonl",
+   "arena_r20/r20s_synth2_w02.jsonl"
   ]
  },
  "metrics": {
@@ -16,7 +17,8 @@
   "arena_r20/r20_real_w02.jsonl": 175,
   "arena_r20/r20_synth2_w02.jsonl": 175,
   "arena_r20/r20s_mirror_w02.jsonl": 175,
-  "arena_r20/r20s_real_w02.jsonl": 175
+  "arena_r20/r20s_real_w02.jsonl": 175,
+  "arena_r20/r20s_synth2_w02.jsonl": 175
  },
  "notes": ""
 }
