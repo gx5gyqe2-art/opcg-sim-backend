@@ -8,7 +8,8 @@
    "arena_omni2/r13m_mirror_w02.jsonl",
    "arena_omni2/r13o_main_w02.jsonl",
    "arena_omni2/r13o_mirror_w02.jsonl",
-   "arena_omni2/r17m_main_w02.jsonl"
+   "arena_omni2/r17m_main_w02.jsonl",
+   "arena_omni2/r17m_mirror_w02.jsonl"
   ]
  },
  "metrics": {
@@ -16,7 +17,8 @@
   "arena_omni2/r13m_mirror_w02.jsonl": 175,
   "arena_omni2/r13o_main_w02.jsonl": 175,
   "arena_omni2/r13o_mirror_w02.jsonl": 175,
-  "arena_omni2/r17m_main_w02.jsonl": 175
+  "arena_omni2/r17m_main_w02.jsonl": 175,
+  "arena_omni2/r17m_mirror_w02.jsonl": 175
  },
  "notes": "repo at /home/user/opcg-sim-backend (not ~/opcg-sim-backend)"
 }
