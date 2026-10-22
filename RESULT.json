@@ -1,7 +1,7 @@
 {
  "job": "n48-w01",
  "role": "gen",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r13d.npz",
   "seed_base": 2511000,
@@ -15,15 +15,16 @@
   "dirs": [
    "n_records/n48_w01_p0",
    "n_records/n48_w01_p1",
-   "n_records/n48_w01_p2"
+   "n_records/n48_w01_p2",
+   "n_records/n48_w01_p3"
   ]
  },
  "metrics": {
-  "parts_done": 3,
-  "games": 360,
-  "rows": 51433,
+  "parts_done": 4,
+  "games": 480,
+  "rows": 67392,
   "dropped": 0,
-  "sec_play_mean": 10.95
+  "sec_play_mean": 10.8
  },
  "notes": "repo at /home/user/opcg-sim-backend instead of ~/opcg-sim-backend"
 }
