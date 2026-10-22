@@ -13,15 +13,16 @@
  },
  "outputs": {
   "dirs": [
-   "n_records/n50s_w13_p0"
+   "n_records/n50s_w13_p0",
+   "n_records/n50s_w13_p1"
   ]
  },
  "metrics": {
-  "parts_done": 1,
-  "games": 120,
-  "rows": 17954,
+  "parts_done": 2,
+  "games": 240,
+  "rows": 34473,
   "dropped": 0,
-  "sec_play_mean": 12.74
+  "sec_play_mean": 11.88
  },
  "notes": "~/opcg-sim-backend was a symlink to /home/user/opcg-sim-backend (same origin) instead of a fresh clone."
 }
