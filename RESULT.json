@@ -16,5 +16,5 @@
  "metrics": {
   "arena_r19p/r19p_w30.jsonl": 84
  },
- "notes": ""
+ "notes": "84/84 pairs, seeds 2170000-2170083 (unique), 4 runs of 21 pairs (317-373s each), no timeouts/void (all games 0/1). Pair score (0-2) distribution: 2.0x6, 1.0x64, 0.0x14 -> candidate per-game rate 76/168 = 0.452 (raw, this shard only). arena_shard logged '候補席の設定 ...（基準席は既定）'; baseline was given --sims 1280 --worlds 2 --budget 0 on the CLI but its settings are not echoed in the jsonl."
 }
