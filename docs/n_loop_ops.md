@@ -181,6 +181,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **世界 4 本 × 1,280 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・16 シャード × 88 ペア・§7.18） | 1511000〜1526000 | 使用済み（2026-10-21・1,336 ペア 0.5434 [0.5227, 0.5642]・+30.2・`2026-10-21_r16_teacher_strength.md`） |
 | 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 使用済み（2026-10-21・r16 主 −5.3／副 +4.7・r16c 主 −7.7／副 +0.4・どちらも非昇格） |
 | 検証 **WP `rs-lethal-root`**（手元 40 ペア × 2 本 root／root_reply vs off・出荷の設定）／監査のやり直し 300 局／本番アリーナ（root・root_reply 各 12 シャード × 120 ペア・合流後） | 1682000〜1682039／1683000〜1683039／3012000〜3012299／2031000〜2042000／2051000〜2062000 | 指示済み（2026-10-22・claude/rs-lethal-root） |
+| 生成 **波 50s**（合成デッキ v2・`--decks synth_roles2`・生成役 r13d・v15・波 50 の対照・§7.34） | 2541000〜2548500（シャード k の base は 2540000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 指示済み（2026-10-22・claude/n50s-w01〜w16） |
 | 生成 **波 50**（実デッキ 115 本・`--decks real`・生成役 r13d・v15・§7.34） | 2531000〜2538500（シャード k の base は 2530000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 指示済み（2026-10-22・claude/n50-w01〜w16） |
 | 検証 **r19 vs r13d・本番の設定**（両席 1,280 回・世界 2 本・枝予算なし・random × real・32 シャード × 84 ペア・§7.33） | 2141000〜2172083（シャード k の base は 2141000 + (k−1)×1000） | 使用済み（2026-10-22・2,683 ペア 0.5052 [0.4948, 0.5156] +3.6・void 5・非昇格） |
 | 検証 **r19 vs r13d（公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.32）** | 主 real 2081000〜2096000／副 ミラー 2101000〜2116000／参考 synth_roles2 2121000〜2136000 | 使用済み（2026-10-22・主 2,799 ペア 0.5179 [0.5075, 0.5282] +12.4・副 0.5116 [0.4995, 0.5237] +8.1・参考 0.4930 −4.8・void 1） |
@@ -3187,6 +3188,85 @@ PY
   bash ~/save50.sh
 done
 tail -n 2 ~/n50_w${K}.log
+echo ALL_DONE
+
+補足:
+- 所要は 1 本（120 局）約 32 分・4 本で約 2.1 時間（同じコンテナで他の重い処理を並べない）。
+- 最初の push が失敗したら（PUSH_FAILED）、その出力を報告してください。
+- コミットメッセージにモデル名を入れない。
+````
+
+**切り分け（ユーザ決定 2026-10-22「一旦教材のデッキの切り分けとして教師の作成も訓練もやってしまいましょう」）**: 教材のデッキだけを変えた対照を同時に作る。台帳 2+336。
+- **波 50s**: 生成役 r13d・設定は波 50 と同じ・**デッキだけ `--decks synth_roles2`**（合成デッキ v2）。16 シャード × 480 局。seed **2541000〜2548500**（シャード k の base は 2540000 + ceil(k/2)×1000 + (k が偶数なら 500)）。
+- **訓練**: r20＝π・価値とも波 50＋49（実デッキ・生成役 r13d）／**r20s＝π・価値とも波 50s＋48（合成 v2・生成役 r13d）**。warm-start r11a・更新量・その他は同じ。違いは教材のデッキだけ。
+- **判定**: 両方を対 r13d で random × real・random × synth_roles2・固定ミラー（160 回）、良い方は本番の深さでも。
+- **予告（数を見る前）**: real 帯で r20 − r20s ≈ +10（r19 と r18 の差 +12 に近い）・synth_roles2 帯で r20s − r20 ≈ +5。本番の深さでは両方とも差が縮む。
+
+波 50s の作業セッション用の本文（`{K}`＝01〜16・`{BASE}`＝上の式）:
+
+````
+波 50s（合成デッキ v2）の生成を 1 シャードぶん回してください（docs/n_loop_ops.md §7.34）。コードは変更せず、下記を実行して結果ブランチを push するだけです。
+PR は作らないでください。git の作業が安全確認で止められたら、`git stash -u` してから実行してよい。質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+出どころの照合（origin 側で）:
+  (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
+  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.34 波 50s"
+  (3) 器: git show origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/record_gen.py | grep -n '"--budget"'
+この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
+
+bash で次の 2 つのブロックを順に実行してください。コンテナが再起動したら、2 つとも最初からもう一度実行します（冪等・終えた本は飛ばす）。
+
+--- ブロック 1（準備）---
+export K={K} BASE={BASE}
+pip install -q numpy maturin
+[ -d ~/opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git ~/opcg-sim-backend
+cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/n50s-w${K} origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/n50s-w${K} 2>/dev/null && git checkout -q FETCH_HEAD -- n_records 2>/dev/null || true
+rm -f ~/built; make rust-develop > ~/build.log 2>&1 && touch ~/built
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+printf '%s\n' 'cd ~/opcg-sim-backend' \
+  'cp ~/n50s_w${K}.log . 2>/dev/null' \
+  'git add -f n_records RESULT.json n50s_w${K}.log 2>/dev/null' \
+  'git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "gen wave 50s shard ${K}"' \
+  'git push -q -u origin claude/n50s-w${K} || echo PUSH_FAILED' > ~/save50s.sh
+
+--- ブロック 2（4 本を順に・1 本ごとに push）---
+下の「#!/bin/bash」から「echo ALL_DONE」までを ~/run50s.sh に保存し（ファイル作成のツールでよい）、
+`nohup bash ~/run50s.sh > ~/run50s.out 2>&1 &` でバックグラウンドに回す（2 時間を超えるのでフォアグラウンドで待たない）。
+**完走（run50s.out に ALL_DONE）までターンを終えない**——待機に入るとコンテナが止まり、生成のプロセスも消える。
+`timeout 540 bash -c 'until grep -q ALL_DONE ~/run50s.out; do sleep 30; done'; tail -n 1 ~/n50s_w{K}.log` のような 9 分以内の待ちを、ALL_DONE が出るまで繰り返し呼ぶ。
+生きているかの確認は `ps -eo pid,etime,cmd | grep "[o]pcg_sim.loop.record_gen"`。
+
+#!/bin/bash
+export K={K} BASE={BASE}
+cd ~/opcg-sim-backend
+for J in 0 1 2 3; do
+  D=n_records/n50s_w${K}_p$J
+  [ -f $D/meta_n_record.json ] && continue
+  rm -rf $D
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen --games 120 --seed-base $((BASE + 120*J)) --workers 4 \
+    --sims 1280 --worlds 1 --budget 0 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2.0 \
+    --eps-play 0.03 --eps-hold 0.03 --decks synth_roles2 --shard-games 10 \
+    --net opcg_sim/data/learned/nrel_r13d.npz --out $D >> ~/n50s_w${K}.log 2>&1
+  python - <<'PY' > RESULT.json
+import glob, json, os
+K = os.environ["K"]; parts = sorted(glob.glob(f"n_records/n50s_w{K}_p[0-3]"))
+done = [p for p in parts if os.path.exists(p + "/meta_n_record.json")]
+m = [json.load(open(p + "/meta_n_record.json")) for p in done]
+g = [x for p in done for x in json.load(open(p + "/meta_games.json"))["games"]]
+print(json.dumps({"job": f"n50s-w{K}", "role": "gen", "status": "done" if len(done) == 4 else "partial",
+  "inputs": {"net": "opcg_sim/data/learned/nrel_r13d.npz", "seed_base": int(os.environ["BASE"]), "games": 480,
+             "sims": 1280, "worlds": 1, "budget": 0, "decks": "synth_roles2"},
+  "outputs": {"dirs": done},
+  "metrics": {"parts_done": len(done), "games": sum(x["games"] for x in m), "rows": sum(x["rows"] for x in m),
+              "dropped": sum(x["dropped"] for x in m),
+              "sec_play_mean": round(sum(x["sec"] for x in g) / max(1, len(g)), 2)},
+  "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  bash ~/save50s.sh
+done
+tail -n 2 ~/n50s_w${K}.log
 echo ALL_DONE
 
 補足:
