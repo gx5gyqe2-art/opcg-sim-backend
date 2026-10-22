@@ -1,124 +1,117 @@
 {
- "job": "rs-trigger-order",
- "role": "implement",
+ "job": "train-r18",
+ "role": "train",
  "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.20 (origin/claude/cpu-spec-improvements-yw91jd @ 96869e9e3; ledger 2+323); defect docs/reports/2026-10-22_enc_v15.md §4",
  "inputs": {
-  "base": "origin/claude/cpu-spec-improvements-yw91jd@96869e9e3",
-  "net": "opcg_sim/data/learned/nrel_r13d.npz (both seats)"
+  "warm_start": "opcg_sim/data/learned/nrel_r11a.npz",
+  "pi_waves": [
+   48
+  ],
+  "pi_dirs": 64,
+  "z_waves": [
+   48,
+   47
+  ],
+  "z_dirs": {
+   "48": 64,
+   "47": 64
+  },
+  "value_rows": 2219641,
+  "value_val_rows": 314239,
+  "policy_points": 463668,
+  "policy_val_points": 65180,
+  "epochs": 2,
+  "lr": 0.0002,
+  "rss_gb": null,
+  "z_mode": "default (勝敗)",
+  "encoding": "v15",
+  "npz_meta_enc_version": 15
  },
  "outputs": {
-  "branch": "claude/rs-trigger-order",
-  "report": "docs/reports/2026-10-22_trigger_order.md",
-  "code": [
-   "rust/opcg_engine/src/journal.rs",
-   "rust/opcg_engine/src/effects/resolver.rs",
-   "rust/opcg_engine/src/effects/triggers.rs",
-   "rust/opcg_engine/src/effects/interact.rs",
-   "rust/opcg_engine/src/effects/actions/flow.rs",
-   "rust/opcg_engine/src/rules/actions.rs",
-   "rust/opcg_engine/src/rules/turn.rs",
-   "rust/opcg_engine/src/rules/battle.rs"
-  ],
-  "tests": [
-   "rust/opcg_engine/src/effects/tests_trigger_order.rs"
-  ],
-  "goldens": [
-   "tests/fixtures/rs_goldens/audit.json",
-   "tests/fixtures/rs_goldens/replay/ (17 files)"
-  ],
-  "ledger": "tests/fixtures/card_audit_ledger.json (20 IMPL_CHANGED re-reviewed ok)",
-  "docs": [
-   "docs/SPEC.md §1.5 §3.5",
-   "docs/TEST_SPEC.md (1 row)"
-  ]
+  "net": "n1_results/nrel_r18.npz",
+  "ep0": "n1_results/nrel_r18.ep0.npz",
+  "ep1": "n1_results/nrel_r18.ep1.npz",
+  "train_log": "train_r18.log",
+  "band": "band_r18.json",
+  "band_log": "band_r18.log"
  },
- "results": {
-  "repro_seed1680032": {
-   "before": "void (step cap)",
-   "after": "2/2 games decided",
-   "settings": "both r13d (v15), 1280 sims, budget 0, synth_roles, leaders random"
-  },
-  "rust_tests": {
-   "cargo_test": "596 passed (594 existing + 2 new)",
-   "new_tests_fail_on_old_engine": true
-  },
-  "golden_audit": {
-   "total": 3387,
-   "changed": 15,
-   "by_trigger": {
-    "TRIGGER": 15
+ "metrics": {
+  "best_ep": 0,
+  "epochs": [
+   {
+    "ep": 0,
+    "val_v_mse": 0.6358,
+    "val_v_sign": 0.756,
+    "pi_top1": 0.531,
+    "pi_top1_visits": 0.5683
    },
-   "by_action": {
-    "PLAY_CARD": 15,
-    "RETURN_DON": 2,
-    "KO": 1,
-    "DISCARD": 1
-   },
-   "verdict": {
-    "correct_now": 1,
-    "equivalent_event_order_only": 14,
-    "suspicious": 0
+   {
+    "ep": 1,
+    "val_v_mse": 0.6567,
+    "val_v_sign": 0.747,
+    "pi_top1": 0.534,
+    "pi_top1_visits": 0.572
    }
-  },
-  "golden_replay": {
-   "total": 200,
-   "changed": 17,
-   "random": 12,
-   "a1": 5,
-   "winner_changed": 0,
-   "verdict": {
-    "correct_now": 5,
-    "equivalent_event_order_only": 11,
-    "decision_only": 1,
-    "suspicious": 0
-   }
-  },
-  "card_audit": {
-   "all_scan_findings": "ACTION_NOT_FIRED 7->5 (OP16-105, ST13-006 now fire 3rd play); no new findings",
-   "impl_changed_reviewed": 20
-  },
-  "audit_cross": {
-   "pairs": 120,
-   "games": 240,
-   "void": 0,
-   "wr": 0.4833
-  },
-  "arena_local": {
-   "pairs": 40,
-   "seed_base": 1681000,
-   "settings": "both r13d, 1280 sims, budget 0, synth_roles, leaders random",
-   "after_wheel": {
-    "void": 0,
-    "wins": 50.0,
-    "wr": 0.625,
-    "ci95": [
-     0.4997,
-     0.7503
-    ]
+  ],
+  "val_v_mse": 0.6358,
+  "val_v_sign": 0.756,
+  "pi_top1": 0.531,
+  "band": {
+   "rows": 152176,
+   "holdout_mod": 7,
+   "src": "wave 48",
+   "nrel_r11a": {
+    "v_mse": 0.6241,
+    "v_sign": 0.7643,
+    "top1_visits": 0.5043,
+    "ce_visits": 1.976,
+    "top1_q_improved": 0.4692,
+    "ce_q_improved": 1.8909
    },
-   "before_wheel": {
-    "void": 0,
-    "wins": 51.0,
-    "wr": 0.6375,
-    "ci95": [
-     0.511,
-     0.764
-    ]
+   "nrel_r13d": {
+    "v_mse": 0.6264,
+    "v_sign": 0.7651,
+    "top1_visits": 0.552,
+    "ce_visits": 1.804,
+    "top1_q_improved": 0.5133,
+    "ce_q_improved": 1.6963
    },
-   "pairs_identical_results_and_turns": 37,
-   "pairs_result_changed": 1
-  },
-  "make_test": "green: cargo test 596 passed; pytest 854 passed, 13 skipped (43 s)"
+   "nrel_r17": {
+    "v_mse": 0.6282,
+    "v_sign": 0.7633,
+    "top1_visits": 0.5522,
+    "ce_visits": 1.7978,
+    "top1_q_improved": 0.5166,
+    "ce_q_improved": 1.6716
+   },
+   "nrel_r18": {
+    "v_mse": 0.5881,
+    "v_sign": 0.7801,
+    "top1_visits": 0.5554,
+    "ce_visits": 1.7901,
+    "top1_q_improved": 0.5206,
+    "ce_q_improved": 1.6736
+   },
+   "nrel_r18.ep0": {
+    "v_mse": 0.5881,
+    "v_sign": 0.7801,
+    "top1_visits": 0.5554,
+    "ce_visits": 1.7901,
+    "top1_q_improved": 0.5206,
+    "ce_q_improved": 1.6736
+   },
+   "nrel_r18.ep1": {
+    "v_mse": 0.5946,
+    "v_sign": 0.777,
+    "top1_visits": 0.5549,
+    "ce_visits": 1.7929,
+    "top1_q_improved": 0.5194,
+    "ce_q_improved": 1.6666
+   },
+   "train_sec": 375,
+   "band_sec": 549
+  }
  },
- "notes": [
-  "Root cause was worse than enc_v15 §4 assumed: the field-overflow interaction has no continuation, so the resolver holding the parent's remaining steps (OP17-092 'then you cannot play Character cards this turn') was dropped, not merely ordered later. Fixed generally: any interaction raised inside an action now defers the rest of the effect's stack (as removal replacement already did) and it resumes before queued triggers.",
-  "Ordering rule implemented: triggers raised while an effect resolves wait in pending_triggers until the outermost effect finishes (Session resolving depth, journal-outside temp like effect_actor); drain after game_resolve_ability (after event flush) and settle_pending (deferred remainder first, then queue) after dialogs and at action/battle/turn boundaries. Rule basis cited as comprehensive rules 8-6-1 (auto effects triggered during an effect's processing activate after it); the repo has no rules text, so the article number/wording is from memory — please verify against the official CR.",
-  "Life [Trigger] stays immediate even during effect damage (part of damage processing, not an auto effect); only life-trigger items are processed while holding.",
-  "Effect PLAY_CARD of a character now honours CANNOT_PLAY_CHARACTER (with min_cost on master cost), same rule as hand play.",
-  "Out of scope, left as-is: own [On K.O.] (triggers::fire_on_ko) and [On Rest] resolve inline instead of via the queue; by the same rule they should wait for the current effect. Proposal: separate WP if wanted (would move goldens further).",
-  "Event log order changed: a child's EFFECT events are now emitted after the parent's (old engine logged the inline child first). 14/15 audit-golden and 11/17 replay-golden changes are this alone (states identical).",
-  "Arena 'after vs before wheel' cannot be played inside one game (one rules engine per game; two builds of the same extension cannot load in one process). Measured instead as the same 40 pairs played once per wheel and compared pair by pair: void 0 both, 37/40 identical results and turns, 1 game flipped. The wr ~0.63 is same-net seat/seed-set noise in both runs, not strength.",
-  "make card-audit default scope is now back to 285 UNREVIEWED vanilla cards only."
- ]
+ "command": "python -m opcg_sim.learned.train.n_rel_train train --in $P48 --z-in $Z47 --ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz --out ~/nrel_r18.npz; python -m opcg_sim.learned.train.n_rel_band --in $P48 --nrel r11a r13d r17 r18 r18.ep0 r18.ep1 --policy --holdout-mod 7 --out ~/band_r18.json",
+ "notes": "指示書どおり完走（コード変更なし・本線 91b1e2b）。dir 数 64/64 は期待値と一致。価値 2,219,641 行（波 48 の 1,080,222 行＋波 47）＝下限 200 万超。best は ep0（val v_mse 0.6358 < ep1 0.6567）＝nrel_r18.npz は ep0 と同一。ep1 で val の価値誤差が悪化（訓練 mse は 0.537→0.514）＝2 周目は価値が過学習気味。評価帯（波 48 holdout・152,176 行）: 価値の誤差は r18 0.5881 < r18.ep1 0.5946 < r11a 0.6241 < r13d 0.6264 < r17 0.6282（r18 が明確に最小・符号一致も 0.780 で最良）。方策は top1_visits r18 0.5554 > r17 0.5522 ≈ r13d 0.552、ce_q_improved は ep1 1.6666 が最小（r17 1.6716・r18 1.6736）＝方策の差は小さい。注意: (1) 波 48 は r18 の訓練データ（holdout-mod 7 が訓練の val 分割と同じ行かは未確認・val 行は約 1/7）、他ネットにとっては未見＝r18 に有利な帯。(2) 訓練 val の v_mse（0.636）が帯（0.588）より大きいのは val に波 47（v14 の 16 列が漏れ入り）が混ざるためと推定（未検証）。(3) rss_gb は計測しなかった（free で途中 4GB 使用を 1 度見ただけ・14GB には遠い）。(4) 準備で setup スクリプトの cd 先を誤り 1 度やり直した（成果物に影響なし）。判定は公平同士のアリーナで行う前提。"
 }
