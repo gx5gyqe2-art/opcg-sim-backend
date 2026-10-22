@@ -1,7 +1,7 @@
 {
  "job": "arena-omni2-w13",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "outputs": {
   "files": [
    "arena_omni2/r13m_main_w13.jsonl",
