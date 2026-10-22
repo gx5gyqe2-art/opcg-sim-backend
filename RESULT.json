@@ -14,7 +14,19 @@
   ]
  },
  "metrics": {
-  "arena_r19p/r19p_w27.jsonl": 84
+  "arena_r19p/r19p_w27.jsonl": 84,
+  "final": {
+   "pairs": 83,
+   "games": 166,
+   "void": 1,
+   "wins": 84.0,
+   "wr": 0.506,
+   "ci95": [
+    0.4421,
+    0.57
+   ],
+   "elo": 4.2
+  }
  },
- "notes": ""
+ "notes": "84/84 pairs done (seed-base 2167000). 1 void: seed 2167051 GameAborted (turn limit), void rate 1/84=1.2% (<2%). The '基準席は既定' log line is a fixed print string; per arena_shard._best_kw the baseline seat did get worlds=2 (best_opts {'worlds': 2}), sims 1280 / budget 0 via --sims/--budget, reveal default (fair). Checkout was a fresh clone in ~/opcg-sim-backend (/root)."
 }
