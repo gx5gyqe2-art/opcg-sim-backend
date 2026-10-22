@@ -1,0 +1,502 @@
+[
+{
+"seed": 5000150,
+"identical": false,
+"first_diff_step": 32,
+"steps_old": 110,
+"steps_new": 114,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": "ATTACH_DON"
+},
+{
+"seed": 5000151,
+"identical": false,
+"first_diff_step": 21,
+"steps_old": 107,
+"steps_new": 147,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": "ATTACH_DON"
+},
+{
+"seed": 5000152,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 110,
+"steps_new": 110,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": null
+},
+{
+"seed": 5000153,
+"identical": false,
+"first_diff_step": 31,
+"steps_old": 93,
+"steps_new": 120,
+"winner_old": "p1",
+"winner_new": "p2",
+"at_old": "ATTACK"
+},
+{
+"seed": 5000154,
+"identical": false,
+"first_diff_step": 19,
+"steps_old": 104,
+"steps_new": 110,
+"winner_old": "p1",
+"winner_new": "p2",
+"at_old": "RESOLVE_EFFECT_SELECTION"
+},
+{
+"seed": 5000155,
+"identical": false,
+"first_diff_step": 30,
+"steps_old": 113,
+"steps_new": 129,
+"winner_old": "p1",
+"winner_new": "p2",
+"at_old": "PASS"
+},
+{
+"seed": 5000156,
+"identical": false,
+"first_diff_step": 0,
+"steps_old": 122,
+"steps_new": 63,
+"winner_old": "p2",
+"winner_new": "p1",
+"at_old": "MULLIGAN"
+},
+{
+"seed": 5000157,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 102,
+"steps_new": 102,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": null
+},
+{
+"seed": 5000158,
+"identical": false,
+"first_diff_step": 0,
+"steps_old": 117,
+"steps_new": 105,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": "MULLIGAN"
+},
+{
+"seed": 5000159,
+"identical": false,
+"first_diff_step": 9,
+"steps_old": 113,
+"steps_new": 98,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "PASS"
+},
+{
+"seed": 5000160,
+"identical": false,
+"first_diff_step": 69,
+"steps_old": 102,
+"steps_new": 103,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": "RESOLVE_EFFECT_SELECTION"
+},
+{
+"seed": 5000161,
+"identical": false,
+"first_diff_step": 110,
+"steps_old": 139,
+"steps_new": 139,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": "ATTACH_DON"
+},
+{
+"seed": 5000162,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 102,
+"steps_new": 102,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": null
+},
+{
+"seed": 5000163,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 97,
+"steps_new": 97,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": null
+},
+{
+"seed": 5000164,
+"identical": false,
+"first_diff_step": 51,
+"steps_old": 125,
+"steps_new": 122,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": "ATTACH_DON"
+},
+{
+"seed": 5000165,
+"identical": false,
+"first_diff_step": 51,
+"steps_old": 103,
+"steps_new": 126,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": "ACTIVATE_MAIN"
+},
+{
+"seed": 5000166,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 102,
+"steps_new": 102,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": null
+},
+{
+"seed": 5000167,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 79,
+"steps_new": 79,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": null
+},
+{
+"seed": 5000168,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 106,
+"steps_new": 106,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": null
+},
+{
+"seed": 5000169,
+"identical": false,
+"first_diff_step": 116,
+"steps_old": 148,
+"steps_new": 185,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "ATTACH_DON"
+},
+{
+"seed": 5000170,
+"identical": false,
+"first_diff_step": 38,
+"steps_old": 123,
+"steps_new": 118,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "SELECT_COUNTER"
+},
+{
+"seed": 5000171,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 75,
+"steps_new": 75,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": null
+},
+{
+"seed": 5000172,
+"identical": false,
+"first_diff_step": 69,
+"steps_old": 100,
+"steps_new": 100,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "ATTACK"
+},
+{
+"seed": 5000173,
+"identical": false,
+"first_diff_step": 15,
+"steps_old": 70,
+"steps_new": 90,
+"winner_old": "p2",
+"winner_new": "p1",
+"at_old": "PLAY"
+},
+{
+"seed": 5000174,
+"identical": false,
+"first_diff_step": 39,
+"steps_old": 96,
+"steps_new": 169,
+"winner_old": "p1",
+"winner_new": "p2",
+"at_old": "PLAY"
+},
+{
+"seed": 5000175,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 105,
+"steps_new": 105,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": null
+},
+{
+"seed": 5000176,
+"identical": false,
+"first_diff_step": 55,
+"steps_old": 97,
+"steps_new": 97,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "ATTACH_DON"
+},
+{
+"seed": 5000177,
+"identical": false,
+"first_diff_step": 23,
+"steps_old": 135,
+"steps_new": 142,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": "TURN_END"
+},
+{
+"seed": 5000178,
+"identical": false,
+"first_diff_step": 45,
+"steps_old": 138,
+"steps_new": 129,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "ATTACK"
+},
+{
+"seed": 5000179,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 135,
+"steps_new": 135,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": null
+},
+{
+"seed": 5000180,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 127,
+"steps_new": 127,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": null
+},
+{
+"seed": 5000181,
+"identical": false,
+"first_diff_step": 81,
+"steps_old": 93,
+"steps_new": 119,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "PASS"
+},
+{
+"seed": 5000182,
+"identical": false,
+"first_diff_step": 10,
+"steps_old": 88,
+"steps_new": 93,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "ATTACK"
+},
+{
+"seed": 5000183,
+"identical": false,
+"first_diff_step": 23,
+"steps_old": 102,
+"steps_new": 118,
+"winner_old": "p2",
+"winner_new": "p1",
+"at_old": "PASS"
+},
+{
+"seed": 5000184,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 88,
+"steps_new": 88,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": null
+},
+{
+"seed": 5000185,
+"identical": false,
+"first_diff_step": 84,
+"steps_old": 136,
+"steps_new": 151,
+"winner_old": "p1",
+"winner_new": "p2",
+"at_old": "PLAY"
+},
+{
+"seed": 5000186,
+"identical": false,
+"first_diff_step": 0,
+"steps_old": 96,
+"steps_new": 91,
+"winner_old": "p1",
+"winner_new": "p2",
+"at_old": "KEEP_HAND"
+},
+{
+"seed": 5000187,
+"identical": false,
+"first_diff_step": 39,
+"steps_old": 99,
+"steps_new": 100,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "PLAY"
+},
+{
+"seed": 5000188,
+"identical": false,
+"first_diff_step": 26,
+"steps_old": 95,
+"steps_new": 100,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "PLAY"
+},
+{
+"seed": 5000189,
+"identical": false,
+"first_diff_step": 8,
+"steps_old": 112,
+"steps_new": 104,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": "PLAY"
+},
+{
+"seed": 5000190,
+"identical": false,
+"first_diff_step": 64,
+"steps_old": 157,
+"steps_new": 128,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "PASS"
+},
+{
+"seed": 5000191,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 118,
+"steps_new": 118,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": null
+},
+{
+"seed": 5000192,
+"identical": false,
+"first_diff_step": 25,
+"steps_old": 107,
+"steps_new": 164,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": "ATTACH_DON"
+},
+{
+"seed": 5000193,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 147,
+"steps_new": 147,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": null
+},
+{
+"seed": 5000194,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 133,
+"steps_new": 133,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": null
+},
+{
+"seed": 5000195,
+"identical": false,
+"first_diff_step": 7,
+"steps_old": 107,
+"steps_new": 132,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "PLAY"
+},
+{
+"seed": 5000196,
+"identical": false,
+"first_diff_step": 1,
+"steps_old": 96,
+"steps_new": 120,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "KEEP_HAND"
+},
+{
+"seed": 5000197,
+"identical": true,
+"first_diff_step": null,
+"steps_old": 106,
+"steps_new": 106,
+"winner_old": "p1",
+"winner_new": "p1",
+"at_old": null
+},
+{
+"seed": 5000198,
+"identical": false,
+"first_diff_step": 15,
+"steps_old": 85,
+"steps_new": 114,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "PLAY"
+},
+{
+"seed": 5000199,
+"identical": false,
+"first_diff_step": 17,
+"steps_old": 154,
+"steps_new": 154,
+"winner_old": "p2",
+"winner_new": "p2",
+"at_old": "SELECT_COUNTER"
+}
+]

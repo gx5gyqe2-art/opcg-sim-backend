@@ -587,6 +587,7 @@ impl Game {
                         .and_then(Value::as_bool)
                         .unwrap_or(false),
                     skip_onplay: v.get("skip_onplay").and_then(Value::as_bool).unwrap_or(false),
+                    deck_v14: v.get("deck_v14").and_then(Value::as_bool).unwrap_or(false),
                 }
             }
         };

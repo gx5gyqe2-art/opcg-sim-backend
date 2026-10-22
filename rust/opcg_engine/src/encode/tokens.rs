@@ -609,6 +609,7 @@ pub fn encode_rel(
     masters: &MasterTable,
     me: Seat,
     with_relations: bool,
+    rem: &super::OwnRemaining,
     cache: &mut ProfileCache,
 ) -> Result<RelEncoding, EngineError> {
     let opp = me.other();
@@ -871,16 +872,27 @@ pub fn encode_rel(
     my_guard += 1000.0 * blockers as f32;
     ex[5] = ((opp_attack as f32 - my_guard) / 20000.0).clamp(-1.5, 1.5);
 
+    // 自デッキ残の役割（符号化 v15: 山札＋伏せたライフから作る期待値・[`super::OwnRemaining`]）。
+    // 役割は 0/1＝足し込みは整数で厳密。`deck_v14` の作りなら v14 と同じ値。
+    let mut sums = [[0f64; N_ROLES + N_ROLES2]; 2];
+    for (acc, set) in sums.iter_mut().zip([&rem.known, &rem.unknown]) {
+        for c in set {
+            let p = cache.get(masters, st.card(*c).master);
+            for k in 0..N_ROLES {
+                acc[k] += f64::from(p.roles[k]);
+            }
+            for k in 0..N_ROLES2 {
+                acc[N_ROLES + k] += f64::from(p.roles2[k]);
+            }
+        }
+    }
     let mut dr = [0.0f32; N_ROLES];
     let mut dr2 = [0.0f32; N_ROLES2];
-    for c in &st.player(me).deck {
-        let p = cache.get(masters, st.card(*c).master);
-        for k in 0..N_ROLES {
-            dr[k] += p.roles[k];
-        }
-        for k in 0..N_ROLES2 {
-            dr2[k] += p.roles2[k];
-        }
+    for k in 0..N_ROLES {
+        dr[k] = rem.combine(sums[0][k], sums[1][k]) as f32;
+    }
+    for k in 0..N_ROLES2 {
+        dr2[k] = rem.combine(sums[0][N_ROLES + k], sums[1][N_ROLES + k]) as f32;
     }
     for k in 0..N_ROLES {
         ex[6 + k] = dr[k].min(10.0) / 10.0;

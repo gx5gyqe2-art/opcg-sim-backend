@@ -13,7 +13,7 @@
   3. dump の 1 行（card_idx＋tokens）から `relations_from_dump` で R を再計算できる（形状）。
      訓練は float32 へ上げてから渡す（`dump_io.rows_f32`）。
   4. meta は `dump_version=5`（v3 の列＋補助教師の 3 列・§20.8.2＋守る側の補助教師 2 列・
-     P8・`2026-09-24_p8_defender_columns.md`）・`enc_version` は **14**（符号化 v14＝tokens 22×22・scalars 127・§20.9）。
+     P8・`2026-09-24_p8_defender_columns.md`）・`enc_version` は **15**（符号化 v15＝形は v14 と同じ tokens 22×22・scalars 127・§20.9／§7.19）。
      `--no-aux` は v3 の列だけを書く（`dump_version=3`）。
 
 fp16 の丸めが forward に与える差は 1 バッチ最大 1.07e-4（`docs/reports/2026-09-07_train_profile.md`
@@ -120,7 +120,8 @@ def test_relations_from_dump_row(game):
 def test_meta_versions():
     assert G.DUMP_VERSION == 5                               # v4 ＋ 守る側の補助教師 2 列（P8・`2026-09-24_p8_defender_columns.md`）
     assert G.ENC_VERSION_V2 == 13                            # 波 29 までの符号化（過去の meta）
-    assert G.ENC_VERSION_V14 == 14                           # 現行（§20.9・列の形が変わる唯一の欄）
+    assert G.ENC_VERSION_V14 == 14                           # §20.9・列の形が変わった最後の版
+    assert G.ENC_VERSION_V15 == 15                           # 現行（§7.19・形は v14 と同じ・16 列の意味だけ）
     assert G.TOKENS_SHAPE == (NR.N_TOK, NR.S_DIM) == (22, 22)
     assert set(G.DT_V3) == {"tokens", "scalars", "card_idx"}
 

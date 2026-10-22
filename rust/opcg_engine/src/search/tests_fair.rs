@@ -297,3 +297,54 @@ fn fair_with_knowledge_is_deterministic() {
         assert_eq!((x.mv, x.n, x.q), (y.mv, y.n, y.q));
     }
 }
+
+/// 符号化 v15（WP `enc-v15`・§7.19）: 自分の残り山札の 16 列は本物・`peek`・`fair`・どの世界でも同じ値
+/// （伏せたライフの中身にも、世界の混ぜ方にも依らない）。v14 の作り（`deck_v14`）は `fair` の世界ごとに揺れる。
+#[test]
+fn enc_v15_own_deck_columns_are_world_invariant() {
+    use crate::encode::{encode, EncodeOptions, Vocab};
+    use crate::testkit::M_BIG;
+    // scalars の列: deck_aggregate 5・deck_apex 2・EXTRA の自デッキの役割 7・直した除去・バウンス。
+    const COLS: [usize; 16] = [46, 47, 48, 49, 50, 68, 69, 100, 101, 102, 103, 104, 105, 106, 123, 125];
+    let mut b = BoardBuilder::new();
+    b.put_hand(Seat::P1, M_CHAR);
+    let mut deck = Vec::new();
+    for m in [M_CHAR, M_EVENT, M_BLOCKER, M_BIG, M_CHAR] {
+        deck.push(b.put_deck(Seat::P1, m));
+    }
+    let mut life = Vec::new();
+    for m in [M_BIG, M_BIG, M_EVENT, M_BLOCKER] {
+        life.push(b.put_life(Seat::P1, m));
+    }
+    b.card_mut(life[1]).is_face_up = true;
+    b.card_mut(deck[4]).known_by = K1; // 山札の下へ置いた札（位置ごと分かっている）
+    b.card_mut(life[2]).known_by = K1; // 伏せたライフにあると分かっている札
+    for m in [M_BLOCKER, M_CHAR, M_EVENT, M_CHAR] {
+        b.put_deck(Seat::P2, m);
+    }
+    for _ in 0..3 {
+        b.put_life(Seat::P2, M_EVENT);
+    }
+    let (masters, state) = b.build();
+    let vocab = Vocab::from_ids(&[]);
+    let cols = |st: &GameState, deck_v14: bool| -> Vec<u32> {
+        let opts = EncodeOptions { skip_relations: true, skip_onplay: false, deck_v14 };
+        let e = encode(st, &masters, &vocab, Seat::P1, &opts).unwrap();
+        COLS.iter().map(|&i| e.scalars[i].to_bits()).collect()
+    };
+    let truth = cols(&state, false);
+    // 手で: 知っている札（山札の M_CHAR）1000 ＋ 知らない札 6 枚（山札 4・伏せたライフ 2）の 8000 × 4/6。
+    let want = (1000.0 + 8000.0 * 4.0 / 6.0) / 100_000.0;
+    assert_eq!(truth[0], (want as f32).to_bits());
+    // 頂点は伏せたライフの M_BIG も「山札に居うる」札として数える。
+    assert_eq!(truth[5], 0.9f32.to_bits());
+    let mut v14_vals = std::collections::BTreeSet::new();
+    for seed in 0..16u64 {
+        let fair = crate::search::determinize::determinize_fair_with(&state, Seat::P1, &mut Pcg32SearchRng::new(seed)).unwrap();
+        let peek = crate::search::determinize::determinize_with(&state, Seat::P1, &mut Pcg32SearchRng::new(seed)).unwrap();
+        assert_eq!(cols(&fair, false), truth, "fair 世界 {seed}");
+        assert_eq!(cols(&peek, false), truth, "peek 世界 {seed}");
+        v14_vals.insert(cols(&fair, true));
+    }
+    assert!(v14_vals.len() > 1, "v14 の作りは fair の世界ごとに揺れる（検査が効いていること）");
+}

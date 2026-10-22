@@ -43,7 +43,8 @@ _CACHE_MAX = 4096                     # 席ごとの符号化キャッシュ上�
 _NOCACHE = bool(os.environ.get("OPCG_NREL_NOCACHE"))
 _VERIFY = bool(os.environ.get("OPCG_NREL_VERIFY"))
 _VERIFY_STATS = collections.Counter()   # 同値性の検査用（キャッシュ無し＝毎回符号化）
-NR_ENC_VERSION = 14                   # NRel の符号化世代（v14＝v13 + S 2 列・EXTRA 4 列・§20.9）
+NR_ENC_VERSION = 15                   # NRel の符号化世代（v15＝形は v14 と同じ・自分の残り山札の 16 列を期待値に・§7.19）
+NR_ENC_VERSION_V14 = 14               # v14＝v13 + S 2 列・EXTRA 4 列（§20.9）。pad と候補行の対象の境目
 NR_ENC_VERSION_V13 = 13               # 1 つ前（pad して読む対象・`nrel_r3.npz`／`nrel_a1.npz`）
 
 D_SC = 94 + NR.EXTRA_DIM              # 127（v13 は 94 + 29 = 123）
@@ -196,7 +197,7 @@ class NRelNet:
         self.time = False                 # 時間軸ヘッドを使うか（訓練器が --time-weight から立てる）
         self.vocab_ids = None
         self.meta = {}
-        #: このネットが読む符号化の世代（新規は現行＝v14。`load` が npz の meta から入れ直す）。
+        #: このネットが読む符号化の世代（新規は現行＝v15。`load` が npz の meta から入れ直す）。
         #: **候補行の対象（§20.9 の A）はこの版で分岐する**＝v13 のネットは v13 の行のまま。
         self.enc_version = NR_ENC_VERSION
         # 切り分け（ablation）: {"rel"}＝関係 R を 0 に・{"opp_pool"}＝相手デッキ知識の列を 0 に。
@@ -496,7 +497,7 @@ class NRelNet:
         # （§20.9 の E）。埋める位置は入力の並びで決まる: x=[構造64, S, ゾーン5] なので `Wt` は
         # 64+20 行目の後ろへ 2 行・z=[scalars, mean h, max h] なので `W1` は 123 行目の後ろへ 4 行。
         net.enc_version = int(net.meta.get("enc_version") or NR_ENC_VERSION_V13)
-        if net.enc_version < NR_ENC_VERSION:
+        if net.enc_version < NR_ENC_VERSION_V14:
             net.Wt = _pad_rows(net.Wt, D_STRUCT + NR.S_DIM_V13, NR.S_DIM - NR.S_DIM_V13, D_X)
             net.W1 = _pad_rows(net.W1, D_SC_V13, D_SC - D_SC_V13, D_Z)
             net.meta = dict(net.meta, enc_version=NR_ENC_VERSION,

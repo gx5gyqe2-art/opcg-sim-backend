@@ -49,7 +49,7 @@ use crate::model::{
 use crate::state::EngineError;
 
 use super::{
-    Encoding, EncodeOptions, Vocab, D_SC, MAX_FIELD,
+    Encoding, EncodeOptions, OwnRemaining, Vocab, D_SC, MAX_FIELD,
     MAX_HAND, N_CARD_IDX, PER_CHAR,
 };
 
@@ -75,26 +75,18 @@ fn char_feats(state: &GameState, masters: &MasterTable, card: CardIdx) -> [f32; 
 }
 
 /// Python `encoder._deck_aggregate`（自デッキ残の守り/資源 5 値）。
-fn deck_aggregate(state: &GameState, masters: &MasterTable, deck: &[CardIdx]) -> [f32; 5] {
-    let mut n = 0f64;
-    let (mut counter_total, mut counter_cards, mut blockers, mut events, mut highcost) =
-        (0f64, 0f64, 0f64, 0f64, 0f64);
-    for c in deck {
-        let m = masters.get(state.card(*c).master);
-        n += 1.0;
-        counter_total += f64::from(m.counter);
-        if m.counter > 0 {
-            counter_cards += 1.0;
-        }
-        if m.keywords.iter().any(|k| k == KW_BLOCKER) {
-            blockers += 1.0;
-        }
-        if m.ty == CardType::Event {
-            events += 1.0;
-        } else if m.ty == CardType::Character && m.cost >= 7 {
-            highcost += 1.0;
-        }
-    }
+///
+/// 符号化 v15（§7.19）: 数える列は山札＋伏せたライフから作る**期待値**（[`OwnRemaining::expect`]）、
+/// 密度はそれ ÷ 山札の枚数。`deck_v14` の [`OwnRemaining`] なら v14 と 1 bit も変わらない。
+fn deck_aggregate(state: &GameState, masters: &MasterTable, rem: &OwnRemaining) -> [f32; 5] {
+    let m = |c: CardIdx| masters.get(state.card(c).master);
+    let counter_total = rem.expect(|c| f64::from(m(c).counter));
+    let counter_cards = rem.expect(|c| f64::from(u8::from(m(c).counter > 0)));
+    let blockers = rem.expect(|c| f64::from(u8::from(m(c).keywords.iter().any(|k| k == KW_BLOCKER))));
+    let events = rem.expect(|c| f64::from(u8::from(m(c).ty == CardType::Event)));
+    let highcost =
+        rem.expect(|c| f64::from(u8::from(m(c).ty == CardType::Character && m(c).cost >= 7)));
+    let n = rem.n_deck as f64;
     let density = if n > 0.0 { counter_cards / n } else { 0.0 };
     [
         (counter_total / (50.0 * 2000.0)) as f32,
@@ -106,9 +98,11 @@ fn deck_aggregate(state: &GameState, masters: &MasterTable, deck: &[CardIdx]) ->
 }
 
 /// Python `encoder._deck_apex`（自デッキ残キャラの頂点 2 値）。
-fn deck_apex(state: &GameState, masters: &MasterTable, deck: &[CardIdx]) -> [f32; 2] {
+///
+/// 符号化 v15: 山札にあると分かっている札と知らない札の全部の最大（＝山札に居うる頂点）。
+fn deck_apex(state: &GameState, masters: &MasterTable, rem: &OwnRemaining) -> [f32; 2] {
     let (mut max_power, mut max_cost) = (0f64, 0f64);
-    for c in deck {
+    for c in rem.candidates() {
         let m = masters.get(state.card(*c).master);
         if m.ty != CardType::Character {
             continue;
@@ -423,9 +417,11 @@ pub fn encode(
     };
     // マスター単位の要約は decide の中なら使い回す（`encode::decide_cache_scope`）。値は同じ。
     let mut caches = super::EncCaches::take(masters);
+    // 自分の残りの札の分け方（v15・16 列が共有する）。
+    let rem = OwnRemaining::of(s.state(), me, opts.deck_v14);
     let rel = {
         let _prof = crate::prof::enter(crate::prof::Cat::EncRel);
-        super::tokens::encode_rel(s, masters, me, !opts.skip_relations, &mut caches.profiles)?
+        super::tokens::encode_rel(s, masters, me, !opts.skip_relations, &rem, &mut caches.profiles)?
     };
 
     let leaders = &mut caches.leaders;
@@ -501,7 +497,7 @@ pub fn encode(
         });
     }
     // v4
-    vals.extend_from_slice(&deck_aggregate(state, masters, &p_me.deck));
+    vals.extend_from_slice(&deck_aggregate(state, masters, &rem));
     // v5
     vals.extend_from_slice(&field_aggregate(state, masters, &p_opp.field));
     vals.push(playable_chars(state, masters, me) as f32 / MAX_HAND as f32);
@@ -516,7 +512,7 @@ pub fn encode(
         p_me.don_deck.len() as f32 / 10.0,
         p_opp.don_deck.len() as f32 / 10.0,
     ]);
-    vals.extend_from_slice(&deck_apex(state, masters, &p_me.deck));
+    vals.extend_from_slice(&deck_apex(state, masters, &rem));
     // v11/v12: リーダー物理要約（自 12 → 相手 12）
     for seat in [me, opp] {
         let v = match state.player(seat).leader {
@@ -598,7 +594,7 @@ mod tests {
         b.put_deck(Seat::P1, M_EVENT);
         b.put_deck(Seat::P1, M_BIG);
         let (masters, state) = b.build();
-        let got = deck_aggregate(&state, &masters, &state.player(Seat::P1).deck);
+        let got = deck_aggregate(&state, &masters, &OwnRemaining::of(&state, Seat::P1, false));
         // counter_total = 1000*3 + 2000 = 5000 → /100000
         assert!((got[0] - 5000.0 / 100_000.0).abs() < 1e-7);
         // 4 枚ともカウンター持ち＝密度 1.0
@@ -614,7 +610,7 @@ mod tests {
         b.put_deck(Seat::P1, M_EVENT); // イベントは対象外
         b.put_deck(Seat::P1, M_BIG); // cost5 power9000
         let (masters, state) = b.build();
-        let got = deck_apex(&state, &masters, &state.player(Seat::P1).deck);
+        let got = deck_apex(&state, &masters, &OwnRemaining::of(&state, Seat::P1, false));
         assert!((got[0] - 0.9).abs() < 1e-7);
         assert!((got[1] - 0.5).abs() < 1e-7);
     }
