@@ -14,7 +14,19 @@
   ]
  },
  "metrics": {
-  "arena_r19p/r19p_w09.jsonl": 84
+  "arena_r19p/r19p_w09.jsonl": 84,
+  "shard_final": {
+   "pairs": 84,
+   "games": 168,
+   "void": 0,
+   "wins": 73.0,
+   "wr": 0.4345,
+   "ci95": [
+    0.3826,
+    0.4864
+   ],
+   "elo": -45.8
+  }
  },
- "notes": ""
+ "notes": "84/84 ペア完走・void 0（168 局）。このシャード単独: r19 勝ち 73/168・wr 0.4345・95%CI [0.3826,0.4864]・Elo -45.8。ログの『（基準席は既定）』は表示だけで、基準席にも --sims 1280 --budget 0 が initargs で渡り、ARENA_RESUME_FINAL の best_opts は {worlds: 2}。所要は 21 ペアあたり約 5 分（全体で約 20 分・4 コア）で、見込みの 1〜3 時間より短かった。"
 }
