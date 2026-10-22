@@ -4,11 +4,13 @@
  "status": "partial",
  "outputs": {
   "files": [
-   "arena_r17/r17_main_w10.jsonl"
+   "arena_r17/r17_main_w10.jsonl",
+   "arena_r17/r17_mirror_w10.jsonl"
   ]
  },
  "metrics": {
-  "arena_r17/r17_main_w10.jsonl": 175
+  "arena_r17/r17_main_w10.jsonl": 175,
+  "arena_r17/r17_mirror_w10.jsonl": 175
  },
  "notes": ""
 }
