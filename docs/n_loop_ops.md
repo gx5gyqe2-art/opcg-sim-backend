@@ -180,7 +180,8 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 生成 **波 46**（生成役 r13d・**世界 4 本 × 1,280 回**・枝予算なし・64 シャード × 120 局・§7.18） | 2461000〜2484620（w01〜w49）・2485000〜2492620 は未使用 | 指示済み（2026-10-20・claude/n46-w01〜w49・w50〜w64 は起動前に取り消し） |
 | 検証 **世界 4 本 × 1,280 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・16 シャード × 88 ペア・§7.18） | 1511000〜1526000 | 使用済み（2026-10-21・1,336 ペア 0.5434 [0.5227, 0.5642]・+30.2・`2026-10-21_r16_teacher_strength.md`） |
 | 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 使用済み（2026-10-21・r16 主 −5.3／副 +4.7・r16c 主 −7.7／副 +0.4・どちらも非昇格） |
-| 生成 **波 47**（公平な物差しの最初の波・生成役 r13d・設定は波 45 と同じ・§7.28） | 2501000〜2508500（シャード k の base は 2500000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 指示済み（2026-10-21・claude/n47-w01〜w16） |
+| 検証 **r17 vs r13d（公平同士・両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.28）** | 主 1791000〜1806000／副 1811000〜1826000 | 払い出し済み（2026-10-22・訓練 claude/train-r17 の後に起動） |
+| 生成 **波 47**（公平な物差しの最初の波・生成役 r13d・設定は波 45 と同じ・§7.28） | 2501000〜2508500（シャード k の base は 2500000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,139,419 行・claude/n47-w01〜w16） |
 | 検証 **公平化の価格（新しい既定〔fair＋知識〕vs peek・12 シャード × 120 ペア・§7.27）** | 1651000〜1662000（共有） | 使用済み（2026-10-22・1,438 ペア 0.4687・**−21.8**・知識の固定は +0.008／ペア z 0.6・`2026-10-22_fair_default_arena.md`） |
 | 検証 **公平を既定にする WP `rs-fair` の手元アリーナ**（新しい既定 vs `peek`・40 ペア・`search_efficiency_plan.md` §7.15） | 1679000〜1679039 | 使用済み（2026-10-21・40 ペア 0.45・−34.9〔CI ±100 級〕・本番は §7.27） |
 | 検証 **木 1 本の方式の診断の手元アリーナ**（WP `rs-ismcts-diag`・88 ペア・`search_efficiency_plan.md` §7.5） | 1671000〜1671087 | 指示済み（2026-10-21・claude/rs-ismcts-diag） |
@@ -2342,6 +2343,47 @@ echo ALL_DONE
 - **訓練（r17・別の指示書）**: warm-start r11a・π＝波 47（公平な教材だけ）・価値＝波 47＋46＋45（生成役 r13d の波・CLAUDE.md の窓）。入力の点検の結果（符号化 v15 があれば）を入れる。
 - **判定（公平同士）**: r17 vs r13d・両席 160 回・主＋副・各 16 シャード × 175 ペア。**どちらの席も公平な既定で打つ**（今の出荷との比較は参考値・採用は公平同士の勝敗で決める）。seed は指示のときに払い出す。
 - **予告（数を見る前）**: r17 vs r13d（公平同士）主 +10〜+30（r13d は覗き見の教材で育ったので、公平な入力では価値がずれる。公平な教材で育て直した分が出る）。評価帯（波 47 holdout）の価値の誤差は r13d より小さい。
+
+
+**波 47 の結果（2026-10-22）**: 16 シャード全部完走・7,680 局・1,139,419 行・dropped 6・1 局平均 11.5 秒（高速化後）。
+
+**訓練 r17 の指示書**（作業セッション用・1 セッション・メモリ 12GB 以上・`claude/train-r17`）。π＝波 47（公平な教材だけ）・価値＝波 47＋46＋45（生成役 r13d の波・約 310 万行）・warm-start r11a・その他は r13d と同じ。符号化は v14 のまま（入力の点検 §7.17 の結果は r17b 以降）。
+評価帯＝波 47 holdout で r11a／r13d／r17（＋`.ep0`／`.ep1`）。判定のアリーナ（**公平同士**・両席 160 回・主＋副・各 16 シャード × 175 ペア）は訓練の後にコーディネータが出す: **主 1791000〜1806000／副 1811000〜1826000**（シャード k の base は + (k−1)×1000）。
+
+```
+作業: r17 の訓練 → 評価帯（docs/n_loop_ops.md §7.28）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（~/opcg-sim-backend）。長い実行は nohup で回し、
+**push し終えるまでターンを終えない**（9 分以内の待ちを繰り返す）。迷った点は RESULT.json の notes に書いて完走する。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+for N in 47 45; do for k in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16; do
+  git fetch -q origin claude/n$N-w$k:tmpw && mkdir -p ~/n$N && git archive tmpw n_records | tar -x -C ~/n$N && git branch -qD tmpw; done; done
+for k in $(seq -w 1 49); do
+  git fetch -q origin claude/n46-w$k:tmpw && mkdir -p ~/n46 && git archive tmpw n_records | tar -x -C ~/n46 && git branch -qD tmpw; done
+ls -d ~/n47/n_records/n47_w*_p[0-3] | wc -l      # 64
+ls -d ~/n46/n_records/n46_w*_p[0-3] | wc -l      # 196
+ls -d ~/n45/n_records/n45_w*_p[0-3] | wc -l      # 64
+
+P47="$HOME/n47/n_records/n47_w*_p[0-3]"
+Z46="$HOME/n46/n_records/n46_w*_p[0-3]"
+Z45="$HOME/n45/n_records/n45_w*_p[0-3]"
+COMMON="--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz"
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P47" --z-in "$Z46" "$Z45" $COMMON --out ~/nrel_r17.npz 2>&1 | tee ~/train_r17.log
+
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$P47" \
+  --nrel opcg_sim/data/learned/nrel_r11a.npz opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r17.npz ~/nrel_r17.ep0.npz ~/nrel_r17.ep1.npz \
+  --policy --holdout-mod 7 --out ~/band_r17.json 2>&1 | tee ~/band_r17.log
+
+git checkout -B claude/train-r17
+mkdir -p n1_results && cp ~/nrel_r17*.npz n1_results/ && cp ~/train_r17.log ~/band_r17.json ~/band_r17.log .
+（RESULT.json〔§5 の形〕: inputs＝warm_start r11a・π dir 数・価値の波と行数・rss_gb／metrics＝best_ep・各周の val v_mse／v_sign／pi_top1／band＝ネットごとの v_mse と方策の指標／train_sec・band_sec／notes）
+git add -f n1_results/nrel_r17*.npz train_r17.log band_r17.json band_r17.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r17 のセット（訓練・評価帯）"
+git push -u origin claude/train-r17
+```
+メモリが 14GB を超えそうなら `--z-in` から波 45 を外して波 47＋46（約 200 万行）で回し、notes に書く。
 
 生成の作業セッション用の本文（`{K}`＝01〜16・`{BASE}`＝上の式）:
 
