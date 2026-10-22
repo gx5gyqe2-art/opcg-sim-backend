@@ -29,5 +29,5 @@
    "n1_results/omni_value/omni_n43_w10_p3.npz"
   ]
  },
- "notes": ""
+ "notes": "outputs.files の glob に、本線から引き継いだ w01 の 4 本（段階 1 の産物）も含まれる。本担当の産物は w09・w10 の各 p0〜p3。"
 }
