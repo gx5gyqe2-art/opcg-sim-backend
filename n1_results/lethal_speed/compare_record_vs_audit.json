@@ -1,0 +1,54 @@
+{
+ "a": "n1_results/lethal_root/redo/points_3012000_300.jsonl.gz",
+ "b": "n1_results/lethal_speed/record_3012000_300.jsonl",
+ "points_a": 13497,
+ "points_b": 13497,
+ "joined": 13497,
+ "status_transitions": {
+  "no->no": 8449,
+  "unknown->unknown": 3898,
+  "win->win": 1150
+ },
+ "applies_transitions": {
+  "False->False": 1148,
+  "True->True": 12349
+ },
+ "win_a": 1150,
+ "win_b": 1150,
+ "win_lost": 0,
+ "win_move_changed": 0,
+ "win_new": 0,
+ "win_but_applies_off": 0,
+ "nodes": {
+  "a": 85528499,
+  "b": 85528499
+ },
+ "nodes_ratio": 1.0,
+ "sec": {
+  "a": 1692.8,
+  "b": 1745.4
+ },
+ "sec_ratio": 1.0311,
+ "nodes_by_status_a": {
+  "unknown": {
+   "n": 3898,
+   "nodes_a": 69588323,
+   "nodes_b": 69588323
+  },
+  "no": {
+   "n": 8449,
+   "nodes_a": 13587070,
+   "nodes_b": 13587070
+  },
+  "win": {
+   "n": 1150,
+   "nodes_a": 2353106,
+   "nodes_b": 2353106
+  }
+ },
+ "invariant_ok": true,
+ "win_lost_rows": [],
+ "win_move_changed_rows": [],
+ "win_new_rows": [],
+ "win_but_applies_off_rows": []
+}

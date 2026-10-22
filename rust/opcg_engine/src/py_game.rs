@@ -680,8 +680,9 @@ impl Game {
         let nodes = ov.get("max_nodes").and_then(Value::as_u64).unwrap_or(lethal::LETHAL_ROOT_NODES);
         let force = ov.get("force").and_then(Value::as_bool).unwrap_or(false);
         let applies = lethal::applies(&mut self.session, masters, seat);
+        let bound = lethal::bound_report(&mut self.session, masters, seat);
         if !applies && !force {
-            return to_py_json(&serde_json::json!({"applies": false, "status": "skip"}));
+            return to_py_json(&serde_json::json!({"applies": false, "status": "skip", "bound": bound}));
         }
         let state = self.session.state();
         let t0 = std::time::Instant::now();
@@ -695,7 +696,7 @@ impl Game {
             "applies": applies, "status": out.status,
             "move": out.mv.as_ref().map(crate::search::Move::to_json),
             "line_len": out.line_len, "deals": out.deals, "nodes": out.nodes,
-            "sec": t0.elapsed().as_secs_f64(),
+            "sec": t0.elapsed().as_secs_f64(), "bound": bound,
         }))
     }
 

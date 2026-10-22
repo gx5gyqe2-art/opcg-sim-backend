@@ -1,124 +1,107 @@
 {
- "job": "rs-trigger-order",
- "role": "implement",
+ "job": "lethal-speed",
+ "role": "engine",
  "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.20 (origin/claude/cpu-spec-improvements-yw91jd @ 96869e9e3; ledger 2+323); defect docs/reports/2026-10-22_enc_v15.md §4",
+ "branch": "claude/lethal-speed",
+ "base": "claude/cpu-spec-improvements-yw91jd@38191d7",
+ "spec": "docs/search_efficiency_plan.md 7.25 (coordinator branch)",
+ "report": "docs/reports/2026-10-22_lethal_speed.md",
  "inputs": {
-  "base": "origin/claude/cpu-spec-improvements-yw91jd@96869e9e3",
-  "net": "opcg_sim/data/learned/nrel_r13d.npz (both seats)"
+  "invariant_points": "n1_results/lethal_root/redo/points_3012000_300.jsonl.gz (300 games, 13,497 points, seeds 3012000-3012299, both seats r13d, 1 world x 1280 sims, budget 0, root_reply)",
+  "latency": "tests/scripts/rs_decide_latency.py --worlds 2 --lethal-proof root (20 games, seed 2999900-, taskset -c 0)"
+ },
+ "changes": {
+  "candidate_1_trigger": "attack upper bound counts only cards usable this turn (board + hand payable with active DON; hand/trash/deck widened by summon/cost-reduction/trash words) and only abilities live this turn (parsed Ability.raw_text; ON_PLAY only from hand, ON_ATTACK only on board or with rush, no opp-turn/counter/trigger/turn-start/turn-end). Bound = ready attackers + payable rush hand chars + double-attack cards. Same bound prunes own MAIN nodes in the tree.",
+  "candidate_2_deal_order": "already present (defensive deals first in make_deals); no change",
+  "candidate_3_node_cap": "curve only; not adopted (10k loses 71 of 1,175 proofs, 5k loses 160)",
+  "candidate_4_speed": "TT key: FxHasher instead of SipHash; Debug-string hashing of restrictions/replacements/battle/triggers/continuous/delayed/interaction stack replaced by derived Hash; plain cards hashed as 1 byte; variant dedupe by Value equality. Node counts bit-identical. Tried and reverted: TT on opponent nodes (-0.5% nodes, key cost larger).",
+  "instrument": "tests/scripts/lethal_speed_check.py (record / judge / compare); Game.lethal_json gains 'bound' diagnostics; prof categories lethal_*"
  },
  "outputs": {
-  "branch": "claude/rs-trigger-order",
-  "report": "docs/reports/2026-10-22_trigger_order.md",
-  "code": [
-   "rust/opcg_engine/src/journal.rs",
-   "rust/opcg_engine/src/effects/resolver.rs",
-   "rust/opcg_engine/src/effects/triggers.rs",
-   "rust/opcg_engine/src/effects/interact.rs",
-   "rust/opcg_engine/src/effects/actions/flow.rs",
-   "rust/opcg_engine/src/rules/actions.rs",
-   "rust/opcg_engine/src/rules/turn.rs",
-   "rust/opcg_engine/src/rules/battle.rs"
-  ],
-  "tests": [
-   "rust/opcg_engine/src/effects/tests_trigger_order.rs"
-  ],
-  "goldens": [
-   "tests/fixtures/rs_goldens/audit.json",
-   "tests/fixtures/rs_goldens/replay/ (17 files)"
-  ],
-  "ledger": "tests/fixtures/card_audit_ledger.json (20 IMPL_CHANGED re-reviewed ok)",
-  "docs": [
-   "docs/SPEC.md §1.5 §3.5",
-   "docs/TEST_SPEC.md (1 row)"
-  ]
+  "data": "n1_results/lethal_speed/ (record_3012000_300.jsonl.gz, judge_after*.jsonl.gz, compare_*.json, lat_*.json)"
  },
- "results": {
-  "repro_seed1680032": {
-   "before": "void (step cap)",
-   "after": "2/2 games decided",
-   "settings": "both r13d (v15), 1280 sims, budget 0, synth_roles, leaders random"
+ "metrics": {
+  "latency_per_move_sec": {
+   "off": 0.176,
+   "root_before": 0.241,
+   "root_after": 0.194,
+   "root_c1_plus_key_only": 0.202
   },
-  "rust_tests": {
-   "cargo_test": "596 passed (594 existing + 2 new)",
-   "new_tests_fail_on_old_engine": true
+  "root_cost_increase": {
+   "before": "+37%",
+   "after": "+10%",
+   "target": "<= +15%"
   },
-  "golden_audit": {
-   "total": 3387,
-   "changed": 15,
-   "by_trigger": {
-    "TRIGGER": 15
+  "root_tried_per_main": {
+   "before": 1.044,
+   "after": 0.854
+  },
+  "root_status_20games": {
+   "before": {
+    "win": 89,
+    "no": 948,
+    "unknown": 450
    },
-   "by_action": {
-    "PLAY_CARD": 15,
-    "RETURN_DON": 2,
-    "KO": 1,
-    "DISCARD": 1
-   },
-   "verdict": {
-    "correct_now": 1,
-    "equivalent_event_order_only": 14,
-    "suspicious": 0
+   "after": {
+    "win": 90,
+    "no": 706,
+    "unknown": 420
    }
   },
-  "golden_replay": {
-   "total": 200,
-   "changed": 17,
-   "random": 12,
-   "a1": 5,
-   "winner_changed": 0,
-   "verdict": {
-    "correct_now": 5,
-    "equivalent_event_order_only": 11,
-    "decision_only": 1,
-    "suspicious": 0
+  "root_judge_sec_mean": {
+   "before": 0.1089,
+   "after": 0.0497
+  },
+  "invariant_13497_points": {
+   "win_before": 1150,
+   "win_after": 1175,
+   "win_lost": 0,
+   "win_move_changed": 0,
+   "proven_points_dropped_by_trigger": 0,
+   "unknown_to_win": 25,
+   "unknown_to_no": 181,
+   "applies_true_to_false": 1431,
+   "nodes_ratio": 0.9368,
+   "invariant_ok": true
+  },
+  "record_reproduces_audit": {
+   "points": 13497,
+   "status_identical": true,
+   "nodes_identical": true
+  },
+  "cap_curve": {
+   "20000": {
+    "win": 1175,
+    "nodes_ratio": 1.0
+   },
+   "10000": {
+    "win": 1104,
+    "nodes_ratio": 0.567
+   },
+   "5000": {
+    "win": 1015,
+    "nodes_ratio": 0.321
    }
   },
-  "card_audit": {
-   "all_scan_findings": "ACTION_NOT_FIRED 7->5 (OP16-105, ST13-006 now fire 3rd play); no new findings",
-   "impl_changed_reviewed": 20
+  "us_per_node_3games": {
+   "before": 15.67,
+   "after": 8.04,
+   "nodes": 261350
   },
-  "audit_cross": {
-   "pairs": 120,
-   "games": 240,
-   "void": 0,
-   "wr": 0.4833
-  },
-  "arena_local": {
-   "pairs": 40,
-   "seed_base": 1681000,
-   "settings": "both r13d, 1280 sims, budget 0, synth_roles, leaders random",
-   "after_wheel": {
-    "void": 0,
-    "wins": 50.0,
-    "wr": 0.625,
-    "ci95": [
-     0.4997,
-     0.7503
-    ]
-   },
-   "before_wheel": {
-    "void": 0,
-    "wins": 51.0,
-    "wr": 0.6375,
-    "ci95": [
-     0.511,
-     0.764
-    ]
-   },
-   "pairs_identical_results_and_turns": 37,
-   "pairs_result_changed": 1
-  },
-  "make_test": "green: cargo test 596 passed; pytest 854 passed, 13 skipped (43 s)"
+  "gates": {
+   "cargo_test_lethal": "6 passed",
+   "make_test": "green (855 passed, 13 skipped; cargo 602 passed)",
+   "make_audit_cross_void": "0 (120 pairs)"
+  }
  },
+ "command": "python tests/scripts/lethal_speed_check.py record --games 300 --workers 3; ... judge --tag after; ... compare --a <audit points> --b judge_after.jsonl; taskset -c 0 python tests/scripts/rs_decide_latency.py --worlds 2 --lethal-proof root",
  "notes": [
-  "Root cause was worse than enc_v15 §4 assumed: the field-overflow interaction has no continuation, so the resolver holding the parent's remaining steps (OP17-092 'then you cannot play Character cards this turn') was dropped, not merely ordered later. Fixed generally: any interaction raised inside an action now defers the rest of the effect's stack (as removal replacement already did) and it resumes before queued triggers.",
-  "Ordering rule implemented: triggers raised while an effect resolves wait in pending_triggers until the outermost effect finishes (Session resolving depth, journal-outside temp like effect_actor); drain after game_resolve_ability (after event flush) and settle_pending (deferred remainder first, then queue) after dialogs and at action/battle/turn boundaries. Rule basis cited as comprehensive rules 8-6-1 (auto effects triggered during an effect's processing activate after it); the repo has no rules text, so the article number/wording is from memory — please verify against the official CR.",
-  "Life [Trigger] stays immediate even during effect damage (part of damage processing, not an auto effect); only life-trigger items are processed while holding.",
-  "Effect PLAY_CARD of a character now honours CANNOT_PLAY_CHARACTER (with min_cost on master cost), same rule as hand play.",
-  "Out of scope, left as-is: own [On K.O.] (triggers::fire_on_ko) and [On Rest] resolve inline instead of via the queue; by the same rule they should wait for the current effect. Proposal: separate WP if wanted (would move goldens further).",
-  "Event log order changed: a child's EFFECT events are now emitted after the parent's (old engine logged the inline child first). 14/15 audit-golden and 11/17 replay-golden changes are this alone (states identical).",
-  "Arena 'after vs before wheel' cannot be played inside one game (one rules engine per game; two builds of the same extension cannot load in one process). Measured instead as the same 40 pairs played once per wheel and compared pair by pair: void 0 both, 37/40 identical results and turns, 1 game flipped. The wr ~0.63 is same-net seat/seed-set noise in both runs, not strength.",
-  "make card-audit default scope is now back to 285 UNREVIEWED vanilla cards only."
+  "Trigger tightening (candidate 1) cut judged points by 18% (main 104% -> 85%) but barely reduced aborts: 80% of aborted points reach life+1 with ready attackers alone; most of the cost reduction came from candidate 4 (TT key hashing was 53% of per-node time).",
+  "unknown -> win at 25 of 13,497 points (and 1 of 20 latency games): smaller trees finish within 20,000 nodes; this changes the played move at those points in the direction of more proofs. Treated as allowed (spec forbids only win decreasing).",
+  "The baseline wheel replay reproduces the audit's 13,497 points bit-for-bit (status and nodes), so the audit's rs field is the 'before'.",
+  "Deck danger cards are still gated only by summon words (search text is not considered), same as before; trash is now gated by 'トラッシュ' text in usable cards' live abilities (before: trash always counted).",
+  "The invariant set contains 1 void game (seed 3012272, DON_BOX apply error at step 156, pre-existing in the audit redo); judge stops that game at the failing move.",
+  "Symmetric-card folding (identical copies in hand/field as one move) was analysed but not implemented; estimated further node reduction in aborted points, result-preserving. Left as next step.",
+  "Session container restarted once mid-run; the judge chain was relaunched from the saved record (results unaffected: judging is deterministic)."
  ]
 }

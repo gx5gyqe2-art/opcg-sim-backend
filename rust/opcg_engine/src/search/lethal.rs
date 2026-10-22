@@ -20,6 +20,7 @@
 //! ときだけ「証明」とする（根では同じ最初の 1 手から）。打ち切りは**節点数**（時間ではない＝決定的）。
 
 use crate::journal::{CardZone, Session};
+use crate::effects::ast::TriggerType;
 use crate::model::{CardIdx, CardType, GameState, MasterIdx, MasterTable, Seat};
 use crate::rules::moves::Payload;
 use crate::state::EngineError;
@@ -187,21 +188,50 @@ pub fn applies(s: &mut Session, masters: &MasterTable, me: Seat) -> bool {
         return !solver.bound_fails(s.state(), &legal);
     }
     let st = s.state();
-    if solver.has_danger(st) {
-        return true;
-    }
+    let ready = ready_units(st, me) + st.active_battle.as_ref().is_some_and(|b| b.attacker_owner == me) as usize;
+    solver.attack_bound(st, ready).is_none_or(|b| b > st.player(me.other()).life.len())
+}
+
+/// アクティブで攻撃できるユニット（レストでない・登場したターンなら速攻持ち）の数（効果対話の中で合法手に
+/// 攻撃が出ないときの「今アタックできるユニット」）。
+fn ready_units(st: &GameState, me: Seat) -> usize {
     let p = st.player(me);
-    let ready = p
-        .leader
+    p.leader
         .iter()
         .chain(&p.field)
         .filter(|c| {
             let card = st.card(**c);
-            !card.is_rest && (!card.is_newly_played || card.current_keywords.iter().any(|k| k == "速攻"))
+            !card.is_rest && (!card.is_newly_played || card.current_keywords.iter().any(|k| k.starts_with("速攻")))
         })
-        .count();
-    let attacking = st.active_battle.as_ref().is_some_and(|b| b.attacker_owner == me) as usize;
-    ready + attacking > st.player(me.other()).life.len()
+        .count()
+}
+
+/// 発動条件の内訳（計測用・`Game.lethal_json` の `bound`）: 必要な攻撃の数（相手のライフ＋1）・今アタックできる
+/// ユニットの数・上界（`null`＝上界なし）。
+pub fn bound_report(s: &mut Session, masters: &MasterTable, me: Seat) -> Value {
+    let mut solver = Solver::new(masters, s.state(), me, 0);
+    let action = crate::rules::pending::pending_actor_action(s).map(|(_, a)| a).unwrap_or("");
+    let ready = if action == MAIN {
+        let legal = crate::rules::legal::get_legal_moves(s, masters, me).unwrap_or_default();
+        distinct_attackers(&legal)
+    } else {
+        let st = s.state();
+        ready_units(st, me) + st.active_battle.as_ref().is_some_and(|b| b.attacker_owner == me) as usize
+    };
+    let st = s.state();
+    let bound = solver.attack_bound(st, ready);
+    serde_json::json!({
+        "need": st.player(me.other()).life.len() + 1, "ready": ready, "bound": bound,
+        "unbounded_by": solver.unbounded_by,
+    })
+}
+
+/// 合法手の攻撃者（重複を潰した数）。
+fn distinct_attackers(moves: &[Move]) -> usize {
+    let mut att: Vec<&str> = moves.iter().filter(|m| act_of(m) == "ATTACK").filter_map(mv_uuid).collect();
+    att.sort_unstable();
+    att.dedup();
+    att.len()
 }
 
 // --- 守りの強さ（守りの強い配り方を作るためだけ）---------------------------------------------
@@ -343,12 +373,91 @@ struct Solver<'a> {
     opp_leader: String,
     max_nodes: u64,
     nodes: u64,
-    /// 置換表（自分の判断点だけ・書くのは確定値だけ）
+    /// 置換表（自分の判断点だけ・書くのは確定値だけ。相手の判断点にも引く案は節点 −0.5% で鍵の費用の方が大きかった＝§7.25 の報告）
     tt: HashMap<u64, bool>,
     /// 勝てた自分の判断点で選んだ手（勝ち筋の長さを数える）
     best: HashMap<u64, Move>,
-    /// (打点を増やしうる, 登場させうる)
-    danger: HashMap<MasterIdx, (bool, bool)>,
+    /// 札ごとの能力の読み（[`MasterInfo`]・上界のため）
+    info: HashMap<MasterIdx, MasterInfo>,
+    /// 直前の上界が「上界なし」になった札（計測用・`bound_report`）
+    unbounded_by: Vec<String>,
+}
+
+/// 上界のための札の読み（本文の文言は**解釈された能力の本文**（`Ability::raw_text`）だけを見る＝キーワードの
+/// 説明文「(このカードは登場したターンにアタックできる)」等は能力ではないので数えない。エンジンが実行するのは
+/// 解釈された能力だけ）。
+#[derive(Debug, Clone, Default)]
+struct MasterInfo {
+    /// 能力ごとの (いつ働くか, 文言の旗)
+    abilities: Vec<(TriggerType, u8)>,
+    /// 【速攻】（「速攻:キャラ」も含む・上界では区別しない）
+    rush: bool,
+    /// 【ダブルアタック】
+    double: bool,
+}
+
+const W_DANGER: u8 = 1;
+const W_SUMMON: u8 = 2;
+const W_COSTRED: u8 = 4;
+const W_TRASH: u8 = 8;
+const W_BOUNCE: u8 = 16;
+
+impl MasterInfo {
+    fn new(cm: &crate::model::CardMaster, abilities: &crate::effects::ast::AbilityTable) -> MasterInfo {
+        let abilities = cm
+            .ability_ids
+            .iter()
+            .filter_map(|id| abilities.get(*id))
+            .map(|a| {
+                let t = &a.raw_text;
+                let mut w = 0u8;
+                if DANGER_WORDS.iter().any(|x| t.contains(x)) {
+                    w |= W_DANGER;
+                }
+                if SUMMON_WORDS.iter().any(|x| t.contains(x)) {
+                    w |= W_SUMMON;
+                }
+                if t.contains("コスト-") {
+                    w |= W_COSTRED;
+                }
+                if t.contains("トラッシュ") {
+                    w |= W_TRASH;
+                }
+                if t.contains("手札に戻") {
+                    w |= W_BOUNCE;
+                }
+                (a.trigger, w)
+            })
+            .collect();
+        MasterInfo {
+            abilities,
+            rush: cm.keywords.iter().any(|k| k.starts_with("速攻")),
+            double: cm.keywords.iter().any(|k| k == "ダブルアタック"),
+        }
+    }
+}
+
+/// 札の置き場（上界で「このターンに働きうる能力」を選ぶため）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Where {
+    /// 場（リーダー・キャラ・ステージ）
+    Board,
+    /// 手札（と、手札に戻りうるトラッシュ・登場させうる山札）
+    Hand,
+}
+
+/// この置き場の札の能力が、自分のこのターンの残りで働きうるか（自分の手番の MAIN 以降）。
+/// 【登場時】は場の札ではもう働かない（手札に戻す文言が在れば働きうる）・【アタック時】は手札の札では
+/// 速攻が無ければ働かない・相手のターン／ブロック時／カウンター／トリガー／ターン開始時／ターン終了時は働かない。
+fn ability_live(t: TriggerType, at: Where, rush: bool, bounce: bool) -> bool {
+    use TriggerType::*;
+    match t {
+        Trigger | Counter | OnBlock | OnOppAttack | OpponentTurn | OpponentAttack | OppTurnEnd | TurnStart | GameStart
+        | OnOppPlay | TurnEnd => false,
+        OnPlay => at == Where::Hand || bounce,
+        OnAttack => at == Where::Board || rush,
+        _ => true,
+    }
 }
 
 fn act_of(mv: &Move) -> &str {
@@ -396,27 +505,40 @@ impl<'a> Solver<'a> {
             nodes: 0,
             tt: HashMap::new(),
             best: HashMap::new(),
-            danger: HashMap::new(),
+            info: HashMap::new(),
+            unbounded_by: Vec::new(),
         }
     }
 
-    fn danger_of(&mut self, m: MasterIdx) -> (bool, bool) {
+    fn info_of(&mut self, m: MasterIdx) -> &MasterInfo {
         let masters = self.masters;
-        *self.danger.entry(m).or_insert_with(|| {
-            let t = &masters.get(m).effect_text;
-            (DANGER_WORDS.iter().any(|w| t.contains(w)), SUMMON_WORDS.iter().any(|w| t.contains(w)))
-        })
+        self.info.entry(m).or_insert_with(|| MasterInfo::new(masters.get(m), &masters.abilities))
+    }
+
+    /// 札の能力の文言の旗（置き場で働きうる能力だけ・無効化された札は 0）。
+    fn words(&mut self, st: &GameState, c: CardIdx, at: Where, bounce: bool) -> u8 {
+        let card = st.card(c);
+        if card.negated || card.ability_disabled {
+            return 0;
+        }
+        let rush = card.current_keywords.iter().any(|k| k.starts_with("速攻"));
+        let info = self.info_of(card.master);
+        let rush = rush || info.rush;
+        info.abilities.iter().filter(|(t, _)| ability_live(*t, at, rush, bounce)).fold(0u8, |w, (_, x)| w | x)
     }
 
     /// 置換表の鍵（盤面＋要求＋付与の続き）。監査は hidden の文字列（ドン!!の uuid を捨てる）を鍵にしたが、
     /// それは 1 回 0.4 ms かかる＝ここでは同じ中身を直接混ぜる（[`state_hash`]）。
     fn key(&self, s: &mut Session, action: &str, commit: Option<&str>) -> u64 {
-        let mut hs = std::collections::hash_map::DefaultHasher::new();
+        let _prof = crate::prof::enter(if action == MAIN { crate::prof::Cat::LethalKey } else { crate::prof::Cat::LethalKeyDialog });
+        // 速いハッシュ（`fxhash`）＝鍵の中身は同じ・衝突の確率も同程度（§7.25 の 4・旧 `DefaultHasher` は 1 節点 12 µs で
+        // 判定の時間の半分を占めていた）
+        let mut hs = crate::fxhash::FxHasher::default();
         state_hash(s.state(), &mut hs);
         action.hash(&mut hs);
         if action != MAIN {
             // 中断の中身（どの効果のどの段か・候補）も混ぜる＝取り違えより取りこぼしの側に倒す
-            format!("{:?}", s.state().interaction_stack).hash(&mut hs);
+            interaction_hash(s.state(), &mut hs);
         }
         commit.hash(&mut hs);
         hs.finish()
@@ -425,10 +547,14 @@ impl<'a> Solver<'a> {
     /// 要求の手（合法手＋効果対話の分岐）。自分の対話は監査の `expand` と同じに絞る。相手の対話は
     /// 絞らない（[`Solver::opp_variants`]）＝数え切れなければ `Abort`（証明しない）。
     fn expand(&self, s: &mut Session, actor: Seat, action: &str) -> Result<Vec<Move>, Abort> {
-        let legal = crate::rules::legal::get_legal_moves(s, self.masters, actor).map_err(|_| Abort)?;
+        let legal = {
+            let _prof = crate::prof::enter(crate::prof::Cat::Legal);
+            crate::rules::legal::get_legal_moves(s, self.masters, actor).map_err(|_| Abort)?
+        };
         if matches!(action, MAIN | "SELECT_COUNTER" | "SELECT_BLOCKER" | "MULLIGAN") || legal.is_empty() {
             return Ok(legal);
         }
+        let _prof = crate::prof::enter(crate::prof::Cat::LethalExpand);
         let base = legal[0].clone();
         let Move::Game { at, payload } = &base else {
             return Ok(legal);
@@ -466,12 +592,11 @@ impl<'a> Solver<'a> {
                 variants.push(with("selected_uuids", Value::Array(Vec::new())));
             }
         }
+        // 同じ答えは 1 つに（JSON の文字列ではなく値で比べる＝同じ同値関係・文字列化の分だけ速い）
         let mut out: Vec<Move> = Vec::new();
-        let mut seen: Vec<String> = Vec::new();
         for v in variants {
-            let k = v.to_string();
-            if !seen.contains(&k) {
-                seen.push(k);
+            let dup = out.iter().any(|m| matches!(m, Move::Game { payload: Payload::Json(x), .. } if *x == v));
+            if !dup {
                 out.push(Move::Game { at, payload: Payload::Json(v) });
             }
         }
@@ -509,38 +634,98 @@ impl<'a> Solver<'a> {
         Some(moves)
     }
 
-    /// 自分の札（手札・場・トラッシュ・リーダー・ステージ、登場させうる札が在れば山札も）に打点の回数を増やしうる
-    /// 文言が在るか。
-    fn has_danger(&mut self, st: &GameState) -> bool {
+    /// このターンに自分が出せる攻撃（相手のライフを減らしうる機会）の数の上界（§7.25 の 1）。`None`＝上界なし。
+    ///
+    /// 数えるのは**今この手番で使える札**だけ: 場の札（リーダー・キャラ・ステージ）と、今のアクティブのドン!!で
+    /// 払える手札。使える札の働きうる能力（[`ability_live`]）の本文に「登場させる」「コスト-」が在れば手札は
+    /// 全部使えるとみなし、「トラッシュ」が在ればトラッシュの札も、「登場させる」が在れば山札の札も加える
+    /// （旗が増えなくなるまで繰り返す）。使える札の働きうる能力の本文に打点の回数を増やしうる文言
+    /// （[`DANGER_WORDS`]）が 1 つでも在れば上界なし。無ければ `ready`（今アタックできるユニット）＋手札から
+    /// 登場させて速攻で殴れる札の数（払えるぶんだけ・手札が全部使えるなら全部）＋【ダブルアタック】の札の数。
+    ///
+    /// 旧い上界（WP `rs-lethal-root`）は「手札・場・トラッシュの札の本文のどこかに文言が在れば上界なし」で、
+    /// 速攻の説明文「(…アタックできる)」や【トリガー】・【カウンター】の本文まで数えていたため、メインの 87% で
+    /// 判定に入っていた（`docs/reports/2026-10-22_lethal_speed.md`）。
+    fn attack_bound(&mut self, st: &GameState, ready: usize) -> Option<usize> {
+        let _prof = crate::prof::enter(crate::prof::Cat::LethalBound);
+        self.unbounded_by.clear();
         let p = st.player(self.me);
-        let mut cards: Vec<CardIdx> = p.hand.iter().chain(&p.field).chain(&p.trash).copied().collect();
-        cards.extend(p.leader);
-        cards.extend(p.stage);
-        let mut summon = false;
-        for c in cards {
-            let (d, sm) = self.danger_of(st.card(c).master);
-            if d {
-                return true;
+        let don = p.don_active.len() as i32;
+        let board: Vec<CardIdx> = p.leader.iter().chain(&p.field).chain(p.stage.iter()).copied().collect();
+        let payable = |st: &GameState, masters: &MasterTable, c: CardIdx| {
+            let card = st.card(c);
+            card.current_cost(masters.get(card.master)) <= don
+        };
+        let masters = self.masters;
+        // 使える札の旗を、増えなくなるまで集める
+        let mut flags = 0u8;
+        loop {
+            let free = flags & (W_SUMMON | W_COSTRED) != 0;
+            let mut usable: Vec<(CardIdx, Where)> = board.iter().map(|c| (*c, Where::Board)).collect();
+            usable.extend(p.hand.iter().filter(|c| free || payable(st, masters, **c)).map(|c| (*c, Where::Hand)));
+            if flags & W_TRASH != 0 {
+                usable.extend(p.trash.iter().filter(|c| free || payable(st, masters, **c)).map(|c| (*c, Where::Hand)));
             }
-            summon |= sm;
+            if flags & W_SUMMON != 0 {
+                usable.extend(p.deck.iter().map(|c| (*c, Where::Hand)));
+            }
+            let bounce = flags & W_BOUNCE != 0;
+            let mut next = flags;
+            for (c, at) in &usable {
+                let w = self.words(st, *c, *at, bounce);
+                next |= w;
+                if w & W_DANGER != 0 && self.unbounded_by.len() < 8 {
+                    let id = masters.get(st.card(*c).master).card_id.clone();
+                    if !self.unbounded_by.contains(&id) {
+                        self.unbounded_by.push(id);
+                    }
+                }
+            }
+            if next == flags {
+                // 旗が増えない＝使える札の集合が確定
+                if flags & W_DANGER != 0 {
+                    return None;
+                }
+                // 速攻で殴れる手札（払えるぶんだけ）とダブルアタック
+                let mut rush_costs: Vec<i32> = Vec::new();
+                let mut double = 0usize;
+                for (c, at) in &usable {
+                    let card = st.card(*c);
+                    let info = self.info_of(card.master).clone();
+                    let kw = |k: &str| card.current_keywords.iter().any(|x| x == k);
+                    if info.double || kw("ダブルアタック") {
+                        double += 1;
+                    }
+                    if *at == Where::Hand
+                        && masters.get(card.master).ty == CardType::Character
+                        && (info.rush || card.current_keywords.iter().any(|k| k.starts_with("速攻")))
+                    {
+                        rush_costs.push(card.current_cost(masters.get(card.master)));
+                    }
+                }
+                let rush = if free {
+                    rush_costs.len()
+                } else {
+                    rush_costs.sort_unstable();
+                    let mut left = don;
+                    rush_costs
+                        .iter()
+                        .take_while(|c| {
+                            left -= **c;
+                            left >= 0
+                        })
+                        .count()
+                };
+                return Some(ready + rush + double);
+            }
+            flags = next;
         }
-        summon && p.deck.iter().any(|&c| self.danger_of(st.card(c).master).0)
     }
 
-    /// 攻撃の回数の上界で詰みが無いと言えるか（自分の札に回数を増やしうる文言が 1 枚も無いときだけ）。
+    /// 攻撃の回数の上界で詰みが無いと言えるか（上界が相手のライフ＋1 に届かない）。
     fn bound_fails(&mut self, st: &GameState, moves: &[Move]) -> bool {
-        if self.has_danger(st) {
-            return false;
-        }
         let need = st.player(self.me.other()).life.len() + 1;
-        let mut att: Vec<&str> = moves
-            .iter()
-            .filter(|m| act_of(m) == "ATTACK")
-            .filter_map(mv_uuid)
-            .collect();
-        att.sort_unstable();
-        att.dedup();
-        att.len() < need
+        self.attack_bound(st, distinct_attackers(moves)).is_some_and(|b| b < need)
     }
 
     fn solve(&mut self, s: &mut Session, commit: Option<&str>, depth: usize) -> Result<bool, Abort> {
@@ -585,13 +770,17 @@ impl<'a> Solver<'a> {
             // 子は盤面を複製せず、記録つきで適用して読み終えたら巻き戻す（`Session::isolated` と同じ見え方）
             s.begin();
             if apply(s, self.masters, actor, &mv).is_err() {
+                let _prof = crate::prof::enter(crate::prof::Cat::LethalRollback);
                 s.rollback();
                 continue; // 分岐した対話の不正な選択などは手として数えない
             }
             tried += 1;
             let nxt = if mine && act_of(&mv) == "ATTACH_DON" { mv_uuid(&mv).map(str::to_owned) } else { None };
             let r = self.solve(s, nxt.as_deref(), depth + 1);
-            s.rollback();
+            {
+                let _prof = crate::prof::enter(crate::prof::Cat::LethalRollback);
+                s.rollback();
+            }
             let r = r?;
             if mine && r {
                 res = true;
@@ -705,7 +894,7 @@ fn in_play(st: &GameState) -> Vec<String> {
 }
 
 /// 盤面の鍵（監査の「hidden からドン!!の uuid を捨てたもの」と同じ中身）: 各ゾーンの並び・カードの可変の欄・
-/// ドン!!は「どこに何枚」（どのドン!!かは区別しない）・ターンの欄・戦闘と誘発と継続効果（`Debug` で混ぜる・
+/// ドン!!は「どこに何枚」（どのドン!!かは区別しない）・ターンの欄・戦闘と誘発と継続効果（欄を直接混ぜる・
 /// ふつうは空か小さい）。カードの番号（`CardIdx`）は複製で変わらない＝並びは番号で混ぜてよい。
 fn state_hash(st: &GameState, h: &mut impl Hasher) {
     st.turn_count.hash(h);
@@ -721,9 +910,37 @@ fn state_hash(st: &GameState, h: &mut impl Hasher) {
         }
         (p.don_deck.len(), p.don_active.len(), p.don_rested.len(), p.don_attached.len()).hash(h);
         p.negate_onplay_until.hash(h);
-        format!("{:?}{:?}", p.restrictions, p.granted_replacements).hash(h);
+        p.restrictions.hash(h);
+        p.granted_replacements.hash(h);
     }
     for c in &st.cards {
+        // 可変の欄が全部既定（山札・トラッシュ・ライフの札のふつうの姿）なら 1 バイトで済ませる＝鍵の中身は同じ
+        // （既定でない札だけ欄を全部混ぜる・印で区別する）。1 節点の鍵の時間の半分がこの輪だった（§7.25 の 4）。
+        let plain = !c.is_rest
+            && !c.is_newly_played
+            && c.attached_don == 0
+            && !c.is_face_up
+            && !c.negated
+            && !c.ability_disabled
+            && c.power_buff == 0
+            && c.cost_buff == 0
+            && c.passive_power == 0
+            && c.passive_power_override.is_none()
+            && c.passive_counter == 0
+            && c.base_power_override.is_none()
+            && c.base_cost_override.is_none()
+            && c.timed_power == 0
+            && c.timed_cost == 0
+            && c.current_keywords.is_empty()
+            && c.flags.is_empty()
+            && c.timed_flags.is_empty()
+            && c.timed_keywords.is_empty()
+            && c.ability_used_this_turn.is_empty();
+        if plain {
+            h.write_u8(0);
+            continue;
+        }
+        h.write_u8(1);
         (c.is_rest, c.is_newly_played, c.attached_don, c.is_face_up, c.negated, c.ability_disabled).hash(h);
         (c.power_buff, c.cost_buff, c.passive_power, c.passive_power_override, c.passive_counter).hash(h);
         (c.base_power_override, c.base_cost_override, c.timed_power, c.timed_cost).hash(h);
@@ -736,15 +953,56 @@ fn state_hash(st: &GameState, h: &mut impl Hasher) {
     }
     don_kinds.hash(h);
     st.turn_events.hash(h);
-    format!(
-        "{:?}{:?}{:?}{:?}{:?}{:?}",
-        st.active_battle, st.battle_triggers, st.pending_triggers, st.continuous, st.pending_end_of_turn, st.pending_extra_turn
-    )
-    .hash(h);
+    st.active_battle.hash(h);
+    st.battle_triggers.hash(h);
+    st.pending_triggers.hash(h);
+    st.continuous.hash(h);
+    st.pending_end_of_turn.hash(h);
+    st.pending_extra_turn.hash(h);
+}
+
+/// 中断（対話）のスタックの鍵（旧 `format!("{:?}", interaction_stack)` と同じ中身を欄ごとに混ぜる・1 節点 14 µs → 1 µs 台）。
+/// `Hash` を持たない欄（効果除去の置換の continuation）だけ `Debug` で混ぜる（在るときだけ・まれ）。
+fn interaction_hash(st: &GameState, h: &mut impl Hasher) {
+    st.interaction_stack.len().hash(h);
+    for it in &st.interaction_stack {
+        it.kind.hash(h);
+        it.player.hash(h);
+        it.message.hash(h);
+        it.candidates.hash(h);
+        it.selectable.hash(h);
+        it.constraints.hash(h);
+        it.can_skip.hash(h);
+        it.source_card.hash(h);
+        it.owner.hash(h);
+        it.options.hash(h);
+        (it.allow_position, it.allow_reorder).hash(h);
+        it.intent.hash(h);
+        match &it.continuation {
+            None => h.write_u8(0),
+            Some(c) => {
+                h.write_u8(1);
+                c.execution_stack.hash(h);
+                c.context.hash(h);
+                c.source_card.hash(h);
+                c.node.hash(h);
+                c.confirm_ability.hash(h);
+                c.trigger_item.hash(h);
+                c.arrange.hash(h);
+                c.battle_ko.hash(h);
+                c.rest_replace.hash(h);
+                c.query.hash(h);
+                if let Some(r) = &c.removal_replace {
+                    format!("{r:?}").hash(h);
+                }
+            }
+        }
+    }
 }
 
 /// 実対局と同じ適用（`Game.apply_game_action`／`apply_battle_action`・対話はドレインしない）。
 fn apply(s: &mut Session, masters: &MasterTable, actor: Seat, mv: &Move) -> Result<(), EngineError> {
+    let _prof = crate::prof::enter(crate::prof::Cat::LethalApply);
     let at = mv.action_type().ok_or_else(|| EngineError::BadPayload("lethal: action_type が無い".into()))?;
     if mv.kind() == Some("battle") {
         crate::rules::actions::apply_battle_action(s, masters, actor, at, mv.card_uuid())
@@ -788,6 +1046,7 @@ fn solve_in(
 /// 根の判定（§7.21 の 3）: 本当の盤面から自分の手の候補を作り、各候補について**全部の配り方**で
 /// 勝てるかを読む（守りの強い配り方から）。最初に全部で勝てた手を返す。`max_nodes` は全部の合計。
 pub fn solve_root(masters: &MasterTable, state: &GameState, me: Seat, deals: &[GameState], max_nodes: u64) -> LethalOut {
+    let _prof = crate::prof::enter_top(crate::prof::Cat::Search);
     let mut solvers: Vec<Solver> = deals.iter().map(|d| Solver::new(masters, d, me, max_nodes)).collect();
     let done = |status: &'static str, mv: Option<Move>, line_len: usize, solvers: &[Solver]| LethalOut {
         status,
