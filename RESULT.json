@@ -18,5 +18,5 @@
   "arena_lethal/off_w06.jsonl": 150,
   "arena_lethal/root_w06.jsonl": 150
  },
- "notes": ""
+ "notes": "Done. root: 149 pairs played (+1 void), wr 0.5067, CI95 [0.4936,0.5199], Elo +4.7. off (control, off vs off): 149 pairs (+1 void), wr 0.5000, CI [0.5,0.5], Elo 0.0 -> with the same deals, off vs off produced identical games (no change). Ledger rows = 150 per arm (void row included). best_opts in the summary shows only {worlds:2}: _best_kw records only the extra settings; baseline sims 1280 / budget 0 come from the regular --sims/--budget arguments. Built from cad5869c7, no code changes."
 }
