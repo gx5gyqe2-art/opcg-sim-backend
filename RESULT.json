@@ -1,7 +1,7 @@
 {
  "job": "n47-w08",
  "role": "gen",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r13d.npz",
   "seed_base": 2504500,
@@ -15,15 +15,16 @@
   "dirs": [
    "n_records/n47_w08_p0",
    "n_records/n47_w08_p1",
-   "n_records/n47_w08_p2"
+   "n_records/n47_w08_p2",
+   "n_records/n47_w08_p3"
   ]
  },
  "metrics": {
-  "parts_done": 3,
-  "games": 360,
-  "rows": 53494,
-  "dropped": 1,
-  "sec_play_mean": 11.34
+  "parts_done": 4,
+  "games": 480,
+  "rows": 70966,
+  "dropped": 2,
+  "sec_play_mean": 11.41
  },
  "notes": ""
 }
