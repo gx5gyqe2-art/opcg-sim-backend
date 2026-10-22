@@ -240,6 +240,75 @@
    "max": 168.031
   }
  },
+ "verify": {
+  "resp": {
+   "verified": 40,
+   "errors": 0,
+   "miss_ko_raw": 40,
+   "miss_ko_full": 33,
+   "miss_ko_full_unknown": 7,
+   "miss_otsu_raw": 32,
+   "miss_otsu_full": 28,
+   "miss_otsu_full_unknown": 1,
+   "turns_miss_otsu_full": 26,
+   "turns_miss_ko_full": 31,
+   "games_miss_otsu_full": 24,
+   "otsu_full_then_lost": 23,
+   "otsu_full_lost_this_turn": 22,
+   "miss_given_threat_full": {
+    "ko": {
+     "k": 33,
+     "n": 477,
+     "rate": 0.0692
+    },
+    "otsu": {
+     "k": 28,
+     "n": 395,
+     "rate": 0.0709
+    }
+   },
+   "live_kind_among_miss_ko_full": {
+    "commit": 24,
+    "window": 9
+   },
+   "live_kind_among_miss_otsu_full": {
+    "commit": 21,
+    "window": 7
+   },
+   "fresh_safe_among_miss_ko_full": {
+    "True": 24,
+    "False": 9
+   },
+   "fresh_safe_among_miss_otsu_full": {
+    "True": 21,
+    "False": 7
+   },
+   "fresh_safe_by_live_kind_otsu_full": {
+    "commit:True": 21,
+    "window:False": 7
+   },
+   "miss_otsu_full_type": {
+    "SELECT_COUNTER:no_counter->counter": 23,
+    "CONFIRM_TRIGGER:confirm_yes->confirm_no": 2,
+    "SEARCH_AND_SELECT:target->target": 1,
+    "SELECT_BLOCKER:no_block->block": 1,
+    "SELECT_COUNTER:counter->counter": 1
+   },
+   "miss_otsu_full_my_life": {
+    "0": 22,
+    "1": 6
+   }
+  },
+  "end": {
+   "verified": 3,
+   "errors": 0,
+   "miss_raw": 3,
+   "miss_full": 1,
+   "miss_strict_full": 0,
+   "miss_full_unknown": 2,
+   "miss_full_then_lost": 0
+  }
+ },
  "examples": [
   {
    "kind": "resp_otsu",
@@ -289,7 +358,11 @@
     }
    },
    "game_winner": "p1",
-   "game_turns": 11
+   "game_turns": 11,
+   "verify": {
+    "miss_ko_full": true,
+    "miss_otsu_full": true
+   }
   },
   {
    "kind": "resp_otsu",
@@ -345,7 +418,11 @@
     }
    },
    "game_winner": "p2",
-   "game_turns": 12
+   "game_turns": 12,
+   "verify": {
+    "miss_ko_full": true,
+    "miss_otsu_full": true
+   }
   },
   {
    "kind": "resp_otsu",
@@ -405,7 +482,11 @@
     }
    },
    "game_winner": "p1",
-   "game_turns": 15
+   "game_turns": 15,
+   "verify": {
+    "miss_ko_full": true,
+    "miss_otsu_full": true
+   }
   },
   {
    "kind": "resp_otsu",
@@ -462,7 +543,11 @@
     }
    },
    "game_winner": "p2",
-   "game_turns": 10
+   "game_turns": 10,
+   "verify": {
+    "miss_ko_full": true,
+    "miss_otsu_full": true
+   }
   },
   {
    "kind": "resp_otsu",
@@ -535,7 +620,11 @@
     }
    },
    "game_winner": "p1",
-   "game_turns": 11
+   "game_turns": 11,
+   "verify": {
+    "miss_ko_full": true,
+    "miss_otsu_full": true
+   }
   },
   {
    "kind": "resp_otsu",
@@ -589,7 +678,11 @@
     }
    },
    "game_winner": "p1",
-   "game_turns": 11
+   "game_turns": 11,
+   "verify": {
+    "miss_ko_full": true,
+    "miss_otsu_full": true
+   }
   },
   {
    "kind": "resp_otsu",
@@ -652,7 +745,11 @@
     }
    },
    "game_winner": "p1",
-   "game_turns": 11
+   "game_turns": 11,
+   "verify": {
+    "miss_ko_full": true,
+    "miss_otsu_full": true
+   }
   },
   {
    "kind": "resp_ko_only",
@@ -717,7 +814,11 @@
     }
    },
    "game_winner": "p1",
-   "game_turns": 11
+   "game_turns": 11,
+   "verify": {
+    "miss_ko_full": false,
+    "miss_otsu_full": false
+   }
   },
   {
    "kind": "resp_ko_only",
@@ -786,7 +887,11 @@
     }
    },
    "game_winner": "p1",
-   "game_turns": 11
+   "game_turns": 11,
+   "verify": {
+    "miss_ko_full": false,
+    "miss_otsu_full": false
+   }
   },
   {
    "kind": "resp_ko_only",
@@ -856,7 +961,11 @@
     }
    },
    "game_winner": "p2",
-   "game_turns": 12
+   "game_turns": 12,
+   "verify": {
+    "miss_ko_full": true,
+    "miss_otsu_full": false
+   }
   },
   {
    "kind": "end_strict",

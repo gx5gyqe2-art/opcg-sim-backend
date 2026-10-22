@@ -883,7 +883,7 @@ def cmd_summarize(a):
                     "miss_full_then_lost": lost({(v["seed"], v["seat"]) for v in ve if v.get("miss_full")})},
         }
         for ex in examples:
-            v = vmap.get((ex["seed"], ex["seat"], ex["step"]))
+            v = vmap.get((ex["seed"], ex["seat"], ex.get("step")))
             if v:
                 ex["verify"] = {k: v[k] for k in v if k.endswith("_full") or k == "error"}
     summ["examples"] = examples
