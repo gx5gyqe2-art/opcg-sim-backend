@@ -14,15 +14,16 @@
  "outputs": {
   "dirs": [
    "n_records/n49_w11_p0",
-   "n_records/n49_w11_p1"
+   "n_records/n49_w11_p1",
+   "n_records/n49_w11_p2"
   ]
  },
  "metrics": {
-  "parts_done": 2,
-  "games": 240,
-  "rows": 35930,
+  "parts_done": 3,
+  "games": 360,
+  "rows": 54074,
   "dropped": 0,
-  "sec_play_mean": 13.82
+  "sec_play_mean": 13.61
  },
  "notes": "repo checkout at /home/user/opcg-sim-backend symlinked to ~/opcg-sim-backend"
 }
