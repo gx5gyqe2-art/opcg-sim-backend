@@ -139,7 +139,8 @@ def build_pair(db, la: Optional[str], lb: Optional[str], seed: int, decks: str =
     if decks in ("official", "real"):
         # 実デッキ帯の拡張（2026-10-22）: official＝公式サイトの構築例 111 本（`official_decks_20261022.json`）、
         # real＝ユーザの 4 本＋構築例 111 本。リーダーはデッキ側が決める（`la`／`lb` は無視）。
-        # **訓練の教材にはしない**（ホールドアウト＝`user` と同じ扱い・record_gen の選択肢には入れない）。
+        # **2026-10-22 ユーザ決定「b でお願いします」で訓練の教材にも使う**（実デッキでリーダーをほぼ網羅できたため・
+        # 波 49 から）。判定の主条件もこの帯（`real`）。
         pair = real_deck_pair(seed, decks)
         return (pair + (kinds,)) if with_kinds else pair
     if decks == "synth_roles2":

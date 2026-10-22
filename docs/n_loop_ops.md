@@ -181,6 +181,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **世界 4 本 × 1,280 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・16 シャード × 88 ペア・§7.18） | 1511000〜1526000 | 使用済み（2026-10-21・1,336 ペア 0.5434 [0.5227, 0.5642]・+30.2・`2026-10-21_r16_teacher_strength.md`） |
 | 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 使用済み（2026-10-21・r16 主 −5.3／副 +4.7・r16c 主 −7.7／副 +0.4・どちらも非昇格） |
 | 検証 **WP `rs-lethal-root`**（手元 40 ペア × 2 本 root／root_reply vs off・出荷の設定）／監査のやり直し 300 局／本番アリーナ（root・root_reply 各 12 シャード × 120 ペア・合流後） | 1682000〜1682039／1683000〜1683039／3012000〜3012299／2031000〜2042000／2051000〜2062000 | 指示済み（2026-10-22・claude/rs-lethal-root） |
+| 生成 **波 49**（実デッキ 115 本・`--decks real`・生成役 r13d・v15・§7.32） | 2521000〜2528500（シャード k の base は 2520000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 指示済み（2026-10-22・claude/n49-w01〜w16） |
 | 検証 **r18 vs r13d・実デッキ帯 115 本**（ユーザの 4 本＋公式の構築例 111 本・`--decks real`・公平同士・両席 160 回・16 シャード × 175 ペア・§7.29） | 2061000〜2076000 | 使用済み（2026-10-22・2,800 ペア 0.5007・**+0.5**＝4 本での +11.2 は消えた・`2026-10-22_r18_realdeck115.md`） |
 | 検証 **r18 vs r13d（公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.29）** | 主 synth_roles2 1951000〜1966000／副 ミラー 1971000〜1986000／実デッキ 1991000〜2006000／旧主 synth_roles 2011000〜2026000 | 使用済み（2026-10-22・主 synth_roles2 −1.5／副 +19.9／**実デッキ +11.2**／旧主 −13.7・規約では非昇格・採用はユーザ判断・`2026-10-22_r18_judgment.md`） |
 | 検証 **r13o／r13m／r17m vs r13d（公平同士・両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.30）** | r13o 主 1831000〜1846000／副 1851000〜1866000・r13m 主 1871000〜1886000／副 1891000〜1906000・r17m 主 1911000〜1926000／副 1931000〜1946000 | 使用済み（2026-10-22・r13o 主 −8.3／r13m 主 −13.2／r17m 主 −9.1・**3 本とも非昇格**・`2026-10-22_omni_value_stage2.md`） |
@@ -2877,6 +2878,87 @@ git add -f RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=wor
 echo ALL_DONE
 
 補足: 1 シャード（4 本）約 8 分。コミットメッセージにモデル名を入れない。
+````
+
+### 7.32 波 49——実デッキ 115 本で打つ最初の波（生成役 r13d・2026-10-22）
+
+ユーザ決定（2026-10-22「b でお願いします」＝実デッキ 115 本をすべて教材に使う・実デッキでリーダーをほぼ網羅できたため）。台帳 2+331。CLAUDE.md の開発判断の前提に追記済み。
+- **教材（波 49）**: 生成役 **r13d**（r17・r18 は非昇格）・設定は波 48 と同じ（sims 1280・worlds 1・`--budget 0`・q_min_n 1/8・t=2・両方向 ε 3%・公平が既定・符号化 v15）、**デッキだけ `--decks real`**（ユーザの 4 本＋公式の構築例 111 本から一様に 2 本）。16 シャード × 480 局。seed **2521000〜2528500**（シャード k の base は 2520000 + ceil(k/2)×1000 + (k が偶数なら 500)）。
+- **訓練（r19・別の指示書）**: π＝波 49・価値＝波 49＋48（どちらも生成役 r13d・約 220 万行）・warm-start r11a・価値の教師は勝敗。
+- **判定**: 公平同士・両席 160 回・基準 r13d・各 16 シャード × 175 ペア。**主＝random × real**（新しい seed 帯）・副＝固定ミラー・参考＝random × synth_roles2（合成デッキへの汎化）。seed は訓練の後に払い出す。
+- **予告（数を見る前）**: r19 vs r13d 主（real）+10〜+25（教材の分布と判定の帯が一致する最初の世代）・synth_roles2 では −10〜+5（合成への汎化は少し落ちうる）。
+
+生成の作業セッション用の本文（`{K}`＝01〜16・`{BASE}`＝上の式）:
+
+````
+波 49 の生成を 1 シャードぶん回してください（docs/n_loop_ops.md §7.32）。コードは変更せず、下記を実行して結果ブランチを push するだけです。
+PR は作らないでください。git の作業が安全確認で止められたら、`git stash -u` してから実行してよい。質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+出どころの照合（origin 側で）:
+  (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
+  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.29 波 49"
+  (3) 器: git show origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/record_gen.py | grep -n '"--budget"'
+この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
+
+bash で次の 2 つのブロックを順に実行してください。コンテナが再起動したら、2 つとも最初からもう一度実行します（冪等・終えた本は飛ばす）。
+
+--- ブロック 1（準備）---
+export K={K} BASE={BASE}
+pip install -q numpy maturin
+[ -d ~/opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git ~/opcg-sim-backend
+cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/n49-w${K} origin/claude/cpu-spec-improvements-yw91jd
+git fetch -q origin claude/n49-w${K} 2>/dev/null && git checkout -q FETCH_HEAD -- n_records 2>/dev/null || true
+rm -f ~/built; make rust-develop > ~/build.log 2>&1 && touch ~/built
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+printf '%s\n' 'cd ~/opcg-sim-backend' \
+  'cp ~/n49_w${K}.log . 2>/dev/null' \
+  'git add -f n_records RESULT.json n49_w${K}.log 2>/dev/null' \
+  'git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "gen wave 49 shard ${K}"' \
+  'git push -q -u origin claude/n49-w${K} || echo PUSH_FAILED' > ~/save49.sh
+
+--- ブロック 2（4 本を順に・1 本ごとに push）---
+下の「#!/bin/bash」から「echo ALL_DONE」までを ~/run49.sh に保存し（ファイル作成のツールでよい）、
+`nohup bash ~/run49.sh > ~/run49.out 2>&1 &` でバックグラウンドに回す（2 時間を超えるのでフォアグラウンドで待たない）。
+**完走（run49.out に ALL_DONE）までターンを終えない**——待機に入るとコンテナが止まり、生成のプロセスも消える。
+`timeout 540 bash -c 'until grep -q ALL_DONE ~/run49.out; do sleep 30; done'; tail -n 1 ~/n49_w{K}.log` のような 9 分以内の待ちを、ALL_DONE が出るまで繰り返し呼ぶ。
+生きているかの確認は `ps -eo pid,etime,cmd | grep "[o]pcg_sim.loop.record_gen"`。
+
+#!/bin/bash
+export K={K} BASE={BASE}
+cd ~/opcg-sim-backend
+for J in 0 1 2 3; do
+  D=n_records/n49_w${K}_p$J
+  [ -f $D/meta_n_record.json ] && continue
+  rm -rf $D
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.record_gen --games 120 --seed-base $((BASE + 120*J)) --workers 4 \
+    --sims 1280 --worlds 1 --budget 0 --select-rule q_min_n --q-min-frac 0.125 --root-prior-temp 2.0 \
+    --eps-play 0.03 --eps-hold 0.03 --decks real --shard-games 10 \
+    --net opcg_sim/data/learned/nrel_r13d.npz --out $D >> ~/n49_w${K}.log 2>&1
+  python - <<'PY' > RESULT.json
+import glob, json, os
+K = os.environ["K"]; parts = sorted(glob.glob(f"n_records/n49_w{K}_p[0-3]"))
+done = [p for p in parts if os.path.exists(p + "/meta_n_record.json")]
+m = [json.load(open(p + "/meta_n_record.json")) for p in done]
+g = [x for p in done for x in json.load(open(p + "/meta_games.json"))["games"]]
+print(json.dumps({"job": f"n49-w{K}", "role": "gen", "status": "done" if len(done) == 4 else "partial",
+  "inputs": {"net": "opcg_sim/data/learned/nrel_r13d.npz", "seed_base": int(os.environ["BASE"]), "games": 480,
+             "sims": 1280, "worlds": 1, "budget": 0, "decks": "real"},
+  "outputs": {"dirs": done},
+  "metrics": {"parts_done": len(done), "games": sum(x["games"] for x in m), "rows": sum(x["rows"] for x in m),
+              "dropped": sum(x["dropped"] for x in m),
+              "sec_play_mean": round(sum(x["sec"] for x in g) / max(1, len(g)), 2)},
+  "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  bash ~/save49.sh
+done
+tail -n 2 ~/n49_w${K}.log
+echo ALL_DONE
+
+補足:
+- 所要は 1 本（120 局）約 32 分・4 本で約 2.1 時間（同じコンテナで他の重い処理を並べない）。
+- 最初の push が失敗したら（PUSH_FAILED）、その出力を報告してください。
+- コミットメッセージにモデル名を入れない。
 ````
 
 ## 8. コーディネータが守ること
