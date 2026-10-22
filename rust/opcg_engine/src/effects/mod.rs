@@ -52,6 +52,8 @@ mod tests_rest_replace;
 mod tests_g3;
 #[cfg(test)]
 mod tests_reactions;
+#[cfg(test)]
+mod tests_trigger_order;
 pub mod triggers;
 pub mod value;
 

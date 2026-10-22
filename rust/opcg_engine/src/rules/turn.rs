@@ -211,7 +211,7 @@ fn begin_turn(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError>
     if s.state().active_interaction().is_none() && s.state().pending_triggers.is_empty() {
         return refresh_phase(s, masters);
     }
-    triggers::advance_pending_triggers(s, masters)?;
+    triggers::settle_pending(s, masters)?;
     if s.state().active_interaction().is_some() || !s.state().pending_triggers.is_empty() {
         s.edit().set_mgr_bool(MgrBoolField::TurnStartPending, true);
         Ok(())

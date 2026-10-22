@@ -222,7 +222,7 @@ pub fn handle_block(
     }
     s.edit().set_phase(Phase::BattleCounter);
     if blocker.is_some() {
-        triggers::advance_pending_triggers(s, masters)?;
+        triggers::settle_pending(s, masters)?;
     }
     Ok(())
 }
@@ -274,7 +274,7 @@ pub fn apply_counter(
             seat,
             Position::Bottom,
         )?;
-        triggers::advance_pending_triggers(s, masters)?;
+        triggers::settle_pending(s, masters)?;
         return Ok(());
     }
     let value = super::current_counter(s.state(), masters, counter_card);
@@ -482,7 +482,7 @@ pub fn finish_attack(
             triggers::enqueue_battle_end_listeners(s, masters, b.attacker, b.target)?;
         }
     }
-    triggers::advance_pending_triggers(s, masters)
+    triggers::settle_pending(s, masters)
 }
 
 /// Python `check_victory`（デッキアウト。§11.8 #6 で `masters` を通し、デッキアウト敗北→勝利

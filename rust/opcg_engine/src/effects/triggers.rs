@@ -88,7 +88,36 @@ pub fn enqueue_trigger_with_subject(
 }
 
 /// Python `_advance_pending_triggers`（積んだ誘発を順に消化する）。
+///
+/// **効果の解決中は消化しない**（WP `rs-trigger-order`）: 効果の実行スタックを処理している間
+/// （[`Session::resolving_depth`] > 0）と、対話で中断した効果の残りが退避されている間
+/// （`deferred_continuations` が空でない）は、誘発は待ち行列に留まり、今解決中の効果を解決し
+/// 切ってから解決する（総合ルール 8-6-1「効果の処理中に自動効果の発動条件が満たされた場合、
+/// その自動効果は処理中の効果の処理が終わった後に発動する」の趣旨）。例外はライフの【トリガー】
+/// （ダメージの処理の一部としてその場で発動する＝効果によるダメージでも親の残りより先）。
 pub fn advance_pending_triggers(
+    s: &mut Session,
+    masters: &MasterTable,
+) -> Result<(), EngineError> {
+    let prev = s.set_draining(true);
+    let r = advance_pending_triggers_inner(s, masters);
+    s.set_draining(prev);
+    r
+}
+
+/// ライフの【トリガー】（効果の解決中でもその場で発動する誘発）か。
+fn is_life_trigger(masters: &MasterTable, s: &Session, item: &PendingTrigger) -> bool {
+    super::ability_of(masters, s.state(), item.card, item.ability as usize)
+        .map(|(_, ab)| ab.trigger == TriggerType::Trigger)
+        .unwrap_or(false)
+}
+
+/// 効果の解決中（または中断した効果の残りが退避中）＝ライフの【トリガー】以外は待たせる。
+fn holding_triggers(s: &Session) -> bool {
+    s.resolving_depth() > 0 || !s.state().deferred_continuations.is_empty()
+}
+
+fn advance_pending_triggers_inner(
     s: &mut Session,
     masters: &MasterTable,
 ) -> Result<(), EngineError> {
@@ -96,13 +125,22 @@ pub fn advance_pending_triggers(
         if s.state().active_interaction().is_some() {
             return Ok(()); // 別の対話が進行中: 解決後に再開される
         }
-        let item = s.state().pending_triggers[0].clone();
+        let pos = if holding_triggers(s) {
+            let queue = &s.state().pending_triggers;
+            match queue.iter().position(|t| is_life_trigger(masters, s, t)) {
+                Some(p) => p,
+                None => return Ok(()), // 効果の終わりに消化される
+            }
+        } else {
+            0
+        };
+        let item = s.state().pending_triggers[pos].clone();
         if item.optional && !item.confirmed {
             suspend_for_trigger_confirm(s, masters, &item)?;
             return Ok(());
         }
         let mut queue = s.state().pending_triggers.clone();
-        queue.remove(0);
+        queue.remove(pos);
         s.edit().set_trigger_queue(TriggerQueue::Pending, queue);
         relocate_activated_trigger_card(s, masters, &item)?;
         super::resolver::game_resolve_ability_with_subject(
@@ -116,6 +154,40 @@ pub fn advance_pending_triggers(
         if s.state().active_interaction().is_some() {
             return Ok(()); // 効果解決が対象選択等で中断 → resolve_interaction が再開
         }
+    }
+    Ok(())
+}
+
+/// 効果を解決し切った後の消化（`resolver::game_resolve_ability` の末尾・イベントを写した後）。一番外の効果が中断せずに
+/// 終わり、退避した残りも無く、消化の最中でもないときだけ待ち行列を消化する。
+pub fn drain_after_effect(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
+    if s.resolving_depth() > 0
+        || s.draining()
+        || s.state().in_passive_recalc
+        || s.state().active_interaction().is_some()
+        || !s.state().deferred_continuations.is_empty()
+        || s.state().pending_triggers.is_empty()
+    {
+        return Ok(());
+    }
+    advance_pending_triggers(s, masters)
+}
+
+/// 対話が片付いた後・行動の境目の消化: 先に**中断していた効果の残り**（退避した継続）を
+/// 解決し切り、それから待ち行列の誘発を消化する（親の効果 → 子の誘発の順）。
+pub fn settle_pending(s: &mut Session, masters: &MasterTable) -> Result<(), EngineError> {
+    // 退避中の残りがある間はライフの【トリガー】だけが先に進む（`advance_pending_triggers`）。
+    if s.state().active_interaction().is_none() && !s.state().pending_triggers.is_empty() {
+        advance_pending_triggers(s, masters)?;
+    }
+    if s.resolving_depth() == 0
+        && s.state().active_interaction().is_none()
+        && !s.state().deferred_continuations.is_empty()
+    {
+        super::interact::resume_deferred_continuations(s, masters, 64)?;
+    }
+    if s.state().active_interaction().is_none() && !s.state().pending_triggers.is_empty() {
+        advance_pending_triggers(s, masters)?;
     }
     Ok(())
 }
@@ -219,7 +291,8 @@ pub fn resolve_confirm_trigger(
             s.edit().set_trigger_queue(TriggerQueue::Pending, queue);
         }
     }
-    advance_pending_triggers(s, masters)?;
+    // 確認した誘発（ライフの【トリガー】ならダメージを与えた効果の残りより先）→ 退避した残り → 他の誘発。
+    settle_pending(s, masters)?;
     // ターン開始時誘発の解決で保留していたリフレッシュフェイズ以降を再開する。
     if s.state().active_interaction().is_none()
         && s.state().pending_triggers.is_empty()
