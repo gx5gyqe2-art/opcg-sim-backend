@@ -6,12 +6,14 @@
   "files": [
    "arena_r18/r18_main_w06.jsonl",
    "arena_r18/r18_mirror_w06.jsonl",
+   "arena_r18/r18_old_w06.jsonl",
    "arena_r18/r18_user_w06.jsonl"
   ]
  },
  "metrics": {
   "arena_r18/r18_main_w06.jsonl": 175,
   "arena_r18/r18_mirror_w06.jsonl": 175,
+  "arena_r18/r18_old_w06.jsonl": 175,
   "arena_r18/r18_user_w06.jsonl": 175
  },
  "notes": ""
