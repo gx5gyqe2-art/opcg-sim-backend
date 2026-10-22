@@ -10,10 +10,12 @@
  },
  "outputs": {
   "files": [
+   "arena_lethal/off_w08.jsonl",
    "arena_lethal/root_w08.jsonl"
   ]
  },
  "metrics": {
+  "arena_lethal/off_w08.jsonl": 25,
   "arena_lethal/root_w08.jsonl": 25
  },
  "notes": ""
