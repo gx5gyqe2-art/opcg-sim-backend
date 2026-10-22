@@ -1,0 +1,161 @@
+{
+ "job": "defense-audit",
+ "role": "measurement (read-only audit)",
+ "status": "done",
+ "spec": "docs/search_efficiency_plan.md §7.24 (origin/claude/cpu-spec-improvements-yw91jd @ 38191d7; ledger 2+343); mirror of §7.13 / docs/reports/2026-10-22_lethal_audit.md",
+ "branch": "claude/defense-audit",
+ "report": "docs/reports/2026-10-22_defense_audit.md",
+ "inputs": {
+  "net": "nrel_r13d (both seats)",
+  "sims": 1280,
+  "worlds": 1,
+  "budget": 0,
+  "lethal_proof": "off (same setting as §7.13)",
+  "decks": "random leaders x synth_roles",
+  "seeds": "3013000-3013299 (300 games, 4 workers)",
+  "target": "response points on the opponent's turn with my life <= 3 and turn >= 4; end-of-turn: last 1-2 MAIN points of my turn with my life <= 3 and turn >= 4",
+  "solver_caps": {
+   "ko_per_response_sec": 5,
+   "otsu_per_deal_sec": 3,
+   "turn_head_sec": 10,
+   "max_nodes": 200000,
+   "rand_deals": 4,
+   "max_alts": 16
+  },
+  "verify_caps": {
+   "ko_sec": 30,
+   "deal_sec": 10,
+   "solver": "full (character attacks + free DON attaches)"
+  }
+ },
+ "outputs": {
+  "tool": "tests/scripts/defense_audit.py (run / summarize / verify)",
+  "points": "n1_results/defense_audit/points_3013000_300.jsonl",
+  "summary": "n1_results/defense_audit/summary.json",
+  "verify": "n1_results/defense_audit/verify.jsonl",
+  "logs": "n1_results/defense_audit/{run,verify}.log",
+  "docs": "docs/TEST_SPEC.md §3 (one row)"
+ },
+ "metrics": {
+  "games": 300,
+  "void": 0,
+  "resp": {
+   "points": 9422,
+   "turns": 1899,
+   "threat_ko": {
+    "k": 477,
+    "rate": 0.0506
+   },
+   "threat_otsu": {
+    "k": 395,
+    "rate": 0.0419
+   },
+   "miss_given_threat_ko": {
+    "k": 40,
+    "n": 477,
+    "rate": 0.0839,
+    "verified_k": 33,
+    "verified_rate": 0.0692,
+    "verified_unknown": 7
+   },
+   "miss_given_threat_otsu": {
+    "k": 32,
+    "n": 395,
+    "rate": 0.081,
+    "verified_k": 28,
+    "verified_rate": 0.0709,
+    "verified_unknown": 3
+   },
+   "miss_per_turn_ko": 0.02,
+   "miss_per_turn_otsu": 0.016,
+   "miss_given_threat_turn_ko": {
+    "k": 38,
+    "n": 191
+   },
+   "miss_given_threat_turn_otsu": {
+    "k": 30,
+    "n": 169,
+    "verified_k": 26
+   },
+   "games_with_otsu_miss": {
+    "raw": 28,
+    "verified": 24,
+    "verified_lost": 23,
+    "verified_lost_this_turn": 22
+   },
+   "unknown_cpu_response": 0.162,
+   "verified_otsu_miss_by_live_decision": {
+    "commit": 21,
+    "window": 7
+   },
+   "fresh_redecide_picks_safe_response": {
+    "commit": "21/21",
+    "window": "0/7"
+   },
+   "verified_otsu_miss_type": {
+    "SELECT_COUNTER:no_counter": 23,
+    "SELECT_COUNTER:wrong_counter": 1,
+    "CONFIRM_TRIGGER:accepted": 2,
+    "SEARCH_AND_SELECT:target": 1,
+    "SELECT_BLOCKER:no_block": 1
+   },
+   "verified_otsu_miss_my_life": {
+    "0": 22,
+    "1": 6
+   },
+   "immediate_loss_after_response": 18
+  },
+  "end": {
+   "turns": 1575,
+   "threat_ko": {
+    "k": 193,
+    "rate": 0.122
+   },
+   "threat_otsu": {
+    "k": 136,
+    "rate": 0.086
+   },
+   "unknown_actual": 0.61,
+   "miss_given_threat": {
+    "k": 3,
+    "n": 136,
+    "rate": 0.022,
+    "verified_k": 1,
+    "verified_unknown": 2
+   },
+   "miss_strict_given_threat": {
+    "k": 2,
+    "n": 136,
+    "verified_k": 0
+   },
+   "own_win_alternatives_excluded_turns": 9
+  },
+  "forecast_check": {
+   "resp_ko_10_20pct": "8.4% raw / 6.9% verified (below)",
+   "resp_otsu_5_10pct": "8.1% raw / 7.1% verified (inside)",
+   "lost_games_per_1000_30_60": "77 (23/300 verified; above)",
+   "end_5_15pct": "2.2% raw / 0.7% verified (below)"
+  },
+  "cost": {
+   "wall": "about 3.5 h for 300 games on 4 workers (run was restarted twice by worker restarts; resumes by seed)",
+   "verify": "43 points, about 8 min on 4 workers"
+  }
+ },
+ "command": "python tests/scripts/defense_audit.py run --games 300 --workers 4 && python tests/scripts/defense_audit.py verify --workers 4 && python tests/scripts/defense_audit.py summarize",
+ "gates": {
+  "make_test": "green on the final tree (2026-10-22 23:5x UTC): cargo test 601 passed / 1 ignored; pytest 855 passed, 13 skipped",
+  "engine": "untouched (read-only audit; no engine/net/default change)"
+ },
+ "notes": [
+  "Headline: 3/4 of the verified otsu misses (21/28) are blind replays of a defense-box commit (decide kind 'commit', no tree) planned at the preceding blocker/counter window; a fresh decide without the carried commit picks a safe response in all 21. 18 of them are 'PASS at life 0 with a holding counter in hand' = immediate loss.",
+  "Likely mechanism (code reading, unverified): rust/opcg_engine/src/search/decide.rs move_sig reads payload.uuid only; battle moves carry the card in card_uuid, so a committed SELECT_COUNTER step has signature [SELECT_COUNTER, null, ...] and find_move replays the FIRST legal counter (possibly a smaller one), then the committed PASS goes through. Not fixed here (read-only WP). Proposed follow-up: include card_uuid in move_sig, or re-decide at battle windows instead of trusting the commit; re-audit the same 300 games and check that the 21 points disappear.",
+  "Target filter mirrors §7.13 for cost: my life <= 3 and turn >= 4 (the spec did not fix the filter; chosen for comparability). Points on my own turn where I answer the opponent's effect are not included (only the opponent's turn).",
+  "Otsu redeal is from the defender's view: the attacker's hand + deck + face-down life are redealt (true + offense-strong + offense-weak + 4 random). The defender's own deck/life are left as is (same as §7.13). Deals are rebuilt via Game.from_hidden, so points with an interaction stack or pending triggers are skipped for otsu (recorded as skip).",
+  "Solver approximations are those of lethal_audit.py (attacker: leader attacks only, DON attach only onto the attacking unit; dialogs: one target at a time). They under-count the attacker, i.e. over-count 'safe' responses; the verify pass re-judges every miss with the full solver (character attacks + free DON) at 30 s and removed 7 (ko) / 4 (otsu) as unknown-or-not-safe. The remaining 'unknown' are not confirmed misses.",
+  "End-of-turn audit: alternatives that win the game outright under default resolution (opponent passes) are the §7.13 own-lethal question and are excluded (9 of 136 threat turns had one). The default resolution assumes the opponent does not counter my alternative attack, so the 3 raw / 1 verified end misses are optimistic. unknown_actual is 61% at 10 s (the opponent's turn head has many options), so the threat-turn count is a lower bound.",
+  "The turn-head judge (end audit) was given its own 10 s cap (--sec-end) instead of the 5 s of §7.13 because the pilot showed 52% unknown at 5 s; its transposition table is shared with the same turn's response points so the cost is mostly recovered.",
+  "Intermediate pushes (partial jsonl) carried only data plus the tool; make test was run once on the tool at the first push (green: cargo 601 passed, pytest 855 passed / 13 skipped) and once more on the final tree before the final push (see gates).",
+  "The container's worker was restarted twice during the run (the python workers died with it); the run resumes by seed and was relaunched with setsid. Wall time about 3.5 h. No games were reduced (300/300).",
+  "pytest-xdist, fastapi, httpx and maturin were pip-installed in this container to build the wheel and run make test."
+ ]
+}
