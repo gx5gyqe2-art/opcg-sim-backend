@@ -4,11 +4,13 @@
  "status": "partial",
  "outputs": {
   "files": [
+   "arena_omni2/r13m_main_w06.jsonl",
    "arena_omni2/r13o_main_w06.jsonl",
    "arena_omni2/r13o_mirror_w06.jsonl"
   ]
  },
  "metrics": {
+  "arena_omni2/r13m_main_w06.jsonl": 175,
   "arena_omni2/r13o_main_w06.jsonl": 175,
   "arena_omni2/r13o_mirror_w06.jsonl": 175
  },
