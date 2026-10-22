@@ -16,5 +16,5 @@
  "metrics": {
   "arena_r19p/r19p_w11.jsonl": 84
  },
- "notes": ""
+ "notes": "84/84 pairs, 168 games, void 0. r19 vs r13d: wins 86.0, wr 0.5119, ci95 [0.4499,0.574], elo +8.3 (shard-local). Log line '基準席は既定' is a stale message: baseline seat did get --sims 1280 --budget 0 (passed via initargs) and worlds 2 (best_opts={'worlds':2}). Batches took 321/371/335/390 s."
 }
