@@ -14,7 +14,19 @@
   ]
  },
  "metrics": {
-  "arena_r19p/r19p_w20.jsonl": 84
+  "arena_r19p/r19p_w20.jsonl": 84,
+  "final": {
+   "pairs_scored": 83,
+   "games": 166,
+   "void": 1,
+   "wins": 93.0,
+   "wr": 0.5602,
+   "ci95": [
+    0.4965,
+    0.624
+   ],
+   "elo": 42.1
+  }
  },
- "notes": ""
+ "notes": "84 pairs planned; 1 void (seed 2160003, GameAborted: hit move limit) -> 83 scored, void rate 1/84=1.2% (<2%). arena_shard prints '（基準席は既定）' but the baseline seat really ran sims 1280 / budget 0 (from --sims/--budget) and worlds 2 (best_opts {\"worlds\": 2} in ARENA_RESUME_FINAL). Each 21-pair batch took about 270-313s with 2 workers on 4 cores."
 }
