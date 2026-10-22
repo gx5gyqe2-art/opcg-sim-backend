@@ -16,5 +16,5 @@
  "metrics": {
   "arena_r19p/r19p_w28.jsonl": 84
  },
- "notes": ""
+ "notes": "84/84 pairs, void 0. Shard final: wins 92/168 wr 0.5476 ci95 [0.491,0.6042] elo +33.2 (best_opts worlds 2 confirmed). Log line '（基準席は既定）' is stale print text only; baseline seat did get worlds=2 via _best_kw (sims 1280 / budget 0 via --sims/--budget)."
 }
