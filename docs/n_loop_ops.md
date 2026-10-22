@@ -181,6 +181,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **世界 4 本 × 1,280 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・16 シャード × 88 ペア・§7.18） | 1511000〜1526000 | 使用済み（2026-10-21・1,336 ペア 0.5434 [0.5227, 0.5642]・+30.2・`2026-10-21_r16_teacher_strength.md`） |
 | 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 使用済み（2026-10-21・r16 主 −5.3／副 +4.7・r16c 主 −7.7／副 +0.4・どちらも非昇格） |
 | 検証 **WP `rs-lethal-root`**（手元 40 ペア × 2 本 root／root_reply vs off・出荷の設定）／監査のやり直し 300 局／本番アリーナ（root・root_reply 各 12 シャード × 120 ペア・合流後） | 1682000〜1682039／1683000〜1683039／3012000〜3012299／2031000〜2042000／2051000〜2062000 | 指示済み（2026-10-22・claude/rs-lethal-root） |
+| 検証 **r19 vs r13d・本番の設定**（両席 1,280 回・世界 2 本・枝予算なし・random × real・32 シャード × 84 ペア・§7.33） | 2141000〜2172083（シャード k の base は 2141000 + (k−1)×1000） | 指示済み（2026-10-22・claude/arena-r19p-w01〜w32） |
 | 検証 **r19 vs r13d（公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.32）** | 主 real 2081000〜2096000／副 ミラー 2101000〜2116000／参考 synth_roles2 2121000〜2136000 | 使用済み（2026-10-22・主 2,799 ペア 0.5179 [0.5075, 0.5282] +12.4・副 0.5116 [0.4995, 0.5237] +8.1・参考 0.4930 −4.8・void 1） |
 | 生成 **波 49**（実デッキ 115 本・`--decks real`・生成役 r13d・v15・§7.32） | 2521000〜2528500（シャード k の base は 2520000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,153,971 行・dropped 2・decks real） |
 | 検証 **r18 vs r13d・実デッキ帯 115 本**（ユーザの 4 本＋公式の構築例 111 本・`--decks real`・公平同士・両席 160 回・16 シャード × 175 ペア・§7.29） | 2061000〜2076000 | 使用済み（2026-10-22・2,800 ペア 0.5007・**+0.5**＝4 本での +11.2 は消えた・`2026-10-22_r18_realdeck115.md`） |
@@ -3054,6 +3055,60 @@ echo ALL_DONE
 - 所要は 1 本（120 局）約 32 分・4 本で約 2.1 時間（同じコンテナで他の重い処理を並べない）。
 - 最初の push が失敗したら（PUSH_FAILED）、その出力を報告してください。
 - コミットメッセージにモデル名を入れない。
+````
+
+### 7.33 r19 の本番の設定での確認（対 r13d・2026-10-22）
+
+ユーザ決定（2026-10-22「a で行きましょうか」＝本番と同じ読みの深さで確かめてから、強ければ切り替える）。台帳 2+333。
+- 両席とも**出荷の設定**: 1,280 回・世界 2 本・枝予算なし・公平（既定）。候補 r19（`claude/train-r19` の n1_results・ep0）・基準 r13d（同梱）。
+  基準席にも世界 2 本を持たせるため `arena_shard --worlds` を本線に足した（WP `rs-lethal-root` の同じ旗だけを先に取り込み・既定は今までどおり 1 本）。
+- 主条件のみ＝random × real（115 本）。**32 シャード × 84 ペア＝2,688 ペア**（r13d の採用時の 2,678 ペアと同じ規模）。シャード k の base は **2141000 + (k−1)×1000**（2141000〜2172083）。
+- 採用の規約: 勝率の 95% CI 下限 > 0.50（主）。副条件は §7.32 の 160 回の固定ミラー（下限 0.4995 ≥ 0.45）を使う。
+- **予告（数を見る前）**: +10〜+25（160 回で +12.4。r13d の採用時は 160 回 +21.5 → 本番 +24.6 で、深い読みで差は縮まなかった）。
+
+作業セッション用の本文（`{K}`＝1〜32・`{KK}`＝01〜32）:
+
+````
+アリーナ（r19 vs r13d・両席とも出荷の設定）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.33）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r19p-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r19p-w$KK origin/claude/cpu-spec-improvements-yw91jd
+git show HEAD:opcg_sim/loop/arena_shard.py | grep -n '"--worlds"'    # 基準席の世界の本数の旗が在ること（無ければ notes に書いて止める）
+git fetch -q origin claude/arena-r19p-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r19p 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r19:r19net && git show r19net:n1_results/nrel_r19.npz > ~/nrel_r19.npz
+mkdir -p arena_r19p
+
+次の内容を ~/run19p.sh に保存し、`nohup bash ~/run19p.sh > ~/run19p.out 2>&1 &` で回す。run19p.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r19p/*.jsonl"))
+print(json.dumps({"job": "arena-r19p-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r19.npz", "baseline": "nrel_r13d.npz", "both": "sims 1280 x worlds 2 x budget 0 (fair)", "pairs": 84},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r19p RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r19p shard $KK"; git push -q -u origin claude/arena-r19p-w$KK || echo PUSH_FAILED; }
+for J in 0 1 2 3 4; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_r19.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --sims 1280 --worlds 2 --budget 0 --cand-sims 1280 --cand-worlds 2 --cand-budget 0 --pairs 84 --max-pairs 21 --bands 1 \
+    --seed-base $(( 2141000 + (k-1)*1000 )) --workers 2 --leaders random --decks real --pair-timeout 3600 \
+    --out arena_r19p/r19p_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 21 ペアずつ進め（4 回目までに 84 ペアに届く・届いた後の回は何もしない）、そのたびに push する（arena_shard は終えたペアを飛ばして再開する）。世界 2 本は 2 スレッド使うので --workers 2。全体で 1〜3 時間。コミットメッセージにモデル名を入れない。
 ````
 
 ## 8. コーディネータが守ること

@@ -66,6 +66,9 @@ def build_parser():
     ap.add_argument("--opp-blind", action="store_true",
                     help="基準席の木の中の相手にこちらの手札を見せない（`docs/search_efficiency_plan.md` §7.14・"
                          "測定専用）。候補席は --cand-opp-blind")
+    ap.add_argument("--worlds", type=int, default=None,
+                    help="基準席の世界サンプルの本数（§20.7.1・省略＝1）。両席を出荷の設定（世界 2 本）で打たせるとき"
+                         "に --cand-worlds と組で使う（§7.21）。K 本ぶんスレッドを使うので --workers を下げること")
     ap.add_argument("--leaders", default="fixed", choices=("fixed", "random", "real", "purple"),
                     help="対面の選び方: fixed=既定リーダーミラー（歴代判定と地続き）／"
                          "random=全リーダーからペアごとに 2 枚引く（汎化）／"
@@ -88,7 +91,8 @@ def _best_kw(args):
                             ("rethink_worlds", args.rethink_worlds),
                             ("omniscient", True if args.omniscient else None),
                             ("reveal", args.reveal),
-                            ("opp_blind", True if args.opp_blind else None)) if v is not None}
+                            ("opp_blind", True if args.opp_blind else None),
+                            ("worlds", args.worlds if args.worlds and args.worlds > 1 else None)) if v is not None}
     return kw or None
 
 
