@@ -20,5 +20,5 @@
   "arena_r20/r20s_real_w13.jsonl": 175,
   "arena_r20/r20s_synth2_w13.jsonl": 175
  },
- "notes": ""
+ "notes": "r20s_real_w13: 175 ペア中 1 ペアに void 1 局（174 ペアで集計・void 率 0.3%＝2% 未満）。他の 5 本は void 0。コードは dfc24929e のまま変更なし。"
 }
