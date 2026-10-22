@@ -1,0 +1,12 @@
+{
+ "dir": "/root/n47/n_records/n47_w08_p1",
+ "out": "n1_results/omni_value/omni_n47_w08_p1.npz",
+ "rows": 17739,
+ "games": 120,
+ "ok_rows": 17739,
+ "omni_rows": 10699,
+ "failed_games": [],
+ "beam_max": 64,
+ "decide_sec_sum": 382.147216796875,
+ "wall_sec": 105.5
+}
