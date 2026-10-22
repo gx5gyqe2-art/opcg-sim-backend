@@ -590,17 +590,34 @@ impl Game {
                 }
             }
         };
-        let enc = crate::encode::encode(self.session.state(), masters, &vocab, seat, &opts)
-            .map_err(err)?;
-        to_py_json(&serde_json::json!({
-            "scalars": enc.scalars,
-            "field": enc.field,
-            "card_idx": enc.card_idx,
-            "tokens": enc.tok,
-            "rel_om": enc.rel_om,
-            "rel_oo": enc.rel_oo,
-            "extra": enc.extra,
-        }))
+        encode_json(self.session.state(), masters, &vocab, seat, &opts)
+    }
+
+    /// **探索の世界を 1 本作って符号化する**（測定専用・`tests/scripts/enc_fair_diff.py`・
+    /// `docs/search_efficiency_plan.md` §7.17 WP `enc-audit`）。
+    ///
+    /// decide が世界 `i` に使うのと同じ作り（`reveal` の混ぜ直し・乱数は
+    /// `Pcg32SearchRng::new(seed)`＝decide の `search_seed + i`）で盤面を引き、その盤面の根の
+    /// 入力（`encode` と同じ形）を返す。`reveal` は `"fair"`／`"peek"`／`"opp_hand"`／`"truth"`
+    /// （`truth`＝混ぜない本物の盤面）。元の対局は 1 ビットも変わらない。
+    #[pyo3(signature = (player_id, reveal, seed))]
+    fn encode_world(&self, player_id: &str, reveal: &str, seed: u64) -> PyResult<String> {
+        use crate::search::determinize as det;
+        let masters = self.masters()?;
+        let seat = self.seat_of(player_id)?;
+        let vocab = crate::encode::current_vocab()
+            .map_err(err)?
+            .ok_or_else(|| PyValueError::new_err("encode_world: 語彙が未設定"))?;
+        let state = self.session.state();
+        let mut rng = crate::search::Pcg32SearchRng::new(seed);
+        let world = match reveal {
+            "truth" => state.clone(),
+            "fair" => det::determinize_fair_with(state, seat, &mut rng).map_err(err)?,
+            "peek" => det::determinize_with(state, seat, &mut rng).map_err(err)?,
+            "opp_hand" => det::determinize_opp_deck_with(state, seat, &mut rng).map_err(err)?,
+            _ => return Err(PyValueError::new_err(format!("encode_world: 未知の reveal '{reveal}'"))),
+        };
+        encode_json(&world, masters, &vocab, seat, &crate::encode::EncodeOptions::default())
     }
 
     /// **読み取り専用の複製**（手の値段の後続局面・`clock_succ.py`・`docs/reports/2026-10-10_clock_value.md` §1.2）。
@@ -709,6 +726,26 @@ impl Game {
 }
 
 /// OS 乱数から seed を作る（`seed=None` のとき）。
+/// `Game.encode`／`Game.encode_world` の出力（同じ鍵・同じ並び）。
+fn encode_json(
+    state: &GameState,
+    masters: &MasterTable,
+    vocab: &crate::encode::Vocab,
+    seat: Seat,
+    opts: &crate::encode::EncodeOptions,
+) -> PyResult<String> {
+    let enc = crate::encode::encode(state, masters, vocab, seat, opts).map_err(err)?;
+    to_py_json(&serde_json::json!({
+        "scalars": enc.scalars,
+        "field": enc.field,
+        "card_idx": enc.card_idx,
+        "tokens": enc.tok,
+        "rel_om": enc.rel_om,
+        "rel_oo": enc.rel_oo,
+        "extra": enc.extra,
+    }))
+}
+
 fn os_seed() -> u64 {
     use std::collections::hash_map::RandomState;
     use std::hash::{BuildHasher, Hasher};
