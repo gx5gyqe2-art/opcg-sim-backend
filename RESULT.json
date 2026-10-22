@@ -16,5 +16,5 @@
   "arena_r18/r18_old_w11.jsonl": 175,
   "arena_r18/r18_user_w11.jsonl": 175
  },
- "notes": ""
+ "notes": "旧主 synth_roles は 174 ペア（175 のうち 1 ペアが void＝決着せず）。~/opcg-sim-backend は /home/user/opcg-sim-backend への symlink で実行。本線 8ce1b1d。"
 }
