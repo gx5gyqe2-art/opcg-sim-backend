@@ -217,6 +217,18 @@ pub fn determinize_fair_with(
     Ok(out)
 }
 
+/// `fair` の自分側だけ（自分の山札＋裏向きのライフのうち自分の知らない枠）を `source` の並びから混ぜ直して
+/// `out` に書く（§7.21 の守りの強い配り方が使う・相手側は呼び出し側が作る）。
+pub(crate) fn reshuffle_own_fair(
+    out: &mut GameState,
+    source: &GameState,
+    me: Seat,
+    rng: &mut dyn crate::search::rng::SearchRng,
+) -> Result<(), EngineError> {
+    let mine = hidden_slots(source, me, false, true, true, Some(me));
+    reshuffle_slots(out, &mine, rng)
+}
+
 /// `opp_blind`（`search_efficiency_plan.md` §7.14・WP `rs-oppblind`・測定専用）: **相手から見えない
 /// こちらの札**＝`me` の手札＋山札＋裏向きのライフを 1 つの山として混ぜ直す（`fair` の自分側と同じ作り
 /// に、相手から見えない手札を足したもの）。相手の側・表向きのライフ（位置と中身）・公開領域・各ゾーンの

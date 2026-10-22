@@ -91,6 +91,18 @@ pub struct DecideOptions {
     /// 評価する。合法手の生成と手の適用は本当の世界のまま（[`TreeMcts`](super::mcts::TreeMcts) の
     /// `opp_blind`）。混ぜ直しの乱数は世界ごとに `search_seed + i` から作る（[`opp_blind_seed`]）。
     pub opp_blind: bool,
+    /// 詰みの証明（`search_efficiency_plan.md` §7.21・WP `rs-lethal-root`・既定 `Off`＝1 bit も変わらない）。
+    /// `Root`: 自分のメインの判断点で、このターンに出せる攻撃の数が相手のライフ＋1 以上のとき、公平な配り方
+    /// （[`super::lethal`]）の全部で勝てる最初の 1 手が在ればそれを返す（`kind="lethal"`・探索は回さない）。
+    /// `RootReply`: 加えて、根の直後の相手の応手の節点で「その応手なら次にこちらの勝ちが証明できる」子を
+    /// 相手から見て負けに固定する。配り方の乱数は決定の乱数とは別の系列・打ち切りは節点数＝決定的。
+    pub lethal_proof: super::lethal::LethalProof,
+    /// 根の判定の節点の上限（`lethal_nodes`・既定 [`super::lethal::LETHAL_ROOT_NODES`]）。
+    pub lethal_nodes: u64,
+    /// `RootReply` の応手の節点 1 つあたりの上限（`lethal_reply_nodes`）。
+    pub lethal_reply_nodes: u64,
+    /// `RootReply` の決定あたりの合計（`lethal_reply_total`・世界の本数で等分）。
+    pub lethal_reply_total: u64,
 }
 
 /// `opp_blind`（§7.14）の混ぜ直しの乱数の seed（世界 `i` の探索乱数 `search_seed + i` と同じ値から、
@@ -186,6 +198,10 @@ impl Default for DecideOptions {
             omniscient: false,
             reveal: Reveal::Fair,
             opp_blind: false,
+            lethal_proof: super::lethal::LethalProof::Off,
+            lethal_nodes: super::lethal::LETHAL_ROOT_NODES,
+            lethal_reply_nodes: super::lethal::LETHAL_REPLY_NODES,
+            lethal_reply_total: super::lethal::LETHAL_REPLY_TOTAL,
         }
     }
 }
@@ -284,6 +300,10 @@ pub struct DecideOut {
     pub per_world: Vec<WorldStats>,
     /// PV とコミットの継続を採った世界（`worlds>1` のときだけ・§20.7.1）。
     pub world_used: Option<usize>,
+    /// 根の詰み判定の結果（§7.21・発動条件を満たして判定したときだけ）。`kind="lethal"` なら証明した。
+    pub lethal: Option<super::lethal::LethalOut>,
+    /// `RootReply` の木の中の証明の実績（全世界の和・応手の節点を判定したときだけ）。
+    pub lethal_reply: Option<super::lethal::ReplyProof>,
 }
 
 /// 1 つの世界の根の統計（§20.7.1・思考ログで「世界によって答えが割れたか」を読む）。
@@ -1217,6 +1237,8 @@ struct WorldRun {
     nodes: Vec<Node>,
     /// 根の世界サンプル（コミットの継続をこの盤面で作る）
     world: GameState,
+    /// `root_reply` の木の中の証明の実績（§7.21・使ったときだけ）
+    reply: Option<super::lethal::ReplyProof>,
 }
 
 /// 1 本の木を回す（つまみは全世界で同じ）。
@@ -1228,7 +1250,8 @@ fn run_one_world(
     world: GameState,
     rng: &mut dyn SearchRng,
     st: &mut SearchState,
-) -> Result<(RunOut, Vec<Node>), EngineError> {
+    reply: bool,
+) -> Result<(RunOut, Vec<Node>, Option<super::lethal::ReplyProof>), EngineError> {
     let mut tree = TreeMcts::new(ctx, opts.c_puct, opts.sims, opts.dirichlet_eps);
     tree.select_rule = opts.select_rule;
     tree.q_min_frac = opts.q_min_frac;
@@ -1236,8 +1259,19 @@ fn run_one_world(
     if opts.opp_blind {
         tree.opp_blind = Some(super::mcts::OppBlind::new(name, opp_blind_seed(world_seed)));
     }
+    if reply {
+        // 決定あたりの合計を世界の本数で等分する（世界はスレッドで並ぶ＝分けておけば決定的）。
+        let k = opts.effective_worlds().max(1) as u64;
+        tree.lethal_reply = Some(super::lethal::ReplyProof::new(
+            name,
+            super::lethal::lethal_seed(world_seed),
+            opts.lethal_reply_nodes,
+            opts.lethal_reply_total / k,
+        ));
+    }
     let run = tree.run_in_world(world, rng, st)?;
-    Ok((run, tree.into_nodes()))
+    let reply = tree.lethal_reply.take();
+    Ok((run, tree.into_nodes(), reply))
 }
 
 /// K 本の世界を引いて木を回す（§20.7.1）。
@@ -1254,13 +1288,14 @@ fn run_worlds(
     opts: &DecideOptions,
     rng: &mut dyn SearchRng,
     st: &mut SearchState,
+    reply: bool,
 ) -> Result<Vec<WorldRun>, EngineError> {
     let k = opts.effective_worlds();
     let seed0 = opts.search_seed.unwrap_or(0);
     let world0 = sample_world(state, name, opts.world_view(), rng)?;
     if k <= 1 {
-        let (run, nodes) = run_one_world(ctx, opts, name, seed0, world0.clone(), rng, st)?;
-        return Ok(vec![WorldRun { seed: seed0, run, nodes, world: world0 }]);
+        let (run, nodes, rp) = run_one_world(ctx, opts, name, seed0, world0.clone(), rng, st, reply)?;
+        return Ok(vec![WorldRun { seed: seed0, run, nodes, world: world0, reply: rp }]);
     }
     let mut runs: Vec<WorldRun> = Vec::with_capacity(k);
     let mut extra_used = 0i64;
@@ -1287,10 +1322,10 @@ fn run_worlds(
                         budget: BoxBudget::new(opts.budget),
                     };
                     let world = sample_world(state, name, opts.world_view(), &mut r)?;
-                    let (run, nodes) =
-                        run_one_world(ctx, opts, name, seed, world.clone(), &mut r, &mut wst)?;
+                    let (run, nodes, rp) =
+                        run_one_world(ctx, opts, name, seed, world.clone(), &mut r, &mut wst, reply)?;
                     Ok((
-                        WorldRun { seed, run, nodes, world },
+                        WorldRun { seed, run, nodes, world, reply: rp },
                         wst.budget.used,
                         wst.budget.exhausted,
                     ))
@@ -1298,8 +1333,8 @@ fn run_worlds(
             })
             .collect();
         // 世界 0 はこのスレッドで回す（スレッドは K-1 本＝K 本が同時に走る）。
-        let (run, nodes) = run_one_world(ctx, opts, name, seed0, world0.clone(), rng, st)?;
-        runs.push(WorldRun { seed: seed0, run, nodes, world: world0 });
+        let (run, nodes, rp) = run_one_world(ctx, opts, name, seed0, world0.clone(), rng, st, reply)?;
+        runs.push(WorldRun { seed: seed0, run, nodes, world: world0, reply: rp });
         for h in handles {
             let (wr, used, exhausted) = h.join().map_err(|_| {
                 EngineError::BadPayload("decide: 世界の探索スレッドが panic した".into())
@@ -1459,6 +1494,8 @@ fn empty_out(kind: &'static str, mv: Option<Move>, carry: DecideCarry, st: &Sear
         worlds: 1,
         per_world: Vec::new(),
         world_used: None,
+        lethal: None,
+        lethal_reply: None,
     }
 }
 
@@ -1472,8 +1509,42 @@ fn decide_inner(
     carry: &DecideCarry,
     st: &mut SearchState,
 ) -> Result<DecideOut, EngineError> {
-    let mut carry = carry.clone();
-    let mut real = Session::new(state.clone());
+    let carry = carry.clone();
+    let real = Session::new(state.clone());
+
+    // ⓪ 詰みの証明（§7.21・既定 off）。根で証明できればその手を返す（持ち越しは捨てる）。証明できなければ
+    // 探索へ戻す（決定の乱数は触っていない）。`root_reply` は発動条件を満たした決定だけ木の中でも証明する。
+    use super::lethal::LethalProof;
+    let lethal = if opts.lethal_proof != LethalProof::Off {
+        super::lethal::root_proof(ctx.masters, state, name, opts.search_seed, opts.lethal_nodes)?
+    } else {
+        None
+    };
+    if let Some(l) = &lethal {
+        if l.status == "win" {
+            let mut out = empty_out("lethal", l.mv.clone(), DecideCarry::default(), st);
+            out.lethal = lethal;
+            return Ok(out);
+        }
+    }
+    let reply = lethal.is_some() && opts.lethal_proof == LethalProof::RootReply;
+    let mut out = decide_after_lethal(ctx, state, name, opts, rng, carry, st, real, reply)?;
+    out.lethal = lethal;
+    Ok(out)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn decide_after_lethal(
+    ctx: &Ctx,
+    state: &GameState,
+    name: Seat,
+    opts: &DecideOptions,
+    rng: &mut dyn SearchRng,
+    mut carry: DecideCarry,
+    st: &mut SearchState,
+    mut real: Session,
+    reply: bool,
+) -> Result<DecideOut, EngineError> {
 
     // ① 箱コミットの機械実行（窓の根畳み・木より前）
     if opts.box_commit && !carry.commit.is_empty() {
@@ -1532,12 +1603,21 @@ fn decide_inner(
                 worlds: 1,
                 per_world: Vec::new(),
                 world_used: None,
+                lethal: None,
+                lethal_reply: None,
             });
         }
     }
 
     // ④ 木（§20.7.1: 世界を K 本引いて根で束ねる。K=1＝今までどおりの 1 本）
-    let runs = run_worlds(ctx, state, name, opts, rng, st)?;
+    let runs = run_worlds(ctx, state, name, opts, rng, st, reply)?;
+    let reply = runs.iter().filter_map(|r| r.reply.clone()).reduce(|mut a, b| {
+        a.checked += b.checked;
+        a.children += b.children;
+        a.proven += b.proven;
+        a.nodes += b.nodes;
+        a
+    });
     let (run, per_world, back) = merge_worlds(&runs, opts);
     let worlds = runs.len();
     // 束ねた統計の実効 sims（K×sims）＝`q_min_n` の訪問下限はこれで測る。
@@ -1702,6 +1782,8 @@ fn decide_inner(
         worlds,
         per_world,
         world_used,
+        lethal: None,
+        lethal_reply: reply,
     })
 }
 
@@ -2286,6 +2368,7 @@ pub(super) mod tests {
             },
             nodes: Vec::new(),
             world: crate::testkit::sample_state(),
+            reply: None,
         };
         let runs = vec![
             mk(0, vec![6.0, 2.0], vec![1.0, -1.0]),

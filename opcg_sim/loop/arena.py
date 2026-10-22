@@ -137,6 +137,7 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
     `arena_shard --omniscient` も同じ口から基準席へ `{"omniscient": True}` を渡す（§7.10）。
     `arena_shard --reveal {fair,peek,opp_hand}` も同じ口から `{"reveal": ...}` を渡す（§7.11）。
     `arena_shard --opp-blind` も同じ口から `{"opp_blind": True}` を渡す（§7.14）。
+    `arena_shard --lethal-proof {root,root_reply}` も同じ口から `{"lethal_proof": ...}` を渡す（§7.21）。
     """
     E.engine()
     _G["leaders_mode"] = leaders_mode
@@ -268,6 +269,10 @@ def add_cand_args(ap) -> None:
                     help="候補席だけ、木の中の相手の番のノードを「こちらの手札＋山札＋裏向きライフを混ぜ直した"
                          "複製」で評価する（`docs/search_efficiency_plan.md` §7.14・測定専用）。合法手と手の適用は"
                          "本当の世界のまま。worlds・reveal・omniscient と併用できる")
+    ap.add_argument("--cand-lethal-proof", default=None, choices=("off", "root", "root_reply"),
+                    help="候補席だけ詰みの証明（`docs/search_efficiency_plan.md` §7.21）。root＝自分のメインで届きうるとき"
+                         "公平な配り方 8 通りの全部で勝てる最初の 1 手を打つ／root_reply＝加えて根の直後の相手の応手の"
+                         "節点でも証明する（省略＝off）")
     # --- 迷う局面だけ世界 K 本で読み直す（§7.4・WP `play-rethink`）------------------------
     ap.add_argument("--cand-rethink-ratio", type=float, default=None,
                     help="候補席だけ、根の 2 位の訪問数 ÷ 1 位 ≥ τ の決定を同じ seed で世界 K 本"
@@ -286,6 +291,7 @@ CAND_VALUE_FLAGS = {
     "cand_budget": "budget",
     "cand_residual_activate": "residual_activate",
     "cand_reveal": "reveal",
+    "cand_lethal_proof": "lethal_proof",
     # 下の 2 つは opts には入らない（`SeatSpec` の名前付き引数・`decide_with_rethink`）。
     "cand_rethink_ratio": "rethink_ratio",
     "cand_rethink_worlds": "rethink_worlds",

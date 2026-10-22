@@ -21,6 +21,7 @@ pub mod adapter;
 pub mod apply;
 pub mod decide;
 pub mod determinize;
+pub mod lethal;
 #[path = "macro.rs"]
 pub mod r#macro;
 pub mod mcts;
@@ -415,6 +416,34 @@ pub fn decide_on_state(
     // **世界 0 のぶんだけ**が出る（世界 1 以降はスレッドが違う＝thread_local の計測を
     // スレッドと共に捨てる。`boxes` と同じ扱い・`decide::run_worlds` の注記）。
     let rollout = quiesce::take_rollout_stats();
+    // 詰みの証明（§7.21）は判定した決定だけに欄を足す（既定 off では鍵ごと出ない）。
+    if out.lethal.is_some() || out.lethal_reply.is_some() {
+        let mut info = serde_json::Map::new();
+        info.insert("mode".into(), Value::from(opts.lethal_proof.name()));
+        if let Some(l) = &out.lethal {
+            info.insert(
+                "root".into(),
+                serde_json::json!({"status": l.status, "deals": l.deals, "nodes": l.nodes, "line_len": l.line_len}),
+            );
+        }
+        if let Some(r) = &out.lethal_reply {
+            info.insert(
+                "reply".into(),
+                serde_json::json!({"checked": r.checked, "children": r.children, "proven": r.proven, "nodes": r.nodes}),
+            );
+        }
+        if let Some(o) = body.as_object_mut() {
+            if out.kind == "lethal" {
+                if let (Some(stats), Some(l)) = (o.get_mut("stats").and_then(Value::as_object_mut), &out.lethal) {
+                    stats.insert("lethal_proof".into(), Value::from("root"));
+                    stats.insert("lethal_line_len".into(), Value::from(l.line_len));
+                    stats.insert("lethal_deals".into(), Value::from(l.deals));
+                    stats.insert("lethal_nodes".into(), Value::from(l.nodes));
+                }
+            }
+            o.insert("lethal".into(), Value::Object(info));
+        }
+    }
     if let Some(o) = body.as_object_mut() {
         o.extend(worlds_fields);
         if !rollout.is_null() {
@@ -456,6 +485,17 @@ pub fn decide_opts_and_carry(
                 return Err(EngineError::BadPayload(
                     "decide: omniscient と reveal は同時に指定できない".into(),
                 ));
+            }
+        }
+    }
+    // `lethal_proof`（§7.21）: "off"／"root"／"root_reply" のほかは黙って既定へ落とさない。
+    match ov.get("lethal_proof") {
+        None | Some(Value::Null) => {}
+        Some(r) => {
+            if r.as_str().and_then(lethal::LethalProof::from_name).is_none() {
+                return Err(EngineError::BadPayload(format!(
+                    "decide: lethal_proof は \"off\"／\"root\"／\"root_reply\" のどれか（{r}）"
+                )));
             }
         }
     }
@@ -582,6 +622,15 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .unwrap_or(d.reveal),
         // 木の中の相手にこちらの手札を見せない（§7.14・測定専用・既定 false）。
         opp_blind: flag("opp_blind", d.opp_blind),
+        // 詰みの証明（§7.21・既定 off）。知らない値は [`decide_opts_and_carry`] がエラーにする。
+        lethal_proof: v
+            .get("lethal_proof")
+            .and_then(Value::as_str)
+            .and_then(lethal::LethalProof::from_name)
+            .unwrap_or(d.lethal_proof),
+        lethal_nodes: v.get("lethal_nodes").and_then(Value::as_u64).unwrap_or(d.lethal_nodes),
+        lethal_reply_nodes: v.get("lethal_reply_nodes").and_then(Value::as_u64).unwrap_or(d.lethal_reply_nodes),
+        lethal_reply_total: v.get("lethal_reply_total").and_then(Value::as_u64).unwrap_or(d.lethal_reply_total),
     }
 }
 

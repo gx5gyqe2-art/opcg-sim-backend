@@ -237,6 +237,10 @@ pub struct TreeMcts<'a, 'b> {
     pub root_prior_temp: f64,
     /// 木の中の相手にこちらの手札を見せない（§7.14・既定 `None`＝今までどおり）。
     pub opp_blind: Option<OppBlind>,
+    /// 根の直後の相手の応手の節点での詰みの証明（§7.21 `root_reply`・既定 `None`＝今までどおり）。
+    pub lethal_reply: Option<super::lethal::ReplyProof>,
+    /// 証明を回す節点（根の子で相手の番のもの・展開のときに 1 度だけ読む）
+    reply_nodes: Vec<usize>,
     nodes: Vec<Node>,
 }
 
@@ -252,6 +256,8 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
             q_min_frac: Q_MIN_FRAC,
             root_prior_temp: 1.0,
             opp_blind: None,
+            lethal_reply: None,
+            reply_nodes: Vec::new(),
             nodes: Vec::new(),
         }
     }
@@ -424,6 +430,42 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
     ) -> Result<f64, EngineError> {
         let ctx = self.ctx;
         let mut leaf_v: Option<f64> = None;
+
+        // §7.21 `root_reply`: 根の直後の相手の応手の節点では、各応手の後にこちらの勝ちが証明できるかを先に読む。
+        // 証明できた応手は相手から見て負け＝相手は選ばない。証明できない応手が在ればそれだけを残す（箱の畳みも
+        // その中から選ぶ）。全部が証明できたら、全部の子を相手から見て -1 の終局に固定する。
+        let mut all_proven = false;
+        if self.lethal_reply.is_some() && self.reply_nodes.contains(&node) {
+            let rp = self.lethal_reply.as_mut().expect("checked");
+            let proven = rp.prove_children(ctx.masters, s, node, &legal)?;
+            if proven.iter().all(|p| *p) && !proven.is_empty() {
+                all_proven = true;
+            } else if proven.iter().any(|p| *p) {
+                legal = legal.into_iter().zip(&proven).filter(|(_, p)| !**p).map(|(m, _)| m).collect();
+            }
+        }
+        if all_proven {
+            let n = legal.len();
+            let mut kids = Vec::with_capacity(n);
+            for _ in 0..n {
+                let c = self.new_node();
+                let cn = &mut self.nodes[c];
+                cn.expanded = true;
+                cn.terminal = true;
+                cn.term_val = -1.0;
+                cn.to_move = Some(to_move_seat);
+                kids.push(Some(c));
+            }
+            let node = &mut self.nodes[node];
+            node.legal = legal;
+            node.n = vec![0.0; n];
+            node.w = vec![0.0; n];
+            node.p = vec![1.0 / n as f64; n];
+            node.p_f32 = false;
+            node.children = kids;
+            node.expanded = true;
+            return Ok(-1.0);
+        }
 
         // 木の中の箱化（`TREE_BOX_BATTLE`）: 戦闘窓は出口 value 最良の 1 手へ畳む。
         if ctx.box_battle && legal.len() > 1 && in_battle(s) {
@@ -636,6 +678,13 @@ impl<'a, 'b> TreeMcts<'a, 'b> {
                 None => {
                     let c = self.new_child_after_apply(node, s);
                     self.nodes[node].children[a] = Some(c);
+                    // §7.21 `root_reply`: 根の子で相手の番の節点に印を付ける（展開のときに証明を回す）
+                    if node == 0 && self.lethal_reply.is_some() {
+                        let cn = &self.nodes[c];
+                        if !cn.terminal && cn.to_move.is_some() && cn.to_move != Some(to_move) {
+                            self.reply_nodes.push(c);
+                        }
+                    }
                     c
                 }
             };

@@ -51,6 +51,12 @@ PLAY_WORLDS = 2
 #: **None＝off（既定）**＝1 本の読みのまま 1 bit も変わらない。線は Phase 0 の結果で決める。
 PLAY_RETHINK_RATIO: Optional[float] = None
 PLAY_RETHINK_WORLDS = 4
+#: 対戦 API の「詰みの証明」（`docs/search_efficiency_plan.md` §7.21・WP `rs-lethal-root`）。"off"／"root"／
+#: "root_reply"。root＝自分のメインでこのターンに届きうるとき、公平な配り方（世界の引き直し 6 通り＋守りの強い
+#: 2 通り）の全部で勝てる最初の 1 手が在ればそれを打つ（節点 20,000 で打ち切り・証明できなければ今の探索）。
+#: root_reply＝加えて根の直後の相手の応手の節点でも証明する。**"off"（既定）**＝1 bit も変わらない。
+#: 既定は本番アリーナの後にコーディネータが決める。
+PLAY_LETHAL_PROOF = "off"
 GEN_PRUNE_FUTILE = False   # 生成は枝刈りを外す（v6 柱⑤: 刈った枝は学習データに現れない）
 
 _STATE: Dict[str, Any] = {}
