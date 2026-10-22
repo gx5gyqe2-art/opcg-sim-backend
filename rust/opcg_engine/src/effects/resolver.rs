@@ -213,6 +213,8 @@ pub fn game_resolve_ability(
     if !s.state().in_passive_recalc {
         resolver.flush_events(s, masters, actor, source_card);
     }
+    // 一番外の効果を解決し切ったら、その間に誘発した能力を消化する（WP `rs-trigger-order`）。
+    super::triggers::drain_after_effect(s, masters)?;
     Ok(())
 }
 
@@ -240,7 +242,7 @@ pub fn game_resolve_ability_with_subject(
     if !s.state().in_passive_recalc {
         resolver.flush_events(s, masters, actor, source_card);
     }
-    Ok(())
+    super::triggers::drain_after_effect(s, masters)
 }
 
 /// `resolver.action_history` を `action_events` の `EFFECT` 行へ写す（Python の 3 か所が
@@ -545,7 +547,24 @@ impl Resolver {
 
     // -- 実行スタック（Python `_process_stack`）------------------------------
 
+    /// 実行スタックを処理する。処理のあいだは [`Session::resolving_depth`] が 1 つ上がり、
+    /// その間に誘発した能力は待ち行列に留まる（誘発は今解決中の効果を解決し切ってから・
+    /// WP `rs-trigger-order`）。消化は呼び出し側＝[`game_resolve_ability`] の末尾（イベントを
+    /// 写した後）と、対話の後の `triggers::settle_pending`。
     pub fn process_stack(
+        &mut self,
+        s: &mut Session,
+        masters: &MasterTable,
+        actor: Seat,
+        source_card: Option<CardIdx>,
+    ) -> Result<(), EngineError> {
+        s.enter_resolving();
+        let r = self.process_stack_inner(s, masters, actor, source_card);
+        s.leave_resolving();
+        r
+    }
+
+    fn process_stack_inner(
         &mut self,
         s: &mut Session,
         masters: &MasterTable,
@@ -935,7 +954,14 @@ impl Resolver {
             source_card,
         )?;
         let drawn = s.state().player(drawer).hand.len() as i32 - hand_before;
-        if s.state().replacement_suspended && !self.execution_stack.is_empty() {
+        // 行動の中で対話が立った（置換の内側中断・場の上限の押し出し・入れ子の効果の対象選択・
+        // 【トリガー】の発動確認など）なら、この効果の残りの手順を退避して対話の後に再開する。
+        // 行動の前は対話が無い（`process_stack` が先に見る）ので、立っていれば行動が立てたもの。
+        // 2026-10-22 まで押し出しでは退避しておらず、親の残り（OP17-092「その後、このターン中、
+        // キャラカードを登場できない」）が消えていた（WP `rs-trigger-order`）。
+        if (s.state().replacement_suspended || s.state().active_interaction().is_some())
+            && !self.execution_stack.is_empty()
+        {
             super::interact::defer_resolver_stack(
                 s,
                 actor,

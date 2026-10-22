@@ -268,6 +268,13 @@ pub struct Session {
     /// いま対象ループで効果を実行している席（「自分の効果で」「相手の効果で」の判定用）。
     /// journal の外の一時値＝対象 1 枚の処理の前後で立てて戻す。効果の外（バトル等）は `None`。
     effect_actor: Option<(Seat, Option<CardIdx>)>,
+    /// いま実行スタックを処理している効果の入れ子の深さ（[`Session::enter_resolving`]）。
+    /// journal の外の一時値＝`process_stack` の前後で立てて戻す（中断しても戻る）。
+    /// 0 でない間は誘発の待ち行列を消化しない＝誘発は今解決中の効果を解決し切ってから解決する
+    /// （WP `rs-trigger-order`・`docs/reports/2026-10-22_trigger_order.md`）。
+    resolving: u32,
+    /// 誘発の待ち行列を消化している最中か（効果の終わりの消化を入れ子にしない）。journal の外。
+    draining: bool,
 }
 
 impl Session {
@@ -280,7 +287,33 @@ impl Session {
             events_muted: false,
             shuffled: Vec::new(),
             effect_actor: None,
+            resolving: 0,
+            draining: false,
         }
+    }
+
+    /// 実行スタックを処理している効果の入れ子の深さ（0＝効果の外）。
+    pub fn resolving_depth(&self) -> u32 {
+        self.resolving
+    }
+
+    /// 効果の実行スタックの処理に入る／出る（`Resolver::process_stack` だけが呼ぶ）。
+    pub fn enter_resolving(&mut self) {
+        self.resolving += 1;
+    }
+
+    pub fn leave_resolving(&mut self) {
+        self.resolving = self.resolving.saturating_sub(1);
+    }
+
+    /// 誘発の待ち行列を消化している最中か。
+    pub fn draining(&self) -> bool {
+        self.draining
+    }
+
+    /// 消化中の印を立てる（戻り値は直前の値＝呼び出し側が戻す）。
+    pub fn set_draining(&mut self, on: bool) -> bool {
+        std::mem::replace(&mut self.draining, on)
     }
 
     /// 対象ループが処理中の効果の実行者（無ければ `None`）。

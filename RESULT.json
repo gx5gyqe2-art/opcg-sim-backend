@@ -1,70 +1,124 @@
 {
- "job": "enc-v15",
+ "job": "rs-trigger-order",
  "role": "implement",
  "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.19 (origin/claude/cpu-spec-improvements-yw91jd @ 25a51f28a; ledger 2+322); basis docs/reports/2026-10-22_enc_audit.md §2, §3.1 plan A",
+ "spec": "docs/search_efficiency_plan.md §7.20 (origin/claude/cpu-spec-improvements-yw91jd @ 96869e9e3; ledger 2+323); defect docs/reports/2026-10-22_enc_v15.md §4",
  "inputs": {
-  "base": "claude/cpu-spec-improvements-yw91jd @ 25a51f28a",
-  "net": "nrel_r13d.npz (DEFAULT_NET; meta enc_version 14, read by v15 without pad)"
+  "base": "origin/claude/cpu-spec-improvements-yw91jd@96869e9e3",
+  "net": "opcg_sim/data/learned/nrel_r13d.npz (both seats)"
  },
  "outputs": {
-  "branch": "claude/enc-v15",
-  "report": "docs/reports/2026-10-22_enc_v15.md",
-  "enc_version": 15,
-  "files": [
-   "rust/opcg_engine/src/encode/mod.rs (ENC_VERSION 15, ENC_VERSION_V14, OwnRemaining, EncodeOptions.deck_v14)",
-   "rust/opcg_engine/src/encode/scalars.rs (deck_aggregate / deck_apex read OwnRemaining)",
-   "rust/opcg_engine/src/encode/tokens.rs (own-deck roles 7+2 as expectation)",
-   "rust/opcg_engine/src/net/nrel.rs (cand_target pinned to v14; encode_options carries deck_v14)",
-   "rust/opcg_engine/src/net/mod.rs, search/quiesce.rs, lib.rs, py_game.rs, search/decide.rs (measurement-only switch: npz meta enc_deck=v14 / encode opts deck_v14)",
-   "rust/opcg_engine/src/search/tests_fair.rs (+1 test: enc_v15_own_deck_columns_are_world_invariant)",
-   "opcg_sim/learned/n_rel_feat.py (own_remaining, expect_combine, _deck_roles(rem) + cache key)",
-   "opcg_sim/learned/encoder.py (_deck_aggregate(me), _deck_apex(me), version map 15)",
-   "opcg_sim/learned/n_rel.py (NR_ENC_VERSION 15, NR_ENC_VERSION_V14; pad boundary stays 14)",
-   "opcg_sim/loop/record_gen.py (meta enc_version 15 = ENC_VERSION_V15)",
-   "tests/test_enc_v14.py, tests/test_n_record_v3.py (version assertions; v14-stamped npz read by v15 matches Python forward)",
-   "tests/scripts/rs_enc_v14_probe.py (--what agree)",
-   "tests/fixtures/rs_goldens/replay/a1_*.json (a1 band regenerated; 34 files changed)",
-   "docs/SPEC.md §2.5.9 (encoding now reads own knowledge for the 16 columns), docs/TEST_SPEC.md rows",
-   "n1_results/enc_v15/ (fair_diff ship/side json+tables, agree, arena jsonl, a1 divergence, void seed reruns)"
+  "branch": "claude/rs-trigger-order",
+  "report": "docs/reports/2026-10-22_trigger_order.md",
+  "code": [
+   "rust/opcg_engine/src/journal.rs",
+   "rust/opcg_engine/src/effects/resolver.rs",
+   "rust/opcg_engine/src/effects/triggers.rs",
+   "rust/opcg_engine/src/effects/interact.rs",
+   "rust/opcg_engine/src/effects/actions/flow.rs",
+   "rust/opcg_engine/src/rules/actions.rs",
+   "rust/opcg_engine/src/rules/turn.rs",
+   "rust/opcg_engine/src/rules/battle.rs"
+  ],
+  "tests": [
+   "rust/opcg_engine/src/effects/tests_trigger_order.rs"
+  ],
+  "goldens": [
+   "tests/fixtures/rs_goldens/audit.json",
+   "tests/fixtures/rs_goldens/replay/ (17 files)"
+  ],
+  "ledger": "tests/fixtures/card_audit_ledger.json (20 IMPL_CHANGED re-reviewed ok)",
+  "docs": [
+   "docs/SPEC.md §1.5 §3.5",
+   "docs/TEST_SPEC.md (1 row)"
   ]
  },
  "results": {
-  "world_invariance": {
-   "ship_1280x2": {"decision_points": 2559, "features": 287, "features_with_any_diff": 0, "value_diff_all_pairs": 0.0, "approximation_cases": 0},
-   "side_160x2": {"decision_points": 2622, "features": 287, "features_with_any_diff": 0, "value_diff_all_pairs": 0.0, "approximation_cases": 0},
-   "pairs_checked": ["peek_fair", "truth_peek", "truth_fair", "fair_world0_vs_1"]
+  "repro_seed1680032": {
+   "before": "void (step cap)",
+   "after": "2/2 games decided",
+   "settings": "both r13d (v15), 1280 sims, budget 0, synth_roles, leaders random"
   },
-  "switch_identity": "r13d + meta enc_deck=v14 on the v15 wheel == branch-point v14 wheel: 40/40 decide rows identical (kind/sig/k/cands n,q)",
-  "move_agreement_r13d_v15_vs_v14": {
-   "setting": "sims 1280, worlds 1, budget 0, synth_roles, seeds 1680000-1680007 (8 games), same board/carry/search seed per point",
-   "all_points": {"n": 1064, "same": 1052, "rate": 0.9887},
-   "free_points_2plus_candidates_no_commit": {"n": 443, "same": 433, "rate": 0.9774},
-   "by_turn_free": {"0-2": [29, 1.0], "3-5": [68, 0.971], "6-8": [130, 0.962], "9+": [216, 0.986]}
+  "rust_tests": {
+   "cargo_test": "596 passed (594 existing + 2 new)",
+   "new_tests_fail_on_old_engine": true
   },
-  "arena_local_40": {
-   "candidate": "r13d v15", "baseline": "r13d v14 (meta enc_deck=v14)",
-   "setting": "sims 1280, budget 0 both, worlds 1, leaders random, decks synth_roles, seed base 1680000",
-   "pairs_scored": 39, "void": 1, "void_rate": 0.025, "wins": 35.0, "games": 78, "wr": 0.4487, "ci95": [0.3304, 0.567], "elo": -35.8,
-   "forecast": "±10",
-   "verdict": "none (void rate 2.5% > 2%, CLAUDE.md; also CI far too wide at 40 pairs)"
+  "golden_audit": {
+   "total": 3387,
+   "changed": 15,
+   "by_trigger": {
+    "TRIGGER": 15
+   },
+   "by_action": {
+    "PLAY_CARD": 15,
+    "RETURN_DON": 2,
+    "KO": 1,
+    "DISCARD": 1
+   },
+   "verdict": {
+    "correct_now": 1,
+    "equivalent_event_order_only": 14,
+    "suspicious": 0
+   }
   },
-  "golden": {
-   "audit_3386": "unchanged (test green, not regenerated)",
-   "replay_random_150": "unchanged (test green, not regenerated)",
-   "replay_a1_50": {"regenerated": true, "identical": 16, "diverged": 34, "winner_changed": 9, "first_divergence_step_median": 28, "first_divergence_frac_median": 0.27, "first_divergence_min": 0, "first_divergence_max": 116, "total_steps_old": 5514, "total_steps_new": 5826}
+  "golden_replay": {
+   "total": 200,
+   "changed": 17,
+   "random": 12,
+   "a1": 5,
+   "winner_changed": 0,
+   "verdict": {
+    "correct_now": 5,
+    "equivalent_event_order_only": 11,
+    "decision_only": 1,
+    "suspicious": 0
+   }
   },
-  "gates": {"make_test": "green (cargo 594 passed 1 ignored; pytest 854 passed 13 skipped)", "audit_cross": "void 0 (120 pairs, 240 games)"},
-  "encode_latency_ms_median": {"v15": [0.065, 0.066, 0.093], "v14": [0.064, 0.064, 0.093]}
+  "card_audit": {
+   "all_scan_findings": "ACTION_NOT_FIRED 7->5 (OP16-105, ST13-006 now fire 3rd play); no new findings",
+   "impl_changed_reviewed": 20
+  },
+  "audit_cross": {
+   "pairs": 120,
+   "games": 240,
+   "void": 0,
+   "wr": 0.4833
+  },
+  "arena_local": {
+   "pairs": 40,
+   "seed_base": 1681000,
+   "settings": "both r13d, 1280 sims, budget 0, synth_roles, leaders random",
+   "after_wheel": {
+    "void": 0,
+    "wins": 50.0,
+    "wr": 0.625,
+    "ci95": [
+     0.4997,
+     0.7503
+    ]
+   },
+   "before_wheel": {
+    "void": 0,
+    "wins": 51.0,
+    "wr": 0.6375,
+    "ci95": [
+     0.511,
+     0.764
+    ]
+   },
+   "pairs_identical_results_and_turns": 37,
+   "pairs_result_changed": 1
+  },
+  "make_test": "green: cargo test 596 passed; pytest 854 passed, 13 skipped (43 s)"
  },
  "notes": [
-  "cand_target() compared enc_version >= ENC_VERSION; bumping to 15 would have silently dropped the v14 candidate-target rule for r13d (enc_version 14) and changed its moves. Pinned to ENC_VERSION_V14 (Python cand_ids already used a literal 14; Python pad boundary moved to NR_ENC_VERSION_V14).",
-  "The 16 columns are computed v15-style regardless of the version argument in both languages (NRel's Python path builds on E.encode(version=12)+encode_rel, so a version gate could not switch them; Rust never had per-version encoding). Only the measurement switch deck_v14 reproduces v14. c-series Python encoding (n_eff, v12) goes through the same helpers.",
-  "Cache key (report §3.1): Rust had no deck-content-keyed cache (trunk cache keys on scalar bits = automatically correct). Only Python _DECK_ROLES_CACHE needed a new key (known ids, unknown ids, unknown deck slots).",
-  "Python known_by port: card attribute known_by (Rust bits P1=1, P2=2) and player attribute know_bit. Python boards carry neither today -> computed as 'no known cards'. The Python-vs-Rust encoding oracle (rs_encode_oracle.py) lives in legacy/ and is not in the current suite, so there were 0 oracle boards to restrict. Proposal (not implemented): add known_by per card to record v5 'hidden' so Python can reproduce v15 exactly on boards with known cards (51% of decision points have >=1 known own-deck card, mean 2.9).",
-  "Apex uses the plain max over known-deck + unknown cards (report's recommendation); it over-reads by the chance the top card sits in face-down life.",
-  "Void in the local arena (seed 1680032, OP17-079 Luffy vs OP06-080 Moria) is an engine trigger-ordering defect, not the encoding: Brogy (OP17-092) / Dorry (OP17-085) on-play each play the other from trash; the field-overflow dialog makes the child's queued ON_PLAY resolve before the parent's remaining 'then you cannot play Character cards this turn', so they ping-pong until the 400-step cap. Reproduces with both seats v15; both seats v14 take a different line. A trial patch making effect play_card honour CANNOT_PLAY_CHARACTER did NOT stop it (restriction not yet applied) -> root cause is the ordering. Not fixed here (changes rules + goldens; out of scope). Proposed: separate WP to drain queued triggers only after the parent ability finishes, plus effect play honouring CANNOT_PLAY_CHARACTER; report §4 has the decision write-up (recommend (c): merge v15, fix in parallel WP).",
-  "Arena verdict withheld per CLAUDE.md (void > 2%). The 0.449 over 39 pairs is reference only; at 40 pairs the CI (±0.12) cannot resolve the ±10 forecast.",
-  "Training data: record shape unchanged, meta enc_version 15; existing waves (<=47) keep v14 (leaky) columns; with current windows all training input is v15 after 2 waves (48, 49)."
+  "Root cause was worse than enc_v15 §4 assumed: the field-overflow interaction has no continuation, so the resolver holding the parent's remaining steps (OP17-092 'then you cannot play Character cards this turn') was dropped, not merely ordered later. Fixed generally: any interaction raised inside an action now defers the rest of the effect's stack (as removal replacement already did) and it resumes before queued triggers.",
+  "Ordering rule implemented: triggers raised while an effect resolves wait in pending_triggers until the outermost effect finishes (Session resolving depth, journal-outside temp like effect_actor); drain after game_resolve_ability (after event flush) and settle_pending (deferred remainder first, then queue) after dialogs and at action/battle/turn boundaries. Rule basis cited as comprehensive rules 8-6-1 (auto effects triggered during an effect's processing activate after it); the repo has no rules text, so the article number/wording is from memory — please verify against the official CR.",
+  "Life [Trigger] stays immediate even during effect damage (part of damage processing, not an auto effect); only life-trigger items are processed while holding.",
+  "Effect PLAY_CARD of a character now honours CANNOT_PLAY_CHARACTER (with min_cost on master cost), same rule as hand play.",
+  "Out of scope, left as-is: own [On K.O.] (triggers::fire_on_ko) and [On Rest] resolve inline instead of via the queue; by the same rule they should wait for the current effect. Proposal: separate WP if wanted (would move goldens further).",
+  "Event log order changed: a child's EFFECT events are now emitted after the parent's (old engine logged the inline child first). 14/15 audit-golden and 11/17 replay-golden changes are this alone (states identical).",
+  "Arena 'after vs before wheel' cannot be played inside one game (one rules engine per game; two builds of the same extension cannot load in one process). Measured instead as the same 40 pairs played once per wheel and compared pair by pair: void 0 both, 37/40 identical results and turns, 1 game flipped. The wr ~0.63 is same-net seat/seed-set noise in both runs, not strength.",
+  "make card-audit default scope is now back to 285 UNREVIEWED vanilla cards only."
  ]
 }

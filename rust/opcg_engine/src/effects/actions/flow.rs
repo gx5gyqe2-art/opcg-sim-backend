@@ -231,6 +231,13 @@ fn play_card(
     if masters.get(s.state().card(target).master).ty == CardType::Event {
         return Ok(());
     }
+    // 「このターン中、（元々のコストN以上の）キャラカードを登場できない」は効果による登場も止める
+    // （登場の手段を問わない。手札からの登場の検証 `rules::actions::play_card_action` と同じ規則）。
+    if masters.get(s.state().card(target).master).ty == CardType::Character
+        && blocks_character_play(s, masters, target, owner)
+    {
+        return Ok(());
+    }
     move_card(s, masters, target, Zone::Field, owner, Position::Bottom)?;
     s.edit()
         .set_card_bool(target, CardBoolField::IsNewlyPlayed, true);
@@ -260,11 +267,24 @@ fn play_card(
     Ok(())
 }
 
+/// 「キャラカードを登場できない」（`CANNOT_PLAY_CHARACTER`）が `owner` に有効で、`card` に効くか
+/// （`min_cost` 付きは元々のコスト＝`master.cost` がそれ以上のキャラだけ）。
+fn blocks_character_play(s: &Session, masters: &MasterTable, card: CardIdx, owner: Seat) -> bool {
+    match crate::rules::active_restriction(s.state(), owner, "CANNOT_PLAY_CHARACTER") {
+        None => false,
+        Some(rec) => match rec.min_cost {
+            None => true,
+            Some(n) => masters.get(s.state().card(card).master).cost >= n,
+        },
+    }
+}
+
 /// Python `per_target.play_card` の ON_PLAY 分岐。
 ///
 /// `triggers::resolve_on_play`（`play_card_action` 用）と違い、**「相手の登場時効果は無効になる」
 /// (OPP_ONPLAY) を見ない**——Python の効果による登場は `negate_onplay_until` を参照しない。
-/// 中断中は待ち行列へ積む（押し出し確定後・対話完了時に消化される）。
+/// 中断中と**効果の解決中**は待ち行列へ積む（今解決中の効果を解決し切った後に消化される・
+/// WP `rs-trigger-order`。2026-10-22 までは効果の途中でその場で解決していた）。
 fn resolve_effect_on_play(
     s: &mut Session,
     masters: &MasterTable,
@@ -281,7 +301,7 @@ fn resolve_effect_on_play(
         if ability(masters, *id)?.trigger != TriggerType::OnPlay {
             continue;
         }
-        if s.state().active_interaction().is_some() {
+        if s.state().active_interaction().is_some() || s.resolving_depth() > 0 {
             triggers::enqueue_trigger(s, owner, card, index, false);
         } else {
             crate::effects::resolver::game_resolve_ability(s, masters, owner, card, index, false)?;

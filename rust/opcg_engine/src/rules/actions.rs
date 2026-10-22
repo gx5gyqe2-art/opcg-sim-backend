@@ -442,7 +442,7 @@ pub fn apply_game_action_with<'p>(
     }
 
     // Python: アクション境界の `_advance_pending_triggers()` → `refresh_passive_state()`。
-    crate::effects::triggers::advance_pending_triggers(s, masters)?;
+    crate::effects::triggers::settle_pending(s, masters)?;
     refresh_passive_state(s, masters)?;
     Ok(())
 }

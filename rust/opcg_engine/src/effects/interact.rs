@@ -878,10 +878,10 @@ pub fn after_resolve(s: &mut Session, masters: &MasterTable) -> Result<(), Engin
         s.edit().set_phase(crate::model::Phase::Mulligan);
         s.edit().clear_mulligan_done();
     }
-    // ライフ公開【トリガー】/ON_LIFE_DECREASE 等のペンディング誘発を消化する。
-    if s.state().active_interaction().is_none() && !s.state().pending_triggers.is_empty() {
-        super::triggers::advance_pending_triggers(s, masters)?;
-    }
+    // 中断していた効果の残り（退避した継続）を先に解決し切り、それからライフ公開【トリガー】/
+    // ON_LIFE_DECREASE・効果による登場の【登場時】等のペンディング誘発を消化する
+    // （親の効果 → 子の誘発の順・WP `rs-trigger-order`。2026-10-22 までは誘発が先だった）。
+    super::triggers::settle_pending(s, masters)?;
     // バトルトリガー解決中の中断から復帰した場合、残りの解決＋フェイズ遷移を再開する。
     if s.state().active_interaction().is_none()
         && s.state().active_battle.is_some()
@@ -945,10 +945,9 @@ fn resolve_field_overflow(
     if s.state().player(owner).field.len() > crate::rules::FIELD_LIMIT {
         crate::rules::actions::suspend_for_field_overflow(s, owner);
     }
-    // 超過対話の背後に積まれた誘発（効果登場の【登場時】等）を消化する。
-    if s.state().active_interaction().is_none() && !s.state().pending_triggers.is_empty() {
-        super::triggers::advance_pending_triggers(s, masters)?;
-    }
+    // 押し出しで中断した効果の残り（例: 「その後、このターン中、キャラカードを登場できない」）を
+    // 先に解決し切り、それから超過対話の背後に積まれた誘発（効果登場の【登場時】等）を消化する。
+    super::triggers::settle_pending(s, masters)?;
     Ok(())
 }
 
