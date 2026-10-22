@@ -118,6 +118,32 @@ def _legal_for(leader, c):
     return True if f is None else bool(f(c))
 
 
+#: 「デッキに何枚でも入れることができる」カード（同名 4 枚上限の例外・例 OP16-042）。
+UNLIMITED_PAT = re.compile(r"デッキに何枚でも入れる")
+
+
+def check_legal(leader, cards, size=DECK_SIZE):
+    """デッキの合法性（50 枚・色一致＋硬い制約・同じカード 4 枚まで）。違反の説明の list を返す（空＝合法・pure）。
+
+    枚数の上限は `MAX_COPIES`（構築ルールどおり**カード番号**で数える＝名前が同じ別番号は別。
+    生成器は名前で数えるのでこれより厳しい）。本文に「何枚でも入れる」と書かれたカードだけ上限を外す。
+    """
+    lm = _master(leader)
+    ms = [_master(c) for c in cards]
+    why = []
+    if len(ms) != size:
+        why.append(f"枚数{len(ms)}")
+    bad = sorted({m.card_id for m in ms if m.type.name == "LEADER" or not _legal_for(lm, m)})
+    if bad:
+        why.append(f"色・制約違反{bad[:3]}")
+    cnt = collections.Counter(m.card_id for m in ms)
+    unl = {m.card_id for m in ms if UNLIMITED_PAT.search(_text(m))}
+    over = sorted(n for n, v in cnt.items() if v > MAX_COPIES and n not in unl)
+    if over:
+        why.append(f"同番号{MAX_COPIES}枚超{over[:3]}")
+    return why
+
+
 def score_card(c, leader, theme):
     """採用スコア（大きいほど優先）。テーマ整合と役割の価値を足す（pure）。"""
     s = 0.0

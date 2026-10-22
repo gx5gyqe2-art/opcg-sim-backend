@@ -9,6 +9,7 @@ Rust の `opcg_engine.Game` は **card_id の列**を取り、その並びがそ
   synth     … `deck_synth.synth_deck`（テーマ整合・依存閉包・守り札比率）
   synth_dig … `deck_dig` で掘りカードを差し込んだ synth（残ドン掘りの対照実験用）
   synth_roles … `deck_roles` で除去の「型」を色ごとに差し込んだ synth（教材の対照・§20.8.1）
+  synth_roles2 … `deck_synth2`（実デッキの量＝積み方・コスト帯・役割に寄せた v2・WP synth-decks-v2）
 """
 import os
 import random
@@ -118,7 +119,7 @@ def build_pair(db, la: Optional[str], lb: Optional[str], seed: int, decks: str =
                with_kinds: bool = False):
     """1 局ぶんの両席デッキ `((l1, d1), (l2, d2))`（card_id）。
 
-    `decks`: "singleton"／"synth"／"synth_dig"／"synth_roles"。`la`／`lb` が None なら既定リーダー
+    `decks`: "singleton"／"synth"／"synth_dig"／"synth_roles"／"synth_roles2"／"user"。`la`／`lb` が None なら既定リーダー
     （singleton の 1 枚目）＝従来のミラー。
 
     `with_kinds=True` なら `((l1, d1), (l2, d2), (k1, k2))` を返す（`k` は `deck_roles` の型 dict・
@@ -135,6 +136,12 @@ def build_pair(db, la: Optional[str], lb: Optional[str], seed: int, decks: str =
         # （ホールドアウトのリーク防止・`heldout_decks.json` の規約と同じ扱い）。
         pair = user_deck_pair(seed)
         return (pair + (kinds,)) if with_kinds else pair
+    if decks == "synth_roles2":
+        from opcg_sim.loop import deck_synth2
+        l1, c1, k1 = deck_synth2.synth_deck2(db, la, seed=seed, owner="p1")
+        l2, c2, k2 = deck_synth2.synth_deck2(db, lb or la, seed=seed + 1, owner="p2")
+        pair = ((_ids([l1])[0], _ids(c1)), (_ids([l2])[0], _ids(c2)))
+        return (pair + ((k1, k2),)) if with_kinds else pair
     l1, c1 = deck_synth.synth_deck(db, la, seed=seed, owner="p1")
     l2, c2 = deck_synth.synth_deck(db, lb or la, seed=seed + 1, owner="p2")
     if decks == "synth_dig":
