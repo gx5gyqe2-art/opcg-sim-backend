@@ -55,9 +55,10 @@ def test_v14_dimensions():
         "deck_removal_fixed", "opp_pool_removal_fixed", "deck_bounce", "opp_pool_bounce")
     assert (NL.D_SC, NL.D_X, NL.D_Z) == (127, 91, 415)
     assert (NL.D_SC_V13, NL.D_X_V13, NL.D_Z_V13) == (123, 89, 411)
-    assert NL.NR_ENC_VERSION == 14
-    # 版マップ（`encoder`）も v13 を据え置いたまま v14 が生えている
-    assert E.scalars_dim(13) == 123 and E.scalars_dim(14) == 127
+    # v15（WP `enc-v15`・§7.19）は形が v14 と同じ（16 列の意味だけが変わる）
+    assert NL.NR_ENC_VERSION == 15 and NL.NR_ENC_VERSION_V14 == 14
+    # 版マップ（`encoder`）も v13 を据え置いたまま v14・v15 が生えている
+    assert E.scalars_dim(13) == 123 and E.scalars_dim(14) == E.scalars_dim(15) == 127
 
 
 def test_new_opp_pool_columns_join_the_ablation_mask():
@@ -167,6 +168,12 @@ def kit(tmp_path_factory):
     ret = np.zeros(N_ROWS, np.float32)
     ret[1] = 3.0
     net.save(v14, meta={"kind": "nrel-a"}, vocab_ids=VOCAB_IDS)
+    # 符号化 v14 で保存した npz（r13d 等）: 形は v15 と同じで meta の版だけが 14（v15 で pad せずに読む）
+    v14s = os.path.join(d, "net_v14_stamp.npz")
+    with np.load(v14, allow_pickle=True) as z:
+        arrs = {k: z[k] for k in z.files}
+    arrs["meta"] = np.array(json.dumps(dict(json.loads(str(arrs["meta"])), enc_version=14)))
+    np.savez(v14s, **arrs)
     _save_v13(v13, net)
     _tables_npz(tp, tables, ret)
     enc = _encoding(np.random.default_rng(5))
@@ -174,7 +181,7 @@ def kit(tmp_path_factory):
     enc0[0][NL.D_SC_V13:] = 0.0
     enc0[2][:, NR.S_DIM_V13:] = 0.0
     return {"dir": d, "tables": tables, "ret": ret, "net": net,
-            "v14": v14, "v13": v13, "tp": tp, "enc": enc, "enc0": enc0}
+            "v14": v14, "v14s": v14s, "v13": v13, "tp": tp, "enc": enc, "enc0": enc0}
 
 
 # ---------------------------------------------------------------------------
@@ -274,12 +281,15 @@ def _legal_and_py_priors(net, tables, ret, enc):
     return json.dumps({"moves": moves}), NL.NRelNet.seg_softmax(lo, seg, 1)
 
 
-def test_rust_matches_python_on_v14(kit):
+@pytest.mark.parametrize("key,stamp", [("v14", 15), ("v14s", 14)])
+def test_rust_matches_python_on_v14(kit, key, stamp):
+    """v15 の符号化で、v15 の版を押した npz も v14 の版の npz（r13d 等）も pad せず同じ値で読む。"""
     enc = kit["enc"]
     legal, p_py = _legal_and_py_priors(kit["net"], kit["tables"], kit["ret"], enc)
-    got = _rust_eval(kit["v14"], kit["tp"], _enc_json(*enc), legal, tmp=kit["dir"])
-    assert got["summary"]["enc_version"] == 14
-    assert got["summary"]["enc_version_current"] == 14
+    got = _rust_eval(kit[key], kit["tp"], _enc_json(*enc), legal, tmp=kit["dir"])
+    assert got["summary"]["enc_version"] == stamp
+    assert got["summary"]["enc_version_current"] == 15
+    assert NL.NRelNet.load(kit[key], kit["tables"]).Wt.shape == kit["net"].Wt.shape
     assert abs(got["value"] - _py_value(kit["net"], enc)) < TOL
     assert np.max(np.abs(np.array(got["priors"]) - p_py)) < TOL
 

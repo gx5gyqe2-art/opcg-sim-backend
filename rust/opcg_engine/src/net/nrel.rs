@@ -169,7 +169,8 @@ impl NRelWeights {
     /// （素性が全部 PAD＝P は一様）。列の pad と違って**重み 0 で無効化できない**変更なので、
     /// 版で分岐しないと「v13 のネットを v14 で読むと手が変わる」ことになる。
     pub fn cand_target(&self) -> bool {
-        self.enc_version >= crate::encode::ENC_VERSION
+        // v14 から（v15 は形も候補行も v14 と同じ＝境目は v14 のまま）。
+        self.enc_version >= crate::encode::ENC_VERSION_V14
     }
 
     /// `NRelNet.mask_sc`（scalars の遮断・`opp_pool`／`onplay`）。
@@ -198,6 +199,7 @@ impl NRelWeights {
         EncodeOptions {
             skip_relations: self.ablated("rel"),
             skip_onplay: self.ablated("onplay"),
+            deck_v14: self.deck_v14,
         }
     }
 }

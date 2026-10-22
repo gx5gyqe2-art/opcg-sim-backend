@@ -281,6 +281,10 @@ fn encode_state_impl(
                     .get("skip_onplay")
                     .and_then(serde_json::Value::as_bool)
                     .unwrap_or(false),
+                deck_v14: v
+                    .get("deck_v14")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
             }
         }
     };

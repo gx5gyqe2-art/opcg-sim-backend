@@ -96,7 +96,11 @@ ENC_VERSION = 12       # dump v1 の符号化世代（過去の波の meta に�
 ENC_VERSION_V2 = 13    # dump v2／v3／波 29 まで（v12 ＋ グローバル追加 29・append-only）
 #: 符号化 v14（2026-09-11・§20.9）。**列の形が変わる唯一の欄**（tokens 22×22・scalars 127）。
 #: `dump_io` は v13 の波を 0 埋めで v14 の形に揃えて読む＝波を混ぜて訓練できる。
-ENC_VERSION_V14 = NL.NR_ENC_VERSION    # 14
+ENC_VERSION_V14 = NL.NR_ENC_VERSION_V14    # 14
+#: 符号化 v15（2026-10-22・WP `enc-v15`・`search_efficiency_plan.md` §7.19）: **形は v14 と同じ**で、自分の残り
+#: 山札の 16 列が「山札＋伏せたライフから作る期待値」になった（伏せたライフの中身に依らない）。meta に書くのはこれ。
+#: 波 47 までの v14 の波と形が同じ＝そのまま混ぜて読める（16 列の意味だけが違う）。
+ENC_VERSION_V15 = NL.NR_ENC_VERSION    # 15
 DUMP_VERSION = 5       # v4 ＋ 守る側の補助教師（aux_def／aux_def_row・P8・`2026-09-24_p8_defender_columns.md`）
 #: `--decks` の既定（歴代の波は全て synth＝規約を変えない）。
 DEFAULT_DECKS = "synth"
@@ -1027,7 +1031,7 @@ def main(argv=None):
     with open(os.path.join(args.out, "meta_n_record.json"), "w") as f:
         json.dump({"games": args.games, "rows": n_rows, "main_rows": n_main,
                    "dropped": n_drop, "sims": args.sims, "decks": args.decks,
-                   "enc_version": ENC_VERSION_V14,
+                   "enc_version": ENC_VERSION_V15,
                    "dump_version": 3 if args.no_aux else DUMP_VERSION,
                    "aux": not args.no_aux, "seed_base": args.seed_base,
                    "net": E.resolve_net(args.net), "engine": "rust",

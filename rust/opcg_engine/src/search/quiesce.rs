@@ -158,6 +158,7 @@ impl<'a> Ctx<'a> {
             // 別途組むが、a1 は `ablate={"rel"}` なので 0 のままでよい。
             skip_relations: true,
             skip_onplay: self.net.weights.ablated("onplay"),
+            deck_v14: self.net.weights.deck_v14,
         }
     }
 

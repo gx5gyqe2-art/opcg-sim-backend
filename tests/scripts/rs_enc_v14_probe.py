@@ -8,6 +8,11 @@
    採り、`--cmp` で突き合わせる＝**同じ手・同じ stats** なら pad が恒等。
 2. **符号化のレイテンシ**（`--what latency`）: 先頭 3 局面で `Game.encode(name)` を
    `--reps` 回まわして中位値（ms）を出す。
+3. **最善手の一致率**（`--what agree`・WP `enc-v15`・`search_efficiency_plan.md` §7.19）: 基準の席
+   （`--net`）で局を打ち、各判断点で同じ盤面・同じ持ち越し・同じ探索 seed のまま候補のネット
+   （`--cand-net`）でも decide して、選んだ手が同じかを数える（decide は盤面を変えない＝同じ点で比べられる。
+   局が分かれないので「同じ位置」の比較が局の分岐に汚れない）。v15 と v14 の符号化の比較は、候補＝r13d
+   （v15 の符号化）・基準＝meta に `"enc_deck": "v14"` を足した r13d の写し（v14 の作りで 16 列を出す・測定専用）。
 
 盤面は生成と同じ規約（`decks.leader_pair`＋`build_pair`）で組む＝計測が実物からずれない。
 
@@ -110,6 +115,55 @@ def latency(seeds, n_pos, reps, sims, decks, net):
     return out[:n_pos]
 
 
+def agree(seeds, sims, decks, net, cand_net, worlds, budget):
+    """基準の席で打ち、各判断点で候補のネットも decide して手の一致を数える（`--what agree`）。
+
+    返り値の各行: `forced`（持ち越しの箱コミットがある＝手が決まっている点）・`n_groups`（根の候補の束の数）・
+    `same`（選んだ手が同じ）。一致率は `forced` でなく候補が 2 つ以上の点で読む。"""
+    E.engine()
+    kw = dict(sims=sims, dirichlet_eps=0.0, temp_turns=0, prune_futile=E.GEN_PRUNE_FUTILE)
+    if worlds:
+        kw["worlds"] = worlds
+    if budget is not None:
+        kw["budget"] = budget
+    base = E.SeatSpec(net, **kw)
+    cand = E.SeatSpec(cand_net, **kw)
+    db = D.load_db()
+    rows = []
+    for seed in seeds:
+        la, lb = D.leader_pair(db, seed, "random")
+        p1, p2 = D.build_pair(db, la, lb, seed, decks)
+        game = DR.new_game(seed, p1, p2)
+        carries = {"p1": DR.Carry(), "p2": DR.Carry()}
+        steps = 0
+        while game.winner() is None and steps < 400:
+            pending = json.loads(game.pending_json())
+            if not pending:
+                break
+            name = pending["player_id"]
+            turn = int(game.turn_count or 0)
+            carry = carries[name].get(turn, name)
+            out = json.loads(game.decide(name, base.decide_opts(seed, turn, name, carry)))
+            alt = json.loads(game.decide(name, cand.decide_opts(seed, turn, name, carry)))
+            move = out.get("move")
+            if move is None:
+                break
+            key = lambda m: json.dumps(m, sort_keys=True, ensure_ascii=False)    # noqa: E731
+            rows.append({"seed": seed, "step": steps, "turn": turn,
+                         "forced": bool(carry.get("commit")),
+                         "n_groups": len(out.get("groups") or []),
+                         "same": key(move) == key(alt.get("move"))})
+            carries[name].put(out)
+            if move.get("kind") == "battle":
+                game.apply_battle_action(name, move["action_type"], move.get("card_uuid"))
+            else:
+                game.apply_game_action(name, move["action_type"],
+                                       json.dumps(move.get("payload") or {}, ensure_ascii=False))
+            steps += 1
+        print(f"[agree] seed={seed} points={len(rows)}", file=sys.stderr, flush=True)
+    return rows
+
+
 def compare(a_path, b_path):
     with open(a_path) as f:
         a = json.load(f)
@@ -125,20 +179,30 @@ def compare(a_path, b_path):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--what", default="decide", choices=("decide", "latency"))
+    ap.add_argument("--what", default="decide", choices=("decide", "latency", "agree"))
     ap.add_argument("--seeds", default="900001,900002,900003,900004")
     ap.add_argument("--positions", type=int, default=20)
     ap.add_argument("--reps", type=int, default=50)
     ap.add_argument("--sims", type=int, default=32)
     ap.add_argument("--decks", default="synth_roles")
     ap.add_argument("--net", default=None)
+    ap.add_argument("--cand-net", default=None, help="--what agree の候補のネット（省略＝出荷既定）")
+    ap.add_argument("--worlds", type=int, default=None, help="--what agree の世界の本数（省略＝decide の既定）")
+    ap.add_argument("--budget", type=int, default=None, help="--what agree の戦闘箱の枝予算（0＝無制限）")
     ap.add_argument("--out", default=None)
     ap.add_argument("--cmp", nargs=2, default=None, metavar=("A", "B"))
     args = ap.parse_args(argv)
     if args.cmp:
         return compare(*args.cmp)
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
-    if args.what == "decide":
+    if args.what == "agree":
+        rows = agree(seeds, args.sims, args.decks, args.net, args.cand_net, args.worlds, args.budget)
+        free = [r for r in rows if not r["forced"] and r["n_groups"] >= 2]
+        doc = {"what": "agree", "sims": args.sims, "decks": args.decks, "seeds": seeds,
+               "net": args.net, "cand_net": args.cand_net, "worlds": args.worlds, "budget": args.budget,
+               "points": len(rows), "same": sum(r["same"] for r in rows),
+               "free_points": len(free), "free_same": sum(r["same"] for r in free), "rows": rows}
+    elif args.what == "decide":
         rows = collect(seeds, args.positions, args.sims, args.decks, args.net)
         doc = {"what": "decide", "sims": args.sims, "decks": args.decks,
                "seeds": seeds, "rows": rows}

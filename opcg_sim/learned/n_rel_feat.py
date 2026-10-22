@@ -622,18 +622,60 @@ def _card_ids(cards):
     return tuple(getattr(getattr(c, "master", None), "card_id", None) for c in cards)
 
 
-def _deck_roles(deck):
-    """(役割 7 の枚数, v14 の追加役割 2 の枚数)。中身が同じ山なら再利用する。"""
+def own_remaining(me):
+    """自分の「残りの札」（山札＋伏せたライフ）の分け方（符号化 v15・`search_efficiency_plan.md` §7.19）。
+
+    → (山札にあると分かっている札, 知らない札, 山札の知らない枠の数, 山札の枚数)。Rust
+    `encode::OwnRemaining::of` の写し。16 列（`_deck_aggregate`・`_deck_apex`・`_deck_roles`）は
+    「知っている札は 1 枚・知らない札は 山札の知らない枠 ÷ 知らない札の総数 の重み」の期待値で作る
+    （[`expect_combine`]）＝本物・peek・fair のどの世界でも同じ値。
+
+    **知っている札の口**: カードの `known_by`（Rust と同じビット: P1=1・P2=2）と席の `know_bit`。
+    Python の盤面は今どちらも持たない＝「知っている札なし」で計算する（Rust と一致するのは
+    知っている札が無い盤面だけ）。伏せたライフにあると分かっている札・表向きのライフは山札に入らない。"""
+    bit = int(getattr(me, "know_bit", 0) or 0)
+
+    def knows(c):
+        return bool(int(getattr(c, "known_by", 0) or 0) & bit)
+    deck = list(getattr(me, "deck", ()) or ())
+    known = [c for c in deck if knows(c)]
+    unknown = [c for c in deck if not knows(c)]
+    n_unknown_deck = len(unknown)
+    unknown += [c for c in (getattr(me, "life", ()) or ())
+                if not getattr(c, "is_face_up", False) and not knows(c)]
+    return known, unknown, n_unknown_deck, len(deck)
+
+
+def expect_combine(rem, k, u):
+    """知っている札の和 `k`・知らない札の和 `u`（どちらも整数の和）→ 期待値（Rust `OwnRemaining::combine`）。"""
+    _known, unknown, n_unknown_deck, _n = rem
+    if not unknown:
+        return float(k)
+    return float(k) + float(u) * n_unknown_deck / len(unknown)
+
+
+def _deck_roles(rem):
+    """(役割 7 の期待枚数, v14 の追加役割 2 の期待枚数)。`rem` は [`own_remaining`]。中身が同じなら再利用する。
+
+    v15: 山札＋伏せたライフからの期待値（v14 までは山札だけの枚数＝伏せたライフの中身が漏れていた）。"""
+    known, unknown, n_unknown_deck, _n = rem
+
     def fn():
-        dr = np.zeros(len(ROLES), np.float32)
-        dr2 = np.zeros(len(ROLES2), np.float32)
-        for c in deck:
-            m = getattr(c, "master", None)
-            if m is not None:
-                dr += roles_of(m)
-                dr2 += roles2_of(m)
+        sums = []
+        for cards in (known, unknown):
+            r = np.zeros(len(ROLES), np.float64)
+            r2 = np.zeros(len(ROLES2), np.float64)
+            for c in cards:
+                m = getattr(c, "master", None)
+                if m is not None:
+                    r += roles_of(m)
+                    r2 += roles2_of(m)
+            sums.append((r, r2))
+        (k, k2), (u, u2) = sums
+        dr = np.array([expect_combine(rem, k[i], u[i]) for i in range(len(ROLES))], np.float32)
+        dr2 = np.array([expect_combine(rem, k2[i], u2[i]) for i in range(len(ROLES2))], np.float32)
         return dr, dr2
-    return _agg_get(_DECK_ROLES_CACHE, _card_ids(deck), fn)
+    return _agg_get(_DECK_ROLES_CACHE, (_card_ids(known), _card_ids(unknown), n_unknown_deck), fn)
 
 
 def _pool_summary(pool, don_next_opp):
@@ -801,7 +843,7 @@ def encode_rel(manager, me_name, with_relations=True, legal=None):
     my_guard = sum(tok[i, 7] * 2000.0 for i in own_ids if _ZONE[i] == "hand") + 1000.0 * sum(
         1 for i in own_ids if tok[i, 6] > 0)
     ex[5] = float(np.clip((opp_attack - my_guard) / 20000.0, -1.5, 1.5))
-    dr, dr2 = _deck_roles(getattr(me, "deck", ()) or ())
+    dr, dr2 = _deck_roles(own_remaining(me))
     ex[6:6 + len(ROLES)] = np.minimum(dr, 10.0) / 10.0
     b = 6 + len(ROLES)
     ex[b:b + len(ROLES)] = np.minimum(pr, 10.0) / 10.0

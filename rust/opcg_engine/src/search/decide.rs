@@ -1939,6 +1939,7 @@ pub(super) mod tests {
             meta_json: String::new(),
             vocab_ids: Vec::new(),
             enc_version: crate::encode::ENC_VERSION,
+            deck_v14: false,
         };
         let vocab = Vocab::from_ids(&[]);
         let tables = crate::encode::EffTables {
