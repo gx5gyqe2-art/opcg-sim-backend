@@ -14,7 +14,28 @@
   ]
  },
  "metrics": {
-  "arena_r19p/r19p_w01.jsonl": 84
+  "arena_r19p/r19p_w01.jsonl": 84,
+  "final": {
+   "pairs": 84,
+   "games": 168,
+   "void": 0,
+   "wins": 90.0,
+   "wr": 0.5357,
+   "ci95": [
+    0.4719,
+    0.5995
+   ],
+   "elo": 24.9,
+   "promoted": false,
+   "cand_opts": {
+    "sims": 1280,
+    "worlds": 2,
+    "budget": 0
+   },
+   "best_opts": {
+    "worlds": 2
+   }
+  }
  },
- "notes": ""
+ "notes": "ARENA_RESUME_FINAL (shard k=1, seed-base 2141000) recorded in metrics.final. arena_shard prints '（基準席は既定）' but best_opts shows worlds=2 for baseline and --sims 1280 --budget 0 are passed to the baseline via initargs, so both seats ran the shipping setting; the message is stale wording only. Batches took 288-381s per 21 pairs on 4 cores."
 }
