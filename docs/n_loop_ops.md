@@ -181,7 +181,8 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **世界 4 本 × 1,280 回 vs 世界 1 本 × 1,280 回**（同じ r13d・本番の設定・16 シャード × 88 ペア・§7.18） | 1511000〜1526000 | 使用済み（2026-10-21・1,336 ペア 0.5434 [0.5227, 0.5642]・+30.2・`2026-10-21_r16_teacher_strength.md`） |
 | 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 使用済み（2026-10-21・r16 主 −5.3／副 +4.7・r16c 主 −7.7／副 +0.4・どちらも非昇格） |
 | 検証 **WP `rs-lethal-root`**（手元 40 ペア × 2 本 root／root_reply vs off・出荷の設定）／監査のやり直し 300 局／本番アリーナ（root・root_reply 各 12 シャード × 120 ペア・合流後） | 1682000〜1682039／1683000〜1683039／3012000〜3012299／2031000〜2042000／2051000〜2062000 | 指示済み（2026-10-22・claude/rs-lethal-root） |
-| 生成 **波 49**（実デッキ 115 本・`--decks real`・生成役 r13d・v15・§7.32） | 2521000〜2528500（シャード k の base は 2520000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 指示済み（2026-10-22・claude/n49-w01〜w16） |
+| 検証 **r19 vs r13d（公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.32）** | 主 real 2081000〜2096000／副 ミラー 2101000〜2116000／参考 synth_roles2 2121000〜2136000 | 払い出し済み（2026-10-22・訓練 claude/train-r19 の後に起動） |
+| 生成 **波 49**（実デッキ 115 本・`--decks real`・生成役 r13d・v15・§7.32） | 2521000〜2528500（シャード k の base は 2520000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,153,971 行・dropped 2・decks real） |
 | 検証 **r18 vs r13d・実デッキ帯 115 本**（ユーザの 4 本＋公式の構築例 111 本・`--decks real`・公平同士・両席 160 回・16 シャード × 175 ペア・§7.29） | 2061000〜2076000 | 使用済み（2026-10-22・2,800 ペア 0.5007・**+0.5**＝4 本での +11.2 は消えた・`2026-10-22_r18_realdeck115.md`） |
 | 検証 **r18 vs r13d（公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.29）** | 主 synth_roles2 1951000〜1966000／副 ミラー 1971000〜1986000／実デッキ 1991000〜2006000／旧主 synth_roles 2011000〜2026000 | 使用済み（2026-10-22・主 synth_roles2 −1.5／副 +19.9／**実デッキ +11.2**／旧主 −13.7・規約では非昇格・採用はユーザ判断・`2026-10-22_r18_judgment.md`） |
 | 検証 **r13o／r13m／r17m vs r13d（公平同士・両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.30）** | r13o 主 1831000〜1846000／副 1851000〜1866000・r13m 主 1871000〜1886000／副 1891000〜1906000・r17m 主 1911000〜1926000／副 1931000〜1946000 | 使用済み（2026-10-22・r13o 主 −8.3／r13m 主 −13.2／r17m 主 −9.1・**3 本とも非昇格**・`2026-10-22_omni_value_stage2.md`） |
@@ -2887,6 +2888,43 @@ echo ALL_DONE
 - **訓練（r19・別の指示書）**: π＝波 49・価値＝波 49＋48（どちらも生成役 r13d・約 220 万行）・warm-start r11a・価値の教師は勝敗。
 - **判定**: 公平同士・両席 160 回・基準 r13d・各 16 シャード × 175 ペア。**主＝random × real**（新しい seed 帯）・副＝固定ミラー・参考＝random × synth_roles2（合成デッキへの汎化）。seed は訓練の後に払い出す。
 - **予告（数を見る前）**: r19 vs r13d 主（real）+10〜+25（教材の分布と判定の帯が一致する最初の世代）・synth_roles2 では −10〜+5（合成への汎化は少し落ちうる）。
+
+
+**波 49 の結果（2026-10-22）**: 16 シャード全部完走・7,680 局・1,153,971 行・dropped 2・1 局平均 13.6 秒・decks real。
+
+**訓練 r19 の指示書**（作業セッション用・1 セッション・`claude/train-r19`）。π＝波 49（実デッキ 115 本）・価値＝波 49＋48（どちらも生成役 r13d・約 223 万行）・warm-start r11a・価値の教師は勝敗・その他は r13d と同じ。評価帯＝波 49 holdout で r11a／r13d／r18／r19（＋`.ep0`／`.ep1`）。
+判定（訓練の後にコーディネータ）: 公平同士・両席 160 回・基準 r13d・各 16 シャード × 175 ペア・今の本線のコード。**主＝random × real 2081000〜2096000**・副＝固定ミラー 2101000〜2116000・参考＝random × synth_roles2 2121000〜2136000。
+
+```
+作業: r19 の訓練 → 評価帯（docs/n_loop_ops.md §7.32）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（~/opcg-sim-backend）。長い実行は nohup で回し、
+**push し終えるまでターンを終えない**（9 分以内の待ちを繰り返す）。迷った点は RESULT.json の notes に書いて完走する。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+for N in 49 48; do for k in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16; do
+  git fetch -q origin claude/n$N-w$k:tmpw && mkdir -p ~/n$N && git archive tmpw n_records | tar -x -C ~/n$N && git branch -qD tmpw; done; done
+ls -d ~/n49/n_records/n49_w*_p[0-3] | wc -l      # 64
+ls -d ~/n48/n_records/n48_w*_p[0-3] | wc -l      # 64
+git fetch -q origin claude/train-r18:r18net && git show r18net:n1_results/nrel_r18.npz > ~/nrel_r18.npz
+
+P49="$HOME/n49/n_records/n49_w*_p[0-3]"
+Z48="$HOME/n48/n_records/n48_w*_p[0-3]"
+COMMON="--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz"
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P49" --z-in "$Z48" $COMMON --out ~/nrel_r19.npz 2>&1 | tee ~/train_r19.log
+
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$P49" \
+  --nrel opcg_sim/data/learned/nrel_r11a.npz opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r18.npz ~/nrel_r19.npz ~/nrel_r19.ep0.npz ~/nrel_r19.ep1.npz \
+  --policy --holdout-mod 7 --out ~/band_r19.json 2>&1 | tee ~/band_r19.log
+
+git checkout -B claude/train-r19
+mkdir -p n1_results && cp ~/nrel_r19*.npz n1_results/ && cp ~/train_r19.log ~/band_r19.json ~/band_r19.log .
+（RESULT.json〔§5 の形〕: inputs＝warm_start r11a・π dir 数・価値の波と行数・rss_gb・npz の meta の enc_version／metrics＝best_ep・各周の val v_mse／v_sign／pi_top1／band＝ネットごとの v_mse と方策の指標／train_sec・band_sec／notes）
+git add -f n1_results/nrel_r19*.npz train_r19.log band_r19.json band_r19.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r19 のセット（訓練・評価帯）"
+git push -u origin claude/train-r19
+```
 
 生成の作業セッション用の本文（`{K}`＝01〜16・`{BASE}`＝上の式）:
 
