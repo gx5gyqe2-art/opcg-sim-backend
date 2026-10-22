@@ -14,7 +14,20 @@
   ]
  },
  "metrics": {
-  "arena_r19p/r19p_w31.jsonl": 84
+  "arena_r19p/r19p_w31.jsonl": 84,
+  "summary": {
+   "pairs": 84,
+   "games": 168,
+   "void": 0,
+   "wins": 80.0,
+   "wr": 0.4762,
+   "ci95": [
+    0.424,
+    0.5284
+   ],
+   "elo": -16.6,
+   "promoted": false
+  }
  },
- "notes": ""
+ "notes": "seed-base 2171000 (k=31)。void 0。arena_shard の表示「（基準席は既定）」は表示だけで、基準席にも --sims 1280 --budget 0 --worlds 2 が渡っている（ARENA_RESUME_FINAL の best_opts={worlds:2}・sims/budget は共通の旗）。21 ペアずつ 4 回で 84 ペアに届き、5 回目は何もしなかった。~ が /root なので、作業ツリーは /root/opcg-sim-backend。"
 }
