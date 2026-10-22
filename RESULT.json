@@ -1,103 +1,14 @@
 {
- "job": "enc-audit",
- "role": "audit",
- "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.17 (origin/claude/cpu-spec-improvements-yw91jd @ 93da7d38f; ledger 2+319)",
- "inputs": {
-  "base": "claude/cpu-spec-improvements-yw91jd @ 93da7d38f",
-  "net": "nrel_r13d.npz (both seats; DEFAULT_NET)",
-  "games": "20 (seed 2999900-2999919, leaders random, decks synth_roles)",
-  "setting": "shipping: sims 1280 (PLAY_SIMS), worlds 2 (PLAY_WORLDS), budget 0 = none (PLAY_BUDGET)"
- },
+ "job": "arena-omni2-w16",
+ "role": "arena",
+ "status": "partial",
  "outputs": {
-  "branch": "claude/enc-audit",
-  "report": "docs/reports/2026-10-22_enc_audit.md",
   "files": [
-   "tests/scripts/enc_fair_diff.py (new instrument; no test — one-off measurement)",
-   "rust/opcg_engine/src/py_game.rs (Game.encode_world(player_id, reveal, seed) — measurement-only; builds the world exactly as decide does for world i and encodes it; Game.encode now shares encode_json; no behaviour change)",
-   "docs/TEST_SPEC.md §2 (+1 row: enc_fair_diff.py)",
-   "n1_results/enc_audit/ship_1280x2.json, ship_1280x2_table.md (main measurement)",
-   "n1_results/enc_audit/side_160x2.json, side_160x2_table.md (side measurement at 160 sims)"
+   "arena_omni2/r13o_main_w16.jsonl"
   ]
  },
- "results": {
-  "decision_points": 2632,
-  "void": 0,
-  "features_named": 287,
-  "features_changed_by_fair": 16,
-  "features_never_changed": 271,
-  "changed": [
-   "deck_agg.counter_total",
-   "deck_agg.counter_density",
-   "deck_agg.events",
-   "deck_agg.blockers",
-   "deck_agg.highcost_char",
-   "deck_apex.max_power",
-   "deck_apex.max_cost",
-   "extra.deck_removal",
-   "extra.deck_reduction",
-   "extra.deck_lock",
-   "extra.deck_draw",
-   "extra.deck_counter",
-   "extra.deck_blocker",
-   "extra.deck_big",
-   "extra.deck_removal_fixed",
-   "extra.deck_bounce"
-  ],
-  "hidden_info_read": "only the 16 own-deck aggregates (truth = own deck, which leaks the contents of own face-down life). Opponent aggregates read the unseen pool (hand+deck+face-down life) as a set only = invariant under every world sample.",
-  "peek_equals_truth_at_root": true,
-  "nonzero_peek_vs_fair_max": {
-   "deck_agg.counter_total": 0.627,
-   "deck_agg.counter_density": 0.452,
-   "deck_agg.events": 0.378
-  },
-  "value_abs_diff_peek_vs_fair": {
-   "mean": 0.0063,
-   "median": 0.0025,
-   "p90": 0.0177,
-   "max": 0.1325
-  },
-  "value_abs_diff_fair_world0_vs_1": {
-   "mean": 0.0069,
-   "p90": 0.0185,
-   "max": 0.1315
-  },
-  "value_mse_vs_outcome": {
-   "truth": 0.6674,
-   "peek_mean": 0.6674,
-   "fair_mean": 0.6666,
-   "fair_world0": 0.6663
-  },
-  "known_cards_freq_ship": {
-   "my_deck_any": 0.509,
-   "my_deck_mean": 2.7,
-   "opp_hand_any": 0.049,
-   "deck_top_any": 0.047
-  },
-  "training_records_use_truth_encoding": true
+ "metrics": {
+  "arena_omni2/r13o_main_w16.jsonl": 175
  },
- "proposal_v15": {
-  "recommended": "A: replace the 16 own-deck columns with the information-set expectation (known-in-deck cards counted exactly + unknown cards of (deck ∪ face-down life) prorated by the deck's share of unknown slots; apex = max over that pool). Same shape/position/scale as v14 -> r13d reads it unchanged. Cost: Rust scalars.rs + tokens.rs, Python encoder.py + n_rel_feat.py, oracle update, ENC_VERSION 15; old waves cannot be re-encoded (records hold no board) -> waves 48+ switch, full turnover in 2 waves under the current windows. Expected strength gain small (value jitter ~0.005 mean, 0.013 in turns 0-2).",
-  "not_recommended": [
-   "B: add known-card features (opp hand known 4.9% of points, deck top 4.7%)",
-   "C: drop the 16 columns (only as a control; can be trained on existing waves now)"
-  ],
-  "side_findings": [
-   "EXTRA_COLS has a duplicate name opp_pool_big (scalars col 113 role 'big' and col 115 threat 'big chars')",
-   "field tensor and the 2 stage card_idx slots are not read by NRel",
-   "deck_removal/opp_pool_removal (v13) duplicate the v14 *_fixed columns"
-  ]
- },
- "gates": {
-  "make_test": "green: cargo test 593 passed / 1 ignored; pytest 850 passed, 13 skipped (skips = torch not installed)",
-  "make_audit_cross": "void 0 (120 pairs, seed 0, sims 32; wr 0.5083)"
- },
- "notes": [
-  "rs_enc_v14_probe.py compares decide outputs and latency, it does not enumerate features. The feature list was taken from the column table at the top of rust/opcg_engine/src/encode/scalars.rs and n_rel_feat.S_COLS / R_COLS / EXTRA_COLS (Python<->Rust column parity is what rs_encode_oracle.py checks).",
-  "To measure exactly what the search feeds the net, a measurement-only pyo3 hook Game.encode_world was added (rebuilding the world with the same sampler and the same Pcg32SearchRng(search_seed + i) as decide's world i). It changes no existing behaviour; make test is green on the final tree.",
-  "Token-state features are bundled per zone (own_leader/own_field/hand/opp_leader/opp_field x 22 columns); rel per R column. A difference in any slot of the bundle counts.",
-  "The instrument's first version merged the two opp_pool_big columns by name; it was fixed (second gets '#2') and the main run was repeated (identical games, identical changed rows). The side 160-sim run was made with the first version (both opp-pool columns are invariant anyway).",
-  "Leaf (in-tree) inputs were not measured: under peek, draws inside the tree took the real next card, which is a search-side leak (handled by rs-fair), not an encoding one.",
-  "The Python board has no known_by; a Python mirror of proposal A matches Rust only on boards with no known cards until a hook passes known_by."
- ]
+ "notes": "k=16 KK=16; ran in /home/user/opcg-sim-backend (not ~/opcg-sim-backend); code at 25a51f28a"
 }
