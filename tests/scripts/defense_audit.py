@@ -541,7 +541,7 @@ def replay_to(seed: int, a, seat: str, step: int):
         if st == step:
             if name != seat:
                 raise RuntimeError(f"replay mismatch: step {step} is {name}'s, expected {seat}")
-            got["game"], got["move"] = game.fork(), move
+            got["game"], got["move"], got["out"], got["turn"] = game.fork(), move, out, turn
             raise _Stop()
 
     try:
@@ -550,7 +550,8 @@ def replay_to(seed: int, a, seat: str, step: int):
         pass
     if "game" not in got:
         raise RuntimeError(f"replay: step {step} not reached")
-    return got["game"], got["move"]
+    got["spec"] = spec
+    return got["game"], got["move"], got
 
 
 def verify_one(args) -> Dict[str, Any]:
@@ -559,8 +560,15 @@ def verify_one(args) -> Dict[str, Any]:
     out = {"kind": rec["kind"], "seed": rec["seed"], "seat": rec["seat"], "turn": rec["turn"], "step": rec["step"]}
     try:
         if rec["kind"] == "resp":
-            game, move = replay_to(rec["seed"], a, rec["seat"], rec["step"])
+            game, move, got = replay_to(rec["seed"], a, rec["seat"], rec["step"])
             name = rec["seat"]
+            # 実対局の決め方（木で読んだか・箱の commit の続きを打っただけか）と、持ち越し無しで読み直したときの手
+            live = got["out"]
+            out["live_kind"] = live.get("kind")
+            out["live_commit_left"] = len(live.get("commit") or [])
+            fresh = json.loads(game.decide(name, got["spec"].decide_opts(rec["seed"], got["turn"], name, None)))
+            out["fresh_kind"] = fresh.get("kind")
+            out["fresh_move"] = LA.describe(game, fresh["move"]) if fresh.get("move") else None
             opp = game.turn_player()
             pend = json.loads(game.pending_json())
             cands, seen = [], set()
@@ -594,6 +602,9 @@ def verify_one(args) -> Dict[str, Any]:
                                             "per": [{"mode": p.get("mode"), "res": p.get("res")} for p in d["per"]]}
                 rows.append(row)
             out["rows"] = rows
+            safe_moves = {r["move"] for r in rows if r.get("ko_full", {}).get("res") is False}
+            out["fresh_safe"] = out["fresh_move"] in safe_moves if out.get("fresh_move") else None
+            out["fresh_same_as_live"] = out["fresh_move"] == rec["rows"][0]["move"]
             out["miss_ko_full"] = bool(still_safe)
             o = next((r for r in rows if r.get("otsu_full")), None)
             out["miss_otsu_full"] = bool(rec.get("miss_otsu") and o and o["otsu_full"]["res"] is True)
@@ -608,7 +619,7 @@ def verify_one(args) -> Dict[str, Any]:
             for r in rec["alts"]:
                 if (r.get("otsu") or {}).get("res") is not False or r.get("settle") == f"winner:{me}":
                     continue
-                game, _ = replay_to(rec["seed"], a, me, r["point_step"])
+                game, _, _got = replay_to(rec["seed"], a, me, r["point_step"])
                 legal = json.loads(game.legal_json(me))
                 mv = next((x for x in legal if LA.describe(game, x) == r["move"]), None)
                 if mv is None:
@@ -857,6 +868,11 @@ def cmd_summarize(a):
                      "otsu_full_lost_this_turn": sum(1 for v in t_miss_ot if (v[0]["seed"], v[0]["seat"], v[0]["turn"]) in t_ot_full
                                                      and lost_this_turn(v)),
                      "miss_given_threat_full": {"ko": _rate(len(ko_full), len(threat)), "otsu": _rate(len(ot_full), len(threat_ot))},
+                     "live_kind_among_miss_ko_full": _count(ko_full, lambda v: v.get("live_kind")),
+                     "live_kind_among_miss_otsu_full": _count(ot_full, lambda v: v.get("live_kind")),
+                     "fresh_safe_among_miss_ko_full": _count(ko_full, lambda v: v.get("fresh_safe")),
+                     "fresh_safe_among_miss_otsu_full": _count(ot_full, lambda v: v.get("fresh_safe")),
+                     "fresh_safe_by_live_kind_otsu_full": _count(ot_full, lambda v: f"{v.get('live_kind')}:{v.get('fresh_safe')}"),
                      "miss_otsu_full_type": _count([p for p in miss_ot if vmap.get(key(p), {}).get("miss_otsu_full")], miss_type),
                      "miss_otsu_full_my_life": _count([p for p in miss_ot if vmap.get(key(p), {}).get("miss_otsu_full")],
                                                       lambda p: p["my_life"])},
