@@ -14,7 +14,22 @@
   ]
  },
  "metrics": {
-  "arena_r19p/r19p_w04.jsonl": 84
+  "arena_r19p/r19p_w04.jsonl": 84,
+  "final": {
+   "pairs": 84,
+   "games": 168,
+   "void": 0,
+   "wins": 84.0,
+   "wr": 0.5,
+   "ci95": [
+    0.4449,
+    0.5551
+   ],
+   "elo": -0.0,
+   "best_opts": {
+    "worlds": 2
+   }
+  }
  },
- "notes": ""
+ "notes": "Log line '候補席の設定 ...（基準席は既定）' is stale wording: arena_shard passes --sims 1280 --budget 0 to the baseline via init_pool initargs and worlds=2 via best_opts (ARENA_RESUME_FINAL shows best_opts {'worlds': 2}). Per-row jsonl records only cand_opts. Batch times 299s/425s/336s/~ per 21 pairs, void 0."
 }
