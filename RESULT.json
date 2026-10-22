@@ -5,12 +5,14 @@
  "outputs": {
   "files": [
    "arena_r19/r19_mirror_w02.jsonl",
-   "arena_r19/r19_real_w02.jsonl"
+   "arena_r19/r19_real_w02.jsonl",
+   "arena_r19/r19_synth2_w02.jsonl"
   ]
  },
  "metrics": {
   "arena_r19/r19_mirror_w02.jsonl": 175,
-  "arena_r19/r19_real_w02.jsonl": 175
+  "arena_r19/r19_real_w02.jsonl": 175,
+  "arena_r19/r19_synth2_w02.jsonl": 175
  },
  "notes": ""
 }
