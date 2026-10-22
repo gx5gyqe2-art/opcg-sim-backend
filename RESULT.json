@@ -16,5 +16,5 @@
  "metrics": {
   "arena_r19p/r19p_w15.jsonl": 84
  },
- "notes": ""
+ "notes": "84/84 pairs, 168 games, void 0. shard result: wins 86.0, wr 0.5119, ci95 [0.4521,0.5717], elo +8.3. The log line '基準席は既定' is stale wording only: best_opts={worlds:2} confirms the baseline seat ran worlds 2 (sims 1280 / budget 0 via --sims/--budget)."
 }
