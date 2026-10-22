@@ -19,6 +19,9 @@
 使い方:
   python tests/scripts/defense_audit.py run --games 300 --workers 4      # 打って判定（JSONL）
   python tests/scripts/defense_audit.py summarize                        # 数える（summary.json）
+  python tests/scripts/defense_audit.py verify --workers 4               # 見逃しの点を打ち直し、攻め手の手順を
+                                                                         # 全部（キャラへのアタック・付与の並べ替え）
+                                                                         # 読む判定器で確かめる（verify.json）
 本線のコードは触らない（計器だけ・テストは足さない）。
 """
 import argparse
@@ -467,6 +470,201 @@ def cmd_run(a):
                   f"stats={g['stats']}", flush=True)
 
 
+# --- 確かめ: 見逃しの点を打ち直し、攻め手の手順を全部読む判定器で判定し直す -----------------------
+
+def judge_full(game, attacker: str, seconds: float, max_nodes: int) -> Dict[str, Any]:
+    """`lethal_audit.judge` と同じだが、キャラへのアタックと付与の並べ替えも手順に入れる（近似を外す）。
+    見つかる詰みは増えるだけ＝「守れる」と判定した応手が本当に守れるかを確かめるために使う。"""
+    s = LA.Solver(attacker, int(game.turn_count), seconds, max_nodes, None, char_attacks=True, full_don=True)
+    t0 = time.perf_counter()
+    try:
+        r: Optional[bool] = s.win(game.fork())
+    except LA.Unknown:
+        r = None
+    except Exception as exc:  # noqa: BLE001
+        r = None
+        s.crash = f"{type(exc).__name__}: {exc}"[:200]
+    out = {"res": r, "nodes": s.nodes, "sec": round(time.perf_counter() - t0, 3)}
+    if s.crash:
+        out["crash"] = s.crash
+    return out
+
+
+def judge_deals_full(game, attacker: str, seconds: float, max_nodes: int, n_rand: int, seed: int,
+                     want: str) -> Dict[str, Any]:
+    reason = _restorable(game)
+    if reason:
+        return {"res": None, "skip": reason, "per": []}
+    hidden = json.loads(game.hidden_json())
+    rng = random.Random(seed)
+    res: Optional[bool] = True
+    per = []
+    for m in ["atk", "weak"] + ["rand"] * n_rand:
+        h = redeal_offense(hidden, attacker, m, rng)
+        try:
+            g = E.engine().Game.from_hidden(json.dumps(h, ensure_ascii=False), "p1", "p2", None)
+        except Exception as exc:  # noqa: BLE001
+            per.append({"mode": m, "res": None, "crash": str(exc)[:200]})
+            res = None
+            continue
+        j = judge_full(g, attacker, seconds, max_nodes)
+        j["mode"] = m
+        per.append(j)
+        bad = (j["res"] is True) if want == "safe" else (j["res"] is False)
+        if bad:
+            res = False
+            break
+        if j["res"] is None:
+            res = None
+    return {"res": res, "per": per}
+
+
+class _Stop(Exception):
+    pass
+
+
+def replay_to(seed: int, a, seat: str, step: int):
+    """同じ seed・同じ読みで打ち直し、`step` の決める前の盤面（と決めた手）を返す（決定論の契約）。"""
+    E.engine()
+    db = D.load_db()
+    kw = {"budget": a.budget}
+    if a.worlds > 1:
+        kw["worlds"] = a.worlds
+    if a.lethal_proof and a.lethal_proof != "off":
+        kw["lethal_proof"] = a.lethal_proof
+    spec = E.SeatSpec(a.net, sims=a.sims, **kw)
+    la, lb = D.leader_pair(db, seed, "random")
+    p1, p2 = D.build_pair(db, la, lb, seed, "synth_roles")
+    got = {}
+
+    def obs(game, name, turn, st, out, move):
+        if st == step:
+            if name != seat:
+                raise RuntimeError(f"replay mismatch: step {step} is {name}'s, expected {seat}")
+            got["game"], got["move"] = game.fork(), move
+            raise _Stop()
+
+    try:
+        DR.run_game(seed, {"p1": spec, "p2": spec}, p1, p2, observer=obs)
+    except _Stop:
+        pass
+    if "game" not in got:
+        raise RuntimeError(f"replay: step {step} not reached")
+    return got["game"], got["move"]
+
+
+def verify_one(args) -> Dict[str, Any]:
+    rec, a = args
+    t0 = time.perf_counter()
+    out = {"kind": rec["kind"], "seed": rec["seed"], "seat": rec["seat"], "turn": rec["turn"], "step": rec["step"]}
+    try:
+        if rec["kind"] == "resp":
+            game, move = replay_to(rec["seed"], a, rec["seat"], rec["step"])
+            name = rec["seat"]
+            opp = game.turn_player()
+            pend = json.loads(game.pending_json())
+            cands, seen = [], set()
+            for mv in [move] + LA.expand(game, name, pend):
+                k = move_key(mv)
+                if k not in seen:
+                    seen.add(k)
+                    cands.append(mv)
+            if LA.describe(game, cands[0]) != rec["rows"][0]["move"]:
+                out["error"] = "cpu move differs on replay"
+                return out
+            rows = []
+            still_safe = []
+            for r in rec["rows"]:
+                if "ko" not in r or r["ko"]["res"] is not False:
+                    continue
+                mv = cands[r["i"]] if r["i"] < len(cands) else None
+                if mv is None or LA.describe(game, mv) != r["move"]:
+                    rows.append({"i": r["i"], "error": "candidate differs on replay"})
+                    continue
+                child = game.fork()
+                LA.apply(child, name, mv)
+                j = judge_full(child, opp, a.sec_verify, a.max_nodes)
+                row = {"i": r["i"], "move": r["move"], "ko_full": j}
+                if j["res"] is False:
+                    still_safe.append(r["i"])
+                    if rec.get("miss_otsu") and (rec.get("otsu") or {}).get("safe_i") == r["i"]:
+                        d = judge_deals_full(child, opp, a.sec_verify_otsu, a.max_nodes, a.rand_hands,
+                                             rec["seed"] * 1000 + rec["step"] * 10 + r["i"], "safe")
+                        row["otsu_full"] = {"res": d["res"], "skip": d.get("skip"),
+                                            "per": [{"mode": p.get("mode"), "res": p.get("res")} for p in d["per"]]}
+                rows.append(row)
+            out["rows"] = rows
+            out["miss_ko_full"] = bool(still_safe)
+            o = next((r for r in rows if r.get("otsu_full")), None)
+            out["miss_otsu_full"] = bool(rec.get("miss_otsu") and o and o["otsu_full"]["res"] is True)
+            out["otsu_full_unknown"] = bool(rec.get("miss_otsu") and o and o["otsu_full"]["res"] is None)
+            out["ko_full_unknown"] = bool(not still_safe and any(r.get("ko_full", {}).get("res") is None for r in rows))
+        else:
+            # 終わり方: 乙の詰みが無いと判定した別の 1 手を、全部読む判定器で判定し直す
+            me = rec["seat"]
+            opp = "p2" if me == "p1" else "p1"
+            rows = []
+            still = []
+            for r in rec["alts"]:
+                if (r.get("otsu") or {}).get("res") is not False or r.get("settle") == f"winner:{me}":
+                    continue
+                game, _ = replay_to(rec["seed"], a, me, r["point_step"])
+                legal = json.loads(game.legal_json(me))
+                mv = next((x for x in legal if LA.describe(game, x) == r["move"]), None)
+                if mv is None:
+                    rows.append({"point_step": r["point_step"], "i": r["i"], "error": "alt differs on replay"})
+                    continue
+                c = game.fork()
+                LA.apply(c, me, mv)
+                why = settle_to_opp_main(c, me, opp, rec["turn"])
+                row = {"point_step": r["point_step"], "i": r["i"], "move": r["move"]}
+                if why:
+                    row["settle"] = why
+                    row["otsu_full"] = {"res": (why != f"winner:{me}")} if why.startswith("winner:") else {"res": None}
+                else:
+                    j = judge_full(c, opp, a.sec_verify, a.max_nodes)
+                    row["ko_full"] = j
+                    if j["res"] is False:
+                        row["otsu_full"] = {"res": False}
+                        d = judge_deals_full(c, opp, a.sec_verify_otsu, a.max_nodes, a.rand_hands,
+                                             rec["seed"] * 1000 + r["point_step"] * 10 + r["i"], "safe")
+                        row["safe_full"] = {"res": d["res"], "per": [{"mode": p.get("mode"), "res": p.get("res")} for p in d["per"]]}
+                    elif j["res"] is True:
+                        d = judge_deals_full(c, opp, a.sec_verify_otsu, a.max_nodes, a.rand_hands,
+                                             rec["seed"] * 1000 + r["point_step"] * 10 + r["i"], "lethal")
+                        row["otsu_full"] = {"res": d["res"], "per": [{"mode": p.get("mode"), "res": p.get("res")} for p in d["per"]]}
+                    else:
+                        row["otsu_full"] = {"res": None}
+                if (row.get("otsu_full") or {}).get("res") is False:
+                    still.append(r["i"])
+                rows.append(row)
+            out["rows"] = rows
+            out["miss_full"] = bool(still)
+            out["miss_strict_full"] = any((r.get("safe_full") or {}).get("res") is True for r in rows)
+            out["unknown_full"] = bool(not still and any((r.get("otsu_full") or {}).get("res") is None for r in rows))
+    except Exception as exc:  # noqa: BLE001
+        out["error"] = f"{type(exc).__name__}: {exc}"[:200]
+    out["sec"] = round(time.perf_counter() - t0, 1)
+    return out
+
+
+def cmd_verify(a):
+    path = a.points or os.path.join(a.out, f"points_{a.seed_base}_{a.games}.jsonl")
+    _games, pts = _load(path)
+    todo = [p for p in pts if (p["kind"] == "resp" and p["miss_ko"])
+            or (p["kind"] == "end" and any((r.get("otsu") or {}).get("res") is False
+                                           and r.get("settle") != f"winner:{p['seat']}" for r in p["alts"]))]
+    print(f"verify {len(todo)} miss points", flush=True)
+    import multiprocessing as mp
+    outp = os.path.join(a.out, "verify.jsonl")
+    with open(outp, "w", encoding="utf-8") as f, mp.get_context("fork").Pool(a.workers) as pool:
+        for i, r in enumerate(pool.imap_unordered(verify_one, [(p, a) for p in todo])):
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            f.flush()
+            print(f"[{i + 1}/{len(todo)}] {r['kind']} seed={r['seed']} step={r['step']} "
+                  f"{ {k: v for k, v in r.items() if k.endswith('_full') or k == 'error'} } sec={r['sec']}", flush=True)
+
+
 def _rate(k, n):
     return {"k": k, "n": n, "rate": round(k / n, 4) if n else None}
 
@@ -568,6 +766,17 @@ def cmd_summarize(a):
         },
     }
     m = len(end)
+
+    def _own_win(p, r):
+        return (r.get("settle") or "").startswith("winner:") and r["settle"] == f"winner:{p['seat']}"
+
+    for p in end:
+        # 既定解決（相手は素通し）でそのまま勝ってしまう別の 1 手は「自分の詰み」（§7.13）の問いなので外す
+        alts = [r for r in p["alts"] if not _own_win(p, r)]
+        p["alts_own_win"] = sum(1 for r in p["alts"] if _own_win(p, r))
+        p["alts"] = alts
+        p["miss"] = any((r.get("otsu") or {}).get("res") is False for r in alts)
+        p["miss_strict"] = any((r.get("safe") or {}).get("res") is True for r in alts)
     e_threat_ko = [p for p in end if p["threat_ko"]]
     e_threat = [p for p in end if p["threat_otsu"]]
     e_miss = [p for p in end if p["miss"]]
@@ -598,6 +807,7 @@ def cmd_summarize(a):
         "miss_alt_type": _count(e_miss, lambda p: alt_type(p, False)),
         "miss_strict_alt_type": _count(e_strict, lambda p: alt_type(p, True)),
         "miss_my_life": _count(e_miss, lambda p: p["my_life"]),
+        "threat_turns_with_own_win_alt": sum(1 for p in e_threat if p.get("alts_own_win")),
         "threat_my_life": _count(e_threat, lambda p: p["my_life"]),
         "alts_mean_among_threat": round(sum(len(p["alts"]) for p in e_threat) / len(e_threat), 1) if e_threat else None,
         "sec": {"mean": round(sum(e_secs) / m, 3) if m else None, "p50": e_secs[m // 2] if m else None,
@@ -623,6 +833,43 @@ def cmd_summarize(a):
                          "alts_safe": [r["move"] for r in p["alts"] if (r.get("safe") or {}).get("res") is True][:5],
                          "board": p.get("board"), "game_winner": games[p["seed"]]["winner"],
                          "game_turns": games[p["seed"]]["turns"]})
+    vpath = os.path.join(a.out, "verify.jsonl")
+    if os.path.exists(vpath):
+        vs = [json.loads(line) for line in open(vpath, encoding="utf-8")]
+        vr = [v for v in vs if v["kind"] == "resp"]
+        ve = [v for v in vs if v["kind"] == "end"]
+        key = lambda v: (v["seed"], v["seat"], v["step"])  # noqa: E731
+        vmap = {key(v): v for v in vs}
+        ok_r = [v for v in vr if "error" not in v]
+        ko_full = [v for v in ok_r if v["miss_ko_full"]]
+        ot_full = [v for v in ok_r if v["miss_otsu_full"]]
+        t_ot_full = {(v["seed"], v["seat"], v["turn"]) for v in ot_full}
+        t_ko_full = {(v["seed"], v["seat"], v["turn"]) for v in ko_full}
+        summ["verify"] = {
+            "resp": {"verified": len(vr), "errors": sum(1 for v in vr if "error" in v),
+                     "miss_ko_raw": len(miss_ko), "miss_ko_full": len(ko_full),
+                     "miss_ko_full_unknown": sum(1 for v in ok_r if v.get("ko_full_unknown")),
+                     "miss_otsu_raw": len(miss_ot), "miss_otsu_full": len(ot_full),
+                     "miss_otsu_full_unknown": sum(1 for v in ok_r if v.get("otsu_full_unknown")),
+                     "turns_miss_otsu_full": len(t_ot_full), "turns_miss_ko_full": len(t_ko_full),
+                     "games_miss_otsu_full": len({s for s, _, _ in t_ot_full}),
+                     "otsu_full_then_lost": lost({(s, seat) for s, seat, _ in t_ot_full}),
+                     "otsu_full_lost_this_turn": sum(1 for v in t_miss_ot if (v[0]["seed"], v[0]["seat"], v[0]["turn"]) in t_ot_full
+                                                     and lost_this_turn(v)),
+                     "miss_given_threat_full": {"ko": _rate(len(ko_full), len(threat)), "otsu": _rate(len(ot_full), len(threat_ot))},
+                     "miss_otsu_full_type": _count([p for p in miss_ot if vmap.get(key(p), {}).get("miss_otsu_full")], miss_type),
+                     "miss_otsu_full_my_life": _count([p for p in miss_ot if vmap.get(key(p), {}).get("miss_otsu_full")],
+                                                      lambda p: p["my_life"])},
+            "end": {"verified": len(ve), "errors": sum(1 for v in ve if "error" in v),
+                    "miss_raw": len(e_miss), "miss_full": sum(1 for v in ve if v.get("miss_full")),
+                    "miss_strict_full": sum(1 for v in ve if v.get("miss_strict_full")),
+                    "miss_full_unknown": sum(1 for v in ve if v.get("unknown_full")),
+                    "miss_full_then_lost": lost({(v["seed"], v["seat"]) for v in ve if v.get("miss_full")})},
+        }
+        for ex in examples:
+            v = vmap.get((ex["seed"], ex["seat"], ex["step"]))
+            if v:
+                ex["verify"] = {k: v[k] for k in v if k.endswith("_full") or k == "error"}
     summ["examples"] = examples
     out = os.path.join(a.out, "summary.json")
     json.dump(summ, open(out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
@@ -632,12 +879,12 @@ def cmd_summarize(a):
 def main(argv=None):
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("run", "summarize"):
+    for name in ("run", "summarize", "verify"):
         p = sub.add_parser(name)
         p.add_argument("--seed-base", type=int, default=3013000)
         p.add_argument("--games", type=int, default=300)
         p.add_argument("--out", default=OUT_DIR)
-        if name == "run":
+        if name in ("run", "verify"):
             p.add_argument("--workers", type=int, default=4)
             p.add_argument("--sims", type=int, default=E.PLAY_SIMS)
             p.add_argument("--budget", type=int, default=E.PLAY_BUDGET)
@@ -654,10 +901,13 @@ def main(argv=None):
             p.add_argument("--max-alts", type=int, default=16, help="副（終わり方）で試す別の 1 手の上限")
             p.add_argument("--lethal-proof", default=None, choices=("off", "root", "root_reply"),
                            help="両席の CPU の詰みの証明（§7.21）。既定は off＝§7.13 と同じ設定")
-        else:
+        if name == "verify":
+            p.add_argument("--sec-verify", type=float, default=30.0, help="確かめの甲の 1 応手あたりの時間の上限")
+            p.add_argument("--sec-verify-otsu", type=float, default=10.0, help="確かめの乙の配り方 1 つあたりの時間の上限")
+        if name != "run":
             p.add_argument("--points", default=None)
     a = ap.parse_args(argv)
-    (cmd_run if a.cmd == "run" else cmd_summarize)(a)
+    {"run": cmd_run, "summarize": cmd_summarize, "verify": cmd_verify}[a.cmd](a)
 
 
 if __name__ == "__main__":
