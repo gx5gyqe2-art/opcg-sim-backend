@@ -13,15 +13,16 @@
  },
  "outputs": {
   "dirs": [
-   "n_records/n49_w13_p0"
+   "n_records/n49_w13_p0",
+   "n_records/n49_w13_p1"
   ]
  },
  "metrics": {
-  "parts_done": 1,
-  "games": 120,
-  "rows": 18344,
+  "parts_done": 2,
+  "games": 240,
+  "rows": 36541,
   "dropped": 0,
-  "sec_play_mean": 14.06
+  "sec_play_mean": 13.73
  },
  "notes": "ledger grep '7.29 wave 49' matched only the instruction text (section is 7.32); other checks matched. repo reused via symlink ~/opcg-sim-backend"
 }
