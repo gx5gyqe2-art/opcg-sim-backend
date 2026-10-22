@@ -493,7 +493,7 @@ def build_parser():
     ap.add_argument("--seed-base", type=int, required=True,
                     help="既存の記録の seed 帯と重ならない値にする（新しい局を打つ）")
     ap.add_argument("--decks", default="synth", choices=("singleton", "synth", "synth_dig",
-                                                          "synth_roles", "user"))
+                                                          "synth_roles", "synth_roles2", "user"))
     ap.add_argument("--sims", type=int, default=64)
     ap.add_argument("--seq", default="off", choices=SF.SEQ_MODES,
                     help="**T144** 付与を攻撃の価格に読み替えるか（`off` 以外なら、読み替えた付与は対象外にしない）")
