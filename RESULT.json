@@ -1,138 +1,20 @@
 {
- "job": "rs-commit-hidden",
- "role": "engine fix (gameplay defect) + re-audit",
- "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.39 (origin/claude/cpu-spec-improvements-yw91jd @ ddcf0df; ledger 2+368); evidence docs/reports/2026-10-23_commit_sig.md §2.2",
- "branch": "claude/rs-commit-hidden",
- "report": "docs/reports/2026-10-23_commit_hidden.md",
+ "job": "arena-chid-w05",
+ "role": "arena",
+ "status": "partial",
  "inputs": {
-  "base": "ddcf0df (Plan WPs rs-commit-hidden and commit-audit)",
-  "net": "nrel_r13d (both seats)",
-  "audit_settings": "same as §7.24: 1 world x 1280 sims, budget none, lethal_proof off, random leaders x synth_roles, seeds 3013000-3013299, verify on, PYTHONHASHSEED=0; before = same base with --commit-hidden-legacy (both 300-game runs with 2 workers each, concurrently)",
-  "latency": "rs_decide_latency.py --worlds 2 --lethal-proof root --games 20 (seed 2999900-), each setting pinned to one core, run concurrently"
+  "candidate": "nrel_r13d.npz (hidden-card continuations re-read)",
+  "baseline": "nrel_r13d.npz + commit_hidden_legacy",
+  "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)",
+  "pairs": 150
  },
  "outputs": {
-  "engine": "rust/opcg_engine/src/search/decide.rs (hidden_at_commit, trace_to_steps truncation, DecideOptions.commit_hidden_legacy), quiesce.rs (TraceStep, dialog_cards), macro.rs (setup-box trace carries candidates), mod.rs (opts key commit_hidden_legacy)",
-  "python": "opcg_sim/api/engine_rs.py (commit_hidden_legacy=), opcg_sim/loop/arena.py (--cand-commit-hidden-legacy), opcg_sim/loop/arena_shard.py (--commit-hidden-legacy)",
-  "tools": "tests/scripts/defense_audit.py (--commit-hidden-legacy), tests/scripts/rs_decide_latency.py (--commit-hidden-legacy, kinds)",
-  "tests": "rust/opcg_engine/src/search/tests_commit_hidden.rs (5 tests)",
-  "goldens": "tests/fixtures/rs_goldens/replay/a1_5000165.json, a1_5000182.json (2 changed); audit.json and random band unchanged",
-  "results": "n1_results/commit_hidden/ (compare300.json, golden_diff.json, new300/, legacy300/, pilot_new/, pilot_legacy/, latency_*.json, logs, one-off scripts compare300.py, golden_diff.py, trace_seed.py)",
-  "docs": "docs/SPEC.md §2.5.11, docs/TEST_SPEC.md (tests_commit_hidden.rs row; defense_audit / rs_decide_latency rows)"
+  "files": [
+   "arena_chid/chid_w05.jsonl"
+  ]
  },
  "metrics": {
-  "audit300": {
-   "void": [
-    0,
-    0
-   ],
-   "resp_points": [
-    9820,
-    9793
-   ],
-   "threat_ko": [
-    450,
-    433
-   ],
-   "threat_otsu": [
-    351,
-    332
-   ],
-   "miss_ko": [
-    24,
-    24
-   ],
-   "miss_otsu_raw": [
-    9,
-    8
-   ],
-   "miss_otsu_verified": [
-    7,
-    6
-   ],
-   "miss_otsu_verified_commit": [
-    3,
-    2
-   ],
-   "miss_otsu_verified_window": [
-    4,
-    4
-   ],
-   "seat_lost_after_verified_miss": [
-    5,
-    4
-   ],
-   "same_game_shape": 262,
-   "same_winner": 288,
-   "order": "[legacy, fixed]",
-   "removed": "3013121 p2 step 142 (choice among resampled-world deck cards)",
-   "remaining_commit": [
-    "3013194 p2 89: target among field cards (visible); re-read gives same move (search miss, not this defect)",
-    "3013217 p2 157: CONFIRM_OPTIONAL replayed from a 7-step window-fold commit made at a simultaneous-trigger order dialog; candidates visible; re-read declines and is safe (commit-vs-reread disagreement, §7.40 scope)"
-   ]
-  },
-  "pilot2": {
-   "seeds": [
-    3013121,
-    3013194
-   ],
-   "legacy_reproduces_both_misses": true,
-   "fixed": "3013121 point gone (p2 now wins); 3013194 unchanged"
-  },
-  "goldens": {
-   "audit_diff": 0,
-   "random_diff": 0,
-   "a1_diff": 2,
-   "a1_legacy_reproduces_head": "50/50",
-   "a1_winner_changed": 1,
-   "a1_cause": "both at the discard of Boa Hancock EB04-027 (draw 2, discard 1) on p2's own turn: two candidates were drawn after the commit"
-  },
-  "latency": {
-   "mean_sec": [
-    0.2,
-    0.201
-   ],
-   "p90": [
-    0.506,
-    0.501
-   ],
-   "p99": [
-    1.32,
-    1.334
-   ],
-   "wall_sec": [
-    616.8,
-    621.1
-   ],
-   "moves": [
-    2747,
-    2758
-   ],
-   "kinds_legacy": {
-    "main": 1311,
-    "window": 616,
-    "commit": 741,
-    "lethal": 79
-   },
-   "kinds_fixed": {
-    "main": 1302,
-    "window": 628,
-    "commit": 747,
-    "lethal": 81
-   },
-   "per_move_delta": "+0.5% (noise level)"
-  },
-  "gates": {
-   "make_test": "green (cargo 615 passed; pytest 857 passed, 13 skipped)",
-   "audit_cross": "void 0 (120 pairs, 240 games)"
-  }
+  "arena_chid/chid_w05.jsonl": 25
  },
- "forecast_check": {
-  "commit_misses_2_to_0": "miss: 3 -> 2 on the same base; the defect-type point is gone; the 2 remaining are other types",
-  "otsu_7_to_5": "miss: 7 -> 6",
-  "golden_a1_3_to_10": "miss: 2",
-  "cost_1_to_3pct": "miss (lower): +0.5%"
- },
- "command": "PYTHONHASHSEED=0 python tests/scripts/defense_audit.py run --games 300 --seed-base 3013000 --workers 2 --out n1_results/commit_hidden/new300 [--commit-hidden-legacy] && ... verify ... && ... summarize",
- "notes": "(1) Judgement form: known-at-commit set (fair-resampled slots without my known_by bit), applied when the commit is generated (the trace now carries each step's dialog candidates) instead of carrying the set into the commit; the zone-based alternative would miss 'draw then discard' (candidates in hand) and needlessly re-read known deck tops. Carry/JSON shape and commit_step are unchanged. (2) The 'before' audit was re-run on the current base with --commit-hidden-legacy because rs-trigger-simul etc. changed play since rs-commit-sig; the commit_sig report's numbers are not directly comparable. (3) commit_sig §2.2 described 3013194 as a deck search; it is a target among field cards (SEARCH_AND_SELECT is the front name of SELECT_TARGET) - outside this fix. (4) 3013217 is a new commit-derived miss type that appears with simultaneous-trigger order dialogs (rs-trigger-simul); left for WP commit-audit (§7.40). (5) My first code push (313d9cd) was before make test; make test was green before every later push. (6) Pre-existing clippy -D warnings failures (lethal.rs too_many_arguments, tests_lethal.rs needless_range_loop) are on the base; not touched. (7) Production arena: candidate = fixed (default), baseline = arena_shard --commit-hidden-legacy, both r13d, shipping settings, random x real, seed 3271000- (coordinator). Expected effect small: 2/50 a1 golden games and 38/300 audit games change."
+ "notes": ""
 }
