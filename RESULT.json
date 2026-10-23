@@ -19,27 +19,27 @@
   "dir": "../../../root/opcg-sim-backend/n50_rean/w05"
  },
  "metrics": {
-  "games": 60,
-  "points": 720,
+  "games": 116,
+  "points": 1392,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
   "points_by_rule": {
-   "early": 240,
-   "end_and_attack": 240,
-   "enel": 2,
-   "random": 238
+   "early": 463,
+   "end_and_attack": 464,
+   "enel": 6,
+   "random": 459
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
-   "early": 0.1792,
-   "end_and_attack": 0.3042,
-   "enel": 0.0,
-   "random": 0.2773
+   "early": 0.203,
+   "end_and_attack": 0.3039,
+   "enel": 0.1667,
+   "random": 0.3028
   },
-  "deep_best_differs_all": 0.2528,
-  "sec_replay_per_game": 11.35,
-  "sec_deep_per_game": 8.27
+  "deep_best_differs_all": 0.2694,
+  "sec_replay_per_game": 12.05,
+  "sec_deep_per_game": 8.49
  },
  "commit": "24ce7244f",
  "notes": "record branch claude/n50-w05 has no n_records/n50_w05; it is split into n50_w05_p0..p3 (120 games each). The first 200 games (seeds 2533000-2533199) = p0 + p1 were combined into one input dir (npz renumbered, meta merged); reanalyze.py unchanged."
