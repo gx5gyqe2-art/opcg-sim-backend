@@ -1,7 +1,7 @@
 {
  "job": "rean-n49-w02",
  "role": "reanalyze",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "record": "claude/n49-w02:n_records/n49_w02",
   "engine_commit": "6f2ce8ff6",
@@ -19,27 +19,27 @@
   "dir": "n49_rean/w02"
  },
  "metrics": {
-  "games": 163,
-  "points": 1956,
+  "games": 200,
+  "points": 2400,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
   "points_by_rule": {
-   "early": 652,
-   "end_and_attack": 652,
+   "early": 800,
+   "end_and_attack": 800,
    "enel": 4,
-   "random": 648
+   "random": 796
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
-   "early": 0.2285,
-   "end_and_attack": 0.316,
+   "early": 0.22,
+   "end_and_attack": 0.3225,
    "enel": 0.0,
-   "random": 0.3086
+   "random": 0.3166
   },
-  "deep_best_differs_all": 0.2837,
-  "sec_replay_per_game": 12.93,
-  "sec_deep_per_game": 9.01
+  "deep_best_differs_all": 0.2858,
+  "sec_replay_per_game": 12.73,
+  "sec_deep_per_game": 8.82
  },
  "commit": "6f2ce8ff6",
  "notes": ""
