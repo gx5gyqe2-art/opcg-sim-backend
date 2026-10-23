@@ -1,38 +1,42 @@
 {
- "job": "lethal-life-deal",
- "role": "engine change trial + measurement",
+ "job": "lethal-own-hidden",
+ "role": "investigation + engine change trial + measurement",
  "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.28 (origin/claude/cpu-spec-improvements-yw91jd @ 4f846bb; ledger 2+351)",
- "branch": "claude/lethal-life-deal",
- "report": "docs/reports/2026-10-23_lethal_life_deal.md",
- "decision": "not adopted: lethal.rs stays as on main (moves unchanged); production arena not needed",
+ "spec": "docs/search_efficiency_plan.md §7.30 (origin/claude/cpu-spec-improvements-yw91jd @ dbdcca8; ledger 2+354)",
+ "branch": "claude/lethal-own-hidden",
+ "report": "docs/reports/2026-10-23_lethal_own_hidden.md",
+ "decision": "not adopted (loss of true-deal-winnable proofs 203 >> 20): lethal.rs decision logic stays as on main (moves unchanged); measurement aids only; production arena not needed; user decision requested in report §6 (adopt the payable-DON counter-event rule or keep)",
  "inputs": {
   "record": "n1_results/lethal_speed/record_3012000_300.jsonl.gz (300 games, seed 3012000-3012299, both r13d, 1 world x 1280, root_reply)",
-  "points": 13473,
-  "baseline": "judge on current main wheel (13,497 -> 13,473: seed 3012144 desyncs at step 98 after rs-trigger-order-2)",
-  "variants": {"both": "both defensive deals fill life slots with defending triggers (8 deals)",
-               "mode0": "only the defence-value deal fills life slots (8 deals)",
-               "add": "8 deals unchanged + 1 life-slot deal first (9 deals)"},
-  "latency": "rs_decide_latency.py --worlds 2 --lethal-proof {off,root}, 20 games, seed 2999900-, 1 core each, same wheel"
+  "points_current_wheel": 12710,
+  "baseline": "judge on current main wheel (13,473 -> 12,710: 25 games desync after rs-trigger-simul; seed 3012080 desyncs at step 101 so its 7 target points were read on the da3438f wheel = §7.28's wheel + the trace facility)",
+  "variants": {"cost": "defensive deals count counter events only within the opponent's active DON (greedy by defence value)",
+               "hidden": "lines that reveal my own hidden cards (known_by bit set on a card that was in my deck / face-down life at the root) are not used for proof",
+               "both": "cost + hidden"},
+  "latency": "rs_decide_latency.py --worlds 2 --lethal-proof {off,root}, 20 games, seed 2999900-, 1 core each (taskset), same wheel, OPCG_LETHAL_OWN switch"
  },
  "outputs": {
-  "judges": "n1_results/lethal_life_deal/judge_{base,off,both,mode0,add,true}.jsonl.gz",
-  "variants": "n1_results/lethal_life_deal/variants.json",
-  "latency": "n1_results/lethal_life_deal/lat_{off_off,off_root,mode0_root}.json",
-  "variant_code_commit": "c1fdf65 (OPCG_LETHAL_LIFE switch; reverted in the next commit)"
+  "trace_tool": "tests/scripts/lethal_trace.py (targets / trace / summarize / show); Game.lethal_json opts trace/first/guide",
+  "traces": "n1_results/lethal_own_hidden/trace3_now.json (3012137,3012157,3012218 on current wheel), trace7_old_{off,cost,hidden,both}.json (3012080 x7 on da3438f wheel), trace_wins_base.json + trace_wins_base_summary.json (all 1,064 proofs)",
+  "judges": "n1_results/lethal_own_hidden/judge_{base,true,cost,hidden,both}.jsonl.gz",
+  "variants": "n1_results/lethal_own_hidden/variants.json",
+  "latency": "n1_results/lethal_own_hidden/lat_{off_off,off_root,cost_root,hidden_root}.json",
+  "variant_code_commit": "afd94ef + df5d251 (OPCG_LETHAL_OWN switch + Rust test (g); decision logic reverted to main in the next commit)"
  },
  "metrics": {
-  "defending_triggers_in_db": {"trigger_cards": 506, "defending": 419},
-  "base": {"win": 1175, "win_not_won_that_turn": 55, "of_which_true_deal_win": 45, "of_which_true_deal_no": 10, "true_deal_no_situations": 4, "true_deal_no_with_life_trigger": 2},
-  "both":  {"win": 1139, "lost": 48, "lost_true_no": 1, "lost_true_win": 45, "lost_won_that_turn": 40, "lost_to_unknown": 38, "lost_to_no": 10, "gained": 12, "nodes_ratio": 0.961},
-  "mode0": {"win": 1140, "lost": 37, "lost_true_no": 1, "lost_true_win": 36, "lost_won_that_turn": 29, "lost_to_unknown": 29, "lost_to_no": 8, "gained": 2, "nodes_ratio": 0.962},
-  "add":   {"win": 1118, "lost": 58, "lost_true_no": 2, "lost_true_win": 56, "lost_won_that_turn": 48, "lost_to_unknown": 47, "lost_to_no": 11, "gained": 1, "nodes_ratio": 0.968},
-  "latency_mean_sec": {"off": 0.177, "root_main": 0.198, "root_mode0": 0.199},
-  "latency_increment": {"root_main": "+11.9%", "root_mode0": "+12.4%"},
-  "root_status_20games": {"root_main": {"win": 90, "no": 706, "unknown": 420}, "root_mode0": {"win": 88, "no": 612, "unknown": 517}},
-  "make_test": "green (cargo 604 passed; pytest 855 passed, 13 skipped)",
-  "audit_cross": {"games": 240, "void": 0}
+  "cause_of_10_points": {"hand_counter_events_overvalued_in_defensive_deal": 8, "life_trigger_slot (§7.28)": 2, "own_hidden_cards_as_cause": 0,
+                          "note": "3012080x7 and 3012137: both defensive deals fill the opponent's hand entirely with counter events the opponent cannot pay (0-1 active DON); 3012218: same + life trigger"},
+  "generalization_1049_proofs": {"my_sequence_splits_across_deals": 577, "split_only_by_don_attach_count": 393, "split_right_after_own_hidden_any_deal": 26, "split_right_after_own_hidden_all_deals": 17, "own_hidden_seen_in_any_line": 62},
+  "base": {"win": 1064, "true_deal_no": 3, "true_deal_unknown": 2, "targets_current_wheel": ["3012137:p2:12:146", "3012157:p2:12:124", "3012218:p1:11:80"], "targets_old_wheel": "3012080:p1:11:103-109 (7)"},
+  "cost":   {"win": 860, "lost": 205, "lost_true_no": 2, "lost_true_win": 203, "lost_won_that_turn": 190, "lost_to_no": 121, "lost_to_unknown": 84, "gained": 1, "move_changed": 39, "nodes_ratio": 1.021, "targets_removed_of_10": 9, "old_wheel_3012080_removed": 7},
+  "hidden": {"win": 1087, "lost": 35, "lost_true_no": 0, "lost_true_win": 35, "gained": 58, "move_changed": 3, "nodes_ratio": 0.875, "targets_removed_of_10": 7, "old_wheel_3012080_removed": 7},
+  "both":   {"win": 889, "lost": 217, "lost_true_no": 2, "lost_true_win": 215, "gained": 42, "nodes_ratio": 0.893, "targets_removed_of_10": 9},
+  "latency_mean_sec": {"off": 0.187, "root_main": 0.207, "root_cost": 0.207, "root_hidden": 0.208},
+  "latency_increment": {"root_main": "+10.7%", "root_cost": "+10.7%", "root_hidden": "+11.2%"},
+  "root_status_20games": {"root_main": {"win": 85, "no": 698, "unknown": 427}, "root_cost": {"win": 68, "no": 693, "unknown": 432}, "root_hidden": {"win": 83, "no": 743, "unknown": 379}},
+  "make_test": "green (cargo 606 passed; pytest 857 passed, 13 skipped)",
+  "audit_cross": "not run (no decision-logic change adopted; golden 2 + make test confirm moves unchanged)"
  },
- "command": "python tests/scripts/lethal_speed_check.py judge --record n1_results/lethal_speed/record_3012000_300.jsonl.gz --out n1_results/lethal_life_deal --tag <v> (OPCG_LETHAL_LIFE=<v> on c1fdf65) ; judge --tag true --true-deal",
- "notes": "Not adopted. Of the 55 proofs not won that turn, 45 are wins on the true deal too (the deal is not the cause; the CPU's decision used a different deal seed / fell back to search). Only 10 are false proofs (true deal no), from 4 situations; only 2 involve a life trigger (3012157 removed by all variants, 3012218 only by add, to unknown). Each variant removes 1-2 false proofs and loses 36-56 proofs that win on the true deal (mostly win->unknown at 20,000 nodes: defending triggers add opponent branches). Invariant 'proof set must not grow' is violated by both (12) and mode0 (2) because the defensive deal itself changes; add (+1) is sound w.r.t. the old 8 deals (a superset of deals; the gain is node budget freed by failing early on the first deal). Forecast (20-60 fewer proofs, >half not won) matched the count but not the content (2-3% were real false proofs). The remaining 8 false proofs (life 0, defended by hand counters in 3012080 x7 and 3012137 x1) are not explained by the hand slots (the defence-value deal should hold at least those counters); unverified hypothesis: the line depends on my own deck order through my own [On Attack] choices, which the fair deals reshuffle. Next step candidate: a read-only judge that uses the true deal except for my own deck reshuffled. Kept: measurement option true_deal in Game.lethal_json and judge --true-deal. Production arena not needed (moves unchanged; golden/make test confirm)."
+ "command": "python tests/scripts/lethal_trace.py trace --points ... ; python tests/scripts/lethal_speed_check.py judge --record n1_results/lethal_speed/record_3012000_300.jsonl.gz --out n1_results/lethal_own_hidden --tag <v> (OPCG_LETHAL_OWN=<v>) ; judge --tag true --true-deal ; python tests/scripts/lethal_trace.py trace --from-judge judge_base.jsonl --wins ; summarize",
+ "notes": "Hypothesis (my own hidden cards) refuted as the cause: of the 10 false proofs, 8 (3012080 x7 life 0, 3012137 life 0) come from the defensive deals themselves: defence value counts counter events (+3000/+4000) regardless of whether the opponent can pay them, so with 0-1 active DON both 'strong' hands are 3-4 unpayable events and weaker than the real hand; 3012218 is the same plus a life trigger; 3012157 is the life-trigger slot (\u00a77.28). The own-hidden split (my dialog answer differs per deal right after a look/search) exists in 26/1049 proofs (2.5%, within forecast) but never decides the true-deal outcome. 55% of proofs do split across deals, mostly by the number of DON attached (adapting to the opponent's hidden hand per deal) - the \u00a77.21 \u00a78 caveat, out of scope here. Fix 'cost' (count counter events only within the opponent's active DON) removes 9/10 targets (7/7 on the da3438f wheel, 2/3 on the current wheel; 3012157 remains = life trigger) but loses 203 proofs that win on the true deal (121 refuted by the now-genuinely-strong hand, 84 to unknown; 190 of them won that turn in the record) = 10x the 20-point budget, so per \u00a77.30-5 it is NOT adopted; the report \u00a76 puts the decision to the user (these 203 are proofs the \u00a77.21 design would never have granted; adopting means -19% proofs, +0% latency, needs a production arena). Fix 'hidden' removes 3012080 x7 for the wrong reason (every line goes through Izo's look-at-5), none of the current-wheel 3 points, loses 35, and gains 58 (budget freed) - not adopted. Invariant note: 'cost' gains 1 proof (3012249:p2:12:120, unknown->win by freed budget, all 8 deals win = sound). Current main wheel desyncs 25 of the 300 recorded games (12,710 points vs 13,473 in \u00a77.28); seed 3012080 desyncs at step 101 (an extra Buggy dialog after rs-trigger-simul), so its 7 points were read on the da3438f wheel with the same trace patch (lethal.rs differs from main only cosmetically there). The 'trace' read-back of all proofs had a measurement quirk (continuing to the remaining deals after one fails consumed node budget: 15 wins -> unknown); fixed in df5d251, generalization counted on the 1,049 reproduced wins. Also fixed line_len for proofs that start with ATTACH_DON (was 1; stats field only). Kept: Game.lethal_json trace/first/guide, tests/scripts/lethal_trace.py, TEST_SPEC row, SPEC \u00a72.5.10 known-limitation note. make audit-cross not run (no decision-logic change adopted)."
 }

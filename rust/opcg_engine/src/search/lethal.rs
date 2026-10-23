@@ -44,19 +44,6 @@ pub const OPP_SELECT_MAX: usize = 64;
 /// 1 本の手順の深さの上限（監査の `MAX_DEPTH`）。
 pub const LETHAL_MAX_DEPTH: usize = 300;
 
-/// 計測用の切替（§7.30・WP `lethal-own-hidden`・環境変数 `OPCG_LETHAL_OWN`）:
-/// `off`＝本線のまま／`cost`＝守りの強い配り方でカウンターイベントを相手の払えるドン!!の範囲でだけ数える／
-/// `hidden`＝自分の隠れた札（山札・裏向きのライフ）を見る・引く手を含む手順は証明に使わない／`both`＝両方。
-fn own_mode() -> u8 {
-    static MODE: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
-    *MODE.get_or_init(|| match std::env::var("OPCG_LETHAL_OWN").as_deref() {
-        Ok("cost") => 1,
-        Ok("hidden") => 2,
-        Ok("both") => 3,
-        _ => 0,
-    })
-}
-
 /// 切替（opts の `lethal_proof`・§7.21）。**既定 `Off`＝1 bit も変わらない**。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LethalProof {
@@ -323,37 +310,14 @@ fn defensive_deal(
         };
         let uuids: Vec<String> = pool.iter().map(|c| state.card(*c).uuid.clone()).collect();
         let mut mixed = by_uuid(rng.shuffle_order(&uuids)?);
-        let key = |v: i64, ev: bool| if mode == 1 { (-(ev as i64), -v) } else { (0, -v) };
         mixed.sort_by_key(|c| {
             let (v, ev) = defense(masters, state.card(*c).master);
-            key(v, ev)
+            if mode == 1 {
+                (-(ev as i64), -v)
+            } else {
+                (0, -v)
+            }
         });
-        if own_mode() & 1 != 0 {
-            // カウンターイベントは**相手が今払えるドン!!**（アクティブのドン!!）の範囲でだけ守りに数える（§7.30）:
-            // 守りの値の順に見て、コストが残りの予算に収まるイベントだけ値を残し、残りは値 0（手札の枠に入れない）。
-            // 旧い形は払えないイベントを値のまま手札の枠へ積み、本当の手札より弱い「守りの強い配り方」を作っていた。
-            let mut budget = p.don_active.len() as i32;
-            let eff: Vec<(CardIdx, (i64, i64))> = mixed
-                .iter()
-                .map(|c| {
-                    let cm = masters.get(state.card(*c).master);
-                    let (v, ev) = defense(masters, state.card(*c).master);
-                    if ev {
-                        if cm.cost <= budget {
-                            budget -= cm.cost;
-                            (*c, key(v, true))
-                        } else {
-                            (*c, key(0, false))
-                        }
-                    } else {
-                        (*c, key(v, false))
-                    }
-                })
-                .collect();
-            let mut eff = eff;
-            eff.sort_by_key(|(_, k)| *k);
-            mixed = eff.into_iter().map(|(c, _)| c).collect();
-        }
         let n_hand = slots.iter().filter(|(z, _)| *z == CardZone::Hand).count();
         let (hand, rest) = mixed.split_at(n_hand);
         let rest_uuids: Vec<String> = rest.iter().map(|c| state.card(*c).uuid.clone()).collect();
@@ -422,8 +386,6 @@ struct Solver<'a> {
     info: HashMap<MasterIdx, MasterInfo>,
     /// 直前の上界が「上界なし」になった札（計測用・`bound_report`）
     unbounded_by: Vec<String>,
-    /// 自分の隠れた札（この配り方の根で自分の山札・裏向きのライフに在り、自分が知らない札・§7.30 の `hidden`）
-    hidden: Vec<CardIdx>,
 }
 
 /// 上界のための札の読み（本文の文言は**解釈された能力の本文**（`Ability::raw_text`）だけを見る＝キーワードの
@@ -550,26 +512,7 @@ impl<'a> Solver<'a> {
             best: HashMap::new(),
             info: HashMap::new(),
             unbounded_by: Vec::new(),
-            hidden: if own_mode() & 2 != 0 {
-                let p = state.player(me);
-                let bit = me.know_bit();
-                p.deck
-                    .iter()
-                    .chain(p.life.iter().filter(|c| !state.card(**c).is_face_up))
-                    .copied()
-                    .filter(|c| state.card(*c).known_by & bit == 0)
-                    .collect()
-            } else {
-                Vec::new()
-            },
         }
-    }
-
-    /// 自分の隠れた札のどれかを見た・引いた（`known_by` に自分の bit が付いた）か（§7.30 の `hidden`）。
-    /// 知識の印は journal が領域の出入り・LOOK・REVEAL で自動で付ける（`docs/SPEC.md` §2.5.9）。
-    fn revealed_own_hidden(&self, st: &GameState) -> bool {
-        let bit = self.me.know_bit();
-        self.hidden.iter().any(|c| st.card(*c).known_by & bit != 0)
     }
 
     fn info_of(&mut self, m: MasterIdx) -> &MasterInfo {
@@ -838,13 +781,7 @@ impl<'a> Solver<'a> {
             }
             tried += 1;
             let nxt = if mine && act_of(&mv) == "ATTACH_DON" { mv_uuid(&mv).map(str::to_owned) } else { None };
-            // 自分の隠れた札を見る・引く手を含む手順は証明に使わない（`hidden`）: 自分の手なら負けの手として
-            // 数え、相手の応手なら（その先は読めないので）こちらの負けとする＝健全側
-            let r = if !self.hidden.is_empty() && self.revealed_own_hidden(s.state()) {
-                Ok(false)
-            } else {
-                self.solve(s, nxt.as_deref(), depth + 1)
-            };
+            let r = self.solve(s, nxt.as_deref(), depth + 1);
             {
                 let _prof = crate::prof::enter(crate::prof::Cat::LethalRollback);
                 s.rollback();
@@ -1280,8 +1217,6 @@ fn solve_in(
         Some((mv, nxt)) => {
             s.begin();
             let r = if apply(s, masters, me, mv).is_err() {
-                Ok(false)
-            } else if !solver.hidden.is_empty() && solver.revealed_own_hidden(s.state()) {
                 Ok(false)
             } else {
                 let r = solver.solve(s, nxt, 1);

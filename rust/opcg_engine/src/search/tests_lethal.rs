@@ -8,7 +8,7 @@
 //! (f) 発動条件は今この手番で使える札だけで数える（§7.25 の 1・WP `lethal-speed`）
 
 use super::*;
-use crate::model::{GameState, MasterIdx, MasterTable, Seat};
+use crate::model::{GameState, MasterTable, Seat};
 use crate::search::decide::{decide, DecideCarry, DecideOptions};
 use crate::testkit::{BoardBuilder, M_BIG, M_CHAR};
 
@@ -143,35 +143,4 @@ fn trigger_counts_only_cards_usable_this_turn() {
     assert!(!applies(&mut crate::journal::Session::new(st), &m, Seat::P1), "払えない速攻は数えない");
     let (m, st) = build(2);
     assert!(applies(&mut crate::journal::Session::new(st), &m, Seat::P1), "払える速攻は 1 回の攻撃として数える");
-}
-
-/// (g) 守りの強い配り方は、カウンターイベントを**相手が今払えるドン!!の範囲でだけ**守りに数える（§7.30・WP `lethal-own-hidden`）。
-/// 相手の知らない山＝手札の枠 2＋山札 6（カウンターイベント〔+3000・コスト 1〕2 枚・カウンター 2000 のキャラ 2 枚・ふつうの
-/// キャラ 2 枚）。相手のアクティブのドン!!が 0 枚ならイベントは払えない＝手札の枠はカウンター 2000 の 2 枚。1 枚なら
-/// イベント 1 枚＋2000 が 1 枚。2 枚ならイベント 2 枚。旧い形（払えるかを見ない）は 0 枚でもイベント 2 枚を手札に積み、
-/// 本当の手札より弱い「守りの強い配り方」になっていた（`docs/reports/2026-10-23_lethal_own_hidden.md`）。
-#[test]
-fn defensive_deal_counts_counter_events_only_within_payable_don() {
-    use crate::testkit::M_EVENT;
-    for (active, want_events, want_bigs) in [(0usize, 0usize, 2usize), (1, 1, 1), (2, 2, 0)] {
-        let mut b = BoardBuilder::new();
-        for _ in 0..2 {
-            b.put_hand(Seat::P2, M_CHAR);
-        }
-        for m in [M_EVENT, M_BIG, M_CHAR, M_EVENT, M_BIG, M_CHAR] {
-            b.put_deck(Seat::P2, m);
-        }
-        b.dons(Seat::P2, "active", active);
-        b.dons(Seat::P2, "rested", 4 - active);
-        let (mut m, st) = b.turn(5, Seat::P1).build();
-        m.masters[M_EVENT as usize].effect_text = "【カウンター】自分のリーダーを、このバトル中、パワー+3000。".into();
-        m.masters[M_EVENT as usize].cost = 1;
-        let deals = make_deals(&st, &m, Seat::P1, 7, LETHAL_RAND_DEALS).unwrap();
-        for mode in 0..2 {
-            let hand: Vec<MasterIdx> = deals[mode].player(Seat::P2).hand.iter().map(|c| deals[mode].card(*c).master).collect();
-            let events = hand.iter().filter(|m| **m == M_EVENT).count();
-            let bigs = hand.iter().filter(|m| **m == M_BIG).count();
-            assert_eq!((events, bigs), (want_events, want_bigs), "active={active} mode={mode} hand={hand:?}");
-        }
-    }
 }
