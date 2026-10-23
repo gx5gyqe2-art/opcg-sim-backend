@@ -1,7 +1,7 @@
 {
  "job": "rean-n50-w06",
  "role": "reanalyze",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "record": "claude/n50-w06:n_records/n50_w06",
   "engine_commit": "24ce7244f",
@@ -19,27 +19,27 @@
   "dir": "../../../root/opcg-sim-backend/n50_rean/w06"
  },
  "metrics": {
-  "games": 176,
-  "points": 2112,
+  "games": 200,
+  "points": 2400,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
   "points_by_rule": {
-   "early": 704,
-   "end_and_attack": 704,
+   "early": 800,
+   "end_and_attack": 800,
    "enel": 4,
-   "random": 700
+   "random": 796
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
-   "early": 0.2344,
-   "end_and_attack": 0.2884,
+   "early": 0.2512,
+   "end_and_attack": 0.3,
    "enel": 0.25,
-   "random": 0.33
+   "random": 0.3304
   },
-  "deep_best_differs_all": 0.2841,
-  "sec_replay_per_game": 12.43,
-  "sec_deep_per_game": 8.39
+  "deep_best_differs_all": 0.2938,
+  "sec_replay_per_game": 12.63,
+  "sec_deep_per_game": 8.56
  },
  "commit": "24ce7244f",
  "notes": "記録ブランチ claude/n50-w06 は n_records/n50_w06 ではなく 4 分割（n50_w06_p0〜p3・各 120 局・seed は互いに素で昇順）だったため、4 つを 1 つの dir に束ねて（npz は名前に p0〜p3 を付けて symlink・meta_n_record は p0 のもの〔局数・行数・seed_base 以外は 4 つとも同一〕・meta_games は連結）--in に渡した。先頭 200 局＝p0 の 120 局＋p1 の先頭 80 局（seed 順）。"
