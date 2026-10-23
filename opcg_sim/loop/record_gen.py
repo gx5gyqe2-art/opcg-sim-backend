@@ -546,13 +546,28 @@ def eps_swap(out, move, cids, db, eps_play, eps_hold, rng):
 def move_sig(mv):
     """Python `learned/plan.move_sig` と同じ鍵（Rust `search::decide::move_sig` の写し）。
 
-    JSON にしたときの形（`[action_type, uuid, target_ids, selected_uuids, accepted]`）が
-    旧版の `json.dumps(tuple)` と一致する＝`pol_sig`／`sig` 列の中身が変わらない。
+    JSON にしたときの形は `[action_type, 札, target_ids, selected_uuids, accepted]`（＋区別の欄）。
+    札は `payload.uuid`、無ければ最上位の `card_uuid`（戦闘の手）。6 つ目の欄（dict）は `position`
+    （既定の "BOTTOM" 以外）・`selects`（2 段以上）・`index`（0 以外）があるときだけ付く（WP `rs-commit-sig`・2026-10-23 から。
+    それより前の波の `sig`／`pol_sig` は戦闘の手の札が null）。
     """
     p = mv.get("payload") or {}
-    return [mv.get("action_type") or p.get("action_type"), p.get("uuid"),
-            list(p.get("target_ids") or ()), list(p.get("selected_uuids") or ()),
-            p.get("accepted")]
+    card = p.get("uuid")
+    if card is None:
+        card = mv.get("card_uuid")
+    sig = [mv.get("action_type") or p.get("action_type"), card,
+           list(p.get("target_ids") or ()), list(p.get("selected_uuids") or ()),
+           p.get("accepted")]
+    ext = {}
+    if p.get("position") is not None and p.get("position") != "BOTTOM":
+        ext["position"] = p["position"]
+    if isinstance(p.get("selects"), list) and len(p["selects"]) >= 2:
+        ext["selects"] = p["selects"]
+    if isinstance(p.get("index"), int) and not isinstance(p.get("index"), bool) and p["index"] != 0:
+        ext["index"] = p["index"]
+    if ext:
+        sig.append(ext)
+    return sig
 
 
 def _don_k(mv):

@@ -103,6 +103,10 @@ pub struct DecideOptions {
     pub lethal_reply_nodes: u64,
     /// `RootReply` の決定あたりの合計（`lethal_reply_total`・世界の本数で等分）。
     pub lethal_reply_total: u64,
+    /// 旧い手の署名（`commit_sig_legacy`・WP `rs-commit-sig`・**測定専用**・既定 false＝修正後）。
+    /// true なら箱の commit の積み・照合と複数世界の束ねで 2026-10-22 までの署名（`payload.uuid` だけ・
+    /// 区別の欄なし＝戦闘の手の札が落ちる）を使う（[`move_sig_with`]）。本番アリーナの基準席用。
+    pub commit_sig_legacy: bool,
 }
 
 /// `opp_blind`（§7.14）の混ぜ直しの乱数の seed（世界 `i` の探索乱数 `search_seed + i` と同じ値から、
@@ -202,6 +206,7 @@ impl Default for DecideOptions {
             lethal_nodes: super::lethal::LETHAL_ROOT_NODES,
             lethal_reply_nodes: super::lethal::LETHAL_REPLY_NODES,
             lethal_reply_total: super::lethal::LETHAL_REPLY_TOTAL,
+            commit_sig_legacy: false,
         }
     }
 }
@@ -352,8 +357,26 @@ pub struct SelectGroup {
 
 // --- 手のキー（plan.move_sig／cpu_ai._move_equiv_key）-----------------------------
 
-/// Python `plan.move_sig`（action_type・uuid・target_ids・selected_uuids・accepted）。
+/// 手の署名（`[action_type, 札, target_ids, selected_uuids, accepted]`＋必要なら区別の欄）。
+///
+/// 箱の commit（窓の根畳み・登場時の対話・準備箱が決めた手順の続き）は各段をこの署名で合法手と照合し、
+/// [`find_move`] は**署名が一致する最初の合法手**を取る＝署名に落ちた区別は再生で失われる
+/// （WP `rs-commit-sig`・`docs/reports/2026-10-23_commit_sig.md`）。そのため:
+/// - 札の欄は `payload.uuid`、無ければ最上位の `card_uuid`（戦闘の手 `SELECT_COUNTER`／`SELECT_BLOCKER`
+///   は札を `card_uuid` に持つ・[`describe_move`] と同じ形）。
+/// - 6 つ目の欄（区別の欄・dict）は、5 つでは割れない手どうしのときだけ付く:
+///   `position`（並べ替えの上下・既定の `"BOTTOM"` 以外のとき）・`selects`（準備箱の対象選択が 2 段以上のとき・
+///   段の区切りは `selected_uuids` の平らな並びでは落ちる）・`index`（選択肢の番号・0 以外のとき）。
+///   付かない手の署名は今までと同じ 5 つ。
+///
+/// `DON_BOX` の `don_k` は入れない（残り回数は [`Step::Box`] が持つ）。
 pub fn move_sig(mv: &Move) -> Value {
+    move_sig_with(mv, false)
+}
+
+/// [`move_sig`] の、旧い署名（`legacy`＝`payload.uuid` だけ・区別の欄なし＝2026-10-22 までの形）も
+/// 出せる版。旧い署名は**測定専用**（`DecideOptions::commit_sig_legacy`）。
+pub fn move_sig_with(mv: &Move, legacy: bool) -> Value {
     // 根でしか呼ばれない読み＝手の JSON（`Move::json`）をそのまま読む（WP `rs-speed-d`）。
     let mvj = mv.json();
     let mv: &Value = &mvj;
@@ -363,20 +386,47 @@ pub fn move_sig(mv: &Move) -> Value {
         Some(v) if !v.is_null() => v.clone(),
         _ => p.get("action_type").cloned().unwrap_or(Value::Null),
     };
-    Value::Array(vec![
+    let card = match p.get("uuid") {
+        Some(v) if legacy || !v.is_null() => v.clone(),
+        _ if legacy => Value::Null,
+        _ => mv.get("card_uuid").cloned().unwrap_or(Value::Null),
+    };
+    let mut sig = vec![
         at,
-        p.get("uuid").cloned().unwrap_or(Value::Null),
+        card,
         p.get("target_ids").cloned().unwrap_or(Value::Array(vec![])),
         p.get("selected_uuids")
             .cloned()
             .unwrap_or(Value::Array(vec![])),
         p.get("accepted").cloned().unwrap_or(Value::Null),
-    ])
+    ];
+    if !legacy {
+        let mut ext = Map::new();
+        if let Some(pos) = p.get("position").filter(|v| v.as_str() != Some("BOTTOM") && !v.is_null()) {
+            ext.insert("position".into(), pos.clone());
+        }
+        if let Some(sel) = p.get("selects").filter(|v| v.as_array().is_some_and(|a| a.len() >= 2)) {
+            ext.insert("selects".into(), sel.clone());
+        }
+        // 選択肢（CHOICE）の番号。探索の候補は既定の 0 だけだが、詰みの判定器の答えは番号で割れる。
+        if let Some(i) = p.get("index").filter(|v| v.as_i64().is_some_and(|i| i != 0)) {
+            ext.insert("index".into(), i.clone());
+        }
+        if !ext.is_empty() {
+            sig.push(Value::Object(ext));
+        }
+    }
+    Value::Array(sig)
 }
 
 /// Python `plan._find_move`。
 pub fn find_move<'a>(legal: &'a [Move], sig: &Value) -> Option<&'a Move> {
-    legal.iter().find(|mv| move_sig(mv) == *sig)
+    find_move_with(legal, sig, false)
+}
+
+/// [`find_move`] の、署名の形（[`move_sig_with`] の `legacy`）を選べる版。
+pub fn find_move_with<'a>(legal: &'a [Move], sig: &Value, legacy: bool) -> Option<&'a Move> {
+    legal.iter().find(|mv| move_sig_with(mv, legacy) == *sig)
 }
 
 /// Python `cpu_ai._find_card`（トレース記述用の全ゾーン横断・p1 → p2 の順）。
@@ -739,8 +789,8 @@ pub fn don_box_first_primitive(mv: &Move) -> Move {
 
 // --- 箱コミット -------------------------------------------------------------------
 
-/// Python `_trace_to_steps`（解決トレース → 自分側の手順）。
-fn trace_to_steps(trace: &[(Seat, Move)], name: Seat) -> Vec<Step> {
+/// Python `_trace_to_steps`（解決トレース → 自分側の手順）。`legacy`＝旧い署名（[`move_sig_with`]・測定専用）。
+fn trace_to_steps(trace: &[(Seat, Move)], name: Seat, legacy: bool) -> Vec<Step> {
     let mut steps = Vec::new();
     for (actor, mv) in trace {
         if *actor != name {
@@ -750,12 +800,12 @@ fn trace_to_steps(trace: &[(Seat, Move)], name: Seat) -> Vec<Step> {
             let total = box_total(mv);
             if total >= 1 {
                 steps.push(Step::Box {
-                    sig: move_sig(mv),
+                    sig: move_sig_with(mv, legacy),
                     left: total,
                 });
             }
         } else {
-            steps.push(Step::Sig(move_sig(mv)));
+            steps.push(Step::Sig(move_sig_with(mv, legacy)));
         }
     }
     steps
@@ -787,11 +837,13 @@ fn commit_apply_ok(state: &GameState, masters: &MasterTable, name: Seat, mv: &Mo
 ///
 /// `steps` は**その場で書き換える**（Python も list を破壊的に更新する）。返り値が `None`
 /// または `steps` が空になったら、呼び出し側はコミットを破棄する（契約違反／消化完了）。
+/// `legacy`＝旧い署名で照合する（`steps` も旧い署名で積んだもの・測定専用・[`move_sig_with`]）。
 pub fn commit_step(
     ctx: &Ctx,
     s: &mut Session,
     name: Seat,
     steps: &mut Vec<Step>,
+    legacy: bool,
 ) -> Result<Option<Move>, EngineError> {
     if steps.is_empty() {
         return Ok(None);
@@ -806,7 +858,7 @@ pub fn commit_step(
     if !legal.is_empty() {
         match steps[0].clone() {
             Step::Box { sig, left } => {
-                if find_move(&legal, &sig).is_some() {
+                if find_move_with(&legal, &sig, legacy).is_some() {
                     if left <= 1 {
                         steps.remove(0);
                     } else {
@@ -831,7 +883,7 @@ pub fn commit_step(
                 }
             }
             Step::Sig(sig) => {
-                if let Some(found) = find_move(&legal, &sig).cloned() {
+                if let Some(found) = find_move_with(&legal, &sig, legacy).cloned() {
                     let k = found
                         .payload()
                         .and_then(|p| p.don_k_f64())
@@ -933,6 +985,7 @@ fn commit_window_continuation(
     name: Seat,
     mv: &Move,
     st: &mut SearchState,
+    legacy: bool,
 ) -> Vec<Step> {
     let window = if real.active_battle.is_some() {
         Window::Battle
@@ -957,13 +1010,14 @@ fn commit_window_continuation(
     if ok.is_err() {
         return Vec::new(); // Python の `except Exception: pass`（コミット生成の失敗は手を止めない）
     }
-    trace_to_steps(&trace, name)
+    trace_to_steps(&trace, name, legacy)
 }
 
 /// Python `_commit_play_dialog`（PLAY / ACTIVATE_MAIN の後続対話をコミットする）。
 ///
 /// 世界サンプルをここで引く（単一世界の経路）。複数世界（§20.7.1）は木を回した世界を
 /// 使い回す＝[`commit_play_dialog_in_world`] を直に呼ぶ（乱数はもう引かない）。
+#[allow(clippy::too_many_arguments)]
 fn commit_play_dialog(
     ctx: &Ctx,
     real: &GameState,
@@ -972,9 +1026,10 @@ fn commit_play_dialog(
     view: WorldView,
     rng: &mut dyn SearchRng,
     st: &mut SearchState,
+    legacy: bool,
 ) -> Result<Vec<Step>, EngineError> {
     let world = sample_world(real, name, view, rng)?;
-    Ok(commit_play_dialog_in_world(ctx, &world, name, mv, st))
+    Ok(commit_play_dialog_in_world(ctx, &world, name, mv, st, legacy))
 }
 
 /// [`commit_play_dialog`] の「世界を外から渡す」版（§20.7.1 の `worlds>1` が使う）。
@@ -984,6 +1039,7 @@ fn commit_play_dialog_in_world(
     name: Seat,
     mv: &Move,
     st: &mut SearchState,
+    legacy: bool,
 ) -> Vec<Step> {
     let mut s = Session::new(world.clone());
     if apply::apply_move_inplace(&mut s, ctx.masters, name, mv, true).is_err() {
@@ -1006,7 +1062,7 @@ fn commit_play_dialog_in_world(
     if ok.is_err() {
         return Vec::new();
     }
-    trace_to_steps(&trace, name)
+    trace_to_steps(&trace, name, legacy)
 }
 
 /// 準備箱（`SETUP_BOX`・§20.7.2）の「素の手より後」の手順をコミットへ積む。
@@ -1019,11 +1075,12 @@ fn commit_setup_box(
     mv: &Move,
     view: WorldView,
     rng: &mut dyn SearchRng,
+    legacy: bool,
 ) -> Result<Vec<Step>, EngineError> {
     let world = sample_world(real, name, view, rng)?;
     let mut s = Session::new(world);
     match super::r#macro::setup_box_continuation(&mut s, ctx.masters, name, mv) {
-        Ok(trace) => Ok(trace_to_steps(&trace, name)),
+        Ok(trace) => Ok(trace_to_steps(&trace, name, legacy)),
         Err(e @ EngineError::Unimplemented(_)) => Err(e),
         Err(_) => Ok(Vec::new()), // コミット生成の失敗は手を止めない（Python の `except: pass`）
     }
@@ -1370,7 +1427,7 @@ fn merge_worlds(
     }
     let legal = runs[0].run.legal.clone();
     let m = legal.len();
-    let sigs: Vec<Value> = legal.iter().map(move_sig).collect();
+    let sigs: Vec<Value> = legal.iter().map(|mv| move_sig_with(mv, opts.commit_sig_legacy)).collect();
     let mut n = vec![0.0f64; m];
     let mut w = vec![0.0f64; m];
     let mut per_world = Vec::with_capacity(runs.len());
@@ -1381,7 +1438,7 @@ fn merge_worlds(
         // 世界 0、または並びが世界 0 と完全に一致する世界は恒等写像（普通はこちら）。
         let same_order = wi == 0
             || (r.run.legal.len() == m
-                && r.run.legal.iter().zip(&sigs).all(|(mv, s)| move_sig(mv) == *s));
+                && r.run.legal.iter().zip(&sigs).all(|(mv, s)| move_sig_with(mv, opts.commit_sig_legacy) == *s));
         let to_root: Vec<Option<usize>> = if same_order {
             (0..r.run.legal.len()).map(Some).collect()
         } else {
@@ -1389,7 +1446,7 @@ fn merge_worlds(
                 .legal
                 .iter()
                 .map(|mv| {
-                    let sg = move_sig(mv);
+                    let sg = move_sig_with(mv, opts.commit_sig_legacy);
                     sigs.iter().position(|s| *s == sg)
                 })
                 .collect()
@@ -1550,7 +1607,7 @@ fn decide_after_lethal(
     // ① 箱コミットの機械実行（窓の根畳み・木より前）
     if opts.box_commit && !carry.commit.is_empty() {
         let mut steps = carry.commit.clone();
-        let mv = commit_step(ctx, &mut real, name, &mut steps)?;
+        let mv = commit_step(ctx, &mut real, name, &mut steps, opts.commit_sig_legacy)?;
         match mv {
             Some(mv) => {
                 carry.commit = if steps.is_empty() { Vec::new() } else { steps };
@@ -1580,7 +1637,7 @@ fn decide_after_lethal(
             if opts.box_commit {
                 if let Some(world) = &pick.world {
                     let steps =
-                        commit_window_continuation(ctx, state, world, name, &pick.mv, st);
+                        commit_window_continuation(ctx, state, world, name, &pick.mv, st, opts.commit_sig_legacy);
                     if !steps.is_empty() {
                         carry.commit = steps;
                     }
@@ -1735,7 +1792,7 @@ fn decide_after_lethal(
                     let total = box_total(&m);
                     if total > 1 {
                         carry.commit = vec![Step::Box {
-                            sig: move_sig(&m),
+                            sig: move_sig_with(&m, opts.commit_sig_legacy),
                             left: total - 1,
                         }];
                     }
@@ -1743,9 +1800,9 @@ fn decide_after_lethal(
                 Some("PLAY") | Some("ACTIVATE_MAIN") => {
                     // 複数世界は木を回した世界（PV と同じ）で継続を作る＝乱数を引き直さない。
                     let steps = if worlds > 1 {
-                        commit_play_dialog_in_world(ctx, &runs[pv_world].world, name, &m, st)
+                        commit_play_dialog_in_world(ctx, &runs[pv_world].world, name, &m, st, opts.commit_sig_legacy)
                     } else {
-                        commit_play_dialog(ctx, state, name, &m, opts.world_view(), rng, st)?
+                        commit_play_dialog(ctx, state, name, &m, opts.world_view(), rng, st, opts.commit_sig_legacy)?
                     };
                     if !steps.is_empty() {
                         carry.commit = steps;
@@ -1753,7 +1810,7 @@ fn decide_after_lethal(
                 }
                 // 準備箱（§20.7.2）: 素の手より後（対話 → 攻撃箱）を機械実行へ積む。
                 Some("SETUP_BOX") => {
-                    let steps = commit_setup_box(ctx, state, name, &m, opts.world_view(), rng)?;
+                    let steps = commit_setup_box(ctx, state, name, &m, opts.world_view(), rng, opts.commit_sig_legacy)?;
                     if !steps.is_empty() {
                         carry.commit = steps;
                     }
@@ -1813,6 +1870,67 @@ pub(super) mod tests {
         assert_ne!(move_sig(&Move::from_json((e).clone())), move_sig(&Move::from_json((f).clone())));
     }
 
+    /// WP `rs-commit-sig`: 戦闘の手は札を最上位の `card_uuid` に持つ＝署名に札が入らないと、
+    /// commit の続きは「署名が一致する最初の合法手」＝手札の先頭のカウンターを打つ。
+    #[test]
+    fn move_sig_splits_counter_cards() {
+        let c1 = Move::battle("SELECT_COUNTER", Some("h1".into()));
+        let c2 = Move::battle("SELECT_COUNTER", Some("h2".into()));
+        let pass = Move::battle("PASS", None);
+        assert_ne!(move_sig(&c1), move_sig(&c2));
+        assert_eq!(move_sig(&c2)[1], json!("h2"));
+        assert_eq!(move_sig(&pass)[1], Value::Null);
+        // commit の続きを照合すると、選んだ札（2 枚目）が返る
+        let legal = vec![c1.clone(), c2.clone(), pass.clone()];
+        assert_eq!(find_move(&legal, &move_sig(&c2)).unwrap().card_uuid(), Some("h2"));
+        // 旧い署名（測定専用）は札が落ちて 1 枚目を返す＝修正前の挙動
+        assert_eq!(move_sig_with(&c1, true), move_sig_with(&c2, true));
+        assert_eq!(
+            find_move_with(&legal, &move_sig_with(&c2, true), true).unwrap().card_uuid(),
+            Some("h1")
+        );
+    }
+
+    #[test]
+    fn move_sig_splits_blocker_cards() {
+        let b1 = Move::battle("SELECT_BLOCKER", Some("f1".into()));
+        let b2 = Move::battle("SELECT_BLOCKER", Some("f2".into()));
+        assert_ne!(move_sig(&b1), move_sig(&b2));
+        let legal = vec![b1.clone(), b2.clone(), Move::battle("PASS", None)];
+        assert_eq!(find_move(&legal, &move_sig(&b2)).unwrap().card_uuid(), Some("f2"));
+        assert_eq!(move_sig_with(&b1, true), move_sig_with(&b2, true));
+    }
+
+    /// 並べ替えの上下（`position`）と準備箱の段の区切り（`selects`）も署名で割れる。
+    /// それ以外の手の署名は今までの 5 つのまま（旧い署名と同じ）。
+    #[test]
+    fn move_sig_ext_only_when_needed() {
+        let base = json!({"selected_uuids":["a","b"],"index":0,"accepted":true,
+                          "position":"BOTTOM","declared_value":0});
+        let mut top = base.clone();
+        top["position"] = json!("TOP");
+        let bot = Move::from_json(json!({"kind":"game","action_type":"RESOLVE_EFFECT_SELECTION","payload":base}));
+        let top = Move::from_json(json!({"kind":"game","action_type":"RESOLVE_EFFECT_SELECTION","payload":top}));
+        assert_ne!(move_sig(&bot), move_sig(&top));
+        assert_eq!(move_sig(&bot), move_sig_with(&bot, true));
+        assert_eq!(move_sig(&top).as_array().unwrap().len(), 6);
+        assert_eq!(move_sig_with(&bot, true), move_sig_with(&top, true));
+        let sb = |sel: Value| {
+            Move::from_json(json!({"kind":"game","action_type":"SETUP_BOX",
+                "payload":{"uuid":"u","selects":sel.clone(),"selected_uuids":["a","b"]}}))
+        };
+        let one = sb(json!([["a","b"]]));
+        let two = sb(json!([["a"],["b"]]));
+        assert_ne!(move_sig(&one), move_sig(&two));
+        assert_eq!(move_sig(&one).as_array().unwrap().len(), 5);
+        let ch = |i: i64| Move::from_json(json!({"kind":"game","action_type":"RESOLVE_EFFECT_SELECTION",
+            "payload":{"selected_uuids":[],"index":i,"accepted":true,"position":"BOTTOM","declared_value":0}}));
+        assert_ne!(move_sig(&ch(0)), move_sig(&ch(1)));
+        assert_eq!(move_sig(&ch(0)), move_sig_with(&ch(0), true));
+        let atk = Move::game("ATTACK", super::super::Payload::Attack { uuid: "u".into(), target: "t".into() });
+        assert_eq!(move_sig(&atk), move_sig_with(&atk, true));
+    }
+
     #[test]
     fn don_box_first_primitive_expands_the_head() {
         let attach = json!({"action_type":"DON_BOX","payload":{"uuid":"u","don_k":2}});
@@ -1845,7 +1963,7 @@ pub(super) mod tests {
             (Seat::P2, Move::from_json(plain.clone())),
             (Seat::P1, Move::from_json(plain.clone())),
         ];
-        let steps = trace_to_steps(&trace, Seat::P1);
+        let steps = trace_to_steps(&trace, Seat::P1, false);
         assert_eq!(steps.len(), 2);
         match &steps[0] {
             Step::Box { left, .. } => assert_eq!(*left, 3), // 付与 2 ＋ 攻撃 1
@@ -1880,7 +1998,7 @@ pub(super) mod tests {
         let sig = move_sig(&Move::from_json(json!({"action_type": "DON_BOX",
                                    "payload": {"uuid": "u", "target_ids": ["t"]}})));
         let mut steps = vec![Step::Box { sig: sig.clone(), left: 2 }];
-        assert!(commit_step(&ctx, &mut s, Seat::P1, &mut steps).unwrap().is_none());
+        assert!(commit_step(&ctx, &mut s, Seat::P1, &mut steps, false).unwrap().is_none());
 
         // カウントダウンの算術そのもの（Python `_commit_step` の箱の分岐と同じ規則）:
         // 残り n>1 は付与・n<=1 かつ対象ありは攻撃。

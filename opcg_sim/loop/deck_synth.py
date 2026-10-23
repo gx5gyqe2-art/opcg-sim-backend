@@ -216,7 +216,7 @@ def synth_deck(db, leader_id, seed=0, size=DECK_SIZE, owner="p1"):
                 add(c)
     # 名指しコンボの閉包（相方が無ければ死に札になる 369枚対策）
     for c in list(picked):
-        for nm in names_in_text(c):
+        for nm in sorted(names_in_text(c)):   # 名前の順（集合のままだと PYTHONHASHSEED で変わる）
             if nm in by_name and len(picked) < TARGET_DISTINCT[1] + 2:
                 add(by_name[nm])
     # 種類の要求: イベントを要求する札があるならイベントを確保

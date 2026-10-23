@@ -1,0 +1,25 @@
+todo 24 (done 0) -> n1_results/commit_sig/new/points_seeds_seeds24.jsonl
+[1/24] seed=3013005 pts=32 sec=54.6 winner=p2 stats={'resp_points_seen': 56, 'resp_points_audited': 29, 'end_turns_seen': 11, 'end_turns_audited': 3}
+[2/24] seed=3013015 pts=26 sec=127.8 winner=p1 stats={'resp_points_seen': 42, 'resp_points_audited': 23, 'end_turns_seen': 12, 'end_turns_audited': 3}
+[3/24] seed=3013018 pts=33 sec=107.6 winner=p2 stats={'resp_points_seen': 54, 'resp_points_audited': 26, 'end_turns_seen': 17, 'end_turns_audited': 7}
+[4/24] seed=3013024 pts=43 sec=181.5 winner=p2 stats={'resp_points_seen': 51, 'resp_points_audited': 34, 'end_turns_seen': 17, 'end_turns_audited': 9}
+[5/24] seed=3013033 pts=62 sec=187.2 winner=p2 stats={'resp_points_seen': 61, 'resp_points_audited': 54, 'end_turns_seen': 13, 'end_turns_audited': 8}
+[6/24] seed=3013028 pts=43 sec=336.4 winner=p2 stats={'resp_points_seen': 49, 'resp_points_audited': 36, 'end_turns_seen': 13, 'end_turns_audited': 7}
+[7/24] seed=3013046 pts=44 sec=131.1 winner=p1 stats={'resp_points_seen': 37, 'resp_points_audited': 35, 'end_turns_seen': 12, 'end_turns_audited': 9}
+[8/24] seed=3013059 pts=57 sec=482.7 winner=p2 stats={'resp_points_seen': 54, 'resp_points_audited': 48, 'end_turns_seen': 15, 'end_turns_audited': 9}
+[9/24] seed=3013085 pts=36 sec=167.8 winner=p2 stats={'resp_points_seen': 32, 'resp_points_audited': 29, 'end_turns_seen': 11, 'end_turns_audited': 7}
+[10/24] seed=3013070 pts=63 sec=542.5 winner=p1 stats={'resp_points_seen': 57, 'resp_points_audited': 54, 'end_turns_seen': 12, 'end_turns_audited': 9}
+[11/24] seed=3013153 pts=33 sec=139.0 winner=p2 stats={'resp_points_seen': 35, 'resp_points_audited': 25, 'end_turns_seen': 13, 'end_turns_audited': 8}
+[12/24] seed=3013093 pts=54 sec=218.4 winner=p2 stats={'resp_points_seen': 82, 'resp_points_audited': 52, 'end_turns_seen': 11, 'end_turns_audited': 2}
+[13/24] seed=3013172 pts=25 sec=81.9 winner=p1 stats={'resp_points_seen': 51, 'resp_points_audited': 22, 'end_turns_seen': 14, 'end_turns_audited': 3}
+[14/24] seed=3013155 pts=53 sec=340.0 winner=p2 stats={'resp_points_seen': 66, 'resp_points_audited': 45, 'end_turns_seen': 17, 'end_turns_audited': 8}
+[15/24] seed=3013190 pts=21 sec=8.7 winner=p1 stats={'resp_points_seen': 31, 'resp_points_audited': 17, 'end_turns_seen': 10, 'end_turns_audited': 4}
+[16/24] seed=3013196 pts=26 sec=136.8 winner=p2 stats={'resp_points_seen': 36, 'resp_points_audited': 22, 'end_turns_seen': 11, 'end_turns_audited': 4}
+[17/24] seed=3013188 pts=74 sec=474.8 winner=p2 stats={'resp_points_seen': 80, 'resp_points_audited': 66, 'end_turns_seen': 15, 'end_turns_audited': 8}
+[18/24] seed=3013221 pts=42 sec=283.1 winner=p1 stats={'resp_points_seen': 49, 'resp_points_audited': 35, 'end_turns_seen': 14, 'end_turns_audited': 7}
+[19/24] seed=3013229 pts=22 sec=88.0 winner=p2 stats={'resp_points_seen': 38, 'resp_points_audited': 18, 'end_turns_seen': 11, 'end_turns_audited': 4}
+[20/24] seed=3013226 pts=58 sec=272.5 winner=p1 stats={'resp_points_seen': 66, 'resp_points_audited': 53, 'end_turns_seen': 10, 'end_turns_audited': 5}
+[21/24] seed=3013243 pts=45 sec=61.6 winner=p2 stats={'resp_points_seen': 50, 'resp_points_audited': 38, 'end_turns_seen': 13, 'end_turns_audited': 7}
+[22/24] seed=3013234 pts=62 sec=227.0 winner=p2 stats={'resp_points_seen': 66, 'resp_points_audited': 52, 'end_turns_seen': 17, 'end_turns_audited': 10}
+[23/24] seed=3013267 pts=35 sec=195.4 winner=p2 stats={'resp_points_seen': 42, 'resp_points_audited': 30, 'end_turns_seen': 11, 'end_turns_audited': 5}
+[24/24] seed=3013288 pts=50 sec=358.4 winner=p1 stats={'resp_points_seen': 53, 'resp_points_audited': 44, 'end_turns_seen': 12, 'end_turns_audited': 6}

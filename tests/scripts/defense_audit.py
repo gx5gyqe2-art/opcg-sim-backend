@@ -418,10 +418,14 @@ def play_one(args) -> List[Dict[str, Any]]:
         kw["worlds"] = a.worlds
     if a.lethal_proof and a.lethal_proof != "off":
         kw["lethal_proof"] = a.lethal_proof
+    if getattr(a, "commit_sig_legacy", False):
+        kw["commit_sig_legacy"] = True       # WP `rs-commit-sig` の前後比較（旧い署名＝修正前の打ち方）
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     la, lb = D.leader_pair(db, seed, "random")
     p1, p2 = D.build_pair(db, la, lb, seed, "synth_roles")
     au = Audit(seed, a)
+    import hashlib
+    deck_md5 = hashlib.md5(json.dumps([la, lb, p1, p2], sort_keys=True, default=str).encode()).hexdigest()[:12]
 
     def obs(game, name, turn, step, out, move):
         pend = json.loads(game.pending_json())
@@ -444,20 +448,24 @@ def play_one(args) -> List[Dict[str, Any]]:
         winner, turns, void = r["winner"], r["turns"], r["winner"] is None
     except DR.GameAborted as exc:
         winner, turns, void = None, None, str(exc)
-    return [{"game": {"seed": seed, "winner": winner, "turns": turns, "void": void,
+    return [{"game": {"seed": seed, "winner": winner, "turns": turns, "void": void, "deck_md5": deck_md5,
                       "sec": round(time.perf_counter() - t0, 1), "points": len(au.points), "stats": au.stats}}] + au.points
 
 
 def cmd_run(a):
     os.makedirs(a.out, exist_ok=True)
     path = os.path.join(a.out, f"points_{a.seed_base}_{a.games}.jsonl")
+    if a.seeds:
+        path = os.path.join(a.out, f"points_seeds_{os.path.basename(a.seeds).split('.')[0]}.jsonl")
     done = set()
     if os.path.exists(path):
         for line in open(path, encoding="utf-8"):
             d = json.loads(line)
             if "game" in d:
                 done.add(d["game"]["seed"])
-    seeds = [a.seed_base + i for i in range(a.games) if a.seed_base + i not in done]
+    planned = ([int(x) for x in open(a.seeds).read().split()] if a.seeds
+               else [a.seed_base + i for i in range(a.games)])
+    seeds = [s for s in planned if s not in done]
     print(f"todo {len(seeds)} (done {len(done)}) -> {path}", flush=True)
     import multiprocessing as mp
     with open(path, "a", encoding="utf-8") as f, mp.get_context("fork").Pool(a.workers) as pool:
@@ -532,6 +540,8 @@ def replay_to(seed: int, a, seat: str, step: int):
         kw["worlds"] = a.worlds
     if a.lethal_proof and a.lethal_proof != "off":
         kw["lethal_proof"] = a.lethal_proof
+    if getattr(a, "commit_sig_legacy", False):
+        kw["commit_sig_legacy"] = True       # WP `rs-commit-sig` の前後比較（旧い署名＝修正前の打ち方）
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     la, lb = D.leader_pair(db, seed, "random")
     p1, p2 = D.build_pair(db, la, lb, seed, "synth_roles")
@@ -917,6 +927,10 @@ def main(argv=None):
             p.add_argument("--max-alts", type=int, default=16, help="副（終わり方）で試す別の 1 手の上限")
             p.add_argument("--lethal-proof", default=None, choices=("off", "root", "root_reply"),
                            help="両席の CPU の詰みの証明（§7.21）。既定は off＝§7.13 と同じ設定")
+            p.add_argument("--commit-sig-legacy", action="store_true",
+                           help="両席を旧い手の署名で打たせる（WP `rs-commit-sig` の前後比較・測定専用）")
+        if name == "run":
+            p.add_argument("--seeds", default=None, help="seed の一覧のファイル（空白区切り）。指定すると --seed-base/--games の代わりにこれだけ回す")
         if name == "verify":
             p.add_argument("--sec-verify", type=float, default=30.0, help="確かめの甲の 1 応手あたりの時間の上限")
             p.add_argument("--sec-verify-otsu", type=float, default=10.0, help="確かめの乙の配り方 1 つあたりの時間の上限")

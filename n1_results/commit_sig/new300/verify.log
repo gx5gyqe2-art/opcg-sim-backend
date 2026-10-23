@@ -1,0 +1,27 @@
+verify 26 miss points
+[1/26] resp seed=3013038 step=140 {'miss_ko_full': True, 'miss_otsu_full': False} sec=10.8
+[2/26] resp seed=3013026 step=144 {'miss_ko_full': True, 'miss_otsu_full': True} sec=11.2
+[3/26] resp seed=3013029 step=170 {'miss_ko_full': True, 'miss_otsu_full': False} sec=12.6
+[4/26] end seed=3013007 step=103 {'miss_full': False, 'miss_strict_full': False, 'unknown_full': True} sec=37.6
+[5/26] resp seed=3013045 step=113 {'miss_ko_full': False, 'miss_otsu_full': False} sec=35.6
+[6/26] end seed=3013042 step=171 {'miss_full': False, 'miss_strict_full': False, 'unknown_full': True} sec=45.5
+[7/26] resp seed=3013093 step=174 {'miss_ko_full': True, 'miss_otsu_full': True} sec=21.6
+[8/26] resp seed=3013116 step=121 {'miss_ko_full': True, 'miss_otsu_full': False} sec=6.7
+[9/26] resp seed=3013116 step=126 {'miss_ko_full': True, 'miss_otsu_full': False} sec=6.6
+[10/26] end seed=3013040 step=95 {'miss_full': True, 'miss_strict_full': True, 'unknown_full': False} sec=65.3
+[11/26] resp seed=3013121 step=142 {'miss_ko_full': True, 'miss_otsu_full': True} sec=14.1
+[12/26] resp seed=3013119 step=169 {'miss_ko_full': True, 'miss_otsu_full': True} sec=17.9
+[13/26] resp seed=3013108 step=101 {'miss_ko_full': False, 'miss_otsu_full': False} sec=46.5
+[14/26] resp seed=3013105 step=102 {'miss_ko_full': True, 'miss_otsu_full': False} sec=56.9
+[15/26] resp seed=3013194 step=89 {'miss_ko_full': True, 'miss_otsu_full': True} sec=9.8
+[16/26] resp seed=3013147 step=122 {'miss_ko_full': True, 'miss_otsu_full': True} sec=23.4
+[17/26] resp seed=3013145 step=121 {'miss_ko_full': False, 'miss_otsu_full': False} sec=49.7
+[18/26] resp seed=3013203 step=97 {'miss_ko_full': True, 'miss_otsu_full': False} sec=35.4
+[19/26] resp seed=3013251 step=103 {'miss_ko_full': True, 'miss_otsu_full': False} sec=20.0
+[20/26] resp seed=3013216 step=136 {'miss_ko_full': False, 'miss_otsu_full': False} sec=39.2
+[21/26] resp seed=3013126 step=78 {'miss_ko_full': False, 'miss_otsu_full': False} sec=97.2
+[22/26] resp seed=3013203 step=120 {'miss_ko_full': False, 'miss_otsu_full': False} sec=70.1
+[23/26] resp seed=3013280 step=148 {'miss_ko_full': True, 'miss_otsu_full': True} sec=13.0
+[24/26] resp seed=3013263 step=149 {'miss_ko_full': False, 'miss_otsu_full': False} sec=42.0
+[25/26] resp seed=3013269 step=140 {'miss_ko_full': False, 'miss_otsu_full': False} sec=45.1
+[26/26] resp seed=3013270 step=71 {'miss_ko_full': False, 'miss_otsu_full': False} sec=156.6

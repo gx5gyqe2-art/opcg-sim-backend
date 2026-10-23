@@ -124,7 +124,8 @@ def synth_deck2(db, leader_id, seed=0, owner="p1"):
             return False
         if c.type.name == "STAGE" and force_n is None:
             return False                            # ステージは要求されたときだけ
-        partners = [by_name[n] for n in DS.names_in_text(c)
+        # 名前の順に回す（集合のまま回すとデッキが PYTHONHASHSEED で変わる・WP `rs-commit-sig`）
+        partners = [by_name[n] for n in sorted(DS.names_in_text(c))
                     if n != c.name and n != lm.name and n in by_name and n not in seen]
         missing = [n for n in DS.names_in_text(c) if n != c.name and n != lm.name
                    and n not in seen and n not in by_name]

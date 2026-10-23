@@ -631,6 +631,8 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
         lethal_nodes: v.get("lethal_nodes").and_then(Value::as_u64).unwrap_or(d.lethal_nodes),
         lethal_reply_nodes: v.get("lethal_reply_nodes").and_then(Value::as_u64).unwrap_or(d.lethal_reply_nodes),
         lethal_reply_total: v.get("lethal_reply_total").and_then(Value::as_u64).unwrap_or(d.lethal_reply_total),
+        // 旧い手の署名（WP `rs-commit-sig`・測定専用・既定 false）。
+        commit_sig_legacy: flag("commit_sig_legacy", d.commit_sig_legacy),
     }
 }
 
