@@ -190,8 +190,9 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 使用済み（2026-10-21・r16 主 −5.3／副 +4.7・r16c 主 −7.7／副 +0.4・どちらも非昇格） |
 | 検証 **WP `rs-lethal-root`**（手元 40 ペア × 2 本 root／root_reply vs off・出荷の設定）／監査のやり直し 300 局／本番アリーナ（root・root_reply 各 12 シャード × 120 ペア・合流後） | 1682000〜1682039／1683000〜1683039／3012000〜3012299／2031000〜2046149（本番・root と対照 off 対 off で共有・16 シャード × 150 ペア・§7.31）／2051000〜2062000（root_reply の本番は取りやめ・未使用） | 手元・監査は使用済み（2026-10-22・報告 2026-10-22_lethal_root.md）・本番は使用済み（2026-10-22・root 2,399 ペア 0.5075 [0.5045, 0.5105] +5.2・対照 0.5000・void 1） |
 | 検証 **r20／r20s vs r13d（教材のデッキの切り分け・公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.34）** | 主 real 3101000〜3116000／副 ミラー 3121000〜3136000／参考 synth_roles2 3141000〜3156000（r20 と r20s で共有） | 使用済み（2026-10-22・r20 主 −1.7／副 +2.9／参考 −39.0・r20s 主 +3.6／副 +13.3／参考 −6.1・void 0〜1） |
+| 検証 **r21 vs r13d（再分析の方策・公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.37）** | 主 real 3211000〜3226000／副 ミラー 3231000〜3246000／参考 synth_roles2 3251000〜3266000 | 指示済み（2026-10-23・claude/arena-r21-w01〜w16） |
 | 検証 **守りの照合の修正 vs 旧い照合（両席 r13d・出荷の設定・random × real・16 シャード × 150 ペア・§7.34）** | 3171000〜3186149 | 使用済み（2026-10-23・2,397 ペア 0.5467 [0.5382, 0.5553] +32.6・void 3） |
-| 検証 **詰みの証明の払える守り vs 旧い配り方（同上・§7.33）** | 3191000〜3206149 | 払い出し済み（WP `lethal-deal-cost` を取り込み済み・§7.36・§7.34 の後に起動） |
+| 検証 **詰みの証明の払える守り vs 旧い配り方（同上・§7.33）** | 3191000〜3206149 | 使用済み（2026-10-23・2,398 ペア 0.5008 [0.4982, 0.5034] +0.6・void 2・採用） |
 | **再分析**（波 49・50 の w01〜w08・各 先頭 200 局 × 12 点・mult 4・budget 0・§7.35） | —（記録の seed をそのまま打ち直す） | 使用済み（2026-10-23・16 本全部 200 局・38,400 点・再生率 1.00・深い最善 ≠ 記録 28.0%） |
 | 生成 **波 50s**（合成デッキ v2・`--decks synth_roles2`・生成役 r13d・v15・波 50 の対照・§7.34） | 2541000〜2548500（シャード k の base は 2540000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,083,501 行・dropped 2・decks synth_roles2） |
 | 生成 **波 50**（実デッキ 115 本・`--decks real`・生成役 r13d・v15・§7.34） | 2531000〜2538500（シャード k の base は 2530000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,149,881 行・dropped 5・decks real） |
@@ -3686,6 +3687,65 @@ git push -u origin claude/train-r21
 ```
 
 **判定（訓練の後にコーディネータ）**: 公平同士・両席 160 回・基準 r13d・各 16 シャード × 175 ペア・新しい組み方。主 random × real・副 固定ミラー・参考 random × synth_roles2（seed は回収の時に台帳で払い出す）。規約を満たせば本番の深さ（§7.33 の形）。あわせて WP `move-judge` の判定役で「r21 の手が r13d の手より良いか」。
+
+### 7.37 r21 の判定（再分析の方策の教師・2026-10-23）
+
+**訓練 r21 の結果**: 完走・best ep1・π 38,400 点（4 倍の読み）・価値 234 万行（波 50＋49）。評価帯（波 50 holdout）: 価値の誤差 r21 0.543 ≈ r20 0.541 < r19 0.561 < r13d 0.637。**方策の一致は r21 が低い**（記録の手〔1,280 回〕との top1: r21 0.529・r20 0.560・r13d 0.543＝教師が 4 倍の読みに変わったので予想どおり）が、**再分析の点（holdout 2,736 点）の上でも r21 は r20・r13d を上回らない**（top1_visits r21 0.560・r20 0.584・r13d 0.588）。評価帯は判定の主ではないので、アリーナで読む。台帳 2+363。
+
+判定: r21 vs r13d・公平同士・両席 160 回・各 16 シャード × 175 ペア・新しい組み方・本線 f87ccb9e9 に固定（守りの照合・払える守りの修正の後）。主 random × real 3211000〜3226000・副 固定ミラー 3231000〜3246000・参考 random × synth_roles2 3251000〜3266000。
+**予告（数を見る前）**: 評価帯の方策の一致が上がっていないので、前の予告（+10〜+25）より下げて 0〜+15。
+
+作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（r21 vs r13d・公平同士・3 条件）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.37）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-r21-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-r21-w$KK f87ccb9e9   # 本線に固定（守りの照合・払える守りの修正の後）
+git fetch -q origin claude/arena-r21-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_r21 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+git fetch -q origin claude/train-r21:r21net && git show r21net:n1_results/nrel_r21.npz > ~/nrel_r21.npz
+mkdir -p arena_r21
+
+次の内容を ~/run21.sh に保存し、`nohup bash ~/run21.sh > ~/run21.out 2>&1 &` で回す。run21.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+B=$(( k - 1 ))
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_r21/*.jsonl"))
+print(json.dumps({"job": "arena-r21-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_r21 RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena r21 shard $KK"; git push -q -u origin claude/arena-r21-w$KK || echo PUSH_FAILED; }
+for C in r21; do
+  BM=3211000; BR=3231000; BS=3251000
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BM + B*1000 )) --workers 4 --leaders random --decks real \
+    --out arena_r21/${C}_real_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BR + B*1000 )) --workers 4 \
+    --out arena_r21/${C}_mirror_w$KK.jsonl
+  save
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate ~/nrel_$C.npz --baseline opcg_sim/data/learned/nrel_r13d.npz \
+    --pairs 175 --max-pairs 175 --bands 1 --seed-base $(( BS + B*1000 )) --workers 4 --leaders random --decks synth_roles2 \
+    --out arena_r21/${C}_synth2_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 1 本 約 12 分 × 3 本＝約 40 分（両席とも公平が既定＝`--reveal` は指定しない）。arena_shard は終えたペアを飛ばして再開する。コミットメッセージにモデル名を入れない。
+````
 
 ## 8. コーディネータが守ること
 
