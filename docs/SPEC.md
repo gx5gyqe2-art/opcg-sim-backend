@@ -1248,6 +1248,26 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
   できるかを読み、証明できた応手は相手から見て負け＝外す（戦闘箱の畳みも残りから選ぶ）。全部が証明できたら全部の子を
   相手から見て -1 の終局に固定する。戻り値の `lethal.reply` に実績（判定した節点・子・証明した子・節点）。
 
+### 2.5.11 箱の commit の照合と手の署名（Rust・`move_sig`・2026-10-23〜）
+
+> 正本はコード（`rust/opcg_engine/src/search/decide.rs` の `move_sig`／`find_move`／`commit_step`）。経緯は
+> `docs/search_efficiency_plan.md` §7.26（WP `rs-commit-sig`）・`docs/reports/2026-10-22_defense_audit.md`・
+> `docs/reports/2026-10-23_commit_sig.md`。
+
+窓の根畳み・登場時の対話・準備箱が決めた「自分側の手順の続き」（箱の commit）は、次の判断点で木を回さずに機械実行する。
+各段は**手の署名**で合法手と照合し、署名が一致する**最初の合法手**を打つ（一致が無ければ commit を畳んで普通に読む）。
+
+- **署名**: `[action_type, 札, target_ids, selected_uuids, accepted]`。**札は `payload.uuid`、無ければ最上位の `card_uuid`**
+  （戦闘の手 `SELECT_COUNTER`／`SELECT_BLOCKER` は札を `card_uuid` に持つ）。5 つで割れない手どうしのときだけ 6 つ目の欄（dict）が付く:
+  `position`（並べ替えの上下・既定の `BOTTOM` 以外）・`selects`（準備箱の対象選択が 2 段以上＝`selected_uuids` の平らな並びでは段の区切りが落ちる）・`index`（選択肢の番号・0 以外。探索の候補は既定の 0 だけだが詰みの判定器の答えは番号で割れる）。
+  `DON_BOX` の `don_k` は入れない（残り回数は commit の段が持つ）。同じ署名は複数世界の束ね（§20.7.1）と記録の `sig`／`pol_sig` 列にも使う
+  （Python の写しは `opcg_sim/loop/record_gen.py::move_sig`・`engine_rs.py::_sig`）。
+- **2026-10-22 までの欠陥**: 署名が `payload.uuid` だけを読んでいたので、カウンター・ブロッカーの手は札に依らず同じ署名になり、
+  commit の続きは**手札の先頭のカウンター**（場の先頭のブロッカー）を打っていた。窓の根畳みが「大きいカウンターで切る」と読んでも、
+  再生では小さいカウンターで切って素通し＝負ける形が守りの見逃しの 4 分の 3 を占めていた（`2026-10-22_defense_audit.md` §2）。
+- **測定用の旗** `commit_sig_legacy`（opts の鍵・既定 false）: true で旧い署名（commit の積み・照合と複数世界の束ね）。
+  アリーナは `--cand-commit-sig-legacy`（候補席）・`arena_shard --commit-sig-legacy`（基準席）。
+
 
 ---
 

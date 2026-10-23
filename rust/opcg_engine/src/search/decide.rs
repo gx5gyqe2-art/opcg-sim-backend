@@ -366,7 +366,8 @@ pub struct SelectGroup {
 ///   は札を `card_uuid` に持つ・[`describe_move`] と同じ形）。
 /// - 6 つ目の欄（区別の欄・dict）は、5 つでは割れない手どうしのときだけ付く:
 ///   `position`（並べ替えの上下・既定の `"BOTTOM"` 以外のとき）・`selects`（準備箱の対象選択が 2 段以上のとき・
-///   段の区切りは `selected_uuids` の平らな並びでは落ちる）。付かない手の署名は今までと同じ 5 つ。
+///   段の区切りは `selected_uuids` の平らな並びでは落ちる）・`index`（選択肢の番号・0 以外のとき）。
+///   付かない手の署名は今までと同じ 5 つ。
 ///
 /// `DON_BOX` の `don_k` は入れない（残り回数は [`Step::Box`] が持つ）。
 pub fn move_sig(mv: &Move) -> Value {
@@ -406,6 +407,10 @@ pub fn move_sig_with(mv: &Move, legacy: bool) -> Value {
         }
         if let Some(sel) = p.get("selects").filter(|v| v.as_array().is_some_and(|a| a.len() >= 2)) {
             ext.insert("selects".into(), sel.clone());
+        }
+        // 選択肢（CHOICE）の番号。探索の候補は既定の 0 だけだが、詰みの判定器の答えは番号で割れる。
+        if let Some(i) = p.get("index").filter(|v| v.as_i64().is_some_and(|i| i != 0)) {
+            ext.insert("index".into(), i.clone());
         }
         if !ext.is_empty() {
             sig.push(Value::Object(ext));
@@ -1918,6 +1923,10 @@ pub(super) mod tests {
         let two = sb(json!([["a"],["b"]]));
         assert_ne!(move_sig(&one), move_sig(&two));
         assert_eq!(move_sig(&one).as_array().unwrap().len(), 5);
+        let ch = |i: i64| Move::from_json(json!({"kind":"game","action_type":"RESOLVE_EFFECT_SELECTION",
+            "payload":{"selected_uuids":[],"index":i,"accepted":true,"position":"BOTTOM","declared_value":0}}));
+        assert_ne!(move_sig(&ch(0)), move_sig(&ch(1)));
+        assert_eq!(move_sig(&ch(0)), move_sig_with(&ch(0), true));
         let atk = Move::game("ATTACK", super::super::Payload::Attack { uuid: "u".into(), target: "t".into() });
         assert_eq!(move_sig(&atk), move_sig_with(&atk, true));
     }

@@ -548,7 +548,7 @@ def move_sig(mv):
 
     JSON にしたときの形は `[action_type, 札, target_ids, selected_uuids, accepted]`（＋区別の欄）。
     札は `payload.uuid`、無ければ最上位の `card_uuid`（戦闘の手）。6 つ目の欄（dict）は `position`
-    （既定の "BOTTOM" 以外）・`selects`（2 段以上）があるときだけ付く（WP `rs-commit-sig`・2026-10-23 から。
+    （既定の "BOTTOM" 以外）・`selects`（2 段以上）・`index`（0 以外）があるときだけ付く（WP `rs-commit-sig`・2026-10-23 から。
     それより前の波の `sig`／`pol_sig` は戦闘の手の札が null）。
     """
     p = mv.get("payload") or {}
@@ -563,6 +563,8 @@ def move_sig(mv):
         ext["position"] = p["position"]
     if isinstance(p.get("selects"), list) and len(p["selects"]) >= 2:
         ext["selects"] = p["selects"]
+    if isinstance(p.get("index"), int) and not isinstance(p.get("index"), bool) and p["index"] != 0:
+        ext["index"] = p["index"]
     if ext:
         sig.append(ext)
     return sig

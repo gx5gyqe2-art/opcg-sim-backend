@@ -579,6 +579,8 @@ class RsGame:
             ext["position"] = p["position"]
         if isinstance(p.get("selects"), list) and len(p["selects"]) >= 2:
             ext["selects"] = p["selects"]
+        if isinstance(p.get("index"), int) and not isinstance(p.get("index"), bool) and p["index"] != 0:
+            ext["index"] = p["index"]
         if ext:
             sig.append(ext)
         return sig
