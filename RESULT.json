@@ -16,5 +16,5 @@
  "metrics": {
   "arena_csig/csig_w09.jsonl": 150
  },
- "notes": ""
+ "notes": "150 pairs recorded: 149 scored, 1 void (GameAborted: seed=3179127 決着せず（上限手数）). Candidate mean pair score over scored pairs 1.0805. Log line says '基準席は既定' but that is only stale wording: arena_shard._best_kw passes commit_sig_legacy=True plus worlds/lethal_proof to the baseline seat (checked at 2eebbf9f0)."
 }
