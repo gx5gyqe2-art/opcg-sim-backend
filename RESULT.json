@@ -16,5 +16,5 @@
  "metrics": {
   "arena_chid/chid_w11.jsonl": 150
  },
- "notes": ""
+ "notes": "150/150 pairs, PUSH_FAILED 0. 1 pair has score=None (seed 3281084; record {\"seed\": 3281084, \"score\": null, \"leaders\": [\"OP03-099\", \"OP07-097\"], \"void\": \"GameAborted: seed=3281084 決着せず（上限手数）\", \"cand_opts\": {\"sims\": 1280, \"worlds\": 2, \"budget\": 0, \"lethal_proof\": \"root\"}}) — left as written, not re-run. Mean candidate score over 149 scored pairs = 1.0201 (per pair of 2 games)."
 }
