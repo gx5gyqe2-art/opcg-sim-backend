@@ -3,7 +3,7 @@
  "role": "reanalyze",
  "status": "done",
  "inputs": {
-  "record": "claude/n50-w08:n_records/n50_w08",
+  "record": "claude/n50-w08:n_records/n50_w08_p0+n50_w08_p1(先頭80局)",
   "engine_commit": "24ce7244f",
   "net": "/root/wt50/opcg_sim/data/learned/nrel_r13d.npz",
   "mult": 4,
@@ -42,5 +42,5 @@
   "sec_deep_per_game": 8.6
  },
  "commit": "24ce7244f",
- "notes": ""
+ "notes": "記録ブランチ claude/n50-w08 に n_records/n50_w08 は無く、n50_w08_p0〜p3（各 120 局・seed 連続 2534500〜2534979）に分かれていた。先頭 200 局＝p0 全部＋p1 の先頭 80 局とするため、p0・p1 の npz を 1 つの dir に束ね（meta_n_record は p0 のものに局数・行数を足し、meta_games は 2 つの games を連結。search 設定は p0・p1 で同一・違いは seed_base と統計だけ）、--games 200 で再分析した。コードは変更していない。seed は 2534500〜2534699。replay_rate=1.0・分岐 0。"
 }
