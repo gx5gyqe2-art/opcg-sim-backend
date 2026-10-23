@@ -1,0 +1,41 @@
+{
+ "legacy vs base(own_hidden)": {
+  "points_a": 12710,
+  "points_b": 12710,
+  "joined": 12710,
+  "win_a": 1064,
+  "win_b": 1064,
+  "diff": {
+   "status": 0,
+   "move": 0,
+   "nodes": 0,
+   "line_len": 449
+  }
+ },
+ "cost vs cost(switch)": {
+  "points_a": 12710,
+  "points_b": 12710,
+  "joined": 12710,
+  "win_a": 860,
+  "win_b": 860,
+  "diff": {
+   "status": 0,
+   "move": 0,
+   "nodes": 0,
+   "line_len": 395
+  }
+ },
+ "legacy vs cost": {
+  "points_a": 12710,
+  "points_b": 12710,
+  "joined": 12710,
+  "win_a": 1064,
+  "win_b": 860,
+  "diff": {
+   "status": 368,
+   "move": 245,
+   "nodes": 4709,
+   "line_len": 512
+  }
+ }
+}

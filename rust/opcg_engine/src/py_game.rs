@@ -667,7 +667,8 @@ impl Game {
     /// 根の詰みの判定だけを回す（`search_efficiency_plan.md` §7.21・計測用・盤面は動かさない）。
     ///
     /// `opts_json`: `search_seed`（配り方の乱数・決定と同じ導出）・`rand`（公平な引き直しの数・既定 6）・
-    /// `max_nodes`（既定 20000）・`force`（true なら発動条件〔自分のメイン・届きうる攻撃の数〕を見ずに回す）。
+    /// `max_nodes`（既定 20000）・`force`（true なら発動条件〔自分のメイン・届きうる攻撃の数〕を見ずに回す）・
+    /// `lethal_deal_legacy`（守りの強い配り方の旧い形・§7.33・既定 false）。
     /// 本当の配り方は読まない（計測用の `true_deal`＝true のときだけ、本当の配り方 1 通りで判定する＝§7.28 の
     /// 「証明したのに勝てなかった点に本当の守りが在ったか」の仕分け。決定は使わない）。戻り値 `{"applies", "status", "move", "line_len", "deals", "nodes", "sec"}`
     /// （発動条件を満たさず `force` も無ければ `status="skip"`）。`sec` は計測のための実時間（判定は節点で打ち切る）。
@@ -681,6 +682,8 @@ impl Game {
         let nodes = ov.get("max_nodes").and_then(Value::as_u64).unwrap_or(lethal::LETHAL_ROOT_NODES);
         let force = ov.get("force").and_then(Value::as_bool).unwrap_or(false);
         let true_deal = ov.get("true_deal").and_then(Value::as_bool).unwrap_or(false);
+        // 守りの強い配り方の旧い形（§7.33・decide の `lethal_deal_legacy` と同じ・既定 false）
+        let deal_legacy = ov.get("lethal_deal_legacy").and_then(Value::as_bool).unwrap_or(false);
         // 計測用（§7.30）: `trace`＝配り方ごとの手順を返す・`first`＝根の候補をこの手に限る・`guide`＝自分の手の案内
         let trace = ov.get("trace").and_then(Value::as_bool).unwrap_or(false);
         let first = ov.get("first").filter(|v| !v.is_null()).cloned().map(crate::search::Move::from_json);
@@ -701,7 +704,7 @@ impl Game {
                 let deals = if true_deal {
                     vec![state.clone()]
                 } else {
-                    lethal::make_deals(state, masters, seat, lethal::lethal_seed(seed), rand)?
+                    lethal::make_deals(state, masters, seat, lethal::lethal_seed(seed), rand, deal_legacy)?
                 };
                 if trace || first.is_some() {
                     let t = lethal::Trace { first: first.as_ref(), guide: &guide };

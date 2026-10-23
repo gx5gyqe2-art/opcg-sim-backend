@@ -224,6 +224,8 @@ CAND_FLAGS = {
     "opp_blind": dict(opp_blind=True),
     # 旧い手の署名（WP `rs-commit-sig`・測定専用＝箱の commit の照合で戦闘の手の札が落ちる 2026-10-22 までの形）。
     "commit_sig_legacy": dict(commit_sig_legacy=True),
+    # 詰みの証明の守りの強い配り方を旧い形に（§7.33・測定用＝カウンターイベントを払えるかを見ずに積む）。
+    "lethal_deal_legacy": dict(lethal_deal_legacy=True),
 }
 
 
@@ -285,6 +287,10 @@ def add_cand_args(ap) -> None:
                     help="候補席だけ旧い手の署名で箱の commit を照合する（WP `rs-commit-sig`・測定専用）。"
                          "2026-10-22 までの形＝戦闘の手（カウンター・ブロッカー）の札が署名から落ち、"
                          "commit の続きは署名が一致する最初の合法手を打つ")
+    ap.add_argument("--cand-lethal-deal-legacy", action="store_true",
+                    help="候補席だけ詰みの証明の守りの強い配り方を旧い形にする（`docs/search_efficiency_plan.md` §7.33・"
+                         "測定用）。カウンターイベントを相手が払えるかを見ずに手札へ積む（2026-10-23 までの形）。"
+                         "省略＝既定（相手のアクティブのドン!!で払える枚数までだけ数える）。--cand-lethal-proof と組で使う")
     # --- 迷う局面だけ世界 K 本で読み直す（§7.4・WP `play-rethink`）------------------------
     ap.add_argument("--cand-rethink-ratio", type=float, default=None,
                     help="候補席だけ、根の 2 位の訪問数 ÷ 1 位 ≥ τ の決定を同じ seed で世界 K 本"
