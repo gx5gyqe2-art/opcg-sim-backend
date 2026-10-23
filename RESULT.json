@@ -1,7 +1,7 @@
 {
  "job": "rean-n50-w04",
  "role": "reanalyze",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "record": "claude/n50-w04:n_records/n50_w04",
   "engine_commit": "24ce7244f",
@@ -19,27 +19,27 @@
   "dir": "../../../root/opcg-sim-backend/n50_rean/w04"
  },
  "metrics": {
-  "games": 177,
-  "points": 2124,
+  "games": 200,
+  "points": 2400,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
   "points_by_rule": {
-   "early": 707,
-   "end_and_attack": 708,
+   "early": 799,
+   "end_and_attack": 800,
    "enel": 4,
-   "random": 705
+   "random": 797
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
-   "early": 0.232,
-   "end_and_attack": 0.3093,
+   "early": 0.2365,
+   "end_and_attack": 0.3187,
    "enel": 0.0,
-   "random": 0.3092
+   "random": 0.3011
   },
-  "deep_best_differs_all": 0.283,
-  "sec_replay_per_game": 13.04,
-  "sec_deep_per_game": 8.95
+  "deep_best_differs_all": 0.285,
+  "sec_replay_per_game": 12.81,
+  "sec_deep_per_game": 8.83
  },
  "commit": "24ce7244f",
  "notes": "記録のブランチ claude/n50-w04 には n_records/n50_w04 が無く、n50_w04_p0〜p3（各 120 局・seed 連続 2532500〜2532979）に分かれていた。p0（120 局）と p1（120 局）の npz と meta を手元で 1 つの dir（~/rec/n_records/n50_w04・meta は games/rows 等を合算・他の欄は両者で一致を確認）にまとめ、seed 昇順の先頭 200 局（2532500〜2532699＝p0 全部＋p1 の先頭 80 局）を再分析した。inputs.record の表記は指示書のまま（実体は p0＋p1）。~/opcg-sim-backend はセッションの既存 checkout へのシンボリックリンク。"
