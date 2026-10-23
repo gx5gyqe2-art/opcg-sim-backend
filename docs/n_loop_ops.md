@@ -192,7 +192,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **r20／r20s vs r13d（教材のデッキの切り分け・公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.34）** | 主 real 3101000〜3116000／副 ミラー 3121000〜3136000／参考 synth_roles2 3141000〜3156000（r20 と r20s で共有） | 使用済み（2026-10-22・r20 主 −1.7／副 +2.9／参考 −39.0・r20s 主 +3.6／副 +13.3／参考 −6.1・void 0〜1） |
 | 検証 **WP `rs-commit-hidden` の本番アリーナ**（修正後 vs `--commit-hidden-legacy`・出荷の設定・random × real・16 シャード × 150 ペア・§7.39） | 3271000〜3286149 | 使用済み（2026-10-23・2,397 ペア 0.5023 [0.4981, 0.5064] +1.6・void 3・採用） |
 | 監査 **WP `rs-window-read` の確かめ**（commit-audit のやり直し 300 局・§7.42） | 3311000〜3311299 | 指示済み（2026-10-23・claude/rs-window-read） |
-| 検証 **WP `rs-window-read` の本番アリーナ**（修正後 vs 旧い旗 3 つ・出荷の設定・random × real・16 シャード × 150 ペア・§7.42） | 3321000〜3336149 | 払い出し済み（取り込みの後） |
+| 検証 **WP `rs-window-read` の本番アリーナ**（修正後 vs 旧い旗 3 つ・出荷の設定・random × real・16 シャード × 150 ペア・§7.42） | 3321000〜3336149 | 指示済み（2026-10-23・claude/arena-wr-w01〜16・fe51a3ac8 に固定・§7.40） |
 | 監査 **WP `blunder-audit`**（両席 r13d・出荷の設定・random × real・§7.41） | 3301000〜3301999 | 指示済み（2026-10-23・claude/blunder-audit） |
 | 監査 **WP `commit-audit`**（両席 r13d・出荷の設定・random × real・300 局・§7.40） | 3291000〜3291299 | 指示済み（2026-10-23・claude/commit-audit） |
 | 検証 **r21 vs r13d（再分析の方策・公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.37）** | 主 real 3211000〜3226000／副 ミラー 3231000〜3246000／参考 synth_roles2 3251000〜3266000 | 使用済み（2026-10-23・主 −23.6／副 −84.0／参考 −47.2・void 0・非昇格） |
@@ -3882,3 +3882,59 @@ shuffle する）と探索乱数（`search_seed`）の両方に効く。出力�
 "outputs": "scenario_out/", "unrestorable_rules": "…（`frame_to_hidden` が復元できない条件の要約）"}`。
 
 確認は `make test`（`tests/test_scenario_play.py` が復元の往復と `play` の出力契約を見る）。
+
+### 7.40 応手と対話の決め方の修正の本番アリーナ（WP `rs-window-read`・取り込みの前に起こす・2026-10-23）
+
+WP `rs-window-read`（`docs/search_efficiency_plan.md` §7.42）のコード（`claude/rs-window-read` の fe51a3ac8）で起こす。コーディネータの手元で fe51a3ac8 の `make test` green（859 passed）・作業セッションの `make audit-cross` void 0。
+作業セッションは守りの再監査（約 3.5 時間）だけが残り、コードは変えない前提（変わったらこのアリーナは取り直す）。報告の下書き `docs/reports/2026-10-23_window_read.md`（commit-audit の (A)(B)(C) の点 0・窓の揺れ 19.5% → 7.1%・1 局の実時間 +0.9%）。台帳 2+374。
+- 候補席＝修正後（既定）・基準席＝`--window-carry-legacy --window-worlds-legacy --window-tree-legacy`（3 つ立てると修正前と 1 bit も同じ）。両席 r13d・出荷の設定・random × real・16 シャード × 150 ペア・seed **3321000 + (k−1)×1000**（払い出し済み）。
+- 採用の規約（§7.33）: 勝率の 95% 下限 ≥ 0.49 で採る（退行なし）。割れば 3 つの旗を分けて測り直す。
+- **予告**: 0.51〜0.53（§7.42）。
+
+作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（応手と対話の決め方の修正後 vs 旧い決め方・両席 r13d・両席とも出荷の設定）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.40）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-wr-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/rs-window-read && git checkout -q -B claude/arena-wr-w$KK fe51a3ac8   # WP rs-window-read のコードに固定
+git show HEAD:opcg_sim/loop/arena_shard.py | grep -n 'window-tree-legacy'    # 基準席の旧い形の旗が在ること（無ければ notes に書いて止める）
+git fetch -q origin claude/arena-wr-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_wr 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_wr
+
+次の内容を ~/runW.sh に保存し、`nohup bash ~/runW.sh > ~/runW.out 2>&1 &` で回す。runW.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_wr/*.jsonl"))
+print(json.dumps({"job": "arena-wr-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz (window read: continuations re-read, 16-world windows, short tree at low life)", "baseline": "nrel_r13d.npz + window_{carry,worlds,tree}_legacy", "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)", "pairs": 150},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_wr RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena wr shard $KK"; git push -q -u origin claude/arena-wr-w$KK || echo PUSH_FAILED; }
+N=opcg_sim/data/learned/nrel_r13d.npz
+for J in 0 1 2 3 4 5 6; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --worlds 2 --budget 0 --lethal-proof root --window-carry-legacy --window-worlds-legacy --window-tree-legacy \
+    --cand-sims 1280 --cand-worlds 2 --cand-budget 0 --cand-lethal-proof root \
+    --pairs 150 --max-pairs 25 --bands 1 \
+    --seed-base $(( 3321000 + (k-1)*1000 )) --workers 2 --leaders random --decks real --pair-timeout 3600 \
+    --out arena_wr/wr_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 25 ペアずつ進め（6 回目までに 150 ペアに届く・届いた後の回は何もしない）、そのたびに push する。世界 2 本は 2 スレッド使うので --workers 2。全体で約 1.5 時間。コミットメッセージにモデル名を入れない。
+````
+
