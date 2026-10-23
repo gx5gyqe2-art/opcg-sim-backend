@@ -1374,7 +1374,9 @@ pub fn solve_root_traced(
                 Ok(false) => {
                     results[i] = "no";
                     all = false;
-                    if trace.is_none() {
+                    // 残りの配り方まで読むのは `first` を指定した読み直しだけ（候補を順に試す読みでは節点の予算を食い、
+                    // 判定が変わってしまう）
+                    if !trace.as_ref().is_some_and(|t| t.first.is_some()) {
                         continue 'moves;
                     }
                 }
@@ -1382,7 +1384,7 @@ pub fn solve_root_traced(
                     results[i] = "unknown";
                     unknown = true;
                     all = false;
-                    if trace.is_none() {
+                    if !trace.as_ref().is_some_and(|t| t.first.is_some()) {
                         break 'moves;
                     }
                 }
