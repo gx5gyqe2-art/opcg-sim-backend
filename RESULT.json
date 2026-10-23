@@ -1,125 +1,20 @@
 {
- "job": "rs-commit-sig",
- "role": "engine fix (gameplay defect) + re-audit",
- "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.26 (origin/claude/cpu-spec-improvements-yw91jd @ dd866c6; ledger 2+349); evidence docs/reports/2026-10-22_defense_audit.md §2",
- "branch": "claude/rs-commit-sig",
- "report": "docs/reports/2026-10-23_commit_sig.md",
+ "job": "arena-csig-w01",
+ "role": "arena",
+ "status": "partial",
  "inputs": {
-  "base": "dd866c6 (Plan WP rs-commit-sig)",
-  "net": "nrel_r13d (both seats)",
-  "audit_settings": "same as §7.24: 1 world x 1280 sims, budget none, lethal_proof off, random leaders x synth_roles, seeds 3013000-3013299, 4 workers, verify on",
-  "pilot": "24 games holding the earlier otsu misses (n1_results/commit_sig/seeds24.txt), run with both signatures, PYTHONHASHSEED=0"
+  "candidate": "nrel_r13d.npz (fixed commit signature)",
+  "baseline": "nrel_r13d.npz + commit_sig_legacy",
+  "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)",
+  "pairs": 150
  },
  "outputs": {
-  "engine": "rust/opcg_engine/src/search/decide.rs (move_sig/move_sig_with/find_move_with, commit_sig_legacy plumbing) + search/mod.rs (opts key)",
-  "python": "opcg_sim/api/engine_rs.py (commit_sig_legacy=, _sig), opcg_sim/loop/record_gen.py (move_sig mirror), opcg_sim/loop/arena.py (--cand-commit-sig-legacy), opcg_sim/loop/arena_shard.py (--commit-sig-legacy)",
-  "decks": "opcg_sim/loop/deck_synth.py, deck_synth2.py (sorted names; separate commit)",
-  "tool": "tests/scripts/defense_audit.py (--commit-sig-legacy, --seeds, deck_md5)",
-  "tests": "move_sig_splits_counter_cards, move_sig_splits_blocker_cards, move_sig_ext_only_when_needed (decide.rs)",
-  "goldens": "tests/fixtures/rs_goldens/replay/a1_*.json (47 changed); audit.json and random band unchanged",
-  "results": "n1_results/commit_sig/ (compare24.json, compare300.json, golden_diff.json, new/, legacy/, new300/summary.json, new300/verify.jsonl, logs; points jsonl kept as .gz for the 24-game runs, the 300-game points as new300/points_3013000_300.jsonl.gz)",
-  "docs": "docs/SPEC.md §2.5.11, docs/TEST_SPEC.md (defense_audit row)"
+  "files": [
+   "arena_csig/csig_w01.jsonl"
+  ]
  },
  "metrics": {
-  "signature_audit": {
-   "dropped_before": [
-    "SELECT_COUNTER/SELECT_BLOCKER card (card_uuid)",
-    "ARRANGE_DECK position",
-    "CHOICE index",
-    "SETUP_BOX multi-stage selects"
-   ],
-   "intentionally_dropped": [
-    "DON_BOX don_k (Step::Box carries the count)"
-   ]
-  },
-  "pilot24": {
-   "legacy_reproduces_previous_audit": true,
-   "points": {
-    "legacy": 699,
-    "new": 887
-   },
-   "otsu_miss_verified": {
-    "legacy": 28,
-    "new": 1
-   },
-   "commit_derived": {
-    "legacy": 21,
-    "new": 0
-   },
-   "lost_this_turn": {
-    "legacy": 22,
-    "new": 1
-   }
-  },
-  "full300": {
-   "before": {
-    "resp_points": 9422,
-    "threat_ko": 477,
-    "threat_otsu": 395,
-    "miss_ko": 40,
-    "miss_ko_verified": 33,
-    "miss_otsu": 32,
-    "miss_otsu_verified": 28,
-    "commit_derived": 21,
-    "window": 7,
-    "games_with_miss": 24,
-    "seats_lost": 23,
-    "lost_this_turn": 22,
-    "unknown_cpu_rate": 0.162
-   },
-   "after": {
-    "resp_points": 9729,
-    "threat_ko": 438,
-    "threat_otsu": 339,
-    "miss_ko": 23,
-    "miss_ko_verified": 14,
-    "miss_otsu": 9,
-    "miss_otsu_verified": 7,
-    "commit_derived": 2,
-    "window": 5,
-    "games_with_miss": 7,
-    "seats_lost": 5,
-    "lost_this_turn": 5,
-    "unknown_cpu_rate": 0.178
-   },
-   "void": 0,
-   "end_of_turn_miss": {
-    "before": "3/136",
-    "after": "3/162 (unverified)"
-   },
-   "p1_wins": {
-    "before": 153,
-    "after": 134
-   },
-   "same_winner": 231
-  },
-  "goldens": {
-   "audit_changed": 0,
-   "replay_random_changed": 0,
-   "replay_a1_changed": 47,
-   "a1_first_divergence": "47/47 SELECT_COUNTER replayed from a commit, different card",
-   "a1_legacy_reproduces_head": "47/47",
-   "from_deck_fix": 0,
-   "suspicious": 0,
-   "winner_changed": 9
-  },
-  "decks": {
-   "synth_roles2_md5_by_hashseed_before": "3 distinct (seeds 3013000-3013149, PYTHONHASHSEED=1/2/3)",
-   "after": "1",
-   "synth_synth_dig_synth_roles_changed_by_fix": "none (300 seeds)"
-  },
-  "gate": {
-   "make_test": "green (cargo 607 passed; pytest 855 passed, 13 skipped)",
-   "audit_cross": "void 0 (120 pairs)"
-  }
+  "arena_csig/csig_w01.jsonl": 25
  },
- "forecast_check": {
-  "commit_21_to_le3": "hit (21 -> 0 on the same games; 2 remaining commit misses in 300 are a different type)",
-  "otsu_28_to_le10": "hit (7)",
-  "lost_22_to_le8": "hit (5)",
-  "golden_a1_1_to_5": "miss (47; every a1 game replays a commit counter at least once)"
- },
- "command": "PYTHONHASHSEED=0 python tests/scripts/defense_audit.py run --games 300 --seed-base 3013000 --workers 4 --out n1_results/commit_sig/new300 && ... verify ... && ... summarize",
- "notes": "(1) I pushed the first fix commit before running make test (make test was run and green before every later push and the final push). (2) The two remaining commit-derived misses (seeds 3013121, 3013194) are SEARCH_AND_SELECT dialogs on the opponent's turn: the window fold chose a card from a resampled world's deck; the signature matched correctly. One of them is not fixed by re-reading either. Candidate next fix: drop the commit when a dialog's options were not visible when it was committed. (3) The 'before' 300 games are the 2026-10-22 records; the legacy flag reproduced them point for point on 24 games and synth_roles decks are hash-stable, so the other 276 are taken as equal. (4) The deck fix was committed after the pilot started; it does not change synth_roles (300-seed md5 identical), so the audit is unaffected. (5) CHOICE index was added to the discriminator field beyond the spec; search candidates always use index 0, so play does not change (goldens and make test confirm). (6) Existing clippy -D warnings failures (5, pre-existing on the base with the current toolchain) were left alone. (7) Production arena: candidate = fixed, baseline = arena_shard --commit-sig-legacy (coordinator)."
+ "notes": ""
 }
