@@ -1,0 +1,3 @@
+todo 2 (done 0) -> n1_results/commit_hidden/pilot_legacy/points_seeds_seeds2.jsonl
+[1/2] seed=3013121 pts=38 sec=110.4 winner=p1 stats={'resp_points_seen': 41, 'resp_points_audited': 30, 'end_turns_seen': 14, 'end_turns_audited': 8}
+[2/2] seed=3013194 pts=28 sec=117.7 winner=p1 stats={'resp_points_seen': 31, 'resp_points_audited': 24, 'end_turns_seen': 8, 'end_turns_audited': 4}

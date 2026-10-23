@@ -35,6 +35,9 @@ def main(argv=None):
     ap.add_argument("--lethal-proof", default=None, choices=("off", "root", "root_reply"),
                     help="両席とも詰みの証明（§7.21）。出力に発動の頻度と根の判定の節点・秒の分布を足す"
                          "（秒は同じ盤面で `Game.lethal_json` を測り直す＝1 手の時間からは外す）")
+    ap.add_argument("--commit-hidden-legacy", action="store_true",
+                    help="両席とも、見えていなかった札を選ぶ commit の続きも積む旧い形（§7.39・測定専用）。"
+                         "出力の kinds（決め方ごとの手数）と並べて読み直しの増分を見る")
     ap.add_argument("--knowledge", action="store_true",
                     help="決定点ごとに打つ席の「知っている札」（§7.15・`Game.knowledge_json`）を数え、分布を出力に足す")
     a = ap.parse_args(argv)
@@ -53,15 +56,19 @@ def main(argv=None):
         kw["opp_blind"] = True
     if a.lethal_proof and a.lethal_proof != "off":
         kw["lethal_proof"] = a.lethal_proof
+    if a.commit_hidden_legacy:
+        kw["commit_hidden_legacy"] = True
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     ts = []
     last = [0.0]
     know = []
     leth = []
+    kinds = {}
 
     def obs(game, name, turn, step, out, move):
         now = time.perf_counter()
         ts.append(now - last[0])
+        kinds[out.get("kind")] = kinds.get(out.get("kind"), 0) + 1
         if a.knowledge:
             know.append(json.loads(game.knowledge_json(name)))
         if a.lethal_proof:
@@ -88,7 +95,9 @@ def main(argv=None):
     print(json.dumps({"sims": a.sims, "worlds": a.worlds, "budget": a.budget,
                       **({"omniscient": True} if a.omniscient else {}),
                       **({"reveal": a.reveal} if a.reveal else {}),
-                      **({"opp_blind": True} if a.opp_blind else {}), "games": a.games, "moves": n,
+                      **({"opp_blind": True} if a.opp_blind else {}),
+                      **({"commit_hidden_legacy": True} if a.commit_hidden_legacy else {}),
+                      "games": a.games, "moves": n, "kinds": kinds,
                       "mean": round(statistics.mean(ts), 3), "p50": round(ts[n // 2], 3),
                       "p90": round(ts[int(n * 0.9)], 3), "p99": round(ts[int(n * 0.99)], 3),
                       "max": round(ts[-1], 2), "wall_sec": round(time.perf_counter() - t0, 1),
