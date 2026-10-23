@@ -1,7 +1,7 @@
 {
  "job": "rean-n50-w08",
  "role": "reanalyze",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "record": "claude/n50-w08:n_records/n50_w08",
   "engine_commit": "24ce7244f",
@@ -19,27 +19,27 @@
   "dir": "../../../root/opcg-sim-backend/n50_rean/w08"
  },
  "metrics": {
-  "games": 168,
-  "points": 2016,
+  "games": 200,
+  "points": 2400,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
   "points_by_rule": {
-   "early": 672,
-   "end_and_attack": 672,
+   "early": 800,
+   "end_and_attack": 800,
    "enel": 6,
-   "random": 666
+   "random": 794
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
-   "early": 0.2158,
-   "end_and_attack": 0.2827,
+   "early": 0.2125,
+   "end_and_attack": 0.28,
    "enel": 0.3333,
-   "random": 0.2718
+   "random": 0.2922
   },
-  "deep_best_differs_all": 0.2569,
-  "sec_replay_per_game": 12.61,
-  "sec_deep_per_game": 8.81
+  "deep_best_differs_all": 0.2617,
+  "sec_replay_per_game": 12.23,
+  "sec_deep_per_game": 8.6
  },
  "commit": "24ce7244f",
  "notes": ""
