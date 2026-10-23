@@ -192,7 +192,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **r20／r20s vs r13d（教材のデッキの切り分け・公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.34）** | 主 real 3101000〜3116000／副 ミラー 3121000〜3136000／参考 synth_roles2 3141000〜3156000（r20 と r20s で共有） | 使用済み（2026-10-22・r20 主 −1.7／副 +2.9／参考 −39.0・r20s 主 +3.6／副 +13.3／参考 −6.1・void 0〜1） |
 | 検証 **守りの照合の修正 vs 旧い照合（両席 r13d・出荷の設定・random × real・16 シャード × 150 ペア・§7.34）** | 3171000〜3186149 | 使用済み（2026-10-23・2,397 ペア 0.5467 [0.5382, 0.5553] +32.6・void 3） |
 | 検証 **詰みの証明の払える守り vs 旧い配り方（同上・§7.33）** | 3191000〜3206149 | 払い出し済み（WP `lethal-deal-cost` を取り込み済み・§7.36・§7.34 の後に起動） |
-| **再分析**（波 49・50 の w01〜w08・各 先頭 200 局 × 12 点・mult 4・budget 0・§7.35） | —（記録の seed をそのまま打ち直す） | 指示済み（2026-10-23・claude/rean-n49-w01〜w08・claude/rean-n50-w01〜w08） |
+| **再分析**（波 49・50 の w01〜w08・各 先頭 200 局 × 12 点・mult 4・budget 0・§7.35） | —（記録の seed をそのまま打ち直す） | 使用済み（2026-10-23・16 本全部 200 局・38,400 点・再生率 1.00・深い最善 ≠ 記録 28.0%） |
 | 生成 **波 50s**（合成デッキ v2・`--decks synth_roles2`・生成役 r13d・v15・波 50 の対照・§7.34） | 2541000〜2548500（シャード k の base は 2540000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,083,501 行・dropped 2・decks synth_roles2） |
 | 生成 **波 50**（実デッキ 115 本・`--decks real`・生成役 r13d・v15・§7.34） | 2531000〜2538500（シャード k の base は 2530000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,149,881 行・dropped 5・decks real） |
 | 検証 **r19 vs r13d・本番の設定**（両席 1,280 回・世界 2 本・枝予算なし・random × real・32 シャード × 84 ペア・§7.33） | 2141000〜2172083（シャード k の base は 2141000 + (k−1)×1000） | 使用済み（2026-10-22・2,683 ペア 0.5052 [0.4948, 0.5156] +3.6・void 5・非昇格） |
@@ -3637,6 +3637,55 @@ echo ALL_DONE
 
 補足: 25 ペアずつ進め（6 回目までに 150 ペアに届く・届いた後の回は何もしない）、そのたびに push する。世界 2 本は 2 スレッド使うので --workers 2。全体で約 1.5 時間。コミットメッセージにモデル名を入れない。
 ````
+
+**§7.35 再分析の結果（2026-10-23）**: 16 本全部完走・各 200 局・**38,400 点**・再生率 1.00（分岐 0）。**深い最善が記録の手と違う点 28.0%**（規則別: 序盤 23%・終える手と攻撃 32%・乱数 30%）＝予告 25〜35% の中。台帳 2+362。
+
+**訓練 r21 の指示書**（作業セッション用・1 セッション・`claude/train-r21`）:
+
+```
+作業: r21 の訓練 → 評価帯（docs/n_loop_ops.md §7.35・方策の教材の再分析）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（~/opcg-sim-backend）。長い実行は nohup で回し、
+**push し終えるまでターンを終えない**（9 分以内の待ちを繰り返す）。迷った点は RESULT.json の notes に書いて完走する。
+r21＝π は再分析の点だけ（波 49・50 の w01〜w08・各 200 局 × 12 点＝38,400 点・4 倍の読みで打ち直した方策）・価値は波 50＋49 の全部（勝敗）・warm-start r11a（r11a のときの形）。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+for W in 49 50; do for XX in 01 02 03 04 05 06 07 08; do
+  [ -d ~/rean/n${W}_rean/w$XX ] && continue
+  git fetch -q origin claude/rean-n$W-w$XX:tmpr && mkdir -p ~/rean && git archive tmpr n${W}_rean/w$XX | tar -x -C ~/rean && git branch -qD tmpr; done; done
+ls -d ~/rean/n49_rean/w* ~/rean/n50_rean/w* | wc -l      # 16
+for N in n50 n49; do for k in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16; do
+  [ -d ~/$N/n_records ] && [ $(ls -d ~/$N/n_records/${N}_w*_p[0-3] 2>/dev/null | wc -l) -ge 64 ] && break
+  git fetch -q origin claude/$N-w$k:tmpw && mkdir -p ~/$N && git archive tmpw n_records | tar -x -C ~/$N && git branch -qD tmpw; done; done
+for N in n50 n49; do echo $N $(ls -d ~/$N/n_records/${N}_w*_p[0-3] | wc -l); done      # どれも 64
+git fetch -q origin claude/train-r19:r19net && git show r19net:n1_results/nrel_r19.npz > ~/nrel_r19.npz
+git fetch -q origin claude/train-r20:r20net && git show r20net:n1_results/nrel_r20.npz > ~/nrel_r20.npz
+
+ZA="$HOME/n50/n_records/n50_w*_p[0-3]"
+ZB="$HOME/n49/n_records/n49_w*_p[0-3]"
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train \
+  --in "$HOME/rean/n49_rean/w*" "$HOME/rean/n50_rean/w*" --z-in "$ZA" "$ZB" \
+  --ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 4 --fast --save-each-epoch \
+  --warm-start opcg_sim/data/learned/nrel_r11a.npz --out ~/nrel_r21.npz 2>&1 | tee ~/train_r21.log
+# メモリ（cgroup 14GB）で落ちたら: --z-in を "$ZA" だけにして 1 回だけやり直し、notes に書く。
+
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$ZA" \
+  --nrel opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r19.npz ~/nrel_r20.npz ~/nrel_r21.npz ~/nrel_r21.ep0.npz ~/nrel_r21.ep1.npz \
+  --policy --holdout-mod 7 --out ~/band_r21.json 2>&1 | tee ~/band_r21.log
+# 再分析の点の上で方策の一致（深い最善の手との一致）も見る（帯の器が --in に再分析の dir を受けるなら）:
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$HOME/rean/n50_rean/w*" \
+  --nrel opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r20.npz ~/nrel_r21.npz --policy --holdout-mod 7 --out ~/band_r21_rean.json 2>&1 | tee ~/band_r21_rean.log || true
+
+git checkout -B claude/train-r21
+mkdir -p n1_results && cp ~/nrel_r21*.npz n1_results/ && cp ~/train_r21.log ~/band_r21*.json ~/band_r21*.log .
+（RESULT.json〔§5 の形〕: inputs＝warm_start r11a・π の dir 数と点数・価値の波と行数・rss_gb・npz の meta の enc_version／metrics＝best_ep・各周の val v_mse／v_sign／pi_top1／band＝ネットごとの v_mse と方策の指標〔波 50 holdout と再分析の点〕／train_sec・band_sec／notes）
+git add -f n1_results/nrel_r21*.npz train_r21.log band_r21*.json band_r21*.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r21 のセット（訓練・評価帯）"
+git push -u origin claude/train-r21
+```
+
+**判定（訓練の後にコーディネータ）**: 公平同士・両席 160 回・基準 r13d・各 16 シャード × 175 ペア・新しい組み方。主 random × real・副 固定ミラー・参考 random × synth_roles2（seed は回収の時に台帳で払い出す）。規約を満たせば本番の深さ（§7.33 の形）。あわせて WP `move-judge` の判定役で「r21 の手が r13d の手より良いか」。
 
 ## 8. コーディネータが守ること
 
