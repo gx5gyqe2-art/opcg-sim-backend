@@ -1,0 +1,5425 @@
+{
+ "games": 300,
+ "void": 0,
+ "decisions": {
+  "own:main": 19527,
+  "opp:main": 388,
+  "opp:window": 8138,
+  "opp:commit": 7134,
+  "own:commit": 5863,
+  "own:window": 2343,
+  "own:lethal": 1120
+ },
+ "commit_share": {
+  "own": {
+   "k": 5863,
+   "n": 28853,
+   "rate": 0.2032
+  },
+  "opp": {
+   "k": 7134,
+   "n": 15660,
+   "rate": 0.4556
+  },
+  "all": {
+   "k": 12997,
+   "n": 44513,
+   "rate": 0.292
+  }
+ },
+ "by_all": {
+  "all": {
+   "points": 12997,
+   "diff": {
+    "k": 1357,
+    "n": 12997,
+    "rate": 0.1044
+   },
+   "diff_desc": {
+    "k": 1345,
+    "n": 12997,
+    "rate": 0.1035
+   },
+   "diff_card": {
+    "k": 1302,
+    "n": 12997,
+    "rate": 0.1002
+   },
+   "cal_diff": {
+    "k": 898,
+    "n": 12997,
+    "rate": 0.0691
+   },
+   "cal_diff_desc": {
+    "k": 894,
+    "n": 12997,
+    "rate": 0.0688
+   },
+   "deep_root": {
+    "n": 453,
+    "fresh_better": 254,
+    "live_better": 194,
+    "tie": 5,
+    "fresh_better_rate_excl_tie": 0.567,
+    "ci": [
+     0.5207,
+     0.6121
+    ],
+    "mean": 0.0079,
+    "median": 0.0017
+   },
+   "deep_child": {
+    "n": 1175,
+    "fresh_better": 684,
+    "live_better": 351,
+    "tie": 140,
+    "fresh_better_rate_excl_tie": 0.6609,
+    "ci": [
+     0.6315,
+     0.6891
+    ],
+    "mean": 0.0362,
+    "median": 0.0051
+   },
+   "cal_deep_root": {
+    "n": 620,
+    "fresh_better": 257,
+    "live_better": 359,
+    "tie": 4,
+    "fresh_better_rate_excl_tie": 0.4172,
+    "ci": [
+     0.3789,
+     0.4565
+    ],
+    "mean": -0.0497,
+    "median": -0.0091
+   },
+   "cal_deep_child": {
+    "n": 682,
+    "fresh_better": 314,
+    "live_better": 354,
+    "tie": 14,
+    "fresh_better_rate_excl_tie": 0.4701,
+    "ci": [
+     0.4325,
+     0.508
+    ],
+    "mean": -0.0156,
+    "median": -0.0007
+   }
+  }
+ },
+ "by_side": {
+  "opp": {
+   "points": 7134,
+   "diff": {
+    "k": 517,
+    "n": 7134,
+    "rate": 0.0725
+   },
+   "diff_desc": {
+    "k": 513,
+    "n": 7134,
+    "rate": 0.0719
+   },
+   "diff_card": {
+    "k": 506,
+    "n": 7134,
+    "rate": 0.0709
+   },
+   "cal_diff": {
+    "k": 179,
+    "n": 7134,
+    "rate": 0.0251
+   },
+   "cal_diff_desc": {
+    "k": 179,
+    "n": 7134,
+    "rate": 0.0251
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 440,
+    "fresh_better": 264,
+    "live_better": 83,
+    "tie": 93,
+    "fresh_better_rate_excl_tie": 0.7608,
+    "ci": [
+     0.7132,
+     0.8027
+    ],
+    "mean": 0.0414,
+    "median": 0.0052
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 74,
+    "fresh_better": 22,
+    "live_better": 51,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.3014,
+    "ci": [
+     0.2082,
+     0.4144
+    ],
+    "mean": -0.1096,
+    "median": -0.0243
+   }
+  },
+  "own": {
+   "points": 5863,
+   "diff": {
+    "k": 840,
+    "n": 5863,
+    "rate": 0.1433
+   },
+   "diff_desc": {
+    "k": 832,
+    "n": 5863,
+    "rate": 0.1419
+   },
+   "diff_card": {
+    "k": 796,
+    "n": 5863,
+    "rate": 0.1358
+   },
+   "cal_diff": {
+    "k": 719,
+    "n": 5863,
+    "rate": 0.1226
+   },
+   "cal_diff_desc": {
+    "k": 715,
+    "n": 5863,
+    "rate": 0.122
+   },
+   "deep_root": {
+    "n": 453,
+    "fresh_better": 254,
+    "live_better": 194,
+    "tie": 5,
+    "fresh_better_rate_excl_tie": 0.567,
+    "ci": [
+     0.5207,
+     0.6121
+    ],
+    "mean": 0.0079,
+    "median": 0.0017
+   },
+   "deep_child": {
+    "n": 735,
+    "fresh_better": 420,
+    "live_better": 268,
+    "tie": 47,
+    "fresh_better_rate_excl_tie": 0.6105,
+    "ci": [
+     0.5735,
+     0.6462
+    ],
+    "mean": 0.033,
+    "median": 0.0051
+   },
+   "cal_deep_root": {
+    "n": 620,
+    "fresh_better": 257,
+    "live_better": 359,
+    "tie": 4,
+    "fresh_better_rate_excl_tie": 0.4172,
+    "ci": [
+     0.3789,
+     0.4565
+    ],
+    "mean": -0.0497,
+    "median": -0.0091
+   },
+   "cal_deep_child": {
+    "n": 608,
+    "fresh_better": 292,
+    "live_better": 303,
+    "tie": 13,
+    "fresh_better_rate_excl_tie": 0.4908,
+    "ci": [
+     0.4508,
+     0.5309
+    ],
+    "mean": -0.0042,
+    "median": 0.0
+   }
+  }
+ },
+ "by_type": {
+  "opp:battle": {
+   "points": 5873,
+   "diff": {
+    "k": 341,
+    "n": 5873,
+    "rate": 0.0581
+   },
+   "diff_desc": {
+    "k": 337,
+    "n": 5873,
+    "rate": 0.0574
+   },
+   "diff_card": {
+    "k": 337,
+    "n": 5873,
+    "rate": 0.0574
+   },
+   "cal_diff": {
+    "k": 147,
+    "n": 5873,
+    "rate": 0.025
+   },
+   "cal_diff_desc": {
+    "k": 147,
+    "n": 5873,
+    "rate": 0.025
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 282,
+    "fresh_better": 132,
+    "live_better": 67,
+    "tie": 83,
+    "fresh_better_rate_excl_tie": 0.6633,
+    "ci": [
+     0.5951,
+     0.7253
+    ],
+    "mean": 0.0252,
+    "median": 0.0
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 56,
+    "fresh_better": 17,
+    "live_better": 38,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.3091,
+    "ci": [
+     0.2028,
+     0.4403
+    ],
+    "mean": -0.1362,
+    "median": -0.0568
+   }
+  },
+  "own:dialog:SEARCH_AND_SELECT": {
+   "points": 2443,
+   "diff": {
+    "k": 254,
+    "n": 2443,
+    "rate": 0.104
+   },
+   "diff_desc": {
+    "k": 254,
+    "n": 2443,
+    "rate": 0.104
+   },
+   "diff_card": {
+    "k": 218,
+    "n": 2443,
+    "rate": 0.0892
+   },
+   "cal_diff": {
+    "k": 64,
+    "n": 2443,
+    "rate": 0.0262
+   },
+   "cal_diff_desc": {
+    "k": 64,
+    "n": 2443,
+    "rate": 0.0262
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 236,
+    "fresh_better": 145,
+    "live_better": 47,
+    "tie": 44,
+    "fresh_better_rate_excl_tie": 0.7552,
+    "ci": [
+     0.6898,
+     0.8106
+    ],
+    "mean": 0.0662,
+    "median": 0.0067
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 57,
+    "fresh_better": 23,
+    "live_better": 24,
+    "tie": 10,
+    "fresh_better_rate_excl_tie": 0.4894,
+    "ci": [
+     0.3528,
+     0.6276
+    ],
+    "mean": 0.0064,
+    "median": 0.0
+   }
+  },
+  "own:attach": {
+   "points": 1546,
+   "diff": {
+    "k": 277,
+    "n": 1546,
+    "rate": 0.1792
+   },
+   "diff_desc": {
+    "k": 273,
+    "n": 1546,
+    "rate": 0.1766
+   },
+   "diff_card": {
+    "k": 273,
+    "n": 1546,
+    "rate": 0.1766
+   },
+   "cal_diff": {
+    "k": 357,
+    "n": 1546,
+    "rate": 0.2309
+   },
+   "cal_diff_desc": {
+    "k": 353,
+    "n": 1546,
+    "rate": 0.2283
+   },
+   "deep_root": {
+    "n": 277,
+    "fresh_better": 166,
+    "live_better": 108,
+    "tie": 3,
+    "fresh_better_rate_excl_tie": 0.6058,
+    "ci": [
+     0.5469,
+     0.6619
+    ],
+    "mean": 0.0043,
+    "median": 0.0036
+   },
+   "deep_child": {
+    "n": 229,
+    "fresh_better": 97,
+    "live_better": 132,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.4236,
+    "ci": [
+     0.3614,
+     0.4883
+    ],
+    "mean": -0.1066,
+    "median": -0.0075
+   },
+   "cal_deep_root": {
+    "n": 355,
+    "fresh_better": 137,
+    "live_better": 215,
+    "tie": 3,
+    "fresh_better_rate_excl_tie": 0.3892,
+    "ci": [
+     0.3397,
+     0.4411
+    ],
+    "mean": -0.0708,
+    "median": -0.0133
+   },
+   "cal_deep_child": {
+    "n": 306,
+    "fresh_better": 149,
+    "live_better": 156,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.4885,
+    "ci": [
+     0.4329,
+     0.5444
+    ],
+    "mean": -0.0012,
+    "median": -0.0006
+   }
+  },
+  "own:attack": {
+   "points": 1074,
+   "diff": {
+    "k": 180,
+    "n": 1074,
+    "rate": 0.1676
+   },
+   "diff_desc": {
+    "k": 176,
+    "n": 1074,
+    "rate": 0.1639
+   },
+   "diff_card": {
+    "k": 176,
+    "n": 1074,
+    "rate": 0.1639
+   },
+   "cal_diff": {
+    "k": 266,
+    "n": 1074,
+    "rate": 0.2477
+   },
+   "cal_diff_desc": {
+    "k": 266,
+    "n": 1074,
+    "rate": 0.2477
+   },
+   "deep_root": {
+    "n": 176,
+    "fresh_better": 88,
+    "live_better": 86,
+    "tie": 2,
+    "fresh_better_rate_excl_tie": 0.5057,
+    "ci": [
+     0.4321,
+     0.5791
+    ],
+    "mean": 0.0137,
+    "median": 0.0001
+   },
+   "deep_child": {
+    "n": 144,
+    "fresh_better": 72,
+    "live_better": 70,
+    "tie": 2,
+    "fresh_better_rate_excl_tie": 0.507,
+    "ci": [
+     0.4257,
+     0.588
+    ],
+    "mean": -0.003,
+    "median": 0.0001
+   },
+   "cal_deep_root": {
+    "n": 265,
+    "fresh_better": 120,
+    "live_better": 144,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.4545,
+    "ci": [
+     0.3956,
+     0.5148
+    ],
+    "mean": -0.0214,
+    "median": -0.0045
+   },
+   "cal_deep_child": {
+    "n": 213,
+    "fresh_better": 106,
+    "live_better": 106,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.5,
+    "ci": [
+     0.4333,
+     0.5667
+    ],
+    "mean": -0.0081,
+    "median": 0.0
+   }
+  },
+  "opp:dialog:SEARCH_AND_SELECT": {
+   "points": 992,
+   "diff": {
+    "k": 112,
+    "n": 992,
+    "rate": 0.1129
+   },
+   "diff_desc": {
+    "k": 112,
+    "n": 992,
+    "rate": 0.1129
+   },
+   "diff_card": {
+    "k": 105,
+    "n": 992,
+    "rate": 0.1058
+   },
+   "cal_diff": {
+    "k": 29,
+    "n": 992,
+    "rate": 0.0292
+   },
+   "cal_diff_desc": {
+    "k": 29,
+    "n": 992,
+    "rate": 0.0292
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 103,
+    "fresh_better": 86,
+    "live_better": 9,
+    "tie": 8,
+    "fresh_better_rate_excl_tie": 0.9053,
+    "ci": [
+     0.8297,
+     0.9494
+    ],
+    "mean": 0.0806,
+    "median": 0.0193
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 15,
+    "fresh_better": 5,
+    "live_better": 10,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.3333,
+    "ci": [
+     0.1518,
+     0.5829
+    ],
+    "mean": -0.0215,
+    "median": -0.0076
+   }
+  },
+  "own:dialog:CONFIRM_OPTIONAL": {
+   "points": 751,
+   "diff": {
+    "k": 129,
+    "n": 751,
+    "rate": 0.1718
+   },
+   "diff_desc": {
+    "k": 129,
+    "n": 751,
+    "rate": 0.1718
+   },
+   "diff_card": {
+    "k": 129,
+    "n": 751,
+    "rate": 0.1718
+   },
+   "cal_diff": {
+    "k": 32,
+    "n": 751,
+    "rate": 0.0426
+   },
+   "cal_diff_desc": {
+    "k": 32,
+    "n": 751,
+    "rate": 0.0426
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 126,
+    "fresh_better": 106,
+    "live_better": 19,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.848,
+    "ci": [
+     0.7748,
+     0.9005
+    ],
+    "mean": 0.2658,
+    "median": 0.2523
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 32,
+    "fresh_better": 14,
+    "live_better": 17,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.4516,
+    "ci": [
+     0.2916,
+     0.6223
+    ],
+    "mean": -0.0255,
+    "median": -0.0005
+   }
+  },
+  "opp:dialog:CONFIRM_OPTIONAL": {
+   "points": 259,
+   "diff": {
+    "k": 64,
+    "n": 259,
+    "rate": 0.2471
+   },
+   "diff_desc": {
+    "k": 64,
+    "n": 259,
+    "rate": 0.2471
+   },
+   "diff_card": {
+    "k": 64,
+    "n": 259,
+    "rate": 0.2471
+   },
+   "cal_diff": {
+    "k": 3,
+    "n": 259,
+    "rate": 0.0116
+   },
+   "cal_diff_desc": {
+    "k": 3,
+    "n": 259,
+    "rate": 0.0116
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 55,
+    "fresh_better": 46,
+    "live_better": 7,
+    "tie": 2,
+    "fresh_better_rate_excl_tie": 0.8679,
+    "ci": [
+     0.7516,
+     0.9345
+    ],
+    "mean": 0.051,
+    "median": 0.0406
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 3,
+    "fresh_better": 0,
+    "live_better": 3,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.0,
+    "ci": [
+     0.0,
+     0.5615
+    ],
+    "mean": -0.0535,
+    "median": -0.0081
+   }
+  },
+  "own:dialog:CHOICE": {
+   "points": 23,
+   "diff": {
+    "k": 0,
+    "n": 23,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 23,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 23,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 23,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 23,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "own:dialog:ARRANGE_DECK": {
+   "points": 16,
+   "diff": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "opp:dialog:ARRANGE_DECK": {
+   "points": 10,
+   "diff": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "own:dialog:CONFIRM_TRIGGER": {
+   "points": 8,
+   "diff": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "own:play": {
+   "points": 2,
+   "diff": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  }
+ },
+ "by_src": {
+  "window@opp": {
+   "points": 7134,
+   "diff": {
+    "k": 517,
+    "n": 7134,
+    "rate": 0.0725
+   },
+   "diff_desc": {
+    "k": 513,
+    "n": 7134,
+    "rate": 0.0719
+   },
+   "diff_card": {
+    "k": 506,
+    "n": 7134,
+    "rate": 0.0709
+   },
+   "cal_diff": {
+    "k": 179,
+    "n": 7134,
+    "rate": 0.0251
+   },
+   "cal_diff_desc": {
+    "k": 179,
+    "n": 7134,
+    "rate": 0.0251
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 440,
+    "fresh_better": 264,
+    "live_better": 83,
+    "tie": 93,
+    "fresh_better_rate_excl_tie": 0.7608,
+    "ci": [
+     0.7132,
+     0.8027
+    ],
+    "mean": 0.0414,
+    "median": 0.0052
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 74,
+    "fresh_better": 22,
+    "live_better": 51,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.3014,
+    "ci": [
+     0.2082,
+     0.4144
+    ],
+    "mean": -0.1096,
+    "median": -0.0243
+   }
+  },
+  "play@own": {
+   "points": 2744,
+   "diff": {
+    "k": 325,
+    "n": 2744,
+    "rate": 0.1184
+   },
+   "diff_desc": {
+    "k": 325,
+    "n": 2744,
+    "rate": 0.1184
+   },
+   "diff_card": {
+    "k": 291,
+    "n": 2744,
+    "rate": 0.106
+   },
+   "cal_diff": {
+    "k": 65,
+    "n": 2744,
+    "rate": 0.0237
+   },
+   "cal_diff_desc": {
+    "k": 65,
+    "n": 2744,
+    "rate": 0.0237
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 317,
+    "fresh_better": 232,
+    "live_better": 49,
+    "tie": 36,
+    "fresh_better_rate_excl_tie": 0.8256,
+    "ci": [
+     0.7769,
+     0.8655
+    ],
+    "mean": 0.1552,
+    "median": 0.0335
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 63,
+    "fresh_better": 26,
+    "live_better": 31,
+    "tie": 6,
+    "fresh_better_rate_excl_tie": 0.4561,
+    "ci": [
+     0.3337,
+     0.5841
+    ],
+    "mean": -0.0028,
+    "median": 0.0
+   }
+  },
+  "box@own": {
+   "points": 2620,
+   "diff": {
+    "k": 457,
+    "n": 2620,
+    "rate": 0.1744
+   },
+   "diff_desc": {
+    "k": 449,
+    "n": 2620,
+    "rate": 0.1714
+   },
+   "diff_card": {
+    "k": 449,
+    "n": 2620,
+    "rate": 0.1714
+   },
+   "cal_diff": {
+    "k": 623,
+    "n": 2620,
+    "rate": 0.2378
+   },
+   "cal_diff_desc": {
+    "k": 619,
+    "n": 2620,
+    "rate": 0.2363
+   },
+   "deep_root": {
+    "n": 453,
+    "fresh_better": 254,
+    "live_better": 194,
+    "tie": 5,
+    "fresh_better_rate_excl_tie": 0.567,
+    "ci": [
+     0.5207,
+     0.6121
+    ],
+    "mean": 0.0079,
+    "median": 0.0017
+   },
+   "deep_child": {
+    "n": 373,
+    "fresh_better": 169,
+    "live_better": 202,
+    "tie": 2,
+    "fresh_better_rate_excl_tie": 0.4555,
+    "ci": [
+     0.4056,
+     0.5064
+    ],
+    "mean": -0.0666,
+    "median": -0.0015
+   },
+   "cal_deep_root": {
+    "n": 620,
+    "fresh_better": 257,
+    "live_better": 359,
+    "tie": 4,
+    "fresh_better_rate_excl_tie": 0.4172,
+    "ci": [
+     0.3789,
+     0.4565
+    ],
+    "mean": -0.0497,
+    "median": -0.0091
+   },
+   "cal_deep_child": {
+    "n": 519,
+    "fresh_better": 255,
+    "live_better": 262,
+    "tie": 2,
+    "fresh_better_rate_excl_tie": 0.4932,
+    "ci": [
+     0.4503,
+     0.5362
+    ],
+    "mean": -0.004,
+    "median": -0.0002
+   }
+  },
+  "window@own": {
+   "points": 499,
+   "diff": {
+    "k": 58,
+    "n": 499,
+    "rate": 0.1162
+   },
+   "diff_desc": {
+    "k": 58,
+    "n": 499,
+    "rate": 0.1162
+   },
+   "diff_card": {
+    "k": 56,
+    "n": 499,
+    "rate": 0.1122
+   },
+   "cal_diff": {
+    "k": 31,
+    "n": 499,
+    "rate": 0.0621
+   },
+   "cal_diff_desc": {
+    "k": 31,
+    "n": 499,
+    "rate": 0.0621
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 45,
+    "fresh_better": 19,
+    "live_better": 17,
+    "tie": 9,
+    "fresh_better_rate_excl_tie": 0.5278,
+    "ci": [
+     0.3701,
+     0.6801
+    ],
+    "mean": -0.0018,
+    "median": 0.0
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 26,
+    "fresh_better": 11,
+    "live_better": 10,
+    "tie": 5,
+    "fresh_better_rate_excl_tie": 0.5238,
+    "ci": [
+     0.3237,
+     0.7166
+    ],
+    "mean": -0.0108,
+    "median": 0.0
+   }
+  }
+ },
+ "by_src_type": {
+  "window@opp|battle": {
+   "points": 5873,
+   "diff": {
+    "k": 341,
+    "n": 5873,
+    "rate": 0.0581
+   },
+   "diff_desc": {
+    "k": 337,
+    "n": 5873,
+    "rate": 0.0574
+   },
+   "diff_card": {
+    "k": 337,
+    "n": 5873,
+    "rate": 0.0574
+   },
+   "cal_diff": {
+    "k": 147,
+    "n": 5873,
+    "rate": 0.025
+   },
+   "cal_diff_desc": {
+    "k": 147,
+    "n": 5873,
+    "rate": 0.025
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 282,
+    "fresh_better": 132,
+    "live_better": 67,
+    "tie": 83,
+    "fresh_better_rate_excl_tie": 0.6633,
+    "ci": [
+     0.5951,
+     0.7253
+    ],
+    "mean": 0.0252,
+    "median": 0.0
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 56,
+    "fresh_better": 17,
+    "live_better": 38,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.3091,
+    "ci": [
+     0.2028,
+     0.4403
+    ],
+    "mean": -0.1362,
+    "median": -0.0568
+   }
+  },
+  "play@own|dialog:SEARCH_AND_SELECT": {
+   "points": 2068,
+   "diff": {
+    "k": 205,
+    "n": 2068,
+    "rate": 0.0991
+   },
+   "diff_desc": {
+    "k": 205,
+    "n": 2068,
+    "rate": 0.0991
+   },
+   "diff_card": {
+    "k": 171,
+    "n": 2068,
+    "rate": 0.0827
+   },
+   "cal_diff": {
+    "k": 37,
+    "n": 2068,
+    "rate": 0.0179
+   },
+   "cal_diff_desc": {
+    "k": 37,
+    "n": 2068,
+    "rate": 0.0179
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 200,
+    "fresh_better": 132,
+    "live_better": 32,
+    "tie": 36,
+    "fresh_better_rate_excl_tie": 0.8049,
+    "ci": [
+     0.7375,
+     0.8583
+    ],
+    "mean": 0.0805,
+    "median": 0.0086
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 35,
+    "fresh_better": 13,
+    "live_better": 16,
+    "tie": 6,
+    "fresh_better_rate_excl_tie": 0.4483,
+    "ci": [
+     0.2841,
+     0.6245
+    ],
+    "mean": 0.0117,
+    "median": 0.0
+   }
+  },
+  "box@own|attach": {
+   "points": 1546,
+   "diff": {
+    "k": 277,
+    "n": 1546,
+    "rate": 0.1792
+   },
+   "diff_desc": {
+    "k": 273,
+    "n": 1546,
+    "rate": 0.1766
+   },
+   "diff_card": {
+    "k": 273,
+    "n": 1546,
+    "rate": 0.1766
+   },
+   "cal_diff": {
+    "k": 357,
+    "n": 1546,
+    "rate": 0.2309
+   },
+   "cal_diff_desc": {
+    "k": 353,
+    "n": 1546,
+    "rate": 0.2283
+   },
+   "deep_root": {
+    "n": 277,
+    "fresh_better": 166,
+    "live_better": 108,
+    "tie": 3,
+    "fresh_better_rate_excl_tie": 0.6058,
+    "ci": [
+     0.5469,
+     0.6619
+    ],
+    "mean": 0.0043,
+    "median": 0.0036
+   },
+   "deep_child": {
+    "n": 229,
+    "fresh_better": 97,
+    "live_better": 132,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.4236,
+    "ci": [
+     0.3614,
+     0.4883
+    ],
+    "mean": -0.1066,
+    "median": -0.0075
+   },
+   "cal_deep_root": {
+    "n": 355,
+    "fresh_better": 137,
+    "live_better": 215,
+    "tie": 3,
+    "fresh_better_rate_excl_tie": 0.3892,
+    "ci": [
+     0.3397,
+     0.4411
+    ],
+    "mean": -0.0708,
+    "median": -0.0133
+   },
+   "cal_deep_child": {
+    "n": 306,
+    "fresh_better": 149,
+    "live_better": 156,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.4885,
+    "ci": [
+     0.4329,
+     0.5444
+    ],
+    "mean": -0.0012,
+    "median": -0.0006
+   }
+  },
+  "box@own|attack": {
+   "points": 1074,
+   "diff": {
+    "k": 180,
+    "n": 1074,
+    "rate": 0.1676
+   },
+   "diff_desc": {
+    "k": 176,
+    "n": 1074,
+    "rate": 0.1639
+   },
+   "diff_card": {
+    "k": 176,
+    "n": 1074,
+    "rate": 0.1639
+   },
+   "cal_diff": {
+    "k": 266,
+    "n": 1074,
+    "rate": 0.2477
+   },
+   "cal_diff_desc": {
+    "k": 266,
+    "n": 1074,
+    "rate": 0.2477
+   },
+   "deep_root": {
+    "n": 176,
+    "fresh_better": 88,
+    "live_better": 86,
+    "tie": 2,
+    "fresh_better_rate_excl_tie": 0.5057,
+    "ci": [
+     0.4321,
+     0.5791
+    ],
+    "mean": 0.0137,
+    "median": 0.0001
+   },
+   "deep_child": {
+    "n": 144,
+    "fresh_better": 72,
+    "live_better": 70,
+    "tie": 2,
+    "fresh_better_rate_excl_tie": 0.507,
+    "ci": [
+     0.4257,
+     0.588
+    ],
+    "mean": -0.003,
+    "median": 0.0001
+   },
+   "cal_deep_root": {
+    "n": 265,
+    "fresh_better": 120,
+    "live_better": 144,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.4545,
+    "ci": [
+     0.3956,
+     0.5148
+    ],
+    "mean": -0.0214,
+    "median": -0.0045
+   },
+   "cal_deep_child": {
+    "n": 213,
+    "fresh_better": 106,
+    "live_better": 106,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.5,
+    "ci": [
+     0.4333,
+     0.5667
+    ],
+    "mean": -0.0081,
+    "median": 0.0
+   }
+  },
+  "window@opp|dialog:SEARCH_AND_SELECT": {
+   "points": 992,
+   "diff": {
+    "k": 112,
+    "n": 992,
+    "rate": 0.1129
+   },
+   "diff_desc": {
+    "k": 112,
+    "n": 992,
+    "rate": 0.1129
+   },
+   "diff_card": {
+    "k": 105,
+    "n": 992,
+    "rate": 0.1058
+   },
+   "cal_diff": {
+    "k": 29,
+    "n": 992,
+    "rate": 0.0292
+   },
+   "cal_diff_desc": {
+    "k": 29,
+    "n": 992,
+    "rate": 0.0292
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 103,
+    "fresh_better": 86,
+    "live_better": 9,
+    "tie": 8,
+    "fresh_better_rate_excl_tie": 0.9053,
+    "ci": [
+     0.8297,
+     0.9494
+    ],
+    "mean": 0.0806,
+    "median": 0.0193
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 15,
+    "fresh_better": 5,
+    "live_better": 10,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.3333,
+    "ci": [
+     0.1518,
+     0.5829
+    ],
+    "mean": -0.0215,
+    "median": -0.0076
+   }
+  },
+  "play@own|dialog:CONFIRM_OPTIONAL": {
+   "points": 646,
+   "diff": {
+    "k": 120,
+    "n": 646,
+    "rate": 0.1858
+   },
+   "diff_desc": {
+    "k": 120,
+    "n": 646,
+    "rate": 0.1858
+   },
+   "diff_card": {
+    "k": 120,
+    "n": 646,
+    "rate": 0.1858
+   },
+   "cal_diff": {
+    "k": 28,
+    "n": 646,
+    "rate": 0.0433
+   },
+   "cal_diff_desc": {
+    "k": 28,
+    "n": 646,
+    "rate": 0.0433
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 117,
+    "fresh_better": 100,
+    "live_better": 17,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.8547,
+    "ci": [
+     0.7796,
+     0.9073
+    ],
+    "mean": 0.2829,
+    "median": 0.2704
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 28,
+    "fresh_better": 13,
+    "live_better": 15,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.4643,
+    "ci": [
+     0.2953,
+     0.6419
+    ],
+    "mean": -0.0209,
+    "median": -0.0129
+   }
+  },
+  "window@own|dialog:SEARCH_AND_SELECT": {
+   "points": 375,
+   "diff": {
+    "k": 49,
+    "n": 375,
+    "rate": 0.1307
+   },
+   "diff_desc": {
+    "k": 49,
+    "n": 375,
+    "rate": 0.1307
+   },
+   "diff_card": {
+    "k": 47,
+    "n": 375,
+    "rate": 0.1253
+   },
+   "cal_diff": {
+    "k": 27,
+    "n": 375,
+    "rate": 0.072
+   },
+   "cal_diff_desc": {
+    "k": 27,
+    "n": 375,
+    "rate": 0.072
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 36,
+    "fresh_better": 13,
+    "live_better": 15,
+    "tie": 8,
+    "fresh_better_rate_excl_tie": 0.4643,
+    "ci": [
+     0.2953,
+     0.6419
+    ],
+    "mean": -0.0131,
+    "median": 0.0
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 22,
+    "fresh_better": 10,
+    "live_better": 8,
+    "tie": 4,
+    "fresh_better_rate_excl_tie": 0.5556,
+    "ci": [
+     0.3372,
+     0.7544
+    ],
+    "mean": -0.0022,
+    "median": 0.0
+   }
+  },
+  "window@opp|dialog:CONFIRM_OPTIONAL": {
+   "points": 259,
+   "diff": {
+    "k": 64,
+    "n": 259,
+    "rate": 0.2471
+   },
+   "diff_desc": {
+    "k": 64,
+    "n": 259,
+    "rate": 0.2471
+   },
+   "diff_card": {
+    "k": 64,
+    "n": 259,
+    "rate": 0.2471
+   },
+   "cal_diff": {
+    "k": 3,
+    "n": 259,
+    "rate": 0.0116
+   },
+   "cal_diff_desc": {
+    "k": 3,
+    "n": 259,
+    "rate": 0.0116
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 55,
+    "fresh_better": 46,
+    "live_better": 7,
+    "tie": 2,
+    "fresh_better_rate_excl_tie": 0.8679,
+    "ci": [
+     0.7516,
+     0.9345
+    ],
+    "mean": 0.051,
+    "median": 0.0406
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 3,
+    "fresh_better": 0,
+    "live_better": 3,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.0,
+    "ci": [
+     0.0,
+     0.5615
+    ],
+    "mean": -0.0535,
+    "median": -0.0081
+   }
+  },
+  "window@own|dialog:CONFIRM_OPTIONAL": {
+   "points": 105,
+   "diff": {
+    "k": 9,
+    "n": 105,
+    "rate": 0.0857
+   },
+   "diff_desc": {
+    "k": 9,
+    "n": 105,
+    "rate": 0.0857
+   },
+   "diff_card": {
+    "k": 9,
+    "n": 105,
+    "rate": 0.0857
+   },
+   "cal_diff": {
+    "k": 4,
+    "n": 105,
+    "rate": 0.0381
+   },
+   "cal_diff_desc": {
+    "k": 4,
+    "n": 105,
+    "rate": 0.0381
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 9,
+    "fresh_better": 6,
+    "live_better": 2,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.75,
+    "ci": [
+     0.4093,
+     0.9285
+    ],
+    "mean": 0.0435,
+    "median": 0.0023
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 4,
+    "fresh_better": 1,
+    "live_better": 2,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.3333,
+    "ci": [
+     0.0615,
+     0.7923
+    ],
+    "mean": -0.0579,
+    "median": 0.0
+   }
+  },
+  "play@own|dialog:CHOICE": {
+   "points": 22,
+   "diff": {
+    "k": 0,
+    "n": 22,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 22,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 22,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 22,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 22,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "window@own|dialog:ARRANGE_DECK": {
+   "points": 16,
+   "diff": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "window@opp|dialog:ARRANGE_DECK": {
+   "points": 10,
+   "diff": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "play@own|dialog:CONFIRM_TRIGGER": {
+   "points": 8,
+   "diff": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "window@own|play": {
+   "points": 2,
+   "diff": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "window@own|dialog:CHOICE": {
+   "points": 1,
+   "diff": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  }
+ },
+ "by_type_shape": {
+  "opp:battle|same": {
+   "points": 5532,
+   "diff": {
+    "k": 0,
+    "n": 5532,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 5532,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 5532,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 123,
+    "n": 5532,
+    "rate": 0.0222
+   },
+   "cal_diff_desc": {
+    "k": 123,
+    "n": 5532,
+    "rate": 0.0222
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 39,
+    "fresh_better": 13,
+    "live_better": 25,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.3421,
+    "ci": [
+     0.2121,
+     0.5011
+    ],
+    "mean": -0.1557,
+    "median": -0.0591
+   }
+  },
+  "own:dialog:SEARCH_AND_SELECT|same": {
+   "points": 2189,
+   "diff": {
+    "k": 0,
+    "n": 2189,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 2189,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 2189,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 37,
+    "n": 2189,
+    "rate": 0.0169
+   },
+   "cal_diff_desc": {
+    "k": 37,
+    "n": 2189,
+    "rate": 0.0169
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 34,
+    "fresh_better": 13,
+    "live_better": 17,
+    "tie": 4,
+    "fresh_better_rate_excl_tie": 0.4333,
+    "ci": [
+     0.2738,
+     0.608
+    ],
+    "mean": 0.0013,
+    "median": 0.0
+   }
+  },
+  "own:attach|same": {
+   "points": 1269,
+   "diff": {
+    "k": 0,
+    "n": 1269,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 1269,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 1269,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 234,
+    "n": 1269,
+    "rate": 0.1844
+   },
+   "cal_diff_desc": {
+    "k": 232,
+    "n": 1269,
+    "rate": 0.1828
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 232,
+    "fresh_better": 86,
+    "live_better": 143,
+    "tie": 3,
+    "fresh_better_rate_excl_tie": 0.3755,
+    "ci": [
+     0.3154,
+     0.4398
+    ],
+    "mean": -0.1039,
+    "median": -0.0247
+   },
+   "cal_deep_child": {
+    "n": 199,
+    "fresh_better": 90,
+    "live_better": 109,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.4523,
+    "ci": [
+     0.3847,
+     0.5217
+    ],
+    "mean": -0.0492,
+    "median": -0.006
+   }
+  },
+  "own:attack|same": {
+   "points": 894,
+   "diff": {
+    "k": 0,
+    "n": 894,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 894,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 894,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 187,
+    "n": 894,
+    "rate": 0.2092
+   },
+   "cal_diff_desc": {
+    "k": 187,
+    "n": 894,
+    "rate": 0.2092
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 187,
+    "fresh_better": 78,
+    "live_better": 109,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.4171,
+    "ci": [
+     0.3488,
+     0.4888
+    ],
+    "mean": -0.0286,
+    "median": -0.0087
+   },
+   "cal_deep_child": {
+    "n": 146,
+    "fresh_better": 76,
+    "live_better": 69,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.5241,
+    "ci": [
+     0.4433,
+     0.6038
+    ],
+    "mean": -0.0031,
+    "median": 0.0035
+   }
+  },
+  "opp:dialog:SEARCH_AND_SELECT|same": {
+   "points": 880,
+   "diff": {
+    "k": 0,
+    "n": 880,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 880,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 880,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 21,
+    "n": 880,
+    "rate": 0.0239
+   },
+   "cal_diff_desc": {
+    "k": 21,
+    "n": 880,
+    "rate": 0.0239
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 8,
+    "fresh_better": 3,
+    "live_better": 5,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.375,
+    "ci": [
+     0.1368,
+     0.6943
+    ],
+    "mean": -0.0271,
+    "median": -0.0057
+   }
+  },
+  "own:dialog:CONFIRM_OPTIONAL|same": {
+   "points": 622,
+   "diff": {
+    "k": 0,
+    "n": 622,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 622,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 622,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 14,
+    "n": 622,
+    "rate": 0.0225
+   },
+   "cal_diff_desc": {
+    "k": 14,
+    "n": 622,
+    "rate": 0.0225
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 14,
+    "fresh_better": 4,
+    "live_better": 10,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.2857,
+    "ci": [
+     0.1172,
+     0.5465
+    ],
+    "mean": -0.0266,
+    "median": -0.0277
+   }
+  },
+  "opp:dialog:CONFIRM_OPTIONAL|same": {
+   "points": 195,
+   "diff": {
+    "k": 0,
+    "n": 195,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 195,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 195,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 2,
+    "n": 195,
+    "rate": 0.0103
+   },
+   "cal_diff_desc": {
+    "k": 2,
+    "n": 195,
+    "rate": 0.0103
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 2,
+    "fresh_better": 0,
+    "live_better": 2,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.0,
+    "ci": [
+     0.0,
+     0.6576
+    ],
+    "mean": -0.0077,
+    "median": -0.0073
+   }
+  },
+  "own:dialog:SEARCH_AND_SELECT|other_card": {
+   "points": 188,
+   "diff": {
+    "k": 188,
+    "n": 188,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 188,
+    "n": 188,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 188,
+    "n": 188,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 22,
+    "n": 188,
+    "rate": 0.117
+   },
+   "cal_diff_desc": {
+    "k": 22,
+    "n": 188,
+    "rate": 0.117
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 174,
+    "fresh_better": 127,
+    "live_better": 33,
+    "tie": 14,
+    "fresh_better_rate_excl_tie": 0.7937,
+    "ci": [
+     0.7245,
+     0.8492
+    ],
+    "mean": 0.0665,
+    "median": 0.0083
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 19,
+    "fresh_better": 9,
+    "live_better": 6,
+    "tie": 4,
+    "fresh_better_rate_excl_tie": 0.6,
+    "ci": [
+     0.3575,
+     0.8018
+    ],
+    "mean": 0.0087,
+    "median": 0.0
+   }
+  },
+  "own:attach|ATTACH_DON->ATTACK": {
+   "points": 188,
+   "diff": {
+    "k": 188,
+    "n": 188,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 188,
+    "n": 188,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 188,
+    "n": 188,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 77,
+    "n": 188,
+    "rate": 0.4096
+   },
+   "cal_diff_desc": {
+    "k": 77,
+    "n": 188,
+    "rate": 0.4096
+   },
+   "deep_root": {
+    "n": 188,
+    "fresh_better": 118,
+    "live_better": 67,
+    "tie": 3,
+    "fresh_better_rate_excl_tie": 0.6378,
+    "ci": [
+     0.5664,
+     0.7036
+    ],
+    "mean": 0.0206,
+    "median": 0.0042
+   },
+   "deep_child": {
+    "n": 141,
+    "fresh_better": 57,
+    "live_better": 84,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.4043,
+    "ci": [
+     0.3268,
+     0.4868
+    ],
+    "mean": -0.136,
+    "median": -0.049
+   },
+   "cal_deep_root": {
+    "n": 77,
+    "fresh_better": 31,
+    "live_better": 46,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.4026,
+    "ci": [
+     0.3002,
+     0.5142
+    ],
+    "mean": -0.0075,
+    "median": -0.0055
+   },
+   "cal_deep_child": {
+    "n": 64,
+    "fresh_better": 35,
+    "live_better": 28,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.5556,
+    "ci": [
+     0.4332,
+     0.6715
+    ],
+    "mean": 0.1281,
+    "median": 0.0408
+   }
+  },
+  "opp:battle|other_card": {
+   "points": 159,
+   "diff": {
+    "k": 159,
+    "n": 159,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 159,
+    "n": 159,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 159,
+    "n": 159,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 7,
+    "n": 159,
+    "rate": 0.044
+   },
+   "cal_diff_desc": {
+    "k": 7,
+    "n": 159,
+    "rate": 0.044
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 132,
+    "fresh_better": 50,
+    "live_better": 4,
+    "tie": 78,
+    "fresh_better_rate_excl_tie": 0.9259,
+    "ci": [
+     0.8245,
+     0.9708
+    ],
+    "mean": 0.019,
+    "median": 0.0
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 6,
+    "fresh_better": 1,
+    "live_better": 5,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.1667,
+    "ci": [
+     0.0301,
+     0.5635
+    ],
+    "mean": -0.0599,
+    "median": -0.001
+   }
+  },
+  "opp:battle|PASS->SELECT_COUNTER": {
+   "points": 150,
+   "diff": {
+    "k": 150,
+    "n": 150,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 150,
+    "n": 150,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 150,
+    "n": 150,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 15,
+    "n": 150,
+    "rate": 0.1
+   },
+   "cal_diff_desc": {
+    "k": 15,
+    "n": 150,
+    "rate": 0.1
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 124,
+    "fresh_better": 60,
+    "live_better": 63,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.4878,
+    "ci": [
+     0.4012,
+     0.5752
+    ],
+    "mean": 0.0253,
+    "median": -0.0002
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 10,
+    "fresh_better": 3,
+    "live_better": 7,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.3,
+    "ci": [
+     0.1078,
+     0.6032
+    ],
+    "mean": -0.0584,
+    "median": -0.1118
+   }
+  },
+  "own:dialog:CONFIRM_OPTIONAL|accept_vs_decline": {
+   "points": 129,
+   "diff": {
+    "k": 129,
+    "n": 129,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 129,
+    "n": 129,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 129,
+    "n": 129,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 18,
+    "n": 129,
+    "rate": 0.1395
+   },
+   "cal_diff_desc": {
+    "k": 18,
+    "n": 129,
+    "rate": 0.1395
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 126,
+    "fresh_better": 106,
+    "live_better": 19,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.848,
+    "ci": [
+     0.7748,
+     0.9005
+    ],
+    "mean": 0.2658,
+    "median": 0.2523
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 18,
+    "fresh_better": 10,
+    "live_better": 7,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.5882,
+    "ci": [
+     0.3601,
+     0.7839
+    ],
+    "mean": -0.0247,
+    "median": 0.0026
+   }
+  },
+  "own:attack|ATTACK->ATTACH_DON": {
+   "points": 91,
+   "diff": {
+    "k": 91,
+    "n": 91,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 91,
+    "n": 91,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 91,
+    "n": 91,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 37,
+    "n": 91,
+    "rate": 0.4066
+   },
+   "cal_diff_desc": {
+    "k": 37,
+    "n": 91,
+    "rate": 0.4066
+   },
+   "deep_root": {
+    "n": 91,
+    "fresh_better": 32,
+    "live_better": 58,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.3556,
+    "ci": [
+     0.2644,
+     0.4585
+    ],
+    "mean": -0.0297,
+    "median": -0.0032
+   },
+   "deep_child": {
+    "n": 72,
+    "fresh_better": 44,
+    "live_better": 28,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.6111,
+    "ci": [
+     0.4956,
+     0.7153
+    ],
+    "mean": 0.0366,
+    "median": 0.0111
+   },
+   "cal_deep_root": {
+    "n": 36,
+    "fresh_better": 26,
+    "live_better": 9,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.7429,
+    "ci": [
+     0.5793,
+     0.8584
+    ],
+    "mean": 0.0678,
+    "median": 0.0222
+   },
+   "cal_deep_child": {
+    "n": 31,
+    "fresh_better": 9,
+    "live_better": 22,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.2903,
+    "ci": [
+     0.161,
+     0.4659
+    ],
+    "mean": -0.0962,
+    "median": -0.0385
+   }
+  },
+  "opp:dialog:SEARCH_AND_SELECT|other_card": {
+   "points": 85,
+   "diff": {
+    "k": 85,
+    "n": 85,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 85,
+    "n": 85,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 85,
+    "n": 85,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 5,
+    "n": 85,
+    "rate": 0.0588
+   },
+   "cal_diff_desc": {
+    "k": 5,
+    "n": 85,
+    "rate": 0.0588
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 77,
+    "fresh_better": 67,
+    "live_better": 7,
+    "tie": 3,
+    "fresh_better_rate_excl_tie": 0.9054,
+    "ci": [
+     0.8174,
+     0.9534
+    ],
+    "mean": 0.0871,
+    "median": 0.0185
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 4,
+    "fresh_better": 2,
+    "live_better": 2,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.5,
+    "ci": [
+     0.15,
+     0.85
+    ],
+    "mean": 0.0007,
+    "median": 0.0023
+   }
+  },
+  "opp:dialog:CONFIRM_OPTIONAL|accept_vs_decline": {
+   "points": 64,
+   "diff": {
+    "k": 64,
+    "n": 64,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 64,
+    "n": 64,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 64,
+    "n": 64,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 1,
+    "n": 64,
+    "rate": 0.0156
+   },
+   "cal_diff_desc": {
+    "k": 1,
+    "n": 64,
+    "rate": 0.0156
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 55,
+    "fresh_better": 46,
+    "live_better": 7,
+    "tie": 2,
+    "fresh_better_rate_excl_tie": 0.8679,
+    "ci": [
+     0.7516,
+     0.9345
+    ],
+    "mean": 0.051,
+    "median": 0.0406
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 1,
+    "fresh_better": 0,
+    "live_better": 1,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.0,
+    "ci": [
+     0.0,
+     0.7935
+    ],
+    "mean": -0.145,
+    "median": -0.145
+   }
+  },
+  "own:attach|other_card": {
+   "points": 39,
+   "diff": {
+    "k": 39,
+    "n": 39,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 39,
+    "n": 39,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 39,
+    "n": 39,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 23,
+    "n": 39,
+    "rate": 0.5897
+   },
+   "cal_diff_desc": {
+    "k": 23,
+    "n": 39,
+    "rate": 0.5897
+   },
+   "deep_root": {
+    "n": 39,
+    "fresh_better": 24,
+    "live_better": 15,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.6154,
+    "ci": [
+     0.459,
+     0.7511
+    ],
+    "mean": 0.0353,
+    "median": 0.0064
+   },
+   "deep_child": {
+    "n": 39,
+    "fresh_better": 19,
+    "live_better": 20,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.4872,
+    "ci": [
+     0.3386,
+     0.638
+    ],
+    "mean": -0.0075,
+    "median": -0.0001
+   },
+   "cal_deep_root": {
+    "n": 23,
+    "fresh_better": 8,
+    "live_better": 15,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.3478,
+    "ci": [
+     0.1881,
+     0.5511
+    ],
+    "mean": -0.0985,
+    "median": -0.01
+   },
+   "cal_deep_child": {
+    "n": 22,
+    "fresh_better": 10,
+    "live_better": 12,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.4545,
+    "ci": [
+     0.2692,
+     0.6534
+    ],
+    "mean": -0.0788,
+    "median": -0.0051
+   }
+  },
+  "own:dialog:SEARCH_AND_SELECT|same_card_other_copy": {
+   "points": 36,
+   "diff": {
+    "k": 36,
+    "n": 36,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 36,
+    "n": 36,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 36,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 2,
+    "n": 36,
+    "rate": 0.0556
+   },
+   "cal_diff_desc": {
+    "k": 2,
+    "n": 36,
+    "rate": 0.0556
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 35,
+    "fresh_better": 3,
+    "live_better": 2,
+    "tie": 30,
+    "fresh_better_rate_excl_tie": 0.6,
+    "ci": [
+     0.2307,
+     0.8824
+    ],
+    "mean": -0.004,
+    "median": 0.0
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 2,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 2,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": 0.0,
+    "median": 0.0
+   }
+  },
+  "own:attack|other_card": {
+   "points": 32,
+   "diff": {
+    "k": 32,
+    "n": 32,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 32,
+    "n": 32,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 32,
+    "n": 32,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 21,
+    "n": 32,
+    "rate": 0.6562
+   },
+   "cal_diff_desc": {
+    "k": 21,
+    "n": 32,
+    "rate": 0.6562
+   },
+   "deep_root": {
+    "n": 32,
+    "fresh_better": 16,
+    "live_better": 16,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.5,
+    "ci": [
+     0.3363,
+     0.6637
+    ],
+    "mean": -0.0246,
+    "median": 0.0016
+   },
+   "deep_child": {
+    "n": 26,
+    "fresh_better": 8,
+    "live_better": 18,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.3077,
+    "ci": [
+     0.165,
+     0.4999
+    ],
+    "mean": -0.1167,
+    "median": -0.0073
+   },
+   "cal_deep_root": {
+    "n": 21,
+    "fresh_better": 9,
+    "live_better": 12,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.4286,
+    "ci": [
+     0.2447,
+     0.6345
+    ],
+    "mean": -0.0395,
+    "median": -0.0036
+   },
+   "cal_deep_child": {
+    "n": 19,
+    "fresh_better": 12,
+    "live_better": 7,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.6316,
+    "ci": [
+     0.4104,
+     0.8085
+    ],
+    "mean": 0.1515,
+    "median": 0.0356
+   }
+  },
+  "own:attach|ATTACH_DON->PLAY": {
+   "points": 29,
+   "diff": {
+    "k": 29,
+    "n": 29,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 29,
+    "n": 29,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 29,
+    "n": 29,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 13,
+    "n": 29,
+    "rate": 0.4483
+   },
+   "cal_diff_desc": {
+    "k": 13,
+    "n": 29,
+    "rate": 0.4483
+   },
+   "deep_root": {
+    "n": 29,
+    "fresh_better": 11,
+    "live_better": 18,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.3793,
+    "ci": [
+     0.2269,
+     0.56
+    ],
+    "mean": -0.1909,
+    "median": -0.0206
+   },
+   "deep_child": {
+    "n": 29,
+    "fresh_better": 15,
+    "live_better": 14,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.5172,
+    "ci": [
+     0.3443,
+     0.6861
+    ],
+    "mean": -0.0662,
+    "median": 0.0006
+   },
+   "cal_deep_root": {
+    "n": 13,
+    "fresh_better": 8,
+    "live_better": 5,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.6154,
+    "ci": [
+     0.3552,
+     0.8229
+    ],
+    "mean": 0.2101,
+    "median": 0.0206
+   },
+   "cal_deep_child": {
+    "n": 13,
+    "fresh_better": 7,
+    "live_better": 6,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.5385,
+    "ci": [
+     0.2914,
+     0.7679
+    ],
+    "mean": 0.1337,
+    "median": 0.0068
+   }
+  },
+  "own:dialog:SEARCH_AND_SELECT|live_none_fresh_some": {
+   "points": 24,
+   "diff": {
+    "k": 24,
+    "n": 24,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 24,
+    "n": 24,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 24,
+    "n": 24,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 2,
+    "n": 24,
+    "rate": 0.0833
+   },
+   "cal_diff_desc": {
+    "k": 2,
+    "n": 24,
+    "rate": 0.0833
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 23,
+    "fresh_better": 15,
+    "live_better": 8,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.6522,
+    "ci": [
+     0.4489,
+     0.8119
+    ],
+    "mean": 0.1886,
+    "median": 0.1255
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 2,
+    "fresh_better": 1,
+    "live_better": 1,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.5,
+    "ci": [
+     0.0945,
+     0.9055
+    ],
+    "mean": 0.0769,
+    "median": 0.1636
+   }
+  },
+  "own:dialog:CHOICE|same": {
+   "points": 23,
+   "diff": {
+    "k": 0,
+    "n": 23,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 23,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 23,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 23,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 23,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "own:attack|other_target": {
+   "points": 22,
+   "diff": {
+    "k": 22,
+    "n": 22,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 22,
+    "n": 22,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 22,
+    "n": 22,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 10,
+    "n": 22,
+    "rate": 0.4545
+   },
+   "cal_diff_desc": {
+    "k": 10,
+    "n": 22,
+    "rate": 0.4545
+   },
+   "deep_root": {
+    "n": 22,
+    "fresh_better": 14,
+    "live_better": 7,
+    "tie": 1,
+    "fresh_better_rate_excl_tie": 0.6667,
+    "ci": [
+     0.4537,
+     0.8281
+    ],
+    "mean": 0.177,
+    "median": 0.0578
+   },
+   "deep_child": {
+    "n": 17,
+    "fresh_better": 6,
+    "live_better": 9,
+    "tie": 2,
+    "fresh_better_rate_excl_tie": 0.4,
+    "ci": [
+     0.1982,
+     0.6425
+    ],
+    "mean": 0.0631,
+    "median": -0.0001
+   },
+   "cal_deep_root": {
+    "n": 10,
+    "fresh_better": 3,
+    "live_better": 7,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.3,
+    "ci": [
+     0.1078,
+     0.6032
+    ],
+    "mean": -0.189,
+    "median": -0.049
+   },
+   "cal_deep_child": {
+    "n": 9,
+    "fresh_better": 7,
+    "live_better": 2,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.7778,
+    "ci": [
+     0.4526,
+     0.9368
+    ],
+    "mean": 0.0361,
+    "median": 0.0834
+   }
+  },
+  "own:attack|ATTACK->PLAY": {
+   "points": 19,
+   "diff": {
+    "k": 19,
+    "n": 19,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 19,
+    "n": 19,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 19,
+    "n": 19,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 6,
+    "n": 19,
+    "rate": 0.3158
+   },
+   "cal_diff_desc": {
+    "k": 6,
+    "n": 19,
+    "rate": 0.3158
+   },
+   "deep_root": {
+    "n": 19,
+    "fresh_better": 17,
+    "live_better": 2,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.8947,
+    "ci": [
+     0.6861,
+     0.9706
+    ],
+    "mean": 0.0444,
+    "median": 0.0325
+   },
+   "deep_child": {
+    "n": 16,
+    "fresh_better": 8,
+    "live_better": 8,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.5,
+    "ci": [
+     0.28,
+     0.72
+    ],
+    "mean": 0.0575,
+    "median": 0.1496
+   },
+   "cal_deep_root": {
+    "n": 6,
+    "fresh_better": 1,
+    "live_better": 5,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.1667,
+    "ci": [
+     0.0301,
+     0.5635
+    ],
+    "mean": -0.0601,
+    "median": -0.0358
+   },
+   "cal_deep_child": {
+    "n": 4,
+    "fresh_better": 1,
+    "live_better": 3,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.25,
+    "ci": [
+     0.0456,
+     0.6994
+    ],
+    "mean": -0.2527,
+    "median": -0.242
+   }
+  },
+  "opp:dialog:SEARCH_AND_SELECT|live_none_fresh_some": {
+   "points": 19,
+   "diff": {
+    "k": 19,
+    "n": 19,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 19,
+    "n": 19,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 19,
+    "n": 19,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 3,
+    "n": 19,
+    "rate": 0.1579
+   },
+   "cal_diff_desc": {
+    "k": 3,
+    "n": 19,
+    "rate": 0.1579
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 18,
+    "fresh_better": 17,
+    "live_better": 1,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.9444,
+    "ci": [
+     0.7424,
+     0.9901
+    ],
+    "mean": 0.0696,
+    "median": 0.0521
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 3,
+    "fresh_better": 0,
+    "live_better": 3,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.0,
+    "ci": [
+     0.0,
+     0.5615
+    ],
+    "mean": -0.0361,
+    "median": -0.0398
+   }
+  },
+  "own:attach|ATTACH_DON->ACTIVATE_MAIN": {
+   "points": 17,
+   "diff": {
+    "k": 17,
+    "n": 17,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 17,
+    "n": 17,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 17,
+    "n": 17,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 8,
+    "n": 17,
+    "rate": 0.4706
+   },
+   "cal_diff_desc": {
+    "k": 8,
+    "n": 17,
+    "rate": 0.4706
+   },
+   "deep_root": {
+    "n": 17,
+    "fresh_better": 11,
+    "live_better": 6,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.6471,
+    "ci": [
+     0.413,
+     0.8269
+    ],
+    "mean": 0.0664,
+    "median": 0.0142
+   },
+   "deep_child": {
+    "n": 16,
+    "fresh_better": 5,
+    "live_better": 11,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.3125,
+    "ci": [
+     0.1416,
+     0.556
+    ],
+    "mean": -0.1677,
+    "median": -0.1903
+   },
+   "cal_deep_root": {
+    "n": 8,
+    "fresh_better": 2,
+    "live_better": 6,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.25,
+    "ci": [
+     0.0715,
+     0.5907
+    ],
+    "mean": -0.1272,
+    "median": -0.0142
+   },
+   "cal_deep_child": {
+    "n": 6,
+    "fresh_better": 5,
+    "live_better": 1,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.8333,
+    "ci": [
+     0.4365,
+     0.9699
+    ],
+    "mean": 0.1714,
+    "median": 0.2628
+   }
+  },
+  "opp:battle|PASS->SELECT_BLOCKER": {
+   "points": 16,
+   "diff": {
+    "k": 16,
+    "n": 16,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 16,
+    "n": 16,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 16,
+    "n": 16,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 14,
+    "fresh_better": 14,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 1.0,
+    "ci": [
+     0.7847,
+     1.0
+    ],
+    "mean": 0.0499,
+    "median": 0.0199
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "own:dialog:ARRANGE_DECK|same": {
+   "points": 16,
+   "diff": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 16,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "opp:battle|SELECT_BLOCKER->PASS": {
+   "points": 12,
+   "diff": {
+    "k": 12,
+    "n": 12,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 12,
+    "n": 12,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 12,
+    "n": 12,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 1,
+    "n": 12,
+    "rate": 0.0833
+   },
+   "cal_diff_desc": {
+    "k": 1,
+    "n": 12,
+    "rate": 0.0833
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 8,
+    "fresh_better": 8,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 1.0,
+    "ci": [
+     0.6756,
+     1.0
+    ],
+    "mean": 0.0945,
+    "median": 0.0188
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "own:attack|ATTACK->ACTIVATE_MAIN": {
+   "points": 11,
+   "diff": {
+    "k": 11,
+    "n": 11,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 11,
+    "n": 11,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 11,
+    "n": 11,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 4,
+    "n": 11,
+    "rate": 0.3636
+   },
+   "cal_diff_desc": {
+    "k": 4,
+    "n": 11,
+    "rate": 0.3636
+   },
+   "deep_root": {
+    "n": 11,
+    "fresh_better": 8,
+    "live_better": 3,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.7273,
+    "ci": [
+     0.4343,
+     0.9025
+    ],
+    "mean": 0.1067,
+    "median": 0.0636
+   },
+   "deep_child": {
+    "n": 9,
+    "fresh_better": 6,
+    "live_better": 3,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.6667,
+    "ci": [
+     0.3542,
+     0.8794
+    ],
+    "mean": -0.0142,
+    "median": 0.1787
+   },
+   "cal_deep_root": {
+    "n": 4,
+    "fresh_better": 2,
+    "live_better": 2,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.5,
+    "ci": [
+     0.15,
+     0.85
+    ],
+    "mean": -0.0604,
+    "median": 0.0259
+   },
+   "cal_deep_child": {
+    "n": 3,
+    "fresh_better": 0,
+    "live_better": 3,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.0,
+    "ci": [
+     0.0,
+     0.5615
+    ],
+    "mean": -0.1988,
+    "median": -0.1787
+   }
+  },
+  "opp:dialog:ARRANGE_DECK|same": {
+   "points": 10,
+   "diff": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "own:dialog:CONFIRM_TRIGGER|same": {
+   "points": 8,
+   "diff": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "opp:dialog:SEARCH_AND_SELECT|same_card_other_copy": {
+   "points": 7,
+   "diff": {
+    "k": 7,
+    "n": 7,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 7,
+    "n": 7,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 7,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 7,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 7,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 7,
+    "fresh_better": 2,
+    "live_better": 0,
+    "tie": 5,
+    "fresh_better_rate_excl_tie": 1.0,
+    "ci": [
+     0.3424,
+     1.0
+    ],
+    "mean": 0.0494,
+    "median": 0.0
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "own:dialog:SEARCH_AND_SELECT|live_some_fresh_none": {
+   "points": 6,
+   "diff": {
+    "k": 6,
+    "n": 6,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 6,
+    "n": 6,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 6,
+    "n": 6,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 1,
+    "n": 6,
+    "rate": 0.1667
+   },
+   "cal_diff_desc": {
+    "k": 1,
+    "n": 6,
+    "rate": 0.1667
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 4,
+    "fresh_better": 0,
+    "live_better": 4,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.0,
+    "ci": [
+     0.0,
+     0.4899
+    ],
+    "mean": -0.0335,
+    "median": -0.0172
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "opp:battle|same_card_other_copy": {
+   "points": 4,
+   "diff": {
+    "k": 4,
+    "n": 4,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 4,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 4,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 1,
+    "n": 4,
+    "rate": 0.25
+   },
+   "cal_diff_desc": {
+    "k": 1,
+    "n": 4,
+    "rate": 0.25
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 4,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 4,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": 0.0,
+    "median": 0.0
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 1,
+    "fresh_better": 0,
+    "live_better": 1,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.0,
+    "ci": [
+     0.0,
+     0.7935
+    ],
+    "mean": -0.6108,
+    "median": -0.6108
+   }
+  },
+  "own:attach|same_card_other_copy": {
+   "points": 4,
+   "diff": {
+    "k": 4,
+    "n": 4,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 4,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 4,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 2,
+    "n": 4,
+    "rate": 0.5
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 4,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 4,
+    "fresh_better": 2,
+    "live_better": 2,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.5,
+    "ci": [
+     0.15,
+     0.85
+    ],
+    "mean": 0.0854,
+    "median": 0.0007
+   },
+   "deep_child": {
+    "n": 4,
+    "fresh_better": 1,
+    "live_better": 3,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.25,
+    "ci": [
+     0.0456,
+     0.6994
+    ],
+    "mean": -0.0874,
+    "median": -0.0082
+   },
+   "cal_deep_root": {
+    "n": 2,
+    "fresh_better": 2,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 1.0,
+    "ci": [
+     0.3424,
+     1.0
+    ],
+    "mean": 0.0584,
+    "median": 0.0771
+   },
+   "cal_deep_child": {
+    "n": 2,
+    "fresh_better": 2,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 1.0,
+    "ci": [
+     0.3424,
+     1.0
+    ],
+    "mean": 0.1006,
+    "median": 0.193
+   }
+  },
+  "own:attack|same_card_other_copy": {
+   "points": 4,
+   "diff": {
+    "k": 4,
+    "n": 4,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 4,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 4,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 1,
+    "n": 4,
+    "rate": 0.25
+   },
+   "cal_diff_desc": {
+    "k": 1,
+    "n": 4,
+    "rate": 0.25
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 3,
+    "fresh_better": 0,
+    "live_better": 3,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.0,
+    "ci": [
+     0.0,
+     0.5615
+    ],
+    "mean": -0.3453,
+    "median": -0.3621
+   },
+   "cal_deep_root": {
+    "n": 1,
+    "fresh_better": 1,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 1.0,
+    "ci": [
+     0.2065,
+     1.0
+    ],
+    "mean": 0.5509,
+    "median": 0.5509
+   },
+   "cal_deep_child": {
+    "n": 1,
+    "fresh_better": 1,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 1.0,
+    "ci": [
+     0.2065,
+     1.0
+    ],
+    "mean": 0.1152,
+    "median": 0.1152
+   }
+  },
+  "own:play|same": {
+   "points": 2,
+   "diff": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "diff_desc": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "diff_card": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "own:attack|ATTACK->TURN_END": {
+   "points": 1,
+   "diff": {
+    "k": 1,
+    "n": 1,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 1,
+    "n": 1,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 1,
+    "n": 1,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 1,
+    "fresh_better": 1,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 1.0,
+    "ci": [
+     0.2065,
+     1.0
+    ],
+    "mean": 0.0012,
+    "median": 0.0012
+   },
+   "deep_child": {
+    "n": 1,
+    "fresh_better": 0,
+    "live_better": 1,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.0,
+    "ci": [
+     0.0,
+     0.7935
+    ],
+    "mean": -0.8623,
+    "median": -0.8623
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  },
+  "opp:dialog:SEARCH_AND_SELECT|live_some_fresh_none": {
+   "points": 1,
+   "diff": {
+    "k": 1,
+    "n": 1,
+    "rate": 1.0
+   },
+   "diff_desc": {
+    "k": 1,
+    "n": 1,
+    "rate": 1.0
+   },
+   "diff_card": {
+    "k": 1,
+    "n": 1,
+    "rate": 1.0
+   },
+   "cal_diff": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0
+   },
+   "cal_diff_desc": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0
+   },
+   "deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "deep_child": {
+    "n": 1,
+    "fresh_better": 0,
+    "live_better": 1,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": 0.0,
+    "ci": [
+     0.0,
+     0.7935
+    ],
+    "mean": -0.0075,
+    "median": -0.0075
+   },
+   "cal_deep_root": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   },
+   "cal_deep_child": {
+    "n": 0,
+    "fresh_better": 0,
+    "live_better": 0,
+    "tie": 0,
+    "fresh_better_rate_excl_tie": null,
+    "ci": null,
+    "mean": null,
+    "median": null
+   }
+  }
+ },
+ "fresh_kind": {
+  "window": 10377,
+  "main": 2620
+ },
+ "fresh_kind_when_diff": {
+  "window": 900,
+  "main": 457
+ }
+}
