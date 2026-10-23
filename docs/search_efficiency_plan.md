@@ -656,3 +656,14 @@ Phase 0 → Phase 1 → Phase 3（Phase 4 の (a)(b) を合間に）→ Phase 4 
 5. 読み: 「変わった手は良くなっていない」が審判 2 本でも成り立つか。成り立てば §7.22 の結論を独立に裏づける。
 **予告（数を見る前）**: 較正は 50% ± 2。r20 の手 vs r13d の手は両審判とも 48〜53%（差なし）・判定できた点は 2 割以下・審判 2 本の符号の一致は 55〜65%（差が小さいので偶然に近い）。理論の式の符号の一致は 50〜60%。
 **完了条件**: 器・報告・`RESULT.json`（§5 の形）を `claude/move-judge` に push・`make test` green。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
+
+### 7.33 WP `lethal-deal-cost`——証明の守りの強い配り方で、カウンターイベントは相手が払える範囲でだけ数える（採用の判定つき・作業セッション用・opus・2026-10-23）
+
+ユーザ決定（2026-10-23「a でお願いします」）。台帳 2+357。根拠は `docs/reports/2026-10-23_lethal_own_hidden.md`（証明したのに本当の配り方で勝てない 10 点のうち 8 点の原因＝守りの強い配り方が払えないカウンターイベントで相手の手札を埋める）。
+**手順**:
+1. 本線の最新・ブランチ `claude/lethal-deal-cost`・`make rust-develop`。修正の形は WP `lethal-own-hidden` の計測の切替 `cost`（ブランチ `claude/lethal-own-hidden` のコミット `afd94ef`・環境変数 `OPCG_LETHAL_OWN=cost`）と同じ: 守りの強い配り方で、カウンターイベントは**相手のアクティブのドン!!で払える枚数まで**を守りに数え、払えない分は守りの値 0 として扱う（手札の枠は他の札で埋める）。
+2. **既定を `cost` にする**。測定用の旗 `DecideOptions.lethal_deal_legacy: bool`（既定 false・true で今の配り方）を足し、opts の鍵・`engine_rs.py`・`arena.py --cand-lethal-deal-legacy`・`arena_shard.py --lethal-deal-legacy`（基準席）に通す（§7.21・§7.26 と同じ配線）。環境変数の切替は残さない。
+3. 不変量（§7.30 の数字の再現）: `tests/scripts/lethal_speed_check.py judge` で、今の wheel の 12,710 点の証明が 1,064 → 約 860（`cost` の数字と一致）・`lethal_deal_legacy=true` で 1,064 と全点一致。`lethal_proof=off` は 1 bit も変わらない（golden 2 本）。
+4. `make test`・`make audit-cross`（void 0）・`docs/SPEC.md` §2.5.10 の追記・報告 `docs/reports/2026-10-23_lethal_deal_cost.md`・`RESULT.json`・push。
+5. **本番アリーナ（取り込みの後にコーディネータ）**: 候補席＝修正後（既定）・基準席＝`--lethal-deal-legacy`。両席 r13d・出荷の設定（1,280 回・世界 2 本・枝予算なし・詰みの証明 root）・random × real・新しい組み方（同じネット同士は 0.5 ちょうど）・16 シャード × 150 ペア・seed **3191000 + (k−1)×1000**。採用の規約: 勝率の 95% 下限 ≥ 0.49（**退行なし**で採る＝正しさの修正なので、強さが同等なら設計どおりの形を取る）。下限が 0.49 を割れば既定を戻す（旗の既定を true に）。
+**予告**: 本番アリーナは 0.495〜0.505（幸運な証明が消えた局面は探索でもほぼ同じ手を打つ・打つ手が変わる局は全体の 1〜2%）。
