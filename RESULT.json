@@ -14,5 +14,5 @@
   "arena_r21/r21_real_w07.jsonl": 175,
   "arena_r21/r21_synth2_w07.jsonl": 175
  },
- "notes": ""
+ "notes": "base f87ccb9e9; r21 from claude/train-r21 n1_results/nrel_r21.npz; void 0 in all 3. shard FINAL (cand=r21 vs r13d): real wins 154/350 wr 0.44 elo -41.9; mirror 135/350 wr 0.3857 elo -80.8; synth2 135/350 wr 0.3857 elo -80.8 (same count as mirror by coincidence; files differ, md5 checked). Wall time much shorter than the ~12 min/run estimate: 154s/76s/121s with 4 workers."
 }
