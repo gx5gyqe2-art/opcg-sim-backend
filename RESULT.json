@@ -19,27 +19,27 @@
   "dir": "../../../root/opcg-sim-backend/n50_rean/w06"
  },
  "metrics": {
-  "games": 4,
-  "points": 48,
+  "games": 60,
+  "points": 720,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
   "points_by_rule": {
-   "early": 16,
-   "end_and_attack": 16,
-   "enel": 0,
-   "random": 16
+   "early": 240,
+   "end_and_attack": 240,
+   "enel": 2,
+   "random": 238
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
-   "early": 0.1875,
-   "end_and_attack": 0.3125,
-   "enel": null,
-   "random": 0.75
+   "early": 0.2375,
+   "end_and_attack": 0.3167,
+   "enel": 0.0,
+   "random": 0.3782
   },
-  "deep_best_differs_all": 0.4167,
-  "sec_replay_per_game": 10.18,
-  "sec_deep_per_game": 8.59
+  "deep_best_differs_all": 0.3097,
+  "sec_replay_per_game": 12.38,
+  "sec_deep_per_game": 8.35
  },
  "commit": "24ce7244f",
  "notes": "記録ブランチ claude/n50-w06 は n_records/n50_w06 ではなく 4 分割（n50_w06_p0〜p3・各 120 局・seed は互いに素で昇順）だったため、4 つを 1 つの dir に束ねて（npz は名前に p0〜p3 を付けて symlink・meta_n_record は p0 のもの〔局数・行数・seed_base 以外は 4 つとも同一〕・meta_games は連結）--in に渡した。先頭 200 局＝p0 の 120 局＋p1 の先頭 80 局（seed 順）。"
