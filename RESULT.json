@@ -42,5 +42,5 @@
   "sec_deep_per_game": 8.82
  },
  "commit": "6f2ce8ff6",
- "notes": ""
+ "notes": "記録ブランチ claude/n49-w02 には n_records/n49_w02 が無く、4 分割（n49_w02_p0〜p3・各 120 局・seed 帯 2521500-619/620-739/740-859/860-979）で置かれていた。コードは変更せず、手元で ~/rec/n_records/n49_w02 に 4 部の npz を symlink で集め（n_record_p{k}_xxxxx.npz）、meta_games.json は games を連結、meta_n_record.json は p0 を基に games/rows/main_rows を合算（sims・dirichlet_eps・temp_turns・eps・search・decks・net が 4 部で一致することを確認）して --in に渡した。--games 200 の先頭 200 局＝seed 2521500〜2521699（p0 の全 120 局＋p1 の先頭 80 局）。record 欄の実体は claude/n49-w02:n_records/n49_w02_p0〜p1。replay_rate 1.0・分岐 0。enel 枠は該当局が少なく 4 点だけ（残りは random へ繰り越し）。"
 }
