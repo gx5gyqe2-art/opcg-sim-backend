@@ -1,7 +1,7 @@
 {
  "job": "rean-n49-w05",
  "role": "reanalyze",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "record": "claude/n49-w05:n_records/n49_w05",
   "engine_commit": "6f2ce8ff6",
@@ -19,27 +19,27 @@
   "dir": "../../../root/opcg-sim-backend/n49_rean/w05"
  },
  "metrics": {
-  "games": 172,
-  "points": 2064,
+  "games": 200,
+  "points": 2400,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
   "points_by_rule": {
-   "early": 688,
-   "end_and_attack": 688,
-   "enel": 2,
-   "random": 686
+   "early": 800,
+   "end_and_attack": 800,
+   "enel": 4,
+   "random": 796
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
-   "early": 0.189,
-   "end_and_attack": 0.298,
-   "enel": 0.0,
-   "random": 0.3017
+   "early": 0.1812,
+   "end_and_attack": 0.3025,
+   "enel": 0.25,
+   "random": 0.304
   },
-  "deep_best_differs_all": 0.2626,
-  "sec_replay_per_game": 12.36,
-  "sec_deep_per_game": 8.53
+  "deep_best_differs_all": 0.2625,
+  "sec_replay_per_game": 12.44,
+  "sec_deep_per_game": 8.6
  },
  "commit": "6f2ce8ff6",
  "notes": ""
