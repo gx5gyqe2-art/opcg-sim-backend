@@ -3778,6 +3778,60 @@ echo ALL_DONE
 `Game`（`from_hidden`＋`decide` の trace）だけで新規に作った**（API は無い・CLI のみ）。
 判定は人・**分析（盤面の要約・人間の方針との比較）はコーディネータ（Claude）の役割**。
 
+### 7.39 続きの中の見えていなかった札の修正の本番アリーナ（WP `rs-commit-hidden` の取り込み後・2026-10-23）
+
+WP `rs-commit-hidden` を本線に取り込んだ（150f889ac・`make test` green・`make audit-cross` void 0）。報告 `docs/reports/2026-10-23_commit_hidden.md`（守りの再監査 300 局: 確かめ後の見逃し 7 → 6・消えたのはこの型の 1 点・golden は a1 帯 2 局だけ変化・旧い旗で全一致）。台帳 2+368。
+- 候補席＝修正後（既定）・基準席＝`--commit-hidden-legacy`。両席 r13d・出荷の設定・random × real・16 シャード × 150 ペア・seed **3271000 + (k−1)×1000**（払い出し済み）。
+- 採用の規約（§7.33）: 勝率の 95% 下限 ≥ 0.49 で採る（退行なし）。割れば旗の既定を戻す。
+- **予告**: 0.497〜0.505（監査で消えた見逃しは 300 局で 1 点・正しさの修正なので退行しないことの確認が主）。
+
+作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（続きの中の見えていなかった札の修正後 vs 旧い形・両席 r13d・両席とも出荷の設定）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.39）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-chid-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-chid-w$KK 150f889ac   # rs-commit-hidden の取り込み後に固定
+git show HEAD:opcg_sim/loop/arena_shard.py | grep -n 'commit-hidden-legacy'    # 基準席の旧い形の旗が在ること（無ければ notes に書いて止める）
+git fetch -q origin claude/arena-chid-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_chid 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_chid
+
+次の内容を ~/runH.sh に保存し、`nohup bash ~/runH.sh > ~/runH.out 2>&1 &` で回す。runH.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_chid/*.jsonl"))
+print(json.dumps({"job": "arena-chid-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz (hidden-card continuations re-read)", "baseline": "nrel_r13d.npz + commit_hidden_legacy", "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)", "pairs": 150},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_chid RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena chid shard $KK"; git push -q -u origin claude/arena-chid-w$KK || echo PUSH_FAILED; }
+N=opcg_sim/data/learned/nrel_r13d.npz
+for J in 0 1 2 3 4 5 6; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --worlds 2 --budget 0 --lethal-proof root --commit-hidden-legacy \
+    --cand-sims 1280 --cand-worlds 2 --cand-budget 0 --cand-lethal-proof root \
+    --pairs 150 --max-pairs 25 --bands 1 \
+    --seed-base $(( 3271000 + (k-1)*1000 )) --workers 2 --leaders random --decks real --pair-timeout 3600 \
+    --out arena_chid/chid_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 25 ペアずつ進め（6 回目までに 150 ペアに届く・届いた後の回は何もしない）、そのたびに push する。世界 2 本は 2 スレッド使うので --workers 2。全体で約 1.5 時間。コミットメッセージにモデル名を入れない。
+````
+
 ### シナリオの書き方
 
 1. `tests/scripts/rs_scenario_play.py list <replay.json.gz>` でリプレイを下見する（ターンごとの
