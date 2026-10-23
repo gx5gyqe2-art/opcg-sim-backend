@@ -134,13 +134,13 @@ def out_value(o: Dict[str, Any]) -> Optional[float]:
 
 
 def child_value(game, mover: str, mv: Dict[str, Any], ss: int, j: int = 0, forward: bool = False) -> Dict[str, Any]:
-    """手を当てた後の盤面の値（手を打った側から見た・深い読み）。`forward`＝値が出ない（候補 1 つ）盤面は先へ進める。"""
+    """手を当てた後の盤面の値（手を打った側から見た・深い読み）。`forward`＝次の木の判断点（メイン）まで判定役の決め方で進めてから測る（窓の値と木の値を混ぜない）。"""
     g = game.fork()
     try:
         apply(g, mover, mv)
     except Exception as exc:  # noqa: BLE001
         return {"v": None, "err": f"{type(exc).__name__}: {exc}"[:120]}
-    for _ in range(12 if forward else 1):
+    for _ in range(40 if forward else 1):
         w = g.winner()
         if w is not None:
             return {"v": 1.0 if w == mover else -1.0, "end": True}
@@ -150,9 +150,12 @@ def child_value(game, mover: str, mv: Dict[str, Any], ss: int, j: int = 0, forwa
         who = pend["player_id"]
         o = deep_decide(g, who, ss, j)
         v = out_value(o)
-        if v is not None or not forward or not o.get("move"):
+        if not forward or o.get("kind") == "main" or not o.get("move"):
             break
-        apply(g, who, o["move"])            # 候補が 1 つ（値が出ない）＝その手を当てて先へ（`forward` のときだけ）
+        # `forward`: 木の判断点（メイン）まで、判定役の決め方（窓・候補 1 つ）で進める＝両方の手の値を同じ読み（木の根の値）で測る
+        apply(g, who, o["move"])
+    if forward and o.get("kind") != "main":
+        v = None
     if v is None:
         return {"v": None, "kind": o.get("kind"), "who": who}
     return {"v": round(v if who == mover else -v, 4), "kind": o.get("kind"), "who": "me" if who == mover else "opp"}
@@ -419,6 +422,15 @@ def summarize(games, pts) -> Dict[str, Any]:
             row["deep_child"] = _better([x[1] for x in jr])
             row["cal_deep_root"] = _better([x[0] for x in jc])
             row["cal_deep_child"] = _better([x[1] for x in jc])
+            if any("judge_multi" in p or "judge_multi_cal" in p for p in g):
+                # 補助の判定（`--judge-seeds`・次の木の判断点まで進めてから seed k 本の平均）
+                row["multi"] = _better([(p.get("judge_multi") or {}).get("dv") for p in g if p.get("judge_multi")])
+                row["cal_multi"] = _better([(p.get("judge_multi_cal") or {}).get("dv") for p in g if p.get("judge_multi_cal")])
+            if any("between_opp" in p for p in g):
+                wb = [p for p in g if p.get("between_opp")]
+                nb = [p for p in g if "between_opp" in p and not p["between_opp"]]
+                row["opp_moved_between"] = {"points": len(wb), "diff": _rate(sum(p["diff"] for p in wb), len(wb)),
+                                            "no_opp_points": len(nb), "no_opp_diff": _rate(sum(p["diff"] for p in nb), len(nb))}
             out[k] = row
         return out
 
