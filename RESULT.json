@@ -16,5 +16,5 @@
  "metrics": {
   "arena_chid/chid_w01.jsonl": 150
  },
- "notes": ""
+ "notes": "150/150 pairs done (seed 3271000-3271149). 1 void: seed 3271076 aborted at step 31 with ValueError 不明なアクションです: DON_BOX (leaders ST30-001 vs OP01-003) - void rate 1/150 = 0.67%. Excluding the void, mean pair score 151/149 = 1.0067 (0-2 scale, candidate perspective ~0.503). Startup log prints '基準席は既定' but _best_kw passes commit_hidden_legacy=True plus the --sims/--worlds/--lethal-proof settings to the baseline seat (checked arena_shard.py:100-112)."
 }
