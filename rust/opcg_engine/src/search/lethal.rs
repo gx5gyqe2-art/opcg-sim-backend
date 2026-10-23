@@ -189,7 +189,10 @@ pub fn applies(s: &mut Session, masters: &MasterTable, me: Seat) -> bool {
     }
     let st = s.state();
     let ready = ready_units(st, me) + st.active_battle.as_ref().is_some_and(|b| b.attacker_owner == me) as usize;
-    solver.attack_bound(st, ready).is_none_or(|b| b > st.player(me.other()).life.len())
+    match solver.attack_bound(st, ready) {
+        None => true,
+        Some(b) => b > st.player(me.other()).life.len(),
+    }
 }
 
 /// アクティブで攻撃できるユニット（レストでない・登場したターンなら速攻持ち）の数（効果対話の中で合法手に

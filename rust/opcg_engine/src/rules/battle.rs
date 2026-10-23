@@ -158,6 +158,10 @@ pub fn advance_battle_triggers(
         return Ok(());
     }
     while !s.state().battle_triggers.is_empty() {
+        // 同時に誘発した束は手番側 → 非手番側・同じプレイヤーの 2 つ以上は本人が順を選ぶ（WP `rs-trigger-simul`）。
+        if crate::effects::triggers::order_front_bundle(s, masters, TriggerQueue::Battle)? {
+            return Ok(()); // 解決順の選択: 解決後に resolve_interaction から再開される
+        }
         let mut queue = s.state().battle_triggers.clone();
         let item = queue.remove(0);
         s.edit().set_trigger_queue(TriggerQueue::Battle, queue);

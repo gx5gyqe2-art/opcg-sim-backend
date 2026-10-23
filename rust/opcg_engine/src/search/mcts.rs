@@ -214,12 +214,15 @@ impl OppBlind {
     }
 }
 
+/// テスト用: `opp_blind` で展開した相手ノードの (本当の盤面, 評価に使った盤面, 合法手, 展開後の本当の盤面)。
+#[cfg(test)]
+pub(in crate::search) type BlindTrace = Vec<(GameState, GameState, Vec<Move>, GameState)>;
+
 #[cfg(test)]
 thread_local! {
-    /// テスト用: `opp_blind` で展開した相手ノードの (本当の盤面, 評価に使った盤面, 合法手, 展開後の本当の盤面)。
-    pub(in crate::search) static BLIND_TRACE: std::cell::RefCell<
-        Option<Vec<(GameState, GameState, Vec<Move>, GameState)>>,
-    > = const { std::cell::RefCell::new(None) };
+    /// テスト用: [`BlindTrace`] の記録先。
+    pub(in crate::search) static BLIND_TRACE: std::cell::RefCell<Option<BlindTrace>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 /// 木の探索（Python `TreeMCTS`）。

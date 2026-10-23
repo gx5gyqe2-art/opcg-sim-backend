@@ -1046,6 +1046,9 @@ pub enum InteractionKind {
     DeclareCost,
     /// `resolver._suspend_for_don_selection`（RETURN_DON の対象ドン!!選択）。
     SelectResource,
+    /// 同時に誘発した自分の効果のうち、どれを先に解決するか（WP `rs-trigger-simul`・
+    /// `effects/triggers.rs::order_front_bundle`）。フロントへは `SEARCH_AND_SELECT`（1 枚を選ぶ）で出す。
+    OrderTriggers,
 }
 
 impl InteractionKind {
@@ -1060,13 +1063,16 @@ impl InteractionKind {
             InteractionKind::ArrangeDeck => "ARRANGE_DECK",
             InteractionKind::DeclareCost => "DECLARE_COST",
             InteractionKind::SelectResource => "SELECT_RESOURCE",
+            InteractionKind::OrderTriggers => "ORDER_TRIGGERS",
         }
     }
     /// `get_pending_request` がフロントへ出す `action`
     /// （`SELECT_TARGET`／`FIELD_OVERFLOW_TRASH` → `SEARCH_AND_SELECT`・他は種別名そのまま）。
     pub fn front_action(self) -> &'static str {
         match self {
-            InteractionKind::FieldOverflowTrash | InteractionKind::SelectTarget => {
+            InteractionKind::FieldOverflowTrash
+            | InteractionKind::SelectTarget
+            | InteractionKind::OrderTriggers => {
                 "SEARCH_AND_SELECT"
             }
             other => other.action_type(),
@@ -1103,6 +1109,8 @@ pub struct Continuation {
     pub rest_replace: Option<RestReplaceContinuation>,
     /// 任意の効果除去置換の確認（`source_card` が除去されようとしているカード）。
     pub removal_replace: Option<RemovalReplaceContinuation>,
+    /// ORDER_TRIGGERS（同時に誘発した効果の解決順）が並べる待ち行列。
+    pub order_queue: Option<crate::journal::TriggerQueue>,
 }
 
 /// 任意の効果除去置換（「KOされる代わりに〜できる」）の continuation。
@@ -1182,6 +1190,8 @@ pub enum SelectionIntent {
     Benefit,
     Cost,
     Unknown,
+    /// 同時に誘発した効果の解決順（[`InteractionKind::OrderTriggers`]）。既定解決は先頭＝積んだ順。
+    Order,
 }
 
 impl SelectionIntent {
@@ -1192,6 +1202,7 @@ impl SelectionIntent {
             SelectionIntent::Benefit => "BENEFIT",
             SelectionIntent::Cost => "COST",
             SelectionIntent::Unknown => "UNKNOWN",
+            SelectionIntent::Order => "ORDER",
         }
     }
 }
@@ -1344,6 +1355,21 @@ pub struct PendingTrigger {
     pub confirmed: bool,
     /// 誘発の契機になったカード（バトルした相手など）。解決時に文脈の `trigger_subject` へ載せる。
     pub subject: Option<CardIdx>,
+    /// 同時に誘発した束の中の並びの状態（WP `rs-trigger-simul`・`effects/triggers.rs::order_front_bundle`）。
+    pub bundle: TriggerBundle,
+}
+
+/// 待ち行列の 1 件が「同時に誘発した束」のどこにいるか（WP `rs-trigger-simul`）。
+///
+/// 積んだ直後は [`TriggerBundle::Fresh`]。消化を始めるとき、先頭から続く `Fresh` の並びを 1 つの束として
+/// 手番側 → 非手番側の順に並べ替え、同じプレイヤーの効果が（別の札で）2 つ以上ある組は `Choose`
+/// （そのプレイヤーが順を選ぶ）、それ以外は `Fixed` にする。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum TriggerBundle {
+    #[default]
+    Fresh,
+    Choose,
+    Fixed,
 }
 
 /// 盤面全体（Python `GameManager`＋両 `Player`）。
