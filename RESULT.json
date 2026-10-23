@@ -1,9 +1,20 @@
 {
- "job": "rs-window-read",
- "role": "engine fix (window/dialog decisions) + re-audits",
- "status": "running",
- "spec": "docs/search_efficiency_plan.md §7.42 (origin/claude/cpu-spec-improvements-yw91jd @ ef33a81; ledger 2+374); evidence docs/reports/2026-10-23_commit_audit.md, 2026-10-23_blunder_audit.md, 2026-10-23_commit_hidden.md §2.2",
- "branch": "claude/rs-window-read",
- "report": "docs/reports/2026-10-23_window_read.md",
- "notes": "in progress: commit-audit redo (seeds 3311000-3311299), audit-cross, defense re-audit (legacy vs fixed) running"
+ "job": "arena-wr-w08",
+ "role": "arena",
+ "status": "partial",
+ "inputs": {
+  "candidate": "nrel_r13d.npz (window read: continuations re-read, 16-world windows, short tree at low life)",
+  "baseline": "nrel_r13d.npz + window_{carry,worlds,tree}_legacy",
+  "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)",
+  "pairs": 150
+ },
+ "outputs": {
+  "files": [
+   "arena_wr/wr_w08.jsonl"
+  ]
+ },
+ "metrics": {
+  "arena_wr/wr_w08.jsonl": 25
+ },
+ "notes": ""
 }
