@@ -42,5 +42,5 @@
   "sec_deep_per_game": 9.02
  },
  "commit": "24ce7244f",
- "notes": ""
+ "notes": "記録ブランチ claude/n50-w07 は n_records/n50_w07 ではなく 4 分割（n50_w07_p0〜p3・各 120 局・seed は互いに素で p0=2534000〜2534119 … p3=2534360〜2534479）だったため、w06 と同じく 4 つを 1 つの dir に束ねて（npz は名前に p0〜p3 を付けて symlink・meta_n_record は p0 のもの・meta_games は連結）--in に渡した。先頭 200 局＝seed 順で p0 の 120 局＋p1 の先頭 80 局（2534000〜2534199）。"
 }
