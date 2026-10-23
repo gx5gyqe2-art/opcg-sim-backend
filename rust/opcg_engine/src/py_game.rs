@@ -681,6 +681,14 @@ impl Game {
         let nodes = ov.get("max_nodes").and_then(Value::as_u64).unwrap_or(lethal::LETHAL_ROOT_NODES);
         let force = ov.get("force").and_then(Value::as_bool).unwrap_or(false);
         let true_deal = ov.get("true_deal").and_then(Value::as_bool).unwrap_or(false);
+        // 計測用（§7.30）: `trace`＝配り方ごとの手順を返す・`first`＝根の候補をこの手に限る・`guide`＝自分の手の案内
+        let trace = ov.get("trace").and_then(Value::as_bool).unwrap_or(false);
+        let first = ov.get("first").filter(|v| !v.is_null()).cloned().map(crate::search::Move::from_json);
+        let guide: Vec<crate::search::Move> = ov
+            .get("guide")
+            .and_then(Value::as_array)
+            .map(|a| a.iter().cloned().map(crate::search::Move::from_json).collect())
+            .unwrap_or_default();
         let applies = lethal::applies(&mut self.session, masters, seat);
         let bound = lethal::bound_report(&mut self.session, masters, seat);
         if !applies && !force {
@@ -695,14 +703,19 @@ impl Game {
                 } else {
                     lethal::make_deals(state, masters, seat, lethal::lethal_seed(seed), rand)?
                 };
-                Ok(lethal::solve_root(masters, state, seat, &deals, nodes))
+                if trace || first.is_some() {
+                    let t = lethal::Trace { first: first.as_ref(), guide: &guide };
+                    Ok(lethal::solve_root_traced(masters, state, seat, &deals, nodes, Some(t)))
+                } else {
+                    Ok(lethal::solve_root(masters, state, seat, &deals, nodes))
+                }
             })
             .map_err(|e| self.map_err(e))?;
         to_py_json(&serde_json::json!({
             "applies": applies, "status": out.status,
             "move": out.mv.as_ref().map(crate::search::Move::to_json),
             "line_len": out.line_len, "deals": out.deals, "nodes": out.nodes,
-            "sec": t0.elapsed().as_secs_f64(), "bound": bound,
+            "sec": t0.elapsed().as_secs_f64(), "bound": bound, "lines": out.lines,
         }))
     }
 
