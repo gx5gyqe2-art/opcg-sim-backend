@@ -1,238 +1,138 @@
 {
- "job": "r21-diag",
- "role": "diag+train",
+ "job": "rs-commit-hidden",
+ "role": "engine fix (gameplay defect) + re-audit",
  "status": "done",
+ "spec": "docs/search_efficiency_plan.md §7.39 (origin/claude/cpu-spec-improvements-yw91jd @ ddcf0df; ledger 2+368); evidence docs/reports/2026-10-23_commit_sig.md §2.2",
+ "branch": "claude/rs-commit-hidden",
+ "report": "docs/reports/2026-10-23_commit_hidden.md",
  "inputs": {
-  "base_commit": "089f0d1f3",
-  "rean_dirs": "claude/rean-n49-w01..08 + claude/rean-n50-w01..08 (16 dir・38,400 点)",
-  "records": "claude/n49-w01..16 + claude/n50-w01..16 (n_records/n{W}_w{XX}_p0..p3・128 dir)",
-  "z_waves": [
-   50,
-   49
-  ],
-  "z_rows": 2303852,
-  "epochs": 2,
-  "lr": 0.0002,
-  "ablate": [
-   "rel"
-  ],
-  "aux_weight": 0.1,
-  "pi_teacher": "q_improved（r21d は visits）",
-  "runs": {
-   "r21b": "warm r11a・π 再分析 38,400 点・z 波 50＋49・pi-steps-mult 1",
-   "r21c": "warm r13d・π 再分析 38,400 点・z 波 50＋49・pi-steps-mult 1",
-   "r21d": "r21c と同じ・--pi-teacher visits（深い訪問そのもの）",
-   "r21e": "warm r13d・π＋z 波 50＋49 の全部（w01〜w08 は reanalyze --merge で再分析の点を差し込み・959,378 点）",
-   "r21f": "warm r13d・π＋z とも再分析の 38,400 点だけ（--z-in なし）",
-   "r21g": "warm r13d・π＋z 波 50＋49 の全部（差し込みなし・r20 の出発点を r13d に替えた形）"
-  }
+  "base": "ddcf0df (Plan WPs rs-commit-hidden and commit-audit)",
+  "net": "nrel_r13d (both seats)",
+  "audit_settings": "same as §7.24: 1 world x 1280 sims, budget none, lethal_proof off, random leaders x synth_roles, seeds 3013000-3013299, verify on, PYTHONHASHSEED=0; before = same base with --commit-hidden-legacy (both 300-game runs with 2 workers each, concurrently)",
+  "latency": "rs_decide_latency.py --worlds 2 --lethal-proof root --games 20 (seed 2999900-), each setting pinned to one core, run concurrently"
  },
  "outputs": {
-  "report": "docs/reports/2026-10-23_r21_diag.md",
-  "align": "n1_results/r21_diag/align.json",
-  "nets": {
-   "r21b": "n1_results/nrel_r21b.npz",
-   "r21c": "n1_results/nrel_r21c.npz",
-   "r21d": "n1_results/nrel_r21d.npz",
-   "r21e": "n1_results/nrel_r21e.npz",
-   "r21f": "n1_results/nrel_r21f.npz",
-   "r21g": "n1_results/nrel_r21g.npz"
-  },
-  "band": [
-   "n1_results/r21_diag/band_final_rean.json",
-   "n1_results/r21_diag/band_final_w50.json"
-  ],
-  "tool": "tests/scripts/r21_teacher_align.py"
+  "engine": "rust/opcg_engine/src/search/decide.rs (hidden_at_commit, trace_to_steps truncation, DecideOptions.commit_hidden_legacy), quiesce.rs (TraceStep, dialog_cards), macro.rs (setup-box trace carries candidates), mod.rs (opts key commit_hidden_legacy)",
+  "python": "opcg_sim/api/engine_rs.py (commit_hidden_legacy=), opcg_sim/loop/arena.py (--cand-commit-hidden-legacy), opcg_sim/loop/arena_shard.py (--commit-hidden-legacy)",
+  "tools": "tests/scripts/defense_audit.py (--commit-hidden-legacy), tests/scripts/rs_decide_latency.py (--commit-hidden-legacy, kinds)",
+  "tests": "rust/opcg_engine/src/search/tests_commit_hidden.rs (5 tests)",
+  "goldens": "tests/fixtures/rs_goldens/replay/a1_5000165.json, a1_5000182.json (2 changed); audit.json and random band unchanged",
+  "results": "n1_results/commit_hidden/ (compare300.json, golden_diff.json, new300/, legacy300/, pilot_new/, pilot_legacy/, latency_*.json, logs, one-off scripts compare300.py, golden_diff.py, trace_seed.py)",
+  "docs": "docs/SPEC.md §2.5.11, docs/TEST_SPEC.md (tests_commit_hidden.rs row; defense_audit / rs_decide_latency rows)"
  },
  "metrics": {
-  "align_totals": {
-   "points": 38400,
-   "row_missing": 0,
-   "a_row_mismatch": 0,
-   "b_pol_mismatch": 0,
-   "b_rec_n_mismatch": 0,
-   "b_deep_n_mismatch": 0,
-   "b_deep_q_mismatch": 0,
-   "b_v0_mismatch": 0,
-   "b_chosen_sig_mismatch": 0,
-   "b_chosen_neg": 0,
-   "points_jsonl_missing": 0,
-   "c_qimp_argmax_ne_deep_best": 7308,
-   "c_visits_argmax_ne_deep_best": 0,
-   "c_deep_best_ne_rec_best": 10737,
-   "c_qimp_argmax_ne_rec_best": 11200,
-   "c_qimp_argmax_lowvisit": 4
+  "audit300": {
+   "void": [
+    0,
+    0
+   ],
+   "resp_points": [
+    9820,
+    9793
+   ],
+   "threat_ko": [
+    450,
+    433
+   ],
+   "threat_otsu": [
+    351,
+    332
+   ],
+   "miss_ko": [
+    24,
+    24
+   ],
+   "miss_otsu_raw": [
+    9,
+    8
+   ],
+   "miss_otsu_verified": [
+    7,
+    6
+   ],
+   "miss_otsu_verified_commit": [
+    3,
+    2
+   ],
+   "miss_otsu_verified_window": [
+    4,
+    4
+   ],
+   "seat_lost_after_verified_miss": [
+    5,
+    4
+   ],
+   "same_game_shape": 262,
+   "same_winner": 288,
+   "order": "[legacy, fixed]",
+   "removed": "3013121 p2 step 142 (choice among resampled-world deck cards)",
+   "remaining_commit": [
+    "3013194 p2 89: target among field cards (visible); re-read gives same move (search miss, not this defect)",
+    "3013217 p2 157: CONFIRM_OPTIONAL replayed from a 7-step window-fold commit made at a simultaneous-trigger order dialog; candidates visible; re-read declines and is safe (commit-vs-reread disagreement, §7.40 scope)"
+   ]
   },
-  "align_loader": {
-   "n": 0,
-   "q": 0,
-   "p": 0,
-   "pi": 0,
-   "len": 0,
-   "chosen": 0,
-   "v0": 0,
-   "row_tok": 0,
-   "row_sc": 0,
-   "row_ci": 0,
-   "at": 0,
-   "si": 0,
-   "ti": 0
+  "pilot2": {
+   "seeds": [
+    3013121,
+    3013194
+   ],
+   "legacy_reproduces_both_misses": true,
+   "fixed": "3013121 point gone (p2 now wins); 3013194 unchanged"
   },
-  "align_forward_r13d": {
-   "net": "nrel_r13d.npz",
-   "points": 38400,
-   "argmax_agree": 0.9096875,
-   "l1_mean": 0.059428051859267514,
-   "l1_median": 7.778911456979461e-05,
-   "l1_p99": 0.3819554908666787,
-   "share_l1_gt_0.05": 0.2615625,
-   "root_prior_temp": 2.0
+  "goldens": {
+   "audit_diff": 0,
+   "random_diff": 0,
+   "a1_diff": 2,
+   "a1_legacy_reproduces_head": "50/50",
+   "a1_winner_changed": 1,
+   "a1_cause": "both at the discard of Boa Hancock EB04-027 (draw 2, discard 1) on p2's own turn: two candidates were drawn after the commit"
   },
-  "best_ep": {
-   "r21b": 1,
-   "r21c": 0,
-   "r21d": 1,
-   "r21e": 0,
-   "r21f": 1,
-   "r21g": 1
+  "latency": {
+   "mean_sec": [
+    0.2,
+    0.201
+   ],
+   "p90": [
+    0.506,
+    0.501
+   ],
+   "p99": [
+    1.32,
+    1.334
+   ],
+   "wall_sec": [
+    616.8,
+    621.1
+   ],
+   "moves": [
+    2747,
+    2758
+   ],
+   "kinds_legacy": {
+    "main": 1311,
+    "window": 616,
+    "commit": 741,
+    "lethal": 79
+   },
+   "kinds_fixed": {
+    "main": 1302,
+    "window": 628,
+    "commit": 747,
+    "lethal": 81
+   },
+   "per_move_delta": "+0.5% (noise level)"
   },
-  "band_rean_holdout_5484": {
-   "nrel_r13d": {
-    "top1_visits": 0.5921,
-    "ce_visits": 1.562,
-    "top1_q_improved": 0.4832,
-    "ce_q_improved": 1.5598
-   },
-   "nrel_r11a": {
-    "top1_visits": 0.5407,
-    "ce_visits": 1.6953,
-    "top1_q_improved": 0.4566,
-    "ce_q_improved": 1.6985
-   },
-   "nrel_r20": {
-    "top1_visits": 0.5904,
-    "ce_visits": 1.5332,
-    "top1_q_improved": 0.5093,
-    "ce_q_improved": 1.5017
-   },
-   "nrel_r21": {
-    "top1_visits": 0.5633,
-    "ce_visits": 1.5661,
-    "top1_q_improved": 0.4903,
-    "ce_q_improved": 1.5325
-   },
-   "nrel_r21b": {
-    "top1_visits": 0.5474,
-    "ce_visits": 1.581,
-    "top1_q_improved": 0.4706,
-    "ce_q_improved": 1.5589
-   },
-   "nrel_r21c": {
-    "top1_visits": 0.576,
-    "ce_visits": 1.5614,
-    "top1_q_improved": 0.49,
-    "ce_q_improved": 1.5381
-   },
-   "nrel_r21d": {
-    "top1_visits": 0.5704,
-    "ce_visits": 1.5583,
-    "top1_q_improved": 0.4845,
-    "ce_q_improved": 1.5442
-   },
-   "nrel_r21e": {
-    "top1_visits": 0.5868,
-    "ce_visits": 1.537,
-    "top1_q_improved": 0.5036,
-    "ce_q_improved": 1.5075
-   },
-   "nrel_r21f": {
-    "top1_visits": 0.5853,
-    "ce_visits": 1.5504,
-    "top1_q_improved": 0.4987,
-    "ce_q_improved": 1.525
-   },
-   "nrel_r21g": {
-    "top1_visits": 0.5884,
-    "ce_visits": 1.5308,
-    "top1_q_improved": 0.5067,
-    "ce_q_improved": 1.4978
-   }
-  },
-  "band_w50_holdout_policy": {
-   "nrel_r13d": {
-    "top1_visits": 0.5432,
-    "ce_visits": 1.8262,
-    "top1_q_improved": 0.5006,
-    "ce_q_improved": 1.7271
-   },
-   "nrel_r11a": {
-    "top1_visits": 0.4911,
-    "ce_visits": 2.0005,
-    "top1_q_improved": 0.4511,
-    "ce_q_improved": 1.9269
-   },
-   "nrel_r20": {
-    "top1_visits": 0.5597,
-    "ce_visits": 1.7966,
-    "top1_q_improved": 0.5199,
-    "ce_q_improved": 1.664
-   },
-   "nrel_r21": {
-    "top1_visits": 0.5288,
-    "ce_visits": 1.8399,
-    "top1_q_improved": 0.4912,
-    "ce_q_improved": 1.7326
-   },
-   "nrel_r21b": {
-    "top1_visits": 0.5126,
-    "ce_visits": 1.8453,
-    "top1_q_improved": 0.4729,
-    "ce_q_improved": 1.7584
-   },
-   "nrel_r21c": {
-    "top1_visits": 0.5351,
-    "ce_visits": 1.825,
-    "top1_q_improved": 0.4945,
-    "ce_q_improved": 1.7277
-   },
-   "nrel_r21d": {
-    "top1_visits": 0.5344,
-    "ce_visits": 1.8156,
-    "top1_q_improved": 0.4932,
-    "ce_q_improved": 1.7263
-   },
-   "nrel_r21e": {
-    "top1_visits": 0.5594,
-    "ce_visits": 1.7996,
-    "top1_q_improved": 0.5198,
-    "ce_q_improved": 1.6719
-   },
-   "nrel_r21f": {
-    "top1_visits": 0.5414,
-    "ce_visits": 1.8133,
-    "top1_q_improved": 0.5031,
-    "ce_q_improved": 1.7108
-   },
-   "nrel_r21g": {
-    "top1_visits": 0.561,
-    "ce_visits": 1.7959,
-    "top1_q_improved": 0.5229,
-    "ce_q_improved": 1.6609
-   }
-  },
-  "band_w50_v_mse": {
-   "nrel_r13d": 0.6367,
-   "nrel_r11a": 0.6336,
-   "nrel_r20": 0.5412,
-   "nrel_r21": 0.5427,
-   "nrel_r21b": 0.5416,
-   "nrel_r21c": 0.5393,
-   "nrel_r21d": 0.5384,
-   "nrel_r21e": 0.5437,
-   "nrel_r21f": 0.6102,
-   "nrel_r21g": 0.541
+  "gates": {
+   "make_test": "green (cargo 615 passed; pytest 857 passed, 13 skipped)",
+   "audit_cross": "void 0 (120 pairs, 240 games)"
   }
  },
- "commit": "see branch head",
- "notes": "照合は全 38,400 点でずれ 0（記録との行・候補の列・選んだ手・深い読みの値・訓練の読み込み・版）。予告の「ずれ 1 つ」は外れ。原因の主は出発点 r11a（再分析の点で深い最善との一致 r11a 0.541 vs r13d 0.592・r21 は r11a から +0.022 で 0.563）、従は方策 3.8 万点に価値 230 万行を流すと共有の本体が引かれて方策が下がること（r13d から: r21c 0.576・r21d 0.570・価値も 3.8 万行の r21f は 0.585）。深い 3.8 万点を全手に混ぜた r21e と混ぜない r21g は帯で差なし（0.587 vs 0.588）。更新量 4 倍は原因でない（r21b 0.547 < r21 0.563）。迷った点: (1) §7.38 の手順 3 は r21b・r21c の 2 本だが、切り分けのため r21d〜r21g の 4 本を追加した（各 5〜10 分）。(2) 再分析の点の holdout は 波 50 だけでなく 49＋50 の 16 dir（5,484 点）で測った（前段の 2,736 点より倍）。(3) 帯に出発点の r11a を足した。(4) 訓練の器の前向き計算と Rust の根の P は 26% の点で L1>0.05 違うが、大半は同じ手の束の写しの数（整数倍）で説明でき、全世代に共通の構造（報告 §1 の参考 f）。(5) 波 49・50 の記録は 1 シャード 4 part に分かれ、再分析の作業セッションは束ねて回していた（照合は (seed, step) で引いたので影響なし）。アリーナは回していない（コーディネータが起こす）。アリーナの候補は r21g（と、深い点の効果を見るなら r21e vs r21g）。"
+ "forecast_check": {
+  "commit_misses_2_to_0": "miss: 3 -> 2 on the same base; the defect-type point is gone; the 2 remaining are other types",
+  "otsu_7_to_5": "miss: 7 -> 6",
+  "golden_a1_3_to_10": "miss: 2",
+  "cost_1_to_3pct": "miss (lower): +0.5%"
+ },
+ "command": "PYTHONHASHSEED=0 python tests/scripts/defense_audit.py run --games 300 --seed-base 3013000 --workers 2 --out n1_results/commit_hidden/new300 [--commit-hidden-legacy] && ... verify ... && ... summarize",
+ "notes": "(1) Judgement form: known-at-commit set (fair-resampled slots without my known_by bit), applied when the commit is generated (the trace now carries each step's dialog candidates) instead of carrying the set into the commit; the zone-based alternative would miss 'draw then discard' (candidates in hand) and needlessly re-read known deck tops. Carry/JSON shape and commit_step are unchanged. (2) The 'before' audit was re-run on the current base with --commit-hidden-legacy because rs-trigger-simul etc. changed play since rs-commit-sig; the commit_sig report's numbers are not directly comparable. (3) commit_sig §2.2 described 3013194 as a deck search; it is a target among field cards (SEARCH_AND_SELECT is the front name of SELECT_TARGET) - outside this fix. (4) 3013217 is a new commit-derived miss type that appears with simultaneous-trigger order dialogs (rs-trigger-simul); left for WP commit-audit (§7.40). (5) My first code push (313d9cd) was before make test; make test was green before every later push. (6) Pre-existing clippy -D warnings failures (lethal.rs too_many_arguments, tests_lethal.rs needless_range_loop) are on the base; not touched. (7) Production arena: candidate = fixed (default), baseline = arena_shard --commit-hidden-legacy, both r13d, shipping settings, random x real, seed 3271000- (coordinator). Expected effect small: 2/50 a1 golden games and 38/300 audit games change."
 }
