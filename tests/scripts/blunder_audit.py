@@ -505,6 +505,7 @@ def group_rates(rows, keyf):
         out.setdefault(k, []).append(x)
     return {k: {"cand": rate(sum(x["cand"] for x in v), len(v)),
                 "confirmed": rate(sum(bool(x.get("confirmed")) for x in v), len(v)),
+                "replicated": rate(sum(bool(x.get("replicated")) for x in v), len(v)),
                 "mean_diff": round(sum(x["ref"]["r13d"]["diff"] or 0 for x in v) / len(v), 4)}
             for k, v in sorted(out.items(), key=lambda kv: -len(kv[1]))}
 
@@ -513,6 +514,16 @@ def cmd_summary(a):
     games = read_jsonl(os.path.join(a.out, "games.jsonl"))
     rows = read_jsonl(os.path.join(a.out, "points.jsonl"))
     ok = [x for x in rows if x["ok"] and x["ref"]["r13d"]["diff"] is not None]
+    # 打ち直し（独立の配り方・審判 2 本）: 両審判の対をまとめた差の区間が 0 を外れ、審判 2 本とも差が正＝再現した損
+    rc = {(x["seed"], x["step"]): x for x in read_jsonl(os.path.join(a.out, "recheck.jsonl"))}
+    for x in ok:
+        r = rc.get((x["seed"], x["step"]))
+        if not x["cand"] or r is None:
+            continue
+        pool = MJ.paired(r["r13d"]["a"] + r["r20"]["a"], r["r13d"]["b"] + r["r20"]["b"])
+        x["recheck"] = {"r13d": r["r13d"]["diff"], "r20": r["r20"]["diff"], "pool": pool["diff"], "pool_ci": pool["ci"]}
+        x["replicated"] = bool(pool["ci"][0] is not None and pool["ci"][0] > 0
+                               and r["r13d"]["diff"] > 0 and r["r20"]["diff"] > 0)
     s = {"games": len(games), "void": sum(1 for g in games if g["winner"] is None),
          "decisions": sum(g["n_points"] for g in games), "eligible": sum(g["n_elig"] for g in games),
          "picked": sum(len(g["pick"]) for g in games), "rows": len(rows), "ok": len(ok),
@@ -533,6 +544,8 @@ def cmd_summary(a):
     s["all"] = {"cand": rate(sum(x["cand"] for x in ok), len(ok)),
                 "confirmed": rate(sum(bool(x.get("confirmed")) for x in ok), len(ok)),
                 "confirmed_strict": rate(sum(bool(x.get("confirmed_strict")) for x in ok), len(ok)),
+                "rechecked": sum(1 for x in ok if "recheck" in x),
+                "replicated": rate(sum(bool(x.get("replicated")) for x in ok), len(ok)),
                 "a_better_mirror": rate(sum(1 for x in ok if x["ref"]["r13d"]["diff"] <= -LOSS and x["ref"]["r13d"]["ci"][1] < 0), len(ok)),
                 "mean_diff": round(sum(x["ref"]["r13d"]["diff"] for x in ok) / len(ok), 4) if ok else None}
     diffs = [x["ref"]["r13d"]["diff"] for x in ok]
@@ -546,8 +559,9 @@ def cmd_summary(a):
     s["by_opp_life"] = group_rates(ok, lambda x: "life%d" % min(x["opp_life"], 4))
     s["by_own"] = group_rates(ok, lambda x: "own" if x["own"] else "opp")
     s["by_rank"] = group_rates(ok, lambda x: str(x.get("b_src")))
+    s["by_kind_mylife"] = group_rates(ok, lambda x: x["kind"] + "|life%d" % min(x["my_life"], 2))
     s["losses"] = [{k: x.get(k) for k in ("seed", "step", "seat", "turn", "kind", "dtype", "act", "b_src", "a_desc", "b_desc",
-                                          "my_life", "opp_life", "confirmed", "confirmed_strict")}
+                                          "my_life", "opp_life", "confirmed", "confirmed_strict", "replicated", "recheck")}
                    | {"d13": x["ref"]["r13d"]["diff"], "ci13": x["ref"]["r13d"]["ci"],
                       "d20": (x["ref"].get("r20") or {}).get("diff"), "ci20": (x["ref"].get("r20") or {}).get("ci"),
                       "deep_best_is_a": (x.get("deep") or {}).get("best_pkey_is_a"),
