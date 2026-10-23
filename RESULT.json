@@ -16,7 +16,7 @@
   ]
  },
  "outputs": {
-  "dir": "../../../root/opcg-sim-backend/n49_rean/w04"
+  "dir": "n49_rean/w04"
  },
  "metrics": {
   "games": 200,
@@ -42,5 +42,5 @@
   "sec_deep_per_game": 9.19
  },
  "commit": "6f2ce8ff6",
- "notes": ""
+ "notes": "記録ブランチ claude/n49-w04 には n_records/n49_w04 が無く、n49_w04_p0〜p3（各 120 局・seed 帯が連続）に分かれていた。4 つを 1 dir（~/rec/n_records/n49_w04・npz は名前だけ変えて写し、meta は局を連結・計 480 局 72,065 行）に束ねて --in に渡した。--games 200 は seed の昇順の先頭 200 局＝seed 2522500〜2522699（p0 の全 120 局＋p1 の先頭 80 局）。inputs.record の 'n_records/n49_w04' は実際には上記 _p0〜_p3 の束。器・エンジンのコードは変更なし。作業ディレクトリは /home/user/opcg-sim-backend（~/opcg-sim-backend はそこへのシンボリックリンク）のため outputs.dir を相対に直した。"
 }
