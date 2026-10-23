@@ -1,36 +1,156 @@
 {
- "job": "lethal-deal-cost",
- "role": "engine change (default) + measurement flag",
+ "job": "train-r21",
+ "role": "train",
  "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.33 (origin/claude/cpu-spec-improvements-yw91jd @ 81d02bb; ledger 2+357)",
- "branch": "claude/lethal-deal-cost",
- "report": "docs/reports/2026-10-23_lethal_deal_cost.md",
- "decision": "default changed: defensive deals count counter events only within the opponent's active DON (same as lethal-own-hidden switch cost, afd94ef); measurement flag lethal_deal_legacy (default false) restores the old deal; production arena left to the coordinator (§7.33-5)",
  "inputs": {
-  "base": "origin/claude/cpu-spec-improvements-yw91jd @ 81d02bb",
-  "record": "n1_results/lethal_speed/record_3012000_300.jsonl.gz (300 games)",
-  "reference_judges": "n1_results/lethal_own_hidden/judge_base.jsonl.gz (main), judge_cost.jsonl.gz (OPCG_LETHAL_OWN=cost)"
+  "warm_start": "opcg_sim/data/learned/nrel_r11a.npz",
+  "base_commit": "f87ccb9",
+  "pi_dirs": 16,
+  "pi_src": "claude/rean-n49-w01..08 + claude/rean-n50-w01..08 (n49_rean/w*, n50_rean/w*)",
+  "pi_points": 38400,
+  "pi_val_points": 5484,
+  "z_waves": [
+   50,
+   49
+  ],
+  "z_dirs": 128,
+  "z_rows": 2342252,
+  "z_val_rows": 333085,
+  "epochs": 2,
+  "lr": 0.0002,
+  "ablate": [
+   "rel"
+  ],
+  "aux_weight": 0.1,
+  "pi_teacher": "q_improved",
+  "pi_steps_mult": 4,
+  "rss_gb": 6.75,
+  "enc_version": 15,
+  "hidden": 192,
+  "kind": "nrel-a"
  },
  "outputs": {
-  "code": "rust/opcg_engine/src/search/lethal.rs (defensive_deal/make_deals/prove/root_proof/ReplyProof take legacy), decide.rs + mod.rs (DecideOptions.lethal_deal_legacy, opts key), py_game.rs (Game.lethal_json lethal_deal_legacy), tests_lethal.rs (test g)",
-  "wiring": "opcg_sim/api/engine_rs.py RsGame.decide(lethal_deal_legacy=...); opcg_sim/loop/arena.py --cand-lethal-deal-legacy; opcg_sim/loop/arena_shard.py --lethal-deal-legacy (baseline seat); tests/scripts/lethal_speed_check.py judge --lethal-deal-legacy",
-  "judges": "n1_results/lethal_deal_cost/judge_{cost,legacy}.jsonl.gz",
-  "identity": "n1_results/lethal_deal_cost/identity.json",
-  "compare": "n1_results/lethal_deal_cost/compare_legacy_vs_cost.json",
-  "logs": "n1_results/lethal_deal_cost/{make_test,audit_cross}.log",
-  "docs": "docs/SPEC.md §2.5.10, docs/TEST_SPEC.md (tests_lethal (g), lethal_speed_check judge flag)"
+  "net": "n1_results/nrel_r21.npz",
+  "ep0": "n1_results/nrel_r21.ep0.npz",
+  "ep1": "n1_results/nrel_r21.ep1.npz"
  },
  "metrics": {
-  "points": 12710,
-  "win_default": 860,
-  "win_legacy": 1064,
-  "default_vs_switch_cost": {"status_diff": 0, "move_diff": 0, "nodes_diff": 0},
-  "legacy_vs_main_base": {"status_diff": 0, "move_diff": 0, "nodes_diff": 0, "line_len_diff": 449, "line_len_note": "stats field only; reference judge_base predates the ATTACH_DON line_len fix (all 449 have base line_len 1 and an ATTACH_DON move)"},
-  "legacy_to_default_transitions": {"win->win": 859, "win->no": 121, "win->unknown": 84, "unknown->win": 1, "move_changed": 39, "nodes_ratio": 1.0207},
-  "make_test": "green (cargo 607 passed, 1 ignored; pytest 857 passed, 13 skipped)",
-  "audit_cross": "void 0 (120 pairs, wr 0.5)",
-  "smoke_arena": "arena_shard --lethal-proof root --lethal-deal-legacy --cand-lethal-proof root, 8 pairs, 32 sims, random x real, seed 3191000: void 0, best_opts carries lethal_deal_legacy=true"
+  "best_ep": 1,
+  "epochs": [
+   {
+    "ep": 0,
+    "val_v_mse": 0.5378,
+    "val_v_sign": 0.808,
+    "pi_top1": 0.486,
+    "pi_ce": 1.531,
+    "train_mse": 0.5067
+   },
+   {
+    "ep": 1,
+    "val_v_mse": 0.5317,
+    "val_v_sign": 0.811,
+    "pi_top1": 0.491,
+    "pi_ce": 1.526,
+    "train_mse": 0.4785
+   }
+  ],
+  "band_w50_holdout": {
+   "rows": 164246,
+   "policy_points": 20000,
+   "nets": {
+    "nrel_r13d": {
+     "v_mse": 0.6367,
+     "v_sign": 0.7605,
+     "top1_visits": 0.5432,
+     "ce_visits": 1.8262,
+     "top1_q_improved": 0.5006,
+     "ce_q_improved": 1.7271,
+     "gate_argmax_removal": 0.2556
+    },
+    "nrel_r19": {
+     "v_mse": 0.561,
+     "v_sign": 0.7921,
+     "top1_visits": 0.5516,
+     "ce_visits": 1.8084,
+     "top1_q_improved": 0.5097,
+     "ce_q_improved": 1.6911,
+     "gate_argmax_removal": 0.2489
+    },
+    "nrel_r20": {
+     "v_mse": 0.5412,
+     "v_sign": 0.8015,
+     "top1_visits": 0.5597,
+     "ce_visits": 1.7966,
+     "top1_q_improved": 0.5199,
+     "ce_q_improved": 1.664,
+     "gate_argmax_removal": 0.2287
+    },
+    "nrel_r21": {
+     "v_mse": 0.5427,
+     "v_sign": 0.8016,
+     "top1_visits": 0.5288,
+     "ce_visits": 1.8399,
+     "top1_q_improved": 0.4912,
+     "ce_q_improved": 1.7326,
+     "gate_argmax_removal": 0.2348
+    },
+    "nrel_r21.ep0": {
+     "v_mse": 0.5418,
+     "v_sign": 0.8009,
+     "top1_visits": 0.529,
+     "ce_visits": 1.8365,
+     "top1_q_improved": 0.4889,
+     "ce_q_improved": 1.737,
+     "gate_argmax_removal": 0.2413
+    },
+    "nrel_r21.ep1": {
+     "v_mse": 0.5427,
+     "v_sign": 0.8016,
+     "top1_visits": 0.5288,
+     "ce_visits": 1.8399,
+     "top1_q_improved": 0.4912,
+     "ce_q_improved": 1.7326,
+     "gate_argmax_removal": 0.2348
+    }
+   }
+  },
+  "band_rean_n50": {
+   "rows": 2736,
+   "policy_points": 2736,
+   "nets": {
+    "nrel_r13d": {
+     "v_mse": 0.6991,
+     "v_sign": 0.7164,
+     "top1_visits": 0.5877,
+     "ce_visits": 1.5766,
+     "top1_q_improved": 0.4836,
+     "ce_q_improved": 1.5746,
+     "gate_argmax_removal": 0.2719
+    },
+    "nrel_r20": {
+     "v_mse": 0.6105,
+     "v_sign": 0.776,
+     "top1_visits": 0.5841,
+     "ce_visits": 1.5451,
+     "top1_q_improved": 0.5117,
+     "ce_q_improved": 1.5093,
+     "gate_argmax_removal": 0.2212
+    },
+    "nrel_r21": {
+     "v_mse": 0.6108,
+     "v_sign": 0.7796,
+     "top1_visits": 0.5599,
+     "ce_visits": 1.5756,
+     "top1_q_improved": 0.4938,
+     "ce_q_improved": 1.5405,
+     "gate_argmax_removal": 0.2335
+    }
+   }
+  },
+  "train_sec": 345,
+  "band_sec": 629,
+  "band_rean_sec": 13
  },
- "command": "python tests/scripts/lethal_speed_check.py judge --record n1_results/lethal_speed/record_3012000_300.jsonl.gz --out n1_results/lethal_deal_cost --tag cost ; ... --tag legacy --lethal-deal-legacy ; make test ; make audit-cross",
- "notes": "Implemented the cost form as in afd94ef but behind a bool parameter threaded through make_deals/prove/root_proof and ReplyProof (so root_reply in-tree proofs follow the same flag); RNG draws are unchanged (the re-sort draws nothing), so the 6 fair deals are bit-identical. The environment switch OPCG_LETHAL_OWN does not exist on main and was not added. make audit-cross runs lethal_proof=off and therefore does not exercise this path; a small root/legacy arena smoke run was added to check the wiring. Container lacked maturin/pytest/fastapi; installed via pip (maturin, opcg_sim/requirements.txt, pytest, pytest-xdist) before the gates. Production arena (§7.33-5, seed 3191000+(k-1)x1000, 16 shards x 150 pairs) not run, as instructed."
+ "command": "python -m opcg_sim.learned.train.n_rel_train train --in ~/rean/n49_rean/w* ~/rean/n50_rean/w* --z-in ~/n50/n_records/n50_w*_p[0-3] ~/n49/n_records/n49_w*_p[0-3] --ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 4 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r11a.npz --out ~/nrel_r21.npz",
+ "notes": "指示どおり完走（メモリ落ちなし・--z-in は波 50＋49 の両方）。rss_gb は python プロセスの RSS 合計を 15 秒ごとに見た最大（/usr/bin/time が無いため）。nrel_r21.npz は best ep1 と同一（帯の値も一致）。評価帯（波 50 holdout・seed%7==0・164,246 行／方策 20,000 点）: 価値は r21 0.5427 ≈ r20 0.5412 < r19 0.5610 < r13d 0.6367（r21 ep0 は 0.5418）。方策の一致（記録の手＝1,280 回の読み）は r21 が低い: top1_visits r21 0.529 / r20 0.560 / r19 0.552 / r13d 0.543・top1_q_improved r21 0.491 / r20 0.520。教師が 4 倍の読みに変わったので記録の手から離れるのは予想どおり。ただし再分析の点（n50_rean・seed%7==0・2,736 点）の上でも r21 は r20 を上回らない: top1_visits r21 0.560 / r20 0.584 / r13d 0.588・top1_q_improved r21 0.494 / r20 0.512 / r13d 0.484・ce_q_improved r21 1.541 / r20 1.509 / r13d 1.575。迷った点: (1) 再分析の帯の 'visits' が深い読み（5,120 回）の訪問かは帯の器の読み方に依る（確かめていない）。(2) 訓練の val（5,484 点）と帯の seed%7==0 の点が同じ分割かは確かめていない——同じなら再分析の帯は訓練に使っていない点。(3) 再分析の帯は 1 波・2,736 点で小さい（top1 の標準誤差 ≈ 0.01）。判定は指示どおりアリーナで。"
 }

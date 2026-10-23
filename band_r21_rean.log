@@ -1,0 +1,31 @@
+holdout 行 2736（seed%7==0・3s）
+  [policy] nrel_r13d.npz top1_visits 0.588 ce_visits 1.577 top1_q_improved 0.484 ce_q_improved 1.575 | gate mass 0.260 argmax 0.272 data 0.243 (n 651)
+  [policy] nrel_r20.npz top1_visits 0.584 ce_visits 1.545 top1_q_improved 0.512 ce_q_improved 1.509 | gate mass 0.243 argmax 0.221 data 0.243 (n 651)
+  [policy] nrel_r21.npz top1_visits 0.560 ce_visits 1.576 top1_q_improved 0.494 ce_q_improved 1.541 | gate mass 0.251 argmax 0.233 data 0.243 (n 651)
+  [policy] 4s
+  nrel_r13d.npz
+    all                          mse 0.6991 sign 0.716 n   2736 | aux 0.4291 life 0.195 atk 0.201 tok_atk 0.173 tok_ab 0.121 (n 2083)
+    turn1-4                      mse 0.9349 sign 0.600 n    880 | aux 0.3678 life 0.136 atk 0.132 tok_atk 0.129 tok_ab 0.099 (n 880)
+    turn5-8                      mse 0.6988 sign 0.732 n    709 | aux 0.5164 life 0.305 atk 0.292 tok_atk 0.205 tok_ab 0.153 (n 653)
+    turn9-99                     mse 0.4050 sign 0.845 n    899 | aux 0.6097 life 0.286 atk 0.361 tok_atk 0.304 tok_ab 0.185 (n 302)
+    after_removal                mse 0.6266 sign 0.764 n    174 | aux 0.4973 life 0.230 atk 0.237 tok_atk 0.186 tok_ab 0.149 (n 140)
+    not_removal                  mse 0.7040 sign 0.713 n   2562 | aux 0.4242 life 0.192 atk 0.198 tok_atk 0.172 tok_ab 0.119 (n 1943)
+  nrel_r20.npz
+    all                          mse 0.6105 sign 0.776 n   2736 | aux 0.4129 life 0.194 atk 0.201 tok_atk 0.171 tok_ab 0.113 (n 2083)
+    turn1-4                      mse 0.7826 sign 0.722 n    880 | aux 0.3532 life 0.138 atk 0.124 tok_atk 0.127 tok_ab 0.092 (n 880)
+    turn5-8                      mse 0.6081 sign 0.776 n    709 | aux 0.5002 life 0.303 atk 0.303 tok_atk 0.201 tok_ab 0.144 (n 653)
+    turn9-99                     mse 0.4084 sign 0.848 n    899 | aux 0.5718 life 0.276 atk 0.355 tok_atk 0.293 tok_ab 0.165 (n 302)
+    after_removal                mse 0.5486 sign 0.799 n    174 | aux 0.4670 life 0.225 atk 0.234 tok_atk 0.178 tok_ab 0.139 (n 140)
+    not_removal                  mse 0.6147 sign 0.774 n   2562 | aux 0.4090 life 0.192 atk 0.199 tok_atk 0.170 tok_ab 0.111 (n 1943)
+  nrel_r21.npz
+    all                          mse 0.6108 sign 0.780 n   2736 | aux 0.3986 life 0.195 atk 0.191 tok_atk 0.167 tok_ab 0.110 (n 2083)
+    turn1-4                      mse 0.7796 sign 0.716 n    880 | aux 0.3395 life 0.139 atk 0.115 tok_atk 0.122 tok_ab 0.088 (n 880)
+    turn5-8                      mse 0.5979 sign 0.787 n    709 | aux 0.4849 life 0.302 atk 0.287 tok_atk 0.202 tok_ab 0.141 (n 653)
+    turn9-99                     mse 0.4176 sign 0.854 n    899 | aux 0.5555 life 0.286 atk 0.340 tok_atk 0.292 tok_ab 0.162 (n 302)
+    after_removal                mse 0.5634 sign 0.805 n    174 | aux 0.4657 life 0.217 atk 0.229 tok_atk 0.181 tok_ab 0.135 (n 140)
+    not_removal                  mse 0.6140 sign 0.778 n   2562 | aux 0.3938 life 0.194 atk 0.188 tok_atk 0.166 tok_ab 0.108 (n 1943)
+  13s
+  → /root/band_r21_rean.json
+N_REL_BAND {"rows": 2736, "src": ["/root/rean/n50_rean/w*"], "out": "/root/band_r21_rean.json", "buckets": 6, "nets": {"nrel_r13d.npz": {"v_mse": 0.6990799552277506, "v_sign": 0.716374269005848, "n": 2736, "aux": {"opp_turn_my_life_lost": 0.1947173923254013, "opp_turn_attacks": 0.20094698667526245, "opp_turn_effects": 1.2896332740783691, "my_turn_opp_life_lost": 0.22816435992717743, "my_turn_attacks": 0.29681962728500366, "my_turn_effects": 1.4605486392974854, "next_my_board_power": 0.05971255525946617, "next_opp_board_power": 0.08456963300704956, "next_my_board_n": 0.22946295142173767, "next_opp_board_n": 0.24653436243534088, "tok_attacked": 0.17251518368721008, "tok_life_pushed": 0.031680334359407425, "tok_ability": 0.12128105759620667, "n": 2083}}, "nrel_r20.npz": {"v_mse": 0.6104562398329456, "v_sign": 0.7759502923976608, "n": 2736, "aux": {"opp_turn_my_life_lost": 0.19419994950294495, "opp_turn_attacks": 0.2010318785905838, "opp_turn_effects": 1.2555546760559082, "my_turn_opp_life_lost": 0.22521308064460754, "my_turn_attacks": 0.28480127453804016, "my_turn_effects": 1.3677070140838623, "next_my_board_power": 0.058143649250268936, "next_opp_board_power": 0.07337255030870438, "next_my_board_n": 0.2250661849975586, "next_opp_board_n": 0.24350984394550323, "tok_attacked": 0.1706535518169403, "tok_life_pushed": 0.03149048238992691, "tok_ability": 0.11300130188465118, "n": 2083}}, "nrel_r21.npz": {"v_mse": 0.6107951839534754, "v_sign": 0.7796052631578947, "n": 2736, "aux": {"opp_turn_my_life_lost": 0.19536592066287994, "opp_turn_attacks": 0.19072571396827698, "opp_turn_effects": 1.189362645149231, "my_turn_opp_life_lost": 0.22524826228618622, "my_turn_attacks": 0.28248149156570435, "my_turn_effects": 1.327881097793579, "next_my_board_power": 0.05640271306037903, "next_opp_board_power": 0.0702773705124855, "next_my_board_n": 0.21223963797092438, "next_opp_board_n": 0.23636451363563538, "tok_attacked": 0.16677558422088623, "tok_life_pushed": 0.03149934858083725, "tok_ability": 0.11002993583679199, "n": 2083}}}, "policy": {"nrel_r13d.npz": {"points": 2736, "top1_visits": 0.5877192982456141, "ce_visits": 1.5766307652345177, "top1_q_improved": 0.48355263157894735, "ce_q_improved": 1.5745700702332615, "gate": {"rows": 651, "p_mass_removal": 0.2597193891320595, "argmax_removal": 0.271889400921659, "data_chose_removal": 0.24270353302611367}}, "nrel_r20.npz": {"points": 2736, "top1_visits": 0.5840643274853801, "ce_visits": 1.5450698339451125, "top1_q_improved": 0.5116959064327485, "ce_q_improved": 1.5093403643334817, "gate": {"rows": 651, "p_mass_removal": 0.24281126851963092, "argmax_removal": 0.22119815668202766, "data_chose_removal": 0.24270353302611367}}, "nrel_r21.npz": {"points": 2736, "top1_visits": 0.5599415204678363, "ce_visits": 1.5756340807641458, "top1_q_improved": 0.49378654970760233, "ce_q_improved": 1.5405257152535066, "gate": {"rows": 651, "p_mass_removal": 0.2511056838572324, "argmax_removal": 0.23348694316436253, "data_chose_removal": 0.24270353302611367}}}}
+BAND_EXIT 0 SEC 13
+ALL_DONE
