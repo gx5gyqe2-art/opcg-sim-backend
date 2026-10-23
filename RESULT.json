@@ -3,7 +3,7 @@
  "role": "reanalyze",
  "status": "done",
  "inputs": {
-  "record": "claude/n50-w03:n_records/n50_w03",
+  "record": "claude/n50-w03:n_records/n50_w03_p0..p3 (merged)",
   "engine_commit": "24ce7244f",
   "net": "/root/wt50/opcg_sim/data/learned/nrel_r13d.npz",
   "mult": 4,
@@ -16,7 +16,7 @@
   ]
  },
  "outputs": {
-  "dir": "../../../root/opcg-sim-backend/n50_rean/w03"
+  "dir": "n50_rean/w03"
  },
  "metrics": {
   "games": 200,
@@ -42,5 +42,5 @@
   "sec_deep_per_game": 8.8
  },
  "commit": "24ce7244f",
- "notes": ""
+ "notes": "記録ブランチ claude/n50-w03 には n_records/n50_w03 が無く、n50_w03_p0〜p3（各約 120 局・計 479 局・seed は連番で重複なし）に分かれていた（ブロック 1 の git archive が失敗）。コードは変えず、手元で 4 つを 1 つの dir にまとめた：npz は n_record_p{k}_*.npz として symlink、meta_games.json は games を連結、meta_n_record.json は p0 のもの（差は件数と seed_base だけで、reanalyze は seed_base を使わない）。--games 200 は seed の昇順で先頭 200 局＝2532000〜2532200（p0 全部と p1 の先頭）。分岐 0・replay_rate 1.0。outputs.dir は ~/opcg-sim-backend が作業ツリーへの symlink だったため相対パスが崩れたので手で直した。"
 }
