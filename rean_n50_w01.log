@@ -1,0 +1,3 @@
+REANALYZE_START {"games": 200, "done": 0, "todo": 200}
+REANALYZE seed=2531000 picks=12 pts=12 lost=0 bad_step=None replay=13.7s deep=9.3s (done 1/200 total 23s)
+REANALYZE seed=2531001 picks=12 pts=12 lost=0 bad_step=None replay=13.0s deep=8.9s (done 2/200 total 45s)
