@@ -1,7 +1,7 @@
 {
  "job": "arena-chid-w10",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r13d.npz (hidden-card continuations re-read)",
   "baseline": "nrel_r13d.npz + commit_hidden_legacy",
