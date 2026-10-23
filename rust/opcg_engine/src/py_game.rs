@@ -621,6 +621,28 @@ impl Game {
         encode_json(&world, masters, &vocab, seat, &crate::encode::EncodeOptions::default())
     }
 
+    /// **世界を引いた複製**（`move_judge.py`・`docs/search_efficiency_plan.md` §7.32・計測専用）: `encode_world` と
+    /// 同じ作り（`reveal` の混ぜ直し・乱数は `Pcg32SearchRng::new(seed)`）で盤面を引き、その盤面を**別の対局**として
+    /// 返す。`fork` と違い、返す対局の対局の乱数（シャッフル・コイントス）は `seed` の PCG32＝この先を最後まで
+    /// 打てる（`Replay` だと効果の SHUFFLE が混ぜない）。元の対局は 1 ビットも変わらない。
+    #[pyo3(signature = (player_id, reveal, seed))]
+    fn fork_world(&self, player_id: &str, reveal: &str, seed: u64) -> PyResult<Game> {
+        use crate::search::determinize as det;
+        let seat = self.seat_of(player_id)?;
+        let state = self.session.state();
+        let mut rng = crate::search::Pcg32SearchRng::new(seed);
+        let world = match reveal {
+            "truth" => state.clone(),
+            "fair" => det::determinize_fair_with(state, seat, &mut rng).map_err(err)?,
+            "peek" => det::determinize_with(state, seat, &mut rng).map_err(err)?,
+            "opp_hand" => det::determinize_opp_deck_with(state, seat, &mut rng).map_err(err)?,
+            _ => return Err(PyValueError::new_err(format!("fork_world: 未知の reveal '{reveal}'"))),
+        };
+        let mut session = Session::new(world);
+        session.rng = Rng::Pcg32(Pcg32::new(seed ^ 0x5851_F42D_4C95_7F2D));
+        Ok(Game { session, names: self.names.clone() })
+    }
+
     /// **読み取り専用の複製**（手の値段の後続局面・`clock_succ.py`・`docs/reports/2026-10-10_clock_value.md` §1.2）。
     ///
     /// 真の盤面（完全情報）を写した別の対局を返す。乱数は `Replay`（混ぜない）・巻き戻しの記録は空。

@@ -1,38 +1,34 @@
 {
- "job": "lethal-life-deal",
- "role": "engine change trial + measurement",
- "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.28 (origin/claude/cpu-spec-improvements-yw91jd @ 4f846bb; ledger 2+351)",
- "branch": "claude/lethal-life-deal",
- "report": "docs/reports/2026-10-23_lethal_life_deal.md",
- "decision": "not adopted: lethal.rs stays as on main (moves unchanged); production arena not needed",
+ "job": "move-judge",
+ "role": "measure",
+ "status": "partial",
  "inputs": {
-  "record": "n1_results/lethal_speed/record_3012000_300.jsonl.gz (300 games, seed 3012000-3012299, both r13d, 1 world x 1280, root_reply)",
-  "points": 13473,
-  "baseline": "judge on current main wheel (13,497 -> 13,473: seed 3012144 desyncs at step 98 after rs-trigger-order-2)",
-  "variants": {"both": "both defensive deals fill life slots with defending triggers (8 deals)",
-               "mode0": "only the defence-value deal fills life slots (8 deals)",
-               "add": "8 deals unchanged + 1 life-slot deal first (9 deals)"},
-  "latency": "rs_decide_latency.py --worlds 2 --lethal-proof {off,root}, 20 games, seed 2999900-, 1 core each, same wheel"
+  "base": "claude/cpu-spec-improvements-yw91jd@8db31b65f",
+  "spec": "docs/search_efficiency_plan.md §7.32",
+  "sample_from": "logs/value_to_move/{real,synth}（§7.22 の記録）",
+  "nets": {
+   "r13d": "opcg_sim/data/learned/nrel_r13d.npz",
+   "r20": "claude/train-r20:n1_results/nrel_r20.npz"
+  },
+  "referee": "SeatSpec(net, sims=160)（世界 1 本・公平・詰みの証明 off）",
+  "k": 32,
+  "points": {
+   "real": {
+    "changed": 400,
+    "calib": 200
+   },
+   "synth": {
+    "changed": 400,
+    "calib": 200
+   }
+  }
  },
  "outputs": {
-  "judges": "n1_results/lethal_life_deal/judge_{base,off,both,mode0,add,true}.jsonl.gz",
-  "variants": "n1_results/lethal_life_deal/variants.json",
-  "latency": "n1_results/lethal_life_deal/lat_{off_off,off_root,mode0_root}.json",
-  "variant_code_commit": "c1fdf65 (OPCG_LETHAL_LIFE switch; reverted in the next commit)"
+  "tool": "tests/scripts/move_judge.py",
+  "logs": "logs/move_judge/{real,synth}/{sample,rows}.jsonl.gz・summary.json",
+  "report": "docs/reports/2026-10-23_move_judge.md（完走後）"
  },
- "metrics": {
-  "defending_triggers_in_db": {"trigger_cards": 506, "defending": 419},
-  "base": {"win": 1175, "win_not_won_that_turn": 55, "of_which_true_deal_win": 45, "of_which_true_deal_no": 10, "true_deal_no_situations": 4, "true_deal_no_with_life_trigger": 2},
-  "both":  {"win": 1139, "lost": 48, "lost_true_no": 1, "lost_true_win": 45, "lost_won_that_turn": 40, "lost_to_unknown": 38, "lost_to_no": 10, "gained": 12, "nodes_ratio": 0.961},
-  "mode0": {"win": 1140, "lost": 37, "lost_true_no": 1, "lost_true_win": 36, "lost_won_that_turn": 29, "lost_to_unknown": 29, "lost_to_no": 8, "gained": 2, "nodes_ratio": 0.962},
-  "add":   {"win": 1118, "lost": 58, "lost_true_no": 2, "lost_true_win": 56, "lost_won_that_turn": 48, "lost_to_unknown": 47, "lost_to_no": 11, "gained": 1, "nodes_ratio": 0.968},
-  "latency_mean_sec": {"off": 0.177, "root_main": 0.198, "root_mode0": 0.199},
-  "latency_increment": {"root_main": "+11.9%", "root_mode0": "+12.4%"},
-  "root_status_20games": {"root_main": {"win": 90, "no": 706, "unknown": 420}, "root_mode0": {"win": 88, "no": 612, "unknown": 517}},
-  "make_test": "green (cargo 604 passed; pytest 855 passed, 13 skipped)",
-  "audit_cross": {"games": 240, "void": 0}
- },
- "command": "python tests/scripts/lethal_speed_check.py judge --record n1_results/lethal_speed/record_3012000_300.jsonl.gz --out n1_results/lethal_life_deal --tag <v> (OPCG_LETHAL_LIFE=<v> on c1fdf65) ; judge --tag true --true-deal",
- "notes": "Not adopted. Of the 55 proofs not won that turn, 45 are wins on the true deal too (the deal is not the cause; the CPU's decision used a different deal seed / fell back to search). Only 10 are false proofs (true deal no), from 4 situations; only 2 involve a life trigger (3012157 removed by all variants, 3012218 only by add, to unknown). Each variant removes 1-2 false proofs and loses 36-56 proofs that win on the true deal (mostly win->unknown at 20,000 nodes: defending triggers add opponent branches). Invariant 'proof set must not grow' is violated by both (12) and mode0 (2) because the defensive deal itself changes; add (+1) is sound w.r.t. the old 8 deals (a superset of deals; the gain is node budget freed by failing early on the first deal). Forecast (20-60 fewer proofs, >half not won) matched the count but not the content (2-3% were real false proofs). The remaining 8 false proofs (life 0, defended by hand counters in 3012080 x7 and 3012137 x1) are not explained by the hand slots (the defence-value deal should hold at least those counters); unverified hypothesis: the line depends on my own deck order through my own [On Attack] choices, which the fair deals reshuffle. Next step candidate: a read-only judge that uses the true deal except for my own deck reshuffled. Kept: measurement option true_deal in Game.lethal_json and judge --true-deal. Production arena not needed (moves unchanged; golden/make test confirm)."
+ "metrics": {},
+ "command": "python tests/scripts/move_judge.py sample/judge/summary（docstring）",
+ "notes": "途中経過の push（実デッキ帯を実行中）。完走後に metrics・report を書く。"
 }
