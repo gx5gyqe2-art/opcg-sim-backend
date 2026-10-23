@@ -16,5 +16,5 @@
  "metrics": {
   "arena_ldc/ldc_w06.jsonl": 150
  },
- "notes": "repo at /home/user/opcg-sim-backend (not ~/opcg-sim-backend)"
+ "notes": "repo at /home/user/opcg-sim-backend (not ~/opcg-sim-backend). lethal-deal-legacy flag present at 6e22f1a. 150/150 pairs, 300 games, 0 void. Every pair scored 1.0 (games (1,0)x77, (0,1)x73) -> candidate score 0.500 exactly; seat/deal decided each pair, no game where the two deal rules produced a different winner."
 }
