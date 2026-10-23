@@ -3,7 +3,7 @@
  "role": "reanalyze",
  "status": "done",
  "inputs": {
-  "record": "claude/n49-w06:n_records/n49_w06",
+  "record": "claude/n49-w06:n_records/n49_w06_p0+n49_w06_p1",
   "engine_commit": "6f2ce8ff6",
   "net": "/root/wt49/opcg_sim/data/learned/nrel_r13d.npz",
   "mult": 4,
@@ -42,5 +42,5 @@
   "sec_deep_per_game": 9.52
  },
  "commit": "6f2ce8ff6",
- "notes": ""
+ "notes": "Records on claude/n49-w06 are split into n_records/n49_w06_p0..p3 (no n_records/n49_w06). Merged p0 (seeds 2523500-2523619) + p1 (2523620-2523739) into one dir (npz renamed n_record_p0_*/p1_*, meta_games concatenated, meta_n_record from p0); first 200 seeds by sort = p0 all + p1 first 80. inputs.record therefore refers to p0+p1."
 }
