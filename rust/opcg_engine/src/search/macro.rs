@@ -18,7 +18,7 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 
 use super::prune::{action_type, first_target_id, master_don_cond, own_units, payload_uuid};
-use super::quiesce::BOX_BRANCH_BUDGET;
+use super::quiesce::{dialog_cards, TraceStep, BOX_BRANCH_BUDGET};
 use super::{adapter, apply, Move, Payload};
 
 /// CPython の「小さな非負 int だけの set」の**反復順**。
@@ -593,13 +593,14 @@ fn resolve_setup_dialogs(
     masters: &MasterTable,
     seat: Seat,
     selects: &SelectPath,
-    mut trace: Option<&mut Vec<(Seat, Move)>>,
+    mut trace: Option<&mut Vec<TraceStep>>,
 ) -> Result<(), EngineError> {
     let mut left = selects.iter();
     for _ in 0..apply::DRAIN_LIMIT {
         let Some(action) = own_dialog_action(s, seat) else {
             return Ok(());
         };
+        let cards = if trace.is_some() { dialog_cards(s.state()) } else { Vec::new() };
         let mut chosen: Option<Move> = None;
         if action == adapter::SELECT_ACTION {
             if let Some(alts) = adapter::selection_moves(s, masters, seat) {
@@ -623,7 +624,7 @@ fn resolve_setup_dialogs(
                     &payload,
                 )?;
                 if let Some(tr) = trace.as_deref_mut() {
-                    tr.push((seat, mv));
+                    tr.push((seat, mv, cards));
                 }
             }
             None => {
@@ -645,6 +646,7 @@ fn resolve_setup_dialogs(
                     tr.push((
                         seat,
                         Move::game(adapter::ACT_RESOLVE_SELECTION, Payload::Json(payload)),
+                        cards,
                     ));
                 }
             }
@@ -663,7 +665,7 @@ pub fn apply_setup_box(
     masters: &MasterTable,
     actor: Seat,
     mv: &Move,
-    trace: Option<&mut Vec<(Seat, Move)>>,
+    trace: Option<&mut Vec<TraceStep>>,
 ) -> Result<(), EngineError> {
     let p = payload_or_null(mv);
     let base = p
@@ -685,8 +687,8 @@ pub fn setup_box_continuation(
     masters: &MasterTable,
     actor: Seat,
     mv: &Move,
-) -> Result<Vec<(Seat, Move)>, EngineError> {
-    let mut trace: Vec<(Seat, Move)> = Vec::new();
+) -> Result<Vec<TraceStep>, EngineError> {
+    let mut trace: Vec<TraceStep> = Vec::new();
     apply_setup_box(s, masters, actor, mv, Some(&mut trace))?;
     Ok(trace)
 }

@@ -420,6 +420,8 @@ def play_one(args) -> List[Dict[str, Any]]:
         kw["lethal_proof"] = a.lethal_proof
     if getattr(a, "commit_sig_legacy", False):
         kw["commit_sig_legacy"] = True       # WP `rs-commit-sig` の前後比較（旧い署名＝修正前の打ち方）
+    if getattr(a, "commit_hidden_legacy", False):
+        kw["commit_hidden_legacy"] = True    # §7.39 の前後比較（見えていなかった札を選ぶ続きも積む＝修正前の打ち方）
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     la, lb = D.leader_pair(db, seed, "random")
     p1, p2 = D.build_pair(db, la, lb, seed, "synth_roles")
@@ -542,6 +544,8 @@ def replay_to(seed: int, a, seat: str, step: int):
         kw["lethal_proof"] = a.lethal_proof
     if getattr(a, "commit_sig_legacy", False):
         kw["commit_sig_legacy"] = True       # WP `rs-commit-sig` の前後比較（旧い署名＝修正前の打ち方）
+    if getattr(a, "commit_hidden_legacy", False):
+        kw["commit_hidden_legacy"] = True    # §7.39 の前後比較（見えていなかった札を選ぶ続きも積む＝修正前の打ち方）
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     la, lb = D.leader_pair(db, seed, "random")
     p1, p2 = D.build_pair(db, la, lb, seed, "synth_roles")
@@ -929,6 +933,8 @@ def main(argv=None):
                            help="両席の CPU の詰みの証明（§7.21）。既定は off＝§7.13 と同じ設定")
             p.add_argument("--commit-sig-legacy", action="store_true",
                            help="両席を旧い手の署名で打たせる（WP `rs-commit-sig` の前後比較・測定専用）")
+            p.add_argument("--commit-hidden-legacy", action="store_true",
+                           help="両席を、見えていなかった札を選ぶ commit の続きも積む旧い形で打たせる（§7.39 の前後比較・測定専用）")
         if name == "run":
             p.add_argument("--seeds", default=None, help="seed の一覧のファイル（空白区切り）。指定すると --seed-base/--games の代わりにこれだけ回す")
         if name == "verify":

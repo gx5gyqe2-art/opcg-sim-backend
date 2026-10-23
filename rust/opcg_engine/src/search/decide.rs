@@ -28,7 +28,7 @@ use super::mcts::{
 };
 use super::quiesce::{
     best_branch, in_battle, in_dialog, resolve_battle_inplace, resolved_branch_values, BoxBudget,
-    Ctx, SearchState, Window, BOX_RESOLVE_DEPTH, QUIESCE_MAX_PLIES,
+    Ctx, SearchState, TraceStep, Window, BOX_RESOLVE_DEPTH, QUIESCE_MAX_PLIES,
 };
 use super::rng::SearchRng;
 use super::{apply, Move, SearchOptions};
@@ -111,6 +111,13 @@ pub struct DecideOptions {
     /// 既定（false）はカウンターイベントを相手のアクティブのドン!!で払える枚数までだけ守りに数える。
     /// true は払えるかを見ずに積む旧い形（[`super::lethal::make_deals`]）。`lethal_proof=off` なら効かない。
     pub lethal_deal_legacy: bool,
+    /// 見えていなかった札を選ぶ続きを捨てない旧い形（`commit_hidden_legacy`・§7.39・WP `rs-commit-hidden`・
+    /// **測定専用**・既定 false＝修正後）。既定（false）は、箱の commit の続き（窓の根畳み・登場時の対話・
+    /// 準備箱）を積むとき、**自分の判断点の対話の候補に、commit した時点で自分に見えていなかった札**
+    /// （両者の山札・裏向きのライフ・相手の手札のうち `known_by` に自分の bit が無い札）が 1 枚でも在れば、
+    /// その段から先を積まない（そこで続きが尽きて読み直す・[`trace_to_steps`]）。true は全部積む旧い形
+    /// （引き直した世界の中身で選んだ札を本当の盤面で照合して打つ）。本番アリーナの基準席用。
+    pub commit_hidden_legacy: bool,
 }
 
 /// `opp_blind`（§7.14）の混ぜ直しの乱数の seed（世界 `i` の探索乱数 `search_seed + i` と同じ値から、
@@ -212,6 +219,7 @@ impl Default for DecideOptions {
             lethal_reply_total: super::lethal::LETHAL_REPLY_TOTAL,
             commit_sig_legacy: false,
             lethal_deal_legacy: false,
+            commit_hidden_legacy: false,
         }
     }
 }
@@ -795,11 +803,20 @@ pub fn don_box_first_primitive(mv: &Move) -> Move {
 // --- 箱コミット -------------------------------------------------------------------
 
 /// Python `_trace_to_steps`（解決トレース → 自分側の手順）。`legacy`＝旧い署名（[`move_sig_with`]・測定専用）。
-fn trace_to_steps(trace: &[(Seat, Move)], name: Seat, legacy: bool) -> Vec<Step> {
+///
+/// `hidden`（WP `rs-commit-hidden`・[`hidden_at_commit`]）が在れば、自分の段の判断点の対話の候補に
+/// commit した時点で見えていなかった札が 1 枚でも在る段で**止める**（その段と先を積まない）。
+/// 続きはそこで尽き、次の判断点は読み直す（窓の根畳み・木）。`None` は全部積む旧い形。
+fn trace_to_steps(trace: &[TraceStep], name: Seat, legacy: bool, hidden: Option<&[bool]>) -> Vec<Step> {
     let mut steps = Vec::new();
-    for (actor, mv) in trace {
+    for (actor, mv, cards) in trace {
         if *actor != name {
             continue;
+        }
+        if let Some(h) = hidden {
+            if cards.iter().any(|c| h.get(*c as usize).copied().unwrap_or(false)) {
+                break;
+            }
         }
         if mv.action_type() == Some("DON_BOX") {
             let total = box_total(mv);
@@ -814,6 +831,32 @@ fn trace_to_steps(trace: &[(Seat, Move)], name: Seat, legacy: bool) -> Vec<Step>
         }
     }
     steps
+}
+
+/// commit した時点で `me` に**見えていない札**の印（札の index ごと・WP `rs-commit-hidden`）。
+///
+/// 両者の山札・裏向きのライフ・相手の手札にあって、`known_by` に `me` の bit が無い札。公平な引き直し
+/// （[`determinize_fair_with`](super::determinize::determinize_fair_with)）が混ぜる枠と同じ集合なので、
+/// 本当の盤面でも引き直した世界でも同じ印になる（混ぜるのは札の位置だけで、札の index と印は動かない）。
+/// 場・トラッシュ・表向きのライフ・自分の手札・一時領域（解決中に見ている札）は見えている。
+pub(crate) fn hidden_at_commit(state: &GameState, me: Seat) -> Vec<bool> {
+    let mut out = vec![false; state.cards.len()];
+    let unknown = |c: CardIdx| state.card(c).known_by & me.know_bit() == 0;
+    for seat in [me, me.other()] {
+        let p = state.player(seat);
+        let hand: &[CardIdx] = if seat == me { &[] } else { &p.hand };
+        for &c in hand.iter().chain(p.deck.iter()) {
+            if unknown(c) {
+                out[c as usize] = true;
+            }
+        }
+        for &c in &p.life {
+            if !state.card(c).is_face_up && unknown(c) {
+                out[c as usize] = true;
+            }
+        }
+    }
+    out
 }
 
 /// DON_BOX の総原始手数（付与 k 枚＋攻撃形なら 1）。
@@ -983,6 +1026,9 @@ fn window_choice(
 }
 
 /// Python `_commit_window_continuation`（選んだ枝の自分側継続をコミットする）。
+///
+/// `hidden_legacy`＝見えていなかった札を選ぶ段も積む旧い形（[`DecideOptions::commit_hidden_legacy`]）。
+#[allow(clippy::too_many_arguments)]
 fn commit_window_continuation(
     ctx: &Ctx,
     real: &GameState,
@@ -991,17 +1037,19 @@ fn commit_window_continuation(
     mv: &Move,
     st: &mut SearchState,
     legacy: bool,
+    hidden_legacy: bool,
 ) -> Vec<Step> {
     let window = if real.active_battle.is_some() {
         Window::Battle
     } else {
         Window::Dialog
     };
+    let hidden = (!hidden_legacy).then(|| hidden_at_commit(world, name));
     let mut s = Session::new(world.clone());
     if apply::apply_move_inplace(&mut s, ctx.masters, name, mv, true).is_err() {
         return Vec::new(); // Python: `nxt is None` → コミット無し
     }
-    let mut trace: Vec<(Seat, Move)> = Vec::new();
+    let mut trace: Vec<TraceStep> = Vec::new();
     let ok = resolve_battle_inplace(
         ctx,
         &mut s,
@@ -1015,7 +1063,7 @@ fn commit_window_continuation(
     if ok.is_err() {
         return Vec::new(); // Python の `except Exception: pass`（コミット生成の失敗は手を止めない）
     }
-    trace_to_steps(&trace, name, legacy)
+    trace_to_steps(&trace, name, legacy, hidden.as_deref())
 }
 
 /// Python `_commit_play_dialog`（PLAY / ACTIVATE_MAIN の後続対話をコミットする）。
@@ -1032,9 +1080,10 @@ fn commit_play_dialog(
     rng: &mut dyn SearchRng,
     st: &mut SearchState,
     legacy: bool,
+    hidden_legacy: bool,
 ) -> Result<Vec<Step>, EngineError> {
     let world = sample_world(real, name, view, rng)?;
-    Ok(commit_play_dialog_in_world(ctx, &world, name, mv, st, legacy))
+    Ok(commit_play_dialog_in_world(ctx, &world, name, mv, st, legacy, hidden_legacy))
 }
 
 /// [`commit_play_dialog`] の「世界を外から渡す」版（§20.7.1 の `worlds>1` が使う）。
@@ -1045,7 +1094,9 @@ fn commit_play_dialog_in_world(
     mv: &Move,
     st: &mut SearchState,
     legacy: bool,
+    hidden_legacy: bool,
 ) -> Vec<Step> {
+    let hidden = (!hidden_legacy).then(|| hidden_at_commit(world, name));
     let mut s = Session::new(world.clone());
     if apply::apply_move_inplace(&mut s, ctx.masters, name, mv, true).is_err() {
         return Vec::new();
@@ -1053,7 +1104,7 @@ fn commit_play_dialog_in_world(
     if !in_dialog(&mut s) || in_battle(&s) {
         return Vec::new(); // 対話が無ければコミット無し
     }
-    let mut trace: Vec<(Seat, Move)> = Vec::new();
+    let mut trace: Vec<TraceStep> = Vec::new();
     let ok = resolve_battle_inplace(
         ctx,
         &mut s,
@@ -1067,12 +1118,13 @@ fn commit_play_dialog_in_world(
     if ok.is_err() {
         return Vec::new();
     }
-    trace_to_steps(&trace, name, legacy)
+    trace_to_steps(&trace, name, legacy, hidden.as_deref())
 }
 
 /// 準備箱（`SETUP_BOX`・§20.7.2）の「素の手より後」の手順をコミットへ積む。
 ///
 /// `commit_play_dialog` と同じ流儀（世界サンプルの上で継続を打ち直し、自分の手だけ手順化）。
+#[allow(clippy::too_many_arguments)]
 fn commit_setup_box(
     ctx: &Ctx,
     real: &GameState,
@@ -1081,11 +1133,13 @@ fn commit_setup_box(
     view: WorldView,
     rng: &mut dyn SearchRng,
     legacy: bool,
+    hidden_legacy: bool,
 ) -> Result<Vec<Step>, EngineError> {
     let world = sample_world(real, name, view, rng)?;
+    let hidden = (!hidden_legacy).then(|| hidden_at_commit(&world, name));
     let mut s = Session::new(world);
     match super::r#macro::setup_box_continuation(&mut s, ctx.masters, name, mv) {
-        Ok(trace) => Ok(trace_to_steps(&trace, name, legacy)),
+        Ok(trace) => Ok(trace_to_steps(&trace, name, legacy, hidden.as_deref())),
         Err(e @ EngineError::Unimplemented(_)) => Err(e),
         Err(_) => Ok(Vec::new()), // コミット生成の失敗は手を止めない（Python の `except: pass`）
     }
@@ -1643,7 +1697,16 @@ fn decide_after_lethal(
             if opts.box_commit {
                 if let Some(world) = &pick.world {
                     let steps =
-                        commit_window_continuation(ctx, state, world, name, &pick.mv, st, opts.commit_sig_legacy);
+                        commit_window_continuation(
+                            ctx,
+                            state,
+                            world,
+                            name,
+                            &pick.mv,
+                            st,
+                            opts.commit_sig_legacy,
+                            opts.commit_hidden_legacy,
+                        );
                     if !steps.is_empty() {
                         carry.commit = steps;
                     }
@@ -1806,9 +1869,27 @@ fn decide_after_lethal(
                 Some("PLAY") | Some("ACTIVATE_MAIN") => {
                     // 複数世界は木を回した世界（PV と同じ）で継続を作る＝乱数を引き直さない。
                     let steps = if worlds > 1 {
-                        commit_play_dialog_in_world(ctx, &runs[pv_world].world, name, &m, st, opts.commit_sig_legacy)
+                        commit_play_dialog_in_world(
+                            ctx,
+                            &runs[pv_world].world,
+                            name,
+                            &m,
+                            st,
+                            opts.commit_sig_legacy,
+                            opts.commit_hidden_legacy,
+                        )
                     } else {
-                        commit_play_dialog(ctx, state, name, &m, opts.world_view(), rng, st, opts.commit_sig_legacy)?
+                        commit_play_dialog(
+                            ctx,
+                            state,
+                            name,
+                            &m,
+                            opts.world_view(),
+                            rng,
+                            st,
+                            opts.commit_sig_legacy,
+                            opts.commit_hidden_legacy,
+                        )?
                     };
                     if !steps.is_empty() {
                         carry.commit = steps;
@@ -1816,7 +1897,16 @@ fn decide_after_lethal(
                 }
                 // 準備箱（§20.7.2）: 素の手より後（対話 → 攻撃箱）を機械実行へ積む。
                 Some("SETUP_BOX") => {
-                    let steps = commit_setup_box(ctx, state, name, &m, opts.world_view(), rng, opts.commit_sig_legacy)?;
+                    let steps = commit_setup_box(
+                        ctx,
+                        state,
+                        name,
+                        &m,
+                        opts.world_view(),
+                        rng,
+                        opts.commit_sig_legacy,
+                        opts.commit_hidden_legacy,
+                    )?;
                     if !steps.is_empty() {
                         carry.commit = steps;
                     }
@@ -1854,6 +1944,10 @@ fn decide_after_lethal(
 #[cfg(test)]
 #[path = "tests_fair.rs"]
 mod tests_fair;
+
+#[cfg(test)]
+#[path = "tests_commit_hidden.rs"]
+mod tests_commit_hidden;
 
 #[cfg(test)]
 pub(super) mod tests {
@@ -1965,11 +2059,11 @@ pub(super) mod tests {
         let mine = json!({"action_type":"DON_BOX","payload":{"uuid":"u","don_k":2,"target_ids":["t"]}});
         let plain = json!({"action_type":"PASS","payload":{}});
         let trace = vec![
-            (Seat::P1, Move::from_json(mine.clone())),
-            (Seat::P2, Move::from_json(plain.clone())),
-            (Seat::P1, Move::from_json(plain.clone())),
+            (Seat::P1, Move::from_json(mine.clone()), Vec::new()),
+            (Seat::P2, Move::from_json(plain.clone()), Vec::new()),
+            (Seat::P1, Move::from_json(plain.clone()), Vec::new()),
         ];
-        let steps = trace_to_steps(&trace, Seat::P1, false);
+        let steps = trace_to_steps(&trace, Seat::P1, false, None);
         assert_eq!(steps.len(), 2);
         match &steps[0] {
             Step::Box { left, .. } => assert_eq!(*left, 3), // 付与 2 ＋ 攻撃 1

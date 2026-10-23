@@ -144,6 +144,7 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
     `arena_shard --opp-blind` も同じ口から `{"opp_blind": True}` を渡す（§7.14）。
     `arena_shard --lethal-proof {root,root_reply}` も同じ口から `{"lethal_proof": ...}` を渡す（§7.21）。
     `arena_shard --commit-sig-legacy` も同じ口から `{"commit_sig_legacy": True}` を渡す（WP `rs-commit-sig`）。
+    `arena_shard --commit-hidden-legacy` も同じ口から `{"commit_hidden_legacy": True}` を渡す（§7.39・WP `rs-commit-hidden`）。
     """
     E.engine()
     _G["leaders_mode"] = leaders_mode
@@ -226,6 +227,8 @@ CAND_FLAGS = {
     "commit_sig_legacy": dict(commit_sig_legacy=True),
     # 詰みの証明の守りの強い配り方を旧い形に（§7.33・測定用＝カウンターイベントを払えるかを見ずに積む）。
     "lethal_deal_legacy": dict(lethal_deal_legacy=True),
+    # 見えていなかった札を選ぶ commit の続きも積む旧い形（§7.39・測定専用＝引き直した世界で選んだ札を本当の盤面で打つ）。
+    "commit_hidden_legacy": dict(commit_hidden_legacy=True),
 }
 
 
@@ -291,6 +294,10 @@ def add_cand_args(ap) -> None:
                     help="候補席だけ詰みの証明の守りの強い配り方を旧い形にする（`docs/search_efficiency_plan.md` §7.33・"
                          "測定用）。カウンターイベントを相手が払えるかを見ずに手札へ積む（2026-10-23 までの形）。"
                          "省略＝既定（相手のアクティブのドン!!で払える枚数までだけ数える）。--cand-lethal-proof と組で使う")
+    ap.add_argument("--cand-commit-hidden-legacy", action="store_true",
+                    help="候補席だけ、箱の commit の続きに「commit した時点で見えていなかった札（山札・裏向きのライフ・"
+                         "相手の手札）から選ぶ段」も積む旧い形で打つ（`docs/search_efficiency_plan.md` §7.39・測定専用）。"
+                         "省略＝既定（その段から先を積まず、そこで読み直す）")
     # --- 迷う局面だけ世界 K 本で読み直す（§7.4・WP `play-rethink`）------------------------
     ap.add_argument("--cand-rethink-ratio", type=float, default=None,
                     help="候補席だけ、根の 2 位の訪問数 ÷ 1 位 ≥ τ の決定を同じ seed で世界 K 本"
