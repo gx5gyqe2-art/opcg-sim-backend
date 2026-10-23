@@ -1,0 +1,6 @@
+todo 300 (done 0) -> n1_results/window_read/commit_audit/points_3311000_300.jsonl
+[1/300] seed=3311002 pts=11 sec=184.8 winner=p2 turns=10
+[2/300] seed=3311003 pts=8 sec=219.4 winner=p1 turns=13
+[3/300] seed=3311004 pts=9 sec=147.4 winner=p1 turns=11
+[4/300] seed=3311000 pts=21 sec=339.8 winner=p2 turns=12
+[5/300] seed=3311005 pts=9 sec=165.4 winner=p2 turns=14

@@ -652,6 +652,12 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
         window_worlds_legacy: flag("window_worlds_legacy", d.window_worlds_legacy),
         window_tree_legacy: flag("window_tree_legacy", d.window_tree_legacy),
         window_tree_life: v.get("window_tree_life").and_then(Value::as_i64).unwrap_or(d.window_tree_life),
+        window_tree_worlds: v
+            .get("window_tree_worlds")
+            .and_then(Value::as_u64)
+            .map(|n| n as usize)
+            .filter(|n| *n > 0)
+            .unwrap_or(d.window_tree_worlds),
     }
 }
 

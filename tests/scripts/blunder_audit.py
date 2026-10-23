@@ -237,7 +237,10 @@ def _init_judge(k):
     E.engine()
     _G["net"] = E.load_net(NET)
     _G["ship"] = ship_spec(NET)
-    _G["refs"] = {n: E.SeatSpec(p, sims=MJ.REFEREE_SIMS) for n, p in REFS.items()}
+    # 審判のネットが無い環境（`vm_nets/` は生成の作業セッションにだけ在る）では、その審判を使う段だけが落ちる
+    # （`winstab` は審判を使わない・WP `rs-window-read`）。
+    _G["refs"] = {n: E.SeatSpec(p, sims=MJ.REFEREE_SIMS) for n, p in REFS.items()
+                  if os.path.exists(os.path.join(_ROOT, p))}
     _G["db"] = D.load_db()
     _G["k"] = int(k)
 

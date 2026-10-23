@@ -33,12 +33,12 @@ fn window_flags_are_read_from_opts() {
     let d = DecideOptions::default();
     assert!(!d.window_carry_legacy && !d.window_worlds_legacy && !d.window_tree_legacy);
     assert_eq!(d.window_worlds, WINDOW_WORLDS);
-    assert_eq!(d.window_tree_life, 1);
+    assert_eq!((d.window_tree_life, d.window_tree_worlds), (1, WINDOW_TREE_WORLDS));
     let (o, _) = super::super::decide_opts_and_carry(&json!({
         "window_carry_legacy": true, "window_worlds_legacy": true, "window_tree_legacy": true,
-        "window_worlds": 3, "window_tree_life": 2})).expect("opts");
+        "window_worlds": 3, "window_tree_life": 2, "window_tree_worlds": 5})).expect("opts");
     assert!(o.window_carry_legacy && o.window_worlds_legacy && o.window_tree_legacy);
-    assert_eq!((o.window_worlds, o.window_tree_life), (3, 2));
+    assert_eq!((o.window_worlds, o.window_tree_life, o.window_tree_worlds), (3, 2, 5));
     // 旧い旗・seed 無しは 1 本
     assert_eq!(o.effective_window_worlds(), 1);
     assert_eq!(DecideOptions::default().effective_window_worlds(), 1);
@@ -155,7 +155,8 @@ fn low_life_battle_window_reads_a_short_tree() {
     let low = attacked(masters, 1, true);
     let out = run(masters, &low, Seat::P1, &opts(9));
     assert_eq!(out["kind"], "window");
-    assert_eq!(out["window"]["tree"], json!(true), "ライフ 1 のブロッカーの窓は木で読む: {}", out["window"]);
+    assert_eq!(out["window"], json!({"worlds": WINDOW_TREE_WORLDS, "tree": true}),
+               "ライフ 1 のブロッカーの窓は木で読む（世界は木の上限まで）");
     let old = run(masters, &low, Seat::P1, &DecideOptions { window_tree_legacy: true, ..opts(9) });
     assert_eq!(old["window"]["tree"], json!(false));
     let mid = attacked(masters, 2, true);

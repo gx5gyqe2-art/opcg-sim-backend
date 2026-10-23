@@ -1,0 +1,720 @@
+{
+ "orig": {
+  "points": 226,
+  "varying": 44,
+  "rate": 0.1947,
+  "ci": [
+   0.148,
+   0.251
+  ],
+  "minority_share": 0.0503,
+  "by_dtype": {
+   "blocker": {
+    "n": 38,
+    "varying": 4
+   },
+   "counter": {
+    "n": 92,
+    "varying": 27
+   },
+   "opp_dialog:CONFIRM_OPTIONAL": {
+    "n": 17,
+    "varying": 3
+   },
+   "opp_dialog:SEARCH_AND_SELECT": {
+    "n": 19,
+    "varying": 0
+   },
+   "own_dialog:CONFIRM_OPTIONAL": {
+    "n": 23,
+    "varying": 8
+   },
+   "own_dialog:SEARCH_AND_SELECT": {
+    "n": 37,
+    "varying": 2
+   }
+  },
+  "loss_points": {
+   "3301004_31": {
+    "a_share": 0.25,
+    "b_share": 0.75,
+    "picks": {
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-099\"}": 2,
+     "{\"action_type\": \"PASS\"}": 6
+    }
+   },
+   "3301005_107": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   }
+  }
+ },
+ "fixed": {
+  "points": 226,
+  "varying": 16,
+  "rate": 0.0708,
+  "ci": [
+   0.044,
+   0.112
+  ],
+  "minority_share": 0.0177,
+  "by_dtype": {
+   "blocker": {
+    "n": 38,
+    "varying": 3
+   },
+   "counter": {
+    "n": 92,
+    "varying": 11
+   },
+   "opp_dialog:CONFIRM_OPTIONAL": {
+    "n": 17,
+    "varying": 0
+   },
+   "opp_dialog:SEARCH_AND_SELECT": {
+    "n": 19,
+    "varying": 0
+   },
+   "own_dialog:CONFIRM_OPTIONAL": {
+    "n": 23,
+    "varying": 1
+   },
+   "own_dialog:SEARCH_AND_SELECT": {
+    "n": 37,
+    "varying": 1
+   }
+  },
+  "loss_points": {
+   "3301004_31": {
+    "a_share": 0.125,
+    "b_share": 0.875,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 7,
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-099\"}": 1
+    }
+   },
+   "3301005_107": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "a_share": 0.0,
+    "b_share": 1.0,
+    "picks": {
+     "{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"EB03-024\"}": 8
+    }
+   }
+  }
+ },
+ "fixed4": {
+  "points": 226,
+  "varying": 30,
+  "rate": 0.1327,
+  "ci": [
+   0.095,
+   0.183
+  ],
+  "minority_share": 0.0326,
+  "by_dtype": {
+   "blocker": {
+    "n": 38,
+    "varying": 3
+   },
+   "counter": {
+    "n": 92,
+    "varying": 18
+   },
+   "opp_dialog:CONFIRM_OPTIONAL": {
+    "n": 17,
+    "varying": 2
+   },
+   "opp_dialog:SEARCH_AND_SELECT": {
+    "n": 19,
+    "varying": 0
+   },
+   "own_dialog:CONFIRM_OPTIONAL": {
+    "n": 23,
+    "varying": 5
+   },
+   "own_dialog:SEARCH_AND_SELECT": {
+    "n": 37,
+    "varying": 2
+   }
+  },
+  "loss_points": {
+   "3301004_31": {
+    "a_share": 0.125,
+    "b_share": 0.875,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 7,
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-099\"}": 1
+    }
+   },
+   "3301005_107": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "a_share": 0.0,
+    "b_share": 1.0,
+    "picks": {
+     "{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"EB03-024\"}": 8
+    }
+   }
+  }
+ },
+ "fixed8": {
+  "points": 226,
+  "varying": 18,
+  "rate": 0.0796,
+  "ci": [
+   0.051,
+   0.122
+  ],
+  "minority_share": 0.0194,
+  "by_dtype": {
+   "blocker": {
+    "n": 38,
+    "varying": 2
+   },
+   "counter": {
+    "n": 92,
+    "varying": 13
+   },
+   "opp_dialog:CONFIRM_OPTIONAL": {
+    "n": 17,
+    "varying": 0
+   },
+   "opp_dialog:SEARCH_AND_SELECT": {
+    "n": 19,
+    "varying": 0
+   },
+   "own_dialog:CONFIRM_OPTIONAL": {
+    "n": 23,
+    "varying": 1
+   },
+   "own_dialog:SEARCH_AND_SELECT": {
+    "n": 37,
+    "varying": 2
+   }
+  },
+  "loss_points": {
+   "3301004_31": {
+    "a_share": 0.125,
+    "b_share": 0.875,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 7,
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-099\"}": 1
+    }
+   },
+   "3301005_107": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "a_share": 0.0,
+    "b_share": 1.0,
+    "picks": {
+     "{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"EB03-024\"}": 8
+    }
+   }
+  }
+ },
+ "legacy": {
+  "points": 226,
+  "varying": 44,
+  "rate": 0.1947,
+  "ci": [
+   0.148,
+   0.251
+  ],
+  "minority_share": 0.0503,
+  "by_dtype": {
+   "blocker": {
+    "n": 38,
+    "varying": 4
+   },
+   "counter": {
+    "n": 92,
+    "varying": 27
+   },
+   "opp_dialog:CONFIRM_OPTIONAL": {
+    "n": 17,
+    "varying": 3
+   },
+   "opp_dialog:SEARCH_AND_SELECT": {
+    "n": 19,
+    "varying": 0
+   },
+   "own_dialog:CONFIRM_OPTIONAL": {
+    "n": 23,
+    "varying": 8
+   },
+   "own_dialog:SEARCH_AND_SELECT": {
+    "n": 37,
+    "varying": 2
+   }
+  },
+  "loss_points": {
+   "3301004_31": {
+    "a_share": 0.25,
+    "b_share": 0.75,
+    "picks": {
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-099\"}": 2,
+     "{\"action_type\": \"PASS\"}": 6
+    }
+   },
+   "3301005_107": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   }
+  }
+ },
+ "w1": {
+  "points": 226,
+  "varying": 44,
+  "rate": 0.1947,
+  "ci": [
+   0.148,
+   0.251
+  ],
+  "minority_share": 0.0503,
+  "by_dtype": {
+   "blocker": {
+    "n": 38,
+    "varying": 4
+   },
+   "counter": {
+    "n": 92,
+    "varying": 27
+   },
+   "opp_dialog:CONFIRM_OPTIONAL": {
+    "n": 17,
+    "varying": 3
+   },
+   "opp_dialog:SEARCH_AND_SELECT": {
+    "n": 19,
+    "varying": 0
+   },
+   "own_dialog:CONFIRM_OPTIONAL": {
+    "n": 23,
+    "varying": 8
+   },
+   "own_dialog:SEARCH_AND_SELECT": {
+    "n": 37,
+    "varying": 2
+   }
+  },
+  "loss_points": {
+   "3301004_31": {
+    "a_share": 0.25,
+    "b_share": 0.75,
+    "picks": {
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-099\"}": 2,
+     "{\"action_type\": \"PASS\"}": 6
+    }
+   },
+   "3301005_107": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   }
+  }
+ },
+ "w16": {
+  "points": 226,
+  "varying": 10,
+  "rate": 0.0442,
+  "ci": [
+   0.024,
+   0.08
+  ],
+  "minority_share": 0.0094,
+  "by_dtype": {
+   "blocker": {
+    "n": 38,
+    "varying": 1
+   },
+   "counter": {
+    "n": 92,
+    "varying": 7
+   },
+   "opp_dialog:CONFIRM_OPTIONAL": {
+    "n": 17,
+    "varying": 0
+   },
+   "opp_dialog:SEARCH_AND_SELECT": {
+    "n": 19,
+    "varying": 0
+   },
+   "own_dialog:CONFIRM_OPTIONAL": {
+    "n": 23,
+    "varying": 1
+   },
+   "own_dialog:SEARCH_AND_SELECT": {
+    "n": 37,
+    "varying": 1
+   }
+  },
+  "loss_points": {
+   "3301004_31": {
+    "a_share": 0.125,
+    "b_share": 0.875,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 7,
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-099\"}": 1
+    }
+   },
+   "3301005_107": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   }
+  }
+ },
+ "w2": {
+  "points": 226,
+  "varying": 33,
+  "rate": 0.146,
+  "ci": [
+   0.106,
+   0.198
+  ],
+  "minority_share": 0.0448,
+  "by_dtype": {
+   "blocker": {
+    "n": 38,
+    "varying": 3
+   },
+   "counter": {
+    "n": 92,
+    "varying": 20
+   },
+   "opp_dialog:CONFIRM_OPTIONAL": {
+    "n": 17,
+    "varying": 1
+   },
+   "opp_dialog:SEARCH_AND_SELECT": {
+    "n": 19,
+    "varying": 0
+   },
+   "own_dialog:CONFIRM_OPTIONAL": {
+    "n": 23,
+    "varying": 7
+   },
+   "own_dialog:SEARCH_AND_SELECT": {
+    "n": 37,
+    "varying": 2
+   }
+  },
+  "loss_points": {
+   "3301004_31": {
+    "a_share": 0.25,
+    "b_share": 0.75,
+    "picks": {
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-099\"}": 2,
+     "{\"action_type\": \"PASS\"}": 6
+    }
+   },
+   "3301005_107": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   }
+  }
+ },
+ "w32": {
+  "points": 226,
+  "varying": 7,
+  "rate": 0.031,
+  "ci": [
+   0.015,
+   0.063
+  ],
+  "minority_share": 0.0061,
+  "by_dtype": {
+   "blocker": {
+    "n": 38,
+    "varying": 1
+   },
+   "counter": {
+    "n": 92,
+    "varying": 4
+   },
+   "opp_dialog:CONFIRM_OPTIONAL": {
+    "n": 17,
+    "varying": 0
+   },
+   "opp_dialog:SEARCH_AND_SELECT": {
+    "n": 19,
+    "varying": 0
+   },
+   "own_dialog:CONFIRM_OPTIONAL": {
+    "n": 23,
+    "varying": 1
+   },
+   "own_dialog:SEARCH_AND_SELECT": {
+    "n": 37,
+    "varying": 1
+   }
+  },
+  "loss_points": {
+   "3301004_31": {
+    "a_share": 0.0,
+    "b_share": 1.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301005_107": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   }
+  }
+ },
+ "w4": {
+  "points": 226,
+  "varying": 26,
+  "rate": 0.115,
+  "ci": [
+   0.08,
+   0.163
+  ],
+  "minority_share": 0.0277,
+  "by_dtype": {
+   "blocker": {
+    "n": 38,
+    "varying": 2
+   },
+   "counter": {
+    "n": 92,
+    "varying": 15
+   },
+   "opp_dialog:CONFIRM_OPTIONAL": {
+    "n": 17,
+    "varying": 2
+   },
+   "opp_dialog:SEARCH_AND_SELECT": {
+    "n": 19,
+    "varying": 0
+   },
+   "own_dialog:CONFIRM_OPTIONAL": {
+    "n": 23,
+    "varying": 5
+   },
+   "own_dialog:SEARCH_AND_SELECT": {
+    "n": 37,
+    "varying": 2
+   }
+  },
+  "loss_points": {
+   "3301004_31": {
+    "a_share": 0.125,
+    "b_share": 0.875,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 7,
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-099\"}": 1
+    }
+   },
+   "3301005_107": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   }
+  }
+ },
+ "w64": {
+  "points": 226,
+  "varying": 4,
+  "rate": 0.0177,
+  "ci": [
+   0.007,
+   0.045
+  ],
+  "minority_share": 0.0028,
+  "by_dtype": {
+   "blocker": {
+    "n": 38,
+    "varying": 0
+   },
+   "counter": {
+    "n": 92,
+    "varying": 3
+   },
+   "opp_dialog:CONFIRM_OPTIONAL": {
+    "n": 17,
+    "varying": 0
+   },
+   "opp_dialog:SEARCH_AND_SELECT": {
+    "n": 19,
+    "varying": 0
+   },
+   "own_dialog:CONFIRM_OPTIONAL": {
+    "n": 23,
+    "varying": 1
+   },
+   "own_dialog:SEARCH_AND_SELECT": {
+    "n": 37,
+    "varying": 0
+   }
+  },
+  "loss_points": {
+   "3301004_31": {
+    "a_share": 0.0,
+    "b_share": 1.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301005_107": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   }
+  }
+ },
+ "w8": {
+  "points": 226,
+  "varying": 13,
+  "rate": 0.0575,
+  "ci": [
+   0.034,
+   0.096
+  ],
+  "minority_share": 0.0144,
+  "by_dtype": {
+   "blocker": {
+    "n": 38,
+    "varying": 0
+   },
+   "counter": {
+    "n": 92,
+    "varying": 10
+   },
+   "opp_dialog:CONFIRM_OPTIONAL": {
+    "n": 17,
+    "varying": 0
+   },
+   "opp_dialog:SEARCH_AND_SELECT": {
+    "n": 19,
+    "varying": 0
+   },
+   "own_dialog:CONFIRM_OPTIONAL": {
+    "n": 23,
+    "varying": 1
+   },
+   "own_dialog:SEARCH_AND_SELECT": {
+    "n": 37,
+    "varying": 2
+   }
+  },
+  "loss_points": {
+   "3301004_31": {
+    "a_share": 0.125,
+    "b_share": 0.875,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 7,
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-099\"}": 1
+    }
+   },
+   "3301005_107": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "a_share": 1.0,
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   }
+  }
+ }
+}

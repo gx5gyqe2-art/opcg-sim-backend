@@ -137,10 +137,17 @@ pub struct DecideOptions {
     pub window_tree_legacy: bool,
     /// 短い木で読む戦闘の窓の自分のライフの上限（`window_tree_life`・既定 1）。
     pub window_tree_life: i64,
+    /// 短い木で読む窓の世界の本数の上限（`window_tree_worlds`・既定 [`WINDOW_TREE_WORLDS`]）。
+    /// 木の費用は「世界の本数 × sims」なので、静的な値の窓の K とは別に抑える（実際は `min(K, これ)`）。
+    pub window_tree_worlds: usize,
 }
 
 /// 窓の根畳みの世界の本数の既定（§7.42 の 2・WP `rs-window-read` で揺れと費用から決めた）。
-pub const WINDOW_WORLDS: usize = 4;
+/// blunder-audit の窓の 226 点で、探索の乱数だけを替えると手が変わる率は K=1/2/4/8/16/32/64 で
+/// 19.5/14.6/11.5/5.8/4.4/3.1/1.8%。静的な値の窓は 1 本あたり数 ms なので 5% を切る最初の K を採った。
+pub const WINDOW_WORLDS: usize = 16;
+/// 短い木で読む窓の世界の本数の上限の既定（§7.42 の 3・費用は「この本数 × sims」）。
+pub const WINDOW_TREE_WORLDS: usize = 2;
 
 /// 窓の根畳みの世界 `i`（≥1）の乱数の seed（世界 0 は決定の乱数そのもの＝1 本なら今までと同じ）。
 /// 木の世界 `search_seed + i` とは別の系列になるよう定数で混ぜる。
@@ -261,6 +268,7 @@ impl Default for DecideOptions {
             window_worlds_legacy: false,
             window_tree_legacy: false,
             window_tree_life: 1,
+            window_tree_worlds: WINDOW_TREE_WORLDS,
         }
     }
 }
@@ -1059,6 +1067,8 @@ fn window_choice(
     let window = if battle { Window::Battle } else { Window::Dialog };
     let tree = !opts.window_tree_legacy && window_tree_applies(&mut s, name, opts.window_tree_life);
     let k = opts.effective_window_worlds();
+    // 木で読む窓は世界の本数を別に抑える（費用は「本数 × sims」・静的な値の世界と混ぜて平均しない）。
+    let k = if tree { k.min(opts.window_tree_worlds.max(1)) } else { k };
     if k <= 1 && !tree {
         // 今までどおり（世界 1 本・静的な値）。
         let vals = resolved_branch_values(
@@ -1152,7 +1162,7 @@ fn window_choice(
     for (wi, (_, v)) in per_world.iter().enumerate() {
         let cur = per_world[wbest].1[best];
         if let Some(x) = v[best] {
-            if cur.is_none_or(|c| x > c) {
+            if !matches!(cur, Some(c) if x <= c) {
                 wbest = wi;
             }
         }
