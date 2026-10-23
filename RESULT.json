@@ -16,5 +16,5 @@
  "metrics": {
   "arena_ldc/ldc_w02.jsonl": 150
  },
- "notes": ""
+ "notes": "150/150 pairs, void 0. Shard summary (ARENA_RESUME_FINAL): wins 148.0/300, wr 0.4933, ci95 [0.4803, 0.5064], elo -4.6. The baseline seat's best_opts lists only lethal_proof/lethal_deal_legacy/worlds; sims 1280 / budget 0 are passed to both seats as the shared --sims/--budget args (arena_shard.py:124), so both seats ran the same settings."
 }
