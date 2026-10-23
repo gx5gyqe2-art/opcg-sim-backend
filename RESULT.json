@@ -16,5 +16,5 @@
  "metrics": {
   "arena_chid/chid_w14.jsonl": 150
  },
- "notes": ""
+ "notes": "150/150 pairs, 150 distinct seeds. 1 void (1/150 = 0.67%): seed 3284123, leaders OP14-001 vs OP02-025, 'GameAborted: step=79 ValueError: 不明なアクションです: DON_BOX'. The other 149 pairs average 0.9933 (raw mean of the score field; I did not read it as a win rate). Each run prints the log line '候補席の設定 {...}（基準席は既定）'. The baseline seat still received the --sims 1280 --worlds 2 --budget 0 --lethal-proof root --commit-hidden-legacy flags as instructed. Built from 150f889ac with commit-hidden-legacy flag present."
 }
