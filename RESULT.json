@@ -82,6 +82,6 @@
    "void": 0
   }
  },
- "gate": "make test (see notes)",
+ "gate": "make test green: cargo 604 passed (1 ignored), pytest 857 passed, 13 skipped",
  "notes": "Predictions held: real-deck results identical pair-by-pair (40/40, incl. turns); same-net pairs are exactly 1-1 in every condition. Other pairers: gate.py goes through play_pair (fixed automatically); tests/scripts/t18_arena.py already uses the same build_pair(la, lb) for both games (only the intervened seat swaps), no change; record_gen untouched (teaching distribution). Judgement calls: cand_leaders is taken from the built decks [ab[0][0], ab[1][0]] rather than [la, lb], because real/user/official ignore la/lb and fixed mode has la=lb=None — these are the leaders actually played; the `leaders` field keeps the leader_pair draw for continuity with older ledgers. Fixed mirror was measured with --decks singleton (arena default). Synth-condition ledgers from before 2026-10-23 should not be merged with new ones (documented). Change to arena.py kept to play_pair_detail + one docstring bullet to minimise conflicts with the parallel WP rs-commit-sig. maturin was not installed in the container; installed via pip to run make rust-develop. pytest/pytest-xdist and opcg_sim/requirements.txt were also installed."
 }
