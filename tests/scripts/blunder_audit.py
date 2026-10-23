@@ -6,7 +6,7 @@
 1. ``play``: 両席 r13d・**出荷の設定**（1,280 回・世界 2 本・枝予算なし・詰みの証明 root＝`commit_audit.ship_spec`）・
    random × real で局を打ち、**全ての判断点**で打った手・決め方（`main`＝木／`window`＝窓の根畳み／`commit`＝続き／
    `lethal`＝証明）・根の候補の訪問の上位 3 手を記録する（`games.jsonl`・局の手の列も）。局ごとに、候補が 2 つ以上の
-   判断点から一様に無作為に上限 10 点を引く（`sample.jsonl`）。
+   判断点から一様に無作為に上限 10 点を引く（`games.jsonl` の `pick`）。
 2. ``judge``: 点ごとに局の手の列を当て直して局面を作り、比べる 2 つの手を決める:
    - ``main``: a＝打った束（箱は箱全体）・b＝根の訪問が次に多い束（打った束が最多でなければ最多の束）。
    - ``window``: a＝打った手・b＝根の訪問（同数は Q）で a 以外の最多。
@@ -16,10 +16,17 @@
    固定の審判 r13d（160 回・世界 1 本・公平・証明 off）が a と b の先を K＝32 局ずつ最後まで打つ（同じ配り方と乱数で対の差）。
    **差（b − a）≥ 0.20 かつ 95% 区間の下限 > 0 の点＝損の候補**。損の候補だけ、審判 r20 でも打ち直し（同じ K）、
    深い読み（出荷の 4 倍の 5,120 回・世界 4 本・証明 off・seed はずらす）で a と b の根の値と、当てた後の値を書く。
-3. ``summary``: 損の率（全点・判断の種類別・決め方別・ターン帯・ライフ別）と損の点の一覧（`summary.json`）。
+   ``recheck``（候補だけ）: 独立の配り方 48 通りで審判 2 本とも打ち直す（K＝32 の 1 回の判定は偶然でも 3% ほど線を越えるため）。
+   ``verify``（候補だけ）: 同じ打ち直しを、**手を打った側の今のターンの残りは出荷の設定が打つ**形で（配り方 24 通り × 審判 2 本）。
+   a が箱の 1 段目・詰みの手順の 1 手目のとき、160 回の審判が残りを打てずに a だけが不利になる偏りを除く。
+   ``winstab``（窓の点）: 探索の乱数（＝窓の根畳みが引く世界 1 本）だけを替えて 8 回選ばせ、選ぶ手が揺れるかを見る。
+3. ``summary``: 損の率（全点・判断の種類別・決め方別・ターン帯・ライフ別・再現・確かめ）・窓の揺れ・損の点の一覧（`summary.json`）。
 
-    python tests/scripts/blunder_audit.py play --games 30 --workers 4
+    python tests/scripts/blunder_audit.py play --games 100 --workers 4
     python tests/scripts/blunder_audit.py judge --workers 4
+    python tests/scripts/blunder_audit.py recheck --workers 4
+    python tests/scripts/blunder_audit.py verify --workers 4
+    python tests/scripts/blunder_audit.py winstab --workers 4
     python tests/scripts/blunder_audit.py summary
 
 再開できる（終えた局・点は飛ばす）。
@@ -478,6 +485,115 @@ def cmd_recheck(a):
     print("RECHECK_DONE", flush=True)
 
 
+# ---------------------------------------------------------------- 2c. verify
+
+#: 確かめの配り方の番号のずらし（judge・recheck と重ねない）。
+VERIFY_OFFSET = 2000
+
+
+def rollout_ship(game, who, move, wseed, ref, ship, max_steps=MJ.MAX_STEPS):
+    """`MJ.rollout` と同じだが、**手を打った側の今のターンの残り**（そのターン中の自分の判断）は出荷の設定が打つ。
+    審判の弱い打ち継ぎ（箱の 1 段目だけを当てた後に続きを打てない等）で a／b のどちらかが不利になるのを除く。"""
+    g = game.fork_world(who, "fair", int(wseed))
+    t0 = int(game.turn_count or 0)
+    try:
+        g.apply_search_move(who, json.dumps(move, ensure_ascii=False))
+        carries = {}
+        steps = 0
+        while g.winner() is None and steps < max_steps:
+            pending = json.loads(g.pending_json())
+            if not pending:
+                break
+            name = pending["player_id"]
+            turn = int(g.turn_count or 0)
+            use_ship = name == who and turn == t0
+            spec = ship if use_ship else ref
+            c = carries.setdefault((name, use_ship), DR.Carry())
+            out = json.loads(g.decide(name, spec.decide_opts(int(wseed), turn, name, c.get(turn, name))))
+            c.put(out)
+            mv = out.get("move")
+            if mv is None:
+                break
+            apply(g, name, mv)
+            steps += 1
+    except Exception as exc:  # noqa: BLE001
+        return None, "%s: %s" % (type(exc).__name__, str(exc)[:120])
+    w = g.winner()
+    if w is None:
+        return None, "no_winner"
+    return (1 if w == who else 0), None
+
+
+def verify_point(job):
+    g, row = job
+    t0 = time.time()
+    seed, step, name = row["seed"], row["step"], row["seat"]
+    out = {"seed": seed, "step": step}
+    game = replay(g, step)
+    K = _G["k"]
+    for rn in ("r13d", "r20"):
+        wa, wb = [], []
+        for i in range(K):
+            ws = MJ.world_seed(seed, step, VERIFY_OFFSET + i)
+            wa.append(rollout_ship(game, name, row["a"], ws, _G["refs"][rn], _G["ship"])[0])
+            wb.append(rollout_ship(game, name, row["b"], ws, _G["refs"][rn], _G["ship"])[0])
+        out[rn] = dict(MJ.paired(wa, wb), a=wa, b=wb)
+    out["sec"] = round(time.time() - t0, 1)
+    return out
+
+
+def cmd_verify(a):
+    """損の候補を、今のターンの残りを出荷の設定が打ち継ぐ形で、独立の配り方 K 通り・審判 2 本で打ち直す。"""
+    games = {g["seed"]: g for g in read_jsonl(os.path.join(a.out, "games.jsonl"))}
+    rows = [x for x in read_jsonl(os.path.join(a.out, "points.jsonl")) if x.get("cand")]
+    rpath = os.path.join(a.out, "verify.jsonl")
+    done = {(x["seed"], x["step"]) for x in read_jsonl(rpath)}
+    jobs = [({k: v for k, v in games[x["seed"]].items() if k != "points"}, x) for x in rows if (x["seed"], x["step"]) not in done]
+    print(f"VERIFY todo {len(jobs)} (done {len(done)}) k={a.k}", flush=True)
+    t0 = time.time()
+    with get_context("fork").Pool(a.workers, initializer=_init_judge, initargs=(a.k,)) as pool:
+        for i, r in enumerate(pool.imap_unordered(verify_point, jobs, chunksize=1)):
+            r["k"] = a.k
+            with open(rpath, "a", encoding="utf-8") as f:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            print(f"VERIFY seed={r['seed']} step={r['step']} r13d={r['r13d']['diff']} {r['r13d']['ci']} "
+                  f"r20={r['r20']['diff']} {r['r20']['ci']} sec={r['sec']} ({i + 1}/{len(jobs)} {time.time() - t0:.0f}s)", flush=True)
+    print("VERIFY_DONE", flush=True)
+
+
+# ---------------------------------------------------------------- 2d. window stability
+
+def winstab_point(job):
+    """窓の点で、探索の乱数（＝窓の根畳みが引く世界 1 本）だけを替えて N 回選ばせ、選ぶ手が揺れるかを見る。"""
+    g, r, n = job
+    game = replay(g, r["step"])
+    who = r["seat"]
+    opts = json.loads(_G["ship"].decide_opts(r["seed"], r["turn"], who, None))
+    picks, qs = [], set()
+    for j in range(n):
+        o = dict(opts, search_seed=(opts["search_seed"] + 7919 * j) & 0xFFFFFFFFFFFFFFFF)
+        d = json.loads(game.fork().decide(who, json.dumps(o)))
+        picks.append(desc(game, d["move"]))
+        qs.add(json.dumps([round(x, 4) for x in d["stats"]["Q"]]))
+    c = {}
+    for x in picks:
+        c[x] = c.get(x, 0) + 1
+    return {"seed": r["seed"], "step": r["step"], "dtype": r["dtype"], "my_life": r["my_life"], "a": r["a_desc"],
+            "b": r["b_desc"], "picks": c, "a_share": c.get(r["a_desc"], 0) / n, "b_share": c.get(r["b_desc"], 0) / n,
+            "q_sets": len(qs), "d13": r["ref"]["r13d"]["diff"], "ci13": r["ref"]["r13d"]["ci"], "cand": r["cand"]}
+
+
+def cmd_winstab(a):
+    games = {g["seed"]: g for g in read_jsonl(os.path.join(a.out, "games.jsonl"))}
+    rows = [x for x in read_jsonl(os.path.join(a.out, "points.jsonl")) if x["ok"] and x["kind"] == "window"]
+    jobs = [({k: v for k, v in games[x["seed"]].items() if k != "points"}, x, a.n) for x in rows]
+    with get_context("fork").Pool(a.workers, initializer=_init_judge, initargs=(1,)) as pool, \
+            open(os.path.join(a.out, "window_stability.jsonl"), "w", encoding="utf-8") as f:
+        for r in pool.imap_unordered(winstab_point, jobs, chunksize=1):
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    print("WINSTAB_DONE", len(jobs), flush=True)
+
+
 # ---------------------------------------------------------------- 3. summary
 
 def wilson(k, n, z=1.96):
@@ -506,6 +622,7 @@ def group_rates(rows, keyf):
     return {k: {"cand": rate(sum(x["cand"] for x in v), len(v)),
                 "confirmed": rate(sum(bool(x.get("confirmed")) for x in v), len(v)),
                 "replicated": rate(sum(bool(x.get("replicated")) for x in v), len(v)),
+                "verified": rate(sum(bool(x.get("verified")) for x in v), len(v)),
                 "mean_diff": round(sum(x["ref"]["r13d"]["diff"] or 0 for x in v) / len(v), 4)}
             for k, v in sorted(out.items(), key=lambda kv: -len(kv[1]))}
 
@@ -524,6 +641,16 @@ def cmd_summary(a):
         x["recheck"] = {"r13d": r["r13d"]["diff"], "r20": r["r20"]["diff"], "pool": pool["diff"], "pool_ci": pool["ci"]}
         x["replicated"] = bool(pool["ci"][0] is not None and pool["ci"][0] > 0
                                and r["r13d"]["diff"] > 0 and r["r20"]["diff"] > 0)
+    # 確かめ（今のターンの残りを出荷の設定が打ち継ぐ・独立の配り方・審判 2 本）: 同じ規則で通った点＝確かめ済みの損
+    vf = {(x["seed"], x["step"]): x for x in read_jsonl(os.path.join(a.out, "verify.jsonl"))}
+    for x in ok:
+        r = vf.get((x["seed"], x["step"]))
+        if not x["cand"] or r is None:
+            continue
+        pool = MJ.paired(r["r13d"]["a"] + r["r20"]["a"], r["r13d"]["b"] + r["r20"]["b"])
+        x["verify"] = {"r13d": r["r13d"]["diff"], "r20": r["r20"]["diff"], "pool": pool["diff"], "pool_ci": pool["ci"]}
+        x["verified"] = bool(pool["ci"][0] is not None and pool["ci"][0] > 0
+                             and r["r13d"]["diff"] > 0 and r["r20"]["diff"] > 0)
     s = {"games": len(games), "void": sum(1 for g in games if g["winner"] is None),
          "decisions": sum(g["n_points"] for g in games), "eligible": sum(g["n_elig"] for g in games),
          "picked": sum(len(g["pick"]) for g in games), "rows": len(rows), "ok": len(ok),
@@ -546,6 +673,7 @@ def cmd_summary(a):
                 "confirmed_strict": rate(sum(bool(x.get("confirmed_strict")) for x in ok), len(ok)),
                 "rechecked": sum(1 for x in ok if "recheck" in x),
                 "replicated": rate(sum(bool(x.get("replicated")) for x in ok), len(ok)),
+                "verified": rate(sum(bool(x.get("verified")) for x in ok), len(ok)),
                 "a_better_mirror": rate(sum(1 for x in ok if x["ref"]["r13d"]["diff"] <= -LOSS and x["ref"]["r13d"]["ci"][1] < 0), len(ok)),
                 "mean_diff": round(sum(x["ref"]["r13d"]["diff"] for x in ok) / len(ok), 4) if ok else None}
     diffs = [x["ref"]["r13d"]["diff"] for x in ok]
@@ -561,12 +689,28 @@ def cmd_summary(a):
     s["by_rank"] = group_rates(ok, lambda x: str(x.get("b_src")))
     s["by_kind_mylife"] = group_rates(ok, lambda x: x["kind"] + "|life%d" % min(x["my_life"], 2))
     s["losses"] = [{k: x.get(k) for k in ("seed", "step", "seat", "turn", "kind", "dtype", "act", "b_src", "a_desc", "b_desc",
-                                          "my_life", "opp_life", "confirmed", "confirmed_strict", "replicated", "recheck")}
+                                          "my_life", "opp_life", "confirmed", "confirmed_strict", "replicated", "recheck",
+                                          "verified", "verify")}
                    | {"d13": x["ref"]["r13d"]["diff"], "ci13": x["ref"]["r13d"]["ci"],
                       "d20": (x["ref"].get("r20") or {}).get("diff"), "ci20": (x["ref"].get("r20") or {}).get("ci"),
                       "deep_best_is_a": (x.get("deep") or {}).get("best_pkey_is_a"),
                       "deep_best_is_b": (x.get("deep") or {}).get("best_pkey_is_b")}
                    for x in ok if x["cand"]]
+    ws = read_jsonl(os.path.join(a.out, "window_stability.jsonl"))
+    if ws:
+        def part(xs):
+            ds = [x["d13"] for x in xs]
+            return {"n": len(xs), "mean_diff": round(sum(ds) / len(ds), 4) if ds else None,
+                    "mean_ci": MJ._mean_ci(ds)["ci"] if len(ds) > 1 else None,
+                    "d_ge_0.2": sum(d >= LOSS for d in ds), "d_le_-0.2": sum(d <= -LOSS for d in ds), "cand": sum(x["cand"] for x in xs)}
+        st = [x for x in ws if x["a_share"] == 1]
+        un = [x for x in ws if x["a_share"] < 1]
+        s["window_stability"] = {"points": len(ws), "draws": 8, "unstable": rate(len(un), len(ws)),
+                                 "q_varies": rate(sum(x["q_sets"] > 1 for x in ws), len(ws)),
+                                 "stable": part(st), "unstable_part": part(un),
+                                 "by_dtype": {k: rate(sum(1 for x in ws if x["dtype"] == k and x["a_share"] < 1),
+                                                      sum(1 for x in ws if x["dtype"] == k))
+                                              for k in sorted({x["dtype"] for x in ws})}}
     txt = json.dumps(s, ensure_ascii=False, indent=1)
     with open(os.path.join(a.out, "summary.json"), "w", encoding="utf-8") as f:
         f.write(txt + "\n")
@@ -592,10 +736,18 @@ def main(argv=None):
     p.add_argument("--k", type=int, default=48)
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--out", default=OUT_DIR)
+    p = sub.add_parser("verify")
+    p.add_argument("--k", type=int, default=24)
+    p.add_argument("--workers", type=int, default=4)
+    p.add_argument("--out", default=OUT_DIR)
+    p = sub.add_parser("winstab")
+    p.add_argument("--n", type=int, default=8)
+    p.add_argument("--workers", type=int, default=4)
+    p.add_argument("--out", default=OUT_DIR)
     p = sub.add_parser("summary")
     p.add_argument("--out", default=OUT_DIR)
     a = ap.parse_args(argv)
-    {"play": cmd_play, "judge": cmd_judge, "recheck": cmd_recheck, "summary": cmd_summary}[a.cmd](a)
+    {"play": cmd_play, "judge": cmd_judge, "recheck": cmd_recheck, "verify": cmd_verify, "winstab": cmd_winstab, "summary": cmd_summary}[a.cmd](a)
     return 0
 
 

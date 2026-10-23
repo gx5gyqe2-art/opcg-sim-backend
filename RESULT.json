@@ -1,225 +1,98 @@
 {
- "job": "move-judge",
+ "job": "blunder-audit",
  "role": "measure",
  "status": "done",
  "inputs": {
-  "base": "claude/cpu-spec-improvements-yw91jd@8db31b65f",
-  "spec": "docs/search_efficiency_plan.md §7.32",
-  "sample_from": "logs/value_to_move/{real,synth}（§7.22 の記録・出荷の設定で r13d と r20 の手が違った点＋較正の点）",
-  "records": "claude/n50-w01〜16・claude/n50s-w01〜16 の n_records（局面の再現）",
+  "base": "claude/cpu-spec-improvements-yw91jd@4837e5441",
+  "spec": "docs/search_efficiency_plan.md §7.41",
+  "seats": "両席 r13d・出荷の設定（PLAY_SIMS 1280・PLAY_WORLDS 2・PLAY_BUDGET 0・PLAY_LETHAL_PROOF root）・random × real",
+  "seeds": "3301000〜3301099（100 局）",
+  "points_per_game": 10,
+  "k": 32,
   "nets": {
    "r13d": "opcg_sim/data/learned/nrel_r13d.npz",
    "r20": "claude/train-r20:n1_results/nrel_r20.npz"
   },
   "referee": "SeatSpec(net, sims=160)・世界 1 本・公平・詰みの証明 off・両席",
-  "k": 32,
-  "sample_seed": 20261023,
-  "points": {
-   "real": {
-    "changed": 400,
-    "calib": 200
-   },
-   "synth": {
-    "changed": 400,
-    "calib": 200
-   }
-  }
+  "loss_line": "差（b − a）≥ 0.20 かつ審判 r13d の 95% 区間の下限 > 0"
  },
  "outputs": {
-  "tool": "tests/scripts/move_judge.py",
-  "rust": "Game.fork_world（読み取り専用の口・rust/opcg_engine/src/py_game.rs）",
-  "logs": "logs/move_judge/{real,synth}/{meta.json,sample.jsonl.gz,rows.jsonl.gz}・logs/move_judge/summary.json",
-  "report": "docs/reports/2026-10-23_move_judge.md",
-  "test_spec": "docs/TEST_SPEC.md（計器の表に 1 行）"
+  "tool": "tests/scripts/blunder_audit.py",
+  "report": "docs/reports/2026-10-23_blunder_audit.md",
+  "data": "n1_results/blunder_audit/（games.jsonl・points.jsonl・recheck.jsonl・verify.jsonl・window_stability.jsonl・summary.json・*.log）"
  },
  "metrics": {
-  "real": {
-   "points_ok": 591,
-   "not_ok": {
-    "legal": 4,
-    "record": 5
-   },
-   "k": 32,
-   "sec_per_point_1core": 106.7,
-   "calib_diff": {
-    "r13d": {
-     "mean": -0.0102,
-     "ci95": [
-      -0.0268,
-      0.0064
-     ]
-    },
-    "r20": {
-     "mean": 0.0005,
-     "ci95": [
-      -0.0156,
-      0.0166
-     ]
-    }
-   },
-   "changed_diff": {
-    "r13d": {
-     "mean": -0.0163,
-     "ci95": [
-      -0.0255,
-      -0.0072
-     ]
-    },
-    "r20": {
-     "mean": -0.0002,
-     "ci95": [
-      -0.0097,
-      0.0094
-     ]
-    }
-   },
-   "changed_wb": {
-    "r13d": 0.5275,
-    "r20": 0.5444
-   },
-   "decided_changed": {
-    "n": 9,
-    "b_better": 3,
-    "a_better": 6,
-    "rate": {
-     "k": 9,
-     "n": 392,
-     "rate": 0.023,
-     "ci95": [
-      0.0121,
-      0.0431
-     ]
-    },
-    "split": 1
-   },
-   "decided_calib": {
-    "n": 9,
-    "b_better": 3,
-    "a_better": 6,
-    "rate": {
-     "k": 9,
-     "n": 199,
-     "rate": 0.0452,
-     "ci95": [
-      0.024,
-      0.0837
-     ]
-    },
-    "split": 1
-   },
-   "sign_agree_refs_changed": 0.5739,
-   "deep_b_better": {
-    "deep_r13d": 0.2668,
-    "deep_r20": 0.7035
-   },
-   "deep_agree_with_refs": {
-    "deep_r13d": 0.5244,
-    "deep_r20": 0.5447
-   },
-   "theory_sign_agree_changed": {
-    "static": 0.5512,
-    "seq": 0.5285
-   },
-   "theory_sign_agree_calib": {
-    "static": 0.5043,
-    "seq": 0.4821
-   }
+  "games": 100,
+  "void": 0,
+  "decisions": 14362,
+  "eligible": 11089,
+  "points_judged": 927,
+  "points_no_b": 73,
+  "cand": {
+   "k": 12,
+   "n": 927,
+   "rate": 0.0129,
+   "ci": [
+    0.0074,
+    0.0225
+   ]
   },
-  "synth": {
-   "points_ok": 587,
-   "not_ok": {
-    "record": 9,
-    "replay: ValueError": 1,
-    "legal": 3
-   },
-   "k": 32,
-   "sec_per_point_1core": 94.5,
-   "calib_diff": {
-    "r13d": {
-     "mean": -0.0018,
-     "ci95": [
-      -0.0151,
-      0.0116
-     ]
-    },
-    "r20": {
-     "mean": -0.0041,
-     "ci95": [
-      -0.0183,
-      0.01
-     ]
-    }
-   },
-   "changed_diff": {
-    "r13d": {
-     "mean": -0.0078,
-     "ci95": [
-      -0.0166,
-      0.0011
-     ]
-    },
-    "r20": {
-     "mean": -0.0032,
-     "ci95": [
-      -0.0121,
-      0.0057
-     ]
-    }
-   },
-   "changed_wb": {
-    "r13d": 0.5135,
-    "r20": 0.5149
-   },
-   "decided_changed": {
-    "n": 6,
-    "b_better": 0,
-    "a_better": 6,
-    "rate": {
-     "k": 6,
-     "n": 391,
-     "rate": 0.0153,
-     "ci95": [
-      0.0071,
-      0.0331
-     ]
-    },
-    "split": 1
-   },
-   "decided_calib": {
-    "n": 4,
-    "b_better": 1,
-    "a_better": 3,
-    "rate": {
-     "k": 4,
-     "n": 196,
-     "rate": 0.0204,
-     "ci95": [
-      0.008,
-      0.0513
-     ]
-    },
-    "split": 0
-   },
-   "sign_agree_refs_changed": 0.5897,
-   "deep_b_better": {
-    "deep_r13d": 0.3047,
-    "deep_r20": 0.6805
-   },
-   "deep_agree_with_refs": {
-    "deep_r13d": 0.5243,
-    "deep_r20": 0.5318
-   },
-   "theory_sign_agree_changed": {
-    "static": 0.5399,
-    "seq": 0.5316
-   },
-   "theory_sign_agree_calib": {
-    "static": 0.4692,
-    "seq": 0.5
-   }
-  }
+  "confirmed_spec": {
+   "k": 10,
+   "n": 927,
+   "rate": 0.0108,
+   "ci": [
+    0.0059,
+    0.0197
+   ]
+  },
+  "replicated": {
+   "k": 8,
+   "n": 927,
+   "rate": 0.0086,
+   "ci": [
+    0.0044,
+    0.0169
+   ]
+  },
+  "verified": {
+   "k": 3,
+   "n": 927,
+   "rate": 0.0032,
+   "ci": [
+    0.0011,
+    0.0095
+   ]
+  },
+  "verified_by_kind": {
+   "main": 0,
+   "window": 3,
+   "commit": 0,
+   "lethal": 0
+  },
+  "verified_types": {
+   "iii_window_root_fold": 3,
+   "i_commit": 0,
+   "ii_rules": 0,
+   "iv_pure_read": 0,
+   "v_default": 0
+  },
+  "measurement_artifact_vi": 2,
+  "undetermined": 3,
+  "chance": 4,
+  "window_unstable": {
+   "k": 44,
+   "n": 226,
+   "rate": 0.1947,
+   "ci": [
+    0.1483,
+    0.2512
+   ]
+  },
+  "mean_diff_all": -0.024,
+  "sec_per_point_core": 61.0,
+  "sec_per_game_core": 28.7
  },
- "command": "python tests/scripts/move_judge.py sample/judge/summary（報告 §9）",
- "gate": "make test green（cargo 606 passed・pytest 857 passed, 13 skipped）。torch は外した構成（下記）。",
- "notes": "1. 較正は 0 のまわり（実 −1.0／+0.1 ポイント・合成 −0.2／−0.4・区間は全部 0 を含む）。\n2. r20 の出荷の手 vs r13d の出荷の手: 審判 r13d で実 −1.6［−2.5, −0.7］・合成 −0.8［−1.7, +0.1］、審判 r20 で実 −0.0・合成 −0.3＝良くなっていない（較正を引けば r13d 審判 −0.6・r20 審判 ±0.1）。判定できた点は 1.5〜2.3%（較正の偽陽性 2.0〜4.5% 以下）・審判 2 本の符号の一致 57〜59%。深い読み（§7.22）の判定と審判の一致は 52〜55%・理論の式の符号の一致は 53〜55%（較正 47〜50%）。\n3. 点の数と K: 較正の点 50 点で 1 点 ≈ 2 分／コア（見積りどおり）だったので、上限の各帯 400＋200 点・K＝32 で回した（4 コアで実 4.7 時間・合成 4.1 時間・計 150,784 局）。\n4. 標本の制限: §7.22 の後に誘発の順の修正（rs-trigger-order-2・rs-trigger-simul）が入り、記録の手の列を今のエンジンで当て直すと 1 割弱の局（実 50/358・合成 34/343）が途中で外れる。標本は『局面まで当て直せる点』に限って無作為に引いた（飛ばした点 実 33＋13・合成 20＋11）。判定時の照合（合法手の並び・記録の符号化）で捨てた点 実 9・合成 13。\n5. エンジンへの追加: Game.fork_world(player, reveal, seed)（encode_world と同じ公平の引き直しを打てる対局として返す読み取り専用の口・既存の挙動は不変）。公平の配り直しを Python から作る口が無かったため。\n6. 決着しない局 12（実: 審判の decide が DON_BOX を返して apply_game_action が拒んだ 11 局・上限手数 1 局・合成 0）は対から外した。アリーナの席と同じ経路（driver.run_game と同じ呼び方）なので頻度も同じはず。\n7. ゲート: この環境は torch の CPU 版の配布元（download.pytorch.org）に届かず、PyPI の torch 2.14.1+cu130 を入れると test_n_rel_train_torch.py::test_grads_match_numpy が勾配の許容（max_rel 2.0e-4 対 下限×5＝1.9e-4）をわずかに超えて落ちる（この WP が触らない訓練側・OMP_NUM_THREADS=1 でも同じ・torch 有りの結果は 880 passed・1 failed）。torch は任意依存（README）なので外した構成で make test green を確認した（857 passed・13 skipped）。\n8. 途中の push（logs/move_judge だけの差分）はゲートを省略した（tests は logs/ を読まない・最終 push は最終ツリーで make test green）。"
+ "command": "python tests/scripts/blunder_audit.py play --games 100 --workers 4 && ... judge --workers 4 && ... recheck --workers 4 && ... verify --workers 4 && ... winstab --workers 4 && ... summary",
+ "notes": "局数: 30 局で器を確かめ、1 点の所要（判定 約 61 秒／1 コア・審判 r13d の 64 局＋候補だけ r20）から 4 コア約 4 時間＝100 局・1,000 点に決めた（仕様の目安 1,200〜1,600 点には届かない）。判定できなかった 73 点は相手のアタック中の続き（カウンターの 2 枚目以降）で、持ち越し無しの読み直しが候補の刈り込みで素通しだけになった点（b が無い）。仕様に 2 段足した（候補だけ）: recheck＝独立の配り方 48 通りで審判 2 本とも打ち直す（K=32 の 1 回の判定は偶然でも 1 本の審判で約 3% が線を越える＝move_judge の較正）・verify＝同じく、ただし手を打った側の今のターンの残りは出荷の設定が打つ（箱の 1 段目・詰みの手順の 1 手目を 160 回の審判が打ち継げず a が不利になる偏り〔3301074・152 / 3301043・118〕を除く）。確かめ済み＝verify で両審判をまとめた差の区間が 0 を外れ、審判 2 本とも差が正。仕様の定義（r20 の差 > 0）は confirmed_spec に並記。窓の揺れ（winstab）は報告の機序の裏づけとして足した（窓の点で探索の乱数だけを替えて 8 回選ぶ）。続き（commit）の点の a は原始手 1 つ・b は読み直しの箱全体のことがある（verify で今のターンの残りを出荷に打たせて揃えた）。途中の push は器とデータだけ（make test は最初の push 前と最終の push 前に回した）。判定の途中で make test・探査を並走させた時間があり、sec の値は並走ぶん膨らんでいる。結論: 確かめ済みの損は 3/927（0.32%）で全部が戦闘の窓（窓の根畳み＝世界 1 本・静的な値 1 回）。直し方の案は報告 §6（窓の世界を K 本に・低いライフの戦闘の窓は短い木で比べる）。"
 }
