@@ -1,44 +1,98 @@
 {
- "job": "commit-audit",
- "role": "audit",
+ "job": "blunder-audit",
+ "role": "measure",
  "status": "done",
  "inputs": {
-  "base_commit": "ddcf0df",
-  "spec": "docs/search_efficiency_plan.md §7.40",
-  "net": "r13d（両席・opcg_sim/data/learned/nrel_r13d.npz）",
-  "setting": "出荷（1,280 回・世界 2 本・枝予算なし・詰みの証明 root・公平）",
-  "leaders_decks": "random × real",
-  "seeds": "3291000〜3291299（300 局・4 並走）",
-  "deep_judge": "r13d・5,120 回・世界 4 本・枝予算なし・証明 off・seed ^ JUDGE_XOR",
-  "supplementary": "同じ seed の最初の 100 局（3291000〜3291099）・対話と戦闘の点だけ・次の木の判断点まで進めて判定役の seed 4 本の平均"
+  "base": "claude/cpu-spec-improvements-yw91jd@4837e5441",
+  "spec": "docs/search_efficiency_plan.md §7.41",
+  "seats": "両席 r13d・出荷の設定（PLAY_SIMS 1280・PLAY_WORLDS 2・PLAY_BUDGET 0・PLAY_LETHAL_PROOF root）・random × real",
+  "seeds": "3301000〜3301099（100 局）",
+  "points_per_game": 10,
+  "k": 32,
+  "nets": {
+   "r13d": "opcg_sim/data/learned/nrel_r13d.npz",
+   "r20": "claude/train-r20:n1_results/nrel_r20.npz"
+  },
+  "referee": "SeatSpec(net, sims=160)・世界 1 本・公平・詰みの証明 off・両席",
+  "loss_line": "差（b − a）≥ 0.20 かつ審判 r13d の 95% 区間の下限 > 0"
  },
  "outputs": {
-  "report": "docs/reports/2026-10-23_commit_audit.md",
-  "tool": "tests/scripts/commit_audit.py",
-  "points": "n1_results/commit_audit/points_3291000_300.jsonl.gz",
-  "summary": "n1_results/commit_audit/summary.json",
-  "supplementary_points": "n1_results/commit_audit/sup/points_3291000_first100.jsonl.gz",
-  "supplementary_summary": "n1_results/commit_audit/sup/summary.json"
+  "tool": "tests/scripts/blunder_audit.py",
+  "report": "docs/reports/2026-10-23_blunder_audit.md",
+  "data": "n1_results/blunder_audit/（games.jsonl・points.jsonl・recheck.jsonl・verify.jsonl・window_stability.jsonl・summary.json・*.log）"
  },
  "metrics": {
-  "games": 300,
+  "games": 100,
   "void": 0,
-  "commit_share_own_turn": 0.2032,
-  "commit_share_all": 0.292,
-  "commit_points": 12997,
-  "diff_rate_own": 0.1433,
-  "diff_rate_opp": 0.0725,
-  "box": {"points": 2620, "diff": 0.1744, "reseed_diff": 0.2378, "deep_root_fresh_better": 0.567, "deep_child_fresh_better": 0.456, "verdict": "揺らぎの範囲・損なし"},
-  "play_dialog_own": {"points": 2744, "diff": 0.1184, "reseed_diff": 0.0237, "deep_child_fresh_better": 0.83, "supp_fresh_better": 0.73},
-  "window_opp_defense": {"points": 7134, "diff": 0.0725, "reseed_diff": 0.0251, "deep_child_fresh_better": 0.76, "supp_fresh_better": 0.63},
-  "loss_types": {
-   "A_confirm_decline_own": {"points": 129, "live_decline_fresh_accept": 115, "supp_fresh_better": 0.82, "supp_mean_dv": 0.199},
-   "B_defense_pass_vs_counter": {"points": 150, "supp_fresh_better": 0.75, "supp_mean_dv": 0.088},
-   "C_search_select_card": {"points_own": 254, "points_opp": 112, "supp_fresh_better_own": 0.67, "supp_fresh_better_opp": 0.74}
+  "decisions": 14362,
+  "eligible": 11089,
+  "points_judged": 927,
+  "points_no_b": 73,
+  "cand": {
+   "k": 12,
+   "n": 927,
+   "rate": 0.0129,
+   "ci": [
+    0.0074,
+    0.0225
+   ]
   },
-  "rough_winrate_impact_per_seat": 0.04,
-  "opp_moves_between_commit_and_replay": 0
+  "confirmed_spec": {
+   "k": 10,
+   "n": 927,
+   "rate": 0.0108,
+   "ci": [
+    0.0059,
+    0.0197
+   ]
+  },
+  "replicated": {
+   "k": 8,
+   "n": 927,
+   "rate": 0.0086,
+   "ci": [
+    0.0044,
+    0.0169
+   ]
+  },
+  "verified": {
+   "k": 3,
+   "n": 927,
+   "rate": 0.0032,
+   "ci": [
+    0.0011,
+    0.0095
+   ]
+  },
+  "verified_by_kind": {
+   "main": 0,
+   "window": 3,
+   "commit": 0,
+   "lethal": 0
+  },
+  "verified_types": {
+   "iii_window_root_fold": 3,
+   "i_commit": 0,
+   "ii_rules": 0,
+   "iv_pure_read": 0,
+   "v_default": 0
+  },
+  "measurement_artifact_vi": 2,
+  "undetermined": 3,
+  "chance": 4,
+  "window_unstable": {
+   "k": 44,
+   "n": 226,
+   "rate": 0.1947,
+   "ci": [
+    0.1483,
+    0.2512
+   ]
+  },
+  "mean_diff_all": -0.024,
+  "sec_per_point_core": 61.0,
+  "sec_per_game_core": 28.7
  },
- "command": "python tests/scripts/commit_audit.py run --games 300 --seed-base 3291000 --workers 4 && python tests/scripts/commit_audit.py run --games 300 --seed-base 3291000 --workers 4 --no-deep --judge-seeds 4 --judge-types dialog,battle --out n1_results/commit_audit/sup（100 局で止めた） && python tests/scripts/commit_audit.py summary [--out …/sup]",
- "notes": "読み取りだけ（エンジン・既定の挙動は変えていない）。付与→攻撃の箱の続きは損なし（別の手 17% < 乱数の揺らぎ 24%・深い読みの向きは割れる）。対話・窓の続きに損の型 3 つ: (A) 自分の登場時の対話で任意効果を見送る（115/129 が見送りの向き）・(B) 守りの続きで素通し（読み直しはカウンター）・(C) 山札から選ぶ札（§7.39 の型が自分の手番にも）。照合（署名）の欠陥ではなく、機序はコードからの読み（未検証）: 続きは resolve_battle_inplace(box_depth=1) の中で resolved_branch_values(depth 0)＝枝の先を方策で進めた値で決まり、読み直しの window_choice（depth 1）より 1 段浅い・見えていない札は引き直した世界の中身で選ぶ。相手の判断が続きの途中に挟まった点は 0。迷った点: (1) 補助の判定は費用（1 局 177 秒・300 局で約 4 時間）のため最初の 100 局で止めた。(2) 深い読みの判定役は同じネットで自分の好みを持つ＝較正（乱数だけ替えた 2 つの読み直し）を並べ、較正が偏る型（相手の手番の戦闘の子の判定 69%）は補助の判定で読んだ。(3) WP move-judge の器は本線に無く、固定の審判で最後まで打つ判定は使っていない。(4) 準備箱は出荷の設定で off＝続きが 0 点で監査対象外。(5) 値の差→勝率の読み替え（1 席あたり約 4%）は上限側の目安。提案: 対話・窓の続きは積まずに毎回読み直す（費用は窓の根畳み 1 回＝平均 0.017 秒）・§7.39 とまとめて 1 WP。"
+ "command": "python tests/scripts/blunder_audit.py play --games 100 --workers 4 && ... judge --workers 4 && ... recheck --workers 4 && ... verify --workers 4 && ... winstab --workers 4 && ... summary",
+ "notes": "局数: 30 局で器を確かめ、1 点の所要（判定 約 61 秒／1 コア・審判 r13d の 64 局＋候補だけ r20）から 4 コア約 4 時間＝100 局・1,000 点に決めた（仕様の目安 1,200〜1,600 点には届かない）。判定できなかった 73 点は相手のアタック中の続き（カウンターの 2 枚目以降）で、持ち越し無しの読み直しが候補の刈り込みで素通しだけになった点（b が無い）。仕様に 2 段足した（候補だけ）: recheck＝独立の配り方 48 通りで審判 2 本とも打ち直す（K=32 の 1 回の判定は偶然でも 1 本の審判で約 3% が線を越える＝move_judge の較正）・verify＝同じく、ただし手を打った側の今のターンの残りは出荷の設定が打つ（箱の 1 段目・詰みの手順の 1 手目を 160 回の審判が打ち継げず a が不利になる偏り〔3301074・152 / 3301043・118〕を除く）。確かめ済み＝verify で両審判をまとめた差の区間が 0 を外れ、審判 2 本とも差が正。仕様の定義（r20 の差 > 0）は confirmed_spec に並記。窓の揺れ（winstab）は報告の機序の裏づけとして足した（窓の点で探索の乱数だけを替えて 8 回選ぶ）。続き（commit）の点の a は原始手 1 つ・b は読み直しの箱全体のことがある（verify で今のターンの残りを出荷に打たせて揃えた）。途中の push は器とデータだけ（make test は最初の push 前と最終の push 前に回した）。判定の途中で make test・探査を並走させた時間があり、sec の値は並走ぶん膨らんでいる。結論: 確かめ済みの損は 3/927（0.32%）で全部が戦闘の窓（窓の根畳み＝世界 1 本・静的な値 1 回）。直し方の案は報告 §6（窓の世界を K 本に・低いライフの戦闘の窓は短い木で比べる）。"
 }
