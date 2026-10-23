@@ -1282,6 +1282,16 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
   再生では小さいカウンターで切って素通し＝負ける形が守りの見逃しの 4 分の 3 を占めていた（`2026-10-22_defense_audit.md` §2）。
 - **測定用の旗** `commit_sig_legacy`（opts の鍵・既定 false）: true で旧い署名（commit の積み・照合と複数世界の束ね）。
   アリーナは `--cand-commit-sig-legacy`（候補席）・`arena_shard --commit-sig-legacy`（基準席）。
+- **見えていなかった札を選ぶ段は積まない**（2026-10-23〜・§7.39・WP `rs-commit-hidden`・`docs/reports/2026-10-23_commit_hidden.md`）:
+  commit の続きは**引き直した世界**（§2.5.9）の上で打ち直して作る。続きの中の自分の判断点が、**commit した時点で自分に見えていなかった札**
+  （両者の山札・裏向きのライフ・相手の手札のうち、`known_by` に自分の bit が無い札＝公平な引き直しが混ぜる札と同じ集合）を
+  対話の候補（`candidates`／`selectable`）に 1 枚でも含むなら、**その段と先を積まない**（`decide.rs::hidden_at_commit`・`trace_to_steps`）。
+  続きはそこで尽き、その判断点は普通に読み直す（窓の根畳み）。例: 山札の上から見て選ぶ・引いてから手札を捨てる（引いた札が候補に入る）。
+  候補が場・トラッシュ・自分の手札（commit の時点で持っていた札）・知っている札だけなら今までどおり続きを打つ。
+  判定は札の index で行う（引き直しは札の位置だけを混ぜるので、本当の盤面と世界で同じ印になる）。窓の根畳み・登場時の対話・準備箱の 3 つの続きが対象
+  （付与 → 攻撃の箱 `Step::Box` は自分の場の札しか選ばない＝対象外）。
+  測定用の旗 `commit_hidden_legacy`（opts の鍵・既定 false）: true で全部積む旧い形。アリーナは `--cand-commit-hidden-legacy`（候補席）・
+  `arena_shard --commit-hidden-legacy`（基準席）。
 
 
 ---

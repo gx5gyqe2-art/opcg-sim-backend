@@ -635,6 +635,8 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
         commit_sig_legacy: flag("commit_sig_legacy", d.commit_sig_legacy),
         // 守りの強い配り方の旧い形（§7.33・測定用・既定 false）。
         lethal_deal_legacy: flag("lethal_deal_legacy", d.lethal_deal_legacy),
+        // 見えていなかった札を選ぶ続きを捨てない旧い形（§7.39・WP `rs-commit-hidden`・測定専用・既定 false）。
+        commit_hidden_legacy: flag("commit_hidden_legacy", d.commit_hidden_legacy),
     }
 }
 

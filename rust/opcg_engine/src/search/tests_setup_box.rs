@@ -404,7 +404,7 @@ fn applying_the_kami_box_expands_into_primitive_moves() {
         boxes::setup_box_continuation(&mut w, masters, Seat::P1, &ko_box).expect("箱の継続");
     let kinds: Vec<&str> = trace
         .iter()
-        .map(|(_, m)| m.action_type().unwrap_or("?"))
+        .map(|(_, m, _)| m.action_type().unwrap_or("?"))
         .collect();
     assert!(
         kinds.iter().all(|k| *k == "RESOLVE_EFFECT_SELECTION"),
@@ -463,7 +463,7 @@ fn gamma_knife_box_stops_after_the_effect_and_leaves_the_attacks_to_the_tree() {
     assert!(
         trace
             .iter()
-            .all(|(_, m)| m.to_json()["action_type"] == json!("RESOLVE_EFFECT_SELECTION")),
+            .all(|(_, m, _)| m.to_json()["action_type"] == json!("RESOLVE_EFFECT_SELECTION")),
         "コミットの手順は対話の解決だけ（攻撃は入らない）: {trace:?}"
     );
     assert!(

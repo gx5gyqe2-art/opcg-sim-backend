@@ -1,98 +1,138 @@
 {
- "job": "blunder-audit",
- "role": "measure",
+ "job": "rs-commit-hidden",
+ "role": "engine fix (gameplay defect) + re-audit",
  "status": "done",
+ "spec": "docs/search_efficiency_plan.md §7.39 (origin/claude/cpu-spec-improvements-yw91jd @ ddcf0df; ledger 2+368); evidence docs/reports/2026-10-23_commit_sig.md §2.2",
+ "branch": "claude/rs-commit-hidden",
+ "report": "docs/reports/2026-10-23_commit_hidden.md",
  "inputs": {
-  "base": "claude/cpu-spec-improvements-yw91jd@4837e5441",
-  "spec": "docs/search_efficiency_plan.md §7.41",
-  "seats": "両席 r13d・出荷の設定（PLAY_SIMS 1280・PLAY_WORLDS 2・PLAY_BUDGET 0・PLAY_LETHAL_PROOF root）・random × real",
-  "seeds": "3301000〜3301099（100 局）",
-  "points_per_game": 10,
-  "k": 32,
-  "nets": {
-   "r13d": "opcg_sim/data/learned/nrel_r13d.npz",
-   "r20": "claude/train-r20:n1_results/nrel_r20.npz"
-  },
-  "referee": "SeatSpec(net, sims=160)・世界 1 本・公平・詰みの証明 off・両席",
-  "loss_line": "差（b − a）≥ 0.20 かつ審判 r13d の 95% 区間の下限 > 0"
+  "base": "ddcf0df (Plan WPs rs-commit-hidden and commit-audit)",
+  "net": "nrel_r13d (both seats)",
+  "audit_settings": "same as §7.24: 1 world x 1280 sims, budget none, lethal_proof off, random leaders x synth_roles, seeds 3013000-3013299, verify on, PYTHONHASHSEED=0; before = same base with --commit-hidden-legacy (both 300-game runs with 2 workers each, concurrently)",
+  "latency": "rs_decide_latency.py --worlds 2 --lethal-proof root --games 20 (seed 2999900-), each setting pinned to one core, run concurrently"
  },
  "outputs": {
-  "tool": "tests/scripts/blunder_audit.py",
-  "report": "docs/reports/2026-10-23_blunder_audit.md",
-  "data": "n1_results/blunder_audit/（games.jsonl・points.jsonl・recheck.jsonl・verify.jsonl・window_stability.jsonl・summary.json・*.log）"
+  "engine": "rust/opcg_engine/src/search/decide.rs (hidden_at_commit, trace_to_steps truncation, DecideOptions.commit_hidden_legacy), quiesce.rs (TraceStep, dialog_cards), macro.rs (setup-box trace carries candidates), mod.rs (opts key commit_hidden_legacy)",
+  "python": "opcg_sim/api/engine_rs.py (commit_hidden_legacy=), opcg_sim/loop/arena.py (--cand-commit-hidden-legacy), opcg_sim/loop/arena_shard.py (--commit-hidden-legacy)",
+  "tools": "tests/scripts/defense_audit.py (--commit-hidden-legacy), tests/scripts/rs_decide_latency.py (--commit-hidden-legacy, kinds)",
+  "tests": "rust/opcg_engine/src/search/tests_commit_hidden.rs (5 tests)",
+  "goldens": "tests/fixtures/rs_goldens/replay/a1_5000165.json, a1_5000182.json (2 changed); audit.json and random band unchanged",
+  "results": "n1_results/commit_hidden/ (compare300.json, golden_diff.json, new300/, legacy300/, pilot_new/, pilot_legacy/, latency_*.json, logs, one-off scripts compare300.py, golden_diff.py, trace_seed.py)",
+  "docs": "docs/SPEC.md §2.5.11, docs/TEST_SPEC.md (tests_commit_hidden.rs row; defense_audit / rs_decide_latency rows)"
  },
  "metrics": {
-  "games": 100,
-  "void": 0,
-  "decisions": 14362,
-  "eligible": 11089,
-  "points_judged": 927,
-  "points_no_b": 73,
-  "cand": {
-   "k": 12,
-   "n": 927,
-   "rate": 0.0129,
-   "ci": [
-    0.0074,
-    0.0225
+  "audit300": {
+   "void": [
+    0,
+    0
+   ],
+   "resp_points": [
+    9820,
+    9793
+   ],
+   "threat_ko": [
+    450,
+    433
+   ],
+   "threat_otsu": [
+    351,
+    332
+   ],
+   "miss_ko": [
+    24,
+    24
+   ],
+   "miss_otsu_raw": [
+    9,
+    8
+   ],
+   "miss_otsu_verified": [
+    7,
+    6
+   ],
+   "miss_otsu_verified_commit": [
+    3,
+    2
+   ],
+   "miss_otsu_verified_window": [
+    4,
+    4
+   ],
+   "seat_lost_after_verified_miss": [
+    5,
+    4
+   ],
+   "same_game_shape": 262,
+   "same_winner": 288,
+   "order": "[legacy, fixed]",
+   "removed": "3013121 p2 step 142 (choice among resampled-world deck cards)",
+   "remaining_commit": [
+    "3013194 p2 89: target among field cards (visible); re-read gives same move (search miss, not this defect)",
+    "3013217 p2 157: CONFIRM_OPTIONAL replayed from a 7-step window-fold commit made at a simultaneous-trigger order dialog; candidates visible; re-read declines and is safe (commit-vs-reread disagreement, §7.40 scope)"
    ]
   },
-  "confirmed_spec": {
-   "k": 10,
-   "n": 927,
-   "rate": 0.0108,
-   "ci": [
-    0.0059,
-    0.0197
-   ]
+  "pilot2": {
+   "seeds": [
+    3013121,
+    3013194
+   ],
+   "legacy_reproduces_both_misses": true,
+   "fixed": "3013121 point gone (p2 now wins); 3013194 unchanged"
   },
-  "replicated": {
-   "k": 8,
-   "n": 927,
-   "rate": 0.0086,
-   "ci": [
-    0.0044,
-    0.0169
-   ]
+  "goldens": {
+   "audit_diff": 0,
+   "random_diff": 0,
+   "a1_diff": 2,
+   "a1_legacy_reproduces_head": "50/50",
+   "a1_winner_changed": 1,
+   "a1_cause": "both at the discard of Boa Hancock EB04-027 (draw 2, discard 1) on p2's own turn: two candidates were drawn after the commit"
   },
-  "verified": {
-   "k": 3,
-   "n": 927,
-   "rate": 0.0032,
-   "ci": [
-    0.0011,
-    0.0095
-   ]
+  "latency": {
+   "mean_sec": [
+    0.2,
+    0.201
+   ],
+   "p90": [
+    0.506,
+    0.501
+   ],
+   "p99": [
+    1.32,
+    1.334
+   ],
+   "wall_sec": [
+    616.8,
+    621.1
+   ],
+   "moves": [
+    2747,
+    2758
+   ],
+   "kinds_legacy": {
+    "main": 1311,
+    "window": 616,
+    "commit": 741,
+    "lethal": 79
+   },
+   "kinds_fixed": {
+    "main": 1302,
+    "window": 628,
+    "commit": 747,
+    "lethal": 81
+   },
+   "per_move_delta": "+0.5% (noise level)"
   },
-  "verified_by_kind": {
-   "main": 0,
-   "window": 3,
-   "commit": 0,
-   "lethal": 0
-  },
-  "verified_types": {
-   "iii_window_root_fold": 3,
-   "i_commit": 0,
-   "ii_rules": 0,
-   "iv_pure_read": 0,
-   "v_default": 0
-  },
-  "measurement_artifact_vi": 2,
-  "undetermined": 3,
-  "chance": 4,
-  "window_unstable": {
-   "k": 44,
-   "n": 226,
-   "rate": 0.1947,
-   "ci": [
-    0.1483,
-    0.2512
-   ]
-  },
-  "mean_diff_all": -0.024,
-  "sec_per_point_core": 61.0,
-  "sec_per_game_core": 28.7
+  "gates": {
+   "make_test": "green (cargo 615 passed; pytest 857 passed, 13 skipped)",
+   "audit_cross": "void 0 (120 pairs, 240 games)"
+  }
  },
- "command": "python tests/scripts/blunder_audit.py play --games 100 --workers 4 && ... judge --workers 4 && ... recheck --workers 4 && ... verify --workers 4 && ... winstab --workers 4 && ... summary",
- "notes": "局数: 30 局で器を確かめ、1 点の所要（判定 約 61 秒／1 コア・審判 r13d の 64 局＋候補だけ r20）から 4 コア約 4 時間＝100 局・1,000 点に決めた（仕様の目安 1,200〜1,600 点には届かない）。判定できなかった 73 点は相手のアタック中の続き（カウンターの 2 枚目以降）で、持ち越し無しの読み直しが候補の刈り込みで素通しだけになった点（b が無い）。仕様に 2 段足した（候補だけ）: recheck＝独立の配り方 48 通りで審判 2 本とも打ち直す（K=32 の 1 回の判定は偶然でも 1 本の審判で約 3% が線を越える＝move_judge の較正）・verify＝同じく、ただし手を打った側の今のターンの残りは出荷の設定が打つ（箱の 1 段目・詰みの手順の 1 手目を 160 回の審判が打ち継げず a が不利になる偏り〔3301074・152 / 3301043・118〕を除く）。確かめ済み＝verify で両審判をまとめた差の区間が 0 を外れ、審判 2 本とも差が正。仕様の定義（r20 の差 > 0）は confirmed_spec に並記。窓の揺れ（winstab）は報告の機序の裏づけとして足した（窓の点で探索の乱数だけを替えて 8 回選ぶ）。続き（commit）の点の a は原始手 1 つ・b は読み直しの箱全体のことがある（verify で今のターンの残りを出荷に打たせて揃えた）。途中の push は器とデータだけ（make test は最初の push 前と最終の push 前に回した）。判定の途中で make test・探査を並走させた時間があり、sec の値は並走ぶん膨らんでいる。結論: 確かめ済みの損は 3/927（0.32%）で全部が戦闘の窓（窓の根畳み＝世界 1 本・静的な値 1 回）。直し方の案は報告 §6（窓の世界を K 本に・低いライフの戦闘の窓は短い木で比べる）。"
+ "forecast_check": {
+  "commit_misses_2_to_0": "miss: 3 -> 2 on the same base; the defect-type point is gone; the 2 remaining are other types",
+  "otsu_7_to_5": "miss: 7 -> 6",
+  "golden_a1_3_to_10": "miss: 2",
+  "cost_1_to_3pct": "miss (lower): +0.5%"
+ },
+ "command": "PYTHONHASHSEED=0 python tests/scripts/defense_audit.py run --games 300 --seed-base 3013000 --workers 2 --out n1_results/commit_hidden/new300 [--commit-hidden-legacy] && ... verify ... && ... summarize",
+ "notes": "(1) Judgement form: known-at-commit set (fair-resampled slots without my known_by bit), applied when the commit is generated (the trace now carries each step's dialog candidates) instead of carrying the set into the commit; the zone-based alternative would miss 'draw then discard' (candidates in hand) and needlessly re-read known deck tops. Carry/JSON shape and commit_step are unchanged. (2) The 'before' audit was re-run on the current base with --commit-hidden-legacy because rs-trigger-simul etc. changed play since rs-commit-sig; the commit_sig report's numbers are not directly comparable. (3) commit_sig §2.2 described 3013194 as a deck search; it is a target among field cards (SEARCH_AND_SELECT is the front name of SELECT_TARGET) - outside this fix. (4) 3013217 is a new commit-derived miss type that appears with simultaneous-trigger order dialogs (rs-trigger-simul); left for WP commit-audit (§7.40). (5) My first code push (313d9cd) was before make test; make test was green before every later push. (6) Pre-existing clippy -D warnings failures (lethal.rs too_many_arguments, tests_lethal.rs needless_range_loop) are on the base; not touched. (7) Production arena: candidate = fixed (default), baseline = arena_shard --commit-hidden-legacy, both r13d, shipping settings, random x real, seed 3271000- (coordinator). Expected effect small: 2/50 a1 golden games and 38/300 audit games change."
 }

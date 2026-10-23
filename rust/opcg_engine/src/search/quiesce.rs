@@ -690,6 +690,24 @@ pub fn best_branch(vals: &[Option<f64>]) -> Option<usize> {
     best
 }
 
+/// 箱コミット生成が読む適用手の 1 段（打った席・手・**打つ前の**判断点の対話の候補の札）。
+///
+/// 3 つ目は WP `rs-commit-hidden` の判定用（[`dialog_cards`]・対話でなければ空）。
+pub type TraceStep = (Seat, Move, Vec<CardIdx>);
+
+/// 判断点の対話の候補の札（`candidates` と `selectable` の両方・ドン!!は除く・対話でなければ空）。
+pub fn dialog_cards(state: &GameState) -> Vec<CardIdx> {
+    match state.active_interaction() {
+        Some(it) => it
+            .candidates
+            .iter()
+            .chain(it.selectable.iter().flatten())
+            .filter_map(|t| t.card())
+            .collect(),
+        None => Vec::new(),
+    }
+}
+
 /// Python `mcts.resolve_battle_inplace`（窓が解決するまで**その場で**進める・巻き戻さない）。
 ///
 /// `box_value=true` が Python の「`box_depth>0` かつ `value_fn` あり」＝残りの窓も出口 value
@@ -703,7 +721,7 @@ pub fn resolve_battle_inplace(
     max_plies: usize,
     box_value: bool,
     box_depth: i32,
-    mut trace: Option<&mut Vec<(Seat, Move)>>,
+    mut trace: Option<&mut Vec<TraceStep>>,
 ) -> Result<usize, EngineError> {
     let mut n = 0usize;
     // §20.7.2 の共通規則: 攻撃箱／防御箱の中でも「**自分が**選ぶ最初の対象選択」を 1 段だけ
@@ -760,13 +778,14 @@ pub fn resolve_battle_inplace(
             Some(i) => i,
             None => quiesce_choice(ctx, s, &legal, true)?,
         };
+        let cards = if trace.is_some() { dialog_cards(s.state()) } else { Vec::new() };
         match apply::apply_move_inplace(s, ctx.masters, name, &legal[pick], true) {
             Ok(()) => {}
             Err(e @ EngineError::Unimplemented(_)) => return Err(e),
             Err(_) => break, // Python の `except Exception: break`
         }
         if let Some(tr) = trace.as_deref_mut() {
-            tr.push((name, legal[pick].clone()));
+            tr.push((name, legal[pick].clone(), cards));
         }
         n += 1;
     }

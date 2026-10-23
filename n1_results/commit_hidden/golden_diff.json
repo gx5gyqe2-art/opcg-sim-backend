@@ -1,0 +1,356 @@
+[
+ {
+  "seed": 5000150,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000151,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000152,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000153,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000154,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000155,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000156,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000157,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000158,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000159,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000160,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000161,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000162,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000163,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000164,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000165,
+  "changed": true,
+  "first_div": 25,
+  "old": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": true,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": [
+     "6756f364-5c2c-4cd8-8871-9df3ecb7a9c0"
+    ]
+   }
+  },
+  "new": {
+   "kind": "game",
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "payload": {
+    "selected_uuids": [
+     "a8d9d917-d944-4d8f-afa2-6de31c34001b"
+    ],
+    "index": 0,
+    "accepted": true,
+    "position": "BOTTOM",
+    "declared_value": 0
+   }
+  },
+  "kind_old": "commit",
+  "kind_new": "window",
+  "seat_turn": [
+   "p2",
+   6
+  ],
+  "prev_kinds_legacy": [
+   "main",
+   "main",
+   "main",
+   "commit"
+  ],
+  "prev_moves": [
+   "PLAY",
+   "TURN_END",
+   "PLAY"
+  ],
+  "legacy_reproduces_head": true,
+  "len": [
+   111,
+   110
+  ],
+  "winner": [
+   "p2",
+   "p1"
+  ]
+ },
+ {
+  "seed": 5000166,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000167,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000168,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000169,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000170,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000171,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000172,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000173,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000174,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000175,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000176,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000177,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000178,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000179,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000180,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000181,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000182,
+  "changed": true,
+  "first_div": 16,
+  "old": {
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "kind": "game",
+   "payload": {
+    "accepted": true,
+    "declared_value": 0,
+    "index": 0,
+    "position": "BOTTOM",
+    "selected_uuids": [
+     "b07d52f6-dea0-4355-90fd-c121676c5928"
+    ]
+   }
+  },
+  "new": {
+   "kind": "game",
+   "action_type": "RESOLVE_EFFECT_SELECTION",
+   "payload": {
+    "selected_uuids": [
+     "b2dad981-1302-4c47-9df7-1a1d571ec73c"
+    ],
+    "index": 0,
+    "accepted": true,
+    "position": "BOTTOM",
+    "declared_value": 0
+   }
+  },
+  "kind_old": "commit",
+  "kind_new": "window",
+  "seat_turn": [
+   "p2",
+   6
+  ],
+  "prev_kinds_legacy": [
+   "commit",
+   "main",
+   "main",
+   "commit"
+  ],
+  "prev_moves": [
+   "PASS",
+   "TURN_END",
+   "PLAY"
+  ],
+  "legacy_reproduces_head": true,
+  "len": [
+   96,
+   96
+  ],
+  "winner": [
+   "p2",
+   "p2"
+  ]
+ },
+ {
+  "seed": 5000183,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000184,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000185,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000186,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000187,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000188,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000189,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000190,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000191,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000192,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000193,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000194,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000195,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000196,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000197,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000198,
+  "changed": false,
+  "legacy_reproduces_head": true
+ },
+ {
+  "seed": 5000199,
+  "changed": false,
+  "legacy_reproduces_head": true
+ }
+]

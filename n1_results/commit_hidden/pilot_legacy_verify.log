@@ -1,0 +1,3 @@
+verify 2 miss points
+[1/2] resp seed=3013194 step=89 {'miss_ko_full': True, 'miss_otsu_full': True} sec=10.9
+[2/2] resp seed=3013121 step=142 {'miss_ko_full': True, 'miss_otsu_full': True} sec=15.0
