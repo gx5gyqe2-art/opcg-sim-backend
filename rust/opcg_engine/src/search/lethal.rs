@@ -158,6 +158,8 @@ pub struct LethalOut {
     /// 配り方の数。
     pub deals: usize,
     pub nodes: u64,
+    /// 計測用（§7.30・`Game.lethal_json` の `trace`）: 配り方ごとの手順（[`Solver::walk`]）。ふつうは `None`。
+    pub lines: Option<Vec<Value>>,
 }
 
 /// 発動条件（§7.21 の 1）: 手番が自分で、自分が答える判断点（メイン、または自分の効果対話）で、**このターンに出せる
@@ -805,9 +807,11 @@ impl<'a> Solver<'a> {
     }
 
     /// 勝ち筋の長さ（自分は記録した手・相手は並びの先頭で適用できる応手）。
-    fn line_len(&self, state: &GameState, limit: usize) -> usize {
+    fn line_len(&self, state: &GameState, commit: Option<&str>, limit: usize) -> usize {
         let mut s = Session::new(state.clone());
-        let mut commit: Option<String> = None;
+        // 根の手が付与なら、その直後の自分の判断点は「付けたユニットで続ける」鍵（`commit`）で記録されている
+        // （旧い形は `None` で引いて 1 手で止まっていた＝計測の欄だけの修正・打つ手は変わらない）
+        let mut commit: Option<String> = commit.map(str::to_owned);
         let mut n = 0;
         while n < limit {
             let st = s.state();
@@ -842,6 +846,185 @@ impl<'a> Solver<'a> {
         }
         n
     }
+
+    /// 計測用（§7.30）: `state`（根の手を当てた後の盤面）から手順を 1 本辿って JSON の列にする。
+    /// 自分の判断点は勝てた手（`best`）→ 無ければ `guide`（配り方 0 の勝ち筋の自分の手・同じ番目）→ 無ければ止まる。
+    /// 相手の判断点は、各応手の後を読み直して**こちらが勝てない応手**（反証）が在ればそれ、無ければ並びの先頭。
+    /// 各手に「自分の隠れた札（根で山札・裏向きのライフに在った自分の札）のうち、この判断点までに見えた札」を添える＝
+    /// 配り方ごとに手順が分かれる点が、自分の隠れた札を見た直後かを読むため。
+    fn walk(&mut self, state: &GameState, commit: Option<&str>, guide: &[Move], hidden: &[CardIdx], limit: usize) -> Vec<Value> {
+        let mut s = Session::new(state.clone());
+        let mut commit: Option<String> = commit.map(str::to_owned);
+        let mut out = Vec::new();
+        let mut my_n = 0usize;
+        let mut seen_before: Vec<CardIdx> = Vec::new();
+        for _ in 0..limit {
+            let st = s.state();
+            if let Some(w) = st.winner {
+                out.push(serde_json::json!({"end": if w == self.me { "win" } else { "lose" }}));
+                return out;
+            }
+            if st.turn_count != self.turn || st.turn_player != self.me {
+                out.push(serde_json::json!({"end": "turn_end"}));
+                return out;
+            }
+            let Some((actor, action)) = crate::rules::pending::pending_actor_action(&mut s) else {
+                out.push(serde_json::json!({"end": "no_pending"}));
+                return out;
+            };
+            let pend = if action == MAIN {
+                Value::Null
+            } else {
+                crate::rules::pending::get_pending_request(&mut s, self.masters, false).unwrap_or(Value::Null)
+            };
+            // この判断点までに見えた自分の隠れた札（山札・裏向きのライフから出た札＋対話の候補に出た札）
+            let seen = seen_hidden(s.state(), self.me, hidden, &pend);
+            let newly: Vec<String> = seen
+                .iter()
+                .filter(|c| !seen_before.contains(c))
+                .map(|c| self.masters.get(s.state().card(*c).master).card_id.clone())
+                .collect();
+            seen_before = seen;
+            let mine = actor == self.me;
+            let (mv, src) = if mine {
+                let k = self.key(&mut s, action, commit.as_deref());
+                match self.best.get(&k).cloned() {
+                    Some(m) => (m, "best"),
+                    None => match guide.get(my_n) {
+                        Some(g) => (g.clone(), "guide"),
+                        None => {
+                            out.push(serde_json::json!({"actor": "me", "action": action, "stop": "no_win_move",
+                                "message": pend.get("message").cloned().unwrap_or(Value::Null), "seen": newly}));
+                            return out;
+                        }
+                    },
+                }
+            } else {
+                let Ok(mut moves) = self.expand(&mut s, actor, action) else {
+                    out.push(serde_json::json!({"actor": "opp", "action": action, "stop": "opp_unbounded"}));
+                    return out;
+                };
+                moves.sort_by_key(opp_order);
+                let mut pick: Option<(Move, &str)> = None;
+                let mut hardest = 0u64;
+                for m in moves {
+                    s.begin();
+                    if apply(&mut s, self.masters, actor, &m).is_err() {
+                        s.rollback();
+                        continue;
+                    }
+                    self.max_nodes = self.nodes + LETHAL_ROOT_NODES;
+                    let before = self.nodes;
+                    let r = self.solve(&mut s, None, 1);
+                    s.rollback();
+                    match r {
+                        Ok(false) => {
+                            pick = Some((m, "refute"));
+                            break;
+                        }
+                        Ok(true) => {
+                            // 全部の応手が負けなら、最も粘った応手（読んだ節点が最多）を手順に採る
+                            let used = self.nodes - before;
+                            if pick.is_none() || used > hardest {
+                                hardest = used;
+                                pick = Some((m, "any"));
+                            }
+                        }
+                        Err(Abort) => {
+                            pick = Some((m, "unknown"));
+                            break;
+                        }
+                    }
+                }
+                match pick {
+                    Some(p) => p,
+                    None => {
+                        out.push(serde_json::json!({"actor": "opp", "action": action, "stop": "no_reply"}));
+                        return out;
+                    }
+                }
+            };
+            let mut row = describe_move(s.state(), self.masters, &mv);
+            if let Some(o) = row.as_object_mut() {
+                o.insert("actor".into(), Value::from(if mine { "me" } else { "opp" }));
+                o.insert("action".into(), Value::from(action));
+                o.insert("src".into(), Value::from(src));
+                o.insert("seen".into(), Value::from(newly));
+                if let Some(m) = pend.get("message") {
+                    o.insert("message".into(), m.clone());
+                }
+            }
+            if mine {
+                my_n += 1;
+            }
+            commit = if mine && act_of(&mv) == "ATTACH_DON" { mv_uuid(&mv).map(str::to_owned) } else { None };
+            if apply(&mut s, self.masters, actor, &mv).is_err() {
+                if let Some(o) = row.as_object_mut() {
+                    o.insert("stop".into(), Value::from("apply_failed"));
+                }
+                out.push(row);
+                return out;
+            }
+            out.push(row);
+        }
+        out.push(serde_json::json!({"end": "limit"}));
+        out
+    }
+}
+
+/// 自分の隠れた札（山札＋裏向きのライフ・計測用）。
+fn hidden_own(st: &GameState, me: Seat) -> Vec<CardIdx> {
+    let p = st.player(me);
+    p.deck.iter().copied().chain(p.life.iter().copied().filter(|c| !st.card(*c).is_face_up)).collect()
+}
+
+/// `hidden` のうち、今は山札・裏向きのライフに無い札（引いた・めくった・トラッシュした）と、対話の候補に出ている札。
+fn seen_hidden(st: &GameState, me: Seat, hidden: &[CardIdx], pend: &Value) -> Vec<CardIdx> {
+    let p = st.player(me);
+    let listed: Vec<&str> = pend
+        .get("selectable_uuids")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default();
+    hidden
+        .iter()
+        .copied()
+        .filter(|c| {
+            let in_deck = p.deck.contains(c);
+            let in_life_down = p.life.contains(c) && !st.card(*c).is_face_up;
+            !(in_deck || in_life_down) || listed.contains(&st.card(*c).uuid.as_str())
+        })
+        .collect()
+}
+
+/// 手の JSON に、手が指す札の `card_id` を添える（計測用）。
+fn describe_move(st: &GameState, masters: &MasterTable, mv: &Move) -> Value {
+    let j = mv.to_json();
+    let mut uuids: Vec<String> = Vec::new();
+    let mut push = |v: Option<&Value>| {
+        if let Some(Value::String(u)) = v {
+            uuids.push(u.clone());
+        } else if let Some(Value::Array(a)) = v {
+            uuids.extend(a.iter().filter_map(Value::as_str).map(str::to_owned));
+        }
+    };
+    push(j.get("card_uuid"));
+    if let Some(p) = j.get("payload") {
+        push(p.get("uuid"));
+        push(p.get("target_ids"));
+        push(p.get("selected_uuids"));
+    }
+    let ids: Vec<String> = uuids
+        .iter()
+        .map(|u| {
+            st.cards
+                .iter()
+                .find(|c| &c.uuid == u)
+                .map(|c| masters.get(c.master).card_id.clone())
+                .unwrap_or_else(|| "?".into())
+        })
+        .collect();
+    serde_json::json!({"move": j, "cards": ids})
 }
 
 /// 相手の対話の全部の答え（§7.21 の健全性: 相手の応手は絞らない）。
@@ -1023,6 +1206,8 @@ fn solve_in(
     total: u64,
     first: Option<(&Move, Option<&str>)>,
     keep_child: &mut Option<GameState>,
+    want_child: bool,
+    keep_any: bool,
 ) -> Result<bool, Abort> {
     solver.max_nodes = solver.nodes + total.saturating_sub(used);
     let masters = solver.masters;
@@ -1035,7 +1220,7 @@ fn solve_in(
                 Ok(false)
             } else {
                 let r = solver.solve(s, nxt, 1);
-                if matches!(r, Ok(true)) {
+                if want_child && (matches!(r, Ok(true)) || keep_any) {
                     *keep_child = Some(s.state().clone());
                 }
                 r
@@ -1049,24 +1234,46 @@ fn solve_in(
 /// 根の判定（§7.21 の 3）: 本当の盤面から自分の手の候補を作り、各候補について**全部の配り方**で
 /// 勝てるかを読む（守りの強い配り方から）。最初に全部で勝てた手を返す。`max_nodes` は全部の合計。
 pub fn solve_root(masters: &MasterTable, state: &GameState, me: Seat, deals: &[GameState], max_nodes: u64) -> LethalOut {
+    solve_root_traced(masters, state, me, deals, max_nodes, None)
+}
+
+/// 計測用の指定（§7.30・`Game.lethal_json` の `trace`／`first`／`guide`）。
+pub struct Trace<'a> {
+    /// 根の候補をこの 1 手に限る（本当の配り方で「証明した手」を読み直すため）。
+    pub first: Option<&'a Move>,
+    /// 自分の判断点で勝てる手が無いときに辿る手（配り方 0 の勝ち筋の自分の手の列）。
+    pub guide: &'a [Move],
+}
+
+/// [`solve_root`] の計測つき（`trace` が `Some` のとき: 候補を `first` に限り、全部の配り方を最後まで読み、
+/// 配り方ごとの結果と手順（[`Solver::walk`]）を `lines` に返す）。`trace` が `None` なら [`solve_root`] と同一。
+pub fn solve_root_traced(
+    masters: &MasterTable,
+    state: &GameState,
+    me: Seat,
+    deals: &[GameState],
+    max_nodes: u64,
+    trace: Option<Trace<'_>>,
+) -> LethalOut {
     let _prof = crate::prof::enter_top(crate::prof::Cat::Search);
     let mut solvers: Vec<Solver> = deals.iter().map(|d| Solver::new(masters, d, me, max_nodes)).collect();
-    let done = |status: &'static str, mv: Option<Move>, line_len: usize, solvers: &[Solver]| LethalOut {
+    let done = |status: &'static str, mv: Option<Move>, line_len: usize, solvers: &[Solver], lines: Option<Vec<Value>>| LethalOut {
         status,
         mv,
         line_len,
         deals: deals.len(),
         nodes: solvers.iter().map(|s| s.nodes).sum(),
+        lines,
     };
     let mut real = Session::new(state.clone());
     let Some((actor, action)) = crate::rules::pending::pending_actor_action(&mut real) else {
-        return done("no", None, 0, &solvers);
+        return done("no", None, 0, &solvers, None);
     };
     if actor != me || deals.is_empty() {
-        return done("no", None, 0, &solvers);
+        return done("no", None, 0, &solvers, None);
     }
     let Ok(moves) = solvers[0].expand(&mut real, me, action) else {
-        return done("unknown", None, 0, &solvers);
+        return done("unknown", None, 0, &solvers, None);
     };
     // 根の候補（上界の枝刈りは配り方ごとに子で効く＝根では使わない）
     let leader = solvers[0].opp_leader.clone();
@@ -1080,31 +1287,85 @@ pub fn solve_root(masters: &MasterTable, state: &GameState, me: Seat, deals: &[G
         moves.retain(|m| act_of(m) != "ATTACH_DON" || mv_uuid(m).is_some_and(|u| att.iter().any(|a| a == u)));
     }
     moves.sort_by_key(my_order);
+    if let Some(first) = trace.as_ref().and_then(|t| t.first) {
+        let fj = first.to_json();
+        moves.retain(|m| m.to_json() == fj);
+    }
+    let hidden = hidden_own(state, me);
     let mut sessions: Vec<Session> = deals.iter().map(|d| Session::new(d.clone())).collect();
     let mut unknown = false;
     'moves: for mv in moves {
         let nxt = if act_of(&mv) == "ATTACH_DON" { mv_uuid(&mv).map(str::to_owned) } else { None };
-        let mut first_child: Option<GameState> = None;
+        let mut children: Vec<Option<GameState>> = vec![None; sessions.len()];
+        let mut results: Vec<&'static str> = vec!["skip"; sessions.len()];
+        let mut all = true;
         for i in 0..sessions.len() {
             let used: u64 = solvers.iter().map(|s| s.nodes).sum();
             let mut keep = None;
-            let r = solve_in(&mut solvers[i], &mut sessions[i], used, max_nodes, Some((&mv, nxt.as_deref())), &mut keep);
-            if i == 0 {
-                first_child = keep;
-            }
+            let r = solve_in(&mut solvers[i], &mut sessions[i], used, max_nodes, Some((&mv, nxt.as_deref())), &mut keep, i == 0 || trace.is_some(), trace.is_some());
+            children[i] = keep;
             match r {
-                Ok(true) => {}
-                Ok(false) => continue 'moves,
+                Ok(true) => results[i] = "win",
+                Ok(false) => {
+                    results[i] = "no";
+                    all = false;
+                    // 残りの配り方まで読むのは `first` を指定した読み直しだけ（候補を順に試す読みでは節点の予算を食い、
+                    // 判定が変わってしまう）
+                    if !trace.as_ref().is_some_and(|t| t.first.is_some()) {
+                        continue 'moves;
+                    }
+                }
                 Err(Abort) => {
+                    results[i] = "unknown";
                     unknown = true;
-                    break 'moves;
+                    all = false;
+                    if !trace.as_ref().is_some_and(|t| t.first.is_some()) {
+                        break 'moves;
+                    }
                 }
             }
         }
-        let line = 1 + first_child.map_or(0, |c| solvers[0].line_len(&c, 60));
-        return done("win", Some(mv), line, &solvers);
+        let lines = trace.as_ref().map(|t| {
+            let mut guide: Vec<Move> = t.guide.to_vec();
+            let mut rows = Vec::new();
+            for i in 0..sessions.len() {
+                let line = match &children[i] {
+                    Some(c) => solvers[i].walk(c, nxt.as_deref(), &guide, &hidden, 80),
+                    None => Vec::new(),
+                };
+                // 配り方 0 の勝ち筋の自分の手を、後の配り方（本当の配り方）の案内に使う
+                if i == 0 && guide.is_empty() {
+                    guide = line
+                        .iter()
+                        .filter(|r| r.get("actor").and_then(Value::as_str) == Some("me"))
+                        .filter_map(|r| r.get("move").cloned())
+                        .map(Move::from_json)
+                        .collect();
+                }
+                let ids = |cards: &[CardIdx]| -> Vec<String> {
+                    cards.iter().map(|c| masters.get(deals[i].card(*c).master).card_id.clone()).collect()
+                };
+                let po = deals[i].player(me.other());
+                let pm = deals[i].player(me);
+                rows.push(serde_json::json!({"deal": i, "result": results[i], "nodes": solvers[i].nodes, "line": line,
+                    "opp_hand": ids(&po.hand), "opp_life": ids(&po.life), "opp_deck_top": ids(&po.deck[..po.deck.len().min(5)]),
+                    "my_deck_top": ids(&pm.deck[..pm.deck.len().min(5)]), "my_life": ids(&pm.life)}));
+            }
+            rows
+        });
+        if all {
+            let line = 1 + children[0].as_ref().map_or(0, |c| solvers[0].line_len(c, nxt.as_deref(), 60));
+            return done("win", Some(mv), line, &solvers, lines);
+        }
+        // `first` を指定した読み直しはその 1 手の結果（配り方ごとの手順つき）を返す。指定が無ければ次の候補へ
+        if trace.as_ref().is_some_and(|t| t.first.is_some()) {
+            return done(if unknown { "unknown" } else { "no" }, Some(mv), 0, &solvers, lines);
+        }
+        if unknown {
+            break;
+        }
     }
-    done(if unknown { "unknown" } else { "no" }, None, 0, &solvers)
+    done(if unknown { "unknown" } else { "no" }, None, 0, &solvers, None)
 }
 
 /// 盤面から（誰の番でも）このターンにこちらの勝ちが**全部の配り方で**証明できるか（§7.21 の 4 の応手の子）。
@@ -1117,7 +1378,7 @@ pub fn prove(masters: &MasterTable, state: &GameState, me: Seat, seed: u64, max_
         let used: u64 = solvers.iter().map(|s| s.nodes).sum();
         let mut sess = Session::new(d.clone());
         let mut keep = None;
-        match solve_in(&mut solvers[i], &mut sess, used, max_nodes, None, &mut keep) {
+        match solve_in(&mut solvers[i], &mut sess, used, max_nodes, None, &mut keep, false, false) {
             Ok(true) => {}
             _ => {
                 ok = false;

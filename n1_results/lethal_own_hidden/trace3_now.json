@@ -1,0 +1,5190 @@
+[
+ {
+  "point": "3012137:p2:12:146",
+  "seat": "p2",
+  "opp_life": 0,
+  "base": {
+   "status": "win",
+   "move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "8727741a-339b-44e2-9662-324940d66ec6",
+     "target_ids": [
+      "da64904f-2d66-492c-a6fd-2972dc3558ee"
+     ]
+    }
+   },
+   "nodes": 1296,
+   "deals": 8,
+   "line_len": 5
+  },
+  "analysis": {
+   "deals": 8,
+   "distinct_my_sequences": 1,
+   "diverging_deals": 0,
+   "diverge_after_own_hidden": 0,
+   "seen_any": false,
+   "diverge": []
+  },
+  "opp_hand": [
+   "OP12-095",
+   "OP05-006",
+   "OP05-005"
+  ],
+  "my_deck_top": [
+   "P-106",
+   "EB03-059",
+   "ST29-009",
+   "EB04-060",
+   "EB03-059"
+  ],
+  "base_lines": [
+   {
+    "deal": 0,
+    "result": "win",
+    "nodes": 20,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_BLOCKER",
+       "card_uuid": "7c0eacb4-1c05-49ce-92f4-cea0c0334086"
+      },
+      "cards": [
+       "OP12-084"
+      ],
+      "actor": "opp",
+      "action": "SELECT_BLOCKER",
+      "src": "any",
+      "seen": [],
+      "message": "ブロッカーを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "1b236e69-79bd-4400-9ce6-a89749ea748c",
+        "target_ids": [
+         "da64904f-2d66-492c-a6fd-2972dc3558ee"
+        ]
+       }
+      },
+      "cards": [
+       "OP13-110",
+       "OP05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "OP05-018",
+     "OP05-018",
+     "OP05-018"
+    ],
+    "opp_life": [],
+    "opp_deck_top": [
+     "ST35-005",
+     "OP05-015",
+     "OP12-084",
+     "ST35-005",
+     "OP07-018"
+    ],
+    "my_deck_top": [
+     "P-118",
+     "EB02-056",
+     "EB03-059",
+     "OP07-114",
+     "EB04-056"
+    ],
+    "my_life": [
+     "ST29-008"
+    ]
+   },
+   {
+    "deal": 1,
+    "result": "win",
+    "nodes": 20,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_BLOCKER",
+       "card_uuid": "7c0eacb4-1c05-49ce-92f4-cea0c0334086"
+      },
+      "cards": [
+       "OP12-084"
+      ],
+      "actor": "opp",
+      "action": "SELECT_BLOCKER",
+      "src": "any",
+      "seen": [],
+      "message": "ブロッカーを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "1b236e69-79bd-4400-9ce6-a89749ea748c",
+        "target_ids": [
+         "da64904f-2d66-492c-a6fd-2972dc3558ee"
+        ]
+       }
+      },
+      "cards": [
+       "OP13-110",
+       "OP05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "OP05-018",
+     "OP05-018",
+     "OP05-018"
+    ],
+    "opp_life": [],
+    "opp_deck_top": [
+     "OP07-018",
+     "OP05-006",
+     "P-105",
+     "OP05-015",
+     "OP05-015"
+    ],
+    "my_deck_top": [
+     "OP08-117",
+     "ST29-008",
+     "ST29-009",
+     "ST29-008",
+     "P-118"
+    ],
+    "my_life": [
+     "OP07-100"
+    ]
+   },
+   {
+    "deal": 2,
+    "result": "win",
+    "nodes": 20,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_BLOCKER",
+       "card_uuid": "7c0eacb4-1c05-49ce-92f4-cea0c0334086"
+      },
+      "cards": [
+       "OP12-084"
+      ],
+      "actor": "opp",
+      "action": "SELECT_BLOCKER",
+      "src": "any",
+      "seen": [],
+      "message": "ブロッカーを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "1b236e69-79bd-4400-9ce6-a89749ea748c",
+        "target_ids": [
+         "da64904f-2d66-492c-a6fd-2972dc3558ee"
+        ]
+       }
+      },
+      "cards": [
+       "OP13-110",
+       "OP05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "OP05-018",
+     "OP05-021",
+     "OP05-018"
+    ],
+    "opp_life": [],
+    "opp_deck_top": [
+     "OP05-021",
+     "OP07-016",
+     "OP05-005",
+     "OP12-094",
+     "OP05-018"
+    ],
+    "my_deck_top": [
+     "ST29-008",
+     "OP13-108",
+     "ST29-009",
+     "ST29-008",
+     "EB04-056"
+    ],
+    "my_life": [
+     "ST29-009"
+    ]
+   },
+   {
+    "deal": 3,
+    "result": "win",
+    "nodes": 210,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_BLOCKER",
+       "card_uuid": "7c0eacb4-1c05-49ce-92f4-cea0c0334086"
+      },
+      "cards": [
+       "OP12-084"
+      ],
+      "actor": "opp",
+      "action": "SELECT_BLOCKER",
+      "src": "any",
+      "seen": [],
+      "message": "ブロッカーを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "89161609-4919-4998-ba1d-d8a3b1653340"
+      },
+      "cards": [
+       "OP12-089"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "1090aba2-9ede-419e-9895-e75ec82c8125"
+      },
+      "cards": [
+       "EB04-045"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "1b236e69-79bd-4400-9ce6-a89749ea748c",
+        "target_ids": [
+         "da64904f-2d66-492c-a6fd-2972dc3558ee"
+        ]
+       }
+      },
+      "cards": [
+       "OP13-110",
+       "OP05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "OP07-018",
+     "OP12-089",
+     "EB04-045"
+    ],
+    "opp_life": [],
+    "opp_deck_top": [
+     "OP05-006",
+     "OP05-021",
+     "ST35-005",
+     "OP07-016",
+     "OP05-021"
+    ],
+    "my_deck_top": [
+     "ST29-008",
+     "EB04-056",
+     "OP08-117",
+     "EB02-056",
+     "OP13-108"
+    ],
+    "my_life": [
+     "EB04-056"
+    ]
+   },
+   {
+    "deal": 4,
+    "result": "win",
+    "nodes": 687,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_BLOCKER",
+       "card_uuid": "7c0eacb4-1c05-49ce-92f4-cea0c0334086"
+      },
+      "cards": [
+       "OP12-084"
+      ],
+      "actor": "opp",
+      "action": "SELECT_BLOCKER",
+      "src": "any",
+      "seen": [],
+      "message": "ブロッカーを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "3823a0b9-cb96-43e4-a6b3-8c27b4514b84"
+      },
+      "cards": [
+       "OP05-005"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "ab7f8f07-ddf9-4931-946e-e0a8c0aa3da5"
+      },
+      "cards": [
+       "OP12-095"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "d72cb5a0-2efa-440f-b967-802b0d511c0f"
+      },
+      "cards": [
+       "OP05-015"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "1b236e69-79bd-4400-9ce6-a89749ea748c",
+        "target_ids": [
+         "da64904f-2d66-492c-a6fd-2972dc3558ee"
+        ]
+       }
+      },
+      "cards": [
+       "OP13-110",
+       "OP05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "OP05-005",
+     "OP12-095",
+     "OP05-015"
+    ],
+    "opp_life": [],
+    "opp_deck_top": [
+     "OP05-018",
+     "OP12-084",
+     "OP05-005",
+     "OP12-089",
+     "OP12-095"
+    ],
+    "my_deck_top": [
+     "EB04-052",
+     "P-106",
+     "EB02-056",
+     "OP08-117",
+     "OP07-105"
+    ],
+    "my_life": [
+     "ST29-008"
+    ]
+   },
+   {
+    "deal": 5,
+    "result": "win",
+    "nodes": 47,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_BLOCKER",
+       "card_uuid": "7c0eacb4-1c05-49ce-92f4-cea0c0334086"
+      },
+      "cards": [
+       "OP12-084"
+      ],
+      "actor": "opp",
+      "action": "SELECT_BLOCKER",
+      "src": "any",
+      "seen": [],
+      "message": "ブロッカーを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "a9a26b8a-436e-4d57-994e-ac89c8d5fff5"
+      },
+      "cards": [
+       "OP12-084"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "1b236e69-79bd-4400-9ce6-a89749ea748c",
+        "target_ids": [
+         "da64904f-2d66-492c-a6fd-2972dc3558ee"
+        ]
+       }
+      },
+      "cards": [
+       "OP13-110",
+       "OP05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "OP05-021",
+     "OP12-094",
+     "OP12-084"
+    ],
+    "opp_life": [],
+    "opp_deck_top": [
+     "OP12-094",
+     "OP05-018",
+     "EB04-045",
+     "OP12-095",
+     "EB04-045"
+    ],
+    "my_deck_top": [
+     "EB02-056",
+     "EB04-052",
+     "OP08-117",
+     "OP13-108",
+     "OP07-105"
+    ],
+    "my_life": [
+     "EB04-056"
+    ]
+   },
+   {
+    "deal": 6,
+    "result": "win",
+    "nodes": 146,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_BLOCKER",
+       "card_uuid": "7c0eacb4-1c05-49ce-92f4-cea0c0334086"
+      },
+      "cards": [
+       "OP12-084"
+      ],
+      "actor": "opp",
+      "action": "SELECT_BLOCKER",
+      "src": "any",
+      "seen": [],
+      "message": "ブロッカーを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "c75a9036-3d76-4f66-a2b7-651e9ef0db3b"
+      },
+      "cards": [
+       "OP12-095"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "2f516c51-440a-42b9-82bb-450fb4111cda"
+      },
+      "cards": [
+       "OP12-084"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "1b236e69-79bd-4400-9ce6-a89749ea748c",
+        "target_ids": [
+         "da64904f-2d66-492c-a6fd-2972dc3558ee"
+        ]
+       }
+      },
+      "cards": [
+       "OP13-110",
+       "OP05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "OP12-095",
+     "OP07-018",
+     "OP12-084"
+    ],
+    "opp_life": [],
+    "opp_deck_top": [
+     "OP05-006",
+     "OP12-089",
+     "OP05-005",
+     "ST35-005",
+     "OP12-095"
+    ],
+    "my_deck_top": [
+     "OP07-105",
+     "ST29-008",
+     "OP08-117",
+     "OP07-100",
+     "ST29-008"
+    ],
+    "my_life": [
+     "EB02-056"
+    ]
+   },
+   {
+    "deal": 7,
+    "result": "win",
+    "nodes": 146,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_BLOCKER",
+       "card_uuid": "7c0eacb4-1c05-49ce-92f4-cea0c0334086"
+      },
+      "cards": [
+       "OP12-084"
+      ],
+      "actor": "opp",
+      "action": "SELECT_BLOCKER",
+      "src": "any",
+      "seen": [],
+      "message": "ブロッカーを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "7e35389b-cc92-4547-bd12-249e3e32baaa"
+      },
+      "cards": [
+       "ST35-005"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "97941b24-6c0f-4eec-be67-f5d8cad2ba19"
+      },
+      "cards": [
+       "OP12-095"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "1b236e69-79bd-4400-9ce6-a89749ea748c",
+        "target_ids": [
+         "da64904f-2d66-492c-a6fd-2972dc3558ee"
+        ]
+       }
+      },
+      "cards": [
+       "OP13-110",
+       "OP05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "OP07-018",
+     "ST35-005",
+     "OP12-095"
+    ],
+    "opp_life": [],
+    "opp_deck_top": [
+     "OP12-089",
+     "OP12-094",
+     "EB04-045",
+     "OP05-005",
+     "P-105"
+    ],
+    "my_deck_top": [
+     "ST29-008",
+     "EB04-052",
+     "ST29-009",
+     "OP07-105",
+     "OP08-117"
+    ],
+    "my_life": [
+     "EB03-059"
+    ]
+   }
+  ],
+  "true": {
+   "status": "no",
+   "nodes": 625
+  },
+  "true_line": [
+   {
+    "move": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    "cards": [],
+    "actor": "opp",
+    "action": "SELECT_BLOCKER",
+    "src": "refute",
+    "seen": [],
+    "message": "ブロッカーを選択してください"
+   },
+   {
+    "move": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    "cards": [],
+    "actor": "opp",
+    "action": "SELECT_COUNTER",
+    "src": "refute",
+    "seen": [],
+    "message": "カウンターカードを選択してください"
+   },
+   {
+    "move": {
+     "action_type": "ATTACK",
+     "kind": "game",
+     "payload": {
+      "target_ids": [
+       "da64904f-2d66-492c-a6fd-2972dc3558ee"
+      ],
+      "uuid": "1b236e69-79bd-4400-9ce6-a89749ea748c"
+     }
+    },
+    "cards": [
+     "OP13-110",
+     "OP05-001"
+    ],
+    "actor": "me",
+    "action": "MAIN_ACTION",
+    "src": "guide",
+    "seen": []
+   },
+   {
+    "move": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    "cards": [],
+    "actor": "opp",
+    "action": "SELECT_BLOCKER",
+    "src": "refute",
+    "seen": [],
+    "message": "ブロッカーを選択してください"
+   },
+   {
+    "move": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "ab7f8f07-ddf9-4931-946e-e0a8c0aa3da5"
+    },
+    "cards": [
+     "OP12-095"
+    ],
+    "actor": "opp",
+    "action": "SELECT_COUNTER",
+    "src": "refute",
+    "seen": [],
+    "message": "カウンターカードを選択してください"
+   },
+   {
+    "move": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "b5a87172-2be8-4d50-855a-e3ac4e7991bf"
+    },
+    "cards": [
+     "OP05-006"
+    ],
+    "actor": "opp",
+    "action": "SELECT_COUNTER",
+    "src": "refute",
+    "seen": [],
+    "message": "カウンターカードを選択してください"
+   },
+   {
+    "move": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "3a3822ec-499b-41e9-b2a9-20395f2b6e00"
+    },
+    "cards": [
+     "OP05-005"
+    ],
+    "actor": "opp",
+    "action": "SELECT_COUNTER",
+    "src": "refute",
+    "seen": [],
+    "message": "カウンターカードを選択してください"
+   },
+   {
+    "move": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    "cards": [],
+    "actor": "opp",
+    "action": "SELECT_COUNTER",
+    "src": "refute",
+    "seen": [],
+    "message": "カウンターカードを選択してください"
+   },
+   {
+    "actor": "me",
+    "action": "MAIN_ACTION",
+    "stop": "no_win_move",
+    "message": null,
+    "seen": []
+   }
+  ],
+  "sec": 0.01
+ },
+ {
+  "point": "3012157:p2:12:124",
+  "seat": "p2",
+  "opp_life": 2,
+  "base": {
+   "status": "win",
+   "move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "5ac58eeb-c536-498e-bf3d-3df5629f0833",
+     "target_ids": [
+      "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+     ]
+    }
+   },
+   "nodes": 3184,
+   "deals": 8,
+   "line_len": 15
+  },
+  "analysis": {
+   "deals": 8,
+   "distinct_my_sequences": 4,
+   "diverging_deals": 7,
+   "diverge_after_own_hidden": 1,
+   "seen_any": true,
+   "diverge": [
+    {
+     "deal": 1,
+     "at_my_move": 2,
+     "seen_before": [],
+     "ref": "{\"action_type\": \"ATTACH_DON\", \"kind\": \"game\", \"payload\": {\"uuid\": \"27462676-9124-417a-a2b4-881c5ca64811\"}}",
+     "other": "{\"action_type\": \"ATTACK\", \"kind\": \"game\", \"payload\": {\"target_ids\": [\"e4d43ece-2e9b-4015-81d1-b415fcdc042a\"], \"uuid\": \"27462676-9124-417a-a2b4-881c5ca64811\"}}"
+    },
+    {
+     "deal": 2,
+     "at_my_move": 2,
+     "seen_before": [],
+     "ref": "{\"action_type\": \"ATTACH_DON\", \"kind\": \"game\", \"payload\": {\"uuid\": \"27462676-9124-417a-a2b4-881c5ca64811\"}}",
+     "other": "{\"action_type\": \"ATTACK\", \"kind\": \"game\", \"payload\": {\"target_ids\": [\"e4d43ece-2e9b-4015-81d1-b415fcdc042a\"], \"uuid\": \"27462676-9124-417a-a2b4-881c5ca64811\"}}"
+    },
+    {
+     "deal": 3,
+     "at_my_move": 2,
+     "seen_before": [],
+     "ref": "{\"action_type\": \"ATTACH_DON\", \"kind\": \"game\", \"payload\": {\"uuid\": \"27462676-9124-417a-a2b4-881c5ca64811\"}}",
+     "other": "{\"action_type\": \"ATTACK\", \"kind\": \"game\", \"payload\": {\"target_ids\": [\"e4d43ece-2e9b-4015-81d1-b415fcdc042a\"], \"uuid\": \"27462676-9124-417a-a2b4-881c5ca64811\"}}"
+    },
+    {
+     "deal": 4,
+     "at_my_move": 1,
+     "seen_before": [],
+     "ref": "{\"action_type\": \"ATTACH_DON\", \"kind\": \"game\", \"payload\": {\"uuid\": \"27462676-9124-417a-a2b4-881c5ca64811\"}}",
+     "other": "{\"action_type\": \"ATTACK\", \"kind\": \"game\", \"payload\": {\"target_ids\": [\"e4d43ece-2e9b-4015-81d1-b415fcdc042a\"], \"uuid\": \"27462676-9124-417a-a2b4-881c5ca64811\"}}"
+    },
+    {
+     "deal": 5,
+     "at_my_move": 2,
+     "seen_before": [],
+     "ref": "{\"action_type\": \"ATTACH_DON\", \"kind\": \"game\", \"payload\": {\"uuid\": \"27462676-9124-417a-a2b4-881c5ca64811\"}}",
+     "other": "{\"action_type\": \"ATTACK\", \"kind\": \"game\", \"payload\": {\"target_ids\": [\"e4d43ece-2e9b-4015-81d1-b415fcdc042a\"], \"uuid\": \"27462676-9124-417a-a2b4-881c5ca64811\"}}"
+    },
+    {
+     "deal": 6,
+     "at_my_move": 5,
+     "seen_before": [
+      "EB03-037",
+      "EB03-035",
+      "EB01-003",
+      "OP09-017",
+      "OP09-064",
+      "OP05-076",
+      "OP03-018"
+     ],
+     "ref": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"kind\": \"game\", \"payload\": {\"accepted\": true, \"declared_value\": 0, \"index\": 0, \"position\": \"BOTTOM\", \"selected_uuids\": [\"56f9d2ec-a496-4d08-88c6-a29626ea18e9\", \"661b2ad5-fc32-4f99-8b60-8201d77d19a8\", \"ba3e4646-4a5e-4315-96a1-2243eb1b7c30\", \"6ce78ae4-57c9-460f-a43c-de99f069db4b\", \"53064375-4b13-49df-888a-f139493b46d3\", \"f4cbdcb3-07fb-4ab3-9340-623e9f6f3550\"]}}",
+     "other": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"kind\": \"game\", \"payload\": {\"accepted\": true, \"declared_value\": 0, \"index\": 0, \"position\": \"BOTTOM\", \"selected_uuids\": [\"2e08c722-2f4d-45d1-a3fe-9451b011cf5c\", \"661b2ad5-fc32-4f99-8b60-8201d77d19a8\", \"6fde4060-d6d9-4ec3-87b3-a93dd8dd8277\", \"b4e0954c-6c21-4b1b-b8d8-44377e307429\", \"d45f7f8a-a9be-46bb-9f16-5ea34dac4f45\", \"f7afb6ca-0be3-4ace-910f-010d754c0aaa\"]}}"
+    },
+    {
+     "deal": 7,
+     "at_my_move": 2,
+     "seen_before": [],
+     "ref": "{\"action_type\": \"ATTACH_DON\", \"kind\": \"game\", \"payload\": {\"uuid\": \"27462676-9124-417a-a2b4-881c5ca64811\"}}",
+     "other": "{\"action_type\": \"ATTACK\", \"kind\": \"game\", \"payload\": {\"target_ids\": [\"e4d43ece-2e9b-4015-81d1-b415fcdc042a\"], \"uuid\": \"27462676-9124-417a-a2b4-881c5ca64811\"}}"
+    }
+   ]
+  },
+  "opp_hand": [],
+  "my_deck_top": [
+   "EB03-037",
+   "OP05-078",
+   "OP09-064",
+   "EB03-009",
+   "EB02-002"
+  ],
+  "base_lines": [
+   {
+    "deal": 0,
+    "result": "win",
+    "nodes": 495,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "OP09-007",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "af69a525-fe04-4c50-a83c-2400280fb79d"
+      },
+      "cards": [
+       "OP10-043"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "8cbe75d1-5759-4be8-a837-525b6e1e7381"
+       }
+      },
+      "cards": [
+       "EB02-032"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "payload": {
+        "selected_uuids": [
+         "56f9d2ec-a496-4d08-88c6-a29626ea18e9",
+         "661b2ad5-fc32-4f99-8b60-8201d77d19a8",
+         "ba3e4646-4a5e-4315-96a1-2243eb1b7c30",
+         "6ce78ae4-57c9-460f-a43c-de99f069db4b",
+         "53064375-4b13-49df-888a-f139493b46d3",
+         "f4cbdcb3-07fb-4ab3-9340-623e9f6f3550"
+        ],
+        "index": 0,
+        "accepted": true,
+        "position": "BOTTOM",
+        "declared_value": 0
+       }
+      },
+      "cards": [
+       "EB02-002",
+       "EB03-035",
+       "EB03-009",
+       "EB01-007",
+       "OP05-078",
+       "EB02-032"
+      ],
+      "actor": "me",
+      "action": "ARRANGE_DECK",
+      "src": "best",
+      "seen": [
+       "OP05-078",
+       "EB02-002",
+       "EB03-035",
+       "EB02-032",
+       "OP09-017",
+       "EB01-007",
+       "EB03-009"
+      ],
+      "message": "「アイスバーグ」の効果: 順番を決めてください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "payload": {
+        "selected_uuids": [
+         "86daac3a-2f28-49b3-b5c3-e713c6c62b83"
+        ],
+        "index": 0,
+        "accepted": true,
+        "position": "BOTTOM",
+        "declared_value": 0
+       }
+      },
+      "cards": [
+       "OP03-075"
+      ],
+      "actor": "me",
+      "action": "SEARCH_AND_SELECT",
+      "src": "best",
+      "seen": [],
+      "message": "「アイスバーグ」の効果: 対象を選択（1枚まで）"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8"
+       }
+      },
+      "cards": [
+       "EB01-003"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "EB01-003",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "bbb49166-2fed-448b-958c-4885dfb04a3e"
+      },
+      "cards": [
+       "OP10-056"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [],
+    "opp_life": [
+     "OP10-043",
+     "OP10-056"
+    ],
+    "opp_deck_top": [
+     "OP10-044",
+     "OP10-044",
+     "OP05-096",
+     "OP10-088",
+     "OP10-081"
+    ],
+    "my_deck_top": [
+     "EB02-002",
+     "EB03-035",
+     "EB03-009",
+     "EB01-007",
+     "OP05-078"
+    ],
+    "my_life": [
+     "ST10-017"
+    ]
+   },
+   {
+    "deal": 1,
+    "result": "win",
+    "nodes": 389,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "OP09-007",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "be83536f-f284-4ab3-a54f-c91d92aa4701"
+      },
+      "cards": [
+       "OP10-044"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "c8760839-13c3-4995-a665-13abf43ff2e1"
+       }
+      },
+      "cards": [
+       "ST10-017"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8"
+       }
+      },
+      "cards": [
+       "EB01-003"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "EB01-003",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "16e574c5-4e09-4d76-8694-4a99026dd863"
+      },
+      "cards": [
+       "OP10-091"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [],
+    "opp_life": [
+     "OP10-044",
+     "OP10-091"
+    ],
+    "opp_deck_top": [
+     "OP10-095",
+     "OP06-088",
+     "OP10-091",
+     "OP05-096",
+     "OP10-087"
+    ],
+    "my_deck_top": [
+     "EB01-007",
+     "EB03-035",
+     "OP09-064",
+     "EB03-037",
+     "EB01-007"
+    ],
+    "my_life": [
+     "EB02-032"
+    ]
+   },
+   {
+    "deal": 2,
+    "result": "win",
+    "nodes": 389,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "OP09-007",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "86b8f69f-e41b-47a3-81d7-a2776a04e495"
+      },
+      "cards": [
+       "OP07-091"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "c8760839-13c3-4995-a665-13abf43ff2e1"
+       }
+      },
+      "cards": [
+       "ST10-017"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8"
+       }
+      },
+      "cards": [
+       "EB01-003"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "EB01-003",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "bbb49166-2fed-448b-958c-4885dfb04a3e"
+      },
+      "cards": [
+       "OP10-056"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [],
+    "opp_life": [
+     "OP07-091",
+     "OP10-056"
+    ],
+    "opp_deck_top": [
+     "OP10-091",
+     "OP10-091",
+     "OP05-096",
+     "OP04-091",
+     "OP05-096"
+    ],
+    "my_deck_top": [
+     "EB03-035",
+     "OP09-017",
+     "OP09-007",
+     "EB02-032",
+     "EB01-007"
+    ],
+    "my_life": [
+     "OP09-064"
+    ]
+   },
+   {
+    "deal": 3,
+    "result": "win",
+    "nodes": 419,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "OP09-007",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "851eec44-2b5b-472c-890e-e6f1bfc4818e"
+      },
+      "cards": [
+       "OP06-088"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "c8760839-13c3-4995-a665-13abf43ff2e1"
+       }
+      },
+      "cards": [
+       "ST10-017"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8"
+       }
+      },
+      "cards": [
+       "EB01-003"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "EB01-003",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "983e2fd7-e093-45b1-8e93-cad41d9e6fbc"
+      },
+      "cards": [
+       "OP10-083"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [],
+    "opp_life": [
+     "OP06-088",
+     "OP10-083"
+    ],
+    "opp_deck_top": [
+     "OP10-095",
+     "OP15-051",
+     "OP10-043",
+     "OP10-087",
+     "OP10-044"
+    ],
+    "my_deck_top": [
+     "EB02-032",
+     "EB03-009",
+     "EB02-002",
+     "OP09-075",
+     "EB03-009"
+    ],
+    "my_life": [
+     "OP09-064"
+    ]
+   },
+   {
+    "deal": 4,
+    "result": "win",
+    "nodes": 219,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "OP09-007",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "c8760839-13c3-4995-a665-13abf43ff2e1"
+       }
+      },
+      "cards": [
+       "ST10-017"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "8cbe75d1-5759-4be8-a837-525b6e1e7381"
+       }
+      },
+      "cards": [
+       "EB02-032"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "payload": {
+        "selected_uuids": [
+         "53cf5b58-f24b-4637-9fa1-ccea488cd006",
+         "c759dd41-56c2-4340-bc6d-eca800f078a3",
+         "ba3e4646-4a5e-4315-96a1-2243eb1b7c30",
+         "b98072b4-3903-4391-a0a9-64d65ce02f8a",
+         "7e8e2409-f69e-4c69-aaa5-544bd86a9b51",
+         "d724bea9-e287-466c-b63c-bc8e3fb70c1c"
+        ],
+        "index": 0,
+        "accepted": true,
+        "position": "BOTTOM",
+        "declared_value": 0
+       }
+      },
+      "cards": [
+       "OP09-075",
+       "OP09-007",
+       "EB03-009",
+       "EB04-005",
+       "EB01-007",
+       "OP03-018"
+      ],
+      "actor": "me",
+      "action": "ARRANGE_DECK",
+      "src": "best",
+      "seen": [
+       "EB02-002",
+       "OP09-007",
+       "OP03-018",
+       "EB04-005",
+       "OP09-075",
+       "EB03-009",
+       "EB01-007"
+      ],
+      "message": "「アイスバーグ」の効果: 順番を決めてください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "payload": {
+        "selected_uuids": [
+         "86daac3a-2f28-49b3-b5c3-e713c6c62b83"
+        ],
+        "index": 0,
+        "accepted": true,
+        "position": "BOTTOM",
+        "declared_value": 0
+       }
+      },
+      "cards": [
+       "OP03-075"
+      ],
+      "actor": "me",
+      "action": "SEARCH_AND_SELECT",
+      "src": "best",
+      "seen": [],
+      "message": "「アイスバーグ」の効果: 対象を選択（1枚まで）"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8"
+       }
+      },
+      "cards": [
+       "EB01-003"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "EB01-003",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "be83536f-f284-4ab3-a54f-c91d92aa4701"
+      },
+      "cards": [
+       "OP10-044"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [],
+    "opp_life": [
+     "OP10-095",
+     "OP10-044"
+    ],
+    "opp_deck_top": [
+     "OP10-095",
+     "OP15-081",
+     "OP06-088",
+     "OP10-087",
+     "OP10-091"
+    ],
+    "my_deck_top": [
+     "OP09-075",
+     "OP09-007",
+     "EB03-009",
+     "EB04-005",
+     "EB01-007"
+    ],
+    "my_life": [
+     "OP09-017"
+    ]
+   },
+   {
+    "deal": 5,
+    "result": "win",
+    "nodes": 389,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "OP09-007",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "93c7d03a-577e-4158-b135-97d2650efe04"
+      },
+      "cards": [
+       "OP16-043"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "c8760839-13c3-4995-a665-13abf43ff2e1"
+       }
+      },
+      "cards": [
+       "ST10-017"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8"
+       }
+      },
+      "cards": [
+       "EB01-003"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "EB01-003",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "c7538a5d-60e7-4ec0-a312-474298782657"
+      },
+      "cards": [
+       "OP10-087"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [],
+    "opp_life": [
+     "OP16-043",
+     "OP10-087"
+    ],
+    "opp_deck_top": [
+     "OP10-091",
+     "OP10-081",
+     "OP06-088",
+     "OP10-088",
+     "OP10-044"
+    ],
+    "my_deck_top": [
+     "EB01-003",
+     "OP05-076",
+     "OP05-078",
+     "OP09-007",
+     "ST10-017"
+    ],
+    "my_life": [
+     "OP09-075"
+    ]
+   },
+   {
+    "deal": 6,
+    "result": "win",
+    "nodes": 495,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "OP09-007",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "af69a525-fe04-4c50-a83c-2400280fb79d"
+      },
+      "cards": [
+       "OP10-043"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "8cbe75d1-5759-4be8-a837-525b6e1e7381"
+       }
+      },
+      "cards": [
+       "EB02-032"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "payload": {
+        "selected_uuids": [
+         "2e08c722-2f4d-45d1-a3fe-9451b011cf5c",
+         "661b2ad5-fc32-4f99-8b60-8201d77d19a8",
+         "6fde4060-d6d9-4ec3-87b3-a93dd8dd8277",
+         "b4e0954c-6c21-4b1b-b8d8-44377e307429",
+         "d45f7f8a-a9be-46bb-9f16-5ea34dac4f45",
+         "f7afb6ca-0be3-4ace-910f-010d754c0aaa"
+        ],
+        "index": 0,
+        "accepted": true,
+        "position": "BOTTOM",
+        "declared_value": 0
+       }
+      },
+      "cards": [
+       "OP05-076",
+       "EB03-035",
+       "OP09-064",
+       "EB03-037",
+       "OP03-018",
+       "EB01-003"
+      ],
+      "actor": "me",
+      "action": "ARRANGE_DECK",
+      "src": "best",
+      "seen": [
+       "EB03-037",
+       "EB03-035",
+       "EB01-003",
+       "OP09-017",
+       "OP09-064",
+       "OP05-076",
+       "OP03-018"
+      ],
+      "message": "「アイスバーグ」の効果: 順番を決めてください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "payload": {
+        "selected_uuids": [
+         "86daac3a-2f28-49b3-b5c3-e713c6c62b83"
+        ],
+        "index": 0,
+        "accepted": true,
+        "position": "BOTTOM",
+        "declared_value": 0
+       }
+      },
+      "cards": [
+       "OP03-075"
+      ],
+      "actor": "me",
+      "action": "SEARCH_AND_SELECT",
+      "src": "best",
+      "seen": [],
+      "message": "「アイスバーグ」の効果: 対象を選択（1枚まで）"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8"
+       }
+      },
+      "cards": [
+       "EB01-003"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "EB01-003",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "fa705fce-b381-498b-8a30-f93fa5d7ed9d"
+      },
+      "cards": [
+       "OP10-081"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [],
+    "opp_life": [
+     "OP10-043",
+     "OP10-081"
+    ],
+    "opp_deck_top": [
+     "OP06-088",
+     "OP06-088",
+     "OP10-044",
+     "OP10-088",
+     "OP16-043"
+    ],
+    "my_deck_top": [
+     "OP05-076",
+     "EB03-035",
+     "OP09-064",
+     "EB03-037",
+     "OP03-018"
+    ],
+    "my_life": [
+     "OP05-078"
+    ]
+   },
+   {
+    "deal": 7,
+    "result": "win",
+    "nodes": 389,
+    "line": [
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+       }
+      },
+      "cards": [
+       "OP09-007"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "27462676-9124-417a-a2b4-881c5ca64811",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "OP09-007",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "7493e804-10fe-4c2d-b2ab-56866e56dac3"
+      },
+      "cards": [
+       "OP10-091"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "c8760839-13c3-4995-a665-13abf43ff2e1"
+       }
+      },
+      "cards": [
+       "ST10-017"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "PLAY",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8"
+       }
+      },
+      "cards": [
+       "EB01-003"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "582a3b3a-c53b-48c6-8f99-793f06958de8",
+        "target_ids": [
+         "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+        ]
+       }
+      },
+      "cards": [
+       "EB01-003",
+       "OP10-042"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "7e0195f2-6b03-4f4e-94ac-eaba39ad5953"
+      },
+      "cards": [
+       "OP06-088"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [],
+    "opp_life": [
+     "OP10-091",
+     "OP06-088"
+    ],
+    "opp_deck_top": [
+     "OP10-081",
+     "OP04-091",
+     "OP10-056",
+     "OP16-043",
+     "OP07-091"
+    ],
+    "my_deck_top": [
+     "EB03-009",
+     "OP05-076",
+     "OP05-078",
+     "EB03-037",
+     "OP09-017"
+    ],
+    "my_life": [
+     "ST10-017"
+    ]
+   }
+  ],
+  "true": {
+   "status": "no",
+   "nodes": 860
+  },
+  "true_line": [
+   {
+    "move": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    "cards": [],
+    "actor": "opp",
+    "action": "SELECT_COUNTER",
+    "src": "refute",
+    "seen": [],
+    "message": "カウンターカードを選択してください"
+   },
+   {
+    "move": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "cards": [],
+    "actor": "opp",
+    "action": "CONFIRM_TRIGGER",
+    "src": "refute",
+    "seen": [],
+    "message": "【トリガー】「5億で買うえ~~!!!」の効果を発動しますか？"
+   },
+   {
+    "move": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "cards": [],
+    "actor": "opp",
+    "action": "CHOICE",
+    "src": "refute",
+    "seen": [],
+    "message": "「5億で買うえ~~!!!」の効果: 効果を選択してください"
+   },
+   {
+    "move": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "27462676-9124-417a-a2b4-881c5ca64811"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "cards": [
+     "OP09-007"
+    ],
+    "actor": "opp",
+    "action": "SEARCH_AND_SELECT",
+    "src": "refute",
+    "seen": [],
+    "message": "「5億で買うえ~~!!!」の効果: 対象を選択（1枚まで）"
+   },
+   {
+    "move": {
+     "action_type": "ATTACH_DON",
+     "kind": "game",
+     "payload": {
+      "uuid": "27462676-9124-417a-a2b4-881c5ca64811"
+     }
+    },
+    "cards": [
+     "OP09-007"
+    ],
+    "actor": "me",
+    "action": "MAIN_ACTION",
+    "src": "guide",
+    "seen": [],
+    "stop": "apply_failed"
+   }
+  ],
+  "sec": 0.04
+ },
+ {
+  "point": "3012218:p1:11:80",
+  "seat": "p1",
+  "opp_life": 1,
+  "base": {
+   "status": "win",
+   "move": {
+    "kind": "game",
+    "action_type": "ATTACH_DON",
+    "payload": {
+     "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8"
+    }
+   },
+   "nodes": 3700,
+   "deals": 8,
+   "line_len": 1
+  },
+  "analysis": {
+   "deals": 8,
+   "distinct_my_sequences": 6,
+   "diverging_deals": 5,
+   "diverge_after_own_hidden": 0,
+   "seen_any": false,
+   "diverge": [
+    {
+     "deal": 1,
+     "at_my_move": 4,
+     "seen_before": [],
+     "ref": "{\"action_type\": \"ATTACK\", \"kind\": \"game\", \"payload\": {\"target_ids\": [\"f63eb5ab-7d1d-4845-a96f-d93c3656f0d6\"], \"uuid\": \"d0bd5791-d2af-46e7-ad03-19b04017f476\"}}",
+     "other": "{\"action_type\": \"ATTACH_DON\", \"kind\": \"game\", \"payload\": {\"uuid\": \"d0bd5791-d2af-46e7-ad03-19b04017f476\"}}"
+    },
+    {
+     "deal": 3,
+     "at_my_move": 0,
+     "seen_before": [],
+     "ref": "{\"action_type\": \"ATTACK\", \"kind\": \"game\", \"payload\": {\"target_ids\": [\"f63eb5ab-7d1d-4845-a96f-d93c3656f0d6\"], \"uuid\": \"6b05dead-ac33-44f0-a8bf-54eaf2e776c8\"}}",
+     "other": "{\"action_type\": \"ATTACH_DON\", \"kind\": \"game\", \"payload\": {\"uuid\": \"6b05dead-ac33-44f0-a8bf-54eaf2e776c8\"}}"
+    },
+    {
+     "deal": 4,
+     "at_my_move": 4,
+     "seen_before": [],
+     "ref": "{\"action_type\": \"ATTACK\", \"kind\": \"game\", \"payload\": {\"target_ids\": [\"f63eb5ab-7d1d-4845-a96f-d93c3656f0d6\"], \"uuid\": \"d0bd5791-d2af-46e7-ad03-19b04017f476\"}}",
+     "other": "{\"action_type\": \"ATTACH_DON\", \"kind\": \"game\", \"payload\": {\"uuid\": \"d0bd5791-d2af-46e7-ad03-19b04017f476\"}}"
+    },
+    {
+     "deal": 6,
+     "at_my_move": 0,
+     "seen_before": [],
+     "ref": "{\"action_type\": \"ATTACK\", \"kind\": \"game\", \"payload\": {\"target_ids\": [\"f63eb5ab-7d1d-4845-a96f-d93c3656f0d6\"], \"uuid\": \"6b05dead-ac33-44f0-a8bf-54eaf2e776c8\"}}",
+     "other": "{\"action_type\": \"ATTACH_DON\", \"kind\": \"game\", \"payload\": {\"uuid\": \"6b05dead-ac33-44f0-a8bf-54eaf2e776c8\"}}"
+    },
+    {
+     "deal": 7,
+     "at_my_move": 0,
+     "seen_before": [],
+     "ref": "{\"action_type\": \"ATTACK\", \"kind\": \"game\", \"payload\": {\"target_ids\": [\"f63eb5ab-7d1d-4845-a96f-d93c3656f0d6\"], \"uuid\": \"6b05dead-ac33-44f0-a8bf-54eaf2e776c8\"}}",
+     "other": "{\"action_type\": \"ATTACH_DON\", \"kind\": \"game\", \"payload\": {\"uuid\": \"6b05dead-ac33-44f0-a8bf-54eaf2e776c8\"}}"
+    }
+   ]
+  },
+  "opp_hand": [
+   "EB04-040",
+   "OP06-073",
+   "OP02-079",
+   "OP08-069",
+   "OP06-073",
+   "ST05-004"
+  ],
+  "my_deck_top": [
+   "OP13-078",
+   "OP13-078",
+   "OP13-061",
+   "OP13-071",
+   "OP13-071"
+  ],
+  "base_lines": [
+   {
+    "deal": 0,
+    "result": "win",
+    "nodes": 37,
+    "line": [
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "EB02-002",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "OP12-004",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "672618c0-e9bd-4209-b5cd-8bc91f9e9923"
+      },
+      "cards": [
+       "ST05-004"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "EB04-040",
+     "EB04-040",
+     "OP01-119",
+     "OP01-119",
+     "ST05-017",
+     "ST05-017"
+    ],
+    "opp_life": [
+     "ST05-004"
+    ],
+    "opp_deck_top": [
+     "ST05-005",
+     "OP06-075",
+     "ST05-005",
+     "OP02-079",
+     "OP13-077"
+    ],
+    "my_deck_top": [
+     "OP13-076",
+     "OP13-061",
+     "OP13-075",
+     "OP12-004",
+     "OP13-078"
+    ],
+    "my_life": [
+     "OP13-067",
+     "OP13-062",
+     "OP09-005",
+     "OP13-068",
+     "OP13-078"
+    ]
+   },
+   {
+    "deal": 1,
+    "result": "win",
+    "nodes": 241,
+    "line": [
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "EB02-002",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "payload": {
+        "selected_uuids": [],
+        "index": 0,
+        "accepted": true,
+        "position": "BOTTOM",
+        "declared_value": 0
+       }
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "CONFIRM_TRIGGER",
+      "src": "any",
+      "seen": [],
+      "message": "【トリガー】「降三世 引奈落」の効果を発動しますか？"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "OP12-004",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "d3e5e9c0-b778-4790-b860-e170163ed15e"
+      },
+      "cards": [
+       "EB04-040"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "payload": {
+        "selected_uuids": [
+         "68604c7c-d26f-441f-a328-bcdeb2c0bc9e"
+        ],
+        "index": 0,
+        "accepted": true,
+        "position": "BOTTOM",
+        "declared_value": 0
+       }
+      },
+      "cards": [
+       "?"
+      ],
+      "actor": "opp",
+      "action": "SELECT_RESOURCE",
+      "src": "any",
+      "seen": [],
+      "message": "ドン!!デッキに戻すドン!!を1枚選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "EB04-040",
+     "ST05-017",
+     "ST05-017",
+     "EB04-040",
+     "OP01-119",
+     "EB04-040"
+    ],
+    "opp_life": [
+     "EB01-039"
+    ],
+    "opp_deck_top": [
+     "ST05-005",
+     "ST05-014",
+     "EB01-039",
+     "OP06-071",
+     "OP06-071"
+    ],
+    "my_deck_top": [
+     "OP13-064",
+     "OP13-068",
+     "OP13-078",
+     "OP13-067",
+     "OP13-067"
+    ],
+    "my_life": [
+     "OP13-067",
+     "OP13-071",
+     "OP13-071",
+     "OP13-061",
+     "OP12-007"
+    ]
+   },
+   {
+    "deal": 2,
+    "result": "win",
+    "nodes": 37,
+    "line": [
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "EB02-002",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "OP12-004",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "965edef9-c77f-41b9-80ae-219feb53cdc0"
+      },
+      "cards": [
+       "ST05-005"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "OP07-077",
+     "OP08-069",
+     "OP05-119",
+     "EB04-040",
+     "ST05-017",
+     "OP13-077"
+    ],
+    "opp_life": [
+     "ST05-005"
+    ],
+    "opp_deck_top": [
+     "OP06-073",
+     "OP06-071",
+     "ST05-004",
+     "EB04-030",
+     "OP06-073"
+    ],
+    "my_deck_top": [
+     "OP13-076",
+     "OP13-064",
+     "OP13-061",
+     "OP13-078",
+     "OP13-067"
+    ],
+    "my_life": [
+     "OP13-067",
+     "OP13-075",
+     "OP13-064",
+     "EB02-002",
+     "OP13-075"
+    ]
+   },
+   {
+    "deal": 3,
+    "result": "win",
+    "nodes": 151,
+    "line": [
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8"
+       }
+      },
+      "cards": [
+       "EB02-002"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "EB02-002",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "af2f78f5-d7b7-400a-b6c0-5e7de3b68f27"
+      },
+      "cards": [
+       "ST05-004"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "965edef9-c77f-41b9-80ae-219feb53cdc0"
+      },
+      "cards": [
+       "ST05-005"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "OP12-004",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "6a6e8517-ba62-42a2-b8c0-c406c6bef7f7"
+      },
+      "cards": [
+       "OP06-073"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "ST05-017",
+     "ST05-017",
+     "ST05-004",
+     "OP08-069",
+     "ST05-005",
+     "OP07-077"
+    ],
+    "opp_life": [
+     "OP06-073"
+    ],
+    "opp_deck_top": [
+     "OP01-119",
+     "OP08-069",
+     "OP05-119",
+     "EB04-040",
+     "OP06-075"
+    ],
+    "my_deck_top": [
+     "OP13-068",
+     "OP13-078",
+     "OP13-064",
+     "OP13-078",
+     "OP13-064"
+    ],
+    "my_life": [
+     "OP13-067",
+     "EB01-007",
+     "OP13-068",
+     "OP09-005",
+     "OP13-061"
+    ]
+   },
+   {
+    "deal": 4,
+    "result": "win",
+    "nodes": 60,
+    "line": [
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "EB02-002",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "04c49794-4651-4ebb-9a46-b6caf17f04f5"
+      },
+      "cards": [
+       "OP06-073"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "OP12-004",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "4bfedd86-0cd2-453b-b87f-3cfbd7a57957"
+      },
+      "cards": [
+       "ST05-014"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "OP06-073",
+     "EB04-040",
+     "OP05-119",
+     "EB04-040",
+     "EB04-040",
+     "OP08-069"
+    ],
+    "opp_life": [
+     "ST05-014"
+    ],
+    "opp_deck_top": [
+     "EB04-030",
+     "OP06-071",
+     "ST05-017",
+     "ST05-017",
+     "OP05-119"
+    ],
+    "my_deck_top": [
+     "OP13-062",
+     "OP13-076",
+     "EB01-007",
+     "OP13-068",
+     "OP13-064"
+    ],
+    "my_life": [
+     "OP13-067",
+     "OP13-075",
+     "OP13-076",
+     "OP13-068",
+     "OP13-060"
+    ]
+   },
+   {
+    "deal": 5,
+    "result": "win",
+    "nodes": 52,
+    "line": [
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "EB02-002",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "cd544e7d-aadb-4edf-9c9c-239d300a03ce"
+      },
+      "cards": [
+       "OP02-079"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "OP12-004",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "81561765-8822-45cd-a674-ef95b7c196ab"
+      },
+      "cards": [
+       "OP06-075"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "ST05-017",
+     "OP02-079",
+     "ST05-017",
+     "EB04-030",
+     "EB04-040",
+     "OP01-119"
+    ],
+    "opp_life": [
+     "OP06-075"
+    ],
+    "opp_deck_top": [
+     "EB04-030",
+     "ST05-004",
+     "ST05-004",
+     "OP05-119",
+     "OP06-071"
+    ],
+    "my_deck_top": [
+     "OP13-067",
+     "OP13-061",
+     "OP12-007",
+     "OP13-078",
+     "OP13-068"
+    ],
+    "my_life": [
+     "OP13-067",
+     "OP13-078",
+     "OP13-068",
+     "OP13-062",
+     "OP13-064"
+    ]
+   },
+   {
+    "deal": 6,
+    "result": "win",
+    "nodes": 548,
+    "line": [
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8"
+       }
+      },
+      "cards": [
+       "EB02-002"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "EB02-002",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "e4f156c8-bb14-427c-a8ac-e61b4e99924e"
+      },
+      "cards": [
+       "ST05-005"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "33b33560-9dee-48a4-8661-53e79924945d"
+      },
+      "cards": [
+       "OP06-071"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "payload": {
+        "selected_uuids": [],
+        "index": 0,
+        "accepted": true,
+        "position": "BOTTOM",
+        "declared_value": 0
+       }
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "CONFIRM_TRIGGER",
+      "src": "any",
+      "seen": [],
+      "message": "【トリガー】「雷鳴八卦」の効果を発動しますか？"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "OP12-004",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "8a455d3f-b0d7-4155-9b8f-8f975250d7e6"
+      },
+      "cards": [
+       "EB04-040"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "payload": {
+        "selected_uuids": [
+         "68604c7c-d26f-441f-a328-bcdeb2c0bc9e"
+        ],
+        "index": 0,
+        "accepted": true,
+        "position": "BOTTOM",
+        "declared_value": 0
+       }
+      },
+      "cards": [
+       "?"
+      ],
+      "actor": "opp",
+      "action": "SELECT_RESOURCE",
+      "src": "any",
+      "seen": [],
+      "message": "ドン!!デッキに戻すドン!!を1枚選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "ST05-005",
+     "ST05-017",
+     "OP06-071",
+     "OP05-119",
+     "EB04-030",
+     "EB04-040"
+    ],
+    "opp_life": [
+     "OP01-119"
+    ],
+    "opp_deck_top": [
+     "EB01-039",
+     "ST05-004",
+     "EB04-040",
+     "ST05-005",
+     "OP13-077"
+    ],
+    "my_deck_top": [
+     "OP13-067",
+     "OP13-075",
+     "OP13-071",
+     "OP12-007",
+     "OP13-078"
+    ],
+    "my_life": [
+     "OP13-067",
+     "EB01-007",
+     "OP13-061",
+     "OP13-068",
+     "OP13-062"
+    ]
+   },
+   {
+    "deal": 7,
+    "result": "win",
+    "nodes": 2574,
+    "line": [
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8"
+       }
+      },
+      "cards": [
+       "EB02-002"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8"
+       }
+      },
+      "cards": [
+       "EB02-002"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8"
+       }
+      },
+      "cards": [
+       "EB02-002"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "EB02-002",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "a5eb7a23-61dc-481a-b288-5bde79150c56"
+      },
+      "cards": [
+       "OP06-073"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "cd544e7d-aadb-4edf-9c9c-239d300a03ce"
+      },
+      "cards": [
+       "OP02-079"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "2df0c3eb-4044-4cd9-bf99-7524d239f3e6"
+      },
+      "cards": [
+       "ST05-004"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "SELECT_COUNTER",
+       "card_uuid": "33b33560-9dee-48a4-8661-53e79924945d"
+      },
+      "cards": [
+       "OP06-071"
+      ],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "RESOLVE_EFFECT_SELECTION",
+       "payload": {
+        "selected_uuids": [],
+        "index": 0,
+        "accepted": true,
+        "position": "BOTTOM",
+        "declared_value": 0
+       }
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "CONFIRM_TRIGGER",
+      "src": "any",
+      "seen": [],
+      "message": "【トリガー】「鎧合体」の効果を発動しますか？"
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACH_DON",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+       }
+      },
+      "cards": [
+       "OP12-004"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "game",
+       "action_type": "ATTACK",
+       "payload": {
+        "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476",
+        "target_ids": [
+         "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+        ]
+       }
+      },
+      "cards": [
+       "OP12-004",
+       "ST05-001"
+      ],
+      "actor": "me",
+      "action": "MAIN_ACTION",
+      "src": "best",
+      "seen": []
+     },
+     {
+      "move": {
+       "kind": "battle",
+       "action_type": "PASS",
+       "card_uuid": null
+      },
+      "cards": [],
+      "actor": "opp",
+      "action": "SELECT_COUNTER",
+      "src": "any",
+      "seen": [],
+      "message": "カウンターカードを選択してください"
+     },
+     {
+      "end": "win"
+     }
+    ],
+    "opp_hand": [
+     "OP06-073",
+     "OP05-119",
+     "OP02-079",
+     "OP08-069",
+     "ST05-004",
+     "OP06-071"
+    ],
+    "opp_life": [
+     "ST05-017"
+    ],
+    "opp_deck_top": [
+     "EB01-039",
+     "OP06-071",
+     "OP01-119",
+     "ST05-005",
+     "EB04-030"
+    ],
+    "my_deck_top": [
+     "OP13-064",
+     "OP13-075",
+     "OP13-064",
+     "OP13-067",
+     "EB01-007"
+    ],
+    "my_life": [
+     "OP13-067",
+     "EB02-002",
+     "EB01-007",
+     "OP13-061",
+     "OP09-005"
+    ]
+   }
+  ],
+  "true": {
+   "status": "no",
+   "nodes": 638
+  },
+  "true_line": [
+   {
+    "move": {
+     "action_type": "ATTACK",
+     "kind": "game",
+     "payload": {
+      "target_ids": [
+       "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+      ],
+      "uuid": "6b05dead-ac33-44f0-a8bf-54eaf2e776c8"
+     }
+    },
+    "cards": [
+     "EB02-002",
+     "ST05-001"
+    ],
+    "actor": "me",
+    "action": "MAIN_ACTION",
+    "src": "guide",
+    "seen": []
+   },
+   {
+    "move": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "6a6e8517-ba62-42a2-b8c0-c406c6bef7f7"
+    },
+    "cards": [
+     "OP06-073"
+    ],
+    "actor": "opp",
+    "action": "SELECT_COUNTER",
+    "src": "refute",
+    "seen": [],
+    "message": "カウンターカードを選択してください"
+   },
+   {
+    "move": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "cd544e7d-aadb-4edf-9c9c-239d300a03ce"
+    },
+    "cards": [
+     "OP02-079"
+    ],
+    "actor": "opp",
+    "action": "SELECT_COUNTER",
+    "src": "refute",
+    "seen": [],
+    "message": "カウンターカードを選択してください"
+   },
+   {
+    "move": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "04c49794-4651-4ebb-9a46-b6caf17f04f5"
+    },
+    "cards": [
+     "OP06-073"
+    ],
+    "actor": "opp",
+    "action": "SELECT_COUNTER",
+    "src": "refute",
+    "seen": [],
+    "message": "カウンターカードを選択してください"
+   },
+   {
+    "move": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "2df0c3eb-4044-4cd9-bf99-7524d239f3e6"
+    },
+    "cards": [
+     "ST05-004"
+    ],
+    "actor": "opp",
+    "action": "SELECT_COUNTER",
+    "src": "refute",
+    "seen": [],
+    "message": "カウンターカードを選択してください"
+   },
+   {
+    "move": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    "cards": [],
+    "actor": "opp",
+    "action": "SELECT_COUNTER",
+    "src": "refute",
+    "seen": [],
+    "message": "カウンターカードを選択してください"
+   },
+   {
+    "move": {
+     "action_type": "ATTACH_DON",
+     "kind": "game",
+     "payload": {
+      "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+     }
+    },
+    "cards": [
+     "OP12-004"
+    ],
+    "actor": "me",
+    "action": "MAIN_ACTION",
+    "src": "guide",
+    "seen": []
+   },
+   {
+    "move": {
+     "action_type": "ATTACH_DON",
+     "kind": "game",
+     "payload": {
+      "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+     }
+    },
+    "cards": [
+     "OP12-004"
+    ],
+    "actor": "me",
+    "action": "MAIN_ACTION",
+    "src": "guide",
+    "seen": []
+   },
+   {
+    "move": {
+     "action_type": "ATTACH_DON",
+     "kind": "game",
+     "payload": {
+      "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+     }
+    },
+    "cards": [
+     "OP12-004"
+    ],
+    "actor": "me",
+    "action": "MAIN_ACTION",
+    "src": "guide",
+    "seen": []
+   },
+   {
+    "move": {
+     "action_type": "ATTACK",
+     "kind": "game",
+     "payload": {
+      "target_ids": [
+       "f63eb5ab-7d1d-4845-a96f-d93c3656f0d6"
+      ],
+      "uuid": "d0bd5791-d2af-46e7-ad03-19b04017f476"
+     }
+    },
+    "cards": [
+     "OP12-004",
+     "ST05-001"
+    ],
+    "actor": "me",
+    "action": "MAIN_ACTION",
+    "src": "guide",
+    "seen": []
+   },
+   {
+    "move": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    "cards": [],
+    "actor": "opp",
+    "action": "SELECT_COUNTER",
+    "src": "refute",
+    "seen": [],
+    "message": "カウンターカードを選択してください"
+   },
+   {
+    "move": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "cards": [],
+    "actor": "opp",
+    "action": "CONFIRM_TRIGGER",
+    "src": "refute",
+    "seen": [],
+    "message": "【トリガー】「降三世 引奈落」の効果を発動しますか？"
+   },
+   {
+    "actor": "me",
+    "action": "MAIN_ACTION",
+    "stop": "no_win_move",
+    "message": null,
+    "seen": []
+   }
+  ],
+  "sec": 0.05
+ }
+]
