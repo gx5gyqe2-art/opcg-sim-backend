@@ -138,6 +138,7 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
     `arena_shard --reveal {fair,peek,opp_hand}` も同じ口から `{"reveal": ...}` を渡す（§7.11）。
     `arena_shard --opp-blind` も同じ口から `{"opp_blind": True}` を渡す（§7.14）。
     `arena_shard --lethal-proof {root,root_reply}` も同じ口から `{"lethal_proof": ...}` を渡す（§7.21）。
+    `arena_shard --commit-sig-legacy` も同じ口から `{"commit_sig_legacy": True}` を渡す（WP `rs-commit-sig`）。
     """
     E.engine()
     _G["leaders_mode"] = leaders_mode
@@ -216,6 +217,8 @@ CAND_FLAGS = {
     "omniscient": dict(omniscient=True),
     # 木の中の相手にこちらの手札を見せない（§7.14・測定専用）。
     "opp_blind": dict(opp_blind=True),
+    # 旧い手の署名（WP `rs-commit-sig`・測定専用＝箱の commit の照合で戦闘の手の札が落ちる 2026-10-22 までの形）。
+    "commit_sig_legacy": dict(commit_sig_legacy=True),
 }
 
 
@@ -273,6 +276,10 @@ def add_cand_args(ap) -> None:
                     help="候補席だけ詰みの証明（`docs/search_efficiency_plan.md` §7.21）。root＝自分のメインで届きうるとき"
                          "公平な配り方 8 通りの全部で勝てる最初の 1 手を打つ／root_reply＝加えて根の直後の相手の応手の"
                          "節点でも証明する（省略＝off）")
+    ap.add_argument("--cand-commit-sig-legacy", action="store_true",
+                    help="候補席だけ旧い手の署名で箱の commit を照合する（WP `rs-commit-sig`・測定専用）。"
+                         "2026-10-22 までの形＝戦闘の手（カウンター・ブロッカー）の札が署名から落ち、"
+                         "commit の続きは署名が一致する最初の合法手を打つ")
     # --- 迷う局面だけ世界 K 本で読み直す（§7.4・WP `play-rethink`）------------------------
     ap.add_argument("--cand-rethink-ratio", type=float, default=None,
                     help="候補席だけ、根の 2 位の訪問数 ÷ 1 位 ≥ τ の決定を同じ seed で世界 K 本"
