@@ -109,8 +109,12 @@ def apply(game, actor: str, mv: Dict[str, Any]) -> None:
         game.apply_game_action(actor, mv["action_type"], json.dumps(mv.get("payload") or {}, ensure_ascii=False))
 
 
-def deep_decide(game, name: str, ss: int) -> Dict[str, Any]:
-    opts = {"net": _G["net"], "search_seed": ss ^ JUDGE_XOR, **DEEP}
+#: 判定役の seed を複数にするときの 2 本目以降のずらし（`--judge-seeds`）。
+JUDGE_STEP = 0x9E3779B97F4A7C15
+
+
+def deep_decide(game, name: str, ss: int, j: int = 0) -> Dict[str, Any]:
+    opts = {"net": _G["net"], "search_seed": (ss ^ JUDGE_XOR ^ (j * JUDGE_STEP)) & 0xFFFFFFFFFFFFFFFF, **DEEP}
     return json.loads(game.decide(name, json.dumps(opts)))
 
 
@@ -129,22 +133,26 @@ def out_value(o: Dict[str, Any]) -> Optional[float]:
     return None
 
 
-def child_value(game, mover: str, mv: Dict[str, Any], ss: int) -> Dict[str, Any]:
-    """手を当てた後の盤面の値（手を打った側から見た・深い読み）。"""
+def child_value(game, mover: str, mv: Dict[str, Any], ss: int, j: int = 0, forward: bool = False) -> Dict[str, Any]:
+    """手を当てた後の盤面の値（手を打った側から見た・深い読み）。`forward`＝値が出ない（候補 1 つ）盤面は先へ進める。"""
     g = game.fork()
     try:
         apply(g, mover, mv)
     except Exception as exc:  # noqa: BLE001
         return {"v": None, "err": f"{type(exc).__name__}: {exc}"[:120]}
-    w = g.winner()
-    if w is not None:
-        return {"v": 1.0 if w == mover else -1.0, "end": True}
-    pend = json.loads(g.pending_json())
-    if not pend:
-        return {"v": None, "err": "no pending"}
-    who = pend["player_id"]
-    o = deep_decide(g, who, ss)
-    v = out_value(o)
+    for _ in range(12 if forward else 1):
+        w = g.winner()
+        if w is not None:
+            return {"v": 1.0 if w == mover else -1.0, "end": True}
+        pend = json.loads(g.pending_json())
+        if not pend:
+            return {"v": None, "err": "no pending"}
+        who = pend["player_id"]
+        o = deep_decide(g, who, ss, j)
+        v = out_value(o)
+        if v is not None or not forward or not o.get("move"):
+            break
+        apply(g, who, o["move"])            # 候補が 1 つ（値が出ない）＝その手を当てて先へ（`forward` のときだけ）
     if v is None:
         return {"v": None, "kind": o.get("kind"), "who": who}
     return {"v": round(v if who == mover else -v, 4), "kind": o.get("kind"), "who": "me" if who == mover else "opp"}
@@ -179,6 +187,16 @@ def judge_pair(game, name: str, ss: int, a: Dict[str, Any], b: Dict[str, Any], t
     return r
 
 
+def judge_multi(game, name: str, ss: int, a: Dict[str, Any], b: Dict[str, Any], k: int) -> Dict[str, Any]:
+    """各手を当てた後の値を判定役の seed k 本で読み、平均する（窓の値は世界 1 本の読みなので揺れる）。"""
+    t0 = time.perf_counter()
+    va = [child_value(game, name, a, ss, j, True).get("v") for j in range(k)]
+    vb = [child_value(game, name, b, ss, j, True).get("v") for j in range(k)]
+    ok = [(x, y) for x, y in zip(va, vb) if x is not None and y is not None]
+    return {"va": va, "vb": vb, "dv": round(sum(y - x for x, y in ok) / len(ok), 4) if ok else None,
+            "sec": round(time.perf_counter() - t0, 2)}
+
+
 def play_one(args) -> List[Dict[str, Any]]:
     seed, a = args
     E.engine()
@@ -190,6 +208,8 @@ def play_one(args) -> List[Dict[str, Any]]:
     kinds: Dict[str, int] = {}
     src = {"p1": None, "p2": None}           # 席ごとの今の続きの出どころ
     pos = {"p1": 0, "p2": 0}                 # 続きの何段目か
+    origin = {"p1": None, "p2": None}        # 続きを積んだ決定の step
+    hist: List[tuple] = []                   # (step, 席, 手の種類)
     points: List[Dict[str, Any]] = []
 
     def obs(game, name, turn, step, out, move):
@@ -197,6 +217,7 @@ def play_one(args) -> List[Dict[str, Any]]:
         own = game.turn_player() == name
         kk = f"{'own' if own else 'opp'}:{kind}"
         kinds[kk] = kinds.get(kk, 0) + 1
+        hist.append((step, name, move.get("action_type")))
         if kind == "commit":
             pos[name] += 1
             pend = json.loads(game.pending_json())
@@ -216,7 +237,15 @@ def play_one(args) -> List[Dict[str, Any]]:
                    "n_legal": _n_legal(game, name),
                    "diff": key(move) != key(fm), "diff_desc": desc(game, move) != desc(game, fm),
                    "cal_diff": key(fm) != key(gm), "cal_diff_desc": desc(game, fm) != desc(game, gm),
-                   "sec_fresh": round(dt, 2)}
+                   "sec_fresh": round(dt, 2), "origin": origin[name]}
+            if origin[name] is not None:
+                rec["between_opp"] = [h[2] for h in hist if origin[name] < h[0] < step and h[1] != name]
+            jt = a.judge_types.split(",") if a.judge_types else None
+            sel = jt is None or any(rec["type"].startswith(t) for t in jt)
+            if a.judge_seeds and sel and rec["diff"] and fm is not None:
+                rec["judge_multi"] = judge_multi(game, name, ss, move, fm, a.judge_seeds)
+            if a.judge_seeds and sel and rec["cal_diff"] and fm is not None and gm is not None:
+                rec["judge_multi_cal"] = judge_multi(game, name, ss, fm, gm, a.judge_seeds)
             if a.deep and rec["diff"] and fm is not None:
                 rec["judge"] = judge_pair(game, name, ss, move, fm, "live_vs_fresh")
             if a.deep and rec["cal_diff"] and fm is not None and gm is not None:
@@ -229,9 +258,9 @@ def play_one(args) -> List[Dict[str, Any]]:
                              {"DON_BOX": "box", "PLAY": "play", "ACTIVATE_MAIN": "play",
                               "SETUP_BOX": "setup"}.get(at, f"other:{at}"))
                 src[name] = f"{src[name]}@{'own' if own else 'opp'}"
-                pos[name] = 0
+                pos[name], origin[name] = 0, step
             else:
-                src[name], pos[name] = None, 0
+                src[name], pos[name], origin[name] = None, 0, None
 
     t0 = time.perf_counter()
     try:
@@ -284,8 +313,9 @@ def wilson(k, n, z=1.96):
 
 def _load(paths):
     games, pts = [], []
+    import gzip
     for p in paths:
-        for line in open(p, encoding="utf-8"):
+        for line in (gzip.open(p, "rt", encoding="utf-8") if p.endswith(".gz") else open(p, encoding="utf-8")):
             d = json.loads(line)
             (games if "game" in d else pts).append(d["game"] if "game" in d else d)
     seeds = {g["seed"] for g in games}
@@ -410,7 +440,7 @@ def summarize(games, pts) -> Dict[str, Any]:
 
 def cmd_summary(a):
     import glob
-    paths = sorted(glob.glob(os.path.join(a.out, "points_*.jsonl")))
+    paths = sorted(glob.glob(os.path.join(a.out, "points_*.jsonl"))) or sorted(glob.glob(os.path.join(a.out, "points_*.jsonl.gz")))
     games, pts = _load(paths)
     s = summarize(games, pts)
     path = os.path.join(a.out, "summary.json")
@@ -437,6 +467,9 @@ def main(argv=None):
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--net", default=None, help="既定＝出荷のネット（r13d）")
     p.add_argument("--no-deep", dest="deep", action="store_false", help="深い読みの比べを省く（試走用）")
+    p.add_argument("--judge-seeds", type=int, default=0,
+                   help="補助の判定: 各手を当てた後の値を判定役の seed k 本の平均で読む（0＝しない）")
+    p.add_argument("--judge-types", default="", help="補助の判定を当てる段の種類（前方一致・カンマ区切り・空＝全部）")
     p.add_argument("--out", default=OUT_DIR)
     p = sub.add_parser("summary")
     p.add_argument("--out", default=OUT_DIR)
