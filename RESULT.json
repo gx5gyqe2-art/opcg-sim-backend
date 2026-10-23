@@ -42,5 +42,5 @@
   "sec_deep_per_game": 8.8
  },
  "commit": "24ce7244f",
- "notes": ""
+ "notes": "claude/n50-w01 の記録は n_records/n50_w01_p0〜p3（各 120 局・計 480 局）に分かれていて n_records/n50_w01 が無く、ブロック 1 の git archive が失敗した。4 つの part の npz を ~/rec/n_records/n50_w01 へ symlink で集め（名前は n_record_p{k}_{元の番号}.npz）、meta_games.json の局を連結し、meta_n_record.json は p0 のもの（games・rows を合計に・sims/net/search 等の設定は 4 part で一致を確認）にした。seed は part 間で重複なし。--games 200 は seed の昇順の先頭 200 局＝p0 の 120 局（2531001〜2531119 付近）＋p1 の先頭 80 局。inputs.record の表記は器のまま（実体は上の 4 part）。波 49 の各シャードも同じ p0〜p3 の形（n49-w01 で確認）なので同じ対処が要るはず。コードは未変更。"
 }
