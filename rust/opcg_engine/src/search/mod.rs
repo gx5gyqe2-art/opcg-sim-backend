@@ -631,6 +631,8 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
         lethal_nodes: v.get("lethal_nodes").and_then(Value::as_u64).unwrap_or(d.lethal_nodes),
         lethal_reply_nodes: v.get("lethal_reply_nodes").and_then(Value::as_u64).unwrap_or(d.lethal_reply_nodes),
         lethal_reply_total: v.get("lethal_reply_total").and_then(Value::as_u64).unwrap_or(d.lethal_reply_total),
+        // 守りの強い配り方の旧い形（§7.33・測定用・既定 false）。
+        lethal_deal_legacy: flag("lethal_deal_legacy", d.lethal_deal_legacy),
     }
 }
 

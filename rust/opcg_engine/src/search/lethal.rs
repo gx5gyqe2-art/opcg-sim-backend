@@ -90,11 +90,13 @@ pub struct ReplyProof {
     pub children: u64,
     pub proven: u64,
     pub nodes: u64,
+    /// 守りの強い配り方の旧い形（opts の `lethal_deal_legacy`・[`make_deals`]）
+    pub deal_legacy: bool,
 }
 
 impl ReplyProof {
-    pub fn new(me: Seat, seed: u64, per_node: u64, left: u64) -> ReplyProof {
-        ReplyProof { me, seed, per_node, left, checked: 0, children: 0, proven: 0, nodes: 0 }
+    pub fn new(me: Seat, seed: u64, per_node: u64, left: u64, deal_legacy: bool) -> ReplyProof {
+        ReplyProof { me, seed, per_node, left, checked: 0, children: 0, proven: 0, nodes: 0, deal_legacy }
     }
 
     /// 応手の節点 `node` の各子（相手の応手 `legal`）について、その応手の後にこちらの勝ちが証明できるか。
@@ -118,10 +120,11 @@ impl ReplyProof {
             self.children += 1;
             let seed = self.seed ^ ((node as u64) << 20 | i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
             let me = self.me;
+            let legacy = self.deal_legacy;
             let r = s.discard_events(|s| {
                 s.transaction(|s| -> Result<(bool, u64), EngineError> {
                     match super::apply::apply_move_inplace(s, masters, opp, mv, true) {
-                        Ok(()) => prove(masters, s.state(), me, seed, budget),
+                        Ok(()) => prove(masters, s.state(), me, seed, budget, legacy),
                         Err(e @ EngineError::Unimplemented(_)) => Err(e),
                         Err(_) => Ok((false, 0)),
                     }
@@ -270,6 +273,7 @@ fn defense(masters: &MasterTable, m: MasterIdx) -> (i64, bool) {
 }
 
 /// 守りの強い配り方（`mode` 0＝守りの値の大きい順に手札へ・1＝カウンターイベントを先に）。
+/// カウンターイベントは相手のアクティブのドン!!で払える枚数までを守りに数える（`legacy`＝true なら払えるかを見ない旧い形）。
 ///
 /// 相手の手札＋山札＋裏向きのライフのうち自分の知らない枠（`fair` と同じ）の札を 1 つの山にし、
 /// 無作為に混ぜてから守りの値で安定に並べ、上から手札の枠へ入れる。残りは混ぜて山札・ライフの枠へ。
@@ -279,6 +283,7 @@ fn defensive_deal(
     masters: &MasterTable,
     me: Seat,
     mode: u8,
+    legacy: bool,
     rng: &mut dyn SearchRng,
 ) -> Result<GameState, EngineError> {
     let opp = me.other();
@@ -310,14 +315,36 @@ fn defensive_deal(
         };
         let uuids: Vec<String> = pool.iter().map(|c| state.card(*c).uuid.clone()).collect();
         let mut mixed = by_uuid(rng.shuffle_order(&uuids)?);
+        let key = |v: i64, ev: bool| if mode == 1 { (-(ev as i64), -v) } else { (0, -v) };
         mixed.sort_by_key(|c| {
             let (v, ev) = defense(masters, state.card(*c).master);
-            if mode == 1 {
-                (-(ev as i64), -v)
-            } else {
-                (0, -v)
-            }
+            key(v, ev)
         });
+        if !legacy {
+            // カウンターイベントは**相手が今払えるドン!!**（アクティブのドン!!）の範囲でだけ守りに数える（§7.33・
+            // WP `lethal-deal-cost`）: 守りの値の順に見て、コストが残りの予算に収まるイベントだけ値を残し、
+            // 残りは値 0（手札の枠は他の札で埋める）。旧い形（`legacy`）は払えないイベントを値のまま手札の枠へ積み、
+            // 本当の手札より弱い「守りの強い配り方」を作っていた（`docs/reports/2026-10-23_lethal_own_hidden.md`）。
+            let mut budget = p.don_active.len() as i32;
+            let mut eff: Vec<(CardIdx, (i64, i64))> = mixed
+                .iter()
+                .map(|c| {
+                    let (v, ev) = defense(masters, state.card(*c).master);
+                    if !ev {
+                        return (*c, key(v, false));
+                    }
+                    let cost = masters.get(state.card(*c).master).cost;
+                    if cost <= budget {
+                        budget -= cost;
+                        (*c, key(v, true))
+                    } else {
+                        (*c, key(0, false))
+                    }
+                })
+                .collect();
+            eff.sort_by_key(|(_, k)| *k);
+            mixed = eff.into_iter().map(|(c, _)| c).collect();
+        }
         let n_hand = slots.iter().filter(|(z, _)| *z == CardZone::Hand).count();
         let (hand, rest) = mixed.split_at(n_hand);
         let rest_uuids: Vec<String> = rest.iter().map(|c| state.card(*c).uuid.clone()).collect();
@@ -339,17 +366,19 @@ fn defensive_deal(
 }
 
 /// 配り方を作る（`fair` の引き直し `rand` 通り＋守りの強い 2 通り・守りの強い方を先に＝早く落ちる）。
+/// `legacy`＝守りの強い配り方でカウンターイベントの払えるかを見ない旧い形（opts の `lethal_deal_legacy`・測定用）。
 pub fn make_deals(
     state: &GameState,
     masters: &MasterTable,
     me: Seat,
     seed: u64,
     rand: usize,
+    legacy: bool,
 ) -> Result<Vec<GameState>, EngineError> {
     let mut rng = Pcg32SearchRng::new(seed);
     let mut out = Vec::with_capacity(rand + 2);
-    out.push(defensive_deal(state, masters, me, 0, &mut rng)?);
-    out.push(defensive_deal(state, masters, me, 1, &mut rng)?);
+    out.push(defensive_deal(state, masters, me, 0, legacy, &mut rng)?);
+    out.push(defensive_deal(state, masters, me, 1, legacy, &mut rng)?);
     for _ in 0..rand {
         out.push(super::determinize::determinize_fair_with(state, me, &mut rng)?);
     }
@@ -1370,8 +1399,15 @@ pub fn solve_root_traced(
 
 /// 盤面から（誰の番でも）このターンにこちらの勝ちが**全部の配り方で**証明できるか（§7.21 の 4 の応手の子）。
 /// 戻り値は (証明できたか, 使った節点)。配り方は `state` から公平に作る（本当の配り方は読まない）。
-pub fn prove(masters: &MasterTable, state: &GameState, me: Seat, seed: u64, max_nodes: u64) -> Result<(bool, u64), EngineError> {
-    let deals = make_deals(state, masters, me, seed, LETHAL_RAND_DEALS)?;
+pub fn prove(
+    masters: &MasterTable,
+    state: &GameState,
+    me: Seat,
+    seed: u64,
+    max_nodes: u64,
+    legacy: bool,
+) -> Result<(bool, u64), EngineError> {
+    let deals = make_deals(state, masters, me, seed, LETHAL_RAND_DEALS, legacy)?;
     let mut solvers: Vec<Solver> = deals.iter().map(|d| Solver::new(masters, d, me, max_nodes)).collect();
     let mut ok = true;
     for (i, d) in deals.iter().enumerate() {
@@ -1396,12 +1432,13 @@ pub fn root_proof(
     me: Seat,
     search_seed: Option<u64>,
     max_nodes: u64,
+    legacy: bool,
 ) -> Result<Option<LethalOut>, EngineError> {
     let mut s = Session::new(state.clone());
     if !applies(&mut s, masters, me) {
         return Ok(None);
     }
-    let deals = make_deals(state, masters, me, lethal_seed(search_seed.unwrap_or(0)), LETHAL_RAND_DEALS)?;
+    let deals = make_deals(state, masters, me, lethal_seed(search_seed.unwrap_or(0)), LETHAL_RAND_DEALS, legacy)?;
     Ok(Some(solve_root(masters, state, me, &deals, max_nodes)))
 }
 

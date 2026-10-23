@@ -221,6 +221,8 @@ CAND_FLAGS = {
     "omniscient": dict(omniscient=True),
     # 木の中の相手にこちらの手札を見せない（§7.14・測定専用）。
     "opp_blind": dict(opp_blind=True),
+    # 詰みの証明の守りの強い配り方を旧い形に（§7.33・測定用＝カウンターイベントを払えるかを見ずに積む）。
+    "lethal_deal_legacy": dict(lethal_deal_legacy=True),
 }
 
 
@@ -278,6 +280,10 @@ def add_cand_args(ap) -> None:
                     help="候補席だけ詰みの証明（`docs/search_efficiency_plan.md` §7.21）。root＝自分のメインで届きうるとき"
                          "公平な配り方 8 通りの全部で勝てる最初の 1 手を打つ／root_reply＝加えて根の直後の相手の応手の"
                          "節点でも証明する（省略＝off）")
+    ap.add_argument("--cand-lethal-deal-legacy", action="store_true",
+                    help="候補席だけ詰みの証明の守りの強い配り方を旧い形にする（`docs/search_efficiency_plan.md` §7.33・"
+                         "測定用）。カウンターイベントを相手が払えるかを見ずに手札へ積む（2026-10-23 までの形）。"
+                         "省略＝既定（相手のアクティブのドン!!で払える枚数までだけ数える）。--cand-lethal-proof と組で使う")
     # --- 迷う局面だけ世界 K 本で読み直す（§7.4・WP `play-rethink`）------------------------
     ap.add_argument("--cand-rethink-ratio", type=float, default=None,
                     help="候補席だけ、根の 2 位の訪問数 ÷ 1 位 ≥ τ の決定を同じ seed で世界 K 本"

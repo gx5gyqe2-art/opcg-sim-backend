@@ -103,6 +103,10 @@ pub struct DecideOptions {
     pub lethal_reply_nodes: u64,
     /// `RootReply` の決定あたりの合計（`lethal_reply_total`・世界の本数で等分）。
     pub lethal_reply_total: u64,
+    /// 守りの強い配り方の旧い形（`lethal_deal_legacy`・§7.33・WP `lethal-deal-cost`・測定用・既定 false）。
+    /// 既定（false）はカウンターイベントを相手のアクティブのドン!!で払える枚数までだけ守りに数える。
+    /// true は払えるかを見ずに積む旧い形（[`super::lethal::make_deals`]）。`lethal_proof=off` なら効かない。
+    pub lethal_deal_legacy: bool,
 }
 
 /// `opp_blind`（§7.14）の混ぜ直しの乱数の seed（世界 `i` の探索乱数 `search_seed + i` と同じ値から、
@@ -202,6 +206,7 @@ impl Default for DecideOptions {
             lethal_nodes: super::lethal::LETHAL_ROOT_NODES,
             lethal_reply_nodes: super::lethal::LETHAL_REPLY_NODES,
             lethal_reply_total: super::lethal::LETHAL_REPLY_TOTAL,
+            lethal_deal_legacy: false,
         }
     }
 }
@@ -1268,6 +1273,7 @@ fn run_one_world(
             super::lethal::lethal_seed(world_seed),
             opts.lethal_reply_nodes,
             opts.lethal_reply_total / k,
+            opts.lethal_deal_legacy,
         ));
     }
     let run = tree.run_in_world(world, rng, st)?;
@@ -1517,7 +1523,7 @@ fn decide_inner(
     // 探索へ戻す（決定の乱数は触っていない）。`root_reply` は発動条件を満たした決定だけ木の中でも証明する。
     use super::lethal::LethalProof;
     let lethal = if opts.lethal_proof != LethalProof::Off {
-        super::lethal::root_proof(ctx.masters, state, name, opts.search_seed, opts.lethal_nodes)?
+        super::lethal::root_proof(ctx.masters, state, name, opts.search_seed, opts.lethal_nodes, opts.lethal_deal_legacy)?
     } else {
         None
     };
