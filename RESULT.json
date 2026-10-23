@@ -1,7 +1,7 @@
 {
  "job": "arena-ldc-w04",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r13d.npz (payable counter events in defensive deals)",
   "baseline": "nrel_r13d.npz + lethal_deal_legacy",
