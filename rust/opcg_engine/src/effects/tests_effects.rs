@@ -217,6 +217,7 @@ fn every_suspension_kind_has_the_python_request_shape() {
         optional: true,
         confirmed: false,
         subject: None,
+        bundle: Default::default(),
     };
     let mut masters_trigger = masters.clone();
     masters_trigger.masters[M_CHAR as usize].ability_ids = vec![AB_LIFE_TRIGGER];

@@ -273,13 +273,11 @@ pub fn move_card(
         Some((owner, Some(zone))) => {
             s.edit().card_zone_remove_value(owner, zone, card);
         }
-        Some((owner, None)) => {
-            // リーダーは 1. で弾いているのでステージ枠のみ。
-            if s.state().player(owner).stage == Some(card) {
-                s.edit().set_slot(owner, CardSlot::Stage, None);
-            }
+        // リーダーは 1. で弾いているのでステージ枠のみ。
+        Some((owner, None)) if s.state().player(owner).stage == Some(card) => {
+            s.edit().set_slot(owner, CardSlot::Stage, None);
         }
-        None => {}
+        Some((_, None)) | None => {}
     }
 
     // 6. 離脱イベント（誘発の待ち行列に積むのは P2/P3）。

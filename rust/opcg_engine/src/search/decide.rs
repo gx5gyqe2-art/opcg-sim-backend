@@ -2696,7 +2696,7 @@ pub(super) mod tests {
         masters: &crate::model::MasterTable,
         state: &GameState,
         opts: &DecideOptions,
-    ) -> (DecideOut, Vec<(GameState, GameState, Vec<Move>, GameState)>) {
+    ) -> (DecideOut, crate::search::mcts::BlindTrace) {
         crate::search::mcts::BLIND_TRACE.with(|t| *t.borrow_mut() = Some(Vec::new()));
         let (out, _) = omni_run(masters, state, opts);
         let trace = crate::search::mcts::BLIND_TRACE.with(|t| t.borrow_mut().take()).unwrap();

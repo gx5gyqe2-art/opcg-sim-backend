@@ -35,7 +35,7 @@
 //! （`_nfc` 正規化済みの前提＝効果 JSON の `raw_text` は Python が NFC で書き出す）。
 
 use crate::journal::{Session, TriggerQueue};
-use crate::model::{CardIdx, CardType, MasterTable, PendingTrigger, Seat, Zone};
+use crate::model::{CardIdx, CardType, MasterTable, PendingTrigger, Seat, TriggerBundle, Zone};
 use crate::ops;
 use crate::state::EngineError;
 
@@ -83,6 +83,7 @@ pub fn enqueue_trigger_with_subject(
         optional,
         confirmed: false,
         subject,
+        bundle: TriggerBundle::Fresh,
     });
     s.edit().set_trigger_queue(TriggerQueue::Pending, queue);
 }
@@ -125,6 +126,168 @@ pub fn must_queue(s: &Session) -> bool {
     s.state().active_interaction().is_some() || holding_triggers(s)
 }
 
+// ---------------------------------------------------------------------------
+// 同時に誘発した束（WP `rs-trigger-simul`）
+// ---------------------------------------------------------------------------
+
+fn trigger_queue(s: &Session, which: TriggerQueue) -> &Vec<PendingTrigger> {
+    match which {
+        TriggerQueue::Pending => &s.state().pending_triggers,
+        TriggerQueue::Battle => &s.state().battle_triggers,
+    }
+}
+
+/// 待ち行列の先頭の束を総合ルールの順に並べ、同じプレイヤーの効果が 2 つ以上なら順を選ぶ対話を立てる
+/// （対話を立てたら `true`）。
+///
+/// **束**＝先頭から続く [`TriggerBundle::Fresh`] の並び＝前の消化が始まってから今の消化が始まるまでに
+/// 積まれた誘発（一番外の効果・行動・戦闘の段の 1 つの区切りの中で条件を満たしたもの）。束の中は
+/// ライフの【トリガー】（ダメージの処理の一部）→ 手番のプレイヤーの効果 → 非手番のプレイヤーの効果の順
+/// （各組の中は積んだ順＝既定の答え）。束を解決している間に新しく誘発した効果は束の後ろに積まれ、
+/// 次の束になる。
+///
+/// 先頭が `Choose`（順を選ぶ組）なら、先頭から続く同じプレイヤーの `Choose` の並びのうち**別の札が 2 枚以上**
+/// あるときだけ ORDER_TRIGGERS（先に解決する効果の札を 1 枚選ぶ）を立てる。選んだ 1 件が `Fixed` で先頭へ
+/// 移り、残りは解決の後でまた選ぶ（1 件ずつ選べば全ての順を選べる）。
+pub fn order_front_bundle(
+    s: &mut Session,
+    masters: &MasterTable,
+    which: TriggerQueue,
+) -> Result<bool, EngineError> {
+    let queue = trigger_queue(s, which);
+    if queue.first().map(|t| t.bundle) == Some(TriggerBundle::Fresh) {
+        let n_fresh = queue
+            .iter()
+            .take_while(|t| t.bundle == TriggerBundle::Fresh)
+            .count();
+        let turn = s.state().turn_player;
+        let (bundle, rest) = queue.split_at(n_fresh);
+        let mut life: Vec<PendingTrigger> = Vec::new();
+        let mut groups: [Vec<PendingTrigger>; 2] = [Vec::new(), Vec::new()];
+        for item in bundle {
+            if is_life_trigger(masters, s, item) {
+                life.push(item.clone());
+            } else {
+                groups[usize::from(item.player != turn)].push(item.clone());
+            }
+        }
+        let rest = rest.to_vec();
+        let mut ordered: Vec<PendingTrigger> = Vec::with_capacity(n_fresh + rest.len());
+        for mut item in life {
+            item.bundle = TriggerBundle::Fixed;
+            ordered.push(item);
+        }
+        for group in groups {
+            let mark = if distinct_cards(&group) >= 2 {
+                TriggerBundle::Choose
+            } else {
+                TriggerBundle::Fixed
+            };
+            for mut item in group {
+                item.bundle = mark;
+                ordered.push(item);
+            }
+        }
+        ordered.extend(rest);
+        s.edit().set_trigger_queue(which, ordered);
+    }
+    let queue = trigger_queue(s, which);
+    let Some(front) = queue.first() else {
+        return Ok(false);
+    };
+    if front.bundle != TriggerBundle::Choose {
+        return Ok(false);
+    }
+    let player = front.player;
+    let run = queue
+        .iter()
+        .take_while(|t| t.bundle == TriggerBundle::Choose && t.player == player)
+        .count();
+    if distinct_cards(&queue[..run]) < 2 {
+        let mut queue = queue.clone();
+        for item in &mut queue[..run] {
+            item.bundle = TriggerBundle::Fixed;
+        }
+        s.edit().set_trigger_queue(which, queue);
+        return Ok(false);
+    }
+    let mut cards: Vec<CardIdx> = Vec::new();
+    for item in &queue[..run] {
+        if !cards.contains(&item.card) {
+            cards.push(item.card);
+        }
+    }
+    let cont = Box::new(crate::model::Continuation {
+        order_queue: Some(which),
+        ..Default::default()
+    });
+    s.edit().set_interaction(crate::model::Interaction {
+        kind: crate::model::InteractionKind::OrderTriggers,
+        player,
+        message: "同時に発動した効果のうち、先に解決する効果のカードを選んでください".to_owned(),
+        candidates: cards.into_iter().map(crate::model::TargetRef::Card).collect(),
+        selectable: None,
+        constraints: Some((1, 1)),
+        can_skip: false,
+        source_card: None,
+        owner: player,
+        options: Vec::new(),
+        allow_position: false,
+        allow_reorder: false,
+        continuation: Some(cont),
+        intent: crate::model::SelectionIntent::Order,
+    });
+    Ok(true)
+}
+
+fn distinct_cards(items: &[PendingTrigger]) -> usize {
+    let mut seen: Vec<CardIdx> = Vec::new();
+    for item in items {
+        if !seen.contains(&item.card) {
+            seen.push(item.card);
+        }
+    }
+    seen.len()
+}
+
+/// ORDER_TRIGGERS の解決: 選んだ札の（組の中で最初の）効果を `Fixed` にして先頭へ移し、消化を再開する。
+/// 選択が無い・候補に無いときは先頭（積んだ順）。
+pub fn resolve_order_triggers(
+    s: &mut Session,
+    masters: &MasterTable,
+    cont: &crate::model::Continuation,
+    payload: &serde_json::Value,
+) -> Result<(), EngineError> {
+    s.edit().pop_interaction();
+    let which = cont.order_queue.unwrap_or(TriggerQueue::Pending);
+    let chosen = payload
+        .get("selected_uuids")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|a| a.first())
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned);
+    let mut queue = trigger_queue(s, which).clone();
+    if let Some(front) = queue.first() {
+        let player = front.player;
+        let run = queue
+            .iter()
+            .take_while(|t| t.bundle == TriggerBundle::Choose && t.player == player)
+            .count();
+        let pos = chosen
+            .and_then(|u| {
+                queue[..run]
+                    .iter()
+                    .position(|t| s.state().card(t.card).uuid == u)
+            })
+            .unwrap_or(0);
+        let mut item = queue.remove(pos);
+        item.bundle = TriggerBundle::Fixed;
+        queue.insert(0, item);
+        s.edit().set_trigger_queue(which, queue);
+    }
+    after_trigger_queue_interaction(s, masters)
+}
+
 fn advance_pending_triggers_inner(
     s: &mut Session,
     masters: &MasterTable,
@@ -140,6 +303,9 @@ fn advance_pending_triggers_inner(
                 None => return Ok(()), // 効果の終わりに消化される
             }
         } else {
+            if order_front_bundle(s, masters, TriggerQueue::Pending)? {
+                return Ok(()); // 解決順の選択 → resolve_order_triggers が再開
+            }
             0
         };
         let item = s.state().pending_triggers[pos].clone();
@@ -299,6 +465,14 @@ pub fn resolve_confirm_trigger(
             s.edit().set_trigger_queue(TriggerQueue::Pending, queue);
         }
     }
+    after_trigger_queue_interaction(s, masters)
+}
+
+/// 待ち行列の対話（CONFIRM_TRIGGER・ORDER_TRIGGERS）が片付いた後の再開。
+fn after_trigger_queue_interaction(
+    s: &mut Session,
+    masters: &MasterTable,
+) -> Result<(), EngineError> {
     // 確認した誘発（ライフの【トリガー】ならダメージを与えた効果の残りより先）→ 退避した残り → 他の誘発。
     settle_pending(s, masters)?;
     // ターン開始時誘発の解決で保留していたリフレッシュフェイズ以降を再開する。
@@ -1366,6 +1540,7 @@ pub fn enqueue_battle_triggers(
                 optional: false,
                 confirmed: false,
                 subject: None,
+                bundle: TriggerBundle::Fresh,
             });
         } else if ab.trigger == TriggerType::OnRest
             && rest_subject_matches(
@@ -1380,6 +1555,7 @@ pub fn enqueue_battle_triggers(
                 optional: false,
                 confirmed: false,
                 subject: None,
+                bundle: TriggerBundle::Fresh,
             });
         }
     }
@@ -1448,6 +1624,7 @@ pub fn enqueue_battle_triggers(
             optional,
             confirmed: false,
             subject: None,
+            bundle: TriggerBundle::Fresh,
         });
     }
     // Python: `opp_cards = ([target_owner.leader] if leader else []) + target_owner.field`
@@ -1471,6 +1648,7 @@ pub fn enqueue_battle_triggers(
                     optional: false,
                     confirmed: false,
                     subject: None,
+                    bundle: TriggerBundle::Fresh,
                 });
             }
         }

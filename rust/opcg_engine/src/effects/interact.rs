@@ -590,6 +590,9 @@ pub fn resolve_interaction(
         InteractionKind::ConfirmTrigger => {
             return super::triggers::resolve_confirm_trigger(s, masters, &cont, payload)
         }
+        InteractionKind::OrderTriggers => {
+            return super::triggers::resolve_order_triggers(s, masters, &cont, payload)
+        }
         _ => {}
     }
 
@@ -849,7 +852,9 @@ pub fn resolve_interaction(
             resolver.process_stack(s, masters, actor, Some(source_card))?;
             history = resolver.action_history;
         }
-        InteractionKind::FieldOverflowTrash | InteractionKind::ConfirmTrigger => unreachable!(),
+        InteractionKind::FieldOverflowTrash
+        | InteractionKind::ConfirmTrigger
+        | InteractionKind::OrderTriggers => unreachable!(),
     }
 
     // Python `resolve_interaction` の共通末尾: 再開経路で実行したアクションも `action_events` へ
@@ -1238,7 +1243,8 @@ pub fn choose_selection(
     max_n: i32,
     intent: SelectionIntent,
 ) -> Option<Vec<String>> {
-    if entries.is_empty() || max_n < 1 {
+    // 解決順の既定は積んだ順＝先頭（呼び手の `uuids[..take]`）。
+    if entries.is_empty() || max_n < 1 || intent == SelectionIntent::Order {
         return None;
     }
     if entries.iter().any(|e| e.side.is_none() || e.zone.is_none()) {
@@ -1276,7 +1282,9 @@ pub fn choose_selection(
     if all_own && zones_in(&["hand", "field", "leader", "stage"]) {
         return Some(match intent {
             SelectionIntent::Benefit => by_value_desc(n_max),
-            SelectionIntent::Cost | SelectionIntent::Unknown => by_value_asc(n_min),
+            SelectionIntent::Cost | SelectionIntent::Unknown | SelectionIntent::Order => {
+                by_value_asc(n_min)
+            }
         });
     }
     if all_opp {
@@ -1321,6 +1329,7 @@ pub fn default_interaction_payload(
     let intent = match pending.get("intent").and_then(Value::as_str) {
         Some("BENEFIT") => SelectionIntent::Benefit,
         Some("COST") => SelectionIntent::Cost,
+        Some("ORDER") => SelectionIntent::Order,
         _ => SelectionIntent::Unknown,
     };
     default_payload_from(state, masters, uuids, min_n, max_n, pid, intent)

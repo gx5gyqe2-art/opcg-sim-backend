@@ -14,6 +14,9 @@
 //! 【レスト時】も同じ規則で、効果の中で KO・レストが起きたら親の効果を解決し切ってから解決する
 //! （旧実装はその場で解決し、親の「その後」の手順より先に子が走っていた）。
 //!
+//! **続き（WP `rs-trigger-simul`・`docs/reports/2026-10-23_trigger_simul.md`）**: 同時に誘発した自動効果は
+//! 手番のプレイヤーの効果から解決し、同じプレイヤーの効果が 2 つ以上なら本人が順を選ぶ（旧実装は積んだ順）。
+//!
 //! 盤面は**実カード**（`opcg_sim/data/opcg_effects.json`）で組む。効果 JSON は生成物
 //! （git 管理外）なので、無い環境では**何も検査せずに戻る**（`tests_rest_replace.rs` と同じ約束）。
 
@@ -43,6 +46,8 @@ const JANGO: &str = "OP03-039";
 /// カード1枚を引き、自分の手札1枚を捨てる）。
 const BARTOLOMEO: &str = "OP07-031";
 const ACTIVATE_MAIN: usize = 0;
+/// EB04-044「コビー」（能力 1＝【自分のターン中】【ターン1回】相手のキャラがKOされた時、カード1枚を引く）。
+const KOBY: &str = "EB04-044";
 
 const EFFECTS: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -306,4 +311,99 @@ fn the_on_rest_waits_for_the_parent_to_finish() {
     assert_eq!(p1.trash.len(), 1, "捨てた 1 枚");
     assert!(s.state().pending_triggers.is_empty(), "待ち行列は消化し切っている");
     assert!(s.state().deferred_continuations.is_empty());
+}
+
+/// 衝撃貝でマルコを KO する盤面（p1 の場はドーマ＋`p1_field`・手番は p1）を組み、衝撃貝の【メイン】を解決する。
+fn shell_ko_marco(masters: &MasterTable, p1_field: &[(&str, &str)]) -> Session {
+    let mut field = vec![card_json(VCHR, "p1-doma", "p1")];
+    field.extend(p1_field.iter().map(|(id, u)| card_json(id, u, "p1")));
+    let mut s = board_with(
+        masters,
+        Value::Array(field),
+        json!([card_json(SHELL, "p1-shell", "p1")]),
+        json!([card_json(MARCO, "p2-marco", "p2")]),
+    );
+    let shell = crate::ops::find_card_by_uuid(s.state(), "p1-shell").expect("衝撃貝");
+    crate::effects::resolver::game_resolve_ability(&mut s, masters, Seat::P1, shell, ACTIVATE_MAIN, false)
+        .expect("衝撃貝の【メイン】");
+    // 衝撃貝の KO の対象選択（候補はマルコだけ）。
+    let it = s.state().active_interaction().cloned().expect("KO の対象選択");
+    assert_eq!((it.kind, it.player), (InteractionKind::SelectTarget, Seat::P1));
+    answer(&mut s, masters);
+    s
+}
+
+/// 同時に誘発した効果は手番側が先（WP `rs-trigger-simul`）: 衝撃貝でマルコを KO すると、マルコの【KO時】（p2・
+/// 非手番）とコビーの「相手のキャラがKOされた時、カード1枚を引く」（p1・手番）が同じ KO で誘発する。手番の p1 の
+/// コビーが先に解決される＝**マルコの【KO時】の対象選択が立つ時点で p1 は既に 1 枚引いている**。修正前は積んだ順
+/// （自身の【KO時】が先に積まれる）でマルコが先に解決され、山札 6 のまま p2 の対話が立って落ちる。
+#[test]
+fn the_turn_player_trigger_resolves_first() {
+    let Some(masters) = masters() else { return };
+    let mut s = shell_ko_marco(masters, &[(KOBY, "p1-koby")]);
+    let mut answered = 0;
+    let mut p2_selections = 0;
+    while let Some(it) = s.state().active_interaction().cloned() {
+        assert_ne!(it.kind, InteractionKind::OrderTriggers, "各プレイヤーの効果は 1 つずつ＝順の選択は立たない");
+        if it.player == Seat::P2 {
+            p2_selections += 1;
+            assert_eq!(
+                s.state().player(Seat::P1).deck.len(),
+                5,
+                "非手番（p2）のマルコの【KO時】が手番（p1）のコビーより先に解決された"
+            );
+        }
+        answer(&mut s, masters);
+        answered += 1;
+        assert!(answered < 10, "対話が終わらない");
+    }
+    assert_eq!(p2_selections, 1, "マルコの【KO時】は解決される");
+    let p1 = s.state().player(Seat::P1);
+    assert_eq!(p1.deck.len(), 5, "コビーは 1 枚引く");
+    assert!(p1.hand.iter().any(|c| s.state().card(*c).uuid == "p1-doma"), "マルコの【KO時】でドーマは手札に戻る");
+    assert!(s.state().pending_triggers.is_empty(), "待ち行列は消化し切っている");
+}
+
+/// 同じプレイヤーの効果が 2 つ以上なら本人が順を選ぶ（WP `rs-trigger-simul`）: コビー 2 枚が同じ KO で誘発すると、
+/// 手番の p1 に「先に解決する効果」を選ぶ対話（ORDER_TRIGGERS）が立つ。候補は積んだ順、既定解決は先頭、CPU の合法手は
+/// 候補ごとに 1 手。2 枚目を選べば 2 枚目が先に解決され、その後に非手番のマルコの【KO時】。修正前は対話が立たない。
+#[test]
+fn the_same_player_chooses_the_order() {
+    let Some(masters) = masters() else { return };
+    let mut s = shell_ko_marco(masters, &[(KOBY, "p1-koby1"), (KOBY, "p1-koby2")]);
+    let it = s.state().active_interaction().cloned().expect("順の選択が立つ");
+    assert_eq!(it.kind, InteractionKind::OrderTriggers, "同じプレイヤーの 2 つの効果で順の選択が立つ");
+    assert_eq!(it.player, Seat::P1, "手番の p1 が選ぶ（非手番のマルコより先）");
+    let cands: Vec<String> = it.candidates.iter().filter_map(|t| t.card()).map(|c| uuid_of(&s, c)).collect();
+    assert_eq!(cands, ["p1-koby1", "p1-koby2"], "候補は積んだ順");
+    assert_eq!(s.state().player(Seat::P1).deck.len(), 6, "選ぶ前は誰も解決していない");
+    let default = crate::effects::interact::default_interaction_payload_of(s.state(), masters, &it);
+    assert_eq!(default["selected_uuids"], json!(["p1-koby1"]), "既定解決は積んだ順（先頭）");
+    let moves = crate::search::adapter::selection_moves(&mut s, masters, Seat::P1).expect("CPU の合法手に出る");
+    assert_eq!(moves.len(), 2, "候補ごとに 1 手");
+
+    let n_events = s.action_events().len();
+    let payload = json!({"selected_uuids": ["p1-koby2"], "index": 0, "accepted": true,
+                         "position": "BOTTOM", "declared_value": 0});
+    crate::effects::interact::resolve_interaction(&mut s, masters, Seat::P1, &payload).expect("2 枚目を先に");
+    let mut answered = 0;
+    while let Some(it) = s.state().active_interaction().cloned() {
+        assert_ne!(it.kind, InteractionKind::OrderTriggers, "残り 1 つでは選び直さない");
+        if it.player == Seat::P2 {
+            assert_eq!(s.state().player(Seat::P1).deck.len(), 4, "コビー 2 枚が非手番のマルコより先");
+        }
+        answer(&mut s, masters);
+        answered += 1;
+        assert!(answered < 10, "対話が終わらない");
+    }
+    let sources: Vec<String> = s.action_events()[n_events..]
+        .iter()
+        .filter(|e| e.get("type").and_then(Value::as_str) == Some("EFFECT"))
+        .filter_map(|e| e.get("source_uuid").and_then(Value::as_str).map(str::to_owned))
+        .filter(|u| u.starts_with("p1-koby"))
+        .collect();
+    assert_eq!(sources.first().map(String::as_str), Some("p1-koby2"), "選んだ 2 枚目が先に解決される: {sources:?}");
+    assert!(sources.iter().any(|u| u == "p1-koby1"), "1 枚目も後で解決される: {sources:?}");
+    assert_eq!(s.state().player(Seat::P1).deck.len(), 4);
+    assert!(s.state().pending_triggers.is_empty(), "待ち行列は消化し切っている");
 }
