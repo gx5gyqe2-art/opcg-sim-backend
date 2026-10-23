@@ -483,6 +483,16 @@ def summarize_band(out_dir):
                 dp[jn] = {"deep_b_better": VM.rate(sum(1 for x in both if ((deep_by.get((x["kind"], x["seed"], x["step"])) or {}).get(jn) or {"na": 0, "nb": 0})["nb"] > ((deep_by.get((x["kind"], x["seed"], x["step"])) or {}).get(jn) or {"na": 0, "nb": 0})["na"]),
                                                    sum(1 for x in both if (deep_by.get((x["kind"], x["seed"], x["step"])) or {}).get(jn))),
                           "agree_with_refs_mean": VM.rate(agree_n, n_all), "agree_on_decided": VM.rate(agree_d, n_dec)}
+            # 深い読みの判定で分けた、審判の勝率の差（2 本の平均）: 深い読みが「b が良い」とした点で審判も b を良いとするか
+            for jn in dp:
+                by = {"deep_b_better": [], "deep_a_better": []}
+                for x in both:
+                    d = (deep_by.get((x["kind"], x["seed"], x["step"])) or {}).get(jn)
+                    if not d or d["na"] == d["nb"]:
+                        continue
+                    by["deep_b_better" if d["nb"] > d["na"] else "deep_a_better"].append(
+                        (x["ref"][r0]["diff"] + x["ref"][r1]["diff"]) / 2)
+                dp[jn]["refs_mean_diff_by_deep"] = {k: _mean_ci(v) for k, v in by.items()}
             ks["vs_deep"] = dp
             # 理論の式（参考）: 値段の差 b − a の符号と、審判の勝率の差の符号の一致
             th = {}

@@ -1,17 +1,19 @@
 {
  "job": "move-judge",
  "role": "measure",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "base": "claude/cpu-spec-improvements-yw91jd@8db31b65f",
   "spec": "docs/search_efficiency_plan.md §7.32",
-  "sample_from": "logs/value_to_move/{real,synth}（§7.22 の記録）",
+  "sample_from": "logs/value_to_move/{real,synth}（§7.22 の記録・出荷の設定で r13d と r20 の手が違った点＋較正の点）",
+  "records": "claude/n50-w01〜16・claude/n50s-w01〜16 の n_records（局面の再現）",
   "nets": {
    "r13d": "opcg_sim/data/learned/nrel_r13d.npz",
    "r20": "claude/train-r20:n1_results/nrel_r20.npz"
   },
-  "referee": "SeatSpec(net, sims=160)（世界 1 本・公平・詰みの証明 off）",
+  "referee": "SeatSpec(net, sims=160)・世界 1 本・公平・詰みの証明 off・両席",
   "k": 32,
+  "sample_seed": 20261023,
   "points": {
    "real": {
     "changed": 400,
@@ -25,10 +27,199 @@
  },
  "outputs": {
   "tool": "tests/scripts/move_judge.py",
-  "logs": "logs/move_judge/{real,synth}/{sample,rows}.jsonl.gz・summary.json",
-  "report": "docs/reports/2026-10-23_move_judge.md（完走後）"
+  "rust": "Game.fork_world（読み取り専用の口・rust/opcg_engine/src/py_game.rs）",
+  "logs": "logs/move_judge/{real,synth}/{meta.json,sample.jsonl.gz,rows.jsonl.gz}・logs/move_judge/summary.json",
+  "report": "docs/reports/2026-10-23_move_judge.md",
+  "test_spec": "docs/TEST_SPEC.md（計器の表に 1 行）"
  },
- "metrics": {},
- "command": "python tests/scripts/move_judge.py sample/judge/summary（docstring）",
- "notes": "途中経過の push（実デッキ帯を実行中）。完走後に metrics・report を書く。"
+ "metrics": {
+  "real": {
+   "points_ok": 591,
+   "not_ok": {
+    "legal": 4,
+    "record": 5
+   },
+   "k": 32,
+   "sec_per_point_1core": 106.7,
+   "calib_diff": {
+    "r13d": {
+     "mean": -0.0102,
+     "ci95": [
+      -0.0268,
+      0.0064
+     ]
+    },
+    "r20": {
+     "mean": 0.0005,
+     "ci95": [
+      -0.0156,
+      0.0166
+     ]
+    }
+   },
+   "changed_diff": {
+    "r13d": {
+     "mean": -0.0163,
+     "ci95": [
+      -0.0255,
+      -0.0072
+     ]
+    },
+    "r20": {
+     "mean": -0.0002,
+     "ci95": [
+      -0.0097,
+      0.0094
+     ]
+    }
+   },
+   "changed_wb": {
+    "r13d": 0.5275,
+    "r20": 0.5444
+   },
+   "decided_changed": {
+    "n": 9,
+    "b_better": 3,
+    "a_better": 6,
+    "rate": {
+     "k": 9,
+     "n": 392,
+     "rate": 0.023,
+     "ci95": [
+      0.0121,
+      0.0431
+     ]
+    },
+    "split": 1
+   },
+   "decided_calib": {
+    "n": 9,
+    "b_better": 3,
+    "a_better": 6,
+    "rate": {
+     "k": 9,
+     "n": 199,
+     "rate": 0.0452,
+     "ci95": [
+      0.024,
+      0.0837
+     ]
+    },
+    "split": 1
+   },
+   "sign_agree_refs_changed": 0.5739,
+   "deep_b_better": {
+    "deep_r13d": 0.2668,
+    "deep_r20": 0.7035
+   },
+   "deep_agree_with_refs": {
+    "deep_r13d": 0.5244,
+    "deep_r20": 0.5447
+   },
+   "theory_sign_agree_changed": {
+    "static": 0.5512,
+    "seq": 0.5285
+   },
+   "theory_sign_agree_calib": {
+    "static": 0.5043,
+    "seq": 0.4821
+   }
+  },
+  "synth": {
+   "points_ok": 587,
+   "not_ok": {
+    "record": 9,
+    "replay: ValueError": 1,
+    "legal": 3
+   },
+   "k": 32,
+   "sec_per_point_1core": 94.5,
+   "calib_diff": {
+    "r13d": {
+     "mean": -0.0018,
+     "ci95": [
+      -0.0151,
+      0.0116
+     ]
+    },
+    "r20": {
+     "mean": -0.0041,
+     "ci95": [
+      -0.0183,
+      0.01
+     ]
+    }
+   },
+   "changed_diff": {
+    "r13d": {
+     "mean": -0.0078,
+     "ci95": [
+      -0.0166,
+      0.0011
+     ]
+    },
+    "r20": {
+     "mean": -0.0032,
+     "ci95": [
+      -0.0121,
+      0.0057
+     ]
+    }
+   },
+   "changed_wb": {
+    "r13d": 0.5135,
+    "r20": 0.5149
+   },
+   "decided_changed": {
+    "n": 6,
+    "b_better": 0,
+    "a_better": 6,
+    "rate": {
+     "k": 6,
+     "n": 391,
+     "rate": 0.0153,
+     "ci95": [
+      0.0071,
+      0.0331
+     ]
+    },
+    "split": 1
+   },
+   "decided_calib": {
+    "n": 4,
+    "b_better": 1,
+    "a_better": 3,
+    "rate": {
+     "k": 4,
+     "n": 196,
+     "rate": 0.0204,
+     "ci95": [
+      0.008,
+      0.0513
+     ]
+    },
+    "split": 0
+   },
+   "sign_agree_refs_changed": 0.5897,
+   "deep_b_better": {
+    "deep_r13d": 0.3047,
+    "deep_r20": 0.6805
+   },
+   "deep_agree_with_refs": {
+    "deep_r13d": 0.5243,
+    "deep_r20": 0.5318
+   },
+   "theory_sign_agree_changed": {
+    "static": 0.5399,
+    "seq": 0.5316
+   },
+   "theory_sign_agree_calib": {
+    "static": 0.4692,
+    "seq": 0.5
+   }
+  }
+ },
+ "command": "python tests/scripts/move_judge.py sample/judge/summary（報告 §9）",
+ "gate": "make test green（cargo 606 passed・pytest 857 passed, 13 skipped）。torch は外した構成（下記）。",
+ "notes": "1. 較正は 0 のまわり（実 −1.0／+0.1 ポイント・合成 −0.2／−0.4・区間は全部 0 を含む）。\n2. r20 の出荷の手 vs r13d の出荷の手: 審判 r13d で実 −1.6［−2.5, −0.7］・合成 −0.8［−1.7, +0.1］、審判 r20 で実 −0.0・合成 −0.3＝良くなっていない（較正を引けば r13d 審判 −0.6・r20 審判 ±0.1）。判定できた点は 1.5〜2.3%（較正の偽陽性 2.0〜4.5% 以下）・審判 2 本の符号の一致 57〜59%。深い読み（§7.22）の判定と審判の一致は 52〜55%・理論の式の符号の一致は 53〜55%（較正 47〜50%）。\n3. 点の数と K: 較正の点 50 点で 1 点 ≈ 2 分／コア（見積りどおり）だったので、上限の各帯 400＋200 点・K＝32 で回した（4 コアで実 4.7 時間・合成 4.1 時間・計 150,784 局）。\n4. 標本の制限: §7.22 の後に誘発の順の修正（rs-trigger-order-2・rs-trigger-simul）が入り、記録の手の列を今のエンジンで当て直すと 1 割弱の局（実 50/358・合成 34/343）が途中で外れる。標本は『局面まで当て直せる点』に限って無作為に引いた（飛ばした点 実 33＋13・合成 20＋11）。判定時の照合（合法手の並び・記録の符号化）で捨てた点 実 9・合成 13。\n5. エンジンへの追加: Game.fork_world(player, reveal, seed)（encode_world と同じ公平の引き直しを打てる対局として返す読み取り専用の口・既存の挙動は不変）。公平の配り直しを Python から作る口が無かったため。\n6. 決着しない局 12（実: 審判の decide が DON_BOX を返して apply_game_action が拒んだ 11 局・上限手数 1 局・合成 0）は対から外した。アリーナの席と同じ経路（driver.run_game と同じ呼び方）なので頻度も同じはず。\n7. ゲート: この環境は torch の CPU 版の配布元（download.pytorch.org）に届かず、PyPI の torch 2.14.1+cu130 を入れると test_n_rel_train_torch.py::test_grads_match_numpy が勾配の許容（max_rel 2.0e-4 対 下限×5＝1.9e-4）をわずかに超えて落ちる（この WP が触らない訓練側・OMP_NUM_THREADS=1 でも同じ・torch 有りの結果は 880 passed・1 failed）。torch は任意依存（README）なので外した構成で make test green を確認した（857 passed・13 skipped）。\n8. 途中の push（logs/move_judge だけの差分）はゲートを省略した（tests は logs/ を読まない・最終 push は最終ツリーで make test green）。"
 }
