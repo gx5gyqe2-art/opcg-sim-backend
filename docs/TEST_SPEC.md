@@ -266,6 +266,7 @@ make test-slow   # 重テストだけ
 | `tests/test_arena_resume.py` | **基盤健全性**（`cpu_infra`）。**再開可能アリーナ**（`tests/scripts/arena_resume.py`・v25）: 台帳 jsonl の読み戻し＋残り seed 抽出（計画順・重複なし＝10分制限下の分割実行の土台）・最終判定は全ペア消化後にのみ出る（部分結果で promoted を出さない）・判定規約（勝ち数0..2→ペア水準0/0.5/1 正規化・wr≥frac かつ CI下限>0.50）が arena_gate と同値。実対局は回さず高速固定。候補席にだけ機構を与える A/B の seam（`--cand-macro` 等・席別 seam の検査は `test_promotion_gate.py`。補償層系の cand フラグは純正AZ化 2026-08-25 で削除） |
 | `tests/test_arena_merge.py` | **基盤健全性**（`cpu_infra`）。**分散アリーナ台帳のマージ**（`tests/scripts/arena_merge.py`・2026-09-01）: シャードに割った台帳の合算が単一台帳の判定と一致する（勝率も CI も）・void は母数から外して件数を残す・**seed 衝突を黙って畳まない**（同じ対局の二重計上は CI を不当に狭める＝帯設計のミスを検出して落とす）・promoted は wr≥frac かつ CI下限>0.50 で `arena_resume` と同規約。実対局は回さず合成台帳で高速固定 |
 | `tests/test_arena_search_opts.py` | **基盤健全性**（`cpu_infra`）。**アリーナの候補席「探索設定」seam**（`--cand-sims`／`--cand-select-rule`／`--cand-q-min-frac`／`--cand-root-prior-temp`／`--cand-worlds`／`--cand-setup-box`・WP `rs-search-arena`・2026-09-09）: ネットを固定して**探索の設定だけ**を比べるための欄が候補席の `Game.decide` opts へ同名でそのまま届く（`--cand-sims` は `SeatSpec` の名前付き引数と衝突するので取り出す）／**基準席には一切漏れない**（漏れたら A/B にならない）／省略した欄は opts に現れない＝Rust 側の既定が効く／台帳の行に `cand_opts` が残る（void 行にも）＝判定を設定へ紐づけられる／**既定（`--cand-*` 無し）の行は歴代の台帳と同じ鍵だけ**＝既存の読み手を壊さない／`arena_merge` は設定を正規化して拾い、シャードで割れていたら判定を出さない（`cand_opts` の無い歴代の台帳は「既定」扱い）。実対局は回さず配線だけを固定 |
+| `tests/test_arena_pair_mirror.py` | **基盤健全性**（`cpu_infra`）。**アリーナの 1 ペアの組み方**（`opcg_sim/loop/arena.py::play_pair_detail`・WP `arena-pair-mirror`・2026-10-23・`docs/reports/2026-10-23_arena_pair_mirror.md`）: 2 局目は 1 局目と**同じデッキの組・同じ席**で、座るネットだけが入れ替わる（配線・台帳の `cand_leaders` は候補が実際に握ったリーダー＝a は p1 側・b は p2 側）／**同じネット同士なら全ペアがちょうど 1 勝 1 敗**（実エンジン・random × synth_roles2・sims 8 で 3 ペア）＝判定の物差しの零点。旧規約は 2 局目を `build_pair(lb, la)` で組み候補が 2 局とも la を握った＝合成デッキでは同じネット同士でも 0.5 にならなかった |
 | `tests/test_residual_dig.py` | **基盤健全性**（`cpu_infra`）。**残ドン掘り seam**（`LearnedEngine(residual_dig=True)`・対照生成の腕A・2026-09-02）: serve 既定（None）は挙動不変（同一 seed で同一手・events 空）／`_is_dig_card` は**構造判定**（CHARACTER・cost1・ON_PLAY に DRAW・コストに RETURN_DON）でサトリ/シュラを真・ドローしないコスト1やコスト≠1 を偽（全カードで真⇒cost1 キャラを機械確認＝カードID非依存）／seam 有効でも合法手が返り、差し替え時は PLAY かつ `residual_dig_events` に発火が記録される |
 | `tests/test_deck_dig.py` | **基盤健全性**（`cpu_infra`）。**掘りカード差し込み合成デッキ**（`tests/harness/deck_dig.py`・2026-09-02）: 紫を含むリーダー（テーマ外で合成では0枚のクロコダイル等）に 8 枚差し込まれ 50枚・同名4枚以下を維持／テーマで既に12枚のエネルでも上限を壊さない／紫を含まないリーダーには差し込まず不変／builder は決定論で run_game 契約（leader, cards, leader, cards）を返す |
 | `tests/test_residual_activate.py` | **基盤健全性**（`cpu_infra`）。**残り起動 seam**（`LearnedEngine(residual_activate="low"\|"high")`・対照生成の腕A2・2026-09-02）: serve 既定（None）は挙動不変／`_pick_attach_target` の方針（low＝攻撃できる最低パワー・無ければ全体最低／high＝最高／同点は uuid 順／候補なし None）／`_leader_has_don_ramp` はテキスト構造語（エネル真・シャンクス偽）／h1@2 掘り分岐 turn2 で起動手→適用→付与対話で low 方針がサトリを選ぶ→適用→付与ドンが乗りドンデッキ0（起動→付与の1周がエンジン上で通る） |
@@ -539,7 +540,7 @@ make test-slow   # 重テストだけ
 | `tests/scripts/rs_search_a_sweep.sh`／`rs_search_a_agg.py`／`rs_search_a_keys.py`／`rs_search_a_latency.py`／`rs_search_a_result.py` | **探索設定の掃引と集計**（§20.5・WP `rs-search-a`）: `sweep.sh <出力先> [S1 S2 S3 S4 S5 R1 R2]` が `rs_scenario_play.py play` を条件ごと（sims 160／640／2,560／10,240／16,000・`q_min_n`＋`root_prior_temp` の副軸）に 9 シナリオ×seed 0/1 で回す（1 プロセス＝1 シナリオ・`JOBS` で並列度）。`agg.py` が `frames.json` から機械的な集計表（訪問された根の手の割合／「訪問数最多より Q が高いのに N で負けた手」の件数／イベント PLAY・相手キャラ攻撃の回数／`decide_ms`）を出し、`keys.py` が分析 #4 の 3 決定（エネル T9 の神の裁き→オーム攻撃の順序・エネル T7 対ロジャーのガンマナイフ・ドフラ T10 の訪問された根の手の数と勝敗）を**決定番号ではなく手の並びと盤面で**特定する。`latency.py` は**同じ 1 局面**（分岐点の開始盤面）に対して sims だけを変えて `decide` を 1 回ずつ呼んで実測する（`play` を sims 別に回すと打つ手が変わって決定の集合が違う＝レイテンシの比較にならない・単独プロセスで回す）。`result.py` が RESULT.json を組む。いずれも判定は書かない（数字だけ） |
 | `tests/scripts/rs_leaf_rollout_keys.py` | **葉の打ち切りの計測の集計**（§20.7.9・WP `rs-leaf-rollout`）: `rs_scenario_play.py play --leaf-rollout turn_end` の出力ディレクトリ（条件ごとに 1 つ）から、分析 #6 の表と同じ 4 つの鍵（エネル T9 の「神の裁き→オーム攻撃の順」`kami_before_attack`／同シナリオで seat が決着させた `lethal`／ロジャー T7 の `gammaknife`／ルフィ T4 の「神の裁きの KO 対象が非空」`kami_ko`〔打った run 数も出す〕）を seed ごとに特定して数え、あわせて全決定の `trace["rollout"]` を束ねた実績（葉の数／打てた葉／総 ply／平均 ply／上限で止まった割合）を出す。鍵の判定そのものは `rs_search_a_keys.py` の述語をそのまま使う（同じ物差し）。判定は書かない（数字だけ） |
 | `opcg_sim/loop/record_gen.py` | **自己対戦の棋譜ダンプ**（旧 `tests/scripts/n_record_gen.py`）: 盤面も思考も Rust。**記録形式（npz の列）は不変**＝`n_rel_train` は無変更で読める。乱数は Rust の決定的な生成器（対局＝`Game(seed)`／探索＝`(対局,ターン,席)` から作る `Pcg32SearchRng`＝ターン内 sticky 世界線）。実測 **4.96 秒/局**（sims 64・Python 版 57.06 秒の 11.5 倍速） |
-| `opcg_sim/loop/arena_shard.py` | **再開可能アリーナ**（旧 `arena_resume.py`）: 帯設計・席入替 CRN・void・ペア水準 95% CI の規約は不変。`--candidate`／`--baseline`／`--leaders`／`--decks`／`--cand-*`（席別の探索つまみ） |
+| `opcg_sim/loop/arena_shard.py` | **再開可能アリーナ**（旧 `arena_resume.py`）: 帯設計・席入替 CRN（2026-10-23 から同じデッキの席でネットだけ入れ替える・§5.05-5）・void・ペア水準 95% CI の規約は不変。`--candidate`／`--baseline`／`--leaders`／`--decks`／`--cand-*`（席別の探索つまみ） |
 | `opcg_sim/loop/arena_merge.py` | **台帳の合算と判定**（旧 `tests/scripts/arena_merge.py`・純関数は同一）: seed 衝突を黙って畳まない |
 | `opcg_sim/loop/gate.py` | **昇格ゲート**（旧 `promotion_gate.py`＋`arena_gate.py`＋`n1_gate.py smoke`）: `promote`（stage1/stage2＋アンカー）／`band`（一次スクリーン＋帯層別の本判定）／`smoke`（1 局完走） |
 | `tests/scripts/card_effect_audit.py` | **カード効果監査**（2026-10-01・skill `.claude/skills/card-effect-audit/`・`make card-audit`）: カード DB の差し替え後・既存カードの点検で、全カードを「Rust が読めるか（未知の効果種別＝エンジン未実装）／パーサの未実装句／本文の句が解析結果のどのノードにも無いか（`raw_text` 照合）／【】見出しとトリガー・条件・キーワードの対応（未知の見出し＝新しい仕組み）／効果プローブで各アクションが実行されるか」で洗い出す（全 2,800 枚で約 10 秒）。`show` でレビュー資料、`record`／`status` で確認済み台帳 `tests/fixtures/card_audit_ledger.json`（本文・解析結果・プローブの指紋つき＝変われば再確認へ戻る）。意味の判定は Claude が §8.3／§8.4 の観点で行う |
@@ -753,7 +754,15 @@ gen15 は「アリーナ 225ペア 0.5756 CI[0.533,0.619]＝歴代初の昇格�
 4. **判定に使ったネットを消さない**。不採用候補でもリポジトリ（または退避先）に残す。
    gen16 は不採用後にネットが失われ、**当時の void 17件を同一条件で再現できなくなった**。
    判定が文書に生きている間は、その判定を再現できる成果物を保持する。
-5. **台帳は消える前提**で運用する（作業台帳は gitignore・実行環境は巻き戻る）。
+5. **1 ペア＝同じ seed・同じ組のデッキ・同じ席で、ネットだけを入れ替えた 2 局**（2026-10-23・WP
+   `arena-pair-mirror`・`docs/reports/2026-10-23_arena_pair_mirror.md`）。候補は 1 局目で p1（la 側）、
+   2 局目で p2（lb 側）を握る＝ペア内でデッキ相性と先後が相殺され、**同じネット同士なら全ペアが
+   ちょうど 1 勝 1 敗**になる（`tests/test_arena_pair_mirror.py`）。旧規約（〜2026-10-22）は 2 局目を
+   `build_pair(lb, la)` で組み、候補が 2 局とも la を握った＝`synth*`・`singleton` の random 対面では
+   同じネット同士でも 0.5 にならない（`real`／`user`／`official`・固定ミラーは seed かリーダー無しで
+   デッキが決まるので旧規約でも同じ組＝結果は変わらない）。**2026-10-22 以前の synth 条件の判定は
+   この偏りのぶんばらつきが大きい**（偏り自体は la/lb がランダムなので総合勝率では不偏）。
+6. **台帳は消える前提**で運用する（作業台帳は gitignore・実行環境は巻き戻る）。
    チャンク境界ごとに中間集計（ペア数・wr・CI）を記録し、**結果はレポートへ落とす**。
 
 ### 5.1 CPU 性能ゲート（Gen2 非退行・手動/定期）
