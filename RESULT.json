@@ -1,7 +1,7 @@
 {
  "job": "rean-n50-w07",
  "role": "reanalyze",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "record": "claude/n50-w07:n_records/n50_w07",
   "engine_commit": "24ce7244f",
@@ -19,27 +19,27 @@
   "dir": "n50_rean/w07"
  },
  "metrics": {
-  "games": 164,
-  "points": 1968,
+  "games": 200,
+  "points": 2400,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
   "points_by_rule": {
-   "early": 656,
-   "end_and_attack": 656,
+   "early": 800,
+   "end_and_attack": 800,
    "enel": 12,
-   "random": 644
+   "random": 788
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
-   "early": 0.1768,
-   "end_and_attack": 0.2759,
+   "early": 0.1837,
+   "end_and_attack": 0.2737,
    "enel": 0.3333,
-   "random": 0.3183
+   "random": 0.3198
   },
-  "deep_best_differs_all": 0.2571,
-  "sec_replay_per_game": 12.81,
-  "sec_deep_per_game": 9.1
+  "deep_best_differs_all": 0.2592,
+  "sec_replay_per_game": 13.05,
+  "sec_deep_per_game": 9.02
  },
  "commit": "24ce7244f",
  "notes": ""
