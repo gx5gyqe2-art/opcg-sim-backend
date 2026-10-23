@@ -1,0 +1,1526 @@
+{
+ "games": 100,
+ "void": 0,
+ "decisions": 14362,
+ "eligible": 11089,
+ "picked": 1000,
+ "rows": 303,
+ "ok": 275,
+ "not_ok": {
+  "no_b": 28
+ },
+ "k": 32,
+ "loss_line": 0.2,
+ "population_eligible": {
+  "kind": {
+   "main": 5749,
+   "window": 2508,
+   "commit": 2552,
+   "lethal": 280
+  },
+  "dtype": {
+   "counter": 2660,
+   "main:attack": 2195,
+   "main:attach": 2175,
+   "main:play": 1223,
+   "own_dialog:SEARCH_AND_SELECT": 450,
+   "main:turn_end": 438,
+   "blocker": 431,
+   "main:activate_main": 347,
+   "own_dialog:ARRANGE_DECK": 327,
+   "opp_dialog:CONFIRM_OPTIONAL": 228,
+   "opp_dialog:SEARCH_AND_SELECT": 218,
+   "mulligan": 200,
+   "own_dialog:CONFIRM_OPTIONAL": 172,
+   "opp_dialog:ARRANGE_DECK": 25
+  }
+ },
+ "sec_per_point": 65.3,
+ "sec_per_game": 28.7,
+ "all": {
+  "cand": {
+   "k": 7,
+   "n": 275,
+   "rate": 0.0255,
+   "ci": [
+    0.0124,
+    0.0516
+   ]
+  },
+  "confirmed": {
+   "k": 5,
+   "n": 275,
+   "rate": 0.0182,
+   "ci": [
+    0.0078,
+    0.0418
+   ]
+  },
+  "confirmed_strict": {
+   "k": 1,
+   "n": 275,
+   "rate": 0.0036,
+   "ci": [
+    0.0006,
+    0.0203
+   ]
+  },
+  "a_better_mirror": {
+   "k": 20,
+   "n": 275,
+   "rate": 0.0727,
+   "ci": [
+    0.0476,
+    0.1097
+   ]
+  },
+  "mean_diff": -0.0214
+ },
+ "hist": {
+  "[-0.5,-0.3)": 7,
+  "[-0.3,-0.2)": 12,
+  "[-0.2,-0.1)": 19,
+  "[-0.1,-0.05)": 28,
+  "[-0.05,0.05)": 167,
+  "[0.05,0.1)": 20,
+  "[0.1,0.2)": 12,
+  "[0.2,0.3)": 1,
+  "[0.3,0.5)": 5,
+  "[0.5,+]": 1,
+  "[-,-0.5)": 3
+ },
+ "by_kind": {
+  "main": {
+   "cand": {
+    "k": 2,
+    "n": 156,
+    "rate": 0.0128,
+    "ci": [
+     0.0035,
+     0.0455
+    ]
+   },
+   "confirmed": {
+    "k": 1,
+    "n": 156,
+    "rate": 0.0064,
+    "ci": [
+     0.0011,
+     0.0354
+    ]
+   },
+   "mean_diff": -0.032
+  },
+  "window": {
+   "cand": {
+    "k": 4,
+    "n": 60,
+    "rate": 0.0667,
+    "ci": [
+     0.0262,
+     0.1593
+    ]
+   },
+   "confirmed": {
+    "k": 3,
+    "n": 60,
+    "rate": 0.05,
+    "ci": [
+     0.0171,
+     0.137
+    ]
+   },
+   "mean_diff": 0.0087
+  },
+  "commit": {
+   "cand": {
+    "k": 1,
+    "n": 42,
+    "rate": 0.0238,
+    "ci": [
+     0.0042,
+     0.1232
+    ]
+   },
+   "confirmed": {
+    "k": 1,
+    "n": 42,
+    "rate": 0.0238,
+    "ci": [
+     0.0042,
+     0.1232
+    ]
+   },
+   "mean_diff": -0.0067
+  },
+  "lethal": {
+   "cand": {
+    "k": 0,
+    "n": 17,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.1843
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 17,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.1843
+    ]
+   },
+   "mean_diff": -0.0662
+  }
+ },
+ "by_dtype": {
+  "main:attack": {
+   "cand": {
+    "k": 0,
+    "n": 66,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.055
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 66,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.055
+    ]
+   },
+   "mean_diff": -0.0384
+  },
+  "main:attach": {
+   "cand": {
+    "k": 2,
+    "n": 57,
+    "rate": 0.0351,
+    "ci": [
+     0.0097,
+     0.1192
+    ]
+   },
+   "confirmed": {
+    "k": 2,
+    "n": 57,
+    "rate": 0.0351,
+    "ci": [
+     0.0097,
+     0.1192
+    ]
+   },
+   "mean_diff": -0.0126
+  },
+  "counter": {
+   "cand": {
+    "k": 1,
+    "n": 44,
+    "rate": 0.0227,
+    "ci": [
+     0.004,
+     0.1181
+    ]
+   },
+   "confirmed": {
+    "k": 1,
+    "n": 44,
+    "rate": 0.0227,
+    "ci": [
+     0.004,
+     0.1181
+    ]
+   },
+   "mean_diff": -0.0014
+  },
+  "main:play": {
+   "cand": {
+    "k": 1,
+    "n": 30,
+    "rate": 0.0333,
+    "ci": [
+     0.0059,
+     0.1667
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 30,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.1135
+    ]
+   },
+   "mean_diff": -0.0563
+  },
+  "main:activate_main": {
+   "cand": {
+    "k": 0,
+    "n": 15,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.2039
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 15,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.2039
+    ]
+   },
+   "mean_diff": -0.0313
+  },
+  "main:turn_end": {
+   "cand": {
+    "k": 0,
+    "n": 15,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.2039
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 15,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.2039
+    ]
+   },
+   "mean_diff": -0.0394
+  },
+  "blocker": {
+   "cand": {
+    "k": 2,
+    "n": 11,
+    "rate": 0.1818,
+    "ci": [
+     0.0514,
+     0.477
+    ]
+   },
+   "confirmed": {
+    "k": 2,
+    "n": 11,
+    "rate": 0.1818,
+    "ci": [
+     0.0514,
+     0.477
+    ]
+   },
+   "mean_diff": 0.0561
+  },
+  "opp_dialog:SEARCH_AND_SELECT": {
+   "cand": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.3244
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.3244
+    ]
+   },
+   "mean_diff": -0.0156
+  },
+  "mulligan": {
+   "cand": {
+    "k": 0,
+    "n": 7,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.3543
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 7,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.3543
+    ]
+   },
+   "mean_diff": -0.0402
+  },
+  "own_dialog:SEARCH_AND_SELECT": {
+   "cand": {
+    "k": 0,
+    "n": 6,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.3903
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 6,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.3903
+    ]
+   },
+   "mean_diff": 0.0312
+  },
+  "own_dialog:ARRANGE_DECK": {
+   "cand": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.4345
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.4345
+    ]
+   },
+   "mean_diff": 0.0187
+  },
+  "opp_dialog:CONFIRM_OPTIONAL": {
+   "cand": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.4345
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.4345
+    ]
+   },
+   "mean_diff": -0.0312
+  },
+  "own_dialog:CONFIRM_OPTIONAL": {
+   "cand": {
+    "k": 1,
+    "n": 5,
+    "rate": 0.2,
+    "ci": [
+     0.0362,
+     0.6245
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.4345
+    ]
+   },
+   "mean_diff": -0.0312
+  },
+  "opp_dialog:ARRANGE_DECK": {
+   "cand": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.7935
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.7935
+    ]
+   },
+   "mean_diff": 0.0
+  }
+ },
+ "by_kind_dtype": {
+  "main|main": {
+   "cand": {
+    "k": 2,
+    "n": 143,
+    "rate": 0.014,
+    "ci": [
+     0.0038,
+     0.0496
+    ]
+   },
+   "confirmed": {
+    "k": 1,
+    "n": 143,
+    "rate": 0.007,
+    "ci": [
+     0.0012,
+     0.0385
+    ]
+   },
+   "mean_diff": -0.0336
+  },
+  "window|counter": {
+   "cand": {
+    "k": 1,
+    "n": 27,
+    "rate": 0.037,
+    "ci": [
+     0.0066,
+     0.1828
+    ]
+   },
+   "confirmed": {
+    "k": 1,
+    "n": 27,
+    "rate": 0.037,
+    "ci": [
+     0.0066,
+     0.1828
+    ]
+   },
+   "mean_diff": -0.0012
+  },
+  "commit|main": {
+   "cand": {
+    "k": 1,
+    "n": 23,
+    "rate": 0.0435,
+    "ci": [
+     0.0077,
+     0.2099
+    ]
+   },
+   "confirmed": {
+    "k": 1,
+    "n": 23,
+    "rate": 0.0435,
+    "ci": [
+     0.0077,
+     0.2099
+    ]
+   },
+   "mean_diff": -0.0027
+  },
+  "commit|counter": {
+   "cand": {
+    "k": 0,
+    "n": 17,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.1843
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 17,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.1843
+    ]
+   },
+   "mean_diff": -0.0018
+  },
+  "lethal|main": {
+   "cand": {
+    "k": 0,
+    "n": 17,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.1843
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 17,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.1843
+    ]
+   },
+   "mean_diff": -0.0662
+  },
+  "window|opp_dialog": {
+   "cand": {
+    "k": 0,
+    "n": 13,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.2281
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 13,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.2281
+    ]
+   },
+   "mean_diff": -0.0216
+  },
+  "window|own_dialog": {
+   "cand": {
+    "k": 1,
+    "n": 11,
+    "rate": 0.0909,
+    "ci": [
+     0.0162,
+     0.3774
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 11,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.2588
+    ]
+   },
+   "mean_diff": 0.0028
+  },
+  "window|blocker": {
+   "cand": {
+    "k": 2,
+    "n": 9,
+    "rate": 0.2222,
+    "ci": [
+     0.0632,
+     0.5474
+    ]
+   },
+   "confirmed": {
+    "k": 2,
+    "n": 9,
+    "rate": 0.2222,
+    "ci": [
+     0.0632,
+     0.5474
+    ]
+   },
+   "mean_diff": 0.0894
+  },
+  "main|mulligan": {
+   "cand": {
+    "k": 0,
+    "n": 7,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.3543
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 7,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.3543
+    ]
+   },
+   "mean_diff": -0.0402
+  },
+  "main|own_dialog": {
+   "cand": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.4345
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.4345
+    ]
+   },
+   "mean_diff": 0.0187
+  },
+  "commit|blocker": {
+   "cand": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.6576
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.6576
+    ]
+   },
+   "mean_diff": -0.0938
+  },
+  "main|opp_dialog": {
+   "cand": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.7935
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.7935
+    ]
+   },
+   "mean_diff": 0.0
+  }
+ },
+ "by_b_src": {
+  "main|runner_up": {
+   "cand": {
+    "k": 2,
+    "n": 154,
+    "rate": 0.013,
+    "ci": [
+     0.0036,
+     0.0461
+    ]
+   },
+   "confirmed": {
+    "k": 1,
+    "n": 154,
+    "rate": 0.0065,
+    "ci": [
+     0.0011,
+     0.0359
+    ]
+   },
+   "mean_diff": -0.0328
+  },
+  "window|runner_up": {
+   "cand": {
+    "k": 4,
+    "n": 60,
+    "rate": 0.0667,
+    "ci": [
+     0.0262,
+     0.1593
+    ]
+   },
+   "confirmed": {
+    "k": 3,
+    "n": 60,
+    "rate": 0.05,
+    "ci": [
+     0.0171,
+     0.137
+    ]
+   },
+   "mean_diff": 0.0087
+  },
+  "commit|fresh_runner_up": {
+   "cand": {
+    "k": 1,
+    "n": 36,
+    "rate": 0.0278,
+    "ci": [
+     0.0049,
+     0.1417
+    ]
+   },
+   "confirmed": {
+    "k": 1,
+    "n": 36,
+    "rate": 0.0278,
+    "ci": [
+     0.0049,
+     0.1417
+    ]
+   },
+   "mean_diff": -0.0017
+  },
+  "lethal|fresh": {
+   "cand": {
+    "k": 0,
+    "n": 12,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.2425
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 12,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.2425
+    ]
+   },
+   "mean_diff": -0.013
+  },
+  "commit|fresh": {
+   "cand": {
+    "k": 0,
+    "n": 6,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.3903
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 6,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.3903
+    ]
+   },
+   "mean_diff": -0.0365
+  },
+  "lethal|fresh_runner_up": {
+   "cand": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.4345
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 5,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.4345
+    ]
+   },
+   "mean_diff": -0.1938
+  },
+  "main|top": {
+   "cand": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.6576
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.6576
+    ]
+   },
+   "mean_diff": 0.0312
+  }
+ },
+ "by_turn": {
+  "t9+": {
+   "cand": {
+    "k": 6,
+    "n": 143,
+    "rate": 0.042,
+    "ci": [
+     0.0194,
+     0.0885
+    ]
+   },
+   "confirmed": {
+    "k": 4,
+    "n": 143,
+    "rate": 0.028,
+    "ci": [
+     0.0109,
+     0.0697
+    ]
+   },
+   "mean_diff": -0.026
+  },
+  "t7-8": {
+   "cand": {
+    "k": 0,
+    "n": 59,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.0611
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 59,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.0611
+    ]
+   },
+   "mean_diff": -0.0212
+  },
+  "t5-6": {
+   "cand": {
+    "k": 1,
+    "n": 42,
+    "rate": 0.0238,
+    "ci": [
+     0.0042,
+     0.1232
+    ]
+   },
+   "confirmed": {
+    "k": 1,
+    "n": 42,
+    "rate": 0.0238,
+    "ci": [
+     0.0042,
+     0.1232
+    ]
+   },
+   "mean_diff": -0.0009
+  },
+  "t3-4": {
+   "cand": {
+    "k": 0,
+    "n": 21,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.1546
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 21,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.1546
+    ]
+   },
+   "mean_diff": -0.0341
+  },
+  "t1-2": {
+   "cand": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.2775
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 10,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.2775
+    ]
+   },
+   "mean_diff": -0.0156
+  }
+ },
+ "by_my_life": {
+  "life4": {
+   "cand": {
+    "k": 2,
+    "n": 93,
+    "rate": 0.0215,
+    "ci": [
+     0.0059,
+     0.0751
+    ]
+   },
+   "confirmed": {
+    "k": 2,
+    "n": 93,
+    "rate": 0.0215,
+    "ci": [
+     0.0059,
+     0.0751
+    ]
+   },
+   "mean_diff": -0.0199
+  },
+  "life1": {
+   "cand": {
+    "k": 2,
+    "n": 58,
+    "rate": 0.0345,
+    "ci": [
+     0.0095,
+     0.1173
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 58,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.0621
+    ]
+   },
+   "mean_diff": -0.0361
+  },
+  "life3": {
+   "cand": {
+    "k": 0,
+    "n": 52,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.0688
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 52,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.0688
+    ]
+   },
+   "mean_diff": -0.0186
+  },
+  "life2": {
+   "cand": {
+    "k": 1,
+    "n": 41,
+    "rate": 0.0244,
+    "ci": [
+     0.0043,
+     0.126
+    ]
+   },
+   "confirmed": {
+    "k": 1,
+    "n": 41,
+    "rate": 0.0244,
+    "ci": [
+     0.0043,
+     0.126
+    ]
+   },
+   "mean_diff": -0.0198
+  },
+  "life0": {
+   "cand": {
+    "k": 2,
+    "n": 31,
+    "rate": 0.0645,
+    "ci": [
+     0.0179,
+     0.2072
+    ]
+   },
+   "confirmed": {
+    "k": 2,
+    "n": 31,
+    "rate": 0.0645,
+    "ci": [
+     0.0179,
+     0.2072
+    ]
+   },
+   "mean_diff": -0.005
+  }
+ },
+ "by_opp_life": {
+  "life4": {
+   "cand": {
+    "k": 2,
+    "n": 104,
+    "rate": 0.0192,
+    "ci": [
+     0.0053,
+     0.0674
+    ]
+   },
+   "confirmed": {
+    "k": 1,
+    "n": 104,
+    "rate": 0.0096,
+    "ci": [
+     0.0017,
+     0.0525
+    ]
+   },
+   "mean_diff": -0.0168
+  },
+  "life3": {
+   "cand": {
+    "k": 2,
+    "n": 53,
+    "rate": 0.0377,
+    "ci": [
+     0.0104,
+     0.1275
+    ]
+   },
+   "confirmed": {
+    "k": 1,
+    "n": 53,
+    "rate": 0.0189,
+    "ci": [
+     0.0033,
+     0.0994
+    ]
+   },
+   "mean_diff": -0.0178
+  },
+  "life1": {
+   "cand": {
+    "k": 2,
+    "n": 43,
+    "rate": 0.0465,
+    "ci": [
+     0.0128,
+     0.1546
+    ]
+   },
+   "confirmed": {
+    "k": 2,
+    "n": 43,
+    "rate": 0.0465,
+    "ci": [
+     0.0128,
+     0.1546
+    ]
+   },
+   "mean_diff": -0.0218
+  },
+  "life2": {
+   "cand": {
+    "k": 0,
+    "n": 40,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.0876
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 40,
+    "rate": 0.0,
+    "ci": [
+     -0.0,
+     0.0876
+    ]
+   },
+   "mean_diff": -0.0141
+  },
+  "life0": {
+   "cand": {
+    "k": 1,
+    "n": 35,
+    "rate": 0.0286,
+    "ci": [
+     0.0051,
+     0.1453
+    ]
+   },
+   "confirmed": {
+    "k": 1,
+    "n": 35,
+    "rate": 0.0286,
+    "ci": [
+     0.0051,
+     0.1453
+    ]
+   },
+   "mean_diff": -0.0482
+  }
+ },
+ "by_own": {
+  "own": {
+   "cand": {
+    "k": 4,
+    "n": 202,
+    "rate": 0.0198,
+    "ci": [
+     0.0077,
+     0.0498
+    ]
+   },
+   "confirmed": {
+    "k": 2,
+    "n": 202,
+    "rate": 0.0099,
+    "ci": [
+     0.0027,
+     0.0354
+    ]
+   },
+   "mean_diff": -0.03
+  },
+  "opp": {
+   "cand": {
+    "k": 3,
+    "n": 73,
+    "rate": 0.0411,
+    "ci": [
+     0.0141,
+     0.114
+    ]
+   },
+   "confirmed": {
+    "k": 3,
+    "n": 73,
+    "rate": 0.0411,
+    "ci": [
+     0.0141,
+     0.114
+    ]
+   },
+   "mean_diff": 0.0025
+  }
+ },
+ "by_rank": {
+  "runner_up": {
+   "cand": {
+    "k": 6,
+    "n": 214,
+    "rate": 0.028,
+    "ci": [
+     0.0129,
+     0.0598
+    ]
+   },
+   "confirmed": {
+    "k": 4,
+    "n": 214,
+    "rate": 0.0187,
+    "ci": [
+     0.0073,
+     0.0471
+    ]
+   },
+   "mean_diff": -0.0212
+  },
+  "fresh_runner_up": {
+   "cand": {
+    "k": 1,
+    "n": 41,
+    "rate": 0.0244,
+    "ci": [
+     0.0043,
+     0.126
+    ]
+   },
+   "confirmed": {
+    "k": 1,
+    "n": 41,
+    "rate": 0.0244,
+    "ci": [
+     0.0043,
+     0.126
+    ]
+   },
+   "mean_diff": -0.0252
+  },
+  "fresh": {
+   "cand": {
+    "k": 0,
+    "n": 18,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.1759
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 18,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.1759
+    ]
+   },
+   "mean_diff": -0.0208
+  },
+  "top": {
+   "cand": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.6576
+    ]
+   },
+   "confirmed": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0,
+    "ci": [
+     0.0,
+     0.6576
+    ]
+   },
+   "mean_diff": 0.0312
+  }
+ },
+ "losses": [
+  {
+   "seed": 3301004,
+   "step": 86,
+   "seat": "p1",
+   "turn": 9,
+   "kind": "commit",
+   "dtype": "main:attach",
+   "act": "MAIN_ACTION",
+   "b_src": "fresh_runner_up",
+   "a_desc": "{\"action_type\": \"ATTACH_DON\", \"card\": \"ST02-007\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"ST02-004\"}",
+   "my_life": 2,
+   "opp_life": 0,
+   "confirmed": true,
+   "confirmed_strict": false,
+   "d13": 0.375,
+   "ci13": [
+    0.1832,
+    0.5668
+   ],
+   "d20": 0.125,
+   "ci20": [
+    -0.086,
+    0.336
+   ],
+   "deep_best_is_a": true,
+   "deep_best_is_b": false
+  },
+  {
+   "seed": 3301004,
+   "step": 31,
+   "seat": "p2",
+   "turn": 5,
+   "kind": "window",
+   "dtype": "counter",
+   "act": "SELECT_COUNTER",
+   "b_src": "runner_up",
+   "a_desc": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-099\"}",
+   "b_desc": "{\"action_type\": \"PASS\"}",
+   "my_life": 5,
+   "opp_life": 4,
+   "confirmed": true,
+   "confirmed_strict": false,
+   "d13": 0.375,
+   "ci13": [
+    0.1464,
+    0.6036
+   ],
+   "d20": 0.1562,
+   "ci20": [
+    -0.0427,
+    0.3552
+   ],
+   "deep_best_is_a": false,
+   "deep_best_is_b": true
+  },
+  {
+   "seed": 3301005,
+   "step": 107,
+   "seat": "p1",
+   "turn": 10,
+   "kind": "window",
+   "dtype": "blocker",
+   "act": "SELECT_BLOCKER",
+   "b_src": "runner_up",
+   "a_desc": "{\"action_type\": \"PASS\"}",
+   "b_desc": "{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"OP14-094\"}",
+   "my_life": 0,
+   "opp_life": 1,
+   "confirmed": true,
+   "confirmed_strict": true,
+   "d13": 0.4688,
+   "ci13": [
+    0.2931,
+    0.6444
+   ],
+   "d20": 0.4062,
+   "ci20": [
+    0.2334,
+    0.5791
+   ],
+   "deep_best_is_a": true,
+   "deep_best_is_b": false
+  },
+  {
+   "seed": 3301011,
+   "step": 107,
+   "seat": "p1",
+   "turn": 11,
+   "kind": "main",
+   "dtype": "main:attach",
+   "act": "MAIN_ACTION",
+   "b_src": "runner_up",
+   "a_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 1, \"card\": \"OP02-064\"}",
+   "b_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP02-062\"}",
+   "my_life": 4,
+   "opp_life": 1,
+   "confirmed": true,
+   "confirmed_strict": false,
+   "d13": 0.3438,
+   "ci13": [
+    0.1175,
+    0.57
+   ],
+   "d20": 0.0312,
+   "ci20": [
+    -0.1749,
+    0.2374
+   ],
+   "deep_best_is_a": true,
+   "deep_best_is_b": false
+  },
+  {
+   "seed": 3301018,
+   "step": 102,
+   "seat": "p2",
+   "turn": 10,
+   "kind": "main",
+   "dtype": "main:play",
+   "act": "MAIN_ACTION",
+   "b_src": "runner_up",
+   "a_desc": "{\"action_type\": \"PLAY\", \"card\": \"OP15-075\"}",
+   "b_desc": "{\"action_type\": \"DON_BOX\", \"don_k\": 0, \"card\": \"OP15-118\", \"targets\": [\"OP07-038\"]}",
+   "my_life": 1,
+   "opp_life": 3,
+   "confirmed": false,
+   "confirmed_strict": false,
+   "d13": 0.3125,
+   "ci13": [
+    0.1073,
+    0.5177
+   ],
+   "d20": 0.0,
+   "ci20": [
+    -0.2328,
+    0.2328
+   ],
+   "deep_best_is_a": true,
+   "deep_best_is_b": false
+  },
+  {
+   "seed": 3301022,
+   "step": 151,
+   "seat": "p2",
+   "turn": 14,
+   "kind": "window",
+   "dtype": "own_dialog:CONFIRM_OPTIONAL",
+   "act": "CONFIRM_OPTIONAL",
+   "b_src": "runner_up",
+   "a_desc": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "b_desc": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\", \"accepted\": false}",
+   "my_life": 1,
+   "opp_life": 4,
+   "confirmed": false,
+   "confirmed_strict": false,
+   "d13": 0.2188,
+   "ci13": [
+    0.0732,
+    0.3643
+   ],
+   "d20": -0.0312,
+   "ci20": [
+    -0.2176,
+    0.1551
+   ],
+   "deep_best_is_a": true,
+   "deep_best_is_b": false
+  },
+  {
+   "seed": 3301025,
+   "step": 117,
+   "seat": "p2",
+   "turn": 11,
+   "kind": "window",
+   "dtype": "blocker",
+   "act": "SELECT_BLOCKER",
+   "b_src": "runner_up",
+   "a_desc": "{\"action_type\": \"PASS\"}",
+   "b_desc": "{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"EB03-024\"}",
+   "my_life": 0,
+   "opp_life": 3,
+   "confirmed": true,
+   "confirmed_strict": false,
+   "d13": 0.5938,
+   "ci13": [
+    0.4209,
+    0.7666
+   ],
+   "d20": 0.1875,
+   "ci20": [
+    -0.0177,
+    0.3927
+   ],
+   "deep_best_is_a": true,
+   "deep_best_is_b": false
+  }
+ ]
+}

@@ -1,0 +1,6 @@
+JUDGE todo 700 (done 300) k=32
+JUDGE seed=3301030 step=72 main main:attack ok=True why=None d13=0.0 ci=[0.0, 0.0] d20=None sec=25.2 (1/700 26s)
+JUDGE seed=3301030 step=65 main main:play ok=True why=None d13=0.0 ci=[0.0, 0.0] d20=None sec=34.2 (2/700 35s)
+JUDGE seed=3301030 step=96 commit counter ok=True why=None d13=0.0 ci=[0.0, 0.0] d20=None sec=12.5 (3/700 39s)
+JUDGE seed=3301030 step=123 window blocker ok=True why=None d13=-0.0625 ci=[-0.1477, 0.0227] d20=None sec=8.5 (4/700 47s)
+JUDGE seed=3301030 step=110 window counter ok=True why=None d13=0.0 ci=[0.0, 0.0] d20=None sec=13.6 (5/700 49s)

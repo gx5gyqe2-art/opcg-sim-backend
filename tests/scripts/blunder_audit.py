@@ -435,6 +435,49 @@ def cmd_judge(a):
     print("JUDGE_DONE", flush=True)
 
 
+# ---------------------------------------------------------------- 2b. recheck
+
+#: 打ち直しの配り方の番号のずらし（judge の 0..K-1 と重ねない＝独立の配り方）。
+RECHECK_OFFSET = 1000
+
+
+def recheck_point(job):
+    g, row = job
+    t0 = time.time()
+    seed, step, name = row["seed"], row["step"], row["seat"]
+    out = {"seed": seed, "step": step}
+    game = replay(g, step)
+    K = _G["k"]
+    for rn in ("r13d", "r20"):
+        wa, wb = [], []
+        for i in range(K):
+            ws = MJ.world_seed(seed, step, RECHECK_OFFSET + i)
+            wa.append(MJ.rollout(game, name, row["a"], ws, _G["refs"][rn])[0])
+            wb.append(MJ.rollout(game, name, row["b"], ws, _G["refs"][rn])[0])
+        out[rn] = dict(MJ.paired(wa, wb), a=wa, b=wb)
+    out["sec"] = round(time.time() - t0, 1)
+    return out
+
+
+def cmd_recheck(a):
+    """損の候補を、独立の配り方 K 通りで審判 2 本とも打ち直す（K＝32 の 1 回の判定は偶然でも 3% ほど線を越えるため）。"""
+    games = {g["seed"]: g for g in read_jsonl(os.path.join(a.out, "games.jsonl"))}
+    rows = [x for x in read_jsonl(os.path.join(a.out, "points.jsonl")) if x.get("cand")]
+    rpath = os.path.join(a.out, "recheck.jsonl")
+    done = {(x["seed"], x["step"]) for x in read_jsonl(rpath)}
+    jobs = [({k: v for k, v in games[x["seed"]].items() if k != "points"}, x) for x in rows if (x["seed"], x["step"]) not in done]
+    print(f"RECHECK todo {len(jobs)} (done {len(done)}) k={a.k}", flush=True)
+    t0 = time.time()
+    with get_context("fork").Pool(a.workers, initializer=_init_judge, initargs=(a.k,)) as pool:
+        for i, r in enumerate(pool.imap_unordered(recheck_point, jobs, chunksize=1)):
+            r["k"] = a.k
+            with open(rpath, "a", encoding="utf-8") as f:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            print(f"RECHECK seed={r['seed']} step={r['step']} r13d={r['r13d']['diff']} {r['r13d']['ci']} "
+                  f"r20={r['r20']['diff']} {r['r20']['ci']} sec={r['sec']} ({i + 1}/{len(jobs)} {time.time() - t0:.0f}s)", flush=True)
+    print("RECHECK_DONE", flush=True)
+
+
 # ---------------------------------------------------------------- 3. summary
 
 def wilson(k, n, z=1.96):
@@ -531,10 +574,14 @@ def main(argv=None):
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--limit", type=int, default=0)
     p.add_argument("--out", default=OUT_DIR)
+    p = sub.add_parser("recheck")
+    p.add_argument("--k", type=int, default=48)
+    p.add_argument("--workers", type=int, default=4)
+    p.add_argument("--out", default=OUT_DIR)
     p = sub.add_parser("summary")
     p.add_argument("--out", default=OUT_DIR)
     a = ap.parse_args(argv)
-    {"play": cmd_play, "judge": cmd_judge, "summary": cmd_summary}[a.cmd](a)
+    {"play": cmd_play, "judge": cmd_judge, "recheck": cmd_recheck, "summary": cmd_summary}[a.cmd](a)
     return 0
 
 
