@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_ldc/ldc_w06.jsonl": 100
+  "arena_ldc/ldc_w06.jsonl": 125
  },
  "notes": "repo at /home/user/opcg-sim-backend (not ~/opcg-sim-backend)"
 }
