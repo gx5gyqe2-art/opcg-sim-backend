@@ -191,7 +191,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **WP `rs-lethal-root`**（手元 40 ペア × 2 本 root／root_reply vs off・出荷の設定）／監査のやり直し 300 局／本番アリーナ（root・root_reply 各 12 シャード × 120 ペア・合流後） | 1682000〜1682039／1683000〜1683039／3012000〜3012299／2031000〜2046149（本番・root と対照 off 対 off で共有・16 シャード × 150 ペア・§7.31）／2051000〜2062000（root_reply の本番は取りやめ・未使用） | 手元・監査は使用済み（2026-10-22・報告 2026-10-22_lethal_root.md）・本番は使用済み（2026-10-22・root 2,399 ペア 0.5075 [0.5045, 0.5105] +5.2・対照 0.5000・void 1） |
 | 検証 **r20／r20s vs r13d（教材のデッキの切り分け・公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.34）** | 主 real 3101000〜3116000／副 ミラー 3121000〜3136000／参考 synth_roles2 3141000〜3156000（r20 と r20s で共有） | 使用済み（2026-10-22・r20 主 −1.7／副 +2.9／参考 −39.0・r20s 主 +3.6／副 +13.3／参考 −6.1・void 0〜1） |
 | 検証 **守りの照合の修正 vs 旧い照合（両席 r13d・出荷の設定・random × real・16 シャード × 150 ペア・§7.34）** | 3171000〜3186149 | 指示済み（2026-10-23・claude/arena-csig-w01〜w16） |
-| 検証 **詰みの証明の払える守り vs 旧い配り方（同上・§7.33）** | 3191000〜3206149 | 払い出し済み（WP `lethal-deal-cost` の取り込み後） |
+| 検証 **詰みの証明の払える守り vs 旧い配り方（同上・§7.33）** | 3191000〜3206149 | 払い出し済み（WP `lethal-deal-cost` を取り込み済み・§7.36・§7.34 の後に起動） |
 | **再分析**（波 49・50 の w01〜w08・各 先頭 200 局 × 12 点・mult 4・budget 0・§7.35） | —（記録の seed をそのまま打ち直す） | 指示済み（2026-10-23・claude/rean-n49-w01〜w08・claude/rean-n50-w01〜w08） |
 | 生成 **波 50s**（合成デッキ v2・`--decks synth_roles2`・生成役 r13d・v15・波 50 の対照・§7.34） | 2541000〜2548500（シャード k の base は 2540000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,083,501 行・dropped 2・decks synth_roles2） |
 | 生成 **波 50**（実デッキ 115 本・`--decks real`・生成役 r13d・v15・§7.34） | 2531000〜2538500（シャード k の base は 2530000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,149,881 行・dropped 5・decks real） |
@@ -3579,6 +3579,61 @@ tail -n 3 ~/rean_n${W}_w${XX}.log
 - 所要は約 2〜3 時間（記録は 1,280 回で打った局なので、4 倍＝5,120 回の読み）（同じコンテナで他の重い処理を並べると 3 倍まで遅くなる）。
 - ログで `bad_step=` が数値の行は、記録と手が分岐した局（その点から先は捨てる）。完走後の RESULT.json の replay_rate が 0.9 を割ったら、notes に書く。
 - ビルドや効果 JSON で落ちたら、~/build${W}.log の末尾を notes に書き、status を failed にして push する。
+````
+
+### 7.36 詰みの証明の払える守りの本番アリーナ（WP `lethal-deal-cost` の取り込み後・2026-10-23）
+
+WP `lethal-deal-cost` を本線に取り込んだ（6e22f1a58・`make test` green・`make audit-cross` void 0・不変量: 12,710 点で証明 1,064 → 860・旧い配り方の旗で全点一致）。報告 `docs/reports/2026-10-23_lethal_deal_cost.md`。台帳 2+360。
+- 候補席＝修正後（既定）・基準席＝`--lethal-deal-legacy`。両席 r13d・出荷の設定・random × real・16 シャード × 150 ペア・seed **3191000 + (k−1)×1000**（§7.33 で払い出し済み）。
+- 採用の規約（§7.33）: 勝率の 95% 下限 ≥ 0.49 で採る（退行なし）。割れば旗の既定を戻す。
+- **予告**: 0.495〜0.505。
+- 起動は §7.34 のアリーナが終わってセッション枠が空いてから。
+
+作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（詰みの証明の払える守り vs 旧い配り方・両席 r13d・両席とも出荷の設定）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.36）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-ldc-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-ldc-w$KK 6e22f1a58   # 払える守りの取り込み後に固定
+git show HEAD:opcg_sim/loop/arena_shard.py | grep -n 'lethal-deal-legacy'    # 基準席の旧い配り方の旗が在ること（無ければ notes に書いて止める）
+git fetch -q origin claude/arena-ldc-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_ldc 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_ldc
+
+次の内容を ~/runD.sh に保存し、`nohup bash ~/runD.sh > ~/runD.out 2>&1 &` で回す。runD.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_ldc/*.jsonl"))
+print(json.dumps({"job": "arena-ldc-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz (payable counter events in defensive deals)", "baseline": "nrel_r13d.npz + lethal_deal_legacy", "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)", "pairs": 150},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_ldc RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena ldc shard $KK"; git push -q -u origin claude/arena-ldc-w$KK || echo PUSH_FAILED; }
+N=opcg_sim/data/learned/nrel_r13d.npz
+for J in 0 1 2 3 4 5 6; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --worlds 2 --budget 0 --lethal-proof root --lethal-deal-legacy \
+    --cand-sims 1280 --cand-worlds 2 --cand-budget 0 --cand-lethal-proof root \
+    --pairs 150 --max-pairs 25 --bands 1 \
+    --seed-base $(( 3191000 + (k-1)*1000 )) --workers 2 --leaders random --decks real --pair-timeout 3600 \
+    --out arena_ldc/ldc_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 25 ペアずつ進め（6 回目までに 150 ペアに届く・届いた後の回は何もしない）、そのたびに push する。世界 2 本は 2 スレッド使うので --workers 2。全体で約 1.5 時間。コミットメッセージにモデル名を入れない。
 ````
 
 ## 8. コーディネータが守ること
