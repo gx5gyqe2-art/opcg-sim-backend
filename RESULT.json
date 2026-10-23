@@ -16,5 +16,5 @@
  "metrics": {
   "arena_csig/csig_w13.jsonl": 150
  },
- "notes": ""
+ "notes": "150/150 pairs done (seeds 3183000..). 1 void pair: seed 3183048 (ST13-001 vs OP12-081, GameAborted 上限手数) = 0.67% of pairs. Candidate score over 298 decided games = 0.5604 (raw, unadjudicated). arena_shard prints '（基準席は既定）' as a fixed string; --commit-sig-legacy is passed to the baseline via _best_kw (checked in code)."
 }
