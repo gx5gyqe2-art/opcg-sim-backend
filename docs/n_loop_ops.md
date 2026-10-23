@@ -190,6 +190,8 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **r16／r16c vs r13d**（両席 160 回・主＋副・各 16 シャード × 175 ペア・§7.18） | r16 主 1531000〜1546000／副 1551000〜1566000／r16c 主 1571000〜1586000／副 1591000〜1606000 | 使用済み（2026-10-21・r16 主 −5.3／副 +4.7・r16c 主 −7.7／副 +0.4・どちらも非昇格） |
 | 検証 **WP `rs-lethal-root`**（手元 40 ペア × 2 本 root／root_reply vs off・出荷の設定）／監査のやり直し 300 局／本番アリーナ（root・root_reply 各 12 シャード × 120 ペア・合流後） | 1682000〜1682039／1683000〜1683039／3012000〜3012299／2031000〜2046149（本番・root と対照 off 対 off で共有・16 シャード × 150 ペア・§7.31）／2051000〜2062000（root_reply の本番は取りやめ・未使用） | 手元・監査は使用済み（2026-10-22・報告 2026-10-22_lethal_root.md）・本番は使用済み（2026-10-22・root 2,399 ペア 0.5075 [0.5045, 0.5105] +5.2・対照 0.5000・void 1） |
 | 検証 **r20／r20s vs r13d（教材のデッキの切り分け・公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.34）** | 主 real 3101000〜3116000／副 ミラー 3121000〜3136000／参考 synth_roles2 3141000〜3156000（r20 と r20s で共有） | 使用済み（2026-10-22・r20 主 −1.7／副 +2.9／参考 −39.0・r20s 主 +3.6／副 +13.3／参考 −6.1・void 0〜1） |
+| 検証 **守りの照合の修正 vs 旧い照合（両席 r13d・出荷の設定・random × real・16 シャード × 150 ペア・§7.34）** | 3171000〜3186149 | 指示済み（2026-10-23・claude/arena-csig-w01〜w16） |
+| 検証 **詰みの証明の払える守り vs 旧い配り方（同上・§7.33）** | 3191000〜3206149 | 払い出し済み（WP `lethal-deal-cost` の取り込み後） |
 | 生成 **波 50s**（合成デッキ v2・`--decks synth_roles2`・生成役 r13d・v15・波 50 の対照・§7.34） | 2541000〜2548500（シャード k の base は 2540000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,083,501 行・dropped 2・decks synth_roles2） |
 | 生成 **波 50**（実デッキ 115 本・`--decks real`・生成役 r13d・v15・§7.34） | 2531000〜2538500（シャード k の base は 2530000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,149,881 行・dropped 5・decks real） |
 | 検証 **r19 vs r13d・本番の設定**（両席 1,280 回・世界 2 本・枝予算なし・random × real・32 シャード × 84 ペア・§7.33） | 2141000〜2172083（シャード k の base は 2141000 + (k−1)×1000） | 使用済み（2026-10-22・2,683 ペア 0.5052 [0.4948, 0.5156] +3.6・void 5・非昇格） |
@@ -3447,6 +3449,60 @@ ST=done save
 echo ALL_DONE
 
 補足: 25 ペアずつ root → off の順に進め（6 回目までに各 150 ペアに届く・届いた後の回は何もしない）、そのたびに push する。2 本は同じ seed（off 対 off は対照＝同じ配りで局が替わったかを見る）。世界 2 本は 2 スレッド使うので --workers 2。全体で約 1.5〜2 時間。コミットメッセージにモデル名を入れない。
+````
+
+### 7.34 守りの照合の修正の本番アリーナ（WP `rs-commit-sig` の取り込み後・2026-10-23）
+
+WP `rs-commit-sig` を本線に取り込んだ（2eebbf9f0・`make test` green・`make audit-cross` void 0）。報告 `docs/reports/2026-10-23_commit_sig.md`（守りの再監査 300 局で乙の見逃し 28 → 7・その手番に負けた 22 → 5・golden の a1 再生 47 局が commit のカウンターの札で変わり、旧い署名で完全に再現）。台帳 2+358。
+- 候補席＝修正後（既定）・基準席＝`--commit-sig-legacy`。両席 r13d・出荷の設定（1,280 回・世界 2 本・枝予算なし・詰みの証明 root・公平）・random × real・新しい組み方（同じネット同士は 0.5 ちょうど）。
+- **16 シャード × 150 ペア＝2,400 ペア**。シャード k の base は **3171000 + (k−1)×1000**（3171000〜3186149）。
+- **予告（数を見る前）**: +10〜+25 Elo（守りの監査の「その手番に負けた」22 → 5 は 1 席あたり約 3% の負けが消える規模・守った後に結局負ける局が在るので下がる）。
+
+作業セッション用の本文（`{K}`＝1〜16・`{KK}`＝01〜16）:
+
+````
+アリーナ（守りの照合の修正後 vs 旧い照合・両席 r13d・両席とも出荷の設定）の 1 シャードを回してください。シャードは k={K} です（docs/n_loop_ops.md §7.34）。コードは変更しない・PR は作らない・質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。結果は claude/arena-csig-w{KK} に push します。
+
+**完走（最後の push）までターンを終えないでください**。長い実行は nohup で回し、9 分以内の待ちを繰り返し呼んで見張ってください。
+git の作業は下のとおり（`checkout -f` が止められたら、`git stash -u` してから同じコマンドを `-f` なしで実行してよい）。
+
+export k={K} KK={KK}
+pip install -q numpy maturin
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/arena-csig-w$KK 2eebbf9f0   # 守りの照合の修正の取り込み後に固定
+git show HEAD:opcg_sim/loop/arena_shard.py | grep -n 'commit-sig-legacy'    # 基準席の旧い照合の旗が在ること（無ければ notes に書いて止める）
+git fetch -q origin claude/arena-csig-w$KK 2>/dev/null && git checkout -q FETCH_HEAD -- arena_csig 2>/dev/null || true
+make rust-develop > ~/build.log 2>&1
+[ -f opcg_sim/data/opcg_effects.json ] || python -m opcg_sim.tools.export_effects_json > /dev/null
+mkdir -p arena_csig
+
+次の内容を ~/runC.sh に保存し、`nohup bash ~/runC.sh > ~/runC.out 2>&1 &` で回す。runC.out に ALL_DONE が出たら完了:
+
+#!/bin/bash
+export k={K} KK={KK}
+cd ~/opcg-sim-backend
+save() { python - <<'PY' > RESULT.json
+import glob, json, os
+fs = sorted(glob.glob("arena_csig/*.jsonl"))
+print(json.dumps({"job": "arena-csig-w" + os.environ["KK"], "role": "arena", "status": os.environ.get("ST", "partial"),
+  "inputs": {"candidate": "nrel_r13d.npz (fixed commit signature)", "baseline": "nrel_r13d.npz + commit_sig_legacy", "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)", "pairs": 150},
+  "outputs": {"files": fs}, "metrics": {f: sum(1 for _ in open(f)) for f in fs}, "notes": ""}, ensure_ascii=False, indent=1))
+PY
+  git add -f arena_csig RESULT.json && git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "arena csig shard $KK"; git push -q -u origin claude/arena-csig-w$KK || echo PUSH_FAILED; }
+N=opcg_sim/data/learned/nrel_r13d.npz
+for J in 0 1 2 3 4 5 6; do
+  OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard --candidate $N --baseline $N \
+    --sims 1280 --worlds 2 --budget 0 --lethal-proof root --commit-sig-legacy \
+    --cand-sims 1280 --cand-worlds 2 --cand-budget 0 --cand-lethal-proof root \
+    --pairs 150 --max-pairs 25 --bands 1 \
+    --seed-base $(( 3171000 + (k-1)*1000 )) --workers 2 --leaders random --decks real --pair-timeout 3600 \
+    --out arena_csig/csig_w$KK.jsonl
+  save
+done
+ST=done save
+echo ALL_DONE
+
+補足: 25 ペアずつ進め（6 回目までに 150 ペアに届く・届いた後の回は何もしない）、そのたびに push する。世界 2 本は 2 スレッド使うので --workers 2。全体で約 1.5 時間。コミットメッセージにモデル名を入れない。
 ````
 
 ## 8. コーディネータが守ること
