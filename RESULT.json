@@ -1,7 +1,7 @@
 {
  "job": "arena-csig-w15",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r13d.npz (fixed commit signature)",
   "baseline": "nrel_r13d.npz + commit_sig_legacy",
