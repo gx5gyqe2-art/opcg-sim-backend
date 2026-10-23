@@ -4,10 +4,15 @@
 1 か所へ集約したもの。**エンジンは Rust**（`opcg_sim.loop.driver`）だが、**判定規約は 1 文字も
 変えていない**——歴代の台帳・seed 帯・報告と地続きに読めることが測定の値打ちなので:
 
-- ペア＝同 seed で**席を入れ替えた 2 局**。候補は 2 局とも `la` を握る
-  （game a: cand=p1=la／game b: cand=p2=la・相手は 2 局とも `lb`）。**入れ替わるのは席（先後）
-  だけでリーダーは入れ替わらない**（2026-09-03 に台帳の発火イベントから判明した実態。総合勝率は
-  la/lb がランダムなので不偏だが、ペア内でリーダー相性は相殺されない）。
+- ペア＝同 seed・**同じ組のデッキ・同じ席で、ネットだけを入れ替えた 2 局**（2026-10-23・WP
+  `arena-pair-mirror`）。game a: p1=cand・p2=best／game b: p1=best・p2=cand で、両局とも
+  `build_pair(la, lb)` の同じ 2 デッキ（p1 が la 側・p2 が lb 側）。候補は a で la 側の先手、
+  b で lb 側の後手を握る＝**ペア内でデッキ相性も先後も相殺される**。同じネット同士なら 2 局は
+  同じ局になり、**どの条件でも全ペアがちょうど 1 勝 1 敗**（勝率 0.5 ちょうど）。
+  旧規約（〜2026-10-22）は game b を `build_pair(lb, la)` で組み、候補が 2 局とも `la` を握った
+  （入れ替わるのは席だけ）。`real`／`user`／`official` は seed がデッキを決めるので旧規約でも
+  同じ組＝結果は 1 局も変わらない。`synth*`・`singleton` の random 対面では候補が la に偏り、
+  同じネット同士でも 0.5 にならなかった（`docs/reports/2026-10-23_arena_pair_mirror.md`）。
 - リーダー対は `seed*7919+13` から決定論的に引く（`decks.leader_pair`）。
 - 勝率は**ペア水準**（0/0.5/1）で集計し 95% CI は正規近似（[`pair_level_ci`]）。
   2×pairs 局を独立 Bernoulli として扱う素朴 CI より狭い＝対照ペア設計の正しい区間。
@@ -170,10 +175,10 @@ def play_pair_detail(seed: int) -> Dict[str, Any]:
         signal.signal(signal.SIGALRM, _alarm)
         signal.alarm(int(_G["pair_timeout"]))
     try:
-        ab = D.build_pair(db, la, lb, seed, decks)          # game a: p1=cand=la / p2=best=lb
-        ba = D.build_pair(db, lb, la, seed, decks)          # game b: p1=best=lb / p2=cand=la
-        a = DR.run_game(seed, {"p1": cand, "p2": best}, *ab)
-        b = DR.run_game(seed, {"p1": best, "p2": cand}, *ba)
+        # 2 局とも同じ組のデッキ・同じ席で、ネットだけを入れ替える（WP `arena-pair-mirror`）。
+        ab = D.build_pair(db, la, lb, seed, decks)          # p1=la 側 / p2=lb 側（2 局共通）
+        a = DR.run_game(seed, {"p1": cand, "p2": best}, *ab)   # game a: cand=p1
+        b = DR.run_game(seed, {"p1": best, "p2": cand}, *ab)   # game b: cand=p2
         if a["winner"] is None or b["winner"] is None:
             raise DR.GameAborted(f"seed={seed} 決着せず（上限手数）")
     except (Exception, PairTimeout) as e:                    # noqa: BLE001  1 ペアで計測を止めない
@@ -186,7 +191,7 @@ def play_pair_detail(seed: int) -> Dict[str, Any]:
     wb = 1.0 if b["winner"] == "p2" else 0.0
     return _with_cand_opts(
         {"seed": seed, "score": wa + wb, "leaders": [la, lb], "games": [wa, wb],
-         "cand_leaders": [la, la], "turns": [a["turns"], b["turns"]]})
+         "cand_leaders": [ab[0][0], ab[1][0]], "turns": [a["turns"], b["turns"]]})
 
 
 def _with_cand_opts(row: Dict[str, Any]) -> Dict[str, Any]:
