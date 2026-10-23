@@ -16,5 +16,5 @@
  "metrics": {
   "arena_ldc/ldc_w01.jsonl": 150
  },
- "notes": ""
+ "notes": "150/150 pairs recorded; 149 decided (298 games, candidate win rate 0.500), 1 void pair (0.67% < 2%): seed 3191060 ST13-003 vs OP03-077 aborted at step 38 with 'ValueError: 不明なアクションです: DON_BOX'. Startup line printed '（基準席は既定）' but arena_shard._best_kw passes --lethal-deal-legacy/--lethal-proof/--worlds to the baseline seat, so the baseline was not default (stale wording only). Run from a fresh clone at /root/opcg-sim-backend on 6e22f1a58; lethal-deal-legacy flag present (arena_shard.py:78)."
 }
