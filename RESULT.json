@@ -16,5 +16,5 @@
  "metrics": {
   "arena_csig/csig_w06.jsonl": 150
  },
- "notes": ""
+ "notes": "150/150 pairs, 150 unique seeds 3176000-3176149, no void games, candidate score 168/300 = 0.560. Pinned at 2eebbf9f0 (--commit-sig-legacy flag present). arena_shard prints '候補席の設定 ...（基準席は既定）' each run; that is fixed text — baseline seat still got --sims 1280 --worlds 2 --budget 0 --lethal-proof root --commit-sig-legacy on the command line. No PUSH_FAILED in any of the 7 rounds."
 }
