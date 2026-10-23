@@ -1,7 +1,7 @@
 {
  "job": "rean-n50-w05",
  "role": "reanalyze",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "record": "claude/n50-w05:n_records/n50_w05_p0+p1",
   "engine_commit": "24ce7244f",
@@ -19,27 +19,27 @@
   "dir": "../../../root/opcg-sim-backend/n50_rean/w05"
  },
  "metrics": {
-  "games": 168,
-  "points": 2016,
+  "games": 200,
+  "points": 2400,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
   "points_by_rule": {
-   "early": 671,
-   "end_and_attack": 672,
-   "enel": 8,
-   "random": 665
+   "early": 799,
+   "end_and_attack": 800,
+   "enel": 10,
+   "random": 791
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
-   "early": 0.2101,
-   "end_and_attack": 0.2932,
-   "enel": 0.25,
-   "random": 0.2977
+   "early": 0.214,
+   "end_and_attack": 0.2888,
+   "enel": 0.3,
+   "random": 0.2984
   },
-  "deep_best_differs_all": 0.2669,
-  "sec_replay_per_game": 12.65,
-  "sec_deep_per_game": 8.7
+  "deep_best_differs_all": 0.2671,
+  "sec_replay_per_game": 12.9,
+  "sec_deep_per_game": 8.92
  },
  "commit": "24ce7244f",
  "notes": "record branch claude/n50-w05 has no n_records/n50_w05; it is split into n50_w05_p0..p3 (120 games each). The first 200 games (seeds 2533000-2533199) = p0 + p1 were combined into one input dir (npz renumbered, meta merged); reanalyze.py unchanged."
