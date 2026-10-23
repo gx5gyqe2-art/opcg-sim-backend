@@ -29,6 +29,7 @@ pytestmark = pytest.mark.cpu_infra
 def test_second_game_swaps_only_the_nets(monkeypatch):
     """2 局目は同じデッキ・同じ席で、候補と基準の席だけが入れ替わる。"""
     monkeypatch.setattr(A.E, "engine", lambda: None)
+    monkeypatch.setattr(A.E, "load_net", lambda spec=None: spec or "DEFAULT")
     monkeypatch.setattr(A.D, "load_db", lambda: {})
     monkeypatch.setattr(A.D, "leader_pair", lambda db, seed, mode: ("LA", "LB"))
     monkeypatch.setattr(A.D, "build_pair",
