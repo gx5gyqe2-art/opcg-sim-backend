@@ -19,27 +19,27 @@
   "dir": "../../../root/opcg-sim-backend/n50_rean/w08"
  },
  "metrics": {
-  "games": 53,
-  "points": 636,
+  "games": 110,
+  "points": 1320,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
   "points_by_rule": {
-   "early": 212,
-   "end_and_attack": 212,
-   "enel": 4,
-   "random": 208
+   "early": 440,
+   "end_and_attack": 440,
+   "enel": 6,
+   "random": 434
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
-   "early": 0.1745,
-   "end_and_attack": 0.2877,
-   "enel": 0.5,
-   "random": 0.2067
+   "early": 0.1909,
+   "end_and_attack": 0.2932,
+   "enel": 0.3333,
+   "random": 0.2604
   },
-  "deep_best_differs_all": 0.2248,
-  "sec_replay_per_game": 13.32,
-  "sec_deep_per_game": 9.01
+  "deep_best_differs_all": 0.2485,
+  "sec_replay_per_game": 12.86,
+  "sec_deep_per_game": 8.95
  },
  "commit": "24ce7244f",
  "notes": ""
