@@ -16,5 +16,5 @@
  "metrics": {
   "arena_ldc/ldc_w12.jsonl": 150
  },
- "notes": ""
+ "notes": "150/150 pairs done (149 valid + 1 void). void 1/150=0.67%: seed 3202006 'GameAborted step=86 ValueError: 不明なアクションです: DON_BOX'. Shard score (candidate, valid pairs) = 0.5034. arena_shard prints '（基準席は既定）' even with --lethal-deal-legacy on the baseline; the baseline flags were passed as specified (sims 1280/worlds 2/budget 0/lethal root/lethal-deal-legacy) — the message only refers to cand-* overrides."
 }
