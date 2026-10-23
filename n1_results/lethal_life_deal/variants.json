@@ -1,0 +1,44 @@
+{
+ "both": {
+  "lost": 48,
+  "lost_false(true=no)": 1,
+  "lost_true_win": 45,
+  "lost_true_unk": 2,
+  "lost_won_turn": 40,
+  "lost_to_unknown": 38,
+  "gained": 12,
+  "gained_true_win": 12,
+  "lost_to_no": 10,
+  "nodes_ratio": 0.961,
+  "sec_ratio": 1.014,
+  "win": 1139
+ },
+ "mode0": {
+  "lost": 37,
+  "lost_false(true=no)": 1,
+  "lost_true_win": 36,
+  "lost_true_unk": 0,
+  "lost_won_turn": 29,
+  "lost_to_unknown": 29,
+  "gained": 2,
+  "gained_true_win": 2,
+  "lost_to_no": 8,
+  "nodes_ratio": 0.9622,
+  "sec_ratio": 1.01,
+  "win": 1140
+ },
+ "add": {
+  "lost": 58,
+  "lost_false(true=no)": 2,
+  "lost_true_win": 56,
+  "lost_true_unk": 0,
+  "lost_won_turn": 48,
+  "lost_to_unknown": 47,
+  "gained": 1,
+  "gained_true_win": 1,
+  "lost_to_no": 11,
+  "nodes_ratio": 0.9677,
+  "sec_ratio": 1.019,
+  "win": 1118
+ }
+}

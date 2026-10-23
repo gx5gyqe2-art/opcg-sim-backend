@@ -15,6 +15,7 @@
                                                      --b n1_results/lethal_speed/judge_after.jsonl
   python tests/scripts/lethal_speed_check.py compare --a n1_results/lethal_root/redo/points_3012000_300.jsonl.gz \
                                                      --b n1_results/lethal_speed/judge_before.jsonl   # 再現の確認
+  python tests/scripts/lethal_speed_check.py judge --tag true --true-deal                # 本当の配り方だけ（§7.28）
 
 `compare` の `--a` には監査の点（`rs` の欄）も渡せる。読み取り専用・テスト無し（理論の道具と同じ扱い）。
 """
@@ -54,8 +55,10 @@ def _is_point(game, name: str, turn: int, min_turn: int, max_life: int) -> Optio
     return life if life <= max_life else None
 
 
-def _judge(game, name: str, seed: int, step: int, max_nodes: Optional[int]) -> Dict[str, Any]:
+def _judge(game, name: str, seed: int, step: int, max_nodes: Optional[int], true_deal: bool = False) -> Dict[str, Any]:
     opts = {"search_seed": seed * 1000 + step, "force": True}
+    if true_deal:
+        opts["true_deal"] = True          # 本当の配り方 1 通りだけ（計測用・§7.28 の仕分け）
     if max_nodes:
         opts["max_nodes"] = int(max_nodes)
     return json.loads(game.lethal_json(name, json.dumps(opts)))
@@ -138,7 +141,7 @@ def judge_one(args) -> List[Dict[str, Any]]:
             break
         life = _is_point(game, name, turn, a.min_turn, a.max_life)
         if life is not None:
-            rs = _judge(game, name, seed, step, a.max_nodes)
+            rs = _judge(game, name, seed, step, a.max_nodes, a.true_deal)
             rows.append({"seed": seed, "seat": name, "turn": turn, "step": step, "opp_life": life, "rs": rs})
         try:
             if move.get("kind") == "battle":
@@ -273,6 +276,8 @@ def main(argv=None):
             p.add_argument("--tag", required=True)
             p.add_argument("--limit", type=int, default=0, help="先頭 N 局だけ（開発中の速い確認）")
             p.add_argument("--max-nodes", type=int, default=None, help="根の節点の上限（§7.25 の 3 の曲線・既定は Rust 既定）")
+            p.add_argument("--true-deal", action="store_true",
+                           help="本当の配り方 1 通りだけで判定する（§7.28・証明したのに勝てなかった点に本当の守りが在ったかの仕分け）")
     p = sub.add_parser("compare")
     p.add_argument("--a", required=True)
     p.add_argument("--b", required=True)

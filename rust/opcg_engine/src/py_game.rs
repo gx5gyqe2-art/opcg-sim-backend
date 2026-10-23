@@ -668,7 +668,8 @@ impl Game {
     ///
     /// `opts_json`: `search_seed`（配り方の乱数・決定と同じ導出）・`rand`（公平な引き直しの数・既定 6）・
     /// `max_nodes`（既定 20000）・`force`（true なら発動条件〔自分のメイン・届きうる攻撃の数〕を見ずに回す）。
-    /// 本当の配り方は読まない。戻り値 `{"applies", "status", "move", "line_len", "deals", "nodes", "sec"}`
+    /// 本当の配り方は読まない（計測用の `true_deal`＝true のときだけ、本当の配り方 1 通りで判定する＝§7.28 の
+    /// 「証明したのに勝てなかった点に本当の守りが在ったか」の仕分け。決定は使わない）。戻り値 `{"applies", "status", "move", "line_len", "deals", "nodes", "sec"}`
     /// （発動条件を満たさず `force` も無ければ `status="skip"`）。`sec` は計測のための実時間（判定は節点で打ち切る）。
     fn lethal_json(&mut self, py: Python<'_>, player_id: &str, opts_json: &str) -> PyResult<String> {
         use crate::search::lethal;
@@ -679,6 +680,7 @@ impl Game {
         let rand = ov.get("rand").and_then(Value::as_u64).map_or(lethal::LETHAL_RAND_DEALS, |n| n as usize);
         let nodes = ov.get("max_nodes").and_then(Value::as_u64).unwrap_or(lethal::LETHAL_ROOT_NODES);
         let force = ov.get("force").and_then(Value::as_bool).unwrap_or(false);
+        let true_deal = ov.get("true_deal").and_then(Value::as_bool).unwrap_or(false);
         let applies = lethal::applies(&mut self.session, masters, seat);
         let bound = lethal::bound_report(&mut self.session, masters, seat);
         if !applies && !force {
@@ -688,7 +690,11 @@ impl Game {
         let t0 = std::time::Instant::now();
         let out = py
             .detach(|| -> Result<lethal::LethalOut, EngineError> {
-                let deals = lethal::make_deals(state, masters, seat, lethal::lethal_seed(seed), rand)?;
+                let deals = if true_deal {
+                    vec![state.clone()]
+                } else {
+                    lethal::make_deals(state, masters, seat, lethal::lethal_seed(seed), rand)?
+                };
                 Ok(lethal::solve_root(masters, state, seat, &deals, nodes))
             })
             .map_err(|e| self.map_err(e))?;

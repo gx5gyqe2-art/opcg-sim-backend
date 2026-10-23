@@ -1,98 +1,38 @@
 {
- "job": "rs-trigger-simul",
- "role": "engine (gameplay correctness)",
+ "job": "lethal-life-deal",
+ "role": "engine change trial + measurement",
  "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.27 (origin/claude/cpu-spec-improvements-yw91jd @ 4f846bb; ledger 2+350); follows §7.20 / §7.23",
- "branch": "claude/rs-trigger-simul",
- "base": "4f846bb",
- "report": "docs/reports/2026-10-23_trigger_simul.md",
+ "spec": "docs/search_efficiency_plan.md §7.28 (origin/claude/cpu-spec-improvements-yw91jd @ 4f846bb; ledger 2+351)",
+ "branch": "claude/lethal-life-deal",
+ "report": "docs/reports/2026-10-23_lethal_life_deal.md",
+ "decision": "not adopted: lethal.rs stays as on main (moves unchanged); production arena not needed",
  "inputs": {
-  "arena": {
-   "net": "nrel_r13d (both seats)",
-   "sims": 1280,
-   "budget": 0,
-   "worlds": 2,
-   "lethal_proof": "root",
-   "reveal": "fair (default)",
-   "decks": "random leaders x synth_roles",
-   "seeds": "1685000-1685039 (40 pairs)",
-   "before_wheel": "4f846bb",
-   "after_wheel": "this branch"
-  }
+  "record": "n1_results/lethal_speed/record_3012000_300.jsonl.gz (300 games, seed 3012000-3012299, both r13d, 1 world x 1280, root_reply)",
+  "points": 13473,
+  "baseline": "judge on current main wheel (13,497 -> 13,473: seed 3012144 desyncs at step 98 after rs-trigger-order-2)",
+  "variants": {"both": "both defensive deals fill life slots with defending triggers (8 deals)",
+               "mode0": "only the defence-value deal fills life slots (8 deals)",
+               "add": "8 deals unchanged + 1 life-slot deal first (9 deals)"},
+  "latency": "rs_decide_latency.py --worlds 2 --lethal-proof {off,root}, 20 games, seed 2999900-, 1 core each, same wheel"
  },
  "outputs": {
-  "code": [
-   "rust/opcg_engine/src/effects/triggers.rs (order_front_bundle / resolve_order_triggers)",
-   "rust/opcg_engine/src/model.rs (PendingTrigger.bundle, TriggerBundle, InteractionKind::OrderTriggers, SelectionIntent::Order, Continuation.order_queue)",
-   "rust/opcg_engine/src/effects/interact.rs",
-   "rust/opcg_engine/src/rules/battle.rs",
-   "clippy: ops.rs / search/mcts.rs / search/decide.rs (signature line only) / search/lethal.rs"
-  ],
-  "tests": "rust/opcg_engine/src/effects/tests_trigger_order.rs (+2: the_turn_player_trigger_resolves_first, the_same_player_chooses_the_order; both fail on the old engine)",
-  "goldens": "tests/fixtures/rs_goldens/replay/random_5000{039,085,088,108}.json (audit.json unchanged)",
-  "docs": [
-   "docs/SPEC.md §1.5 / §3.5",
-   "docs/TEST_SPEC.md §2 (tests_trigger_order row)"
-  ],
-  "arena": [
-   "n1_results/trigger_simul/arena_before_b1685000.jsonl",
-   "n1_results/trigger_simul/arena_after_b1685000.jsonl"
-  ]
+  "judges": "n1_results/lethal_life_deal/judge_{base,off,both,mode0,add,true}.jsonl.gz",
+  "variants": "n1_results/lethal_life_deal/variants.json",
+  "latency": "n1_results/lethal_life_deal/lat_{off_off,off_root,mode0_root}.json",
+  "variant_code_commit": "c1fdf65 (OPCG_LETHAL_LIFE switch; reverted in the next commit)"
  },
  "metrics": {
-  "cargo_test": "606 passed (604 existing + 2 new)",
-  "clippy_D_warnings": 0,
-  "make_test": "green (cargo 606 passed; pytest 855 passed, 13 skipped)",
-  "golden_audit_changed": 0,
-  "golden_replay_changed": 4,
-  "golden_replay_review": {
-   "correct": 4,
-   "order_only": 0,
-   "suspicious": 0
-  },
-  "card_audit": {
-   "impl_changed": 0,
-   "text_changed": 0,
-   "all_scan": "QUALIFIER_GAP 133, ACTION_NOT_FIRED 5, UNCOVERED_TEXT 2, TAG_TRIGGER_MISMATCH 1, DEFERRED 91, FIRED_EMPTY 28 (unchanged)"
-  },
-  "audit_cross": {
-   "pairs": 120,
-   "games": 240,
-   "void": 0,
-   "wr": 0.4833
-  },
-  "arena_after": {
-   "pairs": 40,
-   "games": 80,
-   "void": 0,
-   "wins": 41,
-   "wr": 0.5125,
-   "ci95": [
-    0.3885,
-    0.6365
-   ],
-   "mean_turns": 12.66
-  },
-  "arena_before": {
-   "pairs": 40,
-   "games": 80,
-   "void": 0,
-   "wins": 41,
-   "wr": 0.5125,
-   "ci95": [
-    0.3936,
-    0.6314
-   ],
-   "mean_turns": 12.54
-  },
-  "arena_pairs_identical": 36,
-  "arena_pairs_changed": [
-   1685021,
-   1685025,
-   1685030,
-   1685038
-  ]
+  "defending_triggers_in_db": {"trigger_cards": 506, "defending": 419},
+  "base": {"win": 1175, "win_not_won_that_turn": 55, "of_which_true_deal_win": 45, "of_which_true_deal_no": 10, "true_deal_no_situations": 4, "true_deal_no_with_life_trigger": 2},
+  "both":  {"win": 1139, "lost": 48, "lost_true_no": 1, "lost_true_win": 45, "lost_won_that_turn": 40, "lost_to_unknown": 38, "lost_to_no": 10, "gained": 12, "nodes_ratio": 0.961},
+  "mode0": {"win": 1140, "lost": 37, "lost_true_no": 1, "lost_true_win": 36, "lost_won_that_turn": 29, "lost_to_unknown": 29, "lost_to_no": 8, "gained": 2, "nodes_ratio": 0.962},
+  "add":   {"win": 1118, "lost": 58, "lost_true_no": 2, "lost_true_win": 56, "lost_won_that_turn": 48, "lost_to_unknown": 47, "lost_to_no": 11, "gained": 1, "nodes_ratio": 0.968},
+  "latency_mean_sec": {"off": 0.177, "root_main": 0.198, "root_mode0": 0.199},
+  "latency_increment": {"root_main": "+11.9%", "root_mode0": "+12.4%"},
+  "root_status_20games": {"root_main": {"win": 90, "no": 706, "unknown": 420}, "root_mode0": {"win": 88, "no": 612, "unknown": 517}},
+  "make_test": "green (cargo 604 passed; pytest 855 passed, 13 skipped)",
+  "audit_cross": {"games": 240, "void": 0}
  },
- "command": "make rust-develop; cargo test/clippy; make golden-audit golden-replay; make card-audit (+ --all); make test; make audit-cross; arena_shard x2 (see report §10)",
- "notes": "Bundle = the run of Fresh triggers at the head of the queue when draining starts (everything queued since the previous drain began: one outermost effect / action / battle step). Inside a bundle: life [Trigger] first (part of damage processing, never in the choice), then turn player's, then non-turn player's (queue order within each = default answer). If a player's group has >=2 distinct source cards, ORDER_TRIGGERS (front: SEARCH_AND_SELECT, pick 1, can_skip false, intent ORDER) is raised when the group comes up; pick one at a time. Two abilities of the same card cannot be distinguished (card-based pick) and stay in queue order. Triggers caused while resolving a bundle go behind it (next bundle; FIFO kept). Judgment call: also applied to battle_triggers (on-attack / when-attacked queue), which had the same seat-order defect; all 4 replay-golden changes come from that path. Not changed (reservation): own ON_KO from a battle KO still resolves immediately (needs battle context, §7.23 report §2.2), so it is not bundled with the queued KO listeners. Clippy: 4 listed items fixed plus a 5th that had appeared on mainline since (incompatible_msrv: Option::is_none_or in search/lethal.rs); decide.rs touched only in the return type line of the test helper blind_run. Comprehensive-rule wording/number is from memory (no rule text in the repo). Predictions: audit 0-5 -> 0, replay 5-20 -> 4 (below range: rare positions), arena >=35/40 identical -> 36."
+ "command": "python tests/scripts/lethal_speed_check.py judge --record n1_results/lethal_speed/record_3012000_300.jsonl.gz --out n1_results/lethal_life_deal --tag <v> (OPCG_LETHAL_LIFE=<v> on c1fdf65) ; judge --tag true --true-deal",
+ "notes": "Not adopted. Of the 55 proofs not won that turn, 45 are wins on the true deal too (the deal is not the cause; the CPU's decision used a different deal seed / fell back to search). Only 10 are false proofs (true deal no), from 4 situations; only 2 involve a life trigger (3012157 removed by all variants, 3012218 only by add, to unknown). Each variant removes 1-2 false proofs and loses 36-56 proofs that win on the true deal (mostly win->unknown at 20,000 nodes: defending triggers add opponent branches). Invariant 'proof set must not grow' is violated by both (12) and mode0 (2) because the defensive deal itself changes; add (+1) is sound w.r.t. the old 8 deals (a superset of deals; the gain is node budget freed by failing early on the first deal). Forecast (20-60 fewer proofs, >half not won) matched the count but not the content (2-3% were real false proofs). The remaining 8 false proofs (life 0, defended by hand counters in 3012080 x7 and 3012137 x1) are not explained by the hand slots (the defence-value deal should hold at least those counters); unverified hypothesis: the line depends on my own deck order through my own [On Attack] choices, which the fair deals reshuffle. Next step candidate: a read-only judge that uses the true deal except for my own deck reshuffled. Kept: measurement option true_deal in Game.lethal_json and judge --true-deal. Production arena not needed (moves unchanged; golden/make test confirm)."
 }
