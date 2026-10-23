@@ -1,36 +1,20 @@
 {
- "job": "lethal-deal-cost",
- "role": "engine change (default) + measurement flag",
- "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.33 (origin/claude/cpu-spec-improvements-yw91jd @ 81d02bb; ledger 2+357)",
- "branch": "claude/lethal-deal-cost",
- "report": "docs/reports/2026-10-23_lethal_deal_cost.md",
- "decision": "default changed: defensive deals count counter events only within the opponent's active DON (same as lethal-own-hidden switch cost, afd94ef); measurement flag lethal_deal_legacy (default false) restores the old deal; production arena left to the coordinator (§7.33-5)",
+ "job": "arena-ldc-w03",
+ "role": "arena",
+ "status": "partial",
  "inputs": {
-  "base": "origin/claude/cpu-spec-improvements-yw91jd @ 81d02bb",
-  "record": "n1_results/lethal_speed/record_3012000_300.jsonl.gz (300 games)",
-  "reference_judges": "n1_results/lethal_own_hidden/judge_base.jsonl.gz (main), judge_cost.jsonl.gz (OPCG_LETHAL_OWN=cost)"
+  "candidate": "nrel_r13d.npz (payable counter events in defensive deals)",
+  "baseline": "nrel_r13d.npz + lethal_deal_legacy",
+  "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)",
+  "pairs": 150
  },
  "outputs": {
-  "code": "rust/opcg_engine/src/search/lethal.rs (defensive_deal/make_deals/prove/root_proof/ReplyProof take legacy), decide.rs + mod.rs (DecideOptions.lethal_deal_legacy, opts key), py_game.rs (Game.lethal_json lethal_deal_legacy), tests_lethal.rs (test g)",
-  "wiring": "opcg_sim/api/engine_rs.py RsGame.decide(lethal_deal_legacy=...); opcg_sim/loop/arena.py --cand-lethal-deal-legacy; opcg_sim/loop/arena_shard.py --lethal-deal-legacy (baseline seat); tests/scripts/lethal_speed_check.py judge --lethal-deal-legacy",
-  "judges": "n1_results/lethal_deal_cost/judge_{cost,legacy}.jsonl.gz",
-  "identity": "n1_results/lethal_deal_cost/identity.json",
-  "compare": "n1_results/lethal_deal_cost/compare_legacy_vs_cost.json",
-  "logs": "n1_results/lethal_deal_cost/{make_test,audit_cross}.log",
-  "docs": "docs/SPEC.md §2.5.10, docs/TEST_SPEC.md (tests_lethal (g), lethal_speed_check judge flag)"
+  "files": [
+   "arena_ldc/ldc_w03.jsonl"
+  ]
  },
  "metrics": {
-  "points": 12710,
-  "win_default": 860,
-  "win_legacy": 1064,
-  "default_vs_switch_cost": {"status_diff": 0, "move_diff": 0, "nodes_diff": 0},
-  "legacy_vs_main_base": {"status_diff": 0, "move_diff": 0, "nodes_diff": 0, "line_len_diff": 449, "line_len_note": "stats field only; reference judge_base predates the ATTACH_DON line_len fix (all 449 have base line_len 1 and an ATTACH_DON move)"},
-  "legacy_to_default_transitions": {"win->win": 859, "win->no": 121, "win->unknown": 84, "unknown->win": 1, "move_changed": 39, "nodes_ratio": 1.0207},
-  "make_test": "green (cargo 607 passed, 1 ignored; pytest 857 passed, 13 skipped)",
-  "audit_cross": "void 0 (120 pairs, wr 0.5)",
-  "smoke_arena": "arena_shard --lethal-proof root --lethal-deal-legacy --cand-lethal-proof root, 8 pairs, 32 sims, random x real, seed 3191000: void 0, best_opts carries lethal_deal_legacy=true"
+  "arena_ldc/ldc_w03.jsonl": 25
  },
- "command": "python tests/scripts/lethal_speed_check.py judge --record n1_results/lethal_speed/record_3012000_300.jsonl.gz --out n1_results/lethal_deal_cost --tag cost ; ... --tag legacy --lethal-deal-legacy ; make test ; make audit-cross",
- "notes": "Implemented the cost form as in afd94ef but behind a bool parameter threaded through make_deals/prove/root_proof and ReplyProof (so root_reply in-tree proofs follow the same flag); RNG draws are unchanged (the re-sort draws nothing), so the 6 fair deals are bit-identical. The environment switch OPCG_LETHAL_OWN does not exist on main and was not added. make audit-cross runs lethal_proof=off and therefore does not exercise this path; a small root/legacy arena smoke run was added to check the wiring. Container lacked maturin/pytest/fastapi; installed via pip (maturin, opcg_sim/requirements.txt, pytest, pytest-xdist) before the gates. Production arena (§7.33-5, seed 3191000+(k-1)x1000, 16 shards x 150 pairs) not run, as instructed."
+ "notes": ""
 }
