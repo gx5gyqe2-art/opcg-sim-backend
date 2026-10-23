@@ -16,5 +16,5 @@
  "metrics": {
   "arena_csig/csig_w10.jsonl": 150
  },
- "notes": ""
+ "notes": "150/150 pairs, 0 void. Pair score mean 1.127/2 (candidate win rate ~0.563, 95% CI on pair mean ±0.068). arena_shard prints '（基準席は既定）' after the candidate settings line, but per _best_kw the baseline seat did receive --sims 1280 --budget 0 --worlds 2 --lethal-proof root --commit-sig-legacy; the message is only cosmetic. Repo was used at ~/opcg-sim-backend (/root), per the instructions."
 }
