@@ -1,238 +1,225 @@
 {
- "job": "r21-diag",
- "role": "diag+train",
+ "job": "move-judge",
+ "role": "measure",
  "status": "done",
  "inputs": {
-  "base_commit": "089f0d1f3",
-  "rean_dirs": "claude/rean-n49-w01..08 + claude/rean-n50-w01..08 (16 dir・38,400 点)",
-  "records": "claude/n49-w01..16 + claude/n50-w01..16 (n_records/n{W}_w{XX}_p0..p3・128 dir)",
-  "z_waves": [
-   50,
-   49
-  ],
-  "z_rows": 2303852,
-  "epochs": 2,
-  "lr": 0.0002,
-  "ablate": [
-   "rel"
-  ],
-  "aux_weight": 0.1,
-  "pi_teacher": "q_improved（r21d は visits）",
-  "runs": {
-   "r21b": "warm r11a・π 再分析 38,400 点・z 波 50＋49・pi-steps-mult 1",
-   "r21c": "warm r13d・π 再分析 38,400 点・z 波 50＋49・pi-steps-mult 1",
-   "r21d": "r21c と同じ・--pi-teacher visits（深い訪問そのもの）",
-   "r21e": "warm r13d・π＋z 波 50＋49 の全部（w01〜w08 は reanalyze --merge で再分析の点を差し込み・959,378 点）",
-   "r21f": "warm r13d・π＋z とも再分析の 38,400 点だけ（--z-in なし）",
-   "r21g": "warm r13d・π＋z 波 50＋49 の全部（差し込みなし・r20 の出発点を r13d に替えた形）"
+  "base": "claude/cpu-spec-improvements-yw91jd@8db31b65f",
+  "spec": "docs/search_efficiency_plan.md §7.32",
+  "sample_from": "logs/value_to_move/{real,synth}（§7.22 の記録・出荷の設定で r13d と r20 の手が違った点＋較正の点）",
+  "records": "claude/n50-w01〜16・claude/n50s-w01〜16 の n_records（局面の再現）",
+  "nets": {
+   "r13d": "opcg_sim/data/learned/nrel_r13d.npz",
+   "r20": "claude/train-r20:n1_results/nrel_r20.npz"
+  },
+  "referee": "SeatSpec(net, sims=160)・世界 1 本・公平・詰みの証明 off・両席",
+  "k": 32,
+  "sample_seed": 20261023,
+  "points": {
+   "real": {
+    "changed": 400,
+    "calib": 200
+   },
+   "synth": {
+    "changed": 400,
+    "calib": 200
+   }
   }
  },
  "outputs": {
-  "report": "docs/reports/2026-10-23_r21_diag.md",
-  "align": "n1_results/r21_diag/align.json",
-  "nets": {
-   "r21b": "n1_results/nrel_r21b.npz",
-   "r21c": "n1_results/nrel_r21c.npz",
-   "r21d": "n1_results/nrel_r21d.npz",
-   "r21e": "n1_results/nrel_r21e.npz",
-   "r21f": "n1_results/nrel_r21f.npz",
-   "r21g": "n1_results/nrel_r21g.npz"
-  },
-  "band": [
-   "n1_results/r21_diag/band_final_rean.json",
-   "n1_results/r21_diag/band_final_w50.json"
-  ],
-  "tool": "tests/scripts/r21_teacher_align.py"
+  "tool": "tests/scripts/move_judge.py",
+  "rust": "Game.fork_world（読み取り専用の口・rust/opcg_engine/src/py_game.rs）",
+  "logs": "logs/move_judge/{real,synth}/{meta.json,sample.jsonl.gz,rows.jsonl.gz}・logs/move_judge/summary.json",
+  "report": "docs/reports/2026-10-23_move_judge.md",
+  "test_spec": "docs/TEST_SPEC.md（計器の表に 1 行）"
  },
  "metrics": {
-  "align_totals": {
-   "points": 38400,
-   "row_missing": 0,
-   "a_row_mismatch": 0,
-   "b_pol_mismatch": 0,
-   "b_rec_n_mismatch": 0,
-   "b_deep_n_mismatch": 0,
-   "b_deep_q_mismatch": 0,
-   "b_v0_mismatch": 0,
-   "b_chosen_sig_mismatch": 0,
-   "b_chosen_neg": 0,
-   "points_jsonl_missing": 0,
-   "c_qimp_argmax_ne_deep_best": 7308,
-   "c_visits_argmax_ne_deep_best": 0,
-   "c_deep_best_ne_rec_best": 10737,
-   "c_qimp_argmax_ne_rec_best": 11200,
-   "c_qimp_argmax_lowvisit": 4
-  },
-  "align_loader": {
-   "n": 0,
-   "q": 0,
-   "p": 0,
-   "pi": 0,
-   "len": 0,
-   "chosen": 0,
-   "v0": 0,
-   "row_tok": 0,
-   "row_sc": 0,
-   "row_ci": 0,
-   "at": 0,
-   "si": 0,
-   "ti": 0
-  },
-  "align_forward_r13d": {
-   "net": "nrel_r13d.npz",
-   "points": 38400,
-   "argmax_agree": 0.9096875,
-   "l1_mean": 0.059428051859267514,
-   "l1_median": 7.778911456979461e-05,
-   "l1_p99": 0.3819554908666787,
-   "share_l1_gt_0.05": 0.2615625,
-   "root_prior_temp": 2.0
-  },
-  "best_ep": {
-   "r21b": 1,
-   "r21c": 0,
-   "r21d": 1,
-   "r21e": 0,
-   "r21f": 1,
-   "r21g": 1
-  },
-  "band_rean_holdout_5484": {
-   "nrel_r13d": {
-    "top1_visits": 0.5921,
-    "ce_visits": 1.562,
-    "top1_q_improved": 0.4832,
-    "ce_q_improved": 1.5598
+  "real": {
+   "points_ok": 591,
+   "not_ok": {
+    "legal": 4,
+    "record": 5
    },
-   "nrel_r11a": {
-    "top1_visits": 0.5407,
-    "ce_visits": 1.6953,
-    "top1_q_improved": 0.4566,
-    "ce_q_improved": 1.6985
+   "k": 32,
+   "sec_per_point_1core": 106.7,
+   "calib_diff": {
+    "r13d": {
+     "mean": -0.0102,
+     "ci95": [
+      -0.0268,
+      0.0064
+     ]
+    },
+    "r20": {
+     "mean": 0.0005,
+     "ci95": [
+      -0.0156,
+      0.0166
+     ]
+    }
    },
-   "nrel_r20": {
-    "top1_visits": 0.5904,
-    "ce_visits": 1.5332,
-    "top1_q_improved": 0.5093,
-    "ce_q_improved": 1.5017
+   "changed_diff": {
+    "r13d": {
+     "mean": -0.0163,
+     "ci95": [
+      -0.0255,
+      -0.0072
+     ]
+    },
+    "r20": {
+     "mean": -0.0002,
+     "ci95": [
+      -0.0097,
+      0.0094
+     ]
+    }
    },
-   "nrel_r21": {
-    "top1_visits": 0.5633,
-    "ce_visits": 1.5661,
-    "top1_q_improved": 0.4903,
-    "ce_q_improved": 1.5325
+   "changed_wb": {
+    "r13d": 0.5275,
+    "r20": 0.5444
    },
-   "nrel_r21b": {
-    "top1_visits": 0.5474,
-    "ce_visits": 1.581,
-    "top1_q_improved": 0.4706,
-    "ce_q_improved": 1.5589
+   "decided_changed": {
+    "n": 9,
+    "b_better": 3,
+    "a_better": 6,
+    "rate": {
+     "k": 9,
+     "n": 392,
+     "rate": 0.023,
+     "ci95": [
+      0.0121,
+      0.0431
+     ]
+    },
+    "split": 1
    },
-   "nrel_r21c": {
-    "top1_visits": 0.576,
-    "ce_visits": 1.5614,
-    "top1_q_improved": 0.49,
-    "ce_q_improved": 1.5381
+   "decided_calib": {
+    "n": 9,
+    "b_better": 3,
+    "a_better": 6,
+    "rate": {
+     "k": 9,
+     "n": 199,
+     "rate": 0.0452,
+     "ci95": [
+      0.024,
+      0.0837
+     ]
+    },
+    "split": 1
    },
-   "nrel_r21d": {
-    "top1_visits": 0.5704,
-    "ce_visits": 1.5583,
-    "top1_q_improved": 0.4845,
-    "ce_q_improved": 1.5442
+   "sign_agree_refs_changed": 0.5739,
+   "deep_b_better": {
+    "deep_r13d": 0.2668,
+    "deep_r20": 0.7035
    },
-   "nrel_r21e": {
-    "top1_visits": 0.5868,
-    "ce_visits": 1.537,
-    "top1_q_improved": 0.5036,
-    "ce_q_improved": 1.5075
+   "deep_agree_with_refs": {
+    "deep_r13d": 0.5244,
+    "deep_r20": 0.5447
    },
-   "nrel_r21f": {
-    "top1_visits": 0.5853,
-    "ce_visits": 1.5504,
-    "top1_q_improved": 0.4987,
-    "ce_q_improved": 1.525
+   "theory_sign_agree_changed": {
+    "static": 0.5512,
+    "seq": 0.5285
    },
-   "nrel_r21g": {
-    "top1_visits": 0.5884,
-    "ce_visits": 1.5308,
-    "top1_q_improved": 0.5067,
-    "ce_q_improved": 1.4978
+   "theory_sign_agree_calib": {
+    "static": 0.5043,
+    "seq": 0.4821
    }
   },
-  "band_w50_holdout_policy": {
-   "nrel_r13d": {
-    "top1_visits": 0.5432,
-    "ce_visits": 1.8262,
-    "top1_q_improved": 0.5006,
-    "ce_q_improved": 1.7271
+  "synth": {
+   "points_ok": 587,
+   "not_ok": {
+    "record": 9,
+    "replay: ValueError": 1,
+    "legal": 3
    },
-   "nrel_r11a": {
-    "top1_visits": 0.4911,
-    "ce_visits": 2.0005,
-    "top1_q_improved": 0.4511,
-    "ce_q_improved": 1.9269
+   "k": 32,
+   "sec_per_point_1core": 94.5,
+   "calib_diff": {
+    "r13d": {
+     "mean": -0.0018,
+     "ci95": [
+      -0.0151,
+      0.0116
+     ]
+    },
+    "r20": {
+     "mean": -0.0041,
+     "ci95": [
+      -0.0183,
+      0.01
+     ]
+    }
    },
-   "nrel_r20": {
-    "top1_visits": 0.5597,
-    "ce_visits": 1.7966,
-    "top1_q_improved": 0.5199,
-    "ce_q_improved": 1.664
+   "changed_diff": {
+    "r13d": {
+     "mean": -0.0078,
+     "ci95": [
+      -0.0166,
+      0.0011
+     ]
+    },
+    "r20": {
+     "mean": -0.0032,
+     "ci95": [
+      -0.0121,
+      0.0057
+     ]
+    }
    },
-   "nrel_r21": {
-    "top1_visits": 0.5288,
-    "ce_visits": 1.8399,
-    "top1_q_improved": 0.4912,
-    "ce_q_improved": 1.7326
+   "changed_wb": {
+    "r13d": 0.5135,
+    "r20": 0.5149
    },
-   "nrel_r21b": {
-    "top1_visits": 0.5126,
-    "ce_visits": 1.8453,
-    "top1_q_improved": 0.4729,
-    "ce_q_improved": 1.7584
+   "decided_changed": {
+    "n": 6,
+    "b_better": 0,
+    "a_better": 6,
+    "rate": {
+     "k": 6,
+     "n": 391,
+     "rate": 0.0153,
+     "ci95": [
+      0.0071,
+      0.0331
+     ]
+    },
+    "split": 1
    },
-   "nrel_r21c": {
-    "top1_visits": 0.5351,
-    "ce_visits": 1.825,
-    "top1_q_improved": 0.4945,
-    "ce_q_improved": 1.7277
+   "decided_calib": {
+    "n": 4,
+    "b_better": 1,
+    "a_better": 3,
+    "rate": {
+     "k": 4,
+     "n": 196,
+     "rate": 0.0204,
+     "ci95": [
+      0.008,
+      0.0513
+     ]
+    },
+    "split": 0
    },
-   "nrel_r21d": {
-    "top1_visits": 0.5344,
-    "ce_visits": 1.8156,
-    "top1_q_improved": 0.4932,
-    "ce_q_improved": 1.7263
+   "sign_agree_refs_changed": 0.5897,
+   "deep_b_better": {
+    "deep_r13d": 0.3047,
+    "deep_r20": 0.6805
    },
-   "nrel_r21e": {
-    "top1_visits": 0.5594,
-    "ce_visits": 1.7996,
-    "top1_q_improved": 0.5198,
-    "ce_q_improved": 1.6719
+   "deep_agree_with_refs": {
+    "deep_r13d": 0.5243,
+    "deep_r20": 0.5318
    },
-   "nrel_r21f": {
-    "top1_visits": 0.5414,
-    "ce_visits": 1.8133,
-    "top1_q_improved": 0.5031,
-    "ce_q_improved": 1.7108
+   "theory_sign_agree_changed": {
+    "static": 0.5399,
+    "seq": 0.5316
    },
-   "nrel_r21g": {
-    "top1_visits": 0.561,
-    "ce_visits": 1.7959,
-    "top1_q_improved": 0.5229,
-    "ce_q_improved": 1.6609
+   "theory_sign_agree_calib": {
+    "static": 0.4692,
+    "seq": 0.5
    }
-  },
-  "band_w50_v_mse": {
-   "nrel_r13d": 0.6367,
-   "nrel_r11a": 0.6336,
-   "nrel_r20": 0.5412,
-   "nrel_r21": 0.5427,
-   "nrel_r21b": 0.5416,
-   "nrel_r21c": 0.5393,
-   "nrel_r21d": 0.5384,
-   "nrel_r21e": 0.5437,
-   "nrel_r21f": 0.6102,
-   "nrel_r21g": 0.541
   }
  },
- "commit": "see branch head",
- "notes": "照合は全 38,400 点でずれ 0（記録との行・候補の列・選んだ手・深い読みの値・訓練の読み込み・版）。予告の「ずれ 1 つ」は外れ。原因の主は出発点 r11a（再分析の点で深い最善との一致 r11a 0.541 vs r13d 0.592・r21 は r11a から +0.022 で 0.563）、従は方策 3.8 万点に価値 230 万行を流すと共有の本体が引かれて方策が下がること（r13d から: r21c 0.576・r21d 0.570・価値も 3.8 万行の r21f は 0.585）。深い 3.8 万点を全手に混ぜた r21e と混ぜない r21g は帯で差なし（0.587 vs 0.588）。更新量 4 倍は原因でない（r21b 0.547 < r21 0.563）。迷った点: (1) §7.38 の手順 3 は r21b・r21c の 2 本だが、切り分けのため r21d〜r21g の 4 本を追加した（各 5〜10 分）。(2) 再分析の点の holdout は 波 50 だけでなく 49＋50 の 16 dir（5,484 点）で測った（前段の 2,736 点より倍）。(3) 帯に出発点の r11a を足した。(4) 訓練の器の前向き計算と Rust の根の P は 26% の点で L1>0.05 違うが、大半は同じ手の束の写しの数（整数倍）で説明でき、全世代に共通の構造（報告 §1 の参考 f）。(5) 波 49・50 の記録は 1 シャード 4 part に分かれ、再分析の作業セッションは束ねて回していた（照合は (seed, step) で引いたので影響なし）。アリーナは回していない（コーディネータが起こす）。アリーナの候補は r21g（と、深い点の効果を見るなら r21e vs r21g）。"
+ "command": "python tests/scripts/move_judge.py sample/judge/summary（報告 §9）",
+ "gate": "make test green（cargo 606 passed・pytest 857 passed, 13 skipped）。torch は外した構成（下記）。",
+ "notes": "1. 較正は 0 のまわり（実 −1.0／+0.1 ポイント・合成 −0.2／−0.4・区間は全部 0 を含む）。\n2. r20 の出荷の手 vs r13d の出荷の手: 審判 r13d で実 −1.6［−2.5, −0.7］・合成 −0.8［−1.7, +0.1］、審判 r20 で実 −0.0・合成 −0.3＝良くなっていない（較正を引けば r13d 審判 −0.6・r20 審判 ±0.1）。判定できた点は 1.5〜2.3%（較正の偽陽性 2.0〜4.5% 以下）・審判 2 本の符号の一致 57〜59%。深い読み（§7.22）の判定と審判の一致は 52〜55%・理論の式の符号の一致は 53〜55%（較正 47〜50%）。\n3. 点の数と K: 較正の点 50 点で 1 点 ≈ 2 分／コア（見積りどおり）だったので、上限の各帯 400＋200 点・K＝32 で回した（4 コアで実 4.7 時間・合成 4.1 時間・計 150,784 局）。\n4. 標本の制限: §7.22 の後に誘発の順の修正（rs-trigger-order-2・rs-trigger-simul）が入り、記録の手の列を今のエンジンで当て直すと 1 割弱の局（実 50/358・合成 34/343）が途中で外れる。標本は『局面まで当て直せる点』に限って無作為に引いた（飛ばした点 実 33＋13・合成 20＋11）。判定時の照合（合法手の並び・記録の符号化）で捨てた点 実 9・合成 13。\n5. エンジンへの追加: Game.fork_world(player, reveal, seed)（encode_world と同じ公平の引き直しを打てる対局として返す読み取り専用の口・既存の挙動は不変）。公平の配り直しを Python から作る口が無かったため。\n6. 決着しない局 12（実: 審判の decide が DON_BOX を返して apply_game_action が拒んだ 11 局・上限手数 1 局・合成 0）は対から外した。アリーナの席と同じ経路（driver.run_game と同じ呼び方）なので頻度も同じはず。\n7. ゲート: この環境は torch の CPU 版の配布元（download.pytorch.org）に届かず、PyPI の torch 2.14.1+cu130 を入れると test_n_rel_train_torch.py::test_grads_match_numpy が勾配の許容（max_rel 2.0e-4 対 下限×5＝1.9e-4）をわずかに超えて落ちる（この WP が触らない訓練側・OMP_NUM_THREADS=1 でも同じ・torch 有りの結果は 880 passed・1 failed）。torch は任意依存（README）なので外した構成で make test green を確認した（857 passed・13 skipped）。\n8. 途中の push（logs/move_judge だけの差分）はゲートを省略した（tests は logs/ を読まない・最終 push は最終ツリーで make test green）。"
 }
