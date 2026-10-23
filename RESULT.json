@@ -14,7 +14,19 @@
   ]
  },
  "metrics": {
-  "arena_csig/csig_w07.jsonl": 150
+  "arena_csig/csig_w07.jsonl": 150,
+  "summary": {
+   "pairs": 149,
+   "games": 298,
+   "void": 1,
+   "wins": 159.0,
+   "wr": 0.5336,
+   "ci95": [
+    0.5017,
+    0.5654
+   ],
+   "elo": 23.4
+  }
  },
- "notes": ""
+ "notes": "Ran at fixed commit 2eebbf9f0 (has --commit-sig-legacy). 150/150 pairs, 1 void pair: seed 3177098 (OP05-098 vs OP17-058) GameAborted at step 83 'ValueError: 不明なアクションです: DON_BOX'. Void rate 1/150 = 0.67% (under 2%). The arena_shard log line says '基準席は既定', but the baseline still gets --sims/--budget via initargs, plus lethal_proof/commit_sig_legacy/worlds via _best_kw (ARENA_RESUME_FINAL best_opts lists only the _best_kw part). Shard-level wr 0.5336, CI95 [0.5017, 0.5654], Elo +23.4 (candidate = fixed signature)."
 }
