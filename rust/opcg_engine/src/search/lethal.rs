@@ -264,83 +264,16 @@ fn defense(masters: &MasterTable, m: MasterIdx) -> (i64, bool) {
     (v * 2 + blocker as i64, ev)
 }
 
-/// 【トリガー】が守りに働くか（§7.28・効果の構造だけで決める・新しい定数は無い）。
-///
-/// 相手（＝攻めている側）のユニット・手札・ドン!!に働く手（KO・レスト・手札／デッキの下／ライフへ戻す・
-/// パワー－・効果の無効・アタックできない・捨てさせる・ドン!!を戻す等）、または自分の守りを足す手（パワー＋・
-/// キーワードを得る・KO されない・ライフを足す・引く・手札に加える・アクティブにする・ドン!!を足す・
-/// 登場させる〔このカード自身ならブロッカーか【登場時】が守りに働くとき〕・【メイン】効果の発動は
-/// その効果）を 1 つでも含めば守りに働く。含まないのは見る・並べ替える・自分の山札を削る・自分の手札を
-/// 捨てるだけの【トリガー】。
-pub(crate) fn trigger_defends(masters: &MasterTable, m: MasterIdx) -> bool {
-    ability_defends(masters, m, TriggerType::Trigger, 0)
-}
-
-fn ability_defends(masters: &MasterTable, m: MasterIdx, t: TriggerType, depth: u8) -> bool {
-    let cm = masters.get(m);
-    cm.ability_ids
-        .iter()
-        .filter_map(|id| masters.abilities.get(*id))
-        .filter(|a| a.trigger == t)
-        .any(|a| a.effect.as_ref().is_some_and(|e| node_defends(masters, m, e, depth)))
-}
-
-fn node_defends(masters: &MasterTable, m: MasterIdx, n: &crate::effects::ast::EffectNode, depth: u8) -> bool {
-    use crate::effects::ast::{ActionType as A, EffectNode as N, PlayerRef as P};
-    match n {
-        N::Sequence(xs) => xs.iter().any(|x| node_defends(masters, m, x, depth)),
-        N::Choice { options, .. } => options.iter().any(|x| node_defends(masters, m, x, depth)),
-        N::Branch { if_true, if_false, .. } => [if_true, if_false]
-            .iter()
-            .any(|x| x.as_ref().is_some_and(|x| node_defends(masters, m, x, depth))),
-        N::Action(a) => {
-            let player = a.target.as_ref().map(|q| q.player);
-            let at_opp = matches!(player, Some(P::Opponent) | Some(P::All));
-            let at_self = !matches!(player, Some(P::Opponent));
-            let sign = a.value.base.signum() * a.value.multiplier.signum();
-            let sub = a.sub_effect.as_ref().is_some_and(|x| node_defends(masters, m, x, depth));
-            sub || match a.ty {
-                A::Ko | A::Rest | A::Bounce | A::DeckBottom | A::MoveCard | A::Move | A::Freeze | A::Lock
-                | A::AttackDisable | A::NegateEffect | A::DisableAbility | A::Discard | A::Trash | A::Restriction
-                | A::SwapPower | A::SetBasePower => at_opp || (matches!(a.ty, A::MoveCard | A::Move) && at_self),
-                A::RestDon | A::FreezeDon | A::ReturnDon => player.is_none() || at_opp,
-                A::Buff | A::BpBuff => (at_self && sign > 0) || (at_opp && sign < 0),
-                A::GrantKeyword | A::Keyword | A::GrantEffect | A::PreventLeave | A::PreventRest | A::Active => at_self,
-                A::Heal | A::LifeRecover | A::Draw | A::MoveToHand | A::RampDon | A::ActiveDon | A::RedirectAttack => {
-                    true
-                }
-                A::PlayCard => {
-                    let this = a.target.as_ref().is_some_and(|q| q.ref_id.as_deref() == Some("self"));
-                    !this
-                        || masters.get(m).keywords.iter().any(|k| k == "ブロッカー")
-                        || (depth == 0 && ability_defends(masters, m, TriggerType::OnPlay, depth + 1))
-                }
-                // 「このカードの【メイン】効果を発動する」（無ければ【カウンター】へ・`resolver::main_ability_indices`）
-                A::ExecuteMainEffect => {
-                    depth == 0
-                        && [TriggerType::ActivateMain, TriggerType::Counter]
-                            .iter()
-                            .any(|t| ability_defends(masters, m, *t, depth + 1))
-                }
-                _ => false,
-            }
-        }
-    }
-}
-
 /// 守りの強い配り方（`mode` 0＝守りの値の大きい順に手札へ・1＝カウンターイベントを先に）。
 ///
 /// 相手の手札＋山札＋裏向きのライフのうち自分の知らない枠（`fair` と同じ）の札を 1 つの山にし、
-/// 無作為に混ぜてから守りの値で安定に並べ（同じ値の中では守りに働く【トリガー】の札を後に）、上から手札の枠へ
-/// 入れる。残りは混ぜてから、守りに働く
-/// 【トリガー】の札（[`trigger_defends`]）を先にライフの枠（上から）へ、残りを山札の枠へ（§7.28）。
+/// 無作為に混ぜてから守りの値で安定に並べ、上から手札の枠へ入れる。残りは混ぜて山札・ライフの枠へ。
 /// 自分の側は `fair` と同じに混ぜる。
 fn defensive_deal(
     state: &GameState,
     masters: &MasterTable,
     me: Seat,
     mode: u8,
-    life: bool,
     rng: &mut dyn SearchRng,
 ) -> Result<GameState, EngineError> {
     let opp = me.other();
@@ -372,56 +305,32 @@ fn defensive_deal(
         };
         let uuids: Vec<String> = pool.iter().map(|c| state.card(*c).uuid.clone()).collect();
         let mut mixed = by_uuid(rng.shuffle_order(&uuids)?);
-        // 同じ守りの値の中では守りに働く【トリガー】の札を後に（手札の守りの値は同じまま、その札をライフの枠へ回す）
         mixed.sort_by_key(|c| {
-            let m = state.card(*c).master;
-            let (v, ev) = defense(masters, m);
-            let t = (life && trigger_defends(masters, m)) as i64;
+            let (v, ev) = defense(masters, state.card(*c).master);
             if mode == 1 {
-                (-(ev as i64), -v, t)
+                (-(ev as i64), -v)
             } else {
-                (0, -v, t)
+                (0, -v)
             }
         });
         let n_hand = slots.iter().filter(|(z, _)| *z == CardZone::Hand).count();
         let (hand, rest) = mixed.split_at(n_hand);
         let rest_uuids: Vec<String> = rest.iter().map(|c| state.card(*c).uuid.clone()).collect();
         let rest = if rest_uuids.is_empty() { Vec::new() } else { by_uuid(rng.shuffle_order(&rest_uuids)?) };
-        // ライフの枠（上＝index 0 から）へ守りに働く【トリガー】の札を先に入れる（§7.28）。混ぜた順のまま
-        // 「守りに働く札」→「それ以外」に安定に分け、ライフの枠の数だけ取る。残りは混ぜた順で山札の枠へ。
-        // 乱数は引かない（公平な配り方の系列を変えない）。
-        let n_life = if life { slots.iter().filter(|(z, _)| *z == CardZone::Life).count() } else { 0 };
-        let (life_cards, deck): (Vec<CardIdx>, Vec<CardIdx>) = {
-            let (d, nd): (Vec<CardIdx>, Vec<CardIdx>) =
-                rest.iter().partition(|c| trigger_defends(masters, state.card(**c).master));
-            let life: Vec<CardIdx> = d.iter().chain(nd.iter()).copied().take(n_life).collect();
-            let deck = rest.iter().copied().filter(|c| !life.contains(c)).collect();
-            (life, deck)
-        };
-        // ライフを先に取らないときは今までどおり混ぜた順で山札・ライフの枠へ
-        let (mut deck, mut life_cards) = if life {
-            (deck.into_iter(), life_cards.into_iter())
-        } else {
-            (rest.clone().into_iter(), Vec::new().into_iter())
-        };
-        let mut hand = hand.iter().copied();
+        let mut cards = hand.iter().copied().chain(rest);
         let po = out.player_mut(opp);
         for &(z, i) in &slots {
+            let c = cards.next().expect("同じ枚数");
             match z {
-                CardZone::Hand => po.hand[i] = hand.next().expect("同じ枚数"),
-                CardZone::Deck => po.deck[i] = deck.next().expect("同じ枚数"),
-                _ => po.life[i] = if life { life_cards.next() } else { deck.next() }.expect("同じ枚数"),
+                CardZone::Hand => po.hand[i] = c,
+                CardZone::Deck => po.deck[i] = c,
+                _ => po.life[i] = c,
             }
         }
     }
     // 自分の山札＋裏向きのライフ（`fair` の自分側と同じ）
     super::determinize::reshuffle_own_fair(&mut out, state, me, rng)?;
     Ok(out)
-}
-
-fn life_variant() -> &'static str {
-    static V: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    V.get_or_init(|| std::env::var("OPCG_LETHAL_LIFE").unwrap_or_else(|_| "both".into()))
 }
 
 /// 配り方を作る（`fair` の引き直し `rand` 通り＋守りの強い 2 通り・守りの強い方を先に＝早く落ちる）。
@@ -433,16 +342,11 @@ pub fn make_deals(
     rand: usize,
 ) -> Result<Vec<GameState>, EngineError> {
     let mut rng = Pcg32SearchRng::new(seed);
-    let mut out = Vec::with_capacity(rand + 3);
-    let v = life_variant();
-    out.push(defensive_deal(state, masters, me, 0, v == "both" || v == "mode0", &mut rng)?);
-    out.push(defensive_deal(state, masters, me, 1, v == "both", &mut rng)?);
+    let mut out = Vec::with_capacity(rand + 2);
+    out.push(defensive_deal(state, masters, me, 0, &mut rng)?);
+    out.push(defensive_deal(state, masters, me, 1, &mut rng)?);
     for _ in 0..rand {
         out.push(super::determinize::determinize_fair_with(state, me, &mut rng)?);
-    }
-    if v == "add" {
-        let d = defensive_deal(state, masters, me, 0, true, &mut rng)?;
-        out.insert(0, d);
     }
     Ok(out)
 }
