@@ -1,0 +1,22 @@
+z専用 dir 128 本を合流（π は読まない）
+value 2342252行（val 333085） policy 38400点（val 5484） 5s
+warm-start: opcg_sim/data/learned/nrel_r13d.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 1635698/2342252
+backend: torch threads=4 fast-pairs fast-max fast-index
+予算・候補定数を先に作った（候補 383064行 0.2s）
+  ep0 step 5000/8362 mse 0.5103 ce 1.5698 92s
+ep0 train mse 0.5016 ce 1.5673 | val v_mse 0.5358 v_sign 0.810 pi_top1 0.586 ce 1.549 145s
+  aux val huber 0.4143 tok 0.1073
+N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 4, "train_sec": 129.778, "steps": 8362, "breakdown": {"budget_p": 0.046, "holdout": 0.868, "rel_p": 0.001, "rel_v": 0.426, "slice_p": 0.08, "slice_v": 1.626, "step_p": 0.002, "step_p_bwd": 3.303, "step_p_fwd": 1.832, "step_v": 0.083, "step_v_bwd": 71.417, "step_v_fwd": 50.863, "step_v_prep": 0.03}, "train_mse": 0.5015748621673759, "train_ce": 1.567349268072774, "val_vmse": 0.5357628464698792, "val_vsign": 0.8098, "val_pi_top1": 0.58625, "val_p_loss": 1.5492504196166992, "aux_weight": 0.1, "val_aux": 0.4142988184969494, "val_aux_tok": 0.10725198461770093, "train_aux": [0.3929540812969208, 0.11313057690858841]}
+  ep0 の重みを /root/nrel_r21d.ep0.npz に保存
+  ep0 を /root/nrel_r21d.npz に保存（暫定最良）
+  ep1 step 5000/8362 mse 0.4754 ce 1.5618 225s
+ep1 train mse 0.4722 ce 1.5587 | val v_mse 0.5343 v_sign 0.811 pi_top1 0.577 ce 1.553 279s
+  aux val huber 0.4052 tok 0.1061
+N_REL_TRAIN_EPOCH {"ep": 1, "backend": "torch", "threads": 4, "train_sec": 130.992, "steps": 8362, "breakdown": {"budget_p": 0.044, "holdout": 0.842, "rel_p": 0.001, "rel_v": 0.447, "slice_p": 0.083, "slice_v": 1.677, "step_p": 0.003, "step_p_bwd": 3.362, "step_p_fwd": 1.848, "step_v": 0.084, "step_v_bwd": 71.919, "step_v_fwd": 51.443, "step_v_prep": 0.03}, "train_mse": 0.47218932461650487, "train_ce": 1.5586819409860246, "val_vmse": 0.5343295931816101, "val_vsign": 0.81055, "val_pi_top1": 0.5765, "val_p_loss": 1.5530982131958009, "aux_weight": 0.1, "val_aux": 0.40520544736303477, "val_aux_tok": 0.10613915269336838, "train_aux": [0.3878668248653412, 0.0979621559381485]}
+  ep1 の重みを /root/nrel_r21d.ep1.npz に保存
+  ep1 を /root/nrel_r21d.npz に保存（暫定最良）
+best ep1 val v_mse 0.5343 を保存
+N_REL_TRAIN_DONE {"out": "/root/nrel_r21d.npz"}
+TRAIN_EXIT 0 SEC 283

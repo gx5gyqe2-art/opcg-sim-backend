@@ -1,0 +1,26 @@
+{
+ "r21_n49_n50": {
+  "points": 38400,
+  "cands_mean": 9.975625,
+  "nmax_mean": 3087.6520572916666,
+  "ent_visits": 1.1230026075756294,
+  "ent_qimp": 0.5503559217585113,
+  "qimp_top_mass_mean": 0.7925094962120056,
+  "share_qimp_top_gt_0.9": 0.60828125,
+  "qimp_argmax_ne_visits_argmax": 0.1903125,
+  "q_top2_gap_median": 0.015035688877105713,
+  "v0_abs_mean": 0.5778290541733926
+ },
+ "r11a_pilot_n32": {
+  "points": 14544,
+  "cands_mean": 9.55686193619362,
+  "nmax_mean": 1177.2223597359737,
+  "ent_visits": 1.4351796229748381,
+  "ent_qimp": 0.6531168490360527,
+  "qimp_top_mass_mean": 0.7663677334785461,
+  "share_qimp_top_gt_0.9": 0.5729510451045104,
+  "qimp_argmax_ne_visits_argmax": 0.28534103410341033,
+  "q_top2_gap_median": 0.024667739868164062,
+  "v0_abs_mean": 0.5869752496718639
+ }
+}
