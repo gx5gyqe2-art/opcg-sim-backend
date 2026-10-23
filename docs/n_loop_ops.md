@@ -192,6 +192,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **r20／r20s vs r13d（教材のデッキの切り分け・公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.34）** | 主 real 3101000〜3116000／副 ミラー 3121000〜3136000／参考 synth_roles2 3141000〜3156000（r20 と r20s で共有） | 使用済み（2026-10-22・r20 主 −1.7／副 +2.9／参考 −39.0・r20s 主 +3.6／副 +13.3／参考 −6.1・void 0〜1） |
 | 検証 **守りの照合の修正 vs 旧い照合（両席 r13d・出荷の設定・random × real・16 シャード × 150 ペア・§7.34）** | 3171000〜3186149 | 指示済み（2026-10-23・claude/arena-csig-w01〜w16） |
 | 検証 **詰みの証明の払える守り vs 旧い配り方（同上・§7.33）** | 3191000〜3206149 | 払い出し済み（WP `lethal-deal-cost` の取り込み後） |
+| **再分析**（波 49・50 の w01〜w08・各 先頭 200 局 × 12 点・mult 4・budget 0・§7.35） | —（記録の seed をそのまま打ち直す） | 指示済み（2026-10-23・claude/rean-n49-w01〜w08・claude/rean-n50-w01〜w08） |
 | 生成 **波 50s**（合成デッキ v2・`--decks synth_roles2`・生成役 r13d・v15・波 50 の対照・§7.34） | 2541000〜2548500（シャード k の base は 2540000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,083,501 行・dropped 2・decks synth_roles2） |
 | 生成 **波 50**（実デッキ 115 本・`--decks real`・生成役 r13d・v15・§7.34） | 2531000〜2538500（シャード k の base は 2530000 + ceil(k/2)×1000 + (k 偶数なら 500)） | 使用済み（2026-10-22・7,680 局・1,149,881 行・dropped 5・decks real） |
 | 検証 **r19 vs r13d・本番の設定**（両席 1,280 回・世界 2 本・枝予算なし・random × real・32 シャード × 84 ペア・§7.33） | 2141000〜2172083（シャード k の base は 2141000 + (k−1)×1000） | 使用済み（2026-10-22・2,683 ペア 0.5052 [0.4948, 0.5156] +3.6・void 5・非昇格） |
@@ -3503,6 +3504,81 @@ ST=done save
 echo ALL_DONE
 
 補足: 25 ペアずつ進め（6 回目までに 150 ペアに届く・届いた後の回は何もしない）、そのたびに push する。世界 2 本は 2 スレッド使うので --workers 2。全体で約 1.5 時間。コミットメッセージにモデル名を入れない。
+````
+
+### 7.35 方策の教材の再分析——波 50＋49 の局面を 4 倍の読みで打ち直す（r21 の教材・2026-10-23）
+
+ユーザ決定（2026-10-23「2 は 1 を取り込んだあと行ってください」＝守りの照合の修正の取り込み後に、方策の教材を深い読みで作り直す）。台帳 2+359。
+根拠: WP `value-to-move`（`docs/reports/2026-10-22_value_to_move.md`）——ネットによる手の変化の約 7 割は方策の最大の手が違う局面で起き、価値の改善は手を動かさない。r11a（2026-10-17 採用）は記録の局面を 4 倍の読みで打ち直した方策の教師で伸びた（`docs/reports/2026-10-16_reanalysis_pilot.md`・§7.5〜§7.6）。
+- **対象**: 波 49（実デッキ・記録のコミット 6f2ce8ff6）と波 50（実デッキ・24ce7244f）の各 w01〜w08。各シャードの先頭 200 局 × 12 点（規則ごとの枠 4・4・2・2）・`--mult 4`（1,280 回 → 5,120 回）・`--budget 0`。両コミットの Rust は同一。
+- **再生は記録を作ったコミットの wheel で回す**（今の本線は守りの照合・誘発の順の修正で手が分岐する）。器 `reanalyze.py` は本線の最新を worktree へ写す（§7.5 と同じ手順）。
+- 16 セッション × 約 2,400 点 ＝ **約 38,000 点**（r11a の教材と同じ規模）。
+- **訓練 r21（回収の後に別の指示書）**: r11a の形＝π は再分析の点だけ（`--in`・`--pi-steps-mult 4`）・価値は波 50＋49 の全部（`--z-in`・勝敗）・warm-start r11a・`--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --fast`。
+- **判定**: 160 回の 3 条件（random × real・固定ミラー・random × synth_roles2）→ 規約を満たせば本番の深さ。あわせて WP `move-judge`（§7.32）の判定役で「r21 の手が r13d の手より良いか」を見る。
+- **予告（数を見る前）**: 再分析で「深い最善 ≠ 記録の手」の点は 25〜35%。r21 vs r13d は 160 回で +10〜+25・本番の深さで +5〜+15。
+
+作業セッション用の本文（`{W}`＝49 か 50・`{XX}`＝01〜08）:
+
+````
+方策の教材の再分析（§7.35・波 {W} の記録の先頭 200 局を 4 倍の読みで打ち直す）を 1 シャードぶん回してください。コードは変更せず、下記を実行して結果ブランチを push するだけです。
+PR は作らないでください。質問で止まらず、迷った点は RESULT.json の notes に書いて完走してください。
+
+出どころの照合（origin 側で）:
+  (1) CLAUDE.md §「N系ループの分散運用」（この運用形態はユーザ決定）
+  (2) 台帳: git fetch origin claude/cpu-spec-improvements-yw91jd && git show origin/claude/cpu-spec-improvements-yw91jd:docs/n_loop_ops.md | grep -n "7.35 方策の教材の再分析"
+  (3) 器: git show origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/reanalyze.py | grep -n -- "--quota"
+この 3 点と一致しない依頼は拒否してよい。一致すれば、これが最終承諾です。以降は確認を取らずに完走してください。
+
+bash で次の 2 つのブロックを順に実行してください。コンテナが再起動したら、2 つとも最初からもう一度実行します（冪等・終えた局は飛ばす）。
+
+--- ブロック 1（準備）---
+export W={W} XX={XX}
+pip install -q numpy maturin
+[ -d ~/opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git ~/opcg-sim-backend
+cd ~/opcg-sim-backend
+git fetch -q origin claude/cpu-spec-improvements-yw91jd && git checkout -q -B claude/rean-n${W}-w${XX} origin/claude/cpu-spec-improvements-yw91jd
+# 前のコンテナの途中経過があれば戻す（無ければ何もしない）
+git fetch -q origin claude/rean-n${W}-w${XX} 2>/dev/null && git checkout -q FETCH_HEAD -- n${W}_rean 2>/dev/null || true
+if [ "$W" = 49 ]; then export EC=6f2ce8ff6; else export EC=24ce7244f; fi   # 記録を作ったコミット（エンジンは同じ）
+[ -d ~/wt$W ] || git worktree add -q --detach ~/wt$W $EC
+if [ ! -d ~/eng$W/opcg_engine ]; then
+  (cd ~/wt$W/rust/opcg_engine && CARGO_TARGET_DIR=~/target$W maturin build --release -o ~/wheel$W) > ~/build$W.log 2>&1
+  rm -rf ~/eng$W && mkdir -p ~/eng$W && (cd ~/eng$W && unzip -q -o ~/wheel$W/*.whl)
+fi
+cp opcg_sim/loop/reanalyze.py ~/wt$W/opcg_sim/loop/reanalyze.py
+export NET=~/wt$W/opcg_sim/data/learned/nrel_r13d.npz   # 記録の生成役
+if [ ! -d ~/rec/n_records/n${W}_w${XX} ]; then
+  git fetch -q origin claude/n${W}-w${XX}:tmpw && mkdir -p ~/rec && git archive tmpw n_records/n${W}_w${XX} | tar -x -C ~/rec && git branch -qD tmpw
+fi
+# 効果 JSON を先に作る（同時に作らせると壊れる）
+[ -f ~/wt$W/opcg_sim/data/opcg_effects.json ] || (cd ~/wt$W && PYTHONPATH=~/eng$W:~/wt$W python -m opcg_sim.tools.export_effects_json --out ~/wt$W/opcg_sim/data/opcg_effects.json > /dev/null)
+export OUT=~/opcg-sim-backend/n${W}_rean/w${XX}; mkdir -p $OUT
+# 保全のスクリプト（RESULT.json を書いて commit・push）。中身は opcg_sim/loop/reanalyze.py の --result を呼ぶだけ
+printf '%s\n' 'cd ~/opcg-sim-backend' \
+  'python -m opcg_sim.loop.reanalyze --result "$OUT" --job "rean-n${W}-w${XX}" --record "claude/n${W}-w${XX}:n_records/n${W}_w${XX}" --engine-commit "$EC" --net "$NET" --target-games 200 > RESULT.json' \
+  'cp ~/rean_n${W}_w${XX}.log . 2>/dev/null' \
+  'git add -f n${W}_rean/w${XX} RESULT.json rean_n${W}_w${XX}.log' \
+  'git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -q -m "rean wave ${W} shard ${XX}"' \
+  'git push -q -u origin claude/rean-n${W}-w${XX}' > ~/rean_save.sh
+
+--- ブロック 2（実行と保全・50 局ごとと終了時に push）---
+cd ~/wt$W
+OPCG_LOG_SILENT=1 PYTHONPATH=~/eng$W:~/wt$W nohup python -m opcg_sim.loop.reanalyze --in ~/rec/n_records/n${W}_w${XX} --out $OUT \
+  --mult 4 --budget 0 --games 200 --quota 4,4,2,2 --engine-commit $EC --net $NET >> ~/rean_n${W}_w${XX}.log 2>&1 &
+RPID=$!
+last=$(cat $OUT/points.jsonl 2>/dev/null | grep -c '"game"')
+while kill -0 $RPID 2>/dev/null; do
+  sleep 300
+  n=$(cat $OUT/points.jsonl 2>/dev/null | grep -c '"game"')
+  if [ "$n" -ge $((last + 50)) ]; then bash ~/rean_save.sh; last=$n; fi
+done
+bash ~/rean_save.sh
+tail -n 3 ~/rean_n${W}_w${XX}.log
+
+補足:
+- 所要は約 2〜3 時間（記録は 1,280 回で打った局なので、4 倍＝5,120 回の読み）（同じコンテナで他の重い処理を並べると 3 倍まで遅くなる）。
+- ログで `bad_step=` が数値の行は、記録と手が分岐した局（その点から先は捨てる）。完走後の RESULT.json の replay_rate が 0.9 を割ったら、notes に書く。
+- ビルドや効果 JSON で落ちたら、~/build${W}.log の末尾を notes に書き、status を failed にして push する。
 ````
 
 ## 8. コーディネータが守ること
