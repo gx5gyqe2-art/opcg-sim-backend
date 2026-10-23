@@ -13,7 +13,7 @@ use crate::model::{GameState, MasterTable, Seat};
 use crate::net::LoadedNet;
 use crate::testkit::{BoardBuilder, M_CHAR, M_EVENT};
 
-const K1: u8 = 0b01; // P1 が知る
+pub(super) const K1: u8 = 0b01; // P1 が知る
 
 /// (a) 印の集合: 自分の山札・裏向きのライフ・相手の手札／山札／裏向きのライフのうち知らない札。
 #[test]
@@ -91,7 +91,7 @@ const VCHR: &str = "EB01-005"; // バニラのキャラ（コスト 1）
 /// 効果を持たない《海軍》のキャラ 6 種（たしぎの山札・どれを選ぶかで手が割れる）。
 const NAVY: [&str; 6] = ["OP01-065", "OP05-044", "OP06-049", "OP12-045", "OP12-052", "ST03-012"];
 
-fn card_json(card_id: &str, uuid: &str, owner: &str, is_rest: bool) -> Value {
+pub(super) fn card_json(card_id: &str, uuid: &str, owner: &str, is_rest: bool) -> Value {
     json!({
         "card_id": card_id, "uuid": uuid, "owner_id": owner, "is_rest": is_rest,
         "is_newly_played": false, "attached_don": 0, "is_face_up": false, "power_buff": 0,
@@ -128,7 +128,7 @@ fn player_json(name: &str, leader: &str, deck: &[&str], field: Value, hand: Valu
 }
 
 /// p1: 手札にたしぎ・山札は《海軍》のバニラ 6 種・アクティブドン!! 4。p2: 場にパワー 0 のレストのキャラ。
-fn board(masters: &MasterTable) -> GameState {
+pub(super) fn board(masters: &MasterTable) -> GameState {
     let hidden = json!({
         "players": {
             "p1": player_json("p1", VLDR, &NAVY,
@@ -148,12 +148,12 @@ fn board(masters: &MasterTable) -> GameState {
 }
 
 /// ゼロ重みのネット（`decide::tests::zero_net`・value 0・priors 一様）。ここで見るのは「どの段まで積むか」だけ。
-fn net() -> &'static LoadedNet {
+pub(super) fn net() -> &'static LoadedNet {
     static NET: std::sync::OnceLock<LoadedNet> = std::sync::OnceLock::new();
     NET.get_or_init(super::tests::zero_net)
 }
 
-fn ctx(masters: &'static MasterTable) -> Ctx<'static> {
+pub(super) fn ctx(masters: &'static MasterTable) -> Ctx<'static> {
     Ctx {
         masters,
         net: net(),
@@ -165,7 +165,7 @@ fn ctx(masters: &'static MasterTable) -> Ctx<'static> {
     }
 }
 
-fn play_move(state: &GameState, masters: &'static MasterTable, uuid: &str) -> Move {
+pub(super) fn play_move(state: &GameState, masters: &'static MasterTable, uuid: &str) -> Move {
     let mut s = Session::new(state.clone());
     let legal = ctx(masters).legal_actions(&mut s).expect("合法手");
     legal

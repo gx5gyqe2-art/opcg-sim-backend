@@ -415,6 +415,10 @@ pub fn decide_on_state(
     // 葉の打ち切りの実績（§20.7.9）は `leaf_rollout != none` のときだけ足す。
     // **世界 0 のぶんだけ**が出る（世界 1 以降はスレッドが違う＝thread_local の計測を
     // スレッドと共に捨てる。`boxes` と同じ扱い・`decide::run_worlds` の注記）。
+    // 窓の読み方（§7.42・世界 K 本か短い木で読んだ窓だけ欄を足す）。
+    if let Some((w, tree)) = out.window_read {
+        body["window"] = serde_json::json!({"worlds": w, "tree": tree});
+    }
     let rollout = quiesce::take_rollout_stats();
     // 詰みの証明（§7.21）は判定した決定だけに欄を足す（既定 off では鍵ごと出ない）。
     if out.lethal.is_some() || out.lethal_reply.is_some() {
@@ -637,6 +641,17 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
         lethal_deal_legacy: flag("lethal_deal_legacy", d.lethal_deal_legacy),
         // 見えていなかった札を選ぶ続きを捨てない旧い形（§7.39・WP `rs-commit-hidden`・測定専用・既定 false）。
         commit_hidden_legacy: flag("commit_hidden_legacy", d.commit_hidden_legacy),
+        // 窓・対話の決め方（§7.42・WP `rs-window-read`）。3 つの旧い旗は測定専用・既定 false。
+        window_carry_legacy: flag("window_carry_legacy", d.window_carry_legacy),
+        window_worlds: v
+            .get("window_worlds")
+            .and_then(Value::as_u64)
+            .map(|n| n as usize)
+            .filter(|n| *n > 0)
+            .unwrap_or(d.window_worlds),
+        window_worlds_legacy: flag("window_worlds_legacy", d.window_worlds_legacy),
+        window_tree_legacy: flag("window_tree_legacy", d.window_tree_legacy),
+        window_tree_life: v.get("window_tree_life").and_then(Value::as_i64).unwrap_or(d.window_tree_life),
     }
 }
 

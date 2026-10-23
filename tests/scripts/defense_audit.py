@@ -422,6 +422,11 @@ def play_one(args) -> List[Dict[str, Any]]:
         kw["commit_sig_legacy"] = True       # WP `rs-commit-sig` の前後比較（旧い署名＝修正前の打ち方）
     if getattr(a, "commit_hidden_legacy", False):
         kw["commit_hidden_legacy"] = True    # §7.39 の前後比較（見えていなかった札を選ぶ続きも積む＝修正前の打ち方）
+    for _k in ("window_carry_legacy", "window_worlds_legacy", "window_tree_legacy"):
+        if getattr(a, "window_legacy", False) or getattr(a, _k, False):
+            kw[_k] = True                    # §7.42 の前後比較（窓・対話の決め方の旧い形）
+    if getattr(a, "window_worlds", None):
+        kw["window_worlds"] = a.window_worlds
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     la, lb = D.leader_pair(db, seed, "random")
     p1, p2 = D.build_pair(db, la, lb, seed, "synth_roles")
@@ -546,6 +551,11 @@ def replay_to(seed: int, a, seat: str, step: int):
         kw["commit_sig_legacy"] = True       # WP `rs-commit-sig` の前後比較（旧い署名＝修正前の打ち方）
     if getattr(a, "commit_hidden_legacy", False):
         kw["commit_hidden_legacy"] = True    # §7.39 の前後比較（見えていなかった札を選ぶ続きも積む＝修正前の打ち方）
+    for _k in ("window_carry_legacy", "window_worlds_legacy", "window_tree_legacy"):
+        if getattr(a, "window_legacy", False) or getattr(a, _k, False):
+            kw[_k] = True                    # §7.42 の前後比較（窓・対話の決め方の旧い形）
+    if getattr(a, "window_worlds", None):
+        kw["window_worlds"] = a.window_worlds
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     la, lb = D.leader_pair(db, seed, "random")
     p1, p2 = D.build_pair(db, la, lb, seed, "synth_roles")
@@ -935,6 +945,12 @@ def main(argv=None):
                            help="両席を旧い手の署名で打たせる（WP `rs-commit-sig` の前後比較・測定専用）")
             p.add_argument("--commit-hidden-legacy", action="store_true",
                            help="両席を、見えていなかった札を選ぶ commit の続きも積む旧い形で打たせる（§7.39 の前後比較・測定専用）")
+            p.add_argument("--window-legacy", action="store_true",
+                           help="両席を §7.42 の旧い形 3 つで打たせる（窓・対話の続きを積む・窓の世界 1 本・ライフが少ない戦闘の応手を静的な値で）")
+            p.add_argument("--window-carry-legacy", action="store_true", help="§7.42 の 1 だけ旧い形")
+            p.add_argument("--window-worlds-legacy", action="store_true", help="§7.42 の 2 だけ旧い形")
+            p.add_argument("--window-tree-legacy", action="store_true", help="§7.42 の 3 だけ旧い形")
+            p.add_argument("--window-worlds", type=int, default=None, help="窓の根畳みの世界の本数（省略＝Rust の既定）")
         if name == "run":
             p.add_argument("--seeds", default=None, help="seed の一覧のファイル（空白区切り）。指定すると --seed-base/--games の代わりにこれだけ回す")
         if name == "verify":

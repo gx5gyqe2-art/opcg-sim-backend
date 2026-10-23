@@ -46,10 +46,16 @@ RESEED_XOR = 0x5EED_0F_F5E7_0000
 _G: Dict[str, Any] = {}
 
 
+#: 窓・対話の決め方の旗（§7.42・WP `rs-window-read`・`--window-legacy`／`--window-worlds`）。出荷の席と読み直しの両方に効く。
+WINDOW_KW: Dict[str, Any] = {}
+#: 深い読み（判定役）に足す旗。既定は §7.40 の判定役と同じ読み（窓は旧い形＝世界 1 本・静的な値）。
+DEEP_WINDOW = {"window_carry_legacy": True, "window_worlds_legacy": True, "window_tree_legacy": True}
+
+
 def ship_spec(net: Optional[str]) -> "E.SeatSpec":
     """出荷の設定（対戦 API と同じ: `PLAY_SIMS`・`PLAY_BUDGET`・`PLAY_WORLDS`・`PLAY_LETHAL_PROOF`）。"""
     return E.SeatSpec(net, sims=E.PLAY_SIMS, budget=E.PLAY_BUDGET, worlds=E.PLAY_WORLDS,
-                      lethal_proof=E.PLAY_LETHAL_PROOF)
+                      lethal_proof=E.PLAY_LETHAL_PROOF, **WINDOW_KW)
 
 
 def key(mv: Optional[Dict[str, Any]]) -> Optional[str]:
@@ -114,7 +120,7 @@ JUDGE_STEP = 0x9E3779B97F4A7C15
 
 
 def deep_decide(game, name: str, ss: int, j: int = 0) -> Dict[str, Any]:
-    opts = {"net": _G["net"], "search_seed": (ss ^ JUDGE_XOR ^ (j * JUDGE_STEP)) & 0xFFFFFFFFFFFFFFFF, **DEEP}
+    opts = {"net": _G["net"], "search_seed": (ss ^ JUDGE_XOR ^ (j * JUDGE_STEP)) & 0xFFFFFFFFFFFFFFFF, **DEEP, **DEEP_WINDOW}
     return json.loads(game.decide(name, json.dumps(opts)))
 
 
@@ -278,6 +284,12 @@ def play_one(args) -> List[Dict[str, Any]]:
 
 def cmd_run(a):
     os.makedirs(a.out, exist_ok=True)
+    if a.window_legacy:
+        WINDOW_KW.update(window_carry_legacy=True, window_worlds_legacy=True, window_tree_legacy=True)
+    if a.window_worlds:
+        WINDOW_KW["window_worlds"] = a.window_worlds
+    if a.judge_window_new:
+        DEEP_WINDOW.clear()
     path = os.path.join(a.out, f"points_{a.seed_base}_{a.games}.jsonl")
     done = set()
     if os.path.exists(path):
@@ -481,6 +493,11 @@ def main(argv=None):
     p.add_argument("--no-deep", dest="deep", action="store_false", help="深い読みの比べを省く（試走用）")
     p.add_argument("--judge-seeds", type=int, default=0,
                    help="補助の判定: 各手を当てた後の値を判定役の seed k 本の平均で読む（0＝しない）")
+    p.add_argument("--window-legacy", action="store_true",
+                   help="両席を §7.42 の旧い形 3 つで打たせる（窓・対話の続きを積む・窓の世界 1 本・ライフが少ない戦闘の応手を静的な値で）")
+    p.add_argument("--window-worlds", type=int, default=None, help="窓の根畳みの世界の本数（§7.42 の 2・省略＝Rust の既定）")
+    p.add_argument("--judge-window-new", action="store_true",
+                   help="深い読み（判定役）の窓も修正後の形で読む（省略＝§7.40 と同じ判定役＝旧い形）")
     p.add_argument("--judge-types", default="", help="補助の判定を当てる段の種類（前方一致・カンマ区切り・空＝全部）")
     p.add_argument("--out", default=OUT_DIR)
     p = sub.add_parser("summary")

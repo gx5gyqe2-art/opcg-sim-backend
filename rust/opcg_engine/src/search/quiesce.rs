@@ -806,6 +806,27 @@ pub fn resolved_branch_values(
     box_depth: i32,
     window: Window,
 ) -> Result<Vec<Option<f64>>, EngineError> {
+    resolved_branch_values_with(ctx, s, st, name, legal, max_plies, box_depth, window, &mut |s, _st| {
+        ctx.value(s, name)
+    })
+}
+
+/// [`resolved_branch_values`] の、出口盤面の評価を外から渡す版（WP `rs-window-read`・§7.42 の 3）。
+///
+/// `leaf` は窓を解決した出口盤面（`s`・巻き戻す前）で呼ばれ、`name` から見た値を返す。
+/// `leaf = ctx.value(s, name)` なら [`resolved_branch_values`] と 1 bit も変わらない。
+#[allow(clippy::too_many_arguments)]
+pub fn resolved_branch_values_with(
+    ctx: &Ctx,
+    s: &mut Session,
+    st: &mut SearchState,
+    name: Seat,
+    legal: &[Move],
+    max_plies: usize,
+    box_depth: i32,
+    window: Window,
+    leaf: &mut dyn FnMut(&mut Session, &mut SearchState) -> Result<f64, EngineError>,
+) -> Result<Vec<Option<f64>>, EngineError> {
     if !st.budget.take(legal.len()) {
         return Ok(vec![None; legal.len()]);
     }
@@ -823,7 +844,7 @@ pub fn resolved_branch_values(
                 resolve_battle_inplace(
                     ctx, s, st, window, max_plies, true, box_depth, None,
                 )?;
-                ctx.value(s, name)
+                leaf(s, st)
             })();
             match out {
                 Ok(v) => Some(v),

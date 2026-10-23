@@ -565,10 +565,11 @@ def cmd_verify(a):
 
 def winstab_point(job):
     """窓の点で、探索の乱数（＝窓の根畳みが引く世界 1 本）だけを替えて N 回選ばせ、選ぶ手が揺れるかを見る。"""
-    g, r, n = job
+    g, r, n, extra = job
     game = replay(g, r["step"])
     who = r["seat"]
     opts = json.loads(_G["ship"].decide_opts(r["seed"], r["turn"], who, None))
+    opts.update(extra or {})                 # §7.42（WP `rs-window-read`）: 窓の決め方の旗・世界の本数
     picks, qs = [], set()
     for j in range(n):
         o = dict(opts, search_seed=(opts["search_seed"] + 7919 * j) & 0xFFFFFFFFFFFFFFFF)
@@ -586,9 +587,11 @@ def winstab_point(job):
 def cmd_winstab(a):
     games = {g["seed"]: g for g in read_jsonl(os.path.join(a.out, "games.jsonl"))}
     rows = [x for x in read_jsonl(os.path.join(a.out, "points.jsonl")) if x["ok"] and x["kind"] == "window"]
-    jobs = [({k: v for k, v in games[x["seed"]].items() if k != "points"}, x, a.n) for x in rows]
+    extra = json.loads(a.opts) if a.opts else {}
+    jobs = [({k: v for k, v in games[x["seed"]].items() if k != "points"}, x, a.n, extra) for x in rows]
+    name = f"window_stability{('_' + a.tag) if a.tag else ''}.jsonl"
     with get_context("fork").Pool(a.workers, initializer=_init_judge, initargs=(1,)) as pool, \
-            open(os.path.join(a.out, "window_stability.jsonl"), "w", encoding="utf-8") as f:
+            open(os.path.join(a.tag_out or a.out, name), "w", encoding="utf-8") as f:
         for r in pool.imap_unordered(winstab_point, jobs, chunksize=1):
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
     print("WINSTAB_DONE", len(jobs), flush=True)
@@ -742,6 +745,10 @@ def main(argv=None):
     p.add_argument("--out", default=OUT_DIR)
     p = sub.add_parser("winstab")
     p.add_argument("--n", type=int, default=8)
+    p.add_argument("--opts", default=None,
+                   help="decide の opts に足す JSON（§7.42・例 '{\"window_worlds\": 4}'・旧い形は 3 つの window_*_legacy）")
+    p.add_argument("--tag", default=None, help="出力 window_stability_<tag>.jsonl（省略＝window_stability.jsonl）")
+    p.add_argument("--tag-out", default=None, help="出力の置き場（省略＝--out）")
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--out", default=OUT_DIR)
     p = sub.add_parser("summary")
