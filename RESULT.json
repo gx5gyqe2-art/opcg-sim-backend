@@ -19,27 +19,27 @@
   "dir": "n49_rean/w03"
  },
  "metrics": {
-  "games": 119,
-  "points": 1428,
+  "games": 176,
+  "points": 2112,
   "diverged": 0,
   "unmapped": 0,
   "lost_to_divergence": 0,
   "points_by_rule": {
-   "early": 476,
-   "end_and_attack": 476,
-   "enel": 6,
-   "random": 470
+   "early": 704,
+   "end_and_attack": 704,
+   "enel": 8,
+   "random": 696
   },
   "replay_rate": 1.0,
   "deep_best_differs": {
-   "early": 0.2185,
-   "end_and_attack": 0.2857,
-   "enel": 0.0,
-   "random": 0.2702
+   "early": 0.2017,
+   "end_and_attack": 0.294,
+   "enel": 0.25,
+   "random": 0.2989
   },
-  "deep_best_differs_all": 0.257,
-  "sec_replay_per_game": 13.32,
-  "sec_deep_per_game": 9.29
+  "deep_best_differs_all": 0.2647,
+  "sec_replay_per_game": 13.07,
+  "sec_deep_per_game": 9.04
  },
  "commit": "6f2ce8ff6",
  "notes": " 記録ブランチ claude/n49-w03 は n_records/n49_w03 を持たず 4 分割（n49_w03_p0〜p3・seed 2522000〜2522479・同じ生成設定）だった。4 つを 1 dir に連結して --in に渡した（npz を順に改番・meta は合算・seed_base は再生で使われない）。--games 200 は seed 順の先頭 200＝p0 の 120 局＋p1 の先頭 80 局。"
