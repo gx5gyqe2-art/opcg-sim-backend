@@ -14,5 +14,5 @@
   "arena_r22/r22_real_w16.jsonl": 175,
   "arena_r22/r22_synth2_w16.jsonl": 175
  },
- "notes": ""
+ "notes": "real: 1 void game (ARENA_RESUME_FINAL pairs=174, void=1, wr=0.5431, ci95=[0.5009,0.5853], elo=30.0); mirror: void 0, wr=0.5371, ci95=[0.4875,0.5868], elo=25.9; synth2: void 0, wr=0.5229, ci95=[0.4802,0.5655], elo=15.9. Each run took only ~3 min (about 165 s), much less than the ~25 min estimate. The repo was at /home/user/opcg-sim-backend, so ~/opcg-sim-backend was symlinked to it. No code changes."
 }
