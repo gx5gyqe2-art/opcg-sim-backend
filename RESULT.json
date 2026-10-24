@@ -14,5 +14,5 @@
   "arena_r22/r22_real_w07.jsonl": 175,
   "arena_r22/r22_synth2_w07.jsonl": 175
  },
- "notes": ""
+ "notes": "k=7 (B=6): seed-base real=3367000, mirror=3387000, synth2=3407000. Each shard ran much faster than the ~25 min estimate (logged 178s / 287s for mirror / synth2). real: 174 pairs + 1 void, wr 0.5259 [0.4798,0.5719] Elo +18.0; mirror: 175 pairs, void 0, wr 0.5057 [0.4581,0.5534] Elo +4.0; synth_roles2: 175 pairs, void 0, wr 0.4429 [0.4041,0.4817] Elo -39.9. The repo was cloned to /root/opcg-sim-backend (~), not the pre-existing /home/user checkout. No code changes."
 }
