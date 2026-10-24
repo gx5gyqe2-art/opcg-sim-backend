@@ -1,0 +1,14 @@
+value 339行（val 152） policy 122点（val 57） 2s
+warm-start: opcg_sim/data/learned/nrel_r13d.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 230/339
+backend: torch threads=4 fast-pairs fast-max fast-index
+予算・候補定数を先に作った（候補 1740行 0.0s）
+PI_TEACHER {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.3034347822022552, "entropy_q_improved": 1.6849211463973324}
+ep0 train mse 0.0000 ce 1.9864 | val v_mse 0.9325 v_sign 0.658 pi_top1 0.368 ce 2.019 4s
+  aux val huber 0.4810 tok 0.0628
+N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 4, "train_sec": 0.026, "steps": 1, "breakdown": {"budget_p": 0.0, "holdout": 0.022, "rel_p": 0.0, "slice_p": 0.0, "step_p": 0.0, "step_p_bwd": 0.014, "step_p_fwd": 0.011}, "train_mse": 0.0, "train_ce": 1.9864108562469482, "val_vmse": 0.9325007200241089, "val_vsign": 0.6578947368421053, "val_pi_top1": 0.3684210526315789, "val_p_loss": 2.0193199023865818, "pi_teacher": {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.3034347822022552, "entropy_q_improved": 1.6849211463973324}, "val_pi_top1_visits": 0.543859649122807, "val_p_loss_visits": 1.6852939003392269, "aux_weight": 0.1, "val_aux": 0.48095858097076416, "val_aux_tok": 0.06276505440473557, "train_aux": [0.0, 0.0]}
+  ep0 の重みを /root/nrel_trial.ep0.npz に保存
+  ep0 を /root/nrel_trial.npz に保存（暫定最良）
+best ep0 val v_mse 0.9325 を保存
+N_REL_TRAIN_DONE {"out": "/root/nrel_trial.npz"}
