@@ -1,0 +1,10 @@
+  final {'p1': {'leader': 'OP15-039', 'deck': 14, 'hand': 13, 'life': 2, 'field': 4, 'trash': 17}, 'p2': {'leader': 'OP07-097', 'deck': 20, 'hand': 5, 'life': 2, 'field': 2, 'trash': 20}}
+3461060 winner None turns 35 steps 400 acts {'p1': 189, 'p2': 133} MAX_STEPS 400 sec 213.1
+   (392, 'p2', 34, 'MAIN_ACTION', 'メインアクションを選択してください', 'commit', 'ATTACH_DON', 'MAIN', False)
+   (393, 'p2', 34, 'MAIN_ACTION', 'メインアクションを選択してください', 'commit', 'ATTACH_DON', 'MAIN', False)
+   (394, 'p2', 34, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ATTACK', 'MAIN', False)
+   (395, 'p1', 34, 'SELECT_BLOCKER', 'ブロッカーを選択してください', 'window', 'SELECT_BLOCKER', 'BLOCK_STEP', True)
+   (396, 'p1', 34, 'SELECT_COUNTER', 'カウンターカードを選択してください', 'window', 'PASS', 'BATTLE_COUNTER', True)
+   (397, 'p2', 34, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'TURN_END', 'MAIN', False)
+   (398, 'p2', 35, 'SEARCH_AND_SELECT', '「エッグヘッド」の効果: 対象を選択（1枚まで）', 'window', 'RESOLVE_EFFECT_SELECTION', 'END', False)
+   (399, 'p1', 35, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'PLAY', 'MAIN', False)

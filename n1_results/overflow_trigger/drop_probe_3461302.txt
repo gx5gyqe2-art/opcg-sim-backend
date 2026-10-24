@@ -1,0 +1,10 @@
+  final {'p1': {'leader': 'OP15-058', 'deck': 23, 'hand': 10, 'life': 0, 'field': 3, 'trash': 14}, 'p2': {'leader': 'OP16-079', 'deck': 20, 'hand': 5, 'life': 3, 'field': 5, 'trash': 17}}
+3461302 winner None turns 12 steps 400 acts {'p1': 77, 'p2': 290} MAX_STEPS 400 sec 155.4
+   (392, 'p2', 12, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ACTIVATE_MAIN', ('OP16-084', 'field'), 'MAIN', False)
+   (393, 'p2', 12, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ACTIVATE_MAIN', ('OP16-084', 'field'), 'MAIN', False)
+   (394, 'p2', 12, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ACTIVATE_MAIN', ('OP16-084', 'field'), 'MAIN', False)
+   (395, 'p2', 12, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ACTIVATE_MAIN', ('OP16-084', 'field'), 'MAIN', False)
+   (396, 'p2', 12, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ACTIVATE_MAIN', ('OP16-084', 'field'), 'MAIN', False)
+   (397, 'p2', 12, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ACTIVATE_MAIN', ('OP16-084', 'field'), 'MAIN', False)
+   (398, 'p2', 12, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ACTIVATE_MAIN', ('OP16-084', 'field'), 'MAIN', False)
+   (399, 'p2', 12, 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ACTIVATE_MAIN', ('OP16-084', 'field'), 'MAIN', False)

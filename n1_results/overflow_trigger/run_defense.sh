@@ -5,8 +5,8 @@ export PYTHONHASHSEED=0 OPCG_LOG_SILENT=1
 D=n1_results/overflow_trigger
 F=$D/defense
 NET=opcg_sim/data/learned/nrel_r13d.npz
-python tests/scripts/defense_audit.py run --games 300 --seed-base 3351000 --workers 2 --net $NET --out $F > $D/defense_run.log 2>&1
+python tests/scripts/defense_audit.py run --games 300 --seed-base 3351000 --workers 3 --net $NET --out $F >> $D/defense_run.log 2>&1
 echo "DEF_RUN_DONE $(date -u +%H:%M)" >> $D/progress.log
-python tests/scripts/defense_audit.py verify --games 300 --seed-base 3351000 --workers 2 --net $NET --out $F > $D/defense_verify.log 2>&1
+python tests/scripts/defense_audit.py verify --games 300 --seed-base 3351000 --workers 3 --net $NET --out $F > $D/defense_verify.log 2>&1
 python tests/scripts/defense_audit.py summarize --games 300 --seed-base 3351000 --net $NET --out $F > $D/defense_summary.log 2>&1
 echo "DEFENSE_DONE $(date -u +%H:%M)" >> $D/progress.log
