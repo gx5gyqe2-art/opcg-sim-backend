@@ -39,3 +39,4 @@
 {"seed": 3483019, "score": 1.0, "leaders": ["ST10-003", "OP02-002"], "games": [1.0, 0.0], "cand_leaders": ["OP05-002", "OP04-039"], "turns": [11, 11], "cand_opts": {"sims": 1280, "worlds": 2, "budget": 0, "lethal_proof": "root"}}
 {"seed": 3483019, "score": 1.0, "leaders": ["ST10-003", "OP02-002"], "games": [1.0, 0.0], "cand_leaders": ["OP05-002", "OP04-039"], "turns": [11, 11], "cand_opts": {"sims": 1280, "worlds": 2, "budget": 0, "lethal_proof": "root"}}
 {"seed": 3483020, "score": 1.0, "leaders": ["OP06-022", "OP17-099"], "games": [1.0, 0.0], "cand_leaders": ["OP16-001", "OP14-040"], "turns": [9, 9], "cand_opts": {"sims": 1280, "worlds": 2, "budget": 0, "lethal_proof": "root"}}
+{"seed": 3483020, "score": 1.0, "leaders": ["OP06-022", "OP17-099"], "games": [1.0, 0.0], "cand_leaders": ["OP16-001", "OP14-040"], "turns": [9, 9], "cand_opts": {"sims": 1280, "worlds": 2, "budget": 0, "lethal_proof": "root"}}
