@@ -203,7 +203,7 @@ def _gen_steps(P):
         names = dict(P.names, J=j)
         d = fmt(f"{out_dir}/{s['part_dir']}", names)
         seed = calc(s["seed_base"], names) + games * j
-        P.add("run", ["rm", "-rf", d], skip=("exists", f"{d}/meta_n_record.json"), note=f"part {j}")
+        P.add("run", ["rm", "-rf", d], skip=("exists", f"{d}/meta_n_record.json"), note=f"part {j} の途中の残り")
         P.add("run", ["python", "-m", "opcg_sim.loop.record_gen", "--games", str(games), "--seed-base", str(seed),
                       "--workers", str(s.get("workers", 4))] + list(s.get("args", []))
               + ["--net", s["net"], "--out", d],
@@ -332,6 +332,14 @@ def do_checkout(P):
     remote = git(P, "fetch", "-q", "origin", P.branch, check=False).returncode == 0
     start = "FETCH_HEAD" if remote else P.ref
     git(P, "checkout", "-q", "-f", "-B", P.branch, start)
+    # コードの基のコミット（再開しても始めたときのものを引き継ぐ＝RESULT.json が保存のたびに変わらない）
+    P.code_commit = git(P, "rev-parse", "HEAD").stdout.strip()
+    old = os.path.join(P.repo, "RESULT.json")
+    if remote and os.path.exists(old):
+        try:
+            P.code_commit = json.load(open(old)).get("worker", {}).get("code_commit") or P.code_commit
+        except ValueError:
+            pass
     print(f"結果ブランチ {P.branch} ← {'origin の先端（再開）' if remote else P.ref}", flush=True)
     for root, _dirs, files in os.walk(keep):
         for fn in files:
@@ -381,7 +389,7 @@ def result_dict(P, status):
     r = {"job": P.job, "role": P.kind, "status": status, "inputs": s.get("inputs", {}),
          "outputs": {}, "metrics": {}, "notes": "; ".join(P.notes),
          "worker": {"spec": P.spec_src, "k": P.k, "branch": P.branch,
-                    "commit": git(P, "rev-parse", "HEAD", check=False).stdout.strip()}}
+                    "code_commit": getattr(P, "code_commit", "")}}
     if P.kind == "arena":
         fs = sorted(glob.glob(os.path.join(P.repo, s["out_dir"], "*.jsonl")))
         rel = [os.path.relpath(f, P.repo) for f in fs]
