@@ -11,17 +11,22 @@
  "outputs": {
   "dir": "n1_results/trial_audit/w01",
   "files": [
-   "n1_results/trial_audit/w01/points_3013000_4.jsonl"
+   "n1_results/trial_audit/w01/points_3013000_4.jsonl",
+   "n1_results/trial_audit/w01/worker_steps.json"
   ]
  },
  "metrics": {
-  "games": 3,
+  "games": 4,
   "games_expected": 4,
   "void_games": 0,
-  "points": 118,
-  "steps": {},
+  "points": 173,
+  "steps": {
+   "run": {
+    "sec": 308
+   }
+  },
   "lines": {
-   "points_3013000_4.jsonl": 121
+   "points_3013000_4.jsonl": 177
   }
  },
  "notes": "",
