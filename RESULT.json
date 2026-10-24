@@ -14,13 +14,13 @@
   ]
  },
  "metrics": {
-  "arena_r23p/r23p_real_w16.jsonl": 27
+  "arena_r23p/r23p_real_w16.jsonl": 62
  },
  "notes": "",
  "worker": {
   "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/arena_r23p.json",
   "k": 16,
   "branch": "claude/arena-r23p-w16",
-  "code_commit": "eb2850e4a3447845b01e47add228928b423e2bd6"
+  "code_commit": "6613873451d562f325c579cac930e7ab399e8141"
  }
 }
