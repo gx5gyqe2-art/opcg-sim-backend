@@ -1,7 +1,7 @@
 {
  "job": "arena-ovt-w14",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r22.npz (trigger confirm offers decline)",
   "baseline": "nrel_r22.npz + confirm_trigger_legacy",
