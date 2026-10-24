@@ -4139,3 +4139,26 @@ echo ALL_DONE
 **文書**: この節に使い方（ジョブ定義の書き方・指示文の例）を足し、今後の指示書はジョブ定義＋数行の指示文で書くことを明記する。
 **完了条件**: ブランチ `claude/worker-jobs` に push・`RESULT.json`（job "worker-jobs"・最後に status "done"）。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
 
+
+**使い方（2026-10-24・WP `worker-jobs` の実装）**。**今後の指示書は「ジョブ定義＋数行の指示文」で書く**（手書きの 3,000 字の指示書は書かない）。
+
+1. **ジョブ定義を書く**（`opcg_sim/loop/jobs/<名前>.json`・**本線にコミットしてから配る**＝作業セッションは本線から読む）。いちばん近い既存の定義を写して直すのが早い（§7.41 の写し: `gen_n51.json`・`arena_r22.json`／`arena_r22o.json`・`train_r22.json`。試し: `trial_*.json`）。
+   - 共通の欄: `kind`（`arena`／`gen`／`train`）・`job`（RESULT.json の job）・`branch`（結果ブランチ）・`shards`（k の上限）・`section`／`about`／`hours`（指示文に出る）・`ledger_grep`（出どころの照合＝本線の `docs/n_loop_ops.md` にこの文字列が在ること・CLAUDE.md の「N系ループの分散運用」も見る）・`base`（`{"branch": …}`＝その最新・`{"commit": …}`＝固定）・`require`（`[{"file", "grep"}]`＝旗が在ることの確かめ・無ければ止まる）・`nets`（`"ブランチ:パス"` は取ってきて `~/<ファイル名>` に置く・パスだけなら同梱）・`inputs`（RESULT.json の inputs にそのまま載る）・`commit_message`。
+   - **番号から決まる値**: 文字列の `{k}`・`{KK}`／`{K}`（2 桁）と、`vars` に書いた式（`"B": "k - 1"`・`"BASE": "2550000 + ceil(k/2)*1000 + (500 if k % 2 == 0 else 0)"`。使えるのは四則・`//`・`%`・比較・if 式・`ceil`／`floor`／`max`／`min`／`int`／`abs`）。`seed_base` の欄は式。`~/` は作業の home。
+   - `arena`: `pairs`・`chunk_pairs`（1 回の `--max-pairs`・回の数は `ceil(pairs/chunk_pairs)`・回ごとに push）・`bands`・`workers`・`args`（両席の設定と測定用の旗＝`--sims 1280 --worlds 2 --budget 0 --cand-sims …` など・`--candidate --baseline` の直後に入る）・`arms`（任意・`[{"name", "args"}]`＝同じ seed で腕を替える §7.31 の形・`out` に `{ARM}`）・`tail_args`（`--pair-timeout 3600` など・`--out` の直前）・`conditions`（`[{"name", "seed_base", "args", "out"}]`・`args` は `--leaders --decks`）・`out_dir`。並びは「回 → 条件 → 腕」で、条件ごとに push。台帳がもう `pairs` に届いていれば飛ばす（arena_shard 自身も終えたペアを飛ばす）。
+   - `gen`: `net`・`seed_base`（式）・`games`（1 区切りの局数・区切り J の seed は `seed_base + games×J`）・`parts`・`workers`・`args`（`record_gen` の残りの引数）・`out_dir`／`part_dir`（`{J}` を使う）・`log`・`copy_logs`（リポジトリに写して一緒に push）。区切りは `meta_n_record.json` が在れば飛ばす。
+   - `train`: `waves`（`[{"branch"（`{ww}`＝取ってくる番号 2 桁）, "shards", "dest", "glob", "expect"}]`＝取ってきて個数を確かめる・足りていれば取らない）・`common_args`・`runs`（`[{"name", "in", "z_in", "args", "out", "log"}]`・順に回す＝同時に回さない）・`bands`（`[{"in", "nrel", "args", "out", "log"}]`）・`results_dir`（npz と各周の npz を置く・在れば飛ばす）・`torch_env`。
+2. **確かめる**: `python -m opcg_sim.loop.worker_job --job <名前> --k 1 --dry-run`（手書きの指示書と同じ形のコマンドの列が出る）。
+3. **指示文を出す**: `python -m opcg_sim.loop.worker_prompts --job <名前> --k 1-16 --json`（`create_session` にそのまま渡せる title・prompt・branch・model〔Sonnet〕の並び）。回収するブランチの一覧は `--branches`。例（`--job arena_r22 --k 3`）:
+
+````
+定型の作業を 1 本回してください: ジョブ `arena_r22` の番号 k=3（§7.41・r22 vs r13d の判定アリーナ（…））。結果は `claude/arena-r22-w03` に push されます。
+手順は skill `worker-job`（本線の .claude/skills/worker-job/SKILL.md・…）。仕様の正本は docs/n_loop_ops.md §7.42。
+コードは変更しない・PR は作らない・コミットにモデル名を入れない。質問で止まらず、迷った点は報告と RESULT.json の notes に書いて完走してください。**`~/worker_job.out` に ALL_DONE が出るまでターンを終えないでください**（目安 1.5 時間・9 分以内の待ちを繰り返す）。
+
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend && git fetch -q origin claude/cpu-spec-improvements-yw91jd && git show FETCH_HEAD:opcg_sim/loop/worker_job.py > ~/worker_job.py
+nohup python ~/worker_job.py --job arena_r22 --k 3 > ~/worker_job.out 2>&1 &
+````
+
+**実行役がすること**（`worker_job.py`・標準ライブラリだけ＝本線から取り出した 1 ファイルで動く）: 出どころの照合 → 結果ブランチ（**origin に在ればその先端から再開**・無ければ `base` から。手元にだけ在る途中結果は退避して戻す）→ `require` → numpy／maturin → wheel（`rust/` の木が前回と同じなら飛ばす）→ 効果 JSON → ネット・教材の取得 → 本体（区切りごとに `RESULT.json`〔今までの指示書と同じ形＋`worker` 欄＝ジョブ定義・k・コミット〕を書いて commit・push）→ `status: "done"` で最後の push → `ALL_DONE`。push の失敗は `PUSH_FAILED（n 回目）` を出して 2・4・8・16 秒待って 4 回までやり直し、最後まで通らなければ `PUSH_FAILED（最後の …）` で終わる（ALL_DONE を出さない・次の保存でまとめて押す）。エラーは `WORKER_JOB_ERROR` を出し、`status: "error"`・notes にエラーを書いて push を試みる。
+**範囲の外**: 再分析（§7.35 の `reanalyze.py`）・照合や調査のような読んで考える作業は、今までどおり手書きの指示書（必要になったら `kind` を足す）。
