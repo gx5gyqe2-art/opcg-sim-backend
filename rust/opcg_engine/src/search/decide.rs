@@ -1909,7 +1909,14 @@ fn decide_after_lethal(
     }
 
     // ③ 窓の根畳み（戦闘窓／対話箱が有効なら効果対話窓）
-    if in_battle(&real) || (opts.box_dialog && in_dialog(&mut real)) {
+    // 安全側の守り（WP `rs-overflow-trigger`・§7.44 の (A)）: メインの判断点（`MAIN_ACTION`）は戦闘が
+    // 残っていても窓の道に入らない＝木が合法手（原始手・箱）から選ぶ。窓は原始手を返す前提なので、
+    // ここへ入るとメインの箱（`DON_BOX`）をそのまま返して適用で落ちる（規則の欠陥で戦闘が残った局）。
+    let main_point = matches!(
+        crate::rules::pending::pending_actor_action(&mut real),
+        Some((_, "MAIN_ACTION"))
+    );
+    if (in_battle(&real) && !main_point) || (opts.box_dialog && in_dialog(&mut real)) {
         if let Some(pick) = window_choice(ctx, state, name, opts, rng, st)? {
             // §7.42 の 1: 窓の続きは効果の対話の段・戦闘の応手の段だけ＝既定は積まない（次の判断点で読み直す）。
             if opts.box_commit && opts.window_carry_legacy {
@@ -2173,6 +2180,10 @@ mod tests_commit_hidden;
 #[cfg(test)]
 #[path = "tests_window_read.rs"]
 mod tests_window_read;
+
+#[cfg(test)]
+#[path = "tests_overflow_trigger.rs"]
+mod tests_overflow_trigger;
 
 #[cfg(test)]
 pub(super) mod tests {
@@ -2627,7 +2638,9 @@ pub(super) mod tests {
     fn pv_is_empty_when_kind_is_window() {
         use crate::model::ActiveBattle;
         use crate::testkit::{BoardBuilder, M_CHAR};
-        let mut b = BoardBuilder::new();
+        // カウンターの段（2026-10-24 まではフェイズ MAIN のまま戦闘を置いていた＝規則の欠陥で戦闘が残った
+        // 盤面と同じ形。今は MAIN の判断点で窓の道に入らない〔§7.44 の (A)〕ので段を明示する）。
+        let mut b = BoardBuilder::new().phase(crate::model::Phase::BattleCounter);
         let atk = b.put_field(Seat::P1, M_CHAR);
         let (masters, mut state) = b.build();
         let target = state.player(Seat::P2).leader.expect("p2 leader");

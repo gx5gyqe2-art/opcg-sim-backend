@@ -1,0 +1,1000 @@
+{
+ "counts": {
+  "head_vs_old": 50,
+  "A": 0,
+  "B": 15,
+  "new_vs_committed": 0
+ },
+ "rows": [
+  {
+   "seed": 5000150,
+   "head_vs_old": 14,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000151,
+   "head_vs_old": 0,
+   "A": null,
+   "B": 102,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000152,
+   "head_vs_old": 3,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000153,
+   "head_vs_old": 0,
+   "A": null,
+   "B": 80,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000154,
+   "head_vs_old": 9,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000155,
+   "head_vs_old": 14,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000156,
+   "head_vs_old": 0,
+   "A": null,
+   "B": 30,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000157,
+   "head_vs_old": 8,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000158,
+   "head_vs_old": 5,
+   "A": null,
+   "B": 54,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000159,
+   "head_vs_old": 4,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000160,
+   "head_vs_old": 5,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000161,
+   "head_vs_old": 0,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000162,
+   "head_vs_old": 8,
+   "A": null,
+   "B": 41,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000163,
+   "head_vs_old": 0,
+   "A": null,
+   "B": 58,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000164,
+   "head_vs_old": 6,
+   "A": null,
+   "B": 53,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000165,
+   "head_vs_old": 3,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000166,
+   "head_vs_old": 9,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000167,
+   "head_vs_old": 15,
+   "A": null,
+   "B": 78,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000168,
+   "head_vs_old": 19,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000169,
+   "head_vs_old": 5,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000170,
+   "head_vs_old": 7,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000171,
+   "head_vs_old": 0,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000172,
+   "head_vs_old": 0,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000173,
+   "head_vs_old": 0,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000174,
+   "head_vs_old": 1,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000175,
+   "head_vs_old": 0,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000176,
+   "head_vs_old": 0,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000177,
+   "head_vs_old": 0,
+   "A": null,
+   "B": 62,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000178,
+   "head_vs_old": 1,
+   "A": null,
+   "B": 48,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000179,
+   "head_vs_old": 5,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000180,
+   "head_vs_old": 1,
+   "A": null,
+   "B": 98,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000181,
+   "head_vs_old": 8,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000182,
+   "head_vs_old": 1,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000183,
+   "head_vs_old": 3,
+   "A": null,
+   "B": 42,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000184,
+   "head_vs_old": 9,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000185,
+   "head_vs_old": 2,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000186,
+   "head_vs_old": 0,
+   "A": null,
+   "B": 22,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000187,
+   "head_vs_old": 0,
+   "A": null,
+   "B": 29,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000188,
+   "head_vs_old": 0,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000189,
+   "head_vs_old": 0,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000190,
+   "head_vs_old": 8,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000191,
+   "head_vs_old": 1,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000192,
+   "head_vs_old": 1,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000193,
+   "head_vs_old": 1,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000194,
+   "head_vs_old": 5,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000195,
+   "head_vs_old": 1,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000196,
+   "head_vs_old": 5,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000197,
+   "head_vs_old": 12,
+   "A": null,
+   "B": 52,
+   "new_vs_committed": null,
+   "B_at": {
+    "act": "CONFIRM_TRIGGER",
+    "kind": "window",
+    "legacy": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    "new": {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   },
+   "winner": {
+    "old": "p1",
+    "A": "p1",
+    "AB": "p1"
+   }
+  },
+  {
+   "seed": 5000198,
+   "head_vs_old": 0,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  },
+  {
+   "seed": 5000199,
+   "head_vs_old": 11,
+   "A": null,
+   "B": null,
+   "new_vs_committed": null,
+   "winner": {
+    "old": "p2",
+    "A": "p2",
+    "AB": "p2"
+   }
+  }
+ ]
+}

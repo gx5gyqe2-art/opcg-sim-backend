@@ -107,6 +107,13 @@ Rust の `Game.decide` が行う＝**物差しは 1 本**。CPU（AI）対戦の
     同じく親の効果の後に解決する（§3.5・WP `rs-trigger-order-2`）。
   - 押し出しの後に待ち行列で解決する誘発が複数あるときは、手番のプレイヤーの効果から解決し、同じプレイヤーの効果が 2 つ以上なら
     本人が順を選ぶ（§3.5・WP `rs-trigger-simul`）。
+  - 押し出しを選んだ後は、他の中断と同じ共通の後処理（Rust `effects/interact.rs::after_resolve`）を通る（2026-10-24・WP `rs-overflow-trigger`・
+    `search_efficiency_plan.md` §7.44 の (A)）。【アタック時】の効果の登場（例: OP08-007 チョッパー・ゲッコー・モリアのトラッシュからの登場）で
+    押し出しになったときは、残りの戦闘の誘発を解決してから**ブロック／カウンターの段へ進む**。ターン開始の誘発の中の押し出しの後も
+    リフレッシュ以降を再開する。2026-10-24 までは押し出しの後が誘発の消化だけで、フェイズが MAIN に戻ったまま攻撃が残り
+    （戦闘が解決されない）、CPU は窓の道でメインの箱の手を返して局が落ちた（reaudit-wr の決着せず 2 局・`docs/reports/2026-10-24_reaudit_wr.md` §4.1）。
+    安全側の守りとして、decide は**メインの判断点（`MAIN_ACTION`）では戦闘が残っていても窓の道に入らない**（木が合法手から選ぶ）。
+    どちらも正しさの修正で旗は無い。
 
 ---
 
@@ -1324,6 +1331,16 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
 アリーナは `--cand-window-{carry,worlds,tree}-legacy`（候補席）・`arena_shard --window-{carry,worlds,tree}-legacy`（基準席）・
 `--cand-window-worlds`。器は `defense_audit.py`／`commit_audit.py`／`rs_decide_latency.py` の `--window-legacy`（3 つまとめて）と
 `blunder_audit.py winstab --opts`。
+
+**トリガーの発動確認は「発動する／しない」の 2 手**（2026-10-24・WP `rs-overflow-trigger`・`search_efficiency_plan.md` §7.44 の (B)・
+旗 `confirm_trigger_legacy`・測定専用・既定 false）: ライフの【トリガー】と任意の誘発の発動確認（`CONFIRM_TRIGGER`・`can_skip`）は、
+任意の確認（`CONFIRM_OPTIONAL`）と同じく探索の候補（`search/adapter.rs::selection_moves_with`）で `accepted: true／false` の 2 手に割り、
+窓の根畳みで比べる（断ればトリガーは待ち行列から外れ、ライフの札は手札に残る）。2026-10-24 までは「発動する」1 手だけで、CPU は
+トリガーを必ず発動していた（守りの監査の見逃しの型 (vii)・自分のライフ 0 で「発動すると札がトラッシュへ行き、手札に残せばカウンターで
+守れた」形）。既定解決（`default_interaction_payload`・golden の監査）・合法手の列挙（`Game.legal_json`）は変えない。木の中の自分側の
+対話のドレイン（`apply::drain_own_interactions`）と符号化の登場時スキャンは今までどおり発動確認を既定（発動する）で通す
+（木の中の戦闘は箱で既定解決＝発動確認の分岐が効くのは根の判断点）。アリーナは `--cand-confirm-trigger-legacy`（候補席）・
+`arena_shard --confirm-trigger-legacy`（基準席）、器は `defense_audit.py`／`rs_decide_latency.py` の `--confirm-trigger-legacy`。
 
 ---
 

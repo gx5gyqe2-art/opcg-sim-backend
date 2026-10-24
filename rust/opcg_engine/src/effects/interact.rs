@@ -952,8 +952,11 @@ fn resolve_field_overflow(
     }
     // 押し出しで中断した効果の残り（例: 「その後、このターン中、キャラカードを登場できない」）を
     // 先に解決し切り、それから超過対話の背後に積まれた誘発（効果登場の【登場時】等）を消化する。
-    super::triggers::settle_pending(s, masters)?;
-    Ok(())
+    // 他の中断と同じ共通末尾を通す（WP `rs-overflow-trigger`・§7.44 の (A)）: 【アタック時】の効果の
+    // 登場で押し出しになったとき、戦闘の誘発の再開とブロック／カウンターの段への遷移はここでしか
+    // 起きない（2026-10-24 までは `settle_pending` だけで、フェイズが MAIN に戻り攻撃が残っていた）。
+    // ターン開始の誘発の中の押し出しの後のリフレッシュ以降の再開も同じ。
+    after_resolve(s, masters)
 }
 
 /// 能力表の global index → そのカード内の index（`ability_used_this_turn` のキー）。

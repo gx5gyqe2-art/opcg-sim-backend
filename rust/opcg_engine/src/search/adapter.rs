@@ -55,7 +55,7 @@ pub fn legal_actions(
             // 触るのは冪等な戦闘フェイズの正規化だけ＝2 回目は 1 回目と同じ値を返す。間の列挙は盤面を読むだけ）。
             let pending = get_pending_request(s, masters, false);
             let base = crate::rules::legal::get_legal_moves_for(s, masters, seat, pending.as_ref())?;
-            merged_search_actions_with(s, masters, seat, base, pending, true)
+            merged_search_actions_with(s, masters, seat, base, pending, true, !opts.confirm_trigger_legacy)
         }
     };
 
@@ -125,7 +125,7 @@ pub fn merged_search_actions(
     base_moves: Vec<Move>,
 ) -> Vec<Move> {
     let pending = get_pending_request(s, masters, false);
-    merged_search_actions_with(s, masters, seat, base_moves, pending, false)
+    merged_search_actions_with(s, masters, seat, base_moves, pending, false, true)
 }
 
 /// [`merged_search_actions`] の、要求を外から渡す版。`base_is_listing=true` は `base_moves` が
@@ -138,6 +138,7 @@ fn merged_search_actions_with(
     base_moves: Vec<Move>,
     pending: Option<Value>,
     base_is_listing: bool,
+    confirm_trigger: bool,
 ) -> Vec<Move> {
     let alts = {
         let dialog_payload = match base_moves.as_slice() {
@@ -146,7 +147,7 @@ fn merged_search_actions_with(
             }
             _ => None,
         };
-        selection_moves_with(s, masters, seat, pending.as_ref(), dialog_payload.as_deref())
+        selection_moves_with(s, masters, seat, pending.as_ref(), dialog_payload.as_deref(), confirm_trigger)
     };
     let Some(alts) = alts else {
         return base_moves;
@@ -281,7 +282,7 @@ fn selectable_uuids(pending: &Value) -> Vec<String> {
 /// 無ければ `None`（＝`merged_search_actions` は `base_moves` をそのまま返す）。
 pub fn selection_moves(s: &mut Session, masters: &MasterTable, seat: Seat) -> Option<Vec<Move>> {
     let pending = get_pending_request(s, masters, false);
-    selection_moves_with(s, masters, seat, pending.as_ref(), None)
+    selection_moves_with(s, masters, seat, pending.as_ref(), None, true)
 }
 
 /// [`selection_moves`] の、要求（`get_pending_request(s, masters, false)` の値）と、分かっていれば
@@ -292,6 +293,7 @@ pub(crate) fn selection_moves_with(
     seat: Seat,
     pending: Option<&Value>,
     base_payload: Option<&Value>,
+    confirm_trigger: bool,
 ) -> Option<Vec<Move>> {
     let pending = pending?;
     if request_actor(pending) != Some(seat) {
@@ -309,7 +311,9 @@ pub(crate) fn selection_moves_with(
     };
 
     // 任意確認（任意コスト／任意効果の発動可否）: accept / decline を採点させる。
-    if action == "CONFIRM_OPTIONAL"
+    // トリガーの発動確認（ライフの【トリガー】・任意の誘発）も同じ 2 手に割る（§7.44 の (B)・
+    // `confirm_trigger=false`＝旧い形〔`confirm_trigger_legacy`・測定専用〕は既定の「発動する」1 手だけ）。
+    if (action == "CONFIRM_OPTIONAL" || (confirm_trigger && action == "CONFIRM_TRIGGER"))
         && pending.get("can_skip").and_then(Value::as_bool).unwrap_or(false)
     {
         return Some(vec![
