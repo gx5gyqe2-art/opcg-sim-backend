@@ -1,0 +1,102 @@
+{
+ "kind": "audit",
+ "section": "§7.45",
+ "ledger_grep": "7.45 WP `worker-audit`",
+ "about": "試し: 守りの監査 2 本 × 4 局（§7.24 の帯の頭 8 局・2 分ごとに途中も保存）",
+ "job": "trial-audit-w{KK}",
+ "branch": "claude/worker-job-trial-audit-w{KK}",
+ "base": {
+  "branch": "claude/worker-audit"
+ },
+ "shards": 2,
+ "hours": 0.4,
+ "tool": "tests/scripts/defense_audit.py",
+ "seed_base": "3013000 + (k - 1)*4",
+ "games": 4,
+ "out_dir": "n1_results/trial_audit/w{KK}",
+ "push_every_min": 2,
+ "args": [
+  "--workers",
+  "2",
+  "--sims",
+  "1280",
+  "--worlds",
+  "1",
+  "--budget",
+  "0"
+ ],
+ "steps": [
+  {
+   "name": "run",
+   "args": [
+    "run",
+    "--seed-base",
+    "{SEED}",
+    "--games",
+    "{GAMES}",
+    "--out",
+    "{OUT}"
+   ],
+   "with_args": true
+  },
+  {
+   "name": "verify",
+   "args": [
+    "verify",
+    "--seed-base",
+    "{SEED}",
+    "--games",
+    "{GAMES}",
+    "--out",
+    "{OUT}"
+   ],
+   "with_args": true
+  },
+  {
+   "name": "summarize",
+   "args": [
+    "summarize",
+    "--seed-base",
+    "{SEED}",
+    "--games",
+    "{GAMES}",
+    "--out",
+    "{OUT}"
+   ]
+  }
+ ],
+ "games_file": {
+  "file": "points_{SEED}_{GAMES}.jsonl",
+  "seed_key": "game.seed",
+  "void_key": "game.void"
+ },
+ "points_file": {
+  "file": "points_{SEED}_{GAMES}.jsonl",
+  "skip_key": "game"
+ },
+ "merge": {
+  "games_file": "points_{SEED}_{GAMES}.jsonl",
+  "concat": {
+   "points_{SEED}_{GAMES}.jsonl": "points_merged.jsonl",
+   "verify.jsonl": "verify.jsonl"
+  },
+  "summary": [
+   "summarize",
+   "--points",
+   "{OUT}/points_merged.jsonl",
+   "--out",
+   "{OUT}"
+  ],
+  "summary_file": "summary.json"
+ },
+ "require": [
+  {
+   "file": "tests/scripts/defense_audit.py",
+   "grep": "def cmd_summarize"
+  }
+ ],
+ "inputs": {
+  "setting": "§7.24: 両席 r13d・世界 1 本 × 1,280 回・予算なし・証明 off・random × synth_roles"
+ },
+ "commit_message": "trial defense audit shard {KK}"
+}
