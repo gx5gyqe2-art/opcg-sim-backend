@@ -5,3 +5,6 @@ OPCG_LOG_SILENT=1 python -m opcg_sim.loop.arena_shard \
   --leaders random --decks synth --seed-base 0 \
   --out /tmp/audit_cross_0.jsonl
 消化済み 0/120 ペア・残り 120
+今回 120 ペア（74s）・累計 120/120
+ARENA_RESUME_FINAL {"pairs": 120, "games": 240, "void": 0, "wins": 120.0, "wr": 0.5, "ci95": [0.5, 0.5], "elo": -0.0, "promoted": false, "candidate": ""}
+AUDIT_CROSS_EXIT=0

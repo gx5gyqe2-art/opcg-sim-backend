@@ -178,6 +178,6 @@
 
 ## 8. 品質ゲート
 
-- `make test` green（cargo 625 passed・pytest 874 passed／13 skipped・`n1_results/window_tree_blocker/make_test.log`）。
+- `make test` green（cargo 625 passed・pytest 876 passed／13 skipped・本線〔58a0dd4〕を取り込んだ最終のツリー・`n1_results/window_tree_blocker/make_test.log`）。
 - `make audit-cross` void 0（120 ペア・`audit_cross.log`）。
 - `cargo clippy -D warnings` は触っていない既存のコード（`search/lethal.rs` の引数の数・`tests_lethal.rs` のループ）で落ちる（`make test` には入っていない）。
