@@ -14,5 +14,5 @@
   "arena_r22o/r22o_real_w07.jsonl": 175,
   "arena_r22o/r22o_synth2_w07.jsonl": 175
  },
- "notes": ""
+ "notes": "Base af3ceb301 (claude/cpu-spec-improvements-yw91jd). All 3 conditions 175/175 pairs, void 0. real: wr 0.5143 CI[0.4663,0.5622] elo +9.9; mirror: wr 0.4286 CI[0.3798,0.4773] elo -50.0; synth_roles2: wr 0.4229 CI[0.3813,0.4644] elo -54.0. Wall time much shorter than the brief's estimate (~25 min/run): 249s/110s/210s with --workers 4 on a 4-core container. Seeds start at 3367000/3387000/3407000 as specified; runs looked normal (turn counts 11-18), so cause of speed unknown—flagging for coordinator."
 }
