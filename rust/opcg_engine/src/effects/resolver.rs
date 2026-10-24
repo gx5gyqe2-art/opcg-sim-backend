@@ -100,6 +100,23 @@ pub fn cost_state_noop_on(
     }
 }
 
+/// 「コストN以上（以下）のこのキャラを…」（ref_id='self'）の修飾語: 発生源の**現在の**コストが
+/// 範囲内か（OP16-084 光月モモの助「コスト20以上のこのキャラをトラッシュに置く」）。
+///
+/// 支払い可否（`can_satisfy_node_on`）と実際の支払い（`resolve_targets`）で同じ規則を使う。
+/// 支払い側だけが見ていた（2026-10-24 まで）＝払えないコストの起動メインが合法手に出て、
+/// 打つと何も起きず同じ手番に繰り返された（WP `rs-unpayable-activate`）。
+pub fn self_ref_in_cost_range(
+    state: &crate::model::GameState,
+    masters: &MasterTable,
+    query: &TargetQuery,
+    card: CardIdx,
+) -> bool {
+    let c = state.card(card);
+    let cost = c.current_cost(masters.get(c.master));
+    query.cost_min.map_or(true, |m| cost >= m) && query.cost_max.map_or(true, |m| cost <= m)
+}
+
 /// Python `EffectResolver._turn_limit_of`: 条件木の `TURN_LIMIT` 制限値（AND/OR も探索）。
 pub fn turn_limit_of(cond: Option<&Condition>) -> Option<i32> {
     let cond = cond?;
@@ -478,12 +495,27 @@ impl Resolver {
                     };
                     return Ok(total >= cost);
                 }
+                // 「付与されているドン!!N枚をコストエリアに戻す」（ST28-004）: 付与中のドン!!が N 枚要る
+                // （`move_attached_don` と同じ数え方・0 は 1 枚）。足りないと払えない（WP `rs-unpayable-activate`）。
+                if a.ty == ActionType::MoveAttachedDon {
+                    let need = if a.value.base > 0 { a.value.base } else { 1 };
+                    return Ok(state.player(actor).don_attached.len() as i32 >= need);
+                }
+                // 「デッキの上からN枚をトラッシュに置く」（EB01-051 等）: デッキが N 枚要る（足りなければ払えない）。
+                if a.ty == ActionType::TrashFromDeck {
+                    let owner = if a.status.as_deref() == Some("OPPONENT") { actor.other() } else { actor };
+                    return Ok(state.player(owner).deck.len() as i32 >= a.value.base);
+                }
                 let Some(query) = a.target.as_ref() else {
                     return Ok(true);
                 };
                 // ref_id='self' は zone を見ずに source そのものへ解決する（充足判定も同じ規則）。
                 let mut candidates: Vec<super::TargetRef> = if query.ref_id.as_deref() == Some("self") {
-                    source_card.into_iter().map(super::TargetRef::Card).collect()
+                    source_card
+                        .into_iter()
+                        .filter(|c| self_ref_in_cost_range(state, masters, query, *c))
+                        .map(super::TargetRef::Card)
+                        .collect()
                 } else {
                     // §11.6/§11.8 #2: matcher はドン!!も返す。ここは充足判定（枚数だけが要る）
                     // なので、カードだけに効く絞り込み（cost_state_noop_on）はカードにだけ効かせ、
@@ -508,6 +540,21 @@ impl Resolver {
                 }
                 if !query.is_up_to && candidates.is_empty() {
                     return Ok(false);
+                }
+                // 「（相手の）キャラ1枚に（相手の）レストの／アクティブのドン!!N枚を付与する」（OP15-003／017／023・
+                // OP13-007）: 付与先だけでなく、付与するドン!!がプールに N 枚要る（WP `rs-unpayable-activate`）。
+                // プールは `actions::don::attach_don` と同じ（`OPP`＝相手・`RESTED`＝レストだけ）。本文に「アクティブの」と
+                // ある（status なし）ものはアクティブだけで数える（解決はレストへ落ちるが、コストとしては払えない）。
+                if a.ty == ActionType::AttachDon && !query.is_up_to {
+                    let st = a.status.as_deref().unwrap_or("");
+                    if !st.contains("MOVE") && !st.contains("OWNER") {
+                        let pool = state.player(if st.contains("OPP") { actor.other() } else { actor });
+                        let have = if st.contains("RESTED") { pool.don_rested.len() } else { pool.don_active.len() };
+                        let per = if a.value.base > 0 { a.value.base } else { 1 };
+                        if (have as i32) < per * required.max(1) {
+                            return Ok(false);
+                        }
+                    }
                 }
                 Ok(true)
             }
@@ -623,7 +670,23 @@ impl Resolver {
                         self.context.last_action_success = false;
                     }
                 }
-                EffectNode::Choice { .. } => {
+                EffectNode::Choice { options, .. } => {
+                    // コストの「A か B」（OP13-079・OP17-020 等・DB では全て 2 択）: 払える枝が 1 つだけなら、
+                    // それを選ぶ（払えない枝は選べない・WP `rs-unpayable-activate`）。能力の入口の支払い可否は
+                    // 「どれか 1 つを払える」なので、ここで 0 本になることは無い。
+                    if node_ref.is_cost_node() {
+                        let mut payable = Vec::new();
+                        for i in 0..options.len() {
+                            let child = node_ref.child(i as u16);
+                            if self.can_satisfy_node_on(s.state(), masters, actor, &options[i], &child, source_card)? {
+                                payable.push(child);
+                            }
+                        }
+                        if payable.len() == 1 && options.len() > 1 {
+                            self.execution_stack.push(payable.pop().expect("len 1"));
+                            continue;
+                        }
+                    }
                     super::interact::suspend_for_choice(
                         s,
                         masters,
@@ -1198,13 +1261,12 @@ impl Resolver {
         if let Some(ref_id) = query.ref_id.as_ref() {
             if ref_id == "self" {
                 // 「コストN以上のこのキャラを…」(OP16-084)の修飾語＝現在のコストが範囲外なら対象にならない。
-                let in_range = |c: CardIdx| {
-                    let card = s.state().card(c);
-                    let cost = card.current_cost(masters.get(card.master));
-                    query.cost_min.map_or(true, |m| cost >= m) && query.cost_max.map_or(true, |m| cost <= m)
-                };
                 return Ok(Some(
-                    source_card.into_iter().filter(|c| in_range(*c)).map(TargetRef::Card).collect(),
+                    source_card
+                        .into_iter()
+                        .filter(|c| self_ref_in_cost_range(s.state(), masters, query, *c))
+                        .map(TargetRef::Card)
+                        .collect(),
                 ));
             }
             // 「a+b」＝保存済みの複数の選択をまとめた参照（重複は 1 枚にする）。
