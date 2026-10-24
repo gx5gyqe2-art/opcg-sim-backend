@@ -1,12 +1,12 @@
 ---
 name: worker-job
-description: コーディネータから「ジョブ <名前> の番号 k を回して」と頼まれた作業セッション（アリーナのシャード・教材の生成のシャード・訓練＋評価帯）が使う。実行役 opcg_sim/loop/worker_job.py を nohup で回し、ALL_DONE まで 9 分以内の待ちを繰り返して見張り、結果ブランチへの push と RESULT.json までを確かめる。コードは変えない。
+description: コーディネータから「ジョブ <名前> の番号 k を回して」と頼まれた作業セッション（アリーナのシャード・教材の生成のシャード・訓練＋評価帯・監査のシャード）が使う。実行役 opcg_sim/loop/worker_job.py を nohup で回し、ALL_DONE まで 9 分以内の待ちを繰り返して見張り、結果ブランチへの push と RESULT.json までを確かめる。コードは変えない。
 ---
 
 # 定型の作業を回す（worker-job）
 
 やることは**ジョブ定義（`opcg_sim/loop/jobs/<名前>.json`）と番号 k を実行役に渡して、終わるまで見張る**だけ。
-seed・ブランチ名・コマンドの引数は全部ジョブ定義と実行役が決める（正本 `docs/n_loop_ops.md` §7.42）。
+seed・ブランチ名・コマンドの引数は全部ジョブ定義と実行役が決める（正本 `docs/n_loop_ops.md` §7.42・監査は §7.45）。
 **自分でコマンドを組み立てたり、引数を書き換えたりしない。**
 
 ## 決まり
@@ -37,7 +37,11 @@ seed・ブランチ名・コマンドの引数は全部ジョブ定義と実行�
    ```
 
    生きているかは `ps -eo pid,etime,cmd | grep "[w]orker_job.py"`。本体のログは `~/<ジョブ名>.log`（アリーナ）・`~/n51_w<K>.log`（生成）・
-   `~/train_*.log`（訓練）など、`~/worker_job.out` の `$ …` の行に書いてある。区切りごとに `保存 partial: push 済み` が出る。
+   `~/train_*.log`（訓練）・`~/audit-*.log`（監査）など、`~/worker_job.out` の `$ …` の行に書いてある。区切りごとに `保存 partial: push 済み` が出る。
+   **監査**（ジョブの名前が `audit_*`）も回し方は同じ。道具（`defense_audit.py`／`blunder_audit.py`）のサブコマンドを
+   定義の順に回し（`run` → `verify` → `summarize` など）、1 つの段が長いので**段の途中でも定義の間隔（既定 20 分）ごとに
+   `保存 partial` が出る**。済んだ段は `n1_results/<…>/worker_steps.json` に書かれ、再開すると飛ばす（`run`／`play` の途中なら
+   道具が終えた局を飛ばして続きから）。シャードの要約（`summary.json`）はそのシャードの分だけ＝全体の集計はコーディネータがつなぐ。
 
 3. 完了: `ALL_DONE` が出たら `git -C ~/opcg-sim-backend log -1 --stat | head` と `RESULT.json` の `status`（`done`）を確かめ、
    結果ブランチ名と RESULT.json の metrics を 3 行ほどで報告してターンを終える。
