@@ -94,9 +94,31 @@ def judge_point(job):
     return r
 
 
+def recheck_point(job):
+    """損の候補を独立の配り方（seed のずらしを替えた）K 局で打ち直す（`blunder_audit` の recheck と同じ考え）。"""
+    r, g, K = job
+    BA = _G["BA"]
+    game = BA.replay(g, r["step"])
+    me, seed, turn = r["seat"], r["seed"], r["turn"]
+    h = json.loads(game.hidden_json())
+    hand = {c["uuid"]: c["card_id"] for c in h["players"][me]["hand"]}
+    out = json.loads(game.fork().decide(me, BA._G["ship"].decide_opts(seed, turn, me, None)))
+    legal = out["stats"]["legal"]
+    cards = lambda mv: sorted(hand.get(u) for u in (mv.get("payload") or {}).get("selected_uuids") or [])
+    a = out["move"]
+    b = next(m for m in legal if cards(m) == sorted(r["b"]))
+    wa, wb = [], []
+    for i in range(K):
+        ws = BA.MJ.world_seed(seed, r["step"], i + 1000) ^ 0x5B5B
+        ra, _ = BA.rollout_ship(game, me, a, ws, BA._G["refs"]["r13d"], BA._G["ship"])
+        rb, _ = BA.rollout_ship(game, me, b, ws, BA._G["refs"]["r13d"], BA._G["ship"])
+        wa.append(ra); wb.append(rb)
+    return {"seed": seed, "step": r["step"], "recheck": BA.MJ.paired(wa, wb)}
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=("scan", "judge"))
+    ap.add_argument("cmd", choices=("scan", "judge", "recheck"))
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--n", type=int, default=80)
     ap.add_argument("--k", type=int, default=16)
@@ -111,6 +133,16 @@ def main():
                 for r in rows:
                     f.write(json.dumps(r, ensure_ascii=False) + "\n")
         print("SCAN_DONE", flush=True)
+        return
+    if a.cmd == "recheck":
+        J = [json.loads(l) for l in open(f"{OUT}/hand_judge.jsonl")]
+        cand = [r for r in J if r.get("judge") and r["judge"]["diff"] is not None
+                and abs(r["judge"]["diff"]) >= 0.2 and (r["judge"]["ci"][0] > 0 or r["judge"]["ci"][1] < 0)]
+        with ctx.Pool(a.workers, initializer=_init) as pool, open(f"{OUT}/hand_recheck.jsonl", "w") as f:
+            for r in pool.imap_unordered(recheck_point, [(r, byseed[r["seed"]], a.k) for r in cand]):
+                f.write(json.dumps(r) + "\n"); f.flush()
+                print(r, flush=True)
+        print("RECHECK_DONE", flush=True)
         return
     pts = [json.loads(l) for l in open(f"{OUT}/hand_points.jsonl")]
     rng = random.Random(20261024)
