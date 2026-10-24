@@ -14,5 +14,5 @@
   "arena_r22o/r22o_real_w16.jsonl": 175,
   "arena_r22o/r22o_synth2_w16.jsonl": 175
  },
- "notes": ""
+ "notes": "base 6fb845d4e (origin/claude/cpu-spec-improvements-yw91jd). All 3 bands 175/175 pairs, void 0. Shard finals: real wr 0.5343 ci[0.4965,0.572] elo +23.9; mirror wr 0.46 ci[0.4083,0.5117] elo -27.9; synth_roles2 wr 0.4971 ci[0.4526,0.5417] elo -2.0. Wall time was much shorter than the brief's ~25 min/band: real 261s, mirror 121s, synth2 191s (4 workers, 4 cores). Not investigated; coordinator may want to confirm the window-read fix is active on this base."
 }
