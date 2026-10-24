@@ -21,7 +21,7 @@ JOBS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jobs")
 MODEL = "claude-sonnet-5-5"     # 定型の作業セッションは Sonnet（CLAUDE.md・ユーザ決定 2026-10-24）
 
 PROMPT = """定型の作業を 1 本回してください: ジョブ `{name}` の番号 k={k}（{section}・{about}）。結果は `{branch}` に push されます。
-手順は skill `worker-job`（本線の .claude/skills/worker-job/SKILL.md・読めなければ `git -C ~/opcg-sim-backend show origin/{source}:.claude/skills/worker-job/SKILL.md`）。仕様の正本は docs/n_loop_ops.md §7.42。
+手順は skill `worker-job`（本線の .claude/skills/worker-job/SKILL.md・読めなければ `git -C ~/opcg-sim-backend show origin/{source}:.claude/skills/worker-job/SKILL.md`）。仕様の正本は docs/n_loop_ops.md {spec_sec}。
 コードは変更しない・PR は作らない・コミットにモデル名を入れない。質問で止まらず、迷った点は報告と RESULT.json の notes に書いて完走してください。**`~/worker_job.out` に ALL_DONE が出るまでターンを終えないでください**（目安 {hours} 時間・9 分以内の待ちを繰り返す）。
 
 cd ~ && ([ -d opcg-sim-backend ] || git clone -q {url}) && cd ~/opcg-sim-backend && git fetch -q origin {source} && git show FETCH_HEAD:opcg_sim/loop/worker_job.py > ~/worker_job.py
@@ -51,7 +51,8 @@ def sessions(name, ks, source=W.MAIN, spec=None):
         P = W.build_plan(spec, k, home="~", repo="~/opcg-sim-backend")
         extra = "" if source == W.MAIN else f" --source {source}"
         prompt = PROMPT.format(name=name, k=k, section=spec.get("section", "§7.42"), about=spec.get("about", P.job),
-                               branch=P.branch, source=source, url=W.REPO_URL, hours=spec.get("hours", "?"), extra=extra)
+                               branch=P.branch, source=source, url=W.REPO_URL, hours=spec.get("hours", "?"), extra=extra,
+                               spec_sec="§7.42（監査は §7.45）" if P.kind == "audit" else "§7.42")
         out.append({"title": f"{P.job}（{spec.get('section', '§7.42')}）", "branch": P.branch, "model": MODEL, "prompt": prompt})
     return out
 

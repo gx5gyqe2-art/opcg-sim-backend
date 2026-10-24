@@ -94,3 +94,16 @@ def test_gen_branch_and_seed_range():
     assert _plan("gen_n51", 7).branch == "claude/n51-w07"
     with pytest.raises(SystemExit):
         _plan("gen_n51", 33)
+
+
+@pytest.mark.parametrize("k", [1, 4])
+def test_audit_defense_matches_724(k):
+    """守りの監査（§7.24 の設定・seed 3013000〜3013299 を 4 × 75）: 道具の引数は定義のまま・seed の範囲は番号から。"""
+    P = _plan("audit_defense", k)
+    S, out = 3013000 + (k - 1) * 75, f"n1_results/audit_defense/w{k:02d}"
+    rng = f"--seed-base {S} --games 75 --out {out}"
+    flags = "--workers 4 --sims 1280 --worlds 1 --budget 0"
+    tool = "python tests/scripts/defense_audit.py"
+    assert W.run_commands(P) == [f"{tool} run {rng} {flags}".split(), f"{tool} verify {rng} {flags}".split(),
+                                 f"{tool} summarize {rng}".split()]
+    assert P.branch == f"claude/audit-defense-w{k:02d}"

@@ -192,7 +192,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **r20／r20s vs r13d（教材のデッキの切り分け・公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.34）** | 主 real 3101000〜3116000／副 ミラー 3121000〜3136000／参考 synth_roles2 3141000〜3156000（r20 と r20s で共有） | 使用済み（2026-10-22・r20 主 −1.7／副 +2.9／参考 −39.0・r20s 主 +3.6／副 +13.3／参考 −6.1・void 0〜1） |
 | 検証 **WP `rs-commit-hidden` の本番アリーナ**（修正後 vs `--commit-hidden-legacy`・出荷の設定・random × real・16 シャード × 150 ペア・§7.39） | 3271000〜3286149 | 使用済み（2026-10-23・2,397 ペア 0.5023 [0.4981, 0.5064] +1.6・void 3・採用） |
 | 検証 **WP `rs-window-tree-blocker` の本番アリーナ**（修正後 vs カウンターの窓にも木・出荷の設定・random × real・32 シャード × 84 ペア・search_efficiency_plan §7.45） | 3511000〜3542083 | 払い出し済み（取り込みの後） |
-| 生成 **波 52**（生成役 r22・直したエンジン〔rs-overflow-trigger の後〕・`--decks real`・32 シャード × 480 局・§7.44 of n_loop_ops） | 2571000〜2586500（シャード k の base は 2570000 + ceil(k/2)×1000 + (k 偶数なら 500)・k＝1〜32） | 指示済み（2026-10-24・claude/n52-w01〜32・ジョブ `gen_n52`・Sonnet） |
+| 生成 **波 52**（生成役 r22・直したエンジン〔rs-overflow-trigger の後〕・`--decks real`・32 シャード × 480 局・§7.44 of n_loop_ops） | 2571000〜2586500（シャード k の base は 2570000 + ceil(k/2)×1000 + (k 偶数なら 500)・k＝1〜32） | 使用済み（2026-10-24・15,360 局・2,529,298 行・dropped 26・decks real・生成役 r22） |
 | 監査 **WP `rs-overflow-trigger` の決着せずの確かめ**（生成と同じ設定・生成役 r22・400 局・search_efficiency_plan §7.44） | 3461000〜3461399 | 指示済み（2026-10-24・claude/rs-overflow-trigger） |
 | 検証 **WP `rs-overflow-trigger` の本番アリーナ**（修正後 vs トリガーの旧い候補・出荷の設定・random × real・32 シャード × 84 ペア） | 3471000〜3502083 | 払い出し済み（取り込みの後） |
 | 検証 **r22 vs r13d・本番の設定**（両席 1,280 回・世界 2 本・枝予算なし・証明 root・random × real・32 シャード × 84 ペア・§7.43） | 3421000〜3452083（シャード k の base は 3421000 + (k−1)×1000） | 使用済み（2026-10-24・2,684 ペア 0.5626 [0.5517, 0.5734] +43.7・void 4・出荷の基準を満たす） |
@@ -4153,6 +4153,9 @@ echo ALL_DONE
    - `arena`: `pairs`・`chunk_pairs`（1 回の `--max-pairs`・回の数は `ceil(pairs/chunk_pairs)`・回ごとに push）・`bands`・`workers`・`args`（両席の設定と測定用の旗＝`--sims 1280 --worlds 2 --budget 0 --cand-sims …` など・`--candidate --baseline` の直後に入る）・`arms`（任意・`[{"name", "args"}]`＝同じ seed で腕を替える §7.31 の形・`out` に `{ARM}`）・`tail_args`（`--pair-timeout 3600` など・`--out` の直前）・`conditions`（`[{"name", "seed_base", "args", "out"}]`・`args` は `--leaders --decks`）・`out_dir`。並びは「回 → 条件 → 腕」で、条件ごとに push。台帳がもう `pairs` に届いていれば飛ばす（arena_shard 自身も終えたペアを飛ばす）。
    - `gen`: `net`・`seed_base`（式）・`games`（1 区切りの局数・区切り J の seed は `seed_base + games×J`）・`parts`・`workers`・`args`（`record_gen` の残りの引数）・`out_dir`／`part_dir`（`{J}` を使う）・`log`・`copy_logs`（リポジトリに写して一緒に push）。区切りは `meta_n_record.json` が在れば飛ばす。
    - `train`: `waves`（`[{"branch"（`{ww}`＝取ってくる番号 2 桁）, "shards", "dest", "glob", "expect"}]`＝取ってきて個数を確かめる・足りていれば取らない）・`common_args`・`runs`（`[{"name", "in", "z_in", "args", "out", "log"}]`・順に回す＝同時に回さない）・`bands`（`[{"in", "nrel", "args", "out", "log"}]`）・`results_dir`（npz と各周の npz を置く・在れば飛ばす）・`torch_env`。
+   - `audit`（§7.45）: `tool`（`tests/scripts/defense_audit.py`／`tests/scripts/blunder_audit.py`）・`seed_base`（式・名前 `SEED`）・`games`（式・`GAMES`）・`out_dir`（`OUT`・シャードごとに別の置き場）・`args`（道具の引数の共通部分＝測定用の旗など・`with_args: true` の段の後ろに付く）・`steps`（`[{"name", "args", "with_args"}]`＝サブコマンドの並び・`args` は道具にそのまま渡す〔`{SEED}`・`{GAMES}`・`{OUT}` を埋めるだけ〕）・`fetch`（任意・`{"リポジトリの中のパス": "ブランチ:パス"}`＝道具がリポジトリの中のパスで読むもの・例 `vm_nets/nrel_r20.npz`・結果ブランチには入れない）・`push_every_min`（段の途中も保存する間隔・既定 20）・`games_file`（`{"file", "seed_key", "void_key"}`＝局の記録・RESULT.json の局の数と決着せず）・`points_file`（`{"file", "skip_key"}`＝点の数）・`merge`（つなぎ方・下）。済んだ段は `{OUT}/worker_steps.json`（段の名前 → 所要の秒）に書き、在れば飛ばす。段の途中で止まったら同じ段をもう一度回す（`run`／`play` は道具自身が終えた局を飛ばす・`verify` などは頭から）。始める前に `{OUT}/*.jsonl` の最後の途中で切れた行を落とす。
+     - **つなぎと集計**（コーディネータ側）: `python -m opcg_sim.loop.worker_audit_merge --job <名前>`。定義の `merge`（`games_file`・`concat`〔シャードのファイル名 → つないだファイル名〕・`summary`〔道具の集計の引数・`{OUT}`＝つないだ置き場〕）に従い、各結果ブランチから取って番号の順につなぎ、道具の集計をかける（既定の置き場 `n1_results/<名前>_merged/`・`merge.json` に各シャードのコミット）。**seed の重なり**（範囲どうし・局の記録が 2 本に在る・範囲の外）と**欠けたシャード**（ブランチが無い・RESULT.json が done でない・局が足りない）は止まる（欠けだけは `--allow-partial` で通す）。手元で回した置き場をつなぐなら `--local`。
+     - 例: `audit_defense.json`（§7.24 の設定・seed 3013000〜3013299 の 300 局を 4 × 75）・`audit_blunder.json`（§7.41 の手順・seed 3301000〜3301099 の 100 局を 4 × 25・審判 r20 を `fetch`）。試し: `trial_audit.json`・`trial_audit_blunder.json`。**seed は台帳の払い出しに合わせて写して直す**（例の seed は過去の監査の帯の写し）。
 2. **確かめる**: `python -m opcg_sim.loop.worker_job --job <名前> --k 1 --dry-run`（手書きの指示書と同じ形のコマンドの列が出る）。
 3. **指示文を出す**: `python -m opcg_sim.loop.worker_prompts --job <名前> --k 1-16 --json`（`create_session` にそのまま渡せる title・prompt・branch・model〔Sonnet〕の並び）。回収するブランチの一覧は `--branches`。例（`--job arena_r22 --k 3`）:
 
@@ -4166,7 +4169,7 @@ nohup python ~/worker_job.py --job arena_r22 --k 3 > ~/worker_job.out 2>&1 &
 ````
 
 **実行役がすること**（`worker_job.py`・標準ライブラリだけ＝本線から取り出した 1 ファイルで動く）: 出どころの照合 → 結果ブランチ（**origin に在ればその先端から再開**・無ければ `base` から。手元にだけ在る途中結果は退避して戻す）→ `require` → numpy／maturin → wheel（`rust/` の木が前回と同じなら飛ばす）→ 効果 JSON → ネット・教材の取得 → 本体（区切りごとに `RESULT.json`〔今までの指示書と同じ形＋`worker` 欄＝ジョブ定義・k・コミット〕を書いて commit・push）→ `status: "done"` で最後の push → `ALL_DONE`。push の失敗は `PUSH_FAILED（n 回目）` を出して 2・4・8・16 秒待って 4 回までやり直し、最後まで通らなければ `PUSH_FAILED（最後の …）` で終わる（ALL_DONE を出さない・次の保存でまとめて押す）。エラーは `WORKER_JOB_ERROR` を出し、`status: "error"`・notes にエラーを書いて push を試みる。
-**範囲の外**: 再分析（§7.35 の `reanalyze.py`）・照合や調査のような読んで考える作業は、今までどおり手書きの指示書（必要になったら `kind` を足す）。
+**範囲の外**: 再分析（§7.35 の `reanalyze.py`）・照合や調査のような読んで考える作業は、今までどおり手書きの指示書（必要になったら `kind` を足す）。監査（守りの見逃し・大きな損）は 2026-10-24 に `kind: "audit"` を足した（§7.45）＝**回すところまでは実行役**、点を 1 件ずつ読んで型に分けるのは今までどおり読んで考える作業。
 
 **試し（2026-10-24・`claude/worker-jobs` のコードで・使い捨てのブランチは残してある）**: 作業セッションと同じ 1 行（`git show … worker_job.py > ~/worker_job.py && python ~/worker_job.py --job <名前> --k 1 --source claude/worker-jobs`）で 4 本を最後まで回した。
 - `trial_gen` → `claude/worker-job-trial-gen-w01`: 2 局（1 局 × 2 区切り）・339 行・区切りごとに push・ALL_DONE。**同じ 1 行をもう一度回すと全部飛ばし、コミットを 1 つも足さない**（初めは RESULT.json の `commit` が保存のたびに変わり、済んだ区切りの保存が done → partial → done と揺れていた＝`code_commit`〔始めたときのコード〕に替え、全部飛ばした区切りは保存しないように直した）。
@@ -4205,4 +4208,22 @@ nohup python ~/worker_job.py --job arena_r22 --k 3 > ~/worker_job.out 2>&1 &
 - **訓練 r23（波 52 が揃った後・Sonnet）**: warm-start r22・π＝波 52・価値＝波 52＋51（今の生成役 r22 と 1 つ前の生成役 r13d・どちらも直したエンジン〔波 51 は場の上限・トリガーの修正の前〕・約 490 万行）。
 - **判定**: 公平同士・両席 160 回・基準 r22・主 random × real・副 固定ミラー・参考 random × synth_roles2 → 候補なら本番の設定。seed は訓練の後に払い出す。
 - **予告（数を見る前）**: r23 vs r22 主 +5〜+20（同じ打ち筋の 1 周目・教材がさらにきれいになったぶん）。
+**実装と確かめ（2026-10-24・ブランチ `claude/worker-audit`・使い方は §7.42 の `audit` の項）**。
+- **作ったもの**: `worker_job.py` の `kind: "audit"`（道具のサブコマンドの並びを定義のとおり回す・道具の引数は定義の `args` をそのまま渡す＝測定用の旗は定義に書くだけ・済んだ段は `{OUT}/worker_steps.json`・長い段の途中も 20 分ごとに保存・再開の前に切れた最後の行を落とす）・`worker_audit_merge.py`（つなぎと道具の集計・seed の重なりと欠けで止まる）・`jobs/audit_defense.json`（4 × 75）・`jobs/audit_blunder.json`（4 × 25・審判 r20 を `claude/train-r20` から `vm_nets/` へ）・試し 3 つ。arena／gen／train の動きは変えていない（§7.42 の写しの見張りはそのまま通る・audit_defense の見張りを 1 つ足した）。
+- **分けても同じ結果**（守りの監査・§7.24 の設定・seed 3013000〜3013007 の 8 局）: 1 本で 8 局と、2 本 × 4 局（`trial_audit`・`claude/worker-job-trial-audit-w01`／`w02`）をつないだ要約は、**局 8・対象の応手の点 320・点の行 372・脅威の点（甲 7／乙 2）・見逃し 0・終わり方の手番 52 が一致**。違いは**判定器が時間の上限（5 秒／10 秒）に掛かるかどうかで結果が揺れる 2 点だけ**（応手の点の 1 行が「不明 → 詰み」・終わり方の 1 手番が「不明 → 詰み」＝要約の終わり方の脅威 7 → 8・不明 30 → 29）。`nodes` の違い 196 のうち 189 は両方とも時間切れの判定（どこまで読んだかの数）、残りは同じ手番の置換表を共有する後の点。**同じ 1 局（3013002）を同じ設定で 2 回回しても同じ型の揺れが出る**（`nodes` 13 か所・乙の配り方 1 つが「無い → 不明」）＝分けたことによる差ではなく、判定器の時間の上限による揺れ。
+  - **時間を外した完全一致**: 同じ 8 局を判定の打ち切りを節点 2,000 だけ（時間の上限 600 秒＝掛からない・`PYTHONHASHSEED=0`）にして（`trial_audit_det`・`claude/worker-job-trial-audit-det-w01`／`w02`）、1 本と 2 本 × 4 局をつないだものは**点・`nodes`・verify・要約の全部が 1 か所も違わない**（時間の数を除く）。
+  - この 8 局には見逃しが無く（verify の対象 0）、verify の行のつなぎは空のファイルでしか確かめていない（空でも在ることが要約の節を決めるので、つなぎは空のファイルも運ぶ＝試しで見つけて直した）。
+- **途中で止めて再開**: シャード 1 の `run` の途中（2 局が origin に保存された後）で実行役と道具を止め、手元の結果も消して同じ 1 行で再開すると、origin の先端から取り戻して道具が「todo 2（done 2）」で残りだけを回し、done で終えた。つないだ結果は上のとおり 1 本と一致（時間の揺れの 2 点を除く）。大きな損の試し（`trial_audit_blunder`・1 局・判定 2 点・K＝4）は 5 段（play → judge → recheck → verify → summary）を最後まで回し、同じ 1 行をもう一度回すと全部の段を飛ばしてコミットを足さない。
+- **所要の目安**: 守りの監査 1 局 145〜300 秒（2 並走・1,280 回）。300 局を 4 本 × 4 並走なら 1 本 75 局で約 1 時間（verify は見逃しの点の数による）。
+
+**波 52 の結果（2026-10-24）**: 32 シャード全部完走・15,360 局・**2,529,298 行**・dropped 26（波 51 は 23＝率は同じ・場の上限の型は直っているので、残りは rs-overflow-trigger の 400 局で見た手数の上限・払えない起動の往復の型と見られる・未確認）・1 局平均 26.9 秒。**2 本（w08・w11）は実行役の不具合で結果が結果ブランチに載らず**（クローンが途中で止まった空のリポジトリから走り、結果を手元の main に積んで、動いていない結果ブランチを push して「push 済み」と出した）、作業セッションに結果のファイルだけを結果ブランチへ載せ直してもらった（強制 push なし・中身はエンジンの木と一致を確認）。r23 の訓練（ジョブ `train_r23`・Sonnet）を起こした。
+
+### 7.46 WP `worker-job-push-check`——実行役の push を確かめる（作業セッション用・opus・2026-10-24）
+
+台帳 2+391。§7.44 の波 52 で 32 本中 2 本、結果が届かないのに「push 済み」と出た（上）。直すもの（`opcg_sim/loop/worker_job.py`）:
+1. **最初に作業の木を確かめる**: `~/opcg-sim-backend` が在っても、origin が本リポジトリで、`base` のコミットを持っている（壊れたクローン・空のリポジトリでない）ことを確かめる。満たさなければ退避して取り直す。
+2. **結果ブランチに居ることを確かめる**: 本体を回す前と保存のたびに、今のブランチが結果ブランチであること（`git rev-parse --abbrev-ref HEAD`）。違えばエラーで止める（`WORKER_JOB_ERROR`）。
+3. **push の後に先端を確かめる**: `git ls-remote origin refs/heads/<結果ブランチ>` が手元のコミットと同じであること。違えば「届いていない」として `PUSH_FAILED` と同じやり直しに入り、最後まで違えば ALL_DONE を出さない。
+- 試し: 壊れたクローン（`.git` だけ在る空のリポジトリ）から始めても正しい結果ブランチに載ること・手元の main に居る状態で始めても止まるか正しく切り替わること・push を拒否させる（先端を別のコミットにしておく）と ALL_DONE を出さないこと。§7.42 の写しの見張りの pytest は通ったまま。`make test` green。
+**完了条件**: ブランチ `claude/worker-job-push-check` に push・`RESULT.json`（job "worker-job-push-check"・最後に status "done"）。PR は作らない。
 
