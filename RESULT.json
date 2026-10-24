@@ -14,5 +14,5 @@
   "arena_r22/r22_real_w09.jsonl": 175,
   "arena_r22/r22_synth2_w09.jsonl": 175
  },
- "notes": ""
+ "notes": "1 本あたり約 2.5 分（148s 前後・指示の想定 25 分よりかなり速い）。void は 3 本とも 0。~ が /root だったため ~/opcg-sim-backend は /home/user/opcg-sim-backend へのシンボリックリンクで回した。"
 }
