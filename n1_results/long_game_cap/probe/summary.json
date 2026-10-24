@@ -1,0 +1,62 @@
+{
+ "games": 162,
+ "errors": 0,
+ "reached_cap400": 0,
+ "drop400": 0,
+ "momonosuke_noop_games": [],
+ "noop_games": {
+  "3661016": {
+   "RESOLVE_EFFECT_SELECTION:None": 1
+  },
+  "3661089": {
+   "RESOLVE_EFFECT_SELECTION:None": 1
+  },
+  "3661161": {
+   "RESOLVE_EFFECT_SELECTION:None": 2
+  }
+ },
+ "steps_q": {
+  "p50": 158,
+  "p90": 215,
+  "p99": 268,
+  "max": 371
+ },
+ "turns_q": {
+  "p50": 13,
+  "p90": 16,
+  "p99": 21,
+  "max": 24
+ },
+ "steps_hist": {
+  "100": 129,
+  "200": 23,
+  "0": 9,
+  "300": 1
+ },
+ "drop_at_cap": {
+  "300": 1,
+  "400": 0,
+  "500": 0,
+  "600": 0,
+  "800": 0,
+  "1000": 0,
+  "1200": 0,
+  "1600": 0
+ },
+ "turns_over": {
+  "25": 0,
+  "30": 0,
+  "35": 0,
+  "40": 0,
+  "50": 0,
+  "60": 0
+ },
+ "cap_games": [],
+ "cap_leaders": {},
+ "vega_games": 2,
+ "passive_mean": {
+  "short": 0.007469339645265571,
+  "cap": 0.0
+ },
+ "sec_mean": 26.409876543209876
+}

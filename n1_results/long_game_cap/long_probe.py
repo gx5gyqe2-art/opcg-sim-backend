@@ -126,7 +126,10 @@ def main():
     if os.path.exists(path):
         for line in open(path):
             done.add(json.loads(line)["seed"])
-    seeds = [s for s in range(lo, hi + 1) if s not in done]
+    pool_seeds = range(lo, hi + 1)
+    if os.environ.get("SEEDS_FILE"):  # 絞った seed の列（例: ベガパンクの局だけ）から lo〜hi の範囲を取る
+        pool_seeds = [s for s in json.load(open(os.environ["SEEDS_FILE"])) if lo <= s <= hi]
+    seeds = [s for s in pool_seeds if s not in done]
     print(f"todo {len(seeds)} EXT {EXT}", flush=True)
     with mp.Pool(workers, initializer=_init, maxtasksperchild=20) as pool, open(path, "a") as f:
         for i, row in enumerate(pool.imap_unordered(play, seeds)):
