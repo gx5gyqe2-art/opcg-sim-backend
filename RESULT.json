@@ -1,37 +1,27 @@
 {
- "job": "rs-window-tree-blocker",
- "role": "engine change: short tree only for low-life blocker windows (counter windows back to the K-world static value); measurement flag window_tree_counter_legacy",
- "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.45 (origin/claude/cpu-spec-improvements-yw91jd @ f63941d; ledger 2+387); merged main 9a5d4be (rs-overflow-trigger) before the final push",
- "branch": "claude/rs-window-tree-blocker",
- "report": "docs/reports/2026-10-24_window_tree_blocker.md",
- "artifacts": "n1_results/window_tree_blocker/",
- "flag": {"opts_key": "window_tree_counter_legacy", "default": false,
-          "wired": ["engine_rs.py", "arena.py --cand-window-tree-counter-legacy", "arena_shard --window-tree-counter-legacy",
-                    "defense_audit.py --window-tree-counter-legacy", "rs_decide_latency.py --window-tree-counter-legacy",
-                    "blunder_audit.py winstab --opts"]},
- "make_test": "green (cargo 625 passed 1 ignored; pytest 876 passed 13 skipped on the final tree after merging main 58a0dd4; n1_results/window_tree_blocker/make_test.log)",
- "audit_cross": "void 0 (120 pairs, n1_results/window_tree_blocker/audit_cross.log)",
- "defense": {
-  "setting": "§7.24 (both r13d, 1 world x 1280, no budget, proof off, random x synth_roles); only games whose moves change were re-audited from the first changed move (diverge.py / defense_partial.py / merge_defense.py)",
-  "3013000": {"diverged_games": 157, "verified_miss_ko_otsu_before": [13, 7], "after": [15, 10],
-              "low_life_counter_otsu_before_after": [7, 9]},
-  "3351000": {"diverged_games": 174, "verified_miss_ko_otsu_before": [7, 4], "after": [14, 10],
-              "low_life_counter_otsu_before_after": [1, 6], "void_before_after": [1, 0]},
-  "prediction": "within ±2 on both bands -> missed (+3 and +6, worse)",
-  "per_point": "after-side misses at low-life counter windows (18): legacy (tree) defends 8/8 at 7, 4-6/8 at 4; before-side misses (11): new defends 8/8 at 4. Life 0 counter windows: legacy defends 4 of 5 new misses 8/8, new fixes 0 legacy misses"
+ "job": "arena-wtb-w02",
+ "role": "arena",
+ "status": "partial",
+ "inputs": {
+  "candidate": "nrel_r22.npz (counter windows without short tree)",
+  "baseline": "nrel_r22.npz + window_tree_counter_legacy",
+  "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)",
+  "pairs": 84,
+  "code": "claude/rs-window-tree-blocker"
  },
- "winstab": {"points": 226, "varying_old_default": "16 (7.1%)", "varying_new": "12 (5.3%)", "low_counter_varying": "4 -> 0",
-             "flag_reproduces_old_default": "226/226", "loss_points_b_share": {"3301005_107": 0.0, "3301025_117": 1.0, "3301004_31": 0.875}},
- "cost": {"mean_sec_legacy": 0.314, "mean_sec_new": 0.313, "note": "rs_decide_latency --worlds 2 --lethal-proof root --games 20, 1 core each, simultaneous; no measurable saving"},
- "golden": {"audit": "unchanged", "replay_random": "unchanged (150)", "replay_a1": "36/50 changed, all first diverging at a SELECT_COUNTER window; flag replay equals HEAD golden 50/50; regenerated goldens equal the new play 50/50"},
- "arena": "not run (coordinator): candidate = default vs baseline = --window-tree-counter-legacy, ship settings, random x real, 32 shards x 84 pairs, seed 3511000-",
- "notes": [
-  "The defense re-audit goes the wrong way: verified misses (otsu) 11 -> 20 over both bands, almost all at low-life counter windows. The prediction (±2) is missed on both bands. Revised arena expectation: -8 to +2. If the arena is negative, do not adopt (flip the default back) or measure the variant 'blocker windows + life-0 counter windows keep the tree' (life 0: the tree defended 4 of 5 new misses; life 1: fixes and breaks are about even, as in rs-window-read §4).",
-  "The cost saving the spec hoped for is not measurable (0.314 -> 0.313 s/move).",
-  "Test-board defect fixed: the 'blocker window' board in tests_window_read.rs had no BLOCKER keyword (current_keywords empty), so the window opened at the counter step; rs-window-read's (d) test was in fact checking a counter window. The board now sets the keyword and the blocker step is tested; the terminal ±1 test moved to the no-blocker counter board (its original meaning).",
-  "Defense audit ran on the pre-merge wheel (f63941d engine, same as the 'before' records); cost, goldens, make test and audit-cross ran on the merged tree (with rs-overflow-trigger).",
-  "Re-auditing only diverged games: non-diverged games matched the before records on winner/turns 269/269; re-deciding at probe points reproduced the live move 1320/1320. Points before the first changed move reuse the before records (judge time limits under a different load may differ by ±1-2 raw misses).",
-  "cargo clippy -D warnings fails on pre-existing code (search/lethal.rs too_many_arguments, tests_lethal.rs needless_range_loop) not touched here; make test does not run clippy."
- ]
+ "outputs": {
+  "files": [
+   "arena_wtb/wtb_real_w02.jsonl"
+  ]
+ },
+ "metrics": {
+  "arena_wtb/wtb_real_w02.jsonl": 21
+ },
+ "notes": "",
+ "worker": {
+  "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/arena_wtb.json",
+  "k": 2,
+  "branch": "claude/arena-wtb-w02",
+  "code_commit": "6f720c20d0bf9e0a3cc805b7c18c8bbd8a9d0b0d"
+ }
 }
