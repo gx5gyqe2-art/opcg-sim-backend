@@ -14,5 +14,5 @@
   "arena_r22o/r22o_real_w01.jsonl": 175,
   "arena_r22o/r22o_synth2_w01.jsonl": 175
  },
- "notes": ""
+ "notes": "Each arena_shard run (175 pairs/350 games) finished in ~140s with 4 workers, much faster than the ~25 min estimate; all void=0. Shard summaries: real wr 0.5286 CI[0.4831,0.574] elo +19.9; mirror wr 0.4029 CI[0.3596,0.4461] elo -68.4; synth_roles2 wr 0.4486 CI[0.4072,0.4899] elo -35.9 (shard k=1 only, not a judgment)."
 }
