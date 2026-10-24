@@ -29,6 +29,7 @@ import time
 
 MAIN = "claude/cpu-spec-improvements-yw91jd"
 REPO_URL = "https://github.com/gx5gyqe2-art/opcg-sim-backend.git"
+REPO_SLUG = "gx5gyqe2-art/opcg-sim-backend"                                    # origin の URL の末尾（プロキシ経由でも同じ）
 GIT_ID = ["-c", "user.email=g.x5gyqe2@gmail.com", "-c", "user.name=worker"]   # 今までの指示書と同じ
 PUSH_WAITS = (2, 4, 8, 16)                                                      # 4 回までやり直す
 ENV = {"OPCG_LOG_SILENT": "1"}
@@ -325,6 +326,76 @@ def git(P, *a, check=True, capture=True):
     return sh(["git", *a], cwd=P.repo, check=check, capture=capture)
 
 
+def _origin_ok(url):
+    u = url.strip().rstrip("/")
+    return (u[:-4] if u.endswith(".git") else u).endswith(REPO_SLUG)
+
+
+def repo_problem(repo, refs):
+    """作業の木が使えるか（WP `worker-job-push-check` の 1・§7.46）。使えなければ理由・使えれば None。
+    `refs`＝[(ブランチ, 固定のコミット or None)]: origin から取れて、固定のコミットを持つこと
+    （途中で止まったクローン＝`.git` だけ在る空のリポジトリ・origin の無い／違うリポジトリを弾く）。"""
+    if not os.path.isdir(os.path.join(repo, ".git")):
+        return "クローンが無い"
+
+    def g(*a):
+        return sh(["git", *a], cwd=repo, check=False, capture=True)
+    r = g("rev-parse", "--is-inside-work-tree")
+    if r.returncode or r.stdout.strip() != "true":
+        return "作業の木でない"
+    r = g("remote", "get-url", "origin")
+    if r.returncode or not _origin_ok(r.stdout):
+        return f"origin が本リポジトリでない（{r.stdout.strip() or '無い'}）"
+    for br, commit in refs:
+        if g("fetch", "-q", "origin", br).returncode:
+            return f"origin から {br} を取れない"
+        got = g("rev-parse", "--verify", "-q", "FETCH_HEAD^{commit}").stdout.strip()
+        if not got:
+            return f"origin から取った {br} のコミットが無い"
+        # `origin/<ブランチ>`（出どころの照合とコードの基が読む）を取ったものに揃える（fetch の refspec が狭い木でも古いものを読まない）
+        if g("update-ref", f"refs/remotes/origin/{br}", got).returncode:
+            return f"origin/{br} を更新できない"
+        if commit and g("cat-file", "-e", f"{commit}^{{commit}}").returncode:
+            return f"コミット {commit} が無い"
+    return None
+
+
+def ensure_repo(repo, refs, home):
+    """作業の木を確かめ、使えなければ取り直す（新しいクローンが確かめを通ってから古い木を退避して入れ替える）。
+    退避した木の場所の並びを返す（手元にだけ在った途中結果をそこからも戻す）。"""
+    why = repo_problem(repo, refs)
+    if why is None:
+        return []
+    print(f"作業の木を取り直す: {repo}（{why}）", flush=True)
+    new = repo.rstrip("/") + ".clone"
+    shutil.rmtree(new, ignore_errors=True)
+    sh(["git", "clone", "-q", REPO_URL, new])
+    why2 = repo_problem(new, refs)
+    if why2 is not None:
+        raise RuntimeError(f"取り直したクローンも使えない: {why2}")
+    aside = []
+    if os.path.lexists(repo):
+        dst = os.path.join(home, ".worker_job", "broken", f"{os.path.basename(repo.rstrip('/'))}-{int(time.time())}")
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.move(repo, dst)
+        print(f"  古い木は {dst} へ退避", flush=True)
+        aside.append(dst)
+    shutil.move(new, repo)
+    return aside
+
+
+def check_branch(P, when):
+    """今のブランチが結果ブランチであること（§7.46 の 2）。違えば止める＝別のブランチに結果を積まない。"""
+    cur = git(P, "rev-parse", "--abbrev-ref", "HEAD", check=False).stdout.strip()
+    if cur != P.branch:
+        raise RuntimeError(f"今のブランチが {cur or '不明'}（結果ブランチ {P.branch} のはず・{when}）")
+
+
+def remote_tip(P):
+    r = git(P, "ls-remote", "origin", f"refs/heads/{P.branch}", check=False)
+    return r.stdout.split()[0] if r.returncode == 0 and r.stdout.strip() else ""
+
+
 def _ledger_count(path):
     seeds = set()
     if os.path.exists(path):
@@ -430,12 +501,16 @@ def do_checkout(P):
     手元にだけ在る途中結果（push 前に止まった分）は退避して戻す（大きい方を残す＝追記の台帳は長い方が新しい）。"""
     keep = os.path.join(P.home, ".worker_job", "keep", P.job)
     shutil.rmtree(keep, ignore_errors=True)
-    for p in P.save_paths:
-        src = os.path.join(P.repo, p)
-        if os.path.exists(src):
-            dst = os.path.join(keep, p)
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            (shutil.copytree if os.path.isdir(src) else shutil.copy2)(src, dst)
+    for root in [P.repo] + getattr(P, "aside", []):          # 取り直す前の木（§7.46 の 1）にだけ在る分も
+        for p in P.save_paths:
+            src = os.path.join(root, p)
+            if os.path.exists(src):
+                dst = os.path.join(keep, p)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                if os.path.isdir(src):
+                    shutil.copytree(src, dst, dirs_exist_ok=True)
+                elif not os.path.exists(dst) or os.path.getsize(src) > os.path.getsize(dst):
+                    shutil.copy2(src, dst)
     git(P, "stash", "-u", "-q", check=False)
     remote = git(P, "fetch", "-q", "origin", P.branch, check=False).returncode == 0
     start = "FETCH_HEAD" if remote else P.ref
@@ -448,6 +523,7 @@ def do_checkout(P):
             P.code_commit = json.load(open(old)).get("worker", {}).get("code_commit") or P.code_commit
         except ValueError:
             pass
+    check_branch(P, "切り替えの後")
     print(f"結果ブランチ {P.branch} ← {'origin の先端（再開）' if remote else P.ref}", flush=True)
     for root, _dirs, files in os.walk(keep):
         for fn in files:
@@ -573,12 +649,19 @@ def push(P):
             time.sleep(wait)
         r = git(P, "push", "-q", "-u", "origin", P.branch, check=False)
         if r.returncode == 0:
-            return True
+            # 先端を確かめる（§7.46 の 3）: push が 0 で返っても origin の結果ブランチが手元のコミットでなければ届いていない
+            head, tip = git(P, "rev-parse", "HEAD").stdout.strip(), remote_tip(P)
+            if tip == head:
+                return True
+            print(f"PUSH_FAILED（{i + 1} 回目）: 届いていない（origin の {P.branch} は {tip[:9] or '無い'}・"
+                  f"手元は {head[:9]}）", flush=True)
+            continue
         print(f"PUSH_FAILED（{i + 1} 回目）: {r.stderr.strip()}", flush=True)
     return False
 
 
 def do_save(P, status="partial"):
+    check_branch(P, f"保存 {status} の前")
     with open(os.path.join(P.repo, "RESULT.json"), "w") as f:
         json.dump(result_dict(P, status), f, ensure_ascii=False, indent=1)
         f.write("\n")
@@ -604,6 +687,8 @@ def execute(P):
             print(f"飛ばす（済み）: {st.note or st.show()}", flush=True)
             continue
         print(f"$ {st.show()}", flush=True)
+        if st.kind == "run":
+            check_branch(P, "本体の前")
         dirty = dirty or st.kind == "run"
         if st.fn == "checkout":
             do_checkout(P)
@@ -674,9 +759,7 @@ def load_spec(args):
         if os.path.exists(local):
             return json.load(open(local)), rel
     repo = args.repo
-    if not os.path.isdir(os.path.join(repo, ".git")):
-        sh(["git", "clone", "-q", REPO_URL, repo])
-    sh(["git", "fetch", "-q", "origin", args.source], cwd=repo)
+    args.aside += ensure_repo(repo, [(args.source, None)], args.home)
     body = sh(["git", "show", f"FETCH_HEAD:{rel}"], cwd=repo, capture=True).stdout
     return json.loads(body), f"origin/{args.source}:{rel}"
 
@@ -703,9 +786,15 @@ def main(argv=None):
     ap.add_argument("--dry-run", action="store_true", help="コマンドの列を表示するだけ（git・ビルド・実行をしない）")
     args = ap.parse_args(argv)
     args.repo = args.repo or os.path.join(args.home, "opcg-sim-backend")
-    spec, src = load_spec(args)
+    args.aside = []
+    try:
+        spec, src = load_spec(args)
+    except Exception as ex:                                      # noqa: BLE001
+        print(f"WORKER_JOB_ERROR {ex}", flush=True)              # 作業の木が使えない＝結果ブランチも書けない
+        return 2
     P = build_plan(spec, args.k, args.home, args.repo)
     P.spec_src = src
+    P.aside = args.aside
     if args.dry_run:
         print(f"# job {P.job}（{P.kind}・k={args.k}）→ {P.branch}・repo {P.repo}")
         for st in P.steps:
@@ -713,9 +802,8 @@ def main(argv=None):
         print("echo ALL_DONE")
         return 0
     try:
-        if not os.path.isdir(os.path.join(P.repo, ".git")):
-            sh(["git", "clone", "-q", REPO_URL, P.repo])
-        sh(["git", "fetch", "-q", "origin", args.source], cwd=P.repo)
+        base = P.s.get("base") or {}
+        P.aside += ensure_repo(P.repo, [(args.source, None), (base.get("branch", P.main), base.get("commit"))], P.home)
         if not args.spec:
             provenance(P, args.source)
         ok = execute(P)

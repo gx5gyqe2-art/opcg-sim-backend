@@ -1,83 +1,45 @@
 {
- "job": "worker-audit",
+ "job": "worker-job-push-check",
  "role": "code",
  "status": "done",
  "inputs": {
-  "spec": "docs/n_loop_ops.md §7.45 (main 7bf55b362)",
-  "base": "claude/cpu-spec-improvements-yw91jd@7bf55b362"
+  "spec": "docs/n_loop_ops.md §7.46 (main 58a0dd47f)",
+  "base": "claude/cpu-spec-improvements-yw91jd@58a0dd47f"
  },
  "outputs": {
   "code": [
-   "opcg_sim/loop/worker_job.py (kind audit)",
-   "opcg_sim/loop/worker_audit_merge.py",
-   "opcg_sim/loop/worker_prompts.py (audit の指示文は §7.45 も指す)"
+   "opcg_sim/loop/worker_job.py (repo_problem/ensure_repo・check_branch・push 後の ls-remote)"
   ],
   "jobs": [
-   "opcg_sim/loop/jobs/audit_defense.json",
-   "opcg_sim/loop/jobs/audit_blunder.json",
-   "opcg_sim/loop/jobs/trial_audit.json",
-   "opcg_sim/loop/jobs/trial_audit_det.json",
-   "opcg_sim/loop/jobs/trial_audit_blunder.json"
+   "opcg_sim/loop/jobs/trial_push.json (試し・5 シャード)"
   ],
   "docs": [
    ".claude/skills/worker-job/SKILL.md",
-   "docs/n_loop_ops.md §7.42 (audit の項)・§7.45 (実装と確かめ)",
-   "docs/TEST_SPEC.md (test_worker_job の行)"
-  ],
-  "tests": [
-   "tests/test_worker_job.py::test_audit_defense_matches_724 (dry-run の写しの見張り・k=1,4)"
+   "docs/n_loop_ops.md §7.46 (実装と確かめ)"
   ],
   "trial_branches": [
-   "claude/worker-job-trial-audit-w01",
-   "claude/worker-job-trial-audit-w02",
-   "claude/worker-job-trial-audit-det-w01",
-   "claude/worker-job-trial-audit-det-w02",
-   "claude/worker-job-trial-audit-blunder-w01"
+   "claude/worker-job-trial-push-w01",
+   "claude/worker-job-trial-push-w02",
+   "claude/worker-job-trial-push-w03",
+   "claude/worker-job-trial-push-w04",
+   "claude/worker-job-trial-push-w05"
   ]
  },
  "metrics": {
-  "split_vs_single_724_setting": {
-   "games": [
-    8,
-    8
-   ],
-   "resp_points": [
-    320,
-    320
-   ],
-   "point_lines": [
-    372,
-    372
-   ],
-   "resp_threat_ko_otsu": [
-    [
-     7,
-     2
-    ],
-    [
-     7,
-     2
-    ]
-   ],
-   "miss": [
-    0,
-    0
-   ],
-   "end_turns": [
-    52,
-    52
-   ],
-   "differences_excluding_time": 2,
-   "differences_detail": "判定器の時間の上限で結果が揺れる 2 点（応手の点 1 行・終わり方 1 手番が 不明→詰み）＝要約 end.threat_ko 7→8・end.unknown_actual 30→29。同じ 1 局を 2 回回しても同じ型の揺れが出る"
-  },
-  "split_vs_single_node_limited": {
-   "setting": "--max-nodes 2000・時間の上限 600 秒・PYTHONHASHSEED=0",
-   "differences": 0
-  },
-  "resume": "シャード 1 の run の途中（origin に 2 局）で止め・手元を消して同じ 1 行で再開 → todo 2（done 2）→ done・つないだ結果は 1 本と一致（時間の揺れの 2 点を除く）",
-  "blunder_trial": "1 局・5 段 done・再実行で全段を飛ばしコミットなし",
-  "merge_refusals": "範囲の重なり・ブランチが無い・局の不足（--allow-partial で通る）・範囲の外の局 で止まることを手元で確かめた",
-  "make_test": "873 passed, 13 skipped"
+  "make_test": "827 passed, 62 skipped (72.6s)・cargo test 含む・EXIT 0",
+  "trials": {
+   "w01_broken_clone": "取り直し → done・ALL_DONE・先端一致 943fc38d4",
+   "w02_on_main": "結果ブランチへ切り替え → ALL_DONE・先端一致 cddb9191d・手元 main は不動・main 上で check_branch/do_save は止まる",
+   "w03": "拒否の試しのつもりが早送りで通った（置いたコミットが祖先）＝普通の done",
+   "w04_push_rejected": "PUSH_FAILED 5 回 × 2 保存 → PUSH_FAILED（最後）・ALL_DONE なし",
+   "w05_push_ok_not_delivered": "pushurl を手元の bare に向けた: 届いていない × 10 → PUSH_FAILED（最後）・ALL_DONE なし → 戻して再開で done・先端一致 d38416f0a"
+  }
  },
- "notes": "分けても同じ結果: §7.24 の設定では判定器が時間の上限（5/10 秒）に掛かるかどうかが実行ごとに揺れる（分けたかどうかに依らない・同じ局の 2 回でも揺れる）ので、完全一致は時間を外した節点打ち切りの設定（trial_audit_det）で確かめた; 8 局に見逃しが無く verify の対象は 0＝verify の行のつなぎは空のファイルでしか確かめていない; 試しで見つけて直した: シャードの verify.jsonl が空だとつなぎで落ちていた（道具の要約はファイルが在れば verify の節を足すので、空でも運ぶ）; worker_steps.json の所要は最後に回した 1 回の分（途中で止めて再開した段は再開後の秒だけ）; 例の seed は過去の監査の帯の写し（守り 3013000〜3013299・大きな損 3301000〜3301099）＝新しい払い出しなし。配るときは台帳の払い出しに合わせて写して直す; 試しの 2 本は 1 つのコンテナで home を分けて同時に回した（wheel は 1 回だけ作り、各 home の作り済みの印を同じ rust/ の木で置いた）; worker_audit_merge は一度に 1 つのクローンで fetch するので、つなぐ間はそのクローンの FETCH_HEAD を使う（作業の木は触らない）; 道具（defense_audit.py・blunder_audit.py）は触っていない＝rs-overflow-trigger・rs-window-tree-blocker が足す測定用の旗は定義の args に書けばそのまま渡る"
+ "notes": [
+  "既存のジョブ定義の --dry-run は不変（tests/test_worker_job.py はそのまま通る）。pytest は足していない（試しは 1 回きり・CLAUDE.md の最小限の方針）。",
+  "origin の URL は末尾 gx5gyqe2-art/opcg-sim-backend（.git・/ を除く）で判定＝プロキシ経由の URL でも通る。fetch の後に origin/<ブランチ> を update-ref で取ったものに揃える（refspec の狭い木を壊れたとみなさず直す）。",
+  "取り直しは横に .clone を作り、確かめが通ってから古い木を ~/.worker_job/broken/ に退避して入れ替える（ネットワーク失敗で木を失わない）。クローンは約 7.7GB＝ディスクに 2 本分の余裕が要る。",
+  "既にあった型（直していない）: do_checkout の途中結果の退避は save_paths の置き場を丸ごと運ぶため、同じ木で別ジョブ・別番号を回すと前の結果も新しい結果ブランチに載る（試し w03〜w05 で起きた）。作業セッションは 1 本しか回さないので実害は無いはず。",
+  "make test の初回は pytest が未導入で落ちた → opcg_sim/requirements.txt と pytest・pytest-xdist を入れて green。"
+ ]
 }

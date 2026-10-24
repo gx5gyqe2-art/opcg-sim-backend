@@ -4227,3 +4227,13 @@ nohup python ~/worker_job.py --job arena_r22 --k 3 > ~/worker_job.out 2>&1 &
 - 試し: 壊れたクローン（`.git` だけ在る空のリポジトリ）から始めても正しい結果ブランチに載ること・手元の main に居る状態で始めても止まるか正しく切り替わること・push を拒否させる（先端を別のコミットにしておく）と ALL_DONE を出さないこと。§7.42 の写しの見張りの pytest は通ったまま。`make test` green。
 **完了条件**: ブランチ `claude/worker-job-push-check` に push・`RESULT.json`（job "worker-job-push-check"・最後に status "done"）。PR は作らない。
 
+**実装と確かめ（2026-10-24・ブランチ `claude/worker-job-push-check`）**。直したのは `opcg_sim/loop/worker_job.py` だけ（ジョブ定義の `--dry-run` のコマンドの列は変えていない＝§7.42 の写しの見張りはそのまま通る）。
+- **1. 作業の木**: 始める前（`--job` の定義を読む前と、定義を読んだ後に `base` についてもう一度）、`~/opcg-sim-backend` が「作業の木であり・origin の URL が本リポジトリ（末尾 `gx5gyqe2-art/opcg-sim-backend`・プロキシ経由でも同じ）で・本線と `base` のブランチを origin から取れて・固定の `base.commit` を持つ」ことを確かめる。取ったものに `origin/<ブランチ>` を揃える（出どころの照合とコードの基が古いものを読まない）。満たさなければ `作業の木を取り直す: …（理由）` を出し、**横に新しくクローンして確かめが通ってから**古い木を `~/.worker_job/broken/` へ退避して入れ替える（取り直しが通らなければ古い木は動かさずに `WORKER_JOB_ERROR`）。退避した木にだけ在った途中結果も、結果ブランチに戻す。
+- **2. 今のブランチ**: 結果ブランチへの切り替えの直後・本体の各コマンドの前・保存（commit・push）の前に `git rev-parse --abbrev-ref HEAD` が結果ブランチであることを確かめ、違えば `WORKER_JOB_ERROR 今のブランチが …（結果ブランチ … のはず・…）` で止まる（エラーの保存もしない＝別のブランチに積まない）。
+- **3. push の後の先端**: push が成功で返っても `git ls-remote origin refs/heads/<結果ブランチ>` が手元の HEAD でなければ `PUSH_FAILED（n 回目）: 届いていない（origin の … は …・手元は …）` として同じやり直し（2・4・8・16 秒）に入る。最後まで届かなければ `保存 …: PUSH_FAILED` → `PUSH_FAILED（最後の …）` で終わり、ALL_DONE を出さない。「push 済み」は先端を確かめた後にだけ出る。
+- **試し**（使い捨てのジョブ定義 `jobs/trial_push.json`・1 局 × 1 区切り・32 回・作業の home は使い捨ての置き場・ブランチ `claude/worker-job-trial-push-w01`〜`w05` は残してある）:
+  - k=1 **壊れたクローン**（`git init` しただけの `.git` だけ在る空のリポジトリ）から: 「origin が本リポジトリでない（無い）」で取り直し → `w01` に partial・done を push・ALL_DONE。origin の先端＝手元の HEAD（943fc38d4）。
+  - k=2 **手元の main に居る状態**（古いコミットの `main` を checkout したクローン）から: 結果ブランチ `w02` に切り替わって ALL_DONE（cddb9191d）・手元の `main` は動かない。同じ木で `main` に戻して `check_branch`／`do_save` を直に呼ぶと「今のブランチが main（…のはず）」で止まり、何もコミットしない。
+  - k=4 **push を拒否させる**（本体の最中に、結果ブランチの祖先でないコミットを origin の `w04` に置く）: 保存のたびに `PUSH_FAILED` を 5 回 → `PUSH_FAILED（最後の …）`・ALL_DONE なし・origin の `w04` は置いたコミットのまま。（k=3 は置いたコミットが結果ブランチの祖先で早送りになり、拒否が起きなかった＝試しの組み立ての誤り。`w03` は普通に done。）
+  - k=5 **push は成功で返るが届かない**（push 先だけを手元の bare に向ける `remote.origin.pushurl`）: 旧いコードなら「push 済み」と出た型。`届いていない（origin の … は 無い・手元は …）` を 5 回 × 2 保存 → `PUSH_FAILED（最後の …）`・ALL_DONE なし。push 先を戻して同じ 1 行で再開すると、手元の途中結果を戻して本体を飛ばし、done を push して ALL_DONE（origin の先端＝手元 d38416f0a）。
+- **既にあった型で、直していないもの**: 手元の途中結果の退避（`do_checkout`）は `save_paths` の置き場（例 `n_records`）を丸ごと運ぶ。**同じ木で別のジョブ・別の番号を回すと、前のジョブの結果も新しい結果ブランチに載る**（試しの k=3〜5 で `trial_push_w01_p0` などが載った）。作業セッションは 1 本のジョブしか回さないので実害は無いはずだが、コンテナを使い回すなら直す（退避をこのジョブの区切りの置き場だけに絞る）。
