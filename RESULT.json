@@ -12,6 +12,7 @@
   "dir": "n1_results/trial_audit_blunder/w01",
   "files": [
    "n1_results/trial_audit_blunder/w01/games.jsonl",
+   "n1_results/trial_audit_blunder/w01/points.jsonl",
    "n1_results/trial_audit_blunder/w01/worker_steps.json"
   ]
  },
@@ -19,14 +20,18 @@
   "games": 1,
   "games_expected": 1,
   "void_games": 0,
-  "points": 0,
+  "points": 2,
   "steps": {
    "play": {
     "sec": 30
+   },
+   "judge": {
+    "sec": 25
    }
   },
   "lines": {
-   "games.jsonl": 1
+   "games.jsonl": 1,
+   "points.jsonl": 2
   }
  },
  "notes": "",
