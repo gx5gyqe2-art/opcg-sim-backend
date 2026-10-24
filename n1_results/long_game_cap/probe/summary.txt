@@ -1,0 +1,33 @@
+局 800・例外 0・400 手に届いた 1・生成なら捨てた 1
+何も変えない手（NOOP）を打った局 16・うちモモの助 OP16-084 0
+  noop 3661016 ['OP09-001', 'OP14-060'] {'RESOLVE_EFFECT_SELECTION:None': 1} steps 243 winner p2
+  noop 3661089 ['OP14-060', 'OP06-022'] {'RESOLVE_EFFECT_SELECTION:None': 1} steps 176 winner p2
+  noop 3661161 ['OP13-079', 'OP05-022'] {'RESOLVE_EFFECT_SELECTION:None': 2} steps 207 winner p1
+  noop 3661298 ['OP09-042', 'OP14-060'] {'RESOLVE_EFFECT_SELECTION:None': 2} steps 213 winner p2
+  noop 3661317 ['OP11-040', 'OP03-021'] {'RESOLVE_EFFECT_SELECTION:None': 1} steps 102 winner p2
+  noop 3661325 ['OP17-058', 'OP16-001'] {'RESOLVE_EFFECT_SELECTION:None': 2} steps 178 winner p2
+  noop 3661400 ['OP14-001', 'EB01-001'] {'RESOLVE_EFFECT_SELECTION:None': 5} steps 154 winner p1
+  noop 3661424 ['OP17-001', 'OP04-058'] {'RESOLVE_EFFECT_SELECTION:None': 1} steps 174 winner p1
+  noop 3661452 ['OP09-022', 'OP07-019'] {'RESOLVE_EFFECT_SELECTION:None': 2} steps 193 winner p2
+  noop 3661474 ['OP14-060', 'OP17-058'] {'RESOLVE_EFFECT_SELECTION:None': 2} steps 220 winner p2
+  noop 3661533 ['OP09-001', 'OP14-020'] {'RESOLVE_EFFECT_SELECTION:None': 3} steps 198 winner p2
+  noop 3661562 ['OP17-099', 'OP10-003'] {'RESOLVE_EFFECT_SELECTION:None': 4} steps 291 winner p2
+  noop 3661648 ['OP13-079', 'OP04-058'] {'RESOLVE_EFFECT_SELECTION:None': 3} steps 227 winner p1
+  noop 3661710 ['OP04-058', 'OP15-039'] {'RESOLVE_EFFECT_SELECTION:None': 1} steps 234 winner p1
+  noop 3661714 ['OP17-039', 'OP01-001'] {'RESOLVE_EFFECT_SELECTION:None': 1} steps 203 winner p2
+  noop 3661764 ['OP11-041', 'OP16-001'] {'RESOLVE_EFFECT_SELECTION:None': 2} steps 188 winner p2
+
+決着した局 800 手数 p50/p90/p99/最大 157 220 314 435
+               ターン p50/p90/p99/最大 13 17 23 30
+手数の分布（100 手刻み・全局） {0: 44, 100: 625, 200: 120, 300: 10, 400: 1}
+上限 c で捨てる局（c 手で決着していない） {300: 11, 400: 1, 500: 0, 600: 0, 800: 0, 1000: 0, 1200: 0, 1600: 0}
+ターン数 > c の局 {25: 3, 30: 0, 35: 0, 40: 0, 50: 0, 60: 0}
+
+400 手に届いた局:
+  3661198 ['OP11-041', 'OP11-041']      @400 turn 24 → ('p1', 25, 435) rep 0 noop 0 life_max [7, 4] maxT 35 passive 0.0 spt 17.4
+
+400 手に届いた局のリーダー（届いた局／その リーダーの局）: {'OP11-041': '1/25'}
+ベガパンクの局 17 400 手に届いた 0 手数 p50 143 ターン p50 14
+すぐ終えるターンの割合 平均: 届かない局 0.008 ・届いた局 0.0
+1 ターンの手数 平均: 届かない局 12.04 ・届いた局 17.4
+1 局の秒 平均 26.0 ・届いた局の平均 61.2

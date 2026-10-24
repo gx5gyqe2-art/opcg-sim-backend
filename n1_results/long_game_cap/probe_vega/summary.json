@@ -1,0 +1,255 @@
+{
+ "games": 190,
+ "errors": 0,
+ "reached_cap400": 5,
+ "drop400": 5,
+ "momonosuke_noop_games": [],
+ "noop_games": {
+  "3665531": {
+   "RESOLVE_EFFECT_SELECTION:None": 1
+  }
+ },
+ "steps_q": {
+  "p50": 173,
+  "p90": 309,
+  "p99": 624,
+  "max": 701
+ },
+ "turns_q": {
+  "p50": 15,
+  "p90": 26,
+  "p99": 51,
+  "max": 68
+ },
+ "steps_hist": {
+  "100": 106,
+  "200": 49,
+  "300": 15,
+  "400": 3,
+  "0": 15,
+  "600": 1,
+  "700": 1
+ },
+ "drop_at_cap": {
+  "300": 20,
+  "400": 5,
+  "500": 2,
+  "600": 2,
+  "800": 0,
+  "1000": 0,
+  "1200": 0,
+  "1600": 0
+ },
+ "turns_over": {
+  "25": 21,
+  "30": 11,
+  "35": 5,
+  "40": 3,
+  "50": 2,
+  "60": 1
+ },
+ "cap_games": [
+  {
+   "seed": 3662494,
+   "leaders": [
+    "OP07-097",
+    "OP06-022"
+   ],
+   "vega": true,
+   "turn_at_400": 32,
+   "ext_winner": "p2",
+   "ext_turns": 32,
+   "ext_steps": 410,
+   "ext_capped": false,
+   "turn_sig_repeat": 0,
+   "noops": {},
+   "life_max": [
+    5,
+    4
+   ],
+   "final": {
+    "p1": {
+     "life": 0,
+     "deck": 20,
+     "hand": 1,
+     "field": 2,
+     "trash": 26
+    },
+    "p2": {
+     "life": 3,
+     "deck": 15,
+     "hand": 6,
+     "field": 5,
+     "trash": 21
+    }
+   },
+   "turn_steps_max": 27,
+   "passive_frac": 0.071,
+   "steps_per_turn": 12.8
+  },
+  {
+   "seed": 3664640,
+   "leaders": [
+    "OP07-097",
+    "OP07-097"
+   ],
+   "vega": true,
+   "turn_at_400": 37,
+   "ext_winner": "p1",
+   "ext_turns": 51,
+   "ext_steps": 624,
+   "ext_capped": false,
+   "turn_sig_repeat": 0,
+   "noops": {},
+   "life_max": [
+    6,
+    7
+   ],
+   "final": {
+    "p1": {
+     "life": 2,
+     "deck": 4,
+     "hand": 5,
+     "field": 3,
+     "trash": 35
+    },
+    "p2": {
+     "life": 0,
+     "deck": 11,
+     "hand": 6,
+     "field": 3,
+     "trash": 30
+    }
+   },
+   "turn_steps_max": 29,
+   "passive_frac": 0.021,
+   "steps_per_turn": 12.2
+  },
+  {
+   "seed": 3665794,
+   "leaders": [
+    "OP07-097",
+    "OP07-097"
+   ],
+   "vega": true,
+   "turn_at_400": 44,
+   "ext_winner": "p2",
+   "ext_turns": 68,
+   "ext_steps": 701,
+   "ext_capped": false,
+   "turn_sig_repeat": 0,
+   "noops": {},
+   "life_max": [
+    10,
+    9
+   ],
+   "final": {
+    "p1": {
+     "life": 0,
+     "deck": 1,
+     "hand": 6,
+     "field": 4,
+     "trash": 39
+    },
+    "p2": {
+     "life": 3,
+     "deck": 2,
+     "hand": 8,
+     "field": 2,
+     "trash": 35
+    }
+   },
+   "turn_steps_max": 27,
+   "passive_frac": 0.109,
+   "steps_per_turn": 10.3
+  },
+  {
+   "seed": 3669498,
+   "leaders": [
+    "OP07-097",
+    "OP09-081"
+   ],
+   "vega": true,
+   "turn_at_400": 34,
+   "ext_winner": "p2",
+   "ext_turns": 34,
+   "ext_steps": 407,
+   "ext_capped": false,
+   "turn_sig_repeat": 0,
+   "noops": {},
+   "life_max": [
+    4,
+    5
+   ],
+   "final": {
+    "p1": {
+     "life": 0,
+     "deck": 19,
+     "hand": 5,
+     "field": 1,
+     "trash": 25
+    },
+    "p2": {
+     "life": 4,
+     "deck": 12,
+     "hand": 6,
+     "field": 4,
+     "trash": 23
+    }
+   },
+   "turn_steps_max": 27,
+   "passive_frac": 0.033,
+   "steps_per_turn": 12.0
+  },
+  {
+   "seed": 3671495,
+   "leaders": [
+    "OP09-042",
+    "OP07-097"
+   ],
+   "vega": true,
+   "turn_at_400": 37,
+   "ext_winner": "p1",
+   "ext_turns": 39,
+   "ext_steps": 435,
+   "ext_capped": false,
+   "turn_sig_repeat": 0,
+   "noops": {},
+   "life_max": [
+    5,
+    7
+   ],
+   "final": {
+    "p1": {
+     "life": 0,
+     "deck": 13,
+     "hand": 3,
+     "field": 3,
+     "trash": 31
+    },
+    "p2": {
+     "life": 0,
+     "deck": 19,
+     "hand": 2,
+     "field": 2,
+     "trash": 27
+    }
+   },
+   "turn_steps_max": 25,
+   "passive_frac": 0.0,
+   "steps_per_turn": 11.2
+  }
+ ],
+ "cap_leaders": {
+  "OP07-097": 5,
+  "OP06-022": 1,
+  "OP09-081": 1,
+  "OP09-042": 1
+ },
+ "vega_games": 190,
+ "passive_mean": {
+  "short": 0.06212015979663039,
+  "cap": 0.04708270010131712
+ },
+ "sec_mean": 25.80263157894737
+}

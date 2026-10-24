@@ -1,0 +1,143 @@
+{
+ "games": 800,
+ "errors": 0,
+ "reached_cap400": 1,
+ "drop400": 1,
+ "momonosuke_noop_games": [],
+ "noop_games": {
+  "3661016": {
+   "RESOLVE_EFFECT_SELECTION:None": 1
+  },
+  "3661089": {
+   "RESOLVE_EFFECT_SELECTION:None": 1
+  },
+  "3661161": {
+   "RESOLVE_EFFECT_SELECTION:None": 2
+  },
+  "3661298": {
+   "RESOLVE_EFFECT_SELECTION:None": 2
+  },
+  "3661317": {
+   "RESOLVE_EFFECT_SELECTION:None": 1
+  },
+  "3661325": {
+   "RESOLVE_EFFECT_SELECTION:None": 2
+  },
+  "3661400": {
+   "RESOLVE_EFFECT_SELECTION:None": 5
+  },
+  "3661424": {
+   "RESOLVE_EFFECT_SELECTION:None": 1
+  },
+  "3661452": {
+   "RESOLVE_EFFECT_SELECTION:None": 2
+  },
+  "3661474": {
+   "RESOLVE_EFFECT_SELECTION:None": 2
+  },
+  "3661533": {
+   "RESOLVE_EFFECT_SELECTION:None": 3
+  },
+  "3661562": {
+   "RESOLVE_EFFECT_SELECTION:None": 4
+  },
+  "3661648": {
+   "RESOLVE_EFFECT_SELECTION:None": 3
+  },
+  "3661710": {
+   "RESOLVE_EFFECT_SELECTION:None": 1
+  },
+  "3661714": {
+   "RESOLVE_EFFECT_SELECTION:None": 1
+  },
+  "3661764": {
+   "RESOLVE_EFFECT_SELECTION:None": 2
+  }
+ },
+ "steps_q": {
+  "p50": 157,
+  "p90": 220,
+  "p99": 314,
+  "max": 435
+ },
+ "turns_q": {
+  "p50": 13,
+  "p90": 17,
+  "p99": 23,
+  "max": 30
+ },
+ "steps_hist": {
+  "100": 625,
+  "200": 120,
+  "0": 44,
+  "300": 10,
+  "400": 1
+ },
+ "drop_at_cap": {
+  "300": 11,
+  "400": 1,
+  "500": 0,
+  "600": 0,
+  "800": 0,
+  "1000": 0,
+  "1200": 0,
+  "1600": 0
+ },
+ "turns_over": {
+  "25": 3,
+  "30": 0,
+  "35": 0,
+  "40": 0,
+  "50": 0,
+  "60": 0
+ },
+ "cap_games": [
+  {
+   "seed": 3661198,
+   "leaders": [
+    "OP11-041",
+    "OP11-041"
+   ],
+   "vega": false,
+   "turn_at_400": 24,
+   "ext_winner": "p1",
+   "ext_turns": 25,
+   "ext_steps": 435,
+   "ext_capped": false,
+   "turn_sig_repeat": 0,
+   "noops": {},
+   "life_max": [
+    7,
+    4
+   ],
+   "final": {
+    "p1": {
+     "life": 1,
+     "deck": 8,
+     "hand": 9,
+     "field": 3,
+     "trash": 29
+    },
+    "p2": {
+     "life": 0,
+     "deck": 6,
+     "hand": 2,
+     "field": 5,
+     "trash": 37
+    }
+   },
+   "turn_steps_max": 35,
+   "passive_frac": 0.0,
+   "steps_per_turn": 17.4
+  }
+ ],
+ "cap_leaders": {
+  "OP11-041": 1
+ },
+ "vega_games": 17,
+ "passive_mean": {
+  "short": 0.0075360062687972575,
+  "cap": 0.0
+ },
+ "sec_mean": 25.954
+}
