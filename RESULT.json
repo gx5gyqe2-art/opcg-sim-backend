@@ -26,5 +26,5 @@
   "dropped": 1,
   "sec_play_mean": 20.21
  },
- "notes": ""
+ "notes": "Repo was already at /home/user/opcg-sim-backend; ~/opcg-sim-backend is a symlink to it (no second clone). Each part (120 games) took about 11 min (~45 min total), much faster than the 32 min/part estimate. Branch was created from origin/claude/cpu-spec-improvements-yw91jd @ 8acab03."
 }
