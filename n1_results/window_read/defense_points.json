@@ -1,0 +1,192 @@
+[
+ {
+  "seed": 3013020,
+  "step": 83,
+  "live": "{\"kind\": \"battle\", \"action_type\": \"PASS\", \"card_uuid\": null}",
+  "window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "life": null,
+  "fixed": {
+   "PASS": 6,
+   "SELECT_COUNTER:40eec7e4": 2
+  },
+  "legacy": {
+   "SELECT_COUNTER:40eec7e4": 8
+  },
+  "no_tree": {
+   "SELECT_COUNTER:40eec7e4": 8
+  },
+  "tree_only": {
+   "PASS": 5,
+   "SELECT_COUNTER:40eec7e4": 1,
+   "SELECT_COUNTER:48e06788": 2
+  },
+  "tree4x": {
+   "PASS": 6,
+   "SELECT_COUNTER:40eec7e4": 2
+  }
+ },
+ {
+  "seed": 3013037,
+  "step": 126,
+  "live": "{\"kind\": \"battle\", \"action_type\": \"SELECT_COUNTER\", \"card_uuid\": \"f288a52f-301b-4985-945f-",
+  "window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "life": null,
+  "fixed": {
+   "SELECT_COUNTER:f288a52f": 7,
+   "SELECT_COUNTER:d8897596": 1
+  },
+  "legacy": {
+   "SELECT_COUNTER:f288a52f": 8
+  },
+  "no_tree": {
+   "SELECT_COUNTER:f288a52f": 8
+  },
+  "tree_only": {
+   "SELECT_COUNTER:f288a52f": 8
+  },
+  "tree4x": {
+   "SELECT_COUNTER:f288a52f": 6,
+   "SELECT_COUNTER:d8897596": 2
+  }
+ },
+ {
+  "seed": 3013106,
+  "step": 149,
+  "live": "{\"kind\": \"battle\", \"action_type\": \"PASS\", \"card_uuid\": null}",
+  "window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "life": null,
+  "fixed": {
+   "PASS": 8
+  },
+  "legacy": {
+   "PASS": 8
+  },
+  "no_tree": {
+   "PASS": 8
+  },
+  "tree_only": {
+   "PASS": 8
+  },
+  "tree4x": {
+   "PASS": 7,
+   "SELECT_COUNTER:dcf1a5b0": 1
+  }
+ },
+ {
+  "seed": 3013218,
+  "step": 92,
+  "live": "{\"kind\": \"battle\", \"action_type\": \"PASS\", \"card_uuid\": null}",
+  "window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "life": null,
+  "fixed": {
+   "PASS": 8
+  },
+  "legacy": {
+   "SELECT_COUNTER:809f7446": 8
+  },
+  "no_tree": {
+   "SELECT_COUNTER:809f7446": 8
+  },
+  "tree_only": {
+   "PASS": 6,
+   "SELECT_COUNTER:809f7446": 1,
+   "SELECT_COUNTER:b157c81b": 1
+  },
+  "tree4x": {
+   "PASS": 8
+  }
+ },
+ {
+  "seed": 3013236,
+  "step": 114,
+  "live": "{\"kind\": \"battle\", \"action_type\": \"PASS\", \"card_uuid\": null}",
+  "window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "life": null,
+  "fixed": {
+   "PASS": 8
+  },
+  "legacy": {
+   "PASS": 8
+  },
+  "no_tree": {
+   "PASS": 8
+  },
+  "tree_only": {
+   "PASS": 8
+  },
+  "tree4x": {
+   "PASS": 8
+  }
+ },
+ {
+  "seed": 3013251,
+  "step": 119,
+  "live": "{\"kind\": \"battle\", \"action_type\": \"PASS\", \"card_uuid\": null}",
+  "window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "life": null,
+  "fixed": {
+   "PASS": 8
+  },
+  "legacy": {
+   "PASS": 8
+  },
+  "no_tree": {
+   "PASS": 8
+  },
+  "tree_only": {
+   "PASS": 8
+  },
+  "tree4x": {
+   "PASS": 8
+  }
+ },
+ {
+  "seed": 3013260,
+  "step": 91,
+  "live": "{\"kind\": \"battle\", \"action_type\": \"PASS\", \"card_uuid\": null}",
+  "window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "life": null,
+  "fixed": {
+   "PASS": 3,
+   "SELECT_COUNTER:8b0c49c4": 4,
+   "SELECT_COUNTER:284f7728": 1
+  },
+  "legacy": {
+   "PASS": 6,
+   "SELECT_COUNTER:8b0c49c4": 2
+  },
+  "no_tree": {
+   "PASS": 8
+  },
+  "tree_only": {
+   "PASS": 3,
+   "SELECT_COUNTER:8b0c49c4": 4,
+   "SELECT_COUNTER:4a9b229f": 1
+  },
+  "tree4x": {
+   "SELECT_COUNTER:8b0c49c4": 3,
+   "PASS": 5
+  }
+ }
+]

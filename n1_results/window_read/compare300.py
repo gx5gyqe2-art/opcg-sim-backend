@@ -9,7 +9,7 @@ B = "/home/user/opcg-sim-backend/n1_results/"
 
 
 def load(d):
-    games, pts = DA._load(B + d + "/points_3013000_300.jsonl" + (".gz" if d.startswith("commit_hidden") else ""))
+    games, pts = DA._load(B + d + "/points_3013000_300.jsonl" + ".gz")
     ver = {}
     for line in open(B + d + "/verify.jsonl"):
         r = json.loads(line)
