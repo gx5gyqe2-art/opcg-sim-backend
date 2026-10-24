@@ -145,6 +145,7 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
     `arena_shard --lethal-proof {root,root_reply}` も同じ口から `{"lethal_proof": ...}` を渡す（§7.21）。
     `arena_shard --commit-sig-legacy` も同じ口から `{"commit_sig_legacy": True}` を渡す（WP `rs-commit-sig`）。
     `arena_shard --commit-hidden-legacy` も同じ口から `{"commit_hidden_legacy": True}` を渡す（§7.39・WP `rs-commit-hidden`）。
+    `arena_shard --confirm-trigger-legacy` も同じ口から `{"confirm_trigger_legacy": True}` を渡す（§7.44 の (B)・WP `rs-overflow-trigger`）。
     `arena_shard --window-{carry,worlds,tree}-legacy` も同じ口から `{"window_*_legacy": True}` を渡す（§7.42・WP `rs-window-read`）。
     """
     E.engine()
@@ -234,6 +235,8 @@ CAND_FLAGS = {
     "window_carry_legacy": dict(window_carry_legacy=True),
     "window_worlds_legacy": dict(window_worlds_legacy=True),
     "window_tree_legacy": dict(window_tree_legacy=True),
+    # トリガーの発動確認を「発動する」の 1 手だけにする旧い形（§7.44 の (B)・WP `rs-overflow-trigger`・測定専用）。
+    "confirm_trigger_legacy": dict(confirm_trigger_legacy=True),
 }
 
 
@@ -311,6 +314,9 @@ def add_cand_args(ap) -> None:
     ap.add_argument("--cand-window-tree-legacy", action="store_true",
                     help="候補席だけ、ライフが少ない戦闘の応手を静的な値で比べる旧い形（§7.42 の 3・測定専用）。"
                          "省略＝既定（短い木で読む）")
+    ap.add_argument("--cand-confirm-trigger-legacy", action="store_true",
+                    help="候補席だけ、トリガーの発動確認（ライフの【トリガー】・任意の誘発）を「発動する」の 1 手だけで打つ"
+                         "旧い形（`docs/search_efficiency_plan.md` §7.44 の (B)・測定専用）。省略＝既定（発動する／しないの 2 手）")
     ap.add_argument("--cand-window-worlds", type=int, default=None,
                     help="候補席だけ窓の根畳みの世界の本数（§7.42 の 2・省略＝Rust の既定）")
     # --- 迷う局面だけ世界 K 本で読み直す（§7.4・WP `play-rethink`）------------------------

@@ -111,6 +111,9 @@ pub struct SearchOptions {
     /// `sel_branch_left`・`macro::may_branch_selection`）を on/off できる。準備箱そのもの
     /// （(1)）は [`SearchOptions::setup_box`] のまま。
     pub select_branch: Option<bool>,
+    /// トリガーの発動確認（`CONFIRM_TRIGGER`）を「発動する」の 1 手だけにする旧い形
+    /// （§7.44 の (B)・WP `rs-overflow-trigger`・**測定専用**・既定 false＝「発動する／しない」の 2 手）。
+    pub confirm_trigger_legacy: bool,
 }
 
 impl SearchOptions {
@@ -131,6 +134,7 @@ impl Default for SearchOptions {
             setup_box_keep_bare: false,
             leaf_rollout: LeafRollout::None,
             select_branch: None,
+            confirm_trigger_legacy: false,
         }
     }
 }
@@ -193,6 +197,8 @@ fn options_from_json(v: &Value) -> SearchOptions {
             .unwrap_or(d.leaf_rollout),
         // §20.7.8 の 5: 欄が無い／null＝None（`setup_box` に従う）。
         select_branch: v.get("select_branch").and_then(Value::as_bool),
+        // §7.44 の (B): トリガーの発動確認を「発動する」だけにする旧い形（測定専用）。
+        confirm_trigger_legacy: flag("confirm_trigger_legacy", d.confirm_trigger_legacy),
     }
 }
 

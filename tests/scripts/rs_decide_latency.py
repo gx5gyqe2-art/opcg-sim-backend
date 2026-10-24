@@ -43,6 +43,8 @@ def main(argv=None):
     ap.add_argument("--window-carry-legacy", action="store_true", help="§7.42 の 1 だけ旧い形（測定専用）")
     ap.add_argument("--window-worlds-legacy", action="store_true", help="§7.42 の 2 だけ旧い形（測定専用）")
     ap.add_argument("--window-tree-legacy", action="store_true", help="§7.42 の 3 だけ旧い形（測定専用）")
+    ap.add_argument("--confirm-trigger-legacy", action="store_true",
+                    help="両席とも、トリガーの発動確認を「発動する」の 1 手だけにする旧い形（§7.44 の (B)・測定専用）")
     ap.add_argument("--window-worlds", type=int, default=None, help="窓の根畳みの世界の本数（§7.42 の 2・省略＝Rust の既定）")
     ap.add_argument("--extra", default=None,
                     help="decide の opts に足す JSON（例 '{\"window_tree_life\": 2}'・§7.42 の対象の広げ方の費用を見る）")
@@ -71,6 +73,8 @@ def main(argv=None):
             kw[_k] = True                    # §7.42 の前後比較（窓・対話の決め方の旧い形）
     if getattr(a, "window_worlds", None):
         kw["window_worlds"] = a.window_worlds
+    if a.confirm_trigger_legacy:
+        kw["confirm_trigger_legacy"] = True  # §7.44 の (B) の前後比較（トリガーを断らない旧い形）
     if a.extra:
         kw.update(json.loads(a.extra))
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
@@ -113,6 +117,7 @@ def main(argv=None):
                       **({"opp_blind": True} if a.opp_blind else {}),
                       **({"commit_hidden_legacy": True} if a.commit_hidden_legacy else {}),
                       **{k: v for k, v in kw.items() if k.startswith("window_")},
+                      **({"confirm_trigger_legacy": True} if a.confirm_trigger_legacy else {}),
                       **({"extra": json.loads(a.extra)} if a.extra else {}),
                       "games": a.games, "moves": n, "kinds": kinds,
                       "mean": round(statistics.mean(ts), 3), "p50": round(ts[n // 2], 3),

@@ -304,7 +304,8 @@ class RsGame:
               window_carry_legacy: Optional[bool] = None,
               window_worlds_legacy: Optional[bool] = None,
               window_tree_legacy: Optional[bool] = None,
-              window_worlds: Optional[int] = None):
+              window_worlds: Optional[int] = None,
+              confirm_trigger_legacy: Optional[bool] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
         `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
@@ -365,6 +366,9 @@ class RsGame:
         `window_carry_legacy`／`window_worlds_legacy`／`window_tree_legacy`（省略可・§7.42・WP `rs-window-read`・
         **測定専用**）＝窓・対話の決め方の旧い形（続きを積む／窓の世界 1 本／ライフが少ない戦闘の応手を静的な値で比べる）。
         `window_worlds`（省略可）＝窓の根畳みの世界の本数。**省略（None）／False＝渡さない＝Rust の既定**。
+        `confirm_trigger_legacy`（省略可・§7.44 の (B)・WP `rs-overflow-trigger`・**測定専用**）＝トリガーの発動確認
+        （ライフの【トリガー】・任意の誘発）を「発動する」の 1 手だけにする旧い形。本番アリーナの基準席用。
+        **省略（None）／False＝渡さない＝Rust の既定**（発動する／しないの 2 手を読む）。
         """
         move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
                                 select_rule=select_rule, q_min_frac=q_min_frac,
@@ -381,7 +385,8 @@ class RsGame:
                                 window_carry_legacy=window_carry_legacy,
                                 window_worlds_legacy=window_worlds_legacy,
                                 window_tree_legacy=window_tree_legacy,
-                                window_worlds=window_worlds)
+                                window_worlds=window_worlds,
+                                confirm_trigger_legacy=confirm_trigger_legacy)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
@@ -406,7 +411,8 @@ class RsGame:
                window_carry_legacy: Optional[bool] = None,
                window_worlds_legacy: Optional[bool] = None,
                window_tree_legacy: Optional[bool] = None,
-               window_worlds: Optional[int] = None):
+               window_worlds: Optional[int] = None,
+               confirm_trigger_legacy: Optional[bool] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -489,6 +495,9 @@ class RsGame:
             opts["window_tree_legacy"] = True
         if window_worlds is not None:
             opts["window_worlds"] = int(window_worlds)
+        # トリガーを断らない旧い形（§7.44 の (B)・測定専用）。None／False＝渡さない＝Rust の既定（2 手）。
+        if confirm_trigger_legacy:
+            opts["confirm_trigger_legacy"] = True
         # 迷う局面だけの読み直し（§7.4）。None＝off＝`decide` を 1 回呼ぶだけ（今までと同じ）。
         from opcg_sim.loop import engine as _LE
         out = _LE.decide_with_rethink(lambda o: self._game.decide(player_id, o), json.dumps(opts),

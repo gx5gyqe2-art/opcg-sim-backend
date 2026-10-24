@@ -1,0 +1,2304 @@
+{
+ "about": "WP rs-overflow-trigger（docs/search_efficiency_plan.md §7.44）の確かめの盤面。reaudit-wr（docs/reports/2026-10-24_reaudit_wr.md）の実対局の手の列の頭。3341083・3341000 は n1_results/reaudit_wr/blunder/games.jsonl、3351219 は修正前の wheel（80f8f9c）で守りの監査と同じ設定（r13d・世界 1 本・1,280 回・予算なし）で打ち直した列（n1_results/overflow_trigger/void_3351219_old.*）。",
+ "games": [
+  {
+   "seed": 3341083,
+   "leaders": [
+    "OP14-040",
+    "OP02-093"
+   ],
+   "decks": "real",
+   "attacker": "p2",
+   "what": "(A) チョッパー OP08-007 の【アタック時】で山札からチョッパーを登場→押し出し（41〜42 手目）の直後",
+   "moves": [
+    {
+     "kind": "game",
+     "action_type": "KEEP_HAND",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "MULLIGAN",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "d20da41b-0c91-451e-a744-186927e4d32f"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "9c411ee1-14cc-4f96-8577-c67f0fa9a1a9"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "1792849a-e8c1-4475-a578-7571003943a6"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "e707607f-9ce7-474c-b74c-667cec5f46e5",
+       "b251d6a3-1fbf-4e71-bb46-589cdce4b3f2"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "5a31ecc5-450c-4252-920b-b93398fbc070"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "5a31ecc5-450c-4252-920b-b93398fbc070"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "5a31ecc5-450c-4252-920b-b93398fbc070",
+      "target_ids": [
+       "aef9432e-06d8-4cfd-a4a4-f791e64278c5"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "b3a29bf3-ce8b-4cb6-8811-d38510238566"
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "c45e830d-7fa5-4def-9b69-062e067e8cc2"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "7c88d906-acc0-4ca7-ae7b-beb72370f861",
+       "657264ee-bd82-4830-babf-d05c4d8642d1",
+       "d298b3cf-5c70-4518-8fca-4cad88d43279"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "b83ae4d1-d3e9-4ded-9c31-134ef884fbac"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "8de95d33-ef31-4cde-b79f-a2e1594e6268"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "5e825d32-0167-4be7-8267-eb225de4c150"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "4bcb12ff-3ec9-42cf-a998-7065e25fd09a"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "39dd423d-7077-4d88-a60f-e3224dc79951",
+       "9f390a8e-6359-465f-916c-2b5d1c8f6033",
+       "90674684-0698-4795-a3eb-694060d82d05"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "aef9432e-06d8-4cfd-a4a4-f791e64278c5",
+      "target_ids": [
+       "5a31ecc5-450c-4252-920b-b93398fbc070"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "8de95d33-ef31-4cde-b79f-a2e1594e6268"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "e51bfd5e-d769-4592-bb25-972daa2ffe44"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "33d8373d-cac3-43b8-a02a-309709c23f2c"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "5a31ecc5-450c-4252-920b-b93398fbc070"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "5a31ecc5-450c-4252-920b-b93398fbc070",
+      "target_ids": [
+       "4bcb12ff-3ec9-42cf-a998-7065e25fd09a"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "c72d479d-3c77-4825-95cc-da764702f3b5"
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "1792849a-e8c1-4475-a578-7571003943a6"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "8c84d0cf-a49c-4c66-b10e-1e247cac1abb"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "c45e830d-7fa5-4def-9b69-062e067e8cc2"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "7250b94b-8e56-46dd-a01a-0522461b5ea0"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "ce1e30ed-3e66-4fd9-b834-9db0d4475996",
+       "0e85ba31-072f-43a1-8d38-ebdd6efdbb4d",
+       "3a6291fc-486d-45da-8290-2f2865a22328",
+       "79edf0d9-733d-456f-8b8c-70b51267a113"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "5e825d32-0167-4be7-8267-eb225de4c150",
+      "target_ids": [
+       "5a31ecc5-450c-4252-920b-b93398fbc070"
+      ]
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "e2b0f9da-7c3b-4afa-abaa-b9d020738a9b"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "9c411ee1-14cc-4f96-8577-c67f0fa9a1a9"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   ]
+  },
+  {
+   "seed": 3351219,
+   "leaders": [
+    "OP06-080",
+    "OP16-080"
+   ],
+   "decks": "synth_roles",
+   "attacker": "p1",
+   "what": "(A) ゲッコー・モリアの【アタック時】でトラッシュから登場→押し出し（153 手目）の直後",
+   "moves": [
+    {
+     "kind": "game",
+     "action_type": "MULLIGAN",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "KEEP_HAND",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0",
+      "target_ids": [
+       "c095b84c-815e-4915-84fe-2cf35c7f2573"
+      ]
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "0e272823-06b5-43e4-a041-c89d595d4217"
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "296a820c-3693-4fa5-9e04-c3063508560f"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "47d8304f-6840-4952-b6a1-eb52a2b3c90c"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "c095b84c-815e-4915-84fe-2cf35c7f2573",
+      "target_ids": [
+       "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "d0dd1c5f-3e6c-4d9c-bd82-85e5b601957e"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "ed08f6e8-025e-40ee-9487-ce06f5572ebf"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0",
+      "target_ids": [
+       "c095b84c-815e-4915-84fe-2cf35c7f2573"
+      ]
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "d737e1f7-88cc-4831-910b-5fa95f45882e"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "1720783e-b2c2-471a-bf81-ea93287a89db"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "47d8304f-6840-4952-b6a1-eb52a2b3c90c",
+      "target_ids": [
+       "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "c095b84c-815e-4915-84fe-2cf35c7f2573",
+      "target_ids": [
+       "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "a178cc69-0e93-43a8-a6c8-d89f50ffb2b3"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "ed08f6e8-025e-40ee-9487-ce06f5572ebf"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "ed08f6e8-025e-40ee-9487-ce06f5572ebf"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "ed08f6e8-025e-40ee-9487-ce06f5572ebf",
+      "target_ids": [
+       "47d8304f-6840-4952-b6a1-eb52a2b3c90c"
+      ]
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "47d8304f-6840-4952-b6a1-eb52a2b3c90c"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "c095b84c-815e-4915-84fe-2cf35c7f2573"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "f3eea84a-162c-4b86-8f7e-afc97a7f2d08"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0",
+      "target_ids": [
+       "c095b84c-815e-4915-84fe-2cf35c7f2573"
+      ]
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "e5d04fa9-f523-4af8-8a85-cd3de5e826e3"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "02c5fa76-dd80-48c7-9425-6a4b9e07742b"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "f3eea84a-162c-4b86-8f7e-afc97a7f2d08"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "dfea680f-856c-4767-adfb-58e92ca215e2"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ACTIVATE_MAIN",
+     "payload": {
+      "uuid": "dfea680f-856c-4767-adfb-58e92ca215e2"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "02c5fa76-dd80-48c7-9425-6a4b9e07742b"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "c095b84c-815e-4915-84fe-2cf35c7f2573"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "07ccab35-cc79-4acc-832d-107e82863b25"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ACTIVATE_MAIN",
+     "payload": {
+      "uuid": "07ccab35-cc79-4acc-832d-107e82863b25"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "a0afe947-3bf3-4b1a-a356-4770838cfbd1"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "55ede8ce-025d-4bc1-a02b-4cda734bd295",
+       "17e0f4fb-db32-4c4f-baad-b34c648fe595",
+       "fc50f62b-fca2-4b2f-b40d-3eea6a6cae15"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "c095b84c-815e-4915-84fe-2cf35c7f2573",
+      "target_ids": [
+       "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "d9d72f46-fd71-42f8-ad7d-943cc10fddad"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "1720783e-b2c2-471a-bf81-ea93287a89db",
+      "target_ids": [
+       "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "afd86db0-caed-4538-bf0c-28fd53adabf0"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "78deeff0-94f1-44ec-a1ff-ae0943002903"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0",
+      "target_ids": [
+       "1720783e-b2c2-471a-bf81-ea93287a89db"
+      ]
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "78deeff0-94f1-44ec-a1ff-ae0943002903"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "78deeff0-94f1-44ec-a1ff-ae0943002903"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "ed08f6e8-025e-40ee-9487-ce06f5572ebf"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "7c3e3266-fb48-4cc0-b683-7b804add2987"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "a0afe947-3bf3-4b1a-a356-4770838cfbd1"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "07ccab35-cc79-4acc-832d-107e82863b25"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "56d5354f-4ac6-4076-87cc-706bb481eb43"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "ed08f6e8-025e-40ee-9487-ce06f5572ebf",
+      "target_ids": [
+       "dfea680f-856c-4767-adfb-58e92ca215e2"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "02c5fa76-dd80-48c7-9425-6a4b9e07742b",
+      "target_ids": [
+       "c095b84c-815e-4915-84fe-2cf35c7f2573"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "4c6f0d41-21b4-4aca-ad5d-c6bd33041021"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "91b67770-ed85-4580-a794-94bc50207e3f"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "c095b84c-815e-4915-84fe-2cf35c7f2573"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "c095b84c-815e-4915-84fe-2cf35c7f2573",
+      "target_ids": [
+       "ed08f6e8-025e-40ee-9487-ce06f5572ebf"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "55b77e1b-196d-4941-a8b6-f3a1124c8254"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "02c5fa76-dd80-48c7-9425-6a4b9e07742b",
+      "target_ids": [
+       "c095b84c-815e-4915-84fe-2cf35c7f2573"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_BLOCKER",
+     "card_uuid": "1720783e-b2c2-471a-bf81-ea93287a89db"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "7c3e3266-fb48-4cc0-b683-7b804add2987"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "7c3e3266-fb48-4cc0-b683-7b804add2987"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "78deeff0-94f1-44ec-a1ff-ae0943002903",
+      "target_ids": [
+       "1720783e-b2c2-471a-bf81-ea93287a89db"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "45ac1b80-f4e8-4f9e-a1fb-ffbc85dabf98"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "7c3e3266-fb48-4cc0-b683-7b804add2987"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "56d5354f-4ac6-4076-87cc-706bb481eb43"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "7c3e3266-fb48-4cc0-b683-7b804add2987"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0",
+      "target_ids": [
+       "1720783e-b2c2-471a-bf81-ea93287a89db"
+      ]
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "384e5270-c040-4017-ae84-a551566c1740"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "904dba23-88d1-4cb0-9226-44f037c02d82"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "7c3e3266-fb48-4cc0-b683-7b804add2987"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "0e272823-06b5-43e4-a041-c89d595d4217"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "7c3e3266-fb48-4cc0-b683-7b804add2987",
+      "target_ids": [
+       "0e272823-06b5-43e4-a041-c89d595d4217"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "5e420302-822f-4506-8ccc-6ab98fc097ed"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ACTIVATE_MAIN",
+     "payload": {
+      "uuid": "5e420302-822f-4506-8ccc-6ab98fc097ed"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "56d5354f-4ac6-4076-87cc-706bb481eb43"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "91b67770-ed85-4580-a794-94bc50207e3f",
+      "target_ids": [
+       "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "c095b84c-815e-4915-84fe-2cf35c7f2573"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "c095b84c-815e-4915-84fe-2cf35c7f2573"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "c095b84c-815e-4915-84fe-2cf35c7f2573",
+      "target_ids": [
+       "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_BLOCKER",
+     "card_uuid": "904dba23-88d1-4cb0-9226-44f037c02d82"
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "55b77e1b-196d-4941-a8b6-f3a1124c8254"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "169549b4-4093-4ed1-99bf-67669785c94d"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "7c3e3266-fb48-4cc0-b683-7b804add2987"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "a1c290b5-7aa0-422a-a0f3-6c873d79e568"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "7c3e3266-fb48-4cc0-b683-7b804add2987"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "19a43272-7512-43d7-9acf-1fcb69077ab6"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "19a43272-7512-43d7-9acf-1fcb69077ab6"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "7c3e3266-fb48-4cc0-b683-7b804add2987",
+      "target_ids": [
+       "91b67770-ed85-4580-a794-94bc50207e3f"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "4dfc2eda-1e72-426b-b757-59a373e43f3e"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "7c3e3266-fb48-4cc0-b683-7b804add2987"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "78deeff0-94f1-44ec-a1ff-ae0943002903",
+      "target_ids": [
+       "c095b84c-815e-4915-84fe-2cf35c7f2573"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "4dfc2eda-1e72-426b-b757-59a373e43f3e"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "8a9cd0d0-6c8b-4740-bd0d-9d562c2d4bb0",
+      "target_ids": [
+       "c095b84c-815e-4915-84fe-2cf35c7f2573"
+      ]
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "be7d2d22-e48d-4dac-b66a-b955944420de"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "56d5354f-4ac6-4076-87cc-706bb481eb43"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "4dfc2eda-1e72-426b-b757-59a373e43f3e"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    }
+   ]
+  },
+  {
+   "seed": 3341000,
+   "leaders": [
+    "ST04-001",
+    "OP02-025"
+   ],
+   "decks": "real",
+   "seat": "p1",
+   "turn": 10,
+   "what": "(B) 相手のアタックで公開した p1 のライフの【トリガー】の発動確認（81 手目）",
+   "moves": [
+    {
+     "kind": "game",
+     "action_type": "KEEP_HAND",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "MULLIGAN",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "90a96da6-b1a1-47c6-9848-f66f0deeb7cd"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "6b0b5f92-7d39-4ea1-b984-9b0bdc23b9fd"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "420d4a41-bcfc-431b-8aff-6f79f94e3785"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "3fb00368-1df4-4528-8ae0-4c696a2b6f88",
+      "target_ids": [
+       "7e0e26c3-1418-442f-ab74-44fb5bde2f17"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "b7f6de28-15b2-4a45-bdf8-95f86ae90cc9"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "6b0b5f92-7d39-4ea1-b984-9b0bdc23b9fd"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "7e0e26c3-1418-442f-ab74-44fb5bde2f17"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "90a96da6-b1a1-47c6-9848-f66f0deeb7cd"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "90a96da6-b1a1-47c6-9848-f66f0deeb7cd"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "7e0e26c3-1418-442f-ab74-44fb5bde2f17",
+      "target_ids": [
+       "3fb00368-1df4-4528-8ae0-4c696a2b6f88"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "90a96da6-b1a1-47c6-9848-f66f0deeb7cd",
+      "target_ids": [
+       "3fb00368-1df4-4528-8ae0-4c696a2b6f88"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "ff6b4472-1d06-467b-b0ea-139bfa33313a"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "86880090-6ec8-471a-a88b-aeedd72caace"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "3fb00368-1df4-4528-8ae0-4c696a2b6f88"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "3fb00368-1df4-4528-8ae0-4c696a2b6f88",
+      "target_ids": [
+       "7e0e26c3-1418-442f-ab74-44fb5bde2f17"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "86880090-6ec8-471a-a88b-aeedd72caace"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "86880090-6ec8-471a-a88b-aeedd72caace",
+      "target_ids": [
+       "7e0e26c3-1418-442f-ab74-44fb5bde2f17"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "420d4a41-bcfc-431b-8aff-6f79f94e3785",
+      "target_ids": [
+       "90a96da6-b1a1-47c6-9848-f66f0deeb7cd"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "eab9182b-f512-43ce-8cd4-988f9c83c1e3"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "7e0e26c3-1418-442f-ab74-44fb5bde2f17",
+      "target_ids": [
+       "420d4a41-bcfc-431b-8aff-6f79f94e3785"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "5734e1cf-f31b-4404-8d05-136198939c1b"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "3fb00368-1df4-4528-8ae0-4c696a2b6f88"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "3fb00368-1df4-4528-8ae0-4c696a2b6f88"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "86880090-6ec8-471a-a88b-aeedd72caace"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "86880090-6ec8-471a-a88b-aeedd72caace"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "420d4a41-bcfc-431b-8aff-6f79f94e3785"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "3fb00368-1df4-4528-8ae0-4c696a2b6f88",
+      "target_ids": [
+       "7e0e26c3-1418-442f-ab74-44fb5bde2f17"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_BLOCKER",
+     "card_uuid": "eab9182b-f512-43ce-8cd4-988f9c83c1e3"
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "2ce9142b-79d5-47f8-b86a-bb1bb1e80fdc"
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "debe8e1c-4c55-4cd9-87ef-c961393d8893"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "420d4a41-bcfc-431b-8aff-6f79f94e3785"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "86880090-6ec8-471a-a88b-aeedd72caace"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "86880090-6ec8-471a-a88b-aeedd72caace",
+      "target_ids": [
+       "eab9182b-f512-43ce-8cd4-988f9c83c1e3"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "23e97442-9c9a-4ceb-8e91-d78a632d7dcf"
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "36afd4c8-36d6-489d-ad07-869514a1e3e9"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "eab9182b-f512-43ce-8cd4-988f9c83c1e3"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "420d4a41-bcfc-431b-8aff-6f79f94e3785"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "420d4a41-bcfc-431b-8aff-6f79f94e3785",
+      "target_ids": [
+       "eab9182b-f512-43ce-8cd4-988f9c83c1e3"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "d35c46f4-ec8f-47a3-b138-8d40777ae24e"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "420d4a41-bcfc-431b-8aff-6f79f94e3785"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "7e0e26c3-1418-442f-ab74-44fb5bde2f17",
+      "target_ids": [
+       "420d4a41-bcfc-431b-8aff-6f79f94e3785"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "830a6b7d-0a18-47e4-9141-d0d40f38ea80"
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "d35c46f4-ec8f-47a3-b138-8d40777ae24e",
+      "target_ids": [
+       "420d4a41-bcfc-431b-8aff-6f79f94e3785"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "743176da-639b-4849-8717-33fa7e77b7ac"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [
+       "5021c483-f9f1-4873-96f7-11ffbd2067be",
+       "0c61789c-0f16-4cf7-a859-6621c27d108a",
+       "07eb9ab0-cf9a-4e65-80fc-73cb75636b07",
+       "6286fc4e-8421-440b-8fb2-ce23b122fca9",
+       "b04b76c1-969d-4dcd-891d-b5a6b4e671b3"
+      ],
+      "index": 0,
+      "accepted": true,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "743176da-639b-4849-8717-33fa7e77b7ac"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "743176da-639b-4849-8717-33fa7e77b7ac",
+      "target_ids": [
+       "d35c46f4-ec8f-47a3-b138-8d40777ae24e"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    {
+     "kind": "game",
+     "action_type": "TURN_END",
+     "payload": {}
+    },
+    {
+     "kind": "game",
+     "action_type": "RESOLVE_EFFECT_SELECTION",
+     "payload": {
+      "selected_uuids": [],
+      "index": 0,
+      "accepted": false,
+      "position": "BOTTOM",
+      "declared_value": 0
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "PLAY",
+     "payload": {
+      "uuid": "65bb04a5-b101-41e2-ae4a-ebb96029c295"
+     }
+    },
+    {
+     "kind": "game",
+     "action_type": "ATTACK",
+     "payload": {
+      "uuid": "7e0e26c3-1418-442f-ab74-44fb5bde2f17",
+      "target_ids": [
+       "3fb00368-1df4-4528-8ae0-4c696a2b6f88"
+      ]
+     }
+    },
+    {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    }
+   ]
+  }
+ ]
+}

@@ -1909,7 +1909,14 @@ fn decide_after_lethal(
     }
 
     // ③ 窓の根畳み（戦闘窓／対話箱が有効なら効果対話窓）
-    if in_battle(&real) || (opts.box_dialog && in_dialog(&mut real)) {
+    // 安全側の守り（WP `rs-overflow-trigger`・§7.44 の (A)）: メインの判断点（`MAIN_ACTION`）は戦闘が
+    // 残っていても窓の道に入らない＝木が合法手（原始手・箱）から選ぶ。窓は原始手を返す前提なので、
+    // ここへ入るとメインの箱（`DON_BOX`）をそのまま返して適用で落ちる（規則の欠陥で戦闘が残った局）。
+    let main_point = matches!(
+        crate::rules::pending::pending_actor_action(&mut real),
+        Some((_, "MAIN_ACTION"))
+    );
+    if (in_battle(&real) && !main_point) || (opts.box_dialog && in_dialog(&mut real)) {
         if let Some(pick) = window_choice(ctx, state, name, opts, rng, st)? {
             // §7.42 の 1: 窓の続きは効果の対話の段・戦闘の応手の段だけ＝既定は積まない（次の判断点で読み直す）。
             if opts.box_commit && opts.window_carry_legacy {
@@ -2173,6 +2180,10 @@ mod tests_commit_hidden;
 #[cfg(test)]
 #[path = "tests_window_read.rs"]
 mod tests_window_read;
+
+#[cfg(test)]
+#[path = "tests_overflow_trigger.rs"]
+mod tests_overflow_trigger;
 
 #[cfg(test)]
 pub(super) mod tests {
