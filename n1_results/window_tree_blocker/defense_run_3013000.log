@@ -1,1 +1,11 @@
 todo 157 (done 0) -> n1_results/window_tree_blocker/defense_3013000/points_seeds_div_seeds_3013000.jsonl
+[1/157] seed=3013005 pts=42 sec=86.4 winner=p2 stats={'resp_points_seen': 80, 'resp_points_audited': 39, 'end_turns_seen': 13, 'end_turns_audited': 3}
+[2/157] seed=3013002 pts=45 sec=279.7 winner=p2 stats={'resp_points_seen': 52, 'resp_points_audited': 38, 'end_turns_seen': 15, 'end_turns_audited': 7}
+[3/157] seed=3013003 pts=48 sec=327.9 winner=p2 stats={'resp_points_seen': 64, 'resp_points_audited': 41, 'end_turns_seen': 15, 'end_turns_audited': 7}
+[4/157] seed=3013006 pts=50 sec=410.5 winner=p2 stats={'resp_points_seen': 44, 'resp_points_audited': 42, 'end_turns_seen': 11, 'end_turns_audited': 8}
+[5/157] seed=3013015 pts=16 sec=59.8 winner=p2 stats={'resp_points_seen': 30, 'resp_points_audited': 14, 'end_turns_seen': 11, 'end_turns_audited': 2}
+[6/157] seed=3013011 pts=32 sec=213.6 winner=p1 stats={'resp_points_seen': 38, 'resp_points_audited': 28, 'end_turns_seen': 12, 'end_turns_audited': 4}
+[7/157] seed=3013009 pts=35 sec=431.0 winner=p2 stats={'resp_points_seen': 39, 'resp_points_audited': 31, 'end_turns_seen': 11, 'end_turns_audited': 4}
+[8/157] seed=3013013 pts=75 sec=252.1 winner=p1 stats={'resp_points_seen': 81, 'resp_points_audited': 66, 'end_turns_seen': 14, 'end_turns_audited': 9}
+[9/157] seed=3013020 pts=47 sec=167.4 winner=p2 stats={'resp_points_seen': 55, 'resp_points_audited': 41, 'end_turns_seen': 13, 'end_turns_audited': 6}
+[10/157] seed=3013021 pts=41 sec=163.2 winner=p2 stats={'resp_points_seen': 40, 'resp_points_audited': 35, 'end_turns_seen': 11, 'end_turns_audited': 6}
