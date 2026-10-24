@@ -14,5 +14,5 @@
   "arena_r22/r22_real_w03.jsonl": 175,
   "arena_r22/r22_synth2_w03.jsonl": 175
  },
- "notes": ""
+ "notes": "Wall time ~10 min total (real 248s, mirror 153s, synth2 214s on 4 cores) vs the ~80 min estimate; all 175 pairs per condition, void 0 in all three. Shard summaries: real wr 0.5000 CI[0.4595,0.5405]; mirror wr 0.5400 CI[0.4962,0.5838]; synth2 wr 0.5229 CI[0.4849,0.5608]. Base commit af3ceb301."
 }
