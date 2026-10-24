@@ -191,7 +191,7 @@ Rust の決定的な生成器）ので、**同じ seed でも旧版と同じ局�
 | 検証 **WP `rs-lethal-root`**（手元 40 ペア × 2 本 root／root_reply vs off・出荷の設定）／監査のやり直し 300 局／本番アリーナ（root・root_reply 各 12 シャード × 120 ペア・合流後） | 1682000〜1682039／1683000〜1683039／3012000〜3012299／2031000〜2046149（本番・root と対照 off 対 off で共有・16 シャード × 150 ペア・§7.31）／2051000〜2062000（root_reply の本番は取りやめ・未使用） | 手元・監査は使用済み（2026-10-22・報告 2026-10-22_lethal_root.md）・本番は使用済み（2026-10-22・root 2,399 ペア 0.5075 [0.5045, 0.5105] +5.2・対照 0.5000・void 1） |
 | 検証 **r20／r20s vs r13d（教材のデッキの切り分け・公平同士・両席 160 回・各 16 シャード × 175 ペア・§7.34）** | 主 real 3101000〜3116000／副 ミラー 3121000〜3136000／参考 synth_roles2 3141000〜3156000（r20 と r20s で共有） | 使用済み（2026-10-22・r20 主 −1.7／副 +2.9／参考 −39.0・r20s 主 +3.6／副 +13.3／参考 −6.1・void 0〜1） |
 | 検証 **WP `rs-commit-hidden` の本番アリーナ**（修正後 vs `--commit-hidden-legacy`・出荷の設定・random × real・16 シャード × 150 ペア・§7.39） | 3271000〜3286149 | 使用済み（2026-10-23・2,397 ペア 0.5023 [0.4981, 0.5064] +1.6・void 3・採用） |
-| 生成 **波 51**（直したエンジン・生成役 r13d・v15・`--decks real`・32 シャード × 480 局・§7.41） | 2551000〜2566500（シャード k の base は 2550000 + ceil(k/2)×1000 + (k 偶数なら 500)・k＝1〜32） | 指示済み（2026-10-24・claude/n51-w01〜32） |
+| 生成 **波 51**（直したエンジン・生成役 r13d・v15・`--decks real`・32 シャード × 480 局・§7.41） | 2551000〜2566500（シャード k の base は 2550000 + ceil(k/2)×1000 + (k 偶数なら 500)・k＝1〜32） | 使用済み（2026-10-24・15,360 局・2,470,208 行・dropped 23・decks real・直したエンジン） |
 | 監査 **WP `reaudit-wr`**（大きな損 100 局・守りの見逃し 300 局・§7.43 of search_efficiency_plan） | 3341000〜3341099／3351000〜3351299 | 指示済み（2026-10-24・claude/reaudit-wr） |
 | 監査 **WP `rs-window-read` の確かめ**（commit-audit のやり直し 300 局・§7.42） | 3311000〜3311299 | 指示済み（2026-10-23・claude/rs-window-read） |
 | 検証 **WP `rs-window-read` の本番アリーナ**（修正後 vs 旧い旗 3 つ・出荷の設定・random × real・16 シャード × 150 ペア・§7.42） | 3321000〜3336149 | 使用済み（2026-10-24・2,399 ペア 0.5463 [0.5364, 0.5561] +32.2・void 1・採用） |
@@ -4021,4 +4021,46 @@ echo ALL_DONE
 - 所要は 1 本（120 局）約 32 分・4 本で約 2.1 時間（同じコンテナで他の重い処理を並べない）。
 - 最初の push が失敗したら（PUSH_FAILED）、その出力を報告してください。
 - コミットメッセージにモデル名を入れない。````
+
+**波 51 の結果（2026-10-24）**: 32 シャード全部完走・15,360 局・**2,470,208 行**・dropped 23（波 50 は 2／7,680＝多い・WP `reaudit-wr` が見つけた「アタック時の効果で場の上限を超えると攻撃が消え、窓の経路が打てない手を返す」欠陥の疑い・0.15% なので教材はそのまま使う）・1 局平均 26.0 秒（波 50 は 13.6 秒＝窓の世界 16 本・短い木のぶん）。
+
+**訓練 r22／r22o の指示書**（作業セッション用・1 セッション・`claude/train-r22`）。違いは教材を打ったエンジンだけ（どちらも warm-start r13d・生成役 r13d・実デッキ）。
+- r22＝π 波 51・価値 波 51（直したエンジン・247 万行）。
+- r22o＝π 波 50・価値 波 50＋49（直す前のエンジン・約 230 万行）。
+評価帯＝波 51 holdout（r22 に有利・補助指標）で r13d／r22o／r22（＋各 ep0／ep1）。
+
+```
+作業: r22 と r22o の訓練 → 評価帯（docs/n_loop_ops.md §7.41）。コードは変更しない。PR は作らない。
+本線 claude/cpu-spec-improvements-yw91jd の最新を checkout（~/opcg-sim-backend）。長い実行は nohup で回し、
+**push し終えるまでターンを終えない**（9 分以内の待ちを繰り返す）。迷った点は RESULT.json の notes に書いて完走する。
+r22 と r22o は同時に回さず順に（メモリ 14GB）。1 本ごとに npz とログを push する。
+
+pip install -q numpy maturin && make rust-develop
+pip install -q --target ~/torch_env torch
+export TP="PYTHONPATH=$HOME/torch_env:$PWD"
+for k in $(seq -w 1 32); do git fetch -q origin claude/n51-w$k:tmpw && mkdir -p ~/n51 && git archive tmpw n_records | tar -x -C ~/n51 && git branch -qD tmpw; done
+for N in 50 49; do for k in $(seq -w 1 16); do
+  git fetch -q origin claude/n$N-w$k:tmpw && mkdir -p ~/n$N && git archive tmpw n_records | tar -x -C ~/n$N && git branch -qD tmpw; done; done
+ls -d ~/n51/n_records/n51_w*_p[0-3] | wc -l      # 128
+ls -d ~/n50/n_records/n50_w*_p[0-3] | wc -l      # 64
+ls -d ~/n49/n_records/n49_w*_p[0-3] | wc -l      # 64
+
+P51="$HOME/n51/n_records/n51_w*_p[0-3]"
+P50="$HOME/n50/n_records/n50_w*_p[0-3]"
+Z49="$HOME/n49/n_records/n49_w*_p[0-3]"
+COMMON="--ablate rel --aux-weight 0.1 --lr 2e-4 --epochs 2 --pi-teacher q_improved --pi-steps-mult 1.0 --fast --save-each-epoch --warm-start opcg_sim/data/learned/nrel_r13d.npz"
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P51" $COMMON --out ~/nrel_r22.npz 2>&1 | tee ~/train_r22.log
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_train train --in "$P50" --z-in "$Z49" $COMMON --out ~/nrel_r22o.npz 2>&1 | tee ~/train_r22o.log
+
+env $TP OPCG_LOG_SILENT=1 python -m opcg_sim.learned.train.n_rel_band --in "$P51" \
+  --nrel opcg_sim/data/learned/nrel_r13d.npz ~/nrel_r22o.npz ~/nrel_r22.npz ~/nrel_r22o.ep0.npz ~/nrel_r22o.ep1.npz ~/nrel_r22.ep0.npz ~/nrel_r22.ep1.npz \
+  --policy --holdout-mod 7 --out ~/band_r22.json 2>&1 | tee ~/band_r22.log
+
+git checkout -B claude/train-r22
+mkdir -p n1_results && cp ~/nrel_r22*.npz n1_results/ && cp ~/train_r22.log ~/train_r22o.log ~/band_r22.json ~/band_r22.log .
+（RESULT.json〔§5 の形〕: inputs＝warm_start r13d・各ネットの π dir 数・価値の波と行数・rss_gb・npz の meta の enc_version／metrics＝各ネットの best_ep・各周の val v_mse／v_sign／pi_top1／band＝ネットごとの v_mse と方策の指標／train_sec・band_sec／notes）
+git add -f n1_results/nrel_r22*.npz train_r22.log train_r22o.log band_r22.json band_r22.log RESULT.json
+git -c user.email=g.x5gyqe2@gmail.com -c user.name=worker commit -m "r22 と r22o のセット（訓練・評価帯）"
+git push -u origin claude/train-r22
+```
 
