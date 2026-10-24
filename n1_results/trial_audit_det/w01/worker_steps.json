@@ -4,5 +4,8 @@
  },
  "verify": {
   "sec": 5
+ },
+ "summarize": {
+  "sec": 5
  }
 }
