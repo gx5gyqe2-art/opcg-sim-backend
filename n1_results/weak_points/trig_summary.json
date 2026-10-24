@@ -1,0 +1,658 @@
+{
+ "games": 200,
+ "void": 0,
+ "points": 358,
+ "life_points": 255,
+ "optional_points": 103,
+ "cand2": 358,
+ "life": {
+  "n": 255,
+  "cpu_decline": 122,
+  "flat": 89,
+  "adv": {
+   "n": 255,
+   "mean": 0.0368,
+   "ci": [
+    0.0164,
+    0.0571
+   ]
+  },
+  "diff_all": {
+   "n": 255,
+   "mean": -0.0108,
+   "ci": [
+    -0.0316,
+    0.01
+   ]
+  },
+  "sig_decline_better": 14,
+  "sig_accept_better": 14,
+  "cpu_wrong_sig": 10,
+  "too_many_declines": 6,
+  "too_many_accepts": 4,
+  "by_life": {
+   "0": {
+    "n": 46,
+    "cpu_decline": 19,
+    "adv": 0.0367,
+    "diff": {
+     "n": 46,
+     "mean": 0.0041,
+     "ci": [
+      -0.029,
+      0.0371
+     ]
+    },
+    "nonflat": 16,
+    "wrong_sig": 0
+   },
+   "1": {
+    "n": 53,
+    "cpu_decline": 29,
+    "adv": 0.0519,
+    "diff": {
+     "n": 53,
+     "mean": -0.0189,
+     "ci": [
+      -0.0735,
+      0.0357
+     ]
+    },
+    "nonflat": 28,
+    "wrong_sig": 3
+   },
+   "2": {
+    "n": 64,
+    "cpu_decline": 32,
+    "adv": 0.0391,
+    "diff": {
+     "n": 64,
+     "mean": 0.0078,
+     "ci": [
+      -0.0366,
+      0.0523
+     ]
+    },
+    "nonflat": 47,
+    "wrong_sig": 3
+   },
+   "3+": {
+    "n": 92,
+    "cpu_decline": 42,
+    "adv": 0.0265,
+    "diff": {
+     "n": 92,
+     "mean": -0.0265,
+     "ci": [
+      -0.0599,
+      0.0069
+     ]
+    },
+    "nonflat": 75,
+    "wrong_sig": 4
+   }
+  },
+  "by_type": {
+   "【メイン】を発動": {
+    "n": 20,
+    "cpu_decline": 1,
+    "adv": 0.0156,
+    "diff": {
+     "n": 20,
+     "mean": -0.0156,
+     "ci": [
+      -0.0406,
+      0.0093
+     ]
+    },
+    "nonflat": 7,
+    "wrong_sig": 0
+   },
+   "その他": {
+    "n": 30,
+    "cpu_decline": 11,
+    "adv": -0.0208,
+    "diff": {
+     "n": 30,
+     "mean": 0.0167,
+     "ci": [
+      -0.0121,
+      0.0454
+     ]
+    },
+    "nonflat": 15,
+    "wrong_sig": 0
+   },
+   "なし": {
+    "n": 1,
+    "cpu_decline": 1,
+    "adv": 0.0,
+    "diff": {
+     "n": 1,
+     "mean": 0.0,
+     "ci": [
+      NaN,
+      NaN
+     ]
+    },
+    "nonflat": 0,
+    "wrong_sig": 0
+   },
+   "パワー＋": {
+    "n": 13,
+    "cpu_decline": 12,
+    "adv": 0.0962,
+    "diff": {
+     "n": 13,
+     "mean": 0.0962,
+     "ci": [
+      0.0233,
+      0.169
+     ]
+    },
+    "nonflat": 8,
+    "wrong_sig": 0
+   },
+   "ライフを足す": {
+    "n": 7,
+    "cpu_decline": 3,
+    "adv": 0.1429,
+    "diff": {
+     "n": 7,
+     "mean": -0.1964,
+     "ci": [
+      -0.3555,
+      -0.0373
+     ]
+    },
+    "nonflat": 6,
+    "wrong_sig": 0
+   },
+   "他を登場": {
+    "n": 29,
+    "cpu_decline": 10,
+    "adv": 0.0539,
+    "diff": {
+     "n": 29,
+     "mean": -0.0496,
+     "ci": [
+      -0.1102,
+      0.011
+     ]
+    },
+    "nonflat": 22,
+    "wrong_sig": 1
+   },
+   "引く・加える": {
+    "n": 10,
+    "cpu_decline": 2,
+    "adv": -0.0125,
+    "diff": {
+     "n": 10,
+     "mean": 0.0125,
+     "ci": [
+      -0.0315,
+      0.0565
+     ]
+    },
+    "nonflat": 6,
+    "wrong_sig": 0
+   },
+   "相手をレスト": {
+    "n": 11,
+    "cpu_decline": 6,
+    "adv": 0.0739,
+    "diff": {
+     "n": 11,
+     "mean": 0.142,
+     "ci": [
+      0.053,
+      0.2311
+     ]
+    },
+    "nonflat": 10,
+    "wrong_sig": 1
+   },
+   "相手を除去": {
+    "n": 24,
+    "cpu_decline": 18,
+    "adv": 0.0052,
+    "diff": {
+     "n": 24,
+     "mean": -0.0208,
+     "ci": [
+      -0.0596,
+      0.018
+     ]
+    },
+    "nonflat": 12,
+    "wrong_sig": 1
+   },
+   "自身を登場": {
+    "n": 110,
+    "cpu_decline": 58,
+    "adv": 0.046,
+    "diff": {
+     "n": 110,
+     "mean": -0.0233,
+     "ci": [
+      -0.0615,
+      0.0149
+     ]
+    },
+    "nonflat": 80,
+    "wrong_sig": 7
+   }
+  },
+  "by_hand": {
+   "hand<=3": {
+    "n": 45,
+    "cpu_decline": 23,
+    "adv": 0.0556,
+    "diff": {
+     "n": 45,
+     "mean": 0.0056,
+     "ci": [
+      -0.0563,
+      0.0675
+     ]
+    },
+    "nonflat": 22,
+    "wrong_sig": 2
+   },
+   "hand>=4": {
+    "n": 210,
+    "cpu_decline": 99,
+    "adv": 0.0327,
+    "diff": {
+     "n": 210,
+     "mean": -0.0143,
+     "ci": [
+      -0.0358,
+      0.0073
+     ]
+    },
+    "nonflat": 144,
+    "wrong_sig": 8
+   }
+  },
+  "by_battle": {
+   "no_battle": {
+    "n": 255,
+    "cpu_decline": 122,
+    "adv": 0.0368,
+    "diff": {
+     "n": 255,
+     "mean": -0.0108,
+     "ci": [
+      -0.0316,
+      0.01
+     ]
+    },
+    "nonflat": 166,
+    "wrong_sig": 10
+   }
+  }
+ },
+ "optional": {
+  "n": 103,
+  "cpu_decline": 14,
+  "flat": 68,
+  "adv": {
+   "n": 103,
+   "mean": 0.0334,
+   "ci": [
+    0.0111,
+    0.0557
+   ]
+  },
+  "diff_all": {
+   "n": 103,
+   "mean": -0.0358,
+   "ci": [
+    -0.0579,
+    -0.0137
+   ]
+  },
+  "sig_decline_better": 0,
+  "sig_accept_better": 6,
+  "cpu_wrong_sig": 0,
+  "too_many_declines": 0,
+  "too_many_accepts": 0,
+  "by_life": {
+   "0": {
+    "n": 9,
+    "cpu_decline": 4,
+    "adv": 0.0833,
+    "diff": {
+     "n": 9,
+     "mean": -0.0833,
+     "ci": [
+      -0.2467,
+      0.08
+     ]
+    },
+    "nonflat": 1,
+    "wrong_sig": 0
+   },
+   "1": {
+    "n": 12,
+    "cpu_decline": 1,
+    "adv": 0.0573,
+    "diff": {
+     "n": 12,
+     "mean": -0.0573,
+     "ci": [
+      -0.1203,
+      0.0057
+     ]
+    },
+    "nonflat": 3,
+    "wrong_sig": 0
+   },
+   "2": {
+    "n": 17,
+    "cpu_decline": 5,
+    "adv": -0.0074,
+    "diff": {
+     "n": 17,
+     "mean": -0.0074,
+     "ci": [
+      -0.0306,
+      0.0159
+     ]
+    },
+    "nonflat": 5,
+    "wrong_sig": 0
+   },
+   "3+": {
+    "n": 65,
+    "cpu_decline": 4,
+    "adv": 0.0327,
+    "diff": {
+     "n": 65,
+     "mean": -0.0327,
+     "ci": [
+      -0.0567,
+      -0.0087
+     ]
+    },
+    "nonflat": 26,
+    "wrong_sig": 0
+   }
+  },
+  "by_type": {
+   "なし": {
+    "n": 103,
+    "cpu_decline": 14,
+    "adv": 0.0334,
+    "diff": {
+     "n": 103,
+     "mean": -0.0358,
+     "ci": [
+      -0.0579,
+      -0.0137
+     ]
+    },
+    "nonflat": 35,
+    "wrong_sig": 0
+   }
+  },
+  "by_hand": {
+   "hand<=3": {
+    "n": 19,
+    "cpu_decline": 1,
+    "adv": 0.0526,
+    "diff": {
+     "n": 19,
+     "mean": -0.0526,
+     "ci": [
+      -0.0968,
+      -0.0084
+     ]
+    },
+    "nonflat": 5,
+    "wrong_sig": 0
+   },
+   "hand>=4": {
+    "n": 84,
+    "cpu_decline": 13,
+    "adv": 0.029,
+    "diff": {
+     "n": 84,
+     "mean": -0.032,
+     "ci": [
+      -0.0573,
+      -0.0067
+     ]
+    },
+    "nonflat": 30,
+    "wrong_sig": 0
+   }
+  },
+  "by_battle": {
+   "battle": {
+    "n": 1,
+    "cpu_decline": 0,
+    "adv": 0.0,
+    "diff": {
+     "n": 1,
+     "mean": 0.0,
+     "ci": [
+      NaN,
+      NaN
+     ]
+    },
+    "nonflat": 0,
+    "wrong_sig": 0
+   },
+   "no_battle": {
+    "n": 102,
+    "cpu_decline": 14,
+    "adv": 0.0337,
+    "diff": {
+     "n": 102,
+     "mean": -0.0362,
+     "ci": [
+      -0.0585,
+      -0.0138
+     ]
+    },
+    "nonflat": 35,
+    "wrong_sig": 0
+   }
+  }
+ },
+ "wrong_points": [
+  {
+   "seed": 3671022,
+   "step": 6,
+   "card": "OP02-117",
+   "my_life": 4,
+   "opp_life": 4,
+   "my_hand": 7,
+   "cpu": false,
+   "q": {
+    "True": 0.2386,
+    "False": 0.3466
+   },
+   "type": "相手を除去",
+   "diff": -0.3125,
+   "ci": [
+    -0.5471,
+    -0.0779
+   ]
+  },
+  {
+   "seed": 3671038,
+   "step": 39,
+   "card": "OP03-113",
+   "my_life": 4,
+   "opp_life": 3,
+   "my_hand": 4,
+   "cpu": false,
+   "q": {
+    "True": 0.3493,
+    "False": 0.3874
+   },
+   "type": "自身を登場",
+   "diff": -0.25,
+   "ci": [
+    -0.4691,
+    -0.0309
+   ]
+  },
+  {
+   "seed": 3671071,
+   "step": 39,
+   "card": "OP05-106",
+   "my_life": 2,
+   "opp_life": 4,
+   "my_hand": 9,
+   "cpu": false,
+   "q": {
+    "True": -0.5568,
+    "False": -0.5242
+   },
+   "type": "自身を登場",
+   "diff": -0.375,
+   "ci": [
+    -0.6784,
+    -0.0716
+   ]
+  },
+  {
+   "seed": 3671068,
+   "step": 94,
+   "card": "OP01-058",
+   "my_life": 2,
+   "opp_life": 3,
+   "my_hand": 6,
+   "cpu": true,
+   "q": {
+    "True": -0.6234,
+    "False": -0.6515
+   },
+   "type": "相手をレスト",
+   "diff": 0.375,
+   "ci": [
+    0.13,
+    0.62
+   ]
+  },
+  {
+   "seed": 3671095,
+   "step": 120,
+   "card": "OP03-108",
+   "my_life": 1,
+   "opp_life": 2,
+   "my_hand": 3,
+   "cpu": false,
+   "q": {
+    "True": -0.6578,
+    "False": -0.6117
+   },
+   "type": "自身を登場",
+   "diff": -0.25,
+   "ci": [
+    -0.4691,
+    -0.0309
+   ]
+  },
+  {
+   "seed": 3671115,
+   "step": 58,
+   "card": "OP03-108",
+   "my_life": 1,
+   "opp_life": 2,
+   "my_hand": 10,
+   "cpu": false,
+   "q": {
+    "True": -0.9336,
+    "False": -0.9296
+   },
+   "type": "自身を登場",
+   "diff": -0.25,
+   "ci": [
+    -0.4691,
+    -0.0309
+   ]
+  },
+  {
+   "seed": 3671084,
+   "step": 195,
+   "card": "OP14-111",
+   "my_life": 1,
+   "opp_life": 1,
+   "my_hand": 7,
+   "cpu": true,
+   "q": {
+    "True": 0.4695,
+    "False": 0.4386
+   },
+   "type": "他を登場",
+   "diff": 0.375,
+   "ci": [
+    0.13,
+    0.62
+   ]
+  },
+  {
+   "seed": 3671139,
+   "step": 98,
+   "card": "ST07-009",
+   "my_life": 3,
+   "opp_life": 1,
+   "my_hand": 3,
+   "cpu": true,
+   "q": {
+    "True": -0.0623,
+    "False": -0.2096
+   },
+   "type": "自身を登場",
+   "diff": 0.25,
+   "ci": [
+    0.0309,
+    0.4691
+   ]
+  },
+  {
+   "seed": 3671151,
+   "step": 82,
+   "card": "OP07-110",
+   "my_life": 2,
+   "opp_life": 3,
+   "my_hand": 4,
+   "cpu": true,
+   "q": {
+    "True": -0.9416,
+    "False": -0.9602
+   },
+   "type": "自身を登場",
+   "diff": 0.25,
+   "ci": [
+    0.0309,
+    0.4691
+   ]
+  },
+  {
+   "seed": 3671197,
+   "step": 67,
+   "card": "OP07-107",
+   "my_life": 4,
+   "opp_life": 4,
+   "my_hand": 5,
+   "cpu": false,
+   "q": {
+    "True": 0.3004,
+    "False": 0.3238
+   },
+   "type": "自身を登場",
+   "diff": -0.4375,
+   "ci": [
+    -0.6886,
+    -0.1864
+   ]
+  }
+ ]
+}

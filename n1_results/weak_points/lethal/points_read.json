@@ -1,0 +1,106 @@
+[
+ {
+  "pt": "3012043:p1:11:78",
+  "default": {
+   "status": "win",
+   "move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "01ea024e-fdbc-4a94-b587-38458869379d",
+     "target_ids": [
+      "cd26b356-654e-4caf-8f90-5f5a4d9104de"
+     ]
+    }
+   },
+   "nodes": 17875,
+   "deals": 8,
+   "line_len": 7
+  },
+  "true_big": {
+   "status": "unknown",
+   "move": null,
+   "nodes": 6,
+   "deals": 1,
+   "line_len": 0
+  },
+  "opp_life": [
+   "OP11-060"
+  ],
+  "opp_hand": [
+   "EB01-028",
+   "EB01-028"
+  ],
+  "opp_don_active": 3,
+  "trace_deals": "None"
+ },
+ {
+  "pt": "3012044:p2:14:144",
+  "default": {
+   "status": "win",
+   "move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "0695c0d8-664d-4d40-a55f-6255318bea2a",
+     "target_ids": [
+      "855681b4-0b2b-4917-8956-52d3c0c5050f"
+     ]
+    }
+   },
+   "nodes": 2079,
+   "deals": 8,
+   "line_len": 11
+  },
+  "true_big": {
+   "status": "unknown",
+   "move": null,
+   "nodes": 6,
+   "deals": 1,
+   "line_len": 0
+  },
+  "opp_life": [
+   "OP01-030"
+  ],
+  "opp_hand": [
+   "ST01-017",
+   "ST31-002",
+   "ST30-003"
+  ],
+  "opp_don_active": 0,
+  "trace_deals": "None"
+ },
+ {
+  "pt": "3012157:p2:12:124",
+  "default": {
+   "status": "win",
+   "move": {
+    "kind": "game",
+    "action_type": "ATTACK",
+    "payload": {
+     "uuid": "5ac58eeb-c536-498e-bf3d-3df5629f0833",
+     "target_ids": [
+      "e4d43ece-2e9b-4015-81d1-b415fcdc042a"
+     ]
+    }
+   },
+   "nodes": 3169,
+   "deals": 8,
+   "line_len": 15
+  },
+  "true_big": {
+   "status": "no",
+   "move": null,
+   "nodes": 11952,
+   "deals": 1,
+   "line_len": 0
+  },
+  "opp_life": [
+   "OP05-096",
+   "OP10-043"
+  ],
+  "opp_hand": [],
+  "opp_don_active": 3,
+  "trace_deals": "None"
+ }
+]

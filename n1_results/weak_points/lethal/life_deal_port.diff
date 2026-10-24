@@ -1,0 +1,170 @@
+diff --git a/rust/opcg_engine/src/search/lethal.rs b/rust/opcg_engine/src/search/lethal.rs
+index a67273e..efdf30f 100644
+--- a/rust/opcg_engine/src/search/lethal.rs
++++ b/rust/opcg_engine/src/search/lethal.rs
+@@ -272,6 +272,70 @@ fn defense(masters: &MasterTable, m: MasterIdx) -> (i64, bool) {
+     (v * 2 + blocker as i64, ev)
+ }
+ 
++/// 【トリガー】が守りに働くか（§7.28・効果の構造だけで決める・新しい定数は無い）。
++///
++/// 相手（＝攻めている側）のユニット・手札・ドン!!に働く手（KO・レスト・手札／デッキの下／ライフへ戻す・
++/// パワー－・効果の無効・アタックできない・捨てさせる・ドン!!を戻す等）、または自分の守りを足す手（パワー＋・
++/// キーワードを得る・KO されない・ライフを足す・引く・手札に加える・アクティブにする・ドン!!を足す・
++/// 登場させる〔このカード自身ならブロッカーか【登場時】が守りに働くとき〕・【メイン】効果の発動は
++/// その効果）を 1 つでも含めば守りに働く。含まないのは見る・並べ替える・自分の山札を削る・自分の手札を
++/// 捨てるだけの【トリガー】。
++pub(crate) fn trigger_defends(masters: &MasterTable, m: MasterIdx) -> bool {
++    ability_defends(masters, m, TriggerType::Trigger, 0)
++}
++
++fn ability_defends(masters: &MasterTable, m: MasterIdx, t: TriggerType, depth: u8) -> bool {
++    let cm = masters.get(m);
++    cm.ability_ids
++        .iter()
++        .filter_map(|id| masters.abilities.get(*id))
++        .filter(|a| a.trigger == t)
++        .any(|a| a.effect.as_ref().is_some_and(|e| node_defends(masters, m, e, depth)))
++}
++
++fn node_defends(masters: &MasterTable, m: MasterIdx, n: &crate::effects::ast::EffectNode, depth: u8) -> bool {
++    use crate::effects::ast::{ActionType as A, EffectNode as N, PlayerRef as P};
++    match n {
++        N::Sequence(xs) => xs.iter().any(|x| node_defends(masters, m, x, depth)),
++        N::Choice { options, .. } => options.iter().any(|x| node_defends(masters, m, x, depth)),
++        N::Branch { if_true, if_false, .. } => [if_true, if_false]
++            .iter()
++            .any(|x| x.as_ref().is_some_and(|x| node_defends(masters, m, x, depth))),
++        N::Action(a) => {
++            let player = a.target.as_ref().map(|q| q.player);
++            let at_opp = matches!(player, Some(P::Opponent) | Some(P::All));
++            let at_self = !matches!(player, Some(P::Opponent));
++            let sign = a.value.base.signum() * a.value.multiplier.signum();
++            let sub = a.sub_effect.as_ref().is_some_and(|x| node_defends(masters, m, x, depth));
++            sub || match a.ty {
++                A::Ko | A::Rest | A::Bounce | A::DeckBottom | A::MoveCard | A::Move | A::Freeze | A::Lock
++                | A::AttackDisable | A::NegateEffect | A::DisableAbility | A::Discard | A::Trash | A::Restriction
++                | A::SwapPower | A::SetBasePower => at_opp || (matches!(a.ty, A::MoveCard | A::Move) && at_self),
++                A::RestDon | A::FreezeDon | A::ReturnDon => player.is_none() || at_opp,
++                A::Buff | A::BpBuff => (at_self && sign > 0) || (at_opp && sign < 0),
++                A::GrantKeyword | A::Keyword | A::GrantEffect | A::PreventLeave | A::PreventRest | A::Active => at_self,
++                A::Heal | A::LifeRecover | A::Draw | A::MoveToHand | A::RampDon | A::ActiveDon | A::RedirectAttack => {
++                    true
++                }
++                A::PlayCard => {
++                    let this = a.target.as_ref().is_some_and(|q| q.ref_id.as_deref() == Some("self"));
++                    !this
++                        || masters.get(m).keywords.iter().any(|k| k == "ブロッカー")
++                        || (depth == 0 && ability_defends(masters, m, TriggerType::OnPlay, depth + 1))
++                }
++                // 「このカードの【メイン】効果を発動する」（無ければ【カウンター】へ・`resolver::main_ability_indices`）
++                A::ExecuteMainEffect => {
++                    depth == 0
++                        && [TriggerType::ActivateMain, TriggerType::Counter]
++                            .iter()
++                            .any(|t| ability_defends(masters, m, *t, depth + 1))
++                }
++                _ => false,
++            }
++        }
++    }
++}
++
+ /// 守りの強い配り方（`mode` 0＝守りの値の大きい順に手札へ・1＝カウンターイベントを先に）。
+ /// カウンターイベントは相手のアクティブのドン!!で払える枚数までを守りに数える（`legacy`＝true なら払えるかを見ない旧い形）。
+ ///
+@@ -284,6 +348,7 @@ fn defensive_deal(
+     me: Seat,
+     mode: u8,
+     legacy: bool,
++    life: bool,
+     rng: &mut dyn SearchRng,
+ ) -> Result<GameState, EngineError> {
+     let opp = me.other();
+@@ -315,10 +380,12 @@ fn defensive_deal(
+         };
+         let uuids: Vec<String> = pool.iter().map(|c| state.card(*c).uuid.clone()).collect();
+         let mut mixed = by_uuid(rng.shuffle_order(&uuids)?);
++        let tkey = |c: CardIdx| (life && trigger_defends(masters, state.card(c).master)) as i64;
+         let key = |v: i64, ev: bool| if mode == 1 { (-(ev as i64), -v) } else { (0, -v) };
+         mixed.sort_by_key(|c| {
+             let (v, ev) = defense(masters, state.card(*c).master);
+-            key(v, ev)
++            let (a, b) = key(v, ev);
++            (a, b, tkey(*c))
+         });
+         if !legacy {
+             // カウンターイベントは**相手が今払えるドン!!**（アクティブのドン!!）の範囲でだけ守りに数える（§7.33・
+@@ -342,21 +409,32 @@ fn defensive_deal(
+                     }
+                 })
+                 .collect();
+-            eff.sort_by_key(|(_, k)| *k);
++            eff.sort_by_key(|(c, k)| (k.0, k.1, tkey(*c)));
+             mixed = eff.into_iter().map(|(c, _)| c).collect();
+         }
+         let n_hand = slots.iter().filter(|(z, _)| *z == CardZone::Hand).count();
+         let (hand, rest) = mixed.split_at(n_hand);
+         let rest_uuids: Vec<String> = rest.iter().map(|c| state.card(*c).uuid.clone()).collect();
+         let rest = if rest_uuids.is_empty() { Vec::new() } else { by_uuid(rng.shuffle_order(&rest_uuids)?) };
+-        let mut cards = hand.iter().copied().chain(rest);
++        let n_life = if life { slots.iter().filter(|(z, _)| *z == CardZone::Life).count() } else { 0 };
++        let (life_cards, deck_cards): (Vec<CardIdx>, Vec<CardIdx>) = if life {
++            let (d, nd): (Vec<CardIdx>, Vec<CardIdx>) =
++                rest.iter().partition(|c| trigger_defends(masters, state.card(**c).master));
++            let lc: Vec<CardIdx> = d.iter().chain(nd.iter()).copied().take(n_life).collect();
++            let dk = rest.iter().copied().filter(|c| !lc.contains(c)).collect();
++            (lc, dk)
++        } else {
++            (Vec::new(), rest.clone())
++        };
++        let mut hand_it = hand.iter().copied();
++        let mut deck_it = deck_cards.into_iter();
++        let mut life_it = life_cards.into_iter();
+         let po = out.player_mut(opp);
+         for &(z, i) in &slots {
+-            let c = cards.next().expect("同じ枚数");
+             match z {
+-                CardZone::Hand => po.hand[i] = c,
+-                CardZone::Deck => po.deck[i] = c,
+-                _ => po.life[i] = c,
++                CardZone::Hand => po.hand[i] = hand_it.next().expect("同じ枚数"),
++                CardZone::Deck => po.deck[i] = deck_it.next().expect("同じ枚数"),
++                _ => po.life[i] = if life { life_it.next() } else { deck_it.next() }.expect("同じ枚数"),
+             }
+         }
+     }
+@@ -365,6 +443,12 @@ fn defensive_deal(
+     Ok(out)
+ }
+ 
++/// 測定の切替（scratch の wheel だけ・WP weak-points §4）: OPCG_LETHAL_LIFE=off|both|mode0|add（既定 off＝本線と同じ）。
++fn life_variant() -> &'static str {
++    static V: std::sync::OnceLock<String> = std::sync::OnceLock::new();
++    V.get_or_init(|| std::env::var("OPCG_LETHAL_LIFE").unwrap_or_else(|_| "off".into()))
++}
++
+ /// 配り方を作る（`fair` の引き直し `rand` 通り＋守りの強い 2 通り・守りの強い方を先に＝早く落ちる）。
+ /// `legacy`＝守りの強い配り方でカウンターイベントの払えるかを見ない旧い形（opts の `lethal_deal_legacy`・測定用）。
+ pub fn make_deals(
+@@ -376,12 +460,17 @@ pub fn make_deals(
+     legacy: bool,
+ ) -> Result<Vec<GameState>, EngineError> {
+     let mut rng = Pcg32SearchRng::new(seed);
+-    let mut out = Vec::with_capacity(rand + 2);
+-    out.push(defensive_deal(state, masters, me, 0, legacy, &mut rng)?);
+-    out.push(defensive_deal(state, masters, me, 1, legacy, &mut rng)?);
++    let mut out = Vec::with_capacity(rand + 3);
++    let v = life_variant();
++    out.push(defensive_deal(state, masters, me, 0, legacy, v == "both" || v == "mode0", &mut rng)?);
++    out.push(defensive_deal(state, masters, me, 1, legacy, v == "both", &mut rng)?);
+     for _ in 0..rand {
+         out.push(super::determinize::determinize_fair_with(state, me, &mut rng)?);
+     }
++    if v == "add" {
++        let d = defensive_deal(state, masters, me, 0, legacy, true, &mut rng)?;
++        out.insert(0, d);
++    }
+     Ok(out)
+ }
+ 
