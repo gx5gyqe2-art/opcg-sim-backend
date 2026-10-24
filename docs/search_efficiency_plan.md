@@ -769,3 +769,17 @@ Phase 0 → Phase 1 → Phase 3（Phase 4 の (a)(b) を合間に）→ Phase 4 
 **報告** `docs/reports/2026-10-24_window_tree_blocker.md`・`n1_results/window_tree_blocker/`・`RESULT.json`・`docs/SPEC.md` §2.5.12・`docs/TEST_SPEC.md`・ブランチ `claude/rs-window-tree-blocker`。
 **完了条件**: `make test` green・`make audit-cross` void 0・push。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
 
+### 7.46 WP `rs-unpayable-activate`——払えないコストの【起動メイン】が合法手に出て無効のまま繰り返される欠陥を直す（作業セッション用・opus・2026-10-24）
+
+ユーザ決定（2026-10-24「ももすけをなおして」）。台帳 2+396。根拠 `docs/reports/2026-10-24_overflow_trigger.md`（生成と同じ設定の 400 局で捨てた 3 局のうち 1 局＝3461302）: **光月モモの助（OP16-084）**の【起動メイン】のコスト（「コスト 20 以上のこのキャラをトラッシュ」の形）が払えないのに合法手に出て、選ぶと効果が無効のまま何も変わらず、同じ手が繰り返されて手数の上限まで進む。旧い旗でも同じ＝今までの修正とは無関係の既存の欠陥。教材の生成で 0.25% 前後の局がこれで捨てられうる。
+**直すもの**:
+1. 3461302 の局面を再現し、なぜ合法手に出るか（コストの判定〔トラッシュに置く札の条件・数〕を合法手の生成で見ていない／パーサがコストを効果側に読んでいる 等）を突き止める。**同じ形のコスト（トラッシュに置く・手札を捨てる・ドン!!を戻す 等の「払う」もの）を持つ他のカードにも同じ穴が無いか**、カード DB を一通り洗う（`card-effect-audit` の器や golden 監査の道具を使ってよい）。
+2. 規則の側で直す: 払えないコストの【起動メイン】（とその他の起動型の効果）は合法手に出さない。払える札を選ぶ対話がある形なら、払える候補だけを出す。裁定はパーサ（`opcg_sim/src/effects`）かエンジン（`rust/opcg_engine`）の正しい側に置く（CLAUDE.md の配置規約）。**旗は付けない**（正しさの修正）。
+3. 単体テスト: 3461302 の局面でその起動が合法手に出ない・払えるときは出る。見つかった他のカードも同じ形で 1 本ずつ。
+**確かめ**:
+- 生成と同じ設定（生成役 r22・`opcg_sim/loop/jobs/gen_n52.json` の引数・デッキ real）の 400 局（seed **3651000〜3651399**）で、この型の dropped が 0。
+- golden を作り直し、差分は 1 件ずつ読む（この修正で変わった局だけであること）。カード DB は差し替えないので `card-audit` は不要だが、パーサを触ったら効果 JSON を作り直して `test_effect_oracle_gate.py` を通す。
+- `make test` green・`make audit-cross` void 0。
+**報告** `docs/reports/2026-10-24_unpayable_activate.md`・`n1_results/unpayable_activate/`・`RESULT.json`・`docs/SPEC.md`（コストの節）・`docs/TEST_SPEC.md`・ブランチ `claude/rs-unpayable-activate`。本番アリーナは要らない（両席に効く規則の修正）。
+**完了条件**: `make test` green・`make audit-cross` void 0・push。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
+
