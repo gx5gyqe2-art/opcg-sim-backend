@@ -1417,6 +1417,20 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
 - 【トリガー】（ライフ公開）は `CONFIRM_TRIGGER` で確認してから解決。複数枚はキューで保持し中断跨ぎで消えない。
 - 【ドン‼×N】= `Condition(HAS_DON, value=N, GE)`。`source_card.attached_don` を見る。
 - 任意コスト能力は `Ability.cost_optional`。自動誘発は発動前に `CONFIRM_OPTIONAL` で確認（`ACTIVATE_MAIN` は対象外）。
+- **コストの支払い可否**（Rust `Resolver::can_satisfy_node_on`）は、起動メインの合法手（`rules/legal.rs::has_activatable_main`）・
+  能力の解決の入口（`game_resolve_ability`）・置換の成否で使う 1 本の判定。**払えないコストの能力は合法手に出ず、解決もしない**。
+  実際の支払い（`resolve_targets`・各アクション）と同じ数え方にする（2026-10-24・WP `rs-unpayable-activate`・`docs/reports/2026-10-24_unpayable_activate.md`）:
+  - 「コストN以上のこのキャラを…」（`ref_id='self'`＋`cost_min`／`cost_max`・OP16-084）: 発生源の**現在の**コストが範囲内のときだけ払える
+    （旧: 支払い可否だけが範囲を見ず、払えない起動が合法手に出て、打つと何も起きず同じ手番に繰り返された＝生成の 400 手の上限）。
+  - 「付与されているドン!!N枚をコストエリアに戻す」（`MOVE_ATTACHED_DON`・ST28-004）: 自分の付与中のドン!!が N 枚以上。
+  - 「デッキの上からN枚をトラッシュに置く」（`TRASH_FROM_DECK`）: デッキが N 枚以上。
+  - 「（相手の）キャラ1枚に（相手の）レストの／アクティブのドン!!N枚を付与する」（`ATTACH_DON`・OP15-003／017／023・OP13-007）:
+    付与先に加えて、付与するドン!!がプール（`OPP`＝相手・`RESTED`＝レストだけ・status なし＝アクティブだけ）に N 枚以上。
+  - コストの「A か B」（`Choice`・OP13-079・OP17-020 等・DB では全て 2 択）: どちらか一方を払えれば起動でき、**払える枝が 1 つだけなら
+    選択を出さずにその枝を払う**（旧: 払えない枝を選べ、選ぶとコスト不成立で【ターン1回】だけ消費した）。
+  - 掃き出しの見張り: `rules/tests_unpayable_activate.rs::every_legal_activate_main_changes_the_board`（【起動メイン】を持つ全カード ×
+    資源を空にした盤面 10 通りで、合法手に出た起動は打てば盤面が変わる・コストのある起動は使用回数のほかにも何かが変わる）。
+  - 「コスト：〜の場合、効果」の条件はコストの後ろ（効果側）なので、条件が偽でもコストを払える限り起動できる（`tests_cost_gate.rs`・変わらない）。
 - 遅延「ターン終了時、」は `GameAction.delay="TURN_END"` → `pending_end_of_turn` → `end_turn` で解決。
 
 ### 3.6 対象解決・値解析（要点）
