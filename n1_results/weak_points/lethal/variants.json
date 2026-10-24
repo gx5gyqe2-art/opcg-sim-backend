@@ -1,0 +1,102 @@
+{
+ "off": {
+  "new_true": {},
+  "points": 12710,
+  "proofs": 860,
+  "lost": 0,
+  "lost_target_true_no": 0,
+  "target_pts": [],
+  "lost_true_win": 0,
+  "lost_true_unknown": 0,
+  "lost_to": {},
+  "new": 0,
+  "new_pts": [],
+  "move_changed": 0,
+  "nodes": 76535560,
+  "nodes_base": 76535560
+ },
+ "both": {
+  "new_true": {
+   "win": 11
+  },
+  "points": 12710,
+  "proofs": 842,
+  "lost": 29,
+  "lost_target_true_no": 1,
+  "target_pts": [
+   "3012157:p2:12:124"
+  ],
+  "lost_true_win": 26,
+  "lost_true_unknown": 2,
+  "lost_to": {
+   "unknown": 24,
+   "no": 5
+  },
+  "new": 11,
+  "new_pts": [
+   "3012021:p1:15:137",
+   "3012046:p2:14:124",
+   "3012066:p1:11:111",
+   "3012067:p1:11:94",
+   "3012124:p2:12:137",
+   "3012124:p2:12:138",
+   "3012157:p1:13:140",
+   "3012157:p1:13:142",
+   "3012271:p2:10:97",
+   "3012273:p1:11:112",
+   "3012273:p1:11:114"
+  ],
+  "move_changed": 4,
+  "nodes": 73960400,
+  "nodes_base": 76535560
+ },
+ "mode0": {
+  "new_true": {
+   "win": 4
+  },
+  "points": 12710,
+  "proofs": 842,
+  "lost": 22,
+  "lost_target_true_no": 1,
+  "target_pts": [
+   "3012157:p2:12:124"
+  ],
+  "lost_true_win": 20,
+  "lost_true_unknown": 1,
+  "lost_to": {
+   "unknown": 18,
+   "no": 4
+  },
+  "new": 4,
+  "new_pts": [
+   "3012021:p1:15:137",
+   "3012124:p2:12:137",
+   "3012158:p2:10:94",
+   "3012273:p1:11:112"
+  ],
+  "move_changed": 3,
+  "nodes": 73917088,
+  "nodes_base": 76535560
+ },
+ "add": {
+  "new_true": {},
+  "points": 12710,
+  "proofs": 822,
+  "lost": 38,
+  "lost_target_true_no": 1,
+  "target_pts": [
+   "3012157:p2:12:124"
+  ],
+  "lost_true_win": 37,
+  "lost_true_unknown": 0,
+  "lost_to": {
+   "unknown": 34,
+   "no": 4
+  },
+  "new": 0,
+  "new_pts": [],
+  "move_changed": 1,
+  "nodes": 74194425,
+  "nodes_base": 76535560
+ }
+}

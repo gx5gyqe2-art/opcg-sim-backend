@@ -67,42 +67,43 @@ def follow_battle(game, me, opp, seed, turn):
     return used
 
 
-rows = []
-for p in pts:
-    seed, step, me = p["seed"], p["step"], p["seat"]
-    opp = "p2" if me == "p1" else "p1"
-    game = BA.replay(games[seed], step)
-    turn = int(game.turn_count)
-    r = {"seed": seed, "step": step, "board": BA.board(game, me), "static_root": {"me": static(game, me), "opp": static(game, opp)}}
-    for tag, mv in (("pass", p["a"] if p["a"]["action_type"] == "PASS" else p["b"]),
-                    ("block", p["b"] if p["a"]["action_type"] == "PASS" else p["a"])):
-        c = game.fork()
-        c.apply_search_move(me, json.dumps(mv, ensure_ascii=False))
-        t0 = time.time()
-        d = {"move": BA.desc(game, mv), "exact_child": DA.judge_full(c, opp, 120.0, 3_000_000)}
-        e = c.fork()
-        d["follow"] = follow_battle(e, me, opp, seed, turn)
-        d["end_winner"] = e.winner()
-        if e.winner() is None:
-            d["end_board"] = BA.board(e, me)
-            d["end_static"] = {"me": static(e, me), "opp": static(e, opp)}
-            d["end_exact"] = DA.judge_full(e, opp, 120.0, 3_000_000)
-            dd = deep(e, opp, seed ^ 0x55AA)
-            d["end_deep"] = dict(dd, v_me=None if dd["v_mover"] is None else -dd["v_mover"])
-        # 審判: 勝ち・このターンのうちに負けた
-        wins, lost_now = [], 0
-        for i in range(K):
-            ws = MJ.world_seed(seed, step, i)
-            g = game.fork_world(me, "fair", int(ws))
-            g.apply_search_move(me, json.dumps(mv, ensure_ascii=False))
-            w, _ = MJ.play_out(g, BA._G["refs"]["r13d"], int(ws))
-            wins.append(None if w is None else int(w == me))
-            if w == opp and int(g.turn_count) == turn:
-                lost_now += 1
-        d["ref"] = {"k": K, "win": round(sum(x for x in wins if x is not None) / max(1, sum(x is not None for x in wins)), 3),
-                    "lost_this_turn": lost_now}
-        d["sec"] = round(time.time() - t0, 1)
-        r[tag] = d
-    print(json.dumps(r, ensure_ascii=False), flush=True)
-    rows.append(r)
-json.dump(rows, open("n1_results/weak_points/dbl_attack.json", "w"), ensure_ascii=False, indent=1)
+if __name__ == "__main__":
+    rows = []
+    for p in pts:
+        seed, step, me = p["seed"], p["step"], p["seat"]
+        opp = "p2" if me == "p1" else "p1"
+        game = BA.replay(games[seed], step)
+        turn = int(game.turn_count)
+        r = {"seed": seed, "step": step, "board": BA.board(game, me), "static_root": {"me": static(game, me), "opp": static(game, opp)}}
+        for tag, mv in (("pass", p["a"] if p["a"]["action_type"] == "PASS" else p["b"]),
+                        ("block", p["b"] if p["a"]["action_type"] == "PASS" else p["a"])):
+            c = game.fork()
+            c.apply_search_move(me, json.dumps(mv, ensure_ascii=False))
+            t0 = time.time()
+            d = {"move": BA.desc(game, mv), "exact_child": DA.judge_full(c, opp, 120.0, 3_000_000)}
+            e = c.fork()
+            d["follow"] = follow_battle(e, me, opp, seed, turn)
+            d["end_winner"] = e.winner()
+            if e.winner() is None:
+                d["end_board"] = BA.board(e, me)
+                d["end_static"] = {"me": static(e, me), "opp": static(e, opp)}
+                d["end_exact"] = DA.judge_full(e, opp, 120.0, 3_000_000)
+                dd = deep(e, opp, seed ^ 0x55AA)
+                d["end_deep"] = dict(dd, v_me=None if dd["v_mover"] is None else -dd["v_mover"])
+            # 審判: 勝ち・このターンのうちに負けた
+            wins, lost_now = [], 0
+            for i in range(K):
+                ws = MJ.world_seed(seed, step, i)
+                g = game.fork_world(me, "fair", int(ws))
+                g.apply_search_move(me, json.dumps(mv, ensure_ascii=False))
+                w, _ = MJ.play_out(g, BA._G["refs"]["r13d"], int(ws))
+                wins.append(None if w is None else int(w == me))
+                if w == opp and int(g.turn_count) == turn:
+                    lost_now += 1
+            d["ref"] = {"k": K, "win": round(sum(x for x in wins if x is not None) / max(1, sum(x is not None for x in wins)), 3),
+                        "lost_this_turn": lost_now}
+            d["sec"] = round(time.time() - t0, 1)
+            r[tag] = d
+        print(json.dumps(r, ensure_ascii=False), flush=True)
+        rows.append(r)
+    json.dump(rows, open("n1_results/weak_points/dbl_attack.json", "w"), ensure_ascii=False, indent=1)
