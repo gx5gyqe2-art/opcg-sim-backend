@@ -1,7 +1,7 @@
 {
  "job": "trial-audit-det-w01",
  "role": "audit",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "setting": "§7.24: 両席 r13d・世界 1 本 × 1,280 回・予算なし・証明 off・random × synth_roles",
   "tool": "tests/scripts/defense_audit.py",
