@@ -14,5 +14,5 @@
   "arena_r22/r22_real_w01.jsonl": 175,
   "arena_r22/r22_synth2_w01.jsonl": 175
  },
- "notes": ""
+ "notes": "全 3 条件完走（各 175 ペア・k=1）。real: 2 ペアが void（173 ペア集計・wr 0.5318・Elo +22.1・ci95 [0.489,0.574]）・void は 2/175 ペア＝約 1.1% で 2% 未満。mirror: wr 0.5486・Elo +33.9・void 0。synth_roles2: wr 0.5171・Elo +11.9・void 0。1 条件あたり約 3 分で終わった（補足の見込み約 25 分よりかなり速い・4 コア）。作業ディレクトリは ~/opcg-sim-backend（/root 側に clone）。"
 }
