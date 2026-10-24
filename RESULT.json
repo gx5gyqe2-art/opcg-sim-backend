@@ -1,7 +1,7 @@
 {
  "job": "trial-gen-w01",
  "role": "gen",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r13d.npz",
   "games": 2,
@@ -26,6 +26,6 @@
   "spec": "origin/claude/worker-jobs:opcg_sim/loop/jobs/trial_gen.json",
   "k": 1,
   "branch": "claude/worker-job-trial-gen-w01",
-  "commit": "8bc771dfee725e0b662645a9ff0fe02229396a25"
+  "commit": "9fc86dc0d3b347667fbecb60e7c603a9162528bc"
  }
 }
