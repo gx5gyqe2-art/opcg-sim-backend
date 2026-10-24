@@ -14,5 +14,5 @@
   "arena_r22o/r22o_real_w12.jsonl": 175,
   "arena_r22o/r22o_synth2_w12.jsonl": 175
  },
- "notes": ""
+ "notes": "Each condition took ~5-6 min on 4 workers (real: 317s), far less than the ~25 min estimate; ran exactly as instructed on origin/claude/cpu-spec-improvements-yw91jd @6fb845d4e, no --reveal. real: 174 pairs (1 void); mirror/synth2: 175 pairs, 0 void."
 }
