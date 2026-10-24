@@ -64,7 +64,7 @@
   相手の場と手札）、全部空、発生源に付与ドン!! 2 枚、の 10 通りに置き、**合法手に出た起動は打って既定の応答で消化すれば盤面が変わる**
   （全ての【起動メイン】にコストがあるカードは、使用回数のほかにも何かが変わる＝コストを払った）ことを見る。
   修正前は 2,791 回の合法な起動のうち **42 回**が空振り（OP16-084 が 9 盤面すべて・ST28-004 7・OP15-003 8・OP15-017 8・OP13-079 8・OP17-020 1・
-  `n1_results/unpayable_activate/sweep_before.txt`）、修正後は 0（OP15-023 は効果側で盤面が変わるので掃き出しには出ないが、同じ判定で直っている）。
+  `n1_results/unpayable_activate/sweep_before.txt`）、修正後は合法な起動 2,746 回のうち 0（`sweep_after.txt`・OP15-023 は効果側で盤面が変わるので掃き出しには出ないが、同じ判定で直っている）。
   実データ `opcg_effects.json`（生成物）が無い環境では何もしない（`loader.rs` 等と同じ約束。`make test` の前の Python 側のテストが作る）。
 - 修正前（resolver.rs だけ戻した）で 7 本とも落ちることを確かめた。
 - pytest `tests/test_rs_unpayable_activate.py`（2 本）: 生成の局 3461302 の**実際の盤面**（`tests/fixtures/unpayable_activate_3461302.json`＝

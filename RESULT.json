@@ -19,7 +19,7 @@
   "unchanged": "parser / effects JSON, cost-gate rule (condition after the cost), default_interaction_payload"
  },
  "tests": {
-  "rust": "rules/tests_unpayable_activate.rs (7): OP16-084 x2, ST28-004, EB04-042, OP15-003, OP17-020, DB sweep (377 ACTIVATE_MAIN cards x 10 boards: every legal activation changes the board; costed ones change more than the use counter). All 7 fail with the resolver change reverted; sweep before: 42 inert of 2791 legal activations (OP16-084 9, OP15-003 8, OP15-017 8, OP13-079 8, ST28-004 7, OP17-020 1), after: 0",
+  "rust": "rules/tests_unpayable_activate.rs (7): OP16-084 x2, ST28-004, EB04-042, OP15-003, OP17-020, DB sweep (377 ACTIVATE_MAIN cards x 10 boards: every legal activation changes the board; costed ones change more than the use counter). All 7 fail with the resolver change reverted; sweep before: 42 inert of 2791 legal activations (OP16-084 9, OP15-003 8, OP15-017 8, OP13-079 8, ST28-004 7, OP17-020 1), after: 0 inert of 2746",
   "pytest": "tests/test_rs_unpayable_activate.py (2): real 3461302 position (fixture tests/fixtures/unpayable_activate_3461302.json, turn 12 step 143, p2 MAIN with OP16-084 on field): activation not legal; legal with cost_buff 15"
  },
  "game_3461302": "p2 wins, 12 turns, 155 steps (before: 400-step cap, p2 290 actions)",
