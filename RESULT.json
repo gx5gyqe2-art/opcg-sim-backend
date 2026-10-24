@@ -4,10 +4,12 @@
  "status": "partial",
  "outputs": {
   "files": [
+   "arena_r22o/r22o_mirror_w16.jsonl",
    "arena_r22o/r22o_real_w16.jsonl"
   ]
  },
  "metrics": {
+  "arena_r22o/r22o_mirror_w16.jsonl": 175,
   "arena_r22o/r22o_real_w16.jsonl": 175
  },
  "notes": ""
