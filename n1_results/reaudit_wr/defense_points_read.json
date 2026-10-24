@@ -1,0 +1,332 @@
+[
+ {
+  "seed": 3351039,
+  "step": 164,
+  "pending": "SELECT_COUNTER",
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-051\"}",
+  "kind": "window",
+  "window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "Q": [
+   -0.891,
+   -0.894,
+   -0.894,
+   -0.903
+  ],
+  "legal": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-051\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB01-056\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-101\"}",
+   "{\"action_type\": \"PASS\"}"
+  ],
+  "tree_life2": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-051\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "Q": [
+    -0.891,
+    -0.894,
+    -0.894,
+    -0.903
+   ]
+  },
+  "sims_x4": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-051\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "Q": [
+    -0.884,
+    -0.886,
+    -0.886,
+    -0.893
+   ]
+  },
+  "tree_life2_x4": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-051\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "Q": [
+    -0.884,
+    -0.886,
+    -0.886,
+    -0.893
+   ]
+  }
+ },
+ {
+  "seed": 3351102,
+  "step": 135,
+  "pending": "SEARCH_AND_SELECT",
+  "live": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP15-033\"], \"selected_slots\": [1], \"index\": 0, \"position\": \"BOTTOM\"}",
+  "kind": "window",
+  "window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "Q": [
+   -1.0,
+   -1.0,
+   -0.977,
+   -0.984,
+   -1.0
+  ],
+  "legal": [
+   "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}"
+  ],
+  "tree_life2": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP15-033\"], \"selected_slots\": [1], \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "Q": [
+    -1.0,
+    -1.0,
+    -0.977,
+    -0.984,
+    -1.0
+   ]
+  },
+  "sims_x4": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP15-033\"], \"selected_slots\": [1], \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "Q": [
+    -1.0,
+    -1.0,
+    -0.977,
+    -0.984,
+    -1.0
+   ]
+  },
+  "tree_life2_x4": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"selected\": [\"OP15-033\"], \"selected_slots\": [1], \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "Q": [
+    -1.0,
+    -1.0,
+    -0.977,
+    -0.984,
+    -1.0
+   ]
+  }
+ },
+ {
+  "seed": 3351124,
+  "step": 134,
+  "pending": "CONFIRM_TRIGGER",
+  "live": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+  "kind": "window",
+  "window": null,
+  "Q": [],
+  "legal": [
+   "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}"
+  ],
+  "tree_life2": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": null,
+   "Q": []
+  },
+  "sims_x4": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": null,
+   "Q": []
+  },
+  "tree_life2_x4": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": null,
+   "Q": []
+  }
+ },
+ {
+  "seed": 3351191,
+  "step": 114,
+  "pending": "SELECT_COUNTER",
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+  "kind": "window",
+  "window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "Q": [
+   -0.977,
+   -0.977,
+   -0.991
+  ],
+  "legal": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST03-004\"}",
+   "{\"action_type\": \"PASS\"}"
+  ],
+  "tree_life2": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "Q": [
+    -0.935,
+    -0.935,
+    -0.992
+   ]
+  },
+  "sims_x4": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+   "window": {
+    "worlds": 16,
+    "tree": false
+   },
+   "Q": [
+    -0.977,
+    -0.977,
+    -0.991
+   ]
+  },
+  "tree_life2_x4": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-044\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "Q": [
+    -0.943,
+    -0.943,
+    -0.994
+   ]
+  }
+ },
+ {
+  "seed": 3351233,
+  "step": 81,
+  "pending": "CONFIRM_TRIGGER",
+  "live": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+  "kind": "window",
+  "window": null,
+  "Q": [],
+  "legal": [
+   "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}"
+  ],
+  "tree_life2": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": null,
+   "Q": []
+  },
+  "sims_x4": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": null,
+   "Q": []
+  },
+  "tree_life2_x4": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": null,
+   "Q": []
+  }
+ },
+ {
+  "seed": 3351284,
+  "step": 146,
+  "pending": "SELECT_COUNTER",
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-059\"}",
+  "kind": "window",
+  "window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "Q": [
+   -0.105,
+   -0.564,
+   -0.866,
+   -0.105,
+   -0.916
+  ],
+  "legal": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-059\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST29-007\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST29-004\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-059\"}",
+   "{\"action_type\": \"PASS\"}"
+  ],
+  "tree_life2": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-059\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "Q": [
+    -0.105,
+    -0.564,
+    -0.866,
+    -0.105,
+    -0.916
+   ]
+  },
+  "sims_x4": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-059\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "Q": [
+    0.022,
+    -0.835,
+    -0.927,
+    0.022,
+    -0.959
+   ]
+  },
+  "tree_life2_x4": {
+   "move": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-059\"}",
+   "window": {
+    "worlds": 2,
+    "tree": true
+   },
+   "Q": [
+    0.022,
+    -0.835,
+    -0.927,
+    0.022,
+    -0.959
+   ]
+  }
+ },
+ {
+  "seed": 3351284,
+  "step": 158,
+  "pending": "CONFIRM_TRIGGER",
+  "live": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+  "kind": "window",
+  "window": null,
+  "Q": [],
+  "legal": [
+   "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}"
+  ],
+  "tree_life2": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": null,
+   "Q": []
+  },
+  "sims_x4": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": null,
+   "Q": []
+  },
+  "tree_life2_x4": {
+   "move": "{\"action_type\": \"RESOLVE_EFFECT_SELECTION\", \"index\": 0, \"position\": \"BOTTOM\"}",
+   "window": null,
+   "Q": []
+  }
+ }
+]
