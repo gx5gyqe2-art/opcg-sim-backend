@@ -1,0 +1,6 @@
+aborted: seed=3351219 step=154 ValueError: 不明なアクションです: DON_BOX
+{'step': 150, 'seat': 'p1', 'pending': 'CONFIRM_OPTIONAL', 'msg': '「ゲッコー・モリア」の効果を使用しますか？（コストを払う）', 'kind': 'window', 'move': 'RESOLVE_EFFECT_SELECTION', 'phase': 'MAIN', 'battle': True}
+{'step': 151, 'seat': 'p1', 'pending': 'SEARCH_AND_SELECT', 'msg': '「ゲッコー・モリア」の効果: 対象を選択（1枚）', 'kind': 'window', 'move': 'RESOLVE_EFFECT_SELECTION', 'phase': 'MAIN', 'battle': True}
+{'step': 152, 'seat': 'p1', 'pending': 'SEARCH_AND_SELECT', 'msg': '「ゲッコー・モリア」の効果: 対象を選択（1枚まで）', 'kind': 'window', 'move': 'RESOLVE_EFFECT_SELECTION', 'phase': 'MAIN', 'battle': True}
+{'step': 153, 'seat': 'p1', 'pending': 'SEARCH_AND_SELECT', 'msg': '場のキャラクターが上限(5)を超えました。トラッシュするキャラを1枚選んでください。', 'kind': 'window', 'move': 'RESOLVE_EFFECT_SELECTION', 'phase': 'MAIN', 'battle': True}
+{'step': 154, 'seat': 'p1', 'pending': 'MAIN_ACTION', 'msg': 'メインアクションを選択してください', 'kind': 'window', 'move': 'DON_BOX', 'phase': 'MAIN', 'battle': True}
