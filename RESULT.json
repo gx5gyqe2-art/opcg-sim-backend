@@ -14,5 +14,5 @@
   "arena_r22o/r22o_real_w15.jsonl": 175,
   "arena_r22o/r22o_synth2_w15.jsonl": 175
  },
- "notes": ""
+ "notes": "完走・3 本とも 175/175 ペア・void 0。所要は想定（1 本約 25 分）よりかなり短い: real 311s・mirror 143s・synth2 238s（workers 4）。シャード単体の値: real wr 0.5429 [0.5009,0.5848] +29.9／mirror 0.4657 [0.4139,0.5175] −23.9／synth2 0.44 [0.3985,0.4815] −41.9。"
 }
