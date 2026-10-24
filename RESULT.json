@@ -14,5 +14,5 @@
   "arena_r22/r22_real_w13.jsonl": 175,
   "arena_r22/r22_synth2_w13.jsonl": 175
  },
- "notes": ""
+ "notes": "Base commit af3ceb301 (origin/claude/cpu-spec-improvements-yw91jd). No arena_r22 on the branch beforehand, so all three runs started from 0. Each run took much less than the expected ~25 min: real 345s, mirror 184s, synth2 a few minutes (4 workers, 4 cores). Results look normal: void=0, 175 pairs each. Shard results: real wr 0.5543 [0.5119,0.5967] +37.9 Elo; mirror wr 0.5400 [0.4948,0.5852] +27.9; synth_roles2 wr 0.5314 [0.4916,0.5713] +21.9. The repo was at /root/opcg-sim-backend ($HOME=/root)."
 }
