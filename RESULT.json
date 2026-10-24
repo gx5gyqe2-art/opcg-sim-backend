@@ -1,7 +1,7 @@
 {
  "job": "arena-r22o-w01",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "outputs": {
   "files": [
    "arena_r22o/r22o_mirror_w01.jsonl",
