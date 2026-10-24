@@ -4,5 +4,8 @@
  },
  "judge": {
   "sec": 25
+ },
+ "recheck": {
+  "sec": 5
  }
 }
