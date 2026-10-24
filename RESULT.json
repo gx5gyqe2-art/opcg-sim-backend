@@ -12,6 +12,7 @@
   "dir": "n1_results/trial_audit/w02",
   "files": [
    "n1_results/trial_audit/w02/points_3013004_4.jsonl",
+   "n1_results/trial_audit/w02/verify.jsonl",
    "n1_results/trial_audit/w02/worker_steps.json"
   ]
  },
@@ -23,10 +24,14 @@
   "steps": {
    "run": {
     "sec": 428
+   },
+   "verify": {
+    "sec": 5
    }
   },
   "lines": {
-   "points_3013004_4.jsonl": 203
+   "points_3013004_4.jsonl": 203,
+   "verify.jsonl": 0
   }
  },
  "notes": "",
