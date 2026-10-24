@@ -1,9 +1,27 @@
 {
- "job": "rs-window-read",
- "role": "engine fix (window/dialog decisions) + re-audits",
- "status": "running",
- "spec": "docs/search_efficiency_plan.md §7.42 (origin/claude/cpu-spec-improvements-yw91jd @ ef33a81; ledger 2+374); evidence docs/reports/2026-10-23_commit_audit.md, 2026-10-23_blunder_audit.md, 2026-10-23_commit_hidden.md §2.2",
- "branch": "claude/rs-window-read",
- "report": "docs/reports/2026-10-23_window_read.md",
- "notes": "in progress: commit-audit redo (seeds 3311000-3311299), audit-cross, defense re-audit (legacy vs fixed) running"
+ "job": "n51-w27",
+ "role": "gen",
+ "status": "partial",
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r13d.npz",
+  "seed_base": 2564000,
+  "games": 480,
+  "sims": 1280,
+  "worlds": 1,
+  "budget": 0,
+  "decks": "real"
+ },
+ "outputs": {
+  "dirs": [
+   "n_records/n51_w27_p0"
+  ]
+ },
+ "metrics": {
+  "parts_done": 1,
+  "games": 120,
+  "rows": 19281,
+  "dropped": 0,
+  "sec_play_mean": 37.26
+ },
+ "notes": ""
 }
