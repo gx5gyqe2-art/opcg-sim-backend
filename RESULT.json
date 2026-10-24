@@ -14,5 +14,5 @@
   "arena_r22/r22_real_w06.jsonl": 175,
   "arena_r22/r22_synth2_w06.jsonl": 175
  },
- "notes": ""
+ "notes": "base af3ceb301 (includes rs-window-read 815b3c273). void 0 in all 3. Wall time far below the ~25 min/run estimate: real 151s, mirror 294s, synth2 237s (4 workers, nproc=4); 175/175 pairs each, so not a truncation. Shard summary: real wr 0.5943 [0.5457,0.6428]; mirror 0.5829 [0.5393,0.6264]; synth2 0.4971 [0.4547,0.5395]."
 }
