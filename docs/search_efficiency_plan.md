@@ -736,3 +736,21 @@ Phase 0 → Phase 1 → Phase 3（Phase 4 の (a)(b) を合間に）→ Phase 4 
 **予告（数を見る前）**: 確かめ済みの大きな損は 0.32% → 0.1〜0.2%（窓の 3 点が消え、他の場所は変わらない）。守りの確かめ後の見逃しは 300 局で 3〜6 点（窓の型が残る）。新しい型は 0〜1 つ。
 **完了条件**: エンジン・既定の挙動は変えない。`make test` green・push。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
 
+### 7.44 WP `rs-overflow-trigger`——場の上限超えで戦闘が止まる規則の欠陥と、トリガーを断れない候補の抜けを直す（作業セッション用・opus・2026-10-24）
+
+ユーザ決定（2026-10-24「a でお願いします」）。台帳 2+386。根拠 `docs/reports/2026-10-24_reaudit_wr.md` §0・§4・§6（(A)・(B)）。
+**土台**: 本線の最新（出荷のネットは r22・`opcg_sim/loop/engine.py::DEFAULT_NET`）。
+**直すもの**:
+1. **(A) 規則**: 【アタック時】の効果の登場で場の上限を超えたとき、押し出しのトラッシュ（`rust/opcg_engine/src/effects/interact.rs::resolve_field_overflow`）の後に共通の後処理（`after_resolve`）を通らず、フェイズが MAIN に戻るのに攻撃（`active_battle`）が残る＝戦闘が進まない。**共通の後処理を通して、戦闘をカウンターの段へ進める**（報告の 1 行の修正を土台に、同じ道を通る他の呼び出し元〔起動メイン・登場時・ドン!!の効果など〕も確かめる）。あわせて**安全側の守り**: MAIN の判断点で `active_battle` が残っていても decide が窓の道に入って箱の手を返さないこと（入るなら合法手だけを返す）。規則の修正には旗を付けない（正しさの修正・旧い形に戻す理由が無い）。
+2. **(B) 候補の抜け**: ライフの【トリガー】と任意の誘発の発動確認（`CONFIRM_TRIGGER`）で、探索の候補（`rust/opcg_engine/src/search/adapter.rs::selection_moves_with`）に「発動しない」が無く、CPU は必ず発動する。**`CONFIRM_OPTIONAL` と同じく「発動する／しない」の 2 手に割る**。既定解決（golden の監査）の答えは変えない。**測定用の旗** `confirm_trigger_legacy`（opts の鍵・既定 false＝修正後・`engine_rs.py`／`arena.py --cand-…`／`arena_shard --confirm-trigger-legacy`／`defense_audit.py`／`rs_decide_latency.py` に配線）。
+**確かめ**:
+- 単体テスト: (A) 報告の 3341083・3351219 の局面（手の列から作る）で、修正後は戦闘がカウンターの段へ進み、局が最後まで打てる。(B) トリガーの確認で候補が 2 つ出る・旗を立てると 1 つ。
+- **守りの再監査**（`defense_audit.py`・§7.24 の設定・**seed 3351000〜3351299**＝reaudit-wr と同じ局面・修正後）: (vii) の 3 点が消えるか・決着せず 0。
+- **決着せずの数**: 教材の生成と同じ設定（生成役 r22・`record_gen` の引数は `opcg_sim/loop/jobs/gen_n51.json` と同じ・デッキ real）で 400 局を打ち、dropped が 0 になること（波 51 は 15,360 局で 23）。seed は **3461000〜3461399**。
+- **費用**: `rs_decide_latency.py --worlds 2 --lethal-proof root --games 20`・旧い旗と比べる。
+- golden を作り直し、差分は 1 件ずつ読む（(A) で変わる局・(B) で変わる局を分ける・旗を立てた再生で (B) の差分が消えること）。`make test` green・`make audit-cross` void 0。
+**本番アリーナはコーディネータが起こす**（ジョブ定義・Sonnet・候補＝修正後 vs 基準＝`--confirm-trigger-legacy`・出荷の設定・random × real・32 シャード × 84 ペア・seed 3471000〜）。(A) は両席に効くのでアリーナでは測れない（決着せずの数と golden で確かめる）。
+**報告** `docs/reports/2026-10-24_overflow_trigger.md`・`n1_results/overflow_trigger/`・`RESULT.json`・`docs/SPEC.md`（規則の節と探索の候補の節）・`docs/TEST_SPEC.md`・ブランチ `claude/rs-overflow-trigger`。
+**予告（数を見る前）**: 守りの見逃しの (vii) 3 点 → 0〜1・決着せず 400 局で 0・1 手の費用 +0〜3%・本番アリーナ（(B) だけ）+3〜+10。
+**完了条件**: `make test` green・`make audit-cross` void 0・push。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
+
