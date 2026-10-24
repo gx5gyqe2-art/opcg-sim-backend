@@ -234,6 +234,8 @@ CAND_FLAGS = {
     "window_carry_legacy": dict(window_carry_legacy=True),
     "window_worlds_legacy": dict(window_worlds_legacy=True),
     "window_tree_legacy": dict(window_tree_legacy=True),
+    # カウンターの窓も短い木で読む旧い形（§7.45・WP `rs-window-tree-blocker`・測定専用）。
+    "window_tree_counter_legacy": dict(window_tree_counter_legacy=True),
 }
 
 
@@ -311,6 +313,9 @@ def add_cand_args(ap) -> None:
     ap.add_argument("--cand-window-tree-legacy", action="store_true",
                     help="候補席だけ、ライフが少ない戦闘の応手を静的な値で比べる旧い形（§7.42 の 3・測定専用）。"
                          "省略＝既定（短い木で読む）")
+    ap.add_argument("--cand-window-tree-counter-legacy", action="store_true",
+                    help="候補席だけ、ライフが少ないカウンターの窓も短い木で読む旧い形（§7.45・測定専用）。"
+                         "省略＝既定（木はブロッカーの窓だけ・カウンターの窓は静的な値）")
     ap.add_argument("--cand-window-worlds", type=int, default=None,
                     help="候補席だけ窓の根畳みの世界の本数（§7.42 の 2・省略＝Rust の既定）")
     # --- 迷う局面だけ世界 K 本で読み直す（§7.4・WP `play-rethink`）------------------------

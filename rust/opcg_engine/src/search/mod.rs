@@ -651,6 +651,8 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .unwrap_or(d.window_worlds),
         window_worlds_legacy: flag("window_worlds_legacy", d.window_worlds_legacy),
         window_tree_legacy: flag("window_tree_legacy", d.window_tree_legacy),
+        // カウンターの窓も短い木で読む旧い形（§7.45・WP `rs-window-tree-blocker`・測定専用・既定 false）。
+        window_tree_counter_legacy: flag("window_tree_counter_legacy", d.window_tree_counter_legacy),
         window_tree_life: v.get("window_tree_life").and_then(Value::as_i64).unwrap_or(d.window_tree_life),
         window_tree_worlds: v
             .get("window_tree_worlds")

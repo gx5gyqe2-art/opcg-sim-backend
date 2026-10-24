@@ -749,7 +749,7 @@ def main(argv=None):
     p = sub.add_parser("winstab")
     p.add_argument("--n", type=int, default=8)
     p.add_argument("--opts", default=None,
-                   help="decide の opts に足す JSON（§7.42・例 '{\"window_worlds\": 4}'・旧い形は 3 つの window_*_legacy）")
+                   help="decide の opts に足す JSON（§7.42・例 '{\"window_worlds\": 4}'・旧い形は 3 つの window_*_legacy・§7.45 は window_tree_counter_legacy）")
     p.add_argument("--tag", default=None, help="出力 window_stability_<tag>.jsonl（省略＝window_stability.jsonl）")
     p.add_argument("--tag-out", default=None, help="出力の置き場（省略＝--out）")
     p.add_argument("--workers", type=int, default=4)

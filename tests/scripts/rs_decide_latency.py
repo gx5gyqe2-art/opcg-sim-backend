@@ -43,6 +43,8 @@ def main(argv=None):
     ap.add_argument("--window-carry-legacy", action="store_true", help="§7.42 の 1 だけ旧い形（測定専用）")
     ap.add_argument("--window-worlds-legacy", action="store_true", help="§7.42 の 2 だけ旧い形（測定専用）")
     ap.add_argument("--window-tree-legacy", action="store_true", help="§7.42 の 3 だけ旧い形（測定専用）")
+    ap.add_argument("--window-tree-counter-legacy", action="store_true",
+                    help="ライフが少ないカウンターの窓も短い木で読む旧い形（§7.45・測定専用）")
     ap.add_argument("--window-worlds", type=int, default=None, help="窓の根畳みの世界の本数（§7.42 の 2・省略＝Rust の既定）")
     ap.add_argument("--extra", default=None,
                     help="decide の opts に足す JSON（例 '{\"window_tree_life\": 2}'・§7.42 の対象の広げ方の費用を見る）")
@@ -69,6 +71,8 @@ def main(argv=None):
     for _k in ("window_carry_legacy", "window_worlds_legacy", "window_tree_legacy"):
         if getattr(a, "window_legacy", False) or getattr(a, _k, False):
             kw[_k] = True                    # §7.42 の前後比較（窓・対話の決め方の旧い形）
+    if getattr(a, "window_tree_counter_legacy", False):
+        kw["window_tree_counter_legacy"] = True  # §7.45 の前後比較
     if getattr(a, "window_worlds", None):
         kw["window_worlds"] = a.window_worlds
     if a.extra:

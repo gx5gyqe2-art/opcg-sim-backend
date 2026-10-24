@@ -3,7 +3,8 @@
 //! (a) opts の鍵（3 つの旧い旗は既定 false・`window_worlds` の既定は [`WINDOW_WORLDS`]）
 //! (b) 対話の窓の続きは既定では積まない（`window_carry_legacy` は積む）
 //! (c) 窓の世界: `window_worlds=1` は旧い旗（世界 1 本）と 1 bit も同じ・K 本なら各候補の N が K・同じ seed で再現する
-//! (d) 自分のライフが少ない戦闘の窓（ブロッカー・カウンター）だけ短い木で読む（旧い旗・ライフの上限・候補 1 つは読まない）
+//! (d) 自分のライフが少ないブロッカーの窓だけ短い木で読む（§7.45・カウンターの窓は旗 `window_tree_counter_legacy` で戻る・
+//!     旧い旗・ライフの上限・候補 1 つは読まない）
 //!
 //! 「ブロック ＞ 素通し」の順位の入れ替わり（blunder-audit の 3301025・117）は本物のネットが要る＝
 //! `tests/test_rs_window_read.py` が見る。
@@ -32,12 +33,14 @@ fn run(masters: &'static MasterTable, state: &GameState, seat: Seat, o: &DecideO
 fn window_flags_are_read_from_opts() {
     let d = DecideOptions::default();
     assert!(!d.window_carry_legacy && !d.window_worlds_legacy && !d.window_tree_legacy);
+    assert!(!d.window_tree_counter_legacy);
     assert_eq!(d.window_worlds, WINDOW_WORLDS);
     assert_eq!((d.window_tree_life, d.window_tree_worlds), (1, WINDOW_TREE_WORLDS));
     let (o, _) = super::super::decide_opts_and_carry(&json!({
         "window_carry_legacy": true, "window_worlds_legacy": true, "window_tree_legacy": true,
-        "window_worlds": 3, "window_tree_life": 2, "window_tree_worlds": 5})).expect("opts");
+        "window_tree_counter_legacy": true, "window_worlds": 3, "window_tree_life": 2, "window_tree_worlds": 5})).expect("opts");
     assert!(o.window_carry_legacy && o.window_worlds_legacy && o.window_tree_legacy);
+    assert!(o.window_tree_counter_legacy);
     assert_eq!((o.window_worlds, o.window_tree_life, o.window_tree_worlds), (3, 2, 5));
     // 旧い旗・seed 無しは 1 本
     assert_eq!(o.effective_window_worlds(), 1);
@@ -148,7 +151,7 @@ fn window_worlds_one_is_the_legacy_and_k_counts_worlds() {
     assert_eq!(k, run(masters, &state, Seat::P1, &opts(5)), "同じ seed なら同じ");
 }
 
-/// (d) 自分のライフ ≤ 1 の戦闘の窓だけ短い木で読む。
+/// (d) 自分のライフ ≤ 1 のブロッカーの窓だけ短い木で読む（カウンターの窓は旧い旗のときだけ）。
 #[test]
 fn low_life_battle_window_reads_a_short_tree() {
     let Some(masters) = crate::search::tests_setup_box::masters() else { return };
@@ -164,10 +167,19 @@ fn low_life_battle_window_reads_a_short_tree() {
     assert_eq!(out["window"]["tree"], json!(false), "ライフ 2 は静的な値");
     let out = run(masters, &mid, Seat::P1, &DecideOptions { window_tree_life: 2, ..opts(9) });
     assert_eq!(out["window"]["tree"], json!(true), "上限を 2 にすればライフ 2 も木");
-    // カウンターの窓（ブロッカー無し）もライフ ≤ 1 なら木
+    // カウンターの窓（ブロッカー無し）はライフ ≤ 1 でも静的な値（§7.45）・旧い旗なら木
     let ctr = attacked(masters, 0, false);
     let out = run(masters, &ctr, Seat::P1, &opts(9));
-    assert_eq!(out["window"]["tree"], json!(true), "カウンターの窓: {}", out);
+    assert_eq!(out["kind"], "window");
+    assert_eq!(out["window"], json!({"worlds": WINDOW_WORLDS, "tree": false}), "カウンターの窓: {}", out);
+    let ctr_old = DecideOptions { window_tree_counter_legacy: true, ..opts(9) };
+    let out = run(masters, &ctr, Seat::P1, &ctr_old);
+    assert_eq!(out["window"], json!({"worlds": WINDOW_TREE_WORLDS, "tree": true}), "旧い形のカウンターの窓: {}", out);
+    // 旗はブロッカーの窓を変えない
+    assert_eq!(run(masters, &low, Seat::P1, &ctr_old), run(masters, &low, Seat::P1, &opts(9)));
+    // window_tree_legacy が立てばカウンターの旧い旗があっても木は使わない
+    let none = DecideOptions { window_tree_legacy: true, window_tree_counter_legacy: true, ..opts(9) };
+    assert_eq!(run(masters, &ctr, Seat::P1, &none)["window"]["tree"], json!(false));
     // 全部旧い旗なら 1 bit も変わらない（世界 1 本・静的な値）
     let all_old = DecideOptions { window_tree_legacy: true, window_worlds_legacy: true, ..opts(9) };
     assert!(run(masters, &low, Seat::P1, &all_old).get("window").is_none());

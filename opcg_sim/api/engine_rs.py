@@ -304,6 +304,7 @@ class RsGame:
               window_carry_legacy: Optional[bool] = None,
               window_worlds_legacy: Optional[bool] = None,
               window_tree_legacy: Optional[bool] = None,
+              window_tree_counter_legacy: Optional[bool] = None,
               window_worlds: Optional[int] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
@@ -364,6 +365,8 @@ class RsGame:
         （その段から先を積まず、そこで読み直す）。
         `window_carry_legacy`／`window_worlds_legacy`／`window_tree_legacy`（省略可・§7.42・WP `rs-window-read`・
         **測定専用**）＝窓・対話の決め方の旧い形（続きを積む／窓の世界 1 本／ライフが少ない戦闘の応手を静的な値で比べる）。
+        `window_tree_counter_legacy`（省略可・§7.45・WP `rs-window-tree-blocker`・**測定専用**）＝ライフが少ない
+        カウンターの窓も短い木で読む旧い形（既定はブロッカーの窓だけ木・カウンターの窓は静的な値）。
         `window_worlds`（省略可）＝窓の根畳みの世界の本数。**省略（None）／False＝渡さない＝Rust の既定**。
         """
         move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
@@ -381,6 +384,7 @@ class RsGame:
                                 window_carry_legacy=window_carry_legacy,
                                 window_worlds_legacy=window_worlds_legacy,
                                 window_tree_legacy=window_tree_legacy,
+                                window_tree_counter_legacy=window_tree_counter_legacy,
                                 window_worlds=window_worlds)
         if trace is not None and move is not None:
             trace.update(tr)
@@ -406,6 +410,7 @@ class RsGame:
                window_carry_legacy: Optional[bool] = None,
                window_worlds_legacy: Optional[bool] = None,
                window_tree_legacy: Optional[bool] = None,
+               window_tree_counter_legacy: Optional[bool] = None,
                window_worlds: Optional[int] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
@@ -487,6 +492,9 @@ class RsGame:
             opts["window_worlds_legacy"] = True
         if window_tree_legacy:
             opts["window_tree_legacy"] = True
+        # カウンターの窓も短い木で読む旧い形（§7.45・測定専用）。
+        if window_tree_counter_legacy:
+            opts["window_tree_counter_legacy"] = True
         if window_worlds is not None:
             opts["window_worlds"] = int(window_worlds)
         # 迷う局面だけの読み直し（§7.4）。None＝off＝`decide` を 1 回呼ぶだけ（今までと同じ）。

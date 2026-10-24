@@ -425,6 +425,8 @@ def play_one(args) -> List[Dict[str, Any]]:
     for _k in ("window_carry_legacy", "window_worlds_legacy", "window_tree_legacy"):
         if getattr(a, "window_legacy", False) or getattr(a, _k, False):
             kw[_k] = True                    # §7.42 の前後比較（窓・対話の決め方の旧い形）
+    if getattr(a, "window_tree_counter_legacy", False):
+        kw["window_tree_counter_legacy"] = True  # §7.45 の前後比較（カウンターの窓も短い木で読む旧い形）
     if getattr(a, "window_worlds", None):
         kw["window_worlds"] = a.window_worlds
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
@@ -554,6 +556,8 @@ def replay_to(seed: int, a, seat: str, step: int):
     for _k in ("window_carry_legacy", "window_worlds_legacy", "window_tree_legacy"):
         if getattr(a, "window_legacy", False) or getattr(a, _k, False):
             kw[_k] = True                    # §7.42 の前後比較（窓・対話の決め方の旧い形）
+    if getattr(a, "window_tree_counter_legacy", False):
+        kw["window_tree_counter_legacy"] = True  # §7.45 の前後比較（カウンターの窓も短い木で読む旧い形）
     if getattr(a, "window_worlds", None):
         kw["window_worlds"] = a.window_worlds
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
@@ -950,6 +954,8 @@ def main(argv=None):
             p.add_argument("--window-carry-legacy", action="store_true", help="§7.42 の 1 だけ旧い形")
             p.add_argument("--window-worlds-legacy", action="store_true", help="§7.42 の 2 だけ旧い形")
             p.add_argument("--window-tree-legacy", action="store_true", help="§7.42 の 3 だけ旧い形")
+            p.add_argument("--window-tree-counter-legacy", action="store_true",
+                           help="ライフが少ないカウンターの窓も短い木で読む旧い形（§7.45 の前後比較・測定専用）")
             p.add_argument("--window-worlds", type=int, default=None, help="窓の根畳みの世界の本数（省略＝Rust の既定）")
         if name == "run":
             p.add_argument("--seeds", default=None, help="seed の一覧のファイル（空白区切り）。指定すると --seed-base/--games の代わりにこれだけ回す")

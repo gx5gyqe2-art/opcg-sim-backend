@@ -1320,10 +1320,15 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
    `ΣW ÷ ΣN` を自分から見た値に直す・出口が終局なら ±1）で比べる。世界の本数は `min(K, window_tree_worlds)`（既定 2）＝
    1 つの窓の費用は世界 2 本の木 1 回ぶん。静的な値は相手の手番の途中の盤面（攻撃が残る）で「ブロックで場の札を失う／
    カウンターで手札を失う」の比べを系統的に外す（blunder-audit の 3301025・117: 静的な値は素通し、木はブロック）。
+   **2026-10-24 から木を使うのはブロッカーの窓だけ**（§7.45・WP `rs-window-tree-blocker`・`docs/reports/2026-10-24_window_tree_blocker.md`）:
+   自分のライフ ≤ 上限のカウンターの窓は、ほかの窓と同じ世界 K 本の静的な値で比べる。カウンターの窓の木は守りの再監査で
+   見逃しを直す点と作る点がほぼ同数（読みを 4 倍にしても向きは不変）で、木の値が平らに並ぶ点が多かった
+   （`2026-10-23_window_read.md` §4・`2026-10-24_reaudit_wr.md` §3）。測定用の旗 `window_tree_counter_legacy`
+   （opts の鍵・既定 false）: true でカウンターの窓も木で読む旧い形（2026-10-23〜24 の形）。`window_tree_legacy` が立てば木はどの窓にも使わない。
 
-アリーナは `--cand-window-{carry,worlds,tree}-legacy`（候補席）・`arena_shard --window-{carry,worlds,tree}-legacy`（基準席）・
-`--cand-window-worlds`。器は `defense_audit.py`／`commit_audit.py`／`rs_decide_latency.py` の `--window-legacy`（3 つまとめて）と
-`blunder_audit.py winstab --opts`。
+アリーナは `--cand-window-{carry,worlds,tree,tree-counter}-legacy`（候補席）・`arena_shard --window-{carry,worlds,tree,tree-counter}-legacy`（基準席）・
+`--cand-window-worlds`。器は `defense_audit.py`／`commit_audit.py`／`rs_decide_latency.py` の `--window-legacy`（3 つまとめて）・
+`defense_audit.py`／`rs_decide_latency.py` の `--window-tree-counter-legacy` と `blunder_audit.py winstab --opts`。
 
 ---
 

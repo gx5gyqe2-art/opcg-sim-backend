@@ -131,10 +131,17 @@ pub struct DecideOptions {
     /// 窓の世界を 1 本に戻す旧い形（`window_worlds_legacy`・§7.42 の 2・**測定専用**・既定 false）。
     pub window_worlds_legacy: bool,
     /// ライフが少ない戦闘の応手を静的な値で比べる旧い形（`window_tree_legacy`・§7.42 の 3・**測定専用**・既定 false）。
-    /// 既定（false）は自分のライフが [`DecideOptions::window_tree_life`] 以下の戦闘の窓（ブロッカー・カウンター）で
+    /// 既定（false）は自分のライフが [`DecideOptions::window_tree_life`] 以下の**ブロッカーの窓**
+    /// （§7.45 からカウンターの窓は除く＝[`DecideOptions::window_tree_counter_legacy`]）で
     /// 候補が 2 つ以上なら、各候補を戦闘の終わりまで畳んだ盤面から短い木（`sims ÷ 候補の数`）を回し、
     /// その根の値で比べる（[`tree_branch_values`]）。
     pub window_tree_legacy: bool,
+    /// ライフが少ないカウンターの窓も短い木で読む旧い形（`window_tree_counter_legacy`・§7.45・
+    /// WP `rs-window-tree-blocker`・**測定専用**・既定 false）。既定（false）はカウンターの窓を
+    /// 世界 K 本の静的な値で比べる（守りの再監査で、カウンターの窓の木は見逃しを直す点と作る点が同数だった・
+    /// `docs/reports/2026-10-23_window_read.md` §4）。true は 2026-10-24 までの形（ブロッカー・カウンターの両方を木で読む）。
+    /// `window_tree_legacy` が立っていれば木はどの窓にも使わない。
+    pub window_tree_counter_legacy: bool,
     /// 短い木で読む戦闘の窓の自分のライフの上限（`window_tree_life`・既定 1）。
     pub window_tree_life: i64,
     /// 短い木で読む窓の世界の本数の上限（`window_tree_worlds`・既定 [`WINDOW_TREE_WORLDS`]）。
@@ -267,6 +274,7 @@ impl Default for DecideOptions {
             window_worlds: WINDOW_WORLDS,
             window_worlds_legacy: false,
             window_tree_legacy: false,
+            window_tree_counter_legacy: false,
             window_tree_life: 1,
             window_tree_worlds: WINDOW_TREE_WORLDS,
         }
@@ -1065,7 +1073,8 @@ fn window_choice(
         }));
     }
     let window = if battle { Window::Battle } else { Window::Dialog };
-    let tree = !opts.window_tree_legacy && window_tree_applies(&mut s, name, opts.window_tree_life);
+    let tree = !opts.window_tree_legacy
+        && window_tree_applies(&mut s, name, opts.window_tree_life, opts.window_tree_counter_legacy);
     let k = opts.effective_window_worlds();
     // 木で読む窓は世界の本数を別に抑える（費用は「本数 × sims」・静的な値の世界と混ぜて平均しない）。
     let k = if tree { k.min(opts.window_tree_worlds.max(1)) } else { k };
@@ -1178,16 +1187,17 @@ fn window_choice(
     }))
 }
 
-/// 短い木で読む戦闘の窓か（§7.42 の 3）: 戦闘中・判断するのが `name` のブロッカー／カウンターの選択・
-/// `name` のライフ（枚数）が `life_max` 以下。候補の数は呼び出し側が見る。
-fn window_tree_applies(s: &mut Session, name: Seat, life_max: i64) -> bool {
+/// 短い木で読む戦闘の窓か（§7.42 の 3・§7.45）: 戦闘中・判断するのが `name` のブロッカーの選択
+/// （`counter` が true ならカウンターの選択も・旧い形）・`name` のライフ（枚数）が `life_max` 以下。
+/// 候補の数は呼び出し側が見る。
+fn window_tree_applies(s: &mut Session, name: Seat, life_max: i64, counter: bool) -> bool {
     if s.state().active_battle.is_none() {
         return false;
     }
     match crate::rules::pending::pending_actor_action(s) {
         Some((seat, action)) if seat == name => {
             (action == crate::rules::pending::ACT_SELECT_BLOCKER
-                || action == crate::rules::pending::ACT_SELECT_COUNTER)
+                || (counter && action == crate::rules::pending::ACT_SELECT_COUNTER))
                 && (s.state().player(name).life.len() as i64) <= life_max
         }
         _ => false,
