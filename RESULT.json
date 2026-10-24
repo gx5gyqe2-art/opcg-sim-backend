@@ -10,21 +10,22 @@
  },
  "outputs": {
   "dirs": [
-   "n_records/trial_w01_p0"
+   "n_records/trial_w01_p0",
+   "n_records/trial_w01_p1"
   ]
  },
  "metrics": {
-  "parts_done": 1,
-  "games": 1,
-  "rows": 152,
+  "parts_done": 2,
+  "games": 2,
+  "rows": 339,
   "dropped": 0,
-  "sec_play_mean": 0.84
+  "sec_play_mean": 0.82
  },
  "notes": "",
  "worker": {
   "spec": "origin/claude/worker-jobs:opcg_sim/loop/jobs/trial_gen.json",
   "k": 1,
   "branch": "claude/worker-job-trial-gen-w01",
-  "commit": "f78dc91a3c9de6949c2953e0ae75d3080aeb8f43"
+  "commit": "8bc771dfee725e0b662645a9ff0fe02229396a25"
  }
 }
