@@ -1,63 +1,33 @@
 {
- "job": "reaudit-wr",
- "role": "read-only re-audit after rs-window-read (blunder-audit + defense-audit, new seeds)",
- "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.43 (origin/claude/cpu-spec-improvements-yw91jd @ 8acab03; ledger 2+378)",
- "branch": "claude/reaudit-wr",
- "base": "8acab03",
- "report": "docs/reports/2026-10-24_reaudit_wr.md",
- "artifacts": "n1_results/reaudit_wr/",
- "make_test": "green (620 cargo + 859 pytest passed, 13 skipped; n1_results/reaudit_wr/make_test.log)",
- "blunder": {
-  "games": 100,
-  "seeds": "3341000-3341099",
-  "void": 1,
-  "judged_points": 400,
-  "judged_games": "3341000-3341039",
-  "cand": 3,
-  "confirmed_spec": 2,
-  "replicated": 2,
-  "verified_tool": 2,
-  "replicated_and_verified": 1,
-  "rate_replicated_and_verified": "0.25% [0.04, 1.40]",
-  "battle_window_losses": "0/79",
-  "window_unstable": "9/162 = 5.6% (was 19.5%)",
-  "eligible_share": {
-   "main": 0.48,
-   "window": 0.42,
-   "commit": 0.07,
-   "lethal": 0.026
-  },
-  "loss_points": [
-   "3341039/84 own dialog discard choice (iii-b on dialog window, replicated+verified)",
-   "3341009/35 main play (replicated, not verified; deep read picks b)",
-   "3341008/0 mulligan (recheck opposite direction; noise)"
+ "job": "n52-w29",
+ "role": "gen",
+ "status": "partial",
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r22.npz",
+  "games": 480,
+  "sims": 1280,
+  "worlds": 1,
+  "budget": 0,
+  "decks": "real",
+  "seed_base": 2585000
+ },
+ "outputs": {
+  "dirs": [
+   "n_records/n52_w29_p0"
   ]
  },
- "defense": {
-  "games": 300,
-  "seeds": "3351000-3351299",
-  "void": 1,
-  "threat_ko": 454,
-  "threat_otsu": 362,
-  "miss_raw_ko_otsu": [
-   13,
-   9
-  ],
-  "miss_verified_ko_otsu": [
-   7,
-   4
-  ],
-  "commit_origin": 0,
-  "types_ko7": {
-   "candidate_gap_confirm_trigger_decline": 3,
-   "read_loss": 4
-  }
+ "metrics": {
+  "parts_done": 1,
+  "games": 120,
+  "rows": 19258,
+  "dropped": 0,
+  "sec_play_mean": 23.64
  },
- "new_types": [
-  "(ii) field-overflow trash during ON_ATTACK skips after_resolve -> battle never advances, phase MAIN with active_battle; window path returns DON_BOX -> void (3341083/43, 3351219/154); 1-line fix verified on scratch wheel",
-  "(vii) CONFIRM_TRIGGER decline never enumerated as a search candidate (selection_moves_with handles only CONFIRM_OPTIONAL) -> CPU always activates triggers; 1.8 per game"
- ],
- "tree_budget_3301005_107": "PASS 8/8 at sims x1/x2/x4 (tree worlds 2 and 4); root values pass -0.85..-0.94 vs block -0.98..-0.99 at x1..x8; not flipped",
- "notes": "Judge reduced from 1000 to 400 points (first 40 games): judge cost 150.5 s/point/core vs 61 s before, because the r13d referee now also plays windows with 16 worlds + short trees (window cost is independent of sims, large relative to 160 sims); ran 2+2 in parallel with the defense audit. Tool's 'verified' count (2) includes the mulligan point whose recheck pointed the opposite way; report counts replicated AND verified (1). Field-overflow fix was only tried in a scratch copy of the crate (engine on the branch unchanged). r20 judge net fetched from claude/train-r20 into vm_nets/ (not committed). Point-reading one-off scripts kept under n1_results/reaudit_wr/ as records (no new instrument/test)."
+ "notes": "",
+ "worker": {
+  "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/gen_n52.json",
+  "k": 29,
+  "branch": "claude/n52-w29",
+  "code_commit": "9a5d4be5690783bd9c3a9c451443094fe055ea19"
+ }
 }
