@@ -1,0 +1,39 @@
+moves 44
+40 p2 6 MAIN_ACTION main main:attack {"kind": "game", "action_type": "ATTACK", "payload": {"uuid": "5e825d32-0167-4be7-8267-eb225de4c150", "target_ids": ["5a31ecc5-450c-4252-920b-b93398fbc070"]}} commit_left 0
+41 p2 6 SEARCH_AND_SELECT window own_dialog:SEARCH_AND_SELECT {"kind": "game", "action_type": "RESOLVE_EFFECT_SELECTION", "payload": {"selected_uuids": ["e2b0f9da-7c3b-4afa-abaa-b9d020738a9b"], "index": 0, "accepted": true, "position": "BOTTOM", "declared_value" commit_left 0
+42 p2 6 SEARCH_AND_SELECT window own_dialog:SEARCH_AND_SELECT {"kind": "game", "action_type": "RESOLVE_EFFECT_SELECTION", "payload": {"selected_uuids": ["9c411ee1-14cc-4f96-8577-c67f0fa9a1a9"], "index": 0, "accepted": true, "position": "BOTTOM", "declared_value" commit_left 0
+43 p2 6 MAIN_ACTION window main:attach {"kind": "game", "action_type": "DON_BOX", "payload": {"uuid": "4bcb12ff-3ec9-42cf-a998-7065e25fd09a", "target_ids": [], "don_k": 1}} commit_left 0
+pending {"player_id": "p2", "action": "MAIN_ACTION", "message": "\u30e1\u30a4\u30f3\u30a2\u30af\u30b7\u30e7\u30f3\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044", "selectable_uuids": ["28e52195-0e90-4dc5-a46c-bb246d0e4a47", "8ac6bff9-5f73-4c56-97ec-1470935b2538", "55f48de8-6242-45ed-b983-46857e265a9c", "c45e830d-7fa5-4def-9b69-062e067e8cc2", "4bcb12ff-3ec9-42cf-a998-7065e25fd09a", "8c84d0cf-a49c-4c66-b10e-1e247cac1abb", "7250b94b-8e56-46dd-a01a-0522461b5ea0", "aef9432e-06d8-4cfd-a4a4-f791e64278c5"], "can_skip": true}
+legal [{"kind":"game","action_type":"ATTACK","payload":{"uuid":"aef9432e-06d8-4cfd-a4a4-f791e64278c5","target_ids":["5a31ecc5-450c-4252-920b-b93398fbc070"]}},{"kind":"game","action_type":"ATTACK","payload":{"uuid":"4bcb12ff-3ec9-42cf-a998-7065e25fd09a","target_ids":["5a31ecc5-450c-4252-920b-b93398fbc070"]}},{"kind":"game","action_type":"ATTACH_DON","payload":{"uuid":"aef9432e-06d8-4cfd-a4a4-f791e64278c5"}},{"kind":"game","action_type":"ATTACH_DON","payload":{"uuid":"4bcb12ff-3ec9-42cf-a998-7065e25fd09a"}},{"kind":"game","action_type":"ATTACH_DON","payload":{"uuid":"5e825d32-0167-4be7-8267-eb225de4c150"}},{"kind":"game","action_type":"ATTACH_DON","payload":{"uuid":"e2b0f9da-7c3b-4afa-abaa-b9d020738a9b"}},{"kind":"game","action_type":"ACTIVATE_MAIN","payload":{"uuid":"aef9432e-06d8-4cfd-a4a4-f791e64278c5"}},{"kind":"game","action_type":"TURN_END","payload":{}}]
+opts {'net': 'opcg_sim/data/learned/nrel_r13d.npz', 'sims': 1280, 'budget': 0, 'worlds': 2, 'lethal_proof': 'root', 'search_seed': 8083863790769077742}
+{} window {"kind": "game", "action_type": "DON_BOX", "payload": {"uuid": "4bcb12ff-3ec9-42cf-a998-7065e25fd09a", "target_ids": [], "don_k": 1}} commit [] {'sig': ['DON_BOX', '4bcb12ff-3ec9-42cf-a998-7065e25fd09a', [], [], None], 'k': None, 'kind': 'window', 'groups': [], 'select_groups': [], 'pv': [], 'resact_pending': False, 'budget': {'used': 0, 'exhausted': 0}, 'boxes': None, 'window': {'worlds': 16, 'tree': False}}
+{'window_carry_legacy': True} window {"kind": "game", "action_type": "DON_BOX", "payload": {"uuid": "4bcb12ff-3ec9-42cf-a998-7065e25fd09a", "target_ids": [], "don_k": 1}} commit [{"kind": "sig", "sig": ["ACTIVATE_MAIN", "aef9432e-06d8-4cfd-a4a4-f791e64278c5", [], [], null]}, {"kind": "sig", "sig": ["RESOLVE_EFFECT_SELECTION", null, [], ["5e825d32-0167-4be7-8267-eb225de4c150", "7250b94b-8e56-46dd-a01a-0522461b5ea0", "4bcb12ff-3ec9-42cf-a998-7065e25fd09a"], true]}] {'sig': ['DON_BOX', '4bcb12ff-3ec9-42cf-a998-7065e25fd09a', [], [], None], 'k': None, 'kind': 'window', 'groups': [], 'select_groups': [], 'pv': [], 'resact_pending': False, 'budget': {'used': 0, 'exhausted': 0}, 'boxes': None, 'window': {'worlds': 16, 'tree': False}}
+{'window_carry_legacy': True, 'window_worlds_legacy': True, 'window_tree_legacy': True} window {"kind": "game", "action_type": "ACTIVATE_MAIN", "payload": {"uuid": "aef9432e-06d8-4cfd-a4a4-f791e64278c5"}} commit [{"kind": "sig", "sig": ["RESOLVE_EFFECT_SELECTION", null, [], ["5e825d32-0167-4be7-8267-eb225de4c150", "7250b94b-8e56-46dd-a01a-0522461b5ea0", "4bcb12ff-3ec9-42cf-a998-7065e25fd09a"], true]}] {'sig': ['ACTIVATE_MAIN', 'aef9432e-06d8-4cfd-a4a4-f791e64278c5', [], [], None], 'k': None, 'kind': 'window', 'groups': [], 'select_groups': [], 'pv': [], 'resact_pending': False, 'budget': {'used': 0, 'exhausted': 0}, 'boxes': None}
+{'lethal_proof': 'off'} window {"kind": "game", "action_type": "DON_BOX", "payload": {"uuid": "4bcb12ff-3ec9-42cf-a998-7065e25fd09a", "target_ids": [], "don_k": 1}} commit [] {'sig': ['DON_BOX', '4bcb12ff-3ec9-42cf-a998-7065e25fd09a', [], [], None], 'k': None, 'kind': 'window', 'groups': [], 'select_groups': [], 'pv': [], 'resact_pending': False, 'budget': {'used': 0, 'exhausted': 0}, 'boxes': None, 'window': {'worlds': 16, 'tree': False}}
+keys ['players', 'manager']
+active_battle null
+phase null
+pending_request null
+interaction null
+mkeys ['turn_count', 'phase', 'turn_player', 'winner', 'active_battle', 'turn_events', 'mulligan_done', 'setup_phase_pending', 'turn_start_pending', 'interaction_depth', 'pending_triggers', 'pending_end_of_turn']
+turn_count 6
+phase "MAIN"
+turn_player "p2"
+winner null
+active_battle {"attacker": "5e825d32-0167-4be7-8267-eb225de4c150", "target": "5a31ecc5-450c-4252-920b-b93398fbc070", "attacker_owner": "p2", "target_owner": "p1", "counter_buff": 0}
+turn_events {"CHAR_LEFT_BY_OWN_EFFECT_p2": 1, "BATTLED_CHAR_5a31ecc5-450c-4252-920b-b93398fbc070": 1}
+mulligan_done ["p1", "p2"]
+setup_phase_pending false
+turn_start_pending false
+interaction_depth 0
+pending_triggers 0
+pending_end_of_turn 0
+5e825d32 ('p2', 'field', 'OP08-007', True)
+5a31ecc5 ('p1', 'leader', None, True)
+['name', 'leader', 'stage', 'deck', 'hand', 'life', 'field', 'trash', 'temp_zone', 'don', 'negate_onplay_until', 'restrictions']
+40 [{"type": "ATTACK", "player": "p2", "card_name": "トニートニー・チョッパー", "message": "「トニートニー・チョッパー」→「ヤマト」攻撃"}, {"type": "EFFECT", "player": "p2", "card_name": "トニートニー・チョッパー", "source_uuid": "5e825d32-0167-4be7-8267-eb225de4c150", "trigger": "ON_ATTACK", "action": "LOOK", "targets": [], "value": 5, "success": true}]
+  pending {"player_id": "p2", "action": "SEARCH_AND_SELECT", "message": "「トニートニー・チョッパー」の効果: 対象を選択（1枚まで）", "selectable_uuids": ["e2b0f9da-7c3b-4afa-abaa-b9d020738a9b"], "can_skip": false, "candidates": [{"uuid": "e17545f0-f3e1-4a4c-beaa-656ef9bb2e7f", "card_id": "OP08-016", "name": "Dr.ヒルルク", "power": 0, "coun
+41 [{"type": "EFFECT", "player": "p2", "card_name": "トニートニー・チョッパー", "source_uuid": "5e825d32-0167-4be7-8267-eb225de4c150", "trigger": "ON_ATTACK", "action": "PLAY_CARD", "targets": ["トニートニー・チョッパー(e2b0)"], "value": 0, "success": true, "dest": "FIELD"}]
+  pending {"player_id": "p2", "action": "SEARCH_AND_SELECT", "message": "場のキャラクターが上限(5)を超えました。トラッシュするキャラを1枚選んでください。", "selectable_uuids": ["9c411ee1-14cc-4f96-8577-c67f0fa9a1a9", "5e825d32-0167-4be7-8267-eb225de4c150", "4bcb12ff-3ec9-42cf-a998-7065e25fd09a", "8c84d0cf-a49c-4c66-b10e-1e247cac1abb", "7250b94b-8
+42 []
+  pending {"player_id": "p2", "action": "MAIN_ACTION", "message": "メインアクションを選択してください", "selectable_uuids": ["28e52195-0e90-4dc5-a46c-bb246d0e4a47", "8ac6bff9-5f73-4c56-97ec-1470935b2538", "55f48de8-6242-45ed-b983-46857e265a9c", "c45e830d-7fa5-4def-9b69-062e067e8cc2", "4bcb12ff-3ec9-42cf-a998-7065e25fd09a", "8

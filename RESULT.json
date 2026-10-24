@@ -7,5 +7,5 @@
  "base": "8acab03",
  "report": "docs/reports/2026-10-24_reaudit_wr.md",
  "artifacts": "n1_results/reaudit_wr/",
- "notes": "running: blunder play/judge (seeds 3341000-3341099, 2 workers) || defense run/verify (seeds 3351000-3351299, 2 workers); tree-budget redo of 3301005/107 (sims x1/x2/x4)"
+ "notes": "running: blunder judge (2 workers, ~64 s/point wall = 2x the 10-23 audit per point) || defense run (2 workers, ~2 min/game). Found 1 void game in blunder play: seed 3341083 step 43 (field-overflow trash during ON_ATTACK leaves active_battle set with phase MAIN; window path returns DON_BOX box move -> apply fails). Tree-budget redo (item 3): 3301005/107 stays PASS at sims x1/x2/x4/x8 and tree worlds 4."
 }

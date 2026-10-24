@@ -26,3 +26,12 @@ todo 300 (done 0) -> n1_results/reaudit_wr/defense/points_3351000_300.jsonl
 [25/300] seed=3351022 pts=42 sec=296.6 winner=p1 stats={'resp_points_seen': 65, 'resp_points_audited': 38, 'end_turns_seen': 12, 'end_turns_audited': 4}
 [26/300] seed=3351026 pts=11 sec=19.8 winner=p1 stats={'resp_points_seen': 39, 'resp_points_audited': 9, 'end_turns_seen': 12, 'end_turns_audited': 2}
 [27/300] seed=3351027 pts=52 sec=164.7 winner=p2 stats={'resp_points_seen': 46, 'resp_points_audited': 44, 'end_turns_seen': 11, 'end_turns_audited': 8}
+[28/300] seed=3351025 pts=38 sec=446.0 winner=p2 stats={'resp_points_seen': 44, 'resp_points_audited': 33, 'end_turns_seen': 11, 'end_turns_audited': 5}
+[29/300] seed=3351028 pts=51 sec=337.8 winner=p1 stats={'resp_points_seen': 57, 'resp_points_audited': 44, 'end_turns_seen': 12, 'end_turns_audited': 7}
+[30/300] seed=3351029 pts=27 sec=160.0 winner=p1 stats={'resp_points_seen': 39, 'resp_points_audited': 23, 'end_turns_seen': 10, 'end_turns_audited': 4}
+[31/300] seed=3351031 pts=24 sec=66.7 winner=p2 stats={'resp_points_seen': 31, 'resp_points_audited': 19, 'end_turns_seen': 11, 'end_turns_audited': 5}
+[32/300] seed=3351030 pts=43 sec=142.9 winner=p2 stats={'resp_points_seen': 65, 'resp_points_audited': 38, 'end_turns_seen': 13, 'end_turns_audited': 5}
+[33/300] seed=3351032 pts=43 sec=64.2 winner=p2 stats={'resp_points_seen': 66, 'resp_points_audited': 39, 'end_turns_seen': 13, 'end_turns_audited': 4}
+[34/300] seed=3351034 pts=33 sec=60.8 winner=p1 stats={'resp_points_seen': 42, 'resp_points_audited': 28, 'end_turns_seen': 12, 'end_turns_audited': 5}
+[35/300] seed=3351035 pts=15 sec=73.4 winner=p1 stats={'resp_points_seen': 46, 'resp_points_audited': 13, 'end_turns_seen': 12, 'end_turns_audited': 2}
+[36/300] seed=3351036 pts=25 sec=166.3 winner=p1 stats={'resp_points_seen': 52, 'resp_points_audited': 23, 'end_turns_seen': 12, 'end_turns_audited': 2}
