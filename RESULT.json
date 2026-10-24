@@ -15,13 +15,13 @@
   ]
  },
  "metrics": {
-  "games": 0,
+  "games": 1,
   "games_expected": 4,
   "void_games": 0,
-  "points": 0,
+  "points": 39,
   "steps": {},
   "lines": {
-   "points_3013004_4.jsonl": 0
+   "points_3013004_4.jsonl": 40
   }
  },
  "notes": "",
