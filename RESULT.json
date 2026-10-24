@@ -1,20 +1,26 @@
 {
- "job": "worker-jobs",
- "role": "wp",
- "status": "done",
- "inputs": {"spec": "docs/n_loop_ops.md §7.42 (main a5d917d60)", "copied_from": "§7.41 (wave 51 gen / r22・r22o train / r22・r22o arena)"},
+ "job": "arena-r22p-w03",
+ "role": "arena",
+ "status": "partial",
+ "inputs": {
+  "candidate": "nrel_r22.npz (claude/train-r22)",
+  "baseline": "nrel_r13d.npz",
+  "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)",
+  "pairs": 84
+ },
  "outputs": {
-  "files": ["opcg_sim/loop/worker_job.py", "opcg_sim/loop/worker_prompts.py", ".claude/skills/worker-job/SKILL.md",
-            "opcg_sim/loop/jobs/gen_n51.json", "opcg_sim/loop/jobs/arena_r22.json", "opcg_sim/loop/jobs/arena_r22o.json", "opcg_sim/loop/jobs/train_r22.json",
-            "opcg_sim/loop/jobs/trial_gen.json", "opcg_sim/loop/jobs/trial_train.json", "opcg_sim/loop/jobs/trial_arena.json", "opcg_sim/loop/jobs/trial_gen_resume.json",
-            "tests/test_worker_job.py", "docs/TEST_SPEC.md (1 row)", "docs/n_loop_ops.md §7.42 (usage + trial)"],
-  "trial_branches": ["claude/worker-job-trial-gen-w01", "claude/worker-job-trial-train", "claude/worker-job-trial-arena-w01", "claude/worker-job-trial-gen-resume"]
+  "files": [
+   "arena_r22p/r22p_real_w03.jsonl"
+  ]
  },
  "metrics": {
-  "watch_test": "tests/test_worker_job.py 12 passed (dry-run commands == §7.41 hand-written for gen k=1,2,17,32 / arena r22,r22o k=1,9,16 / train+band)",
-  "trial": {"gen": "2 games 339 rows done; re-run adds no commit", "train": "1 epoch + band done", "arena": "2 pairs (2 rounds) done; re-run after kill skips both",
-            "resume": "killed in part 1 with only p0 on origin and local results wiped -> re-run restored p0, ran p1,p2, 6 games 866 rows done"},
-  "make_test": "green"
+  "arena_r22p/r22p_real_w03.jsonl": 21
  },
- "notes": "迷った点: (1) アリーナの r22 と r22o は 1 つの定義に変数を持たせず 2 ファイルにした（番号 k だけで決まる形を保つ・worker_prompts を 2 回呼ぶ）。(2) 再開は「origin に結果ブランチが在ればその先端から」にした（手書きの指示書は毎回本線から -B で作り直していて、再開の後の push が non-fast-forward になりうる。シャードが最後まで同じコードで回る利点もある）。base が本線の最新のジョブでも、途中で本線が進んだら再開は始めたときのコードのまま（RESULT.json の worker.code_commit）。(3) 写しの見張りのテストは .md を読まず、§7.41 の bash を期待値として写した（文書だけの変更はゲートを飛ばす決まりの前提を守る）。cpu_infra に分類（対戦の動きに関わらない）。(4) 再分析（reanalyze）と §7.33 の pair-timeout・§7.31 の腕は定義の欄（tail_args・arms）で書けるが、今の 3 つの写しにだけテストを付けた。(5) 試しの訓練の torch は ~/torch_env に入れた（定義の torch_env）。(6) コミットの名前・メールは今までの指示書と同じ worker／ユーザのメールを使う。"
+ "notes": "",
+ "worker": {
+  "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/arena_r22p.json",
+  "k": 3,
+  "branch": "claude/arena-r22p-w03",
+  "code_commit": "9b7677bbc1e47cfbb67d8f2041d67bce53ef0393"
+ }
 }
