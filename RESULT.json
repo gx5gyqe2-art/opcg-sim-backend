@@ -11,15 +11,16 @@
  "outputs": {
   "dirs": [
    "n_records/trial_resume_p0",
-   "n_records/trial_resume_p1"
+   "n_records/trial_resume_p1",
+   "n_records/trial_resume_p2"
   ]
  },
  "metrics": {
-  "parts_done": 2,
-  "games": 4,
-  "rows": 622,
+  "parts_done": 3,
+  "games": 6,
+  "rows": 866,
   "dropped": 0,
-  "sec_play_mean": 1.42
+  "sec_play_mean": 1.31
  },
  "notes": "",
  "worker": {
