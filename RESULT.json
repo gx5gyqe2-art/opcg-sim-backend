@@ -14,5 +14,5 @@
   "arena_r22o/r22o_real_w08.jsonl": 175,
   "arena_r22o/r22o_synth2_w08.jsonl": 175
  },
- "notes": ""
+ "notes": "Engine commit 87bd12885 (origin/claude/cpu-spec-improvements-yw91jd). Each condition took about 2 min (126 s for real), not the expected 25 min; 4 cores. real: 174 pairs, void 1, wr 0.5144 [0.4741,0.5546], Elo +10.0; mirror: 175 pairs, void 0, wr 0.4571 [0.4089,0.5054], Elo -29.9; synth_roles2: 173 pairs, void 2, wr 0.4335 [0.391,0.476], Elo -46.5. The jsonl files have 175 lines each (void pairs included)."
 }
