@@ -175,3 +175,9 @@
   修正前の記録の負荷（3351000〜は 2＋2 並走）と打ち直しの負荷（4 並走）が違う。判定器のまま（甲）の見逃しは判定不能の振れで ±1〜2 動きうる。
 - **点の数が少ない**。11 → 20 の差は 2 つの局面で同じ向きだが、それぞれは区間の内（合わせた 31 点を半々の二項で見て片側 p ≈ 0.07）。§2.3 の点ごとの読みは選び方の偏りがある（対称に並べた）。
 - 3013119・3013147（rs-window-read §4 の修正前の点）は今回の 2 つの記録のどちらにも見逃しとして出ない（rs-window-read の「修正前」は rs-commit-hidden の局で、この WP の修正前とは別の形）。
+
+## 8. 品質ゲート
+
+- `make test` green（cargo 625 passed・pytest 874 passed／13 skipped・`n1_results/window_tree_blocker/make_test.log`）。
+- `make audit-cross` void 0（120 ペア・`audit_cross.log`）。
+- `cargo clippy -D warnings` は触っていない既存のコード（`search/lethal.rs` の引数の数・`tests_lethal.rs` のループ）で落ちる（`make test` には入っていない）。
