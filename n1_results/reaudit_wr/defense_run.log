@@ -1,0 +1,3 @@
+todo 300 (done 0) -> n1_results/reaudit_wr/defense/points_3351000_300.jsonl
+[1/300] seed=3351000 pts=19 sec=39.0 winner=p1 stats={'resp_points_seen': 41, 'resp_points_audited': 16, 'end_turns_seen': 12, 'end_turns_audited': 3}
+[2/300] seed=3351001 pts=33 sec=50.8 winner=p1 stats={'resp_points_seen': 56, 'resp_points_audited': 26, 'end_turns_seen': 16, 'end_turns_audited': 7}

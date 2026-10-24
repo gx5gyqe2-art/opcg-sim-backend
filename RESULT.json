@@ -1,9 +1,11 @@
 {
- "job": "rs-window-read",
- "role": "engine fix (window/dialog decisions) + re-audits",
+ "job": "reaudit-wr",
+ "role": "read-only re-audit after rs-window-read (blunder-audit 100 games + defense-audit 300 games)",
  "status": "running",
- "spec": "docs/search_efficiency_plan.md §7.42 (origin/claude/cpu-spec-improvements-yw91jd @ ef33a81; ledger 2+374); evidence docs/reports/2026-10-23_commit_audit.md, 2026-10-23_blunder_audit.md, 2026-10-23_commit_hidden.md §2.2",
- "branch": "claude/rs-window-read",
- "report": "docs/reports/2026-10-23_window_read.md",
- "notes": "in progress: commit-audit redo (seeds 3311000-3311299), audit-cross, defense re-audit (legacy vs fixed) running"
+ "spec": "docs/search_efficiency_plan.md §7.43 (origin/claude/cpu-spec-improvements-yw91jd @ 8acab03; ledger 2+378)",
+ "branch": "claude/reaudit-wr",
+ "base": "8acab03",
+ "report": "docs/reports/2026-10-24_reaudit_wr.md",
+ "artifacts": "n1_results/reaudit_wr/",
+ "notes": "running: blunder play/judge (seeds 3341000-3341099, 2 workers) || defense run/verify (seeds 3351000-3351299, 2 workers); tree-budget redo of 3301005/107 (sims x1/x2/x4)"
 }
