@@ -1,7 +1,7 @@
 {
  "job": "arena-ovt-w13",
  "role": "arena",
- "status": "done",
+ "status": "partial",
  "inputs": {
   "candidate": "nrel_r22.npz (trigger confirm offers decline)",
   "baseline": "nrel_r22.npz + confirm_trigger_legacy",
@@ -14,7 +14,7 @@
   ]
  },
  "metrics": {
-  "arena_ovt/ovt_real_w13.jsonl": 167
+  "arena_ovt/ovt_real_w13.jsonl": 168
  },
  "notes": "",
  "worker": {
