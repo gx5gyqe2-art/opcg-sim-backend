@@ -1,0 +1,10 @@
+3341083 after 43 moves: p1 SELECT_COUNTER phase BATTLE_COUNTER battle True
+3341083 finished: winner p2 steps 161 sec 39.9
+3351219 (150, 'p1', 'MAIN_ACTION', 'メインアクションを選択してください', 'commit', 'ATTACK', 'MAIN', False)
+3351219 (151, 'p1', 'CONFIRM_OPTIONAL', '「ゲッコー・モリア」の効果を使用しますか？（コストを払う）', 'window', 'RESOLVE_EFFECT_SELECTION', 'MAIN', True)
+3351219 (152, 'p2', 'SELECT_COUNTER', 'カウンターカードを選択してください', 'window', 'PASS', 'BATTLE_COUNTER', True)
+3351219 (153, 'p1', 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'PLAY', 'MAIN', False)
+3351219 (154, 'p1', 'SEARCH_AND_SELECT', '「ペローナ」の効果: 対象を選択（1枚まで）', 'window', 'RESOLVE_EFFECT_SELECTION', 'MAIN', False)
+3351219 (155, 'p1', 'SEARCH_AND_SELECT', '「ペローナ」の効果: 対象を選択（1枚まで）', 'window', 'RESOLVE_EFFECT_SELECTION', 'MAIN', False)
+3351219 (156, 'p1', 'MAIN_ACTION', 'メインアクションを選択してください', 'main', 'ATTACH_DON', 'MAIN', False)
+3351219 finished: winner p1 steps 204 sec 203.6

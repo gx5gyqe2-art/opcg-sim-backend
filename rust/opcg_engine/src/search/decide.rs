@@ -2638,7 +2638,9 @@ pub(super) mod tests {
     fn pv_is_empty_when_kind_is_window() {
         use crate::model::ActiveBattle;
         use crate::testkit::{BoardBuilder, M_CHAR};
-        let mut b = BoardBuilder::new();
+        // カウンターの段（2026-10-24 まではフェイズ MAIN のまま戦闘を置いていた＝規則の欠陥で戦闘が残った
+        // 盤面と同じ形。今は MAIN の判断点で窓の道に入らない〔§7.44 の (A)〕ので段を明示する）。
+        let mut b = BoardBuilder::new().phase(crate::model::Phase::BattleCounter);
         let atk = b.put_field(Seat::P1, M_CHAR);
         let (masters, mut state) = b.build();
         let target = state.player(Seat::P2).leader.expect("p2 leader");

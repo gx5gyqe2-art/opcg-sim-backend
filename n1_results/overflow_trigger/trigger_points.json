@@ -1,0 +1,1256 @@
+[
+ {
+  "seed": 5000151,
+  "step": 102,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「ジンベエ」の効果を発動しますか？",
+  "src": "7b2d965a-ee08-4567-a5b7-b876a8da5d1c",
+  "card": [
+   "EB02-055",
+   "hand"
+  ],
+  "my_life": 3,
+  "opp_life": 0,
+  "my_hand": 6,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": -0.85,
+   "False": -0.725
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000153,
+  "step": 80,
+  "seat": "p2",
+  "turn_player": "p1",
+  "msg": "【トリガー】「バーソロミュー・くま」の効果を発動しますか？",
+  "src": "2db96e85-8e47-44df-909b-4b6febfc3d0f",
+  "card": [
+   "EB04-055",
+   "hand"
+  ],
+  "my_life": 2,
+  "opp_life": 4,
+  "my_hand": 4,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": 0.89,
+   "False": 0.907
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000154,
+  "step": 127,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「ジンベエ」の効果を発動しますか？",
+  "src": "02dcb405-a90e-4ab2-a607-7dbf2ba8afe9",
+  "card": [
+   "OP01-071",
+   "hand"
+  ],
+  "my_life": 0,
+  "opp_life": 0,
+  "my_hand": 1,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": -0.159,
+   "False": -0.788
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000156,
+  "step": 30,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「キャロット」の効果を発動しますか？",
+  "src": "8226c8e5-5898-47d0-b07a-95cfcdb75a13",
+  "card": [
+   "OP01-009",
+   "hand"
+  ],
+  "my_life": 3,
+  "opp_life": 3,
+  "my_hand": 6,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": -0.705,
+   "False": -0.641
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000157,
+  "step": 21,
+  "seat": "p2",
+  "turn_player": "p2",
+  "msg": "「ナミ」の効果を発動しますか？",
+  "src": "291e4c83-e1f8-4cd1-940c-3d369b21ced6",
+  "card": [
+   "OP11-041",
+   "leader"
+  ],
+  "my_life": 4,
+  "opp_life": 4,
+  "my_hand": 6,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": 0.299,
+   "False": 0.128
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000157,
+  "step": 53,
+  "seat": "p2",
+  "turn_player": "p2",
+  "msg": "「ナミ」の効果を発動しますか？",
+  "src": "291e4c83-e1f8-4cd1-940c-3d369b21ced6",
+  "card": [
+   "OP11-041",
+   "leader"
+  ],
+  "my_life": 3,
+  "opp_life": 3,
+  "my_hand": 7,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": 0.761,
+   "False": 0.694
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000157,
+  "step": 57,
+  "seat": "p2",
+  "turn_player": "p2",
+  "msg": "「ナミ」の効果を発動しますか？",
+  "src": "291e4c83-e1f8-4cd1-940c-3d369b21ced6",
+  "card": [
+   "OP11-041",
+   "leader"
+  ],
+  "my_life": 3,
+  "opp_life": 2,
+  "my_hand": 8,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": 0.836,
+   "False": 0.836
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000157,
+  "step": 70,
+  "seat": "p2",
+  "turn_player": "p2",
+  "msg": "「ナミ」の効果を発動しますか？",
+  "src": "291e4c83-e1f8-4cd1-940c-3d369b21ced6",
+  "card": [
+   "OP11-041",
+   "leader"
+  ],
+  "my_life": 2,
+  "opp_life": 1,
+  "my_hand": 10,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": 0.945,
+   "False": 0.945
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000157,
+  "step": 86,
+  "seat": "p2",
+  "turn_player": "p2",
+  "msg": "「ナミ」の効果を発動しますか？",
+  "src": "291e4c83-e1f8-4cd1-940c-3d369b21ced6",
+  "card": [
+   "OP11-041",
+   "leader"
+  ],
+  "my_life": 2,
+  "opp_life": 0,
+  "my_hand": 10,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": 0.957,
+   "False": 0.957
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000158,
+  "step": 54,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「リリス」の効果を発動しますか？",
+  "src": "9ab9a1d6-a635-44ba-8ce6-4f832aec9c24",
+  "card": [
+   "EB03-058",
+   "hand"
+  ],
+  "my_life": 3,
+  "opp_life": 2,
+  "my_hand": 6,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": 0.056,
+   "False": 0.22
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000158,
+  "step": 57,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「キングバーム」の効果を発動しますか？",
+  "src": "b126bdd6-0f25-4706-b8dd-6d579956a1d8",
+  "card": [
+   "OP03-100",
+   "hand"
+  ],
+  "my_life": 2,
+  "opp_life": 2,
+  "my_hand": 7,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": -0.16,
+   "False": 0.295
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000160,
+  "step": 59,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「ガスティーノ」の効果を発動しますか？",
+  "src": "268d2b92-71b0-4578-ba9c-d7cacb18da28",
+  "card": [
+   "EB01-053",
+   "hand"
+  ],
+  "my_life": 3,
+  "opp_life": 1,
+  "my_hand": 5,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": 0.344,
+   "False": 0.255
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000162,
+  "step": 41,
+  "seat": "p2",
+  "turn_player": "p1",
+  "msg": "【トリガー】「ボア・ハンコック」の効果を発動しますか？",
+  "src": "7b7d78e0-eb11-40bc-8206-890e64696b0c",
+  "card": [
+   "EB04-027",
+   "hand"
+  ],
+  "my_life": 1,
+  "opp_life": 3,
+  "my_hand": 9,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": -0.789,
+   "False": -0.744
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000162,
+  "step": 86,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「キャロット」の効果を発動しますか？",
+  "src": "701f7ed9-454e-4aed-a8b0-2afaa778b280",
+  "card": [
+   "OP01-009",
+   "hand"
+  ],
+  "my_life": 2,
+  "opp_life": 0,
+  "my_hand": 1,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": 0.146,
+   "False": 0.488
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000163,
+  "step": 58,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「リリス」の効果を発動しますか？",
+  "src": "0f937254-f152-49b2-90f4-c69400553447",
+  "card": [
+   "EB03-058",
+   "hand"
+  ],
+  "my_life": 2,
+  "opp_life": 3,
+  "my_hand": 4,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": -0.037,
+   "False": 0.239
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000163,
+  "step": 80,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「シャーロット・スムージー」の効果を発動しますか？",
+  "src": "1306afe7-2daa-41ea-b1a7-145636db3e56",
+  "card": [
+   "OP03-110",
+   "hand"
+  ],
+  "my_life": 1,
+  "opp_life": 3,
+  "my_hand": 6,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": -0.816,
+   "False": -0.727
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000164,
+  "step": 53,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「モネ」の効果を発動しますか？",
+  "src": "933cc8a0-0683-4f90-a8ee-dd57867af498",
+  "card": [
+   "OP01-082",
+   "hand"
+  ],
+  "my_life": 2,
+  "opp_life": 1,
+  "my_hand": 6,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": 0.402,
+   "False": 0.511
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000167,
+  "step": 78,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「ジンベエ」の効果を発動しますか？",
+  "src": "935bf869-eca1-4878-97f5-5ac1feaa3129",
+  "card": [
+   "EB02-055",
+   "hand"
+  ],
+  "my_life": 3,
+  "opp_life": 1,
+  "my_hand": 1,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": -0.864,
+   "False": -0.761
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000167,
+  "step": 89,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「シャーロット・クラッカー」の効果を発動しますか？",
+  "src": "e2d2cd9f-404a-424a-89d7-5b230e10a0fc",
+  "card": [
+   "OP03-108",
+   "hand"
+  ],
+  "my_life": 1,
+  "opp_life": 1,
+  "my_hand": 3,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": -0.229,
+   "False": -0.024
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000168,
+  "step": 12,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「ガスティーノ」の効果を発動しますか？",
+  "src": "4478702b-1051-4da9-b046-87af0be3d336",
+  "card": [
+   "EB01-053",
+   "hand"
+  ],
+  "my_life": 4,
+  "opp_life": 4,
+  "my_hand": 6,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": -0.055,
+   "False": -0.387
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000173,
+  "step": 46,
+  "seat": "p2",
+  "turn_player": "p1",
+  "msg": "【トリガー】「ガスティーノ」の効果を発動しますか？",
+  "src": "40f800a9-5c16-495a-85b4-77c3b70bb230",
+  "card": [
+   "EB01-053",
+   "hand"
+  ],
+  "my_life": 2,
+  "opp_life": 3,
+  "my_hand": 6,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": 0.516,
+   "False": 0.372
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000177,
+  "step": 62,
+  "seat": "p2",
+  "turn_player": "p1",
+  "msg": "【トリガー】「シャーロット・スムージー」の効果を発動しますか？",
+  "src": "d4ff99af-3cfb-41bf-8f08-ee185a7f7664",
+  "card": [
+   "OP03-110",
+   "hand"
+  ],
+  "my_life": 3,
+  "opp_life": 3,
+  "my_hand": 5,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": -0.709,
+   "False": -0.684
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000178,
+  "step": 48,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「ボア・ハンコック」の効果を発動しますか？",
+  "src": "ae6e25ac-4eb0-459f-b1be-679dacf1aa23",
+  "card": [
+   "EB04-027",
+   "hand"
+  ],
+  "my_life": 2,
+  "opp_life": 3,
+  "my_hand": 8,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": -0.941,
+   "False": -0.932
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000180,
+  "step": 98,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「スピード」の効果を発動しますか？",
+  "src": "0490f8f4-16bb-464f-9f80-53607d74edd4",
+  "card": [
+   "OP01-104",
+   "hand"
+  ],
+  "my_life": 1,
+  "opp_life": 1,
+  "my_hand": 6,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": 0.515,
+   "False": 0.608
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000183,
+  "step": 42,
+  "seat": "p2",
+  "turn_player": "p1",
+  "msg": "【トリガー】「河松」の効果を発動しますか？",
+  "src": "8ad31e8e-7493-4c23-acff-9f68737249f9",
+  "card": [
+   "OP01-037",
+   "hand"
+  ],
+  "my_life": 4,
+  "opp_life": 2,
+  "my_hand": 5,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": 0.311,
+   "False": 0.325
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000186,
+  "step": 13,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「シャーロット・クラッカー」の効果を発動しますか？",
+  "src": "2217be12-d9f4-4f90-bd10-5de8276c894c",
+  "card": [
+   "OP03-108",
+   "hand"
+  ],
+  "my_life": 4,
+  "opp_life": 5,
+  "my_hand": 6,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": -0.125,
+   "False": -0.34
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000186,
+  "step": 22,
+  "seat": "p2",
+  "turn_player": "p1",
+  "msg": "【トリガー】「モネ」の効果を発動しますか？",
+  "src": "6c7f6f4d-1405-430c-a7c0-7f4b3cfecc48",
+  "card": [
+   "OP01-082",
+   "hand"
+  ],
+  "my_life": 4,
+  "opp_life": 4,
+  "my_hand": 6,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": -0.38,
+   "False": -0.361
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000186,
+  "step": 115,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「シャーロット・スムージー」の効果を発動しますか？",
+  "src": "a1d3a185-b382-4177-9e03-a7780ae1f3ab",
+  "card": [
+   "OP03-110",
+   "hand"
+  ],
+  "my_life": 1,
+  "opp_life": 0,
+  "my_hand": 5,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": 0.877,
+   "False": 0.894
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000187,
+  "step": 29,
+  "seat": "p2",
+  "turn_player": "p1",
+  "msg": "【トリガー】「モネ」の効果を発動しますか？",
+  "src": "47c9ad72-d8b1-48ce-a857-0fac677b25e3",
+  "card": [
+   "OP01-082",
+   "hand"
+  ],
+  "my_life": 2,
+  "opp_life": 3,
+  "my_hand": 4,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": 0.027,
+   "False": 0.104
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000189,
+  "step": 5,
+  "seat": "p1",
+  "turn_player": "p1",
+  "msg": "「ジュエリー・ボニー」の効果を発動しますか？",
+  "src": "3a7f0564-bb2c-4d6d-afd4-5aa46ec7868c",
+  "card": [
+   "OP13-100",
+   "leader"
+  ],
+  "my_life": 5,
+  "opp_life": 4,
+  "my_hand": 5,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": 0.225,
+   "False": 0.054
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000189,
+  "step": 18,
+  "seat": "p1",
+  "turn_player": "p1",
+  "msg": "「ジュエリー・ボニー」の効果を発動しますか？",
+  "src": "3a7f0564-bb2c-4d6d-afd4-5aa46ec7868c",
+  "card": [
+   "OP13-100",
+   "leader"
+  ],
+  "my_life": 4,
+  "opp_life": 4,
+  "my_hand": 6,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": 0.057,
+   "False": 0.057
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000189,
+  "step": 40,
+  "seat": "p1",
+  "turn_player": "p1",
+  "msg": "「ジュエリー・ボニー」の効果を発動しますか？",
+  "src": "3a7f0564-bb2c-4d6d-afd4-5aa46ec7868c",
+  "card": [
+   "OP13-100",
+   "leader"
+  ],
+  "my_life": 4,
+  "opp_life": 3,
+  "my_hand": 2,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": -0.615,
+   "False": -0.663
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000189,
+  "step": 61,
+  "seat": "p1",
+  "turn_player": "p2",
+  "msg": "【トリガー】「ガスティーノ」の効果を発動しますか？",
+  "src": "b31db115-9512-4107-8f75-234055c24401",
+  "card": [
+   "EB01-053",
+   "hand"
+  ],
+  "my_life": 2,
+  "opp_life": 3,
+  "my_hand": 4,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": -0.477,
+   "False": -0.514
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000189,
+  "step": 79,
+  "seat": "p1",
+  "turn_player": "p1",
+  "msg": "「ジュエリー・ボニー」の効果を発動しますか？",
+  "src": "3a7f0564-bb2c-4d6d-afd4-5aa46ec7868c",
+  "card": [
+   "OP13-100",
+   "leader"
+  ],
+  "my_life": 2,
+  "opp_life": 3,
+  "my_hand": 3,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": -0.78,
+   "False": -0.78
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000189,
+  "step": 113,
+  "seat": "p1",
+  "turn_player": "p1",
+  "msg": "「ジュエリー・ボニー」の効果を発動しますか？",
+  "src": "3a7f0564-bb2c-4d6d-afd4-5aa46ec7868c",
+  "card": [
+   "OP13-100",
+   "leader"
+  ],
+  "my_life": 1,
+  "opp_life": 2,
+  "my_hand": 3,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": -0.926,
+   "False": -0.926
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000193,
+  "step": 8,
+  "seat": "p2",
+  "turn_player": "p1",
+  "msg": "【トリガー】「ガスティーノ」の効果を発動しますか？",
+  "src": "df21a3b6-1cf5-45d0-b746-5607ff3a2ded",
+  "card": [
+   "EB01-053",
+   "hand"
+  ],
+  "my_life": 3,
+  "opp_life": 4,
+  "my_hand": 6,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": -0.766,
+   "False": -0.843
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000197,
+  "step": 52,
+  "seat": "p2",
+  "turn_player": "p1",
+  "msg": "【トリガー】「しらほし」の効果を発動しますか？",
+  "src": "4a01082e-c0d3-4c11-9274-536fb4ff04b0",
+  "card": [
+   "OP03-116",
+   "hand"
+  ],
+  "my_life": 2,
+  "opp_life": 2,
+  "my_hand": 5,
+  "battle": false,
+  "accepted": false,
+  "q": {
+   "True": -0.235,
+   "False": -0.034
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ },
+ {
+  "seed": 5000197,
+  "step": 76,
+  "seat": "p2",
+  "turn_player": "p1",
+  "msg": "【トリガー】「ガスティーノ」の効果を発動しますか？",
+  "src": "7200681e-9871-4626-9845-c24afe728ceb",
+  "card": [
+   "EB01-053",
+   "hand"
+  ],
+  "my_life": 1,
+  "opp_life": 2,
+  "my_hand": 6,
+  "battle": false,
+  "accepted": true,
+  "q": {
+   "True": -0.366,
+   "False": -0.665
+  },
+  "pend_keys": [
+   "action",
+   "can_skip",
+   "candidates",
+   "constraints",
+   "intent",
+   "message",
+   "options",
+   "player_id",
+   "selectable_uuids",
+   "source_card_uuid"
+  ]
+ }
+]
