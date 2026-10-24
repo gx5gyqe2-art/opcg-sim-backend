@@ -12,6 +12,7 @@
   "dir": "n1_results/trial_audit/w01",
   "files": [
    "n1_results/trial_audit/w01/points_3013000_4.jsonl",
+   "n1_results/trial_audit/w01/summary.json",
    "n1_results/trial_audit/w01/verify.jsonl",
    "n1_results/trial_audit/w01/worker_steps.json"
   ]
@@ -26,6 +27,9 @@
     "sec": 308
    },
    "verify": {
+    "sec": 5
+   },
+   "summarize": {
     "sec": 5
    }
   },

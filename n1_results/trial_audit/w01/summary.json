@@ -1,0 +1,240 @@
+{
+ "games": 4,
+ "void_games": 0,
+ "resp": {
+  "points_seen": 212,
+  "points": 150,
+  "turns": 26,
+  "by_action": {
+   "SELECT_COUNTER": 96,
+   "SELECT_BLOCKER": 28,
+   "SEARCH_AND_SELECT": 11,
+   "CONFIRM_TRIGGER": 7,
+   "CONFIRM_OPTIONAL": 7,
+   "ARRANGE_DECK": 1
+  },
+  "threat": {
+   "k": 2,
+   "n": 150,
+   "rate": 0.0133
+  },
+  "threat_otsu": {
+   "k": 0,
+   "n": 150,
+   "rate": 0.0
+  },
+  "unknown_cpu": {
+   "k": 28,
+   "n": 150,
+   "rate": 0.1867
+  },
+  "unknown_any": {
+   "k": 30,
+   "n": 150,
+   "rate": 0.2
+  },
+  "unknown_otsu_among_threat": {
+   "k": 2,
+   "n": 2,
+   "rate": 1.0
+  },
+  "miss_per_point": {
+   "ko": {
+    "k": 0,
+    "n": 150,
+    "rate": 0.0
+   },
+   "otsu": {
+    "k": 0,
+    "n": 150,
+    "rate": 0.0
+   }
+  },
+  "miss_given_threat": {
+   "ko": {
+    "k": 0,
+    "n": 2,
+    "rate": 0.0
+   },
+   "otsu": {
+    "k": 0,
+    "n": 0,
+    "rate": null
+   }
+  },
+  "miss_per_turn": {
+   "ko": {
+    "k": 0,
+    "n": 26,
+    "rate": 0.0
+   },
+   "otsu": {
+    "k": 0,
+    "n": 26,
+    "rate": 0.0
+   },
+   "turns_with_threat": 1,
+   "turns_with_threat_otsu": 0,
+   "ko_given_threat": {
+    "k": 0,
+    "n": 1,
+    "rate": 0.0
+   },
+   "otsu_given_threat": {
+    "k": 0,
+    "n": 0,
+    "rate": null
+   }
+  },
+  "miss_per_game": {
+   "ko": {
+    "k": 0,
+    "n": 4,
+    "rate": 0.0
+   },
+   "otsu": {
+    "k": 0,
+    "n": 4,
+    "rate": 0.0
+   },
+   "ko_seats": 0,
+   "otsu_seats": 0,
+   "ko_missed_then_lost": 0,
+   "otsu_missed_then_lost": 0,
+   "otsu_missed_lost_this_turn": 0,
+   "ko_missed_lost_this_turn": 0
+  },
+  "miss_ko_by_action": {},
+  "miss_ko_type": {},
+  "miss_otsu_type": {},
+  "threat_by_action": {
+   "SELECT_COUNTER": 2
+  },
+  "miss_otsu_my_life": {},
+  "miss_otsu_opp_life": {},
+  "miss_ko_my_life": {},
+  "threat_my_life": {
+   "1": 2
+  },
+  "cands_mean": 3.34,
+  "sec": {
+   "mean": 3.322,
+   "p50": 0.028,
+   "p99": 30.008,
+   "max": 40.011
+  }
+ },
+ "end": {
+  "turns_seen": 51,
+  "turns": 23,
+  "threat_ko": {
+   "k": 2,
+   "n": 23,
+   "rate": 0.087
+  },
+  "threat_otsu": {
+   "k": 1,
+   "n": 23,
+   "rate": 0.0435
+  },
+  "unknown_actual": {
+   "k": 15,
+   "n": 23,
+   "rate": 0.6522
+  },
+  "unknown_actual_otsu_among_ko": {
+   "k": 1,
+   "n": 2,
+   "rate": 0.5
+  },
+  "miss_per_turn": {
+   "k": 0,
+   "n": 23,
+   "rate": 0.0
+  },
+  "miss_strict_per_turn": {
+   "k": 0,
+   "n": 23,
+   "rate": 0.0
+  },
+  "miss_given_threat": {
+   "k": 0,
+   "n": 1,
+   "rate": 0.0
+  },
+  "miss_strict_given_threat": {
+   "k": 0,
+   "n": 1,
+   "rate": 0.0
+  },
+  "unknown_alts_among_threat": {
+   "k": 0,
+   "n": 1,
+   "rate": 0.0
+  },
+  "miss_games": 0,
+  "miss_then_lost": 0,
+  "miss_lost_next_turn": 0,
+  "miss_strict_then_lost": 0,
+  "miss_alt_type": {},
+  "miss_strict_alt_type": {},
+  "miss_my_life": {},
+  "threat_turns_with_own_win_alt": 0,
+  "threat_my_life": {
+   "1": 1
+  },
+  "alts_mean_among_threat": 25.0,
+  "sec": {
+   "mean": 7.474,
+   "p50": 10.001,
+   "p99": 12.028,
+   "max": 12.028
+  }
+ },
+ "verify": {
+  "resp": {
+   "verified": 0,
+   "errors": 0,
+   "miss_ko_raw": 0,
+   "miss_ko_full": 0,
+   "miss_ko_full_unknown": 0,
+   "miss_otsu_raw": 0,
+   "miss_otsu_full": 0,
+   "miss_otsu_full_unknown": 0,
+   "turns_miss_otsu_full": 0,
+   "turns_miss_ko_full": 0,
+   "games_miss_otsu_full": 0,
+   "otsu_full_then_lost": 0,
+   "otsu_full_lost_this_turn": 0,
+   "miss_given_threat_full": {
+    "ko": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0
+    },
+    "otsu": {
+     "k": 0,
+     "n": 0,
+     "rate": null
+    }
+   },
+   "live_kind_among_miss_ko_full": {},
+   "live_kind_among_miss_otsu_full": {},
+   "fresh_safe_among_miss_ko_full": {},
+   "fresh_safe_among_miss_otsu_full": {},
+   "fresh_safe_by_live_kind_otsu_full": {},
+   "miss_otsu_full_type": {},
+   "miss_otsu_full_my_life": {}
+  },
+  "end": {
+   "verified": 0,
+   "errors": 0,
+   "miss_raw": 0,
+   "miss_full": 0,
+   "miss_strict_full": 0,
+   "miss_full_unknown": 0,
+   "miss_full_then_lost": 0
+  }
+ },
+ "examples": []
+}
