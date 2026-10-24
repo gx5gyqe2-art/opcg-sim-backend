@@ -1,0 +1,13 @@
+--- /home/user/opcg-sim-backend/rust/opcg_engine/src/effects/interact.rs	2026-10-23 18:49:15.092753037 +0000
++++ src/effects/interact.rs	2026-10-24 02:38:59.257340596 +0000
+@@ -952,8 +952,8 @@
+     }
+     // 押し出しで中断した効果の残り（例: 「その後、このターン中、キャラカードを登場できない」）を
+     // 先に解決し切り、それから超過対話の背後に積まれた誘発（効果登場の【登場時】等）を消化する。
+-    super::triggers::settle_pending(s, masters)?;
+-    Ok(())
++    // （試し: 共通末尾を通し、中断していた戦闘の誘発の再開・フェイズ遷移もする）
++    after_resolve(s, masters)
+ }
+ 
+ /// 能力表の global index → そのカード内の index（`ability_used_this_turn` のキー）。

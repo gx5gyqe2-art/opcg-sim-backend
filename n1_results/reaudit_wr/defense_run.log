@@ -35,3 +35,5 @@ todo 300 (done 0) -> n1_results/reaudit_wr/defense/points_3351000_300.jsonl
 [34/300] seed=3351034 pts=33 sec=60.8 winner=p1 stats={'resp_points_seen': 42, 'resp_points_audited': 28, 'end_turns_seen': 12, 'end_turns_audited': 5}
 [35/300] seed=3351035 pts=15 sec=73.4 winner=p1 stats={'resp_points_seen': 46, 'resp_points_audited': 13, 'end_turns_seen': 12, 'end_turns_audited': 2}
 [36/300] seed=3351036 pts=25 sec=166.3 winner=p1 stats={'resp_points_seen': 52, 'resp_points_audited': 23, 'end_turns_seen': 12, 'end_turns_audited': 2}
+[37/300] seed=3351033 pts=43 sec=373.0 winner=p2 stats={'resp_points_seen': 40, 'resp_points_audited': 36, 'end_turns_seen': 11, 'end_turns_audited': 7}
+[38/300] seed=3351038 pts=11 sec=89.5 winner=p2 stats={'resp_points_seen': 17, 'resp_points_audited': 8, 'end_turns_seen': 9, 'end_turns_audited': 3}

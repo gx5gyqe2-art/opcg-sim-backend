@@ -12,3 +12,5 @@ JUDGE seed=3341000 step=119 window opp_dialog:CONFIRM_OPTIONAL ok=True why=None 
 JUDGE seed=3341001 step=55 window own_dialog:SEARCH_AND_SELECT ok=True why=None d13=-0.0625 ci=[-0.1477, 0.0227] d20=None sec=149.6 (11/1000 670s)
 JUDGE seed=3341001 step=94 window blocker ok=True why=None d13=-0.0938 ci=[-0.2775, 0.09] d20=None sec=95.4 (12/1000 766s)
 JUDGE seed=3341001 step=24 main main:attack ok=True why=None d13=-0.0625 ci=[-0.2371, 0.1121] d20=None sec=321.9 (13/1000 792s)
+JUDGE seed=3341001 step=111 main main:attach ok=True why=None d13=-0.0938 ci=[-0.2289, 0.0414] d20=None sec=102.8 (14/1000 868s)
+JUDGE seed=3341001 step=129 main main:turn_end ok=True why=None d13=-0.0938 ci=[-0.1964, 0.0089] d20=None sec=132.4 (15/1000 924s)
