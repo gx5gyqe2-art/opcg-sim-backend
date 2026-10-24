@@ -1,0 +1,2 @@
+  1/1局 行98（main 38） 棄却0 5s
+N_RECORD_DONE {"rows": 98, "main_rows": 38, "dropped": 0, "forced": {"play": 0, "hold": 0, "target": 0}, "removal_legal_rows": 0}
