@@ -1,45 +1,83 @@
 {
- "job": "worker-job-push-check",
- "role": "code",
+ "job": "rs-overflow-trigger",
+ "role": "engine fix (A: field-overflow resumes the battle; MAIN-point window guard) + search candidate fix (B: CONFIRM_TRIGGER accept/decline, measurement flag confirm_trigger_legacy)",
  "status": "done",
- "inputs": {
-  "spec": "docs/n_loop_ops.md §7.46 (main 58a0dd47f)",
-  "base": "claude/cpu-spec-improvements-yw91jd@58a0dd47f"
+ "spec": "docs/search_efficiency_plan.md §7.44 (origin/claude/cpu-spec-improvements-yw91jd @ 80f8f9c; ledger 2+386)",
+ "branch": "claude/rs-overflow-trigger",
+ "base": "80f8f9c",
+ "report": "docs/reports/2026-10-24_overflow_trigger.md",
+ "artifacts": "n1_results/overflow_trigger/",
+ "make_test": "green (cargo 625 passed; pytest 874 passed, 13 skipped; n1_results/overflow_trigger/make_test.log)",
+ "audit_cross": "void 0 / 240 games (n1_results/overflow_trigger/audit_cross.log)",
+ "changes": {
+  "A_rule": "effects/interact.rs::resolve_field_overflow ends with after_resolve (was settle_pending): battle triggers resume and the battle moves to block/counter; no flag",
+  "A_guard": "search/decide.rs: at a MAIN_ACTION point decide does not take the window path even if active_battle is left over",
+  "B_candidates": "search/adapter.rs::selection_moves_with splits CONFIRM_TRIGGER (can_skip) into accepted true/false like CONFIRM_OPTIONAL; SearchOptions.confirm_trigger_legacy (opts key, default false) restores 1 move",
+  "B_wiring": "RsGame.decide(confirm_trigger_legacy=), arena --cand-confirm-trigger-legacy, arena_shard --confirm-trigger-legacy, defense_audit.py --confirm-trigger-legacy, rs_decide_latency.py --confirm-trigger-legacy",
+  "unchanged": "default_interaction_payload, Game.legal_json (rules listing), tree drain of own dialogs, encoding on-play scan (trigger confirm still default-accepted inside the tree)",
+  "tests": "rust search/tests_overflow_trigger.rs (5); pytest tests/test_rs_overflow_trigger.py (3; fixture tests/fixtures/overflow_trigger_games.json; all 3 fail on the pre-fix wheel); pv_is_empty_when_kind_is_window now sets the counter step"
  },
- "outputs": {
-  "code": [
-   "opcg_sim/loop/worker_job.py (repo_problem/ensure_repo・check_branch・push 後の ls-remote)"
-  ],
-  "jobs": [
-   "opcg_sim/loop/jobs/trial_push.json (試し・5 シャード)"
-  ],
-  "docs": [
-   ".claude/skills/worker-job/SKILL.md",
-   "docs/n_loop_ops.md §7.46 (実装と確かめ)"
-  ],
-  "trial_branches": [
-   "claude/worker-job-trial-push-w01",
-   "claude/worker-job-trial-push-w02",
-   "claude/worker-job-trial-push-w03",
-   "claude/worker-job-trial-push-w04",
-   "claude/worker-job-trial-push-w05"
-  ]
+ "unit_positions": {
+  "3341083_43": "after overflow: p1 SELECT_COUNTER, phase BATTLE_COUNTER; played to the end with the shipping settings (r13d): p2 wins at 161 moves",
+  "3351219_154": "after overflow: defender SELECT_COUNTER/BLOCKER; game finishes (pytest, light settings); move list taken by replaying with the pre-fix wheel (DON_BOX crash reproduced)",
+  "3341000_81": "defender life trigger confirm: 2 candidates (shipping), 1 with confirm_trigger_legacy"
  },
- "metrics": {
-  "make_test": "827 passed, 62 skipped (72.6s)・cargo test 含む・EXIT 0",
-  "trials": {
-   "w01_broken_clone": "取り直し → done・ALL_DONE・先端一致 943fc38d4",
-   "w02_on_main": "結果ブランチへ切り替え → ALL_DONE・先端一致 cddb9191d・手元 main は不動・main 上で check_branch/do_save は止まる",
-   "w03": "拒否の試しのつもりが早送りで通った（置いたコミットが祖先）＝普通の done",
-   "w04_push_rejected": "PUSH_FAILED 5 回 × 2 保存 → PUSH_FAILED（最後）・ALL_DONE なし",
-   "w05_push_ok_not_delivered": "pushurl を手元の bare に向けた: 届いていない × 10 → PUSH_FAILED（最後）・ALL_DONE なし → 戻して再開で done・先端一致 d38416f0a"
-  }
+ "defense": {
+  "games": 300,
+  "seeds": "3351000-3351299",
+  "net": "r13d (reaudit-wr shipping net, same positions)",
+  "void": 0,
+  "void_before": 1,
+  "threat_ko_otsu": [445, 347],
+  "miss_raw_ko_otsu": [12, 5],
+  "miss_verified_ko_otsu": [6, 2],
+  "miss_verified_ko_otsu_before": [7, 4],
+  "vii_confirm_trigger_verified": 0,
+  "vii_before": 3,
+  "remaining_types_ko6": {"SELECT_COUNTER": 3, "CONFIRM_OPTIONAL": 2, "SEARCH_AND_SELECT": 1},
+  "commit_origin": 0
+ },
+ "gen_void": {
+  "games": 400,
+  "seeds": "3461000-3461399",
+  "settings": "gen_n51.json args, generator r22, decks real",
+  "dropped": 3,
+  "dropped_seeds": {
+   "3461060": "400-step cap at turn 33 (Rebecca OP15-039 vs Vegapunk OP07-097, both leaders cannot attack); same with confirm_trigger_legacy",
+   "3461163": "400-step cap at turn 30 (Teach OP09-081 vs Vegapunk OP07-097); legacy flag run ends at turn 21 (divergent trajectory)",
+   "3461302": "400-step cap at turn 12: p2 repeats ACTIVATE_MAIN of OP16-084 Kozuki Momonosuke whose cost (trash this character with cost >= 20) cannot be paid; no-op loop; same with legacy flag -> new defect type, not fixed here"
+  },
+  "A_type_voids": 0,
+  "exceptions": 0,
+  "rows": 65265
+ },
+ "latency": {
+  "settings": "rs_decide_latency.py --worlds 2 --lethal-proof root --games 20 (1280 sims, r22), each pinned to one core, run side by side",
+  "legacy_mean_sec": 0.547,
+  "new_mean_sec": 0.533,
+  "legacy_wall_sec": 1606.1,
+  "new_wall_sec": 1579.5,
+  "delta": "-2.6% per move, -1.7% per 20 games (no difference)"
+ },
+ "golden": {
+  "audit": "0 / 3387 changed",
+  "random": "0 / 150 changed",
+  "a1": "50 / 50 changed: all 50 already change on the pre-fix wheel (a1 band was not regenerated when r22 became the default); vs pre-fix wheel: (A) 0 games, (B) 15 games, each first diverging at a CONFIRM_TRIGGER decline; confirm_trigger_legacy reproduces the pre-fix wheel 50/50",
+  "trigger_points_a1": "38 trigger confirms: 10 optional triggered abilities all accepted; 28 life triggers: 20 declined, 8 accepted (legacy: 38 accepted)"
+ },
+ "forecast_check": {
+  "vii_3_to_0_1": "0 (hit)",
+  "void_400_zero": "3 dropped, none of type (A); 2 long step-cap games + 1 new no-op ACTIVATE_MAIN loop (miss, outside A/B)",
+  "cost_0_3pct": "-2.6% (hit)",
+  "arena_B_3_10": "not measured here (coordinator runs the production arena: candidate = fixed vs baseline --confirm-trigger-legacy)"
  },
  "notes": [
-  "既存のジョブ定義の --dry-run は不変（tests/test_worker_job.py はそのまま通る）。pytest は足していない（試しは 1 回きり・CLAUDE.md の最小限の方針）。",
-  "origin の URL は末尾 gx5gyqe2-art/opcg-sim-backend（.git・/ を除く）で判定＝プロキシ経由の URL でも通る。fetch の後に origin/<ブランチ> を update-ref で取ったものに揃える（refspec の狭い木を壊れたとみなさず直す）。",
-  "取り直しは横に .clone を作り、確かめが通ってから古い木を ~/.worker_job/broken/ に退避して入れ替える（ネットワーク失敗で木を失わない）。クローンは約 7.7GB＝ディスクに 2 本分の余裕が要る。",
-  "既にあった型（直していない）: do_checkout の途中結果の退避は save_paths の置き場を丸ごと運ぶため、同じ木で別ジョブ・別番号を回すと前の結果も新しい結果ブランチに載る（試し w03〜w05 で起きた）。作業セッションは 1 本しか回さないので実害は無いはず。",
-  "make test の初回は pytest が未導入で落ちた → opcg_sim/requirements.txt と pytest・pytest-xdist を入れて green。"
+  "Defense re-audit used r13d (reaudit-wr's shipping net at the time) to replay the same positions; with r22 the games would be different.",
+  "(B) is only branched at root decision points: the tree's own-dialog drain and the encoding on-play scan still resolve CONFIRM_TRIGGER by default (accept), to keep the encoding unchanged and because battles inside the tree are boxed with default resolution. Branching inside the tree would be a separate change.",
+  "The CPU declines life triggers often (20/28 in the a1 golden band at 32 sims): the static window value weighs keeping the card in hand above the trigger effect. Whether this is good is for the production arena; if the arena is flat or negative, the static window value of trigger confirms is the place to look (short tree as in window_tree, or a value correction).",
+  "New defect found (not fixed): OP16-084 Kozuki Momonosuke ACTIVATE_MAIN with an unpayable cost (trash this character if its cost >= 20) is listed as legal and is a no-op, so the CPU can repeat it until the 400-step cap (gen seed 3461302, turn 12). Proposal: a separate WP to gate ACTIVATE_MAIN on payable self-referential costs.",
+  "Two of the three dropped gen games are long step-cap games with Vegapunk OP07-097 (cannot attack, adds life). They are not engine voids; wave 51's 23 drops were not broken down, so the 0.75% vs 0.15% comparison is not conclusive.",
+  "Replay goldens: the a1 band had not been regenerated after r22 adoption, so the committed a1 goldens now also carry the net change; the breakdown separates net change, (A) and (B).",
+  "audit golden count is 3,387 abilities (CLAUDE.md says 3,386)."
  ]
 }
