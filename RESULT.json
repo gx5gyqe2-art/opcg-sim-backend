@@ -14,5 +14,5 @@
   "arena_r22/r22_real_w11.jsonl": 175,
   "arena_r22/r22_synth2_w11.jsonl": 175
  },
- "notes": ""
+ "notes": "1 本あたり約 3 分（175s 前後）で完走し、見積り（約 25 分）よりずっと速かった。void は 3 条件とも 0。結果: real wr 0.5429 [0.5002,0.5855] / mirror 0.5286 [0.4831,0.574] / synth2 0.5029 [0.466,0.5397]。作業ディレクトリは ~/opcg-sim-backend（/root 側の新規 clone）。"
 }
