@@ -16,5 +16,5 @@
  "metrics": {
   "arena_wr/wr_w04.jsonl": 150
  },
- "notes": ""
+ "notes": "150/150 pairs, void 0; candidate score 161.0/300 (0.537). The startup line '（基準席は既定）' is fixed text: _best_kw in arena_shard.py does pass window_{carry,worlds,tree}_legacy, lethal_proof root and worlds 2 to the baseline seat. Code pinned at fe51a3ac8."
 }
