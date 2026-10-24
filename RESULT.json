@@ -26,5 +26,5 @@
   "dropped": 0,
   "sec_play_mean": 21.97
  },
- "notes": ""
+ "notes": "ブロック1の git clone がネットワーク切断（curl 56）で失敗したため、既存の /home/user/opcg-sim-backend（同じ origin・HEAD 8acab03 を checkout）を ~/opcg-sim-backend へ symlink して実行した。中身・手順は指示どおり。1 本あたり約 12 分（見込み 32 分より速い）。"
 }
