@@ -429,6 +429,8 @@ def play_one(args) -> List[Dict[str, Any]]:
         kw["window_tree_counter_legacy"] = True  # §7.45 の前後比較（カウンターの窓も短い木で読む旧い形）
     if getattr(a, "window_worlds", None):
         kw["window_worlds"] = a.window_worlds
+    if getattr(a, "confirm_trigger_legacy", False):
+        kw["confirm_trigger_legacy"] = True  # §7.44 の (B) の前後比較（トリガーを断らない＝修正前の打ち方）
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     la, lb = D.leader_pair(db, seed, "random")
     p1, p2 = D.build_pair(db, la, lb, seed, "synth_roles")
@@ -560,6 +562,8 @@ def replay_to(seed: int, a, seat: str, step: int):
         kw["window_tree_counter_legacy"] = True  # §7.45 の前後比較（カウンターの窓も短い木で読む旧い形）
     if getattr(a, "window_worlds", None):
         kw["window_worlds"] = a.window_worlds
+    if getattr(a, "confirm_trigger_legacy", False):
+        kw["confirm_trigger_legacy"] = True  # §7.44 の (B) の前後比較（トリガーを断らない＝修正前の打ち方）
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     la, lb = D.leader_pair(db, seed, "random")
     p1, p2 = D.build_pair(db, la, lb, seed, "synth_roles")
@@ -957,6 +961,8 @@ def main(argv=None):
             p.add_argument("--window-tree-counter-legacy", action="store_true",
                            help="ライフが少ないカウンターの窓も短い木で読む旧い形（§7.45 の前後比較・測定専用）")
             p.add_argument("--window-worlds", type=int, default=None, help="窓の根畳みの世界の本数（省略＝Rust の既定）")
+            p.add_argument("--confirm-trigger-legacy", action="store_true",
+                           help="両席を、トリガーの発動確認を「発動する」の 1 手だけで打つ旧い形で打たせる（§7.44 の (B) の前後比較・測定専用）")
         if name == "run":
             p.add_argument("--seeds", default=None, help="seed の一覧のファイル（空白区切り）。指定すると --seed-base/--games の代わりにこれだけ回す")
         if name == "verify":

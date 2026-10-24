@@ -1,0 +1,7 @@
+engine /tmp/claude-0/-home-user-opcg-sim-backend/1a6405db-2a29-5344-8450-75ce29a8b97b/scratchpad/old_site/opcg_engine/__init__.py
+aborted: seed=3351219 step=154 ValueError: 不明なアクションです: DON_BOX
+(150, 'p1', 'CONFIRM_OPTIONAL', '「ゲッコー・モリア」の効果を使用しますか？（コストを払う）', 'window', 'RESOLVE_EFFECT_SELECTION', 'MAIN', True)
+(151, 'p1', 'SEARCH_AND_SELECT', '「ゲッコー・モリア」の効果: 対象を選択（1枚）', 'window', 'RESOLVE_EFFECT_SELECTION', 'MAIN', True)
+(152, 'p1', 'SEARCH_AND_SELECT', '「ゲッコー・モリア」の効果: 対象を選択（1枚まで）', 'window', 'RESOLVE_EFFECT_SELECTION', 'MAIN', True)
+(153, 'p1', 'SEARCH_AND_SELECT', '場のキャラクターが上限(5)を超えました。トラッシュするキャラを1枚選んでくださ', 'window', 'RESOLVE_EFFECT_SELECTION', 'MAIN', True)
+(154, 'p1', 'MAIN_ACTION', 'メインアクションを選択してください', 'window', 'DON_BOX', 'MAIN', True)
