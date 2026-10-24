@@ -1,0 +1,154 @@
+[
+ {
+  "seed": 3301005,
+  "step": 107,
+  "x": 1,
+  "pick": "{\"action_type\": \"PASS\"}",
+  "Q": [
+   -0.984,
+   -0.851
+  ],
+  "N": [
+   2.0,
+   2.0
+  ],
+  "legal": null,
+  "window": {
+   "worlds": 2,
+   "tree": true
+  }
+ },
+ {
+  "seed": 3301005,
+  "step": 107,
+  "x": 2,
+  "pick": "{\"action_type\": \"PASS\"}",
+  "Q": [
+   -0.982,
+   -0.885
+  ],
+  "N": [
+   2.0,
+   2.0
+  ],
+  "legal": null,
+  "window": {
+   "worlds": 2,
+   "tree": true
+  }
+ },
+ {
+  "seed": 3301005,
+  "step": 107,
+  "x": 4,
+  "pick": "{\"action_type\": \"PASS\"}",
+  "Q": [
+   -0.984,
+   -0.912
+  ],
+  "N": [
+   2.0,
+   2.0
+  ],
+  "legal": null,
+  "window": {
+   "worlds": 2,
+   "tree": true
+  }
+ },
+ {
+  "seed": 3301005,
+  "step": 107,
+  "x": 8,
+  "pick": "{\"action_type\": \"PASS\"}",
+  "Q": [
+   -0.987,
+   -0.94
+  ],
+  "N": [
+   2.0,
+   2.0
+  ],
+  "legal": null,
+  "window": {
+   "worlds": 2,
+   "tree": true
+  }
+ },
+ {
+  "seed": 3301025,
+  "step": 117,
+  "x": 1,
+  "pick": "{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"EB03-024\"}",
+  "Q": [
+   0.187,
+   -0.087
+  ],
+  "N": [
+   2.0,
+   2.0
+  ],
+  "legal": null,
+  "window": {
+   "worlds": 2,
+   "tree": true
+  }
+ },
+ {
+  "seed": 3301025,
+  "step": 117,
+  "x": 2,
+  "pick": "{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"EB03-024\"}",
+  "Q": [
+   0.195,
+   -0.063
+  ],
+  "N": [
+   2.0,
+   2.0
+  ],
+  "legal": null,
+  "window": {
+   "worlds": 2,
+   "tree": true
+  }
+ },
+ {
+  "seed": 3301025,
+  "step": 117,
+  "x": 4,
+  "pick": "{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"EB03-024\"}",
+  "Q": [
+   0.247,
+   -0.08
+  ],
+  "N": [
+   2.0,
+   2.0
+  ],
+  "legal": null,
+  "window": {
+   "worlds": 2,
+   "tree": true
+  }
+ },
+ {
+  "seed": 3301025,
+  "step": 117,
+  "x": 8,
+  "pick": "{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"EB03-024\"}",
+  "Q": [
+   0.147,
+   -0.129
+  ],
+  "N": [
+   2.0,
+   2.0
+  ],
+  "legal": null,
+  "window": {
+   "worlds": 2,
+   "tree": true
+  }
+ }
+]

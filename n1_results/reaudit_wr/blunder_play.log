@@ -1,1 +1,5 @@
 PLAY todo 100 (done 0)
+[1/100] seed=3341000 pts=158 elig=130 pick=10 sec=61.8 winner=p1 (66s)
+[2/100] seed=3341001 pts=204 elig=158 pick=10 sec=92.1 winner=p2 (96s)
+[3/100] seed=3341003 pts=140 elig=107 pick=10 sec=63.5 winner=p2 (160s)
+[4/100] seed=3341004 pts=139 elig=124 pick=10 sec=71.0 winner=p1 (231s)
