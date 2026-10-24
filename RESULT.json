@@ -1,7 +1,7 @@
 {
  "job": "arena-wr-w09",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r13d.npz (window read: continuations re-read, 16-world windows, short tree at low life)",
   "baseline": "nrel_r13d.npz + window_{carry,worlds,tree}_legacy",
