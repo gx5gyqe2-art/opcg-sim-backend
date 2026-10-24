@@ -30,6 +30,9 @@
    },
    "recheck": {
     "sec": 5
+   },
+   "verify": {
+    "sec": 5
    }
   },
   "lines": {
