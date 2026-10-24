@@ -14,5 +14,5 @@
   "arena_r22o/r22o_real_w11.jsonl": 175,
   "arena_r22o/r22o_synth2_w11.jsonl": 175
  },
- "notes": ""
+ "notes": "base=origin/claude/cpu-spec-improvements-yw91jd @ 6fb845d4e; 3 本とも想定（約 25 分／本）より大幅に速く完走: real 252s・mirror 113s・synth2 208s（4 workers・4 コア）。局数は全て 175 ペア＝350 局。速さの原因は未調査（応手修正が取り込まれていない可能性を含め、コーディネータ側で base コミットを確認されたい）。 結果: real wr 0.5057 [0.4601,0.5513] Elo +4.0 void 0; mirror wr 0.4257 [0.3774,0.4741] Elo -52.0 void 0; synth2 wr 0.431 [0.3908,0.4712] Elo -48.2 void 1（1/350=0.29%）。"
 }
