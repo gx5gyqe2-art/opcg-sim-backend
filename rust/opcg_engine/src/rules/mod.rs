@@ -30,6 +30,8 @@ pub mod turn;
 mod tests_rules;
 #[cfg(test)]
 mod tests_cost_gate;
+#[cfg(test)]
+mod tests_unpayable_activate;
 
 use crate::model::{CardIdx, CardType, GameState, MasterTable, Restriction, Seat};
 
