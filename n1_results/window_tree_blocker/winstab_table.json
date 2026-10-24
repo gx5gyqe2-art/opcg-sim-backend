@@ -1,0 +1,232 @@
+{
+ "old_default": {
+  "points": 226,
+  "varying": 16,
+  "rate": 0.0708,
+  "ci": [
+   0.044,
+   0.112
+  ],
+  "minority_share": 0.0177,
+  "by_group": {
+   "low_blocker": {
+    "n": 13,
+    "varying": 2
+   },
+   "low_counter": {
+    "n": 11,
+    "varying": 4
+   },
+   "rest": {
+    "n": 202,
+    "varying": 10
+   }
+  },
+  "loss_points": {
+   "3301005_107": {
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "b_share": 1.0,
+    "picks": {
+     "{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"EB03-024\"}": 8
+    }
+   },
+   "3301004_31": {
+    "b_share": 0.875,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 7,
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-099\"}": 1
+    }
+   }
+  }
+ },
+ "counter_legacy": {
+  "points": 226,
+  "varying": 16,
+  "rate": 0.0708,
+  "ci": [
+   0.044,
+   0.112
+  ],
+  "minority_share": 0.0177,
+  "by_group": {
+   "low_blocker": {
+    "n": 13,
+    "varying": 2
+   },
+   "low_counter": {
+    "n": 11,
+    "varying": 4
+   },
+   "rest": {
+    "n": 202,
+    "varying": 10
+   }
+  },
+  "loss_points": {
+   "3301005_107": {
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "b_share": 1.0,
+    "picks": {
+     "{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"EB03-024\"}": 8
+    }
+   },
+   "3301004_31": {
+    "b_share": 0.875,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 7,
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-099\"}": 1
+    }
+   }
+  }
+ },
+ "blocker": {
+  "points": 226,
+  "varying": 12,
+  "rate": 0.0531,
+  "ci": [
+   0.031,
+   0.091
+  ],
+  "minority_share": 0.0127,
+  "by_group": {
+   "low_blocker": {
+    "n": 13,
+    "varying": 2
+   },
+   "low_counter": {
+    "n": 11,
+    "varying": 0
+   },
+   "rest": {
+    "n": 202,
+    "varying": 10
+   }
+  },
+  "loss_points": {
+   "3301005_107": {
+    "b_share": 0.0,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 8
+    }
+   },
+   "3301025_117": {
+    "b_share": 1.0,
+    "picks": {
+     "{\"action_type\": \"SELECT_BLOCKER\", \"card\": \"EB03-024\"}": 8
+    }
+   },
+   "3301004_31": {
+    "b_share": 0.875,
+    "picks": {
+     "{\"action_type\": \"PASS\"}": 7,
+     "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-099\"}": 1
+    }
+   }
+  }
+ },
+ "counter_legacy_equals_old_default": 226,
+ "changed_points": [
+  {
+   "seed": 3301014,
+   "step": 82,
+   "dtype": "counter",
+   "my_life": 1,
+   "old": {
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP01-006\"}": 8
+   },
+   "new": {
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP04-118\"}": 8
+   },
+   "a": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP04-118\"}",
+   "b": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP03-013\"}"
+  },
+  {
+   "seed": 3301024,
+   "step": 70,
+   "dtype": "counter",
+   "my_life": 1,
+   "old": {
+    "{\"action_type\": \"PASS\"}": 7,
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP06-030\"}": 1
+   },
+   "new": {
+    "{\"action_type\": \"PASS\"}": 8
+   },
+   "a": "{\"action_type\": \"PASS\"}",
+   "b": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP06-030\"}"
+  },
+  {
+   "seed": 3301060,
+   "step": 104,
+   "dtype": "counter",
+   "my_life": 1,
+   "old": {
+    "{\"action_type\": \"PASS\"}": 5,
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP04-048\"}": 3
+   },
+   "new": {
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP04-048\"}": 8
+   },
+   "a": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP04-048\"}",
+   "b": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP03-044\"}"
+  },
+  {
+   "seed": 3301093,
+   "step": 101,
+   "dtype": "counter",
+   "my_life": 0,
+   "old": {
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP01-006\"}": 8
+   },
+   "new": {
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP05-006\"}": 8
+   },
+   "a": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP05-006\"}",
+   "b": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP04-083\"}"
+  },
+  {
+   "seed": 3301044,
+   "step": 111,
+   "dtype": "counter",
+   "my_life": 0,
+   "old": {
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP03-086\"}": 5,
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP02-106\"}": 3
+   },
+   "new": {
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-080\"}": 8
+   },
+   "a": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-080\"}",
+   "b": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP02-106\"}"
+  },
+  {
+   "seed": 3301091,
+   "step": 87,
+   "dtype": "counter",
+   "my_life": 1,
+   "old": {
+    "{\"action_type\": \"PASS\"}": 6,
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP12-015\"}": 1,
+    "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP12-006\"}": 1
+   },
+   "new": {
+    "{\"action_type\": \"PASS\"}": 8
+   },
+   "a": "{\"action_type\": \"PASS\"}",
+   "b": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP12-015\"}"
+  }
+ ],
+ "changed_by_group": {
+  "low_counter": 6
+ }
+}
