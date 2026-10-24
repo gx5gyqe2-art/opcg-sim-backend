@@ -754,3 +754,18 @@ Phase 0 → Phase 1 → Phase 3（Phase 4 の (a)(b) を合間に）→ Phase 4 
 **予告（数を見る前）**: 守りの見逃しの (vii) 3 点 → 0〜1・決着せず 400 局で 0・1 手の費用 +0〜3%・本番アリーナ（(B) だけ）+3〜+10。
 **完了条件**: `make test` green・`make audit-cross` void 0・push。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
 
+### 7.45 WP `rs-window-tree-blocker`——ライフが少ない戦闘の応手の短い木を、ブロッカーの窓だけにする（作業セッション用・opus・2026-10-24）
+
+ユーザ決定（2026-10-24「その順番で進めてください」）。台帳 2+387。根拠: `docs/reports/2026-10-23_window_read.md` §4（守りの再監査で、短い木は自分のライフ ≤ 1 のカウンターの窓で見逃しを直す点 2 と作る点 2 がほぼ同数・読みを 4 倍にしても向きは不変・ブロッカーの窓〔3301025〕では正しく直す）・`docs/reports/2026-10-24_reaudit_wr.md` §3（新しい 300 局でも、ライフ ≤ 1 のカウンターの窓の見逃し 2 点は 2 点とも短い木で読んだ窓・木の値が平ら・ブロッカーの窓の見逃しは 0）。
+**土台**: 本線の最新。同時に WP `rs-overflow-trigger`（§7.44・`decide.rs` の安全側の守りと `adapter.rs` を触る）が走っている——**触る場所を窓の木の条件（`window_tree_applies` まわり）に絞り**、先に向こうが本線に入ったら取り込んでから push する。
+**直すもの**: 自分のライフ ≤ 1 で短い木を使う窓を**ブロッカーの窓だけ**にする（カウンターの窓は世界 16 本の静的な値に戻る）。**測定用の旗** `window_tree_counter_legacy`（opts の鍵・既定 false＝修正後・true でカウンターの窓にも木を使う今の形・`engine_rs.py`／`arena.py --cand-…`／`arena_shard`／`defense_audit.py`／`blunder_audit.py winstab --opts`／`rs_decide_latency.py` に配線）。
+**確かめ**:
+- 守りの再監査（`defense_audit.py`・§7.24 の設定）を **seed 3013000〜3013299**（rs-window-read の守りの再監査と同じ局面）と **seed 3351000〜3351299**（reaudit-wr と同じ局面）の 2 つで・修正後。確かめ後の見逃しのうち「ライフ ≤ 1 のカウンターの窓」の点が減るか、増える点はどれか（短い木が直していた 3013119・3013260 寄りの点がどうなるか）。
+- blunder-audit の窓の 226 点（seed 3301000〜3301099・`winstab`）の揺れと、確かめ済みの損 3 点の手。
+- 単体テスト: ライフ ≤ 1 のカウンターの窓は木を使わず、ブロッカーの窓は使う・旗で戻る（`tests_window_read.rs` の該当テストを直す）。3301025・117 はブロックのまま（`tests/test_rs_window_read.py`）。
+- 費用・golden の作り直しと差分のレビュー（旗を立てると HEAD と一致）・`make test` green・`make audit-cross` void 0。
+**本番アリーナはコーディネータが起こす**（ジョブ定義・Sonnet・候補＝修正後 vs 基準＝`--window-tree-counter-legacy`・出荷の設定・random × real・32 シャード × 84 ペア・seed 3511000〜）。
+**予告（数を見る前）**: 守りの見逃しはどちらの局面でも ±2 点の内（直す点と作る点が入れ替わるだけ）・本番アリーナ −3〜+5。**正の効果が出なくても、木の費用（ライフ ≤ 1 のカウンターの窓で 1 手ぶんの読み）が消えるぶん採る価値がある**かを報告に書く。
+**報告** `docs/reports/2026-10-24_window_tree_blocker.md`・`n1_results/window_tree_blocker/`・`RESULT.json`・`docs/SPEC.md` §2.5.12・`docs/TEST_SPEC.md`・ブランチ `claude/rs-window-tree-blocker`。
+**完了条件**: `make test` green・`make audit-cross` void 0・push。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
+
