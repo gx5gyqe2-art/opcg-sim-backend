@@ -1,13 +1,49 @@
 {
  "job": "rs-unpayable-activate",
- "status": "running",
+ "role": "engine rule fix: unpayable costs no longer make ACTIVATE_MAIN legal (payability check = payment); no flag",
+ "status": "done",
  "spec": "docs/search_efficiency_plan.md §7.46 (origin/claude/cpu-spec-improvements-yw91jd @ ec7b265; ledger 2+396)",
  "branch": "claude/rs-unpayable-activate",
  "base": "ec7b265",
  "report": "docs/reports/2026-10-24_unpayable_activate.md",
  "artifacts": "n1_results/unpayable_activate/",
  "make_test": "green (cargo 632 passed, 1 ignored; pytest 878 passed, 13 skipped; n1_results/unpayable_activate/make_test.log)",
+ "audit_cross": "void 0 / 240 games (n1_results/unpayable_activate/audit_cross.log)",
+ "cause": "Resolver::can_satisfy_node_on treated ref_id='self' cost targets as always present, ignoring cost_min/cost_max that resolve_targets applies; OP16-084 (cost 5) 'trash this character with cost >= 20' was legal, did nothing when played, and repeated until the 400-step cap (seed 3461302). Parser output is correct; fix is in the engine.",
+ "changes": {
+  "self_cost_range": "new resolver::self_ref_in_cost_range used by both payability and resolve_targets (OP16-084)",
+  "move_attached_don": "payable only with >= max(value,1) attached DON!! (ST28-004)",
+  "trash_from_deck": "payable only with deck >= value (EB01-051, EB04-049, OP11-098 events; EB04-042, OP15-088 on play; OP07-079, OP12-090, ST35-003 on attack)",
+  "attach_don": "payable only if the DON!! pool (OPP -> opponent, RESTED -> rested only, no status -> active only) has value x count (OP15-003/017/023, OP13-007)",
+  "cost_choice": "in a cost Choice with exactly one payable branch, that branch is taken without a CHOICE prompt (OP13-079, OP17-020; all cost Choices in the DB have 2 options)",
+  "unchanged": "parser / effects JSON, cost-gate rule (condition after the cost), default_interaction_payload"
+ },
+ "tests": {
+  "rust": "rules/tests_unpayable_activate.rs (7): OP16-084 x2, ST28-004, EB04-042, OP15-003, OP17-020, DB sweep (377 ACTIVATE_MAIN cards x 10 boards: every legal activation changes the board; costed ones change more than the use counter). All 7 fail with the resolver change reverted; sweep before: 42 inert of 2791 legal activations (OP16-084 9, OP15-003 8, OP15-017 8, OP13-079 8, ST28-004 7, OP17-020 1), after: 0",
+  "pytest": "tests/test_rs_unpayable_activate.py (2): real 3461302 position (fixture tests/fixtures/unpayable_activate_3461302.json, turn 12 step 143, p2 MAIN with OP16-084 on field): activation not legal; legal with cost_buff 15"
+ },
+ "game_3461302": "p2 wins, 12 turns, 155 steps (before: 400-step cap, p2 290 actions)",
+ "gen_void": {
+  "games": 400,
+  "seeds": "3651000-3651399",
+  "settings": "gen_n52.json args, generator r22, decks real",
+  "dropped": 0,
+  "this_type": 0,
+  "rows": 68616
+ },
+ "golden": {
+  "audit_changed": "6/3387 (OP16-084, ST28-004, OP15-003, OP15-017, OP15-023, OP13-079)",
+  "random_changed": "6/150 (5000014, 5000017, 5000142 leader OP13-079; 5000053, 5000131, 5000133 leader OP17-020): first diff is the state right after the same leader ACTIVATE_MAIN (cost choice auto-picks the only payable branch)",
+  "a1_changed": "1/50 (5000176, p2 leader OP13-079; differs from the first move, search tree changed)",
+  "diff": "n1_results/unpayable_activate/golden_diff.txt"
+ },
  "notes": [
-  "in progress: 400-game generation run (seeds 3651000-3651399) and make audit-cross"
+  "ATTACH_DON with no status ('アクティブのドン!!' in all 5 cost texts) is now payable only from active DON!!; resolution (attach_don) still falls back to rested DON!! when active runs out - left as is (only makes resolution looser than text, never makes an unpayable cost legal)",
+  "cost Choice auto-pick covers 2-option choices only; no cost Choice with 3+ options exists in the DB",
+  "cost Sequence parts are still checked independently against the same board (shared-resource conflicts not modelled); the 10-board sweep found none",
+  "the pytest on the 3461302 position was not run against a rebuilt pre-fix wheel; pre-fix failure is shown by the Rust tests (all 7 fail with resolver.rs reverted) and by the old drop probe (n1_results/overflow_trigger/drop_probe_3461302.txt)",
+  "the DB sweep test silently does nothing if opcg_sim/data/opcg_effects.json is absent (same convention as other real-data Rust tests); in make test the Python side creates it",
+  "gen part 0 ran concurrently with golden rebuild and make test (slower); not used for cost comparison",
+  "pytest/xdist were not installed in this container; installed opcg_sim/requirements.txt + pytest pytest-xdist httpx to run make test"
  ]
 }
