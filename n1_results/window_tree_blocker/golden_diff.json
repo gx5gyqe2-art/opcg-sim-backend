@@ -1,0 +1,958 @@
+{
+ "ref": "HEAD",
+ "counts": {
+  "legacy_vs_head": 0,
+  "new_vs_legacy": 36,
+  "new_vs_committed": 0
+ },
+ "rows": [
+  {
+   "seed": 5000150,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 63,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "66fd3bb6-6938-4cd9-9c2c-da31b94f09b2"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "409f517e-a9d2-4ada-a7ed-c7e2fd557902"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000151,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 113,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "7b2d965a-ee08-4567-a5b7-b876a8da5d1c"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000152,
+   "legacy_vs_head": null,
+   "new_vs_legacy": null,
+   "new_vs_committed": null
+  },
+  {
+   "seed": 5000153,
+   "legacy_vs_head": null,
+   "new_vs_legacy": null,
+   "new_vs_committed": null
+  },
+  {
+   "seed": 5000154,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 92,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "984ad45b-4792-4d7e-8f19-ed1857b089bc"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000155,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 75,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "f5b5bda8-0c1f-431c-b6ff-0973c780c701"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000156,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 80,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "c7417f63-2d02-496d-913d-9adf1c5499f0"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "d8537c3f-72df-46a7-b7f2-8b2dfc622533"
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000157,
+   "legacy_vs_head": null,
+   "new_vs_legacy": null,
+   "new_vs_committed": null
+  },
+  {
+   "seed": 5000158,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 94,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "9ab9a1d6-a635-44ba-8ce6-4f832aec9c24"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000159,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 80,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "d837b7f5-59fb-429c-9f17-b1ef1f9957b7"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000160,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 67,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "248a387a-a5a9-4de3-b247-36712a515936"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "c0b95895-7e24-4d89-b99c-446d8d97525c"
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000161,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 132,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "075c135c-dfad-4020-83d8-09839590ef81"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000162,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 65,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "dcdf9bb6-f7ad-48fb-b3e6-83a8ed8d0e8e"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "d2f63df9-650c-42e7-b5c8-57c6737411ec"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000163,
+   "legacy_vs_head": null,
+   "new_vs_legacy": null,
+   "new_vs_committed": null
+  },
+  {
+   "seed": 5000164,
+   "legacy_vs_head": null,
+   "new_vs_legacy": null,
+   "new_vs_committed": null
+  },
+  {
+   "seed": 5000165,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 57,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "ce75845a-a057-4125-afb8-7cd71ca5e230"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "79b301a5-67eb-4e79-bcd7-9a2f6f3dfc81"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000166,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 103,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "28832787-9bf3-4fc1-8cf1-8986ae7a1c78"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "054f522d-a373-4bff-9524-5ff38115bb2e"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000167,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 94,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "935bf869-eca1-4878-97f5-5ac1feaa3129"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "e2d2cd9f-404a-424a-89d7-5b230e10a0fc"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000168,
+   "legacy_vs_head": null,
+   "new_vs_legacy": null,
+   "new_vs_committed": null
+  },
+  {
+   "seed": 5000169,
+   "legacy_vs_head": null,
+   "new_vs_legacy": null,
+   "new_vs_committed": null
+  },
+  {
+   "seed": 5000170,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 71,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "d0feaa6b-7edf-4a52-b06e-e2efe44b1d20"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "4baf7533-644b-4976-a80d-4408d4232f86"
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000171,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 54,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "559d6338-60ea-4285-ab11-158683ecb873"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "d44681f6-b8b5-4df3-bdee-1c7a1840473f"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000172,
+   "legacy_vs_head": null,
+   "new_vs_legacy": null,
+   "new_vs_committed": null
+  },
+  {
+   "seed": 5000173,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 102,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "a7ae14a1-93dc-4883-a2ee-fdce584634da"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "1f4391b8-1811-4e76-adb8-b3b18bb55194"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000174,
+   "legacy_vs_head": null,
+   "new_vs_legacy": null,
+   "new_vs_committed": null
+  },
+  {
+   "seed": 5000175,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 117,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "ca74ec2b-3ea2-4a71-a40f-28edeac8e81d"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "1b2ccb1f-a9aa-4fa6-8095-08e229356e53"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000176,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 75,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "e4094c13-7f81-4bfd-acef-a771b5ca4f0d"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "b804f667-9b3a-4037-b916-d98856a0d948"
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000177,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 87,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "27c54d80-ec9b-4125-8d94-2a6739cf1980"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "3c4e2578-aae6-465a-92de-2f374bc405e3"
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000178,
+   "legacy_vs_head": null,
+   "new_vs_legacy": null,
+   "new_vs_committed": null
+  },
+  {
+   "seed": 5000179,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 64,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "63e47806-caf2-4bb3-bc54-47f3e475d0d6"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000180,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 89,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "46fc9131-2b4c-4468-8504-28b975c740f2"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "cf281e83-6cd0-40c4-8e89-02fe28338d15"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000181,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 91,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "4954d41d-ad40-4bc8-acb6-15ed34f545f8"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "9f7c73fe-b50b-4ec9-91ae-5bba57338f19"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000182,
+   "legacy_vs_head": null,
+   "new_vs_legacy": null,
+   "new_vs_committed": null
+  },
+  {
+   "seed": 5000183,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 110,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "a1607add-2aba-446a-8986-3e849f50e6a8"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "e138c8bd-c369-4b5e-91a0-06f54ee48617"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000184,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 60,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "13c2aec2-6e0b-4db7-a7c8-50ba0d978844"
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000185,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 72,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "65208dba-50b1-443c-9f5e-b94003973b87"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000186,
+   "legacy_vs_head": null,
+   "new_vs_legacy": null,
+   "new_vs_committed": null
+  },
+  {
+   "seed": 5000187,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 56,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "fe5f8664-5c3b-40ce-beb8-6236e5aafb9f"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "aca6928e-6cdb-4f72-a1d7-cd26cfdf9146"
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000188,
+   "legacy_vs_head": null,
+   "new_vs_legacy": null,
+   "new_vs_committed": null
+  },
+  {
+   "seed": 5000189,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 103,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "3bda8cb5-27e2-41a1-9912-ec0c8970e743"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "11ea9efe-588a-4ab6-b72d-e265ba817b6e"
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000190,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 78,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "7110c75f-1087-4284-a42d-1d4b2fe95a4e"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "ffd63000-444a-46e4-bbaa-f073ae169f39"
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000191,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 61,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "2c3c2ee9-8f25-4b97-88c3-e9edd675d6c6"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "9ffc8a25-b087-42cb-ad05-0ee2ba14d701"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000192,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 66,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "0ec9c882-0392-4c23-a338-68a925d5d91e"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000193,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 75,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "122e2a10-fc43-4379-931b-024c1a14b513"
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000194,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 50,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "72d5b834-80ae-4870-af91-a032e67ab44f"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "89179f9c-49c0-45bf-a59b-774a43fce5b3"
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000195,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 65,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "d4ff82c1-267d-4075-a0aa-92a68d84843c"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "c69ee840-d3a1-4668-b31a-47d73b523da1"
+    }
+   },
+   "winner": {
+    "legacy": "p1",
+    "new": "p1"
+   }
+  },
+  {
+   "seed": 5000196,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 77,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "8ff272ac-170d-4deb-86b8-c9227872fe4d"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "39b86d29-dd20-4fbc-8a2a-162d3d5a2873"
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000197,
+   "legacy_vs_head": null,
+   "new_vs_legacy": null,
+   "new_vs_committed": null
+  },
+  {
+   "seed": 5000198,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 75,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "29a8827f-1f31-426b-a1b8-e7c8ba0fa068"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "cb19ec26-e3c1-459f-b4aa-0836c8f7b544"
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p2"
+   }
+  },
+  {
+   "seed": 5000199,
+   "legacy_vs_head": null,
+   "new_vs_legacy": 118,
+   "new_vs_committed": null,
+   "at": {
+    "act": "SELECT_COUNTER",
+    "kind": "window",
+    "legacy": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "96674360-ab47-40d6-87da-854ca9c1e0df"
+    },
+    "new": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    }
+   },
+   "winner": {
+    "legacy": "p2",
+    "new": "p2"
+   }
+  }
+ ]
+}

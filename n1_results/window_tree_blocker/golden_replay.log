@@ -1,0 +1,26 @@
+OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_golden_make.py replay \
+  --policy random --games 150 --seed-base 5000000
+  10/150 局
+  20/150 局
+  30/150 局
+  40/150 局
+  50/150 局
+  60/150 局
+  70/150 局
+  80/150 局
+  90/150 局
+  100/150 局
+  110/150 局
+  120/150 局
+  130/150 局
+  140/150 局
+  150/150 局
+RS_GOLDEN_REPLAY {"policy": "random", "written": 150, "mismatched": 0, "seed_base": 5000000}
+OPCG_LOG_SILENT=1 PYTHONPATH=tests python tests/scripts/rs_golden_make.py replay \
+  --policy a1 --games 50 --seed-base 5000150
+  10/50 局
+  20/50 局
+  30/50 局
+  40/50 局
+  50/50 局
+RS_GOLDEN_REPLAY {"policy": "a1", "written": 50, "mismatched": 0, "seed_base": 5000150}
