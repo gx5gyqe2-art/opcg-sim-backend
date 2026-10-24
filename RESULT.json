@@ -14,5 +14,5 @@
   "arena_r22o/r22o_real_w14.jsonl": 175,
   "arena_r22o/r22o_synth2_w14.jsonl": 175
  },
- "notes": ""
+ "notes": "完走・void 0（3 条件とも）。所要は想定（各 25 分）より短く real 266s・mirror 113s・synth2 218s（workers 4）。作業ツリーは /root/opcg-sim-backend（~ が /root）。各条件の ARENA_RESUME_FINAL: real wr 0.4914 [0.4448,0.5381] elo -6.0／mirror wr 0.4743 [0.4292,0.5194] elo -17.9／synth2 wr 0.4343 [0.3938,0.4748] elo -45.9（いずれも 1 シャード 175 ペアのみ）。"
 }
