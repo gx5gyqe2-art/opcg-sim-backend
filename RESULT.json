@@ -14,5 +14,5 @@
   "arena_r22o/r22o_real_w04.jsonl": 175,
   "arena_r22o/r22o_synth2_w04.jsonl": 175
  },
- "notes": "repo was pre-cloned at /home/user/opcg-sim-backend (HOME=/root); ran there instead of ~/opcg-sim-backend. No other deviations."
+ "notes": "repo was pre-cloned at /home/user/opcg-sim-backend (HOME=/root); ran there instead of ~/opcg-sim-backend. No other deviations. Results: real 162/350 wr0.4629 CI[0.4126,0.5131] void0; mirror 169/350 wr0.4829 CI[0.4417,0.5240] void0; synth_roles2 163/348 wr0.4684 CI[0.4283,0.5085] void1 (1 of 350 games = 0.29%, under 2%). Wall time ~2.5-3 min per condition (much faster than the 25 min estimate; base af3ceb3 includes rs-window-read, so likely just more cores here)."
 }
