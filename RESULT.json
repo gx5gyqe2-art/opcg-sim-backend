@@ -14,5 +14,5 @@
   "arena_r22o/r22o_real_w13.jsonl": 175,
   "arena_r22o/r22o_synth2_w13.jsonl": 175
  },
- "notes": ""
+ "notes": "Finished much faster than the expected ~80 min: real 331s, mirror 145s, synth2 255s, 4 workers. void=0 in all three conditions. Cloned into /root/opcg-sim-backend because ~ is /root. Final lines per condition: real wr 0.5229 [0.4774,0.5684]; mirror wr 0.46 [0.4089,0.5111]; synth2 wr 0.44 [0.4001,0.4799]."
 }
