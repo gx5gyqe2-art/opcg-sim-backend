@@ -14,5 +14,5 @@
   "arena_r22/r22_real_w04.jsonl": 175,
   "arena_r22/r22_synth2_w04.jsonl": 175
  },
- "notes": ""
+ "notes": "real: 174 counted pairs + 1 void pair (void 1/175, wr 0.5402 ci95 [0.5007,0.5797] elo +28.0). mirror: wr 0.5514 ci95 [0.5058,0.5971] elo +35.9 void 0. synth_roles2: wr 0.5029 ci95 [0.4597,0.546] elo +2.0 void 0. All pairs/void are from this shard's ARENA_RESUME_FINAL lines."
 }
