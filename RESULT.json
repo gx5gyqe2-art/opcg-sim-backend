@@ -1,45 +1,26 @@
 {
- "job": "worker-job-push-check",
- "role": "code",
- "status": "done",
+ "job": "arena-ovt-w16",
+ "role": "arena",
+ "status": "partial",
  "inputs": {
-  "spec": "docs/n_loop_ops.md §7.46 (main 58a0dd47f)",
-  "base": "claude/cpu-spec-improvements-yw91jd@58a0dd47f"
+  "candidate": "nrel_r22.npz (trigger confirm offers decline)",
+  "baseline": "nrel_r22.npz + confirm_trigger_legacy",
+  "both": "sims 1280 x worlds 2 x budget 0 x lethal root (fair)",
+  "pairs": 84
  },
  "outputs": {
-  "code": [
-   "opcg_sim/loop/worker_job.py (repo_problem/ensure_repo・check_branch・push 後の ls-remote)"
-  ],
-  "jobs": [
-   "opcg_sim/loop/jobs/trial_push.json (試し・5 シャード)"
-  ],
-  "docs": [
-   ".claude/skills/worker-job/SKILL.md",
-   "docs/n_loop_ops.md §7.46 (実装と確かめ)"
-  ],
-  "trial_branches": [
-   "claude/worker-job-trial-push-w01",
-   "claude/worker-job-trial-push-w02",
-   "claude/worker-job-trial-push-w03",
-   "claude/worker-job-trial-push-w04",
-   "claude/worker-job-trial-push-w05"
+  "files": [
+   "arena_ovt/ovt_real_w16.jsonl"
   ]
  },
  "metrics": {
-  "make_test": "827 passed, 62 skipped (72.6s)・cargo test 含む・EXIT 0",
-  "trials": {
-   "w01_broken_clone": "取り直し → done・ALL_DONE・先端一致 943fc38d4",
-   "w02_on_main": "結果ブランチへ切り替え → ALL_DONE・先端一致 cddb9191d・手元 main は不動・main 上で check_branch/do_save は止まる",
-   "w03": "拒否の試しのつもりが早送りで通った（置いたコミットが祖先）＝普通の done",
-   "w04_push_rejected": "PUSH_FAILED 5 回 × 2 保存 → PUSH_FAILED（最後）・ALL_DONE なし",
-   "w05_push_ok_not_delivered": "pushurl を手元の bare に向けた: 届いていない × 10 → PUSH_FAILED（最後）・ALL_DONE なし → 戻して再開で done・先端一致 d38416f0a"
-  }
+  "arena_ovt/ovt_real_w16.jsonl": 21
  },
- "notes": [
-  "既存のジョブ定義の --dry-run は不変（tests/test_worker_job.py はそのまま通る）。pytest は足していない（試しは 1 回きり・CLAUDE.md の最小限の方針）。",
-  "origin の URL は末尾 gx5gyqe2-art/opcg-sim-backend（.git・/ を除く）で判定＝プロキシ経由の URL でも通る。fetch の後に origin/<ブランチ> を update-ref で取ったものに揃える（refspec の狭い木を壊れたとみなさず直す）。",
-  "取り直しは横に .clone を作り、確かめが通ってから古い木を ~/.worker_job/broken/ に退避して入れ替える（ネットワーク失敗で木を失わない）。クローンは約 7.7GB＝ディスクに 2 本分の余裕が要る。",
-  "既にあった型（直していない）: do_checkout の途中結果の退避は save_paths の置き場を丸ごと運ぶため、同じ木で別ジョブ・別番号を回すと前の結果も新しい結果ブランチに載る（試し w03〜w05 で起きた）。作業セッションは 1 本しか回さないので実害は無いはず。",
-  "make test の初回は pytest が未導入で落ちた → opcg_sim/requirements.txt と pytest・pytest-xdist を入れて green。"
- ]
+ "notes": "",
+ "worker": {
+  "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/arena_ovt.json",
+  "k": 16,
+  "branch": "claude/arena-ovt-w16",
+  "code_commit": "23d64cb23306f944a1719b4bd7f3eb6c0872ef07"
+ }
 }
