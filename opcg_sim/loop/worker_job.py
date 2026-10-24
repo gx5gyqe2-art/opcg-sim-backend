@@ -240,7 +240,7 @@ def _train_steps(P):
         P.add("run", None, fn=("collect_net", n), skip=("exists", done), note=f"{n['name']} の npz とログを {res}/ へ")
         P.add("save", None, fn="save", note="RESULT.json → commit → push")
     if s.get("bands"):
-        P.add("run", None, fn="restore_nets", note=f"~/ に無い npz を {res}/ から戻す（再起動の後）")
+        P.add("prep", None, fn="restore_nets", note=f"~/ に無い npz を {res}/ から戻す（再起動の後）")
     for b in s.get("bands", []):
         out = P.path(b["out"])
         cmd = (["python", "-m", "opcg_sim.learned.train.n_rel_band", "--in"] + [P.path(x) for x in b["in"]]
@@ -429,7 +429,11 @@ def result_dict(P, status):
             if os.path.exists(js):
                 bands[os.path.basename(js)] = json.load(open(js))
         r["inputs"] = dict(s.get("inputs", {}), nets=nets)
-        r["outputs"] = {"files": sorted(os.path.relpath(f, P.repo) for f in glob.glob(os.path.join(P.repo, res, "*.npz")))}
+        mine = set()
+        for n in s["runs"]:
+            stem = os.path.basename(P.path(n["out"]))[:-4]
+            mine |= set(glob.glob(os.path.join(P.repo, res, stem + ".npz")) + glob.glob(os.path.join(P.repo, res, stem + ".ep*.npz")))
+        r["outputs"] = {"files": sorted(os.path.relpath(f, P.repo) for f in mine)}
         r["metrics"] = dict(metrics, band=bands, rss_gb=round(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 2**20, 2),
                             band_sec=P.timing.get("band_sec"))
     return r
@@ -464,17 +468,22 @@ def do_save(P, status="partial"):
 
 def execute(P):
     P.timing, P.pushed = {}, True
+    dirty = False                                   # この区切りで何か回したか（全部飛ばした区切りは保存しない）
     for st in P.steps:
+        if st.fn == "save" and not dirty:
+            continue
         if should_skip(P, st):
             print(f"飛ばす（済み）: {st.note or st.show()}", flush=True)
             continue
         print(f"$ {st.show()}", flush=True)
+        dirty = dirty or st.kind == "run"
         if st.fn == "checkout":
             do_checkout(P)
         elif st.fn == "build":
             do_build(P, st)
         elif st.fn == "save":
             do_save(P)
+            dirty = False
         elif isinstance(st.fn, tuple) and st.fn[0] == "require":
             chk = st.fn[1]
             body = git(P, "show", f"HEAD:{chk['file']}", check=False).stdout

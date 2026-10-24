@@ -4162,3 +4162,9 @@ nohup python ~/worker_job.py --job arena_r22 --k 3 > ~/worker_job.out 2>&1 &
 
 **実行役がすること**（`worker_job.py`・標準ライブラリだけ＝本線から取り出した 1 ファイルで動く）: 出どころの照合 → 結果ブランチ（**origin に在ればその先端から再開**・無ければ `base` から。手元にだけ在る途中結果は退避して戻す）→ `require` → numpy／maturin → wheel（`rust/` の木が前回と同じなら飛ばす）→ 効果 JSON → ネット・教材の取得 → 本体（区切りごとに `RESULT.json`〔今までの指示書と同じ形＋`worker` 欄＝ジョブ定義・k・コミット〕を書いて commit・push）→ `status: "done"` で最後の push → `ALL_DONE`。push の失敗は `PUSH_FAILED（n 回目）` を出して 2・4・8・16 秒待って 4 回までやり直し、最後まで通らなければ `PUSH_FAILED（最後の …）` で終わる（ALL_DONE を出さない・次の保存でまとめて押す）。エラーは `WORKER_JOB_ERROR` を出し、`status: "error"`・notes にエラーを書いて push を試みる。
 **範囲の外**: 再分析（§7.35 の `reanalyze.py`）・照合や調査のような読んで考える作業は、今までどおり手書きの指示書（必要になったら `kind` を足す）。
+
+**試し（2026-10-24・`claude/worker-jobs` のコードで・使い捨てのブランチは残してある）**: 作業セッションと同じ 1 行（`git show … worker_job.py > ~/worker_job.py && python ~/worker_job.py --job <名前> --k 1 --source claude/worker-jobs`）で 4 本を最後まで回した。
+- `trial_gen` → `claude/worker-job-trial-gen-w01`: 2 局（1 局 × 2 区切り）・339 行・区切りごとに push・ALL_DONE。**同じ 1 行をもう一度回すと全部飛ばし、コミットを 1 つも足さない**（初めは RESULT.json の `commit` が保存のたびに変わり、済んだ区切りの保存が done → partial → done と揺れていた＝`code_commit`〔始めたときのコード〕に替え、全部飛ばした区切りは保存しないように直した）。
+- `trial_train` → `claude/worker-job-trial-train`: 上の 2 局を取ってきて 1 周の訓練 → 評価帯・npz（＋ep0）・ログ・`band_trial.json`・RESULT.json（各周の val・meta の行数・rss）。
+- `trial_arena` → `claude/worker-job-trial-arena-w01`: 候補＝上の訓練のブランチから取ったネット・2 ペア（1 ペアずつ 2 回）。2 回目の保存の途中で止め、同じ 1 行で再開すると 2 回とも飛ばして done で終えた。
+- `trial_gen_resume` → `claude/worker-job-trial-gen-resume`: 2 局 × 3 区切り。**区切り 1 の途中で実行役を止め**（origin には区切り 0 だけ）、手元の途中結果も消して（コンテナが替わったのと同じ）同じ 1 行で再開すると、区切り 0 を origin から取り戻して飛ばし、区切り 1・2 だけを回して 6 局・866 行で done。
