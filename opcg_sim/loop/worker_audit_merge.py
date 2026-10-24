@@ -76,7 +76,7 @@ def read_shard(P, repo, local):
     return {"commit": commit, "result": result, "files": files}
 
 
-def merge(spec, ks, repo, out_dir, local=False, allow_partial=False, run_summary=True):
+def merge(spec, ks, repo, out_dir, local=False, allow_partial=False, run_summary=True, name=None):
     plans = shard_plans(spec, ks, repo)
     check_ranges(plans)
     m = plans[0].s["merge"]
@@ -112,8 +112,8 @@ def merge(spec, ks, repo, out_dir, local=False, allow_partial=False, run_summary
             missing.append(f"k={P.k}: 局 {len(seeds)}／{a['GAMES']}")
         for src, dst in m["concat"].items():
             body = sh["files"].get(W.fmt(src, a))
-            if body:
-                joined.setdefault(dst, []).append(body if body.endswith(b"\n") else body + b"\n")
+            if body is not None:                # 空のファイルも在ることが意味を持つ（道具の集計は在れば節を足す）
+                joined.setdefault(dst, []).append(body if not body or body.endswith(b"\n") else body + b"\n")
         shards.append({"k": P.k, "branch": P.branch, "commit": sh["commit"], "status": st, "seed_base": lo,
                        "games": a["GAMES"], "games_done": len(seeds), "void_games": void})
     if missing and not allow_partial:
@@ -122,7 +122,7 @@ def merge(spec, ks, repo, out_dir, local=False, allow_partial=False, run_summary
         with open(os.path.join(out_dir, dst), "wb") as f:
             for b in parts:
                 f.write(b)
-    info = {"job": spec.get("job"), "tool": spec["tool"], "ks": list(ks), "shards": shards,
+    info = {"job": name, "tool": spec["tool"], "ks": list(ks), "shards": shards,
             "games": len(seen), "missing": missing, "files": sorted(joined)}
     with open(os.path.join(out_dir, "merge.json"), "w", encoding="utf-8") as f:
         json.dump(info, f, ensure_ascii=False, indent=1)
@@ -153,7 +153,7 @@ def main(argv=None):
     out = args.out or os.path.join("n1_results", f"{name}_merged")
     out = out if os.path.isabs(out) else os.path.join(os.path.abspath(args.repo), out)
     info = merge(spec, ks, os.path.abspath(args.repo), out, local=args.local,
-                 allow_partial=args.allow_partial, run_summary=not args.no_summary)
+                 allow_partial=args.allow_partial, run_summary=not args.no_summary, name=name)
     print(json.dumps({k: v for k, v in info.items() if k != "shards"}, ensure_ascii=False), flush=True)
     print(f"MERGED → {os.path.relpath(out, os.path.abspath(args.repo))}", flush=True)
     return 0
