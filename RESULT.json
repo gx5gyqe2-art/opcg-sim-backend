@@ -14,5 +14,5 @@
   "arena_r22/r22_real_w05.jsonl": 175,
   "arena_r22/r22_synth2_w05.jsonl": 175
  },
- "notes": ""
+ "notes": "All 3 conditions complete, void=0. Each 175-pair run took ~3 min (179s) with 4 workers, far faster than the ~25 min estimate. Shard summaries: real wr 0.5343 [0.4965,0.572] elo +23.9; mirror wr 0.5571 [0.5083,0.606] elo +39.9; synth_roles2 wr 0.5429 [0.5033,0.5825] elo +29.9. Branch base af3ceb301."
 }
