@@ -118,6 +118,41 @@ pub struct DecideOptions {
     /// その段から先を積まない（そこで続きが尽きて読み直す・[`trace_to_steps`]）。true は全部積む旧い形
     /// （引き直した世界の中身で選んだ札を本当の盤面で照合して打つ）。本番アリーナの基準席用。
     pub commit_hidden_legacy: bool,
+    /// 対話・窓の続きを積む旧い形（`window_carry_legacy`・§7.42 の 1・WP `rs-window-read`・**測定専用**・既定 false）。
+    /// 既定（false）は窓の根畳み（戦闘の応手・効果の対話・同時誘発の順）と登場／起動の後の対話が決めた
+    /// 自分側の続き（効果の対話の段・戦闘の応手の段）を**積まず**、次の判断点で読み直す（窓の根畳み）。
+    /// 付与 → 攻撃の箱（[`Step::Box`]）と準備箱の続きは今までどおり積む。true は 2026-10-23 までの形
+    /// （続きは 1 段浅い読み〔`box_depth − 1`〕で決まる・`docs/reports/2026-10-23_commit_audit.md`）。
+    pub window_carry_legacy: bool,
+    /// 窓の根畳みで引く世界の本数（`window_worlds`・§7.42 の 2・既定 [`WINDOW_WORLDS`]）。
+    /// 候補ごとの値を世界の平均で比べる（世界 0 は決定の乱数・世界 i≥1 は [`window_world_seed`]）。
+    /// `search_seed` が無い経路・`omniscient` では 1。
+    pub window_worlds: usize,
+    /// 窓の世界を 1 本に戻す旧い形（`window_worlds_legacy`・§7.42 の 2・**測定専用**・既定 false）。
+    pub window_worlds_legacy: bool,
+    /// ライフが少ない戦闘の応手を静的な値で比べる旧い形（`window_tree_legacy`・§7.42 の 3・**測定専用**・既定 false）。
+    /// 既定（false）は自分のライフが [`DecideOptions::window_tree_life`] 以下の戦闘の窓（ブロッカー・カウンター）で
+    /// 候補が 2 つ以上なら、各候補を戦闘の終わりまで畳んだ盤面から短い木（`sims ÷ 候補の数`）を回し、
+    /// その根の値で比べる（[`tree_branch_values`]）。
+    pub window_tree_legacy: bool,
+    /// 短い木で読む戦闘の窓の自分のライフの上限（`window_tree_life`・既定 1）。
+    pub window_tree_life: i64,
+    /// 短い木で読む窓の世界の本数の上限（`window_tree_worlds`・既定 [`WINDOW_TREE_WORLDS`]）。
+    /// 木の費用は「世界の本数 × sims」なので、静的な値の窓の K とは別に抑える（実際は `min(K, これ)`）。
+    pub window_tree_worlds: usize,
+}
+
+/// 窓の根畳みの世界の本数の既定（§7.42 の 2・WP `rs-window-read` で揺れと費用から決めた）。
+/// blunder-audit の窓の 226 点で、探索の乱数だけを替えると手が変わる率は K=1/2/4/8/16/32/64 で
+/// 19.5/14.6/11.5/5.8/4.4/3.1/1.8%。静的な値の窓は 1 本あたり数 ms なので 5% を切る最初の K を採った。
+pub const WINDOW_WORLDS: usize = 16;
+/// 短い木で読む窓の世界の本数の上限の既定（§7.42 の 3・費用は「この本数 × sims」）。
+pub const WINDOW_TREE_WORLDS: usize = 2;
+
+/// 窓の根畳みの世界 `i`（≥1）の乱数の seed（世界 0 は決定の乱数そのもの＝1 本なら今までと同じ）。
+/// 木の世界 `search_seed + i` とは別の系列になるよう定数で混ぜる。
+pub(crate) fn window_world_seed(search_seed: u64, i: usize) -> u64 {
+    (search_seed ^ 0x57A1_D0C5_0FF5_EED5u64).wrapping_add(i as u64)
 }
 
 /// `opp_blind`（§7.14）の混ぜ直しの乱数の seed（世界 `i` の探索乱数 `search_seed + i` と同じ値から、
@@ -182,6 +217,14 @@ impl DecideOptions {
         WorldView { omniscient: self.omniscient, reveal: self.reveal }
     }
 
+    /// 窓の根畳みで実際に引く世界の本数（§7.42 の 2）。旧い旗・`search_seed` 無し・`omniscient` は 1。
+    pub fn effective_window_worlds(&self) -> usize {
+        if self.window_worlds_legacy || self.search_seed.is_none() || self.omniscient {
+            return 1;
+        }
+        self.window_worlds.max(1)
+    }
+
     pub fn effective_worlds(&self) -> usize {
         if self.search_seed.is_none() || self.omniscient {
             return 1;
@@ -220,6 +263,12 @@ impl Default for DecideOptions {
             commit_sig_legacy: false,
             lethal_deal_legacy: false,
             commit_hidden_legacy: false,
+            window_carry_legacy: false,
+            window_worlds: WINDOW_WORLDS,
+            window_worlds_legacy: false,
+            window_tree_legacy: false,
+            window_tree_life: 1,
+            window_tree_worlds: WINDOW_TREE_WORLDS,
         }
     }
 }
@@ -322,6 +371,8 @@ pub struct DecideOut {
     pub lethal: Option<super::lethal::LethalOut>,
     /// `RootReply` の木の中の証明の実績（全世界の和・応手の節点を判定したときだけ）。
     pub lethal_reply: Option<super::lethal::ReplyProof>,
+    /// 窓の根畳みの読み方（§7.42・`kind="window"` で世界 K 本か短い木のときだけ）: (世界の本数, 短い木か)。
+    pub window_read: Option<(usize, bool)>,
 }
 
 /// 1 つの世界の根の統計（§20.7.1・思考ログで「世界によって答えが割れたか」を読む）。
@@ -975,17 +1026,27 @@ struct WindowPick {
     q: Vec<f64>,
     /// 評価に使った世界（コミット継続の生成に使う）。単一候補で即決したときは `None`。
     world: Option<GameState>,
+    /// 引いた世界の本数と短い木で読んだか（§7.42・1 本の静的な値なら `None`）。
+    read: Option<(usize, bool)>,
 }
 
 /// Python `_window_choice`（窓では木を回さず、出口 value 最良の 1 手を直接返す）。
+///
+/// WP `rs-window-read`（§7.42）で 2 つを足した（どちらも旧い旗で元の形に戻る）:
+/// - **世界を K 本**（[`DecideOptions::effective_window_worlds`]）: 世界 0 は決定の乱数 `rng` で引き
+///   （1 本なら今までと 1 bit も変わらない）、世界 i≥1 は [`window_world_seed`] の乱数で引く。
+///   候補ごとの値は「値が出た世界」の平均（`n` はその世界の数）。候補の並びは世界 0 の列挙で、
+///   他の世界は手の署名で突き合わせる。続き（旧い旗のとき）は選んだ候補の値が最大の世界から積む。
+/// - **自分のライフが少ない戦闘の応手は短い木**（[`tree_branch_values`]）。
 fn window_choice(
     ctx: &Ctx,
     real: &GameState,
     name: Seat,
-    view: WorldView,
+    opts: &DecideOptions,
     rng: &mut dyn SearchRng,
     st: &mut SearchState,
 ) -> Result<Option<WindowPick>, EngineError> {
+    let view = opts.world_view();
     let battle = real.active_battle.is_some();
     let world = sample_world(real, name, view, rng)?;
     let mut s = Session::new(world.clone());
@@ -1000,29 +1061,184 @@ fn window_choice(
             n: Vec::new(),
             q: Vec::new(),
             world: None,
+            read: None,
         }));
     }
     let window = if battle { Window::Battle } else { Window::Dialog };
-    let vals = resolved_branch_values(
-        ctx,
-        &mut s,
-        st,
-        name,
-        &legal,
-        QUIESCE_MAX_PLIES,
-        BOX_RESOLVE_DEPTH,
-        window,
-    )?;
-    let Some(best) = best_branch(&vals) else {
-        return Ok(None); // 全枝で解決に失敗＝full-tree へ委ねる（安全側）
+    let tree = !opts.window_tree_legacy && window_tree_applies(&mut s, name, opts.window_tree_life);
+    let k = opts.effective_window_worlds();
+    // 木で読む窓は世界の本数を別に抑える（費用は「本数 × sims」・静的な値の世界と混ぜて平均しない）。
+    let k = if tree { k.min(opts.window_tree_worlds.max(1)) } else { k };
+    if k <= 1 && !tree {
+        // 今までどおり（世界 1 本・静的な値）。
+        let vals = resolved_branch_values(
+            ctx,
+            &mut s,
+            st,
+            name,
+            &legal,
+            QUIESCE_MAX_PLIES,
+            BOX_RESOLVE_DEPTH,
+            window,
+        )?;
+        let Some(best) = best_branch(&vals) else {
+            return Ok(None); // 全枝で解決に失敗＝full-tree へ委ねる（安全側）
+        };
+        return Ok(Some(WindowPick {
+            mv: legal[best].clone(),
+            legal,
+            n: vals.iter().map(|v| f64::from(v.is_some())).collect(),
+            q: vals.iter().map(|v| v.unwrap_or(-1.0)).collect(),
+            world: Some(world),
+            read: None,
+        }));
+    }
+    let seed0 = opts.search_seed.unwrap_or(0);
+    let sigs: Vec<Value> = legal.iter().map(move_sig).collect();
+    let m = legal.len();
+    let mut sum = vec![0.0f64; m];
+    let mut cnt = vec![0.0f64; m];
+    // 世界ごとの値（世界 0 の添字に揃えた）と世界そのもの（続きを積む世界を選ぶのに使う）。
+    let mut per_world: Vec<(GameState, Vec<Option<f64>>)> = Vec::with_capacity(k);
+    for wi in 0..k {
+        let (w, mut ws, wlegal) = if wi == 0 {
+            (world.clone(), Session::new(world.clone()), legal.clone())
+        } else {
+            let mut r = super::rng::Pcg32SearchRng::new(window_world_seed(seed0, wi));
+            let w = sample_world(real, name, view, &mut r)?;
+            let mut ws = Session::new(w.clone());
+            let wl = ctx.legal_actions(&mut ws)?;
+            (w, ws, wl)
+        };
+        let vals = if tree {
+            let sims = (opts.sims / m).max(1);
+            let tseed = window_world_seed(seed0, wi) ^ 0x7EE5_EED0_0000_0001u64;
+            tree_branch_values(ctx, &mut ws, st, name, &wlegal, window, sims, opts.c_puct, tseed)?
+        } else {
+            resolved_branch_values(
+                ctx,
+                &mut ws,
+                st,
+                name,
+                &wlegal,
+                QUIESCE_MAX_PLIES,
+                BOX_RESOLVE_DEPTH,
+                window,
+            )?
+        };
+        // 世界 0 の添字へ（並びが同じなら恒等）。
+        let same = wi == 0
+            || (wlegal.len() == m && wlegal.iter().zip(&sigs).all(|(mv, sg)| move_sig(mv) == *sg));
+        let mut aligned: Vec<Option<f64>> = vec![None; m];
+        for (j, v) in vals.iter().enumerate() {
+            let i = if same {
+                Some(j)
+            } else {
+                let sg = move_sig(&wlegal[j]);
+                sigs.iter().position(|x| *x == sg)
+            };
+            if let Some(i) = i {
+                aligned[i] = *v;
+            }
+        }
+        for (i, v) in aligned.iter().enumerate() {
+            if let Some(v) = v {
+                sum[i] += v;
+                cnt[i] += 1.0;
+            }
+        }
+        per_world.push((w, aligned));
+    }
+    let avg: Vec<Option<f64>> = sum
+        .iter()
+        .zip(&cnt)
+        .map(|(s, c)| (*c > 0.0).then(|| s / c))
+        .collect();
+    let Some(best) = best_branch(&avg) else {
+        return Ok(None);
     };
+    // 続きを積む世界: 選んだ候補の値が最大の世界（同点は若い方）。
+    let mut wbest = 0usize;
+    for (wi, (_, v)) in per_world.iter().enumerate() {
+        let cur = per_world[wbest].1[best];
+        if let Some(x) = v[best] {
+            if !matches!(cur, Some(c) if x <= c) {
+                wbest = wi;
+            }
+        }
+    }
+    let world = per_world.swap_remove(wbest).0;
     Ok(Some(WindowPick {
         mv: legal[best].clone(),
         legal,
-        n: vals.iter().map(|v| f64::from(v.is_some())).collect(),
-        q: vals.iter().map(|v| v.unwrap_or(-1.0)).collect(),
+        n: cnt,
+        q: avg.iter().map(|v| v.unwrap_or(-1.0)).collect(),
         world: Some(world),
+        read: Some((k, tree)),
     }))
+}
+
+/// 短い木で読む戦闘の窓か（§7.42 の 3）: 戦闘中・判断するのが `name` のブロッカー／カウンターの選択・
+/// `name` のライフ（枚数）が `life_max` 以下。候補の数は呼び出し側が見る。
+fn window_tree_applies(s: &mut Session, name: Seat, life_max: i64) -> bool {
+    if s.state().active_battle.is_none() {
+        return false;
+    }
+    match crate::rules::pending::pending_actor_action(s) {
+        Some((seat, action)) if seat == name => {
+            (action == crate::rules::pending::ACT_SELECT_BLOCKER
+                || action == crate::rules::pending::ACT_SELECT_COUNTER)
+                && (s.state().player(name).life.len() as i64) <= life_max
+        }
+        _ => false,
+    }
+}
+
+/// 各候補を戦闘の終わりまで畳んだ盤面から短い木を回し、その根の値（`name` から見た）で比べる（§7.42 の 3）。
+///
+/// 畳み方は [`resolved_branch_values`] と同じ（同じ窓・同じ深さ・同じ CRN）。出口盤面が終局なら ±1、
+/// そうでなければその盤面（引いた世界の中＝木の中では引き直さない）から `sims` 回の木を回し、
+/// 根の値 `Σ W ÷ Σ N`（根の手番から見た）を `name` から見た値に直す。Dirichlet は混ぜない。
+#[allow(clippy::too_many_arguments)]
+fn tree_branch_values(
+    ctx: &Ctx,
+    s: &mut Session,
+    st: &mut SearchState,
+    name: Seat,
+    legal: &[Move],
+    window: Window,
+    sims: usize,
+    c_puct: f64,
+    seed: u64,
+) -> Result<Vec<Option<f64>>, EngineError> {
+    super::quiesce::resolved_branch_values_with(
+        ctx,
+        s,
+        st,
+        name,
+        legal,
+        QUIESCE_MAX_PLIES,
+        BOX_RESOLVE_DEPTH,
+        window,
+        &mut |s, st| {
+            if ctx.is_terminal(s) {
+                return ctx.value(s, name);
+            }
+            let mut tree = TreeMcts::new(ctx, c_puct, sims, 0.0);
+            let mut r = super::rng::Pcg32SearchRng::new(seed);
+            tree.run_in_world(s.state().clone(), &mut r, st)?;
+            let nodes = tree.into_nodes();
+            let Some(root) = nodes.first() else {
+                return ctx.value(s, name);
+            };
+            let n: f64 = root.n.iter().sum();
+            let (Some(seat), true) = (root.to_move, n > 0.0) else {
+                return ctx.value(s, name);
+            };
+            let v = root.w.iter().sum::<f64>() / n;
+            Ok(if seat == name { v } else { -v })
+        },
+    )
 }
 
 /// Python `_commit_window_continuation`（選んだ枝の自分側継続をコミットする）。
@@ -1614,6 +1830,7 @@ fn empty_out(kind: &'static str, mv: Option<Move>, carry: DecideCarry, st: &Sear
         world_used: None,
         lethal: None,
         lethal_reply: None,
+        window_read: None,
     }
 }
 
@@ -1693,8 +1910,9 @@ fn decide_after_lethal(
 
     // ③ 窓の根畳み（戦闘窓／対話箱が有効なら効果対話窓）
     if in_battle(&real) || (opts.box_dialog && in_dialog(&mut real)) {
-        if let Some(pick) = window_choice(ctx, state, name, opts.world_view(), rng, st)? {
-            if opts.box_commit {
+        if let Some(pick) = window_choice(ctx, state, name, opts, rng, st)? {
+            // §7.42 の 1: 窓の続きは効果の対話の段・戦闘の応手の段だけ＝既定は積まない（次の判断点で読み直す）。
+            if opts.box_commit && opts.window_carry_legacy {
                 if let Some(world) = &pick.world {
                     let steps =
                         commit_window_continuation(
@@ -1732,6 +1950,7 @@ fn decide_after_lethal(
                 world_used: None,
                 lethal: None,
                 lethal_reply: None,
+                window_read: pick.read,
             });
         }
     }
@@ -1866,7 +2085,8 @@ fn decide_after_lethal(
                         }];
                     }
                 }
-                Some("PLAY") | Some("ACTIVATE_MAIN") => {
+                // §7.42 の 1: 登場／起動の後の対話の続きは効果の対話の段だけ＝既定は積まない（読み直す）。
+                Some("PLAY") | Some("ACTIVATE_MAIN") if opts.window_carry_legacy => {
                     // 複数世界は木を回した世界（PV と同じ）で継続を作る＝乱数を引き直さない。
                     let steps = if worlds > 1 {
                         commit_play_dialog_in_world(
@@ -1938,6 +2158,7 @@ fn decide_after_lethal(
         world_used,
         lethal: None,
         lethal_reply: reply,
+        window_read: None,
     })
 }
 
@@ -1948,6 +2169,10 @@ mod tests_fair;
 #[cfg(test)]
 #[path = "tests_commit_hidden.rs"]
 mod tests_commit_hidden;
+
+#[cfg(test)]
+#[path = "tests_window_read.rs"]
+mod tests_window_read;
 
 #[cfg(test)]
 pub(super) mod tests {

@@ -145,6 +145,7 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
     `arena_shard --lethal-proof {root,root_reply}` も同じ口から `{"lethal_proof": ...}` を渡す（§7.21）。
     `arena_shard --commit-sig-legacy` も同じ口から `{"commit_sig_legacy": True}` を渡す（WP `rs-commit-sig`）。
     `arena_shard --commit-hidden-legacy` も同じ口から `{"commit_hidden_legacy": True}` を渡す（§7.39・WP `rs-commit-hidden`）。
+    `arena_shard --window-{carry,worlds,tree}-legacy` も同じ口から `{"window_*_legacy": True}` を渡す（§7.42・WP `rs-window-read`）。
     """
     E.engine()
     _G["leaders_mode"] = leaders_mode
@@ -229,6 +230,10 @@ CAND_FLAGS = {
     "lethal_deal_legacy": dict(lethal_deal_legacy=True),
     # 見えていなかった札を選ぶ commit の続きも積む旧い形（§7.39・測定専用＝引き直した世界で選んだ札を本当の盤面で打つ）。
     "commit_hidden_legacy": dict(commit_hidden_legacy=True),
+    # 窓・対話の決め方の旧い形（§7.42・WP `rs-window-read`・測定専用）。3 つまとめて立てれば修正前の打ち方。
+    "window_carry_legacy": dict(window_carry_legacy=True),
+    "window_worlds_legacy": dict(window_worlds_legacy=True),
+    "window_tree_legacy": dict(window_tree_legacy=True),
 }
 
 
@@ -298,6 +303,16 @@ def add_cand_args(ap) -> None:
                     help="候補席だけ、箱の commit の続きに「commit した時点で見えていなかった札（山札・裏向きのライフ・"
                          "相手の手札）から選ぶ段」も積む旧い形で打つ（`docs/search_efficiency_plan.md` §7.39・測定専用）。"
                          "省略＝既定（その段から先を積まず、そこで読み直す）")
+    ap.add_argument("--cand-window-carry-legacy", action="store_true",
+                    help="候補席だけ、窓の根畳み・登場時の対話が決めた続き（効果の対話の段・戦闘の応手の段）を積む"
+                         "旧い形で打つ（`docs/search_efficiency_plan.md` §7.42 の 1・測定専用）。省略＝既定（積まずに読み直す）")
+    ap.add_argument("--cand-window-worlds-legacy", action="store_true",
+                    help="候補席だけ、窓の根畳みを世界 1 本で読む旧い形（§7.42 の 2・測定専用）。省略＝既定（世界 K 本の平均）")
+    ap.add_argument("--cand-window-tree-legacy", action="store_true",
+                    help="候補席だけ、ライフが少ない戦闘の応手を静的な値で比べる旧い形（§7.42 の 3・測定専用）。"
+                         "省略＝既定（短い木で読む）")
+    ap.add_argument("--cand-window-worlds", type=int, default=None,
+                    help="候補席だけ窓の根畳みの世界の本数（§7.42 の 2・省略＝Rust の既定）")
     # --- 迷う局面だけ世界 K 本で読み直す（§7.4・WP `play-rethink`）------------------------
     ap.add_argument("--cand-rethink-ratio", type=float, default=None,
                     help="候補席だけ、根の 2 位の訪問数 ÷ 1 位 ≥ τ の決定を同じ seed で世界 K 本"
@@ -317,6 +332,7 @@ CAND_VALUE_FLAGS = {
     "cand_residual_activate": "residual_activate",
     "cand_reveal": "reveal",
     "cand_lethal_proof": "lethal_proof",
+    "cand_window_worlds": "window_worlds",
     # 下の 2 つは opts には入らない（`SeatSpec` の名前付き引数・`decide_with_rethink`）。
     "cand_rethink_ratio": "rethink_ratio",
     "cand_rethink_worlds": "rethink_worlds",

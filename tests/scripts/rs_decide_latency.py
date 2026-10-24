@@ -38,6 +38,14 @@ def main(argv=None):
     ap.add_argument("--commit-hidden-legacy", action="store_true",
                     help="両席とも、見えていなかった札を選ぶ commit の続きも積む旧い形（§7.39・測定専用）。"
                          "出力の kinds（決め方ごとの手数）と並べて読み直しの増分を見る")
+    ap.add_argument("--window-legacy", action="store_true",
+                    help="両席とも §7.42 の旧い形 3 つ（窓・対話の続きを積む・窓の世界 1 本・ライフが少ない戦闘の応手を静的な値で）")
+    ap.add_argument("--window-carry-legacy", action="store_true", help="§7.42 の 1 だけ旧い形（測定専用）")
+    ap.add_argument("--window-worlds-legacy", action="store_true", help="§7.42 の 2 だけ旧い形（測定専用）")
+    ap.add_argument("--window-tree-legacy", action="store_true", help="§7.42 の 3 だけ旧い形（測定専用）")
+    ap.add_argument("--window-worlds", type=int, default=None, help="窓の根畳みの世界の本数（§7.42 の 2・省略＝Rust の既定）")
+    ap.add_argument("--extra", default=None,
+                    help="decide の opts に足す JSON（例 '{\"window_tree_life\": 2}'・§7.42 の対象の広げ方の費用を見る）")
     ap.add_argument("--knowledge", action="store_true",
                     help="決定点ごとに打つ席の「知っている札」（§7.15・`Game.knowledge_json`）を数え、分布を出力に足す")
     a = ap.parse_args(argv)
@@ -58,6 +66,13 @@ def main(argv=None):
         kw["lethal_proof"] = a.lethal_proof
     if a.commit_hidden_legacy:
         kw["commit_hidden_legacy"] = True
+    for _k in ("window_carry_legacy", "window_worlds_legacy", "window_tree_legacy"):
+        if getattr(a, "window_legacy", False) or getattr(a, _k, False):
+            kw[_k] = True                    # §7.42 の前後比較（窓・対話の決め方の旧い形）
+    if getattr(a, "window_worlds", None):
+        kw["window_worlds"] = a.window_worlds
+    if a.extra:
+        kw.update(json.loads(a.extra))
     spec = E.SeatSpec(a.net, sims=a.sims, **kw)
     ts = []
     last = [0.0]
@@ -97,6 +112,8 @@ def main(argv=None):
                       **({"reveal": a.reveal} if a.reveal else {}),
                       **({"opp_blind": True} if a.opp_blind else {}),
                       **({"commit_hidden_legacy": True} if a.commit_hidden_legacy else {}),
+                      **{k: v for k, v in kw.items() if k.startswith("window_")},
+                      **({"extra": json.loads(a.extra)} if a.extra else {}),
                       "games": a.games, "moves": n, "kinds": kinds,
                       "mean": round(statistics.mean(ts), 3), "p50": round(ts[n // 2], 3),
                       "p90": round(ts[int(n * 0.9)], 3), "p99": round(ts[int(n * 0.99)], 3),

@@ -300,7 +300,11 @@ class RsGame:
               lethal_proof: Optional[str] = None,
               commit_sig_legacy: Optional[bool] = None,
               lethal_deal_legacy: Optional[bool] = None,
-              commit_hidden_legacy: Optional[bool] = None):
+              commit_hidden_legacy: Optional[bool] = None,
+              window_carry_legacy: Optional[bool] = None,
+              window_worlds_legacy: Optional[bool] = None,
+              window_tree_legacy: Optional[bool] = None,
+              window_worlds: Optional[int] = None):
         """[`RsGame._decide`] の薄いラッパ（`trace` を渡すと思考の内訳を書き込む）。
 
         `net`／`sims`（省略可）はこの 1 回だけ serve 既定を上書きする（席ごとに別ネット・
@@ -358,6 +362,9 @@ class RsGame:
         時点で見えていなかった札（山札・裏向きのライフ・相手の手札）から選ぶ段も積む旧い形（引き直した世界の中身で
         選んだ札を本当の盤面で照合して打つ）。本番アリーナの基準席用。**省略（None）／False＝渡さない＝Rust の既定**
         （その段から先を積まず、そこで読み直す）。
+        `window_carry_legacy`／`window_worlds_legacy`／`window_tree_legacy`（省略可・§7.42・WP `rs-window-read`・
+        **測定専用**）＝窓・対話の決め方の旧い形（続きを積む／窓の世界 1 本／ライフが少ない戦闘の応手を静的な値で比べる）。
+        `window_worlds`（省略可）＝窓の根畳みの世界の本数。**省略（None）／False＝渡さない＝Rust の既定**。
         """
         move, tr = self._decide(player_id, net=net, sims=sims, action_index=action_index,
                                 select_rule=select_rule, q_min_frac=q_min_frac,
@@ -370,7 +377,11 @@ class RsGame:
                                 reveal=reveal, opp_blind=opp_blind, lethal_proof=lethal_proof,
                                 commit_sig_legacy=commit_sig_legacy,
                                 lethal_deal_legacy=lethal_deal_legacy,
-                                commit_hidden_legacy=commit_hidden_legacy)
+                                commit_hidden_legacy=commit_hidden_legacy,
+                                window_carry_legacy=window_carry_legacy,
+                                window_worlds_legacy=window_worlds_legacy,
+                                window_tree_legacy=window_tree_legacy,
+                                window_worlds=window_worlds)
         if trace is not None and move is not None:
             trace.update(tr)
         return move
@@ -391,7 +402,11 @@ class RsGame:
                lethal_proof: Optional[str] = None,
                commit_sig_legacy: Optional[bool] = None,
                lethal_deal_legacy: Optional[bool] = None,
-               commit_hidden_legacy: Optional[bool] = None):
+               commit_hidden_legacy: Optional[bool] = None,
+               window_carry_legacy: Optional[bool] = None,
+               window_worlds_legacy: Optional[bool] = None,
+               window_tree_legacy: Optional[bool] = None,
+               window_worlds: Optional[int] = None):
         """`player_id` の 1 手を Rust の探索で決める（`opcg_engine.Game.decide`）。
 
         **生の盤面**（中断スタックを持ったまま）に対して決めるので、対話の途中でも正しく読める。
@@ -465,6 +480,15 @@ class RsGame:
         # 見えていなかった札を選ぶ続きも積む旧い形（§7.39・測定専用）。None／False＝渡さない＝Rust の既定（読み直す）。
         if commit_hidden_legacy:
             opts["commit_hidden_legacy"] = True
+        # 窓・対話の決め方の旧い形（§7.42・測定専用）。None／False＝渡さない＝Rust の既定（修正後）。
+        if window_carry_legacy:
+            opts["window_carry_legacy"] = True
+        if window_worlds_legacy:
+            opts["window_worlds_legacy"] = True
+        if window_tree_legacy:
+            opts["window_tree_legacy"] = True
+        if window_worlds is not None:
+            opts["window_worlds"] = int(window_worlds)
         # 迷う局面だけの読み直し（§7.4）。None＝off＝`decide` を 1 回呼ぶだけ（今までと同じ）。
         from opcg_sim.loop import engine as _LE
         out = _LE.decide_with_rethink(lambda o: self._game.decide(player_id, o), json.dumps(opts),

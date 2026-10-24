@@ -1269,7 +1269,8 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
 > `docs/search_efficiency_plan.md` §7.26（WP `rs-commit-sig`）・`docs/reports/2026-10-22_defense_audit.md`・
 > `docs/reports/2026-10-23_commit_sig.md`。
 
-窓の根畳み・登場時の対話・準備箱が決めた「自分側の手順の続き」（箱の commit）は、次の判断点で木を回さずに機械実行する。
+窓の根畳み・登場時の対話・準備箱が決めた「自分側の手順の続き」（箱の commit）は、次の判断点で木を回さずに機械実行する
+（**2026-10-23 から窓の根畳み・登場／起動の後の対話の続きは積まない**＝付与 → 攻撃の箱と準備箱の続きだけ・§2.5.12）。
 各段は**手の署名**で合法手と照合し、署名が一致する**最初の合法手**を打つ（一致が無ければ commit を畳んで普通に読む）。
 
 - **署名**: `[action_type, 札, target_ids, selected_uuids, accepted]`。**札は `payload.uuid`、無ければ最上位の `card_uuid`**
@@ -1293,6 +1294,36 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
   測定用の旗 `commit_hidden_legacy`（opts の鍵・既定 false）: true で全部積む旧い形。アリーナは `--cand-commit-hidden-legacy`（候補席）・
   `arena_shard --commit-hidden-legacy`（基準席）。
 
+
+### 2.5.12 戦闘の応手と効果の対話の決め方（窓の根畳み・Rust・2026-10-23〜）
+
+> 正本はコード（`rust/opcg_engine/src/search/decide.rs` の `window_choice`／`tree_branch_values`・`quiesce.rs` の
+> `resolved_branch_values_with`）。経緯は `docs/search_efficiency_plan.md` §7.42（WP `rs-window-read`）・
+> `docs/reports/2026-10-23_window_read.md`（根拠は `2026-10-23_commit_audit.md`・`2026-10-23_blunder_audit.md`）。
+
+戦闘の窓（ブロッカー・カウンター・トリガーの確認）と効果の対話の窓（任意の確認・選ぶ・並べ替え・同時誘発の順）では
+木を回さず、**見えない札を引き直した世界**の上で各候補を当て、窓が閉じるまで畳んだ盤面のネットの値で比べる（窓の根畳み）。
+2026-10-23 に次の 3 つを入れた（3 つとも opts の測定用の旗で旧い形に戻る・既定 false＝修正後）:
+
+1. **続きを積まない**（旗 `window_carry_legacy`）: 窓の根畳みと登場／起動の後の対話が決めた自分側の続き（効果の対話の段・
+   戦闘の応手の段＝カウンターの 2 枚目以降など）は commit に積まず、次の判断点でもう一度窓の根畳みで読む。旧い形の続きは
+   1 段浅い読み（枝の先の選択を方策で進めた出口の値）で決まり、読み直すと別の手で良い型が 3 つあった（任意の確認の見送り・
+   守りの素通し・山札から選ぶ札・`2026-10-23_commit_audit.md`）。付与 → 攻撃の箱（`Step::Box`）と準備箱の続きは今までどおり積む。
+2. **世界を K 本**（旗 `window_worlds_legacy`・本数 `window_worlds`・既定 **16**）: 世界を K 本引き、候補ごとの値を
+   「値が出た世界」の平均で比べる。世界 0 は決定の乱数・世界 i≥1 は `search_seed` から別の系列（`window_world_seed`）＝
+   1 本なら旧い形と 1 bit も同じ。候補の並びは世界 0 の列挙で、他の世界は手の署名で突き合わせる。出力の `stats.N` は
+   値が出た世界の数、`window` 欄に `{worlds, tree}` が載る（1 本・静的な値の窓では欄が出ない）。探索の乱数だけを替えると
+   手が変わる窓の率（blunder-audit の窓の 226 点）は K=1 で 19.5%・K=16 で 4.4%。`search_seed` が無い経路・`omniscient` は 1 本。
+3. **自分のライフが少ない戦闘の応手は短い木**（旗 `window_tree_legacy`・上限 `window_tree_life`・既定 1）: 判断するのが
+   自分のブロッカー／カウンターの選択で、自分のライフ（枚数）が上限以下・候補が 2 つ以上なら、各候補を戦闘の終わりまで
+   畳んだ盤面から**短い木**（`sims ÷ 候補の数` 回・Dirichlet なし・引いた世界の中）を回し、その根の値（根の手番から見た
+   `ΣW ÷ ΣN` を自分から見た値に直す・出口が終局なら ±1）で比べる。世界の本数は `min(K, window_tree_worlds)`（既定 2）＝
+   1 つの窓の費用は世界 2 本の木 1 回ぶん。静的な値は相手の手番の途中の盤面（攻撃が残る）で「ブロックで場の札を失う／
+   カウンターで手札を失う」の比べを系統的に外す（blunder-audit の 3301025・117: 静的な値は素通し、木はブロック）。
+
+アリーナは `--cand-window-{carry,worlds,tree}-legacy`（候補席）・`arena_shard --window-{carry,worlds,tree}-legacy`（基準席）・
+`--cand-window-worlds`。器は `defense_audit.py`／`commit_audit.py`／`rs_decide_latency.py` の `--window-legacy`（3 つまとめて）と
+`blunder_audit.py winstab --opts`。
 
 ---
 
