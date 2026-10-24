@@ -1,7 +1,7 @@
 {
  "job": "arena-wtb-w19",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r22.npz (counter windows without short tree)",
   "baseline": "nrel_r22.npz + window_tree_counter_legacy",
