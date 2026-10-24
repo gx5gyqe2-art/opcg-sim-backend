@@ -1,83 +1,30 @@
 {
- "job": "worker-audit",
- "role": "code",
- "status": "done",
+ "job": "trial-push-w01",
+ "role": "gen",
+ "status": "partial",
  "inputs": {
-  "spec": "docs/n_loop_ops.md §7.45 (main 7bf55b362)",
-  "base": "claude/cpu-spec-improvements-yw91jd@7bf55b362"
+  "net": "opcg_sim/data/learned/nrel_r13d.npz",
+  "games": 1,
+  "sims": 32,
+  "seed_base": 9961000
  },
  "outputs": {
-  "code": [
-   "opcg_sim/loop/worker_job.py (kind audit)",
-   "opcg_sim/loop/worker_audit_merge.py",
-   "opcg_sim/loop/worker_prompts.py (audit の指示文は §7.45 も指す)"
-  ],
-  "jobs": [
-   "opcg_sim/loop/jobs/audit_defense.json",
-   "opcg_sim/loop/jobs/audit_blunder.json",
-   "opcg_sim/loop/jobs/trial_audit.json",
-   "opcg_sim/loop/jobs/trial_audit_det.json",
-   "opcg_sim/loop/jobs/trial_audit_blunder.json"
-  ],
-  "docs": [
-   ".claude/skills/worker-job/SKILL.md",
-   "docs/n_loop_ops.md §7.42 (audit の項)・§7.45 (実装と確かめ)",
-   "docs/TEST_SPEC.md (test_worker_job の行)"
-  ],
-  "tests": [
-   "tests/test_worker_job.py::test_audit_defense_matches_724 (dry-run の写しの見張り・k=1,4)"
-  ],
-  "trial_branches": [
-   "claude/worker-job-trial-audit-w01",
-   "claude/worker-job-trial-audit-w02",
-   "claude/worker-job-trial-audit-det-w01",
-   "claude/worker-job-trial-audit-det-w02",
-   "claude/worker-job-trial-audit-blunder-w01"
+  "dirs": [
+   "n_records/trial_push_w01_p0"
   ]
  },
  "metrics": {
-  "split_vs_single_724_setting": {
-   "games": [
-    8,
-    8
-   ],
-   "resp_points": [
-    320,
-    320
-   ],
-   "point_lines": [
-    372,
-    372
-   ],
-   "resp_threat_ko_otsu": [
-    [
-     7,
-     2
-    ],
-    [
-     7,
-     2
-    ]
-   ],
-   "miss": [
-    0,
-    0
-   ],
-   "end_turns": [
-    52,
-    52
-   ],
-   "differences_excluding_time": 2,
-   "differences_detail": "判定器の時間の上限で結果が揺れる 2 点（応手の点 1 行・終わり方 1 手番が 不明→詰み）＝要約 end.threat_ko 7→8・end.unknown_actual 30→29。同じ 1 局を 2 回回しても同じ型の揺れが出る"
-  },
-  "split_vs_single_node_limited": {
-   "setting": "--max-nodes 2000・時間の上限 600 秒・PYTHONHASHSEED=0",
-   "differences": 0
-  },
-  "resume": "シャード 1 の run の途中（origin に 2 局）で止め・手元を消して同じ 1 行で再開 → todo 2（done 2）→ done・つないだ結果は 1 本と一致（時間の揺れの 2 点を除く）",
-  "blunder_trial": "1 局・5 段 done・再実行で全段を飛ばしコミットなし",
-  "merge_refusals": "範囲の重なり・ブランチが無い・局の不足（--allow-partial で通る）・範囲の外の局 で止まることを手元で確かめた",
-  "make_test": "873 passed, 13 skipped"
+  "parts_done": 1,
+  "games": 1,
+  "rows": 133,
+  "dropped": 0,
+  "sec_play_mean": 0.63
  },
- "notes": "分けても同じ結果: §7.24 の設定では判定器が時間の上限（5/10 秒）に掛かるかどうかが実行ごとに揺れる（分けたかどうかに依らない・同じ局の 2 回でも揺れる）ので、完全一致は時間を外した節点打ち切りの設定（trial_audit_det）で確かめた; 8 局に見逃しが無く verify の対象は 0＝verify の行のつなぎは空のファイルでしか確かめていない; 試しで見つけて直した: シャードの verify.jsonl が空だとつなぎで落ちていた（道具の要約はファイルが在れば verify の節を足すので、空でも運ぶ）; worker_steps.json の所要は最後に回した 1 回の分（途中で止めて再開した段は再開後の秒だけ）; 例の seed は過去の監査の帯の写し（守り 3013000〜3013299・大きな損 3301000〜3301099）＝新しい払い出しなし。配るときは台帳の払い出しに合わせて写して直す; 試しの 2 本は 1 つのコンテナで home を分けて同時に回した（wheel は 1 回だけ作り、各 home の作り済みの印を同じ rust/ の木で置いた）; worker_audit_merge は一度に 1 つのクローンで fetch するので、つなぐ間はそのクローンの FETCH_HEAD を使う（作業の木は触らない）; 道具（defense_audit.py・blunder_audit.py）は触っていない＝rs-overflow-trigger・rs-window-tree-blocker が足す測定用の旗は定義の args に書けばそのまま渡る"
+ "notes": "",
+ "worker": {
+  "spec": "/tmp/claude-0/-home-user-opcg-sim-backend/c031145e-8706-5a74-8978-ec520ee3d25f/scratchpad/trial/trial_push.json",
+  "k": 1,
+  "branch": "claude/worker-job-trial-push-w01",
+  "code_commit": "58a0dd47f9f1702146f802a57c42345b3732bb56"
+ }
 }

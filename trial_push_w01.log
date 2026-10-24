@@ -1,0 +1,2 @@
+  1/1局 行133（main 55） 棄却0 3s
+N_RECORD_DONE {"rows": 133, "main_rows": 55, "dropped": 0, "forced": {"play": 0, "hold": 0, "target": 0}, "removal_legal_rows": 0}
