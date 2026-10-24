@@ -7,6 +7,7 @@
 を使う。
 
   python merge_defense.py <B> points   # → defense_<B>/merged/points_<B>_300.jsonl と new_points.jsonl（確かめる点）
+  （コミットしたのは gzip した points_<B>_300.jsonl.gz だけ・new_points は打ち直した 2 つのファイルの連結）
   python merge_defense.py <B> verify   # → defense_<B>/merged/verify.jsonl（修正前の確かめ＋new_points の確かめ）
 """
 import gzip

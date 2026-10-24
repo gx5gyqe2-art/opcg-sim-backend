@@ -23,8 +23,8 @@ NET = "opcg_sim/data/learned/nrel_r13d.npz"
 SETS = {"new": {}, "legacy": {"window_tree_counter_legacy": True}}
 PATHS = {("before", 3013000): "n1_results/window_read/defense_new/points_3013000_300.jsonl.gz",
          ("before", 3351000): "n1_results/reaudit_wr/defense/points_3351000_300.jsonl",
-         ("after", 3013000): f"{D}/defense_3013000/merged/points_3013000_300.jsonl",
-         ("after", 3351000): f"{D}/defense_3351000/merged/points_3351000_300.jsonl"}
+         ("after", 3013000): f"{D}/defense_3013000/merged/points_3013000_300.jsonl.gz",
+         ("after", 3351000): f"{D}/defense_3351000/merged/points_3351000_300.jsonl.gz"}
 
 
 class A:

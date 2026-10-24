@@ -54,7 +54,7 @@ def main():
     for b, s in SIDES.items():
         div = {d["seed"] for d in map(json.loads, open(f"{D}/diverge_{b}.jsonl")) if d["diverged"]}
         before = side(s["before"], s["before_v"])
-        after = side(f"{D}/defense_{b}/merged/points_{b}_300.jsonl", f"{D}/defense_{b}/merged/verify.jsonl")
+        after = side(f"{D}/defense_{b}/merged/points_{b}_300.jsonl.gz", f"{D}/defense_{b}/merged/verify.jsonl")
         key = lambda r: (r["seed"], r["seat"], r["step"])
         bk = {key(r) for r in before["verified_rows"] if r["ko_verified"]}
         ak = {key(r) for r in after["verified_rows"] if r["ko_verified"]}

@@ -1,0 +1,741 @@
+[
+ {
+  "side": "after",
+  "band": 3013000,
+  "seed": 3013021,
+  "step": 107,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP05-101\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-110\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "legacy_safe": 0
+ },
+ {
+  "side": "after",
+  "band": 3013000,
+  "seed": 3013035,
+  "step": 108,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP17-080\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP17-085\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP17-080\"}": 2,
+   "{\"action_type\": \"PASS\"}": 4,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP17-085\"}": 2
+  },
+  "legacy_safe": 4
+ },
+ {
+  "side": "after",
+  "band": 3013000,
+  "seed": 3013059,
+  "step": 213,
+  "my_life": 0,
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP14-038\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP09-031\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP14-038\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP09-031\"}": 8
+  },
+  "legacy_safe": 8
+ },
+ {
+  "side": "after",
+  "band": 3013000,
+  "seed": 3013104,
+  "step": 118,
+  "my_life": 1,
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP02-064\"}",
+  "safe": [
+   "{\"action_type\": \"PASS\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP02-064\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "legacy_safe": 8
+ },
+ {
+  "side": "after",
+  "band": 3013000,
+  "seed": 3013106,
+  "step": 149,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP03-043\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "legacy_safe": 0
+ },
+ {
+  "side": "after",
+  "band": 3013000,
+  "seed": 3013116,
+  "step": 126,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP01-041\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP14-118\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP14-118\"}": 8
+  },
+  "legacy_safe": 8
+ },
+ {
+  "side": "after",
+  "band": 3013000,
+  "seed": 3013212,
+  "step": 98,
+  "my_life": 1,
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"P-120\"}",
+  "safe": [
+   "{\"action_type\": \"PASS\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"P-120\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"P-120\"}": 6,
+   "{\"action_type\": \"PASS\"}": 2
+  },
+  "legacy_safe": 2
+ },
+ {
+  "side": "after",
+  "band": 3013000,
+  "seed": 3013218,
+  "step": 91,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP10-081\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP10-088\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP10-091\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP10-081\"}": 6,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP10-088\"}": 1,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP10-091\"}": 1
+  },
+  "legacy_safe": 8
+ },
+ {
+  "side": "after",
+  "band": 3013000,
+  "seed": 3013236,
+  "step": 114,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-050\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP05-099\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-109\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "legacy_safe": 0
+ },
+ {
+  "side": "after",
+  "band": 3013000,
+  "seed": 3013251,
+  "step": 119,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB04-046\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP11-084\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP12-048\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "legacy_safe": 0
+ },
+ {
+  "side": "after",
+  "band": 3013000,
+  "seed": 3013260,
+  "step": 91,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB01-027\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-010\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP10-008\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 3,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB01-027\"}": 4,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-010\"}": 1
+  },
+  "legacy_safe": 5
+ },
+ {
+  "side": "before",
+  "band": 3013000,
+  "seed": 3013020,
+  "step": 83,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP05-061\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP05-068\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-109\"}"
+  ],
+  "live_window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-109\"}": 8
+  },
+  "new_safe": 8,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 6,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-109\"}": 2
+  },
+  "legacy_safe": 2
+ },
+ {
+  "side": "before",
+  "band": 3013000,
+  "seed": 3013035,
+  "step": 109,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP17-085\"}"
+  ],
+  "live_window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP17-085\"}": 8
+  },
+  "new_safe": 8,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 2,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP17-085\"}": 6
+  },
+  "legacy_safe": 6
+ },
+ {
+  "side": "before",
+  "band": 3013000,
+  "seed": 3013037,
+  "step": 126,
+  "my_life": 0,
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-014\"}",
+  "safe": [
+   "{\"action_type\": \"PASS\"}"
+  ],
+  "live_window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-014\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-014\"}": 7,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP14-033\"}": 1
+  },
+  "legacy_safe": 0
+ },
+ {
+  "side": "before",
+  "band": 3013000,
+  "seed": 3013106,
+  "step": 149,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP03-043\"}"
+  ],
+  "live_window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "new": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "legacy_safe": 0
+ },
+ {
+  "side": "before",
+  "band": 3013000,
+  "seed": 3013212,
+  "step": 98,
+  "my_life": 1,
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"P-120\"}",
+  "safe": [
+   "{\"action_type\": \"PASS\"}"
+  ],
+  "live_window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"P-120\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"P-120\"}": 6,
+   "{\"action_type\": \"PASS\"}": 2
+  },
+  "legacy_safe": 2
+ },
+ {
+  "side": "before",
+  "band": 3013000,
+  "seed": 3013218,
+  "step": 92,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP10-081\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP10-088\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP10-091\"}"
+  ],
+  "live_window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP10-088\"}": 8
+  },
+  "new_safe": 8,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "legacy_safe": 0
+ },
+ {
+  "side": "before",
+  "band": 3013000,
+  "seed": 3013236,
+  "step": 114,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-050\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP05-099\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-109\"}"
+  ],
+  "live_window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "new": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "legacy_safe": 0
+ },
+ {
+  "side": "before",
+  "band": 3013000,
+  "seed": 3013251,
+  "step": 119,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB04-046\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP11-084\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP12-048\"}"
+  ],
+  "live_window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "new": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "legacy_safe": 0
+ },
+ {
+  "side": "before",
+  "band": 3013000,
+  "seed": 3013260,
+  "step": 91,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB01-027\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-010\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP10-008\"}"
+  ],
+  "live_window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "new": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 3,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB01-027\"}": 4,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-010\"}": 1
+  },
+  "legacy_safe": 5
+ },
+ {
+  "side": "after",
+  "band": 3351000,
+  "seed": 3351001,
+  "step": 108,
+  "my_life": 1,
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST05-017\"}",
+  "safe": [
+   "{\"action_type\": \"PASS\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST05-017\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 1,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST05-017\"}": 7
+  },
+  "legacy_safe": 1
+ },
+ {
+  "side": "after",
+  "band": 3351000,
+  "seed": 3351039,
+  "step": 164,
+  "my_life": 1,
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB01-056\"}",
+  "safe": [
+   "{\"action_type\": \"PASS\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-101\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB01-056\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-051\"}": 5,
+   "{\"action_type\": \"PASS\"}": 2,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB01-056\"}": 1
+  },
+  "legacy_safe": 2
+ },
+ {
+  "side": "after",
+  "band": 3351000,
+  "seed": 3351065,
+  "step": 148,
+  "my_life": 0,
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP13-072\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP13-076\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP13-072\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP13-076\"}": 8
+  },
+  "legacy_safe": 8
+ },
+ {
+  "side": "after",
+  "band": 3351000,
+  "seed": 3351109,
+  "step": 242,
+  "my_life": 0,
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP12-093\"}",
+  "safe": [
+   "{\"action_type\": \"PASS\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP12-093\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "legacy_safe": 8
+ },
+ {
+  "side": "after",
+  "band": 3351000,
+  "seed": 3351127,
+  "step": 125,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP12-029\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP15-028\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP12-029\"}": 6,
+   "{\"action_type\": \"PASS\"}": 2
+  },
+  "legacy_safe": 6
+ },
+ {
+  "side": "after",
+  "band": 3351000,
+  "seed": 3351168,
+  "step": 119,
+  "my_life": 1,
+  "live": "{\"action_type\": \"PASS\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-042\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP06-088\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP07-116\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP10-087\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 4,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP10-087\"}": 3,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP06-088\"}": 1
+  },
+  "legacy_safe": 4
+ },
+ {
+  "side": "after",
+  "band": 3351000,
+  "seed": 3351275,
+  "step": 114,
+  "my_life": 0,
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-003\"}",
+  "safe": [
+   "{\"action_type\": \"PASS\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-003\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"PASS\"}": 8
+  },
+  "legacy_safe": 8
+ },
+ {
+  "side": "after",
+  "band": 3351000,
+  "seed": 3351284,
+  "step": 154,
+  "my_life": 0,
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-059\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST29-007\"}"
+  ],
+  "live_window": {
+   "worlds": 16,
+   "tree": false
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-059\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-059\"}": 8
+  },
+  "legacy_safe": 0
+ },
+ {
+  "side": "before",
+  "band": 3351000,
+  "seed": 3351039,
+  "step": 164,
+  "my_life": 1,
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-051\"}",
+  "safe": [
+   "{\"action_type\": \"PASS\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"OP08-101\"}"
+  ],
+  "live_window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB01-056\"}": 8
+  },
+  "new_safe": 0,
+  "legacy": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB03-051\"}": 5,
+   "{\"action_type\": \"PASS\"}": 2,
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB01-056\"}": 1
+  },
+  "legacy_safe": 2
+ },
+ {
+  "side": "before",
+  "band": 3351000,
+  "seed": 3351284,
+  "step": 146,
+  "my_life": 1,
+  "live": "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-059\"}",
+  "safe": [
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST29-004\"}",
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST29-007\"}"
+  ],
+  "live_window": {
+   "worlds": 2,
+   "tree": true
+  },
+  "new": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"ST29-004\"}": 8
+  },
+  "new_safe": 8,
+  "legacy": {
+   "{\"action_type\": \"SELECT_COUNTER\", \"card\": \"EB02-059\"}": 8
+  },
+  "legacy_safe": 0
+ }
+]
