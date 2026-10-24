@@ -14,5 +14,5 @@
   "arena_r22/r22_real_w02.jsonl": 175,
   "arena_r22/r22_synth2_w02.jsonl": 175
  },
- "notes": ""
+ "notes": "完走・void 0（3 条件とも）。シャード単体の値: real wr 0.5657 [0.5215,0.6099] +45.9 Elo／mirror wr 0.5057 [0.4594,0.552] +4.0／synth_roles2 wr 0.5000 [0.458,0.542] ±0。所要は見積り（各約 25 分）より大幅に短く 321s／183s／284s（nproc=4・--workers 4）。本線 af3ceb301（rs-window-read の取り込み 815b3c273 を含む）で回したので古いコードではない。速さの理由は未確認。"
 }
