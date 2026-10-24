@@ -31,7 +31,7 @@ def side(path, vpath):
                      "otsu": bool(p.get("miss_otsu")), "ko_verified": bool(v.get("miss_ko_full")),
                      "otsu_verified": bool(v.get("miss_otsu_full")), "live_kind": v.get("live_kind"),
                      "cpu_move": next((r["move"] for r in p["rows"] if r.get("cpu")), None),
-                     "low_counter": p.get("action") == "SELECT_COUNTER" and (p.get("my_life") or 9) <= 1,
+                     "low_counter": p.get("action") == "SELECT_COUNTER" and p.get("my_life", 9) <= 1,
                      "winner": games[p["seed"]]["winner"]})
     low = [p for p in resp if p.get("action") == "SELECT_COUNTER" and p["my_life"] <= 1]
     return {

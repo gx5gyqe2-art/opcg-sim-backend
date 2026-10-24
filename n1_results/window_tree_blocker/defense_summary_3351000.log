@@ -1,0 +1,317 @@
+{
+ "games": 300,
+ "void_games": 0,
+ "resp": {
+  "points_seen": 8733,
+  "points": 9836,
+  "turns": 1884,
+  "by_action": {
+   "SELECT_COUNTER": 6804,
+   "SELECT_BLOCKER": 1016,
+   "SEARCH_AND_SELECT": 877,
+   "CONFIRM_OPTIONAL": 602,
+   "CONFIRM_TRIGGER": 337,
+   "SELECT_RESOURCE": 123,
+   "ARRANGE_DECK": 60,
+   "CHOICE": 17
+  },
+  "threat": {
+   "k": 374,
+   "n": 9836,
+   "rate": 0.038
+  },
+  "threat_otsu": {
+   "k": 296,
+   "n": 9836,
+   "rate": 0.0301
+  },
+  "unknown_cpu": {
+   "k": 1855,
+   "n": 9836,
+   "rate": 0.1886
+  },
+  "unknown_any": {
+   "k": 1954,
+   "n": 9836,
+   "rate": 0.1987
+  },
+  "unknown_otsu_among_threat": {
+   "k": 55,
+   "n": 374,
+   "rate": 0.1471
+  },
+  "miss_per_point": {
+   "ko": {
+    "k": 19,
+    "n": 9836,
+    "rate": 0.0019
+   },
+   "otsu": {
+    "k": 13,
+    "n": 9836,
+    "rate": 0.0013
+   }
+  },
+  "miss_given_threat": {
+   "ko": {
+    "k": 19,
+    "n": 374,
+    "rate": 0.0508
+   },
+   "otsu": {
+    "k": 13,
+    "n": 296,
+    "rate": 0.0439
+   }
+  },
+  "miss_per_turn": {
+   "ko": {
+    "k": 18,
+    "n": 1884,
+    "rate": 0.0096
+   },
+   "otsu": {
+    "k": 12,
+    "n": 1884,
+    "rate": 0.0064
+   },
+   "turns_with_threat": 164,
+   "turns_with_threat_otsu": 134,
+   "ko_given_threat": {
+    "k": 18,
+    "n": 164,
+    "rate": 0.1098
+   },
+   "otsu_given_threat": {
+    "k": 12,
+    "n": 134,
+    "rate": 0.0896
+   }
+  },
+  "miss_per_game": {
+   "ko": {
+    "k": 18,
+    "n": 300,
+    "rate": 0.06
+   },
+   "otsu": {
+    "k": 12,
+    "n": 300,
+    "rate": 0.04
+   },
+   "ko_seats": 18,
+   "otsu_seats": 12,
+   "ko_missed_then_lost": 17,
+   "otsu_missed_then_lost": 11,
+   "otsu_missed_lost_this_turn": 6,
+   "ko_missed_lost_this_turn": 8
+  },
+  "miss_ko_by_action": {
+   "SELECT_COUNTER": 11,
+   "CONFIRM_TRIGGER": 3,
+   "SELECT_BLOCKER": 2,
+   "CONFIRM_OPTIONAL": 2,
+   "SEARCH_AND_SELECT": 1
+  },
+  "miss_ko_type": {
+   "SELECT_COUNTER:counter->no_counter": 4,
+   "SELECT_COUNTER:no_counter->counter": 4,
+   "CONFIRM_TRIGGER:confirm_yes->confirm_no": 3,
+   "SELECT_COUNTER:counter->counter": 2,
+   "CONFIRM_OPTIONAL:confirm_yes->confirm_no": 2,
+   "SELECT_BLOCKER:no_block->block": 1,
+   "SELECT_COUNTER:counter->counter/no_counter": 1,
+   "SEARCH_AND_SELECT:target->target": 1,
+   "SELECT_BLOCKER:block->no_block": 1
+  },
+  "miss_otsu_type": {
+   "SELECT_COUNTER:counter->no_counter": 4,
+   "SELECT_COUNTER:no_counter->counter": 3,
+   "SELECT_BLOCKER:no_block->block": 1,
+   "SELECT_COUNTER:counter->counter/no_counter": 1,
+   "SEARCH_AND_SELECT:target->target": 1,
+   "CONFIRM_OPTIONAL:confirm_yes->confirm_no": 1,
+   "CONFIRM_TRIGGER:confirm_yes->confirm_no": 1,
+   "SELECT_COUNTER:counter->counter": 1
+  },
+  "threat_by_action": {
+   "SELECT_COUNTER": 304,
+   "SELECT_BLOCKER": 33,
+   "SEARCH_AND_SELECT": 23,
+   "CONFIRM_OPTIONAL": 7,
+   "CONFIRM_TRIGGER": 7
+  },
+  "miss_otsu_my_life": {
+   "0": 6,
+   "1": 5,
+   "2": 2
+  },
+  "miss_otsu_opp_life": {
+   "1": 6,
+   "3": 4,
+   "0": 2,
+   "2": 1
+  },
+  "miss_ko_my_life": {
+   "0": 9,
+   "1": 7,
+   "2": 3
+  },
+  "threat_my_life": {
+   "0": 272,
+   "1": 78,
+   "2": 24
+  },
+  "cands_mean": 2.97,
+  "sec": {
+   "mean": 3.287,
+   "p50": 0.04,
+   "p99": 30.012,
+   "max": 69.962
+  }
+ },
+ "end": {
+  "turns_seen": 2023,
+  "turns": 1748,
+  "threat_ko": {
+   "k": 284,
+   "n": 1748,
+   "rate": 0.1625
+  },
+  "threat_otsu": {
+   "k": 190,
+   "n": 1748,
+   "rate": 0.1087
+  },
+  "unknown_actual": {
+   "k": 990,
+   "n": 1748,
+   "rate": 0.5664
+  },
+  "unknown_actual_otsu_among_ko": {
+   "k": 87,
+   "n": 284,
+   "rate": 0.3063
+  },
+  "miss_per_turn": {
+   "k": 2,
+   "n": 1748,
+   "rate": 0.0011
+  },
+  "miss_strict_per_turn": {
+   "k": 1,
+   "n": 1748,
+   "rate": 0.0006
+  },
+  "miss_given_threat": {
+   "k": 2,
+   "n": 190,
+   "rate": 0.0105
+  },
+  "miss_strict_given_threat": {
+   "k": 1,
+   "n": 190,
+   "rate": 0.0053
+  },
+  "unknown_alts_among_threat": {
+   "k": 40,
+   "n": 190,
+   "rate": 0.2105
+  },
+  "miss_games": 2,
+  "miss_then_lost": 2,
+  "miss_lost_next_turn": 1,
+  "miss_strict_then_lost": 1,
+  "miss_alt_type": {
+   "ATTACK": 2
+  },
+  "miss_strict_alt_type": {
+   "ATTACK": 1
+  },
+  "miss_my_life": {
+   "1": 1,
+   "3": 1
+  },
+  "threat_turns_with_own_win_alt": 9,
+  "threat_my_life": {
+   "0": 105,
+   "1": 61,
+   "2": 19,
+   "3": 5
+  },
+  "alts_mean_among_threat": 6.8,
+  "sec": {
+   "mean": 8.582,
+   "p50": 10.001,
+   "p99": 42.487,
+   "max": 162.91
+  }
+ },
+ "verify": {
+  "resp": {
+   "verified": 19,
+   "errors": 0,
+   "miss_ko_raw": 19,
+   "miss_ko_full": 14,
+   "miss_ko_full_unknown": 5,
+   "miss_otsu_raw": 13,
+   "miss_otsu_full": 10,
+   "miss_otsu_full_unknown": 1,
+   "turns_miss_otsu_full": 10,
+   "turns_miss_ko_full": 14,
+   "games_miss_otsu_full": 10,
+   "otsu_full_then_lost": 9,
+   "otsu_full_lost_this_turn": 6,
+   "miss_given_threat_full": {
+    "ko": {
+     "k": 14,
+     "n": 374,
+     "rate": 0.0374
+    },
+    "otsu": {
+     "k": 10,
+     "n": 296,
+     "rate": 0.0338
+    }
+   },
+   "live_kind_among_miss_ko_full": {
+    "window": 14
+   },
+   "live_kind_among_miss_otsu_full": {
+    "window": 10
+   },
+   "fresh_safe_among_miss_ko_full": {
+    "False": 14
+   },
+   "fresh_safe_among_miss_otsu_full": {
+    "False": 10
+   },
+   "fresh_safe_by_live_kind_otsu_full": {
+    "window:False": 10
+   },
+   "miss_otsu_full_type": {
+    "SELECT_COUNTER:counter->no_counter": 4,
+    "SELECT_COUNTER:counter->counter/no_counter": 1,
+    "SEARCH_AND_SELECT:target->target": 1,
+    "SELECT_COUNTER:no_counter->counter": 1,
+    "CONFIRM_OPTIONAL:confirm_yes->confirm_no": 1,
+    "CONFIRM_TRIGGER:confirm_yes->confirm_no": 1,
+    "SELECT_COUNTER:counter->counter": 1
+   },
+   "miss_otsu_full_my_life": {
+    "0": 6,
+    "1": 3,
+    "2": 1
+   }
+  },
+  "end": {
+   "verified": 2,
+   "errors": 0,
+   "miss_raw": 2,
+   "miss_full": 0,
+   "miss_strict_full": 0,
+   "miss_full_unknown": 2,
+   "miss_full_then_lost": 0
+  }
+ }
+}
