@@ -1,32 +1,34 @@
 {
- "job": "league-gen",
- "status": "done",
- "section": "docs/search_efficiency_plan.md §7.56",
- "branch": "claude/league-gen",
- "base": "claude/cpu-spec-improvements-yw91jd@daf3abf",
- "report": "docs/reports/2026-10-25_league_gen.md",
- "ops_doc": "docs/n_loop_ops.md §7.58",
- "changes": {
-  "record_gen": "--opp-pool name:weight,...（seed で決まる引き・学ぶ側の席は seed の偶奇で交互・相手も同じ探索の設定）・列 seat_net／learner・meta に nets／learner_seat／opp_pool／opp_games（集団なしでは何も足さない）",
-  "dump_io": "load_dump(pi_rows='all'|'learner')",
-  "n_rel_train": "train --pi-rows {all,learner}（既定 all）",
-  "tests": ["tests/test_league_gen.py", "tests/test_dump_io.py::test_pi_rows_learner_keeps_only_learner_seats"]
+ "job": "n55l-w09",
+ "role": "gen",
+ "status": "partial",
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r24.npz",
+  "games": 480,
+  "sims": 1280,
+  "worlds": 1,
+  "budget": 0,
+  "decks": "real",
+  "opp_pool": "r24:0.5,r23:0.2,r22:0.15,r13d:0.15",
+  "seed_base": 2635000
  },
- "checks": {
-  "default_bit_identical": "本線の record_gen と 4 局（seed 9960000〜・回数 32・real）で 31 列すべてバイト一致・meta 一致（sec 除く）",
-  "trial_pool_20": {"seeds": "9961000-9961019", "pool": "r24:0.5,r23:0.2,r22:0.15,r13d:0.15", "games_match_opp_draw": 20, "learner_seat": {"p1": 10, "p2": 10},
-                    "opp_games": {"r24": 8, "r23": 3, "r22": 6, "r13d": 3}, "rows": 3834, "row_mark_mismatch": 0,
-                    "pi_points_all": 1463, "pi_points_learner": 1077, "non_learner_in_learner_set": 0, "value_rows": 3834},
-  "train_smoke": "n_rel_train --pi-rows learner --backend numpy 1 周が完走",
-  "make_test": "green（883 passed, 13 skipped・76 秒）",
-  "audit_cross": "不要（rust/・パーサ不変）"
+ "outputs": {
+  "dirs": [
+   "n_records/n55l_w09_p0"
+  ]
  },
- "notes": [
-  "「学ぶ側の行」はネットで決めた: learner=1 は学ぶ側のネットが打った席。集団に r24 自身が入って引かれた局は両席とも 1（今の自己対戦と同じ教材）。席で絞りたいときは learner_seat から作れる",
-  "学ぶ側の席は seed の偶奇（偶数 p1）で交互・相手の引きとは独立",
-  "試しの seed 帯は仕様に無かったので 9960000〜9961019 を使った（記録はブランチに積まず meta だけ n1_results/league_gen/）",
-  "--reanalyze-mult と --opp-pool の併用は断る（相手の席の点を学ぶ側で深読みすると教師の意味が変わる）",
-  "1 局の時間は試しでは測っていない（相手も同じ回数を読む＝大きくは変わらない見込み・波の RESULT.json で確認）",
-  "torch がコンテナに無かったので訓練の通しは numpy backend（読み込みは backend 非依存）"
- ]
+ "metrics": {
+  "parts_done": 1,
+  "games": 120,
+  "rows": 19934,
+  "dropped": 0,
+  "sec_play_mean": 24.06
+ },
+ "notes": "",
+ "worker": {
+  "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/gen_n55l.json",
+  "k": 9,
+  "branch": "claude/n55l-w09",
+  "code_commit": "050e87fbd6385d1f074c39c10b23644c842f4c5c"
+ }
 }
