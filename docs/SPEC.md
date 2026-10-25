@@ -1358,6 +1358,18 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
 アリーナは `--cand-defense-proof`（候補席）、器は `defense_audit.py --defense-proof`・`rs_decide_latency.py --extra '{"defense_proof": true}'`。
 計測（守りの再監査の局面・費用）は `docs/reports/2026-10-25_defense_proof.md`。
 
+### 2.5.13 世界の木を同時に回すスレッド（Rust・opts の `world_threads`・2026-10-25〜）
+
+> 正本はコード（`rust/opcg_engine/src/search/decide.rs` の `run_worlds`）。経緯は `docs/search_efficiency_plan.md` §7.55
+> （WP `rs-world-parallel`）・`docs/reports/2026-10-25_world_parallel.md`。
+
+decide の世界 K 本（`worlds`・§20.7.1）の木は別々のスレッドで同時に回る（世界 0 は呼んだスレッド・世界 i≥1 は世界ごとに新しい
+スレッド・`Game.decide` は木を回す間 GIL を放す）。opts の `world_threads` は**同時に走る世界の本数の上限**: 既定 **0**＝世界 1 本に
+1 スレッド（K 本が一度に走る）・N≥1＝高々 N 本（1＝1 本ずつ順に）。どの値でも世界 i は自分だけの新しいスレッドで回り、
+束ねは世界の番号の順＝**打つ手と出力は 1 bit も変わらない**（変わるのは 1 手の時間とピークのコア数だけ）。4 コアで出荷の設定の
+1 手平均は世界 1 本 0.195 秒・世界 2 本（今）0.203 秒・世界 4 本 0.254 秒（スレッド 1 なら 0.306／0.607 秒）。対戦 API・生成・
+アリーナは鍵を渡さない（既定 0）。窓の根畳みの世界（§2.5.12 の 2）は 1 スレッドで順に回る。
+
 ---
 
 ## 3. カード効果システム
