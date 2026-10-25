@@ -630,6 +630,12 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .map(|n| n as usize)
             .filter(|n| *n > 0)
             .unwrap_or(d.worlds),
+        // 世界を同時に回すスレッドの上限（§7.55・既定 0＝世界ごとに 1 スレッド・打つ手は不変）。
+        world_threads: v
+            .get("world_threads")
+            .and_then(Value::as_u64)
+            .map(|n| n as usize)
+            .unwrap_or(d.world_threads),
         search_seed: v.get("search_seed").and_then(Value::as_u64),
         search: options_from_json(v),
         budget: match v.get("budget") {
