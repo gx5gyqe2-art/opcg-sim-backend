@@ -1,0 +1,1 @@
+[dfp prod] ARENA_MERGE_FINAL {"pairs": 2688, "games": 5376, "void": 0, "wins": 2695.0, "wr": 0.5013, "ci95": [0.4996, 0.5031], "elo": 0.9, "elo95": [-0.3, 2.1], "promoted": false, "shards": 32, "dup_seeds": 0, "cand_opts": [{"budget": 0, "defense_proof": true, "lethal_proof": "root", "sims": 1280, "worlds": 2}]}
