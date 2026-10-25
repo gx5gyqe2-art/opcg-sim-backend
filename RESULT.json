@@ -1,7 +1,7 @@
 {
  "job": "trial-shallow-gen",
  "role": "gen",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r13d.npz",
   "games": 2,
