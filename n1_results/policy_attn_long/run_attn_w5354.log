@@ -11,3 +11,8 @@ ATTN_DESK_EPOCH {"ep": 0, "head": "attn", "warm": false, "lr": 0.0005, "x_scale"
   ep1 step 15000/23011 mse 0.4967 ce 1.8361 1904s
   ep1 step 20000/23011 mse 0.4929 ce 1.8349 2138s
 ATTN_DESK_EPOCH {"ep": 1, "head": "attn", "warm": false, "lr": 0.0005, "x_scale": 1.0, "wp1x_norm": 8.317262649536133, "wp1_norm": 16.85023307800293, "train_ce_run": 1.8335030419521858, "train_mse_run": 0.4909308671930972, "train_probe": {"ce": 1.8222102554623796, "top1": 0.536375, "n": 8000, "mis_all": 0.07875, "mis_atk_atk": 0.025375, "mis_order": 0.02575, "mis_play_play": 0.01075, "mis_other": 0.016875, "mis_unvisited": 0.002375}, "val": {"ce": 1.8457203528929635, "top1": 0.531, "n": 20000, "mis_all": 0.0724, "mis_atk_atk": 0.0265, "mis_order": 0.02085, "mis_play_play": 0.0107, "mis_other": 0.01435, "mis_unvisited": 0.00245}, "val_vmse": 0.49800458550453186, "sec": 1068.0, "wall": 2286.9}
+  ep2 step 5000/23011 mse 0.4666 ce 1.8267 2522s
+  ep2 step 10000/23011 mse 0.4627 ce 1.8249 2749s
+  ep2 step 15000/23011 mse 0.4590 ce 1.8245 2976s
+  ep2 step 20000/23011 mse 0.4554 ce 1.8247 3202s
+ATTN_DESK_EPOCH {"ep": 2, "head": "attn", "warm": false, "lr": 0.0005, "x_scale": 1.0, "wp1x_norm": 8.693912506103516, "wp1_norm": 19.274551391601562, "train_ce_run": 1.82382668462935, "train_mse_run": 0.453144731139145, "train_probe": {"ce": 1.814866082725078, "top1": 0.54675, "n": 8000, "mis_all": 0.077, "mis_atk_atk": 0.025625, "mis_order": 0.023375, "mis_play_play": 0.0115, "mis_other": 0.0165, "mis_unvisited": 0.002}, "val": {"ce": 1.839781074349451, "top1": 0.53505, "n": 20000, "mis_all": 0.0702, "mis_atk_atk": 0.02695, "mis_order": 0.0196, "mis_play_play": 0.00915, "mis_other": 0.0145, "mis_unvisited": 0.00215}, "val_vmse": 0.5492955446243286, "sec": 1047.9, "wall": 3341.9}
