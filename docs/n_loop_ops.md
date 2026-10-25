@@ -4313,3 +4313,6 @@ nohup python ~/worker_job.py --job arena_r22 --k 3 > ~/worker_job.out 2>&1 &
 テストは足さない（器の直し）。`make test` green。エンジンを触らないので `audit-cross` は要らない。
 **報告** `docs/reports/2026-10-25_worker_shallow.md`・`RESULT.json`（job "worker-shallow"・status done）・ブランチ `claude/worker-shallow`。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
 **注意**: 試しの間にも本番の作業セッション（§7.51 のアリーナ 32 本・r24 の訓練）が本線の `worker_job.py` を読む。本線へはコーディネータが取り込む（作業セッションは自分のブランチにだけ push する）。
+
+**波 53 の結果（2026-10-25）**: 32 シャード全部完走・15,360 局・**2,594,900 行**・**dropped 0**（波 52 は 26・払えない起動の修正と手数の上限 1,000 で消えた＝予告どおり）。
+r24 の訓練はジョブ定義 `train_r24`（Sonnet・warm-start r23・π＝波 53・価値＝波 53＋52・約 512 万行・評価帯は波 53 の holdout で r22／r23／r24 を比べる）。メモリは r23（499 万行で 12.92 GB）から見て約 13.2 GB の見込み。
