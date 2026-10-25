@@ -1,7 +1,7 @@
 {
  "job": "arena-w4p-w16",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r24.npz・世界 4 本",
   "baseline": "nrel_r24.npz・世界 2 本（今の出荷）",
