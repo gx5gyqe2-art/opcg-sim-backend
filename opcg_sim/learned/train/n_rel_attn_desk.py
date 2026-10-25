@@ -12,7 +12,7 @@
       (2) 候補（今の頭の入力 499 列を 64 次元へ写したもの）→ トークンの注意 1 層
       (3) 候補どうしの自己注意 `--cand-layers` 層（同じ判断点の候補だけを見る）
     logit = relu(u·Wp1 + a·Wp1x + bp1)·Wp2 + bp2。r24 から始めるときは Wp1x を 0 で始める
-    （＝最初の出力は r24 と同じ）。一から始めるときは注意の部分も含めて全部乱数。
+    （＝最初の出力は r24 と同じ・`--x-scale` で乱数から始めることもできる）。一から始めるときは注意の部分も含めて全部乱数。
 価値の頭は今の形のまま（比べるのは方策）。
 
 周ごとに測るもの: 訓練側の方策誤差（周の平均）・検証側（holdout seed%7）の方策誤差・1 位の一致・
@@ -99,15 +99,14 @@ class AttnPolicy(torch.nn.Module):
 class TorchNRelAttn(TT.TorchNRel):
     """`TorchNRel` の方策だけを差し替えたもの（`attn=None` なら今の頭そのもの）。"""
 
-    def __init__(self, net, attn_cfg=None, zero_out=True, seed=13):
+    def __init__(self, net, attn_cfg=None, x_scale=0.0, seed=13):
         super().__init__(net)
         self.attn = None
         if attn_cfg is not None:
             torch.manual_seed(seed)
             self.attn = AttnPolicy(**attn_cfg)
             hp = self.Wp1.shape[1]
-            w = (torch.zeros(self.attn.d, hp) if zero_out
-                 else torch.randn(self.attn.d, hp) * (1.0 / np.sqrt(self.attn.d)))
+            w = torch.randn(self.attn.d, hp) * (x_scale / np.sqrt(self.attn.d))
             self.Wp1x = torch.nn.Parameter(w)
 
     def policy_logits(self, sc, ci, tok, rel_om, rel_oo, b):
@@ -196,6 +195,8 @@ def main(argv=None):
     ap.add_argument("--val-pts", type=int, default=20000, help="検証側で測る方策点（先頭から）")
     ap.add_argument("--val-rows", type=int, default=20000)
     ap.add_argument("--train-probe", type=int, default=8000, help="周の終わりに測る訓練側の点（固定）")
+    ap.add_argument("--x-scale", type=float, default=None,
+                    help="Wp1x の初期値の大きさ（既定: r24 から＝0・一から＝1）")
     ap.add_argument("--threads", type=int, default=0)
     ap.add_argument("--cache-dir", default=None)
     ap.add_argument("--out-json", required=True)
@@ -225,7 +226,8 @@ def main(argv=None):
     tail = NT.cand_tail_all(net, C)
     src = TT.EpochBatches(V, P, C, ptr, C["budget"], tail, rt, net.ablate)
     cfg = None if args.head == "base" else {"cand_layers": args.cand_layers}
-    tn = TorchNRelAttn(net, cfg, zero_out=bool(args.warm_start), seed=args.seed)
+    xs = args.x_scale if args.x_scale is not None else (0.0 if args.warm_start else 1.0)
+    tn = TorchNRelAttn(net, cfg, x_scale=xs, seed=args.seed)
     n_par = sum(p.numel() for p in tn.parameters())
     n_attn = sum(p.numel() for p in tn.attn.parameters()) + tn.Wp1x.numel() if tn.attn is not None else 0
     opt = torch.optim.Adam(tn.parameters(), lr=args.lr)
@@ -249,7 +251,10 @@ def main(argv=None):
             pr = eval_points(tn, src, P, C, ptr, probe)
             vm = eval_value(tn, src, V, vi)
         tn.train()
+        xn = float(tn.Wp1x.detach().norm()) if tn.attn is not None else None
         log_row({"ep": ep, "head": args.head, "warm": bool(args.warm_start), "lr": args.lr,
+                 "x_scale": xs if tn.attn is not None else None, "wp1x_norm": xn,
+                 "wp1_norm": float(tn.Wp1.detach().norm()),
                  "train_ce_run": train_ce, "train_mse_run": train_mse,
                  "train_probe": pr, "val": ev, "val_vmse": vm, "sec": round(sec, 1),
                  "wall": round(time.time() - t0, 1)})
