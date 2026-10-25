@@ -384,8 +384,16 @@ def rows_f32(V, bi):
             np.asarray(V["tok"][bi], np.float32))
 
 
-def load_dump(dirs, vocab, with_policy=True, z_dirs=(), cache_dir=None, n_tok=None):
+#: 方策の教師に使う行の選び方（§7.56・WP `league-gen`）。`all`＝今までどおり全部の席の行。
+#: `learner`＝`learner==1` の行（学ぶ側のネットが打った席）だけ。`learner` 列を持たない波
+#: （自己対戦の波＝両席とも学ぶ側）は全部の行を使う。価値の教師（`V`）はどちらでも全部の行。
+PI_ROWS = ("all", "learner")
+
+
+def load_dump(dirs, vocab, with_policy=True, z_dirs=(), cache_dir=None, n_tok=None, pi_rows="all"):
     """dump v2／v3 → V（value 行・memmap）, P（方策点）, C（候補）。R は含めない。
+
+    `pi_rows`＝方策点に使う行（[`PI_ROWS`]・既定 `all`＝今までと 1 bit も同じ）。
 
     `dirs` は π も z も使う波・`z_dirs` は z 専用（π を読まない）。`cache_dir` は pack の置き場所
     （既定は `default_cache_dir()`）。`n_tok` は `V["ci"]` に出す card_idx の列数
@@ -400,6 +408,8 @@ def load_dump(dirs, vocab, with_policy=True, z_dirs=(), cache_dir=None, n_tok=No
     waves = [(d, p) for d, p in waves if shard_files(d)]
     if not waves:
         raise ValueError(f"dump が見つからない: {dirs} {z_dirs}")
+    if pi_rows not in PI_ROWS:
+        raise ValueError(f"pi_rows は {PI_ROWS} のどれか（{pi_rows!r}）")
     packs = [(build_pack(d, cache_dir), d, pol) for d, pol in waves]
     V = {k: _Waves([np.load(os.path.join(p, f"{k}.npy"), mmap_mode="r") for p, _d, _x in packs],
                    cols=(n_tok if k == "ci" else None))
@@ -434,7 +444,7 @@ def load_dump(dirs, vocab, with_policy=True, z_dirs=(), cache_dir=None, n_tok=No
             continue
         for f, n in zip(shard_files(d), meta["shard_rows"]):
             with np.load(f, allow_pickle=True) as dd:
-                _read_policy(dd, off_v, vocab, P, C)
+                _read_policy(dd, off_v, vocab, P, C, pi_rows)
             off_v += n
     if P["row"]:
         # 1 本でも持たないシャードがある列は `None`（＝揃わない列は無い列として扱う契約）。
@@ -447,11 +457,17 @@ def load_dump(dirs, vocab, with_policy=True, z_dirs=(), cache_dir=None, n_tok=No
     return V, P, C
 
 
-def _read_policy(d, off_v, vocab, P, C):
-    """1 シャードの main 窓の方策点（候補 2 本以上・選択が判っている行）を P/C へ積む。"""
+def _read_policy(d, off_v, vocab, P, C, pi_rows="all"):
+    """1 シャードの main 窓の方策点（候補 2 本以上・選択が判っている行）を P/C へ積む。
+
+    `pi_rows="learner"` なら `learner==1` の行だけ（列が無いシャードは全部＝自己対戦の波）。
+    """
     pl, pc, kind = d["pol_len"], d["pol_chosen"], d["kind"]
     off = np.concatenate([[0], np.cumsum(pl)])
-    take = np.where((kind == 0) & (pl >= 2) & (pc >= 0))[0]
+    keep = (kind == 0) & (pl >= 2) & (pc >= 0)
+    if pi_rows == "learner" and "learner" in d.files:
+        keep &= d["learner"] == 1
+    take = np.where(keep)[0]
     if not len(take):
         return
     P["row"].append((take + off_v).astype(np.int64))

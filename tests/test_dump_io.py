@@ -245,3 +245,24 @@ def test_z_only_dirs_skip_policy(waves):
 def test_rejects_non_dump_dir(tmp_path):
     with pytest.raises(ValueError):
         DIO.load_dump([str(tmp_path)], VOCAB, cache_dir=str(tmp_path / "c"))
+
+
+# --- 6. 方策の教師の行の選び方（§7.56・WP `league-gen`）---------------------
+def test_pi_rows_learner_keeps_only_learner_seats(tmp_path):
+    """`pi_rows="learner"` は `learner==1` の行だけを方策点にし、価値の行（V）は全部のまま。
+    `learner` 列の無い波（自己対戦）は全部の行を使う＝既定 `all` と同じ。"""
+    rng = np.random.default_rng(5)
+    a, b = _shard(rng, 40, 8000), _shard(rng, 30, 9000)
+    a["learner"] = (np.arange(40) % 2).astype(np.int8)
+    da = _write(str(tmp_path / "pool"), [a], v3=True)
+    db = _write(str(tmp_path / "self"), [b], v3=True)
+    cache = str(tmp_path / "cache")
+    V0, P0, _C0 = DIO.load_dump([da, db], VOCAB, cache_dir=cache)
+    V1, P1, C1 = DIO.load_dump([da, db], VOCAB, cache_dir=cache, pi_rows="learner")
+    assert len(V0["z"]) == len(V1["z"]) == 70
+    rows0, rows1 = set(P0["row"].tolist()), set(P1["row"].tolist())
+    want = {r for r in rows0 if r >= 40 or a["learner"][r] == 1}
+    assert rows1 == want and len(rows1) < len(rows0)
+    assert len(C1["pi"]) == int(P1["len"].sum())
+    with pytest.raises(ValueError):
+        DIO.load_dump([da], VOCAB, cache_dir=cache, pi_rows="opp")

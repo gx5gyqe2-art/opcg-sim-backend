@@ -1,32 +1,32 @@
 {
- "job": "defect-hunt-2",
- "role": "audit",
+ "job": "league-gen",
  "status": "done",
- "inputs": {
-  "spec": "docs/search_efficiency_plan.md §7.58",
-  "base": "claude/cpu-spec-improvements-yw91jd@daf3abf",
-  "records": "waves 53/54 meta_games (claude/n53-w01..32, claude/n54-w01..32; 30,720 games)",
-  "seeds": "3961000-3961599 (600 general), 3962100-3962299 (200 weak decks), 3963000-3963039 (40 Rosinante after fix)"
+ "section": "docs/search_efficiency_plan.md §7.56",
+ "branch": "claude/league-gen",
+ "base": "claude/cpu-spec-improvements-yw91jd@daf3abf",
+ "report": "docs/reports/2026-10-25_league_gen.md",
+ "ops_doc": "docs/n_loop_ops.md §7.58",
+ "changes": {
+  "record_gen": "--opp-pool name:weight,...（seed で決まる引き・学ぶ側の席は seed の偶奇で交互・相手も同じ探索の設定）・列 seat_net／learner・meta に nets／learner_seat／opp_pool／opp_games（集団なしでは何も足さない）",
+  "dump_io": "load_dump(pi_rows='all'|'learner')",
+  "n_rel_train": "train --pi-rows {all,learner}（既定 all）",
+  "tests": ["tests/test_league_gen.py", "tests/test_dump_io.py::test_pi_rows_learner_keeps_only_learner_seats"]
  },
- "outputs": {
-  "report": "docs/reports/2026-10-25_defect_hunt_2.md",
-  "dir": "n1_results/defect_hunt_2/",
-  "engine_fixes": [
-   "rules/pending.rs::blocker_candidates (+ battle.rs::has_blocker, actions.rs SELECT_BLOCKER): leaders with Blocker (OP05-022) can block; attacked card excluded; BLOCKER_DISABLED unified",
-   "ops::reset_turn_status_keep_freeze used by turn.rs::reset_player_status and battle.rs::finish_attack: FREEZE survives until the owner's next refresh (OP04-090 self-freeze, OP15-023 on-KO, freeze then attacked)"
-  ],
-  "golden": "audit unchanged; replay 4/200 regenerated (all OP05-022 games)",
-  "ledger": "OP15-003, OP15-017, OP15-023, OP16-084 re-recorded ok (IMPL_CHANGED from rs-unpayable-activate)"
+ "checks": {
+  "default_bit_identical": "本線の record_gen と 4 局（seed 9960000〜・回数 32・real）で 31 列すべてバイト一致・meta 一致（sec 除く）",
+  "trial_pool_20": {"seeds": "9961000-9961019", "pool": "r24:0.5,r23:0.2,r22:0.15,r13d:0.15", "games_match_opp_draw": 20, "learner_seat": {"p1": 10, "p2": 10},
+                    "opp_games": {"r24": 8, "r23": 3, "r22": 6, "r13d": 3}, "rows": 3834, "row_mark_mismatch": 0,
+                    "pi_points_all": 1463, "pi_points_learner": 1077, "non_learner_in_learner_set": 0, "value_rows": 3834},
+  "train_smoke": "n_rel_train --pi-rows learner --backend numpy 1 周が完走",
+  "make_test": "green（883 passed, 13 skipped・76 秒）",
+  "audit_cross": "不要（rust/・パーサ不変）"
  },
- "metrics": {
-  "defects_found": 2,
-  "defects_fixed": 2,
-  "invariant_violations": 0,
-  "games_checked": 840,
-  "void": 0,
-  "make_test": "880 passed, 13 skipped (torch optional)",
-  "audit_cross": {"pairs": 120, "games": 240, "void": 0},
-  "rosinante_leader_blocks_after_fix": {"games": 40, "leader_blocks": 62, "wins": 10}
- },
- "notes": "Weak decks OP04-039/OP07-097/OP04-001 (cannot-attack leaders) and OP08-057 showed no rule defect; read as evaluation/deck strength. meta_games 'leaders' is the unused random leader pair under --decks real (not changed: downstream tools pass it to build_pair). Leader blocker and FREEZE are not visible in NRel tokens (encoding candidate). finish_attack resets all temporary state of the attacked card (power/cost buffs, flags) - only FREEZE fixed; other parts worth a rules review. Regenerating golden-replay rewrites all 50 a1 games due to earlier search changes (rs-window-read); only the 4 failing games were regenerated."
+ "notes": [
+  "「学ぶ側の行」はネットで決めた: learner=1 は学ぶ側のネットが打った席。集団に r24 自身が入って引かれた局は両席とも 1（今の自己対戦と同じ教材）。席で絞りたいときは learner_seat から作れる",
+  "学ぶ側の席は seed の偶奇（偶数 p1）で交互・相手の引きとは独立",
+  "試しの seed 帯は仕様に無かったので 9960000〜9961019 を使った（記録はブランチに積まず meta だけ n1_results/league_gen/）",
+  "--reanalyze-mult と --opp-pool の併用は断る（相手の席の点を学ぶ側で深読みすると教師の意味が変わる）",
+  "1 局の時間は試しでは測っていない（相手も同じ回数を読む＝大きくは変わらない見込み・波の RESULT.json で確認）",
+  "torch がコンテナに無かったので訓練の通しは numpy backend（読み込みは backend 非依存）"
+ ]
 }

@@ -1,0 +1,4 @@
+opp_games {'r24': 8, 'r23': 3, 'r22': 6, 'r13d': 3} pool [('r24', 0.5), ('r23', 0.2), ('r22', 0.15), ('r13d', 0.15)]
+games match opp_draw: 20 learner seats Counter({'p1': 10, 'p2': 10}) winners Counter({'r24': 12, 'r22': 4, 'r13d': 3, 'r23': 1})
+rows 3834 row marks mismatched 0 learner rows 2799 Counter({'r24': 2799, 'r22': 500, 'r23': 269, 'r13d': 266})
+V rows 3834 3834 pi points all 1463 learner 1077 non-learner in learner set 0 learner points dropped 0
