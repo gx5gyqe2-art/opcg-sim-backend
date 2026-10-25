@@ -1,66 +1,33 @@
 {
- "job": "weak-points",
- "role": "read-only check of five remaining weak spots (no engine/default change, no new tests)",
- "status": "done",
- "spec": "docs/search_efficiency_plan.md §7.48 (origin/claude/cpu-spec-improvements-yw91jd @ cae56e7; ledger 2+398)",
- "branch": "claude/weak-points",
- "base": "cae56e7",
- "report": "docs/reports/2026-10-24_weak_points.md",
- "artifacts": "n1_results/weak_points/",
- "make_test": "green (cargo 625 passed, 1 ignored; pytest 876 passed, 13 skipped; n1_results/weak_points/make_test.log)",
- "engine_changed": false,
- "findings": {
-  "1_defense_misses": {
-   "reproduced": "6/6 same move on current mainline (r13d, audit settings)",
-   "mechanism": "all 6 have candidate values within 0.02 or saturated |v|>=0.85; tie-break inside saturation",
-   "type": "search cut-off (tie-break in saturated values)",
-   "r22": "3/6 (the three dialog points) pick the safe move with the shipping net r22",
-   "fix_idea": "defense window: run the lethal prover from the attacker's side on each candidate when values are flat/saturated (tens of lines); upper bound ~+2 Elo (otsu 2/300 games); low priority"
-  },
-  "2_double_attack_life0_3301005_107": {
-   "result": "lost either way: with both seats on shipping settings for the rest of the turn, pass 0/16 and block 0/16; referee's +0.47 came from the 160-sim opponent failing the kill (22/32)",
-   "attacker": "OP16-003 (grants the leader Double Attack; this attack itself is not Double Attack; life 0)",
-   "type": "measurement (weak referee opponent)",
-   "encoding_gap": "granted Double Attack is not visible to NRel tokens; 0.26% of decision points (1 game in 100); card-table flag set on 16 'your leader gains DA' cards",
-   "fix_idea": "no CPU fix; blunder/defense audit verify should also play the opponent's rest of turn with shipping settings (few lines); DA-now token column at next encoding bump"
-  },
-  "3_hand_selection": {
-   "population": "378 own hand-select dialog points in 100 games (81% discard)",
-   "judged": 80,
-   "mean_diff_b_minus_a": "+0.002 [-0.031, +0.034]",
-   "loss_after_recheck": "2/80 = 2.5% [0.7, 8.7] (3341068_69, 3341063_111); 3341039_84 recheck +0.09 [-0.07, +0.26]",
-   "type": "net evaluation (candidates complete; post-dialog tree agrees with the window at all 3 loss points)",
-   "r22": "picks a different card in 24/80; fixes 3341063_111",
-   "fix_idea": "none structural; upper bound +12 Elo (+3..+40) but mean diff is 0"
-  },
-  "4_lethal_false_proof": {
-   "current": "860 proofs identical to lethal-deal-cost default; 1 false proof left (3012157:p2:12:124, life trigger OP05-096, opponent hand 0)",
-   "life_deal_variants": "both/mode0/add each remove it but lose 20-37 true-deal-winning proofs (mostly node-budget unknowns); <1 Elo either way; not adopted",
-   "side_finding": "node cap 20k -> 80k: proofs 860 -> 972 (+112, all true-deal wins, false proofs unchanged), judge nodes x3.06; candidate WP (latency + production arena)"
-  },
-  "5_trigger_decline": {
-   "games": 200,
-   "seeds": "3671000-3671199",
-   "void": 0,
-   "points": 358,
-   "life_triggers": 255,
-   "optional": 103,
-   "cpu_declines_life": "122/255 (48%)",
-   "cpu_vs_always_accept": "+0.013 [-0.002, +0.028] per life-trigger point (consistent with arena +5.0 Elo)",
-   "cpu_vs_always_decline": "+0.024 [+0.010, +0.038]",
-   "by_gap": "gap>=0.05: +0.035 vs always-accept; gap 0.02-0.05: -0.018 (sign agreement 42%)",
-   "type": "no systematic over-decline/over-accept (10 significant misses = noise floor)",
-   "fix_idea": "none needed; short tree for small-gap points upper bound ~+2 Elo"
-  }
+ "job": "n53-w32",
+ "role": "gen",
+ "status": "partial",
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r23.npz",
+  "games": 480,
+  "sims": 1280,
+  "worlds": 1,
+  "budget": 0,
+  "decks": "real",
+  "seed_base": 2606500
  },
- "next_wp_recommended": [
-  "lethal proof node cap x4 (latency + production arena)",
-  "audit verify: opponent's rest of turn on shipping settings (instrument fix)"
- ],
- "notes": [
-  "r22 defense audit (300 games) not run: CPU shared with sections 3/5; section 1 re-read r13d games with r22 only",
-  "section 4 variants built only in a scratch worktree (n1_results/weak_points/lethal/life_deal_port.diff); switch off == mainline on all 12,710 points",
-  "referee r20 (vm_nets/) not available in this container; section 3 used referee r13d only",
-  "environment: installed maturin, pytest, pytest-xdist and opcg_sim/requirements.txt into the container to run make test (no repo change)"
- ]
+ "outputs": {
+  "dirs": [
+   "n_records/n53_w32_p0"
+  ]
+ },
+ "metrics": {
+  "parts_done": 1,
+  "games": 120,
+  "rows": 20187,
+  "dropped": 0,
+  "sec_play_mean": 40.54
+ },
+ "notes": "",
+ "worker": {
+  "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/gen_n53.json",
+  "k": 32,
+  "branch": "claude/n53-w32",
+  "code_commit": "d8105739c851f0c64f7a213c90be1ef5445e5796"
+ }
 }
