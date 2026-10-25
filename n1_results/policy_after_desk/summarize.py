@@ -1,7 +1,7 @@
 """周ごとの行（*.jsonl）→ 報告の表（markdown）と RESULT.json の数字。1 回きり。"""
 import json, glob, os, sys
 D = os.path.dirname(os.path.abspath(__file__))
-ARMS = ["base_scratch", "after_scratch", "base_r24", "after_r24", "after_r24_detach", "after_r24_xrand"]
+ARMS = ["base_scratch", "after_scratch", "base_r24", "after_r24", "after_r24_xrand", "h_base_r24", "h_after_r24", "h_afterres_r24"]
 out = {}
 for a in ARMS:
     f = os.path.join(D, a + ".jsonl")

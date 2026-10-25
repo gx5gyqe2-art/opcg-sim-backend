@@ -1,69 +1,169 @@
 {
- "job": "worker-shallow",
+ "job": "policy-after-desk",
  "status": "done",
- "make_test": "green（cargo test 637 passed＋pytest 831 passed, 62 skipped・77.7 秒）",
- "method": {
-  "chosen": "git clone -q --filter=blob:none --single-branch --branch claude/cpu-spec-improvements-yw91jd",
-  "why": "秒と容量は --depth 1 と同じ（約 13 秒・80 MB）。blob を後で取る木は履歴を全部持つので今の fetch・checkout・push がそのまま動く。--depth 1 は深さを付けずに別のブランチを取ると履歴を根まで取る（波 1 本 9 秒・+73 MB）",
-  "shallow_trees": "履歴を切った木（--depth・環境の履歴 50）でだけ fetch に --depth 1（shell の段は $WORKER_JOB_DEPTH）。全部持つ木には付けない＝深く取った木は今までと同じ",
-  "reuse_env_clone": "採らない（2 つ目の取得はもう 13 秒・0.1 GB。セッションの作業ブランチとの取り合い・環境によって push の中継が違う点の方が重い）"
+ "branch": "claude/policy-after-desk",
+ "spec": "docs/search_efficiency_plan.md §7.53（本線 claude/cpu-spec-improvements-yw91jd @ 18cec8b・台帳 2+421）",
+ "report": "docs/reports/2026-10-25_policy_after_desk.md",
+ "code": [
+  "opcg_sim/learned/train/n_rel_after_desk.py（build＝記録の再生と打った後の盤面・train＝比べる訓練。1 回きりの道具・テストなし）",
+  "n1_results/policy_after_desk/summarize.py",
+  "n1_results/policy_after_desk/oracle_1ply.py"
+ ],
+ "make_test": "green（cargo test 637 passed＋pytest 880 passed, 13 skipped・torch はゲートの環境から外した＝torch のテストは skip）",
+ "material": {
+  "wave": "54（claude/n54-w01〜w08・生成役 r24・1/4 波）",
+  "games": 3840,
+  "replay_diverged": 0,
+  "policy_points": 269169,
+  "candidates": 3347160,
+  "value_rows": 665962,
+  "holdout": "seed % 7",
+  "val_points": 20000,
+  "resolved_variant": "w01〜w04 だけ（窓を Game.resolve_windows で閉じた材料・h_* の組）"
  },
- "fetch_cost": {
-  "before_full_clone": {
-   "sec": 249,
-   "git_mb": 7617,
-   "tree_mb": 8129,
-   "note": "このコンテナで 1 本。§7.51 の 32 本同時では約 10 分・8.2 GB"
+ "final_epoch": {
+  "base_scratch": {
+   "ep": 3,
+   "val_ce": 1.8712,
+   "top1": 0.5077,
+   "mis": 0.092,
+   "mis_order": 0.028,
+   "mis_atk_atk": 0.0364,
+   "train_probe_ce": 1.8553,
+   "val_vmse": 0.612
   },
-  "after_blobless_single_branch": {
-   "sec": 12.8,
-   "git_mb": 81,
-   "tree_mb": 718,
-   "start_line_sec": "10.3〜18.5（試し 11 回）"
+  "after_scratch": {
+   "ep": 3,
+   "val_ce": 1.8586,
+   "top1": 0.5001,
+   "mis": 0.0922,
+   "mis_order": 0.0267,
+   "mis_atk_atk": 0.0349,
+   "train_probe_ce": 1.8436,
+   "val_vmse": 0.5663
   },
-  "depth1_single_branch": {
-   "sec": 13.0,
-   "git_mb": 77,
-   "tree_mb": 713
+  "base_r24": {
+   "ep": 3,
+   "val_ce": 1.8283,
+   "top1": 0.5386,
+   "mis": 0.0822,
+   "mis_order": 0.0242,
+   "mis_atk_atk": 0.0314,
+   "train_probe_ce": 1.8157,
+   "val_vmse": 0.518
   },
-  "treeless_single_branch": {
-   "sec": 13.3,
-   "git_mb": 80,
-   "tree_mb": 716
+  "after_r24": {
+   "ep": 3,
+   "val_ce": 1.8221,
+   "top1": 0.5289,
+   "mis": 0.0833,
+   "mis_order": 0.0235,
+   "mis_atk_atk": 0.0314,
+   "train_probe_ce": 1.8072,
+   "val_vmse": 0.5303
   },
-  "depth50_env_like": {
-   "sec": 11,
-   "git_mb": 79
+  "after_r24_xrand": {
+   "ep": 3,
+   "val_ce": 1.8249,
+   "top1": 0.5241,
+   "mis": 0.0825,
+   "mis_order": 0.023,
+   "mis_atk_atk": 0.0315,
+   "train_probe_ce": 1.81,
+   "val_vmse": 0.5247
   },
-  "wave_branch_fetch": {
-   "depth1_tree_no_depth": "9 秒・+73 MB（3,532 コミット）",
-   "depth1_tree_depth1": "2 秒・+14 MB",
-   "blobless": "fetch 1 秒＋archive 2 秒・+15 MB"
+  "h_base_r24": {
+   "ep": 3,
+   "val_ce": 1.8315,
+   "top1": 0.5325,
+   "mis": 0.0818,
+   "mis_order": 0.0248,
+   "mis_atk_atk": 0.0311,
+   "train_probe_ce": 1.8206,
+   "val_vmse": 0.5428
+  },
+  "h_after_r24": {
+   "ep": 3,
+   "val_ce": 1.827,
+   "top1": 0.5194,
+   "mis": 0.0819,
+   "mis_order": 0.0246,
+   "mis_atk_atk": 0.0291,
+   "train_probe_ce": 1.8133,
+   "val_vmse": 0.5415
+  },
+  "h_afterres_r24": {
+   "ep": 3,
+   "val_ce": 1.8251,
+   "top1": 0.5205,
+   "mis": 0.0808,
+   "mis_order": 0.0241,
+   "mis_atk_atk": 0.0304,
+   "train_probe_ce": 1.8111,
+   "val_vmse": 0.5331
   }
  },
- "trials": {
-  "claude/worker-shallow-trial-gen": "2 局×3 区切り・保存の後で止め home を消して再開 → 全部飛ばして ALL_DONE",
-  "claude/worker-shallow-trial-resume": "区切り 1 の途中で止め home を消して再開 → 区切り 0 を origin から取り戻し 1・2 を回して ALL_DONE",
-  "claude/worker-shallow-trial-train": "教材を別のブランチから取って 1 周＋評価帯 → ALL_DONE",
-  "claude/worker-shallow-trial-arena-w01": "候補を訓練のブランチから取る・2 ペア・done の前で止めて再開 → ALL_DONE",
-  "claude/worker-shallow-trial-audit-w01": "審判 r20 を claude/train-r20 から取る・5 段 → ALL_DONE",
-  "claude/worker-shallow-trial-w01": "壊れたクローン → 浅く取り直し（.git 82 MB）→ ALL_DONE",
-  "claude/worker-shallow-trial-w02": "手元の main に居る → 結果ブランチへ・main は動かない → ALL_DONE",
-  "claude/worker-shallow-trial-w03": "push を拒否させる → PUSH_FAILED（最後）・ALL_DONE なし",
-  "claude/worker-shallow-trial-w04": "届かない push → PUSH_FAILED（最後）→ 戻して再開で ALL_DONE",
-  "claude/worker-shallow-trial-w05": "全部取った 7.6 GB の木 → ALL_DONE・浅くならない（互換）",
-  "claude/worker-shallow-trial-w06": "履歴 50 の浅い木 → --depth 1 で ALL_DONE・再開も ALL_DONE"
+ "diff_after_minus_base_val_ce_ep3": {
+  "scratch": -0.0126,
+  "r24": -0.0062,
+  "r24_xrand": -0.0034,
+  "half_r24": -0.0045,
+  "half_r24_resolved": -0.0064
  },
- "outputs": {
-  "report": "docs/reports/2026-10-25_worker_shallow.md",
-  "code": [
-   "opcg_sim/loop/worker_job.py",
-   "opcg_sim/loop/worker_prompts.py",
-   ".claude/skills/worker-job/SKILL.md",
-   "docs/n_loop_ops.md §7.42 の例・§7.53 の実装と確かめ"
-  ],
-  "trial_specs": "opcg_sim/loop/jobs/trial_shallow*.json",
-  "trial_source_branch": "claude/worker-shallow-trial-src"
+ "oracle_1ply_r24": {
+  "points": 20000,
+  "top1_value_1ply": 0.35055,
+  "top1_when_best_keeps_turn": 0.4135984950282182,
+  "top1_when_best_passes": 0.2709064162045943,
+  "persp": "actor",
+  "mis_all": 0.1545,
+  "mis_atk_atk": 0.04255,
+  "mis_order": 0.03795,
+  "mis_play_play": 0.0137,
+  "mis_other": 0.0603,
+  "mis_unvisited": 0.0119,
+  "pend_self_frac": 0.4754457726063302,
+  "q_corr_within_point_mean": 0.5103645564034636,
+  "q_corr_points": 16839
  },
- "notes": "壊れたクローン（.git だけ）では起動の行の fetch が先に失敗して ~/worker_job.py が書かれない（今までと同じ・直していない。k=1 は実行役のファイルを別に置いて回した。浅い取得で clone が十数秒になり clone 途中で止まる壊れ方は起きにくくなった）; origin のブランチ削除は中継が 403 で断る＝試しの結果ブランチは残る; §7.46 の『手元の途中結果の退避が別のジョブの結果も運ぶ』型は範囲外で直していない; 32 本同時の負荷は測っていない（§7.51 の exit 128 が消えるかは次の本番で見る）; テストは足していない（器の直し）。エンジンを触らないので audit-cross は回していない; このコンテナには pytest が無く、make test の前に pytest・pytest-xdist・fastapi・pydantic・httpx・uvicorn を pip で入れた。62 skipped の理由は確かめていない"
+ "oracle_1ply_r24_resolved": {
+  "points": 19249,
+  "top1_value_1ply": 0.33892669749077875,
+  "top1_when_best_keeps_turn": 0.3348333234649772,
+  "top1_when_best_passes": 0.36822033898305084,
+  "persp": "actor",
+  "mis_all": 0.1503454724920775,
+  "mis_atk_atk": 0.07387396747883007,
+  "mis_order": 0.03543041196945296,
+  "mis_play_play": 0.006493843836043431,
+  "mis_other": 0.034547249207751055,
+  "mis_unvisited": 0.006182139331913346,
+  "pend_self_frac": 0.9166707953494517,
+  "q_corr_within_point_mean": 0.5552357422732792,
+  "q_corr_points": 16212
+ },
+ "forecast_check": {
+  "ce_drop_ge_0.05 (p=0.3)": "外れ（最大 0.013・r24 から 0.006）",
+  "order_mistakes_halved": "該当しない（r24 から 2.42%→2.35%・一から 2.80%→2.67%）",
+  "lt_0.02_and_order_flat => search's job": "該当"
+ },
+ "verdict": "本実装へは進まない（推薦）。壁は入力の中身でもない＝残りは数手先を読む種類で探索の仕事。",
+ "cost_estimate": {
+  "forward_ratio_L12": "×6.4（候補ごとに胴体 0.31M MAC）",
+  "move_time": "×3.3〜×5.5（中心 ×5）＝対戦 API 0.24 秒→約 1.2 秒。根だけで使う形なら ×1.01 前後・上位 4 本だけなら ×2.3 前後",
+  "generation": "教材作りも同じ比＝波 54（約 1.7 時間）→約 8.5 時間、または同じ時間で 1/5 の局",
+  "training": "torch 1 周 約 200 秒→約 830 秒（×4.2）・打った後の盤面は 1/4 波で 4.0 GB（全波 16 GB・memmap 前提）"
+ },
+ "notes": [
+  "局の再生は reanalyze.py の打ち直し（探索を回す）ではなく、記録の sig／pol_k／forced_sig から実対局に出た原始手を組み直して当てた。各行で encode が記録の scalars／tokens とビット一致することを確かめ、3,840 局で外れ 0。",
+  "対象選択（RESOLVE_EFFECT_SELECTION）は legal_json が既定の 1 本しか返さないので、その形に記録の selected_uuids／accepted を写した。",
+  "打った後の盤面は fork_world(席, 'fair') で作った（打った後に引く・覗く札は本物を見せない）。本物の盤面からだと選んだ候補の後が記録の次の行と全部一致し、公平な世界では山札を見る効果の後だけ違う（5 局 73 本中 18 本）。",
+  "打った後の頭の比較相手（今の頭）は同じ材料・同じ点（全候補で盤面が作れた点＝全点）・同じ周数。トークンの対は全組 factor_pairs・fast_max（値は丸めの範囲で同じ）。",
+  "§7.52 の数字は波 53 の前半・この報告は波 54 の 1/4 なので、水準（1.85 前後）は直接は並ばない。同じ材料の今の頭と並べて読んだ。",
+  "打った後に決める席から符号化して価値の符号を返す版（build --persp pending）は w01 だけで一手先の計器だけ測った（1 位一致 0.337 対 0.344＝良くならない）。訓練の組は回していない。",
+  "h_after_r24 の 1 回目は同時に回した組とのメモリの取り合いで落ちた（ログ空・OOM と推定）ので、単独で回し直した（--threads 2・値は 1 スレッドと丸めの範囲で同じ）。",
+  "torch 2.14.1+cu130（CPU 版の配布元はプロキシで 403）を入れたままだと test_grads_match_numpy が 5.5e-3 で落ちる（2026-10-16 の r11 の記録と同じ既知の件）。訓練の後に torch を外してゲートを回した。pip uninstall の残りの空の torch ディレクトリはスクラッチへ退避した。",
+  "道具は learned/train に置いたが tests/scripts ではないので docs/TEST_SPEC.md の表には足していない（§7.52 の n_rel_attn_desk.py と同じ扱い）。",
+  "材料（data/n_records・data/after*・4 GB 超）は push していない。build で作り直せる（3,840 局で 4 プロセス 10 分）。"
+ ]
 }
