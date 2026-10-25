@@ -1,7 +1,7 @@
 {
  "job": "arena-r24p-w08",
  "role": "arena",
- "status": "error",
+ "status": "partial",
  "inputs": {
   "candidate": "nrel_r24.npz (claude/train-r24)",
   "baseline": "nrel_r23.npz",
@@ -9,10 +9,14 @@
   "pairs": 84
  },
  "outputs": {
-  "files": []
+  "files": [
+   "arena_r24p/r24p_real_w08.jsonl"
+  ]
  },
- "metrics": {},
- "notes": "error: 失敗（2）: make rust-develop\n（ログ /root/build.log）",
+ "metrics": {
+  "arena_r24p/r24p_real_w08.jsonl": 21
+ },
+ "notes": "",
  "worker": {
   "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/arena_r24p.json",
   "k": 8,
