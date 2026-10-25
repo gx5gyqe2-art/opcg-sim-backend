@@ -2,13 +2,13 @@
  "kind": "gen",
  "section": "§7.53",
  "ledger_grep": "7.53 WP `worker-shallow`",
- "about": "試し: 浅い取得（1 局 × 1 区切り・32 回・§7.46 の型 k=1〜5）",
+ "about": "試し: 浅い取得（1 局 × 1 区切り・32 回・§7.46 の型 k=1〜4・深い木 k=5・履歴 50 の木 k=6）",
  "job": "trial-shallow-w{K}",
  "branch": "claude/worker-shallow-trial-w{K}",
  "base": {
   "branch": "claude/cpu-spec-improvements-yw91jd"
  },
- "shards": 5,
+ "shards": 6,
  "hours": 0.2,
  "vars": {
   "BASE": "9970000 + k*1000"
