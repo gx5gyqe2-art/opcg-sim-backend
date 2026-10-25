@@ -13834,9 +13834,9 @@
   },
   "OP15-003": {
    "ast_sha": "8385fe718d08da57",
-   "note": "全句一致 [厳格レビュー]",
-   "probe_sha": "09c77a9560c06814",
-   "reviewed": "2026-10-01",
+   "note": "全句一致 [厳格レビュー]。2026-10-25 再確認（defect-hunt-2）: NOT_FIRED は rs-unpayable-activate（2026-10-24）で相手のレストのドン!!が 0 の汎用盤面では起動が合法手に出なくなったため（実局 492 局で起動 2〜5 回・付与あり）",
+   "probe_sha": "2c038f07ee0aa196",
+   "reviewed": "2026-10-25",
    "text_sha": "b16f7da4032d09e6",
    "verdict": "ok"
   },
@@ -13938,9 +13938,9 @@
   },
   "OP15-017": {
    "ast_sha": "30c758129d4376b4",
-   "note": "全句一致 [厳格レビュー]",
-   "probe_sha": "c9c2c09b2614b025",
-   "reviewed": "2026-10-01",
+   "note": "全句一致 [厳格レビュー]。2026-10-25 再確認（defect-hunt-2）: NOT_FIRED は rs-unpayable-activate（2026-10-24）で相手のレストのドン!!が 0 の汎用盤面では起動が合法手に出なくなったため（実局 492 局で起動 2〜5 回・付与あり）",
+   "probe_sha": "1eb955a601a5618f",
+   "reviewed": "2026-10-25",
    "text_sha": "7da79fd732cc5a13",
    "verdict": "ok"
   },
@@ -13986,9 +13986,9 @@
   },
   "OP15-023": {
    "ast_sha": "5cf1666e74931384",
-   "note": "全句一致 [厳格レビュー]",
-   "probe_sha": "7242c5469d65285f",
-   "reviewed": "2026-10-01",
+   "note": "全句一致 [厳格レビュー]。2026-10-25 再確認（defect-hunt-2）: NOT_FIRED は rs-unpayable-activate（2026-10-24）で相手のレストのドン!!が 0 の汎用盤面では起動が合法手に出なくなったため（実局 492 局で起動 2〜5 回・付与あり）",
+   "probe_sha": "af580a94ce1677d2",
+   "reviewed": "2026-10-25",
    "text_sha": "89880caf1eb32dce",
    "verdict": "ok"
   },
@@ -15330,9 +15330,9 @@
   },
   "OP16-084": {
    "ast_sha": "49601e39d65ee1ee",
-   "note": "全句一致。コスト自身トラッシュのcost_min=20は自キャラのコスト条件として正（FIRED_EMPTYはプローブの自キャラ<20による）・条件はコスト後でBranchに残る [厳格レビュー]",
-   "probe_sha": "6bb62d5011041d43",
-   "reviewed": "2026-10-01",
+   "note": "全句一致。コスト自身トラッシュのcost_min=20は自キャラのコスト条件として正。2026-10-25 再確認（defect-hunt-2）: NOT_FIRED は rs-unpayable-activate（2026-10-24）で今のコストが 20 未満なら起動が合法手に出なくなったため（プローブの自キャラはコスト<20）。任意（できる）はコストの cost_optional 相当＝起動しないことで表現 [厳格レビュー]",
+   "probe_sha": "1eb955a601a5618f",
+   "reviewed": "2026-10-25",
    "text_sha": "0fe9ce57dc488743",
    "verdict": "ok"
   },
