@@ -1,147 +1,32 @@
 {
- "job": "policy-oracle-hand-desk",
+ "job": "league-gen",
  "status": "done",
- "branch": "claude/policy-oracle-hand-desk",
- "spec": "docs/search_efficiency_plan.md §7.54（本線 claude/cpu-spec-improvements-yw91jd @ fc3ed8c・台帳 2+426）",
- "report": "docs/reports/2026-10-25_policy_oracle_hand_desk.md",
- "code": [
-  "opcg_sim/learned/train/n_rel_oracle_hand_desk.py（build＝記録の再生と相手の本当の手札の列・train＝比べる訓練。1 回きりの道具・テストなし）",
-  "n1_results/policy_oracle_hand_desk/summarize.py",
-  "n1_results/policy_oracle_hand_desk/value_probe.py"
- ],
- "make_test": "green（cargo test 637 passed＋pytest 880 passed, 13 skipped・torch はゲートの前に外した。1 回目は他の処理が無い状態でも journal::tests::undo_is_faster_than_cloning_the_state〔時間比べ・3.9 倍〕が落ち、回し直しで green）",
- "material": {
-  "wave": "54（claude/n54-w01〜w08・生成役 r24・1/4 波・§7.53 と同じ材料）",
-  "games": 3840,
-  "replay_diverged": 0,
-  "value_rows": 665962,
-  "policy_points": 269169,
-  "holdout": "seed % 7",
-  "val_points": 20000,
-  "val_points_def": 338,
-  "hand_cols": 18,
-  "note_def": "守り（決める席が手番でない）の方策点は 1.2% で、引き直し（MULLIGAN/KEEP_HAND）と効果の対象選択だけ。カウンター・ブロックの窓は記録に訪問分布が無い"
+ "section": "docs/search_efficiency_plan.md §7.56",
+ "branch": "claude/league-gen",
+ "base": "claude/cpu-spec-improvements-yw91jd@daf3abf",
+ "report": "docs/reports/2026-10-25_league_gen.md",
+ "ops_doc": "docs/n_loop_ops.md §7.58",
+ "changes": {
+  "record_gen": "--opp-pool name:weight,...（seed で決まる引き・学ぶ側の席は seed の偶奇で交互・相手も同じ探索の設定）・列 seat_net／learner・meta に nets／learner_seat／opp_pool／opp_games（集団なしでは何も足さない）",
+  "dump_io": "load_dump(pi_rows='all'|'learner')",
+  "n_rel_train": "train --pi-rows {all,learner}（既定 all）",
+  "tests": ["tests/test_league_gen.py", "tests/test_dump_io.py::test_pi_rows_learner_keeps_only_learner_seats"]
  },
- "r24_before": {
-  "val_ce": 1.8508,
-  "top1": 0.54,
-  "mis": 0.0853
+ "checks": {
+  "default_bit_identical": "本線の record_gen と 4 局（seed 9960000〜・回数 32・real）で 31 列すべてバイト一致・meta 一致（sec 除く）",
+  "trial_pool_20": {"seeds": "9961000-9961019", "pool": "r24:0.5,r23:0.2,r22:0.15,r13d:0.15", "games_match_opp_draw": 20, "learner_seat": {"p1": 10, "p2": 10},
+                    "opp_games": {"r24": 8, "r23": 3, "r22": 6, "r13d": 3}, "rows": 3834, "row_mark_mismatch": 0,
+                    "pi_points_all": 1463, "pi_points_learner": 1077, "non_learner_in_learner_set": 0, "value_rows": 3834},
+  "train_smoke": "n_rel_train --pi-rows learner --backend numpy 1 周が完走",
+  "make_test": "green（883 passed, 13 skipped・76 秒）",
+  "audit_cross": "不要（rust/・パーサ不変）"
  },
- "final_epoch": {
-  "base_scratch": {
-   "ep": 3,
-   "val_ce": 1.8693,
-   "top1": 0.505,
-   "mis": 0.0924,
-   "mis_atk_atk": 0.0348,
-   "mis_order": 0.0293,
-   "mis_play_play": 0.0095,
-   "val_atk_ce": 1.8883,
-   "val_def_ce": 0.7634,
-   "train_probe_ce": 1.8531,
-   "val_vmse": 0.621,
-   "val_vmse_def": 0.6197
-  },
-  "true_scratch": {
-   "ep": 3,
-   "val_ce": 1.8849,
-   "top1": 0.5004,
-   "mis": 0.0969,
-   "mis_atk_atk": 0.0357,
-   "mis_order": 0.03,
-   "mis_play_play": 0.0101,
-   "val_atk_ce": 1.9042,
-   "val_def_ce": 0.7628,
-   "train_probe_ce": 1.8669,
-   "val_vmse": 0.6996,
-   "val_vmse_def": 0.7114
-  },
-  "shuffle_scratch": {
-   "ep": 3,
-   "val_ce": 1.8805,
-   "top1": 0.5027,
-   "mis": 0.095,
-   "mis_atk_atk": 0.037,
-   "mis_order": 0.0294,
-   "mis_play_play": 0.0094,
-   "val_atk_ce": 1.8997,
-   "val_def_ce": 0.763,
-   "train_probe_ce": 1.8676,
-   "val_vmse": 0.5602,
-   "val_vmse_def": 0.5644
-  },
-  "base_r24": {
-   "ep": 3,
-   "val_ce": 1.8284,
-   "top1": 0.5382,
-   "mis": 0.0818,
-   "mis_atk_atk": 0.0314,
-   "mis_order": 0.0243,
-   "mis_play_play": 0.0088,
-   "val_atk_ce": 1.8467,
-   "val_def_ce": 0.7626,
-   "train_probe_ce": 1.816,
-   "val_vmse": 0.5247,
-   "val_vmse_def": 0.5312
-  },
-  "true_r24": {
-   "ep": 3,
-   "val_ce": 1.829,
-   "top1": 0.5393,
-   "mis": 0.0816,
-   "mis_atk_atk": 0.0307,
-   "mis_order": 0.0252,
-   "mis_play_play": 0.0089,
-   "val_atk_ce": 1.8473,
-   "val_def_ce": 0.7627,
-   "train_probe_ce": 1.8161,
-   "val_vmse": 0.5571,
-   "val_vmse_def": 0.5684
-  },
-  "shuffle_r24": {
-   "ep": 3,
-   "val_ce": 1.8291,
-   "top1": 0.537,
-   "mis": 0.0818,
-   "mis_atk_atk": 0.0311,
-   "mis_order": 0.0247,
-   "mis_play_play": 0.0086,
-   "val_atk_ce": 1.8475,
-   "val_def_ce": 0.7627,
-   "train_probe_ce": 1.8154,
-   "val_vmse": 0.5231,
-   "val_vmse_def": 0.5325
-  }
- },
- "diff_val_ce_ep3": {
-  "true_minus_base_r24": 0.0006,
-  "true_minus_shuffle_r24": -0.0001,
-  "true_minus_base_scratch": 0.0156,
-  "true_minus_shuffle_scratch": 0.0044
- },
- "value_probe_frozen_r24_linear": {
-  "lin_v": 0.5054,
-  "lin_v+hand": 0.5047,
-  "lin_v+shuffle": 0.5054,
-  "lin_v+hand+hand*v": 0.5044
- },
- "value_probe_def": {
-  "lin_v": 0.519,
-  "lin_v+hand": 0.5179,
-  "lin_v+shuffle": 0.519
- },
- "forecast_check": {
-  "policy_drop_ge_0.05_p0.5": "外れ（r24 から +0.0006・一から 混ぜた列比 +0.0044）",
-  "value_drops_clearly": "外れ（凍結した胴体の上の線形で −0.0007＝0.14%）",
-  "rule": "0.02 未満＝この線（方策の頭に見立ての列）を閉じる"
- },
- "reading": "方策の教師（訪問分布）は公平な世界（reveal=fair・世界 1 本）で読む探索が作る＝相手の本当の手札を知らない。教師の分布は公開情報とその席が知る札の関数なので、本当の手札を見せても方策の誤差の上限は定義の上で 0（実測 0.000）。+76.5 Elo（相手の手札を見て読む探索・2026-10-21_reveal_arena）は探索側の伸びしろで、公平な教師を真似るネットの一目には移らない。",
- "next": "第 2 段を「方策の頭に推測の列を足す」形でやるのはやめる。推測は探索の世界の引き直し（相手の手札を推測の分布で引く）か窓の配り直しに入れ、アリーナで測る（天井 +76.5）。",
  "notes": [
-  "予告の 5 割は『本当の最善手が手札で変わる』見込みで、『教師の分布が手札で変わる』見込みではなかった（数を見た後に気づいた・報告の読み 1〜2）",
-  "一からの組は足した重みを乱数で始めるので、混ぜた列でも今の入力より +0.011 悪い（列を足す手間）。比べるのは本当の手札 − 混ぜた列",
-  "価値は 1/4 波（約 3,300 局）では局ごとに覚え込むので、一緒に訓練した価値の誤差は周ごとに上がり、本当の手札の組が最も悪化した（指紋として覚え込みを速める）。凍結した胴体の上の線形の探りで読んだ",
-  "守りの応手（カウンター・ブロック）の方策は記録に無く測れない。測るなら窓の候補と Q を記録に書き出す必要がある",
-  "torch 2.14.1+cu130（CPU 版の配布元はプロキシで 403）を PyPI から入れて訓練し、ゲートの前に外した（§7.53 と同じ既知の件）"
+  "「学ぶ側の行」はネットで決めた: learner=1 は学ぶ側のネットが打った席。集団に r24 自身が入って引かれた局は両席とも 1（今の自己対戦と同じ教材）。席で絞りたいときは learner_seat から作れる",
+  "学ぶ側の席は seed の偶奇（偶数 p1）で交互・相手の引きとは独立",
+  "試しの seed 帯は仕様に無かったので 9960000〜9961019 を使った（記録はブランチに積まず meta だけ n1_results/league_gen/）",
+  "--reanalyze-mult と --opp-pool の併用は断る（相手の席の点を学ぶ側で深読みすると教師の意味が変わる）",
+  "1 局の時間は試しでは測っていない（相手も同じ回数を読む＝大きくは変わらない見込み・波の RESULT.json で確認）",
+  "torch がコンテナに無かったので訓練の通しは numpy backend（読み込みは backend 非依存）"
  ]
 }

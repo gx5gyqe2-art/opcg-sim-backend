@@ -900,8 +900,11 @@ def train(args):
     ptab = NR.profile_table(db, vocab)
     rt = NR.RelTable(ptab)
     ptab_ret = np.array([(p["ret_don"] if p else 0.0) for p in ptab], np.float32)
+    pi_rows = getattr(args, "pi_rows", "all") or "all"
     V, P, C = DIO.load_dump(_expand(args.src), vocab, z_dirs=_expand(args.zsrc),
-                            cache_dir=args.cache_dir, n_tok=N_TOK)
+                            cache_dir=args.cache_dir, n_tok=N_TOK, pi_rows=pi_rows)
+    if pi_rows != "all":
+        print(f"pi-rows {pi_rows}: 方策点 {len(P['row'])}（価値の行は全部 {len(V['z'])}）", flush=True)
     if args.zsrc:
         print(f"z専用 dir {len(_expand(args.zsrc))} 本を合流（π は読まない）", flush=True)
     z_mode = getattr(args, "z_mode", "z") or "z"
@@ -1171,6 +1174,9 @@ def main(argv=None):
     tr = sub.add_parser("train")
     tr.add_argument("--in", dest="src", nargs="+", required=True, help="dump v2 のディレクトリ（glob 可）")
     tr.add_argument("--z-in", dest="zsrc", nargs="*", default=[], help="z 専用（π を読まない）dump v2")
+    tr.add_argument("--pi-rows", choices=DIO.PI_ROWS, default="all",
+                    help="方策の教師に使う行（§7.56）: all＝全部の席（既定・今まで）／learner＝相手の集団の波で"
+                         "学ぶ側のネットが打った席の行だけ（learner 列の無い波は全部）。価値の教師はどちらでも全部の行")
     tr.add_argument("--z-mode", choices=Z_MODES, default="z",
                     help="価値の教師（§7.16・WP omni-value）: z＝勝敗（**既定・今までと 1 bit も変わらない**）／"
                          "omni＝全部見える探索の根の評価 v_omni／mix＝0.5 z + 0.5 v_omni。v_omni の無い行は z のまま")
