@@ -1,0 +1,1 @@
+{"points": 20000, "top1_value_1ply": 0.35055, "mis_all": 0.1545, "mis_atk_atk": 0.04255, "mis_order": 0.03795, "mis_play_play": 0.0137, "mis_other": 0.0603, "mis_unvisited": 0.0119, "pend_self_frac": 0.4754457726063302, "q_corr_within_point_mean": 0.5103645564034636, "q_corr_points": 16839}

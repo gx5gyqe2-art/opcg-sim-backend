@@ -107,12 +107,20 @@ def _world_seed(seed, step):
 
 
 def build_file(args):
-    """1 シャード（`n_record_*.npz`）→ `after_*.npz`。戻り値は数え上げ。"""
-    path, out_path = args
+    """1 シャード（`n_record_*.npz`）→ `after_*.npz`。戻り値は数え上げ。
+
+    `persp`＝"actor"（打った席から符号化・既定）／"pending"（打った後に決める席から符号化。相手へ移った候補は
+    相手の席から見た盤面になり、`a_pend=0` が「符号化の席＝相手」の印。価値は訓練側で符号を返す）。
+    """
+    path, out_path = args[:2]
+    persp = args[2] if len(args) > 2 else "actor"
+    resolve = bool(args[3]) if len(args) > 3 else False
     from opcg_sim.loop import decks as D
     from opcg_sim.loop import driver as DR
     from opcg_sim.loop import engine as E
     E.load_net(None)                         # 符号化の語彙（ネット付属の vocab_ids）
+    # `resolve`＝候補を当てた後の戦闘・対話の窓を、探索が葉を評価する前に閉じる規則で閉じる（`Game.resolve_windows`）
+    spec = _G_DB.setdefault("spec", E.SeatSpec(None, sims=160)) if resolve else None
     db = _G_DB.setdefault("db", D.load_db())
     d = os.path.dirname(path)
     gm = {int(g["seed"]): g for g in json.load(open(os.path.join(d, "meta_games.json")))["games"]}
@@ -172,8 +180,10 @@ def build_file(args):
                     try:
                         w = game.fork_world(name, "fair", wseed)
                         w.apply_search_move(name, json.dumps(mv, ensure_ascii=False))
-                        ea = json.loads(w.encode(name))
+                        if resolve and w.winner() is None:
+                            w.resolve_windows(spec.decide_opts(int(sd), int(z["turn"][i]), name, None))
                         pn = (json.loads(w.pending_json()) or {}).get("player_id")
+                        ea = json.loads(w.encode(pn if (persp == "pending" and pn) else name))
                         win = w.winner()
                     except Exception:                          # noqa: BLE001
                         good = False
@@ -218,6 +228,8 @@ def cmd_build(argv):
     ap.add_argument("--in", dest="src", nargs="+", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--persp", choices=("actor", "pending"), default="actor")
+    ap.add_argument("--resolve", action="store_true", help="候補を当てた後の窓を葉の規則で閉じてから符号化する")
     args = ap.parse_args(argv)
     from opcg_sim.learned.train import dump_io as DIO
     from opcg_sim.learned.train import n_rel_train as NT
@@ -228,7 +240,7 @@ def cmd_build(argv):
             if os.path.exists(op):
                 continue
             os.makedirs(os.path.dirname(op), exist_ok=True)
-            jobs.append((f, op))
+            jobs.append((f, op, args.persp, args.resolve))
     print(f"build {len(jobs)} shards", flush=True)
     log = open(os.path.join(args.out, "build_log.jsonl"), "a")
     t0 = time.time()
@@ -289,8 +301,9 @@ def _make_classes():
     class TorchNRelAfter(TT.TorchNRel):
         """`TorchNRel` の方策だけを差し替えたもの（`after=False` なら今の頭そのもの）。"""
 
-        def __init__(self, net, after=False, x_scale=0.0, seed=13, detach=False):
+        def __init__(self, net, after=False, x_scale=0.0, seed=13, detach=False, persp_pending=False):
             super().__init__(net)
+            self.persp_pending = bool(persp_pending)
             self.after = bool(after)
             self.detach = bool(detach)
             self.factor_pairs = True        # R を遮断した式（値は丸めの範囲で同じ・全組で同じ）
@@ -321,6 +334,8 @@ def _make_classes():
                     ha, pa = self.tokens_forward(a_ci, a_tok, None, None, tab)
                     ea = self.body(a_sc, ha, pa)
                 va = torch.tanh((ea @ self.Wv + self.bv)[:, 0])
+                if self.persp_pending:      # 相手の席から符号化した候補は、価値の符号を返して打った席から見る
+                    va = torch.where(a_pend > 0, va, -va)
                 x = torch.cat([ea, ea - e[b.seg], va[:, None], a_pend[:, None], a_win[:, None]], 1)
                 pre = pre + x @ self.Wp1a
             return (torch.relu(pre) @ self.Wp2 + self.bp2)[:, 0]
@@ -453,6 +468,7 @@ def cmd_train(argv):
     ap.add_argument("--train-probe", type=int, default=8000)
     ap.add_argument("--x-scale", type=float, default=None, help="Wp1a の初期値の大きさ（既定: r24 から＝0・一から＝1）")
     ap.add_argument("--detach", action="store_true", help="打った後の盤面の胴体へ勾配を流さない")
+    ap.add_argument("--persp-pending", action="store_true", help="`build --persp pending` の材料（価値の符号を返す）")
     ap.add_argument("--threads", type=int, default=0)
     ap.add_argument("--cache-dir", default=None)
     ap.add_argument("--out-json", required=True)
@@ -489,7 +505,8 @@ def cmd_train(argv):
     tail = NT.cand_tail_all(net, C)
     src = AfterBatches(V, P, C, ptr, C["budget"], tail, rt, net.ablate, after=A)
     xs = args.x_scale if args.x_scale is not None else (0.0 if args.warm_start else 1.0)
-    tn = TorchNRelAfter(net, after=(args.head == "after"), x_scale=xs, seed=args.seed, detach=args.detach)
+    tn = TorchNRelAfter(net, after=(args.head == "after"), x_scale=xs, seed=args.seed, detach=args.detach,
+                        persp_pending=args.persp_pending)
     n_par = sum(p.numel() for p in tn.parameters())
     opt = torch.optim.Adam(tn.parameters(), lr=args.lr)
     print(f"head {args.head} params {n_par}（足した {tn.Wp1a.numel() if tn.after else 0}） warm {args.warm_start}",
@@ -510,6 +527,7 @@ def cmd_train(argv):
             vm = float(np.mean((src.eval_value(tn, vi) - np.asarray(V["z"][vi], np.float32)) ** 2))
         tn.train()
         row = {"ep": ep, "head": args.head, "warm": bool(args.warm_start), "lr": args.lr, "detach": args.detach,
+               "persp_pending": args.persp_pending, "after_root": args.after,
                "x_scale": xs if tn.after else None,
                "wp1a_norm": float(tn.Wp1a.detach().norm()) if tn.after else None,
                "train_ce_run": train_ce, "train_mse_run": train_mse, "train_probe": pr, "val": ev,
