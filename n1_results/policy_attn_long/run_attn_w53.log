@@ -43,3 +43,4 @@ ATTN_DESK_EPOCH {"ep": 12, "head": "attn", "warm": false, "lr": 0.0005, "x_scale
   ep13 step 5000/11357 mse 0.1071 ce 1.7936 10550s
   ep13 step 10000/11357 mse 0.1071 ce 1.7936 10862s
 ATTN_DESK_EPOCH {"ep": 13, "head": "attn", "warm": false, "lr": 0.0005, "x_scale": 1.0, "wp1x_norm": 10.420517921447754, "wp1_norm": 29.12296485900879, "train_ce_run": 1.7930567109125657, "train_mse_run": 0.10725851772875382, "train_probe": {"ce": 1.7794928886838939, "top1": 0.563, "n": 8000, "mis_all": 0.059625, "mis_atk_atk": 0.02225, "mis_order": 0.01925, "mis_play_play": 0.006, "mis_other": 0.012125, "mis_unvisited": 0.00175}, "val": {"ce": 1.8393199466376255, "top1": 0.5387, "n": 20000, "mis_all": 0.0688, "mis_atk_atk": 0.0269, "mis_order": 0.0188, "mis_play_play": 0.0088, "mis_other": 0.0143, "mis_unvisited": 0.0023}, "val_vmse": 0.9987677931785583, "sec": 719.1, "wall": 10956.0}
+  ep14 step 5000/11357 mse 0.1011 ce 1.7889 11318s
