@@ -21,11 +21,12 @@ seed・ブランチ名・コマンドの引数は全部ジョブ定義と実行�
 1. 起動（指示文の 2 行。`<名前>` と `<k>` は指示文のとおり）:
 
    ```bash
-   cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend \
+   cd ~ && ([ -d opcg-sim-backend ] || git clone -q --filter=blob:none --single-branch --branch claude/cpu-spec-improvements-yw91jd https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend \
      && git fetch -q origin claude/cpu-spec-improvements-yw91jd && git show FETCH_HEAD:opcg_sim/loop/worker_job.py > ~/worker_job.py
    nohup python ~/worker_job.py --job <名前> --k <k> > ~/worker_job.out 2>&1 &
    ```
 
+   取得は浅い（本線だけ・中身は要るときだけ取る＝十数秒・約 0.1 GB・§7.53）。既に `~/opcg-sim-backend` が在れば取らない（深く取った木もそのまま使える）。
    実行役は本線から取り出した 1 ファイル（`~/worker_job.py`）で動く＝作業中にリポジトリのブランチが替わっても本体は変わらない。
    最初に出どころの照合（CLAUDE.md の「N系ループの分散運用」と台帳の節が本線に在ること）をして、無ければ `WORKER_JOB_ERROR` で止まる。
    その前に作業の木（`~/opcg-sim-backend`）を確かめ、壊れたクローン（途中で止まった clone・origin が違う）なら
