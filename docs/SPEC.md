@@ -1342,6 +1342,19 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
 （木の中の戦闘は箱で既定解決＝発動確認の分岐が効くのは根の判断点）。アリーナは `--cand-confirm-trigger-legacy`（候補席）・
 `arena_shard --confirm-trigger-legacy`（基準席）、器は `defense_audit.py`／`rs_decide_latency.py` の `--confirm-trigger-legacy`。
 
+**守りの窓で相手から見た詰みの証明を使う**（2026-10-25・WP `rs-defense-proof`・`search_efficiency_plan.md` §7.51・opts の `defense_proof`・
+**測定用・既定 off＝1 bit も変わらない**・`decide.rs::defense_pick`）: 相手の手番の窓（戦闘の応手・効果の対話）で、自分のライフが
+`defense_proof_life`（既定 2）以下、かつ値の出た候補が 2 つ以上で**値が平ら**（最大−最小 ≤ `defense_proof_flat`・既定 0.02）か
+**張り付き**（全部 |値| ≥ `defense_proof_sat`・既定 0.85）のときだけ、値の高い候補から順に（同点は若い方）窓の世界 0 に当てた盤面で
+**相手の側から**このターンの詰みを証明し（`lethal.rs::prove_each`・配り方 8 通り〔`make_deals`〕の全部で相手が勝てば「証明」・
+判定不能と節点の上限は「証明されない」側）、証明されなかった最初の候補を打つ＝「どの配り方でも相手が勝つ候補を外して値で選ぶ」。
+全部が証明されたら今の選び方のまま。配り方の視点は `defense_proof_view`（既定 `mine`＝自分の視点: 自分に見えない札〔相手の手札・山札・
+裏向きのライフ・自分の山札・裏向きのライフ〕を配り直し、自分の手札は本物のまま。`opp`＝指示書の字面: 相手の知らない札〔自分の手札など〕を
+配り直し、相手の札は窓の世界 0 のまま）。節点は候補 1 つ `defense_proof_nodes`（既定 20,000）・窓 1 つ `defense_proof_total`（既定 80,000）。
+決定の出力に `defense_proof`（`flat`／`sat`／証明された候補 `proven`／`pick`／`was`／`all_proven`／`nodes`／`view`）が載る（対象の窓だけ）。
+アリーナは `--cand-defense-proof`（候補席）、器は `defense_audit.py --defense-proof`・`rs_decide_latency.py --extra '{"defense_proof": true}'`。
+計測（守りの再監査の局面・費用）は `docs/reports/2026-10-25_defense_proof.md`。
+
 ---
 
 ## 3. カード効果システム

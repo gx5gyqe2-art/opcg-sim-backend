@@ -17,6 +17,15 @@ os.environ.setdefault("OPCG_LOG_SILENT", "1")
 from opcg_sim.loop import decks as D, driver as DR, engine as E  # noqa: E402
 
 
+def _dfp_summary(rows):
+    """守りの証明（§7.51）を回した窓の数・手を替えた数・全部証明された数・節点の平均と最大。"""
+    nodes = sorted(r["nodes"] for r in rows)
+    return {"windows": len(rows), "changed": sum(r["pick"] != r["was"] for r in rows),
+            "all_proven": sum(bool(r["all_proven"]) for r in rows),
+            "nodes_mean": round(statistics.mean(nodes), 1), "nodes_p99": nodes[int(len(nodes) * 0.99)],
+            "nodes_max": nodes[-1]}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--sims", type=int, default=E.PLAY_SIMS)
@@ -83,11 +92,14 @@ def main(argv=None):
     know = []
     leth = []
     kinds = {}
+    dfp = []
 
     def obs(game, name, turn, step, out, move):
         now = time.perf_counter()
         ts.append(now - last[0])
         kinds[out.get("kind")] = kinds.get(out.get("kind"), 0) + 1
+        if out.get("defense_proof"):
+            dfp.append(out["defense_proof"])   # 守りの証明（§7.51）を回した窓
         if a.knowledge:
             know.append(json.loads(game.knowledge_json(name)))
         if a.lethal_proof:
@@ -125,7 +137,8 @@ def main(argv=None):
                       "max": round(ts[-1], 2), "wall_sec": round(time.perf_counter() - t0, 1),
                       "affinity": sorted(os.sched_getaffinity(0)),
                       **({"lethal_proof": a.lethal_proof, "lethal": _lethal_summary(leth)} if a.lethal_proof else {}),
-                      **({"knowledge": _knowledge_summary(know)} if a.knowledge else {})}))
+                      **({"knowledge": _knowledge_summary(know)} if a.knowledge else {}),
+                      **({"defense_proof": _dfp_summary(dfp)} if dfp else {})}))
 
 
 def _q(vals, f):

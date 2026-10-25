@@ -140,7 +140,53 @@ pub struct DecideOptions {
     /// 短い木で読む窓の世界の本数の上限（`window_tree_worlds`・既定 [`WINDOW_TREE_WORLDS`]）。
     /// 木の費用は「世界の本数 × sims」なので、静的な値の窓の K とは別に抑える（実際は `min(K, これ)`）。
     pub window_tree_worlds: usize,
+    /// 守りの窓で相手から見た詰みの証明を使う（`defense_proof`・§7.51・WP `rs-defense-proof`・**測定用**・既定 false）。
+    /// true なら相手の手番の窓（戦闘の応手・効果の対話）で、自分のライフが [`DecideOptions::defense_proof_life`] 以下かつ
+    /// 候補の値が平ら（差 ≤ [`DecideOptions::defense_proof_flat`]）か張り付き（全部 |値| ≥ [`DecideOptions::defense_proof_sat`]）の
+    /// ときだけ、値の高い候補から順に、当てた後の盤面で**相手の側から**詰みの証明（[`super::lethal::prove_each`]・
+    /// 配り方は [`DecideOptions::defense_proof_view`] の視点で公平に 8 通り）を回し、証明されなかった最初の候補を選ぶ
+    /// （＝どの配り方でも相手が勝つ候補を外して値で選ぶ）。全部が証明されたら今の選び方のまま（[`defense_pick`]）。
+    pub defense_proof: bool,
+    /// 守りの証明の対象にする自分のライフの上限（`defense_proof_life`・既定 2）。
+    pub defense_proof_life: i64,
+    /// 「値が平ら」の差の上限（`defense_proof_flat`・既定 0.02・`2026-10-24_weak_points.md` §1.3）。
+    pub defense_proof_flat: f64,
+    /// 「値が張り付き」の絶対値の下限（`defense_proof_sat`・既定 0.85・同）。
+    pub defense_proof_sat: f64,
+    /// 候補 1 つの証明の節点の上限（`defense_proof_nodes`・既定 [`DEFENSE_PROOF_NODES`]）。
+    pub defense_proof_nodes: u64,
+    /// 1 つの窓の証明の節点の合計の上限（`defense_proof_total`・既定 [`DEFENSE_PROOF_TOTAL`]）。
+    pub defense_proof_total: u64,
+    /// 配り方を誰の視点で作るか（`defense_proof_view`・既定 [`DefenseView::Mine`]）。
+    pub defense_proof_view: DefenseView,
 }
+
+/// 守りの証明の配り方の視点（§7.51）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DefenseView {
+    /// 自分の視点（既定）: 自分に見えない札（相手の手札・山札・裏向きのライフ・自分の山札・裏向きのライフ）を配り直し、
+    /// 自分の手札は本物のまま（知っている札で読む）。攻め手（相手）は配り方ごとに全部見えている読み。
+    #[default]
+    Mine,
+    /// 相手の視点（指示書 §7.51 の字面）: 相手の知らない札（自分の手札・山札・裏向きのライフ）を配り直し、
+    /// 相手の札は窓の世界 0 で引いたまま（[`super::lethal::prove`] と同じ配り方）。
+    Opp,
+}
+
+impl DefenseView {
+    pub fn from_name(s: &str) -> Option<DefenseView> {
+        match s {
+            "mine" => Some(DefenseView::Mine),
+            "opp" => Some(DefenseView::Opp),
+            _ => None,
+        }
+    }
+}
+
+/// 守りの証明の候補 1 つの節点の上限の既定（§7.51・根の証明 [`super::lethal::LETHAL_ROOT_NODES`] と同じ桁）。
+pub const DEFENSE_PROOF_NODES: u64 = 20_000;
+/// 守りの証明の窓 1 つの節点の合計の上限の既定（候補 4 つぶん）。
+pub const DEFENSE_PROOF_TOTAL: u64 = 80_000;
 
 /// 窓の根畳みの世界の本数の既定（§7.42 の 2・WP `rs-window-read` で揺れと費用から決めた）。
 /// blunder-audit の窓の 226 点で、探索の乱数だけを替えると手が変わる率は K=1/2/4/8/16/32/64 で
@@ -269,6 +315,13 @@ impl Default for DecideOptions {
             window_tree_legacy: false,
             window_tree_life: 1,
             window_tree_worlds: WINDOW_TREE_WORLDS,
+            defense_proof: false,
+            defense_proof_life: 2,
+            defense_proof_flat: 0.02,
+            defense_proof_sat: 0.85,
+            defense_proof_nodes: DEFENSE_PROOF_NODES,
+            defense_proof_total: DEFENSE_PROOF_TOTAL,
+            defense_proof_view: DefenseView::Mine,
         }
     }
 }
@@ -373,6 +426,8 @@ pub struct DecideOut {
     pub lethal_reply: Option<super::lethal::ReplyProof>,
     /// 窓の根畳みの読み方（§7.42・`kind="window"` で世界 K 本か短い木のときだけ）: (世界の本数, 短い木か)。
     pub window_read: Option<(usize, bool)>,
+    /// 守りの証明の実績（§7.51・`defense_proof` で対象の窓だったときだけ・[`defense_pick`]）。
+    pub defense_proof: Option<Value>,
 }
 
 /// 1 つの世界の根の統計（§20.7.1・思考ログで「世界によって答えが割れたか」を読む）。
@@ -1028,6 +1083,8 @@ struct WindowPick {
     world: Option<GameState>,
     /// 引いた世界の本数と短い木で読んだか（§7.42・1 本の静的な値なら `None`）。
     read: Option<(usize, bool)>,
+    /// 守りの証明の実績（§7.51・対象の窓だったときだけ）。
+    defense: Option<Value>,
 }
 
 /// Python `_window_choice`（窓では木を回さず、出口 value 最良の 1 手を直接返す）。
@@ -1062,6 +1119,7 @@ fn window_choice(
             q: Vec::new(),
             world: None,
             read: None,
+            defense: None,
         }));
     }
     let window = if battle { Window::Battle } else { Window::Dialog };
@@ -1084,6 +1142,7 @@ fn window_choice(
         let Some(best) = best_branch(&vals) else {
             return Ok(None); // 全枝で解決に失敗＝full-tree へ委ねる（安全側）
         };
+        let (best, defense) = defense_pick(ctx, real, &world, name, opts, &legal, &vals, best)?;
         return Ok(Some(WindowPick {
             mv: legal[best].clone(),
             legal,
@@ -1091,6 +1150,7 @@ fn window_choice(
             q: vals.iter().map(|v| v.unwrap_or(-1.0)).collect(),
             world: Some(world),
             read: None,
+            defense,
         }));
     }
     let seed0 = opts.search_seed.unwrap_or(0);
@@ -1157,6 +1217,7 @@ fn window_choice(
     let Some(best) = best_branch(&avg) else {
         return Ok(None);
     };
+    let (best, defense) = defense_pick(ctx, real, &world, name, opts, &legal, &avg, best)?;
     // 続きを積む世界: 選んだ候補の値が最大の世界（同点は若い方）。
     let mut wbest = 0usize;
     for (wi, (_, v)) in per_world.iter().enumerate() {
@@ -1175,7 +1236,99 @@ fn window_choice(
         q: avg.iter().map(|v| v.unwrap_or(-1.0)).collect(),
         world: Some(world),
         read: Some((k, tree)),
+        defense,
     }))
+}
+
+/// 守りの窓の証明（§7.51・WP `rs-defense-proof`・[`DecideOptions::defense_proof`]）。
+///
+/// 対象（相手の手番・自分のライフ ≤ `defense_proof_life`・値の出た候補が 2 つ以上・平らか張り付き）なら、
+/// 候補を値の高い順（同点は若い方＝[`best_branch`] と同じ）に、窓の世界 0（`world`・自分の視点で引いた世界）へ
+/// 当てた盤面で**相手の側から**このターンの詰みを証明する（[`super::lethal::prove_each`]・配り方は
+/// [`DefenseView`] の視点で公平に 8 通り〔[`super::lethal::make_deals`]〕・全部で相手が勝てば「証明」）。証明されなかった最初の候補を返す＝「どの配り方でも相手が勝つ候補を外して値で選ぶ」と同じ
+/// （判定不能・節点の上限は「証明されない」側）。全部が証明されたら `best` のまま。対象外は `(best, None)`。
+#[allow(clippy::too_many_arguments)]
+fn defense_pick(
+    ctx: &Ctx,
+    real: &GameState,
+    world: &GameState,
+    name: Seat,
+    opts: &DecideOptions,
+    legal: &[Move],
+    vals: &[Option<f64>],
+    best: usize,
+) -> Result<(usize, Option<Value>), EngineError> {
+    if !opts.defense_proof || real.winner.is_some() || real.turn_player == name {
+        return Ok((best, None));
+    }
+    if (real.player(name).life.len() as i64) > opts.defense_proof_life {
+        return Ok((best, None));
+    }
+    let got: Vec<f64> = vals.iter().flatten().copied().collect();
+    if got.len() < 2 {
+        return Ok((best, None));
+    }
+    let hi = got.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let lo = got.iter().copied().fold(f64::INFINITY, f64::min);
+    let flat = hi - lo <= opts.defense_proof_flat;
+    let sat = got.iter().all(|v| v.abs() >= opts.defense_proof_sat);
+    if !flat && !sat {
+        return Ok((best, None));
+    }
+    let mut order: Vec<usize> = (0..vals.len()).filter(|i| vals[*i].is_some()).collect();
+    order.sort_by(|a, b| vals[*b].partial_cmp(&vals[*a]).unwrap_or(std::cmp::Ordering::Equal).then(a.cmp(b)));
+    let opp = name.other();
+    let seed0 = super::lethal::lethal_seed(window_world_seed(opts.search_seed.unwrap_or(0), 0)) ^ 0xDEF0_0000_0000_0000u64;
+    let mut left = opts.defense_proof_total;
+    let mut nodes = 0u64;
+    let mut proven: Vec<usize> = Vec::new();
+    let mut pick = None;
+    let mut s = Session::new(world.clone());
+    for (j, &i) in order.iter().enumerate() {
+        let budget = opts.defense_proof_nodes.min(left);
+        if budget == 0 {
+            pick = Some(i);
+            break;
+        }
+        let seed = seed0 ^ (j as u64 + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        let mv = &legal[i];
+        let r = s.discard_events(|s| {
+            s.transaction(|s| -> Result<(bool, u64), EngineError> {
+                match super::apply::apply_move_inplace(s, ctx.masters, name, mv, true) {
+                    Ok(()) => {
+                        let from = if opts.defense_proof_view == DefenseView::Opp { opp } else { name };
+                        let deals = super::lethal::make_deals(
+                            s.state(),
+                            ctx.masters,
+                            from,
+                            seed,
+                            super::lethal::LETHAL_RAND_DEALS,
+                            opts.lethal_deal_legacy,
+                        )?;
+                        let (per, used) = super::lethal::prove_each(ctx.masters, &deals, opp, budget, true);
+                        Ok((per.len() == deals.len() && per.iter().all(|r| *r == "win"), used))
+                    }
+                    Err(e @ EngineError::Unimplemented(_)) => Err(e),
+                    Err(_) => Ok((false, 0)),
+                }
+            })
+        });
+        let (ok, used) = r?;
+        nodes += used;
+        left = left.saturating_sub(used);
+        if !ok {
+            pick = Some(i);
+            break;
+        }
+        proven.push(i);
+    }
+    let chosen = pick.unwrap_or(best);
+    let info = serde_json::json!({
+        "flat": flat, "sat": sat, "proven": proven, "pick": chosen, "was": best,
+        "all_proven": pick.is_none(), "nodes": nodes,
+        "view": if opts.defense_proof_view == DefenseView::Opp { "opp" } else { "mine" },
+    });
+    Ok((chosen, Some(info)))
 }
 
 /// 短い木で読む戦闘の窓か（§7.42 の 3）: 戦闘中・判断するのが `name` のブロッカー／カウンターの選択・
@@ -1831,6 +1984,7 @@ fn empty_out(kind: &'static str, mv: Option<Move>, carry: DecideCarry, st: &Sear
         lethal: None,
         lethal_reply: None,
         window_read: None,
+        defense_proof: None,
     }
 }
 
@@ -1958,6 +2112,7 @@ fn decide_after_lethal(
                 lethal: None,
                 lethal_reply: None,
                 window_read: pick.read,
+                defense_proof: pick.defense,
             });
         }
     }
@@ -2166,6 +2321,7 @@ fn decide_after_lethal(
         lethal: None,
         lethal_reply: reply,
         window_read: None,
+        defense_proof: None,
     })
 }
 
@@ -2180,6 +2336,10 @@ mod tests_commit_hidden;
 #[cfg(test)]
 #[path = "tests_window_read.rs"]
 mod tests_window_read;
+
+#[cfg(test)]
+#[path = "tests_defense_proof.rs"]
+mod tests_defense_proof;
 
 #[cfg(test)]
 #[path = "tests_overflow_trigger.rs"]

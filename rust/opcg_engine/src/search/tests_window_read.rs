@@ -104,7 +104,7 @@ fn player(name: &str, life: usize, field: Value, hand: Value, active_don: usize)
 }
 
 /// p2 のリーダーが p1 のリーダーへアタックした直後（p1 はブロッカー 1 体・手札にカウンター 2 枚・ライフ `life`）。
-fn attacked(masters: &'static MasterTable, life: usize, blocker: bool) -> GameState {
+pub(super) fn attacked(masters: &'static MasterTable, life: usize, blocker: bool) -> GameState {
     let field = if blocker { json!([card_json(BLOCKER, "p1-blocker", "p1", false)]) } else { json!([]) };
     let hidden = json!({
         "players": {

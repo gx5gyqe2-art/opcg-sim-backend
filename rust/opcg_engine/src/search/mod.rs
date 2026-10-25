@@ -425,6 +425,10 @@ pub fn decide_on_state(
     if let Some((w, tree)) = out.window_read {
         body["window"] = serde_json::json!({"worlds": w, "tree": tree});
     }
+    // 守りの証明（§7.51）は対象の窓だった決定だけに欄を足す（既定 off では鍵ごと出ない）。
+    if let Some(d) = &out.defense_proof {
+        body["defense_proof"] = d.clone();
+    }
     let rollout = quiesce::take_rollout_stats();
     // 詰みの証明（§7.21）は判定した決定だけに欄を足す（既定 off では鍵ごと出ない）。
     if out.lethal.is_some() || out.lethal_reply.is_some() {
@@ -495,6 +499,17 @@ pub fn decide_opts_and_carry(
                 return Err(EngineError::BadPayload(
                     "decide: omniscient と reveal は同時に指定できない".into(),
                 ));
+            }
+        }
+    }
+    // `defense_proof_view`（§7.51）: "mine"／"opp" のほかは黙って既定へ落とさない。
+    match ov.get("defense_proof_view") {
+        None | Some(Value::Null) => {}
+        Some(r) => {
+            if r.as_str().and_then(decide::DefenseView::from_name).is_none() {
+                return Err(EngineError::BadPayload(format!(
+                    "decide: defense_proof_view は \"mine\"／\"opp\" のどれか（{r}）"
+                )));
             }
         }
     }
@@ -664,6 +679,18 @@ fn decide_options_from_json(v: &Value) -> decide::DecideOptions {
             .map(|n| n as usize)
             .filter(|n| *n > 0)
             .unwrap_or(d.window_tree_worlds),
+        // 守りの窓の相手から見た詰みの証明（§7.51・WP `rs-defense-proof`・測定用・既定 false）。
+        defense_proof: flag("defense_proof", d.defense_proof),
+        defense_proof_life: v.get("defense_proof_life").and_then(Value::as_i64).unwrap_or(d.defense_proof_life),
+        defense_proof_flat: v.get("defense_proof_flat").and_then(Value::as_f64).unwrap_or(d.defense_proof_flat),
+        defense_proof_sat: v.get("defense_proof_sat").and_then(Value::as_f64).unwrap_or(d.defense_proof_sat),
+        defense_proof_nodes: v.get("defense_proof_nodes").and_then(Value::as_u64).unwrap_or(d.defense_proof_nodes),
+        defense_proof_total: v.get("defense_proof_total").and_then(Value::as_u64).unwrap_or(d.defense_proof_total),
+        defense_proof_view: v
+            .get("defense_proof_view")
+            .and_then(Value::as_str)
+            .and_then(decide::DefenseView::from_name)
+            .unwrap_or(d.defense_proof_view),
     }
 }
 

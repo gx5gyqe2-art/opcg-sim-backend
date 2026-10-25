@@ -714,6 +714,26 @@ impl Game {
             .and_then(Value::as_array)
             .map(|a| a.iter().cloned().map(crate::search::Move::from_json).collect())
             .unwrap_or_default();
+        // 計測用（§7.51・WP `rs-defense-proof`）: `prove`＝誰の番でも、このターンに `player_id` の勝ちが配り方ごとに
+        // 証明できるか（[`lethal::prove_each`]・根の候補を作らない＝守りの窓の候補を当てた後の盤面を相手の側から読む）。
+        // `true_deal` なら本当の配り方 1 通り。
+        if ov.get("prove").and_then(Value::as_bool).unwrap_or(false) {
+            let state = self.session.state();
+            let t0 = std::time::Instant::now();
+            let (per, used) = py
+                .detach(|| -> Result<(Vec<&'static str>, u64), EngineError> {
+                    // `view`="other"＝配り方を相手（`player_id` の相手）の視点で作る（相手が知っている札は本物のまま）
+                    let from = if ov.get("view").and_then(Value::as_str) == Some("other") { seat.other() } else { seat };
+                    let deals = if true_deal {
+                        vec![state.clone()]
+                    } else {
+                        lethal::make_deals(state, masters, from, seed, rand, deal_legacy)?
+                    };
+                    Ok(lethal::prove_each(masters, &deals, seat, nodes, false))
+                })
+                .map_err(|e| self.map_err(e))?;
+            return to_py_json(&serde_json::json!({"per": per, "nodes": used, "sec": t0.elapsed().as_secs_f64()}));
+        }
         let applies = lethal::applies(&mut self.session, masters, seat);
         let bound = lethal::bound_report(&mut self.session, masters, seat);
         if !applies && !force {
