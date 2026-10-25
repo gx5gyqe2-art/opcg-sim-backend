@@ -1,7 +1,7 @@
 """周ごとの行（*.jsonl）→ 報告の表（markdown・--md）／差の表（--diff）／RESULT.json 用の数字。1 回きり。"""
 import json, os, sys
 D = os.path.dirname(os.path.abspath(__file__))
-ARMS = ["base_scratch_w53", "attn_scratch_w53", "base_scratch_w5354", "attn_scratch_w5354"]
+ARMS = ["base_scratch_w53", "attn_scratch_w53", "base_scratch_w5354", "attn_scratch_w5354", "base_r24_w5354"]
 
 
 def load(a):
