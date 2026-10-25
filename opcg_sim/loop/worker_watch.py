@@ -43,7 +43,7 @@ def main(argv=None):
     ap.add_argument("--job", required=True, help="opcg_sim/loop/jobs/<名前>.json の名前")
     ap.add_argument("--k", default="", help="番号の範囲（既定は定義の shards 全部）")
     ap.add_argument("--started", default="", help="起動の時刻 HH:MM（UTC・今日）。ブランチがまだ無い本の待ち時間に使う")
-    ap.add_argument("--boot", type=float, default=25.0, help="起動からこの分数でブランチが無ければ疑う（既定 25）")
+    ap.add_argument("--boot", type=float, default=40.0, help="起動からこの分数でブランチが無ければ疑う（既定 40・本番の設定のアリーナは最初の区切りの push まで 30 分前後かかる）")
     ap.add_argument("--stale", type=float, default=0.0,
                     help="done でない本の最後の push からこの分数で疑う（既定はジョブの hours の 1/3・最低 30 分）")
     ap.add_argument("--no-fetch", action="store_true")
