@@ -1261,7 +1261,10 @@ N系の探索（MCTS＋PIMC）は、決定のたびに「自分に見えない�
   `Game.lethal_json` の `lethal_deal_legacy`。`lethal_proof=off` なら効かない。
   計測用に `Game.lethal_json` の `trace`（配り方ごとの手順）・`first`・`guide`・`true_deal` が在る
   （`tests/scripts/lethal_trace.py`・打つ手は変えない）。
-- **打ち切りは節点数**（決定的）: 根 20,000（`lethal_nodes`）・`root_reply` の応手の節点 5,000（`lethal_reply_nodes`）・
+- **打ち切りは節点数**（決定的）: 根 20,000（`lethal_nodes`・測定用に `RsGame.decide(lethal_nodes=…)`・`arena --cand-lethal-root-nodes`・
+  `arena_shard --lethal-root-nodes`・`rs_decide_latency.py --lethal-nodes`〔§7.49・WP `rs-lethal-nodes`〕。80,000 で証明 +13%〔853 → 966・
+  増えた分は全部本当の配り方でも勝てる・偽の証明は増えない〕・出荷の設定の 1 手の平均 +20%・99% 点 +10%・本番アリーナ待ち・
+  `docs/reports/2026-10-25_lethal_nodes.md`）・`root_reply` の応手の節点 5,000（`lethal_reply_nodes`）・
   決定あたり合計 40,000（`lethal_reply_total`・世界の本数で等分）。
 - **`root`**: 根で証明できれば最初の 1 手を返す（`kind="lethal"`・探索は回さない・持ち越しは捨てる）。`stats` に
   `lethal_proof`・`lethal_line_len`・`lethal_deals`・`lethal_nodes`。戻り値の `lethal` に判定の実績（`root.status` ＝

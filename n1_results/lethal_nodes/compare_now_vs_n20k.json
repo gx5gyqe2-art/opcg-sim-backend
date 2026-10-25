@@ -1,0 +1,248 @@
+{
+ "a": "n1_results/weak_points/lethal/judge_now.jsonl.gz",
+ "b": "n1_results/lethal_nodes/judge_n20k.jsonl.gz",
+ "points_a": 12710,
+ "points_b": 12716,
+ "joined": 12710,
+ "status_transitions": {
+  "no->no": 8348,
+  "no->unknown": 5,
+  "unknown->no": 3,
+  "unknown->unknown": 3494,
+  "win->no": 6,
+  "win->unknown": 1,
+  "win->win": 853
+ },
+ "applies_transitions": {
+  "False->False": 2414,
+  "True->True": 10296
+ },
+ "win_a": 860,
+ "win_b": 853,
+ "win_lost": 7,
+ "win_move_changed": 0,
+ "win_new": 0,
+ "win_but_applies_off": 0,
+ "nodes": {
+  "a": 76535560,
+  "b": 76570842
+ },
+ "nodes_ratio": 1.0005,
+ "sec": {
+  "a": 793.7,
+  "b": 929.3
+ },
+ "sec_ratio": 1.1708,
+ "nodes_by_status_a": {
+  "unknown": {
+   "n": 3497,
+   "nodes_a": 62651520,
+   "nodes_b": 62631925
+  },
+  "no": {
+   "n": 8353,
+   "nodes_a": 12287985,
+   "nodes_b": 12329538
+  },
+  "win": {
+   "n": 860,
+   "nodes_a": 1596055,
+   "nodes_b": 1609379
+  }
+ },
+ "invariant_ok": false,
+ "win_lost_rows": [
+  {
+   "key": [
+    3012213,
+    "p1",
+    17,
+    193
+   ],
+   "a": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "c7d929d9-2bdf-438b-817a-e471a3836b2a"
+     }
+    },
+    "nodes": 1569,
+    "applies": true
+   },
+   "b": {
+    "status": "no",
+    "move": null,
+    "nodes": 3099,
+    "applies": true
+   },
+   "opp_life": 1
+  },
+  {
+   "key": [
+    3012213,
+    "p1",
+    17,
+    194
+   ],
+   "a": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "c7d929d9-2bdf-438b-817a-e471a3836b2a"
+     }
+    },
+    "nodes": 1220,
+    "applies": true
+   },
+   "b": {
+    "status": "no",
+    "move": null,
+    "nodes": 2527,
+    "applies": true
+   },
+   "opp_life": 1
+  },
+  {
+   "key": [
+    3012213,
+    "p1",
+    17,
+    198
+   ],
+   "a": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "b268cf76-bdb1-4eb8-a27d-3cfd6dc21291"
+     }
+    },
+    "nodes": 476,
+    "applies": true
+   },
+   "b": {
+    "status": "no",
+    "move": null,
+    "nodes": 162,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012213,
+    "p1",
+    17,
+    199
+   ],
+   "a": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "b268cf76-bdb1-4eb8-a27d-3cfd6dc21291"
+     }
+    },
+    "nodes": 379,
+    "applies": true
+   },
+   "b": {
+    "status": "no",
+    "move": null,
+    "nodes": 132,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012213,
+    "p1",
+    17,
+    200
+   ],
+   "a": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "b268cf76-bdb1-4eb8-a27d-3cfd6dc21291"
+     }
+    },
+    "nodes": 353,
+    "applies": true
+   },
+   "b": {
+    "status": "no",
+    "move": null,
+    "nodes": 102,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012213,
+    "p1",
+    17,
+    201
+   ],
+   "a": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "b268cf76-bdb1-4eb8-a27d-3cfd6dc21291"
+     }
+    },
+    "nodes": 333,
+    "applies": true
+   },
+   "b": {
+    "status": "no",
+    "move": null,
+    "nodes": 40,
+    "applies": true
+   },
+   "opp_life": 0
+  },
+  {
+   "key": [
+    3012213,
+    "p2",
+    16,
+    174
+   ],
+   "a": {
+    "status": "win",
+    "move": {
+     "kind": "game",
+     "action_type": "ATTACH_DON",
+     "payload": {
+      "uuid": "4a85445e-3e18-4efc-8c97-61ece182025d"
+     }
+    },
+    "nodes": 14033,
+    "applies": true
+   },
+   "b": {
+    "status": "unknown",
+    "move": null,
+    "nodes": 20001,
+    "applies": true
+   },
+   "opp_life": 0
+  }
+ ],
+ "win_move_changed_rows": [],
+ "win_new_rows": [],
+ "win_but_applies_off_rows": []
+}
