@@ -1,7 +1,7 @@
 {
  "job": "n55l-w21",
  "role": "gen",
- "status": "error",
+ "status": "partial",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r24.npz",
   "games": 480,
@@ -13,16 +13,18 @@
   "seed_base": 2641000
  },
  "outputs": {
-  "dirs": []
+  "dirs": [
+   "n_records/n55l_w21_p0"
+  ]
  },
  "metrics": {
-  "parts_done": 0,
-  "games": 0,
-  "rows": 0,
+  "parts_done": 1,
+  "games": 120,
+  "rows": 19345,
   "dropped": 0,
-  "sec_play_mean": 0.0
+  "sec_play_mean": 23.75
  },
- "notes": "error: 失敗（2）: make rust-develop\n（ログ /root/build.log）",
+ "notes": "",
  "worker": {
   "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/gen_n55l.json",
   "k": 21,
