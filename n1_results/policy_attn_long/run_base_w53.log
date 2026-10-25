@@ -1,0 +1,5 @@
+dirs 64 value 1297134行（val 184162） policy 522817点（val 74132） 35s
+head base params 139330（注意 0） warm None
+ATTN_DESK_EPOCH {"ep": -1, "head": "base", "warm": false, "lr": 0.0005, "x_scale": null, "wp1x_norm": null, "wp1_norm": 11.317164421081543, "train_ce_run": null, "train_mse_run": null, "train_probe": {"ce": 2.1610787110856897, "top1": 0.230625, "n": 8000, "mis_all": 0.24875, "mis_atk_atk": 0.050625, "mis_order": 0.083625, "mis_play_play": 0.064875, "mis_other": 0.049625, "mis_unvisited": 0.032}, "val": {"ce": 2.1780275725639036, "top1": 0.219, "n": 20000, "mis_all": 0.2359, "mis_atk_atk": 0.053, "mis_order": 0.0783, "mis_play_play": 0.06075, "mis_other": 0.04385, "mis_unvisited": 0.03185}, "val_vmse": 1.0589879751205444, "sec": 0.0, "wall": 52.9}
+  ep0 step 5000/11357 mse 0.6020 ce 1.9491 255s
+  ep0 step 10000/11357 mse 0.5662 ce 1.9193 459s
