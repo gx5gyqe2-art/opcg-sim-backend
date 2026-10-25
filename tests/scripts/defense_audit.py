@@ -22,6 +22,10 @@
   python tests/scripts/defense_audit.py verify --workers 4               # 見逃しの点を打ち直し、攻め手の手順を
                                                                          # 全部（キャラへのアタック・付与の並べ替え）
                                                                          # 読む判定器で確かめる（verify.json）
+確かめ（`verify`）は判定器のあと、見逃しの点（確かめ後の甲）で CPU の応手と守れる応手を、**今のターンの残りを両席とも
+出荷の設定**（`E.PLAY_*`）で打ち、その先は審判（160 回）が打つ形で K 局ずつ打ち比べる（`playout`・WP `audit-verify-opp`・§7.50）。
+本当の盤面（`real`・探索の乱数だけ替える＝甲）と、守る側から公平に配り直した世界（`fair`）の 2 通り。
+旧い形（守る側だけ出荷の設定・相手の残りのターンは審判）は `--verify-mover-only`、打ち比べ無し（§7.24 の確かめ）は `--playout-k 0`。
 本線のコードは触らない（計器だけ・テストは足さない）。
 """
 import argparse
@@ -38,6 +42,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault("OPCG_LOG_SILENT", "1")
 
 import lethal_audit as LA  # noqa: E402  判定器・配り直し・盤面の要約を再利用
+import blunder_audit as BA  # noqa: E402  打ち継ぎ（`rollout_ship`）
+import move_judge as MJ  # noqa: E402  paired／world_seed／REFEREE_SIMS
 from opcg_sim.loop import decks as D, driver as DR, engine as E  # noqa: E402
 
 OUT_DIR = os.path.join("n1_results", "defense_audit")
@@ -582,6 +588,34 @@ def replay_to(seed: int, a, seat: str, step: int):
     return got["game"], got["move"], got
 
 
+#: 打ち比べの配り方の番号のずらし（`blunder_audit` の judge・recheck・verify と重ねない）。
+PLAYOUT_OFFSET = 3000
+
+
+def playout_pair(game, me: str, cpu_mv: Dict[str, Any], safe_mv: Dict[str, Any], a, seed: int, step: int) -> Dict[str, Any]:
+    """CPU の応手と守れる応手の先を K 局ずつ打ち比べる（今のターンの残りは出荷の設定・その先は審判）。
+    `diff` は 守れる応手 − CPU の応手（守る側の勝率）。`lost_this_turn` はこのターンの中で負けた局の数。"""
+    net = a.net or E.DEFAULT_NET
+    ship = E.SeatSpec(net, sims=E.PLAY_SIMS, budget=E.PLAY_BUDGET, worlds=E.PLAY_WORLDS, lethal_proof=E.PLAY_LETHAL_PROOF)
+    ref = E.SeatSpec(net, sims=MJ.REFEREE_SIMS)
+    both = not a.verify_mover_only
+    out: Dict[str, Any] = {"k": a.playout_k, "both": both}
+    for mode in ("real", "fair"):
+        res = {"cpu": [], "safe": [], "cpu_lost_this_turn": 0, "safe_lost_this_turn": 0}
+        for i in range(a.playout_k):
+            ws = MJ.world_seed(seed, step, PLAYOUT_OFFSET + i)
+            for tag, mv in (("cpu", cpu_mv), ("safe", safe_mv)):
+                info: Dict[str, Any] = {}
+                w, _err = BA.rollout_ship(game, me, mv, ws, ref, ship, both=both, real=(mode == "real"), info=info)
+                res[tag].append(w)
+                res[tag + "_lost_this_turn"] += int(bool(info.get("lost_this_turn")))
+        out[mode] = dict(MJ.paired(res["cpu"], res["safe"]), **res)
+    r = out["real"]
+    # 見逃しが残る＝本当の盤面で、守れる応手のほうが勝率が高く、95% 区間の下限 > 0（`blunder_audit` の確かめと同じ規則）
+    out["kept"] = bool(r["ci"][0] is not None and r["ci"][0] > 0)
+    return out
+
+
 def verify_one(args) -> Dict[str, Any]:
     rec, a = args
     t0 = time.perf_counter()
@@ -638,6 +672,13 @@ def verify_one(args) -> Dict[str, Any]:
             out["miss_otsu_full"] = bool(rec.get("miss_otsu") and o and o["otsu_full"]["res"] is True)
             out["otsu_full_unknown"] = bool(rec.get("miss_otsu") and o and o["otsu_full"]["res"] is None)
             out["ko_full_unknown"] = bool(not still_safe and any(r.get("ko_full", {}).get("res") is None for r in rows))
+            if still_safe and a.playout_k > 0:
+                # 守れる応手は、乙の点なら乙で守れた応手・そうでなければ判定器で守れた最初の応手
+                si = (rec.get("otsu") or {}).get("safe_i") if out["miss_otsu_full"] else None
+                si = si if si in still_safe else still_safe[0]
+                pl = playout_pair(game, name, cands[0], cands[si], a, rec["seed"], rec["step"])
+                pl["safe_i"], pl["safe_move"] = si, LA.describe(game, cands[si])
+                out["playout"] = pl
         else:
             # 終わり方: 乙の詰みが無いと判定した別の 1 手を、全部読む判定器で判定し直す
             me = rec["seat"]
@@ -695,7 +736,7 @@ def cmd_verify(a):
                                            and r.get("settle") != f"winner:{p['seat']}" for r in p["alts"]))]
     print(f"verify {len(todo)} miss points", flush=True)
     import multiprocessing as mp
-    outp = os.path.join(a.out, "verify.jsonl")
+    outp = os.path.join(a.out, a.verify_file)
     with open(outp, "w", encoding="utf-8") as f, mp.get_context("fork").Pool(a.workers) as pool:
         for i, r in enumerate(pool.imap_unordered(verify_one, [(p, a) for p in todo])):
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
@@ -872,7 +913,7 @@ def cmd_summarize(a):
                          "alts_safe": [r["move"] for r in p["alts"] if (r.get("safe") or {}).get("res") is True][:5],
                          "board": p.get("board"), "game_winner": games[p["seed"]]["winner"],
                          "game_turns": games[p["seed"]]["turns"]})
-    vpath = os.path.join(a.out, "verify.jsonl")
+    vpath = os.path.join(a.out, a.verify_file)
     if os.path.exists(vpath):
         vs = [json.loads(line) for line in open(vpath, encoding="utf-8")]
         vr = [v for v in vs if v["kind"] == "resp"]
@@ -884,8 +925,12 @@ def cmd_summarize(a):
         ot_full = [v for v in ok_r if v["miss_otsu_full"]]
         t_ot_full = {(v["seed"], v["seat"], v["turn"]) for v in ot_full}
         t_ko_full = {(v["seed"], v["seat"], v["turn"]) for v in ko_full}
+        pl = [v for v in ko_full if v.get("playout")]
         summ["verify"] = {
             "resp": {"verified": len(vr), "errors": sum(1 for v in vr if "error" in v),
+                     "playout": {"n": len(pl), "kept": sum(1 for v in pl if v["playout"]["kept"]),
+                                 "kept_otsu": sum(1 for v in pl if v["playout"]["kept"] and v.get("miss_otsu_full")),
+                                 "both": sorted({v["playout"]["both"] for v in pl})} if pl else None,
                      "miss_ko_raw": len(miss_ko), "miss_ko_full": len(ko_full),
                      "miss_ko_full_unknown": sum(1 for v in ok_r if v.get("ko_full_unknown")),
                      "miss_otsu_raw": len(miss_ot), "miss_otsu_full": len(ot_full),
@@ -914,6 +959,10 @@ def cmd_summarize(a):
             v = vmap.get((ex["seed"], ex["seat"], ex.get("step")))
             if v:
                 ex["verify"] = {k: v[k] for k in v if k.endswith("_full") or k == "error"}
+                if v.get("playout"):
+                    ex["verify"]["playout"] = {m: {k: v["playout"][m][k] for k in ("wa", "wb", "diff", "ci", "cpu_lost_this_turn",
+                                                                                    "safe_lost_this_turn")}
+                                               for m in ("real", "fair")} | {"kept": v["playout"]["kept"]}
     summ["examples"] = examples
     out = os.path.join(a.out, "summary.json")
     json.dump(summ, open(out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
@@ -962,6 +1011,13 @@ def main(argv=None):
         if name == "verify":
             p.add_argument("--sec-verify", type=float, default=30.0, help="確かめの甲の 1 応手あたりの時間の上限")
             p.add_argument("--sec-verify-otsu", type=float, default=10.0, help="確かめの乙の配り方 1 つあたりの時間の上限")
+            p.add_argument("--playout-k", type=int, default=16,
+                           help="確かめ後の見逃しの点で CPU の応手と守れる応手を打ち比べる局数（本当の盤面・公平の各 K）。0＝打ち比べ無し（§7.24 の形）")
+            p.add_argument("--verify-mover-only", action="store_true",
+                           help="旧い形: 打ち比べで今のターンの残りを守る側だけ出荷の設定が打つ（相手は審判）")
+            p.add_argument("--verify-file", default="verify.jsonl", help="確かめの出力（--out からの相対・絶対パス可）")
+        if name == "summarize":
+            p.add_argument("--verify-file", default="verify.jsonl", help="読む確かめ（--out からの相対・絶対パス可）")
         if name != "run":
             p.add_argument("--points", default=None)
     a = ap.parse_args(argv)
