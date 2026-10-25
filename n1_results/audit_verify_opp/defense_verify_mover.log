@@ -1,0 +1,7 @@
+verify 6 miss points
+[1/6] resp seed=3351014 step=208 {'miss_ko_full': True, 'miss_otsu_full': False} sec=39.0
+[2/6] resp seed=3351122 step=182 {'miss_ko_full': True, 'miss_otsu_full': False} sec=54.4
+[3/6] resp seed=3351127 step=110 {'miss_ko_full': True, 'miss_otsu_full': False} sec=43.1
+[4/6] resp seed=3351102 step=99 {'miss_ko_full': True, 'miss_otsu_full': True} sec=86.5
+[5/6] resp seed=3351006 step=159 {'miss_ko_full': True, 'miss_otsu_full': False} sec=107.8
+[6/6] resp seed=3351191 step=114 {'miss_ko_full': True, 'miss_otsu_full': True} sec=124.6
