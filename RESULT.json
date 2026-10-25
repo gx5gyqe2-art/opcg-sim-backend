@@ -1,7 +1,7 @@
 {
  "job": "n53-w24",
  "role": "gen",
- "status": "error",
+ "status": "partial",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r23.npz",
   "games": 480,
@@ -12,16 +12,18 @@
   "seed_base": 2602500
  },
  "outputs": {
-  "dirs": []
+  "dirs": [
+   "n_records/n53_w24_p0"
+  ]
  },
  "metrics": {
-  "parts_done": 0,
-  "games": 0,
-  "rows": 0,
+  "parts_done": 1,
+  "games": 120,
+  "rows": 19706,
   "dropped": 0,
-  "sec_play_mean": 0.0
+  "sec_play_mean": 44.73
  },
- "notes": "error: 失敗（2）: make rust-develop\n（ログ /root/build.log）",
+ "notes": "",
  "worker": {
   "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/gen_n53.json",
   "k": 24,
