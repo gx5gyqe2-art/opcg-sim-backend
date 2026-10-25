@@ -1,0 +1,32 @@
+z専用 dir 128 本を合流（π は読まない）
+value 5124198行（val 731319） policy 1044709点（val 148796） 176s
+warm-start: opcg_sim/data/learned/nrel_r23.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 3666137/5124198
+backend: torch threads=4 fast-pairs fast-max fast-index
+予算・候補定数を先に作った（候補 13078551行 15.9s）
+PI_TEACHER {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.5271416755500429, "entropy_q_improved": 1.1050315560619461}
+  ep0 step 5000/31157 mse 0.5025 ce 1.7270 395s
+  ep0 step 10000/31157 mse 0.5009 ce 1.7215 560s
+  ep0 step 15000/31157 mse 0.4992 ce 1.7204 725s
+  ep0 step 20000/31157 mse 0.4983 ce 1.7196 889s
+  ep0 step 25000/31157 mse 0.4973 ce 1.7191 1055s
+  ep0 step 30000/31157 mse 0.4967 ce 1.7190 1224s
+ep0 train mse 0.4965 ce 1.7193 | val v_mse 0.4795 v_sign 0.815 pi_top1 0.504 ce 1.724 1266s
+  aux val huber 0.4287 tok 0.1145
+N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 4, "train_sec": 1044.65, "steps": 31157, "breakdown": {"budget_p": 2.819, "holdout": 2.518, "rel_p": 0.084, "rel_v": 3.001, "slice_p": 5.906, "slice_v": 10.468, "step_p": 0.133, "step_p_bwd": 216.278, "step_p_fwd": 126.178, "step_v": 0.409, "step_v_bwd": 403.132, "step_v_fwd": 272.299, "step_v_prep": 0.147}, "train_mse": 0.49652263632089677, "train_ce": 1.719265566159698, "val_vmse": 0.479542076587677, "val_vsign": 0.815, "val_pi_top1": 0.50375, "val_p_loss": 1.7244419021606445, "pi_teacher": {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.5271416755500429, "entropy_q_improved": 1.1050315560619461}, "val_pi_top1_visits": 0.5375, "val_p_loss_visits": 1.843153923034668, "aux_weight": 0.1, "val_aux": 0.4286667858827515, "val_aux_tok": 0.11449552803445054, "train_aux": [0.4102775752544403, 0.11772623658180237]}
+  ep0 の重みを /root/nrel_r24.ep0.npz に保存
+  ep0 を /root/nrel_r24.npz に保存（暫定最良）
+  ep1 step 5000/31157 mse 0.4891 ce 1.7095 1445s
+  ep1 step 10000/31157 mse 0.4888 ce 1.7097 1616s
+  ep1 step 15000/31157 mse 0.4882 ce 1.7093 1783s
+  ep1 step 20000/31157 mse 0.4873 ce 1.7096 1952s
+  ep1 step 25000/31157 mse 0.4863 ce 1.7103 2117s
+  ep1 step 30000/31157 mse 0.4858 ce 1.7103 2290s
+ep1 train mse 0.4857 ce 1.7103 | val v_mse 0.4729 v_sign 0.817 pi_top1 0.499 ce 1.722 2329s
+  aux val huber 0.4225 tok 0.1139
+N_REL_TRAIN_EPOCH {"ep": 1, "backend": "torch", "threads": 4, "train_sec": 1056.07, "steps": 31157, "breakdown": {"budget_p": 2.903, "holdout": 2.184, "rel_p": 0.085, "rel_v": 3.064, "slice_p": 6.06, "slice_v": 10.786, "step_p": 0.136, "step_p_bwd": 219.183, "step_p_fwd": 128.452, "step_v": 0.428, "step_v_bwd": 407.319, "step_v_fwd": 273.966, "step_v_prep": 0.152}, "train_mse": 0.4857243126651972, "train_ce": 1.710344492690804, "val_vmse": 0.47291064262390137, "val_vsign": 0.8169, "val_pi_top1": 0.4995, "val_p_loss": 1.7223784713745116, "pi_teacher": {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.5271416755500429, "entropy_q_improved": 1.1050315560619461}, "val_pi_top1_visits": 0.5395, "val_p_loss_visits": 1.8476144943237305, "aux_weight": 0.1, "val_aux": 0.4224574666280043, "val_aux_tok": 0.11385180863015176, "train_aux": [0.435613214969635, 0.1126674935221672]}
+  ep1 の重みを /root/nrel_r24.ep1.npz に保存
+  ep1 を /root/nrel_r24.npz に保存（暫定最良）
+best ep1 val v_mse 0.4729 を保存
+N_REL_TRAIN_DONE {"out": "/root/nrel_r24.npz"}
