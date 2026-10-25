@@ -1,7 +1,7 @@
 {
  "job": "n53-w10",
  "role": "gen",
- "status": "done",
+ "status": "partial",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r23.npz",
   "games": 480,
@@ -24,7 +24,7 @@
   "games": 480,
   "rows": 81199,
   "dropped": 0,
-  "sec_play_mean": 68.35
+  "sec_play_mean": 66.82
  },
  "notes": "",
  "worker": {
