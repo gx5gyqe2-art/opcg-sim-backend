@@ -1,0 +1,67 @@
+{
+ "kind": "arena",
+ "section": "§7.57",
+ "ledger_grep": "7.57 世界 4 本の本番アリーナ",
+ "about": "世界 4 本 vs 世界 2 本（両席 r24・ほかは出荷の設定・1,280 回・枝予算なし・詰みの証明 root・公平）・random×real",
+ "job": "arena-w4p-w{KK}",
+ "branch": "claude/arena-w4p-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 32,
+ "hours": 3,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "opcg_sim/data/learned/nrel_r24.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r24.npz"
+ },
+ "out_dir": "arena_w4p",
+ "pairs": 84,
+ "chunk_pairs": 21,
+ "bands": 1,
+ "workers": 2,
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "2",
+  "--budget",
+  "0",
+  "--lethal-proof",
+  "root",
+  "--cand-sims",
+  "1280",
+  "--cand-worlds",
+  "4",
+  "--cand-budget",
+  "0",
+  "--cand-lethal-proof",
+  "root"
+ ],
+ "tail_args": [
+  "--pair-timeout",
+  "3600"
+ ],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "3921000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "w4p_real_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_r24.npz・世界 4 本",
+  "baseline": "nrel_r24.npz・世界 2 本（今の出荷）",
+  "both": "sims 1280 x budget 0 x lethal root (fair)",
+  "pairs": 84
+ },
+ "commit_message": "arena w4p shard {KK}"
+}
