@@ -1,7 +1,7 @@
 {
  "job": "trial-shallow-audit-w01",
  "role": "audit",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "setting": "§7.41: 両席 r13d・出荷の設定・random × real・審判 r13d／r20（160 回・K＝32）",
   "tool": "tests/scripts/blunder_audit.py",
