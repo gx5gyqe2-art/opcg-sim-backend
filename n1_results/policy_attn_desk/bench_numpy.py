@@ -70,3 +70,14 @@ n = len(pts)
 out = {"points": n, "mean_cands": nc / n, "base_value_plus_policy_ms": 1e3 * tb / n, "attn_extra_ms": 1e3 * ta / n,
        "ratio": ta / tb}
 print(json.dumps(out))
+
+
+def macs(L, n_tok=22, n_own=16, n_opp=6, d=64, F=128, cand_layers=2, tok_layers=2):
+    """乗算加算の数（机上）。今の forward（関係 R なし・候補 L 本）と注意の追加分。"""
+    base = n_tok * 91 * 48 + 2 * (n_own + n_opp) * 48 * 32 + 2 * n_own * 48 * 32 \
+        + 415 * 192 + 192 * 64 + 64 + L * (499 * 64 + 64)
+    T = n_tok + 1
+    enc = lambda n: n * (4 * d * d + 2 * d * F) + 2 * n * n * d
+    extra = n_tok * 144 * d + 64 * d + tok_layers * enc(T) + L * 499 * d \
+        + (L * 2 * d * d + T * 2 * d * d + 2 * L * T * d + L * 2 * d * F) + cand_layers * enc(L) + L * d * 64
+    return base, extra
