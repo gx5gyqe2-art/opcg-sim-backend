@@ -34,3 +34,5 @@ ATTN_DESK_EPOCH {"ep": 5, "head": "base", "warm": false, "lr": 0.0005, "x_scale"
   ep6 step 5000/23011 mse 0.3946 ce 1.8279 5236s
   ep6 step 10000/23011 mse 0.3939 ce 1.8278 5393s
   ep6 step 15000/23011 mse 0.3926 ce 1.8271 5555s
+  ep6 step 20000/23011 mse 0.3912 ce 1.8285 5712s
+ATTN_DESK_EPOCH {"ep": 6, "head": "base", "warm": false, "lr": 0.0005, "x_scale": null, "wp1x_norm": null, "wp1_norm": 33.34733200073242, "train_ce_run": 1.828118014681215, "train_mse_run": 0.39016311870493503, "train_probe": {"ce": 1.8242977179553765, "top1": 0.533, "n": 8000, "mis_all": 0.078, "mis_atk_atk": 0.026375, "mis_order": 0.02225, "mis_play_play": 0.010625, "mis_other": 0.01875, "mis_unvisited": 0.00275}, "val": {"ce": 1.8490201062837965, "top1": 0.52575, "n": 20000, "mis_all": 0.07175, "mis_atk_atk": 0.0271, "mis_order": 0.01875, "mis_play_play": 0.00945, "mis_other": 0.01645, "mis_unvisited": 0.0028}, "val_vmse": 0.5722870826721191, "sec": 734.2, "wall": 5810.9}
