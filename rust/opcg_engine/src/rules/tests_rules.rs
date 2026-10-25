@@ -151,6 +151,36 @@ fn end_turn_switches_the_player_and_keeps_the_opponents_attached_don() {
     assert_eq!(s.state().player(Seat::P2).don_active.len(), 2);
 }
 
+/// 自分のターン中に自分のキャラへ付けた FREEZE（OP04-090「このキャラをアクティブにする。その後、次の自分の
+/// リフレッシュフェイズでアクティブにならない」）は、自分のターン終了の一時効果の解除では消えず、
+/// 次の自分のリフレッシュで 1 回だけ効く（2026-10-25 まではターン終了で消え、次のリフレッシュで起きていた・WP `defect-hunt-2`）。
+#[test]
+fn a_freeze_on_your_own_card_survives_your_turn_end_until_your_next_refresh() {
+    let mut b = BoardBuilder::new().turn(3, Seat::P1);
+    let mine = b.put_field(Seat::P1, M_CHAR);
+    b.card_mut(mine).is_rest = true;
+    b.card_mut(mine).flags = vec!["FREEZE".to_string()];
+    b.card_mut(mine).power_buff = 2000;
+    for _ in 0..3 {
+        b.put_deck(Seat::P1, M_CHAR);
+        b.put_deck(Seat::P2, M_CHAR);
+    }
+    b.dons(Seat::P1, "deck", 10);
+    b.dons(Seat::P2, "deck", 10);
+    let (masters, mut s) = session(b.build());
+
+    turn::end_turn(&mut s, &masters).expect("end p1");
+    assert_eq!(s.state().card(mine).power_buff, 0, "一時バフは消える");
+    assert_eq!(s.state().card(mine).flags, vec!["FREEZE".to_string()], "FREEZE は残る");
+    turn::end_turn(&mut s, &masters).expect("end p2");
+    assert_eq!(s.state().turn_player, Seat::P1);
+    assert!(s.state().card(mine).is_rest, "次の自分のリフレッシュでアクティブにならない");
+    assert!(s.state().card(mine).flags.is_empty(), "1 回で下りる");
+    turn::end_turn(&mut s, &masters).expect("end p1 again");
+    turn::end_turn(&mut s, &masters).expect("end p2 again");
+    assert!(!s.state().card(mine).is_rest, "その次のリフレッシュではアクティブへ");
+}
+
 /// Python `switch_turn`: 新しいターン＝`_turn_events` をクリアする。
 #[test]
 fn switching_turns_clears_the_turn_events() {
@@ -335,6 +365,48 @@ fn a_blocker_on_the_field_routes_the_attack_through_the_block_step() {
     actions::apply_battle_action(&mut s, &masters, Seat::P2, "PASS", None).expect("pass");
     assert_eq!(s.state().phase, Phase::Main);
     assert!(s.state().active_battle.is_none());
+}
+
+/// 【ブロッカー】を持つリーダー（OP05-022 ロシナンテ）: キャラへのアタックをリーダーでブロックでき、
+/// ブロック後は戦闘の対象がリーダーに替わる（ダメージはライフへ）。リーダー自身へのアタックは
+/// ブロッカーの候補に出さない（2026-10-25 までリーダーは候補に一度も出なかった・WP `defect-hunt-2`）。
+#[test]
+fn a_leader_with_blocker_can_block_attacks_on_its_characters() {
+    let mut b = BoardBuilder::new().turn(3, Seat::P1);
+    let atk = b.put_field(Seat::P1, M_BIG);
+    let victim = b.put_field(Seat::P2, M_CHAR);
+    b.put_deck(Seat::P1, M_CHAR);
+    b.put_deck(Seat::P2, M_CHAR);
+    b.put_life(Seat::P2, M_CHAR);
+    b.put_life(Seat::P2, M_CHAR);
+    let (masters, mut state) = b.build();
+    let leader = state.player(Seat::P2).leader.unwrap();
+    state.cards[leader as usize].current_keywords = vec!["ブロッカー".to_string()];
+    state.cards[victim as usize].is_rest = true;
+    let mut s = Session::new(state);
+
+    // リーダー自身へのアタック: 候補はリーダーしか居ない＝ブロックステップを飛ばす。
+    let atk_leader = s.state().player(Seat::P1).leader.unwrap();
+    s.edit().set_active_battle(Some(crate::model::ActiveBattle {
+        attacker: atk_leader, target: leader, attacker_owner: Seat::P1, target_owner: Seat::P2,
+        counter_buff: 0,
+    }));
+    assert!(!battle::has_blocker(&s, Seat::P2), "アタックされているリーダー自身はブロックしない");
+    assert!(pending::blocker_candidates(s.state(), Seat::P2).is_empty());
+    s.edit().set_active_battle(None);
+
+    // キャラへのアタック: リーダーがブロッカーの候補に出て、ブロックすると対象がリーダーへ。
+    battle::declare_attack(&mut s, &masters, atk, victim).expect("declare");
+    assert_eq!(s.state().phase, Phase::BlockStep);
+    assert_eq!(pending::blocker_candidates(s.state(), Seat::P2), vec![leader]);
+    let leader_uuid = s.state().card(leader).uuid.clone();
+    actions::apply_battle_action(&mut s, &masters, Seat::P2, "SELECT_BLOCKER", Some(&leader_uuid))
+        .expect("block with the leader");
+    assert!(s.state().card(leader).is_rest);
+    assert_eq!(s.state().active_battle.as_ref().unwrap().target, leader);
+    actions::apply_battle_action(&mut s, &masters, Seat::P2, "PASS", None).expect("pass");
+    assert_eq!(s.state().player(Seat::P2).life.len(), 1, "リーダーが受けてライフ 1 枚");
+    assert!(s.state().player(Seat::P2).field.contains(&victim), "キャラは守られた");
 }
 
 /// Python `apply_counter`: カウンター値を `active_battle["counter_buff"]` へ加算し、

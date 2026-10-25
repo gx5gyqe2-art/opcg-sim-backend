@@ -490,12 +490,11 @@ pub fn apply_battle_action(
     }
     match action_type {
         ACT_SELECT_BLOCKER => {
+            // ブロッカーの候補（場のキャラ＋【ブロッカー】のリーダー）から引く（2026-10-25 までは場だけを
+            // 探していて、リーダーの uuid は「ブロックしない」と同じに落ちていた・WP `defect-hunt-2`）。
             let blocker = card_uuid.and_then(|u| {
-                s.state()
-                    .player(seat)
-                    .field
-                    .iter()
-                    .copied()
+                super::pending::blocker_candidates(s.state(), seat)
+                    .into_iter()
                     .find(|c| s.state().card(*c).uuid == u)
             });
             if let Some(b) = blocker {

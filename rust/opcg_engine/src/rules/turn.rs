@@ -232,7 +232,7 @@ pub fn refresh_phase(s: &mut Session, masters: &MasterTable) -> Result<(), Engin
 /// （付与ドン!!は剥がさない＝`keep_don=True`。【ターン1回】の使用回数は戻す）。
 fn reset_player_status(s: &mut Session, masters: &MasterTable, seat: Seat) {
     for card in units(s, seat) {
-        ops::reset_turn_status(s, masters, card, true, true);
+        ops::reset_turn_status_keep_freeze(s, masters, card, true, true);
     }
 }
 

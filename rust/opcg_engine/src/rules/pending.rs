@@ -62,20 +62,29 @@ pub fn pending_actor_action(s: &mut Session) -> Option<(Seat, &'static str)> {
     }
 }
 
-/// ブロッカー候補（Python `get_pending_request` の BLOCK_STEP 分岐。`has_blocker` と
-/// 条件が **1 つずれている**: こちらは `BLOCKER_DISABLED` を見ない＝Python のまま移す）。
+/// ブロッカー候補（Python `get_pending_request` の BLOCK_STEP 分岐）。
+///
+/// 場のキャラに加えて**リーダー**も見る（【ブロッカー】を持つリーダー OP05-022 ロシナンテ。
+/// 2026-10-25 までは場のキャラだけを見ていて、リーダーは一度もブロックできなかった・WP `defect-hunt-2`）。
+/// 今アタックされているカード自身は外す（対象を自分に移し替えるだけの空のブロック）。
+/// `BLOCKER_DISABLED`（「【ブロッカー】を発動できない」）は [`super::battle::has_blocker`] と同じく見る
+/// （2026-10-25 までは候補の列挙だけ見ていなかった＝Python のずれを移していた）。
+/// 並びは場のキャラ → リーダー（キャラの手の並びは従来どおり）。
 pub fn blocker_candidates(state: &crate::model::GameState, seat: Seat) -> Vec<CardIdx> {
     if crate::rules::blocking_suppressed(state) {
         return Vec::new();
     }
-    state
-        .player(seat)
-        .field
+    let target = state.active_battle.as_ref().map(|b| b.target);
+    let p = state.player(seat);
+    p.field
         .iter()
         .copied()
+        .chain(p.leader)
         .filter(|c| {
-            !state.card(*c).is_rest
+            Some(*c) != target
+                && !state.card(*c).is_rest
                 && has_keyword(state, *c, KW_BLOCKER)
+                && !state.card(*c).flags.iter().any(|f| f == "BLOCKER_DISABLED")
                 && !crate::rules::has_timed_flag(state, *c, "CANNOT_REST")
         })
         .collect()
