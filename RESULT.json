@@ -1,147 +1,26 @@
 {
- "job": "policy-oracle-hand-desk",
- "status": "done",
- "branch": "claude/policy-oracle-hand-desk",
- "spec": "docs/search_efficiency_plan.md §7.54（本線 claude/cpu-spec-improvements-yw91jd @ fc3ed8c・台帳 2+426）",
- "report": "docs/reports/2026-10-25_policy_oracle_hand_desk.md",
- "code": [
-  "opcg_sim/learned/train/n_rel_oracle_hand_desk.py（build＝記録の再生と相手の本当の手札の列・train＝比べる訓練。1 回きりの道具・テストなし）",
-  "n1_results/policy_oracle_hand_desk/summarize.py",
-  "n1_results/policy_oracle_hand_desk/value_probe.py"
- ],
- "make_test": "green（cargo test 637 passed＋pytest 880 passed, 13 skipped・torch はゲートの前に外した。1 回目は他の処理が無い状態でも journal::tests::undo_is_faster_than_cloning_the_state〔時間比べ・3.9 倍〕が落ち、回し直しで green）",
- "material": {
-  "wave": "54（claude/n54-w01〜w08・生成役 r24・1/4 波・§7.53 と同じ材料）",
-  "games": 3840,
-  "replay_diverged": 0,
-  "value_rows": 665962,
-  "policy_points": 269169,
-  "holdout": "seed % 7",
-  "val_points": 20000,
-  "val_points_def": 338,
-  "hand_cols": 18,
-  "note_def": "守り（決める席が手番でない）の方策点は 1.2% で、引き直し（MULLIGAN/KEEP_HAND）と効果の対象選択だけ。カウンター・ブロックの窓は記録に訪問分布が無い"
+ "job": "arena-w4p-w25",
+ "role": "arena",
+ "status": "partial",
+ "inputs": {
+  "candidate": "nrel_r24.npz・世界 4 本",
+  "baseline": "nrel_r24.npz・世界 2 本（今の出荷）",
+  "both": "sims 1280 x budget 0 x lethal root (fair)",
+  "pairs": 84
  },
- "r24_before": {
-  "val_ce": 1.8508,
-  "top1": 0.54,
-  "mis": 0.0853
+ "outputs": {
+  "files": [
+   "arena_w4p/w4p_real_w25.jsonl"
+  ]
  },
- "final_epoch": {
-  "base_scratch": {
-   "ep": 3,
-   "val_ce": 1.8693,
-   "top1": 0.505,
-   "mis": 0.0924,
-   "mis_atk_atk": 0.0348,
-   "mis_order": 0.0293,
-   "mis_play_play": 0.0095,
-   "val_atk_ce": 1.8883,
-   "val_def_ce": 0.7634,
-   "train_probe_ce": 1.8531,
-   "val_vmse": 0.621,
-   "val_vmse_def": 0.6197
-  },
-  "true_scratch": {
-   "ep": 3,
-   "val_ce": 1.8849,
-   "top1": 0.5004,
-   "mis": 0.0969,
-   "mis_atk_atk": 0.0357,
-   "mis_order": 0.03,
-   "mis_play_play": 0.0101,
-   "val_atk_ce": 1.9042,
-   "val_def_ce": 0.7628,
-   "train_probe_ce": 1.8669,
-   "val_vmse": 0.6996,
-   "val_vmse_def": 0.7114
-  },
-  "shuffle_scratch": {
-   "ep": 3,
-   "val_ce": 1.8805,
-   "top1": 0.5027,
-   "mis": 0.095,
-   "mis_atk_atk": 0.037,
-   "mis_order": 0.0294,
-   "mis_play_play": 0.0094,
-   "val_atk_ce": 1.8997,
-   "val_def_ce": 0.763,
-   "train_probe_ce": 1.8676,
-   "val_vmse": 0.5602,
-   "val_vmse_def": 0.5644
-  },
-  "base_r24": {
-   "ep": 3,
-   "val_ce": 1.8284,
-   "top1": 0.5382,
-   "mis": 0.0818,
-   "mis_atk_atk": 0.0314,
-   "mis_order": 0.0243,
-   "mis_play_play": 0.0088,
-   "val_atk_ce": 1.8467,
-   "val_def_ce": 0.7626,
-   "train_probe_ce": 1.816,
-   "val_vmse": 0.5247,
-   "val_vmse_def": 0.5312
-  },
-  "true_r24": {
-   "ep": 3,
-   "val_ce": 1.829,
-   "top1": 0.5393,
-   "mis": 0.0816,
-   "mis_atk_atk": 0.0307,
-   "mis_order": 0.0252,
-   "mis_play_play": 0.0089,
-   "val_atk_ce": 1.8473,
-   "val_def_ce": 0.7627,
-   "train_probe_ce": 1.8161,
-   "val_vmse": 0.5571,
-   "val_vmse_def": 0.5684
-  },
-  "shuffle_r24": {
-   "ep": 3,
-   "val_ce": 1.8291,
-   "top1": 0.537,
-   "mis": 0.0818,
-   "mis_atk_atk": 0.0311,
-   "mis_order": 0.0247,
-   "mis_play_play": 0.0086,
-   "val_atk_ce": 1.8475,
-   "val_def_ce": 0.7627,
-   "train_probe_ce": 1.8154,
-   "val_vmse": 0.5231,
-   "val_vmse_def": 0.5325
-  }
+ "metrics": {
+  "arena_w4p/w4p_real_w25.jsonl": 21
  },
- "diff_val_ce_ep3": {
-  "true_minus_base_r24": 0.0006,
-  "true_minus_shuffle_r24": -0.0001,
-  "true_minus_base_scratch": 0.0156,
-  "true_minus_shuffle_scratch": 0.0044
- },
- "value_probe_frozen_r24_linear": {
-  "lin_v": 0.5054,
-  "lin_v+hand": 0.5047,
-  "lin_v+shuffle": 0.5054,
-  "lin_v+hand+hand*v": 0.5044
- },
- "value_probe_def": {
-  "lin_v": 0.519,
-  "lin_v+hand": 0.5179,
-  "lin_v+shuffle": 0.519
- },
- "forecast_check": {
-  "policy_drop_ge_0.05_p0.5": "外れ（r24 から +0.0006・一から 混ぜた列比 +0.0044）",
-  "value_drops_clearly": "外れ（凍結した胴体の上の線形で −0.0007＝0.14%）",
-  "rule": "0.02 未満＝この線（方策の頭に見立ての列）を閉じる"
- },
- "reading": "方策の教師（訪問分布）は公平な世界（reveal=fair・世界 1 本）で読む探索が作る＝相手の本当の手札を知らない。教師の分布は公開情報とその席が知る札の関数なので、本当の手札を見せても方策の誤差の上限は定義の上で 0（実測 0.000）。+76.5 Elo（相手の手札を見て読む探索・2026-10-21_reveal_arena）は探索側の伸びしろで、公平な教師を真似るネットの一目には移らない。",
- "next": "第 2 段を「方策の頭に推測の列を足す」形でやるのはやめる。推測は探索の世界の引き直し（相手の手札を推測の分布で引く）か窓の配り直しに入れ、アリーナで測る（天井 +76.5）。",
- "notes": [
-  "予告の 5 割は『本当の最善手が手札で変わる』見込みで、『教師の分布が手札で変わる』見込みではなかった（数を見た後に気づいた・報告の読み 1〜2）",
-  "一からの組は足した重みを乱数で始めるので、混ぜた列でも今の入力より +0.011 悪い（列を足す手間）。比べるのは本当の手札 − 混ぜた列",
-  "価値は 1/4 波（約 3,300 局）では局ごとに覚え込むので、一緒に訓練した価値の誤差は周ごとに上がり、本当の手札の組が最も悪化した（指紋として覚え込みを速める）。凍結した胴体の上の線形の探りで読んだ",
-  "守りの応手（カウンター・ブロック）の方策は記録に無く測れない。測るなら窓の候補と Q を記録に書き出す必要がある",
-  "torch 2.14.1+cu130（CPU 版の配布元はプロキシで 403）を PyPI から入れて訓練し、ゲートの前に外した（§7.53 と同じ既知の件）"
- ]
+ "notes": "",
+ "worker": {
+  "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/arena_w4p.json",
+  "k": 25,
+  "branch": "claude/arena-w4p-w25",
+  "code_commit": "daf3abfb3a4f9836168f233fbd879fa505a1e755"
+ }
 }
