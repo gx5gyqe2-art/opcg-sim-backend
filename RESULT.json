@@ -1,169 +1,147 @@
 {
- "job": "policy-after-desk",
+ "job": "policy-oracle-hand-desk",
  "status": "done",
- "branch": "claude/policy-after-desk",
- "spec": "docs/search_efficiency_plan.md §7.53（本線 claude/cpu-spec-improvements-yw91jd @ 18cec8b・台帳 2+421）",
- "report": "docs/reports/2026-10-25_policy_after_desk.md",
+ "branch": "claude/policy-oracle-hand-desk",
+ "spec": "docs/search_efficiency_plan.md §7.54（本線 claude/cpu-spec-improvements-yw91jd @ fc3ed8c・台帳 2+426）",
+ "report": "docs/reports/2026-10-25_policy_oracle_hand_desk.md",
  "code": [
-  "opcg_sim/learned/train/n_rel_after_desk.py（build＝記録の再生と打った後の盤面・train＝比べる訓練。1 回きりの道具・テストなし）",
-  "n1_results/policy_after_desk/summarize.py",
-  "n1_results/policy_after_desk/oracle_1ply.py"
+  "opcg_sim/learned/train/n_rel_oracle_hand_desk.py（build＝記録の再生と相手の本当の手札の列・train＝比べる訓練。1 回きりの道具・テストなし）",
+  "n1_results/policy_oracle_hand_desk/summarize.py",
+  "n1_results/policy_oracle_hand_desk/value_probe.py"
  ],
- "make_test": "green（cargo test 637 passed＋pytest 880 passed, 13 skipped・torch はゲートの環境から外した＝torch のテストは skip）",
+ "make_test": "green（cargo test 637 passed＋pytest 880 passed, 13 skipped・torch はゲートの前に外した。1 回目は他の処理が無い状態でも journal::tests::undo_is_faster_than_cloning_the_state〔時間比べ・3.9 倍〕が落ち、回し直しで green）",
  "material": {
-  "wave": "54（claude/n54-w01〜w08・生成役 r24・1/4 波）",
+  "wave": "54（claude/n54-w01〜w08・生成役 r24・1/4 波・§7.53 と同じ材料）",
   "games": 3840,
   "replay_diverged": 0,
-  "policy_points": 269169,
-  "candidates": 3347160,
   "value_rows": 665962,
+  "policy_points": 269169,
   "holdout": "seed % 7",
   "val_points": 20000,
-  "resolved_variant": "w01〜w04 だけ（窓を Game.resolve_windows で閉じた材料・h_* の組）"
+  "val_points_def": 338,
+  "hand_cols": 18,
+  "note_def": "守り（決める席が手番でない）の方策点は 1.2% で、引き直し（MULLIGAN/KEEP_HAND）と効果の対象選択だけ。カウンター・ブロックの窓は記録に訪問分布が無い"
+ },
+ "r24_before": {
+  "val_ce": 1.8508,
+  "top1": 0.54,
+  "mis": 0.0853
  },
  "final_epoch": {
   "base_scratch": {
    "ep": 3,
-   "val_ce": 1.8712,
-   "top1": 0.5077,
-   "mis": 0.092,
-   "mis_order": 0.028,
-   "mis_atk_atk": 0.0364,
-   "train_probe_ce": 1.8553,
-   "val_vmse": 0.612
+   "val_ce": 1.8693,
+   "top1": 0.505,
+   "mis": 0.0924,
+   "mis_atk_atk": 0.0348,
+   "mis_order": 0.0293,
+   "mis_play_play": 0.0095,
+   "val_atk_ce": 1.8883,
+   "val_def_ce": 0.7634,
+   "train_probe_ce": 1.8531,
+   "val_vmse": 0.621,
+   "val_vmse_def": 0.6197
   },
-  "after_scratch": {
+  "true_scratch": {
    "ep": 3,
-   "val_ce": 1.8586,
-   "top1": 0.5001,
-   "mis": 0.0922,
-   "mis_order": 0.0267,
-   "mis_atk_atk": 0.0349,
-   "train_probe_ce": 1.8436,
-   "val_vmse": 0.5663
+   "val_ce": 1.8849,
+   "top1": 0.5004,
+   "mis": 0.0969,
+   "mis_atk_atk": 0.0357,
+   "mis_order": 0.03,
+   "mis_play_play": 0.0101,
+   "val_atk_ce": 1.9042,
+   "val_def_ce": 0.7628,
+   "train_probe_ce": 1.8669,
+   "val_vmse": 0.6996,
+   "val_vmse_def": 0.7114
+  },
+  "shuffle_scratch": {
+   "ep": 3,
+   "val_ce": 1.8805,
+   "top1": 0.5027,
+   "mis": 0.095,
+   "mis_atk_atk": 0.037,
+   "mis_order": 0.0294,
+   "mis_play_play": 0.0094,
+   "val_atk_ce": 1.8997,
+   "val_def_ce": 0.763,
+   "train_probe_ce": 1.8676,
+   "val_vmse": 0.5602,
+   "val_vmse_def": 0.5644
   },
   "base_r24": {
    "ep": 3,
-   "val_ce": 1.8283,
-   "top1": 0.5386,
-   "mis": 0.0822,
-   "mis_order": 0.0242,
-   "mis_atk_atk": 0.0314,
-   "train_probe_ce": 1.8157,
-   "val_vmse": 0.518
-  },
-  "after_r24": {
-   "ep": 3,
-   "val_ce": 1.8221,
-   "top1": 0.5289,
-   "mis": 0.0833,
-   "mis_order": 0.0235,
-   "mis_atk_atk": 0.0314,
-   "train_probe_ce": 1.8072,
-   "val_vmse": 0.5303
-  },
-  "after_r24_xrand": {
-   "ep": 3,
-   "val_ce": 1.8249,
-   "top1": 0.5241,
-   "mis": 0.0825,
-   "mis_order": 0.023,
-   "mis_atk_atk": 0.0315,
-   "train_probe_ce": 1.81,
-   "val_vmse": 0.5247
-  },
-  "h_base_r24": {
-   "ep": 3,
-   "val_ce": 1.8315,
-   "top1": 0.5325,
+   "val_ce": 1.8284,
+   "top1": 0.5382,
    "mis": 0.0818,
-   "mis_order": 0.0248,
+   "mis_atk_atk": 0.0314,
+   "mis_order": 0.0243,
+   "mis_play_play": 0.0088,
+   "val_atk_ce": 1.8467,
+   "val_def_ce": 0.7626,
+   "train_probe_ce": 1.816,
+   "val_vmse": 0.5247,
+   "val_vmse_def": 0.5312
+  },
+  "true_r24": {
+   "ep": 3,
+   "val_ce": 1.829,
+   "top1": 0.5393,
+   "mis": 0.0816,
+   "mis_atk_atk": 0.0307,
+   "mis_order": 0.0252,
+   "mis_play_play": 0.0089,
+   "val_atk_ce": 1.8473,
+   "val_def_ce": 0.7627,
+   "train_probe_ce": 1.8161,
+   "val_vmse": 0.5571,
+   "val_vmse_def": 0.5684
+  },
+  "shuffle_r24": {
+   "ep": 3,
+   "val_ce": 1.8291,
+   "top1": 0.537,
+   "mis": 0.0818,
    "mis_atk_atk": 0.0311,
-   "train_probe_ce": 1.8206,
-   "val_vmse": 0.5428
-  },
-  "h_after_r24": {
-   "ep": 3,
-   "val_ce": 1.827,
-   "top1": 0.5194,
-   "mis": 0.0819,
-   "mis_order": 0.0246,
-   "mis_atk_atk": 0.0291,
-   "train_probe_ce": 1.8133,
-   "val_vmse": 0.5415
-  },
-  "h_afterres_r24": {
-   "ep": 3,
-   "val_ce": 1.8251,
-   "top1": 0.5205,
-   "mis": 0.0808,
-   "mis_order": 0.0241,
-   "mis_atk_atk": 0.0304,
-   "train_probe_ce": 1.8111,
-   "val_vmse": 0.5331
+   "mis_order": 0.0247,
+   "mis_play_play": 0.0086,
+   "val_atk_ce": 1.8475,
+   "val_def_ce": 0.7627,
+   "train_probe_ce": 1.8154,
+   "val_vmse": 0.5231,
+   "val_vmse_def": 0.5325
   }
  },
- "diff_after_minus_base_val_ce_ep3": {
-  "scratch": -0.0126,
-  "r24": -0.0062,
-  "r24_xrand": -0.0034,
-  "half_r24": -0.0045,
-  "half_r24_resolved": -0.0064
+ "diff_val_ce_ep3": {
+  "true_minus_base_r24": 0.0006,
+  "true_minus_shuffle_r24": -0.0001,
+  "true_minus_base_scratch": 0.0156,
+  "true_minus_shuffle_scratch": 0.0044
  },
- "oracle_1ply_r24": {
-  "points": 20000,
-  "top1_value_1ply": 0.35055,
-  "top1_when_best_keeps_turn": 0.4135984950282182,
-  "top1_when_best_passes": 0.2709064162045943,
-  "persp": "actor",
-  "mis_all": 0.1545,
-  "mis_atk_atk": 0.04255,
-  "mis_order": 0.03795,
-  "mis_play_play": 0.0137,
-  "mis_other": 0.0603,
-  "mis_unvisited": 0.0119,
-  "pend_self_frac": 0.4754457726063302,
-  "q_corr_within_point_mean": 0.5103645564034636,
-  "q_corr_points": 16839
+ "value_probe_frozen_r24_linear": {
+  "lin_v": 0.5054,
+  "lin_v+hand": 0.5047,
+  "lin_v+shuffle": 0.5054,
+  "lin_v+hand+hand*v": 0.5044
  },
- "oracle_1ply_r24_resolved": {
-  "points": 19249,
-  "top1_value_1ply": 0.33892669749077875,
-  "top1_when_best_keeps_turn": 0.3348333234649772,
-  "top1_when_best_passes": 0.36822033898305084,
-  "persp": "actor",
-  "mis_all": 0.1503454724920775,
-  "mis_atk_atk": 0.07387396747883007,
-  "mis_order": 0.03543041196945296,
-  "mis_play_play": 0.006493843836043431,
-  "mis_other": 0.034547249207751055,
-  "mis_unvisited": 0.006182139331913346,
-  "pend_self_frac": 0.9166707953494517,
-  "q_corr_within_point_mean": 0.5552357422732792,
-  "q_corr_points": 16212
+ "value_probe_def": {
+  "lin_v": 0.519,
+  "lin_v+hand": 0.5179,
+  "lin_v+shuffle": 0.519
  },
  "forecast_check": {
-  "ce_drop_ge_0.05 (p=0.3)": "外れ（最大 0.013・r24 から 0.006）",
-  "order_mistakes_halved": "該当しない（r24 から 2.42%→2.35%・一から 2.80%→2.67%）",
-  "lt_0.02_and_order_flat => search's job": "該当"
+  "policy_drop_ge_0.05_p0.5": "外れ（r24 から +0.0006・一から 混ぜた列比 +0.0044）",
+  "value_drops_clearly": "外れ（凍結した胴体の上の線形で −0.0007＝0.14%）",
+  "rule": "0.02 未満＝この線（方策の頭に見立ての列）を閉じる"
  },
- "verdict": "本実装へは進まない（推薦）。壁は入力の中身でもない＝残りは数手先を読む種類で探索の仕事。",
- "cost_estimate": {
-  "forward_ratio_L12": "×6.4（候補ごとに胴体 0.31M MAC）",
-  "move_time": "×3.3〜×5.5（中心 ×5）＝対戦 API 0.24 秒→約 1.2 秒。根だけで使う形なら ×1.01 前後・上位 4 本だけなら ×2.3 前後",
-  "generation": "教材作りも同じ比＝波 54（約 1.7 時間）→約 8.5 時間、または同じ時間で 1/5 の局",
-  "training": "torch 1 周 約 200 秒→約 830 秒（×4.2）・打った後の盤面は 1/4 波で 4.0 GB（全波 16 GB・memmap 前提）"
- },
+ "reading": "方策の教師（訪問分布）は公平な世界（reveal=fair・世界 1 本）で読む探索が作る＝相手の本当の手札を知らない。教師の分布は公開情報とその席が知る札の関数なので、本当の手札を見せても方策の誤差の上限は定義の上で 0（実測 0.000）。+76.5 Elo（相手の手札を見て読む探索・2026-10-21_reveal_arena）は探索側の伸びしろで、公平な教師を真似るネットの一目には移らない。",
+ "next": "第 2 段を「方策の頭に推測の列を足す」形でやるのはやめる。推測は探索の世界の引き直し（相手の手札を推測の分布で引く）か窓の配り直しに入れ、アリーナで測る（天井 +76.5）。",
  "notes": [
-  "局の再生は reanalyze.py の打ち直し（探索を回す）ではなく、記録の sig／pol_k／forced_sig から実対局に出た原始手を組み直して当てた。各行で encode が記録の scalars／tokens とビット一致することを確かめ、3,840 局で外れ 0。",
-  "対象選択（RESOLVE_EFFECT_SELECTION）は legal_json が既定の 1 本しか返さないので、その形に記録の selected_uuids／accepted を写した。",
-  "打った後の盤面は fork_world(席, 'fair') で作った（打った後に引く・覗く札は本物を見せない）。本物の盤面からだと選んだ候補の後が記録の次の行と全部一致し、公平な世界では山札を見る効果の後だけ違う（5 局 73 本中 18 本）。",
-  "打った後の頭の比較相手（今の頭）は同じ材料・同じ点（全候補で盤面が作れた点＝全点）・同じ周数。トークンの対は全組 factor_pairs・fast_max（値は丸めの範囲で同じ）。",
-  "§7.52 の数字は波 53 の前半・この報告は波 54 の 1/4 なので、水準（1.85 前後）は直接は並ばない。同じ材料の今の頭と並べて読んだ。",
-  "打った後に決める席から符号化して価値の符号を返す版（build --persp pending）は w01 だけで一手先の計器だけ測った（1 位一致 0.337 対 0.344＝良くならない）。訓練の組は回していない。",
-  "h_after_r24 の 1 回目は同時に回した組とのメモリの取り合いで落ちた（ログ空・OOM と推定）ので、単独で回し直した（--threads 2・値は 1 スレッドと丸めの範囲で同じ）。",
-  "torch 2.14.1+cu130（CPU 版の配布元はプロキシで 403）を入れたままだと test_grads_match_numpy が 5.5e-3 で落ちる（2026-10-16 の r11 の記録と同じ既知の件）。訓練の後に torch を外してゲートを回した。pip uninstall の残りの空の torch ディレクトリはスクラッチへ退避した。",
-  "道具は learned/train に置いたが tests/scripts ではないので docs/TEST_SPEC.md の表には足していない（§7.52 の n_rel_attn_desk.py と同じ扱い）。",
-  "材料（data/n_records・data/after*・4 GB 超）は push していない。build で作り直せる（3,840 局で 4 プロセス 10 分）。"
+  "予告の 5 割は『本当の最善手が手札で変わる』見込みで、『教師の分布が手札で変わる』見込みではなかった（数を見た後に気づいた・報告の読み 1〜2）",
+  "一からの組は足した重みを乱数で始めるので、混ぜた列でも今の入力より +0.011 悪い（列を足す手間）。比べるのは本当の手札 − 混ぜた列",
+  "価値は 1/4 波（約 3,300 局）では局ごとに覚え込むので、一緒に訓練した価値の誤差は周ごとに上がり、本当の手札の組が最も悪化した（指紋として覚え込みを速める）。凍結した胴体の上の線形の探りで読んだ",
+  "守りの応手（カウンター・ブロック）の方策は記録に無く測れない。測るなら窓の候補と Q を記録に書き出す必要がある",
+  "torch 2.14.1+cu130（CPU 版の配布元はプロキシで 403）を PyPI から入れて訓練し、ゲートの前に外した（§7.53 と同じ既知の件）"
  ]
 }
