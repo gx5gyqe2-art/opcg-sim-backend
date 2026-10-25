@@ -27,9 +27,10 @@ MODELS = os.path.join(DATA, "learned")
 CARDS_PATH = os.path.join(DATA, "opcg_cards.json")
 
 #: 出荷既定のネット（生成・アリーナ・serve が同じものを使う＝物差しを 1 本に保つ）。
-#: **r22**（2026-10-24 採用・`docs/reports/r22_adoption_20261024.md`・直したエンジンで r13d が打った波 51 だけで r13d から育てた＝era12）。
-#: ロールバック先は r13d（同梱 `nrel_r13d.npz`）、その先は r13b（`nrel_r13b.npz`）。
-DEFAULT_NET = os.path.join(MODELS, "nrel_r22.npz")
+#: 前の既定 r22（2026-10-24 採用・`docs/reports/r22_adoption_20261024.md`・直したエンジンで r13d が打った波 51 だけで r13d から育てた＝era12）。
+#: **r23**（2026-10-25 採用・`docs/reports/r23_adoption_20261025.md`・r22 が打った波 52 の π と波 52＋51 の価値で r22 から育てた＝era13）。
+#: ロールバック先は r22（同梱 `nrel_r22.npz`）、その先は r13d（`nrel_r13d.npz`）、r13b（`nrel_r13b.npz`）。
+DEFAULT_NET = os.path.join(MODELS, "nrel_r23.npz")
 
 #: serve 既定（`opcg_sim/learned/config.py` の共有既定と同じ値。Rust 側 `DecideOptions`
 #: の既定と一致するので、通常はここを触らない）。

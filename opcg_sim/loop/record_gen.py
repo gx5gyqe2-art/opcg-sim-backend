@@ -90,7 +90,7 @@ from opcg_sim.loop import decks as D                                   # noqa: E
 from opcg_sim.loop import driver as DR                                 # noqa: E402
 from opcg_sim.loop import engine as E                                  # noqa: E402
 
-MAX_STEPS = 400
+MAX_STEPS = DR.DEFAULT_MAX_STEPS   # 1,000（2026-10-25・driver と同じ値・reanalyze も使う）
 MAX_CI = 24            # card_idx の PAD 長（G 系符号化の既定枠・列の形は据え置き）
 ENC_VERSION = 12       # dump v1 の符号化世代（過去の波の meta にだけ残る）
 ENC_VERSION_V2 = 13    # dump v2／v3／波 29 まで（v12 ＋ グローバル追加 29・append-only）
