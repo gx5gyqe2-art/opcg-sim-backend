@@ -17,15 +17,17 @@
    **差（b − a）≥ 0.20 かつ 95% 区間の下限 > 0 の点＝損の候補**。損の候補だけ、審判 r20 でも打ち直し（同じ K）、
    深い読み（出荷の 4 倍の 5,120 回・世界 4 本・証明 off・seed はずらす）で a と b の根の値と、当てた後の値を書く。
    ``recheck``（候補だけ）: 独立の配り方 48 通りで審判 2 本とも打ち直す（K＝32 の 1 回の判定は偶然でも 3% ほど線を越えるため）。
-   ``verify``（候補だけ）: 同じ打ち直しを、**手を打った側の今のターンの残りは出荷の設定が打つ**形で（配り方 24 通り × 審判 2 本）。
-   a が箱の 1 段目・詰みの手順の 1 手目のとき、160 回の審判が残りを打てずに a だけが不利になる偏りを除く。
+   ``verify``（候補だけ）: 同じ打ち直しを、**今のターンの残りは両席とも出荷の設定が打つ**形で（配り方 24 通り × 審判 2 本）。
+   a が箱の 1 段目・詰みの手順の 1 手目のとき、160 回の審判が残りを打てずに a だけが不利になる偏りと、
+   相手の手番に打った守りの手で、審判の相手役（160 回）が詰めを打ち損じて出る偽の損（3301005・107）を除く
+   （WP `audit-verify-opp`・§7.50）。旧い形（手を打った側だけ出荷の設定・§7.41 の数字）は ``--verify-mover-only``。
    ``winstab``（窓の点）: 探索の乱数（＝窓の根畳みが引く世界 1 本）だけを替えて 8 回選ばせ、選ぶ手が揺れるかを見る。
 3. ``summary``: 損の率（全点・判断の種類別・決め方別・ターン帯・ライフ別・再現・確かめ）・窓の揺れ・損の点の一覧（`summary.json`）。
 
     python tests/scripts/blunder_audit.py play --games 100 --workers 4
     python tests/scripts/blunder_audit.py judge --workers 4
     python tests/scripts/blunder_audit.py recheck --workers 4
-    python tests/scripts/blunder_audit.py verify --workers 4
+    python tests/scripts/blunder_audit.py verify --workers 4            # 旧い形は --verify-mover-only
     python tests/scripts/blunder_audit.py winstab --workers 4
     python tests/scripts/blunder_audit.py summary
 
@@ -455,8 +457,12 @@ def recheck_point(job):
     g, row = job
     t0 = time.time()
     seed, step, name = row["seed"], row["step"], row["seat"]
-    out = {"seed": seed, "step": step}
-    game = replay(g, step)
+    out = {"seed": seed, "step": step, "both": _G["verify_both"]}
+    try:
+        game = replay(g, step)
+    except Exception as exc:  # noqa: BLE001  エンジンが変わって手の列を当て直せない（記録した wheel と違う）
+        out["error"] = "replay: %s: %s" % (type(exc).__name__, str(exc)[:120])
+        return out
     K = _G["k"]
     for rn in ("r13d", "r20"):
         wa, wb = [], []
@@ -494,10 +500,15 @@ def cmd_recheck(a):
 VERIFY_OFFSET = 2000
 
 
-def rollout_ship(game, who, move, wseed, ref, ship, max_steps=MJ.MAX_STEPS):
-    """`MJ.rollout` と同じだが、**手を打った側の今のターンの残り**（そのターン中の自分の判断）は出荷の設定が打つ。
-    審判の弱い打ち継ぎ（箱の 1 段目だけを当てた後に続きを打てない等）で a／b のどちらかが不利になるのを除く。"""
-    g = game.fork_world(who, "fair", int(wseed))
+def rollout_ship(game, who, move, wseed, ref, ship, max_steps=MJ.MAX_STEPS, both=True, real=False, info=None):
+    """`MJ.rollout` と同じだが、**今のターンの残り**は出荷の設定が打つ（その先は審判 `ref`）。
+    ``both``（既定）: 両席とも＝相手の手番に打った守りの手で、審判の相手役（160 回）が詰めを打ち損じる偽の損を除く
+    （WP `audit-verify-opp`・`n1_results/weak_points/dbl_attack2.py` の打ち継ぎ）。
+    ``both=False``: 手を打った側だけ（旧い形・§7.41）。審判の弱い打ち継ぎ（箱の 1 段目だけを当てた後に続きを打てない等）で
+    a／b のどちらかが不利になるのを除く。
+    ``real``: 配り直さず本当の盤面（`game.fork()`）で打つ（`defense_audit` の甲＝本当の手札の確かめ）。配り方の番号は探索の乱数だけを替える。
+    ``info``（dict）を渡すと、決着が今のターンの中で who の負けだったか（``lost_this_turn``）を書く。"""
+    g = game.fork() if real else game.fork_world(who, "fair", int(wseed))
     t0 = int(game.turn_count or 0)
     try:
         g.apply_search_move(who, json.dumps(move, ensure_ascii=False))
@@ -509,7 +520,7 @@ def rollout_ship(game, who, move, wseed, ref, ship, max_steps=MJ.MAX_STEPS):
                 break
             name = pending["player_id"]
             turn = int(g.turn_count or 0)
-            use_ship = name == who and turn == t0
+            use_ship = turn == t0 and (both or name == who)
             spec = ship if use_ship else ref
             c = carries.setdefault((name, use_ship), DR.Carry())
             out = json.loads(g.decide(name, spec.decide_opts(int(wseed), turn, name, c.get(turn, name))))
@@ -524,6 +535,8 @@ def rollout_ship(game, who, move, wseed, ref, ship, max_steps=MJ.MAX_STEPS):
     w = g.winner()
     if w is None:
         return None, "no_winner"
+    if info is not None:
+        info["lost_this_turn"] = bool(w != who and int(g.turn_count or 0) == t0)
     return (1 if w == who else 0), None
 
 
@@ -531,34 +544,47 @@ def verify_point(job):
     g, row = job
     t0 = time.time()
     seed, step, name = row["seed"], row["step"], row["seat"]
-    out = {"seed": seed, "step": step}
-    game = replay(g, step)
+    out = {"seed": seed, "step": step, "both": _G["verify_both"]}
+    try:
+        game = replay(g, step)
+    except Exception as exc:  # noqa: BLE001  エンジンが変わって手の列を当て直せない（記録した wheel と違う）
+        out["error"] = "replay: %s: %s" % (type(exc).__name__, str(exc)[:120])
+        return out
     K = _G["k"]
     for rn in ("r13d", "r20"):
         wa, wb = [], []
         for i in range(K):
             ws = MJ.world_seed(seed, step, VERIFY_OFFSET + i)
-            wa.append(rollout_ship(game, name, row["a"], ws, _G["refs"][rn], _G["ship"])[0])
-            wb.append(rollout_ship(game, name, row["b"], ws, _G["refs"][rn], _G["ship"])[0])
+            wa.append(rollout_ship(game, name, row["a"], ws, _G["refs"][rn], _G["ship"], both=_G["verify_both"])[0])
+            wb.append(rollout_ship(game, name, row["b"], ws, _G["refs"][rn], _G["ship"], both=_G["verify_both"])[0])
         out[rn] = dict(MJ.paired(wa, wb), a=wa, b=wb)
     out["sec"] = round(time.time() - t0, 1)
     return out
+
+
+def _init_verify(k, both):
+    _init_judge(k)
+    _G["verify_both"] = bool(both)
 
 
 def cmd_verify(a):
     """損の候補を、今のターンの残りを出荷の設定が打ち継ぐ形で、独立の配り方 K 通り・審判 2 本で打ち直す。"""
     games = {g["seed"]: g for g in read_jsonl(os.path.join(a.out, "games.jsonl"))}
     rows = [x for x in read_jsonl(os.path.join(a.out, "points.jsonl")) if x.get("cand")]
-    rpath = os.path.join(a.out, "verify.jsonl")
+    rpath = os.path.join(a.out, a.verify_file)
     done = {(x["seed"], x["step"]) for x in read_jsonl(rpath)}
     jobs = [({k: v for k, v in games[x["seed"]].items() if k != "points"}, x) for x in rows if (x["seed"], x["step"]) not in done]
-    print(f"VERIFY todo {len(jobs)} (done {len(done)}) k={a.k}", flush=True)
+    both = not a.verify_mover_only
+    print(f"VERIFY todo {len(jobs)} (done {len(done)}) k={a.k} both={both} -> {rpath}", flush=True)
     t0 = time.time()
-    with get_context("fork").Pool(a.workers, initializer=_init_judge, initargs=(a.k,)) as pool:
+    with get_context("fork").Pool(a.workers, initializer=_init_verify, initargs=(a.k, both)) as pool:
         for i, r in enumerate(pool.imap_unordered(verify_point, jobs, chunksize=1)):
             r["k"] = a.k
             with open(rpath, "a", encoding="utf-8") as f:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            if "error" in r:
+                print(f"VERIFY seed={r['seed']} step={r['step']} error={r['error']} ({i + 1}/{len(jobs)})", flush=True)
+                continue
             print(f"VERIFY seed={r['seed']} step={r['step']} r13d={r['r13d']['diff']} {r['r13d']['ci']} "
                   f"r20={r['r20']['diff']} {r['r20']['ci']} sec={r['sec']} ({i + 1}/{len(jobs)} {time.time() - t0:.0f}s)", flush=True)
     print("VERIFY_DONE", flush=True)
@@ -648,10 +674,10 @@ def cmd_summary(a):
         x["replicated"] = bool(pool["ci"][0] is not None and pool["ci"][0] > 0
                                and r["r13d"]["diff"] > 0 and r["r20"]["diff"] > 0)
     # 確かめ（今のターンの残りを出荷の設定が打ち継ぐ・独立の配り方・審判 2 本）: 同じ規則で通った点＝確かめ済みの損
-    vf = {(x["seed"], x["step"]): x for x in read_jsonl(os.path.join(a.out, "verify.jsonl"))}
+    vf = {(x["seed"], x["step"]): x for x in read_jsonl(os.path.join(a.out, a.verify_file))}
     for x in ok:
         r = vf.get((x["seed"], x["step"]))
-        if not x["cand"] or r is None:
+        if not x["cand"] or r is None or "error" in r:
             continue
         pool = MJ.paired(r["r13d"]["a"] + r["r20"]["a"], r["r13d"]["b"] + r["r20"]["b"])
         x["verify"] = {"r13d": r["r13d"]["diff"], "r20": r["r20"]["diff"], "pool": pool["diff"], "pool_ci": pool["ci"]}
@@ -746,6 +772,9 @@ def main(argv=None):
     p.add_argument("--k", type=int, default=24)
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--out", default=OUT_DIR)
+    p.add_argument("--verify-mover-only", action="store_true",
+                   help="旧い形: 今のターンの残りを手を打った側だけ出荷の設定が打つ（§7.41 の数字の打ち直し）")
+    p.add_argument("--verify-file", default="verify.jsonl", help="確かめの出力（--out からの相対・絶対パス可）")
     p = sub.add_parser("winstab")
     p.add_argument("--n", type=int, default=8)
     p.add_argument("--opts", default=None,
@@ -756,6 +785,7 @@ def main(argv=None):
     p.add_argument("--out", default=OUT_DIR)
     p = sub.add_parser("summary")
     p.add_argument("--out", default=OUT_DIR)
+    p.add_argument("--verify-file", default="verify.jsonl", help="読む確かめ（--out からの相対・絶対パス可）")
     a = ap.parse_args(argv)
     {"play": cmd_play, "judge": cmd_judge, "recheck": cmd_recheck, "verify": cmd_verify, "winstab": cmd_winstab, "summary": cmd_summary}[a.cmd](a)
     return 0
