@@ -7,7 +7,7 @@ Rust 切替後、`pending.rs::counter_candidates` が「カウンター値を持
 両方を出していた。golden の random 帯は防御側のドン!!が尽きた盤面ばかりでこの経路を通らないため、
 ここで API と同じ `RsGame` を実際に駆動して固定する。
 
-盤面の作り方: p1 のデッキを「コスト 1 の【カウンター】イベント EB01-009」で埋めて先攻にし、
+盤面の作り方: p1 のデッキを全部「コスト 1 の【カウンター】イベント EB01-009」にして先攻にし、
 両者の 1 ターン目（攻撃不可）と p1 の 2 ターン目を TURN_END で流す（p1 のドン!! 3 枚はアクティブの
 まま）→ p2 がリーダーで p1 のリーダーを攻撃 → p1 のカウンター要求。
 """
@@ -27,7 +27,8 @@ def _drive_to_counter_step(spend_don: bool = False):
     """p1 先攻。両者 1 ターン目は攻撃できないので、p1 の 2 ターン目（ドン!! 3 枚）を終えてから
     p2 がリーダーで p1 のリーダーを攻撃する。`spend_don` なら p1 は 2 ターン目にドン!!を全部
     リーダーへ付与してアクティブ 0 で防御に入る。"""
-    p1_deck = [COUNTER_EVENT] * 30 + [VANILLA_CHAR] * 20
+    # デッキを全部カウンターイベントにする（30＋20 枚だと配りによって手札に 1 枚も来ない局が 300 回に 1 回あった・2026-10-25）。
+    p1_deck = [COUNTER_EVENT] * 50
     p2_deck = [VANILLA_CHAR] * 50
     game = RsGame.create_from_ids("P1", "P2", LEADER, p1_deck, LEADER, p2_deck, first_player="p1")
     for _ in range(2):
