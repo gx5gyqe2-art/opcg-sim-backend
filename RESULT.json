@@ -1,69 +1,33 @@
 {
- "job": "worker-shallow",
- "status": "done",
- "make_test": "green（cargo test 637 passed＋pytest 831 passed, 62 skipped・77.7 秒）",
- "method": {
-  "chosen": "git clone -q --filter=blob:none --single-branch --branch claude/cpu-spec-improvements-yw91jd",
-  "why": "秒と容量は --depth 1 と同じ（約 13 秒・80 MB）。blob を後で取る木は履歴を全部持つので今の fetch・checkout・push がそのまま動く。--depth 1 は深さを付けずに別のブランチを取ると履歴を根まで取る（波 1 本 9 秒・+73 MB）",
-  "shallow_trees": "履歴を切った木（--depth・環境の履歴 50）でだけ fetch に --depth 1（shell の段は $WORKER_JOB_DEPTH）。全部持つ木には付けない＝深く取った木は今までと同じ",
-  "reuse_env_clone": "採らない（2 つ目の取得はもう 13 秒・0.1 GB。セッションの作業ブランチとの取り合い・環境によって push の中継が違う点の方が重い）"
- },
- "fetch_cost": {
-  "before_full_clone": {
-   "sec": 249,
-   "git_mb": 7617,
-   "tree_mb": 8129,
-   "note": "このコンテナで 1 本。§7.51 の 32 本同時では約 10 分・8.2 GB"
-  },
-  "after_blobless_single_branch": {
-   "sec": 12.8,
-   "git_mb": 81,
-   "tree_mb": 718,
-   "start_line_sec": "10.3〜18.5（試し 11 回）"
-  },
-  "depth1_single_branch": {
-   "sec": 13.0,
-   "git_mb": 77,
-   "tree_mb": 713
-  },
-  "treeless_single_branch": {
-   "sec": 13.3,
-   "git_mb": 80,
-   "tree_mb": 716
-  },
-  "depth50_env_like": {
-   "sec": 11,
-   "git_mb": 79
-  },
-  "wave_branch_fetch": {
-   "depth1_tree_no_depth": "9 秒・+73 MB（3,532 コミット）",
-   "depth1_tree_depth1": "2 秒・+14 MB",
-   "blobless": "fetch 1 秒＋archive 2 秒・+15 MB"
-  }
- },
- "trials": {
-  "claude/worker-shallow-trial-gen": "2 局×3 区切り・保存の後で止め home を消して再開 → 全部飛ばして ALL_DONE",
-  "claude/worker-shallow-trial-resume": "区切り 1 の途中で止め home を消して再開 → 区切り 0 を origin から取り戻し 1・2 を回して ALL_DONE",
-  "claude/worker-shallow-trial-train": "教材を別のブランチから取って 1 周＋評価帯 → ALL_DONE",
-  "claude/worker-shallow-trial-arena-w01": "候補を訓練のブランチから取る・2 ペア・done の前で止めて再開 → ALL_DONE",
-  "claude/worker-shallow-trial-audit-w01": "審判 r20 を claude/train-r20 から取る・5 段 → ALL_DONE",
-  "claude/worker-shallow-trial-w01": "壊れたクローン → 浅く取り直し（.git 82 MB）→ ALL_DONE",
-  "claude/worker-shallow-trial-w02": "手元の main に居る → 結果ブランチへ・main は動かない → ALL_DONE",
-  "claude/worker-shallow-trial-w03": "push を拒否させる → PUSH_FAILED（最後）・ALL_DONE なし",
-  "claude/worker-shallow-trial-w04": "届かない push → PUSH_FAILED（最後）→ 戻して再開で ALL_DONE",
-  "claude/worker-shallow-trial-w05": "全部取った 7.6 GB の木 → ALL_DONE・浅くならない（互換）",
-  "claude/worker-shallow-trial-w06": "履歴 50 の浅い木 → --depth 1 で ALL_DONE・再開も ALL_DONE"
+ "job": "n54-w13",
+ "role": "gen",
+ "status": "partial",
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r24.npz",
+  "games": 480,
+  "sims": 1280,
+  "worlds": 1,
+  "budget": 0,
+  "decks": "real",
+  "seed_base": 2617000
  },
  "outputs": {
-  "report": "docs/reports/2026-10-25_worker_shallow.md",
-  "code": [
-   "opcg_sim/loop/worker_job.py",
-   "opcg_sim/loop/worker_prompts.py",
-   ".claude/skills/worker-job/SKILL.md",
-   "docs/n_loop_ops.md §7.42 の例・§7.53 の実装と確かめ"
-  ],
-  "trial_specs": "opcg_sim/loop/jobs/trial_shallow*.json",
-  "trial_source_branch": "claude/worker-shallow-trial-src"
+  "dirs": [
+   "n_records/n54_w13_p0"
+  ]
  },
- "notes": "壊れたクローン（.git だけ）では起動の行の fetch が先に失敗して ~/worker_job.py が書かれない（今までと同じ・直していない。k=1 は実行役のファイルを別に置いて回した。浅い取得で clone が十数秒になり clone 途中で止まる壊れ方は起きにくくなった）; origin のブランチ削除は中継が 403 で断る＝試しの結果ブランチは残る; §7.46 の『手元の途中結果の退避が別のジョブの結果も運ぶ』型は範囲外で直していない; 32 本同時の負荷は測っていない（§7.51 の exit 128 が消えるかは次の本番で見る）; テストは足していない（器の直し）。エンジンを触らないので audit-cross は回していない; このコンテナには pytest が無く、make test の前に pytest・pytest-xdist・fastapi・pydantic・httpx・uvicorn を pip で入れた。62 skipped の理由は確かめていない"
+ "metrics": {
+  "parts_done": 1,
+  "games": 120,
+  "rows": 20463,
+  "dropped": 0,
+  "sec_play_mean": 23.35
+ },
+ "notes": "",
+ "worker": {
+  "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/gen_n54.json",
+  "k": 13,
+  "branch": "claude/n54-w13",
+  "code_commit": "880c22ba41be40ce38c5a569f60e72e6db2af98f"
+ }
 }
