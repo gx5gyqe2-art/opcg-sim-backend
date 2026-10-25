@@ -1,0 +1,52 @@
+{
+ "kind": "arena",
+ "section": "§7.53",
+ "ledger_grep": "7.53 WP `worker-shallow`",
+ "about": "試し: 浅い取得からアリーナ 2 ペア（1 ペアずつ 2 区切り・32 回・候補は試しの訓練のブランチから）",
+ "job": "trial-shallow-arena-w{KK}",
+ "branch": "claude/worker-shallow-trial-arena-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 1,
+ "hours": 0.3,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "claude/worker-shallow-trial-train:n1_results/nrel_strial.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r13d.npz"
+ },
+ "out_dir": "arena_strial",
+ "pairs": 2,
+ "chunk_pairs": 1,
+ "bands": 1,
+ "workers": 2,
+ "args": [
+  "--sims",
+  "32",
+  "--cand-sims",
+  "32"
+ ],
+ "tail_args": [],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "9990000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "strial_real_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_strial.npz",
+  "baseline": "nrel_r13d.npz",
+  "both": "sims 32",
+  "pairs": 2
+ },
+ "commit_message": "trial shallow arena shard {KK}"
+}

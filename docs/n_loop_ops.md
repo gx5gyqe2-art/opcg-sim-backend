@@ -4172,7 +4172,7 @@ echo ALL_DONE
 手順は skill `worker-job`（本線の .claude/skills/worker-job/SKILL.md・…）。仕様の正本は docs/n_loop_ops.md §7.42。
 コードは変更しない・PR は作らない・コミットにモデル名を入れない。質問で止まらず、迷った点は報告と RESULT.json の notes に書いて完走してください。**`~/worker_job.out` に ALL_DONE が出るまでターンを終えないでください**（目安 1.5 時間・9 分以内の待ちを繰り返す）。
 
-cd ~ && ([ -d opcg-sim-backend ] || git clone -q https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend && git fetch -q origin claude/cpu-spec-improvements-yw91jd && git show FETCH_HEAD:opcg_sim/loop/worker_job.py > ~/worker_job.py
+cd ~ && ([ -d opcg-sim-backend ] || git clone -q --filter=blob:none --single-branch --branch claude/cpu-spec-improvements-yw91jd https://github.com/gx5gyqe2-art/opcg-sim-backend.git) && cd ~/opcg-sim-backend && git fetch -q origin claude/cpu-spec-improvements-yw91jd && git show FETCH_HEAD:opcg_sim/loop/worker_job.py > ~/worker_job.py
 nohup python ~/worker_job.py --job arena_r22 --k 3 > ~/worker_job.out 2>&1 &
 ````
 
@@ -4278,12 +4278,17 @@ nohup python ~/worker_job.py --job arena_r22 --k 3 > ~/worker_job.out 2>&1 &
 - **判定**: 公平同士・両席 160 回・基準 r23・主 random × real・副 固定ミラー・参考 random × synth_roles2 → 候補なら本番の設定。seed は訓練の後に払い出す。
 - **予告（数を見る前）**: r24 vs r23 主 +5〜+20（r22 → r23 の +25.3 より小さい見込み・同じ打ち筋の 2 周目）。dropped は波 52 の 26 局（0.17%）から 0〜数局（手数の上限と払えない起動の型が消えるため）。
 
+**波 53 の結果（2026-10-25）**: 32 シャード全部完走・15,360 局・**2,594,900 行**・**dropped 0**（波 52 は 26・払えない起動の修正と手数の上限 1,000 で消えた＝予告どおり）。
+r24 の訓練はジョブ定義 `train_r24`（Sonnet・warm-start r23・π＝波 53・価値＝波 53＋52・約 512 万行・評価帯は波 53 の holdout で r22／r23／r24 を比べる）。メモリは r23（499 万行で 12.92 GB）から見て約 13.2 GB の見込み。
+
 ### 7.51 根の詰みの証明の節点の上限の本番アリーナ（WP `rs-lethal-nodes`・2026-10-25）
 
 `docs/search_efficiency_plan.md` §7.49・報告 `docs/reports/2026-10-25_lethal_nodes.md`。台帳 2+407。候補席＝根の証明の節点の上限 80,000（`--cand-lethal-root-nodes 80000`）・基準席＝今の 20,000。
 両席 r23・出荷の設定・random × real・32 シャード × 84 ペア・seed **3681000 + (k−1)×1000**。ジョブ定義 `arena_lnodes`・Sonnet。
 作業セッションの測り: 証明 853 → 966（+113・増えた分は全部、本当の配り方でも勝てる点・偽の証明は 1 点のまま・失った証明 0）・1 手の平均 +19.6%・99% 点 +10.3%。
 **予告**: +1〜+3。採るのは下限 ≥ 0.49 かつ正のとき（1 手 +20% の費用があるので、退行なしだけでは採らない）。
+
+**結果（2026-10-25・報告 `docs/reports/2026-10-25_lethal_nodes_arena.md`）**: 2,688 ペア **+0.6 [−0.3, +1.6]**・void 0・結果が分かれたのは 15 ペア（候補 10・基準 5）。採否はユーザ判断。
 
 ### 7.52 守りの窓の相手から見た詰みの証明の本番アリーナ（WP `rs-defense-proof`・2026-10-25）
 
@@ -4314,5 +4319,8 @@ nohup python ~/worker_job.py --job arena_r22 --k 3 > ~/worker_job.out 2>&1 &
 **報告** `docs/reports/2026-10-25_worker_shallow.md`・`RESULT.json`（job "worker-shallow"・status done）・ブランチ `claude/worker-shallow`。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
 **注意**: 試しの間にも本番の作業セッション（§7.51 のアリーナ 32 本・r24 の訓練）が本線の `worker_job.py` を読む。本線へはコーディネータが取り込む（作業セッションは自分のブランチにだけ push する）。
 
-**波 53 の結果（2026-10-25）**: 32 シャード全部完走・15,360 局・**2,594,900 行**・**dropped 0**（波 52 は 26・払えない起動の修正と手数の上限 1,000 で消えた＝予告どおり）。
-r24 の訓練はジョブ定義 `train_r24`（Sonnet・warm-start r23・π＝波 53・価値＝波 53＋52・約 512 万行・評価帯は波 53 の holdout で r22／r23／r24 を比べる）。メモリは r23（499 万行で 12.92 GB）から見て約 13.2 GB の見込み。
+**実装と確かめ（2026-10-25・ブランチ `claude/worker-shallow`・報告 `docs/reports/2026-10-25_worker_shallow.md`）**。
+- **方式は `--filter=blob:none --single-branch --branch 本線`**（履歴は取って中身は要るときだけ）。取得は **249 秒・7.6 GB → 約 13 秒・81 MB**（作業の木込み 0.72 GB）。`--depth 1` も同じ 13 秒・77 MB だが、深さを付けずに別のブランチを取るとその履歴を根まで取る（波 1 本で 9 秒・+73 MB）＝どの fetch にも深さが要る。blob を後で取る木は履歴を全部持つので、今の fetch・checkout・push がそのまま動く。
+- 指示文の起動の行（`worker_prompts.py`＝`worker_job.CLONE_ARGS`・skill・§7.42 の例）と実行役の取り直しを同じ形にした。実行役は履歴を切った木（`--depth`・環境が取る履歴 50 の木）でだけ fetch に `--depth 1` を付ける（shell の段は `$WORKER_JOB_DEPTH`）。**全部持つ木には付けない＝既に深く取った木は今までと同じ操作**。固定の `base.commit` が手元に無ければ名指しで取る。
+- 試し（結果ブランチ `claude/worker-shallow-trial-*` は残してある）: 浅い取得から gen（区切りの途中で止め、作業の home を消して再開）・train・arena（止めて再開）・audit（審判を別のブランチから取る）が ALL_DONE。§7.46 の型: 壊れたクローン → 浅く取り直し・手元の main・push の拒否（ALL_DONE なし）・届かない push（ALL_DONE なし → 戻して再開で ALL_DONE）。加えて全部取った 7.6 GB の木（浅くならない）と履歴 50 の木（再開も）で ALL_DONE。
+- 環境の木（`/home/user/opcg-sim-backend`）の使い回しは採らない: 2 つ目の取得はもう 13 秒・0.1 GB で、セッションの作業ブランチと結果ブランチの取り合い（§7.46 の 2 で止まる）・環境によっては push の中継がセッションのブランチしか通さないかもしれない点の方が重い。

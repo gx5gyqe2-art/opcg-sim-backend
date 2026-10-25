@@ -31,6 +31,10 @@ MAIN = "claude/cpu-spec-improvements-yw91jd"
 REPO_URL = "https://github.com/gx5gyqe2-art/opcg-sim-backend.git"
 REPO_SLUG = "gx5gyqe2-art/opcg-sim-backend"                                    # origin の URL の末尾（プロキシ経由でも同じ）
 GIT_ID = ["-c", "user.email=g.x5gyqe2@gmail.com", "-c", "user.name=worker"]   # 今までの指示書と同じ
+# 取得は浅く（WP `worker-shallow`・§7.53）: 本線だけ・履歴は取って中身（blob）は要るときだけ origin から取る。
+# 全部取る clone は 1 本 約 10 分・8 GB（過去の教材・アリーナの記録・ネットの履歴）＝これは十数秒・約 0.1 GB。
+CLONE_ARGS = ["--filter=blob:none", "--single-branch", "--branch", MAIN]
+DEPTH_ENV = "WORKER_JOB_DEPTH"   # 履歴を切った木（`--depth`）なら `--depth 1`・そうでなければ空（shell の fetch が読む）
 PUSH_WAITS = (2, 4, 8, 16)                                                      # 4 回までやり直す
 ENV = {"OPCG_LOG_SILENT": "1"}
 
@@ -161,7 +165,7 @@ def _prep_steps(P):
         if ":" in src:
             br, p = src.split(":", 1)
             dst = P.path(f"~/{os.path.basename(p)}")
-            P.add("prep", f"git fetch -q origin {shlex.quote(br)} && git show FETCH_HEAD:{shlex.quote(p)} > {shlex.quote(dst)}",
+            P.add("prep", f"git fetch -q ${DEPTH_ENV} origin {shlex.quote(br)} && git show FETCH_HEAD:{shlex.quote(p)} > {shlex.quote(dst)}",
                   shell=True, note=f"ネット {name}")
             s["nets"][name] = dst
 
@@ -223,7 +227,7 @@ def _train_steps(P):
         dest = P.path(w["dest"])
         for i in range(int(w.get("first", 1)), int(w["shards"]) + 1):
             br = fmt(w["branch"], dict(P.names, w=i, ww=f"{i:02d}"))
-            P.add("prep", f"git fetch -q origin {shlex.quote(br)} && mkdir -p {shlex.quote(dest)} && "
+            P.add("prep", f"git fetch -q ${DEPTH_ENV} origin {shlex.quote(br)} && mkdir -p {shlex.quote(dest)} && "
                           f"git archive FETCH_HEAD {shlex.quote(w.get('path', 'n_records'))} | tar -x -C {shlex.quote(dest)}",
                   shell=True, skip=("glob_count", P.path(w["glob"]), int(w["expect"])), note=f"教材 {br}")
         P.add("prep", None, fn=("expect", P.path(w["glob"]), int(w["expect"])), note=f"{w['glob']} が {w['expect']} 個")
@@ -277,7 +281,7 @@ def _audit_steps(P):
     P.add("prep", ["mkdir", "-p", out])
     for dst, src in (s.get("fetch") or {}).items():          # 道具がリポジトリの中のパスで読むもの（審判のネットなど）
         br, p = src.split(":", 1)
-        P.add("prep", f"mkdir -p {shlex.quote(os.path.dirname(dst) or '.')} && git fetch -q origin {shlex.quote(br)} "
+        P.add("prep", f"mkdir -p {shlex.quote(os.path.dirname(dst) or '.')} && git fetch -q ${DEPTH_ENV} origin {shlex.quote(br)} "
                       f"&& git show FETCH_HEAD:{shlex.quote(p)} > {shlex.quote(dst)}",
               shell=True, skip=("exists", dst), note=f"道具が読むファイル {dst}")
     common = list(s.get("args", []))
@@ -331,6 +335,14 @@ def _origin_ok(url):
     return (u[:-4] if u.endswith(".git") else u).endswith(REPO_SLUG)
 
 
+def depth_args(repo):
+    """履歴を切った木（`git clone --depth`・環境が取った履歴 50 コミットの木）なら `--depth 1`。
+    切った木で深さを付けずに別のブランチを取ると、その履歴を根まで全部取ってくる（動くが重い）。
+    全部持つ木・blob を後で取る木には付けない（付けると全部持つ木が浅い木に変わる）。"""
+    r = sh(["git", "rev-parse", "--is-shallow-repository"], cwd=repo, check=False, capture=True)
+    return ["--depth", "1"] if r.returncode == 0 and r.stdout.strip() == "true" else []
+
+
 def repo_problem(repo, refs):
     """作業の木が使えるか（WP `worker-job-push-check` の 1・§7.46）。使えなければ理由・使えれば None。
     `refs`＝[(ブランチ, 固定のコミット or None)]: origin から取れて、固定のコミットを持つこと
@@ -346,8 +358,9 @@ def repo_problem(repo, refs):
     r = g("remote", "get-url", "origin")
     if r.returncode or not _origin_ok(r.stdout):
         return f"origin が本リポジトリでない（{r.stdout.strip() or '無い'}）"
+    depth = depth_args(repo)
     for br, commit in refs:
-        if g("fetch", "-q", "origin", br).returncode:
+        if g("fetch", "-q", *depth, "origin", br).returncode:
             return f"origin から {br} を取れない"
         got = g("rev-parse", "--verify", "-q", "FETCH_HEAD^{commit}").stdout.strip()
         if not got:
@@ -356,7 +369,10 @@ def repo_problem(repo, refs):
         if g("update-ref", f"refs/remotes/origin/{br}", got).returncode:
             return f"origin/{br} を更新できない"
         if commit and g("cat-file", "-e", f"{commit}^{{commit}}").returncode:
-            return f"コミット {commit} が無い"
+            # 本線だけ・浅く取った木には別のブランチのコミットが無い＝コミットを名指しで取る（GitHub は取れる）
+            g("fetch", "-q", *depth, "origin", commit)
+            if g("cat-file", "-e", f"{commit}^{{commit}}").returncode:
+                return f"コミット {commit} が無い"
     return None
 
 
@@ -369,7 +385,7 @@ def ensure_repo(repo, refs, home):
     print(f"作業の木を取り直す: {repo}（{why}）", flush=True)
     new = repo.rstrip("/") + ".clone"
     shutil.rmtree(new, ignore_errors=True)
-    sh(["git", "clone", "-q", REPO_URL, new])
+    sh(["git", "clone", "-q", *CLONE_ARGS, REPO_URL, new])
     why2 = repo_problem(new, refs)
     if why2 is not None:
         raise RuntimeError(f"取り直したクローンも使えない: {why2}")
@@ -512,7 +528,7 @@ def do_checkout(P):
                 elif not os.path.exists(dst) or os.path.getsize(src) > os.path.getsize(dst):
                     shutil.copy2(src, dst)
     git(P, "stash", "-u", "-q", check=False)
-    remote = git(P, "fetch", "-q", "origin", P.branch, check=False).returncode == 0
+    remote = git(P, "fetch", "-q", *depth_args(P.repo), "origin", P.branch, check=False).returncode == 0
     start = "FETCH_HEAD" if remote else P.ref
     git(P, "checkout", "-q", "-f", "-B", P.branch, start)
     # コードの基のコミット（再開しても始めたときのものを引き継ぐ＝RESULT.json が保存のたびに変わらない）
@@ -804,6 +820,7 @@ def main(argv=None):
     try:
         base = P.s.get("base") or {}
         P.aside += ensure_repo(P.repo, [(args.source, None), (base.get("branch", P.main), base.get("commit"))], P.home)
+        os.environ[DEPTH_ENV] = " ".join(depth_args(P.repo))          # 下の shell の fetch（ネット・教材・道具が読むファイル）
         if not args.spec:
             provenance(P, args.source)
         ok = execute(P)

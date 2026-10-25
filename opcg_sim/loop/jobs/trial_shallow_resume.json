@@ -1,0 +1,51 @@
+{
+ "kind": "gen",
+ "section": "§7.53",
+ "ledger_grep": "7.53 WP `worker-shallow`",
+ "about": "試し: 浅い取得から区切りの途中で止め、作業の木も消して再開する（2 局 × 3 区切り・400 回）",
+ "job": "trial-shallow-resume",
+ "branch": "claude/worker-shallow-trial-resume",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 1,
+ "hours": 0.2,
+ "vars": {
+  "BASE": "9985000 + k*1000"
+ },
+ "seed_base": "BASE",
+ "games": 2,
+ "parts": 3,
+ "workers": 1,
+ "out_dir": "n_records",
+ "part_dir": "trial_sres_p{J}",
+ "net": "opcg_sim/data/learned/nrel_r13d.npz",
+ "args": [
+  "--sims",
+  "400",
+  "--worlds",
+  "1",
+  "--budget",
+  "0",
+  "--decks",
+  "real",
+  "--shard-games",
+  "1"
+ ],
+ "log": "~/trial_shallow_resume.log",
+ "copy_logs": [
+  "~/trial_shallow_resume.log"
+ ],
+ "require": [
+  {
+   "file": "opcg_sim/loop/record_gen.py",
+   "grep": "\"--budget\""
+  }
+ ],
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r13d.npz",
+  "games": 2,
+  "sims": 400
+ },
+ "commit_message": "trial shallow resume"
+}

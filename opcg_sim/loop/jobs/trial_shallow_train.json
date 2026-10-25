@@ -1,0 +1,74 @@
+{
+ "kind": "train",
+ "section": "§7.53",
+ "ledger_grep": "7.53 WP `worker-shallow`",
+ "about": "試し: 浅い取得から訓練 1 周（試しの生成の 6 局）→ 評価帯",
+ "job": "trial-shallow-train",
+ "branch": "claude/worker-shallow-trial-train",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 1,
+ "hours": 0.3,
+ "waves": [
+  {
+   "branch": "claude/worker-shallow-trial-gen",
+   "shards": 1,
+   "dest": "~/trialsw",
+   "glob": "~/trialsw/n_records/trial_sgen_p[0-2]",
+   "expect": 3
+  }
+ ],
+ "common_args": [
+  "--ablate",
+  "rel",
+  "--aux-weight",
+  "0.1",
+  "--lr",
+  "2e-4",
+  "--epochs",
+  "1",
+  "--pi-teacher",
+  "q_improved",
+  "--fast",
+  "--save-each-epoch",
+  "--holdout-mod",
+  "2",
+  "--warm-start",
+  "opcg_sim/data/learned/nrel_r13d.npz"
+ ],
+ "runs": [
+  {
+   "name": "trial",
+   "in": [
+    "~/trialsw/n_records/trial_sgen_p[0-2]"
+   ],
+   "out": "~/nrel_strial.npz",
+   "log": "~/train_strial.log"
+  }
+ ],
+ "bands": [
+  {
+   "in": [
+    "~/trialsw/n_records/trial_sgen_p[0-2]"
+   ],
+   "nrel": [
+    "opcg_sim/data/learned/nrel_r13d.npz",
+    "~/nrel_strial.npz",
+    "~/nrel_strial.ep0.npz"
+   ],
+   "args": [
+    "--policy",
+    "--holdout-mod",
+    "2"
+   ],
+   "out": "~/band_strial.json",
+   "log": "~/band_strial.log"
+  }
+ ],
+ "results_dir": "n1_results",
+ "inputs": {
+  "warm_start": "opcg_sim/data/learned/nrel_r13d.npz"
+ },
+ "commit_message": "trial shallow train"
+}
