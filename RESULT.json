@@ -11,15 +11,16 @@
  "outputs": {
   "dirs": [
    "n_records/trial_sgen_p0",
-   "n_records/trial_sgen_p1"
+   "n_records/trial_sgen_p1",
+   "n_records/trial_sgen_p2"
   ]
  },
  "metrics": {
-  "parts_done": 2,
-  "games": 4,
-  "rows": 527,
+  "parts_done": 3,
+  "games": 6,
+  "rows": 776,
   "dropped": 0,
-  "sec_play_mean": 0.93
+  "sec_play_mean": 0.89
  },
  "notes": "",
  "worker": {
