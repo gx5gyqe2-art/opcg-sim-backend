@@ -1,3 +1,6 @@
   1/2局 行151（main 74） 棄却0 7s
   2/2局 行266（main 124） 棄却0 15s
 N_RECORD_DONE {"rows": 266, "main_rows": 124, "dropped": 0, "forced": {"play": 0, "hold": 0, "target": 0}, "removal_legal_rows": 0}
+  1/2局 行175（main 81） 棄却0 8s
+  2/2局 行376（main 186） 棄却0 15s
+N_RECORD_DONE {"rows": 376, "main_rows": 186, "dropped": 0, "forced": {"play": 0, "hold": 0, "target": 0}, "removal_legal_rows": 0}
