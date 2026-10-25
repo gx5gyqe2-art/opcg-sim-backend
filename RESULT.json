@@ -1,7 +1,7 @@
 {
  "job": "arena-lnodes-w11",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r23.npz + lethal_nodes 80000",
   "baseline": "nrel_r23.npz (lethal_nodes default 20000)",
