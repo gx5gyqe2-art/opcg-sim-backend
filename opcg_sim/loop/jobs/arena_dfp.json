@@ -1,12 +1,12 @@
 {
  "kind": "arena",
- "section": "§7.51",
- "ledger_grep": "7.51 守りの窓の相手から見た詰みの証明の本番アリーナ",
+ "section": "§7.52",
+ "ledger_grep": "7.52 守りの窓の相手から見た詰みの証明の本番アリーナ",
  "about": "守りの証明（defense_proof・自分の視点の配り方）を入れた形 vs 今の形（両席 r23・出荷の設定・random×real・作業ブランチ rs-defense-proof のコード）",
  "job": "arena-dfp-w{KK}",
  "branch": "claude/arena-dfp-w{KK}",
  "base": {
-  "branch": "claude/rs-defense-proof"
+  "branch": "claude/cpu-spec-improvements-yw91jd"
  },
  "shards": 32,
  "hours": 2,

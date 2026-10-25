@@ -1,12 +1,12 @@
 {
  "kind": "arena",
- "section": "§7.49",
- "ledger_grep": "7.49 根の詰みの証明の節点の上限",
+ "section": "§7.51",
+ "ledger_grep": "7.51 根の詰みの証明の節点の上限の本番アリーナ",
  "about": "根の詰みの証明の節点の上限を 80,000 にした形 vs 今の形（20,000・両席 r23・出荷の設定・random×real・作業ブランチ rs-lethal-nodes のコード）",
  "job": "arena-lnodes-w{KK}",
  "branch": "claude/arena-lnodes-w{KK}",
  "base": {
-  "branch": "claude/rs-lethal-nodes"
+  "branch": "claude/cpu-spec-improvements-yw91jd"
  },
  "shards": 32,
  "hours": 2,
