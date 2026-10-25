@@ -10,5 +10,8 @@
  },
  "verify": {
   "sec": 5
+ },
+ "summary": {
+  "sec": 5
  }
 }

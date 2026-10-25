@@ -13,6 +13,7 @@
   "files": [
    "n1_results/trial_shallow_audit/w01/games.jsonl",
    "n1_results/trial_shallow_audit/w01/points.jsonl",
+   "n1_results/trial_shallow_audit/w01/summary.json",
    "n1_results/trial_shallow_audit/w01/worker_steps.json"
   ]
  },
@@ -32,6 +33,9 @@
     "sec": 5
    },
    "verify": {
+    "sec": 5
+   },
+   "summary": {
     "sec": 5
    }
   },
