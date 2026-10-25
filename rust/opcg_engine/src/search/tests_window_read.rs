@@ -105,7 +105,15 @@ fn player(name: &str, life: usize, field: Value, hand: Value, active_don: usize)
 
 /// p2 のリーダーが p1 のリーダーへアタックした直後（p1 はブロッカー 1 体・手札にカウンター 2 枚・ライフ `life`）。
 pub(super) fn attacked(masters: &'static MasterTable, life: usize, blocker: bool) -> GameState {
-    let field = if blocker { json!([card_json(BLOCKER, "p1-blocker", "p1", false)]) } else { json!([]) };
+    // 【ブロッカー】は盤面の記録の `current_keywords` から読む（マスターからは引かない）＝明示しないと
+    // ブロックの段が開かずカウンターの段から始まる（2026-10-24 まではそうなっていた・§7.45 で気づいた）。
+    let field = if blocker {
+        let mut c = card_json(BLOCKER, "p1-blocker", "p1", false);
+        c["current_keywords"] = json!([crate::rules::KW_BLOCKER]);
+        json!([c])
+    } else {
+        json!([])
+    };
     let hidden = json!({
         "players": {
             "p1": player("p1", life, field,
@@ -177,7 +185,8 @@ fn low_life_battle_window_reads_a_short_tree() {
 #[test]
 fn tree_values_are_terminal_when_the_battle_ends_the_game() {
     let Some(masters) = crate::search::tests_setup_box::masters() else { return };
-    let state = attacked(masters, 0, true);
+    // カウンターの段（ブロッカー無し）: 素通しはライフ 0 で負け・カウンターは負けではない。
+    let state = attacked(masters, 0, false);
     let c = ctx(masters);
     let mut s = Session::new(state);
     let legal = c.legal_actions(&mut s).expect("合法手");
@@ -187,5 +196,5 @@ fn tree_values_are_terminal_when_the_battle_ends_the_game() {
     let pass = legal.iter().position(|m| m.action_type() == Some("PASS")).expect("素通しがある");
     assert_eq!(vals[pass], Some(-1.0), "ライフ 0 で素通しは負け: {vals:?}");
     assert!(vals.iter().enumerate().all(|(i, v)| i == pass || v.is_some_and(|v| v > -1.0)),
-            "ブロックは負けではない: {vals:?}");
+            "カウンターは負けではない: {vals:?}");
 }

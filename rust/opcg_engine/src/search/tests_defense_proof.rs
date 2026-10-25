@@ -80,7 +80,8 @@ fn defense_pick_only_fires_in_flat_or_saturated_low_life_defense_windows() {
 fn proven_pass_is_dropped_at_zero_life() {
     let Some(masters) = crate::search::tests_setup_box::masters() else { return };
     let c = ctx(masters);
-    let state = attacked(masters, 0, true);
+    // カウンターの段（ブロッカー無し）: ブロッカーの段の素通しはまだカウンターが残るので負けと証明されない。
+    let state = attacked(masters, 0, false);
     let legal = c.legal_actions(&mut Session::new(state.clone())).expect("合法手");
     let pass = legal.iter().position(|m| m.action_type() == Some("PASS")).expect("素通し");
     let vals: Vec<Option<f64>> = (0..legal.len()).map(|i| Some(if i == pass { -0.90 } else { -0.91 })).collect();
