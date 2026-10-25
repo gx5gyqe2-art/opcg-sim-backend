@@ -238,6 +238,8 @@ CAND_FLAGS = {
     "window_tree_legacy": dict(window_tree_legacy=True),
     # トリガーの発動確認を「発動する」の 1 手だけにする旧い形（§7.44 の (B)・WP `rs-overflow-trigger`・測定専用）。
     "confirm_trigger_legacy": dict(confirm_trigger_legacy=True),
+    # 守りの窓で相手から見た詰みの証明を使う（§7.51・WP `rs-defense-proof`・測定用＝既定 off）。
+    "defense_proof": dict(defense_proof=True),
 }
 
 
@@ -321,6 +323,10 @@ def add_cand_args(ap) -> None:
     ap.add_argument("--cand-confirm-trigger-legacy", action="store_true",
                     help="候補席だけ、トリガーの発動確認（ライフの【トリガー】・任意の誘発）を「発動する」の 1 手だけで打つ"
                          "旧い形（`docs/search_efficiency_plan.md` §7.44 の (B)・測定専用）。省略＝既定（発動する／しないの 2 手）")
+    ap.add_argument("--cand-defense-proof", action="store_true",
+                    help="候補席だけ、相手の手番の守りの窓（自分のライフ ≤ 2・候補の値が平らか張り付き）で、各候補の後に"
+                         "相手から見た詰みの証明を回し、どの配り方でも相手が勝つ候補を外して選ぶ"
+                         "（`docs/search_efficiency_plan.md` §7.51・測定用）。省略＝既定（off）")
     ap.add_argument("--cand-window-worlds", type=int, default=None,
                     help="候補席だけ窓の根畳みの世界の本数（§7.42 の 2・省略＝Rust の既定）")
     # --- 迷う局面だけ世界 K 本で読み直す（§7.4・WP `play-rethink`）------------------------

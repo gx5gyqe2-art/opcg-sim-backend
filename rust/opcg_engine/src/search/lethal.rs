@@ -1425,6 +1425,29 @@ pub fn prove(
     Ok((ok, solvers.iter().map(|s| s.nodes).sum()))
 }
 
+/// 与えた配り方ごとに、このターンにこちらの勝ちが証明できるかを読む（[`prove`] と同じ読み・配り方を外から渡す・
+/// 守りの窓の証明〔§7.51・`search::decide` の `defense_pick`〕と `Game.lethal_json` の `prove`）。`stop`＝勝てない
+/// 配り方が出たらそこで止める（残りは返さない）。戻り値は配り方ごとの "win"／"no"／"unknown" と使った節点（全部の合計）。
+pub fn prove_each(masters: &MasterTable, deals: &[GameState], me: Seat, max_nodes: u64, stop: bool) -> (Vec<&'static str>, u64) {
+    let mut solvers: Vec<Solver> = deals.iter().map(|d| Solver::new(masters, d, me, max_nodes)).collect();
+    let mut out = Vec::with_capacity(deals.len());
+    for (i, d) in deals.iter().enumerate() {
+        let used: u64 = solvers.iter().map(|s| s.nodes).sum();
+        let mut sess = Session::new(d.clone());
+        let mut keep = None;
+        let r = match solve_in(&mut solvers[i], &mut sess, used, max_nodes, None, &mut keep, false, false) {
+            Ok(true) => "win",
+            Ok(false) => "no",
+            Err(Abort) => "unknown",
+        };
+        out.push(r);
+        if stop && r != "win" {
+            break;
+        }
+    }
+    (out, solvers.iter().map(|s| s.nodes).sum())
+}
+
 /// 根の判定の入口（§7.21 の 1・3）: 発動条件を満たせば配り方を作って根を判定する。満たさなければ `None`。
 pub fn root_proof(
     masters: &MasterTable,

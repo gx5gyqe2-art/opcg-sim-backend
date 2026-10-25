@@ -1,0 +1,302 @@
+[
+ {
+  "seed": 3351102,
+  "seat": "p2",
+  "step": 99,
+  "cpu_move": {
+   "kind": "battle",
+   "action_type": "PASS",
+   "card_uuid": null
+  },
+  "base_move": {
+   "kind": "battle",
+   "action_type": "PASS",
+   "card_uuid": null
+  },
+  "new_move": {
+   "kind": "battle",
+   "action_type": "PASS",
+   "card_uuid": null
+  },
+  "defense_proof": {
+   "flat": true,
+   "sat": true,
+   "proven": [],
+   "pick": 3,
+   "was": 3,
+   "all_proven": false,
+   "nodes": 200
+  },
+  "rows": [
+   {
+    "i": 0,
+    "move": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "fb58e866-4ab9-4fcd-af50-d693e6741731"
+    },
+    "q": -0.9530075492337347,
+    "true": [
+     "no"
+    ],
+    "fair": [
+     "no",
+     "no",
+     "win",
+     "no",
+     "no",
+     "no",
+     "win",
+     "no"
+    ],
+    "nodes_fair": 1151,
+    "mine": [
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "win"
+    ],
+    "nodes_mine": 446
+   },
+   {
+    "i": 1,
+    "move": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "55b77819-57be-44cb-94e3-bd03b744719d"
+    },
+    "q": -0.9545745492912829,
+    "true": [
+     "no"
+    ],
+    "fair": [
+     "no",
+     "no",
+     "win",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no"
+    ],
+    "nodes_fair": 1231,
+    "mine": [
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "win"
+    ],
+    "nodes_mine": 446
+   },
+   {
+    "i": 2,
+    "move": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "3699c7fb-91f8-4134-b7c0-fd739b182b17"
+    },
+    "q": -0.9530075492337347,
+    "true": [
+     "no"
+    ],
+    "fair": [
+     "no",
+     "no",
+     "win",
+     "win",
+     "win",
+     "no",
+     "no",
+     "no"
+    ],
+    "nodes_fair": 1144,
+    "mine": [
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "win"
+    ],
+    "nodes_mine": 446
+   },
+   {
+    "i": 3,
+    "move": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    "q": -0.9524976794607938,
+    "true": [
+     "win"
+    ],
+    "fair": [
+     "no",
+     "no",
+     "win",
+     "win",
+     "no",
+     "win",
+     "win",
+     "no"
+    ],
+    "nodes_fair": 1947,
+    "mine": [
+     "win",
+     "win",
+     "win",
+     "win",
+     "win",
+     "win",
+     "win",
+     "win"
+    ],
+    "nodes_mine": 1476
+   }
+  ]
+ },
+ {
+  "seed": 3351191,
+  "seat": "p1",
+  "step": 114,
+  "cpu_move": {
+   "kind": "battle",
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "910d8d68-80da-4e26-97f5-d56e351b7b18"
+  },
+  "base_move": {
+   "kind": "battle",
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "910d8d68-80da-4e26-97f5-d56e351b7b18"
+  },
+  "new_move": {
+   "kind": "battle",
+   "action_type": "SELECT_COUNTER",
+   "card_uuid": "910d8d68-80da-4e26-97f5-d56e351b7b18"
+  },
+  "defense_proof": {
+   "flat": true,
+   "sat": true,
+   "proven": [],
+   "pick": 0,
+   "was": 0,
+   "all_proven": false,
+   "nodes": 243
+  },
+  "rows": [
+   {
+    "i": 0,
+    "move": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "910d8d68-80da-4e26-97f5-d56e351b7b18"
+    },
+    "q": -0.9773702621459961,
+    "true": [
+     "unknown"
+    ],
+    "fair": [
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no"
+    ],
+    "nodes_fair": 1972,
+    "mine": [
+     "win",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "unknown",
+     "no"
+    ],
+    "nodes_mine": 1494
+   },
+   {
+    "i": 1,
+    "move": {
+     "kind": "battle",
+     "action_type": "SELECT_COUNTER",
+     "card_uuid": "35b21c9e-af02-47f9-b2d1-92393889fbca"
+    },
+    "q": -0.9773702621459961,
+    "true": [
+     "unknown"
+    ],
+    "fair": [
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no"
+    ],
+    "nodes_fair": 1967,
+    "mine": [
+     "win",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "unknown",
+     "no"
+    ],
+    "nodes_mine": 1494
+   },
+   {
+    "i": 2,
+    "move": {
+     "kind": "battle",
+     "action_type": "PASS",
+     "card_uuid": null
+    },
+    "q": -0.9913573861122131,
+    "true": [
+     "unknown"
+    ],
+    "fair": [
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no"
+    ],
+    "nodes_fair": 1590,
+    "mine": [
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "no",
+     "unknown",
+     "no"
+    ],
+    "nodes_mine": 1357
+   }
+  ]
+ }
+]
