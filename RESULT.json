@@ -1,32 +1,120 @@
 {
- "job": "league-gen",
+ "job": "rs-world-parallel",
  "status": "done",
- "section": "docs/search_efficiency_plan.md §7.56",
- "branch": "claude/league-gen",
- "base": "claude/cpu-spec-improvements-yw91jd@daf3abf",
- "report": "docs/reports/2026-10-25_league_gen.md",
- "ops_doc": "docs/n_loop_ops.md §7.58",
- "changes": {
-  "record_gen": "--opp-pool name:weight,...（seed で決まる引き・学ぶ側の席は seed の偶奇で交互・相手も同じ探索の設定）・列 seat_net／learner・meta に nets／learner_seat／opp_pool／opp_games（集団なしでは何も足さない）",
-  "dump_io": "load_dump(pi_rows='all'|'learner')",
-  "n_rel_train": "train --pi-rows {all,learner}（既定 all）",
-  "tests": ["tests/test_league_gen.py", "tests/test_dump_io.py::test_pi_rows_learner_keeps_only_learner_seats"]
+ "branch": "claude/rs-world-parallel",
+ "spec": "docs/search_efficiency_plan.md §7.55（本線 claude/cpu-spec-improvements-yw91jd @ daf3abf・台帳 2+429）",
+ "report": "docs/reports/2026-10-25_world_parallel.md",
+ "code": [
+  "rust/opcg_engine/src/search/decide.rs（DecideOptions::world_threads・run_worlds の上限つきの回し方・単体テスト world_threads_do_not_change_the_output）",
+  "rust/opcg_engine/src/search/mod.rs（opts JSON の world_threads）",
+  "tests/test_rs_world_threads.py（cpu_infra・出荷のネットで decide の出力 JSON が上限に依らず一致）",
+  "tests/scripts/rs_decide_latency.py --world-threads"
+ ],
+ "docs": [
+  "docs/SPEC.md §2.5.13",
+  "docs/TEST_SPEC.md（2 行）"
+ ],
+ "make_test": "green（cargo test 638 passed＋pytest 881 passed, 13 skipped）",
+ "audit_cross": {
+  "pairs": 120,
+  "games": 240,
+  "void": 0
  },
- "checks": {
-  "default_bit_identical": "本線の record_gen と 4 局（seed 9960000〜・回数 32・real）で 31 列すべてバイト一致・meta 一致（sec 除く）",
-  "trial_pool_20": {"seeds": "9961000-9961019", "pool": "r24:0.5,r23:0.2,r22:0.15,r13d:0.15", "games_match_opp_draw": 20, "learner_seat": {"p1": 10, "p2": 10},
-                    "opp_games": {"r24": 8, "r23": 3, "r22": 6, "r13d": 3}, "rows": 3834, "row_mark_mismatch": 0,
-                    "pi_points_all": 1463, "pi_points_learner": 1077, "non_learner_in_learner_set": 0, "value_rows": 3834},
-  "train_smoke": "n_rel_train --pi-rows learner --backend numpy 1 周が完走",
-  "make_test": "green（883 passed, 13 skipped・76 秒）",
-  "audit_cross": "不要（rust/・パーサ不変）"
+ "golden": "不変（既定 0 は今までと同じ道・作り直していない）",
+ "bit_identical": "世界 2・4 本 × world_threads 0/1/2/3/4/8（Rust）・0/1/2/4（pytest 決定点 40）で出力一致。latency 20 局も上限に依らず手数が同じ（世界 2 本 3106・4 本 3051）",
+ "latency_4core": [
+  {
+   "worlds": 1,
+   "world_threads": 1,
+   "moves": 2825,
+   "mean": 0.195,
+   "p50": 0.142,
+   "p90": 0.462,
+   "p99": 1.179,
+   "max": 3.08,
+   "wall_sec": 661.4
+  },
+  {
+   "worlds": 2,
+   "world_threads": 1,
+   "moves": 3106,
+   "mean": 0.306,
+   "p50": 0.184,
+   "p90": 0.784,
+   "p99": 1.707,
+   "max": 3.48,
+   "wall_sec": 1076.5
+  },
+  {
+   "worlds": 2,
+   "world_threads": 2,
+   "moves": 3106,
+   "mean": 0.203,
+   "p50": 0.136,
+   "p90": 0.529,
+   "p99": 1.146,
+   "max": 2.54,
+   "wall_sec": 756.5
+  },
+  {
+   "worlds": 2,
+   "world_threads": 4,
+   "moves": 3106,
+   "mean": 0.201,
+   "p50": 0.135,
+   "p90": 0.519,
+   "p99": 1.176,
+   "max": 2.68,
+   "wall_sec": 748.6
+  },
+  {
+   "worlds": 4,
+   "world_threads": 1,
+   "moves": 3051,
+   "mean": 0.607,
+   "p50": 0.353,
+   "p90": 1.482,
+   "p99": 3.754,
+   "max": 17.08,
+   "wall_sec": 1976.5
+  },
+  {
+   "worlds": 4,
+   "world_threads": 2,
+   "moves": 3051,
+   "mean": 0.382,
+   "p50": 0.287,
+   "p90": 0.916,
+   "p99": 2.264,
+   "max": 10.22,
+   "wall_sec": 1293.3
+  },
+  {
+   "worlds": 4,
+   "world_threads": 4,
+   "moves": 3051,
+   "mean": 0.254,
+   "p50": 0.186,
+   "p90": 0.616,
+   "p99": 1.444,
+   "max": 6.12,
+   "wall_sec": 897.7
+  }
+ ],
+ "headline": {
+  "worlds2_now_sec": 0.203,
+  "worlds4_threads4_sec": 0.254,
+  "ratio_vs_now": 1.25,
+  "worlds2_threads1_sec": 0.306,
+  "worlds4_speedup_t1_to_t4": 2.39
  },
+ "serve_proposal": "既定 0（世界の本数ぶんのスレッド）のまま。同時に G 局を C コアで打つなら world_threads = max(1, C÷G)。出荷の既定は変えていない",
  "notes": [
-  "「学ぶ側の行」はネットで決めた: learner=1 は学ぶ側のネットが打った席。集団に r24 自身が入って引かれた局は両席とも 1（今の自己対戦と同じ教材）。席で絞りたいときは learner_seat から作れる",
-  "学ぶ側の席は seed の偶奇（偶数 p1）で交互・相手の引きとは独立",
-  "試しの seed 帯は仕様に無かったので 9960000〜9961019 を使った（記録はブランチに積まず meta だけ n1_results/league_gen/）",
-  "--reanalyze-mult と --opp-pool の併用は断る（相手の席の点を学ぶ側で深読みすると教師の意味が変わる）",
-  "1 局の時間は試しでは測っていない（相手も同じ回数を読む＝大きくは変わらない見込み・波の RESULT.json で確認）",
-  "torch がコンテナに無かったので訓練の通しは numpy backend（読み込みは backend 非依存）"
+  "仕様の前提と違い、世界の木は §20.7.1（rs-pimc-worlds）からすでに世界ごとに別スレッドで同時に回っていた（GIL も放す）。「世界 2 本は 1 手 2 倍」は 1 コア固定の測定の数字で、4 コアの壁時計では世界 2 本は世界 1 本の +4%。",
+  "仕様は「既定 1＝今と同じ」と書くが、今と同じを優先して既定を 0（世界ごとに 1 スレッド）にした。1 は 1 本ずつ順に回す値。",
+  "世界 4 本の時間の費用は 4 コアで今（世界 2 本）の +25%（「1 手 2 倍」ではない）。最悪の 1 手は 2.5→6.1 秒。",
+  "窓の根畳みの 16 世界（手の約 44%）は 1 スレッドで順に回り、枝予算を世界の順に使い回す。次に縮めるならここ（本 WP の範囲外）。",
+  "arena_shard --worlds K は 1 プロセスで K スレッドを使う（§7.57 の世界 4 本のアリーナ）。world_threads を arena の旗には足していない（仕様どおり生成・アリーナは今のまま）。opts の鍵としては --extra 等で渡せる。",
+  "make test の 1 回目はコンテナに fastapi 等が無く 13 件 ImportError（コードと無関係）。opcg_sim/requirements.txt を入れて回し直し green。"
  ]
 }

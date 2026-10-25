@@ -68,6 +68,13 @@ pub struct DecideOptions {
     /// （N は和・Q は N 重みの平均・P は世界 0 のもの）。[`DecideOptions::search_seed`] が
     /// 無いと世界 1 以降の乱数を作れないので 1 に落ちる（[`DecideOptions::effective_worlds`]）。
     pub worlds: usize,
+    /// 世界の木を同時に回すスレッドの上限（§7.55・WP `rs-world-parallel`・既定 0）。
+    ///
+    /// 0＝世界 1 本に 1 スレッド（K 本が同時に走る＝今までどおり）。N≥1 なら同時に走る世界は
+    /// 高々 N 本（世界 0 を回すこのスレッドを含む・1＝世界を 1 本ずつ順に回す）。どの値でも
+    /// 世界 i は自分だけの新しいスレッドで回る（thread_local の状態を世界どうしで持ち越さない）
+    /// ＝**打つ手と出力は 1 bit も変わらない**（変わるのは 1 手の時間とピークのコア数だけ）。
+    pub world_threads: usize,
     /// 探索乱数の seed（`Game.decide` の `search_seed`）。世界 i の乱数は `seed + i`（§20.7.1）。
     pub search_seed: Option<u64>,
     /// 候補生成（`OPCGGame`）
@@ -296,6 +303,7 @@ impl Default for DecideOptions {
             q_min_frac: Q_MIN_FRAC,
             root_prior_temp: 1.0,
             worlds: 1,
+            world_threads: 0,
             search_seed: None,
             search: SearchOptions::default(),
             budget: Some(super::quiesce::BOX_BRANCH_BUDGET),
@@ -1784,54 +1792,85 @@ fn run_worlds(
         let (run, nodes, rp) = run_one_world(ctx, opts, name, seed0, world0.clone(), rng, st, reply)?;
         return Ok(vec![WorldRun { seed: seed0, run, nodes, world: world0, reply: rp }]);
     }
+    // 世界 i>=1 を 1 本回す（呼んだスレッドの thread_local を使う＝必ず新しいスレッドから呼ぶ）。
+    let world_job = |i: usize| -> Result<(WorldRun, i64, u64), EngineError> {
+        let seed = seed0.wrapping_add(i as u64);
+        let _prof = crate::prof::enter_top(crate::prof::Cat::Search);
+        let _enc_cache = crate::encode::decide_cache_scope(ctx.masters);
+        let _tok_cache = crate::net::nrel::tok_cache_scope();
+        // 準備箱（§20.7.2）の状態は **thread_local**（`macro::SETUP`）＝新しい
+        // スレッドでは既定（無効）で始まる。世界 0（このスレッド）と同じ候補列挙に
+        // するため、世界ごとに張り直す（張らないと世界 1 以降だけ箱が出ず、根の
+        // `legal` が世界 0 と食い違って `unmapped` に落ちる）。枝の計測は世界 0 の
+        // ぶんだけが `boxes` に出る（他世界の計測はスレッドと共に捨てる）。
+        super::r#macro::reset_setup_state(opts.search.setup_box, opts.search.select_branch_on());
+        let mut r = super::rng::Pcg32SearchRng::new(seed);
+        let mut wst = SearchState {
+            budget: BoxBudget::new(opts.budget),
+        };
+        let world = sample_world(state, name, opts.world_view(), &mut r)?;
+        let (run, nodes, rp) = run_one_world(ctx, opts, name, seed, world.clone(), &mut r, &mut wst, reply)?;
+        Ok((WorldRun { seed, run, nodes, world, reply: rp }, wst.budget.used, wst.budget.exhausted))
+    };
+    let world_job = &world_job;
+    let lost = || EngineError::BadPayload("decide: 世界の探索スレッドが panic した".into());
+    // 世界 i を新しいスレッドで回して待つ（同時に走る本数を抑えるときの 1 単位）。
+    let fresh = |i: usize| -> Result<(WorldRun, i64, u64), EngineError> {
+        std::thread::scope(|s| s.spawn(|| world_job(i)).join().map_err(|_| lost())?)
+    };
+    // 同時に走る世界の上限（§7.55）。0 か K 以上なら全部を一度に（今までどおり）。
+    let cap = if opts.world_threads == 0 { k } else { opts.world_threads.min(k) };
     let mut runs: Vec<WorldRun> = Vec::with_capacity(k);
     let mut extra_used = 0i64;
     let mut extra_exhausted = 0u64;
-    std::thread::scope(|scope| -> Result<(), EngineError> {
-        let handles: Vec<_> = (1..k)
-            .map(|i| {
-                let seed = seed0.wrapping_add(i as u64);
-                scope.spawn(move || -> Result<(WorldRun, i64, u64), EngineError> {
-                    let _prof = crate::prof::enter_top(crate::prof::Cat::Search);
-                    let _enc_cache = crate::encode::decide_cache_scope(ctx.masters);
-                    let _tok_cache = crate::net::nrel::tok_cache_scope();
-                    // 準備箱（§20.7.2）の状態は **thread_local**（`macro::SETUP`）＝新しい
-                    // スレッドでは既定（無効）で始まる。世界 0（このスレッド）と同じ候補列挙に
-                    // するため、世界ごとに張り直す（張らないと世界 1 以降だけ箱が出ず、根の
-                    // `legal` が世界 0 と食い違って `unmapped` に落ちる）。枝の計測は世界 0 の
-                    // ぶんだけが `boxes` に出る（他世界の計測はスレッドと共に捨てる）。
-                    super::r#macro::reset_setup_state(
-                        opts.search.setup_box,
-                        opts.search.select_branch_on(),
-                    );
-                    let mut r = super::rng::Pcg32SearchRng::new(seed);
-                    let mut wst = SearchState {
-                        budget: BoxBudget::new(opts.budget),
-                    };
-                    let world = sample_world(state, name, opts.world_view(), &mut r)?;
-                    let (run, nodes, rp) =
-                        run_one_world(ctx, opts, name, seed, world.clone(), &mut r, &mut wst, reply)?;
-                    Ok((
-                        WorldRun { seed, run, nodes, world, reply: rp },
-                        wst.budget.used,
-                        wst.budget.exhausted,
-                    ))
-                })
-            })
-            .collect();
-        // 世界 0 はこのスレッドで回す（スレッドは K-1 本＝K 本が同時に走る）。
-        let (run, nodes, rp) = run_one_world(ctx, opts, name, seed0, world0.clone(), rng, st, reply)?;
+    let mut rest: Vec<Result<(WorldRun, i64, u64), EngineError>> = Vec::with_capacity(k - 1);
+    if cap >= k {
+        std::thread::scope(|scope| -> Result<(), EngineError> {
+            let handles: Vec<_> = (1..k).map(|i| scope.spawn(move || world_job(i))).collect();
+            // 世界 0 はこのスレッドで回す（スレッドは K-1 本＝K 本が同時に走る）。
+            let (run, nodes, rp) = run_one_world(ctx, opts, name, seed0, world0.clone(), rng, st, reply)?;
+            runs.push(WorldRun { seed: seed0, run, nodes, world: world0, reply: rp });
+            for h in handles {
+                rest.push(h.join().map_err(|_| lost())?);
+            }
+            Ok(())
+        })?;
+    } else {
+        // 上限つき: 世界 1.. を次の番号から取り合う「取り手」を cap-1 本立て、このスレッドも
+        // 世界 0 の後で取り手に加わる。取り手は世界ごとに新しいスレッドを立てて待つ
+        // （thread_local を持ち越さない）。結果は番号の位置へ置く＝終わる順に依らない。
+        type Slot = std::sync::Mutex<Option<Result<(WorldRun, i64, u64), EngineError>>>;
+        let next = std::sync::atomic::AtomicUsize::new(1);
+        let slots: Vec<Slot> = (1..k).map(|_| std::sync::Mutex::new(None)).collect();
+        let take = || loop {
+            let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if i >= k {
+                break;
+            }
+            let res = fresh(i);
+            *slots[i - 1].lock().unwrap_or_else(|e| e.into_inner()) = Some(res);
+        };
+        let w0 = std::thread::scope(|scope| -> Result<_, EngineError> {
+            let takers: Vec<_> = (1..cap).map(|_| scope.spawn(&take)).collect();
+            let w0 = run_one_world(ctx, opts, name, seed0, world0.clone(), rng, st, reply);
+            take();
+            for h in takers {
+                h.join().map_err(|_| lost())?;
+            }
+            Ok(w0)
+        })?;
+        let (run, nodes, rp) = w0?;
         runs.push(WorldRun { seed: seed0, run, nodes, world: world0, reply: rp });
-        for h in handles {
-            let (wr, used, exhausted) = h.join().map_err(|_| {
-                EngineError::BadPayload("decide: 世界の探索スレッドが panic した".into())
-            })??;
-            extra_used += used;
-            extra_exhausted += exhausted;
-            runs.push(wr);
+        for slot in slots {
+            rest.push(slot.into_inner().unwrap_or_else(|e| e.into_inner()).ok_or_else(lost)?);
         }
-        Ok(())
-    })?;
+    }
+    for r in rest {
+        let (wr, used, exhausted) = r?;
+        extra_used += used;
+        extra_exhausted += exhausted;
+        runs.push(wr);
+    }
     // 予算の実績だけ足す（`left` は世界 0 のものを残す＝この後のコミット生成の見え方を変えない）。
     st.budget.used += extra_used;
     st.budget.exhausted += extra_exhausted;
@@ -2964,6 +3003,37 @@ pub(super) mod tests {
         for (x, y) in a.pv.iter().zip(&b.pv) {
             assert_eq!(x.mv, y.mv);
             assert_eq!(x.n, y.n);
+        }
+    }
+
+    /// 世界を同時に回すスレッドの上限（§7.55・`world_threads`）は打つ手も出力も変えない:
+    /// 世界 2 本・4 本 × 上限 0（世界ごとに 1 本）・1・2・3・4・8 で `DecideOut` が丸ごと一致する
+    /// （`Debug` の文字列で比べる＝f64 も bit 単位・PV・per_world・予算の実績まで）。
+    #[test]
+    fn world_threads_do_not_change_the_output() {
+        let (masters, state) = worlds_board();
+        let net = zero_net();
+        let carry = DecideCarry::default();
+        for worlds in [2usize, 4] {
+            let run = |threads: usize| {
+                let opts = DecideOptions { world_threads: threads, ..worlds_opts(worlds, Some(7)) };
+                let out = decide(
+                    &masters,
+                    &net,
+                    &state,
+                    Seat::P1,
+                    &opts,
+                    &mut crate::search::Pcg32SearchRng::new(7),
+                    &carry,
+                )
+                .unwrap();
+                format!("{out:?}")
+            };
+            let base = run(0);
+            assert!(base.contains(&format!("worlds: {worlds}")), "世界 {worlds} 本で回っていない");
+            for threads in [1usize, 2, 3, 4, 8] {
+                assert_eq!(run(threads), base, "worlds={worlds} world_threads={threads}");
+            }
         }
     }
 

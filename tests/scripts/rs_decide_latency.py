@@ -30,6 +30,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--sims", type=int, default=E.PLAY_SIMS)
     ap.add_argument("--worlds", type=int, default=1)
+    ap.add_argument("--world-threads", type=int, default=None,
+                    help="世界を同時に回すスレッドの上限（§7.55・省略＝Rust の既定 0＝世界ごとに 1 本・打つ手は不変）")
     ap.add_argument("--budget", type=int, default=E.PLAY_BUDGET, help="戦闘箱の枝予算（0＝無制限・-1＝Rust 既定）")
     ap.add_argument("--games", type=int, default=20)
     ap.add_argument("--seed-base", type=int, default=2999900)
@@ -69,6 +71,8 @@ def main(argv=None):
         kw["budget"] = a.budget
     if a.worlds > 1:
         kw["worlds"] = a.worlds
+    if a.world_threads is not None:
+        kw["world_threads"] = a.world_threads
     if a.omniscient:
         kw["omniscient"] = True
     if a.reveal:
@@ -129,6 +133,7 @@ def main(argv=None):
     ts.sort()
     n = len(ts)
     print(json.dumps({"sims": a.sims, "worlds": a.worlds, "budget": a.budget,
+                      **({"world_threads": a.world_threads} if a.world_threads is not None else {}),
                       **({"omniscient": True} if a.omniscient else {}),
                       **({"reveal": a.reveal} if a.reveal else {}),
                       **({"opp_blind": True} if a.opp_blind else {}),
