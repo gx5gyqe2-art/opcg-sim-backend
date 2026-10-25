@@ -1,7 +1,7 @@
 {
  "job": "arena-dfp-w29",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_r23.npz + defense_proof (view mine)",
   "baseline": "nrel_r23.npz",
