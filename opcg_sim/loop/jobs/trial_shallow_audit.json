@@ -1,0 +1,117 @@
+{
+ "kind": "audit",
+ "section": "§7.53",
+ "ledger_grep": "7.53 WP `worker-shallow`",
+ "about": "試し: 浅い取得から大きな損の洗い出し 1 局（審判 r20 を別のブランチから取る）",
+ "job": "trial-shallow-audit-w{KK}",
+ "branch": "claude/worker-shallow-trial-audit-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 1,
+ "hours": 0.5,
+ "tool": "tests/scripts/blunder_audit.py",
+ "seed_base": "3301000 + (k - 1)",
+ "games": 1,
+ "out_dir": "n1_results/trial_shallow_audit/w{KK}",
+ "push_every_min": 3,
+ "fetch": {
+  "vm_nets/nrel_r20.npz": "claude/train-r20:n1_results/nrel_r20.npz"
+ },
+ "args": [
+  "--workers",
+  "2"
+ ],
+ "steps": [
+  {
+   "name": "play",
+   "args": [
+    "play",
+    "--games",
+    "{GAMES}",
+    "--seed-base",
+    "{SEED}",
+    "--out",
+    "{OUT}"
+   ],
+   "with_args": true
+  },
+  {
+   "name": "judge",
+   "args": [
+    "judge",
+    "--k",
+    "4",
+    "--limit",
+    "2",
+    "--out",
+    "{OUT}"
+   ],
+   "with_args": true
+  },
+  {
+   "name": "recheck",
+   "args": [
+    "recheck",
+    "--k",
+    "4",
+    "--out",
+    "{OUT}"
+   ],
+   "with_args": true
+  },
+  {
+   "name": "verify",
+   "args": [
+    "verify",
+    "--k",
+    "4",
+    "--out",
+    "{OUT}"
+   ],
+   "with_args": true
+  },
+  {
+   "name": "summary",
+   "args": [
+    "summary",
+    "--out",
+    "{OUT}"
+   ]
+  }
+ ],
+ "games_file": {
+  "file": "games.jsonl",
+  "seed_key": "seed",
+  "void_key": "void"
+ },
+ "points_file": {
+  "file": "points.jsonl"
+ },
+ "merge": {
+  "games_file": "games.jsonl",
+  "concat": {
+   "games.jsonl": "games.jsonl",
+   "points.jsonl": "points.jsonl",
+   "recheck.jsonl": "recheck.jsonl",
+   "verify.jsonl": "verify.jsonl",
+   "window_stability.jsonl": "window_stability.jsonl"
+  },
+  "summary": [
+   "summary",
+   "--out",
+   "{OUT}"
+  ],
+  "summary_file": "summary.json"
+ },
+ "require": [
+  {
+   "file": "tests/scripts/blunder_audit.py",
+   "grep": "def cmd_summary"
+  }
+ ],
+ "inputs": {
+  "setting": "§7.41: 両席 r13d・出荷の設定・random × real・審判 r13d／r20（160 回・K＝32）"
+ },
+ "commit_message": "trial shallow audit shard {KK}"
+}
