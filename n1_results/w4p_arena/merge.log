@@ -1,0 +1,1 @@
+[w4p prod] ARENA_MERGE_FINAL {"pairs": 2688, "games": 5376, "void": 0, "wins": 2790.0, "wr": 0.519, "ci95": [0.5094, 0.5285], "elo": 13.2, "elo95": [6.6, 19.8], "promoted": false, "shards": 32, "dup_seeds": 0, "cand_opts": [{"budget": 0, "lethal_proof": "root", "sims": 1280, "worlds": 4}]}
