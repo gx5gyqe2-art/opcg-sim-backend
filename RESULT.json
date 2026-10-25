@@ -1,7 +1,7 @@
 {
  "job": "trial-shallow-arena-w01",
  "role": "arena",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "candidate": "nrel_strial.npz",
   "baseline": "nrel_r13d.npz",
