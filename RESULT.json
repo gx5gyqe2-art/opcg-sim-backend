@@ -1,37 +1,60 @@
 {
-  "wp": "audit-verify-opp",
-  "status": "done",
-  "branch": "claude/audit-verify-opp",
-  "base": "claude/cpu-spec-improvements-yw91jd@1899954",
-  "spec": "docs/search_efficiency_plan.md §7.50",
-  "report": "docs/reports/2026-10-25_audit_verify_opp.md",
-  "results_dir": "n1_results/audit_verify_opp/",
-  "make_test": "green (cargo test 632 passed; pytest 878 passed, 13 skipped)",
-  "audit_cross": "not run (engine untouched, per spec)",
-  "changed": ["tests/scripts/blunder_audit.py", "tests/scripts/defense_audit.py", "docs/TEST_SPEC.md"],
-  "legacy_flags": {"blunder_audit verify": "--verify-mover-only", "defense_audit verify": "--verify-mover-only / --playout-k 0"},
-  "blunder_verified_3": {
-    "gone": ["3301005:107 (a, b both lose 48/48; diff 0.00 [0.00, 0.00]; old record +0.44)"],
-    "kept": ["3301004:31 (+0.35 [+0.19, +0.51])", "3301025:117 (+0.58 [+0.43, +0.74])"]
+ "job": "rs-lethal-nodes",
+ "status": "done",
+ "spec": "docs/search_efficiency_plan.md §7.49 (origin/claude/cpu-spec-improvements-yw91jd @ 1899954; ledger 2+405)",
+ "branch": "claude/rs-lethal-nodes",
+ "base": "1899954",
+ "report": "docs/reports/2026-10-25_lethal_nodes.md",
+ "artifacts": "n1_results/lethal_nodes/",
+ "make_test": "green (cargo 633 passed, 1 ignored; pytest 879 passed, 13 skipped; n1_results/lethal_nodes/make_test.log)",
+ "audit_cross": "void 0 (120 pairs, 240 games; n1_results/lethal_nodes/audit_cross.log)",
+ "engine_default_changed": false,
+ "chosen_cap": 80000,
+ "proofs": {
+  "n20k": 853,
+  "n40k": 913,
+  "n80k": 966,
+  "n160k": 1008,
+  "new_vs_n20k_all_true_deal_wins": true,
+  "false_proofs_all_caps": [
+   "3012157:p2:12:124"
+  ],
+  "lost_proofs": 0,
+  "proved_move_changed": 0,
+  "judge_nodes_ratio": {
+   "n40k": 1.755,
+   "n80k": 3.061,
+   "n160k": 5.299
+  }
+ },
+ "cost": {
+  "setting": "r23 both seats, worlds 2, sims 1280, budget 0, lethal root, random x synth_roles, 20 games, 1 core each in parallel",
+  "mean_sec": {
+   "n20k": 0.387,
+   "n40k": 0.414,
+   "n80k": 0.463,
+   "n160k": 0.555
   },
-  "blunder_candidates_current_wheel": {"verified_old_record": 3, "verified_mover_only": 5, "verified_both": 6, "not_replayable": ["3301043:118"]},
-  "defense_miss_6": {
-    "kept_by_win_rate": [],
-    "gone": {
-      "3351006:159": "reversed: CPU move wins 0.81 vs safe 0.06 (real board)",
-      "3351014:208": "both lose this turn (16 vs 15 of 16)",
-      "3351122:182": "win rate equal (0/0); CPU move loses this turn 16/16, safe move survives this turn 16/16 then loses",
-      "3351102:99 (otsu)": "both lose (0/0), neither this turn",
-      "3351127:110": "both win (1.0/1.0)",
-      "3351191:114 (otsu)": "both lose (0/0), neither this turn"
-    }
+  "p99_sec": {
+   "n20k": 2.515,
+   "n40k": 2.549,
+   "n80k": 2.775,
+   "n160k": 4.015
   },
-  "notes": [
-    "Increase of blunder verified count 3 -> 6 is mostly the wheel change (mover-only on current wheel already gives 5); only 3301005 (gone) and 3301095:107 (borderline, r13d diff +0.04) move between old and new forms.",
-    "Defense false positives are not from the weak referee (mover-only playout gives the same conclusions): the full-information solver's 'opponent lethal this turn' does not separate actual outcomes.",
-    "Implication for §7.51 rs-defense-proof: its two otsu targets (3351102, 3351191) lose with either response under strong play for both seats; the +2 Elo upper bound looks near 0. Not acted on (parallel WP) — for the coordinator.",
-    "Defense playout compares the CPU response with only one safe response (otsu-safe or first solver-safe). 'kept' uses real-board win-rate CI; lost-this-turn counts are listed but not counted (3351122 is a this-turn-only difference).",
-    "Referee r20 taken from origin claude/train-r20 (n1_results/nrel_r20.npz) into vm_nets/ (not committed).",
-    "Environment: had to pip install maturin, pytest, pytest-xdist, fastapi, httpx, uvicorn before make rust-develop / make test."
-  ]
+  "n80k_vs_n20k": {
+   "mean": "+19.6%",
+   "p99": "+10.3%"
+  }
+ },
+ "arena_job_draft": "opcg_sim/loop/jobs/arena_lnodes.json (candidate --cand-lethal-root-nodes 80000 vs baseline default; both r23 shipping settings; random x real; 32 shards x 84 pairs; seed 3681000 + (k-1)*1000; not run)",
+ "forecast": "+1..+3 Elo",
+ "notes": [
+  "The engine already had the opts key `lethal_nodes` (DecideOptions::lethal_nodes, default LETHAL_ROOT_NODES=20000) used by the root proof; no non-test Rust change. I reused that key instead of adding `lethal_root_nodes` (one name per knob). The arena flags are named as specified: --cand-lethal-root-nodes / arena_shard --lethal-root-nodes.",
+  "Solver::walk (trace-only line extraction) still uses the LETHAL_ROOT_NODES constant per reply; it never affects the played move, so I left it to keep clear of rs-defense-proof.",
+  "Goldens were not regenerated: no non-test engine code changed and the proof is default off; the two golden tests pass in make test (= diff 0).",
+  "Baseline 853 proofs differs from weak-points' 860: weak-points judged on a mainline without rs-unpayable-activate (3145b25); all differences are in games 3012167/3012213 (12,710 -> 12,716 points). +113 at 80k matches their +112.",
+  "Latency baseline 0.387 s/move is higher than 2026-10-21's 0.24 (4 runs in parallel plus window-read since); read only the ratios between the 4 same-condition runs.",
+  "At push time rs-defense-proof was on origin (ce285d8) but not in mainline, so it was not merged (spec: merge only after it lands on mainline). Mainline d810573 (docs + gen_n53.json) was merged in; make test re-run on the merged tree.",
+  "Adopting it would be a 1-line PLAY_LETHAL_NODES = 80000 in opcg_sim/loop/engine.py passed by routers.py / audit tools; not done here."
+ ]
 }

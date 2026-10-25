@@ -35,6 +35,8 @@ def main(argv=None):
     ap.add_argument("--lethal-proof", default=None, choices=("off", "root", "root_reply"),
                     help="両席とも詰みの証明（§7.21）。出力に発動の頻度と根の判定の節点・秒の分布を足す"
                          "（秒は同じ盤面で `Game.lethal_json` を測り直す＝1 手の時間からは外す）")
+    ap.add_argument("--lethal-nodes", type=int, default=None,
+                    help="両席とも根の詰みの証明の節点の上限（§7.49・省略＝Rust の既定 20,000）。秒の測り直しも同じ上限")
     ap.add_argument("--commit-hidden-legacy", action="store_true",
                     help="両席とも、見えていなかった札を選ぶ commit の続きも積む旧い形（§7.39・測定専用）。"
                          "出力の kinds（決め方ごとの手数）と並べて読み直しの増分を見る")
@@ -66,6 +68,8 @@ def main(argv=None):
         kw["opp_blind"] = True
     if a.lethal_proof and a.lethal_proof != "off":
         kw["lethal_proof"] = a.lethal_proof
+    if a.lethal_nodes:
+        kw["lethal_nodes"] = a.lethal_nodes
     if a.commit_hidden_legacy:
         kw["commit_hidden_legacy"] = True
     for _k in ("window_carry_legacy", "window_worlds_legacy", "window_tree_legacy"):
@@ -95,7 +99,8 @@ def main(argv=None):
             row = {"main": pend.get("action") == "MAIN_ACTION" and game.turn_player() == name,
                    "kind": out.get("kind"), "lethal": out.get("lethal")}
             if (out.get("lethal") or {}).get("root"):
-                r = json.loads(game.lethal_json(name, json.dumps({"search_seed": E.search_seed(seed_now[0], turn, name)})))
+                r = json.loads(game.lethal_json(name, json.dumps({"search_seed": E.search_seed(seed_now[0], turn, name),
+                                                             **({"max_nodes": a.lethal_nodes} if a.lethal_nodes else {})})))
                 row["root_sec"] = r.get("sec")
             leth.append(row)
         last[0] = time.perf_counter()
@@ -124,6 +129,7 @@ def main(argv=None):
                       "p90": round(ts[int(n * 0.9)], 3), "p99": round(ts[int(n * 0.99)], 3),
                       "max": round(ts[-1], 2), "wall_sec": round(time.perf_counter() - t0, 1),
                       "affinity": sorted(os.sched_getaffinity(0)),
+                      **({"lethal_nodes": a.lethal_nodes} if a.lethal_nodes else {}),
                       **({"lethal_proof": a.lethal_proof, "lethal": _lethal_summary(leth)} if a.lethal_proof else {}),
                       **({"knowledge": _knowledge_summary(know)} if a.knowledge else {})}))
 

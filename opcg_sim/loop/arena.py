@@ -143,6 +143,7 @@ def init_pool(cand_spec, best_spec, cand_kw=None, leaders_mode="fixed",
     `arena_shard --reveal {fair,peek,opp_hand}` も同じ口から `{"reveal": ...}` を渡す（§7.11）。
     `arena_shard --opp-blind` も同じ口から `{"opp_blind": True}` を渡す（§7.14）。
     `arena_shard --lethal-proof {root,root_reply}` も同じ口から `{"lethal_proof": ...}` を渡す（§7.21）。
+    `arena_shard --lethal-root-nodes N` も同じ口から `{"lethal_nodes": N}` を渡す（§7.49・WP `rs-lethal-nodes`）。
     `arena_shard --commit-sig-legacy` も同じ口から `{"commit_sig_legacy": True}` を渡す（WP `rs-commit-sig`）。
     `arena_shard --commit-hidden-legacy` も同じ口から `{"commit_hidden_legacy": True}` を渡す（§7.39・WP `rs-commit-hidden`）。
     `arena_shard --confirm-trigger-legacy` も同じ口から `{"confirm_trigger_legacy": True}` を渡す（§7.44 の (B)・WP `rs-overflow-trigger`）。
@@ -294,6 +295,9 @@ def add_cand_args(ap) -> None:
                     help="候補席だけ詰みの証明（`docs/search_efficiency_plan.md` §7.21）。root＝自分のメインで届きうるとき"
                          "公平な配り方 8 通りの全部で勝てる最初の 1 手を打つ／root_reply＝加えて根の直後の相手の応手の"
                          "節点でも証明する（省略＝off）")
+    ap.add_argument("--cand-lethal-root-nodes", type=int, default=None,
+                    help="候補席だけ根の詰みの証明の節点の上限（`docs/search_efficiency_plan.md` §7.49・測定用・"
+                         "opts の `lethal_nodes`）。省略＝Rust の既定（20,000）。--cand-lethal-proof と組で使う")
     ap.add_argument("--cand-commit-sig-legacy", action="store_true",
                     help="候補席だけ旧い手の署名で箱の commit を照合する（WP `rs-commit-sig`・測定専用）。"
                          "2026-10-22 までの形＝戦闘の手（カウンター・ブロッカー）の札が署名から落ち、"
@@ -338,6 +342,7 @@ CAND_VALUE_FLAGS = {
     "cand_residual_activate": "residual_activate",
     "cand_reveal": "reveal",
     "cand_lethal_proof": "lethal_proof",
+    "cand_lethal_root_nodes": "lethal_nodes",
     "cand_window_worlds": "window_worlds",
     # 下の 2 つは opts には入らない（`SeatSpec` の名前付き引数・`decide_with_rethink`）。
     "cand_rethink_ratio": "rethink_ratio",

@@ -1,0 +1,168 @@
+{
+ "n20k": {
+  "points": 12716,
+  "win": 853,
+  "win_new_vs_n20k": 0,
+  "new_by_true_deal": {},
+  "win_by_true_deal": {
+   "win": 850,
+   "unknown": 2,
+   "no": 1
+  },
+  "false_proofs": [
+   "3012157:p2:12:124"
+  ],
+  "nodes": 76570884,
+  "sec": 929.3,
+  "latency": {
+   "moves": 2786,
+   "mean": 0.387,
+   "p50": 0.228,
+   "p90": 0.997,
+   "p99": 2.515,
+   "max": 4.33,
+   "wall_sec": 1188.7
+  },
+  "latency_lethal": {
+   "fired": 68,
+   "root_tried": 1282,
+   "root_status": {
+    "no": 747,
+    "unknown": 467,
+    "win": 68
+   },
+   "root_nodes_mean": 7392.9,
+   "root_sec_mean": 0.0851,
+   "root_sec_p99": 0.46225136
+  },
+  "nodes_ratio": 1.0,
+  "mean_ratio": 1.0,
+  "p99_ratio": 1.0
+ },
+ "n40k": {
+  "points": 12716,
+  "win": 913,
+  "win_new_vs_n20k": 60,
+  "new_by_true_deal": {
+   "win": 60
+  },
+  "win_by_true_deal": {
+   "win": 910,
+   "unknown": 2,
+   "no": 1
+  },
+  "false_proofs": [
+   "3012157:p2:12:124"
+  ],
+  "nodes": 134410273,
+  "sec": 1618.4,
+  "latency": {
+   "moves": 2787,
+   "mean": 0.414,
+   "p50": 0.271,
+   "p90": 1.082,
+   "p99": 2.549,
+   "max": 4.71,
+   "wall_sec": 1345.5
+  },
+  "latency_lethal": {
+   "fired": 73,
+   "root_tried": 1284,
+   "root_status": {
+    "no": 793,
+    "unknown": 418,
+    "win": 73
+   },
+   "root_nodes_mean": 13028.6,
+   "root_sec_mean": 0.1487,
+   "root_sec_p99": 0.881189937
+  },
+  "nodes_ratio": 1.755,
+  "mean_ratio": 1.07,
+  "p99_ratio": 1.014
+ },
+ "n80k": {
+  "points": 12716,
+  "win": 966,
+  "win_new_vs_n20k": 113,
+  "new_by_true_deal": {
+   "win": 113
+  },
+  "win_by_true_deal": {
+   "win": 963,
+   "unknown": 2,
+   "no": 1
+  },
+  "false_proofs": [
+   "3012157:p2:12:124"
+  ],
+  "nodes": 234378536,
+  "sec": 3075.3,
+  "latency": {
+   "moves": 2783,
+   "mean": 0.463,
+   "p50": 0.277,
+   "p90": 1.28,
+   "p99": 2.775,
+   "max": 4.57,
+   "wall_sec": 1632.9
+  },
+  "latency_lethal": {
+   "fired": 81,
+   "root_tried": 1283,
+   "root_status": {
+    "no": 832,
+    "unknown": 370,
+    "win": 81
+   },
+   "root_nodes_mean": 22631.1,
+   "root_sec_mean": 0.2667,
+   "root_sec_p99": 1.731163661
+  },
+  "nodes_ratio": 3.061,
+  "mean_ratio": 1.196,
+  "p99_ratio": 1.103
+ },
+ "n160k": {
+  "points": 12716,
+  "win": 1008,
+  "win_new_vs_n20k": 155,
+  "new_by_true_deal": {
+   "win": 155
+  },
+  "win_by_true_deal": {
+   "win": 1005,
+   "unknown": 2,
+   "no": 1
+  },
+  "false_proofs": [
+   "3012157:p2:12:124"
+  ],
+  "nodes": 405786172,
+  "sec": 4992.0,
+  "latency": {
+   "moves": 2795,
+   "mean": 0.555,
+   "p50": 0.276,
+   "p90": 1.72,
+   "p99": 4.015,
+   "max": 5.87,
+   "wall_sec": 2160.3
+  },
+  "latency_lethal": {
+   "fired": 95,
+   "root_tried": 1292,
+   "root_status": {
+    "no": 866,
+    "unknown": 331,
+    "win": 95
+   },
+   "root_nodes_mean": 39492.8,
+   "root_sec_mean": 0.4702,
+   "root_sec_p99": 3.245475629
+  },
+  "nodes_ratio": 5.299,
+  "mean_ratio": 1.434,
+  "p99_ratio": 1.596
+ }
+}

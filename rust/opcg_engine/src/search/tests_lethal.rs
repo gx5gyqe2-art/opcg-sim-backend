@@ -7,6 +7,7 @@
 //! (e) 同じ seed で決定的
 //! (f) 発動条件は今この手番で使える札だけで数える（§7.25 の 1・WP `lethal-speed`）
 //! (g) 守りの強い配り方はカウンターイベントを相手が払えるドン!!の範囲でだけ数える（§7.33・WP `lethal-deal-cost`）
+//! (h) 根の判定の節点の上限は opts の `lethal_nodes` で替わる・鍵が無ければ既定（§7.49・WP `rs-lethal-nodes`）
 
 use super::*;
 use crate::model::{GameState, MasterIdx, MasterTable, Seat};
@@ -178,4 +179,45 @@ fn defensive_deal_counts_counter_events_only_within_payable_don() {
             }
         }
     }
+}
+
+/// (h) 根の判定の節点の上限（§7.49・WP `rs-lethal-nodes`）: opts の `lethal_nodes` で替わり、鍵が無ければ
+/// [`LETHAL_ROOT_NODES`]。小さな上限で判定不能（`unknown`）になる盤面が、既定の上限では証明される
+/// （決定も `kind="lethal"` に変わる）。上限は節点の数なので、判定不能の決定は探索へ戻って既定 off と同じ手を打つ。
+#[test]
+fn root_node_cap_comes_from_the_lethal_nodes_key() {
+    let parse = |v: serde_json::Value| crate::search::decide_opts_and_carry(&v).unwrap().0;
+    assert_eq!(parse(serde_json::json!({})).lethal_nodes, LETHAL_ROOT_NODES);
+    assert_eq!(parse(serde_json::json!({"lethal_nodes": 80_000})).lethal_nodes, 80_000);
+
+    let (m, st) = board(1, 1, false);
+    let full = root(&m, &st, 3);
+    assert_eq!(full.status, "win");
+    assert!(full.nodes > 1, "{}", full.nodes);
+    let tiny = root_proof(&m, &st, Seat::P1, Some(3), 1, false).unwrap().expect("発動する");
+    assert_eq!(tiny.status, "unknown");
+    let enough = root_proof(&m, &st, Seat::P1, Some(3), full.nodes, false).unwrap().expect("発動する");
+    assert_eq!((enough.status, &enough.mv), (full.status, &full.mv));
+
+    let net = crate::search::decide::tests::zero_net();
+    let run = |extra: serde_json::Value| {
+        let mut v = serde_json::json!({"sims": 8, "lethal_proof": "root", "search_seed": 3});
+        v.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        let o = parse(v);
+        let mut rng = crate::search::Pcg32SearchRng::new(11);
+        decide(&m, &net, &st, Seat::P1, &o, &mut rng, &DecideCarry::default()).unwrap()
+    };
+    let small = run(serde_json::json!({"lethal_nodes": 1}));
+    assert_ne!(small.kind, "lethal");
+    assert_eq!(small.lethal.as_ref().map(|l| l.status), Some("unknown"));
+    let big = run(serde_json::json!({}));
+    assert_eq!(big.kind, "lethal");
+    assert_eq!(big.mv, full.mv);
+    // 判定不能の決定は既定 off と同じ探索の手（上限は探索の乱数を触らない）
+    let off = {
+        let o = DecideOptions { sims: 8, search_seed: Some(3), ..DecideOptions::default() };
+        let mut rng = crate::search::Pcg32SearchRng::new(11);
+        decide(&m, &net, &st, Seat::P1, &o, &mut rng, &DecideCarry::default()).unwrap()
+    };
+    assert_eq!((small.kind, &small.mv, &small.n), (off.kind, &off.mv, &off.n));
 }

@@ -298,6 +298,7 @@ class RsGame:
               reveal: Optional[str] = None,
               opp_blind: Optional[bool] = None,
               lethal_proof: Optional[str] = None,
+              lethal_nodes: Optional[int] = None,
               commit_sig_legacy: Optional[bool] = None,
               lethal_deal_legacy: Optional[bool] = None,
               commit_hidden_legacy: Optional[bool] = None,
@@ -354,6 +355,8 @@ class RsGame:
         "root_reply" は加えて、根の直後の相手の応手の節点で「この応手なら次にこちらの勝ちが証明できる」子を
         相手から見て負けに固定する。**省略（None）／"off"＝渡さない＝今までと同じ**（対戦 API は
         `PLAY_LETHAL_PROOF` を渡す・既定 "off"）。
+        `lethal_nodes`（省略可・§7.49・**測定用**）＝根の詰みの証明の節点の上限。**省略（None）＝渡さない＝Rust の既定**
+        （`search/lethal.rs::LETHAL_ROOT_NODES`＝20,000）。`lethal_proof` が off なら効かない。
         `commit_sig_legacy`（省略可・WP `rs-commit-sig`・**測定専用**）＝箱の commit の照合に旧い手の署名
         （戦闘の手の札が落ちる・2026-10-22 までの形）を使う。本番アリーナの基準席用。**省略（None）／False＝渡さない**。
         `lethal_deal_legacy`（省略可・§7.33・**測定用**）＝詰みの証明の守りの強い配り方を旧い形にする（カウンター
@@ -379,6 +382,7 @@ class RsGame:
                                 budget=budget, rethink_ratio=rethink_ratio,
                                 rethink_worlds=rethink_worlds, omniscient=omniscient,
                                 reveal=reveal, opp_blind=opp_blind, lethal_proof=lethal_proof,
+                                lethal_nodes=lethal_nodes,
                                 commit_sig_legacy=commit_sig_legacy,
                                 lethal_deal_legacy=lethal_deal_legacy,
                                 commit_hidden_legacy=commit_hidden_legacy,
@@ -405,6 +409,7 @@ class RsGame:
                reveal: Optional[str] = None,
                opp_blind: Optional[bool] = None,
                lethal_proof: Optional[str] = None,
+               lethal_nodes: Optional[int] = None,
                commit_sig_legacy: Optional[bool] = None,
                lethal_deal_legacy: Optional[bool] = None,
                commit_hidden_legacy: Optional[bool] = None,
@@ -477,6 +482,9 @@ class RsGame:
         # 詰みの証明（§7.21）。None／"off"＝渡さない＝Rust の既定（off）。
         if lethal_proof and lethal_proof != "off":
             opts["lethal_proof"] = str(lethal_proof)
+        # 根の詰みの証明の節点の上限（§7.49・測定用）。None＝渡さない＝Rust の既定（20,000）。
+        if lethal_nodes is not None:
+            opts["lethal_nodes"] = int(lethal_nodes)
         # 旧い手の署名（WP `rs-commit-sig`・測定専用）。None／False＝渡さない＝Rust の既定（修正後）。
         if commit_sig_legacy:
             opts["commit_sig_legacy"] = True

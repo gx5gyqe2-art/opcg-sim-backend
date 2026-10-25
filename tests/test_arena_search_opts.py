@@ -127,3 +127,13 @@ def test_merge_reads_cand_opts_and_refuses_to_mix(tmp_path):
     assert M.read_cand_opts([a, b]) == {json.dumps(w4, ensure_ascii=False, sort_keys=True)}
     assert M.read_cand_opts([old]) == {"{}"}
     assert len(M.read_cand_opts([a, old])) == 2
+
+
+def test_lethal_root_nodes_reaches_only_the_named_seat(no_engine):
+    """根の詰みの証明の節点の上限（§7.49・WP `rs-lethal-nodes`）: `--cand-lethal-root-nodes` は候補席の、
+    `--lethal-root-nodes` は基準席の opts の `lethal_nodes`（Rust の欄名）へ載る。省略なら鍵ごと出ない。"""
+    args = _args(["--lethal-proof", "root", "--cand-lethal-proof", "root", "--cand-lethal-root-nodes", "80000"])
+    assert A.cand_kw_from_args(args) == {"lethal_proof": "root", "lethal_nodes": 80000}
+    assert arena_shard._best_kw(args) == {"lethal_proof": "root"}
+    best = arena_shard._best_kw(_args(["--lethal-proof", "root", "--lethal-root-nodes", "40000"]))
+    assert best == {"lethal_proof": "root", "lethal_nodes": 40000}
