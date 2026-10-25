@@ -23,6 +23,9 @@ from opcg_sim.loop import engine as E  # noqa: E402
 
 POINTS = _os.path.join(_bootstrap.FIXTURES_DIR, "window_read_points.json")
 LEGACY = {"window_carry_legacy": True, "window_worlds_legacy": True, "window_tree_legacy": True}
+#: 点を見つけたときのネット（r13d）に固定する。出荷の既定が替わると、値の近い点（3301005）の旧い形の手が
+#: 入れ替わる（2026-10-25 に r23 で素通し → ブロック）。この検査は窓の読み方の違いを見るもので、ネットの違いは見ない。
+NET = _os.path.join(E.MODELS, "nrel_r13d.npz")
 
 
 def _apply(game, actor, mv):
@@ -44,7 +47,7 @@ def _board(p):
 
 
 def _decide(game, p, extra):
-    spec = E.SeatSpec(None, sims=E.PLAY_SIMS, budget=E.PLAY_BUDGET, worlds=E.PLAY_WORLDS,
+    spec = E.SeatSpec(NET, sims=E.PLAY_SIMS, budget=E.PLAY_BUDGET, worlds=E.PLAY_WORLDS,
                       lethal_proof=E.PLAY_LETHAL_PROOF, **extra)
     opts = spec.decide_opts(p["seed"], p["turn"], p["seat"], None)
     return json.loads(game.fork().decide(p["seat"], opts))

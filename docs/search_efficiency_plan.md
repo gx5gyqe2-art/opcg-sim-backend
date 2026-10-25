@@ -807,3 +807,49 @@ Phase 0 → Phase 1 → Phase 3（Phase 4 の (a)(b) を合間に）→ Phase 4 
 **報告** `docs/reports/2026-10-24_weak_points.md`（5 つそれぞれの結論と、直す WP の案を量の見積もりつきで）・`n1_results/weak_points/`・`RESULT.json`・ブランチ `claude/weak-points`。
 **完了条件**: エンジン・既定の挙動は変えない。`make test` green・push。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
 
+
+### 7.49 WP `rs-lethal-nodes`——根の詰みの証明の節点の上限を上げる（作業セッション用・opus・2026-10-25）
+
+ユーザ決定（2026-10-25・弱点の点検の後の選択「証明の上限を 4 倍」）。台帳 2+405。根拠 `docs/reports/2026-10-24_weak_points.md` §4.4: 上限 20,000（`search/lethal.rs::LETHAL_ROOT_NODES`）→ 80,000 で、
+証明 860 → 972（+112・+13%・増えた分は全部、本当の配り方でも勝てる点）・偽の証明は増えない・判定の節点は ×3.06。
+**直すもの**: 根の証明（`PLAY_LETHAL_PROOF = "root"`・出荷の CPU だけ）の節点の上限を opts の鍵で替えられるようにする（例 `lethal_root_nodes`・既定は今の 20,000 のまま・測定用）。
+エンジンの既定・生成・アリーナの物差しは変えない（根の証明は出荷の設定でしか動かない）。
+**確かめ**:
+- 費用: `rs_decide_latency.py`（世界 2 本・証明 root・20 局・1 コアずつ同時）で 20k／40k／80k／160k の 1 手の平均・99% 点。`lethal_speed_check.py` で証明の数と偽の証明（§7.25 の点）。
+- 選ぶ上限（費用と証明の数の曲線から 1 つ・**予告: 80k・1 手 +10〜30%・+1〜+3 Elo**）を候補に、**本番アリーナはコーディネータが起こす**（ジョブ定義・Sonnet・候補＝上限を上げた形 vs 基準＝今の形・両席 r23・出荷の設定・random × real・32 シャード × 84 ペア・seed **3681000 + (k−1)×1000**）。
+  そのため `arena_shard` に候補席だけ上限を替える引数（例 `--cand-lethal-root-nodes`）を通す。
+- 単体テスト: 鍵で上限が替わる（小さな上限で判定不能になる局面が、大きな上限で証明される）・鍵が無ければ今と同じ。golden は変わらないはず（証明は既定 off）＝作り直して差分 0 を確かめる。
+- `make test` green・`make audit-cross` void 0。
+**同時に走る WP**: `rs-defense-proof`（§7.51・同じ `search/lethal.rs` の証明器を守りの窓から呼ぶ）。**触る場所を上限の受け渡しに絞り**、先に向こうが本線に入ったら取り込んでから push する。
+**報告** `docs/reports/2026-10-25_lethal_nodes.md`・`n1_results/lethal_nodes/`・`RESULT.json`・`docs/SPEC.md` §2.5.10・`docs/TEST_SPEC.md`・ブランチ `claude/rs-lethal-nodes`。
+**完了条件**: `make test` green・`make audit-cross` void 0・push。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
+
+### 7.50 WP `audit-verify-opp`——監査の確かめで、相手の残りのターンも出荷の設定で打つ（器の直し・作業セッション用・opus・2026-10-25）
+
+ユーザ決定（2026-10-25・「監査の測り方を直す」）。台帳 2+405。根拠 `docs/reports/2026-10-24_weak_points.md` §2.3〜2.4: `blunder_audit` の `verify` は今のターンの残りを**手を打った側だけ**出荷の設定にするので、
+相手の手番に打った守りの手では、相手の残りのターンを審判（160 回）が打つ。審判の相手役が詰めを打ち損じると偽の損が出る（3301005・107: 両席とも出荷の設定なら素通し 0／16・ブロック 0／16、審判だと 0.06 対 0.47）。
+**直すもの**（`tests/scripts` の器だけ・エンジンは触らない）: `blunder_audit.py` の `verify` と、同じ形の確かめを持つ `defense_audit.py`（確かめの段）で、**今のターンの残りを両席とも出荷の設定**で打つ（`n1_results/weak_points/dbl_attack2.py` の打ち継ぎを器に移す）。
+旧い形は旗で残す（例 `--verify-mover-only`・前の報告の数字を打ち直せるように）。
+**確かめ**:
+- 3301005・107 が損に数えられなくなる。前回の blunder-audit の確かめ済みの損 3 点（`2026-10-23_blunder_audit.md`）と、守りの再監査の確かめ後の見逃し（`2026-10-24_overflow_trigger.md` §3 の甲 6・乙 2）を新しい確かめで読み直し、残る点と消える点を 1 点ずつ書く。
+- テストは足さない（CLAUDE.md「理論の道具のテストは最小限」）。`make test` green。エンジンを触らないので `audit-cross` は要らない。
+**報告** `docs/reports/2026-10-25_audit_verify_opp.md`・`n1_results/audit_verify_opp/`・`RESULT.json`・`docs/TEST_SPEC.md`（器の行）・ブランチ `claude/audit-verify-opp`。
+**完了条件**: `make test` green・push。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
+
+### 7.51 WP `rs-defense-proof`——守りの窓で、相手から見た詰みの証明を使う（作業セッション用・opus・2026-10-25）
+
+ユーザ決定（2026-10-25・「守りに相手の詰みの証明」）。台帳 2+405。根拠 `docs/reports/2026-10-24_weak_points.md` §1.4 案 A: 守りの見逃しの残りは、候補の値が並ぶ（差 ≤ 0.02）か張り付く（|値| ≥ 0.85）中での同点崩し。
+そのうち乙の 2 点（3351102・114 の前後・3351191）は「どの配り方でも守れる手が在る」点で、相手から見た詰みの証明で拾える。
+**直すもの**: 相手の手番の守りの窓（カウンター・ブロッカー・守りの対話）で、自分のライフ ≤ 2 かつ候補の値が平ら・張り付きのときだけ、各候補を当てた後の盤面で**相手の側から**詰みの証明（`search/lethal.rs`・
+相手の知らない札＝自分の手札などを公平に 8 通り配る）を回し、どの配り方でも相手が勝つ候補を外してから値で選ぶ。全部の候補が外れるなら今の選び方のまま。
+**opts の鍵で入切**（例 `defense_proof`・既定 off＝今の形・測定用）。しきい値（平ら・張り付き）は報告の 0.02／0.85 を出発点にし、新しく決めた数は報告に根拠を書く。
+**確かめ**:
+- 守りの再監査（`defense_audit.py`・§7.24 の設定）を seed 3351000〜3351299（reaudit-wr と同じ局面・両席 r13d）で、入れた形と入れない形。乙 2 点が守れる手に変わるか・新しく作る見逃しが無いか。
+  可能なら変わった局だけ打ち直す形（`rs-window-tree-blocker` の `diverge.py`／`defense_partial.py`）を使う。
+- 費用: `rs_decide_latency.py`（出荷の設定）で 1 手の平均・99% 点。**予告: 1 手 +1% 前後・+0〜+2 Elo**。
+- 本番アリーナはコーディネータが起こす（候補＝入れた形 vs 基準＝今の形・両席 r23・出荷の設定・random × real・32 シャード × 84 ペア・seed **3721000 + (k−1)×1000**）。`arena_shard` に `--cand-defense-proof` を通す。
+- 単体テスト: 乙の 1 点の盤面（fixture）で入れた形が守る手を選ぶ・鍵が無ければ今と同じ。golden は既定 off で変わらない＝作り直して差分 0。
+- `make test` green・`make audit-cross` void 0。
+**同時に走る WP**: `rs-lethal-nodes`（§7.49・同じ証明器の節点の上限）。触る場所を守りの窓からの呼び出しに絞り、先に向こうが本線に入ったら取り込んでから push する。
+**報告** `docs/reports/2026-10-25_defense_proof.md`・`n1_results/defense_proof/`・`RESULT.json`・`docs/SPEC.md` §2.5.12・`docs/TEST_SPEC.md`・ブランチ `claude/rs-defense-proof`。
+**完了条件**: `make test` green・`make audit-cross` void 0・push。PR は作らない。質問で止まらず、迷った点は notes に書いて完走する。
