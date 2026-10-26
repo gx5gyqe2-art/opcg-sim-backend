@@ -13,15 +13,16 @@
  },
  "outputs": {
   "dirs": [
-   "n_records/n58_w19_p0"
+   "n_records/n58_w19_p0",
+   "n_records/n58_w19_p1"
   ]
  },
  "metrics": {
-  "parts_done": 1,
-  "games": 120,
-  "rows": 20266,
+  "parts_done": 2,
+  "games": 240,
+  "rows": 41807,
   "dropped": 0,
-  "sec_play_mean": 45.99
+  "sec_play_mean": 47.36
  },
  "notes": "",
  "worker": {
