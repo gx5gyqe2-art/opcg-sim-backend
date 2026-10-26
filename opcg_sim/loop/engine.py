@@ -29,8 +29,10 @@ CARDS_PATH = os.path.join(DATA, "opcg_cards.json")
 #: 出荷既定のネット（生成・アリーナ・serve が同じものを使う＝物差しを 1 本に保つ）。
 #: 前の既定 r23（2026-10-25 採用・`docs/reports/r23_adoption_20261025.md`・r22 が打った波 52 の π と波 52＋51 の価値で r22 から育てた＝era13）。
 #: **r24**（2026-10-25 採用・`docs/reports/r24_adoption_20261025.md`・r23 が打った波 53 の π と波 53＋52 の価値で r23 から育てた＝era14）。
-#: ロールバック先は r23（同梱 `nrel_r23.npz`）、その先は r22（`nrel_r22.npz`）、r13d（`nrel_r13d.npz`）。
-DEFAULT_NET = os.path.join(MODELS, "nrel_r24.npz")
+#: **r26**（2026-10-26 採用・`docs/reports/r26_adoption_20261026.md`・r24 を学ぶ側に相手の集団〔r24／r23／r22／r13d〕と打った
+#: 波 55L の π〔学ぶ側の行だけ〕と波 55L＋54 の価値で r24 から育てた＝era15・本番の設定で r24 に +18.9）。
+#: ロールバック先は r24（同梱 `nrel_r24.npz`）、その先は r23（`nrel_r23.npz`）、r22（`nrel_r22.npz`）、r13d（`nrel_r13d.npz`）。
+DEFAULT_NET = os.path.join(MODELS, "nrel_r26.npz")
 
 #: serve 既定（`opcg_sim/learned/config.py` の共有既定と同じ値。Rust 側 `DecideOptions`
 #: の既定と一致するので、通常はここを触らない）。
@@ -45,7 +47,10 @@ PLAY_BUDGET = 0
 #: 2026-10-21 ユーザ決定「b でお願いします」: 世界 2 本 × 1,280 回（同じ seed 帯の 1,438 ペアで +18.1 Elo・
 #: 世界 4 本／8 本・5,120 回／10,240 回とは組の差が有意でない＝計算 ×2 で頭打ち・1 コアの 1 手平均 0.24 秒・最大 2.2 秒。
 #: `docs/reports/2026-10-21_phase5_curve.md`・`2026-10-21_phase6_materials.md`）。生成・アリーナの物差しは 1 本のまま。
-PLAY_WORLDS = 2
+#: 2026-10-26 ユーザ決定「4 本にする」: 世界 4 本（今の 2 本に +13.2 Elo [+6.6, +19.8]・`docs/reports/2026-10-25_worlds4_prod_arena.md`）。
+#: 1 コアの機械では世界を順に読むので 1 手平均 0.31 → 0.61 秒・最悪 3.5 → 17 秒（`2026-10-25_world_parallel.md`）。
+#: 長い思考はフロントに経過秒を出して見せる（`api/services/cpu_think.py`）。
+PLAY_WORLDS = 4
 #: 対戦 API の「迷う局面だけ世界 K 本で読み直す」（`docs/search_efficiency_plan.md` §7.4・WP
 #: `play-rethink`）。根の 2 位の訪問数 ÷ 1 位の訪問数が `PLAY_RETHINK_RATIO` 以上なら、同じ
 #: `search_seed` で世界 `PLAY_RETHINK_WORLDS` 本の読みをやり直してその手に差し替える。

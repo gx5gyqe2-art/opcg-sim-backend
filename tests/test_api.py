@@ -181,7 +181,7 @@ def test_cpu_step_uses_play_search_settings(client, monkeypatch):
     出荷の設定が気づかないうちに変わる（世界の本数が渡らず 1 本に戻る等）のを見張る。"""
     from opcg_sim.api import engine_rs
     from opcg_sim.loop import engine as E
-    assert E.PLAY_WORLDS == 2  # 2026-10-21 ユーザ決定（世界 2 本 × 1,280 回）
+    assert E.PLAY_WORLDS == 4  # 2026-10-26 ユーザ決定（世界 4 本 × 1,280 回）
     seen = []
     orig = engine_rs.RsGame.decide
 
