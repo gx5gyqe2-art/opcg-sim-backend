@@ -1,155 +1,26 @@
 {
- "job": "policy-attn-long",
- "status": "done",
- "branch": "claude/policy-attn-long",
- "spec": "docs/search_efficiency_plan.md §7.57（本線 claude/cpu-spec-improvements-yw91jd @ daf3abf・台帳 2+429）",
- "report": "docs/reports/2026-10-25_policy_attn_long.md",
- "code": "変更なし（本線の opcg_sim/learned/train/n_rel_attn_desk.py をそのまま使用）。n1_results/policy_attn_long/summarize.py（表の出力・1 回きり）",
- "make_test": "green（torch を PYTHONPATH に入れない構成・cargo test 637 passed＋pytest 831 passed, 62 skipped〔skip は全部 torch の任意依存〕）",
- "material": {
-  "A_w53": {
-   "shards": "claude/n53-w01〜w16 の 64 シャード（生成役 r23・§7.52 と同じ）",
-   "value_rows": 1297134,
-   "policy_points": 522817,
-   "threads": 2,
-   "where": "このセッション"
-  },
-  "B_w5354": {
-   "shards": "上＋claude/n54-w01〜w16 の 64 シャード（生成役 r24）＝128 シャード",
-   "value_rows": 2626205,
-   "policy_points": 1060238,
-   "threads": 4,
-   "where": "Sonnet の作業セッション 2 本（claude/policy-attn-long-w54-base・-w54-attn・各約 4.8 時間・回収後アーカイブ）"
-  },
-  "val": "holdout seed%7 の先頭 20,000 点／20,000 行・全組で同じ点（全部波 53）"
+ "job": "arena-r27p-w13",
+ "role": "arena",
+ "status": "partial",
+ "inputs": {
+  "candidate": "nrel_r27.npz (claude/train-r27)",
+  "baseline": "nrel_r26.npz",
+  "both": "sims 1280 x worlds 4 x budget 0 x lethal root (fair)",
+  "pairs": 84
  },
- "conditions": {
-  "epochs": 16,
-  "lr": 0.0005,
-  "bs_v": 256,
-  "bs_p": 64,
-  "ablate": "rel",
-  "pi_teacher": "visits",
-  "aux_heads": "off",
-  "attn": "§7.52 と同じ（d=64・4 頭・トークン 2 層＋候補→トークン 1 層＋候補どうし 2 層）",
-  "control": "B の材料で r24 から・今の頭・lr 2e-4・4 周（base_r24_w5354）"
+ "outputs": {
+  "files": [
+   "arena_r27p/r27p_real_w13.jsonl"
+  ]
  },
- "gap_attn_minus_base_val_ce": {
-  "A_first4": -0.0163,
-  "A_last4": -0.0156,
-  "B_first4": -0.0137,
-  "B_last4": -0.0153,
-  "A_ep15": -0.0151,
-  "B_ep15": -0.0147
+ "metrics": {
+  "arena_r27p/r27p_real_w13.jsonl": 21
  },
- "gap_attn_minus_base_train_probe_ce": {
-  "A_first4": -0.0155,
-  "A_last4": -0.031,
-  "B_first4": -0.0171,
-  "B_last4": -0.031
- },
- "best_val_ce": {
-  "A_base": 1.8542,
-  "A_attn": 1.8383,
-  "B_base": 1.8447,
-  "B_attn": 1.8296,
-  "r24_itself": 1.8606,
-  "r24_retrain_A_4ep": 1.8354,
-  "r24_retrain_B_4ep": 1.8352
- },
- "mis_last4": {
-  "A_base": 0.0745,
-  "A_attn": 0.07,
-  "B_base": 0.0718,
-  "B_attn": 0.0672,
-  "order_gap_A": -0.0006,
-  "order_gap_B": -0.0001
- },
- "final_epoch": {
-  "base_scratch_w53": {
-   "ep": 15,
-   "train_ce_run": 1.8201,
-   "train_probe_ce": 1.8068,
-   "val_ce": 1.8563,
-   "val_top1": 0.5222,
-   "val_mis": 0.0732,
-   "val_mis_atk": 0.0275,
-   "val_mis_order": 0.0203,
-   "val_mis_play": 0.0096,
-   "val_mis_other": 0.0158,
-   "val_vmse": 0.9019,
-   "sec": 383.1
-  },
-  "attn_scratch_w53": {
-   "ep": 15,
-   "train_ce_run": 1.7888,
-   "train_probe_ce": 1.776,
-   "val_ce": 1.8411,
-   "val_top1": 0.5355,
-   "val_mis": 0.0696,
-   "val_mis_atk": 0.027,
-   "val_mis_order": 0.0194,
-   "val_mis_play": 0.0084,
-   "val_mis_other": 0.0147,
-   "val_vmse": 1.0142,
-   "sec": 721.2
-  },
-  "base_scratch_w5354": {
-   "ep": 15,
-   "train_ce_run": 1.8229,
-   "train_probe_ce": 1.8181,
-   "val_ce": 1.8463,
-   "val_top1": 0.5269,
-   "val_mis": 0.0714,
-   "val_mis_atk": 0.0282,
-   "val_mis_order": 0.0193,
-   "val_mis_play": 0.0092,
-   "val_mis_other": 0.0147,
-   "val_vmse": 0.7176,
-   "sec": 680.3
-  },
-  "attn_scratch_w5354": {
-   "ep": 15,
-   "train_ce_run": 1.7943,
-   "train_probe_ce": 1.7851,
-   "val_ce": 1.8316,
-   "val_top1": 0.5402,
-   "val_mis": 0.0683,
-   "val_mis_atk": 0.0259,
-   "val_mis_order": 0.0205,
-   "val_mis_play": 0.0089,
-   "val_mis_other": 0.013,
-   "val_vmse": 0.786,
-   "sec": 1017.7
-  },
-  "base_r24_w5354": {
-   "ep": 3,
-   "train_ce_run": 1.8162,
-   "train_probe_ce": 1.8092,
-   "val_ce": 1.8352,
-   "val_top1": 0.5387,
-   "val_mis": 0.0694,
-   "val_mis_atk": 0.0246,
-   "val_mis_order": 0.0208,
-   "val_mis_play": 0.0091,
-   "val_mis_other": 0.015,
-   "val_vmse": 0.5067,
-   "sec": 642.9
-  }
- },
- "forecast_check": {
-  "gap_opens_to_-0.02_-0.03_p0.3": "外れ（最後の 4 周の平均 A −0.0156・B −0.0153。開いたのは訓練側だけ −0.031）",
-  "scratch_attn_below_r24_p0.1": "A では外れ（1.8383＝r24 から再訓練 1.838 に並ぶだけ）・B では僅差で当たり（1.8305 対 同じ材料で r24 から 1.8352）"
- },
- "judgment": "差は −0.02 より小さいまま（−0.015 で一定）・順番の取り違えは減らない＝「頭の形では伸びない」を確定。本実装へは進まない（推薦）。1 手の時間の見積もりは §7.52 のまま（×2.5 前後・軽い版 ×1.3）。",
- "reading": "注意の頭の得は学ぶ速さの一定の 0.015 で、長く回しても開かない（両方とも周 6〜8 で頭打ち・残りの力は訓練側の覚え込みに使われる）。一から育てた注意の頭が r24 の積み上げと同じ種類の得を一度で取れる（B で r24 から再訓練を 0.005 下回る）が、§7.52 では r24 に足しても差 0.000＝足し算にならない。",
- "notes": [
-  "組 B（波 54 を足した組）は波 54 の前半 w01〜w16（64 シャード）だけを足した。波 54 は 32 シャードあるが、全部だと材料 3 倍で 16 周の注意の頭が 1 日を超えるため。前半同士で材料をちょうど倍にした",
-  "組 B は時間の都合で Sonnet の作業セッション 2 本に分けた（定型の訓練・CLAUDE.md の Sonnet の決まり）。結果ブランチ claude/policy-attn-long-w54-base・-w54-attn に push させ、jsonl とログをこのブランチへ写した。両セッションは回収後にアーカイブした",
-  "「r24 を下回るか」を同じ材料で比べるため、指示書に無い対照 base_r24_w5354（B の材料で r24 から・今の頭・4 周）を足した。A の材料の対照は §7.52 の base_r24 を使った",
-  "指示書の『r24 の 1.838』は r24 から再訓練した値（§7.52 の base_r24 周 3 1.8382）と読んだ。r24 そのもの（訓練前）は同じ検証点で 1.8606",
-  "組 A は 2 スレッドずつ 2 本並べたため §7.52（1 スレッド）と僅かに数字が違う（周 0 は同じ・周 1 の今の頭 1.8680 → 1.8698）",
-  "torch 2.14.1+cu130 を ~/torch_env（PYTHONPATH）に入れて訓練し、ゲートは torch を入れない構成で回した（§7.53・§7.54 と同じ扱い）。torch を入れた構成では tests/test_n_rel_train_torch.py::test_grads_match_numpy が数値の許容差で 1 件落ちる（コードは変えていないので本線の既知の件・この torch の版との相性）",
-  "台帳（docs/cpu_theory_gap.md）・計画（§7.57）の書き換えはコーディネータに任せた"
- ]
+ "notes": "",
+ "worker": {
+  "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/arena_r27p.json",
+  "k": 13,
+  "branch": "claude/arena-r27p-w13",
+  "code_commit": "3d68cd348544648b66bb7a6993f86170e47e839d"
+ }
 }
