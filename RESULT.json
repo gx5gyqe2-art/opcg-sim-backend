@@ -11,12 +11,14 @@
  "outputs": {
   "files": [
    "arena_r25v/r25v_mirror_w07.jsonl",
-   "arena_r25v/r25v_real_w07.jsonl"
+   "arena_r25v/r25v_real_w07.jsonl",
+   "arena_r25v/r25v_synth2_w07.jsonl"
   ]
  },
  "metrics": {
   "arena_r25v/r25v_mirror_w07.jsonl": 175,
-  "arena_r25v/r25v_real_w07.jsonl": 175
+  "arena_r25v/r25v_real_w07.jsonl": 175,
+  "arena_r25v/r25v_synth2_w07.jsonl": 175
  },
  "notes": "",
  "worker": {
