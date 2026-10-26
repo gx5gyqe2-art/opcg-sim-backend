@@ -1,0 +1,29 @@
+value 5207687行（val 744195） policy 2055873点（val 293021） 287s
+warm-start: opcg_sim/data/learned/nrel_r26.npz（hidden=192）
+ablate: ['rel']
+aux: on λ=0.1 有効行 3733838/5207687
+pi_steps_mult: 2.0（方策のステップ数を 2.0 倍・V は不変）
+backend: torch threads=4 fast-pairs fast-max fast-index
+予算・候補定数を先に作った（候補 25511395行 93.1s）
+PI_TEACHER {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.497225679516076, "entropy_q_improved": 1.067012429429764}
+  ep0 step 5000/72523 mse 0.4930 ce 1.6848 562s
+  ep0 step 10000/72523 mse 0.4920 ce 1.6819 675s
+  ep0 step 15000/72523 mse 0.4901 ce 1.6805 791s
+  ep0 step 20000/72523 mse 0.4892 ce 1.6799 910s
+  ep0 step 25000/72523 mse 0.4887 ce 1.6801 1029s
+  ep0 step 30000/72523 mse 0.4884 ce 1.6800 1146s
+  ep0 step 35000/72523 mse 0.4883 ce 1.6795 1264s
+  ep0 step 40000/72523 mse 0.4881 ce 1.6786 1378s
+  ep0 step 45000/72523 mse 0.4876 ce 1.6780 1492s
+  ep0 step 50000/72523 mse 0.4871 ce 1.6775 1606s
+  ep0 step 55000/72523 mse 0.4869 ce 1.6768 1718s
+  ep0 step 60000/72523 mse 0.4866 ce 1.6763 1830s
+  ep0 step 65000/72523 mse 0.4863 ce 1.6759 1944s
+  ep0 step 70000/72523 mse 0.4861 ce 1.6755 2056s
+ep0 train mse 0.4860 ce 1.6752 | val v_mse 0.4391 v_sign 0.849 pi_top1 0.506 ce 1.730 2113s
+  aux val huber 0.4214 tok 0.1115
+N_REL_TRAIN_EPOCH {"ep": 0, "backend": "torch", "threads": 4, "train_sec": 1673.439, "steps": 72523, "breakdown": {"budget_p": 8.238, "holdout": 1.223, "rel_p": 0.215, "rel_v": 2.295, "slice_p": 17.164, "slice_v": 7.656, "step_p": 0.364, "step_p_bwd": 681.165, "step_p_fwd": 401.164, "step_v": 0.297, "step_v_bwd": 325.428, "step_v_fwd": 220.278, "step_v_prep": 0.109}, "train_mse": 0.4859525767855019, "train_ce": 1.6752438021890306, "val_vmse": 0.4390983283519745, "val_vsign": 0.84915, "val_pi_top1": 0.50625, "val_p_loss": 1.7299591903686524, "pi_teacher": {"pi_teacher": "q_improved", "p_net_src": "pol_p", "v_mix_src": "pol_v0", "n_min": 1.0, "c_visit": 50.0, "c_scale": 0.3, "entropy_visits": 1.497225679516076, "entropy_q_improved": 1.067012429429764}, "val_pi_top1_visits": 0.53225, "val_p_loss_visits": 1.8738539962768554, "aux_weight": 0.1, "val_aux": 0.4213709548787693, "val_aux_tok": 0.11149516925343958, "train_aux": [0.40090247988700867, 0.11626851558685303]}
+  ep0 の重みを /root/nrel_r27o.ep0.npz に保存
+  ep0 を /root/nrel_r27o.npz に保存（暫定最良）
+best ep0 val v_mse 0.4391 を保存
+N_REL_TRAIN_DONE {"out": "/root/nrel_r27o.npz"}
