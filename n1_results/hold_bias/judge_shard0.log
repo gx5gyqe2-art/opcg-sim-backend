@@ -1,0 +1,21 @@
+SCENE blocker pool=799 take=150
+SCENE confirm pool=643 take=150
+SCENE confirm:opp pool=540 take=150
+SCENE counter pool=1769 take=200
+SCENE main_end pool=1604 take=300
+SCENE select_none pool=635 take=150
+SCENE select_none:opp pool=159 take=150
+SCENE trigger pool=50 take=50
+SCENE trigger:opp pool=231 take=150
+JUDGE shard=0/8 todo 167 (done overall 115) k=8 k_from=0 -> n1_results/hold_bias/points_shard0.jsonl
+JUDGE seed=4171030 step=83 window confirm a_hold=False why=None d=0.0 sec=75.3 (1/167 77s)
+JUDGE seed=4171102 step=21 window confirm:opp a_hold=True why=None d=0.0 sec=99.4 (2/167 101s)
+JUDGE seed=4171112 step=79 window trigger a_hold=True why=None d=0.375 sec=51.6 (3/167 152s)
+JUDGE seed=4171004 step=5 main main_end:activate a_hold=False why=None d=-0.125 sec=163.8 (4/167 165s)
+JUDGE seed=4171063 step=115 window blocker a_hold=False why=None d=-0.125 sec=173.5 (5/167 175s)
+JUDGE seed=4171045 step=112 main main_end:activate a_hold=True why=None d=0.0 sec=80.3 (6/167 255s)
+JUDGE seed=4171047 step=57 window counter a_hold=True why=None d=0.0 sec=45.4 (7/167 301s)
+JUDGE seed=4171019 step=136 window select_none:opp a_hold=False why=None d=-0.25 sec=164.7 (8/167 317s)
+JUDGE seed=4171032 step=77 window trigger:opp a_hold=False why=None d=0.0 sec=288.9 (9/167 365s)
+JUDGE seed=4171040 step=118 window blocker a_hold=True why=None d=0.125 sec=43.3 (10/167 409s)
+JUDGE seed=4171029 step=12 window confirm a_hold=True why=None d=-0.125 sec=109.0 (11/167 426s)

@@ -16,11 +16,13 @@
 
     python tests/scripts/hold_bias.py play --games 150 --workers 4
     python tests/scripts/hold_bias.py judge --workers 4
+    python tests/scripts/hold_bias.py judge --workers 4 --shard 3/8     # 別のセッションで並べる（points_shard3.jsonl）
     python tests/scripts/hold_bias.py summary
 
 再開できる（終えた局・点は飛ばす）。
 """
 import argparse
+import glob
 import json
 import math
 import os
@@ -197,10 +199,20 @@ def _rank(seed, step):
 CAPS = {"main_end": 300, "counter": 200}
 
 
-def cmd_judge(a):
-    games = {g["seed"]: g for g in BA.read_jsonl(os.path.join(a.out, "games.jsonl"))}
-    rpath = os.path.join(a.out, "points.jsonl")
-    done = {(x["seed"], x["step"]) for x in BA.read_jsonl(rpath)}
+def read_points(out):
+    """1 巡目の判定（`points.jsonl` と各シャードの `points_shard*.jsonl`）を重複なく合わせる（判定できた行を優先）。"""
+    rows = {}
+    for path in [os.path.join(out, "points.jsonl")] + sorted(glob.glob(os.path.join(out, "points_shard*.jsonl"))):
+        for x in BA.read_jsonl(path):
+            k = (x["seed"], x["step"])
+            if k not in rows or (x["ok"] and not rows[k]["ok"]):
+                rows[k] = x
+    return list(rows.values())
+
+
+def job_order(games, cap):
+    """判定する点の全体の並び（局の記録だけで決まる・pure）。場面ごとに上限まで（並びは pure な順位）を取り、
+    場面をまたいで交互に並べる（途中で止めても場面が偏らない）。シャードはこの並びの番号 mod n で分ける。"""
     pools = {}
     for s in sorted(games):
         g = games[s]
@@ -211,26 +223,36 @@ def cmd_judge(a):
             sc = prefilter(p)
             if sc is not None:
                 pools.setdefault(sc, []).append((light, p))
-    # 場面ごとに上限まで（並びは pure な順位）・場面をまたいで交互に並べる（途中で止めても場面が偏らない）
     queues = []
     for sc, v in sorted(pools.items()):
         v.sort(key=lambda j: _rank(j[0]["seed"], j[1]["step"]))
-        v = v[:CAPS.get(sc, a.cap)]
-        print(f"SCENE {sc} pool={len(pools[sc])} take={len(v)}", flush=True)
-        queues.append([j for j in v if a.more or (j[0]["seed"], j[1]["step"]) not in done])
+        queues.append(v[:CAPS.get(sc, cap)])
+        print(f"SCENE {sc} pool={len(v)} take={len(queues[-1])}", flush=True)
     jobs = []
     while any(queues):
         for q in queues:
             if q:
                 jobs.append(q.pop(0))
+    return jobs
+
+
+def cmd_judge(a):
+    games = {g["seed"]: g for g in BA.read_jsonl(os.path.join(a.out, "games.jsonl"))}
+    jobs = job_order(games, a.cap)
+    si, sn = (int(x) for x in a.shard.split("/")) if a.shard else (0, 1)
+    jobs = [j for idx, j in enumerate(jobs) if idx % sn == si]
+    first = {(x["seed"], x["step"]): x for x in read_points(a.out)}
     if a.more:
         # 2 巡目: 1 巡目で判定した点に、別の配り方 K 通り（番号 k_from..）を足す（`points_more.jsonl`・summary で対を合わせる）
-        first = {(x["seed"], x["step"]): x for x in BA.read_jsonl(rpath) if x["ok"]}
         rpath = os.path.join(a.out, "points_more.jsonl")
         done = {(x["seed"], x["step"]) for x in BA.read_jsonl(rpath)}
         jobs = [j for j in jobs if (j[0]["seed"], j[1]["step"]) in first and (j[0]["seed"], j[1]["step"]) not in done
-                and first[(j[0]["seed"], j[1]["step"])]["k"] <= a.k_from]
-    print(f"JUDGE todo {len(jobs)} (done {len(done)}) k={a.k} k_from={a.k_from}", flush=True)
+                and first[(j[0]["seed"], j[1]["step"])]["ok"] and first[(j[0]["seed"], j[1]["step"])]["k"] <= a.k_from]
+    else:
+        rpath = os.path.join(a.out, f"points_shard{si}.jsonl" if a.shard else "points.jsonl")
+        done = set(first)
+        jobs = [j for j in jobs if (j[0]["seed"], j[1]["step"]) not in done]
+    print(f"JUDGE shard={a.shard} todo {len(jobs)} (done overall {len(done)}) k={a.k} k_from={a.k_from} -> {rpath}", flush=True)
     t0 = time.time()
     with get_context("fork").Pool(a.workers, initializer=_init, initargs=(a.k, a.k_from)) as pool:
         for i, row in enumerate(pool.imap_unordered(judge_point, jobs, chunksize=1)):
@@ -285,7 +307,7 @@ def phase(t):
 
 def cmd_summary(a):
     games = BA.read_jsonl(os.path.join(a.out, "games.jsonl"))
-    rows = BA.read_jsonl(os.path.join(a.out, "points.jsonl"))
+    rows = read_points(a.out)
     more = {(x["seed"], x["step"]): x for x in BA.read_jsonl(os.path.join(a.out, "points_more.jsonl")) if x.get("ok")}
     for x in rows:
         m = more.get((x["seed"], x["step"]))
@@ -349,6 +371,7 @@ def main(argv=None):
     p = sub.add_parser("judge")
     p.add_argument("--k", type=int, default=8)
     p.add_argument("--k-from", type=int, default=0, help="配り方の番号の始まり（2 巡目は 1 巡目の K）")
+    p.add_argument("--shard", default=None, help="i/n: 全体の並びの番号 mod n == i の点だけ（出力 points_shard{i}.jsonl）")
     p.add_argument("--more", action="store_true", help="2 巡目: 1 巡目で判定した点に配り方を足す（points_more.jsonl）")
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--cap", type=int, default=150, help="場面ごとの点の上限（main_end 300・counter 200 は別）")
