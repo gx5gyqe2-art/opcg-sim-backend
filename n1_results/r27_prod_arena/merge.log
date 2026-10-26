@@ -1,0 +1,1 @@
+[r27p real] ARENA_MERGE_FINAL {"pairs": 2688, "games": 5376, "void": 0, "wins": 2759.0, "wr": 0.5132, "ci95": [0.503, 0.5234], "elo": 9.2, "elo95": [2.1, 16.3], "promoted": false, "shards": 32, "dup_seeds": 0, "cand_opts": [{"budget": 0, "lethal_proof": "root", "sims": 1280, "worlds": 4}]}
