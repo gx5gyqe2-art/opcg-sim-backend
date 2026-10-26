@@ -1,7 +1,7 @@
 {
  "job": "arena-r26v-w04",
  "role": "arena",
- "status": "done",
+ "status": "partial",
  "inputs": {
   "candidate": "nrel_r26v.npz (claude/train-r26v)",
   "baseline": "nrel_r24.npz",
@@ -18,7 +18,7 @@
  "metrics": {
   "arena_r26v/r26v_mirror_w04.jsonl": 350,
   "arena_r26v/r26v_real_w04.jsonl": 350,
-  "arena_r26v/r26v_synth2_w04.jsonl": 349
+  "arena_r26v/r26v_synth2_w04.jsonl": 350
  },
  "notes": "",
  "worker": {
