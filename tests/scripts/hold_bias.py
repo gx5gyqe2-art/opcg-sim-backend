@@ -8,7 +8,7 @@
 2. ``judge``: 候補 2 つ以上の判断点ごとに、`blunder_audit.pick_b` で打った手 a と比べる手 b（根の次点）を取り、
    **a か b のどちらかが「しない」側で、もう一方が「する」側の点だけ**を判定する（`hold_scene`）。
    審判は「今のターンの残りを両席とも出荷の設定で打ち継ぎ、その先を審判〔r27・160 回・世界 1 本〕」
-   （`blunder_audit.rollout_ship(both=True)`・§7.59 の手順 3）。公平な配り直し・a と b の対・K 通り（既定 16）。
+   （`blunder_audit.rollout_ship(both=True)`・§7.59 の手順 3）。公平な配り直し・a と b の対・K 通り（既定 8・``--more`` で別の配り方 K 通りを足せる）。
    点は場面ごとに上限まで（既定 150・ターン終了 300・カウンター 200）を pure な順位で選び、場面を交互に並べて判定する。
    続き（commit）・証明（lethal）の点は数えない（打った手は前の判断点で決めた計画の続き）。
 3. ``summary``: 場面ごとに「する − しない」の勝率の差の平均と 95% 区間（点の間の t 区間）・CPU が選んだ側の別・
@@ -112,8 +112,9 @@ def cmd_play(a):
 
 # ---------------------------------------------------------------- 2. judge
 
-def _init(k):
+def _init(k, k_from=0):
     E.engine()
+    _G["k_from"] = int(k_from)
     _G["db"] = D.load_db()
     BA._G["db"] = _G["db"]
     BA._G["net"] = E.load_net(NET)
@@ -154,7 +155,7 @@ def judge_point(job):
     row["top"] = [{"d": BA.desc(game, t["mv"]), "n": t["n"], "q": t["q"]} for t in p["top"][:4]]
     wa, wb, errs = [], [], {}
     for i in range(_G["k"]):
-        ws = MJ.world_seed(seed, step, OFFSET + i)
+        ws = MJ.world_seed(seed, step, OFFSET + _G["k_from"] + i)
         ra, ea = BA.rollout_ship(game, name, a, ws, _G["ref"], BA._G["ship"], both=True)
         rb, eb = BA.rollout_ship(game, name, b, ws, _G["ref"], BA._G["ship"], both=True)
         wa.append(ra)
@@ -216,17 +217,24 @@ def cmd_judge(a):
         v.sort(key=lambda j: _rank(j[0]["seed"], j[1]["step"]))
         v = v[:CAPS.get(sc, a.cap)]
         print(f"SCENE {sc} pool={len(pools[sc])} take={len(v)}", flush=True)
-        queues.append([j for j in v if (j[0]["seed"], j[1]["step"]) not in done])
+        queues.append([j for j in v if a.more or (j[0]["seed"], j[1]["step"]) not in done])
     jobs = []
     while any(queues):
         for q in queues:
             if q:
                 jobs.append(q.pop(0))
-    print(f"JUDGE todo {len(jobs)} (done {len(done)}) k={a.k}", flush=True)
+    if a.more:
+        # 2 巡目: 1 巡目で判定した点に、別の配り方 K 通り（番号 k_from..）を足す（`points_more.jsonl`・summary で対を合わせる）
+        first = {(x["seed"], x["step"]): x for x in BA.read_jsonl(rpath) if x["ok"]}
+        rpath = os.path.join(a.out, "points_more.jsonl")
+        done = {(x["seed"], x["step"]) for x in BA.read_jsonl(rpath)}
+        jobs = [j for j in jobs if (j[0]["seed"], j[1]["step"]) in first and (j[0]["seed"], j[1]["step"]) not in done
+                and first[(j[0]["seed"], j[1]["step"])]["k"] <= a.k_from]
+    print(f"JUDGE todo {len(jobs)} (done {len(done)}) k={a.k} k_from={a.k_from}", flush=True)
     t0 = time.time()
-    with get_context("fork").Pool(a.workers, initializer=_init, initargs=(a.k,)) as pool:
+    with get_context("fork").Pool(a.workers, initializer=_init, initargs=(a.k, a.k_from)) as pool:
         for i, row in enumerate(pool.imap_unordered(judge_point, jobs, chunksize=1)):
-            row["k"] = a.k
+            row["k"], row["k_from"] = a.k, a.k_from
             with open(rpath, "a", encoding="utf-8") as f:
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
             r = row.get("ref") or {}
@@ -278,11 +286,18 @@ def phase(t):
 def cmd_summary(a):
     games = BA.read_jsonl(os.path.join(a.out, "games.jsonl"))
     rows = BA.read_jsonl(os.path.join(a.out, "points.jsonl"))
+    more = {(x["seed"], x["step"]): x for x in BA.read_jsonl(os.path.join(a.out, "points_more.jsonl")) if x.get("ok")}
+    for x in rows:
+        m = more.get((x["seed"], x["step"]))
+        if x["ok"] and m is not None and m.get("a") == x.get("a") and m.get("b") == x.get("b"):
+            wa, wb = x["ref"]["a"] + m["ref"]["a"], x["ref"]["b"] + m["ref"]["b"]
+            x["ref"] = dict(MJ.paired(wa, wb), a=wa, b=wb)
+            x["k"] = x["k"] + m["k"]
     ok = [x for x in rows if x["ok"]]
     s = {"games": len(games), "void": sum(1 for g in games if g["winner"] is None),
          "seeds": [min(g["seed"] for g in games), max(g["seed"] for g in games)] if games else None,
          "decisions": sum(g["n_points"] for g in games), "eligible": sum(g["n_elig"] for g in games),
-         "rows": len(rows), "ok": len(ok), "k": rows[0]["k"] if rows else None, "not_ok": {},
+         "rows": len(rows), "ok": len(ok), "k": {str(k): sum(1 for x in ok if x["k"] == k) for k in sorted({x["k"] for x in ok})}, "not_ok": {},
          "sec_per_game": round(sum(g["sec"] for g in games) / len(games), 1) if games else None,
          "sec_per_point": round(sum(x["sec"] for x in ok) / len(ok), 1) if ok else None}
     for x in rows:
@@ -332,7 +347,9 @@ def main(argv=None):
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--out", default=OUT_DIR)
     p = sub.add_parser("judge")
-    p.add_argument("--k", type=int, default=16)
+    p.add_argument("--k", type=int, default=8)
+    p.add_argument("--k-from", type=int, default=0, help="配り方の番号の始まり（2 巡目は 1 巡目の K）")
+    p.add_argument("--more", action="store_true", help="2 巡目: 1 巡目で判定した点に配り方を足す（points_more.jsonl）")
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--cap", type=int, default=150, help="場面ごとの点の上限（main_end 300・counter 200 は別）")
     p.add_argument("--out", default=OUT_DIR)
