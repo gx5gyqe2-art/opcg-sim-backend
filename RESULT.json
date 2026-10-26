@@ -10,11 +10,13 @@
  },
  "outputs": {
   "files": [
+   "arena_r26v/r26v_mirror_w04.jsonl",
    "arena_r26v/r26v_real_w04.jsonl"
   ]
  },
  "metrics": {
-  "arena_r26v/r26v_real_w04.jsonl": 348
+  "arena_r26v/r26v_mirror_w04.jsonl": 0,
+  "arena_r26v/r26v_real_w04.jsonl": 350
  },
  "notes": "",
  "worker": {
