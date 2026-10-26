@@ -1,0 +1,64 @@
+{
+ "kind": "gen",
+ "section": "§7.63",
+ "ledger_grep": "7.63 波 56",
+ "about": "波 56 の生成（生成役 r26 の自己対戦・相手の集団なし・設定は波 55S と同じ・32 シャード × 480 局・r27 の教材 2 波のうち 1 本目）",
+ "job": "n56-w{K}",
+ "branch": "claude/n56-w{K}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 32,
+ "hours": 2.5,
+ "vars": {
+  "BASE": "2650000 + ceil(k/2)*1000 + (500 if k % 2 == 0 else 0)"
+ },
+ "seed_base": "BASE",
+ "games": 120,
+ "parts": 4,
+ "workers": 4,
+ "out_dir": "n_records",
+ "part_dir": "n56_w{K}_p{J}",
+ "net": "opcg_sim/data/learned/nrel_r26.npz",
+ "args": [
+  "--sims",
+  "1280",
+  "--worlds",
+  "1",
+  "--budget",
+  "0",
+  "--select-rule",
+  "q_min_n",
+  "--q-min-frac",
+  "0.125",
+  "--root-prior-temp",
+  "2.0",
+  "--eps-play",
+  "0.03",
+  "--eps-hold",
+  "0.03",
+  "--decks",
+  "real",
+  "--shard-games",
+  "10"
+ ],
+ "log": "~/n56_w{K}.log",
+ "copy_logs": [
+  "~/n56_w{K}.log"
+ ],
+ "require": [
+  {
+   "file": "opcg_sim/loop/record_gen.py",
+   "grep": "\"--budget\""
+  }
+ ],
+ "inputs": {
+  "net": "opcg_sim/data/learned/nrel_r26.npz",
+  "games": 480,
+  "sims": 1280,
+  "worlds": 1,
+  "budget": 0,
+  "decks": "real"
+ },
+ "commit_message": "gen wave 56 shard {K}"
+}

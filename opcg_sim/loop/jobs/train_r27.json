@@ -1,0 +1,84 @@
+{
+ "kind": "train",
+ "section": "§7.63",
+ "ledger_grep": "7.63 波 56",
+ "about": "r27（warm-start r26・π と価値とも波 56＋57＝今の生成役 r26 の 2 波）→ 評価帯（波 57 holdout）",
+ "job": "train-r27",
+ "branch": "claude/train-r27",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 1,
+ "hours": 5,
+ "waves": [
+  {
+   "branch": "claude/n56-w{ww}",
+   "shards": 32,
+   "dest": "~/n56",
+   "glob": "~/n56/n_records/n56_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n57-w{ww}",
+   "shards": 32,
+   "dest": "~/n57",
+   "glob": "~/n57/n_records/n57_w*_p[0-3]",
+   "expect": 128
+  }
+ ],
+ "common_args": [
+  "--ablate",
+  "rel",
+  "--aux-weight",
+  "0.1",
+  "--lr",
+  "2e-4",
+  "--epochs",
+  "2",
+  "--pi-teacher",
+  "q_improved",
+  "--pi-steps-mult",
+  "1.0",
+  "--fast",
+  "--save-each-epoch",
+  "--warm-start",
+  "opcg_sim/data/learned/nrel_r26.npz"
+ ],
+ "runs": [
+  {
+   "name": "r27",
+   "in": [
+    "~/n56/n_records/n56_w*_p[0-3]",
+    "~/n57/n_records/n57_w*_p[0-3]"
+   ],
+   "out": "~/nrel_r27.npz",
+   "log": "~/train_r27.log"
+  }
+ ],
+ "bands": [
+  {
+   "in": [
+    "~/n57/n_records/n57_w*_p[0-3]"
+   ],
+   "nrel": [
+    "opcg_sim/data/learned/nrel_r24.npz",
+    "opcg_sim/data/learned/nrel_r26.npz",
+    "~/nrel_r27.npz",
+    "~/nrel_r27.ep0.npz",
+    "~/nrel_r27.ep1.npz"
+   ],
+   "args": [
+    "--policy",
+    "--holdout-mod",
+    "7"
+   ],
+   "out": "~/band_r27.json",
+   "log": "~/band_r27.log"
+  }
+ ],
+ "results_dir": "n1_results",
+ "inputs": {
+  "warm_start": "opcg_sim/data/learned/nrel_r26.npz"
+ },
+ "commit_message": "r27 のセット（訓練・評価帯）"
+}
