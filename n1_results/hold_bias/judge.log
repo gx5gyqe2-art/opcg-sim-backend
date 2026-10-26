@@ -1,0 +1,67 @@
+SCENE blocker pool=799 take=150
+SCENE confirm pool=643 take=150
+SCENE confirm:opp pool=540 take=150
+SCENE counter pool=1769 take=200
+SCENE main_end pool=1604 take=300
+SCENE select_none pool=635 take=150
+SCENE select_none:opp pool=159 take=150
+SCENE trigger pool=50 take=50
+SCENE trigger:opp pool=231 take=150
+JUDGE todo 1450 (done 0) k=16
+JUDGE seed=4171015 step=102 window confirm a_hold=True why=None d=0.0 sec=98.9 (1/1450 100s)
+JUDGE seed=4171060 step=30 window blocker a_hold=True why=None d=0.0 sec=100.4 (2/1450 102s)
+JUDGE seed=4171098 step=123 window select_none a_hold=False why=None d=-0.5 sec=45.2 (3/1450 147s)
+JUDGE seed=4171070 step=34 window counter a_hold=True why=None d=0.0 sec=181.4 (4/1450 183s)
+JUDGE seed=4171077 step=122 main main_end:attack a_hold=False why=None d=-0.1875 sec=150.2 (5/1450 250s)
+JUDGE seed=4171137 step=19 window trigger a_hold=False why=None d=-0.0625 sec=104.2 (6/1450 287s)
+JUDGE seed=4171090 step=120 window blocker a_hold=False why=None d=0.0625 sec=96.8 (7/1450 384s)
+JUDGE seed=4171059 step=20 window trigger:opp a_hold=True why=None d=-0.125 sec=146.7 (8/1450 397s)
+JUDGE seed=4171110 step=70 window select_none:opp a_hold=True why=None d=-0.1875 sec=299.0 (9/1450 446s)
+JUDGE seed=4171067 step=8 window confirm a_hold=False why=None d=0.0625 sec=148.6 (10/1450 532s)
+JUDGE seed=4171110 step=124 window confirm:opp a_hold=False why=None d=0.1875 sec=181.2 (11/1450 578s)
+JUDGE seed=4171024 step=144 window select_none a_hold=False why=None d=0.1875 sec=25.1 (12/1450 603s)
+JUDGE seed=4171082 step=71 window counter a_hold=False why=None d=0.0667 sec=211.4 (13/1450 657s)
+SCENE blocker pool=799 take=150
+SCENE confirm pool=643 take=150
+SCENE confirm:opp pool=540 take=150
+SCENE counter pool=1769 take=200
+SCENE main_end pool=1604 take=300
+SCENE select_none pool=635 take=150
+SCENE select_none:opp pool=159 take=150
+SCENE trigger pool=50 take=50
+SCENE trigger:opp pool=231 take=150
+JUDGE todo 1437 (done 13) k=8 k_from=0
+JUDGE seed=4171126 step=124 window confirm a_hold=False why=None d=-0.25 sec=40.7 (1/1437 42s)
+JUDGE seed=4171016 step=56 window counter a_hold=True why=None d=0.0 sec=129.7 (2/1437 131s)
+JUDGE seed=4171105 step=2 main main_end:play a_hold=False why=None d=0.0 sec=100.5 (3/1437 142s)
+JUDGE seed=4171050 step=102 window blocker a_hold=False why=None d=0.125 sec=223.0 (4/1437 224s)
+JUDGE seed=4171085 step=28 window select_none a_hold=False why=None d=-0.25 sec=94.6 (5/1437 226s)
+JUDGE seed=4171015 step=48 window select_none:opp a_hold=True why=None d=0.125 sec=88.4 (6/1437 231s)
+JUDGE seed=4171002 step=104 window trigger a_hold=False why=None d=0.0 sec=27.7 (7/1437 252s)
+JUDGE seed=4171022 step=100 window confirm:opp a_hold=True why=None d=-0.125 sec=339.8 (8/1437 341s)
+JUDGE seed=4171014 step=150 window blocker a_hold=False why=None d=0.0 sec=143.5 (9/1437 374s)
+JUDGE seed=4171093 step=72 window confirm a_hold=False why=None d=-0.125 sec=123.0 (10/1437 375s)
+JUDGE seed=4171020 step=95 window confirm:opp a_hold=False why=None d=0.0 sec=34.7 (11/1437 376s)
+JUDGE seed=4171087 step=85 window counter a_hold=False why=None d=0.0 sec=44.8 (12/1437 419s)
+JUDGE seed=4171146 step=28 window select_none a_hold=False why=None d=0.0 sec=55.8 (13/1437 431s)
+JUDGE seed=4171002 step=134 window trigger a_hold=False why=None d=0.0 sec=18.6 (14/1437 450s)
+JUDGE seed=4171020 step=18 window select_none:opp a_hold=False why=None d=0.0 sec=36.0 (15/1437 455s)
+JUDGE seed=4171050 step=15 main main_end:activate a_hold=True why=None d=-0.125 sec=81.7 (16/1437 457s)
+JUDGE seed=4171051 step=35 window blocker a_hold=True why=None d=0.0 sec=56.0 (17/1437 511s)
+JUDGE seed=4171035 step=170 window trigger:opp a_hold=True why=None d=0.0 sec=312.3 (18/1437 538s)
+JUDGE seed=4171030 step=110 window confirm a_hold=True why=None d=0.0 sec=90.0 (19/1437 547s)
+JUDGE seed=4171022 step=13 window trigger:opp a_hold=True why=None d=0.0 sec=134.7 (20/1437 585s)
+JUDGE seed=4171114 step=7 main main_end:play a_hold=False why=None d=-0.125 sec=65.1 (21/1437 612s)
+JUDGE seed=4171009 step=17 window select_none a_hold=False why=None d=-0.125 sec=37.1 (22/1437 622s)
+JUDGE seed=4171117 step=105 window confirm:opp a_hold=True why=None d=0.0 sec=135.8 (23/1437 647s)
+JUDGE seed=4171112 step=26 window trigger a_hold=True why=None d=0.0 sec=35.0 (24/1437 657s)
+JUDGE seed=4171133 step=35 window counter a_hold=True why=None d=-0.25 sec=131.6 (25/1437 669s)
+JUDGE seed=4171030 step=33 window select_none:opp a_hold=True why=None d=-0.125 sec=76.6 (26/1437 688s)
+JUDGE seed=4171116 step=109 window blocker a_hold=True why=None d=-0.375 sec=46.7 (27/1437 703s)
+JUDGE seed=4171019 step=189 window counter a_hold=True why=None d=0.0 sec=14.9 (28/1437 718s)
+JUDGE seed=4171069 step=17 main main_end:activate a_hold=True why=None d=0.25 sec=37.8 (29/1437 756s)
+JUDGE seed=4171115 step=113 window confirm a_hold=False why=None d=0.0 sec=111.0 (30/1437 780s)
+JUDGE seed=4171117 step=20 window trigger:opp a_hold=False why=None d=0.0 sec=137.5 (31/1437 784s)
+JUDGE seed=4171065 step=75 window select_none:opp a_hold=False why=None d=-0.375 sec=58.7 (32/1437 839s)
+JUDGE seed=4171019 step=201 window trigger:opp a_hold=False why=None d=0.0 sec=0.0 (33/1437 839s)
+JUDGE seed=4171137 step=9 window trigger a_hold=False why=None d=0.125 sec=61.3 (34/1437 846s)
