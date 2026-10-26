@@ -1,0 +1,64 @@
+{
+ "kind": "arena",
+ "section": "§7.61",
+ "ledger_grep": "7.61 伸びの切り分け",
+ "about": "r25 vs r24 を規則の直しの後のエンジンで測り直す（r26 の判定と同じ seed・公平同士・両席 160 回・3 条件）＝規則の直しの効きを教材と測る盤に分ける",
+ "job": "arena-r25n-w{KK}",
+ "branch": "claude/arena-r25n-w{KK}",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 16,
+ "hours": 2,
+ "vars": {
+  "B": "k - 1"
+ },
+ "nets": {
+  "candidate": "claude/train-r25:n1_results/nrel_r25.npz",
+  "baseline": "opcg_sim/data/learned/nrel_r24.npz"
+ },
+ "out_dir": "arena_r25n",
+ "pairs": 175,
+ "chunk_pairs": 175,
+ "bands": 1,
+ "workers": 4,
+ "args": [],
+ "tail_args": [],
+ "conditions": [
+  {
+   "name": "real",
+   "seed_base": "3971000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "real"
+   ],
+   "out": "r25n_real_w{KK}.jsonl"
+  },
+  {
+   "name": "mirror",
+   "seed_base": "3991000 + B*1000",
+   "args": [],
+   "out": "r25n_mirror_w{KK}.jsonl"
+  },
+  {
+   "name": "synth2",
+   "seed_base": "4011000 + B*1000",
+   "args": [
+    "--leaders",
+    "random",
+    "--decks",
+    "synth_roles2"
+   ],
+   "out": "r25n_synth2_w{KK}.jsonl"
+  }
+ ],
+ "inputs": {
+  "candidate": "nrel_r25.npz (claude/train-r25)",
+  "baseline": "nrel_r24.npz",
+  "both": "sims 160 (fair)",
+  "pairs": 175
+ },
+ "commit_message": "arena r25n shard {KK}"
+}
