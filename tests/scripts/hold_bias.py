@@ -308,8 +308,14 @@ def cmd_summary(a):
     s["by_kind"] = {k: block(v) for k, v in s["by_kind"].items()}
     s["all"] = block(ok)
     # 1 局あたりの点の数（1 席・判定した点の母集団＝候補 2 つ以上で「する」と「しない」の比べの点）
-    n_games = len({x["seed"] for x in rows}) or 1
-    s["per_game_per_seat"] = {k: round(len(v) / n_games / 2, 2) for k, v in by.items()}
+    pop = {}
+    for g in games:
+        for p in g["points"]:
+            sc = prefilter(p)
+            if sc is not None:
+                pop[sc] = pop.get(sc, 0) + 1
+    s["population"] = pop
+    s["per_game_per_seat"] = {k: round(v / max(len(games), 1) / 2, 2) for k, v in pop.items()}
     txt = json.dumps(s, ensure_ascii=False, indent=1)
     with open(os.path.join(a.out, "summary.json"), "w", encoding="utf-8") as f:
         f.write(txt + "\n")
