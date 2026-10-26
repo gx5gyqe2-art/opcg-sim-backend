@@ -1,0 +1,83 @@
+{
+ "kind": "train",
+ "section": "§7.62",
+ "ledger_grep": "7.62 価値の窓と規則の直し",
+ "about": "r26v（warm-start r24・π と価値とも波 55S だけ＝直した後のエンジン・今の生成役 r24 の波だけ）→ 評価帯（波 55L holdout）",
+ "job": "train-r26v",
+ "branch": "claude/train-r26v",
+ "base": {
+  "branch": "claude/cpu-spec-improvements-yw91jd"
+ },
+ "shards": 1,
+ "hours": 5,
+ "waves": [
+  {
+   "branch": "claude/n55s-w{ww}",
+   "shards": 32,
+   "dest": "~/n55s",
+   "glob": "~/n55s/n_records/n55s_w*_p[0-3]",
+   "expect": 128
+  },
+  {
+   "branch": "claude/n55l-w{ww}",
+   "shards": 32,
+   "dest": "~/n55l",
+   "glob": "~/n55l/n_records/n55l_w*_p[0-3]",
+   "expect": 128
+  }
+ ],
+ "common_args": [
+  "--ablate",
+  "rel",
+  "--aux-weight",
+  "0.1",
+  "--lr",
+  "2e-4",
+  "--epochs",
+  "2",
+  "--pi-teacher",
+  "q_improved",
+  "--pi-steps-mult",
+  "1.0",
+  "--fast",
+  "--save-each-epoch",
+  "--warm-start",
+  "opcg_sim/data/learned/nrel_r24.npz"
+ ],
+ "runs": [
+  {
+   "name": "r26v",
+   "in": [
+    "~/n55s/n_records/n55s_w*_p[0-3]"
+   ],
+   "out": "~/nrel_r26v.npz",
+   "log": "~/train_r26v.log"
+  }
+ ],
+ "bands": [
+  {
+   "in": [
+    "~/n55l/n_records/n55l_w*_p[0-3]"
+   ],
+   "nrel": [
+    "opcg_sim/data/learned/nrel_r24.npz",
+    "opcg_sim/data/learned/nrel_r26.npz",
+    "~/nrel_r26v.npz",
+    "~/nrel_r26v.ep0.npz",
+    "~/nrel_r26v.ep1.npz"
+   ],
+   "args": [
+    "--policy",
+    "--holdout-mod",
+    "7"
+   ],
+   "out": "~/band_r26v.json",
+   "log": "~/band_r26v.log"
+  }
+ ],
+ "results_dir": "n1_results",
+ "inputs": {
+  "warm_start": "opcg_sim/data/learned/nrel_r24.npz"
+ },
+ "commit_message": "r26v のセット（訓練・評価帯）"
+}
