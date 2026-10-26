@@ -1,0 +1,48 @@
+SCENE blocker pool=799 take=150
+SCENE confirm pool=643 take=150
+SCENE confirm:opp pool=540 take=150
+SCENE counter pool=1769 take=200
+SCENE main_end pool=1604 take=300
+SCENE select_none pool=635 take=150
+SCENE select_none:opp pool=159 take=150
+SCENE trigger pool=50 take=50
+SCENE trigger:opp pool=231 take=150
+JUDGE shard=2/8 todo 167 (done overall 126) k=8 k_from=0 -> n1_results/hold_bias/points_shard2.jsonl
+JUDGE seed=4171012 step=103 window counter a_hold=False why=None d=0.0 sec=57.5 (1/167 62s)
+JUDGE seed=4171145 step=121 window confirm:opp a_hold=False why=None d=0.0 sec=38.1 (2/167 100s)
+JUDGE seed=4171005 step=24 window select_none:opp a_hold=True why=None d=-0.25 sec=127.0 (3/167 131s)
+JUDGE seed=4171053 step=3 main main_end:play a_hold=False why=None d=-0.125 sec=128.0 (4/167 132s)
+JUDGE seed=4171059 step=59 window select_none a_hold=False why=None d=-0.375 sec=183.3 (5/167 187s)
+JUDGE seed=4171093 step=18 window confirm a_hold=False why=None d=0.0 sec=123.5 (6/167 224s)
+JUDGE seed=4171137 step=131 window trigger a_hold=False why=None d=0.0 sec=51.5 (7/167 238s)
+JUDGE seed=4171047 step=91 window select_none a_hold=False why=None d=0.0 sec=32.6 (8/167 271s)
+JUDGE seed=4171143 step=67 window blocker a_hold=True why=None d=0.0 sec=173.6 (9/167 304s)
+JUDGE seed=4171015 step=151 window select_none:opp a_hold=False why=None d=0.125 sec=146.7 (10/167 371s)
+JUDGE seed=4171030 step=200 window confirm:opp a_hold=True why=None d=0.0 sec=0.6 (11/167 371s)
+JUDGE seed=4171041 step=9 main main_end:activate a_hold=True why=None d=-0.125 sec=127.3 (12/167 398s)
+JUDGE seed=4171050 step=158 window confirm a_hold=False why=None d=0.0 sec=68.9 (13/167 440s)
+JUDGE seed=4171098 step=106 window blocker a_hold=True why=None d=0.0 sec=156.9 (14/167 555s)
+JUDGE seed=4171082 step=121 window counter a_hold=True why=None d=-0.125 sec=261.0 (15/167 565s)
+JUDGE seed=4171096 step=100 window trigger:opp a_hold=True why=None d=0.0 sec=128.1 (16/167 568s)
+JUDGE seed=4171035 step=243 window trigger:opp a_hold=True why=None d=0.0 sec=456.9 (17/167 589s)
+JUDGE seed=4171083 step=48 window trigger a_hold=False why=None d=0.0 sec=87.7 (18/167 643s)
+JUDGE seed=4171082 step=18 main main_end:play a_hold=False why=None d=0.0 sec=75.6 (19/167 664s)
+JUDGE seed=4171110 step=79 window select_none:opp a_hold=True why=None d=-0.125 sec=137.1 (20/167 702s)
+JUDGE seed=4171043 step=52 window confirm:opp a_hold=True why=None d=0.0 sec=67.3 (21/167 731s)
+JUDGE seed=4171126 step=68 window confirm a_hold=True why=None d=0.0 sec=45.8 (22/167 748s)
+JUDGE seed=4171147 step=175 window trigger:opp a_hold=False why=None d=0.0 sec=33.4 (23/167 781s)
+JUDGE seed=4171078 step=95 window counter a_hold=True why=None d=0.0 sec=167.7 (24/167 811s)
+JUDGE seed=4171119 step=91 window blocker a_hold=False why=None d=0.625 sec=92.6 (25/167 824s)
+JUDGE seed=4171029 step=134 window select_none a_hold=False why=None d=0.0 sec=13.1 (26/167 837s)
+JUDGE seed=4171007 step=54 window select_none:opp a_hold=False why=None d=0.0 sec=41.7 (27/167 852s)
+JUDGE seed=4171098 step=73 main main_end:activate a_hold=True why=None d=0.125 sec=29.4 (28/167 867s)
+JUDGE seed=4171076 step=26 window trigger a_hold=False why=None d=0.0 sec=129.0 (29/167 910s)
+JUDGE seed=4171060 step=109 window confirm a_hold=False why=None d=0.0 sec=7.3 (30/167 918s)
+JUDGE seed=4171142 step=44 window select_none a_hold=True why=None d=0.25 sec=351.6 (31/167 920s)
+JUDGE seed=4171088 step=48 window confirm:opp a_hold=True why=None d=0.0 sec=61.2 (32/167 928s)
+JUDGE seed=4171041 step=108 window trigger:opp a_hold=False why=None d=0.0 sec=52.3 (33/167 972s)
+JUDGE seed=4171049 step=39 window counter a_hold=True why=None d=-0.25 sec=122.8 (34/167 975s)
+JUDGE seed=4171103 step=60 window select_none:opp a_hold=False why=None d=0.0 sec=31.0 (35/167 1003s)
+JUDGE seed=4171077 step=97 window blocker a_hold=False why=None d=-0.375 sec=90.6 (36/167 1008s)
+JUDGE seed=4171005 step=176 main main_end:play a_hold=False why=None d=0.0 sec=7.2 (37/167 1010s)
+JUDGE seed=4171148 step=45 window select_none a_hold=False why=None d=-0.375 sec=60.3 (38/167 1035s)
