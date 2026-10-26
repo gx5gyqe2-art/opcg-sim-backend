@@ -1,7 +1,7 @@
 {
  "job": "n56-w04",
  "role": "gen",
- "status": "partial",
+ "status": "done",
  "inputs": {
   "net": "opcg_sim/data/learned/nrel_r26.npz",
   "games": 480,
