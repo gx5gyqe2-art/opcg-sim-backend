@@ -219,6 +219,49 @@ def test_cpu_step_does_not_override_reveal(client, monkeypatch):
         assert "reveal" not in opts and "omniscient" not in opts and "opp_blind" not in opts, opts
 
 
+def test_cpu_step_returns_thinking_while_the_cpu_reads(client, monkeypatch):
+    """思考が長いとき `cpu/step` は待たずに「思考中・経過秒」を返し、その間も状態の取得に答える。
+    呼び直すと同じ思考の続きを待ち、終われば手を適用して返す（1 コアで思考が十数秒になる対策・2026-10-26）。"""
+    import threading
+    from opcg_sim.api import engine_rs
+    release = threading.Event()
+    calls = []
+    orig = engine_rs.RsGame.decide
+
+    def slow(self, player_id, *a, **kw):
+        calls.append(player_id)
+        assert release.wait(30), "テストが思考を解放しなかった"
+        return orig(self, player_id, *a, **kw)
+
+    monkeypatch.setattr(engine_rs.RsGame, "decide", slow)
+    gid = _create_game(client, vs_cpu=True, cpu_deck="db:cpu", cpu_difficulty="hard").json()["game_id"]
+    cpu_pid = A.CPU_GAMES[gid]["cpu_player_id"]
+    # CPU に要求が来るまで人間側を進める（マリガン→人間のターンを畳む）。
+    for _ in range(20):
+        pending = client.get("/api/game/state", params={"game_id": gid}).json().get("pending_request")
+        assert pending, "要求が無い"
+        if pending["player_id"] == cpu_pid:
+            break
+        act = "KEEP_HAND" if pending["action"] == "MULLIGAN" else "TURN_END"
+        client.post("/api/game/action", json={"game_id": gid, "player_id": pending["player_id"], "action": act})
+    else:
+        pytest.fail("CPU に要求が来なかった")
+
+    r1 = client.post("/api/game/cpu/step", json={"game_id": gid, "wait_sec": 0}).json()
+    assert r1["success"] is True and r1["cpu_acted"] is False and r1["waiting_for"] == "cpu"
+    assert r1["cpu_thinking"] is not None and r1["cpu_thinking"]["elapsed_sec"] >= 0
+    # 思考中も状態の取得は答える（本体は探索に貸していない）。
+    s = client.get("/api/game/state", params={"game_id": gid}).json()
+    assert s["success"] is True and s["pending_request"]["player_id"] == cpu_pid
+    r2 = client.post("/api/game/cpu/step", json={"game_id": gid, "wait_sec": 0}).json()
+    assert r2["cpu_acted"] is False and r2["cpu_thinking"] is not None
+    assert len(calls) == 1, "同じ局面で思考を重ねて起こした"
+    release.set()
+    r3 = client.post("/api/game/cpu/step", json={"game_id": gid, "wait_sec": 30}).json()
+    assert r3["success"] is True and r3["cpu_acted"] is True and r3["cpu_thinking"] is None
+    assert len(calls) == 1
+
+
 def test_cpu_step_on_non_cpu_game(client):
     gid = _create_game(client).json()["game_id"]  # 通常対局（CPU ではない）
     r = client.post("/api/game/cpu/step", json={"game_id": gid})

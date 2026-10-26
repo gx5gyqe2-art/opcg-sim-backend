@@ -508,7 +508,11 @@ class RsGame:
             opts["confirm_trigger_legacy"] = True
         # 迷う局面だけの読み直し（§7.4）。None＝off＝`decide` を 1 回呼ぶだけ（今までと同じ）。
         from opcg_sim.loop import engine as _LE
-        out = _LE.decide_with_rethink(lambda o: self._game.decide(player_id, o), json.dumps(opts),
+        # 読むのは盤面の複製（`Game.fork`＝状態をそのまま写す・探索は状態しか読まない＝手は 1 bit も
+        # 変わらない）。対戦 API は思考を裏のスレッドで回すので（`services/cpu_think.py`）、その間も
+        # 本体へ状況の問い合わせ（`pending_json` 等）が来る＝本体を探索に貸したままにしない。
+        g = self._game.fork()
+        out = _LE.decide_with_rethink(lambda o: g.decide(player_id, o), json.dumps(opts),
                                       rethink_ratio,
                                       _LE.PLAY_RETHINK_WORLDS if rethink_worlds is None
                                       else int(rethink_worlds))

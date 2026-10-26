@@ -27,6 +27,7 @@ from .state import GAMES, SANDBOX_GAMES, CPU_GAMES, RULE_ROOMS
 from .presenters import build_game_result_hybrid, build_rule_message, _rule_room_meta
 from .ws import ws_manager, game_ws_manager, broadcast_rule_state
 from .services import decks as deck_svc
+from .services import cpu_think
 from .services.replay import (_replay_enabled, _replay_record_action, _capture_final_winner,
                               _replay_record_frame)
 from .services.games import _resolve_first_player_seat
@@ -177,12 +178,22 @@ async def game_battle(req: BattleActionRequest):
 
 # ---- CPU 対戦（ポーリング駆動）／リプレイ ----------------------------------
 
+# `cpu/step` が思考の終わりを待つ秒数の既定（リクエストの `wait_sec` で上書きできる）。
+# 1 手の大半（中央 0.14〜0.35 秒）はこの中で終わり、今までどおり 1 回の呼び出しで手が返る。
+CPU_STEP_WAIT_SEC = 0.8
+
+
 @router.options("/api/game/cpu/step")
 async def options_game_cpu_step(): return {"status": "ok"}
 
 @router.post("/api/game/cpu/step")
 async def game_cpu_step(req: Dict[str, Any] = Body(...)):
-    """CPU 対戦で CPU(p2) の「次の 1 手」を適用して返す（ポーリング駆動）。"""
+    """CPU 対戦で CPU(p2) の「次の 1 手」を適用して返す（ポーリング駆動）。
+
+    思考は裏のスレッドで回す（`services/cpu_think.py`）。`wait_sec`（既定 `CPU_STEP_WAIT_SEC`）以内に
+    終われば手を適用して返し、終わらなければ `cpu_acted=False`・`waiting_for="cpu"`・
+    `cpu_thinking={"elapsed_sec": n}` を返す（同じ局面で呼び直すと同じ思考の続きを待つ）。
+    """
     game_id = req.get("game_id"); manager = GAMES.get(game_id); meta = CPU_GAMES.get(game_id)
     error_codes = CONST.get('ERROR_CODES', {})
     if not manager:
@@ -202,45 +213,60 @@ async def game_cpu_step(req: Dict[str, Any] = Body(...)):
             return "human_decision"
         return "human"
 
-    cpu_acted = False; cpu_event = None
+    cpu_acted = False; cpu_event = None; thinking = None
     try:
         manager.action_events = []
         if not manager.winner:
             pending = manager.get_pending_request()
             if pending and pending.get("player_id") == cpu_pid:
                 trace_on = _replay_enabled(meta)
-                tr = {} if trace_on else None
-                # CPU の思考は Rust（`opcg_engine.Game.decide` を生の盤面に対して呼ぶ）。
-                # 2026-09-07・第 2 段 `rs-archive-cutover` で、`hidden` から `GameManager` を
-                # 組み直して Python に読ませる暫定経路（§15.1）を撤去した。
-                # 探索は対戦 API だけの既定（`PLAY_SIMS`／`PLAY_BUDGET`・2026-10-18・`PLAY_WORLDS`・2026-10-21）。
-                # 迷う局面だけ世界 K 本で読み直す（§7.4・既定 `PLAY_RETHINK_RATIO=None`＝off）。
-                # 詰みの証明（§7.21・対戦 API は `PLAY_LETHAL_PROOF="root"`・2026-10-22）。
-                move = manager.decide(cpu_pid, trace=tr, sims=E.PLAY_SIMS, budget=E.PLAY_BUDGET,
-                                      worlds=E.PLAY_WORLDS,
-                                      rethink_ratio=E.PLAY_RETHINK_RATIO,
-                                      rethink_worlds=E.PLAY_RETHINK_WORLDS,
-                                      lethal_proof=E.PLAY_LETHAL_PROOF)
-                if move is not None:
-                    if trace_on:
-                        # action_index＝直後に記録する actions のインデックス（決定↔アクションの明示対応）。
-                        meta.setdefault("decisions", []).append(
-                            {"turn": manager.turn_count, "player": cpu_pid,
-                             "action_index": len(meta.get("actions", [])), **tr})
-                        _replay_record_action(meta, manager, "cpu", cpu_pid, {
-                            "action_type": move["action_type"], "card_uuid": move.get("card_uuid"),
-                            "payload": move.get("payload")})
-                    manager.apply_move(cpu_pid, move)
-                    _capture_final_winner(meta, manager)
-                    if trace_on:
-                        _replay_record_frame(meta, manager)
-                    cpu_acted = True
-                    cpu_event = manager.action_events[0] if manager.action_events else {"action": move["action_type"]}
+                # 思考は裏のスレッドで対局の複製を読む（`services/cpu_think.py`）。最大 `wait_sec` 秒だけ
+                # 待ち、間に合わなければ「思考中・経過 n 秒」を返す＝フロントは 1 秒ごとに呼び直す。
+                key = (manager.turn_count, pending.get("request_id"))
+
+                def _think():
+                    tr = {} if trace_on else None
+                    # CPU の思考は Rust（`opcg_engine.Game.decide` を生の盤面の複製に対して呼ぶ）。
+                    # 探索は対戦 API だけの既定（`PLAY_SIMS`／`PLAY_BUDGET`・2026-10-18・`PLAY_WORLDS`・2026-10-21）。
+                    # 迷う局面だけ世界 K 本で読み直す（§7.4・既定 `PLAY_RETHINK_RATIO=None`＝off）。
+                    # 詰みの証明（§7.21・対戦 API は `PLAY_LETHAL_PROOF="root"`・2026-10-22）。
+                    mv = manager.decide(cpu_pid, trace=tr, sims=E.PLAY_SIMS, budget=E.PLAY_BUDGET,
+                                        worlds=E.PLAY_WORLDS,
+                                        rethink_ratio=E.PLAY_RETHINK_RATIO,
+                                        rethink_worlds=E.PLAY_RETHINK_WORLDS,
+                                        lethal_proof=E.PLAY_LETHAL_PROOF)
+                    return mv, tr
+
+                th = cpu_think.start_or_get(game_id, key, _think)
+                wait_sec = float(req.get("wait_sec", CPU_STEP_WAIT_SEC))
+                if not await cpu_think.wait(th, wait_sec):
+                    thinking = {"elapsed_sec": round(th.elapsed(), 1)}
+                else:
+                    cpu_think.pop(game_id, th)
+                    move, tr = th.future.result()
+                    if move is not None:
+                        if trace_on:
+                            # action_index＝直後に記録する actions のインデックス（決定↔アクションの明示対応）。
+                            meta.setdefault("decisions", []).append(
+                                {"turn": manager.turn_count, "player": cpu_pid,
+                                 "action_index": len(meta.get("actions", [])), **tr})
+                            _replay_record_action(meta, manager, "cpu", cpu_pid, {
+                                "action_type": move["action_type"], "card_uuid": move.get("card_uuid"),
+                                "payload": move.get("payload")})
+                        manager.apply_move(cpu_pid, move)
+                        _capture_final_winner(meta, manager)
+                        if trace_on:
+                            _replay_record_frame(meta, manager)
+                        cpu_acted = True
+                        cpu_event = manager.action_events[0] if manager.action_events else {"action": move["action_type"]}
         result = build_game_result_hybrid(manager, game_id, success=True)
         result["cpu_acted"] = cpu_acted
         result["cpu_event"] = cpu_event
         result["waiting_for"] = _waiting_for()
-        await broadcast_rule_state(game_id)
+        # 思考中なら経過秒（フロントの「CPU 思考中… n 秒」）。思考中でなければ None。
+        result["cpu_thinking"] = thinking
+        if thinking is None:
+            await broadcast_rule_state(game_id)
         return result
     except Exception as e:
         return build_game_result_hybrid(manager, game_id, success=False, error_code=error_codes.get('INVALID_ACTION', 'INVALID_ACTION'), error_msg=str(e))

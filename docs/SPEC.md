@@ -217,6 +217,12 @@ status(WAITING/PLAYING/FINISHED), ready{p1,p2}, decks{p1,p2}, deck_preview{p1,p2
   コアパス）経由で適用し、`{cpu_acted, cpu_event, waiting_for}` を返す
   （`waiting_for`: `cpu`=継続 / `human` / `human_decision` / `game_over`）。フロントは
   `waiting_for!='cpu'` までポーリングして 1 手ずつ演出する。毎回再計画するステートレス設計で desync に強い。
+  **思考は裏のスレッド**（2026-10-26・`api/services/cpu_think.py`・1 コアの機械で 1 手が十数秒になりうるため）:
+  `cpu/step` は思考を起こして最大 `wait_sec` 秒（既定 `routers.CPU_STEP_WAIT_SEC`＝0.8）待ち、間に合えば
+  今までどおり手を適用して返す。間に合わなければ `cpu_acted=false`・`waiting_for='cpu'`・
+  `cpu_thinking={elapsed_sec}` を返し（思考中でなければ `cpu_thinking=null`）、フロントは 1 秒ごとに呼び直して
+  「CPU 思考中… n 秒」を出す。思考は `(ターン, request_id)` に紐づき、同じ局面の呼び直しは同じ思考を待つ
+  （重ねて起こさない）。探索は盤面の複製（Rust `Game.fork`）を読むので、思考中も状態の取得に答え、手は変わらない。
 
 ### 2.5.2 AI 設計（`cpu_ai.py`）
 
