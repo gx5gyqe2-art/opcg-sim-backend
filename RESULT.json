@@ -15,15 +15,16 @@
   "dirs": [
    "n_records/n56_w28_p0",
    "n_records/n56_w28_p1",
-   "n_records/n56_w28_p2"
+   "n_records/n56_w28_p2",
+   "n_records/n56_w28_p3"
   ]
  },
  "metrics": {
-  "parts_done": 3,
-  "games": 360,
-  "rows": 59872,
+  "parts_done": 4,
+  "games": 480,
+  "rows": 80007,
   "dropped": 0,
-  "sec_play_mean": 34.14
+  "sec_play_mean": 33.9
  },
  "notes": "",
  "worker": {
