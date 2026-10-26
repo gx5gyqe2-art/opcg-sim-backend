@@ -1,120 +1,60 @@
 {
- "job": "rs-world-parallel",
- "status": "done",
- "branch": "claude/rs-world-parallel",
- "spec": "docs/search_efficiency_plan.md §7.55（本線 claude/cpu-spec-improvements-yw91jd @ daf3abf・台帳 2+429）",
- "report": "docs/reports/2026-10-25_world_parallel.md",
- "code": [
-  "rust/opcg_engine/src/search/decide.rs（DecideOptions::world_threads・run_worlds の上限つきの回し方・単体テスト world_threads_do_not_change_the_output）",
-  "rust/opcg_engine/src/search/mod.rs（opts JSON の world_threads）",
-  "tests/test_rs_world_threads.py（cpu_infra・出荷のネットで decide の出力 JSON が上限に依らず一致）",
-  "tests/scripts/rs_decide_latency.py --world-threads"
- ],
- "docs": [
-  "docs/SPEC.md §2.5.13",
-  "docs/TEST_SPEC.md（2 行）"
- ],
- "make_test": "green（cargo test 638 passed＋pytest 881 passed, 13 skipped）",
- "audit_cross": {
-  "pairs": 120,
-  "games": 240,
-  "void": 0
- },
- "golden": "不変（既定 0 は今までと同じ道・作り直していない）",
- "bit_identical": "世界 2・4 本 × world_threads 0/1/2/3/4/8（Rust）・0/1/2/4（pytest 決定点 40）で出力一致。latency 20 局も上限に依らず手数が同じ（世界 2 本 3106・4 本 3051）",
- "latency_4core": [
-  {
-   "worlds": 1,
-   "world_threads": 1,
-   "moves": 2825,
-   "mean": 0.195,
-   "p50": 0.142,
-   "p90": 0.462,
-   "p99": 1.179,
-   "max": 3.08,
-   "wall_sec": 661.4
-  },
-  {
-   "worlds": 2,
-   "world_threads": 1,
-   "moves": 3106,
-   "mean": 0.306,
-   "p50": 0.184,
-   "p90": 0.784,
-   "p99": 1.707,
-   "max": 3.48,
-   "wall_sec": 1076.5
-  },
-  {
-   "worlds": 2,
-   "world_threads": 2,
-   "moves": 3106,
-   "mean": 0.203,
-   "p50": 0.136,
-   "p90": 0.529,
-   "p99": 1.146,
-   "max": 2.54,
-   "wall_sec": 756.5
-  },
-  {
-   "worlds": 2,
-   "world_threads": 4,
-   "moves": 3106,
-   "mean": 0.201,
-   "p50": 0.135,
-   "p90": 0.519,
-   "p99": 1.176,
-   "max": 2.68,
-   "wall_sec": 748.6
-  },
-  {
-   "worlds": 4,
-   "world_threads": 1,
-   "moves": 3051,
-   "mean": 0.607,
-   "p50": 0.353,
-   "p90": 1.482,
-   "p99": 3.754,
-   "max": 17.08,
-   "wall_sec": 1976.5
-  },
-  {
-   "worlds": 4,
-   "world_threads": 2,
-   "moves": 3051,
-   "mean": 0.382,
-   "p50": 0.287,
-   "p90": 0.916,
-   "p99": 2.264,
-   "max": 10.22,
-   "wall_sec": 1293.3
-  },
-  {
-   "worlds": 4,
-   "world_threads": 4,
-   "moves": 3051,
-   "mean": 0.254,
-   "p50": 0.186,
-   "p90": 0.616,
-   "p99": 1.444,
-   "max": 6.12,
-   "wall_sec": 897.7
+ "job": "train-r26",
+ "role": "train",
+ "status": "partial",
+ "inputs": {
+  "warm_start": "opcg_sim/data/learned/nrel_r24.npz",
+  "nets": {
+   "r26": {
+    "pi_dirs": 128,
+    "z_dirs": 128,
+    "rows_v": 5297232,
+    "points_p": 804661,
+    "enc_version": 15,
+    "best_ep": 0,
+    "ablate": [
+     "rel"
+    ]
+   }
   }
- ],
- "headline": {
-  "worlds2_now_sec": 0.203,
-  "worlds4_threads4_sec": 0.254,
-  "ratio_vs_now": 1.25,
-  "worlds2_threads1_sec": 0.306,
-  "worlds4_speedup_t1_to_t4": 2.39
  },
- "serve_proposal": "既定 0（世界の本数ぶんのスレッド）のまま。同時に G 局を C コアで打つなら world_threads = max(1, C÷G)。出荷の既定は変えていない",
- "notes": [
-  "仕様の前提と違い、世界の木は §20.7.1（rs-pimc-worlds）からすでに世界ごとに別スレッドで同時に回っていた（GIL も放す）。「世界 2 本は 1 手 2 倍」は 1 コア固定の測定の数字で、4 コアの壁時計では世界 2 本は世界 1 本の +4%。",
-  "仕様は「既定 1＝今と同じ」と書くが、今と同じを優先して既定を 0（世界ごとに 1 スレッド）にした。1 は 1 本ずつ順に回す値。",
-  "世界 4 本の時間の費用は 4 コアで今（世界 2 本）の +25%（「1 手 2 倍」ではない）。最悪の 1 手は 2.5→6.1 秒。",
-  "窓の根畳みの 16 世界（手の約 44%）は 1 スレッドで順に回り、枝予算を世界の順に使い回す。次に縮めるならここ（本 WP の範囲外）。",
-  "arena_shard --worlds K は 1 プロセスで K スレッドを使う（§7.57 の世界 4 本のアリーナ）。world_threads を arena の旗には足していない（仕様どおり生成・アリーナは今のまま）。opts の鍵としては --extra 等で渡せる。",
-  "make test の 1 回目はコンテナに fastapi 等が無く 13 件 ImportError（コードと無関係）。opcg_sim/requirements.txt を入れて回し直し green。"
- ]
+ "outputs": {
+  "files": [
+   "n1_results/nrel_r26.ep0.npz",
+   "n1_results/nrel_r26.ep1.npz",
+   "n1_results/nrel_r26.npz"
+  ]
+ },
+ "metrics": {
+  "r26": {
+   "best_ep": 0,
+   "epochs": [
+    {
+     "ep": 0,
+     "val_vmse": 0.4496743679046631,
+     "val_vsign": 0.8388,
+     "val_pi_top1": 0.4845,
+     "train_sec": 678.87
+    },
+    {
+     "ep": 1,
+     "val_vmse": 0.45765116810798645,
+     "val_vsign": 0.8362,
+     "val_pi_top1": 0.4905,
+     "train_sec": 571.34
+    }
+   ],
+   "train_sec": 1374
+  },
+  "band": {},
+  "rss_gb": 12.64,
+  "band_sec": null
+ },
+ "notes": "",
+ "worker": {
+  "spec": "origin/claude/cpu-spec-improvements-yw91jd:opcg_sim/loop/jobs/train_r26.json",
+  "k": 1,
+  "branch": "claude/train-r26",
+  "code_commit": "242c6cce5467cfc8eff29342d0235d88ea2dd111"
+ }
 }
